@@ -6,7 +6,7 @@ pub fn methodSupportsImage(method: BootMethod, image: ImageKind) bool {
     return switch (method) {
         .automatic => true,
         .direct_iso => image == .iso,
-        .wimboot => image == .iso or image == .wim,
+        .wimboot => image == .wim,
         .vhdboot => image == .vhd or image == .vhdx,
         .direct_efi => image == .efi,
         .chainload => image == .iso or image == .img or image == .efi,
@@ -26,9 +26,9 @@ pub fn canUse(system: *const SystemEntry, image: ImageKind, method: BootMethod) 
     return systemAllowsMethod(system, method) and methodSupportsImage(method, image);
 }
 
-test "ISO can use WIMBoot but WIM cannot use direct ISO" {
+test "WIMBoot requires a standalone WIM while direct ISO requires ISO" {
     const std = @import("std");
-    try std.testing.expect(methodSupportsImage(.wimboot, .iso));
+    try std.testing.expect(!methodSupportsImage(.wimboot, .iso));
     try std.testing.expect(methodSupportsImage(.wimboot, .wim));
     try std.testing.expect(!methodSupportsImage(.direct_iso, .wim));
 }

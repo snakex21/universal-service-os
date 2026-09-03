@@ -41,7 +41,7 @@ func main() {
 	serial := flag.String("serial", "USOS-GPT-TEST", "required target serial")
 	size := flag.Uint64("size", 40*layout.GiB, "required target size in bytes")
 	out := flag.String("out", "", "result file path")
-	installerPath := flag.String("installer", "", "final USOS Installer.exe to copy into DATA\\TOOLS; defaults to sibling of this test executable")
+	installerPath := flag.String("installer", "", "final USOS Installer.exe to copy into DATA\\Programs\\USOS; defaults to sibling of this test executable")
 	flag.Parse()
 	if strings.TrimSpace(*out) == "" {
 		fmt.Fprintln(os.Stderr, "missing -out")

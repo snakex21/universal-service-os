@@ -45,7 +45,7 @@ func (b Backend) CopyInstallPayload(media install.MediaLayout, progress func(don
 	if err != nil {
 		return err
 	}
-	total := espTotal + uint64(len(readme)) + installerSize
+	total := espTotal + dataGuidesTotalBytes() + uint64(len(readme)) + installerSize
 	var globalDone uint64
 	if progress != nil {
 		progress(0, total)
@@ -62,13 +62,35 @@ func (b Backend) CopyInstallPayload(media install.MediaLayout, progress func(don
 		return fmt.Errorf("ESP payload progress mismatch: got %d want %d", globalDone, espTotal)
 	}
 
-	for _, directory := range []string{"ISO", "TOOLS", "DRIVERS"} {
+	for _, directory := range requiredDataDirectories {
 		if err := os.MkdirAll(filepath.Join(resolved.DATA.VolumePath, directory), 0o755); err != nil {
 			return fmt.Errorf("create DATA directory %s: %w", directory, err)
 		}
 	}
+	for _, guide := range dataGuides {
+		guidePath := filepath.Join(resolved.DATA.VolumePath, guide.relativePath)
+		if err := writeFileSync(guidePath, guide.contents); err != nil {
+			return fmt.Errorf("write DATA guide %s: %w", guide.relativePath, err)
+		}
+		if err := verifyFileMatchesBytes(guidePath, guide.contents); err != nil {
+			return fmt.Errorf("verify DATA guide %s: %w", guide.relativePath, err)
+		}
+		globalDone += uint64(len(guide.contents))
+		if progress != nil {
+			progress(globalDone, total)
+		}
+	}
+	if err := syncDataCatalog(resolved); err != nil {
+		return fmt.Errorf("synchronize DATA catalog metadata to ESP: %w", err)
+	}
+	if err := ensureWimBootTemplate(resolved.DATA.VolumePath); err != nil {
+		return fmt.Errorf("prepare WIMBoot template: %w", err)
+	}
+	if err := ensureVHDBootTemplates(resolved.DATA.VolumePath); err != nil {
+		return fmt.Errorf("prepare VHDBoot templates: %w", err)
+	}
 
-	readmePath := filepath.Join(resolved.DATA.VolumePath, "TOOLS", "README.md")
+	readmePath := dataProgramFile(resolved.DATA.VolumePath, "README.md")
 	if err := writeFileSync(readmePath, readme); err != nil {
 		return fmt.Errorf("write DATA README: %w", err)
 	}
@@ -80,7 +102,7 @@ func (b Backend) CopyInstallPayload(media install.MediaLayout, progress func(don
 		progress(globalDone, total)
 	}
 
-	destination := filepath.Join(resolved.DATA.VolumePath, "TOOLS", "USOS Installer.exe")
+	destination := dataProgramFile(resolved.DATA.VolumePath, "USOS Installer.exe")
 	copied, sourceHash, err := copyFileSyncHash(installerPath, destination, func(written uint64) {
 		if progress != nil {
 			progress(globalDone+written, total)
@@ -127,7 +149,7 @@ func prepareESPPayload(media install.MediaLayout) (payload.Bundle, []dynamicPayl
 	}
 	loaderConf := []byte("default usos-micro-linux.conf\r\ntimeout 0\r\neditor no\r\n")
 	loaderEntry := []byte(fmt.Sprintf(
-		"title USOS micro-Linux preparation\r\nlinux /EFI/USOS/micro-linux/vmlinuz-virt\r\ninitrd /EFI/USOS/micro-linux/initramfs-usos\r\noptions console=tty0 console=ttyS0,115200 rdinit=/usos-init usos.esp_partuuid=%s\r\n",
+		"title USOS micro-Linux preparation\r\nlinux /EFI/USOS/micro-linux/vmlinuz-virt\r\ninitrd /EFI/USOS/micro-linux/initramfs-usos\r\noptions console=tty0 console=ttyS0,115200 quiet loglevel=3 vt.global_cursor_default=0 rdinit=/usos-init usos.esp_partuuid=%s\r\n",
 		media.ESP.PartUUID,
 	))
 	installState := []byte("phase=pending\r\n")

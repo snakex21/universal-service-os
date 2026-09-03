@@ -11,6 +11,8 @@ WORK_FS_DRIVER=${WORK_FS_DRIVER:-ntfs3}
 PREFIX='/dev/disk/by-partuuid/'
 WORK_PATH="${PREFIX}${WORK_PARTUUID}"
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+[ -r "$SCRIPT_DIR/micro_linux_ui.sh" ] || { printf '[PREPARE_WORK] STOP: micro_linux_ui.sh is missing\n' >&2; exit 1; }
+. "$SCRIPT_DIR/micro_linux_ui.sh"
 
 fail() {
     printf '[PREPARE_WORK] STOP: %s\n' "$1" >&2
@@ -23,6 +25,8 @@ command -v mount >/dev/null 2>&1 || fail 'mount is required'
 command -v umount >/dev/null 2>&1 || fail 'umount is required'
 [ -f "$SCRIPT_DIR/device_guard.sh" ] || fail 'device_guard.sh is missing'
 [ -f "$SCRIPT_DIR/extract.sh" ] || fail 'extract.sh is missing'
+[ -f "$SCRIPT_DIR/prepare_wimboot.sh" ] || fail 'prepare_wimboot.sh is missing'
+[ -f "$SCRIPT_DIR/prepare_vhdboot.sh" ] || fail 'prepare_vhdboot.sh is missing'
 [ -e "$WORK_PATH" ] || fail "WORK PARTUUID path is missing: $WORK_PATH"
 [ -f "$STATE_FILE" ] || fail "state file is missing: $STATE_FILE"
 REQUEST_PHASE=$(awk -F= '/^[[:space:]]*phase[[:space:]]*=/ { value=$0; sub(/^[^=]*=/, "", value); gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); print value; found=1; exit } END { if (!found) exit 1 }' "$STATE_FILE") || fail 'state file has no phase'
@@ -33,11 +37,17 @@ case "$WORK_MOUNT" in
 esac
 
 printf '[PREPARE_WORK] phase=prepare-requested\n'
+usos_ui_stage 8 10 'Checking target safety' 'Verifying disk identity and WORK ownership.'
 sh "$SCRIPT_DIR/device_guard.sh" pre-format
 printf '[PREPARE_WORK] device_guard pre-format PASS\n'
 
 # This is the first destructive operation. It is unreachable unless the guard
 # above accepted every topology/identity check or exact first-run confirmation.
+case "${SELECTED_METHOD:-iso}" in
+    wimboot) usos_ui_stage 9 10 'Formatting WORK' 'Creating a fresh NTFS workspace for the WIM boot environment.' ;;
+    vhdboot) usos_ui_stage 9 10 'Formatting WORK' 'Creating a small NTFS workspace for native VHD/VHDX boot files.' ;;
+    *) usos_ui_stage 9 10 'Formatting WORK' 'Creating a fresh NTFS workspace for prepared boot media.' ;;
+esac
 mkfs.ntfs -f -F -L USOS_WORK "$WORK_PATH" || fail 'mkfs.ntfs failed'
 printf '[PREPARE_WORK] mkfs.ntfs PASS\n'
 
@@ -46,6 +56,11 @@ sh "$SCRIPT_DIR/device_guard.sh" restore-marker
 printf '[PREPARE_WORK] WORK identity restore PASS\n'
 
 mkdir -p "$WORK_MOUNT"
+case "${SELECTED_METHOD:-iso}" in
+    wimboot) usos_ui_stage 10 10 'Opening WORK' 'The WIM boot environment will be assembled next.' ;;
+    vhdboot) usos_ui_stage 10 10 'Opening WORK' 'The native VHD boot manager and BCD will be assembled next.' ;;
+    *) usos_ui_stage 10 10 'Opening WORK' 'The boot media copy will start next.' ;;
+esac
 mount -t "$WORK_FS_DRIVER" -o rw,noatime "$WORK_PATH" "$WORK_MOUNT" || fail "failed to mount WORK with $WORK_FS_DRIVER"
 mounted=yes
 cleanup() {
@@ -56,11 +71,13 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-SOURCE_ROOT=$SOURCE_ROOT \
-WORK_ROOT=$WORK_MOUNT \
-STATE_FILE=$STATE_FILE \
-UNATTEND_FILE=$UNATTEND_FILE \
-sh "$SCRIPT_DIR/extract.sh"
+WORK_ROOT=$WORK_MOUNT
+export SOURCE_ROOT WORK_ROOT STATE_FILE UNATTEND_FILE SELECTED_METHOD WIM_FILE WIM_TEMPLATE VHD_SHARED VHD_BCD SELECTED_ISO
+case "${SELECTED_METHOD:-iso}" in
+    wimboot) sh "$SCRIPT_DIR/prepare_wimboot.sh" ;;
+    vhdboot) sh "$SCRIPT_DIR/prepare_vhdboot.sh" ;;
+    *) sh "$SCRIPT_DIR/extract.sh" ;;
+esac
 
 sync
 umount "$WORK_MOUNT" || fail 'failed to unmount prepared WORK'

@@ -36,7 +36,7 @@ func BuildConfirmation(d Disk) Confirmation {
 		if len(volume.RootEntries) > 0 {
 			root = strings.Join(volume.RootEntries, ", ")
 		} else if volume.RootScanError != "" {
-			root = "odczyt niedostepny: " + volume.RootScanError
+			root = "odczyt niedostępny: " + volume.RootScanError
 		}
 		losses = append(losses, LossItem{
 			Volume:      name,

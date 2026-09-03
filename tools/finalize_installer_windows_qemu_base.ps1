@@ -1,9 +1,9 @@
 param(
-    [string]$StagingPath = 'test-images/.staging-usos-installer-windows-base.vhd',
-    [string]$OutputPath = 'test-images/usos-installer-windows-base.vhd',
+    [string]$StagingPath = 'tools/tests/artifacts/qemu/.staging-usos-installer-windows-base.vhd',
+    [string]$OutputPath = 'tools/tests/artifacts/qemu/usos-installer-windows-base.vhd',
     [string]$QemuImgPath = 'tools/qemu/qemu-img.exe',
-    [string]$UnattendPath = 'installer/testdata/windows-qemu-base/unattend.xml',
-    [string]$BootstrapPath = 'installer/testdata/windows-qemu-base/bootstrap.cmd'
+    [string]$UnattendPath = 'tools/tests/fixtures/installer/windows-qemu-base/unattend.xml',
+    [string]$BootstrapPath = 'tools/tests/fixtures/installer/windows-qemu-base/bootstrap.cmd'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -14,11 +14,11 @@ $OutputPath = Full $OutputPath
 $QemuImgPath = Full $QemuImgPath
 $UnattendPath = Full $UnattendPath
 $BootstrapPath = Full $BootstrapPath
-$testImages = Full 'test-images'
+$testImages = Full 'tools/tests/artifacts/qemu'
 
 foreach ($path in @($StagingPath,$OutputPath)) {
     if (-not $path.StartsWith($testImages, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Refusing Windows QEMU image path outside test-images: $path"
+        throw "Refusing Windows QEMU image path outside tools/tests/artifacts/qemu: $path"
     }
 }
 foreach ($required in @($StagingPath,$QemuImgPath,$UnattendPath,$BootstrapPath)) {

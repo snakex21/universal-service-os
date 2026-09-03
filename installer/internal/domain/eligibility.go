@@ -11,7 +11,7 @@ func ApplyEligibility(d Disk) Disk {
 	d.Reason = ""
 
 	if d.InspectionError != "" {
-		d.Reason = "nie udalo sie bezpiecznie odczytac urzadzenia: " + d.InspectionError
+		d.Reason = "nie udało się bezpiecznie odczytać urządzenia: " + d.InspectionError
 		return d
 	}
 	if d.SystemDisk {
@@ -19,23 +19,23 @@ func ApplyEligibility(d Disk) Disk {
 		return d
 	}
 	if strings.TrimSpace(d.Model) == "" {
-		d.Reason = "urzadzenie nie zglasza pelnego modelu wymaganego do potwierdzenia"
+		d.Reason = "urządzenie nie zgłasza pełnego modelu wymaganego do potwierdzenia"
 		return d
 	}
 	if strings.TrimSpace(d.Serial) == "" {
-		d.Reason = "urzadzenie nie zglasza numeru seryjnego wymaganego do rewalidacji"
+		d.Reason = "urządzenie nie zgłasza numeru seryjnego wymaganego do rewalidacji"
 		return d
 	}
 	if d.SpannedVolume {
-		d.Reason = "dysk nalezy do woluminu rozlozonego na wiecej niz jednym dysku"
+		d.Reason = "dysk należy do woluminu rozłożonego na więcej niż jednym dysku"
 		return d
 	}
 	if !d.Removable {
-		d.Reason = "urzadzenie nie zglasza flagi RemovableMedia"
+		d.Reason = "urządzenie nie zgłasza flagi RemovableMedia"
 		return d
 	}
 	if d.SizeBytes < layout.MinimumDiskBytes {
-		d.Reason = "urzadzenie ma mniej niz wymagane 32 GiB"
+		d.Reason = "urządzenie ma mniej niż wymagane 32 GiB"
 		return d
 	}
 

@@ -3,6 +3,15 @@ cd /d "%~dp0"
 echo UWAGA: ten wariant kasuje tylko poprzedni stan wirtualnego testu manualnego.
 echo Nie dotyka zadnego PhysicalDrive ani fizycznego pendrive'a.
 pause
+echo.
+echo Budowanie swiezej bazy E2E z aktualnego kodu i aktualnej zawartosci media...
+call "%~dp0tools\zig\zig.exe" build prepare-e2e-base -Doptimize=ReleaseFast
+if errorlevel 1 (
+  echo.
+  echo [FAIL] Nie udalo sie zbudowac swiezej bazy E2E.
+  pause
+  exit /b 1
+)
 powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\start_manual_full_flow_qemu.ps1" -Fresh
 if errorlevel 1 (
   echo.

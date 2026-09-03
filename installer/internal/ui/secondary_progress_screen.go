@@ -8,6 +8,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
+	"github.com/snakex21/universal-service-os/installer/internal/localupdate"
 	"github.com/snakex21/universal-service-os/installer/internal/repair"
 	"github.com/snakex21/universal-service-os/installer/internal/uninstall"
 )
@@ -63,6 +64,49 @@ func newSecondaryProgressScreen(title, warning string, defs []secondaryStage, ev
 	return s
 }
 
+func NewLocalUpdateProgressScreen(events <-chan localupdate.Event, onFinish func(*install.VerificationReport, error)) *SecondaryProgressScreen {
+	defs := make([]secondaryStage, 0, localupdate.StageCount)
+	for id := localupdate.StageID(1); id <= localupdate.StageCount; id++ {
+		stage, ok := localupdate.StageInfo(id)
+		if ok {
+			defs = append(defs, secondaryStage{ID: int(stage.ID), Number: stage.Number, Total: localupdate.StageCount, Name: stage.Name})
+		}
+	}
+	normalized := make(chan secondaryEvent, 32)
+	go func() {
+		defer close(normalized)
+		for event := range events {
+			out := secondaryEvent{stageID: int(event.StageID), message: event.Message, progressKnown: event.ProgressKnown, progress: event.Progress, err: event.Err, verification: event.Verification}
+			switch event.Kind {
+			case localupdate.EventStage:
+				out.kind = secondaryEventStage
+			case localupdate.EventLog:
+				out.kind = secondaryEventLog
+			case localupdate.EventFinished:
+				out.kind = secondaryEventFinished
+			}
+			switch event.State {
+			case localupdate.StateActive:
+				out.state = secondaryActive
+			case localupdate.StateSucceeded:
+				out.state = secondarySucceeded
+			case localupdate.StateFailed:
+				out.state = secondaryFailed
+			default:
+				out.state = secondaryPending
+			}
+			normalized <- out
+		}
+	}()
+	return newSecondaryProgressScreen(
+		"Aktualizacja lokalna Universal Service OS",
+		"Aktualizowane są pliki USOS na ESP i program na DATA. Obrazy systemów, unattended i pozostałe dane użytkownika nie są usuwane.",
+		defs,
+		normalized,
+		onFinish,
+	)
+}
+
 func NewRepairProgressScreen(events <-chan repair.Event, onFinish func(*install.VerificationReport, error)) *SecondaryProgressScreen {
 	defs := make([]secondaryStage, 0, repair.StageCount)
 	for id := repair.StageID(1); id <= repair.StageCount; id++ {
@@ -99,7 +143,7 @@ func NewRepairProgressScreen(events <-chan repair.Event, onFinish func(*install.
 	}()
 	return newSecondaryProgressScreen(
 		"Naprawa Universal Service OS",
-		"ESP jest aktualizowane. DATA i WORK pozostaja bez zmian. Nie odlaczaj nosnika podczas zapisu.",
+		"ESP jest aktualizowane. DATA i WORK pozostają bez zmian. Nie odłączaj nośnika podczas zapisu.",
 		defs,
 		normalized,
 		onFinish,
@@ -146,7 +190,7 @@ func NewUninstallProgressScreen(events <-chan uninstall.Event, onFinish func(*in
 	}()
 	return newSecondaryProgressScreen(
 		"Deinstalacja Universal Service OS",
-		"Operacja niszczaca zostala rozpoczeta. Anulowanie nie jest juz dostepne. Nie odlaczaj nosnika ani nie wylaczaj komputera.",
+		"Operacja niszcząca została rozpoczęta. Anulowanie nie jest już dostępne. Nie odłączaj nośnika ani nie wyłączaj komputera.",
 		defs,
 		normalized,
 		onFinish,
@@ -231,7 +275,7 @@ func (s *SecondaryProgressScreen) apply(event secondaryEvent) {
 			row.activity.Stop()
 			row.activity.Hide()
 			row.bar.Hide()
-			message := "Blad"
+			message := "Błąd"
 			if event.err != nil {
 				message += ": " + event.err.Error()
 			}

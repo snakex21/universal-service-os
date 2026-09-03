@@ -48,14 +48,6 @@ fn addReleaseMediaLayout(b: *std.Build) void {
         .install_subdir = "usb",
     });
     b.getInstallStep().dependOn(&install_media.step);
-
-    // Preserve the user-facing filename in the release media. The UEFI menu
-    // enumerates XML files, so it must not silently rename this to unattend.xml.
-    const install_unattended = b.addInstallFile(
-        b.path("win10-11 best-ustawienia.xml"),
-        "usb/Systems/Windows/Windows 11/Unattended/win10-11 best-ustawienia.xml",
-    );
-    b.getInstallStep().dependOn(&install_unattended.step);
 }
 
 fn addHostTests(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
@@ -183,7 +175,7 @@ fn addRunNtfsHandoffQemu(b: *std.Build, overlay_step: *std.Build.Step) void {
         "-QemuPath",
         "tools/qemu/qemu-system-x86_64.exe",
         "-ImagePath",
-        "test-images/usos-handoff.qcow2",
+        "tools/tests/artifacts/qemu/usos-handoff.qcow2",
         "-FirmwareCode",
         "tools/qemu/share/edk2-x86_64-code.fd",
         "-FirmwareVars",
@@ -207,11 +199,11 @@ fn addPrepareNtfsHandoffImage(b: *std.Build, ntfs_driver_step: *std.Build.Step, 
         "-File",
         "tools/prepare_ntfs_handoff_image.ps1",
         "-IsoPath",
-        "Win11_25H2_Polish_x64_v2.iso",
+        "media/Systems/Windows/Windows 11/Images/Win11_25H2_Polish_x64_v2.iso",
         "-VhdPath",
-        "test-images/.staging-usos-handoff.vhd",
+        "tools/tests/artifacts/qemu/.staging-usos-handoff.vhd",
         "-BaseQcow2Path",
-        "test-images/usos-handoff-base.qcow2",
+        "tools/tests/artifacts/qemu/usos-handoff-base.qcow2",
         "-QemuImgPath",
         "tools/qemu/qemu-img.exe",
         "-BootEfiPath",
@@ -237,9 +229,9 @@ fn addPrepareNtfsHandoffOverlay(b: *std.Build, base_step: *std.Build.Step) *std.
         "-QemuImgPath",
         "tools/qemu/qemu-img.exe",
         "-BasePath",
-        "test-images/usos-handoff-base.qcow2",
+        "tools/tests/artifacts/qemu/usos-handoff-base.qcow2",
         "-OverlayPath",
-        "test-images/usos-handoff.qcow2",
+        "tools/tests/artifacts/qemu/usos-handoff.qcow2",
     });
     create.step.dependOn(base_step);
     const step = b.step("prepare-ntfs-handoff-overlay", "Create a fresh differential qcow2 overlay for the handoff test");
@@ -272,11 +264,11 @@ fn addPrepareE2eBase(b: *std.Build, ntfs_driver_step: *std.Build.Step, manual_im
         "-File",
         "tools/prepare_e2e_base.ps1",
         "-IsoPath",
-        "Win11_25H2_Polish_x64_v2.iso",
+        "media/Systems/Windows/Windows 11/Images/Win11_25H2_Polish_x64_v2.iso",
         "-VhdPath",
-        "test-images/.staging-usos-e2e.vhd",
+        "tools/tests/artifacts/qemu/.staging-usos-e2e.vhd",
         "-BaseQcow2Path",
-        "test-images/usos-e2e-base.qcow2",
+        "tools/tests/artifacts/qemu/usos-e2e-base.qcow2",
         "-QemuImgPath",
         "tools/qemu/qemu-img.exe",
         "-BootEfiPath",
@@ -292,7 +284,7 @@ fn addPrepareE2eBase(b: *std.Build, ntfs_driver_step: *std.Build.Step, manual_im
         "-MicroLinuxLoaderPath",
         "zig-out/micro-linux/systemd-bootx64.efi",
         "-UnattendPath",
-        "win10-11 best-ustawienia.xml",
+        "media/Systems/Windows/Windows 11/Unattended/win10-11 best-ustawienia.xml",
     });
     prepare.step.dependOn(ntfs_driver_step);
     prepare.step.dependOn(manual_image_step);
@@ -313,9 +305,9 @@ fn addPrepareE2eOverlay(b: *std.Build, base_step: *std.Build.Step) *std.Build.St
         "-QemuImgPath",
         "tools/qemu/qemu-img.exe",
         "-BasePath",
-        "test-images/usos-e2e-base.qcow2",
+        "tools/tests/artifacts/qemu/usos-e2e-base.qcow2",
         "-OverlayPath",
-        "test-images/usos-e2e.qcow2",
+        "tools/tests/artifacts/qemu/usos-e2e.qcow2",
     });
     create.step.dependOn(base_step);
     const step = b.step("prepare-e2e-overlay", "Create a fresh differential qcow2 overlay for the full installation-flow test");
@@ -366,21 +358,15 @@ fn addNtfsHandoffTestApp(b: *std.Build, optimize: std.builtin.OptimizeMode) *std
 
 fn addQemuX86ManualImage(b: *std.Build, app: *std.Build.Step.Compile) *std.Build.Step {
     const install_boot = b.addInstallFile(app.getEmittedBin(), "manual-usb/EFI/BOOT/BOOTX64.EFI");
-    const install_layout = b.addInstallDirectory(.{
-        .source_dir = b.path("media"),
+    const install_ui = b.addInstallDirectory(.{
+        .source_dir = b.path("media/UI"),
         .install_dir = .prefix,
-        .install_subdir = "manual-usb",
-    });
-    const install_fixture = b.addInstallDirectory(.{
-        .source_dir = b.path("testdata/media"),
-        .install_dir = .prefix,
-        .install_subdir = "manual-usb",
+        .install_subdir = "manual-usb/UI",
     });
 
-    const step = b.step("qemu-x86_64-manual-image", "Build the interactive x86_64 QEMU preview image");
+    const step = b.step("qemu-x86_64-manual-image", "Build the x86_64 UEFI app and UI used by the full QEMU flow");
     step.dependOn(&install_boot.step);
-    step.dependOn(&install_layout.step);
-    step.dependOn(&install_fixture.step);
+    step.dependOn(&install_ui.step);
     return step;
 }
 
@@ -409,7 +395,7 @@ fn addQemuX86TestImage(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
     });
     const install_boot = b.addInstallFile(app.getEmittedBin(), "qemu-usb/EFI/BOOT/BOOTX64.EFI");
     const install_media = b.addInstallDirectory(.{
-        .source_dir = b.path("testdata/media"),
+        .source_dir = b.path("tools/tests/fixtures/media"),
         .install_dir = .prefix,
         .install_subdir = "qemu-usb",
     });
@@ -438,7 +424,7 @@ fn addQemuAarch64TestImage(b: *std.Build, optimize: std.builtin.OptimizeMode) vo
     });
     const install_boot = b.addInstallFile(app.getEmittedBin(), "qemu-arm64-usb/EFI/BOOT/BOOTAA64.EFI");
     const install_media = b.addInstallDirectory(.{
-        .source_dir = b.path("testdata/media"),
+        .source_dir = b.path("tools/tests/fixtures/media"),
         .install_dir = .prefix,
         .install_subdir = "qemu-arm64-usb",
     });

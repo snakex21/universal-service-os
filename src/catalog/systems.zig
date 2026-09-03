@@ -6,14 +6,12 @@ const windows_legacy = @import("windows_legacy.zig");
 const linux_systems = @import("linux_systems.zig");
 const windows_betas = @import("windows_betas.zig");
 const dos_systems = @import("dos_systems.zig");
-const utility_entries = @import("utility_entries.zig");
 
 pub const all = windows_modern.entries ++
     windows_legacy.entries ++
     linux_systems.entries ++
     windows_betas.entries ++
-    dos_systems.entries ++
-    utility_entries.entries;
+    dos_systems.entries;
 
 pub fn findById(id: []const u8) ?*const SystemEntry {
     for (&all) |*entry| {
@@ -40,12 +38,12 @@ pub fn byCategoryIndex(category: Category, wanted: usize) ?*const SystemEntry {
     return null;
 }
 
-test "built-in catalog contains every top-level category" {
+test "built-in system catalog contains fixed operating-system profiles" {
     try std.testing.expect(findById("windows-11") != null);
     try std.testing.expect(findById("ubuntu") != null);
     try std.testing.expect(findById("windows-longhorn") != null);
     try std.testing.expect(findById("ms-dos") != null);
-    try std.testing.expect(findById("memory-tests") != null);
+    try std.testing.expectEqual(@as(usize, 0), countInCategory(.utilities));
 }
 
 test "category lookup stays isolated" {

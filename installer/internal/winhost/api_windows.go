@@ -23,6 +23,7 @@ var (
 	procGetWindowsDirectoryW              = kernel32.NewProc("GetWindowsDirectoryW")
 	procGetVolumePathNameW                = kernel32.NewProc("GetVolumePathNameW")
 	procGetVolumeNameForVolumeMountPointW = kernel32.NewProc("GetVolumeNameForVolumeMountPointW")
+	procDeleteVolumeMountPointW           = kernel32.NewProc("DeleteVolumeMountPointW")
 )
 
 const (

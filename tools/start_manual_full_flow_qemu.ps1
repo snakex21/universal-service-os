@@ -7,27 +7,27 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$testRoot = [IO.Path]::GetFullPath((Join-Path $root 'test-images'))
+$testRoot = [IO.Path]::GetFullPath((Join-Path $root 'tools/tests/artifacts/qemu'))
 function Full([string]$Path) { [IO.Path]::GetFullPath((Join-Path $root $Path)) }
 
 $qemu = Full 'tools/qemu/qemu-system-x86_64.exe'
 $qemuImg = Full 'tools/qemu/qemu-img.exe'
 $firmwareCode = Full 'tools/qemu/share/edk2-x86_64-code.fd'
 $firmwareVarsSource = Full 'tools/qemu/share/edk2-i386-vars.fd'
-$base = Full 'test-images/usos-e2e-base.qcow2'
-$overlay = Full 'test-images/usos-manual-run.qcow2'
-$windowsDisk = Full 'test-images/usos-manual-windows.qcow2'
-$runDir = Full 'test-images/usos-manual-run'
+$base = Full 'tools/tests/artifacts/qemu/usos-e2e-base.qcow2'
+$overlay = Full 'tools/tests/artifacts/qemu/usos-manual-run.qcow2'
+$windowsDisk = Full 'tools/tests/artifacts/qemu/usos-manual-windows.qcow2'
+$runDir = Full 'tools/tests/artifacts/qemu/usos-manual-run'
 $firmwareVars = Join-Path $runDir 'edk2-vars.fd'
 $serialLog = Join-Path $runDir 'serial.log'
 $qemuLog = Join-Path $runDir 'qemu.stderr.log'
 $pidFile = Join-Path $runDir 'qemu.pid'
 $monitorFile = Join-Path $runDir 'monitor.port'
-$unattend = Full 'win10-11 best-ustawienia.xml'
+$unattend = Full 'media/Systems/Windows/Windows 11/Unattended/win10-11 best-ustawienia.xml'
 
 foreach ($path in @($overlay, $windowsDisk, $runDir)) {
     if (-not $path.StartsWith($testRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Refusing manual-test path outside test-images: $path"
+        throw "Refusing manual-test path outside tools/tests/artifacts/qemu: $path"
     }
 }
 foreach ($required in @($qemu, $qemuImg, $firmwareCode, $firmwareVarsSource, $base, $unattend)) {
@@ -66,7 +66,7 @@ if ($Fresh) {
 $overlayExists = Test-Path -LiteralPath $overlay -PathType Leaf
 $windowsDiskExists = Test-Path -LiteralPath $windowsDisk -PathType Leaf
 if ($overlayExists -xor $windowsDiskExists) {
-    throw 'Incomplete manual-test state. Run START-MANUAL-TEST-CLEAN.cmd to create both images again.'
+    throw 'Incomplete manual-test state. Run RESET-USOS-TEST.cmd, then TEST-USOS.cmd.'
 }
 if (-not $overlayExists) {
     & (Full 'tools/create_qcow2_overlay.ps1') -QemuImgPath $qemuImg -BasePath $base -OverlayPath $overlay
@@ -88,13 +88,41 @@ function Get-FreeTcpPort {
     try { return ([Net.IPEndPoint]$listener.LocalEndpoint).Port }
     finally { $listener.Stop() }
 }
+function Resolve-QemuAccelerator {
+    $probeLog = Join-Path $runDir 'whpx-probe.err'
+    Remove-Item -LiteralPath $probeLog -Force -ErrorAction SilentlyContinue
+    $probeArgs = @(
+        '-machine', 'q35',
+        '-accel', 'whpx',
+        '-cpu', 'max',
+        '-m', '64M',
+        '-nodefaults',
+        '-display', 'none',
+        '-monitor', 'none',
+        '-serial', 'none',
+        '-S'
+    )
+    try {
+        $probe = Start-Process -FilePath $qemu -ArgumentList $probeArgs -PassThru -RedirectStandardError $probeLog
+        if ($probe.WaitForExit(1200)) {
+            return 'tcg,thread=multi'
+        }
+        Stop-Process -Id $probe.Id -Force -ErrorAction SilentlyContinue
+        $probe.WaitForExit()
+        return 'whpx'
+    } catch {
+        return 'tcg,thread=multi'
+    }
+}
+
 $monitorPort = Get-FreeTcpPort
+$accelerator = Resolve-QemuAccelerator
 Remove-Item -LiteralPath $qemuLog -Force -ErrorAction SilentlyContinue
 
 $args = @(
     '-name', 'USOS-manual-full-flow-test',
     '-machine', 'q35',
-    '-accel', 'tcg,thread=multi',
+    '-accel', $accelerator,
     '-cpu', 'max',
     '-m', [string]$MemoryMiB,
     '-smp', [string]$CpuCount,
@@ -122,6 +150,7 @@ $process = Start-Process -FilePath $qemu -ArgumentList $args -PassThru -Redirect
 
 Write-Host ''
 Write-Host '[PASS] Visible QEMU window started.' -ForegroundColor Green
+Write-Host "Accelerator: $accelerator"
 Write-Host "PID: $($process.Id)"
 Write-Host 'USOS disk: 24 GiB overlay (do not install Windows here)'
 Write-Host "Windows target: $WindowsDiskGiB GiB empty qcow2 (select this disk in Windows Setup)"
@@ -130,4 +159,4 @@ Write-Host "Serial log: $serialLog"
 Write-Host ''
 Write-Host 'Choose in USOS: Windows -> Windows 11 -> ISO -> setup method -> unattended.xml.' -ForegroundColor Cyan
 Write-Host "In Windows Setup choose only the empty $WindowsDiskGiB GiB disk." -ForegroundColor Yellow
-Write-Host 'Closing the QEMU window affects only qcow2 files in test-images.'
+Write-Host 'Closing the QEMU window affects only qcow2 files in tools/tests/artifacts/qemu.'

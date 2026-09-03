@@ -27,7 +27,7 @@ func NewConfirmationScreen(disk domain.Disk, onCancel, onConfirm func()) *Confir
 	}
 	s.entry = widget.NewEntry()
 	s.entry.SetPlaceHolder(s.model.ExpectedText)
-	s.confirm = widget.NewButton("ROZPOCZNIJ KASOWANIE I INSTALACJE", s.confirmDestructive)
+	s.confirm = widget.NewButton("ROZPOCZNIJ KASOWANIE I INSTALACJĘ", s.confirmDestructive)
 	s.confirm.Importance = widget.DangerImportance
 	s.confirm.Disable()
 	s.cancel = widget.NewButton("Anuluj", func() {
@@ -46,25 +46,25 @@ func NewConfirmationScreen(disk domain.Disk, onCancel, onConfirm func()) *Confir
 }
 
 func (s *ConfirmationScreen) Content() fyne.CanvasObject {
-	title := widget.NewLabelWithStyle("UWAGA - OPERACJA NISZCZACA", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	title := widget.NewLabelWithStyle("UWAGA - OPERACJA NISZCZĄCA", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	title.Importance = widget.DangerImportance
-	warning := widget.NewLabel("Wszystkie partycje i wszystkie dane na wybranym nosniku zostana bezpowrotnie usuniete. Po rozpoczeciu kroku 1/8 - czyszczenia tablicy partycji - anulowanie nie bedzie juz mozliwe. Nie odlaczaj nosnika ani nie wylaczaj komputera podczas operacji.")
+	warning := widget.NewLabel("Wszystkie partycje i wszystkie dane na wybranym nośniku zostaną bezpowrotnie usunięte. Po rozpoczęciu kroku 1/8 — czyszczenia tablicy partycji — anulowanie nie będzie już możliwe. Nie odłączaj nośnika ani nie wyłączaj komputera podczas operacji.")
 	warning.Wrapping = fyne.TextWrapWord
 	warning.Importance = widget.DangerImportance
 
 	disk := widget.NewLabel(fmt.Sprintf(
-		"Cel: %s\nPhysicalDrive%d\nPojemnosc: %s\nSerial: %s",
+		"Cel: %s\nPhysicalDrive%d\nPojemność: %s\nSerial: %s",
 		s.model.DiskModel,
 		s.model.DiskNumber,
 		s.model.DiskCapacity,
 		s.model.DiskSerial,
 	))
 
-	lossHeader := widget.NewLabelWithStyle("To zostanie usuniete:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	lossHeader := widget.NewLabelWithStyle("To zostanie usunięte:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	lossObjects := make([]fyne.CanvasObject, 0, len(s.model.Losses)+1)
 	lossObjects = append(lossObjects, lossHeader)
 	if len(s.model.Losses) == 0 {
-		lossObjects = append(lossObjects, widget.NewLabel("Brak obecnie rozpoznanych woluminow - tablica partycji i tak zostanie wyczyszczona."))
+		lossObjects = append(lossObjects, widget.NewLabel("Brak obecnie rozpoznanych woluminów — tablica partycji i tak zostanie wyczyszczona."))
 	}
 	for _, item := range s.model.Losses {
 		root := strings.TrimSpace(item.RootContent)
@@ -72,7 +72,7 @@ func (s *ConfirmationScreen) Content() fyne.CanvasObject {
 			root = "-"
 		}
 		label := widget.NewLabel(fmt.Sprintf(
-			"%s\n  system plikow: %s | pojemnosc: %s | zajete: %s\n  katalog glowny: %s",
+			"%s\n  system plików: %s | pojemność: %s | zajęte: %s\n  katalog główny: %s",
 			item.Volume,
 			item.FileSystem,
 			item.Capacity,
@@ -85,7 +85,7 @@ func (s *ConfirmationScreen) Content() fyne.CanvasObject {
 	lossScroll := container.NewVScroll(container.NewVBox(lossObjects...))
 	lossScroll.SetMinSize(fyne.NewSize(1000, 280))
 
-	prompt := widget.NewLabel("Aby potwierdzic, wpisz pelny model urzadzenia dokladnie znak w znak:")
+	prompt := widget.NewLabel("Aby potwierdzić, wpisz pełny model urządzenia dokładnie znak w znak:")
 	expected := widget.NewLabelWithStyle(s.model.ExpectedText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true, Monospace: true})
 	buttons := container.NewHBox(s.cancel, s.confirm)
 

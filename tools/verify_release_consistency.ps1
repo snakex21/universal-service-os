@@ -9,6 +9,10 @@ $releaseBoot = Join-Path $usbRoot 'EFI\BOOT\BOOTX64.EFI'
 $manualBoot = Join-Path $ProjectRoot 'zig-out\manual-usb\EFI\BOOT\BOOTX64.EFI'
 $payloadPath = Join-Path $ProjectRoot 'installer\internal\payload\assets\payload.zip'
 
+function Test-StaticEspPath([string]$Relative) {
+    return $Relative -match '^(EFI|UI)/'
+}
+
 foreach ($required in @($releaseBoot, $manualBoot, $payloadPath)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
         throw "Missing release consistency input: $required"
@@ -27,6 +31,9 @@ $sha256 = [Security.Cryptography.SHA256]::Create()
 try {
     $entries = @{}
     foreach ($entry in $archive.Entries) {
+        if (-not (Test-StaticEspPath $entry.FullName)) {
+            throw "Embedded payload contains DATA/generated-catalog file that does not belong on ESP: $($entry.FullName)"
+        }
         $entries[$entry.FullName] = $entry
     }
 
@@ -34,8 +41,7 @@ try {
         'EFI/BOOT/BOOTX64.EFI',
         'UI/index.html',
         'UI/theme.css',
-        'UI/Icons/Systems/windows-11.png',
-        'Systems/Windows/Windows 11/Unattended/win10-11 best-ustawienia.xml'
+        'UI/Icons/Systems/windows-11.png'
     )
     foreach ($requiredPath in $requiredPayloadPaths) {
         if (-not $entries.ContainsKey($requiredPath)) {
@@ -46,8 +52,11 @@ try {
     $usbFiles = Get-ChildItem -LiteralPath $usbRoot -Recurse -File
     foreach ($source in $usbFiles) {
         $relative = $source.FullName.Substring($usbRoot.Length).TrimStart('\').Replace('\', '/')
+        if (-not (Test-StaticEspPath $relative)) {
+            continue
+        }
         if (-not $entries.ContainsKey($relative)) {
-            throw "Embedded payload is stale; missing USB file: $relative"
+            throw "Embedded payload is stale; missing static ESP file: $relative"
         }
 
         $sourceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $source.FullName).Hash
@@ -68,4 +77,4 @@ try {
 }
 
 Write-Host "[PASS] BOOTX64.EFI shared SHA-256=$releaseHash"
-Write-Host '[PASS] Embedded payload contains the current USB UI, icons, systems and unattended file.'
+Write-Host '[PASS] Embedded payload contains only current static ESP files; DATA and generated catalog stay outside the EXE.'

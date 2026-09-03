@@ -7,9 +7,9 @@ $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 function Full([string]$Path) { [IO.Path]::GetFullPath((Join-Path $root $Path)) }
 
 $qemu = Full 'tools/qemu/qemu-system-x86_64.exe'
-$iso = Full 'Win11_25H2_Polish_x64_v2.iso'
-$target = Full 'test-images/usos-installer-full-target.qcow2'
-$config = Full 'test-images/usos-postverify-winpe-config'
+$iso = Full 'media/Systems/Windows/Windows 11/Images/Win11_25H2_Polish_x64_v2.iso'
+$target = Full 'tools/tests/artifacts/qemu/usos-installer-full-target.qcow2'
+$config = Full 'tools/tests/artifacts/qemu/usos-postverify-winpe-config'
 $firmwareCode = Full 'tools/qemu/share/edk2-x86_64-code.fd'
 $firmwareVarsSource = Full 'tools/qemu/share/edk2-i386-vars.fd'
 $varsCopy = Join-Path $config 'edk2-vars.fd'

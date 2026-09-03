@@ -6,14 +6,22 @@ WORK_ROOT=${WORK_ROOT:?WORK_ROOT is required}
 STATE_FILE=${STATE_FILE:?STATE_FILE is required}
 UNATTEND_FILE=${UNATTEND_FILE:-}
 SOURCE_LABEL=${SOURCE_LABEL:-Windows ISO}
-UI_TTY=/dev/tty1
-[ -w "$UI_TTY" ] || UI_TTY=/dev/console
+SELECTED_METHOD=${SELECTED_METHOD:-iso}
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+[ -r "$SCRIPT_DIR/micro_linux_ui.sh" ] || { printf '[EXTRACT] STOP: micro_linux_ui.sh is missing\n' >&2; exit 1; }
+. "$SCRIPT_DIR/micro_linux_ui.sh"
+UI_TTY=$USOS_UI_TTY
 
 fail() {
     printf '\033[0m\033[?25h' > "$UI_TTY" 2>/dev/null || true
     printf '[EXTRACT] STOP: %s\n' "$1" >&2
     exit 1
 }
+
+case "$SELECTED_METHOD" in
+    iso|chainload) ;;
+    *) fail "unsupported extraction method: $SELECTED_METHOD" ;;
+esac
 
 command -v rsync >/dev/null 2>&1 || fail 'rsync is required for extraction progress'
 command -v find >/dev/null 2>&1 || fail 'find is required'
@@ -52,10 +60,10 @@ set -- $(stats "$SOURCE_ROOT" no)
 SOURCE_FILES=$1
 SOURCE_BYTES=$2
 printf '[EXTRACT] source files=%s bytes=%s\n' "$SOURCE_FILES" "$SOURCE_BYTES"
-printf '[EXTRACT] copying installer to WORK with real byte progress\n'
+printf '[EXTRACT] copying source to WORK with real byte progress method=%s\n' "$SELECTED_METHOD"
 
 render_progress() {
-    tr '\r' '\n' | awk -v total="$SOURCE_BYTES" -v label="$SOURCE_LABEL" '
+    tr '\r' '\n' | awk -v total="$SOURCE_BYTES" -v label="$SOURCE_LABEL" -v method="$SELECTED_METHOD" '
         BEGIN {
             reset = "\033[0m"
             bold = "\033[1m"
@@ -93,27 +101,31 @@ render_progress() {
             line("      " cyan bold "USOS" reset "  " dim "Universal Service OS" reset)
             line("      " dim "--------------------------------------------------------------" reset)
             line("")
-            line("      " white bold "Przygotowywanie instalatora Windows" reset)
-            line("      " dim "Etap 3 z 4  -  kopiowanie plikow instalacyjnych" reset)
+            if (method == "chainload") {
+                line("      " white bold "Preparing chainload media" reset)
+                line("      " dim "Measured progress - copying boot media files" reset)
+            } else {
+                line("      " white bold "Preparing Windows installer" reset)
+                line("      " dim "Measured progress - copying Windows files" reset)
+            }
             line("")
-            line("      " dim "Obraz" reset)
+            line("      " dim "Image" reset)
             line("      " white label reset)
             line("")
             line("      [" bar "]")
             line("      " cyan bold sprintf("%3d%%", pct) reset "    " white human(done) reset " " dim "/ " human(total) reset)
-            line("")
             if (speed != "" || eta != "") {
-                line("      " dim "Predkosc" reset "  " white speed reset "      " dim "Pozostalo" reset "  " white eta reset)
+                line("      " dim "Speed" reset "  " white speed reset "      " dim "Remaining" reset "  " white eta reset)
             } else {
                 line("")
             }
             line("")
-            line("      " blue "[1] Sprawdzenie nosnika" reset "   " green "OK" reset)
-            line("      " blue "[2] Przygotowanie WORK" reset "    " green "OK" reset)
-            line("      " cyan bold "[3] Kopiowanie ISO" reset "          " cyan "W TOKU" reset)
-            line("      " dim "[4] Weryfikacja" reset "            oczekuje")
+            line("      " blue "[1] Device checks" reset "       " green "OK" reset)
+            line("      " blue "[2] WORK preparation" reset "    " green "OK" reset)
+            line("      " cyan bold "[3] File copy" reset "             " cyan "RUNNING" reset)
+            line("      " dim "[4] Verification" reset "          waiting")
             line("")
-            line("      " dim "Nie odlaczaj nosnika i nie wylaczaj komputera." reset)
+            line("      " dim "Do not disconnect the drive or turn off the computer." reset)
             line("")
             fflush()
         }
@@ -160,15 +172,19 @@ rm -f "$PROGRESS_FIFO"
     printf '\n'
     printf '      \033[1;36m\033[1mUSOS\033[0m  \033[2mUniversal Service OS\033[0m\033[K\n'
     printf '      \033[2m--------------------------------------------------------------\033[0m\033[K\n\n'
-    printf '      \033[1;37m\033[1mPrzygotowywanie instalatora Windows\033[0m\033[K\n'
-    printf '      \033[2mEtap 4 z 4  -  weryfikacja plikow\033[0m\033[K\n\n'
+    if [ "$SELECTED_METHOD" = chainload ]; then
+        printf '      \033[1;37m\033[1mPreparing chainload media\033[0m\033[K\n'
+    else
+        printf '      \033[1;37m\033[1mPreparing Windows installer\033[0m\033[K\n'
+    fi
+    printf '      \033[2mVerification - checking copied data\033[0m\033[K\n\n'
     printf '      [\033[1;36m====================================================\033[0m]\033[K\n'
-    printf '      \033[1;32m\033[1m100%%\033[0m    Kopiowanie zakonczone\033[K\n\n'
-    printf '      \033[1;34m[1] Sprawdzenie nosnika\033[0m   \033[1;32mOK\033[0m\033[K\n'
-    printf '      \033[1;34m[2] Przygotowanie WORK\033[0m    \033[1;32mOK\033[0m\033[K\n'
-    printf '      \033[1;34m[3] Kopiowanie ISO\033[0m          \033[1;32mOK\033[0m\033[K\n'
-    printf '      \033[1;36m\033[1m[4] Weryfikacja\033[0m            \033[1;36mW TOKU\033[0m\033[K\n\n'
-    printf '      \033[2mSprawdzanie liczby plikow i rozmiaru danych...\033[0m\033[K\n'
+    printf '      \033[1;32m\033[1mCopy 100%%\033[0m    Source files copied\033[K\n\n'
+    printf '      \033[1;34m[1] Device checks\033[0m       \033[1;32mOK\033[0m\033[K\n'
+    printf '      \033[1;34m[2] WORK preparation\033[0m    \033[1;32mOK\033[0m\033[K\n'
+    printf '      \033[1;34m[3] File copy\033[0m             \033[1;32mOK\033[0m\033[K\n'
+    printf '      \033[1;36m\033[1m[4] Verification\033[0m          \033[1;36mRUNNING\033[0m\033[K\n\n'
+    printf '      \033[2mChecking file count and byte size...\033[0m\033[K\n'
 } > "$UI_TTY"
 
 set -- $(stats "$WORK_ROOT" yes)
@@ -179,6 +195,16 @@ printf '[EXTRACT] destination files=%s bytes=%s\n' "$DEST_FILES" "$DEST_BYTES"
 [ "$DEST_FILES" = "$SOURCE_FILES" ] || fail "file-count mismatch source=$SOURCE_FILES destination=$DEST_FILES"
 [ "$DEST_BYTES" = "$SOURCE_BYTES" ] || fail "byte-count mismatch source=$SOURCE_BYTES destination=$DEST_BYTES"
 printf '[EXTRACT] completeness PASS\n'
+
+if [ "$SELECTED_METHOD" = chainload ]; then
+    BOOT_FILE=$(find "$WORK_ROOT" -type f | awk 'tolower($0) ~ /\/efi\/boot\/bootx64\.efi$/ { print; exit }')
+    [ -n "$BOOT_FILE" ] || fail 'chainload source has no EFI/BOOT/BOOTX64.EFI'
+    printf '[EXTRACT] chainload boot file PASS path=%s\n' "$BOOT_FILE"
+else
+    INSTALL_WIM=$(find "$WORK_ROOT" -type f | awk 'tolower($0) ~ /\/sources\/install\.wim$/ { print; exit }')
+    [ -n "$INSTALL_WIM" ] || fail 'Windows installer has no sources/install.wim'
+    printf '[EXTRACT] Windows install.wim PASS path=%s\n' "$INSTALL_WIM"
+fi
 
 UNATTEND_COPIED=no
 if [ -n "$UNATTEND_FILE" ]; then
@@ -204,8 +230,14 @@ trap 'rm -f "$STATE_TMP"' EXIT HUP INT TERM
     printf 'source_files=%s\n' "$SOURCE_FILES"
     printf 'source_bytes=%s\n' "$SOURCE_BYTES"
     printf 'unattend_copied=%s\n' "$UNATTEND_COPIED"
+    printf 'selected_method=%s\n' "$SELECTED_METHOD"
 } > "$STATE_TMP" || fail 'failed to write temporary prepared state'
 mv -f "$STATE_TMP" "$STATE_FILE" || fail 'failed to publish prepared state'
 trap - EXIT HUP INT TERM
 sync
+if [ "$SELECTED_METHOD" = chainload ]; then
+    usos_ui_done 'Chainload media ready' 'Verification complete.'
+else
+    usos_ui_done 'Windows installer ready' 'Verification complete.'
+fi
 printf '[EXTRACT] phase=prepared PASS state=%s\n' "$STATE_FILE"

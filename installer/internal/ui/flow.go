@@ -5,6 +5,7 @@ import (
 	"github.com/snakex21/universal-service-os/installer/internal/domain"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/installed"
+	"github.com/snakex21/universal-service-os/installer/internal/localupdate"
 	"github.com/snakex21/universal-service-os/installer/internal/repair"
 	"github.com/snakex21/universal-service-os/installer/internal/uninstall"
 )
@@ -15,6 +16,7 @@ type Flow struct {
 	installSource   DiskSource
 	installedSource InstalledUSOSSource
 	installEngine   *install.Engine
+	updateEngine    *localupdate.Engine
 	repairEngine    *repair.Engine
 	uninstallEngine *uninstall.Engine
 	busy            bool
@@ -26,6 +28,7 @@ func NewFlow(
 	installSource DiskSource,
 	installedSource InstalledUSOSSource,
 	installEngine *install.Engine,
+	updateEngine *localupdate.Engine,
 	repairEngine *repair.Engine,
 	uninstallEngine *uninstall.Engine,
 ) *Flow {
@@ -35,6 +38,7 @@ func NewFlow(
 		installSource:   installSource,
 		installedSource: installedSource,
 		installEngine:   installEngine,
+		updateEngine:    updateEngine,
 		repairEngine:    repairEngine,
 		uninstallEngine: uninstallEngine,
 	}
@@ -46,7 +50,7 @@ func (f *Flow) Start() { f.showModes() }
 
 func (f *Flow) showModes() {
 	f.busy = false
-	screen := NewModeScreenWithDetection(f.showInstallDevices, f.showRepairDevices, f.showUninstallDevices, f.installedSource)
+	screen := NewModeScreenWithDetection(f.showInstallDevices, f.showUpdateDevices, f.showRepairDevices, f.showUninstallDevices, f.installedSource)
 	ConfigureWindow(f.window, screen.Content())
 }
 
@@ -72,11 +76,39 @@ func (f *Flow) showInstallProgress(disk domain.Disk) {
 	ConfigureWindow(f.window, screen.Content())
 }
 
+func (f *Flow) showUpdateDevices() {
+	f.busy = false
+	screen := NewInstalledCardScreen(
+		"Wybierz nośnik USOS do aktualizacji",
+		"Aktualizacja lokalna wgrywa na istniejący nośnik aktualny USOS z tego instalatora bez formatowania i bez usuwania obrazów systemów.",
+		f.installedSource,
+		f.showModes,
+		f.showUpdateConfirmation,
+	)
+	ConfigureWindow(f.window, screen.Content())
+}
+
+func (f *Flow) showUpdateConfirmation(target installed.Target) {
+	screen := NewUpdateConfirmationScreen(target, f.showUpdateDevices, func() { f.showUpdateProgress(target) })
+	ConfigureWindow(f.window, screen.Content())
+}
+
+func (f *Flow) showUpdateProgress(target installed.Target) {
+	f.busy = true
+	events := f.updateEngine.RunAsync(target)
+	screen := NewLocalUpdateProgressScreen(events, func(report *install.VerificationReport, err error) {
+		f.busy = false
+		finalScreen := NewOperationFinalScreen("Aktualizacja", report, err, f.showModes)
+		ConfigureWindow(f.window, finalScreen.Content())
+	})
+	ConfigureWindow(f.window, screen.Content())
+}
+
 func (f *Flow) showRepairDevices() {
 	f.busy = false
 	screen := NewInstalledCardScreen(
-		"Wybierz nosnik USOS do naprawy",
-		"Lista zawiera wylacznie nosniki z wykrytym USOS. Wybierz nosnik, aby kontynuowac.",
+		"Wybierz nośnik USOS do naprawy",
+		"Lista zawiera wyłącznie nośniki z wykrytym USOS. Wybierz nośnik, aby kontynuować.",
 		f.installedSource,
 		f.showModes,
 		f.showRepairConfirmation,
@@ -103,8 +135,8 @@ func (f *Flow) showRepairProgress(target installed.Target) {
 func (f *Flow) showUninstallDevices() {
 	f.busy = false
 	screen := NewInstalledCardScreen(
-		"Wybierz nosnik USOS do deinstalacji",
-		"Lista zawiera wylacznie nosniki z wykrytym USOS. Zwykle pendrive bez USOS nie pojawiaja sie na tej liscie.",
+		"Wybierz nośnik USOS do deinstalacji",
+		"Lista zawiera wyłącznie nośniki z wykrytym USOS. Zwykłe pendrive'y bez USOS nie pojawiają się na tej liście.",
 		f.installedSource,
 		f.showModes,
 		f.showUninstallConfirmation,

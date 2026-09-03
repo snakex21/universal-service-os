@@ -45,6 +45,11 @@ func setGPTLayout(handle windows.Handle, plan layout.Plan, header gptHeader, ids
 }
 
 func readDriveLayout(handle windows.Handle) (parsedLayout, error) {
+	_, parsed, err := readDriveLayoutRaw(handle)
+	return parsed, err
+}
+
+func readDriveLayoutRaw(handle windows.Handle) ([]byte, parsedLayout, error) {
 	bufferSize := 16 * 1024
 	for bufferSize <= 1024*1024 {
 		buffer := make([]byte, bufferSize)
@@ -60,14 +65,19 @@ func readDriveLayout(handle windows.Handle) (parsedLayout, error) {
 			nil,
 		)
 		if err == nil {
-			return parseDriveLayout(buffer[:returned])
+			raw := append([]byte(nil), buffer[:returned]...)
+			parsed, parseErr := parseDriveLayout(raw)
+			if parseErr != nil {
+				return nil, parsedLayout{}, parseErr
+			}
+			return raw, parsed, nil
 		}
 		if err != windows.ERROR_INSUFFICIENT_BUFFER && err != windows.ERROR_MORE_DATA {
-			return parsedLayout{}, err
+			return nil, parsedLayout{}, err
 		}
 		bufferSize *= 2
 	}
-	return parsedLayout{}, fmt.Errorf("DRIVE_LAYOUT_INFORMATION_EX exceeds 1 MiB")
+	return nil, parsedLayout{}, fmt.Errorf("DRIVE_LAYOUT_INFORMATION_EX exceeds 1 MiB")
 }
 
 func waitForGPTHeader(handle windows.Handle, expectedDiskID windows.GUID, timeout time.Duration) (gptHeader, error) {

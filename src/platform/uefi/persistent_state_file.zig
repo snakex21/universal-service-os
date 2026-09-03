@@ -9,6 +9,7 @@ pub const Selection = struct {
     phase: usos.flow.persistent_phase.Phase,
     selected_iso: ?[]const u8 = null,
     selected_unattend: ?[]const u8 = null,
+    selected_method: ?[]const u8 = null,
 };
 
 pub fn read(root: *uefi.protocol.File, storage: *[max_state_bytes]u8) !Selection {
@@ -21,6 +22,7 @@ pub fn read(root: *uefi.protocol.File, storage: *[max_state_bytes]u8) !Selection
         .phase = try usos.flow.persistent_phase.parse(phase_text),
         .selected_iso = value(bytes, "selected_iso"),
         .selected_unattend = value(bytes, "selected_unattend"),
+        .selected_method = value(bytes, "selected_method"),
     };
 }
 
@@ -29,6 +31,7 @@ pub fn write(
     phase: usos.flow.persistent_phase.Phase,
     selected_iso: ?[]const u8,
     selected_unattend: ?[]const u8,
+    selected_method: ?[]const u8,
 ) !void {
     var storage: [max_state_bytes]u8 = @splat('\n');
     var used: usize = 0;
@@ -46,6 +49,11 @@ pub fn write(
         try append(&storage, &used, "\r\n");
     } else {
         try append(&storage, &used, "selected_unattend=none\r\n");
+    }
+    if (selected_method) |method| {
+        try append(&storage, &used, "selected_method=");
+        try append(&storage, &used, method);
+        try append(&storage, &used, "\r\n");
     }
 
     const file = try root.open(state_path, .read_write_create, .{});

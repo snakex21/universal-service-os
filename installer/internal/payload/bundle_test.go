@@ -26,7 +26,6 @@ func TestEmbeddedPayloadHasRequiredFiles(t *testing.T) {
 		"UI/index.html":                       false,
 		"UI/theme.css":                        false,
 		"UI/Icons/Systems/windows-11.png":     false,
-		"Systems/Windows/Windows 11/Unattended/win10-11 best-ustawienia.xml": false,
 	}
 	for _, file := range manifest {
 		if file.Size == 0 || file.SHA256 == "" {
@@ -43,6 +42,22 @@ func TestEmbeddedPayloadHasRequiredFiles(t *testing.T) {
 	}
 }
 
+func TestEmbeddedPayloadContainsOnlyStaticESPFiles(t *testing.T) {
+	bundle, err := Embedded()
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := bundle.Manifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range manifest {
+		if !strings.HasPrefix(file.Path, "EFI/") && !strings.HasPrefix(file.Path, "UI/") {
+			t.Fatalf("non-ESP DATA/catalog file embedded in payload: %s", file.Path)
+		}
+	}
+}
+
 func TestEmbeddedREADMEContainsOperationalInstructions(t *testing.T) {
 	readme, err := README()
 	if err != nil {
@@ -50,11 +65,13 @@ func TestEmbeddedREADMEContainsOperationalInstructions(t *testing.T) {
 	}
 	text := string(readme)
 	required := []string{
-		"DATA:\\ISO",
-		"DATA:\\TOOLS\\USOS Installer.exe",
+		"DATA:\\Systems\\Windows\\Windows 11\\Images",
+		"DATA:\\Systems\\Windows\\Windows 11\\Unattended",
+		"DATA:\\Programs\\USOS\\USOS Installer.exe",
 		"WORK",
 		"ukryta partycja robocza",
 		"Instalacja",
+		"Aktualizacja lokalna",
 		"Naprawa",
 		"Deinstalacja",
 		"USOS Installer.log",

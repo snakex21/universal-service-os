@@ -1,9 +1,9 @@
 param(
-    [string]$IsoPath = 'Win11_25H2_Polish_x64_v2.iso',
-    [string]$VhdxPath = 'test-images/usos-installer-windows-base.vhd',
+    [string]$IsoPath = 'media/Systems/Windows/Windows 11/Images/Win11_25H2_Polish_x64_v2.iso',
+    [string]$VhdxPath = 'tools/tests/artifacts/qemu/usos-installer-windows-base.vhd',
     [string]$QemuImgPath = 'tools/qemu/qemu-img.exe',
-    [string]$UnattendPath = 'installer/testdata/windows-qemu-base/unattend.xml',
-    [string]$BootstrapPath = 'installer/testdata/windows-qemu-base/bootstrap.cmd',
+    [string]$UnattendPath = 'tools/tests/fixtures/installer/windows-qemu-base/unattend.xml',
+    [string]$BootstrapPath = 'tools/tests/fixtures/installer/windows-qemu-base/bootstrap.cmd',
     [int]$ImageIndex = 5
 )
 
@@ -15,10 +15,10 @@ $VhdxPath = Full $VhdxPath
 $QemuImgPath = Full $QemuImgPath
 $UnattendPath = Full $UnattendPath
 $BootstrapPath = Full $BootstrapPath
-$testImages = Full 'test-images'
+$testImages = Full 'tools/tests/artifacts/qemu'
 
 if (-not $VhdxPath.StartsWith($testImages, [StringComparison]::OrdinalIgnoreCase)) {
-    throw "Refusing Windows QEMU base outside test-images: $VhdxPath"
+    throw "Refusing Windows QEMU base outside tools/tests/artifacts/qemu: $VhdxPath"
 }
 foreach ($required in @($IsoPath,$QemuImgPath,$UnattendPath,$BootstrapPath)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "Missing required file: $required" }

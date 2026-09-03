@@ -31,8 +31,8 @@ type InstalledDeviceScreen struct {
 
 func NewInstalledDeviceScreen(title, description string, source InstalledUSOSSource, onBack func(), onSelected func(installed.Target)) *InstalledDeviceScreen {
 	s := &InstalledDeviceScreen{title: title, description: description, source: source, selected: -1, onSelected: onSelected}
-	s.status = widget.NewLabel("Wyszukiwanie poprawnych nosnikow USOS...")
-	s.refresh = widget.NewButton("Odswiez", s.Refresh)
+	s.status = widget.NewLabel("Wyszukiwanie poprawnych nośników USOS...")
+	s.refresh = widget.NewButton("Odśwież", s.Refresh)
 	s.back = widget.NewButton("Wstecz", onBack)
 	s.next = widget.NewButton("Dalej", s.continueWithSelected)
 	s.next.Importance = widget.HighImportance
@@ -60,7 +60,7 @@ func (s *InstalledDeviceScreen) Refresh() {
 	s.next.Disable()
 	s.selected = -1
 	s.status.Importance = widget.MediumImportance
-	s.status.SetText("Wyszukiwanie poprawnych nosnikow USOS...")
+	s.status.SetText("Wyszukiwanie poprawnych nośników USOS...")
 	go func() {
 		targets, err := s.source.ListInstalledUSOS()
 		fyne.Do(func() {
@@ -70,7 +70,7 @@ func (s *InstalledDeviceScreen) Refresh() {
 				s.rows = nil
 				s.table.Refresh()
 				s.status.Importance = widget.DangerImportance
-				s.status.SetText("Blad skanowania: " + err.Error())
+				s.status.SetText("Błąd skanowania: " + err.Error())
 				return
 			}
 			s.targets = targets
@@ -89,12 +89,12 @@ func (s *InstalledDeviceScreen) Refresh() {
 
 func installedFoundNote(count int) string {
 	if count <= 0 {
-		return "Nie wykryto zainstalowanego USOS. Podlacz nosnik z USOS albo wroc i uzyj instalacji."
+		return "Nie wykryto zainstalowanego USOS. Podłącz nośnik z USOS albo wróć i użyj instalacji."
 	}
 	if count == 1 {
-		return "Wykryto USOS na 1 nosniku. Wybierz go z listy, aby kontynuowac."
+		return "Wykryto USOS na 1 nośniku. Wybierz go z listy, aby kontynuować."
 	}
-	return fmt.Sprintf("Wykryto USOS na %d nosnikach. Wybierz go z listy, aby kontynuowac.", count)
+	return fmt.Sprintf("Wykryto USOS na %d nośnikach. Wybierz go z listy, aby kontynuować.", count)
 }
 
 func (s *InstalledDeviceScreen) newTable() *widget.Table {

@@ -20,14 +20,18 @@ pub fn select(root: *std.os.uefi.protocol.File, category: usos.catalog.Category)
         switch (navigation.handle(input.readBlocking(), &selected, count, start, @min(visible_rows, count - start))) {
             .activate => {
                 if (usos.catalog.systems.byCategoryIndex(category, selected)) |entry| {
+                    const media = system_media_scan.scan(root, entry);
+                    if (!media.hasImages()) {
+                        showMissingImageNotice(entry);
+                        render(root, category, selected, count, start);
+                        continue;
+                    }
                     if (!usos.flow.preparation_capability.supportsSystem(entry.id)) {
                         showBackendDisabledNotice(entry);
                         render(root, category, selected, count, start);
                         continue;
                     }
-                    if (system_media_scan.scan(root, entry).hasImages()) return entry;
-                    showMissingImageNotice(entry);
-                    render(root, category, selected, count, start);
+                    return entry;
                 }
             },
             .back => return null,
@@ -52,13 +56,14 @@ fn render(root: *std.os.uefi.protocol.File, category: usos.catalog.Category, sel
     var index = start;
     while (index < end) : (index += 1) {
         const entry = usos.catalog.systems.byCategoryIndex(category, index) orelse continue;
-        const icon = system_icons.get(root, entry.id);
-        if (!usos.flow.preparation_capability.supportsSystem(entry.id)) {
-            view.systemRowDisabled(index == selected, entry.name, icon, "[backend: Windows 11 + ISO only]");
-        } else if (system_media_scan.scan(root, entry).hasImages()) {
-            view.systemRow(index == selected, entry.name, icon);
-        } else {
+        const icon = system_icons.get(root, entry);
+        const media = system_media_scan.scan(root, entry);
+        if (!media.hasImages()) {
             view.systemRowDisabled(index == selected, entry.name, icon, "[no image]");
+        } else if (!usos.flow.preparation_capability.supportsSystem(entry.id)) {
+            view.systemRowDisabled(index == selected, entry.name, icon, "[backend unavailable]");
+        } else {
+            view.systemRow(index == selected, entry.name, icon);
         }
     }
 

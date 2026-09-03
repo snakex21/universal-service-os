@@ -1,11 +1,11 @@
 param(
-    [string]$IsoPath = 'Win11_25H2_Polish_x64_v2.iso',
+    [string]$IsoPath = 'media/Systems/Windows/Windows 11/Images/Win11_25H2_Polish_x64_v2.iso',
     [string]$QemuPath = 'tools/qemu/qemu-system-x86_64.exe',
     [string]$QemuImgPath = 'tools/qemu/qemu-img.exe',
     [string]$FirmwareCode = 'tools/qemu/share/edk2-x86_64-code.fd',
     [string]$FirmwareVars = 'tools/qemu/share/edk2-i386-vars.fd',
-    [string]$TargetImage = 'test-images/usos-installer-gpt-target.qcow2',
-    [string]$RuntimeConfigDir = 'test-images/usos-installer-gpt-config',
+    [string]$TargetImage = 'tools/tests/artifacts/qemu/usos-installer-gpt-target.qcow2',
+    [string]$RuntimeConfigDir = 'tools/tests/artifacts/qemu/usos-installer-gpt-config',
     [int]$TimeoutSeconds = 260
 )
 
@@ -20,8 +20,8 @@ $FirmwareCode = Full $FirmwareCode
 $FirmwareVars = Full $FirmwareVars
 $TargetImage = Full $TargetImage
 $RuntimeConfigDir = Full $RuntimeConfigDir
-$testImagesRoot = Full 'test-images'
-$templateDir = Full 'installer/testdata/winpe-gpt-qemu'
+$testImagesRoot = Full 'tools/tests/artifacts/qemu'
+$templateDir = Full 'tools/tests/fixtures/installer/winpe-gpt-qemu'
 $installerDir = Full 'installer'
 $testExe = Join-Path $RuntimeConfigDir 'usos-gpt-qemu-test.exe'
 $resultPath = Join-Path $RuntimeConfigDir 'usos-gpt-result.txt'
@@ -54,10 +54,10 @@ foreach ($required in @($IsoPath, $QemuPath, $QemuImgPath, $FirmwareCode, $Firmw
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "Missing required file: $required" }
 }
 if (-not $TargetImage.StartsWith($testImagesRoot, [StringComparison]::OrdinalIgnoreCase)) {
-    throw "Refusing target image outside test-images: $TargetImage"
+    throw "Refusing target image outside tools/tests/artifacts/qemu: $TargetImage"
 }
 if (-not $RuntimeConfigDir.StartsWith($testImagesRoot, [StringComparison]::OrdinalIgnoreCase)) {
-    throw "Refusing runtime config outside test-images: $RuntimeConfigDir"
+    throw "Refusing runtime config outside tools/tests/artifacts/qemu: $RuntimeConfigDir"
 }
 if ($TargetImage -match 'PhysicalDrive|\\\\\.\\') {
     throw "Refusing physical device target: $TargetImage"

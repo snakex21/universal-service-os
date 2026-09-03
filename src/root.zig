@@ -41,6 +41,7 @@ pub const catalog = struct {
     pub const SystemFamily = @import("catalog/system_family.zig").SystemFamily;
     pub const SystemMediaStatus = @import("catalog/system_media_status.zig").SystemMediaStatus;
     pub const systems = @import("catalog/systems.zig");
+    pub const utility_boot_methods = @import("catalog/utility_boot_methods.zig");
     pub const MediaStatus = @import("catalog/media_status.zig").MediaStatus;
     pub const Windows11Status = @import("catalog/windows_11_status.zig").Windows11Status;
     pub const DetectedSystem = @import("catalog/detected_system.zig").DetectedSystem;
@@ -54,6 +55,9 @@ pub const flow = struct {
     pub const boot_next_order = @import("flow/boot_next_order.zig");
     pub const preparation_state = @import("flow/preparation_state.zig");
     pub const preparation_capability = @import("flow/preparation_capability.zig");
+    pub const boot_method_options = @import("flow/boot_method_options.zig");
+    pub const boot_method_help = @import("flow/boot_method_help.zig");
+    pub const preparation_boot_progress = @import("flow/preparation_boot_progress.zig");
     pub const persistent_phase = @import("flow/persistent_phase.zig");
 };
 pub const selftest = struct {
@@ -98,6 +102,7 @@ test {
     _ = catalog.SystemFamily;
     _ = catalog.SystemMediaStatus;
     _ = catalog.systems;
+    _ = catalog.utility_boot_methods;
     _ = catalog.MediaStatus;
     _ = catalog.Windows11Status;
     _ = catalog.DetectedSystem;
@@ -109,6 +114,9 @@ test {
     _ = flow.boot_next_order;
     _ = flow.preparation_state;
     _ = flow.preparation_capability;
+    _ = flow.boot_method_options;
+    _ = flow.boot_method_help;
+    _ = flow.preparation_boot_progress;
     _ = flow.persistent_phase;
     _ = selftest.Case;
     _ = selftest.Report;

@@ -28,13 +28,18 @@ func NewOperationFinalScreen(operation string, report *install.VerificationRepor
 
 func (s *FinalScreen) Content() fyne.CanvasObject {
 	success := s.err == nil && s.report.OK()
-	titleText := s.operation + " zakonczona i zweryfikowana"
-	statusText := "Koncowy odczyt nosnika jest zgodny z oczekiwanym stanem operacji."
+	titleText := s.operation + " zakończona i zweryfikowana"
+	statusText := "Końcowy odczyt nośnika jest zgodny z oczekiwanym stanem operacji."
 	importance := widget.SuccessImportance
 	if !success {
-		titleText = s.operation + " zakonczona bledem weryfikacji"
-		statusText = "Nosnik nie przeszedl koncowej weryfikacji. Nie traktuj go jako poprawnie przygotowanego."
 		importance = widget.DangerImportance
+		if len(s.report.Items) > 0 && !s.report.OK() {
+			titleText = s.operation + " zakończona błędem weryfikacji"
+			statusText = "Nośnik nie przeszedł końcowej weryfikacji. Nie traktuj go jako poprawnie przygotowanego."
+		} else {
+			titleText = s.operation + " nie powiodła się"
+			statusText = "Operacja została zatrzymana przed końcową weryfikacją."
+		}
 	}
 	title := widget.NewLabelWithStyle(titleText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	title.Importance = importance
@@ -42,7 +47,7 @@ func (s *FinalScreen) Content() fyne.CanvasObject {
 	status.Wrapping = fyne.TextWrapWord
 	status.Importance = importance
 	if s.err != nil {
-		errorLabel := widget.NewLabel("Blad: " + s.err.Error())
+		errorLabel := widget.NewLabel("Błąd: " + s.err.Error())
 		errorLabel.Wrapping = fyne.TextWrapWord
 		errorLabel.Importance = widget.DangerImportance
 		status = errorLabel
@@ -79,7 +84,7 @@ func (s *FinalScreen) Content() fyne.CanvasObject {
 		},
 	)
 	table.ShowHeaderRow = true
-	headers := []string{"Sprawdzenie", "Zapisane / oczekiwane", "Odczytane z nosnika", "Wynik"}
+	headers := []string{"Sprawdzenie", "Zapisane / oczekiwane", "Odczytane z nośnika", "Wynik"}
 	table.CreateHeader = func() fyne.CanvasObject {
 		return widget.NewLabelWithStyle("", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	}
@@ -93,7 +98,7 @@ func (s *FinalScreen) Content() fyne.CanvasObject {
 	table.SetColumnWidth(2, 520)
 	table.SetColumnWidth(3, 120)
 
-	back := widget.NewButton("Wroc do wyboru trybu", func() {
+	back := widget.NewButton("Wróć do wyboru trybu", func() {
 		if s.onBack != nil {
 			s.onBack()
 		}

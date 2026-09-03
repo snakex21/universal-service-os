@@ -10,12 +10,20 @@ const work_chainload = @import("work_chainload.zig");
 const work_volume = @import("work_volume.zig");
 
 const linux_loader_path = "EFI/USOS/systemd-bootx64.efi";
+const PreparationStage = usos.flow.preparation_boot_progress.Stage;
+const ProgressFn = *const fn (PreparationStage) void;
+
+pub const ResumeStage = enum {
+    starting_windows_setup,
+    starting_chainload,
+};
+const ResumeProgressFn = *const fn (ResumeStage) void;
 
 fn say(text: []const u8) void {
     serial.writeAscii(text);
 }
 
-pub fn resumePersistent(root: *uefi.protocol.File) bool {
+pub fn resumePersistent(root: *uefi.protocol.File, progress: ?ResumeProgressFn) bool {
     var state_storage: [persistent_state_file.max_state_bytes]u8 = undefined;
     const state = persistent_state_file.read(root, &state_storage) catch |err| {
         say("PERSISTENT STATE READ FAIL: ");
@@ -26,31 +34,52 @@ pub fn resumePersistent(root: *uefi.protocol.File) bool {
     switch (state.phase) {
         .pending => return false,
         .prepare_requested => {
-            say("PERSISTENT PHASE PREPARE-REQUESTED\n");
-            startMicroLinux() catch |err| {
-                say("MICRO-LINUX CHAINLOAD FAIL: ");
+            say("PERSISTENT PHASE PREPARE-REQUESTED RECOVERY: PREVIOUS PREPARATION DID NOT COMMIT PREPARED; RESETTING TO PENDING\n");
+            persistent_state_file.write(root, .pending, null, null, null) catch |err| {
+                say("PERSISTENT RECOVERY RESET FAIL: ");
                 say(@errorName(err));
                 say("\n");
+                return true;
             };
-            return true;
+            return false;
         },
         .prepared => {
             say("PERSISTENT PHASE PREPARED\n");
-            handoffWindows(root) catch |err| {
-                say("WINDOWS HANDOFF FAIL: ");
-                say(@errorName(err));
-                say("\n");
-            };
+            const method = persistedMethod(state.selected_method) orelse .direct_iso;
+            if (method == .chainload or method == .wimboot or method == .vhdboot) {
+                if (progress) |callback| callback(.starting_chainload);
+                handoffChainload(root, method) catch |err| {
+                    say("CHAINLOAD HANDOFF FAIL: ");
+                    say(@errorName(err));
+                    say("\n");
+                };
+            } else {
+                if (progress) |callback| callback(.starting_windows_setup);
+                handoffWindows(root, method) catch |err| {
+                    say("WINDOWS HANDOFF FAIL: ");
+                    say(@errorName(err));
+                    say("\n");
+                };
+            }
             return true;
         },
         .handoff => {
             say("PERSISTENT PHASE HANDOFF RECOVERY TO PREPARED\n");
-            persistent_state_file.write(root, .prepared, null, null) catch return true;
-            handoffWindows(root) catch |err| {
-                say("WINDOWS HANDOFF RETRY FAIL: ");
-                say(@errorName(err));
-                say("\n");
-            };
+            const method = persistedMethod(state.selected_method) orelse .direct_iso;
+            persistent_state_file.write(root, .prepared, null, null, method.persistedValue()) catch return true;
+            if (method == .chainload or method == .wimboot or method == .vhdboot) {
+                handoffChainload(root, method) catch |err| {
+                    say("CHAINLOAD HANDOFF RETRY FAIL: ");
+                    say(@errorName(err));
+                    say("\n");
+                };
+            } else {
+                handoffWindows(root, method) catch |err| {
+                    say("WINDOWS HANDOFF RETRY FAIL: ");
+                    say(@errorName(err));
+                    say("\n");
+                };
+            }
             return true;
         },
     }
@@ -62,8 +91,11 @@ pub fn requestPreparation(
     image: usos.catalog.ImageItem,
     method: usos.catalog.BootMethod,
     unattended: ?[]const u8,
+    progress: ?ProgressFn,
 ) !void {
     try usos.flow.preparation_capability.validate(system.id, image.kind, method);
+    const resolved_method = usos.flow.preparation_capability.resolve(system.id, image.kind, method) orelse return error.UnsupportedMethod;
+    if (resolved_method == .direct_efi) return error.DirectEfiDoesNotUsePreparation;
 
     var iso_path_storage: [512]u8 = undefined;
     const iso_path = try dataPath(&iso_path_storage, system.image_directory, image.name.slice());
@@ -73,32 +105,40 @@ pub fn requestPreparation(
         break :blk try dataPath(&unattended_path_storage, directory, name);
     } else null;
 
-    try persistent_state_file.write(root, .prepare_requested, iso_path, unattended_path);
+    try persistent_state_file.write(root, .prepare_requested, iso_path, unattended_path, resolved_method.persistedValue());
+    reportProgress(progress, .request_saved);
     say("PERSISTENT PHASE PREPARE-REQUESTED PASS\n");
     const current = boot_next.prepareReturnToCurrentBoot() catch |err| {
-        persistent_state_file.write(root, .pending, null, null) catch {};
+        persistent_state_file.write(root, .pending, null, null, null) catch {};
         return err;
     };
     _ = current;
+    reportProgress(progress, .return_boot_configured);
     say("BOOTORDER BACKUP PASS\n");
     say("BOOTNEXT CURRENT PASS\n");
-    startMicroLinux() catch |err| {
-        persistent_state_file.write(root, .pending, null, null) catch {};
+    startMicroLinux(progress) catch |err| {
+        persistent_state_file.write(root, .pending, null, null, null) catch {};
         return err;
     };
 }
 
-fn startMicroLinux() !void {
+fn startMicroLinux(progress: ?ProgressFn) !void {
     const image = try loadEspImage(linux_loader_path);
+    reportProgress(progress, .loader_ready);
     say("MICRO-LINUX EFI LOADIMAGE PASS\n");
     const boot_services = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
+    reportProgress(progress, .transferring_control);
     say("MICRO-LINUX STARTIMAGE BEGIN\n");
     const result = try boot_services.startImage(image);
     if (result.code != .success) return error.MicroLinuxReturnedError;
     return error.MicroLinuxReturned;
 }
 
-fn handoffWindows(root: *uefi.protocol.File) !void {
+fn reportProgress(progress: ?ProgressFn, stage: PreparationStage) void {
+    if (progress) |callback| callback(stage);
+}
+
+fn handoffWindows(root: *uefi.protocol.File, method: usos.catalog.BootMethod) !void {
     ntfs_driver.loadAndConnect(root) catch |err| {
         say("NTFS DRIVER FAIL: ");
         say(@errorName(err));
@@ -111,32 +151,66 @@ fn handoffWindows(root: *uefi.protocol.File) !void {
     if (!work.has_install_wim) return error.InstallWimMissing;
     say("INSTALL.WIM VISIBLE ON WORK\n");
     if (!work.has_windows_boot) return error.WindowsBootMissing;
-    say("BOOTX64.EFI VISIBLE ON WORK\n");
+    say("EFI BOOT FILE VISIBLE ON WORK\n");
 
     const windows_image = try work_chainload.load(work.handle);
     say("WINDOWS LOADIMAGE PASS\n");
     _ = try work_chainload.checkLoadedImage(windows_image, work.handle);
     say("WINDOWS LOADEDIMAGE CHECK PASS\n");
 
-    try persistent_state_file.write(root, .handoff, null, null);
+    try persistent_state_file.write(root, .handoff, null, null, method.persistedValue());
     say("PERSISTENT PHASE HANDOFF PASS\n");
-    // StartImage does not return after a successful Windows boot. Publish the
-    // one-shot reset immediately before transferring control; any returned
-    // error restores prepared below so extraction is never repeated.
-    try persistent_state_file.write(root, .pending, null, null);
+    try persistent_state_file.write(root, .pending, null, null, null);
     say("ONE-SHOT PHASE PENDING PASS\n");
 
     const boot_services = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
     say("WINDOWS STARTIMAGE BEGIN\n");
     const result = boot_services.startImage(windows_image) catch |err| {
-        persistent_state_file.write(root, .prepared, null, null) catch {};
+        persistent_state_file.write(root, .prepared, null, null, method.persistedValue()) catch {};
         say("WINDOWS STARTIMAGE ERROR; PHASE PREPARED RESTORED\n");
         return err;
     };
     if (result.code != .success) {
-        persistent_state_file.write(root, .prepared, null, null) catch {};
+        persistent_state_file.write(root, .prepared, null, null, method.persistedValue()) catch {};
         return error.WindowsReturnedError;
     }
+}
+
+fn handoffChainload(root: *uefi.protocol.File, method: usos.catalog.BootMethod) !void {
+    ntfs_driver.loadAndConnect(root) catch |err| {
+        say("NTFS DRIVER FAIL: ");
+        say(@errorName(err));
+        say("\n");
+        return err;
+    };
+    say("NTFS DRIVER PASS\n");
+    const work = work_volume.find() orelse return error.WorkNotFound;
+    say("WORK FOUND\n");
+    if (!work.has_windows_boot) return error.EfiBootFileMissing;
+    say("EFI BOOT FILE VISIBLE ON WORK\n");
+
+    const chained_image = try work_chainload.load(work.handle);
+    say("CHAINLOAD LOADIMAGE PASS\n");
+    _ = try work_chainload.checkLoadedImage(chained_image, work.handle);
+    say("CHAINLOAD LOADEDIMAGE CHECK PASS\n");
+
+    try persistent_state_file.write(root, .handoff, null, null, method.persistedValue());
+    try persistent_state_file.write(root, .pending, null, null, null);
+    const boot_services = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
+    say("CHAINLOAD STARTIMAGE BEGIN\n");
+    const result = boot_services.startImage(chained_image) catch |err| {
+        persistent_state_file.write(root, .prepared, null, null, method.persistedValue()) catch {};
+        return err;
+    };
+    if (result.code != .success) {
+        persistent_state_file.write(root, .prepared, null, null, method.persistedValue()) catch {};
+        return error.ChainloadedImageReturnedError;
+    }
+}
+
+fn persistedMethod(value: ?[]const u8) ?usos.catalog.BootMethod {
+    const text = value orelse return null;
+    return usos.catalog.BootMethod.fromPersistedValue(text);
 }
 
 fn loadEspImage(path: []const u8) !uefi.Handle {

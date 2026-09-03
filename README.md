@@ -33,9 +33,11 @@ Szczegółowe reguły pracy są zapisane w `PROJECT_RULES.md`.
 
 Projekt używa przenośnego Ziga z `tools/zig/zig.exe` i nie wymaga dodawania Ziga do PATH.
 
-- `build.bat` - buduje kompletną wersję `ReleaseFast`: wspólny program EFI dla pendrive'a i testu, payload oraz `installer\build\USOS Installer.exe`; na końcu sprawdza zgodność SHA-256,
-- `test.bat` - uruchamia pełne testy jednostkowe,
-- `selftest.bat` - uruchamia te same krytyczne testy startowe, których użyje system.
+- `build.bat` - buduje kompletną wersję `ReleaseFast`: wspólny program EFI dla pendrive'a i testu, payload oraz gotowy `installer\USOS Installer.exe`; na końcu sprawdza zgodność SHA-256. Świeży instalator ma tryb `Aktualizuj USOS`, którym można lokalnie wgrać bieżący build na już przygotowany pendrive bez ponownego formatowania i bez usuwania obrazów systemów,
+- `TEST-USOS.cmd` - uruchamia pełny, widoczny test USOS w QEMU z prawdziwym ISO Windows,
+- `RESET-USOS-TEST.cmd` - czyści wyłącznie stan i wirtualny dysk pełnego testu QEMU,
+- `installer\USOS Installer.exe` - instalacja, lokalna aktualizacja istniejącego pendrive'a, naprawa i deinstalacja; aktualizacja synchronizuje katalog menu ESP z zawartością DATA bez kopiowania dużych obrazów,
+- `tools/tests/run.ps1` - jedno wejście do automatycznych testów deweloperskich (`all`, `unit`, `selftest`, `x86_64`, `aarch64`).
 
 ## Pierwszy kamień milowy
 

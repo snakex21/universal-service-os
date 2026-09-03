@@ -8,11 +8,11 @@ $ErrorActionPreference = 'Stop'
 $QemuImgPath = [IO.Path]::GetFullPath($QemuImgPath)
 $BasePath = [IO.Path]::GetFullPath($BasePath)
 $OverlayPath = [IO.Path]::GetFullPath($OverlayPath)
-$testImagesRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\test-images'))
+$testImagesRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'tests\artifacts\qemu'))
 
 foreach ($path in @($BasePath, $OverlayPath)) {
     if (-not $path.StartsWith($testImagesRoot, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Refusing qcow2 path outside test-images: $path"
+        throw "Refusing qcow2 path outside tools/tests/artifacts/qemu: $path"
     }
 }
 if (-not (Test-Path -LiteralPath $QemuImgPath -PathType Leaf)) { throw "Missing qemu-img: $QemuImgPath" }

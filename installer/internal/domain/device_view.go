@@ -44,7 +44,7 @@ func BuildDeviceRow(d Disk) DeviceRow {
 			}
 			roots = append(roots, prefix+": "+strings.Join(volume.RootEntries, ", "))
 		} else if volume.RootScanError != "" {
-			roots = append(roots, "odczyt niedostepny")
+			roots = append(roots, "odczyt niedostępny")
 		}
 	}
 

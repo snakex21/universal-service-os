@@ -1,8 +1,8 @@
 param(
-    [string]$BasePath = 'test-images/usos-installer-windows-base.raw',
-    [string]$OverlayPath = 'test-images/usos-installer-windows-overlay.qcow2',
-    [string]$TargetPath = 'test-images/usos-installer-full-target.qcow2',
-    [string]$ConfigDir = 'test-images/usos-installer-full-config',
+    [string]$BasePath = 'tools/tests/artifacts/qemu/usos-installer-windows-base.raw',
+    [string]$OverlayPath = 'tools/tests/artifacts/qemu/usos-installer-windows-overlay.qcow2',
+    [string]$TargetPath = 'tools/tests/artifacts/qemu/usos-installer-full-target.qcow2',
+    [string]$ConfigDir = 'tools/tests/artifacts/qemu/usos-installer-full-config',
     [string]$QemuPath = 'tools/qemu/qemu-system-x86_64.exe',
     [string]$QemuImgPath = 'tools/qemu/qemu-img.exe'
 )
@@ -16,15 +16,15 @@ $TargetPath = Full $TargetPath
 $ConfigDir = Full $ConfigDir
 $QemuPath = Full $QemuPath
 $QemuImgPath = Full $QemuImgPath
-$testImages = Full 'test-images'
+$testImages = Full 'tools/tests/artifacts/qemu'
 $firmwareCode = Full 'tools/qemu/share/edk2-x86_64-code.fd'
 $firmwareVarsSource = Full 'tools/qemu/share/edk2-i386-vars.fd'
-$tagSource = Full 'installer/testdata/winpe-gpt-qemu/USOS_QEMU_TEST.TAG'
+$tagSource = Full 'tools/tests/fixtures/installer/winpe-gpt-qemu/USOS_QEMU_TEST.TAG'
 $installerDir = Full 'installer'
 
 foreach ($path in @($BasePath,$OverlayPath,$TargetPath,$ConfigDir)) {
     if (-not $path.StartsWith($testImages, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Refusing test path outside test-images: $path"
+        throw "Refusing test path outside tools/tests/artifacts/qemu: $path"
     }
 }
 foreach ($required in @($BasePath,$QemuPath,$QemuImgPath,$firmwareCode,$firmwareVarsSource,$tagSource)) {
@@ -50,7 +50,7 @@ $qemuOut = Join-Path $ConfigDir 'qemu.stdout.log'
 
 Push-Location $installerDir
 try {
-    $finalInstaller = Join-Path $installerDir 'build\USOS Installer.exe'
+    $finalInstaller = Join-Path $installerDir 'USOS Installer.exe'
     & go.exe build -trimpath -ldflags '-H=windowsgui' -o $finalInstaller ./cmd/usos-installer
     if ($LASTEXITCODE -ne 0) { throw "go build final USOS Installer.exe failed: $LASTEXITCODE" }
     Copy-Item -LiteralPath $finalInstaller -Destination (Join-Path $ConfigDir 'USOS Installer.exe') -Force

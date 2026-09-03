@@ -22,14 +22,14 @@ func NewRepairConfirmationScreen(target installed.Target, onCancel, onConfirm fu
 
 func (s *RepairConfirmationScreen) Content() fyne.CanvasObject {
 	title := widget.NewLabelWithStyle("Naprawa Universal Service OS", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-	description := widget.NewLabel("Naprawa odtworzy wylacznie pliki na ESP. DATA i WORK nie beda formatowane ani czyszczone.")
+	description := widget.NewLabel("Naprawa odtworzy wyłącznie pliki na ESP. DATA i WORK nie będą formatowane ani czyszczone.")
 	description.Wrapping = fyne.TextWrapWord
 	serial := s.target.Disk.DisplaySerial()
 	if serial == "" {
 		serial = "-"
 	}
 	identity := widget.NewLabel(fmt.Sprintf(
-		"Cel: %s\nPhysicalDrive%d\nPojemnosc: %s\nSerial: %s",
+		"Cel: %s\nPhysicalDrive%d\nPojemność: %s\nSerial: %s",
 		s.target.Disk.DisplayName(),
 		s.target.Disk.Number,
 		domain.FormatBytes(s.target.Disk.SizeBytes),

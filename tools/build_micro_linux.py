@@ -165,7 +165,7 @@ def main() -> int:
     lock = json.loads((root / "tools/micro_linux.lock.json").read_text(encoding="utf-8"))
     iso_record = lock["alpine_iso"]
     iso = obtain(root, iso_record, root / str(iso_record["file"]))
-    packages_dir = root / "third_party/alpine/packages"
+    packages_dir = root / "tools/cache/alpine/packages"
     packages: list[tuple[dict[str, object], Path]] = []
     for record in lock["packages"]:
         packages.append((record, obtain(root, record, packages_dir / str(record["file"]))))
@@ -225,6 +225,9 @@ def main() -> int:
             ("tools/device_guard.sh", "usr/lib/usos/device_guard.sh"),
             ("tools/extract.sh", "usr/lib/usos/extract.sh"),
             ("tools/prepare_work.sh", "usr/lib/usos/prepare_work.sh"),
+            ("tools/prepare_wimboot.sh", "usr/lib/usos/prepare_wimboot.sh"),
+            ("tools/prepare_vhdboot.sh", "usr/lib/usos/prepare_vhdboot.sh"),
+            ("tools/micro_linux_ui.sh", "usr/lib/usos/micro_linux_ui.sh"),
             ("tools/micro_linux_init.sh", "usos-init"),
         ):
             payload = (root / source_name).read_bytes().replace(b"\r\n", b"\n")

@@ -13,6 +13,7 @@ set "FIRMWARE_VARS=%QEMU_DIR%\share\edk2-i386-vars.fd"
 if not exist "%FIRMWARE_CODE%" exit /b 3
 if not exist "%FIRMWARE_VARS%" exit /b 3
 
+if exist "%~dp0zig-out\manual-usb" rmdir /s /q "%~dp0zig-out\manual-usb"
 call "%~dp0tools\zig\zig.exe" build qemu-x86_64-manual-image -Doptimize=ReleaseFast
 if errorlevel 1 exit /b %errorlevel%
 

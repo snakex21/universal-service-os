@@ -19,19 +19,19 @@ foreach ($name in @('IsoPath','VhdPath','BaseQcow2Path','QemuImgPath','BootEfiPa
 }
 if (-not [string]::IsNullOrWhiteSpace($UnattendPath)) { $UnattendPath = [IO.Path]::GetFullPath($UnattendPath) }
 
-$testImagesRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\test-images'))
+$testImagesRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'tests\artifacts\qemu'))
 foreach ($path in @($VhdPath, $BaseQcow2Path)) {
     if (-not $path.StartsWith($testImagesRoot, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Refusing image path outside test-images: $path"
+        throw "Refusing image path outside tools/tests/artifacts/qemu: $path"
     }
 }
 $candidateBasePath = "$BaseQcow2Path.new"
 if (-not $candidateBasePath.StartsWith($testImagesRoot, [StringComparison]::OrdinalIgnoreCase)) {
-    throw "Refusing candidate image path outside test-images: $candidateBasePath"
+    throw "Refusing candidate image path outside tools/tests/artifacts/qemu: $candidateBasePath"
 }
 $mountRoot = [IO.Path]::GetFullPath("$VhdPath.mount")
 if (-not $mountRoot.StartsWith($testImagesRoot, [StringComparison]::OrdinalIgnoreCase)) {
-    throw "Refusing mount path outside test-images: $mountRoot"
+    throw "Refusing mount path outside tools/tests/artifacts/qemu: $mountRoot"
 }
 foreach ($required in @($IsoPath, $QemuImgPath, $BootEfiPath, $NtfsDriverPath, $MicroLinuxKernelPath, $MicroLinuxInitramfsPath, $MicroLinuxLoaderPath)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "Missing required file: $required" }
@@ -120,7 +120,7 @@ try {
     Copy-Item -LiteralPath $MicroLinuxKernelPath -Destination (Join-Path $espRoot 'EFI\USOS\micro-linux\vmlinuz-virt') -Force
     Copy-Item -LiteralPath $MicroLinuxInitramfsPath -Destination (Join-Path $espRoot 'EFI\USOS\micro-linux\initramfs-usos') -Force
     [IO.File]::WriteAllText((Join-Path $espRoot 'loader\loader.conf'), "default usos-micro-linux.conf`r`ntimeout 0`r`neditor no`r`n")
-    $kernelOptions = "console=tty0 console=ttyS0,115200 rdinit=/usos-init usos.esp_partuuid=$espGuid"
+    $kernelOptions = "console=tty0 console=ttyS0,115200 quiet loglevel=3 vt.global_cursor_default=0 rdinit=/usos-init usos.esp_partuuid=$espGuid"
     if (-not [string]::IsNullOrWhiteSpace($GuardTestBadPartuuid)) {
         if ($GuardTestBadPartuuid -notmatch '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$') {
             throw "GuardTestBadPartuuid is not a GUID: $GuardTestBadPartuuid"

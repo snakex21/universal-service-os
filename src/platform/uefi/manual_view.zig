@@ -25,6 +25,7 @@ var css_buffer: [css_capacity]u8 = undefined;
 var surface: ?usos.gui.Surface = null;
 var theme = usos.gui.Theme{};
 var row_y: u32 = 0;
+var status_y: u32 = 0;
 var active_footer: []const u8 = "";
 var cursor_under: [cursor_patch_capacity]u32 = undefined;
 var cursor_saved = false;
@@ -121,6 +122,7 @@ pub fn begin(screen_id: []const u8, fallback_title: []const u8) void {
         const content_height = canvas.framebuffer.height -| (list_content_y + 74);
         canvas.fillRect(panel_x, list_content_y, panel_width, content_height, theme.panel);
         row_y = list_content_y + 22;
+        status_y = 0;
     } else {
         console.clear();
         console.writeAscii("Universal Service OS\n");
@@ -136,6 +138,60 @@ pub fn begin(screen_id: []const u8, fallback_title: []const u8) void {
 
 pub fn row(selected: bool, value: []const u8) void {
     drawRow(selected, value, null);
+}
+
+pub fn helpBox(title: []const u8, line1: []const u8, line2: []const u8, status: []const u8) void {
+    if (surface) |canvas| {
+        const panel_width = @min(max_panel_width, canvas.framebuffer.width -| (outer_margin * 2));
+        const panel_x = (canvas.framebuffer.width -| panel_width) / 2;
+        const x = panel_x + 18;
+        const width = panel_width -| 36;
+        const y = row_y + 14;
+        const height: u32 = if (status.len > 0) 110 else 88;
+
+        canvas.fillRect(x, y, width, height, theme.background);
+        canvas.borderRect(x, y, width, height, 1, theme.border);
+        canvas.fillRect(x, y, 5, height, theme.accent);
+        usos.gui.text.draw(canvas, x + 18, y + 14, title, 1, theme.accent);
+        usos.gui.text.draw(canvas, x + 18, y + 37, line1, 1, theme.text);
+        usos.gui.text.draw(canvas, x + 18, y + 59, line2, 1, theme.muted);
+        if (status.len > 0) usos.gui.text.draw(canvas, x + 18, y + 81, status, 1, theme.accent);
+        row_y = y + height + 8;
+        return;
+    }
+
+    console.writeAscii("\n");
+    console.writeAscii(title);
+    console.writeAscii("\n");
+    console.writeAscii(line1);
+    console.writeAscii("\n");
+    console.writeAscii(line2);
+    console.writeAscii("\n");
+    if (status.len > 0) {
+        console.writeAscii(status);
+        console.writeAscii("\n");
+    }
+}
+
+pub fn handoffStatus(label: []const u8) void {
+    if (surface) |canvas| {
+        const panel_width = @min(max_panel_width, canvas.framebuffer.width -| (outer_margin * 2));
+        const panel_x = (canvas.framebuffer.width -| panel_width) / 2;
+        const x = panel_x + 18;
+        const width = panel_width -| 36;
+        if (status_y == 0) {
+            status_y = row_y + 8;
+            row_y = status_y + 58;
+        }
+        const y = status_y;
+        canvas.fillRect(x, y, width, 44, theme.panel);
+        usos.gui.text.draw(canvas, x, y + 4, label, 1, theme.text);
+        usos.gui.text.draw(canvas, x, y + 25, "Kernel start is indeterminate; measured percent begins during ISO copy.", 1, theme.muted);
+        return;
+    }
+
+    console.writeAscii(label);
+    console.writeAscii("\n");
 }
 
 pub fn systemRow(selected: bool, value: []const u8, icon: ?*const usos.gui.RgbaImage) void {
@@ -160,11 +216,11 @@ fn drawRowDisabled(selected: bool, value: []const u8, icon: ?*const usos.gui.Rgb
         const panel_x = (canvas.framebuffer.width -| panel_width) / 2;
         const x = panel_x + 18;
         const width = panel_width -| 36;
-        canvas.fillRect(x, row_y, width, row_height - 6, theme.panel);
+        canvas.fillRect(x, row_y, width, row_height - 6, theme.disabled);
         if (selected) canvas.fillRect(x, row_y, 5, row_height - 6, theme.border);
         var text_x = x + 18;
         if (icon) |system_icon| {
-            drawRgbaIcon(canvas, x + 12, row_y + 2, system_icon, theme.panel);
+            drawRgbaIcon(canvas, x + 12, row_y + 2, system_icon, theme.disabled);
             text_x = x + 58;
         }
         const dim = theme.muted;
@@ -241,16 +297,25 @@ pub fn number(value: u64) void {
 }
 
 pub fn footer(back_enabled: bool) void {
+    drawFooter(back_enabled, true);
+}
+
+pub fn passiveFooter() void {
+    invalidatePointer();
+    drawFooter(false, false);
+}
+
+fn drawFooter(back_enabled: bool, pointer_enabled: bool) void {
     if (surface) |canvas| {
         const panel_width = @min(max_panel_width, canvas.framebuffer.width -| (outer_margin * 2));
         const panel_x = (canvas.framebuffer.width -| panel_width) / 2;
         const y = canvas.framebuffer.height -| 48;
-        const footer_text = if (active_footer.len > 0) active_footer else if (back_enabled) "ARROWS/MOUSE - SELECT    ENTER/CLICK - OPEN    ESC/RIGHT CLICK - BACK" else "ARROWS/MOUSE - SELECT    ENTER/CLICK - OPEN";
+        const footer_text = if (active_footer.len > 0) active_footer else if (back_enabled) "ARROWS/MOUSE - SELECT    ENTER/CLICK - OPEN    ESC/RIGHT CLICK - BACK" else "PLEASE WAIT";
         usos.gui.text.draw(canvas, panel_x, y, footer_text, 1, theme.muted);
-        updatePointer();
+        if (pointer_enabled) updatePointer();
     } else {
         console.writeAscii("\n");
-        if (active_footer.len > 0) console.writeAscii(active_footer) else console.writeAscii(if (back_enabled) "Arrows - select, Enter - open, Esc - back" else "Arrows - select, Enter - open");
+        if (active_footer.len > 0) console.writeAscii(active_footer) else console.writeAscii(if (back_enabled) "Arrows - select, Enter - open, Esc - back" else "Please wait");
         console.writeAscii("\n");
     }
 }

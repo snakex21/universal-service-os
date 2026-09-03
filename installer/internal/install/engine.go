@@ -19,6 +19,7 @@ type Backend interface {
 	FormatESP(media MediaLayout) error
 	FormatDATA(media MediaLayout) error
 	FormatWORK(media MediaLayout) error
+	EnsureWORKHidden(media MediaLayout) error
 	CopyInstallPayload(media MediaLayout, progress func(done, total uint64)) error
 	WriteIdentity(media MediaLayout, workBytes uint64) (DeviceINI, error)
 	Verify(media MediaLayout, expected DeviceINI) (VerificationReport, error)
@@ -100,6 +101,9 @@ func (e *Engine) run(expected domain.Disk, events chan<- Event) {
 	if err := e.runSimpleStage(events, StageFormatWORK, func() error {
 		if err := e.backend.FormatWORK(media); err != nil {
 			return err
+		}
+		if err := e.backend.EnsureWORKHidden(media); err != nil {
+			return fmt.Errorf("hide WORK after format: %w", err)
 		}
 		readBack, err := session.VerifyLayoutUnchanged(media)
 		if err != nil {

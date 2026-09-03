@@ -1,10 +1,18 @@
 const std = @import("std");
 const uefi = std.os.uefi;
+const builtin = @import("builtin");
 const case_path = @import("case_path.zig");
 
 const marker = std.unicode.utf8ToUtf16LeStringLiteral("\\.usos-work");
 const install_wim = "sources/install.wim";
-const windows_boot = "EFI/BOOT/BOOTX64.EFI";
+fn bootPath() []const u8 {
+    return switch (builtin.cpu.arch) {
+        .x86_64 => "EFI/BOOT/BOOTX64.EFI",
+        .aarch64 => "EFI/BOOT/BOOTAA64.EFI",
+        .x86 => "EFI/BOOT/BOOTIA32.EFI",
+        else => "EFI/BOOT/BOOTX64.EFI",
+    };
+}
 
 pub const Found = struct {
     handle: uefi.Handle,
@@ -25,10 +33,8 @@ pub fn find() ?Found {
         tag.close() catch {};
 
         const has_install_wim = existsCaseInsensitive(root, install_wim);
-        if (!has_install_wim) return .{ .handle = handle, .has_install_wim = false, .has_windows_boot = false };
-
-        const has_windows_boot = existsCaseInsensitive(root, windows_boot);
-        return .{ .handle = handle, .has_install_wim = true, .has_windows_boot = has_windows_boot };
+        const has_windows_boot = existsCaseInsensitive(root, bootPath());
+        return .{ .handle = handle, .has_install_wim = has_install_wim, .has_windows_boot = has_windows_boot };
     }
     return null;
 }

@@ -33,6 +33,12 @@ Każdy profil ma własny katalog `Images`. Obsługiwane w katalogu są obecnie f
 
 Nazwa pliku jest dowolna. Format i metoda startu są rozdzielone: po wybraniu obrazu GUI pokazuje tylko metody zgodne z profilem i typem pliku.
 
+## Ikony profili
+
+Profil systemu albo narzędzia może mieć opcjonalne `icon.png` obok katalogu `Images`, np. `Systems/Windows/Windows 11/icon.png` albo `Utilities/MemTest86/icon.png`. PNG jest jedynym formatem ikon profili; bootmanager ma własny lekki dekoder PNG i nie ładuje kodeków JPEG. Maksymalny rozmiar ikony to 1 MiB.
+
+Na gotowym nośniku plik `icon.png` znajduje się na DATA. `Aktualizuj USOS` synchronizuje go do małego katalogu metadanych na ESP. Brak własnej ikony oznacza użycie ikony wbudowanej, jeśli taka istnieje.
+
 ## Windows
 
 Przykład:
@@ -62,15 +68,17 @@ FreeDOS, MS-DOS, PC DOS, DR-DOS, OpenDOS i Other DOS. Każdy ma `Images`; obrazy
 
 ## Utilities
 
-`Utilities/`
+`Utilities/` jest dynamiczne. Każdy podkatalog jest jednym narzędziem widocznym w menu, np.:
 
-- `Memory Tests/Images/`
-- `Disk & Storage/Images/`
-- `Recovery/Images/`
-- `Firmware & BIOS/Images/`
-- `Network/Images/`
-- `Boot & Partition/Images/`
-- `Hardware Diagnostics/Images/`
-- `Other Utilities/Images/`
+`Utilities/MemTest86/Images/memtest86.efi`
+`Utilities/GParted/Images/gparted.iso`
 
-Utilities są osobną kategorią GUI, a nie systemem operacyjnym w menu.
+Nazwa folderu jest nazwą narzędzia w GUI. W katalogu narzędzia można dodać `icon.png`; po lokalnej aktualizacji USOS ikona jest synchronizowana do katalogu metadanych na ESP i wyświetlana w menu. PNG może mieć maksymalnie 1 MiB.
+
+Duże obrazy pozostają wyłącznie na DATA. ESP przechowuje tylko mały katalog metadanych: nazwy plików obrazów jako wpisy zerowej długości, małe pliki unattended oraz ikony. `Aktualizuj USOS` odtwarza ten katalog na podstawie faktycznej zawartości DATA.
+
+Utilities są osobną kategorią GUI, a nie systemem operacyjnym.
+
+## Programs
+
+`Programs/` jest przeznaczone na programy używane już po uruchomieniu docelowego systemu operacyjnego. Każdy program może mieć własny folder i opcjonalne `icon.png` jako metadane. Zwykłe pliki Windows EXE nie są uruchamiane bez Windows; narzędzia bootowalne należy umieszczać w `Utilities`.

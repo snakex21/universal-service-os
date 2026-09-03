@@ -5,6 +5,7 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/widget"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
+	"github.com/snakex21/universal-service-os/installer/internal/localupdate"
 	"github.com/snakex21/universal-service-os/installer/internal/repair"
 	"github.com/snakex21/universal-service-os/installer/internal/ui"
 	"github.com/snakex21/universal-service-os/installer/internal/uninstall"
@@ -29,6 +30,12 @@ func main() {
 		window.ShowAndRun()
 		return
 	}
+	updateEngine, err := localupdate.NewEngine(backend, logger)
+	if err != nil {
+		showStartupError(window, "Nie można uruchomić silnika aktualizacji lokalnej:\n"+err.Error())
+		window.ShowAndRun()
+		return
+	}
 	repairEngine, err := repair.NewEngine(backend, logger)
 	if err != nil {
 		showStartupError(window, "Nie można uruchomić silnika naprawy:\n"+err.Error())
@@ -48,6 +55,7 @@ func main() {
 		winhost.Enumerator{},
 		winhost.InstalledUSOSSource{},
 		installEngine,
+		updateEngine,
 		repairEngine,
 		uninstallEngine,
 	)

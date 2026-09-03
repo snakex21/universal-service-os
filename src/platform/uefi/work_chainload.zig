@@ -1,8 +1,16 @@
 const std = @import("std");
 const uefi = std.os.uefi;
+const builtin = @import("builtin");
 const case_path = @import("case_path.zig");
 
-const boot_path = "EFI/BOOT/BOOTX64.EFI";
+fn bootPath() []const u8 {
+    return switch (builtin.cpu.arch) {
+        .x86_64 => "EFI/BOOT/BOOTX64.EFI",
+        .aarch64 => "EFI/BOOT/BOOTAA64.EFI",
+        .x86 => "EFI/BOOT/BOOTIA32.EFI",
+        else => "EFI/BOOT/BOOTX64.EFI",
+    };
+}
 
 pub const LoadedImageCheck = struct {
     file_path: []align(1) const u16,
@@ -15,7 +23,7 @@ pub fn load(work_handle: uefi.Handle) !uefi.Handle {
     defer root.close() catch {};
 
     var resolved_storage: [case_path.max_path_units + 1:0]u16 = undefined;
-    const resolved_path = try case_path.resolve(root, boot_path, &resolved_storage);
+    const resolved_path = try case_path.resolve(root, bootPath(), &resolved_storage);
 
     const device_path = (try boot_services.handleProtocol(uefi.protocol.DevicePath, work_handle)) orelse return error.DevicePathUnavailable;
     var path_storage: [2048]u8 = undefined;
@@ -54,7 +62,7 @@ pub fn checkLoadedImage(image_handle: uefi.Handle, work_handle: uefi.Handle) !Lo
     const root = try file_system.openVolume();
     defer root.close() catch {};
     var resolved_storage: [case_path.max_path_units + 1:0]u16 = undefined;
-    const expected_path = try case_path.resolve(root, boot_path, &resolved_storage);
+    const expected_path = try case_path.resolve(root, bootPath(), &resolved_storage);
     if (expected_path.len != actual_path.len) return error.FilePathMismatch;
     for (expected_path, 0..) |unit, index| {
         if (unit != actual_path[index]) return error.FilePathMismatch;

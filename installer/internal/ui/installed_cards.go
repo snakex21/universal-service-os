@@ -10,8 +10,8 @@ import (
 	"github.com/snakex21/universal-service-os/installer/internal/installed"
 )
 
-// InstalledCardScreen to ten sam uklad Karty + szczegoly co DeviceScreen,
-// ale lista zawiera wylacznie nosniki z wykrytym USOS.
+// InstalledCardScreen to ten sam układ Karty + szczegóły co DeviceScreen,
+// ale lista zawiera wyłącznie nośniki z wykrytym USOS.
 type InstalledCardScreen struct {
 	title       string
 	description string
@@ -30,11 +30,11 @@ type InstalledCardScreen struct {
 
 func NewInstalledCardScreen(title, description string, source InstalledUSOSSource, onBack func(), onSelected func(installed.Target)) *InstalledCardScreen {
 	s := &InstalledCardScreen{title: title, description: description, source: source, selected: -1, onSelected: onSelected}
-	s.status = widget.NewLabel("Wyszukiwanie poprawnych nosnikow USOS...")
+	s.status = widget.NewLabel("Wyszukiwanie poprawnych nośników USOS...")
 	s.status.Wrapping = fyne.TextWrapWord
 	s.listBox = container.NewVBox()
 	s.detailsBox = container.NewVBox()
-	s.refresh = widget.NewButton("Odswiez", s.Refresh)
+	s.refresh = widget.NewButton("Odśwież", s.Refresh)
 	if onBack != nil {
 		s.back = widget.NewButton("Wstecz", onBack)
 	}
@@ -79,7 +79,7 @@ func (s *InstalledCardScreen) Refresh() {
 	s.selected = -1
 	if s.status != nil {
 		s.status.Importance = widget.MediumImportance
-		s.status.SetText("Wyszukiwanie poprawnych nosnikow USOS...")
+		s.status.SetText("Wyszukiwanie poprawnych nośników USOS...")
 	}
 	go func() {
 		targets, err := s.source.ListInstalledUSOS()
@@ -94,7 +94,7 @@ func (s *InstalledCardScreen) Refresh() {
 				s.refreshDetails()
 				if s.status != nil {
 					s.status.Importance = widget.DangerImportance
-					s.status.SetText("Blad skanowania: " + err.Error())
+					s.status.SetText("Błąd skanowania: " + err.Error())
 				}
 				return
 			}
@@ -108,7 +108,7 @@ func (s *InstalledCardScreen) Refresh() {
 			if s.status != nil {
 				if len(targets) == 0 {
 					s.status.Importance = widget.MediumImportance
-					s.status.SetText("Nie wykryto zainstalowanego USOS. Podlacz nosnik z USOS albo wroc i uzyj instalacji.")
+					s.status.SetText("Nie wykryto zainstalowanego USOS. Podłącz nośnik z USOS albo wróć i użyj instalacji.")
 				} else {
 					s.status.Importance = widget.HighImportance
 					s.status.SetText(installedFoundNote(len(targets)))
@@ -126,13 +126,13 @@ func (s *InstalledCardScreen) rebuildList() {
 	}
 	s.listBox.Objects = nil
 	if len(s.rows) == 0 {
-		s.listBox.Add(widget.NewLabel("Brak nosnikow USOS do wyswietlenia."))
+		s.listBox.Add(widget.NewLabel("Brak nośników USOS do wyświetlenia."))
 		s.listBox.Refresh()
 		return
 	}
 	for i, row := range s.rows {
 		idx := i
-		label := fmt.Sprintf("%s - %s\nUSOS wykryty - gotowy do naprawy / deinstalacji", row.Model, row.Capacity)
+		label := fmt.Sprintf("%s - %s\nUSOS wykryty - gotowy do aktualizacji / naprawy / deinstalacji", row.Model, row.Capacity)
 		btn := widget.NewButton(label, func() { s.selectTarget(idx) })
 		btn.Alignment = widget.ButtonAlignLeading
 		if s.selected == idx {
@@ -163,7 +163,7 @@ func (s *InstalledCardScreen) refreshDetails() {
 	}
 	s.detailsBox.Objects = nil
 	if s.selected < 0 || s.selected >= len(s.rows) || s.selected >= len(s.targets) {
-		info := widget.NewLabel("Wybierz nosnik USOS z listy po lewej, aby zobaczyc szczegoly.")
+		info := widget.NewLabel("Wybierz nośnik USOS z listy po lewej, aby zobaczyć szczegóły.")
 		info.Wrapping = fyne.TextWrapWord
 		s.detailsBox.Add(info)
 		s.detailsBox.Refresh()
@@ -173,14 +173,14 @@ func (s *InstalledCardScreen) refreshDetails() {
 	title := widget.NewLabelWithStyle("Wybrano: "+row.Model, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	title.Wrapping = fyne.TextWrapWord
 	form := widget.NewForm(
-		widget.NewFormItem("Pojemnosc", widget.NewLabel(row.Capacity)),
+		widget.NewFormItem("Pojemność", widget.NewLabel(row.Capacity)),
 		widget.NewFormItem("Litery", widget.NewLabel(row.Letters)),
 		widget.NewFormItem("Etykiety", widget.NewLabel(row.Labels)),
-		widget.NewFormItem("System plikow", widget.NewLabel(row.FileSystems)),
-		widget.NewFormItem("Zajete", widget.NewLabel(row.Used)),
+		widget.NewFormItem("System plików", widget.NewLabel(row.FileSystems)),
+		widget.NewFormItem("Zajęte", widget.NewLabel(row.Used)),
 		widget.NewFormItem("Stan", widget.NewLabel("USOS wykryty")),
 	)
-	rootTitle := widget.NewLabelWithStyle("Zawartosc korzenia", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	rootTitle := widget.NewLabelWithStyle("Zawartość korzenia", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	root := widget.NewLabel(row.RootContents)
 	root.Wrapping = fyne.TextWrapWord
 	s.detailsBox.Add(title)

@@ -3,7 +3,7 @@
 Universal Service OS uses the public Microsoft MS-DOS source tree as a behavioural reference for DOS compatibility.
 
 Reference repository:
-- local checkout: `third_party/msdos-reference`
+- local checkout: `tools/reference/msdos-reference`
 - upstream clone URL: `https://github.com/microsoft/MS-DOS.git`
 - upstream web URL: `https://github.com/microsoft/MS-DOS`
 - exact reference commit: `2d04cacc5322951f187bb17e017c12920ac8ebe2`

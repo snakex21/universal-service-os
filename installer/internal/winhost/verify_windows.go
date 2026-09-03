@@ -23,7 +23,7 @@ func (b Backend) VerifyRepair(media install.MediaLayout, expected install.Device
 	return b.verify(media, expected, false)
 }
 
-func (b Backend) verify(media install.MediaLayout, expected install.DeviceINI, verifyDataTools bool) (install.VerificationReport, error) {
+func (b Backend) verify(media install.MediaLayout, expected install.DeviceINI, verifyDataPayload bool) (install.VerificationReport, error) {
 	report := install.VerificationReport{}
 	add := func(name, want, actual string) {
 		report.Items = append(report.Items, install.VerificationItem{
@@ -99,7 +99,7 @@ func (b Backend) verify(media install.MediaLayout, expected install.DeviceINI, v
 	}
 
 	verifyMountVisibility(&report, resolved)
-	if verifyDataTools {
+	if verifyDataPayload {
 		b.verifyDataPayload(&report, resolved)
 	}
 	return report, nil
@@ -141,7 +141,7 @@ func hasDriveLetter(paths []string) bool {
 }
 
 func (b Backend) verifyDataPayload(report *install.VerificationReport, resolved install.MediaLayout) {
-	for _, directory := range []string{"ISO", "TOOLS", "DRIVERS"} {
+	for _, directory := range requiredDataDirectories {
 		path := filepath.Join(resolved.DATA.VolumePath, directory)
 		info, err := os.Stat(path)
 		actual := "katalog istnieje"
@@ -153,35 +153,61 @@ func (b Backend) verifyDataPayload(report *install.VerificationReport, resolved 
 		}
 		report.Items = append(report.Items, install.VerificationItem{Name: "DATA\\" + directory, Expected: "katalog istnieje", Actual: actual, Match: match})
 	}
+	for _, guide := range dataGuides {
+		path := filepath.Join(resolved.DATA.VolumePath, guide.relativePath)
+		wantHashRaw := sha256.Sum256(guide.contents)
+		wantHash := hex.EncodeToString(wantHashRaw[:])
+		actualHash, err := hashFileSHA256(path)
+		if err != nil {
+			report.Items = append(report.Items, install.VerificationItem{Name: "DATA\\" + guide.relativePath, Expected: wantHash, Actual: err.Error(), Match: false})
+			continue
+		}
+		report.Items = append(report.Items, install.VerificationItem{Name: "DATA\\" + guide.relativePath + " SHA-256", Expected: wantHash, Actual: actualHash, Match: wantHash == actualHash})
+	}
+	if catalogErr := verifyDataCatalogMatches(resolved); catalogErr != nil {
+		report.Items = append(report.Items, install.VerificationItem{Name: "Katalog menu ESP", Expected: "zgodny z zawartością DATA", Actual: catalogErr.Error(), Match: false})
+	} else {
+		report.Items = append(report.Items, install.VerificationItem{Name: "Katalog menu ESP", Expected: "zgodny z zawartością DATA", Actual: "zgodny z zawartością DATA", Match: true})
+	}
+	if templateErr := verifyWimBootTemplate(resolved.DATA.VolumePath); templateErr != nil {
+		report.Items = append(report.Items, install.VerificationItem{Name: "Szablon WIMBoot", Expected: "gotowy, gdy DATA zawiera WIM", Actual: templateErr.Error(), Match: false})
+	} else {
+		report.Items = append(report.Items, install.VerificationItem{Name: "Szablon WIMBoot", Expected: "gotowy, gdy DATA zawiera WIM", Actual: "gotowy / nie jest wymagany", Match: true})
+	}
+	if templateErr := verifyVHDBootTemplates(resolved.DATA.VolumePath); templateErr != nil {
+		report.Items = append(report.Items, install.VerificationItem{Name: "Szablony VHDBoot", Expected: "gotowe, gdy DATA zawiera VHD/VHDX", Actual: templateErr.Error(), Match: false})
+	} else {
+		report.Items = append(report.Items, install.VerificationItem{Name: "Szablony VHDBoot", Expected: "gotowe, gdy DATA zawiera VHD/VHDX", Actual: "gotowe / nie są wymagane", Match: true})
+	}
 
 	readme, err := payload.README()
 	if err != nil {
-		report.Items = append(report.Items, install.VerificationItem{Name: "TOOLS\\README.md", Expected: "SHA-256 zgodne z README w EXE", Actual: err.Error(), Match: false})
+		report.Items = append(report.Items, install.VerificationItem{Name: "Programs\\USOS\\README.md", Expected: "SHA-256 zgodne z README w EXE", Actual: err.Error(), Match: false})
 	} else {
 		wantHashRaw := sha256.Sum256(readme)
 		wantHash := hex.EncodeToString(wantHashRaw[:])
-		actualHash, hashErr := hashFileSHA256(filepath.Join(resolved.DATA.VolumePath, "TOOLS", "README.md"))
+		actualHash, hashErr := hashFileSHA256(dataProgramFile(resolved.DATA.VolumePath, "README.md"))
 		if hashErr != nil {
-			report.Items = append(report.Items, install.VerificationItem{Name: "TOOLS\\README.md", Expected: wantHash, Actual: hashErr.Error(), Match: false})
+			report.Items = append(report.Items, install.VerificationItem{Name: "Programs\\USOS\\README.md", Expected: wantHash, Actual: hashErr.Error(), Match: false})
 		} else {
-			report.Items = append(report.Items, install.VerificationItem{Name: "TOOLS\\README.md SHA-256", Expected: wantHash, Actual: actualHash, Match: wantHash == actualHash})
+			report.Items = append(report.Items, install.VerificationItem{Name: "Programs\\USOS\\README.md SHA-256", Expected: wantHash, Actual: actualHash, Match: wantHash == actualHash})
 		}
 	}
 
 	installerPath, _, err := b.installerExecutable()
 	if err != nil {
-		report.Items = append(report.Items, install.VerificationItem{Name: "TOOLS\\USOS Installer.exe", Expected: "SHA-256 zgodne z uruchomionym instalatorem", Actual: err.Error(), Match: false})
+		report.Items = append(report.Items, install.VerificationItem{Name: "Programs\\USOS\\USOS Installer.exe", Expected: "SHA-256 zgodne z uruchomionym instalatorem", Actual: err.Error(), Match: false})
 		return
 	}
 	wantHash, err := hashFileSHA256(installerPath)
 	if err != nil {
-		report.Items = append(report.Items, install.VerificationItem{Name: "TOOLS\\USOS Installer.exe", Expected: "SHA-256 zgodne z uruchomionym instalatorem", Actual: err.Error(), Match: false})
+		report.Items = append(report.Items, install.VerificationItem{Name: "Programs\\USOS\\USOS Installer.exe", Expected: "SHA-256 zgodne z uruchomionym instalatorem", Actual: err.Error(), Match: false})
 		return
 	}
-	actualHash, err := hashFileSHA256(filepath.Join(resolved.DATA.VolumePath, "TOOLS", "USOS Installer.exe"))
+	actualHash, err := hashFileSHA256(dataProgramFile(resolved.DATA.VolumePath, "USOS Installer.exe"))
 	if err != nil {
-		report.Items = append(report.Items, install.VerificationItem{Name: "TOOLS\\USOS Installer.exe SHA-256", Expected: wantHash, Actual: err.Error(), Match: false})
+		report.Items = append(report.Items, install.VerificationItem{Name: "Programs\\USOS\\USOS Installer.exe SHA-256", Expected: wantHash, Actual: err.Error(), Match: false})
 		return
 	}
-	report.Items = append(report.Items, install.VerificationItem{Name: "TOOLS\\USOS Installer.exe SHA-256", Expected: wantHash, Actual: actualHash, Match: wantHash == actualHash})
+	report.Items = append(report.Items, install.VerificationItem{Name: "Programs\\USOS\\USOS Installer.exe SHA-256", Expected: wantHash, Actual: actualHash, Match: wantHash == actualHash})
 }

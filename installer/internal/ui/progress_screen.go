@@ -42,7 +42,7 @@ func (s *ProgressScreen) Content() fyne.CanvasObject {
 
 func (s *ProgressScreen) buildContent() fyne.CanvasObject {
 	title := widget.NewLabelWithStyle("Instalacja Universal Service OS", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-	warning := widget.NewLabel("Operacja niszczaca zostala rozpoczeta. Anulowanie nie jest juz dostepne. Nie odlaczaj nosnika i nie wylaczaj komputera.")
+	warning := widget.NewLabel("Operacja niszcząca została rozpoczęta. Anulowanie nie jest już dostępne. Nie odłączaj nośnika i nie wyłączaj komputera.")
 	warning.Wrapping = fyne.TextWrapWord
 	warning.Importance = widget.DangerImportance
 
@@ -140,7 +140,7 @@ func (s *ProgressScreen) applyStage(event install.Event) {
 		row.activity.Stop()
 		row.activity.Hide()
 		row.bar.Hide()
-		message := "Blad"
+		message := "Błąd"
 		if event.Err != nil {
 			message += ": " + event.Err.Error()
 		}

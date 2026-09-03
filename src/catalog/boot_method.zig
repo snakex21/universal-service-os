@@ -22,9 +22,41 @@ pub const BootMethod = enum {
             .floppy_image => "Floppy image",
         };
     }
+
+    pub fn persistedValue(self: BootMethod) []const u8 {
+        return switch (self) {
+            .automatic => "automatic",
+            .direct_iso => "iso",
+            .wimboot => "wimboot",
+            .vhdboot => "vhdboot",
+            .direct_efi => "efi",
+            .chainload => "chainload",
+            .memdisk => "memdisk",
+            .disk_image => "disk-image",
+            .floppy_image => "floppy-image",
+        };
+    }
+
+    pub fn fromPersistedValue(value: []const u8) ?BootMethod {
+        const std = @import("std");
+        inline for (std.meta.fields(BootMethod)) |field| {
+            const method: BootMethod = @enumFromInt(field.value);
+            if (std.mem.eql(u8, method.persistedValue(), value)) return method;
+        }
+        return null;
+    }
 };
 
 test "boot method labels stay user readable" {
     const std = @import("std");
     try std.testing.expectEqualStrings("WIMBoot", BootMethod.wimboot.label());
+}
+
+test "boot method persisted values round trip" {
+    const std = @import("std");
+    inline for (std.meta.fields(BootMethod)) |field| {
+        const method: BootMethod = @enumFromInt(field.value);
+        try std.testing.expectEqual(method, BootMethod.fromPersistedValue(method.persistedValue()).?);
+    }
+    try std.testing.expect(BootMethod.fromPersistedValue("unknown") == null);
 }

@@ -29,7 +29,7 @@ func NewUninstallConfirmationScreen(target installed.Target, onCancel, onConfirm
 	}
 	s.entry = widget.NewEntry()
 	s.entry.SetPlaceHolder(s.model.ExpectedText)
-	s.confirm = widget.NewButton("ROZPOCZNIJ DEINSTALACJE", s.confirmDestructive)
+	s.confirm = widget.NewButton("ROZPOCZNIJ DEINSTALACJĘ", s.confirmDestructive)
 	s.confirm.Importance = widget.DangerImportance
 	s.confirm.Disable()
 	s.cancel = widget.NewButton("Anuluj", func() {
@@ -50,7 +50,7 @@ func NewUninstallConfirmationScreen(target installed.Target, onCancel, onConfirm
 func (s *UninstallConfirmationScreen) Content() fyne.CanvasObject {
 	title := widget.NewLabelWithStyle("UWAGA - DEINSTALACJA USOS", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	title.Importance = widget.DangerImportance
-	warning := widget.NewLabel("Deinstalacja usunie caly uklad USOS i utworzy jedna zwykla partycje exFAT. Zawartosc katalogow DATA:\\ISO, DATA:\\TOOLS i DATA:\\DRIVERS zniknie. Po rozpoczeciu czyszczenia tablicy partycji operacji nie mozna anulowac ani automatycznie naprawic.")
+	warning := widget.NewLabel("Deinstalacja usunie cały układ USOS i utworzy jedną zwykłą partycję exFAT. Cała zawartość DATA, w tym Systems, Utilities i Programs, zniknie. Po rozpoczęciu czyszczenia tablicy partycji operacji nie można anulować ani automatycznie naprawić.")
 	warning.Wrapping = fyne.TextWrapWord
 	warning.Importance = widget.DangerImportance
 
@@ -59,7 +59,7 @@ func (s *UninstallConfirmationScreen) Content() fyne.CanvasObject {
 		serial = "-"
 	}
 	identity := widget.NewLabel(fmt.Sprintf(
-		"Cel: %s\nPhysicalDrive%d\nPojemnosc: %s\nSerial: %s",
+		"Cel: %s\nPhysicalDrive%d\nPojemność: %s\nSerial: %s",
 		s.target.Disk.DisplayName(),
 		s.target.Disk.Number,
 		domain.FormatBytes(s.target.Disk.SizeBytes),
@@ -68,12 +68,12 @@ func (s *UninstallConfirmationScreen) Content() fyne.CanvasObject {
 	identity.Wrapping = fyne.TextWrapWord
 
 	losses := container.NewVBox(
-		widget.NewLabelWithStyle("Zostanie usuniete:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewLabelWithStyle("Zostanie usunięte:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		widget.NewLabel("- ESP z bootmanagerem USOS"),
-		widget.NewLabel("- DATA razem z ISO, TOOLS, DRIVERS i pozostala zawartoscia"),
-		widget.NewLabel("- WORK razem z zawartoscia robocza i .usos-work"),
+		widget.NewLabel("- DATA razem z Systems, Utilities, Programs i pozostałą zawartością"),
+		widget.NewLabel("- WORK razem z zawartością roboczą i .usos-work"),
 	)
-	prompt := widget.NewLabel("Aby potwierdzic, wpisz pelny model urzadzenia dokladnie znak w znak:")
+	prompt := widget.NewLabel("Aby potwierdzić, wpisz pełny model urządzenia dokładnie znak w znak:")
 	expected := widget.NewLabelWithStyle(s.model.ExpectedText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true, Monospace: true})
 	buttons := container.NewHBox(s.cancel, s.confirm)
 	return container.NewBorder(

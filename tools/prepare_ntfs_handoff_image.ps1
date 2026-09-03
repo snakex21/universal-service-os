@@ -21,9 +21,9 @@ $WorkLabel = 'USOS_WORK'
 
 function Assert-TestImagePath([string]$Path) {
     $full = [IO.Path]::GetFullPath($Path)
-    $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\test-images'))
+    $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'tests\artifacts\qemu'))
     if (-not $full.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Refusing image path outside test-images: $full"
+        throw "Refusing image path outside tools/tests/artifacts/qemu: $full"
     }
 }
 

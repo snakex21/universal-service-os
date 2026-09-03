@@ -1,13 +1,28 @@
-# Local reference source trees
-third_party/
+# Local caches and reference source trees
+tools/cache/
+tools/reference/
+
+# Generated test artifacts
+tools/tests/artifacts/
 
 # Zig build output and cache
 .zig-cache/
 zig-out/
 
-# Local QEMU test images and installation media
-test-images/
+# Generated installer executable and local runtime logs
+installer/USOS Installer.exe
+installer/*.log
+installer/*.pid
+
+# Local SuperCLI attachment cache
+.supercli/attachments/
+
+# Local disk images / installation media
 *.qcow2
 *.raw
 *.iso
 *.ISO
+
+# Tiny tracked media fixtures used only by automated tests
+!tools/tests/fixtures/**/*.iso
+!tools/tests/fixtures/**/*.ISO

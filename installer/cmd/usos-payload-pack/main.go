@@ -75,6 +75,9 @@ func pack(root, out string) error {
 			if err != nil {
 				return fmt.Errorf("relative payload path %s: %w", source, err)
 			}
+			if !shouldBundleMediaFile(relative) {
+				return nil
+			}
 			target := filepath.ToSlash(filepath.Join(item.Target, relative))
 			return addFile(zw, source, target)
 		}); err != nil {

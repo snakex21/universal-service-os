@@ -10,6 +10,7 @@ pub const Theme = struct {
     accent: Color = .{ .r = 0x5a, .g = 0xa9, .b = 0xff },
     selected: Color = .{ .r = 0x2f, .g = 0x6f, .b = 0xae },
     border: Color = .{ .r = 0x34, .g = 0x46, .b = 0x5d },
+    disabled: Color = .{ .r = 0x3a, .g = 0x42, .b = 0x4c },
 
     pub fn parse(css: []const u8) Theme {
         var result = Theme{};
@@ -21,6 +22,7 @@ pub const Theme = struct {
         result.accent = property(css, "--accent") orelse result.accent;
         result.selected = property(css, "--selected") orelse result.selected;
         result.border = property(css, "--border") orelse result.border;
+        result.disabled = property(css, "--disabled") orelse result.disabled;
         return result;
     }
 };
