@@ -1,0 +1,13 @@
+# Local reference source trees
+third_party/
+
+# Zig build output and cache
+.zig-cache/
+zig-out/
+
+# Local QEMU test images and installation media
+test-images/
+*.qcow2
+*.raw
+*.iso
+*.ISO

@@ -1,0 +1,147 @@
+const std = @import("std");
+const random_access = @import("random_access.zig");
+
+pub const FileInfo = struct {
+    size: u64,
+    is_directory: bool,
+};
+
+pub const Error = error{
+    NotIso9660,
+    InvalidIso9660,
+    UnsupportedBlockSize,
+};
+
+const descriptor_sector: u64 = 16;
+const descriptor_size: usize = 2048;
+
+pub fn findPath(reader: anytype, path: []const u8) !?FileInfo {
+    var pvd: [descriptor_size]u8 = undefined;
+    try random_access.readExactAt(reader, descriptor_sector * descriptor_size, &pvd);
+    if (pvd[0] != 1 or !std.mem.eql(u8, pvd[1..6], "CD001")) return error.NotIso9660;
+
+    const block_size = readLe16(pvd[128..130]);
+    if (block_size < 512 or block_size > 4096) return error.UnsupportedBlockSize;
+    if (pvd[156] < 34) return error.InvalidIso9660;
+
+    var current = recordInfo(pvd[156..]) orelse return error.InvalidIso9660;
+    var remaining = std.mem.tokenizeScalar(u8, path, '/');
+    while (remaining.next()) |component| {
+        if (!current.is_directory) return null;
+        current = (try findInDirectory(reader, block_size, current, component)) orelse return null;
+    }
+    return .{ .size = current.size, .is_directory = current.is_directory };
+}
+
+const Record = struct {
+    extent_lba: u32,
+    size: u64,
+    is_directory: bool,
+    name_offset: usize = 0,
+    name_len: usize = 0,
+};
+
+fn findInDirectory(reader: anytype, block_size: u16, directory: Record, wanted: []const u8) !?Record {
+    var consumed: u64 = 0;
+    var record_buf: [255]u8 = undefined;
+
+    while (consumed < directory.size) {
+        const absolute = @as(u64, directory.extent_lba) * block_size + consumed;
+        var len_byte: [1]u8 = undefined;
+        try random_access.readExactAt(reader, absolute, &len_byte);
+        const record_len = len_byte[0];
+        if (record_len == 0) {
+            const next_block = ((consumed / block_size) + 1) * block_size;
+            if (next_block <= consumed) return error.InvalidIso9660;
+            consumed = next_block;
+            continue;
+        }
+        if (record_len < 34) return error.InvalidIso9660;
+        try random_access.readExactAt(reader, absolute, record_buf[0..record_len]);
+        const rec = recordInfo(record_buf[0..record_len]) orelse return error.InvalidIso9660;
+        const raw_name = record_buf[rec.name_offset .. rec.name_offset + rec.name_len];
+        if (!isSpecialName(raw_name) and isoNameEquals(raw_name, wanted)) return rec;
+        consumed += record_len;
+    }
+    return null;
+}
+
+fn recordInfo(bytes: []const u8) ?Record {
+    if (bytes.len < 34) return null;
+    const record_len = bytes[0];
+    if (record_len < 34 or record_len > bytes.len) return null;
+    const name_len = bytes[32];
+    if (@as(usize, 33) + name_len > record_len) return null;
+    return .{
+        .extent_lba = readLe32(bytes[2..6]),
+        .size = readLe32(bytes[10..14]),
+        .is_directory = (bytes[25] & 0x02) != 0,
+        .name_offset = 33,
+        .name_len = name_len,
+    };
+}
+
+fn isSpecialName(name: []const u8) bool {
+    return name.len == 1 and (name[0] == 0 or name[0] == 1);
+}
+
+fn isoNameEquals(raw_name: []const u8, wanted: []const u8) bool {
+    var name = raw_name;
+    if (std.mem.indexOfScalar(u8, name, ';')) |index| name = name[0..index];
+    while (name.len > 0 and name[name.len - 1] == '.') name = name[0 .. name.len - 1];
+    return std.ascii.eqlIgnoreCase(name, wanted);
+}
+
+fn readLe16(bytes: []const u8) u16 {
+    return std.mem.readInt(u16, bytes[0..2], .little);
+}
+
+fn readLe32(bytes: []const u8) u32 {
+    return std.mem.readInt(u32, bytes[0..4], .little);
+}
+
+test "ISO9660 path matching is case-insensitive for uppercase media" {
+    var image = [_]u8{0} ** (24 * descriptor_size);
+    writeTestImage(&image, "SOURCES", "INSTALL.WIM;1", 123456);
+
+    var reader = random_access.SliceReader{ .bytes = &image };
+    const info = (try findPath(&reader, "sources/install.wim")).?;
+    try std.testing.expectEqual(@as(u64, 123456), info.size);
+    try std.testing.expect(!info.is_directory);
+}
+
+test "ISO9660 path matching is case-insensitive for lowercase media" {
+    var image = [_]u8{0} ** (24 * descriptor_size);
+    writeTestImage(&image, "sources", "install.wim;1", 654321);
+
+    var reader = random_access.SliceReader{ .bytes = &image };
+    const info = (try findPath(&reader, "SOURCES/INSTALL.WIM")).?;
+    try std.testing.expectEqual(@as(u64, 654321), info.size);
+    try std.testing.expect(!info.is_directory);
+}
+
+fn writeTestImage(image: []u8, directory_name: []const u8, file_name: []const u8, file_size: u32) void {
+    const pvd = image[16 * descriptor_size .. 17 * descriptor_size];
+    pvd[0] = 1;
+    @memcpy(pvd[1..6], "CD001");
+    std.mem.writeInt(u16, pvd[128..130], descriptor_size, .little);
+    _ = writeRecord(pvd[156..], 20, descriptor_size, true, &.{0});
+
+    const root = image[20 * descriptor_size .. 21 * descriptor_size];
+    _ = writeRecord(root, 21, descriptor_size, true, directory_name);
+    const sources = image[21 * descriptor_size .. 22 * descriptor_size];
+    _ = writeRecord(sources, 22, file_size, false, file_name);
+}
+
+fn writeRecord(dest: []u8, extent: u32, size: u32, is_dir: bool, name: []const u8) usize {
+    const padded_name_len = name.len + @intFromBool((name.len & 1) == 0);
+    const len: u8 = @intCast(33 + padded_name_len);
+    @memset(dest[0..len], 0);
+    dest[0] = len;
+    std.mem.writeInt(u32, dest[2..6], extent, .little);
+    std.mem.writeInt(u32, dest[10..14], size, .little);
+    dest[25] = if (is_dir) 0x02 else 0;
+    dest[32] = @intCast(name.len);
+    @memcpy(dest[33 .. 33 + name.len], name);
+    return len;
+}

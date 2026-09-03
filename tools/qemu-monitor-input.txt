@@ -1,0 +1,2 @@
+help mouse_move
+quit

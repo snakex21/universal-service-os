@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<unattend xmlns="urn:schemas-microsoft-com:unattend">
+  <settings pass="windowsPE">
+    <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+      <RunSynchronous>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <Description>Run USOS GPT QEMU destructive integration test</Description>
+          <Path>cmd.exe /c for %D in (C D E F G H I J K L M N O P Q R S T U V W X Y Z) do @if exist %D:\USOS_QEMU_TEST.TAG call %D:\run-usos-gpt-test.cmd %D:</Path>
+        </RunSynchronousCommand>
+      </RunSynchronous>
+    </component>
+  </settings>
+</unattend>
