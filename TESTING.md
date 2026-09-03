@@ -8,7 +8,7 @@ Projekt korzysta z `tools/zig/zig.exe`. Nie wymaga Ziga w PATH.
 
 - `test.bat` - wszystkie testy jednostkowe.
 - `selftest.bat` - te same krytyczne kontrole, które wykonuje system podczas startu.
-- `build.bat` - pełny build ReleaseFast dla aktualnych obrazów UEFI.
+- `build.bat` - pełny build ReleaseFast programu USB i instalatora. Zawsze przebudowuje payload, uruchamia testy Go i kończy się kontrolą spójności SHA-256.
 
 ## QEMU x86_64
 
@@ -39,6 +39,10 @@ Test negatywny można zbudować parametrem `-GuardTestBadPartuuid` skryptu `tool
 
 Potwierdzony pełny przebieg używa `-cpu max` i wykonuje w jednej VM: menu USOS, `prepare-requested`, backup `BootOrder`, `BootNext`, mikro-Linux, guard, format i marker WORK, ekstrakcję z weryfikacją, `prepared`, reboot, EfiFs oraz Windows Setup. Sukces wizualny oznacza ekran wyboru lokalizacji instalacji z widocznymi `USOS_DATA` i `USOS_WORK`; test kończy się przed rozpoczęciem instalacji.
 
+Regresja UI/backend musi dodatkowo potwierdzić, że tylko Windows 11 + ISO + metoda `ISO` jest aktywna. Pozostałe systemy i metody mają pozostać widoczne, lecz niewybieralne z komunikatem o aktualnym ograniczeniu backendu. Test jednostkowy kontraktu wymaga również jawnego błędu `UnsupportedMethod` dla przykładowego `VHDBoot`; backend nie może ignorować metody wybranej przez UI.
+
+Artefakty, testy i logi wcześniejszego przebiegu pozostają zachowane co najmniej do czasu przejścia przez nowy build całej tej samej macierzy. Dowody sprzed scalenia oraz manifest SHA-256 znajdują się w `docs/evidence/pre-merge/`.
+
 Runner zachowuje:
 
 - `serial.log` z etapami USOS i zweryfikowaną ścieżką `LoadedImage`,
@@ -67,3 +71,5 @@ Po pełnym buildzie:
 - `zig-out/usb/EFI/BOOT/BOOTAA64.EFI` - ARM64.
 
 Oba pliki mogą znajdować się na tej samej partycji EFI/FAT.
+
+`BOOTX64.EFI` dla `zig-out/usb` i `zig-out/manual-usb` powstaje z jednego obiektu kompilacji, więc wersja testowa i wersja zapisywana na pendrive nie mają osobnych implementacji. `tools/verify_release_consistency.ps1` dodatkowo porównuje ich SHA-256 i sprawdza każdy plik `zig-out/usb` z zawartością ZIP-a wbudowanego w instalator. Brak UI, ikon, systemów, pliku `win10-11 best-ustawienia.xml` albo jakakolwiek niezgodność przerywa `build.bat`.

@@ -3,7 +3,6 @@ const uefi = std.os.uefi;
 const usos = @import("usos");
 const boot_next = @import("boot_next.zig");
 const case_path = @import("case_path.zig");
-const log = @import("log.zig");
 const ntfs_driver = @import("ntfs_driver.zig");
 const persistent_state_file = @import("persistent_state_file.zig");
 const serial = @import("serial.zig");
@@ -13,7 +12,6 @@ const work_volume = @import("work_volume.zig");
 const linux_loader_path = "EFI/USOS/systemd-bootx64.efi";
 
 fn say(text: []const u8) void {
-    log.writeAscii(text);
     serial.writeAscii(text);
 }
 
@@ -62,10 +60,10 @@ pub fn requestPreparation(
     root: *uefi.protocol.File,
     system: *const usos.catalog.SystemEntry,
     image: usos.catalog.ImageItem,
+    method: usos.catalog.BootMethod,
     unattended: ?[]const u8,
 ) !void {
-    if (!std.mem.eql(u8, system.id, "windows-11")) return error.UnsupportedSystem;
-    if (image.kind != .iso) return error.UnsupportedImage;
+    try usos.flow.preparation_capability.validate(system.id, image.kind, method);
 
     var iso_path_storage: [512]u8 = undefined;
     const iso_path = try dataPath(&iso_path_storage, system.image_directory, image.name.slice());

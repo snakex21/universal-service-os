@@ -33,7 +33,7 @@ Szczegółowe reguły pracy są zapisane w `PROJECT_RULES.md`.
 
 Projekt używa przenośnego Ziga z `tools/zig/zig.exe` i nie wymaga dodawania Ziga do PATH.
 
-- `build.bat` - buduje wersję `ReleaseFast`,
+- `build.bat` - buduje kompletną wersję `ReleaseFast`: wspólny program EFI dla pendrive'a i testu, payload oraz `installer\build\USOS Installer.exe`; na końcu sprawdza zgodność SHA-256,
 - `test.bat` - uruchamia pełne testy jednostkowe,
 - `selftest.bat` - uruchamia te same krytyczne testy startowe, których użyje system.
 

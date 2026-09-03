@@ -142,11 +142,15 @@ pub fn systemRow(selected: bool, value: []const u8, icon: ?*const usos.gui.RgbaI
     drawRow(selected, value, icon);
 }
 
-pub fn systemRowDisabled(selected: bool, value: []const u8, icon: ?*const usos.gui.RgbaImage) void {
-    drawRowDisabled(selected, value, icon);
+pub fn systemRowDisabled(selected: bool, value: []const u8, icon: ?*const usos.gui.RgbaImage, reason: []const u8) void {
+    drawRowDisabled(selected, value, icon, reason);
 }
 
-fn drawRowDisabled(selected: bool, value: []const u8, icon: ?*const usos.gui.RgbaImage) void {
+pub fn rowDisabled(selected: bool, value: []const u8, reason: []const u8) void {
+    drawRowDisabled(selected, value, null, reason);
+}
+
+fn drawRowDisabled(selected: bool, value: []const u8, icon: ?*const usos.gui.RgbaImage, reason: []const u8) void {
     if (surface) |canvas| {
         if (value.len == 0) {
             row_y += 16;
@@ -157,6 +161,7 @@ fn drawRowDisabled(selected: bool, value: []const u8, icon: ?*const usos.gui.Rgb
         const x = panel_x + 18;
         const width = panel_width -| 36;
         canvas.fillRect(x, row_y, width, row_height - 6, theme.panel);
+        if (selected) canvas.fillRect(x, row_y, 5, row_height - 6, theme.border);
         var text_x = x + 18;
         if (icon) |system_icon| {
             drawRgbaIcon(canvas, x + 12, row_y + 2, system_icon, theme.panel);
@@ -164,12 +169,14 @@ fn drawRowDisabled(selected: bool, value: []const u8, icon: ?*const usos.gui.Rgb
         }
         const dim = theme.muted;
         usos.gui.text.draw(canvas, text_x, row_y + 10, value, 2, dim);
-        usos.gui.text.draw(canvas, text_x + usos.gui.text.width(value, 2) + 16, row_y + 10, "[no ISO]", 1, dim);
+        usos.gui.text.draw(canvas, text_x + usos.gui.text.width(value, 2) + 16, row_y + 10, reason, 1, dim);
         row_y += row_height;
     } else {
         console.writeAscii(if (selected) "> " else "  ");
         console.writeAscii(value);
-        console.writeAscii(" [no ISO]\n");
+        console.writeAscii(" ");
+        console.writeAscii(reason);
+        console.writeAscii("\n");
     }
 }
 

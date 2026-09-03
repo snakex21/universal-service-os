@@ -53,6 +53,7 @@ pub const flow = struct {
     pub const extract_verification = @import("flow/extract_verification.zig");
     pub const boot_next_order = @import("flow/boot_next_order.zig");
     pub const preparation_state = @import("flow/preparation_state.zig");
+    pub const preparation_capability = @import("flow/preparation_capability.zig");
     pub const persistent_phase = @import("flow/persistent_phase.zig");
 };
 pub const selftest = struct {
@@ -107,6 +108,7 @@ test {
     _ = flow.extract_verification;
     _ = flow.boot_next_order;
     _ = flow.preparation_state;
+    _ = flow.preparation_capability;
     _ = flow.persistent_phase;
     _ = selftest.Case;
     _ = selftest.Report;

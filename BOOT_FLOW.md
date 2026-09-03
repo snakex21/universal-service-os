@@ -39,6 +39,8 @@ Docelowa kolejność dla instalatora Windows jest następująca:
 
 `tools/prepare_work.sh` jest jedynym przewidzianym entrypointem destrukcyjnej części mikro-Linuxa i wymusza kolejność guard → format → marker → mount → extract/verify/sync → prepared.
 
+Kontrakt możliwości backendu jest wspólnym źródłem prawdy dla UI i `requestPreparation()`. Obecnie jedyną aktywną kombinacją jest Windows 11, obraz ISO i metoda `direct_iso` (`ISO`). Pozostałe systemy i metody pozostają widoczne jako planowane, ale UI nie pozwala ich uruchomić i pokazuje powód. Niezależnie od kontroli UI `requestPreparation()` ponownie waliduje system, typ obrazu oraz metodę i jawnie odrzuca nieobsługiwane wartości.
+
 ## Architektura katalogu
 
 Profile są danymi. GUI nie posiada osobnych `if` dla Windows 11, Ubuntu, Longhorna czy MemTesta. Profil określa kategorię, rodzinę, katalog obrazów, opcjonalny katalog unattended i listę metod bootowania. Loader jest osobną warstwą i implementuje konkretne techniki startu.

@@ -23,6 +23,10 @@ func TestEmbeddedPayloadHasRequiredFiles(t *testing.T) {
 		"EFI/USOS/systemd-bootx64.efi":        false,
 		"EFI/USOS/micro-linux/vmlinuz-virt":   false,
 		"EFI/USOS/micro-linux/initramfs-usos": false,
+		"UI/index.html":                       false,
+		"UI/theme.css":                        false,
+		"UI/Icons/Systems/windows-11.png":     false,
+		"Systems/Windows/Windows 11/Unattended/win10-11 best-ustawienia.xml": false,
 	}
 	for _, file := range manifest {
 		if file.Size == 0 || file.SHA256 == "" {
@@ -83,5 +87,8 @@ func TestExtractReportsRealByteProgress(t *testing.T) {
 	}
 	if info, err := os.Stat(filepath.Join(root, "EFI", "BOOT", "BOOTX64.EFI")); err != nil || info.Size() == 0 {
 		t.Fatalf("BOOTX64.EFI not extracted correctly: info=%v err=%v", info, err)
+	}
+	if info, err := os.Stat(filepath.Join(root, "UI", "Icons", "Systems", "windows-11.png")); err != nil || info.Size() == 0 {
+		t.Fatalf("Windows 11 icon not extracted correctly: info=%v err=%v", info, err)
 	}
 }

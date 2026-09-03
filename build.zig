@@ -9,10 +9,10 @@ pub fn build(b: *std.Build) void {
     addHostImageProbe(b, target, optimize);
     const ntfs_driver = addFetchNtfsDriver(b);
 
-    _ = addUefiApp(b, optimize, .x86_64, "usos-x86_64", "usb/EFI/BOOT/BOOTX64.EFI");
-    _ = addUefiApp(b, optimize, .aarch64, "usos-aarch64", "usb/EFI/BOOT/BOOTAA64.EFI");
+    const x86_64_app = addInteractiveX86UefiApp(b, optimize);
+    _ = addBootstrapUefiApp(b, optimize, .aarch64, "usos-aarch64", "usb/EFI/BOOT/BOOTAA64.EFI");
     addReleaseMediaLayout(b);
-    const manual_image = addQemuX86ManualImage(b, optimize);
+    const manual_image = addQemuX86ManualImage(b, x86_64_app);
     const micro_linux = addMicroLinux(b);
     const handoff_app = addNtfsHandoffTestApp(b, optimize);
     addBootNextCompileCheck(b, optimize);
@@ -48,6 +48,14 @@ fn addReleaseMediaLayout(b: *std.Build) void {
         .install_subdir = "usb",
     });
     b.getInstallStep().dependOn(&install_media.step);
+
+    // Preserve the user-facing filename in the release media. The UEFI menu
+    // enumerates XML files, so it must not silently rename this to unattend.xml.
+    const install_unattended = b.addInstallFile(
+        b.path("win10-11 best-ustawienia.xml"),
+        "usb/Systems/Windows/Windows 11/Unattended/win10-11 best-ustawienia.xml",
+    );
+    b.getInstallStep().dependOn(&install_unattended.step);
 }
 
 fn addHostTests(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
@@ -98,7 +106,7 @@ fn addHostSelftest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     selftest_step.dependOn(&run_selftest.step);
 }
 
-fn addUefiApp(
+fn addBootstrapUefiApp(
     b: *std.Build,
     optimize: std.builtin.OptimizeMode,
     arch: std.Target.Cpu.Arch,
@@ -127,6 +135,39 @@ fn addUefiApp(
     b.getInstallStep().dependOn(&install_boot.step);
 
     const step = b.step(name, b.fmt("Build {s} UEFI bootstrap", .{name}));
+    step.dependOn(&app.step);
+    return app;
+}
+
+fn addInteractiveX86UefiApp(b: *std.Build, optimize: std.builtin.OptimizeMode) *std.Build.Step.Compile {
+    const target = b.resolveTargetQuery(.{
+        .cpu_arch = .x86_64,
+        .os_tag = .uefi,
+    });
+    const usos_module = createUsosModule(b, target, optimize);
+    const ps2_mouse_module = b.createModule(.{
+        .root_source_file = b.path("src/arch/x86/ps2_mouse.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const app_module = b.createModule(.{
+        .root_source_file = b.path("src/platform/uefi/manual_main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    app_module.addImport("usos", usos_module);
+    app_module.addImport("ps2_mouse", ps2_mouse_module);
+
+    const app = b.addExecutable(.{
+        .name = "usos-x86_64",
+        .root_module = app_module,
+    });
+    b.installArtifact(app);
+
+    const install_boot = b.addInstallFile(app.getEmittedBin(), "usb/EFI/BOOT/BOOTX64.EFI");
+    b.getInstallStep().dependOn(&install_boot.step);
+
+    const step = b.step("usos-x86_64", "Build the interactive x86_64 UEFI application used by release USB media");
     step.dependOn(&app.step);
     return app;
 }
@@ -240,6 +281,8 @@ fn addPrepareE2eBase(b: *std.Build, ntfs_driver_step: *std.Build.Step, manual_im
         "tools/qemu/qemu-img.exe",
         "-BootEfiPath",
         "zig-out/manual-usb/EFI/BOOT/BOOTX64.EFI",
+        "-UiRootPath",
+        "zig-out/manual-usb/UI",
         "-NtfsDriverPath",
         "zig-out/test-assets/ntfs_x64.efi",
         "-MicroLinuxKernelPath",
@@ -321,29 +364,7 @@ fn addNtfsHandoffTestApp(b: *std.Build, optimize: std.builtin.OptimizeMode) *std
     return step;
 }
 
-fn addQemuX86ManualImage(b: *std.Build, optimize: std.builtin.OptimizeMode) *std.Build.Step {
-    const target = b.resolveTargetQuery(.{
-        .cpu_arch = .x86_64,
-        .os_tag = .uefi,
-    });
-    const usos_module = createUsosModule(b, target, optimize);
-    const ps2_mouse_module = b.createModule(.{
-        .root_source_file = b.path("src/arch/x86/ps2_mouse.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    const app_module = b.createModule(.{
-        .root_source_file = b.path("src/platform/uefi/manual_main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    app_module.addImport("usos", usos_module);
-    app_module.addImport("ps2_mouse", ps2_mouse_module);
-
-    const app = b.addExecutable(.{
-        .name = "usos-manual-x86_64",
-        .root_module = app_module,
-    });
+fn addQemuX86ManualImage(b: *std.Build, app: *std.Build.Step.Compile) *std.Build.Step {
     const install_boot = b.addInstallFile(app.getEmittedBin(), "manual-usb/EFI/BOOT/BOOTX64.EFI");
     const install_layout = b.addInstallDirectory(.{
         .source_dir = b.path("media"),

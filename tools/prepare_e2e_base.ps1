@@ -4,6 +4,7 @@ param(
     [Parameter(Mandatory=$true)][string]$BaseQcow2Path,
     [Parameter(Mandatory=$true)][string]$QemuImgPath,
     [Parameter(Mandatory=$true)][string]$BootEfiPath,
+    [Parameter(Mandatory=$true)][string]$UiRootPath,
     [Parameter(Mandatory=$true)][string]$NtfsDriverPath,
     [Parameter(Mandatory=$true)][string]$MicroLinuxKernelPath,
     [Parameter(Mandatory=$true)][string]$MicroLinuxInitramfsPath,
@@ -13,7 +14,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-foreach ($name in @('IsoPath','VhdPath','BaseQcow2Path','QemuImgPath','BootEfiPath','NtfsDriverPath','MicroLinuxKernelPath','MicroLinuxInitramfsPath','MicroLinuxLoaderPath')) {
+foreach ($name in @('IsoPath','VhdPath','BaseQcow2Path','QemuImgPath','BootEfiPath','UiRootPath','NtfsDriverPath','MicroLinuxKernelPath','MicroLinuxInitramfsPath','MicroLinuxLoaderPath')) {
     Set-Variable -Name $name -Value ([IO.Path]::GetFullPath((Get-Variable -Name $name -ValueOnly)))
 }
 if (-not [string]::IsNullOrWhiteSpace($UnattendPath)) { $UnattendPath = [IO.Path]::GetFullPath($UnattendPath) }
@@ -28,8 +29,17 @@ $candidateBasePath = "$BaseQcow2Path.new"
 if (-not $candidateBasePath.StartsWith($testImagesRoot, [StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing candidate image path outside test-images: $candidateBasePath"
 }
+$mountRoot = [IO.Path]::GetFullPath("$VhdPath.mount")
+if (-not $mountRoot.StartsWith($testImagesRoot, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Refusing mount path outside test-images: $mountRoot"
+}
 foreach ($required in @($IsoPath, $QemuImgPath, $BootEfiPath, $NtfsDriverPath, $MicroLinuxKernelPath, $MicroLinuxInitramfsPath, $MicroLinuxLoaderPath)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "Missing required file: $required" }
+}
+if (-not (Test-Path -LiteralPath $UiRootPath -PathType Container)) { throw "Missing UI directory: $UiRootPath" }
+foreach ($requiredUiPath in @('index.html', 'theme.css', 'Icons\Systems')) {
+    $candidate = Join-Path $UiRootPath $requiredUiPath
+    if (-not (Test-Path -LiteralPath $candidate)) { throw "Missing UI asset: $candidate" }
 }
 if (-not [string]::IsNullOrWhiteSpace($UnattendPath) -and -not (Test-Path -LiteralPath $UnattendPath -PathType Leaf)) {
     throw "Missing unattended file: $UnattendPath"
@@ -43,6 +53,7 @@ $DataLabel = 'USOS_DATA'
 New-Item -ItemType Directory -Force -Path $testImagesRoot | Out-Null
 if (Test-Path -LiteralPath $VhdPath) { Remove-Item -LiteralPath $VhdPath -Force }
 if (Test-Path -LiteralPath $candidateBasePath) { Remove-Item -LiteralPath $candidateBasePath -Force }
+if (Test-Path -LiteralPath $mountRoot) { Remove-Item -LiteralPath $mountRoot -Recurse -Force }
 
 & $QemuImgPath create -f vpc -o subformat=fixed $VhdPath 24G
 if ($LASTEXITCODE -ne 0) { throw "qemu-img VHD create failed: $LASTEXITCODE" }
@@ -50,8 +61,9 @@ if ($LASTEXITCODE -ne 0) { throw "qemu-img VHD create failed: $LASTEXITCODE" }
 if ($LASTEXITCODE -ne 0) { throw "failed to clear sparse flag on VHD: $LASTEXITCODE" }
 
 $mountedVhd = $false
+$mountBindings = @()
 try {
-    Mount-DiskImage -ImagePath $VhdPath -StorageType VHD | Out-Null
+    Mount-DiskImage -ImagePath $VhdPath -StorageType VHD -NoDriveLetter | Out-Null
     $mountedVhd = $true
     Start-Sleep -Milliseconds 500
 
@@ -61,9 +73,9 @@ try {
 
     Initialize-Disk -Number $disk.Number -PartitionStyle GPT | Out-Null
     $disk = Get-Disk -Number $disk.Number
-    $esp = New-Partition -DiskNumber $disk.Number -Size 512MB -GptType $EspType -AssignDriveLetter
-    $data = New-Partition -DiskNumber $disk.Number -Size 10GB -GptType $BasicDataType -AssignDriveLetter
-    $work = New-Partition -DiskNumber $disk.Number -UseMaximumSize -GptType $BasicDataType -AssignDriveLetter
+    $esp = New-Partition -DiskNumber $disk.Number -Size 512MB -GptType $EspType
+    $data = New-Partition -DiskNumber $disk.Number -Size 10GB -GptType $BasicDataType
+    $work = New-Partition -DiskNumber $disk.Number -UseMaximumSize -GptType $BasicDataType
 
     $esp | Format-Volume -FileSystem FAT32 -NewFileSystemLabel 'USOS_ESP' -Confirm:$false -Force | Out-Null
     $data | Format-Volume -FileSystem NTFS -NewFileSystemLabel $DataLabel -Confirm:$false -Force | Out-Null
@@ -72,10 +84,18 @@ try {
     $esp = Get-Partition -DiskNumber $disk.Number -PartitionNumber $esp.PartitionNumber
     $data = Get-Partition -DiskNumber $disk.Number -PartitionNumber $data.PartitionNumber
     $work = Get-Partition -DiskNumber $disk.Number -PartitionNumber $work.PartitionNumber
-    $espRoot = "$($esp.DriveLetter):\"
-    $dataRoot = "$($data.DriveLetter):\"
-    $workRoot = "$($work.DriveLetter):\"
-    if (("$($work.DriveLetter):") -eq $env:SystemDrive) { throw 'WORK unexpectedly equals Windows root volume' }
+    $espRoot = Join-Path $mountRoot 'esp'
+    $dataRoot = Join-Path $mountRoot 'data'
+    $workRoot = Join-Path $mountRoot 'work'
+    New-Item -ItemType Directory -Force -Path $espRoot,$dataRoot,$workRoot | Out-Null
+    foreach ($binding in @(
+        @{ Partition = $esp; Path = $espRoot },
+        @{ Partition = $data; Path = $dataRoot },
+        @{ Partition = $work; Path = $workRoot }
+    )) {
+        Add-PartitionAccessPath -DiskNumber $disk.Number -PartitionNumber $binding.Partition.PartitionNumber -AccessPath $binding.Path
+        $mountBindings += $binding
+    }
 
     $diskGuid = "$($disk.Guid)".Trim('{}')
     $espGuid = "$($esp.Guid)".Trim('{}')
@@ -93,6 +113,7 @@ try {
     New-Item -ItemType Directory -Force -Path (Join-Path $espRoot 'EFI\USOS') | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $espRoot 'EFI\USOS\micro-linux') | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $espRoot 'loader\entries') | Out-Null
+    Copy-Item -LiteralPath $UiRootPath -Destination (Join-Path $espRoot 'UI') -Recurse -Force
     Copy-Item -LiteralPath $BootEfiPath -Destination (Join-Path $espRoot 'EFI\BOOT\BOOTX64.EFI') -Force
     Copy-Item -LiteralPath $NtfsDriverPath -Destination (Join-Path $espRoot 'EFI\USOS\ntfs_x64.efi') -Force
     Copy-Item -LiteralPath $MicroLinuxLoaderPath -Destination (Join-Path $espRoot 'EFI\USOS\systemd-bootx64.efi') -Force
@@ -136,7 +157,7 @@ try {
         throw 'DATA ISO size mismatch after copy'
     }
     if (-not [string]::IsNullOrWhiteSpace($UnattendPath)) {
-        Copy-Item -LiteralPath $UnattendPath -Destination (Join-Path $unattendDir 'unattend.xml') -Force
+        Copy-Item -LiteralPath $UnattendPath -Destination (Join-Path $unattendDir (Split-Path -Leaf $UnattendPath)) -Force
     }
 
     # The ESP contains only catalog entries. The large payload stays on DATA
@@ -146,11 +167,11 @@ try {
     New-Item -ItemType Directory -Force -Path $espImageDir,$espUnattendDir | Out-Null
     [IO.File]::WriteAllBytes((Join-Path $espImageDir (Split-Path -Leaf $IsoPath)), [byte[]]@())
     if (-not [string]::IsNullOrWhiteSpace($UnattendPath)) {
-        Copy-Item -LiteralPath $UnattendPath -Destination (Join-Path $espUnattendDir 'unattend.xml') -Force
+        Copy-Item -LiteralPath $UnattendPath -Destination (Join-Path $espUnattendDir (Split-Path -Leaf $UnattendPath)) -Force
     }
 
-    $workVolume = Get-Volume -DriveLetter $work.DriveLetter
-    $dataVolume = Get-Volume -DriveLetter $data.DriveLetter
+    $workVolume = $work | Get-Volume
+    $dataVolume = $data | Get-Volume
     if ($work.GptType -ne $BasicDataType -or $data.GptType -ne $BasicDataType) { throw 'WORK/DATA GPT type is not Microsoft Basic Data' }
     if ($workVolume.FileSystemLabel -ne $WorkLabel) { throw "WORK label mismatch: $($workVolume.FileSystemLabel)" }
     if ($dataVolume.FileSystemLabel -ne $DataLabel) { throw "DATA label mismatch: $($dataVolume.FileSystemLabel)" }
@@ -162,7 +183,11 @@ try {
     Write-Host "[PASS] WORK PARTUUID=$workGuid label=$WorkLabel marker=.usos-work nonce=$nonce"
     Write-Host '[PASS] state phase=pending'
 } finally {
+    foreach ($binding in $mountBindings) {
+        Remove-PartitionAccessPath -DiskNumber $disk.Number -PartitionNumber $binding.Partition.PartitionNumber -AccessPath $binding.Path -Confirm:$false -ErrorAction SilentlyContinue
+    }
     if ($mountedVhd) { Dismount-DiskImage -ImagePath $VhdPath -ErrorAction SilentlyContinue | Out-Null }
+    if (Test-Path -LiteralPath $mountRoot) { Remove-Item -LiteralPath $mountRoot -Recurse -Force }
 }
 
 & $QemuImgPath convert -f vpc -O qcow2 $VhdPath $candidateBasePath

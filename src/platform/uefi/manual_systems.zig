@@ -20,8 +20,13 @@ pub fn select(root: *std.os.uefi.protocol.File, category: usos.catalog.Category)
         switch (navigation.handle(input.readBlocking(), &selected, count, start, @min(visible_rows, count - start))) {
             .activate => {
                 if (usos.catalog.systems.byCategoryIndex(category, selected)) |entry| {
+                    if (!usos.flow.preparation_capability.supportsSystem(entry.id)) {
+                        showBackendDisabledNotice(entry);
+                        render(root, category, selected, count, start);
+                        continue;
+                    }
                     if (system_media_scan.scan(root, entry).hasImages()) return entry;
-                    showDisabledNotice(category, entry);
+                    showMissingImageNotice(entry);
                     render(root, category, selected, count, start);
                 }
             },
@@ -48,21 +53,33 @@ fn render(root: *std.os.uefi.protocol.File, category: usos.catalog.Category, sel
     while (index < end) : (index += 1) {
         const entry = usos.catalog.systems.byCategoryIndex(category, index) orelse continue;
         const icon = system_icons.get(root, entry.id);
-        if (system_media_scan.scan(root, entry).hasImages()) {
+        if (!usos.flow.preparation_capability.supportsSystem(entry.id)) {
+            view.systemRowDisabled(index == selected, entry.name, icon, "[backend: Windows 11 + ISO only]");
+        } else if (system_media_scan.scan(root, entry).hasImages()) {
             view.systemRow(index == selected, entry.name, icon);
         } else {
-            view.systemRowDisabled(index == selected, entry.name, icon);
+            view.systemRowDisabled(index == selected, entry.name, icon, "[no image]");
         }
     }
 
     view.footer(true);
 }
 
-fn showDisabledNotice(category: usos.catalog.Category, entry: *const usos.catalog.SystemEntry) void {
-    _ = category;
+fn showMissingImageNotice(entry: *const usos.catalog.SystemEntry) void {
     view.begin("systems", entry.name);
     view.row(false, "No image files found for this system.");
     view.row(false, "Copy ISO/WIM/IMG/VHD/VHDX/EFI into Images first.");
+    waitForDismiss();
+}
+
+fn showBackendDisabledNotice(entry: *const usos.catalog.SystemEntry) void {
+    view.begin("systems", entry.name);
+    view.row(false, usos.flow.preparation_capability.unavailable_reason);
+    view.row(false, "This system remains visible because its backend is planned.");
+    waitForDismiss();
+}
+
+fn waitForDismiss() void {
     view.footer(true);
     while (true) {
         switch (input.readBlocking()) {

@@ -22,12 +22,12 @@ pub fn show(
     view.footer(true);
 
     while (true) switch (input.readBlocking()) {
-        .enter => return start(root, system, image, unattended),
+        .enter => return start(root, system, image, method, unattended),
         .back => return,
         .pointer => |mouse| {
             if (mouse.right_click) return;
             if (mouse.left_click and view.hitRow(mouse.x, mouse.y, start_row_index + 1) == start_row_index) {
-                return start(root, system, image, unattended);
+                return start(root, system, image, method, unattended);
             }
             if (mouse.moved) view.updatePointer();
         },
@@ -39,9 +39,18 @@ fn start(
     root: *std.os.uefi.protocol.File,
     system: *const usos.catalog.SystemEntry,
     image: usos.catalog.ImageItem,
+    method: usos.catalog.BootMethod,
     unattended: ?[]const u8,
 ) void {
-    e2e_flow.requestPreparation(root, system, image, unattended) catch |err| {
+    view.begin("loading", "Loading Windows ISO");
+    view.writeText("System: ", system.name);
+    view.writeText("Image: ", image.name.slice());
+    view.writeText("Method: ", method.label());
+    view.row(false, "Saving prepare-requested and BootNext...");
+    view.row(false, "Starting micro-Linux. Please wait.");
+    view.footer(false);
+
+    e2e_flow.requestPreparation(root, system, image, method, unattended) catch |err| {
         view.begin("summary", "Preparation failed");
         view.writeText("Error: ", @errorName(err));
         view.row(false, "Preparation stopped safely. Inspect the serial log.");
