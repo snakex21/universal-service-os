@@ -1,0 +1,82 @@
+;
+; uaspstor.inf
+;
+; Copyright (c) VIA Technologies, Inc.
+;
+
+[Version]
+signature="$Windows NT$"
+Class=USB
+ClassGuid={36FC9E60-C465-11CF-8056-444553540000}
+Provider="%VIA%"
+;CatalogFile=uapstor.cat
+DriverVer=01/18/2013,6.1.7600.4002
+
+[SourceDisksNames]
+1="%DiskID%"
+
+[SourceDisksFiles]
+uaspstor.sys = 1
+usbd8.sys    = 1
+wpprecor.sys = 1
+
+[ControlFlags]
+BasicDriverOk = *
+ExcludeFromSelect = *
+
+[DestinationDirs]
+DefaultDestDir    = 12
+
+[Manufacturer]
+%GenericUAS.Mfg% = GenericUAS, NTx86
+
+;
+; ---------------------- UASP Controllers ----------------------
+;
+
+[GenericUAS.NTx86]
+%GenericUAS.DeviceDesc% = GenericUAS.Install, USB\Class_08&SubClass_06&Prot_62
+
+[GenericUAS.Install.NT]
+CopyFiles=UASPort_DriverCopy
+
+[GenericUAS.Install.NT.Services]
+AddService=UASPStor,2,UASPort_DriverInstallSection
+
+[UASPort_DriverCopy]
+uaspstor.sys
+usbd8.sys
+wpprecor.sys
+
+[UASPort_DriverInstallSection]
+DisplayName    = "%UASPortName%"
+ServiceType    = 1                  ; SERVICE_KERNEL_DRIVER
+StartType      = 3                  ; SERVICE_DEMAND_START
+ErrorControl   = 1                  ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\uaspstor.sys
+AddReg         = ServiceUAS_AddReg
+
+[ServiceUAS_AddReg]
+HKR, Parameters, TransportType, 0x00010001, 2
+HKR, Parameters, MaxUASFlyingRequestNum, 0x00010001, 7
+HKR, Parameters, UaspSequence, 0x00010001, 0
+HKR, Parameters, ErrorHandle, 0x00010001, 2
+HKR, Parameters, MaxRetryNumber, 0x00010001, 1
+HKR, Parameters, DebugMessageLevel, 0x00010001, 2
+HKR, Parameters, IgnoreStatus, 0x00010001, 1
+HKR, Parameters, TimeOutValue, 0x00010001, 10
+HKR, Parameters, AdapterMaxTransferLength, 0x00010001, 1048576
+
+;
+; --------------------------- Strings --------------------------
+;
+
+[Strings]
+;Non-Localizable
+VIA = "VIA Technologies"
+
+;Localizable
+GenericUAS.Mfg        = "VIA Technologies"
+DiskID                = "VIA USB Attached SCSI (UAS) Device Driver Installation Disk"
+GenericUAS.DeviceDesc = "Standard USB Attached SCSI (UAS) Mass Storage Device (VIA)"
+UASPortName           = "VIA USB Attached SCSI (UAS) Compatible Device Driver"

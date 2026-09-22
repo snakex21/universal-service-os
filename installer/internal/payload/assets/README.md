@@ -6,7 +6,7 @@ Ten nośnik zawiera bootmanager Universal Service OS (USOS) oraz miejsce na obra
 
 - **ESP** — partycja startowa FAT32. Zawiera bootmanager USOS, sterownik NTFS UEFI, UI i pliki środowiska startowego.
 - **DATA** — zwykła partycja NTFS widoczna dla użytkownika. Tutaj znajdują się obrazy systemów, unattended, narzędzia i kopia instalatora USOS.
-- **WORK** — ukryta partycja robocza NTFS. Jest używana podczas instalacji systemu i może być czyszczona przed kolejną instalacją. Nie należy przechowywać na niej własnych plików.
+- **WORK** — partycja robocza NTFS widoczna jako `USOS_WORK` dla Windows Setup. Nie wrzucaj tam żadnych plików — jej zawartość jest usuwana przed każdą instalacją.
 
 ## Dodawanie systemów i narzędzi
 
@@ -37,7 +37,7 @@ Nie uruchamiaj instalatora bezpośrednio z pendrive'a. Najpierw skopiuj `USOS In
 Instalator ma cztery tryby:
 
 - **Instalacja** — przygotowuje nośnik USOS od początku. Formatuje cały wybrany nośnik i usuwa wszystkie znajdujące się na nim dane.
-- **Aktualizacja lokalna** — wgrywa aktualny build USOS na istniejący nośnik, synchronizuje katalog menu ESP z DATA i nie usuwa obrazów ani własnych danych.
+- **Aktualizacja lokalna** — wgrywa aktualny build USOS na istniejący nośnik i nie usuwa obrazów ani własnych danych; menu wykrywa ISO/WIM/IMG/VHD/VHDX bezpośrednio z `USOS_DATA`, więc nie potrzebuje zerobajtowych znaczników na ESP.
 - **Naprawa** — odtwarza pliki startowe na ESP poprawnie rozpoznanego nośnika USOS. Nie formatuje DATA ani WORK.
 - **Deinstalacja** — usuwa układ USOS i przywraca nośnik do jednej zwykłej partycji exFAT. Zawartość DATA, w tym `Systems`, `Utilities` i `Programs`, zostaje usunięta.
 

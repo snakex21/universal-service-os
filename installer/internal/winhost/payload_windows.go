@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/snakex21/universal-service-os/installer/internal/install"
+	"github.com/snakex21/universal-service-os/installer/internal/localupdate"
 	"github.com/snakex21/universal-service-os/installer/internal/payload"
 )
 
@@ -26,6 +27,38 @@ func (b Backend) CopyESPPayload(media install.MediaLayout, progress func(done, t
 		return fmt.Errorf("resolve formatted ESP: %w", err)
 	}
 	return copyESPPayloadResolved(resolved, progress)
+}
+
+func (b Backend) PayloadStatus(media install.MediaLayout) ([]localupdate.PayloadFileStatus, error) {
+	resolved, err := resolveFormattedMedia(media, 10*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("resolve formatted ESP for payload status: %w", err)
+	}
+	bundle, err := payload.Embedded()
+	if err != nil {
+		return nil, err
+	}
+	manifest, err := bundle.Manifest()
+	if err != nil {
+		return nil, err
+	}
+	statuses := make([]localupdate.PayloadFileStatus, 0, len(manifest))
+	for _, expected := range manifest {
+		path := filepath.Join(resolved.ESP.VolumePath, filepath.FromSlash(expected.Path))
+		actual, hashErr := hashFileSHA256(path)
+		if hashErr != nil {
+			if !os.IsNotExist(hashErr) {
+				return nil, fmt.Errorf("hash current payload file %s: %w", path, hashErr)
+			}
+			actual = ""
+		}
+		statuses = append(statuses, localupdate.PayloadFileStatus{
+			Path:           expected.Path,
+			ActualSHA256:   actual,
+			ExpectedSHA256: expected.SHA256,
+		})
+	}
+	return statuses, nil
 }
 
 func (b Backend) CopyInstallPayload(media install.MediaLayout, progress func(done, total uint64)) error {
@@ -148,8 +181,10 @@ func prepareESPPayload(media install.MediaLayout) (payload.Bundle, []dynamicPayl
 		return payload.Bundle{}, nil, 0, err
 	}
 	loaderConf := []byte("default usos-micro-linux.conf\r\ntimeout 0\r\neditor no\r\n")
+	// Match the BIOS boot path: deferred fbcon takeover can leave the old
+	// firmware frame visible while the preparation renderer is already running.
 	loaderEntry := []byte(fmt.Sprintf(
-		"title USOS micro-Linux preparation\r\nlinux /EFI/USOS/micro-linux/vmlinuz-virt\r\ninitrd /EFI/USOS/micro-linux/initramfs-usos\r\noptions console=tty0 console=ttyS0,115200 quiet loglevel=3 vt.global_cursor_default=0 rdinit=/usos-init usos.esp_partuuid=%s\r\n",
+		"title USOS micro-Linux preparation\r\nlinux /EFI/USOS/micro-linux/vmlinuz-virt\r\ninitrd /EFI/USOS/micro-linux/initramfs-usos\r\noptions console=tty0 console=ttyS0,115200 quiet loglevel=3 fbcon=nodefer vt.global_cursor_default=0 rdinit=/usos-init usos.esp_partuuid=%s\r\n",
 		media.ESP.PartUUID,
 	))
 	installState := []byte("phase=pending\r\n")

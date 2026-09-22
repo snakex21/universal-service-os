@@ -19,7 +19,7 @@ type expectedPartition struct {
 }
 
 func verifyReadBack(plan layout.Plan, ids gptIDs, actual parsedLayout) (install.MediaLayout, error) {
-	if guidString(actual.Header.DiskID) != guidString(ids.Disk) {
+	if !equalGUIDText(guidString(actual.Header.DiskID), guidString(ids.Disk)) {
 		return install.MediaLayout{}, fmt.Errorf("read-back disk GUID mismatch: got %s want %s", guidString(actual.Header.DiskID), guidString(ids.Disk))
 	}
 	if len(actual.Partitions) != 3 {
@@ -29,7 +29,7 @@ func verifyReadBack(plan layout.Plan, ids gptIDs, actual parsedLayout) (install.
 	expected := []expectedPartition{
 		{name: "ESP", plan: plan.ESP, typeID: efiSystemPartitionType, partID: ids.ESP, attributes: 0},
 		{name: "DATA", plan: plan.DATA, typeID: basicDataPartitionType, partID: ids.DATA, attributes: 0},
-		{name: "WORK", plan: plan.WORK, typeID: basicDataPartitionType, partID: ids.WORK, attributes: gptBasicDataAttributeNoDriveLetter},
+		{name: "WORK", plan: plan.WORK, typeID: basicDataPartitionType, partID: ids.WORK, attributes: 0},
 	}
 
 	refs := make(map[string]install.PartitionRef, len(expected))
@@ -39,7 +39,7 @@ func verifyReadBack(plan layout.Plan, ids gptIDs, actual parsedLayout) (install.
 		var got *parsedPartition
 		for i := range actual.Partitions {
 			candidate := &actual.Partitions[i]
-			if guidString(candidate.PartitionID) == wantID {
+			if equalGUIDText(guidString(candidate.PartitionID), wantID) {
 				if got != nil {
 					return install.MediaLayout{}, fmt.Errorf("read-back contains duplicate PARTUUID %s", wantID)
 				}
@@ -49,7 +49,7 @@ func verifyReadBack(plan layout.Plan, ids gptIDs, actual parsedLayout) (install.
 		if got == nil {
 			return install.MediaLayout{}, fmt.Errorf("read-back missing %s PARTUUID %s", want.name, wantID)
 		}
-		if guidString(got.PartitionType) != guidString(want.typeID) {
+		if !equalGUIDText(guidString(got.PartitionType), guidString(want.typeID)) {
 			return install.MediaLayout{}, fmt.Errorf("read-back %s GPT type mismatch: got %s want %s", want.name, guidString(got.PartitionType), guidString(want.typeID))
 		}
 		if got.StartBytes != want.plan.StartBytes {
@@ -61,7 +61,7 @@ func verifyReadBack(plan layout.Plan, ids gptIDs, actual parsedLayout) (install.
 		if got.Attributes != want.attributes {
 			return install.MediaLayout{}, fmt.Errorf("read-back %s GPT attributes mismatch: got 0x%016X want 0x%016X", want.name, got.Attributes, want.attributes)
 		}
-		seen[wantID] = struct{}{}
+		seen[guidTextKey(wantID)] = struct{}{}
 		refs[want.name] = install.PartitionRef{
 			Number:     got.Number,
 			StartBytes: got.StartBytes,
@@ -71,7 +71,7 @@ func verifyReadBack(plan layout.Plan, ids gptIDs, actual parsedLayout) (install.
 	}
 	for _, got := range actual.Partitions {
 		id := guidString(got.PartitionID)
-		if _, ok := seen[id]; !ok {
+		if _, ok := seen[guidTextKey(id)]; !ok {
 			return install.MediaLayout{}, fmt.Errorf("read-back contains unexpected PARTUUID %s", id)
 		}
 	}

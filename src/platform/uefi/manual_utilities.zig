@@ -1,114 +1,101 @@
 const std = @import("std");
 const usos = @import("usos");
-const directory_scan = @import("directory_scan.zig");
 const input = @import("input.zig");
 const navigation = @import("manual_navigation.zig");
 const system_icons = @import("system_icons.zig");
-const system_media_scan = @import("system_media_scan.zig");
 const view = @import("manual_view.zig");
 
-const max_utilities: usize = 32;
-const max_path_bytes: usize = 260;
+const max_utilities: usize = usos.catalog.utility_catalog.max_items;
 const visible_rows: usize = 12;
-const utilities_root = "\\Utilities";
-const path_prefix = "\\Utilities\\";
-const images_suffix = "\\Images";
 
-var names: [max_utilities]usos.catalog.FixedText = undefined;
-var paths: [max_utilities][max_path_bytes]u8 = undefined;
+var utility_list: usos.catalog.utility_catalog.List = .{};
 var entries: [max_utilities]usos.catalog.SystemEntry = undefined;
 
-pub fn select(root: *std.os.uefi.protocol.File) ?*const usos.catalog.SystemEntry {
-    const count = scan(root);
+pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_discovery.Discovery, firmware: usos.firmware.Firmware) ?*const usos.catalog.SystemEntry {
+    const count = scan(discovery);
     if (count == 0) {
         showEmpty();
         return null;
     }
 
-    var selected: usize = 0;
-    var start = visibleStart(selected);
-    render(root, selected, count, start);
+    var selectable: [max_utilities]bool = undefined;
+    var index: usize = 0;
+    while (index < count) : (index += 1) {
+        const entry = &entries[index];
+        const media = discovery.mediaStatus(entry.image_directory);
+        selectable[index] = (usos.gui.menu_policy.Access{
+            .firmware_compatible = entry.firmware.accepts(firmware),
+            .has_images = media.hasImages(),
+            .backend_available = usos.flow.preparation_capability.supportsSystem(entry.id),
+        }).navigable();
+    }
+
+    var rows: [max_utilities]view.ListRow = undefined;
+    index = 0;
+    while (index < count) : (index += 1) {
+        const entry = &entries[index];
+        const icon = system_icons.get(root, entry);
+        const media = discovery.mediaStatus(entry.image_directory);
+        rows[index] = if (!entry.firmware.accepts(firmware))
+            .{ .system_disabled = .{ .value = entry.name, .icon = icon, .reason = entry.firmware.mismatchReason(firmware) } }
+        else if (!media.hasImages())
+            .{ .system_disabled = .{ .value = entry.name, .icon = icon, .reason = "[no image]" } }
+        else if (!usos.flow.preparation_capability.supportsSystem(entry.id))
+            .{ .system_disabled = .{ .value = entry.name, .icon = icon, .reason = "[backend unavailable]" } }
+        else
+            .{ .system = .{ .value = entry.name, .icon = icon } };
+    }
+
+    var selected: usize = usos.gui.selectable_list.first(selectable[0..count]) orelse 0;
+    var list = view.ListScreen.open("systems", "Utilities", rows[0..count], selected, visible_rows, null);
 
     while (true) {
-        switch (navigation.handle(input.readBlocking(), &selected, count, start, @min(visible_rows, count - start))) {
+        switch (navigation.handleSelectable(input.readBlocking(), &selected, count, list.visibleStart(), list.visibleCount(), selectable[0..count])) {
             .activate => {
                 const entry = &entries[selected];
-                const media = system_media_scan.scan(root, entry);
-                if (!media.hasImages()) {
-                    showMissingImageNotice(entry);
-                    render(root, selected, count, start);
-                    continue;
+                const media = discovery.mediaStatus(entry.image_directory);
+                switch ((usos.gui.menu_policy.Access{
+                    .firmware_compatible = entry.firmware.accepts(firmware),
+                    .has_images = media.hasImages(),
+                    .backend_available = usos.flow.preparation_capability.supportsSystem(entry.id),
+                }).activation()) {
+                    .firmware_mismatch => continue,
+                    .no_image => {
+                        showMissingImageNotice(entry);
+                        list.redrawFull(selected, null);
+                        continue;
+                    },
+                    .backend_unavailable => {
+                        showBackendDisabledNotice(entry);
+                        list.redrawFull(selected, null);
+                        continue;
+                    },
+                    .open => return entry,
                 }
-                if (!usos.flow.preparation_capability.supportsSystem(entry.id)) {
-                    showBackendDisabledNotice(entry);
-                    render(root, selected, count, start);
-                    continue;
-                }
-                return entry;
             },
             .back => return null,
-            .changed => {
-                start = visibleStart(selected);
-                render(root, selected, count, start);
-            },
+            .changed => list.updateSelection(selected, null),
             .pointer_moved => view.updatePointer(),
             .ignored => {},
         }
     }
 }
 
-fn scan(root: *std.os.uefi.protocol.File) usize {
-    const count = directory_scan.listDirectories(root, utilities_root, &names);
+fn scan(discovery: *usos.catalog.media_discovery.Discovery) usize {
+    usos.catalog.utility_catalog.discover(discovery, &utility_list);
     var index: usize = 0;
-    while (index < count) : (index += 1) {
-        const name = names[index].slice();
-        const image_directory = buildImageDirectory(name, &paths[index]) orelse continue;
+    while (index < utility_list.len) : (index += 1) {
+        const item = &utility_list.items[index];
         entries[index] = .{
-            .id = name,
-            .name = name,
+            .id = item.name.slice(),
+            .name = item.name.slice(),
             .category = .utilities,
             .family = .utility,
-            .image_directory = image_directory,
+            .image_directory = item.imageDirectory(),
             .boot_methods = &usos.catalog.utility_boot_methods.all,
         };
     }
-    return count;
-}
-
-fn buildImageDirectory(name: []const u8, buffer: *[max_path_bytes]u8) ?[]const u8 {
-    const needed = path_prefix.len + name.len + images_suffix.len;
-    if (needed > buffer.len) return null;
-    var offset: usize = 0;
-    @memcpy(buffer[offset .. offset + path_prefix.len], path_prefix);
-    offset += path_prefix.len;
-    @memcpy(buffer[offset .. offset + name.len], name);
-    offset += name.len;
-    @memcpy(buffer[offset .. offset + images_suffix.len], images_suffix);
-    offset += images_suffix.len;
-    return buffer[0..offset];
-}
-
-fn visibleStart(selected: usize) usize {
-    return if (selected >= visible_rows) selected - visible_rows + 1 else 0;
-}
-
-fn render(root: *std.os.uefi.protocol.File, selected: usize, count: usize, start: usize) void {
-    view.begin("systems", "Utilities");
-    const end = @min(start + visible_rows, count);
-    var index = start;
-    while (index < end) : (index += 1) {
-        const entry = &entries[index];
-        const icon = system_icons.get(root, entry);
-        const media = system_media_scan.scan(root, entry);
-        if (!media.hasImages()) {
-            view.systemRowDisabled(index == selected, entry.name, icon, "[no image]");
-        } else if (!usos.flow.preparation_capability.supportsSystem(entry.id)) {
-            view.systemRowDisabled(index == selected, entry.name, icon, "[backend unavailable]");
-        } else {
-            view.systemRow(index == selected, entry.name, icon);
-        }
-    }
-    view.footer(true);
+    return utility_list.len;
 }
 
 fn showEmpty() void {
@@ -120,8 +107,8 @@ fn showEmpty() void {
 
 fn showMissingImageNotice(entry: *const usos.catalog.SystemEntry) void {
     view.begin("systems", entry.name);
-    view.row(false, "No supported image files found in this utility folder.");
-    view.row(false, "Copy ISO/WIM/IMG/VHD/VHDX/EFI into Images and run Update USOS.");
+    view.row(false, "No supported image files were found. Copy a file to:");
+    view.row(false, usos.gui.menu_policy.displayImagePath(entry.image_directory));
     waitForDismiss();
 }
 
@@ -145,10 +132,4 @@ fn waitForDismiss() void {
             else => {},
         }
     }
-}
-
-test "dynamic utility image directory follows folder name" {
-    var buffer: [max_path_bytes]u8 = undefined;
-    const path = buildImageDirectory("MemTest86", &buffer).?;
-    try std.testing.expectEqualStrings("\\Utilities\\MemTest86\\Images", path);
 }

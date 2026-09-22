@@ -85,7 +85,7 @@ func (s *ConfirmationScreen) Content() fyne.CanvasObject {
 	lossScroll := container.NewVScroll(container.NewVBox(lossObjects...))
 	lossScroll.SetMinSize(fyne.NewSize(1000, 280))
 
-	prompt := widget.NewLabel("Aby potwierdzić, wpisz pełny model urządzenia dokładnie znak w znak:")
+	prompt := widget.NewLabel("Wymagany tekst potwierdzenia — wpisz dokładnie znak w znak:")
 	expected := widget.NewLabelWithStyle(s.model.ExpectedText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true, Monospace: true})
 	buttons := container.NewHBox(s.cancel, s.confirm)
 

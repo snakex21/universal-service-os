@@ -1,0 +1,9 @@
+{
+  "kb": "KB2685811",
+  "architecture": "amd64",
+  "source": "https://catalog.s.download.windowsupdate.com/msdownload/update/software/updt/2012/11/windows6.1-kb2685811-x64_191e09df632b70fd4f4b27d4cb9227f7c5a1c98c.msu",
+  "catalog_update_id": "a25841a9-c405-493e-96ca-996b42f622d4",
+  "sha1": "191e09df632b70fd4f4b27d4cb9227f7c5a1c98c",
+  "sha256": "c1aa0a453e4a886d7670da2209872737323baa9e36145ea838c9f8ffd7e7d7e7",
+  "file": "windows6.1-kb2685811-x64_191e09df632b70fd4f4b27d4cb9227f7c5a1c98c.msu"
+}

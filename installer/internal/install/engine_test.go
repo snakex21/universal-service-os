@@ -6,6 +6,7 @@ import (
 
 	"github.com/snakex21/universal-service-os/installer/internal/domain"
 	"github.com/snakex21/universal-service-os/installer/internal/layout"
+	"github.com/snakex21/universal-service-os/installer/internal/legacyboot"
 )
 
 type engineTestLogger struct{}
@@ -20,6 +21,10 @@ func (s *engineTestSession) CleanPartitionTable() error { return nil }
 func (s *engineTestSession) CreateGPTAndPartitions(layout.Plan) (MediaLayout, error) {
 	return s.media, nil
 }
+func (s *engineTestSession) WriteLegacyBoot(MediaLayout) (legacyboot.Audit, error) {
+	return legacyboot.Audit{}, nil
+}
+func (s *engineTestSession) VerifyLegacyBoot(MediaLayout) error { return nil }
 func (s *engineTestSession) VerifyLayoutUnchanged(MediaLayout) (MediaLayout, error) {
 	return s.media, nil
 }
@@ -39,8 +44,8 @@ func (*engineTestBackend) FormatESP(MediaLayout) error { return nil }
 func (b *engineTestBackend) FormatDATA(MediaLayout) error {
 	return b.failFormat
 }
-func (*engineTestBackend) FormatWORK(MediaLayout) error       { return nil }
-func (*engineTestBackend) EnsureWORKHidden(MediaLayout) error { return nil }
+func (*engineTestBackend) FormatWORK(MediaLayout) error        { return nil }
+func (*engineTestBackend) EnsureWORKVisible(MediaLayout) error { return nil }
 func (*engineTestBackend) CopyInstallPayload(MediaLayout, func(uint64, uint64)) error {
 	return nil
 }

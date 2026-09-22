@@ -15,6 +15,12 @@ const ProgressFn = *const fn (PreparationStage) void;
 
 pub const ResumeStage = enum {
     starting_windows_setup,
+    loading_ntfs_driver,
+    locating_work_partition,
+    verifying_windows_media,
+    loading_windows_boot_manager,
+    committing_windows_handoff,
+    transferring_to_windows,
     starting_chainload,
 };
 const ResumeProgressFn = *const fn (ResumeStage) void;
@@ -54,8 +60,9 @@ pub fn resumePersistent(root: *uefi.protocol.File, progress: ?ResumeProgressFn) 
                     say("\n");
                 };
             } else {
-                if (progress) |callback| callback(.starting_windows_setup);
-                handoffWindows(root, method) catch |err| {
+                reportResumeProgress(progress, .starting_windows_setup);
+                say("WINDOWS HANDOFF UI PRESENTED BEFORE NTFS/WORK DISCOVERY\n");
+                handoffWindows(root, method, progress) catch |err| {
                     say("WINDOWS HANDOFF FAIL: ");
                     say(@errorName(err));
                     say("\n");
@@ -74,7 +81,9 @@ pub fn resumePersistent(root: *uefi.protocol.File, progress: ?ResumeProgressFn) 
                     say("\n");
                 };
             } else {
-                handoffWindows(root, method) catch |err| {
+                reportResumeProgress(progress, .starting_windows_setup);
+                say("WINDOWS HANDOFF RETRY UI PRESENTED BEFORE NTFS/WORK DISCOVERY\n");
+                handoffWindows(root, method, progress) catch |err| {
                     say("WINDOWS HANDOFF RETRY FAIL: ");
                     say(@errorName(err));
                     say("\n");
@@ -138,7 +147,12 @@ fn reportProgress(progress: ?ProgressFn, stage: PreparationStage) void {
     if (progress) |callback| callback(stage);
 }
 
-fn handoffWindows(root: *uefi.protocol.File, method: usos.catalog.BootMethod) !void {
+fn reportResumeProgress(progress: ?ResumeProgressFn, stage: ResumeStage) void {
+    if (progress) |callback| callback(stage);
+}
+
+fn handoffWindows(root: *uefi.protocol.File, method: usos.catalog.BootMethod, progress: ?ResumeProgressFn) !void {
+    reportResumeProgress(progress, .loading_ntfs_driver);
     ntfs_driver.loadAndConnect(root) catch |err| {
         say("NTFS DRIVER FAIL: ");
         say(@errorName(err));
@@ -146,24 +160,29 @@ fn handoffWindows(root: *uefi.protocol.File, method: usos.catalog.BootMethod) !v
         return err;
     };
     say("NTFS DRIVER PASS\n");
+    reportResumeProgress(progress, .locating_work_partition);
     const work = work_volume.find() orelse return error.WorkNotFound;
     say("WORK FOUND\n");
+    reportResumeProgress(progress, .verifying_windows_media);
     if (!work.has_install_wim) return error.InstallWimMissing;
     say("INSTALL.WIM VISIBLE ON WORK\n");
     if (!work.has_windows_boot) return error.WindowsBootMissing;
     say("EFI BOOT FILE VISIBLE ON WORK\n");
 
+    reportResumeProgress(progress, .loading_windows_boot_manager);
     const windows_image = try work_chainload.load(work.handle);
     say("WINDOWS LOADIMAGE PASS\n");
     _ = try work_chainload.checkLoadedImage(windows_image, work.handle);
     say("WINDOWS LOADEDIMAGE CHECK PASS\n");
 
+    reportResumeProgress(progress, .committing_windows_handoff);
     try persistent_state_file.write(root, .handoff, null, null, method.persistedValue());
     say("PERSISTENT PHASE HANDOFF PASS\n");
     try persistent_state_file.write(root, .pending, null, null, null);
     say("ONE-SHOT PHASE PENDING PASS\n");
 
     const boot_services = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
+    reportResumeProgress(progress, .transferring_to_windows);
     say("WINDOWS STARTIMAGE BEGIN\n");
     const result = boot_services.startImage(windows_image) catch |err| {
         persistent_state_file.write(root, .prepared, null, null, method.persistedValue()) catch {};

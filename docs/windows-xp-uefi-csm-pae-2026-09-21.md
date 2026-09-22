@@ -1,0 +1,125 @@
+# XP x86: separate UEFI preparation / CSM / PAE experiment
+
+User approved UEFI preparation followed by **firmware CSM boot of XP**, with PAE.
+This is not native XP x86 boot through x64 UEFI and does not use Quibble/CSMWrap.
+
+## Deployed
+
+Menu: Windows -> **Windows XP - UEFI/CSM + PAE (experimental)**.
+The existing Windows XP BIOS entry and production BIOS initramfs remain separate.
+Launchers bind the existing SP2 / NiKKA SP3 ISO names; no ISO was changed.
+
+The launcher starts the EFI stub of the existing pinned Linux kernel with a separate
+`EFI/USOS-XP/initramfs-xp`. Its explicit disk selection and destructive confirmation
+come from the production staging workflow. The target is MBR / NTFS, not GPT.
+After preparation, remove USOS and boot the target disk through firmware CSM.
+Keep CSM enabled. This deployment itself did not write to Intel or change partitions.
+
+The experiment uses canonical 255/63 on-disk geometry, **not measured BIOS geometry**.
+It verifies that the NT52 NTFS template contains the existing EDD-only modification.
+The old BIOS implementation still uses its existing BIOS inventory / AH08 checks.
+Only the separate archive gets the altered geometry handling and new PAE helper.
+
+## PAE
+
+`GuiRunOnce` invokes `%SystemDrive%\USOS\XP\pae.exe` after setup at first logon.
+It requires Windows XP 5.1.2600 and checks the kernel/HAL file versions and unique
+patch patterns in executable PE sections. It writes `usospae.exe` and `usoshal.dll`,
+updates their PE checksums, backs up boot.ini to `USOS\XP\boot-original.ini`,
+then adds a PAE entry retaining the original entries. PAE applies on a subsequent boot.
+Original kernel/HAL files are not overwritten. Unknown versions/patterns are refused.
+The helper logs to its own `USOS\XP\pae-install.log` and does not use host registry or
+profile directories for application data. Prior output/backup files block a blind retry.
+
+Patterns adapted from [evgen-b/PatchPAE3](https://github.com/evgen-b/PatchPAE3), commit
+`3e1d3b65f5c3c1ec0c4759f707d3017e51113103`, with CC-BY-4.0 attribution/license in payload.
+The upstream auto-elevating CMD script is **not executed or deployed**.
+Its instructions also contain an inconsistent XP kernel filename; our boot entry names
+the actual separately patched output `usospae.exe`.
+
+## Verification actually performed
+
+- `python tools/build_xp_uefi_csm_trial.py`: exit 0; x86 helper and two x64 EFI launchers.
+- `python tools/build_xp_uefi_csm_trial.py --menu-only`: exit 0; Zig UEFI build and Zig tests.
+- `python tools/tests/check_xp_pae.py`: exit 0; real MP kernel and ACPI MP HAL extracted
+  from **both user's ISO files**, patching copies only. Original files unchanged;
+  repeat patches refused. Shell syntax and exact experimental archive delta checked.
+- USB deploy: exit 0, hash readback PASS, partition layout unchanged, production
+  BIOS and Vista payload hashes unchanged.
+- Backup: `artifacts/xp-pae/deploy-20260921-215410`.
+- No VM / QEMU / E2E / physical XP boot performed.
+
+## Still unverified / limitations
+
+No new XP ACPI, AHCI or xHCI drivers have been integrated. Preparation uses Linux USB
+drivers, but XP requires its own compatible drivers. The old SP2 and 2014 SP3 sources
+must **not** be represented as verified Ryzen/X470 installers. PAE pattern success
+does not establish runtime driver compatibility, usable RAM above 4 GiB, or successful
+hardware installation. Current Vista success does not prove any of these for XP.
+
+Logs from preparation are in `EFI/USOS-XP/` on ESP. Source ISO library and the prior
+BIOS XP installation path are preserved. Rebuilding the experiment requires a matching
+production base on the selected ESP; the deployment verifies its recorded hashes.
+
+## 2026-09-22: final USB flow (silent PAE, no boot menu, hardening)
+
+Physical result before this change: clean SP3 PL install on Intel/Ryzen 5700X,
+PAE entry booted, 31.9 GB RAM visible. Changes in the flow source:
+
+- `pae.exe` (v2) is a GUI-subsystem binary (no console). `/silent` (also `/quiet`)
+  suppresses the message box; GuiRunOnce runs `pae.exe /silent`. The log
+  `USOS\XP\pae-install.log` is still written.
+- boot.ini: the PAE entry stays first in `[operating systems]` with the original
+  ARC path, so NTLDR takes it as `default=`; `timeout=0` means no menu is shown.
+  Original entry: press F8 at boot -> "Return to OS Choices Menu"; original
+  boot.ini is kept in `C:\USOS\XP\boot-original.ini`.
+- `HIVESYS.INF` in every driver bundle: `CrashDumpEnabled=0` (was 3). The 0x50
+  bugcheck in `dump_ntoskrn8` and the forced power-off that followed produced the
+  zero-filled WinSxS files (see `artifacts/xp-pae/winsxs-repair-20260922-202458`).
+  AutoReboot stays 0 (source default), so a real STOP stays on screen.
+- Linux preparer: after the final unmount `blockdev --flushbufs`, then
+  `xp_verify_target.sh` drops caches, remounts the target read-only, compares
+  pae.exe and refuses the target if any non-empty file reads back as all zeros;
+  it unmounts and flushes again. Host-side equivalent for an attached XP disk:
+  `tools/check_xp_zero_files.ps1 -DriveLetter M` (read-only).
+- No diagnostics in the flow: `/NUMPROC`, `/SOS`, `/BOOTLOG`, `d.cmd` and CmdLine
+  edits were only ever applied to the Intel test disk; `check_xp_pae.py` now
+  asserts they are absent from the shipped scripts.
+
+Build: `python tools/build_xp_uefi_csm_trial.py --refresh-pae-flow` (after any
+`--add-source` bundle rebuild). Checks: `check_xp_pae.py`,
+`check_xp_driver_integration.py [--added-source]`, `check_xp_driver_imports.py`,
+`check_xp_menu_overlay.py`. Deploy to the Kingston ESP (only
+`EFI/USOS-XP/initramfs-xp` and `manifest.json`):
+`tools/deploy_xp_uefi_csm_trial.ps1 -DriversOnly`.
+
+## 2026-09-22 (later): PAE at setup end, first-logon fallback; console flashes
+
+Clean install from the pendrive worked end-to-end. Two follow-ups:
+
+**PAE without the extra restart.** `pae.exe` v3 now runs at the END of GUI setup
+via `[SetupParams] UserExecute="C:\USOS\XP\pae.exe"` (SYSTEM context; the flow
+always installs XP to C:). No argument = silent setup-end mode. system32 is
+complete at that point; the helper writes only its own `usospae.exe`/`usoshal.dll`
+(no Setup/WFP file names) and clears then restores boot.ini's R/H/S attributes
+around an atomic replace. The reboot that ends setup therefore boots PAE.
+Fallback: GuiRunOnce runs `pae.exe /firstlogon`. If the entry is present it logs
+and exits with no UI. Only if it is missing does it apply PAE (re-using the
+original backup if an earlier run's entry did not survive) and ask, in Polish,
+"Pełna pamięć (PAE) zostanie włączona po ponownym uruchomieniu komputera.
+Uruchom ponownie teraz?" (Tak = restart now). `/interactive` keeps the manual
+English message. `USOS\XP\pae-install.log` is appended to and records
+`path=setup-end`, `path=first-logon` and the RESULT of each run.
+Not yet verified on hardware: that XP's syssetup honours UserExecute here; if it
+does not, the fallback prompt appears once at first logon.
+
+**Console flashes during "Rejestrowanie składników".** The USB flow injects no
+program into that phase: no cmdlines.txt, svcpack.inf entries, DetachedProgram,
+RunOnce or scripts (checked in the SIF, the driver overlay diff against the
+source TXTSETUP/DOSNET/HIVESYS, and the driver INFs: no RunPrograms/co-installers).
+Before this change the only hook was GuiRunOnce at first logon, and pae.exe is a
+GUI-subsystem binary. The flashes therefore come from stock XP Setup processes
+and were not changed; no launcher (usoshide) was needed. To identify them,
+read `C:\WINDOWS\setupact.log`/`setupapi.log` from a finished install.
+`check_xp_pae.py` now also tests mode parsing, boot.ini staging (PAE first,
+timeout=0, originals retained) and entry detection through the DLL harness.

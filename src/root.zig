@@ -1,3 +1,7 @@
+pub const build_info = @import("build_info");
+pub const windows_iso_config = @import("platform/bios/windows_iso_config.zig");
+pub const wim_setup = @import("image_probe/wim_setup.zig");
+pub const windows7_iso = @import("windows7_iso.zig");
 pub const architecture = @import("core/architecture.zig");
 pub const firmware = @import("core/firmware.zig");
 pub const decimal = @import("core/decimal.zig");
@@ -11,13 +15,22 @@ pub const gui = struct {
     pub const rgba_image = @import("gui/rgba_image.zig");
     pub const png_rgba = @import("gui/png_rgba.zig");
     pub const text = @import("gui/text.zig");
+    pub const preparation_screen = @import("gui/preparation_screen.zig");
+    pub const ScreenBuffer = @import("gui/screen_buffer.zig").ScreenBuffer;
     pub const html_screen = @import("gui/html_screen.zig");
+    pub const selectable_list = @import("gui/selectable_list.zig");
+    pub const menu_policy = @import("gui/menu_policy.zig");
+    pub const boot_method_model = @import("gui/boot_method_model.zig");
+    pub const menu_canvas = @import("gui/menu_canvas.zig");
 };
 pub const dos = @import("compat/dos/root.zig");
-pub const config = struct {
-    pub const parser = @import("config/parser.zig");
-};
 pub const device_guard = @import("device_guard/check.zig");
+pub const storage = struct {
+    pub const random_reader = @import("storage/random_reader.zig");
+    pub const gpt = @import("storage/gpt.zig");
+    pub const fat32 = @import("storage/fat32.zig");
+    pub const ntfs = @import("storage/ntfs.zig");
+};
 pub const image_probe = struct {
     pub const probe = @import("image_probe/probe.zig");
     pub const random_access = @import("image_probe/random_access.zig");
@@ -26,28 +39,7 @@ pub const image_probe = struct {
     pub const optical_fs = @import("image_probe/optical_fs.zig");
     pub const windows_detect = @import("image_probe/windows_detect.zig");
 };
-pub const catalog = struct {
-    pub const Category = @import("catalog/category.zig").Category;
-    pub const categories = @import("catalog/categories.zig");
-    pub const BootMethod = @import("catalog/boot_method.zig").BootMethod;
-    pub const ImageKind = @import("catalog/image_kind.zig").ImageKind;
-    pub const ImageItem = @import("catalog/image_item.zig").ImageItem;
-    pub const ImageList = @import("catalog/image_list.zig").ImageList;
-    pub const image_list_max_items = @import("catalog/image_list.zig").max_items;
-    pub const FixedText = @import("core/fixed_text.zig").FixedText;
-    pub const boot_compatibility = @import("catalog/boot_compatibility.zig");
-    pub const BootSelection = @import("catalog/boot_selection.zig").BootSelection;
-    pub const SystemEntry = @import("catalog/system_entry.zig").SystemEntry;
-    pub const SystemFamily = @import("catalog/system_family.zig").SystemFamily;
-    pub const SystemMediaStatus = @import("catalog/system_media_status.zig").SystemMediaStatus;
-    pub const systems = @import("catalog/systems.zig");
-    pub const utility_boot_methods = @import("catalog/utility_boot_methods.zig");
-    pub const MediaStatus = @import("catalog/media_status.zig").MediaStatus;
-    pub const Windows11Status = @import("catalog/windows_11_status.zig").Windows11Status;
-    pub const DetectedSystem = @import("catalog/detected_system.zig").DetectedSystem;
-    pub const DiscoveredImage = @import("catalog/discovered_image.zig").DiscoveredImage;
-    pub const image_catalog = @import("catalog/image_catalog.zig");
-};
+pub const catalog = @import("catalog/root.zig");
 pub const flow = struct {
     pub const install_plan = @import("flow/install_plan.zig");
     pub const install_state = @import("flow/install_state.zig");
@@ -55,8 +47,10 @@ pub const flow = struct {
     pub const boot_next_order = @import("flow/boot_next_order.zig");
     pub const preparation_state = @import("flow/preparation_state.zig");
     pub const preparation_capability = @import("flow/preparation_capability.zig");
+    pub const backend_validation = @import("flow/backend_validation.zig");
     pub const boot_method_options = @import("flow/boot_method_options.zig");
     pub const boot_method_help = @import("flow/boot_method_help.zig");
+    pub const unattended_policy = @import("flow/unattended_policy.zig");
     pub const preparation_boot_progress = @import("flow/preparation_boot_progress.zig");
     pub const persistent_phase = @import("flow/persistent_phase.zig");
 };
@@ -68,6 +62,20 @@ pub const selftest = struct {
 };
 
 test {
+    _ = @import("platform/bios/windows_boot_contract.zig");
+    _ = @import("platform/bios/windows_cpio.zig");
+    _ = windows_iso_config;
+    _ = wim_setup;
+    _ = @import("image_probe/windows7_pe_rules_test.zig");
+    _ = @import("platform/bios/dos_fat.zig");
+    _ = @import("gui/rgba_rle.zig");
+    _ = @import("platform/bios/dos_partition.zig");
+    _ = @import("platform/bios/dos_fat32_format.zig");
+    _ = @import("platform/bios/dos_fat16_format.zig");
+    _ = @import("platform/bios/dos_fat16_seed.zig");
+    _ = build_info.id;
+    _ = build_info.epoch;
+    _ = build_info.source_sha256;
     _ = architecture;
     _ = firmware;
     _ = decimal;
@@ -79,11 +87,21 @@ test {
     _ = gui.RgbaImage;
     _ = gui.png_rgba;
     _ = gui.text;
+    _ = gui.ScreenBuffer;
     _ = gui.html_screen;
+    _ = gui.selectable_list;
+    _ = gui.menu_policy;
+    _ = gui.boot_method_model;
+    _ = gui.menu_canvas;
     _ = dos;
-    _ = config.parser;
     _ = image_probe.probe;
+    _ = windows7_iso;
+    _ = @import("windows7_iso_test.zig");
     _ = device_guard;
+    _ = storage.random_reader;
+    _ = storage.gpt;
+    _ = storage.fat32;
+    _ = storage.ntfs;
     _ = image_probe.random_access;
     _ = image_probe.udf;
     _ = image_probe.iso9660;
@@ -92,6 +110,7 @@ test {
     _ = catalog.Category;
     _ = catalog.categories;
     _ = catalog.BootMethod;
+    _ = catalog.FirmwareRequirement;
     _ = catalog.ImageKind;
     _ = catalog.ImageItem;
     _ = catalog.ImageList;
@@ -114,8 +133,10 @@ test {
     _ = flow.boot_next_order;
     _ = flow.preparation_state;
     _ = flow.preparation_capability;
+    _ = flow.backend_validation;
     _ = flow.boot_method_options;
     _ = flow.boot_method_help;
+    _ = flow.unattended_policy;
     _ = flow.preparation_boot_progress;
     _ = flow.persistent_phase;
     _ = selftest.Case;
@@ -123,3 +144,4 @@ test {
     _ = @import("selftest/runner.zig");
     _ = @import("selftest/startup.zig");
 }
+pub const calendar = @import("core/calendar.zig");

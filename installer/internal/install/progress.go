@@ -7,13 +7,14 @@ type StageID uint8
 const (
 	StageCleanPartitionTable StageID = iota + 1
 	StageCreateGPT
+	StageWriteLegacyBoot
 	StageFormatESP
 	StageFormatDATA
 	StageFormatWORK
 	StageCopyESP
 	StageWriteIdentity
 	StageVerify
-	StageCount = 8
+	StageCount = 9
 )
 
 type StageState uint8
@@ -35,12 +36,13 @@ type StageDefinition struct {
 var stages = [...]StageDefinition{
 	{StageCleanPartitionTable, 1, "Czyszczenie tablicy partycji", false},
 	{StageCreateGPT, 2, "Tworzenie GPT i partycji", false},
-	{StageFormatESP, 3, "Formatowanie ESP (FAT32)", false},
-	{StageFormatDATA, 4, "Formatowanie DATA (NTFS)", false},
-	{StageFormatWORK, 5, "Formatowanie WORK (NTFS)", false},
-	{StageCopyESP, 6, "Kopiowanie payloadu na ESP i DATA", true},
-	{StageWriteIdentity, 7, "Zapis usos-device.ini i .usos-work", false},
-	{StageVerify, 8, "Weryfikacja", false},
+	{StageWriteLegacyBoot, 3, "Zapis Legacy BIOS Stage 1 i Core", false},
+	{StageFormatESP, 4, "Formatowanie ESP (FAT32)", false},
+	{StageFormatDATA, 5, "Formatowanie DATA (NTFS)", false},
+	{StageFormatWORK, 6, "Formatowanie WORK (NTFS)", false},
+	{StageCopyESP, 7, "Kopiowanie payloadu na ESP i DATA", true},
+	{StageWriteIdentity, 8, "Zapis usos-device.ini i .usos-work", false},
+	{StageVerify, 9, "Weryfikacja", false},
 }
 
 func Stages() []StageDefinition {

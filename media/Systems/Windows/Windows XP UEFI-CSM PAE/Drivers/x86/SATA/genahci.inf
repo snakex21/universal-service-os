@@ -1,0 +1,63 @@
+; Copyright (c) Microsoft Corporation.  All rights reserved.
+
+[Version]
+Signature   = "$Windows NT$"
+;Class       = HDC
+;ClassGUID   = {4D36E96A-E325-11CE-BFC1-08002BE10318}
+Class       = SCSIAdapter
+ClassGuid   = {4D36E97B-E325-11CE-BFC1-08002BE10318}
+Provider    = %Manufacturer%
+DriverVer   = 07/30/2023,6.3.0.1
+
+
+[SourceDisksNames]
+1 = %DiskName%,,,
+
+[SourceDisksFiles]
+genahci.sys = 1
+
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[Manufacturer]
+%Manufacturer% = Models, NTx86
+
+
+[Models.NTx86]
+%PCI\CC_010601.DeviceDesc% = genahci, "PCI\CC_010601" ; Standard SATA AHCI Controller
+
+[genahci]
+CopyFiles = genahci.CopyFiles
+
+[genahci.CopyFiles]
+genahci.sys
+
+
+[genahci.Services]
+AddService = genahci, 2, Service
+
+[Service]
+DisplayName    = %ServiceDescription%
+ServiceType    = 1
+StartType      = 0
+ErrorControl   = 1
+ServiceBinary  = %12%\genahci.sys
+LoadOrderGroup = "SCSI Miniport"
+AddReg         = genahci_AddReg
+
+[genahci_AddReg]
+HKR, "Parameters\PnpInterface", "5", 0x00010001, 0x00000001
+HKR, "Parameters", "BusType", 0x00010001, 0x0000000b
+
+
+
+;********************************************************
+; Extra Registry Entries
+
+[Strings]
+;Localizable
+Manufacturer             = "Microsoft"
+DiskName                 = "Microsoft SATA/AHCI Device Driver Installation Disk"
+PCI\CC_010601.DeviceDesc = "Standard SATA/AHCI Controller (Microsoft)"
+ServiceDescription       = "Microsoft SATA/AHCI Driver"

@@ -13,22 +13,17 @@ import (
 
 const (
 	maxProfileIconBytes = int64(1024 * 1024)
-	maxUnattendBytes     = int64(4 * 1024 * 1024)
+	maxUnattendBytes    = int64(4 * 1024 * 1024)
 )
 
 var pngSignature = []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a}
-var catalogImageExtensions = map[string]struct{}{
-	".iso": {},
-	".wim": {},
-	".img": {},
-	".vhd": {},
-	".vhdx": {},
-	".efi": {},
+var legacyCatalogImageExtensions = map[string]struct{}{
+	".iso": {}, ".wim": {}, ".img": {}, ".vhd": {}, ".vhdx": {}, ".efi": {},
 }
 
 type catalogProfile struct {
-	root       string
-	profile    dataProfile
+	root    string
+	profile dataProfile
 }
 
 func syncDataCatalog(media install.MediaLayout) error {
@@ -70,8 +65,8 @@ func syncCatalogProfile(media install.MediaLayout, profile catalogProfile) error
 	if err := os.MkdirAll(filepath.Join(espRoot, "Images"), 0o755); err != nil {
 		return fmt.Errorf("create ESP Images metadata %s: %w", relativeRoot, err)
 	}
-	if err := mirrorImageNames(filepath.Join(dataRoot, "Images"), filepath.Join(espRoot, "Images")); err != nil {
-		return fmt.Errorf("sync image catalog %s: %w", relativeRoot, err)
+	if err := mirrorEspExecutableImages(filepath.Join(dataRoot, "Images"), filepath.Join(espRoot, "Images")); err != nil {
+		return fmt.Errorf("sync EFI executable images %s: %w", relativeRoot, err)
 	}
 	if profile.profile.unattended {
 		if err := os.MkdirAll(filepath.Join(espRoot, "Unattended"), 0o755); err != nil {
@@ -109,8 +104,8 @@ func syncDynamicUtilitiesCatalog(media install.MediaLayout) error {
 		if err := os.MkdirAll(filepath.Join(espUtility, "Images"), 0o755); err != nil {
 			return fmt.Errorf("create ESP utility metadata %s: %w", entry.Name(), err)
 		}
-		if err := mirrorImageNames(filepath.Join(dataUtility, "Images"), filepath.Join(espUtility, "Images")); err != nil {
-			return fmt.Errorf("sync utility image catalog %s: %w", entry.Name(), err)
+		if err := mirrorEspExecutableImages(filepath.Join(dataUtility, "Images"), filepath.Join(espUtility, "Images")); err != nil {
+			return fmt.Errorf("sync utility EFI executable images %s: %w", entry.Name(), err)
 		}
 		if err := mirrorOptionalIcon(filepath.Join(dataUtility, "icon.png"), filepath.Join(espUtility, "icon.png")); err != nil {
 			return fmt.Errorf("sync utility icon %s: %w", entry.Name(), err)
@@ -119,7 +114,39 @@ func syncDynamicUtilitiesCatalog(media install.MediaLayout) error {
 	return nil
 }
 
-func mirrorImageNames(sourceDir, destinationDir string) error {
+// RestoreLegacyImageMarkers recreates the pre-direct-NTFS ESP image catalog.
+// It is not used by normal install/update flows; it exists only as a rollback
+// escape hatch while physical Legacy NTFS discovery is being validated.
+func RestoreLegacyImageMarkers(media install.MediaLayout) error {
+	for _, profile := range catalogProfiles() {
+		relativeRoot := filepath.Join(profile.root, profile.profile.name)
+		if err := restoreLegacyImageDirectory(filepath.Join(media.DATA.VolumePath, relativeRoot, "Images"), filepath.Join(media.ESP.VolumePath, relativeRoot, "Images")); err != nil {
+			return fmt.Errorf("restore legacy image markers %s: %w", relativeRoot, err)
+		}
+	}
+	dataUtilities := filepath.Join(media.DATA.VolumePath, "Utilities")
+	entries, err := os.ReadDir(dataUtilities)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("read DATA Utilities for rollback: %w", err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		if err := restoreLegacyImageDirectory(filepath.Join(dataUtilities, entry.Name(), "Images"), filepath.Join(media.ESP.VolumePath, "Utilities", entry.Name(), "Images")); err != nil {
+			return fmt.Errorf("restore legacy utility markers %s: %w", entry.Name(), err)
+		}
+	}
+	return nil
+}
+
+func restoreLegacyImageDirectory(sourceDir, destinationDir string) error {
+	if err := os.MkdirAll(destinationDir, 0o755); err != nil {
+		return err
+	}
 	entries, err := os.ReadDir(sourceDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -131,14 +158,15 @@ func mirrorImageNames(sourceDir, destinationDir string) error {
 		if entry.IsDir() {
 			continue
 		}
-		if _, ok := catalogImageExtensions[strings.ToLower(filepath.Ext(entry.Name()))]; !ok {
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
+		if _, ok := legacyCatalogImageExtensions[ext]; !ok {
 			continue
 		}
 		source := filepath.Join(sourceDir, entry.Name())
 		destination := filepath.Join(destinationDir, entry.Name())
-		if strings.EqualFold(filepath.Ext(entry.Name()), ".efi") {
+		if ext == ".efi" {
 			if err := mirrorExecutableEFI(source, destination); err != nil {
-				return fmt.Errorf("copy EFI image %s: %w", entry.Name(), err)
+				return err
 			}
 			continue
 		}
@@ -146,12 +174,29 @@ func mirrorImageNames(sourceDir, destinationDir string) error {
 		if err != nil {
 			return err
 		}
-		if err := file.Sync(); err != nil {
-			_ = file.Close()
-			return err
-		}
 		if err := file.Close(); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func mirrorEspExecutableImages(sourceDir, destinationDir string) error {
+	entries, err := os.ReadDir(sourceDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.EqualFold(filepath.Ext(entry.Name()), ".efi") {
+			continue
+		}
+		source := filepath.Join(sourceDir, entry.Name())
+		destination := filepath.Join(destinationDir, entry.Name())
+		if err := mirrorExecutableEFI(source, destination); err != nil {
+			return fmt.Errorf("copy EFI image %s: %w", entry.Name(), err)
 		}
 	}
 	return nil

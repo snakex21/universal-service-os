@@ -1,0 +1,7 @@
+{
+  "commit": "b8f0baba63e60e74d4ed3e86b15b76319d316b83",
+  "url": "https://raw.githubusercontent.com/manatails/uefiseven/b8f0baba63e60e74d4ed3e86b15b76319d316b83/UefiSevenPkg/Platform/UefiSeven/Int10hHandler.h",
+  "efi_sha256": "0a44a256cda725c22f1daadcf093fc4660b7214e6437968a4c8e119aed02a947",
+  "header_sha256": "af1aa2e4823a9599474a969e37bd3b00b233a46702666b8a06bea0bd324e217f",
+  "handler_sha256": "081e8ebcdccb1d4e3b32599f54c19a6c1fcce9d524a7a7de30b8846daee0d75a"
+}

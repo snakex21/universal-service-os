@@ -1,0 +1,12 @@
+{
+  "version": "3.40",
+  "upstream": "https://github.com/Baron-von-Riedesel/HimemX/releases/tag/v3.40",
+  "download": "https://github.com/Baron-von-Riedesel/HimemX/releases/download/v3.40/HimemX340.zip",
+  "files": {
+    "HIMEMX.EXE": "95557fe6d35ff7801a9baa072f7cef1f8a6d53a46f00c90785ad7e59c094cba9",
+    "README.TXT": "be54cf4a34e96935e2abe2c1cd86ea902c7680be96b5b2d155ed55419edc5dbd",
+    "HISTORY.TXT": "8edd94dc83c53bedb32cb2fe956c81bb0ace0401acbfc268edd144f88d6729bb",
+    "COPYING": "dcc100d4161cc0b7177545ab6e47216f84857cda3843847c792a25289852dcaa",
+    "source-and-binaries.zip": "e6e9913f26aec2e264bf514ddd1910cde319122cafeeda1b46cc0756beae25f8"
+  }
+}

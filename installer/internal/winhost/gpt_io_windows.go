@@ -86,7 +86,7 @@ func waitForGPTHeader(handle windows.Handle, expectedDiskID windows.GUID, timeou
 	for {
 		layoutInfo, err := readDriveLayout(handle)
 		if err == nil {
-			if guidString(layoutInfo.Header.DiskID) == guidString(expectedDiskID) &&
+			if equalGUIDText(guidString(layoutInfo.Header.DiskID), guidString(expectedDiskID)) &&
 				layoutInfo.Header.StartingUsableOffset > 0 &&
 				layoutInfo.Header.UsableLength > 0 {
 				return layoutInfo.Header, nil

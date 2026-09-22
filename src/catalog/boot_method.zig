@@ -1,3 +1,5 @@
+const FirmwareRequirement = @import("firmware_requirement.zig").FirmwareRequirement;
+
 pub const BootMethod = enum {
     automatic,
     direct_iso,
@@ -20,6 +22,13 @@ pub const BootMethod = enum {
             .memdisk => "Memdisk",
             .disk_image => "Disk image",
             .floppy_image => "Floppy image",
+        };
+    }
+
+    pub fn firmwareRequirement(self: BootMethod) FirmwareRequirement {
+        return switch (self) {
+            .direct_efi => .uefi,
+            else => .any,
         };
     }
 
@@ -50,6 +59,13 @@ pub const BootMethod = enum {
 test "boot method labels stay user readable" {
     const std = @import("std");
     try std.testing.expectEqualStrings("WIMBoot", BootMethod.wimboot.label());
+}
+
+test "Direct EFI is UEFI-only while generic methods stay firmware-neutral" {
+    const std = @import("std");
+    try std.testing.expectEqual(FirmwareRequirement.uefi, BootMethod.direct_efi.firmwareRequirement());
+    try std.testing.expectEqual(FirmwareRequirement.any, BootMethod.chainload.firmwareRequirement());
+    try std.testing.expectEqual(FirmwareRequirement.any, BootMethod.automatic.firmwareRequirement());
 }
 
 test "boot method persisted values round trip" {

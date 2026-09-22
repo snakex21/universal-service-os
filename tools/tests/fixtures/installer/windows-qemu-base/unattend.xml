@@ -5,20 +5,11 @@
       <ComputerName>USOS-QEMU</ComputerName>
       <TimeZone>Central European Standard Time</TimeZone>
     </component>
-  </settings>
-  <settings pass="oobeSystem">
-    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-      <Reseal>
-        <Mode>Audit</Mode>
-      </Reseal>
-    </component>
-  </settings>
-  <settings pass="auditUser">
     <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
       <RunSynchronous>
         <RunSynchronousCommand wcm:action="add">
           <Order>1</Order>
-          <Description>Run USOS installer QEMU E2E</Description>
+          <Description>Run USOS installer QEMU E2E before OOBE</Description>
           <Path>cmd.exe /c C:\USOS_TEST\bootstrap.cmd</Path>
         </RunSynchronousCommand>
       </RunSynchronous>

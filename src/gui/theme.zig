@@ -2,14 +2,14 @@ const std = @import("std");
 const Color = @import("color.zig").Color;
 
 pub const Theme = struct {
-    background: Color = .{ .r = 0x11, .g = 0x15, .b = 0x1c },
-    panel: Color = .{ .r = 0x1b, .g = 0x23, .b = 0x30 },
-    panel_alt: Color = .{ .r = 0x22, .g = 0x2d, .b = 0x3d },
-    text: Color = .{ .r = 0xf2, .g = 0xf5, .b = 0xf8 },
-    muted: Color = .{ .r = 0x9a, .g = 0xa8, .b = 0xb8 },
-    accent: Color = .{ .r = 0x5a, .g = 0xa9, .b = 0xff },
-    selected: Color = .{ .r = 0x2f, .g = 0x6f, .b = 0xae },
-    border: Color = .{ .r = 0x34, .g = 0x46, .b = 0x5d },
+    background: Color = .{ .r = 0x08, .g = 0x0d, .b = 0x14 },
+    panel: Color = .{ .r = 0x10, .g = 0x19, .b = 0x23 },
+    panel_alt: Color = .{ .r = 0x17, .g = 0x25, .b = 0x35 },
+    text: Color = .{ .r = 0xef, .g = 0xfc, .b = 0xff },
+    muted: Color = .{ .r = 0x8f, .g = 0xa8, .b = 0xb8 },
+    accent: Color = .{ .r = 0x43, .g = 0xd8, .b = 0xe8 },
+    selected: Color = .{ .r = 0x14, .g = 0x5b, .b = 0x7a },
+    border: Color = .{ .r = 0x29, .g = 0x44, .b = 0x57 },
     disabled: Color = .{ .r = 0x3a, .g = 0x42, .b = 0x4c },
 
     pub fn parse(css: []const u8) Theme {

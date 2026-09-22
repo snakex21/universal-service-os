@@ -61,7 +61,7 @@ func TestDriveLayoutBufferUsesCurrentPartitionInformationEXOffsets(t *testing.T)
 	}
 	wantNames := []string{"USOS_ESP", "USOS_DATA", "USOS_WORK"}
 	wantIDs := []string{guidString(ids.ESP), guidString(ids.DATA), guidString(ids.WORK)}
-	wantAttributes := []uint64{0, 0, gptBasicDataAttributeNoDriveLetter}
+	wantAttributes := []uint64{0, 0, 0}
 	for i, partition := range parsed.Partitions {
 		if partition.Ordinal != uint16(i+1) {
 			t.Fatalf("partition %d ordinal=%d, want %d", i, partition.Ordinal, i+1)

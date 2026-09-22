@@ -20,7 +20,16 @@ func (b Backend) Verify(media install.MediaLayout, expected install.DeviceINI) (
 }
 
 func (b Backend) VerifyRepair(media install.MediaLayout, expected install.DeviceINI) (install.VerificationReport, error) {
-	return b.verify(media, expected, false)
+	report, err := b.verify(media, expected, false)
+	if err != nil {
+		return report, err
+	}
+	if legacyErr := verifyLegacyBootForMedia(media); legacyErr != nil {
+		report.Items = append(report.Items, install.VerificationItem{Name: "Legacy BIOS boot area", Expected: "Stage 1 i Core zgodne z payloadem instalatora", Actual: legacyErr.Error(), Match: false})
+	} else {
+		report.Items = append(report.Items, install.VerificationItem{Name: "Legacy BIOS boot area", Expected: "Stage 1 i Core zgodne z payloadem instalatora", Actual: "Stage 1 i Core zgodne z payloadem instalatora", Match: true})
+	}
+	return report, nil
 }
 
 func (b Backend) verify(media install.MediaLayout, expected install.DeviceINI, verifyDataPayload bool) (install.VerificationReport, error) {
@@ -61,10 +70,19 @@ func (b Backend) verify(media install.MediaLayout, expected install.DeviceINI, v
 		return report, fmt.Errorf("close usos-device.ini during verification: %w", closeErr)
 	}
 
-	add("Disk GPT UUID", actualINI.DiskPTUUID, media.DiskPTUUID)
-	add("ESP PARTUUID", actualINI.ESPPartUUID, media.ESP.PartUUID)
-	add("DATA PARTUUID", actualINI.DataPartUUID, media.DATA.PartUUID)
-	add("WORK PARTUUID", actualINI.WorkPartUUID, media.WORK.PartUUID)
+	addGUID := func(name, want, actual string) {
+		report.Items = append(report.Items, install.VerificationItem{
+			Name:     name,
+			Expected: want,
+			Actual:   actual,
+			Match:    equalGUIDText(want, actual),
+		})
+	}
+
+	addGUID("Disk GPT UUID", actualINI.DiskPTUUID, media.DiskPTUUID)
+	addGUID("ESP PARTUUID", actualINI.ESPPartUUID, media.ESP.PartUUID)
+	addGUID("DATA PARTUUID", actualINI.DataPartUUID, media.DATA.PartUUID)
+	addGUID("WORK PARTUUID", actualINI.WorkPartUUID, media.WORK.PartUUID)
 	add("WORK rozmiar", strconv.FormatUint(actualINI.WorkBytes, 10), strconv.FormatUint(media.WORK.SizeBytes, 10))
 	add("WORK etykieta w usos-device.ini", expected.WorkLabel, actualINI.WorkLabel)
 	add("DATA etykieta w usos-device.ini", expected.DataLabel, actualINI.DataLabel)
@@ -98,14 +116,14 @@ func (b Backend) verify(media install.MediaLayout, expected install.DeviceINI, v
 		add("install-state.ini", "phase=pending", actualState)
 	}
 
-	verifyMountVisibility(&report, resolved)
+	verifyDataVisibility(&report, resolved)
 	if verifyDataPayload {
 		b.verifyDataPayload(&report, resolved)
 	}
 	return report, nil
 }
 
-func verifyMountVisibility(report *install.VerificationReport, resolved install.MediaLayout) {
+func verifyDataVisibility(report *install.VerificationReport, resolved install.MediaLayout) {
 	dataVolume, dataErr := findVolumeByExtent(resolved.DiskNumber, resolved.DATA.StartBytes, resolved.DATA.SizeBytes)
 	if dataErr != nil {
 		report.Items = append(report.Items, install.VerificationItem{Name: "DATA widoczne dla użytkownika", Expected: "ma literę dysku", Actual: dataErr.Error(), Match: false})
@@ -116,18 +134,6 @@ func verifyMountVisibility(report *install.VerificationReport, resolved install.
 			actual = "ma literę dysku"
 		}
 		report.Items = append(report.Items, install.VerificationItem{Name: "DATA widoczne dla użytkownika", Expected: "ma literę dysku", Actual: actual, Match: match})
-	}
-
-	workVolume, workErr := findVolumeByExtent(resolved.DiskNumber, resolved.WORK.StartBytes, resolved.WORK.SizeBytes)
-	if workErr != nil {
-		report.Items = append(report.Items, install.VerificationItem{Name: "WORK ukryte w Eksploratorze", Expected: "brak litery dysku", Actual: workErr.Error(), Match: false})
-	} else {
-		match := !hasDriveLetter(workVolume.Info.MountPaths)
-		actual := "brak litery dysku"
-		if !match {
-			actual = "ma przypisaną literę dysku"
-		}
-		report.Items = append(report.Items, install.VerificationItem{Name: "WORK ukryte w Eksploratorze", Expected: "brak litery dysku", Actual: actual, Match: match})
 	}
 }
 

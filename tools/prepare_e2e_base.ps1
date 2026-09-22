@@ -10,7 +10,9 @@ param(
     [Parameter(Mandatory=$true)][string]$MicroLinuxInitramfsPath,
     [Parameter(Mandatory=$true)][string]$MicroLinuxLoaderPath,
     [string]$UnattendPath = '',
-    [string]$GuardTestBadPartuuid = ''
+    [string]$GuardTestBadPartuuid = '',
+    [string]$DirectEfiFixturePath = '',
+    [switch]$StopAfterPrepared
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,6 +20,7 @@ foreach ($name in @('IsoPath','VhdPath','BaseQcow2Path','QemuImgPath','BootEfiPa
     Set-Variable -Name $name -Value ([IO.Path]::GetFullPath((Get-Variable -Name $name -ValueOnly)))
 }
 if (-not [string]::IsNullOrWhiteSpace($UnattendPath)) { $UnattendPath = [IO.Path]::GetFullPath($UnattendPath) }
+if (-not [string]::IsNullOrWhiteSpace($DirectEfiFixturePath)) { $DirectEfiFixturePath = [IO.Path]::GetFullPath($DirectEfiFixturePath) }
 
 $testImagesRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'tests\artifacts\qemu'))
 foreach ($path in @($VhdPath, $BaseQcow2Path)) {
@@ -43,6 +46,9 @@ foreach ($requiredUiPath in @('index.html', 'theme.css', 'Icons\Systems')) {
 }
 if (-not [string]::IsNullOrWhiteSpace($UnattendPath) -and -not (Test-Path -LiteralPath $UnattendPath -PathType Leaf)) {
     throw "Missing unattended file: $UnattendPath"
+}
+if (-not [string]::IsNullOrWhiteSpace($DirectEfiFixturePath) -and -not (Test-Path -LiteralPath $DirectEfiFixturePath -PathType Leaf)) {
+    throw "Missing Direct EFI validation fixture: $DirectEfiFixturePath"
 }
 
 $BasicDataType = '{EBD0A0A2-B9E5-4433-87C0-68B6B72699C7}'
@@ -76,6 +82,11 @@ try {
     $esp = New-Partition -DiskNumber $disk.Number -Size 512MB -GptType $EspType
     $data = New-Partition -DiskNumber $disk.Number -Size 10GB -GptType $BasicDataType
     $work = New-Partition -DiskNumber $disk.Number -UseMaximumSize -GptType $BasicDataType
+    # New-Partition on file-backed VHDs can set GPT bit 63 when no drive letter
+    # is assigned. Production USOS requires DATA and WORK with NoDriveLetter=0;
+    # WinPE otherwise refuses to mount WORK during the Windows Setup handoff.
+    Set-Partition -InputObject $data -NoDefaultDriveLetter $false -Confirm:$false
+    Set-Partition -InputObject $work -NoDefaultDriveLetter $false -Confirm:$false
 
     $esp | Format-Volume -FileSystem FAT32 -NewFileSystemLabel 'USOS_ESP' -Confirm:$false -Force | Out-Null
     $data | Format-Volume -FileSystem NTFS -NewFileSystemLabel $DataLabel -Confirm:$false -Force | Out-Null
@@ -127,6 +138,9 @@ try {
         }
         $kernelOptions += " usos.guard_test_bad_partuuid=$GuardTestBadPartuuid"
     }
+    if ($StopAfterPrepared) {
+        $kernelOptions += ' usos.test_stop_after_prepared=1'
+    }
     $loaderEntry = @(
         'title USOS micro-Linux preparation',
         'linux /EFI/USOS/micro-linux/vmlinuz-virt',
@@ -166,6 +180,9 @@ try {
     $espUnattendDir = Join-Path $espRoot 'Systems\Windows\Windows 11\Unattended'
     New-Item -ItemType Directory -Force -Path $espImageDir,$espUnattendDir | Out-Null
     [IO.File]::WriteAllBytes((Join-Path $espImageDir (Split-Path -Leaf $IsoPath)), [byte[]]@())
+    if (-not [string]::IsNullOrWhiteSpace($DirectEfiFixturePath)) {
+        Copy-Item -LiteralPath $DirectEfiFixturePath -Destination (Join-Path $espImageDir (Split-Path -Leaf $DirectEfiFixturePath)) -Force
+    }
     if (-not [string]::IsNullOrWhiteSpace($UnattendPath)) {
         Copy-Item -LiteralPath $UnattendPath -Destination (Join-Path $espUnattendDir (Split-Path -Leaf $UnattendPath)) -Force
     }
@@ -173,6 +190,7 @@ try {
     $workVolume = $work | Get-Volume
     $dataVolume = $data | Get-Volume
     if ($work.GptType -ne $BasicDataType -or $data.GptType -ne $BasicDataType) { throw 'WORK/DATA GPT type is not Microsoft Basic Data' }
+    if ($work.NoDefaultDriveLetter -or $data.NoDefaultDriveLetter) { throw 'DATA/WORK GPT NoDefaultDriveLetter must be false for Windows Setup compatibility' }
     if ($workVolume.FileSystemLabel -ne $WorkLabel) { throw "WORK label mismatch: $($workVolume.FileSystemLabel)" }
     if ($dataVolume.FileSystemLabel -ne $DataLabel) { throw "DATA label mismatch: $($dataVolume.FileSystemLabel)" }
     if ($work.Guid -eq $data.Guid -or $work.Guid -eq $esp.Guid -or $data.Guid -eq $esp.Guid) { throw 'Partition GUID collision' }

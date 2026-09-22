@@ -4,9 +4,13 @@ import (
 	"fmt"
 
 	"github.com/snakex21/universal-service-os/installer/internal/domain"
+	"github.com/snakex21/universal-service-os/installer/internal/install"
+	"github.com/snakex21/universal-service-os/installer/internal/legacyboot"
 )
 
 type DestructiveSession interface {
+	ClearLegacyBoot(media install.MediaLayout) (legacyboot.Audit, error)
+	VerifyLegacyBootCleared() error
 	CleanPartitionTable() error
 	CreateSingleDataPartition() (MediaLayout, error)
 	VerifyUninstallLayoutUnchanged(expected MediaLayout) (MediaLayout, error)
@@ -61,6 +65,14 @@ func (e *Engine) run(expected Target, events chan<- Event) {
 	}()
 	e.log(events, fmt.Sprintf("Preflight PASS: PhysicalDrive%d nadal jest zatwierdzonym nośnikiem USOS", current.Number))
 
+	if err := e.runStage(events, StageClearLegacyBoot, func() error {
+		audit, clearErr := session.ClearLegacyBoot(expected.Media)
+		e.logLegacyAudit(events, audit)
+		return clearErr
+	}); err != nil {
+		return
+	}
+
 	if err := e.runStage(events, StageClean, session.CleanPartitionTable); err != nil {
 		return
 	}
@@ -95,6 +107,9 @@ func (e *Engine) run(expected Target, events chan<- Event) {
 			return fmt.Errorf("final GPT read-back mismatch: %w", err)
 		}
 		media = readBack
+		if err := session.VerifyLegacyBootCleared(); err != nil {
+			return fmt.Errorf("Legacy boot area was not cleared: %w", err)
+		}
 		report, err = e.backend.VerifyUninstall(media)
 		if err == nil && !report.OK() {
 			err = fmt.Errorf("verification report contains mismatches")
@@ -125,6 +140,26 @@ func (e *Engine) runStage(events chan<- Event, stageID StageID, operation func()
 	e.log(events, "PASS "+caption)
 	events <- Event{Kind: EventStage, StageID: stageID, State: StateSucceeded}
 	return nil
+}
+
+func (e *Engine) logLegacyAudit(events chan<- Event, audit legacyboot.Audit) {
+	if audit.Stage1.BeforeSHA256 != "" {
+		e.log(events, fmt.Sprintf("LEGACY_BOOT BEFORE component=stage1 sha256=%s expected=%s", audit.Stage1.BeforeSHA256, audit.Stage1.ExpectedSHA256))
+	}
+	if audit.Core.BeforeSHA256 != "" {
+		e.log(events, fmt.Sprintf("LEGACY_BOOT BEFORE component=core sha256=%s expected=%s", audit.Core.BeforeSHA256, audit.Core.ExpectedSHA256))
+	}
+	if audit.Stage1.AfterSHA256 != "" {
+		e.log(events, fmt.Sprintf("LEGACY_BOOT AFTER component=stage1 sha256=%s expected=%s changed=%s", audit.Stage1.AfterSHA256, audit.Stage1.ExpectedSHA256, uninstallYesNo(audit.Stage1.Changed)))
+	}
+	if audit.Core.AfterSHA256 != "" {
+		e.log(events, fmt.Sprintf("LEGACY_BOOT AFTER component=core sha256=%s expected=%s changed=%s", audit.Core.AfterSHA256, audit.Core.ExpectedSHA256, uninstallYesNo(audit.Core.Changed)))
+	}
+}
+
+func uninstallYesNo(value bool) string {
+	if value { return "yes" }
+	return "no"
 }
 
 func (e *Engine) finishWithError(events chan<- Event, err error) {

@@ -8,6 +8,7 @@ $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $zig = Join-Path $root 'tools\zig\zig.exe'
 $zigCache = Join-Path $root 'tools\cache\zig'
 $qemuLocal = Join-Path $root 'tools\qemu'
+$qemuArtifacts = Join-Path $root 'tools\tests\artifacts\qemu'
 
 function Require-File([string]$Path, [string]$Label) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
@@ -26,6 +27,49 @@ function Run-Zig([string[]]$Arguments) {
 function Run-Unit {
     Write-Host '[TEST] Unit tests' -ForegroundColor Cyan
     Run-Zig @('build', '--cache-dir', $zigCache, 'test')
+    Run-Zig @('test', 'src/platform/bios/memtest_image.zig', '--cache-dir', $zigCache)
+    Run-Zig @('test', 'src/platform/bios/dos_fat.zig', '--cache-dir', $zigCache)
+    Run-Zig @('test', '--dep', 'graphics', '-Mroot=src/platform/bios/linux_boot_params.zig', '-Mgraphics=src/legacy_graphics_module.zig', '--cache-dir', $zigCache)
+    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_hardware_smart.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Hardware SMART tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_legacy_rgba_rle.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Legacy icon compression tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_windows3_media.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Windows 3.x media conversion tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_xp_dosnet_aliases.py')
+    if ($LASTEXITCODE -ne 0) { throw 'XP DOSNET alias tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_nt5_source.py')
+    if ($LASTEXITCODE -ne 0) { throw 'NT5 source identity tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_nt5_media_markers.py')
+    if ($LASTEXITCODE -ne 0) { throw 'NT5 local media marker tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_xp_drive_letters.py')
+    if ($LASTEXITCODE -ne 0) { throw 'XP drive letter tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_xp_source_io.py')
+    if ($LASTEXITCODE -ne 0) { throw 'XP source I/O tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_wimboot_kexec.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Windows BIOS kexec entry tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_ordered_wimboot_kexec.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Windows BIOS ordered kexec entry tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_windows_bios_cpu_check.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Windows BIOS CPU compatibility tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_windows_disk_order.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Windows BIOS disk-order tests failed' }
+    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_dos_disk_filter.py')
+    if ($LASTEXITCODE -ne 0) { throw 'DOS disk isolation and target MBR tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_dos_reboot.py')
+    if ($LASTEXITCODE -ne 0) { throw 'DOS restart helper tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/test_windows_source_mount.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Windows PE source mapping tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/test_windows_driver_support.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Windows driver transport and answer-file tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/test_windows7_nvme.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Windows 7 NVMe helper tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/test_windows7_uefi_publish.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Windows 7 EFI publication tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/test_uefi_graphics_refresh.py')
+    if ($LASTEXITCODE -ne 0) { throw 'UEFI graphics mode-change regression failed.' }
+    & python.exe (Join-Path $root 'tools/tests/test_uefi_graphics_connect.py')
+    if ($LASTEXITCODE -ne 0) { throw 'UEFI graphics controller reconnect regression failed.' }
 }
 
 function Run-Selftest {
@@ -43,6 +87,9 @@ function Resolve-QemuX64 {
 
 function Run-X64 {
     Write-Host '[TEST] UEFI x86_64 in QEMU' -ForegroundColor Cyan
+    New-Item -ItemType Directory -Force -Path $qemuArtifacts | Out-Null
+    $serialLog = Join-Path $qemuArtifacts 'qemu-selftest-x86_64-serial.log'
+    Remove-Item -LiteralPath $serialLog -Force -ErrorAction SilentlyContinue
     Run-Zig @('build', '--cache-dir', $zigCache, 'qemu-x86_64-image', '-Doptimize=ReleaseFast')
 
     $qemu = Resolve-QemuX64
@@ -62,7 +109,7 @@ function Run-X64 {
         -net none `
         -display none `
         -monitor none `
-        -serial stdio `
+        -serial "file:$($serialLog.Replace('\','/'))" `
         -no-reboot `
         -device isa-debug-exit,iobase=0xf4,iosize=0x04
 
@@ -77,6 +124,9 @@ function Run-X64 {
 
 function Run-Aarch64 {
     Write-Host '[TEST] UEFI ARM64 in QEMU' -ForegroundColor Cyan
+    New-Item -ItemType Directory -Force -Path $qemuArtifacts | Out-Null
+    $serialLog = Join-Path $qemuArtifacts 'qemu-selftest-aarch64-serial.log'
+    Remove-Item -LiteralPath $serialLog -Force -ErrorAction SilentlyContinue
     Run-Zig @('build', '--cache-dir', $zigCache, 'qemu-aarch64-image', '-Doptimize=ReleaseFast')
 
     $qemu = Join-Path $qemuLocal 'qemu-system-aarch64.exe'
@@ -97,7 +147,7 @@ function Run-Aarch64 {
         -net none `
         -display none `
         -monitor none `
-        -serial stdio `
+        -serial "file:$($serialLog.Replace('\','/'))" `
         -no-reboot
 
     if ($LASTEXITCODE -ne 0) {

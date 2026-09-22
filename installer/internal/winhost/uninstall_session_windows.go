@@ -75,6 +75,7 @@ func (Backend) BeginUSOSDestructive(expected uninstall.Target) (uninstall.Destru
 		return fail(fmt.Errorf("post-lock GPT revalidation: %w", err))
 	}
 	session.sectorBytes = current.SectorBytes
+	session.diskBytes = current.SizeBytes
 	return session, current, nil
 }
 

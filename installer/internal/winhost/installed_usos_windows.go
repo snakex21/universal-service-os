@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/snakex21/universal-service-os/installer/internal/buildinfo"
 	"github.com/snakex21/universal-service-os/installer/internal/domain"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/installed"
@@ -155,6 +156,11 @@ func validateInstalledUSOSLayout(disk domain.Disk, actual parsedLayout) (install
 		return installed.Target{}, fmt.Errorf("WORK marker nonce mismatch")
 	}
 
+	installedBuild, err := readInstalledBuildInfo(espVolume.Info.GUIDPath)
+	if err != nil {
+		return installed.Target{}, err
+	}
+
 	media := install.MediaLayout{
 		DiskNumber: disk.Number,
 		DiskPTUUID: guidString(actual.Header.DiskID),
@@ -162,7 +168,24 @@ func validateInstalledUSOSLayout(disk domain.Disk, actual parsedLayout) (install
 		DATA:       install.PartitionRef{Number: data.Number, StartBytes: data.StartBytes, SizeBytes: data.SizeBytes, PartUUID: guidString(data.PartitionID), VolumePath: dataVolume.Info.GUIDPath},
 		WORK:       install.PartitionRef{Number: work.Number, StartBytes: work.StartBytes, SizeBytes: work.SizeBytes, PartUUID: guidString(work.PartitionID), VolumePath: workVolume.Info.GUIDPath},
 	}
-	return installed.Target{Disk: disk, Identity: identity, Media: media}, nil
+	return installed.Target{Disk: disk, Identity: identity, Media: media, BuildInfo: installedBuild}, nil
+}
+
+func readInstalledBuildInfo(espRoot string) (buildinfo.Info, error) {
+	path := filepath.Join(espRoot, "EFI", "USOS", "build-info.ini")
+	file, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return buildinfo.Info{}, nil
+		}
+		return buildinfo.Info{}, fmt.Errorf("open build-info.ini: %w", err)
+	}
+	defer file.Close()
+	info, err := buildinfo.Parse(file)
+	if err != nil {
+		return buildinfo.Info{}, fmt.Errorf("parse build-info.ini: %w", err)
+	}
+	return info, nil
 }
 
 func partitionByID(actual parsedLayout, id string) (parsedPartition, error) {

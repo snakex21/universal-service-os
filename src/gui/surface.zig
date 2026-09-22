@@ -1,5 +1,6 @@
-const BootFramebuffer = @import("../kernel/boot_info.zig").Framebuffer;
-const PixelFormat = @import("../kernel/boot_info.zig").PixelFormat;
+const framebuffer_types = @import("framebuffer.zig");
+const BootFramebuffer = framebuffer_types.Framebuffer;
+const PixelFormat = framebuffer_types.PixelFormat;
 const Color = @import("color.zig").Color;
 
 pub const Surface = struct {
@@ -8,6 +9,7 @@ pub const Surface = struct {
     pub fn init(framebuffer: BootFramebuffer) ?Surface {
         if (framebuffer.pixel_format == .bit_mask) return null;
         if (framebuffer.address == 0 or framebuffer.width == 0 or framebuffer.height == 0) return null;
+        if (@bitSizeOf(usize) == 32 and framebuffer.address > 0xFFFFFFFF) return null;
         return .{ .framebuffer = framebuffer };
     }
 
@@ -40,14 +42,16 @@ pub const Surface = struct {
     pub fn getRawPixel(self: Surface, x: u32, y: u32) u32 {
         if (x >= self.framebuffer.width or y >= self.framebuffer.height) return 0;
         const index: usize = @as(usize, y) * self.framebuffer.pixels_per_scan_line + x;
-        const pixels: [*]volatile u32 = @ptrFromInt(self.framebuffer.address);
+        const address: usize = @intCast(self.framebuffer.address);
+        const pixels: [*]volatile u32 = @ptrFromInt(address);
         return pixels[index];
     }
 
     pub fn setRawPixel(self: Surface, x: u32, y: u32, value: u32) void {
         if (x >= self.framebuffer.width or y >= self.framebuffer.height) return;
         const index: usize = @as(usize, y) * self.framebuffer.pixels_per_scan_line + x;
-        const pixels: [*]volatile u32 = @ptrFromInt(self.framebuffer.address);
+        const address: usize = @intCast(self.framebuffer.address);
+        const pixels: [*]volatile u32 = @ptrFromInt(address);
         pixels[index] = value;
     }
 };

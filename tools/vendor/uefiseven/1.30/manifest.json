@@ -1,0 +1,9 @@
+{
+  "version": "1.30",
+  "source": "https://github.com/manatails/uefiseven/releases/tag/1.30",
+  "license_source": "https://raw.githubusercontent.com/manatails/uefiseven/1.30/UefiSevenPkg/License.txt",
+  "files": {
+    "LICENSE.txt": "30b044939b58ef5754ed7479e5ec930dd49d154dbf07f618825d4470c189f4dd",
+    "UefiSeven.efi": "0a44a256cda725c22f1daadcf093fc4660b7214e6437968a4c8e119aed02a947"
+  }
+}

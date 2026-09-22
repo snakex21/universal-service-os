@@ -4,23 +4,28 @@ param(
     [string]$QemuImgPath = 'tools/qemu/qemu-img.exe',
     [string]$UnattendPath = 'tools/tests/fixtures/installer/windows-qemu-base/unattend.xml',
     [string]$BootstrapPath = 'tools/tests/fixtures/installer/windows-qemu-base/bootstrap.cmd',
+    [string]$SetupCompletePath = 'tools/tests/fixtures/installer/windows-qemu-base/SetupComplete.cmd',
     [int]$ImageIndex = 5
 )
 
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-function Full([string]$Path) { [IO.Path]::GetFullPath((Join-Path $root $Path)) }
+function Full([string]$Path) {
+    if ([IO.Path]::IsPathRooted($Path)) { return [IO.Path]::GetFullPath($Path) }
+    return [IO.Path]::GetFullPath((Join-Path $root $Path))
+}
 $IsoPath = Full $IsoPath
 $VhdxPath = Full $VhdxPath
 $QemuImgPath = Full $QemuImgPath
 $UnattendPath = Full $UnattendPath
 $BootstrapPath = Full $BootstrapPath
+$SetupCompletePath = Full $SetupCompletePath
 $testImages = Full 'tools/tests/artifacts/qemu'
 
 if (-not $VhdxPath.StartsWith($testImages, [StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing Windows QEMU base outside tools/tests/artifacts/qemu: $VhdxPath"
 }
-foreach ($required in @($IsoPath,$QemuImgPath,$UnattendPath,$BootstrapPath)) {
+foreach ($required in @($IsoPath,$QemuImgPath,$UnattendPath,$BootstrapPath,$SetupCompletePath)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "Missing required file: $required" }
 }
 if (Test-Path -LiteralPath $VhdxPath) {
@@ -78,8 +83,10 @@ try {
 
     $testDir = Join-Path $windowsRoot 'USOS_TEST'
     $panther = Join-Path $windowsRoot 'Windows\Panther'
-    New-Item -ItemType Directory -Force -Path $testDir,$panther | Out-Null
+    $setupScripts = Join-Path $windowsRoot 'Windows\Setup\Scripts'
+    New-Item -ItemType Directory -Force -Path $testDir,$panther,$setupScripts | Out-Null
     Copy-Item -LiteralPath $BootstrapPath -Destination (Join-Path $testDir 'bootstrap.cmd') -Force
+    Copy-Item -LiteralPath $SetupCompletePath -Destination (Join-Path $setupScripts 'SetupComplete.cmd') -Force
     Copy-Item -LiteralPath $UnattendPath -Destination (Join-Path $panther 'unattend.xml') -Force
     Copy-Item -LiteralPath $UnattendPath -Destination (Join-Path $windowsRoot 'unattend.xml') -Force
 
@@ -95,7 +102,8 @@ try {
         & reg.exe unload HKLM\USOSQEMU | Out-Null
     }
 
-    Write-Host '[PASS] Windows files, UEFI boot and audit-mode test bootstrap prepared'
+    if (-not (Test-Path -LiteralPath (Join-Path $setupScripts 'SetupComplete.cmd') -PathType Leaf)) { throw 'SetupComplete.cmd missing after copy' }
+    Write-Host '[PASS] Windows files, UEFI boot and deterministic SetupComplete test bootstrap prepared'
 } finally {
     if ($isoMounted) { Dismount-DiskImage -ImagePath $IsoPath -ErrorAction SilentlyContinue | Out-Null }
     if ($vhdMounted -and $null -ne $mountedVhd) { Dismount-DiskImage -InputObject $mountedVhd -ErrorAction SilentlyContinue | Out-Null }

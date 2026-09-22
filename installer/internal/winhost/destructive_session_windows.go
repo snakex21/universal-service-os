@@ -13,16 +13,24 @@ import (
 
 type Backend struct {
 	InstallerExecutable string
+	// LegacyCoreOverride is intentionally empty in normal install/update paths.
+	// It exists only for an explicitly invoked physical rollback tool and still
+	// goes through the same locked-disk/GPT/read-back safety path.
+	LegacyCoreOverride []byte
 }
 
 type destructiveSession struct {
 	diskNumber  uint32
 	sectorBytes uint32
+	diskBytes   uint64
 	disk        windows.Handle
 	volumes     []lockedVolume
-	cleaned     bool
-	created     bool
-	closed      bool
+	cleaned          bool
+	created          bool
+	closed           bool
+	legacyCleared    bool
+	legacyCoreStart  uint64
+	legacyCoreLength uint64
 }
 
 func (Backend) BeginDestructive(expected domain.Disk) (install.DestructiveSession, domain.Disk, error) {
@@ -82,6 +90,7 @@ func (Backend) BeginDestructive(expected domain.Disk) (install.DestructiveSessio
 		return fail(fmt.Errorf("post-lock revalidation: %w", err))
 	}
 	session.sectorBytes = current.SectorBytes
+	session.diskBytes = current.SizeBytes
 	return session, current, nil
 }
 

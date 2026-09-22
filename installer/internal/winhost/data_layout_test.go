@@ -11,11 +11,13 @@ func TestRequiredDataDirectoriesCoverEveryVisibleProfile(t *testing.T) {
 		filepath.Join("Systems", "Windows", "Windows 10", "Images"),
 		filepath.Join("Systems", "Windows", "Windows XP", "Images"),
 		filepath.Join("Systems", "Windows", "Windows 3.11", "Images"),
+		filepath.Join("Systems", "Windows", "Windows 3.1", "Images"),
 		filepath.Join("Systems", "Linux", "Ubuntu", "Images"),
 		filepath.Join("Systems", "Linux", "Ubuntu", "Unattended"),
 		filepath.Join("Systems", "Betas", "Windows Whistler", "Images"),
 		filepath.Join("Systems", "Betas", "Windows Longhorn", "Unattended"),
 		filepath.Join("Systems", "DOS", "MS-DOS", "Images"),
+		filepath.Join("Systems", "DOS", "MS-DOS", "Programs"),
 		"Utilities",
 		filepath.Join("Programs", "USOS"),
 	}
@@ -34,8 +36,8 @@ func TestWindows311DoesNotCreateUnattendedDirectory(t *testing.T) {
 }
 
 func TestDataProfileCountsStayInSyncWithCatalog(t *testing.T) {
-	if len(windowsProfiles) != 14 {
-		t.Fatalf("windows profile count=%d, want 14", len(windowsProfiles))
+	if len(windowsProfiles) != 15 {
+		t.Fatalf("windows profile count=%d, want 15", len(windowsProfiles))
 	}
 	if len(linuxProfiles) != 9 {
 		t.Fatalf("linux profile count=%d, want 9", len(linuxProfiles))

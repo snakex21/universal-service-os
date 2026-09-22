@@ -1,0 +1,43 @@
+#!/bin/sh
+# Finalize the shared boot/source/Windows volume after its guarded preparation.
+set -eu
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+TARGET_DEVICE=${TARGET_DEVICE:?}
+TARGET_SNAPSHOT=${TARGET_SNAPSHOT:?}
+XP_WINDOWS_PLAN=${XP_WINDOWS_PLAN:?}
+XP_EXPECTED_MBR=${XP_EXPECTED_MBR:?}
+MTOOLS_IMAGE=${MTOOLS_IMAGE:?}
+. "$SCRIPT_DIR/xp_source_io.sh"
+. "$SCRIPT_DIR/nt5_profile.sh"
+usos_nt5_profile
+fail() { printf '[XP_WINDOWS] STOP: %s\n' "$1" >&2; exit 1; }
+value() { awk -F= -v key="$2" '$1==key {sub(/^[^=]*=/, ""); print; found=1; exit} END {if(!found) exit 1}' "$1"; }
+work=$(mktemp -d)
+trap 'rm -f "$work/plan" "$work/mbr" "$work/migrate.inf" "$work/readback" "$work/winnt.sif"; rmdir "$work"' EXIT HUP INT TERM
+awk -f "$SCRIPT_DIR/xp_windows_partition_plan.awk" "$TARGET_SNAPSHOT" > "$work/plan"
+printf '[XP_WINDOWS] shared volume plan checked\n'
+cmp -s "$work/plan" "$XP_WINDOWS_PLAN" || fail 'Windows reservation changed after confirmation'
+dd if="$TARGET_DEVICE" of="$work/mbr" bs=512 count=1 2>/dev/null
+cmp -s "$work/mbr" "$XP_EXPECTED_MBR" || fail 'MBR changed after shared volume preparation'
+slot=$(value "$XP_WINDOWS_PLAN" windows_slot)
+start=$(value "$XP_WINDOWS_PLAN" windows_start_lba)
+sectors=$(value "$XP_WINDOWS_PLAN" windows_sectors)
+signature=$(od -An -tx1 -j 440 -N4 "$work/mbr" | tr -d ' \n\r')
+printf '[XP_WINDOWS] preparing C: mapping\n'
+awk -v signature="$signature" -v windows_start="$start" -f "$SCRIPT_DIR/xp_drive_letters.awk" > "$work/migrate.inf" || fail 'invalid drive letter mapping'
+put_verified() {
+    printf '[XP_WINDOWS] writing %s\n' "$2"
+    mcopy -o -i "$MTOOLS_IMAGE" "$1" "::/\$WIN_NT\$.~BT/$2"
+    rm -f "$work/readback"
+    mcopy -o -i "$MTOOLS_IMAGE" "::/\$WIN_NT\$.~BT/$2" "$work/readback"
+    cmp -s "$1" "$work/readback" || fail "$2 readback mismatch"
+}
+awk -v directory="$NT5_INSTALL_DIR" '
+    /^InstallDir=/ { print "InstallDir=\"\\" directory "\""; next }
+    /^TargetPath=/ { print "TargetPath=\\" directory; next }
+    { sub(/\r$/, ""); print }
+' "$SCRIPT_DIR/xp_selected_partition.sif" > "$work/winnt.sif"
+put_verified "$work/winnt.sif" WINNT.SIF
+put_verified "$work/migrate.inf" MIGRATE.INF
+sync
+printf '[XP_WINDOWS] PREPARED PASS slot=%s start=%s sectors=%s Windows=C: layout=single-volume filesystem=NTFS existing_partitions=preserved\n' "$slot" "$start" "$sectors"

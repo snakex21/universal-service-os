@@ -1,0 +1,24 @@
+[menu]
+menuitem=WINSTD,Windows - tryb standardowy (domyslny)
+menuitem=WIN386,Windows - tryb rozszerzony 386 (alternatywny)
+menuitem=DOSONLY,MS-DOS - wiersz polecen
+menuitem=WINSET,Ustawienia myszy PS/2 - Windows Setup
+menudefault=WINSTD,8
+
+[common]
+DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF
+DOS=HIGH
+FILES=40
+BUFFERS=20
+LASTDRIVE=Z
+SHELL=C:\COMMAND.COM C:\ /E:2048 /P
+STACKS=9,256
+
+[WINSTD]
+
+[WIN386]
+DEVICE=C:\WINDOWS\SMARTDRV.EXE /DOUBLE_BUFFER
+
+[DOSONLY]
+
+[WINSET]

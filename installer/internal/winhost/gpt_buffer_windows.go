@@ -82,7 +82,7 @@ func buildCreateDiskBuffer(diskID windows.GUID) ([]byte, error) {
 }
 
 func buildDriveLayoutBuffer(plan layout.Plan, header gptHeader, ids gptIDs) ([]byte, error) {
-	if guidString(header.DiskID) != guidString(ids.Disk) {
+	if !equalGUIDText(guidString(header.DiskID), guidString(ids.Disk)) {
 		return nil, fmt.Errorf("GPT disk GUID changed between CREATE_DISK and layout write")
 	}
 	usableEnd := header.StartingUsableOffset + header.UsableLength
@@ -114,7 +114,7 @@ func buildDriveLayoutBuffer(plan layout.Plan, header gptHeader, ids gptIDs) ([]b
 	}{
 		{1, 1, plan.ESP, efiSystemPartitionType, ids.ESP, 0, "USOS_ESP"},
 		{2, 2, plan.DATA, basicDataPartitionType, ids.DATA, 0, "USOS_DATA"},
-		{3, 3, plan.WORK, basicDataPartitionType, ids.WORK, gptBasicDataAttributeNoDriveLetter, "USOS_WORK"},
+		{3, 3, plan.WORK, basicDataPartitionType, ids.WORK, 0, "USOS_WORK"},
 	}
 	for index, partition := range partitions {
 		offset := driveLayoutHeaderSize + index*partitionEntrySize

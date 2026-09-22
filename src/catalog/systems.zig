@@ -52,6 +52,12 @@ test "category lookup stays isolated" {
     try std.testing.expectEqual(Category.linux, byCategoryIndex(.linux, 0).?.category);
 }
 
+test "legacy catalog exposes firmware requirements to the view model" {
+    try std.testing.expectEqual(@import("firmware_requirement.zig").FirmwareRequirement.any, findById("windows-xp").?.firmware);
+    try std.testing.expectEqual(@import("firmware_requirement.zig").FirmwareRequirement.bios, findById("ms-dos").?.firmware);
+    try std.testing.expectEqual(@import("firmware_requirement.zig").FirmwareRequirement.any, findById("windows-11").?.firmware);
+}
+
 test "built-in entry ids are unique" {
     for (all, 0..) |entry, index| {
         for (all[index + 1 ..]) |other| {

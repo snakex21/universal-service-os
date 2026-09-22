@@ -1,11 +1,13 @@
 param(
     [switch]$Fresh,
+    [ValidateSet('auto','whpx','tcg')][string]$AccelerationMode = 'tcg',
     [int]$MemoryMiB = 4096,
     [int]$CpuCount = 4,
     [int]$WindowsDiskGiB = 64
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'process_argument_line.ps1')
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $testRoot = [IO.Path]::GetFullPath((Join-Path $root 'tools/tests/artifacts/qemu'))
 function Full([string]$Path) { [IO.Path]::GetFullPath((Join-Path $root $Path)) }
@@ -23,6 +25,7 @@ $serialLog = Join-Path $runDir 'serial.log'
 $qemuLog = Join-Path $runDir 'qemu.stderr.log'
 $pidFile = Join-Path $runDir 'qemu.pid'
 $monitorFile = Join-Path $runDir 'monitor.port'
+$qmpFile = Join-Path $runDir 'qmp.port'
 $unattend = Full 'media/Systems/Windows/Windows 11/Unattended/win10-11 best-ustawienia.xml'
 
 foreach ($path in @($overlay, $windowsDisk, $runDir)) {
@@ -58,7 +61,7 @@ if ($LASTEXITCODE -ne 0) { throw "Base qcow2 check failed: $LASTEXITCODE" }
 
 New-Item -ItemType Directory -Force -Path $runDir | Out-Null
 if ($Fresh) {
-    foreach ($path in @($overlay, $windowsDisk, $firmwareVars, $serialLog, $qemuLog, $pidFile, $monitorFile)) {
+    foreach ($path in @($overlay, $windowsDisk, $firmwareVars, $serialLog, $qemuLog, $pidFile, $monitorFile, $qmpFile)) {
         if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path -Force }
     }
 }
@@ -94,7 +97,7 @@ function Resolve-QemuAccelerator {
     $probeArgs = @(
         '-machine', 'q35',
         '-accel', 'whpx',
-        '-cpu', 'max',
+        '-cpu', 'qemu64,-xsave',
         '-m', '64M',
         '-nodefaults',
         '-display', 'none',
@@ -103,7 +106,7 @@ function Resolve-QemuAccelerator {
         '-S'
     )
     try {
-        $probe = Start-Process -FilePath $qemu -ArgumentList $probeArgs -PassThru -RedirectStandardError $probeLog
+        $probe = Start-Process -FilePath $qemu -ArgumentList (ConvertTo-NativeArgumentLine -Arguments $probeArgs) -PassThru -RedirectStandardError $probeLog
         if ($probe.WaitForExit(1200)) {
             return 'tcg,thread=multi'
         }
@@ -116,13 +119,18 @@ function Resolve-QemuAccelerator {
 }
 
 $monitorPort = Get-FreeTcpPort
-$accelerator = Resolve-QemuAccelerator
+$qmpPort = Get-FreeTcpPort
+$qemuAccelerator = switch ($AccelerationMode) {
+    'whpx' { 'whpx' }
+    'tcg' { 'tcg,thread=multi' }
+    default { Resolve-QemuAccelerator }
+}
 Remove-Item -LiteralPath $qemuLog -Force -ErrorAction SilentlyContinue
 
-$args = @(
+$qemuArgs = @(
     '-name', 'USOS-manual-full-flow-test',
     '-machine', 'q35',
-    '-accel', $accelerator,
+    '-accel', $qemuAccelerator,
     '-cpu', 'max',
     '-m', [string]$MemoryMiB,
     '-smp', [string]$CpuCount,
@@ -132,6 +140,7 @@ $args = @(
     '-vga', 'std',
     '-boot', 'menu=on,strict=on',
     '-monitor', "tcp:127.0.0.1:$monitorPort,server=on,wait=off",
+    '-qmp', "tcp:127.0.0.1:$qmpPort,server=on,wait=off",
     '-serial', "file:$($serialLog.Replace('\','/'))",
     '-drive', "if=pflash,format=raw,readonly=on,file=$firmwareCode",
     '-drive', "if=pflash,format=raw,file=$firmwareVars",
@@ -142,15 +151,55 @@ $args = @(
     '-device', 'qemu-xhci,id=input-xhci',
     '-device', 'usb-kbd,bus=input-xhci.0'
 )
-if (($args -join ' ') -match '(?i)PhysicalDrive') { throw 'Refusing physical disk in manual QEMU arguments' }
+if (($qemuArgs -join ' ') -match '(?i)PhysicalDrive') { throw 'Refusing physical disk in manual QEMU arguments' }
 
-$process = Start-Process -FilePath $qemu -ArgumentList $args -PassThru -RedirectStandardError $qemuLog
+function Start-QemuChecked([object[]]$BaseArgs, [string]$SelectedAccelerator) {
+    $launchArgs = @($BaseArgs)
+    $accelIndex = [Array]::IndexOf($launchArgs, '-accel')
+    $cpuIndex = [Array]::IndexOf($launchArgs, '-cpu')
+    if ($accelIndex -lt 0 -or ($accelIndex + 1) -ge $launchArgs.Count) {
+        throw 'Internal launcher error: missing -accel argument'
+    }
+    if ($cpuIndex -lt 0 -or ($cpuIndex + 1) -ge $launchArgs.Count) {
+        throw 'Internal launcher error: missing -cpu argument'
+    }
+    $launchArgs[$accelIndex + 1] = $SelectedAccelerator
+    $launchArgs[$cpuIndex + 1] = if ($SelectedAccelerator -eq 'whpx') { 'qemu64,-xsave' } else { 'max' }
+
+    Remove-Item -LiteralPath $qemuLog -Force -ErrorAction SilentlyContinue
+    $launched = Start-Process -FilePath $qemu -ArgumentList (ConvertTo-NativeArgumentLine -Arguments $launchArgs) -PassThru -RedirectStandardError $qemuLog
+    Start-Sleep -Milliseconds 1500
+    if (-not $launched.HasExited) {
+        return $launched
+    }
+
+    $stderr = if (Test-Path -LiteralPath $qemuLog -PathType Leaf) {
+        Get-Content -LiteralPath $qemuLog -Raw -ErrorAction SilentlyContinue
+    } else { '' }
+    $detail = if ([string]::IsNullOrWhiteSpace($stderr)) { 'QEMU exited during startup without stderr output.' } else { $stderr.Trim() }
+    throw "QEMU startup failed with accelerator '$SelectedAccelerator' (exit=$($launched.ExitCode)).`n$detail"
+}
+
+try {
+    $process = Start-QemuChecked -BaseArgs $qemuArgs -SelectedAccelerator $qemuAccelerator
+} catch {
+    $failure = $_.Exception.Message
+    $isWhpxFailure = $qemuAccelerator -eq 'whpx' -and $failure -match '(?i)(WHPX|failed to initialize whpx|No accelerator found)'
+    if (-not $isWhpxFailure) { throw }
+
+    Write-Warning "WHPX failed during actual VM startup. Falling back to TCG. $failure"
+    $qemuAccelerator = 'tcg,thread=multi'
+    $process = Start-QemuChecked -BaseArgs $qemuArgs -SelectedAccelerator $qemuAccelerator
+}
+
 [IO.File]::WriteAllText($pidFile, [string]$process.Id)
 [IO.File]::WriteAllText($monitorFile, [string]$monitorPort)
+[IO.File]::WriteAllText($qmpFile, [string]$qmpPort)
 
 Write-Host ''
 Write-Host '[PASS] Visible QEMU window started.' -ForegroundColor Green
-Write-Host "Accelerator: $accelerator"
+Write-Host "Accelerator: $qemuAccelerator"
+Write-Host "CPU model: $(if ($qemuAccelerator -eq 'whpx') { 'qemu64,-xsave' } else { 'max' })"
 Write-Host "PID: $($process.Id)"
 Write-Host 'USOS disk: 24 GiB overlay (do not install Windows here)'
 Write-Host "Windows target: $WindowsDiskGiB GiB empty qcow2 (select this disk in Windows Setup)"

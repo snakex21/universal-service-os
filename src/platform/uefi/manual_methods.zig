@@ -3,71 +3,47 @@ const input = @import("input.zig");
 const navigation = @import("manual_navigation.zig");
 const view = @import("manual_view.zig");
 
-pub fn select(system: *const usos.catalog.SystemEntry, image: usos.catalog.ImageItem) ?usos.catalog.BootMethod {
-    var options: [10]usos.flow.boot_method_options.Option = undefined;
-    const len = usos.flow.boot_method_options.collect(system, image.kind, &options);
-
-    if (len == 0) {
+pub fn select(system: *const usos.catalog.SystemEntry, image: usos.catalog.ImageItem, firmware: usos.firmware.Firmware) ?usos.catalog.BootMethod {
+    const model = usos.gui.boot_method_model.collect(system, image.kind, firmware);
+    if (model.len == 0) {
         showNoMethodNotice(image);
         return null;
     }
+    if (model.singleEnabledIndex()) |index| return model.items[index].method;
 
-    var selected: usize = 0;
-    render(system, image, &options, len, selected);
+    var selectable_storage: [usos.gui.boot_method_model.max_items]bool = undefined;
+    const selectable = model.selectable(&selectable_storage);
+    var rows: [usos.gui.boot_method_model.max_items]view.ListRow = undefined;
+    for (model.items[0..model.len], 0..) |*item, index| {
+        rows[index] = if (item.enabled)
+            .{ .plain = item.label.slice() }
+        else
+            .{ .disabled = .{ .value = item.label.slice(), .reason = item.reason } };
+    }
+
+    var selected: usize = usos.gui.selectable_list.first(selectable) orelse 0;
+    var list = view.ListScreen.open("methods", image.name.slice(), rows[0..model.len], selected, model.len, helpFor(&model.items[selected]));
 
     while (true) {
-        switch (navigation.handle(input.readBlocking(), &selected, len, 0, len)) {
+        switch (navigation.handleSelectable(input.readBlocking(), &selected, model.len, list.visibleStart(), list.visibleCount(), selectable)) {
             .activate => {
-                if (options[selected].enabled) return options[selected].method;
+                if (model.items[selected].enabled) return model.items[selected].method;
             },
             .back => return null,
-            .changed => render(system, image, &options, len, selected),
+            .changed => list.updateSelection(selected, helpFor(&model.items[selected])),
             .pointer_moved => view.updatePointer(),
             .ignored => {},
         }
     }
 }
 
-fn render(
-    system: *const usos.catalog.SystemEntry,
-    image: usos.catalog.ImageItem,
-    options: *const [10]usos.flow.boot_method_options.Option,
-    len: usize,
-    selected: usize,
-) void {
-    view.begin("methods", image.name.slice());
-    for (options[0..len], 0..) |option, index| {
-        const label = displayLabel(system.id, image.kind, option.method);
-        if (option.enabled) {
-            view.row(index == selected, label);
-        } else {
-            view.rowDisabled(index == selected, label, option.reason);
-        }
-    }
-
-    const current = options[selected];
-    const help = usos.flow.boot_method_help.describe(system.id, image.kind, current.method);
-    view.helpBox(help.title, help.line1, help.line2, if (current.enabled) "READY" else current.reason);
-    view.footer(true);
-}
-
-fn displayLabel(system_id: []const u8, image: usos.catalog.ImageKind, method: usos.catalog.BootMethod) []const u8 {
-    if (method == .automatic) {
-        if (usos.flow.preparation_capability.resolve(system_id, image, method)) |resolved| {
-            return switch (resolved) {
-                .direct_iso => "Automatic (ISO)",
-                .wimboot => "Automatic (WIMBoot)",
-                .vhdboot => "Automatic (VHDBoot)",
-                .direct_efi => "Automatic (EFI)",
-                .chainload => "Automatic (Chainload)",
-                .memdisk => "Automatic (Memdisk)",
-                .disk_image => "Automatic (Disk image)",
-                .floppy_image => "Automatic (Floppy image)",
-                .automatic => "Automatic",
-            };
-        }
-    }
-    return method.label();
+fn helpFor(item: *const usos.gui.boot_method_model.Item) view.ListHelp {
+    return .{
+        .title = item.help.title,
+        .line1 = item.help.line1,
+        .line2 = item.help.line2,
+        .status = item.statusLabel(),
+    };
 }
 
 fn showNoMethodNotice(image: usos.catalog.ImageItem) void {

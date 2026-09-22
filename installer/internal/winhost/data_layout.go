@@ -23,6 +23,7 @@ var windowsProfiles = []dataProfile{
 	{"windows-98", "Windows 98", true},
 	{"windows-95", "Windows 95", true},
 	{"windows-3-11", "Windows 3.11", false},
+	{"windows-3-1", "Windows 3.1", false},
 }
 
 var linuxProfiles = []dataProfile{
@@ -73,6 +74,9 @@ func buildRequiredDataDirectories() []string {
 	appendProfiles(filepath.Join("Systems", "Betas"), betaProfiles)
 	appendProfiles(filepath.Join("Systems", "DOS"), dosProfiles)
 	directories = append(directories, "Utilities", "Programs", filepath.Join("Programs", "USOS"))
+	directories = append(directories, filepath.Join("Systems", "DOS", "MS-DOS", "Programs"))
+	directories = append(directories, filepath.Join("Utilities", "FreeDOS", "Programs"))
+	directories = append(directories, filepath.Join("Systems", "Windows", "Windows 7", "Drivers", "x64"))
 	return directories
 }
 

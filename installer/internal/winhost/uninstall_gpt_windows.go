@@ -57,7 +57,7 @@ func createSingleDataLayout(handle windows.Handle, diskNumber uint32, sectorByte
 }
 
 func buildSingleDataLayoutBuffer(header gptHeader, diskID, partID windows.GUID, part install.PartitionRef) ([]byte, error) {
-	if guidString(header.DiskID) != guidString(diskID) {
+	if !equalGUIDText(guidString(header.DiskID), guidString(diskID)) {
 		return nil, fmt.Errorf("uninstall GPT disk GUID changed between CREATE_DISK and layout write")
 	}
 	buffer := make([]byte, driveLayoutHeaderSize+partitionEntrySize)
@@ -120,6 +120,10 @@ func alignDown64(value, alignment uint64) uint64 {
 	return value - value%alignment
 }
 
+func guidTextKey(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
 func equalGUIDText(a, b string) bool {
-	return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
+	return guidTextKey(a) == guidTextKey(b)
 }

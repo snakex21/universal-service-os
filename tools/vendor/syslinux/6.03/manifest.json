@@ -1,0 +1,10 @@
+{
+  "version": "6.03",
+  "url": "https://www.kernel.org/pub/linux/utils/boot/syslinux/syslinux-6.03.zip",
+  "upstream_sha256": "16e61397b9c2d7e347bb09fd92af2bd635ee9063a8676a68dadbf5fc3aa088d9",
+  "files": {
+    "memdisk": "3f6cd656b8a14109cd3f906fee2dd2e75418f983a5e1bfdb64f44f7765588cbb",
+    "COPYING": "dcc100d4161cc0b7177545ab6e47216f84857cda3843847c792a25289852dcaa",
+    "source.zip": "390d8d6a5ec069dbefeb5a6d4f36cdbb13f998aeedc6a2c36fbf412c3d59639e"
+  }
+}

@@ -19,6 +19,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'process_argument_line.ps1')
+. (Join-Path $PSScriptRoot 'qemu_harness.ps1')
 foreach ($name in @('QemuPath','ImagePath','FirmwareCode','FirmwareVars','OutputDir')) {
     Set-Variable -Name $name -Value ([IO.Path]::GetFullPath((Get-Variable -Name $name -ValueOnly)))
 }
@@ -90,6 +92,7 @@ $qmpPath = Join-Path $OutputDir 'qmp-events.log'
 $stderrPath = Join-Path $OutputDir 'qemu.stderr.log'
 $debugPath = Join-Path $OutputDir 'qemu-debug.log'
 Get-ChildItem -LiteralPath $OutputDir -Filter 'screen-*.ppm' -File -ErrorAction SilentlyContinue | Remove-Item -Force
+Get-ChildItem -LiteralPath $OutputDir -Filter 'screen-*.png' -File -ErrorAction SilentlyContinue | Remove-Item -Force
 Remove-Item -LiteralPath $serialPath,$qmpPath,$stderrPath,$debugPath -Force -ErrorAction SilentlyContinue
 
 function Get-FreeTcpPort {
@@ -160,7 +163,20 @@ function Send-QmpText([string]$Value, [IO.StreamWriter]$Writer, [IO.StreamReader
 
 $qmpPort = Get-FreeTcpPort
 $qmpEndpoint = "tcp:127.0.0.1:$qmpPort,server=on,wait=off"
-$args = @(
+
+function Resolve-QemuProcess {
+    $matches = @(Get-CimInstance Win32_Process -Filter "Name='qemu-system-x86_64.exe'" -ErrorAction SilentlyContinue | Where-Object {
+        $_.CommandLine -and $_.CommandLine.Contains($ImagePath) -and $_.CommandLine.Contains(":$qmpPort")
+    })
+    if ($matches.Count -eq 0) { return $null }
+    if ($matches.Count -ne 1) { throw "Multiple QEMU processes match image/QMP endpoint: $($matches.ProcessId -join ', ')" }
+    return Get-Process -Id $matches[0].ProcessId -ErrorAction Stop
+}
+
+$stale = Resolve-QemuProcess
+if ($null -ne $stale) { throw "QEMU is already running for this image/QMP endpoint: PID=$($stale.Id)" }
+
+$qemuArgs = @(
     '-machine','q35',
     '-cpu',$CpuModel,
     '-m','4096',
@@ -178,27 +194,36 @@ $args = @(
     '-no-shutdown'
 )
 if (-not [string]::IsNullOrWhiteSpace($KernelPath)) {
-    $args += @('-kernel',$KernelPath,'-initrd',$InitrdPath)
-    if (-not [string]::IsNullOrWhiteSpace($KernelAppend)) { $args += @('-append',('"' + $KernelAppend + '"')) }
+    $qemuArgs += @('-kernel',$KernelPath,'-initrd',$InitrdPath)
+    if (-not [string]::IsNullOrWhiteSpace($KernelAppend)) { $qemuArgs += @('-append',('"' + $KernelAppend + '"')) }
 }
 
-$proc = Start-Process -FilePath $QemuPath -ArgumentList $args -PassThru -WindowStyle Hidden -RedirectStandardError $stderrPath
+$proc = Start-Process -FilePath $QemuPath -ArgumentList (ConvertTo-NativeArgumentLine -Arguments $qemuArgs) -PassThru -WindowStyle Hidden -RedirectStandardError $stderrPath
 $client = $null
 $clock = [Diagnostics.Stopwatch]::StartNew()
 $runnerOutcome = 'running'
 try {
     $connectTimer = [Diagnostics.Stopwatch]::StartNew()
     while ($null -eq $client) {
-        if ($proc.HasExited) { throw "QEMU exited before QMP connection, code=$($proc.ExitCode)" }
         try {
             $candidate = [Net.Sockets.TcpClient]::new()
             $candidate.Connect('127.0.0.1', $qmpPort)
             $client = $candidate
         } catch {
             if ($null -ne $candidate) { $candidate.Dispose() }
-            if ($connectTimer.ElapsedMilliseconds -ge 10000) { throw 'Timed out connecting to QMP' }
+            if ($connectTimer.ElapsedMilliseconds -ge 10000) {
+                $exitDetail = if ($proc.HasExited) { " original-process-exit=$($proc.ExitCode)" } else { '' }
+                throw "Timed out connecting to QMP.$exitDetail"
+            }
             Start-Sleep -Milliseconds 50
         }
+    }
+
+    $activeProc = Resolve-QemuProcess
+    if ($null -ne $activeProc) {
+        $proc = $activeProc
+    } elseif ($proc.HasExited) {
+        throw "QMP connected but no live QEMU process could be resolved for image $ImagePath"
     }
 
     $stream = $client.GetStream()
@@ -230,8 +255,10 @@ try {
         }
 
         $screenName = 'screen-{0:D6}ms.ppm' -f $elapsedMs
-        $screenPath = (Join-Path $OutputDir $screenName).Replace('\','/')
+        $screenLocalPath = Join-Path $OutputDir $screenName
+        $screenPath = $screenLocalPath.Replace('\','/')
         Invoke-Qmp 'screendump' @{ filename = $screenPath } $writer $reader $stream $clock | Out-Null
+        Wait-AndConvert-QemuPpmToPng -PpmPath $screenLocalPath -RemovePpm | Out-Null
         if ($clock.Elapsed.TotalSeconds -lt $FastCaptureUntilSeconds) {
             $nextCaptureMs += $FastCaptureIntervalMilliseconds
         } else {
@@ -271,5 +298,5 @@ if (Test-Path -LiteralPath $qmpPath) {
     Write-Host '--- QMP EVENTS ---'
     Get-Content -LiteralPath $qmpPath | Where-Object { $_ -match '"kind":"event"|"kind":"runner"|query-status' }
 }
-$screens = @(Get-ChildItem -LiteralPath $OutputDir -Filter 'screen-*.ppm' -File -ErrorAction SilentlyContinue)
-Write-Host "[PASS] screenshots=$($screens.Count) output=$OutputDir"
+$screens = @(Get-ChildItem -LiteralPath $OutputDir -Filter 'screen-*.png' -File -ErrorAction SilentlyContinue)
+Write-Host "[PASS] screenshots=$($screens.Count) format=PNG output=$OutputDir"

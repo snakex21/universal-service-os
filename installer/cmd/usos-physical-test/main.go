@@ -20,6 +20,7 @@ func main() {
 	size := flag.Uint64("size", 61991813632, "required size in bytes")
 	mount := flag.String("mount", `L:\`, "required current mount path")
 	label := flag.String("label", "KINGSTON", "required current volume label")
+	installerPath := flag.String("installer", "", "required final USOS Installer.exe path copied by production payload code")
 	confirm := flag.String("confirm", "", "must exactly equal the full model")
 	flag.Parse()
 
@@ -32,6 +33,17 @@ func main() {
 	}
 	if *confirm != *model {
 		fail("confirmation mismatch: exact full model is required")
+	}
+	if strings.TrimSpace(*installerPath) == "" {
+		fail("final installer executable path is required")
+	}
+	installerAbs, err := filepath.Abs(*installerPath)
+	if err != nil {
+		fail("resolve final installer path: %v", err)
+	}
+	installerInfo, err := os.Stat(installerAbs)
+	if err != nil || !installerInfo.Mode().IsRegular() || installerInfo.Size() <= 0 {
+		fail("invalid final installer executable %s: %v", installerAbs, err)
 	}
 
 	disks, err := (winhost.Enumerator{}).ListDisks()
@@ -90,12 +102,13 @@ func main() {
 	}
 	defer logger.Close()
 
-	engine, err := install.NewEngine(winhost.Backend{}, logger)
+	engine, err := install.NewEngine(winhost.Backend{InstallerExecutable: installerAbs}, logger)
 	if err != nil {
 		fail("create install engine: %v", err)
 	}
 
 	fmt.Printf("CONFIRMED PhysicalDrive%d model=%q serial=%q size=%d mount=%s label=%q\n", target.Number, target.DisplayName(), target.Serial, target.SizeBytes, *mount, *label)
+	fmt.Printf("INSTALLER=%s bytes=%d\n", installerAbs, installerInfo.Size())
 	fmt.Println("DESTRUCTIVE_START=AUTHORIZED")
 
 	var final *install.VerificationReport

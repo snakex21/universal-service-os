@@ -1,0 +1,7 @@
+#include "../windows_xp_pae.c"
+__declspec(dllexport) int patch_copy(const char *input,const char *output,int hal){log_file=INVALID_HANDLE_VALUE;return patch(input,output,hal);}
+__declspec(dllexport) LONG find_pattern(BYTE *b,DWORD n,const BYTE *p,DWORD len){return match(b,n,p,len);}
+__declspec(dllexport) int mode_of(const char *command_line){return parse_mode(command_line);}
+__declspec(dllexport) int stage_copy(const char *ini,const char *staged){log_file=INVALID_HANDLE_VALUE;return stage_bootini(ini,staged);}
+__declspec(dllexport) int entry_present(const char *ini){return pae_entry_present(ini);}
+BOOL WINAPI DllMain(HINSTANCE h,DWORD reason,void *unused){(void)h;(void)reason;(void)unused;return TRUE;}

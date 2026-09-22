@@ -1,0 +1,146 @@
+[Version]
+Signature = "$Windows NT$"
+LayoutFile = layout.inf
+SetupClass = BASE
+
+[SourceDisksNames]
+1 = "%KMDF%"
+
+[SourceDisksFiles]
+wdf01000.sys = 1
+wdfldr.sys   = 1
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[DefaultInstall.NTx86]
+CopyFiles = WDF_DriverFiles
+AddReg    = WDF_AddReg
+
+[DefaultInstall.NTx86.Services]
+AddService = Wdf01000, 0x00000400, WDF_AddService
+
+[PostSetup.NTx86]
+;CopyFiles = WDF_DriverFiles
+AddReg     = WDF_AddReg
+
+[PostSetup.NTx86.Services]
+AddService = Wdf01000, 0x00000400, WDF_AddService_NoRestart
+
+
+[WDF_DriverFiles]
+wdf01000.sys
+wdfldr.sys
+
+[WDF_AddReg]
+HKLM,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Wdf01000","SystemComponent",0x00010001,"1"
+HKLM,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Wdf01001","SystemComponent",0x00010001,"1"
+HKLM,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Wdf01005","SystemComponent",0x00010001,"1"
+HKLM,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Wdf01007","SystemComponent",0x00010001,"1"
+HKLM,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Wdf01009","SystemComponent",0x00010001,"1"
+HKLM,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Wdf01011","SystemComponent",0x00010001,"1"
+HKLM,"SYSTEM\CurrentControlSet\Control\SafeBoot\Minimal\Wdf01000.sys","",0x00000000,"Driver"
+HKLM,"SYSTEM\CurrentControlSet\Control\SafeBoot\Network\Wdf01000.sys","",0x00000000,"Driver"
+HKLM,"SYSTEM\CurrentControlSet\Control\Wdf\Kmdf\1","Version",0x00000000,"1.11"
+HKLM,"SYSTEM\CurrentControlSet\Control\Wdf\Kmdf\KmdfLibrary\Versions\1","Service",0x00000000,"Wdf01000"
+HKLM,"SYSTEM\CurrentControlSet\Control\Wdf\Schema\KmdfService","Type",0x00010001,"0"
+HKLM,"SYSTEM\CurrentControlSet\Control\Wdf\Schema\KmdfService\Object","KeyPath",0x00000000,"CurrentControlSet\Services"
+HKLM,"SYSTEM\CurrentControlSet\Control\Wdf\Schema\KmdfService\Object","KeyRoot",0x00000000,"SYSTEM"
+HKLM,"SYSTEM\CurrentControlSet\Services\EventLog\System\wdf01000","EventMessageFile",0x00020000,"%SystemRoot%\System32\drivers\Wdf01000.sys"
+HKLM,"SYSTEM\CurrentControlSet\Services\EventLog\System\wdf01000","TypesSupported",0x00010001,"7"
+HKLM,"SYSTEM\CurrentControlSet\Control\ServiceGroupOrder","List",0x00010000,\
+"System Reserved",\
+"WdfLoadGroup",\
+"Boot Bus Extender",\
+"System Bus Extender",\
+"SCSI miniport",\
+"Port",\
+"Primary Disk",\
+"SCSI Class",\
+"SCSI CDROM Class",\
+"FSFilter Infrastructure",\
+"FSFilter System",\
+"FSFilter Bottom",\
+"FSFilter Copy Protection",\
+"FSFilter Security Enhancer",\
+"FSFilter Open File",\
+"FSFilter Physical Quota Management",\
+"FSFilter Encryption",\
+"FSFilter Compression",\
+"FSFilter HSM",\
+"FSFilter Cluster File System",\
+"FSFilter System Recovery",\
+"FSFilter Quota Management",\
+"FSFilter Content Screener",\
+"FSFilter Continuous Backup",\
+"FSFilter Replication",\
+"FSFilter Anti-Virus",\
+"FSFilter Undelete",\
+"FSFilter Activity Monitor",\
+"FSFilter Top",\
+"Filter",\
+"Boot File System",\
+"Base",\
+"Pointer Port",\
+"Keyboard Port",\
+"Pointer Class",\
+"Keyboard Class",\
+"Video Init",\
+"Video",\
+"Video Save",\
+"File System",\
+"Event Log",\
+"Streams Drivers",\
+"NDIS Wrapper",\
+"COM Infrastructure",\
+"UIGroup",\
+"LocalValidation",\
+"PlugPlay",\
+"PNP_TDI",\
+"NDIS",\
+"TDI",\
+"NetBIOSGroup",\
+"ShellSvcGroup",\
+"SchedulerGroup",\
+"SpoolerGroup",\
+"AudioGroup",\
+"SmartCardGroup",\
+"NetworkProvider",\
+"RemoteValidation",\
+"NetDDEGroup",\
+"Parallel arbitrator",\
+"Extended Base",\
+"PCI Configuration"
+
+[WDF_AddService]
+DisplayName    = "%WDF.ServiceDesc%"
+ServiceType    = 1
+StartType      = 0
+ErrorControl   = 1
+ServiceBinary  = "%12%\wdf01000.sys"
+LoadOrderGroup = "WdfLoadGroup"
+AddReg         = WDF_AddService.AddReg
+
+[WDF_AddService_NoRestart]
+DisplayName    = "%WDF.ServiceDesc%"
+ServiceType    = 1
+StartType      = 3
+ErrorControl   = 1
+ServiceBinary  = "%12%\wdf01000.sys"
+LoadOrderGroup = "WdfLoadGroup"
+AddReg         = WDF_AddService.AddReg, NoRestartPromoting_Tweak
+
+[WDF_AddService.AddReg]
+HKLM,"SYSTEM\CurrentControlSet\Control\GroupOrderList","WdfLoadGroup",0x00000001,01,00,00,00,01,00,00,00
+HKLM,"SYSTEM\CurrentControlSet\Services\Wdf01000","Start",0x00010001,"0"
+HKLM,"SYSTEM\CurrentControlSet\Services\Wdf01000\Parameters","BuildNumber",0x00010001,"0"
+HKLM,"SYSTEM\CurrentControlSet\Services\Wdf01000\Parameters","MajorVersion",0x00010001,"1"
+HKLM,"SYSTEM\CurrentControlSet\Services\Wdf01000\Parameters","MinorVersion",0x00010001,"11"
+
+[NoRestartPromoting_Tweak]
+HKLM,"SYSTEM\CurrentControlSet\Services\Wdf01000","Start",0x00010001,"0"
+
+[Strings]
+;Localizable
+KMDF            = "Kernel-Mode Driver Framework 1.11 Driver Installation Disk"
+WDF.ServiceDesc = "Kernel Mode Driver Framework service"

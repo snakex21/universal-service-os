@@ -5,11 +5,12 @@ import "fmt"
 type StageID uint8
 
 const (
-	StageClean StageID = iota + 1
+	StageClearLegacyBoot StageID = iota + 1
+	StageClean
 	StageCreateSinglePartition
 	StageFormatExFAT
 	StageVerify
-	StageCount = 4
+	StageCount = 5
 )
 
 type Stage struct {
@@ -19,10 +20,11 @@ type Stage struct {
 }
 
 var stages = map[StageID]Stage{
-	StageClean:                 {ID: StageClean, Number: 1, Name: "Czyszczenie tablicy partycji"},
-	StageCreateSinglePartition: {ID: StageCreateSinglePartition, Number: 2, Name: "Tworzenie jednej partycji danych"},
-	StageFormatExFAT:           {ID: StageFormatExFAT, Number: 3, Name: "Formatowanie exFAT"},
-	StageVerify:                {ID: StageVerify, Number: 4, Name: "Weryfikacja"},
+	StageClearLegacyBoot:       {ID: StageClearLegacyBoot, Number: 1, Name: "Usuwanie Legacy BIOS Stage 1 i Core"},
+	StageClean:                 {ID: StageClean, Number: 2, Name: "Czyszczenie tablicy partycji"},
+	StageCreateSinglePartition: {ID: StageCreateSinglePartition, Number: 3, Name: "Tworzenie jednej partycji danych"},
+	StageFormatExFAT:           {ID: StageFormatExFAT, Number: 4, Name: "Formatowanie exFAT"},
+	StageVerify:                {ID: StageVerify, Number: 5, Name: "Weryfikacja"},
 }
 
 func StageInfo(id StageID) (Stage, bool) {

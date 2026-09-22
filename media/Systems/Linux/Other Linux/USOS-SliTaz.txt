@@ -1,0 +1,22 @@
+Universal Service OS - SliTaz Live (BIOS)
+
+Obraz slitaz-cooking.iso skopiuj do folderu Images w tym katalogu.
+W menu wybierz Linux -> Other Linux -> slitaz-cooking.iso -> Automatic.
+Sprawdzony obraz: SliTaz Cooking 32-bit, 5.0-RC4 20260525, 61 849 600 bajtow.
+Oficjalne pobieranie: https://www.slitaz.org/en/get/
+
+Start otwiera pulpit Live. System i jego pliki pracuja w RAM; zmiany
+w sesji Live znikaja po restarcie, chyba ze sam zapiszesz je na dysku.
+Samo uruchomienie obrazu nie instaluje systemu ani nie formatuje dysku.
+
+Oryginalny instalator: Applications -> System -> SliTaz Installer.
+Wybierz zrodlo ISO i wskaz ten sam plik na USOS_DATA.
+Do przygotowania pustego dysku sluzy dolaczony GParted.
+
+Ten profil BIOS obsluguje obecnie tylko wskazany uklad obrazu SliTaz:
+bzImage i cztery warstwy rootfs4.gz, rootfs3.gz, rootfs2.gz, rootfs1.gz.
+Inne dystrybucje wymagaja osobnej obslugi. To nie jest ogolny loader ISO Linux.
+
+Installation note: SliTaz tazinst 115 with MBR/auto stores disk numbers.
+The tested USB-to-first-internal-disk installation boots without USB.
+Changing internal disk order can require bootloader/root-device repair.

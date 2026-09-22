@@ -30,7 +30,7 @@ func TestCatalogProfilesCoverFixedOperatingSystems(t *testing.T) {
 	}
 }
 
-func TestMirrorImageNamesKeepsLargeImagesAsMetadataButCopiesEFIExecutables(t *testing.T) {
+func TestMirrorEspExecutableImagesSkipsCatalogMarkersAndCopiesEFIExecutables(t *testing.T) {
 	source := filepath.Join(t.TempDir(), "source")
 	destination := filepath.Join(t.TempDir(), "destination")
 	if err := os.MkdirAll(source, 0o755); err != nil {
@@ -49,15 +49,11 @@ func TestMirrorImageNamesKeepsLargeImagesAsMetadataButCopiesEFIExecutables(t *te
 			t.Fatal(err)
 		}
 	}
-	if err := mirrorImageNames(source, destination); err != nil {
+	if err := mirrorEspExecutableImages(source, destination); err != nil {
 		t.Fatal(err)
 	}
-	isoInfo, err := os.Stat(filepath.Join(destination, "Windows.iso"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if isoInfo.Size() != 0 {
-		t.Fatalf("ISO catalog entry size=%d, want 0", isoInfo.Size())
+	if _, err := os.Stat(filepath.Join(destination, "Windows.iso")); !os.IsNotExist(err) {
+		t.Fatalf("ISO marker must not exist on ESP: %v", err)
 	}
 	efiData, err := os.ReadFile(filepath.Join(destination, "Tool.EFI"))
 	if err != nil {
@@ -96,7 +92,7 @@ func TestMirrorUnattendedCopiesXmlContent(t *testing.T) {
 	}
 }
 
-func TestKnownProfileCatalogMirrorsImageUnattendedAndIcon(t *testing.T) {
+func TestKnownProfileCatalogKeepsImagesOnDataAndMirrorsUnattendedAndIcon(t *testing.T) {
 	dataRoot := t.TempDir()
 	espRoot := t.TempDir()
 	profile := catalogProfile{root: filepath.Join("Systems", "Windows"), profile: dataProfile{id: "windows-11", name: "Windows 11", unattended: true}}
@@ -110,7 +106,7 @@ func TestKnownProfileCatalogMirrorsImageUnattendedAndIcon(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(profileRoot, "Images", "Win11.iso"), []byte("iso bytes"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(profileRoot, "Unattended", "answer.xml"), []byte("<answer/>") , 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(profileRoot, "Unattended", "answer.xml"), []byte("<answer/>"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	icon := append(append([]byte(nil), pngSignature...), []byte{1, 2, 3, 4}...)
@@ -124,12 +120,38 @@ func TestKnownProfileCatalogMirrorsImageUnattendedAndIcon(t *testing.T) {
 	if err := verifyCatalogProfileMatches(media, profile); err != nil {
 		t.Fatalf("mirrored known profile did not verify: %v", err)
 	}
-	info, err := os.Stat(filepath.Join(espRoot, profile.root, profile.profile.name, "Images", "Win11.iso"))
-	if err != nil {
+	if _, err := os.Stat(filepath.Join(espRoot, profile.root, profile.profile.name, "Images", "Win11.iso")); !os.IsNotExist(err) {
+		t.Fatalf("known profile ISO marker must not exist on ESP: %v", err)
+	}
+}
+
+func TestKnownProfileCatalogRemovesLegacyImageMarkers(t *testing.T) {
+	dataRoot := t.TempDir()
+	espRoot := t.TempDir()
+	profile := catalogProfile{root: filepath.Join("Systems", "Windows"), profile: dataProfile{id: "windows-xp", name: "Windows XP", unattended: true}}
+	dataImages := filepath.Join(dataRoot, profile.root, profile.profile.name, "Images")
+	if err := os.MkdirAll(dataImages, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if info.Size() != 0 {
-		t.Fatalf("known profile catalog image size=%d, want zero", info.Size())
+	if err := os.WriteFile(filepath.Join(dataImages, "XP.iso"), []byte("real image stays on DATA"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	legacyMarker := filepath.Join(espRoot, profile.root, profile.profile.name, "Images", "XP.iso")
+	if err := os.MkdirAll(filepath.Dir(legacyMarker), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacyMarker, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	media := install.MediaLayout{DATA: install.PartitionRef{VolumePath: dataRoot}, ESP: install.PartitionRef{VolumePath: espRoot}}
+	if err := syncCatalogProfile(media, profile); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(legacyMarker); !os.IsNotExist(err) {
+		t.Fatalf("legacy zero-byte image marker survived ESP projection rebuild: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dataImages, "XP.iso")); err != nil {
+		t.Fatalf("DATA image was modified while removing legacy ESP marker: %v", err)
 	}
 }
 
@@ -197,6 +219,26 @@ func TestDynamicUtilitiesCatalogRemovesStaleMetadata(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(espRoot, "Utilities", "Old Tool")); !os.IsNotExist(err) {
 		t.Fatalf("stale utility metadata was not removed: %v", err)
 	}
+}
+
+func TestRestoreLegacyImageMarkersRecreatesZeroLengthCatalogWithoutTouchingData(t *testing.T) {
+	dataRoot := t.TempDir()
+	espRoot := t.TempDir()
+	profile := catalogProfile{root: filepath.Join("Systems", "Windows"), profile: dataProfile{id: "windows-xp", name: "Windows XP", unattended: true}}
+	images := filepath.Join(dataRoot, profile.root, profile.profile.name, "Images")
+	if err := os.MkdirAll(images, 0o755); err != nil { t.Fatal(err) }
+	isoPath := filepath.Join(images, "XP.iso")
+	isoBytes := []byte("real iso bytes must stay on DATA")
+	if err := os.WriteFile(isoPath, isoBytes, 0o644); err != nil { t.Fatal(err) }
+	media := install.MediaLayout{DATA: install.PartitionRef{VolumePath: dataRoot}, ESP: install.PartitionRef{VolumePath: espRoot}}
+	if err := RestoreLegacyImageMarkers(media); err != nil { t.Fatal(err) }
+	marker := filepath.Join(espRoot, profile.root, profile.profile.name, "Images", "XP.iso")
+	info, err := os.Stat(marker)
+	if err != nil { t.Fatal(err) }
+	if info.Size() != 0 { t.Fatalf("rollback marker size=%d, want 0", info.Size()) }
+	got, err := os.ReadFile(isoPath)
+	if err != nil { t.Fatal(err) }
+	if string(got) != string(isoBytes) { t.Fatalf("DATA ISO changed: %q", string(got)) }
 }
 
 func TestVerifyPNGSignature(t *testing.T) {

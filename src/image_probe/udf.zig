@@ -60,7 +60,7 @@ const Extent = struct {
     length: u64,
 };
 
-const Node = struct {
+pub const Node = struct {
     size: u64,
     is_directory: bool,
     extents: [max_extents]Extent = undefined,
@@ -70,21 +70,28 @@ const Node = struct {
 };
 
 pub fn findPath(reader: anytype, path: []const u8) !?FileInfo {
+    var node: Node = undefined;
+    if (!try openPath(reader, path, &node)) return null;
+    return .{ .size = node.size, .is_directory = node.is_directory };
+}
+
+/// Retain the allocation descriptors so callers can stream file contents.
+pub fn openPath(reader: anytype, path: []const u8, current: *Node) !bool {
     const volume = try openVolume(reader);
     const fsd = try readDescriptor(reader, try volume.absoluteBlock(volume.file_set), volume.block_size);
     if (tagId(&fsd) != 256) return error.InvalidUdf;
     const root_icb = readLongAd(fsd[400..416]);
-    var current = try readNode(reader, &volume, root_icb);
+    try readNode(reader, &volume, root_icb, current);
 
     var components = std.mem.tokenizeScalar(u8, path, '/');
     while (components.next()) |component| {
-        if (!current.is_directory) return null;
-        const child = (try findInDirectory(reader, &volume, &current, component)) orelse return null;
-        current = try readNode(reader, &volume, child.icb);
+        if (!current.is_directory) return false;
+        const child = (try findInDirectory(reader, &volume, current, component)) orelse return false;
+        try readNode(reader, &volume, child.icb, current);
         current.is_directory = child.is_directory;
     }
 
-    return .{ .size = current.size, .is_directory = current.is_directory };
+    return true;
 }
 
 fn openVolume(reader: anytype) !Volume {
@@ -92,7 +99,7 @@ fn openVolume(reader: anytype) !Volume {
     const anchor = try findAnchor(reader);
     const main_length = readLe32(anchor[16..20]) & 0x3fffffff;
     const main_location = readLe32(anchor[20..24]);
-    if (main_length < sector_size) return error.InvalidUdf;
+    if (main_length < sector_size or main_length > 1024 * 1024) return error.InvalidUdf;
 
     var volume: Volume = undefined;
     volume.partitions = undefined;
@@ -169,15 +176,15 @@ fn parseLogicalVolumeDescriptor(volume: *Volume, descriptor: []const u8) Error!v
 
     const map_table_length = readLe32(descriptor[264..268]);
     const number_of_maps = readLe32(descriptor[268..272]);
-    if (number_of_maps > max_maps or 440 + map_table_length > descriptor.len) return error.InvalidUdf;
+    if (number_of_maps > max_maps or map_table_length > descriptor.len - 440) return error.InvalidUdf;
 
     var map_offset: usize = 440;
     var map_index: usize = 0;
     while (map_index < number_of_maps) : (map_index += 1) {
-        if (map_offset + 2 > descriptor.len) return error.InvalidUdf;
+        if (map_offset + 2 > 440 + map_table_length) return error.InvalidUdf;
         const map_type = descriptor[map_offset];
         const map_length = descriptor[map_offset + 1];
-        if (map_length < 2 or map_offset + map_length > descriptor.len) return error.InvalidUdf;
+        if (map_length < 2 or map_offset + map_length > 440 + map_table_length) return error.InvalidUdf;
         if (map_type == 1 and map_length == 6) {
             volume.partition_maps[map_index] = readLe16(descriptor[map_offset + 4 .. map_offset + 6]);
         } else {
@@ -194,7 +201,7 @@ fn readDescriptor(reader: anytype, offset: u64, block_size: u32) ![max_block_siz
     return block;
 }
 
-fn readNode(reader: anytype, volume: *const Volume, icb: LongAd) !Node {
+fn readNode(reader: anytype, volume: *const Volume, icb: LongAd, node: *Node) !void {
     const absolute = try volume.absoluteBlock(icb);
     const block = try readDescriptor(reader, absolute, volume.block_size);
     const id = tagId(&block);
@@ -210,10 +217,11 @@ fn readNode(reader: anytype, volume: *const Volume, icb: LongAd) !Node {
     const ad_start_base: usize = if (extended) 216 else 176;
     const length_ea: usize = @intCast(readLe32(block[length_ea_offset .. length_ea_offset + 4]));
     const length_ads: usize = @intCast(readLe32(block[length_ad_offset .. length_ad_offset + 4]));
+    if (length_ea > volume.block_size - ad_start_base) return error.InvalidUdf;
     const ad_start = ad_start_base + length_ea;
-    if (ad_start > volume.block_size or ad_start + length_ads > volume.block_size) return error.InvalidUdf;
+    if (length_ads > volume.block_size - ad_start) return error.InvalidUdf;
 
-    var node = Node{
+    node.* = .{
         .size = information_length,
         .is_directory = file_type == 4,
     };
@@ -222,7 +230,7 @@ fn readNode(reader: anytype, volume: *const Volume, icb: LongAd) !Node {
         if (length_ads > node.embedded.len or information_length > length_ads) return error.InvalidUdf;
         @memcpy(node.embedded[0..length_ads], block[ad_start .. ad_start + length_ads]);
         node.embedded_len = length_ads;
-        return node;
+        return;
     }
 
     const ad_size: usize = switch (ad_type) {
@@ -238,8 +246,7 @@ fn readNode(reader: anytype, volume: *const Volume, icb: LongAd) !Node {
         const allocation_type = encoded_length >> 30;
         const extent_length = encoded_length & 0x3fffffff;
         if (extent_length == 0) continue;
-        if (allocation_type == 3) return error.UnsupportedAllocationDescriptors;
-        if (allocation_type != 0) continue;
+        if (allocation_type != 0) return error.UnsupportedAllocationDescriptors;
         if (node.extent_count == max_extents) return error.TooManyExtents;
 
         const extent_offset = if (ad_type == 0) blk: {
@@ -253,7 +260,7 @@ fn readNode(reader: anytype, volume: *const Volume, icb: LongAd) !Node {
         node.extents[node.extent_count] = .{ .offset = extent_offset, .length = extent_length };
         node.extent_count += 1;
     }
-    return node;
+
 }
 
 const Child = struct {
@@ -270,7 +277,7 @@ fn findInDirectory(reader: anytype, volume: *const Volume, directory: *const Nod
         try readNodeAt(reader, directory, pos, &header);
         const id = tagId(&header);
         if (id == 0) {
-            const next_block = ((pos / volume.block_size) + 1) * volume.block_size;
+            const next_block = (pos | (@as(u64, volume.block_size) - 1)) + 1;
             if (next_block <= pos) return error.InvalidUdf;
             pos = next_block;
             continue;
@@ -299,8 +306,9 @@ fn findInDirectory(reader: anytype, volume: *const Volume, directory: *const Nod
     return null;
 }
 
-fn readNodeAt(reader: anytype, node: *const Node, logical_offset: u64, buffer: []u8) !void {
-    if (logical_offset + buffer.len > node.size) return error.EndOfStream;
+pub fn readNodeAt(reader: anytype, node: *const Node, logical_offset: u64, buffer: []u8) !void {
+    if (logical_offset > node.size or buffer.len > node.size - logical_offset) return error.EndOfStream;
+    if (buffer.len == 0) return;
     if (node.embedded_len != 0) {
         const start: usize = @intCast(logical_offset);
         if (start + buffer.len > node.embedded_len) return error.EndOfStream;
@@ -398,6 +406,41 @@ test "UDF path matching is case-insensitive for lowercase media" {
     const info = (try findPath(&reader, "SOURCES/INSTALL.WIM")).?;
     try std.testing.expectEqual(@as(u64, 987654321), info.size);
     try std.testing.expect(!info.is_directory);
+}
+
+test "UDF file content reads preserve extent order and reject truncated media" {
+    var node = Node{ .size = 6, .is_directory = false, .extent_count = 2 };
+    node.extents[0] = .{ .offset = 4, .length = 3 };
+    node.extents[1] = .{ .offset = 12, .length = 3 };
+    var reader = random_access.SliceReader{ .bytes = "xxxxabcxxxxxdef" };
+    var out: [4]u8 = undefined;
+    try readNodeAt(&reader, &node, 1, &out);
+    try std.testing.expectEqualStrings("bcde", &out);
+    try std.testing.expectError(error.EndOfStream, readNodeAt(&reader, &node, 3, &out));
+    try std.testing.expectError(error.EndOfStream, readNodeAt(&reader, &node, std.math.maxInt(u64), &out));
+    node.extents[1].offset = 14;
+    try std.testing.expectError(error.EndOfStream, readNodeAt(&reader, &node, 2, &out));
+}
+
+test "UDF embedded files and unsupported allocation types fail predictably" {
+    var image = [_]u8{0} ** (308 * 2048);
+    writeTestImage(&image, "sources", "boot.wim", 3);
+    const entry = image[306 * 2048..][0..2048];
+    std.mem.writeInt(u16, entry[34..36], 3, .little);
+    std.mem.writeInt(u32, entry[172..176], 3, .little);
+    @memcpy(entry[176..179], "wim");
+    var reader = random_access.SliceReader{ .bytes = &image };
+    var node: Node = undefined;
+    try std.testing.expect(try openPath(&reader, "sources/boot.wim", &node));
+    var data: [3]u8 = undefined;
+    try readNodeAt(&reader, &node, 0, &data);
+    try std.testing.expectEqualStrings("wim", &data);
+    std.mem.writeInt(u16, entry[34..36], 0, .little);
+    std.mem.writeInt(u32, entry[172..176], 8, .little);
+    std.mem.writeInt(u32, entry[176..180], 0x40000003, .little);
+    try std.testing.expectError(error.UnsupportedAllocationDescriptors, openPath(&reader, "sources/boot.wim", &node));
+    std.mem.writeInt(u32, entry[168..172], 0xffffffff, .little);
+    try std.testing.expectError(error.InvalidUdf, openPath(&reader, "sources/boot.wim", &node));
 }
 
 fn writeTestImage(image: []u8, sources_name: []const u8, install_name: []const u8, install_size: u64) void {

@@ -102,6 +102,22 @@ func main() {
 		fmt.Sprintf("WORK partuuid=%s offset=%d size=%d", media.WORK.PartUUID, media.WORK.StartBytes, media.WORK.SizeBytes),
 	)
 
+	legacyAudit, err := session.WriteLegacyBoot(media)
+	if err != nil {
+		finish(false, fmt.Errorf("write Legacy BIOS boot area: %w", err))
+	}
+	lines = append(lines,
+		fmt.Sprintf("LEGACY_BOOT BEFORE component=stage1 sha256=%s expected=%s", legacyAudit.Stage1.BeforeSHA256, legacyAudit.Stage1.ExpectedSHA256),
+		fmt.Sprintf("LEGACY_BOOT BEFORE component=core sha256=%s expected=%s", legacyAudit.Core.BeforeSHA256, legacyAudit.Core.ExpectedSHA256),
+		fmt.Sprintf("LEGACY_BOOT AFTER component=stage1 sha256=%s expected=%s changed=%v", legacyAudit.Stage1.AfterSHA256, legacyAudit.Stage1.ExpectedSHA256, legacyAudit.Stage1.Changed),
+		fmt.Sprintf("LEGACY_BOOT AFTER component=core sha256=%s expected=%s changed=%v", legacyAudit.Core.AfterSHA256, legacyAudit.Core.ExpectedSHA256, legacyAudit.Core.Changed),
+		"LEGACY_BOOT_WRITE=PASS",
+	)
+	if err := session.VerifyLegacyBoot(media); err != nil {
+		finish(false, fmt.Errorf("verify Legacy BIOS boot area: %w", err))
+	}
+	lines = append(lines, "LEGACY_BOOT_READBACK=PASS")
+
 	if err := backend.FormatESP(media); err != nil {
 		finish(false, fmt.Errorf("format ESP: %w", err))
 	}

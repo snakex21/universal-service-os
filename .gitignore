@@ -8,6 +8,7 @@ tools/tests/artifacts/
 # Zig build output and cache
 .zig-cache/
 zig-out/
+build/generated/
 
 # Generated installer executable and local runtime logs
 installer/USOS Installer.exe
@@ -26,3 +27,31 @@ installer/*.pid
 # Tiny tracked media fixtures used only by automated tests
 !tools/tests/fixtures/**/*.iso
 !tools/tests/fixtures/**/*.ISO
+
+# Local build scratch, disk/hive backups and physical-test snapshots
+/build/
+/artifacts/
+/test-images/
+# User driver/update drop folder and Microsoft update packages (blobs)
+/driwer/
+*.msu
+# Partial downloads, stray objects and local OS media archives in the root
+*.part
+*.o
+/*.zip
+/%SystemDrive%/
+# Root-level physical test logs
+/*.log
+# Generated helper executables next to the installer sources
+installer/*.exe
+# Python bytecode
+__pycache__/
+# Local SuperCLI state (attachments already ignored above)
+.supercli/
+# Third-party XP integrator tree (large archives, very long paths) and
+# vendored source/asset archives; only small pinned inputs are tracked
+tools/vendor/xp-modern/*/integrator/
+tools/vendor/**/*.zip
+tools/vendor/**/*.7z
+# Zig compiler cache inside the bundled toolchain
+tools/zig/data/

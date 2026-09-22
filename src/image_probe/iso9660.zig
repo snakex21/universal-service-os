@@ -16,12 +16,17 @@ const descriptor_sector: u64 = 16;
 const descriptor_size: usize = 2048;
 
 pub fn findPath(reader: anytype, path: []const u8) !?FileInfo {
+    const current = (try findRecord(reader, path)) orelse return null;
+    return .{ .size = current.size, .is_directory = current.is_directory };
+}
+
+pub fn findRecord(reader: anytype, path: []const u8) !?Record {
     var pvd: [descriptor_size]u8 = undefined;
     try random_access.readExactAt(reader, descriptor_sector * descriptor_size, &pvd);
     if (pvd[0] != 1 or !std.mem.eql(u8, pvd[1..6], "CD001")) return error.NotIso9660;
 
     const block_size = readLe16(pvd[128..130]);
-    if (block_size < 512 or block_size > 4096) return error.UnsupportedBlockSize;
+    if (block_size < 512 or block_size > 4096 or block_size & (block_size - 1) != 0) return error.UnsupportedBlockSize;
     if (pvd[156] < 34) return error.InvalidIso9660;
 
     var current = recordInfo(pvd[156..]) orelse return error.InvalidIso9660;
@@ -30,10 +35,10 @@ pub fn findPath(reader: anytype, path: []const u8) !?FileInfo {
         if (!current.is_directory) return null;
         current = (try findInDirectory(reader, block_size, current, component)) orelse return null;
     }
-    return .{ .size = current.size, .is_directory = current.is_directory };
+    return current;
 }
 
-const Record = struct {
+pub const Record = struct {
     extent_lba: u32,
     size: u64,
     is_directory: bool,
@@ -51,7 +56,7 @@ fn findInDirectory(reader: anytype, block_size: u16, directory: Record, wanted: 
         try random_access.readExactAt(reader, absolute, &len_byte);
         const record_len = len_byte[0];
         if (record_len == 0) {
-            const next_block = ((consumed / block_size) + 1) * block_size;
+            const next_block = (consumed & ~(@as(u64, block_size) - 1)) + block_size;
             if (next_block <= consumed) return error.InvalidIso9660;
             consumed = next_block;
             continue;
@@ -66,7 +71,7 @@ fn findInDirectory(reader: anytype, block_size: u16, directory: Record, wanted: 
     return null;
 }
 
-fn recordInfo(bytes: []const u8) ?Record {
+pub fn recordInfo(bytes: []const u8) ?Record {
     if (bytes.len < 34) return null;
     const record_len = bytes[0];
     if (record_len < 34 or record_len > bytes.len) return null;

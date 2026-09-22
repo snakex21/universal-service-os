@@ -5,11 +5,14 @@ import (
 
 	"github.com/snakex21/universal-service-os/installer/internal/domain"
 	"github.com/snakex21/universal-service-os/installer/internal/layout"
+	"github.com/snakex21/universal-service-os/installer/internal/legacyboot"
 )
 
 type DestructiveSession interface {
 	CleanPartitionTable() error
 	CreateGPTAndPartitions(plan layout.Plan) (MediaLayout, error)
+	WriteLegacyBoot(media MediaLayout) (legacyboot.Audit, error)
+	VerifyLegacyBoot(media MediaLayout) error
 	VerifyLayoutUnchanged(expected MediaLayout) (MediaLayout, error)
 	Close() error
 }
@@ -19,7 +22,7 @@ type Backend interface {
 	FormatESP(media MediaLayout) error
 	FormatDATA(media MediaLayout) error
 	FormatWORK(media MediaLayout) error
-	EnsureWORKHidden(media MediaLayout) error
+	EnsureWORKVisible(media MediaLayout) error
 	CopyInstallPayload(media MediaLayout, progress func(done, total uint64)) error
 	WriteIdentity(media MediaLayout, workBytes uint64) (DeviceINI, error)
 	Verify(media MediaLayout, expected DeviceINI) (VerificationReport, error)
@@ -92,6 +95,16 @@ func (e *Engine) run(expected domain.Disk, events chan<- Event) {
 		return
 	}
 
+	var legacyAudit legacyboot.Audit
+	if err := e.runSimpleStage(events, StageWriteLegacyBoot, func() error {
+		var legacyErr error
+		legacyAudit, legacyErr = session.WriteLegacyBoot(media)
+		e.logLegacyAudit(events, legacyAudit)
+		return legacyErr
+	}); err != nil {
+		return
+	}
+
 	if err := e.runSimpleStage(events, StageFormatESP, func() error { return e.backend.FormatESP(media) }); err != nil {
 		return
 	}
@@ -102,15 +115,15 @@ func (e *Engine) run(expected domain.Disk, events chan<- Event) {
 		if err := e.backend.FormatWORK(media); err != nil {
 			return err
 		}
-		if err := e.backend.EnsureWORKHidden(media); err != nil {
-			return fmt.Errorf("hide WORK after format: %w", err)
+		if err := e.backend.EnsureWORKVisible(media); err != nil {
+			return fmt.Errorf("expose WORK after format: %w", err)
 		}
 		readBack, err := session.VerifyLayoutUnchanged(media)
 		if err != nil {
 			return fmt.Errorf("post-format GPT read-back mismatch: %w", err)
 		}
 		media = readBack
-		e.log(events, "POST-FORMAT READ-BACK PASS: PARTUUID-y, typy i atrybuty GPT (WORK bit 63 NoDriveLetter), offsety oraz rozmiary nie zmieniły się po formatowaniu")
+		e.log(events, "POST-FORMAT READ-BACK PASS: PARTUUID-y, typy i atrybuty GPT (WORK NoDriveLetter=0), offsety oraz rozmiary nie zmieniły się po formatowaniu")
 		return nil
 	}); err != nil {
 		return
@@ -142,6 +155,15 @@ func (e *Engine) run(expected domain.Disk, events chan<- Event) {
 			return fmt.Errorf("final GPT read-back mismatch: %w", readErr)
 		}
 		media = finalReadBack
+		if legacyErr := session.VerifyLegacyBoot(media); legacyErr != nil {
+			report = VerificationReport{Items: []VerificationItem{{
+				Name:     "Legacy BIOS boot area",
+				Expected: "Stage 1 i Core zgodne z payloadem instalatora",
+				Actual:   legacyErr.Error(),
+				Match:    false,
+			}}}
+			return fmt.Errorf("final Legacy BIOS boot-area verification failed: %w", legacyErr)
+		}
 		var verifyErr error
 		report, verifyErr = e.backend.Verify(media, identity)
 		if verifyErr == nil && !report.OK() {
@@ -216,6 +238,28 @@ func (e *Engine) runCopyStage(events chan<- Event, media MediaLayout) error {
 	return nil
 }
 
+func (e *Engine) logLegacyAudit(events chan<- Event, audit legacyboot.Audit) {
+	if audit.Stage1.BeforeSHA256 != "" {
+		e.log(events, fmt.Sprintf("LEGACY_BOOT BEFORE component=stage1 sha256=%s expected=%s", audit.Stage1.BeforeSHA256, audit.Stage1.ExpectedSHA256))
+	}
+	if audit.Core.BeforeSHA256 != "" {
+		e.log(events, fmt.Sprintf("LEGACY_BOOT BEFORE component=core sha256=%s expected=%s", audit.Core.BeforeSHA256, audit.Core.ExpectedSHA256))
+	}
+	if audit.Stage1.AfterSHA256 != "" {
+		e.log(events, fmt.Sprintf("LEGACY_BOOT AFTER component=stage1 sha256=%s expected=%s changed=%s", audit.Stage1.AfterSHA256, audit.Stage1.ExpectedSHA256, yesNo(audit.Stage1.Changed)))
+	}
+	if audit.Core.AfterSHA256 != "" {
+		e.log(events, fmt.Sprintf("LEGACY_BOOT AFTER component=core sha256=%s expected=%s changed=%s", audit.Core.AfterSHA256, audit.Core.ExpectedSHA256, yesNo(audit.Core.Changed)))
+	}
+}
+
+func yesNo(value bool) string {
+	if value {
+		return "yes"
+	}
+	return "no"
+}
+
 func (e *Engine) finishWithError(events chan<- Event, err error) {
 	e.log(events, "FAIL "+err.Error())
 	events <- Event{Kind: EventFinished, Err: err}
@@ -227,4 +271,28 @@ func (e *Engine) log(events chan<- Event, message string) {
 		return
 	}
 	events <- Event{Kind: EventLog, Message: message}
+}
+
+// StageWin7UEFI wywoluje opcjonalny staging win7-uefi-x64-modern na backendzie.
+// Backend bez metody StageWin7UEFIModern(Win7StagingJournal) to no-op (log + nil),
+// wiec istniejace mocki i sciezka pendrive USOS sa nietkniete. Wywolanie
+// dopiero po verify apply-image; rollback/watchdog realizuje strona wykonawcza
+// (installer/internal/winhost/win7_uefi_staging_windows.go).
+func (e *Engine) StageWin7UEFI(events chan<- Event, kind Win7TargetKind, journal Win7StagingJournal) error {
+	if kind != Win7UEFIX64Modern {
+		e.log(events, "Win7 staging: win7-bios-vanilla (retro), bez zmian")
+		return nil
+	}
+	capable, ok := e.backend.(win7StagingCapable)
+	if !ok {
+		e.log(events, "Win7 staging: backend bez StageWin7UEFIModern, pliki modern generuje winhost offline")
+		return nil
+	}
+	if err := capable.StageWin7UEFIModern(journal); err != nil {
+		wrapped := fmt.Errorf("Win7 UEFI staging: %w", err)
+		e.log(events, "FAIL "+wrapped.Error())
+		return wrapped
+	}
+	e.log(events, "Win7 staging PASS: one-shot BootNext bez ruszania BootOrder")
+	return nil
 }

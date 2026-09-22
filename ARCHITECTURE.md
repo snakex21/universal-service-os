@@ -37,6 +37,16 @@ Docelowo:
 - x86_64 dla nowego sprzętu,
 - warstwa zgodności z programami DOS.
 
+## Legacy BIOS i mikro-Linux x86_64
+
+Legacy boot manager pozostaje kompilowany jako `i386` baseline i nie wymaga SSE2 ani long mode do samego menu. Przygotowanie WORK dla instalatorów jest wykonywane przez jeden wspólny mikro-Linux z Alpine `6.18.35-0-lts`, który jest kernelem **x86_64**. Stockowy kernel LTS zastąpił `virt`, ponieważ zawiera modularne sterowniki dla szerokiego zakresu kontrolerów ATA/SATA z epoki ok. 2000-2010. USOS nie kopiuje całego `modloop-lts`: builder wylicza dependency closure z `modules.dep`, dołącza pełną rodzinę `drivers/ata` oraz tylko wymagane moduły USB/virtio/NVMe/filesystemów. Legacy Core uruchamia ten sam artefakt publikowany kompatybilnościowo jako `vmlinuz-virt` i ten sam `initramfs-usos`, które w UEFI startują przez systemd-boot; różni się wyłącznie loader firmware.
+
+W praktyce bieżąca ścieżka `Legacy USOS -> micro-Linux -> przygotowanie Windows/XP` wymaga CPU z x86-64/long mode (np. Athlon 64 lub Pentium 4 z EM64T i nowsze). Pentium III i 32-bitowy Athlon XP pozostają w zasięgu samego bootmanagera Legacy, ale nie obecnego środowiska przygotowawczego. Wspierane minimum pamięci dla pełnego startu bieżącego kernela/initramfs wynosi **256 MiB RAM**; sam loader rozmieści artefakty przy 128 MiB, ale pełne rozpakowanie initramfs przy 128/132 MiB nie przechodzi.
+
+Legacy loader używa Linux x86 boot protocol 2.15: pobiera E820 przez real-mode thunk, ładuje protected bzImage i initramfs do zweryfikowanych zakresów RAM, buduje zero page/cmdline i skacze do 32-bitowego `startup_32`. Gdy VBE jest aktywne, przed skokiem `4F03` musi potwierdzić niezmieniony numer trybu, a `screen_info` przekazuje ten sam LFB do kernela. SeaBIOS potwierdza przejęcie fizycznego `0xFD000000` przez Linux/simpledrm bez ponownego ustawiania trybu.
+
+Późniejszy osobny kamień: **32-bitowy mikro-kernel dla starszego x86 bez long mode**. Ma korzystać z tego samego initramfs, guarda i skryptów; nie implementujemy go równolegle z bieżącym loaderem x86_64.
+
 ## ARM64
 
 Docelowo:

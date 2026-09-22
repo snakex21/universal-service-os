@@ -23,7 +23,7 @@ func verifyCatalogProfileMatches(media install.MediaLayout, profile catalogProfi
 	relativeRoot := filepath.Join(profile.root, profile.profile.name)
 	dataRoot := filepath.Join(media.DATA.VolumePath, relativeRoot)
 	espRoot := filepath.Join(media.ESP.VolumePath, relativeRoot)
-	if err := compareCatalogImageNames(filepath.Join(dataRoot, "Images"), filepath.Join(espRoot, "Images")); err != nil {
+	if err := verifyEspImageProjection(filepath.Join(dataRoot, "Images"), filepath.Join(espRoot, "Images")); err != nil {
 		return fmt.Errorf("%s Images: %w", relativeRoot, err)
 	}
 	if profile.profile.unattended {
@@ -54,7 +54,7 @@ func verifyDynamicUtilitiesCatalogMatches(media install.MediaLayout) error {
 	for _, name := range dataNames {
 		dataUtility := filepath.Join(dataRoot, name)
 		espUtility := filepath.Join(espRoot, name)
-		if err := compareCatalogImageNames(filepath.Join(dataUtility, "Images"), filepath.Join(espUtility, "Images")); err != nil {
+		if err := verifyEspImageProjection(filepath.Join(dataUtility, "Images"), filepath.Join(espUtility, "Images")); err != nil {
 			return fmt.Errorf("utility %s Images: %w", name, err)
 		}
 		if err := compareOptionalFile(filepath.Join(dataUtility, "icon.png"), filepath.Join(espUtility, "icon.png")); err != nil {
@@ -64,39 +64,21 @@ func verifyDynamicUtilitiesCatalogMatches(media install.MediaLayout) error {
 	return nil
 }
 
-func compareCatalogImageNames(dataDir, espDir string) error {
-	data, err := filteredNames(dataDir, func(name string) bool {
-		_, ok := catalogImageExtensions[strings.ToLower(filepath.Ext(name))]
-		return ok
-	})
+func verifyEspImageProjection(dataDir, espDir string) error {
+	dataEFI, err := filteredNames(dataDir, func(name string) bool { return strings.EqualFold(filepath.Ext(name), ".efi") })
 	if err != nil {
 		return err
 	}
-	esp, err := filteredNames(espDir, func(name string) bool {
-		_, ok := catalogImageExtensions[strings.ToLower(filepath.Ext(name))]
-		return ok
-	})
+	espFiles, err := filteredNames(espDir, func(string) bool { return true })
 	if err != nil {
 		return err
 	}
-	if !equalStringSets(data, esp) {
-		return fmt.Errorf("catalog names differ: DATA=%v ESP=%v", data, esp)
+	if !equalStringSets(dataEFI, espFiles) {
+		return fmt.Errorf("ESP Images must contain only executable EFI mirrors: DATA EFI=%v ESP=%v", dataEFI, espFiles)
 	}
-	for _, name := range esp {
-		dataPath := filepath.Join(dataDir, name)
-		espPath := filepath.Join(espDir, name)
-		if strings.EqualFold(filepath.Ext(name), ".efi") {
-			if err := compareOptionalFile(dataPath, espPath); err != nil {
-				return fmt.Errorf("EFI executable mirror %s: %w", name, err)
-			}
-			continue
-		}
-		info, err := os.Stat(espPath)
-		if err != nil {
-			return err
-		}
-		if info.Size() != 0 {
-			return fmt.Errorf("ESP catalog entry %s is %d bytes, want zero-byte metadata", name, info.Size())
+	for _, name := range dataEFI {
+		if err := compareOptionalFile(filepath.Join(dataDir, name), filepath.Join(espDir, name)); err != nil {
+			return fmt.Errorf("EFI executable mirror %s: %w", name, err)
 		}
 	}
 	return nil

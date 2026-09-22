@@ -1,6 +1,8 @@
 const std = @import("std");
 const BootMethod = @import("../catalog/boot_method.zig").BootMethod;
 const ImageKind = @import("../catalog/image_kind.zig").ImageKind;
+const SystemEntry = @import("../catalog/system_entry.zig").SystemEntry;
+const systems = @import("../catalog/systems.zig");
 const capability = @import("preparation_capability.zig");
 
 pub const Help = struct {
@@ -10,18 +12,45 @@ pub const Help = struct {
 };
 
 pub fn describe(system_id: []const u8, image: ImageKind, method: BootMethod) Help {
+    const system = systems.findById(system_id) orelse return genericAutomatic();
+    return describeEntry(system, image, method);
+}
+
+pub fn describeEntry(system: *const SystemEntry, image: ImageKind, method: BootMethod) Help {
+    // The direct Win7 WIMBoot implementation is UEFI-only. Keep its extra help
+    // outside the size-limited, freestanding 32-bit BIOS Core.
+    if (@import("builtin").os.tag != .freestanding and std.mem.eql(u8, system.id, "windows-7") and image == .iso and (method == .automatic or method == .direct_iso)) return .{
+        .title = "WINDOWS ISO - WIMBOOT UEFI",
+        .line1 = "Detects the installer version and starts it directly from ISO in UEFI.",
+        .line2 = "WinPE 7 receives UEFI compatibility and optional Drivers/x64 packages in RAM.",
+    };
     if (method == .automatic) {
-        if (capability.resolve(system_id, image, method)) |resolved| {
-            return switch (resolved) {
-                .direct_iso => .{
+        if (capability.resolveBackend(system, image, method)) |backend| {
+            return switch (backend) {
+                .windows_iso => .{
                     .title = "AUTOMATIC - RECOMMENDED",
                     .line1 = "USOS selects the supported boot path for this image automatically.",
                     .line2 = "For this Windows 11 ISO it currently resolves to the ISO method below.",
+                },
+                .xp_staging => .{
+                    .title = "AUTOMATIC - WINDOWS SETUP",
+                    .line1 = "Copies installation files to the selected Windows partition.",
+                    .line2 = "After preparation, remove the USB drive and start the computer from that disk.",
                 },
                 else => genericAutomatic(),
             };
         }
         return genericAutomatic();
+    }
+
+    if (capability.resolveBackend(system, image, method)) |backend| {
+        if (backend == .xp_staging) {
+            return .{
+                .title = "WINDOWS SETUP",
+                .line1 = "Copies installation files to the selected Windows partition.",
+                .line2 = "After preparation, remove the USB drive and start the computer from that disk.",
+            };
+        }
     }
 
     return switch (method) {

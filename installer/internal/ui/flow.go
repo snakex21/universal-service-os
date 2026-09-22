@@ -89,13 +89,18 @@ func (f *Flow) showUpdateDevices() {
 }
 
 func (f *Flow) showUpdateConfirmation(target installed.Target) {
-	screen := NewUpdateConfirmationScreen(target, f.showUpdateDevices, func() { f.showUpdateProgress(target) })
+	screen := NewUpdateConfirmationScreen(target, f.showUpdateDevices, func(allowDowngrade bool) { f.showUpdateProgress(target, allowDowngrade) })
 	ConfigureWindow(f.window, screen.Content())
 }
 
-func (f *Flow) showUpdateProgress(target installed.Target) {
+func (f *Flow) showUpdateProgress(target installed.Target, allowDowngrade bool) {
 	f.busy = true
-	events := f.updateEngine.RunAsync(target)
+	var events <-chan localupdate.Event
+	if allowDowngrade {
+		events = f.updateEngine.RunAsyncConfirmedDowngrade(target)
+	} else {
+		events = f.updateEngine.RunAsync(target)
+	}
 	screen := NewLocalUpdateProgressScreen(events, func(report *install.VerificationReport, err error) {
 		f.busy = false
 		finalScreen := NewOperationFinalScreen("Aktualizacja", report, err, f.showModes)

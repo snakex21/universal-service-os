@@ -11,10 +11,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/snakex21/universal-service-os/installer/internal/buildinfo"
 )
 
 //go:embed assets/payload.zip assets/README.md
 var embedded embed.FS
+
+const BootManagerPath = "EFI/BOOT/BOOTX64.EFI"
+const BuildInfoPath = "EFI/USOS/build-info.ini"
 
 type File struct {
 	Path   string
@@ -88,6 +93,65 @@ func (b Bundle) Manifest() ([]File, error) {
 		files = append(files, File{Path: clean, Size: uint64(written), SHA256: hex.EncodeToString(hash.Sum(nil))})
 	}
 	return files, nil
+}
+
+func (b Bundle) BuildInfo() (buildinfo.Info, error) {
+	data, err := b.ReadFile(BuildInfoPath)
+	if err != nil {
+		return buildinfo.Info{}, err
+	}
+	info, err := buildinfo.Parse(bytes.NewReader(data))
+	if err != nil {
+		return buildinfo.Info{}, fmt.Errorf("parse embedded %s: %w", BuildInfoPath, err)
+	}
+	return info, nil
+}
+
+func (b Bundle) ReadFile(path string) ([]byte, error) {
+	clean, err := safeRelativePath(path)
+	if err != nil {
+		return nil, err
+	}
+	reader, err := zip.NewReader(bytes.NewReader(b.data), int64(len(b.data)))
+	if err != nil {
+		return nil, fmt.Errorf("open embedded payload ZIP: %w", err)
+	}
+	for _, entry := range reader.File {
+		if filepath.ToSlash(entry.Name) != clean || entry.FileInfo().IsDir() {
+			continue
+		}
+		rc, err := entry.Open()
+		if err != nil {
+			return nil, fmt.Errorf("open embedded payload entry %s: %w", clean, err)
+		}
+		data, readErr := io.ReadAll(rc)
+		closeErr := rc.Close()
+		if readErr != nil {
+			return nil, fmt.Errorf("read embedded payload entry %s: %w", clean, readErr)
+		}
+		if closeErr != nil {
+			return nil, fmt.Errorf("close embedded payload entry %s: %w", clean, closeErr)
+		}
+		return data, nil
+	}
+	return nil, fmt.Errorf("embedded payload file not found: %s", clean)
+}
+
+func (b Bundle) File(path string) (File, error) {
+	clean, err := safeRelativePath(path)
+	if err != nil {
+		return File{}, err
+	}
+	manifest, err := b.Manifest()
+	if err != nil {
+		return File{}, err
+	}
+	for _, file := range manifest {
+		if file.Path == clean {
+			return file, nil
+		}
+	}
+	return File{}, fmt.Errorf("embedded payload file not found: %s", clean)
 }
 
 func (b Bundle) TotalBytes() (uint64, error) {

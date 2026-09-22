@@ -9,7 +9,7 @@ import (
 )
 
 func verifyMediaLayout(expected install.MediaLayout, actual parsedLayout) (install.MediaLayout, error) {
-	if guidString(actual.Header.DiskID) != expected.DiskPTUUID {
+	if !equalGUIDText(guidString(actual.Header.DiskID), expected.DiskPTUUID) {
 		return install.MediaLayout{}, fmt.Errorf("disk GUID changed: got %s want %s", guidString(actual.Header.DiskID), expected.DiskPTUUID)
 	}
 	if len(actual.Partitions) != 3 {
@@ -24,7 +24,7 @@ func verifyMediaLayout(expected install.MediaLayout, actual parsedLayout) (insta
 	}{
 		{"ESP", expected.ESP, guidString(efiSystemPartitionType), 0},
 		{"DATA", expected.DATA, guidString(basicDataPartitionType), 0},
-		{"WORK", expected.WORK, guidString(basicDataPartitionType), gptBasicDataAttributeNoDriveLetter},
+		{"WORK", expected.WORK, guidString(basicDataPartitionType), 0},
 	}
 
 	result := install.MediaLayout{DiskNumber: expected.DiskNumber, DiskPTUUID: expected.DiskPTUUID}
@@ -33,7 +33,7 @@ func verifyMediaLayout(expected install.MediaLayout, actual parsedLayout) (insta
 		var got *parsedPartition
 		for i := range actual.Partitions {
 			candidate := &actual.Partitions[i]
-			if guidString(candidate.PartitionID) == want.expected.PartUUID {
+			if equalGUIDText(guidString(candidate.PartitionID), want.expected.PartUUID) {
 				if got != nil {
 					return install.MediaLayout{}, fmt.Errorf("duplicate %s PARTUUID %s", want.name, want.expected.PartUUID)
 				}
@@ -43,7 +43,7 @@ func verifyMediaLayout(expected install.MediaLayout, actual parsedLayout) (insta
 		if got == nil {
 			return install.MediaLayout{}, fmt.Errorf("missing %s PARTUUID %s", want.name, want.expected.PartUUID)
 		}
-		if guidString(got.PartitionType) != want.typeID {
+		if !equalGUIDText(guidString(got.PartitionType), want.typeID) {
 			return install.MediaLayout{}, fmt.Errorf("%s GPT type changed: got %s want %s", want.name, guidString(got.PartitionType), want.typeID)
 		}
 		if got.StartBytes != want.expected.StartBytes {
@@ -55,7 +55,7 @@ func verifyMediaLayout(expected install.MediaLayout, actual parsedLayout) (insta
 		if got.Attributes != want.attributes {
 			return install.MediaLayout{}, fmt.Errorf("%s GPT attributes changed: got 0x%016X want 0x%016X", want.name, got.Attributes, want.attributes)
 		}
-		seen[want.expected.PartUUID] = struct{}{}
+		seen[guidTextKey(want.expected.PartUUID)] = struct{}{}
 		ref := install.PartitionRef{
 			Number:     got.Number,
 			StartBytes: got.StartBytes,
@@ -72,7 +72,7 @@ func verifyMediaLayout(expected install.MediaLayout, actual parsedLayout) (insta
 		}
 	}
 	for _, partition := range actual.Partitions {
-		if _, ok := seen[guidString(partition.PartitionID)]; !ok {
+		if _, ok := seen[guidTextKey(guidString(partition.PartitionID))]; !ok {
 			return install.MediaLayout{}, fmt.Errorf("unexpected PARTUUID after format: %s", guidString(partition.PartitionID))
 		}
 	}

@@ -17,6 +17,29 @@ foreach ($required in @($zig, $launcher)) {
     }
 }
 
+function Stop-StaleUsosQemu {
+    $stale = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.Name -like 'qemu-system-*.exe' -and
+        $_.CommandLine -and
+        $_.CommandLine -match '(?i)(?:^|\s)-name\s+USOS-[^\s"]+'
+    })
+
+    foreach ($processInfo in $stale) {
+        Write-Host "[USOS] Zatrzymuje pozostawiony QEMU PID=$($processInfo.ProcessId): $($processInfo.CommandLine)" -ForegroundColor Yellow
+        Stop-Process -Id $processInfo.ProcessId -Force -ErrorAction Stop
+    }
+
+    if ($stale.Count -gt 0) { Start-Sleep -Milliseconds 500 }
+    $left = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.Name -like 'qemu-system-*.exe' -and
+        $_.CommandLine -and
+        $_.CommandLine -match '(?i)(?:^|\s)-name\s+USOS-[^\s"]+'
+    })
+    if ($left.Count -gt 0) {
+        throw "Failed to stop stale USOS QEMU process(es): $($left.ProcessId -join ', ')"
+    }
+}
+
 function Get-NewestInputTime {
     $paths = @(
         (Full 'build.zig'),
@@ -49,6 +72,8 @@ function Get-NewestInputTime {
     return $newest
 }
 
+Stop-StaleUsosQemu
+
 $needsBuild = $ForceRebuild -or -not (Test-Path -LiteralPath $base -PathType Leaf)
 if (-not $needsBuild) {
     $baseTime = (Get-Item -LiteralPath $base).LastWriteTimeUtc
@@ -69,5 +94,5 @@ if ($needsBuild) {
 }
 
 Write-Host '[USOS] Tworze czysty stan testu i uruchamiam QEMU...' -ForegroundColor Cyan
-& powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $launcher -Fresh
+& powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $launcher -Fresh -AccelerationMode tcg
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

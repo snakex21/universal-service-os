@@ -2,6 +2,7 @@ const BootMethod = @import("boot_method.zig").BootMethod;
 const SystemEntry = @import("system_entry.zig").SystemEntry;
 
 const methods = [_]BootMethod{ .automatic, .direct_iso, .wimboot, .vhdboot, .direct_efi, .chainload };
+const windows7_methods = [_]BootMethod{ .automatic, .direct_iso, .wimboot, .vhdboot, .direct_efi };
 
 pub const entries = [_]SystemEntry{
     windows("windows-11", "Windows 11", "Windows 11"),
@@ -20,6 +21,6 @@ fn windows(comptime id: []const u8, comptime name: []const u8, comptime folder: 
         .family = .windows,
         .image_directory = "\\Systems\\Windows\\" ++ folder ++ "\\Images",
         .unattended_directory = "\\Systems\\Windows\\" ++ folder ++ "\\Unattended",
-        .boot_methods = &methods,
+        .boot_methods = if (@import("std").mem.eql(u8, id, "windows-7")) &windows7_methods else &methods,
     };
 }

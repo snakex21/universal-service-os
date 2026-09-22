@@ -35,7 +35,7 @@ func ApplyEligibility(d Disk) Disk {
 		return d
 	}
 	if d.SizeBytes < layout.MinimumDiskBytes {
-		d.Reason = "urządzenie ma mniej niż wymagane 32 GiB"
+		d.Reason = "urządzenie ma mniej niż wymagane 32 GB"
 		return d
 	}
 

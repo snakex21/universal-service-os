@@ -63,12 +63,20 @@ foreach ($obsolete in @('Systems', 'Programs', 'Utilities')) {
 }
 
 if ($Deep) {
-    Remove-SafePath (Join-Path $qemuRoot 'usos-e2e-base.qcow2') $qemuRoot
+    # Deep cleanup means exactly what it says: everything below the dedicated
+    # generated-artifact root is reproducible test output. Keep the source
+    # runners/fixtures under tools/tests, but remove all old QEMU images,
+    # prepared EXEs, screenshots and cached E2E bases that accumulated there.
+    if (Test-Path -LiteralPath $artifactRoot) {
+        foreach ($entry in @(Get-ChildItem -LiteralPath $artifactRoot -Force)) {
+            Remove-SafePath $entry.FullName $artifactRoot
+        }
+    }
 }
 
 Write-Host ''
 if ($Deep) {
-    Write-Host '[PASS] Test artifacts and E2E base removed.' -ForegroundColor Green
+    Write-Host '[PASS] All generated test artifacts removed; tools/tests source files kept.' -ForegroundColor Green
 } else {
     Write-Host '[PASS] Stale test artifacts removed; E2E base kept for fast TEST-USOS.cmd.' -ForegroundColor Green
 }

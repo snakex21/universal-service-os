@@ -5,6 +5,7 @@ package winhost
 import (
 	"fmt"
 
+	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/installed"
 )
 
@@ -16,13 +17,13 @@ func (Backend) RevalidateInstalledUSOS(expected installed.Target) (installed.Tar
 	if err != nil {
 		return installed.Target{}, fmt.Errorf("revalidate installed USOS: %w", err)
 	}
-	if current.Identity != expected.Identity {
+	if !sameDeviceIdentity(current.Identity, expected.Identity) {
 		return installed.Target{}, fmt.Errorf("usos-device.ini changed since selection")
 	}
-	if current.Media.DiskPTUUID != expected.Media.DiskPTUUID ||
-		current.Media.ESP.PartUUID != expected.Media.ESP.PartUUID ||
-		current.Media.DATA.PartUUID != expected.Media.DATA.PartUUID ||
-		current.Media.WORK.PartUUID != expected.Media.WORK.PartUUID ||
+	if !equalGUIDText(current.Media.DiskPTUUID, expected.Media.DiskPTUUID) ||
+		!equalGUIDText(current.Media.ESP.PartUUID, expected.Media.ESP.PartUUID) ||
+		!equalGUIDText(current.Media.DATA.PartUUID, expected.Media.DATA.PartUUID) ||
+		!equalGUIDText(current.Media.WORK.PartUUID, expected.Media.WORK.PartUUID) ||
 		current.Media.ESP.StartBytes != expected.Media.ESP.StartBytes ||
 		current.Media.DATA.StartBytes != expected.Media.DATA.StartBytes ||
 		current.Media.WORK.StartBytes != expected.Media.WORK.StartBytes ||
@@ -32,4 +33,15 @@ func (Backend) RevalidateInstalledUSOS(expected installed.Target) (installed.Tar
 		return installed.Target{}, fmt.Errorf("GPT identity/layout changed since selection")
 	}
 	return current, nil
+}
+
+func sameDeviceIdentity(a, b install.DeviceINI) bool {
+	return a.Nonce == b.Nonce &&
+		equalGUIDText(a.DiskPTUUID, b.DiskPTUUID) &&
+		equalGUIDText(a.ESPPartUUID, b.ESPPartUUID) &&
+		equalGUIDText(a.DataPartUUID, b.DataPartUUID) &&
+		equalGUIDText(a.WorkPartUUID, b.WorkPartUUID) &&
+		a.WorkLabel == b.WorkLabel &&
+		a.DataLabel == b.DataLabel &&
+		a.WorkBytes == b.WorkBytes
 }

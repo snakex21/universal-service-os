@@ -1,0 +1,14 @@
+USOS uses the unmodified DOS Patcher9x 0.9.91 release by JHRobotics.
+The RAM patch incorporated in that project is by Rudolph R. Loew.
+Upstream: https://github.com/JHRobotics/patcher9x/releases/tag/v0.9.91
+The corresponding Patcher9x sources, including libmspack and its license,
+are provided in source.zip. See LICENSE.TXT for the Patcher9x MIT license.
+
+CWSDPMI release 7 is Copyright (C) 1995-2010 Charles W. Sandmann.
+Its executable is redistributed unmodified under the binary redistribution
+permission in CWSDPMI.TXT. Users have the right to receive its source code
+and binary updates. Sources: https://www.delorie.com/pub/djgpp/current/v2misc/csdpmi7s.zip
+Author's site: http://sandmann.dotster.com/cwsdpmi/
+
+INSTALL.BAT and REPAIR.BAT are USOS integration scripts. They select only
+the memory patch and disable CWSDPMI disk swapping.

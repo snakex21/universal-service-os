@@ -5,11 +5,13 @@ import (
 
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/installed"
+	"github.com/snakex21/universal-service-os/installer/internal/legacyboot"
 )
 
 type Backend interface {
 	RevalidateInstalledUSOS(expected installed.Target) (installed.Target, error)
 	CopyESPPayload(media install.MediaLayout, progress func(done, total uint64)) error
+	RestoreLegacyBoot(expected installed.Target) (legacyboot.Audit, error)
 	VerifyRepair(media install.MediaLayout, expected install.DeviceINI) (install.VerificationReport, error)
 }
 
@@ -30,8 +32,9 @@ type StageID uint8
 const (
 	StageRevalidate StageID = iota + 1
 	StageCopyESP
+	StageLegacyBoot
 	StageVerify
-	StageCount = 3
+	StageCount = 4
 )
 
 type State uint8
@@ -63,7 +66,8 @@ type Stage struct {
 var stages = map[StageID]Stage{
 	StageRevalidate: {ID: StageRevalidate, Number: 1, Name: "Ponowna walidacja nośnika USOS"},
 	StageCopyESP:    {ID: StageCopyESP, Number: 2, Name: "Odtwarzanie plików ESP"},
-	StageVerify:     {ID: StageVerify, Number: 3, Name: "Weryfikacja"},
+	StageLegacyBoot: {ID: StageLegacyBoot, Number: 3, Name: "Odtwarzanie Legacy BIOS Stage 1 i Core"},
+	StageVerify:     {ID: StageVerify, Number: 4, Name: "Weryfikacja"},
 }
 
 func StageInfo(id StageID) (Stage, bool) {
@@ -107,6 +111,13 @@ func (e *Engine) run(expected installed.Target, events chan<- Event) {
 	if err := e.runCopy(events, current); err != nil {
 		return
 	}
+	if err := e.runStage(events, StageLegacyBoot, func() error {
+		audit, err := e.backend.RestoreLegacyBoot(current)
+		e.logLegacyAudit(events, audit)
+		return err
+	}); err != nil {
+		return
+	}
 	var report install.VerificationReport
 	if err := e.runStage(events, StageVerify, func() error {
 		var err error
@@ -121,7 +132,7 @@ func (e *Engine) run(expected installed.Target, events chan<- Event) {
 		}
 		return
 	}
-	e.log(events, "Naprawa zakończona: ESP odtworzone, DATA i WORK niezmienione")
+	e.log(events, "Naprawa zakończona: ESP oraz Legacy BIOS Stage 1/Core odtworzone, GPT, DATA i WORK niezmienione")
 	events <- Event{Kind: EventFinished, Verification: &report}
 }
 
@@ -167,6 +178,26 @@ func (e *Engine) runCopy(events chan<- Event, current installed.Target) error {
 	e.log(events, "PASS "+caption)
 	events <- Event{Kind: EventStage, StageID: StageCopyESP, State: StateSucceeded, ProgressKnown: true, Progress: 1}
 	return nil
+}
+
+func (e *Engine) logLegacyAudit(events chan<- Event, audit legacyboot.Audit) {
+	if audit.Stage1.BeforeSHA256 != "" {
+		e.log(events, fmt.Sprintf("LEGACY_BOOT BEFORE component=stage1 sha256=%s expected=%s", audit.Stage1.BeforeSHA256, audit.Stage1.ExpectedSHA256))
+	}
+	if audit.Core.BeforeSHA256 != "" {
+		e.log(events, fmt.Sprintf("LEGACY_BOOT BEFORE component=core sha256=%s expected=%s", audit.Core.BeforeSHA256, audit.Core.ExpectedSHA256))
+	}
+	if audit.Stage1.AfterSHA256 != "" {
+		e.log(events, fmt.Sprintf("LEGACY_BOOT AFTER component=stage1 sha256=%s expected=%s changed=%s", audit.Stage1.AfterSHA256, audit.Stage1.ExpectedSHA256, repairYesNo(audit.Stage1.Changed)))
+	}
+	if audit.Core.AfterSHA256 != "" {
+		e.log(events, fmt.Sprintf("LEGACY_BOOT AFTER component=core sha256=%s expected=%s changed=%s", audit.Core.AfterSHA256, audit.Core.ExpectedSHA256, repairYesNo(audit.Core.Changed)))
+	}
+}
+
+func repairYesNo(value bool) string {
+	if value { return "yes" }
+	return "no"
 }
 
 func (e *Engine) log(events chan<- Event, message string) {

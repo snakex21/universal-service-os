@@ -10,8 +10,13 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'process_argument_line.ps1')
+. (Join-Path $PSScriptRoot 'qemu_harness.ps1')
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-function Full([string]$path) { [IO.Path]::GetFullPath((Join-Path $root $path)) }
+function Full([string]$Path) {
+    if ([IO.Path]::IsPathRooted($Path)) { return [IO.Path]::GetFullPath($Path) }
+    return [IO.Path]::GetFullPath((Join-Path $root $Path))
+}
 
 $IsoPath = Full $IsoPath
 $QemuPath = Full $QemuPath
@@ -23,11 +28,14 @@ $RuntimeConfigDir = Full $RuntimeConfigDir
 $testImagesRoot = Full 'tools/tests/artifacts/qemu'
 $templateDir = Full 'tools/tests/fixtures/installer/winpe-gpt-qemu'
 $installerDir = Full 'installer'
+$finalInstaller = Join-Path $installerDir 'USOS Installer.exe'
 $testExe = Join-Path $RuntimeConfigDir 'usos-gpt-qemu-test.exe'
 $resultPath = Join-Path $RuntimeConfigDir 'usos-gpt-result.txt'
 $varsCopy = Join-Path $RuntimeConfigDir 'edk2-vars.fd'
 $qemuErr = Join-Path $RuntimeConfigDir 'qemu.stderr.log'
+$serialPath = Join-Path $RuntimeConfigDir 'serial.log'
 $screenPath = Join-Path $RuntimeConfigDir 'timeout-screen.ppm'
+$screenPngPath = [IO.Path]::ChangeExtension($screenPath, '.png')
 
 function Get-FreeTcpPort {
     $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
@@ -50,7 +58,7 @@ function Send-Hmp([int]$port, [string]$command) {
     }
 }
 
-foreach ($required in @($IsoPath, $QemuPath, $QemuImgPath, $FirmwareCode, $FirmwareVars)) {
+foreach ($required in @($IsoPath, $QemuPath, $QemuImgPath, $FirmwareCode, $FirmwareVars, $finalInstaller)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "Missing required file: $required" }
 }
 if (-not $TargetImage.StartsWith($testImagesRoot, [StringComparison]::OrdinalIgnoreCase)) {
@@ -69,6 +77,12 @@ Copy-Item -LiteralPath (Join-Path $templateDir 'Autounattend.xml') -Destination 
 Copy-Item -LiteralPath (Join-Path $templateDir 'run-usos-gpt-test.cmd') -Destination $RuntimeConfigDir
 Copy-Item -LiteralPath (Join-Path $templateDir 'USOS_QEMU_TEST.TAG') -Destination $RuntimeConfigDir
 Copy-Item -LiteralPath $FirmwareVars -Destination $varsCopy
+Copy-Item -LiteralPath $finalInstaller -Destination (Join-Path $RuntimeConfigDir 'USOS Installer.exe') -Force
+
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Full 'tools/build_legacy_bios.ps1')
+if ($LASTEXITCODE -ne 0) { throw "Legacy BIOS build failed: $LASTEXITCODE" }
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Full 'tools/generate_legacy_boot_payload.ps1')
+if ($LASTEXITCODE -ne 0) { throw "Legacy BIOS payload generation failed: $LASTEXITCODE" }
 
 Push-Location $installerDir
 try {
@@ -97,6 +111,7 @@ $arguments = @(
     '-no-reboot',
     '-boot','order=d,menu=off',
     '-monitor',"tcp:127.0.0.1:$monitorPort,server=on,wait=off",
+    '-serial',"file:$($serialPath.Replace('\','/'))",
     '-drive',"if=pflash,format=raw,readonly=on,file=$FirmwareCode",
     '-drive',"if=pflash,format=raw,file=$varsCopy",
     '-drive',"file=$IsoPath,media=cdrom,readonly=on",
@@ -107,7 +122,7 @@ $arguments = @(
     '-device','usb-storage,bus=xhci.0,drive=usoscfg,removable=on,serial=USOS-CONFIG'
 )
 
-$process = Start-Process -FilePath $QemuPath -ArgumentList $arguments -PassThru -RedirectStandardError $qemuErr
+$process = Start-Process -FilePath $QemuPath -ArgumentList (ConvertTo-NativeArgumentLine -Arguments $arguments) -PassThru -RedirectStandardError $qemuErr
 $startedAt = [DateTime]::UtcNow
 $deadline = $startedAt.AddSeconds($TimeoutSeconds)
 $nextBootKeyAt = $startedAt.AddSeconds(1)
@@ -130,13 +145,16 @@ while (-not $process.HasExited -and [DateTime]::UtcNow -lt $deadline) {
     }
 }
 if (-not (Test-Path -LiteralPath $resultPath -PathType Leaf) -and -not $process.HasExited) {
-    try { Send-Hmp $monitorPort "screendump $($screenPath.Replace('\\','/'))" } catch {}
+    try {
+        Send-Hmp $monitorPort "screendump $($screenPath.Replace('\\','/'))"
+        Wait-AndConvert-QemuPpmToPng -PpmPath $screenPath -RemovePpm | Out-Null
+    } catch {}
 }
 if (-not $process.HasExited) { $process.Kill() }
 $process.WaitForExit()
 
 if (-not (Test-Path -LiteralPath $resultPath -PathType Leaf)) {
-    throw "QEMU/WinPE produced no result file. See $qemuErr and $screenPath"
+    throw "QEMU/WinPE produced no result file. See $qemuErr, $serialPath and $screenPngPath"
 }
 $result = Get-Content -LiteralPath $resultPath -Raw
 Write-Host $result

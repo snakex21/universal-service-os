@@ -2,6 +2,10 @@ const std = @import("std");
 const uefi = std.os.uefi;
 const pointer = @import("pointer.zig");
 
+const idle_hook_interval_ticks: u16 = 250;
+var idle_hook: ?*const fn () void = null;
+var idle_ticks: u16 = 0;
+
 pub const Event = union(enum) {
     up,
     down,
@@ -15,6 +19,11 @@ pub const Event = union(enum) {
 
 pub fn hasPointer() bool {
     return pointer.available();
+}
+
+pub fn setIdleHook(hook: ?*const fn () void) void {
+    idle_hook = hook;
+    idle_ticks = 0;
 }
 
 pub fn readBlocking() Event {
@@ -50,4 +59,9 @@ pub fn readBlocking() Event {
 
 fn stall() void {
     if (uefi.system_table.boot_services) |services| services.stall(2_000) catch {};
+
+    idle_ticks +%= 1;
+    if (idle_ticks < idle_hook_interval_ticks) return;
+    idle_ticks = 0;
+    if (idle_hook) |hook| hook();
 }

@@ -197,6 +197,13 @@ test "device guard requires by-partuuid path" {
     try std.testing.expectError(error.MissingPartuuidPath, verifyBeforeFormat(facts));
 }
 
+test "device guard PARTUUID comparison ignores GUID letter case" {
+    var facts = validFacts();
+    facts.work.partuuid = "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE";
+    facts.work.path = "/dev/disk/by-partuuid/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+    try verifyBeforeFormat(facts);
+}
+
 test "device guard rejects non GPT target" {
     var facts = validFacts();
     facts.work.is_gpt = false;

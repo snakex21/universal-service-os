@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/widget"
+	"github.com/snakex21/universal-service-os/installer/internal/buildinfo"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/localupdate"
 	"github.com/snakex21/universal-service-os/installer/internal/repair"
@@ -22,6 +25,8 @@ func main() {
 		return
 	}
 	defer logger.Close()
+	linkedBuild := buildinfo.Current()
+	_ = logger.WriteLine(fmt.Sprintf("INSTALLER BUILD id=%s epoch=%d source_sha256=%s", linkedBuild.Display(), linkedBuild.Epoch, linkedBuild.SourceSHA256))
 
 	backend := winhost.Backend{}
 	installEngine, err := install.NewEngine(backend, logger)

@@ -1,14 +1,12 @@
-const std = @import("std");
 const usos = @import("usos");
-const image_scan = @import("image_scan.zig");
 const input = @import("input.zig");
 const navigation = @import("manual_navigation.zig");
 const view = @import("manual_view.zig");
 
 const visible_rows: usize = 12;
 
-pub fn select(root: *std.os.uefi.protocol.File, system: *const usos.catalog.SystemEntry) ?usos.catalog.ImageItem {
-    const images = image_scan.scan(root, system.image_directory);
+pub fn select(discovery: *usos.catalog.media_discovery.Discovery, system: *const usos.catalog.SystemEntry) ?usos.catalog.ImageItem {
+    const images = discovery.images(system.image_directory);
     if (images.len == 0) {
         view.begin("images", system.name);
         view.row(false, "No supported image files found in Images.");
@@ -28,36 +26,23 @@ pub fn select(root: *std.os.uefi.protocol.File, system: *const usos.catalog.Syst
         }
     }
 
+    var rows: [usos.catalog.image_list_max_items]view.ListRow = undefined;
+    for (images.items[0..images.len], 0..) |*image, index| {
+        rows[index] = .{ .parts = .{ .first = kindPrefix(image.kind), .second = image.name.slice() } };
+    }
+
     var selected: usize = 0;
-    var start = visibleStart(selected);
-    render(system.name, &images, selected, start);
+    var list = view.ListScreen.open("images", system.name, rows[0..images.len], selected, visible_rows, null);
 
     while (true) {
-        switch (navigation.handle(input.readBlocking(), &selected, images.len, start, @min(visible_rows, images.len - start))) {
+        switch (navigation.handle(input.readBlocking(), &selected, images.len, list.visibleStart(), list.visibleCount())) {
             .activate => return images.items[selected],
             .back => return null,
-            .changed => {
-                start = visibleStart(selected);
-                render(system.name, &images, selected, start);
-            },
+            .changed => list.updateSelection(selected, null),
             .pointer_moved => view.updatePointer(),
             .ignored => {},
         }
     }
-}
-
-fn visibleStart(selected: usize) usize {
-    return if (selected >= visible_rows) selected - visible_rows + 1 else 0;
-}
-
-fn render(system_name: []const u8, images: *const usos.catalog.ImageList, selected: usize, start: usize) void {
-    view.begin("images", system_name);
-    const end = @min(start + visible_rows, images.len);
-
-    for (images.items[start..end], start..) |image, index| {
-        view.rowParts(index == selected, kindPrefix(image.kind), image.name.slice());
-    }
-    view.footer(true);
 }
 
 fn kindPrefix(kind: usos.catalog.ImageKind) []const u8 {

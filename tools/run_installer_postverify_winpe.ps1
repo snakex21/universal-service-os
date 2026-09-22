@@ -3,6 +3,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'process_argument_line.ps1')
+. (Join-Path $PSScriptRoot 'qemu_harness.ps1')
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 function Full([string]$Path) { [IO.Path]::GetFullPath((Join-Path $root $Path)) }
 
@@ -15,7 +17,9 @@ $firmwareVarsSource = Full 'tools/qemu/share/edk2-i386-vars.fd'
 $varsCopy = Join-Path $config 'edk2-vars.fd'
 $result = Join-Path $config 'usos-postverify-result.txt'
 $qemuErr = Join-Path $config 'qemu.stderr.log'
+$serial = Join-Path $config 'serial.log'
 $screen = Join-Path $config 'timeout.ppm'
+$screenPng = [IO.Path]::ChangeExtension($screen, '.png')
 
 foreach ($required in @($qemu,$iso,$target,$firmwareCode,$firmwareVarsSource,(Join-Path $config 'Autounattend.xml'),(Join-Path $config 'run-usos-gpt-test.cmd'),(Join-Path $config 'USOS_QEMU_TEST.TAG'),(Join-Path $config 'usos-gpt-qemu-test.exe'),(Join-Path $config 'USOS Installer.exe'))) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "Missing required file: $required" }
@@ -25,7 +29,7 @@ $active = @(Get-CimInstance Win32_Process -Filter "Name='qemu-system-x86_64.exe'
 if ($active.Count -gt 0) { throw "Post-verify WinPE QEMU already running: PID=$($active[0].ProcessId)" }
 
 Copy-Item -LiteralPath $firmwareVarsSource -Destination $varsCopy -Force
-Remove-Item -LiteralPath $result,$qemuErr,$screen -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $result,$qemuErr,$serial,$screen,$screenPng -Force -ErrorAction SilentlyContinue
 
 function Get-FreeTcpPort {
     $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,0)
@@ -46,7 +50,7 @@ function Send-Hmp([int]$Port,[string]$Command) {
 
 $monitorPort = Get-FreeTcpPort
 $configForQemu = $config.Replace('\','/')
-$args = @(
+$qemuArgs = @(
     '-machine','q35',
     '-accel','tcg',
     '-cpu','max',
@@ -57,6 +61,7 @@ $args = @(
     '-no-reboot',
     '-boot','order=d,menu=off',
     '-monitor',"tcp:127.0.0.1:$monitorPort,server=on,wait=off",
+    '-serial',"file:$($serial.Replace('\','/'))",
     '-drive',"if=pflash,format=raw,readonly=on,file=$firmwareCode",
     '-drive',"if=pflash,format=raw,file=$varsCopy",
     '-drive',"file=$iso,media=cdrom,readonly=on",
@@ -67,7 +72,7 @@ $args = @(
     '-device','usb-storage,bus=xhci.0,drive=cfg,removable=on,serial=USOS-CONFIG'
 )
 
-$process = Start-Process -FilePath $qemu -ArgumentList $args -PassThru -RedirectStandardError $qemuErr
+$process = Start-Process -FilePath $qemu -ArgumentList (ConvertTo-NativeArgumentLine -Arguments $qemuArgs) -PassThru -RedirectStandardError $qemuErr
 $startedAt = [DateTime]::UtcNow
 $deadline = $startedAt.AddSeconds($TimeoutSeconds)
 $nextBootKeyAt = $startedAt.AddSeconds(1)
@@ -85,12 +90,15 @@ while (-not $process.HasExited -and [DateTime]::UtcNow -lt $deadline) {
     }
 }
 if (-not (Test-Path -LiteralPath $result -PathType Leaf) -and -not $process.HasExited) {
-    try { Send-Hmp $monitorPort "screendump $($screen.Replace('\','/'))" } catch {}
+    try {
+        Send-Hmp $monitorPort "screendump $($screen.Replace('\','/'))"
+        Wait-AndConvert-QemuPpmToPng -PpmPath $screen -RemovePpm | Out-Null
+    } catch {}
 }
 if (-not $process.HasExited) { $process.Kill() }
 $process.WaitForExit()
 
 if (-not (Test-Path -LiteralPath $result -PathType Leaf)) {
-    throw "QEMU/WinPE produced no result file. See $qemuErr and $screen"
+    throw "QEMU/WinPE produced no result file. See $qemuErr, $serial and $screenPng"
 }
 Get-Content -LiteralPath $result -Raw

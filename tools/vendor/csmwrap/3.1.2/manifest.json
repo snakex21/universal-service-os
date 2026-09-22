@@ -1,0 +1,11 @@
+{
+  "version": "3.1.2",
+  "release_url": "https://github.com/CSMWrap/CSMWrap/releases/tag/3.1.2",
+  "asset_url": "https://github.com/CSMWrap/CSMWrap/releases/download/3.1.2/csmwrapx64.efi",
+  "github_digest": "sha256:96fdb387e177c6340287b7e07713dc09bf1f965dd404311eafd9c6eb99a02745",
+  "files": {
+    "csmwrapx64.efi": "96fdb387e177c6340287b7e07713dc09bf1f965dd404311eafd9c6eb99a02745",
+    "README.md": "9c36640a7fd4eb3f8d3f3ffb54e91292d80dfe30a07d39cdfcc4a0774e703f66",
+    "LICENSE": "20c17d8b8c48a600800dfd14f95d5cb9ff47066a9641ddeab48dc54aec96e331"
+  }
+}

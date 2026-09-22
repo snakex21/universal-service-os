@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/evgen-b/PatchPAE3",
+  "commit": "3e1d3b65f5c3c1ec0c4759f707d3017e51113103",
+  "purpose": "source review; not executed or shipped",
+  "sha256": {
+    "LICENSE": "aee86eb38d7357eb23d52108a72fc995644243dc57175ca83022dbd8d18ba849",
+    "README.md": "969c38838edb80c76fe254554ef6b1799257666b0f28db78b8fe261059bd93b5",
+    "PatchPAE3/main.c": "d3e16b7e0f04d7fdcab7dd08fcb0b253ab98a6cb88b80bf42e87b2a72e7cae66",
+    "ScriptPAE/ScriptPAE3v26.cmd": "eec9aa3a903b2f300615803a2793b38bb43577f0479cce60459570202577340e"
+  }
+}

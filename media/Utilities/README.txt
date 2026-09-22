@@ -10,6 +10,18 @@ W każdym folderze narzędzia utwórz folder Images i umieść tam plik obrazu l
 
   Utilities\MemTest86\Images\memtest86.efi
 
+W tym wydaniu dołączono również obraz BIOS MemTest86+:
+
+  Utilities\MemTest86\Images\memtest86plus-8.10-i586.iso
+
+BIOS: Utilities -> MemTest86 -> wybierz powyzszy ISO -> Enter.
+USOS odczytuje program z ISO i uruchamia go bezposrednio w pamieci.
+Memtest86+ rozpoczyna test automatycznie; F1 otwiera konfiguracje,
+Esc restartuje komputer. Uruchomienie testu RAM nie formatuje dyskow.
+Ta sciezka obsluguje oficjalny ISO i586 Memtest86+ z BOOT/FLOPPY.IMG.
+Inne typy obrazow i narzedzia moga byc widoczne w katalogu, ale nie maja
+jeszcze obslugi uruchamiania BIOS. Obraz EFI wymaga osobnej sciezki UEFI.
+
 Obsługiwane typy katalogowe: ISO, WIM, IMG, VHD, VHDX i EFI.
 
 Opcjonalna ikona narzędzia:
@@ -18,3 +30,5 @@ Opcjonalna ikona narzędzia:
 
 icon.png musi być prawidłowym plikiem PNG i mieć maksymalnie 1 MiB.
 Po dodaniu, usunięciu lub zmianie narzędzia albo icon.png uruchom Aktualizuj USOS. Aktualizator odświeży mały katalog metadanych na ESP bez kopiowania dużych obrazów.
+
+Partycja robocza jest widoczna jako USOS_WORK. Nie wrzucaj tam żadnych plików — jej zawartość jest usuwana przed każdą instalacją.

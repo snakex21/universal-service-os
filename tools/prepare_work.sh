@@ -8,13 +8,15 @@ STATE_FILE=${STATE_FILE:?STATE_FILE is required}
 USOS_DEVICE_INI=${USOS_DEVICE_INI:?USOS_DEVICE_INI is required}
 UNATTEND_FILE=${UNATTEND_FILE:-}
 WORK_FS_DRIVER=${WORK_FS_DRIVER:-ntfs3}
-PREFIX='/dev/disk/by-partuuid/'
-WORK_PATH="${PREFIX}${WORK_PARTUUID}"
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+[ -r "$SCRIPT_DIR/partuuid.sh" ] || { printf '[PREPARE_WORK] STOP: partuuid.sh is missing\n' >&2; exit 1; }
+. "$SCRIPT_DIR/partuuid.sh"
+WORK_PATH=$(usos_partuuid_path "$WORK_PARTUUID")
 [ -r "$SCRIPT_DIR/micro_linux_ui.sh" ] || { printf '[PREPARE_WORK] STOP: micro_linux_ui.sh is missing\n' >&2; exit 1; }
 . "$SCRIPT_DIR/micro_linux_ui.sh"
 
 fail() {
+    usos_ui_fail 'Preparation stopped' "$1" || true
     printf '[PREPARE_WORK] STOP: %s\n' "$1" >&2
     exit 1
 }
@@ -37,18 +39,36 @@ case "$WORK_MOUNT" in
 esac
 
 printf '[PREPARE_WORK] phase=prepare-requested\n'
-usos_ui_stage 8 10 'Checking target safety' 'Verifying disk identity and WORK ownership.'
+usos_ui_stage 2 5 'Checking target safety' 'Verifying disk identity and WORK ownership.'
+usos_perf_mark 'device_guard pre-format begin'
 sh "$SCRIPT_DIR/device_guard.sh" pre-format
+usos_perf_mark 'device_guard pre-format end'
 printf '[PREPARE_WORK] device_guard pre-format PASS\n'
+
+WINDOWS7_UEFI=no
+if [ "${SELECTED_METHOD:-iso}" = chainload ]; then
+    case "${SELECTED_ISO:-}" in
+        'Systems/Windows/Windows 7/Images/'*)
+            sh "$SCRIPT_DIR/prepare_windows7_uefi.sh" --check || fail 'Windows 7 UEFI preflight failed'
+            command -v ntfs-3g >/dev/null 2>&1 || fail 'ntfs-3g is required for Windows 7 WORK compatibility'
+            WORK_FS_DRIVER=ntfs-3g
+            WINDOWS7_UEFI=yes
+            ;;
+    esac
+fi
+export WINDOWS7_UEFI
 
 # This is the first destructive operation. It is unreachable unless the guard
 # above accepted every topology/identity check or exact first-run confirmation.
 case "${SELECTED_METHOD:-iso}" in
-    wimboot) usos_ui_stage 9 10 'Formatting WORK' 'Creating a fresh NTFS workspace for the WIM boot environment.' ;;
-    vhdboot) usos_ui_stage 9 10 'Formatting WORK' 'Creating a small NTFS workspace for native VHD/VHDX boot files.' ;;
-    *) usos_ui_stage 9 10 'Formatting WORK' 'Creating a fresh NTFS workspace for prepared boot media.' ;;
+    wimboot) usos_ui_stage 3 5 'Formatting WORK' 'Creating a fresh NTFS workspace for the WIM boot environment.' ;;
+    vhdboot) usos_ui_stage 3 5 'Formatting WORK' 'Creating a small NTFS workspace for native VHD/VHDX boot files.' ;;
+    *) usos_ui_stage 3 5 'Formatting WORK' 'Creating a fresh NTFS workspace for prepared boot media.' ;;
 esac
+usos_perf_mark 'mkfs.ntfs quick format begin'
+# mkfs.ntfs -f is the fast/quick-format mode; -F permits the explicitly guarded block device.
 mkfs.ntfs -f -F -L USOS_WORK "$WORK_PATH" || fail 'mkfs.ntfs failed'
+usos_perf_mark 'mkfs.ntfs quick format end'
 printf '[PREPARE_WORK] mkfs.ntfs PASS\n'
 
 # Restore and verify .usos-work before mounting or copying any installer file.
@@ -57,9 +77,9 @@ printf '[PREPARE_WORK] WORK identity restore PASS\n'
 
 mkdir -p "$WORK_MOUNT"
 case "${SELECTED_METHOD:-iso}" in
-    wimboot) usos_ui_stage 10 10 'Opening WORK' 'The WIM boot environment will be assembled next.' ;;
-    vhdboot) usos_ui_stage 10 10 'Opening WORK' 'The native VHD boot manager and BCD will be assembled next.' ;;
-    *) usos_ui_stage 10 10 'Opening WORK' 'The boot media copy will start next.' ;;
+    wimboot) usos_ui_stage 3 5 'Opening WORK' 'The WIM boot environment will be assembled next.' ;;
+    vhdboot) usos_ui_stage 3 5 'Opening WORK' 'The native VHD boot manager and BCD will be assembled next.' ;;
+    *) usos_ui_stage 3 5 'Opening WORK' 'The boot media copy will start next.' ;;
 esac
 mount -t "$WORK_FS_DRIVER" -o rw,noatime "$WORK_PATH" "$WORK_MOUNT" || fail "failed to mount WORK with $WORK_FS_DRIVER"
 mounted=yes
@@ -79,7 +99,8 @@ case "${SELECTED_METHOD:-iso}" in
     *) sh "$SCRIPT_DIR/extract.sh" ;;
 esac
 
-sync
+usos_ui_sync_with_activity 'Flushing to disk' 'Finishing WORK writes before closing the prepared partition.' || fail 'final WORK sync failed'
+usos_ui_stage 5 5 'Closing WORK partition' 'All buffered writes are complete; closing the prepared filesystem.'
 umount "$WORK_MOUNT" || fail 'failed to unmount prepared WORK'
 mounted=no
 trap - EXIT HUP INT TERM

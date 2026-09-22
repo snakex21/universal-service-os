@@ -1,0 +1,21 @@
+{
+  "distribution": "FreeDOS 1.4",
+  "files": {
+    "kernel.zip": "43ed55fec6e795bb24e658302c7fae9eec9eb8dfeaba15734317b3f8302706d6",
+    "freecom.zip": "3a7cfa03cce242031926cd67b69e1fd030d1c27127885d927629945f3137b6f0",
+    "doszip.zip": "d1dfa5f050e7282eafb4b8ceca9d1d445629e370994563285ef4cec67f554b37",
+    "BOOT16.BIN": "58a9154e3607063377948b0ecc2ff7498cf9ebc94d06b0c2f46712c79e9e94ce",
+    "KERNEL.SYS": "932c0c155701eddb7b902f7269a1b2ce31f5c82a6dc195172f2336d18a74e1fb",
+    "COMMAND.COM": "077808379e896476f7f69d62e6c8989d8fc23e8ef58d1c8492db1ac106784107"
+  },
+  "upstream": {
+    "kernel.zip": "https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/repositories/1.4/base/kernel/20250409.9/kernel.zip",
+    "freecom.zip": "https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/repositories/1.4/base/freecom.zip",
+    "doszip.zip": "https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/repositories/1.4/apps/doszip/20251128.7/doszip.zip"
+  },
+  "upstream_image": {
+    "url": "https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/distributions/1.4/FD14-LiteUSB.zip",
+    "sha256": "857dcd2ebf9d3d094320154db5fb5b830acba6fb98f981a95a0ca7ab3350338b",
+    "boot_sector_partition_lba": 63
+  }
+}

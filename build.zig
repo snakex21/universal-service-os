@@ -7,20 +7,26 @@ pub fn build(b: *std.Build) void {
     addHostTests(b, target, optimize);
     addHostSelftest(b, target, optimize);
     addHostImageProbe(b, target, optimize);
+    addHostLegacyFat32Probe(b, target, optimize);
+    addHostLegacyNtfsProbe(b, target, optimize);
     const ntfs_driver = addFetchNtfsDriver(b);
 
     const x86_64_app = addInteractiveX86UefiApp(b, optimize);
     _ = addBootstrapUefiApp(b, optimize, .aarch64, "usos-aarch64", "usb/EFI/BOOT/BOOTAA64.EFI");
     addReleaseMediaLayout(b);
     const manual_image = addQemuX86ManualImage(b, x86_64_app);
-    const micro_linux = addMicroLinux(b);
+    const framebuffer_ui = addFramebufferUi(b, optimize);
+    const micro_linux = addMicroLinux(b, framebuffer_ui);
     const handoff_app = addNtfsHandoffTestApp(b, optimize);
+    _ = addGptNoBlockIoProbeApp(b, optimize);
+    _ = addUefiNtfsCatalogProbeApp(b, optimize);
     addBootNextCompileCheck(b, optimize);
     const handoff_base = addPrepareNtfsHandoffImage(b, ntfs_driver, handoff_app);
     const handoff_overlay = addPrepareNtfsHandoffOverlay(b, handoff_base);
     addRunNtfsHandoffQemu(b, handoff_overlay);
     const e2e_base = addPrepareE2eBase(b, ntfs_driver, manual_image, micro_linux);
     _ = addPrepareE2eOverlay(b, e2e_base);
+    addDirectEfiValidationFixture(b, optimize);
     addQemuX86TestImage(b, optimize);
     addQemuAarch64TestImage(b, optimize);
 }
@@ -55,9 +61,20 @@ fn addHostTests(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
     const unit_tests = b.addTest(.{ .root_module = root_module });
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
+    const framebuffer_test_module = b.createModule(.{
+        .root_source_file = b.path("src/platform/linux/fb_ui_tests.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    framebuffer_test_module.addImport("usos", createUsosModule(b, target, optimize));
+    const framebuffer_tests = b.addTest(.{ .root_module = framebuffer_test_module });
+    const run_framebuffer_tests = b.addRunArtifact(framebuffer_tests);
+
     const test_step = b.step("test", "Run all unit tests");
     test_step.dependOn(&run_unit_tests.step);
+    test_step.dependOn(&run_framebuffer_tests.step);
     b.default_step.dependOn(&run_unit_tests.step);
+    b.default_step.dependOn(&run_framebuffer_tests.step);
 }
 
 fn addHostImageProbe(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
@@ -77,6 +94,90 @@ fn addHostImageProbe(b: *std.Build, target: std.Build.ResolvedTarget, optimize: 
 
     const step = b.step("image-probe-tool", "Build the host optical image inspection tool");
     step.dependOn(&exe.step);
+}
+
+fn addHostLegacyFat32Probe(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
+    const root_module = createUsosModule(b, target, optimize);
+    const tool_module = b.createModule(.{
+        .root_source_file = b.path("src/tools/legacy_fat32_probe_main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    tool_module.addImport("usos", root_module);
+    const exe = b.addExecutable(.{
+        .name = "usos-legacy-fat32-probe",
+        .root_module = tool_module,
+    });
+    const install_exe = b.addInstallArtifact(exe, .{});
+    const step = b.step("legacy-fat32-probe", "Build the host probe for the Legacy BIOS GPT/FAT32 reader");
+    step.dependOn(&install_exe.step);
+}
+
+fn addHostLegacyNtfsProbe(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
+    const storage_module = b.createModule(.{
+        .root_source_file = b.path("src/storage/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const catalog_module = b.createModule(.{
+        .root_source_file = b.path("src/catalog_module.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const adapter_module = b.createModule(.{
+        .root_source_file = b.path("src/platform/bios/catalog_ntfs_directory_source.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    adapter_module.addImport("storage", storage_module);
+    adapter_module.addImport("catalog", catalog_module);
+
+    const tool_module = b.createModule(.{
+        .root_source_file = b.path("src/tools/legacy_ntfs_probe_main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    tool_module.addImport("storage", storage_module);
+    tool_module.addImport("catalog", catalog_module);
+    tool_module.addImport("ntfs_directory_source", adapter_module);
+    const exe = b.addExecutable(.{
+        .name = "usos-legacy-ntfs-probe",
+        .root_module = tool_module,
+    });
+    const install_exe = b.addInstallArtifact(exe, .{});
+    const step = b.step("legacy-ntfs-probe", "Build the host probe for the Legacy BIOS NTFS reader");
+    step.dependOn(&install_exe.step);
+
+    const physical_tool_module = b.createModule(.{
+        .root_source_file = b.path("src/tools/physical_ntfs_catalog_probe_main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    physical_tool_module.addImport("storage", storage_module);
+    physical_tool_module.addImport("catalog", catalog_module);
+    physical_tool_module.addImport("ntfs_directory_source", adapter_module);
+    const physical_exe = b.addExecutable(.{
+        .name = "usos-physical-ntfs-catalog-probe",
+        .root_module = physical_tool_module,
+    });
+    const install_physical = b.addInstallArtifact(physical_exe, .{});
+    const physical_step = b.step("physical-ntfs-catalog-probe", "Build the read-only host probe for NTFS discovery on a physical USOS disk");
+    physical_step.dependOn(&install_physical.step);
+
+    const native_tool_module = b.createModule(.{
+        .root_source_file = b.path("src/tools/windows_native_io_probe_main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    native_tool_module.addImport("storage", storage_module);
+    native_tool_module.addImport("catalog", catalog_module);
+    const native_exe = b.addExecutable(.{
+        .name = "usos-windows-native-io-probe",
+        .root_module = native_tool_module,
+    });
+    const install_native = b.addInstallArtifact(native_exe, .{});
+    const native_step = b.step("windows-native-io-probe", "Build the read-only GPT/NTFS/UDF Windows ISO content probe");
+    native_step.dependOn(&install_native.step);
 }
 
 fn addHostSelftest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
@@ -160,7 +261,7 @@ fn addInteractiveX86UefiApp(b: *std.Build, optimize: std.builtin.OptimizeMode) *
     b.getInstallStep().dependOn(&install_boot.step);
 
     const step = b.step("usos-x86_64", "Build the interactive x86_64 UEFI application used by release USB media");
-    step.dependOn(&app.step);
+    step.dependOn(&install_boot.step);
     return app;
 }
 
@@ -239,7 +340,46 @@ fn addPrepareNtfsHandoffOverlay(b: *std.Build, base_step: *std.Build.Step) *std.
     return step;
 }
 
-fn addMicroLinux(b: *std.Build) *std.Build.Step {
+fn addFramebufferUi(b: *std.Build, optimize: std.builtin.OptimizeMode) *std.Build.Step.Compile {
+    const target = b.resolveTargetQuery(.{
+        .cpu_arch = .x86_64,
+        .os_tag = .linux,
+        .abi = .musl,
+    });
+    const usos_module = createUsosModule(b, target, optimize);
+    const ui_module = b.createModule(.{
+        .root_source_file = b.path("src/platform/linux/fb_ui_main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    ui_module.addImport("usos", usos_module);
+    return b.addExecutable(.{
+        .name = "usos-fb-ui",
+        .root_module = ui_module,
+        .linkage = .static,
+    });
+}
+
+fn addMicroLinux(b: *std.Build, framebuffer_ui: *std.Build.Step.Compile) *std.Build.Step {
+    const install_framebuffer_ui = b.addInstallFile(framebuffer_ui.getEmittedBin(), "micro-linux/usos-fb-ui");
+    const ui_only = b.step("framebuffer-ui", "Build only the Linux framebuffer UI (no image assembly or VM)");
+    ui_only.dependOn(&install_framebuffer_ui.step);
+    const build_xp_bootstrap = b.addSystemCommand(&.{
+        "powershell.exe",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "tools/build_xp_bootstrap.ps1",
+    });
+    const build_xp_geometry_fix_mbr = b.addSystemCommand(&.{
+        "powershell.exe",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "tools/build_xp_geometry_fix_mbr.ps1",
+    });
     const build_micro = b.addSystemCommand(&.{
         "python",
         "tools/build_micro_linux.py",
@@ -247,10 +387,15 @@ fn addMicroLinux(b: *std.Build) *std.Build.Step {
         ".",
         "--seven-zip",
         "C:/Program Files/7-Zip/7z.exe",
+        "--fb-ui",
+        "zig-out/micro-linux/usos-fb-ui",
         "--output-dir",
         "zig-out/micro-linux",
     });
-    const step = b.step("micro-linux", "Build the pinned Alpine kernel/initramfs and EFI loader for WORK preparation");
+    build_micro.step.dependOn(&install_framebuffer_ui.step);
+    build_micro.step.dependOn(&build_xp_bootstrap.step);
+    build_micro.step.dependOn(&build_xp_geometry_fix_mbr.step);
+    const step = b.step("micro-linux", "Build the pinned Alpine kernel/initramfs, framebuffer UI and EFI loader for WORK preparation");
     step.dependOn(&build_micro.step);
     return step;
 }
@@ -356,6 +501,48 @@ fn addNtfsHandoffTestApp(b: *std.Build, optimize: std.builtin.OptimizeMode) *std
     return step;
 }
 
+fn addUefiNtfsCatalogProbeApp(b: *std.Build, optimize: std.builtin.OptimizeMode) *std.Build.Step {
+    const target = b.resolveTargetQuery(.{
+        .cpu_arch = .x86_64,
+        .os_tag = .uefi,
+    });
+    const usos_module = createUsosModule(b, target, optimize);
+    const app_module = b.createModule(.{
+        .root_source_file = b.path("src/platform/uefi/ntfs_catalog_probe_main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    app_module.addImport("usos", usos_module);
+    const app = b.addExecutable(.{
+        .name = "usos-uefi-ntfs-catalog-probe-x86_64",
+        .root_module = app_module,
+    });
+    const install_app = b.addInstallFile(app.getEmittedBin(), "test-assets/uefi-ntfs-catalog-probe-x86_64.efi");
+    const step = b.step("uefi-ntfs-catalog-probe-app", "Build the UEFI direct-NTFS catalog discovery probe");
+    step.dependOn(&install_app.step);
+    return step;
+}
+
+fn addGptNoBlockIoProbeApp(b: *std.Build, optimize: std.builtin.OptimizeMode) *std.Build.Step {
+    const target = b.resolveTargetQuery(.{
+        .cpu_arch = .x86_64,
+        .os_tag = .uefi,
+    });
+    const app_module = b.createModule(.{
+        .root_source_file = b.path("src/platform/uefi/gpt_no_block_io_probe_main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const app = b.addExecutable(.{
+        .name = "usos-gpt-no-block-io-probe-x86_64",
+        .root_module = app_module,
+    });
+    const install_app = b.addInstallFile(app.getEmittedBin(), "test-assets/gpt-no-block-io-probe-x86_64.efi");
+    const step = b.step("gpt-no-block-io-probe-app", "Build the UEFI probe for DATA/WORK visibility with GPT NO_BLOCK_IO_PROTOCOL");
+    step.dependOn(&install_app.step);
+    return step;
+}
+
 fn addQemuX86ManualImage(b: *std.Build, app: *std.Build.Step.Compile) *std.Build.Step {
     const install_boot = b.addInstallFile(app.getEmittedBin(), "manual-usb/EFI/BOOT/BOOTX64.EFI");
     const install_ui = b.addInstallDirectory(.{
@@ -368,6 +555,32 @@ fn addQemuX86ManualImage(b: *std.Build, app: *std.Build.Step.Compile) *std.Build
     step.dependOn(&install_boot.step);
     step.dependOn(&install_ui.step);
     return step;
+}
+
+fn addDirectEfiValidationFixture(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
+    const target = b.resolveTargetQuery(.{
+        .cpu_arch = .x86_64,
+        .os_tag = .uefi,
+    });
+    const serial_module = b.createModule(.{
+        .root_source_file = b.path("src/platform/uefi/serial.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const fixture_module = b.createModule(.{
+        .root_source_file = b.path("tools/tests/fixtures/backend_validation/direct_efi_main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    fixture_module.addImport("serial", serial_module);
+
+    const fixture = b.addExecutable(.{
+        .name = "direct-efi-validation",
+        .root_module = fixture_module,
+    });
+    const install_fixture = b.addInstallFile(fixture.getEmittedBin(), "test-assets/direct-efi-validation.efi");
+    const step = b.step("direct-efi-validation-fixture", "Build the EFI payload used to validate Direct EFI LoadImage/StartImage");
+    step.dependOn(&install_fixture.step);
 }
 
 fn addQemuX86TestImage(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
@@ -439,9 +652,19 @@ fn createUsosModule(
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
 ) *std.Build.Module {
-    return b.createModule(.{
+    const module = b.createModule(.{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
+    const options = b.addOptions();
+    const id = b.graph.environ_map.get("USOS_BUILD_ID") orelse "DEV";
+    const epoch_text = b.graph.environ_map.get("USOS_BUILD_EPOCH") orelse "0";
+    const source_sha256 = b.graph.environ_map.get("USOS_BUILD_SOURCE_SHA256") orelse "DEV";
+    const epoch = std.fmt.parseInt(u64, epoch_text, 10) catch 0;
+    options.addOption([]const u8, "id", id);
+    options.addOption(u64, "epoch", epoch);
+    options.addOption([]const u8, "source_sha256", source_sha256);
+    module.addOptions("build_info", options);
+    return module;
 }

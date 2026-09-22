@@ -19,6 +19,7 @@ fn dos(comptime id: []const u8, comptime name: []const u8, comptime folder: []co
         .category = .dos,
         .family = .dos,
         .image_directory = "\\Systems\\DOS\\" ++ folder ++ "\\Images",
+        .firmware = .bios,
         .boot_methods = &methods,
     };
 }

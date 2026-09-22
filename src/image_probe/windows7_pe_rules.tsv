@@ -1,0 +1,50 @@
+# Windows 7 media / PE generation - JEDYNA wspolna tabela regul.
+#
+# Te same reguly sa zaimplementowane dwa razy, bo dzialaja w dwoch swiatach,
+# ktore nie moga wspoldzielic kodu:
+#
+#   * Zig  - src/image_probe/wim_setup.zig, dziala w firmware (UEFI, bez OS,
+#            bez procesow). To on decyduje, jak wystartowac wybrane ISO:
+#            wim_setup.classifyWin7 -> Win7Mode.
+#   * Go   - installer/internal/winmedia/classify.go, dziala na hoscie Windows
+#            przy przygotowaniu/patchowaniu nosnika: winmedia.classify -> Class.
+#
+# Ten plik jest zrodlem prawdy dla obu. Zmieniasz regule -> zmieniasz wiersz
+# tutaj, a nastepnie obie implementacje. Oba jezyki maja test, ktory czyta
+# dokladnie ten plik i sprawdza zgodnosc:
+#
+#   * src/image_probe/windows7_pe_rules_test.zig
+#   * installer/internal/winmedia/pe_rules_agreement_test.go
+#
+# Kolumny (rozdzielone TABem):
+#
+#   install   wersja <WINDOWS><VERSION> z sources/install.{wim,esd,swm}
+#   boot      wersja <WINDOWS><VERSION> z sources/boot.wim (WinPE)
+#   arch      <ARCH> obrazu instalacyjnego: x64 (9) albo x86 (0)
+#   go_class  oczekiwane winmedia.Class
+#   zig_mode  oczekiwany wynik wim_setup.classifyWin7:
+#             original = natywny WinPE 3.x; USOS startuje zewnetrzny PE10
+#                        z Systems/Windows/Windows 10/Images, a instaluje
+#                        z wybranego ISO Win7
+#             hybrid   = ISO ma wlasny nowoczesny PE i Setup; startuje samo
+#             rejected = backend Win7 odmawia (typowany blad, brak fallbacku)
+#
+# UWAGA - dwie ROZMYSLNE roznice. Obie klasyfikacje odpowiadaja na inne
+# pytanie, wiec nie musza dac tej samej odpowiedzi:
+#
+#  1. boot 6.3.x (WinPE 8.1). Go zna tylko nazwane rodziny PE7/PE10, wiec
+#     zwraca UNKNOWN. Zig pyta wylacznie "czy PE jest nowoczesny (>= 6.2)",
+#     bo taki PE ma stos USB3 i wlasny Setup - wiec startuje jako hybrid.
+#  2. arch x86. Go klasyfikuje generacje nosnika niezaleznie od architektury
+#     (odmowa UEFI jest osobna decyzja: UEFICapable/ErrArchNotUEFICapable).
+#     Zig nie ma sciezki x86 w ogole - detectX64Setup odrzuca ARCH != 9.
+#
+# install	boot	arch	go_class	zig_mode
+6.1.7600	6.1.7600	x64	WIN7_PE7	original
+6.1.7601	6.1.7601	x64	WIN7_PE7	original
+6.1.7601	10.0.17763	x64	WIN7_PE10	hybrid
+6.1.7601	10.0.19041	x64	WIN7_PE10	hybrid
+10.0.19045	10.0.19041	x64	WIN10	rejected
+6.0.6002	6.0.6002	x64	UNKNOWN	rejected
+6.1.7601	6.3.9600	x64	UNKNOWN	hybrid
+6.1.7601	6.1.7601	x86	WIN7_PE7	rejected

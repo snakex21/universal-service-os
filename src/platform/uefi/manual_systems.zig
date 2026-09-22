@@ -3,77 +3,85 @@ const usos = @import("usos");
 const input = @import("input.zig");
 const navigation = @import("manual_navigation.zig");
 const system_icons = @import("system_icons.zig");
-const system_media_scan = @import("system_media_scan.zig");
 const view = @import("manual_view.zig");
 
 const visible_rows: usize = 12;
 
-pub fn select(root: *std.os.uefi.protocol.File, category: usos.catalog.Category) ?*const usos.catalog.SystemEntry {
+pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_discovery.Discovery, category: usos.catalog.Category, firmware: usos.firmware.Firmware) ?*const usos.catalog.SystemEntry {
     const count = usos.catalog.systems.countInCategory(category);
     if (count == 0) return null;
 
-    var selected: usize = 0;
-    var start = visibleStart(selected);
-    render(root, category, selected, count, start);
+    var selectable: [usos.catalog.systems.all.len]bool = undefined;
+    var index: usize = 0;
+    while (index < count) : (index += 1) {
+        const entry = usos.catalog.systems.byCategoryIndex(category, index) orelse {
+            selectable[index] = false;
+            continue;
+        };
+        const media = discovery.mediaStatus(entry.image_directory);
+        selectable[index] = (usos.gui.menu_policy.Access{
+            .firmware_compatible = entry.firmware.accepts(firmware),
+            .has_images = media.hasImages(),
+            .backend_available = usos.flow.preparation_capability.supportsSystem(entry.id),
+        }).navigable();
+    }
+
+    var rows: [usos.catalog.systems.all.len]view.ListRow = undefined;
+    index = 0;
+    while (index < count) : (index += 1) {
+        const entry = usos.catalog.systems.byCategoryIndex(category, index) orelse continue;
+        const icon = system_icons.get(root, entry);
+        const media = discovery.mediaStatus(entry.image_directory);
+        rows[index] = if (!entry.firmware.accepts(firmware))
+            .{ .system_disabled = .{ .value = entry.name, .icon = icon, .reason = entry.firmware.mismatchReason(firmware) } }
+        else if (!media.hasImages())
+            .{ .system_disabled = .{ .value = entry.name, .icon = icon, .reason = "[no image]" } }
+        else if (!usos.flow.preparation_capability.supportsSystem(entry.id))
+            .{ .system_disabled = .{ .value = entry.name, .icon = icon, .reason = "[backend unavailable]" } }
+        else
+            .{ .system = .{ .value = entry.name, .icon = icon } };
+    }
+
+    var selected: usize = usos.gui.selectable_list.first(selectable[0..count]) orelse 0;
+    var list = view.ListScreen.open("systems", category.label(), rows[0..count], selected, visible_rows, null);
 
     while (true) {
-        switch (navigation.handle(input.readBlocking(), &selected, count, start, @min(visible_rows, count - start))) {
+        switch (navigation.handleSelectable(input.readBlocking(), &selected, count, list.visibleStart(), list.visibleCount(), selectable[0..count])) {
             .activate => {
                 if (usos.catalog.systems.byCategoryIndex(category, selected)) |entry| {
-                    const media = system_media_scan.scan(root, entry);
-                    if (!media.hasImages()) {
-                        showMissingImageNotice(entry);
-                        render(root, category, selected, count, start);
-                        continue;
+                    const media = discovery.mediaStatus(entry.image_directory);
+                    switch ((usos.gui.menu_policy.Access{
+                        .firmware_compatible = entry.firmware.accepts(firmware),
+                        .has_images = media.hasImages(),
+                        .backend_available = usos.flow.preparation_capability.supportsSystem(entry.id),
+                    }).activation()) {
+                        .firmware_mismatch => continue,
+                        .no_image => {
+                            showMissingImageNotice(entry);
+                            list.redrawFull(selected, null);
+                            continue;
+                        },
+                        .backend_unavailable => {
+                            showBackendDisabledNotice(entry);
+                            list.redrawFull(selected, null);
+                            continue;
+                        },
+                        .open => return entry,
                     }
-                    if (!usos.flow.preparation_capability.supportsSystem(entry.id)) {
-                        showBackendDisabledNotice(entry);
-                        render(root, category, selected, count, start);
-                        continue;
-                    }
-                    return entry;
                 }
             },
             .back => return null,
-            .changed => {
-                start = visibleStart(selected);
-                render(root, category, selected, count, start);
-            },
+            .changed => list.updateSelection(selected, null),
             .pointer_moved => view.updatePointer(),
             .ignored => {},
         }
     }
 }
 
-fn visibleStart(selected: usize) usize {
-    return if (selected >= visible_rows) selected - visible_rows + 1 else 0;
-}
-
-fn render(root: *std.os.uefi.protocol.File, category: usos.catalog.Category, selected: usize, count: usize, start: usize) void {
-    view.begin("systems", category.label());
-    const end = @min(start + visible_rows, count);
-
-    var index = start;
-    while (index < end) : (index += 1) {
-        const entry = usos.catalog.systems.byCategoryIndex(category, index) orelse continue;
-        const icon = system_icons.get(root, entry);
-        const media = system_media_scan.scan(root, entry);
-        if (!media.hasImages()) {
-            view.systemRowDisabled(index == selected, entry.name, icon, "[no image]");
-        } else if (!usos.flow.preparation_capability.supportsSystem(entry.id)) {
-            view.systemRowDisabled(index == selected, entry.name, icon, "[backend unavailable]");
-        } else {
-            view.systemRow(index == selected, entry.name, icon);
-        }
-    }
-
-    view.footer(true);
-}
-
 fn showMissingImageNotice(entry: *const usos.catalog.SystemEntry) void {
     view.begin("systems", entry.name);
-    view.row(false, "No image files found for this system.");
-    view.row(false, "Copy ISO/WIM/IMG/VHD/VHDX/EFI into Images first.");
+    view.row(false, "No supported image files were found. Copy a file to:");
+    view.row(false, usos.gui.menu_policy.displayImagePath(entry.image_directory));
     waitForDismiss();
 }
 

@@ -1,0 +1,287 @@
+[
+  {
+    "file": "GenAHCI_6.3.0.1.7z",
+    "url": "https://github.com/GeorgeK1ng/GenAHCI/releases/download/GenAHCI/GenAHCI_6.3.0.1.7z",
+    "sha256": "f8dd54123934c176a2b6315df7b4a1dfe2ff6761fa3bc27cecfeedbe421b279f",
+    "size": 73992
+  },
+  {
+    "file": "xhci98-1.1.0.0.zip",
+    "url": "https://github.com/yeokm1/xhci98/releases/download/v1.1.0.0/xhci98-1.1.0.0.zip",
+    "sha256": "e826ccd94bc2901c66dcea40a8e61e3bb93231e5fb663efcbd746004e4de92b1",
+    "size": 388566
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Options Menu.cmd",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Options Menu.cmd",
+    "sha256": "ec920014f73359788425d8d61761ee049e303a3f753b6f7c52aa0aa1c3831c79",
+    "size": 230346
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 5048 - 2020.10.24 - daniel_k, diderius6/acpi.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 5048 - 2020.10.24 - daniel_k, diderius6/acpi.sys",
+    "sha256": "b386ca0307942806fe2b18e9f2693e133d183faea13a349f1a06958027bc3057",
+    "size": 239616
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 5048 - 2020.10.24 - daniel_k, diderius6/checksums.sha1",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 5048 - 2020.10.24 - daniel_k, diderius6/checksums.sha1",
+    "sha256": "d0224d2cee7e3bdeb044dc5ffe10b189695c32e08947a3c148782d7408a32547",
+    "size": 164
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 5048 - 2020.10.24 - daniel_k, diderius6/ReadMe.txt",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 5048 - 2020.10.24 - daniel_k, diderius6/ReadMe.txt",
+    "sha256": "6913bcc2223b08ef6bcb9345a4fae08dc54eff5978f5b0132de46cbcc03cc325",
+    "size": 103
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 6666 - 2021.8.28 - daniel_k, diderius6/acpi.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 6666 - 2021.8.28 - daniel_k, diderius6/acpi.sys",
+    "sha256": "c5a2d5c9627cd30d86fdd579ee2c4cdb2e4ebdd3fe92b1261195053e254f45a3",
+    "size": 195968
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 6666 - 2021.8.28 - daniel_k, diderius6/checksums.sha1",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 6666 - 2021.8.28 - daniel_k, diderius6/checksums.sha1",
+    "sha256": "c832c24b77de6e75ea17c3399ffa19d0c6b71a473b76b9d6656a2c5f2708fadf",
+    "size": 164
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 6666 - 2021.8.28 - daniel_k, diderius6/ReadMe.txt",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 6666 - 2021.8.28 - daniel_k, diderius6/ReadMe.txt",
+    "sha256": "afebf5ae859fcb001c180c4612445122a7741d67b08d1904fcb17c8533ba0eaa",
+    "size": 103
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 7777.8 - 2024.11.7 - Dietmar/acpi.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 7777.8 - 2024.11.7 - Dietmar/acpi.sys",
+    "sha256": "6b15128a105b783291e9102a841b149d80464bdda6799463c6c66f89ece2e672",
+    "size": 185472
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 7777.8 - 2024.11.7 - Dietmar/checksums.sha1",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 7777.8 - 2024.11.7 - Dietmar/checksums.sha1",
+    "sha256": "e42ee9f28df4695acfa961887e7eee62138a66df765ea0b002781adc340d4ab9",
+    "size": 164
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 7777.8 - 2024.11.7 - Dietmar/ReadMe.txt",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi 7777.8 - 2024.11.7 - Dietmar/ReadMe.txt",
+    "sha256": "a15152c9a1ea769ddaf19f8395597c638824d5253a05a7e8af1c775710ff0bee",
+    "size": 136
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/acpi.sys",
+    "sha256": "6b15128a105b783291e9102a841b149d80464bdda6799463c6c66f89ece2e672",
+    "size": 185472
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/ReadMe.txt",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/ACPI drivers/ReadMe.txt",
+    "sha256": "4b487b5897170ed81fa5beb451f8ff8d42ea5077b26c389ebb269bc4826350b8",
+    "size": 197
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Kernel-Mode Driver Framework 1.11/ReadMe.txt",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Kernel-Mode Driver Framework 1.11/ReadMe.txt",
+    "sha256": "362cd9e74671af1937daf31da638993b62a348696fd0618a8ae13fb6f8094682",
+    "size": 295
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Kernel-Mode Driver Framework 1.11/wdf01000.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Kernel-Mode Driver Framework 1.11/wdf01000.sys",
+    "sha256": "b1c119f541c46100731b5781964f1c9bed9cdf316cd73e40a5c328eba3933000",
+    "size": 527064
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Kernel-Mode Driver Framework 1.11/wdf01011.inf",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Kernel-Mode Driver Framework 1.11/wdf01011.inf",
+    "sha256": "415ce0ebafe3871870bfedc6b9670d3c21ce467daecff1487de9e855965a9d02",
+    "size": 4768
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Kernel-Mode Driver Framework 1.11/wdfldr.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Kernel-Mode Driver Framework 1.11/wdfldr.sys",
+    "sha256": "149de723bf02d8449fb63b71406857db54decf2dae7be0d51d003fbcf5c2a39b",
+    "size": 47720
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft SATA driver v6.3.0.1/genahci.inf",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft SATA driver v6.3.0.1/genahci.inf",
+    "sha256": "f1ca668691305951a257d7cbde4b0c6bad6c66e57d46bdfc399af4be1cb4ff12",
+    "size": 1464
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft SATA driver v6.3.0.1/genahci.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft SATA driver v6.3.0.1/genahci.sys",
+    "sha256": "de7e22d16bc4d94530789c2061900a0dd5178b2967b5c302c5fe1c9296fb3edd",
+    "size": 60928
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft SATA driver v6.3.0.1/ReadMe.txt",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft SATA driver v6.3.0.1/ReadMe.txt",
+    "sha256": "481ae0124b607d83e4f8940a8a12ce8b7c5d3c7266bc6e5486dc1bc91263ce76",
+    "size": 347
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/ksecd8.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/ksecd8.sys",
+    "sha256": "2ba1f6e253dd9a252816d6dd4aa70604f62ca5ff5c8aa683fdf788aca5a3ca58",
+    "size": 392160
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/ReadMe.txt",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/ReadMe.txt",
+    "sha256": "614d1d3ae1c6574e8729259c2c0aafadbf974b968f81e303f899345f88d87729",
+    "size": 525
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/uaspstor.inf",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/uaspstor.inf",
+    "sha256": "901f05be9f51b2a098e5458c114e1add8a1ffadd07a5d04025d06e16788f5b48",
+    "size": 2140
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/uaspstor.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/uaspstor.sys",
+    "sha256": "c18eb77252f393d75a455ac203f1dc72e2f73685ea43423715c9d593b689f418",
+    "size": 66048
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/ucx01000.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/ucx01000.sys",
+    "sha256": "376cc4ac12e1b1241005ef5227f45057bc381cef286d66fc9b17a5b0f84a65aa",
+    "size": 179032
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/usbd8.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/usbd8.sys",
+    "sha256": "33dfba5429864696c351beb76ac1a6b5141b61a8793ca6e416ec8d0278a7ca99",
+    "size": 18776
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/usbhub3.inf",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/usbhub3.inf",
+    "sha256": "a4658961dc6679c7640f761d45a933177f1d679112d7af8ebe6d4d84ba3bc20e",
+    "size": 2575
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/usbhub3.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/usbhub3.sys",
+    "sha256": "7648152c456e48f38fdecad3d637e5b46d86c3a2d190612772f53f6c286de90d",
+    "size": 363328
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/usbxhci.inf",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/usbxhci.inf",
+    "sha256": "bb27f4772b9e5dd49246a4489c3345c5cf948f88618034375dedbb2ef8fbe7cd",
+    "size": 2751
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/usbxhci.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/usbxhci.sys",
+    "sha256": "ce3c1c5aaabd91f20edc55697f4959e39a68b9c823f63cf8dcb433220d8b57af",
+    "size": 268128
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/wpprecor.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Microsoft USB3.x xHCI driver v2.2/wpprecor.sys",
+    "sha256": "a2636f0b9747c032bf3bda44c9c35783f0e11d2f2ede3b6c831f2b1f420436ef",
+    "size": 21232
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/ntoskrn8.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/ntoskrn8.sys",
+    "sha256": "1f603da5938fc8a80efde4e98293b4bd20dd6a4140f825a682611e6a490325b9",
+    "size": 141952
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/ReadMe.txt",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/ReadMe.txt",
+    "sha256": "548b7abbcdec977528b982845c8abda35256c40db8689725e0a488541d16ef5c",
+    "size": 290
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/storpor8.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/storpor8.sys",
+    "sha256": "06f407cb155ed16730c7788ea000e9c3d70a55b0046f5786a4d7e2a2daff283a",
+    "size": 19456
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/storport.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/storport.sys",
+    "sha256": "fc49d785021de49c3649c2d2e5adddd1867212121f14327d49ffa3bc75f8d442",
+    "size": 151808
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/Win2003/KB2862330/KB2862330.CAT",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/Win2003/KB2862330/KB2862330.CAT",
+    "sha256": "e2cacaa1ec59fa9b012d9346181b49d51c82d6f55bb1570d4a3c4c15b9f20149",
+    "size": 10287
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/Win2003/KB2862330/usbd.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/Win2003/KB2862330/usbd.sys",
+    "sha256": "62d2cd8fb4acd60c47f64b8b13e388aa8c5bfcd9290bb9b149d99484fd76e8df",
+    "size": 5760
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/Win2003/KB2862330/usbport.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/Win2003/KB2862330/usbport.sys",
+    "sha256": "d311eed36e89f6db1fbad3ebb427856ad4346356e942f7e4d5c3370456fe5f5d",
+    "size": 146432
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/Win2003/KB3139398/KB3139398.CAT",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/Win2003/KB3139398/KB3139398.CAT",
+    "sha256": "4968e8c1215ee2dab7abea298445dfcb7900381f59eb736c00e77362bad6beb8",
+    "size": 8252
+  },
+  {
+    "file": "integrator/Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/Win2003/KB3139398/usbstor.sys",
+    "url": "https://zone94.com/files/software/operating_systems/Windows%20XP%20Professional%20SP3%20x86%20-%20Integral%20Edition%202025.8.19.zip",
+    "member": "Windows XP Professional SP3 x86 - Integral Edition 2025.8.19/Patch Integrator v4.2.3/Patches/Miscellaneous/Win2003/KB3139398/usbstor.sys",
+    "sha256": "e4a6ccc986568dbd28638c1f8a54fb41d602c7fc655b57e3ffdaff452c9ef29d",
+    "size": 28160
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "version": "0.9.91",
+  "upstream": "https://github.com/JHRobotics/patcher9x",
+  "release": "https://github.com/JHRobotics/patcher9x/releases/tag/v0.9.91",
+  "source_commit": "d7e2ed7",
+  "boot_image_sha256": "ca4fddeb6ad44f63f42f50c668b5e9e1587f9686b21d5a68c3beac1f5781ed03",
+  "files": {
+    "PATCH9X.EXE": "c37f9a119772cd4814419168f09a692c376fef007e00ed2bbe520346e2f66b6f",
+    "CWSDPMI.EXE": "2de899fecaa90632b8b9bdfc0305cb0375e59ae252c37e32d06c1ed3f98a8f44",
+    "CWSDPMI.TXT": "4d278854e4ae881ebad408bb9c94dc4072f954875f29dc502b7847e06ba65978",
+    "LICENSE.TXT": "e4900f554b4de46e0c5cdfe32c3af03e8e92d9e273e31fa81ef4ce508772f257",
+    "README.TXT": "c2e814708429fc4475727b7fe35b7d79ba579c828a0a6dbbbfda8305d20edd45",
+    "source.zip": "751f7a07950d61a7906ea7a68c1a304ee9802d6ee6e68930d7c067ab8c8cefac"
+  }
+}
