@@ -43,7 +43,8 @@ pub fn start(root: *uefi.protocol.File, name: []const u8, unattended: ?[]const u
         hex[i * 2 + 1] = "0123456789abcdef"[c & 15];
     }
     var cmd: [2048]u8 = undefined;
-    const command = try std.fmt.bufPrint(&cmd, "initrd=\\EFI\\USOS-XP\\initramfs-xp rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action=xp-staging usos.legacy_image_hex={s} console=ttyS0,115200n8 console=tty0 rw quiet", .{ id, hex[0 .. name.len * 2] });
+    const diagnostic = @import("diagnostic_boot.zig");
+    const command = try std.fmt.bufPrint(&cmd, "initrd=\\EFI\\USOS-XP\\initramfs-xp rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action=xp-staging usos.legacy_image_hex={s} {s}", .{ id, hex[0 .. name.len * 2], diagnostic.xpConsoleOptions(diagnostic.requested(root)) });
     var options: [2049]u16 = @splat(0);
     for (command, 0..) |c, i| options[i] = c;
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;

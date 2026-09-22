@@ -53,6 +53,7 @@ pub const flow = struct {
     pub const unattended_policy = @import("flow/unattended_policy.zig");
     pub const preparation_boot_progress = @import("flow/preparation_boot_progress.zig");
     pub const persistent_phase = @import("flow/persistent_phase.zig");
+    pub const boot_console = @import("flow/boot_console.zig");
 };
 pub const selftest = struct {
     pub const Case = @import("selftest/case.zig").Case;
@@ -139,6 +140,7 @@ test {
     _ = flow.unattended_policy;
     _ = flow.preparation_boot_progress;
     _ = flow.persistent_phase;
+    _ = flow.boot_console;
     _ = selftest.Case;
     _ = selftest.Report;
     _ = @import("selftest/runner.zig");

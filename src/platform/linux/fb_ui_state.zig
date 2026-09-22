@@ -11,6 +11,7 @@ pub const Mode = enum {
 };
 
 pub const max_diagnostic_lines: usize = 120;
+pub const max_stage_labels: usize = 5;
 
 pub const State = struct {
     mode: Mode = .stage,
@@ -26,6 +27,9 @@ pub const State = struct {
     diagnostics: [max_diagnostic_lines][]const u8 = undefined,
     diagnostic_count: usize = 0,
     diagnostics_truncated: bool = false,
+    /// Optional `label=` lines: the stages this path really runs.
+    labels: [max_stage_labels][]const u8 = undefined,
+    label_count: usize = 0,
 };
 
 pub fn parse(input: []const u8) !State {
@@ -58,6 +62,11 @@ pub fn parse(input: []const u8) !State {
             state.bytes_total = try parseU64(value);
         } else if (std.mem.eql(u8, key, "speed_bps")) {
             state.speed_bps = try parseU64(value);
+        } else if (std.mem.eql(u8, key, "label")) {
+            if (state.label_count >= state.labels.len) return error.TooManyStageLabels;
+            if (value.len == 0) return error.InvalidStageLabel;
+            state.labels[state.label_count] = value;
+            state.label_count += 1;
         } else if (std.mem.eql(u8, key, "diag")) {
             if (state.diagnostic_count < state.diagnostics.len) {
                 state.diagnostics[state.diagnostic_count] = value;
@@ -69,6 +78,8 @@ pub fn parse(input: []const u8) !State {
     }
 
     if (state.total == 0) return error.InvalidStageTotal;
+    // Declared labels define the stage count; never draw unnamed stages.
+    if (state.label_count > 0) state.total = @intCast(state.label_count);
     if (state.current == 0) state.current = 1;
     if (state.current > state.total) state.current = state.total;
     if (state.bytes_total > 0 and state.bytes_done > state.bytes_total) state.bytes_done = state.bytes_total;
@@ -132,3 +143,16 @@ test "done state forces final progress" {
     try std.testing.expectEqual(@as(u8, 100), state.percent);
     try std.testing.expectEqual(@as(u64, 20), state.bytes_done);
 }
+
+test "declared stage labels define the stage count" {
+    const state = try parse("mode=stage" ++ NL ++ "current=2" ++ NL ++ "total=5" ++ NL ++ "label=Starting environment" ++ NL ++ "label=Continuing installation" ++ NL ++ "title=Continuing" ++ NL);
+    try std.testing.expectEqual(@as(usize, 2), state.label_count);
+    try std.testing.expectEqual(@as(u8, 2), state.total);
+    try std.testing.expectEqualStrings("Continuing installation", state.labels[1]);
+}
+
+test "stage labels beyond the renderer limit are rejected" {
+    try std.testing.expectError(error.TooManyStageLabels, parse("label=a" ++ NL ++ "label=b" ++ NL ++ "label=c" ++ NL ++ "label=d" ++ NL ++ "label=e" ++ NL ++ "label=f" ++ NL));
+}
+
+const NL = "\n";

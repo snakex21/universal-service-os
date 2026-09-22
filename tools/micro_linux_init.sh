@@ -247,6 +247,9 @@ if [ -n "$LEGACY_ACTION" ]; then
             legacy_windows_request
             ;;
         xp-resume)
+            # Resume runs a single step; do not show four stages that never run.
+            usos_ui_declare_stages 'Continuing Windows XP installation'
+            usos_ui_stage 1 1 'Continuing Windows XP installation' 'Checking the prepared XP target.' || true
             sh /usr/lib/usos/legacy_xp_resume.sh || stop 'XP resume refused; see EFI/USOS/legacy-xp-resume.log'
             umount /mnt/esp || stop 'cannot unmount ESP after XP resume'
             sync

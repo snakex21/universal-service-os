@@ -30,13 +30,13 @@ fn run() !void {
     const root = @import("filesystem.zig").openBootVolume() orelse return error.NoRoot;
     defer root.close() catch {};
     view.init(root, .{ .architecture = .x86_64, .firmware = .uefi, .framebuffer = try framebuffer.locate(), .memory = .{ .descriptor_count = 0, .conventional_bytes = 0 } });
-    view.windowsIsoStatus("Before firmware graphics mode change");
+    view.windowsIsoStatus(.validating, "Before firmware graphics mode change");
     try gop.setMode(small orelse return error.SmallModeMissing);
     original_blt = gop._blt;
     gop._blt = checkedBlt;
     defer gop._blt = original_blt;
     view.refreshFramebuffer();
-    view.windowsIsoStatus("Recovered after graphics mode change");
+    view.windowsIsoStatus(.validating, "Recovered after graphics mode change");
     if (invalid_geometry or full_frames == 0) return error.StaleGraphicsGeometry;
     serial.writeAscii("GRAPHICS_REFRESH_PASS: 1280x1024 -> 1024x768; renderer uses new geometry\r\n");
 }

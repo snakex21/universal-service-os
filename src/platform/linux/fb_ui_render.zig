@@ -39,6 +39,7 @@ pub fn render(surface: usos.gui.Surface, state: model.State) void {
         .speed_bps = state.speed_bps,
         .diagnostics = state.diagnostics[0..state.diagnostic_count],
         .diagnostics_truncated = state.diagnostics_truncated,
+        .labels = if (state.label_count > 0) state.labels[0..state.label_count] else &usos.gui.preparation_screen.stage_labels,
     });
     if (state.mode != .diagnostic) {
         const width = @min(@as(u32, 1040), surface.framebuffer.width -| 64);

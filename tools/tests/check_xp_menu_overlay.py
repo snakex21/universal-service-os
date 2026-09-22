@@ -8,9 +8,10 @@ base=root/'zig-out/xp-uefi-csm'
 entries=parse_newc(gzip.decompress((base/'initramfs-xp').read_bytes()))
 assert entries['usr/bin/usos-fb-ui'].data==(root/'zig-out/micro-linux/usos-fb-ui').read_bytes()
 assert entries['usr/lib/usos/xp_menu_ui.sh'].data==(root/'tools/xp_menu_ui.sh').read_bytes()
+assert entries['usr/lib/usos/micro_linux_ui.sh'].data==(root/'tools/micro_linux_ui.sh').read_bytes()
 work=base/'menu-checks';work.mkdir(exist_ok=True)
 shell='C:/Program Files/Git/bin/bash.exe'
-for name in ('usos-init','usr/lib/usos/xp_menu_ui.sh','usr/lib/usos/legacy_xp_staging.sh'):
+for name in ('usos-init','usr/lib/usos/xp_menu_ui.sh','usr/lib/usos/legacy_xp_staging.sh','usr/lib/usos/micro_linux_ui.sh'):
     path=work/(Path(name).name+'.sh');path.write_bytes(entries[name].data)
     subprocess.run([shell,'-n',str(path)],check=True)
 def posix(path):return '/'+path.drive[0].lower()+path.as_posix()[2:]

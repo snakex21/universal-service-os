@@ -7,9 +7,27 @@ USOS_FB_STATE=${USOS_FB_STATE:-/run/usos-fb-ui.state}
 USOS_FB_MODULES=${USOS_FB_MODULES:-/usr/lib/usos/simpledrm.modules}
 USOS_FB_ACTIVE=${USOS_FB_ACTIVE:-no}
 USOS_UI_CURRENT=${USOS_UI_CURRENT:-1}
-export USOS_UI_TTY USOS_FB_UI USOS_FB_STATE USOS_FB_MODULES USOS_FB_ACTIVE USOS_UI_CURRENT
+# A path that runs other stages than the five micro-Linux preparation stages
+# declares them: USOS_UI_LABELS='First|Second' (the count becomes the total).
+USOS_UI_LABELS=${USOS_UI_LABELS:-}
+USOS_UI_TOTAL=${USOS_UI_TOTAL:-}
+export USOS_UI_TTY USOS_FB_UI USOS_FB_STATE USOS_FB_MODULES USOS_FB_ACTIVE USOS_UI_CURRENT USOS_UI_LABELS USOS_UI_TOTAL
+
+usos_ui_declare_stages() {
+    USOS_UI_LABELS=$1
+    USOS_UI_TOTAL=$(printf '%s' "$1" | awk -F'|' '{print NF}')
+    export USOS_UI_LABELS USOS_UI_TOTAL
+}
+
+usos_ui_total() {
+    printf '%s' "${USOS_UI_TOTAL:-${1:-5}}"
+}
 
 usos_ui_stage_label() {
+    if [ -n "$USOS_UI_LABELS" ]; then
+        printf '%s' "$USOS_UI_LABELS" | awk -F'|' -v n="$1" '{ if (n >= 1 && n <= NF) printf "%s", $n; else printf "Preparation" }'
+        return 0
+    fi
     case "$1" in
         1) printf '%s' 'Starting environment' ;;
         2) printf '%s' 'Verifying target device' ;;
@@ -152,6 +170,11 @@ usos_ui_render_state() {
         printf 'bytes_done=%s\n' "$bytes_done"
         printf 'bytes_total=%s\n' "$bytes_total"
         printf 'speed_bps=%s\n' "$speed_bps"
+        if [ -n "$USOS_UI_LABELS" ]; then
+            printf '%s\n' "$USOS_UI_LABELS" | tr '|' '\n' | while IFS= read -r stage_name; do
+                printf 'label=%s\n' "$stage_name"
+            done
+        fi
     } > "$USOS_FB_STATE"
     if "$USOS_FB_UI" "$USOS_FB_STATE" >/dev/null 2>&1; then
         return 0
@@ -163,7 +186,8 @@ usos_ui_render_state() {
 
 usos_ui_stage() {
     current=$1
-    total=$2
+    total=$(usos_ui_total "$2")
+    [ "$current" -le "$total" ] || current=$total
     USOS_UI_CURRENT=$current
     title=$3
     detail=${4:-}
@@ -182,7 +206,8 @@ usos_ui_stage() {
 
 usos_ui_progress() {
     current=$1
-    total=$2
+    total=$(usos_ui_total "$2")
+    [ "$current" -le "$total" ] || current=$total
     USOS_UI_CURRENT=$current
     percent=$3
     bytes_done=$4
@@ -219,7 +244,8 @@ usos_ui_wait_activity() {
             2) activity_glyph='-' ;;
             *) activity_glyph='\\' ;;
         esac
-        usos_ui_stage 5 5 "$activity_title" "$activity_detail [$activity_glyph]" || true
+        activity_total=$(usos_ui_total 5)
+        usos_ui_stage "$activity_total" "$activity_total" "$activity_title" "$activity_detail [$activity_glyph]" || true
         activity_frame=$(( (activity_frame + 1) % 4 ))
         sleep 0.2
     done
@@ -242,9 +268,10 @@ usos_ui_sync_with_activity() {
 usos_ui_done() {
     title=$1
     detail=${2:-}
-    USOS_UI_CURRENT=5
+    done_total=$(usos_ui_total 5)
+    USOS_UI_CURRENT=$done_total
     usos_ui_log "DONE title=$title detail=$detail"
-    if usos_ui_render_state done 5 5 "$title" "$detail" '' 100 0 0 0; then
+    if usos_ui_render_state done "$done_total" "$done_total" "$title" "$detail" '' 100 0 0 0; then
         usos_ui_log "DONE RENDER PASS backend=framebuffer action=[ENTER]-POWER-OFF"
         return 0
     fi
@@ -255,7 +282,7 @@ usos_ui_done() {
 usos_ui_fail() {
     title=$1
     detail=${2:-}
-    usos_ui_render_state failure "$USOS_UI_CURRENT" 5 "$title" "$detail" '' 0 0 0 0 || true
+    usos_ui_render_state failure "$USOS_UI_CURRENT" "$(usos_ui_total 5)" "$title" "$detail" '' 0 0 0 0 || true
 }
 
 usos_ui_diagnostic() {
@@ -299,7 +326,7 @@ usos_ui_diagnostic() {
 # cannot expose the firmware framebuffer.
 usos_ui_console_stage() {
     current=$1
-    _total=$2
+    total=$(usos_ui_total "$2")
     title=$3
     detail=${4:-}
     footer=${5:-'Do not disconnect the drive or turn off the computer.'}
@@ -312,14 +339,14 @@ usos_ui_console_stage() {
         [ -n "$detail" ] && printf '      \033[2m%s\033[0m\n' "$detail"
         printf '\n'
         stage=1
-        while [ "$stage" -le 5 ]; do
+        while [ "$stage" -le "$total" ]; do
             label=$(usos_ui_stage_label "$stage")
             if [ "$stage" -lt "$current" ]; then
-                printf '      \033[1;34m[%d/5] %-45s\033[0m \033[1;32mOK\033[0m\n' "$stage" "$label"
+                printf '      \033[1;34m[%d/%d] %-45s\033[0m \033[1;32mOK\033[0m\n' "$stage" "$total" "$label"
             elif [ "$stage" -eq "$current" ]; then
-                printf '      \033[1;36m\033[1m[%d/5] %-45s RUNNING\033[0m\n' "$stage" "$label"
+                printf '      \033[1;36m\033[1m[%d/%d] %-45s RUNNING\033[0m\n' "$stage" "$total" "$label"
             else
-                printf '      \033[2m[%d/5] %-45s waiting\033[0m\n' "$stage" "$label"
+                printf '      \033[2m[%d/%d] %-45s waiting\033[0m\n' "$stage" "$total" "$label"
             fi
             stage=$((stage + 1))
         done
@@ -331,7 +358,7 @@ usos_ui_console_progress() {
     percent=$1
     title=$2
     detail=${3:-}
-    usos_ui_console_stage 4 5 "$title" "$detail"
+    usos_ui_console_stage "$USOS_UI_CURRENT" "$(usos_ui_total 5)" "$title" "$detail"
     printf '\n      Progress: %s%%\n' "$percent" >> "$USOS_UI_TTY"
 }
 

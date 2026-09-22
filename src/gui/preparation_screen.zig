@@ -25,7 +25,30 @@ pub const State = struct {
     speed_bps: u64 = 0,
     diagnostics: []const []const u8 = &.{},
     diagnostics_truncated: bool = false,
+    /// Labels of the stages this path really runs; `total` rows are drawn.
+    /// Defaults to the five micro-Linux preparation stages.
+    labels: []const []const u8 = &stage_labels,
 };
+
+pub const max_stages: usize = 5;
+
+/// Number of stage rows actually drawn for a state.
+pub fn stageCount(state: State) usize {
+    return @max(@as(usize, 1), @min(@min(@as(usize, state.total), state.labels.len), max_stages));
+}
+
+/// True for the five-stage micro-Linux model, whose stage 4 measures a copy.
+fn usesCopyStages(state: State) bool {
+    return state.labels.ptr == @as([*]const []const u8, &stage_labels) and stageCount(state) == stage_labels.len;
+}
+
+fn stagePanelHeight(count: usize) u32 {
+    return 26 + @as(u32, @intCast(count)) * 42;
+}
+
+fn detailTop(count: usize) u32 {
+    return stages_y + stagePanelHeight(count) + 18;
+}
 
 pub const stage_labels = [_][]const u8{
     "STARTING ENVIRONMENT",
@@ -40,8 +63,6 @@ const failure = Color{ .r = 0xff, .g = 0x70, .b = 0x70 };
 const max_width: u32 = 1040;
 const outer_margin: u32 = 32;
 const stages_y: u32 = 150;
-const stage_panel_height: u32 = 236;
-const detail_y: u32 = 404;
 
 pub fn render(surface: Surface, theme: Theme, state: State) void {
     surface.fill(theme.background);
@@ -59,10 +80,12 @@ pub fn render(surface: Surface, theme: Theme, state: State) void {
     text.draw(surface, x, 78, "PREPARING WINDOWS INSTALLER", 1, theme.muted);
     surface.fillRect(x, 108, width, 1, theme.border);
 
-    surface.fillRect(x, stages_y, width, stage_panel_height, theme.panel);
-    surface.borderRect(x, stages_y, width, stage_panel_height, 1, theme.border);
-    for (stage_labels, 0..) |_, index| {
-        drawStage(surface, theme, state, x + 18, stages_y + 16 + @as(u32, @intCast(index)) * 42, width -| 36, index + 1);
+    const count = stageCount(state);
+    const detail_y = detailTop(count);
+    surface.fillRect(x, stages_y, width, stagePanelHeight(count), theme.panel);
+    surface.borderRect(x, stages_y, width, stagePanelHeight(count), 1, theme.border);
+    for (0..count) |index| {
+        drawStage(surface, theme, state, x + 18, stages_y + 16 + @as(u32, @intCast(index)) * 42, width -| 36, index + 1, count);
     }
 
     const footer_y = surface.framebuffer.height -| 34;
@@ -76,6 +99,7 @@ pub fn updateProgress(surface: Surface, theme: Theme, state: State) void {
     const width = @min(max_width, surface.framebuffer.width -| (outer_margin * 2));
     const x = (surface.framebuffer.width -| width) / 2;
     const footer_y = surface.framebuffer.height -| 34;
+    const detail_y = detailTop(stageCount(state));
     if (footer_y <= detail_y + 54) return;
     drawDetail(surface, theme, state, x, detail_y, width, footer_y -| detail_y -| 18);
 }
@@ -106,7 +130,7 @@ fn renderDiagnostic(surface: Surface, theme: Theme, state: State) void {
     }
 }
 
-fn drawStage(surface: Surface, theme: Theme, state: State, x: u32, y: u32, width: u32, number: usize) void {
+fn drawStage(surface: Surface, theme: Theme, state: State, x: u32, y: u32, width: u32, number: usize, count: usize) void {
     const stage: u8 = @intCast(number);
     const done = state.mode == .done or stage < state.current;
     const current = state.mode != .done and stage == state.current;
@@ -116,9 +140,9 @@ fn drawStage(surface: Surface, theme: Theme, state: State, x: u32, y: u32, width
     surface.fillRect(x, y, 4, 34, if (failed) failure else if (done) success else if (current) theme.accent else theme.border);
 
     var number_buffer: [12]u8 = undefined;
-    const number_text = std.fmt.bufPrint(&number_buffer, "[{d}/{d}]", .{ number, state.total }) catch "[?/?]";
+    const number_text = std.fmt.bufPrint(&number_buffer, "[{d}/{d}]", .{ number, count }) catch "[?/?]";
     text.draw(surface, x + 14, y + 13, number_text, 1, theme.muted);
-    drawClipped(surface, x + 62, y + 13, width -| 180, stage_labels[number - 1], 1, if (done or current) theme.text else theme.muted);
+    drawClipped(surface, x + 62, y + 13, width -| 180, state.labels[number - 1], 1, if (done or current) theme.text else theme.muted);
 
     const status = if (failed) "FAILED" else if (done) "OK" else if (current) "RUNNING" else "WAITING";
     const status_color = if (failed) failure else if (done) success else if (current) theme.accent else theme.muted;
@@ -156,7 +180,7 @@ fn drawDetail(surface: Surface, theme: Theme, state: State, x: u32, y: u32, widt
     }
 
     if (state.mode != .progress) {
-        if (state.current < 4 and height >= 104) drawClipped(surface, x + 18, y + 78, width -| 36, "MEASURED PERCENTAGE, SPEED AND ETA BEGIN DURING FILE COPY.", 1, theme.muted);
+        if (usesCopyStages(state) and state.current < 4 and height >= 104) drawClipped(surface, x + 18, y + 78, width -| 36, "MEASURED PERCENTAGE, SPEED AND ETA BEGIN DURING FILE COPY.", 1, theme.muted);
         return;
     }
 
@@ -247,6 +271,16 @@ test "shared preparation screen exposes the five canonical stages" {
     try std.testing.expectEqual(@as(usize, 5), stage_labels.len);
     try std.testing.expectEqualStrings("STARTING ENVIRONMENT", stage_labels[0]);
     try std.testing.expectEqualStrings("VERIFICATION AND FINALIZATION", stage_labels[4]);
+}
+
+test "stage rows follow the stages a path really runs" {
+    const iso_labels = [_][]const u8{ "VALIDATING ISO", "LOADING BOOT FILES", "STARTING SETUP" };
+    try std.testing.expectEqual(@as(usize, 5), stageCount(.{}));
+    try std.testing.expectEqual(@as(usize, 3), stageCount(.{ .total = 3, .labels = &iso_labels }));
+    try std.testing.expectEqual(@as(usize, 1), stageCount(.{ .total = 1 }));
+    // A declared total larger than the declared labels never draws unnamed rows.
+    try std.testing.expectEqual(@as(usize, 3), stageCount(.{ .total = 5, .labels = &iso_labels }));
+    try std.testing.expectEqual(@as(u32, 404), detailTop(5));
 }
 
 test "visible transfer units use Windows-style labels without changing scaling" {

@@ -402,15 +402,17 @@ pub fn helpBox(title: []const u8, line1: []const u8, line2: []const u8, status: 
     }
 }
 
-pub fn windowsIsoStatus(detail: []const u8) void {
+pub fn windowsIsoStatus(stage: usos.flow.preparation_boot_progress.DirectIsoStage, detail: []const u8) void {
+    const Stage = usos.flow.preparation_boot_progress.DirectIsoStage;
     header_clock_active = true;
     active_footer = "";
     beginFullFrame();
     if (surface) |canvas| {
         usos.gui.preparation_screen.render(canvas, theme, .{
             .mode = .stage,
-            .current = 1,
-            .total = 1,
+            .current = stage.number(),
+            .total = Stage.labels.len,
+            .labels = &Stage.labels,
             .title = "STARTING WINDOWS FROM ISO",
             .detail = detail,
         });
@@ -420,6 +422,12 @@ pub fn windowsIsoStatus(detail: []const u8) void {
     }
     console.clear();
     console.writeAscii("UNIVERSAL SERVICE OS\nSTARTING WINDOWS FROM ISO\n\n");
+    for (Stage.labels, 1..) |label, index| {
+        console.writeAscii(if (index < stage.number()) "[OK]      " else if (index == stage.number()) "[RUNNING] " else "[WAITING] ");
+        console.writeAscii(label);
+        console.writeAscii("\n");
+    }
+    console.writeAscii("\n");
     console.writeAscii(detail);
     console.writeAscii("\n");
 }

@@ -73,7 +73,8 @@ pub fn externalDriverCount() !usize {
     var catalog = try data_volume.openCatalog();
     return driver_files.infCount(&catalog);
 }
-pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: ?[]const u8, vista: bool, progress: *const fn ([]const u8) void) !void {
+const IsoStage = @import("usos").flow.preparation_boot_progress.DirectIsoStage;
+pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: ?[]const u8, vista: bool, progress: *const fn (IsoStage, []const u8) void) !void {
     if (@import("builtin").cpu.arch != .x86_64) return error.WindowsSetupRequiresX64;
     try source_config.validateName(name);
     if (answer_name) |answer| try source_config.validateName(answer);
@@ -83,7 +84,7 @@ pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: 
     try initBootState(state);
     const catalog = &state.catalog;
     if (vista and answer_name != null) return error.VistaUnattendedNotSupported;
-    progress("Validating installation ISO and resolving boot source");
+    progress(.validating, "Validating installation ISO and resolving boot source");
     const inspection = try inspectState(state, name, vista);
     const source = &state.source;
     const external_pe10 = inspection.mode == .original;
@@ -100,7 +101,7 @@ pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: 
     serial.writeAscii(try std.fmt.bufPrint(&boot_message, "[WIN7_NATIVE] {s}; boot ISO={s}; PE={d}.{d}.{d} x64 index={d}\r\n", .{
         if (vista) "Vista SP2 x64 -> external PE10" else inspection.mode.label(), inspection.bootName(name), setup.major, setup.minor, setup.build, setup.index,
     }));
-    progress(inspection.bootName(name));
+    progress(.validating, inspection.bootName(name));
     const volume = &state.volume;
     var owned: [10][]align(8) u8 = undefined;
     var count: usize = 0;
@@ -125,7 +126,7 @@ pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: 
     if (external_pe10) try volume.add("usos-external-pe10.flag", "1\r\n");
     if (inspection.nvme_packages) try volume.add("usos-nvme-packages.flag", "1\r\n");
     if (!vista) {
-        progress("Reading optional Windows 7 x64 driver packages");
+        progress(.loading, "Reading optional Windows 7 x64 driver packages");
         const drivers = try driver_files.load(catalog);
         owned[count] = drivers.bytes; count += 1;
         try volume.add("usos-drivers.bin", drivers.bytes);
@@ -145,7 +146,7 @@ pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: 
             offset += amount;
             if (std.mem.eql(u8, boot_name, "boot.wim") and (offset % (8 * 1024 * 1024) == 0 or offset == bytes.len)) {
                 var message: [100]u8 = undefined;
-                progress(try std.fmt.bufPrint(&message, "Loading boot-source boot.wim: {d}%", .{offset * 100 / bytes.len}));
+                progress(.loading, try std.fmt.bufPrint(&message, "Loading boot-source boot.wim: {d}%", .{offset * 100 / bytes.len}));
             }
         }
         try volume.add(boot_name, bytes);
@@ -170,13 +171,13 @@ pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: 
     const loaded = (try bs.handleProtocol(uefi.protocol.LoadedImage, image)) orelse return error.NoLoadedImage;
     loaded.device_handle = handle;
     var option_text: [32]u8 = undefined;
-    const option_ascii = try std.fmt.bufPrint(&option_text, "index={d}", .{setup.index});
+    const option_ascii = try @import("diagnostic_boot.zig").wimbootOptions(&option_text, setup.index, @import("diagnostic_boot.zig").requested(root));
     var options: [32:0]u16 = undefined;
     for (option_ascii, 0..) |ch, i| options[i] = ch;
     options[option_ascii.len] = 0;
     loaded.load_options = &options;
     loaded.load_options_size = @intCast((option_ascii.len + 1) * 2);
-    progress(if (external_pe10) "Starting external PE10; install source remains selected Windows ISO" else "Starting hybrid ISO's own WinPE and Setup");
+    progress(.starting, if (external_pe10) "Starting external PE10; install source remains selected Windows ISO" else "Starting hybrid ISO's own WinPE and Setup");
     serial.writeAscii("[WIN7_NATIVE] CORE -> WIMBOOT UEFI\r\n");
     const result = try bs.startImage(image);
     if (result.code != .success) return error.WimbootReturnedError;

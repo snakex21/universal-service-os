@@ -83,7 +83,7 @@ assert entries['usr/lib/usos/xp-pae.exe'].data==(out.parent/'pae.exe').read_byte
 base=parse_newc(gzip.decompress(Path('J:/EFI/USOS/micro-linux/initramfs-usos').read_bytes()))
 changed={n for n in entries if n not in base or entries[n].data!=base[n].data}
 driver_entries={n for n in entries if n=='usr/lib/usos/xp-drivers' or n.startswith('usr/lib/usos/xp-drivers/')}
-assert changed=={'usos-init','usr/bin/usos-fb-ui','usr/lib/usos/xp_menu_ui.sh','usr/lib/usos/legacy_xp_staging.sh','usr/lib/usos/prepare_xp_ntfs_target.sh','usr/lib/usos/xp_selected_partition.sif','usr/lib/usos/xp-pae.exe','usr/lib/usos/xp-pae-LICENSE.txt','usr/lib/usos/xp_driver_stage.sh','usr/lib/usos/xp_verify_target.sh'}|driver_entries,changed
+assert changed=={'usos-init','usr/bin/usos-fb-ui','usr/lib/usos/xp_menu_ui.sh','usr/lib/usos/legacy_xp_staging.sh','usr/lib/usos/prepare_xp_ntfs_target.sh','usr/lib/usos/xp_selected_partition.sif','usr/lib/usos/xp-pae.exe','usr/lib/usos/xp-pae-LICENSE.txt','usr/lib/usos/xp_driver_stage.sh','usr/lib/usos/xp_verify_target.sh','usr/lib/usos/micro_linux_ui.sh'}|driver_entries,changed
 assert driver_entries
 for name in ['usos-init','usr/lib/usos/legacy_xp_staging.sh','usr/lib/usos/prepare_xp_ntfs_target.sh','usr/lib/usos/xp_verify_target.sh']:
     script=out/(Path(name).name+'.sh');script.write_bytes(entries[name].data)

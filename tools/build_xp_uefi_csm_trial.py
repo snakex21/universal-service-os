@@ -18,6 +18,8 @@ def update_ui(entries):
     prefix='usr/lib/usos/'
     put(entries,Entry('usr/bin/usos-fb-ui',stat.S_IFREG|0o755,(ROOT/'zig-out/micro-linux/usos-fb-ui').read_bytes()))
     put(entries,Entry(prefix+'xp_menu_ui.sh',stat.S_IFREG|0o755,(ROOT/'tools/xp_menu_ui.sh').read_bytes()))
+    # Shared UI library: per-path stage labels/totals for the renderer above.
+    put(entries,Entry(prefix+'micro_linux_ui.sh',stat.S_IFREG|0o755,(ROOT/'tools/micro_linux_ui.sh').read_bytes()))
     init=entries['usos-init'].data.decode()
     marker='export USOS_XP_TRACE_DIR=/mnt/esp/EFI/USOS-XP'
     if marker not in init:
@@ -42,7 +44,7 @@ def rebuild_ui():
     init=OUT/'initramfs-xp'
     init.write_bytes(gzip.compress(newc(update_ui(parse_newc(gzip.decompress(init.read_bytes())))),compresslevel=6,mtime=0))
     metadata['sha256']['initramfs-xp']=digest(init)
-    metadata['ui_revision']='20260922-menu-trace-bounded-vt'
+    metadata['ui_revision']='20260922-per-path-stage-labels'
     path.write_text(json.dumps(metadata,indent=2)+'\n')
     print('XP_UI_OVERLAY_BUILT; driver payload unchanged; no VM/E2E',flush=True)
 
@@ -251,7 +253,7 @@ def build(esp, data):
     launchers=[]
     for index,iso in enumerate(images):
         # No filename interpolation into shell; Linux receives hex UTF-8.
-        options='initrd=\\EFI\\USOS-XP\\initramfs-xp rdinit=/usos-init usos.esp_partuuid='+uuid+' usos.legacy_action=xp-staging usos.legacy_image_hex='+iso.name.encode().hex()+' console=tty0 console=ttyS0,115200n8 rw quiet'
+        options='initrd=\\EFI\\USOS-XP\\initramfs-xp rdinit=/usos-init usos.esp_partuuid='+uuid+' usos.legacy_action=xp-staging usos.legacy_image_hex='+iso.name.encode().hex()+' console=tty0 console=ttyS0,115200n8 rw quiet loglevel=1 fbcon=nodefer vt.global_cursor_default=0'
         source=OUT/f'build-{index}';source.mkdir(exist_ok=True)
         shutil.copyfile(ROOT/'tools/xp_uefi_csm_launcher.zig',source/'launcher.zig')
         (source/'xp_trial_config.zig').write_text('pub const options = '+json.dumps(options)+';\npub const description = '+json.dumps('Source: '+iso.name+'\r\n')+';\n',encoding='ascii')

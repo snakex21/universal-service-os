@@ -118,7 +118,7 @@ fn start(
 
     const vista = std.mem.eql(u8, system.id, "windows-vista");
     if (image.kind == .iso and (vista or std.mem.eql(u8, system.id, "windows-7")) and resolved == .direct_iso) {
-        view.windowsIsoStatus("Reading the selected Windows ISO");
+        view.windowsIsoStatus(.validating, "Reading the selected Windows ISO");
         windows_native_iso.start(root, image.name.slice(), unattended, vista, view.windowsIsoStatus) catch |err| {
             view.refreshFramebuffer();
             showError("Windows ISO start failed", err);

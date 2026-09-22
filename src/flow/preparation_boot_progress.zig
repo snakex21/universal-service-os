@@ -25,6 +25,34 @@ pub const Stage = enum {
     }
 };
 
+/// Stages of the micro-Linux preparation paths (extract, WIM/VHD boot,
+/// chainload, XP staging). The UEFI handoff is stage 1 of these five.
+pub const micro_linux_stage_count: u8 = 5;
+
+/// Direct Windows Vista/7 ISO start from UEFI: only these three steps run
+/// before Windows PE takes over, so only these three are shown.
+pub const DirectIsoStage = enum(u8) {
+    validating = 1,
+    loading = 2,
+    starting = 3,
+
+    pub const labels = [_][]const u8{
+        "VALIDATING INSTALLATION ISO",
+        "LOADING WINDOWS BOOT FILES",
+        "STARTING WINDOWS SETUP",
+    };
+
+    pub fn number(self: DirectIsoStage) u8 {
+        return @intFromEnum(self);
+    }
+};
+
+test "direct ISO path declares exactly the stages it runs" {
+    try std.testing.expectEqual(@as(usize, 3), DirectIsoStage.labels.len);
+    try std.testing.expectEqual(@as(u8, 3), DirectIsoStage.starting.number());
+    try std.testing.expectEqual(@as(usize, DirectIsoStage.labels.len), @typeInfo(DirectIsoStage).@"enum".fields.len);
+}
+
 test "preparation handoff stages always have a visible label" {
     const stages = [_]Stage{
         .request_saved,
