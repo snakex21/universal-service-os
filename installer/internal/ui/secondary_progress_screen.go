@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
+	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/localupdate"
 	"github.com/snakex21/universal-service-os/installer/internal/repair"
@@ -58,7 +59,7 @@ func newSecondaryProgressScreen(title, warning string, defs []secondaryStage, ev
 	s := &SecondaryProgressScreen{title: title, warning: warning, defs: defs, stages: make(map[int]*progressStageWidgets), onFinish: onFinish}
 	s.log = widget.NewMultiLineEntry()
 	s.log.Disable()
-	s.log.SetPlaceHolder("Log operacji")
+	s.log.SetPlaceHolder(i18n.T("installer.common.log"))
 	s.content = s.buildContent()
 	go s.consume(events)
 	return s
@@ -69,7 +70,7 @@ func NewLocalUpdateProgressScreen(events <-chan localupdate.Event, onFinish func
 	for id := localupdate.StageID(1); id <= localupdate.StageCount; id++ {
 		stage, ok := localupdate.StageInfo(id)
 		if ok {
-			defs = append(defs, secondaryStage{ID: int(stage.ID), Number: stage.Number, Total: localupdate.StageCount, Name: stage.Name})
+			defs = append(defs, secondaryStage{ID: int(stage.ID), Number: stage.Number, Total: localupdate.StageCount, Name: stageName("update", int(stage.ID), stage.Name)})
 		}
 	}
 	normalized := make(chan secondaryEvent, 32)
@@ -99,8 +100,8 @@ func NewLocalUpdateProgressScreen(events <-chan localupdate.Event, onFinish func
 		}
 	}()
 	return newSecondaryProgressScreen(
-		"Aktualizacja lokalna Universal Service OS",
-		"Aktualizowane są pliki USOS na ESP i program na DATA. Obrazy systemów, unattended i pozostałe dane użytkownika nie są usuwane.",
+		i18n.T("installer.update.title"),
+		i18n.T("installer.update.progress_warning"),
 		defs,
 		normalized,
 		onFinish,
@@ -112,7 +113,7 @@ func NewRepairProgressScreen(events <-chan repair.Event, onFinish func(*install.
 	for id := repair.StageID(1); id <= repair.StageCount; id++ {
 		stage, ok := repair.StageInfo(id)
 		if ok {
-			defs = append(defs, secondaryStage{ID: int(stage.ID), Number: stage.Number, Total: repair.StageCount, Name: stage.Name})
+			defs = append(defs, secondaryStage{ID: int(stage.ID), Number: stage.Number, Total: repair.StageCount, Name: stageName("repair", int(stage.ID), stage.Name)})
 		}
 	}
 	normalized := make(chan secondaryEvent, 24)
@@ -142,8 +143,8 @@ func NewRepairProgressScreen(events <-chan repair.Event, onFinish func(*install.
 		}
 	}()
 	return newSecondaryProgressScreen(
-		"Naprawa Universal Service OS",
-		"ESP jest aktualizowane. DATA i WORK pozostają bez zmian. Nie odłączaj nośnika podczas zapisu.",
+		i18n.T("installer.repair.title"),
+		i18n.T("installer.repair.progress_warning"),
 		defs,
 		normalized,
 		onFinish,
@@ -155,7 +156,7 @@ func NewUninstallProgressScreen(events <-chan uninstall.Event, onFinish func(*in
 	for id := uninstall.StageID(1); id <= uninstall.StageCount; id++ {
 		stage, ok := uninstall.StageInfo(id)
 		if ok {
-			defs = append(defs, secondaryStage{ID: int(stage.ID), Number: stage.Number, Total: uninstall.StageCount, Name: stage.Name})
+			defs = append(defs, secondaryStage{ID: int(stage.ID), Number: stage.Number, Total: uninstall.StageCount, Name: stageName("uninstall", int(stage.ID), stage.Name)})
 		}
 	}
 	normalized := make(chan secondaryEvent, 16)
@@ -189,8 +190,8 @@ func NewUninstallProgressScreen(events <-chan uninstall.Event, onFinish func(*in
 		}
 	}()
 	return newSecondaryProgressScreen(
-		"Deinstalacja Universal Service OS",
-		"Operacja niszcząca została rozpoczęta. Anulowanie nie jest już dostępne. Nie odłączaj nośnika ani nie wyłączaj komputera.",
+		i18n.T("installer.uninstall.progress_title"),
+		i18n.T("installer.uninstall.progress_warning"),
 		defs,
 		normalized,
 		onFinish,
@@ -207,7 +208,7 @@ func (s *SecondaryProgressScreen) buildContent() fyne.CanvasObject {
 	for _, stage := range s.defs {
 		number := widget.NewLabelWithStyle(fmt.Sprintf("%d/%d", stage.Number, stage.Total), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 		name := widget.NewLabel(stage.Name)
-		status := widget.NewLabel("Oczekuje")
+		status := widget.NewLabel(i18n.T("installer.common.pending"))
 		status.Importance = widget.LowImportance
 		bar := widget.NewProgressBar()
 		bar.Hide()
@@ -220,7 +221,7 @@ func (s *SecondaryProgressScreen) buildContent() fyne.CanvasObject {
 	}
 	steps := container.NewVScroll(container.NewVBox(rows...))
 	steps.SetMinSize(fyne.NewSize(1000, 300))
-	logTitle := widget.NewLabelWithStyle("Log operacji", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	logTitle := widget.NewLabelWithStyle(i18n.T("installer.common.log"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	logScroll := container.NewVScroll(s.log)
 	logScroll.SetMinSize(fyne.NewSize(1000, 220))
 	return container.NewBorder(
@@ -250,7 +251,7 @@ func (s *SecondaryProgressScreen) apply(event secondaryEvent) {
 		}
 		switch event.state {
 		case secondaryActive:
-			row.status.SetText("W toku")
+			row.status.SetText(i18n.T("installer.common.active"))
 			row.status.Importance = widget.MediumImportance
 			if event.progressKnown {
 				row.activity.Stop()
@@ -269,15 +270,15 @@ func (s *SecondaryProgressScreen) apply(event secondaryEvent) {
 				row.bar.SetValue(1)
 				row.bar.Show()
 			}
-			row.status.SetText("Gotowe")
+			row.status.SetText(i18n.T("installer.common.done"))
 			row.status.Importance = widget.SuccessImportance
 		case secondaryFailed:
 			row.activity.Stop()
 			row.activity.Hide()
 			row.bar.Hide()
-			message := "Błąd"
+			message := i18n.T("installer.common.error")
 			if event.err != nil {
-				message += ": " + event.err.Error()
+				message = i18n.T("installer.common.error_detail", event.err.Error())
 			}
 			row.status.SetText(message)
 			row.status.Importance = widget.DangerImportance

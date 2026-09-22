@@ -9,6 +9,22 @@ dll=out/'xp-pae-tests.dll'
 subprocess.run([str(root/'tools/zig/zig.exe'),'cc','-target','x86_64-windows-gnu','-shared','-nostdlib','-fno-builtin','-fno-stack-protector','-Os','-I'+str(root/'tools/zig/lib/libc/include/any-windows-any'),str(root/'tools/tests/xp_pae_harness.c'),'-Wl,--entry,DllMain','-lkernel32','-luser32','-ladvapi32','-lversion','-o',str(dll)],env=env,check=True)
 api=ctypes.CDLL(str(dll));api.patch_copy.argtypes=[ctypes.c_char_p,ctypes.c_char_p,ctypes.c_int];api.find_pattern.argtypes=[ctypes.c_char_p,ctypes.c_uint,ctypes.c_char_p,ctypes.c_uint]
 assert api.find_pattern(b'not a PE',8,b'abc',3)==-1
+# Localized strings: only the installer-chosen language reaches the stick
+# (EFI/USOS/lang-xp.ini -> USOS/XP/pae-strings.ini); English is built in.
+lang_out=out/'lang-export';shutil.rmtree(lang_out,ignore_errors=True)
+subprocess.run(['go','run','./cmd/usos-i18n-gen','-root','..','-export','pl','-out',str(lang_out)],cwd=root/'installer',check=True,stdout=subprocess.DEVNULL)
+catalog={l:json.loads((root/'installer/internal/i18n/locales'/(l+'.json')).read_text('utf-8')) for l in ('en','pl')}
+api.pae_string.argtypes=[ctypes.c_wchar_p,ctypes.c_wchar_p,ctypes.c_wchar_p,ctypes.c_uint]
+def pae_string(ini,key):
+    buf=ctypes.create_unicode_buffer(1024);api.pae_string(ini,key,buf,1024);return buf.value
+lang_ini=lang_out/'EFI/USOS/lang-xp.ini'
+assert lang_ini.read_bytes()[:2]==b'\xff\xfe'
+assert pae_string(str(lang_ini),'restart_prompt')==catalog['pl']['xp_pae.restart_prompt']
+assert pae_string(str(lang_ini),'title')==catalog['pl']['xp_pae.title']
+assert pae_string(None,'restart_prompt')==catalog['en']['xp_pae.restart_prompt']
+assert pae_string(str(out/'missing-pae-strings.ini'),'restart_prompt')==catalog['en']['xp_pae.restart_prompt']
+garbage=out/'garbage-pae-strings.ini';garbage.write_bytes(b'garbage without section\r\nrestart_prompt=junk\r\n')
+assert pae_string(str(garbage),'restart_prompt')==catalog['en']['xp_pae.restart_prompt']
 # Modes: 0 setup-end (default / UserExecute), 1 first-logon fallback, 2 interactive.
 api.mode_of.argtypes=[ctypes.c_char_p];api.stage_copy.argtypes=[ctypes.c_char_p,ctypes.c_char_p];api.entry_present.argtypes=[ctypes.c_char_p]
 for line,mode in [(b'C:\\USOS\\XP\\pae.exe',0),(b'"C:\\USOS\\XP\\pae.exe"',0),(b'pae.exe /silent',0),(b'pae.exe /QUIET',0),
@@ -68,6 +84,7 @@ assert b'Command0="%SystemDrive%\\USOS\\XP\\pae.exe /firstlogon"' in sif_text
 assert b'cmdlines' not in sif_text.lower() and b'detachedprogram' not in sif_text.lower()
 prepare=entries['usr/lib/usos/prepare_xp_ntfs_target.sh'].data
 assert b'xp_verify_target.sh' in prepare and b'blockdev --flushbufs' in prepare
+assert b'cp /mnt/esp/EFI/USOS/lang-xp.ini "$work/volume/USOS/XP/pae-strings.ini"' in prepare and b'PAE strings readback mismatch' in prepare
 assert entries['usr/lib/usos/xp_verify_target.sh'].data==(root/'tools/xp_verify_target.sh').read_bytes()
 for name,entry in entries.items():
     if name.startswith('usr/lib/usos/xp-drivers/') and name.endswith('/I386/HIVESYS.INF'):
@@ -96,6 +113,9 @@ helper_source=(root/'tools/windows_xp_pae.c').read_text()
 assert '"timeout","0"' in helper_source and 'OPEN_ALWAYS' in helper_source
 # The only message box outside /interactive is the first-logon fallback prompt.
 assert helper_source.count('MessageBoxW(')==1 and 'if(mode==MODE_FIRST_LOGON&&r==RUN_ENABLED)' in helper_source
+# Only English is compiled in; other languages come from pae-strings.ini.
+assert 'pae-strings.ini' in helper_source and 'USOS_XP_PAE_RESTART_PROMPT_EN' in helper_source
+assert catalog['pl']['xp_pae.restart_prompt'].encode('utf-16-le') not in exe and catalog['en']['xp_pae.restart_prompt'].encode('utf-16-le') in exe
 (out/'results.json').write_text(json.dumps(results,indent=2)+'\n')
 assert all(r['supported'] for r in results),'At least one source does not support this strict PAE patch'
 print('PASS: real XP kernel/HAL patch copies; repeat patch refused; original files unchanged; experimental archive isolation')

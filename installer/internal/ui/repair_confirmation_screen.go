@@ -1,12 +1,11 @@
 package ui
 
 import (
-	"fmt"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 	"github.com/snakex21/universal-service-os/installer/internal/domain"
+	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 	"github.com/snakex21/universal-service-os/installer/internal/installed"
 )
 
@@ -21,27 +20,27 @@ func NewRepairConfirmationScreen(target installed.Target, onCancel, onConfirm fu
 }
 
 func (s *RepairConfirmationScreen) Content() fyne.CanvasObject {
-	title := widget.NewLabelWithStyle("Naprawa Universal Service OS", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-	description := widget.NewLabel("Naprawa odtworzy wyłącznie pliki na ESP. DATA i WORK nie będą formatowane ani czyszczone.")
+	title := widget.NewLabelWithStyle(i18n.T("installer.repair.title"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	description := widget.NewLabel(i18n.T("installer.repair.description"))
 	description.Wrapping = fyne.TextWrapWord
 	serial := s.target.Disk.DisplaySerial()
 	if serial == "" {
 		serial = "-"
 	}
-	identity := widget.NewLabel(fmt.Sprintf(
-		"Cel: %s\nPhysicalDrive%d\nPojemność: %s\nSerial: %s",
+	identity := widget.NewLabel(i18n.T(
+		"installer.common.target_identity",
 		s.target.Disk.DisplayName(),
 		s.target.Disk.Number,
 		domain.FormatBytes(s.target.Disk.SizeBytes),
 		serial,
 	))
 	identity.Wrapping = fyne.TextWrapWord
-	back := widget.NewButton("Wstecz", func() {
+	back := widget.NewButton(i18n.T("installer.common.back"), func() {
 		if s.onCancel != nil {
 			s.onCancel()
 		}
 	})
-	start := widget.NewButton("Napraw ESP", func() {
+	start := widget.NewButton(i18n.T("installer.repair.button"), func() {
 		if s.onConfirm != nil {
 			s.onConfirm()
 		}

@@ -88,7 +88,8 @@ def add_driver_source(iso,out_dir=None):
 # the helper's default mode is the silent setup-end path.
 PAE_SETUP_END='[SetupParams]\nUserExecute="C:\\USOS\\XP\\pae.exe"\n'
 # First logon: silent check; only if setup-end did not enable PAE does it apply
-# it and ask (Polish Yes/No) for the one restart it then needs.
+# it and ask (Yes/No, in the installer-chosen language from pae-strings.ini,
+# English fallback) for the one restart it then needs.
 PAE_GUI_RUN_ONCE='Command0="%SystemDrive%\\USOS\\XP\\pae.exe /firstlogon"'
 # Entries owned by the PAE/finalization part of the flow (see refresh_pae_flow).
 PAE_FLOW_ENTRIES=('prepare_xp_ntfs_target.sh','xp_selected_partition.sif','xp-pae.exe','xp_verify_target.sh')
@@ -100,6 +101,16 @@ def overlay_prepare(prepare):
 cp "$SCRIPT_DIR/xp-pae.exe" "$work/volume/USOS/XP/pae.exe"
 cp "$SCRIPT_DIR/xp-pae-LICENSE.txt" "$work/volume/USOS/XP/LICENSE.txt"
 cmp -s "$SCRIPT_DIR/xp-pae.exe" "$work/volume/USOS/XP/pae.exe" || fail 'PAE helper readback mismatch'
+# Installer-chosen language (only that one is on the ESP); pae.exe falls back to English.
+if [ -f /mnt/esp/EFI/USOS/lang-xp.ini ]; then
+cp /mnt/esp/EFI/USOS/lang-xp.ini "$work/volume/USOS/XP/pae-strings.ini"
+cmp -s /mnt/esp/EFI/USOS/lang-xp.ini "$work/volume/USOS/XP/pae-strings.ini" || fail 'PAE strings readback mismatch'
+printf '[XP_PAE] strings=lang-xp.ini
+'
+else
+printf '[XP_PAE] strings=built-in English (no lang-xp.ini on ESP)
+'
+fi
 sync
 umount "$work/volume"; mounted=no
 blockdev --flushbufs "$TARGET_DEVICE" || fail 'cannot flush target disk buffers'
@@ -158,7 +169,7 @@ def refresh_pae_flow(esp):
     assert checked['usr/lib/usos/xp-pae.exe'].data==helper.read_bytes()
     init.write_bytes(result)
     metadata['sha256']['initramfs-xp']=digest(init);metadata['sha256']['pae.exe']=digest(helper)
-    metadata['pae_flow_revision']='20260922-setup-end-pae-firstlogon-fallback'
+    metadata['pae_flow_revision']='20260923-setup-end-pae-firstlogon-fallback-i18n'
     manifest_path.write_text(json.dumps(metadata,indent=2)+'\n')
     print('XP_PAE_FLOW_REFRESHED; silent helper; PAE default timeout=0; read-only zero-file verification; other entries unchanged; no VM/E2E',flush=True)
 

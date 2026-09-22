@@ -6,6 +6,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <winver.h>
+#include "windows_xp_pae_strings.h"
 
 static HANDLE log_file;
 void *memset(void *p,int v,size_t n){volatile BYTE *b=p;while(n--)*b++=(BYTE)v;return p;}
@@ -164,6 +165,19 @@ static void reboot_now(void){
     /* Planned, operating-system reconfiguration. */
     ExitWindowsEx(EWX_REBOOT,0x80000000|0x00020000|0x00000004);
 }
+/* User-visible strings: the chosen language comes from pae-strings.ini next to
+   pae.exe (UTF-16LE INI, [xp_pae]; written by the USB flow from the installer's
+   language choice, only that language). Missing file/key: built-in English. */
+static void ini_string(const WCHAR *ini,const WCHAR *key,const WCHAR *fallback,WCHAR *out,DWORD size){
+    DWORD n=ini?GetPrivateProfileStringW(L"xp_pae",key,L"",out,size,ini):0;
+    if(n==0||n>=size-2||!out[0])lstrcpynW(out,fallback,size);
+}
+static BOOL strings_path(WCHAR *p){
+    DWORD n=GetModuleFileNameW(0,p,MAX_PATH);if(n==0||n>=MAX_PATH)return FALSE;
+    while(n&&p[n-1]!=L'\\')n--;
+    if(n+16>=MAX_PATH)return FALSE;
+    p[n]=0;lstrcatW(p,L"pae-strings.ini");return GetFileAttributesW(p)!=INVALID_FILE_ATTRIBUTES;
+}
 static void open_log(void){
     char p[MAX_PATH];GetModuleFileNameA(0,p,sizeof(p));int i=lstrlenA(p);while(i&&p[i-1]!='\\')i--;p[i]=0;lstrcatA(p,"pae-install.log");
     /* Append: the setup-end run and the first-logon check share one log. */
@@ -180,7 +194,12 @@ void entry(void){
     else if(r==RUN_ALREADY)logline(mode==MODE_FIRST_LOGON?"RESULT: already enabled at setup end; nothing shown":"RESULT: already enabled");
     else logline(mode==MODE_SETUP_END?"RESULT: PAE NOT ENABLED at setup end; first-logon fallback will retry":"RESULT: PAE NOT ENABLED; original XP entry retained");
     if(mode==MODE_FIRST_LOGON&&r==RUN_ENABLED){
-        int answer=MessageBoxW(0,L"Pełna pamięć (PAE) zostanie włączona po ponownym uruchomieniu komputera. Uruchom ponownie teraz?",L"USOS XP",MB_YESNO|MB_ICONQUESTION|MB_SETFOREGROUND);
+        static WCHAR ini[MAX_PATH],prompt[1024],title[128];
+        BOOL localized=strings_path(ini);
+        logline(localized?"strings=pae-strings.ini":"strings=built-in English");
+        ini_string(localized?ini:0,L"restart_prompt",USOS_XP_PAE_RESTART_PROMPT_EN,prompt,1024);
+        ini_string(localized?ini:0,L"title",USOS_XP_PAE_TITLE_EN,title,128);
+        int answer=MessageBoxW(0,prompt,title,MB_YESNO|MB_ICONQUESTION|MB_SETFOREGROUND);
         logline(answer==IDYES?"user chose restart now":"user postponed restart");
         if(log_file!=INVALID_HANDLE_VALUE){CloseHandle(log_file);log_file=INVALID_HANDLE_VALUE;}
         if(answer==IDYES)reboot_now();

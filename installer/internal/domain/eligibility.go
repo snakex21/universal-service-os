@@ -3,6 +3,7 @@ package domain
 import (
 	"strings"
 
+	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 	"github.com/snakex21/universal-service-os/installer/internal/layout"
 )
 
@@ -11,31 +12,31 @@ func ApplyEligibility(d Disk) Disk {
 	d.Reason = ""
 
 	if d.InspectionError != "" {
-		d.Reason = "nie udało się bezpiecznie odczytać urządzenia: " + d.InspectionError
+		d.Reason = i18n.T("installer.reason.inspection_failed", d.InspectionError)
 		return d
 	}
 	if d.SystemDisk {
-		d.Reason = "dysk zawiera uruchomiony system Windows"
+		d.Reason = i18n.T("installer.reason.system_disk")
 		return d
 	}
 	if strings.TrimSpace(d.Model) == "" {
-		d.Reason = "urządzenie nie zgłasza pełnego modelu wymaganego do potwierdzenia"
+		d.Reason = i18n.T("installer.reason.no_model")
 		return d
 	}
 	if strings.TrimSpace(d.Serial) == "" {
-		d.Reason = "urządzenie nie zgłasza numeru seryjnego wymaganego do rewalidacji"
+		d.Reason = i18n.T("installer.reason.no_serial")
 		return d
 	}
 	if d.SpannedVolume {
-		d.Reason = "dysk należy do woluminu rozłożonego na więcej niż jednym dysku"
+		d.Reason = i18n.T("installer.reason.spanned_volume")
 		return d
 	}
 	if !d.Removable {
-		d.Reason = "urządzenie nie zgłasza flagi RemovableMedia"
+		d.Reason = i18n.T("installer.reason.not_removable")
 		return d
 	}
 	if d.SizeBytes < layout.MinimumDiskBytes {
-		d.Reason = "urządzenie ma mniej niż wymagane 32 GB"
+		d.Reason = i18n.T("installer.reason.too_small")
 		return d
 	}
 

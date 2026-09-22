@@ -3,6 +3,8 @@ package domain
 import (
 	"fmt"
 	"strings"
+
+	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 )
 
 type LossItem struct {
@@ -36,7 +38,7 @@ func BuildConfirmation(d Disk) Confirmation {
 		if len(volume.RootEntries) > 0 {
 			root = strings.Join(volume.RootEntries, ", ")
 		} else if volume.RootScanError != "" {
-			root = "odczyt niedostępny: " + volume.RootScanError
+			root = i18n.T("installer.reason.unreadable_detail", volume.RootScanError)
 		}
 		losses = append(losses, LossItem{
 			Volume:      name,

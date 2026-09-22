@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 )
 
 type DeviceRow struct {
@@ -44,7 +46,7 @@ func BuildDeviceRow(d Disk) DeviceRow {
 			}
 			roots = append(roots, prefix+": "+strings.Join(volume.RootEntries, ", "))
 		} else if volume.RootScanError != "" {
-			roots = append(roots, "odczyt niedostępny")
+			roots = append(roots, i18n.T("installer.reason.unreadable"))
 		}
 	}
 

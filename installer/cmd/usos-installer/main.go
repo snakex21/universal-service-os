@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/widget"
 	"github.com/snakex21/universal-service-os/installer/internal/buildinfo"
+	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/localupdate"
 	"github.com/snakex21/universal-service-os/installer/internal/repair"
@@ -16,11 +17,13 @@ import (
 )
 
 func main() {
+	// Preselect the host Windows UI language; the first screen lets the user change it.
+	i18n.SetLanguage(i18n.SystemLanguage())
 	application := app.NewWithID("com.snakex21.usos.installer")
-	window := application.NewWindow("Universal Service OS Installer")
+	window := application.NewWindow(i18n.T("installer.window.title"))
 	logger, err := install.NewOperationLogger()
 	if err != nil {
-		showStartupError(window, "Nie można uruchomić instalatora, ponieważ nie udało się otworzyć pliku logu obok programu:\n"+err.Error())
+		showStartupError(window, i18n.T("installer.startup.log_failed", err.Error()))
 		window.ShowAndRun()
 		return
 	}
@@ -31,25 +34,25 @@ func main() {
 	backend := winhost.Backend{}
 	installEngine, err := install.NewEngine(backend, logger)
 	if err != nil {
-		showStartupError(window, "Nie można uruchomić silnika instalacji:\n"+err.Error())
+		showStartupError(window, i18n.T("installer.startup.install_engine_failed", err.Error()))
 		window.ShowAndRun()
 		return
 	}
 	updateEngine, err := localupdate.NewEngine(backend, logger)
 	if err != nil {
-		showStartupError(window, "Nie można uruchomić silnika aktualizacji lokalnej:\n"+err.Error())
+		showStartupError(window, i18n.T("installer.startup.update_engine_failed", err.Error()))
 		window.ShowAndRun()
 		return
 	}
 	repairEngine, err := repair.NewEngine(backend, logger)
 	if err != nil {
-		showStartupError(window, "Nie można uruchomić silnika naprawy:\n"+err.Error())
+		showStartupError(window, i18n.T("installer.startup.repair_engine_failed", err.Error()))
 		window.ShowAndRun()
 		return
 	}
 	uninstallEngine, err := uninstall.NewEngine(backend, logger)
 	if err != nil {
-		showStartupError(window, "Nie można uruchomić silnika deinstalacji:\n"+err.Error())
+		showStartupError(window, i18n.T("installer.startup.uninstall_engine_failed", err.Error()))
 		window.ShowAndRun()
 		return
 	}

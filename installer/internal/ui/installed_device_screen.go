@@ -1,12 +1,11 @@
 package ui
 
 import (
-	"fmt"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 	"github.com/snakex21/universal-service-os/installer/internal/domain"
+	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 	"github.com/snakex21/universal-service-os/installer/internal/installed"
 )
 
@@ -31,10 +30,10 @@ type InstalledDeviceScreen struct {
 
 func NewInstalledDeviceScreen(title, description string, source InstalledUSOSSource, onBack func(), onSelected func(installed.Target)) *InstalledDeviceScreen {
 	s := &InstalledDeviceScreen{title: title, description: description, source: source, selected: -1, onSelected: onSelected}
-	s.status = widget.NewLabel("Wyszukiwanie poprawnych nośników USOS...")
-	s.refresh = widget.NewButton("Odśwież", s.Refresh)
-	s.back = widget.NewButton("Wstecz", onBack)
-	s.next = widget.NewButton("Dalej", s.continueWithSelected)
+	s.status = widget.NewLabel(i18n.T("installer.installed.searching"))
+	s.refresh = widget.NewButton(i18n.T("installer.common.refresh"), s.Refresh)
+	s.back = widget.NewButton(i18n.T("installer.common.back"), onBack)
+	s.next = widget.NewButton(i18n.T("installer.common.next"), s.continueWithSelected)
 	s.next.Importance = widget.HighImportance
 	s.next.Disable()
 	s.table = s.newTable()
@@ -60,7 +59,7 @@ func (s *InstalledDeviceScreen) Refresh() {
 	s.next.Disable()
 	s.selected = -1
 	s.status.Importance = widget.MediumImportance
-	s.status.SetText("Wyszukiwanie poprawnych nośników USOS...")
+	s.status.SetText(i18n.T("installer.installed.searching"))
 	go func() {
 		targets, err := s.source.ListInstalledUSOS()
 		fyne.Do(func() {
@@ -70,7 +69,7 @@ func (s *InstalledDeviceScreen) Refresh() {
 				s.rows = nil
 				s.table.Refresh()
 				s.status.Importance = widget.DangerImportance
-				s.status.SetText("Błąd skanowania: " + err.Error())
+				s.status.SetText(i18n.T("installer.common.scan_error", err.Error()))
 				return
 			}
 			s.targets = targets
@@ -89,17 +88,15 @@ func (s *InstalledDeviceScreen) Refresh() {
 
 func installedFoundNote(count int) string {
 	if count <= 0 {
-		return "Nie wykryto zainstalowanego USOS. Podłącz nośnik z USOS albo wróć i użyj instalacji."
+		return i18n.T("installer.installed.none")
 	}
-	if count == 1 {
-		return "Wykryto USOS na 1 nośniku. Wybierz go z listy, aby kontynuować."
-	}
-	return fmt.Sprintf("Wykryto USOS na %d nośnikach. Wybierz go z listy, aby kontynuować.", count)
+	return i18n.N("installer.installed.found", count)
 }
 
 func (s *InstalledDeviceScreen) newTable() *widget.Table {
+	headers := deviceHeaders()
 	table := widget.NewTable(
-		func() (int, int) { return len(s.rows), len(deviceHeaders) },
+		func() (int, int) { return len(s.rows), len(headers) },
 		func() fyne.CanvasObject {
 			label := widget.NewLabel("")
 			label.Truncation = fyne.TextTruncateEllipsis
@@ -114,8 +111,8 @@ func (s *InstalledDeviceScreen) newTable() *widget.Table {
 		return widget.NewLabelWithStyle("", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	}
 	table.UpdateHeader = func(id widget.TableCellID, object fyne.CanvasObject) {
-		if id.Row == -1 && id.Col >= 0 && id.Col < len(deviceHeaders) {
-			object.(*widget.Label).SetText(deviceHeaders[id.Col])
+		if id.Row == -1 && id.Col >= 0 && id.Col < len(headers) {
+			object.(*widget.Label).SetText(headers[id.Col])
 		}
 	}
 	table.SetColumnWidth(0, 220)

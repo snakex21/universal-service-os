@@ -1,12 +1,11 @@
 package ui
 
 import (
-	"fmt"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 	"github.com/snakex21/universal-service-os/installer/internal/domain"
+	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 	"github.com/snakex21/universal-service-os/installer/internal/installed"
 )
 
@@ -29,10 +28,10 @@ func NewUninstallConfirmationScreen(target installed.Target, onCancel, onConfirm
 	}
 	s.entry = widget.NewEntry()
 	s.entry.SetPlaceHolder(s.model.ExpectedText)
-	s.confirm = widget.NewButton("ROZPOCZNIJ DEINSTALACJĘ", s.confirmDestructive)
+	s.confirm = widget.NewButton(i18n.T("installer.uninstall.button"), s.confirmDestructive)
 	s.confirm.Importance = widget.DangerImportance
 	s.confirm.Disable()
-	s.cancel = widget.NewButton("Anuluj", func() {
+	s.cancel = widget.NewButton(i18n.T("installer.common.cancel"), func() {
 		if s.onCancel != nil {
 			s.onCancel()
 		}
@@ -48,9 +47,9 @@ func NewUninstallConfirmationScreen(target installed.Target, onCancel, onConfirm
 }
 
 func (s *UninstallConfirmationScreen) Content() fyne.CanvasObject {
-	title := widget.NewLabelWithStyle("UWAGA - DEINSTALACJA USOS", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	title := widget.NewLabelWithStyle(i18n.T("installer.uninstall.confirm_title"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	title.Importance = widget.DangerImportance
-	warning := widget.NewLabel("Deinstalacja usunie cały układ USOS i utworzy jedną zwykłą partycję exFAT. Cała zawartość DATA, w tym Systems, Utilities i Programs, zniknie. Po rozpoczęciu czyszczenia tablicy partycji operacji nie można anulować ani automatycznie naprawić.")
+	warning := widget.NewLabel(i18n.T("installer.uninstall.confirm_warning"))
 	warning.Wrapping = fyne.TextWrapWord
 	warning.Importance = widget.DangerImportance
 
@@ -58,8 +57,8 @@ func (s *UninstallConfirmationScreen) Content() fyne.CanvasObject {
 	if serial == "" {
 		serial = "-"
 	}
-	identity := widget.NewLabel(fmt.Sprintf(
-		"Cel: %s\nPhysicalDrive%d\nPojemność: %s\nSerial: %s",
+	identity := widget.NewLabel(i18n.T(
+		"installer.common.target_identity",
 		s.target.Disk.DisplayName(),
 		s.target.Disk.Number,
 		domain.FormatBytes(s.target.Disk.SizeBytes),
@@ -68,12 +67,12 @@ func (s *UninstallConfirmationScreen) Content() fyne.CanvasObject {
 	identity.Wrapping = fyne.TextWrapWord
 
 	losses := container.NewVBox(
-		widget.NewLabelWithStyle("Zostanie usunięte:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewLabel("- ESP z bootmanagerem USOS"),
-		widget.NewLabel("- DATA razem z Systems, Utilities, Programs i pozostałą zawartością"),
-		widget.NewLabel("- WORK razem z zawartością roboczą i .usos-work"),
+		widget.NewLabelWithStyle(i18n.T("installer.uninstall.losses_header"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewLabel(i18n.T("installer.uninstall.loss_esp")),
+		widget.NewLabel(i18n.T("installer.uninstall.loss_data")),
+		widget.NewLabel(i18n.T("installer.uninstall.loss_work")),
 	)
-	prompt := widget.NewLabel("Aby potwierdzić, wpisz pełny model urządzenia dokładnie znak w znak:")
+	prompt := widget.NewLabel(i18n.T("installer.uninstall.prompt"))
 	expected := widget.NewLabelWithStyle(s.model.ExpectedText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true, Monospace: true})
 	buttons := container.NewHBox(s.cancel, s.confirm)
 	return container.NewBorder(

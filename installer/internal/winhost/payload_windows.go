@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/localupdate"
 	"github.com/snakex21/universal-service-os/installer/internal/payload"
@@ -192,6 +193,15 @@ func prepareESPPayload(media install.MediaLayout) (payload.Bundle, []dynamicPayl
 		{path: filepath.Join("loader", "loader.conf"), data: loaderConf},
 		{path: filepath.Join("loader", "entries", "usos-micro-linux.conf"), data: loaderEntry},
 		{path: filepath.Join("EFI", "USOS", "install-state.ini"), data: installState},
+	}
+	// Only the language chosen in this installer goes onto the drive; the EFI
+	// and helpers keep English built in for anything missing here.
+	languageFiles, err := i18n.DeviceFiles(i18n.Current())
+	if err != nil {
+		return payload.Bundle{}, nil, 0, fmt.Errorf("prepare language files: %w", err)
+	}
+	for _, file := range languageFiles {
+		dynamic = append(dynamic, dynamicPayloadFile{path: filepath.FromSlash(file.Path), data: file.Data})
 	}
 	total := staticBytes
 	for _, file := range dynamic {

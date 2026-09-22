@@ -1,5 +1,5 @@
 # Add the separate experiment to the identified Kingston; preserve production BIOS.
-param([switch]$DriversOnly,[switch]$LaunchersOnly,[switch]$UnifiedMenu,[string]$SourceIso)
+param([switch]$DriversOnly,[switch]$LaunchersOnly,[switch]$UnifiedMenu,[string]$SourceIso,[string]$Language)
 $ErrorActionPreference='Stop'
 if(([int]$DriversOnly.IsPresent+[int]$LaunchersOnly.IsPresent+[int]$UnifiedMenu.IsPresent) -gt 1){throw 'Choose one targeted deployment mode'}
 if($SourceIso -and !$DriversOnly){throw 'Source ISO deployment requires DriversOnly mode'}
@@ -67,6 +67,18 @@ if($UnifiedMenu){
  foreach($name in @('legacy-xp-staging-status.txt','legacy-xp-disk-enumeration.txt','legacy-xp-staging-last-error.txt','menu-events.log','menu-hardware.txt','uefi-start.txt')){
   $log=Join-Path $espRoot ('EFI\USOS-XP\'+$name)
   if(Test-Path -LiteralPath $log){[IO.File]::Copy($log,(Join-Path $backup $name),$false)}
+ }
+}
+# Optional: the per-language ESP files the installer writes (only this language;
+# the EFI and pae.exe keep English built in), generated from the same catalog.
+if($Language){
+ if($Language -notmatch '^[a-z]{2}$'){throw 'Language must be a two-letter catalog code'}
+ $langOut=Join-Path $backup 'lang-export'
+ Push-Location (Join-Path $project 'installer')
+ try{& go run ./cmd/usos-i18n-gen -root .. -export $Language -out $langOut|Out-Null;if($LASTEXITCODE -ne 0){throw 'Language export failed'}}finally{Pop-Location}
+ foreach($name in @('usos-settings.ini','lang.bin','lang-xp.ini')){
+  $source=Join-Path $langOut ('EFI\USOS\'+$name);if(!(Test-Path -LiteralPath $source -PathType Leaf)){throw ('Missing exported '+$name)}
+  $files+=@{Source=$source;Target=(Join-Path $espRoot ('EFI\USOS\'+$name))}
  }
 }
 $index=0

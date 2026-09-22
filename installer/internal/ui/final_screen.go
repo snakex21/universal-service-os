@@ -4,6 +4,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
+	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 )
 
@@ -15,7 +16,7 @@ type FinalScreen struct {
 }
 
 func NewFinalScreen(report *install.VerificationReport, err error, onBack func()) *FinalScreen {
-	return NewOperationFinalScreen("Instalacja", report, err, onBack)
+	return NewOperationFinalScreen(i18n.T("installer.operation.install"), report, err, onBack)
 }
 
 func NewOperationFinalScreen(operation string, report *install.VerificationReport, err error, onBack func()) *FinalScreen {
@@ -28,17 +29,17 @@ func NewOperationFinalScreen(operation string, report *install.VerificationRepor
 
 func (s *FinalScreen) Content() fyne.CanvasObject {
 	success := s.err == nil && s.report.OK()
-	titleText := s.operation + " zakończona i zweryfikowana"
-	statusText := "Końcowy odczyt nośnika jest zgodny z oczekiwanym stanem operacji."
+	titleText := i18n.T("installer.final.success_title", s.operation)
+	statusText := i18n.T("installer.final.success_status")
 	importance := widget.SuccessImportance
 	if !success {
 		importance = widget.DangerImportance
 		if len(s.report.Items) > 0 && !s.report.OK() {
-			titleText = s.operation + " zakończona błędem weryfikacji"
-			statusText = "Nośnik nie przeszedł końcowej weryfikacji. Nie traktuj go jako poprawnie przygotowanego."
+			titleText = i18n.T("installer.final.verify_failed_title", s.operation)
+			statusText = i18n.T("installer.final.verify_failed_status")
 		} else {
-			titleText = s.operation + " nie powiodła się"
-			statusText = "Operacja została zatrzymana przed końcową weryfikacją."
+			titleText = i18n.T("installer.final.failed_title", s.operation)
+			statusText = i18n.T("installer.final.failed_status")
 		}
 	}
 	title := widget.NewLabelWithStyle(titleText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
@@ -47,7 +48,7 @@ func (s *FinalScreen) Content() fyne.CanvasObject {
 	status.Wrapping = fyne.TextWrapWord
 	status.Importance = importance
 	if s.err != nil {
-		errorLabel := widget.NewLabel("Błąd: " + s.err.Error())
+		errorLabel := widget.NewLabel(i18n.T("installer.common.error_detail", s.err.Error()))
 		errorLabel.Wrapping = fyne.TextWrapWord
 		errorLabel.Importance = widget.DangerImportance
 		status = errorLabel
@@ -76,15 +77,15 @@ func (s *FinalScreen) Content() fyne.CanvasObject {
 				label.SetText(item.Actual)
 			case 3:
 				if item.Match {
-					label.SetText("ZGODNE")
+					label.SetText(i18n.T("installer.final.match"))
 				} else {
-					label.SetText("NIEZGODNE")
+					label.SetText(i18n.T("installer.final.mismatch"))
 				}
 			}
 		},
 	)
 	table.ShowHeaderRow = true
-	headers := []string{"Sprawdzenie", "Zapisane / oczekiwane", "Odczytane z nośnika", "Wynik"}
+	headers := []string{i18n.T("installer.final.header.check"), i18n.T("installer.final.header.expected"), i18n.T("installer.final.header.actual"), i18n.T("installer.final.header.result")}
 	table.CreateHeader = func() fyne.CanvasObject {
 		return widget.NewLabelWithStyle("", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	}
@@ -98,7 +99,7 @@ func (s *FinalScreen) Content() fyne.CanvasObject {
 	table.SetColumnWidth(2, 520)
 	table.SetColumnWidth(3, 120)
 
-	back := widget.NewButton("Wróć do wyboru trybu", func() {
+	back := widget.NewButton(i18n.T("installer.final.back"), func() {
 		if s.onBack != nil {
 			s.onBack()
 		}

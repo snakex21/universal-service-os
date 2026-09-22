@@ -1,13 +1,13 @@
 package ui
 
 import (
-	"fmt"
 	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 	"github.com/snakex21/universal-service-os/installer/internal/domain"
+	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 )
 
 type ConfirmationScreen struct {
@@ -27,10 +27,10 @@ func NewConfirmationScreen(disk domain.Disk, onCancel, onConfirm func()) *Confir
 	}
 	s.entry = widget.NewEntry()
 	s.entry.SetPlaceHolder(s.model.ExpectedText)
-	s.confirm = widget.NewButton("ROZPOCZNIJ KASOWANIE I INSTALACJĘ", s.confirmDestructive)
+	s.confirm = widget.NewButton(i18n.T("installer.confirm.button"), s.confirmDestructive)
 	s.confirm.Importance = widget.DangerImportance
 	s.confirm.Disable()
-	s.cancel = widget.NewButton("Anuluj", func() {
+	s.cancel = widget.NewButton(i18n.T("installer.common.cancel"), func() {
 		if s.onCancel != nil {
 			s.onCancel()
 		}
@@ -46,33 +46,33 @@ func NewConfirmationScreen(disk domain.Disk, onCancel, onConfirm func()) *Confir
 }
 
 func (s *ConfirmationScreen) Content() fyne.CanvasObject {
-	title := widget.NewLabelWithStyle("UWAGA - OPERACJA NISZCZĄCA", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	title := widget.NewLabelWithStyle(i18n.T("installer.confirm.title"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	title.Importance = widget.DangerImportance
-	warning := widget.NewLabel("Wszystkie partycje i wszystkie dane na wybranym nośniku zostaną bezpowrotnie usunięte. Po rozpoczęciu kroku 1/8 — czyszczenia tablicy partycji — anulowanie nie będzie już możliwe. Nie odłączaj nośnika ani nie wyłączaj komputera podczas operacji.")
+	warning := widget.NewLabel(i18n.T("installer.confirm.warning"))
 	warning.Wrapping = fyne.TextWrapWord
 	warning.Importance = widget.DangerImportance
 
-	disk := widget.NewLabel(fmt.Sprintf(
-		"Cel: %s\nPhysicalDrive%d\nPojemność: %s\nSerial: %s",
+	disk := widget.NewLabel(i18n.T(
+		"installer.common.target_identity",
 		s.model.DiskModel,
 		s.model.DiskNumber,
 		s.model.DiskCapacity,
 		s.model.DiskSerial,
 	))
 
-	lossHeader := widget.NewLabelWithStyle("To zostanie usunięte:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	lossHeader := widget.NewLabelWithStyle(i18n.T("installer.confirm.losses_header"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	lossObjects := make([]fyne.CanvasObject, 0, len(s.model.Losses)+1)
 	lossObjects = append(lossObjects, lossHeader)
 	if len(s.model.Losses) == 0 {
-		lossObjects = append(lossObjects, widget.NewLabel("Brak obecnie rozpoznanych woluminów — tablica partycji i tak zostanie wyczyszczona."))
+		lossObjects = append(lossObjects, widget.NewLabel(i18n.T("installer.confirm.no_volumes")))
 	}
 	for _, item := range s.model.Losses {
 		root := strings.TrimSpace(item.RootContent)
 		if root == "" {
 			root = "-"
 		}
-		label := widget.NewLabel(fmt.Sprintf(
-			"%s\n  system plików: %s | pojemność: %s | zajęte: %s\n  katalog główny: %s",
+		label := widget.NewLabel(i18n.T(
+			"installer.confirm.volume",
 			item.Volume,
 			item.FileSystem,
 			item.Capacity,
@@ -85,7 +85,7 @@ func (s *ConfirmationScreen) Content() fyne.CanvasObject {
 	lossScroll := container.NewVScroll(container.NewVBox(lossObjects...))
 	lossScroll.SetMinSize(fyne.NewSize(1000, 280))
 
-	prompt := widget.NewLabel("Wymagany tekst potwierdzenia — wpisz dokładnie znak w znak:")
+	prompt := widget.NewLabel(i18n.T("installer.confirm.prompt"))
 	expected := widget.NewLabelWithStyle(s.model.ExpectedText, fyne.TextAlignLeading, fyne.TextStyle{Bold: true, Monospace: true})
 	buttons := container.NewHBox(s.cancel, s.confirm)
 

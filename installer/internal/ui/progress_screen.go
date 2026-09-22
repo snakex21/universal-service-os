@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
+	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 )
 
@@ -30,7 +31,7 @@ func NewProgressScreen(events <-chan install.Event, onFinish func(*install.Verif
 	}
 	s.log = widget.NewMultiLineEntry()
 	s.log.Disable()
-	s.log.SetPlaceHolder("Log operacji")
+	s.log.SetPlaceHolder(i18n.T("installer.common.log"))
 	s.content = s.buildContent()
 	go s.consume(events)
 	return s
@@ -41,16 +42,16 @@ func (s *ProgressScreen) Content() fyne.CanvasObject {
 }
 
 func (s *ProgressScreen) buildContent() fyne.CanvasObject {
-	title := widget.NewLabelWithStyle("Instalacja Universal Service OS", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-	warning := widget.NewLabel("Operacja niszcząca została rozpoczęta. Anulowanie nie jest już dostępne. Nie odłączaj nośnika i nie wyłączaj komputera.")
+	title := widget.NewLabelWithStyle(i18n.T("installer.install.progress_title"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	warning := widget.NewLabel(i18n.T("installer.install.progress_warning"))
 	warning.Wrapping = fyne.TextWrapWord
 	warning.Importance = widget.DangerImportance
 
 	rows := make([]fyne.CanvasObject, 0, install.StageCount)
 	for _, stage := range install.Stages() {
 		number := widget.NewLabelWithStyle(fmt.Sprintf("%d/%d", stage.Number, install.StageCount), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-		name := widget.NewLabel(stage.Name)
-		status := widget.NewLabel("Oczekuje")
+		name := widget.NewLabel(stageName("install", int(stage.ID), stage.Name))
+		status := widget.NewLabel(i18n.T("installer.common.pending"))
 		status.Importance = widget.LowImportance
 		bar := widget.NewProgressBar()
 		bar.SetValue(0)
@@ -68,7 +69,7 @@ func (s *ProgressScreen) buildContent() fyne.CanvasObject {
 	stepsScroll := container.NewVScroll(steps)
 	stepsScroll.SetMinSize(fyne.NewSize(1000, 360))
 
-	logTitle := widget.NewLabelWithStyle("Log operacji", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	logTitle := widget.NewLabelWithStyle(i18n.T("installer.common.log"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	logScroll := container.NewVScroll(s.log)
 	logScroll.SetMinSize(fyne.NewSize(1000, 220))
 
@@ -113,7 +114,7 @@ func (s *ProgressScreen) applyStage(event install.Event) {
 	}
 	switch event.State {
 	case install.StateActive:
-		row.status.SetText("W toku")
+		row.status.SetText(i18n.T("installer.common.active"))
 		row.status.Importance = widget.MediumImportance
 		if event.ProgressKnown {
 			row.activity.Stop()
@@ -134,15 +135,15 @@ func (s *ProgressScreen) applyStage(event install.Event) {
 		} else {
 			row.bar.Hide()
 		}
-		row.status.SetText("Gotowe")
+		row.status.SetText(i18n.T("installer.common.done"))
 		row.status.Importance = widget.SuccessImportance
 	case install.StateFailed:
 		row.activity.Stop()
 		row.activity.Hide()
 		row.bar.Hide()
-		message := "Błąd"
+		message := i18n.T("installer.common.error")
 		if event.Err != nil {
-			message += ": " + event.Err.Error()
+			message = i18n.T("installer.common.error_detail", event.Err.Error())
 		}
 		row.status.SetText(message)
 		row.status.Importance = widget.DangerImportance

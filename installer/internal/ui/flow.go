@@ -3,6 +3,7 @@ package ui
 import (
 	"fyne.io/fyne/v2"
 	"github.com/snakex21/universal-service-os/installer/internal/domain"
+	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/installed"
 	"github.com/snakex21/universal-service-os/installer/internal/localupdate"
@@ -20,6 +21,7 @@ type Flow struct {
 	repairEngine    *repair.Engine
 	uninstallEngine *uninstall.Engine
 	busy            bool
+	systemLanguage  string
 }
 
 func NewFlow(
@@ -41,16 +43,26 @@ func NewFlow(
 		updateEngine:    updateEngine,
 		repairEngine:    repairEngine,
 		uninstallEngine: uninstallEngine,
+		systemLanguage:  i18n.Current(),
 	}
 	window.SetCloseIntercept(flow.closeRequested)
 	return flow
 }
 
-func (f *Flow) Start() { f.showModes() }
+// Start opens the language picker; the language preselected there is the one
+// main() set from the host Windows UI language.
+func (f *Flow) Start() { f.showLanguage() }
+
+func (f *Flow) showLanguage() {
+	f.busy = false
+	screen := NewLanguageScreen(f.systemLanguage, f.showLanguage, f.showModes)
+	ConfigureWindow(f.window, screen.Content())
+}
 
 func (f *Flow) showModes() {
 	f.busy = false
 	screen := NewModeScreenWithDetection(f.showInstallDevices, f.showUpdateDevices, f.showRepairDevices, f.showUninstallDevices, f.installedSource)
+	screen.onLanguage = f.showLanguage
 	ConfigureWindow(f.window, screen.Content())
 }
 
@@ -70,7 +82,7 @@ func (f *Flow) showInstallProgress(disk domain.Disk) {
 	events := f.installEngine.RunAsync(disk)
 	screen := NewProgressScreen(events, func(report *install.VerificationReport, err error) {
 		f.busy = false
-		finalScreen := NewOperationFinalScreen("Instalacja", report, err, f.showModes)
+		finalScreen := NewOperationFinalScreen(i18n.T("installer.operation.install"), report, err, f.showModes)
 		ConfigureWindow(f.window, finalScreen.Content())
 	})
 	ConfigureWindow(f.window, screen.Content())
@@ -79,8 +91,8 @@ func (f *Flow) showInstallProgress(disk domain.Disk) {
 func (f *Flow) showUpdateDevices() {
 	f.busy = false
 	screen := NewInstalledCardScreen(
-		"Wybierz nośnik USOS do aktualizacji",
-		"Aktualizacja lokalna wgrywa na istniejący nośnik aktualny USOS z tego instalatora bez formatowania i bez usuwania obrazów systemów.",
+		i18n.T("installer.update.select_title"),
+		i18n.T("installer.update.select_description"),
 		f.installedSource,
 		f.showModes,
 		f.showUpdateConfirmation,
@@ -103,7 +115,7 @@ func (f *Flow) showUpdateProgress(target installed.Target, allowDowngrade bool) 
 	}
 	screen := NewLocalUpdateProgressScreen(events, func(report *install.VerificationReport, err error) {
 		f.busy = false
-		finalScreen := NewOperationFinalScreen("Aktualizacja", report, err, f.showModes)
+		finalScreen := NewOperationFinalScreen(i18n.T("installer.operation.update"), report, err, f.showModes)
 		ConfigureWindow(f.window, finalScreen.Content())
 	})
 	ConfigureWindow(f.window, screen.Content())
@@ -112,8 +124,8 @@ func (f *Flow) showUpdateProgress(target installed.Target, allowDowngrade bool) 
 func (f *Flow) showRepairDevices() {
 	f.busy = false
 	screen := NewInstalledCardScreen(
-		"Wybierz nośnik USOS do naprawy",
-		"Lista zawiera wyłącznie nośniki z wykrytym USOS. Wybierz nośnik, aby kontynuować.",
+		i18n.T("installer.repair.select_title"),
+		i18n.T("installer.repair.select_description"),
 		f.installedSource,
 		f.showModes,
 		f.showRepairConfirmation,
@@ -131,7 +143,7 @@ func (f *Flow) showRepairProgress(target installed.Target) {
 	events := f.repairEngine.RunAsync(target)
 	screen := NewRepairProgressScreen(events, func(report *install.VerificationReport, err error) {
 		f.busy = false
-		finalScreen := NewOperationFinalScreen("Naprawa", report, err, f.showModes)
+		finalScreen := NewOperationFinalScreen(i18n.T("installer.operation.repair"), report, err, f.showModes)
 		ConfigureWindow(f.window, finalScreen.Content())
 	})
 	ConfigureWindow(f.window, screen.Content())
@@ -140,8 +152,8 @@ func (f *Flow) showRepairProgress(target installed.Target) {
 func (f *Flow) showUninstallDevices() {
 	f.busy = false
 	screen := NewInstalledCardScreen(
-		"Wybierz nośnik USOS do deinstalacji",
-		"Lista zawiera wyłącznie nośniki z wykrytym USOS. Zwykłe pendrive'y bez USOS nie pojawiają się na tej liście.",
+		i18n.T("installer.uninstall.select_title"),
+		i18n.T("installer.uninstall.select_description"),
 		f.installedSource,
 		f.showModes,
 		f.showUninstallConfirmation,
@@ -159,7 +171,7 @@ func (f *Flow) showUninstallProgress(target installed.Target) {
 	events := f.uninstallEngine.RunAsync(target)
 	screen := NewUninstallProgressScreen(events, func(report *install.VerificationReport, err error) {
 		f.busy = false
-		finalScreen := NewOperationFinalScreen("Deinstalacja", report, err, f.showModes)
+		finalScreen := NewOperationFinalScreen(i18n.T("installer.operation.uninstall"), report, err, f.showModes)
 		ConfigureWindow(f.window, finalScreen.Content())
 	})
 	ConfigureWindow(f.window, screen.Content())

@@ -40,6 +40,7 @@ pub const image_probe = struct {
     pub const windows_detect = @import("image_probe/windows_detect.zig");
 };
 pub const catalog = @import("catalog/root.zig");
+pub const i18n = @import("i18n/lang_file.zig");
 pub const flow = struct {
     pub const install_plan = @import("flow/install_plan.zig");
     pub const install_state = @import("flow/install_state.zig");
@@ -98,6 +99,7 @@ test {
     _ = image_probe.probe;
     _ = windows7_iso;
     _ = @import("windows7_iso_test.zig");
+    _ = i18n;
     _ = device_guard;
     _ = storage.random_reader;
     _ = storage.gpt;

@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 	"github.com/snakex21/universal-service-os/installer/internal/domain"
+	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 )
 
 type DiskSource interface {
@@ -34,29 +35,31 @@ func NewDeviceScreen(source DiskSource, onSelected func(domain.Disk)) *DeviceScr
 	return NewDeviceScreenWithBack(source, nil, onSelected)
 }
 
-var deviceHeaders = []string{
-	"Model",
-	"Pojemność",
-	"Litery",
-	"Etykiety",
-	"System plików",
-	"Zajęte",
-	"Zawartość korzenia",
-	"Stan",
+func deviceHeaders() []string {
+	return []string{
+		i18n.T("installer.field.model"),
+		i18n.T("installer.field.capacity"),
+		i18n.T("installer.field.letters"),
+		i18n.T("installer.field.labels"),
+		i18n.T("installer.field.filesystem"),
+		i18n.T("installer.field.used"),
+		i18n.T("installer.field.root_contents"),
+		i18n.T("installer.field.state"),
+	}
 }
 
 func NewDeviceScreenWithBack(source DiskSource, onBack func(), onSelected func(domain.Disk)) *DeviceScreen {
 	s := &DeviceScreen{source: source, selected: -1, onSelected: onSelected}
 	s.hiddenNote = widget.NewLabel("")
 	s.hiddenNote.Wrapping = fyne.TextWrapWord
-	s.status = widget.NewLabel("Wyszukiwanie urządzeń...")
+	s.status = widget.NewLabel(i18n.T("installer.device.searching"))
 	s.listBox = container.NewVBox()
 	s.detailsBox = container.NewVBox()
-	s.refresh = widget.NewButton("Odśwież", s.Refresh)
+	s.refresh = widget.NewButton(i18n.T("installer.common.refresh"), s.Refresh)
 	if onBack != nil {
-		s.back = widget.NewButton("Wstecz", onBack)
+		s.back = widget.NewButton(i18n.T("installer.common.back"), onBack)
 	}
-	s.next = widget.NewButton("Dalej", s.continueWithSelected)
+	s.next = widget.NewButton(i18n.T("installer.common.next"), s.continueWithSelected)
 	s.next.Importance = widget.HighImportance
 	s.next.Disable()
 	s.refreshDetails()
@@ -66,16 +69,16 @@ func NewDeviceScreenWithBack(source DiskSource, onBack func(), onSelected func(d
 
 func NewDeviceScreenWithBackAndDetection(source DiskSource, installed InstalledUSOSSource, onBack func(), onSelected func(domain.Disk)) *DeviceScreen {
 	s := &DeviceScreen{source: source, installed: installed, selected: -1, onSelected: onSelected}
-	s.status = widget.NewLabel("Wyszukiwanie urządzeń...")
+	s.status = widget.NewLabel(i18n.T("installer.device.searching"))
 	s.listBox = container.NewVBox()
 	s.detailsBox = container.NewVBox()
 	s.hiddenNote = widget.NewLabel("")
 	s.hiddenNote.Wrapping = fyne.TextWrapWord
-	s.refresh = widget.NewButton("Odśwież", s.Refresh)
+	s.refresh = widget.NewButton(i18n.T("installer.common.refresh"), s.Refresh)
 	if onBack != nil {
-		s.back = widget.NewButton("Wstecz", onBack)
+		s.back = widget.NewButton(i18n.T("installer.common.back"), onBack)
 	}
-	s.next = widget.NewButton("Dalej", s.continueWithSelected)
+	s.next = widget.NewButton(i18n.T("installer.common.next"), s.continueWithSelected)
 	s.next.Importance = widget.HighImportance
 	s.next.Disable()
 	s.refreshDetails()
@@ -85,11 +88,11 @@ func NewDeviceScreenWithBackAndDetection(source DiskSource, installed InstalledU
 
 func (s *DeviceScreen) Content() fyne.CanvasObject {
 	heading := widget.NewLabelWithStyle(
-		"Wybierz nośnik dla Universal Service OS",
+		i18n.T("installer.device.heading"),
 		fyne.TextAlignLeading,
 		fyne.TextStyle{Bold: true},
 	)
-	description := widget.NewLabel("Kliknij cały wiersz dysku, aby go wybrać. Dyski odrzucone przez politykę bezpieczeństwa pozostają widoczne i są oznaczone powodem odrzucenia.")
+	description := widget.NewLabel(i18n.T("installer.device.description"))
 	description.Wrapping = fyne.TextWrapWord
 	buttons := container.NewHBox()
 	if s.back != nil {
@@ -113,7 +116,7 @@ func (s *DeviceScreen) Content() fyne.CanvasObject {
 func (s *DeviceScreen) Refresh() {
 	s.refresh.Disable()
 	s.next.Disable()
-	s.status.SetText("Wyszukiwanie urządzeń...")
+	s.status.SetText(i18n.T("installer.device.searching"))
 	s.selected = -1
 	go func() {
 		disks, err := s.source.ListDisks()
@@ -125,7 +128,7 @@ func (s *DeviceScreen) Refresh() {
 				s.rebuildList()
 				s.refreshDetails()
 				s.status.Importance = widget.DangerImportance
-				s.status.SetText("Błąd skanowania: " + err.Error())
+				s.status.SetText(i18n.T("installer.common.scan_error", err.Error()))
 				return
 			}
 			if s.installed != nil {
@@ -157,14 +160,14 @@ func (s *DeviceScreen) Refresh() {
 				}
 			}
 			s.status.Importance = widget.MediumImportance
-			s.status.SetText(fmt.Sprintf("Znaleziono %d dysków, %d spełnia politykę instalatora.", len(disks), eligible))
+			s.status.SetText(i18n.T("installer.device.found", len(disks), eligible))
 			if s.hiddenNote != nil {
 				if s.hiddenCount > 0 {
 					s.hiddenNote.Importance = widget.HighImportance
 					s.hiddenNote.SetText(hiddenUSOSNote(s.hiddenCount))
 				} else {
 					s.hiddenNote.Importance = widget.MediumImportance
-					s.hiddenNote.SetText("Nie wykryto zainstalowanego USOS.")
+					s.hiddenNote.SetText(i18n.T("installer.device.none_installed"))
 				}
 				s.hiddenNote.Refresh()
 			}
@@ -175,10 +178,7 @@ func (s *DeviceScreen) Refresh() {
 }
 
 func hiddenUSOSNote(count int) string {
-	if count == 1 {
-		return "Wykryto USOS na 1 nośniku — ukryto go przed instalacją. Użyj aktualizacji, naprawy albo deinstalacji."
-	}
-	return fmt.Sprintf("Wykryto USOS na %d nośnikach — ukryto je przed instalacją. Użyj aktualizacji, naprawy albo deinstalacji.", count)
+	return i18n.N("installer.device.hidden", count)
 }
 
 func (s *DeviceScreen) rebuildList() {
@@ -187,16 +187,13 @@ func (s *DeviceScreen) rebuildList() {
 	}
 	s.listBox.Objects = nil
 	if len(s.rows) == 0 {
-		s.listBox.Add(widget.NewLabel("Brak dysków do wyświetlenia."))
+		s.listBox.Add(widget.NewLabel(i18n.T("installer.device.empty")))
 		s.listBox.Refresh()
 		return
 	}
 	for i, row := range s.rows {
 		idx := i
-		state := "Gotowy do użycia"
-		if !row.Selectable {
-			state = "Odrzucony: " + row.Reason
-		}
+		state := deviceState(row)
 		label := fmt.Sprintf("%s  -  %s\n%s", row.Model, row.Capacity, state)
 		btn := widget.NewButton(label, func() { s.selectDisk(idx) })
 		btn.Alignment = widget.ButtonAlignLeading
@@ -228,28 +225,25 @@ func (s *DeviceScreen) refreshDetails() {
 	}
 	s.detailsBox.Objects = nil
 	if s.selected < 0 || s.selected >= len(s.rows) {
-		info := widget.NewLabel("Wybierz dysk z listy po lewej, aby zobaczyć szczegóły.")
+		info := widget.NewLabel(i18n.T("installer.device.pick_hint"))
 		info.Wrapping = fyne.TextWrapWord
 		s.detailsBox.Add(info)
 		s.detailsBox.Refresh()
 		return
 	}
 	row := s.rows[s.selected]
-	title := widget.NewLabelWithStyle("Wybrano: "+row.Model, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	title := widget.NewLabelWithStyle(i18n.T("installer.common.selected", row.Model), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	title.Wrapping = fyne.TextWrapWord
-	state := "Gotowy do użycia"
-	if !row.Selectable {
-		state = "Odrzucony: " + row.Reason
-	}
+	state := deviceState(row)
 	form := widget.NewForm(
-		widget.NewFormItem("Pojemność", widget.NewLabel(row.Capacity)),
-		widget.NewFormItem("Litery", widget.NewLabel(row.Letters)),
-		widget.NewFormItem("Etykiety", widget.NewLabel(row.Labels)),
-		widget.NewFormItem("System plików", widget.NewLabel(row.FileSystems)),
-		widget.NewFormItem("Zajęte", widget.NewLabel(row.Used)),
-		widget.NewFormItem("Stan", widget.NewLabel(state)),
+		widget.NewFormItem(i18n.T("installer.field.capacity"), widget.NewLabel(row.Capacity)),
+		widget.NewFormItem(i18n.T("installer.field.letters"), widget.NewLabel(row.Letters)),
+		widget.NewFormItem(i18n.T("installer.field.labels"), widget.NewLabel(row.Labels)),
+		widget.NewFormItem(i18n.T("installer.field.filesystem"), widget.NewLabel(row.FileSystems)),
+		widget.NewFormItem(i18n.T("installer.field.used"), widget.NewLabel(row.Used)),
+		widget.NewFormItem(i18n.T("installer.field.state"), widget.NewLabel(state)),
 	)
-	rootTitle := widget.NewLabelWithStyle("Zawartość korzenia", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	rootTitle := widget.NewLabelWithStyle(i18n.T("installer.field.root_contents"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	root := widget.NewLabel(row.RootContents)
 	root.Wrapping = fyne.TextWrapWord
 	s.detailsBox.Add(title)
@@ -283,11 +277,15 @@ func deviceCell(row domain.DeviceRow, column int) string {
 	case 6:
 		return row.RootContents
 	case 7:
-		if row.Selectable {
-			return "Gotowy do użycia"
-		}
-		return "Odrzucony: " + row.Reason
+		return deviceState(row)
 	default:
 		return ""
 	}
+}
+
+func deviceState(row domain.DeviceRow) string {
+	if row.Selectable {
+		return i18n.T("installer.device.ready")
+	}
+	return i18n.T("installer.device.rejected", row.Reason)
 }
