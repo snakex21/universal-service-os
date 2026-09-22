@@ -12,6 +12,7 @@
   "installer.language.description": "Instalator używa wybranego języka. Na nośnik USOS trafia tylko ten język — dla menu startowego i programów pomocniczych. Aby go później zmienić, uruchom ponownie instalator albo aktualizację USOS.",
   "installer.language.detected": "Język interfejsu Windows: %s",
   "installer.language.change": "Język: %s",
+  "installer.ng.keys_hint": "Góra/Dół: wybór    Enter: dalej    Esc: zamknij",
 
   "installer.common.back": "Wstecz",
   "installer.common.refresh": "Odśwież",

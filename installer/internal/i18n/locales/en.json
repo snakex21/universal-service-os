@@ -12,6 +12,7 @@
   "installer.language.description": "The installer uses the selected language. Only this language is written to the USOS drive, for the boot menu and the helper programs. To change it later, run the installer again or update USOS.",
   "installer.language.detected": "Windows display language: %s",
   "installer.language.change": "Language: %s",
+  "installer.ng.keys_hint": "Up/Down: choose    Enter: next    Esc: close",
 
   "installer.common.back": "Back",
   "installer.common.refresh": "Refresh",
