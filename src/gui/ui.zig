@@ -712,8 +712,13 @@ fn shortBuild(build: []const u8) []const u8 {
 
 /// The USOS logo tile: a cyan rounded square with a dark "U" stroke.
 pub fn drawLogo(ui: *const Ui, x: u32, y: u32, size: u32) void {
+    drawLogoOn(ui, x, y, size, ui.theme.header);
+}
+
+/// The logo tile on `background` (its rounded corners blend into it).
+pub fn drawLogoOn(ui: *const Ui, x: u32, y: u32, size: u32, background: Color) void {
     const theme = ui.theme;
-    paint.roundRect(ui.surface, x, y, size, size, size / 4, theme.accent, theme.header);
+    paint.roundRect(ui.surface, x, y, size, size, size / 4, theme.accent, background);
     const stroke = @max(@divTrunc(paint.s(size), 11), paint.sub);
     const left = paint.s(x) + @divTrunc(paint.s(size) * 31, 100);
     const right = paint.s(x) + @divTrunc(paint.s(size) * 69, 100);
