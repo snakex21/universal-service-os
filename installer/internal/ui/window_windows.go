@@ -992,7 +992,7 @@ func (w *win) edit(id string, r rect, o editOptions) (*nativeEdit, widgetState) 
 		w.nextCtrlID++
 		ctrl := w.nextCtrlID
 		hwnd, _, _ := procCreateWindowExW.Call(0, uintptr(unsafe.Pointer(utf16Ptr("EDIT"))), uintptr(unsafe.Pointer(utf16Ptr(toCRLF(o.initial)))),
-			style, uintptr(r.Left), uintptr(r.Top), uintptr(r.w()), uintptr(r.h()), uintptr(w.hwnd), ctrl, w.instance, 0)
+			style, uintptr(r.Left), uintptr(r.Top), uintptr(max(r.w(), 1)), uintptr(max(r.h(), 1)), uintptr(w.hwnd), ctrl, w.instance, 0)
 		e = &nativeEdit{id: id, hwnd: windows.HWND(hwnd), ctrlID: ctrl, multiline: o.multiline, mono: o.mono, fontSize: o.fontSize}
 		if e.fontSize == 0 {
 			e.fontSize = 14
@@ -1016,11 +1016,11 @@ func (w *win) edit(id string, r rect, o editOptions) (*nativeEdit, widgetState) 
 		e.disabled = o.disabled
 	}
 	visible := r.intersect(w.canvas.clip)
-	if visible != r {
-		e.used = false // never show a partly clipped native control
+	if r.empty() || visible != r {
+		e.used = false // never show a partly clipped (or collapsed) native control
 	}
 	if e.placed != r {
-		procSetWindowPos.Call(uintptr(e.hwnd), 0, uintptr(r.Left), uintptr(r.Top), uintptr(r.w()), uintptr(r.h()), swpNoZOrder|swpNoActivate)
+		procSetWindowPos.Call(uintptr(e.hwnd), 0, uintptr(r.Left), uintptr(r.Top), uintptr(max(r.w(), 1)), uintptr(max(r.h(), 1)), swpNoZOrder|swpNoActivate)
 		e.placed = r
 	}
 	st := w.add(widget{id: id, r: r, focusable: !o.disabled, disabled: o.disabled, edit: e})

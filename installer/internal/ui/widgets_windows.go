@@ -20,7 +20,6 @@ const (
 	radiusCard   = 10
 	radiusButton = 6
 	buttonHeight = 36
-	gap          = 12
 	pad          = 24
 )
 
@@ -149,10 +148,6 @@ func (w *win) wrapped(font windows.Handle, s string, x, y, width int32, col colo
 	h := w.canvas.measure(font, s, width)
 	w.canvas.text(font, s, rect{x, y, x + width, y + h}, col, dtLeft|dtWordBreak|dtEditControl)
 	return h
-}
-
-func (w *win) line(font windows.Handle, s string, r rect, col color) {
-	w.canvas.text(font, s, r, col, dtLeft|dtSingleLine|dtVCenter|dtEndEllipsis)
 }
 
 type tone int
