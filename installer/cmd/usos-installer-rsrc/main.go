@@ -1,7 +1,7 @@
 // usos-installer-rsrc generates cmd/usos-installer/rsrc_windows_amd64.syso:
 // a COFF object with a .rsrc section holding the application icon (drawn by
 // internal/ui/logo, so no image asset is stored), the version information and
-// the application manifest (per-monitor DPI v2, common controls 6, asInvoker).
+// the application manifest (per-monitor DPI v2, common controls 6, requireAdministrator: double-clicking shows the UAC prompt).
 // The Go linker merges it into the EXE. The output is deterministic; a test
 // checks that the committed .syso is current.
 //

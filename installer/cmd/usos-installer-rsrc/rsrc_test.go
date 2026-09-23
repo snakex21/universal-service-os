@@ -24,3 +24,14 @@ func TestICOHasEveryIconSize(t *testing.T) {
 		t.Fatalf("ico header count = %d, want %d", ico[4], len(iconSizes))
 	}
 }
+
+// The installer writes raw disks, so Windows must elevate it on launch.
+func TestManifestRequiresAdministrator(t *testing.T) {
+	syso := buildSyso()
+	if !bytes.Contains(syso, []byte(`<requestedExecutionLevel level="requireAdministrator" uiAccess="false"/>`)) {
+		t.Fatal("manifest must request requireAdministrator")
+	}
+	if bytes.Contains(syso, []byte(`level="asInvoker"`)) {
+		t.Fatal("manifest still contains asInvoker")
+	}
+}
