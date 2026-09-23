@@ -26,6 +26,9 @@ type Disk struct {
 	SizeBytes       uint64
 	SectorBytes     uint32
 	Removable       bool
+	// BusType is STORAGE_DEVICE_DESCRIPTOR.BusType (informational only; it
+	// plays no part in eligibility).
+	BusType         uint32
 	SystemDisk      bool
 	SpannedVolume   bool
 	Eligible        bool
@@ -101,3 +104,19 @@ func cleanDisplayToken(s string) string {
 func (d Disk) ConfirmationValue() string {
 	return d.DisplayName()
 }
+
+// Storage bus types reported by IOCTL_STORAGE_QUERY_PROPERTY.
+const (
+	BusUSB  = 7
+	BusNVMe = 17
+)
+
+var busNames = map[uint32]string{
+	1: "SCSI", 2: "ATAPI", 3: "ATA", 4: "IEEE 1394", 5: "SSA", 6: "Fibre Channel",
+	7: "USB", 8: "RAID", 9: "iSCSI", 10: "SAS", 11: "SATA", 12: "SD", 13: "MMC",
+	14: "Virtual", 15: "File-backed virtual", 16: "Storage Spaces", 17: "NVMe",
+	18: "SCM", 19: "UFS",
+}
+
+// BusName returns the bus name, or "" when the bus type is unknown.
+func (d Disk) BusName() string { return busNames[d.BusType] }

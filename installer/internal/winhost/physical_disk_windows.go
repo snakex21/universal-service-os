@@ -98,7 +98,16 @@ func inspectPhysicalDiskHandle(number uint32, handle windows.Handle) (domain.Dis
 		SizeBytes:   sizeBytes,
 		SectorBytes: sectorBytes,
 		Removable:   len(descriptor) > 10 && descriptor[10] != 0,
+		BusType:     descriptorBusType(descriptor),
 	}, nil
+}
+
+// descriptorBusType reads STORAGE_DEVICE_DESCRIPTOR.BusType (offset 28).
+func descriptorBusType(descriptor []byte) uint32 {
+	if len(descriptor) < 32 {
+		return 0
+	}
+	return binary.LittleEndian.Uint32(descriptor[28:32])
 }
 
 func storageDescriptor(handle windows.Handle) ([]byte, error) {
