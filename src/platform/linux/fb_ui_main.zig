@@ -84,6 +84,7 @@ pub fn main(init: std.process.Init) !u8 {
     } else {
         renderer.render(device.surface, context, state);
     }
+    device.present();
     return 0;
 }
 

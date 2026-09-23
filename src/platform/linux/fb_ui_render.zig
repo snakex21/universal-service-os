@@ -9,6 +9,13 @@ pub fn fillBackground(surface: usos.gui.Surface) void {
 
 pub fn render(surface: usos.gui.Surface, context: *const fb_i18n.Context, state: model.State) void {
     const ui = context.ui(surface);
+    if (state.mode == .splash) {
+        const splash = usos.gui.splash_screen;
+        const layout = splash.usosLayout(&ui);
+        splash.draw(&ui, layout, ui.t(.splash_starting));
+        splash.spinner(&ui, layout, 0);
+        return;
+    }
     var clock_buffer: [48]u8 = undefined;
     const header = fb_i18n.header(&ui, &clock_buffer);
     if (state.mode == .notice or state.mode == .service) {
@@ -41,7 +48,7 @@ pub fn render(surface: usos.gui.Surface, context: *const fb_i18n.Context, state:
             .done => .done,
             .failure => .failure,
             .diagnostic => .diagnostic,
-            .notice, .service => unreachable,
+            .notice, .service, .splash => unreachable,
         },
         .current = state.current,
         .total = state.total,
@@ -66,10 +73,10 @@ test "every framebuffer UI mode renders" {
     defer std.testing.allocator.destroy(context);
     context.* = .{};
     context.load();
-    for ([_][]const u8{ "stage", "progress", "done", "failure", "diagnostic", "notice", "service" }) |mode| {
+    for ([_][]const u8{ "stage", "progress", "done", "failure", "diagnostic", "notice", "service", "splash" }) |mode| {
         var text: [96]u8 = undefined;
         const state = try model.parse(try std.fmt.bufPrint(&text, "mode={s}\ntitle=Copying files\ncurrent=2\ndiag=line", .{mode}));
         render(buffer.surface, context, state);
-        try std.testing.expect(pixels[0] != pixels[pixels.len / 2]);
+        try std.testing.expect(std.mem.indexOfNone(u32, pixels, pixels[0..1]) != null);
     }
 }

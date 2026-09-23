@@ -3,7 +3,12 @@ const usos = @import("usos");
 const linux = std.os.linux;
 
 const FBIOGET_VSCREENINFO: u32 = 0x4600;
+const FBIOPUT_VSCREENINFO: u32 = 0x4601;
 const FBIOGET_FSCREENINFO: u32 = 0x4602;
+const FB_ACTIVATE_NOW: u32 = 0;
+const FB_ACTIVATE_FORCE: u32 = 128;
+/// Created after the first forced scanout of this boot (tmpfs /run).
+const scanout_marker = "/run/usos-fb-scanout";
 
 const FbBitfield = extern struct {
     offset: u32,
@@ -144,8 +149,33 @@ pub const Device = struct {
         };
     }
 
+    /// Makes what was drawn visible. The micro-Linux boots with deferred
+    /// fbcon takeover, so the last UEFI or Legacy BIOS frame (the USOS
+    /// "Starting..." splash) stays on screen through the kernel boot instead
+    /// of a black console. Until something sets the mode, simpledrm's fbdev
+    /// emulation keeps our writes in its shadow buffer; the first call per
+    /// boot re-applies the current mode (FBIOPUT_VSCREENINFO with
+    /// FB_ACTIVATE_FORCE -> fb_set_par), which scans the drawn frame out in
+    /// one step. Later frames are flushed by fbdev deferred I/O as before.
+    pub fn present(self: *Device) void {
+        if (scanoutDone()) return;
+        var variable = std.mem.zeroes(FbVarScreenInfo);
+        if (linux.errno(linux.ioctl(self.fd, FBIOGET_VSCREENINFO, @intFromPtr(&variable))) != .SUCCESS) return;
+        variable.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_FORCE;
+        if (linux.errno(linux.ioctl(self.fd, FBIOPUT_VSCREENINFO, @intFromPtr(&variable))) != .SUCCESS) return;
+        const marker = linux.open(scanout_marker, .{ .ACCMODE = .WRONLY, .CREAT = true }, 0o644);
+        if (linux.errno(marker) == .SUCCESS) _ = linux.close(@intCast(marker));
+    }
+
     pub fn close(self: *Device) void {
         _ = linux.munmap(self.mapping, self.mapping_len);
         _ = linux.close(self.fd);
     }
 };
+
+fn scanoutDone() bool {
+    const result = linux.open(scanout_marker, .{ .ACCMODE = .RDONLY }, 0);
+    if (linux.errno(result) != .SUCCESS) return false;
+    _ = linux.close(@intCast(result));
+    return true;
+}

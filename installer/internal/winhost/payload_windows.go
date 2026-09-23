@@ -182,14 +182,7 @@ func prepareESPPayload(media install.MediaLayout) (payload.Bundle, []dynamicPayl
 		return payload.Bundle{}, nil, 0, err
 	}
 	loaderConf := []byte("default usos-micro-linux.conf\r\ntimeout 0\r\neditor no\r\n")
-	// Match the BIOS boot path: deferred fbcon takeover can leave the old
-	// firmware frame visible while the preparation renderer is already running.
-	// lang.cpio (written below with the language files) adds
-	// /etc/usos/lang.bin so the preparation screens use the chosen language.
-	loaderEntry := []byte(fmt.Sprintf(
-		"title USOS micro-Linux preparation\r\nlinux /EFI/USOS/micro-linux/vmlinuz-virt\r\ninitrd /EFI/USOS/micro-linux/initramfs-usos\r\ninitrd /"+i18n.LinuxLangPath+"\r\noptionsconsole=tty0 console=ttyS0,115200 quiet loglevel=3 fbcon=nodefer vt.global_cursor_default=0 rdinit=/usos-init usos.esp_partuuid=%s\r\n",
-		media.ESP.PartUUID,
-	))
+	loaderEntry := []byte(MicroLinuxLoaderEntry(media.ESP.PartUUID))
 	installState := []byte("phase=pending\r\n")
 	dynamic := []dynamicPayloadFile{
 		{path: filepath.Join("loader", "loader.conf"), data: loaderConf},

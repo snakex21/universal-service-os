@@ -51,7 +51,6 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
     const vt_query = linux.ioctl(tty, 0x5603, @intFromPtr(&vt)); // VT_GETSTATE
     trace.write("vt-query errno={s} active={d}", .{@tagName(linux.errno(vt_query)), vt.active});
     if (linux.errno(vt_result) != .SUCCESS or linux.errno(vt_query) != .SUCCESS or vt.active != 1) return 3;
-    _ = linux.write(tty, "\x1b[2J\x1b[H".ptr, 7);
 
     trace.write("before-framebuffer-open", .{});
     var device: ?fb.Device = fb.Device.open() catch |err| blk: {
@@ -59,6 +58,9 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
         break :blk null;
     };
     defer if (device) |*d| d.close();
+    // Clearing the VT is only needed for the text fallback: writing to it
+    // would end the deferred fbcon takeover and blank the screen.
+    if (device == null) _ = linux.write(tty, "\x1b[2J\x1b[H".ptr, 7);
     const width = if (device) |d| d.width else 640;
     const height = if (device) |d| d.height else 480;
     // Keep VT text out of the framebuffer throughout the preparation session.
@@ -85,9 +87,10 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
     while (true) {
         const layout = renderer.Layout.init(&ui, state);
         if (redraw) {
-            if (device) |d| {
+            if (device) |*d| {
                 renderer.renderWith(&ui, state, input.x, input.y, input.pointer_visible, input.gamepad_active);
                 buffer.copyTo(d.surface);
+                d.present();
             } else {
                 console(tty, state);
             }

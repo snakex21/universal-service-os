@@ -8,6 +8,9 @@ pub const Mode = enum {
     diagnostic,
     notice,
     service,
+    /// The USOS "Starting..." splash, identical to the one the UEFI menu
+    /// leaves on screen, so the takeover is invisible.
+    splash,
 };
 
 pub const max_diagnostic_lines: usize = 120;

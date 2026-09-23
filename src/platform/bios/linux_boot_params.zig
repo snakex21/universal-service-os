@@ -153,7 +153,10 @@ pub fn buildLive(output: *[boot_params_bytes]u8, cmdline: *[cmdline_capacity]u8,
 }
 
 pub fn buildCommandLine(output: *[cmdline_capacity]u8, part_guid_disk: [16]u8, request: CommandRequest) Error!usize {
-    const prefix = "console=tty0 console=ttyS0,115200 quiet loglevel=3 fbcon=nodefer vt.global_cursor_default=0 rdinit=/usos-init usos.esp_partuuid=";
+    // Deferred fbcon takeover (no fbcon=nodefer): the Core's last VBE frame
+    // stays on screen through the kernel boot until usos-fb-ui scans out
+    // its first frame (src/platform/linux/fb_device.zig, present).
+    const prefix = "console=tty0 console=ttyS0,115200 quiet loglevel=3 vt.global_cursor_default=0 rdinit=/usos-init usos.esp_partuuid=";
     if (prefix.len + 36 + 1 > output.len) return error.CommandLineTooLong;
     @memset(output, 0);
     @memcpy(output[0..prefix.len], prefix);
@@ -367,7 +370,7 @@ test "boot params copy setup header and install initrd cmdline E820" {
     try std.testing.expect(result.cmdline_len < cmdline_capacity);
     try std.testing.expect(std.mem.indexOf(u8, cmdline[0..result.cmdline_len], "usos.esp_partuuid=0257e175-1685-4311-91aa-5a83d8eb41e5") != null);
     try std.testing.expect(std.mem.indexOf(u8, cmdline[0..result.cmdline_len], "initrd=") == null);
-    try std.testing.expect(std.mem.indexOf(u8, cmdline[0..result.cmdline_len], "fbcon=nodefer") != null);
+    try std.testing.expect(std.mem.indexOf(u8, cmdline[0..result.cmdline_len], "fbcon=nodefer") == null);
 }
 
 test "XP staging request hex-encodes image and optional WINNT.SIF names" {

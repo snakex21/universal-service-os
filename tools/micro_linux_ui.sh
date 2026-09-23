@@ -107,8 +107,13 @@ usos_ui_log_framebuffer_resource() {
 }
 
 usos_ui_bootstrap_frame() {
+    # The UEFI menu leaves its "Starting..." splash on screen and the kernel
+    # keeps it (deferred fbcon takeover), so this first frame is the same
+    # splash and the takeover is invisible. After the Legacy BIOS loader's
+    # progress screen it is a neutral "Starting..." for every session
+    # (preparation, Hardware & SMART, XP) until the session's own screen.
     {
-        printf 'mode=stage\n'
+        printf 'mode=splash\n'
         printf 'current=1\n'
         printf 'total=5\n'
         printf 'title=STARTING ENVIRONMENT\n'
