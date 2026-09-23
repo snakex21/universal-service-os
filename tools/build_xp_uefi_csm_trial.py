@@ -169,7 +169,7 @@ def refresh_pae_flow(esp):
     assert checked['usr/lib/usos/xp-pae.exe'].data==helper.read_bytes()
     init.write_bytes(result)
     metadata['sha256']['initramfs-xp']=digest(init);metadata['sha256']['pae.exe']=digest(helper)
-    metadata['pae_flow_revision']='20260923-setup-end-pae-firstlogon-fallback-i18n'
+    metadata['pae_flow_revision']='20260923-setup-end-pae-firstlogon-fallback-i18n-crashdump-off'
     manifest_path.write_text(json.dumps(metadata,indent=2)+'\n')
     print('XP_PAE_FLOW_REFRESHED; silent helper; PAE default timeout=0; read-only zero-file verification; other entries unchanged; no VM/E2E',flush=True)
 

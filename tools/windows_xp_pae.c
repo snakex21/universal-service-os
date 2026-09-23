@@ -103,6 +103,24 @@ static BOOL stage_bootini(const char *ini,const char *staged){
     BOOL ok=inserted&&writefile(staged,(BYTE*)out,p)&&WritePrivateProfileStringA("boot loader","timeout","0",staged);
     GlobalFree(out);GlobalFree(old);return ok;
 }
+/* GUI setup's SetUpVirtualMemory turns crash dumps back on (CrashDumpEnabled=3)
+   although text mode installed 0. A full dump through dump_ntoskrn8 caused the
+   0x50 STOP whose forced power-off left zero-filled files, so turn it off again.
+   AutoReboot and every other CrashControl value are left alone.
+   Returns 1 changed, 0 already 0, -1 key/value not writable. XP APIs only. */
+static int disable_crash_dump(HKEY root,const char *path){
+    HKEY k;DWORD type=0,value=0,size=sizeof(value),zero=0;char line[128];
+    if(RegOpenKeyExA(root,path,0,KEY_QUERY_VALUE|KEY_SET_VALUE,&k)!=ERROR_SUCCESS){logline("crashdump: CrashControl key not opened; unchanged");return -1;}
+    LONG q=RegQueryValueExA(k,"CrashDumpEnabled",0,&type,(BYTE*)&value,&size);
+    BOOL known=q==ERROR_SUCCESS&&type==REG_DWORD&&size==sizeof(value);
+    if(known&&value==0){RegCloseKey(k);logline("crashdump: CrashDumpEnabled already 0");return 0;}
+    LONG s=RegSetValueExA(k,"CrashDumpEnabled",0,REG_DWORD,(const BYTE*)&zero,sizeof(zero));
+    if(s==ERROR_SUCCESS)RegFlushKey(k);
+    RegCloseKey(k);
+    if(known)wsprintfA(line,s==ERROR_SUCCESS?"crashdump: CrashDumpEnabled %lu -> 0 (AutoReboot unchanged)":"crashdump: FAILED to set CrashDumpEnabled=0 (was %lu)",value);
+    else lstrcpyA(line,s==ERROR_SUCCESS?"crashdump: CrashDumpEnabled (missing/non-DWORD) -> 0 (AutoReboot unchanged)":"crashdump: FAILED to set CrashDumpEnabled=0");
+    logline(line);return s==ERROR_SUCCESS?1:-1;
+}
 enum { RUN_FAILED=0, RUN_ENABLED=1, RUN_ALREADY=2 };
 static int run(BOOL fallback){
     OSVERSIONINFOA version={sizeof(version)};if(!GetVersionExA(&version)||version.dwMajorVersion!=5||version.dwMinorVersion!=1||version.dwBuildNumber!=2600){logline("REFUSED: not Windows XP 5.1.2600");return RUN_FAILED;}
@@ -187,12 +205,14 @@ static void open_log(void){
 void entry(void){
     int mode=parse_mode(GetCommandLineA());
     open_log();
-    logline("USOS XP PAE v3: originals retained; separate kernel/HAL; no host patching");
+    logline("USOS XP PAE v4: originals retained; separate kernel/HAL; no host patching; crash dump off");
     logline(mode==MODE_FIRST_LOGON?"path=first-logon (GuiRunOnce check)":mode==MODE_INTERACTIVE?"path=interactive":"path=setup-end (UserExecute, silent)");
     int r=run(mode==MODE_FIRST_LOGON);
     if(r==RUN_ENABLED)logline(mode==MODE_FIRST_LOGON?"RESULT: enabled by FIRST-LOGON FALLBACK; restart required":"RESULT: PAE ENTRY READY; default entry, timeout=0; used from the next boot");
     else if(r==RUN_ALREADY)logline(mode==MODE_FIRST_LOGON?"RESULT: already enabled at setup end; nothing shown":"RESULT: already enabled");
     else logline(mode==MODE_SETUP_END?"RESULT: PAE NOT ENABLED at setup end; first-logon fallback will retry":"RESULT: PAE NOT ENABLED; original XP entry retained");
+    /* Independent of the PAE result; before any restart prompt. */
+    if(mode!=MODE_INTERACTIVE)disable_crash_dump(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Control\\CrashControl");
     if(mode==MODE_FIRST_LOGON&&r==RUN_ENABLED){
         static WCHAR ini[MAX_PATH],prompt[1024],title[128];
         BOOL localized=strings_path(ini);

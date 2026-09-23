@@ -48,6 +48,31 @@ assert api.entry_present(os.fsencode(staged))
 assert api.stage_copy(os.fsencode(ini),os.fsencode(staged))
 ini.write_bytes(b'[boot loader]\r\ntimeout=30\r\n[operating systems]\r\n');staged.unlink(missing_ok=True)
 assert not api.stage_copy(os.fsencode(ini),os.fsencode(staged)) and not staged.exists()
+# Crash dumps off (GUI setup re-enables 3); AutoReboot and other values untouched.
+# Exercised on a scratch HKCU key; the helper itself targets HKLM CrashControl.
+import winreg
+api.crash_dump_off.argtypes=[ctypes.c_char_p]
+test_key='Software\\USOS-XP-PAE-Test\\CrashControl'
+def reset_test_key():
+    try:winreg.DeleteKey(winreg.HKEY_CURRENT_USER,test_key)
+    except FileNotFoundError:pass
+reset_test_key()
+assert api.crash_dump_off(test_key.encode())==-1
+with winreg.CreateKey(winreg.HKEY_CURRENT_USER,test_key) as k:
+    winreg.SetValueEx(k,'CrashDumpEnabled',0,winreg.REG_DWORD,3);winreg.SetValueEx(k,'AutoReboot',0,winreg.REG_DWORD,0)
+    winreg.SetValueEx(k,'DumpFile',0,winreg.REG_EXPAND_SZ,'%SystemRoot%\\MEMORY.DMP')
+assert api.crash_dump_off(test_key.encode())==1
+with winreg.OpenKey(winreg.HKEY_CURRENT_USER,test_key) as k:
+    assert winreg.QueryValueEx(k,'CrashDumpEnabled')==(0,winreg.REG_DWORD)
+    assert winreg.QueryValueEx(k,'AutoReboot')==(0,winreg.REG_DWORD)
+    assert winreg.QueryValueEx(k,'DumpFile')==('%SystemRoot%\\MEMORY.DMP',winreg.REG_EXPAND_SZ)
+assert api.crash_dump_off(test_key.encode())==0
+with winreg.OpenKey(winreg.HKEY_CURRENT_USER,test_key,0,winreg.KEY_SET_VALUE) as k:winreg.SetValueEx(k,'CrashDumpEnabled',0,winreg.REG_SZ,'3')
+assert api.crash_dump_off(test_key.encode())==1
+with winreg.OpenKey(winreg.HKEY_CURRENT_USER,test_key) as k:assert winreg.QueryValueEx(k,'CrashDumpEnabled')==(0,winreg.REG_DWORD)
+reset_test_key()
+try:winreg.DeleteKey(winreg.HKEY_CURRENT_USER,'Software\\USOS-XP-PAE-Test')
+except OSError:pass
 seven=Path('C:/Program Files/7-Zip/7z.exe')
 images=sorted(Path('L:/Systems/Windows/Windows XP/Images').glob('*.iso'))
 results=[]
@@ -111,6 +136,10 @@ assert struct.unpack_from('<HH',exe,pe+24+48)==(5,1)
 assert struct.unpack_from('<H',exe,pe+24+68)[0]==2,'PAE helper must use the GUI subsystem (no console)'
 helper_source=(root/'tools/windows_xp_pae.c').read_text()
 assert '"timeout","0"' in helper_source and 'OPEN_ALWAYS' in helper_source
+# Setup-end and first-logon runs both disable crash dumps in the live CrashControl key.
+assert 'if(mode!=MODE_INTERACTIVE)disable_crash_dump(HKEY_LOCAL_MACHINE,"SYSTEM\\\\CurrentControlSet\\\\Control\\\\CrashControl");' in helper_source
+assert '"AutoReboot"' not in helper_source
+assert b'CrashDumpEnabled' in exe and b'SYSTEM\\CurrentControlSet\\Control\\CrashControl' in exe
 # The only message box outside /interactive is the first-logon fallback prompt.
 assert helper_source.count('MessageBoxW(')==1 and 'if(mode==MODE_FIRST_LOGON&&r==RUN_ENABLED)' in helper_source
 # Only English is compiled in; other languages come from pae-strings.ini.
