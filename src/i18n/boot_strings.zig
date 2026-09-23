@@ -242,6 +242,9 @@ pub const Key = enum(u16) {
     prep_step,
     prep_title,
     prep_xp_disks,
+    splash_images,
+    splash_loading,
+    splash_starting,
     summary_answer_file,
     summary_boot_pe,
     summary_boot_source,
@@ -538,6 +541,9 @@ pub const hashes = [_]u32{
     0x5a2661f6, // prep.step
     0x84ce2712, // prep.title
     0x87155e69, // prep.xp_disks
+    0x4f9583c2, // splash.images
+    0x35ce4a04, // splash.loading
+    0x790f2c74, // splash.starting
     0x21b7d2fc, // summary.answer_file
     0x793c0723, // summary.boot_pe
     0xae5be5f9, // summary.boot_source
@@ -862,6 +868,9 @@ pub const bios = [_]bool{
     false,
     false,
     false,
+    false,
+    false,
+    false,
     true,
     true,
     true,
@@ -1129,6 +1138,9 @@ pub const english = [_][]const u8{
     "Step {0} of {1}",
     "Preparing Windows installer",
     "Starting XP disk selection",
+    "Loading system images\xe2\x80\xa6",
+    "Loading\xe2\x80\xa6",
+    "Starting\xe2\x80\xa6",
     "Answer file",
     "Boot PE",
     "Boot source ISO",
