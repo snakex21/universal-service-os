@@ -188,10 +188,16 @@ func (l *driveList) drawRow(w *win, r rect, e *driveEntry, selected, hot, ring b
 	if !e.selectable {
 		titleCol = theme.Muted
 	}
-	c.text(w.semiFont(), e.title, rect{textX, r.Top + w.px(11), textR, r.Top + w.px(32)}, titleCol, dtLeft|dtSingleLine|dtVCenter|dtEndEllipsis)
+	titleR := rect{textX, r.Top + w.px(11), textR, r.Top + w.px(32)}
+	c.text(w.semiFont(), e.title, titleR, titleCol, dtLeft|dtSingleLine|dtVCenter|dtEndEllipsis)
 	line2, col := e.meta, theme.Muted
 	if e.reason != "" {
+		// Rejected rows use line 2 for the reason; bus and size move up
+		// next to the model.
 		line2, col = e.reason, theme.Warning
+		if tw := c.textWidth(w.semiFont(), e.title); titleR.Left+tw+w.px(16) < titleR.Right {
+			c.text(w.captionFont(), e.meta, rect{titleR.Left + tw + w.px(12), titleR.Top, titleR.Right, titleR.Bottom}, theme.Faint, dtLeft|dtSingleLine|dtVCenter|dtEndEllipsis)
+		}
 	}
 	c.text(w.captionFont(), line2, rect{textX, r.Top + w.px(34), textR, r.Top + w.px(52)}, col, dtLeft|dtSingleLine|dtVCenter|dtEndEllipsis)
 }
