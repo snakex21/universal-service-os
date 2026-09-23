@@ -74,7 +74,7 @@ fn feed(byte: u8) ?console.Key {
     if (event.right) return .{ .ascii = 27, .scan = 0 };
     // The wheel moves the selection like the arrow keys (the list scrolls
     // to keep it visible); IntelliMouse Z is negative when turned away.
-    if (event.wheel != 0) return .{ .ascii = 0, .scan = if (event.wheel < 0) 0x48 else 0x50 };
+    if (event.wheel != 0) return .{ .ascii = 0, .scan = mouse.wheelScan(event.wheel) };
     if (graphics_menu.hit(surface, state.x, state.y)) |index| {
         if (event.left or ((event.dx != 0 or event.dy != 0) and index != state.selected)) {
             state.selected = index;

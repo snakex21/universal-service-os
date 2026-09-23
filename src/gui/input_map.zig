@@ -43,6 +43,36 @@ pub const WheelAccumulator = struct {
     }
 };
 
+/// Wheel sign conventions of the raw sources USOS reads. Every path turns
+/// its raw value into USOS notches (positive = wheel turned away from the
+/// user = scroll up, towards the start), like Windows WM_MOUSEWHEEL.
+pub const WheelSource = enum {
+    /// HID Wheel usage, Linux REL_WHEEL/REL_WHEEL_HI_RES, WM_MOUSEWHEEL and
+    /// EDK2's USB mouse driver: positive = away (up).
+    positive_up,
+    /// IntelliMouse PS/2 Z (4th byte) and AMI Aptio's
+    /// EFI_SIMPLE_POINTER_PROTOCOL: negative = away (up).
+    negative_up,
+};
+
+pub fn orientWheel(source: WheelSource, raw: i32) i32 {
+    return switch (source) {
+        .positive_up => raw,
+        .negative_up => if (raw == std.math.minInt(i32)) std.math.maxInt(i32) else -raw,
+    };
+}
+
+/// RelativeMovementZ has no sign in the UEFI spec. EDK2 (OVMF, most
+/// open-source based firmware) passes the HID value through; AMI Aptio
+/// (ASRock, ASUS incl. ROG Ally, MSI, Gigabyte desktops) reports it the
+/// PS/2 way round, as confirmed on hardware. `vendor` is the ASCII-folded
+/// EFI_SYSTEM_TABLE.FirmwareVendor.
+pub fn uefiSimplePointerWheel(vendor: []const u8) WheelSource {
+    if (std.ascii.indexOfIgnoreCase(vendor, "American Megatrends") != null) return .negative_up;
+    if (vendor.len >= 3 and std.ascii.eqlIgnoreCase(vendor[0..3], "AMI")) return .negative_up;
+    return .positive_up;
+}
+
 /// Press/move/release classifier: a press that ends within `threshold`
 /// pixels of where it started is a tap (click); once the pointer travels
 /// further while pressed it becomes a drag and never turns into a tap.
@@ -290,6 +320,21 @@ test "wheel accumulator learns the notch unit and keeps high-resolution remainde
     var scaled = WheelAccumulator{};
     try std.testing.expectEqual(@as(i32, -1), scaled.feed(-8192));
     try std.testing.expectEqual(@as(i32, 2), scaled.feed(16384));
+}
+
+test "wheel sign per source: away from the user is always a positive (up) notch" {
+    // Linux REL_WHEEL +1, HID +1, WM_MOUSEWHEEL +120, EDK2 USB mouse Z +1.
+    try std.testing.expectEqual(@as(i32, 1), orientWheel(.positive_up, 1));
+    try std.testing.expectEqual(@as(i32, 120), orientWheel(.positive_up, 120));
+    // IntelliMouse PS/2 Z -1 (nibble 0xF) and AMI Aptio SimplePointer Z -1.
+    try std.testing.expectEqual(@as(i32, 1), orientWheel(.negative_up, -1));
+    try std.testing.expectEqual(@as(i32, -1), orientWheel(.negative_up, 1));
+    try std.testing.expectEqual(WheelSource.negative_up, uefiSimplePointerWheel("American Megatrends"));
+    try std.testing.expectEqual(WheelSource.negative_up, uefiSimplePointerWheel("AMI"));
+    try std.testing.expectEqual(WheelSource.positive_up, uefiSimplePointerWheel("EDK II"));
+    try std.testing.expectEqual(WheelSource.positive_up, uefiSimplePointerWheel("INSYDE Corp."));
+    var wheel = WheelAccumulator{};
+    try std.testing.expectEqual(@as(i32, 1), wheel.feed(orientWheel(.negative_up, -1)));
 }
 
 test "tap versus drag uses a movement threshold" {

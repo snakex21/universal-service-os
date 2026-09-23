@@ -107,6 +107,9 @@ var cursor_x: u32 = 0;
 var cursor_y: u32 = 0;
 var gesture = input_map.Gesture{};
 var initialized = false;
+var simple_wheel: input_map.WheelSource = .positive_up;
+var vendor_buffer: [64]u8 = undefined;
+var vendor_len: usize = 0;
 
 pub fn configure(value: Settings) void {
     settings = value;
@@ -124,6 +127,13 @@ pub fn init(width: u32, height: u32) void {
         return;
     }
     initialized = true;
+    vendor_len = 0;
+    const vendor = uefi.system_table.firmware_vendor;
+    while (vendor[vendor_len] != 0 and vendor_len < vendor_buffer.len) : (vendor_len += 1) {
+        const unit = vendor[vendor_len];
+        vendor_buffer[vendor_len] = if (unit >= 0x20 and unit < 0x7f) @intCast(unit) else '?';
+    }
+    simple_wheel = input_map.uefiSimplePointerWheel(vendor_buffer[0..vendor_len]);
     simple_count = 0;
     absolute_count = 0;
     const firmware_ps2 = scanDevices();
@@ -285,7 +295,7 @@ fn pollPs2() ?Event {
     const next_x = applyDelta(cursor_x, state.dx, screen_width);
     const next_y = applyDelta(cursor_y, state.dy, screen_height);
     // IntelliMouse reports negative Z for the wheel turned away.
-    const notches = ps2_wheel.feed(-@as(i32, state.wheel));
+    const notches = ps2_wheel.feed(input_map.orientWheel(.negative_up, state.wheel));
     const event = commit(next_x, next_y, wheelSign(notches), state.left, ps2_left, state.right, ps2_right, false);
     ps2_left = state.left;
     ps2_right = state.right;
@@ -299,8 +309,8 @@ fn pollSimple(device: *SimpleDevice) ?Event {
     const dy = normalizedDelta(state.relative_movement_y, device.protocol.mode.resolution_y);
     const next_x = applyDelta(cursor_x, dx, screen_width);
     const next_y = applyDelta(cursor_y, dy, screen_height);
-    // EDK2 and AMI pass the HID wheel through: positive = away from the user.
-    const notches = device.wheel.feed(state.relative_movement_z);
+    // The sign depends on the firmware (see input_map.uefiSimplePointerWheel).
+    const notches = device.wheel.feed(input_map.orientWheel(simple_wheel, state.relative_movement_z));
     const event = commit(next_x, next_y, wheelSign(notches), state.left_button, device.left, state.right_button, device.right, false);
     device.left = state.left_button;
     device.right = state.right_button;
@@ -444,6 +454,12 @@ pub const Report = struct {
     }
     pub fn ps2SkippedForFirmware() bool {
         return ps2_skipped_for_firmware;
+    }
+    pub fn firmwareVendor() []const u8 {
+        return vendor_buffer[0..vendor_len];
+    }
+    pub fn simpleWheelSource() []const u8 {
+        return @tagName(simple_wheel);
     }
     pub fn wheelInverted() bool {
         return settings.wheel_invert;

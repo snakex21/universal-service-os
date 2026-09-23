@@ -69,6 +69,12 @@ fn decodeWheel(value: u8) i8 {
     return if ((nibble & 0x08) != 0) @as(i8, @intCast(nibble)) - 16 else @intCast(nibble);
 }
 
+/// BIOS scan code a wheel packet acts as: IntelliMouse Z is negative when
+/// the wheel turns away from the user, which moves the selection up.
+pub fn wheelScan(wheel: i8) u8 {
+    return if (wheel < 0) 0x48 else 0x50;
+}
+
 /// Reads one byte from the auxiliary (mouse) port, leaving keyboard bytes.
 fn readAux() ?u8 {
     var attempts: usize = 0;
@@ -119,6 +125,8 @@ test "IntelliMouse four-byte packets carry the wheel" {
     _ = decoder.feed(0);
     _ = decoder.feed(0);
     try std.testing.expectEqual(@as(i8, 1), decoder.feed(0x01).?.wheel);
+    try std.testing.expectEqual(@as(u8, 0x48), wheelScan(up.wheel)); // away = up arrow
+    try std.testing.expectEqual(@as(u8, 0x50), wheelScan(1));
     var standard = Decoder{};
     _ = standard.feed(0x08);
     _ = standard.feed(0);

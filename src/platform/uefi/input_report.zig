@@ -61,6 +61,7 @@ fn build(width: u32, height: u32) void {
         yesNo(pointer.Report.ps2Wheel()),
         yesNo(pointer.Report.ps2SkippedForFirmware()),
     });
+    print("firmware_vendor={s} simple_pointer_wheel_z={s}\n", .{ pointer.Report.firmwareVendor(), pointer.Report.simpleWheelSource() });
     print("settings: wheel_invert={s}\n\n", .{yesNo(pointer.Report.wheelInverted())});
 
     if (services.locateHandleBuffer(.{ .by_protocol = &pointer.SimplePointer.guid }) catch null) |handles| {
