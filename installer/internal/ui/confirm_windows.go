@@ -32,14 +32,14 @@ func drawTarget(w *win, x, y, width int32, disk domain.Disk, extra [][2]string) 
 	labelW := min(w.px(170), inner/3)
 	h := w.px(18) + w.px(40) + w.px(12)
 	for _, kv := range rows {
-		h += w.kvHeight(labelW, inner, kv[1]) + w.px(6)
+		h += w.kvHeight(labelW, inner, kv[0], kv[1]) + w.px(6)
 	}
 	h += w.px(12)
 	r := rect{x, y, x + width, y + h}
 	w.panel(r)
 	iconSize := w.px(40)
 	ix, iy := x+w.px(20), y+w.px(18)
-	c.icon(w.stockIcon(driveIcon(disk), iconSize), ix, iy, iconSize)
+	w.driveIcon(classifyDrive(disk), ix, iy, iconSize)
 	c.text(w.font(sizeH2, fwSemiBold), disk.DisplayName(), rect{ix + iconSize + w.px(14), iy, r.Right - w.px(20), iy + iconSize}, theme.Text, dtLeft|dtSingleLine|dtVCenter|dtEndEllipsis)
 	yy := iy + iconSize + w.px(12)
 	for _, kv := range rows {
@@ -262,7 +262,7 @@ func (s *updateConfirmScreen) draw(f *Flow, w *win, area rect) {
 	}
 	h := w.px(18+26+12) + w.px(16)
 	for _, kv := range rows {
-		h += w.kvHeight(labelW, inner, kv[1]) + w.px(6)
+		h += w.kvHeight(labelW, inner, kv[0], kv[1]) + w.px(6)
 	}
 	card := rect{rightR.Left, rightR.Top, rightR.Right, rightR.Top + h}
 	w.panel(card)

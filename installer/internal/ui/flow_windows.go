@@ -3,7 +3,10 @@
 package ui
 
 import (
+	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 	"unsafe"
 
 	"github.com/snakex21/universal-service-os/installer/internal/domain"
@@ -86,6 +89,9 @@ type Flow struct {
 	busy       bool
 	langOpen   bool
 	langIndex  int
+	langReveal bool // scroll the menu so langIndex is visible on the next frame
+	langTyped  string
+	langTypeAt time.Time
 	toast      string
 	toastUntil time.Time
 	langAnchor rect
@@ -253,24 +259,78 @@ func (f *Flow) openLanguageMenu() {
 	}
 	f.langOpen = true
 	f.langIndex = 0
+	f.langReveal = true
+	f.langTyped = ""
 	for i, language := range i18n.Languages() {
 		if language.Code == i18n.Current() {
 			f.langIndex = i
 		}
 	}
+	// Keys (arrows, type-to-jump) must reach the menu, not a focused EDIT.
+	if getFocus() != f.w.hwnd {
+		setFocus(f.w.hwnd)
+	}
 	f.w.invalidate()
+}
+
+// selectLanguageIndex moves the menu highlight and keeps it in view.
+func (f *Flow) selectLanguageIndex(i int) {
+	f.langIndex = max(0, min(i, len(i18n.Languages())-1))
+	f.langReveal = true
+}
+
+// char implements type-to-jump in the open language menu: typed letters
+// (a prefix typed within a second, or one letter repeated to cycle) select
+// the next language whose native name starts with them (diacritics folded).
+func (f *Flow) char(w *win, r rune) bool {
+	if !f.langOpen || r < ' ' {
+		return false
+	}
+	w.cues = true
+	now := time.Now()
+	if now.Sub(f.langTypeAt) > time.Second {
+		f.langTyped = ""
+	}
+	f.langTypeAt = now
+	f.langTyped += string(unicode.ToLower(r))
+	prefix, start := f.langTyped, f.langIndex
+	// One letter (or the same letter repeated) cycles through the matches;
+	// a longer prefix refines the current match.
+	if first, _ := utf8.DecodeRuneInString(prefix); strings.Count(prefix, string(first)) == utf8.RuneCountInString(prefix) {
+		prefix, start = string(first), f.langIndex+1
+	}
+	languages := i18n.Languages()
+	for k := 0; k < len(languages); k++ {
+		i := (start + k) % len(languages)
+		if languageMatches(languages[i], prefix) {
+			f.selectLanguageIndex(i)
+			break
+		}
+	}
+	return true
+}
+
+func languageMatches(language i18n.Language, prefix string) bool {
+	// Only the native name is shown, so only it is matched.
+	return strings.HasPrefix(i18n.FoldName(language.Name), i18n.FoldName(prefix))
 }
 
 func (f *Flow) drawLanguageMenu(w *win, client rect) {
 	anchor := widget{r: f.langAnchor}
 	languages := i18n.Languages()
 	c := w.canvas
-	width := max(w.px(280), anchor.r.w())
-	itemH := w.px(38)
+	width := max(w.px(300), anchor.r.w())
+	itemH := w.px(36)
 	hint := i18n.T("installer.language.hint")
 	hintH := c.measure(w.captionFont(), hint, width-w.px(32))
-	height := w.px(8) + int32(len(languages))*itemH + w.px(8) + hintH + w.px(16)
-	panel := rect{anchor.r.Right - width, anchor.r.Bottom + w.px(6), anchor.r.Right, anchor.r.Bottom + w.px(6) + height}
+	top := anchor.r.Bottom + w.px(6)
+	// The list scrolls when all languages do not fit above the window's
+	// bottom edge; the hint always stays visible below it.
+	content := int32(len(languages)) * itemH
+	chrome := w.px(8) + w.px(8) + w.px(14) + hintH + w.px(16)
+	listH := max(min(content, client.Bottom-w.px(12)-top-chrome), 3*itemH)
+	height := listH + chrome
+	panel := rect{anchor.r.Right - width, top, anchor.r.Right, top + height}
 	w.overlay = panel
 	// Clicking anywhere outside the menu closes it.
 	w.add(widget{id: "lang.scrim", r: client, onClick: func() { f.langOpen = false }})
@@ -279,10 +339,34 @@ func (f *Flow) drawLanguageMenu(w *win, client rect) {
 	c.roundRectAlpha(shadow, w.px(12), color{0, 0, 0}, 0.35)
 	c.roundRect(panel, w.px(10), theme.Panel)
 	c.roundBorder(panel, w.px(10), max(1, w.px(1)), theme.BorderStrong)
-	y := panel.Top + w.px(8)
+	view := rect{panel.Left + w.px(6), panel.Top + w.px(8), panel.Right - w.px(6), panel.Top + w.px(8) + listH}
+	if f.langReveal {
+		f.langReveal = false
+		st := w.scrolls["lang.scroll"]
+		if st == nil {
+			st = &scrollState{}
+			w.scrolls["lang.scroll"] = st
+		}
+		itemTop := int32(f.langIndex) * itemH
+		if itemTop < st.offset {
+			st.offset = itemTop
+		} else if itemTop+itemH > st.offset+listH {
+			st.offset = itemTop + itemH - listH
+		}
+	}
+	offset := w.beginScroll("lang.scroll", view)
+	scrollbar := int32(0)
+	if content > listH {
+		scrollbar = w.px(12)
+	}
+	y := view.Top - offset
 	for i, language := range languages {
 		code := language.Code
-		item := rect{panel.Left + w.px(6), y, panel.Right - w.px(6), y + itemH}
+		item := rect{view.Left, y, view.Right - scrollbar, y + itemH}
+		y += itemH
+		if item.Bottom <= view.Top || item.Top >= view.Bottom {
+			continue
+		}
 		st := w.add(widget{id: "lang." + code, r: item, onClick: func() { f.setLanguage(code) }})
 		if st.hot || (i == f.langIndex && w.cues) {
 			c.roundRect(item, w.px(6), theme.PanelAlt)
@@ -290,11 +374,10 @@ func (f *Flow) drawLanguageMenu(w *win, client rect) {
 		if code == i18n.Current() {
 			w.glyph(glyphCheck, rect{item.Left + w.px(8), item.Top, item.Left + w.px(28), item.Bottom}, 13, theme.Accent)
 		}
-		c.text(w.semiFont(), language.Name, rect{item.Left + w.px(36), item.Top, item.Right - w.px(48), item.Bottom}, theme.Text, dtLeft|dtSingleLine|dtVCenter|dtEndEllipsis)
-		c.text(w.captionFont(), code, rect{item.Right - w.px(48), item.Top, item.Right - w.px(10), item.Bottom}, theme.Faint, dtRight|dtSingleLine|dtVCenter)
-		y += itemH
+		c.text(w.semiFont(), language.Name, rect{item.Left + w.px(36), item.Top, item.Right - w.px(10), item.Bottom}, theme.Text, dtLeft|dtSingleLine|dtVCenter|dtEndEllipsis)
 	}
-	y += w.px(4)
+	w.endScroll("lang.scroll", view, content)
+	y = view.Bottom + w.px(4)
 	w.separator(panel.Left+w.px(12), panel.Right-w.px(12), y)
 	y += w.px(10)
 	c.text(w.captionFont(), hint, rect{panel.Left + w.px(16), y, panel.Right - w.px(16), y + hintH}, theme.Muted, dtLeft|dtWordBreak|dtEditControl)
@@ -333,9 +416,17 @@ func (f *Flow) key(w *win, vk uintptr, pre bool) bool {
 		case vkEscape, vkTab:
 			f.langOpen = false
 		case vkUp:
-			f.langIndex = max(0, f.langIndex-1)
+			f.selectLanguageIndex(f.langIndex - 1)
 		case vkDown:
-			f.langIndex = min(len(languages)-1, f.langIndex+1)
+			f.selectLanguageIndex(f.langIndex + 1)
+		case vkPrior:
+			f.selectLanguageIndex(f.langIndex - 8)
+		case vkNext:
+			f.selectLanguageIndex(f.langIndex + 8)
+		case vkHome:
+			f.selectLanguageIndex(0)
+		case vkEnd:
+			f.selectLanguageIndex(len(languages) - 1)
 		case vkReturn, vkSpace:
 			if f.langIndex >= 0 && f.langIndex < len(languages) {
 				f.setLanguage(languages[f.langIndex].Code)

@@ -271,7 +271,21 @@ func (c *canvas) text(font windows.Handle, s string, r rect, col color, flags ui
 	}
 	procDrawTextW.Call(uintptr(c.dc), uintptr(unsafe.Pointer(&u[0])), uintptr(len(u)-1), uintptr(unsafe.Pointer(&r)), flags|dtNoPrefix)
 	c.dirty = true
+	if textOverflowHook != nil {
+		if flags&dtSingleLine != 0 {
+			if need := c.textWidth(font, s); need > r.w() {
+				textOverflowHook(s, need, r.w(), false)
+			}
+		} else if need := c.measure(font, s, r.w()); need > r.h() {
+			textOverflowHook(s, need, r.h(), true)
+		}
+	}
 }
+
+// textOverflowHook, when set (screenshot harness only), is told about every
+// string that did not fit its rectangle: need/have are widths for single-line
+// text and heights for wrapped text.
+var textOverflowHook func(text string, need, have int32, wrapped bool)
 
 // measure returns the height DrawTextW needs to wrap s into width.
 func (c *canvas) measure(font windows.Handle, s string, width int32) int32 {

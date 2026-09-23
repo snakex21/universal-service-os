@@ -281,15 +281,26 @@ func (w *win) checkbox(id string, x, y, width int32, label string, checked bool,
 
 // kvRow draws a label/value pair; the value wraps. Returns the row height.
 func (w *win) kvRow(x, y, labelW, width int32, label, value string) int32 {
-	valueW := width - labelW
-	h := max(w.px(20), w.canvas.measure(w.bodyFont(), value, valueW))
-	w.canvas.text(w.captionFont(), label, rect{x, y + w.px(1), x + labelW - w.px(8), y + w.px(20)}, theme.Muted, dtLeft|dtSingleLine|dtVCenter|dtEndEllipsis)
+	h := w.kvHeight(labelW, width, label, value)
+	// A label too long for its column (long translations) wraps instead of
+	// being cut off.
+	labelR := rect{x, y + w.px(1), x + labelW - w.px(8), y + w.px(20)}
+	if w.canvas.textWidth(w.captionFont(), label) > labelR.w() {
+		labelR.Bottom = y + h
+		w.canvas.text(w.captionFont(), label, labelR, theme.Muted, dtLeft|dtWordBreak|dtEditControl)
+	} else {
+		w.canvas.text(w.captionFont(), label, labelR, theme.Muted, dtLeft|dtSingleLine|dtVCenter)
+	}
 	w.canvas.text(w.bodyFont(), value, rect{x + labelW, y, x + width, y + h}, theme.Text, dtLeft|dtWordBreak|dtEditControl)
 	return h
 }
 
-func (w *win) kvHeight(labelW, width int32, value string) int32 {
-	return max(w.px(20), w.canvas.measure(w.bodyFont(), value, width-labelW))
+func (w *win) kvHeight(labelW, width int32, label, value string) int32 {
+	h := max(w.px(20), w.canvas.measure(w.bodyFont(), value, width-labelW))
+	if w.canvas.textWidth(w.captionFont(), label) > labelW-w.px(8) {
+		h = max(h, w.canvas.measure(w.captionFont(), label, labelW-w.px(8))+w.px(1))
+	}
+	return h
 }
 
 // textField draws the frame of a native single-line EDIT and places it.

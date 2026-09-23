@@ -19,7 +19,7 @@ type driveEntry struct {
 	badge      string
 	badgeTone  tone
 	selectable bool
-	siid       int32
+	kind       driveKind
 	details    [][2]string
 	root       string
 }
@@ -28,13 +28,6 @@ type driveEntry struct {
 type driveList struct {
 	selected int
 	entries  []driveEntry
-}
-
-func driveIcon(d domain.Disk) int32 {
-	if d.Removable || d.BusType == domain.BusUSB {
-		return siidDriveRemove
-	}
-	return siidDriveFixed
 }
 
 func busLabel(d domain.Disk) string {
@@ -180,7 +173,7 @@ func (l *driveList) drawRow(w *win, r rect, e *driveEntry, selected, hot, ring b
 		w.focusRing(r, radius)
 	}
 	iconSize := w.px(32)
-	c.icon(w.stockIcon(e.siid, iconSize), r.Left+w.px(14), r.Top+(r.h()-iconSize)/2, iconSize)
+	w.driveIcon(e.kind, r.Left+w.px(14), r.Top+(r.h()-iconSize)/2, iconSize)
 	badgeRect := w.badge(e.badge, r.Right-w.px(14), r.Top+r.h()/2, e.badgeTone)
 	textX := r.Left + w.px(14) + iconSize + w.px(14)
 	textR := badgeRect.Left - w.px(12)
@@ -216,7 +209,7 @@ func drawDetails(w *win, r rect, e *driveEntry, hint string) {
 	offset := w.beginScroll("details.scroll", inner)
 	y := inner.Top - offset
 	iconSize := w.px(48)
-	c.icon(w.stockIcon(e.siid, iconSize), inner.Left, y, iconSize)
+	w.driveIcon(e.kind, inner.Left, y, iconSize)
 	tx := inner.Left + iconSize + w.px(14)
 	titleW := inner.Right - tx - w.px(10)
 	th := c.measure(w.font(sizeH2, fwSemiBold), e.title, titleW)
@@ -323,7 +316,7 @@ func (s *deviceScreen) entries() []driveEntry {
 			title:      row.Model,
 			meta:       joinMeta(busLabel(d), row.Capacity, row.Letters),
 			selectable: row.Selectable,
-			siid:       driveIcon(d),
+			kind:       classifyDrive(d),
 			details:    diskDetails(d, row),
 			root:       row.RootContents,
 		}
@@ -470,7 +463,7 @@ func (s *installedScreen) entries() []driveEntry {
 			badge:      i18n.T("installer.badge.usos"),
 			badgeTone:  toneAccent,
 			selectable: true,
-			siid:       driveIcon(t.Disk),
+			kind:       classifyDrive(t.Disk),
 			details:    details,
 			root:       row.RootContents,
 		}

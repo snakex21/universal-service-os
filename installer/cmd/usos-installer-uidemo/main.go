@@ -39,6 +39,8 @@ func main() {
 	height := flag.Int("h", 0, "client height in DIPs")
 	startupError := flag.Bool("startup-error", false, "show the startup error screen")
 	measure := flag.String("measure", "", "write first-frame timing and memory to this file and exit")
+	langShots := flag.String("langshots", "", "comma-separated languages: shoot the home screen, the device list and the language menu in each, then exit")
+	overflow := flag.String("overflow", "", "append every ellipsized or clipped string to this file")
 	flag.Parse()
 	i18n.SetLanguage(*lang)
 
@@ -67,7 +69,15 @@ func main() {
 		}
 	} else if *shots != "" {
 		cfg.Script = func(d *ui.Driver) {
-			err := tour(d, engines, *shots, *suffix, *startupError)
+			if *overflow != "" {
+				logOverflow(d, *overflow, *lang, *dpi)
+			}
+			var err error
+			if *langShots != "" {
+				err = languageTour(d, *shots, strings.Split(*langShots, ","), *suffix)
+			} else {
+				err = tour(d, engines, *shots, *suffix, *startupError, *lang)
+			}
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "TOUR FAILED:", err)
 				_ = os.WriteFile(filepath.Join(*shots, "tour-error"+*suffix+".txt"), []byte(err.Error()), 0o644)
@@ -81,7 +91,73 @@ func main() {
 	}
 }
 
-func tour(d *ui.Driver, e *fakeEngines, dir, suffix string, startupError bool) error {
+// logOverflow records strings the UI had to ellipsize or clip, one line each
+// (language, DPI, screen, need/have in px, text), for the layout check.
+func logOverflow(d *ui.Driver, path, lang string, dpi uint) {
+	seen := map[string]bool{}
+	d.OnTextOverflow(func(screen, text string, need, have int32, wrapped bool) {
+		kind := "width"
+		if wrapped {
+			kind = "height"
+		}
+		line := fmt.Sprintf("%s\t%d\t%s\t%s %d>%d\t%q\n", lang, dpi, screen, kind, need, have, text)
+		if seen[line] {
+			return
+		}
+		seen[line] = true
+		if f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
+			_, _ = f.WriteString(line)
+			_ = f.Close()
+		}
+	})
+}
+
+// languageTour shoots, per language, the home screen, the install device
+// list with the USB stick selected, and (first language only) the language
+// menu after type-to-jump.
+func languageTour(d *ui.Driver, dir string, langs []string, suffix string) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	d.Loaded()
+	for i, lang := range langs {
+		lang = strings.TrimSpace(lang)
+		d.SetLanguage(lang)
+		name := func(what string) string { return filepath.Join(dir, fmt.Sprintf("%s-%s%s.png", lang, what, suffix)) }
+		d.Focus("mode.install")
+		if err := d.Shot(name("home")); err != nil {
+			return err
+		}
+		if i == 0 {
+			if err := d.Activate("header.lang"); err != nil {
+				return err
+			}
+			d.Type("f") // type-to-jump: first language starting with F
+			if err := d.Shot(name("language-menu")); err != nil {
+				return err
+			}
+			d.Key(0x1B)
+		}
+		if err := d.Activate("mode.install"); err != nil {
+			return err
+		}
+		d.Loaded()
+		if err := d.Activate("list.row.1"); err != nil {
+			return err
+		}
+		d.Focus("list")
+		if err := d.Shot(name("devices")); err != nil {
+			return err
+		}
+		if err := d.Activate("action.back"); err != nil {
+			return err
+		}
+		d.Loaded()
+	}
+	return nil
+}
+
+func tour(d *ui.Driver, e *fakeEngines, dir, suffix string, startupError bool, lang string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
@@ -123,7 +199,7 @@ func tour(d *ui.Driver, e *fakeEngines, dir, suffix string, startupError bool) e
 	if err := shot("mode-english"); err != nil {
 		return err
 	}
-	d.SetLanguage("pl")
+	d.SetLanguage(lang)
 
 	// Install: device list, select the eligible stick, then a rejected one.
 	if err := d.Activate("mode.install"); err != nil {

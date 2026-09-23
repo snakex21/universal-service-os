@@ -42,6 +42,12 @@ type rootView interface {
 	languageChanged()
 }
 
+// charHandler roots receive WM_CHAR typed into the main window (not into a
+// native EDIT), e.g. for type-to-jump in a menu.
+type charHandler interface {
+	char(w *win, r rune) bool
+}
+
 type widget struct {
 	id        string
 	r         rect // visible (clipped) hit area
@@ -386,6 +392,13 @@ func (w *win) run() {
 		if int32(r) <= 0 {
 			break
 		}
+		// A scripted (screenshot harness) window steals the foreground, so
+		// real keystrokes meant for another program must not drive it. The
+		// Driver posts its keys with lParam 0; real ones always carry a
+		// repeat count and scan code.
+		if w.scripted && m.Message >= wmKeyDown && m.Message <= wmSysKeyDown+3 && m.LParam != 0 {
+			continue
+		}
 		if w.preTranslate(&m) {
 			continue
 		}
@@ -524,6 +537,9 @@ func (w *win) wndProc(hwnd windows.HWND, message uint32, wParam, lParam uintptr)
 		w.handleKey(wParam, false)
 		return 0
 	case wmChar:
+		if h, ok := w.root.(charHandler); ok && h.char(w, rune(wParam)) {
+			w.invalidate()
+		}
 		return 0
 	case wmSetFocus:
 		w.invalidate()

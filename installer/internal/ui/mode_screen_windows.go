@@ -170,10 +170,16 @@ func (s *modeScreen) drawCard(w *win, r rect, card modeCard) {
 	// Effect chips along the bottom edge.
 	cx := textX
 	cy := inner.Bottom - w.px(11)
+	if cy-w.px(11) <= inner.Top+w.px(30)+summaryH && textOverflowHook != nil && len(card.chips) > 0 {
+		textOverflowHook("chips hidden under: "+card.summary, inner.Top+w.px(30)+summaryH, cy-w.px(11), true)
+	}
 	if cy-w.px(11) > inner.Top+w.px(30)+summaryH {
 		for _, ch := range card.chips {
 			bw := w.badgeWidth(ch.text)
 			if cx+bw > inner.Right {
+				if textOverflowHook != nil {
+					textOverflowHook("chip: "+ch.text, cx+bw-textX, inner.Right-textX, false)
+				}
 				break
 			}
 			w.badge(ch.text, cx+bw, cy, ch.tone)

@@ -140,6 +140,16 @@ func (d *Driver) SetLanguage(code string) {
 	d.Idle()
 }
 
+// OnTextOverflow registers fn for every drawn string that is ellipsized or
+// clipped (see textOverflowHook); screen is the current screen type.
+func (d *Driver) OnTextOverflow(fn func(screen, text string, need, have int32, wrapped bool)) {
+	d.do(func() {
+		textOverflowHook = func(text string, need, have int32, wrapped bool) {
+			fn(fmt.Sprintf("%T", d.f.screen), text, need, have, wrapped)
+		}
+	})
+}
+
 // Busy reports whether an operation is running.
 func (d *Driver) Busy() bool {
 	var busy bool
