@@ -11,6 +11,7 @@
 #include <wchar.h>
 #include <wctype.h>
 #include <string.h>
+#include "windows_winpe_ui.h"
 
 typedef struct { char magic[8]; GUID disk,part; uint64_t offset,length,disk_length; } Request;
 _Static_assert(sizeof(Request)==64,"request wire size");
@@ -104,7 +105,7 @@ static int repair(void){
  if(!waited||(code!=0&&code!=3010))return fail("DISM did not apply package; request retained as .running; Setup blocked");
  swprintf(path,MAX_PATH,L"%ls.done",request);if(!MoveFileW(running,path))return fail("package accepted but request completion marker failed");
  note("DISM accepted KB2685811. Reboot required; USB function and Windows startup still require hardware verification.");
- MessageBoxW(0,L"Dodano pakiet KMDF 1.11 wymagany przez sterowniki USB.\n\nUruchom ponownie komputer z dysku Intel.\nNie rozpoczeto instalacji Windows. Log zapisano na pendrivie.",L"USOS - naprawa zaleznosci USB",MB_OK|MB_ICONINFORMATION|MB_SETFOREGROUND);
+ MessageBoxW(0,USOS_UI_TEXT(KMDF_DONE),USOS_UI_TEXT(KMDF_TITLE),MB_OK|MB_ICONINFORMATION|MB_SETFOREGROUND);
  return 0;
 }
 int main(void){int code=repair();if(report!=INVALID_HANDLE_VALUE)CloseHandle(report);return code;}

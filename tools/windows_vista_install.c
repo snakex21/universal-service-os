@@ -14,6 +14,8 @@
 #include "vista_boot_files.h"
 #include "vista_hive.h"
 #include "vista_servicing_answer.h"
+#include "windows_setup_result.h"
+#include "windows_winpe_ui.h"
 
 static WCHAR base[MAX_PATH], scratch[MAX_PATH], command[2048];
 static BYTE buffer[65536];
@@ -265,7 +267,7 @@ static DWORD run_setup(const WCHAR *executable,WCHAR *line){
  refresh_esp();
  if((pinned_esp&&profile_disk_count!=1)||(!store_ready&&have_selected_esp)||(!pinned_esp&&!store_ready&&original_esp_count>1)){
   logcode("Setup not started: target EFI selection could not be verified=",store_error?store_error:ERROR_NOT_READY);
-  MessageBoxW(0,L"Nie mozna potwierdzic partycji startowej Visty. Instalacja nie zostala uruchomiona. Logi BCD zostana zapisane na pendrivie.",L"USOS - Vista UEFI",MB_OK|MB_ICONERROR);
+  MessageBoxW(0,USOS_UI_TEXT(VISTA_ESP_FAILED),USOS_UI_TEXT(VISTA_ESP_TITLE),MB_OK|MB_ICONERROR);
   unmount_esp(selected_alias);return ERROR_NOT_READY;
  }
  WNDCLASSW wc={0};wc.lpfnWndProc=device_window;wc.hInstance=GetModuleHandleW(0);wc.lpszClassName=L"USOSVistaESP";
@@ -456,7 +458,7 @@ void entry(void){
  lstrcatW(command,L" /unattend:\"");lstrcatW(command,servicing_answer);lstrcatW(command,L"\"");
  /* refresh_esp uses the command buffer too, so give Setup its own command. */
  static WCHAR setup_command[2048];lstrcpyW(setup_command,command);
- DWORD result=run_setup(setup_path,setup_command);logcode("Vista Setup returned=",result);if(result)ExitProcess(result);
+ DWORD result=run_setup(setup_path,setup_command);logcode("Vista Setup returned=",result);usos_record_setup_result(result);if(result)ExitProcess(result);
  if(!inventory(after,&after_count))ExitProcess(5);
  Target *target=0;DWORD candidates=0;
  for(DWORD i=0;i<after_count;i++){
@@ -469,7 +471,7 @@ void entry(void){
  if(pinned_esp&&(!store_ready||!have_selected_esp||target->disk!=selected_esp.disk)){logcode("Setup target differs from verified EFI target=",ERROR_INVALID_DATA);ExitProcess(5);}
  if(!verify_offline_kmdf(target->root)){
   logcode("STOP: KMDF 1.11 not applied offline; USB firstboot has NOT been armed=",ERROR_NOT_READY);
-  MessageBoxW(0,L"Instalator nie przygotowal KMDF 1.11 wymaganego przez USB. Nie uruchamiaj jeszcze Visty z dysku. Logi instalacji zostana zapisane na pendrivie.",L"USOS - Vista KMDF",MB_OK|MB_ICONERROR);
+  MessageBoxW(0,USOS_UI_TEXT(VISTA_KMDF_FAILED),USOS_UI_TEXT(VISTA_KMDF_TITLE),MB_OK|MB_ICONERROR);
   ExitProcess(10);
  }
  if(!copy_payload(target)){logcode("Copy target USB package failed=",GetLastError());ExitProcess(6);}

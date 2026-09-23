@@ -17,7 +17,7 @@ def build(root: Path, output: Path):
           '-Wl,--entry,entry','-lkernel32','-ladvapi32','-o',str(output/('usos-source-'+arch+'.exe'))],env=env,check=True)
         subprocess.run([str(root/'tools/zig/zig.exe'),'cc','-target',arch+'-windows.vista-gnu','-Os','-nostdlib','-fno-stack-protector','-fno-builtin',
           '-I'+str(root/'tools/zig/lib/libc/include/any-windows-any'),str(root/'tools/windows_setup_launcher.c'),
-          '-Wl,--entry,entry','-Wl,--subsystem,windows','-lkernel32','-ladvapi32','-luser32','-o',str(output/('usos-launch-'+arch+'.exe'))],env=env,check=True)
+          '-Wl,--entry,entry','-Wl,--subsystem,windows','-lkernel32','-ladvapi32','-luser32','-lgdi32','-o',str(output/('usos-launch-'+arch+'.exe'))],env=env,check=True)
         subprocess.run([str(root/'tools/zig/zig.exe'),'cc','-target',arch+'-windows.vista-gnu','-Os','-nostdlib','-fno-stack-protector','-fno-builtin',
           '-I'+str(root/'tools/zig/lib/libc/include/any-windows-any'),str(root/'tools/windows_usb_report.c'),
           '-Wl,--entry,entry','-lkernel32','-ladvapi32','-lsetupapi','-lcfgmgr32','-o',str(output/('usos-usb-report-'+arch+'.exe'))],env=env,check=True)

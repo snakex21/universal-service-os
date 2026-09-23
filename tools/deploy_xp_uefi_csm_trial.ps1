@@ -76,7 +76,7 @@ if($Language){
  $langOut=Join-Path $backup 'lang-export'
  Push-Location (Join-Path $project 'installer')
  try{& go run ./cmd/usos-i18n-gen -root .. -export $Language -out $langOut|Out-Null;if($LASTEXITCODE -ne 0){throw 'Language export failed'}}finally{Pop-Location}
- foreach($name in @('usos-settings.ini','lang.bin','lang-xp.ini')){
+ foreach($name in @('usos-settings.ini','lang.bin','lang-xp.ini','lang-winpe.ini')){
   $source=Join-Path $langOut ('EFI\USOS\'+$name);if(!(Test-Path -LiteralPath $source -PathType Leaf)){throw ('Missing exported '+$name)}
   # Keep the drive's other settings (wheel_invert, touch_rotation...): only set language.
   $current=Join-Path $espRoot ('EFI\USOS\'+$name)

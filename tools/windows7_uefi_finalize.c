@@ -8,6 +8,7 @@
 #include <winioctl.h>
 #include <stddef.h>
 #include <winver.h>
+#include "windows_setup_result.h"
 
 typedef struct { WCHAR volume[64]; GUID partition; FILETIME loader,bcd; } Record;
 typedef struct { DWORD magic,count; Record records[64]; } Snapshot;
@@ -105,7 +106,9 @@ static int run_setup(const WCHAR *executable,const WCHAR *arguments){
  if(!CreateProcessW(executable,command,0,0,FALSE,CREATE_NO_WINDOW,0,0,&si,&pi))return say("UEFI: cannot launch Windows Setup.\r\n");
  CloseHandle(pi.hThread);DWORD wait;
  while((wait=WaitForSingleObject(pi.hProcess,100))==WAIT_TIMEOUT)refresh_system_store();
- DWORD result=1;int ok=wait==WAIT_OBJECT_0&&GetExitCodeProcess(pi.hProcess,&result);CloseHandle(pi.hProcess);return ok?(int)result:1;
+ DWORD result=1;int ok=wait==WAIT_OBJECT_0&&GetExitCodeProcess(pi.hProcess,&result);CloseHandle(pi.hProcess);
+ if(ok)usos_record_setup_result(result);
+ return ok?(int)result:1;
 }
 #include "windows7_uefi_publish.h"
 static int win7_loader(const WCHAR *file){
