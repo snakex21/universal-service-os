@@ -13,7 +13,12 @@ param(
     # OVMF offers at most 1920x1080 here; 4K is covered by zig build ui-preview.
     [string[]]$ExtraUefiResolutions = @('1920x1080:pl'),
     [switch]$SkipBios,
-    [switch]$SkipUefi
+    [switch]$SkipUefi,
+    # Instead of screenshots: drive the UEFI menu with wheel, drag and tap
+    # through QMP for usb-tablet, usb-mouse and the PS/2 mouse, and the
+    # Legacy BIOS menu with the PS/2 wheel (tools/boot_input_qemu.py).
+    [switch]$InputTest,
+    [string]$InputDevices = 'ps2,mouse,tablet,bios'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -157,6 +162,13 @@ function Set-Language([string]$Language) {
 }
 
 New-TestDisk
+if ($InputTest) {
+    Set-Language $Languages[0]
+    & $python (Full 'tools/boot_input_qemu.py') --disk $vhd --out $out --devices $InputDevices
+    if ($LASTEXITCODE -ne 0) { throw 'UEFI input test failed' }
+    Write-Host "[PASS] Boot UI input test: $out"
+    return
+}
 foreach ($language in $Languages) {
     Set-Language $language
     if (-not $SkipUefi) {
