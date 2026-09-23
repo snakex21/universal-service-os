@@ -659,5 +659,26 @@
   "boot.lx.move": "Mover",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "A memória completa (PAE) será ativada após a reinicialização do computador. Reiniciar agora?"
+  "xp_pae.restart_prompt": "A memória completa (PAE) será ativada após a reinicialização do computador. Reiniciar agora?",
+
+  "boot.xp_prep.stage.1": "Verificando o pacote do Windows XP",
+  "boot.xp_prep.stage.2": "Carregando o ambiente de preparação",
+  "boot.xp_prep.stage.3": "Iniciando a seleção de disco",
+  "boot.xp_prep.checking": "Verificando o kernel do XP, o initramfs e a identidade da unidade USB",
+  "boot.xp_prep.loading": "Carregando o kernel do micro-Linux a partir da unidade USB",
+  "boot.xp_prep.starting": "O kernel está carregando o ambiente do XP; em seguida vem a seleção de disco",
+  "winpe.setup_title": "USOS - Instalação do Windows",
+  "winpe.cancelled": "A instalação do Windows foi cancelada.\n\nO que você deseja fazer?",
+  "winpe.restart": "Reiniciar",
+  "winpe.shutdown": "Desligar",
+  "winpe.command_prompt": "Prompt de comando",
+  "winpe.failed": "A Instalação do Windows não pôde ser iniciada ou retornou um erro (código {0}).\n\nO USOS tentou salvar os diagnósticos em EFI\\USOS\\Logs na unidade USB de origem. Se o registro em USB não estava disponível, o log permanece na RAM do WinPE.\n\nAbrir o log de diagnóstico e o prompt de comando?",
+  "winpe.yes": "Sim",
+  "winpe.no": "Não",
+  "winpe.kmdf_title": "USOS - reparo da dependência USB",
+  "winpe.kmdf_done": "O pacote KMDF 1.11 exigido pelos drivers USB foi adicionado.\n\nReinicie o computador a partir do disco de destino.\nA instalação do Windows não foi iniciada. O log foi salvo na unidade USB.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "Não foi possível confirmar a partição de inicialização do Vista. A instalação não foi iniciada. Os logs do BCD serão salvos na unidade USB.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "A instalação não preparou o KMDF 1.11 exigido pelo USB. Ainda não inicie o Vista pelo disco. Os logs de instalação serão salvos na unidade USB."
 }

@@ -659,5 +659,26 @@
   "boot.lx.move": "Move",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "Full memory (PAE) will be enabled after the computer restarts. Restart now?"
+  "xp_pae.restart_prompt": "Full memory (PAE) will be enabled after the computer restarts. Restart now?",
+
+  "boot.xp_prep.stage.1": "Checking the Windows XP package",
+  "boot.xp_prep.stage.2": "Loading the preparation environment",
+  "boot.xp_prep.stage.3": "Starting the disk selection",
+  "boot.xp_prep.checking": "Checking the XP kernel, initramfs and USB drive identity",
+  "boot.xp_prep.loading": "Loading the micro-Linux kernel from the USB drive",
+  "boot.xp_prep.starting": "The kernel is loading the XP environment; the disk selection follows",
+  "winpe.setup_title": "USOS - Windows Setup",
+  "winpe.cancelled": "Windows installation was cancelled.\n\nWhat would you like to do?",
+  "winpe.restart": "Restart",
+  "winpe.shutdown": "Shut down",
+  "winpe.command_prompt": "Command prompt",
+  "winpe.failed": "Windows Setup could not start or returned an error (code {0}).\n\nUSOS attempted to save diagnostics to EFI\\USOS\\Logs on the source USB drive. If USB logging was unavailable, the log remains in WinPE RAM.\n\nOpen the diagnostic log and command prompt?",
+  "winpe.yes": "Yes",
+  "winpe.no": "No",
+  "winpe.kmdf_title": "USOS - USB dependency repair",
+  "winpe.kmdf_done": "The KMDF 1.11 package required by the USB drivers was added.\n\nRestart the computer from the target disk.\nWindows installation was not started. The log was saved to the USB drive.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "The Vista boot partition could not be confirmed. Installation was not started. The BCD logs will be saved to the USB drive.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "Setup did not prepare KMDF 1.11, which USB requires. Do not start Vista from the disk yet. The installation logs will be saved to the USB drive."
 }

@@ -659,5 +659,26 @@
   "boot.lx.move": "Bewegen",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "Der volle Arbeitsspeicher (PAE) wird nach einem Neustart des Computers aktiviert. Jetzt neu starten?"
+  "xp_pae.restart_prompt": "Der volle Arbeitsspeicher (PAE) wird nach einem Neustart des Computers aktiviert. Jetzt neu starten?",
+
+  "boot.xp_prep.stage.1": "Windows-XP-Paket wird geprüft",
+  "boot.xp_prep.stage.2": "Vorbereitungsumgebung wird geladen",
+  "boot.xp_prep.stage.3": "Datenträgerauswahl wird gestartet",
+  "boot.xp_prep.checking": "XP-Kernel, Initramfs und USB-Laufwerkskennung werden geprüft",
+  "boot.xp_prep.loading": "Micro-Linux-Kernel wird vom USB-Laufwerk geladen",
+  "boot.xp_prep.starting": "Der Kernel lädt die XP-Umgebung; danach folgt die Datenträgerauswahl",
+  "winpe.setup_title": "USOS - Windows-Setup",
+  "winpe.cancelled": "Die Windows-Installation wurde abgebrochen.\n\nWas möchten Sie tun?",
+  "winpe.restart": "Neu starten",
+  "winpe.shutdown": "Herunterfahren",
+  "winpe.command_prompt": "Eingabeaufforderung",
+  "winpe.failed": "Windows-Setup konnte nicht gestartet werden oder hat einen Fehler gemeldet (Code {0}).\n\nUSOS hat versucht, die Diagnose unter EFI\\USOS\\Logs auf dem Quell-USB-Laufwerk zu speichern. War die USB-Protokollierung nicht verfügbar, bleibt das Protokoll im WinPE-RAM.\n\nDiagnoseprotokoll und Eingabeaufforderung öffnen?",
+  "winpe.yes": "Ja",
+  "winpe.no": "Nein",
+  "winpe.kmdf_title": "USOS - Reparatur der USB-Abhängigkeit",
+  "winpe.kmdf_done": "Das von den USB-Treibern benötigte KMDF-1.11-Paket wurde hinzugefügt.\n\nStarten Sie den Computer vom Zieldatenträger neu.\nDie Windows-Installation wurde nicht gestartet. Das Protokoll wurde auf dem USB-Laufwerk gespeichert.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "Die Vista-Startpartition konnte nicht bestätigt werden. Die Installation wurde nicht gestartet. Die BCD-Protokolle werden auf dem USB-Laufwerk gespeichert.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "Setup hat das für USB erforderliche KMDF 1.11 nicht vorbereitet. Starten Sie Vista noch nicht vom Datenträger. Die Installationsprotokolle werden auf dem USB-Laufwerk gespeichert."
 }

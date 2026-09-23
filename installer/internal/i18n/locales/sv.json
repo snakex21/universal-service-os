@@ -659,5 +659,26 @@
   "boot.lx.move": "Flytta",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "Hela minnet (PAE) aktiveras efter att datorn har startats om. Starta om nu?"
+  "xp_pae.restart_prompt": "Hela minnet (PAE) aktiveras efter att datorn har startats om. Starta om nu?",
+
+  "boot.xp_prep.stage.1": "Kontrollerar Windows XP-paketet",
+  "boot.xp_prep.stage.2": "Läser in förberedelsemiljön",
+  "boot.xp_prep.stage.3": "Startar diskvalet",
+  "boot.xp_prep.checking": "Kontrollerar XP-kärnan, initramfs och USB-enhetens identitet",
+  "boot.xp_prep.loading": "Läser in mikro-Linux-kärnan från USB-enheten",
+  "boot.xp_prep.starting": "Kärnan läser in XP-miljön; därefter följer diskvalet",
+  "winpe.setup_title": "USOS - Windows installationsprogram",
+  "winpe.cancelled": "Windows-installationen avbröts.\n\nVad vill du göra?",
+  "winpe.restart": "Starta om",
+  "winpe.shutdown": "Stäng av",
+  "winpe.command_prompt": "Kommandotolken",
+  "winpe.failed": "Windows installationsprogram kunde inte starta eller returnerade ett fel (kod {0}).\n\nUSOS försökte spara diagnostik i EFI\\USOS\\Logs på käll-USB-enheten. Om loggning till USB inte var tillgänglig finns loggen kvar i WinPE:s RAM.\n\nÖppna diagnostikloggen och kommandotolken?",
+  "winpe.yes": "Ja",
+  "winpe.no": "Nej",
+  "winpe.kmdf_title": "USOS - reparation av USB-beroende",
+  "winpe.kmdf_done": "KMDF 1.11-paketet som USB-drivrutinerna kräver har lagts till.\n\nStarta om datorn från måldisken.\nWindows-installationen startades inte. Loggen sparades på USB-enheten.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "Startpartitionen för Vista kunde inte bekräftas. Installationen startades inte. BCD-loggarna sparas på USB-enheten.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "Installationsprogrammet förberedde inte KMDF 1.11, som USB kräver. Starta inte Vista från disken ännu. Installationsloggarna sparas på USB-enheten."
 }

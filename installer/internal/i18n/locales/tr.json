@@ -659,5 +659,26 @@
   "boot.lx.move": "Taşı",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "Tam bellek (PAE), bilgisayar yeniden başlatıldıktan sonra etkinleştirilecek. Şimdi yeniden başlatılsın mı?"
+  "xp_pae.restart_prompt": "Tam bellek (PAE), bilgisayar yeniden başlatıldıktan sonra etkinleştirilecek. Şimdi yeniden başlatılsın mı?",
+
+  "boot.xp_prep.stage.1": "Windows XP paketi denetleniyor",
+  "boot.xp_prep.stage.2": "Hazırlık ortamı yükleniyor",
+  "boot.xp_prep.stage.3": "Disk seçimi başlatılıyor",
+  "boot.xp_prep.checking": "XP çekirdeği, initramfs ve USB sürücü kimliği denetleniyor",
+  "boot.xp_prep.loading": "Mikro-Linux çekirdeği USB sürücüden yükleniyor",
+  "boot.xp_prep.starting": "Çekirdek XP ortamını yüklüyor; ardından disk seçimi gelecek",
+  "winpe.setup_title": "USOS - Windows Kurulumu",
+  "winpe.cancelled": "Windows yüklemesi iptal edildi.\n\nNe yapmak istiyorsunuz?",
+  "winpe.restart": "Yeniden başlat",
+  "winpe.shutdown": "Kapat",
+  "winpe.command_prompt": "Komut istemi",
+  "winpe.failed": "Windows Kurulumu başlatılamadı veya bir hata döndürdü (kod {0}).\n\nUSOS tanılama bilgilerini kaynak USB sürücüdeki EFI\\USOS\\Logs klasörüne kaydetmeyi denedi. USB'ye günlük kaydı yapılamadıysa günlük WinPE RAM'inde kalır.\n\nTanılama günlüğü ve komut istemi açılsın mı?",
+  "winpe.yes": "Evet",
+  "winpe.no": "Hayır",
+  "winpe.kmdf_title": "USOS - USB bağımlılığı onarımı",
+  "winpe.kmdf_done": "USB sürücülerinin gerektirdiği KMDF 1.11 paketi eklendi.\n\nBilgisayarı hedef diskten yeniden başlatın.\nWindows yüklemesi başlatılmadı. Günlük USB sürücüye kaydedildi.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "Vista önyükleme bölümü doğrulanamadı. Yükleme başlatılmadı. BCD günlükleri USB sürücüye kaydedilecek.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "Kurulum, USB için gereken KMDF 1.11'i hazırlamadı. Vista'yı henüz diskten başlatmayın. Yükleme günlükleri USB sürücüye kaydedilecek."
 }

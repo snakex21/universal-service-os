@@ -659,5 +659,26 @@
   "boot.lx.move": "Liigu",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "Täismälu (PAE) lülitatakse sisse pärast arvuti taaskäivitamist. Kas taaskäivitada kohe?"
+  "xp_pae.restart_prompt": "Täismälu (PAE) lülitatakse sisse pärast arvuti taaskäivitamist. Kas taaskäivitada kohe?",
+
+  "boot.xp_prep.stage.1": "Windows XP paketi kontrollimine",
+  "boot.xp_prep.stage.2": "Ettevalmistuskeskkonna laadimine",
+  "boot.xp_prep.stage.3": "Ketta valiku käivitamine",
+  "boot.xp_prep.checking": "XP tuuma, initramfs-i ja USB-draivi identiteedi kontrollimine",
+  "boot.xp_prep.loading": "Mikro-Linuxi tuuma laadimine USB-draivilt",
+  "boot.xp_prep.starting": "Tuum laadib XP keskkonda; seejärel järgneb ketta valik",
+  "winpe.setup_title": "USOS - Windowsi häälestus",
+  "winpe.cancelled": "Windowsi installimine tühistati.\n\nMida soovite teha?",
+  "winpe.restart": "Taaskäivita",
+  "winpe.shutdown": "Lülita välja",
+  "winpe.command_prompt": "Käsuviip",
+  "winpe.failed": "Windowsi häälestust ei saanud käivitada või see tagastas tõrke (kood {0}).\n\nUSOS proovis salvestada diagnostika kausta EFI\\USOS\\Logs lähte-USB-draivil. Kui USB-logimine polnud saadaval, jääb logi WinPE mällu.\n\nKas avada diagnostikalogi ja käsuviip?",
+  "winpe.yes": "Jah",
+  "winpe.no": "Ei",
+  "winpe.kmdf_title": "USOS - USB-sõltuvuse parandus",
+  "winpe.kmdf_done": "Lisati USB-draiverite nõutav KMDF 1.11 pakett.\n\nTaaskäivitage arvuti sihtkettalt.\nWindowsi installimist ei alustatud. Logi salvestati USB-draivile.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "Vista käivitussektsiooni ei õnnestunud kinnitada. Installimist ei käivitatud. BCD logid salvestatakse USB-draivile.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "Häälestus ei valmistanud ette USB jaoks vajalikku KMDF 1.11. Ärge käivitage Vistat veel kettalt. Installilogid salvestatakse USB-draivile."
 }

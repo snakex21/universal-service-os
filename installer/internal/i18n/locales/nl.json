@@ -659,5 +659,26 @@
   "boot.lx.move": "Verplaatsen",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "Het volledige geheugen (PAE) wordt ingeschakeld nadat de computer opnieuw is opgestart. Nu opnieuw opstarten?"
+  "xp_pae.restart_prompt": "Het volledige geheugen (PAE) wordt ingeschakeld nadat de computer opnieuw is opgestart. Nu opnieuw opstarten?",
+
+  "boot.xp_prep.stage.1": "Windows XP-pakket controleren",
+  "boot.xp_prep.stage.2": "Voorbereidingsomgeving laden",
+  "boot.xp_prep.stage.3": "Schijfselectie starten",
+  "boot.xp_prep.checking": "XP-kernel, initramfs en identiteit van het USB-station controleren",
+  "boot.xp_prep.loading": "Micro-Linux-kernel laden vanaf het USB-station",
+  "boot.xp_prep.starting": "De kernel laadt de XP-omgeving; daarna volgt de schijfselectie",
+  "winpe.setup_title": "USOS - Windows Setup",
+  "winpe.cancelled": "De Windows-installatie is geannuleerd.\n\nWat wilt u doen?",
+  "winpe.restart": "Opnieuw opstarten",
+  "winpe.shutdown": "Afsluiten",
+  "winpe.command_prompt": "Opdrachtprompt",
+  "winpe.failed": "Windows Setup kon niet starten of gaf een fout terug (code {0}).\n\nUSOS heeft geprobeerd de diagnose op te slaan in EFI\\USOS\\Logs op het bron-USB-station. Als logboekregistratie op USB niet beschikbaar was, blijft het logboek in het WinPE-RAM.\n\nHet diagnoselogboek en de opdrachtprompt openen?",
+  "winpe.yes": "Ja",
+  "winpe.no": "Nee",
+  "winpe.kmdf_title": "USOS - herstel van USB-afhankelijkheid",
+  "winpe.kmdf_done": "Het KMDF 1.11-pakket dat de USB-stuurprogramma's nodig hebben, is toegevoegd.\n\nStart de computer opnieuw op vanaf de doelschijf.\nDe Windows-installatie is niet gestart. Het logboek is op het USB-station opgeslagen.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "De opstartpartitie van Vista kon niet worden bevestigd. De installatie is niet gestart. De BCD-logboeken worden op het USB-station opgeslagen.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "Setup heeft KMDF 1.11, dat USB nodig heeft, niet voorbereid. Start Vista nog niet vanaf de schijf. De installatielogboeken worden op het USB-station opgeslagen."
 }

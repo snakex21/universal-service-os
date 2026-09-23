@@ -19,8 +19,10 @@ const (
 	BootBlobPath   = "EFI/USOS/lang.bin"
 	LinuxLangPath  = "EFI/USOS/lang.cpio"
 	XPHelperPath   = "EFI/USOS/lang-xp.ini"
+	WinPEPath      = "EFI/USOS/lang-winpe.ini"
 	BootKeyPrefix  = "boot."
 	XPKeyPrefix    = "xp_pae."
+	WinPEKeyPrefix = "winpe."
 	bootBlobMagic  = "USOSLANG"
 	bootBlobFormat = 1
 	bootHeaderSize = 28
@@ -43,11 +45,16 @@ func DeviceFiles(lang string) ([]DeviceFile, error) {
 	if err != nil {
 		return nil, err
 	}
+	winpe, err := WinPEINI(lang)
+	if err != nil {
+		return nil, err
+	}
 	return []DeviceFile{
 		{Path: SettingsPath, Data: SettingsINI(lang)},
 		{Path: BootBlobPath, Data: boot},
 		{Path: LinuxLangPath, Data: LangCPIO(boot)},
 		{Path: XPHelperPath, Data: xp},
+		{Path: WinPEPath, Data: winpe},
 	}, nil
 }
 
@@ -196,6 +203,32 @@ func XPHelperINI(lang string) ([]byte, error) {
 			return nil, fmt.Errorf("%s must be a single line", key)
 		}
 		text.WriteString(strings.TrimPrefix(key, XPKeyPrefix) + "=" + value + "\r\n")
+	}
+	units := utf16.Encode([]rune(text.String()))
+	out := make([]byte, 2+2*len(units))
+	out[0], out[1] = 0xff, 0xfe
+	for i, unit := range units {
+		binary.LittleEndian.PutUint16(out[2+2*i:], unit)
+	}
+	return out, nil
+}
+
+// WinPEINI encodes the chosen language's winpe.* strings (the USOS dialogs
+// shown inside Windows PE: Setup cancelled or failed, the KMDF and Vista
+// checks) as a UTF-16LE INI file with BOM. The WinPE helpers find it on the
+// source ESP and parse it themselves, so a value may span lines: a newline
+// is stored as the two characters \n and a backslash as \\.
+func WinPEINI(lang string) ([]byte, error) {
+	lang = Normalize(lang)
+	keys, catalog, err := prefixedEntries(lang, WinPEKeyPrefix)
+	if err != nil {
+		return nil, err
+	}
+	escape := strings.NewReplacer(`\`, `\\`, "\n", `\n`, "\r", "")
+	var text strings.Builder
+	text.WriteString("[winpe]\r\nlanguage=" + lang + "\r\n")
+	for _, key := range keys {
+		text.WriteString(strings.TrimPrefix(key, WinPEKeyPrefix) + "=" + escape.Replace(catalog[key]) + "\r\n")
 	}
 	units := utf16.Encode([]rune(text.String()))
 	out := make([]byte, 2+2*len(units))

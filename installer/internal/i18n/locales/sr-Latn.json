@@ -662,5 +662,26 @@
   "boot.lx.move": "Pomeranje",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "Puna memorija (PAE) biće omogućena nakon ponovnog pokretanja računara. Ponovo pokrenuti sada?"
+  "xp_pae.restart_prompt": "Puna memorija (PAE) biće omogućena nakon ponovnog pokretanja računara. Ponovo pokrenuti sada?",
+
+  "boot.xp_prep.stage.1": "Provera paketa Windows XP",
+  "boot.xp_prep.stage.2": "Učitavanje okruženja za pripremu",
+  "boot.xp_prep.stage.3": "Pokretanje izbora diska",
+  "boot.xp_prep.checking": "Provera XP jezgra, initramfs-a i identiteta USB diska",
+  "boot.xp_prep.loading": "Učitavanje mikro-Linux jezgra sa USB diska",
+  "boot.xp_prep.starting": "Jezgro učitava XP okruženje; zatim sledi izbor diska",
+  "winpe.setup_title": "USOS - Instalacija operativnog sistema Windows",
+  "winpe.cancelled": "Instalacija operativnog sistema Windows je otkazana.\n\nŠta želite da uradite?",
+  "winpe.restart": "Ponovo pokreni",
+  "winpe.shutdown": "Isključi",
+  "winpe.command_prompt": "Komandna linija",
+  "winpe.failed": "Instalacija operativnog sistema Windows nije mogla da se pokrene ili je vratila grešku (kod {0}).\n\nUSOS je pokušao da sačuva dijagnostiku u EFI\\USOS\\Logs na izvornom USB disku. Ako evidentiranje na USB nije bilo dostupno, evidencija ostaje u RAM memoriji okruženja WinPE.\n\nOtvoriti dijagnostičku evidenciju i komandnu liniju?",
+  "winpe.yes": "Da",
+  "winpe.no": "Ne",
+  "winpe.kmdf_title": "USOS - popravka USB zavisnosti",
+  "winpe.kmdf_done": "Dodat je paket KMDF 1.11 koji zahtevaju USB upravljački programi.\n\nPonovo pokrenite računar sa ciljnog diska.\nInstalacija operativnog sistema Windows nije započeta. Evidencija je sačuvana na USB disku.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "Nije moguće potvrditi particiju za pokretanje sistema Vista. Instalacija nije pokrenuta. BCD evidencije biće sačuvane na USB disku.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "Instalacija nije pripremila KMDF 1.11 potreban za USB. Još ne pokrećite Vistu sa diska. Evidencije instalacije biće sačuvane na USB disku."
 }

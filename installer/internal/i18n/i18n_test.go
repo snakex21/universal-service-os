@@ -339,6 +339,22 @@ func TestDeviceFilesCarryOnlyTheChosenLanguage(t *testing.T) {
 	if strings.Contains(text, english["xp_pae.restart_prompt"]) {
 		t.Fatal("XP helper INI contains the English prompt")
 	}
+	winpe := byPath[WinPEPath]
+	if len(winpe) < 2 || winpe[0] != 0xff || winpe[1] != 0xfe {
+		t.Fatal("WinPE INI lacks the UTF-16LE BOM")
+	}
+	units = make([]uint16, (len(winpe)-2)/2)
+	for i := range units {
+		units[i] = binary.LittleEndian.Uint16(winpe[2+2*i:])
+	}
+	text = string(utf16.Decode(units))
+	escaped := strings.NewReplacer(`\`, `\\`, "\n", `\n`).Replace(polish["winpe.cancelled"])
+	if !strings.HasPrefix(text, "[winpe]\r\nlanguage=pl\r\n") || !strings.Contains(text, "cancelled="+escaped+"\r\n") || !strings.Contains(text, "restart=Uruchom ponownie\r\n") {
+		t.Fatalf("WinPE INI:\n%s", text)
+	}
+	if strings.Contains(text, english["winpe.cancelled"]) || strings.Count(text, "\n") != strings.Count(text, "\r\n") {
+		t.Fatal("WinPE INI contains English text or a raw line break inside a value")
+	}
 }
 
 // The Zig tables, the XP header and the Zig lang.bin fixture are derived
@@ -357,11 +373,15 @@ func TestGeneratedFilesAreCurrent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	winpe, err := GenerateWinPEHeader()
+	if err != nil {
+		t.Fatal(err)
+	}
 	fixture, err := BootBlob(ZigFixtureLang)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for path, want := range map[string][]byte{ZigTablePath: zig, ZigLinuxTablePath: linux, XPHeaderPath: header, ZigFixturePath: fixture} {
+	for path, want := range map[string][]byte{ZigTablePath: zig, ZigLinuxTablePath: linux, XPHeaderPath: header, WinPEHeaderPath: winpe, ZigFixturePath: fixture} {
 		got, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
 			t.Fatal(err)
@@ -422,6 +442,9 @@ func TestLangCPIOCarriesLangBin(t *testing.T) {
 func TestMachineTranslatedMarks(t *testing.T) {
 	if !MachineTranslatedKey("pl", "boot.menu.title") || MachineTranslatedKey("pl", "installer.common.back") {
 		t.Fatal("pl: boot.* must be marked machine-translated, installer.* not")
+	}
+	if !MachineTranslatedKey("pl", "winpe.cancelled") {
+		t.Fatal("pl: winpe.* must be marked machine-translated")
 	}
 	if !MachineTranslatedKey("de", "installer.common.back") || MachineTranslatedKey("en", "boot.menu.title") {
 		t.Fatal("de must be machine-translated, en not")

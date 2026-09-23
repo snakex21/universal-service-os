@@ -659,5 +659,26 @@
   "boot.lx.move": "Flyt",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "Den fulde hukommelse (PAE) aktiveres, når computeren er genstartet. Genstart nu?"
+  "xp_pae.restart_prompt": "Den fulde hukommelse (PAE) aktiveres, når computeren er genstartet. Genstart nu?",
+
+  "boot.xp_prep.stage.1": "Kontrollerer Windows XP-pakken",
+  "boot.xp_prep.stage.2": "Indlæser forberedelsesmiljøet",
+  "boot.xp_prep.stage.3": "Starter diskvalget",
+  "boot.xp_prep.checking": "Kontrollerer XP-kernen, initramfs og USB-drevets identitet",
+  "boot.xp_prep.loading": "Indlæser mikro-Linux-kernen fra USB-drevet",
+  "boot.xp_prep.starting": "Kernen indlæser XP-miljøet; derefter følger diskvalget",
+  "winpe.setup_title": "USOS - Windows Installation",
+  "winpe.cancelled": "Windows-installationen blev annulleret.\n\nHvad vil du gøre?",
+  "winpe.restart": "Genstart",
+  "winpe.shutdown": "Luk computeren",
+  "winpe.command_prompt": "Kommandoprompt",
+  "winpe.failed": "Windows Installation kunne ikke starte eller returnerede en fejl (kode {0}).\n\nUSOS forsøgte at gemme diagnosticering i EFI\\USOS\\Logs på kilde-USB-drevet. Hvis logning på USB ikke var tilgængelig, forbliver loggen i WinPE's RAM.\n\nÅbn diagnoseloggen og kommandoprompten?",
+  "winpe.yes": "Ja",
+  "winpe.no": "Nej",
+  "winpe.kmdf_title": "USOS - reparation af USB-afhængighed",
+  "winpe.kmdf_done": "KMDF 1.11-pakken, som USB-driverne kræver, blev tilføjet.\n\nGenstart computeren fra måldisken.\nWindows-installationen blev ikke startet. Loggen blev gemt på USB-drevet.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "Vistas startpartition kunne ikke bekræftes. Installationen blev ikke startet. BCD-loggene gemmes på USB-drevet.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "Installationen forberedte ikke KMDF 1.11, som USB kræver. Start endnu ikke Vista fra disken. Installationsloggene gemmes på USB-drevet."
 }

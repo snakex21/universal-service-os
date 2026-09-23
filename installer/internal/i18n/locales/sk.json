@@ -662,5 +662,26 @@
   "boot.lx.move": "Presun",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "Plná pamäť (PAE) sa zapne po reštarte počítača. Reštartovať teraz?"
+  "xp_pae.restart_prompt": "Plná pamäť (PAE) sa zapne po reštarte počítača. Reštartovať teraz?",
+
+  "boot.xp_prep.stage.1": "Kontrola balíka Windows XP",
+  "boot.xp_prep.stage.2": "Načítava sa prípravné prostredie",
+  "boot.xp_prep.stage.3": "Spúšťa sa výber disku",
+  "boot.xp_prep.checking": "Kontrola jadra XP, initramfs a identity jednotky USB",
+  "boot.xp_prep.loading": "Načítava sa jadro mikro-Linuxu z jednotky USB",
+  "boot.xp_prep.starting": "Jadro načítava prostredie XP; potom nasleduje výber disku",
+  "winpe.setup_title": "USOS - Inštalácia systému Windows",
+  "winpe.cancelled": "Inštalácia systému Windows bola zrušená.\n\nČo chcete urobiť?",
+  "winpe.restart": "Reštartovať",
+  "winpe.shutdown": "Vypnúť",
+  "winpe.command_prompt": "Príkazový riadok",
+  "winpe.failed": "Inštaláciu systému Windows sa nepodarilo spustiť alebo vrátila chybu (kód {0}).\n\nUSOS sa pokúsil uložiť diagnostiku do EFI\\USOS\\Logs na zdrojovej jednotke USB. Ak zápis na USB nebol dostupný, protokol zostáva v pamäti RAM prostredia WinPE.\n\nOtvoriť diagnostický protokol a príkazový riadok?",
+  "winpe.yes": "Áno",
+  "winpe.no": "Nie",
+  "winpe.kmdf_title": "USOS - oprava závislosti USB",
+  "winpe.kmdf_done": "Bol pridaný balík KMDF 1.11, ktorý vyžadujú ovládače USB.\n\nReštartujte počítač z cieľového disku.\nInštalácia systému Windows sa nezačala. Protokol bol uložený na jednotku USB.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "Spúšťací oddiel systému Vista sa nepodarilo potvrdiť. Inštalácia sa nespustila. Protokoly BCD sa uložia na jednotku USB.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "Inštalácia nepripravila KMDF 1.11, ktoré vyžaduje USB. Zatiaľ nespúšťajte Vistu z disku. Protokoly inštalácie sa uložia na jednotku USB."
 }

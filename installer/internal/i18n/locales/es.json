@@ -659,5 +659,26 @@
   "boot.lx.move": "Mover",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "La memoria completa (PAE) se activará después de reiniciar el equipo. ¿Reiniciar ahora?"
+  "xp_pae.restart_prompt": "La memoria completa (PAE) se activará después de reiniciar el equipo. ¿Reiniciar ahora?",
+
+  "boot.xp_prep.stage.1": "Comprobando el paquete de Windows XP",
+  "boot.xp_prep.stage.2": "Cargando el entorno de preparación",
+  "boot.xp_prep.stage.3": "Iniciando la selección de disco",
+  "boot.xp_prep.checking": "Comprobando el kernel de XP, el initramfs y la identidad de la unidad USB",
+  "boot.xp_prep.loading": "Cargando el kernel de micro-Linux desde la unidad USB",
+  "boot.xp_prep.starting": "El kernel está cargando el entorno de XP; a continuación se mostrará la selección de disco",
+  "winpe.setup_title": "USOS - Instalación de Windows",
+  "winpe.cancelled": "La instalación de Windows se ha cancelado.\n\n¿Qué desea hacer?",
+  "winpe.restart": "Reiniciar",
+  "winpe.shutdown": "Apagar",
+  "winpe.command_prompt": "Símbolo del sistema",
+  "winpe.failed": "El programa de instalación de Windows no pudo iniciarse o devolvió un error (código {0}).\n\nUSOS intentó guardar los diagnósticos en EFI\\USOS\\Logs en la unidad USB de origen. Si el registro en USB no estaba disponible, el registro permanece en la RAM de WinPE.\n\n¿Abrir el registro de diagnóstico y el símbolo del sistema?",
+  "winpe.yes": "Sí",
+  "winpe.no": "No",
+  "winpe.kmdf_title": "USOS - reparación de la dependencia USB",
+  "winpe.kmdf_done": "Se agregó el paquete KMDF 1.11 que requieren los controladores USB.\n\nReinicie el equipo desde el disco de destino.\nLa instalación de Windows no se inició. El registro se guardó en la unidad USB.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "No se pudo confirmar la partición de arranque de Vista. La instalación no se inició. Los registros de BCD se guardarán en la unidad USB.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "El programa de instalación no preparó KMDF 1.11, necesario para USB. No inicie Vista desde el disco todavía. Los registros de instalación se guardarán en la unidad USB."
 }

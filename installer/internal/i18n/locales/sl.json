@@ -665,5 +665,26 @@
   "boot.lx.move": "Premakni",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "Polni pomnilnik (PAE) bo omogočen po ponovnem zagonu računalnika. Želite znova zagnati zdaj?"
+  "xp_pae.restart_prompt": "Polni pomnilnik (PAE) bo omogočen po ponovnem zagonu računalnika. Želite znova zagnati zdaj?",
+
+  "boot.xp_prep.stage.1": "Preverjanje paketa Windows XP",
+  "boot.xp_prep.stage.2": "Nalaganje okolja za pripravo",
+  "boot.xp_prep.stage.3": "Zagon izbire diska",
+  "boot.xp_prep.checking": "Preverjanje jedra XP, initramfs in identitete pogona USB",
+  "boot.xp_prep.loading": "Nalaganje jedra mikro-Linux s pogona USB",
+  "boot.xp_prep.starting": "Jedro nalaga okolje XP; nato sledi izbira diska",
+  "winpe.setup_title": "USOS - Namestitev sistema Windows",
+  "winpe.cancelled": "Namestitev sistema Windows je bila preklicana.\n\nKaj želite storiti?",
+  "winpe.restart": "Znova zaženi",
+  "winpe.shutdown": "Zaustavi sistem",
+  "winpe.command_prompt": "Ukazni poziv",
+  "winpe.failed": "Namestitve sistema Windows ni bilo mogoče zagnati ali pa je vrnila napako (koda {0}).\n\nUSOS je poskušal shraniti diagnostiko v EFI\\USOS\\Logs na izvornem pogonu USB. Če beleženje na USB ni bilo na voljo, dnevnik ostane v pomnilniku RAM okolja WinPE.\n\nŽelite odpreti diagnostični dnevnik in ukazni poziv?",
+  "winpe.yes": "Da",
+  "winpe.no": "Ne",
+  "winpe.kmdf_title": "USOS - popravilo odvisnosti USB",
+  "winpe.kmdf_done": "Dodan je bil paket KMDF 1.11, ki ga zahtevajo gonilniki USB.\n\nZnova zaženite računalnik s ciljnega diska.\nNamestitev sistema Windows se ni začela. Dnevnik je bil shranjen na pogon USB.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "Zagonske particije sistema Vista ni bilo mogoče potrditi. Namestitev se ni zagnala. Dnevniki BCD bodo shranjeni na pogon USB.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "Namestitev ni pripravila KMDF 1.11, ki ga potrebuje USB. Viste še ne zaganjajte z diska. Dnevniki namestitve bodo shranjeni na pogon USB."
 }

@@ -1,5 +1,5 @@
 {
-  "_meta": {"native_name": "Polski", "english_name": "Polish", "machine_translated": false, "machine_translated_prefixes": ["boot."]},
+  "_meta": {"native_name": "Polski", "english_name": "Polish", "machine_translated": false, "machine_translated_prefixes": ["boot.", "winpe."]},
 
   "installer.window.title": "Universal Service OS Installer",
   "installer.startup.log_failed": "Nie można uruchomić instalatora, ponieważ nie udało się otworzyć pliku logu obok programu:\n%s",
@@ -662,5 +662,26 @@
   "boot.lx.move": "Ruch",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "Pełna pamięć (PAE) zostanie włączona po ponownym uruchomieniu komputera. Uruchom ponownie teraz?"
+  "xp_pae.restart_prompt": "Pełna pamięć (PAE) zostanie włączona po ponownym uruchomieniu komputera. Uruchom ponownie teraz?",
+
+  "boot.xp_prep.stage.1": "Sprawdzanie pakietu Windows XP",
+  "boot.xp_prep.stage.2": "Ładowanie środowiska przygotowania",
+  "boot.xp_prep.stage.3": "Uruchamianie wyboru dysku",
+  "boot.xp_prep.checking": "Sprawdzanie jądra XP, initramfs i tożsamości pendrive'a",
+  "boot.xp_prep.loading": "Ładowanie jądra mikro-Linuksa z pendrive'a",
+  "boot.xp_prep.starting": "Jądro ładuje środowisko XP; następnie pojawi się wybór dysku",
+  "winpe.setup_title": "USOS - Instalator systemu Windows",
+  "winpe.cancelled": "Instalacja Windows została anulowana.\n\nCo chcesz zrobić?",
+  "winpe.restart": "Uruchom ponownie",
+  "winpe.shutdown": "Wyłącz komputer",
+  "winpe.command_prompt": "Wiersz poleceń",
+  "winpe.failed": "Instalator systemu Windows nie uruchomił się lub zwrócił błąd (kod {0}).\n\nUSOS spróbował zapisać diagnostykę w EFI\\USOS\\Logs na źródłowym pendrivie. Jeśli zapis na USB był niedostępny, log pozostaje w pamięci RAM WinPE.\n\nOtworzyć log diagnostyczny i wiersz poleceń?",
+  "winpe.yes": "Tak",
+  "winpe.no": "Nie",
+  "winpe.kmdf_title": "USOS - naprawa zależności USB",
+  "winpe.kmdf_done": "Dodano pakiet KMDF 1.11 wymagany przez sterowniki USB.\n\nUruchom ponownie komputer z dysku docelowego.\nInstalacja Windows nie została rozpoczęta. Log zapisano na pendrivie.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "Nie można potwierdzić partycji startowej Visty. Instalacja nie została uruchomiona. Logi BCD zostaną zapisane na pendrivie.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "Instalator nie przygotował KMDF 1.11 wymaganego przez USB. Nie uruchamiaj jeszcze Visty z dysku. Logi instalacji zostaną zapisane na pendrivie."
 }

@@ -12,6 +12,7 @@ const (
 	ZigTablePath      = "src/i18n/boot_strings.zig"
 	ZigLinuxTablePath = "src/i18n/linux_strings.zig"
 	XPHeaderPath      = "tools/windows_xp_pae_strings.h"
+	WinPEHeaderPath   = "tools/windows_winpe_strings.h"
 	ZigFixtureLang    = "pl"
 	ZigFixturePath    = "src/i18n/testdata/lang-pl.bin"
 	BootFontPath      = "src/gui/fonts/usos-font.bin"
@@ -23,7 +24,7 @@ const (
 var uefiOnlyPrefixes = []string{
 	"summary.", "handoff.", "iso.", "efi.", "chainload.", "error.", "action.",
 	"help.win7_wimboot.", "power.firmware", "notice.backend.", "utility.",
-	"prep.request_saved", "prep.return_boot", "prep.loader_ready", "prep.starting", "prep.xp_disks",
+	"prep.request_saved", "prep.return_boot", "prep.loader_ready", "prep.starting", "prep.xp_disks", "xp_prep.",
 	"header.no_mouse", "splash.",
 }
 
@@ -145,6 +146,27 @@ func GenerateXPHeader() ([]byte, error) {
 	return []byte(b.String()), nil
 }
 
+// GenerateWinPEHeader renders the English fallback strings compiled into
+// the WinPE helpers (tools/windows_winpe_ui.h reads lang-winpe.ini).
+func GenerateWinPEHeader() ([]byte, error) {
+	keys, catalog, err := prefixedEntries(Fallback, WinPEKeyPrefix)
+	if err != nil {
+		return nil, err
+	}
+	var b strings.Builder
+	b.WriteString("/* " + generatedWarning + " */\n")
+	b.WriteString("/* English fallback; the chosen language is read from EFI\\USOS\\lang-winpe.ini on the source ESP. */\n")
+	for _, key := range keys {
+		name := strings.TrimPrefix(key, WinPEKeyPrefix)
+		if !zigIdentifier.MatchString(name) {
+			return nil, fmt.Errorf("winpe key %s does not map to a C identifier", key)
+		}
+		b.WriteString("#define USOS_WINPE_" + strings.ToUpper(name) + "_KEY L\"" + name + "\"\n")
+		b.WriteString("#define USOS_WINPE_" + strings.ToUpper(name) + "_EN " + cWideString(catalog[key]) + "\n")
+	}
+	return []byte(b.String()), nil
+}
+
 func zigString(value string) string {
 	var b strings.Builder
 	b.WriteByte('"')
@@ -171,6 +193,8 @@ func cWideString(value string) string {
 		case r == '"' || r == '\\':
 			b.WriteByte('\\')
 			b.WriteRune(r)
+		case r == '\n':
+			b.WriteString(`\n`)
 		case r >= 32 && r <= 126:
 			b.WriteRune(r)
 		case r <= 0xffff:

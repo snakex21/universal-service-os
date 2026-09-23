@@ -659,5 +659,26 @@
   "boot.lx.move": "Mozgatás",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "A teljes memória (PAE) a számítógép újraindítása után lesz bekapcsolva. Újraindítja most?"
+  "xp_pae.restart_prompt": "A teljes memória (PAE) a számítógép újraindítása után lesz bekapcsolva. Újraindítja most?",
+
+  "boot.xp_prep.stage.1": "A Windows XP-csomag ellenőrzése",
+  "boot.xp_prep.stage.2": "Az előkészítő környezet betöltése",
+  "boot.xp_prep.stage.3": "A lemezválasztás indítása",
+  "boot.xp_prep.checking": "Az XP-kernel, az initramfs és az USB-meghajtó azonosságának ellenőrzése",
+  "boot.xp_prep.loading": "A mikro-Linux kernel betöltése az USB-meghajtóról",
+  "boot.xp_prep.starting": "A kernel betölti az XP-környezetet; ezután következik a lemezválasztás",
+  "winpe.setup_title": "USOS - Windows telepítő",
+  "winpe.cancelled": "A Windows telepítése megszakadt.\n\nMit szeretne tenni?",
+  "winpe.restart": "Újraindítás",
+  "winpe.shutdown": "Leállítás",
+  "winpe.command_prompt": "Parancssor",
+  "winpe.failed": "A Windows telepítő nem indult el, vagy hibát jelzett (kód: {0}).\n\nA USOS megpróbálta menteni a diagnosztikát a forrás USB-meghajtó EFI\\USOS\\Logs mappájába. Ha az USB-naplózás nem volt elérhető, a napló a WinPE RAM-jában marad.\n\nMegnyitja a diagnosztikai naplót és a parancssort?",
+  "winpe.yes": "Igen",
+  "winpe.no": "Nem",
+  "winpe.kmdf_title": "USOS - USB-függőség javítása",
+  "winpe.kmdf_done": "Az USB-illesztőprogramok által igényelt KMDF 1.11 csomag hozzáadva.\n\nIndítsa újra a számítógépet a céllemezről.\nA Windows telepítése nem kezdődött el. A napló az USB-meghajtóra mentve.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "A Vista rendszerindító partíciója nem erősíthető meg. A telepítés nem indult el. A BCD-naplók az USB-meghajtóra lesznek mentve.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "A telepítő nem készítette elő az USB-hez szükséges KMDF 1.11-et. Még ne indítsa a Vistát a lemezről. A telepítési naplók az USB-meghajtóra lesznek mentve."
 }

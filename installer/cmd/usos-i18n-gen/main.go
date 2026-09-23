@@ -70,6 +70,10 @@ func run(root string, check bool, export, out string) error {
 	if err != nil {
 		return err
 	}
+	winpeHeader, err := i18n.GenerateWinPEHeader()
+	if err != nil {
+		return err
+	}
 	fixture, err := i18n.BootBlob(i18n.ZigFixtureLang)
 	if err != nil {
 		return err
@@ -77,7 +81,7 @@ func run(root string, check bool, export, out string) error {
 	outputs := []struct {
 		path string
 		data []byte
-	}{{i18n.ZigTablePath, zig}, {i18n.ZigLinuxTablePath, linux}, {i18n.XPHeaderPath, header}, {i18n.ZigFixturePath, fixture}}
+	}{{i18n.ZigTablePath, zig}, {i18n.ZigLinuxTablePath, linux}, {i18n.XPHeaderPath, header}, {i18n.WinPEHeaderPath, winpeHeader}, {i18n.ZigFixturePath, fixture}}
 	stale := 0
 	for _, output := range outputs {
 		path := filepath.Join(root, filepath.FromSlash(output.path))

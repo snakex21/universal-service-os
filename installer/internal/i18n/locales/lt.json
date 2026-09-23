@@ -662,5 +662,26 @@
   "boot.lx.move": "Perkelti",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "Visa atmintis (PAE) bus įjungta iš naujo paleidus kompiuterį. Paleisti iš naujo dabar?"
+  "xp_pae.restart_prompt": "Visa atmintis (PAE) bus įjungta iš naujo paleidus kompiuterį. Paleisti iš naujo dabar?",
+
+  "boot.xp_prep.stage.1": "Tikrinamas Windows XP paketas",
+  "boot.xp_prep.stage.2": "Įkeliama paruošimo aplinka",
+  "boot.xp_prep.stage.3": "Paleidžiamas disko pasirinkimas",
+  "boot.xp_prep.checking": "Tikrinamas XP branduolys, initramfs ir USB disko tapatybė",
+  "boot.xp_prep.loading": "Iš USB disko įkeliamas mikro-Linux branduolys",
+  "boot.xp_prep.starting": "Branduolys įkelia XP aplinką; po to bus disko pasirinkimas",
+  "winpe.setup_title": "USOS - Windows sąranka",
+  "winpe.cancelled": "Windows diegimas atšauktas.\n\nKą norite daryti?",
+  "winpe.restart": "Paleisti iš naujo",
+  "winpe.shutdown": "Išjungti",
+  "winpe.command_prompt": "Komandų eilutė",
+  "winpe.failed": "Windows sąranka nepasileido arba grąžino klaidą (kodas {0}).\n\nUSOS bandė įrašyti diagnostiką į EFI\\USOS\\Logs šaltinio USB diske. Jei registravimas USB diske buvo nepasiekiamas, žurnalas lieka WinPE RAM atmintyje.\n\nAtidaryti diagnostikos žurnalą ir komandų eilutę?",
+  "winpe.yes": "Taip",
+  "winpe.no": "Ne",
+  "winpe.kmdf_title": "USOS - USB priklausomybės taisymas",
+  "winpe.kmdf_done": "Pridėtas USB tvarkyklėms reikalingas KMDF 1.11 paketas.\n\nPaleiskite kompiuterį iš naujo iš tikslinio disko.\nWindows diegimas nepradėtas. Žurnalas įrašytas į USB diską.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "Nepavyko patvirtinti Vista paleisties skaidinio. Diegimas nepaleistas. BCD žurnalai bus įrašyti į USB diską.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "Sąranka neparuošė USB reikalingo KMDF 1.11. Kol kas nepaleiskite Vista iš disko. Diegimo žurnalai bus įrašyti į USB diską."
 }

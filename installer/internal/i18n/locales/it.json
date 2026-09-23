@@ -659,5 +659,26 @@
   "boot.lx.move": "Sposta",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "La memoria completa (PAE) verrà attivata dopo il riavvio del computer. Riavviare ora?"
+  "xp_pae.restart_prompt": "La memoria completa (PAE) verrà attivata dopo il riavvio del computer. Riavviare ora?",
+
+  "boot.xp_prep.stage.1": "Verifica del pacchetto Windows XP",
+  "boot.xp_prep.stage.2": "Caricamento dell'ambiente di preparazione",
+  "boot.xp_prep.stage.3": "Avvio della selezione del disco",
+  "boot.xp_prep.checking": "Verifica del kernel XP, dell'initramfs e dell'identità dell'unità USB",
+  "boot.xp_prep.loading": "Caricamento del kernel micro-Linux dall'unità USB",
+  "boot.xp_prep.starting": "Il kernel sta caricando l'ambiente XP; seguirà la selezione del disco",
+  "winpe.setup_title": "USOS - Installazione di Windows",
+  "winpe.cancelled": "L'installazione di Windows è stata annullata.\n\nCosa vuoi fare?",
+  "winpe.restart": "Riavvia",
+  "winpe.shutdown": "Arresta",
+  "winpe.command_prompt": "Prompt dei comandi",
+  "winpe.failed": "Il programma di installazione di Windows non è stato avviato o ha restituito un errore (codice {0}).\n\nUSOS ha tentato di salvare la diagnostica in EFI\\USOS\\Logs sull'unità USB di origine. Se la registrazione su USB non era disponibile, il log rimane nella RAM di WinPE.\n\nAprire il log diagnostico e il prompt dei comandi?",
+  "winpe.yes": "Sì",
+  "winpe.no": "No",
+  "winpe.kmdf_title": "USOS - riparazione della dipendenza USB",
+  "winpe.kmdf_done": "È stato aggiunto il pacchetto KMDF 1.11 richiesto dai driver USB.\n\nRiavvia il computer dal disco di destinazione.\nL'installazione di Windows non è stata avviata. Il log è stato salvato sull'unità USB.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "Impossibile confermare la partizione di avvio di Vista. L'installazione non è stata avviata. I log BCD verranno salvati sull'unità USB.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "L'installazione non ha preparato KMDF 1.11, richiesto per USB. Non avviare ancora Vista dal disco. I log di installazione verranno salvati sull'unità USB."
 }

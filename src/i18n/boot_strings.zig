@@ -297,6 +297,12 @@ pub const Key = enum(u16) {
     utility_unavailable,
     wait,
     wait_usb,
+    xp_prep_checking,
+    xp_prep_loading,
+    xp_prep_stage_1,
+    xp_prep_stage_2,
+    xp_prep_stage_3,
+    xp_prep_starting,
 };
 
 /// FNV-1a 32 of the key names stored in lang.bin (without the "boot." prefix).
@@ -596,6 +602,12 @@ pub const hashes = [_]u32{
     0x30ddf187, // utility.unavailable
     0x892e4ca0, // wait
     0x3e1f8ab9, // wait_usb
+    0xd1d3d8e5, // xp_prep.checking
+    0x6e3859d3, // xp_prep.loading
+    0x5cb584dc, // xp_prep.stage.1
+    0x5fb58995, // xp_prep.stage.2
+    0x5eb58802, // xp_prep.stage.3
+    0xb07b1d15, // xp_prep.starting
 };
 
 /// False for strings only the UEFI menu shows (left out of the BIOS Core).
@@ -895,6 +907,12 @@ pub const bios = [_]bool{
     false,
     true,
     true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
 };
 
 pub const english = [_][]const u8{
@@ -1193,4 +1211,10 @@ pub const english = [_][]const u8{
     "This utility stays visible while its boot backend is unavailable.",
     "Please wait",
     "Please wait - keep the USB drive connected",
+    "Checking the XP kernel, initramfs and USB drive identity",
+    "Loading the micro-Linux kernel from the USB drive",
+    "Checking the Windows XP package",
+    "Loading the preparation environment",
+    "Starting the disk selection",
+    "The kernel is loading the XP environment; the disk selection follows",
 };

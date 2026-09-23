@@ -662,5 +662,26 @@
   "boot.lx.move": "Pārvietot",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "Pilna atmiņa (PAE) tiks ieslēgta pēc datora restartēšanas. Restartēt tagad?"
+  "xp_pae.restart_prompt": "Pilna atmiņa (PAE) tiks ieslēgta pēc datora restartēšanas. Restartēt tagad?",
+
+  "boot.xp_prep.stage.1": "Pārbauda Windows XP pakotni",
+  "boot.xp_prep.stage.2": "Ielādē sagatavošanas vidi",
+  "boot.xp_prep.stage.3": "Palaiž diska izvēli",
+  "boot.xp_prep.checking": "Pārbauda XP kodolu, initramfs un USB diska identitāti",
+  "boot.xp_prep.loading": "Ielādē mikro-Linux kodolu no USB diska",
+  "boot.xp_prep.starting": "Kodols ielādē XP vidi; pēc tam sekos diska izvēle",
+  "winpe.setup_title": "USOS - Windows iestatīšana",
+  "winpe.cancelled": "Windows instalēšana tika atcelta.\n\nKo vēlaties darīt?",
+  "winpe.restart": "Restartēt",
+  "winpe.shutdown": "Izslēgt",
+  "winpe.command_prompt": "Komandu uzvedne",
+  "winpe.failed": "Windows iestatīšanu neizdevās palaist, vai tā atgrieza kļūdu (kods {0}).\n\nUSOS mēģināja saglabāt diagnostiku mapē EFI\\USOS\\Logs avota USB diskā. Ja reģistrēšana USB diskā nebija pieejama, žurnāls paliek WinPE RAM atmiņā.\n\nVai atvērt diagnostikas žurnālu un komandu uzvedni?",
+  "winpe.yes": "Jā",
+  "winpe.no": "Nē",
+  "winpe.kmdf_title": "USOS - USB atkarības labošana",
+  "winpe.kmdf_done": "Tika pievienota USB draiveriem nepieciešamā KMDF 1.11 pakotne.\n\nRestartējiet datoru no mērķa diska.\nWindows instalēšana netika sākta. Žurnāls tika saglabāts USB diskā.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "Neizdevās apstiprināt Vista sāknēšanas nodalījumu. Instalēšana netika palaista. BCD žurnāli tiks saglabāti USB diskā.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "Iestatīšana nesagatavoja USB nepieciešamo KMDF 1.11. Pagaidām nepalaidiet Vista no diska. Instalēšanas žurnāli tiks saglabāti USB diskā."
 }

@@ -659,5 +659,26 @@
   "boot.lx.move": "Siirrä",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "Täysi muisti (PAE) otetaan käyttöön, kun tietokone käynnistetään uudelleen. Käynnistetäänkö uudelleen nyt?"
+  "xp_pae.restart_prompt": "Täysi muisti (PAE) otetaan käyttöön, kun tietokone käynnistetään uudelleen. Käynnistetäänkö uudelleen nyt?",
+
+  "boot.xp_prep.stage.1": "Tarkistetaan Windows XP -pakettia",
+  "boot.xp_prep.stage.2": "Ladataan valmisteluympäristöä",
+  "boot.xp_prep.stage.3": "Käynnistetään levyn valinta",
+  "boot.xp_prep.checking": "Tarkistetaan XP-ydin, initramfs ja USB-aseman tunniste",
+  "boot.xp_prep.loading": "Ladataan mikro-Linux-ydintä USB-asemalta",
+  "boot.xp_prep.starting": "Ydin lataa XP-ympäristöä; seuraavaksi tulee levyn valinta",
+  "winpe.setup_title": "USOS - Windowsin asennus",
+  "winpe.cancelled": "Windowsin asennus peruutettiin.\n\nMitä haluat tehdä?",
+  "winpe.restart": "Käynnistä uudelleen",
+  "winpe.shutdown": "Sammuta",
+  "winpe.command_prompt": "Komentokehote",
+  "winpe.failed": "Windowsin asennusohjelma ei käynnistynyt tai palautti virheen (koodi {0}).\n\nUSOS yritti tallentaa diagnostiikan kansioon EFI\\USOS\\Logs lähde-USB-asemalla. Jos USB-lokitus ei ollut käytettävissä, loki jää WinPE:n RAM-muistiin.\n\nAvataanko diagnostiikkaloki ja komentokehote?",
+  "winpe.yes": "Kyllä",
+  "winpe.no": "Ei",
+  "winpe.kmdf_title": "USOS - USB-riippuvuuden korjaus",
+  "winpe.kmdf_done": "USB-ohjainten vaatima KMDF 1.11 -paketti lisättiin.\n\nKäynnistä tietokone uudelleen kohdelevyltä.\nWindowsin asennusta ei aloitettu. Loki tallennettiin USB-asemalle.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "Vistan käynnistysosiota ei voitu vahvistaa. Asennusta ei käynnistetty. BCD-lokit tallennetaan USB-asemalle.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "Asennusohjelma ei valmistellut USB:n vaatimaa KMDF 1.11:tä. Älä vielä käynnistä Vistaa levyltä. Asennuslokit tallennetaan USB-asemalle."
 }

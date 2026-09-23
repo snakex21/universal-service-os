@@ -662,5 +662,26 @@
   "boot.lx.move": "Mutare",
 
   "xp_pae.title": "USOS XP",
-  "xp_pae.restart_prompt": "Memoria completă (PAE) va fi activată după repornirea computerului. Reporniți acum?"
+  "xp_pae.restart_prompt": "Memoria completă (PAE) va fi activată după repornirea computerului. Reporniți acum?",
+
+  "boot.xp_prep.stage.1": "Se verifică pachetul Windows XP",
+  "boot.xp_prep.stage.2": "Se încarcă mediul de pregătire",
+  "boot.xp_prep.stage.3": "Se pornește selectarea discului",
+  "boot.xp_prep.checking": "Se verifică nucleul XP, initramfs și identitatea unității USB",
+  "boot.xp_prep.loading": "Se încarcă nucleul micro-Linux de pe unitatea USB",
+  "boot.xp_prep.starting": "Nucleul încarcă mediul XP; urmează selectarea discului",
+  "winpe.setup_title": "USOS - Instalare Windows",
+  "winpe.cancelled": "Instalarea Windows a fost anulată.\n\nCe doriți să faceți?",
+  "winpe.restart": "Repornire",
+  "winpe.shutdown": "Închidere",
+  "winpe.command_prompt": "Linie de comandă",
+  "winpe.failed": "Instalarea Windows nu a putut porni sau a returnat o eroare (cod {0}).\n\nUSOS a încercat să salveze diagnosticarea în EFI\\USOS\\Logs pe unitatea USB sursă. Dacă jurnalizarea pe USB nu era disponibilă, jurnalul rămâne în memoria RAM a WinPE.\n\nDeschideți jurnalul de diagnosticare și linia de comandă?",
+  "winpe.yes": "Da",
+  "winpe.no": "Nu",
+  "winpe.kmdf_title": "USOS - reparare dependență USB",
+  "winpe.kmdf_done": "A fost adăugat pachetul KMDF 1.11 necesar driverelor USB.\n\nReporniți computerul de pe discul țintă.\nInstalarea Windows nu a început. Jurnalul a fost salvat pe unitatea USB.",
+  "winpe.vista_esp_title": "USOS - Vista UEFI",
+  "winpe.vista_esp_failed": "Partiția de pornire Vista nu a putut fi confirmată. Instalarea nu a fost pornită. Jurnalele BCD vor fi salvate pe unitatea USB.",
+  "winpe.vista_kmdf_title": "USOS - Vista KMDF",
+  "winpe.vista_kmdf_failed": "Instalarea nu a pregătit KMDF 1.11, necesar pentru USB. Nu porniți încă Vista de pe disc. Jurnalele de instalare vor fi salvate pe unitatea USB."
 }
