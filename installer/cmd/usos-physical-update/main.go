@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/localupdate"
 	"github.com/snakex21/universal-service-os/installer/internal/winhost"
@@ -29,6 +30,7 @@ func main() {
 	legacyCorePath := flag.String("legacy-core", "", "optional rollback Core slot override; normal updates leave this empty")
 	restoreImageMarkers := flag.Bool("restore-image-markers", false, "rollback only: recreate pre-direct-NTFS zero-byte image markers on ESP after update")
 	debugBootmgrProbe := flag.String("debug-bootmgr-probe", "", "optional physical diagnostic bootmgr.exe probe copied to the identified ESP after a successful update")
+	language := flag.String("language", "", "language written to the ESP (usos-settings.ini, lang.bin); empty keeps the target's current usos-settings.ini language")
 	flag.Parse()
 
 	fatalf := func(format string, args ...any) {
@@ -95,6 +97,28 @@ func main() {
 	if !strings.EqualFold(target.Media.WORK.PartUUID, strings.TrimSpace(*workPartUUID)) {
 		fatalf("WORK PARTUUID changed: got %q want %q", target.Media.WORK.PartUUID, strings.TrimSpace(*workPartUUID))
 	}
+
+	// The update rewrites the ESP language files from i18n.Current(); keep
+	// the drive's language unless one is given explicitly.
+	chosen := strings.TrimSpace(*language)
+	if chosen == "" {
+		settings, err := os.ReadFile(filepath.Join(target.Media.ESP.VolumePath, filepath.FromSlash(i18n.SettingsPath)))
+		if err != nil {
+			fatalf("read current %s (pass -language to choose one): %v", i18n.SettingsPath, err)
+		}
+		current, ok := i18n.ParseSettingsLanguage(settings)
+		if !ok {
+			fatalf("%s has no [ui] language= (pass -language to choose one)", i18n.SettingsPath)
+		}
+		chosen = current
+	}
+	if err := i18n.LoadError(); err != nil {
+		fatalf("load language catalogs: %v", err)
+	}
+	if _, ok := i18n.Catalog(i18n.Normalize(chosen)); !ok {
+		fatalf("no catalog for language %q", chosen)
+	}
+	fmt.Printf("LANGUAGE=%s\n", i18n.SetLanguage(chosen))
 
 	logger, err := install.NewOperationLoggerAt(logAbs)
 	if err != nil {
