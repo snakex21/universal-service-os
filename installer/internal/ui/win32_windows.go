@@ -71,6 +71,8 @@ var (
 	procMessageBeep                   = user32.NewProc("MessageBeep")
 	procSetForegroundWindow           = user32.NewProc("SetForegroundWindow")
 	procIsWindowVisible               = user32.NewProc("IsWindowVisible")
+	procSystemParametersInfoW         = user32.NewProc("SystemParametersInfoW")
+	procWindowFromPoint               = user32.NewProc("WindowFromPoint")
 
 	procCreateCompatibleDC     = gdi32.NewProc("CreateCompatibleDC")
 	procCreateCompatibleBitmap = gdi32.NewProc("CreateCompatibleBitmap")
@@ -133,6 +135,7 @@ const (
 	wmLButtonUp        = 0x0202
 	wmLButtonDblClk    = 0x0203
 	wmMouseWheel       = 0x020A
+	wmMouseHWheel      = 0x020E
 	wmCaptureChanged   = 0x0215
 	wmMouseLeave       = 0x02A3
 	wmDpiChanged       = 0x02E0
@@ -239,6 +242,17 @@ const (
 	siidDriveRemove   = 7
 	siidDriveFixed    = 8
 	shgsiIconLocation = 0
+)
+
+// Input: wheel settings, pointer (touch/pen) messages and types.
+const (
+	spiGetWheelScrollLines = 0x0068
+	wmPointerUpdate        = 0x0245
+	wmPointerDown          = 0x0246
+	wmPointerUp            = 0x0247
+	wmPointerCaptureChange = 0x024C
+	ptTouch                = 2
+	ptPen                  = 3
 )
 
 type point struct{ X, Y int32 }

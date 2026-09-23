@@ -114,6 +114,11 @@ func (l *driveList) draw(w *win, r rect, status string, statusTone tone, loading
 		}
 		l.ensureSelectedVisible(w)
 		return true
+	}, onWheel: func(rows int32) {
+		// Only reached while every row fits (nothing to scroll): the wheel
+		// then walks the selection, like Up/Down.
+		l.move(int(rows))
+		l.ensureSelectedVisible(w)
 	}})
 	w.panel(body)
 	listFocused := st.focused

@@ -59,6 +59,10 @@ type widget struct {
 	onKey     func(vk uintptr) bool
 	edit      *nativeEdit
 	drag      *dragHandler
+	// onWheel steps a widget that has nothing to scroll (a list that fits):
+	// rows > 0 moves down. Only used when no scrolling region is under the
+	// pointer.
+	onWheel func(rows int32)
 }
 
 type widgetState struct {
@@ -144,6 +148,8 @@ type win struct {
 	tracking          bool
 	dragging          *dragHandler
 	dragOrigin        int32
+	wheelAcc          wheelAccum
+	wheelForwarding   bool // a wheel message is being handed to a native child
 
 	scrolls    map[string]*scrollState
 	edits      map[string]*nativeEdit
@@ -419,6 +425,9 @@ func (w *win) editForHwnd(hwnd windows.HWND) *nativeEdit {
 // preTranslate routes Tab/Escape out of native EDIT controls into the
 // window's focus handling and swallows the characters that would beep.
 func (w *win) preTranslate(m *msg) bool {
+	if m.Message == wmMouseWheel || m.Message == wmMouseHWheel {
+		return w.routeWheel(m)
+	}
 	if m.Hwnd == w.hwnd || (m.Message != wmKeyDown && m.Message != wmChar) {
 		return false
 	}
@@ -525,10 +534,24 @@ func (w *win) wndProc(hwnd windows.HWND, message uint32, wParam, lParam uintptr)
 	case wmCaptureChanged:
 		w.dragging = nil
 		return 0
-	case wmMouseWheel:
-		pt := point{loWord(lParam), hiWord(lParam)}
+	case wmMouseWheel, wmMouseHWheel:
+		screen := point{loWord(lParam), hiWord(lParam)}
+		// Over the native log the EDIT scrolls itself (its own scrollbar,
+		// its own line metrics). The guard stops a ping-pong should the
+		// control ever hand the message back to its parent.
+		if e := w.nativeScrollerAt(screen); e != nil && !w.wheelForwarding {
+			w.wheelForwarding = true
+			sendMessage(e.hwnd, message, wParam, lParam)
+			w.wheelForwarding = false
+			return 0
+		}
+		pt := screen
 		procScreenToClient.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&pt)))
-		w.wheel(pt.X, pt.Y, hiWord(wParam))
+		if message == wmMouseWheel {
+			w.wheel(pt.X, pt.Y, hiWord(wParam))
+		}
+		// Nothing in the installer scrolls horizontally; a tilt is consumed
+		// so it does not bubble anywhere.
 		return 0
 	case wmKeyDown, wmSysKeyDown:
 		if message == wmSysKeyDown && wParam != vkF5 {
@@ -797,15 +820,85 @@ func (w *win) mouseUp(x, y int32) {
 	w.invalidate()
 }
 
+// routeWheel runs in the message loop for posted WM_MOUSE(H)WHEEL. Windows
+// posts the wheel to the focus window (or, with "scroll inactive windows",
+// to the window under the pointer). When that is one of the native EDITs but
+// the pointer is over the custom-drawn area, the message is handed to the
+// main window, which scrolls whatever is under the pointer; a single-line
+// EDIT would otherwise swallow it or the log would scroll instead of the
+// list the user points at.
+func (w *win) routeWheel(m *msg) bool {
+	if m.Hwnd == w.hwnd {
+		return false
+	}
+	e := w.editForHwnd(m.Hwnd)
+	if e == nil {
+		return false
+	}
+	screen := point{loWord(m.LParam), hiWord(m.LParam)}
+	if e.multiline && windowRect(e.hwnd).contains(screen.X, screen.Y) {
+		return false // the log under the pointer scrolls itself
+	}
+	sendMessage(w.hwnd, m.Message, m.WParam, m.LParam)
+	return true
+}
+
+// nativeScrollerAt returns the visible multiline EDIT (the log) under a
+// screen point.
+func (w *win) nativeScrollerAt(screen point) *nativeEdit {
+	for _, e := range w.edits {
+		if e.multiline && e.shown && windowRect(e.hwnd).contains(screen.X, screen.Y) {
+			return e
+		}
+	}
+	return nil
+}
+
+// wheelLines is the user's "lines per notch" setting (Settings > Mouse).
+func wheelLines() uint32 {
+	lines := uint32(3)
+	if r, _, _ := procSystemParametersInfoW.Call(spiGetWheelScrollLines, 0, uintptr(unsafe.Pointer(&lines)), 0); r == 0 {
+		return 3
+	}
+	return lines
+}
+
+// wheelLineDIP is one wheel "line" in DIPs; 3 lines give the 48 DIP the
+// installer always scrolled per notch.
+const wheelLineDIP = 16
+
+// wheel scrolls the innermost scrolling region under (x, y) by the user's
+// lines-per-notch, pixel-exact for fractional (touchpad) deltas. A region
+// whose content fits, or a list that is not a scroll region, steps its
+// selection instead (one row per notch).
 func (w *win) wheel(x, y, delta int32) {
+	if !w.overlay.empty() && !w.overlay.contains(x, y) {
+		return // the open menu is modal; the page under it stays put
+	}
 	for i := len(w.lastRegs) - 1; i >= 0; i-- {
 		region := w.lastRegs[i]
 		if !region.r.contains(x, y) {
 			continue
 		}
-		if s := w.scrolls[region.id]; s != nil {
-			s.offset -= delta * w.px(48) / wheelDelta
+		s := w.scrolls[region.id]
+		if s == nil || s.content <= s.view {
+			break
+		}
+		step := wheelStep(wheelLines(), w.px(wheelLineDIP), s.view)
+		if px := w.wheelAcc.add(region.id, delta, step); px != 0 {
+			s.offset -= px
 			s.clamp()
+			w.invalidate()
+		}
+		return
+	}
+	for i := len(w.last) - 1; i >= 0; i-- {
+		wd := &w.last[i]
+		if wd.onWheel == nil || wd.disabled || !wd.r.contains(x, y) {
+			continue
+		}
+		if rows := w.wheelAcc.add(wd.id+"#rows", delta, 1); rows != 0 {
+			wd.onWheel(-rows)
 			w.invalidate()
 		}
 		return
