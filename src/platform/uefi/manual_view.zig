@@ -711,6 +711,21 @@ pub fn windowsIsoStatus(stage: usos.flow.preparation_boot_progress.DirectIsoStag
     });
 }
 
+/// Windows XP from UEFI: the same progress page as the Vista/7 ISO path,
+/// headed by the chosen system's name, with only the steps the XP path runs.
+pub fn xpStatus(stage: usos.flow.preparation_boot_progress.XpStage, heading: []const u8) void {
+    const Stage = usos.flow.preparation_boot_progress.XpStage;
+    progress(.{
+        .mode = .stage,
+        .current = stage.number(),
+        .total = Stage.labels.len,
+        .labels = &Stage.labels,
+        .heading = heading,
+        .title = Stage.labels[stage.number() - 1],
+        .detail = stage.detail(),
+    });
+}
+
 fn progress(state: gui.preparation_screen.State) void {
     active = .none;
     setFooter(&.{}, "");

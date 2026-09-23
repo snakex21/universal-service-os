@@ -119,10 +119,12 @@ fn start(
     if (!method_firmware.accepts(firmware)) return showFirmwareUnavailable();
 
     if (backend == .xp_uefi_staging) {
-        // The splash stays up (spinner turning) while firmware loads the XP
-        // kernel and initramfs, until usos-fb-ui draws its first screen.
-        view.handover(view.t(.splash_starting));
-        @import("xp_preparation.zig").start(root, image.name.slice(), unattended) catch |err| {
+        // The progress page (like the Vista/7 ISO path) stays up while the
+        // firmware loads the XP kernel and initramfs, until usos-fb-ui draws
+        // the disk selection.
+        xp_heading = system.name;
+        showXpProgress(.checking);
+        @import("xp_preparation.zig").start(root, image.name.slice(), unattended, showXpProgress) catch |err| {
             view.refreshFramebuffer();
             showError(view.t(.error_xp), err);
         };
@@ -186,6 +188,12 @@ fn showError(title: []const u8, err: anyerror) void {
     const lines = [_][]const u8{ std.fmt.bufPrint(&buffer, "{s}: {s}", .{ view.t(.summary_error), @errorName(err) }) catch @errorName(err), view.t(.error_stopped) };
     view.notice(title, .error_circle, .danger, "", &lines);
     view.waitForDismiss();
+}
+
+var xp_heading: []const u8 = "Windows XP";
+
+fn showXpProgress(stage: usos.flow.preparation_boot_progress.XpStage) void {
+    view.xpStatus(stage, xp_heading);
 }
 
 fn showPreparationProgress(stage: usos.flow.preparation_boot_progress.Stage) void {

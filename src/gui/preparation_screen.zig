@@ -321,6 +321,17 @@ test "stage labels match the catalog keys" {
     for (keys, stage_labels) |key, label| try std.testing.expectEqualStrings(label, table.get(key));
 }
 
+test "XP stage labels and details match the catalog keys" {
+    const lang_file = @import("../i18n/lang_file.zig");
+    const XpStage = @import("../flow/preparation_boot_progress.zig").XpStage;
+    const table = lang_file.Table.english_only;
+    const labels = [_]lang_file.Key{ .xp_prep_stage_1, .xp_prep_stage_2, .xp_prep_stage_3 };
+    for (labels, XpStage.labels) |key, label| try std.testing.expectEqualStrings(label, table.get(key));
+    try std.testing.expectEqualStrings(XpStage.checking.detail(), table.get(.xp_prep_checking));
+    try std.testing.expectEqualStrings(XpStage.loading.detail(), table.get(.xp_prep_loading));
+    try std.testing.expectEqualStrings(XpStage.starting.detail(), table.get(.xp_prep_starting));
+}
+
 test "stage rows follow the stages a path really runs" {
     const iso_labels = [_][]const u8{ "Validating installation ISO", "Loading Windows boot files", "Starting Windows Setup" };
     try std.testing.expectEqual(@as(usize, 5), stageCount(.{}));

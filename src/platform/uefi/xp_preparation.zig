@@ -2,6 +2,7 @@ const std = @import("std");
 const uefi = std.os.uefi;
 const wide = std.unicode.utf8ToUtf16LeStringLiteral;
 const esp_image = @import("esp_image_start.zig");
+const Stage = @import("usos").flow.preparation_boot_progress.XpStage;
 
 fn mark(root: *uefi.protocol.File, stage: []const u8, name: []const u8) !void {
     var data: [2048]u8 = @splat('\n');
@@ -13,7 +14,7 @@ fn mark(root: *uefi.protocol.File, stage: []const u8, name: []const u8) !void {
     try file.flush();
 }
 
-pub fn start(root: *uefi.protocol.File, name: []const u8, unattended: ?[]const u8) !void {
+pub fn start(root: *uefi.protocol.File, name: []const u8, unattended: ?[]const u8, progress: *const fn (Stage) void) !void {
     if (unattended != null) return error.XpUefiCustomUnattendedUnsupported;
     if (name.len == 0 or name.len > 512 or std.mem.indexOfAny(u8, name, "\\/\r\n") != null) return error.InvalidXpImageName;
     // Require the isolated payload before creating any diagnostics.
@@ -55,6 +56,7 @@ pub fn start(root: *uefi.protocol.File, name: []const u8, unattended: ?[]const u
     for (command, 0..) |c, i| options[i] = c;
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
     try bs.setWatchdogTimer(0, 0, null);
+    progress(.loading);
     const image = try esp_image.load(root, "\\EFI\\USOS-XP\\vmlinuz.efi");
     defer _ = bs.unloadImage(image) catch .load_error;
     const loaded = (try bs.handleProtocol(uefi.protocol.LoadedImage, image)) orelse return error.NoLoadedImage;
@@ -62,6 +64,7 @@ pub fn start(root: *uefi.protocol.File, name: []const u8, unattended: ?[]const u
     loaded.load_options_size = @intCast((command.len + 1) * 2);
     // Initrd is loaded by the kernel's EFI stub, not by LoadImage above.
     try mark(root, "kernel-loaded-before-start", name);
+    progress(.starting);
     const result = bs.startImage(image) catch |err| {
         mark(root, @errorName(err), name) catch {};
         return err;
