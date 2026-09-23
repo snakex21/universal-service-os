@@ -11,6 +11,8 @@ const input = @import("input.zig");
 const input_report = @import("input_report.zig");
 const pointer = @import("pointer.zig");
 const serial = @import("serial.zig");
+const boot_timing = @import("boot_timing.zig");
+const splash = @import("splash.zig");
 
 const gui = usos.gui;
 const Ui = gui.ui.Ui;
@@ -54,28 +56,73 @@ var home_hints: [3]Hint = undefined;
 var summary_hints: [2]Hint = undefined;
 var notice_hints: [1]Hint = undefined;
 var settings_buffer: [1024]u8 = undefined;
+var boot_root: ?*std.os.uefi.protocol.File = null;
+var timing_reported = false;
 
-pub fn init(root: *std.os.uefi.protocol.File, info: usos.boot_info.BootInfo) void {
-    if (file_read.into(root, "\\UI\\theme.css", &css_buffer)) |css| theme = gui.Theme.parse(css);
-    font_pack = gui.font.Pack.parse(gui.font_pack) catch null;
+/// Reads EFI\USOS\usos-settings.ini (empty when missing). Read before the
+/// splash so `boot_logo=` can choose the logo.
+pub fn readSettings(root: *std.os.uefi.protocol.File) []const u8 {
+    return file_read.into(root, "\\EFI\\USOS\\usos-settings.ini", &settings_buffer) orelse "";
+}
+
+/// Loads the theme, font and language and prepares the screen. The splash
+/// (splash.begin) is already on screen; it switches to the chosen language
+/// as soon as lang.bin is parsed.
+pub fn init(root: *std.os.uefi.protocol.File, info: usos.boot_info.BootInfo, settings: []const u8) void {
+    boot_root = root;
+    font_pack = if (splash.fontPack()) |pack| pack.* else (gui.font.Pack.parse(gui.font_pack) catch null);
     const coverage: ?usos.i18n.Coverage = if (font_pack) |*pack| .{ .context = @ptrCast(pack), .has = gui.font.coverageHas } else null;
     strings = usos.i18n.Table.parseOrEnglish(file_read.into(root, usos.i18n.path, &lang_buffer), coverage);
+    boot_timing.mark("lang.bin read and parsed");
+    splash.setStrings(&strings);
+    splash.status(t(.splash_loading));
+    if (file_read.into(root, "\\UI\\theme.css", &css_buffer)) |css| theme = gui.Theme.parse(css);
+    boot_timing.mark("theme.css read");
 
     runtime_firmware = info.firmware;
     input.setIdleHook(updateClock);
     input.setHintHook(hintAt);
-    pointer.configure(parseSettings(file_read.into(root, "\\EFI\\USOS\\usos-settings.ini", &settings_buffer) orelse ""));
+    pointer.configure(parseSettings(settings));
     if (info.framebuffer) |framebuffer| video_surface = gui.Surface.init(framebuffer);
     surface = video_surface;
 
     if (video_surface) |canvas| {
         pointer.init(canvas.framebuffer.width, canvas.framebuffer.height);
+        boot_timing.mark("pointer devices initialised");
         if (std.os.uefi.system_table.con_out) |out| out.enableCursor(false) catch {};
         initScreenBuffer(canvas);
+        boot_timing.mark("off-screen buffer allocated");
     }
+}
+
+/// Work that must not delay the first menu frame: the input-devices report
+/// (a file write plus several KiB on the serial port, ~50 ms in QEMU and far
+/// more on a board whose UART runs at 115200 baud) and the timing log.
+fn afterFirstFrame() void {
+    const root = boot_root orelse return;
+    const serial_before = serial.bytes_written;
     // One report per boot of what the firmware exposes as input devices
     // (EFI\USOS\Logs\input-devices.txt), for touch/gamepad bring-up.
     input_report.write(root, if (video_surface) |canvas| canvas.framebuffer.width else 0, if (video_surface) |canvas| canvas.framebuffer.height else 0);
+    boot_timing.mark("input-devices.txt written (after the menu)");
+    boot_timing.report(root, "boot-timing.txt", serial_before);
+}
+
+/// Replaces the screen with the "Starting…" splash before a handover to
+/// another loader; the spinner turns while that loader reads its files.
+pub fn handover(text: []const u8) void {
+    patch.saved = false;
+    header_clock_active = false;
+    active = .none;
+    setFooter(&.{}, "");
+    const canvas = video_surface orelse return console_clear(text);
+    splash.handover(canvas.framebuffer, text);
+}
+
+/// Handover status line (shown only once the spinner runs, so quick
+/// steps do not flicker).
+pub fn handoverStatus(text: []const u8) void {
+    splash.status(text);
 }
 
 /// Input options from usos-settings.ini (written by the installer; these
@@ -198,6 +245,8 @@ fn clockNow(buffer: []u8, u: *const Ui) []const u8 {
 }
 
 fn beginFullFrame() void {
+    // The first full frame (menu, resume status or error) replaces the splash.
+    splash.end();
     patch.saved = false;
     surface = video_surface;
     full_frame_buffered = false;
@@ -240,6 +289,11 @@ fn presentFullFrame() void {
     if (!presented) buffer.copyTo(video);
     surface = video;
     full_frame_buffered = false;
+    if (!timing_reported) {
+        timing_reported = true;
+        boot_timing.mark("first frame presented");
+        afterFirstFrame();
+    }
 }
 
 /// Partial redraw on the visible surface: hide the pointer, draw, show it.
@@ -556,10 +610,6 @@ pub fn windowsIsoStatus(stage: usos.flow.preparation_boot_progress.DirectIsoStag
         .title = Stage.labels[stage.number() - 1],
         .detail = detail,
     });
-}
-
-pub fn handoffStatus(detail: []const u8) void {
-    progress(.{ .mode = .stage, .current = 1, .total = 5, .title = "Starting environment", .detail = detail });
 }
 
 fn progress(state: gui.preparation_screen.State) void {

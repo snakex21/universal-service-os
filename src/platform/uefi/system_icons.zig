@@ -55,6 +55,15 @@ pub fn get(root: *std.os.uefi.protocol.File, system: *const usos.catalog.SystemE
             }
         }
 
+        // Built-in icons come pre-scaled from bios-ui.bin (one small file
+        // read per boot); the 1254x1254 PNGs remain the fallback.
+        if (builtinPack(root)) |pack| {
+            if (pack.icon(system.id, &entry.image.pixels)) {
+                entry.state = .ready;
+                return &entry.image;
+            }
+        }
+
         const builtin_path = buildBuiltinPath(system.id, &path_buffer) orelse {
             entry.state = .missing;
             return null;
@@ -68,6 +77,32 @@ pub fn get(root: *std.os.uefi.protocol.File, system: *const usos.catalog.SystemE
         return &entry.image;
     }
     return null;
+}
+
+const PackState = enum { unread, ready, unavailable };
+var pack_state: PackState = .unread;
+var icon_pack: usos.gui.ui_pack.Pack = undefined;
+
+/// EFI\USOS\bios-ui.bin, read and validated once (pool memory, kept).
+fn builtinPack(root: *std.os.uefi.protocol.File) ?usos.gui.ui_pack.Pack {
+    switch (pack_state) {
+        .ready => return icon_pack,
+        .unavailable => return null,
+        .unread => {},
+    }
+    pack_state = .unavailable;
+    const bs = std.os.uefi.system_table.boot_services orelse return null;
+    const storage = bs.allocatePool(.loader_data, usos.gui.ui_pack.max_bytes) catch return null;
+    const bytes = file_read.into(root, usos.gui.ui_pack.path, storage) orelse {
+        bs.freePool(storage.ptr) catch {};
+        return null;
+    };
+    icon_pack = usos.gui.ui_pack.parse(bytes) orelse {
+        bs.freePool(storage.ptr) catch {};
+        return null;
+    };
+    pack_state = .ready;
+    return icon_pack;
 }
 
 fn decodePath(root: *std.os.uefi.protocol.File, icon_path: []const u8, image: *usos.gui.RgbaImage) bool {

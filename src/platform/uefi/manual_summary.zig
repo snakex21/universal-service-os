@@ -119,7 +119,9 @@ fn start(
     if (!method_firmware.accepts(firmware)) return showFirmwareUnavailable();
 
     if (backend == .xp_uefi_staging) {
-        view.handoffStatus("Starting XP disk selection");
+        // The splash stays up (spinner turning) while firmware loads the XP
+        // kernel and initramfs, until usos-fb-ui draws its first screen.
+        view.handover(view.t(.splash_starting));
         @import("xp_preparation.zig").start(root, image.name.slice(), unattended) catch |err| {
             view.refreshFramebuffer();
             showError(view.t(.error_xp), err);
@@ -145,7 +147,10 @@ fn start(
         return;
     }
 
-    view.handoffStatus("Starting preparation environment");
+    // Same "Starting…" splash for the micro-Linux preparation: systemd-boot
+    // and the kernel's EFI stub load their files under the spinner, and
+    // Linux keeps the frame until usos-fb-ui takes over.
+    view.handover(view.t(.splash_starting));
 
     e2e_flow.requestPreparation(root, system, image, resolved, unattended, showPreparationProgress) catch |err| {
         showError(view.t(.error_preparation), err);
@@ -184,5 +189,5 @@ fn showError(title: []const u8, err: anyerror) void {
 }
 
 fn showPreparationProgress(stage: usos.flow.preparation_boot_progress.Stage) void {
-    view.handoffStatus(stage.detail());
+    view.handoverStatus(view.tr(stage.detail()));
 }

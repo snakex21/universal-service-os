@@ -13,6 +13,8 @@ const manual_systems = @import("manual_systems.zig");
 const manual_unattended = @import("manual_unattended.zig");
 const manual_utilities = @import("manual_utilities.zig");
 const manual_view = @import("manual_view.zig");
+const boot_timing = @import("boot_timing.zig");
+const splash = @import("splash.zig");
 
 const CatalogState = struct {
     catalog: data_volume.Catalog,
@@ -28,10 +30,19 @@ noinline fn initCatalogState(state: *CatalogState) !void {
 
 pub fn run() void {
     const info = collect_boot_info.collect() catch return;
+    boot_timing.mark("GOP and memory map");
     const root = filesystem.openBootVolume() orelse return;
     defer root.close() catch {};
-    manual_view.init(root, info);
+    boot_timing.mark("ESP volume open");
+    // The splash goes up before any slow I/O; only the tiny settings file
+    // (boot_logo=) is read first.
+    const settings = manual_view.readSettings(root);
+    boot_timing.mark("usos-settings.ini read");
+    splash.begin(info.framebuffer, splash.logoSetting(settings), "");
+    manual_view.init(root, info, settings);
     if (e2e_flow.resumePersistent(root, showResumeStatus)) return;
+    boot_timing.mark("persistent state checked");
+    splash.status(manual_view.t(.splash_images));
 
     const bs = std.os.uefi.system_table.boot_services orelse return;
     const pages = bs.allocatePages(.any, .loader_data, (@sizeOf(CatalogState) + 4095) / 4096) catch |err| {
@@ -44,6 +55,7 @@ pub fn run() void {
         showDataCatalogError(err);
         return;
     };
+    boot_timing.mark("DATA catalog open (BlockIo, GPT, NTFS mount)");
     const discovery = &state.discovery;
     while (true) {
         const category = manual_categories.select();

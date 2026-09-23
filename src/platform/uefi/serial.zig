@@ -3,6 +3,8 @@ const uefi = std.os.uefi;
 const SerialIo = uefi.protocol.SerialIo;
 
 var device: ?*SerialIo = null;
+/// Bytes sent so far (at 115200 baud a real UART needs ~87 us per byte).
+pub var bytes_written: usize = 0;
 
 pub fn init() void {
     const boot_services = uefi.system_table.boot_services orelse return;
@@ -29,5 +31,6 @@ pub fn writeAscii(text: []const u8) void {
 
 fn write(serial: *SerialIo, bytes: []const u8) void {
     if (bytes.len == 0) return;
+    bytes_written += bytes.len;
     _ = serial.write(bytes) catch return;
 }

@@ -1,9 +1,12 @@
 const std = @import("std");
 const manual_app = @import("manual_app.zig");
 const serial = @import("serial.zig");
+const boot_timing = @import("boot_timing.zig");
 
 pub fn main() noreturn {
+    boot_timing.mark("BOOTX64.EFI entry");
     serial.init();
+    boot_timing.mark("serial console ready");
     // Firmware arms a five-minute watchdog before starting an EFI boot option.
     // An interactive menu and ISO reads must not retain that boot deadline.
     if (std.os.uefi.system_table.boot_services) |bs| {
