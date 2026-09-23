@@ -20,6 +20,8 @@ Nośnik jest czytelny również bez uruchamiania Universal Service OS:
 
 WORK nie używa własnego typu GPT, ponieważ WinPE nie montuje niestandardowego typu jako zwykłej partycji danych. Tożsamość WORK jest chroniona przez PARTUUID i dysk nadrzędny oraz dodatkowo przez `.usos-work`; plik zawiera nonce zgodny z `EFI/USOS/usos-device.ini`. Po formatowaniu `.usos-work` jest pierwszym zwykłym plikiem zapisywanym na WORK, przed rozpakowaniem instalatora.
 
+Tylko ESP może zawierać ścieżkę nośnika wymiennego `\EFI\BOOT\BOOTX64.EFI` (ani `BOOTIA32.EFI`). Firmware (np. AMI Aptio) pokazuje każdą partycję z tą ścieżką jako osobną pozycję „UEFI: <dysk>, Partition N”. Przygotowany łańcuch startowy WORK leży więc w `\EFI\USOS-WORK\` (`BOOTX64.EFI`, a dla Windows 7 także `win7.efi`, `win7.original.efi`, `UefiSeven.ini`); `tools/work_boot_relocate.sh` przenosi tam `\EFI\BOOT` skopiowanego nośnika (loadery Linuksa: kopia całego katalogu, z `\EFI\BOOT` usuwane są tylko pliki `BOOT*.EFI`) i na końcu przygotowania sprawdza, że na WORK nie został żaden `\EFI\BOOT\BOOT*.EFI`. Windows Boot Manager czyta BCD z bezwzględnej ścieżki `\EFI\Microsoft\Boot\BCD` urządzenia, z którego wystartował, a wrapper Windows 7 i UefiSeven szukają swoich plików obok siebie, więc nazwa katalogu nie ma dla nich znaczenia. Loader USOS przez jedno wydanie akceptuje jeszcze stare `\EFI\BOOT` na WORK, a aktualizacja/naprawa z Windows przemianowuje je na `\EFI\USOS-WORK`.
+
 ## Obrazy
 
 Każdy profil ma własny katalog `Images`. Obsługiwane w katalogu są obecnie formaty rozpoznawane jako:

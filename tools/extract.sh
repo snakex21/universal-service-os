@@ -32,6 +32,7 @@ command -v cmp >/dev/null 2>&1 || fail 'cmp is required'
 command -v sync >/dev/null 2>&1 || fail 'sync is required'
 command -v mkfifo >/dev/null 2>&1 || fail 'mkfifo is required for extraction progress'
 command -v tr >/dev/null 2>&1 || fail 'tr is required for extraction progress'
+[ -f "$SCRIPT_DIR/work_boot_relocate.sh" ] || fail 'work_boot_relocate.sh is missing'
 
 [ -d "$SOURCE_ROOT" ] || fail "source root is not a directory: $SOURCE_ROOT"
 [ -d "$WORK_ROOT" ] || fail "WORK root is not a directory: $WORK_ROOT"
@@ -292,11 +293,14 @@ if [ "${WINDOWS7_UEFI:-no}" = yes ]; then
 fi
 
 usos_ui_stage 5 5 'Checking boot files' 'Verifying the prepared boot path before committing state.'
+# Only the USOS ESP may offer the removable-media path EFI/BOOT/BOOTX64.EFI;
+# the copied media's boot chain is published under EFI/USOS-WORK instead.
+sh "$SCRIPT_DIR/work_boot_relocate.sh" relocate "$WORK_ROOT" || fail 'cannot move the WORK boot chain to EFI/USOS-WORK'
 if [ "$SELECTED_METHOD" = chainload ]; then
-    BOOT_FILE=$(find "$WORK_ROOT" -type f | awk 'tolower($0) ~ /\/efi\/boot\/bootx64\.efi$/ { print; exit }')
-    [ -n "$BOOT_FILE" ] || fail 'chainload source has no EFI/BOOT/BOOTX64.EFI'
-    printf '[EXTRACT] chainload boot file PASS path=%s\n' "$BOOT_FILE"
+    sh "$SCRIPT_DIR/work_boot_relocate.sh" assert "$WORK_ROOT" --require-entry || fail 'chainload source has no EFI boot entry (EFI/BOOT/BOOTX64.EFI before relocation)'
+    printf '[EXTRACT] chainload boot file PASS path=EFI/USOS-WORK/BOOTX64.EFI\n'
 else
+    sh "$SCRIPT_DIR/work_boot_relocate.sh" assert "$WORK_ROOT" || fail 'removable-media EFI boot entry left on WORK'
     INSTALL_WIM=$(find "$WORK_ROOT" -type f | awk 'tolower($0) ~ /\/sources\/install\.(wim|esd)$/ { print; exit }')
     [ -n "$INSTALL_WIM" ] || fail 'Windows installer has no sources/install.wim or install.esd'
     printf '[EXTRACT] Windows installation image PASS path=%s\n' "$INSTALL_WIM"

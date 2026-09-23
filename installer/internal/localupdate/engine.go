@@ -6,12 +6,16 @@ import (
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/installed"
 	"github.com/snakex21/universal-service-os/installer/internal/legacyboot"
+	"github.com/snakex21/universal-service-os/installer/internal/workboot"
 )
 
 type Backend interface {
 	RevalidateInstalledUSOS(expected installed.Target) (installed.Target, error)
 	RestoreLegacyBoot(expected installed.Target) (legacyboot.Audit, error)
 	EnsureWORKVisible(media install.MediaLayout) error
+	// MigrateWORKBootPath moves a pre-USOS-WORK EFI/BOOT chain on WORK to
+	// EFI/USOS-WORK so firmware stops listing WORK as a boot option.
+	MigrateWORKBootPath(media install.MediaLayout) (workboot.Migration, error)
 	PayloadStatus(media install.MediaLayout) ([]PayloadFileStatus, error)
 	CopyInstallPayload(media install.MediaLayout, progress func(done, total uint64)) error
 	Verify(media install.MediaLayout, expected install.DeviceINI) (install.VerificationReport, error)
@@ -145,6 +149,11 @@ func (e *Engine) run(expected installed.Target, allowDowngrade bool, events chan
 		return
 	}
 	if err := e.runStage(events, StageExposeWORK, func() error {
+		migration, err := e.backend.MigrateWORKBootPath(current.Media)
+		if err != nil {
+			return fmt.Errorf("move WORK EFI/BOOT to EFI/%s: %w", workboot.Dir, err)
+		}
+		e.log(events, "WORK BOOT PATH MIGRATION "+migration.String())
 		return e.backend.EnsureWORKVisible(current.Media)
 	}); err != nil {
 		return

@@ -13,6 +13,7 @@ import (
 
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/payload"
+	"github.com/snakex21/universal-service-os/installer/internal/workboot"
 )
 
 func (b Backend) Verify(media install.MediaLayout, expected install.DeviceINI) (install.VerificationReport, error) {
@@ -93,6 +94,17 @@ func (b Backend) verify(media install.MediaLayout, expected install.DeviceINI, v
 		report.Items = append(report.Items, install.VerificationItem{Name: ".usos-work nonce", Expected: actualINI.Nonce, Actual: markerErr.Error(), Match: false})
 	} else {
 		add(".usos-work nonce", actualINI.Nonce, markerNonce)
+	}
+
+	// Only the ESP may offer \EFI\BOOT\BOOT*.EFI; firmware lists every other
+	// partition that has it as an extra boot option.
+	const workBootExpected = `brak EFI\BOOT\BOOT*.EFI (łańcuch w EFI\USOS-WORK)`
+	if left, err := workboot.RemovableEntries(resolved.WORK.VolumePath); err != nil {
+		report.Items = append(report.Items, install.VerificationItem{Name: "WORK bez EFI\\BOOT", Expected: workBootExpected, Actual: err.Error(), Match: false})
+	} else if len(left) != 0 {
+		report.Items = append(report.Items, install.VerificationItem{Name: "WORK bez EFI\\BOOT", Expected: workBootExpected, Actual: fmt.Sprint(left), Match: false})
+	} else {
+		add("WORK bez EFI\\BOOT", workBootExpected, workBootExpected)
 	}
 
 	bundle, bundleErr := payload.Embedded()

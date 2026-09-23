@@ -29,6 +29,7 @@ command -v umount >/dev/null 2>&1 || fail 'umount is required'
 [ -f "$SCRIPT_DIR/extract.sh" ] || fail 'extract.sh is missing'
 [ -f "$SCRIPT_DIR/prepare_wimboot.sh" ] || fail 'prepare_wimboot.sh is missing'
 [ -f "$SCRIPT_DIR/prepare_vhdboot.sh" ] || fail 'prepare_vhdboot.sh is missing'
+[ -f "$SCRIPT_DIR/work_boot_relocate.sh" ] || fail 'work_boot_relocate.sh is missing'
 [ -e "$WORK_PATH" ] || fail "WORK PARTUUID path is missing: $WORK_PATH"
 [ -f "$STATE_FILE" ] || fail "state file is missing: $STATE_FILE"
 REQUEST_PHASE=$(awk -F= '/^[[:space:]]*phase[[:space:]]*=/ { value=$0; sub(/^[^=]*=/, "", value); gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); print value; found=1; exit } END { if (!found) exit 1 }' "$STATE_FILE") || fail 'state file has no phase'
@@ -99,6 +100,12 @@ case "${SELECTED_METHOD:-iso}" in
     *) sh "$SCRIPT_DIR/extract.sh" ;;
 esac
 
+# Final invariant: no partition except the ESP may offer the removable-media
+# path EFI/BOOT/BOOTX64.EFI (firmware would list it as an extra boot option).
+sh "$SCRIPT_DIR/work_boot_relocate.sh" assert "$WORK_ROOT" || fail 'removable-media EFI boot entry left on WORK'
+if [ -d "${DATA_ROOT:-/mnt/data}" ]; then
+    sh "$SCRIPT_DIR/work_boot_relocate.sh" check "${DATA_ROOT:-/mnt/data}" || true
+fi
 usos_ui_sync_with_activity 'Flushing to disk' 'Finishing WORK writes before closing the prepared partition.' || fail 'final WORK sync failed'
 usos_ui_stage 5 5 'Closing WORK partition' 'All buffered writes are complete; closing the prepared filesystem.'
 umount "$WORK_MOUNT" || fail 'failed to unmount prepared WORK'

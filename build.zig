@@ -71,11 +71,23 @@ fn addHostTests(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
     const framebuffer_tests = b.addTest(.{ .root_module = framebuffer_test_module });
     const run_framebuffer_tests = b.addRunArtifact(framebuffer_tests);
 
+    // UEFI-side policy modules that belong to the UEFI executables' root
+    // module (so they cannot be imported from src/root.zig as well).
+    const work_boot_path_module = b.createModule(.{
+        .root_source_file = b.path("src/platform/uefi/work_boot_path.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const work_boot_path_tests = b.addTest(.{ .root_module = work_boot_path_module });
+    const run_work_boot_path_tests = b.addRunArtifact(work_boot_path_tests);
+
     const test_step = b.step("test", "Run all unit tests");
     test_step.dependOn(&run_unit_tests.step);
     test_step.dependOn(&run_framebuffer_tests.step);
+    test_step.dependOn(&run_work_boot_path_tests.step);
     b.default_step.dependOn(&run_unit_tests.step);
     b.default_step.dependOn(&run_framebuffer_tests.step);
+    b.default_step.dependOn(&run_work_boot_path_tests.step);
 }
 
 fn addHostUiPreview(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {

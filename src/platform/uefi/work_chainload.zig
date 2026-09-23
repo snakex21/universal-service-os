@@ -2,14 +2,18 @@ const std = @import("std");
 const uefi = std.os.uefi;
 const builtin = @import("builtin");
 const case_path = @import("case_path.zig");
+const work_boot_path = @import("work_boot_path.zig");
 
-fn bootPath() []const u8 {
-    return switch (builtin.cpu.arch) {
-        .x86_64 => "EFI/BOOT/BOOTX64.EFI",
-        .aarch64 => "EFI/BOOT/BOOTAA64.EFI",
-        .x86 => "EFI/BOOT/BOOTIA32.EFI",
-        else => "EFI/BOOT/BOOTX64.EFI",
-    };
+/// Resolves the WORK boot entry: EFI/USOS-WORK first, then (one-release
+/// fallback) the legacy EFI/BOOT path written by older builds.
+fn resolveBootPath(root: *uefi.protocol.File, storage: *[case_path.max_path_units + 1:0]u16) case_path.ResolveError![:0]const u16 {
+    for (work_boot_path.candidates) |candidate| {
+        return case_path.resolve(root, candidate, storage) catch |err| switch (err) {
+            error.NotFound => continue,
+            else => return err,
+        };
+    }
+    return error.NotFound;
 }
 
 pub const LoadedImageCheck = struct {
@@ -23,7 +27,7 @@ pub fn load(work_handle: uefi.Handle) !uefi.Handle {
     defer root.close() catch {};
 
     var resolved_storage: [case_path.max_path_units + 1:0]u16 = undefined;
-    const resolved_path = try case_path.resolve(root, bootPath(), &resolved_storage);
+    const resolved_path = try resolveBootPath(root, &resolved_storage);
 
     const device_path = (try boot_services.handleProtocol(uefi.protocol.DevicePath, work_handle)) orelse return error.DevicePathUnavailable;
     var path_storage: [2048]u8 = undefined;
@@ -62,7 +66,7 @@ pub fn checkLoadedImage(image_handle: uefi.Handle, work_handle: uefi.Handle) !Lo
     const root = try file_system.openVolume();
     defer root.close() catch {};
     var resolved_storage: [case_path.max_path_units + 1:0]u16 = undefined;
-    const expected_path = try case_path.resolve(root, bootPath(), &resolved_storage);
+    const expected_path = try resolveBootPath(root, &resolved_storage);
     if (expected_path.len != actual_path.len) return error.FilePathMismatch;
     for (expected_path, 0..) |unit, index| {
         if (unit != actual_path[index]) return error.FilePathMismatch;

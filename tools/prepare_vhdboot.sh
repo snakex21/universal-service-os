@@ -22,6 +22,7 @@ command -v cmp >/dev/null 2>&1 || fail 'cmp is required'
 [ -d "$VHD_SHARED" ] || fail "VHDBoot shared directory is missing: $VHD_SHARED"
 [ -f "$VHD_BCD" ] || fail "VHDBoot BCD is missing: $VHD_BCD"
 [ -f "$WORK_ROOT/.usos-work" ] || fail 'WORK identity marker is missing'
+[ -f "$SCRIPT_DIR/work_boot_relocate.sh" ] || fail 'work_boot_relocate.sh is missing'
 
 usos_ui_stage 4 5 'Building native VHD boot environment' 'Copying Windows Boot Manager and the BCD entry for the selected VHD/VHDX.'
 usos_perf_mark 'VHD boot files copy begin'
@@ -33,11 +34,8 @@ usos_ui_stage 5 5 'Verifying VHD boot files' 'Checking the selected BCD and EFI 
 usos_perf_mark 'VHD verification and finalization begin'
 cmp -s "$VHD_BCD" "$WORK_ROOT/EFI/Microsoft/Boot/BCD" || fail 'selected VHDBoot BCD verification failed'
 
-BOOT_FILE=''
-for candidate in "$WORK_ROOT/EFI/BOOT/BOOTX64.EFI" "$WORK_ROOT/EFI/BOOT/BOOTAA64.EFI" "$WORK_ROOT/EFI/BOOT/BOOTIA32.EFI"; do
-    if [ -s "$candidate" ]; then BOOT_FILE=$candidate; break; fi
-done
-[ -n "$BOOT_FILE" ] || fail 'VHDBoot fallback EFI boot manager is missing'
+sh "$SCRIPT_DIR/work_boot_relocate.sh" relocate "$WORK_ROOT" || fail 'cannot move the VHDBoot boot manager to EFI/USOS-WORK'
+sh "$SCRIPT_DIR/work_boot_relocate.sh" assert "$WORK_ROOT" --require-entry || fail 'VHDBoot EFI boot manager is missing'
 [ -s "$WORK_ROOT/EFI/Microsoft/Boot/BCD" ] || fail 'VHDBoot BCD is empty after copy'
 
 usos_perf_mark 'VHD files flush begin'

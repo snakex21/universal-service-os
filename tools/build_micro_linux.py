@@ -439,6 +439,7 @@ def main() -> int:
             ("tools/prepare_xp_windows_partition.sh", "usr/lib/usos/prepare_xp_windows_partition.sh"),
             ("tools/prepare_wimboot.sh", "usr/lib/usos/prepare_wimboot.sh"),
             ("tools/prepare_vhdboot.sh", "usr/lib/usos/prepare_vhdboot.sh"),
+            ("tools/work_boot_relocate.sh", "usr/lib/usos/work_boot_relocate.sh"),
             ("tools/micro_linux_ui.sh", "usr/lib/usos/micro_linux_ui.sh"),
             ("tools/micro_linux_init.sh", "usos-init"),
         ):

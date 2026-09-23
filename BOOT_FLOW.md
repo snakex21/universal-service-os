@@ -105,7 +105,7 @@ Docelowa kolejność dla instalatora Windows jest następująca:
 3. Mikro-Linux akceptuje wykonanie tylko przy `phase=prepare-requested`.
 4. `device_guard.sh pre-format` musi przejść przed pierwszą operacją zapisującą na WORK.
 5. Dopiero wtedy wykonywany jest `mkfs.ntfs`; następnie `device_guard.sh restore-marker` zapisuje `.usos-work` jako pierwszy zwykły plik i weryfikuje nonce oraz etykietę `USOS_WORK`.
-6. `extract.sh` kopiuje instalator z raportowaniem postępu, porównuje liczbę plików i sumę bajtów ze źródłem, kopiuje wskazany `unattend.xml`, wykonuje `sync` i dopiero potem publikuje `phase=prepared`.
+6. `extract.sh` kopiuje instalator z raportowaniem postępu, porównuje liczbę plików i sumę bajtów ze źródłem, przenosi łańcuch startowy nośnika z `\EFI\BOOT` do `\EFI\USOS-WORK` (tylko ESP może mieć `\EFI\BOOT\BOOTX64.EFI`), kopiuje wskazany `unattend.xml`, wykonuje `sync` i dopiero potem publikuje `phase=prepared`.
 7. Restart mikro-Linuxa zużywa `BootNext` i wraca jednorazowo do USOS.
 8. USOS widząc `prepared` przechodzi do handoffu Windows Boot Managera z WORK NTFS.
 9. Po udanym `StartImage` stan one-shot wraca do `pending`; po błędzie `StartImage` wraca do `prepared`, aby umożliwić retry bez ponownego rozpakowania.

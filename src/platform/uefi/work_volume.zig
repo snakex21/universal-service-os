@@ -2,22 +2,18 @@ const std = @import("std");
 const uefi = std.os.uefi;
 const builtin = @import("builtin");
 const case_path = @import("case_path.zig");
+const work_boot_path = @import("work_boot_path.zig");
 
 const marker = std.unicode.utf8ToUtf16LeStringLiteral("\\.usos-work");
 const install_wim = "sources/install.wim";
-fn bootPath() []const u8 {
-    return switch (builtin.cpu.arch) {
-        .x86_64 => "EFI/BOOT/BOOTX64.EFI",
-        .aarch64 => "EFI/BOOT/BOOTAA64.EFI",
-        .x86 => "EFI/BOOT/BOOTIA32.EFI",
-        else => "EFI/BOOT/BOOTX64.EFI",
-    };
-}
 
 pub const Found = struct {
     handle: uefi.Handle,
     has_install_wim: bool,
+    /// A UEFI boot entry exists (EFI/USOS-WORK, or the legacy EFI/BOOT).
     has_windows_boot: bool,
+    /// The entry was found only at the legacy EFI/BOOT path.
+    legacy_boot_path: bool,
 };
 
 pub fn find() ?Found {
@@ -33,8 +29,13 @@ pub fn find() ?Found {
         tag.close() catch {};
 
         const has_install_wim = existsCaseInsensitive(root, install_wim);
-        const has_windows_boot = existsCaseInsensitive(root, bootPath());
-        return .{ .handle = handle, .has_install_wim = has_install_wim, .has_windows_boot = has_windows_boot };
+        const boot = work_boot_path.select(work_boot_path.candidates, root, existsCaseInsensitive);
+        return .{
+            .handle = handle,
+            .has_install_wim = has_install_wim,
+            .has_windows_boot = boot != null,
+            .legacy_boot_path = if (boot) |selected| selected.legacy else false,
+        };
     }
     return null;
 }

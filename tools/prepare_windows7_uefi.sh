@@ -114,11 +114,16 @@ sh "$SCRIPT_DIR/prepare_windows7_nvme.sh" "$boot" "$index" "$stage" || fail 'can
 efi_root=$(find "$work" -mindepth 1 -maxdepth 1 -type d | awk 'tolower($0) ~ /\/efi$/ {print;exit}')
 [ -n "$efi_root" ] || efi_root="$work/efi"
 mkdir -p "$efi_root"
-efi=$(find "$efi_root" -mindepth 1 -maxdepth 1 -type d | awk 'tolower($0) ~ /\/boot$/ {print;exit}')
-[ -n "$efi" ] || efi="$efi_root/boot"
+# The chain lives in EFI/USOS-WORK, never in the removable-media EFI/BOOT:
+# firmware lists every partition with EFI/BOOT/BOOTX64.EFI as a boot option.
+# win7-wrapper.efi and UefiSeven resolve win7.efi/win7.original.efi and
+# UefiSeven.ini next to themselves, and bootmgfw reads the device-absolute
+# \EFI\Microsoft\Boot\BCD, so the directory name does not matter to them.
+efi=$(find "$efi_root" -mindepth 1 -maxdepth 1 -type d | awk 'tolower($0) ~ /\/usos-work$/ {print;exit}')
+[ -n "$efi" ] || efi="$efi_root/USOS-WORK"
 mkdir -p "$efi"
 entry=$(find "$efi" -mindepth 1 -maxdepth 1 -type f | awk 'tolower($0) ~ /\/bootx64\.efi$/ {print;exit}')
-[ -n "$entry" ] || entry="$efi/bootx64.efi"
+[ -n "$entry" ] || entry="$efi/BOOTX64.EFI"
 cp "$u/win7-wrapper.efi" "$entry"
 for file in win7.original.efi win7.efi UefiSeven.ini uefiseven-LICENSE.txt; do cp "$u/$file" "$efi/$file"; done
 cmp "$u/win7-wrapper.efi" "$entry" || fail 'EFI loader readback failed'

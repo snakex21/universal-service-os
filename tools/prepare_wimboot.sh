@@ -26,6 +26,7 @@ command -v stat >/dev/null 2>&1 || fail 'stat is required'
 [ -f "$WIM_TEMPLATE/EFI/Microsoft/Boot/BCD" ] || fail 'WIMBoot template has no BCD'
 [ -f "$WIM_TEMPLATE/boot/boot.sdi" ] || fail 'WIMBoot template has no boot/boot.sdi'
 [ -f "$WORK_ROOT/.usos-work" ] || fail 'WORK identity marker is missing'
+[ -f "$SCRIPT_DIR/work_boot_relocate.sh" ] || fail 'work_boot_relocate.sh is missing'
 
 usos_ui_stage 4 5 'Building WIM boot environment' 'Copying Windows boot manager, BCD, boot.sdi and fonts.'
 rsync -a "$WIM_TEMPLATE/" "$WORK_ROOT/" || fail 'failed to copy WIMBoot template to WORK'
@@ -137,7 +138,8 @@ usos_ui_stage 5 5 'Verifying WIM file' 'Comparing the copied boot.wim with the s
 usos_perf_mark 'WIM verification and finalization begin'
 cmp -s "$WIM_FILE" "$WORK_ROOT/sources/boot.wim" || fail 'boot.wim verification failed'
 usos_ui_stage 5 5 'Verifying boot files' 'Checking BCD, boot.sdi and the EFI fallback boot manager.'
-[ -s "$WORK_ROOT/EFI/BOOT/BOOTX64.EFI" ] || fail 'fallback EFI boot manager is missing after copy'
+sh "$SCRIPT_DIR/work_boot_relocate.sh" relocate "$WORK_ROOT" || fail 'cannot move the WIMBoot boot manager to EFI/USOS-WORK'
+sh "$SCRIPT_DIR/work_boot_relocate.sh" assert "$WORK_ROOT" --require-entry || fail 'EFI boot manager is missing after copy'
 [ -s "$WORK_ROOT/EFI/Microsoft/Boot/BCD" ] || fail 'BCD is missing after copy'
 [ -s "$WORK_ROOT/boot/boot.sdi" ] || fail 'boot.sdi is missing after copy'
 

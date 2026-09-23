@@ -10,6 +10,7 @@ import (
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/installed"
 	"github.com/snakex21/universal-service-os/installer/internal/legacyboot"
+	"github.com/snakex21/universal-service-os/installer/internal/workboot"
 )
 
 type testLogger struct{ lines []string }
@@ -43,6 +44,11 @@ func (b *testBackend) RestoreLegacyBoot(installed.Target) (legacyboot.Audit, err
 		Core:                   legacyboot.ComponentAudit{BeforeSHA256: strings.Repeat("3", 64), AfterSHA256: strings.Repeat("4", 64), ExpectedSHA256: strings.Repeat("4", 64), Changed: true},
 		CoreSlotZeroReadbackOK: true,
 	}, b.restoreErr
+}
+
+func (b *testBackend) MigrateWORKBootPath(install.MediaLayout) (workboot.Migration, error) {
+	b.calls = append(b.calls, "migrate-work-boot")
+	return workboot.Migration{Action: workboot.ActionRename, From: "EFI/BOOT", To: "EFI/USOS-WORK"}, nil
 }
 
 func (b *testBackend) EnsureWORKVisible(install.MediaLayout) error {
@@ -98,7 +104,7 @@ func TestLocalUpdateSuccessWritesGuardedLegacyBootBeforePayload(t *testing.T) {
 	if len(finished) != 1 || finished[0].Err != nil || finished[0].Verification == nil || !finished[0].Verification.OK() {
 		t.Fatalf("unexpected finished events: %+v", finished)
 	}
-	want := []string{"revalidate", "legacy", "expose-work", "payload-status", "copy", "payload-status", "verify"}
+	want := []string{"revalidate", "legacy", "migrate-work-boot", "expose-work", "payload-status", "copy", "payload-status", "verify"}
 	if len(backend.calls) != len(want) {
 		t.Fatalf("calls=%v want=%v", backend.calls, want)
 	}
@@ -138,7 +144,7 @@ func TestLocalUpdateStopsBeforePayloadWhenLegacyWriteFails(t *testing.T) {
 		t.Fatalf("expected Legacy stage failure, got %+v", finished)
 	}
 	for _, call := range backend.calls {
-		if call == "expose-work" || call == "copy" || call == "verify" {
+		if call == "migrate-work-boot" || call == "expose-work" || call == "copy" || call == "verify" {
 			t.Fatalf("Legacy failure must stop before ordinary update writes: calls=%v", backend.calls)
 		}
 	}
@@ -222,7 +228,7 @@ func TestLocalUpdateRejectsDowngradeWithoutExplicitConfirmation(t *testing.T) {
 		t.Fatalf("expected downgrade rejection, got %+v", finished)
 	}
 	for _, call := range backend.calls {
-		if call == "legacy" || call == "expose-work" || call == "copy" || call == "verify" {
+		if call == "legacy" || call == "migrate-work-boot" || call == "expose-work" || call == "copy" || call == "verify" {
 			t.Fatalf("downgrade changed media before confirmation: calls=%v", backend.calls)
 		}
 	}

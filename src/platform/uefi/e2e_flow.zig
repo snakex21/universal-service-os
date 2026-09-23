@@ -168,6 +168,7 @@ fn handoffWindows(root: *uefi.protocol.File, method: usos.catalog.BootMethod, pr
     say("INSTALL.WIM VISIBLE ON WORK\n");
     if (!work.has_windows_boot) return error.WindowsBootMissing;
     say("EFI BOOT FILE VISIBLE ON WORK\n");
+    if (work.legacy_boot_path) say("WORK BOOT PATH LEGACY EFI/BOOT (pre-USOS-WORK preparation)\n");
 
     reportResumeProgress(progress, .loading_windows_boot_manager);
     const windows_image = try work_chainload.load(work.handle);
@@ -207,6 +208,7 @@ fn handoffChainload(root: *uefi.protocol.File, method: usos.catalog.BootMethod) 
     say("WORK FOUND\n");
     if (!work.has_windows_boot) return error.EfiBootFileMissing;
     say("EFI BOOT FILE VISIBLE ON WORK\n");
+    if (work.legacy_boot_path) say("WORK BOOT PATH LEGACY EFI/BOOT (pre-USOS-WORK preparation)\n");
 
     const chained_image = try work_chainload.load(work.handle);
     say("CHAINLOAD LOADIMAGE PASS\n");
