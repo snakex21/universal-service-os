@@ -246,7 +246,11 @@ fn runFrontend(context: *const BootContext) void {
         .hardware = &hardware_runtime,
     };
     var graphics = vbe_probe.init();
-    if (graphics != null) @import("boot_ui.zig").init(&fs, reader);
+    if (graphics) |session| {
+        // Loading screen from the moment the VBE mode is set.
+        @import("boot_ui.zig").splash(session.surface);
+        @import("boot_ui.zig").init(&fs, reader, bulk_reader);
+    }
     console.screen_output = true;
     if (windows_index_offset != 0) {
         const cluster_bytes = data_directory_adapter.fs.cluster_bytes;

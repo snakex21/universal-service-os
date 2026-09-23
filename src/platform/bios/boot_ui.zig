@@ -44,6 +44,7 @@ const lang_path = [_][]const u16{ &p_efi, &p_usos, &p_lang };
 var state: struct {
     fs: ?*const fat32.FileSystem = null,
     reader: ?random_reader.Reader = null,
+    bulk: ?random_reader.Reader = null,
     window_ok: bool = false,
     resource_len: u32 = 0,
     lang_len: u32 = 0,
@@ -57,11 +58,53 @@ var state: struct {
 
 const english_table = lang_file.Table.english_only;
 
+var splash_surface: ?graphics.Surface linksection(".data") = null;
+
+/// Minimal splash drawn right after the VBE mode is set (the font is not
+/// loaded yet): the menu background, the USOS logo tile and a thin bar that
+/// fills while bios-ui.bin loads. The first menu frame replaces it.
+pub fn splash(surface: graphics.Surface) void {
+    const ui = Ui.init(surface, graphics.Theme{}, null, &english_table);
+    surface.fill(ui.theme.background);
+    const size = ui.px(84);
+    graphics.ui.drawLogoOn(&ui, (ui.width() -| size) / 2, splashLogoY(&ui), size, ui.theme.background);
+    splash_surface = surface;
+    splashBar(0);
+}
+
+fn splashLogoY(ui: *const Ui) u32 {
+    return (ui.height() * 42 / 100) -| ui.px(42);
+}
+
+fn splashBar(percent: u8) void {
+    const surface = splash_surface orelse return;
+    const ui = Ui.init(surface, graphics.Theme{}, null, &english_table);
+    const w = ui.px(160);
+    const h = ui.px(4);
+    const x = (ui.width() -| w) / 2;
+    const y = splashLogoY(&ui) + ui.px(84 + 44);
+    const theme = ui.theme;
+    graphics.paint.roundRect(surface, x, y, w, h, h / 2, theme.border, theme.background);
+    const filled = w * percent / 100;
+    if (filled >= h) graphics.paint.roundRect(surface, x, y, filled, h, h / 2, theme.accent, theme.border);
+}
+
+const SplashProgress = struct {
+    total: usize,
+
+    fn update(context: *anyopaque, bytes_done: usize) void {
+        const self: *SplashProgress = @ptrCast(@alignCast(context));
+        splashBar(@intCast(@min(100, bytes_done * 100 / @max(self.total, 1))));
+    }
+};
+
 /// Remembers the ESP and loads the resources. `fs` must stay valid for the
-/// life of the menu (core_main never returns).
-pub fn init(fs: *const fat32.FileSystem, reader: random_reader.Reader) void {
+/// life of the menu (core_main never returns). `bulk` reads up to 127
+/// sectors per INT 13h call (bios-ui.bin was ~240 single-sector calls).
+pub fn init(fs: *const fat32.FileSystem, reader: random_reader.Reader, bulk: random_reader.Reader) void {
     state.fs = fs;
     state.reader = reader;
+    state.bulk = bulk;
     state.window_ok = windowUsable();
     if (!state.window_ok) {
         console.line("[BIOS_UI] high-memory window not usable; 5x7 English fallback");
@@ -85,14 +128,17 @@ fn windowUsable() bool {
 
 fn reload() void {
     const fs = state.fs orelse return;
-    const reader = state.reader orelse return;
+    const reader = state.bulk orelse state.reader orelse return;
     state.pack_ok = false;
     state.table_ok = false;
     forgetPointer();
     const resources: [*]u8 = @ptrFromInt(resource_addr);
-    state.resource_len = @intCast(fat32.readFile(fs.*, reader, &resource_path, resources[0..resource_capacity]) catch 0);
+    var splash_progress = SplashProgress{ .total = if (fat32.fileInfo(fs.*, reader, &resource_path)) |info| info.size else |_| resource_capacity };
+    state.resource_len = @intCast(fat32.readFileSequentialProgress(fs.*, reader, &resource_path, resources[0..resource_capacity], .{ .context = &splash_progress, .update_fn = SplashProgress.update }) catch 0);
+    // Only the first load draws on the splash; reloads happen under menus.
+    splash_surface = null;
     const lang: [*]u8 = @ptrFromInt(lang_addr);
-    state.lang_len = @intCast(fat32.readFile(fs.*, reader, &lang_path, lang[0..lang_capacity]) catch 0);
+    state.lang_len = @intCast(fat32.readFileSequentialProgress(fs.*, reader, &lang_path, lang[0..lang_capacity], .{ .context = &splash_progress, .update_fn = SplashProgress.update }) catch 0);
     _ = validate(@ptrFromInt(table_addr));
     console.line(if (state.pack_ok) "[BIOS_UI] font pack ready" else "[BIOS_UI] bios-ui.bin missing or invalid; 5x7 English fallback");
     console.line(if (state.table_ok) "[BIOS_UI] language ready" else "[BIOS_UI] English (no valid lang.bin)");
