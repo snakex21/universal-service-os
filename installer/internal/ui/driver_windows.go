@@ -125,6 +125,31 @@ func (d *Driver) Type(text string) {
 	d.Idle()
 }
 
+// Pad feeds one controller input as the XInput poll would: "up", "down",
+// "left", "right", "a", "b", "lb", "rb" or "start".
+func (d *Driver) Pad(button string) error {
+	events := map[string]padEvent{
+		"up": {kind: padMove, dir: dirUp}, "down": {kind: padMove, dir: dirDown},
+		"left": {kind: padMove, dir: dirLeft}, "right": {kind: padMove, dir: dirRight},
+		"a": {kind: padActivate}, "b": {kind: padCancel},
+		"lb": {kind: padPrevSection}, "rb": {kind: padNextSection}, "start": {kind: padPrimary},
+	}
+	e, ok := events[button]
+	if !ok {
+		return fmt.Errorf("unknown pad button %q", button)
+	}
+	d.do(func() { d.w.padEvent(e) })
+	d.Idle()
+	return nil
+}
+
+// Focused returns the id of the focused widget.
+func (d *Driver) Focused() string {
+	var id string
+	d.do(func() { id = d.w.focus })
+	return id
+}
+
 // Focus gives keyboard focus to a widget.
 func (d *Driver) Focus(id string) {
 	d.do(func() {

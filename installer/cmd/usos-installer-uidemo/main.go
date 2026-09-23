@@ -41,6 +41,7 @@ func main() {
 	measure := flag.String("measure", "", "write first-frame timing and memory to this file and exit")
 	langShots := flag.String("langshots", "", "comma-separated languages: shoot the home screen, the device list and the language menu in each, then exit")
 	overflow := flag.String("overflow", "", "append every ellipsized or clipped string to this file")
+	padTour := flag.Bool("pad", false, "with -shots: take the gamepad tour (hint bar, focus moves, Start guard) instead")
 	flag.Parse()
 	i18n.SetLanguage(*lang)
 
@@ -75,6 +76,8 @@ func main() {
 			var err error
 			if *langShots != "" {
 				err = languageTour(d, *shots, strings.Split(*langShots, ","), *suffix)
+			} else if *padTour {
+				err = gamepadTour(d, *shots, *suffix)
 			} else {
 				err = tour(d, engines, *shots, *suffix, *startupError, *lang)
 			}
@@ -353,6 +356,83 @@ func tour(d *ui.Driver, e *fakeEngines, dir, suffix string, startupError bool, l
 	close(e.uninstallHold)
 	waitIdle(d)
 	return shot("uninstall-final-error")
+}
+
+// gamepadTour drives the UI with controller input only and checks that
+// Start never commits an operation.
+func gamepadTour(d *ui.Driver, dir, suffix string) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	n := 0
+	shot := func(name string) error {
+		n++
+		return d.Shot(filepath.Join(dir, fmt.Sprintf("pad-%02d-%s%s.png", n, name, suffix)))
+	}
+	press := func(buttons ...string) error {
+		for _, b := range buttons {
+			if err := d.Pad(b); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	expect := func(id string) error {
+		if got := d.Focused(); got != id {
+			return fmt.Errorf("focus %q, want %q", got, id)
+		}
+		return nil
+	}
+	d.Loaded()
+	// Home: install -> right (update) -> down (uninstall).
+	if err := errors.Join(press("right", "down"), expect("mode.uninstall")); err != nil {
+		return err
+	}
+	if err := shot("mode"); err != nil {
+		return err
+	}
+	if err := errors.Join(press("left", "up"), expect("mode.install"), press("a")); err != nil {
+		return err
+	}
+	d.Loaded()
+	// Device list: rows first, then down past the last row to Back.
+	if err := errors.Join(expect("list"), press("down", "down")); err != nil {
+		return err
+	}
+	if err := shot("devices"); err != nil {
+		return err
+	}
+	if err := errors.Join(press("rb"), expect("action.back"), press("lb"), expect("list")); err != nil {
+		return err
+	}
+	// Start on the device list continues to the typed confirmation...
+	if err := press("start"); err != nil {
+		return err
+	}
+	if !d.Enabled("confirm.go") && d.Enabled("action.back") {
+		// ...where Start only moves to the (still disabled) erase button:
+		// nothing is focused or pressed while it is disabled.
+		if err := errors.Join(press("start"), expect("confirm.input")); err != nil {
+			return err
+		}
+	} else {
+		return fmt.Errorf("Start did not reach the confirmation screen")
+	}
+	d.Type("Kingston DataTraveler 3.0")
+	if err := errors.Join(press("start"), expect("confirm.go")); err != nil {
+		return err
+	}
+	if d.Busy() {
+		return fmt.Errorf("Start started the installation")
+	}
+	if err := shot("confirm-start-focuses"); err != nil {
+		return err
+	}
+	// B backs out to the device list.
+	if err := errors.Join(press("b"), expect("list")); err != nil {
+		return err
+	}
+	return shot("back-to-devices")
 }
 
 func waitIdle(d *ui.Driver) {

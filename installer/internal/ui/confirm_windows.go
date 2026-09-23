@@ -156,7 +156,7 @@ func (s *typedConfirmScreen) draw(f *Flow, w *win, area rect) {
 
 	w.actions(bar,
 		[]action{{"action.back", buttonSpec{label: i18n.T("installer.common.cancel"), disabled: s.submitted, onClick: s.cancel}}},
-		[]action{{"confirm.go", buttonSpec{label: button, glyph: glyphWarning, style: buttonDanger, disabled: s.submitted || !s.accepted(), onClick: s.confirm}}},
+		[]action{{"confirm.go", buttonSpec{label: button, glyph: glyphWarning, style: buttonDanger, disabled: s.submitted || !s.accepted(), onClick: s.confirm, commits: true}}},
 	)
 }
 
@@ -287,7 +287,7 @@ func (s *updateConfirmScreen) draw(f *Flow, w *win, area rect) {
 		w.banner(rightR.Left, y, rightR.w(), i18n.T("installer.update.safe_note"), toneSuccess)
 	}
 
-	spec := buttonSpec{label: i18n.T("installer.mode.update.button"), glyph: glyphSync, style: buttonPrimary, disabled: !s.canStart(), onClick: s.start}
+	spec := buttonSpec{label: i18n.T("installer.mode.update.button"), glyph: glyphSync, style: buttonPrimary, disabled: !s.canStart(), onClick: s.start, commits: true}
 	if s.downgrade && s.payloadErr == nil {
 		spec.label = i18n.T("installer.update.downgrade_button", s.payloadInfo)
 		spec.style = buttonDanger
@@ -337,7 +337,7 @@ func (s *repairConfirmScreen) draw(f *Flow, w *win, area rect) {
 	w.banner(rightR.Left, y, rightR.w(), i18n.T("installer.repair.rewrites"), toneAccent)
 	w.actions(bar,
 		[]action{{"action.back", buttonSpec{label: i18n.T("installer.common.back"), glyph: glyphBack, disabled: s.started, onClick: func() { f.showInstalledDevices(opRepair) }}}},
-		[]action{{"action.primary", buttonSpec{label: i18n.T("installer.repair.button"), glyph: glyphRepair, style: buttonPrimary, disabled: s.started, onClick: s.start}}},
+		[]action{{"action.primary", buttonSpec{label: i18n.T("installer.repair.button"), glyph: glyphRepair, style: buttonPrimary, disabled: s.started, onClick: s.start, commits: true}}},
 	)
 }
 

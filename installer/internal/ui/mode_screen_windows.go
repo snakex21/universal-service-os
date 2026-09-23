@@ -130,7 +130,9 @@ func (s *modeScreen) draw(f *Flow, w *win, area rect) {
 	}
 	build := buildinfo.Current()
 	c.text(w.captionFont(), i18n.T("installer.mode.build", build.Display()), rect{area.Left, area.Bottom - footerH, area.Right, area.Bottom}, theme.Faint, dtLeft|dtSingleLine|dtVCenter|dtEndEllipsis)
-	c.text(w.captionFont(), i18n.T("installer.mode.keys_hint"), rect{area.Left, area.Bottom - footerH, area.Right, area.Bottom}, theme.Faint, dtRight|dtSingleLine|dtVCenter|dtEndEllipsis)
+	if !w.pad.active { // the controller hint bar replaces the keyboard hint
+		c.text(w.captionFont(), i18n.T("installer.mode.keys_hint"), rect{area.Left, area.Bottom - footerH, area.Right, area.Bottom}, theme.Faint, dtRight|dtSingleLine|dtVCenter|dtEndEllipsis)
+	}
 }
 
 func (s *modeScreen) drawCard(w *win, r rect, card modeCard) {

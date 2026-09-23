@@ -40,6 +40,11 @@ type buttonSpec struct {
 	onClick  func()
 	// trailing places the glyph after the label (dropdown chevrons).
 	trailing bool
+	// commits marks a button that starts a disk operation. With primary
+	// (set by actions for the right-most button) the gamepad Start button
+	// only focuses such a button and never presses it.
+	commits bool
+	primary bool
 }
 
 func (w *win) bodyFont() windows.Handle    { return w.font(sizeBody, fwNormal) }
@@ -58,7 +63,8 @@ func (w *win) buttonWidth(b buttonSpec) int32 {
 }
 
 func (w *win) button(id string, r rect, b buttonSpec) widgetState {
-	st := w.add(widget{id: id, r: r, focusable: true, disabled: b.disabled, onClick: b.onClick})
+	st := w.add(widget{id: id, r: r, focusable: true, disabled: b.disabled, onClick: b.onClick,
+		primary: b.primary, guarded: b.commits || b.style == buttonDanger})
 	var bg, fg, border color
 	switch b.style {
 	case buttonPrimary:

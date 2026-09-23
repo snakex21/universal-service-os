@@ -167,11 +167,21 @@ func (f *Flow) draw(w *win) {
 	client := rect{0, 0, c.width, c.height}
 	c.fill(client, theme.Background)
 	header, body := client.cutTop(w.px(56))
+	var hints rect
+	if w.pad.active {
+		hints, body = body.cutBottom(w.px(padHintsH))
+	}
 	content := body.inset(w.px(pad), w.px(20))
+	if w.pad.active {
+		content.Bottom += w.px(8) // the hint bar has its own margin
+	}
 	if f.screen != nil {
 		f.screen.draw(f, w, content)
 	}
 	f.drawHeader(w, header)
+	if w.pad.active {
+		f.drawPadHints(w, hints)
+	}
 	f.drawToast(w, client)
 	if f.langOpen {
 		f.drawLanguageMenu(w, client)

@@ -57,6 +57,7 @@ func (w *win) actions(bar rect, left, right []action) {
 	total += int32(max(0, len(right)-1)) * w.px(10)
 	x = bar.Right - total
 	for i, a := range right {
+		a.spec.primary = i == len(right)-1
 		w.button(a.id, rect{x, bar.Top, x + widths[i], bar.Bottom}, a.spec)
 		x += widths[i] + w.px(10)
 	}

@@ -119,6 +119,21 @@ func (l *driveList) draw(w *win, r rect, status string, statusTone tone, loading
 		// then walks the selection, like Up/Down.
 		l.move(int(rows))
 		l.ensureSelectedVisible(w)
+	}, padStep: func(d navDir) bool {
+		// Up/Down walk the rows; past the first or last row (and for
+		// Left/Right) the focus moves on to the neighbouring widget.
+		switch {
+		case len(l.entries) == 0:
+			return false
+		case d == dirDown && l.selected < len(l.entries)-1:
+			l.move(1)
+		case d == dirUp && l.selected > 0:
+			l.move(-1)
+		default:
+			return false
+		}
+		l.ensureSelectedVisible(w)
+		return true
 	}})
 	w.panel(body)
 	listFocused := st.focused

@@ -63,6 +63,12 @@ type widget struct {
 	// rows > 0 moves down. Only used when no scrolling region is under the
 	// pointer.
 	onWheel func(rows int32)
+	// padStep lets a widget use a gamepad direction itself (a list walks
+	// its rows); false hands it to spatial focus movement.
+	padStep func(d navDir) bool
+	// primary is the screen's main button (gamepad Start); guarded ones
+	// start an operation or are destructive and are only focused by Start.
+	primary, guarded bool
 }
 
 type widgetState struct {
@@ -150,6 +156,7 @@ type win struct {
 	dragOrigin        int32
 	wheelAcc          wheelAccum
 	wheelForwarding   bool // a wheel message is being handed to a native child
+	pad               gamepad
 
 	scrolls    map[string]*scrollState
 	edits      map[string]*nativeEdit
@@ -435,6 +442,7 @@ func (w *win) preTranslate(m *msg) bool {
 	if e == nil {
 		return false
 	}
+	w.setPadActive(false) // typing into a native field
 	if m.Message == wmChar {
 		switch m.WParam {
 		case '\t', 0x1b, 0x01:
@@ -490,12 +498,18 @@ func (w *win) wndProc(hwnd windows.HWND, message uint32, wParam, lParam uintptr)
 		w.drainQueue()
 		return 0
 	case wmTimer:
-		if wParam == animTimerID {
+		switch wParam {
+		case animTimerID:
 			w.invalidate()
+		case padTimerID:
+			w.padTick()
 		}
 		return 0
 	case wmMouseMove:
 		if !w.scripted {
+			if x, y := loWord(lParam), hiWord(lParam); x != w.mouse.X || y != w.mouse.Y {
+				w.setPadActive(false) // a real move, not a synthetic repeat
+			}
 			w.mouseMove(loWord(lParam), hiWord(lParam))
 		}
 		return 0
@@ -523,6 +537,7 @@ func (w *win) wndProc(hwnd windows.HWND, message uint32, wParam, lParam uintptr)
 		if w.scripted {
 			return 0
 		}
+		w.setPadActive(false)
 		w.mouseDown(loWord(lParam), hiWord(lParam))
 		return 0
 	case wmLButtonUp:
@@ -557,6 +572,7 @@ func (w *win) wndProc(hwnd windows.HWND, message uint32, wParam, lParam uintptr)
 		if message == wmSysKeyDown && wParam != vkF5 {
 			break // Alt+F4 and the system menu stay with DefWindowProc
 		}
+		w.setPadActive(false)
 		w.handleKey(wParam, false)
 		return 0
 	case wmChar:
@@ -571,6 +587,7 @@ func (w *win) wndProc(hwnd windows.HWND, message uint32, wParam, lParam uintptr)
 		w.invalidate()
 		return 0
 	case wmActivateApp:
+		w.padPolling(wParam != 0)
 		w.invalidate()
 	case wmCommand:
 		code := uint32(wParam >> 16)
