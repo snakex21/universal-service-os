@@ -1,5 +1,5 @@
 {
-  "language.name": "Polski",
+  "_meta": {"native_name": "Polski", "english_name": "Polish", "machine_translated": false},
 
   "installer.window.title": "Universal Service OS Installer",
   "installer.startup.log_failed": "Nie można uruchomić instalatora, ponieważ nie udało się otworzyć pliku logu obok programu:\n%s",

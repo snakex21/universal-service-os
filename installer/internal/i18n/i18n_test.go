@@ -13,15 +13,66 @@ import (
 	"unicode/utf16"
 )
 
-var pluralSuffix = regexp.MustCompile(`\.(one|few|many|other)$`)
+var pluralSuffix = regexp.MustCompile(`\.(zero|one|two|few|many|other)$`)
+
+// shippedLanguages is the full set of embedded catalogs.
+var shippedLanguages = []string{
+	"bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "hr", "hu", "it", "lt",
+	"lv", "nb", "nl", "pl", "pt-BR", "ro", "ru", "sk", "sl", "sr-Latn", "sv", "tr", "uk",
+}
 var formatVerb = regexp.MustCompile(`%[-+# 0]*[0-9]*(\.[0-9]+)?[a-zA-Z%]`)
 
 func TestCatalogsLoad(t *testing.T) {
 	if err := LoadError(); err != nil {
 		t.Fatal(err)
 	}
-	if got := Languages(); len(got) < 2 || got[0].Code != Fallback {
-		t.Fatalf("Languages()=%v, want en first and at least pl", got)
+	got := Languages()
+	codes := make([]string, 0, len(got))
+	for i, language := range got {
+		codes = append(codes, language.Code)
+		if language.Name == "" || language.EnglishName == "" {
+			t.Errorf("%s: _meta lacks names", language.Code)
+		}
+		// Only the hand-written catalogs may claim a human translation.
+		if human := language.Code == "en" || language.Code == "pl"; language.MachineTranslated == human {
+			t.Errorf("%s: machine_translated=%v", language.Code, language.MachineTranslated)
+		}
+		if i > 0 && FoldName(got[i-1].Name) > FoldName(language.Name) {
+			t.Errorf("Languages() not sorted by native name at %s", language.Code)
+		}
+		if len(language.Code) > 8 {
+			t.Errorf("%s: code does not fit lang.bin", language.Code)
+		}
+	}
+	sort.Strings(codes)
+	if strings.Join(codes, " ") != strings.Join(shippedLanguages, " ") {
+		t.Fatalf("languages %v, want %v", codes, shippedLanguages)
+	}
+}
+
+func TestLanguageMenuOrder(t *testing.T) {
+	var names []string
+	for _, language := range Languages() {
+		names = append(names, language.Name)
+	}
+	got := strings.Join(names, ", ")
+	// Latin script alphabetically (diacritics folded), then Greek, then Cyrillic.
+	for _, pair := range [][2]string{{"Čeština", "Dansk"}, {"Dansk", "Deutsch"}, {"Suomi", "Svenska"}, {"Türkçe", "Ελληνικά"}, {"Ελληνικά", "Български"}} {
+		if strings.Index(got, pair[0]) > strings.Index(got, pair[1]) {
+			t.Errorf("%s should come before %s: %s", pair[0], pair[1], got)
+		}
+	}
+}
+
+func TestParseCatalogMeta(t *testing.T) {
+	catalog, meta, err := ParseCatalogWithMeta([]byte(`{"_meta": {"native_name": "Deutsch", "english_name": "German", "machine_translated": true}, "a": "b"}`))
+	if err != nil || meta.NativeName != "Deutsch" || !meta.MachineTranslated || len(catalog) != 1 {
+		t.Fatalf("got %v %+v %v", catalog, meta, err)
+	}
+	for _, input := range []string{`{"_meta": "x"}`, `{"_meta": {"native": "x"}}`} {
+		if _, err := ParseCatalog([]byte(input)); err == nil {
+			t.Errorf("ParseCatalog(%s) accepted a bad _meta", input)
+		}
 	}
 }
 
@@ -77,16 +128,78 @@ func TestEveryLanguageIsComplete(t *testing.T) {
 				t.Errorf("%s: key %s does not exist in English", language.Code, key)
 			}
 		}
+		required := RequiredPluralForms(language.Code)
 		for base := range enPlural {
-			for _, form := range RequiredPluralForms(language.Code) {
+			for _, form := range required {
 				if !plural[base][form] {
 					t.Errorf("%s: plural %s lacks form %s", language.Code, base, form)
+				}
+				value := catalog[base+"."+form]
+				if verbs(value) != verbs(english[base+".other"]) {
+					t.Errorf("%s: %s.%s format verbs %q", language.Code, base, form, verbs(value))
+				}
+				// A form used for more than one number must print it.
+				if !strings.Contains(value, "{count}") && !(form == "one" && OneMeansExactlyOne(language.Code)) {
+					t.Errorf("%s: %s.%s lacks {count}", language.Code, base, form)
+				}
+			}
+			for form := range plural[base] {
+				if !contains(required, form) {
+					t.Errorf("%s: plural %s has form %s the language does not use", language.Code, base, form)
 				}
 			}
 		}
 		for base := range plural {
 			if enPlural[base] == nil {
 				t.Errorf("%s: plural %s does not exist in English", language.Code, base)
+			}
+		}
+	}
+}
+
+func contains(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+// Every counted message renders without a raw {count} or a fallback to the
+// key for every number class of every language.
+func TestPluralMessagesRender(t *testing.T) {
+	previous := Current()
+	defer SetLanguage(previous)
+	for _, language := range Languages() {
+		SetLanguage(language.Code)
+		for _, n := range []int{0, 1, 2, 3, 4, 5, 11, 12, 21, 22, 25, 101, 102, 111} {
+			for _, key := range []string{"installer.device.hidden", "installer.installed.found", "installer.mode.detected_hidden"} {
+				got := N(key, n)
+				if got == key || strings.Contains(got, "{count}") {
+					t.Errorf("%s N(%s,%d)=%q", language.Code, key, n, got)
+				}
+			}
+		}
+	}
+}
+
+// Every language can produce its drive files; lang.bin keeps the code.
+func TestDeviceFilesForEveryLanguage(t *testing.T) {
+	for _, language := range Languages() {
+		files, err := DeviceFiles(language.Code)
+		if err != nil {
+			t.Errorf("%s: %v", language.Code, err)
+			continue
+		}
+		for _, file := range files {
+			if file.Path == BootBlobPath && string(bytes.TrimRight(file.Data[12:20], "\x00")) != language.Code {
+				t.Errorf("%s: lang.bin language %q", language.Code, file.Data[12:20])
+			}
+			if file.Path == SettingsPath {
+				if got, ok := ParseSettingsLanguage(file.Data); !ok || Normalize(got) != language.Code {
+					t.Errorf("%s: settings language %q", language.Code, got)
+				}
 			}
 		}
 	}
@@ -108,7 +221,11 @@ func TestLookupFallsBackToEnglishThenKey(t *testing.T) {
 }
 
 func TestNormalizeAndWindowsLanguage(t *testing.T) {
-	cases := map[string]string{"pl": "pl", "pl-PL": "pl", "PL_pl": "pl", "en-US": "en", "": "en", "xx": "en"}
+	cases := map[string]string{"pl": "pl", "pl-PL": "pl", "PL_pl": "pl", "en-US": "en", "": "en", "xx": "en",
+		"de-AT": "de", "de-CH": "de", "fr-CA": "fr", "es-MX": "es", "nl-BE": "nl", "sv-FI": "sv", "ro-MD": "ro",
+		"pt": "pt-BR", "pt-BR": "pt-BR", "pt_br": "pt-BR", "pt-PT": "pt-BR", "sr": "sr-Latn", "sr-Latn-RS": "sr-Latn",
+		"sr-Cyrl": "sr-Latn", "sr-Cyrl-RS": "sr-Latn", "SR-LATN": "sr-Latn", "nb-NO": "nb", "nn": "nb", "nn-NO": "nb",
+		"no": "nb", "ja-JP": "en", "zh-Hans-CN": "en"}
 	for input, want := range cases {
 		if got := Normalize(input); got != want {
 			t.Errorf("Normalize(%q)=%q want %q", input, got, want)
@@ -120,9 +237,19 @@ func TestNormalizeAndWindowsLanguage(t *testing.T) {
 	if got := FromWindowsLangID(0x0409); got != "en" {
 		t.Errorf("0x0409 -> %q", got)
 	}
-	// A language without a catalog yet (Hungarian) falls back to English.
-	if got := FromWindowsLangID(0x040e); got != "en" {
-		t.Errorf("0x040e -> %q", got)
+	windows := map[uint16]string{
+		0x0402: "bg", 0x0405: "cs", 0x0406: "da", 0x0407: "de", 0x0c07: "de", 0x0807: "de", 0x0408: "el",
+		0x0809: "en", 0x0c0a: "es", 0x080a: "es", 0x0425: "et", 0x040b: "fi", 0x040c: "fr", 0x0c0c: "fr",
+		0x041a: "hr", 0x101a: "hr", 0x040e: "hu", 0x0410: "it", 0x0427: "lt", 0x0426: "lv", 0x0414: "nb",
+		0x0814: "nb", 0x0413: "nl", 0x0813: "nl", 0x0416: "pt-BR", 0x0816: "pt-BR", 0x0418: "ro", 0x0818: "ro",
+		0x0419: "ru", 0x041b: "sk", 0x0424: "sl", 0x241a: "sr-Latn", 0x281a: "sr-Latn", 0x081a: "sr-Latn",
+		0x0c1a: "sr-Latn", 0x2c1a: "sr-Latn", 0x301a: "sr-Latn", 0x041d: "sv", 0x081d: "sv", 0x041f: "tr",
+		0x0422: "uk", 0x0411: "en", 0x0804: "en", 0x141a: "en", 0: "en",
+	}
+	for id, want := range windows {
+		if got := FromWindowsLangID(id); got != want {
+			t.Errorf("0x%04x -> %q want %q", id, got, want)
+		}
 	}
 	if got := SystemLanguage(); Normalize(got) != got {
 		t.Errorf("SystemLanguage()=%q is not a catalog code", got)
@@ -135,7 +262,15 @@ func TestPluralForms(t *testing.T) {
 		n    int
 		want string
 	}{{"pl", 1, "one"}, {"pl", 2, "few"}, {"pl", 4, "few"}, {"pl", 5, "many"}, {"pl", 12, "many"}, {"pl", 22, "few"}, {"pl", 0, "many"},
-		{"en", 1, "one"}, {"en", 2, "other"}, {"cs", 3, "few"}, {"cs", 5, "other"}}
+		{"en", 1, "one"}, {"en", 2, "other"}, {"en", 0, "other"}, {"de", 1, "one"}, {"de", 0, "other"}, {"cs", 3, "few"}, {"cs", 5, "other"},
+		{"fr", 0, "one"}, {"fr", 1, "one"}, {"fr", 2, "other"}, {"pt-BR", 0, "one"}, {"pt-BR", 2, "other"},
+		{"ru", 1, "one"}, {"ru", 21, "one"}, {"ru", 11, "many"}, {"ru", 3, "few"}, {"ru", 13, "many"}, {"ru", 24, "few"}, {"ru", 25, "many"}, {"uk", 0, "many"},
+		{"hr", 21, "one"}, {"hr", 11, "other"}, {"hr", 22, "few"}, {"sr-Latn", 5, "other"}, {"sr-Latn", 101, "one"},
+		{"sl", 1, "one"}, {"sl", 101, "one"}, {"sl", 2, "two"}, {"sl", 102, "two"}, {"sl", 3, "few"}, {"sl", 104, "few"}, {"sl", 5, "other"}, {"sl", 11, "other"},
+		{"ro", 1, "one"}, {"ro", 0, "few"}, {"ro", 2, "few"}, {"ro", 19, "few"}, {"ro", 20, "other"}, {"ro", 101, "few"}, {"ro", 120, "other"},
+		{"lt", 1, "one"}, {"lt", 21, "one"}, {"lt", 11, "other"}, {"lt", 2, "few"}, {"lt", 9, "few"}, {"lt", 10, "other"}, {"lt", 12, "other"}, {"lt", 22, "few"},
+		{"lv", 0, "zero"}, {"lv", 10, "zero"}, {"lv", 11, "zero"}, {"lv", 1, "one"}, {"lv", 21, "one"}, {"lv", 2, "other"}, {"lv", 22, "other"},
+		{"fi", 1, "one"}, {"hu", 2, "other"}}
 	for _, c := range cases {
 		if got := PluralForm(c.lang, c.n); got != c.want {
 			t.Errorf("PluralForm(%s,%d)=%s want %s", c.lang, c.n, got, c.want)
