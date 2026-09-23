@@ -203,7 +203,15 @@ func prepareESPPayload(media install.MediaLayout) (payload.Bundle, []dynamicPayl
 		return payload.Bundle{}, nil, 0, fmt.Errorf("prepare language files: %w", err)
 	}
 	for _, file := range languageFiles {
-		dynamic = append(dynamic, dynamicPayloadFile{path: filepath.FromSlash(file.Path), data: file.Data})
+		data := file.Data
+		if file.Path == i18n.SettingsPath {
+			// Update/repair: keep the drive's other settings (wheel_invert,
+			// touch_rotation, ...) and only set the language.
+			if existing, err := os.ReadFile(filepath.Join(media.ESP.VolumePath, filepath.FromSlash(file.Path))); err == nil {
+				data = i18n.MergeSettingsINI(existing, i18n.Current())
+			}
+		}
+		dynamic = append(dynamic, dynamicPayloadFile{path: filepath.FromSlash(file.Path), data: data})
 	}
 	total := staticBytes
 	for _, file := range dynamic {

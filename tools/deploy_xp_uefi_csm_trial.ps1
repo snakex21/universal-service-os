@@ -78,6 +78,15 @@ if($Language){
  try{& go run ./cmd/usos-i18n-gen -root .. -export $Language -out $langOut|Out-Null;if($LASTEXITCODE -ne 0){throw 'Language export failed'}}finally{Pop-Location}
  foreach($name in @('usos-settings.ini','lang.bin','lang-xp.ini')){
   $source=Join-Path $langOut ('EFI\USOS\'+$name);if(!(Test-Path -LiteralPath $source -PathType Leaf)){throw ('Missing exported '+$name)}
+  # Keep the drive's other settings (wheel_invert, touch_rotation...): only set language.
+  $current=Join-Path $espRoot ('EFI\USOS\'+$name)
+  if($name -eq 'usos-settings.ini' -and (Test-Path -LiteralPath $current -PathType Leaf)){
+   $text=[IO.File]::ReadAllText($current)
+   if($text -match '(?im)^\s*language\s*='){$text=[regex]::Replace($text,'(?im)^[ \t]*language[ \t]*=.*$',('language='+$Language),1)}
+   elseif($text -match '(?im)^\s*\[ui\]\s*$'){$text=[regex]::Replace($text,'(?im)^(\s*\[ui\]\s*)$',('$1'+"`r`nlanguage="+$Language),1)}
+   else{$text="[ui]`r`nlanguage=$Language`r`n"+$text}
+   [IO.File]::WriteAllText($source,$text,(New-Object Text.UTF8Encoding($false)))
+  }
   $files+=@{Source=$source;Target=(Join-Path $espRoot ('EFI\USOS\'+$name))}
  }
 }

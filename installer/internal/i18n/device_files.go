@@ -56,6 +56,58 @@ func SettingsINI(lang string) []byte {
 	return []byte("[ui]\r\nlanguage=" + Normalize(lang) + "\r\n")
 }
 
+// MergeSettingsINI sets [ui] language= in an existing usos-settings.ini and
+// keeps every other section, key, comment and line (e.g. the boot menu's
+// wheel_invert= and touch_rotation=, which may be added by hand). An empty
+// or missing file yields SettingsINI(lang).
+func MergeSettingsINI(existing []byte, lang string) []byte {
+	if len(strings.TrimSpace(string(existing))) == 0 {
+		return SettingsINI(lang)
+	}
+	value := "language=" + Normalize(lang)
+	lines := strings.Split(strings.ReplaceAll(string(existing), "\r\n", "\n"), "\n")
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	section, uiEnd, replaced := "", -1, false
+	for i, raw := range lines {
+		line := strings.TrimSpace(raw)
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			section = strings.ToLower(line[1 : len(line)-1])
+			continue
+		}
+		if section != "ui" {
+			continue
+		}
+		uiEnd = i
+		if key, _, ok := strings.Cut(line, "="); ok && strings.EqualFold(strings.TrimSpace(key), "language") {
+			if !replaced {
+				lines[i] = value
+				replaced = true
+			}
+		}
+	}
+	if !replaced {
+		header := -1
+		for i, raw := range lines {
+			if strings.EqualFold(strings.TrimSpace(raw), "[ui]") {
+				header = i
+				break
+			}
+		}
+		if header < 0 {
+			lines = append([]string{"[ui]", value}, lines...)
+		} else {
+			at := header + 1
+			if uiEnd >= at {
+				at = uiEnd + 1
+			}
+			lines = append(lines[:at], append([]string{value}, lines[at:]...)...)
+		}
+	}
+	return []byte(strings.Join(lines, "\r\n") + "\r\n")
+}
+
 // ParseSettingsLanguage extracts language= from a usos-settings.ini body.
 func ParseSettingsLanguage(data []byte) (string, bool) {
 	section := ""
