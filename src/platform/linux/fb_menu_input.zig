@@ -186,21 +186,34 @@ pub const Input = struct {
         }
         for (&self.fds, 0..) |*slot, index| {
             if (slot.fd < 0 or slot.revents == 0) continue;
-            var events: [32]Event = undefined;
-            const n = linux.read(slot.fd, @ptrCast(&events), @sizeOf(@TypeOf(events)));
-            if (linux.errno(n) == .AGAIN) continue;
-            if (linux.errno(n) != .SUCCESS or n < @sizeOf(Event)) {
-                _ = linux.close(slot.fd);
-                slot.fd = -1;
-                continue;
+            // Drain everything the device has buffered, so a fast (1000 Hz)
+            // mouse yields one present for its newest position instead of a
+            // backlog of stale positions presented one by one.
+            var reads: usize = 0;
+            while (reads < 64) : (reads += 1) {
+                var events: [64]Event = undefined;
+                const n = linux.read(slot.fd, @ptrCast(&events), @sizeOf(@TypeOf(events)));
+                if (linux.errno(n) == .AGAIN) break;
+                if (linux.errno(n) == .INTR) continue;
+                if (linux.errno(n) != .SUCCESS or n < @sizeOf(Event)) {
+                    _ = linux.close(slot.fd);
+                    slot.fd = -1;
+                    break;
+                }
+                for (events[0 .. n / @sizeOf(Event)]) |event| self.handle(&self.devices[index], event);
+                if (n < @sizeOf(@TypeOf(events))) break;
             }
-            for (events[0 .. n / @sizeOf(Event)]) |event| self.handle(&self.devices[index], event);
         }
         return self.pop() orelse .none;
     }
 
     fn push(self: *Input, action: Action) void {
         if (action == .none or self.queued == self.queue.len) return;
+        // Pointer moves carry no data (x/y already hold the newest position):
+        // one queued .pointer is enough.
+        if (action == .pointer) {
+            for (self.queue[0..self.queued]) |queued| if (queued == .pointer) return;
+        }
         self.queue[self.queued] = action;
         self.queued += 1;
     }
@@ -494,6 +507,28 @@ test "wheel: classic notches and high-resolution counts scroll once per notch" {
     feed(&input, &hires, EV_REL, REL_WHEEL, -1);
     feed(&input, &hires, EV_SYN, SYN_REPORT, 0);
     try std.testing.expectEqualSlices(Action, &.{.scroll_down}, drain(&input, &out));
+}
+
+test "mouse: a burst of motion frames queues a single pointer update" {
+    var input = testInput();
+    var mouse = Device{};
+    var out: [16]Action = undefined;
+    for (0..40) |_| {
+        feed(&input, &mouse, EV_REL, REL_X, 3);
+        feed(&input, &mouse, EV_REL, REL_Y, 1);
+        feed(&input, &mouse, EV_SYN, SYN_REPORT, 0);
+    }
+    try std.testing.expectEqualSlices(Action, &.{.pointer}, drain(&input, &out));
+    try std.testing.expectEqual(@as(i32, 320 + 120), input.x);
+    try std.testing.expectEqual(@as(i32, 240 + 40), input.y);
+    // A click after the moves is still delivered, after the one pointer.
+    feed(&input, &mouse, EV_REL, REL_X, 1);
+    feed(&input, &mouse, EV_SYN, SYN_REPORT, 0);
+    feed(&input, &mouse, EV_KEY, BTN_LEFT, 1);
+    feed(&input, &mouse, EV_SYN, SYN_REPORT, 0);
+    feed(&input, &mouse, EV_KEY, BTN_LEFT, 0);
+    feed(&input, &mouse, EV_SYN, SYN_REPORT, 0);
+    try std.testing.expectEqualSlices(Action, &.{ .pointer, .click }, drain(&input, &out));
 }
 
 test "touch: tap clicks where the finger went down, a drag scrolls instead" {

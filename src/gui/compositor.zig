@@ -196,6 +196,18 @@ pub const Presenter = struct {
 
     /// Shows the back buffer's changes and the pointer at its current place.
     pub fn present(self: *Presenter, sink: Sink) void {
+        self.presentWith(sink, true);
+    }
+
+    /// Only the pointer moved and the back buffer is unchanged since the
+    /// last present: repaint just the old and new pointer rectangles, with
+    /// no full-screen diff (which costs milliseconds per move at 1080p and
+    /// made a 1000 Hz mouse fall behind).
+    pub fn presentPointer(self: *Presenter, sink: Sink) void {
+        self.presentWith(sink, false);
+    }
+
+    fn presentWith(self: *Presenter, sink: Sink, compare: bool) void {
         const width = self.back.framebuffer.width;
         const height = self.back.framebuffer.height;
         var dirty = Dirty{};
@@ -204,7 +216,7 @@ pub const Presenter = struct {
             copyRect(self.back, self.front, all);
             dirty.add(all);
             self.stale = false;
-        } else {
+        } else if (compare) {
             diff(self.back, self.front, &dirty);
         }
         const now: ?Rect = if (self.pointer) |p| p.rect().clip(width, height) else null;
@@ -308,6 +320,17 @@ test "composited dirty-rect presents equal a clean render with the pointer" {
         // Reference: a clean render of the same state with the pointer.
         const reference = TestScreen.surface(&screen.expected);
         TestScreen.render(reference, hovered);
+        var full: [TestScreen.w * TestScreen.h]u32 = undefined;
+        compose(reference, .{ .x = 0, .y = 0, .w = TestScreen.w, .h = TestScreen.h }, presenter.pointer, &full);
+        try std.testing.expectEqualSlices(u32, &full, &screen.video);
+    }
+    // Pointer-only presents (no diff) give the same picture while the back
+    // buffer is unchanged.
+    for ([_][2]u32{ .{ 10, 10 }, .{ 70, 80 }, .{ 159, 119 } }) |at| {
+        presenter.pointer = .{ .sprite = &sprite, .x = at[0], .y = at[1] };
+        presenter.presentPointer(sink);
+        const reference = TestScreen.surface(&screen.expected);
+        TestScreen.render(reference, 2);
         var full: [TestScreen.w * TestScreen.h]u32 = undefined;
         compose(reference, .{ .x = 0, .y = 0, .w = TestScreen.w, .h = TestScreen.h }, presenter.pointer, &full);
         try std.testing.expectEqualSlices(u32, &full, &screen.video);

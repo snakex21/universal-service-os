@@ -145,7 +145,9 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
                 redraw = true;
             },
             // Only the pointer moved: repaint its old and new rectangles.
-            .pointer => if (device) |*d| presentMenu(&presenter, d, &sprite, &input) else {
+            // The menu is not re-rendered on a move (no hover state), so the
+            // back buffer is unchanged and the full-screen diff is skipped.
+            .pointer => if (device) |*d| presentPointer(&presenter, d, &sprite, &input) else {
                 redraw = true;
             },
             .click => {
@@ -165,12 +167,23 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
     }
 }
 
-fn presentMenu(presenter: *usos.gui.compositor.Presenter, device: *const fb.Device, sprite: *const usos.gui.cursor.Sprite, input: *const input_module.Input) void {
+fn setPointer(presenter: *usos.gui.compositor.Presenter, sprite: *const usos.gui.cursor.Sprite, input: *const input_module.Input) void {
     presenter.pointer = if (input.pointer_visible and input.x >= 0 and input.y >= 0)
         .{ .sprite = sprite, .x = @intCast(input.x), .y = @intCast(input.y) }
     else
         null;
+}
+
+fn presentMenu(presenter: *usos.gui.compositor.Presenter, device: *const fb.Device, sprite: *const usos.gui.cursor.Sprite, input: *const input_module.Input) void {
+    setPointer(presenter, sprite, input);
     presenter.present(usos.gui.compositor.surfaceSink(&device.surface));
+    device.flush();
+}
+
+fn presentPointer(presenter: *usos.gui.compositor.Presenter, device: *const fb.Device, sprite: *const usos.gui.cursor.Sprite, input: *const input_module.Input) void {
+    setPointer(presenter, sprite, input);
+    presenter.presentPointer(usos.gui.compositor.surfaceSink(&device.surface));
+    device.flush();
 }
 
 fn selected(index: usize) u8 {

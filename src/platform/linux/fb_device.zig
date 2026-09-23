@@ -167,6 +167,16 @@ pub const Device = struct {
         if (linux.errno(marker) == .SUCCESS) _ = linux.close(@intCast(marker));
     }
 
+    /// Pushes what was just written through the mapping to the screen now.
+    /// simpledrm's fbdev emulation uses deferred I/O: writes to the mmap are
+    /// only copied to the scanout by a worker that runs every HZ/20 (50 ms),
+    /// so a pointer drawn through the mapping moved at 20 fps at best and
+    /// felt laggy. fsync on /dev/fb0 (fb_deferred_io_fsync) runs that worker
+    /// immediately. Harmless where the driver has no deferred I/O.
+    pub fn flush(self: *const Device) void {
+        _ = linux.fsync(self.fd);
+    }
+
     pub fn close(self: *Device) void {
         _ = linux.munmap(self.mapping, self.mapping_len);
         _ = linux.close(self.fd);
