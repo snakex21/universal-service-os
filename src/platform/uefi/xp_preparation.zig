@@ -44,7 +44,13 @@ pub fn start(root: *uefi.protocol.File, name: []const u8, unattended: ?[]const u
     }
     var cmd: [2048]u8 = undefined;
     const diagnostic = @import("diagnostic_boot.zig");
-    const command = try std.fmt.bufPrint(&cmd, "initrd=\\EFI\\USOS-XP\\initramfs-xp rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action=xp-staging usos.legacy_image_hex={s} {s}", .{ id, hex[0 .. name.len * 2], diagnostic.xpConsoleOptions(diagnostic.requested(root)) });
+    // lang.cpio (written by the installer) gives usos-fb-ui the chosen
+    // language; installs from before it existed boot without it.
+    const lang_initrd = if (root.open(wide("\\EFI\\USOS\\lang.cpio"), .read, .{})) |file| blk: {
+        file.close() catch {};
+        break :blk " initrd=\\EFI\\USOS\\lang.cpio";
+    } else |_| "";
+    const command = try std.fmt.bufPrint(&cmd, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action=xp-staging usos.legacy_image_hex={s} {s}", .{ lang_initrd, id, hex[0 .. name.len * 2], diagnostic.xpConsoleOptions(diagnostic.requested(root)) });
     var options: [2049]u16 = @splat(0);
     for (command, 0..) |c, i| options[i] = c;
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;

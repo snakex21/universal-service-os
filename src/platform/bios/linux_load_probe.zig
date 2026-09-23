@@ -19,7 +19,11 @@ const p_initramfs = [_]u16{ 'i', 'n', 'i', 't', 'r', 'a', 'm', 'f', 's', '-', 'u
 const p_probe_marker = [_]u16{ 'l', 'e', 'g', 'a', 'c', 'y', '-', 'l', 'i', 'n', 'u', 'x', '-', 'p', 'r', 'o', 'b', 'e', '.', 'f', 'l', 'a', 'g' };
 const p_boot_marker = [_]u16{ 'l', 'e', 'g', 'a', 'c', 'y', '-', 'l', 'i', 'n', 'u', 'x', '-', 'b', 'o', 'o', 't', '.', 'f', 'l', 'a', 'g' };
 
+const p_lang_cpio = [_]u16{ 'l', 'a', 'n', 'g', '.', 'c', 'p', 'i', 'o' };
 const kernel_path = [_][]const u16{ &p_efi, &p_usos, &p_micro, &p_kernel };
+/// lang.bin as a newc archive (written by the installer); appended to the
+/// initramfs so usos-fb-ui finds /etc/usos/lang.bin.
+const lang_cpio_path = [_][]const u16{ &p_efi, &p_usos, &p_lang_cpio };
 const initramfs_path = [_][]const u16{ &p_efi, &p_usos, &p_micro, &p_initramfs };
 const probe_marker_path = [_][]const u16{ &p_efi, &p_usos, &p_probe_marker };
 const boot_marker_path = [_][]const u16{ &p_efi, &p_usos, &p_boot_marker };
@@ -210,6 +214,9 @@ fn run(
 
     const kernel_info = try fat32.fileInfo(fs, reader, &kernel_path);
     const initramfs_info = try fat32.fileInfo(fs, reader, &initramfs_path);
+    const lang_size: u32 = if (fat32.fileInfo(fs, reader, &lang_cpio_path)) |info| info.size else |_| 0;
+    const initramfs_padded: u32 = (initramfs_info.size + 3) & ~@as(u32, 3);
+    const initrd_size: u32 = if (lang_size > 0) initramfs_padded + lang_size else initramfs_info.size;
 
     var setup_header: [linux_boot_header.minimum_header_bytes]u8 = undefined;
     const header_read = try fat32.readFileRange(fs, reader, &kernel_path, 0, &setup_header);
@@ -223,7 +230,7 @@ fn run(
     const map_count = try e820.probe(&map);
     const memory_map = map[0..map_count];
     e820.dumpEntries(memory_map);
-    const layout = try linux_memory.plan(memory_map, header, kernel_info.size, initramfs_info.size);
+    const layout = try linux_memory.plan(memory_map, header, kernel_info.size, initrd_size);
 
     const params_range = linux_memory.Range{
         .start = linux_boot_params.boot_params_phys,
@@ -240,7 +247,8 @@ fn run(
     printLayout(layout);
 
     const kernel_memory = try writableRange(layout.kernel_protected);
-    const initramfs_memory = try writableRange(layout.initramfs);
+    const initrd_memory = try writableRange(layout.initramfs);
+    const initramfs_memory = initrd_memory[0..initramfs_info.size];
     var load_progress = LoadProgress{
         .session = graphics_session,
         .total = @intCast(kernel_memory.len + initramfs_memory.len),
@@ -261,6 +269,13 @@ fn run(
         try fat32.readFileRange(fs, bulk_reader, &initramfs_path, 0, initramfs_memory);
     if (initramfs_read != initramfs_memory.len) return error.ShortInitramfsRead;
     if (initramfs_memory.len < 4 or initramfs_memory[0] != 0x1F or initramfs_memory[1] != 0x8B) return error.BadInitramfsMagic;
+    if (lang_size > 0) {
+        @memset(initrd_memory[initramfs_info.size..initramfs_padded], 0);
+        const lang_memory = initrd_memory[initramfs_padded..];
+        const lang_read = fat32.readFile(fs, bulk_reader, &lang_cpio_path, lang_memory) catch 0;
+        // A missing or short language archive only costs the translation.
+        if (lang_read != lang_memory.len) @memset(lang_memory, 0);
+    }
 
     console.print("LINUX LOAD kernel_first=0x");
     console.printHex8(kernel_memory[0]);

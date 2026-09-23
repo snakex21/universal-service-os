@@ -15,6 +15,12 @@ type payloadFile struct {
 }
 
 var payloadFiles = []payloadFile{
+	// Legacy BIOS menu font, icons (the Core slot is too small for them) and
+	// the licenses of the boot UI fonts.
+	{`zig-out/legacy-bios/bios-ui.bin`, `EFI/USOS/bios-ui.bin`},
+	{`assets/fonts/README.md`, `EFI/USOS/licenses/fonts/README.md`},
+	{`assets/fonts/LICENSE-Apache-2.0.txt`, `EFI/USOS/licenses/fonts/LICENSE-Apache-2.0.txt`},
+	{`assets/fonts/LICENSE-OFL-1.1.txt`, `EFI/USOS/licenses/fonts/LICENSE-OFL-1.1.txt`},
 	{`zig-out/test-assets/ntfs_x64.efi`, `EFI/USOS/ntfs_x64.efi`},
 	{`zig-out/micro-linux/systemd-bootx64.efi`, `EFI/USOS/systemd-bootx64.efi`},
 	{`zig-out/micro-linux/vmlinuz-virt`, `EFI/USOS/micro-linux/vmlinuz-virt`},

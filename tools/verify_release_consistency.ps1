@@ -78,6 +78,8 @@ try {
         'EFI/USOS/dos-native/ram-patch/INSTALL.BAT',
         'EFI/USOS/dos-native/ram-patch/REPAIR.BAT',
         'EFI/USOS/systemd-bootx64.efi',
+        'EFI/USOS/bios-ui.bin',
+        'EFI/USOS/licenses/fonts/LICENSE-OFL-1.1.txt',
         'UI/index.html',
         'UI/theme.css',
         'UI/Icons/Systems/windows-11.png'
@@ -113,6 +115,7 @@ try {
 
     $explicitPayloadFiles = @(
         @{ Source = (Join-Path $ProjectRoot 'zig-out\micro-linux\initramfs-usos'); Target = 'EFI/USOS/micro-linux/initramfs-usos' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\legacy-bios\bios-ui.bin'); Target = 'EFI/USOS/bios-ui.bin' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\windows-native\wimboot'); Target = 'EFI/USOS/windows-native/wimboot' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\windows-native\support.cpio'); Target = 'EFI/USOS/windows-native/support.cpio' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\memdisk'); Target = 'EFI/USOS/dos-native/memdisk' },
