@@ -84,7 +84,8 @@ fn homeItems(ui: *const Ui, items: *[catalog.categories.all.len + 1]screens.Home
             }),
         };
     }
-    items[catalog.categories.all.len] = .{ .icon = .power, .title = ui.t(.category_power), .description = ui.t(.category_power_desc) };
+    // Legacy BIOS offers restart and shut down only (no firmware setup).
+    items[catalog.categories.all.len] = .{ .icon = .power, .title = ui.t(.category_power), .description = ui.t(.power_subtitle) };
     return items;
 }
 

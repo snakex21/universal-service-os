@@ -621,8 +621,10 @@ pub const Ui = struct {
         return h;
     }
 
-    pub fn buttonSize(self: *const Ui, label: []const u8) struct { w: u32, h: u32 } {
-        return .{ .w = self.fonts.width(.strong, label) + self.px(48 + 26), .h = self.px(44) };
+    /// Size of a `button` with the given key cap ("" for none) and label.
+    pub fn buttonSize(self: *const Ui, key: []const u8, label: []const u8) struct { w: u32, h: u32 } {
+        const cap = if (key.len > 0) @max(self.px(26), self.fonts.width(.small, key) + self.px(12)) + self.px(12) else 0;
+        return .{ .w = self.px(16) + cap + self.fonts.width(.strong, label) + self.px(20), .h = self.px(44) };
     }
 
     /// Primary (accent) or secondary button with a leading key cap label.

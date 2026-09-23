@@ -183,7 +183,7 @@ pub fn summary(ui: *const Ui, header: HeaderInfo, spec: SummarySpec) Rect {
         ui.banner(.{ .x = body.x, .y = y, .w = body.w, .h = ui.px(44) }, .warning, .warning, note);
         y += ui.px(44) + ui.px(10);
     }
-    const size = ui.buttonSize(spec.action);
+    const size = ui.buttonSize(if (spec.action_enabled) "Enter" else "", spec.action);
     const button = Rect{ .x = body.x, .y = y + ui.px(6), .w = @min(size.w, body.w), .h = size.h };
     summaryButton(ui, button, spec);
     if (spec.action_enabled) {
