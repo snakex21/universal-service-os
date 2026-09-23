@@ -261,6 +261,28 @@ pub const Ui = struct {
         if (note.len > 0) _ = self.fonts.drawRight(self.surface, self.width() -| margin, self.fonts.centeredTop(.small, y + h / 2), .small, note, theme.faint, theme.header);
     }
 
+    /// Index of the footer hint at (x, y), for tapping or clicking a hint.
+    /// The whole footer height counts, so the target is at least 44 logical
+    /// pixels tall (66 px at 1080p), and the gap after each hint belongs to
+    /// it. Mirrors the layout of `footer`.
+    pub fn footerHit(self: *const Ui, hints: []const Hint, note: []const u8, x: u32, y: u32) ?usize {
+        const h = self.footerHeight();
+        const top = self.height() -| h;
+        if (y < top or y >= self.height()) return null;
+        const margin = self.px(24);
+        var left = margin;
+        const note_width = if (note.len > 0) self.fonts.width(.small, note) + self.px(16) else 0;
+        const limit = self.width() -| margin -| note_width;
+        for (hints, 0..) |hint, index| {
+            const needed = self.keycapWidth(hint.key) + self.px(8) + self.fonts.width(.small, hint.label);
+            if (left + needed > limit) break;
+            const start = left -| self.px(11);
+            left += needed + self.px(22);
+            if (x >= start and x < left -| self.px(11)) return index;
+        }
+        return null;
+    }
+
     fn keycapWidth(self: *const Ui, key: []const u8) u32 {
         return @max(self.px(24), self.fonts.width(.small, key) + self.px(14));
     }
@@ -784,7 +806,17 @@ test "toolkit renders a full home, list and panels at 1024x768 and 1920x1080" {
             try std.testing.expect(rect.right() <= size[0] and rect.bottom() < size[1] - ui.footerHeight());
             ui.homeCard(rect, .windows, "Windows", "Install and repair Microsoft Windows", if (index == 0) .selected else .normal);
         }
-        ui.footer(&.{ .{ .key = "Enter", .label = "Open" }, .{ .key = "Esc", .label = "Power" } }, "B260923");
+        const footer_hints = [_]Hint{ .{ .key = "Enter", .label = "Open" }, .{ .key = "Esc", .label = "Power" } };
+        ui.footer(&footer_hints, "B260923");
+        // Footer hints are touch targets: the full footer height, both hints.
+        const footer_mid = size[1] - ui.footerHeight() / 2;
+        try std.testing.expectEqual(@as(?usize, 0), ui.footerHit(&footer_hints, "B260923", ui.px(30), footer_mid));
+        try std.testing.expectEqual(@as(?usize, 0), ui.footerHit(&footer_hints, "B260923", ui.px(30), size[1] - 1));
+        const second_x = ui.px(24) + ui.keycapWidth("Enter") + ui.px(8) + ui.fonts.width(.small, "Open") + ui.px(22) + ui.px(4);
+        try std.testing.expectEqual(@as(?usize, 1), ui.footerHit(&footer_hints, "B260923", second_x, footer_mid));
+        try std.testing.expect(ui.footerHit(&footer_hints, "B260923", size[0] - 2, footer_mid) == null);
+        try std.testing.expect(ui.footerHit(&footer_hints, "B260923", ui.px(30), size[1] - ui.footerHeight() - 2) == null);
+        try std.testing.expect(ui.footerHeight() >= 44);
         const body = ui.bodyRect(true);
         const layout = ui.listLayout(body, ui.rowHeight(true));
         try std.testing.expect(layout.visible >= 5);

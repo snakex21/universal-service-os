@@ -25,6 +25,7 @@ pub const gui = struct {
     pub const icons = @import("gui/icons.zig");
     pub const cursor = @import("gui/cursor.zig");
     pub const scale = @import("gui/scale.zig");
+    pub const input_map = @import("gui/input_map.zig");
     pub const ui = @import("gui/ui.zig");
     pub const menu_screens = @import("gui/menu_screens.zig");
     pub const font_pack = @embedFile("gui/fonts/usos-font.bin");
@@ -76,6 +77,7 @@ test {
     _ = wim_setup;
     _ = @import("image_probe/windows7_pe_rules_test.zig");
     _ = @import("platform/bios/dos_fat.zig");
+    _ = @import("platform/bios/ps2_mouse.zig");
     _ = @import("gui/rgba_rle.zig");
     _ = @import("platform/bios/dos_partition.zig");
     _ = @import("platform/bios/dos_fat32_format.zig");
@@ -104,6 +106,7 @@ test {
     _ = gui.icons;
     _ = gui.cursor;
     _ = gui.scale;
+    _ = gui.input_map;
     _ = gui.ui;
     _ = gui.menu_screens;
     _ = dos;
