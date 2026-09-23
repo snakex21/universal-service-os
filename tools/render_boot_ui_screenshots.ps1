@@ -10,7 +10,8 @@
 param(
     [string[]]$Languages = @('pl', 'en', 'ru', 'el'),
     [string]$OutputDirectory = 'artifacts/boot-ui',
-    [string[]]$ExtraUefiResolutions = @('1920x1080:pl', '3840x2160:ru'),
+    # OVMF offers at most 1920x1080 here; 4K is covered by zig build ui-preview.
+    [string[]]$ExtraUefiResolutions = @('1920x1080:pl'),
     [switch]$SkipBios,
     [switch]$SkipUefi
 )
