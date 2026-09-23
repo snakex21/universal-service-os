@@ -4,6 +4,7 @@
 /// FNV-1a 32 of the key names stored in lang.bin (without the "boot." prefix).
 pub const hashes = [_]u32{
     0x4c1c62c1, // lx.a_new_x_layout_will_be_created
+    0xcde86d7b, // lx.after_the_restart_x_setup_runs_on_its_own_up_to
     0xb2a68a12, // lx.all_buffered_writes_are_complete_closing_the_pre
     0xd0eebedd, // lx.all_partitions_systems_and_files_on_this_disk_wi
     0xbb9ba1eb, // lx.building_native_vhd_boot_environment
@@ -91,6 +92,7 @@ pub const hashes = [_]u32{
     0x702336a3, // lx.preparing_the_windows_partition_and_installation
     0xa3706ee2, // lx.preparing_uefi_startup_and_usb_drivers
     0xade2b7b3, // lx.preparing_windows_7
+    0x309b72dd, // lx.proceed
     0x67123194, // lx.publishing_phase_prepared_after_boot_files_are_d
     0xc5abf57e, // lx.publishing_phase_prepared_after_file_data_is_dur
     0xea0a2936, // lx.publishing_phase_prepared_after_wim_data_is_dura
@@ -161,11 +163,13 @@ pub const hashes = [_]u32{
     0x02de0ef1, // lx.x_prepare_disk
     0x915c2db1, // lx.x_ready_to_install
     0xdca3696c, // lx.x_select_disk
+    0xf8c61f6b, // lx.x_will_now_install_on_its_own
     0x2d25b64d, // lx.xp_kontynuacja_gotowa
 };
 
 pub const english = [_][]const u8{
     "A new {0} layout will be created.",
+    "After the restart, {0} Setup runs on its own up to the graphical setup wizard. Until then do not press any keys: the disk has already been chosen here.",
     "All buffered writes are complete; closing the prepared filesystem.",
     "All partitions, systems and files on this disk will be erased.",
     "Building native VHD boot environment",
@@ -253,6 +257,7 @@ pub const english = [_][]const u8{
     "Preparing the Windows partition and installation files.",
     "Preparing UEFI startup and USB drivers.",
     "Preparing Windows 7",
+    "Proceed",
     "Publishing phase=prepared after boot files are durable.",
     "Publishing phase=prepared after file data is durable.",
     "Publishing phase=prepared after WIM data is durable.",
@@ -323,5 +328,6 @@ pub const english = [_][]const u8{
     "{0} - PREPARE DISK",
     "{0} READY TO INSTALL",
     "{0} - SELECT DISK",
+    "{0} will now install on its own",
     "XP - KONTYNUACJA GOTOWA",
 };

@@ -233,6 +233,8 @@ usos_ui_render_state() {
         printf 'bytes_total=%s\n' "$bytes_total"
         printf 'speed_bps=%s\n' "$speed_bps"
         [ -z "$USOS_UI_HEADING" ] || printf 'heading=%s\n' "$USOS_UI_HEADING"
+        [ -z "${USOS_UI_NOTICE:-}" ] || printf 'notice=%s\n' "$USOS_UI_NOTICE"
+        [ -z "${USOS_UI_ACTION:-}" ] || printf 'action=%s\n' "$USOS_UI_ACTION"
         if [ -n "$USOS_UI_LABELS" ]; then
             printf '%s\n' "$USOS_UI_LABELS" | tr '|' '\n' | while IFS= read -r stage_name; do
                 printf 'label=%s\n' "$stage_name"
@@ -348,6 +350,28 @@ usos_ui_done() {
     fi
     usos_ui_console_done "$title" "$detail"
     usos_ui_log "DONE RENDER PASS backend=console action=[ENTER]-POWER-OFF"
+}
+
+# Done page with a notice the user acknowledges with Enter (the caller reads
+# the key): every stage done, the notice below the progress card.
+usos_ui_notice_continue() {
+    notice_title=$1
+    USOS_UI_NOTICE=$2
+    USOS_UI_ACTION=${3:-Proceed}
+    notice_total=$(usos_ui_total 5)
+    USOS_UI_CURRENT=$notice_total
+    usos_ui_log "NOTICE title=$notice_title action=$USOS_UI_ACTION"
+    if usos_ui_render_state done "$notice_total" "$notice_total" "$notice_title" '' '' 100 0 0 0; then
+        USOS_UI_NOTICE='' USOS_UI_ACTION=''
+        return 0
+    fi
+    {
+        printf '\033[2J\033[H\033[?25l\n'
+        printf '      \033[1;33m\033[1m%s\033[0m\n\n' "$notice_title"
+        printf '      \033[1;37m%s\033[0m\n\n' "$USOS_UI_NOTICE"
+        printf '      \033[1;36m\033[1m[ ENTER ]  %s\033[0m\n\n' "$USOS_UI_ACTION"
+    } > "$USOS_UI_TTY" 2>/dev/null || true
+    USOS_UI_NOTICE='' USOS_UI_ACTION=''
 }
 
 usos_ui_fail() {

@@ -159,3 +159,47 @@ times / key times / their hashes only), 13 equal to the current micro-Linux
 base (Win7/WIM/VHD/WORK helpers), 0 unexplained. Pinning the proven hives
 gives the new hives byte for byte. pae.exe is unchanged (v4, bab558bb...).
 Unit test: `tools/tests/test_xp_reproducible.py`.
+
+## 2026-09-24: which XP screens can take a key after the USOS disk choice
+
+Measured in QEMU/SeaBIOS with the package's own preparation chain
+(`tools/tests/legacy_bios/run_seabios_xp_uefi_csm_textmode.py`: probe_nt5_source,
+driver preflight, target_disk_guard snapshot, the automatic plan,
+prepare_xp_target.sh -> prepare_xp_ntfs_target.sh on a blank 12 GiB disk, then
+the disk booted alone as BIOS 0x80 with no USOS media and no ISO; frames every
+1.5 s plus VGA text dumps). Sequence after the restart:
+
+1. NTDETECT ("Instalator sprawdza konfigurację sprzętową komputera...").
+2. SETUPLDR, blue "Instalator systemu Windows": status line "Naciśnij klawisz F6..."
+   (~5 s), then "Naciśnij klawisz F2 ... (ASR)" (~5 s), then "Instalator ładuje pliki".
+3. Text-mode Setup: "Badanie konfiguracji dysku...", "Czekaj. Instalator
+   sprawdza dyski" (autochk of C:, gauge), "Tworzenie listy plików do
+   skopiowania...", "Instalator kopiuje pliki..." (gauge).
+
+No Welcome, EULA, partition-list or format screen appears: WINNT.SIF has
+`[Unattended]` (Microsoft: specifying UnattendMode "fully automates text-mode
+Setup"), OemSkipEula=Yes, FileSystem=LeaveAlone, Repartition=No, and no
+AutoPartition, for which the reference says text-mode Setup installs on the
+partition holding `$WIN_NT$.~LS` - the one USOS prepared and formatted.
+`AutoPartition=1` would instead pick "the first available partition that has
+adequate space" (possibly another disk), and `UnattendMode=FullUnattended`
+would change GUI mode (refuses unsigned drivers, stops on missing answers), so
+neither is set. During setup NTLDR is SETUPLDR itself: there is no boot.ini
+and no boot menu until text mode writes a single-entry boot.ini.
+
+Keys: 88 key presses (D, C, Esc, F3, Enter, L, F8, R) typed throughout the
+disk check and 45 s of copying changed nothing (`...-keys` run). The only live
+keys are SETUPLDR's in its first ~10 s: F6 (extra storage driver prompt later;
+Enter continues), F2 (ASR, asks for a floppy; nothing written yet), F5 (HAL
+list), F7 (non-ACPI HAL) and F10 (Recovery Console). SETUPLDR.BIN calls that
+prompt unconditionally (disassembly: 0x31cc02 with a 5 s timeout); only the F2
+prompt can be disabled (TXTSETUP.SIF `[SetupData] DisableAsr=1`), which is in
+the driver bundle and deliberately left unchanged here.
+
+USOS now says so before the power-off step: a done-style progress page
+"Windows XP zainstaluje się teraz automatycznie" with the notice "Po ponownym
+uruchomieniu instalator Windows XP przebiegnie automatycznie aż do graficznego
+kreatora instalacji. Do tego czasu nie naciskaj żadnych klawiszy - dysk został
+już wybrany tutaj." and [Enter] Kontynuuj (boot.lx.* keys, 27 locales). The
+GUI wizard itself still asks its normal questions (ProvideDefault), so the
+notice does not say "until the desktop".

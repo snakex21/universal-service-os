@@ -35,6 +35,10 @@ pub const State = struct {
     /// Optional `label=` lines: the stages this path really runs.
     labels: [max_stage_labels][]const u8 = undefined,
     label_count: usize = 0,
+    /// Done page that must be acknowledged: `notice=` text and `action=`
+    /// key label (English, translated like the other texts).
+    notice: []const u8 = "",
+    action: []const u8 = "",
 };
 
 pub fn parse(input: []const u8) !State {
@@ -69,6 +73,10 @@ pub fn parse(input: []const u8) !State {
             state.bytes_total = try parseU64(value);
         } else if (std.mem.eql(u8, key, "speed_bps")) {
             state.speed_bps = try parseU64(value);
+        } else if (std.mem.eql(u8, key, "notice")) {
+            state.notice = value;
+        } else if (std.mem.eql(u8, key, "action")) {
+            state.action = value;
         } else if (std.mem.eql(u8, key, "label")) {
             if (state.label_count >= state.labels.len) return error.TooManyStageLabels;
             if (value.len == 0) return error.InvalidStageLabel;
@@ -156,6 +164,13 @@ test "declared stage labels define the stage count" {
     try std.testing.expectEqual(@as(usize, 2), state.label_count);
     try std.testing.expectEqual(@as(u8, 2), state.total);
     try std.testing.expectEqualStrings("Continuing installation", state.labels[1]);
+}
+
+test "done state carries a notice and its action" {
+    const state = try parse("mode=done" ++ NL ++ "title=T" ++ NL ++ "notice=Do not press keys" ++ NL ++ "action=Proceed" ++ NL);
+    try std.testing.expectEqual(Mode.done, state.mode);
+    try std.testing.expectEqualStrings("Do not press keys", state.notice);
+    try std.testing.expectEqualStrings("Proceed", state.action);
 }
 
 test "stage labels beyond the renderer limit are rejected" {

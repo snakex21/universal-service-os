@@ -63,6 +63,8 @@ pub fn render(surface: usos.gui.Surface, context: *const fb_i18n.Context, state:
         .diagnostics = state.diagnostics[0..state.diagnostic_count],
         .diagnostics_truncated = state.diagnostics_truncated,
         .labels = if (state.label_count > 0) state.labels[0..state.label_count] else &usos.gui.preparation_screen.stage_labels,
+        .notice = state.notice,
+        .action = state.action,
     }, header);
 }
 

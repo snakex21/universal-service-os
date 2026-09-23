@@ -35,6 +35,10 @@ pub const State = struct {
     /// Labels of the stages this path really runs; `total` rows are drawn.
     /// Defaults to the five micro-Linux preparation stages.
     labels: []const []const u8 = &stage_labels,
+    /// Done page only: a notice the user must read before `action` (Enter)
+    /// replaces the power-off step (English, translated by Ui.tr).
+    notice: []const u8 = "",
+    action: []const u8 = "",
 };
 
 pub const max_stages: usize = 5;
@@ -76,19 +80,20 @@ pub fn render(ui: *const Ui, state: State, header: ui_mod.HeaderInfo) void {
     const body = ui.bodyRect(false);
 
     const banner_h = ui.px(46);
-    const banner_tone: ui_mod.Tone = switch (state.mode) {
+    const notice = state.mode == .done and state.notice.len > 0;
+    const banner_tone: ui_mod.Tone = if (notice) .warning else switch (state.mode) {
         .done => .success,
         .failure => .danger,
         else => .warning,
     };
-    const banner_icon: icons.Kind = switch (state.mode) {
+    const banner_icon: icons.Kind = if (notice) .warning else switch (state.mode) {
         .done => .check_circle,
         .failure => .error_circle,
         else => .warning,
     };
     var title_buffer: [192]u8 = undefined;
     const activity = ui.tr(&title_buffer, state.title);
-    const banner_text = switch (state.mode) {
+    const banner_text = if (notice) activity else switch (state.mode) {
         .done => ui.t(.prep_footer_done),
         .failure => activity,
         else => ui.t(.prep_footer_running),
@@ -99,13 +104,23 @@ pub fn render(ui: *const Ui, state: State, header: ui_mod.HeaderInfo) void {
     const card_h = progressCardHeight(ui, state);
     drawProgressCard(ui, state, .{ .x = body.x, .y = card_y, .w = body.w, .h = card_h });
 
-    const steps_y = card_y + card_h + ui.px(16);
+    var steps_y = card_y + card_h + ui.px(16);
+    var action_buffer: [96]u8 = undefined;
+    if (notice) {
+        var notice_buffer: [448]u8 = undefined;
+        const lines = [_][]const u8{ui.tr(&notice_buffer, state.notice)};
+        const notice_h = ui.infoPanelHeight(body.w, true, "", &lines);
+        _ = ui.infoPanel(.{ .x = body.x, .y = steps_y, .w = body.w, .h = notice_h }, .warning, .warning, "", &lines, null);
+        steps_y += notice_h + ui.px(16);
+    }
     const count = stageCount(state);
     const step_h = ui.px(46);
     const steps_h = ui.px(16) + @as(u32, @intCast(count)) * step_h;
     if (steps_y + steps_h <= body.bottom()) drawSteps(ui, state, .{ .x = body.x, .y = steps_y, .w = body.w, .h = steps_h }, step_h);
 
-    if (state.mode == .done) {
+    if (notice) {
+        ui.footer(&.{.{ .key = "Enter", .label = ui.tr(&action_buffer, state.action) }}, "");
+    } else if (state.mode == .done) {
         ui.footer(&.{.{ .key = "Enter", .label = ui.t(.key_power_off) }}, ui.t(.prep_next_boot));
     } else {
         ui.footer(&.{}, ui.t(.wait));
@@ -205,7 +220,7 @@ fn drawProgressCard(ui: *const Ui, state: State, rect: Rect) void {
             x += ui.fonts.draw(ui.surface, x, y, .body, ui.t(.prep_eta), theme.muted, theme.panel) + ui.px(8);
             _ = ui.fonts.draw(ui.surface, x, y, .body, etaText(&eta_buffer, state.bytes_done, state.bytes_total, state.speed_bps), theme.text, theme.panel);
         }
-    } else if (state.mode == .done) {
+    } else if (state.mode == .done and state.notice.len == 0) {
         _ = ui.fonts.drawFit(ui.surface, rect.x + pad, y, inner_w, .body, ui.t(.prep_remove_usb), theme.text, theme.panel);
     } else if (usesCopyStages(state) and state.current < 4) {
         _ = ui.fonts.drawFit(ui.surface, rect.x + pad, y, inner_w, .small, ui.t(.prep_copy_note), theme.faint, theme.panel);
@@ -376,4 +391,11 @@ test "progress screen renders every mode in Polish at 1920x1080" {
         try std.testing.expect(pixels[0] != pixels[pixels.len / 2]);
     }
     updateProgress(&ui, .{ .mode = .progress, .current = 4, .percent = 50 });
+    // The XP hand-off notice: done page, notice panel, Enter = the action.
+    for ([_][2]u32{ .{ 1920, 1080 }, .{ 1024, 768 } }) |size| {
+        const small = ScreenBuffer.init(@intFromPtr(pixels.ptr), size[0] * size[1] * 4, size[0], size[1], .bgrx8).?;
+        const notice_ui = Ui.init(small.surface, Theme{}, &pack, &table);
+        render(&notice_ui, .{ .mode = .done, .title = "Windows XP will now install on its own", .notice = "After the restart, Windows XP Setup runs on its own up to the graphical setup wizard. Until then do not press any keys: the disk has already been chosen here.", .action = "Proceed" }, .{ .firmware = "UEFI", .language = "Polski" });
+        try std.testing.expect(pixels[0] != pixels[size[0] * size[1] / 2]);
+    }
 }

@@ -534,6 +534,16 @@ usos_legacy_xp_staging() {
     enable_emergency_input || true
     if [ -n "$XP_WINDOWS_PLAN" ]; then
         printf '[LEGACY_XP] Target boot runs Text Mode on NTFS automatically, then restarts into GUI Setup on C:.\n'
+        # Text Mode needs no input here (partition preselected via the local
+        # source, EULA and format skipped). Say so before the restart: the only
+        # live keys are SETUPLDR's F2/F5/F6/F7 hints in its first seconds.
+        usos_ui_notice_continue "$NT5_NAME will now install on its own" "After the restart, $NT5_NAME Setup runs on its own up to the graphical setup wizard. Until then do not press any keys: the disk has already been chosen here." 'Proceed' || true
+        printf '[LEGACY_XP] WAITING FOR USER: automatic-install notice, ENTER to continue\n'
+        if [ -r "$USOS_UI_TTY" ]; then
+            IFS= read -r _notice_ack < "$USOS_UI_TTY" || true
+        else
+            IFS= read -r _notice_ack || true
+        fi
     else
         printf '[LEGACY_XP] After Text Mode copies files, boot USOS again and choose CONTINUE XP.\n'
     fi

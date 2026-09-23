@@ -77,6 +77,11 @@ pub fn main(init: std.process.Init) !u8 {
     gui.preparation_screen.render(&ui, .{ .mode = .progress, .current = 4, .title = "Copying WIM file", .detail = "Measured byte progress, transfer speed and ETA.", .image = "Win11_24H2_Polish_x64.iso", .percent = 44, .bytes_done = 2_300_000_000, .bytes_total = 5_200_000_000, .speed_bps = 96_000_000 }, header);
     try save(io, cwd, init.gpa, out_dir, "05-progress", pixels, width, height);
 
+    // micro-Linux XP hand-off notice (the English literals legacy_xp_staging.sh sends).
+    const xp_labels = [_][]const u8{ "Loading the preparation environment", "Detecting disks", "Choosing the target disk", "Preparing workspace", "Copying and verifying files" };
+    gui.preparation_screen.render(&ui, .{ .mode = .done, .current = 5, .heading = "Windows XP", .labels = &xp_labels, .title = "Windows XP will now install on its own", .notice = "After the restart, Windows XP Setup runs on its own up to the graphical setup wizard. Until then do not press any keys: the disk has already been chosen here.", .action = "Proceed" }, header);
+    try save(io, cwd, init.gpa, out_dir, "05b-xp-notice", pixels, width, height);
+
     const power_rows = [_]gui.ui.Row{
         .{ .title = ui.t(.power_restart), .icon = .{ .vector = .restart } },
         .{ .title = ui.t(.power_shutdown), .icon = .{ .vector = .shutdown } },
