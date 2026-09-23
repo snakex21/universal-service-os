@@ -88,9 +88,15 @@ def point(qmp: Qmp, device: str, width: int, height: int, x: int, y: int) -> Non
         qmp.absolute(x * 32767 // (width - 1), y * 32767 // (height - 1), None)
     else:
         # Relative devices: park in the top-left corner, then move exactly.
-        for _ in range(6):
-            qmp.relative(-500, -500, None)
-        qmp.relative(x, y, None)
+        # Small steps: QEMU's PS/2 queue holds four packets and sends the
+        # rest of a big move with the next input event (the button press),
+        # which would turn a tap into a drag.
+        for _ in range((max(width, height) + 99) // 100):
+            qmp.relative(-100, -100, None)
+        while x > 0 or y > 0:
+            step_x, step_y = min(x, 100), min(y, 100)
+            qmp.relative(step_x, step_y, None)
+            x, y = x - step_x, y - step_y
     time.sleep(0.6)
 
 
@@ -179,7 +185,7 @@ def run(device: str, disk: Path, out: Path, width: int, height: int) -> dict:
         # A tap/click (no movement) on the second visible row opens it, and a
         # tap on the footer's Esc hint goes back (touch-only navigation).
         mark = len(list_states(serial))
-        point(qmp, device, width, height, width // 2, int(height * 0.42))
+        point(qmp, device, width, height, width // 2, int(height * 0.32))
         qmp.click("left", target)
         time.sleep(4)
         monitor.shot(Path(f"{prefix}-05-tap.png"))
