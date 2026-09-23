@@ -240,6 +240,11 @@ def rebuild_launchers():
     manifest_path.write_text(json.dumps(metadata,indent=2)+'\n')
     print('XP_LAUNCHERS_BUILT; driver payload unchanged; no VM/E2E',flush=True)
 
+def is_sp3(iso):
+    # Microsoft names it "..._with_service_pack_3_...", others "SP3".
+    name=iso.name.lower()
+    return 'sp3' in name or 'service_pack_3' in name
+
 def build(esp, data):
     OUT.mkdir(parents=True,exist_ok=True);(OUT/'tmp').mkdir(exist_ok=True)
     env=dict(os.environ,TEMP=str(OUT/'tmp'),TMP=str(OUT/'tmp'),ZIG_GLOBAL_CACHE_DIR=str(ROOT/'tools/cache/zig-global'),ZIG_LOCAL_CACHE_DIR=str(OUT/'zig-cache'))
@@ -249,7 +254,7 @@ def build(esp, data):
     if not images:raise ValueError('No XP ISO on DATA')
     # SP2 remains visible for historical compatibility but is refused before
     # any target write by the new runtime preflight. First hardware trial: SP3.
-    supported=[p for p in images if 'sp3' in p.name.lower()]
+    supported=[p for p in images if is_sp3(p)]
     if not supported:raise ValueError('XP SP3 source required for modern driver integration')
     driver_bundles=[build_driver_overlay(p,OUT/'drivers'/str(i)) for i,p in enumerate(supported)]
     init=OUT/'initramfs-xp';init.write_bytes(overlay(base,helper,driver_bundles))
@@ -268,7 +273,7 @@ def build(esp, data):
         source=OUT/f'build-{index}';source.mkdir(exist_ok=True)
         shutil.copyfile(ROOT/'tools/xp_uefi_csm_launcher.zig',source/'launcher.zig')
         (source/'xp_trial_config.zig').write_text('pub const options = '+json.dumps(options)+';\npub const description = '+json.dumps('Source: '+iso.name+'\r\n')+';\n',encoding='ascii')
-        name=('XP-SP3-NiKKA' if 'NiKKA' in iso.name else 'XP-SP2')+'-UEFI-CSM-PAE.efi'
+        name=('XP-SP3-NiKKA' if 'NiKKA' in iso.name else 'XP-SP3' if is_sp3(iso) else 'XP-SP2')+'-UEFI-CSM-PAE.efi'
         if name in launchers:raise ValueError('Ambiguous trial launcher name')
         subprocess.run([zig,'build-exe','-target','x86_64-uefi','-O','ReleaseSmall',str(source/'launcher.zig'),'-femit-bin='+str(OUT/name)],env=env,check=True)
         launchers.append(name)
