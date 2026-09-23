@@ -109,7 +109,11 @@ static int setup_cancelled(DWORD *setup_code,const char **reason){
  UINT n=GetWindowsDirectoryW(windows,MAX_PATH);if(!n||n>=MAX_PATH-40)return 0;
  copy(act,windows);append(act,L"\\Panther\\setupact.log");
  copy(err,windows);append(err,L"\\Panther\\setuperr.log");
- if(file_contains(act,"Accepting Cancel")){*reason="panther-cancel";return 1;}
+ /* Measured on the X470 (2026-09-23): closing Setup at the language page
+  * returns 1223 = ERROR_CANCELLED from Vista SP2 and Windows 7 SP1 setup.exe,
+  * and Panther logs "Accepting Cancel" + "InstallWindows:User cancelled Setup". */
+ if(*setup_code==ERROR_CANCELLED){*reason="setup-exit-1223-error-cancelled";return 1;}
+ if(file_contains(act,"User cancelled Setup")||file_contains(act,"Accepting Cancel")){*reason="panther-cancel";return 1;}
  *reason="setup-returned-success";
  if(*setup_code==0)return 0;
  *reason="setup-failure-code";
