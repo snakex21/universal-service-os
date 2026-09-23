@@ -117,6 +117,13 @@ $coreBytes = [IO.File]::ReadAllBytes($core)
 if ($coreBytes.Length -gt ($coreSlotBytes - $bootstrapReservedBytes)) {
     throw "Legacy Core payload is $($coreBytes.Length) bytes; slot payload maximum is $($coreSlotBytes - $bootstrapReservedBytes) bytes"
 }
+# Keep room for fixes: a Core that is almost full cannot take an urgent change.
+# tools/legacy_core_map.py shows where the bytes go.
+$coreMinimumHeadroom = 4096
+$coreHeadroom = ($coreSlotBytes - $bootstrapReservedBytes) - $coreBytes.Length
+if ($coreHeadroom -lt $coreMinimumHeadroom) {
+    throw "Legacy Core headroom is $coreHeadroom bytes; at least $coreMinimumHeadroom bytes must stay free (run python tools/legacy_core_map.py)"
+}
 $coreSlotPath = Join-Path $out 'core-slot.bin'
 & $python $coreSlotPacker --bootstrap $bootstrapRaw --core $core --output $coreSlotPath
 if ($LASTEXITCODE -ne 0) { throw "Legacy Core slot packing failed with exit code $LASTEXITCODE" }
@@ -134,7 +141,7 @@ $vbrPath = Join-Path $out 'test-vbr.bin'
 
 Write-Host "[PASS] Legacy Stage 1: $($stage1Bytes.Length) code bytes, padded to 440"
 Write-Host "[PASS] Legacy bootstrap: $($bootstrapBytes.Length) bytes in fixed $bootstrapReservedBytes-byte load window"
-Write-Host "[PASS] Legacy Core PM32 payload: $($coreBytes.Length) bytes inside $coreSlotBytes-byte slot"
+Write-Host "[PASS] Legacy Core PM32 payload: $($coreBytes.Length) bytes inside $coreSlotBytes-byte slot (headroom $coreHeadroom bytes, minimum $coreMinimumHeadroom)"
 Write-Host "[PASS] Test VBR: $($vbrBytes.Length) code bytes, sector signature=55AA"
 Write-Host "[PASS] Legacy catalog mode: $CatalogMode"
 Write-Host "[PASS] Output: $out"

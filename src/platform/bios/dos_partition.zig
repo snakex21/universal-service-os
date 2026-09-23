@@ -26,14 +26,19 @@ pub fn plan(drive: u8, source: u8, sectors: u32, gib: u32, before: [512]u8) !Pla
     return .{ .drive = drive, .source_drive = source, .disk_sectors = sectors, .partition_sectors = wanted, .before = before };
 }
 pub fn planFat16(drive: u8, source: u8, sectors: u32, mib: u32, cylinders: u16, heads: u16, spt: u16, before: [512]u8) !Plan {
+    // Checked in a void helper: comptime errors returned with the 536-byte
+    // Plan payload would each be a 536-byte constant in the Legacy Core.
+    try checkFat16(drive, source, sectors, mib, cylinders, heads, spt);
+    return .{ .drive = drive, .source_drive = source, .disk_sectors = sectors, .partition_sectors = mib * 2048, .before = before,
+        .fat16 = true, .cylinders = cylinders, .heads = heads, .sectors_per_track = spt };
+}
+fn checkFat16(drive: u8, source: u8, sectors: u32, mib: u32, cylinders: u16, heads: u16, spt: u16) !void {
     if (drive < 0x80 or drive > 0x8f or drive == source) return error.UnsafeDosTarget;
     if (mib != 128 and mib != 256 and mib != 512) return error.InvalidDosPartitionSize;
     if (cylinders == 0 or cylinders > 1024 or heads == 0 or heads > 255 or spt == 0 or spt > 63) return error.UnsupportedDosGeometry;
     const wanted = mib * 2048;
     if (sectors < wanted + 2082) return error.DosTargetTooSmall;
     if (wanted + 2048 > @as(u32, cylinders) * heads * spt) return error.DosPartitionOutsideChs;
-    return .{ .drive = drive, .source_drive = source, .disk_sectors = sectors, .partition_sectors = wanted, .before = before,
-        .fat16 = true, .cylinders = cylinders, .heads = heads, .sectors_per_track = spt };
 }
 fn chs(lba: u32, heads: u16, spt: u16) [3]u8 {
     const cylinder = lba / (@as(u32, heads) * spt);

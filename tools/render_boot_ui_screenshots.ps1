@@ -35,7 +35,11 @@ param(
     [string]$SplashBootLogo = '',
     # Refresh BOOTX64.EFI, bios-ui.bin, the Core slot and the micro-Linux
     # files on the existing test disk instead of building a new one.
-    [switch]$ReuseDisk
+    [switch]$ReuseDisk,
+    # Legacy BIOS second-stage resources: 'missing' deletes EFI/USOS/bios-ui.bin
+    # and 'corrupt' flips one payload byte (CRC mismatch), to check that the
+    # Core falls back to its built-in 5x7 font and English text.
+    [ValidateSet('present', 'missing', 'corrupt')][string]$BiosUiPack = 'present'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -223,7 +227,28 @@ function Set-Language([string]$Language) {
     }
 }
 
+function Set-BiosUiPack([string]$Mode) {
+    if ($Mode -eq 'present') { return }
+    $disk = Mount-TestDisk
+    $paths = @{}
+    try {
+        $paths = Mount-Partitions $disk
+        $pack = Join-Path $paths['esp'].Path 'EFI\USOS\bios-ui.bin'
+        if ($Mode -eq 'missing') {
+            Remove-Item -LiteralPath $pack -Force
+        } else {
+            $bytes = [IO.File]::ReadAllBytes($pack)
+            $bytes[$bytes.Length - 100] = $bytes[$bytes.Length - 100] -bxor 0x5A
+            [IO.File]::WriteAllBytes($pack, $bytes)
+        }
+        Write-Host "[TEST] bios-ui.bin on the test ESP: $Mode"
+    } finally {
+        Dismount-TestDisk $disk $paths
+    }
+}
+
 if ($ReuseDisk -and (Test-Path -LiteralPath $vhd)) { Update-TestDisk } else { New-TestDisk }
+Set-BiosUiPack $BiosUiPack
 if ($Splash) {
     Set-Language $Languages[0]
     $splashOut = Join-Path $out 'splash'

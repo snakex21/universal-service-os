@@ -93,7 +93,9 @@ const Run = struct {
 };
 
 const Stream = struct {
-    runs: [max_runs]Run = [_]Run{.{ .vcn = 0, .lcn = 0, .clusters = 0, .sparse = false }} ** max_runs,
+    /// Only runs[0..len] are valid. No default contents: a zero-filled
+    /// default is a 3.5 KiB constant copied into every Stream{} (Legacy Core).
+    runs: [max_runs]Run = undefined,
     len: usize = 0,
     data_size: u64 = 0,
 
@@ -151,6 +153,15 @@ pub fn probeBootSector(reader: random_reader.Reader, partition: Partition) Error
 }
 
 pub fn mount(reader: random_reader.Reader, partition: Partition) Error!FileSystem {
+    // Errors are returned through a small error union: returning a comptime
+    // error from a function whose payload is the 3.6 KiB FileSystem makes the
+    // compiler emit one zero-filled 3.6 KiB constant per error (Legacy Core).
+    var fs: FileSystem = undefined;
+    try mountInto(reader, partition, &fs);
+    return fs;
+}
+
+fn mountInto(reader: random_reader.Reader, partition: Partition, out: *FileSystem) Error!void {
     const probe = try probeBootSector(reader, partition);
     if (!probe.oem_ntfs or !probe.boot_signature_valid) return error.InvalidBPB;
 
@@ -191,7 +202,7 @@ pub fn mount(reader: random_reader.Reader, partition: Partition) Error!FileSyste
     if (mft_stream.len == 0 or mft_stream.data_size < file_record_bytes) return error.MissingMftData;
     if (mft_stream.runs[0].sparse or mft_stream.runs[0].vcn != 0 or mft_stream.runs[0].lcn != @as(i64, @intCast(mft_lcn))) return error.InvalidAttribute;
 
-    return .{
+    out.* = .{
         .partition = partition,
         .bytes_per_sector = bytes_per_sector,
         .sectors_per_cluster = sectors_per_cluster,
@@ -673,7 +684,13 @@ fn readMftRecord(fs: FileSystem, reader: random_reader.Reader, record_number: u6
 }
 
 fn collectStream(record: []const u8, wanted_type: u32, wanted_name: ?[]const u8, cluster_bytes: u32, total_clusters: u64) Error!Stream {
+    // Same small-error-union pattern as mount: no 3.5 KiB constant per error.
     var result = Stream{};
+    try collectStreamInto(record, wanted_type, wanted_name, cluster_bytes, total_clusters, &result);
+    return result;
+}
+
+fn collectStreamInto(record: []const u8, wanted_type: u32, wanted_name: ?[]const u8, cluster_bytes: u32, total_clusters: u64, result: *Stream) Error!void {
     var offset: usize = le16(record[20..22]);
     const used: usize = le32(record[24..28]);
     if (offset < 24 or used > record.len) return error.InvalidAttribute;
@@ -700,14 +717,13 @@ fn collectStream(record: []const u8, wanted_type: u32, wanted_name: ?[]const u8,
             }
             if (low_vcn != expected_vcn) return error.InvalidAttribute;
             const before = result.len;
-            const next_vcn = try decodeRunlist(attr[mapping_offset..], low_vcn, cluster_bytes, total_clusters, &result);
+            const next_vcn = try decodeRunlist(attr[mapping_offset..], low_vcn, cluster_bytes, total_clusters, result);
             if (result.len == before or next_vcn != high_vcn + 1) return error.InvalidAttribute;
             expected_vcn = next_vcn;
             saw_extent = true;
         }
         offset += length;
     }
-    return result;
 }
 
 fn decodeRunlist(bytes: []const u8, base_vcn: u64, cluster_bytes: u32, total_clusters: u64, stream: *Stream) Error!u64 {

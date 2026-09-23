@@ -13,11 +13,16 @@ pub const Source = struct {
 
     pub fn open(fs: ntfs.FileSystem, reader: Reader, bulk: Reader, path: []const []const u16) !Source {
         var result = Source{ .fs = fs, .disk = bulk, .file = undefined };
-        try ntfs.openFile(fs, reader, path, &result.file);
-        var descriptor: [2048]u8 = undefined;
-        _ = try result.readAt(16 * 2048, &descriptor);
-        if (descriptor[0] != 1 or !std.mem.eql(u8, descriptor[1..6], "CD001") or dos.get16(&descriptor, 128) != 2048) return error.UnsupportedDosIso;
+        // Errors come from a void helper: a comptime error returned with the
+        // 11 KiB Source payload would be an 11 KiB constant in the Core.
+        try result.check(reader, path);
         return result;
+    }
+    fn check(self: *Source, reader: Reader, path: []const []const u16) !void {
+        try ntfs.openFile(self.fs, reader, path, &self.file);
+        var descriptor: [2048]u8 = undefined;
+        _ = try self.readAt(16 * 2048, &descriptor);
+        if (descriptor[0] != 1 or !std.mem.eql(u8, descriptor[1..6], "CD001") or dos.get16(&descriptor, 128) != 2048) return error.UnsupportedDosIso;
     }
     pub fn size(self: *const Source) u64 { return self.file.size(); }
     pub fn readAt(self: *const Source, offset: u64, output: []u8) !usize {
