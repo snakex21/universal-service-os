@@ -51,7 +51,7 @@ func (b Backend) RestoreLegacyBoot(expected installed.Target) (legacyboot.Audit,
 		return legacyboot.Audit{}, fmt.Errorf("pre-lock Legacy repair GPT mismatch: %w", err)
 	}
 
-	locked, err := lockVolumesForDisk(expected.Disk.Number)
+	locked, err := b.lockVolumesForDisk(expected.Disk.Number)
 	if err != nil {
 		return legacyboot.Audit{}, fmt.Errorf("lock target volumes for Legacy repair: %w", err)
 	}

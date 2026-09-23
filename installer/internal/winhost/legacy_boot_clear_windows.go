@@ -10,7 +10,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func (Backend) ClearInstalledLegacyBoot(expected installed.Target) (legacyboot.Audit, error) {
+func (b Backend) ClearInstalledLegacyBoot(expected installed.Target) (legacyboot.Audit, error) {
 	if err := refuseRunningFromTarget(expected.Disk.Number); err != nil {
 		return legacyboot.Audit{}, err
 	}
@@ -49,7 +49,7 @@ func (Backend) ClearInstalledLegacyBoot(expected installed.Target) (legacyboot.A
 		return legacyboot.Audit{}, fmt.Errorf("pre-lock Legacy clear GPT mismatch: %w", err)
 	}
 
-	locked, err := lockVolumesForDisk(expected.Disk.Number)
+	locked, err := b.lockVolumesForDisk(expected.Disk.Number)
 	if err != nil {
 		return legacyboot.Audit{}, fmt.Errorf("lock target volumes for Legacy clear: %w", err)
 	}

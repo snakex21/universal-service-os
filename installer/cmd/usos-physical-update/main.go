@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"flag"
 	"fmt"
@@ -13,7 +14,9 @@ import (
 	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/localupdate"
+	"github.com/snakex21/universal-service-os/installer/internal/volumelock"
 	"github.com/snakex21/universal-service-os/installer/internal/winhost"
+	"golang.org/x/sys/windows"
 )
 
 func main() {
@@ -126,7 +129,7 @@ func main() {
 	}
 	defer logger.Close()
 
-	backend := winhost.Backend{InstallerExecutable: installerAbs}
+	backend := winhost.Backend{InstallerExecutable: installerAbs, VolumeInUse: consoleVolumeInUse, VolumeLockLog: func(line string) { fmt.Println(line) }}
 	if strings.TrimSpace(*legacyCorePath) != "" {
 		coreAbs, err := filepath.Abs(*legacyCorePath)
 		if err != nil {
@@ -229,4 +232,27 @@ func main() {
 	}
 	fmt.Printf("LOG=%s\n", logAbs)
 	fmt.Println("RESULT=PASS")
+}
+
+// consoleVolumeInUse mirrors the installer's Retry/Cancel choice: it prints
+// the localized reason and, on an interactive console, waits for Enter
+// (retry) or Q (cancel). Without a console it cancels.
+func consoleVolumeInUse(e *volumelock.InUseError) bool {
+	fmt.Println("VOLUME_BUSY " + e.Message())
+	fmt.Println("VOLUME_BUSY_DETAIL " + e.Error())
+	if !interactiveStdin() {
+		fmt.Println("VOLUME_BUSY no interactive console: cancelled")
+		return false
+	}
+	fmt.Print(i18n.T("installer.volume_busy.cli_prompt") + " ")
+	line, err := bufio.NewReader(os.Stdin).ReadString(0x0a)
+	if err != nil {
+		return false
+	}
+	return !strings.EqualFold(strings.TrimSpace(line), "q")
+}
+
+func interactiveStdin() bool {
+	var mode uint32
+	return windows.GetConsoleMode(windows.Handle(os.Stdin.Fd()), &mode) == nil
 }

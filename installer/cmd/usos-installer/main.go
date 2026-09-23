@@ -20,6 +20,7 @@ import (
 	"github.com/snakex21/universal-service-os/installer/internal/repair"
 	"github.com/snakex21/universal-service-os/installer/internal/ui"
 	"github.com/snakex21/universal-service-os/installer/internal/uninstall"
+	"github.com/snakex21/universal-service-os/installer/internal/volumelock"
 	"github.com/snakex21/universal-service-os/installer/internal/winhost"
 )
 
@@ -48,7 +49,9 @@ func run(prefsPath string) error {
 	linkedBuild := buildinfo.Current()
 	_ = logger.WriteLine(fmt.Sprintf("INSTALLER BUILD id=%s epoch=%d source_sha256=%s", linkedBuild.Display(), linkedBuild.Epoch, linkedBuild.SourceSHA256))
 
-	backend := winhost.Backend{}
+	// The progress screen answers "drive in use" with Retry/Cancel.
+	volumeInUse := &volumelock.Relay{}
+	backend := winhost.Backend{VolumeInUse: volumeInUse.Ask}
 	installEngine, err := install.NewEngine(backend, logger)
 	if err != nil {
 		return startupError(i18n.T("installer.startup.install_engine_failed", err.Error()))
@@ -73,6 +76,7 @@ func run(prefsPath string) error {
 		Update:    updateEngine,
 		Repair:    repairEngine,
 		Uninstall: uninstallEngine,
-		PrefsPath: prefsPath,
+		PrefsPath:   prefsPath,
+		VolumeInUse: volumeInUse,
 	})
 }

@@ -67,6 +67,8 @@ type progressScreen struct {
 	// height at that time (opening the log shrinks the list).
 	lastActive int
 	lastView   int32
+	// busy is the Retry/Cancel choice for a volume another program holds.
+	busy *volumeBusyPrompt
 }
 
 func newProgressScreen(f *Flow, op operation, events <-chan opEvent) *progressScreen {
@@ -90,6 +92,7 @@ func (s *progressScreen) apply(e opEvent) {
 		if s.model.finished {
 			return
 		}
+		s.resolveBusy(false)
 		s.model.apply(e)
 		s.ended = time.Now()
 		s.f.showFinal(s.op, e.verification, e.err, s.log.text.String())
@@ -144,6 +147,9 @@ func (s *progressScreen) draw(f *Flow, w *win, area rect) {
 	c.text(w.captionFont(), i18n.T("installer.close.blocked"), rect{info.Left + w.px(20) + elapsedW, info.Top, info.Right, info.Bottom}, theme.Faint, dtRight|dtSingleLine|dtVCenter|dtEndEllipsis)
 	w.animate = true // elapsed clock
 	body.Top = card.Bottom + w.px(16)
+	if s.busy != nil {
+		body.Top += s.drawBusy(w, body) + w.px(16)
+	}
 
 	// Log toggle row at the bottom; the log takes 40 % of the rest when open.
 	toggleH := w.px(32)
@@ -231,7 +237,13 @@ func drawStageRow(w *win, r rect, op operation, def stageDef, m *progressModel) 
 	c.text(w.captionFont(), statusText, statusR, statusCol, dtRight|dtSingleLine|dtVCenter)
 }
 
-func (s *progressScreen) key(f *Flow, w *win, vk uintptr) bool { return false }
+func (s *progressScreen) key(f *Flow, w *win, vk uintptr) bool {
+	if s.busy != nil && vk == vkEscape {
+		s.resolveBusy(false)
+		return true
+	}
+	return false
+}
 
 // ---- final report -----------------------------------------------------------
 

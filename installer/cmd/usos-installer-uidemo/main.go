@@ -28,6 +28,7 @@ import (
 	"github.com/snakex21/universal-service-os/installer/internal/repair"
 	"github.com/snakex21/universal-service-os/installer/internal/ui"
 	"github.com/snakex21/universal-service-os/installer/internal/uninstall"
+	"github.com/snakex21/universal-service-os/installer/internal/volumelock"
 )
 
 func main() {
@@ -48,15 +49,16 @@ func main() {
 	started := time.Now()
 	engines := newFakeEngines()
 	cfg := ui.Config{
-		Disks:     fakeDisks{},
-		Installed: fakeInstalled{},
-		Install:   engines.install,
-		Update:    engines.update,
-		Repair:    engines.repair,
-		Uninstall: engines.uninstall,
-		ForceDPI:  uint32(*dpi),
-		ClientW:   int32(*width),
-		ClientH:   int32(*height),
+		Disks:       fakeDisks{},
+		Installed:   fakeInstalled{},
+		Install:     engines.install,
+		Update:      engines.update,
+		Repair:      engines.repair,
+		Uninstall:   engines.uninstall,
+		VolumeInUse: engines.volumeInUse,
+		ForceDPI:    uint32(*dpi),
+		ClientW:     int32(*width),
+		ClientH:     int32(*height),
 	}
 	if *startupError {
 		cfg.StartupError = i18n.T("installer.startup.log_failed", `open operation log C:\USOS\USOS Installer.log: Access is denied.`)
@@ -297,6 +299,18 @@ func tour(d *ui.Driver, e *fakeEngines, dir, suffix string, startupError bool, l
 	if err := d.Activate("action.primary"); err != nil {
 		return err
 	}
+	for deadline := time.Now().Add(10 * time.Second); !d.Enabled("busy.retry"); time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("volume-in-use prompt did not appear")
+		}
+	}
+	d.Idle()
+	if err := shot("update-volume-busy"); err != nil {
+		return err
+	}
+	if err := d.Activate("busy.retry"); err != nil {
+		return err
+	}
 	waitIdle(d)
 	if err := shot("update-final-failed"); err != nil {
 		return err
@@ -515,12 +529,14 @@ type fakeEngines struct {
 	installReached   chan struct{}
 	uninstallHold    chan struct{}
 	uninstallReached chan struct{}
+	volumeInUse      *volumelock.Relay
 }
 
 func newFakeEngines() *fakeEngines {
 	e := &fakeEngines{installHold: make(chan struct{}), installReached: make(chan struct{}), uninstallHold: make(chan struct{}), uninstallReached: make(chan struct{})}
 	e.install = &fakeInstall{e}
-	e.update = &fakeUpdate{}
+	e.volumeInUse = &volumelock.Relay{}
+	e.update = &fakeUpdate{e}
 	e.repair = &fakeRepair{}
 	e.uninstall = &fakeUninstall{e}
 	return e
@@ -562,7 +578,7 @@ func (f *fakeInstall) RunAsync(disk domain.Disk) <-chan install.Event {
 	return ch
 }
 
-type fakeUpdate struct{}
+type fakeUpdate struct{ e *fakeEngines }
 
 func (f *fakeUpdate) RunAsync(t installed.Target) <-chan localupdate.Event { return f.run(t) }
 func (f *fakeUpdate) RunAsyncConfirmedDowngrade(t installed.Target) <-chan localupdate.Event {
@@ -576,6 +592,16 @@ func (f *fakeUpdate) run(installed.Target) <-chan localupdate.Event {
 		for id := localupdate.StageID(1); id <= localupdate.StageCount; id++ {
 			ch <- localupdate.Event{Kind: localupdate.EventStage, StageID: id, State: localupdate.StateActive}
 			pause()
+			if id == 2 {
+				// An Explorer window keeps the ESP open: the Retry/Cancel card.
+				busy := &volumelock.InUseError{Volume: `\\?\Volume{0257e175-1685-4311-91aa-5a83d8eb41e5}\`, Mount: `J:\`, Holders: []string{"Eksplorator Windows"}, Attempts: 5, Err: volumelock.ErrBusy}
+				if !f.e.volumeInUse.Ask(busy) {
+					err := fmt.Errorf("lock target volumes: %w", busy)
+					ch <- localupdate.Event{Kind: localupdate.EventStage, StageID: id, State: localupdate.StateFailed, Err: err}
+					ch <- localupdate.Event{Kind: localupdate.EventFinished, Err: err}
+					return
+				}
+			}
 			if id == localupdate.StageVerify {
 				report := install.VerificationReport{Items: []install.VerificationItem{
 					{Name: "BOOTX64.EFI", Expected: "sha256 3f9a…c201", Actual: "sha256 3f9a…c201", Match: true},

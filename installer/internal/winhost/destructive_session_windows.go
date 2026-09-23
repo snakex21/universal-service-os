@@ -3,6 +3,7 @@
 package winhost
 
 import (
+	"github.com/snakex21/universal-service-os/installer/internal/volumelock"
 	"fmt"
 
 	"github.com/snakex21/universal-service-os/installer/internal/domain"
@@ -17,6 +18,12 @@ type Backend struct {
 	// It exists only for an explicitly invoked physical rollback tool and still
 	// goes through the same locked-disk/GPT/read-back safety path.
 	LegacyCoreOverride []byte
+	// VolumeInUse is asked when a volume of the target stays locked by
+	// another program (an Explorer window) after the automatic retries:
+	// true = Retry, false = Cancel. Nil means fail after the retries.
+	VolumeInUse volumelock.Prompt
+	// VolumeLockLog receives the retry log lines; nil discards them.
+	VolumeLockLog func(string)
 }
 
 type destructiveSession struct {
@@ -33,7 +40,7 @@ type destructiveSession struct {
 	legacyCoreLength uint64
 }
 
-func (Backend) BeginDestructive(expected domain.Disk) (install.DestructiveSession, domain.Disk, error) {
+func (b Backend) BeginDestructive(expected domain.Disk) (install.DestructiveSession, domain.Disk, error) {
 	if err := refuseRunningFromTarget(expected.Number); err != nil {
 		return nil, domain.Disk{}, err
 	}
@@ -76,7 +83,7 @@ func (Backend) BeginDestructive(expected domain.Disk) (install.DestructiveSessio
 		return fail(fmt.Errorf("refusing destructive session: PhysicalDrive%d contains the running Windows system volume", expected.Number))
 	}
 
-	locked, err := lockVolumesForDisk(expected.Number)
+	locked, err := b.lockVolumesForDisk(expected.Number)
 	if err != nil {
 		return fail(fmt.Errorf("lock target volumes: %w", err))
 	}

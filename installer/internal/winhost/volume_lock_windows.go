@@ -3,9 +3,11 @@
 package winhost
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/snakex21/universal-service-os/installer/internal/volumelock"
 	"golang.org/x/sys/windows"
 )
 
@@ -14,7 +16,11 @@ type lockedVolume struct {
 	handle windows.Handle
 }
 
-func lockVolumesForDisk(diskNumber uint32) ([]lockedVolume, error) {
+// lockVolumesForDisk locks and dismounts every volume of the disk. A volume
+// another program has open is retried (volumelock.DefaultDelays), then the
+// user is asked through b.VolumeInUse; the holders are named by the Restart
+// Manager. Dismount still happens only after the lock succeeded.
+func (b Backend) lockVolumesForDisk(diskNumber uint32) ([]lockedVolume, error) {
 	names, err := volumeNames()
 	if err != nil {
 		return nil, err
@@ -59,7 +65,17 @@ func lockVolumesForDisk(diskNumber uint32) ([]lockedVolume, error) {
 			}
 		}
 
-		volume, lockErr := lockAndDismountVolume(name)
+		mount := ""
+		if paths, pathErr := volumeMountPaths(name); pathErr == nil && len(paths) > 0 {
+			mount = paths[0]
+		}
+		volumeName := name
+		volume, lockErr := volumelock.Acquire(volumelock.Target[lockedVolume]{
+			Volume:  volumeName,
+			Mount:   mount,
+			Lock:    func() (lockedVolume, error) { return lockAndDismountVolume(volumeName) },
+			Holders: func() []string { return volumeHolders(mount) },
+		}, volumelock.Options{Prompt: b.VolumeInUse, Log: b.VolumeLockLog})
 		if lockErr != nil {
 			closeLocked()
 			return nil, lockErr
@@ -85,12 +101,15 @@ func lockAndDismountVolume(volumeName string) (lockedVolume, error) {
 		0,
 	)
 	if err != nil {
-		return lockedVolume{}, fmt.Errorf("open volume %s for lock: %w", volumeName, err)
+		return lockedVolume{}, fmt.Errorf("open volume %s for lock: %w", volumeName, busyError(err))
 	}
 
+	// The lock is the exclusive intent: it fails while any other handle is
+	// open. Only after it succeeded is the dismount safe (no handle can be
+	// invalidated), so a denied lock is never followed by a forced dismount.
 	if err := deviceIoControlNoBuffer(handle, fsctlLockVolume); err != nil {
 		windows.CloseHandle(handle)
-		return lockedVolume{}, fmt.Errorf("FSCTL_LOCK_VOLUME %s: %w", volumeName, err)
+		return lockedVolume{}, fmt.Errorf("FSCTL_LOCK_VOLUME %s: %w", volumeName, busyError(err))
 	}
 	if err := deviceIoControlNoBuffer(handle, fsctlDismountVolume); err != nil {
 		windows.CloseHandle(handle)
@@ -112,4 +131,13 @@ func closeLockedVolumes(volumes []lockedVolume) error {
 func deviceIoControlNoBuffer(handle windows.Handle, code uint32) error {
 	var returned uint32
 	return windows.DeviceIoControl(handle, code, nil, 0, nil, 0, &returned, nil)
+}
+
+// busyError marks the errors another program's open handle causes, so the
+// lock is retried; any other failure stops at once.
+func busyError(err error) error {
+	if errors.Is(err, windows.ERROR_ACCESS_DENIED) || errors.Is(err, windows.ERROR_SHARING_VIOLATION) || errors.Is(err, windows.ERROR_LOCK_VIOLATION) {
+		return fmt.Errorf("%w (%w)", err, volumelock.ErrBusy)
+	}
+	return err
 }

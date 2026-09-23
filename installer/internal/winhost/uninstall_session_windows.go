@@ -12,7 +12,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func (Backend) BeginUSOSDestructive(expected uninstall.Target) (uninstall.DestructiveSession, domain.Disk, error) {
+func (b Backend) BeginUSOSDestructive(expected uninstall.Target) (uninstall.DestructiveSession, domain.Disk, error) {
 	if err := refuseRunningFromTarget(expected.Disk.Number); err != nil {
 		return nil, domain.Disk{}, err
 	}
@@ -58,7 +58,7 @@ func (Backend) BeginUSOSDestructive(expected uninstall.Target) (uninstall.Destru
 		return fail(fmt.Errorf("refusing uninstall destructive session: PhysicalDrive%d contains the running Windows system volume", expected.Disk.Number))
 	}
 
-	locked, err := lockVolumesForDisk(expected.Disk.Number)
+	locked, err := b.lockVolumesForDisk(expected.Disk.Number)
 	if err != nil {
 		return fail(fmt.Errorf("lock target volumes: %w", err))
 	}

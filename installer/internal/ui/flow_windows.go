@@ -17,6 +17,7 @@ import (
 	"github.com/snakex21/universal-service-os/installer/internal/prefs"
 	"github.com/snakex21/universal-service-os/installer/internal/repair"
 	"github.com/snakex21/universal-service-os/installer/internal/uninstall"
+	"github.com/snakex21/universal-service-os/installer/internal/volumelock"
 )
 
 type DiskSource interface {
@@ -59,6 +60,9 @@ type Config struct {
 	// PrefsPath is where the language choice is saved; "" disables saving.
 	PrefsPath    string
 	StartupError string
+	// VolumeInUse receives the Retry/Cancel prompt the progress screen shows
+	// when a volume of the drive stays locked by another program.
+	VolumeInUse *volumelock.Relay
 
 	// Test harness only (cmd/usos-installer-uidemo).
 	ForceDPI         uint32
@@ -105,6 +109,10 @@ func Run(cfg Config) error {
 		return err
 	}
 	f.w = w
+	if cfg.VolumeInUse != nil {
+		cfg.VolumeInUse.Set(f.askVolumeInUse)
+		defer cfg.VolumeInUse.Set(nil)
+	}
 	if cfg.StartupError != "" {
 		f.show(&errorScreen{message: cfg.StartupError}, "startup.close")
 	} else {

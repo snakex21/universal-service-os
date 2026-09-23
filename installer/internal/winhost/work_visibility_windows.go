@@ -15,7 +15,7 @@ import (
 // Setup/WinPE must be allowed to mount WORK during the installation handoff.
 // Older USOS media may still carry bit 63 from the previous hidden-WORK policy,
 // so update/repair paths use the same operation to migrate them in place.
-func (Backend) EnsureWORKVisible(media install.MediaLayout) error {
+func (b Backend) EnsureWORKVisible(media install.MediaLayout) error {
 	if strings.TrimSpace(media.WORK.PartUUID) == "" {
 		return fmt.Errorf("refusing to expose WORK with empty PARTUUID")
 	}
@@ -49,7 +49,7 @@ func (Backend) EnsureWORKVisible(media install.MediaLayout) error {
 	}
 	defer windows.CloseHandle(disk)
 
-	locked, err := lockVolumesForDisk(media.DiskNumber)
+	locked, err := b.lockVolumesForDisk(media.DiskNumber)
 	if err != nil {
 		return fmt.Errorf("lock target volumes before WORK GPT update: %w", err)
 	}
