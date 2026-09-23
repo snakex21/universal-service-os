@@ -1,65 +1,71 @@
+//! Boot method choice. Only methods that can actually run here are listed:
+//! methods that do not fit the image type, have no backend yet or need the
+//! other firmware mode are left out instead of shown as disabled filler.
+//! A single runnable method is used without asking.
+const std = @import("std");
 const usos = @import("usos");
 const input = @import("input.zig");
 const navigation = @import("manual_navigation.zig");
 const view = @import("manual_view.zig");
 
+const model_mod = usos.gui.boot_method_model;
+
 pub fn select(system: *const usos.catalog.SystemEntry, image: usos.catalog.ImageItem, firmware: usos.firmware.Firmware) ?usos.catalog.BootMethod {
-    const model = usos.gui.boot_method_model.collect(system, image.kind, firmware);
-    if (model.len == 0) {
-        showNoMethodNotice(image);
+    const model = model_mod.collect(system, image.kind, firmware);
+    if (model.enabledCount() == 0) {
+        const lines = [_][]const u8{view.t(.methods_none)};
+        view.notice(image.name.slice(), .warning, .warning, view.t(.error_unsupported_title), &lines);
+        view.waitForDismiss();
         return null;
     }
     if (model.singleEnabledIndex()) |index| return model.items[index].method;
 
-    var selectable_storage: [usos.gui.boot_method_model.max_items]bool = undefined;
-    const selectable = model.selectable(&selectable_storage);
-    var rows: [usos.gui.boot_method_model.max_items]view.ListRow = undefined;
+    var map: [model_mod.max_items]usize = undefined;
+    var rows: [model_mod.max_items]usos.gui.ui.Row = undefined;
+    var count: usize = 0;
     for (model.items[0..model.len], 0..) |*item, index| {
-        rows[index] = if (item.enabled)
-            .{ .plain = item.label.slice() }
-        else
-            .{ .disabled = .{ .value = item.label.slice(), .reason = item.reason } };
+        if (!item.enabled) continue;
+        map[count] = index;
+        rows[count] = .{ .title = label(item), .badge = badge(item, count == 0) };
+        count += 1;
     }
 
-    var selected: usize = usos.gui.selectable_list.first(selectable) orelse 0;
-    var list = view.ListScreen.open("methods", image.name.slice(), rows[0..model.len], selected, model.len, helpFor(&model.items[selected]));
+    var selected: usize = 0;
+    var help_lines: [2][]const u8 = undefined;
+    var list: view.ListScreen = undefined;
+    list.open(view.t(.methods_title), image.name.slice(), rows[0..count], selected, false, help(&model.items[map[selected]], &help_lines));
 
     while (true) {
-        switch (navigation.handleSelectable(input.readBlocking(), &selected, model.len, list.visibleStart(), list.visibleCount(), selectable)) {
-            .activate => {
-                if (model.items[selected].enabled) return model.items[selected].method;
-            },
+        switch (navigation.handle(input.readBlocking(), &selected, count, list.visibleStart(), list.visibleCount())) {
+            .activate => return model.items[map[selected]].method,
             .back => return null,
-            .changed => list.updateSelection(selected, helpFor(&model.items[selected])),
+            .changed => list.updateSelection(selected, help(&model.items[map[selected]], &help_lines)),
             .pointer_moved => view.updatePointer(),
             .ignored => {},
         }
     }
 }
 
-fn helpFor(item: *const usos.gui.boot_method_model.Item) view.ListHelp {
-    return .{
-        .title = item.help.title,
-        .line1 = item.help.line1,
-        .line2 = item.help.line2,
-        .status = item.statusLabel(),
+/// The method label without the validation suffix (shown as a badge).
+pub fn label(item: *const model_mod.Item) []const u8 {
+    var text = item.label.slice();
+    if (item.validation_status) |status| {
+        const suffix = status.badge();
+        if (suffix.len > 0 and std.mem.endsWith(u8, text, suffix)) text = std.mem.trimEnd(u8, text[0 .. text.len - suffix.len], " ");
+    }
+    return view.tr(text);
+}
+
+pub fn badge(item: *const model_mod.Item, recommended: bool) ?usos.gui.ui.Badge {
+    const status = item.validation_status orelse return if (recommended) .{ .text = view.t(.badge_recommended), .tone = .accent } else null;
+    return switch (status) {
+        .validated_hardware => if (recommended and item.method == .automatic) .{ .text = view.t(.badge_recommended), .tone = .accent } else .{ .text = view.t(.badge_ready), .tone = .success },
+        .tested_in_vm => .{ .text = view.t(.badge_tested_in_vm), .tone = .accent },
+        .experimental => .{ .text = view.t(.badge_experimental), .tone = .warning },
     };
 }
 
-fn showNoMethodNotice(image: usos.catalog.ImageItem) void {
-    view.begin("methods", image.name.slice());
-    view.row(false, "No boot methods are configured for this system.");
-    view.footer(true);
-    while (true) {
-        switch (input.readBlocking()) {
-            .enter => return,
-            .back => return,
-            .pointer => |mouse| {
-                if (mouse.right_click) return;
-                if (mouse.left_click) return;
-                if (mouse.moved) view.updatePointer();
-            },
-            else => {},
-        }
-    }
+fn help(item: *const model_mod.Item, lines: *[2][]const u8) usos.gui.menu_screens.Help {
+    lines.* = .{ view.tr(item.help.line1), view.tr(item.help.line2) };
+    return .{ .title = view.tr(item.help.title), .lines = lines, .badge = badge(item, false) };
 }

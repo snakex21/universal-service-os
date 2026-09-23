@@ -8,105 +8,84 @@ const power_index = category_count;
 const item_count = category_count + 1;
 
 pub fn select() usos.catalog.Category {
-    var selected: usize = 0;
-    render(selected);
+    var items: [item_count]usos.gui.menu_screens.HomeItem = undefined;
+    for (&items, 0..) |*item, index| item.* = .{ .icon = icon(index), .title = title(index), .description = description(index) };
+    var home: view.Home = undefined;
+    home.open(&items, 0);
 
     while (true) {
         switch (input.readBlocking()) {
-            .up => selectIndex(&selected, moveVertical(selected, -1)),
-            .down => selectIndex(&selected, moveVertical(selected, 1)),
-            .left => selectIndex(&selected, moveHorizontal(selected, -1)),
-            .right => selectIndex(&selected, moveHorizontal(selected, 1)),
+            .up => home.select(moveVertical(home.selected, -1)),
+            .down => home.select(moveVertical(home.selected, 1)),
+            .left => home.select(moveHorizontal(home.selected, -1)),
+            .right => home.select(moveHorizontal(home.selected, 1)),
             .enter => {
-                if (selected == power_index) {
+                if (home.selected == power_index) {
                     manual_power.show();
-                    render(selected);
+                    home.redraw();
                     continue;
                 }
-                return usos.catalog.categories.all[selected];
+                return usos.catalog.categories.all[home.selected];
             },
-            .back => selectIndex(&selected, power_index),
+            .back => home.select(power_index),
             .pointer => |mouse| {
                 if (mouse.right_click) {
-                    selectIndex(&selected, power_index);
+                    home.select(power_index);
                     continue;
                 }
                 if (mouse.scroll != 0) {
+                    const selected = home.selected;
                     const next = if (mouse.scroll > 0)
                         if (selected > 0) selected - 1 else selected
                     else if (selected + 1 < item_count)
                         selected + 1
                     else
                         selected;
-                    selectIndex(&selected, next);
+                    home.select(next);
                     continue;
                 }
-                if (view.hitCategoryCard(mouse.x, mouse.y, item_count)) |index| {
-                    selectIndex(&selected, index);
-                    if (mouse.left_click) {
-                        if (selected == power_index) {
+                if (mouse.left_click) {
+                    if (view.hitCategoryCard(mouse.x, mouse.y)) |index| {
+                        home.select(index);
+                        if (index == power_index) {
                             manual_power.show();
-                            render(selected);
-                        } else {
-                            return usos.catalog.categories.all[selected];
+                            home.redraw();
+                            continue;
                         }
-                    } else if (mouse.moved) {
-                        view.updatePointer();
+                        return usos.catalog.categories.all[index];
                     }
-                } else if (mouse.moved) {
-                    view.updatePointer();
                 }
+                if (mouse.moved) view.updatePointer();
             },
             .other => {},
         }
     }
 }
 
-fn selectIndex(selected: *usize, next: usize) void {
-    if (next == selected.*) return;
-    const previous = selected.*;
-    selected.* = next;
-    redrawItem(previous, false);
-    redrawItem(next, true);
-}
-
-fn render(selected: usize) void {
-    view.beginHome();
-    var index: usize = 0;
-    while (index < item_count) : (index += 1) {
-        view.categoryCard(index, index == selected, title(index), description(index), symbol(index));
-    }
-    view.footer(true);
-}
-
-fn redrawItem(index: usize, selected: bool) void {
-    view.redrawCategoryCard(index, selected, title(index), description(index), symbol(index));
-}
-
 fn title(index: usize) []const u8 {
-    if (index == power_index) return "POWER";
-    return usos.catalog.categories.all[index].label();
+    if (index == power_index) return view.t(.category_power);
+    return view.tr(usos.catalog.categories.all[index].label());
 }
 
 fn description(index: usize) []const u8 {
-    if (index == power_index) return "Restart, shut down or enter firmware setup";
+    if (index == power_index) return view.t(.category_power_desc);
     return switch (usos.catalog.categories.all[index]) {
-        .windows => "Install and repair Microsoft Windows",
-        .linux => "Linux installers and live systems",
-        .beta => "Whistler, Longhorn and other builds",
-        .dos => "DOS systems and legacy boot images",
-        .utilities => "Diagnostics, recovery and firmware tools",
+        .windows => view.t(.category_windows_desc),
+        .linux => view.t(.category_linux_desc),
+        .beta => view.t(.category_beta_desc),
+        .dos => view.t(.category_dos_desc),
+        .utilities => view.t(.category_utilities_desc),
     };
 }
 
-fn symbol(index: usize) []const u8 {
-    if (index == power_index) return "P";
+pub fn icon(index: usize) usos.gui.icons.Kind {
+    if (index == power_index) return .power;
     return switch (usos.catalog.categories.all[index]) {
-        .windows => "W",
-        .linux => "L",
-        .beta => "B",
-        .dos => "D",
-        .utilities => "+",
+        .windows => .windows,
+        .linux => .terminal,
+        .beta => .flask,
+        .dos => .floppy,
+        .utilities => .gear,
     };
 }
 

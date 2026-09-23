@@ -1,5 +1,6 @@
 const std = @import("std");
 const uefi = std.os.uefi;
+const usos = @import("usos");
 const input = @import("input.zig");
 const navigation = @import("manual_navigation.zig");
 const view = @import("manual_view.zig");
@@ -12,16 +13,14 @@ const option_count: usize = 3;
 pub fn show() void {
     const firmware_ui = firmwareUiSupported();
     var selectable = [_]bool{ true, true, firmware_ui };
-    var rows = [_]view.ListRow{
-        .{ .plain = "Restart" },
-        .{ .plain = "Shut down" },
-        if (firmware_ui)
-            .{ .plain = "Firmware setup (BIOS/UEFI)" }
-        else
-            .{ .disabled = .{ .value = "Firmware setup (BIOS/UEFI)", .reason = "Not supported by this firmware" } },
+    var rows = [_]usos.gui.ui.Row{
+        .{ .title = view.t(.power_restart), .icon = .{ .vector = .restart } },
+        .{ .title = view.t(.power_shutdown), .icon = .{ .vector = .shutdown } },
+        firmwareRow(firmware_ui),
     };
     var selected: usize = 0;
-    var list = view.ListScreen.open("power", "POWER", &rows, selected, option_count, null);
+    var list: view.ListScreen = undefined;
+    list.open(view.t(.power_title), view.t(.power_subtitle), &rows, selected, false, null);
 
     while (true) {
         switch (navigation.handleSelectable(input.readBlocking(), &selected, option_count, list.visibleStart(), list.visibleCount(), &selectable)) {
@@ -32,10 +31,7 @@ pub fn show() void {
                     showFirmwareError(err);
                     const current_support = firmwareUiSupported();
                     selectable[2] = current_support;
-                    rows[2] = if (current_support)
-                        .{ .plain = "Firmware setup (BIOS/UEFI)" }
-                    else
-                        .{ .disabled = .{ .value = "Firmware setup (BIOS/UEFI)", .reason = "Not supported by this firmware" } };
+                    rows[2] = firmwareRow(current_support);
                     list.redrawFull(selected, null);
                 },
                 else => {},
@@ -46,6 +42,15 @@ pub fn show() void {
             .ignored => {},
         }
     }
+}
+
+fn firmwareRow(supported: bool) usos.gui.ui.Row {
+    return .{
+        .title = view.t(.power_firmware),
+        .detail = if (supported) "" else view.t(.power_firmware_unsupported),
+        .icon = .{ .vector = .firmware },
+        .enabled = supported,
+    };
 }
 
 fn firmwareUiSupported() bool {
@@ -99,18 +104,7 @@ fn readGlobalU64WithAttributes(name: [*:0]const u16) !?GlobalU64 {
 }
 
 fn showFirmwareError(err: anyerror) void {
-    view.begin("power-error", "FIRMWARE SETUP");
-    view.row(false, "Could not request firmware setup on next reboot.");
-    view.rowParts(false, "Error: ", @errorName(err));
-    view.footer(true);
-    while (true) {
-        switch (input.readBlocking()) {
-            .back, .enter => return,
-            .pointer => |mouse| {
-                if (mouse.right_click or mouse.left_click) return;
-                if (mouse.moved) view.updatePointer();
-            },
-            else => {},
-        }
-    }
+    const lines = [_][]const u8{ view.t(.power_firmware_error_line1), @errorName(err) };
+    view.notice(view.t(.power_firmware_error_title), .error_circle, .danger, "", &lines);
+    view.waitForDismiss();
 }

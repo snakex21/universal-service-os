@@ -201,6 +201,7 @@
   "installer.stage.uninstall.4": "Formátovanie exFAT",
   "installer.stage.uninstall.5": "Overenie",
 
+  "boot.language.name": "Slovenčina",
   "boot.header.subtitle": "Ponuka zavádzania",
   "boot.header.build": "Zostava {0}",
   "boot.header.no_mouse": "Bez myši",

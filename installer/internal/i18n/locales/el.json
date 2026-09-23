@@ -198,6 +198,7 @@
   "installer.stage.uninstall.4": "Διαμόρφωση exFAT",
   "installer.stage.uninstall.5": "Επαλήθευση",
 
+  "boot.language.name": "Ελληνικά",
   "boot.header.subtitle": "Μενού εκκίνησης",
   "boot.header.build": "Έκδοση {0}",
   "boot.header.no_mouse": "Χωρίς ποντίκι",

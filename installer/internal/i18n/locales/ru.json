@@ -201,6 +201,7 @@
   "installer.stage.uninstall.4": "Форматирование exFAT",
   "installer.stage.uninstall.5": "Проверка",
 
+  "boot.language.name": "Русский",
   "boot.header.subtitle": "Меню загрузки",
   "boot.header.build": "Сборка {0}",
   "boot.header.no_mouse": "Нет мыши",

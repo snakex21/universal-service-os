@@ -201,6 +201,7 @@
   "installer.stage.uninstall.4": "Форматування exFAT",
   "installer.stage.uninstall.5": "Перевірка",
 
+  "boot.language.name": "Українська",
   "boot.header.subtitle": "Меню завантаження",
   "boot.header.build": "Збірка {0}",
   "boot.header.no_mouse": "Немає миші",

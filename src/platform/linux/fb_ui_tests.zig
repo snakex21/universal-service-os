@@ -7,4 +7,5 @@ test "framebuffer UI modules are reachable by host tests" {
     _ = @import("fb_menu_model.zig");
     _ = @import("fb_menu_render.zig");
     _ = @import("fb_menu_input.zig");
+    _ = @import("fb_i18n.zig");
 }

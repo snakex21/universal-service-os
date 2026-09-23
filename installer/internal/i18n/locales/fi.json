@@ -198,6 +198,7 @@
   "installer.stage.uninstall.4": "Alustus exFAT-muotoon",
   "installer.stage.uninstall.5": "Tarkistus",
 
+  "boot.language.name": "Suomi",
   "boot.header.subtitle": "Käynnistysvalikko",
   "boot.header.build": "Koontiversio {0}",
   "boot.header.no_mouse": "Ei hiirtä",

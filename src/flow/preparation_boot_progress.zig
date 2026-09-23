@@ -17,10 +17,10 @@ pub const Stage = enum {
 
     pub fn detail(self: Stage) []const u8 {
         return switch (self) {
-            .request_saved => "PREPARATION REQUEST SAVED",
-            .return_boot_configured => "RETURN BOOT CONFIGURED",
-            .loader_ready => "PREPARATION ENVIRONMENT READY",
-            .transferring_control => "STARTING PREPARATION ENVIRONMENT",
+            .request_saved => "Preparation request saved",
+            .return_boot_configured => "Return boot configured",
+            .loader_ready => "Preparation environment ready",
+            .transferring_control => "Starting preparation environment",
         };
     }
 };
@@ -37,9 +37,9 @@ pub const DirectIsoStage = enum(u8) {
     starting = 3,
 
     pub const labels = [_][]const u8{
-        "VALIDATING INSTALLATION ISO",
-        "LOADING WINDOWS BOOT FILES",
-        "STARTING WINDOWS SETUP",
+        "Validating installation ISO",
+        "Loading Windows boot files",
+        "Starting Windows Setup",
     };
 
     pub fn number(self: DirectIsoStage) u8 {

@@ -7,12 +7,7 @@ const Reader = storage.random_reader.Reader;
 extern const dos_mbr_start: [512]u8;
 
 pub fn run(esp: storage.fat32.FileSystem, reader: Reader, bulk: Reader, graphics: ?@import("vbe_probe.zig").Session) !void {
-    if (graphics) |session| {
-        const canvas = @import("graphics").menu_canvas.Canvas.init(session.surface, .{});
-        canvas.beginList("FreeDOS tools", "Loading DOS and your programs from USB", "BIOS", "");
-        canvas.listRow(0, .{ .value = "Preparing a DOS session in RAM", .selected = true });
-        canvas.footer("PLEASE WAIT");
-    }
+    if (graphics) |session| @import("graphics_menu.zig").busy(&session, "FreeDOS");
     const ram = try memdisk.allocateFreeDos(esp, reader, bulk);
     var boot: [512]u8 = undefined;
     try readHelper(esp, bulk, "BOOT16.BIN", &boot);

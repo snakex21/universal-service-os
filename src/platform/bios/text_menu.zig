@@ -238,9 +238,9 @@ fn showSystems(discovery: *catalog.media_discovery.Discovery, diag: diagnostics.
         }
         const key = readTimedKey(diag, &idle_ticks, graphics) orelse return;
         if (key.selection != 255) {
-            const hovered: usize = key.selection;
-            selected = hovered;
-            full_redraw = true;
+            const previous = selected;
+            selected = key.selection;
+            if (graphics.*) |*session| graphics_menu.systemSelection(session, discovery, category, previous, selected, count) else full_redraw = true;
         }
         menu_telemetry.recordKey(.systems, selected, key);
         if (isDiagnosticsKey(key.ascii)) {
@@ -362,9 +362,9 @@ fn showUtilities(discovery: *catalog.media_discovery.Discovery, diag: diagnostic
 
         const key = readTimedKey(diag, &idle_ticks, graphics) orelse return;
         if (key.selection != 255) {
-            const hovered: usize = key.selection;
-            selected = hovered;
-            full_redraw = true;
+            const previous = selected;
+            selected = key.selection;
+            if (graphics.*) |*session| graphics_menu.utilitySelection(session, discovery, &utilities, previous, selected) else full_redraw = true;
         }
         menu_telemetry.recordKey(.utilities, selected, key);
         if (isDiagnosticsKey(key.ascii)) {
@@ -483,9 +483,9 @@ fn showSystemImages(
 
         const key = readTimedKey(diag, &idle_ticks, graphics) orelse return true;
         if (key.selection != 255) {
-            const hovered: usize = key.selection;
-            selected = hovered;
-            full_redraw = true;
+            const previous = selected;
+            selected = key.selection;
+            if (graphics.*) |*session| graphics_menu.imageSelection(session, system.name, &images, previous, selected, true) else full_redraw = true;
         }
         menu_telemetry.recordKey(.images, selected, key);
         if (isDiagnosticsKey(key.ascii)) {
@@ -523,26 +523,33 @@ fn showMethods(
     if (model.singleEnabledIndex()) |index| {
         return executeMethodChoice(discovery, diag, actions, system, image, &model.items[index], graphics);
     }
-
-    var selectable_storage: [boot_method_model.max_items]bool = undefined;
-    const selectable = model.selectable(&selectable_storage);
-    var selected = firstNavigable(selectable) orelse 0;
+    // Only methods that can run here are offered; the rest are not shown.
+    var runnable_storage: [boot_method_model.max_items]usize = undefined;
+    var runnable_count: usize = 0;
+    for (model.items[0..model.len], 0..) |item, index| {
+        if (!item.enabled) continue;
+        runnable_storage[runnable_count] = index;
+        runnable_count += 1;
+    }
+    if (runnable_count == 0) return false;
+    const runnable = runnable_storage[0..runnable_count];
+    var selected: usize = 0;
     var idle_ticks: u32 = 0;
     var full_redraw = true;
 
     while (true) {
-        menu_telemetry.setSelection(.methods, selected);
+        menu_telemetry.setSelection(.methods, runnable[selected]);
         if (full_redraw) {
-            renderMethods(&model, image, selected, graphics);
+            renderMethods(&model, runnable, image, selected, graphics);
             full_redraw = false;
         }
         const key = readTimedKey(diag, &idle_ticks, graphics) orelse return true;
-        if (key.selection != 255) {
-            const hovered: usize = key.selection;
-            selected = hovered;
-            full_redraw = true;
+        if (key.selection != 255 and key.selection < runnable.len) {
+            const previous = selected;
+            selected = key.selection;
+            if (graphics.*) |*session| graphics_menu.methodSelection(session, image.name.slice(), &model, runnable, previous, selected) else full_redraw = true;
         }
-        menu_telemetry.recordKey(.methods, selected, key);
+        menu_telemetry.recordKey(.methods, runnable[selected], key);
         if (isDiagnosticsKey(key.ascii)) {
             if (showDiagnostics(graphics, diag)) return true;
             full_redraw = true;
@@ -551,18 +558,16 @@ fn showMethods(
         if (key.ascii == 27 or key.ascii == 8) return false;
         if (key.scan == scan_up or key.scan == scan_down) {
             const previous = selected;
-            selected = moveNavigable(selectable, selected, key.scan == scan_down);
+            selected = if (key.scan == scan_down) nextIndex(selected, runnable.len) else previousIndex(selected, runnable.len);
             if (graphics.*) |*session| {
-                graphics_menu.methodSelection(session, image.name.slice(), &model, previous, selected);
+                graphics_menu.methodSelection(session, image.name.slice(), &model, runnable, previous, selected);
             } else {
                 full_redraw = true;
             }
             continue;
         }
         if (key.ascii != 13) continue;
-        const item = &model.items[selected];
-        if (!item.enabled) continue;
-        if (executeMethodChoice(discovery, diag, actions, system, image, item, graphics)) return true;
+        if (executeMethodChoice(discovery, diag, actions, system, image, &model.items[runnable[selected]], graphics)) return true;
         full_redraw = true;
     }
 }
@@ -605,6 +610,8 @@ fn showUnattended(
     var options: [9]?[]const u8 = .{ null, null, null, null, null, null, null, null, null };
     const extension = catalog.unattended_policy.extension(system);
     const found = discovery.listFilesWithExtension(directory, extension, file_storage[0..]);
+    // Without answer files there is nothing to choose: skip the screen.
+    if (found == 0) return .{};
     var index: usize = 0;
     while (index < found) : (index += 1) options[index + 1] = file_storage[index].slice();
     const len = found + 1;
@@ -621,9 +628,9 @@ fn showUnattended(
 
         const key = readTimedKey(diag, &idle_ticks, graphics) orelse return .{ .back = true };
         if (key.selection != 255) {
-            const hovered: usize = key.selection;
-            selected = hovered;
-            full_redraw = true;
+            const previous = selected;
+            selected = key.selection;
+            if (graphics.*) |*session| graphics_menu.unattendedSelection(session, system.name, catalog.unattended_policy.fileKindLabel(system), options[0..len], previous, selected) else full_redraw = true;
         }
         menu_telemetry.recordKey(.unattended, selected, key);
         if (isDiagnosticsKey(key.ascii)) {
@@ -680,9 +687,9 @@ fn renderUnattended(system: *const catalog.SystemEntry, options: []const ?[]cons
     console.line("ARROWS: MOVE   ENTER: USE   ESC/BACKSPACE: BACK   D: DIAGNOSTICS   AUTO-RETURN: 30s");
 }
 
-fn renderMethods(model: *const boot_method_model.List, image: catalog.ImageItem, selected: usize, graphics: *?vbe_probe.Session) void {
+fn renderMethods(model: *const boot_method_model.List, runnable: []const usize, image: catalog.ImageItem, selected: usize, graphics: *?vbe_probe.Session) void {
     if (graphics.*) |*session| {
-        graphics_menu.methods(session, image.name.slice(), model, selected);
+        graphics_menu.methods(session, image.name.slice(), model, runnable, selected);
         return;
     }
     console.clear();
@@ -691,22 +698,15 @@ fn renderMethods(model: *const boot_method_model.List, image: catalog.ImageItem,
     console.print("IMAGE: ");
     console.line(image.name.slice());
     console.line("");
-    for (model.items[0..model.len], 0..) |item, index| {
-        console.print(if (index == selected) "> " else "  ");
-        console.print(item.label.slice());
-        if (!item.enabled and item.reason.len != 0) {
-            console.print(" ");
-            console.print(item.reason);
-        }
-        console.line("");
+    for (runnable, 0..) |index, row| {
+        console.print(if (row == selected) "> " else "  ");
+        console.line(model.items[index].label.slice());
     }
-    const current = &model.items[selected];
+    const current = &model.items[runnable[selected]];
     console.line("");
     console.line(current.help.title);
     console.line(current.help.line1);
     console.line(current.help.line2);
-    console.print("STATUS: ");
-    console.line(current.statusLabel());
     console.line("");
     console.line("ARROWS: MOVE   ENTER: SELECT   ESC/BACKSPACE: BACK   D: DIAGNOSTICS   AUTO-RETURN: 30s");
 }
@@ -767,9 +767,9 @@ fn showImages(discovery: *catalog.media_discovery.Discovery, diag: diagnostics.I
 
         const key = readTimedKey(diag, &idle_ticks, graphics) orelse return true;
         if (key.selection != 255) {
-            const hovered: usize = key.selection;
-            selected = hovered;
-            full_redraw = true;
+            const previous = selected;
+            selected = key.selection;
+            if (graphics.*) |*session| graphics_menu.imageSelection(session, title, &images, previous, selected, false) else full_redraw = true;
         }
         menu_telemetry.recordKey(.images, selected, key);
         if (isDiagnosticsKey(key.ascii)) {

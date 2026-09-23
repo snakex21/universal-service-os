@@ -201,6 +201,7 @@
   "installer.stage.uninstall.4": "Formatarea exFAT",
   "installer.stage.uninstall.5": "Verificare",
 
+  "boot.language.name": "Română",
   "boot.header.subtitle": "Meniu de pornire",
   "boot.header.build": "Versiunea {0}",
   "boot.header.no_mouse": "Fără mouse",

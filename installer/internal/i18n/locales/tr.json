@@ -198,6 +198,7 @@
   "installer.stage.uninstall.4": "exFAT biçimlendiriliyor",
   "installer.stage.uninstall.5": "Doğrulama",
 
+  "boot.language.name": "Türkçe",
   "boot.header.subtitle": "Önyükleme menüsü",
   "boot.header.build": "Derleme {0}",
   "boot.header.no_mouse": "Fare yok",

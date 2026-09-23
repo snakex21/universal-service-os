@@ -198,6 +198,7 @@
   "installer.stage.uninstall.4": "Formaterar exFAT",
   "installer.stage.uninstall.5": "Verifiering",
 
+  "boot.language.name": "Svenska",
   "boot.header.subtitle": "Startmeny",
   "boot.header.build": "Bygge {0}",
   "boot.header.no_mouse": "Ingen mus",

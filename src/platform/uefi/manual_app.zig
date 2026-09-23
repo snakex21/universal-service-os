@@ -71,34 +71,26 @@ fn runEntry(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_dis
 
 fn showResumeStatus(stage: e2e_flow.ResumeStage) void {
     switch (stage) {
-        .starting_windows_setup => showWindowsHandoffStatus("Preparing Windows Setup handoff..."),
-        .loading_ntfs_driver => showWindowsHandoffStatus("Loading NTFS driver..."),
-        .locating_work_partition => showWindowsHandoffStatus("Locating prepared WORK partition..."),
-        .verifying_windows_media => showWindowsHandoffStatus("Verifying install.wim and EFI boot files..."),
-        .loading_windows_boot_manager => showWindowsHandoffStatus("Loading Windows Boot Manager..."),
-        .committing_windows_handoff => showWindowsHandoffStatus("Saving one-shot handoff state..."),
-        .transferring_to_windows => showWindowsHandoffStatus("Transferring control to Windows Setup..."),
+        .starting_windows_setup => showWindowsHandoffStatus(.handoff_setup),
+        .loading_ntfs_driver => showWindowsHandoffStatus(.handoff_ntfs),
+        .locating_work_partition => showWindowsHandoffStatus(.handoff_work),
+        .verifying_windows_media => showWindowsHandoffStatus(.handoff_verify),
+        .loading_windows_boot_manager => showWindowsHandoffStatus(.handoff_bootmgr),
+        .committing_windows_handoff => showWindowsHandoffStatus(.handoff_commit),
+        .transferring_to_windows => showWindowsHandoffStatus(.handoff_transfer),
         .starting_chainload => {
-            manual_view.begin("windows-handoff", "Starting chained bootloader");
-            manual_view.row(false, "Boot media preparation is complete.");
-            manual_view.row(false, "Starting EFI/BOOT from the prepared WORK partition...");
-            manual_view.passiveFooter();
+            const lines = [_][]const u8{ manual_view.t(.chainload_line1), manual_view.t(.chainload_line2) };
+            manual_view.status(manual_view.t(.chainload_title), "", &lines);
         },
     }
 }
 
 fn showDataCatalogError(err: anyerror) void {
-    manual_view.begin("data-catalog", "DATA CATALOG UNAVAILABLE");
-    manual_view.row(false, "USOS could not open the NTFS USOS_DATA volume.");
-    manual_view.row(false, @errorName(err));
-    manual_view.row(false, "Images are discovered directly from DATA; ESP marker files are not used.");
-    manual_view.passiveFooter();
+    const lines = [_][]const u8{ manual_view.t(.error_catalog_line1), @errorName(err), manual_view.t(.error_catalog_line2) };
+    manual_view.status(manual_view.t(.error_catalog_title), "", &lines);
 }
 
-fn showWindowsHandoffStatus(status: []const u8) void {
-    manual_view.begin("windows-handoff", "STARTING WINDOWS SETUP");
-    manual_view.row(false, "Windows installer preparation is complete.");
-    manual_view.row(false, status);
-    manual_view.row(false, "Please wait. The Windows logo will appear shortly.");
-    manual_view.passiveFooter();
+fn showWindowsHandoffStatus(key: manual_view.Key) void {
+    const lines = [_][]const u8{ manual_view.t(.handoff_line1), manual_view.t(key), manual_view.t(.handoff_line2) };
+    manual_view.status(manual_view.t(.handoff_title), "", &lines);
 }

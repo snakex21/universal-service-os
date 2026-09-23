@@ -1,178 +1,231 @@
-const menu_pointer = @import("menu_pointer.zig");
+//! Legacy BIOS graphical menu: the same screens as the UEFI menu
+//! (src/gui/menu_screens.zig) drawn straight into the VBE framebuffer, with
+//! the font, icons and language from boot_ui.zig.
 const std = @import("std");
 const catalog = @import("catalog");
 const boot_method_model = catalog.boot_method_model;
 const graphics = @import("graphics");
 const vbe_probe = @import("vbe_probe.zig");
-const rtc = @import("rtc.zig");
-const legacy_icons = @import("legacy_icons");
+const boot_ui = @import("boot_ui.zig");
+const menu_pointer = @import("menu_pointer.zig");
 
-const Canvas = graphics.menu_canvas.Canvas;
-const HomeItem = graphics.menu_canvas.HomeItem;
-const Row = graphics.menu_canvas.Row;
-const Theme = graphics.Theme;
+const Ui = graphics.ui.Ui;
+const Row = graphics.ui.Row;
+const Hint = graphics.ui.Hint;
+const screens = graphics.ui_screens;
+const lang_file = graphics.lang_file;
 
-const firmware_label = "FIRMWARE: BIOS";
-const footer_home = "ARROWS/MOUSE - SELECT    ENTER/CLICK - OPEN    ESC - POWER    D - DIAGNOSTICS";
-const footer_list = "ARROWS/MOUSE - SELECT    ENTER/CLICK - OPEN    ESC/RIGHT CLICK - BACK    D - DIAGNOSTICS";
-const footer_notice = "ENTER / ESC / BACKSPACE - BACK    D - DIAGNOSTICS";
+const max_rows: usize = 64;
 
-pub fn visibleRows(session: *const vbe_probe.Session) usize {
-    return Canvas.init(session.surface, Theme{}).visibleRows();
+/// Geometry of the screen on display, for pointer hit testing.
+var current: struct {
+    kind: enum(u8) { none, home, list } = .none,
+    count: usize = 0,
+    geometry: screens.ListGeometry = undefined,
+    marker: u8 = 1,
+} linksection(".data") = .{};
+
+pub fn hit(surface: graphics.Surface, x: u32, y: u32) ?usize {
+    switch (current.kind) {
+        .home => {
+            var ui = boot_ui.partial(surface);
+            return screens.homeHit(&ui, current.count, x, y);
+        },
+        .list => return screens.listHit(current.geometry, current.count, x, y),
+        .none => return null,
+    }
+}
+
+fn listHints(buffer: *[4]Hint, ui: *const Ui, open: lang_file.Key) []const Hint {
+    buffer.* = .{
+        .{ .key = "\u{2191}\u{2193}", .label = ui.t(.key_select) },
+        .{ .key = "Enter", .label = ui.t(open) },
+        .{ .key = "Esc", .label = ui.t(.key_back) },
+        .{ .key = "D", .label = ui.t(.key_diagnostics) },
+    };
+    return buffer;
+}
+
+fn noticeHints(buffer: *[2]Hint, ui: *const Ui) []const Hint {
+    buffer.* = .{
+        .{ .key = "Esc", .label = ui.t(.key_back) },
+        .{ .key = "D", .label = ui.t(.key_diagnostics) },
+    };
+    return buffer;
 }
 
 pub fn refreshClock(session: *const vbe_probe.Session) void {
-    var clock_buffer: [26]u8 = undefined;
-    const status = headerStatus(&clock_buffer);
-    if (status.len == 0) return;
-    Canvas.init(session.surface, Theme{}).refreshHeaderStatus(status);
+    if (current.kind == .none) return;
+    var ui = boot_ui.partial(session.surface);
+    var buffer: [48]u8 = undefined;
+    const info = boot_ui.header(&ui, &buffer);
+    ui.headerClockAt(ui.headerClockRight(info), info.clock);
+}
+
+// ------------------------------------------------------------------ home
+
+fn homeItems(ui: *const Ui, items: *[catalog.categories.all.len + 1]screens.HomeItem) []const screens.HomeItem {
+    for (catalog.categories.all, 0..) |category, index| {
+        items[index] = .{
+            .icon = switch (category) {
+                .windows => .windows,
+                .linux => .terminal,
+                .beta => .flask,
+                .dos => .floppy,
+                .utilities => .gear,
+            },
+            .title = ui.strings.lookup(category.label()),
+            .description = ui.t(switch (category) {
+                .windows => .category_windows_desc,
+                .linux => .category_linux_desc,
+                .beta => .category_beta_desc,
+                .dos => .category_dos_desc,
+                .utilities => .category_utilities_desc,
+            }),
+        };
+    }
+    items[catalog.categories.all.len] = .{ .icon = .power, .title = ui.t(.category_power), .description = ui.t(.category_power_desc) };
+    return items;
 }
 
 pub fn categories(session: *const vbe_probe.Session, selected: usize) void {
     menu_pointer.configure(session.surface, true, catalog.categories.all.len + 1, selected);
-    const canvas = Canvas.init(session.surface, Theme{});
-    var clock_buffer: [26]u8 = undefined;
-    canvas.beginHome(firmware_label, headerStatus(&clock_buffer));
-    const count = catalog.categories.all.len + 1;
-    var index: usize = 0;
-    while (index < count) : (index += 1) drawCategoryCard(canvas, index, index == selected);
-    canvas.footer(footer_home);
+    var ui = boot_ui.menu(session.surface);
+    var items: [catalog.categories.all.len + 1]screens.HomeItem = undefined;
+    var clock: [48]u8 = undefined;
+    const hints = [_]Hint{
+        .{ .key = "\u{2191}\u{2193}\u{2190}\u{2192}", .label = ui.t(.key_select) },
+        .{ .key = "Enter", .label = ui.t(.key_open) },
+        .{ .key = "Esc", .label = ui.t(.key_power) },
+        .{ .key = "D", .label = ui.t(.key_diagnostics) },
+    };
+    screens.home(&ui, boot_ui.header(&ui, &clock), homeItems(&ui, &items), selected, null, &hints);
+    current.kind = .home;
+    current.count = items.len;
 }
 
-pub fn categorySelection(session: *const vbe_probe.Session, previous: usize, current: usize) void {
-    if (previous == current) return;
-    menu_pointer.configure(session.surface, true, catalog.categories.all.len + 1, current);
-    const canvas = Canvas.init(session.surface, Theme{});
-    drawCategoryCard(canvas, previous, false);
-    drawCategoryCard(canvas, current, true);
+pub fn categorySelection(session: *const vbe_probe.Session, previous: usize, now: usize) void {
+    if (previous == now) return;
+    menu_pointer.configure(session.surface, true, catalog.categories.all.len + 1, now);
+    var ui = boot_ui.partial(session.surface);
+    var items: [catalog.categories.all.len + 1]screens.HomeItem = undefined;
+    const list = homeItems(&ui, &items);
+    screens.homeItem(&ui, list, previous, .normal);
+    screens.homeItem(&ui, list, now, .selected);
 }
 
-fn drawCategoryCard(canvas: Canvas, index: usize, selected: bool) void {
-    const count = catalog.categories.all.len + 1;
-    if (index >= count) return;
-    if (index < catalog.categories.all.len) {
-        const category = catalog.categories.all[index];
-        canvas.homeItem(index, count, .{
-            .title = category.label(),
-            .description = categoryDescription(category),
-            .symbol = categorySymbol(category),
-        }, selected);
-        return;
+// ------------------------------------------------------------------ lists
+
+const ListBuild = struct {
+    rows: [max_rows]Row = undefined,
+    details: [max_rows][48]u8 = undefined,
+    count: usize = 0,
+};
+
+fn showList(session: *const vbe_probe.Session, ui: *const Ui, spec: screens.ListSpec) void {
+    menu_pointer.configure(session.surface, false, spec.rows.len, spec.selected);
+    var clock: [48]u8 = undefined;
+    current.geometry = screens.listScreen(ui, boot_ui.header(ui, &clock), spec, 0);
+    current.kind = .list;
+    current.count = spec.rows.len;
+}
+
+fn updateList(session: *const vbe_probe.Session, ui: *const Ui, spec: screens.ListSpec, previous: usize) void {
+    menu_pointer.configure(session.surface, false, spec.rows.len, spec.selected);
+    if (current.kind != .list) return showList(session, ui, spec);
+    const first = screens.firstVisible(spec.selected, spec.rows.len, current.geometry.list.visible, current.geometry.first);
+    if (first != current.geometry.first) {
+        current.geometry.first = first;
+        screens.drawRows(ui, current.geometry, spec);
+    } else {
+        screens.drawRow(ui, current.geometry, spec, previous);
+        screens.drawRow(ui, current.geometry, spec, spec.selected);
     }
-    canvas.homeItem(index, count, HomeItem{
-        .title = "POWER",
-        .description = "Restart or shut down this computer",
-        .symbol = "P",
-    }, selected);
+    if (current.geometry.help) |rect| {
+        if (spec.help) |help| screens.drawHelp(ui, rect, help);
+    }
+}
+
+fn systemRows(ui: *const Ui, build: *ListBuild, discovery: *catalog.media_discovery.Discovery, category: catalog.Category, count: usize) void {
+    build.count = @min(count, max_rows);
+    for (0..build.count) |index| {
+        const entry = catalog.systems.byCategoryIndex(category, index) orelse {
+            build.rows[index] = .{ .title = "", .enabled = false };
+            continue;
+        };
+        build.rows[index] = systemRow(ui, index, entry.id, entry.name, entry.firmware, discovery.mediaStatus(entry.image_directory), &build.details[index]);
+    }
+}
+
+fn systemRow(ui: *const Ui, slot: usize, id: []const u8, name: []const u8, firmware: catalog.FirmwareRequirement, media: catalog.SystemMediaStatus, detail: *[48]u8) Row {
+    const icon: graphics.ui.RowIcon = if (boot_ui.icon(id, slot)) |rgba| .{ .rgba = rgba } else .{ .label = name[0..@min(name.len, 1)] };
+    if (!firmware.accepts(.bios)) return .{
+        .title = name,
+        .detail = ui.t(.system_requires_uefi_detail),
+        .icon = icon,
+        .badge = .{ .text = ui.t(.system_requires_uefi), .tone = .warning },
+        .enabled = false,
+    };
+    if (!media.hasImages()) return .{ .title = name, .detail = ui.t(.system_no_image), .icon = icon, .enabled = false };
+    var number: [12]u8 = undefined;
+    return .{
+        .title = name,
+        .detail = ui.format(detail, .system_image_count, &.{std.fmt.bufPrint(&number, "{d}", .{media.imageCount()}) catch "?"}),
+        .icon = icon,
+        .badge = .{ .text = ui.t(.system_ready), .tone = .success },
+    };
 }
 
 pub fn systems(session: *const vbe_probe.Session, discovery: *catalog.media_discovery.Discovery, category: catalog.Category, selected: usize, count: usize) void {
-    menu_pointer.configure(session.surface, false, count, selected);
-    const canvas = Canvas.init(session.surface, Theme{});
-    var clock_buffer: [26]u8 = undefined;
-    canvas.beginList(category.label(), "Supported systems and image availability", firmware_label, headerStatus(&clock_buffer));
-    const visible = canvas.visibleRows();
-    const start = graphics.menu_canvas.listStart(selected, count, visible);
-    const end = @min(count, start + visible);
-    var index = start;
-    while (index < end) : (index += 1) drawSystemRow(canvas, discovery, category, index, start, index == selected);
-    canvas.footer(footer_list);
+    var ui = boot_ui.menu(session.surface);
+    var build: ListBuild = .{};
+    systemRows(&ui, &build, discovery, category, count);
+    var hints: [4]Hint = undefined;
+    showList(session, &ui, .{ .title = ui.strings.lookup(category.label()), .subtitle = ui.t(.systems_subtitle), .rows = build.rows[0..build.count], .selected = selected, .hints = listHints(&hints, &ui, .key_open) });
 }
 
-pub fn systemSelection(session: *const vbe_probe.Session, discovery: *catalog.media_discovery.Discovery, category: catalog.Category, previous: usize, current: usize, count: usize) void {
-    if (previous == current) return;
-    menu_pointer.configure(session.surface, false, count, current);
-    const canvas = Canvas.init(session.surface, Theme{});
-    const visible = canvas.visibleRows();
-    const previous_start = graphics.menu_canvas.listStart(previous, count, visible);
-    const current_start = graphics.menu_canvas.listStart(current, count, visible);
-    if (previous_start != current_start) {
-        canvas.clearListRows();
-        const end = @min(count, current_start + visible);
-        var index = current_start;
-        while (index < end) : (index += 1) drawSystemRow(canvas, discovery, category, index, current_start, index == current);
-        return;
+pub fn systemSelection(session: *const vbe_probe.Session, discovery: *catalog.media_discovery.Discovery, category: catalog.Category, previous: usize, now: usize, count: usize) void {
+    if (previous == now) return;
+    var ui = boot_ui.partial(session.surface);
+    var build: ListBuild = .{};
+    systemRows(&ui, &build, discovery, category, count);
+    updateList(session, &ui, .{ .title = "", .rows = build.rows[0..build.count], .selected = now }, previous);
+}
+
+fn utilityRows(ui: *const Ui, build: *ListBuild, discovery: *catalog.media_discovery.Discovery, list: *const catalog.utility_catalog.List) void {
+    build.count = @min(list.len, max_rows);
+    for (0..build.count) |index| {
+        const item = &list.items[index];
+        build.rows[index] = switch (item.builtin) {
+            .hardware => .{ .title = ui.t(.bios_hardware), .detail = ui.t(.utilities_hardware_desc), .icon = .{ .vector = .chip } },
+            .freedos => .{ .title = item.name.slice(), .detail = ui.t(.utilities_freedos_desc), .icon = .{ .vector = .floppy } },
+            .none => systemRow(ui, index, item.name.slice(), item.name.slice(), .any, discovery.mediaStatus(item.imageDirectory()), &build.details[index]),
+        };
     }
-    drawSystemRow(canvas, discovery, category, previous, current_start, false);
-    drawSystemRow(canvas, discovery, category, current, current_start, true);
-}
-
-fn drawSystemRow(canvas: Canvas, discovery: *catalog.media_discovery.Discovery, category: catalog.Category, index: usize, start: usize, selected: bool) void {
-    const entry = catalog.systems.byCategoryIndex(category, index) orelse return;
-    const media = discovery.mediaStatus(entry.image_directory);
-    var detail_buffer: [40]u8 = undefined;
-    const detail = if (!entry.firmware.accepts(.bios))
-        entry.firmware.mismatchReason(.bios)
-    else if (!media.hasImages())
-        "[no image]"
-    else
-        std.fmt.bufPrint(&detail_buffer, "[images={d}]", .{media.imageCount()}) catch "[images]";
-    var icon_buffer: [legacy_icons.byte_len]u8 = undefined;
-    const icon: ?[]const u8 = if (legacy_icons.get(entry.id)) |encoded| graphics.rgba_rle.decode(encoded, &icon_buffer) catch null else null;
-    canvas.listRow(index - start, Row{
-        .value = entry.name,
-        .detail = detail,
-        .icon_rgba = icon,
-        .icon_symbol = entry.name[0..@min(entry.name.len, 1)],
-        .selected = selected,
-        .unavailable = !entry.firmware.accepts(.bios),
-    });
 }
 
 pub fn utilities(session: *const vbe_probe.Session, discovery: *catalog.media_discovery.Discovery, list: *const catalog.utility_catalog.List, selected: usize) void {
-    menu_pointer.configure(session.surface, false, list.len, selected);
-    const canvas = Canvas.init(session.surface, Theme{});
-    var clock_buffer: [26]u8 = undefined;
-    canvas.beginList("Utilities", "Diagnostics, recovery and firmware tools", firmware_label, headerStatus(&clock_buffer));
-    const visible = canvas.visibleRows();
-    const start = graphics.menu_canvas.listStart(selected, list.len, visible);
-    const end = @min(list.len, start + visible);
-    var index = start;
-    while (index < end) : (index += 1) drawUtilityRow(canvas, discovery, list, index, start, index == selected);
-    canvas.footer(footer_list);
+    var ui = boot_ui.menu(session.surface);
+    var build: ListBuild = .{};
+    utilityRows(&ui, &build, discovery, list);
+    var hints: [4]Hint = undefined;
+    showList(session, &ui, .{ .title = ui.t(.category_utilities), .subtitle = ui.t(.category_utilities_desc), .rows = build.rows[0..build.count], .selected = selected, .hints = listHints(&hints, &ui, .key_open) });
 }
 
-pub fn utilitySelection(session: *const vbe_probe.Session, discovery: *catalog.media_discovery.Discovery, list: *const catalog.utility_catalog.List, previous: usize, current: usize) void {
-    if (previous == current) return;
-    menu_pointer.configure(session.surface, false, list.len, current);
-    const canvas = Canvas.init(session.surface, Theme{});
-    const visible = canvas.visibleRows();
-    const previous_start = graphics.menu_canvas.listStart(previous, list.len, visible);
-    const current_start = graphics.menu_canvas.listStart(current, list.len, visible);
-    if (previous_start != current_start) {
-        canvas.clearListRows();
-        const end = @min(list.len, current_start + visible);
-        var index = current_start;
-        while (index < end) : (index += 1) drawUtilityRow(canvas, discovery, list, index, current_start, index == current);
-        return;
-    }
-    drawUtilityRow(canvas, discovery, list, previous, current_start, false);
-    drawUtilityRow(canvas, discovery, list, current, current_start, true);
+pub fn utilitySelection(session: *const vbe_probe.Session, discovery: *catalog.media_discovery.Discovery, list: *const catalog.utility_catalog.List, previous: usize, now: usize) void {
+    if (previous == now) return;
+    var ui = boot_ui.partial(session.surface);
+    var build: ListBuild = .{};
+    utilityRows(&ui, &build, discovery, list);
+    updateList(session, &ui, .{ .title = "", .rows = build.rows[0..build.count], .selected = now }, previous);
 }
 
-fn drawUtilityRow(canvas: Canvas, discovery: *catalog.media_discovery.Discovery, list: *const catalog.utility_catalog.List, index: usize, start: usize, selected: bool) void {
-    const item = &list.items[index];
-    if (item.builtin == .hardware) {
-        canvas.listRow(index - start, Row{ .value = item.name.slice(), .detail = "Built-in: CPU, RAM, board and disks | 64-bit CPU", .icon_symbol = "H", .selected = selected });
-        return;
+fn imageRows(build: *ListBuild, images_list: *const catalog.ImageList) void {
+    build.count = @min(images_list.len, max_rows);
+    for (0..build.count) |index| {
+        const image = images_list.items[index];
+        build.rows[index] = .{ .title = image.name.slice(), .icon = .{ .label = kindLabel(image.kind) } };
     }
-    if (item.builtin == .freedos) {
-        canvas.listRow(index - start, Row{ .value = item.name.slice(), .detail = "DOS programs from USB | File manager and command prompt", .icon_symbol = "D", .selected = selected });
-        return;
-    }
-    const media = discovery.mediaStatus(item.imageDirectory());
-    var detail_buffer: [40]u8 = undefined;
-    const detail = if (!media.hasImages())
-        "[no image]"
-    else
-        std.fmt.bufPrint(&detail_buffer, "[images={d}]", .{media.imageCount()}) catch "[images]";
-    const utility_name = item.name.slice();
-    canvas.listRow(index - start, Row{
-        .value = utility_name,
-        .detail = detail,
-        .icon_symbol = utility_name[0..@min(utility_name.len, 1)],
-        .selected = selected,
-    });
 }
 
 pub fn images(session: *const vbe_probe.Session, title: []const u8, images_list: *const catalog.ImageList, selected: usize) void {
@@ -184,327 +237,296 @@ pub fn systemImages(session: *const vbe_probe.Session, title: []const u8, images
 }
 
 fn renderImages(session: *const vbe_probe.Session, title: []const u8, images_list: *const catalog.ImageList, selected: usize, methods_enabled: bool) void {
-    menu_pointer.configure(session.surface, false, images_list.len, selected);
-    const canvas = Canvas.init(session.surface, Theme{});
-    var clock_buffer: [26]u8 = undefined;
-    canvas.beginList(title, "Available boot images", firmware_label, headerStatus(&clock_buffer));
-    const visible = canvas.visibleRows();
-    const start = graphics.menu_canvas.listStart(selected, images_list.len, visible);
-    const end = @min(images_list.len, start + visible);
-    var index = start;
-    while (index < end) : (index += 1) drawImageRow(canvas, images_list, index, start, index == selected);
-    canvas.footer(if (methods_enabled)
-        "ARROWS/MOUSE - SELECT    ENTER/CLICK - BOOT METHOD    ESC/RIGHT CLICK - BACK    D - DIAGNOSTICS"
-    else
-        "ARROWS/MOUSE - SELECT    ENTER/CLICK - RUN    ESC/RIGHT CLICK - BACK    D - DIAGNOSTICS");
+    var ui = boot_ui.menu(session.surface);
+    var build: ListBuild = .{};
+    imageRows(&build, images_list);
+    var hints: [4]Hint = undefined;
+    showList(session, &ui, .{ .title = title, .subtitle = ui.t(.images_subtitle), .rows = build.rows[0..build.count], .selected = selected, .two_line = false, .hints = listHints(&hints, &ui, if (methods_enabled) .key_boot_method else .key_run) });
 }
 
-pub fn imageSelection(session: *const vbe_probe.Session, title: []const u8, images_list: *const catalog.ImageList, previous: usize, current: usize, methods_enabled: bool) void {
-    if (previous == current) return;
-    menu_pointer.configure(session.surface, false, images_list.len, current);
-    const canvas = Canvas.init(session.surface, Theme{});
-    const visible = canvas.visibleRows();
-    const previous_start = graphics.menu_canvas.listStart(previous, images_list.len, visible);
-    const current_start = graphics.menu_canvas.listStart(current, images_list.len, visible);
-    if (previous_start != current_start) {
-        _ = title;
-        _ = methods_enabled;
-        canvas.clearListRows();
-        const end = @min(images_list.len, current_start + visible);
-        var index = current_start;
-        while (index < end) : (index += 1) drawImageRow(canvas, images_list, index, current_start, index == current);
-        return;
+pub fn imageSelection(session: *const vbe_probe.Session, title: []const u8, images_list: *const catalog.ImageList, previous: usize, now: usize, methods_enabled: bool) void {
+    _ = title;
+    _ = methods_enabled;
+    if (previous == now) return;
+    var ui = boot_ui.partial(session.surface);
+    var build: ListBuild = .{};
+    imageRows(&build, images_list);
+    updateList(session, &ui, .{ .title = "", .rows = build.rows[0..build.count], .selected = now, .two_line = false }, previous);
+}
+
+// ------------------------------------------------------------------ methods
+
+fn methodLabel(ui: *const Ui, item: *const boot_method_model.Item) []const u8 {
+    var value = item.label.slice();
+    if (item.validation_status) |status| {
+        const suffix = status.badge();
+        if (suffix.len > 0 and std.mem.endsWith(u8, value, suffix)) value = std.mem.trimEnd(u8, value[0 .. value.len - suffix.len], " ");
     }
-    drawImageRow(canvas, images_list, previous, current_start, false);
-    drawImageRow(canvas, images_list, current, current_start, true);
+    return ui.strings.lookup(value);
 }
 
-fn drawImageRow(canvas: Canvas, images_list: *const catalog.ImageList, index: usize, start: usize, selected: bool) void {
-    const image = images_list.items[index];
-    var name_buffer: [160]u8 = undefined;
-    const value = std.fmt.bufPrint(&name_buffer, "{s}{s}", .{ kindPrefix(image.kind), image.name.slice() }) catch image.name.slice();
-    canvas.listRow(index - start, Row{
-        .value = value,
-        .selected = selected,
-    });
+fn methodBadge(ui: *const Ui, item: *const boot_method_model.Item) ?graphics.ui.Badge {
+    const status = item.validation_status orelse return null;
+    return switch (status) {
+        .validated_hardware => .{ .text = ui.t(.badge_ready), .tone = .success },
+        .tested_in_vm => .{ .text = ui.t(.badge_tested_in_vm), .tone = .accent },
+        .experimental => .{ .text = ui.t(.badge_experimental), .tone = .warning },
+    };
 }
 
-pub fn methods(session: *const vbe_probe.Session, image_name: []const u8, model: *const boot_method_model.List, selected: usize) void {
-    menu_pointer.configure(session.surface, false, model.len, selected);
-    const canvas = Canvas.init(session.surface, Theme{});
-    var clock_buffer: [26]u8 = undefined;
-    canvas.beginList("BOOT METHOD", image_name, firmware_label, headerStatus(&clock_buffer));
-    const visible = canvas.visibleRows();
-    const start = graphics.menu_canvas.listStart(selected, model.len, visible);
-    const end = @min(model.len, start + visible);
-    var index = start;
-    while (index < end) : (index += 1) drawMethodRow(canvas, model, index, start, index == selected);
-    const current = &model.items[selected];
-    canvas.listHelp(current.help.line1);
-    canvas.footer("ARROWS/MOUSE - SELECT    ENTER/CLICK - USE METHOD    ESC/RIGHT CLICK - BACK    D - DIAGNOSTICS");
-}
-
-pub fn methodSelection(session: *const vbe_probe.Session, image_name: []const u8, model: *const boot_method_model.List, previous: usize, current: usize) void {
-    if (previous == current) return;
-    menu_pointer.configure(session.surface, false, model.len, current);
-    const canvas = Canvas.init(session.surface, Theme{});
-    const visible = canvas.visibleRows();
-    const previous_start = graphics.menu_canvas.listStart(previous, model.len, visible);
-    const current_start = graphics.menu_canvas.listStart(current, model.len, visible);
-    if (previous_start != current_start) {
-        _ = image_name;
-        canvas.clearListRows();
-        const end = @min(model.len, current_start + visible);
-        var index = current_start;
-        while (index < end) : (index += 1) drawMethodRow(canvas, model, index, current_start, index == current);
-        canvas.listHelp(model.items[current].help.line1);
-        return;
+fn methodRows(ui: *const Ui, build: *ListBuild, model: *const boot_method_model.List, runnable: []const usize) void {
+    build.count = runnable.len;
+    for (runnable, 0..) |index, row| {
+        const item = &model.items[index];
+        build.rows[row] = .{ .title = methodLabel(ui, item), .badge = methodBadge(ui, item) };
     }
-    drawMethodRow(canvas, model, previous, current_start, false);
-    drawMethodRow(canvas, model, current, current_start, true);
-    canvas.listHelp(model.items[current].help.line1);
 }
 
-fn drawMethodRow(canvas: Canvas, model: *const boot_method_model.List, index: usize, start: usize, selected: bool) void {
-    const item = &model.items[index];
-    canvas.listRow(index - start, Row{
-        .value = item.label.slice(),
-        .detail = item.detail(),
+fn methodHelp(ui: *const Ui, item: *const boot_method_model.Item, lines: *[2][]const u8) screens.Help {
+    lines.* = .{ ui.strings.lookup(item.help.line1), ui.strings.lookup(item.help.line2) };
+    return .{ .title = ui.strings.lookup(item.help.title), .lines = lines, .badge = methodBadge(ui, item) };
+}
+
+/// `runnable` lists the model indices of the methods that can run here;
+/// `selected` indexes into it.
+pub fn methods(session: *const vbe_probe.Session, image_name: []const u8, model: *const boot_method_model.List, runnable: []const usize, selected: usize) void {
+    var ui = boot_ui.menu(session.surface);
+    var build: ListBuild = .{};
+    methodRows(&ui, &build, model, runnable);
+    var lines: [2][]const u8 = undefined;
+    var hints: [4]Hint = undefined;
+    showList(session, &ui, .{
+        .title = ui.t(.methods_title),
+        .subtitle = image_name,
+        .rows = build.rows[0..build.count],
         .selected = selected,
-        .unavailable = !item.enabled,
+        .two_line = false,
+        .help = methodHelp(&ui, &model.items[runnable[selected]], &lines),
+        .hints = listHints(&hints, &ui, .key_use),
     });
 }
 
-pub fn unattended(
-    session: *const vbe_probe.Session,
-    system_name: []const u8,
-    file_kind_label: []const u8,
-    options: []const ?[]const u8,
-    selected: usize,
-) void {
-    menu_pointer.configure(session.surface, false, options.len, selected);
-    const canvas = Canvas.init(session.surface, Theme{});
-    var clock_buffer: [26]u8 = undefined;
-    var subtitle_buffer: [128]u8 = undefined;
-    const subtitle = std.fmt.bufPrint(&subtitle_buffer, "{s} - {s}", .{ system_name, file_kind_label }) catch system_name;
-    canvas.beginList("UNATTENDED", subtitle, firmware_label, headerStatus(&clock_buffer));
-    const visible = canvas.visibleRows();
-    const start = graphics.menu_canvas.listStart(selected, options.len, visible);
-    const end = @min(options.len, start + visible);
-    var index = start;
-    while (index < end) : (index += 1) drawUnattendedRow(canvas, options, index, start, index == selected);
-    drawUnattendedHelp(canvas, options[selected]);
-    canvas.footer("ARROWS/MOUSE - SELECT    ENTER/CLICK - USE    ESC/RIGHT CLICK - BACK    D - DIAGNOSTICS");
+pub fn methodSelection(session: *const vbe_probe.Session, image_name: []const u8, model: *const boot_method_model.List, runnable: []const usize, previous: usize, now: usize) void {
+    _ = image_name;
+    if (previous == now) return;
+    var ui = boot_ui.partial(session.surface);
+    var build: ListBuild = .{};
+    methodRows(&ui, &build, model, runnable);
+    var lines: [2][]const u8 = undefined;
+    updateList(session, &ui, .{ .title = "", .rows = build.rows[0..build.count], .selected = now, .two_line = false, .help = methodHelp(&ui, &model.items[runnable[now]], &lines) }, previous);
 }
 
-pub fn unattendedSelection(
-    session: *const vbe_probe.Session,
-    system_name: []const u8,
-    file_kind_label: []const u8,
-    options: []const ?[]const u8,
-    previous: usize,
-    current: usize,
-) void {
-    if (previous == current) return;
-    menu_pointer.configure(session.surface, false, options.len, current);
-    const canvas = Canvas.init(session.surface, Theme{});
-    const visible = canvas.visibleRows();
-    const previous_start = graphics.menu_canvas.listStart(previous, options.len, visible);
-    const current_start = graphics.menu_canvas.listStart(current, options.len, visible);
-    if (previous_start != current_start) {
-        _ = system_name;
-        _ = file_kind_label;
-        canvas.clearListRows();
-        const end = @min(options.len, current_start + visible);
-        var index = current_start;
-        while (index < end) : (index += 1) drawUnattendedRow(canvas, options, index, current_start, index == current);
-        drawUnattendedHelp(canvas, options[current]);
-        return;
+// ------------------------------------------------------------------ unattended
+
+fn unattendedRows(ui: *const Ui, build: *ListBuild, options: []const ?[]const u8, kind: []const u8) void {
+    build.count = @min(options.len, max_rows);
+    for (0..build.count) |index| {
+        build.rows[index] = if (options[index]) |name|
+            .{ .title = name, .icon = .{ .label = kind } }
+        else
+            .{ .title = ui.t(.unattended_none), .icon = .{ .vector = .close } };
     }
-    drawUnattendedRow(canvas, options, previous, current_start, false);
-    drawUnattendedRow(canvas, options, current, current_start, true);
-    drawUnattendedHelp(canvas, options[current]);
 }
 
-fn drawUnattendedRow(canvas: Canvas, options: []const ?[]const u8, index: usize, start: usize, selected: bool) void {
-    canvas.listRow(index - start, Row{
-        .value = options[index] orelse "None",
-        .detail = if (options[index] == null) "[manual/default]" else "[user file]",
+fn unattendedHelp(ui: *const Ui, option: ?[]const u8, line: *[1][]const u8) screens.Help {
+    line[0] = if (option == null) ui.t(.unattended_none_detail) else ui.t(.unattended_file_detail);
+    return .{ .title = ui.t(.unattended_title), .lines = line };
+}
+
+pub fn unattended(session: *const vbe_probe.Session, system_name: []const u8, file_kind_label: []const u8, options: []const ?[]const u8, selected: usize) void {
+    var ui = boot_ui.menu(session.surface);
+    var build: ListBuild = .{};
+    unattendedRows(&ui, &build, options, file_kind_label);
+    var line: [1][]const u8 = undefined;
+    var hints: [4]Hint = undefined;
+    showList(session, &ui, .{
+        .title = ui.t(.unattended_title),
+        .subtitle = system_name,
+        .rows = build.rows[0..build.count],
         .selected = selected,
+        .two_line = false,
+        .help = unattendedHelp(&ui, options[selected], &line),
+        .hints = listHints(&hints, &ui, .key_use),
     });
 }
 
-fn drawUnattendedHelp(canvas: Canvas, option: ?[]const u8) void {
-    canvas.listHelp(if (option == null)
-        "Use the default setup options without a custom answer file."
-    else
-        "The selected answer file will be copied after target-safety validation.");
+pub fn unattendedSelection(session: *const vbe_probe.Session, system_name: []const u8, file_kind_label: []const u8, options: []const ?[]const u8, previous: usize, now: usize) void {
+    _ = system_name;
+    if (previous == now) return;
+    var ui = boot_ui.partial(session.surface);
+    var build: ListBuild = .{};
+    unattendedRows(&ui, &build, options, file_kind_label);
+    var line: [1][]const u8 = undefined;
+    updateList(session, &ui, .{ .title = "", .rows = build.rows[0..build.count], .selected = now, .two_line = false, .help = unattendedHelp(&ui, options[now], &line) }, previous);
 }
 
-pub fn preparationStart(session: *const vbe_probe.Session) void {
-    environmentStart(session, "STARTING WINDOWS INSTALLER");
-}
+// ------------------------------------------------------------------ power
 
-pub fn environmentStart(session: *const vbe_probe.Session, title: []const u8) void {
-    menu_pointer.configure(session.surface, false, 0, 0);
-    const canvas = Canvas.init(session.surface, Theme{});
-    var clock_buffer: [26]u8 = undefined;
-    canvas.beginList(title, "Legacy BIOS", firmware_label, headerStatus(&clock_buffer));
-    canvas.listRow(0, .{
-        .value = "LOADING ENVIRONMENT",
-        .detail = "RUNNING",
-        .selected = true,
-    });
-    canvas.progressBar(0, "Loading startup files - 0%");
-    canvas.footer("PLEASE WAIT");
-}
-
-pub fn preparationProgress(session: *const vbe_probe.Session, percent: u8) void {
-    menu_pointer.configure(session.surface, false, 0, 0);
-    const canvas = Canvas.init(session.surface, Theme{});
-    var label_buffer: [80]u8 = undefined;
-    const label = std.fmt.bufPrint(&label_buffer, "Loading startup files - {d}%", .{percent}) catch "Loading startup files";
-    canvas.progressBar(percent, label);
-}
-
-pub fn xpResume(session: *const vbe_probe.Session) void {
-    menu_pointer.configure(session.surface, false, 0, 0);
-    const canvas = Canvas.init(session.surface, Theme{});
-    const lines = [_][]const u8{
-        "A Windows XP installation was prepared on a target disk.",
-        "After Text Mode has copied files and restarted, press ENTER.",
-        "USOS will verify that disk and restore its startup code.",
-        "Then remove USOS and start the target disk to continue Setup.",
+fn powerRows(ui: *const Ui, rows: *[2]Row) []const Row {
+    rows.* = .{
+        .{ .title = ui.t(.power_restart), .icon = .{ .vector = .restart } },
+        .{ .title = ui.t(.power_shutdown), .icon = .{ .vector = .shutdown } },
     };
-    canvas.notice("WINDOWS XP - CONTINUE INSTALLATION", &lines, "ENTER - CONTINUE XP    ESC - USOS MENU");
-}
-
-pub fn windowsSetupStart(session: *const vbe_probe.Session) void {
-    menu_pointer.configure(session.surface, false, 0, 0);
-    const canvas = Canvas.init(session.surface, Theme{});
-    var clock_buffer: [26]u8 = undefined;
-    canvas.beginList("STARTING WINDOWS SETUP", "Legacy BIOS", firmware_label, headerStatus(&clock_buffer));
-    canvas.listRow(0, .{ .value = "READING INSTALLER FROM USB", .detail = "RUNNING", .selected = true });
-    canvas.listHelp("Loading Windows Setup into memory. Keep the USB drive connected.");
-    windowsSetupProgress(session, 0);
-    canvas.footer("PLEASE WAIT - KEEP THE USB DRIVE CONNECTED");
-}
-
-pub fn windowsSetupProgress(session: *const vbe_probe.Session, percent: u8) void {
-    menu_pointer.configure(session.surface, false, 0, 0);
-    const canvas = Canvas.init(session.surface, Theme{});
-    var label_buffer: [80]u8 = undefined;
-    const label = std.fmt.bufPrint(&label_buffer, "Loading Windows Setup - {d}%", .{percent}) catch "Loading Windows Setup";
-    canvas.progressBar(percent, label);
-}
-
-pub fn windowsSetupFailure(session: *const vbe_probe.Session, error_name: []const u8) void {
-    menu_pointer.configure(session.surface, false, 0, 0);
-    const canvas = Canvas.init(session.surface, Theme{});
-    const lines = [_][]const u8{
-        "Windows Setup could not be loaded.",
-        error_name,
-        "The prepared installation files have been kept on the USB drive.",
-        "Restart to retry, or press ESC to return to the USOS menu.",
-    };
-    canvas.notice("WINDOWS SETUP - START FAILED", &lines, "ESC - USOS MENU");
-}
-
-pub fn backendFailure(session: *const vbe_probe.Session, method_label: []const u8, error_name: []const u8) void {
-    menu_pointer.configure(session.surface, false, 0, 0);
-    const canvas = Canvas.init(session.surface, Theme{});
-    var heading: [128]u8 = undefined;
-    const title = std.fmt.bufPrint(&heading, "BOOT METHOD FAILED: {s}", .{method_label}) catch "BOOT METHOD FAILED";
-    const lines = [_][]const u8{
-        "The selected Legacy backend returned an error.",
-        error_name,
-    };
-    canvas.notice(title, &lines, footer_notice);
-}
-
-pub fn noUtilities(session: *const vbe_probe.Session) void {
-    menu_pointer.configure(session.surface, false, 0, 0);
-    const canvas = Canvas.init(session.surface, Theme{});
-    const lines = [_][]const u8{"No utility folders were found on this USOS media."};
-    canvas.notice("UTILITIES", &lines, footer_notice);
-}
-
-pub fn missingImage(session: *const vbe_probe.Session, title: []const u8, path: []const u8) void {
-    menu_pointer.configure(session.surface, false, 0, 0);
-    const canvas = Canvas.init(session.surface, Theme{});
-    var heading: [96]u8 = undefined;
-    const heading_text = std.fmt.bufPrint(&heading, "NO IMAGES: {s}", .{title}) catch "NO IMAGES";
-    const lines = [_][]const u8{
-        "No supported image files were found.",
-        "Copy ISO/WIM/IMG/VHD/VHDX/EFI into:",
-        path,
-    };
-    canvas.notice(heading_text, &lines, footer_notice);
+    return rows;
 }
 
 pub fn power(session: *const vbe_probe.Session, selected: usize) void {
-    menu_pointer.configure(session.surface, false, 2, selected);
-    const canvas = Canvas.init(session.surface, Theme{});
-    var clock_buffer: [26]u8 = undefined;
-    canvas.beginList("POWER", "Restart or shut down this computer", firmware_label, headerStatus(&clock_buffer));
-    drawPowerRow(canvas, 0, selected == 0);
-    drawPowerRow(canvas, 1, selected == 1);
-    canvas.footer("ARROWS/MOUSE - SELECT    ENTER/CLICK - RUN    ESC/RIGHT CLICK - BACK    D - DIAGNOSTICS");
+    var ui = boot_ui.menu(session.surface);
+    var rows: [2]Row = undefined;
+    var hints: [4]Hint = undefined;
+    showList(session, &ui, .{ .title = ui.t(.power_title), .subtitle = ui.t(.power_subtitle), .rows = powerRows(&ui, &rows), .selected = selected, .two_line = false, .hints = listHints(&hints, &ui, .key_run) });
 }
 
-pub fn powerSelection(session: *const vbe_probe.Session, previous: usize, current: usize) void {
-    if (previous == current) return;
-    menu_pointer.configure(session.surface, false, 2, current);
-    const canvas = Canvas.init(session.surface, Theme{});
-    drawPowerRow(canvas, previous, false);
-    drawPowerRow(canvas, current, true);
+pub fn powerSelection(session: *const vbe_probe.Session, previous: usize, now: usize) void {
+    if (previous == now) return;
+    var ui = boot_ui.partial(session.surface);
+    var rows: [2]Row = undefined;
+    updateList(session, &ui, .{ .title = "", .rows = powerRows(&ui, &rows), .selected = now, .two_line = false }, previous);
 }
 
-fn drawPowerRow(canvas: Canvas, index: usize, selected: bool) void {
-    canvas.listRow(index, .{ .value = if (index == 0) "Restart" else "Shut down", .selected = selected });
+// ------------------------------------------------------------------ notices
+
+fn notice(session: *const vbe_probe.Session, ui: *const Ui, spec: screens.NoticeSpec) void {
+    menu_pointer.configure(session.surface, false, 0, 0);
+    var clock: [48]u8 = undefined;
+    screens.notice(ui, boot_ui.header(ui, &clock), spec);
+    current.kind = .none;
+}
+
+pub fn xpResume(session: *const vbe_probe.Session) void {
+    var ui = boot_ui.menu(session.surface);
+    const lines = [_][]const u8{ ui.t(.bios_xp_resume_line1), ui.t(.bios_xp_resume_line2), ui.t(.bios_xp_resume_line3), ui.t(.bios_xp_resume_line4) };
+    const hints = [_]Hint{
+        .{ .key = "Enter", .label = ui.t(.bios_xp_resume_continue) },
+        .{ .key = "Esc", .label = ui.t(.key_usos_menu) },
+    };
+    notice(session, &ui, .{ .title = ui.t(.bios_xp_resume_title), .icon = .info, .lines = &lines, .hints = &hints });
+}
+
+pub fn windowsSetupFailure(session: *const vbe_probe.Session, error_name: []const u8) void {
+    var ui = boot_ui.menu(session.surface);
+    const lines = [_][]const u8{ ui.t(.bios_setup_failed_line1), error_name, ui.t(.bios_setup_failed_line2), ui.t(.bios_setup_failed_line3) };
+    const hints = [_]Hint{.{ .key = "Esc", .label = ui.t(.key_usos_menu) }};
+    notice(session, &ui, .{ .title = ui.t(.bios_setup_failed_title), .icon = .error_circle, .tone = .danger, .lines = &lines, .hints = &hints });
+}
+
+pub fn backendFailure(session: *const vbe_probe.Session, method_label: []const u8, error_name: []const u8) void {
+    var ui = boot_ui.menu(session.surface);
+    var heading: [160]u8 = undefined;
+    const lines = [_][]const u8{ ui.t(.bios_backend_failed_line1), error_name };
+    var hints: [2]Hint = undefined;
+    notice(session, &ui, .{ .title = ui.format(&heading, .bios_backend_failed_title, &.{ui.strings.lookup(method_label)}), .icon = .error_circle, .tone = .danger, .lines = &lines, .hints = noticeHints(&hints, &ui) });
+}
+
+pub fn noUtilities(session: *const vbe_probe.Session) void {
+    var ui = boot_ui.menu(session.surface);
+    const lines = [_][]const u8{ ui.t(.utilities_none_line1), ui.t(.utilities_none_line2) };
+    var hints: [2]Hint = undefined;
+    notice(session, &ui, .{ .title = ui.t(.utilities_none_title), .lines = &lines, .hints = noticeHints(&hints, &ui) });
+}
+
+pub fn missingImage(session: *const vbe_probe.Session, title: []const u8, path: []const u8) void {
+    var ui = boot_ui.menu(session.surface);
+    const lines = [_][]const u8{ ui.t(.notice_no_image_line1), path };
+    var hints: [2]Hint = undefined;
+    notice(session, &ui, .{ .title = title, .icon = .warning, .tone = .warning, .heading = ui.t(.notice_no_image_title), .lines = &lines, .hints = noticeHints(&hints, &ui) });
 }
 
 pub fn manualPowerOff(session: *const vbe_probe.Session) void {
+    var ui = boot_ui.menu(session.surface);
+    const lines = [_][]const u8{ ui.t(.power_apm_line1), ui.t(.power_apm_line2) };
+    notice(session, &ui, .{ .title = ui.t(.power_title), .icon = .power, .lines = &lines });
+}
+
+/// A simple list/notice screen for the DOS and Windows 9x helpers.
+pub fn choice(session: *const vbe_probe.Session, title: []const u8, subtitle: []const u8, rows: []const Row, selected: usize, notes: []const []const u8, hints: []const Hint) void {
+    var ui = boot_ui.menu(session.surface);
+    var clock: [48]u8 = undefined;
+    const help: ?screens.Help = if (notes.len > 0) .{ .title = "", .lines = notes } else null;
     menu_pointer.configure(session.surface, false, 0, 0);
-    const canvas = Canvas.init(session.surface, Theme{});
-    const lines = [_][]const u8{
-        "APM power-off is unavailable on this machine.",
-        "Turn off the computer manually.",
-    };
-    canvas.notice("POWER", &lines, footer_notice);
+    _ = screens.listScreen(&ui, boot_ui.header(&ui, &clock), .{ .title = title, .subtitle = subtitle, .rows = rows, .selected = selected, .two_line = false, .help = help, .hints = hints }, 0);
+    current.kind = .none;
 }
 
-fn headerStatus(buffer: *[26]u8) []const u8 {
-    return rtc.formatHeader(buffer) orelse "";
+// ------------------------------------------------------------------ progress
+
+fn progressFrame(session: *const vbe_probe.Session, heading: []const u8, title: []const u8, detail: []const u8, percent: u8, labels: []const []const u8) void {
+    menu_pointer.configure(session.surface, false, 0, 0);
+    current.kind = .none;
+    var scratch: lang_file.Table = undefined;
+    var ui = boot_ui.progress(session.surface, &scratch);
+    var clock: [48]u8 = undefined;
+    graphics.preparation_screen.render(&ui, .{
+        .mode = .progress,
+        .current = 1,
+        .total = @intCast(labels.len),
+        .labels = labels,
+        .heading = heading,
+        .title = title,
+        .detail = detail,
+        .percent = percent,
+    }, boot_ui.header(&ui, &clock));
 }
 
-fn categoryDescription(category: catalog.Category) []const u8 {
-    return switch (category) {
-        .windows => "Install and repair Microsoft Windows",
-        .linux => "Linux installers and live systems",
-        .beta => "Whistler, Longhorn and other builds",
-        .dos => "DOS systems and legacy boot images",
-        .utilities => "Diagnostics, recovery and firmware tools",
-    };
+const environment_labels = [_][]const u8{"Loading environment"};
+const setup_labels = [_][]const u8{"Reading the installer from USB"};
+
+pub fn preparationStart(session: *const vbe_probe.Session) void {
+    environmentStart(session, "Starting Windows installer");
 }
 
-fn categorySymbol(category: catalog.Category) []const u8 {
-    return switch (category) {
-        .windows => "W",
-        .linux => "L",
-        .beta => "B",
-        .dos => "D",
-        .utilities => "+",
-    };
+var environment_title: []const u8 linksection(".data") = "Starting Windows installer";
+
+pub fn environmentStart(session: *const vbe_probe.Session, title: []const u8) void {
+    environment_title = title;
+    preparationProgress(session, 0);
 }
 
-fn kindPrefix(kind: catalog.ImageKind) []const u8 {
+pub fn preparationProgress(session: *const vbe_probe.Session, percent: u8) void {
+    var number: [8]u8 = undefined;
+    const value = std.fmt.bufPrint(&number, "{d}", .{percent}) catch "";
+    var scratch: lang_file.Table = undefined;
+    var ui = boot_ui.progress(session.surface, &scratch);
+    var detail: [96]u8 = undefined;
+    progressFrame(session, environment_title, "Loading environment", ui.format(&detail, .bios_loading_files, &.{value}), percent, &environment_labels);
+}
+
+pub fn windowsSetupStart(session: *const vbe_probe.Session) void {
+    windowsSetupProgress(session, 0);
+}
+
+pub fn windowsSetupProgress(session: *const vbe_probe.Session, percent: u8) void {
+    var number: [8]u8 = undefined;
+    const value = std.fmt.bufPrint(&number, "{d}", .{percent}) catch "";
+    var scratch: lang_file.Table = undefined;
+    var ui = boot_ui.progress(session.surface, &scratch);
+    var detail: [96]u8 = undefined;
+    progressFrame(session, "Starting Windows Setup", "Reading the installer from USB", ui.format(&detail, .bios_setup_progress, &.{value}), percent, &setup_labels);
+}
+
+fn kindLabel(kind: catalog.ImageKind) []const u8 {
     return switch (kind) {
-        .iso => "[ISO] ",
-        .wim => "[WIM] ",
-        .img => "[IMG] ",
-        .vhd => "[VHD] ",
-        .vhdx => "[VHDX] ",
-        .efi => "[EFI] ",
+        .iso => "ISO",
+        .wim => "WIM",
+        .img => "IMG",
+        .vhd => "VHD",
+        .vhdx => "VHDX",
+        .efi => "EFI",
     };
+}
+
+/// "Please wait" screen while a DOS/FreeDOS session is assembled in memory.
+pub fn busy(session: *const vbe_probe.Session, title: []const u8) void {
+    menu_pointer.configure(session.surface, false, 0, 0);
+    current.kind = .none;
+    var scratch: lang_file.Table = undefined;
+    var ui = boot_ui.progress(session.surface, &scratch);
+    var clock: [48]u8 = undefined;
+    const lines = [_][]const u8{ui.t(.wait_usb)};
+    screens.notice(&ui, boot_ui.header(&ui, &clock), .{ .title = title, .icon = .floppy, .heading = ui.t(.bios_loading), .lines = &lines });
+}
+
+/// Strings for helper screens outside this file.
+pub fn strings(session: *const vbe_probe.Session) Ui {
+    return boot_ui.menu(session.surface);
 }

@@ -201,6 +201,7 @@
   "installer.stage.uninstall.4": "Formatiranje exFAT",
   "installer.stage.uninstall.5": "Provera",
 
+  "boot.language.name": "Srpski (latinica)",
   "boot.header.subtitle": "Meni za pokretanje",
   "boot.header.build": "Verzija {0}",
   "boot.header.no_mouse": "Nema miša",

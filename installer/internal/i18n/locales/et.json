@@ -198,6 +198,7 @@
   "installer.stage.uninstall.4": "exFAT-vormindamine",
   "installer.stage.uninstall.5": "Kontroll",
 
+  "boot.language.name": "Eesti",
   "boot.header.subtitle": "Käivitusmenüü",
   "boot.header.build": "Järk {0}",
   "boot.header.no_mouse": "Hiirt pole",

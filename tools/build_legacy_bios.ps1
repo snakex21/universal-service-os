@@ -50,8 +50,9 @@ function Build-CorePayload {
     $catalogRoot = Full 'src/catalog_module.zig'
     $graphicsRoot = Full 'src/legacy_graphics_module.zig'
     $menuPolicyRoot = Full 'src/gui/menu_policy.zig'
-    $legacyIconsGenerator = Full 'tools/generate_legacy_icons.py'
-    $legacyIcons = Join-Path $out 'legacy_icons.zig'
+    $biosUiGenerator = Full 'tools/generate_bios_ui_pack.py'
+    $biosUiPack = Join-Path $out 'bios-ui.bin'
+    $buildInfoModule = Join-Path $out 'legacy_build_info.zig'
     $catalogModeModule = Join-Path $out 'legacy_catalog_mode.zig'
     $testModeModule = Join-Path $out 'legacy_test_mode.zig'
     $legacyIconSource = Full 'media/UI/Icons/Systems'
@@ -62,16 +63,20 @@ function Build-CorePayload {
     $coreScript = Join-Path $sourceRoot 'core.ld'
     $coreAsm = Join-Path $sourceRoot 'core.S'
 
-    & $python $legacyIconsGenerator --input $legacyIconSource --output $legacyIcons | ForEach-Object { Write-Host $_ }
-    if ($LASTEXITCODE -ne 0) { throw "Legacy icon generation failed with exit code $LASTEXITCODE" }
+    # Font, icons and strings do not fit the 256 KiB Core slot; the Core reads
+    # them from EFI/USOS/bios-ui.bin (and lang.bin) on the ESP at startup.
+    & $python $biosUiGenerator --icons $legacyIconSource --output $biosUiPack | ForEach-Object { Write-Host $_ }
+    if ($LASTEXITCODE -ne 0) { throw "Legacy BIOS UI pack generation failed with exit code $LASTEXITCODE" }
+    $buildId = if ($env:USOS_BUILD_ID) { $env:USOS_BUILD_ID } else { 'DEV' }
+    [IO.File]::WriteAllText($buildInfoModule, "pub const id = `"$buildId`";`n", [Text.UTF8Encoding]::new($false))
     $forceEsp = if ($CatalogMode -eq 'esp-fallback') { 'true' } else { 'false' }
     [IO.File]::WriteAllText($catalogModeModule, "pub const force_esp_catalog = $forceEsp;`n", [Text.UTF8Encoding]::new($false))
     $xpMenuAuto = if ($XpMenuAutoTest) { 'true' } else { 'false' }
     $xpMenuAutoNone = if ($XpMenuAutoNone) { 'true' } else { 'false' }
     [IO.File]::WriteAllText($testModeModule, "pub const xp_menu_auto = $xpMenuAuto;`npub const xp_menu_auto_none = $xpMenuAutoNone;`n", [Text.UTF8Encoding]::new($false))
 
-    & $zig build-obj -target x86-freestanding-none -mcpu=i386 -O ReleaseSmall --dep storage --dep catalog --dep menu_policy --dep graphics --dep legacy_icons --dep catalog_mode --dep test_mode `
-        "-Mroot=$coreMain" "-Mstorage=$storageRoot" "-Mcatalog=$catalogRoot" "-Mmenu_policy=$menuPolicyRoot" "-Mgraphics=$graphicsRoot" "-Mlegacy_icons=$legacyIcons" "-Mcatalog_mode=$catalogModeModule" "-Mtest_mode=$testModeModule" "-femit-bin=$coreObject" "-femit-asm=$coreAssembly"
+    & $zig build-obj -target x86-freestanding-none -mcpu=i386 -O ReleaseSmall --dep storage --dep catalog --dep menu_policy --dep graphics --dep build_info --dep catalog_mode --dep test_mode `
+        "-Mroot=$coreMain" "-Mstorage=$storageRoot" "-Mcatalog=$catalogRoot" "-Mmenu_policy=$menuPolicyRoot" "-Mgraphics=$graphicsRoot" "-Mbuild_info=$buildInfoModule" "-Mcatalog_mode=$catalogModeModule" "-Mtest_mode=$testModeModule" "-femit-bin=$coreObject" "-femit-asm=$coreAssembly"
     if ($LASTEXITCODE -ne 0) { throw "Legacy Core Zig compile failed with exit code $LASTEXITCODE" }
 
     $generatedAssembly = [IO.File]::ReadAllText($coreAssembly)

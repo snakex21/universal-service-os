@@ -198,6 +198,7 @@
   "installer.stage.uninstall.4": "Formaterer exFAT",
   "installer.stage.uninstall.5": "Verifikation",
 
+  "boot.language.name": "Dansk",
   "boot.header.subtitle": "Startmenu",
   "boot.header.build": "Build {0}",
   "boot.header.no_mouse": "Ingen mus",

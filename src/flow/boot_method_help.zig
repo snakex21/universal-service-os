@@ -20,7 +20,7 @@ pub fn describeEntry(system: *const SystemEntry, image: ImageKind, method: BootM
     // The direct Win7 WIMBoot implementation is UEFI-only. Keep its extra help
     // outside the size-limited, freestanding 32-bit BIOS Core.
     if (@import("builtin").os.tag != .freestanding and std.mem.eql(u8, system.id, "windows-7") and image == .iso and (method == .automatic or method == .direct_iso)) return .{
-        .title = "WINDOWS ISO - WIMBOOT UEFI",
+        .title = "Windows ISO - WIMBoot UEFI",
         .line1 = "Detects the installer version and starts it directly from ISO in UEFI.",
         .line2 = "WinPE 7 receives UEFI compatibility and optional Drivers/x64 packages in RAM.",
     };
@@ -28,12 +28,12 @@ pub fn describeEntry(system: *const SystemEntry, image: ImageKind, method: BootM
         if (capability.resolveBackend(system, image, method)) |backend| {
             return switch (backend) {
                 .windows_iso => .{
-                    .title = "AUTOMATIC - RECOMMENDED",
+                    .title = "Automatic - recommended",
                     .line1 = "USOS selects the supported boot path for this image automatically.",
-                    .line2 = "For this Windows 11 ISO it currently resolves to the ISO method below.",
+                    .line2 = "For this Windows ISO it currently resolves to the ISO method below.",
                 },
                 .xp_staging => .{
-                    .title = "AUTOMATIC - WINDOWS SETUP",
+                    .title = "Automatic - Windows Setup",
                     .line1 = "Copies installation files to the selected Windows partition.",
                     .line2 = "After preparation, remove the USB drive and start the computer from that disk.",
                 },
@@ -46,7 +46,7 @@ pub fn describeEntry(system: *const SystemEntry, image: ImageKind, method: BootM
     if (capability.resolveBackend(system, image, method)) |backend| {
         if (backend == .xp_staging) {
             return .{
-                .title = "WINDOWS SETUP",
+                .title = "Windows Setup",
                 .line1 = "Copies installation files to the selected Windows partition.",
                 .line2 = "After preparation, remove the USB drive and start the computer from that disk.",
             };
@@ -55,42 +55,42 @@ pub fn describeEntry(system: *const SystemEntry, image: ImageKind, method: BootM
 
     return switch (method) {
         .direct_iso => .{
-            .title = "ISO - FORCE ISO PREPARATION",
+            .title = "ISO - force ISO preparation",
             .line1 = "Extracts Windows Setup from the ISO to the WORK partition.",
             .line2 = "After preparation USOS restarts once and boots Windows Setup from WORK.",
         },
         .wimboot => .{
-            .title = "WIMBOOT",
+            .title = "WIMBoot",
             .line1 = "Starts a Windows PE/WIM image using a WIM-oriented boot path.",
             .line2 = "Useful when the source is a WIM instead of a complete installation ISO.",
         },
         .vhdboot => .{
-            .title = "VHDBOOT",
+            .title = "VHDBoot",
             .line1 = "Boots a prepared Windows installation stored in a VHD or VHDX image.",
             .line2 = "It is for virtual-disk images, not normal Windows installation ISO files.",
         },
         .direct_efi => .{
-            .title = "EFI - DIRECT UEFI START",
+            .title = "EFI - direct UEFI start",
             .line1 = "Loads the selected EFI application directly through UEFI LoadImage/StartImage.",
             .line2 = "Use it for standalone .efi boot programs that do not need another loader.",
         },
         .chainload => .{
-            .title = "CHAINLOAD",
+            .title = "Chainload",
             .line1 = "Transfers control to another bootloader instead of preparing the image itself.",
             .line2 = "Useful when the selected media already contains its own compatible bootloader.",
         },
         .memdisk => .{
-            .title = "MEMDISK",
+            .title = "Memdisk",
             .line1 = "Presents a small image as memory-backed boot media for legacy software.",
             .line2 = "Primarily intended for DOS and older utilities, not modern Windows installers.",
         },
         .disk_image => .{
-            .title = "DISK IMAGE",
+            .title = "Disk image",
             .line1 = "Treats an IMG file as a complete disk image rather than an optical image.",
             .line2 = "Use it for utilities or systems distributed as raw disk images.",
         },
         .floppy_image => .{
-            .title = "FLOPPY IMAGE",
+            .title = "Floppy image",
             .line1 = "Treats an IMG file as a legacy floppy image.",
             .line2 = "Intended for DOS-era boot disks and small legacy diagnostic tools.",
         },
@@ -100,7 +100,7 @@ pub fn describeEntry(system: *const SystemEntry, image: ImageKind, method: BootM
 
 fn genericAutomatic() Help {
     return .{
-        .title = "AUTOMATIC - RECOMMENDED",
+        .title = "Automatic - recommended",
         .line1 = "USOS chooses the best implemented boot method for the selected image.",
         .line2 = "Choose an explicit method only when you intentionally want to force that path.",
     };

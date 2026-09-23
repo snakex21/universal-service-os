@@ -20,10 +20,15 @@ pub const Surface = struct {
     pub fn fillRect(self: Surface, x: u32, y: u32, width: u32, height: u32, color: Color) void {
         const max_x = @min(x +| width, self.framebuffer.width);
         const max_y = @min(y +| height, self.framebuffer.height);
+        if (x >= max_x or y >= max_y) return;
+        const raw = pack(self.framebuffer.pixel_format, color);
+        const address: usize = @intCast(self.framebuffer.address);
+        const pixels: [*]volatile u32 = @ptrFromInt(address);
         var py = y;
         while (py < max_y) : (py += 1) {
+            const row: usize = @as(usize, py) * self.framebuffer.pixels_per_scan_line;
             var px = x;
-            while (px < max_x) : (px += 1) self.setPixel(px, py, color);
+            while (px < max_x) : (px += 1) pixels[row + px] = raw;
         }
     }
 
@@ -37,6 +42,27 @@ pub const Surface = struct {
 
     pub fn setPixel(self: Surface, x: u32, y: u32, color: Color) void {
         self.setRawPixel(x, y, pack(self.framebuffer.pixel_format, color));
+    }
+
+    pub fn getPixel(self: Surface, x: u32, y: u32) Color {
+        return unpack(self.framebuffer.pixel_format, self.getRawPixel(x, y));
+    }
+
+    /// Draws color with coverage alpha (0..255) over `background`, or over
+    /// the pixel already on the surface when background is null.
+    pub fn blendPixel(self: Surface, x: u32, y: u32, color: Color, alpha: u8, background: ?Color) void {
+        if (alpha == 0 or x >= self.framebuffer.width or y >= self.framebuffer.height) return;
+        if (alpha == 255) return self.setPixel(x, y, color);
+        const under = background orelse self.getPixel(x, y);
+        self.setPixel(x, y, mix(under, color, alpha));
+    }
+
+    pub fn packColor(self: Surface, color: Color) u32 {
+        return pack(self.framebuffer.pixel_format, color);
+    }
+
+    pub fn unpackColor(self: Surface, raw: u32) Color {
+        return unpack(self.framebuffer.pixel_format, raw);
     }
 
     pub fn getRawPixel(self: Surface, x: u32, y: u32) u32 {
@@ -55,6 +81,27 @@ pub const Surface = struct {
         pixels[index] = value;
     }
 };
+
+/// Linear blend of `to` over `from` with alpha 0..255.
+pub fn mix(from: Color, to: Color, alpha: u8) Color {
+    return .{
+        .r = mixChannel(from.r, to.r, alpha),
+        .g = mixChannel(from.g, to.g, alpha),
+        .b = mixChannel(from.b, to.b, alpha),
+    };
+}
+
+fn mixChannel(from: u8, to: u8, alpha: u8) u8 {
+    const a: u32 = alpha;
+    return @intCast((@as(u32, from) * (255 - a) + @as(u32, to) * a + 127) / 255);
+}
+
+fn unpack(format: PixelFormat, raw: u32) Color {
+    return switch (format) {
+        .rgbx8 => .{ .r = @truncate(raw), .g = @truncate(raw >> 8), .b = @truncate(raw >> 16) },
+        .bgrx8, .bit_mask => .{ .r = @truncate(raw >> 16), .g = @truncate(raw >> 8), .b = @truncate(raw) },
+    };
+}
 
 fn pack(format: PixelFormat, color: Color) u32 {
     return switch (format) {

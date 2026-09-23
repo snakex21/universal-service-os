@@ -180,7 +180,7 @@ pub fn runWindowsIso(fs: fat32.FileSystem, reader: random_reader.Reader, bulk_re
 }
 
 pub fn runHardware(fs: fat32.FileSystem, reader: random_reader.Reader, bulk: random_reader.Reader, esp_guid: [16]u8, graphics: ?vbe_probe.Session) Error!void {
-    if (graphics) |session| graphics_menu.environmentStart(&session, "HARDWARE & SMART");
+    if (graphics) |session| graphics_menu.environmentStart(&session, "Hardware & SMART");
     console.line("HARDWARE DIAGNOSTICS: loading service environment");
     try run(fs, reader, bulk, esp_guid, graphics, .boot, .hardware);
 }

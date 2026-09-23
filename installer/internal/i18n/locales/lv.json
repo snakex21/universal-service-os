@@ -201,6 +201,7 @@
   "installer.stage.uninstall.4": "exFAT formatēšana",
   "installer.stage.uninstall.5": "Pārbaude",
 
+  "boot.language.name": "Latviešu",
   "boot.header.subtitle": "Sāknēšanas izvēlne",
   "boot.header.build": "Būvējums {0}",
   "boot.header.no_mouse": "Nav peles",

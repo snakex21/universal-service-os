@@ -1,8 +1,12 @@
+//! Progress screen shared by the UEFI handoff/ISO paths and the micro-Linux
+//! preparation UI, styled like the installer's progress page: a warning
+//! banner, a progress card with the current step and a list of the steps
+//! the path really runs.
 const std = @import("std");
-const Color = @import("color.zig").Color;
-const Surface = @import("surface.zig").Surface;
-const Theme = @import("theme.zig").Theme;
-const text = @import("text.zig");
+const ui_mod = @import("ui.zig");
+const icons = @import("icons.zig");
+const Ui = ui_mod.Ui;
+const Rect = ui_mod.Rect;
 
 pub const Mode = enum {
     stage,
@@ -16,7 +20,10 @@ pub const State = struct {
     mode: Mode = .stage,
     current: u8 = 1,
     total: u8 = 5,
-    title: []const u8 = "STARTING ENVIRONMENT",
+    /// Page heading; empty means "Preparing Windows installer".
+    heading: []const u8 = "",
+    /// Current activity (English from scripts is translated by Ui.tr).
+    title: []const u8 = "Starting environment",
     detail: []const u8 = "",
     image: []const u8 = "",
     percent: u8 = 0,
@@ -32,6 +39,20 @@ pub const State = struct {
 
 pub const max_stages: usize = 5;
 
+/// Byte, speed and ETA figures need 64-bit division, which the i386 Legacy
+/// BIOS Core does not link; its progress frames never carry byte counts.
+const byte_figures = !(@import("builtin").os.tag == .freestanding and @import("builtin").cpu.arch == .x86);
+
+/// English stage labels of the five micro-Linux preparation stages; they
+/// equal the boot.prep.stage.* catalog values and the script labels.
+pub const stage_labels = [_][]const u8{
+    "Starting environment",
+    "Verifying target device",
+    "Preparing workspace",
+    "Copying files",
+    "Verification and finalization",
+};
+
 /// Number of stage rows actually drawn for a state.
 pub fn stageCount(state: State) usize {
     return @max(@as(usize, 1), @min(@min(@as(usize, state.total), state.labels.len), max_stages));
@@ -42,190 +63,221 @@ fn usesCopyStages(state: State) bool {
     return state.labels.ptr == @as([*]const []const u8, &stage_labels) and stageCount(state) == stage_labels.len;
 }
 
-fn stagePanelHeight(count: usize) u32 {
-    return 26 + @as(u32, @intCast(count)) * 42;
-}
-
-fn detailTop(count: usize) u32 {
-    return stages_y + stagePanelHeight(count) + 18;
-}
-
-pub const stage_labels = [_][]const u8{
-    "STARTING ENVIRONMENT",
-    "VERIFYING TARGET DEVICE",
-    "PREPARING WORKSPACE",
-    "COPYING FILES",
-    "VERIFICATION AND FINALIZATION",
-};
-
-const success = Color{ .r = 0x63, .g = 0xd3, .b = 0x91 };
-const failure = Color{ .r = 0xff, .g = 0x70, .b = 0x70 };
-const max_width: u32 = 1040;
-const outer_margin: u32 = 32;
-const stages_y: u32 = 150;
-
-pub fn render(surface: Surface, theme: Theme, state: State) void {
-    surface.fill(theme.background);
-    surface.fillRect(0, 0, surface.framebuffer.width, 5, theme.accent);
-
+pub fn render(ui: *const Ui, state: State, header: ui_mod.HeaderInfo) void {
+    ui.clear();
+    ui.header(header);
     if (state.mode == .diagnostic) {
-        renderDiagnostic(surface, theme, state);
+        renderDiagnostic(ui, state);
         return;
     }
+    var heading_buffer: [160]u8 = undefined;
+    const heading = if (state.heading.len > 0) ui.tr(&heading_buffer, state.heading) else ui.t(.prep_title);
+    ui.pageTitle(heading, "");
+    const body = ui.bodyRect(false);
 
-    const width = @min(max_width, surface.framebuffer.width -| (outer_margin * 2));
-    const x = (surface.framebuffer.width -| width) / 2;
-
-    text.draw(surface, x, 28, "UNIVERSAL SERVICE OS", 3, theme.text);
-    text.draw(surface, x, 78, "PREPARING WINDOWS INSTALLER", 1, theme.muted);
-    surface.fillRect(x, 108, width, 1, theme.border);
-
-    const count = stageCount(state);
-    const detail_y = detailTop(count);
-    surface.fillRect(x, stages_y, width, stagePanelHeight(count), theme.panel);
-    surface.borderRect(x, stages_y, width, stagePanelHeight(count), 1, theme.border);
-    for (0..count) |index| {
-        drawStage(surface, theme, state, x + 18, stages_y + 16 + @as(u32, @intCast(index)) * 42, width -| 36, index + 1, count);
-    }
-
-    const footer_y = surface.framebuffer.height -| 34;
-    if (footer_y > detail_y + 54) {
-        drawDetail(surface, theme, state, x, detail_y, width, footer_y -| detail_y -| 18);
-    }
-    drawClipped(surface, x, footer_y, width, footerText(state.mode), 1, theme.muted);
-}
-
-pub fn updateProgress(surface: Surface, theme: Theme, state: State) void {
-    const width = @min(max_width, surface.framebuffer.width -| (outer_margin * 2));
-    const x = (surface.framebuffer.width -| width) / 2;
-    const footer_y = surface.framebuffer.height -| 34;
-    const detail_y = detailTop(stageCount(state));
-    if (footer_y <= detail_y + 54) return;
-    drawDetail(surface, theme, state, x, detail_y, width, footer_y -| detail_y -| 18);
-}
-
-fn renderDiagnostic(surface: Surface, theme: Theme, state: State) void {
-    const margin: u32 = 20;
-    const width = surface.framebuffer.width -| (margin * 2);
-    text.draw(surface, margin, 16, "UNIVERSAL SERVICE OS", 2, theme.text);
-    const interactive = !std.mem.eql(u8, state.title, "STARTING ENVIRONMENT");
-    text.draw(surface, margin, 40, if (interactive) state.title else "USB / PARTUUID DIAGNOSTICS - SCREEN IS FROZEN FOR PHOTO", 1, if (interactive) theme.accent else failure);
-    surface.fillRect(margin, 56, width, 1, theme.border);
-
-    const first_y: u32 = 66;
-    const line_step: u32 = if (interactive) 14 else 7;
-    const bottom_margin: u32 = 8;
-    const available = surface.framebuffer.height -| first_y -| bottom_margin;
-    const visible_lines: usize = @intCast(available / line_step);
-    const count = @min(state.diagnostics.len, visible_lines);
-    for (state.diagnostics[0..count], 0..) |line, index| {
-        const y = first_y + @as(u32, @intCast(index)) * line_step;
-        const color = if (std.mem.startsWith(u8, line, "==")) theme.accent else theme.text;
-        drawClipped(surface, margin, y, width, line, 1, color);
-    }
-    if ((state.diagnostics.len > visible_lines or state.diagnostics_truncated) and visible_lines > 0) {
-        const y = first_y + @as(u32, @intCast(visible_lines - 1)) * line_step;
-        surface.fillRect(margin, y, width, line_step, theme.background);
-        drawClipped(surface, margin, y, width, "[DIAGNOSTICS TRUNCATED - SEE SERIAL OUTPUT]", 1, failure);
-    }
-}
-
-fn drawStage(surface: Surface, theme: Theme, state: State, x: u32, y: u32, width: u32, number: usize, count: usize) void {
-    const stage: u8 = @intCast(number);
-    const done = state.mode == .done or stage < state.current;
-    const current = state.mode != .done and stage == state.current;
-    const failed = state.mode == .failure and current;
-
-    surface.fillRect(x, y, width, 34, if (current) theme.selected else theme.panel_alt);
-    surface.fillRect(x, y, 4, 34, if (failed) failure else if (done) success else if (current) theme.accent else theme.border);
-
-    var number_buffer: [12]u8 = undefined;
-    const number_text = std.fmt.bufPrint(&number_buffer, "[{d}/{d}]", .{ number, count }) catch "[?/?]";
-    text.draw(surface, x + 14, y + 13, number_text, 1, theme.muted);
-    drawClipped(surface, x + 62, y + 13, width -| 180, state.labels[number - 1], 1, if (done or current) theme.text else theme.muted);
-
-    const status = if (failed) "FAILED" else if (done) "OK" else if (current) "RUNNING" else "WAITING";
-    const status_color = if (failed) failure else if (done) success else if (current) theme.accent else theme.muted;
-    const status_width = text.width(status, 1);
-    text.draw(surface, x +| width -| status_width -| 14, y + 13, status, 1, status_color);
-}
-
-fn drawDetail(surface: Surface, theme: Theme, state: State, x: u32, y: u32, width: u32, height: u32) void {
-    surface.fillRect(x, y, width, height, theme.panel);
-    surface.borderRect(x, y, width, height, 1, theme.border);
-
-    const title_color = switch (state.mode) {
-        .done => success,
-        .failure => failure,
-        else => theme.text,
+    const banner_h = ui.px(46);
+    const banner_tone: ui_mod.Tone = switch (state.mode) {
+        .done => .success,
+        .failure => .danger,
+        else => .warning,
     };
-    drawClipped(surface, x + 18, y + 18, width -| 36, state.title, 1, title_color);
-    if (state.detail.len > 0) drawClipped(surface, x + 18, y + 44, width -| 36, state.detail, 1, theme.muted);
+    const banner_icon: icons.Kind = switch (state.mode) {
+        .done => .check_circle,
+        .failure => .error_circle,
+        else => .warning,
+    };
+    var title_buffer: [192]u8 = undefined;
+    const activity = ui.tr(&title_buffer, state.title);
+    const banner_text = switch (state.mode) {
+        .done => ui.t(.prep_footer_done),
+        .failure => activity,
+        else => ui.t(.prep_footer_running),
+    };
+    ui.banner(.{ .x = body.x, .y = body.y, .w = body.w, .h = banner_h }, banner_tone, banner_icon, banner_text);
+
+    const card_y = body.y + banner_h + ui.px(16);
+    const card_h = progressCardHeight(ui, state);
+    drawProgressCard(ui, state, .{ .x = body.x, .y = card_y, .w = body.w, .h = card_h });
+
+    const steps_y = card_y + card_h + ui.px(16);
+    const count = stageCount(state);
+    const step_h = ui.px(46);
+    const steps_h = ui.px(16) + @as(u32, @intCast(count)) * step_h;
+    if (steps_y + steps_h <= body.bottom()) drawSteps(ui, state, .{ .x = body.x, .y = steps_y, .w = body.w, .h = steps_h }, step_h);
 
     if (state.mode == .done) {
-        if (height >= 154) {
-            drawClipped(surface, x + 18, y + 78, width -| 36, "REMOVE THE USOS USB DRIVE BEFORE POWERING OFF.", 1, theme.text);
-            const button_x = x + 18;
-            const button_y = y + 106;
-            const button_width: u32 = @min(340, width -| 36);
-            const button_height: u32 = 42;
-            surface.fillRect(button_x, button_y, button_width, button_height, theme.selected);
-            surface.borderRect(button_x, button_y, button_width, button_height, 2, theme.accent);
-            text.draw(surface, button_x + 18, button_y + 16, "[ ENTER ]  POWER OFF", 1, theme.text);
-            if (button_y + button_height + 30 < y + height) {
-                drawClipped(surface, x + 18, button_y + button_height + 18, width -| 36, "NEXT POWER-ON: BOOT THE TARGET DISK WITHOUT USOS.", 1, theme.muted);
-            }
+        ui.footer(&.{.{ .key = "Enter", .label = ui.t(.key_power_off) }}, ui.t(.prep_next_boot));
+    } else {
+        ui.footer(&.{}, ui.t(.wait));
+    }
+}
+
+/// Redraws only the progress card (percent, bytes, speed) of a frame that
+/// `render` drew with the same state layout.
+pub fn updateProgress(ui: *const Ui, state: State) void {
+    const body = ui.bodyRect(false);
+    const card_y = body.y + ui.px(46) + ui.px(16);
+    drawProgressCard(ui, state, .{ .x = body.x, .y = card_y, .w = body.w, .h = progressCardHeight(ui, state) });
+}
+
+fn progressCardHeight(ui: *const Ui, state: State) u32 {
+    var h = ui.px(22) + ui.fonts.lineHeight(.strong) + ui.px(14) + ui.px(8) + ui.px(14) + ui.fonts.lineHeight(.body) + ui.px(20);
+    if (state.mode == .progress and (state.bytes_total > 0 or state.image.len > 0)) h += ui.fonts.lineHeight(.body) + ui.px(6);
+    if (state.mode == .done) h += ui.fonts.lineHeight(.body) + ui.px(6);
+    return h;
+}
+
+fn drawProgressCard(ui: *const Ui, state: State, rect: Rect) void {
+    const theme = ui.theme;
+    const paint = @import("paint.zig");
+    paint.card(ui.surface, rect.x, rect.y, rect.w, rect.h, ui.px(10), ui.line(1), theme.border, theme.panel, theme.background);
+    const pad = ui.px(22);
+    const inner_w = rect.w -| (2 * pad);
+    var y = rect.y + pad;
+
+    const count = stageCount(state);
+    const current: usize = @min(@max(@as(usize, state.current), 1), count);
+    var label_buffer: [160]u8 = undefined;
+    const label = ui.tr(&label_buffer, state.labels[current - 1]);
+    var step_buffer: [48]u8 = undefined;
+    var current_text: [4]u8 = undefined;
+    var total_text: [4]u8 = undefined;
+    const step = ui.format(&step_buffer, .prep_step, &.{ decimal(&current_text, current), decimal(&total_text, count) });
+    var heading_buffer: [224]u8 = undefined;
+    const heading = std.fmt.bufPrint(&heading_buffer, "{s}: {s}", .{ step, label }) catch label;
+
+    const percent: u8 = switch (state.mode) {
+        .done => 100,
+        .progress => state.percent,
+        else => @intCast(@min(100, ((current - 1) * 100) / count)),
+    };
+    var percent_buffer: [8]u8 = undefined;
+    const percent_text = std.fmt.bufPrint(&percent_buffer, "{d}%", .{percent}) catch "";
+    const percent_w = ui.fonts.width(.heading, percent_text);
+    const tone: ui_mod.Tone = switch (state.mode) {
+        .done => .success,
+        .failure => .danger,
+        else => .accent,
+    };
+    const tone_color = switch (tone) {
+        .success => theme.success,
+        .danger => theme.danger,
+        else => theme.accent,
+    };
+    _ = ui.fonts.drawFit(ui.surface, rect.x + pad, y + (ui.fonts.lineHeight(.heading) -| ui.fonts.lineHeight(.strong)) / 2, inner_w -| percent_w -| ui.px(20), .strong, heading, theme.text, theme.panel);
+    _ = ui.fonts.drawRight(ui.surface, rect.right() -| pad, y -| ui.px(2), .heading, percent_text, tone_color, theme.panel);
+    y += ui.fonts.lineHeight(.strong) + ui.px(14);
+    ui.progressBar(.{ .x = rect.x + pad, .y = y, .w = inner_w, .h = ui.px(8) }, percent, tone, theme.panel);
+    y += ui.px(8) + ui.px(14);
+
+    var activity_buffer: [192]u8 = undefined;
+    var detail_buffer: [256]u8 = undefined;
+    const activity = ui.tr(&activity_buffer, state.title);
+    const detail = ui.tr(&detail_buffer, state.detail);
+    if (state.mode == .failure) {
+        _ = ui.fonts.drawFit(ui.surface, rect.x + pad, y, inner_w, .body, if (detail.len > 0) detail else activity, theme.danger, theme.panel);
+    } else {
+        var line_buffer: [448]u8 = undefined;
+        const joined = if (detail.len > 0 and !std.mem.eql(u8, activity, label))
+            std.fmt.bufPrint(&line_buffer, "{s} - {s}", .{ activity, detail }) catch detail
+        else if (detail.len > 0)
+            detail
+        else
+            activity;
+        _ = ui.fonts.drawFit(ui.surface, rect.x + pad, y, inner_w, .body, joined, theme.muted, theme.panel);
+    }
+    y += ui.fonts.lineHeight(.body) + ui.px(6);
+
+    if (state.mode == .progress) {
+        var x = rect.x + pad;
+        if (state.image.len > 0) {
+            const image_w = inner_w / 3;
+            _ = ui.fonts.drawFit(ui.surface, x, y, image_w, .body, state.image, theme.text, theme.panel);
+            x += image_w + ui.px(16);
         }
-        return;
+        var transfer_buffer: [64]u8 = undefined;
+        if (byte_figures and state.bytes_total > 0) x += ui.fonts.draw(ui.surface, x, y, .body, transferText(&transfer_buffer, state.bytes_done, state.bytes_total), theme.text, theme.panel) + ui.px(24);
+        if (byte_figures and state.bytes_total > 0) {
+            var speed_buffer: [32]u8 = undefined;
+            x += ui.fonts.draw(ui.surface, x, y, .body, ui.t(.prep_speed), theme.muted, theme.panel) + ui.px(8);
+            x += ui.fonts.draw(ui.surface, x, y, .body, speedText(&speed_buffer, state.speed_bps), theme.text, theme.panel) + ui.px(24);
+            var eta_buffer: [24]u8 = undefined;
+            x += ui.fonts.draw(ui.surface, x, y, .body, ui.t(.prep_eta), theme.muted, theme.panel) + ui.px(8);
+            _ = ui.fonts.draw(ui.surface, x, y, .body, etaText(&eta_buffer, state.bytes_done, state.bytes_total, state.speed_bps), theme.text, theme.panel);
+        }
+    } else if (state.mode == .done) {
+        _ = ui.fonts.drawFit(ui.surface, rect.x + pad, y, inner_w, .body, ui.t(.prep_remove_usb), theme.text, theme.panel);
+    } else if (usesCopyStages(state) and state.current < 4) {
+        _ = ui.fonts.drawFit(ui.surface, rect.x + pad, y, inner_w, .small, ui.t(.prep_copy_note), theme.faint, theme.panel);
     }
-
-    if (state.mode != .progress) {
-        if (usesCopyStages(state) and state.current < 4 and height >= 104) drawClipped(surface, x + 18, y + 78, width -| 36, "MEASURED PERCENTAGE, SPEED AND ETA BEGIN DURING FILE COPY.", 1, theme.muted);
-        return;
-    }
-
-    const progress_top: u32 = if (state.detail.len > 0) y + 78 else y + 52;
-    if (state.image.len > 0 and progress_top + 22 < y + height) {
-        drawClipped(surface, x + 18, progress_top, width -| 36, state.image, 1, theme.text);
-    }
-    const bar_y = if (state.image.len > 0) progress_top + 28 else progress_top;
-    if (bar_y + 24 >= y + height) return;
-
-    const bar_x = x + 18;
-    const bar_width = width -| 36;
-    surface.fillRect(bar_x, bar_y, bar_width, 24, theme.background);
-    surface.borderRect(bar_x, bar_y, bar_width, 24, 1, theme.border);
-    const filled: u32 = @intCast((@as(u64, bar_width -| 4) * state.percent) / 100);
-    surface.fillRect(bar_x + 2, bar_y + 2, filled, 20, if (state.mode == .done) success else theme.accent);
-
-    if (bar_y + 64 >= y + height) return;
-    var percent_buffer: [16]u8 = undefined;
-    const percent_text = std.fmt.bufPrint(&percent_buffer, "{d}%", .{state.percent}) catch "?%";
-    text.draw(surface, bar_x, bar_y + 36, percent_text, 2, if (state.mode == .done) success else theme.text);
-
-    var transfer_buffer: [64]u8 = undefined;
-    if (state.bytes_total > 0) text.draw(surface, bar_x + 112, bar_y + 42, transferText(&transfer_buffer, state.bytes_done, state.bytes_total), 1, theme.text);
-    if (bar_y + 98 >= y + height) return;
-
-    var speed_buffer: [32]u8 = undefined;
-    var eta_buffer: [24]u8 = undefined;
-    text.draw(surface, bar_x, bar_y + 72, "SPEED", 1, theme.muted);
-    text.draw(surface, bar_x + 58, bar_y + 72, speedText(&speed_buffer, state.speed_bps), 1, theme.text);
-    text.draw(surface, bar_x + 260, bar_y + 72, "ETA", 1, theme.muted);
-    text.draw(surface, bar_x + 300, bar_y + 72, etaText(&eta_buffer, state.bytes_done, state.bytes_total, state.speed_bps), 1, theme.text);
 }
 
-fn footerText(mode: Mode) []const u8 {
-    return if (mode == .done)
-        "READY - REMOVE USOS USB, THEN PRESS ENTER TO POWER OFF."
-    else
-        "DO NOT DISCONNECT THE DRIVE OR TURN OFF THE COMPUTER.";
+fn drawSteps(ui: *const Ui, state: State, rect: Rect, step_h: u32) void {
+    const theme = ui.theme;
+    const paint = @import("paint.zig");
+    paint.card(ui.surface, rect.x, rect.y, rect.w, rect.h, ui.px(10), ui.line(1), theme.border, theme.panel, theme.background);
+    const count = stageCount(state);
+    for (0..count) |index| {
+        const number = index + 1;
+        const done = state.mode == .done or number < state.current;
+        const current = state.mode != .done and number == state.current;
+        const failed = state.mode == .failure and current;
+        const row = Rect{ .x = rect.x + ui.px(8), .y = rect.y + ui.px(8) + @as(u32, @intCast(index)) * step_h, .w = rect.w -| ui.px(16), .h = step_h };
+        const fill = if (current) theme.panel_alt else theme.panel;
+        if (current) paint.roundRect(ui.surface, row.x, row.y, row.w, row.h, ui.px(8), fill, theme.panel);
+        const icon_size = ui.px(24);
+        const icon_x = row.x + ui.px(16);
+        const icon_y = row.y + (row.h -| icon_size) / 2;
+        if (failed) {
+            icons.draw(ui.surface, .error_circle, icon_x, icon_y, icon_size, theme.danger, null);
+        } else if (done) {
+            icons.draw(ui.surface, .check_circle, icon_x, icon_y, icon_size, theme.success, null);
+        } else if (current) {
+            icons.draw(ui.surface, .spinner, icon_x, icon_y, icon_size, theme.accent, null);
+        } else {
+            icons.draw(ui.surface, .pending, icon_x, icon_y, icon_size, theme.faint, null);
+        }
+        var number_buffer: [12]u8 = undefined;
+        const number_text = std.fmt.bufPrint(&number_buffer, "{d}/{d}", .{ number, count }) catch "";
+        const center = row.y + row.h / 2;
+        const number_x = icon_x + icon_size + ui.px(16);
+        _ = ui.fonts.draw(ui.surface, number_x, ui.fonts.centeredTop(.body, center), .body, number_text, theme.faint, fill);
+        const status = if (failed) ui.t(.prep_status_failed) else if (done) ui.t(.prep_status_done) else if (current) ui.t(.prep_status_running) else ui.t(.prep_status_waiting);
+        const status_color = if (failed) theme.danger else if (done) theme.success else if (current) theme.accent else theme.faint;
+        const status_w = ui.fonts.drawRight(ui.surface, row.right() -| ui.px(16), ui.fonts.centeredTop(.body, center), .body, status, status_color, fill);
+        var label_buffer: [160]u8 = undefined;
+        const label = ui.tr(&label_buffer, state.labels[index]);
+        const label_x = number_x + ui.fonts.width(.body, "00/00") + ui.px(16);
+        _ = ui.fonts.drawFit(ui.surface, label_x, ui.fonts.centeredTop(.strong, center), row.right() -| ui.px(32) -| status_w -| label_x, if (current) .strong else .body, label, if (done or current) theme.text else theme.muted, fill);
+    }
 }
 
-fn drawClipped(surface: Surface, x: u32, y: u32, max_text_width: u32, value: []const u8, scale: u32, color: Color) void {
-    const chars: usize = @intCast(max_text_width / (6 * scale));
-    if (chars == 0) return;
-    text.draw(surface, x, y, value[0..@min(value.len, chars)], scale, color);
+fn renderDiagnostic(ui: *const Ui, state: State) void {
+    const theme = ui.theme;
+    const content = ui.contentRect();
+    const frozen = std.mem.eql(u8, state.title, "Starting environment") or state.title.len == 0;
+    var title_buffer: [192]u8 = undefined;
+    const title = if (frozen) ui.t(.prep_diag_title) else ui.tr(&title_buffer, state.title);
+    _ = ui.fonts.drawFit(ui.surface, content.x, content.y, content.w, .strong, title, if (frozen) theme.danger else theme.accent, theme.background);
+    const first_y = content.y + ui.fonts.lineHeight(.strong) + ui.px(8);
+    const step = ui.fonts.lineHeight(.small);
+    const bottom = ui.height() -| ui.px(8);
+    const visible: usize = @intCast((bottom -| first_y) / @max(step, 1));
+    const count = @min(state.diagnostics.len, visible);
+    for (state.diagnostics[0..count], 0..) |line, index| {
+        const y = first_y + @as(u32, @intCast(index)) * step;
+        const color = if (std.mem.startsWith(u8, line, "==")) theme.accent else theme.text;
+        _ = ui.fonts.drawFit(ui.surface, content.x, y, content.w, .small, line, color, theme.background);
+    }
+    if ((state.diagnostics.len > visible or state.diagnostics_truncated) and visible > 0) {
+        const y = first_y + @as(u32, @intCast(visible - 1)) * step;
+        ui.surface.fillRect(content.x, y, content.w, step, theme.background);
+        _ = ui.fonts.drawFit(ui.surface, content.x, y, content.w, .small, ui.t(.prep_diag_truncated), theme.danger, theme.background);
+    }
+}
+
+fn decimal(buffer: []u8, value: usize) []const u8 {
+    return std.fmt.bufPrint(buffer, "{d}", .{value}) catch "?";
 }
 
 fn transferText(out: []u8, done: u64, total: u64) []const u8 {
@@ -262,25 +314,20 @@ fn etaText(out: []u8, done: u64, total: u64, bps: u64) []const u8 {
     return std.fmt.bufPrint(out, "{d:0>2}:{d:0>2}", .{ minutes, secs }) catch "--:--";
 }
 
-test "done preparation footer exposes the physical shutdown action" {
-    try std.testing.expectEqualStrings("READY - REMOVE USOS USB, THEN PRESS ENTER TO POWER OFF.", footerText(.done));
-    try std.testing.expectEqualStrings("DO NOT DISCONNECT THE DRIVE OR TURN OFF THE COMPUTER.", footerText(.stage));
-}
-
-test "shared preparation screen exposes the five canonical stages" {
-    try std.testing.expectEqual(@as(usize, 5), stage_labels.len);
-    try std.testing.expectEqualStrings("STARTING ENVIRONMENT", stage_labels[0]);
-    try std.testing.expectEqualStrings("VERIFICATION AND FINALIZATION", stage_labels[4]);
+test "stage labels match the catalog keys" {
+    const lang_file = @import("../i18n/lang_file.zig");
+    const table = lang_file.Table.english_only;
+    const keys = [_]lang_file.Key{ .prep_stage_1, .prep_stage_2, .prep_stage_3, .prep_stage_4, .prep_stage_5 };
+    for (keys, stage_labels) |key, label| try std.testing.expectEqualStrings(label, table.get(key));
 }
 
 test "stage rows follow the stages a path really runs" {
-    const iso_labels = [_][]const u8{ "VALIDATING ISO", "LOADING BOOT FILES", "STARTING SETUP" };
+    const iso_labels = [_][]const u8{ "Validating installation ISO", "Loading Windows boot files", "Starting Windows Setup" };
     try std.testing.expectEqual(@as(usize, 5), stageCount(.{}));
     try std.testing.expectEqual(@as(usize, 3), stageCount(.{ .total = 3, .labels = &iso_labels }));
     try std.testing.expectEqual(@as(usize, 1), stageCount(.{ .total = 1 }));
     // A declared total larger than the declared labels never draws unnamed rows.
     try std.testing.expectEqual(@as(usize, 3), stageCount(.{ .total = 5, .labels = &iso_labels }));
-    try std.testing.expectEqual(@as(u32, 404), detailTop(5));
 }
 
 test "visible transfer units use Windows-style labels without changing scaling" {
@@ -292,4 +339,24 @@ test "visible transfer units use Windows-style labels without changing scaling" 
 test "ETA is based on remaining measured bytes" {
     var buffer: [32]u8 = undefined;
     try std.testing.expectEqualStrings("00:05", etaText(&buffer, 500, 1000, 100));
+}
+
+test "progress screen renders every mode in Polish at 1920x1080" {
+    const font = @import("font.zig");
+    const lang_file = @import("../i18n/lang_file.zig");
+    const ScreenBuffer = @import("screen_buffer.zig").ScreenBuffer;
+    const Theme = @import("theme.zig").Theme;
+    const pack = try font.Pack.parse(@embedFile("fonts/usos-font.bin"));
+    const coverage = lang_file.Coverage{ .context = @ptrCast(&pack), .has = font.coverageHas };
+    const table = try lang_file.Table.parse(@embedFile("../i18n/testdata/lang-pl.bin"), coverage);
+    const pixels = try std.testing.allocator.alloc(u32, 1920 * 1080);
+    defer std.testing.allocator.free(pixels);
+    const buffer = ScreenBuffer.init(@intFromPtr(pixels.ptr), pixels.len * 4, 1920, 1080, .bgrx8).?;
+    const ui = Ui.init(buffer.surface, Theme{}, &pack, &table);
+    const lines = [_][]const u8{ "== DISKS ==", "sda 8 GiB" };
+    for ([_]Mode{ .stage, .progress, .done, .failure, .diagnostic }) |mode| {
+        render(&ui, .{ .mode = mode, .current = 4, .title = "Copying WIM file", .detail = "12 of 40 files", .image = "win11.iso", .percent = 44, .bytes_done = 1 << 30, .bytes_total = 3 << 30, .speed_bps = 90 << 20, .diagnostics = &lines }, .{ .firmware = "UEFI", .language = "Polski" });
+        try std.testing.expect(pixels[0] != pixels[pixels.len / 2]);
+    }
+    updateProgress(&ui, .{ .mode = .progress, .current = 4, .percent = 50 });
 }

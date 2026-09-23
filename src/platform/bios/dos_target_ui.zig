@@ -6,14 +6,14 @@ const partition = @import("dos_partition.zig");
 const formatter = @import("dos_fat32_format.zig");
 const formatter16 = @import("dos_fat16_format.zig");
 const seeder16 = @import("dos_fat16_seed.zig");
-const Canvas = graphics.menu_canvas.Canvas;
+const menu = @import("graphics_menu.zig");
 const Raw = extern struct { sectors_low: u32 = 0, sectors_high: u32 = 0, bytes_per_sector: u16 = 0, cylinders: u16 = 0, heads: u16 = 0, sectors_per_track: u16 = 0 };
 extern fn bios_drive_info(drive: u32, output: *Raw) callconv(.c) u32;
 extern fn bios_read_sector_drive(drive: u32, lba: u64, out: [*]u8) callconv(.c) u32;
 extern fn bios_write_sector_drive(drive: u32, lba: u64, out: [*]const u8) callconv(.c) u32;
 extern fn bios_write_sectors_drive(drive: u32, lba: u64, out: [*]const u8, count: u32) callconv(.c) u32;
 extern const dos_mbr_start: [512]u8;
-const Disk = struct { drive: u8, sectors: u32, before: [512]u8, label: [100]u8, len: usize, cylinders: u16, heads: u16, spt: u16 };
+const Disk = struct { drive: u8, sectors: u32, before: [512]u8, label: [160]u8, len: usize, cylinders: u16, heads: u16, spt: u16 };
 pub const Action = enum { repair, install, dos_install };
 pub const Selection = struct { drive: u8, format_plan: ?partition.Plan = null };
 const Writer = struct {
@@ -32,14 +32,25 @@ const Writer = struct {
     }
 };
 
+fn hints(ui: *const graphics.ui.Ui, buffer: *[3]graphics.ui.Hint, enter: graphics.lang_file.Key) []const graphics.ui.Hint {
+    buffer.* = .{
+        .{ .key = "\u{2191}\u{2193}", .label = ui.t(.key_select) },
+        .{ .key = "Enter", .label = ui.t(enter) },
+        .{ .key = "Esc", .label = ui.t(.key_back) },
+    };
+    return buffer;
+}
+
 pub fn action(session: vbe.Session) ?Action {
-    const canvas = Canvas.init(session.surface, graphics.Theme{});
     var selected: usize = 0;
     while (true) {
-        canvas.beginList("Windows 98 SE", "Instalacja i naprawa obslugi wiekszej pamieci RAM", "BIOS", "");
-        canvas.listRow(0, .{ .value = "Napraw RAM w zainstalowanym Windows 98", .selected = selected == 0 });
-        canvas.listRow(1, .{ .value = "Nowa instalacja Windows 98 SE", .selected = selected == 1 });
-        canvas.footer("STRZALKI - WYBIERZ    ENTER - DALEJ    ESC - WROC");
+        const ui = menu.strings(&session);
+        const rows = [_]graphics.ui.Row{
+            .{ .title = ui.t(.dos_w98_repair), .icon = .{ .vector = .chip } },
+            .{ .title = ui.t(.dos_w98_install), .icon = .{ .vector = .windows } },
+        };
+        var buffer: [3]graphics.ui.Hint = undefined;
+        menu.choice(&session, "Windows 98 SE", ui.t(.dos_w98_subtitle), &rows, selected, &.{}, hints(&ui, &buffer, .key_next));
         const key = console.readKey();
         if (key.ascii == 27) return null;
         if (key.scan == 0x48) selected = 0;
@@ -49,15 +60,16 @@ pub fn action(session: vbe.Session) ?Action {
 }
 
 pub fn dosAction(session: vbe.Session) ?bool {
-    const canvas = Canvas.init(session.surface, graphics.Theme{});
     var install = false;
     while (true) {
-        canvas.beginList("MS-DOS", "Uruchom programy z USB albo zainstaluj DOS na dysku", "BIOS", "");
-        canvas.listRow(0, .{ .value = "Uruchom DOS i programy z USB", .selected = !install });
-        canvas.listRow(1, .{ .value = "Zainstaluj MS-DOS na dysku", .selected = install });
-        canvas.listRow(3, .{ .value = "Uruchomienie z USB: C: jest dyskiem w RAM." });
-        canvas.listRow(4, .{ .value = "Zmiany w tej sesji znikna po wylaczeniu komputera." });
-        canvas.footer("STRZALKI - WYBIERZ    ENTER - DALEJ    ESC - WROC");
+        const ui = menu.strings(&session);
+        const rows = [_]graphics.ui.Row{
+            .{ .title = ui.t(.dos_msdos_run), .icon = .{ .vector = .floppy } },
+            .{ .title = ui.t(.dos_msdos_install), .icon = .{ .vector = .drive } },
+        };
+        const notes = [_][]const u8{ ui.t(.dos_msdos_note1), ui.t(.dos_msdos_note2) };
+        var buffer: [3]graphics.ui.Hint = undefined;
+        menu.choice(&session, "MS-DOS", ui.t(.dos_msdos_subtitle), &rows, @intFromBool(install), &notes, hints(&ui, &buffer, .key_next));
         const key = console.readKey();
         if (key.ascii == 27) return null;
         if (key.scan == 0x48) install = false;
@@ -96,21 +108,28 @@ pub fn choose(source: u8, session: vbe.Session, selected_action: Action) !?Selec
         var disk = &disks[count];
         disk.drive = @intCast(number); disk.sectors = raw.sectors_low; disk.before = sector;
         disk.cylinders = raw.cylinders; disk.heads = raw.heads; disk.spt = raw.sectors_per_track;
+        const strings = menu.strings(&session);
+        var ordinal: [8]u8 = undefined;
+        var mib: [12]u8 = undefined;
+        var part_text: [4]u8 = undefined;
+        const number_text = try std.fmt.bufPrint(&ordinal, "{d}", .{count + 1});
+        const mib_text = try std.fmt.bufPrint(&mib, "{d}", .{raw.sectors_low >> 11});
         const text = if (std.mem.eql(u8, style, "GPT"))
-            try std.fmt.bufPrint(&disk.label, "Dysk {d} - {d} MiB - GPT", .{ count + 1, raw.sectors_low >> 11 })
+            strings.format(&disk.label, .dos_disk, &.{ number_text, mib_text })
         else
-            try std.fmt.bufPrint(&disk.label, "Dysk {d} - {d} MiB - {s}, partycje: {d}", .{ count + 1, raw.sectors_low >> 11, style, parts });
+            strings.format(&disk.label, .dos_disk_mbr, &.{ number_text, mib_text, style, try std.fmt.bufPrint(&part_text, "{d}", .{parts}) });
         disk.len = text.len; count += 1;
     }
     if (count == 0) return error.NoCompatibleDosTargetDisk;
     console.releaseKeyAfterFirmwareIo();
-    const canvas = Canvas.init(session.surface, graphics.Theme{});
     var selected: usize = 0;
+    var rows: [16]graphics.ui.Row = undefined;
     while (true) {
-        canvas.beginList(title, if (selected_action == .repair) "Naprawa RAM: zachowuje system i partycje. Pendrive jest wykluczony." else if (fat16) "Wybierz dysk dla nowej partycji FAT16. Pendrive jest wykluczony." else "USOS przygotuje nowa partycje FAT32. Pendrive instalacyjny jest wykluczony.", "BIOS", "");
-        const begin = graphics.menu_canvas.listStart(selected, count, canvas.visibleRows());
-        for (begin..@min(count, begin + canvas.visibleRows())) |i| canvas.listRow(i - begin, .{ .value = disks[i].label[0..disks[i].len], .selected = selected == i });
-        canvas.footer("STRZALKI - WYBIERZ    ENTER - DALEJ    ESC - ANULUJ");
+        const ui = menu.strings(&session);
+        for (disks[0..count], 0..) |*disk, i| rows[i] = .{ .title = disk.label[0..disk.len], .icon = .{ .vector = .drive } };
+        const subtitle = ui.t(if (selected_action == .repair) .dos_pick_repair else if (fat16) .dos_pick_fat16 else .dos_pick_fat32);
+        var buffer: [3]graphics.ui.Hint = undefined;
+        menu.choice(&session, title, subtitle, rows[0..count], selected, &.{}, hints(&ui, &buffer, .key_next));
         const key = console.readKey();
         if (key.ascii == 27) return null;
         if (key.scan == 0x48 and selected > 0) selected -= 1;
@@ -120,12 +139,14 @@ pub fn choose(source: u8, session: vbe.Session, selected_action: Action) !?Selec
         if (selected_action == .repair) {
             var confirmed = false;
             while (true) {
-                canvas.beginList("Naprawa RAM Windows 98", disk.label[0..disk.len], "Patcher9x / poprawka RAM", "");
-                canvas.listRow(0, .{ .value = "ANULUJ", .selected = !confirmed });
-                canvas.listRow(1, .{ .value = "ZASTOSUJ POPRAWKE RAM", .selected = confirmed });
-                canvas.listRow(3, .{ .value = "System i partycje pozostana. Pliki przed zmiana dostana kopie." });
-                canvas.listRow(4, .{ .value = "Naprawa instalacji w C:\\WINDOWS, takze po pierwszym restarcie." });
-                canvas.footer("STRZALKI - WYBIERZ    ENTER - ZATWIERDZ    ESC - WROC");
+                const repair_ui = menu.strings(&session);
+                const choices = [_]graphics.ui.Row{
+                    .{ .title = repair_ui.t(.key_cancel), .icon = .{ .vector = .close } },
+                    .{ .title = repair_ui.t(.dos_repair_apply), .detail = repair_ui.t(.dos_repair_detail), .icon = .{ .vector = .check } },
+                };
+                const notes = [_][]const u8{ repair_ui.t(.dos_repair_note1), repair_ui.t(.dos_repair_note2) };
+                var repair_hints: [3]graphics.ui.Hint = undefined;
+                menu.choice(&session, repair_ui.t(.dos_repair_title), disk.label[0..disk.len], &choices, @intFromBool(confirmed), &notes, hints(&repair_ui, &repair_hints, .key_confirm));
                 const repair_key = console.readKey();
                 if (repair_key.ascii == 27) break;
                 if (repair_key.scan == 0x48) confirmed = false;
@@ -140,13 +161,18 @@ pub fn choose(source: u8, session: vbe.Session, selected_action: Action) !?Selec
         var size_index: usize = 0;
         const sizes = if (fat16) [_]u32{ 256, 512, 128 } else [_]u32{ 8, 4, 2 };
         while (size_index < 2 and !sizeAvailable(disk, source, sizes[size_index], fat16)) size_index += 1;
+        const labels = if (fat16) [_][]const u8{ "256 MiB", "512 MiB", "128 MiB" } else [_][]const u8{ "8 GiB", "4 GiB", "2 GiB" };
         while (true) {
-            canvas.beginList("Rozmiar nowej partycji", disk.label[0..disk.len], if (fat16) "MS-DOS / FAT16" else "Windows 98 SE / FAT32", "");
-            const labels = if (fat16) [_][]const u8{ "256 MiB - zalecane", "512 MiB", "128 MiB" } else [_][]const u8{ "8 GiB - zalecane", "4 GiB", "2 GiB" };
-            for (labels, 0..) |label, i| canvas.listRow(i, .{ .value = label, .selected = size_index == i, .unavailable = !sizeAvailable(disk, source, sizes[i], fat16) });
-            canvas.listRow(4, .{ .value = "Pozostale miejsce zostanie nieprzydzielone." });
-            canvas.listRow(5, .{ .value = "Dotychczasowe partycje na tym dysku zostana usuniete." });
-            canvas.footer("STRZALKI - ROZMIAR    ENTER - PODSUMOWANIE    ESC - WROC");
+            const size_ui = menu.strings(&session);
+            var size_rows: [3]graphics.ui.Row = undefined;
+            for (labels, 0..) |label, i| size_rows[i] = .{
+                .title = label,
+                .badge = if (i == 0) .{ .text = size_ui.t(.badge_recommended), .tone = .accent } else null,
+                .enabled = sizeAvailable(disk, source, sizes[i], fat16),
+            };
+            const notes = [_][]const u8{ size_ui.t(.dos_size_note1), size_ui.t(.dos_size_note2) };
+            var size_hints: [3]graphics.ui.Hint = undefined;
+            menu.choice(&session, size_ui.t(.dos_size_title), disk.label[0..disk.len], &size_rows, size_index, &notes, hints(&size_ui, &size_hints, .key_summary));
             const size_key = console.readKey();
             if (size_key.ascii == 27) break;
             if (size_key.scan == 0x48 and size_index > 0) size_index -= 1;
@@ -155,17 +181,18 @@ pub fn choose(source: u8, session: vbe.Session, selected_action: Action) !?Selec
             const planned = if (fat16)
                 try partition.planFat16(disk.drive, source, disk.sectors, sizes[size_index], disk.cylinders, disk.heads, disk.spt, disk.before)
             else try partition.plan(disk.drive, source, disk.sectors, sizes[size_index], disk.before);
-            var size_text: [80]u8 = undefined;
-            const detail = try std.fmt.bufPrint(&size_text, "Nowy uklad: jedna aktywna partycja {s} {d} {s}, litera C:", .{ if (fat16) @as([]const u8, "FAT16") else "FAT32", sizes[size_index], if (fat16) @as([]const u8, "MiB") else "GiB" });
             var confirm: usize = 0;
             while (true) {
-                canvas.beginList("Potwierdz przygotowanie dysku", disk.label[0..disk.len], title, "");
-                canvas.listRow(0, .{ .value = "ANULUJ", .selected = confirm == 0 });
-                canvas.listRow(1, .{ .value = "USUN PARTYCJE I INSTALUJ", .selected = confirm == 1 });
-                canvas.listRow(3, .{ .value = detail });
-                canvas.listRow(4, .{ .value = "Wszystkie obecne dane na wybranym dysku zostana utracone." });
-                canvas.listRow(5, .{ .value = "Nastepnie automatycznie ruszy formatowanie i instalator." });
-                canvas.footer("STRZALKI - WYBIERZ    ENTER - ZATWIERDZ    ESC - WROC");
+                const confirm_ui = menu.strings(&session);
+                var size_text: [160]u8 = undefined;
+                const detail = confirm_ui.format(&size_text, .dos_layout, &.{ if (fat16) "FAT16" else "FAT32", labels[size_index] });
+                const choices = [_]graphics.ui.Row{
+                    .{ .title = confirm_ui.t(.key_cancel), .icon = .{ .vector = .close } },
+                    .{ .title = confirm_ui.t(.dos_confirm_go), .icon = .{ .vector = .warning } },
+                };
+                const confirm_notes = [_][]const u8{ detail, confirm_ui.t(.dos_confirm_note1), confirm_ui.t(.dos_confirm_note2) };
+                var confirm_hints: [3]graphics.ui.Hint = undefined;
+                menu.choice(&session, confirm_ui.t(.dos_confirm_title), disk.label[0..disk.len], &choices, confirm, &confirm_notes, hints(&confirm_ui, &confirm_hints, .key_confirm));
                 const confirm_key = console.readKey();
                 if (confirm_key.ascii == 27) break;
                 if (confirm_key.scan == 0x48) confirm = 0;

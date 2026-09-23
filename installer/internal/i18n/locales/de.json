@@ -198,6 +198,7 @@
   "installer.stage.uninstall.4": "exFAT wird formatiert",
   "installer.stage.uninstall.5": "Überprüfung",
 
+  "boot.language.name": "Deutsch",
   "boot.header.subtitle": "Bootmenü",
   "boot.header.build": "Build {0}",
   "boot.header.no_mouse": "Keine Maus",

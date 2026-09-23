@@ -201,6 +201,7 @@
   "installer.stage.uninstall.4": "exFAT formatavimas",
   "installer.stage.uninstall.5": "Patikrinimas",
 
+  "boot.language.name": "Lietuvių",
   "boot.header.subtitle": "Įkrovos meniu",
   "boot.header.build": "Versija {0}",
   "boot.header.no_mouse": "Nėra pelės",

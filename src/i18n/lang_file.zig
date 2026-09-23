@@ -9,7 +9,13 @@
 //! "{0} of {1} files" templates.
 const std = @import("std");
 pub const strings = @import("boot_strings.zig");
-pub const linux_strings = @import("linux_strings.zig");
+/// The Legacy BIOS Core (freestanding i386, fixed 256 KiB slot) never shows
+/// the micro-Linux screens, so it leaves their strings out.
+const with_linux_strings = !(@import("builtin").os.tag == .freestanding and @import("builtin").cpu.arch == .x86);
+pub const linux_strings = if (with_linux_strings) @import("linux_strings.zig") else struct {
+    pub const hashes = [_]u32{};
+    pub const english = [_][]const u8{};
+};
 pub const Key = strings.Key;
 
 pub const path = "\\EFI\\USOS\\lang.bin";
@@ -42,10 +48,22 @@ pub const Coverage = struct {
     }
 };
 
+/// Built-in English. The BIOS Core keeps only the strings it can show.
+const english_values = if (with_linux_strings) strings.english else blk: {
+    var values = strings.english;
+    for (strings.bios, 0..) |used, index| {
+        if (!used) values[index] = "";
+    }
+    break :blk values;
+};
+
 pub const Table = struct {
-    /// Borrowed slices into the blob; null means "use English".
-    values: [key_count]?[]const u8 = [_]?[]const u8{null} ** key_count,
-    linux_values: [linux_key_count]?[]const u8 = [_]?[]const u8{null} ** linux_key_count,
+    /// The validated blob the values point into.
+    blob: []const u8 = "",
+    /// Offsets of each value inside `blob` (its u16 length precedes it);
+    /// 0 means "use English". Compact so the BIOS Core stays small.
+    values: [key_count]u32 = [_]u32{0} ** key_count,
+    linux_values: [linux_key_count]u32 = [_]u32{0} ** linux_key_count,
     language: [8]u8 = [_]u8{0} ** 8,
 
     pub const english_only = Table{ .language = "en\x00\x00\x00\x00\x00\x00".* };
@@ -64,7 +82,7 @@ pub const Table = struct {
         const payload = blob[header_size..];
         if (std.hash.Crc32.hash(payload) != std.mem.readInt(u32, blob[24..28], .little)) return error.ChecksumMismatch;
 
-        var table = Table{};
+        var table = Table{ .blob = blob };
         @memcpy(&table.language, blob[12..20]);
         var offset: usize = 0;
         var index: usize = 0;
@@ -79,15 +97,16 @@ pub const Table = struct {
             offset += 2;
             if (offset + value_len > payload.len) return error.Truncated;
             const value = payload[offset .. offset + value_len];
+            const value_offset: u32 = @intCast(header_size + offset);
             offset += value_len;
             const cover = coverage orelse continue;
             // Unknown keys (newer installer) are ignored; undrawable values stay English.
             if (!cover.covers(value)) continue;
             const hash = nameHash(name);
             if (indexOfHash(&strings.hashes, hash)) |slot| {
-                table.values[slot] = value;
-            } else if (indexOfHash(&linux_strings.hashes, hash)) |slot| {
-                table.linux_values[slot] = value;
+                table.values[slot] = value_offset;
+            } else if (with_linux_strings) {
+                if (indexOfHash(&linux_strings.hashes, hash)) |slot| table.linux_values[slot] = value_offset;
             }
         }
         if (offset != payload.len) return error.LengthMismatch;
@@ -100,8 +119,14 @@ pub const Table = struct {
         return parse(bytes, coverage) catch english_only;
     }
 
+    fn at(self: *const Table, offset: u32) ?[]const u8 {
+        if (offset == 0) return null;
+        const len = std.mem.readInt(u16, self.blob[offset - 2 ..][0..2], .little);
+        return self.blob[offset .. offset + len];
+    }
+
     pub fn get(self: *const Table, key: Key) []const u8 {
-        return self.values[@intFromEnum(key)] orelse strings.english[@intFromEnum(key)];
+        return self.at(self.values[@intFromEnum(key)]) orelse english_values[@intFromEnum(key)];
     }
 
     pub fn languageCode(self: *const Table) []const u8 {
@@ -113,26 +138,34 @@ pub const Table = struct {
         return substitute(buffer, self.get(key), args);
     }
 
+    /// Exact reverse lookup of an English catalog value (no templates, no
+    /// buffer); unknown text is returned unchanged.
+    pub fn lookup(self: *const Table, text: []const u8) []const u8 {
+        for (english_values, 0..) |english, index| {
+            if (english.len > 0 and std.mem.eql(u8, english, text)) return self.at(self.values[index]) orelse english;
+        }
+        for (linux_strings.english, 0..) |english, index| {
+            if (std.mem.eql(u8, english, text)) return self.at(self.linux_values[index]) orelse english;
+        }
+        return text;
+    }
+
     /// Translates text that arrives as its English value. Exact matches win;
     /// otherwise an English template such as "{0} of {1} files" is matched
     /// and its captures are placed into the translated template. Unknown text
     /// is returned unchanged.
     pub fn translate(self: *const Table, buffer: []u8, text: []const u8) []const u8 {
         if (text.len == 0) return text;
-        for (strings.english, 0..) |english, index| {
-            if (std.mem.eql(u8, english, text)) return self.values[index] orelse english;
-        }
-        for (linux_strings.english, 0..) |english, index| {
-            if (std.mem.eql(u8, english, text)) return self.linux_values[index] orelse english;
-        }
+        const exact = self.lookup(text);
+        if (exact.ptr != text.ptr) return exact;
         var captures: [3][]const u8 = undefined;
         for (linux_strings.english, 0..) |english, index| {
-            const translated = self.linux_values[index] orelse continue;
+            const translated = self.at(self.linux_values[index]) orelse continue;
             if (std.mem.indexOfScalar(u8, english, '{') == null) continue;
             if (matchTemplate(english, text, &captures)) |count| return substitute(buffer, translated, captures[0..count]);
         }
-        for (strings.english, 0..) |english, index| {
-            const translated = self.values[index] orelse continue;
+        for (english_values, 0..) |english, index| {
+            const translated = self.at(self.values[index]) orelse continue;
             if (std.mem.indexOfScalar(u8, english, '{') == null) continue;
             if (matchTemplate(english, text, &captures)) |count| return substitute(buffer, translated, captures[0..count]);
         }

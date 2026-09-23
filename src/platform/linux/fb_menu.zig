@@ -6,6 +6,7 @@ const renderer = @import("fb_menu_render.zig");
 const input_module = @import("fb_menu_input.zig");
 const fb = @import("fb_device.zig");
 const trace = @import("fb_menu_trace.zig");
+const fb_i18n = @import("fb_i18n.zig");
 
 pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
     trace.write("menu-entry state={s}", .{path});
@@ -73,13 +74,18 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
     var inputs: usize = 0;
     for (input.fds) |slot| { if (slot.fd >= 0) inputs += 1; }
     trace.write("input-open count={d}", .{inputs});
+    const context = try allocator.create(fb_i18n.Context);
+    defer allocator.destroy(context);
+    context.* = .{};
+    context.load();
+    const ui = context.ui(buffer.surface);
     var redraw = true;
     var ready = false;
     while (true) {
-        const layout = renderer.Layout.init(buffer.surface, state);
+        const layout = renderer.Layout.init(&ui, state);
         if (redraw) {
             if (device) |d| {
-                renderer.render(buffer.surface, state, input.x, input.y, input.pointer_visible);
+                renderer.render(&ui, state, input.x, input.y, input.pointer_visible);
                 buffer.copyTo(d.surface);
             } else {
                 console(tty, state);

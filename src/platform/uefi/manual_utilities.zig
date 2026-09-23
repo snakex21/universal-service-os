@@ -1,12 +1,13 @@
 const std = @import("std");
 const usos = @import("usos");
 const input = @import("input.zig");
+const manual_systems = @import("manual_systems.zig");
+const rows_model = @import("manual_rows.zig");
 const navigation = @import("manual_navigation.zig");
 const system_icons = @import("system_icons.zig");
 const view = @import("manual_view.zig");
 
 const max_utilities: usize = usos.catalog.utility_catalog.max_items;
-const visible_rows: usize = 12;
 
 var utility_list: usos.catalog.utility_catalog.List = .{};
 var entries: [max_utilities]usos.catalog.SystemEntry = undefined;
@@ -30,24 +31,17 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
         }).navigable();
     }
 
-    var rows: [max_utilities]view.ListRow = undefined;
+    var rows: [max_utilities]usos.gui.ui.Row = undefined;
+    var details: [max_utilities]rows_model.DetailBuffer = undefined;
     index = 0;
     while (index < count) : (index += 1) {
         const entry = &entries[index];
-        const icon = system_icons.get(root, entry);
-        const media = discovery.mediaStatus(entry.image_directory);
-        rows[index] = if (!entry.firmware.accepts(firmware))
-            .{ .system_disabled = .{ .value = entry.name, .icon = icon, .reason = entry.firmware.mismatchReason(firmware) } }
-        else if (!media.hasImages())
-            .{ .system_disabled = .{ .value = entry.name, .icon = icon, .reason = "[no image]" } }
-        else if (!usos.flow.preparation_capability.supportsSystem(entry.id))
-            .{ .system_disabled = .{ .value = entry.name, .icon = icon, .reason = "[backend unavailable]" } }
-        else
-            .{ .system = .{ .value = entry.name, .icon = icon } };
+        rows[index] = rows_model.system(entry, system_icons.get(root, entry), discovery.mediaStatus(entry.image_directory), firmware, &details[index]);
     }
 
     var selected: usize = usos.gui.selectable_list.first(selectable[0..count]) orelse 0;
-    var list = view.ListScreen.open("systems", "Utilities", rows[0..count], selected, visible_rows, null);
+    var list: view.ListScreen = undefined;
+    list.open(view.tr("Utilities"), view.t(.category_utilities_desc), rows[0..count], selected, true, null);
 
     while (true) {
         switch (navigation.handleSelectable(input.readBlocking(), &selected, count, list.visibleStart(), list.visibleCount(), selectable[0..count])) {
@@ -61,12 +55,12 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
                 }).activation()) {
                     .firmware_mismatch => continue,
                     .no_image => {
-                        showMissingImageNotice(entry);
+                        manual_systems.showMissingImageNotice(entry);
                         list.redrawFull(selected, null);
                         continue;
                     },
                     .backend_unavailable => {
-                        showBackendDisabledNotice(entry);
+                        manual_systems.showBackendDisabledNotice(entry, view.t(.utility_unavailable));
                         list.redrawFull(selected, null);
                         continue;
                     },
@@ -99,37 +93,7 @@ fn scan(discovery: *usos.catalog.media_discovery.Discovery) usize {
 }
 
 fn showEmpty() void {
-    view.begin("systems", "Utilities");
-    view.row(false, "No utility folders found.");
-    view.row(false, "Create Utilities/<tool name>/Images on DATA, then run Update USOS.");
-    waitForDismiss();
-}
-
-fn showMissingImageNotice(entry: *const usos.catalog.SystemEntry) void {
-    view.begin("systems", entry.name);
-    view.row(false, "No supported image files were found. Copy a file to:");
-    view.row(false, usos.gui.menu_policy.displayImagePath(entry.image_directory));
-    waitForDismiss();
-}
-
-fn showBackendDisabledNotice(entry: *const usos.catalog.SystemEntry) void {
-    view.begin("systems", entry.name);
-    view.row(false, usos.flow.preparation_capability.unavailable_reason);
-    view.row(false, "The utility remains visible while its boot backend is unavailable.");
-    waitForDismiss();
-}
-
-fn waitForDismiss() void {
-    view.footer(true);
-    while (true) {
-        switch (input.readBlocking()) {
-            .enter => return,
-            .back => return,
-            .pointer => |mouse| {
-                if (mouse.right_click or mouse.left_click) return;
-                if (mouse.moved) view.updatePointer();
-            },
-            else => {},
-        }
-    }
+    const lines = [_][]const u8{ view.t(.utilities_none_line1), view.t(.utilities_none_line2) };
+    view.notice(view.tr("Utilities"), .info, .neutral, view.t(.utilities_none_title), &lines);
+    view.waitForDismiss();
 }

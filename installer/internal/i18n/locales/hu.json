@@ -198,6 +198,7 @@
   "installer.stage.uninstall.4": "Formázás exFAT-ra",
   "installer.stage.uninstall.5": "Ellenőrzés",
 
+  "boot.language.name": "Magyar",
   "boot.header.subtitle": "Rendszerindító menü",
   "boot.header.build": "Build: {0}",
   "boot.header.no_mouse": "Nincs egér",

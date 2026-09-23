@@ -27,6 +27,25 @@ pub fn writeAscii(text: []const u8) void {
     flush(out, &buffer, &used);
 }
 
+/// UTF-8 text through the firmware's UCS-2 console (text-mode fallback when
+/// no GOP framebuffer exists). Codepoints outside the BMP print as '?'.
+pub fn writeUtf8(text: []const u8) void {
+    const out = uefi.system_table.con_out orelse return;
+    var buffer: [buffer_capacity:0]u16 = undefined;
+    var used: usize = 0;
+    var view = std.unicode.Utf8View.init(text) catch return writeAscii(text);
+    var iterator = view.iterator();
+    while (iterator.nextCodepoint()) |codepoint| {
+        if (codepoint == '\n') {
+            append(out, &buffer, &used, '\r');
+            append(out, &buffer, &used, '\n');
+            continue;
+        }
+        append(out, &buffer, &used, if (codepoint >= 0x20 and codepoint < 0xD800) @intCast(codepoint) else '?');
+    }
+    flush(out, &buffer, &used);
+}
+
 fn append(out: *uefi.protocol.SimpleTextOutput, buffer: *[buffer_capacity:0]u16, used: *usize, char: u16) void {
     if (used.* == buffer_capacity) flush(out, buffer, used);
     buffer[used.*] = char;

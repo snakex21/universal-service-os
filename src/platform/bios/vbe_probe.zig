@@ -206,23 +206,23 @@ fn render(surface: Surface, version: u16, raw_count: usize, modes: []const Mode,
     surface.fill(theme.background);
     surface.fillRect(0, 0, surface.framebuffer.width, 5, theme.accent);
 
-    text.draw(surface, 20, 18, "UNIVERSAL SERVICE OS - VESA-1", 2, theme.text);
-    text.draw(surface, 20, 46, "PROBE / MODE SET TEST - MENU IS DELIBERATELY DISABLED", 1, theme.muted);
+    text.legacy.draw(surface, 20, 18, "UNIVERSAL SERVICE OS - VESA-1", 2, theme.text);
+    text.legacy.draw(surface, 20, 46, "PROBE / MODE SET TEST - MENU IS DELIBERATELY DISABLED", 1, theme.muted);
 
     const selected = modes[selected_index];
     var line: [96]u8 = undefined;
     const version_line = std.fmt.bufPrint(&line, "VBE: {d}.{d}   BIOS MODE IDS: {d}   32-BIT LFB: {d}", .{ version >> 8, version & 0xFF, raw_count, modes.len }) catch "VBE INFO";
-    text.draw(surface, 20, 70, version_line, 1, theme.text);
+    text.legacy.draw(surface, 20, 70, version_line, 1, theme.text);
 
     var selected_line: [112]u8 = undefined;
     const selected_text = selectedSummary(&selected_line, selected);
-    text.draw(surface, 20, 86, selected_text, 1, theme.accent);
+    text.legacy.draw(surface, 20, 86, selected_text, 1, theme.accent);
 
     var fb_line: [96]u8 = undefined;
     const fb_text = framebufferSummary(&fb_line, selected);
-    text.draw(surface, 20, 102, fb_text, 1, theme.text);
+    text.legacy.draw(surface, 20, 102, fb_text, 1, theme.text);
 
-    text.draw(surface, 20, 126, "ALL 32-BIT LINEAR FRAMEBUFFER MODES:", 1, theme.text);
+    text.legacy.draw(surface, 20, 126, "ALL 32-BIT LINEAR FRAMEBUFFER MODES:", 1, theme.text);
 
     const margin: u32 = 20;
     const usable_width = surface.framebuffer.width -| (margin * 2);
@@ -249,7 +249,7 @@ fn render(surface: Surface, version: u16, raw_count: usize, modes: []const Mode,
 fn drawClipped(surface: Surface, x: u32, y: u32, width: u32, value: []const u8, theme: Theme, selected: bool) void {
     const chars: usize = @intCast(width / 6);
     if (chars == 0) return;
-    text.draw(surface, x, y, value[0..@min(value.len, chars)], 1, if (selected) theme.accent else theme.muted);
+    text.legacy.draw(surface, x, y, value[0..@min(value.len, chars)], 1, if (selected) theme.accent else theme.muted);
 }
 
 fn compactMode(out: *[40]u8, mode: Mode, selected: bool) []const u8 {

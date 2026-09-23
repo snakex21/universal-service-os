@@ -198,6 +198,7 @@
   "installer.stage.uninstall.4": "Форматиране с exFAT",
   "installer.stage.uninstall.5": "Проверка",
 
+  "boot.language.name": "Български",
   "boot.header.subtitle": "Меню за зареждане",
   "boot.header.build": "Версия {0}",
   "boot.header.no_mouse": "Няма мишка",

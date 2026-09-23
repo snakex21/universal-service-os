@@ -3,6 +3,7 @@ const usos = @import("usos");
 const linux = std.os.linux;
 const fb_device = @import("fb_device.zig");
 const renderer = @import("fb_ui_render.zig");
+const fb_i18n = @import("fb_i18n.zig");
 const state_model = @import("fb_ui_state.zig");
 
 pub fn main(init: std.process.Init) !u8 {
@@ -73,11 +74,15 @@ pub fn main(init: std.process.Init) !u8 {
         return 2;
     };
 
+    const context = try init.gpa.create(fb_i18n.Context);
+    defer init.gpa.destroy(context);
+    context.* = .{};
+    context.load();
     if (back) |buffer| {
-        renderer.render(buffer.surface, state);
+        renderer.render(buffer.surface, context, state);
         buffer.copyTo(device.surface);
     } else {
-        renderer.render(device.surface, state);
+        renderer.render(device.surface, context, state);
     }
     return 0;
 }

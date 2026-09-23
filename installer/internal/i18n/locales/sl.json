@@ -204,6 +204,7 @@
   "installer.stage.uninstall.4": "Formatiranje exFAT",
   "installer.stage.uninstall.5": "Preverjanje",
 
+  "boot.language.name": "Slovenščina",
   "boot.header.subtitle": "Zagonski meni",
   "boot.header.build": "Različica {0}",
   "boot.header.no_mouse": "Ni miške",

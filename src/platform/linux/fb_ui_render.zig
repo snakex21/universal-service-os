@@ -1,25 +1,40 @@
 const usos = @import("usos");
 const std = @import("std");
 const model = @import("fb_ui_state.zig");
+const fb_i18n = @import("fb_i18n.zig");
 
 pub fn fillBackground(surface: usos.gui.Surface) void {
     surface.fill((usos.gui.Theme{}).background);
 }
 
-pub fn render(surface: usos.gui.Surface, state: model.State) void {
-    var clock_buffer: [26]u8 = undefined;
-    const clock = clockText(&clock_buffer);
+pub fn render(surface: usos.gui.Surface, context: *const fb_i18n.Context, state: model.State) void {
+    const ui = context.ui(surface);
+    var clock_buffer: [48]u8 = undefined;
+    const header = fb_i18n.header(&ui, &clock_buffer);
     if (state.mode == .notice or state.mode == .service) {
-        const canvas = usos.gui.menu_canvas.Canvas.init(surface, usos.gui.Theme{});
-        var stage: [32]u8 = undefined;
-        const step = if (state.total > 1) std.fmt.bufPrint(&stage, "Step {d} of {d}", .{ state.current, state.total }) catch "" else "";
-        canvas.beginList(state.title, if (state.mode == .service) step else "", "USOS", clock);
-        canvas.listRow(0, .{ .value = if (state.mode == .service) state.detail else "Detecting disks", .selected = true });
-        canvas.listHelp(if (state.mode == .service) state.image else state.detail);
-        canvas.footer(if (state.mode == .service) "Reading hardware information" else "Choose a disk and confirm the installation before any changes.");
+        var title_buffer: [192]u8 = undefined;
+        var detail_buffer: [256]u8 = undefined;
+        var image_buffer: [256]u8 = undefined;
+        const detail = ui.tr(&detail_buffer, state.detail);
+        const image = ui.tr(&image_buffer, state.image);
+        const lines = [_][]const u8{ if (state.mode == .service) image else detail, if (state.mode == .service) ui.strings.lookup("Reading hardware information") else ui.strings.lookup("Choose a disk and confirm the installation before any changes.") };
+        var step_buffer: [48]u8 = undefined;
+        var current_text: [4]u8 = undefined;
+        var total_text: [4]u8 = undefined;
+        const step = if (state.mode == .service and state.total > 1)
+            ui.format(&step_buffer, .prep_step, &.{ std.fmt.bufPrint(&current_text, "{d}", .{state.current}) catch "", std.fmt.bufPrint(&total_text, "{d}", .{state.total}) catch "" })
+        else
+            "";
+        usos.gui.menu_screens.notice(&ui, header, .{
+            .title = ui.tr(&title_buffer, state.title),
+            .subtitle = step,
+            .icon = if (state.mode == .service) .chip else .drive,
+            .heading = if (state.mode == .service) detail else ui.strings.lookup("Detecting disks"),
+            .lines = &lines,
+        });
         return;
     }
-    usos.gui.preparation_screen.render(surface, usos.gui.Theme{}, .{
+    usos.gui.preparation_screen.render(&ui, .{
         .mode = switch (state.mode) {
             .stage => .stage,
             .progress => .progress,
@@ -40,21 +55,21 @@ pub fn render(surface: usos.gui.Surface, state: model.State) void {
         .diagnostics = state.diagnostics[0..state.diagnostic_count],
         .diagnostics_truncated = state.diagnostics_truncated,
         .labels = if (state.label_count > 0) state.labels[0..state.label_count] else &usos.gui.preparation_screen.stage_labels,
-    });
-    if (state.mode != .diagnostic) {
-        const width = @min(@as(u32, 1040), surface.framebuffer.width -| 64);
-        const right = (surface.framebuffer.width -| width) / 2 + width;
-        usos.gui.text.draw(surface, right -| usos.gui.text.width(clock, 1), 58, clock, 1, (usos.gui.Theme{}).muted);
-    }
+    }, header);
 }
 
-fn clockText(buffer: []u8) []const u8 {
-    if (@import("builtin").os.tag != .linux) return "";
-    var now: std.os.linux.timespec = undefined;
-    if (std.os.linux.clock_gettime(.REALTIME, &now) != 0 or now.sec < 0) return "";
-    const epoch = std.time.epoch.EpochSeconds{ .secs = @intCast(now.sec) };
-    const year = epoch.getEpochDay().calculateYearDay();
-    const date = year.calculateMonthDay();
-    const time = epoch.getDaySeconds();
-    return std.fmt.bufPrint(buffer, "{s} {d:0>2}.{d:0>2}.{d:0>4} {d:0>2}:{d:0>2}", .{ usos.calendar.weekdayName(year.year, @intFromEnum(date.month), date.day_index + 1), date.day_index + 1, @intFromEnum(date.month), year.year, time.getHoursIntoDay(), time.getMinutesIntoHour() }) catch "";
+test "every framebuffer UI mode renders" {
+    const pixels = try std.testing.allocator.alloc(u32, 1024 * 768);
+    defer std.testing.allocator.free(pixels);
+    const buffer = usos.gui.ScreenBuffer.init(@intFromPtr(pixels.ptr), pixels.len * 4, 1024, 768, .bgrx8).?;
+    const context = try std.testing.allocator.create(fb_i18n.Context);
+    defer std.testing.allocator.destroy(context);
+    context.* = .{};
+    context.load();
+    for ([_][]const u8{ "stage", "progress", "done", "failure", "diagnostic", "notice", "service" }) |mode| {
+        var text: [96]u8 = undefined;
+        const state = try model.parse(try std.fmt.bufPrint(&text, "mode={s}\ntitle=Copying files\ncurrent=2\ndiag=line", .{mode}));
+        render(buffer.surface, context, state);
+        try std.testing.expect(pixels[0] != pixels[pixels.len / 2]);
+    }
 }

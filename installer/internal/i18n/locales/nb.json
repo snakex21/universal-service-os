@@ -198,6 +198,7 @@
   "installer.stage.uninstall.4": "Formaterer exFAT",
   "installer.stage.uninstall.5": "Verifisering",
 
+  "boot.language.name": "Norsk bokmål",
   "boot.header.subtitle": "Oppstartsmeny",
   "boot.header.build": "Bygg {0}",
   "boot.header.no_mouse": "Ingen mus",

@@ -427,3 +427,14 @@ func TestMachineTranslatedMarks(t *testing.T) {
 		t.Fatal("de must be machine-translated, en not")
 	}
 }
+
+// The boot header shows boot.language.name; it must be the native name the
+// installer's language menu shows.
+func TestBootLanguageNameMatchesMeta(t *testing.T) {
+	for _, language := range Languages() {
+		catalog, _ := Catalog(language.Code)
+		if catalog["boot.language.name"] != language.Name {
+			t.Errorf("%s: boot.language.name=%q, _meta native_name=%q", language.Code, catalog["boot.language.name"], language.Name)
+		}
+	}
+}

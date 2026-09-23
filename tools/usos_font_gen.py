@@ -133,12 +133,12 @@ def rasterize(font: ImageFont.FreeTypeFont, symbols: ImageFont.FreeTypeFont, cp:
     return (w, h, offset[0] + left, offset[1] + top, advance, packed)
 
 
-def build() -> tuple[bytes, dict]:
+def build(tiers=TIERS) -> tuple[bytes, dict]:
     codepoints = sorted(base_codepoints() | catalog_codepoints())
     symbol_path = FONT_DIR / SYMBOL_FONT
     faces = []
     report = {"codepoints": len(codepoints), "faces": []}
-    for tier, numerator in TIERS:
+    for tier, numerator in tiers:
         for role, name, file_name, base in ROLES:
             size = (base * numerator + 1) // 2
             font = ImageFont.truetype(str(FONT_DIR / file_name), size)

@@ -84,7 +84,7 @@ pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: 
     try initBootState(state);
     const catalog = &state.catalog;
     if (vista and answer_name != null) return error.VistaUnattendedNotSupported;
-    progress(.validating, "Validating installation ISO and resolving boot source");
+    progress(.validating, "Validating the installation ISO and resolving the boot source");
     const inspection = try inspectState(state, name, vista);
     const source = &state.source;
     const external_pe10 = inspection.mode == .original;
@@ -177,7 +177,7 @@ pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: 
     options[option_ascii.len] = 0;
     loaded.load_options = &options;
     loaded.load_options_size = @intCast((option_ascii.len + 1) * 2);
-    progress(.starting, if (external_pe10) "Starting external PE10; install source remains selected Windows ISO" else "Starting hybrid ISO's own WinPE and Setup");
+    progress(.starting, if (external_pe10) "Starting external PE10; the install source remains the selected Windows ISO" else "Starting the hybrid ISO's own WinPE and Setup");
     serial.writeAscii("[WIN7_NATIVE] CORE -> WIMBOOT UEFI\r\n");
     const result = try bs.startImage(image);
     if (result.code != .success) return error.WimbootReturnedError;

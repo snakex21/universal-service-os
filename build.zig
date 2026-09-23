@@ -7,6 +7,7 @@ pub fn build(b: *std.Build) void {
     addHostTests(b, target, optimize);
     addHostSelftest(b, target, optimize);
     addHostImageProbe(b, target, optimize);
+    addHostUiPreview(b, target, optimize);
     addHostLegacyFat32Probe(b, target, optimize);
     addHostLegacyNtfsProbe(b, target, optimize);
     const ntfs_driver = addFetchNtfsDriver(b);
@@ -75,6 +76,19 @@ fn addHostTests(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
     test_step.dependOn(&run_framebuffer_tests.step);
     b.default_step.dependOn(&run_unit_tests.step);
     b.default_step.dependOn(&run_framebuffer_tests.step);
+}
+
+fn addHostUiPreview(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
+    const tool_module = b.createModule(.{
+        .root_source_file = b.path("src/tools/ui_preview_main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    tool_module.addImport("usos", createUsosModule(b, target, optimize));
+    const exe = b.addExecutable(.{ .name = "usos-ui-preview", .root_module = tool_module });
+    const install = b.addInstallArtifact(exe, .{});
+    const step = b.step("ui-preview", "Build the host boot menu preview renderer (writes BMP screens)");
+    step.dependOn(&install.step);
 }
 
 fn addHostImageProbe(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
