@@ -44,7 +44,7 @@ def rebuild_ui():
     init=OUT/'initramfs-xp'
     init.write_bytes(gzip.compress(newc(update_ui(parse_newc(gzip.decompress(init.read_bytes())))),compresslevel=6,mtime=0))
     metadata['sha256']['initramfs-xp']=digest(init)
-    metadata['ui_revision']='20260922-per-path-stage-labels'
+    metadata['ui_revision']='20260923-splash-seamless-takeover'
     path.write_text(json.dumps(metadata,indent=2)+'\n')
     print('XP_UI_OVERLAY_BUILT; driver payload unchanged; no VM/E2E',flush=True)
 
