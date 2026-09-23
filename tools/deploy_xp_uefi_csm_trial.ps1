@@ -30,7 +30,8 @@ $layout|Set-Content -LiteralPath (Join-Path $backup 'partitions.json')
 $files=@()
 if($SourceIso){
  $source=Get-Item -LiteralPath $SourceIso
- $info=$manifest.added_source
+ $info=@($manifest.driver_sources|Where-Object {$_.name -eq $source.Name})[0]
+ if(!$info){$info=$manifest.added_source}
  if(!$info -or $source.Name -ne $info.name -or $source.Length -ne $info.size -or (Hash $source.FullName) -ne $info.sha256){throw 'Source ISO differs from prepared overlay'}
  $isoTarget=Join-Path $dataRoot ('Systems\Windows\Windows XP\Images\'+$source.Name)
  if(Test-Path -LiteralPath $isoTarget){

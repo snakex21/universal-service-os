@@ -29,7 +29,10 @@ def pe(path):
 base=r/'zig-out/xp-uefi-csm'
 parser=argparse.ArgumentParser();parser.add_argument('--source-iso',type=Path);args=parser.parse_args()
 iso=args.source_iso or next(Path('L:/Systems/Windows/Windows XP/Images').glob('*NiKKA.iso'))
-source=base/'drivers'/json.loads((base/'manifest.json').read_text())['added_source']['sha256'] if args.source_iso else None
+def source_hash(name):
+ m=json.loads((base/'manifest.json').read_text())
+ return next(x['sha256'] for x in m.get('driver_sources') or [m['added_source']] if x['name']==name)
+source=base/'drivers'/source_hash(args.source_iso.name) if args.source_iso else None
 out=(source/'import-checks') if source else (base/'driver-checks');out.mkdir(exist_ok=True)
 subprocess.run(['C:/Program Files/7-Zip/7z.exe','e',str(iso),r'I386\WMILIB.SY_','-o'+str(out),'-y'],check=True,stdout=subprocess.DEVNULL)
 subprocess.run(['C:/Program Files/7-Zip/7z.exe','e',str(out/'WMILIB.SY_'),'-o'+str(out),'-y'],check=True,stdout=subprocess.DEVNULL)

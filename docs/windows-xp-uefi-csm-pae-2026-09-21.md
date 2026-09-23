@@ -123,3 +123,39 @@ and were not changed; no launcher (usoshide) was needed. To identify them,
 read `C:\WINDOWS\setupact.log`/`setupapi.log` from a finished install.
 `check_xp_pae.py` now also tests mode parsing, boot.ini staging (PAE first,
 timeout=0, originals retained) and entry detection through the DLL harness.
+
+## 2026-09-24: reproducible package build
+
+Until now the deployed package was the proven 2026-09-22 build, patched in
+place (`--ui-only`, `--refresh-pae-flow`), because a full rebuild never gave
+the same driver bundles. Causes, found by building twice and comparing:
+
+- **Cabinets:** makecab copies each input file's local modification time into
+  its CFFILE entry. The 15 USOS driver files are copied into `raw/` (and the
+  replacement `acpi.sys` into the SP3 cabinet folder) at build time, so each
+  build stamped a new time. The MSZIP data and every other byte were already
+  identical; Microsoft's own files keep their source times through 7-Zip.
+- **Setup hive:** `RegLoadAppKeyW` stamps the current time into the 29 keys it
+  creates or touches, the header's reorganisation time and the first bin, and
+  writes the loader's path and a runtime root-parent link. Keys, values and
+  cell layout were already identical.
+- **drivers/0:** bundle work folders were numbered by list position. The first
+  build had only the NiKKA ISO (drivers/0); the Microsoft ISO was added later
+  (drivers/<sha>), and a later full build sorted the Microsoft ISO first and
+  overwrote drivers/0 with it, so `check_xp_driver_integration.py` compared
+  the NiKKA-era folder number with a different bundle.
+
+Fixes: `tools/xp_cab.py` pins every CFFILE date/time (source-cabinet files
+keep Microsoft's stamp, files USOS supplies get 2026-09-22 21:21:32);
+`tools/xp_hive.py` pins the touched keys' LastWriteTime and restores the
+header bookkeeping from the source hive (content verified unchanged); bundle
+work folders start empty and are named by the source ISO's SHA-256; the
+manifest records `driver_sources` and the checks look bundles up there.
+Two consecutive full builds are byte-identical
+(`initramfs-xp` d362b73f...eb0a). `tools/compare_xp_packages.py OLD NEW --base`
+expands every cabinet, parses every hive and classifies each entry; against
+the proven package: 721 entries identical, 20 content-equivalent (CFFILE
+times / key times / their hashes only), 13 equal to the current micro-Linux
+base (Win7/WIM/VHD/WORK helpers), 0 unexplained. Pinning the proven hives
+gives the new hives byte for byte. pae.exe is unchanged (v4, bab558bb...).
+Unit test: `tools/tests/test_xp_reproducible.py`.

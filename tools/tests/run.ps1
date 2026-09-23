@@ -70,6 +70,8 @@ function Run-Unit {
     if ($LASTEXITCODE -ne 0) { throw 'UEFI graphics mode-change regression failed.' }
     & python.exe (Join-Path $root 'tools/tests/test_uefi_graphics_connect.py')
     if ($LASTEXITCODE -ne 0) { throw 'UEFI graphics controller reconnect regression failed.' }
+    & python.exe (Join-Path $root 'tools/tests/test_xp_reproducible.py')
+    if ($LASTEXITCODE -ne 0) { throw 'XP cabinet/hive reproducibility tests failed.' }
 }
 
 function Run-Selftest {

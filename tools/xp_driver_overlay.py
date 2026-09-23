@@ -5,6 +5,7 @@ Microsoft USB3, ACPI sections). Changes are emitted only to the trial bundle.
 """
 from pathlib import Path
 import ctypes as c, hashlib, json, re, shutil, struct, subprocess, winreg
+import xp_cab, xp_hive
 
 ROOT=Path(__file__).resolve().parents[1]
 DRIVERS=ROOT/'media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86'
@@ -98,12 +99,18 @@ def disable_crash_dump(text):
     if len(found)!=1:raise ValueError('HIVESYS.INF must declare CrashDumpEnabled exactly once')
     return CRASH_DUMP.sub(lambda m:m.group(1)+'0',text)
 
-def pack_file(src,dst):
+def pack_file(src,dst,source_stamps=None):
+    # Sorted, fixed inputs and pinned CFFILE times: identical inputs give
+    # byte-identical cabinets (makecab's MSZIP output is deterministic).
     subprocess.run(['C:/Windows/System32/makecab.exe','/D','CompressionType=MSZIP',str(src),str(dst)],check=True,stdout=subprocess.DEVNULL)
     assert dst.read_bytes()[:4]==b'MSCF'
+    xp_cab.pin(dst,source_stamps)
 
 def build_driver_overlay(iso,out):
     out.mkdir(parents=True,exist_ok=True)
+    # Start from empty work folders: a folder reused for another ISO would
+    # otherwise leak that ISO's extracted SP3.CAB files into this cabinet.
+    for work in ('original','sp3-files','raw','native-usb','source-driver-cache','bundle'):shutil.rmtree(out/work,ignore_errors=True)
     original=out/'original';original.mkdir(exist_ok=True)
     subprocess.run([SEVEN,'e',str(iso),*['I386\\'+n for n in META],r'I386\SP3.CAB','WIN51IP.SP3','-o'+str(original),'-y'],check=True,stdout=subprocess.DEVNULL)
     if not (original/'WIN51IP.SP3').exists():raise ValueError('Driver experiment currently requires XP Professional SP3')
@@ -130,15 +137,19 @@ def build_driver_overlay(iso,out):
         pack_file(p,i386/(p.name[:-1]+'_'))
     native=out/'native-usb';native.mkdir(exist_ok=True)
     fallback=out/'source-driver-cache';fallback.mkdir(exist_ok=True)
+    sp3_stamps=xp_cab.stamps((original/'SP3.CAB').read_bytes())
+    driver_stamps={}
     if any(not (cabdir/n).is_file() for n in BUILTIN_USB):
         # SP3.CAB contains updated files; unchanged XP files remain in DRIVER.CAB.
         subprocess.run([SEVEN,'e',str(iso),r'I386\DRIVER.CAB','-o'+str(original),'-y'],check=True,stdout=subprocess.DEVNULL)
         subprocess.run([SEVEN,'e',str(original/'DRIVER.CAB'),*BUILTIN_USB,'-o'+str(fallback),'-y'],check=True,stdout=subprocess.DEVNULL)
+        driver_stamps=xp_cab.stamps((original/'DRIVER.CAB').read_bytes())
     for name in BUILTIN_USB:
         src=cabdir/name if (cabdir/name).is_file() else fallback/name
         if not src.is_file():raise ValueError('Source cabinets lack native USB dependency: '+name)
         shutil.copyfile(src,native/name)
-        pack_file(src,i386/(name[:-1]+'_').upper())
+        # Unchanged Microsoft file: keep the date/time of the cabinet it came from.
+        pack_file(src,i386/(name[:-1]+'_').upper(),sp3_stamps if src.parent==cabdir else driver_stamps)
     names=[Path(n).name.lower() for n in SELECTED]+list(BUILTIN_USB)
     sysnames=[n for n in names if n.endswith('.sys')]
     text,encoding=decode((original/'TXTSETUP.SIF').read_bytes())
@@ -178,6 +189,8 @@ def build_driver_overlay(iso,out):
     for suffix in ('.LOG','.LOG1','.LOG2'):(i386/('SETUPREG.HIV'+suffix)).unlink(missing_ok=True)
     shutil.copyfile(original/'SETUPREG.HIV',i386/'SETUPREG.HIV');patch_hive(i386/'SETUPREG.HIV')
     for suffix in ('.LOG','.LOG1','.LOG2'):(i386/('SETUPREG.HIV'+suffix)).unlink(missing_ok=True)
+    # The registry engine stamps the build time into touched keys and header.
+    hive=i386/'SETUPREG.HIV';hive.write_bytes(xp_hive.pin_hive(hive.read_bytes(),(original/'SETUPREG.HIV').read_bytes()))
     # PnP can extract ACPI from SP3.CAB later, so replace its copy too.
     acpi=[p for p in cabdir.iterdir() if p.name.lower()=='acpi.sys']
     if len(acpi)!=1:raise ValueError('SP3.CAB lacks unique ACPI; refusing incomplete integration')
@@ -187,6 +200,8 @@ def build_driver_overlay(iso,out):
     directives += ['"'+str(p)+'" '+p.name for p in sorted(cabdir.iterdir()) if p.is_file()]
     ddf.write_text('\n'.join(directives)+'\n',encoding='ascii')
     subprocess.run(['C:/Windows/System32/makecab.exe','/F',str(ddf)],check=True,stdout=subprocess.DEVNULL)
+    # Unchanged files keep Microsoft's date/time; the replaced ACPI gets the pinned one.
+    xp_cab.pin(i386/'SP3.CAB',{n:t for n,t in sp3_stamps.items() if n!=acpi[0].name.lower()})
     (bundle/'payload.sha256').write_text(''.join(sha(p)+'  I386/'+p.name+'\n' for p in sorted(i386.iterdir()) if p.is_file()),encoding='ascii',newline='\n')
     (bundle/'replace-names.txt').write_text('\n'.join(n.upper() for n in names)+'\n',encoding='ascii',newline='\n')
     report={'id':bundle_id,'source':iso.name,'source_size':iso.stat().st_size,'drivers':SELECTED,'native_usb_dependencies':{n:sha(native/n) for n in BUILTIN_USB},'sha256':{p.relative_to(bundle).as_posix():sha(p) for p in bundle.rglob('*') if p.is_file() and p.name!='manifest.json'},'runtime_verified':False}

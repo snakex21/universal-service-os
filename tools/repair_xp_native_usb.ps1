@@ -3,9 +3,12 @@ $ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $package=Join-Path $project 'zig-out\xp-uefi-csm'
 $manifest=Get-Content -LiteralPath (Join-Path $package 'manifest.json') -Raw|ConvertFrom-Json
-$source=Join-Path $package ('drivers\'+$manifest.added_source.sha256)
-$report=Get-Content -LiteralPath (Join-Path $source 'bundle\manifest.json') -Raw|ConvertFrom-Json
 $part=Get-Partition -DriveLetter M
+$installedId=(Get-Content -LiteralPath 'M:\USOS\XP\drivers-manifest.json' -Raw|ConvertFrom-Json).id
+$entry=@($manifest.driver_sources|Where-Object {$_.bundle -eq $installedId})[0]
+if(!$entry){$entry=$manifest.added_source}
+$source=Join-Path $package ('drivers\'+$entry.sha256)
+$report=Get-Content -LiteralPath (Join-Path $source 'bundle\manifest.json') -Raw|ConvertFrom-Json
 $disk=Get-Disk -Number $part.DiskNumber
 if($disk.FriendlyName -notlike '*INTEL*' -or $disk.Size -ne 120034123776 -or $disk.IsBoot -or $disk.IsSystem -or $disk.PartitionStyle -ne 'MBR' -or $part.Offset -ne 1048576 -or $disk.Signature -ne 2225656991){throw 'Unexpected XP target'}
 $installed=Get-Content -LiteralPath 'M:\USOS\XP\drivers-manifest.json' -Raw|ConvertFrom-Json

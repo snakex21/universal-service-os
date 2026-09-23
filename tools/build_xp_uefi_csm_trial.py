@@ -77,6 +77,7 @@ def add_driver_source(iso,out_dir=None):
     for key,value in [('driver_bundles',bundle_id),('driver_supported_sources',iso.name),('iso_names',iso.name)]:
         if value not in metadata[key]:metadata[key].append(value)
     metadata['added_source']={'name':iso.name,'sha256':source_hash,'size':iso.stat().st_size,'bundle':bundle_id}
+    metadata['driver_sources']=[s for s in metadata.get('driver_sources',[]) if s['name']!=iso.name]+[metadata['added_source']]
     metadata['hardware_verified']=False
     manifest_path.write_text(json.dumps(metadata,indent=2)+'\n')
     print('XP_SOURCE_ADDED',iso.name,'BUNDLE',bundle_id,flush=True)
@@ -256,7 +257,11 @@ def build(esp, data):
     # any target write by the new runtime preflight. First hardware trial: SP3.
     supported=[p for p in images if is_sp3(p)]
     if not supported:raise ValueError('XP SP3 source required for modern driver integration')
-    driver_bundles=[build_driver_overlay(p,OUT/'drivers'/str(i)) for i,p in enumerate(supported)]
+    # One work folder per source ISO content (not per list position), so a
+    # bundle always rebuilds from, and is checked against, its own source.
+    sources=[{'name':p.name,'sha256':digest(p),'size':p.stat().st_size} for p in supported]
+    driver_bundles=[build_driver_overlay(p,OUT/'drivers'/s['sha256']) for p,s in zip(supported,sources)]
+    for s,(bundle_id,_) in zip(sources,driver_bundles):s['bundle']=bundle_id
     init=OUT/'initramfs-xp';init.write_bytes(overlay(base,helper,driver_bundles))
     shutil.copyfile(kernel,OUT/'vmlinuz.efi')
     config={}
@@ -277,7 +282,7 @@ def build(esp, data):
         if name in launchers:raise ValueError('Ambiguous trial launcher name')
         subprocess.run([zig,'build-exe','-target','x86_64-uefi','-O','ReleaseSmall',str(source/'launcher.zig'),'-femit-bin='+str(OUT/name)],env=env,check=True)
         launchers.append(name)
-    metadata={'experimental':True,'driver_bundles':[n for n,_ in driver_bundles],'driver_supported_sources':[p.name for p in supported],'firmware':'UEFI preparation; XP through firmware CSM','hardware_verified':False,'base_initramfs_sha256':digest(base),'base_kernel_sha256':digest(kernel),'launchers':launchers,'iso_names':[i.name for i in images],'sha256':{p.name:digest(p) for p in [init,OUT/'vmlinuz.efi',helper,*[OUT/n for n in launchers]]}}
+    metadata={'experimental':True,'driver_bundles':[n for n,_ in driver_bundles],'driver_supported_sources':[p.name for p in supported],'driver_sources':sources,'firmware':'UEFI preparation; XP through firmware CSM','hardware_verified':False,'base_initramfs_sha256':digest(base),'base_kernel_sha256':digest(kernel),'launchers':launchers,'iso_names':[i.name for i in images],'sha256':{p.name:digest(p) for p in [init,OUT/'vmlinuz.efi',helper,*[OUT/n for n in launchers]]}}
     (OUT/'manifest.json').write_text(json.dumps(metadata,indent=2)+'\n')
     print('XP_UEFI_CSM_TRIAL_BUILT; isolated initramfs; BIOS artifacts untouched; no VM/E2E',flush=True)
 if __name__=='__main__':
