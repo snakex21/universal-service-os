@@ -57,7 +57,7 @@ pub fn select() usos.catalog.Category {
                 }
                 if (mouse.moved) view.updatePointer();
             },
-            .other => {},
+            else => {},
         }
     }
 }

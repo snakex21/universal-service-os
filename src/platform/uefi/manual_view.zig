@@ -8,7 +8,9 @@ const usos = @import("usos");
 const console = @import("console.zig");
 const file_read = @import("file_read.zig");
 const input = @import("input.zig");
+const input_report = @import("input_report.zig");
 const pointer = @import("pointer.zig");
+const serial = @import("serial.zig");
 
 const gui = usos.gui;
 const Ui = gui.ui.Ui;
@@ -45,6 +47,13 @@ var active_home: ?*Home = null;
 var active_list: ?*ListScreen = null;
 var summary_button: gui.ui.Rect = .{ .x = 0, .y = 0, .w = 0, .h = 0 };
 var summary_spec: screens.SummarySpec = undefined;
+// Footer hints of the screen on display: tapping one acts like its key.
+var footer_hints: []const Hint = &.{};
+var footer_note: []const u8 = "";
+var home_hints: [3]Hint = undefined;
+var summary_hints: [2]Hint = undefined;
+var notice_hints: [1]Hint = undefined;
+var settings_buffer: [1024]u8 = undefined;
 
 pub fn init(root: *std.os.uefi.protocol.File, info: usos.boot_info.BootInfo) void {
     if (file_read.into(root, "\\UI\\theme.css", &css_buffer)) |css| theme = gui.Theme.parse(css);
@@ -54,6 +63,8 @@ pub fn init(root: *std.os.uefi.protocol.File, info: usos.boot_info.BootInfo) voi
 
     runtime_firmware = info.firmware;
     input.setIdleHook(updateClock);
+    input.setHintHook(hintAt);
+    pointer.configure(parseSettings(file_read.into(root, "\\EFI\\USOS\\usos-settings.ini", &settings_buffer) orelse ""));
     if (info.framebuffer) |framebuffer| video_surface = gui.Surface.init(framebuffer);
     surface = video_surface;
 
@@ -62,6 +73,47 @@ pub fn init(root: *std.os.uefi.protocol.File, info: usos.boot_info.BootInfo) voi
         if (std.os.uefi.system_table.con_out) |out| out.enableCursor(false) catch {};
         initScreenBuffer(canvas);
     }
+    // One report per boot of what the firmware exposes as input devices
+    // (EFI\USOS\Logs\input-devices.txt), for touch/gamepad bring-up.
+    input_report.write(root, if (video_surface) |canvas| canvas.framebuffer.width else 0, if (video_surface) |canvas| canvas.framebuffer.height else 0);
+}
+
+/// Input options from usos-settings.ini (written by the installer; these
+/// keys are optional and may be added by hand):
+///   wheel_invert=1               reverse the mouse wheel
+///   touch_rotation=0|90|180|270  touch panel rotation (default: automatic)
+pub fn parseSettings(text: []const u8) pointer.Settings {
+    var result = pointer.Settings{};
+    var lines = std.mem.splitScalar(u8, text, '\n');
+    while (lines.next()) |raw| {
+        const line = std.mem.trim(u8, raw, " \t\r\x00");
+        const equals = std.mem.indexOfScalar(u8, line, '=') orelse continue;
+        const key = std.mem.trim(u8, line[0..equals], " \t");
+        const value = std.mem.trim(u8, line[equals + 1 ..], " \t");
+        if (std.ascii.eqlIgnoreCase(key, "wheel_invert")) {
+            result.wheel_invert = std.mem.eql(u8, value, "1") or std.ascii.eqlIgnoreCase(value, "true") or std.ascii.eqlIgnoreCase(value, "yes");
+        } else if (std.ascii.eqlIgnoreCase(key, "touch_rotation")) {
+            const degrees = std.fmt.parseInt(u16, value, 10) catch continue;
+            if (degrees == 0 or degrees == 90 or degrees == 180 or degrees == 270) result.touch_rotation = degrees;
+        }
+    }
+    return result;
+}
+
+fn setFooter(hints: []const Hint, note: []const u8) void {
+    footer_hints = hints;
+    footer_note = note;
+}
+
+/// A tap or click on a footer hint acts like pressing its key.
+fn hintAt(x: u32, y: u32) ?input.Event {
+    if (footer_hints.len == 0) return null;
+    var u = ui() orelse return null;
+    const index = u.footerHit(footer_hints, footer_note, x, y) orelse return null;
+    const key = footer_hints[index].key;
+    if (std.mem.eql(u8, key, "Enter")) return .enter;
+    if (std.mem.eql(u8, key, "Esc")) return .back;
+    return null;
 }
 
 /// The string table (for screens that format their own text).
@@ -106,6 +158,7 @@ pub fn refreshFramebuffer() void {
     patch.saved = false;
     header_clock_active = false;
     active = .none;
+    setFooter(&.{}, "");
     surface = null;
     video_surface = null;
     screen_buffer = null;
@@ -235,12 +288,13 @@ pub const Home = struct {
         beginFullFrame();
         var u = ui() orelse return self.console();
         var clock: [48]u8 = undefined;
-        const hints = [_]Hint{
+        home_hints = .{
             .{ .key = "\u{2191}\u{2193}\u{2190}\u{2192}", .label = t(.key_select) },
             .{ .key = "Enter", .label = t(.key_open) },
             .{ .key = "Esc", .label = t(.key_power) },
         };
-        screens.home(&u, headerInfo(&clock, &u), self.items, self.selected, self.hover, &hints);
+        setFooter(&home_hints, "");
+        screens.home(&u, headerInfo(&clock, &u), self.items, self.selected, self.hover, &home_hints);
         presentFullFrame();
         showPointer();
     }
@@ -312,8 +366,10 @@ pub const ListScreen = struct {
         beginFullFrame();
         var u = ui() orelse return self.console();
         var clock: [48]u8 = undefined;
+        setFooter(self.spec.hints, self.spec.note);
         self.geometry = screens.listScreen(&u, headerInfo(&clock, &u), self.spec, self.first);
         self.first = self.geometry.first;
+        self.trace();
         presentFullFrame();
         showPointer();
     }
@@ -329,6 +385,7 @@ pub const ListScreen = struct {
 
     pub fn updateSelection(self: *ListScreen, selected: usize, help: ?screens.Help) void {
         if (selected >= self.spec.rows.len) return;
+        defer self.trace();
         if (surface == null) return self.redrawFull(selected, help);
         const previous = self.spec.selected;
         self.spec.selected = selected;
@@ -357,6 +414,43 @@ pub const ListScreen = struct {
         if (previous) |value| screens.drawRow(&u, self.geometry, self.spec, value);
         if (index) |value| screens.drawRow(&u, self.geometry, self.spec, value);
     }
+
+    /// More rows than fit: the wheel and drags scroll the view.
+    pub fn overflows(self: *const ListScreen) bool {
+        return surface != null and self.spec.rows.len > self.geometry.list.visible;
+    }
+
+    /// Vertical distance between rows, for drag-to-scroll.
+    pub fn rowPitch(self: *const ListScreen) u32 {
+        return self.geometry.list.row_step;
+    }
+
+    /// Scrolls the view by `delta` rows (positive = further down the list)
+    /// and keeps the selection on a visible, selectable row. Returns the
+    /// selection after scrolling; the rows are already redrawn.
+    pub fn scrollBy(self: *ListScreen, delta: i32, selectable: ?[]const bool) usize {
+        if (!self.overflows()) return self.spec.selected;
+        const count = self.spec.rows.len;
+        const visible = self.geometry.list.visible;
+        const first = gui.input_map.scrollFirst(self.first, delta, count, visible);
+        if (first == self.first) return self.spec.selected;
+        self.first = first;
+        self.geometry.first = first;
+        self.spec.selected = gui.input_map.clampSelection(self.spec.selected, first, visible, count, selectable);
+        self.spec.hover = null;
+        defer self.trace();
+        var u = beginPartial() orelse return self.spec.selected;
+        screens.drawRows(&u, self.geometry, self.spec);
+        endPartial();
+        return self.spec.selected;
+    }
+
+    /// Serial trace of the list state (QEMU input tests read it).
+    fn trace(self: *const ListScreen) void {
+        var buffer: [96]u8 = undefined;
+        const line = std.fmt.bufPrint(&buffer, "[UI_LIST] first={d} selected={d} visible={d} rows={d}\n", .{ self.first, self.spec.selected, self.geometry.list.visible, self.spec.rows.len }) catch return;
+        serial.writeAscii(line);
+    }
 };
 
 /// Visible row index under the pointer on the active list screen.
@@ -380,8 +474,7 @@ pub const NoticeLines = []const []const u8;
 
 /// A notice the user dismisses with Enter/Esc/click.
 pub fn notice(title: []const u8, icon: gui.icons.Kind, tone: gui.ui.Tone, heading: []const u8, lines: NoticeLines) void {
-    var hints: [1]Hint = undefined;
-    drawNotice(title, icon, tone, heading, lines, dismissHints(&hints), true);
+    drawNotice(title, icon, tone, heading, lines, dismissHints(&notice_hints), true);
 }
 
 /// A passive status (no input expected, no pointer).
@@ -393,6 +486,7 @@ pub fn status(title: []const u8, heading: []const u8, lines: NoticeLines) void {
 fn drawNotice(title: []const u8, icon: gui.icons.Kind, tone: gui.ui.Tone, heading: []const u8, lines: NoticeLines, hints: []const Hint, interactive: bool) void {
     active = .none;
     header_clock_active = true;
+    setFooter(if (interactive) hints else &.{}, "");
     beginFullFrame();
     var u = ui() orelse {
         console_clear(title);
@@ -424,11 +518,12 @@ pub fn summary(spec: screens.SummarySpec) void {
     active = .summary;
     header_clock_active = true;
     summary_spec = spec;
-    var hints: [2]Hint = .{
+    summary_hints = .{
         .{ .key = "Enter", .label = t(.key_start) },
         .{ .key = "Esc", .label = t(.key_back) },
     };
-    summary_spec.hints = if (spec.action_enabled) &hints else hints[1..];
+    summary_spec.hints = if (spec.action_enabled) &summary_hints else summary_hints[1..];
+    setFooter(summary_spec.hints, "");
     beginFullFrame();
     var u = ui() orelse {
         console_clear(spec.title);
@@ -469,6 +564,7 @@ pub fn handoffStatus(detail: []const u8) void {
 
 fn progress(state: gui.preparation_screen.State) void {
     active = .none;
+    setFooter(&.{}, "");
     header_clock_active = true;
     beginFullFrame();
     var u = ui() orelse {
@@ -514,7 +610,7 @@ pub fn updatePointer() void {
     switch (active) {
         .home => if (active_home) |home| home.setHover(home.hit(pos.x, pos.y)),
         .list => if (active_list) |list| {
-            const hit = screens.listHit(list.geometry, list.spec.rows.len, pos.x, pos.y);
+            const hit = if (pointer.isDragging()) null else screens.listHit(list.geometry, list.spec.rows.len, pos.x, pos.y);
             list.setHover(if (hit) |index| (if (index != list.spec.selected and list.spec.rows[index].enabled) index else null) else null);
         },
         .summary => {
@@ -569,4 +665,31 @@ fn consoleLine(prefix: []const u8, first: []const u8, second: []const u8) void {
         console.writeUtf8(second);
     }
     console.writeAscii("\n");
+}
+
+// ------------------------------------------------------------------ input test
+
+var input_test_hints: [1]Hint = undefined;
+
+/// One frame of the input test screen: live input lines and a marker at
+/// the last tap/click (touch bring-up on new hardware).
+pub fn inputTestFrame(lines: NoticeLines, marker: ?[2]u32, dragging: bool) void {
+    active = .none;
+    header_clock_active = true;
+    input_test_hints = .{.{ .key = "Esc", .label = t(.key_back) }};
+    setFooter(&input_test_hints, "");
+    beginFullFrame();
+    var u = ui() orelse {
+        console_clear(t(.input_test_title));
+        for (lines) |line| consoleLine("", line, "");
+        return;
+    };
+    var clock: [48]u8 = undefined;
+    screens.notice(&u, headerInfo(&clock, &u), .{ .title = t(.input_test_title), .subtitle = t(.input_test_help), .icon = .gear, .tone = .neutral, .heading = "", .lines = lines, .hints = &input_test_hints });
+    if (marker) |point| {
+        const theme_color = if (dragging) theme.warning else theme.accent;
+        gui.paint.circle(u.surface, gui.paint.s(point[0]), gui.paint.s(point[1]), gui.paint.s(u.px(14)), theme_color, null);
+    }
+    presentFullFrame();
+    showPointer();
 }

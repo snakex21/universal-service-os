@@ -22,7 +22,7 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, system: *const
     list.open(system.name, view.t(.images_subtitle), rows[0..images.len], selected, false, null);
 
     while (true) {
-        switch (navigation.handle(input.readBlocking(), &selected, images.len, list.visibleStart(), list.visibleCount())) {
+        switch (navigation.handle(input.readBlocking(), &selected, images.len, &list)) {
             .activate => return images.items[selected],
             .back => return null,
             .changed => list.updateSelection(selected, null),

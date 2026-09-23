@@ -32,7 +32,7 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, system: *const
     list.open(view.t(.unattended_title), view.t(.unattended_subtitle), rows[0..len], selected, false, help(selected));
 
     while (true) {
-        switch (navigation.handle(input.readBlocking(), &selected, len, list.visibleStart(), list.visibleCount())) {
+        switch (navigation.handle(input.readBlocking(), &selected, len, &list)) {
             .activate => return .{ .path = options[selected] },
             .back => return .{ .back = true },
             .changed => list.updateSelection(selected, help(selected)),

@@ -44,7 +44,7 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
     list.open(view.tr("Utilities"), view.t(.category_utilities_desc), rows[0..count], selected, true, null);
 
     while (true) {
-        switch (navigation.handleSelectable(input.readBlocking(), &selected, count, list.visibleStart(), list.visibleCount(), selectable[0..count])) {
+        switch (navigation.handleSelectable(input.readBlocking(), &selected, count, &list, selectable[0..count])) {
             .activate => {
                 const entry = &entries[selected];
                 const media = discovery.mediaStatus(entry.image_directory);

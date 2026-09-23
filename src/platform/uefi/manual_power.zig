@@ -8,22 +8,23 @@ const view = @import("manual_view.zig");
 const os_indications_name = std.unicode.utf8ToUtf16LeStringLiteral("OsIndications");
 const os_indications_supported_name = std.unicode.utf8ToUtf16LeStringLiteral("OsIndicationsSupported");
 const boot_to_fw_ui: u64 = 0x0000000000000001;
-const option_count: usize = 3;
+const option_count: usize = 4;
 
 pub fn show() void {
     const firmware_ui = firmwareUiSupported();
-    var selectable = [_]bool{ true, true, firmware_ui };
+    var selectable = [_]bool{ true, true, firmware_ui, true };
     var rows = [_]usos.gui.ui.Row{
         .{ .title = view.t(.power_restart), .icon = .{ .vector = .restart } },
         .{ .title = view.t(.power_shutdown), .icon = .{ .vector = .shutdown } },
         firmwareRow(firmware_ui),
+        .{ .title = view.t(.input_test_title), .detail = view.t(.power_input_test), .icon = .{ .vector = .gear } },
     };
     var selected: usize = 0;
     var list: view.ListScreen = undefined;
     list.open(view.t(.power_title), view.t(.power_subtitle), &rows, selected, false, null);
 
     while (true) {
-        switch (navigation.handleSelectable(input.readBlocking(), &selected, option_count, list.visibleStart(), list.visibleCount(), &selectable)) {
+        switch (navigation.handleSelectable(input.readBlocking(), &selected, option_count, &list, &selectable)) {
             .activate => switch (selected) {
                 0 => uefi.system_table.runtime_services.resetSystem(.cold, .success, null),
                 1 => uefi.system_table.runtime_services.resetSystem(.shutdown, .success, null),
@@ -32,6 +33,10 @@ pub fn show() void {
                     const current_support = firmwareUiSupported();
                     selectable[2] = current_support;
                     rows[2] = firmwareRow(current_support);
+                    list.redrawFull(selected, null);
+                },
+                3 => {
+                    @import("manual_input_test.zig").show();
                     list.redrawFull(selected, null);
                 },
                 else => {},

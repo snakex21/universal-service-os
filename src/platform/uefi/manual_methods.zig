@@ -36,7 +36,7 @@ pub fn select(system: *const usos.catalog.SystemEntry, image: usos.catalog.Image
     list.open(view.t(.methods_title), image.name.slice(), rows[0..count], selected, false, help(&model.items[map[selected]], &help_lines));
 
     while (true) {
-        switch (navigation.handle(input.readBlocking(), &selected, count, list.visibleStart(), list.visibleCount())) {
+        switch (navigation.handle(input.readBlocking(), &selected, count, &list)) {
             .activate => return model.items[map[selected]].method,
             .back => return null,
             .changed => list.updateSelection(selected, help(&model.items[map[selected]], &help_lines)),
