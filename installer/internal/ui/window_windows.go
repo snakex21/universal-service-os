@@ -76,17 +76,18 @@ type scrollRegion struct {
 }
 
 type nativeEdit struct {
-	id        string
-	hwnd      windows.HWND
-	ctrlID    uintptr
-	multiline bool
-	mono      bool
-	placed    rect
-	shown     bool
-	used      bool
-	disabled  bool
-	onChange  func(string)
-	fontSize  int32
+	id         string
+	hwnd       windows.HWND
+	ctrlID     uintptr
+	multiline  bool
+	mono       bool
+	placed     rect
+	shown      bool
+	used       bool
+	disabled   bool
+	pendingEnd bool
+	onChange   func(string)
+	fontSize   int32
 }
 
 type editOptions struct {
@@ -631,6 +632,9 @@ func (w *win) endFrame() {
 		} else if !hide && !e.shown {
 			procShowWindow.Call(uintptr(e.hwnd), swShowNA)
 			e.shown = true
+			if e.pendingEnd {
+				e.scrollToEnd()
+			}
 		}
 	}
 	if w.focus != "" {
@@ -1050,6 +1054,19 @@ func (e *nativeEdit) appendText(s string) {
 		sendMessage(e.hwnd, emReplaceSel, 0, uintptr(unsafe.Pointer(utf16Ptr(toCRLF(s)))))
 	}
 	sendMessage(e.hwnd, emScrollCaret, 0, 0)
+	e.scrollToEnd()
+}
+
+// scrollToEnd shows the last line; EM_SCROLLCARET alone does nothing while
+// the control is still hidden, so endFrame repeats it after showing it.
+func (e *nativeEdit) scrollToEnd() {
+	if !e.shown {
+		e.pendingEnd = true
+		return
+	}
+	lines := sendMessage(e.hwnd, emGetLineCount, 0, 0)
+	sendMessage(e.hwnd, emLineScroll, 0, lines)
+	e.pendingEnd = false
 }
 
 var procEnableWindow = user32.NewProc("EnableWindow")

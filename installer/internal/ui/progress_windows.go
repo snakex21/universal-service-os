@@ -63,8 +63,10 @@ type progressScreen struct {
 	log     logView
 	started time.Time
 	ended   time.Time
-	// lastActive is the stage that was scrolled into view last.
+	// lastActive/lastView: the stage scrolled into view last and the list
+	// height at that time (opening the log shrinks the list).
 	lastActive int
+	lastView   int32
 }
 
 func newProgressScreen(f *Flow, op operation, events <-chan opEvent) *progressScreen {
@@ -167,7 +169,7 @@ func (s *progressScreen) drawStages(w *win, r rect) {
 	// Keep the running stage in view.
 	for i, def := range s.model.defs {
 		if st := s.model.states[def.ID]; st == stateActive || st == stateFailed {
-			if sc := w.scrolls["stages"]; sc != nil && s.lastActive != def.ID {
+			if sc := w.scrolls["stages"]; sc != nil && (s.lastActive != def.ID || s.lastView != view.h()) {
 				top, bottom := int32(i)*rowH, int32(i+1)*rowH
 				if top < sc.offset || bottom > sc.offset+view.h() {
 					sc.offset = bottom - view.h() + rowH
@@ -176,6 +178,7 @@ func (s *progressScreen) drawStages(w *win, r rect) {
 			s.lastActive = def.ID
 		}
 	}
+	s.lastView = view.h()
 	offset := w.beginScroll("stages", view)
 	y := view.Top - offset
 	for _, def := range s.model.defs {

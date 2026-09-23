@@ -112,7 +112,12 @@ func (d *Driver) Key(vk uintptr) {
 func (d *Driver) Type(text string) {
 	for _, r := range text {
 		d.do(func() {
-			if target := getFocus(); target != 0 {
+			// The focused EDIT, even when another application is active.
+			target := getFocus()
+			if e := d.w.edits[d.w.focus]; e != nil {
+				target = e.hwnd
+			}
+			if target != 0 {
 				procPostMessageW.Call(uintptr(target), wmChar, uintptr(r), 0)
 			}
 		})
@@ -165,6 +170,11 @@ func (d *Driver) Memory() (uint64, uint64) { return processMemory() }
 // The window is raised above other windows and copied from the screen, which
 // captures exactly what DWM composed, native controls included.
 func (d *Driver) Shot(path string) error {
+	d.do(func() {
+		if iconic, _, _ := procIsIconic.Call(uintptr(d.w.hwnd)); iconic != 0 {
+			procShowWindow.Call(uintptr(d.w.hwnd), swRestore)
+		}
+	})
 	d.Idle()
 	d.do(func() {
 		procSetWindowPos.Call(uintptr(d.w.hwnd), hwndTopmost, 0, 0, 0, 0, swpNoMove|swpNoSize|swpNoActivate)
@@ -189,7 +199,12 @@ var (
 	procDwmGetWindowAttribute = dwmapi.NewProc("DwmGetWindowAttribute")
 )
 
-const dwmaExtendedFrameBounds = 9
+const (
+	dwmaExtendedFrameBounds = 9
+	swRestore               = 9
+)
+
+var procIsIconic = user32.NewProc("IsIconic")
 
 // Loaded waits until the header refresh control is enabled again, i.e. the
 // current screen finished scanning.

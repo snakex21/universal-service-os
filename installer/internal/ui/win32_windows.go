@@ -143,6 +143,8 @@ const (
 	enKillFocus        = 0x0200
 	emSetSel           = 0x00B1
 	emScrollCaret      = 0x00B7
+	emLineScroll       = 0x00B6
+	emGetLineCount     = 0x00BA
 	emReplaceSel       = 0x00C2
 	emSetLimitText     = 0x00C5
 	emSetMargins       = 0x00D3
