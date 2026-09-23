@@ -54,7 +54,7 @@ def run(device: str, out: Path, width: int, height: int) -> dict:
     port, qmp_port = free_port(), free_port()
     vars_copy = WORK / f"vars-linux-input-{device}.fd"
     shutil.copyfile(OVMF_VARS, vars_copy)
-    append = "rdinit=/usos-init usos.legacy_action=hardware console=tty0 console=ttyS0,115200n8 quiet loglevel=3 fbcon=nodefer vt.global_cursor_default=0"
+    append = "rdinit=/usos-init usos.legacy_action=hardware console=tty0 console=ttyS0,115200n8 quiet loglevel=3 vt.global_cursor_default=0"
     args = [
         str(QEMU), "-name", f"USOS-linux-input-{device}", "-machine", "q35", "-accel", "tcg,thread=multi",
         "-cpu", "max", "-m", "2048", "-smp", "2", "-nic", "none",

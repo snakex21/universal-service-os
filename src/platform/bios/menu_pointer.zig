@@ -1,5 +1,6 @@
 //! PS/2 mouse pointer for the Legacy BIOS menu: the anti-aliased arrow from
-//! src/gui/cursor.zig (sprite and saved patch live in boot_ui's window).
+//! src/gui/cursor.zig (the sprite lives in boot_ui's window), composited
+//! over the menu's back buffer on every present.
 //! Moving over a row or card selects it, a left click opens it, a right
 //! click goes back, like Esc, and the wheel (IntelliMouse) moves the
 //! selection like the arrow keys.
@@ -16,6 +17,7 @@ var state: struct {
     initialized: bool = false,
     enabled: bool = false,
     selected: usize = 0,
+    shown: bool = false,
     x: u32 = 0,
     y: u32 = 0,
     marker: u8 = 1,
@@ -29,6 +31,7 @@ pub fn configure(surface: Surface, home: bool, count: usize, selected: usize) vo
     state.selected = selected;
     if (!state.initialized) {
         state.initialized = true;
+        console.before_wait = flush;
         state.x = surface.framebuffer.width / 2;
         state.y = surface.framebuffer.height / 2;
         const result = mouse.init();
@@ -48,21 +51,26 @@ pub fn stopListening() void {
     console.setAuxiliaryHook(null);
 }
 
+/// Presents the menu's back buffer with the pointer where it is (or none).
+pub fn flush() void {
+    if (!boot_ui.hasPresenter()) return;
+    const surface = state.surface orelse return boot_ui.present(null);
+    if (!state.shown or !state.enabled) return boot_ui.present(null);
+    const ui = boot_ui.partial(surface);
+    const sprite = boot_ui.sprite(ui.fonts.scale.twice()) orelse return boot_ui.present(null);
+    boot_ui.present(.{ .sprite = sprite, .x = state.x, .y = state.y });
+}
+
+/// The pointer is composited by boot_ui's presenter (never drawn into the
+/// menu); without the presenter's RAM the menu has no visible pointer.
 pub fn hide() void {
-    const surface = state.surface orelse return;
-    const patch = boot_ui.patch() orelse return;
-    patch.restore(surface);
+    state.shown = false;
 }
 
 fn show() void {
     if (!state.enabled) return;
-    const surface = state.surface orelse return;
-    const patch = boot_ui.patch() orelse return;
-    if (patch.saved) return;
-    const ui = boot_ui.partial(surface);
-    const sprite = boot_ui.sprite(ui.fonts.scale.twice()) orelse return;
-    patch.save(surface, state.x, state.y, sprite.width, sprite.height);
-    sprite.draw(surface, state.x, state.y, &patch.pixels);
+    state.shown = true;
+    flush();
 }
 
 fn feed(byte: u8) ?console.Key {

@@ -22,13 +22,18 @@ const Ui = graphics.ui.Ui;
 
 pub const window_base: u32 = 0x02000000;
 pub const window_bytes: u32 = 0x00100000;
+// Menu back buffer, on-screen copy and composite scratch (5 MiB each, up to
+// 1280x1024x32) right above the resource window. Backends may overwrite
+// them like the window; every full menu screen resends the whole frame.
+const frame_addr: u32 = window_base + window_bytes;
+const frame_capacity: u32 = 0x00500000;
+const frames_end: u64 = frame_addr + 3 * @as(u64, frame_capacity);
 const resource_addr: u32 = window_base;
 const resource_capacity: u32 = 0x80000;
 const lang_addr: u32 = window_base + 0x80000;
 const lang_capacity: u32 = lang_file.max_blob_bytes;
 const table_addr: u32 = window_base + 0xC0000;
 const sprite_addr: u32 = window_base + 0xD0000;
-const patch_addr: u32 = window_base + 0xE0000;
 const icon_addr: u32 = window_base + 0xF0000;
 
 const resource_magic = "USOSBUI1";
@@ -58,54 +63,75 @@ var state: struct {
 
 const english_table = lang_file.Table.english_only;
 
-var splash_surface: ?graphics.Surface linksection(".data") = null;
-
 /// Minimal splash drawn right after the VBE mode is set (the font is not
-/// loaded yet): the menu background, the USOS logo tile and a thin bar that
-/// fills while bios-ui.bin loads. The first menu frame replaces it.
+/// loaded yet): the menu background and the USOS logo tile. The first menu
+/// frame replaces it about 0.1 s later.
 pub fn splash(surface: graphics.Surface) void {
     const ui = Ui.init(surface, graphics.Theme{}, null, &english_table);
     surface.fill(ui.theme.background);
     const size = ui.px(84);
-    graphics.ui.drawLogoOn(&ui, (ui.width() -| size) / 2, splashLogoY(&ui), size, ui.theme.background);
-    splash_surface = surface;
-    splashBar(0);
+    graphics.ui.drawLogoOn(&ui, (ui.width() -| size) / 2, (ui.height() * 42 / 100) -| (size / 2), size, ui.theme.background);
 }
 
-fn splashLogoY(ui: *const Ui) u32 {
-    return (ui.height() * 42 / 100) -| ui.px(42);
+fn ignoreProgress(_: *anyopaque, _: usize) void {}
+
+/// Flicker-free menus (src/gui/compositor.zig): screens are drawn into a
+/// RAM back buffer and only changed rectangles, with the pointer
+/// composited in, are copied to the VBE framebuffer. Null when the RAM
+/// above the window is not usable: then menus draw straight to the LFB.
+var presenter: ?graphics.compositor.Presenter linksection(".data") = null;
+var lfb: graphics.Surface linksection(".data") = undefined;
+
+/// Where menu screens draw: the back buffer, or the LFB without one.
+pub fn menuSurface(surface: graphics.Surface) graphics.Surface {
+    return if (presenter) |p| p.back else surface;
 }
 
-fn splashBar(percent: u8) void {
-    const surface = splash_surface orelse return;
-    const ui = Ui.init(surface, graphics.Theme{}, null, &english_table);
-    const w = ui.px(160);
-    const h = ui.px(4);
-    const x = (ui.width() -| w) / 2;
-    const y = splashLogoY(&ui) + ui.px(84 + 44);
-    const theme = ui.theme;
-    graphics.paint.roundRect(surface, x, y, w, h, h / 2, theme.border, theme.background);
-    const filled = w * percent / 100;
-    if (filled >= h) graphics.paint.roundRect(surface, x, y, filled, h, h / 2, theme.accent, theme.border);
+pub fn hasPresenter() bool {
+    return presenter != null;
 }
 
-const SplashProgress = struct {
-    total: usize,
+/// Shows the menu's changes and the pointer (null: hidden).
+pub fn present(pointer: ?graphics.compositor.Pointer) void {
+    const p = if (presenter) |*value| value else return;
+    p.pointer = pointer;
+    p.present(graphics.compositor.surfaceSink(&lfb));
+}
 
-    fn update(context: *anyopaque, bytes_done: usize) void {
-        const self: *SplashProgress = @ptrCast(@alignCast(context));
-        splashBar(@intCast(@min(100, bytes_done * 100 / @max(self.total, 1))));
-    }
-};
+/// The LFB was drawn directly (progress frames, text mode): resend all.
+pub fn invalidate() void {
+    if (presenter) |*p| p.invalidate();
+}
+
+fn setupPresenter(surface: graphics.Surface) void {
+    const fb = surface.framebuffer;
+    const bytes = @as(u64, fb.width) * fb.height * 4;
+    if (bytes > frame_capacity or !ramUsable(frame_addr, frames_end)) return;
+    const frameSurface = struct {
+        fn f(address: u32, source: graphics.Framebuffer) ?graphics.Surface {
+            var info = source;
+            info.address = address;
+            info.pixels_per_scan_line = source.width;
+            info.size = source.width * source.height * 4;
+            return graphics.Surface.init(info);
+        }
+    }.f;
+    const back = frameSurface(frame_addr, fb) orelse return;
+    const front = frameSurface(frame_addr + frame_capacity, fb) orelse return;
+    const scratch: [*]u32 = @ptrFromInt(frame_addr + 2 * frame_capacity);
+    lfb = surface;
+    presenter = .{ .back = back, .front = front, .scratch = scratch[0 .. frame_capacity / 4] };
+}
 
 /// Remembers the ESP and loads the resources. `fs` must stay valid for the
 /// life of the menu (core_main never returns). `bulk` reads up to 127
 /// sectors per INT 13h call (bios-ui.bin was ~240 single-sector calls).
-pub fn init(fs: *const fat32.FileSystem, reader: random_reader.Reader, bulk: random_reader.Reader) void {
+pub fn init(fs: *const fat32.FileSystem, reader: random_reader.Reader, bulk: random_reader.Reader, surface: graphics.Surface) void {
     state.fs = fs;
     state.reader = reader;
     state.bulk = bulk;
-    state.window_ok = windowUsable();
+    state.window_ok = ramUsable(window_base, window_base + window_bytes);
+    if (state.window_ok) setupPresenter(surface);
     if (!state.window_ok) {
         console.line("[BIOS_UI] high-memory window not usable; 5x7 English fallback");
         return;
@@ -113,11 +139,9 @@ pub fn init(fs: *const fat32.FileSystem, reader: random_reader.Reader, bulk: ran
     reload();
 }
 
-fn windowUsable() bool {
+fn ramUsable(start: u64, end: u64) bool {
     var map: [e820.max_entries]e820.Entry = undefined;
     const count = e820.probe(&map) catch return false;
-    const start: u64 = window_base;
-    const end: u64 = window_base + window_bytes;
     for (map[0..count]) |entry| {
         if (!entry.isUsable()) continue;
         const entry_end = entry.end() orelse continue;
@@ -133,12 +157,10 @@ fn reload() void {
     state.table_ok = false;
     forgetPointer();
     const resources: [*]u8 = @ptrFromInt(resource_addr);
-    var splash_progress = SplashProgress{ .total = if (fat32.fileInfo(fs.*, reader, &resource_path)) |info| info.size else |_| resource_capacity };
-    state.resource_len = @intCast(fat32.readFileSequentialProgress(fs.*, reader, &resource_path, resources[0..resource_capacity], .{ .context = &splash_progress, .update_fn = SplashProgress.update }) catch 0);
-    // Only the first load draws on the splash; reloads happen under menus.
-    splash_surface = null;
+    const quiet = fat32.ReadProgress{ .context = undefined, .update_fn = ignoreProgress };
+    state.resource_len = @intCast(fat32.readFileSequentialProgress(fs.*, reader, &resource_path, resources[0..resource_capacity], quiet) catch 0);
     const lang: [*]u8 = @ptrFromInt(lang_addr);
-    state.lang_len = @intCast(fat32.readFileSequentialProgress(fs.*, reader, &lang_path, lang[0..lang_capacity], .{ .context = &splash_progress, .update_fn = SplashProgress.update }) catch 0);
+    state.lang_len = @intCast(fat32.readFileSequentialProgress(fs.*, reader, &lang_path, lang[0..lang_capacity], quiet) catch 0);
     _ = validate(@ptrFromInt(table_addr));
     console.line(if (state.pack_ok) "[BIOS_UI] font pack ready" else "[BIOS_UI] bios-ui.bin missing or invalid; 5x7 English fallback");
     console.line(if (state.table_ok) "[BIOS_UI] language ready" else "[BIOS_UI] English (no valid lang.bin)");
@@ -181,19 +203,24 @@ pub fn menu(surface: graphics.Surface) Ui {
     if (state.window_ok and !validate(table)) {
         reload();
     }
-    return make(surface, table);
+    // A full screen follows: send it whole (a backend may have overwritten
+    // the buffers or drawn on the LFB meanwhile).
+    invalidate();
+    return make(menuSurface(surface), table);
 }
 
 /// Toolkit for frames drawn while a backend owns memory: never writes to
 /// the window; `scratch` (caller's stack) receives the parsed language.
 pub fn progress(surface: graphics.Surface, scratch: *lang_file.Table) Ui {
+    // Progress frames draw on the LFB (a backend owns the RAM above).
+    invalidate();
     _ = validate(scratch);
     return make(surface, scratch);
 }
 
 /// Toolkit for partial redraws right after a full menu screen.
 pub fn partial(surface: graphics.Surface) Ui {
-    return make(surface, @ptrFromInt(table_addr));
+    return make(menuSurface(surface), @ptrFromInt(table_addr));
 }
 
 fn make(surface: graphics.Surface, table: *const lang_file.Table) Ui {
@@ -240,15 +267,9 @@ pub fn sprite(scale_twice: u32) ?*graphics.cursor.Sprite {
     return value;
 }
 
-pub fn patch() ?*graphics.cursor.Patch {
-    if (!state.window_ok) return null;
-    return @ptrFromInt(patch_addr);
-}
-
 /// Invalidates cached pointer data after a backend may have used the window.
 pub fn forgetPointer() void {
     state.sprite_scale = 0;
-    if (patch()) |value| value.saved = false;
 }
 
 pub fn clock(ui: *const Ui, buffer: []u8) []const u8 {

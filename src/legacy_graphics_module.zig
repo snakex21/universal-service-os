@@ -15,6 +15,7 @@ pub const ui = @import("gui/ui.zig");
 pub const ui_screens = @import("gui/menu_screens.zig");
 pub const preparation_screen = @import("gui/preparation_screen.zig");
 pub const rgba_rle = @import("gui/rgba_rle.zig");
+pub const compositor = @import("gui/compositor.zig");
 pub const lang_file = @import("i18n/lang_file.zig");
 
 test {

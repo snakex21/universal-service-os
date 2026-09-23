@@ -70,6 +70,17 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
     const pixels = try allocator.alloc(u32, @as(usize, width) * height);
     defer allocator.free(pixels);
     const buffer = usos.gui.ScreenBuffer.init(@intFromPtr(pixels.ptr), pixels.len * 4, width, height, if (device) |d| d.surface.framebuffer.pixel_format else .bgrx8) orelse return 3;
+    // Flicker-free presentation (src/gui/compositor.zig): the menu is drawn
+    // into `buffer` without the pointer; only changed rectangles, with the
+    // pointer composited in, are copied to the framebuffer. A pointer move
+    // repaints just the old and new pointer rectangles.
+    const front_pixels = try allocator.alloc(u32, pixels.len);
+    defer allocator.free(front_pixels);
+    const scratch = try allocator.alloc(u32, pixels.len);
+    defer allocator.free(scratch);
+    const front = usos.gui.ScreenBuffer.init(@intFromPtr(front_pixels.ptr), front_pixels.len * 4, width, height, buffer.surface.framebuffer.pixel_format) orelse return 3;
+    var presenter = usos.gui.compositor.Presenter{ .back = buffer.surface, .front = front.surface, .scratch = scratch };
+    var sprite = usos.gui.cursor.Sprite{};
     var input = input_module.Input{ .x = @intCast(width / 2), .y = @intCast(height / 2), .width = @intCast(width), .height = @intCast(height) };
     defer input.close();
     input.scan();
@@ -81,6 +92,7 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
     context.* = .{};
     context.load();
     const ui = context.ui(buffer.surface);
+    sprite.build(ui.fonts.scale.twice());
     var redraw = true;
     var ready = false;
     var drag_scroll = usos.gui.input_map.DragScroll{};
@@ -88,8 +100,8 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
         const layout = renderer.Layout.init(&ui, state);
         if (redraw) {
             if (device) |*d| {
-                renderer.renderWith(&ui, state, input.x, input.y, input.pointer_visible, input.gamepad_active);
-                buffer.copyTo(d.surface);
+                renderer.renderWith(&ui, state, input.x, input.y, false, input.gamepad_active);
+                presentMenu(&presenter, d, &sprite, &input);
                 d.present();
             } else {
                 console(tty, state);
@@ -132,7 +144,10 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
                 }
                 redraw = true;
             },
-            .pointer => { redraw = true; },
+            // Only the pointer moved: repaint its old and new rectangles.
+            .pointer => if (device) |*d| presentMenu(&presenter, d, &sprite, &input) else {
+                redraw = true;
+            },
             .click => {
                 drag_scroll.reset();
                 if (input.has_position and input.x >= 0 and input.y >= 0) {
@@ -148,6 +163,14 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
             },
         }
     }
+}
+
+fn presentMenu(presenter: *usos.gui.compositor.Presenter, device: *const fb.Device, sprite: *const usos.gui.cursor.Sprite, input: *const input_module.Input) void {
+    presenter.pointer = if (input.pointer_visible and input.x >= 0 and input.y >= 0)
+        .{ .sprite = sprite, .x = @intCast(input.x), .y = @intCast(input.y) }
+    else
+        null;
+    presenter.present(usos.gui.compositor.surfaceSink(&device.surface));
 }
 
 fn selected(index: usize) u8 {

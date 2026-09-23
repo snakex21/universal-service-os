@@ -43,6 +43,20 @@ var sprite = gui.cursor.Sprite{};
 var sprite_scale: u32 = 0;
 var patch = gui.cursor.Patch{};
 
+// Flicker-free presentation (src/gui/compositor.zig): every screen is drawn
+// into the back buffer, the pointer is composited per dirty rectangle and
+// each rectangle reaches the screen in one GOP Blt. Without the three
+// buffers (allocation failed) the menu draws straight to the framebuffer
+// with the saved-patch pointer as before.
+var presenter: ?gui.compositor.Presenter = null;
+var front_pool: ?[]align(8) u8 = null;
+var scratch_pool: ?[]align(8) u8 = null;
+var pointer_visible = false;
+var pointer_pending = false;
+var last_pointer_present: u64 = 0;
+/// Pointer-driven redraws are limited to about 60 per second.
+const pointer_frame_ms: u64 = 16;
+
 const Active = enum { none, home, list, summary };
 var active: Active = .none;
 var active_home: ?*Home = null;
@@ -82,6 +96,7 @@ pub fn init(root: *std.os.uefi.protocol.File, info: usos.boot_info.BootInfo, set
     runtime_firmware = info.firmware;
     input.setIdleHook(updateClock);
     input.setHintHook(hintAt);
+    input.setFrameHook(flushPointer);
     pointer.configure(parseSettings(settings));
     if (info.framebuffer) |framebuffer| video_surface = gui.Surface.init(framebuffer);
     surface = video_surface;
@@ -115,6 +130,8 @@ pub fn handover(text: []const u8) void {
     header_clock_active = false;
     active = .none;
     setFooter(&.{}, "");
+    pointer_visible = false;
+    if (presenter) |*p| p.invalidate();
     const canvas = video_surface orelse return console_clear(text);
     splash.handover(canvas.framebuffer, text);
 }
@@ -197,6 +214,71 @@ fn initScreenBuffer(canvas: gui.Surface) void {
     };
     screen_buffer_pool = pool;
     screen_buffer = buffer;
+
+    const front_bytes = boot_services.allocatePool(.boot_services_data, needed) catch return;
+    const scratch_bytes = boot_services.allocatePool(.boot_services_data, needed) catch {
+        boot_services.freePool(front_bytes.ptr) catch {};
+        return;
+    };
+    const front = gui.ScreenBuffer.init(@intFromPtr(front_bytes.ptr), front_bytes.len, canvas.framebuffer.width, canvas.framebuffer.height, .bgrx8) orelse {
+        boot_services.freePool(front_bytes.ptr) catch {};
+        boot_services.freePool(scratch_bytes.ptr) catch {};
+        return;
+    };
+    front_pool = front_bytes;
+    scratch_pool = scratch_bytes;
+    const scratch: [*]u32 = @ptrCast(scratch_bytes.ptr);
+    presenter = .{ .back = buffer.surface, .front = front.surface, .scratch = scratch[0 .. needed / 4] };
+    surface = buffer.surface;
+}
+
+fn releaseBuffers() void {
+    presenter = null;
+    const bs = std.os.uefi.system_table.boot_services orelse return;
+    inline for (.{ &screen_buffer_pool, &front_pool, &scratch_pool }) |slot| {
+        if (slot.*) |pool| bs.freePool(pool.ptr) catch {};
+        slot.* = null;
+    }
+}
+
+fn bltSink() gui.compositor.Sink {
+    return .{ .context = undefined, .write = bltRect };
+}
+
+fn bltRect(_: *anyopaque, rect: gui.compositor.Rect, pixels: []const u32) void {
+    const GraphicsOutput = std.os.uefi.protocol.GraphicsOutput;
+    if (graphics_output) |graphics| {
+        const source: [*]GraphicsOutput.BltPixel = @ptrCast(@constCast(pixels.ptr));
+        if (graphics.blt(source, .blt_buffer_to_video, 0, 0, rect.x, rect.y, rect.w, rect.h, @as(usize, rect.w) * @sizeOf(GraphicsOutput.BltPixel))) |_| return else |_| {}
+    }
+    // No Blt: row copies into the linear framebuffer (format converted).
+    const video = video_surface orelse return;
+    const back = (presenter orelse return).back;
+    var row: u32 = 0;
+    while (row < rect.h) : (row += 1) {
+        var column: u32 = 0;
+        while (column < rect.w) : (column += 1) {
+            video.setPixel(rect.x + column, rect.y + row, back.unpackColor(pixels[@as(usize, row) * rect.w + column]));
+        }
+    }
+}
+
+/// Sends the back buffer's changes and the pointer to the screen.
+fn present() void {
+    const p = if (presenter) |*value| value else return;
+    p.pointer = if (pointer_visible and pointer.available()) pointerSprite() else null;
+    p.present(bltSink());
+}
+
+fn pointerSprite() ?gui.compositor.Pointer {
+    var u = ui() orelse return null;
+    const scale = u.fonts.scale.twice();
+    if (scale != sprite_scale) {
+        sprite.build(scale);
+        sprite_scale = scale;
+    }
+    const pos = pointer.position();
+    return .{ .sprite = &sprite, .x = pos.x, .y = pos.y };
 }
 
 // An EFI application may return after changing the GOP mode. Discard every
@@ -211,10 +293,8 @@ pub fn refreshFramebuffer() void {
     screen_buffer = null;
     graphics_output = null;
     full_frame_buffered = false;
-    if (screen_buffer_pool) |pool| {
-        if (std.os.uefi.system_table.boot_services) |bs| bs.freePool(pool.ptr) catch {};
-    }
-    screen_buffer_pool = null;
+    pointer_visible = false;
+    releaseBuffers();
     const framebuffer = (@import("framebuffer.zig").locate() catch null) orelse return;
     const canvas = gui.Surface.init(framebuffer) orelse return;
     video_surface = canvas;
@@ -247,6 +327,13 @@ fn clockNow(buffer: []u8, u: *const Ui) []const u8 {
 fn beginFullFrame() void {
     // The first full frame (menu, resume status or error) replaces the splash.
     splash.end();
+    if (presenter) |*p| {
+        // Something else may have drawn on the screen (splash, an EFI
+        // application): send the whole next frame.
+        p.invalidate();
+        surface = p.back;
+        return;
+    }
     patch.saved = false;
     surface = video_surface;
     full_frame_buffered = false;
@@ -256,7 +343,26 @@ fn beginFullFrame() void {
     }
 }
 
-fn presentFullFrame() void {
+fn presentFullFrame(interactive: bool) void {
+    if (presenter != null) {
+        pointer_visible = interactive;
+        present();
+        firstFrameDone();
+        return;
+    }
+    presentDirect();
+    if (interactive) showPointer();
+}
+
+fn firstFrameDone() void {
+    if (!timing_reported) {
+        timing_reported = true;
+        boot_timing.mark("first frame presented");
+        afterFirstFrame();
+    }
+}
+
+fn presentDirect() void {
     if (!full_frame_buffered) {
         surface = video_surface;
         return;
@@ -289,21 +395,18 @@ fn presentFullFrame() void {
     if (!presented) buffer.copyTo(video);
     surface = video;
     full_frame_buffered = false;
-    if (!timing_reported) {
-        timing_reported = true;
-        boot_timing.mark("first frame presented");
-        afterFirstFrame();
-    }
+    firstFrameDone();
 }
 
 /// Partial redraw on the visible surface: hide the pointer, draw, show it.
 fn beginPartial() ?Ui {
     const canvas = surface orelse return null;
-    hidePointer(canvas);
+    if (presenter == null) hidePointer(canvas);
     return ui();
 }
 
 fn endPartial() void {
+    if (presenter != null) return present();
     showPointer();
 }
 
@@ -349,8 +452,7 @@ pub const Home = struct {
         };
         setFooter(&home_hints, "");
         screens.home(&u, headerInfo(&clock, &u), self.items, self.selected, self.hover, &home_hints);
-        presentFullFrame();
-        showPointer();
+        presentFullFrame(true);
     }
 
     fn console(self: *Home) void {
@@ -424,8 +526,7 @@ pub const ListScreen = struct {
         self.geometry = screens.listScreen(&u, headerInfo(&clock, &u), self.spec, self.first);
         self.first = self.geometry.first;
         self.trace();
-        presentFullFrame();
-        showPointer();
+        presentFullFrame(true);
     }
 
     fn console(self: *ListScreen) void {
@@ -550,8 +651,7 @@ fn drawNotice(title: []const u8, icon: gui.icons.Kind, tone: gui.ui.Tone, headin
     };
     var clock: [48]u8 = undefined;
     screens.notice(&u, headerInfo(&clock, &u), .{ .title = title, .icon = icon, .tone = tone, .heading = heading, .lines = lines, .hints = if (interactive) hints else &.{} });
-    presentFullFrame();
-    if (interactive) showPointer();
+    presentFullFrame(interactive);
 }
 
 /// Blocks until Enter, Esc or a mouse click.
@@ -589,8 +689,7 @@ pub fn summary(spec: screens.SummarySpec) void {
     var clock: [48]u8 = undefined;
     summary_button = screens.summary(&u, headerInfo(&clock, &u), summary_spec);
     summary_spec.hints = &.{};
-    presentFullFrame();
-    showPointer();
+    presentFullFrame(true);
 }
 
 pub fn hitSummaryButton(x: u32, y: u32) bool {
@@ -628,7 +727,7 @@ fn progress(state: gui.preparation_screen.State) void {
     };
     var clock: [48]u8 = undefined;
     gui.preparation_screen.render(&u, state, headerInfo(&clock, &u));
-    presentFullFrame();
+    presentFullFrame(false);
 }
 
 // ------------------------------------------------------------------ clock
@@ -642,6 +741,10 @@ pub fn updateClock() void {
     var u = ui() orelse return;
     var buffer: [48]u8 = undefined;
     const info = headerInfo(&buffer, &u);
+    if (presenter != null) {
+        u.headerClockAt(u.headerClockRight(info), info.clock);
+        return present();
+    }
     const pos = pointer.position();
     const covers = patch.saved and pos.y < u.headerHeight();
     if (covers) hidePointer(canvas);
@@ -655,7 +758,17 @@ pub fn updateClock() void {
 pub fn updatePointer() void {
     const canvas = surface orelse return;
     if (!pointer.available()) return;
-    hidePointer(canvas);
+    if (presenter != null) {
+        // At most one pointer frame per ~16 ms; the input loop's frame hook
+        // draws the last position when the pointer stops.
+        const now = boot_timing.now();
+        if (now -% last_pointer_present < boot_timing.ticksFor(pointer_frame_ms)) {
+            pointer_pending = true;
+            return;
+        }
+        last_pointer_present = now;
+        pointer_pending = false;
+    } else hidePointer(canvas);
     const pos = pointer.position();
     switch (active) {
         .home => if (active_home) |home| home.setHover(home.hit(pos.x, pos.y)),
@@ -667,8 +780,7 @@ pub fn updatePointer() void {
             const hover = summary_button.contains(pos.x, pos.y) and summary_spec.action_enabled;
             if (hover != summary_spec.action_hover) {
                 summary_spec.action_hover = hover;
-                var u = ui() orelse return;
-                screens.summaryButton(&u, summary_button, summary_spec);
+                if (ui()) |u| screens.summaryButton(&u, summary_button, summary_spec);
             }
         },
         .none => {},
@@ -676,11 +788,23 @@ pub fn updatePointer() void {
     showPointer();
 }
 
+/// Input-loop hook (every ~2 ms): draws a throttled pointer move.
+fn flushPointer() void {
+    if (!pointer_pending) return;
+    if (boot_timing.now() -% last_pointer_present < boot_timing.ticksFor(pointer_frame_ms)) return;
+    updatePointer();
+}
+
 fn hidePointer(canvas: gui.Surface) void {
+    if (presenter != null) return;
     patch.restore(canvas);
 }
 
 fn showPointer() void {
+    if (presenter != null) {
+        pointer_visible = true;
+        return present();
+    }
     const canvas = surface orelse return;
     if (!pointer.available() or full_frame_buffered) return;
     var u = ui() orelse return;
@@ -740,6 +864,5 @@ pub fn inputTestFrame(lines: NoticeLines, marker: ?[2]u32, dragging: bool) void 
         const theme_color = if (dragging) theme.warning else theme.accent;
         gui.paint.circle(u.surface, gui.paint.s(point[0]), gui.paint.s(point[1]), gui.paint.s(u.px(14)), theme_color, null);
     }
-    presentFullFrame();
-    showPointer();
+    presentFullFrame(true);
 }

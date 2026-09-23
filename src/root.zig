@@ -31,6 +31,7 @@ pub const gui = struct {
     pub const splash_screen = @import("gui/splash_screen.zig");
     pub const bmp = @import("gui/bmp.zig");
     pub const ui_pack = @import("gui/ui_pack.zig");
+    pub const compositor = @import("gui/compositor.zig");
     pub const font_pack = @embedFile("gui/fonts/usos-font.bin");
 };
 pub const dos = @import("compat/dos/root.zig");
@@ -115,6 +116,7 @@ test {
     _ = gui.splash_screen;
     _ = gui.bmp;
     _ = gui.ui_pack;
+    _ = gui.compositor;
     _ = dos;
     _ = image_probe.probe;
     _ = windows7_iso;

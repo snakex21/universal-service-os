@@ -121,13 +121,20 @@ pub fn clear() void {
     core_clear_screen();
 }
 
+/// Runs before every key wait: the graphical menu presents what it drew
+/// into its back buffer (boot_ui / menu_pointer), so every screen that
+/// waits for a key is on the display, whichever helper drew it.
+pub var before_wait: ?*const fn () void linksection(".data") = null;
+
 pub fn readKey() Key {
+    if (before_wait) |hook| hook();
     while (true) {
         if (pollKey()) |key| return key;
     }
 }
 
 pub fn readKeyTimeoutTicks(timeout_ticks: u32) ?Key {
+    if (before_wait) |hook| hook();
     if (timeout_ticks == 0) return pollKey();
     const target_counts = timeout_ticks *| pit_counts_per_bios_tick;
     var elapsed: u32 = 0;

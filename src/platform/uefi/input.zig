@@ -8,6 +8,7 @@ const pointer = @import("pointer.zig");
 
 const idle_hook_interval_ticks: u16 = 250;
 var idle_hook: ?*const fn () void = null;
+var frame_hook: ?*const fn () void = null;
 var idle_ticks: u16 = 0;
 var rescan_ticks: u8 = 0;
 var hint_hook: ?*const fn (x: u32, y: u32) ?Event = null;
@@ -37,6 +38,12 @@ pub fn hasPointer() bool {
 pub fn setIdleHook(hook: ?*const fn () void) void {
     idle_hook = hook;
     idle_ticks = 0;
+}
+
+/// Called on every poll pass (~2 ms) while waiting, e.g. to draw a
+/// throttled pointer frame once the pointer stops.
+pub fn setFrameHook(hook: ?*const fn () void) void {
+    frame_hook = hook;
 }
 
 /// Maps a tap/click on the footer to a key event (null = not on a hint).
@@ -111,6 +118,7 @@ pub fn mapKey(scan: u16, unicode: u16) Event {
 
 fn stall() void {
     if (uefi.system_table.boot_services) |services| services.stall(2_000) catch {};
+    if (frame_hook) |hook| hook();
 
     idle_ticks +%= 1;
     if (idle_ticks < idle_hook_interval_ticks) return;

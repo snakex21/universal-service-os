@@ -249,7 +249,7 @@ fn runFrontend(context: *const BootContext) void {
     if (graphics) |session| {
         // Loading screen from the moment the VBE mode is set.
         @import("boot_ui.zig").splash(session.surface);
-        @import("boot_ui.zig").init(&fs, reader, bulk_reader);
+        @import("boot_ui.zig").init(&fs, reader, bulk_reader, session.surface);
     }
     console.screen_output = true;
     if (windows_index_offset != 0) {

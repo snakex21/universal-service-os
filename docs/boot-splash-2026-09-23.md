@@ -137,3 +137,41 @@ Screenshots (pl, 1280x800): `artifacts/boot-ui/splash/` - `uefi-pl-1..3`
 (Uruchamianie... handover), `uefi-pl-7..8` (Linux takeover: same splash, then
 the first stage screen), `bios-pl-1..2` (BIOS splash and filled bar); raw
 samples, timelines and timestamped serial logs next to them.
+
+## Pointer over buttons: no more stale patches (flicker fix)
+
+Cause: the UEFI and BIOS menus drew partial updates (hover, selection,
+clock) straight into the visible framebuffer and kept the pointer as a
+saved patch taken from that same framebuffer: each hover repaint was
+visible in steps (row cleared, then drawn), the pointer was restored and
+re-saved around it, and a full frame was Blt without the pointer before the
+pointer was drawn on top. In micro-Linux every pointer move re-rendered and
+copied the whole screen, which fbdev deferred I/O could flush half-way.
+
+Fix (`src/gui/compositor.zig`): screens are drawn only into a RAM back
+buffer; `Presenter.present` diffs it against a copy of what is on screen in
+32-row bands, merges touching rectangles (8 on UEFI/Linux, one bounding
+rectangle in the BIOS Core), adds the old and new pointer rectangles and
+sends each rectangle with the pointer composited from the back buffer in
+one operation: a GOP `EfiBltBufferToVideo` on UEFI, row copies into the
+LFB/fbdev mapping in BIOS and micro-Linux. The pointer is never in the back
+buffer, so nothing can go stale. Hover is repainted only when the hovered
+item changes; UEFI pointer frames are limited to ~60 Hz (the input loop
+draws the last position when the pointer stops).
+
+- UEFI: back, on-screen copy and scratch are three pool buffers; without
+  them the old direct path remains.
+- BIOS: the buffers sit at 33..48 MiB (checked in E820); every full menu
+  screen and every progress frame (drawn straight to the LFB while a
+  backend owns RAM) resend the whole frame; `console.before_wait` presents
+  before every key wait, so helper screens are always shown. Without that
+  RAM the menu has no pointer. The splash lost its progress bar to fit:
+  Core 245,388 of 245,760 bytes.
+- micro-Linux menus: a pointer move repaints only the two pointer rectangles.
+
+Tests: `compositor.zig` checks that after a sequence of hover changes and
+pointer moves the screen equals a clean full render with the pointer.
+`tools/boot_hover_qemu.py --disk <vhd> --out artifacts/boot-ui/hover` sweeps
+the PS/2 pointer across every home card in UEFI and BIOS and requires the
+final frame to equal the reference pixel for pixel (only the header clock
+may differ): both pass.
