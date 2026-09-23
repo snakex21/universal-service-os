@@ -664,9 +664,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Puna memorija (PAE) bit će omogućena nakon ponovnog pokretanja računala. Ponovno pokrenuti sada?",
 
-  "boot.xp_prep.stage.1": "Provjera paketa Windows XP",
-  "boot.xp_prep.stage.2": "Učitavanje okruženja za pripremu",
-  "boot.xp_prep.stage.3": "Pokretanje odabira diska",
+  "boot.xp_prep.environment": "Učitavanje okruženja za pripremu",
+  "boot.xp_prep.choose_disk": "Odabir ciljnog diska",
+  "boot.xp_prep.copy_verify": "Kopiranje i provjera datoteka",
   "boot.xp_prep.checking": "Provjera XP jezgre, initramfsa i identiteta USB pogona",
   "boot.xp_prep.loading": "Učitavanje mikro-Linux jezgre s USB pogona",
   "boot.xp_prep.starting": "Jezgra učitava XP okruženje; zatim slijedi odabir diska",

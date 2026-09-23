@@ -325,11 +325,17 @@ test "XP stage labels and details match the catalog keys" {
     const lang_file = @import("../i18n/lang_file.zig");
     const XpStage = @import("../flow/preparation_boot_progress.zig").XpStage;
     const table = lang_file.Table.english_only;
-    const labels = [_]lang_file.Key{ .xp_prep_stage_1, .xp_prep_stage_2, .xp_prep_stage_3 };
-    for (labels, XpStage.labels) |key, label| try std.testing.expectEqualStrings(label, table.get(key));
+    const labels = [_]lang_file.Key{ .xp_prep_environment, .xp_prep_choose_disk, .prep_stage_3, .xp_prep_copy_verify };
+    for (labels, [_][]const u8{ XpStage.labels[0], XpStage.labels[2], XpStage.labels[3], XpStage.labels[4] }) |key, label| try std.testing.expectEqualStrings(label, table.get(key));
+    // Stage 2 is the micro-Linux string boot.lx.detecting_disks.
+    const linux_strings = @import("../i18n/linux_strings.zig");
+    var found = false;
+    for (linux_strings.english) |english| found = found or std.mem.eql(u8, english, XpStage.labels[1]);
+    try std.testing.expect(found);
     try std.testing.expectEqualStrings(XpStage.checking.detail(), table.get(.xp_prep_checking));
     try std.testing.expectEqualStrings(XpStage.loading.detail(), table.get(.xp_prep_loading));
     try std.testing.expectEqualStrings(XpStage.starting.detail(), table.get(.xp_prep_starting));
+    try std.testing.expectEqual(@as(usize, 5), stageCount(.{ .total = 5, .labels = &XpStage.labels }));
 }
 
 test "stage rows follow the stages a path really runs" {

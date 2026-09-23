@@ -31,6 +31,12 @@ usos_xp_menu() {
             xp_stage_set menu-selected
         fi
         USOS_MENU_RESULT=$xp_menu_result
+        # Back on the progress page (stage 3 of 5, earlier stages done) while
+        # the choice is checked, instead of a frozen menu.
+        if [ "${USOS_UI_NT5:-no}" = yes ]; then
+            USOS_UI_CURRENT=3
+            usos_ui_render_state stage 3 5 "$(usos_ui_stage_label 3)" '' '' 0 0 0 0 || true
+        fi
         return 0
     else
         xp_menu_status=$?

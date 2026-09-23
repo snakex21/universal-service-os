@@ -661,9 +661,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Η πλήρης μνήμη (PAE) θα ενεργοποιηθεί μετά την επανεκκίνηση του υπολογιστή. Επανεκκίνηση τώρα;",
 
-  "boot.xp_prep.stage.1": "Έλεγχος πακέτου Windows XP",
-  "boot.xp_prep.stage.2": "Φόρτωση περιβάλλοντος προετοιμασίας",
-  "boot.xp_prep.stage.3": "Έναρξη επιλογής δίσκου",
+  "boot.xp_prep.environment": "Φόρτωση περιβάλλοντος προετοιμασίας",
+  "boot.xp_prep.choose_disk": "Επιλογή δίσκου προορισμού",
+  "boot.xp_prep.copy_verify": "Αντιγραφή και επαλήθευση αρχείων",
   "boot.xp_prep.checking": "Έλεγχος πυρήνα XP, initramfs και ταυτότητας μονάδας USB",
   "boot.xp_prep.loading": "Φόρτωση πυρήνα micro-Linux από τη μονάδα USB",
   "boot.xp_prep.starting": "Ο πυρήνας φορτώνει το περιβάλλον XP, στη συνέχεια ακολουθεί η επιλογή δίσκου",

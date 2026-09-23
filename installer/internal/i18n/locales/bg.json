@@ -661,9 +661,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Пълната памет (PAE) ще бъде активирана след рестартиране на компютъра. Да се рестартира ли сега?",
 
-  "boot.xp_prep.stage.1": "Проверка на пакета Windows XP",
-  "boot.xp_prep.stage.2": "Зареждане на средата за подготовка",
-  "boot.xp_prep.stage.3": "Стартиране на избора на диск",
+  "boot.xp_prep.environment": "Зареждане на средата за подготовка",
+  "boot.xp_prep.choose_disk": "Избор на целеви диск",
+  "boot.xp_prep.copy_verify": "Копиране и проверка на файловете",
   "boot.xp_prep.checking": "Проверка на ядрото на XP, initramfs и идентичността на USB устройството",
   "boot.xp_prep.loading": "Зареждане на ядрото на микро-Linux от USB устройството",
   "boot.xp_prep.starting": "Ядрото зарежда средата на XP; след това следва изборът на диск",

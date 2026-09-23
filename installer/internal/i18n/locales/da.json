@@ -661,9 +661,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Den fulde hukommelse (PAE) aktiveres, når computeren er genstartet. Genstart nu?",
 
-  "boot.xp_prep.stage.1": "Kontrollerer Windows XP-pakken",
-  "boot.xp_prep.stage.2": "Indlæser forberedelsesmiljøet",
-  "boot.xp_prep.stage.3": "Starter diskvalget",
+  "boot.xp_prep.environment": "Indlæser forberedelsesmiljøet",
+  "boot.xp_prep.choose_disk": "Valg af måldisk",
+  "boot.xp_prep.copy_verify": "Kopiering og kontrol af filer",
   "boot.xp_prep.checking": "Kontrollerer XP-kernen, initramfs og USB-drevets identitet",
   "boot.xp_prep.loading": "Indlæser mikro-Linux-kernen fra USB-drevet",
   "boot.xp_prep.starting": "Kernen indlæser XP-miljøet; derefter følger diskvalget",

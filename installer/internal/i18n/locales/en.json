@@ -661,9 +661,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Full memory (PAE) will be enabled after the computer restarts. Restart now?",
 
-  "boot.xp_prep.stage.1": "Checking the Windows XP package",
-  "boot.xp_prep.stage.2": "Loading the preparation environment",
-  "boot.xp_prep.stage.3": "Starting the disk selection",
+  "boot.xp_prep.environment": "Loading the preparation environment",
+  "boot.xp_prep.choose_disk": "Choosing the target disk",
+  "boot.xp_prep.copy_verify": "Copying and verifying files",
   "boot.xp_prep.checking": "Checking the XP kernel, initramfs and USB drive identity",
   "boot.xp_prep.loading": "Loading the micro-Linux kernel from the USB drive",
   "boot.xp_prep.starting": "The kernel is loading the XP environment; the disk selection follows",

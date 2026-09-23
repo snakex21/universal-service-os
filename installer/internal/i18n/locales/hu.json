@@ -661,9 +661,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "A teljes memória (PAE) a számítógép újraindítása után lesz bekapcsolva. Újraindítja most?",
 
-  "boot.xp_prep.stage.1": "A Windows XP-csomag ellenőrzése",
-  "boot.xp_prep.stage.2": "Az előkészítő környezet betöltése",
-  "boot.xp_prep.stage.3": "A lemezválasztás indítása",
+  "boot.xp_prep.environment": "Az előkészítő környezet betöltése",
+  "boot.xp_prep.choose_disk": "A céllemez kiválasztása",
+  "boot.xp_prep.copy_verify": "Fájlok másolása és ellenőrzése",
   "boot.xp_prep.checking": "Az XP-kernel, az initramfs és az USB-meghajtó azonosságának ellenőrzése",
   "boot.xp_prep.loading": "A mikro-Linux kernel betöltése az USB-meghajtóról",
   "boot.xp_prep.starting": "A kernel betölti az XP-környezetet; ezután következik a lemezválasztás",

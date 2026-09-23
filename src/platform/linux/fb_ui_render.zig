@@ -52,6 +52,7 @@ pub fn render(surface: usos.gui.Surface, context: *const fb_i18n.Context, state:
         },
         .current = state.current,
         .total = state.total,
+        .heading = state.heading,
         .title = state.title,
         .detail = state.detail,
         .image = state.image,

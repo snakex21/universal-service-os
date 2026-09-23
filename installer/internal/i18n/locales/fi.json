@@ -661,9 +661,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Täysi muisti (PAE) otetaan käyttöön, kun tietokone käynnistetään uudelleen. Käynnistetäänkö uudelleen nyt?",
 
-  "boot.xp_prep.stage.1": "Tarkistetaan Windows XP -pakettia",
-  "boot.xp_prep.stage.2": "Ladataan valmisteluympäristöä",
-  "boot.xp_prep.stage.3": "Käynnistetään levyn valinta",
+  "boot.xp_prep.environment": "Ladataan valmisteluympäristöä",
+  "boot.xp_prep.choose_disk": "Kohdelevyn valinta",
+  "boot.xp_prep.copy_verify": "Tiedostojen kopiointi ja tarkistus",
   "boot.xp_prep.checking": "Tarkistetaan XP-ydin, initramfs ja USB-aseman tunniste",
   "boot.xp_prep.loading": "Ladataan mikro-Linux-ydintä USB-asemalta",
   "boot.xp_prep.starting": "Ydin lataa XP-ympäristöä; seuraavaksi tulee levyn valinta",

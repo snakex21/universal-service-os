@@ -122,7 +122,6 @@ fn start(
         // The progress page (like the Vista/7 ISO path) stays up while the
         // firmware loads the XP kernel and initramfs, until usos-fb-ui draws
         // the disk selection.
-        xp_heading = system.name;
         showXpProgress(.checking);
         @import("xp_preparation.zig").start(root, image.name.slice(), unattended, showXpProgress) catch |err| {
             view.refreshFramebuffer();
@@ -190,7 +189,8 @@ fn showError(title: []const u8, err: anyerror) void {
     view.waitForDismiss();
 }
 
-var xp_heading: []const u8 = "Windows XP";
+/// Same heading as the micro-Linux XP pages (tools/micro_linux_ui.sh).
+const xp_heading = "Windows XP";
 
 fn showXpProgress(stage: usos.flow.preparation_boot_progress.XpStage) void {
     view.xpStatus(stage, xp_heading);

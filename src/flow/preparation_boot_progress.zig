@@ -47,24 +47,30 @@ pub const DirectIsoStage = enum(u8) {
     }
 };
 
-/// Windows XP from UEFI (xp_uefi_staging): USOS checks the XP package, loads
-/// the micro-Linux kernel and starts it; the kernel's EFI stub then loads the
-/// initramfs and usos-fb-ui replaces this screen with the disk selection.
-/// Only these three steps run before Linux takes over.
+/// Windows XP from UEFI (xp_uefi_staging) and its micro-Linux staging share
+/// one progress page and one stage list, from the UEFI handoff to the end
+/// (tools/micro_linux_ui.sh declares the same labels). UEFI runs only stage
+/// 1: it checks the XP package, loads the micro-Linux kernel and starts it;
+/// the three steps are shown as the stage-1 detail.
 pub const XpStage = enum(u8) {
-    checking = 1,
-    loading = 2,
-    starting = 3,
+    checking,
+    loading,
+    starting,
 
-    /// Equal to the boot.xp_prep.stage.* catalog values.
+    /// Equal to boot.xp_prep.environment, boot.lx.detecting_disks,
+    /// boot.xp_prep.choose_disk, boot.prep.stage.3 and boot.xp_prep.copy_verify.
     pub const labels = [_][]const u8{
-        "Checking the Windows XP package",
         "Loading the preparation environment",
-        "Starting the disk selection",
+        "Detecting disks",
+        "Choosing the target disk",
+        "Preparing workspace",
+        "Copying and verifying files",
     };
 
+    /// All UEFI steps belong to stage 1.
     pub fn number(self: XpStage) u8 {
-        return @intFromEnum(self);
+        _ = self;
+        return 1;
     }
 
     /// Equal to the boot.xp_prep.checking/loading/starting catalog values.
@@ -77,10 +83,9 @@ pub const XpStage = enum(u8) {
     }
 };
 
-test "XP path declares exactly the stages it runs" {
-    try std.testing.expectEqual(@as(usize, 3), XpStage.labels.len);
-    try std.testing.expectEqual(@as(usize, XpStage.labels.len), @typeInfo(XpStage).@"enum".fields.len);
-    try std.testing.expectEqual(@as(u8, 3), XpStage.starting.number());
+test "XP path declares its five stages and UEFI stays in stage 1" {
+    try std.testing.expectEqual(@as(usize, 5), XpStage.labels.len);
+    for ([_]XpStage{ .checking, .loading, .starting }) |stage| try std.testing.expectEqual(@as(u8, 1), stage.number());
 }
 
 test "direct ISO path declares exactly the stages it runs" {

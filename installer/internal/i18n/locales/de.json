@@ -661,9 +661,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Der volle Arbeitsspeicher (PAE) wird nach einem Neustart des Computers aktiviert. Jetzt neu starten?",
 
-  "boot.xp_prep.stage.1": "Windows-XP-Paket wird geprüft",
-  "boot.xp_prep.stage.2": "Vorbereitungsumgebung wird geladen",
-  "boot.xp_prep.stage.3": "Datenträgerauswahl wird gestartet",
+  "boot.xp_prep.environment": "Vorbereitungsumgebung wird geladen",
+  "boot.xp_prep.choose_disk": "Zieldatenträger wird ausgewählt",
+  "boot.xp_prep.copy_verify": "Dateien kopieren und prüfen",
   "boot.xp_prep.checking": "XP-Kernel, Initramfs und USB-Laufwerkskennung werden geprüft",
   "boot.xp_prep.loading": "Micro-Linux-Kernel wird vom USB-Laufwerk geladen",
   "boot.xp_prep.starting": "Der Kernel lädt die XP-Umgebung; danach folgt die Datenträgerauswahl",

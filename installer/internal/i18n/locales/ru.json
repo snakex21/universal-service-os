@@ -664,9 +664,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Полный объём памяти (PAE) будет включён после перезагрузки компьютера. Перезагрузить сейчас?",
 
-  "boot.xp_prep.stage.1": "Проверка пакета Windows XP",
-  "boot.xp_prep.stage.2": "Загрузка среды подготовки",
-  "boot.xp_prep.stage.3": "Запуск выбора диска",
+  "boot.xp_prep.environment": "Загрузка среды подготовки",
+  "boot.xp_prep.choose_disk": "Выбор целевого диска",
+  "boot.xp_prep.copy_verify": "Копирование и проверка файлов",
   "boot.xp_prep.checking": "Проверка ядра XP, initramfs и идентификатора USB-накопителя",
   "boot.xp_prep.loading": "Загрузка ядра микро-Linux с USB-накопителя",
   "boot.xp_prep.starting": "Ядро загружает среду XP; затем откроется выбор диска",

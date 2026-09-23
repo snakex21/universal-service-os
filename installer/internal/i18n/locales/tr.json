@@ -661,9 +661,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Tam bellek (PAE), bilgisayar yeniden başlatıldıktan sonra etkinleştirilecek. Şimdi yeniden başlatılsın mı?",
 
-  "boot.xp_prep.stage.1": "Windows XP paketi denetleniyor",
-  "boot.xp_prep.stage.2": "Hazırlık ortamı yükleniyor",
-  "boot.xp_prep.stage.3": "Disk seçimi başlatılıyor",
+  "boot.xp_prep.environment": "Hazırlık ortamı yükleniyor",
+  "boot.xp_prep.choose_disk": "Hedef disk seçimi",
+  "boot.xp_prep.copy_verify": "Dosyaları kopyalama ve doğrulama",
   "boot.xp_prep.checking": "XP çekirdeği, initramfs ve USB sürücü kimliği denetleniyor",
   "boot.xp_prep.loading": "Mikro-Linux çekirdeği USB sürücüden yükleniyor",
   "boot.xp_prep.starting": "Çekirdek XP ortamını yüklüyor; ardından disk seçimi gelecek",

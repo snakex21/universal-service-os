@@ -298,10 +298,10 @@ pub const Key = enum(u16) {
     wait,
     wait_usb,
     xp_prep_checking,
+    xp_prep_choose_disk,
+    xp_prep_copy_verify,
+    xp_prep_environment,
     xp_prep_loading,
-    xp_prep_stage_1,
-    xp_prep_stage_2,
-    xp_prep_stage_3,
     xp_prep_starting,
 };
 
@@ -603,10 +603,10 @@ pub const hashes = [_]u32{
     0x892e4ca0, // wait
     0x3e1f8ab9, // wait_usb
     0xd1d3d8e5, // xp_prep.checking
+    0x72ed5eb8, // xp_prep.choose_disk
+    0x8a502c84, // xp_prep.copy_verify
+    0xe5b1ef16, // xp_prep.environment
     0x6e3859d3, // xp_prep.loading
-    0x5cb584dc, // xp_prep.stage.1
-    0x5fb58995, // xp_prep.stage.2
-    0x5eb58802, // xp_prep.stage.3
     0xb07b1d15, // xp_prep.starting
 };
 
@@ -1212,9 +1212,9 @@ pub const english = [_][]const u8{
     "Please wait",
     "Please wait - keep the USB drive connected",
     "Checking the XP kernel, initramfs and USB drive identity",
-    "Loading the micro-Linux kernel from the USB drive",
-    "Checking the Windows XP package",
+    "Choosing the target disk",
+    "Copying and verifying files",
     "Loading the preparation environment",
-    "Starting the disk selection",
+    "Loading the micro-Linux kernel from the USB drive",
     "The kernel is loading the XP environment; the disk selection follows",
 };

@@ -661,9 +661,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Het volledige geheugen (PAE) wordt ingeschakeld nadat de computer opnieuw is opgestart. Nu opnieuw opstarten?",
 
-  "boot.xp_prep.stage.1": "Windows XP-pakket controleren",
-  "boot.xp_prep.stage.2": "Voorbereidingsomgeving laden",
-  "boot.xp_prep.stage.3": "Schijfselectie starten",
+  "boot.xp_prep.environment": "Voorbereidingsomgeving laden",
+  "boot.xp_prep.choose_disk": "Doelschijf kiezen",
+  "boot.xp_prep.copy_verify": "Bestanden kopiëren en controleren",
   "boot.xp_prep.checking": "XP-kernel, initramfs en identiteit van het USB-station controleren",
   "boot.xp_prep.loading": "Micro-Linux-kernel laden vanaf het USB-station",
   "boot.xp_prep.starting": "De kernel laadt de XP-omgeving; daarna volgt de schijfselectie",

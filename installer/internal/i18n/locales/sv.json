@@ -661,9 +661,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Hela minnet (PAE) aktiveras efter att datorn har startats om. Starta om nu?",
 
-  "boot.xp_prep.stage.1": "Kontrollerar Windows XP-paketet",
-  "boot.xp_prep.stage.2": "Läser in förberedelsemiljön",
-  "boot.xp_prep.stage.3": "Startar diskvalet",
+  "boot.xp_prep.environment": "Läser in förberedelsemiljön",
+  "boot.xp_prep.choose_disk": "Val av måldisk",
+  "boot.xp_prep.copy_verify": "Kopiering och kontroll av filer",
   "boot.xp_prep.checking": "Kontrollerar XP-kärnan, initramfs och USB-enhetens identitet",
   "boot.xp_prep.loading": "Läser in mikro-Linux-kärnan från USB-enheten",
   "boot.xp_prep.starting": "Kärnan läser in XP-miljön; därefter följer diskvalet",

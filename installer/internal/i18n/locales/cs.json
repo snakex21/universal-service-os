@@ -664,9 +664,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Plná paměť (PAE) bude zapnuta po restartu počítače. Restartovat nyní?",
 
-  "boot.xp_prep.stage.1": "Kontrola balíčku Windows XP",
-  "boot.xp_prep.stage.2": "Načítání přípravného prostředí",
-  "boot.xp_prep.stage.3": "Spouštění výběru disku",
+  "boot.xp_prep.environment": "Načítání přípravného prostředí",
+  "boot.xp_prep.choose_disk": "Výběr cílového disku",
+  "boot.xp_prep.copy_verify": "Kopírování a ověření souborů",
   "boot.xp_prep.checking": "Kontrola jádra XP, initramfs a identity jednotky USB",
   "boot.xp_prep.loading": "Načítání jádra mikro-Linuxu z jednotky USB",
   "boot.xp_prep.starting": "Jádro načítá prostředí XP; poté následuje výběr disku",

@@ -661,9 +661,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "La memoria completa (PAE) verrà attivata dopo il riavvio del computer. Riavviare ora?",
 
-  "boot.xp_prep.stage.1": "Verifica del pacchetto Windows XP",
-  "boot.xp_prep.stage.2": "Caricamento dell'ambiente di preparazione",
-  "boot.xp_prep.stage.3": "Avvio della selezione del disco",
+  "boot.xp_prep.environment": "Caricamento dell'ambiente di preparazione",
+  "boot.xp_prep.choose_disk": "Scelta del disco di destinazione",
+  "boot.xp_prep.copy_verify": "Copia e verifica dei file",
   "boot.xp_prep.checking": "Verifica del kernel XP, dell'initramfs e dell'identità dell'unità USB",
   "boot.xp_prep.loading": "Caricamento del kernel micro-Linux dall'unità USB",
   "boot.xp_prep.starting": "Il kernel sta caricando l'ambiente XP; seguirà la selezione del disco",

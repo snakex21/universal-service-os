@@ -664,9 +664,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Visa atmintis (PAE) bus įjungta iš naujo paleidus kompiuterį. Paleisti iš naujo dabar?",
 
-  "boot.xp_prep.stage.1": "Tikrinamas Windows XP paketas",
-  "boot.xp_prep.stage.2": "Įkeliama paruošimo aplinka",
-  "boot.xp_prep.stage.3": "Paleidžiamas disko pasirinkimas",
+  "boot.xp_prep.environment": "Įkeliama paruošimo aplinka",
+  "boot.xp_prep.choose_disk": "Tikslinio disko pasirinkimas",
+  "boot.xp_prep.copy_verify": "Failų kopijavimas ir tikrinimas",
   "boot.xp_prep.checking": "Tikrinamas XP branduolys, initramfs ir USB disko tapatybė",
   "boot.xp_prep.loading": "Iš USB disko įkeliamas mikro-Linux branduolys",
   "boot.xp_prep.starting": "Branduolys įkelia XP aplinką; po to bus disko pasirinkimas",

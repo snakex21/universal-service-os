@@ -661,9 +661,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "La memoria completa (PAE) se activará después de reiniciar el equipo. ¿Reiniciar ahora?",
 
-  "boot.xp_prep.stage.1": "Comprobando el paquete de Windows XP",
-  "boot.xp_prep.stage.2": "Cargando el entorno de preparación",
-  "boot.xp_prep.stage.3": "Iniciando la selección de disco",
+  "boot.xp_prep.environment": "Cargando el entorno de preparación",
+  "boot.xp_prep.choose_disk": "Selección del disco de destino",
+  "boot.xp_prep.copy_verify": "Copia y verificación de archivos",
   "boot.xp_prep.checking": "Comprobando el kernel de XP, el initramfs y la identidad de la unidad USB",
   "boot.xp_prep.loading": "Cargando el kernel de micro-Linux desde la unidad USB",
   "boot.xp_prep.starting": "El kernel está cargando el entorno de XP; a continuación se mostrará la selección de disco",

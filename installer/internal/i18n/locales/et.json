@@ -661,9 +661,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Täismälu (PAE) lülitatakse sisse pärast arvuti taaskäivitamist. Kas taaskäivitada kohe?",
 
-  "boot.xp_prep.stage.1": "Windows XP paketi kontrollimine",
-  "boot.xp_prep.stage.2": "Ettevalmistuskeskkonna laadimine",
-  "boot.xp_prep.stage.3": "Ketta valiku käivitamine",
+  "boot.xp_prep.environment": "Ettevalmistuskeskkonna laadimine",
+  "boot.xp_prep.choose_disk": "Sihtketta valimine",
+  "boot.xp_prep.copy_verify": "Failide kopeerimine ja kontrollimine",
   "boot.xp_prep.checking": "XP tuuma, initramfs-i ja USB-draivi identiteedi kontrollimine",
   "boot.xp_prep.loading": "Mikro-Linuxi tuuma laadimine USB-draivilt",
   "boot.xp_prep.starting": "Tuum laadib XP keskkonda; seejärel järgneb ketta valik",

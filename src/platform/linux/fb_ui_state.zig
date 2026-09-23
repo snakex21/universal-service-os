@@ -21,6 +21,8 @@ pub const State = struct {
     current: u8 = 1,
     total: u8 = 5,
     title: []const u8 = "Preparing boot media",
+    /// Optional page heading (e.g. "Windows XP"); empty = default heading.
+    heading: []const u8 = "",
     detail: []const u8 = "",
     image: []const u8 = "",
     percent: u8 = 0,
@@ -53,6 +55,8 @@ pub fn parse(input: []const u8) !State {
             state.total = try parseU8(value);
         } else if (std.mem.eql(u8, key, "title")) {
             state.title = value;
+        } else if (std.mem.eql(u8, key, "heading")) {
+            state.heading = value;
         } else if (std.mem.eql(u8, key, "detail")) {
             state.detail = value;
         } else if (std.mem.eql(u8, key, "image")) {

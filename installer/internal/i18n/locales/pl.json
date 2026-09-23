@@ -664,9 +664,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Pełna pamięć (PAE) zostanie włączona po ponownym uruchomieniu komputera. Uruchom ponownie teraz?",
 
-  "boot.xp_prep.stage.1": "Sprawdzanie pakietu Windows XP",
-  "boot.xp_prep.stage.2": "Ładowanie środowiska przygotowania",
-  "boot.xp_prep.stage.3": "Uruchamianie wyboru dysku",
+  "boot.xp_prep.environment": "Ładowanie środowiska przygotowania",
+  "boot.xp_prep.choose_disk": "Wybór dysku docelowego",
+  "boot.xp_prep.copy_verify": "Kopiowanie i weryfikacja plików",
   "boot.xp_prep.checking": "Sprawdzanie jądra XP, initramfs i tożsamości pendrive'a",
   "boot.xp_prep.loading": "Ładowanie jądra mikro-Linuksa z pendrive'a",
   "boot.xp_prep.starting": "Jądro ładuje środowisko XP; następnie pojawi się wybór dysku",

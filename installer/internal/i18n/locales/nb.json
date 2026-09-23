@@ -661,9 +661,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Fullt minne (PAE) aktiveres etter at datamaskinen er startet på nytt. Starte på nytt nå?",
 
-  "boot.xp_prep.stage.1": "Kontrollerer Windows XP-pakken",
-  "boot.xp_prep.stage.2": "Laster inn forberedelsesmiljøet",
-  "boot.xp_prep.stage.3": "Starter diskvalget",
+  "boot.xp_prep.environment": "Laster inn forberedelsesmiljøet",
+  "boot.xp_prep.choose_disk": "Velger måldisk",
+  "boot.xp_prep.copy_verify": "Kopiering og kontroll av filer",
   "boot.xp_prep.checking": "Kontrollerer XP-kjernen, initramfs og identiteten til USB-stasjonen",
   "boot.xp_prep.loading": "Laster inn mikro-Linux-kjernen fra USB-stasjonen",
   "boot.xp_prep.starting": "Kjernen laster inn XP-miljøet; deretter kommer diskvalget",

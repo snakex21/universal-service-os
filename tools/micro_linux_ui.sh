@@ -11,7 +11,22 @@ USOS_UI_CURRENT=${USOS_UI_CURRENT:-1}
 # declares them: USOS_UI_LABELS='First|Second' (the count becomes the total).
 USOS_UI_LABELS=${USOS_UI_LABELS:-}
 USOS_UI_TOTAL=${USOS_UI_TOTAL:-}
-export USOS_UI_TTY USOS_FB_UI USOS_FB_STATE USOS_FB_MODULES USOS_FB_ACTIVE USOS_UI_CURRENT USOS_UI_LABELS USOS_UI_TOTAL
+USOS_UI_HEADING=${USOS_UI_HEADING:-}
+# Windows XP / 2000 staging shows one progress page from the UEFI handoff to
+# the end, with the stages this path really runs (the UEFI menu already drew
+# stage 1 of the same list; boot.xp_prep.* and boot.prep.stage.3 in the
+# catalogs). The shared scripts keep calling the generic five stages; they
+# are mapped onto this list by usos_ui_nt5_stage.
+USOS_UI_NT5=${USOS_UI_NT5:-no}
+case " $(cat /proc/cmdline 2>/dev/null) " in
+    *' usos.legacy_action=xp-staging '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows XP' ;;
+    *' usos.legacy_action=windows2000-staging '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows 2000' ;;
+esac
+if [ "$USOS_UI_NT5" = yes ] && [ -z "$USOS_UI_LABELS" ]; then
+    USOS_UI_LABELS='Loading the preparation environment|Detecting disks|Choosing the target disk|Preparing workspace|Copying and verifying files'
+    USOS_UI_TOTAL=5
+fi
+export USOS_UI_TTY USOS_FB_UI USOS_FB_STATE USOS_FB_MODULES USOS_FB_ACTIVE USOS_UI_CURRENT USOS_UI_LABELS USOS_UI_TOTAL USOS_UI_HEADING USOS_UI_NT5
 
 usos_ui_declare_stages() {
     USOS_UI_LABELS=$1
@@ -35,6 +50,32 @@ usos_ui_stage_label() {
         4) printf '%s' 'Copying files' ;;
         5) printf '%s' 'Verification and finalization' ;;
         *) printf '%s' 'Preparation' ;;
+    esac
+}
+
+# Generic stage number (1-5 of the shared scripts) -> NT5 stage. Checks that
+# run while the disk menus are in use belong to "Choosing the target disk".
+usos_ui_nt5_stage() {
+    if [ "${USOS_XP_CHOOSING:-no}" = yes ] && [ "${USOS_XP_MENU_SHOWN:-no}" = yes ]; then
+        printf '3'
+        return 0
+    fi
+    case "$1" in
+        1) printf '1' ;;
+        2) printf '2' ;;
+        3) printf '4' ;;
+        *) printf '5' ;;
+    esac
+}
+
+# A script title that only names its generic stage is replaced by the NT5
+# stage name; specific activity titles are kept.
+usos_ui_nt5_title() {
+    case "$2" in
+        'Starting environment'|'Verifying target device'|'Preparing workspace'|'Copying files'|'Verification and finalization')
+            usos_ui_stage_label "$1"
+            ;;
+        *) printf '%s' "$2" ;;
     esac
 }
 
@@ -112,6 +153,22 @@ usos_ui_bootstrap_frame() {
     # splash and the takeover is invisible. After the Legacy BIOS loader's
     # progress screen it is a neutral "Starting..." for every session
     # (preparation, Hardware & SMART, XP) until the session's own screen.
+    # For Windows XP / 2000 the UEFI menu left the progress page at stage 1;
+    # the first Linux frame is the same page.
+    if [ "$USOS_UI_NT5" = yes ]; then
+        {
+            printf 'mode=stage\n'
+            printf 'current=1\n'
+            printf 'total=5\n'
+            printf 'heading=%s\n' "$USOS_UI_HEADING"
+            printf 'title=%s\n' "$(usos_ui_stage_label 1)"
+            printf 'detail=%s\n' 'The kernel is loading the XP environment; the disk selection follows'
+            printf '%s\n' "$USOS_UI_LABELS" | tr '|' '\n' | while IFS= read -r stage_name; do
+                printf 'label=%s\n' "$stage_name"
+            done
+        } | "$USOS_FB_UI" >/dev/null 2>&1
+        return
+    fi
     {
         printf 'mode=splash\n'
         printf 'current=1\n'
@@ -175,6 +232,7 @@ usos_ui_render_state() {
         printf 'bytes_done=%s\n' "$bytes_done"
         printf 'bytes_total=%s\n' "$bytes_total"
         printf 'speed_bps=%s\n' "$speed_bps"
+        [ -z "$USOS_UI_HEADING" ] || printf 'heading=%s\n' "$USOS_UI_HEADING"
         if [ -n "$USOS_UI_LABELS" ]; then
             printf '%s\n' "$USOS_UI_LABELS" | tr '|' '\n' | while IFS= read -r stage_name; do
                 printf 'label=%s\n' "$stage_name"
@@ -196,7 +254,11 @@ usos_ui_stage() {
     USOS_UI_CURRENT=$current
     title=$3
     detail=${4:-}
-    if [ "${USOS_XP_CHOOSING:-no}" = yes ]; then
+    if [ "$USOS_UI_NT5" = yes ]; then
+        current=$(usos_ui_nt5_stage "$1")
+        title=$(usos_ui_nt5_title "$current" "$title")
+        USOS_UI_CURRENT=$current
+    elif [ "${USOS_XP_CHOOSING:-no}" = yes ]; then
         # Keep the selected menu visible while read-only checks run between
         # choices. The initial detection screen is shown only before a menu.
         [ "${USOS_XP_MENU_SHOWN:-no}" != yes ] || return 0
@@ -221,6 +283,10 @@ usos_ui_progress() {
     title=$7
     detail=${8:-}
     image=${9:-}
+    if [ "$USOS_UI_NT5" = yes ]; then
+        current=$(usos_ui_nt5_stage "$1")
+        USOS_UI_CURRENT=$current
+    fi
     if usos_ui_render_state progress "$current" "$total" "$title" "$detail" "$image" "$percent" "$bytes_done" "$bytes_total" "$speed_bps"; then
         return 0
     fi

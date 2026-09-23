@@ -661,9 +661,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "La mémoire complète (PAE) sera activée après le redémarrage de l'ordinateur. Redémarrer maintenant ?",
 
-  "boot.xp_prep.stage.1": "Vérification du paquet Windows XP",
-  "boot.xp_prep.stage.2": "Chargement de l'environnement de préparation",
-  "boot.xp_prep.stage.3": "Démarrage de la sélection du disque",
+  "boot.xp_prep.environment": "Chargement de l'environnement de préparation",
+  "boot.xp_prep.choose_disk": "Choix du disque cible",
+  "boot.xp_prep.copy_verify": "Copie et vérification des fichiers",
   "boot.xp_prep.checking": "Vérification du noyau XP, de l'initramfs et de l'identité de la clé USB",
   "boot.xp_prep.loading": "Chargement du noyau micro-Linux depuis la clé USB",
   "boot.xp_prep.starting": "Le noyau charge l'environnement XP ; la sélection du disque suit",

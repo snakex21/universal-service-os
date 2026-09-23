@@ -667,9 +667,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Polni pomnilnik (PAE) bo omogočen po ponovnem zagonu računalnika. Želite znova zagnati zdaj?",
 
-  "boot.xp_prep.stage.1": "Preverjanje paketa Windows XP",
-  "boot.xp_prep.stage.2": "Nalaganje okolja za pripravo",
-  "boot.xp_prep.stage.3": "Zagon izbire diska",
+  "boot.xp_prep.environment": "Nalaganje okolja za pripravo",
+  "boot.xp_prep.choose_disk": "Izbira ciljnega diska",
+  "boot.xp_prep.copy_verify": "Kopiranje in preverjanje datotek",
   "boot.xp_prep.checking": "Preverjanje jedra XP, initramfs in identitete pogona USB",
   "boot.xp_prep.loading": "Nalaganje jedra mikro-Linux s pogona USB",
   "boot.xp_prep.starting": "Jedro nalaga okolje XP; nato sledi izbira diska",

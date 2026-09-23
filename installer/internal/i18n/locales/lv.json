@@ -664,9 +664,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Pilna atmiņa (PAE) tiks ieslēgta pēc datora restartēšanas. Restartēt tagad?",
 
-  "boot.xp_prep.stage.1": "Pārbauda Windows XP pakotni",
-  "boot.xp_prep.stage.2": "Ielādē sagatavošanas vidi",
-  "boot.xp_prep.stage.3": "Palaiž diska izvēli",
+  "boot.xp_prep.environment": "Ielādē sagatavošanas vidi",
+  "boot.xp_prep.choose_disk": "Mērķa diska izvēle",
+  "boot.xp_prep.copy_verify": "Failu kopēšana un pārbaude",
   "boot.xp_prep.checking": "Pārbauda XP kodolu, initramfs un USB diska identitāti",
   "boot.xp_prep.loading": "Ielādē mikro-Linux kodolu no USB diska",
   "boot.xp_prep.starting": "Kodols ielādē XP vidi; pēc tam sekos diska izvēle",

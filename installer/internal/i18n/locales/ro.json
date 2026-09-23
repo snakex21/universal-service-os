@@ -664,9 +664,9 @@
   "xp_pae.title": "USOS XP",
   "xp_pae.restart_prompt": "Memoria completă (PAE) va fi activată după repornirea computerului. Reporniți acum?",
 
-  "boot.xp_prep.stage.1": "Se verifică pachetul Windows XP",
-  "boot.xp_prep.stage.2": "Se încarcă mediul de pregătire",
-  "boot.xp_prep.stage.3": "Se pornește selectarea discului",
+  "boot.xp_prep.environment": "Se încarcă mediul de pregătire",
+  "boot.xp_prep.choose_disk": "Alegerea discului țintă",
+  "boot.xp_prep.copy_verify": "Copierea și verificarea fișierelor",
   "boot.xp_prep.checking": "Se verifică nucleul XP, initramfs și identitatea unității USB",
   "boot.xp_prep.loading": "Se încarcă nucleul micro-Linux de pe unitatea USB",
   "boot.xp_prep.starting": "Nucleul încarcă mediul XP; urmează selectarea discului",
