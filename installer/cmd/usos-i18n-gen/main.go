@@ -1,6 +1,6 @@
 // usos-i18n-gen derives the boot (Zig) and XP helper (C) string tables and
 // the lang.bin test fixture from installer/internal/i18n/locales, reports the
-// boot-font glyph gaps per language, and can export the per-language ESP files.
+// boot-font glyph gaps per language (src/gui/fonts/usos-font.bin), and can export the per-language ESP files.
 //
 //	go run ./cmd/usos-i18n-gen -root ..            regenerate
 //	go run ./cmd/usos-i18n-gen -root .. -check     fail if anything is stale
@@ -62,6 +62,10 @@ func run(root string, check bool, export, out string) error {
 	if err != nil {
 		return err
 	}
+	linux, err := i18n.GenerateZigLinuxTable()
+	if err != nil {
+		return err
+	}
 	header, err := i18n.GenerateXPHeader()
 	if err != nil {
 		return err
@@ -73,7 +77,7 @@ func run(root string, check bool, export, out string) error {
 	outputs := []struct {
 		path string
 		data []byte
-	}{{i18n.ZigTablePath, zig}, {i18n.XPHeaderPath, header}, {i18n.ZigFixturePath, fixture}}
+	}{{i18n.ZigTablePath, zig}, {i18n.ZigLinuxTablePath, linux}, {i18n.XPHeaderPath, header}, {i18n.ZigFixturePath, fixture}}
 	stale := 0
 	for _, output := range outputs {
 		path := filepath.Join(root, filepath.FromSlash(output.path))
@@ -95,26 +99,46 @@ func run(root string, check bool, export, out string) error {
 		}
 		fmt.Println("[WROTE]", output.path)
 	}
-	reportGlyphGaps()
+	gapLanguages, err := reportGlyphGaps(root)
+	if err != nil {
+		return err
+	}
+	if gapLanguages > 0 {
+		return fmt.Errorf("%d language(s) need glyphs the boot font lacks; run python tools/usos_font_gen.py", gapLanguages)
+	}
 	if stale > 0 {
 		return fmt.Errorf("%d generated file(s) are stale; run go run ./cmd/usos-i18n-gen -root ..", stale)
 	}
 	return nil
 }
 
-// The boot font is 5x7 printable ASCII (lowercase drawn as uppercase). A
-// language is boot-renderable only when every boot.* string fits it.
-func reportGlyphGaps() {
+// Every boot.* string of every language must be drawable by the boot font
+// pack (tools/usos_font_gen.py derives its codepoints from the catalogs).
+func reportGlyphGaps(root string) (int, error) {
+	pack, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(i18n.BootFontPath)))
+	if err != nil {
+		return 0, err
+	}
+	coverage, err := i18n.BootFontCoverage(pack)
+	if err != nil {
+		return 0, err
+	}
+	failed := 0
 	for _, language := range i18n.Languages() {
-		gaps, err := i18n.BootGlyphGaps(language.Code)
+		gaps, err := i18n.BootGlyphGaps(language.Code, coverage)
 		if err != nil {
-			fmt.Println("[GLYPHS]", language.Code, "error:", err)
-			continue
+			return 0, err
+		}
+		for _, r := range language.Name {
+			if !coverage[r] {
+				gaps["_meta.native_name"] = append(gaps["_meta.native_name"], r)
+			}
 		}
 		if len(gaps) == 0 {
-			fmt.Println("[GLYPHS]", language.Code, "boot-renderable")
+			fmt.Println("[GLYPHS]", language.Code, "OK - every boot string is drawable")
 			continue
 		}
+		failed++
 		missing := map[rune]bool{}
 		for _, runes := range gaps {
 			for _, r := range runes {
@@ -126,6 +150,7 @@ func reportGlyphGaps() {
 			list = append(list, fmt.Sprintf("%c(U+%04X)", r, r))
 		}
 		sort.Strings(list)
-		fmt.Printf("[GLYPHS] %s NOT boot-renderable: %d of its boot strings need %s; the EFI keeps English for them\n", language.Code, len(gaps), strings.Join(list, " "))
+		fmt.Printf("[GLYPHS] %s MISSING in %d string(s): %s\n", language.Code, len(gaps), strings.Join(list, " "))
 	}
+	return failed, nil
 }

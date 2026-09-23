@@ -34,6 +34,30 @@ type Meta struct {
 	NativeName        string `json:"native_name"`
 	EnglishName       string `json:"english_name"`
 	MachineTranslated bool   `json:"machine_translated"`
+	// MachineTranslatedPrefixes marks key groups of an otherwise
+	// hand-written catalog that were machine-translated (e.g. "boot.").
+	MachineTranslatedPrefixes []string `json:"machine_translated_prefixes,omitempty"`
+}
+
+// MachineTranslatedKey reports whether the value of key in the language's
+// catalog is a machine translation.
+func MachineTranslatedKey(code, key string) bool {
+	if ensureLoaded() != nil {
+		return false
+	}
+	meta, ok := metas[code]
+	if !ok {
+		return false
+	}
+	if meta.MachineTranslated {
+		return true
+	}
+	for _, prefix := range meta.MachineTranslatedPrefixes {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // Language describes one embedded catalog. Name is the native name shown in

@@ -20,7 +20,7 @@ var shippedLanguages = []string{
 	"bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "hr", "hu", "it", "lt",
 	"lv", "nb", "nl", "pl", "pt-BR", "ro", "ru", "sk", "sl", "sr-Latn", "sv", "tr", "uk",
 }
-var formatVerb = regexp.MustCompile(`%[-+# 0]*[0-9]*(\.[0-9]+)?[a-zA-Z%]`)
+var formatVerb = regexp.MustCompile(`%[-+# 0]*[0-9]*(\.[0-9]+)?[a-zA-Z%]|\{[0-9]\}`)
 
 func TestCatalogsLoad(t *testing.T) {
 	if err := LoadError(); err != nil {
@@ -310,8 +310,17 @@ func TestDeviceFilesCarryOnlyTheChosenLanguage(t *testing.T) {
 	}
 	english, _ := Catalog("en")
 	polish, _ := Catalog("pl")
+	var polishText strings.Builder
+	for key, value := range polish {
+		if strings.HasPrefix(key, BootKeyPrefix) {
+			polishText.WriteString(value + "\n")
+		}
+	}
 	for key, value := range english {
-		if strings.HasPrefix(key, BootKeyPrefix) && value != polish[key] && bytes.Contains(blob, []byte(value)) {
+		// Short English words may legitimately occur inside Polish text
+		// ("Utilities/<tool name>/Images"); only whole translated-away
+		// strings count.
+		if strings.HasPrefix(key, BootKeyPrefix) && value != polish[key] && !strings.Contains(polishText.String(), value) && bytes.Contains(blob, []byte(value)) {
 			t.Errorf("Polish boot blob contains English %s", key)
 		}
 	}
@@ -332,11 +341,15 @@ func TestDeviceFilesCarryOnlyTheChosenLanguage(t *testing.T) {
 	}
 }
 
-// The Zig table, the XP header and the Zig lang.bin fixture are derived from
-// the catalogs; regenerate with `go run ./cmd/usos-i18n-gen -root ..`.
+// The Zig tables, the XP header and the Zig lang.bin fixture are derived
+// from the catalogs; regenerate with `go run ./cmd/usos-i18n-gen -root ..`.
 func TestGeneratedFilesAreCurrent(t *testing.T) {
 	root := filepath.Join("..", "..", "..")
 	zig, err := GenerateZigTable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	linux, err := GenerateZigLinuxTable()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,7 +361,7 @@ func TestGeneratedFilesAreCurrent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for path, want := range map[string][]byte{ZigTablePath: zig, XPHeaderPath: header, ZigFixturePath: fixture} {
+	for path, want := range map[string][]byte{ZigTablePath: zig, ZigLinuxTablePath: linux, XPHeaderPath: header, ZigFixturePath: fixture} {
 		got, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
 			t.Fatal(err)
@@ -359,9 +372,58 @@ func TestGeneratedFilesAreCurrent(t *testing.T) {
 	}
 }
 
-func TestEnglishBootStringsFitTheBootFont(t *testing.T) {
-	gaps, err := BootGlyphGaps(Fallback)
-	if err != nil || len(gaps) != 0 {
-		t.Fatalf("English boot strings need glyphs outside font5x7: %v %v", gaps, err)
+// Every boot.* string of every language must be drawable by the boot font
+// pack, which tools/usos_font_gen.py derives from these catalogs.
+func TestEveryBootStringFitsTheBootFont(t *testing.T) {
+	pack, err := os.ReadFile(filepath.Join("..", "..", "..", filepath.FromSlash(BootFontPath)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	coverage, err := BootFontCoverage(pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, language := range Languages() {
+		gaps, err := BootGlyphGaps(language.Code, coverage)
+		if err != nil || len(gaps) != 0 {
+			t.Errorf("%s: boot strings need glyphs outside the font pack: %v %v", language.Code, gaps, err)
+		}
+		for _, r := range language.Name {
+			if !coverage[r] {
+				t.Errorf("%s: native name %q needs %q", language.Code, language.Name, r)
+			}
+		}
+	}
+}
+
+func TestLangCPIOCarriesLangBin(t *testing.T) {
+	blob, err := BootBlob("pl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive := LangCPIO(blob)
+	if len(archive)%512 != 0 || !bytes.HasPrefix(archive, []byte("070701")) {
+		t.Fatalf("bad newc archive header %q", archive[:6])
+	}
+	name := []byte("etc/usos/lang.bin\x00")
+	at := bytes.Index(archive, name)
+	if at < 110 {
+		t.Fatal("lang.bin entry missing")
+	}
+	data := at + len(name)
+	for data%4 != 0 {
+		data++
+	}
+	if !bytes.Equal(archive[data:data+len(blob)], blob) || !bytes.Contains(archive, []byte("TRAILER!!!")) {
+		t.Fatal("lang.bin payload or trailer missing")
+	}
+}
+
+func TestMachineTranslatedMarks(t *testing.T) {
+	if !MachineTranslatedKey("pl", "boot.menu.title") || MachineTranslatedKey("pl", "installer.common.back") {
+		t.Fatal("pl: boot.* must be marked machine-translated, installer.* not")
+	}
+	if !MachineTranslatedKey("de", "installer.common.back") || MachineTranslatedKey("en", "boot.menu.title") {
+		t.Fatal("de must be machine-translated, en not")
 	}
 }

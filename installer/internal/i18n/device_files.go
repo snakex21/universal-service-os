@@ -17,6 +17,7 @@ import (
 const (
 	SettingsPath   = "EFI/USOS/usos-settings.ini"
 	BootBlobPath   = "EFI/USOS/lang.bin"
+	LinuxLangPath  = "EFI/USOS/lang.cpio"
 	XPHelperPath   = "EFI/USOS/lang-xp.ini"
 	BootKeyPrefix  = "boot."
 	XPKeyPrefix    = "xp_pae."
@@ -45,6 +46,7 @@ func DeviceFiles(lang string) ([]DeviceFile, error) {
 	return []DeviceFile{
 		{Path: SettingsPath, Data: SettingsINI(lang)},
 		{Path: BootBlobPath, Data: boot},
+		{Path: LinuxLangPath, Data: LangCPIO(boot)},
 		{Path: XPHelperPath, Data: xp},
 	}, nil
 }
@@ -152,9 +154,34 @@ func XPHelperINI(lang string) ([]byte, error) {
 	return out, nil
 }
 
-// BootGlyphGaps lists, per boot.* key, the characters the boot font
-// (src/gui/font5x7.zig: printable ASCII 32..126 only) cannot draw.
-func BootGlyphGaps(lang string) (map[string][]rune, error) {
+// BootFontCoverage returns the codepoints of a USOS boot font pack
+// (src/gui/fonts/usos-font.bin, written by tools/usos_font_gen.py).
+func BootFontCoverage(pack []byte) (map[rune]bool, error) {
+	const header = 32
+	if len(pack) < header || string(pack[:8]) != "USOSFONT" {
+		return nil, fmt.Errorf("not a USOS font pack")
+	}
+	if binary.LittleEndian.Uint16(pack[8:10]) != 1 {
+		return nil, fmt.Errorf("unsupported font pack version")
+	}
+	payload := pack[header:]
+	if binary.LittleEndian.Uint32(pack[12:16]) != uint32(len(payload)) || crc32.ChecksumIEEE(payload) != binary.LittleEndian.Uint32(pack[16:20]) {
+		return nil, fmt.Errorf("font pack length/CRC mismatch")
+	}
+	count := int(binary.LittleEndian.Uint16(pack[20:22]))
+	if len(payload) < 2*count {
+		return nil, fmt.Errorf("font pack codepoint table truncated")
+	}
+	coverage := make(map[rune]bool, count)
+	for i := 0; i < count; i++ {
+		coverage[rune(binary.LittleEndian.Uint16(payload[2*i:]))] = true
+	}
+	return coverage, nil
+}
+
+// BootGlyphGaps lists, per boot.* key, the characters the boot font pack
+// cannot draw. Newlines are layout, not glyphs.
+func BootGlyphGaps(lang string, coverage map[rune]bool) (map[string][]rune, error) {
 	keys, catalog, err := prefixedEntries(Normalize(lang), BootKeyPrefix)
 	if err != nil {
 		return nil, err
@@ -163,11 +190,42 @@ func BootGlyphGaps(lang string) (map[string][]rune, error) {
 	for _, key := range keys {
 		seen := map[rune]bool{}
 		for _, r := range catalog[key] {
-			if (r < 32 || r > 126) && !seen[r] {
+			if r != '\n' && !coverage[r] && !seen[r] {
 				seen[r] = true
 				gaps[key] = append(gaps[key], r)
 			}
 		}
 	}
 	return gaps, nil
+}
+
+// LangCPIO wraps lang.bin as etc/usos/lang.bin in an uncompressed newc
+// archive. The micro-Linux loaders (systemd-boot, the XP EFI stub path and
+// the BIOS Core) pass it as a second initrd, so usos-fb-ui has the chosen
+// language from its first frame, before the ESP is mounted.
+func LangCPIO(langBin []byte) []byte {
+	var out bytes.Buffer
+	ino := uint32(1)
+	entry := func(name string, mode uint32, data []byte) {
+		fmt.Fprintf(&out, "070701%08X%08X%08X%08X%08X%08X%08X%08X%08X%08X%08X%08X%08X",
+			ino, mode, 0, 0, 1, 0, len(data), 0, 0, 0, 0, len(name)+1, 0)
+		ino++
+		out.WriteString(name)
+		out.WriteByte(0)
+		for out.Len()%4 != 0 {
+			out.WriteByte(0)
+		}
+		out.Write(data)
+		for out.Len()%4 != 0 {
+			out.WriteByte(0)
+		}
+	}
+	entry("etc", 0o040755, nil)
+	entry("etc/usos", 0o040755, nil)
+	entry("etc/usos/lang.bin", 0o100644, langBin)
+	entry("TRAILER!!!", 0, nil)
+	for out.Len()%512 != 0 {
+		out.WriteByte(0)
+	}
+	return out.Bytes()
 }
