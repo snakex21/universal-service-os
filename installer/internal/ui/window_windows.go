@@ -157,6 +157,7 @@ type win struct {
 	wheelAcc          wheelAccum
 	wheelForwarding   bool // a wheel message is being handed to a native child
 	pad               gamepad
+	touch             touchState
 
 	scrolls    map[string]*scrollState
 	edits      map[string]*nativeEdit
@@ -503,8 +504,14 @@ func (w *win) wndProc(hwnd windows.HWND, message uint32, wParam, lParam uintptr)
 			w.invalidate()
 		case padTimerID:
 			w.padTick()
+		case flingTimerID:
+			w.flingTick()
 		}
 		return 0
+	case wmPointerDown, wmPointerUpdate, wmPointerUp, wmPointerCaptureChange:
+		if w.pointer(message, wParam, lParam) {
+			return 0 // touch/pen handled: no mouse emulation
+		}
 	case wmMouseMove:
 		if !w.scripted {
 			if x, y := loWord(lParam), hiWord(lParam); x != w.mouse.X || y != w.mouse.Y {
@@ -538,6 +545,7 @@ func (w *win) wndProc(hwnd windows.HWND, message uint32, wParam, lParam uintptr)
 			return 0
 		}
 		w.setPadActive(false)
+		w.stopFling()
 		w.mouseDown(loWord(lParam), hiWord(lParam))
 		return 0
 	case wmLButtonUp:
@@ -725,6 +733,9 @@ func (w *win) resetScreen() {
 		delete(w.editByCtrl, e.ctrlID)
 	}
 	w.scrolls = map[string]*scrollState{}
+	w.stopFling()
+	w.touch.tracker.cancel()
+	w.touch.thumb = false
 	w.focus, w.hot, w.pressed = "", "", ""
 	w.dragging = nil
 	w.last = w.last[:0]
@@ -892,6 +903,7 @@ func (w *win) wheel(x, y, delta int32) {
 	if !w.overlay.empty() && !w.overlay.contains(x, y) {
 		return // the open menu is modal; the page under it stays put
 	}
+	w.stopFling()
 	for i := len(w.lastRegs) - 1; i >= 0; i-- {
 		region := w.lastRegs[i]
 		if !region.r.contains(x, y) {
