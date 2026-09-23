@@ -54,7 +54,28 @@ pub const Layout = struct {
     }
 };
 
+/// Footer key hints; with a gamepad in use they name its buttons. The
+/// hints are touch targets too (see fb_menu.zig).
+pub fn footerHints(buffer: *[4]usos.gui.ui.Hint, ui: *const Ui, state: model.State, layout: Layout, pad: bool) []const usos.gui.ui.Hint {
+    buffer.* = if (pad) .{
+        .{ .key = "\u{2191}\u{2193}", .label = ui.t(.key_select) },
+        .{ .key = "A", .label = ui.t(.key_open) },
+        .{ .key = "B", .label = ui.t(.key_back) },
+        .{ .key = "LB/RB", .label = ui.t(.key_scroll) },
+    } else .{
+        .{ .key = "\u{2191}\u{2193}", .label = ui.t(.key_select) },
+        .{ .key = "Enter", .label = ui.t(.key_open) },
+        .{ .key = "Esc", .label = ui.t(.key_back) },
+        .{ .key = "PgUp/PgDn", .label = ui.t(.key_scroll) },
+    };
+    return if (state.detailCount() > layout.info_lines) buffer[0..4] else buffer[0..3];
+}
+
 pub fn render(ui: *const Ui, state: model.State, mouse_x: i32, mouse_y: i32, mouse_visible: bool) void {
+    renderWith(ui, state, mouse_x, mouse_y, mouse_visible, false);
+}
+
+pub fn renderWith(ui: *const Ui, state: model.State, mouse_x: i32, mouse_y: i32, mouse_visible: bool, gamepad: bool) void {
     const theme = ui.theme;
     const layout = Layout.init(ui, state);
     var clock_buffer: [48]u8 = undefined;
@@ -100,13 +121,8 @@ pub fn render(ui: *const Ui, state: model.State, mouse_x: i32, mouse_y: i32, mou
         const text = std.fmt.bufPrint(&english, "Details {d}-{d} of {d}", .{ state.scroll + 1, @min(state.detailCount(), state.scroll + layout.info_lines), state.detailCount() }) catch "";
         note = ui.tr(&note_buffer, text);
     }
-    const hints = [_]usos.gui.ui.Hint{
-        .{ .key = "\u{2191}\u{2193}", .label = ui.t(.key_select) },
-        .{ .key = "Enter", .label = ui.t(.key_open) },
-        .{ .key = "Esc", .label = ui.t(.key_back) },
-        .{ .key = "PgUp/PgDn", .label = ui.t(.key_scroll) },
-    };
-    ui.footer(if (state.detailCount() > layout.info_lines) hints[0..4] else hints[0..3], note);
+    var hint_buffer: [4]usos.gui.ui.Hint = undefined;
+    ui.footer(footerHints(&hint_buffer, ui, state, layout, gamepad), note);
 
     if (mouse_visible and mouse_x >= 0 and mouse_y >= 0) {
         var sprite = usos.gui.cursor.Sprite{};

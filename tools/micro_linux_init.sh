@@ -64,6 +64,15 @@ enable_emergency_input() {
     load_input_module 'kernel/drivers/hid/hid-generic.ko' || true
     load_input_module 'kernel/drivers/input/evdev.ko' || true
     modprobe psmouse 2>/dev/null || true
+    # Gamepads and touchscreens for the framebuffer menus (usos-fb-ui):
+    # xpad (Xbox-compatible pads, ROG Ally gamepad mode), USB/I2C HID
+    # multitouch panels, and hid-asus (ROG Ally keys) on ASUS machines only.
+    modprobe xpad 2>/dev/null || true
+    modprobe hid_multitouch 2>/dev/null || true
+    modprobe i2c_hid_acpi 2>/dev/null || true
+    case "$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null)" in
+        *ASUS*) modprobe hid_asus 2>/dev/null || true ;;
+    esac
     mdev -s 2>/dev/null || true
 }
 

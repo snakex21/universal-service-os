@@ -81,11 +81,12 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
     const ui = context.ui(buffer.surface);
     var redraw = true;
     var ready = false;
+    var drag_scroll = usos.gui.input_map.DragScroll{};
     while (true) {
         const layout = renderer.Layout.init(&ui, state);
         if (redraw) {
             if (device) |d| {
-                renderer.render(&ui, state, input.x, input.y, input.pointer_visible);
+                renderer.renderWith(&ui, state, input.x, input.y, input.pointer_visible, input.gamepad_active);
                 buffer.copyTo(d.surface);
             } else {
                 console(tty, state);
@@ -99,6 +100,7 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
         }
         const action = input.next();
         if (action != .none and action != .pointer) trace.write("action={s}", .{@tagName(action)});
+        defer if (action != .none and action != .pointer) std.debug.print("[FB_MENU] action={s} selected={d} scroll={d} pad={s}\n", .{ @tagName(action), state.selected, state.scroll, if (input.gamepad_active) "yes" else "no" });
         switch (action) {
             .none => {},
             .previous, .next => { state.move(action == .next); redraw = true; },
@@ -108,9 +110,36 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
                 if (state.detailCount() > layout.info_lines) state.scrollInfo(action == .scroll_down, layout.info_lines) else state.move(action == .scroll_down);
                 redraw = true;
             },
+            // LB/RB and D-pad left/right page the details panel.
+            .page_up, .page_down => {
+                if (state.detailCount() > layout.info_lines) {
+                    for (0..@max(1, layout.info_lines)) |_| state.scrollInfo(action == .page_down, layout.info_lines);
+                } else state.move(action == .page_down);
+                redraw = true;
+            },
+            // Content follows the finger: details scroll, else the selection moves.
+            .drag => {
+                var rows = drag_scroll.feed(input.takeDrag(), layout.line_height);
+                while (rows != 0) : (rows += if (rows > 0) -1 else 1) {
+                    if (state.detailCount() > layout.info_lines) {
+                        state.scrollInfo(rows > 0, layout.info_lines);
+                    } else if (rows > 0) {
+                        if (state.selected + 1 < state.count) state.move(true);
+                    } else if (state.selected > 0) state.move(false);
+                }
+                redraw = true;
+            },
             .pointer => { redraw = true; },
             .click => {
-                if (input.pointer_visible) {
+                drag_scroll.reset();
+                if (input.has_position and input.x >= 0 and input.y >= 0) {
+                    // The footer hints are touch targets: Enter/A and Esc/B.
+                    var hint_buffer: [4]usos.gui.ui.Hint = undefined;
+                    const hints = renderer.footerHints(&hint_buffer, &ui, state, layout, input.gamepad_active);
+                    if (ui.footerHit(hints, "", @intCast(input.x), @intCast(input.y))) |index| {
+                        if (index == 1) return selected(state.selected);
+                        if (index == 2) return 1;
+                    }
                     if (layout.hit(input.x, input.y, state.count)) |index| return selected(index);
                 }
             },

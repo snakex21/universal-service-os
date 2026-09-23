@@ -323,6 +323,14 @@ def main() -> int:
             "kernel/drivers/hid/usbhid/usbhid.ko",
             "kernel/drivers/input/evdev.ko",
             "kernel/drivers/input/mouse/psmouse.ko",
+            # Gamepads (Xbox-compatible, incl. the ROG Ally's built-in pad in
+            # gamepad mode), touchscreens (USB and I2C HID multitouch; the
+            # AMD/Intel I2C controllers and GPIO are built into the kernel)
+            # and the ASUS HID keys (ROG Ally N-KEY device 0b05:1abe/1b4c).
+            "kernel/drivers/input/joystick/xpad.ko",
+            "kernel/drivers/hid/hid-multitouch.ko",
+            "kernel/drivers/hid/i2c-hid/i2c-hid-acpi.ko",
+            "kernel/drivers/hid/hid-asus.ko",
             "kernel/drivers/usb/host/xhci-hcd.ko",
             "kernel/drivers/usb/host/xhci-pci.ko",
             "kernel/drivers/usb/host/ehci-hcd.ko",
