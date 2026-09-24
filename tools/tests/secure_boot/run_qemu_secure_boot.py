@@ -92,7 +92,7 @@ def wait_for(path: Path, needles: list[str], timeout: float) -> str | None:
 
 class Machine:
     def __init__(self, name: str, esp: Path | None, vars_file: Path, keep_screens: bool, extra: list[str] | None = None, disk: Path | None = None,
-                 device: list[str] | None = None, machine: str = "q35,smm=on"):
+                 device: list[str] | None = None, machine: str = "q35,smm=on", firmware: Path | None = None):
         self.name = name
         self.serial = WORK / f"{name}.serial.log"
         self.keep_screens = keep_screens
@@ -103,8 +103,9 @@ class Machine:
         args = [
             str(QEMU), "-name", f"USOS-SB-{name}",
             "-machine", machine, "-accel", "tcg,thread=multi", "-cpu", "max", "-m", "2048", "-smp", "2",
-            "-global", "driver=cfi.pflash01,property=secure,value=on",
-            "-drive", f"if=pflash,format=raw,unit=0,readonly=on,file={(CACHE / 'OVMF_CODE.secboot.fd').as_posix()}",
+            # firmware: a non-SMM OVMF (i440fx has no TSEG for the SMM build).
+            *([] if firmware else ["-global", "driver=cfi.pflash01,property=secure,value=on"]),
+            "-drive", f"if=pflash,format=raw,unit=0,readonly=on,file={(firmware or CACHE / 'OVMF_CODE.secboot.fd').as_posix()}",
             "-drive", f"if=pflash,format=raw,unit=1,file={vars_file.as_posix()}",
             "-nic", "none", "-display", "none", "-vga", "std",
             "-monitor", f"tcp:127.0.0.1:{port},server=on,wait=off",
@@ -883,7 +884,7 @@ def scenario_drivers(args, failures: list[str]) -> None:
 
 CONTROLLERS = {
     "ahci": ("q35,smm=on", ["-device", "ide-hd,bus=ide.0,drive=esp,bootindex=1"]),
-    "ide": ("pc,smm=on", ["-device", "ide-hd,bus=ide.0,drive=esp,bootindex=1"]),
+    "ide": ("pc", ["-device", "ide-hd,bus=ide.0,drive=esp,bootindex=1"]),
     "nvme": ("q35,smm=on", ["-device", "nvme,serial=USOSTEST,drive=esp,bootindex=1"]),
     "virtio-blk": ("q35,smm=on", ["-device", "virtio-blk-pci,drive=esp,bootindex=1"]),
     "virtio-scsi": ("q35,smm=on", ["-device", "virtio-scsi-pci,id=scsi", "-device", "scsi-hd,bus=scsi.0,drive=esp,bootindex=1"]),
@@ -900,15 +901,24 @@ def scenario_matrix(args, failures: list[str]) -> None:
     der = (USB / "EFI" / "USOS" / CERT_NAME).read_bytes()
     mok = [{"name": "MokList", "guid": SHIM_GUID, "attr": 3, "data": x509_list(der).hex()}]
     disk = driver_disk("matrix")
+    plain_code = ROOT / "tools" / "qemu" / "share" / "edk2-x86_64-code.fd"
+    plain_vars = ROOT / "tools" / "qemu" / "share" / "edk2-i386-vars.fd"
     for name, (machine_type, device) in CONTROLLERS.items():
-        try:
-            vars_file = seeded_vars(f"matrix-{name}", mok, set_false=["SecureBootEnable"])
-        except (subprocess.CalledProcessError, FileNotFoundError, ModuleNotFoundError) as error:
-            expect(False, f"matrix {name}: could not prepare NVRAM ({error})", failures)
-            continue
+        firmware = None
+        if machine_type.startswith("pc"):
+            # i440fx + PIIX IDE: the plain (non-SMM, no keys) OVMF; Secure Boot off.
+            firmware = plain_code
+            vars_file = WORK / f"vars-matrix-{name}.fd"
+            shutil.copyfile(plain_vars, vars_file)
+        else:
+            try:
+                vars_file = seeded_vars(f"matrix-{name}", mok, set_false=["SecureBootEnable"])
+            except (subprocess.CalledProcessError, FileNotFoundError, ModuleNotFoundError) as error:
+                expect(False, f"matrix {name}: could not prepare NVRAM ({error})", failures)
+                continue
         copy = WORK / f"drivers-matrix-{name}.vhd"
         shutil.copyfile(disk, copy)
-        machine = Machine(f"matrix-{name}", None, vars_file, args.keep_screens, disk=copy, device=device, machine=machine_type)
+        machine = Machine(f"matrix-{name}", None, vars_file, args.keep_screens, disk=copy, device=device, machine=machine_type, firmware=firmware)
         try:
             wait_for(machine.serial, ["[DRIVERS_REPORT END]", "Verification failed"], 420)
             time.sleep(2)
@@ -923,6 +933,8 @@ def scenario_matrix(args, failures: list[str]) -> None:
 
 
 def main() -> int:
+    # Reports print non-ASCII driver folder names.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser()
     parser.add_argument("--keep-screens", action="store_true")
     parser.add_argument("--only", choices=["unsigned", "enroll", "probe", "timeout", "repeat", "helper", "noauth", "wait", "direct", "touch", "drivers", "matrix"], default=None)

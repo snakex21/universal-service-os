@@ -39,8 +39,11 @@ fn countText(started: usize, total: usize) []const u8 {
 }
 
 var details: [max_rows][160]u8 = undefined;
-var help_lines: [8][]const u8 = undefined;
-var help_text: [8][200]u8 = undefined;
+var help_lines: [help_rows][]const u8 = undefined;
+var help_text: [help_rows][200]u8 = undefined;
+/// Every help panel gets the same number of rows: the list sizes the panel
+/// once, from the help it opens with.
+const help_rows = 10;
 
 pub fn page() void {
     var selected: usize = 0;
@@ -158,6 +161,14 @@ fn sbLine(entry: *const uefi_drivers.Entry) []const u8 {
 }
 
 fn rowHelp(selected: usize) ?Help {
+    var help = rowHelpLines(selected) orelse return null;
+    var n = help.lines.len;
+    while (n < help_rows) : (n += 1) help_lines[n] = " ";
+    help.lines = help_lines[0..n];
+    return help;
+}
+
+fn rowHelpLines(selected: usize) ?Help {
     const drivers = uefi_drivers.list();
     var n: usize = 0;
     if (selected == 0) {
