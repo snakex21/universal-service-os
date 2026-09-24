@@ -21,6 +21,8 @@ import (
 //	EFI/BOOT/mmx64.efi    MokManager (signed by the shim vendor)
 //	EFI/BOOT/grubx64.efi  USOS, MOK-signed, with a .sbat section
 //	EFI/USOS/ENROLL_THIS_KEY_IN_MOKMANAGER.cer, ENROLL-README.txt, secure-boot.ini
+//	USOS-KEY.cer          the same certificate at the ESP root, so MokManager's
+//	                      "Enroll key from disk" needs one click: USOS_ESP -> USOS-KEY.cer
 const (
 	shimVendorDir     = "tools/vendor/shim/16.1-7"
 	sbatPath          = "assets/secure-boot/usos.sbat.csv"
@@ -29,6 +31,7 @@ const (
 	unsignedUsosPath  = "zig-out/manual-usb/EFI/BOOT/BOOTX64.EFI"
 	usbRoot           = "zig-out/usb"
 	enrollCertName    = "ENROLL_THIS_KEY_IN_MOKMANAGER.cer"
+	rootCertName      = "USOS-KEY.cer"
 	secureBootINIPath = "EFI/USOS/secure-boot.ini"
 )
 
@@ -140,8 +143,10 @@ func release(args []string) error {
 			}
 			fmt.Printf("[SIGN] %s\n", relative)
 		}
-		if err := os.WriteFile(filepath.Join(usosDir, enrollCertName), pair.Cert.Raw, 0o644); err != nil {
-			return err
+		for _, target := range []string{filepath.Join(usosDir, enrollCertName), at(usbRoot + "/" + rootCertName)} {
+			if err := os.WriteFile(target, pair.Cert.Raw, 0o644); err != nil {
+				return err
+			}
 		}
 	} else {
 		unsigned, err := os.ReadFile(at(unsignedUsosPath))
@@ -156,6 +161,7 @@ func release(args []string) error {
 			return err
 		}
 		_ = os.Remove(filepath.Join(usosDir, enrollCertName))
+		_ = os.Remove(at(usbRoot + "/" + rootCertName))
 	}
 	fmt.Printf("[SIGN] %s <- %s (%s)\n", filepath.ToSlash(filepath.Join(usbRoot, "EFI/BOOT", manifest.SecondStage)), unsignedUsosPath, map[bool]string{true: "signed", false: "UNSIGNED"}[signed])
 

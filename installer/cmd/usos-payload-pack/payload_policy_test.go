@@ -8,6 +8,7 @@ func TestShouldBundleMediaFileKeepsOnlyStaticESPPayload(t *testing.T) {
 		`EFI/USOS/ntfs_x64.efi`,
 		`UI/index.html`,
 		`UI/Icons/Systems/windows-11.png`,
+		`USOS-KEY.cer`,
 	}
 	for _, path := range accepted {
 		if !shouldBundleMediaFile(path) {
@@ -23,6 +24,7 @@ func TestShouldBundleMediaFileExcludesDataAndGeneratedCatalog(t *testing.T) {
 		`Systems/README.txt`,
 		`Utilities/MemTest86/icon.png`,
 		`Programs/README.txt`,
+		`OTHER-KEY.cer`,
 	}
 	for _, path := range rejected {
 		if shouldBundleMediaFile(path) {

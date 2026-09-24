@@ -57,6 +57,12 @@ func main() {
 		Uninstall:   engines.uninstall,
 		VolumeInUse: engines.volumeInUse,
 		MokFirmware: &fakeMokFirmware{vars: map[string][]byte{}},
+		// Never touch this PC: markers go to a temporary directory, the
+		// machine UUID is fixed and restarts only show a toast.
+		MokMarkerDir:      filepath.Join(os.TempDir(), "usos-uidemo-mok"),
+		MachineUUID:       func() string { return "00112233-4455-6677-8899-AABBCCDDEEFF" },
+		Restart:           func() error { return errors.New("demo: restart skipped") },
+		RestartToFirmware: func() error { return errors.New("demo: restart into firmware settings skipped") },
 		ForceDPI:    uint32(*dpi),
 		ClientW:     int32(*width),
 		ClientH:     int32(*height),
@@ -270,27 +276,27 @@ func tour(d *ui.Driver, e *fakeEngines, dir, suffix string, startupError bool, l
 	if err := shot("install-final-success"); err != nil {
 		return err
 	}
-	// Secure Boot key enrollment (fake firmware: nothing reaches NVRAM).
-	if err := d.Activate("final.mok"); err != nil {
+	// Secure Boot (fake firmware with Secure Boot on: nothing reaches
+	// NVRAM). The final screen shows the one-time card; Prepare writes only
+	// MokTimeout and the guide switches to "Restart now".
+	d.SecureBootChecked()
+	if err := d.Activate("sb.prepare"); err != nil {
 		return err
 	}
 	if err := shot("install-mok"); err != nil {
 		return err
 	}
-	d.Focus("mok.password")
-	d.Type(" x")
-	if d.Enabled("action.primary") {
-		return fmt.Errorf("MOK prepare enabled for a password with a space")
-	}
-	if err := shot("install-mok-invalid"); err != nil {
-		return err
-	}
-	d.Type("\b\busos") // valid again whether focus selected the text or not
 	if err := d.Activate("action.primary"); err != nil {
 		return err
 	}
 	waitIdle(d)
-	if err := shot("install-mok-done"); err != nil {
+	if err := shot("install-mok-prepared"); err != nil {
+		return err
+	}
+	if err := d.Activate("action.firmware"); err != nil {
+		return err
+	}
+	if err := shot("install-mok-restart-skipped"); err != nil {
 		return err
 	}
 	if err := d.Activate("action.back"); err != nil {

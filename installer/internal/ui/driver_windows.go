@@ -250,6 +250,21 @@ func (d *Driver) Loaded() {
 		}
 		time.Sleep(25 * time.Millisecond)
 	}
+	d.SecureBootChecked()
+	d.Idle()
+}
+
+// SecureBootChecked waits until the background Secure Boot / USOS key check
+// (home card) has finished.
+func (d *Driver) SecureBootChecked() {
+	for i := 0; i < 200; i++ {
+		ready := false
+		d.do(func() { ready = d.f.sb.ready })
+		if ready {
+			break
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
 	d.Idle()
 }
 

@@ -243,6 +243,51 @@ pub const Key = enum(u16) {
     prep_step,
     prep_title,
     prep_xp_disks,
+    sbinfo_add_needs_off,
+    sbinfo_desc,
+    sbinfo_how,
+    sbinfo_how_line1,
+    sbinfo_how_line2,
+    sbinfo_how_line3,
+    sbinfo_how_line4,
+    sbinfo_key_denied,
+    sbinfo_key_missing,
+    sbinfo_key_saved,
+    sbinfo_key_short_missing,
+    sbinfo_key_short_saved,
+    sbinfo_key_unknown,
+    sbinfo_no_cert,
+    sbinfo_off,
+    sbinfo_on,
+    sbinfo_pk_no,
+    sbinfo_pk_yes,
+    sbinfo_remind,
+    sbinfo_remove_hint,
+    sbinfo_sb_off,
+    sbinfo_sb_on,
+    sbinfo_sb_setup,
+    sbinfo_sb_unsupported,
+    sbinfo_title,
+    sbkey_add,
+    sbkey_back_menu,
+    sbkey_banner,
+    sbkey_banner_action,
+    sbkey_confirm_line1,
+    sbkey_confirm_line2,
+    sbkey_confirm_title,
+    sbkey_failed_line1,
+    sbkey_failed_title,
+    sbkey_never,
+    sbkey_never_note,
+    sbkey_no,
+    sbkey_not_now,
+    sbkey_offer_line1,
+    sbkey_offer_line2,
+    sbkey_open_setup,
+    sbkey_saved_line1,
+    sbkey_saved_title,
+    sbkey_title,
+    sbkey_yes,
     splash_images,
     splash_loading,
     splash_starting,
@@ -556,6 +601,51 @@ pub const hashes = [_]u32{
     0x5a2661f6, // prep.step
     0x84ce2712, // prep.title
     0x87155e69, // prep.xp_disks
+    0x9e2530dd, // sbinfo.add_needs_off
+    0x491358b7, // sbinfo.desc
+    0x74355308, // sbinfo.how
+    0xf8944fd2, // sbinfo.how_line1
+    0xf7944e3f, // sbinfo.how_line2
+    0xf6944cac, // sbinfo.how_line3
+    0xf5944b19, // sbinfo.how_line4
+    0x7e82a855, // sbinfo.key_denied
+    0xf388d60a, // sbinfo.key_missing
+    0x91c57175, // sbinfo.key_saved
+    0x03b334ff, // sbinfo.key_short_missing
+    0x99146cbc, // sbinfo.key_short_saved
+    0x7a3d527c, // sbinfo.key_unknown
+    0x9d0b5e08, // sbinfo.no_cert
+    0x3425b013, // sbinfo.off
+    0xc82a9b4f, // sbinfo.on
+    0x5bbf17eb, // sbinfo.pk_no
+    0x237c6f57, // sbinfo.pk_yes
+    0xb8be361b, // sbinfo.remind
+    0x96476e16, // sbinfo.remove_hint
+    0xcc03016d, // sbinfo.sb_off
+    0xc99edd31, // sbinfo.sb_on
+    0x718f9815, // sbinfo.sb_setup
+    0x88fb8557, // sbinfo.sb_unsupported
+    0xf386e6a0, // sbinfo.title
+    0x97fca9c6, // sbkey.add
+    0xd00e547e, // sbkey.back_menu
+    0x8ae86fc5, // sbkey.banner
+    0x13784be4, // sbkey.banner_action
+    0xf3f648cf, // sbkey.confirm_line1
+    0xf4f64a62, // sbkey.confirm_line2
+    0x84200708, // sbkey.confirm_title
+    0xd24c51b8, // sbkey.failed_line1
+    0x734b2463, // sbkey.failed_title
+    0x39f3e177, // sbkey.never
+    0xe43bbd14, // sbkey.never_note
+    0xbcd77668, // sbkey.no
+    0xd6be6c03, // sbkey.not_now
+    0xf71ed549, // sbkey.offer_line1
+    0xf41ed090, // sbkey.offer_line2
+    0x18485ded, // sbkey.open_setup
+    0x415d50a8, // sbkey.saved_line1
+    0xee1489b3, // sbkey.saved_title
+    0xff5020b3, // sbkey.title
+    0xd9dbe826, // sbkey.yes
     0x4f9583c2, // splash.images
     0x35ce4a04, // splash.loading
     0x790f2c74, // splash.starting
@@ -869,6 +959,51 @@ pub const bios = [_]bool{
     true,
     true,
     false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
     false,
     false,
     false,
@@ -1181,6 +1316,51 @@ pub const english = [_][]const u8{
     "Step {0} of {1}",
     "Preparing Windows installer",
     "Starting XP disk selection",
+    "Available while Secure Boot is off",
+    "Secure Boot state and the USOS key on this computer",
+    "Add the key with Secure Boot on",
+    "1. Start the computer from the USOS drive. At \"Verification failed\" press Enter once.",
+    "2. In the blue MokManager screen choose Enroll key from disk -> USOS_ESP -> USOS-KEY.cer.",
+    "3. Choose Continue -> Yes -> Reboot. No password is needed.",
+    "On a handheld tap each button once, do not hold it: a held button skips the screens.",
+    "The USOS key is on this computer's deny list (MokListX), so it is not trusted.",
+    "The USOS key is not saved on this computer",
+    "The USOS key is saved on this computer",
+    "Missing",
+    "Saved",
+    "The USOS key status is unknown",
+    "The key file USOS-KEY.cer is missing from the drive",
+    "Off",
+    "On",
+    "Secure Boot cannot be turned on until the default keys are restored in the BIOS settings.",
+    "Secure Boot can be turned on (a platform key is installed).",
+    "Remind on the home screen",
+    "To remove it: MokManager -> Delete MOK, or reset the Secure Boot keys in the BIOS settings.",
+    "Secure Boot: off",
+    "Secure Boot: on",
+    "Secure Boot: setup mode (no platform key)",
+    "Secure Boot: not supported by this firmware",
+    "Secure Boot",
+    "Add the key",
+    "Back to the menu",
+    "USOS cannot find its Secure Boot key on this computer. Add it?",
+    "Add",
+    "Do you agree to save the USOS key in this computer's memory? It lets USOS start while Secure Boot is on.",
+    "Only this computer is changed. The key can be removed later in MokManager (Delete MOK) or by resetting the Secure Boot keys in the BIOS settings.",
+    "Save the key?",
+    "The firmware did not store the key. Use MokManager instead (Tools -> Secure Boot -> Add the key with Secure Boot on).",
+    "The key was not saved",
+    "Don't ask again",
+    "You can add the key later in Tools -> Secure Boot.",
+    "No",
+    "Not now",
+    "Without the USOS key, this computer does not start USOS while Secure Boot is on.",
+    "Secure Boot is off right now, so the key can be saved here directly: no password and no MokManager.",
+    "Open BIOS settings",
+    "Key saved. You can now turn Secure Boot on in the BIOS settings.",
+    "Key saved",
+    "Secure Boot key",
+    "Yes, save the key",
     "Loading system images\xe2\x80\xa6",
     "Loading\xe2\x80\xa6",
     "Starting\xe2\x80\xa6",

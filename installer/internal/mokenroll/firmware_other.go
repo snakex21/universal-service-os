@@ -14,3 +14,15 @@ func (unsupportedFirmware) Get(string, GUID) ([]byte, uint32, error) {
 }
 
 func (unsupportedFirmware) Set(string, GUID, []byte, uint32) error { return ErrUnsupported }
+
+// MachineUUID is only implemented on Windows.
+func MachineUUID() (string, error) { return "", ErrUnsupported }
+
+// AppDataDir is only implemented on Windows.
+func AppDataDir() string { return "" }
+
+// RestartToFirmware is only implemented on Windows.
+func RestartToFirmware() error { return ErrUnsupported }
+
+// Restart is only implemented on Windows.
+func Restart() error { return ErrUnsupported }

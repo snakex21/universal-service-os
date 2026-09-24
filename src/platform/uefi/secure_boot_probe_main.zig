@@ -10,6 +10,8 @@ const filesystem = @import("filesystem.zig");
 const ntfs_driver = @import("ntfs_driver.zig");
 const secure_boot = @import("secure_boot.zig");
 const serial = @import("serial.zig");
+const mok_key = @import("mok_key.zig");
+const mok_list = @import("usos").flow.mok_list;
 
 fn say(text: []const u8) void {
     serial.writeAscii(text);
@@ -51,6 +53,9 @@ pub fn main() uefi.Status {
     };
     defer root.close() catch {};
 
+    // Secure Boot off (PK present): the "Add the key" path of the menu.
+    if (secure_boot.state() == .disabled) return mokSave(root);
+
     startChild(root, "unsigned-child", "\\EFI\\USOS\\probe\\unsigned-child.efi");
 
     if (ntfs_driver.loadAndConnect(root)) |_| {
@@ -73,5 +78,40 @@ pub fn main() uefi.Status {
     say("[SB_PROBE] systemd-boot handover\n");
     startChild(root, "systemd-boot", "\\EFI\\USOS\\systemd-bootx64.efi");
     say("[SB_PROBE] end\n");
+    return .success;
+}
+
+fn countLists(name: [*:0]const u16) usize {
+    var buffer: [16384]u8 = undefined;
+    const guid align(8) = secure_boot.ShimLock.guid;
+    const found = (uefi.system_table.runtime_services.getVariable(name, &guid, &buffer) catch return 0) orelse return 0;
+    var offset: usize = 0;
+    var count: usize = 0;
+    while (offset + mok_list.list_header_size <= found[0].len) : (count += 1) {
+        const size = std.mem.readInt(u32, found[0][offset + 16 ..][0..4], .little);
+        if (size < mok_list.list_header_size) break;
+        offset += size;
+    }
+    return count;
+}
+
+/// The same mok_key.save() the Tools -> Secure Boot page and the home offer
+/// call, reported on the serial port.
+fn mokSave(root: *uefi.protocol.File) uefi.Status {
+    const name = std.unicode.utf8ToUtf16LeStringLiteral("MokList");
+    var line: [160]u8 = undefined;
+    const before = mok_key.status(root);
+    say(std.fmt.bufPrint(&line, "[SB_PROBE] mok-save before key={s} lists={d} cert={s} can_save={s}\n", .{ @tagName(before.key), countLists(name), if (before.certificate) "yes" else "no", if (before.canSave()) "yes" else "no" }) catch "");
+    mok_key.save(root) catch |err| {
+        sayError("[SB_PROBE] mok-save FAIL error=", err);
+        return .success;
+    };
+    const after = mok_key.refresh(root);
+    say(std.fmt.bufPrint(&line, "[SB_PROBE] mok-save PASS key={s} lists={d}\n", .{ @tagName(after.key), countLists(name) }) catch "");
+    // A second save must be refused (already saved) and add nothing.
+    if (mok_key.save(root)) |_| {
+        say("[SB_PROBE] mok-save second UNEXPECTED PASS\n");
+    } else |err| sayError("[SB_PROBE] mok-save second refused error=", err);
+    say(std.fmt.bufPrint(&line, "[SB_PROBE] mok-save end lists={d}\n", .{countLists(name)}) catch "");
     return .success;
 }

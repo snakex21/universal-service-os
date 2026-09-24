@@ -15,7 +15,8 @@ $win7NativeFiles = @('win7-support.cpio', 'vista-support.cpio', 'int10.efi', 'in
 $msDosFiles = @('HIMEMX.EXE', 'HIMEMX.TXT', 'HIMEMSRC.ZIP', 'LICENSE.TXT', 'manifest.json', 'INSTALL.BAT', 'LIVE.BAT', 'PREPDOS.BAT', 'COPYDOS.BAT', 'UNPACK.BAT', 'W3START.BAT', 'WINMENU.BAT', 'W3CONFIG.SYS', 'W3AUTO.BAT', 'REBOOT.COM')
 
 function Test-StaticEspPath([string]$Relative) {
-    return $Relative -match '^(EFI|UI)/'
+    # USOS-KEY.cer: the Secure Boot certificate at the ESP root (short path in MokManager).
+    return ($Relative -match '^(EFI|UI)/') -or ($Relative -eq 'USOS-KEY.cer')
 }
 
 function Test-ByteSequence([byte[]]$Haystack, [byte[]]$Needle) {
@@ -61,6 +62,11 @@ try {
         foreach ($signedFile in @($secondStage, (Join-Path $ProjectRoot 'zig-out\micro-linux\vmlinuz-virt'), (Join-Path $ProjectRoot 'zig-out\micro-linux\systemd-bootx64.efi'), (Join-Path $ProjectRoot 'zig-out\test-assets\ntfs_x64.efi'))) {
             & go run ./cmd/usos-efisign verify -in $signedFile -cert $enrollCert
             if ($LASTEXITCODE -ne 0) { throw "Not signed with the enrolled USOS key: $signedFile" }
+        }
+        $rootCert = Join-Path $usbRoot 'USOS-KEY.cer'
+        if (-not (Test-Path -LiteralPath $rootCert -PathType Leaf)) { throw "Missing root certificate copy: $rootCert" }
+        if ((Get-FileHash -Algorithm SHA256 -LiteralPath $rootCert).Hash -ne (Get-FileHash -Algorithm SHA256 -LiteralPath $enrollCert).Hash) {
+            throw "USOS-KEY.cer differs from EFI\USOS\ENROLL_THIS_KEY_IN_MOKMANAGER.cer"
         }
     } else {
         Write-Host '[WARN] UNSIGNED Secure Boot layout (no signing key): the stick boots only with Secure Boot off.'

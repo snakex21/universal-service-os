@@ -13,6 +13,7 @@ const manual_systems = @import("manual_systems.zig");
 const manual_unattended = @import("manual_unattended.zig");
 const manual_utilities = @import("manual_utilities.zig");
 const manual_view = @import("manual_view.zig");
+const manual_secure_boot = @import("manual_secure_boot.zig");
 const boot_timing = @import("boot_timing.zig");
 const splash = @import("splash.zig");
 
@@ -40,6 +41,7 @@ pub fn run() void {
     boot_timing.mark("usos-settings.ini read");
     splash.begin(info.framebuffer, splash.logoSetting(settings), "");
     manual_view.init(root, info, settings);
+    manual_secure_boot.init(root, settings);
     if (e2e_flow.resumePersistent(root, showResumeStatus)) return;
     boot_timing.mark("persistent state checked");
     splash.status(manual_view.t(.splash_images));

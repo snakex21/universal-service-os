@@ -1,189 +1,180 @@
-USOS and Secure Boot - enroll the USOS key once
-================================================
+USOS and Secure Boot - add the USOS key once per computer
+=========================================================
 
 [EN] English
 ------------
-USOS starts with Secure Boot ON after you enroll its key once per computer.
-There are two ways. Method A needs Windows on that computer and a USB
-keyboard for one password; method B works from the stick alone.
+USOS starts with Secure Boot ON after its key has been added once on that
+computer. No password is needed in any of the ways below.
 
-Method A - prepare it in Windows (recommended for handhelds, e.g. ROG Ally)
-1. In Windows on THAT computer run "USOS Installer.exe" as administrator and
-   choose "Prepare key enrollment on this computer" in the Secure Boot note.
-   Pick a short password (default "usos"). Nothing else is changed.
-2. Restart and boot the USOS stick. A blue "Shim UEFI key management"
-   screen appears by itself (no error first). Press ONE key/button briefly
-   within 10 seconds.
-3. Choose "Enroll MOK" -> "Continue" -> "Yes", type the password, Enter.
-4. Choose "Reboot". USOS now starts with Secure Boot ON.
-   If the 10 seconds passed, run step 1 again (the request is used once).
+The USOS menu shows the state of this computer in Tools -> Secure Boot
+(Secure Boot on/off, whether the USOS key is saved, whether Secure Boot can
+be turned on) and has "Add the key" and "Open BIOS settings" there.
 
-Method B - from the stick (no Windows needed)
+Way 1 - easiest: start USOS once with Secure Boot OFF
+1. Turn Secure Boot off in the BIOS/UEFI settings (in Windows the USOS
+   installer has "Restart into BIOS settings").
+2. Start the computer from the USOS stick. The home screen shows
+   "USOS cannot find its Secure Boot key on this computer. Add it?"
+   Choose Add -> Add the key -> "Yes, save the key".
+   (Or later: Tools -> Secure Boot -> Add the key.)
+3. "Key saved." Choose "Open BIOS settings" and turn Secure Boot back on.
+   Done: USOS now starts with Secure Boot ON, no MokManager at all.
+
+Way 2 - Secure Boot stays ON (MokManager, from the stick alone)
+Optional first step in Windows: USOS installer -> "Prepare (one time)".
+It only makes MokManager wait on its menu instead of a 10 s countdown.
+
+1. "Verification failed"     2. Enroll key from disk      3. the USOS stick
++-------------------------+  +-------------------------+  +-------------------------+
+|          ERROR          |  |  Perform MOK management |  |        Select Key       |
+|   Verification failed   |  |      Continue boot      |  |       > USOS_ESP <      |
+|          > OK <         |  | > Enroll key from disk <|  |           ...           |
++-------------------------+  |  Enroll hash from disk  |  +-------------------------+
+                             +-------------------------+
+   press Enter ONCE             arrows, Enter                Enter
+
+4. the key file              5. Continue                  6. Yes, then 7. Reboot
++-------------------------+  +-------------------------+  +-------------------------+
+|         USOS_ESP        |  |       [Enroll MOK]      |  |    Enroll the key(s)?   |
+|           EFI/          |  |        View key 0       |  |            No           |
+|     > USOS-KEY.cer <    |  |       > Continue <      |  |         > Yes <         |
++-------------------------+  +-------------------------+  +-------------------------+
+
 1. Boot the computer from the USOS stick.
-2. A blue screen says "Verification failed: (0x1A) Security Violation".
-   Tap Enter (OK) ONCE and release it: "Shim UEFI key management"
-   (MokManager) opens with a 10 second countdown. Tap any key within 10 s.
-   Holding the key/button (or a handheld pad's auto-repeat) skips the
-   countdown, picks "Continue boot" and the computer boots the next system
-   (e.g. Windows) - that looks like "MokManager never appeared".
+2. Blue screen "Verification failed: (0x1A) Security Violation": press Enter
+   ONCE and release it. MokManager ("Shim UEFI key management") opens; if it
+   shows a 10 s countdown, tap any key once.
 3. Choose "Enroll key from disk".
-4. Choose the USOS stick (USOS_ESP), then EFI -> USOS ->
-   ENROLL_THIS_KEY_IN_MOKMANAGER.cer
-5. Choose "Continue", then "Yes", then "Reboot". No password is needed, so
-   arrows + Enter (D-pad + A on a handheld) are enough.
-6. USOS now starts normally with Secure Boot ON. You never need to repeat this
-   on this computer (unless the firmware settings are reset).
+4. Choose the USOS stick (USOS_ESP), then USOS-KEY.cer (the same file is
+   also in EFI\USOS\ENROLL_THIS_KEY_IN_MOKMANAGER.cer).
+5. Choose "Continue", then "Yes", then "Reboot". Arrows + Enter (D-pad + A
+   on a handheld) are enough.
 
+Handhelds (ROG Ally and similar): tap each button ONCE, do not hold it. A held
+button or auto-repeat skips the screens, picks "Continue boot" and the
+computer starts the next system (e.g. Windows) - it then looks as if
+MokManager never appeared. Way 1 avoids MokManager completely.
+
+You never need to repeat this on this computer, unless the Secure Boot keys
+in the firmware settings are reset.
 With Secure Boot ON, entries that need a legacy boot path (Windows XP through
-CSM, Windows 7 and Vista) are marked "Requires Secure Boot off" in the menu;
-you can still select them to read why.
-To remove the key later: MokManager "Delete MOK", or in Linux
-"mokutil --delete ENROLL_THIS_KEY_IN_MOKMANAGER.cer".
+CSM, Windows 7 and Vista) are marked "Requires Secure Boot off" in the menu.
+To remove the key: MokManager "Delete MOK", "mokutil --delete USOS-KEY.cer"
+in Linux, or reset the Secure Boot keys in the firmware settings.
+Advanced: the installer can also write a MokNew request with a password
+("USOS Installer.exe" -prepare-mok-enrollment -mok-password P).
 
 [PL] Polski
 -----------
-USOS uruchamia sie przy WLACZONYM Secure Boot po jednorazowym dodaniu
-(enroll) jego klucza na danym komputerze. Sa dwa sposoby. Sposob A wymaga
-Windows na tym komputerze i klawiatury USB do wpisania hasla; sposob B
-dziala z samego pendrive'a.
+USOS uruchamia sie przy WLACZONYM Secure Boot po jednorazowym dodaniu jego
+klucza na danym komputerze. Zaden z ponizszych sposobow nie wymaga hasla.
 
-Sposob A - przygotowanie w Windows (zalecany dla konsol, np. ROG Ally)
-1. W Windows na TYM komputerze uruchom "USOS Installer.exe" jako
-   administrator i w uwadze o Secure Boot wybierz "Przygotuj rejestracje
-   klucza na tym komputerze". Wybierz krotkie haslo (domyslnie "usos").
-   Nic innego nie jest zmieniane.
-2. Uruchom ponownie i wystartuj z pendrive'a USOS. Sam pojawi sie niebieski
-   ekran "Shim UEFI key management" (bez bledu przed nim). W ciagu 10 sekund
-   nacisnij krotko JEDEN klawisz/przycisk.
-3. Wybierz "Enroll MOK" -> "Continue" -> "Yes", wpisz haslo, Enter.
-4. Wybierz "Reboot". USOS startuje juz z wlaczonym Secure Boot.
-   Jesli minelo 10 sekund, powtorz krok 1 (zgloszenie dziala raz).
+W menu USOS stan komputera widac w Narzedzia -> Secure Boot (Secure Boot
+wlaczony/wylaczony, czy klucz USOS jest zapisany, czy Secure Boot da sie
+wlaczyc); sa tam tez "Dodaj klucz" i "Otworz ustawienia BIOS".
 
-Sposob B - z pendrive'a (bez Windows)
+Sposob 1 - najprosciej: uruchom USOS raz przy WYLACZONYM Secure Boot
+1. Wylacz Secure Boot w ustawieniach BIOS/UEFI (w Windows instalator USOS
+   ma przycisk "Uruchom ponownie do ustawien BIOS").
+2. Uruchom komputer z pendrive'a USOS. Ekran glowny pokaze "Nie wykryto
+   klucza Secure Boot potrzebnego do uruchamiania USOS. Dodac go?".
+   Wybierz Dodaj -> Dodaj klucz -> "Tak, zapisz klucz".
+   (Albo pozniej: Narzedzia -> Secure Boot -> Dodaj klucz.)
+3. "Klucz zapisany." Wybierz "Otworz ustawienia BIOS" i wlacz z powrotem
+   Secure Boot. Gotowe: USOS startuje z wlaczonym Secure Boot, bez
+   MokManagera.
+
+Sposob 2 - Secure Boot zostaje WLACZONY (MokManager, z samego pendrive'a)
+Opcjonalnie najpierw w Windows: instalator USOS -> "Przygotuj
+(jednorazowo)". To tylko sprawia, ze MokManager czeka na swoim menu zamiast
+odliczac 10 s. Obrazki ekranow: patrz sekcja [EN] powyzej.
 1. Uruchom komputer z pendrive'a USOS.
-2. Pojawi sie niebieski ekran "Verification failed: (0x1A) Security
-   Violation". Nacisnij Enter (OK) RAZ i pusc. Otworzy sie "Shim UEFI key
-   management" (MokManager) z odliczaniem 10 sekund; w tym czasie nacisnij
-   krotko dowolny klawisz. Przytrzymanie klawisza/przycisku (albo
-   autopowtarzanie pada w konsoli) pomija odliczanie, wybiera "Continue
-   boot" i komputer uruchamia kolejny system (np. Windows) - wyglada to
-   tak, jakby MokManager sie nie pojawil.
+2. Niebieski ekran "Verification failed: (0x1A) Security Violation":
+   nacisnij Enter RAZ i pusc. Otworzy sie MokManager ("Shim UEFI key
+   management"); jesli odlicza 10 s, nacisnij krotko dowolny klawisz.
 3. Wybierz "Enroll key from disk".
-4. Wybierz pendrive USOS (USOS_ESP), nastepnie EFI -> USOS ->
-   ENROLL_THIS_KEY_IN_MOKMANAGER.cer
-5. Wybierz "Continue", potem "Yes", potem "Reboot". Haslo nie jest potrzebne,
-   wystarcza strzalki + Enter (krzyzak + A na konsoli).
-6. USOS startuje juz normalnie z wlaczonym Secure Boot. Na tym komputerze nie
-   trzeba tego powtarzac (chyba ze ustawienia firmware zostana zresetowane).
+4. Wybierz pendrive USOS (USOS_ESP), potem USOS-KEY.cer (ten sam plik jest
+   tez w EFI\USOS\ENROLL_THIS_KEY_IN_MOKMANAGER.cer).
+5. Wybierz "Continue", potem "Yes", potem "Reboot". Wystarcza strzalki +
+   Enter (krzyzak + A na konsoli).
 
+Konsole przenosne (ROG Ally itp.): naciskaj kazdy przycisk RAZ, nie
+przytrzymuj. Przytrzymanie albo autopowtarzanie przeskakuje ekrany, wybiera
+"Continue boot" i komputer uruchamia kolejny system (np. Windows) - wyglada
+to tak, jakby MokManager sie nie pojawil. Sposob 1 w ogole omija MokManager.
+
+Na tym komputerze nie trzeba tego powtarzac (chyba ze klucze Secure Boot w
+ustawieniach firmware zostana zresetowane).
 Przy wlaczonym Secure Boot pozycje wymagajace starszej sciezki startu
-(Windows XP przez CSM, Windows 7 i Vista) sa w menu oznaczone "Wymaga
-wylaczenia Secure Boot"; mozna je zaznaczyc, zeby przeczytac wyjasnienie.
-Usuniecie klucza: w MokManager "Delete MOK" albo w Linuksie
-"mokutil --delete ENROLL_THIS_KEY_IN_MOKMANAGER.cer".
+(Windows XP przez CSM, Windows 7 i Vista) sa oznaczone "Wymaga wylaczenia
+Secure Boot".
+Usuniecie klucza: MokManager "Delete MOK", w Linuksie
+"mokutil --delete USOS-KEY.cer" albo reset kluczy Secure Boot w firmware.
 
 The following sections are machine-translated.
 
 [DE] Deutsch
 ------------
 USOS startet mit aktiviertem Secure Boot, nachdem sein Schluessel einmal pro
-Computer registriert wurde.
-Methode A (Windows): "USOS Installer.exe" als Administrator starten,
-"Schluesselregistrierung auf diesem Computer vorbereiten" waehlen, Passwort
-festlegen. Neu starten, vom USOS-Stick booten, im blauen Bildschirm
-innerhalb von 10 s kurz eine Taste druecken, "Enroll MOK" -> "Continue" ->
-"Yes", Passwort eingeben (USB-Tastatur), "Reboot".
-Methode B (Stick):
-1. Vom USOS-Stick starten.
-2. Bei "Verification failed: (0x1A) Security Violation" EINMAL kurz Enter
-   druecken. "Shim UEFI key management" (MokManager) oeffnet sich; innerhalb
-   von 10 Sekunden kurz eine Taste druecken (nicht gedrueckt halten).
-3. "Enroll key from disk" waehlen.
-4. USOS-Stick (USOS_ESP) -> EFI -> USOS -> ENROLL_THIS_KEY_IN_MOKMANAGER.cer
-5. "Continue", "Yes", "Reboot".
-6. USOS startet nun mit aktiviertem Secure Boot.
-Eintraege, die Secure Boot aus benoetigen (Windows XP ueber CSM, Windows 7,
-Vista), sind im Menue markiert.
+Computer hinzugefuegt wurde. Kein Passwort noetig. Zustand im USOS-Menue:
+Werkzeuge -> Secure Boot.
+Weg 1 (am einfachsten): Secure Boot im BIOS ausschalten, vom USOS-Stick
+starten, auf dem Startbildschirm "Hinzufuegen" -> "Ja, Schluessel speichern"
+waehlen, dann Secure Boot wieder einschalten.
+Weg 2 (Secure Boot bleibt an): vom USOS-Stick starten, bei "Verification
+failed" EINMAL Enter druecken, im MokManager "Enroll key from disk" ->
+USOS_ESP -> USOS-KEY.cer -> "Continue" -> "Yes" -> "Reboot".
+Handhelds: jede Taste nur einmal kurz druecken, nicht halten.
 
 [FR] Francais
 -------------
-USOS demarre avec Secure Boot active apres l'enregistrement unique de sa cle
-sur chaque ordinateur.
-Methode A (Windows) : lancez "USOS Installer.exe" en administrateur, choisissez
-"Preparer l'enregistrement de la cle sur cet ordinateur", choisissez un mot
-de passe. Redemarrez sur la cle USOS, dans l'ecran bleu appuyez brievement
-sur une touche en moins de 10 s, "Enroll MOK" -> "Continue" -> "Yes", tapez
-le mot de passe (clavier USB), "Reboot".
-Methode B (cle) :
-1. Demarrez depuis la cle USOS.
-2. A "Verification failed: (0x1A) Security Violation", appuyez UNE fois
-   brievement sur Entree. "Shim UEFI key management" (MokManager) s'ouvre ;
-   appuyez brievement sur une touche dans les 10 secondes.
-3. Choisissez "Enroll key from disk".
-4. Cle USOS (USOS_ESP) -> EFI -> USOS -> ENROLL_THIS_KEY_IN_MOKMANAGER.cer
-5. "Continue", "Yes", "Reboot".
-6. USOS demarre maintenant avec Secure Boot active.
-Les entrees qui exigent Secure Boot desactive (Windows XP via CSM, Windows 7,
-Vista) sont signalees dans le menu.
+USOS demarre avec Secure Boot active apres l'ajout unique de sa cle sur
+chaque ordinateur. Aucun mot de passe. Etat dans le menu USOS :
+Utilitaires -> Secure Boot.
+Methode 1 (la plus simple) : desactiver Secure Boot dans le BIOS, demarrer
+sur la cle USOS, choisir "Ajouter" -> "Oui, enregistrer la cle" sur l'ecran
+d'accueil, puis reactiver Secure Boot.
+Methode 2 (Secure Boot reste active) : demarrer sur la cle USOS, a
+"Verification failed" appuyer UNE fois sur Entree, dans MokManager
+"Enroll key from disk" -> USOS_ESP -> USOS-KEY.cer -> "Continue" -> "Yes"
+-> "Reboot".
+Consoles portables : appuyer une seule fois sur chaque bouton, sans le tenir.
 
 [ES] Espanol
 ------------
-USOS arranca con Secure Boot activado despues de registrar su clave una vez
-en cada equipo.
-Metodo A (Windows): ejecute "USOS Installer.exe" como administrador, elija
-"Preparar el registro de la clave en este equipo" y una contrasena. Reinicie
-desde la memoria USOS, en la pantalla azul pulse brevemente una tecla antes
-de 10 s, "Enroll MOK" -> "Continue" -> "Yes", escriba la contrasena
-(teclado USB), "Reboot".
-Metodo B (memoria):
-1. Arranque desde la memoria USOS.
-2. En "Verification failed: (0x1A) Security Violation" pulse Intro UNA vez,
-   brevemente. Se abre "Shim UEFI key management" (MokManager); pulse
-   brevemente una tecla antes de 10 segundos.
-3. Elija "Enroll key from disk".
-4. Memoria USOS (USOS_ESP) -> EFI -> USOS -> ENROLL_THIS_KEY_IN_MOKMANAGER.cer
-5. "Continue", "Yes", "Reboot".
-6. USOS ya arranca con Secure Boot activado.
-Las entradas que requieren desactivar Secure Boot (Windows XP mediante CSM,
-Windows 7, Vista) aparecen marcadas en el menu.
+USOS arranca con Secure Boot activado despues de agregar su clave una vez
+en cada equipo. No se necesita contrasena. Estado en el menu de USOS:
+Utilidades -> Secure Boot.
+Forma 1 (la mas facil): desactive Secure Boot en la BIOS, arranque desde la
+memoria USOS, elija "Agregar" -> "Si, guardar la clave" en la pantalla de
+inicio y vuelva a activar Secure Boot.
+Forma 2 (Secure Boot sigue activado): arranque desde la memoria USOS, en
+"Verification failed" pulse Enter UNA vez, en MokManager "Enroll key from
+disk" -> USOS_ESP -> USOS-KEY.cer -> "Continue" -> "Yes" -> "Reboot".
+Consolas portatiles: pulse cada boton una sola vez, sin mantenerlo.
 
 [PT-BR] Portugues (Brasil)
 --------------------------
-O USOS inicia com o Secure Boot ativado depois que sua chave e registrada uma
-vez em cada computador.
-Metodo A (Windows): execute "USOS Installer.exe" como administrador, escolha
-"Preparar o registro da chave neste computador" e uma senha. Reinicie pelo
-pendrive USOS, na tela azul pressione rapidamente uma tecla em ate 10 s,
-"Enroll MOK" -> "Continue" -> "Yes", digite a senha (teclado USB), "Reboot".
-Metodo B (pendrive):
-1. Inicie pelo pendrive USOS.
-2. Em "Verification failed: (0x1A) Security Violation" pressione Enter UMA
-   vez, rapidamente. O "Shim UEFI key management" (MokManager) abre;
-   pressione rapidamente uma tecla em ate 10 segundos.
-3. Escolha "Enroll key from disk".
-4. Pendrive USOS (USOS_ESP) -> EFI -> USOS -> ENROLL_THIS_KEY_IN_MOKMANAGER.cer
-5. "Continue", "Yes", "Reboot".
-6. O USOS agora inicia com o Secure Boot ativado.
-Entradas que exigem desativar o Secure Boot (Windows XP via CSM, Windows 7,
-Vista) ficam marcadas no menu.
+O USOS inicia com o Secure Boot ativado depois que sua chave e adicionada
+uma vez em cada computador. Nenhuma senha e necessaria. Estado no menu do
+USOS: Utilitarios -> Secure Boot.
+Forma 1 (mais facil): desative o Secure Boot no BIOS, inicie pelo pendrive
+USOS, escolha "Adicionar" -> "Sim, salvar a chave" na tela inicial e
+reative o Secure Boot.
+Forma 2 (Secure Boot continua ativado): inicie pelo pendrive USOS, em
+"Verification failed" pressione Enter UMA vez, no MokManager "Enroll key
+from disk" -> USOS_ESP -> USOS-KEY.cer -> "Continue" -> "Yes" -> "Reboot".
+Consoles portateis: pressione cada botao uma vez, sem segurar.
 
 [RU] Russkij (transliteration)
 ------------------------------
-USOS zapuskaetsya pri vklyuchennom Secure Boot posle odnokratnoj registracii
-ego klyucha na kazhdom kompyutere.
-Sposob A (Windows): zapustite "USOS Installer.exe" ot imeni administratora,
-vyberite "Podgotovit registraciyu klyucha na etom kompyutere" i parol.
-Perezagruzites s fleshki USOS, na sinem ekrane v techenie 10 s korotko
-nazhmite klavishu, "Enroll MOK" -> "Continue" -> "Yes", vvedite parol
-(USB-klaviatura), "Reboot".
-Sposob B (fleshka):
-1. Zagruzites s fleshki USOS.
-2. Pri "Verification failed: (0x1A) Security Violation" ODIN raz korotko
-   nazhmite Enter. Otkroetsya "Shim UEFI key management" (MokManager);
-   korotko nazhmite lyubuyu klavishu v techenie 10 sekund.
-3. Vyberite "Enroll key from disk".
-4. Fleshka USOS (USOS_ESP) -> EFI -> USOS -> ENROLL_THIS_KEY_IN_MOKMANAGER.cer
-5. "Continue", "Yes", "Reboot".
-6. Teper USOS zapuskaetsya s vklyuchennym Secure Boot.
-Punkty, trebuyushchie otklyuchit Secure Boot (Windows XP cherez CSM,
-Windows 7, Vista), otmecheny v menyu.
+USOS zapuskaetsya pri vklyuchennom Secure Boot posle odnokratnogo
+dobavleniya ego klyucha na kazhdom kompyutere. Parol ne nuzhen. Sostoyanie v
+menyu USOS: Utility -> Secure Boot.
+Sposob 1 (samyj prostoj): otklyuchite Secure Boot v BIOS, zagruzites s
+fleshki USOS, na glavnom ekrane vyberite "Dobavit" -> "Da, sohranit klyuch",
+zatem snova vklyuchite Secure Boot.
+Sposob 2 (Secure Boot ostaetsya vklyuchennym): zagruzites s fleshki USOS, pri
+"Verification failed" ODIN raz nazhmite Enter, v MokManager "Enroll key from
+disk" -> USOS_ESP -> USOS-KEY.cer -> "Continue" -> "Yes" -> "Reboot".
+Portativnye konsoli: nazhimajte kazhduyu knopku odin raz, ne uderzhivajte.

@@ -36,6 +36,25 @@ pub fn homeItem(ui: *const Ui, items: []const HomeItem, index: usize, state: Row
     ui.homeCard(ui.homeCardRect(index, items.len), item.icon, item.title, item.description, state);
 }
 
+/// The optional offer banner under the home cards (e.g. "save the Secure
+/// Boot key"): as wide as the card grid, below its last row. Null when the
+/// screen has no room for it.
+pub fn homeBannerRect(ui: *const Ui, count: usize) ?Rect {
+    if (count == 0) return null;
+    const last = ui.homeCardRect(count - 1, count);
+    const first = ui.homeCardRect(0, count);
+    const body = ui.bodyRect(true);
+    const y = last.bottom() + ui.px(16);
+    const h = ui.px(56);
+    if (y + h > body.bottom()) return null;
+    return .{ .x = first.x, .y = y, .w = body.w, .h = h };
+}
+
+pub fn homeBanner(ui: *const Ui, count: usize, message: []const u8, action: []const u8, state: RowState) void {
+    const rect = homeBannerRect(ui, count) orelse return;
+    ui.offerBanner(rect, message, action, state);
+}
+
 pub fn homeHit(ui: *const Ui, count: usize, x: u32, y: u32) ?usize {
     for (0..count) |index| {
         if (ui.homeCardRect(index, count).contains(x, y)) return index;

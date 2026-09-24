@@ -43,6 +43,9 @@ func (s *modeScreen) refresh() {
 				return
 			}
 			s.checking, s.targets, s.err = false, targets, err
+			if err == nil {
+				s.f.refreshSecureBoot(targets)
+			}
 		})
 	}()
 }
@@ -114,6 +117,10 @@ func (s *modeScreen) draw(f *Flow, w *win, area rect) {
 		y += w.banner(area.Left, y, area.w(), text, t)
 	}
 	y += w.px(18)
+	// Secure Boot on and the USOS key not known to be here: one-time card.
+	if h := f.drawSecureBootCard(w, area.Left, y, area.w(), f.showModes); h > 0 {
+		y += h + w.px(16)
+	}
 
 	footerH := w.px(20)
 	grid := rect{area.Left, y, area.Right, area.Bottom - footerH - w.px(12)}

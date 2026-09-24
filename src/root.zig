@@ -70,6 +70,7 @@ pub const flow = struct {
     pub const persistent_phase = @import("flow/persistent_phase.zig");
     pub const boot_console = @import("flow/boot_console.zig");
     pub const secure_boot_policy = @import("flow/secure_boot_policy.zig");
+    pub const mok_list = @import("flow/mok_list.zig");
 };
 pub const selftest = struct {
     pub const Case = @import("selftest/case.zig").Case;
@@ -173,6 +174,7 @@ test {
     _ = flow.persistent_phase;
     _ = flow.boot_console;
     _ = flow.secure_boot_policy;
+    _ = flow.mok_list;
     _ = selftest.Case;
     _ = selftest.Report;
     _ = @import("selftest/runner.zig");

@@ -16,6 +16,16 @@ Scenarios (each prints [PASS]/[FAIL]):
                probe (secure_boot_probe_main.zig): signed child starts,
                unsigned child is rejected, the signed NTFS driver starts, the
                signed kernel loads, and systemd-boot boots micro-Linux.
+  noauth       MokNew WITHOUT MokAuth (a password-less request): MokManager
+               refuses to enroll ("Failed to get MokAuth"), USOS stays refused.
+  wait         MokTimeout = -1 (the installer's "Prepare"): after
+               "Verification failed" MokManager shows its menu with no
+               countdown and waits; Enroll key from disk -> USOS_ESP ->
+               USOS-KEY.cer (ESP root) -> Continue -> Yes -> Reboot starts USOS.
+  direct       Secure Boot OFF with the Microsoft PK/KEK/db and a MokList that
+               already holds another key: the probe runs mok_key.save() (the
+               menu's "Add the key"), MokList stays NV|BS with both keys; then
+               Secure Boot ON: shim starts USOS with no MokManager at all.
 
     python tools/tests/secure_boot/run_qemu_secure_boot.py [--keep-screens]
 
@@ -41,6 +51,8 @@ USB = ROOT / "zig-out" / "usb"
 INSTALLER = ROOT / "installer"
 SBAT = ROOT / "assets" / "secure-boot" / "usos.sbat.csv"
 CERT_NAME = "ENROLL_THIS_KEY_IN_MOKMANAGER.cer"
+ROOT_CERT_NAME = "USOS-KEY.cer"
+SHIM_GUID = "605dab50-e046-4300-abb6-3dd810dd8b23"
 
 
 def efisign(*args: str) -> None:
@@ -119,6 +131,8 @@ def esp_tree(name: str, second_stage: Path, extra: dict[str, Path] | None = None
     if target.exists():
         shutil.rmtree(target)
     shutil.copytree(USB / "EFI", target / "EFI")
+    if (USB / ROOT_CERT_NAME).exists():
+        shutil.copyfile(USB / ROOT_CERT_NAME, target / ROOT_CERT_NAME)
     shutil.copyfile(second_stage, target / "EFI" / "BOOT" / "grubx64.efi")
     for relative, source in (extra or {}).items():
         path = target / relative
@@ -334,6 +348,188 @@ def scenario_helper(args, failures: list[str]) -> None:
         machine.stop()
 
 
+def virt_fw_vars(*args: str) -> subprocess.CompletedProcess:
+    env = dict(**__import__("os").environ)
+    env["PYTHONPATH"] = str(CACHE / "pylib")
+    return subprocess.run([sys.executable, "-m", "virt.firmware.vars", *args], check=True, env=env,
+                          capture_output=True, text=True)
+
+
+def seeded_vars(name: str, variables: list[dict], base: Path | None = None, set_false: list[str] | None = None) -> Path:
+    """Microsoft-keys NVRAM plus the given shim variables (virt-firmware)."""
+    import json
+    out = WORK / f"seed-{name}"
+    out.mkdir(parents=True, exist_ok=True)
+    spec = out / "vars.json"
+    spec.write_text(json.dumps({"version": 2, "variables": variables}))
+    vars_file = WORK / f"vars-{name}.fd"
+    args = ["-i", str(base or (CACHE / "OVMF_VARS.secboot.fd"))]
+    if variables:
+        args += ["--set-json", str(spec)]
+    for item in set_false or []:
+        args += ["--set-false", item]
+    virt_fw_vars(*args, "-o", str(vars_file))
+    return vars_file
+
+
+def dump_vars(vars_file: Path) -> dict:
+    import json
+    out = vars_file.with_suffix(".json")
+    virt_fw_vars("-i", str(vars_file), "--output-json", str(out))
+    data = json.loads(out.read_text())
+    return {v["name"]: v for v in data.get("variables", [])}
+
+
+def x509_list(der: bytes) -> bytes:
+    """EFI_SIGNATURE_LIST with one X.509 certificate owned by shim."""
+    import uuid
+    size = 28 + 16 + len(der)
+    return (uuid.UUID("a5c059a1-94e4-4aa7-87b5-ab155c2bf072").bytes_le + size.to_bytes(4, "little")
+            + (0).to_bytes(4, "little") + (16 + len(der)).to_bytes(4, "little")
+            + uuid.UUID(SHIM_GUID).bytes_le + der)
+
+
+def scenario_noauth(args, failures: list[str]) -> None:
+    """A MokNew request without MokAuth: shim 16.1 MokManager enrolls with
+    authenticate=TRUE, store_keys() needs MokAuth and fails."""
+    der = (USB / "EFI" / "USOS" / CERT_NAME).read_bytes()
+    try:
+        vars_file = seeded_vars("noauth", [{"name": "MokNew", "guid": SHIM_GUID, "attr": 7, "data": x509_list(der).hex()}])
+    except (subprocess.CalledProcessError, FileNotFoundError, ModuleNotFoundError) as error:
+        expect(False, f"noauth: could not prepare NVRAM ({error})", failures)
+        return
+    esp = esp_tree("noauth", USB / "EFI" / "BOOT" / "grubx64.efi")
+    machine = Machine("noauth", esp, vars_file, args.keep_screens)
+    try:
+        hit = wait_for(machine.serial, ["Press any key to perform MOK management", "Verification failed", "USOS MANUAL FLOW BOOT PASS"], 180)
+        expect(hit == "Press any key to perform MOK management", "noauth: a pending MokNew opens MokManager", failures)
+        time.sleep(1)
+        # Space, Enroll MOK (2nd item), Continue, Yes.
+        for keys, label in zip([["spc"], ["down", "ret"], ["down", "ret"], ["down", "ret"]], ["menu", "enroll-mok", "enroll-question", "after-yes"]):
+            machine.keys(*keys, pause=0.6)
+            time.sleep(1.5)
+            machine.shot(label)
+        failed = wait_for(machine.serial, ["Failed to get MokAuth", "Failed to enroll keys"], 30)
+        time.sleep(2)
+        machine.shot("failed")
+        expect(failed is not None, "noauth: MokManager refuses the request without MokAuth (\"Failed to get MokAuth\")", failures)
+        machine.keys("ret", pause=1.0)
+        time.sleep(2)
+        machine.keys("ret", pause=1.0)
+        time.sleep(10)
+        expect("USOS MANUAL FLOW BOOT PASS" not in serial_text(machine.serial), "noauth: nothing was enrolled, USOS is not started", failures)
+    finally:
+        machine.stop()
+
+
+# MokManager with MokTimeout = -1 after "Verification failed":
+#   [OK]                                              -> Enter (once)
+#   no countdown: Continue boot / Enroll key from disk / Enroll hash  -> Down, Enter
+#   volume list: one vvfat volume                     -> Enter
+#   /: EFI/ USOS-KEY.cer                              -> Down, Enter
+#   [Enroll MOK] View key 0 / Continue                -> Down, Enter
+#   Enroll the key(s)? No / Yes                       -> Down, Enter
+#   Perform MOK management: Reboot                    -> Enter
+WAIT_KEYS = [["down", "ret"], ["ret"], ["down", "ret"], ["down", "ret"], ["down", "ret"], ["ret"]]
+WAIT_LABELS = ["select-volume", "root", "enroll-mok", "enroll-question", "enrolled", "reboot"]
+
+
+def scenario_wait(args, failures: list[str]) -> None:
+    try:
+        vars_file = seeded_vars("wait", [{"name": "MokTimeout", "guid": SHIM_GUID, "attr": 7, "data": "ffffffff"}])
+    except (subprocess.CalledProcessError, FileNotFoundError, ModuleNotFoundError) as error:
+        expect(False, f"wait: could not prepare NVRAM ({error})", failures)
+        return
+    esp = esp_tree("wait", USB / "EFI" / "BOOT" / "grubx64.efi")
+    expect((esp / ROOT_CERT_NAME).exists(), "wait: USOS-KEY.cer is at the ESP root", failures)
+    machine = Machine("wait", esp, vars_file, args.keep_screens)
+    try:
+        hit = wait_for(machine.serial, ["Verification failed", "Security Violation", "USOS MANUAL FLOW BOOT PASS"], 180)
+        expect(hit in ("Verification failed", "Security Violation"), "wait: shim refuses the not-yet-enrolled USOS", failures)
+        time.sleep(2)
+        machine.keys("ret", pause=0.5)
+        # Longer than the default 10 s countdown: the menu must still wait.
+        time.sleep(15)
+        machine.shot("menu-waits")
+        text = serial_text(machine.serial)
+        expect("Press any key to perform MOK management" not in text, "wait: MokTimeout=-1 skips the countdown", failures)
+        expect(max(text.count("Verification failed"), text.count("Security Violation")) == 1,
+               "wait: after 15 s MokManager still waits on its menu (no second refusal)", failures)
+        for keys, label in zip(WAIT_KEYS, WAIT_LABELS):
+            machine.keys(*keys, pause=1.0)
+            time.sleep(1.5)
+            if label != "reboot":
+                machine.shot(label)
+        started = wait_for(machine.serial, ["[SECURE_BOOT] state="], 240)
+        time.sleep(4)
+        machine.shot("usos-after-enroll")
+        text = serial_text(machine.serial)
+        expect(started is not None and "USOS MANUAL FLOW BOOT PASS" in text,
+               "wait: Enroll key from disk -> USOS-KEY.cer at the ESP root enrolls the key and USOS starts", failures)
+    finally:
+        machine.stop()
+
+
+def other_certificate() -> bytes:
+    directory = WORK / "other-key"
+    cert = directory / "usos-secure-boot.cer"
+    if not cert.exists():
+        efisign("keygen", "-key-dir", str(directory), "-cn", "Some Other Distribution MOK")
+    return cert.read_bytes()
+
+
+def scenario_direct(args, failures: list[str]) -> None:
+    """Secure Boot off (PK present): the menu's "Add the key" writes MokList
+    itself; then Secure Boot on: no MokManager, USOS starts."""
+    der = (USB / "EFI" / "USOS" / CERT_NAME).read_bytes()
+    other = other_certificate()
+    try:
+        vars_off = seeded_vars("direct-off", [{"name": "MokList", "guid": SHIM_GUID, "attr": 3, "data": x509_list(other).hex()}],
+                               set_false=["SecureBootEnable"])
+    except (subprocess.CalledProcessError, FileNotFoundError, ModuleNotFoundError) as error:
+        expect(False, f"direct: could not prepare NVRAM ({error})", failures)
+        return
+    probe_src = ROOT / "zig-out" / "test-assets" / "secure-boot-probe-x86_64.efi"
+    probe = WORK / "grubx64-probe.efi"
+    efisign("sign", "-in", str(probe_src), "-out", str(probe), "-sbat", str(SBAT))
+    esp = esp_tree("direct-off", probe)
+    machine = Machine("direct-off", esp, vars_off, args.keep_screens)
+    try:
+        wait_for(machine.serial, ["[SB_PROBE] mok-save end", "[SB_PROBE] mok-save FAIL", "[SB_PROBE] ESP OPEN FAIL"], 240)
+        time.sleep(2)
+        text = serial_text(machine.serial)
+        expect("[SB_PROBE] begin state=off" in text, "direct: Secure Boot is off with the platform key installed", failures)
+        expect("[SB_PROBE] mok-save before key=missing lists=1 cert=yes can_save=yes" in text,
+               "direct: the key is missing, another key is in MokList, saving is offered", failures)
+        expect("[SB_PROBE] mok-save PASS key=saved lists=2" in text, "direct: mok_key.save() appends the USOS key (2 lists)", failures)
+        expect("[SB_PROBE] mok-save second refused error=NotAllowed" in text and "[SB_PROBE] mok-save end lists=2" in text,
+               "direct: saving again is refused and adds nothing", failures)
+    finally:
+        machine.stop()
+    variables = dump_vars(vars_off)
+    mok = variables.get("MokList")
+    data = bytes.fromhex(mok["data"]) if mok else b""
+    attr = mok.get("attr", 0) if mok else 0
+    expect(mok is not None and der in data and other in data, "direct: MokList in NVRAM holds the USOS key and keeps the other key", failures)
+    expect(attr & 0x7 == 0x3, f"direct: MokList attributes are NV|BS without RT (0x{attr:x})", failures)
+    # Same NVRAM, Secure Boot on, the release USOS as the second stage.
+    vars_on = WORK / "vars-direct-on.fd"
+    virt_fw_vars("-i", str(vars_off), "--set-true", "SecureBootEnable", "-o", str(vars_on))
+    esp_on = esp_tree("direct-on", USB / "EFI" / "BOOT" / "grubx64.efi")
+    machine = Machine("direct-on", esp_on, vars_on, args.keep_screens)
+    try:
+        hit = wait_for(machine.serial, ["[SECURE_BOOT] state=", "Verification failed", "Security Violation"], 240)
+        time.sleep(4)
+        machine.shot("usos-secure-boot-on")
+        text = serial_text(machine.serial)
+        expect(hit == "[SECURE_BOOT] state=" and "Verification failed" not in text,
+               "direct: with Secure Boot on shim trusts the saved key, no MokManager", failures)
+        expect("[SECURE_BOOT] state=on shim_lock=yes shim_loader=yes" in text and "USOS MANUAL FLOW BOOT PASS" in text,
+               "direct: USOS runs under Secure Boot", failures)
+    finally:
+        machine.stop()
+
+
 def scenario_unsigned_after_mok(args, vars_file: Path, failures: list[str]) -> None:
     copy = WORK / "vars-unsigned-mok.fd"
     shutil.copyfile(vars_file, copy)
@@ -397,7 +593,7 @@ def scenario_probe(args, vars_file: Path, failures: list[str]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--keep-screens", action="store_true")
-    parser.add_argument("--only", choices=["unsigned", "enroll", "probe", "timeout", "repeat", "helper"], default=None)
+    parser.add_argument("--only", choices=["unsigned", "enroll", "probe", "timeout", "repeat", "helper", "noauth", "wait", "direct"], default=None)
     args = parser.parse_args()
     subprocess.run([sys.executable, str(Path(__file__).with_name("fetch_ovmf_secboot.py"))], check=True)
     WORK.mkdir(parents=True, exist_ok=True)
@@ -412,6 +608,12 @@ def main() -> int:
         scenario_repeat(args, failures)
     if args.only in (None, "helper"):
         scenario_helper(args, failures)
+    if args.only in (None, "noauth"):
+        scenario_noauth(args, failures)
+    if args.only in (None, "wait"):
+        scenario_wait(args, failures)
+    if args.only in (None, "direct"):
+        scenario_direct(args, failures)
     if args.only in (None, "enroll", "probe"):
         enrolled = scenario_enroll(args, failures)
         if args.only is None:

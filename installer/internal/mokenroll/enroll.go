@@ -168,6 +168,9 @@ type Status struct {
 	Pending bool
 	// PendingAuth: MokAuth exists next to it.
 	PendingAuth bool
+	// WaitPending: MokTimeout is set (PrepareWait ran, MokManager has not
+	// shown its menu since).
+	WaitPending bool
 }
 
 // Check reads the Secure Boot state, MokListRT and a pending request. It
@@ -200,6 +203,7 @@ func Check(fw Firmware, der []byte) (Status, error) {
 	if _, _, err := fw.Get(VarMokAuth, ShimLockGUID); err == nil {
 		st.PendingAuth = true
 	}
+	st.WaitPending = WaitPending(fw)
 	return st, nil
 }
 
@@ -208,5 +212,5 @@ func (s Status) String() string {
 	if !s.UEFI {
 		return "firmware=legacy-bios"
 	}
-	return fmt.Sprintf("firmware=uefi secure_boot=%s enrolled=%s pending_request=%v pending_password=%v", s.SecureBoot, s.Enrolled, s.Pending, s.PendingAuth)
+	return fmt.Sprintf("firmware=uefi secure_boot=%s enrolled=%s pending_request=%v pending_password=%v mokmanager_wait=%v", s.SecureBoot, s.Enrolled, s.Pending, s.PendingAuth, s.WaitPending)
 }

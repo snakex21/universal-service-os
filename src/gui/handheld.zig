@@ -71,7 +71,29 @@ pub const SystemInfo = struct {
     version: []const u8 = "",
     board_manufacturer: []const u8 = "",
     board_product: []const u8 = "",
+    /// SMBIOS type 1 UUID bytes as stored (offset 0x08), null when absent
+    /// or all 0x00 / all 0xFF (not set).
+    uuid: ?[16]u8 = null,
 };
+
+/// Formats an SMBIOS system UUID the way Windows (Win32_ComputerSystemProduct)
+/// and dmidecode show it for SMBIOS 2.6+: the first three fields are stored
+/// little-endian. Upper-case, 36 characters.
+pub fn formatUuid(bytes: [16]u8, out: *[36]u8) []const u8 {
+    const order = [_]u8{ 3, 2, 1, 0, 5, 4, 7, 6, 8, 9, 10, 11, 12, 13, 14, 15 };
+    const hex = "0123456789ABCDEF";
+    var o: usize = 0;
+    for (order, 0..) |index, position| {
+        if (position == 4 or position == 6 or position == 8 or position == 10) {
+            out[o] = '-';
+            o += 1;
+        }
+        out[o] = hex[bytes[index] >> 4];
+        out[o + 1] = hex[bytes[index] & 15];
+        o += 2;
+    }
+    return out[0..36];
+}
 
 fn has(haystack: []const u8, needle: []const u8) bool {
     return std.ascii.indexOfIgnoreCase(haystack, needle) != null;
@@ -136,6 +158,11 @@ pub fn parseSmbios(table: []const u8) SystemInfo {
                 info.manufacturer = smbiosString(formatted, strings, 0x04);
                 info.product = smbiosString(formatted, strings, 0x05);
                 info.version = smbiosString(formatted, strings, 0x06);
+                if (formatted.len >= 0x18) {
+                    const raw = formatted[0x08..0x18].*;
+                    const unset = std.mem.allEqual(u8, &raw, 0) or std.mem.allEqual(u8, &raw, 0xff);
+                    if (!unset) info.uuid = raw;
+                }
             },
             2 => if (info.board_manufacturer.len == 0 and info.board_product.len == 0) {
                 info.board_manufacturer = smbiosString(formatted, strings, 0x04);
@@ -342,4 +369,14 @@ test "pointer input and the hint style" {
     // Movement alone changes nothing; the pad's own pointer means pad.
     try std.testing.expect(styleAfterPointer(true, false, false, false, false));
     try std.testing.expect(styleAfterPointer(false, false, true, false, true));
+}
+
+test "SMBIOS type 1 UUID is read and formatted like Windows" {
+    // Type 1, length 0x1B, handle 1, strings 1..3, UUID, wake-up type.
+    const formatted = [_]u8{ 1, 0x1B, 1, 0, 1, 2, 3, 0, 0x33, 0x22, 0x11, 0x00, 0x55, 0x44, 0x77, 0x66, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 6, 0, 0 };
+    const table = formatted ++ "ASUS\x00Ally\x001.0\x00\x00".* ++ [_]u8{ 127, 4, 2, 0, 0, 0 };
+    const info = parseSmbios(&table);
+    try std.testing.expectEqualStrings("ASUS", info.manufacturer);
+    var text: [36]u8 = undefined;
+    try std.testing.expectEqualStrings("00112233-4455-6677-8899-AABBCCDDEEFF", formatUuid(info.uuid.?, &text));
 }

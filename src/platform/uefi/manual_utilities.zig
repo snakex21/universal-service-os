@@ -6,47 +6,57 @@ const rows_model = @import("manual_rows.zig");
 const navigation = @import("manual_navigation.zig");
 const system_icons = @import("system_icons.zig");
 const view = @import("manual_view.zig");
+const manual_secure_boot = @import("manual_secure_boot.zig");
 
 const max_utilities: usize = usos.catalog.utility_catalog.max_items;
 
 var utility_list: usos.catalog.utility_catalog.List = .{};
 var entries: [max_utilities]usos.catalog.SystemEntry = undefined;
 
+/// Row 0 is the built-in Secure Boot page; utilities from DATA follow.
+const builtin_rows = 1;
+
 pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_discovery.Discovery, firmware: usos.firmware.Firmware) ?*const usos.catalog.SystemEntry {
     const count = scan(discovery);
-    if (count == 0) {
-        showEmpty();
-        return null;
-    }
+    const total = count + builtin_rows;
 
-    var selectable: [max_utilities]bool = undefined;
+    var selectable: [max_utilities + builtin_rows]bool = undefined;
+    selectable[0] = true;
     var index: usize = 0;
     while (index < count) : (index += 1) {
         const entry = &entries[index];
         const media = discovery.mediaStatus(entry.image_directory);
-        selectable[index] = (usos.gui.menu_policy.Access{
+        selectable[builtin_rows + index] = (usos.gui.menu_policy.Access{
             .firmware_compatible = entry.firmware.accepts(firmware),
             .has_images = media.hasImages(),
             .backend_available = usos.flow.preparation_capability.supportsSystem(entry.id),
         }).navigable();
     }
 
-    var rows: [max_utilities]usos.gui.ui.Row = undefined;
+    var rows: [max_utilities + builtin_rows]usos.gui.ui.Row = undefined;
     var details: [max_utilities]rows_model.DetailBuffer = undefined;
+    rows[0] = manual_secure_boot.toolsRow();
     index = 0;
     while (index < count) : (index += 1) {
         const entry = &entries[index];
-        rows[index] = rows_model.system(entry, system_icons.get(root, entry), discovery.mediaStatus(entry.image_directory), firmware, &details[index]);
+        rows[builtin_rows + index] = rows_model.system(entry, system_icons.get(root, entry), discovery.mediaStatus(entry.image_directory), firmware, &details[index]);
     }
 
-    var selected: usize = usos.gui.selectable_list.first(selectable[0..count]) orelse 0;
+    var selected: usize = 0;
     var list: view.ListScreen = undefined;
-    list.open(view.tr("Utilities"), view.t(.category_utilities_desc), rows[0..count], selected, true, null);
+    list.open(view.tr("Utilities"), view.t(.category_utilities_desc), rows[0..total], selected, true, null);
+    if (count == 0) showEmptyOnce(&list, selected);
 
     while (true) {
-        switch (navigation.handleSelectable(input.readBlocking(), &selected, count, &list, selectable[0..count])) {
+        switch (navigation.handleSelectable(input.readBlocking(), &selected, total, &list, selectable[0..total])) {
             .activate => {
-                const entry = &entries[selected];
+                if (selected < builtin_rows) {
+                    manual_secure_boot.page();
+                    rows[0] = manual_secure_boot.toolsRow();
+                    list.redrawFull(selected, null);
+                    continue;
+                }
+                const entry = &entries[selected - builtin_rows];
                 const media = discovery.mediaStatus(entry.image_directory);
                 switch ((usos.gui.menu_policy.Access{
                     .firmware_compatible = entry.firmware.accepts(firmware),
@@ -91,6 +101,17 @@ fn scan(discovery: *usos.catalog.media_discovery.Discovery) usize {
         };
     }
     return utility_list.len;
+}
+
+var empty_shown = false;
+
+/// Without utilities on DATA the list still has the Secure Boot page; the
+/// "no utilities" notice is shown once per start.
+fn showEmptyOnce(list: *view.ListScreen, selected: usize) void {
+    if (empty_shown) return;
+    empty_shown = true;
+    showEmpty();
+    list.redrawFull(selected, null);
 }
 
 fn showEmpty() void {

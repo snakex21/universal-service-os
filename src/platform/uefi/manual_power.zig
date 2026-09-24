@@ -58,9 +58,15 @@ fn firmwareRow(supported: bool) usos.gui.ui.Row {
     };
 }
 
-fn firmwareUiSupported() bool {
+pub fn firmwareUiSupported() bool {
     const supported = readGlobalU64(os_indications_supported_name) catch return false;
     return if (supported) |value| (value & boot_to_fw_ui) != 0 else false;
+}
+
+/// Reboots into the firmware setup (OsIndications BOOT_TO_FW_UI); shows
+/// the error when the firmware refuses.
+pub fn openFirmwareSetup() void {
+    enterFirmwareSetup() catch |err| showFirmwareError(err);
 }
 
 fn enterFirmwareSetup() !void {

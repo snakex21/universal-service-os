@@ -797,6 +797,37 @@ pub const Ui = struct {
         _ = self.fonts.drawFit(self.surface, x, self.fonts.centeredTop(.body, rect.y + rect.h / 2), rect.right() -| x -| self.px(16), .body, message, self.theme.text, colors.fill);
     }
 
+    /// A selectable offer strip (home screen): shield icon, message and an
+    /// action label on the right, in the warning tone; selection and hover
+    /// draw the same ring as the home cards.
+    pub fn offerBanner(self: *const Ui, rect: Rect, message: []const u8, action: []const u8, state: RowState) void {
+        const theme = self.theme;
+        const colors = self.toneColors(.warning);
+        const border = switch (state) {
+            .selected => theme.accent,
+            .hover => theme.border_strong,
+            .normal => colors.text,
+        };
+        const thickness = if (state == .selected) self.line(2) else self.line(1);
+        self.surface.fillRect(rect.x, rect.y, rect.w, rect.h, theme.background);
+        paint.card(self.surface, rect.x, rect.y, rect.w, rect.h, self.px(10), thickness, border, colors.fill, theme.background);
+        const size = self.px(24);
+        const icon_x = rect.x + self.px(18);
+        icons.drawKind(self.surface, .shield, icon_x, rect.y + (rect.h -| size) / 2, size, colors.text, null);
+        const action_w = if (action.len > 0) self.fonts.width(.strong, action) + self.px(28) else 0;
+        const right = rect.right() -| self.px(16);
+        if (action.len > 0) {
+            const pill_h = self.px(32);
+            const pill_x = right -| action_w;
+            const pill_y = rect.y + (rect.h -| pill_h) / 2;
+            paint.roundRect(self.surface, pill_x, pill_y, action_w, pill_h, pill_h / 2, colors.text, colors.fill);
+            self.fonts.drawCentered(self.surface, pill_x + action_w / 2, self.fonts.centeredTop(.strong, pill_y + pill_h / 2), .strong, action, theme.background, colors.text);
+        }
+        const x = icon_x + size + self.px(14);
+        const text_right = right -| action_w -| self.px(12);
+        _ = self.fonts.drawFit(self.surface, x, self.fonts.centeredTop(.body, rect.y + rect.h / 2), text_right -| x, .body, message, theme.text, colors.fill);
+    }
+
     /// Label/value rows. Returns the y below the last row.
     pub fn keyValues(self: *const Ui, rect: Rect, labels: []const []const u8, values: []const []const u8) u32 {
         const theme = self.theme;

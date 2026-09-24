@@ -457,9 +457,29 @@ pub const Home = struct {
     items: []const screens.HomeItem,
     selected: usize,
     hover: ?usize = null,
+    /// Optional offer strip under the cards (index items.len when shown):
+    /// message and its action label.
+    banner: ?[2][]const u8 = null,
 
-    pub fn open(self: *Home, items: []const screens.HomeItem, selected: usize) void {
-        self.* = .{ .items = items, .selected = selected };
+    pub fn open(self: *Home, items: []const screens.HomeItem, selected: usize, banner: ?[2][]const u8) void {
+        self.* = .{ .items = items, .selected = selected, .banner = banner };
+        self.redraw();
+    }
+
+    /// Number of selectable things: the cards plus the banner when it fits.
+    pub fn count(self: *const Home) usize {
+        return self.items.len + @intFromBool(self.bannerShown());
+    }
+
+    pub fn bannerShown(self: *const Home) bool {
+        if (self.banner == null) return false;
+        var u = ui() orelse return true; // console: listed as a line
+        return screens.homeBannerRect(&u, self.items.len) != null;
+    }
+
+    pub fn setBanner(self: *Home, banner: ?[2][]const u8) void {
+        self.banner = banner;
+        if (self.selected >= self.count()) self.selected = 0;
         self.redraw();
     }
 
@@ -477,7 +497,13 @@ pub const Home = struct {
         };
         setFooter(&home_hints, "");
         screens.home(&u, headerInfo(&clock, &u), self.items, self.selected, self.hover, &home_hints);
+        self.drawBanner(&u);
         presentFullFrame(true);
+    }
+
+    fn drawBanner(self: *const Home, u: *const gui.ui.Ui) void {
+        const banner = self.banner orelse return;
+        screens.homeBanner(u, self.items.len, banner[0], banner[1], screens.stateOf(self.items.len, self.selected, self.hover));
     }
 
     fn console(self: *Home) void {
@@ -485,22 +511,34 @@ pub const Home = struct {
         for (self.items, 0..) |item, index| {
             consoleLine(if (index == self.selected) "> " else "  ", item.title, item.description);
         }
+        if (self.banner) |banner| consoleLine(if (self.selected == self.items.len) "> " else "  ", banner[0], banner[1]);
+    }
+
+    fn drawEntry(self: *const Home, u: *const gui.ui.Ui, index: usize) void {
+        if (index == self.items.len) return self.drawBanner(u);
+        screens.homeItem(u, self.items, index, screens.stateOf(index, self.selected, self.hover));
     }
 
     pub fn select(self: *Home, index: usize) void {
-        if (index == self.selected or index >= self.items.len) return;
+        if (index == self.selected or index >= self.count()) return;
         const previous = self.selected;
         self.selected = index;
         if (surface == null) return self.redraw();
         var u = beginPartial() orelse return;
-        screens.homeItem(&u, self.items, previous, screens.stateOf(previous, self.selected, self.hover));
-        screens.homeItem(&u, self.items, index, .selected);
+        self.drawEntry(&u, previous);
+        self.drawEntry(&u, index);
         endPartial();
     }
 
     pub fn hit(self: *const Home, x: u32, y: u32) ?usize {
         var u = ui() orelse return null;
-        return screens.homeHit(&u, self.items.len, x, y);
+        if (screens.homeHit(&u, self.items.len, x, y)) |index| return index;
+        if (self.banner != null) {
+            if (screens.homeBannerRect(&u, self.items.len)) |rect| {
+                if (rect.contains(x, y)) return self.items.len;
+            }
+        }
+        return null;
     }
 
     fn setHover(self: *Home, index: ?usize) void {
@@ -508,8 +546,8 @@ pub const Home = struct {
         const previous = self.hover;
         self.hover = index;
         var u = ui() orelse return;
-        if (previous) |value| screens.homeItem(&u, self.items, value, screens.stateOf(value, self.selected, self.hover));
-        if (index) |value| screens.homeItem(&u, self.items, value, screens.stateOf(value, self.selected, self.hover));
+        if (previous) |value| self.drawEntry(&u, value);
+        if (index) |value| self.drawEntry(&u, value);
     }
 };
 

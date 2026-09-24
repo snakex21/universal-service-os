@@ -163,6 +163,30 @@ Pointer moves switch to Enter/Esc except touch on a handheld and a handheld
 controller's pointer. The menu redraws when the style changes; footer taps
 are hit-tested against the hints on screen.
 
+### Controller glyphs in the footer (2026-09-24)
+
+`src/gui/ui.zig` (`PadButton`, `padButtons`, `Ui.keycap`) draws a hint key
+made only of controller button names, joined with `/`, the way the Windows
+installer does (`installer/internal/ui/pad_hints_windows.go`):
+
+| Key | Drawn as |
+|---|---|
+| `A` `B` `X` `Y` | round face button, Xbox colours from the installer palette: A green (Success `#4AD68C`), B red (Danger `#F05A5F`), X blue `#4A9BF0`, Y yellow (Warning `#F2B13C`), dark letter `#0B0F14` |
+| `LB` `RB` `LT` `RT` `LS` `RS` | pill (fully rounded, PanelAlt fill, BorderStrong ring), `LB/RB` = two pills |
+| `Start` / `Menu` | pill with three bars |
+| `View` | pill with two overlapping windows |
+| `DPad` | cross |
+
+Everything is anti-aliased with the `paint.zig` primitives (4x4 coverage,
+integer maths, so the i386 BIOS Core can use it) and sized with `px()`
+(24 logical px face buttons, 22 px pills). Any other key (`Enter`, `Esc`,
+`PgUp/PgDn`, arrows, `D`) keeps the key-cap style. `footerHit` uses the same
+widths, so tapping a glyph still works. While a pad is in use the UEFI menu
+(`input.moveKey`) and micro-Linux (`fb_menu_render.footerHints`) show the
+D-pad glyph instead of the arrow key cap; the BIOS menu has no pad input and
+is unchanged. Previews: `zig build ui-preview`, screens `07-pad-hints` and
+`08-pad-glyphs` (artifacts/boot-ui/pad-hints).
+
 ## Legacy BIOS menu
 
 PS/2 only (the Core talks to the 8042). The IntelliMouse knock enables the

@@ -13,6 +13,7 @@ Violation - Invalid signature detected".
 | `\EFI\BOOT\mmx64.efi` | MokManager from the same package | Fedora CA built into that shim |
 | `\EFI\BOOT\grubx64.efi` | USOS (the Zig UEFI app) + `.sbat` section | USOS key, enrolled in MOK |
 | `\EFI\USOS\ENROLL_THIS_KEY_IN_MOKMANAGER.cer` | USOS public certificate (DER) | - |
+| `\USOS-KEY.cer` | the same certificate at the ESP root, so MokManager's file browser needs one step (USOS_ESP -> USOS-KEY.cer); in the installer payload, checked equal by `verify_release_consistency.ps1` | - |
 | `\EFI\USOS\ENROLL-README.txt` | enrollment steps (EN, PL + 6 machine-translated) | - |
 | `\EFI\USOS\secure-boot.ini` | `signed=1/0`, shim version, certificate SHA-256 | - |
 | `\EFI\USOS\licenses\shim\` | shim licence and provenance | - |
@@ -224,16 +225,38 @@ manager) or Secure Boot off.
 
 ## First boot on a Secure Boot machine (ROG Ally)
 
-Two ways to enroll the key (both in `EFI\USOS\ENROLL-README.txt`; the
-installer shows the same instructions after an install, update or repair).
+The USOS key has to be trusted once per computer. MokManager's
+physical-presence confirmation cannot be bypassed while Secure Boot is on,
+so USOS offers three ways, easiest first. None needs a password (steps in
+`EFI\USOS\ENROLL-README.txt`, in the installer guide and in the USOS menu
+Tools -> Secure Boot -> "Add the key with Secure Boot on").
 
-**Method A: prepare it in Windows** (the `mokutil --import` equivalent,
-recommended for handhelds). In Windows on that computer, the installer's
-Secure Boot note has "Prepare key enrollment on this computer" ("Przygotuj
-rejestrację klucza na tym komputerze"). It writes two shim variables
-(vendor GUID `605dab50-e046-4300-abb6-3dd810dd8b23`, attributes
-NV|BS|RT = 7) with `SetFirmwareEnvironmentVariableExW` after enabling
-`SeSystemEnvironmentPrivilege`:
+**Way 1: USOS saves the key itself while Secure Boot is off (no
+MokManager).** Details in the next section. With Secure Boot off and a
+platform key installed, the USOS home screen shows "USOS cannot find its
+Secure Boot key on this computer. Add it?" ("Nie wykryto klucza Secure Boot
+potrzebnego do uruchamiania USOS. Dodać go?") with **Add / Not now / Don't
+ask again**. Add asks "Do you agree to save the USOS key in this computer's
+memory?" (**No** preselected), writes MokList, reads it back and says "Key
+saved. You can now turn Secure Boot on in the BIOS settings." with **Open
+BIOS settings** (OsIndications `EFI_OS_INDICATIONS_BOOT_TO_FW_UI`, only when
+`OsIndicationsSupported` has it). In Windows the installer's guide offers
+"Restart into BIOS settings" (`shutdown /r /fw /t 0`) for turning Secure Boot
+off first.
+
+**Way 2: Secure Boot stays on, MokManager "Enroll key from disk".** Boot
+the stick; shim shows "Verification failed: (0x1A) Security Violation"; tap
+Enter once; **Enroll key from disk** -> USOS_ESP -> `USOS-KEY.cer` (ESP
+root, new) -> **Continue** -> **Yes** -> **Reboot**. No password, so arrows
+and Enter (D-pad and A) are enough. The installer's "Prepare (one time)"
+only writes `MokTimeout` = -1 (see below), so MokManager shows its menu at
+once and waits instead of the 10 s countdown a held button can skip.
+
+**Way 3 (advanced, command line only): a MokNew request.**
+`"USOS Installer.exe" -prepare-mok-enrollment -mok-password P` writes the
+`mokutil --import` equivalent (`installer/internal/mokenroll`, vendor GUID
+`605dab50-e046-4300-abb6-3dd810dd8b23`, attributes NV|BS|RT = 7, via
+`SetFirmwareEnvironmentVariableExW` with `SeSystemEnvironmentPrivilege`):
 
 - `MokNew`: one `EFI_SIGNATURE_LIST`, type `EFI_CERT_X509_GUID`
   (`a5c059a1-94e4-4aa7-87b5-ab155c2bf072`), `SignatureListSize` =
@@ -243,27 +266,135 @@ NV|BS|RT = 7) with `SetFirmwareEnvironmentVariableExW` after enabling
 - `MokAuth`: mokutil's packed `pw_crypt_t` (172 bytes): `u16 method` = 4
   (SHA512_BASED), `u64 iter_count` = 5000, `u16 salt_size` = 16,
   `salt[32]` (16 chars of `[./0-9A-Za-z]`), `hash[128]` = the raw 64-byte
-  SHA-512-crypt (`$6$`) digest of the ASCII password. MokManager
-  (`store_keys` -> `match_password` -> `password_crypt`) recomputes it from
-  the typed password.
+  SHA-512-crypt (`$6$`) digest of the ASCII password.
 
-On the next start of the stick shim's `import_mok_state` ->
-`check_mok_request` sees `MokNew` and starts MokManager before the second
-stage, so there is no "Verification failed" dialog first. MokManager deletes
-`MokNew` as soon as it reads it and `MokAuth` when it exits, so the request is
-single-use: if the 10 s countdown passes, run the helper again. The user
-presses one key, **Enroll MOK** -> **Continue** -> **Yes**, types the
-password (a USB keyboard is needed: MokManager takes printable characters
-only, which a handheld's pad cannot produce), then **Reboot**. The helper
-does not change anything else (no MokTimeout, no Boot#### entries).
+shim's `check_mok_request` then starts MokManager before the second stage:
+one key, **Enroll MOK** -> **Continue** -> **Yes**, the password (a USB
+keyboard is needed: MokManager takes printable characters only), **Reboot**.
+It is no longer in the window: a password is one more thing to know or
+forget, and the password-free ways above cover every case.
 
-**Method B: from the stick.** Boot the stick; shim shows "Verification
-failed: (0x1A) Security Violation"; tap Enter once; MokManager's 10 s
-countdown; any key; **Enroll key from disk** -> USOS ESP -> `EFI` -> `USOS`
--> `ENROLL_THIS_KEY_IN_MOKMANAGER.cer` -> **Continue** -> **Yes** ->
-**Reboot**. No password, so arrows and Enter (D-pad and A) are enough.
+### Why a password-less MokNew is impossible (shim 16.1 source)
 
-### Why the Ally went straight to Windows (2026-09-24)
+`MokManager.c`: `enter_mok_menu` shows **Enroll MOK** when `MokNew` exists and
+calls `mok_enrollment_prompt(MokNew, size, auth = TRUE, FALSE)`; after
+**Continue** and "Enroll the key(s)?" **Yes**, `store_keys(..., authenticate =
+TRUE)` reads `MokAuth` and, when it is missing or has the wrong size
+(neither `SHA256_DIGEST_SIZE` nor `PASSWORD_CRYPT_SIZE`), prints "Failed to
+get MokAuth" and returns the error ("Failed to enroll keys"). There is no
+branch that skips `match_password`, which requires 1..256 characters
+(`PASSWORD_MIN` = 1, so an empty password is refused too). `check_mok_request`
+deletes `MokNew` when it reads it, so such a request is also used up.
+"Enroll key from disk" is password-free because it calls
+`mok_enrollment_prompt(..., auth = FALSE)`: physical presence is the
+confirmation. QEMU scenario `noauth` confirms this behaviour.
+
+### MokTimeout (shim 16.1 source)
+
+`MokManager.c` `draw_countdown()`: reads `MokTimeout` (shim GUID, packed
+`INT32 Timeout`), deletes it right after reading, and uses it instead of
+the default 10 s. A negative value returns at once without a countdown, so
+`enter_mok_menu` shows the menu and waits for a key; 0 would skip the menu
+entirely (`draw_countdown() == 0` -> `goto out`). `mokutil --timeout` writes
+the same variable. `MokTimeout` alone does not start MokManager; shim starts
+it after the second stage fails verification, which is exactly the first
+start of the stick on a computer without the key. Being single-use, nothing
+has to be restored afterwards. The installer writes `MokTimeout` = -1
+(`ff ff ff ff`, NV|BS|RT, read back) and nothing else; `-check-mok` reports
+`mokmanager_wait=true` while it is pending. QEMU scenario `wait`.
+
+## Saving the key without MokManager (Secure Boot off)
+
+shim 16.1 `mok.c`, table `mok_state_variables`, entry `MokList` (mirrored as
+`MokListRT`): `yes_attr` = `EFI_VARIABLE_NON_VOLATILE |
+EFI_VARIABLE_BOOTSERVICE_ACCESS`, `no_attr` = `EFI_VARIABLE_RUNTIME_ACCESS`,
+flags `MOK_MIRROR_KEYDB | MOK_MIRROR_DELETE_FIRST | MOK_VARIABLE_LOG`, PCR 14.
+`import_one_mok_state()` reads the variable with its attributes and, when a
+required bit is missing or `RUNTIME_ACCESS` is set, logs "Variable MokList has
+incorrect attribute" and deletes it. A variable without runtime access can
+only be created before `ExitBootServices`, i.e. by the firmware setup, a
+pre-OS application or MokManager, which is why shim trusts it. The content is
+parsed as a sequence of `EFI_SIGNATURE_LIST`s (a zero `SignatureListSize` or
+`SignatureSize` stops the walk). `import_mok_state()` does the same whether
+Secure Boot is on or off (mirroring is unconditional). MokManager itself
+enrolls by `SetVariable("MokList", NV | BS | APPEND_WRITE, <one X.509 list>)`.
+Related variables: `MokListX` is the deny list with the same attribute rules
+(USOS reports if its certificate is in it); `MokSBState` only disables
+validation and `MokListTrusted` only controls kernel keyring trust, neither is
+needed. SBAT applies to the images, not to the list (grubx64.efi carries
+`usos,1`). shim measures MokList into PCR 14, not the PCR 7/11 BitLocker uses.
+
+USOS therefore does what MokManager does, from its own menu, when:
+
+- Secure Boot is **off** and a platform key is installed (`SecureBoot` = 0,
+  `SetupMode` = 0: Secure Boot can be turned on). Never while Secure Boot is
+  enforcing and never in setup mode (`src/flow/mok_list.zig`
+  `shouldOffer`/`canSave`, unit-tested). With Secure Boot off anyone at the
+  keyboard can run any code anyway, so this adds no new trust path;
+- the certificate is on the stick (`\USOS-KEY.cer`, else
+  `\EFI\USOS\ENROLL_THIS_KEY_IN_MOKMANAGER.cer`) and not yet in MokList;
+- the existing MokList (if any) has trusted attributes.
+
+`src/platform/uefi/mok_key.zig` `save()`: `SetVariable(MokList, shim GUID,
+NV | BS | APPEND_WRITE, <EFI_SIGNATURE_LIST: EFI_CERT_X509_GUID, owner
+SHIM_LOCK_GUID, DER>)`; if the firmware refuses append, it writes the merged
+list (existing + ours) with NV | BS. Other keys are kept, ours is never
+added twice. Then it re-reads MokList and requires NV|BS without RT and the
+certificate inside (`VerifyFailed` otherwise).
+
+UI (`manual_secure_boot.zig`, strings `boot.sbkey.*`/`boot.sbinfo.*` in all 27
+locales, all but English machine-translated or marked):
+
+- Home screen: a selectable banner under the category cards (Down from the
+  last row, touch, click) with the offer. "Not now" hides it until the next
+  start; "Don't ask again" writes `secure_boot_key_prompt=0` into
+  `EFI\USOS\usos-settings.ini` (kept by the installer's settings merge) and
+  says "You can add the key later in Tools -> Secure Boot".
+- Tools -> **Secure Boot** (first row, shield icon, badge Saved/Missing): the
+  help panel shows the key state, Secure Boot on/off/setup mode/unsupported,
+  whether Secure Boot can be turned on (PK present), a deny-list warning, and
+  when the key is saved how to remove it (MokManager "Delete MOK" or resetting
+  the Secure Boot keys; no removal button). Rows: **Add the key** (enabled only
+  when saving is allowed; otherwise the reason), **Open BIOS settings**,
+  **Remind on the home screen** On/Off (undoes "Don't ask again"), **Add the
+  key with Secure Boot on** (the MokManager steps).
+- At every UEFI start USOS writes `EFI\USOS\Logs\secure-boot-<SMBIOS
+  UUID>.ini` (`secure_boot=`, `usos_key=saved|missing|unknown`, `shim=`,
+  build) when its content changed; the installer reads it.
+
+Previews: `zig build ui-preview`, screens `09`..`14`
+(artifacts/boot-ui/secure-boot). QEMU scenario `direct`.
+
+## Installer: proactive card
+
+At startup, after the drive detection and after every install, update or
+repair, the installer (`secure_boot_card_windows.go`) checks, read-only:
+UEFI or legacy BIOS, `SecureBoot`, `MokListRT` (visible only when Windows was
+itself started through shim), `MokTimeout`, and whether the key is known to
+be on this computer from
+
+- `%APPDATA%\USOS\mok-enrolled-<SMBIOS UUID>`, written when a source below
+  confirmed the key or the user clicked **Already done**;
+- the per-machine report on any detected USOS drive
+  (`EFI\USOS\Logs\secure-boot-<UUID>.ini`, `usos_key=saved`), matched by the
+  SMBIOS system UUID (`GetSystemFirmwareTable('RSMB')`, formatted like
+  Win32_ComputerSystemProduct and like USOS).
+
+When the computer starts in UEFI with Secure Boot on and the key is not known
+to be here, the home screen (and the final screen of an operation) shows
+"Ten komputer ma włączony Secure Boot. Aby uruchamiać USOS bez wyłączania
+Secure Boot, trzeba raz dodać klucz USOS. Kliknij Przygotuj (jednorazowo)."
+with **Przygotuj (jednorazowo)** and **Już zrobione**. Prepare opens the guide:
+way 1 with **Uruchom ponownie do ustawień BIOS**, way 2 with **Przygotuj**
+(MokTimeout) and then **Uruchom ponownie teraz**, and seven drawn MokManager
+screens (blue console, selection bar, captions): "Verification failed" ->
+Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes ->
+Reboot, plus "tap each button once, do not hold it". Screenshots:
+`usos-installer-uidemo -shots` (artifacts/installer-ui/secure-boot). The demo
+uses a fake firmware, a fixed UUID, a temporary marker directory and fake
+restarts, so it never touches the PC it runs on.
+
+## Why the Ally went straight to Windows (2026-09-24)
 
 User report: Secure Boot on, the blue "Verification failed (0x1A)" dialog,
 OK, then Windows 11 at once; no MokManager, no countdown. Checked:
@@ -333,6 +464,21 @@ The helper scenario needs `virt-firmware` without dependencies in
 `tools/cache/secure-boot/pylib` (`pip install --target ... --no-deps
 virt-firmware`; its `crypt_r` dependency does not build on Windows and is not
 needed for `--set-json`).
+
+Run 2026-09-24 evening (build B260924-132627-E7C8C649, key design without
+passwords), all 41 checks passed (`artifacts/sb-qemu-20260924-key.log`,
+screenshots in `artifacts/boot-ui/secure-boot/qemu`), with three new
+scenarios:
+
+| Scenario | Result |
+| --- | --- |
+| `noauth`: NVRAM with `MokNew` (the USOS certificate) and no `MokAuth` | MokManager opens by itself, Enroll MOK -> Continue -> Yes -> "ERROR Failed to get MokAuth: (0xE) Not Found"; nothing enrolled, USOS still refused |
+| `wait`: NVRAM with `MokTimeout` = `ff ff ff ff` (the installer's Prepare) | after one Enter on "Verification failed" MokManager shows its menu with no countdown and is still waiting 15 s later (no second refusal); Enroll key from disk -> volume -> `USOS-KEY.cer` (second entry of the ESP root) -> Continue -> Yes -> Reboot; USOS starts under Secure Boot |
+| `direct`: Microsoft PK/KEK/db, `SecureBootEnable` = 0, MokList (NV\|BS) holding a throwaway "Some Other Distribution MOK" certificate; second stage = the signed probe, which calls `mok_key.save()` | `[SB_PROBE] begin state=off`, `mok-save before key=missing lists=1 cert=yes can_save=yes`, `mok-save PASS key=saved lists=2`, a second save refused (`NotAllowed`, still 2 lists); the NVRAM file (virt-firmware JSON) has MokList attr 0x3 (NV\|BS, no RT) with both certificates. Same NVRAM with `SecureBootEnable` = 1 and the release USOS: no "Verification failed", no MokManager, `[SECURE_BOOT] state=on shim_lock=yes shim_loader=yes` |
+
+The home-screen offer itself needs a DATA volume (the catalog opens before
+the home screen), so the `direct` scenario drives the same `mok_key.save()`
+through the probe; the screens are covered by `zig build ui-preview`.
 
 `tools/tests/secure_boot/check_authenticode.ps1`: Windows reports the four
 USOS-signed files as `UnknownError` (self-signed root not trusted, hash and

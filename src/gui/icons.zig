@@ -30,6 +30,7 @@ pub const Kind = enum {
     shutdown,
     firmware,
     chip,
+    shield,
 };
 
 /// Grid units: 1/64 of a design-grid cell; 24 cells span the icon.
@@ -180,6 +181,8 @@ fn shapes(comptime kind: Kind) []const Shape {
             line(2.5, 9, 6, 9, 1.4), line(2.5, 15, 6, 15, 1.4), line(18, 9, 21.5, 9, 1.4), line(18, 15, 21.5, 15, 1.4),
         }),
         .chip => &(outline(&.{ .{ 4, 6 }, .{ 20, 6 }, .{ 20, 18 }, .{ 4, 18 } }, 1.7) ++ [_]Shape{ line(8, 10, 16, 10, 1.5), line(8, 14, 13, 14, 1.5) }),
+        // Shield with a check mark (Secure Boot).
+        .shield => &(outline(&.{ .{ 12, 2.5 }, .{ 19.5, 5.5 }, .{ 19.5, 11 }, .{ 17, 16.8 }, .{ 12, 21.2 }, .{ 7, 16.8 }, .{ 4.5, 11 }, .{ 4.5, 5.5 } }, 1.7) ++ [_]Shape{ line(8.6, 12, 11.2, 14.6, 1.8), line(11.2, 14.6, 15.8, 9.4, 1.8) }),
     };
     return list;
 }

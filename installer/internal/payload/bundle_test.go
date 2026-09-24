@@ -96,7 +96,8 @@ func TestEmbeddedPayloadContainsOnlyStaticESPFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, file := range manifest {
-		if !strings.HasPrefix(file.Path, "EFI/") && !strings.HasPrefix(file.Path, "UI/") {
+		// USOS-KEY.cer: the Secure Boot certificate at the ESP root.
+		if !strings.HasPrefix(file.Path, "EFI/") && !strings.HasPrefix(file.Path, "UI/") && file.Path != "USOS-KEY.cer" {
 			t.Fatalf("non-ESP DATA/catalog file embedded in payload: %s", file.Path)
 		}
 	}

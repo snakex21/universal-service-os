@@ -67,6 +67,15 @@ type Config struct {
 	// MokFirmware is the UEFI variable store the "prepare key enrollment"
 	// screen uses; nil means this computer's (mokenroll.System).
 	MokFirmware mokenroll.Firmware
+	// MokMarkerDir holds the per-computer "key enrolled" markers; "" means
+	// %APPDATA%\USOS.
+	MokMarkerDir string
+	// MachineUUID returns this computer's SMBIOS UUID; nil = the real one.
+	MachineUUID func() string
+	// Restart and RestartToFirmware reboot Windows (now / into the firmware
+	// settings); nil = the real shutdown.exe calls. The UI demo passes fakes.
+	Restart           func() error
+	RestartToFirmware func() error
 
 	// Test harness only (cmd/usos-installer-uidemo).
 	ForceDPI         uint32
@@ -103,6 +112,9 @@ type Flow struct {
 	toast      string
 	toastUntil time.Time
 	langAnchor rect
+	// sb: Secure Boot / USOS key state of this computer (home card).
+	sb          secureBootState
+	lastTargets []installed.Target
 }
 
 // Run creates the installer window and blocks until it is closed.
@@ -121,6 +133,7 @@ func Run(cfg Config) error {
 		f.show(&errorScreen{message: cfg.StartupError}, "startup.close")
 	} else {
 		f.showModes()
+		f.refreshSecureBoot(nil)
 	}
 	w.show()
 	if cfg.Script != nil {
@@ -540,4 +553,5 @@ func (f *Flow) showUninstallProgress(target installed.Target) {
 func (f *Flow) showFinal(op operation, report *install.VerificationReport, err error, log string) {
 	f.busy = false
 	f.show(newFinalScreen(f, op, report, err, log), "action.primary")
+	f.refreshSecureBoot(nil)
 }

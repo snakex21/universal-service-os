@@ -139,6 +139,52 @@ pub fn main(init: std.process.Init) !u8 {
     };
     _ = gui.menu_screens.listScreen(&ui, header, .{ .title = "Windows", .subtitle = ui.t(.systems_subtitle), .rows = &rows, .selected = 0, .hints = &all_glyphs }, 0);
     try save(io, cwd, init.gpa, out_dir, "08-pad-glyphs", pixels, width, height);
+
+    // Secure Boot key offer on the home screen (selected) and the Tools ->
+    // Secure Boot page (UEFI, Secure Boot off, key missing).
+    gui.menu_screens.home(&ui, header, &home_items, home_items.len, null, &hints);
+    gui.menu_screens.homeBanner(&ui, home_items.len, ui.t(.sbkey_banner), ui.t(.sbkey_banner_action), .selected);
+    try save(io, cwd, init.gpa, out_dir, "09-home-secure-boot-offer", pixels, width, height);
+    const offer_rows = [_]gui.ui.Row{
+        .{ .title = ui.t(.sbkey_add), .icon = .{ .vector = .shield } },
+        .{ .title = ui.t(.sbkey_not_now), .icon = .{ .vector = .chevron_left } },
+        .{ .title = ui.t(.sbkey_never), .icon = .{ .vector = .close } },
+    };
+    const offer_lines = [_][]const u8{ ui.t(.sbkey_offer_line1), ui.t(.sbkey_offer_line2) };
+    _ = gui.menu_screens.listScreen(&ui, header, .{ .title = ui.t(.sbkey_title), .subtitle = ui.t(.sbkey_banner), .rows = &offer_rows, .two_line = false, .selected = 0, .help = .{ .title = ui.t(.sbkey_title), .lines = &offer_lines }, .hints = &hints }, 0);
+    try save(io, cwd, init.gpa, out_dir, "10-secure-boot-offer", pixels, width, height);
+    const confirm_rows = [_]gui.ui.Row{
+        .{ .title = ui.t(.sbkey_yes), .icon = .{ .vector = .check } },
+        .{ .title = ui.t(.sbkey_no), .icon = .{ .vector = .close } },
+    };
+    const confirm_lines = [_][]const u8{ ui.t(.sbkey_confirm_line1), ui.t(.sbkey_confirm_line2) };
+    _ = gui.menu_screens.listScreen(&ui, header, .{ .title = ui.t(.sbkey_confirm_title), .subtitle = ui.t(.sbkey_title), .rows = &confirm_rows, .two_line = false, .selected = 1, .help = .{ .title = ui.t(.sbkey_confirm_title), .lines = &confirm_lines }, .hints = &hints }, 0);
+    try save(io, cwd, init.gpa, out_dir, "11-secure-boot-confirm", pixels, width, height);
+    const saved_rows = [_]gui.ui.Row{
+        .{ .title = ui.t(.sbkey_open_setup), .icon = .{ .vector = .firmware } },
+        .{ .title = ui.t(.sbkey_back_menu), .icon = .{ .vector = .chevron_left } },
+    };
+    const saved_lines = [_][]const u8{ui.t(.sbkey_saved_line1)};
+    _ = gui.menu_screens.listScreen(&ui, header, .{ .title = ui.t(.sbkey_saved_title), .subtitle = ui.t(.sbkey_title), .rows = &saved_rows, .two_line = false, .selected = 0, .help = .{ .title = ui.t(.sbkey_saved_title), .lines = &saved_lines, .badge = .{ .text = ui.t(.sbinfo_key_short_saved), .tone = .success } }, .hints = &hints }, 0);
+    try save(io, cwd, init.gpa, out_dir, "12-secure-boot-saved", pixels, width, height);
+    const page_rows = [_]gui.ui.Row{
+        .{ .title = ui.t(.sbkey_add), .icon = .{ .vector = .shield } },
+        .{ .title = ui.t(.sbkey_open_setup), .icon = .{ .vector = .firmware } },
+        .{ .title = ui.t(.sbinfo_remind), .icon = .{ .vector = .info }, .badge = .{ .text = ui.t(.sbinfo_on), .tone = .success } },
+        .{ .title = ui.t(.sbinfo_how), .icon = .{ .vector = .chevron_right } },
+    };
+    const page_lines = [_][]const u8{ ui.t(.sbinfo_key_missing), ui.t(.sbinfo_sb_off), ui.t(.sbinfo_pk_yes) };
+    _ = gui.menu_screens.listScreen(&ui, header, .{ .title = ui.t(.sbinfo_title), .subtitle = ui.t(.sbinfo_desc), .rows = &page_rows, .two_line = false, .selected = 0, .help = .{ .title = ui.t(.sbkey_title), .lines = &page_lines, .badge = .{ .text = ui.t(.sbinfo_key_short_missing), .tone = .warning } }, .hints = &hints }, 0);
+    try save(io, cwd, init.gpa, out_dir, "13-tools-secure-boot", pixels, width, height);
+    const enrolled_lines = [_][]const u8{ ui.t(.sbinfo_key_saved), ui.t(.sbinfo_sb_on), ui.t(.sbinfo_remove_hint) };
+    const enrolled_rows = [_]gui.ui.Row{
+        .{ .title = ui.t(.sbkey_add), .detail = ui.t(.sbinfo_key_saved), .icon = .{ .vector = .shield }, .enabled = false },
+        .{ .title = ui.t(.sbkey_open_setup), .icon = .{ .vector = .firmware } },
+        .{ .title = ui.t(.sbinfo_remind), .icon = .{ .vector = .info }, .badge = .{ .text = ui.t(.sbinfo_on), .tone = .success } },
+        .{ .title = ui.t(.sbinfo_how), .icon = .{ .vector = .chevron_right } },
+    };
+    _ = gui.menu_screens.listScreen(&ui, header, .{ .title = ui.t(.sbinfo_title), .subtitle = ui.t(.sbinfo_desc), .rows = &enrolled_rows, .two_line = true, .selected = 1, .help = .{ .title = ui.t(.sbkey_title), .lines = &enrolled_lines, .badge = .{ .text = ui.t(.sbinfo_key_short_saved), .tone = .success } }, .hints = &hints }, 0);
+    try save(io, cwd, init.gpa, out_dir, "14-tools-secure-boot-enrolled", pixels, width, height);
     return 0;
 }
 
