@@ -303,14 +303,16 @@ check_xp_driver_imports, check_xp_menu_overlay, check_xp_driver_integration
 -Language pl after usos-physical-update (backup
 artifacts/xp-pae/deploy-20260924-202244).
 
-## 2026-09-24: rebuild for B260924-200740-5076F5D6 (Secure Boot key gate)
+## 2026-09-24: rebuild for B260924-202302-7ED55EB2 (Secure Boot key gate)
 
-usos-fb-ui changed (boot string table: new Secure Boot guidance strings;
-the XP flow does not show them), so the package was rebuilt in full
-(staging ESP zig-out/xp-staging-20260924-sbgate from zig-out/micro-linux + the
-stick's usos-device.ini, --data L:/). Two builds are byte-identical
-(initramfs-xp 18b7160b...2ea3). compare_xp_packages.py against the deployed
-package (64426a81...): 759 identical, 1 base update (usr/bin/usos-fb-ui), 0
-intended, 0 unexplained (artifacts/xp-pae/compare-20260924-sbgate.log).
-Kernel unchanged (155c0f9f...). Previous package kept in
-artifacts/xp-pae/package-before-20260924-sbgate.
+usos-fb-ui changed (boot string table: new Secure Boot guidance strings and
+the corrected key-removal strings; the XP flow does not show them), so the
+package was rebuilt in full (staging ESP zig-out/xp-staging-20260924-sbgate2
+from zig-out/micro-linux + the stick's usos-device.ini, --data L:/). Two
+builds are byte-identical (initramfs-xp 2beb9c5e...0bef). compare_xp_packages.py
+against the deployed package (64426a81...): 759 identical, 1 base update
+(usr/bin/usos-fb-ui), 0 intended, 0 unexplained
+(artifacts/xp-pae/compare-20260924-sbgate2.log). Kernel unchanged
+(155c0f9f...). Previous package kept in
+artifacts/xp-pae/package-before-20260924-sbgate. (The intermediate build
+B260924-200740, initramfs-xp 18b7160b..., was never deployed.)
