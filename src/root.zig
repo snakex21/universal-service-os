@@ -26,6 +26,7 @@ pub const gui = struct {
     pub const cursor = @import("gui/cursor.zig");
     pub const scale = @import("gui/scale.zig");
     pub const input_map = @import("gui/input_map.zig");
+    pub const usb_gamepad = @import("gui/usb_gamepad.zig");
     pub const ui = @import("gui/ui.zig");
     pub const menu_screens = @import("gui/menu_screens.zig");
     pub const splash_screen = @import("gui/splash_screen.zig");
@@ -111,6 +112,7 @@ test {
     _ = gui.cursor;
     _ = gui.scale;
     _ = gui.input_map;
+    _ = gui.usb_gamepad;
     _ = gui.ui;
     _ = gui.menu_screens;
     _ = gui.splash_screen;

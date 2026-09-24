@@ -10,6 +10,7 @@ const file_read = @import("file_read.zig");
 const input = @import("input.zig");
 const input_report = @import("input_report.zig");
 const pointer = @import("pointer.zig");
+const usb_gamepad = @import("usb_gamepad.zig");
 const serial = @import("serial.zig");
 const boot_timing = @import("boot_timing.zig");
 const splash = @import("splash.zig");
@@ -94,8 +95,9 @@ pub fn init(root: *std.os.uefi.protocol.File, info: usos.boot_info.BootInfo, set
     boot_timing.mark("theme.css read");
 
     runtime_firmware = info.firmware;
-    input.setIdleHook(updateClock);
+    input.setIdleHook(idle);
     input.setHintHook(hintAt);
+    input.setModeHook(inputModeChanged);
     input.setFrameHook(flushPointer);
     pointer.configure(parseSettings(settings));
     if (info.framebuffer) |framebuffer| video_surface = gui.Surface.init(framebuffer);
@@ -126,6 +128,7 @@ fn afterFirstFrame() void {
 /// Replaces the screen with the "Starting…" splash before a handover to
 /// another loader; the spinner turns while that loader reads its files.
 pub fn handover(text: []const u8) void {
+    input.stopGamepads();
     patch.saved = false;
     header_clock_active = false;
     active = .none;
@@ -175,9 +178,31 @@ fn hintAt(x: u32, y: u32) ?input.Event {
     var u = ui() orelse return null;
     const index = u.footerHit(footer_hints, footer_note, x, y) orelse return null;
     const key = footer_hints[index].key;
-    if (std.mem.eql(u8, key, "Enter")) return .enter;
-    if (std.mem.eql(u8, key, "Esc")) return .back;
+    if (std.mem.eql(u8, key, "Enter") or std.mem.eql(u8, key, "A")) return .enter;
+    if (std.mem.eql(u8, key, "Esc") or std.mem.eql(u8, key, "B")) return .back;
     return null;
+}
+
+/// Idle work (~every 0.5 s while waiting for input): the header clock, and
+/// a fresh input-devices.txt when a USB gamepad was plugged in or removed.
+fn idle() void {
+    updateClock();
+    if (!timing_reported) return;
+    if (!usb_gamepad.takeChanged()) return;
+    const root = boot_root orelse return;
+    input_report.write(root, if (video_surface) |canvas| canvas.framebuffer.width else 0, if (video_surface) |canvas| canvas.framebuffer.height else 0);
+}
+
+/// The last input switched between a USB gamepad and keyboard/pointer:
+/// redraw the screen so the footer names A/B or Enter/Esc.
+fn inputModeChanged() void {
+    switch (active) {
+        .home => if (active_home) |home| home.redraw(),
+        .list => if (active_list) |list| list.redrawFull(list.spec.selected, list.spec.help),
+        .summary => summary(summary_spec),
+        // Notices and the input test build their hints on the next draw.
+        .none => {},
+    }
 }
 
 /// The string table (for screens that format their own text).
@@ -415,14 +440,14 @@ fn endPartial() void {
 fn listHints(buffer: *[3]Hint) []const Hint {
     buffer.* = .{
         .{ .key = "\u{2191}\u{2193}", .label = t(.key_select) },
-        .{ .key = "Enter", .label = t(.key_open) },
-        .{ .key = "Esc", .label = t(.key_back) },
+        .{ .key = input.enterKey(), .label = t(.key_open) },
+        .{ .key = input.backKey(), .label = t(.key_back) },
     };
     return buffer;
 }
 
 fn dismissHints(buffer: *[1]Hint) []const Hint {
-    buffer.* = .{.{ .key = "Esc", .label = t(.key_back) }};
+    buffer.* = .{.{ .key = input.backKey(), .label = t(.key_back) }};
     return buffer;
 }
 
@@ -447,8 +472,8 @@ pub const Home = struct {
         var clock: [48]u8 = undefined;
         home_hints = .{
             .{ .key = "\u{2191}\u{2193}\u{2190}\u{2192}", .label = t(.key_select) },
-            .{ .key = "Enter", .label = t(.key_open) },
-            .{ .key = "Esc", .label = t(.key_power) },
+            .{ .key = input.enterKey(), .label = t(.key_open) },
+            .{ .key = input.backKey(), .label = t(.key_power) },
         };
         setFooter(&home_hints, "");
         screens.home(&u, headerInfo(&clock, &u), self.items, self.selected, self.hover, &home_hints);
@@ -673,8 +698,8 @@ pub fn summary(spec: screens.SummarySpec) void {
     header_clock_active = true;
     summary_spec = spec;
     summary_hints = .{
-        .{ .key = "Enter", .label = t(.key_start) },
-        .{ .key = "Esc", .label = t(.key_back) },
+        .{ .key = input.enterKey(), .label = t(.key_start) },
+        .{ .key = input.backKey(), .label = t(.key_back) },
     };
     summary_spec.hints = if (spec.action_enabled) &summary_hints else summary_hints[1..];
     setFooter(summary_spec.hints, "");
@@ -865,7 +890,7 @@ var input_test_hints: [1]Hint = undefined;
 pub fn inputTestFrame(lines: NoticeLines, marker: ?[2]u32, dragging: bool) void {
     active = .none;
     header_clock_active = true;
-    input_test_hints = .{.{ .key = "Esc", .label = t(.key_back) }};
+    input_test_hints = .{.{ .key = input.backKey(), .label = t(.key_back) }};
     setFooter(&input_test_hints, "");
     beginFullFrame();
     var u = ui() orelse {

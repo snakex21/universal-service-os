@@ -113,6 +113,9 @@ fn start(
     firmware: usos.firmware.Firmware,
 ) void {
     if (!system.firmware.accepts(firmware)) return showFirmwareUnavailable();
+    // No USB gamepad transfer may outlive the menu into another loader;
+    // the pads are picked up again if the launch fails and the menu returns.
+    input.stopGamepads();
     const backend = usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, firmware) orelse return showUnsupported();
     const resolved = backend.method();
     const method_firmware = backend.firmwareRequirement();

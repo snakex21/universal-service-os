@@ -12,6 +12,11 @@ writes at boot is copied next to the screenshots.
 Devices: tablet (usb-tablet: EFI_ABSOLUTE_POINTER_PROTOCOL if the firmware
 drives it), mouse (usb-mouse: EFI_SIMPLE_POINTER_PROTOCOL) and ps2 (the
 i8042 PS/2 mouse, polled directly with the IntelliMouse wheel enabled).
+
+usb: the USB gamepad enumeration (EFI_USB_IO_PROTOCOL) next to QEMU's USB
+keyboard, mouse, tablet, Wacom tablet and U2F key (QEMU emulates no
+gamepad). The report must list every interface, claim none of them, leave
+the firmware-bound keyboard alone, and the menu must still navigate.
 """
 from __future__ import annotations
 
@@ -208,6 +213,78 @@ def run(device: str, disk: Path, out: Path, width: int, height: int) -> dict:
     return result
 
 
+def run_usb(disk: Path, out: Path, width: int, height: int) -> dict:
+    """USB gamepad enumeration must coexist with QEMU's USB HID devices."""
+    WORK.mkdir(parents=True, exist_ok=True)
+    serial = WORK / "serial-input-usb.log"
+    if serial.exists():
+        serial.unlink()
+    port = free_port()
+    vars_copy = WORK / "vars-input-usb.fd"
+    shutil.copyfile(OVMF_VARS, vars_copy)
+    args = [
+        str(QEMU), "-name", "USOS-input-usb", "-machine", "q35", "-accel", "tcg,thread=multi",
+        "-cpu", "max", "-m", "2048", "-smp", "2", "-nic", "none", "-rtc", "base=localtime",
+        "-display", "none", "-device", f"VGA,edid=on,xres={width},yres={height}",
+        "-monitor", f"tcp:127.0.0.1:{port},server=on,wait=off",
+        "-serial", f"file:{serial.as_posix()}",
+        "-drive", f"if=none,id=usos,file={disk.as_posix()},format=vpc,snapshot=on",
+        "-device", "ide-hd,bus=ide.0,drive=usos,bootindex=1",
+        "-drive", f"if=pflash,format=raw,readonly=on,file={OVMF_CODE.as_posix()}",
+        "-drive", f"if=pflash,format=raw,file={vars_copy.as_posix()}",
+        "-device", "qemu-xhci,id=xhci",
+        "-device", "usb-kbd,bus=xhci.0",
+        "-device", "usb-mouse,bus=xhci.0",
+        "-device", "usb-tablet,bus=xhci.0",
+        "-device", "usb-wacom-tablet,bus=xhci.0",
+        "-device", "u2f-emulated,bus=xhci.0",
+        "-no-shutdown",
+    ]
+    stderr = open(WORK / "qemu-input-usb.stderr.log", "wb")
+    process = subprocess.Popen(args, stderr=stderr)
+    result: dict = {"device": "usb"}
+    try:
+        monitor = Monitor(port)
+        wait_serial(serial, "USOS MANUAL FLOW BOOT PASS", 240)
+        wait_serial(serial, "[INPUT_REPORT END]", 120)
+        time.sleep(3)
+        text = report(serial)
+        (out / "input-usb-report.txt").write_text(text, encoding="utf-8")
+        section = text.split("[EFI_USB_IO_PROTOCOL]", 1)[1] if "[EFI_USB_IO_PROTOCOL]" in text else ""
+        result["usb_interfaces"] = len(re.findall(r"^- handle=", section, re.M))
+        result["claimed"] = section.count("usos=claimed")
+        result["keyboard_left_alone"] = "HID boot keyboard/mouse" in section
+        result["hid_probed"] = "hid_application_usage=" in section
+        # Keyboard navigation still works with the USB scan in the loop.
+        mark = len(list_states(serial))
+        monitor.key("ret", 4)
+        for _ in range(3):
+            monitor.key("down", 0.8)
+        time.sleep(1.5)
+        monitor.shot(Path(out / "input-usb-01-list.png"))
+        states = list_states(serial)[mark:]
+        result["list"] = states
+        result["pass"] = bool(
+            section
+            and result["usb_interfaces"] >= 5
+            and result["claimed"] == 0
+            and result["keyboard_left_alone"]
+            and result["hid_probed"]
+            and len(states) >= 2
+            and states[-1][1] > states[0][1]
+        )
+        try:
+            monitor.command("quit")
+        except ConnectionError:
+            pass
+    finally:
+        try:
+            process.wait(timeout=20)
+        except subprocess.TimeoutExpired:
+            process.kill()
+    return result
+
+
 def run_bios(disk: Path, out: Path) -> dict:
     """Legacy BIOS (SeaBIOS) with the i8042 PS/2 mouse: the Core enables the
     IntelliMouse wheel and turns notches into arrow keys."""
@@ -259,16 +336,26 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--disk", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--devices", default="ps2,mouse,tablet,bios")
+    parser.add_argument("--devices", default="ps2,mouse,tablet,usb,bios")
     parser.add_argument("--width", type=int, default=1280)
     parser.add_argument("--height", type=int, default=800)
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
-    results = [run_bios(args.disk, args.out) if device == "bios" else run(device, args.disk, args.out, args.width, args.height) for device in args.devices.split(",")]
+    results = [
+        run_bios(args.disk, args.out) if device == "bios"
+        else run_usb(args.disk, args.out, args.width, args.height) if device == "usb"
+        else run(device, args.disk, args.out, args.width, args.height)
+        for device in args.devices.split(",")
+    ]
     (args.out / "input-results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
+    failed = False
     for result in results:
+        if result["device"] == "usb":
+            print(f"[INPUT] usb: interfaces={result.get('usb_interfaces')} claimed={result.get('claimed')} keyboard_left_alone={result.get('keyboard_left_alone')} hid_probed={result.get('hid_probed')} list={result.get('list')} pass={result.get('pass')}")
+            failed = failed or not result.get("pass")
+            continue
         print(f"[INPUT] {result['device']}: bios_mouse={result.get('mouse_line')} wheel_down={result.get('wheel_down')} wheel_up={result.get('wheel_up')} drag={result.get('drag')} tap={result.get('tap')} hint_back={result.get('hint_back')}")
-    return 0
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

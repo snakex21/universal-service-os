@@ -1,11 +1,12 @@
 //! Hidden input test screen (Power -> Input test): shows every pointer,
-//! touch, wheel and key event live, so a new machine (e.g. a handheld)
+//! touch, wheel, key and USB gamepad event live (with the pad's type), so a new machine (e.g. a handheld)
 //! can be checked for what its firmware delivers to UEFI applications.
 //! Esc (or a tap on the Esc hint) twice in a row leaves.
 const std = @import("std");
 const uefi = std.os.uefi;
 const input = @import("input.zig");
 const pointer = @import("pointer.zig");
+const usb_gamepad = @import("usb_gamepad.zig");
 const view = @import("manual_view.zig");
 
 const max_log = 6;
@@ -45,7 +46,11 @@ pub fn show() void {
                         mouse.drag_dy,
                     }) catch "";
                 },
-                else => blk: {
+                else => if (input.lastSource() == .pad and input.lastPad() != null) blk: {
+                    const pad = input.lastPad().?;
+                    var name: [96]u8 = undefined;
+                    break :blk std.fmt.bufPrint(&line, "pad {s}: {s} -> {s}", .{ usb_gamepad.describe(&name, pad.kind, pad.vid, pad.pid), @tagName(pad.button), @tagName(event) }) catch "";
+                } else blk: {
                     const key = input.lastKey();
                     break :blk std.fmt.bufPrint(&line, "key {s} scan=0x{x:0>2} char=0x{x:0>4}", .{ @tagName(event), key.scan, key.unicode }) catch "";
                 },
@@ -79,14 +84,16 @@ pub fn show() void {
         if (dirty and quiet_ticks >= 2) {
             dirty = false;
             var status: [4][128]u8 = undefined;
-            var lines: [4 + max_log][]const u8 = undefined;
+            var pads: [256]u8 = undefined;
+            var lines: [5 + max_log][]const u8 = undefined;
             const pos = pointer.position();
             lines[0] = std.fmt.bufPrint(&status[0], "Pointer: {s}  simple={d} absolute={d}  position {d},{d}", .{ pointer.backendLabel(), pointer.Report.simpleCount(), pointer.Report.absoluteCount(), pos.x, pos.y }) catch "";
             lines[1] = std.fmt.bufPrint(&status[1], "Wheel notches total: {d}   drag pixels total: {d}   events: {d}", .{ wheel_total, drag_total, events }) catch "";
             lines[2] = std.fmt.bufPrint(&status[2], "PS/2 direct: {s}  wheel: {s}   Report: EFI\\USOS\\Logs\\input-devices.txt", .{ if (pointer.Report.ps2Direct()) "yes" else "no", if (pointer.Report.ps2Wheel()) "yes" else "no" }) catch "";
-            lines[3] = if (backs == 1) "Press Esc once more to leave." else "";
-            for (0..log_count) |index| lines[4 + index] = log[index][0..log_len[index]];
-            view.inputTestFrame(lines[0 .. 4 + log_count], marker, dragging);
+            lines[3] = usb_gamepad.padsLine(&pads);
+            lines[4] = if (backs == 1) (if (input.padActive()) "Press B once more to leave." else "Press Esc once more to leave.") else "";
+            for (0..log_count) |index| lines[5 + index] = log[index][0..log_len[index]];
+            view.inputTestFrame(lines[0 .. 5 + log_count], marker, dragging);
         }
     }
 }

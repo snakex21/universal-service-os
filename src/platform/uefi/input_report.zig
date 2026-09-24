@@ -1,15 +1,18 @@
-//! Writes EFI\USOS\Logs\input-devices.txt once per boot: every pointer,
-//! absolute-pointer (touch) and text-input handle the firmware exposes,
-//! with device paths, ranges, resolutions and attributes, plus what the
-//! menu polls. Running USOS once on a new machine (e.g. a handheld) shows
+//! Writes EFI\USOS\Logs\input-devices.txt once per boot (and again when a
+//! USB gamepad is plugged in or removed): every pointer, absolute-pointer
+//! (touch), text-input and USB I/O handle (per USB interface: VID/PID,
+//! class, subclass, protocol and whether USOS claimed it as a gamepad) the
+//! firmware exposes, with device paths, ranges, resolutions and
+//! attributes, plus what the menu polls. Running USOS once on a new machine (e.g. a handheld) shows
 //! exactly which touch/controller inputs its firmware offers pre-boot.
 const std = @import("std");
 const uefi = std.os.uefi;
 const usos = @import("usos");
 const pointer = @import("pointer.zig");
+const usb_gamepad = @import("usb_gamepad.zig");
 const serial = @import("serial.zig");
 
-const capacity = 16 * 1024;
+const capacity = 32 * 1024;
 
 var buffer: [capacity]u8 = undefined;
 var used: usize = 0;
@@ -106,7 +109,49 @@ fn build(width: u32, height: u32) void {
             devicePath(services, to_text, handle);
         }
     } else print("[EFI_SIMPLE_TEXT_INPUT_PROTOCOL] handles=0\n", .{});
-    print("\nGamepads have no UEFI protocol; handheld firmware that supports its\ncontrols pre-boot presents them as a keyboard (arrows/Enter/Esc) or a\npointer, which appear above.\n", .{});
+    print("\n", .{});
+
+    usbInterfaces(services, to_text);
+    print("\nGamepads have no UEFI protocol. USOS reads XInput (Xbox 360), GIP\n(Xbox One/Series, wired) and HID gamepads itself through the USB I/O\nprotocol above; handheld firmware may also present its controls as a\nkeyboard (arrows/Enter/Esc) or a pointer.\n", .{});
+}
+
+fn usbInterfaces(services: *uefi.tables.BootServices, to_text: ?*DevicePathToText) void {
+    usb_gamepad.ensureScanned();
+    // This report reflects the current set; the idle rewrite waits for the
+    // next change.
+    _ = usb_gamepad.takeChanged();
+    const Report = usb_gamepad.Report;
+    print("[EFI_USB_IO_PROTOCOL] interfaces={d} gamepads_in_use={d}{s}\n", .{ Report.handles(), Report.activePads(), if (Report.handles() == 0) " (no firmware USB stack, or no USB devices)" else "" });
+    for (0..Report.count()) |index| {
+        const entry = Report.entry(index);
+        print("- handle=0x{x} vid={x:0>4} pid={x:0>4} device_class={x:0>2}/{x:0>2}/{x:0>2} interface={d} class={x:0>2} subclass={x:0>2} protocol={x:0>2} endpoints={d}\n", .{
+            @intFromPtr(entry.handle),
+            entry.vid,
+            entry.pid,
+            entry.device_class[0],
+            entry.device_class[1],
+            entry.device_class[2],
+            entry.interface.number,
+            entry.interface.class,
+            entry.interface.subclass,
+            entry.interface.protocol,
+            entry.endpoints,
+        });
+        devicePath(services, to_text, entry.handle);
+        if (usos.gui.usb_gamepad.productName(entry.vid, entry.pid)) |name| print("  product={s}\n", .{name});
+        print("  bound_by_firmware_driver={s} usos={s}\n", .{ yesNo(entry.bound), entry.verdict.text() });
+        if (entry.kind) |kind| print("  type={s}\n", .{kind.label()});
+        if (entry.hid_application != 0) print("  hid_application_usage={x:0>4}:{x:0>4}\n", .{ entry.hid_application >> 16, entry.hid_application & 0xFFFF });
+        if (entry.verdict == .claimed) {
+            print("  interrupt_in=0x{x:0>2} interrupt_out=0x{x:0>2} transfer={s} reports_so_far={d}\n", .{
+                entry.in_endpoint,
+                entry.out_endpoint,
+                if (entry.async_mode) "async (UsbAsyncInterruptTransfer)" else "polled (UsbSyncInterruptTransfer)",
+                Report.reportsFor(entry.handle) orelse 0,
+            });
+        }
+    }
+    if (Report.dropped() > 0) print("({d} more interfaces not listed)\n", .{Report.dropped()});
 }
 
 fn polledSimple(handle: uefi.Handle) bool {

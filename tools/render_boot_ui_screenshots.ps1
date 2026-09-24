@@ -18,7 +18,7 @@ param(
     # through QMP for usb-tablet, usb-mouse and the PS/2 mouse, and the
     # Legacy BIOS menu with the PS/2 wheel (tools/boot_input_qemu.py).
     [switch]$InputTest,
-    [string]$InputDevices = 'ps2,mouse,tablet,bios',
+    [string]$InputDevices = 'ps2,mouse,tablet,usb,bios',
     # Instead of screenshots: measure the boot splash and loading time
     # (tools/boot_splash_qemu.py) for UEFI and BIOS in the first language,
     # saving timelines and animation frames to <OutputDirectory>/splash.

@@ -19,7 +19,72 @@ Installer: `installer/internal/ui/{wheel,gamepad,touch}.go` and their
 
 Gamepads have no UEFI protocol. Handheld firmware that supports its
 controls pre-boot presents them as keyboard keys (arrows/Enter/Esc) or a
-pointer; both work.
+pointer; both work. USB pads are also read directly (next section).
+
+### USB gamepads (2026-09-24)
+
+`src/platform/uefi/usb_gamepad.zig` talks to pads through the firmware's own
+USB stack (`EFI_USB_IO_PROTOCOL`, one handle per USB interface); protocol
+parsing and the mapping are in `src/gui/usb_gamepad.zig` (unit tested). No
+host controller driver, no third-party code.
+
+| Pad | Detected by | Start-up | Reports |
+|---|---|---|---|
+| Xbox 360 wired and clones, handheld pads that present XInput | interface FF/5D/01 | vendor request C1/01 wValue 0x100 (xpad), LED `01 03 02` | 20 bytes: type 00, len 14 |
+| Xbox 360 wireless receiver | FF/5D/81 (one per pad slot) | presence inquiry `08 00 0F C0 ...` | 29 bytes, wired layout from byte 4 |
+| Xbox One / Series wired (USB-C) | FF/47/D0, interface 0 only | GIP power-on `05 20 seq 01 00` (+ xpad's vendor quirks: One S/Elite 2, PDP, PowerA, Hori), resent up to 4x every 1.5 s until input arrives | GIP `20` input packets; the guide-button packet is ACKed |
+| Generic HID gamepad / joystick (8BitDo, DragonRise, DualShock 4, DualSense, ...) | class 03, not a boot keyboard/mouse, report descriptor with a Joystick/Gamepad/Multi-axis application collection | none | minimal descriptor parser: buttons 1-16, X/Y, hat, D-pad usages, report IDs |
+
+ROG Ally (0B05:1ABE) and Ally X (0B05:1B4C): detection is by interface
+class, not by VID/PID, so whichever XInput or GIP interface the built-in
+controller exposes is used (Linux drives it with xpad; the MCU's HID
+interfaces for hid-asus carry configuration and macro keys, not the
+sticks). An 045E:028E XInput pad seen next to the Ally MCU is labelled
+"ROG Ally built-in controller". Unverified on the hardware so far: the
+report shows exactly what the Ally exposes pre-boot.
+
+Rules:
+- The protocol is opened with GET_PROTOCOL only. Interfaces a firmware
+  driver holds BY_DRIVER/EXCLUSIVE (`OpenProtocolInformation`) and HID boot
+  keyboards/mice are never touched, only listed; DisconnectController is
+  never called.
+- Reports arrive through `UsbAsyncInterruptTransfer` (callback queues up to
+  16 reports per pad; the menu drains them with the TPL raised to NOTIFY).
+  If the firmware refuses async transfers the pad is polled with
+  `UsbSyncInterruptTransfer` (1 ms timeout, every 8 ms). Transfer errors are
+  recovered (cancel, CLEAR_FEATURE(ENDPOINT_HALT), restart) up to 5 times.
+- Hot-plug: the handle list is re-read every 2 s; new interfaces are
+  inspected, vanished ones are dropped without calling their protocol.
+  `input-devices.txt` is rewritten when the set changes.
+- All transfers are cancelled before any launch (`manual_summary.start`,
+  `manual_view.handover`); a failed launch returning to the menu rescans.
+- Layout = micro-Linux: D-pad or left stick move (deadzone 50%/35%
+  hysteresis, repeat 400 ms then 90 ms), A and Start = Enter, B and
+  Back/View = Esc, LB/RB = Page Up/Down. HID button numbers: Gamepad usage
+  uses the Linux BTN_GAMEPAD order (1 A, 2 B, 7/8 LB/RB, 11 Back, 12 Start),
+  Joystick usage the DirectInput order (1 A, 2 B, 5/6 LB/RB, 9 Back,
+  10 Start), Sony and Logitech D-mode pads square-first (2 = A/Cross,
+  3 = B/Circle).
+- While a pad is in use the footer names A/B instead of Enter/Esc (tapping
+  them still works). The same action from the keyboard within 150 ms of the
+  pad (or the reverse) is dropped: handheld firmware can send a pad press
+  as a key as well.
+- Input test (Power -> Input test) shows the claimed pads with type,
+  VID:PID and report counts, and every pad event as
+  `pad GIP Xbox Series X|S Controller 045E:0B12: a -> enter`; B twice leaves.
+
+Not supported: Bluetooth pads (no Bluetooth stack pre-boot; the user's
+Xbox Wireless Controller 045E:0B13 must be connected with a USB-C cable,
+where it is 045E:0B12 GIP), the Xbox Wireless Adapter dongle (proprietary
+Wi-Fi protocol with firmware upload), Switch Pro (needs a handshake), pads
+whose interface a firmware driver already owns (reported), and the ROG Ally
+touch panel (see below).
+
+`input-devices.txt` gains an `[EFI_USB_IO_PROTOCOL]` section: every
+interface with handle, VID/PID, device class, interface number, class,
+subclass, protocol, endpoints, device path, product name when known,
+whether a firmware driver has it open, and what USOS did with it (and for
+claimed pads the endpoints, async/polled and the report count).
 
 Handheld touch panels (ROG Ally and similar) are usually I2C-HID devices
 (ACPI `PNP0C50` on an AMD/Intel DesignWare I2C controller). Most firmware
@@ -70,9 +135,18 @@ and every touch target exceeds 40 effective px at 150% (60 device px).
 
 ## QEMU tests
 
-    powershell -File tools/render_boot_ui_screenshots.ps1 -InputTest [-InputDevices ps2,mouse,tablet,bios]
+    powershell -File tools/render_boot_ui_screenshots.ps1 -InputTest [-InputDevices ps2,mouse,tablet,usb,bios]
     python tools/boot_input_linux_qemu.py --out artifacts/boot-input
 
 The bundled OVMF has no USB mouse/tablet driver (its input report lists only
 the console splitter), so UEFI pointer tests in QEMU run through the PS/2
 mouse; the absolute-pointer path is covered by unit tests only.
+
+`usb` boots with QEMU's usb-kbd, usb-mouse, usb-tablet, usb-wacom-tablet and
+u2f-emulated on an xHCI controller (QEMU has no gamepad): the report must
+list them all (6 interfaces with the hub), claim none, show the keyboard as
+bound by OVMF's UsbKbDxe, read the HID report descriptors (tablet 0001:0002,
+U2F F1D0:0001), and keyboard navigation must still move the list. The pad
+protocols themselves are covered by the unit tests in
+`src/gui/usb_gamepad.zig`; `usb-host` passthrough would need the WinUSB
+driver on the pad, so it is not used.
