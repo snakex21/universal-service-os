@@ -96,10 +96,8 @@ func (b Backend) CopyInstallPayload(media install.MediaLayout, progress func(don
 		return fmt.Errorf("ESP payload progress mismatch: got %d want %d", globalDone, espTotal)
 	}
 
-	for _, directory := range requiredDataDirectories {
-		if err := os.MkdirAll(filepath.Join(resolved.DATA.VolumePath, directory), 0o755); err != nil {
-			return fmt.Errorf("create DATA directory %s: %w", directory, err)
-		}
+	if err := ensureDataDirectories(resolved.DATA.VolumePath); err != nil {
+		return err
 	}
 	for _, guide := range dataGuides {
 		guidePath := filepath.Join(resolved.DATA.VolumePath, guide.relativePath)

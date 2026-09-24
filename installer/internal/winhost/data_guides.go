@@ -28,6 +28,7 @@ var dataGuides = []dataGuide{
 		relativePath: filepath.Join("Programs", "README.txt"),
 		contents:     []byte("Universal Service OS - Programs\r\n\r\nTen katalog jest przeznaczony na programy do instalacji lub uruchamiania już po starcie docelowego systemu operacyjnego.\r\nKażdy program trzymaj w osobnym folderze, np. Programs\\7-Zip lub Programs\\Drivers.\r\n\r\nKonwencja metadanych programu:\r\n  icon.png   - opcjonalna ikona programu do wykorzystania przez interfejsy pracujące już w systemie\r\n\r\nBoot menu USOS wyświetla obecnie icon.png dla profili systemów i narzędzi z Utilities. Programs nie jest menu bootowalnym.\r\nUSOS nie udaje uruchamiania zwykłych plików Windows EXE bez Windows. Narzędzia bootowalne umieszczaj w Utilities.\r\n"),
 	},
+	driversGuide,
 }
 
 func dataGuidesTotalBytes() uint64 {
