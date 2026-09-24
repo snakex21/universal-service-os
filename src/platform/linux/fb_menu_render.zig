@@ -58,7 +58,7 @@ pub const Layout = struct {
 /// hints are touch targets too (see fb_menu.zig).
 pub fn footerHints(buffer: *[4]usos.gui.ui.Hint, ui: *const Ui, state: model.State, layout: Layout, pad: bool) []const usos.gui.ui.Hint {
     buffer.* = if (pad) .{
-        .{ .key = "\u{2191}\u{2193}", .label = ui.t(.key_select) },
+        .{ .key = "DPad", .label = ui.t(.key_select) },
         .{ .key = "A", .label = ui.t(.key_open) },
         .{ .key = "B", .label = ui.t(.key_back) },
         .{ .key = "LB/RB", .label = ui.t(.key_scroll) },

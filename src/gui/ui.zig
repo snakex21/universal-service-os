@@ -69,6 +69,101 @@ pub const Hint = struct {
     label: []const u8,
 };
 
+/// Controller buttons a footer hint key can name. A hint key made only of
+/// these names, separated by "/", is drawn as button glyphs ("A", "B",
+/// "LB/RB", "Start", "DPad"); anything else is a keyboard key cap.
+pub const PadButton = enum {
+    a,
+    b,
+    x,
+    y,
+    lb,
+    rb,
+    lt,
+    rt,
+    ls,
+    rs,
+    start,
+    view,
+    dpad,
+
+    const Name = struct { text: []const u8, button: PadButton };
+    const names = [_]Name{
+        .{ .text = "A", .button = .a },         .{ .text = "B", .button = .b },
+        .{ .text = "X", .button = .x },         .{ .text = "Y", .button = .y },
+        .{ .text = "LB", .button = .lb },       .{ .text = "RB", .button = .rb },
+        .{ .text = "LT", .button = .lt },       .{ .text = "RT", .button = .rt },
+        .{ .text = "LS", .button = .ls },       .{ .text = "RS", .button = .rs },
+        .{ .text = "Start", .button = .start }, .{ .text = "Menu", .button = .start },
+        .{ .text = "View", .button = .view },   .{ .text = "DPad", .button = .dpad },
+    };
+
+    pub fn parse(name: []const u8) ?PadButton {
+        for (names) |entry| {
+            if (std.mem.eql(u8, entry.text, name)) return entry.button;
+        }
+        return null;
+    }
+
+    pub fn label(self: PadButton) []const u8 {
+        return switch (self) {
+            .a => "A",
+            .b => "B",
+            .x => "X",
+            .y => "Y",
+            .lb => "LB",
+            .rb => "RB",
+            .lt => "LT",
+            .rt => "RT",
+            .ls => "LS",
+            .rs => "RS",
+            .start => "Start",
+            .view => "View",
+            .dpad => "DPad",
+        };
+    }
+
+    /// Xbox face button colours from the installer palette: A green
+    /// (Success), B red (Danger), X blue, Y yellow (Warning).
+    pub fn faceColor(self: PadButton, theme: Theme) Color {
+        return switch (self) {
+            .a => theme.success,
+            .b => theme.danger,
+            .x => face_blue,
+            .y => theme.warning,
+            else => theme.panel_alt,
+        };
+    }
+};
+
+/// X button blue (the installer palette has no blue status colour).
+pub const face_blue = Color{ .r = 0x4a, .g = 0x9b, .b = 0xf0 };
+/// Letter colour on the face buttons (installer: color{0x0b, 0x0f, 0x14}).
+pub const face_letter = Color{ .r = 0x0b, .g = 0x0f, .b = 0x14 };
+
+pub const PadButtons = struct {
+    items: [4]PadButton = undefined,
+    len: usize = 0,
+
+    pub fn slice(self: *const PadButtons) []const PadButton {
+        return self.items[0..self.len];
+    }
+};
+
+/// Splits a hint key into controller buttons; null when any part is not a
+/// pad button (then the key is drawn as a keyboard key cap).
+pub fn padButtons(key: []const u8) ?PadButtons {
+    if (key.len == 0) return null;
+    var result = PadButtons{};
+    var parts = std.mem.splitScalar(u8, key, '/');
+    while (parts.next()) |part| {
+        if (result.len == result.items.len) return null;
+        result.items[result.len] = PadButton.parse(part) orelse return null;
+        result.len += 1;
+    }
+    return result;
+}
+
 pub const RowIcon = union(enum) {
     none,
     vector: Icon,
@@ -283,11 +378,29 @@ pub const Ui = struct {
         return null;
     }
 
+    /// Width of a footer hint symbol: a key cap, or controller button
+    /// glyphs when every "/"-separated part of `key` names a pad button.
     fn keycapWidth(self: *const Ui, key: []const u8) u32 {
+        if (padButtons(key)) |buttons| {
+            var total: u32 = 0;
+            for (buttons.slice(), 0..) |pad_button, index| {
+                if (index > 0) total += self.px(4);
+                total += self.padButtonWidth(pad_button);
+            }
+            return total;
+        }
         return @max(self.px(24), self.fonts.width(.small, key) + self.px(14));
     }
 
     fn keycap(self: *const Ui, x: u32, center_y: u32, key: []const u8, background: Color) u32 {
+        if (padButtons(key)) |buttons| {
+            var right = x;
+            for (buttons.slice(), 0..) |pad_button, index| {
+                if (index > 0) right += self.px(4);
+                right = self.padButton(right, center_y, pad_button, background);
+            }
+            return right;
+        }
         const w = self.keycapWidth(key);
         const h = self.px(24);
         const y = center_y -| (h / 2);
@@ -295,6 +408,87 @@ pub const Ui = struct {
         // A slightly darker bottom lip gives the key some depth.
         self.surface.fillRect(x + self.px(4), y + h -| self.line(2), w -| self.px(8), self.line(1), self.theme.border);
         self.fonts.drawCentered(self.surface, x + w / 2, self.fonts.centeredTop(.small, y + h / 2), .small, key, self.theme.text, self.theme.panel_alt);
+        return x + w;
+    }
+
+    fn padButtonWidth(self: *const Ui, kind: PadButton) u32 {
+        return switch (kind) {
+            .a, .b, .x, .y, .dpad => self.px(24),
+            .start, .view => self.px(32),
+            else => self.fonts.width(.small, kind.label()) + self.px(16),
+        };
+    }
+
+    /// Draws one controller button the way the Windows installer does
+    /// (installer/internal/ui/pad_hints_windows.go): A/B/X/Y as round face
+    /// buttons in the Xbox colours with a dark letter; bumpers, triggers and
+    /// sticks as pills; Start (three bars) and View (two windows) as pills
+    /// with a symbol; the D-pad as a cross. All edges are anti-aliased and
+    /// every length goes through px(). Returns the right edge.
+    fn padButton(self: *const Ui, x: u32, center_y: u32, kind: PadButton, background: Color) u32 {
+        const theme = self.theme;
+        const w = self.padButtonWidth(kind);
+        const surface = self.surface;
+        switch (kind) {
+            .a, .b, .x, .y => {
+                const fill = kind.faceColor(theme);
+                const radius = @divTrunc(paint.s(w), 2);
+                paint.circle(surface, paint.s(x) + radius, paint.s(center_y), radius, fill, background);
+                self.fonts.drawCentered(surface, x + w / 2, self.fonts.centeredTop(.strong, center_y), .strong, kind.label(), face_letter, fill);
+            },
+            .dpad => {
+                const cx = paint.s(x) + @divTrunc(paint.s(w), 2);
+                const cy = paint.s(center_y);
+                const arm = @divTrunc(paint.s(w), 2) - paint.s(self.px(1));
+                const half = paint.s(self.px(4));
+                const inset = paint.s(self.line(1));
+                const outer = [_]paint.Box{
+                    .{ .x0 = cx - arm, .y0 = cy - half, .x1 = cx + arm, .y1 = cy + half },
+                    .{ .x0 = cx - half, .y0 = cy - arm, .x1 = cx + half, .y1 = cy + arm },
+                };
+                const inner = [_]paint.Box{
+                    .{ .x0 = cx - arm + inset, .y0 = cy - half + inset, .x1 = cx + arm - inset, .y1 = cy + half - inset },
+                    .{ .x0 = cx - half + inset, .y0 = cy - arm + inset, .x1 = cx + half - inset, .y1 = cy + arm - inset },
+                };
+                const x0: i32 = @intCast(x);
+                const y0: i32 = @as(i32, @intCast(center_y)) - @as(i32, @intCast(w / 2)) - 1;
+                const x1 = x0 + @as(i32, @intCast(w)) + 1;
+                const y1 = y0 + @as(i32, @intCast(w)) + 3;
+                paint.fillShape(surface, x0, y0, x1, y1, paint.Union(paint.Box){ .items = &outer }, theme.muted, background);
+                paint.fillShape(surface, x0, y0, x1, y1, paint.Union(paint.Box){ .items = &inner }, theme.panel_alt, theme.muted);
+            },
+            else => {
+                const h = self.px(22);
+                const y = center_y -| (h / 2);
+                paint.card(surface, x, y, w, h, h / 2, self.line(1), theme.border_strong, theme.panel_alt, background);
+                switch (kind) {
+                    .start => {
+                        // Three short bars: the Menu/Start symbol.
+                        const len = paint.s(self.px(10));
+                        const thick = @max(paint.s(self.line(2)), paint.sub + @divTrunc(paint.sub, 2));
+                        const cx = paint.s(x) + @divTrunc(paint.s(w), 2);
+                        const gap = paint.s(self.px(4));
+                        var bar: i32 = -1;
+                        while (bar <= 1) : (bar += 1) {
+                            const cy = paint.s(center_y) + bar * gap;
+                            paint.capsule(surface, .{ .x0 = cx - @divTrunc(len, 2), .y0 = cy, .x1 = cx + @divTrunc(len, 2), .y1 = cy, .r = @divTrunc(thick, 2) }, theme.text, theme.panel_alt);
+                        }
+                    },
+                    .view => {
+                        // Two overlapping windows: the View/Back symbol.
+                        const bw = self.px(9);
+                        const bh = self.px(7);
+                        const offset = self.px(3);
+                        const left = x + (w -| (bw + offset)) / 2;
+                        const top = center_y -| ((bh + offset) / 2);
+                        const t1 = self.line(1);
+                        paint.card(surface, left + offset, top, bw, bh, self.px(1), t1, theme.text, theme.panel_alt, theme.panel_alt);
+                        paint.card(surface, left, top + offset, bw, bh, self.px(1), t1, theme.text, theme.panel_alt, theme.panel_alt);
+                    },
+                    else => self.fonts.drawCentered(surface, x + w / 2, self.fonts.centeredTop(.small, center_y), .small, kind.label(), theme.text, theme.panel_alt),
+                }
+            },
+        }
         return x + w;
     }
 
@@ -834,5 +1028,47 @@ test "toolkit renders a full home, list and panels at 1024x768 and 1920x1080" {
         ui.progressBar(.{ .x = body.x, .y = body.y, .w = body.w, .h = ui.px(8) }, 44, .accent, (Theme{}).panel);
         ui.button(.{ .x = body.x, .y = body.y, .w = ui.px(300), .h = ui.px(44) }, "Enter", "Load the Windows ISO", true, .normal, true);
         try std.testing.expect(pixels[0] != pixels[pixels.len / 2]);
+    }
+}
+
+test "pad hint keys draw as controller glyphs, other keys as key caps" {
+    try std.testing.expectEqual(@as(usize, 2), padButtons("LB/RB").?.len);
+    try std.testing.expectEqual(PadButton.start, padButtons("Menu").?.slice()[0]);
+    try std.testing.expect(padButtons("Enter") == null);
+    try std.testing.expect(padButtons("PgUp/PgDn") == null);
+    try std.testing.expect(padButtons("A/Esc") == null);
+    try std.testing.expect(padButtons("") == null);
+    try std.testing.expect(padButtons("D") == null);
+
+    const ScreenBuffer = @import("screen_buffer.zig").ScreenBuffer;
+    const pack = try font.Pack.parse(@embedFile("fonts/usos-font.bin"));
+    const table = lang_file.Table.english_only;
+    const sizes = [_][2]u32{ .{ 1024, 768 }, .{ 1920, 1080 } };
+    for (sizes) |size| {
+        const pixels = try std.testing.allocator.alloc(u32, size[0] * size[1]);
+        defer std.testing.allocator.free(pixels);
+        const buffer = ScreenBuffer.init(@intFromPtr(pixels.ptr), pixels.len * 4, size[0], size[1], .bgrx8).?;
+        const ui = Ui.init(buffer.surface, Theme{}, &pack, &table);
+        ui.clear();
+        const hints = [_]Hint{ .{ .key = "A", .label = "Open" }, .{ .key = "B", .label = "Back" }, .{ .key = "LB/RB", .label = "Scroll" } };
+        ui.footer(&hints, "");
+        // Face buttons are round (DPI-scaled) and coloured: the centre of A
+        // is the Success green, B the Danger red.
+        const cy = size[1] - ui.footerHeight() / 2;
+        const a_x = ui.px(24) + ui.px(24) / 2;
+        const theme = Theme{};
+        const a_pixel = buffer.surface.getRawPixel(a_x - ui.px(7), cy);
+        try std.testing.expectEqual(@as(u32, theme.success.r), (a_pixel >> 16) & 0xff);
+        try std.testing.expectEqual(@as(u32, theme.success.g), (a_pixel >> 8) & 0xff);
+        const b_left = ui.px(24) + ui.keycapWidth("A") + ui.px(8) + ui.fonts.width(.small, "Open") + ui.px(22);
+        const b_pixel = buffer.surface.getRawPixel(b_left + ui.px(5), cy);
+        try std.testing.expectEqual(@as(u32, theme.danger.r), (b_pixel >> 16) & 0xff);
+        // The circle's corner stays footer background (round, not square).
+        const corner = buffer.surface.getRawPixel(ui.px(24), cy - ui.px(11));
+        try std.testing.expectEqual(@as(u32, theme.header.r), (corner >> 16) & 0xff);
+        // Hit-testing uses the same widths.
+        try std.testing.expectEqual(@as(?usize, 1), ui.footerHit(&hints, "", b_left + ui.px(2), cy));
+        try std.testing.expectEqual(@as(?usize, 2), ui.footerHit(&hints, "", b_left + ui.keycapWidth("B") + ui.px(8) + ui.fonts.width(.small, "Back") + ui.px(22) + ui.px(4), cy));
+        try std.testing.expect(ui.keycapWidth("LB/RB") > 2 * ui.px(24));
     }
 }

@@ -114,6 +114,31 @@ pub fn main(init: std.process.Init) !u8 {
     patch.save(buffer.surface, width / 2, height / 2, sprite.width, sprite.height);
     sprite.draw(buffer.surface, width / 2, height / 2, &patch.pixels);
     try save(io, cwd, init.gpa, out_dir, "06-power", pixels, width, height);
+
+    // Footer while a gamepad is in use (UEFI and micro-Linux menus), and a
+    // strip with every controller glyph the footer can draw.
+    const pad_hints = [_]gui.ui.Hint{
+        .{ .key = "DPad", .label = ui.t(.key_select) },
+        .{ .key = "A", .label = ui.t(.key_open) },
+        .{ .key = "B", .label = ui.t(.key_back) },
+        .{ .key = "LB/RB", .label = ui.t(.key_scroll) },
+    };
+    _ = gui.menu_screens.listScreen(&ui, header, .{ .title = "Windows", .subtitle = ui.t(.systems_subtitle), .rows = &rows, .selected = 0, .hints = &pad_hints }, 0);
+    try save(io, cwd, init.gpa, out_dir, "07-pad-hints", pixels, width, height);
+    const all_glyphs = [_]gui.ui.Hint{
+        .{ .key = "A", .label = "A" },
+        .{ .key = "B", .label = "B" },
+        .{ .key = "X", .label = "X" },
+        .{ .key = "Y", .label = "Y" },
+        .{ .key = "LB/RB", .label = "LB/RB" },
+        .{ .key = "LT/RT", .label = "LT/RT" },
+        .{ .key = "Start", .label = "Start" },
+        .{ .key = "View", .label = "View" },
+        .{ .key = "DPad", .label = "D-pad" },
+        .{ .key = "Enter", .label = "Enter" },
+    };
+    _ = gui.menu_screens.listScreen(&ui, header, .{ .title = "Windows", .subtitle = ui.t(.systems_subtitle), .rows = &rows, .selected = 0, .hints = &all_glyphs }, 0);
+    try save(io, cwd, init.gpa, out_dir, "08-pad-glyphs", pixels, width, height);
     return 0;
 }
 

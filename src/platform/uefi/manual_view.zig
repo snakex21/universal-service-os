@@ -439,7 +439,7 @@ fn endPartial() void {
 
 fn listHints(buffer: *[3]Hint) []const Hint {
     buffer.* = .{
-        .{ .key = "\u{2191}\u{2193}", .label = t(.key_select) },
+        .{ .key = input.moveKey("\u{2191}\u{2193}"), .label = t(.key_select) },
         .{ .key = input.enterKey(), .label = t(.key_open) },
         .{ .key = input.backKey(), .label = t(.key_back) },
     };
@@ -471,7 +471,7 @@ pub const Home = struct {
         var u = ui() orelse return self.console();
         var clock: [48]u8 = undefined;
         home_hints = .{
-            .{ .key = "\u{2191}\u{2193}\u{2190}\u{2192}", .label = t(.key_select) },
+            .{ .key = input.moveKey("\u{2191}\u{2193}\u{2190}\u{2192}"), .label = t(.key_select) },
             .{ .key = input.enterKey(), .label = t(.key_open) },
             .{ .key = input.backKey(), .label = t(.key_power) },
         };

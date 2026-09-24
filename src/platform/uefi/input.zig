@@ -116,6 +116,11 @@ pub fn backKey() []const u8 {
     return if (padActive()) "B" else "Esc";
 }
 
+/// Movement hint: the D-pad glyph for a pad, else the given arrow keys.
+pub fn moveKey(arrows: []const u8) []const u8 {
+    return if (padActive()) "DPad" else arrows;
+}
+
 /// Cancels the USB gamepad transfers before another loader starts.
 pub fn stopGamepads() void {
     usb_gamepad.stop();
