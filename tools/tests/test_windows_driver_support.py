@@ -47,6 +47,15 @@ class Support(unittest.TestCase):
             self.assertNotEqual(0, self.run_helper('usos-drivers.exe','--inspect',file).returncode)
         self.assertFalse((self.root/'usos-win7-drivers').exists())
 
+    def test_archive_with_user_packages_after_the_bundled_library_is_valid(self):
+        # windows_driver_files.zig: bundled entries first, then the user's
+        # DATA\Drivers\Windows 7 packages under user\<Class>\NN and the log.
+        file = self.root / 'drivers.bin'
+        file.write_bytes(archive([(r'USB_Generic\usbxhci.inf', b'INF'), (r'USB_Generic\usbxhci.sys', b'SYS'),
+                                  (r'user\Storage\01\iaStorAC.inf', b'INF'), (r'user\Storage\01\d1\iaStorAC.sys', b'SYS'),
+                                  (r'user\Other\02\net.inf', b'INF'), (r'user\usos-user-drivers.log', b'log')]))
+        self.assertEqual(0, self.run_helper('usos-drivers.exe', '--inspect', file).returncode)
+
     def test_target_efi_assets_are_transported_as_data_not_boot_applications(self):
         from build_windows_native_support import build_stock_support
         build_stock_support(ROOT,self.root)

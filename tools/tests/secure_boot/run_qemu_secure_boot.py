@@ -30,6 +30,17 @@ Scenarios (each prints [PASS]/[FAIL]):
                already holds another key: the probe runs mok_key.save() (the
                menu's "Add the key"), MokList stays NV|BS with both keys; then
                Secure Boot ON: shim starts USOS with no MokManager at all.
+  matrix       the same USOS disk behind AHCI, IDE (i440fx), NVMe, virtio-blk,
+               virtio-scsi, USB xHCI and USB EHCI (Secure Boot off): the menu
+               starts, reads DATA through that controller's Block I/O and
+               starts the user drivers from Drivers\\UEFI every time.
+  drivers      user UEFI drivers from DATA\\Drivers\\UEFI on a GPT test disk
+               (tools/tests/uefi_drivers/new_test_disk.ps1): MOK-signed and
+               unsigned test drivers with and without [match], a wrong
+               architecture, an EFI application, a duplicate, a non-ASCII and
+               a long folder name, with Secure Boot on (MokList seeded with
+               the USOS key) and off; then a driver that never returns: the
+               watchdog resets the machine and the next start blocks it.
 
     python tools/tests/secure_boot/run_qemu_secure_boot.py [--keep-screens]
 
@@ -64,7 +75,8 @@ def efisign(*args: str) -> None:
 
 
 def serial_text(path: Path) -> str:
-    return path.read_text(errors="replace") if path.exists() else ""
+    # UTF-8: drivers.txt carries non-ASCII folder names.
+    return path.read_text(encoding="utf-8", errors="replace") if path.exists() else ""
 
 
 def wait_for(path: Path, needles: list[str], timeout: float) -> str | None:
@@ -79,7 +91,8 @@ def wait_for(path: Path, needles: list[str], timeout: float) -> str | None:
 
 
 class Machine:
-    def __init__(self, name: str, esp: Path, vars_file: Path, keep_screens: bool, extra: list[str] | None = None):
+    def __init__(self, name: str, esp: Path | None, vars_file: Path, keep_screens: bool, extra: list[str] | None = None, disk: Path | None = None,
+                 device: list[str] | None = None, machine: str = "q35,smm=on"):
         self.name = name
         self.serial = WORK / f"{name}.serial.log"
         self.keep_screens = keep_screens
@@ -89,15 +102,16 @@ class Machine:
         port = free_port()
         args = [
             str(QEMU), "-name", f"USOS-SB-{name}",
-            "-machine", "q35,smm=on", "-accel", "tcg,thread=multi", "-cpu", "max", "-m", "2048", "-smp", "2",
+            "-machine", machine, "-accel", "tcg,thread=multi", "-cpu", "max", "-m", "2048", "-smp", "2",
             "-global", "driver=cfi.pflash01,property=secure,value=on",
             "-drive", f"if=pflash,format=raw,unit=0,readonly=on,file={(CACHE / 'OVMF_CODE.secboot.fd').as_posix()}",
             "-drive", f"if=pflash,format=raw,unit=1,file={vars_file.as_posix()}",
             "-nic", "none", "-display", "none", "-vga", "std",
             "-monitor", f"tcp:127.0.0.1:{port},server=on,wait=off",
             "-serial", f"file:{self.serial.as_posix()}",
-            "-drive", f"if=none,id=esp,format=raw,snapshot=on,file=fat:{esp.as_posix()}",
-            "-device", "ide-hd,bus=ide.0,drive=esp,bootindex=1",
+            *(["-drive", f"if=none,id=esp,format=vpc,file={disk.as_posix()}"] if disk is not None
+              else ["-drive", f"if=none,id=esp,format=raw,snapshot=on,file=fat:{esp.as_posix()}"]),
+            *(device or ["-device", "ide-hd,bus=ide.0,drive=esp,bootindex=1"]),
             *(extra or []),
         ]
         self.stderr = open(WORK / f"{name}.qemu.stderr.log", "wb")
@@ -670,10 +684,248 @@ def scenario_touch(args, enrolled: Path, failures: list[str]) -> None:
            "touch: touch_driver=off keeps the driver unloaded on RC71L", failures)
 
 
+DRIVER_ASSETS = ROOT / "zig-out" / "test-assets" / "uefi-drivers"
+NEW_TEST_DISK = ROOT / "tools" / "tests" / "uefi_drivers" / "new_test_disk.ps1"
+LONG_FOLDER = "L" + "ong driver folder name" * 5  # > 96 bytes: no toggle key
+UNICODE_FOLDER = "K Zażółć ünïcode"
+
+
+def drivers_data(name: str, hang: bool) -> Path:
+    """DATA tree with Drivers\\UEFI test drivers (MOK-signed unless the
+    folder says unsigned)."""
+    data = WORK / f"data-{name}"
+    if data.exists():
+        shutil.rmtree(data)
+    uefi = data / "Drivers" / "UEFI"
+    signed_dir = WORK / "signed-drivers"
+    signed_dir.mkdir(parents=True, exist_ok=True)
+
+    def signed(fixture: str) -> Path:
+        out = signed_dir / f"{fixture}.efi"
+        efisign("sign", "-in", str(DRIVER_ASSETS / f"{fixture}.efi"), "-out", str(out))
+        return out
+
+    def put(folder: str, source: Path, ini: str | None = None) -> None:
+        target = uefi / folder
+        target.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target / source.name)
+        if ini is not None:
+            (target / "driver.ini").write_text(ini, encoding="utf-8", newline="")
+
+    put("A Everywhere Signed", signed("test-driver-a"))
+    put("B Unsigned", DRIVER_ASSETS / "test-driver-b.efi")
+    put("C Match QEMU", signed("test-driver-c"), "[driver]\r\nname=QEMU match\r\ntype=input\r\nthis line is junk\r\n[match]\r\nsmbios_manufacturer=qemu\r\n")
+    put("D No Match", signed("test-driver-d"), "[driver]\nname=No match\ntype=storage\n[match]\nsmbios_baseboard=NoSuchBoard\n")
+    put("E Or PCI ACPI", signed("test-driver-e"), "[driver]\nname=PCI and ACPI\n[match]\nsmbios_baseboard=NoSuchBoard\n[match]\npci=8086:29C0\nacpi_hid=PNP0A08\n")
+    put("F Binding", signed("test-driver-binding"), "[driver]\nname=Binding test\ntype=storage\n")
+    put("G Off In Ini", DRIVER_ASSETS / "test-driver-c.efi", "[driver]\nload=off\n")
+    put("H Duplicate", signed("test-driver-a"))
+    put("I IA32", DRIVER_ASSETS / "test-driver-ia32.efi")
+    put("J Application", ROOT / "zig-out" / "test-assets" / "direct-efi-validation.efi")
+    put(UNICODE_FOLDER, signed("test-driver-f"))
+    put(LONG_FOLDER, signed("test-driver-g"))
+    shutil.copyfile(DRIVER_ASSETS / "test-driver-e.efi", uefi / "loose.efi")
+    if hang:
+        put("Z Hang", DRIVER_ASSETS / "test-driver-hang.efi")
+    return data
+
+
+def driver_disk(name: str, hang: bool = False, settings: str | None = None) -> Path:
+    esp = esp_tree(f"drivers-{name}", USB / "EFI" / "BOOT" / "grubx64.efi")
+    shutil.copytree(USB / "UI", esp / "UI", dirs_exist_ok=True)
+    if settings is not None:
+        (esp / "EFI" / "USOS" / "usos-settings.ini").write_text(settings, newline="")
+    vhd = WORK / f"drivers-{name}.vhd"
+    subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(NEW_TEST_DISK),
+                    "-Vhd", str(vhd), "-EspSource", str(esp), "-DataSource", str(drivers_data(name, hang))], check=True)
+    return vhd
+
+
+def drivers_report(text: str) -> str:
+    start = text.rfind("[DRIVERS_REPORT BEGIN]")
+    end = text.find("[DRIVERS_REPORT END]", start)
+    return text[start:end] if start >= 0 and end > start else ""
+
+
+def driver_block(report: str, folder: str) -> str:
+    start = report.find(f'- folder="{folder}"')
+    if start < 0:
+        return ""
+    end = report.find("\n- folder=", start + 1)
+    return report[start:end if end > 0 else len(report)]
+
+
+def drivers_boot(args, name: str, vars_file: Path, disk: Path, needles: list[str], timeout: float = 300, page: bool = False) -> str:
+    machine = Machine(name, None, vars_file, args.keep_screens, disk=disk)
+    try:
+        wait_for(machine.serial, needles, timeout)
+        time.sleep(3)
+        machine.shot("menu")
+        if page:
+            # Home: Windows -> down, down = Utilities; Tools row 1 = Drivers.
+            machine.keys("down", "down", "ret", pause=1.5)
+            time.sleep(2)
+            # The test disk has no Utilities: dismiss the one-time notice.
+            machine.keys("ret", pause=1.5)
+            time.sleep(1)
+            machine.shot("tools")
+            machine.keys("down", "ret", pause=1.5)
+            time.sleep(3)
+            machine.shot("drivers-page")
+            machine.keys("down", "down", pause=1.0)
+            time.sleep(1)
+            machine.shot("drivers-page-user")
+            machine.keys("down", "down", "down", "down", "down", "down", pause=0.8)
+            time.sleep(1)
+            machine.shot("drivers-page-refused")
+    finally:
+        machine.stop()
+    return serial_text(machine.serial)
+
+
+def check_common(label: str, report: str, text: str, failures: list[str]) -> None:
+    expect("USOS MANUAL FLOW BOOT PASS" in text and "[DRIVERS_REPORT BEGIN]" in text, f"{label}: the menu starts and writes drivers.txt", failures)
+    expect("scan=listed drivers=12" in report, f"{label}: 12 driver folders listed", failures)
+    expect("ignored_files=1" in report, f"{label}: a loose .efi directly in Drivers\\UEFI is ignored", failures)
+    c = driver_block(report, "C Match QEMU")
+    expect("match=matched [match] #1 of 1" in c and "type=input" in c and "ignored_lines=1" in c and "result=started" in c,
+           f"{label}: smbios_manufacturer=qemu (prefix, case-insensitive) matches; a junk line is ignored", failures)
+    d = driver_block(report, "D No Match")
+    expect("decision=skipped (no [match] section matches this computer)" in d and "[TEST_DRIVER] D entry" not in text,
+           f"{label}: a non-matching [match] keeps the driver unloaded", failures)
+    e = driver_block(report, "E Or PCI ACPI")
+    expect("match=matched [match] #2 of 2" in e and "result=started" in e,
+           f"{label}: [match] sections are OR'ed; pci=8086:29C0 + acpi_hid=PNP0A08 (EisaId in the Q35 DSDT) match", failures)
+    g = driver_block(report, "G Off In Ini")
+    expect("decision=skipped (load=off in driver.ini)" in g, f"{label}: load=off in driver.ini", failures)
+    h = driver_block(report, "H Duplicate")
+    expect('duplicate_of="A Everywhere Signed"' in h or "setting=off" in driver_block(report, "A Everywhere Signed"),
+           f"{label}: an identical second copy is skipped as a duplicate", failures)
+    i = driver_block(report, "I IA32")
+    expect("wrong architecture (ia32" in i and "decision=skipped (not an x64 EFI driver)" in i and "[TEST_DRIVER] IA32" not in text,
+           f"{label}: an ia32 driver is refused before loading", failures)
+    j = driver_block(report, "J Application")
+    expect("image=EFI application" in j and "decision=skipped (not an x64 EFI driver)" in j and "DIRECT EFI VALIDATION PASS" not in text,
+           f"{label}: an EFI application is refused (not a driver)", failures)
+    f = driver_block(report, "F Binding")
+    expect("result=started" in f and "driver_bindings=1" in f and "[TEST_DRIVER] BINDING binding installed" in text,
+           f"{label}: a Driver Binding driver starts; controllers are connected with it (Supported refuses, no crash)", failures)
+    k = driver_block(report, UNICODE_FOLDER)
+    expect("result=started" in k and "[TEST_DRIVER] F entry" in text, f"{label}: a non-ASCII folder name loads", failures)
+    long = driver_block(report, LONG_FOLDER)
+    expect("result=started" in long, f"{label}: a long folder name loads (no toggle key)", failures)
+
+
+def scenario_drivers(args, failures: list[str]) -> None:
+    """User UEFI drivers (DATA\\Drivers\\UEFI) with Secure Boot on and off,
+    the Tools -> Drivers setting and the hang guard."""
+    der = (USB / "EFI" / "USOS" / CERT_NAME).read_bytes()
+    mok = [{"name": "MokList", "guid": SHIM_GUID, "attr": 3, "data": x509_list(der).hex()}]
+    try:
+        vars_on = seeded_vars("drivers-on", mok)
+        vars_off = seeded_vars("drivers-off", mok, set_false=["SecureBootEnable"])
+        vars_hang = seeded_vars("drivers-hang", mok, set_false=["SecureBootEnable"])
+    except (subprocess.CalledProcessError, FileNotFoundError, ModuleNotFoundError) as error:
+        expect(False, f"drivers: could not prepare NVRAM ({error})", failures)
+        return
+    done = ["[DRIVERS_REPORT END]", "Verification failed", "Security Violation"]
+
+    text = drivers_boot(args, "drivers-sb-on", vars_on, driver_disk("sb-on"), done, page=True)
+    report = drivers_report(text)
+    print("[INFO] drivers-sb-on report:\n" + report[:6000])
+    expect("[SECURE_BOOT] state=on" in text and "secure_boot=on" in report, "drivers: USOS runs under Secure Boot (MOK seeded)", failures)
+    check_common("drivers SB on", report, text, failures)
+    a = driver_block(report, "A Everywhere Signed")
+    expect("match=every computer (no [match] section)" in a and "secure_boot=on: signature verified" in a and "result=started" in a
+           and "[TEST_DRIVER] A entry" in text, "drivers SB on: a MOK-signed driver without [match] is verified and started", failures)
+    b = driver_block(report, "B Unsigned")
+    expect("requires Secure Boot off or a signature" in b and "[TEST_DRIVER] B entry" not in text,
+           "drivers SB on: an unsigned driver is skipped (requires Secure Boot off or a signature)", failures)
+
+    text = drivers_boot(args, "drivers-sb-off", vars_off, driver_disk("sb-off"), done)
+    report = drivers_report(text)
+    expect("[SECURE_BOOT] state=off" in text, "drivers: Secure Boot off", failures)
+    check_common("drivers SB off", report, text, failures)
+    b = driver_block(report, "B Unsigned")
+    expect("secure_boot=off (loaded without a signature check)" in b and "result=started" in b and "[TEST_DRIVER] B entry" in text,
+           "drivers SB off: the unsigned driver loads normally", failures)
+
+    # Hang guard: "Z Hang" never returns; the watchdog resets the machine and
+    # the next start blocks it. "A" is switched off like the page's toggle.
+    settings = "[ui]\r\nlanguage=en\r\ndriver.A Everywhere Signed=off\r\n"
+    disk = driver_disk("hang", hang=True, settings=settings)
+    machine = Machine("drivers-hang", None, vars_hang, args.keep_screens, disk=disk)
+    try:
+        first = wait_for(machine.serial, ["[TEST_DRIVER] HANG entry"], 300)
+        expect(first is not None, "drivers hang: the hanging driver was entered", failures)
+        deadline = time.time() + 400
+        while time.time() < deadline:
+            current = serial_text(machine.serial)
+            if current.count("USOS MANUAL FLOW BOOT PASS") >= 2 and current.rfind("[DRIVERS_REPORT END]") > current.rfind("USOS MANUAL FLOW BOOT PASS"):
+                break
+            time.sleep(2)
+        time.sleep(3)
+        machine.shot("after-hang")
+    finally:
+        machine.stop()
+    text = serial_text(machine.serial)
+    report = drivers_report(text)
+    print("[INFO] drivers-hang report (second start):\n" + report[:3000])
+    expect(text.count("USOS MANUAL FLOW BOOT PASS") >= 2, "drivers hang: the watchdog reset the machine and USOS started again", failures)
+    expect('guard: the previous start stopped inside driver "Z Hang" -> blocked' in report, "drivers hang: the guard names the driver", failures)
+    z = driver_block(report, "Z Hang")
+    expect("setting=blocked" in z and "blocked: the menu stopped" in z and "[TEST_DRIVER] HANG entry" not in text[text.rfind("USOS MANUAL FLOW BOOT PASS"):],
+           "drivers hang: the hanging driver is blocked on the next start", failures)
+    a = driver_block(report, "A Everywhere Signed")
+    expect("setting=off" in a and "decision=skipped (turned off on Tools -> Drivers)" in a,
+           "drivers: driver.<folder>=off in usos-settings.ini (the Tools -> Drivers toggle) keeps it unloaded", failures)
+
+
+CONTROLLERS = {
+    "ahci": ("q35,smm=on", ["-device", "ide-hd,bus=ide.0,drive=esp,bootindex=1"]),
+    "ide": ("pc,smm=on", ["-device", "ide-hd,bus=ide.0,drive=esp,bootindex=1"]),
+    "nvme": ("q35,smm=on", ["-device", "nvme,serial=USOSTEST,drive=esp,bootindex=1"]),
+    "virtio-blk": ("q35,smm=on", ["-device", "virtio-blk-pci,drive=esp,bootindex=1"]),
+    "virtio-scsi": ("q35,smm=on", ["-device", "virtio-scsi-pci,id=scsi", "-device", "scsi-hd,bus=scsi.0,drive=esp,bootindex=1"]),
+    "xhci": ("q35,smm=on", ["-device", "qemu-xhci,id=xhci", "-device", "usb-storage,bus=xhci.0,drive=esp,removable=on,bootindex=1"]),
+    "ehci": ("q35,smm=on", ["-device", "usb-ehci,id=ehci", "-device", "usb-storage,bus=ehci.0,drive=esp,removable=on,bootindex=1"]),
+}
+
+
+def scenario_matrix(args, failures: list[str]) -> None:
+    """One USOS test disk (Drivers\\UEFI test drivers on DATA) behind every
+    storage/USB controller QEMU offers; Secure Boot off (shim still loads
+    USOS). The menu must read DATA through that controller and start the
+    user drivers each time."""
+    der = (USB / "EFI" / "USOS" / CERT_NAME).read_bytes()
+    mok = [{"name": "MokList", "guid": SHIM_GUID, "attr": 3, "data": x509_list(der).hex()}]
+    disk = driver_disk("matrix")
+    for name, (machine_type, device) in CONTROLLERS.items():
+        try:
+            vars_file = seeded_vars(f"matrix-{name}", mok, set_false=["SecureBootEnable"])
+        except (subprocess.CalledProcessError, FileNotFoundError, ModuleNotFoundError) as error:
+            expect(False, f"matrix {name}: could not prepare NVRAM ({error})", failures)
+            continue
+        copy = WORK / f"drivers-matrix-{name}.vhd"
+        shutil.copyfile(disk, copy)
+        machine = Machine(f"matrix-{name}", None, vars_file, args.keep_screens, disk=copy, device=device, machine=machine_type)
+        try:
+            wait_for(machine.serial, ["[DRIVERS_REPORT END]", "Verification failed"], 420)
+            time.sleep(2)
+            machine.shot("menu")
+        finally:
+            machine.stop()
+        text = serial_text(machine.serial)
+        report = drivers_report(text)
+        ok = ("USOS MANUAL FLOW BOOT PASS" in text and "scan=listed drivers=12" in report
+              and "result=started" in driver_block(report, "A Everywhere Signed") and "[TEST_DRIVER] A entry" in text)
+        expect(ok, f"matrix {name}: USOS boots, reads DATA\\Drivers\\UEFI through the controller and starts the user drivers", failures)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--keep-screens", action="store_true")
-    parser.add_argument("--only", choices=["unsigned", "enroll", "probe", "timeout", "repeat", "helper", "noauth", "wait", "direct", "touch"], default=None)
+    parser.add_argument("--only", choices=["unsigned", "enroll", "probe", "timeout", "repeat", "helper", "noauth", "wait", "direct", "touch", "drivers", "matrix"], default=None)
     args = parser.parse_args()
     subprocess.run([sys.executable, str(Path(__file__).with_name("fetch_ovmf_secboot.py"))], check=True)
     WORK.mkdir(parents=True, exist_ok=True)
@@ -694,6 +946,10 @@ def main() -> int:
         scenario_wait(args, failures)
     if args.only in (None, "direct"):
         scenario_direct(args, failures)
+    if args.only in (None, "drivers"):
+        scenario_drivers(args, failures)
+    if args.only in (None, "matrix"):
+        scenario_matrix(args, failures)
     if args.only in (None, "enroll", "probe", "touch"):
         enrolled = scenario_enroll(args, failures)
         if args.only is None:

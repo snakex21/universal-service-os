@@ -29,6 +29,7 @@ pub fn build(b: *std.Build) void {
     const e2e_base = addPrepareE2eBase(b, ntfs_driver, manual_image, micro_linux);
     _ = addPrepareE2eOverlay(b, e2e_base);
     addDirectEfiValidationFixture(b, optimize);
+    addUefiDriverFixtures(b, optimize);
     addQemuX86TestImage(b, optimize);
     addQemuAarch64TestImage(b, optimize);
 }
@@ -635,6 +636,48 @@ fn addDirectEfiValidationFixture(b: *std.Build, optimize: std.builtin.OptimizeMo
     const install_fixture = b.addInstallFile(fixture.getEmittedBin(), "test-assets/direct-efi-validation.efi");
     const step = b.step("direct-efi-validation-fixture", "Build the EFI payload used to validate Direct EFI LoadImage/StartImage");
     step.dependOn(&install_fixture.step);
+}
+
+/// Test EFI drivers for DATA\Drivers\UEFI (tools/tests/uefi_drivers):
+/// x64 ok/binding/hang variants with distinct labels (so no two share
+/// bytes) and an ia32 build as the wrong-architecture sample.
+fn addUefiDriverFixtures(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
+    const step = b.step("uefi-driver-fixtures", "Build the test EFI drivers used by tools/tests/uefi_drivers");
+    const Variant = struct { name: []const u8, label: []const u8, variant: []const u8, arch: std.Target.Cpu.Arch };
+    const variants = [_]Variant{
+        .{ .name = "test-driver-a", .label = "A", .variant = "ok", .arch = .x86_64 },
+        .{ .name = "test-driver-b", .label = "B", .variant = "ok", .arch = .x86_64 },
+        .{ .name = "test-driver-c", .label = "C", .variant = "ok", .arch = .x86_64 },
+        .{ .name = "test-driver-d", .label = "D", .variant = "ok", .arch = .x86_64 },
+        .{ .name = "test-driver-e", .label = "E", .variant = "ok", .arch = .x86_64 },
+        .{ .name = "test-driver-f", .label = "F", .variant = "ok", .arch = .x86_64 },
+        .{ .name = "test-driver-g", .label = "G", .variant = "ok", .arch = .x86_64 },
+        .{ .name = "test-driver-binding", .label = "BINDING", .variant = "binding", .arch = .x86_64 },
+        .{ .name = "test-driver-hang", .label = "HANG", .variant = "hang", .arch = .x86_64 },
+        .{ .name = "test-driver-ia32", .label = "IA32", .variant = "ok", .arch = .x86 },
+    };
+    for (variants) |v| {
+        const target = b.resolveTargetQuery(.{ .cpu_arch = v.arch, .os_tag = .uefi });
+        const serial_module = b.createModule(.{
+            .root_source_file = b.path("src/platform/uefi/serial.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+        const opts = b.addOptions();
+        opts.addOption([]const u8, "label", v.label);
+        opts.addOption([]const u8, "variant", v.variant);
+        const module = b.createModule(.{
+            .root_source_file = b.path("tools/tests/fixtures/uefi_driver/test_driver_main.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+        module.addImport("serial", serial_module);
+        module.addOptions("options", opts);
+        const exe = b.addExecutable(.{ .name = v.name, .root_module = module });
+        exe.subsystem = .efi_boot_service_driver;
+        const install = b.addInstallFile(exe.getEmittedBin(), b.fmt("test-assets/uefi-drivers/{s}.efi", .{v.name}));
+        step.dependOn(&install.step);
+    }
 }
 
 fn addQemuX86TestImage(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
