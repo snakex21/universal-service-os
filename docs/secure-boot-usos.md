@@ -221,17 +221,83 @@ manager) or Secure Boot off.
 
 ## First boot on a Secure Boot machine (ROG Ally)
 
-1. Boot the stick. shim shows "Verification failed: (0x1A) Security
-   Violation"; press Enter.
-2. MokManager: press a key within 10 s, choose **Enroll key from disk**.
-3. Choose the USOS ESP, then `EFI` -> `USOS` ->
-   `ENROLL_THIS_KEY_IN_MOKMANAGER.cer`.
-4. **Continue** -> **Yes** -> **Reboot**. USOS now starts with Secure Boot on.
+Two ways to enroll the key (both in `EFI\USOS\ENROLL-README.txt`; the
+installer shows the same instructions after an install, update or repair).
 
-The installer shows the same instructions after a successful install, update
-or repair, and the stick carries `EFI\USOS\ENROLL-README.txt`. On the Ally,
-MokManager needs keyboard input; attach a USB keyboard if the built-in
-controls do not move the selection.
+**Method A: prepare it in Windows** (the `mokutil --import` equivalent,
+recommended for handhelds). In Windows on that computer, the installer's
+Secure Boot note has "Prepare key enrollment on this computer" ("Przygotuj
+rejestrację klucza na tym komputerze"). It writes two shim variables
+(vendor GUID `605dab50-e046-4300-abb6-3dd810dd8b23`, attributes
+NV|BS|RT = 7) with `SetFirmwareEnvironmentVariableExW` after enabling
+`SeSystemEnvironmentPrivilege`:
+
+- `MokNew`: one `EFI_SIGNATURE_LIST`, type `EFI_CERT_X509_GUID`
+  (`a5c059a1-94e4-4aa7-87b5-ab155c2bf072`), `SignatureListSize` =
+  28 + 16 + DER length, header size 0, `SignatureSize` = 16 + DER length,
+  owner = the shim GUID, then the DER certificate (exactly what
+  `mokutil --import` builds in `issue_mok_request`).
+- `MokAuth`: mokutil's packed `pw_crypt_t` (172 bytes): `u16 method` = 4
+  (SHA512_BASED), `u64 iter_count` = 5000, `u16 salt_size` = 16,
+  `salt[32]` (16 chars of `[./0-9A-Za-z]`), `hash[128]` = the raw 64-byte
+  SHA-512-crypt (`$6$`) digest of the ASCII password. MokManager
+  (`store_keys` -> `match_password` -> `password_crypt`) recomputes it from
+  the typed password.
+
+On the next start of the stick shim's `import_mok_state` ->
+`check_mok_request` sees `MokNew` and starts MokManager before the second
+stage, so there is no "Verification failed" dialog first. MokManager deletes
+`MokNew` as soon as it reads it and `MokAuth` when it exits, so the request is
+single-use: if the 10 s countdown passes, run the helper again. The user
+presses one key, **Enroll MOK** -> **Continue** -> **Yes**, types the
+password (a USB keyboard is needed: MokManager takes printable characters
+only, which a handheld's pad cannot produce), then **Reboot**. The helper
+does not change anything else (no MokTimeout, no Boot#### entries).
+
+**Method B: from the stick.** Boot the stick; shim shows "Verification
+failed: (0x1A) Security Violation"; tap Enter once; MokManager's 10 s
+countdown; any key; **Enroll key from disk** -> USOS ESP -> `EFI` -> `USOS`
+-> `ENROLL_THIS_KEY_IN_MOKMANAGER.cer` -> **Continue** -> **Yes** ->
+**Reboot**. No password, so arrows and Enter (D-pad and A) are enough.
+
+### Why the Ally went straight to Windows (2026-09-24)
+
+User report: Secure Boot on, the blue "Verification failed (0x1A)" dialog,
+OK, then Windows 11 at once; no MokManager, no countdown. Checked:
+
+- The stick has exactly the vendored files: `BOOTX64.EFI` = shim 16.1-7
+  (`351e131d...`), `\EFI\BOOT\mmx64.efi` = MokManager from the same RPM
+  (`ed4442fa...`), `grubx64.efi` = the release USOS (`57994856...`), same as
+  `zig-out/usb`. No `fbx64.efi`, so `should_use_fallback()` is false.
+- shim 16.1 `init_grub()`: `start_image(second_stage)`; on
+  `EFI_SECURITY_VIOLATION`/`EFI_ACCESS_DENIED` it runs
+  `start_image(MOK_MANAGER)` (`\mmx64.efi` joined to shim's own directory,
+  the same path logic that found `grubx64.efi`), then retries the second
+  stage once. If that fails again shim prints `start_image() returned
+  Security Policy Violation`, waits 2 s and returns; the firmware then boots
+  the next boot option (Windows Boot Manager).
+- MokManager without a pending request shows a 10 s countdown
+  (`console_countdown`, `WaitForKey`); any key opens the menu whose first
+  item is **Continue boot**.
+- QEMU with these exact files (`run_qemu_secure_boot.py --only timeout`):
+  one Enter -> countdown shown -> after 10 s a second "Verification failed"
+  -> shim gives up. The Fedora-signed MokManager loads fine under shim's
+  vendor certificate.
+- QEMU with four Enter presses 120 ms apart (`--only repeat`, what a held
+  button or keyboard auto-repeat produces): dialog dismissed, countdown
+  skipped by the 2nd key, **Continue boot** chosen by the 3rd, the second
+  refusal dismissed by the 4th, shim returns and OVMF moves on. On screen it
+  looks exactly like the Ally report. The Ally's pad reaches the firmware as
+  a USB keyboard (ASUS MCU `0b05:1abe`, HID boot keyboard bound by AMI's
+  driver, see `artifacts/ally-logs/input-devices.txt`), with the firmware's
+  typematic repeat.
+
+Most likely cause: repeated/held key events from the pad's keyboard
+emulation. Not proven on the hardware; other causes that would also end in
+Windows (MokManager failing to load, e.g. a dbx entry for the Fedora signer)
+would show a second "Verification failed" or a `start_image() returned`
+line for 2 s. Method A avoids the dialog entirely; method B works when the
+first key is a short tap.
 
 ## QEMU verification
 

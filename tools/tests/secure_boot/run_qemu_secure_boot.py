@@ -219,6 +219,121 @@ def scenario_enroll(args, failures: list[str]) -> Path:
     return vars_file
 
 
+def scenario_timeout(args, failures: list[str]) -> None:
+    """One OK press, then nothing: MokManager's 10 s countdown must be shown,
+    and after it expires shim retries grubx64.efi and gives up."""
+    esp = esp_tree("timeout", USB / "EFI" / "BOOT" / "grubx64.efi")
+    machine = Machine("timeout", esp, fresh_vars("timeout"), args.keep_screens)
+    try:
+        hit = wait_for(machine.serial, ["Verification failed", "Security Violation"], 180)
+        expect(hit is not None, "timeout: shim refuses the not-yet-enrolled USOS", failures)
+        time.sleep(2)
+        machine.keys("ret", pause=0.5)
+        countdown = wait_for(machine.serial, ["Press any key to perform MOK management"], 30)
+        time.sleep(1)
+        machine.shot("countdown")
+        expect(countdown is not None, "timeout: MokManager shows its countdown after OK", failures)
+        time.sleep(14)
+        machine.shot("after-countdown")
+        text = serial_text(machine.serial)
+        expect(text.count("Verification failed") >= 2 or text.count("Security Violation") >= 2,
+               "timeout: after the countdown shim retries grubx64.efi (second refusal)", failures)
+    finally:
+        machine.stop()
+
+
+def scenario_repeat(args, failures: list[str]) -> None:
+    """A burst of Enter keys (a held button / typematic repeat from a
+    handheld's keyboard emulation): the first dismisses the dialog, the next
+    ones skip the countdown, pick "Continue boot" and dismiss the second
+    refusal, so shim exits back to the firmware without MokManager being
+    visible. Informational: shows why a single held A press can look like
+    "no MokManager at all"."""
+    esp = esp_tree("repeat", USB / "EFI" / "BOOT" / "grubx64.efi")
+    machine = Machine("repeat", esp, fresh_vars("repeat"), args.keep_screens)
+    try:
+        hit = wait_for(machine.serial, ["Verification failed", "Security Violation"], 180)
+        expect(hit is not None, "repeat: shim refuses the not-yet-enrolled USOS", failures)
+        time.sleep(2)
+        for _ in range(4):
+            machine.keys("ret", pause=0.12)
+        time.sleep(8)
+        machine.shot("after-burst")
+        text = serial_text(machine.serial)
+        refusals = max(text.count("Verification failed"), text.count("Security Violation"))
+        print(f"[INFO] repeat: refusals={refusals} countdown_seen={'Press any key to perform MOK management' in text} "
+              f"start_image_returned={'start_image() returned' in text}")
+    finally:
+        machine.stop()
+
+
+def mok_request_vars(name: str, password: str) -> Path:
+    """Fresh Microsoft-keys NVRAM plus MokNew/MokAuth exactly as the Windows
+    installer's enrollment helper writes them (bytes from the Go code)."""
+    out = WORK / f"mok-request-{name}"
+    if out.exists():
+        shutil.rmtree(out)
+    out.mkdir(parents=True)
+    efisign("mok-request", "-cert", str(USB / "EFI" / "USOS" / CERT_NAME), "-password", password, "-out", str(out))
+    variables = []
+    for var in ("MokNew", "MokAuth"):
+        data = (out / f"{var}.bin").read_bytes()
+        variables.append({"name": var, "guid": "605dab50-e046-4300-abb6-3dd810dd8b23", "attr": 7, "data": data.hex()})
+    import json
+    spec = out / "vars.json"
+    spec.write_text(json.dumps({"version": 2, "variables": variables}))
+    vars_file = WORK / f"vars-{name}.fd"
+    env = dict(**__import__("os").environ)
+    env["PYTHONPATH"] = str(CACHE / "pylib")
+    subprocess.run([sys.executable, "-m", "virt.firmware.vars", "-i", str(CACHE / "OVMF_VARS.secboot.fd"),
+                    "--set-json", str(spec), "-o", str(vars_file)], check=True, env=env,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return vars_file
+
+
+# MokManager with a pending MokNew (no "Verification failed" first):
+#   10 s countdown                                  -> Space
+#   Continue boot / Enroll MOK / Enroll key from disk / Enroll hash  -> Down, Enter
+#   [Enroll MOK] View key 0 / Continue              -> Down, Enter
+#   Enroll the key(s)? No / Yes                     -> Down, Enter
+#   Password:                                       -> u s o s Enter
+#   Perform MOK management: Reboot                  -> Enter
+HELPER_KEYS = [["spc"], ["down", "ret"], ["down", "ret"], ["down", "ret"], ["u", "s", "o", "s", "ret"], ["ret"]]
+HELPER_LABELS = ["mok-management", "enroll-mok", "enroll-question", "password", "enrolled", "reboot"]
+
+
+def scenario_helper(args, failures: list[str]) -> None:
+    """The Windows helper's MokNew/MokAuth: MokManager opens by itself on the
+    next boot, the password enrolls the key and USOS then starts."""
+    try:
+        vars_file = mok_request_vars("helper", "usos")
+    except (subprocess.CalledProcessError, FileNotFoundError, ModuleNotFoundError) as error:
+        expect(False, f"helper: could not prepare MokNew/MokAuth NVRAM ({error})", failures)
+        return
+    esp = esp_tree("helper", USB / "EFI" / "BOOT" / "grubx64.efi")
+    machine = Machine("helper", esp, vars_file, args.keep_screens)
+    try:
+        hit = wait_for(machine.serial, ["Press any key to perform MOK management", "Verification failed", "USOS MANUAL FLOW BOOT PASS"], 180)
+        expect(hit == "Press any key to perform MOK management",
+               "helper: pending MokNew opens MokManager directly (before any verification failure)", failures)
+        time.sleep(1)
+        machine.shot("countdown")
+        for keys, label in zip(HELPER_KEYS, HELPER_LABELS):
+            machine.keys(*keys, pause=0.6)
+            time.sleep(1.5)
+            if label != "reboot":
+                machine.shot(label)
+        started = wait_for(machine.serial, ["[SECURE_BOOT] state="], 240)
+        time.sleep(4)
+        machine.shot("usos-after-helper")
+        text = serial_text(machine.serial)
+        expect(started is not None and "USOS MANUAL FLOW BOOT PASS" in text,
+               "helper: after the password the MOK-signed USOS starts", failures)
+        expect("Password doesn't match" not in text, "helper: MokManager accepted the helper's MokAuth password hash", failures)
+    finally:
+        machine.stop()
+
+
 def scenario_unsigned_after_mok(args, vars_file: Path, failures: list[str]) -> None:
     copy = WORK / "vars-unsigned-mok.fd"
     shutil.copyfile(vars_file, copy)
@@ -282,7 +397,7 @@ def scenario_probe(args, vars_file: Path, failures: list[str]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--keep-screens", action="store_true")
-    parser.add_argument("--only", choices=["unsigned", "enroll", "probe"], default=None)
+    parser.add_argument("--only", choices=["unsigned", "enroll", "probe", "timeout", "repeat", "helper"], default=None)
     args = parser.parse_args()
     subprocess.run([sys.executable, str(Path(__file__).with_name("fetch_ovmf_secboot.py"))], check=True)
     WORK.mkdir(parents=True, exist_ok=True)
@@ -291,6 +406,12 @@ def main() -> int:
     failures: list[str] = []
     if args.only in (None, "unsigned"):
         scenario_unsigned(args, failures)
+    if args.only in (None, "timeout"):
+        scenario_timeout(args, failures)
+    if args.only in (None, "repeat"):
+        scenario_repeat(args, failures)
+    if args.only in (None, "helper"):
+        scenario_helper(args, failures)
     if args.only in (None, "enroll", "probe"):
         enrolled = scenario_enroll(args, failures)
         if args.only is None:
