@@ -24,6 +24,10 @@ pub const Layout = struct {
     reloc_size: u32,
     section_table: usize,
     section_count: u16,
+    /// COFF IMAGE_FILE_RELOCS_STRIPPED: the image may only run at its
+    /// preferred base. Without it, an image with no relocation directory is
+    /// position independent (nothing to fix up), as EDK2's loader treats it.
+    relocs_stripped: bool = false,
 };
 
 pub const subsystem_efi_application: u16 = 10;
@@ -64,6 +68,7 @@ pub fn parse(image: []const u8) Error!Layout {
         .reloc_size = try read32(image, opt + 112 + 5 * 8 + 4),
         .section_table = opt + optional_size,
         .section_count = section_count,
+        .relocs_stripped = (try read16(image, pe + 22)) & 0x0001 != 0,
     };
     if (layout.size_of_headers > image.len or layout.size_of_headers > layout.size_of_image) return error.Truncated;
     if (layout.section_table + @as(usize, section_count) * 40 > layout.size_of_headers) return error.BadSection;
@@ -96,7 +101,7 @@ pub fn load(image: []const u8, layout: Layout, destination: []u8, load_address: 
 
 fn relocate(memory: []u8, layout: Layout, delta: u64) Error!void {
     if (layout.reloc_size == 0) {
-        if (delta != 0) return error.BadRelocation;
+        if (delta != 0 and layout.relocs_stripped) return error.BadRelocation;
         return;
     }
     if (@as(u64, layout.reloc_rva) + layout.reloc_size > memory.len) return error.BadRelocation;
@@ -184,6 +189,27 @@ test "rejects truncated or unsupported images" {
     image[0x58] = 0x0b; // PE32 magic 0x10b
     image[0x59] = 0x01;
     try std.testing.expectError(error.UnsupportedFormat, parse(&image));
+}
+
+test "an image without relocations loads anywhere unless RELOCS_STRIPPED" {
+    var image: [0x600]u8 = undefined;
+    testImage(&image);
+    // No relocation directory (position-independent code, e.g. small Zig
+    // or RIP-relative drivers).
+    std.mem.writeInt(u32, image[0x58 + 112 + 40 ..][0..4], 0, .little);
+    std.mem.writeInt(u32, image[0x58 + 112 + 44 ..][0..4], 0, .little);
+    var layout = try parse(&image);
+    try std.testing.expect(!layout.relocs_stripped);
+    var memory: [0x3000]u8 = undefined;
+    try load(&image, layout, &memory, 0x7f00_0000);
+    // Nothing was fixed up.
+    try std.testing.expectEqual(@as(u64, 0x401010), std.mem.readInt(u64, memory[0x1008..][0..8], .little));
+    // IMAGE_FILE_RELOCS_STRIPPED: only the preferred base is allowed.
+    std.mem.writeInt(u16, image[0x40 + 22 ..][0..2], 0x0001, .little);
+    layout = try parse(&image);
+    try std.testing.expect(layout.relocs_stripped);
+    try std.testing.expectError(error.BadRelocation, load(&image, layout, &memory, 0x7f00_0000));
+    try load(&image, layout, &memory, 0x400000);
 }
 
 test "rejects relocation entries outside the image" {

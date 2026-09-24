@@ -846,7 +846,13 @@ fn encodedRecordBytes(code: i8, cluster_bytes: u32) Error!u32 {
 fn nameEqualsAsciiIgnoreCase(actual: []const u16, wanted: []const u16) bool {
     if (actual.len != wanted.len) return false;
     for (actual, wanted) |a, b| {
-        if (a > 0x7f or b > 0x7f) return false;
+        // Non-ASCII units (e.g. "Zażółć" folder names) compare exactly: the
+        // wanted name comes from a directory listing or the user's own
+        // spelling; only ASCII is folded (no $UpCase table here).
+        if (a > 0x7f or b > 0x7f) {
+            if (a != b) return false;
+            continue;
+        }
         if (asciiLower(@intCast(a)) != asciiLower(@intCast(b))) return false;
     }
     return true;
