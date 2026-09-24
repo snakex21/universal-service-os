@@ -340,6 +340,10 @@ def main() -> int:
             "kernel/drivers/usb/storage/usb-storage.ko",
             "kernel/drivers/usb/storage/uas.ko",
             "kernel/drivers/scsi/sd_mod.ko",
+            # virtio_blk/virtio_scsi only bind through the virtio PCI
+            # transport (virtio_pci + virtio_pci_{modern,legacy}_dev, pulled
+            # in by modules.dep); without it QEMU's virtio disks stay invisible.
+            "kernel/drivers/virtio/virtio_pci.ko",
             "kernel/drivers/scsi/virtio_scsi.ko",
             "kernel/drivers/block/virtio_blk.ko",
             "kernel/drivers/block/loop.ko",
@@ -364,6 +368,9 @@ def main() -> int:
             "kernel/drivers/ata/ata_piix.ko",
             "kernel/drivers/ata/sata_promise.ko",
             "kernel/drivers/ata/sata_sil.ko",
+            "kernel/drivers/virtio/virtio_pci.ko",
+            "kernel/drivers/virtio/virtio_pci_modern_dev.ko",
+            "kernel/drivers/virtio/virtio_pci_legacy_dev.ko",
         }
         missing_strategic = sorted(strategic_storage_modules - set(selected_modules))
         if missing_strategic:

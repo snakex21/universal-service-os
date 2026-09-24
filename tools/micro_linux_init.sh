@@ -151,6 +151,9 @@ modprobe sd_mod 2>/dev/null || true
 # initramfs carries the complete libata driver family but loads only drivers
 # matching hardware actually present (e.g. CK804 -> sata_nv).
 load_pci_storage_modules
+# The virtio PCI transport must be present before virtio_blk/virtio_scsi can
+# see QEMU's virtio disks (its PCI alias also matches in the loop above).
+modprobe virtio_pci 2>/dev/null || true
 modprobe virtio_blk 2>/dev/null || true
 modprobe virtio_scsi 2>/dev/null || true
 modprobe loop 2>/dev/null || true
