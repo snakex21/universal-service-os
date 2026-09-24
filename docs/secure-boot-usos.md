@@ -407,6 +407,14 @@ default keys afterwards, and MokList is independent of PK/db. Now:
   `setup_mode_var`, `pk`, `mok_list`, `mok_list_rt`, `mok_list_x`,
   `csm_likely` and `can_save`.
 
+**Confirmed on ASRock X470 hardware 2026-09-24, build B260924-202302**
+(B260924-202302-7ED55EB2): the board was in Setup Mode (no PK). With Secure
+Boot off USOS offered the key, saved it through this path, and with Secure
+Boot then turned on shim started USOS directly, with no MokManager and no
+"Verification failed". The MokManager file-enroll path (Enroll key from
+disk -> USOS_ESP -> USOS-KEY.cer) was confirmed earlier the same day on
+the ROG Ally RC71L.
+
 ### Does "Install default keys" / "Clear keys" remove the USOS key?
 
 Normally not. AMI's "Install default Secure Boot keys"/"Restore Factory
