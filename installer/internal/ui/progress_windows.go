@@ -264,6 +264,12 @@ func newFinalScreen(f *Flow, op operation, report *install.VerificationReport, e
 	return s
 }
 
+// showMok opens the key enrollment screen; Back rebuilds this report.
+func (s *finalScreen) showMok() {
+	f, op, report, err, log := s.f, s.op, s.report, s.err, s.log.text.String()
+	f.show(newMokScreen(f, func() { f.show(newFinalScreen(f, op, &report, err, log), "final.mok") }), "mok.password")
+}
+
 func (s *finalScreen) texts() (title, status string, ok bool) {
 	ok = s.err == nil && s.report.OK()
 	name := s.op.name()
@@ -297,7 +303,12 @@ func (s *finalScreen) draw(f *Flow, w *win, area rect) {
 	}
 	if ok && s.op != opUninstall {
 		// One-time MokManager enrollment for Secure Boot (docs/secure-boot-usos.md).
-		y += w.banner(body.Left, y, body.w(), i18n.T("installer.secure_boot.enroll_note"), toneAccent) + w.px(16)
+		y += w.banner(body.Left, y, body.w(), i18n.T("installer.secure_boot.enroll_note"), toneAccent) + w.px(10)
+		// Optional: queue the enrollment from Windows so MokManager opens by
+		// itself (for firmware where it does not appear after the failure).
+		spec := buttonSpec{label: i18n.T("installer.mok.button"), glyph: glyphShield, onClick: s.showMok}
+		w.button("final.mok", rect{body.Left, y, body.Left + min(w.buttonWidth(spec), body.w()), y + w.px(buttonHeight)}, spec)
+		y += w.px(buttonHeight) + w.px(16)
 	}
 	toggleRow, rest := rect{body.Left, y, body.Right, body.Bottom}.cutBottom(w.px(32))
 	if s.log.open {

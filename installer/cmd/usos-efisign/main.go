@@ -7,6 +7,7 @@
 //	go run ./cmd/usos-efisign verify -in A [-cert C]
 //	go run ./cmd/usos-efisign hash -in A
 //	go run ./cmd/usos-efisign derive-check -unsigned A -signed B -sbat F
+//	go run ./cmd/usos-efisign mok-request -cert C -password P -out DIR   dump MokNew.bin/MokAuth.bin
 //
 // The private key is read from %APPDATA%\USOS\signing (or USOS_SIGNING_DIR)
 // and never enters the repository.
@@ -43,6 +44,8 @@ func main() {
 		err = release(os.Args[2:])
 	case "derive-check":
 		err = deriveCheck(os.Args[2:])
+	case "mok-request":
+		err = mokRequest(os.Args[2:])
 	default:
 		usage()
 	}
@@ -53,7 +56,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: usos-efisign keygen|sign|verify|hash|release|derive-check [flags]")
+	fmt.Fprintln(os.Stderr, "usage: usos-efisign keygen|sign|verify|hash|release|derive-check|mok-request [flags]")
 	os.Exit(2)
 }
 

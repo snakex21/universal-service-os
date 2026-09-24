@@ -14,6 +14,7 @@ import (
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/installed"
 	"github.com/snakex21/universal-service-os/installer/internal/localupdate"
+	"github.com/snakex21/universal-service-os/installer/internal/mokenroll"
 	"github.com/snakex21/universal-service-os/installer/internal/prefs"
 	"github.com/snakex21/universal-service-os/installer/internal/repair"
 	"github.com/snakex21/universal-service-os/installer/internal/uninstall"
@@ -63,6 +64,9 @@ type Config struct {
 	// VolumeInUse receives the Retry/Cancel prompt the progress screen shows
 	// when a volume of the drive stays locked by another program.
 	VolumeInUse *volumelock.Relay
+	// MokFirmware is the UEFI variable store the "prepare key enrollment"
+	// screen uses; nil means this computer's (mokenroll.System).
+	MokFirmware mokenroll.Firmware
 
 	// Test harness only (cmd/usos-installer-uidemo).
 	ForceDPI         uint32

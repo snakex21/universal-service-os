@@ -56,6 +56,7 @@ func main() {
 		Repair:      engines.repair,
 		Uninstall:   engines.uninstall,
 		VolumeInUse: engines.volumeInUse,
+		MokFirmware: &fakeMokFirmware{vars: map[string][]byte{}},
 		ForceDPI:    uint32(*dpi),
 		ClientW:     int32(*width),
 		ClientH:     int32(*height),
@@ -267,6 +268,32 @@ func tour(d *ui.Driver, e *fakeEngines, dir, suffix string, startupError bool, l
 	close(e.installHold)
 	waitIdle(d)
 	if err := shot("install-final-success"); err != nil {
+		return err
+	}
+	// Secure Boot key enrollment (fake firmware: nothing reaches NVRAM).
+	if err := d.Activate("final.mok"); err != nil {
+		return err
+	}
+	if err := shot("install-mok"); err != nil {
+		return err
+	}
+	d.Focus("mok.password")
+	d.Type(" x")
+	if d.Enabled("action.primary") {
+		return fmt.Errorf("MOK prepare enabled for a password with a space")
+	}
+	if err := shot("install-mok-invalid"); err != nil {
+		return err
+	}
+	d.Type("\b\busos") // valid again whether focus selected the text or not
+	if err := d.Activate("action.primary"); err != nil {
+		return err
+	}
+	waitIdle(d)
+	if err := shot("install-mok-done"); err != nil {
+		return err
+	}
+	if err := d.Activate("action.back"); err != nil {
 		return err
 	}
 

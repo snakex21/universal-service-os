@@ -31,6 +31,11 @@ func main() {
 	prefsPath, _ := prefs.DefaultPath()
 	i18n.SetLanguage(prefs.StartupLanguage(prefsPath))
 
+	// -prepare-mok-enrollment / -check-mok run without the window.
+	if handled, code := runMokCLI(os.Args[1:]); handled {
+		os.Exit(code)
+	}
+
 	if err := run(prefsPath); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
