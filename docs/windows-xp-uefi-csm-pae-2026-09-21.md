@@ -302,3 +302,15 @@ check_xp_driver_imports, check_xp_menu_overlay, check_xp_driver_integration
 (default and --added-source) and check_xp_pae PASS. Deployed with -DriversOnly
 -Language pl after usos-physical-update (backup
 artifacts/xp-pae/deploy-20260924-202244).
+
+## 2026-09-24: rebuild for B260924-200740-5076F5D6 (Secure Boot key gate)
+
+usos-fb-ui changed (boot string table: new Secure Boot guidance strings;
+the XP flow does not show them), so the package was rebuilt in full
+(staging ESP zig-out/xp-staging-20260924-sbgate from zig-out/micro-linux + the
+stick's usos-device.ini, --data L:/). Two builds are byte-identical
+(initramfs-xp 18b7160b...2ea3). compare_xp_packages.py against the deployed
+package (64426a81...): 759 identical, 1 base update (usr/bin/usos-fb-ui), 0
+intended, 0 unexplained (artifacts/xp-pae/compare-20260924-sbgate.log).
+Kernel unchanged (155c0f9f...). Previous package kept in
+artifacts/xp-pae/package-before-20260924-sbgate.
