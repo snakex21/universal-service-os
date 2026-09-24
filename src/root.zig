@@ -51,6 +51,7 @@ pub const image_probe = struct {
     pub const iso9660 = @import("image_probe/iso9660.zig");
     pub const optical_fs = @import("image_probe/optical_fs.zig");
     pub const windows_detect = @import("image_probe/windows_detect.zig");
+    pub const windows_media = @import("image_probe/windows_media.zig");
     pub const pe_loader = @import("image_probe/pe_loader.zig");
 };
 pub const catalog = @import("catalog/root.zig");
@@ -130,6 +131,7 @@ test {
     _ = gui.compositor;
     _ = dos;
     _ = image_probe.probe;
+    _ = image_probe.windows_media;
     _ = windows7_iso;
     _ = @import("windows7_iso_test.zig");
     _ = i18n;

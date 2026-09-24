@@ -564,6 +564,24 @@ else
     SOURCE_MOUNTED=yes
 fi
 
+# Architecture gate before any write: a chainload/ISO preparation on UEFI
+# must have the removable-media loader of this firmware on the source (the
+# 32-bit Windows 10 ISO has only EFI/BOOT/BOOTIA32.EFI). The boot menu blocks
+# such images already; this stops an older or hand-written request too.
+if [ "$SOURCE_MOUNTED" = yes ] && [ -d /sys/firmware/efi ] && [ "${USOS_WINDOWS_BIOS:-no}" != yes ]; then
+    case "$SELECTED_METHOD" in
+        chainload|iso)
+            FW_BITS=$(cat /sys/firmware/efi/fw_platform_size 2>/dev/null || echo 64)
+            FW_LOADER=x64
+            [ "$FW_BITS" != 32 ] || FW_LOADER=ia32
+            [ "$(uname -m)" != aarch64 ] || FW_LOADER=aa64
+            usos_ui_stage 1 5 'Checking the image architecture' "$SELECTED_ISO"
+            SOURCE_CHECK=$(sh /usr/lib/usos/work_boot_relocate.sh source-check /mnt/source "$FW_LOADER" 2>&1) || stop "$(printf '%s' "$SOURCE_CHECK" | sed 's/^\[WORK_BOOT\] STOP: //' | tail -n 1)"
+            printf '%s\n' "$SOURCE_CHECK"
+            ;;
+    esac
+fi
+
 UNATTEND_FILE=''
 if [ -n "$SELECTED_UNATTEND" ] && [ "$SELECTED_UNATTEND" != none ]; then
     UNATTEND_FILE="/mnt/data/$SELECTED_UNATTEND"

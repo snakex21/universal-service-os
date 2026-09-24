@@ -118,6 +118,35 @@ class WorkBootRelocateTest(unittest.TestCase):
         self.assertEqual(['grub.cfg'], names(self.legacy_boot()))
         self.assertIsNone(self.usos_work())
 
+    def test_source_check_accepts_lowercase_x64_loader(self):
+        # Windows ISOs mounted by the Linux udf driver keep their lowercase names.
+        self.write('efi/boot/bootx64.efi', b'bootmgfw')
+        result = run('source-check', self.root)
+        self.assertIn('source loader PASS BOOTX64.EFI', result.stdout)
+        self.write('EFI/Boot/BOOTIA32.EFI')
+        self.assertEqual(0, run('source-check', self.root, 'x64', check=False).returncode)
+
+    def test_source_check_explains_32bit_media_before_copy(self):
+        # pl-pl Windows 10 22H2 x86: only efi/boot/bootia32.efi.
+        self.write('efi/boot/bootia32.efi', b'bootmgfw32')
+        self.write('sources/boot.wim')
+        result = run('source-check', self.root, check=False)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn('32-bit (x86)', result.stderr)
+        self.assertIn('BOOTIA32.EFI', result.stderr)
+        self.assertIn('Nothing was copied', result.stderr)
+        self.assertEqual(0, run('source-check', self.root, 'ia32', check=False).returncode)
+
+    def test_source_check_reports_arm64_and_missing_loader(self):
+        self.write('efi/boot/bootaa64.efi')
+        result = run('source-check', self.root, check=False)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn('ARM64', result.stderr)
+        shutil.rmtree(self.root / 'efi')
+        result = run('source-check', self.root, check=False)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn('no UEFI loader', result.stderr)
+
     def test_assert_rejects_removable_entries(self):
         for entry in ('EFI/BOOT/BOOTX64.EFI', 'efi/Boot/bootia32.efi'):
             with self.subTest(entry=entry):

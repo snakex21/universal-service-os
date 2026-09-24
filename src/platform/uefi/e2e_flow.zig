@@ -104,6 +104,13 @@ pub fn requestPreparation(
     progress: ?ProgressFn,
 ) !void {
     try usos.flow.preparation_capability.validate(system.id, image.kind, method);
+    // Never prepare (copy to WORK) media that cannot start here or that is
+    // not a Windows installer: the menu blocks both, this is the last check
+    // before install-state.ini is written.
+    if (image.media) |info| {
+        if (usos.image_probe.windows_media.block(info, @import("windows_media_probe.zig").firmware()) != null) return error.ImageArchitectureNotSupportedHere;
+        if (info.content == .winpe) return error.NotAWindowsInstaller;
+    }
     const resolved_method = usos.flow.preparation_capability.resolve(system.id, image.kind, method) orelse return error.UnsupportedMethod;
     if (resolved_method == .direct_efi) return error.DirectEfiDoesNotUsePreparation;
 

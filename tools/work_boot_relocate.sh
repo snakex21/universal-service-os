@@ -20,6 +20,11 @@
 #       --require-entry, also require \EFI\USOS-WORK\BOOTX64.EFI.
 #   sh work_boot_relocate.sh check <root>
 #       Like assert, but only prints a WARNING (for volumes USOS never writes).
+#   sh work_boot_relocate.sh source-check <source root> [x64|ia32|aa64]
+#       Before anything is copied: the mounted source (ISO) must carry the
+#       removable-media loader of this firmware (default x64) in EFI/BOOT, any
+#       case. Otherwise stop with what the media has instead (e.g. only
+#       BOOTIA32.EFI: 32-bit Windows, which x64 UEFI cannot start).
 set -eu
 
 say() { printf '[WORK_BOOT] %s\n' "$1"; }
@@ -128,6 +133,28 @@ assert_clean() {
     say "no removable-media entry outside the ESP PASS root=$root"
 }
 
+# Before copying: the source must have EFI/BOOT/BOOT<arch>.EFI (any case).
+source_check() {
+    root=$1
+    want=$(printf '%s' "${2:-x64}" | tr 'A-Z' 'a-z')
+    case "$want" in x64|ia32|aa64) ;; *) die "unknown firmware architecture: $want" ;; esac
+    found=''
+    efi=$(child_ci "$root" efi d)
+    boot=''
+    [ -z "$efi" ] || boot=$(child_ci "$efi" boot d)
+    [ -z "$boot" ] || found=$(entries_in "$boot" | awk '{ n = $0; sub(/.*\//, "", n); printf "%s%s", sep, toupper(n); sep = " " }')
+    if [ -n "$boot" ] && [ -n "$(child_ci "$boot" "boot$want.efi" f)" ]; then
+        say "source loader PASS BOOT$(printf '%s' "$want" | tr 'a-z' 'A-Z').EFI (media has: $found)"
+        return 0
+    fi
+    case "$want:$found" in
+        x64:*BOOTIA32.EFI*) die "the image is 32-bit (x86): its EFI/BOOT has only $found; 64-bit UEFI cannot start it. Use 32-bit UEFI or BIOS mode (CSM), or a 64-bit ISO. Nothing was copied." ;;
+        x64:*BOOTAA64.EFI*) die "the image is for ARM64 (EFI/BOOT: $found); it cannot start on this PC. Nothing was copied." ;;
+        *:) die "the image has no UEFI loader (no EFI/BOOT/BOOT*.EFI); it cannot start in UEFI mode. Nothing was copied." ;;
+        *) die "the image has no BOOT$(printf '%s' "$want" | tr 'a-z' 'A-Z').EFI for this firmware (EFI/BOOT: $found). Nothing was copied." ;;
+    esac
+}
+
 command=${1:-}
 case "$command" in
     relocate) [ "$#" -eq 2 ] || die 'usage: relocate <root>'; relocate "$2" ;;
@@ -138,5 +165,6 @@ case "$command" in
         assert_clean "$2" "$mode"
         ;;
     check) [ "$#" -eq 2 ] || die 'usage: check <root>'; assert_clean "$2" warn ;;
+    source-check) [ "$#" -ge 2 ] || die 'usage: source-check <root> [x64|ia32|aa64]'; source_check "$2" "${3:-x64}" ;;
     *) die "unknown command: $command" ;;
 esac
