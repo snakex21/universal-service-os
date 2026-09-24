@@ -433,6 +433,17 @@ pub fn missingImage(session: *const vbe_probe.Session, title: []const u8, path: 
     notice(session, &ui, .{ .title = title, .icon = .warning, .tone = .warning, .heading = ui.t(.notice_no_image_title), .lines = &lines, .hints = noticeHints(&hints, &ui) });
 }
 
+/// Enter on a system that needs the other firmware mode: say why and how.
+pub fn firmwareMismatch(session: *const vbe_probe.Session, title: []const u8, requires_uefi: bool) void {
+    var ui = boot_ui.menu(session.surface);
+    const lines = [_][]const u8{
+        ui.t(if (requires_uefi) .system_requires_uefi_detail else .system_requires_bios_detail),
+        ui.t(if (requires_uefi) .system_requires_uefi_hint else .system_requires_bios_hint),
+    };
+    var hints: [2]Hint = undefined;
+    notice(session, &ui, .{ .title = title, .icon = .warning, .tone = .warning, .heading = ui.t(if (requires_uefi) .system_requires_uefi else .system_requires_bios), .lines = &lines, .hints = noticeHints(&hints, &ui) });
+}
+
 pub fn manualPowerOff(session: *const vbe_probe.Session) void {
     var ui = boot_ui.menu(session.surface);
     const lines = [_][]const u8{ ui.t(.power_apm_line1), ui.t(.power_apm_line2) };

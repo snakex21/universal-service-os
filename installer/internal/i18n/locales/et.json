@@ -264,6 +264,8 @@
   "boot.system.requires_bios": "Vajab BIOS-i",
   "boot.system.requires_uefi.detail": "See süsteem käivitub ainult UEFI-režiimis; USOS töötab BIOS-režiimis.",
   "boot.system.requires_bios.detail": "See süsteem käivitub ainult BIOS-režiimis; USOS töötab UEFI-režiimis.",
+  "boot.system.requires_uefi.hint": "Kasutamiseks käivitage USB-mälupulk UEFI-režiimis: valige püsivara alglaadimismenüüst selle UEFI kirje.",
+  "boot.system.requires_bios.hint": "Kasutamiseks käivitage USB-mälupulk Legacy BIOS (CSM) režiimis: valige püsivara alglaadimismenüüst selle UEFI-ta kirje.",
   "boot.system.unavailable": "Pole saadaval",
   "boot.system.unavailable.detail": "Ükski töötav käivitustaustsüsteem seda süsteemi veel ei toeta.",
   "boot.notice.no_image.title": "Tõmmiseid ei leitud",

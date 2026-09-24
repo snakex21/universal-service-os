@@ -53,7 +53,8 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
                     .has_images = media.hasImages(),
                     .backend_available = usos.flow.preparation_capability.supportsSystem(entry.id),
                 }).activation()) {
-                    .firmware_mismatch => continue,
+                    // Utilities are firmware-neutral and never Secure Boot gated.
+                    .firmware_mismatch, .secure_boot_off_required => continue,
                     .no_image => {
                         manual_systems.showMissingImageNotice(entry);
                         list.redrawFull(selected, null);

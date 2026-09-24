@@ -264,6 +264,8 @@
   "boot.system.requires_bios": "Vaatii BIOSin",
   "boot.system.requires_uefi.detail": "Tämä järjestelmä käynnistyy vain UEFI-tilassa; USOS toimii BIOS-tilassa.",
   "boot.system.requires_bios.detail": "Tämä järjestelmä käynnistyy vain BIOS-tilassa; USOS toimii UEFI-tilassa.",
+  "boot.system.requires_uefi.hint": "Käynnistä USB-tikku UEFI-tilassa käyttääksesi sitä: valitse laiteohjelmiston käynnistysvalikosta sen UEFI-kohta.",
+  "boot.system.requires_bios.hint": "Käynnistä USB-tikku Legacy BIOS (CSM) -tilassa käyttääksesi sitä: valitse laiteohjelmiston käynnistysvalikosta sen kohta ilman UEFI:ä.",
   "boot.system.unavailable": "Ei saatavilla",
   "boot.system.unavailable.detail": "Mikään toimiva käynnistystaustaosa ei vielä tue tätä järjestelmää.",
   "boot.notice.no_image.title": "Levykuvia ei löytynyt",

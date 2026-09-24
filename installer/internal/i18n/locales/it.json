@@ -264,6 +264,8 @@
   "boot.system.requires_bios": "Richiede BIOS",
   "boot.system.requires_uefi.detail": "Questo sistema si avvia solo in modalità UEFI; USOS è in esecuzione in modalità BIOS.",
   "boot.system.requires_bios.detail": "Questo sistema si avvia solo in modalità BIOS; USOS è in esecuzione in modalità UEFI.",
+  "boot.system.requires_uefi.hint": "Per usarlo, avvia la chiavetta USB in modalità UEFI: scegli la sua voce UEFI nel menu di avvio del firmware.",
+  "boot.system.requires_bios.hint": "Per usarlo, avvia la chiavetta USB in modalità Legacy BIOS (CSM): scegli la sua voce senza UEFI nel menu di avvio del firmware.",
   "boot.system.unavailable": "Non disponibile",
   "boot.system.unavailable.detail": "Nessun backend di avvio funzionante supporta ancora questo sistema.",
   "boot.notice.no_image.title": "Nessuna immagine trovata",

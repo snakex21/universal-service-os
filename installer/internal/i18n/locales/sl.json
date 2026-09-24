@@ -270,6 +270,8 @@
   "boot.system.requires_bios": "Zahteva BIOS",
   "boot.system.requires_uefi.detail": "Ta sistem se zažene samo v načinu UEFI; USOS teče v načinu BIOS.",
   "boot.system.requires_bios.detail": "Ta sistem se zažene samo v načinu BIOS; USOS teče v načinu UEFI.",
+  "boot.system.requires_uefi.hint": "Za uporabo zaženite ključek USB v načinu UEFI: v zagonskem meniju vdelane programske opreme izberite njegov vnos UEFI.",
+  "boot.system.requires_bios.hint": "Za uporabo zaženite ključek USB v načinu Legacy BIOS (CSM): v zagonskem meniju vdelane programske opreme izberite njegov vnos brez UEFI.",
   "boot.system.unavailable": "Ni na voljo",
   "boot.system.unavailable.detail": "Tega sistema še ne podpira noben delujoč zagonski zaledni sistem.",
   "boot.notice.no_image.title": "Ni najdenih slik",

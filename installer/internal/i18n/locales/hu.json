@@ -264,6 +264,8 @@
   "boot.system.requires_bios": "BIOS szükséges",
   "boot.system.requires_uefi.detail": "Ez a rendszer csak UEFI módban indul; a USOS BIOS módban fut.",
   "boot.system.requires_bios.detail": "Ez a rendszer csak BIOS módban indul; a USOS UEFI módban fut.",
+  "boot.system.requires_uefi.hint": "A használatához indítsa a pendrive-ot UEFI módban: a firmware rendszerindító menüjében válassza az UEFI bejegyzését.",
+  "boot.system.requires_bios.hint": "A használatához indítsa a pendrive-ot Legacy BIOS (CSM) módban: a firmware rendszerindító menüjében válassza a nem UEFI bejegyzését.",
   "boot.system.unavailable": "Nem elérhető",
   "boot.system.unavailable.detail": "Ezt a rendszert még egyetlen működő indítási háttérmodul sem támogatja.",
   "boot.notice.no_image.title": "Nem található kép",

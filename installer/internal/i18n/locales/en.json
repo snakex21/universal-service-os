@@ -264,6 +264,8 @@
   "boot.system.requires_bios": "Requires BIOS",
   "boot.system.requires_uefi.detail": "This system starts only in UEFI mode; USOS is running in BIOS mode.",
   "boot.system.requires_bios.detail": "This system starts only in BIOS mode; USOS is running in UEFI mode.",
+  "boot.system.requires_uefi.hint": "To use it, start the USB stick in UEFI mode: pick its UEFI entry in the firmware boot menu.",
+  "boot.system.requires_bios.hint": "To use it, start the USB stick in Legacy BIOS (CSM) mode: pick its non-UEFI entry in the firmware boot menu.",
   "boot.system.unavailable": "Unavailable",
   "boot.system.unavailable.detail": "No working boot backend supports this system yet.",
   "boot.notice.no_image.title": "No images found",

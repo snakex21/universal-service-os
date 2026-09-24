@@ -264,6 +264,8 @@
   "boot.system.requires_bios": "Изисква BIOS",
   "boot.system.requires_uefi.detail": "Тази система стартира само в режим UEFI; USOS работи в режим BIOS.",
   "boot.system.requires_bios.detail": "Тази система стартира само в режим BIOS; USOS работи в режим UEFI.",
+  "boot.system.requires_uefi.hint": "За да го използвате, стартирайте USB паметта в режим UEFI: изберете записа ѝ с UEFI в менюто за зареждане на фърмуера.",
+  "boot.system.requires_bios.hint": "За да го използвате, стартирайте USB паметта в режим Legacy BIOS (CSM): изберете записа ѝ без UEFI в менюто за зареждане на фърмуера.",
   "boot.system.unavailable": "Недостъпно",
   "boot.system.unavailable.detail": "Засега нито един работещ механизъм за зареждане не поддържа тази система.",
   "boot.notice.no_image.title": "Не са намерени образи",

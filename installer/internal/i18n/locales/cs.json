@@ -267,6 +267,8 @@
   "boot.system.requires_bios": "Vyžaduje BIOS",
   "boot.system.requires_uefi.detail": "Tento systém se spouští pouze v režimu UEFI; USOS běží v režimu BIOS.",
   "boot.system.requires_bios.detail": "Tento systém se spouští pouze v režimu BIOS; USOS běží v režimu UEFI.",
+  "boot.system.requires_uefi.hint": "Chcete-li jej použít, spusťte USB disk v režimu UEFI: v zaváděcí nabídce firmwaru vyberte jeho položku UEFI.",
+  "boot.system.requires_bios.hint": "Chcete-li jej použít, spusťte USB disk v režimu Legacy BIOS (CSM): v zaváděcí nabídce firmwaru vyberte jeho položku bez UEFI.",
   "boot.system.unavailable": "Nedostupné",
   "boot.system.unavailable.detail": "Tento systém zatím nepodporuje žádný funkční spouštěcí backend.",
   "boot.notice.no_image.title": "Nebyly nalezeny žádné obrazy",

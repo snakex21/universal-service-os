@@ -264,6 +264,8 @@
   "boot.system.requires_bios": "Krever BIOS",
   "boot.system.requires_uefi.detail": "Dette systemet starter bare i UEFI-modus; USOS kjører i BIOS-modus.",
   "boot.system.requires_bios.detail": "Dette systemet starter bare i BIOS-modus; USOS kjører i UEFI-modus.",
+  "boot.system.requires_uefi.hint": "Start USB-pinnen i UEFI-modus for å bruke det: velg UEFI-oppføringen i fastvarens oppstartsmeny.",
+  "boot.system.requires_bios.hint": "Start USB-pinnen i Legacy BIOS-modus (CSM) for å bruke det: velg oppføringen uten UEFI i fastvarens oppstartsmeny.",
   "boot.system.unavailable": "Utilgjengelig",
   "boot.system.unavailable.detail": "Ingen fungerende oppstartsbackend støtter dette systemet ennå.",
   "boot.notice.no_image.title": "Fant ingen avbildninger",

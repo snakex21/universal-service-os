@@ -264,6 +264,8 @@
   "boot.system.requires_bios": "Requer BIOS",
   "boot.system.requires_uefi.detail": "Este sistema só inicia no modo UEFI; o USOS está sendo executado no modo BIOS.",
   "boot.system.requires_bios.detail": "Este sistema só inicia no modo BIOS; o USOS está sendo executado no modo UEFI.",
+  "boot.system.requires_uefi.hint": "Para usá-lo, inicie o pendrive no modo UEFI: escolha a entrada UEFI no menu de inicialização do firmware.",
+  "boot.system.requires_bios.hint": "Para usá-lo, inicie o pendrive no modo Legacy BIOS (CSM): escolha a entrada sem UEFI no menu de inicialização do firmware.",
   "boot.system.unavailable": "Indisponível",
   "boot.system.unavailable.detail": "Nenhum backend de inicialização funcional oferece suporte a este sistema ainda.",
   "boot.notice.no_image.title": "Nenhuma imagem encontrada",

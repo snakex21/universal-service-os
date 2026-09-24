@@ -101,48 +101,19 @@ fn pointerEvent(mouse: @import("pointer.zig").Event, selected: *usize, total: us
 }
 
 fn stepLinear(selected: *usize, total: usize, selectable: ?[]const bool, forward: bool, steps: u8) void {
-    var remaining = steps;
-    while (remaining > 0) : (remaining -= 1) {
-        if (selectable) |items| {
-            selected.* = usos.gui.selectable_list.stepLinear(items, selected.*, forward) orelse return;
-        } else if (forward) {
-            if (selected.* + 1 >= total) return;
-            selected.* += 1;
-        } else {
-            if (selected.* == 0) return;
-            selected.* -= 1;
-        }
-    }
+    selected.* = usos.gui.selectable_list.stepLinearBy(selectable, total, selected.*, forward, steps);
 }
 
 fn jump(selected: *usize, total: usize, selectable: ?[]const bool, delta: i64) Result {
     const before = selected.*;
-    const target: usize = @intCast(@max(0, @min(@as(i64, @intCast(total)) - 1, @as(i64, @intCast(before)) + delta)));
-    if (isSelectable(selectable, target)) {
-        selected.* = target;
-    } else if (selectable) |items| {
-        // Nearest selectable row in the jump direction, else backwards.
-        const forward = delta > 0;
-        selected.* = usos.gui.selectable_list.stepLinear(items, target, forward) orelse
-            usos.gui.selectable_list.stepLinear(items, target, !forward) orelse before;
-    }
+    selected.* = usos.gui.selectable_list.jump(selectable, total, before, delta);
     return if (selected.* != before) .changed else .ignored;
 }
 
 fn moveWrapped(selected: *usize, total: usize, selectable: ?[]const bool, forward: bool) Result {
-    if (selectable) |items| {
-        const next = usos.gui.selectable_list.stepWrapped(items[0..total], selected.*, forward) orelse return .ignored;
-        if (next == selected.*) return .ignored;
-        selected.* = next;
-        return .changed;
-    }
-
-    selected.* = if (forward)
-        (selected.* + 1) % total
-    else if (selected.* == 0)
-        total - 1
-    else
-        selected.* - 1;
+    const next = usos.gui.selectable_list.move(selectable, total, selected.*, forward) orelse return .ignored;
+    if (next == selected.*) return .ignored;
+    selected.* = next;
     return .changed;
 }
 

@@ -267,6 +267,8 @@
   "boot.system.requires_bios": "Zahtijeva BIOS",
   "boot.system.requires_uefi.detail": "Ovaj se sustav pokreće samo u načinu UEFI; USOS radi u načinu BIOS.",
   "boot.system.requires_bios.detail": "Ovaj se sustav pokreće samo u načinu BIOS; USOS radi u načinu UEFI.",
+  "boot.system.requires_uefi.hint": "Za korištenje pokrenite USB stick u načinu UEFI: u izborniku pokretanja firmvera odaberite njegov UEFI unos.",
+  "boot.system.requires_bios.hint": "Za korištenje pokrenite USB stick u načinu Legacy BIOS (CSM): u izborniku pokretanja firmvera odaberite njegov unos bez UEFI.",
   "boot.system.unavailable": "Nedostupno",
   "boot.system.unavailable.detail": "Nijedan funkcionalni pozadinski modul za pokretanje još ne podržava ovaj sustav.",
   "boot.notice.no_image.title": "Nisu pronađene slike",

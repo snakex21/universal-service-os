@@ -267,6 +267,8 @@
   "boot.system.requires_bios": "Necesită BIOS",
   "boot.system.requires_uefi.detail": "Acest sistem pornește doar în modul UEFI; USOS rulează în modul BIOS.",
   "boot.system.requires_bios.detail": "Acest sistem pornește doar în modul BIOS; USOS rulează în modul UEFI.",
+  "boot.system.requires_uefi.hint": "Pentru a-l folosi, porniți stick-ul USB în modul UEFI: alegeți intrarea UEFI din meniul de pornire al firmware-ului.",
+  "boot.system.requires_bios.hint": "Pentru a-l folosi, porniți stick-ul USB în modul Legacy BIOS (CSM): alegeți intrarea fără UEFI din meniul de pornire al firmware-ului.",
   "boot.system.unavailable": "Indisponibil",
   "boot.system.unavailable.detail": "Niciun backend de pornire funcțional nu acceptă încă acest sistem.",
   "boot.notice.no_image.title": "Nu s-au găsit imagini",

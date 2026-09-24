@@ -267,6 +267,8 @@
   "boot.system.requires_bios": "Zahteva BIOS",
   "boot.system.requires_uefi.detail": "Ovaj sistem se pokreće samo u UEFI režimu; USOS radi u BIOS režimu.",
   "boot.system.requires_bios.detail": "Ovaj sistem se pokreće samo u BIOS režimu; USOS radi u UEFI režimu.",
+  "boot.system.requires_uefi.hint": "Za korišćenje pokrenite USB fleš u režimu UEFI: u meniju za pokretanje firmvera izaberite njegovu UEFI stavku.",
+  "boot.system.requires_bios.hint": "Za korišćenje pokrenite USB fleš u režimu Legacy BIOS (CSM): u meniju za pokretanje firmvera izaberite njegovu stavku bez UEFI.",
   "boot.system.unavailable": "Nedostupno",
   "boot.system.unavailable.detail": "Nijedan funkcionalni mehanizam za pokretanje još ne podržava ovaj sistem.",
   "boot.notice.no_image.title": "Nisu pronađene slike",

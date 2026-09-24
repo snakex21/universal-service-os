@@ -59,6 +59,26 @@ pub fn main(init: std.process.Init) !u8 {
     _ = gui.menu_screens.listScreen(&ui, header, .{ .title = "Windows", .subtitle = ui.t(.systems_subtitle), .rows = &rows, .selected = 0, .hover = 3, .hints = &hints }, 0);
     try save(io, cwd, init.gpa, out_dir, "02-systems", pixels, width, height);
 
+    // UEFI with Secure Boot on: rows that need Secure Boot off or BIOS stay
+    // selectable and explain themselves in the help panel.
+    const sb_badge = gui.ui.Badge{ .text = ui.t(.summary_secure_boot_badge), .tone = .warning };
+    const bios_badge = gui.ui.Badge{ .text = ui.t(.system_requires_bios), .tone = .warning };
+    const blocked_rows = [_]gui.ui.Row{
+        .{ .title = "Windows 11", .detail = ui.format(&count_buffer, .system_image_count, &.{"2"}), .icon = .{ .vector = .windows }, .badge = .{ .text = ui.t(.system_ready), .tone = .success } },
+        .{ .title = "Windows 10", .detail = ui.t(.system_no_image), .icon = .{ .vector = .windows }, .enabled = false },
+        .{ .title = "Windows 7", .detail = ui.t(.summary_secure_boot_detail), .icon = .{ .vector = .windows }, .badge = sb_badge, .enabled = false },
+        .{ .title = "Windows XP", .detail = ui.t(.summary_secure_boot_detail), .icon = .{ .vector = .windows }, .badge = sb_badge, .enabled = false },
+        .{ .title = "Windows 2000", .detail = ui.t(.system_requires_bios_detail), .icon = .{ .vector = .windows }, .badge = bios_badge, .enabled = false },
+        .{ .title = "Windows 98 SE", .detail = ui.t(.system_requires_bios_detail), .icon = .{ .vector = .windows }, .badge = bios_badge, .enabled = false },
+        .{ .title = "Windows 3.1", .detail = ui.t(.system_requires_bios_detail), .icon = .{ .vector = .windows }, .badge = bios_badge, .enabled = false },
+    };
+    const bios_help_lines = [_][]const u8{ ui.t(.system_requires_bios_detail), ui.t(.system_requires_bios_hint) };
+    _ = gui.menu_screens.listScreen(&ui, header, .{ .title = "Windows", .subtitle = ui.t(.systems_subtitle), .rows = &blocked_rows, .selected = blocked_rows.len - 1, .help = .{ .title = ui.t(.system_requires_bios), .lines = &bios_help_lines }, .hints = &hints }, 0);
+    try save(io, cwd, init.gpa, out_dir, "02b-systems-requires-bios", pixels, width, height);
+    const sb_help_lines = [_][]const u8{ ui.t(.summary_secure_boot_line1), ui.t(.summary_secure_boot_line2) };
+    _ = gui.menu_screens.listScreen(&ui, header, .{ .title = "Windows", .subtitle = ui.t(.systems_subtitle), .rows = &blocked_rows, .selected = 3, .help = .{ .title = ui.t(.summary_secure_boot_badge), .lines = &sb_help_lines }, .hints = &hints }, 0);
+    try save(io, cwd, init.gpa, out_dir, "02c-systems-secure-boot-off", pixels, width, height);
+
     const methods = [_]gui.ui.Row{
         .{ .title = ui.t(.method_auto_iso), .badge = .{ .text = ui.t(.badge_recommended), .tone = .accent } },
         .{ .title = "ISO", .badge = .{ .text = ui.t(.badge_ready), .tone = .success } },

@@ -264,6 +264,8 @@
   "boot.system.requires_bios": "Απαιτεί BIOS",
   "boot.system.requires_uefi.detail": "Αυτό το σύστημα ξεκινά μόνο σε λειτουργία UEFI, το USOS εκτελείται σε λειτουργία BIOS.",
   "boot.system.requires_bios.detail": "Αυτό το σύστημα ξεκινά μόνο σε λειτουργία BIOS, το USOS εκτελείται σε λειτουργία UEFI.",
+  "boot.system.requires_uefi.hint": "Για να το χρησιμοποιήσετε, εκκινήστε το USB σε λειτουργία UEFI: επιλέξτε την καταχώρισή του UEFI στο μενού εκκίνησης του υλικολογισμικού.",
+  "boot.system.requires_bios.hint": "Για να το χρησιμοποιήσετε, εκκινήστε το USB σε λειτουργία Legacy BIOS (CSM): επιλέξτε την καταχώρισή του χωρίς UEFI στο μενού εκκίνησης του υλικολογισμικού.",
   "boot.system.unavailable": "Μη διαθέσιμο",
   "boot.system.unavailable.detail": "Κανένας λειτουργικός μηχανισμός εκκίνησης δεν υποστηρίζει ακόμη αυτό το σύστημα.",
   "boot.notice.no_image.title": "Δεν βρέθηκαν είδωλα",

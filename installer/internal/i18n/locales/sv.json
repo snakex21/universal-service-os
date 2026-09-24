@@ -264,6 +264,8 @@
   "boot.system.requires_bios": "Kräver BIOS",
   "boot.system.requires_uefi.detail": "Det här systemet startar bara i UEFI-läge; USOS körs i BIOS-läge.",
   "boot.system.requires_bios.detail": "Det här systemet startar bara i BIOS-läge; USOS körs i UEFI-läge.",
+  "boot.system.requires_uefi.hint": "Starta USB-minnet i UEFI-läge för att använda det: välj UEFI-posten i firmwarens startmeny.",
+  "boot.system.requires_bios.hint": "Starta USB-minnet i Legacy BIOS-läge (CSM) för att använda det: välj posten utan UEFI i firmwarens startmeny.",
   "boot.system.unavailable": "Ej tillgänglig",
   "boot.system.unavailable.detail": "Ingen fungerande startbackend stöder det här systemet ännu.",
   "boot.notice.no_image.title": "Inga avbildningar hittades",

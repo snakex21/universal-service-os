@@ -267,6 +267,8 @@
   "boot.system.requires_bios": "Требуется BIOS",
   "boot.system.requires_uefi.detail": "Эта система запускается только в режиме UEFI; USOS работает в режиме BIOS.",
   "boot.system.requires_bios.detail": "Эта система запускается только в режиме BIOS; USOS работает в режиме UEFI.",
+  "boot.system.requires_uefi.hint": "Чтобы использовать его, загрузите флешку в режиме UEFI: выберите её пункт UEFI в загрузочном меню прошивки.",
+  "boot.system.requires_bios.hint": "Чтобы использовать его, загрузите флешку в режиме Legacy BIOS (CSM): выберите её пункт без UEFI в загрузочном меню прошивки.",
   "boot.system.unavailable": "Недоступно",
   "boot.system.unavailable.detail": "Пока ни один рабочий механизм загрузки не поддерживает эту систему.",
   "boot.notice.no_image.title": "Образы не найдены",

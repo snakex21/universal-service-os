@@ -264,6 +264,8 @@
   "boot.system.requires_bios": "BIOS gerekir",
   "boot.system.requires_uefi.detail": "Bu sistem yalnızca UEFI modunda başlar; USOS BIOS modunda çalışıyor.",
   "boot.system.requires_bios.detail": "Bu sistem yalnızca BIOS modunda başlar; USOS UEFI modunda çalışıyor.",
+  "boot.system.requires_uefi.hint": "Kullanmak için USB belleği UEFI modunda başlatın: ürün yazılımı önyükleme menüsünde UEFI girişini seçin.",
+  "boot.system.requires_bios.hint": "Kullanmak için USB belleği Legacy BIOS (CSM) modunda başlatın: ürün yazılımı önyükleme menüsünde UEFI olmayan girişini seçin.",
   "boot.system.unavailable": "Kullanılamaz",
   "boot.system.unavailable.detail": "Çalışan hiçbir önyükleme arka ucu bu sistemi henüz desteklemiyor.",
   "boot.notice.no_image.title": "Görüntü bulunamadı",

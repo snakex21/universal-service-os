@@ -264,6 +264,8 @@
   "boot.system.requires_bios": "Nécessite BIOS",
   "boot.system.requires_uefi.detail": "Ce système démarre uniquement en mode UEFI ; USOS fonctionne en mode BIOS.",
   "boot.system.requires_bios.detail": "Ce système démarre uniquement en mode BIOS ; USOS fonctionne en mode UEFI.",
+  "boot.system.requires_uefi.hint": "Pour l'utiliser, démarrez la clé USB en mode UEFI : choisissez son entrée UEFI dans le menu de démarrage du firmware.",
+  "boot.system.requires_bios.hint": "Pour l'utiliser, démarrez la clé USB en mode Legacy BIOS (CSM) : choisissez son entrée sans UEFI dans le menu de démarrage du firmware.",
   "boot.system.unavailable": "Indisponible",
   "boot.system.unavailable.detail": "Aucun backend de démarrage fonctionnel ne prend encore en charge ce système.",
   "boot.notice.no_image.title": "Aucune image trouvée",

@@ -267,6 +267,8 @@
   "boot.system.requires_bios": "Vajadzīgs BIOS",
   "boot.system.requires_uefi.detail": "Šī sistēma startē tikai UEFI režīmā; USOS darbojas BIOS režīmā.",
   "boot.system.requires_bios.detail": "Šī sistēma startē tikai BIOS režīmā; USOS darbojas UEFI režīmā.",
+  "boot.system.requires_uefi.hint": "Lai to izmantotu, palaidiet USB zibatmiņu UEFI režīmā: aparātprogrammatūras sāknēšanas izvēlnē izvēlieties tās UEFI ierakstu.",
+  "boot.system.requires_bios.hint": "Lai to izmantotu, palaidiet USB zibatmiņu Legacy BIOS (CSM) režīmā: aparātprogrammatūras sāknēšanas izvēlnē izvēlieties tās ierakstu bez UEFI.",
   "boot.system.unavailable": "Nav pieejams",
   "boot.system.unavailable.detail": "Neviena strādājoša sāknēšanas aizmugursistēma vēl neatbalsta šo sistēmu.",
   "boot.notice.no_image.title": "Attēli nav atrasti",

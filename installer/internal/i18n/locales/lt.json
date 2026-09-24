@@ -267,6 +267,8 @@
   "boot.system.requires_bios": "Reikia BIOS",
   "boot.system.requires_uefi.detail": "Ši sistema paleidžiama tik UEFI režimu; USOS veikia BIOS režimu.",
   "boot.system.requires_bios.detail": "Ši sistema paleidžiama tik BIOS režimu; USOS veikia UEFI režimu.",
+  "boot.system.requires_uefi.hint": "Norėdami naudoti, paleiskite USB atmintinę UEFI režimu: programinės įrangos įkrovos meniu pasirinkite jos UEFI įrašą.",
+  "boot.system.requires_bios.hint": "Norėdami naudoti, paleiskite USB atmintinę Legacy BIOS (CSM) režimu: programinės įrangos įkrovos meniu pasirinkite jos įrašą be UEFI.",
   "boot.system.unavailable": "Neprieinama",
   "boot.system.unavailable.detail": "Šios sistemos dar nepalaiko jokia veikianti įkrovos posistemė.",
   "boot.notice.no_image.title": "Atvaizdų nerasta",

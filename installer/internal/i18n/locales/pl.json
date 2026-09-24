@@ -267,6 +267,8 @@
   "boot.system.requires_bios": "Wymaga BIOS",
   "boot.system.requires_uefi.detail": "Ten system startuje tylko w trybie UEFI; USOS działa w trybie BIOS.",
   "boot.system.requires_bios.detail": "Ten system startuje tylko w trybie BIOS; USOS działa w trybie UEFI.",
+  "boot.system.requires_uefi.hint": "Aby go użyć, uruchom pendrive w trybie UEFI: wybierz jego pozycję UEFI w menu rozruchu firmware.",
+  "boot.system.requires_bios.hint": "Aby go użyć, uruchom pendrive w trybie Legacy BIOS (CSM): wybierz jego pozycję bez UEFI w menu rozruchu firmware.",
   "boot.system.unavailable": "Niedostępny",
   "boot.system.unavailable.detail": "Żaden działający backend startowy nie obsługuje jeszcze tego systemu.",
   "boot.notice.no_image.title": "Nie znaleziono obrazów",

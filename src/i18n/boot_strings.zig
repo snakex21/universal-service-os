@@ -285,8 +285,10 @@ pub const Key = enum(u16) {
     system_ready,
     system_requires_bios,
     system_requires_bios_detail,
+    system_requires_bios_hint,
     system_requires_uefi,
     system_requires_uefi_detail,
+    system_requires_uefi_hint,
     system_unavailable,
     system_unavailable_detail,
     systems_subtitle,
@@ -596,8 +598,10 @@ pub const hashes = [_]u32{
     0xd3048155, // system.ready
     0xab6c36c8, // system.requires_bios
     0x47e54d83, // system.requires_bios.detail
+    0xb33e3eff, // system.requires_bios.hint
     0xeb00f308, // system.requires_uefi
     0xc483f543, // system.requires_uefi.detail
+    0xa4c837bf, // system.requires_uefi.hint
     0x31aec0c8, // system.unavailable
     0xa6ba9b83, // system.unavailable.detail
     0xab5ff4f5, // systems.subtitle
@@ -922,6 +926,8 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    true,
+    true,
     false,
     true,
     true,
@@ -1217,8 +1223,10 @@ pub const english = [_][]const u8{
     "Ready",
     "Requires BIOS",
     "This system starts only in BIOS mode; USOS is running in UEFI mode.",
+    "To use it, start the USB stick in Legacy BIOS (CSM) mode: pick its non-UEFI entry in the firmware boot menu.",
     "Requires UEFI",
     "This system starts only in UEFI mode; USOS is running in BIOS mode.",
+    "To use it, start the USB stick in UEFI mode: pick its UEFI entry in the firmware boot menu.",
     "Unavailable",
     "No working boot backend supports this system yet.",
     "Select a system, distribution or utility group",

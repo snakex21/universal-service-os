@@ -266,7 +266,13 @@ fn showSystems(discovery: *catalog.media_discovery.Discovery, diag: diagnostics.
             .firmware_compatible = entry.firmware.accepts(.bios),
             .has_images = media.hasImages(),
         }).activation()) {
-            .firmware_mismatch => continue,
+            // Selectable so the badge can be read; never launched here.
+            .firmware_mismatch => {
+                showFirmwareMismatchNotice(diag, entry, graphics);
+                full_redraw = true;
+                continue;
+            },
+            .secure_boot_off_required => continue,
             .no_image => {
                 showMissingImageNotice(diag, entry.name, entry.image_directory, graphics);
                 full_redraw = true;
@@ -413,8 +419,36 @@ fn showUtilities(discovery: *catalog.media_discovery.Discovery, diag: diagnostic
                 if (showImages(discovery, diag, actions, item.name.slice(), item.imageDirectory(), graphics)) return;
                 full_redraw = true;
             },
-            .firmware_mismatch, .backend_unavailable => continue,
+            .firmware_mismatch, .secure_boot_off_required, .backend_unavailable => continue,
         }
+    }
+}
+
+fn showFirmwareMismatchNotice(diag: diagnostics.Info, entry: *const catalog.SystemEntry, graphics: *?vbe_probe.Session) void {
+    var idle_ticks: u32 = 0;
+    while (true) {
+        if (graphics.*) |*session| {
+            graphics_menu.firmwareMismatch(session, entry.name, entry.firmware == .uefi);
+        } else {
+            console.clear();
+            console.line("UNIVERSAL SERVICE OS");
+            console.line("FIRMWARE: BIOS");
+            console.line("");
+            console.print(entry.name);
+            console.print(" ");
+            console.line(entry.firmware.mismatchReason(.bios));
+            console.line("");
+            console.line("Start the USB stick in UEFI mode to use this system.");
+            console.line("");
+            console.line("ENTER/ESC/BACKSPACE: BACK   D: DIAGNOSTICS");
+        }
+
+        const key = readTimedKey(diag, &idle_ticks, graphics) orelse return;
+        if (isDiagnosticsKey(key.ascii)) {
+            _ = showDiagnostics(graphics, diag);
+            continue;
+        }
+        if (key.ascii == 13 or key.ascii == 27 or key.ascii == 8) return;
     }
 }
 

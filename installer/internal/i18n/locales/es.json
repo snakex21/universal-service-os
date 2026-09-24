@@ -264,6 +264,8 @@
   "boot.system.requires_bios": "Requiere BIOS",
   "boot.system.requires_uefi.detail": "Este sistema solo arranca en modo UEFI; USOS se está ejecutando en modo BIOS.",
   "boot.system.requires_bios.detail": "Este sistema solo arranca en modo BIOS; USOS se está ejecutando en modo UEFI.",
+  "boot.system.requires_uefi.hint": "Para usarlo, inicia la memoria USB en modo UEFI: elige su entrada UEFI en el menú de arranque del firmware.",
+  "boot.system.requires_bios.hint": "Para usarlo, inicia la memoria USB en modo Legacy BIOS (CSM): elige su entrada sin UEFI en el menú de arranque del firmware.",
   "boot.system.unavailable": "No disponible",
   "boot.system.unavailable.detail": "Todavía ningún backend de arranque funcional admite este sistema.",
   "boot.notice.no_image.title": "No se encontraron imágenes",

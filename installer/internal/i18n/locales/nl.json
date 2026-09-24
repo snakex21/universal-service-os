@@ -264,6 +264,8 @@
   "boot.system.requires_bios": "Vereist BIOS",
   "boot.system.requires_uefi.detail": "Dit systeem start alleen in UEFI-modus; USOS draait in BIOS-modus.",
   "boot.system.requires_bios.detail": "Dit systeem start alleen in BIOS-modus; USOS draait in UEFI-modus.",
+  "boot.system.requires_uefi.hint": "Start de USB-stick in UEFI-modus om het te gebruiken: kies de UEFI-vermelding in het opstartmenu van de firmware.",
+  "boot.system.requires_bios.hint": "Start de USB-stick in Legacy BIOS-modus (CSM) om het te gebruiken: kies de vermelding zonder UEFI in het opstartmenu van de firmware.",
   "boot.system.unavailable": "Niet beschikbaar",
   "boot.system.unavailable.detail": "Nog geen werkende opstartbackend ondersteunt dit systeem.",
   "boot.notice.no_image.title": "Geen images gevonden",

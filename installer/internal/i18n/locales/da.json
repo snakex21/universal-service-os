@@ -264,6 +264,8 @@
   "boot.system.requires_bios": "Kræver BIOS",
   "boot.system.requires_uefi.detail": "Dette system starter kun i UEFI-tilstand; USOS kører i BIOS-tilstand.",
   "boot.system.requires_bios.detail": "Dette system starter kun i BIOS-tilstand; USOS kører i UEFI-tilstand.",
+  "boot.system.requires_uefi.hint": "Start USB-drevet i UEFI-tilstand for at bruge det: vælg dets UEFI-post i firmwarens boot-menu.",
+  "boot.system.requires_bios.hint": "Start USB-drevet i Legacy BIOS-tilstand (CSM) for at bruge det: vælg dets post uden UEFI i firmwarens boot-menu.",
   "boot.system.unavailable": "Utilgængelig",
   "boot.system.unavailable.detail": "Ingen fungerende startbackend understøtter dette system endnu.",
   "boot.notice.no_image.title": "Ingen aftryk fundet",
