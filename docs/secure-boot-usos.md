@@ -360,8 +360,8 @@ locales, all but English machine-translated or marked):
 - Tools -> **Secure Boot** (first row, shield icon, badge Saved/Missing): the
   help panel shows the key state, Secure Boot on/off/setup mode/unsupported,
   whether Secure Boot can be turned on (PK present), a deny-list warning, and
-  when the key is saved how to remove it (MokManager "Delete MOK" or resetting
-  the Secure Boot keys; no removal button). Rows: **Add the key** (enabled only
+  when the key is saved how to remove it (MokManager "Delete MOK"; a Secure
+  Boot key reset keeps it, only an NVRAM reset removes it; no removal button). Rows: **Add the key** (enabled only
   when saving is allowed; otherwise the reason), **Open BIOS settings**,
   **Remind on the home screen** On/Off (undoes "Don't ask again"), **Add the
   key with Secure Boot on** (the MokManager steps).
@@ -419,9 +419,10 @@ It is lost on an NVRAM reset: CMOS clear, a BIOS update that reinitialises
 NVRAM, or on some boards "Load UEFI defaults". If a key disappears, compare
 the `[SECURE BOOT]` sections of two drivers.txt/input-devices.txt copies:
 `MokList: status=not_found` with an unchanged PK means MokList itself was
-wiped; `MokListRT` is only a volatile copy shim makes at each start. (The
-strings `boot.sbinfo.remove_hint` and `boot.sbkey.confirm_line2` still name
-"resetting the Secure Boot keys" as a way to remove the key; open item.)
+wiped; `MokListRT` is only a volatile copy shim makes at each start. The
+UI says the same (`boot.sbinfo.remove_hint`, `boot.sbkey.confirm_line2`):
+remove the key with MokManager "Delete MOK"; a Secure Boot key reset keeps
+it, only an NVRAM reset removes it.
 
 ### shim's clipped "Verification failed" box (X470 + BenQ over HDMI)
 
