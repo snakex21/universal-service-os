@@ -227,6 +227,14 @@ func mirrorExecutableEFI(source, destination string) error {
 	return nil
 }
 
+// isAnswerFileName: unattend.xml (Windows Vista and later) or WINNT.SIF
+// (2000/XP), extension in any case. The boot menus list answer files straight
+// from DATA with their NTFS reader; this ESP copy is only a fallback cache.
+func isAnswerFileName(name string) bool {
+	ext := filepath.Ext(name)
+	return strings.EqualFold(ext, ".xml") || strings.EqualFold(ext, ".sif")
+}
+
 func mirrorUnattended(sourceDir, destinationDir string) error {
 	entries, err := os.ReadDir(sourceDir)
 	if err != nil {
@@ -236,7 +244,7 @@ func mirrorUnattended(sourceDir, destinationDir string) error {
 		return err
 	}
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.EqualFold(filepath.Ext(entry.Name()), ".xml") {
+		if entry.IsDir() || !isAnswerFileName(entry.Name()) {
 			continue
 		}
 		info, err := entry.Info()

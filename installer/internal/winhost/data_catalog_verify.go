@@ -85,16 +85,16 @@ func verifyEspImageProjection(dataDir, espDir string) error {
 }
 
 func compareCatalogXmlFiles(dataDir, espDir string) error {
-	data, err := filteredNames(dataDir, func(name string) bool { return strings.EqualFold(filepath.Ext(name), ".xml") })
+	data, err := filteredNames(dataDir, isAnswerFileName)
 	if err != nil {
 		return err
 	}
-	esp, err := filteredNames(espDir, func(name string) bool { return strings.EqualFold(filepath.Ext(name), ".xml") })
+	esp, err := filteredNames(espDir, isAnswerFileName)
 	if err != nil {
 		return err
 	}
 	if !equalStringSets(data, esp) {
-		return fmt.Errorf("XML catalog names differ: DATA=%v ESP=%v", data, esp)
+		return fmt.Errorf("answer-file catalog names differ: DATA=%v ESP=%v", data, esp)
 	}
 	for _, name := range data {
 		dataHash, err := hashFileSHA256(filepath.Join(dataDir, name))
@@ -106,7 +106,7 @@ func compareCatalogXmlFiles(dataDir, espDir string) error {
 			return err
 		}
 		if dataHash != espHash {
-			return fmt.Errorf("XML SHA-256 mismatch for %s", name)
+			return fmt.Errorf("answer-file SHA-256 mismatch for %s", name)
 		}
 	}
 	return nil
