@@ -391,3 +391,12 @@ Reguły i ścieżki: [docs/drivers.md](docs/drivers.md). Testy:
 ## initramfs-usos: kompresja (pomiar 2026-09-24)
 
 Jądro Alpine LTS 6.18.35 rozpakowuje initramfs w gzip, xz (CRC32) i zstd (sprawdzone w QEMU: rdinit=/bin/sh dochodzi do powłoki). Rozmiary dla tego samego cpio (104,0 MB): gzip -9 38,76 MB, xz -6 28,16 MB, xz -9e dict 32 MiB 23,28 MB, zstd -19 29,76 MB. Rozpakowanie w jądrze (dmesg, QEMU TCG): gzip 2,04 s, xz -9e 5,34 s, zstd -19 2,05 s. Po skalowaniu przez natywny inflate hosta (zlib 0,28 s, współczynnik TCG około 6,4) xz kosztuje około +0,52 s CPU, a oszczędza 15,5 MB odczytu, czyli 0,52 s przy 30 MB/s i 0,16 s przy 100 MB/s. Bilans: 0,0 s przy 30 MB/s i +0,36 s przy 100 MB/s, więc **xz nie przyjęto**, zostaje gzip. zstd -19 byłby szybszy w obu modelach (−0,30 s i −0,09 s), ale wymaga dekompresora zstd w narzędziach budujących (Python 3.13 nie ma go w bibliotece standardowej; `parse_newc` w pakiecie XP i w `compare_xp_packages.py` czyta gzip). Otwarte do decyzji.
+
+## Sterownik Storage użytkownika: dowód end-to-end (virtio)
+
+Opis, zasób testowy (virtio-win 0.1.302, SHA-256 `303f7ae40dad495d6ae474fdc571df58958a4dbc5c37a522d80f9a203867949d`, w `%LOCALAPPDATA%\USOS\test-assets\`, poza repozytorium) i wyniki: [tools/tests/virtio_e2e/README.md](tools/tests/virtio_e2e/README.md).
+
+- `python tools/tests/virtio_e2e/run_setup_virtio_qemu.py --iso <Win11 x64 ISO>`: prawdziwy stager + handoff USOS, Setup Windows 11 widzi dysk virtio-blk tylko z przygotowanym viostor (kontrola negatywna bez sterownika). Około 6 minut na przebieg w TCG.
+- `--full-install`: pełna instalacja na dysk virtio-blk (WORK jako wymienny dysk USB); 2026-09-24 Setup zainstalował system na dysku virtio, a zainstalowany Windows uruchomił się z niego po restarcie (przebieg zatrzymany przed OOBE, TCG ok. 90 min). VirtualBox 7.2: vioscsi ładuje się z `$WinPEDriver$`, ale VirtualBox nie pokazuje za virtio-scsi żadnego dysku (ograniczenie VBox).
+- `python tools/tests/run_extract_drivers_qemu.py`, `python tools/tests/test_windows_setup_media.py`: staging dla chainload i iso, formaty install.wim/esd/swm.
+- `python tools/tests/run_micro_linux_virtio_qemu.py`: mikro-Linux widzi dyski virtio-blk i virtio-scsi.

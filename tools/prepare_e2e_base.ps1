@@ -12,6 +12,9 @@ param(
     [string]$UnattendPath = '',
     [string]$GuardTestBadPartuuid = '',
     [string]$DirectEfiFixturePath = '',
+    # Optional tree copied to DATA\Drivers (docs/drivers.md), e.g. with
+    # "Windows 11\Storage\viostor" for the virtio storage-driver e2e.
+    [string]$DataDriversPath = '',
     [switch]$StopAfterPrepared
 )
 
@@ -173,6 +176,10 @@ try {
     if (-not [string]::IsNullOrWhiteSpace($UnattendPath)) {
         Copy-Item -LiteralPath $UnattendPath -Destination (Join-Path $unattendDir (Split-Path -Leaf $UnattendPath)) -Force
     }
+    if (-not [string]::IsNullOrWhiteSpace($DataDriversPath)) {
+        & robocopy.exe $DataDriversPath (Join-Path $dataRoot 'Drivers') /E /R:0 /W:0 /NP /NJH /NJS | Out-Null
+        if ($LASTEXITCODE -ge 8) { throw "robocopy of DATA drivers failed: $LASTEXITCODE" }
+    }
 
     # The ESP contains only catalog entries. The large payload stays on DATA
     # and is addressed by the selected relative path persisted by USOS.
@@ -208,6 +215,9 @@ try {
     if (Test-Path -LiteralPath $mountRoot) { Remove-Item -LiteralPath $mountRoot -Recurse -Force }
 }
 
+# USOS finds its ESP/DATA/WORK by GPT partition name, which Windows cannot set.
+& python.exe (Join-Path $PSScriptRoot 'boot_ui_screens.py') --name-gpt --disk $VhdPath
+if ($LASTEXITCODE -ne 0) { throw 'setting GPT partition names failed' }
 & $QemuImgPath convert -f vpc -O qcow2 $VhdPath $candidateBasePath
 if ($LASTEXITCODE -ne 0) { throw "qemu-img convert to qcow2 failed: $LASTEXITCODE" }
 & $QemuImgPath check $candidateBasePath
