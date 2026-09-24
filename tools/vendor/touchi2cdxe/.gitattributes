@@ -1,0 +1,4 @@
+*.efi binary
+*.patch -text
+*.dsc -text
+LICENSE -text

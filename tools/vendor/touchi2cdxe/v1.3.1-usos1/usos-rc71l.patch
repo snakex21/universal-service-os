@@ -1,0 +1,186 @@
+diff --git a/src/TouchI2cDxe.c b/src/TouchI2cDxe.c
+index 3fc3068..c538f5f 100644
+--- a/src/TouchI2cDxe.c
++++ b/src/TouchI2cDxe.c
+@@ -5,6 +5,8 @@
+   the mProfiles table below:
+ 
+     - ASUS ROG Xbox Ally X      -- Novatek NVTK0603,  I2C0 @ 0xFEDC2000, addr 0x01
++    - ASUS ROG Ally (RC71L)     -- Novatek NVTK0603,  I2C0 @ 0xFEDC2000, addr 0x01
++                                   (USOS patch; constants from the RC71L DSDT)
+     - Steam Deck OLED (Galileo) -- FocalTech FTS3528, I2C1 @ 0xFEDC3000, addr 0x38
+     - Steam Deck LCD (Jupiter)  -- FocalTech FTS3528, I2C1 @ 0xFEDC3000, addr 0x38
+ 
+@@ -77,9 +79,13 @@
+   video modes long after bring-up. Landscape-native panels (Ally X) and
+   portrait GOP modes pass through untouched.
+ 
+-  Every load appends a diagnostic record to \TouchI2c.log in the root of the
+-  volume the driver was loaded from (the ESP -- /boot/TouchI2c.log or
+-  /esp/TouchI2c.log from Linux): pre-existing AbsolutePointer handle count
++  USOS build: the diagnostic log is OFF unless enabled. With TOUCH_ESP_LOG=1
++  at compile time every load appends to \TouchI2c.log in the root of the
++  volume the driver was loaded from (upstream behaviour). The USOS build
++  keeps TOUCH_ESP_LOG=0 and writes only when the loader passes the UTF-16
++  load option "log=<path>" (e.g. log=\EFI\USOS\Logs\touchi2c.log) together
++  with a LoadedImage DeviceHandle; USOS does that only on a diagnostic boot.
++  The record contains: pre-existing AbsolutePointer handle count
+   (a nonzero count means the firmware's own touch driver is resident), per
+   profile AOAC tile state, per-step bring-up results, the retry at which
+   bring-up succeeded, and a one-time record of the first touch report.
+@@ -127,6 +133,15 @@
+ //     \_SB.I2CA.TPL0 (NVTK0603/PNP0C50) I2cSerialBusV2 slave 0x01, 400 kHz;
+ //     _DSM(HID-I2C, func 1) = 0x0000; AOAC device 5 (DSDT I2A0).
+ //
++//   ROG Ally 2023 (RC71L):  identical to the Ally X -- \_SB.I2CA (AMDI0010
++//     _UID 0) Memory32Fixed 0xFEDC2000, _PS0 -> DSAD (5, 0) (AOAC device 5);
++//     \_SB.I2CA.TPL0 is a Novatek NVTK0603 (_CID PNP0C50, VID 0x0603 PID
++//     0xF200), I2cSerialBusV2 slave 0x01, 400 kHz; _DSM(HID-I2C, func 1) =
++//     0x0000; GpioInt 9 (unused, this driver polls); no reset/power GPIO.
++//     Source: RC71L DSDT (hhd-dev/hwinfo devices/rog_ally, BIOS RC71L.336)
++//     and Linux probes (AMDI0010:00/i2c-0, NVTK0603:00 0603:F200). Earlier
++//     upstream notes expected a Goodix GT7868Q here; the DSDT says Novatek.
++//
+ //   Steam Deck OLED (Galileo):  \_SB.I2CB (AMDI0010 _UID 1) Memory32Fixed
+ //     0xFEDC3000; \_SB.I2CB.TPNL (FTS3528/PNP0C50) I2cSerialBusV2 slave
+ //     0x38, 400 kHz; _DSM(HID-I2C, func 1) = 0x0000; AOAC device 6
+@@ -204,12 +219,17 @@ STATIC CONST TOUCH_PROFILE  mProfiles[] = {
+     TouchPlatformIntelLpss, 0x51E8, 0x15, 0x0 },
+   //
+   // Sweep profiles: identified AMD handhelds whose panel constants are not
+-  // DSDT-confirmed. Board/product strings per the Linux kernel's DMI quirk
++  // DSDT-confirmed (the RC71L entry above was moved out of this list). Board/product strings per the Linux kernel's DMI quirk
+   // tables (asus-wmi / drm_panel_orientation_quirks). Untested on hardware;
+   // worst case is EFI_NOT_FOUND, same as no profile at all.
+   //
+-  { "ROG Ally 2023 (sweep; Goodix GT7868Q expected)", NULL, "RC71L", NULL,
+-    0, 0, 0x0000, TOUCH_AOAC_SWEEP, 0 },
++  //
++  // ROG Ally 2023: exact DSDT-confirmed profile (USOS patch; was a sweep
++  // profile). Only I2C0 / AOAC tile 5 is powered and probed, so the other
++  // FCH I2C buses (IMU on I2CB, amplifiers on I2CD) are never touched.
++  //
++  { "ROG Ally RC71L (Novatek NVTK0603)", NULL, "RC71L", NULL,
++    DW_I2C_FCH_BASE_0, NVTK_I2C_ADDR, 0x0000, FCH_AOAC_DEV_I2C0, 0 },
+   { "ROG Ally X 2024 (sweep)", NULL, "RC72LA", NULL,
+     0, 0, 0x0000, TOUCH_AOAC_SWEEP, 0 },
+   { "Lenovo Legion Go 8APU1 (sweep)", "83E1", NULL, NULL,
+@@ -218,7 +238,7 @@ STATIC CONST TOUCH_PROFILE  mProfiles[] = {
+ 
+ #define TOUCH_PROFILE_COUNT  ARRAY_SIZE (mProfiles)
+ 
+-#define TOUCH_DRIVER_VERSION  "v13"
++#define TOUCH_DRIVER_VERSION  "v13-usos1"
+ 
+ //
+ // Poll no faster than every 10 ms (EFI timer units are 100 ns). The final
+@@ -242,6 +262,25 @@ STATIC CONST TOUCH_PROFILE  mProfiles[] = {
+ //
+ #define TOUCH_LOG_MAX_SIZE     SIZE_32KB
+ 
++//
++// USOS build switches (compile time, override with -D):
++//   TOUCH_ESP_LOG        1 = upstream behaviour, append to \TouchI2c.log on
++//                        the load volume on every boot. 0 (USOS default) =
++//                        log only to the path passed as load option
++//                        "log=<path>", otherwise not at all.
++//   TOUCH_CONSOLE_PRINT  1 = Print() load-time status to ConOut (upstream).
++//                        0 (USOS default) = silent; USOS draws its own
++//                        graphical menu and console text would corrupt it.
++//
++#ifndef TOUCH_ESP_LOG
++#define TOUCH_ESP_LOG  0
++#endif
++#ifndef TOUCH_CONSOLE_PRINT
++#define TOUCH_CONSOLE_PRINT  0
++#endif
++
++#define TOUCH_LOG_PATH_MAX  96
++
+ typedef struct {
+   UINT64                          Signature;
+   EFI_ABSOLUTE_POINTER_PROTOCOL   AbsolutePointer;
+@@ -268,6 +307,7 @@ typedef struct {
+   UINTN                           AttemptCount;
+   EFI_HANDLE                      Handle;
+   EFI_HANDLE                      LogDevice;      // ESP handle; NULL = no log
++  CHAR16                          LogPath[TOUCH_LOG_PATH_MAX];
+ } TOUCH_DEV;
+ 
+ #define TOUCH_SIG  SIGNATURE_64 ('T','c','h','I','2','c','D','x')
+@@ -492,14 +532,14 @@ TouchLog (
+     return;
+   }
+ 
+-  if (!EFI_ERROR (Root->Open (Root, &File, L"TouchI2c.log",
++  if (!EFI_ERROR (Root->Open (Root, &File, Dev->LogPath,
+                               EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE |
+                               EFI_FILE_MODE_CREATE, 0))) {
+     if (!EFI_ERROR (File->SetPosition (File, MAX_UINT64)) &&
+         !EFI_ERROR (File->GetPosition (File, &Pos)) &&
+         (Pos > TOUCH_LOG_MAX_SIZE)) {
+       File->Delete (File);              // closes the handle; start over fresh
+-      if (EFI_ERROR (Root->Open (Root, &File, L"TouchI2c.log",
++      if (EFI_ERROR (Root->Open (Root, &File, Dev->LogPath,
+                                  EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE |
+                                  EFI_FILE_MODE_CREATE, 0))) {
+         Root->Close (Root);
+@@ -513,7 +553,9 @@ TouchLog (
+ }
+ 
+ /**
+-  Record where this image was loaded from, so TouchLog can reach the ESP.
++  Pick the log target: the "log=<path>" load option (USOS diagnostic boot),
++  else \TouchI2c.log when TOUCH_ESP_LOG is compiled in, else no log at all
++  (LogDevice stays NULL and TouchLog returns immediately).
+ **/
+ STATIC
+ VOID
+@@ -523,12 +565,37 @@ TouchLogInit (
+   )
+ {
+   EFI_LOADED_IMAGE_PROTOCOL  *LoadedImage;
++  CONST CHAR16               *Opt;
++  UINTN                      OptChars;
++  UINTN                      i;
++  UINTN                      n;
+ 
+   if (EFI_ERROR (gBS->HandleProtocol (ImageHandle, &gEfiLoadedImageProtocolGuid,
+-                                      (VOID **)&LoadedImage))) {
++                                      (VOID **)&LoadedImage)) ||
++      (LoadedImage->DeviceHandle == NULL)) {
+     return;
+   }
++
++  Opt      = (CONST CHAR16 *)LoadedImage->LoadOptions;
++  OptChars = (Opt != NULL) ? (LoadedImage->LoadOptionsSize / sizeof (CHAR16)) : 0;
++  if ((OptChars > 4) && (Opt[0] == L'l') && (Opt[1] == L'o') &&
++      (Opt[2] == L'g') && (Opt[3] == L'=')) {
++    n = 0;
++    for (i = 4; (i < OptChars) && (Opt[i] != L'\0') && (Opt[i] != L' ') &&
++                (n < TOUCH_LOG_PATH_MAX - 1); i++) {
++      Dev->LogPath[n++] = Opt[i];
++    }
++    Dev->LogPath[n] = L'\0';
++    if (n != 0) {
++      Dev->LogDevice = LoadedImage->DeviceHandle;
++    }
++    return;
++  }
++
++ #if TOUCH_ESP_LOG
++  StrCpyS (Dev->LogPath, TOUCH_LOG_PATH_MAX, L"TouchI2c.log");
+   Dev->LogDevice = LoadedImage->DeviceHandle;
++ #endif
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -1342,7 +1409,7 @@ TouchI2cDxeEntry (
+     return EFI_SUCCESS;
+   }
+   Dev->Signature = TOUCH_SIG;
+-  Dev->Verbose   = TRUE;
++  Dev->Verbose   = (BOOLEAN)(TOUCH_CONSOLE_PRINT != 0);
+ 
+   TouchLogInit (Dev, ImageHandle);
+   if (EFI_ERROR (gRT->GetTime (&Time, NULL))) {
