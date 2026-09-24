@@ -33,7 +33,8 @@ class SetupCompletePath(unittest.TestCase):
         self.assertLess(before, self.script.index("run /noreboot"))
         body = self.script[self.script.index(":user_drivers_setupcomplete"):]
         self.assertIn('if not "%USOS_TARGET_COUNT%"=="1"', body)
-        self.assertIn('findstr /x /i /c:"%~1" "%~dp0usos-old-windows.txt"', body)
+        self.assertIn('find /i "%~1" "%~dp0usos-old-windows.txt"', body)
+        self.assertNotIn("findstr", self.script)  # not in every WinPE
         self.assertIn("Windows\\Panther\\setupact.log", body)
         # Letters: never X: (the WinPE RAM disk).
         self.assertIn("for %%D in (C D E F G H I J K L M N O P Q R S T U V W Y Z)", body)

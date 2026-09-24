@@ -118,7 +118,9 @@ echo USOS: user drivers copied to %USOS_TARGET%:\USOS\Drivers; the installed Win
 exit /b 0
 
 :user_drivers_candidate
-if exist "%~dp0usos-old-windows.txt" findstr /x /i /c:"%~1" "%~dp0usos-old-windows.txt" >nul 2>&1 && exit /b 0
+rem find.exe (WinPE does not always ship the regex search tool). Each line of the
+rem list is one drive letter, so a substring match is an exact match.
+if exist "%~dp0usos-old-windows.txt" find /i "%~1" "%~dp0usos-old-windows.txt" >nul 2>&1 && exit /b 0
 set "USOS_TARGET=%~1"
 set /a USOS_TARGET_COUNT+=1
 exit /b 0
