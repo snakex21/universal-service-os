@@ -149,6 +149,8 @@
   "installer.final.mismatch": "ABWEICHUNG",
   "installer.final.back": "Zurück zur Vorgangsauswahl",
   "installer.final.no_report": "Kein Prüfbericht verfügbar.",
+  "installer.final.open_drivers": "Treiberordner öffnen",
+  "installer.final.open_drivers_failed": "Der Treiberordner konnte nicht geöffnet werden: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: Ein Computer mit aktivem Secure Boot startet dieses Laufwerk, nachdem der USOS-Schlüssel einmal hinzugefügt wurde. Am einfachsten: USOS einmal bei ausgeschaltetem Secure Boot starten und \"Schlüssel hinzufügen\" bestätigen. Bei aktivem Secure Boot: im MokManager Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot wählen. Siehe EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "USOS-Schlüssel auf diesem Computer hinzufügen",
   "installer.mok.intro": "USOS ist mit einem eigenen Schlüssel signiert. Ein Computer mit aktivem Secure Boot startet USOS erst, nachdem dieser Schlüssel einmal hinzugefügt wurde. Kein Passwort nötig.",

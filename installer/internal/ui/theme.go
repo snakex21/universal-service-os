@@ -125,4 +125,5 @@ const (
 	glyphCheckSolid   = "\uEC61"
 	glyphErrorSolid   = "\uEB90"
 	glyphLock         = "\uE72E"
+	glyphFolder       = "\uE838"
 )

@@ -253,6 +253,9 @@ type finalScreen struct {
 	report install.VerificationReport
 	err    error
 	log    logView
+	// drivers is the DATA Drivers folder of the installed or updated drive
+	// once it is known ("" keeps "Open drivers folder" disabled).
+	drivers string
 }
 
 func newFinalScreen(f *Flow, op operation, report *install.VerificationReport, err error, log string) *finalScreen {
@@ -261,6 +264,9 @@ func newFinalScreen(f *Flow, op operation, report *install.VerificationReport, e
 		s.report = *report
 	}
 	s.log.text.WriteString(log)
+	if s.offersDrivers() && f.opHasDisk && f.cfg.Installed != nil {
+		s.resolveDrivers(f.opDisk)
+	}
 	return s
 }
 
@@ -319,7 +325,11 @@ func (s *finalScreen) draw(f *Flow, w *win, area rect) {
 	}
 	spec := s.log.toggleSpec()
 	w.button("log.toggle", rect{toggleRow.Left, toggleRow.Top, toggleRow.Left + w.buttonWidth(spec), toggleRow.Bottom}, spec)
-	w.actions(bar, nil, []action{{"action.primary", buttonSpec{label: i18n.T("installer.final.back"), style: buttonPrimary, onClick: f.showModes}}})
+	var left []action
+	if s.offersDrivers() {
+		left = append(left, action{"final.drivers", buttonSpec{label: i18n.T("installer.final.open_drivers"), glyph: glyphFolder, disabled: s.drivers == "", onClick: s.openDrivers}})
+	}
+	w.actions(bar, left, []action{{"action.primary", buttonSpec{label: i18n.T("installer.final.back"), style: buttonPrimary, onClick: f.showModes}}})
 }
 
 func (s *finalScreen) drawReport(w *win, r rect) {

@@ -149,6 +149,8 @@
   "installer.final.mismatch": "EI VASTA",
   "installer.final.back": "Tagasi toimingu valikusse",
   "installer.final.no_report": "Kontrolliaruanne pole saadaval.",
+  "installer.final.open_drivers": "Ava draiverite kaust",
+  "installer.final.open_drivers_failed": "Draiverite kausta ei saanud avada: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: arvuti, kus Secure Boot on sees, käivitab selle ketta pärast USOS-i võtme ühekordset lisamist. Lihtsaim: käivitage USOS üks kord, kui Secure Boot on väljas, ja kinnitage \"Lisa võti\". Kui Secure Boot on sees: valige MokManageris Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Vt EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Lisa USOS-i võti selles arvutis",
   "installer.mok.intro": "USOS on allkirjastatud oma võtmega. Arvuti, kus Secure Boot on sees, käivitab USOS-i alles pärast selle võtme ühekordset lisamist. Parooli pole vaja.",

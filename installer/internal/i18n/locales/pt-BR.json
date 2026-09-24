@@ -149,6 +149,8 @@
   "installer.final.mismatch": "NÃO CONFERE",
   "installer.final.back": "Voltar à escolha da operação",
   "installer.final.no_report": "Nenhum relatório de verificação disponível.",
+  "installer.final.open_drivers": "Abrir pasta de drivers",
+  "installer.final.open_drivers_failed": "Não foi possível abrir a pasta de drivers: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: um computador com Secure Boot ativado inicia esta unidade depois que a chave USOS for adicionada uma vez. Mais fácil: inicie o USOS uma vez com o Secure Boot desativado e confirme \"Adicionar a chave\". Com o Secure Boot ativado: no MokManager, escolha Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Veja EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Adicionar a chave USOS neste computador",
   "installer.mok.intro": "O USOS é assinado com sua própria chave. Um computador com Secure Boot ativado só inicia o USOS depois que essa chave for adicionada uma vez. Não é necessária senha.",

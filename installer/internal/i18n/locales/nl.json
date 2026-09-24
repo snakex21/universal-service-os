@@ -149,6 +149,8 @@
   "installer.final.mismatch": "AFWIJKING",
   "installer.final.back": "Terug naar bewerkingskeuze",
   "installer.final.no_report": "Er is geen verificatierapport beschikbaar.",
+  "installer.final.open_drivers": "Stuurprogrammamap openen",
+  "installer.final.open_drivers_failed": "De stuurprogrammamap kan niet worden geopend: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: een computer met Secure Boot aan start dit station nadat de USOS-sleutel eenmalig is toegevoegd. Het eenvoudigst: start USOS één keer met Secure Boot uit en bevestig \"Sleutel toevoegen\". Met Secure Boot aan: kies in MokManager Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Zie EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "USOS-sleutel toevoegen op deze computer",
   "installer.mok.intro": "USOS is ondertekend met een eigen sleutel. Een computer met Secure Boot aan start USOS pas nadat deze sleutel eenmalig is toegevoegd. Er is geen wachtwoord nodig.",

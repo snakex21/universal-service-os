@@ -155,6 +155,8 @@
   "installer.final.mismatch": "NE UJEMA SE",
   "installer.final.back": "Nazaj na izbiro operacije",
   "installer.final.no_report": "Poročilo o preverjanju ni na voljo.",
+  "installer.final.open_drivers": "Odpri mapo z gonilniki",
+  "installer.final.open_drivers_failed": "Mape z gonilniki ni bilo mogoče odpreti: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: računalnik z vklopljenim Secure Boot zažene ta pogon, ko je ključ USOS enkrat dodan. Najlažje: enkrat zaženite USOS z izklopljenim Secure Boot in potrdite \"Dodaj ključ\". Z vklopljenim Secure Boot: v MokManager izberite Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Glejte EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Dodaj ključ USOS na ta računalnik",
   "installer.mok.intro": "USOS je podpisan z lastnim ključem. Računalnik z vklopljenim Secure Boot zažene USOS šele, ko je ta ključ enkrat dodan. Geslo ni potrebno.",

@@ -149,6 +149,8 @@
   "installer.final.mismatch": "AFVIGER",
   "installer.final.back": "Tilbage til valg af handling",
   "installer.final.no_report": "Der er ingen verifikationsrapport tilgængelig.",
+  "installer.final.open_drivers": "Åbn mappen med drivere",
+  "installer.final.open_drivers_failed": "Mappen med drivere kunne ikke åbnes: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: en computer med Secure Boot slået til starter dette drev, når USOS-nøglen er tilføjet én gang. Nemmest: start USOS én gang med Secure Boot slået fra, og bekræft \"Tilføj nøglen\". Med Secure Boot slået til: vælg i MokManager Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Se EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Tilføj USOS-nøglen på denne computer",
   "installer.mok.intro": "USOS er signeret med sin egen nøgle. En computer med Secure Boot slået til starter først USOS, når denne nøgle er tilføjet én gang. Der kræves ingen adgangskode.",

@@ -149,6 +149,8 @@
   "installer.final.mismatch": "MISMATCH",
   "installer.final.back": "Back to operation choice",
   "installer.final.no_report": "No verification report is available.",
+  "installer.final.open_drivers": "Open drivers folder",
+  "installer.final.open_drivers_failed": "Could not open the drivers folder: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: a computer with Secure Boot on starts this drive after the USOS key has been added once. Easiest: start USOS once with Secure Boot off and confirm \"Add the key\". With Secure Boot on: in MokManager choose Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. See EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Add the USOS key on this computer",
   "installer.mok.intro": "USOS is signed with its own key. A computer with Secure Boot on starts USOS only after this key has been added once. No password is needed.",

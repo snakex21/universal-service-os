@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/snakex21/universal-service-os/installer/internal/buildinfo"
@@ -63,9 +64,10 @@ func main() {
 		MachineUUID:       func() string { return "00112233-4455-6677-8899-AABBCCDDEEFF" },
 		Restart:           func() error { return errors.New("demo: restart skipped") },
 		RestartToFirmware: func() error { return errors.New("demo: restart into firmware settings skipped") },
-		ForceDPI:    uint32(*dpi),
-		ClientW:     int32(*width),
-		ClientH:     int32(*height),
+		OpenDriversFolder: func(path string) error { return fmt.Errorf("demo: opening %s skipped", path) },
+		ForceDPI:          uint32(*dpi),
+		ClientW:           int32(*width),
+		ClientH:           int32(*height),
 	}
 	if *startupError {
 		cfg.StartupError = i18n.T("installer.startup.log_failed", `open operation log C:\USOS\USOS Installer.log: Access is denied.`)
@@ -273,7 +275,19 @@ func tour(d *ui.Driver, e *fakeEngines, dir, suffix string, startupError bool, l
 	}
 	close(e.installHold)
 	waitIdle(d)
+	for deadline := time.Now().Add(10 * time.Second); !d.Enabled("final.drivers"); time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("open drivers folder button stayed disabled")
+		}
+	}
+	d.Idle()
 	if err := shot("install-final-success"); err != nil {
+		return err
+	}
+	if err := d.Activate("final.drivers"); err != nil {
+		return err
+	}
+	if err := shot("install-final-drivers"); err != nil {
 		return err
 	}
 	// Secure Boot (fake firmware with Secure Boot on: nothing reaches
@@ -527,6 +541,10 @@ func (fakeDisks) ListDisks() ([]domain.Disk, error) {
 
 type fakeInstalled struct{}
 
+// demoInstalled: after the fake install finishes, its drive (PhysicalDrive1)
+// is listed as an installed USOS too (the final screen's drivers folder).
+var demoInstalled atomic.Bool
+
 func (fakeInstalled) ListInstalledUSOS() ([]installed.Target, error) {
 	time.Sleep(120 * time.Millisecond)
 	disks := allDisks()
@@ -548,7 +566,11 @@ func (fakeInstalled) ListInstalledUSOS() ([]installed.Target, error) {
 	for _, d := range disks {
 		byNumber[d.Number] = d
 	}
-	return []installed.Target{target(byNumber[2], older), target(byNumber[5], newer)}, nil
+	targets := []installed.Target{target(byNumber[2], older), target(byNumber[5], newer)}
+	if demoInstalled.Load() {
+		targets = append(targets, target(byNumber[1], current))
+	}
+	return targets, nil
 }
 
 // ---- fake engines: scripted events only ----------------------------------
@@ -606,6 +628,7 @@ func (f *fakeInstall) RunAsync(disk domain.Disk) <-chan install.Event {
 			{Name: "Legacy BIOS", Expected: "Stage 1 i Core zgodne z payloadem instalatora", Actual: "Stage 1 i Core zgodne z payloadem instalatora", Match: true},
 			{Name: "lang.bin", Expected: "pl, 23 108 B", Actual: "pl, 23 108 B", Match: true},
 		}}
+		demoInstalled.Store(true)
 		ch <- install.Event{Kind: install.EventFinished, Verification: &report}
 	}()
 	return ch

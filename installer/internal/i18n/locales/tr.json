@@ -149,6 +149,8 @@
   "installer.final.mismatch": "EŞLEŞMİYOR",
   "installer.final.back": "İşlem seçimine dön",
   "installer.final.no_report": "Doğrulama raporu yok.",
+  "installer.final.open_drivers": "Sürücü klasörünü aç",
+  "installer.final.open_drivers_failed": "Sürücü klasörü açılamadı: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: Secure Boot açık bir bilgisayar, USOS anahtarı bir kez eklendikten sonra bu sürücüden başlar. En kolayı: USOS'u Secure Boot kapalıyken bir kez başlatın ve \"Anahtarı ekle\" seçeneğini onaylayın. Secure Boot açıkken: MokManager'da Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot seçin. Bkz. EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "USOS anahtarını bu bilgisayara ekle",
   "installer.mok.intro": "USOS kendi anahtarıyla imzalanmıştır. Secure Boot açık bir bilgisayar, USOS'u yalnızca bu anahtar bir kez eklendikten sonra başlatır. Parola gerekmez.",

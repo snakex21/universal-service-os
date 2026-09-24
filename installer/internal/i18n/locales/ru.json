@@ -152,6 +152,8 @@
   "installer.final.mismatch": "НЕ СОВПАДАЕТ",
   "installer.final.back": "Назад к выбору операции",
   "installer.final.no_report": "Отчёт о проверке недоступен.",
+  "installer.final.open_drivers": "Открыть папку драйверов",
+  "installer.final.open_drivers_failed": "Не удалось открыть папку драйверов: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: компьютер с включённым Secure Boot запускает этот накопитель после однократного добавления ключа USOS. Проще всего: один раз запустите USOS с выключенным Secure Boot и подтвердите \"Добавить ключ\". При включённом Secure Boot: в MokManager выберите Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. См. EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Добавить ключ USOS на этом компьютере",
   "installer.mok.intro": "USOS подписан собственным ключом. Компьютер с включённым Secure Boot запускает USOS только после однократного добавления этого ключа. Пароль не нужен.",

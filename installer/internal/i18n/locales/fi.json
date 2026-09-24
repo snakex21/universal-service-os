@@ -149,6 +149,8 @@
   "installer.final.mismatch": "EI VASTAA",
   "installer.final.back": "Takaisin toiminnon valintaan",
   "installer.final.no_report": "Tarkistusraporttia ei ole saatavilla.",
+  "installer.final.open_drivers": "Avaa ohjainkansio",
+  "installer.final.open_drivers_failed": "Ohjainkansiota ei voitu avata: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: tietokone, jossa Secure Boot on päällä, käynnistää tämän aseman, kun USOS-avain on lisätty kerran. Helpoin: käynnistä USOS kerran Secure Boot pois päältä ja vahvista \"Lisää avain\". Secure Boot päällä: valitse MokManagerissa Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Katso EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Lisää USOS-avain tähän tietokoneeseen",
   "installer.mok.intro": "USOS on allekirjoitettu omalla avaimellaan. Tietokone, jossa Secure Boot on päällä, käynnistää USOSin vasta, kun tämä avain on lisätty kerran. Salasanaa ei tarvita.",

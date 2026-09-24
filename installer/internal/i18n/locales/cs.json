@@ -152,6 +152,8 @@
   "installer.final.mismatch": "NESHODA",
   "installer.final.back": "Zpět na výběr operace",
   "installer.final.no_report": "Zpráva o ověření není k dispozici.",
+  "installer.final.open_drivers": "Otevřít složku ovladačů",
+  "installer.final.open_drivers_failed": "Složku ovladačů nelze otevřít: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: počítač se zapnutým Secure Boot spustí tuto jednotku po jednorázovém přidání klíče USOS. Nejsnazší: jednou spustit USOS s vypnutým Secure Boot a potvrdit \"Přidat klíč\". Se zapnutým Secure Boot: v MokManageru zvolte Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Viz EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Přidat klíč USOS na tomto počítači",
   "installer.mok.intro": "USOS je podepsán vlastním klíčem. Počítač se zapnutým Secure Boot spustí USOS až po jednorázovém přidání tohoto klíče. Heslo není potřeba.",

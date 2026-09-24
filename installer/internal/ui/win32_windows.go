@@ -99,6 +99,7 @@ var (
 
 	procSHGetStockIconInfo = shell32.NewProc("SHGetStockIconInfo")
 	procSHDefExtractIconW  = shell32.NewProc("SHDefExtractIconW")
+	procShellExecuteW      = shell32.NewProc("ShellExecuteW")
 
 	procDwmSetWindowAttribute = dwmapi.NewProc("DwmSetWindowAttribute")
 	procSetWindowTheme        = uxtheme.NewProc("SetWindowTheme")

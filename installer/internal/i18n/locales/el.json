@@ -149,6 +149,8 @@
   "installer.final.mismatch": "ΔΕΝ ΤΑΙΡΙΑΖΕΙ",
   "installer.final.back": "Πίσω στην επιλογή λειτουργίας",
   "installer.final.no_report": "Δεν υπάρχει διαθέσιμη αναφορά επαλήθευσης.",
+  "installer.final.open_drivers": "Άνοιγμα φακέλου προγραμμάτων οδήγησης",
+  "installer.final.open_drivers_failed": "Δεν ήταν δυνατό το άνοιγμα του φακέλου προγραμμάτων οδήγησης: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: ένας υπολογιστής με ενεργό Secure Boot εκκινεί αυτή τη μονάδα αφού προστεθεί μία φορά το κλειδί USOS. Το πιο απλό: εκκινήστε το USOS μία φορά με ανενεργό Secure Boot και επιβεβαιώστε \"Προσθήκη κλειδιού\". Με ενεργό Secure Boot: στο MokManager επιλέξτε Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Δείτε EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Προσθήκη του κλειδιού USOS σε αυτόν τον υπολογιστή",
   "installer.mok.intro": "Το USOS είναι υπογεγραμμένο με δικό του κλειδί. Ένας υπολογιστής με ενεργό Secure Boot ξεκινά το USOS μόνο αφού προστεθεί μία φορά αυτό το κλειδί. Δεν χρειάζεται κωδικός.",

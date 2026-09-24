@@ -149,6 +149,8 @@
   "installer.final.mismatch": "AVVIKER",
   "installer.final.back": "Tillbaka till val av åtgärd",
   "installer.final.no_report": "Ingen verifieringsrapport finns tillgänglig.",
+  "installer.final.open_drivers": "Öppna drivrutinsmappen",
+  "installer.final.open_drivers_failed": "Det gick inte att öppna drivrutinsmappen: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: en dator med Secure Boot på startar den här enheten när USOS-nyckeln har lagts till en gång. Enklast: starta USOS en gång med Secure Boot av och bekräfta \"Lägg till nyckeln\". Med Secure Boot på: välj i MokManager Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Se EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Lägg till USOS-nyckeln på den här datorn",
   "installer.mok.intro": "USOS är signerat med en egen nyckel. En dator med Secure Boot på startar USOS först när nyckeln har lagts till en gång. Inget lösenord behövs.",

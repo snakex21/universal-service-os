@@ -10,6 +10,7 @@ Nośnik jest czytelny również bez uruchamiania Universal Service OS:
 - `Systems/DOS/` - systemy DOS,
 - `Utilities/` - diagnostyka, recovery, firmware, sieć i narzędzia bootujące,
 - `Programs/` - programy przeznaczone do instalacji po instalacji systemu,
+- `Drivers/` - sterowniki użytkownika: UEFI dla menu USOS i pakiety INF dla instalatorów Windows,
 - `UI/` - HTML i CSS interfejsu.
 
 ## Partycje techniczne
@@ -260,3 +261,15 @@ Utilities są osobną kategorią GUI, a nie systemem operacyjnym.
 ## Programs
 
 `Programs/` jest przeznaczone na programy używane już po uruchomieniu docelowego systemu operacyjnego. Każdy program może mieć własny folder i opcjonalne `icon.png` jako metadane. Zwykłe pliki Windows EXE nie są uruchamiane bez Windows; narzędzia bootowalne należy umieszczać w `Utilities`.
+
+## Sterowniki (Drivers)
+
+`Drivers/` należy do użytkownika. Instalacja i lokalna aktualizacja tworzą tylko brakujące foldery (wyłącznie `MkdirAll`) i nadpisują `Drivers/README.txt` (instrukcja PL + EN); nic pod `Drivers/` nie jest usuwane. Naprawa kopiuje tylko ładunek ESP i nie dotyka DATA. Deinstalacja usuwa cały nośnik razem z tym folderem.
+
+- `Drivers/UEFI/<Nazwa>/` - sterowniki ładowane przez menu USOS (dotyk, wejście, dyski, systemy plików): plik `.efi` (sterownik x64 boot-service lub runtime, nie aplikacja) i opcjonalny `driver.ini` (`[driver]` z `name`, `type`, `load`; opcjonalne sekcje `[match]` z `smbios_manufacturer`, `smbios_product`, `smbios_baseboard`, `pci`, `acpi_hid`). Przy włączonym Secure Boot ładują się tylko sterowniki podpisane kluczem z db firmware lub zarejestrowanym MOK. Lista i przełączniki: Narzędzia -> Sterowniki; dziennik na ESP: `EFI/USOS/Logs/drivers.txt`.
+- `Drivers/<wersja Windows>/` - jeden folder na każdy profil z `Systems/Windows/` (te same nazwy, np. `Drivers/Windows 11/`, `Drivers/Windows 98 SE/`) na rozpakowane pakiety INF (INF+SYS+CAT, każdy pakiet w osobnym podfolderze). Wersje oparte na instalatorze NT (Windows 11, 10, 8.1, 8, 7, Vista, XP, 2000) mają podfoldery:
+  - `Storage/` - kontrolery dysków potrzebne do startu (SATA/AHCI, RAID, Intel VMD/RST, NVMe): ładowane w Instalatorze Windows i dodawane do zainstalowanego systemu,
+  - `USB/` - kontrolery USB 3, tak samo jak `Storage/`,
+  - `Other/` - pozostałe (sieć, grafika, chipset): tylko do zainstalowanego systemu; pliki leżące bezpośrednio w `Drivers/<system>/` liczą się jako `Other/`.
+
+Sterowniki użytkownika tylko uzupełniają sterowniki wbudowane w USOS (wbudowane są stosowane najpierw). Używana jest tylko architektura celu (amd64 dla x64, x86 dla 32-bit); USOS nigdy nie omija podpisu sterowników, a uszkodzony pakiet jest pomijany i logowany. Instalator Windows USOS udostępnia przycisk „Otwórz folder sterowników” na ekranie końcowym instalacji i aktualizacji. Szczegóły: [docs/drivers.md](docs/drivers.md).

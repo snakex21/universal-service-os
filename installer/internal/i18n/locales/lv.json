@@ -152,6 +152,8 @@
   "installer.final.mismatch": "NESAKRĪT",
   "installer.final.back": "Atpakaļ uz darbības izvēli",
   "installer.final.no_report": "Pārbaudes atskaite nav pieejama.",
+  "installer.final.open_drivers": "Atvērt draiveru mapi",
+  "installer.final.open_drivers_failed": "Neizdevās atvērt draiveru mapi: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: dators ar ieslēgtu Secure Boot palaiž šo disku pēc tam, kad USOS atslēga ir vienreiz pievienota. Vienkāršākais: vienreiz palaidiet USOS ar izslēgtu Secure Boot un apstipriniet \"Pievienot atslēgu\". Ar ieslēgtu Secure Boot: MokManager izvēlieties Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Skatiet EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Pievienot USOS atslēgu šajā datorā",
   "installer.mok.intro": "USOS ir parakstīta ar savu atslēgu. Dators ar ieslēgtu Secure Boot palaiž USOS tikai pēc tam, kad šī atslēga ir vienreiz pievienota. Parole nav vajadzīga.",

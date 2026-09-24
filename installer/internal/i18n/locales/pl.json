@@ -152,6 +152,8 @@
   "installer.final.mismatch": "NIEZGODNE",
   "installer.final.back": "Wróć do wyboru trybu",
   "installer.final.no_report": "Brak raportu weryfikacji.",
+  "installer.final.open_drivers": "Otwórz folder sterowników",
+  "installer.final.open_drivers_failed": "Nie udało się otworzyć folderu sterowników: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: komputer z włączonym Secure Boot uruchomi ten nośnik po jednorazowym dodaniu klucza USOS. Najprościej: uruchom USOS raz z wyłączonym Secure Boot i potwierdź \"Dodaj klucz\". Przy włączonym Secure Boot: w MokManagerze wybierz Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Szczegóły w EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Dodaj klucz USOS na tym komputerze",
   "installer.mok.intro": "USOS jest podpisany własnym kluczem. Komputer z włączonym Secure Boot uruchamia USOS dopiero po jednorazowym dodaniu tego klucza. Hasło nie jest potrzebne.",

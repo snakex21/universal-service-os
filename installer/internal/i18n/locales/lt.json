@@ -152,6 +152,8 @@
   "installer.final.mismatch": "NESUTAMPA",
   "installer.final.back": "Atgal į operacijos pasirinkimą",
   "installer.final.no_report": "Patikrinimo ataskaita nepasiekiama.",
+  "installer.final.open_drivers": "Atidaryti tvarkyklių aplanką",
+  "installer.final.open_drivers_failed": "Nepavyko atidaryti tvarkyklių aplanko: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: kompiuteris su įjungtu Secure Boot paleidžia šį diską vieną kartą pridėjus USOS raktą. Paprasčiausia: vieną kartą paleiskite USOS su išjungtu Secure Boot ir patvirtinkite \"Pridėti raktą\". Su įjungtu Secure Boot: MokManager pasirinkite Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Žr. EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Pridėti USOS raktą šiame kompiuteryje",
   "installer.mok.intro": "USOS pasirašyta savo raktu. Kompiuteris su įjungtu Secure Boot paleidžia USOS tik vieną kartą pridėjus šį raktą. Slaptažodžio nereikia.",

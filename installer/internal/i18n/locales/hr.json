@@ -152,6 +152,8 @@
   "installer.final.mismatch": "NE PODUDARA SE",
   "installer.final.back": "Natrag na odabir operacije",
   "installer.final.no_report": "Izvješće o provjeri nije dostupno.",
+  "installer.final.open_drivers": "Otvori mapu upravljačkih programa",
+  "installer.final.open_drivers_failed": "Mapu upravljačkih programa nije moguće otvoriti: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: računalo s uključenim Secure Bootom pokreće ovaj pogon nakon što se ključ USOS jednom doda. Najlakše: pokrenite USOS jednom uz isključen Secure Boot i potvrdite \"Dodaj ključ\". Uz uključen Secure Boot: u MokManageru odaberite Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Vidi EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Dodaj ključ USOS na ovom računalu",
   "installer.mok.intro": "USOS je potpisan vlastitim ključem. Računalo s uključenim Secure Bootom pokreće USOS tek nakon što se taj ključ jednom doda. Lozinka nije potrebna.",

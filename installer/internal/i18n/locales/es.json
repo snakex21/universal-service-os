@@ -149,6 +149,8 @@
   "installer.final.mismatch": "NO COINCIDE",
   "installer.final.back": "Volver a la elección de operación",
   "installer.final.no_report": "No hay ningún informe de verificación disponible.",
+  "installer.final.open_drivers": "Abrir carpeta de controladores",
+  "installer.final.open_drivers_failed": "No se pudo abrir la carpeta de controladores: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: un equipo con Secure Boot activado inicia esta unidad después de añadir una vez la clave de USOS. Lo más fácil: iniciar USOS una vez con Secure Boot desactivado y confirmar \"Añadir la clave\". Con Secure Boot activado: en MokManager elija Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Vea EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Añadir la clave de USOS en este equipo",
   "installer.mok.intro": "USOS está firmado con su propia clave. Un equipo con Secure Boot activado inicia USOS solo después de añadir esta clave una vez. No se necesita contraseña.",

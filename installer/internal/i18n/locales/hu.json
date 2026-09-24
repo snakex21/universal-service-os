@@ -149,6 +149,8 @@
   "installer.final.mismatch": "ELTÉR",
   "installer.final.back": "Vissza a műveletválasztáshoz",
   "installer.final.no_report": "Nem áll rendelkezésre ellenőrzési jelentés.",
+  "installer.final.open_drivers": "Illesztőprogram-mappa megnyitása",
+  "installer.final.open_drivers_failed": "Az illesztőprogram-mappa nem nyitható meg: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: bekapcsolt Secure Boot mellett a számítógép az USOS-kulcs egyszeri hozzáadása után indítja el ezt a meghajtót. Legegyszerűbb: indítsa el egyszer az USOS-t kikapcsolt Secure Boot mellett, és erősítse meg a \"Kulcs hozzáadása\" lehetőséget. Bekapcsolt Secure Boot mellett a MokManagerben válassza: Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Lásd EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "USOS-kulcs hozzáadása ezen a számítógépen",
   "installer.mok.intro": "Az USOS saját kulccsal van aláírva. Bekapcsolt Secure Boot mellett a számítógép csak a kulcs egyszeri hozzáadása után indítja el az USOS-t. Jelszó nem szükséges.",

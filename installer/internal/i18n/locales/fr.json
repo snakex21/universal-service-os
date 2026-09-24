@@ -149,6 +149,8 @@
   "installer.final.mismatch": "NON CONFORME",
   "installer.final.back": "Retour au choix de l'opération",
   "installer.final.no_report": "Aucun rapport de vérification disponible.",
+  "installer.final.open_drivers": "Ouvrir le dossier des pilotes",
+  "installer.final.open_drivers_failed": "Impossible d'ouvrir le dossier des pilotes : %s",
   "installer.secure_boot.enroll_note": "Secure Boot : un ordinateur où Secure Boot est activé démarre ce support une fois la clé USOS ajoutée. Le plus simple : démarrer USOS une fois avec Secure Boot désactivé et confirmer \"Ajouter la clé\". Avec Secure Boot activé : dans MokManager, choisissez Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Voir EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Ajouter la clé USOS sur cet ordinateur",
   "installer.mok.intro": "USOS est signé avec sa propre clé. Un ordinateur avec Secure Boot activé ne démarre USOS qu'une fois cette clé ajoutée. Aucun mot de passe n'est nécessaire.",

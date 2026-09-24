@@ -149,6 +149,8 @@
   "installer.final.mismatch": "НЕ СЪВПАДА",
   "installer.final.back": "Обратно към избора на операция",
   "installer.final.no_report": "Няма наличен отчет от проверката.",
+  "installer.final.open_drivers": "Отвори папката с драйвери",
+  "installer.final.open_drivers_failed": "Папката с драйвери не може да бъде отворена: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: компютър с включен Secure Boot стартира това устройство, след като ключът на USOS бъде добавен веднъж. Най-лесно: стартирайте USOS веднъж с изключен Secure Boot и потвърдете \"Добави ключа\". При включен Secure Boot: в MokManager изберете Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Вижте EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Добавяне на ключа на USOS на този компютър",
   "installer.mok.intro": "USOS е подписан със собствен ключ. Компютър с включен Secure Boot стартира USOS едва след като този ключ бъде добавен веднъж. Не е нужна парола.",

@@ -152,6 +152,8 @@
   "installer.final.mismatch": "NU CORESPUNDE",
   "installer.final.back": "Înapoi la alegerea operației",
   "installer.final.no_report": "Nu este disponibil niciun raport de verificare.",
+  "installer.final.open_drivers": "Deschide folderul de drivere",
+  "installer.final.open_drivers_failed": "Folderul de drivere nu a putut fi deschis: %s",
   "installer.secure_boot.enroll_note": "Secure Boot: un computer cu Secure Boot activat pornește această unitate după ce cheia USOS a fost adăugată o dată. Cel mai simplu: porniți USOS o dată cu Secure Boot dezactivat și confirmați \"Adăugați cheia\". Cu Secure Boot activat: în MokManager alegeți Enroll key from disk -> USOS_ESP -> USOS-KEY.cer -> Continue -> Yes -> Reboot. Vedeți EFI\\USOS\\ENROLL-README.txt.",
   "installer.mok.button": "Adăugați cheia USOS pe acest computer",
   "installer.mok.intro": "USOS este semnat cu propria cheie. Un computer cu Secure Boot activat pornește USOS doar după ce această cheie a fost adăugată o dată. Nu este necesară nicio parolă.",

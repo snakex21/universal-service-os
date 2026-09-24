@@ -76,6 +76,10 @@ type Config struct {
 	// settings); nil = the real shutdown.exe calls. The UI demo passes fakes.
 	Restart           func() error
 	RestartToFirmware func() error
+	// OpenDriversFolder opens DATA\Drivers of the finished drive (final
+	// screen); nil = create it if missing and open it in Explorer. The UI
+	// demo passes a fake.
+	OpenDriversFolder func(path string) error
 
 	// Test harness only (cmd/usos-installer-uidemo).
 	ForceDPI         uint32
@@ -115,6 +119,10 @@ type Flow struct {
 	// sb: Secure Boot / USOS key state of this computer (home card).
 	sb          secureBootState
 	lastTargets []installed.Target
+	// opDisk is the disk number of the running install or update (for the
+	// final screen's "Open drivers folder"); opHasDisk is false otherwise.
+	opDisk    uint32
+	opHasDisk bool
 }
 
 // Run creates the installer window and blocks until it is closed.
@@ -508,6 +516,7 @@ func (f *Flow) showInstallConfirmation(disk domain.Disk) {
 
 func (f *Flow) showInstallProgress(disk domain.Disk) {
 	f.busy = true
+	f.opDisk, f.opHasDisk = disk.Number, true
 	events := normalizeInstall(f.cfg.Install.RunAsync(disk))
 	f.show(newProgressScreen(f, opInstall, events), "")
 }
@@ -523,6 +532,7 @@ func (f *Flow) showUpdateConfirmation(target installed.Target) {
 
 func (f *Flow) showUpdateProgress(target installed.Target, allowDowngrade bool) {
 	f.busy = true
+	f.opDisk, f.opHasDisk = target.Disk.Number, true
 	var events <-chan localupdate.Event
 	if allowDowngrade {
 		events = f.cfg.Update.RunAsyncConfirmedDowngrade(target)
@@ -538,6 +548,7 @@ func (f *Flow) showRepairConfirmation(target installed.Target) {
 
 func (f *Flow) showRepairProgress(target installed.Target) {
 	f.busy = true
+	f.opHasDisk = false
 	f.show(newProgressScreen(f, opRepair, normalizeRepair(f.cfg.Repair.RunAsync(target))), "")
 }
 
@@ -547,6 +558,7 @@ func (f *Flow) showUninstallConfirmation(target installed.Target) {
 
 func (f *Flow) showUninstallProgress(target installed.Target) {
 	f.busy = true
+	f.opHasDisk = false
 	f.show(newProgressScreen(f, opUninstall, normalizeUninstall(f.cfg.Uninstall.RunAsync(target))), "")
 }
 
