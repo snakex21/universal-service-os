@@ -21,6 +21,7 @@ func TestEmbeddedPayloadHasRequiredFiles(t *testing.T) {
 		"EFI/USOS/build-info.ini":                 false,
 		"EFI/BOOT/BOOTAA64.EFI":                   false,
 		"EFI/USOS/ntfs_x64.efi":                   false,
+		"EFI/USOS/touchi2c_x64.efi":               false,
 		"EFI/USOS/systemd-bootx64.efi":            false,
 		"EFI/USOS/micro-linux/vmlinuz-virt":       false,
 		"EFI/USOS/micro-linux/initramfs-usos":     false,

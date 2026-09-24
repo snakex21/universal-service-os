@@ -59,7 +59,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Second stage $secondStage does not derive from $manualBoot" }
     if ((Get-Content -LiteralPath $secureBootIni -Raw) -match '(?m)^signed=1\r?$') {
         $enrollCert = Join-Path $usbRoot 'EFI\USOS\ENROLL_THIS_KEY_IN_MOKMANAGER.cer'
-        foreach ($signedFile in @($secondStage, (Join-Path $ProjectRoot 'zig-out\micro-linux\vmlinuz-virt'), (Join-Path $ProjectRoot 'zig-out\micro-linux\systemd-bootx64.efi'), (Join-Path $ProjectRoot 'zig-out\test-assets\ntfs_x64.efi'))) {
+        foreach ($signedFile in @($secondStage, (Join-Path $ProjectRoot 'zig-out\micro-linux\vmlinuz-virt'), (Join-Path $ProjectRoot 'zig-out\micro-linux\systemd-bootx64.efi'), (Join-Path $ProjectRoot 'zig-out\test-assets\ntfs_x64.efi'), (Join-Path $usbRoot 'EFI\USOS\touchi2c_x64.efi'))) {
             & go run ./cmd/usos-efisign verify -in $signedFile -cert $enrollCert
             if ($LASTEXITCODE -ne 0) { throw "Not signed with the enrolled USOS key: $signedFile" }
         }
@@ -114,6 +114,8 @@ try {
         'EFI/USOS/dos-native/ram-patch/INSTALL.BAT',
         'EFI/USOS/dos-native/ram-patch/REPAIR.BAT',
         'EFI/USOS/systemd-bootx64.efi',
+        'EFI/USOS/touchi2c_x64.efi',
+        'EFI/USOS/licenses/touchi2cdxe/LICENSE',
         'EFI/USOS/bios-ui.bin',
         'EFI/USOS/licenses/fonts/LICENSE-OFL-1.1.txt',
         'UI/index.html',

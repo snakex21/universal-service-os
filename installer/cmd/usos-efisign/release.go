@@ -33,6 +33,13 @@ const (
 	enrollCertName    = "ENROLL_THIS_KEY_IN_MOKMANAGER.cer"
 	rootCertName      = "USOS-KEY.cer"
 	secureBootINIPath = "EFI/USOS/secure-boot.ini"
+
+	// Handheld I2C touch driver (tools/vendor/touchi2cdxe): copied from the
+	// vendored build after its manifest hash check, then signed like the
+	// NTFS driver. USOS starts it only on matching SMBIOS (touch_driver.zig).
+	touchVendorDir    = "tools/vendor/touchi2cdxe/v1.3.1-usos1"
+	touchDriverTarget = "EFI/USOS/touchi2c_x64.efi"
+	touchLicenseDir   = "EFI/USOS/licenses/touchi2cdxe"
 )
 
 // signedInPlace are the non-Microsoft EFI binaries USOS loads after itself.
@@ -131,6 +138,11 @@ func release(args []string) error {
 		}
 	}
 
+	touchDriver, err := stageTouchDriver(at(touchVendorDir), at(usbRoot))
+	if err != nil {
+		return err
+	}
+
 	secondStage := filepath.Join(bootDir, manifest.SecondStage)
 	options := efisign.SignOptions{SBAT: sbat}
 	if signed {
@@ -143,6 +155,10 @@ func release(args []string) error {
 			}
 			fmt.Printf("[SIGN] %s\n", relative)
 		}
+		if err := signFile(touchDriver, touchDriver, pair, efisign.SignOptions{ReplaceSignature: true}); err != nil {
+			return err
+		}
+		fmt.Printf("[SIGN] %s/%s\n", usbRoot, touchDriverTarget)
 		for _, target := range []string{filepath.Join(usosDir, enrollCertName), at(usbRoot + "/" + rootCertName)} {
 			if err := os.WriteFile(target, pair.Cert.Raw, 0o644); err != nil {
 				return err
@@ -258,4 +274,39 @@ func copyVerified(source, target, expected string) error {
 		return fmt.Errorf("%s SHA-256 %s, manifest pins %s", source, actual, expected)
 	}
 	return writeFileAtomic(target, data)
+}
+
+type touchManifest struct {
+	Version string            `json:"version"`
+	Files   map[string]string `json:"files"`
+}
+
+// stageTouchDriver copies the vendored TouchI2cDxe.efi (hash-checked against
+// its manifest) and its licence into the release ESP tree and returns the
+// driver's path there.
+func stageTouchDriver(vendorDir, usb string) (string, error) {
+	var manifest touchManifest
+	data, err := os.ReadFile(filepath.Join(vendorDir, "manifest.json"))
+	if err != nil {
+		return "", fmt.Errorf("vendored touch driver manifest: %w", err)
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return "", fmt.Errorf("vendored touch driver manifest: %w", err)
+	}
+	if manifest.Files["TouchI2cDxe.efi"] == "" || manifest.Files["LICENSE"] == "" {
+		return "", errors.New("vendored touch driver manifest lacks the TouchI2cDxe.efi or LICENSE hash")
+	}
+	target := filepath.Join(usb, filepath.FromSlash(touchDriverTarget))
+	licenseDir := filepath.Join(usb, filepath.FromSlash(touchLicenseDir))
+	if err := os.MkdirAll(licenseDir, 0o755); err != nil {
+		return "", err
+	}
+	if err := copyVerified(filepath.Join(vendorDir, "TouchI2cDxe.efi"), target, manifest.Files["TouchI2cDxe.efi"]); err != nil {
+		return "", err
+	}
+	if err := copyVerified(filepath.Join(vendorDir, "LICENSE"), filepath.Join(licenseDir, "LICENSE"), manifest.Files["LICENSE"]); err != nil {
+		return "", err
+	}
+	fmt.Printf("[STAGE] %s <- %s (TouchI2cDxe %s)\n", touchDriverTarget, filepath.ToSlash(vendorDir), manifest.Version)
+	return target, nil
 }

@@ -14,7 +14,8 @@ $files = @(
     'zig-out\usb\EFI\BOOT\grubx64.efi',
     'zig-out\micro-linux\vmlinuz-virt',
     'zig-out\micro-linux\systemd-bootx64.efi',
-    'zig-out\test-assets\ntfs_x64.efi'
+    'zig-out\test-assets\ntfs_x64.efi',
+    'zig-out\usb\EFI\USOS\touchi2c_x64.efi'
 )
 $failures = 0
 foreach ($relative in $files) {
