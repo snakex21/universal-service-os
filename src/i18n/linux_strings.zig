@@ -4,6 +4,7 @@
 /// FNV-1a 32 of the key names stored in lang.bin (without the "boot." prefix).
 pub const hashes = [_]u32{
     0x4c1c62c1, // lx.a_new_x_layout_will_be_created
+    0x82f97f5e, // lx.adding_your_drivers
     0xcde86d7b, // lx.after_the_restart_x_setup_runs_on_its_own_up_to
     0xb2a68a12, // lx.all_buffered_writes_are_complete_closing_the_pre
     0xd0eebedd, // lx.all_partitions_systems_and_files_on_this_disk_wi
@@ -13,6 +14,7 @@ pub const hashes = [_]u32{
     0xd8b480aa, // lx.checking_boot_files
     0x76837b85, // lx.checking_selected_image_and_device_identity
     0xa5ea45fa, // lx.checking_target_safety
+    0xc4495f07, // lx.checking_the_packages_in_drivers_for_windows_setup
     0x51a80680, // lx.checking_the_prepared_xp_target
     0xb777cf4e, // lx.checking_the_selected_bcd_and_efi_fallback_boot
     0x10e4c869, // lx.choose_a_disk_and_confirm_the_installation_befor
@@ -169,6 +171,7 @@ pub const hashes = [_]u32{
 
 pub const english = [_][]const u8{
     "A new {0} layout will be created.",
+    "Adding your drivers",
     "After the restart, {0} Setup runs on its own up to the graphical setup wizard. Until then do not press any keys: the disk has already been chosen here.",
     "All buffered writes are complete; closing the prepared filesystem.",
     "All partitions, systems and files on this disk will be erased.",
@@ -178,6 +181,7 @@ pub const english = [_][]const u8{
     "Checking boot files",
     "Checking selected image and device identity.",
     "Checking target safety",
+    "Checking the packages in Drivers for Windows Setup.",
     "Checking the prepared XP target.",
     "Checking the selected BCD and EFI fallback boot manager.",
     "Choose a disk and confirm the installation before any changes.",
