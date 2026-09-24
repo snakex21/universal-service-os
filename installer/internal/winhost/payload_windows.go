@@ -99,6 +99,10 @@ func (b Backend) CopyInstallPayload(media install.MediaLayout, progress func(don
 	if err := ensureDataDirectories(resolved.DATA.VolumePath); err != nil {
 		return err
 	}
+	// PE10 donor for Vista/Windows 7: managed folder, legacy move, record, attributes.
+	if _, err := ensureWinpeDonor(resolved.DATA.VolumePath, resolved.ESP.VolumePath); err != nil {
+		return fmt.Errorf("prepare the WinPE donor (Programs\\USOS\\WinPE): %w", err)
+	}
 	for _, guide := range dataGuides {
 		guidePath := filepath.Join(resolved.DATA.VolumePath, guide.relativePath)
 		if err := writeFileSync(guidePath, guide.contents); err != nil {

@@ -29,6 +29,22 @@ var dataGuides = []dataGuide{
 		contents:     []byte("Universal Service OS - Programs\r\n\r\nTen katalog jest przeznaczony na programy do instalacji lub uruchamiania już po starcie docelowego systemu operacyjnego.\r\nKażdy program trzymaj w osobnym folderze, np. Programs\\7-Zip lub Programs\\Drivers.\r\n\r\nKonwencja metadanych programu:\r\n  icon.png   - opcjonalna ikona programu do wykorzystania przez interfejsy pracujące już w systemie\r\n\r\nBoot menu USOS wyświetla obecnie icon.png dla profili systemów i narzędzi z Utilities. Programs nie jest menu bootowalnym.\r\nUSOS nie udaje uruchamiania zwykłych plików Windows EXE bez Windows. Narzędzia bootowalne umieszczaj w Utilities.\r\n"),
 	},
 	driversGuide,
+	{
+		relativePath: filepath.Join("Programs", "USOS", "README.txt"),
+		contents: []byte("Universal Service OS - Programs\\USOS\r\n\r\n" +
+			"[PL] Ten folder jest zarządzany przez USOS. Nie edytuj, nie przenoś i nie usuwaj jego zawartości.\r\n" +
+			"Instalator, aktualizacja i Naprawa USOS zapisują tu swoje pliki (USOS Installer.exe, szablony WIMBoot/VHDBoot).\r\n" +
+			"WinPE\\ (ukryty folder systemowy) zawiera obraz pomocniczy WinPE 10, którego potrzebują Windows Vista i Windows 7 w trybie UEFI.\r\n" +
+			"Jego sumę SHA-256 zapisuje EFI\\USOS\\winpe-donor.ini na partycji USOS_ESP; menu USOS sprawdza ją przed użyciem.\r\n" +
+			"Jeśli obraz zniknie albo zostanie zmieniony, menu zablokuje Vistę/Windows 7 z prośbą o uruchomienie Naprawy w instalatorze USOS.\r\n" +
+			"Nic z tego folderu nie pojawia się w menu systemów.\r\n\r\n" +
+			"[EN] This folder is managed by USOS. Do not edit, move or delete its contents.\r\n" +
+			"The USOS installer, update and Repair keep their files here (USOS Installer.exe, WIMBoot/VHDBoot templates).\r\n" +
+			"WinPE\\ (a hidden system folder) holds the WinPE 10 helper image that Windows Vista and Windows 7 need in UEFI mode.\r\n" +
+			"Its SHA-256 is recorded in EFI\\USOS\\winpe-donor.ini on the USOS_ESP partition; the USOS menu checks it before use.\r\n" +
+			"If the image goes missing or is changed, the menu blocks Vista/Windows 7 and asks you to run Repair in the USOS installer.\r\n" +
+			"Nothing in this folder appears in the systems menu.\r\n"),
+	},
 }
 
 func dataGuidesTotalBytes() uint64 {

@@ -16,7 +16,10 @@ $espRoot=$esp[0].DriveLetter+':\';$dataRoot=$data[0].DriveLetter+':\'
 $espVolume=$esp[0]|Get-Volume
 if($espVolume.FileSystem -ne 'FAT32' -or $espVolume.FileSystemLabel -ne 'USOS_ESP' -or $espVolume.SizeRemaining -lt 8MB){throw 'Unexpected/full ESP'}
 $source=Join-Path $dataRoot 'Systems\Windows\Windows Vista\Images\pl_windows_vista_with_sp2_x64_dvd_x15-36359.iso'
-$donor=Join-Path $dataRoot 'Systems\Windows\Windows 10\Images\PE10_x64_19041_USOS.iso'
+# The PE10 donor lives in the USOS-managed Programs\USOS\WinPE (moved there by
+# install/update); Systems\Windows\Windows 10\Images is read for one release only.
+$donor=Join-Path $dataRoot 'Programs\USOS\WinPE\PE10_x64_19041_USOS.iso'
+if(!(Test-Path -LiteralPath $donor -PathType Leaf)){$donor=Join-Path $dataRoot 'Systems\Windows\Windows 10\Images\PE10_x64_19041_USOS.iso'}
 if((Get-Item -LiteralPath $source).Length -ne 3702233088 -or !(Test-Path -LiteralPath $donor -PathType Leaf)){throw 'Expected Vista ISO / PE10 donor missing'}
 & python (Join-Path $project 'tools\tests\check_vista_usb_support.py')
 if($LASTEXITCODE -ne 0){throw 'Support archive verification failed'}
