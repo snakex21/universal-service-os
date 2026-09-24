@@ -22,6 +22,10 @@ Scenarios (each prints [PASS]/[FAIL]):
                "Verification failed" MokManager shows its menu with no
                countdown and waits; Enroll key from disk -> USOS_ESP ->
                USOS-KEY.cer (ESP root) -> Continue -> Yes -> Reboot starts USOS.
+  touch        the enrolled NVRAM, release USOS: QEMU -smbios RC71L starts the
+               signed TouchI2cDxe with Secure Boot on and off (it fails
+               gracefully, no AMDI0010), default SMBIOS and touch_driver=off
+               leave it unloaded, and the menu always starts.
   direct       Secure Boot OFF with the Microsoft PK/KEK/db and a MokList that
                already holds another key: the probe runs mok_key.save() (the
                menu's "Add the key"), MokList stays NV|BS with both keys; then
@@ -75,7 +79,7 @@ def wait_for(path: Path, needles: list[str], timeout: float) -> str | None:
 
 
 class Machine:
-    def __init__(self, name: str, esp: Path, vars_file: Path, keep_screens: bool):
+    def __init__(self, name: str, esp: Path, vars_file: Path, keep_screens: bool, extra: list[str] | None = None):
         self.name = name
         self.serial = WORK / f"{name}.serial.log"
         self.keep_screens = keep_screens
@@ -94,6 +98,7 @@ class Machine:
             "-serial", f"file:{self.serial.as_posix()}",
             "-drive", f"if=none,id=esp,format=raw,snapshot=on,file=fat:{esp.as_posix()}",
             "-device", "ide-hd,bus=ide.0,drive=esp,bootindex=1",
+            *(extra or []),
         ]
         self.stderr = open(WORK / f"{name}.qemu.stderr.log", "wb")
         self.process = subprocess.Popen(args, stderr=self.stderr)
@@ -581,6 +586,7 @@ def scenario_probe(args, vars_file: Path, failures: list[str]) -> None:
                "unsigned child EFI is rejected with SecureBootRejected", failures)
         expect("[SB_PROBE] START PASS" in text, "a started child that returns hands control back safely (shim 16 StartImage)", failures)
         expect("[SB_PROBE] ntfs-driver START PASS" in text, "MOK-signed NTFS driver starts (verified + USOS PE loader)", failures)
+        expect("[SB_PROBE] touch-driver START PASS" in text, "MOK-signed TouchI2cDxe starts (verified + USOS PE loader) and fails closed on QEMU", failures)
         expect("[SB_PROBE] wimboot LOAD PASS" in text, "Microsoft-signed wimboot loads (db via shim's loader)", failures)
         expect("[SB_PROBE] kernel LOAD PASS" in text, "MOK-signed micro-Linux kernel loads", failures)
         expect("[SB_PROBE] systemd-boot LOAD PASS" in text, "MOK-signed systemd-boot loads", failures)
@@ -590,10 +596,84 @@ def scenario_probe(args, vars_file: Path, failures: list[str]) -> None:
         machine.stop()
 
 
+# QEMU SMBIOS of a ROG Ally 2023 (what AMI reports on the RC71L): type 1
+# product and type 2 baseboard product "RC71L", the key USOS gates on.
+ALLY_SMBIOS = [
+    "-smbios", "type=1,manufacturer=ASUSTeK COMPUTER INC.,product=ROG Ally RC71L_RC71L,version=1.0",
+    "-smbios", "type=2,manufacturer=ASUSTeK COMPUTER INC.,product=RC71L,version=1.0",
+]
+
+
+def input_report(text: str) -> str:
+    start = text.rfind("[INPUT_REPORT BEGIN]")
+    end = text.find("[INPUT_REPORT END]", start)
+    return text[start:end] if start >= 0 and end > start else ""
+
+
+def touch_boot(args, name: str, vars_file: Path, smbios: list[str], settings: str | None = None) -> tuple[str, str]:
+    """Boots the release USOS (grubx64.efi via shim) and returns the serial
+    log and the last input-devices report printed on it."""
+    extra_files = {}
+    if settings is not None:
+        path = WORK / f"settings-{name}.ini"
+        path.write_text(settings)
+        extra_files["EFI/USOS/usos-settings.ini"] = path
+    esp = esp_tree(name, USB / "EFI" / "BOOT" / "grubx64.efi", extra_files)
+    machine = Machine(name, esp, vars_file, args.keep_screens, smbios)
+    try:
+        wait_for(machine.serial, ["[INPUT_REPORT END]", "Verification failed", "Security Violation"], 300)
+        # Retry timer of the driver runs; USOS must keep drawing and polling.
+        time.sleep(6)
+        machine.shot("menu")
+        text = serial_text(machine.serial)
+    finally:
+        machine.stop()
+    return text, input_report(text)
+
+
+def scenario_touch(args, enrolled: Path, failures: list[str]) -> None:
+    """TouchI2cDxe gating and loading in the release USOS: loads on RC71L
+    SMBIOS with Secure Boot on (shim-verified) and off, and fails
+    gracefully (no AMDI0010 in QEMU); stays unloaded on other SMBIOS and with
+    touch_driver=off; the menu starts in every case."""
+    on = WORK / "vars-touch-on.fd"
+    shutil.copyfile(enrolled, on)
+    text, report = touch_boot(args, "touch-ally-sb-on", on, ALLY_SMBIOS)
+    expect("USOS MANUAL FLOW BOOT PASS" in text and "[SECURE_BOOT] state=on" in text, "touch: USOS boots under Secure Boot with RC71L SMBIOS", failures)
+    expect("smbios_match=ROG Ally RC71L (exact profile)" in report and "loaded=yes result=started" in report,
+           "touch: RC71L SMBIOS -> the signed driver is started", failures)
+    expect("secure_boot_path=on (SHIM_LOCK verify + USOS PE loader)" in report, "touch: Secure Boot on uses SHIM_LOCK + the USOS PE loader", failures)
+    expect("driver_handle=0x" in report and "panel=not up yet (placeholder range)" in report and "source=TouchI2cDxe" in report,
+           "touch: the driver's AbsolutePointer handle is listed with its placeholder range (no AMDI0010 in QEMU)", failures)
+    expect("[ACPI_DUMP] written" in text and "acpi_dump=written" in report, "touch: ACPI tables dumped to EFI\\USOS\\Logs\\acpi", failures)
+    section = report[report.find("[TOUCH DRIVER]"):]
+    print("[INFO] touch-ally-sb-on:\n" + section[:section.find("\n\n")])
+
+    off = WORK / "vars-touch-off.fd"
+    virt_fw_vars("-i", str(enrolled), "--set-false", "SecureBootEnable", "-o", str(off))
+    text, report = touch_boot(args, "touch-ally-sb-off", off, ALLY_SMBIOS)
+    expect("USOS MANUAL FLOW BOOT PASS" in text and "[SECURE_BOOT] state=off" in text, "touch: USOS boots with Secure Boot off and RC71L SMBIOS", failures)
+    expect("loaded=yes result=started" in report and "secure_boot_path=off (LoadImage from buffer)" in report,
+           "touch: Secure Boot off -> the driver starts through plain LoadImage", failures)
+
+    plain = WORK / "vars-touch-plain.fd"
+    shutil.copyfile(enrolled, plain)
+    text, report = touch_boot(args, "touch-qemu-smbios", plain, [])
+    expect("USOS MANUAL FLOW BOOT PASS" in text, "touch: USOS boots with the default QEMU SMBIOS", failures)
+    expect("decision=skipped (SMBIOS does not match a supported handheld)" in report and "loaded=no result=not loaded" in report
+           and "[TOUCH_DRIVER] started" not in text, "touch: non-Ally SMBIOS -> the driver is not loaded", failures)
+
+    setting = WORK / "vars-touch-setting.fd"
+    shutil.copyfile(enrolled, setting)
+    text, report = touch_boot(args, "touch-ally-disabled", setting, ALLY_SMBIOS, "[ui]\r\nlanguage=en\r\ntouch_driver=off\r\n")
+    expect("USOS MANUAL FLOW BOOT PASS" in text and "decision=skipped (touch_driver=off)" in report and "[TOUCH_DRIVER] started" not in text,
+           "touch: touch_driver=off keeps the driver unloaded on RC71L", failures)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--keep-screens", action="store_true")
-    parser.add_argument("--only", choices=["unsigned", "enroll", "probe", "timeout", "repeat", "helper", "noauth", "wait", "direct"], default=None)
+    parser.add_argument("--only", choices=["unsigned", "enroll", "probe", "timeout", "repeat", "helper", "noauth", "wait", "direct", "touch"], default=None)
     args = parser.parse_args()
     subprocess.run([sys.executable, str(Path(__file__).with_name("fetch_ovmf_secboot.py"))], check=True)
     WORK.mkdir(parents=True, exist_ok=True)
@@ -614,11 +694,14 @@ def main() -> int:
         scenario_wait(args, failures)
     if args.only in (None, "direct"):
         scenario_direct(args, failures)
-    if args.only in (None, "enroll", "probe"):
+    if args.only in (None, "enroll", "probe", "touch"):
         enrolled = scenario_enroll(args, failures)
         if args.only is None:
             scenario_unsigned_after_mok(args, enrolled, failures)
-        scenario_probe(args, enrolled, failures)
+        if args.only != "touch":
+            scenario_probe(args, enrolled, failures)
+        if args.only in (None, "touch"):
+            scenario_touch(args, enrolled, failures)
     print(f"[RESULT] {len(failures)} failure(s)" + ("" if not failures else ": " + "; ".join(failures)))
     return 1 if failures else 0
 
