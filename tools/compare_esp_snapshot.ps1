@@ -31,7 +31,8 @@ param(
     [switch]$SnapshotOnly,
     [string]$DiskGuid = '{31c644bf-74dd-4807-9cb2-46745adeadd4}',
     [switch]$NoRawEspHash,
-    [switch]$IncludeAccessTime   # also treat LastAccessTime differences as changes
+    [switch]$IncludeAccessTime,  # also treat LastAccessTime differences as changes
+    [switch]$AllowVirtualDisk    # test images only: accept a mounted VHD ('Msft Virtual Disk') with -DiskGuid
 )
 
 $ErrorActionPreference = 'Stop'
@@ -281,7 +282,8 @@ function New-UsosSnapshot([string]$Dir) {
     $disk = Get-Disk | Where-Object { $_.Guid -eq $DiskGuid }
     if (-not $disk) { throw "Disk $DiskGuid not found" }
     if (@($disk).Count -ne 1) { throw "More than one disk matched $DiskGuid" }
-    if ($disk.FriendlyName -notmatch 'DataTraveler') { throw "Disk $DiskGuid is '$($disk.FriendlyName)', not the Kingston DataTraveler" }
+    $modelOk = $disk.FriendlyName -match 'DataTraveler' -or ($AllowVirtualDisk -and $disk.FriendlyName -match 'Virtual Disk')
+    if (-not $modelOk) { throw "Disk $DiskGuid is '$($disk.FriendlyName)', not the Kingston DataTraveler" }
     $disk | Select-Object Number, FriendlyName, Model, SerialNumber, Size, PartitionStyle, Guid, Signature,
         LogicalSectorSize, PhysicalSectorSize, BusType, IsReadOnly, IsOffline, NumberOfPartitions |
         ConvertTo-Json | Set-Content -Encoding UTF8 (Join-Path $Dir 'disk.json')
