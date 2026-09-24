@@ -282,3 +282,23 @@ Redeployed the same day for B260924-155947-C34E7F2A (Tools -> Drivers help
 panel fix; usos-fb-ui differs only by build info): 755 identical, 1 base
 update, 0 unexplained (artifacts/xp-pae/compare-20260924-drivers2.log),
 initramfs-xp a4f1e4a3...; backup artifacts/xp-pae/deploy-20260924-180604.
+
+## 2026-09-24: rebuild for B260924-181530-020158EF (batch of leftovers)
+
+The micro-Linux base changed (virtio_pci + its two dependencies, the
+Setup-media driver staging in extract.sh with windows_setup_media.sh,
+selected_system, install.esd/.swm, the documented dead Win7 WORK path), so
+the package was rebuilt in full (staging ESP zig-out/xp-staging-20260924-batch
+from zig-out/micro-linux + the stick's usos-device.ini, --data L:/). Two builds
+are byte-identical (initramfs-xp 64426a81...945b). compare_xp_packages.py
+against the deployed package (a4f1e4a3...): 749 identical, 10 base updates
+(usos-fb-ui, the three virtio modules, extract.sh, windows_setup_media.sh,
+legacy_windows_request.sh, prepare_windows7_uefi.sh, prepare_work.sh,
+windows_bios_startup.cmd), 1 intended change (`usos-init`: the XP package
+patches its own copy of the base init, so the base's new virtio_pci modprobe
+and SELECTED_SYSTEM lines show up as a diff), 0 unexplained
+(artifacts/xp-pae/compare-20260924-batch.log). Kernel unchanged (155c0f9f...).
+check_xp_driver_imports, check_xp_menu_overlay, check_xp_driver_integration
+(default and --added-source) and check_xp_pae PASS. Deployed with -DriversOnly
+-Language pl after usos-physical-update (backup
+artifacts/xp-pae/deploy-20260924-202244).
