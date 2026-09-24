@@ -75,12 +75,12 @@ func run(prefsPath string) error {
 	}
 
 	return ui.Run(ui.Config{
-		Disks:     winhost.Enumerator{},
-		Installed: winhost.InstalledUSOSSource{},
-		Install:   installEngine,
-		Update:    updateEngine,
-		Repair:    repairEngine,
-		Uninstall: uninstallEngine,
+		Disks:       winhost.Enumerator{},
+		Installed:   winhost.InstalledUSOSSource{},
+		Install:     installEngine,
+		Update:      updateEngine,
+		Repair:      repairEngine,
+		Uninstall:   uninstallEngine,
 		PrefsPath:   prefsPath,
 		VolumeInUse: volumeInUse,
 	})
