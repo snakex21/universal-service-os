@@ -1,7 +1,10 @@
 # UEFI touch on the ROG Ally (RC71L): I2C-HID research
 
-Status: Route A implemented on 2026-09-24 (see "Implementation" at the end);
-not yet tried on the Ally. Research date: 2026-09-24.
+Status: Route A implemented and **confirmed on RC71L hardware** on 2026-09-24
+(build B260924-141634-EDC5E1F4): tap, drag-to-scroll and the Test wejścia
+touch diagnostics all work on the ROG Ally, as do the pad (A/B hints) and
+Secure Boot MOK enrollment. See "Implementation" at the end. Research date:
+2026-09-24.
 
 ## Verdict
 
