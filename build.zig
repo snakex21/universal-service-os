@@ -20,6 +20,7 @@ pub fn build(b: *std.Build) void {
     const micro_linux = addMicroLinux(b, framebuffer_ui);
     const handoff_app = addNtfsHandoffTestApp(b, optimize);
     _ = addGptNoBlockIoProbeApp(b, optimize);
+    _ = addSecureBootProbeApp(b, optimize);
     _ = addUefiNtfsCatalogProbeApp(b, optimize);
     addBootNextCompileCheck(b, optimize);
     const handoff_base = addPrepareNtfsHandoffImage(b, ntfs_driver, handoff_app);
@@ -515,6 +516,8 @@ fn addNtfsHandoffTestApp(b: *std.Build, optimize: std.builtin.OptimizeMode) *std
         .target = target,
         .optimize = optimize,
     });
+    // ntfs_driver.zig loads the driver through verified_image.zig (usos module).
+    app_module.addImport("usos", createUsosModule(b, target, optimize));
     const app = b.addExecutable(.{
         .name = "usos-ntfs-handoff-x86_64",
         .root_module = app_module,
@@ -549,6 +552,30 @@ fn addUefiNtfsCatalogProbeApp(b: *std.Build, optimize: std.builtin.OptimizeMode)
     return step;
 }
 
+/// QEMU-only probe for the Secure Boot chain: started by shim in place of
+/// USOS, it loads signed/unsigned children, the NTFS driver and the
+/// micro-Linux loader through verified_image.zig (tools/tests/secure_boot).
+fn addSecureBootProbeApp(b: *std.Build, optimize: std.builtin.OptimizeMode) *std.Build.Step {
+    const target = b.resolveTargetQuery(.{
+        .cpu_arch = .x86_64,
+        .os_tag = .uefi,
+    });
+    const app_module = b.createModule(.{
+        .root_source_file = b.path("src/platform/uefi/secure_boot_probe_main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    app_module.addImport("usos", createUsosModule(b, target, optimize));
+    const app = b.addExecutable(.{
+        .name = "usos-secure-boot-probe-x86_64",
+        .root_module = app_module,
+    });
+    const install_app = b.addInstallFile(app.getEmittedBin(), "test-assets/secure-boot-probe-x86_64.efi");
+    const step = b.step("secure-boot-probe-app", "Build the QEMU Secure Boot chain probe (verified loads through shim)");
+    step.dependOn(&install_app.step);
+    return step;
+}
+
 fn addGptNoBlockIoProbeApp(b: *std.Build, optimize: std.builtin.OptimizeMode) *std.Build.Step {
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .x86_64,
@@ -559,6 +586,7 @@ fn addGptNoBlockIoProbeApp(b: *std.Build, optimize: std.builtin.OptimizeMode) *s
         .target = target,
         .optimize = optimize,
     });
+    app_module.addImport("usos", createUsosModule(b, target, optimize));
     const app = b.addExecutable(.{
         .name = "usos-gpt-no-block-io-probe-x86_64",
         .root_module = app_module,

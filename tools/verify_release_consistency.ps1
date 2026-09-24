@@ -38,11 +38,37 @@ foreach ($required in @($releaseBoot, $manualBoot, $payloadPath, $buildInfoPath,
     }
 }
 
+# Secure Boot layout: the release BOOTX64.EFI is the vendored shim, and the
+# second stage (grubx64.efi) must be the manual-test USOS binary plus only the
+# .sbat section, padding and (when a key was available) the signature.
+$shimManifest = Get-Content -LiteralPath (Join-Path $ProjectRoot 'tools\vendor\shim\16.1-7\manifest.json') -Raw | ConvertFrom-Json
 $releaseHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $releaseBoot).Hash
-$manualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $manualBoot).Hash
-if ($releaseHash -ne $manualHash) {
-    throw "BOOTX64.EFI mismatch: release=$releaseHash manual=$manualHash"
+if ($releaseHash -ne $shimManifest.files.'shimx64.efi'.ToUpperInvariant()) {
+    throw "Release BOOTX64.EFI is not the vendored shim: $releaseHash"
 }
+$secondStage = Join-Path $usbRoot ('EFI\BOOT\' + $shimManifest.second_stage)
+$secureBootIni = Join-Path $usbRoot 'EFI\USOS\secure-boot.ini'
+foreach ($required in @($secondStage, (Join-Path $usbRoot ('EFI\BOOT\' + $shimManifest.mok_manager)), $secureBootIni)) {
+    if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "Missing Secure Boot layout file: $required" }
+}
+$sbatFile = Join-Path $ProjectRoot 'assets\secure-boot\usos.sbat.csv'
+Push-Location (Join-Path $ProjectRoot 'installer')
+try {
+    & go run ./cmd/usos-efisign derive-check -unsigned $manualBoot -signed $secondStage -sbat $sbatFile
+    if ($LASTEXITCODE -ne 0) { throw "Second stage $secondStage does not derive from $manualBoot" }
+    if ((Get-Content -LiteralPath $secureBootIni -Raw) -match '(?m)^signed=1\r?$') {
+        $enrollCert = Join-Path $usbRoot 'EFI\USOS\ENROLL_THIS_KEY_IN_MOKMANAGER.cer'
+        foreach ($signedFile in @($secondStage, (Join-Path $ProjectRoot 'zig-out\micro-linux\vmlinuz-virt'), (Join-Path $ProjectRoot 'zig-out\micro-linux\systemd-bootx64.efi'), (Join-Path $ProjectRoot 'zig-out\test-assets\ntfs_x64.efi'))) {
+            & go run ./cmd/usos-efisign verify -in $signedFile -cert $enrollCert
+            if ($LASTEXITCODE -ne 0) { throw "Not signed with the enrolled USOS key: $signedFile" }
+        }
+    } else {
+        Write-Host '[WARN] UNSIGNED Secure Boot layout (no signing key): the stick boots only with Secure Boot off.'
+    }
+} finally {
+    Pop-Location
+}
+$manualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $manualBoot).Hash
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive = [IO.Compression.ZipFile]::OpenRead($payloadPath)
@@ -58,6 +84,10 @@ try {
 
     $requiredPayloadPaths = @(
         'EFI/BOOT/BOOTX64.EFI',
+        'EFI/BOOT/grubx64.efi',
+        'EFI/BOOT/mmx64.efi',
+        'EFI/USOS/secure-boot.ini',
+        'EFI/USOS/ENROLL-README.txt',
         'EFI/USOS/build-info.ini',
         'EFI/USOS/micro-linux/initramfs-usos',
         'EFI/USOS/micro-linux/vmlinuz-virt',
@@ -220,6 +250,6 @@ try {
     $archive.Dispose()
 }
 
-Write-Host "[PASS] BOOTX64.EFI shared SHA-256=$releaseHash"
+Write-Host "[PASS] BOOTX64.EFI = vendored shim SHA-256=$releaseHash; second stage derives from manual-usb BOOTX64.EFI SHA-256=$manualHash"
 Write-Host "[PASS] build-info.ini embedded SHA-256=$buildInfoHash build=$($env:USOS_BUILD_ID)"
 Write-Host '[PASS] Embedded payload contains only current static ESP files; DATA images and runtime NTFS discovery stay outside the EXE.'

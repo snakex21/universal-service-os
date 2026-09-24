@@ -65,11 +65,11 @@ pub fn start(root: *uefi.protocol.File, name: []const u8, unattended: ?[]const u
     // Initrd is loaded by the kernel's EFI stub, not by LoadImage above.
     try mark(root, "kernel-loaded-before-start", name);
     progress(.starting);
-    const result = bs.startImage(image) catch |err| {
+    const code = @import("verified_image.zig").start(image) catch |err| {
         mark(root, @errorName(err), name) catch {};
         return err;
     };
     try mark(root, "kernel-returned", name);
-    if (result.code != .success) return error.XpKernelReturnedError;
+    if (code != .success) return error.XpKernelReturnedError;
     return error.XpKernelReturned;
 }

@@ -50,6 +50,7 @@ pub const image_probe = struct {
     pub const iso9660 = @import("image_probe/iso9660.zig");
     pub const optical_fs = @import("image_probe/optical_fs.zig");
     pub const windows_detect = @import("image_probe/windows_detect.zig");
+    pub const pe_loader = @import("image_probe/pe_loader.zig");
 };
 pub const catalog = @import("catalog/root.zig");
 pub const i18n = @import("i18n/lang_file.zig");
@@ -67,6 +68,7 @@ pub const flow = struct {
     pub const preparation_boot_progress = @import("flow/preparation_boot_progress.zig");
     pub const persistent_phase = @import("flow/persistent_phase.zig");
     pub const boot_console = @import("flow/boot_console.zig");
+    pub const secure_boot_policy = @import("flow/secure_boot_policy.zig");
 };
 pub const selftest = struct {
     pub const Case = @import("selftest/case.zig").Case;
@@ -134,6 +136,7 @@ test {
     _ = image_probe.iso9660;
     _ = image_probe.optical_fs;
     _ = image_probe.windows_detect;
+    _ = image_probe.pe_loader;
     _ = catalog.Category;
     _ = catalog.categories;
     _ = catalog.BootMethod;
@@ -167,6 +170,7 @@ test {
     _ = flow.preparation_boot_progress;
     _ = flow.persistent_phase;
     _ = flow.boot_console;
+    _ = flow.secure_boot_policy;
     _ = selftest.Case;
     _ = selftest.Report;
     _ = @import("selftest/runner.zig");

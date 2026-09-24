@@ -55,3 +55,10 @@ tools/vendor/**/*.zip
 tools/vendor/**/*.7z
 # Zig compiler cache inside the bundled toolchain
 tools/zig/data/
+# Secure Boot signing keys never enter the repository (key custody:
+# docs/secure-boot-usos.md). Only the public .cer is tracked.
+*.key
+*.pfx
+*.p12
+usos-secure-boot.key
+/signing/

@@ -5,7 +5,7 @@
 #
 # Needs an elevated shell (it builds a small GPT test disk in a file-backed
 # VHD under tools/tests/artifacts/qemu/boot-ui) and a finished build
-# (zig-out/usb/EFI/BOOT/BOOTX64.EFI, zig-out/legacy-bios/*). It never touches
+# (zig-out/manual-usb/EFI/BOOT/BOOTX64.EFI, zig-out/legacy-bios/*). It never touches
 # a physical disk.
 param(
     [string[]]$Languages = @('pl', 'en', 'ru', 'el'),
@@ -58,7 +58,7 @@ $python = (Get-Command python.exe -ErrorAction Stop).Source
 $driver = Full 'tools/boot_ui_screens.py'
 $langDir = Join-Path $testRoot 'lang'
 
-foreach ($required in @('zig-out/usb/EFI/BOOT/BOOTX64.EFI', 'zig-out/legacy-bios/stage1.bin', 'zig-out/legacy-bios/core-slot.bin', 'zig-out/legacy-bios/bios-ui.bin', 'zig-out/test-assets/ntfs_x64.efi')) {
+foreach ($required in @('zig-out/manual-usb/EFI/BOOT/BOOTX64.EFI', 'zig-out/legacy-bios/stage1.bin', 'zig-out/legacy-bios/core-slot.bin', 'zig-out/legacy-bios/bios-ui.bin', 'zig-out/test-assets/ntfs_x64.efi')) {
     if (-not (Test-Path -LiteralPath (Full $required) -PathType Leaf)) { throw "Missing build output: $required" }
 }
 New-Item -ItemType Directory -Force -Path $testRoot, $out, $langDir | Out-Null
@@ -124,7 +124,7 @@ function Update-TestDisk {
     try {
         $paths = Mount-Partitions $disk
         $espRoot = $paths['esp'].Path
-        Copy-Item -LiteralPath (Full 'zig-out/usb/EFI/BOOT/BOOTX64.EFI') -Destination (Join-Path $espRoot 'EFI\BOOT\BOOTX64.EFI') -Force
+        Copy-Item -LiteralPath (Full 'zig-out/manual-usb/EFI/BOOT/BOOTX64.EFI') -Destination (Join-Path $espRoot 'EFI\BOOT\BOOTX64.EFI') -Force
         Copy-Item -LiteralPath (Full 'zig-out/legacy-bios/bios-ui.bin') -Destination (Join-Path $espRoot 'EFI\USOS\bios-ui.bin') -Force
         Copy-MicroLinux $espRoot
     } finally {

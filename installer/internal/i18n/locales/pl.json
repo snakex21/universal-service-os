@@ -1,5 +1,5 @@
 {
-  "_meta": {"native_name": "Polski", "english_name": "Polish", "machine_translated": false, "machine_translated_prefixes": ["boot.", "winpe."]},
+  "_meta": {"native_name": "Polski", "english_name": "Polish", "machine_translated": false, "machine_translated_prefixes": ["boot.", "winpe.", "installer.secure_boot."]},
 
   "installer.window.title": "Universal Service OS Installer",
   "installer.startup.log_failed": "Nie można uruchomić instalatora, ponieważ nie udało się otworzyć pliku logu obok programu:\n%s",
@@ -152,6 +152,7 @@
   "installer.final.mismatch": "NIEZGODNE",
   "installer.final.back": "Wróć do wyboru trybu",
   "installer.final.no_report": "Brak raportu weryfikacji.",
+  "installer.secure_boot.enroll_note": "Secure Boot: na komputerze z włączonym Secure Boot pierwszy start z tego nośnika otwiera MokManager. Wybierz Enroll key from disk -> USOS_ESP -> EFI -> USOS -> ENROLL_THIS_KEY_IN_MOKMANAGER.cer -> Continue -> Yes -> Reboot. Wystarczy raz na komputer; szczegóły w EFI\\USOS\\ENROLL-README.txt.",
 
   "installer.install.progress_title": "Instalacja Universal Service OS",
   "installer.install.progress_warning": "Operacja niszcząca została rozpoczęta. Anulowanie nie jest już dostępne. Nie odłączaj nośnika i nie wyłączaj komputera.",
@@ -365,6 +366,11 @@
   "boot.summary.driver_inventory": "Spis sterowników",
   "boot.summary.iso_inspection": "Analiza ISO",
   "boot.summary.error": "Błąd",
+  "boot.summary.secure_boot_badge": "Wymaga wyłączenia Secure Boot",
+  "boot.summary.secure_boot_detail": "Wyłącz Secure Boot w ustawieniach firmware, aby go użyć",
+  "boot.summary.secure_boot_title": "Secure Boot jest włączony",
+  "boot.summary.secure_boot_line1": "Ten system startuje starszą ścieżką (CSM, UefiSeven lub stary menedżer rozruchu Windows), którą Secure Boot blokuje.",
+  "boot.summary.secure_boot_line2": "Wyłącz Secure Boot w ustawieniach firmware i uruchom USOS ponownie.",
   "boot.summary.xp_preparation": "UEFI; zainstalowany XP wymaga CSM w firmware i MBR",
   "boot.summary.xp_source": "XP SP3 x86; sterowniki ACPI / SATA / USB; opcjonalna pozycja startowa PAE",
   "boot.summary.xp_disk": "Wybierany i potwierdzany na następnym ekranie graficznym",
@@ -392,6 +398,7 @@
   "boot.error.efi": "Start EFI nie powiódł się",
   "boot.error.iso": "Start ISO Windows nie powiódł się",
   "boot.error.preparation": "Przygotowanie nie powiodło się",
+  "boot.error.secure_boot_rejected": "Secure Boot odrzucił plik: nie jest podpisany przez Microsoft ani zarejestrowanym kluczem.",
   "boot.error.catalog.title": "Katalog DATA niedostępny",
   "boot.error.catalog.line1": "USOS nie mógł otworzyć woluminu NTFS USOS_DATA.",
   "boot.error.catalog.line2": "Obrazy są odczytywane bezpośrednio z DATA; pliki znaczników na ESP nie są używane.",

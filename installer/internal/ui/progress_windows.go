@@ -295,6 +295,10 @@ func (s *finalScreen) draw(f *Flow, w *win, area rect) {
 	if s.err != nil {
 		y += w.banner(body.Left, y, body.w(), i18n.T("installer.common.error_detail", s.err.Error()), toneDanger) + w.px(16)
 	}
+	if ok && s.op != opUninstall {
+		// One-time MokManager enrollment for Secure Boot (docs/secure-boot-usos.md).
+		y += w.banner(body.Left, y, body.w(), i18n.T("installer.secure_boot.enroll_note"), toneAccent) + w.px(16)
+	}
 	toggleRow, rest := rect{body.Left, y, body.Right, body.Bottom}.cutBottom(w.px(32))
 	if s.log.open {
 		logR, tableR := rest.cutBottom(rest.h() * 42 / 100)

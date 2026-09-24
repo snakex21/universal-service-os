@@ -1,5 +1,14 @@
 # Przepływ uruchamiania obrazu
 
+Secure Boot (24 września 2026): `\EFI\BOOT\BOOTX64.EFI` to podpisany przez
+Microsoft shim 16.1 (Fedora), a USOS startuje jako `grubx64.efi` podpisany
+kluczem USOS (MOK). Przy pierwszym starcie z włączonym Secure Boot shim otwiera
+MokManager: Enroll key from disk -> `EFI\USOS\ENROLL_THIS_KEY_IN_MOKMANAGER.cer`,
+raz na komputer. Jądro mikro-Linuksa, systemd-boot i sterownik NTFS mają podpis
+USOS, wimboot podpis Microsoft. Przy włączonym Secure Boot Windows XP, 7 i Vista
+są oznaczone „Wymaga wyłączenia Secure Boot”.
+[Projekt, klucz i ograniczenia](docs/secure-boot-usos.md).
+
 Hardware & SMART, poprawa panelu (13 września 2026): start pokazuje procent
 odczytu plików oraz kolejne etapy wykrywania sprzętu. Dyski mają nazwy
 z modelem i pojemnością. Atrybuty SMART są wyświetlane w tabeli, a surowy

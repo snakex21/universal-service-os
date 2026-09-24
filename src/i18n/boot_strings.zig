@@ -92,6 +92,7 @@ pub const Key = enum(u16) {
     error_firmware_title,
     error_iso,
     error_preparation,
+    error_secure_boot_rejected,
     error_stopped,
     error_unsupported_line1,
     error_unsupported_title,
@@ -259,6 +260,11 @@ pub const Key = enum(u16) {
     summary_method,
     summary_no_drivers,
     summary_preparation,
+    summary_secure_boot_badge,
+    summary_secure_boot_detail,
+    summary_secure_boot_line1,
+    summary_secure_boot_line2,
+    summary_secure_boot_title,
     summary_source,
     summary_subtitle,
     summary_system,
@@ -397,6 +403,7 @@ pub const hashes = [_]u32{
     0xaeecd888, // error.firmware.title
     0x5f16a066, // error.iso
     0xacc67c62, // error.preparation
+    0x18cdd544, // error.secure_boot_rejected
     0xfe82b516, // error.stopped
     0x96c6d0e3, // error.unsupported.line1
     0x471635f4, // error.unsupported.title
@@ -564,6 +571,11 @@ pub const hashes = [_]u32{
     0x3ed2d6ee, // summary.method
     0xe8143028, // summary.no_drivers
     0x92637c78, // summary.preparation
+    0xb2783d3b, // summary.secure_boot_badge
+    0xfedbcf61, // summary.secure_boot_detail
+    0x60a25811, // summary.secure_boot_line1
+    0x5da25358, // summary.secure_boot_line2
+    0xaf249476, // summary.secure_boot_title
     0x46c71b92, // summary.source
     0xa12382cb, // summary.subtitle
     0xa6031186, // summary.system
@@ -716,6 +728,7 @@ pub const bios = [_]bool{
     false,
     false,
     false,
+    false,
     true,
     false,
     true,
@@ -851,6 +864,11 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
+    false,
+    false,
+    false,
+    false,
     false,
     false,
     false,
@@ -1006,6 +1024,7 @@ pub const english = [_][]const u8{
     "Firmware mismatch",
     "Windows ISO start failed",
     "Preparation failed",
+    "Secure Boot rejected the file: it is not signed by Microsoft or by an enrolled key.",
     "The operation stopped safely. Check the serial log if needed.",
     "The selected method has no working backend.",
     "Boot method unavailable",
@@ -1173,6 +1192,11 @@ pub const english = [_][]const u8{
     "Method",
     "None in Drivers/x64; target USB 3 may be unavailable",
     "Preparation",
+    "Requires Secure Boot off",
+    "Turn Secure Boot off in the firmware setup to use it",
+    "This system starts through a legacy path (CSM, UefiSeven or an old Windows boot manager) that Secure Boot blocks.",
+    "Turn Secure Boot off in the firmware setup, then start USOS again.",
+    "Secure Boot is on",
     "Source",
     "Review the selected boot configuration",
     "System",
