@@ -378,3 +378,12 @@ na MS-7100 pozostają niepotwierdzone. [Raport i ograniczenia](docs/win98-native
 Walidację pierwszego obrazu Linux Live, parametry VM i ograniczenie starego
 instalatora dotyczące numeracji dysków opisuje
 [raport SliTaz](docs/linux-live-slitaz-bios-2026-09-13.md).
+# Sterowniki użytkownika (DATA\Drivers)
+
+Reguły i ścieżki: [docs/drivers.md](docs/drivers.md). Testy:
+
+- `zig build test` — `src/flow/driver_manifest.zig` (driver.ini, [match] AND/OR, SMBIOS, PCI, ACPI HID, obraz x64/driver, przełącznik, blokada po zawieszeniu, bramka Secure Boot), `src/flow/inf_package.zig` (architektura INF, katalog, brakujące pliki, UTF-16, granice pakietów), `touch_driver_policy.zig` (wbudowany manifest).
+- `python tools/tests/secure_boot/run_qemu_secure_boot.py --only drivers` — sterowniki testowe (`zig build uefi-driver-fixtures`) na DATA dysku testowego GPT (`tools/tests/uefi_drivers/new_test_disk.ps1`, powłoka z uprawnieniami administratora), Secure Boot włączony (MokList z kluczem USOS) i wyłączony, oraz sterownik, który się zawiesza (watchdog, blokada przy następnym starcie).
+- `--only matrix` — ten sam dysk za AHCI, IDE, NVMe, virtio-blk, virtio-scsi, xHCI i EHCI.
+- `--only touch` — TouchI2cDxe nadal tylko na SMBIOS RC71L.
+- `python tools/tests/uefi_drivers/run_stage_drivers_qemu.py` — `usos-fb-ui --stage-drivers` w mikro-Linuksie na prawdziwym ntfs3 (amd64, x86, mało miejsca).

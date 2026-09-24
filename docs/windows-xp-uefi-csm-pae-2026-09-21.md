@@ -258,3 +258,22 @@ unexplained (artifacts/xp-pae/compare-20260924-touch.log). Kernel unchanged
 (155c0f9f...).
 Deployed with -DriversOnly -Language pl after usos-physical-update
 (backup artifacts/xp-pae/deploy-20260924-162654).
+
+## 2026-09-24: rebuild for B260924-154458 (driver folders)
+
+The micro-Linux base changed (usos-fb-ui gained `--stage-drivers`, and
+extract.sh stages user INF drivers into WORK's $WinPEDriver$; neither is used
+by the XP flow), so the package was rebuilt in full (staging ESP
+zig-out/xp-staging-20260924-drivers from zig-out/micro-linux + the stick's
+usos-device.ini, --data L:/). Two builds are byte-identical (initramfs-xp
+58e5131b...140f). compare_xp_packages.py against the deployed package
+(0e585726...): 754 identical, 2 base updates (usr/bin/usos-fb-ui,
+usr/lib/usos/extract.sh), 0 unexplained
+(artifacts/xp-pae/compare-20260924-drivers.log). Kernel unchanged
+(155c0f9f...). The XP driver bundles and hives are unchanged; the user
+folder Drivers\Windows XP is not used yet (design in docs/drivers.md).
+check_xp_driver_imports, check_xp_menu_overlay, check_xp_driver_integration
+(default and --added-source) PASS; check_xp_pae PASS once the stick carries
+the new base (it compares against J:\EFI\USOS\micro-linux).
+Deployed with -DriversOnly -Language pl after usos-physical-update
+(backup artifacts/xp-pae/deploy-20260924-175702).
