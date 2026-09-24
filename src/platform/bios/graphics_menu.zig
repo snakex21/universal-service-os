@@ -177,16 +177,33 @@ fn systemRow(ui: *const Ui, slot: usize, id: []const u8, name: []const u8, firmw
     };
 }
 
+/// A system that needs UEFI is selectable but blocked here: the side panel
+/// says why and what to do, like the UEFI menu's blocked-entry help.
+fn requiresUefi(category: catalog.Category, index: usize) bool {
+    const entry = catalog.systems.byCategoryIndex(category, index) orelse return false;
+    return !entry.firmware.accepts(.bios);
+}
+
+fn blockedHelp(ui: *const Ui, category: catalog.Category, index: usize, lines: *[2][]const u8) ?screens.Help {
+    if (!requiresUefi(category, index)) return null;
+    lines.* = .{ ui.t(.system_requires_uefi_detail), ui.t(.system_requires_uefi_hint) };
+    return .{ .title = ui.t(.system_requires_uefi), .lines = lines };
+}
+
 pub fn systems(session: *const vbe_probe.Session, discovery: *catalog.media_discovery.Discovery, category: catalog.Category, selected: usize, count: usize) void {
     var ui = boot_ui.menu(session.surface);
     var build: ListBuild = .{};
     systemRows(&ui, &build, discovery, category, count);
     var hints: [4]Hint = undefined;
-    showList(session, &ui, .{ .title = ui.strings.lookup(category.label()), .subtitle = ui.t(.systems_subtitle), .rows = build.rows[0..build.count], .selected = selected, .hints = listHints(&hints, &ui, .key_open) });
+    var lines: [2][]const u8 = undefined;
+    showList(session, &ui, .{ .title = ui.strings.lookup(category.label()), .subtitle = ui.t(.systems_subtitle), .rows = build.rows[0..build.count], .selected = selected, .help = blockedHelp(&ui, category, selected, &lines), .hints = listHints(&hints, &ui, .key_open) });
 }
 
 pub fn systemSelection(session: *const vbe_probe.Session, discovery: *catalog.media_discovery.Discovery, category: catalog.Category, previous: usize, now: usize, count: usize) void {
     if (previous == now) return;
+    // The help panel takes list space: it appearing or disappearing needs a
+    // full relayout (same text for every blocked row, so no redraw otherwise).
+    if (requiresUefi(category, previous) != requiresUefi(category, now)) return systems(session, discovery, category, now, count);
     var ui = boot_ui.partial(session.surface);
     var build: ListBuild = .{};
     systemRows(&ui, &build, discovery, category, count);
