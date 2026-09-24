@@ -46,6 +46,23 @@ pub const Layout = struct {
         };
     }
 
+    pub const WheelTarget = enum { list, details, none };
+
+    /// What a wheel notch scrolls: the list (selection) when the pointer is
+    /// over the list, the details when it is over an overflowing details
+    /// panel (nothing over a panel that fits), and without a pointer position
+    /// (or elsewhere on screen) the details if they overflow, else the list.
+    pub fn wheelTarget(self: Layout, state: model.State, has_position: bool, x: i32, y: i32) WheelTarget {
+        const overflows = state.detailCount() > self.info_lines;
+        if (has_position and x >= 0 and y >= 0) {
+            const px: u32 = @intCast(x);
+            const py: u32 = @intCast(y);
+            if (self.list.panel.contains(px, py)) return .list;
+            if (state.detailCount() > 0 and self.info.contains(px, py)) return if (overflows) .details else .none;
+        }
+        return if (overflows) .details else .list;
+    }
+
     pub fn hit(self: Layout, x: i32, y: i32, count: usize) ?usize {
         if (x < 0 or y < 0) return null;
         const visible_count = @min(self.list.visible, count -| self.first);
@@ -201,4 +218,18 @@ test "SMART table remains inside a small framebuffer and scrolls rows under a fi
     for (0..100) |_| state.scrollInfo(true, layout.info_lines);
     try std.testing.expectEqual(state.table.count - layout.info_lines, state.scroll);
     render(&ui, state, 0, 0, false);
+}
+
+test "wheel scrolls what is under the pointer" {
+    const list = Ui.List{ .panel = .{ .x = 0, .y = 100, .w = 800, .h = 200 }, .first_y = 104, .row_x = 4, .row_w = 792, .row_h = 60, .row_step = 64, .visible = 3 };
+    const layout = Layout{ .list = list, .first = 0, .info = .{ .x = 0, .y = 320, .w = 800, .h = 200 }, .info_y = 336, .info_lines = 2, .line_height = 20 };
+    var state = try model.parse("item=a\nitem=b\nitem=c\ninfo=1\ninfo=2\ninfo=3\n");
+    try std.testing.expectEqual(Layout.WheelTarget.list, layout.wheelTarget(state, true, 400, 150));
+    try std.testing.expectEqual(Layout.WheelTarget.details, layout.wheelTarget(state, true, 400, 400));
+    // Elsewhere or without a pointer position: the overflowing details.
+    try std.testing.expectEqual(Layout.WheelTarget.details, layout.wheelTarget(state, true, 400, 50));
+    try std.testing.expectEqual(Layout.WheelTarget.details, layout.wheelTarget(state, false, 400, 150));
+    state.info_count = 2; // details fit: over the panel the wheel does nothing
+    try std.testing.expectEqual(Layout.WheelTarget.none, layout.wheelTarget(state, true, 400, 400));
+    try std.testing.expectEqual(Layout.WheelTarget.list, layout.wheelTarget(state, false, 0, 0));
 }

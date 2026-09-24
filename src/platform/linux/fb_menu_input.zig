@@ -22,7 +22,9 @@ const handheld = usos.gui.handheld;
 
 pub const Event = extern struct { seconds: i64, micros: i64, kind: u16, code: u16, value: i32 };
 const AbsInfo = extern struct { value: i32 = 0, minimum: i32 = 0, maximum: i32 = 0, fuzz: i32 = 0, flat: i32 = 0, resolution: i32 = 0 };
-pub const Action = enum { none, previous, next, accept, back, scroll_up, scroll_down, page_up, page_down, pointer, click, drag };
+/// scroll_up/down come from keys (PgUp/PgDn); wheel_up/down from a mouse
+/// wheel, which the menu routes by pointer position (list or details).
+pub const Action = enum { none, previous, next, accept, back, scroll_up, scroll_down, wheel_up, wheel_down, page_up, page_down, pointer, click, drag };
 
 const EV_SYN = 0;
 const EV_KEY = 1;
@@ -428,8 +430,8 @@ pub const Input = struct {
             var notches = device.wheel.feed(device.wheel_raw);
             device.wheel_raw = 0;
             notches = std.math.clamp(notches, -5, 5);
-            while (notches > 0) : (notches -= 1) self.push(.scroll_up);
-            while (notches < 0) : (notches += 1) self.push(.scroll_down);
+            while (notches > 0) : (notches -= 1) self.push(.wheel_up);
+            while (notches < 0) : (notches += 1) self.push(.wheel_down);
         }
     }
 
@@ -572,7 +574,7 @@ test "wheel: classic notches and high-resolution counts scroll once per notch" {
     var out: [16]Action = undefined;
     feed(&input, &mouse, EV_REL, REL_WHEEL, 1);
     feed(&input, &mouse, EV_SYN, SYN_REPORT, 0);
-    try std.testing.expectEqualSlices(Action, &.{.scroll_up}, drain(&input, &out));
+    try std.testing.expectEqualSlices(Action, &.{.wheel_up}, drain(&input, &out));
     var hires = Device{};
     for (0..3) |_| {
         feed(&input, &hires, EV_REL, REL_WHEEL_HI_RES, -40);
@@ -581,7 +583,7 @@ test "wheel: classic notches and high-resolution counts scroll once per notch" {
     // The classic REL_WHEEL the kernel adds for the same notch is ignored.
     feed(&input, &hires, EV_REL, REL_WHEEL, -1);
     feed(&input, &hires, EV_SYN, SYN_REPORT, 0);
-    try std.testing.expectEqualSlices(Action, &.{.scroll_down}, drain(&input, &out));
+    try std.testing.expectEqualSlices(Action, &.{.wheel_down}, drain(&input, &out));
 }
 
 test "mouse: a burst of motion frames queues a single pointer update" {

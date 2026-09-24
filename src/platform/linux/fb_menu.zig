@@ -129,6 +129,19 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
                 if (state.detailCount() > layout.info_lines) state.scrollInfo(action == .scroll_down, layout.info_lines) else state.move(action == .scroll_down);
                 redraw = true;
             },
+            // The wheel scrolls what is under the pointer (list or details).
+            .wheel_up, .wheel_down => {
+                const down = action == .wheel_down;
+                switch (layout.wheelTarget(state, input.has_position, input.x, input.y)) {
+                    .details => state.scrollInfo(down, layout.info_lines),
+                    // Within the list: no wrap-around at either end.
+                    .list => if (down) {
+                        if (state.selected + 1 < state.count) state.move(true);
+                    } else if (state.selected > 0) state.move(false),
+                    .none => {},
+                }
+                redraw = true;
+            },
             // LB/RB and D-pad left/right page the details panel.
             .page_up, .page_down => {
                 if (state.detailCount() > layout.info_lines) {
