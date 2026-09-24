@@ -387,3 +387,7 @@ Reguły i ścieżki: [docs/drivers.md](docs/drivers.md). Testy:
 - `--only matrix` — ten sam dysk za AHCI, IDE, NVMe, virtio-blk, virtio-scsi, xHCI i EHCI.
 - `--only touch` — TouchI2cDxe nadal tylko na SMBIOS RC71L.
 - `python tools/tests/uefi_drivers/run_stage_drivers_qemu.py` — `usos-fb-ui --stage-drivers` w mikro-Linuksie na prawdziwym ntfs3 (amd64, x86, mało miejsca).
+
+## initramfs-usos: kompresja (pomiar 2026-09-24)
+
+Jądro Alpine LTS 6.18.35 rozpakowuje initramfs w gzip, xz (CRC32) i zstd (sprawdzone w QEMU: rdinit=/bin/sh dochodzi do powłoki). Rozmiary dla tego samego cpio (104,0 MB): gzip -9 38,76 MB, xz -6 28,16 MB, xz -9e dict 32 MiB 23,28 MB, zstd -19 29,76 MB. Rozpakowanie w jądrze (dmesg, QEMU TCG): gzip 2,04 s, xz -9e 5,34 s, zstd -19 2,05 s. Po skalowaniu przez natywny inflate hosta (zlib 0,28 s, współczynnik TCG około 6,4) xz kosztuje około +0,52 s CPU, a oszczędza 15,5 MB odczytu, czyli 0,52 s przy 30 MB/s i 0,16 s przy 100 MB/s. Bilans: 0,0 s przy 30 MB/s i +0,36 s przy 100 MB/s, więc **xz nie przyjęto**, zostaje gzip. zstd -19 byłby szybszy w obu modelach (−0,30 s i −0,09 s), ale wymaga dekompresora zstd w narzędziach budujących (Python 3.13 nie ma go w bibliotece standardowej; `parse_newc` w pakiecie XP i w `compare_xp_packages.py` czyta gzip). Otwarte do decyzji.
