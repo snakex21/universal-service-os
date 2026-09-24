@@ -14,6 +14,8 @@ const usb_gamepad = @import("usb_gamepad.zig");
 const serial = @import("serial.zig");
 const boot_timing = @import("boot_timing.zig");
 const splash = @import("splash.zig");
+const touch_driver = @import("touch_driver.zig");
+const acpi_dump = @import("acpi_dump.zig");
 
 const gui = usos.gui;
 const Ui = gui.ui.Ui;
@@ -100,6 +102,10 @@ pub fn init(root: *std.os.uefi.protocol.File, info: usos.boot_info.BootInfo, set
     input.setModeHook(inputModeChanged);
     input.setFrameHook(flushPointer);
     pointer.configure(parseSettings(settings));
+    // The handheld touch driver installs its AbsolutePointer at entry, so it
+    // starts before the pointer layer enumerates (and never blocks the menu).
+    touch_driver.start(root, settings);
+    boot_timing.mark("touch driver checked");
     if (info.framebuffer) |framebuffer| video_surface = gui.Surface.init(framebuffer);
     surface = video_surface;
 
@@ -118,6 +124,9 @@ pub fn init(root: *std.os.uefi.protocol.File, info: usos.boot_info.BootInfo, set
 fn afterFirstFrame() void {
     const root = boot_root orelse return;
     const serial_before = serial.bytes_written;
+    // ACPI tables (DSDT/SSDTs) once per machine, for touch/I2C bring-up.
+    acpi_dump.write(root);
+    boot_timing.mark("ACPI dump checked");
     // One report per boot of what the firmware exposes as input devices
     // (EFI\USOS\Logs\input-devices.txt), for touch/gamepad bring-up.
     input_report.write(root, if (video_surface) |canvas| canvas.framebuffer.width else 0, if (video_surface) |canvas| canvas.framebuffer.height else 0);
@@ -149,6 +158,7 @@ pub fn handoverStatus(text: []const u8) void {
 /// keys are optional and may be added by hand):
 ///   wheel_invert=1               reverse the mouse wheel
 ///   touch_rotation=0|90|180|270  touch panel rotation (default: automatic)
+///   touch_driver=auto|off        handheld I2C touch driver (touch_driver.zig)
 pub fn parseSettings(text: []const u8) pointer.Settings {
     var result = pointer.Settings{};
     var lines = std.mem.splitScalar(u8, text, '\n');
@@ -188,7 +198,10 @@ fn hintAt(x: u32, y: u32) ?input.Event {
 fn idle() void {
     updateClock();
     if (!timing_reported) return;
-    if (!usb_gamepad.takeChanged()) return;
+    // A touch driver's panel came up (placeholder range -> panel range):
+    // the report then shows the live range.
+    const touch_changed = pointer.takeMappingChanged();
+    if (!usb_gamepad.takeChanged() and !touch_changed) return;
     const root = boot_root orelse return;
     input_report.write(root, if (video_surface) |canvas| canvas.framebuffer.width else 0, if (video_surface) |canvas| canvas.framebuffer.height else 0);
 }
@@ -925,7 +938,7 @@ var input_test_hints: [1]Hint = undefined;
 
 /// One frame of the input test screen: live input lines and a marker at
 /// the last tap/click (touch bring-up on new hardware).
-pub fn inputTestFrame(lines: NoticeLines, marker: ?[2]u32, dragging: bool) void {
+pub fn inputTestFrame(lines: NoticeLines, marker: ?[2]u32, dragging: bool, touch_points: []const [2]u32) void {
     active = .none;
     header_clock_active = true;
     input_test_hints = .{.{ .key = input.backKey(), .label = t(.key_back) }};
@@ -938,6 +951,10 @@ pub fn inputTestFrame(lines: NoticeLines, marker: ?[2]u32, dragging: bool) void 
     };
     var clock: [48]u8 = undefined;
     screens.notice(&u, headerInfo(&clock, &u), .{ .title = t(.input_test_title), .subtitle = t(.input_test_help), .icon = .gear, .tone = .neutral, .heading = "", .lines = lines, .hints = &input_test_hints });
+    // Touch trail: small dots for the recent touch points, oldest first.
+    for (touch_points) |point| {
+        gui.paint.circle(u.surface, gui.paint.s(point[0]), gui.paint.s(point[1]), gui.paint.s(u.px(6)), theme.success, null);
+    }
     if (marker) |point| {
         const theme_color = if (dragging) theme.warning else theme.accent;
         gui.paint.circle(u.surface, gui.paint.s(point[0]), gui.paint.s(point[1]), gui.paint.s(u.px(14)), theme_color, null);

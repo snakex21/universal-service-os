@@ -29,3 +29,13 @@ func TestMergeSettingsAddsLanguage(t *testing.T) {
 		}
 	}
 }
+
+// touch_driver=off (the handheld touch driver switch) is a hand-added boot
+// menu key like wheel_invert: update/repair must keep it.
+func TestMergeSettingsKeepsTouchDriver(t *testing.T) {
+	existing := "[ui]\r\nlanguage=en\r\ntouch_driver=off\r\n"
+	got := string(MergeSettingsINI([]byte(existing), "pl"))
+	if want := "[ui]\r\nlanguage=pl\r\ntouch_driver=off\r\n"; got != want {
+		t.Fatalf("merge:\n got %q\nwant %q", got, want)
+	}
+}

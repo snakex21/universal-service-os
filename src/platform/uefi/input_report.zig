@@ -13,6 +13,8 @@ const usb_gamepad = @import("usb_gamepad.zig");
 const text_input = @import("text_input.zig");
 const input = @import("input.zig");
 const serial = @import("serial.zig");
+const touch_driver = @import("touch_driver.zig");
+const acpi_dump = @import("acpi_dump.zig");
 
 const capacity = 32 * 1024;
 
@@ -74,7 +76,11 @@ fn build(width: u32, height: u32) void {
     if (text_input.handheld()) |machine| {
         print("handheld=yes ({s}) default_hints=pad\n", .{machine.label()});
     } else print("handheld=no default_hints=keyboard\n", .{});
-    print("hints_now={s}\n\n", .{if (input.padActive()) "pad (A/B)" else "keyboard (Enter/Esc)"});
+    print("hints_now={s}\n", .{if (input.padActive()) "pad (A/B)" else "keyboard (Enter/Esc)"});
+    print("acpi_dump={s} folder=EFI\\USOS\\Logs\\acpi\\{s} tables_written={d}\n\n", .{ @tagName(acpi_dump.lastResult()), acpi_dump.folder(), acpi_dump.tablesWritten() });
+    touch_driver.describe(print);
+    touchHandles(services);
+    print("\n", .{});
 
     if (services.locateHandleBuffer(.{ .by_protocol = &pointer.SimplePointer.guid }) catch null) |handles| {
         defer services.freePool(@ptrCast(handles.ptr)) catch {};
@@ -102,8 +108,9 @@ fn build(width: u32, height: u32) void {
                 print("  range x={d}..{d} y={d}..{d} z={d}..{d}\n", .{ mode.absolute_min_x, mode.absolute_max_x, mode.absolute_min_y, mode.absolute_max_y, mode.absolute_min_z, mode.absolute_max_z });
                 print("  attributes=0x{x} supports_alt_active={s} supports_pressure_as_z={s}\n", .{ @as(u32, @bitCast(mode.attributes)), yesNo(mode.attributes.supports_alt_active), yesNo(mode.attributes.supports_pressure_as_z) });
             }
+            if (touch_driver.ownsHandle(handle)) print("  source=TouchI2cDxe (started by USOS)\n", .{});
             if (polledAbsolute(handle)) |index| {
-                print("  polled=yes rotation={d} z_as_wheel={s}\n", .{ pointer.Report.absoluteRotation(index), yesNo(pointer.Report.absoluteWheel(index)) });
+                print("  polled=yes rotation={d} z_as_wheel={s} range_changes={d}\n", .{ pointer.Report.absoluteRotation(index), yesNo(pointer.Report.absoluteWheel(index)), pointer.Report.absoluteMappingChanges(index) });
             } else print("  polled=no\n", .{});
         }
     } else print("[EFI_ABSOLUTE_POINTER_PROTOCOL] handles=0 (no firmware touchscreen/tablet driver)\n", .{});
@@ -168,6 +175,26 @@ fn usbInterfaces(services: *uefi.tables.BootServices, to_text: ?*DevicePathToTex
         }
     }
     if (Report.dropped() > 0) print("({d} more interfaces not listed)\n", .{Report.dropped()});
+}
+
+/// The touch driver's AbsolutePointer handle(s) with their live ranges. The
+/// driver publishes 0..65535 until the panel answers, then the panel range.
+fn touchHandles(services: *uefi.tables.BootServices) void {
+    const status = touch_driver.report();
+    for (status.new_handles) |candidate| {
+        const handle = candidate orelse continue;
+        const protocol = (services.handleProtocol(pointer.AbsolutePointer, handle) catch null) orelse {
+            print("  handle=0x{x} (protocol gone)\n", .{@intFromPtr(handle)});
+            continue;
+        };
+        const mode = protocol.mode.*;
+        const placeholder = mode.absolute_max_x == 0xFFFF and mode.absolute_max_y == 0xFFFF;
+        print("  handle=0x{x} range x={d}..{d} y={d}..{d} panel={s}\n", .{ @intFromPtr(handle), mode.absolute_min_x, mode.absolute_max_x, mode.absolute_min_y, mode.absolute_max_y, if (placeholder) "not up yet (placeholder range)" else "live" });
+    }
+    const touch = pointer.lastTouch();
+    if (touch.serial != 0) {
+        print("  last_touch raw={d},{d} screen={d},{d} active={s} reports={d}\n", .{ touch.raw_x, touch.raw_y, touch.x, touch.y, yesNo(touch.active), touch.serial });
+    }
 }
 
 fn polledSimple(handle: uefi.Handle) bool {

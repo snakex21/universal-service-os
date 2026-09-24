@@ -8,6 +8,7 @@ const uefi = std.os.uefi;
 const esp_image_start = @import("esp_image_start.zig");
 const filesystem = @import("filesystem.zig");
 const ntfs_driver = @import("ntfs_driver.zig");
+const touch_driver = @import("touch_driver.zig");
 const secure_boot = @import("secure_boot.zig");
 const serial = @import("serial.zig");
 const mok_key = @import("mok_key.zig");
@@ -61,6 +62,16 @@ pub fn main() uefi.Status {
     if (ntfs_driver.loadAndConnect(root)) |_| {
         say("[SB_PROBE] ntfs-driver START PASS\n");
     } else |err| sayError("[SB_PROBE] ntfs-driver FAIL error=", err);
+
+    // The MOK-signed touch driver, without the SMBIOS gate: it must verify
+    // and start through shim, then fail closed (QEMU has no FCH I2C).
+    touch_driver.startUngated(root);
+    const touch = touch_driver.report();
+    if (touch.outcome == .started) {
+        say("[SB_PROBE] touch-driver START PASS\n");
+    } else if (touch.err) |err| {
+        sayError("[SB_PROBE] touch-driver FAIL error=", err);
+    } else say("[SB_PROBE] touch-driver FAIL (file missing)\n");
 
     const bs = uefi.system_table.boot_services orelse return .load_error;
     if (esp_image_start.load(root, "\\EFI\\USOS\\micro-linux\\vmlinuz-virt")) |kernel| {

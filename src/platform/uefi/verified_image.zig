@@ -168,16 +168,37 @@ fn readWhole(bs: *uefi.tables.BootServices, file: *uefi.protocol.File) ![]align(
 
 /// Loads and starts a boot-service driver held in `bytes`.
 pub fn startDriver(bytes: []const u8, device_handle: ?uefi.Handle) Error!void {
+    return startDriverWithOptions(bytes, device_handle, null);
+}
+
+/// startDriver with LoadedImage->LoadOptions (UTF-16, e.g. `log=<path>`)
+/// and DeviceHandle set before the entry point runs, on every load path.
+/// `options` must stay valid while the driver is resident.
+pub fn startDriverWithOptions(bytes: []const u8, device_handle: ?uefi.Handle, options: ?[]const u16) Error!void {
     const bs = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
     const lock = if (secure_boot.enforced()) secure_boot.shimLock() else null;
     if (lock) |shim| {
         try secure_boot.shimVerify(shim, bytes);
-        if (secure_boot.shimOwnsLoadImage()) return startDriverManually(bs, bytes, device_handle);
+        if (secure_boot.shimOwnsLoadImage()) return startDriverManually(bs, bytes, device_handle, options);
         const image = try loadWithOverride(bs, null, bytes);
+        setLoadedImage(bs, image, device_handle, options);
         return startLoaded(image);
     }
     const image = try plainLoad(bs, .{ .buffer = bytes });
+    setLoadedImage(bs, image, device_handle, options);
     return startLoaded(image);
+}
+
+/// An image loaded from a buffer has no DeviceHandle and no options; fill
+/// them in between LoadImage and StartImage (as a shell passes arguments).
+fn setLoadedImage(bs: *uefi.tables.BootServices, image: uefi.Handle, device_handle: ?uefi.Handle, options: ?[]const u16) void {
+    if (device_handle == null and options == null) return;
+    const loaded = (bs.handleProtocol(uefi.protocol.LoadedImage, image) catch null) orelse return;
+    if (device_handle) |device| loaded.device_handle = device;
+    if (options) |text| {
+        loaded.load_options = @ptrCast(@constCast(text.ptr));
+        loaded.load_options_size = @intCast(text.len * 2);
+    }
 }
 
 fn startLoaded(image: uefi.Handle) Error!void {
@@ -220,7 +241,7 @@ fn unloadUnsupported(_: *uefi.protocol.LoadedImage, _: uefi.Handle) callconv(cc)
 /// into boot-services code pages, installs a LoadedImage protocol on a new
 /// handle and calls its entry point. The memory stays allocated for the
 /// rest of boot services, like any resident driver.
-fn startDriverManually(bs: *uefi.tables.BootServices, bytes: []const u8, device_handle: ?uefi.Handle) Error!void {
+fn startDriverManually(bs: *uefi.tables.BootServices, bytes: []const u8, device_handle: ?uefi.Handle, options: ?[]const u16) Error!void {
     const layout = try pe_loader.parse(bytes);
     if (layout.subsystem != pe_loader.subsystem_efi_boot_service_driver) return error.Unsupported;
     const pages = try bs.allocatePages(.any, .boot_services_code, (@as(usize, layout.size_of_image) + 4095) / 4096);
@@ -240,8 +261,8 @@ fn startDriverManually(bs: *uefi.tables.BootServices, bytes: []const u8, device_
         .device_handle = device_handle,
         .file_path = @ptrCast(@constCast(&end_of_path)),
         .reserved = @ptrCast(&reserved_word),
-        .load_options_size = 0,
-        .load_options = null,
+        .load_options_size = if (options) |text| @intCast(text.len * 2) else 0,
+        .load_options = if (options) |text| @ptrCast(@constCast(text.ptr)) else null,
         .image_base = memory.ptr,
         .image_size = layout.size_of_image,
         .image_code_type = .boot_services_code,

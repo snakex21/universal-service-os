@@ -65,8 +65,8 @@ func SettingsINI(lang string) []byte {
 
 // MergeSettingsINI sets [ui] language= in an existing usos-settings.ini and
 // keeps every other section, key, comment and line (e.g. the boot menu's
-// wheel_invert= and touch_rotation=, which may be added by hand). An empty
-// or missing file yields SettingsINI(lang).
+// wheel_invert=, touch_rotation= and touch_driver=, which may be added by
+// hand). An empty or missing file yields SettingsINI(lang).
 func MergeSettingsINI(existing []byte, lang string) []byte {
 	if len(strings.TrimSpace(string(existing))) == 0 {
 		return SettingsINI(lang)
