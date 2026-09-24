@@ -47,6 +47,14 @@ usos_perf_mark 'device_guard pre-format end'
 printf '[PREPARE_WORK] device_guard pre-format PASS\n'
 
 WINDOWS7_UEFI=no
+# DEAD PATH (2026-09-24): the boot menu never requests it. preparation_capability
+# resolveBackend() returns null for windows-7 + chainload (test in that file);
+# Windows 7 on UEFI uses the native ISO path (src/platform/uefi/windows_native_iso.zig)
+# and on BIOS legacy_windows_request.sh (method iso). Known defects to fix before
+# re-enabling it: prepare_windows7_uefi.sh stages KB4474419*.msu while
+# usos-win7-unattend.exe (tools/windows7_nvme_unattend.c) looks for
+# Windows6.1-KB4474419-v3-x64.cab, and its `mkdir -p "$u/updates"` makes the
+# later plain `mkdir "$u/updates"` in prepare_windows7_nvme.sh fail.
 if [ "${SELECTED_METHOD:-iso}" = chainload ]; then
     case "${SELECTED_ISO:-}" in
         'Systems/Windows/Windows 7/Images/'*)

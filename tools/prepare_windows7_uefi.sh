@@ -1,5 +1,8 @@
 #!/bin/sh
 # Prepare only the guarded WORK copy. The selected original ISO stays read-only.
+# DEAD PATH: only reachable with windows-7 + chainload, which the capability
+# contract rejects; see the note in prepare_work.sh (SHA-2 .msu vs .cab and the
+# updates/ mkdir collision must be fixed before it is re-enabled).
 set -eu
 mode=${1:-prepare}
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
