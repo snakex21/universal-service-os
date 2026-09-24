@@ -41,7 +41,7 @@ pub fn run() void {
     boot_timing.mark("usos-settings.ini read");
     splash.begin(info.framebuffer, splash.logoSetting(settings), "");
     manual_view.init(root, info, settings);
-    manual_secure_boot.init(root, settings);
+    manual_secure_boot.init(root);
     if (e2e_flow.resumePersistent(root, showResumeStatus)) return;
     boot_timing.mark("persistent state checked");
     splash.status(manual_view.t(.splash_images));

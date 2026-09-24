@@ -15,6 +15,7 @@ const serial = @import("serial.zig");
 const boot_timing = @import("boot_timing.zig");
 const splash = @import("splash.zig");
 const touch_driver = @import("touch_driver.zig");
+const uefi_drivers = @import("uefi_drivers.zig");
 const acpi_dump = @import("acpi_dump.zig");
 
 const gui = usos.gui;
@@ -72,14 +73,13 @@ var footer_note: []const u8 = "";
 var home_hints: [3]Hint = undefined;
 var summary_hints: [2]Hint = undefined;
 var notice_hints: [1]Hint = undefined;
-var settings_buffer: [1024]u8 = undefined;
 var boot_root: ?*std.os.uefi.protocol.File = null;
 var timing_reported = false;
 
-/// Reads EFI\USOS\usos-settings.ini (empty when missing). Read before the
-/// splash so `boot_logo=` can choose the logo.
+/// Reads EFI\USOS\usos-settings.ini (empty when missing) into the shared
+/// settings store. Read before the splash so `boot_logo=` can choose the logo.
 pub fn readSettings(root: *std.os.uefi.protocol.File) []const u8 {
-    return file_read.into(root, "\\EFI\\USOS\\usos-settings.ini", &settings_buffer) orelse "";
+    return @import("settings_store.zig").load(root);
 }
 
 /// Loads the theme, font and language and prepares the screen. The splash
@@ -106,6 +106,10 @@ pub fn init(root: *std.os.uefi.protocol.File, info: usos.boot_info.BootInfo, set
     // starts before the pointer layer enumerates (and never blocks the menu).
     touch_driver.start(root, settings);
     boot_timing.mark("touch driver checked");
+    // User drivers from DATA\Drivers\UEFI (after the built-in one, before
+    // the pointer layer and the DATA catalog enumerate devices).
+    uefi_drivers.start(root);
+    boot_timing.mark("user UEFI drivers checked");
     if (info.framebuffer) |framebuffer| video_surface = gui.Surface.init(framebuffer);
     surface = video_surface;
 
@@ -127,6 +131,8 @@ fn afterFirstFrame() void {
     // ACPI tables (DSDT/SSDTs) once per machine, for touch/I2C bring-up.
     acpi_dump.write(root);
     boot_timing.mark("ACPI dump checked");
+    uefi_drivers.writeReport(root);
+    boot_timing.mark("drivers.txt written");
     // One report per boot of what the firmware exposes as input devices
     // (EFI\USOS\Logs\input-devices.txt), for touch/gamepad bring-up.
     input_report.write(root, if (video_surface) |canvas| canvas.framebuffer.width else 0, if (video_surface) |canvas| canvas.framebuffer.height else 0);

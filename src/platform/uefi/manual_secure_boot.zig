@@ -10,24 +10,20 @@ const mok_key = @import("mok_key.zig");
 const manual_power = @import("manual_power.zig");
 const navigation = @import("manual_navigation.zig");
 const view = @import("manual_view.zig");
+const settings_store = @import("settings_store.zig");
 
 var root_dir: ?*uefi.protocol.File = null;
-var settings_copy: [4096]u8 = undefined;
-var settings_len: usize = 0;
 /// "Not now" hides the banner until the next start.
 var dismissed = false;
 
-pub fn init(root: *uefi.protocol.File, settings: []const u8) void {
+pub fn init(root: *uefi.protocol.File) void {
     root_dir = root;
-    const n = @min(settings.len, settings_copy.len);
-    @memcpy(settings_copy[0..n], settings[0..n]);
-    settings_len = n;
     _ = mok_key.status(root);
     mok_key.writeReport(root);
 }
 
 fn currentSettings() []const u8 {
-    return settings_copy[0..settings_len];
+    return settings_store.current();
 }
 
 fn status() mok_key.Status {
@@ -153,16 +149,12 @@ fn savedScreen() void {
 }
 
 fn setRemind(enabled: bool) void {
-    const root = root_dir orelse return;
-    const content = mok_key.setRemind(root, currentSettings(), enabled) catch |err| {
+    settings_store.set(mok_key.remind_key, if (enabled) "1" else "0") catch |err| {
         const lines = [_][]const u8{@errorName(err)};
         view.notice(view.t(.sbkey_title), .warning, .warning, "", &lines);
         view.waitForDismiss();
         return;
     };
-    const n = @min(content.len, settings_copy.len);
-    std.mem.copyForwards(u8, settings_copy[0..n], content[0..n]);
-    settings_len = n;
 }
 
 // ------------------------------------------------------------ Tools page

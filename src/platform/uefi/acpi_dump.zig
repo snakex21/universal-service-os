@@ -44,10 +44,12 @@ pub fn write(root: *uefi.protocol.File) void {
     };
 }
 
-fn run(root: *uefi.protocol.File) !Result {
-    var tables: [max_tables]Table = undefined;
+const Walk = struct { count: usize, root_address: usize, entry_bytes: usize, crc: u32 };
+
+/// Every XSDT/RSDT table plus the FADT's DSDT (at most max_tables).
+fn collect(tables: *[max_tables]Table) ?Walk {
     var count: usize = 0;
-    const rsdp = findRsdp() orelse return .no_acpi;
+    const rsdp = findRsdp() orelse return null;
     const revision = rsdp[15];
     var root_address: usize = 0;
     var entry_bytes: usize = 4;
@@ -59,8 +61,8 @@ fn run(root: *uefi.protocol.File) !Result {
         }
     }
     if (root_address == 0) root_address = std.mem.readInt(u32, rsdp[16..20], .little);
-    if (root_address == 0) return .no_acpi;
-    const root_table = headerAt(root_address) orelse return .no_acpi;
+    if (root_address == 0) return null;
+    const root_table = headerAt(root_address) orelse return null;
 
     var crc = std.hash.Crc32.init();
     var offset: usize = rules.header_size;
@@ -83,9 +85,31 @@ fn run(root: *uefi.protocol.File) !Result {
             }
         }
     }
+    return .{ .count = count, .root_address = root_address, .entry_bytes = entry_bytes, .crc = crc.final() };
+}
+
+/// True when an ACPI ID (e.g. PNP0C50, NVTK0603) appears as a _HID/_CID
+/// value in the DSDT or an SSDT (byte-pattern scan, driver_manifest rules).
+pub fn amlContainsId(id: []const u8) bool {
+    var tables: [max_tables]Table = undefined;
+    const walk = collect(&tables) orelse return false;
+    for (tables[0..walk.count]) |table| {
+        const signature = &table.header.signature;
+        if (!std.mem.eql(u8, signature, "DSDT") and !std.mem.eql(u8, signature, "SSDT")) continue;
+        if (@import("usos").flow.driver_manifest.amlContainsId(bytesAt(table.address, table.header.length), id)) return true;
+    }
+    return false;
+}
+
+fn run(root: *uefi.protocol.File) !Result {
+    var tables: [max_tables]Table = undefined;
+    const walk = collect(&tables) orelse return .no_acpi;
+    const count = walk.count;
+    const root_address = walk.root_address;
+    const entry_bytes = walk.entry_bytes;
 
     const info = text_input.Report.smbios();
-    const key = rules.machineKey(if (info) |system| system.uuid else null, crc.final(), &folder_name);
+    const key = rules.machineKey(if (info) |system| system.uuid else null, walk.crc, &folder_name);
     folder_len = key.len;
 
     var path: [96]u16 = undefined;

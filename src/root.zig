@@ -72,6 +72,8 @@ pub const flow = struct {
     pub const secure_boot_policy = @import("flow/secure_boot_policy.zig");
     pub const mok_list = @import("flow/mok_list.zig");
     pub const touch_driver_policy = @import("flow/touch_driver_policy.zig");
+    pub const driver_manifest = @import("flow/driver_manifest.zig");
+    pub const inf_package = @import("flow/inf_package.zig");
     pub const acpi_dump = @import("flow/acpi_dump.zig");
 };
 pub const selftest = struct {
@@ -178,6 +180,8 @@ test {
     _ = flow.secure_boot_policy;
     _ = flow.mok_list;
     _ = flow.touch_driver_policy;
+    _ = flow.driver_manifest;
+    _ = flow.inf_package;
     _ = flow.acpi_dump;
     _ = selftest.Case;
     _ = selftest.Report;

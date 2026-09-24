@@ -161,34 +161,8 @@ fn logError(what: []const u8, err: anyerror) void {
 
 pub const remindEnabled = mok_list.remindEnabled;
 
-var settings_out: [4096]u8 = undefined;
-
-/// Rewrites usos-settings.ini with the reminder on or off. Returns the new
-/// file content (the caller keeps it as the current settings).
-pub fn setRemind(root: *uefi.protocol.File, settings: []const u8, enabled: bool) ![]const u8 {
-    const content = mok_list.withSetting(settings, remind_key, if (enabled) "1" else "0", &settings_out) orelse return error.SettingsTooLarge;
-    try replaceFile(root, settings_path, content);
-    return content;
-}
-
-fn replaceFile(root: *uefi.protocol.File, path: []const u8, content: []const u8) !void {
-    var name: [128]u16 = undefined;
-    const units = try std.unicode.utf8ToUtf16Le(&name, path);
-    name[units] = 0;
-    const z: [*:0]const u16 = @ptrCast(&name);
-    // UEFI files have no truncate: delete and create again.
-    if (root.open(z, .read_write, .{})) |old| {
-        _ = old.delete() catch {};
-    } else |_| {}
-    const file = try root.open(z, .read_write_create, .{});
-    defer file.close() catch {};
-    var written: usize = 0;
-    while (written < content.len) {
-        const n = try file.write(content[written..]);
-        if (n == 0) return error.ShortWrite;
-        written += n;
-    }
-    try file.flush();
+fn replaceFile(root: *uefi.protocol.File, file_path: []const u8, content: []const u8) !void {
+    return @import("settings_store.zig").replaceFile(root, file_path, content);
 }
 
 // ------------------------------------------------------------ report

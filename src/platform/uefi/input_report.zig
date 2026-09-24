@@ -81,6 +81,8 @@ fn build(width: u32, height: u32) void {
     touch_driver.describe(print);
     touchHandles(services);
     print("\n", .{});
+    @import("uefi_drivers.zig").describe(print);
+    print("\n", .{});
 
     if (services.locateHandleBuffer(.{ .by_protocol = &pointer.SimplePointer.guid }) catch null) |handles| {
         defer services.freePool(@ptrCast(handles.ptr)) catch {};

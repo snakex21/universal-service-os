@@ -64,9 +64,22 @@ pub const Status = struct {
 };
 
 var status: Status = .{};
+var image_hash: ?[32]u8 = null;
+
+/// SHA-256 of the started driver image (user drivers with the same bytes
+/// are skipped as duplicates).
+pub fn startedImageHash() ?[32]u8 {
+    return if (status.outcome == .started) image_hash else null;
+}
 
 pub fn report() Status {
     return status;
+}
+
+/// Tools -> Drivers changed touch_driver= for the next start: the page and
+/// the reports show the new setting (the running driver stays as it is).
+pub fn setModeForReport(mode: policy.Mode) void {
+    status.mode = mode;
 }
 
 /// Loads the driver when the hardware and settings allow it. Never fails:
@@ -97,6 +110,9 @@ fn startMatched(root: *uefi.protocol.File) void {
         return;
     };
     status.size = bytes.len;
+    var hash: [32]u8 = undefined;
+    std.crypto.hash.sha2.Sha256.hash(bytes, &hash, .{});
+    image_hash = hash;
     const services = uefi.system_table.boot_services orelse {
         status.outcome = .failed;
         status.err = error.BootServicesUnavailable;

@@ -2,11 +2,41 @@
 //! (tools/vendor/touchi2cdxe, \EFI\USOS\touchi2c_x64.efi): only on machines
 //! whose SMBIOS identity matches one of the driver's profiles, so the
 //! driver's fixed AMD FCH MMIO/AOAC accesses never happen on other hardware
-//! (the driver itself fails closed as well). The strings mirror the
-//! driver's own match: a Type 2 baseboard product that starts with the
-//! profile's board name, or an exact Type 1 product name.
+//! (the driver itself fails closed as well). The gate is a built-in
+//! driver manifest (src/flow/driver_manifest.zig, the same rules as the
+//! user drivers in DATA\Drivers\UEFI): a Type 2 baseboard product that
+//! starts with the profile's board name, or a Type 1 product name, both
+//! case-insensitive prefixes (the driver's own check is case-sensitive, so
+//! a lower-case board string only makes the driver fail closed).
 const std = @import("std");
 const handheld = @import("../gui/handheld.zig");
+const driver_manifest = @import("driver_manifest.zig");
+
+/// The built-in manifest of \EFI\USOS\touchi2c_x64.efi: one [match] per
+/// driver profile, any one may match.
+pub const manifest_text =
+    \\[driver]
+    \\name=TouchI2cDxe
+    \\type=input
+    \\load=auto
+    \\[match]
+    \\smbios_baseboard=RC71L
+    \\[match]
+    \\smbios_baseboard=RC72LA
+    \\[match]
+    \\smbios_baseboard=RC73XA
+    \\[match]
+    \\smbios_baseboard=RC73YA
+    \\[match]
+    \\smbios_product=Galileo
+    \\[match]
+    \\smbios_product=Jupiter
+    \\
+;
+
+pub fn manifest() driver_manifest.Manifest {
+    return driver_manifest.parse(manifest_text, "TouchI2cDxe");
+}
 
 pub const Target = enum {
     /// ROG Ally 2023: exact RC71L profile (USOS patch; Novatek NVTK0603 on
@@ -44,14 +74,13 @@ const products = [_]struct { name: []const u8, target: Target }{
 };
 
 /// The driver profile this machine matches, or null (do not load).
+/// (A label for the reports; the load decision is the manifest's.)
 pub fn target(info: handheld.SystemInfo) ?Target {
-    const board = std.mem.trim(u8, info.board_product, " \t\r\n");
     for (boards) |entry| {
-        if (std.mem.startsWith(u8, board, entry.prefix)) return entry.target;
+        if (driver_manifest.prefixIgnoreCase(info.board_product, entry.prefix)) return entry.target;
     }
-    const product = std.mem.trim(u8, info.product, " \t\r\n");
     for (products) |entry| {
-        if (std.mem.eql(u8, product, entry.name)) return entry.target;
+        if (driver_manifest.prefixIgnoreCase(info.product, entry.name)) return entry.target;
     }
     return null;
 }
@@ -97,7 +126,11 @@ pub const Decision = enum {
 pub fn decide(mode: Mode, info: ?handheld.SystemInfo) Decision {
     if (mode == .off) return .disabled_by_setting;
     const system = info orelse return .no_smbios;
-    return if (target(system) != null) .load else .hardware_not_matched;
+    const built_in = manifest();
+    return switch (driver_manifest.evaluate(&built_in, .{ .smbios = system })) {
+        .matched, .everywhere => .load,
+        .not_matched => .hardware_not_matched,
+    };
 }
 
 test "touch driver loads only on handhelds its profiles cover" {
@@ -114,9 +147,24 @@ test "touch driver loads only on handhelds its profiles cover" {
     try std.testing.expectEqual(@as(?Target, null), target(.{ .manufacturer = "LENOVO", .product = "83E1", .version = "Legion Go 8APU1" }));
     // The product string alone ("ROG Ally RC71L_RC71L") is not the driver's key.
     try std.testing.expectEqual(@as(?Target, null), target(.{ .product = "ROG Ally RC71L_RC71L" }));
-    // Case matters like in the driver (AsciiStrnCmp); "rc71l" is no match.
-    try std.testing.expectEqual(@as(?Target, null), target(.{ .board_product = "rc71l" }));
+    // Manifest rule: case-insensitive prefix (the driver then applies its
+    // own case-sensitive check and fails closed).
+    try std.testing.expectEqual(@as(?Target, .rog_ally_rc71l), target(.{ .board_product = "rc71l" }));
     try std.testing.expectEqual(@as(?Target, null), target(.{}));
+    const built_in = manifest();
+    try std.testing.expectEqualStrings("TouchI2cDxe", built_in.name);
+    try std.testing.expectEqual(@as(usize, 6), built_in.match_count);
+    try std.testing.expectEqual(@as(usize, 0), built_in.ignored_lines);
+    try std.testing.expectEqual(driver_manifest.Type.input, built_in.type);
+    // Every labelled profile is covered by the manifest and vice versa.
+    for ([_]handheld.SystemInfo{
+        .{ .board_product = "RC71L" },       .{ .board_product = "RC72LA" },
+        .{ .board_product = "RC73XA" },      .{ .board_product = "RC73YA" },
+        .{ .product = "Galileo" },           .{ .product = "Jupiter" },
+        .{ .board_product = "X470 Taichi" }, .{ .product = "Standard PC (Q35 + ICH9, 2009)" },
+    }) |info| {
+        try std.testing.expectEqual(target(info) != null, decide(.auto, info) == .load);
+    }
 }
 
 test "touch_driver setting and the load decision" {
