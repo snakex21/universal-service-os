@@ -299,6 +299,34 @@ pub fn autoRotation(range_w: u64, range_h: u64, width: u32, height: u32) u16 {
     return if (portrait_panel and landscape_screen) 90 else 0;
 }
 
+/// The rotation of one absolute device, recomputed whenever its advertised
+/// range changes. A driver may install its protocol with a placeholder
+/// range (TouchI2cDxe publishes 0..0xFFFF on both axes until the panel is
+/// live, then e.g. 0..1920 x 0..1080), so the rotation chosen when the
+/// handle first appeared must not be kept for the real range.
+pub const AbsoluteMapping = struct {
+    /// min_x, max_x, min_y, max_y as last seen.
+    range: [4]u64 = .{ 0, 0, 0, 0 },
+    rotation: u16 = 0,
+    known: bool = false,
+
+    /// Returns true when the range (or the forced rotation) changed and the
+    /// rotation was recomputed.
+    pub fn update(self: *AbsoluteMapping, range: [4]u64, forced_rotation: ?u16, width: u32, height: u32) bool {
+        const rotation = forced_rotation orelse autoRotation(range[1] -| range[0], range[3] -| range[2], width, height);
+        if (self.known and std.mem.eql(u64, &self.range, &range) and self.rotation == rotation) return false;
+        self.range = range;
+        self.rotation = rotation;
+        self.known = true;
+        return true;
+    }
+
+    /// Screen coordinates for a device report under the current mapping.
+    pub fn map(self: AbsoluteMapping, value: [2]u64, width: u32, height: u32) [2]u32 {
+        return mapAbsolute(value, self.range, self.rotation, width, height);
+    }
+};
+
 test "wheel accumulator learns the notch unit and keeps high-resolution remainders" {
     var wheel = WheelAccumulator{};
     try std.testing.expectEqual(@as(i32, 1), wheel.feed(120));
@@ -402,4 +430,56 @@ test "hold to repeat fires at press, after the delay, then at the interval" {
     try std.testing.expect(repeat.set(null, 1510) == null);
     try std.testing.expect(repeat.tick(2000) == null);
     try std.testing.expectEqual(Direction.up, repeat.set(.up, 2000).?);
+}
+
+test "absolute mapping is recomputed when a placeholder range becomes the panel range" {
+    var mapping = AbsoluteMapping{};
+    // TouchI2cDxe before bring-up: square placeholder, no rotation.
+    try std.testing.expect(mapping.update(.{ 0, 0xFFFF, 0, 0xFFFF }, null, 1920, 1080));
+    try std.testing.expectEqual(@as(u16, 0), mapping.rotation);
+    // Same range again: nothing to do.
+    try std.testing.expect(!mapping.update(.{ 0, 0xFFFF, 0, 0xFFFF }, null, 1920, 1080));
+    // The panel comes up landscape 1920x1080 (ROG Ally): the new range is
+    // used for scaling, the rotation stays 0.
+    try std.testing.expect(mapping.update(.{ 0, 1920, 0, 1080 }, null, 1920, 1080));
+    try std.testing.expectEqual(@as(u16, 0), mapping.rotation);
+    try std.testing.expectEqual([2]u32{ 959, 539 }, mapping.map(.{ 960, 540 }, 1920, 1080));
+    try std.testing.expectEqual([2]u32{ 1919, 1079 }, mapping.map(.{ 1920, 1080 }, 1920, 1080));
+    // A portrait panel (Steam Deck 800x1280 matrix) on a landscape screen
+    // turns 90 degrees once its real range is published.
+    var deck = AbsoluteMapping{};
+    _ = deck.update(.{ 0, 0xFFFF, 0, 0xFFFF }, null, 1280, 800);
+    try std.testing.expectEqual(@as(u16, 0), deck.rotation);
+    try std.testing.expect(deck.update(.{ 0, 800, 0, 1280 }, null, 1280, 800));
+    try std.testing.expectEqual(@as(u16, 90), deck.rotation);
+    try std.testing.expectEqual([2]u32{ 0, 799 }, deck.map(.{ 0, 0 }, 1280, 800));
+    // touch_rotation= in usos-settings.ini always wins.
+    var forced = AbsoluteMapping{};
+    _ = forced.update(.{ 0, 800, 0, 1280 }, 270, 1280, 800);
+    try std.testing.expectEqual(@as(u16, 270), forced.rotation);
+    // A screen mode change alone re-evaluates the automatic rotation.
+    try std.testing.expect(deck.update(.{ 0, 800, 0, 1280 }, null, 800, 1280));
+    try std.testing.expectEqual(@as(u16, 0), deck.rotation);
+}
+
+test "a touch tap and a drag on the new absolute handle" {
+    // What pointer.zig feeds the gesture for TouchI2cDxe reports: press at
+    // the touched point, lift-off at the same (last) point = tap.
+    var mapping = AbsoluteMapping{};
+    _ = mapping.update(.{ 0, 1920, 0, 1080 }, null, 1920, 1080);
+    var gesture = Gesture{ .threshold = tapThreshold(1920, 1080) };
+    const down = mapping.map(.{ 400, 300 }, 1920, 1080);
+    gesture.press(@intCast(down[0]), @intCast(down[1]));
+    const jitter = mapping.map(.{ 405, 306 }, 1920, 1080);
+    try std.testing.expect(gesture.move(@intCast(jitter[0]), @intCast(jitter[1])) == null);
+    const tap = gesture.release().?;
+    try std.testing.expectEqual(@as(i32, @intCast(down[0])), tap.x);
+    // Finger dragged upwards by 200 panel units: a drag, scrolled by rows.
+    gesture.press(@intCast(down[0]), @intCast(down[1]));
+    const up = mapping.map(.{ 400, 100 }, 1920, 1080);
+    const drag = gesture.move(@intCast(up[0]), @intCast(up[1])).?;
+    try std.testing.expect(drag.dy < -150);
+    var scroll = DragScroll{};
+    try std.testing.expectEqual(@as(i32, 2), scroll.feed(drag.dy, 90));
+    try std.testing.expect(gesture.release() == null);
 }

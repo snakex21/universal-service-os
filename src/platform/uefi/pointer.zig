@@ -82,8 +82,12 @@ const SimpleDevice = struct {
 const AbsoluteDevice = struct {
     protocol: *AbsolutePointer,
     handle: uefi.Handle,
-    rotation: u16 = 0,
+    /// Range and rotation, recomputed when the protocol's Mode changes
+    /// (a driver may publish a placeholder range until its panel is up).
+    mapping: input_map.AbsoluteMapping = .{},
     wheel_axis: bool = false,
+    /// How often the range changed after the handle was first seen.
+    mapping_changes: u16 = 0,
     wheel: input_map.WheelAccumulator = .{},
     last_z: u64 = 0,
     z_known: bool = false,
@@ -111,6 +115,23 @@ var simple_wheel: input_map.WheelSource = .positive_up;
 var vendor_buffer: [64]u8 = undefined;
 var vendor_len: usize = 0;
 var last_handle: ?uefi.Handle = null;
+var last_touch: TouchSample = .{};
+var mapping_changed = false;
+
+/// The last report of an absolute device (touchscreen), raw and mapped.
+pub const TouchSample = struct {
+    raw_x: u64 = 0,
+    raw_y: u64 = 0,
+    x: u32 = 0,
+    y: u32 = 0,
+    active: bool = false,
+    /// Increments with every absolute report (0 = none yet).
+    serial: u32 = 0,
+};
+
+pub fn lastTouch() TouchSample {
+    return last_touch;
+}
 
 pub fn configure(value: Settings) void {
     settings = value;
@@ -124,7 +145,7 @@ pub fn init(width: u32, height: u32) void {
     gesture = .{ .threshold = input_map.tapThreshold(width, height) };
     // A GOP mode change re-initialises the geometry but keeps the devices.
     if (initialized) {
-        for (absolute_devices[0..absolute_count]) |*device| device.rotation = rotationFor(device.protocol);
+        for (absolute_devices[0..absolute_count]) |*device| _ = refreshMapping(device);
         return;
     }
     initialized = true;
@@ -143,11 +164,41 @@ pub fn init(width: u32, height: u32) void {
     ps2_ready = if (firmware_ps2) false else ps2.init();
 }
 
-/// Picks up pointer devices connected after start (USB hot plug). Known
-/// handles keep their state; cheap enough to call twice a second.
+/// Picks up pointer devices connected after start (USB hot plug, or a
+/// touch driver USOS started). Known handles keep their state, but their
+/// absolute range is re-read; cheap enough to call twice a second.
 pub fn rescan() void {
     if (!initialized) return;
     _ = scanDevices();
+    for (absolute_devices[0..absolute_count]) |*device| _ = refreshMapping(device);
+}
+
+/// Re-reads the device's Mode: a changed range (e.g. TouchI2cDxe's 0xFFFF
+/// placeholder becoming 1920x1080) recomputes the rotation and wheel axis.
+fn refreshMapping(device: *AbsoluteDevice) bool {
+    const mode = device.protocol.mode;
+    const range = [4]u64{ mode.absolute_min_x, mode.absolute_max_x, mode.absolute_min_y, mode.absolute_max_y };
+    const first = !device.mapping.known;
+    if (!device.mapping.update(range, settings.touch_rotation, screen_width, screen_height)) return false;
+    const wheel_axis = !mode.attributes.supports_pressure_as_z and mode.absolute_max_z > mode.absolute_min_z;
+    if (wheel_axis != device.wheel_axis) {
+        device.wheel_axis = wheel_axis;
+        device.z_known = false;
+        device.wheel.reset();
+    }
+    if (!first) {
+        device.mapping_changes +%= 1;
+        mapping_changed = true;
+    }
+    return true;
+}
+
+/// A known absolute device changed its range since the last call (the
+/// menu then rewrites input-devices.txt once with the live range).
+pub fn takeMappingChanged() bool {
+    const value = mapping_changed;
+    mapping_changed = false;
+    return value;
 }
 
 fn scanDevices() bool {
@@ -188,9 +239,9 @@ fn scanDevices() bool {
             absolute_devices[absolute_count] = .{
                 .protocol = protocol,
                 .handle = handle,
-                .rotation = rotationFor(protocol),
                 .wheel_axis = !mode.attributes.supports_pressure_as_z and mode.absolute_max_z > mode.absolute_min_z,
             };
+            _ = refreshMapping(&absolute_devices[absolute_count]);
             absolute_count += 1;
         }
     }
@@ -330,14 +381,9 @@ fn pollSimple(device: *SimpleDevice) ?Event {
 
 fn pollAbsolute(device: *AbsoluteDevice) ?Event {
     const state = device.protocol.getState() catch return null;
-    const mode = device.protocol.mode;
-    const mapped = input_map.mapAbsolute(
-        .{ state.current_x, state.current_y },
-        .{ mode.absolute_min_x, mode.absolute_max_x, mode.absolute_min_y, mode.absolute_max_y },
-        device.rotation,
-        screen_width,
-        screen_height,
-    );
+    // The range may have changed since the last report (driver bring-up).
+    _ = refreshMapping(device);
+    const mapped = device.mapping.map(.{ state.current_x, state.current_y }, screen_width, screen_height);
     var notches: i32 = 0;
     if (device.wheel_axis) {
         if (device.z_known) {
@@ -349,6 +395,7 @@ fn pollAbsolute(device: *AbsoluteDevice) ?Event {
     }
     const touch = state.active_buttons.touch_active;
     const alt = state.active_buttons.alt_active;
+    last_touch = .{ .raw_x = state.current_x, .raw_y = state.current_y, .x = mapped[0], .y = mapped[1], .active = touch, .serial = last_touch.serial +% 1 };
     const event = commit(mapped[0], mapped[1], wheelSign(notches), touch, device.touch, alt, device.alt, true);
     device.touch = touch;
     device.alt = alt;
@@ -387,11 +434,6 @@ fn commit(next_x: u32, next_y: u32, scroll: i8, left: bool, was_left: bool, righ
     cursor_x = next_x;
     cursor_y = next_y;
     return result;
-}
-
-fn rotationFor(protocol: *AbsolutePointer) u16 {
-    if (settings.touch_rotation) |value| return value;
-    return input_map.autoRotation(protocol.mode.absolute_max_x -| protocol.mode.absolute_min_x, protocol.mode.absolute_max_y -| protocol.mode.absolute_min_y, screen_width, screen_height);
 }
 
 fn normalizedDelta(value: i32, resolution: u64) i32 {
@@ -452,7 +494,10 @@ pub const Report = struct {
         return absolute_devices[index].protocol.mode.*;
     }
     pub fn absoluteRotation(index: usize) u16 {
-        return absolute_devices[index].rotation;
+        return absolute_devices[index].mapping.rotation;
+    }
+    pub fn absoluteMappingChanges(index: usize) u16 {
+        return absolute_devices[index].mapping_changes;
     }
     pub fn absoluteWheel(index: usize) bool {
         return absolute_devices[index].wheel_axis;
