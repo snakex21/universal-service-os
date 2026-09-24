@@ -1,6 +1,7 @@
 # UEFI touch on the ROG Ally (RC71L): I2C-HID research
 
-Status: research only, nothing implemented. Date: 2026-09-24.
+Status: Route A implemented on 2026-09-24 (see "Implementation" at the end);
+not yet tried on the Ally. Research date: 2026-09-24.
 
 ## Verdict
 
@@ -241,3 +242,53 @@ Required, and all read-only on the device:
 - MrChromebox firmware docs: https://docs.mrchromebox.tech/docs/known-issues.html
 - ASUS ROG Ally FAQ (BIOS entry: power + hold volume-down): https://www.asus.com/support/faq/1050046/
 - Microsoft HID over I2C Protocol Specification v1.0 (descriptor layout, SET_POWER/RESET, input register).
+
+## Implementation (Route A, 2026-09-24)
+
+- **Driver:** TouchI2cDxe v1.3.1 (commit `cd673f65`) plus
+  `usos-rc71l.patch`, vendored with its build recipe in
+  `tools/vendor/touchi2cdxe/v1.3.1-usos1/` (`PROVENANCE.md`). The patch adds
+  the exact RC71L profile (I2CA / `0xFEDC2000` / AOAC 5, address `0x01`,
+  descriptor register `0x0000`), fixes the Goodix comments, and turns the ESP
+  log and console `Print()` off by default. Rebuilt reproducibly with EDK2
+  `edk2-stable202411` and VS2022 outside the repo (`tools/build_touchi2cdxe.ps1`).
+- **Release:** `usos-efisign release` copies it to `EFI/USOS/touchi2c_x64.efi`
+  (hash-checked) and signs it with the USOS MOK key; the licence goes to
+  `EFI/USOS/licenses/touchi2cdxe/`.
+- **Loading:** `src/platform/uefi/touch_driver.zig`, from `manual_view.init`
+  before `pointer.init`, through `verified_image.startDriverWithOptions`
+  (Secure Boot on: SHIM_LOCK + USOS PE loader; off: LoadImage). Gate:
+  `src/flow/touch_driver_policy.zig` (SMBIOS baseboard `RC71L`, `RC72LA`,
+  `RC73XA`, `RC73YA`, or product `Galileo`/`Jupiter`) and
+  `usos-settings.ini` `touch_driver=auto|off`. Failures are recorded, never
+  fatal.
+- **Driver log:** only on a diagnostic boot (`EFI\USOS\diagnostic-boot.flag`):
+  USOS passes `log=\EFI\USOS\Logs\touchi2c.log` and the ESP device handle.
+- **Pointer:** `input_map.AbsoluteMapping` recomputes the range and rotation
+  whenever a handle's `AbsoluteMin/Max` changes (the driver's `0..0xFFFF`
+  placeholder becoming `0..1920 x 0..1080`); `pointer.rescan()` re-reads it
+  every ~2 s and each report re-checks it. Touch taps keep the pad hints on a
+  handheld (`handheld.styleAfterPointer`).
+- **Diagnostics:** `input-devices.txt` has a `[TOUCH DRIVER]` block
+  (setting, SMBIOS match, decision, load result, Secure Boot path, driver
+  handle and its live range, last touch) and is rewritten once when the
+  range changes; the ACPI tables go to `EFI\USOS\Logs\acpi\<SMBIOS UUID>\`
+  (`DSDT.aml`, `SSDT-NN-*.aml`, `index.txt`) once per machine; Power ->
+  Input test shows the driver state, raw/screen touch coordinates and a
+  trail of touch points.
+
+### Test on the Ally
+
+1. Boot the stick (Secure Boot on or off). The menu must appear as before.
+2. Wait about 5 s, then touch a tile: it should highlight/open; drag a list
+   up and down: it should scroll with the finger. The footer keeps A/B.
+3. Power -> Input test: the "Touch driver:" line should say
+   `started, range 0..1920 x 0..1080 (panel live)`; touching draws green
+   dots and "Touch raw x,y -> x,y down".
+4. Send back `EFI\USOS\Logs\input-devices.txt` and the folder
+   `EFI\USOS\Logs\acpi\` (one sub-folder per machine).
+5. If touch does not work: create an empty `EFI\USOS\diagnostic-boot.flag`,
+   boot once more, and also send `EFI\USOS\Logs\touchi2c.log` (the driver's
+   probe log: AOAC state, `COMP_TYPE`, descriptor read, first report). To
+   rule the driver out entirely, add `touch_driver=off` to
+   `EFI\USOS\usos-settings.ini`.
