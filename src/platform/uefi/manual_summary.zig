@@ -58,6 +58,7 @@ pub fn show(
     var version_text: [96]u8 = undefined;
     var count_text: [100]u8 = undefined;
     var number_text: [12]u8 = undefined;
+    var user_text: [120]u8 = undefined;
     const vista = std.mem.eql(u8, system.id, "windows-vista");
     if (image.kind == .iso and (vista or std.mem.eql(u8, system.id, "windows-7"))) {
         if (windows_native_iso.inspect(image.name.slice(), vista)) |inspection| {
@@ -74,6 +75,15 @@ pub fn show(
                 fields.add(view.t(.summary_drivers), if (drivers == 0) view.t(.summary_no_drivers) else view.format(&count_text, .summary_inf_count, &.{number}));
             } else |err| {
                 fields.add(view.t(.summary_driver_inventory), @errorName(err));
+            }
+            if (!vista) {
+                if (windows_native_iso.userDriverCounts()) |counts| {
+                    var used_text: [12]u8 = undefined;
+                    var skipped_text: [12]u8 = undefined;
+                    const used = std.fmt.bufPrint(&used_text, "{d}", .{counts[0]}) catch "?";
+                    const skipped = std.fmt.bufPrint(&skipped_text, "{d}", .{counts[1]}) catch "?";
+                    fields.add(view.t(.summary_user_drivers), view.format(&user_text, .summary_user_drivers_count, &.{ used, skipped }));
+                }
             }
         } else |err| {
             can_start = false;

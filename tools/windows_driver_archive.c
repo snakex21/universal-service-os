@@ -38,21 +38,36 @@ static int validate(unsigned size,unsigned *files){
  }
  if(at!=size)return 0;*files=count;return 1;
 }
+/* User packages (DATA\Drivers\<OS>, archive prefix "user\") come after the
+ * bundled library. They are written only while the WinPE RAM disk keeps a
+ * 16 MiB reserve; the bundled files are always written first. */
+static int is_user(unsigned i){
+ const BYTE *s=data+positions[i];
+ return lengths[i]>5&&(s[0]|32)=='u'&&(s[1]|32)=='s'&&(s[2]|32)=='e'&&(s[3]|32)=='r'&&s[4]=='\\';
+}
 static int extract(unsigned count){
  unsigned prefix=len(base);if(prefix+21+180>=MAX_PATH)return 0;
  copy(path,base);copy(path+prefix,L"usos-win7-drivers");
  if(!CreateDirectoryW(path,0)&&GetLastError()!=ERROR_ALREADY_EXISTS)return 0;
  copy(base+prefix,L"usos-win7-drivers\\");prefix=len(base);
- for(unsigned i=0;i<count;i++){
+ ULARGE_INTEGER avail;unsigned long long room=~0ull,reserve=16ull*1024*1024;
+ if(GetDiskFreeSpaceExW(base,&avail,0,0))room=avail.QuadPart>reserve?avail.QuadPart-reserve:0;
+ unsigned skipped=0;
+ for(unsigned pass=0;pass<2;pass++)for(unsigned i=0;i<count;i++){
+  if(is_user(i)!=(int)pass)continue;
+  if(pass){unsigned long long need=u32(data+positions[i]-4);if(need>room){skipped++;continue;}room-=need;}
   copy(path,base);unsigned name=lengths[i],at=positions[i];
-  for(unsigned j=0;j<name;j++){
+  int made=1;
+  for(unsigned j=0;j<name&&made;j++){
    path[prefix+j]=data[at+j];
-   if(data[at+j]=='\\'){path[prefix+j]=0;if(!CreateDirectoryW(path,0)&&GetLastError()!=ERROR_ALREADY_EXISTS)return 0;path[prefix+j]='\\';}
+   if(data[at+j]=='\\'){path[prefix+j]=0;if(!CreateDirectoryW(path,0)&&GetLastError()!=ERROR_ALREADY_EXISTS)made=0;path[prefix+j]='\\';}
   }
+  if(!made){if(pass){skipped++;continue;}return 0;}
   path[prefix+name]=0;unsigned bytes=u32(data+at-4);at+=name;
-  HANDLE h=CreateFileW(path,GENERIC_WRITE,0,0,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);if(h==INVALID_HANDLE_VALUE)return 0;
-  DWORD done=0;int ok=WriteFile(h,data+at,bytes,&done,0)&&done==bytes;CloseHandle(h);if(!ok)return 0;
+  HANDLE h=CreateFileW(path,GENERIC_WRITE,0,0,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);if(h==INVALID_HANDLE_VALUE){if(pass){skipped++;continue;}return 0;}
+  DWORD done=0;int ok=WriteFile(h,data+at,bytes,&done,0)&&done==bytes;CloseHandle(h);if(!ok){if(pass){DeleteFileW(path);skipped++;continue;}return 0;}
  }
+ if(skipped)say("USOS: user driver files skipped (WinPE RAM disk space or write error); bundled drivers are complete.\r\n");
  return 1;
 }
 void entry(void){

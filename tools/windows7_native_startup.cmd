@@ -10,7 +10,12 @@ wpeinit
 "%~dp0usos-usb-report-x86_64.exe"
 "%~dp0usos-drivers.exe"
 if errorlevel 1 exit /b 1
-if exist "%~dp0usos-win7-drivers\" for /l %%P in (1,1,2) do for /r "%~dp0usos-win7-drivers" %%I in (*.inf) do drvload "%%I" >nul 2>&1
+rem Bundled library first, then the user's boot-critical packages (user\Storage, user\USB);
+rem user\Other (network, GPU, ...) is for the installed system only (DriverPaths).
+if exist "%~dp0usos-win7-drivers\" for /l %%P in (1,1,2) do for /d %%D in ("%~dp0usos-win7-drivers\*") do if /i not "%%~nxD"=="user" for /r "%%D" %%I in (*.inf) do drvload "%%I" >nul 2>&1
+if exist "%~dp0usos-win7-drivers\" for /l %%P in (1,1,2) do for /f "delims=" %%I in ('dir /b "%~dp0usos-win7-drivers\*.inf" 2^>nul') do drvload "%~dp0usos-win7-drivers\%%I" >nul 2>&1
+for %%C in (Storage USB) do if exist "%~dp0usos-win7-drivers\user\%%C\" for /r "%~dp0usos-win7-drivers\user\%%C" %%I in (*.inf) do drvload "%%I" >nul 2>&1
+if exist "%~dp0usos-win7-drivers\user\usos-user-drivers.log" type "%~dp0usos-win7-drivers\user\usos-user-drivers.log"
 echo USOS Win7 x64: VMD/RST ON (Intel 11-14gen) = brak dysku w Setup - wylacz VMD/RST w BIOS.
 echo USOS Win7 x64: Xe/UHD 730/770 i RDNA2 (AM5) = brak driverow pod 7, wymagane dGPU (GTX 900/1000/1600, RTX 2000/3000, RX 400/500/Vega/5000/czesc 6000), inaczej 800x600 VGA. SATA omija NVMe, CSM omija UefiSeven.
 rem USOS Win7 x64 SHA-2 queue: KB4474419 Add-Package MUSI poprzedzac Add-Driver (kolejnosc sztywna). Brak pliku = warning, nie fail. Bez unattenda: nie zmienia wyborow instalacji, tylko DriverPaths/offlineServicing via usos-unattend-drivers.exe.

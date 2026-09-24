@@ -18,6 +18,10 @@ rem Stage optional target packages without automating edition, disk or OOBE choi
 "%~dp0usos-drivers.exe"
 if errorlevel 1 exit /b 1
 rem This PE keeps its own USB/storage stack. Win7 packages belong to the target.
+rem The user's packages (DATA\Drivers\Windows 7 -> usos-win7-drivers\user, Storage/USB/Other)
+rem are Windows 7 drivers too: they reach the installed system through the DriverPaths
+rem entry below (offlineServicing); PE10 is not given Windows 7 drivers.
+if exist "%~dp0usos-win7-drivers\user\usos-user-drivers.log" type "%~dp0usos-win7-drivers\user\usos-user-drivers.log"
 set "USOS_SOURCE_DISK="
 set /p USOS_SOURCE_DISK=<"%USOS_READER%\source-disk.txt"
 if not defined USOS_SOURCE_DISK exit /b 1

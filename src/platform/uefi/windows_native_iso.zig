@@ -73,6 +73,13 @@ pub fn externalDriverCount() !usize {
     var catalog = try data_volume.openCatalog();
     return driver_files.infCount(&catalog);
 }
+/// DATA\Drivers\Windows 7: [used, skipped] INFs, null when there are none.
+pub fn userDriverCounts() ?[2]usize {
+    const catalog = uefi.pool_allocator.create(data_volume.Catalog) catch return null;
+    defer uefi.pool_allocator.destroy(catalog);
+    catalog.* = data_volume.openCatalog() catch return null;
+    return driver_files.userCounts(catalog);
+}
 const IsoStage = @import("usos").flow.preparation_boot_progress.DirectIsoStage;
 pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: ?[]const u8, vista: bool, progress: *const fn (IsoStage, []const u8) void) !void {
     if (@import("builtin").cpu.arch != .x86_64) return error.WindowsSetupRequiresX64;
@@ -131,7 +138,7 @@ pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: 
         owned[count] = drivers.bytes; count += 1;
         try volume.add("usos-drivers.bin", drivers.bytes);
         var driver_message: [128]u8 = undefined;
-        serial.writeAscii(try std.fmt.bufPrint(&driver_message, "[WIN7_NATIVE] external driver INF files={d}; Windows validates hardware match\r\n", .{drivers.inf_count}));
+        serial.writeAscii(try std.fmt.bufPrint(&driver_message, "[WIN7_NATIVE] external driver INF files={d}; user INFs used={d} skipped={d}; Windows validates hardware match\r\n", .{ drivers.inf_count, drivers.user_infs, drivers.user_skipped }));
     }
     const paths = scanner.boot_paths;
     const names = [_][]const u8{ "BCD", "boot.sdi", "boot.wim" };

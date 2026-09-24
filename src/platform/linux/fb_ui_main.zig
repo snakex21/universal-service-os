@@ -15,6 +15,14 @@ pub fn main(init: std.process.Init) !u8 {
         if (std.mem.eql(u8, arg, "--menu")) {
             return @import("fb_menu.zig").run(init.gpa, args.next() orelse return 2);
         }
+        // tools/extract.sh: user INF drivers -> WORK $WinPEDriver$ (no UI).
+        if (std.mem.eql(u8, arg, "--stage-drivers")) {
+            const source = args.next() orelse return 2;
+            const destination = args.next() orelse return 2;
+            const image = args.next() orelse return 2;
+            const log_path = args.next() orelse return 2;
+            return @import("driver_stage.zig").run(source, destination, image, log_path);
+        }
     }
 
     // Take ownership of the visible fbdev surface first. As soon as mmap is

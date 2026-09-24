@@ -320,6 +320,34 @@ else
     usos_ui_stage 5 5 'Copying unattended file' 'No unattended file selected - skipped.'
 fi
 
+# The user's INF drivers (DATA\Drivers\<Windows version>, docs/drivers.md) go
+# into $WinPEDriver$ on WORK: Windows Setup 7 and later loads them in WinPE
+# and adds them to the installed system. usos-fb-ui --stage-drivers checks
+# architecture, catalog and files per package and never fails the
+# preparation; an empty or missing folder changes nothing on WORK.
+USER_DRIVERS_STAGED=no
+if [ "$SELECTED_METHOD" = iso ]; then
+    USER_DRIVERS_OS=''
+    case "${SELECTED_ISO:-}" in
+        'Systems/Windows/Windows 7/Images/'*) USER_DRIVERS_OS='Windows 7' ;;
+        'Systems/Windows/Windows 8/Images/'*) USER_DRIVERS_OS='Windows 8' ;;
+        'Systems/Windows/Windows 8.1/Images/'*) USER_DRIVERS_OS='Windows 8.1' ;;
+        'Systems/Windows/Windows 10/Images/'*) USER_DRIVERS_OS='Windows 10' ;;
+        'Systems/Windows/Windows 11/Images/'*) USER_DRIVERS_OS='Windows 11' ;;
+    esac
+    USER_DRIVERS_SOURCE="${DATA_ROOT:-/mnt/data}/Drivers/$USER_DRIVERS_OS"
+    if [ -n "$USER_DRIVERS_OS" ] && [ -d "$USER_DRIVERS_SOURCE" ] && find "$USER_DRIVERS_SOURCE" -type f -iname '*.inf' 2>/dev/null | grep -q .; then
+        usos_ui_stage 5 5 'Adding your drivers' 'Checking the packages in Drivers for Windows Setup.'
+        if command -v usos-fb-ui >/dev/null 2>&1; then
+            usos-fb-ui --stage-drivers "$USER_DRIVERS_SOURCE" "$WORK_ROOT/\$WinPEDriver\$" "${INSTALL_WIM:--}" "$WORK_ROOT/usos-drivers.log" || true
+            USER_DRIVERS_STAGED=yes
+        else
+            printf '[EXTRACT] WARNING: usos-fb-ui missing; user drivers not staged\n'
+        fi
+    fi
+fi
+printf '[EXTRACT] user drivers staged=%s\n' "$USER_DRIVERS_STAGED"
+
 # All installer data and optional unattended data must reach the backing store
 # before phase=prepared is made visible to the bootmanager. sync is deliberately
 # run in the background only so the UI can show activity; completion is still
