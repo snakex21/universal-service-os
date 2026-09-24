@@ -73,7 +73,7 @@ pub fn main() uefi.Status {
         return .not_found;
     };
     say("WORK FOUND\n");
-    if (!work.has_install_wim) {
+    if (work.install_image == null) {
         say("INSTALL.WIM NOT FOUND ON WORK\n");
         return .not_found;
     }

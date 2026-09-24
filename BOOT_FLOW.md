@@ -121,7 +121,7 @@ Docelowa kolejność dla instalatora Windows jest następująca:
 
 `tools/prepare_work.sh` jest jedynym przewidzianym entrypointem destrukcyjnej części mikro-Linuxa i wymusza kolejność guard → format → marker → mount → extract/verify/sync → prepared.
 
-Kontrakt możliwości backendu jest wspólnym źródłem prawdy dla UI i `requestPreparation()`. Obecnie jedyną aktywną kombinacją jest Windows 11, obraz ISO i metoda `direct_iso` (`ISO`). Pozostałe systemy i metody pozostają widoczne jako planowane, ale UI nie pozwala ich uruchomić i pokazuje powód. Niezależnie od kontroli UI `requestPreparation()` ponownie waliduje system, typ obrazu oraz metodę i jawnie odrzuca nieobsługiwane wartości.
+Kontrakt możliwości backendu jest wspólnym źródłem prawdy dla UI i `requestPreparation()`. Aktywne kombinacje i ich backendy wylicza `src/flow/preparation_capability.zig` (`resolveBackend`/`resolveForFirmware`). W UEFI przez WORK: Windows 11 z obrazu ISO metodą `direct_iso` (`ISO`), Windows 8/8.1/10 metodą `chainload` (kopia nośnika na WORK, start `EFI\USOS-WORK\BOOTX64.EFI`), obrazy WIM/VHD metodami `wimboot`/`vhdboot`; Windows 7/Vista idą własną ścieżką natywną (`windows_native_iso.zig`), XP przez staging. W BIOS: Windows 10 i Vista natywnie z ISO (`src/platform/bios/windows_native_iso.zig`), Windows 7 przez mikro-Linux (`legacy_windows_request.sh`). Handoff z WORK akceptuje `sources/install.wim`, `install.esd` i `install.swm`. Kombinacje spoza kontraktu UI pokazuje z powodem i nie pozwala ich uruchomić. Niezależnie od kontroli UI `requestPreparation()` ponownie waliduje system, typ obrazu oraz metodę i jawnie odrzuca nieobsługiwane wartości.
 
 ## Windows 98 SE w BIOS: partycja z menu USOS
 

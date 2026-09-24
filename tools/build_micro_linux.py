@@ -415,6 +415,7 @@ def main() -> int:
             ("tools/target_disk_identity.sh", "usr/lib/usos/target_disk_identity.sh"),
             ("tools/target_disk_guard.sh", "usr/lib/usos/target_disk_guard.sh"),
             ("tools/extract.sh", "usr/lib/usos/extract.sh"),
+            ("tools/windows_setup_media.sh", "usr/lib/usos/windows_setup_media.sh"),
             ("tools/legacy_windows_request.sh", "usr/lib/usos/legacy_windows_request.sh"),
             ("tools/prepare_windows_bios_boot.sh", "usr/lib/usos/prepare_windows_bios_boot.sh"),
             ("tools/prepare_windows7_uefi.sh", "usr/lib/usos/prepare_windows7_uefi.sh"),

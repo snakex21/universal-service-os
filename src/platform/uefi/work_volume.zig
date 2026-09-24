@@ -5,11 +5,13 @@ const case_path = @import("case_path.zig");
 const work_boot_path = @import("work_boot_path.zig");
 
 const marker = std.unicode.utf8ToUtf16LeStringLiteral("\\.usos-work");
-const install_wim = "sources/install.wim";
+const usos = @import("usos");
 
 pub const Found = struct {
     handle: uefi.Handle,
-    has_install_wim: bool,
+    /// sources/install.wim, install.esd or install.swm (the formats Windows
+    /// Setup and tools/extract.sh accept); null when none is present.
+    install_image: ?[]const u8,
     /// A UEFI boot entry exists (EFI/USOS-WORK, or the legacy EFI/BOOT).
     has_windows_boot: bool,
     /// The entry was found only at the legacy EFI/BOOT path.
@@ -28,11 +30,11 @@ pub fn find() ?Found {
         const tag = root.open(marker, .read, .{}) catch continue;
         tag.close() catch {};
 
-        const has_install_wim = existsCaseInsensitive(root, install_wim);
+        const install_image = usos.image_probe.windows_detect.firstInstallImage(root, existsCaseInsensitive);
         const boot = work_boot_path.select(work_boot_path.candidates, root, existsCaseInsensitive);
         return .{
             .handle = handle,
-            .has_install_wim = has_install_wim,
+            .install_image = install_image,
             .has_windows_boot = boot != null,
             .legacy_boot_path = if (boot) |selected| selected.legacy else false,
         };

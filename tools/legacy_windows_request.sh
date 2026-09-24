@@ -14,8 +14,8 @@ legacy_windows_name() {
 
 legacy_windows_request() {
     case "$LEGACY_ACTION" in
-        windows7-iso) windows_folder='Windows 7'; USOS_WINDOWS_BIOS_HANDOFF=direct; USOS_WINDOWS_SETUP_FROM_SOURCE=0; USOS_WINDOWS_BIOS_ORDERED=0 ;;
-        windows-vista-iso) windows_folder='Windows Vista'; USOS_WINDOWS_BIOS_HANDOFF=direct; USOS_WINDOWS_SETUP_FROM_SOURCE=1; USOS_WINDOWS_BIOS_ORDERED=1 ;;
+        windows7-iso) windows_folder='Windows 7'; system_id=windows-7; USOS_WINDOWS_BIOS_HANDOFF=direct; USOS_WINDOWS_SETUP_FROM_SOURCE=0; USOS_WINDOWS_BIOS_ORDERED=0 ;;
+        windows-vista-iso) windows_folder='Windows Vista'; system_id=windows-vista; USOS_WINDOWS_BIOS_HANDOFF=direct; USOS_WINDOWS_SETUP_FROM_SOURCE=1; USOS_WINDOWS_BIOS_ORDERED=1 ;;
         *) stop 'Unsupported Windows BIOS request' ;;
     esac
     export USOS_WINDOWS_BIOS_HANDOFF USOS_WINDOWS_SETUP_FROM_SOURCE USOS_WINDOWS_BIOS_ORDERED
@@ -32,6 +32,7 @@ legacy_windows_request() {
     state=/mnt/esp/EFI/USOS/install-state.ini
     {
         printf 'phase=prepare-requested\nselected_method=iso\n'
+        printf 'selected_system=%s\n' "$system_id"
         printf 'selected_iso=Systems/Windows/%s/Images/%s\n' "$windows_folder" "$image"
         printf 'selected_unattend=%s\n' "$unattended"
     } > "$state.tmp"

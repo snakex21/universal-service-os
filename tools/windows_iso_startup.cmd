@@ -37,6 +37,8 @@ if not defined USOS_SOURCE goto missing
 if not exist "%USOS_SOURCE%\sources\setup.exe" goto missing
 set "USOS_INSTALL=%USOS_SOURCE%\sources\install.wim"
 if not exist "%USOS_INSTALL%" set "USOS_INSTALL=%USOS_SOURCE%\sources\install.esd"
+rem A split image: /installfrom takes the first part, install.swm.
+if not exist "%USOS_INSTALL%" set "USOS_INSTALL=%USOS_SOURCE%\sources\install.swm"
 if not exist "%USOS_INSTALL%" goto missing
 echo Selected Windows installation ISO mounted at %USOS_SOURCE%
 echo [USOS] phase=source-ready install=%USOS_INSTALL%

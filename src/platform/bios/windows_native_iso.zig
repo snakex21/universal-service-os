@@ -53,7 +53,14 @@ pub fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8, graphic
     var setup: udf.Node = undefined;
     var install: udf.Node = undefined;
     if (!try udf.openPath(&iso, "sources/setup.exe", &setup)) return error.WindowsSetupMissing;
-    if (!try udf.openPath(&iso, "sources/install.wim", &install)) return error.WindowsInstallImageMissing;
+    // Setup is started with /installfrom by tools/windows_iso_startup.cmd,
+    // which accepts install.wim, install.esd (Media Creation Tool ISOs) and a
+    // split install.swm, the same list as image_probe/windows_detect.zig.
+    const install_images = [_][]const u8{ "sources/install.wim", "sources/install.esd", "sources/install.swm" };
+    const has_install = for (install_images) |path| {
+        if (try udf.openPath(&iso, path, &install)) break true;
+    } else false;
+    if (!has_install) return error.WindowsInstallImageMissing;
     if (setup.is_directory or setup.size == 0 or install.is_directory or install.size == 0) return error.InvalidWindowsBootFile;
     console.line("[WINDOWS_NATIVE] ORIGINAL UDF BOOT AND SETUP FILES FOUND");
     const support = try fat.fileInfo(esp, reader, &support_path);

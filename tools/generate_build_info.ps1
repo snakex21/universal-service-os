@@ -99,6 +99,7 @@ foreach ($relative in @(
     'tools\target_disk_identity.sh',
     'tools\target_disk_guard.sh',
     'tools\extract.sh',
+    'tools\windows_setup_media.sh',
     'tools\prepare_work.sh',
     'tools\probe_xp_source.sh',
     'tools\probe_nt5_source.sh',

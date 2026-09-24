@@ -33,6 +33,8 @@ command -v sync >/dev/null 2>&1 || fail 'sync is required'
 command -v mkfifo >/dev/null 2>&1 || fail 'mkfifo is required for extraction progress'
 command -v tr >/dev/null 2>&1 || fail 'tr is required for extraction progress'
 [ -f "$SCRIPT_DIR/work_boot_relocate.sh" ] || fail 'work_boot_relocate.sh is missing'
+[ -r "$SCRIPT_DIR/windows_setup_media.sh" ] || fail 'windows_setup_media.sh is missing'
+. "$SCRIPT_DIR/windows_setup_media.sh"
 
 [ -d "$SOURCE_ROOT" ] || fail "source root is not a directory: $SOURCE_ROOT"
 [ -d "$WORK_ROOT" ] || fail "WORK root is not a directory: $WORK_ROOT"
@@ -296,15 +298,20 @@ usos_ui_stage 5 5 'Checking boot files' 'Verifying the prepared boot path before
 # Only the USOS ESP may offer the removable-media path EFI/BOOT/BOOTX64.EFI;
 # the copied media's boot chain is published under EFI/USOS-WORK instead.
 sh "$SCRIPT_DIR/work_boot_relocate.sh" relocate "$WORK_ROOT" || fail 'cannot move the WORK boot chain to EFI/USOS-WORK'
+# Windows Setup media: sources/setup.exe plus an install image in any format
+# Setup accepts (install.wim, install.esd, split install.swm).
+INSTALL_WIM=$(windows_install_image "$WORK_ROOT")
+WINDOWS_SETUP_MEDIA=no
+if [ -n "$INSTALL_WIM" ] && windows_setup_exe "$WORK_ROOT"; then WINDOWS_SETUP_MEDIA=yes; fi
 if [ "$SELECTED_METHOD" = chainload ]; then
     sh "$SCRIPT_DIR/work_boot_relocate.sh" assert "$WORK_ROOT" --require-entry || fail 'chainload source has no EFI boot entry (EFI/BOOT/BOOTX64.EFI before relocation)'
     printf '[EXTRACT] chainload boot file PASS path=EFI/USOS-WORK/BOOTX64.EFI\n'
 else
     sh "$SCRIPT_DIR/work_boot_relocate.sh" assert "$WORK_ROOT" || fail 'removable-media EFI boot entry left on WORK'
-    INSTALL_WIM=$(find "$WORK_ROOT" -type f | awk 'tolower($0) ~ /\/sources\/install\.(wim|esd)$/ { print; exit }')
-    [ -n "$INSTALL_WIM" ] || fail 'Windows installer has no sources/install.wim or install.esd'
+    [ -n "$INSTALL_WIM" ] || fail 'Windows installer has no sources/install.wim, install.esd or install.swm'
     printf '[EXTRACT] Windows installation image PASS path=%s\n' "$INSTALL_WIM"
 fi
+printf '[EXTRACT] windows setup media=%s image=%s\n' "$WINDOWS_SETUP_MEDIA" "${INSTALL_WIM:-none}"
 
 UNATTEND_COPIED=no
 if [ -n "$UNATTEND_FILE" ]; then
@@ -325,18 +332,18 @@ fi
 # and adds them to the installed system. usos-fb-ui --stage-drivers checks
 # architecture, catalog and files per package and never fails the
 # preparation; an empty or missing folder changes nothing on WORK.
+#
+# Every method that leaves Windows Setup media on WORK gets them: iso (Windows
+# 11 on UEFI, Windows 7/Vista through the BIOS path) and chainload (Windows
+# 8/8.1/10 on UEFI start EFI/USOS-WORK/BOOTX64.EFI, i.e. the same Setup from
+# WORK). The folder comes from the catalog system id the boot menu recorded
+# (selected_system); a request without it falls back to the image's folder.
 USER_DRIVERS_STAGED=no
-if [ "$SELECTED_METHOD" = iso ]; then
-    USER_DRIVERS_OS=''
-    case "${SELECTED_ISO:-}" in
-        'Systems/Windows/Windows 7/Images/'*) USER_DRIVERS_OS='Windows 7' ;;
-        'Systems/Windows/Windows 8/Images/'*) USER_DRIVERS_OS='Windows 8' ;;
-        'Systems/Windows/Windows 8.1/Images/'*) USER_DRIVERS_OS='Windows 8.1' ;;
-        'Systems/Windows/Windows 10/Images/'*) USER_DRIVERS_OS='Windows 10' ;;
-        'Systems/Windows/Windows 11/Images/'*) USER_DRIVERS_OS='Windows 11' ;;
-    esac
+USER_DRIVERS_OS=$(user_drivers_os "${SELECTED_SYSTEM:-}" "${SELECTED_ISO:-}")
+printf '[EXTRACT] user drivers target system=%s folder=%s\n' "${SELECTED_SYSTEM:-none}" "${USER_DRIVERS_OS:-none}"
+if [ "$WINDOWS_SETUP_MEDIA" = yes ] && [ -n "$USER_DRIVERS_OS" ]; then
     USER_DRIVERS_SOURCE="${DATA_ROOT:-/mnt/data}/Drivers/$USER_DRIVERS_OS"
-    if [ -n "$USER_DRIVERS_OS" ] && [ -d "$USER_DRIVERS_SOURCE" ] && find "$USER_DRIVERS_SOURCE" -type f -iname '*.inf' 2>/dev/null | grep -q .; then
+    if [ -d "$USER_DRIVERS_SOURCE" ] && find "$USER_DRIVERS_SOURCE" -type f -iname '*.inf' 2>/dev/null | grep -q .; then
         usos_ui_stage 5 5 'Adding your drivers' 'Checking the packages in Drivers for Windows Setup.'
         if command -v usos-fb-ui >/dev/null 2>&1; then
             usos-fb-ui --stage-drivers "$USER_DRIVERS_SOURCE" "$WORK_ROOT/\$WinPEDriver\$" "${INSTALL_WIM:--}" "$WORK_ROOT/usos-drivers.log" || true

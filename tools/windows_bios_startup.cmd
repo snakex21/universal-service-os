@@ -65,6 +65,8 @@ if "!USOS_SETUP_FROM_SOURCE!"=="1" set "USOS_SETUP=!USOS_SOURCE!\sources\setup.e
 if not exist "!USOS_SETUP!" goto missing
 set "USOS_IMAGE=!USOS_SOURCE!\sources\install.wim"
 if not exist "!USOS_IMAGE!" set "USOS_IMAGE=!USOS_SOURCE!\sources\install.esd"
+rem A split image: /installfrom takes the first part, install.swm.
+if not exist "!USOS_IMAGE!" set "USOS_IMAGE=!USOS_SOURCE!\sources\install.swm"
 if exist "!USOS_SOURCE!\Autounattend.xml" (
     "!USOS_SETUP!" /installfrom:"!USOS_IMAGE!" /unattend:"!USOS_SOURCE!\Autounattend.xml"
 ) else (
@@ -78,7 +80,7 @@ set "USOS_MATCH="
 for /f "usebackq delims=" %%L in ("%~1:\.usos-work") do if "%%L"=="nonce=%USOS_NONCE%" set "USOS_MATCH=1"
 if not defined USOS_MATCH exit /b
 if not exist "%~1:\sources\boot.wim" exit /b
-if not exist "%~1:\sources\install.wim" if not exist "%~1:\sources\install.esd" exit /b
+if not exist "%~1:\sources\install.wim" if not exist "%~1:\sources\install.esd" if not exist "%~1:\sources\install.swm" exit /b
 set "USOS_SOURCE=%~1:"
 set /a USOS_FOUND+=1
 exit /b

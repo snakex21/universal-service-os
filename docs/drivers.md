@@ -245,8 +245,17 @@ micro-Linux stager:
 
 ### Windows 10 / 11 / 8.1 / 8 / 7 from WORK (micro-Linux preparation) - wired
 
-`tools/extract.sh` (method ISO), after the copy has been verified and
-before the flush: when `Drivers\<OS>\` holds at least one `.inf`,
+`tools/extract.sh`, after the copy has been verified and before the flush,
+for **every method that leaves Windows Setup media on WORK**
+(`sources/setup.exe` plus `sources/install.wim`, `install.esd` or a split
+`install.swm`): method ISO (Windows 11 on UEFI, Windows 7/Vista through the
+BIOS path) and method chainload (Windows 8, 8.1 and 10 on UEFI resolve to
+chainload: USOS starts `EFI\USOS-WORK\BOOTX64.EFI`, i.e. the same Setup from
+WORK). The folder comes from the catalog system id the boot menu records in
+`install-state.ini` (`selected_system=windows-10` -> `Drivers\Windows 10`;
+UEFI `persistent_state_file.zig`, BIOS `legacy_windows_request.sh`), not from
+the image path; a request without it falls back to the image's folder
+(`tools/windows_setup_media.sh`). When `Drivers\<OS>\` holds at least one `.inf`,
 `usos-fb-ui --stage-drivers <DATA\Drivers\OS> <WORK>\$WinPEDriver$
 <install.wim|esd> <WORK>\usos-drivers.log` (`src/platform/linux/driver_stage.zig`)
 copies the accepted packages to `$WinPEDriver$\<Class>-NN\` on WORK.
@@ -263,6 +272,10 @@ works with and without an answer file and does not touch the user's
   is kept) is skipped; order Storage, USB, Other.
 * An empty or missing folder changes nothing on WORK.
 * The decisions are in `usos-drivers.log` on WORK and on the serial console.
+* Tests: `python tools/tests/test_windows_setup_media.py` (media detection,
+  folder mapping, wiring) and `python tools/tests/run_extract_drivers_qemu.py`
+  (the real `extract.sh` in micro-Linux: chainload + install.esd for Windows
+  10, ISO + install.swm for Windows 11, nothing staged without `setup.exe`).
 
 ### Windows 7 x64 through the USOS UEFI path (wimboot, PE7 or PE10) - wired
 

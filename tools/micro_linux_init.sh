@@ -498,6 +498,9 @@ EXPECTED_DISK_PTUUID=$(ini_value disk_ptuuid "$DEVICE_INI") || stop 'disk PTUUID
 SELECTED_ISO=$(ini_value selected_iso "$STATE_FILE") || stop 'selected ISO missing'
 SELECTED_UNATTEND=$(ini_value selected_unattend "$STATE_FILE" 2>/dev/null || true)
 SELECTED_METHOD=$(ini_value selected_method "$STATE_FILE" 2>/dev/null || true)
+# Catalog system id (e.g. windows-10) recorded by the boot menu; extract.sh
+# takes the DATA\Drivers folder from it. Empty in older requests.
+SELECTED_SYSTEM=$(ini_value selected_system "$STATE_FILE" 2>/dev/null || true)
 [ -n "$SELECTED_METHOD" ] || SELECTED_METHOD=iso
 case "$SELECTED_METHOD" in
     iso|chainload|wimboot|vhdboot) ;;
@@ -570,10 +573,10 @@ fi
 printf '[MICRO-LINUX] phase=prepare-requested PASS\n'
 printf '[MICRO-LINUX] DATA mounted by PARTUUID=%s\n' "$DATA_PARTUUID"
 printf '[MICRO-LINUX] WORK target PARTUUID=%s\n' "$WORK_PARTUUID"
-printf '[MICRO-LINUX] selected image path=%s method=%s\n' "$SELECTED_ISO" "$SELECTED_METHOD"
+printf '[MICRO-LINUX] selected image path=%s method=%s system=%s\n' "$SELECTED_ISO" "$SELECTED_METHOD" "${SELECTED_SYSTEM:-none}"
 
 export WORK_PARTUUID ESP_PARTUUID DATA_PARTUUID EXPECTED_DISK_PTUUID
-export WORK_MOUNT=/mnt/work SOURCE_ROOT=/mnt/source STATE_FILE SOURCE_LABEL SELECTED_METHOD SELECTED_ISO WIM_FILE WIM_TEMPLATE VHD_SHARED VHD_BCD
+export WORK_MOUNT=/mnt/work SOURCE_ROOT=/mnt/source STATE_FILE SOURCE_LABEL SELECTED_METHOD SELECTED_SYSTEM SELECTED_ISOWIM_FILE WIM_TEMPLATE VHD_SHARED VHD_BCD
 export USOS_DEVICE_INI="$DEVICE_INI" UNATTEND_FILE WORK_FS_DRIVER=ntfs3
 
 usos_ui_stage 2 5 'Starting device verification' 'device_guard runs before the first destructive operation.'

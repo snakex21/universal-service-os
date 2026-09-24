@@ -32,6 +32,9 @@ pub fn write(
     selected_iso: ?[]const u8,
     selected_unattend: ?[]const u8,
     selected_method: ?[]const u8,
+    /// Catalog system id (e.g. "windows-10"); micro-Linux's extract.sh takes
+    /// the DATA\Drivers folder from it (docs/drivers.md).
+    selected_system: ?[]const u8,
 ) !void {
     var storage: [max_state_bytes]u8 = @splat('\n');
     var used: usize = 0;
@@ -53,6 +56,11 @@ pub fn write(
     if (selected_method) |method| {
         try append(&storage, &used, "selected_method=");
         try append(&storage, &used, method);
+        try append(&storage, &used, "\r\n");
+    }
+    if (selected_system) |id| {
+        try append(&storage, &used, "selected_system=");
+        try append(&storage, &used, id);
         try append(&storage, &used, "\r\n");
     }
 
