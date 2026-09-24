@@ -6,6 +6,7 @@ import (
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/installed"
 	"github.com/snakex21/universal-service-os/installer/internal/legacyboot"
+	"github.com/snakex21/universal-service-os/installer/internal/obsolete"
 	"github.com/snakex21/universal-service-os/installer/internal/workboot"
 )
 
@@ -18,6 +19,9 @@ type Backend interface {
 	MigrateWORKBootPath(media install.MediaLayout) (workboot.Migration, error)
 	PayloadStatus(media install.MediaLayout) ([]PayloadFileStatus, error)
 	CopyInstallPayload(media install.MediaLayout, progress func(done, total uint64)) error
+	// RemoveObsoleteESPFiles deletes only the allow-listed leftovers
+	// (obsolete.ESPFiles, exact path + SHA-256); each result is logged.
+	RemoveObsoleteESPFiles(media install.MediaLayout) ([]obsolete.Result, error)
 	Verify(media install.MediaLayout, expected install.DeviceINI) (install.VerificationReport, error)
 }
 
@@ -251,6 +255,13 @@ func (e *Engine) runCopy(events chan<- Event, current installed.Target, payloadB
 	}
 	if err := auditPayloadAfter(before, afterStatuses, payloadBuildID, func(message string) { e.log(events, message) }); err != nil {
 		return e.failCopy(events, caption, err)
+	}
+	removed, err := e.backend.RemoveObsoleteESPFiles(current.Media)
+	for _, result := range removed {
+		e.log(events, result.String())
+	}
+	if err != nil {
+		return e.failCopy(events, caption, fmt.Errorf("remove obsolete ESP files: %w", err))
 	}
 
 	e.log(events, "PASS "+caption)

@@ -77,3 +77,16 @@ po późniejszej aktualizacji.
 
 Kod 3.1.2 zawiera własne odblokowanie regionu BIOS przez AMD MTRR.
 Nie stanowi to dowodu kompatybilności z badaną płytą X470.
+
+## Sprzątanie (2026-09-24)
+
+Od układu Secure Boot `EFI/BOOT` zawiera tylko shim, `grubx64.efi` (USOS) i
+`mmx64.efi`; ścieżka XP UEFI-CSM używa CSM firmware, nie CSMWrap, a żaden
+komponent USOS, wpis loadera ani pakiet XP nie odwołuje się do
+`EFI/BOOT/USOS-original.efi` ani `EFI/BOOT/csmwrap.ini`. Aktualizacja i
+naprawa (`installer/internal/obsolete`) usuwają dokładnie te dwa pliki, tylko
+gdy ścieżka i SHA-256 zgadzają się z powyższymi (`3008d265…` i `2dbd22de…`),
+i logują każdy wynik (`OBSOLETE_ESP removed|absent|kept-unknown-content`).
+Nic innego nie jest usuwane; katalog `EFI/CSMWrap/` zostaje. `deploy_csmwrap_trial.ps1
+-Restore` nie ma już czego przywracać (i przywróciłby stary, niepodpisany build).
+

@@ -10,6 +10,7 @@ import (
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/installed"
 	"github.com/snakex21/universal-service-os/installer/internal/legacyboot"
+	"github.com/snakex21/universal-service-os/installer/internal/obsolete"
 	"github.com/snakex21/universal-service-os/installer/internal/workboot"
 )
 
@@ -73,6 +74,14 @@ func (b *testBackend) CopyInstallPayload(install.MediaLayout, func(uint64, uint6
 	return b.copyErr
 }
 
+func (b *testBackend) RemoveObsoleteESPFiles(install.MediaLayout) ([]obsolete.Result, error) {
+	b.calls = append(b.calls, "obsolete")
+	return []obsolete.Result{
+		{Path: "EFI/BOOT/USOS-original.efi", Action: obsolete.ActionRemoved, SHA256: strings.Repeat("e", 64), Reason: "test"},
+		{Path: "EFI/BOOT/csmwrap.ini", Action: obsolete.ActionAbsent},
+	}, nil
+}
+
 func (b *testBackend) Verify(install.MediaLayout, install.DeviceINI) (install.VerificationReport, error) {
 	b.calls = append(b.calls, "verify")
 	return b.verify, b.verifyErr
@@ -104,7 +113,7 @@ func TestLocalUpdateSuccessWritesGuardedLegacyBootBeforePayload(t *testing.T) {
 	if len(finished) != 1 || finished[0].Err != nil || finished[0].Verification == nil || !finished[0].Verification.OK() {
 		t.Fatalf("unexpected finished events: %+v", finished)
 	}
-	want := []string{"revalidate", "legacy", "migrate-work-boot", "expose-work", "payload-status", "copy", "payload-status", "verify"}
+	want := []string{"revalidate", "legacy", "migrate-work-boot", "expose-work", "payload-status", "copy", "payload-status", "obsolete", "verify"}
 	if len(backend.calls) != len(want) {
 		t.Fatalf("calls=%v want=%v", backend.calls, want)
 	}
@@ -122,7 +131,9 @@ func TestLocalUpdateSuccessWritesGuardedLegacyBootBeforePayload(t *testing.T) {
 		!strings.Contains(joined, "PAYLOAD AFTER") ||
 		!strings.Contains(joined, "EFI/USOS/micro-linux/initramfs-usos") ||
 		!strings.Contains(joined, "BOOTMANAGER AFTER") ||
-		!strings.Contains(joined, "changed=yes") {
+		!strings.Contains(joined, "changed=yes") ||
+		!strings.Contains(joined, "OBSOLETE_ESP removed path=EFI/BOOT/USOS-original.efi") ||
+		!strings.Contains(joined, "OBSOLETE_ESP absent path=EFI/BOOT/csmwrap.ini") {
 		t.Fatalf("full payload SHA-256 audit missing from log: %s", joined)
 	}
 }

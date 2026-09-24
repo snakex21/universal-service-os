@@ -6,11 +6,13 @@ import (
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/installed"
 	"github.com/snakex21/universal-service-os/installer/internal/legacyboot"
+	"github.com/snakex21/universal-service-os/installer/internal/obsolete"
 )
 
 type Backend interface {
 	RevalidateInstalledUSOS(expected installed.Target) (installed.Target, error)
 	CopyESPPayload(media install.MediaLayout, progress func(done, total uint64)) error
+	RemoveObsoleteESPFiles(media install.MediaLayout) ([]obsolete.Result, error)
 	RestoreLegacyBoot(expected installed.Target) (legacyboot.Audit, error)
 	VerifyRepair(media install.MediaLayout, expected install.DeviceINI) (install.VerificationReport, error)
 }
@@ -168,6 +170,16 @@ func (e *Engine) runCopy(events chan<- Event, current installed.Target) error {
 		}
 		events <- Event{Kind: EventStage, StageID: StageCopyESP, State: StateActive, ProgressKnown: true, Progress: progress}
 	})
+	if err == nil {
+		var removed []obsolete.Result
+		removed, err = e.backend.RemoveObsoleteESPFiles(current.Media)
+		for _, result := range removed {
+			e.log(events, result.String())
+		}
+		if err != nil {
+			err = fmt.Errorf("remove obsolete ESP files: %w", err)
+		}
+	}
 	if err != nil {
 		wrapped := fmt.Errorf("%s: %w", caption, err)
 		e.log(events, "FAIL "+wrapped.Error())
