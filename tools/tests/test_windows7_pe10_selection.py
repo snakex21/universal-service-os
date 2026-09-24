@@ -101,7 +101,11 @@ class StartupSelection(unittest.TestCase):
         self.assertIn('.file = if (external_pe10) &state.donor else source', native)
         self.assertIn('udf.openPath(&boot_iso, boot_path', native)
         self.assertIn('udf.readNodeAt(&boot_iso, &node', native)
-        self.assertIn('source.size(), "Windows 7", name)', native)
+        # usos-source.ini always describes the selected install ISO (never the
+        # PE10 donor) in its own folder; Vista shares this path since the
+        # Vista SP2 x64 -> external PE10 route was added.
+        self.assertIn('source.size(), if (vista) "Windows Vista" else "Windows 7", name)', native)
+        self.assertNotIn('donor.size()', native)
         self.assertIn('if (external_pe10) try volume.add("usos-external-pe10.flag"', native)
         self.assertNotIn('"usos-stock-win7.flag"', native)
 
