@@ -243,3 +243,18 @@ compare_xp_packages.py against the deployed package (initramfs-xp
 unexplained (artifacts/xp-pae/compare-20260924-key.log). New initramfs-xp
 3d288525...0fd6, kernel unchanged (155c0f9f...). Deployed with -DriversOnly
 -Language pl (backup artifacts/xp-pae/deploy-20260924-154357).
+
+## 2026-09-24: rebuild for B260924-141634 (touch driver release)
+
+usos-fb-ui differs from the deployed base only by the embedded build
+information (build ID/epoch/source hash and the resulting string layout; no
+UI code change in this release), but the package was rebuilt in full as
+usual so the XP menu names the current build (staging ESP
+zig-out/xp-staging-20260924-touch from zig-out/micro-linux + the stick's
+usos-device.ini, --data L:/). Two builds are byte-identical (initramfs-xp
+0e585726...fd48). compare_xp_packages.py against the deployed package
+(3d288525...): 755 identical, 1 base update (usr/bin/usos-fb-ui), 0
+unexplained (artifacts/xp-pae/compare-20260924-touch.log). Kernel unchanged
+(155c0f9f...).
+Deployed with -DriversOnly -Language pl after usos-physical-update
+(backup artifacts/xp-pae/deploy-20260924-162654).
