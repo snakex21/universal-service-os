@@ -577,6 +577,11 @@ pub const ListScreen = struct {
     geometry: screens.ListGeometry = undefined,
     first: usize = 0,
     hint_storage: [3]Hint = undefined,
+    /// Rows the keyboard/pointer can select (null: `Row.enabled`). Blocked
+    /// rows (firmware mismatch, Secure Boot) are disabled but selectable so
+    /// their reason can be read; they take hover like any other row.
+    /// Set by manual_navigation.handleSelectable on every event.
+    selectable: ?[]const bool = null,
 
     /// Opens a list in place (the view keeps a pointer for hover handling).
     pub fn open(self: *ListScreen, title: []const u8, subtitle: []const u8, rows: []const Row, selected: usize, two_line: bool, help: ?screens.Help) void {
@@ -641,6 +646,11 @@ pub const ListScreen = struct {
             if (help) |value| screens.drawHelp(&u, rect, value);
         }
         endPartial();
+    }
+
+    fn hoverable(self: *const ListScreen, index: usize) bool {
+        if (self.selectable) |items| return index < items.len and items[index];
+        return self.spec.rows[index].enabled;
     }
 
     fn setHover(self: *ListScreen, index: ?usize) void {
@@ -871,7 +881,7 @@ pub fn updatePointer() void {
         .home => if (active_home) |home| home.setHover(home.hit(pos.x, pos.y)),
         .list => if (active_list) |list| {
             const hit = if (pointer.isDragging()) null else screens.listHit(list.geometry, list.spec.rows.len, pos.x, pos.y);
-            list.setHover(if (hit) |index| (if (index != list.spec.selected and list.spec.rows[index].enabled) index else null) else null);
+            list.setHover(if (hit) |index| (if (index != list.spec.selected and list.hoverable(index)) index else null) else null);
         },
         .summary => {
             const hover = summary_button.contains(pos.x, pos.y) and summary_spec.action_enabled;

@@ -664,9 +664,10 @@ pub const Ui = struct {
     pub fn row(self: *const Ui, rect: Rect, item: Row, state: RowState) void {
         const theme = self.theme;
         self.surface.fillRect(rect.x, rect.y, rect.w, rect.h, theme.panel);
-        const fill = if (!item.enabled and state != .selected)
-            theme.panel
-        else switch (state) {
+        // Disabled rows the list lets you select (blocked systems) take the
+        // same selection and hover fill as normal rows; their text, icon and
+        // badge stay greyed.
+        const fill = switch (state) {
             .selected => theme.accent_soft,
             .hover => theme.panel_alt,
             .normal => theme.panel,

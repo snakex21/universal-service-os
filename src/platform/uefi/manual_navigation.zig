@@ -21,6 +21,7 @@ pub const Result = enum {
 var drag_scroll = input_map.DragScroll{};
 
 pub fn handle(event: input.Event, selected: *usize, total: usize, list: *view.ListScreen) Result {
+    list.selectable = null;
     return handleInternal(event, selected, total, list, null);
 }
 
@@ -32,6 +33,9 @@ pub fn handleSelectable(
     selectable: []const bool,
 ) Result {
     if (selectable.len < total) return .ignored;
+    // The pointer hover (view.updatePointer, after .pointer_moved) uses the
+    // same selectability as clicks and the keyboard.
+    list.selectable = selectable[0..total];
     return handleInternal(event, selected, total, list, selectable[0..total]);
 }
 
