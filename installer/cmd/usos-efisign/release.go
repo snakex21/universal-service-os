@@ -202,6 +202,9 @@ func secureBootINI(signed bool, pair efisign.KeyPair, manifest shimManifest) str
 	if signed {
 		b.WriteString("signed=1\r\n")
 		fmt.Fprintf(&b, "certificate=EFI/USOS/%s\r\n", enrollCertName)
+		// Informational: the same certificate at the ESP root, the file
+		// MokManager's "Enroll key from disk" picks with one click.
+		fmt.Fprintf(&b, "certificate_root=%s\r\n", rootCertName)
 		fmt.Fprintf(&b, "certificate_sha256=%s\r\n", pair.Fingerprint())
 		fmt.Fprintf(&b, "certificate_subject=%s\r\n", pair.Cert.Subject.CommonName)
 	} else {

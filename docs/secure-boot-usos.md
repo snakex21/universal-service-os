@@ -15,7 +15,7 @@ Violation - Invalid signature detected".
 | `\EFI\USOS\ENROLL_THIS_KEY_IN_MOKMANAGER.cer` | USOS public certificate (DER) | - |
 | `\USOS-KEY.cer` | the same certificate at the ESP root, so MokManager's file browser needs one step (USOS_ESP -> USOS-KEY.cer); in the installer payload, checked equal by `verify_release_consistency.ps1` | - |
 | `\EFI\USOS\ENROLL-README.txt` | enrollment steps (EN, PL + 6 machine-translated) | - |
-| `\EFI\USOS\secure-boot.ini` | `signed=1/0`, shim version, certificate SHA-256 | - |
+| `\EFI\USOS\secure-boot.ini` | `signed=1/0`, shim version, certificate SHA-256, `certificate_root=USOS-KEY.cer` (informational: the ESP-root copy for MokManager) | - |
 | `\EFI\USOS\licenses\shim\` | shim licence and provenance | - |
 
 shim starts `grubx64.efi` from its own directory. If that fails verification
