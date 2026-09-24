@@ -98,7 +98,7 @@ class Wiring(unittest.TestCase):
         self.assertIn("resolved_method.persistedValue(), system.id);", flow)
         init = (ROOT / "tools/micro_linux_init.sh").read_text(encoding="utf-8")
         self.assertIn("SELECTED_SYSTEM=$(ini_value selected_system", init)
-        self.assertIn("SELECTED_METHOD SELECTED_SYSTEM SELECTED_ISO", init)
+        self.assertIn("SELECTED_METHOD SELECTED_SYSTEM SELECTED_ISO WIM_FILE WIM_TEMPLATE", init)
         bios = (ROOT / "tools/legacy_windows_request.sh").read_text(encoding="utf-8")
         self.assertIn("printf 'selected_system=%s", bios)
 
