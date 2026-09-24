@@ -277,3 +277,8 @@ check_xp_driver_imports, check_xp_menu_overlay, check_xp_driver_integration
 the new base (it compares against J:\EFI\USOS\micro-linux).
 Deployed with -DriversOnly -Language pl after usos-physical-update
 (backup artifacts/xp-pae/deploy-20260924-175702).
+
+Redeployed the same day for B260924-155947-C34E7F2A (Tools -> Drivers help
+panel fix; usos-fb-ui differs only by build info): 755 identical, 1 base
+update, 0 unexplained (artifacts/xp-pae/compare-20260924-drivers2.log),
+initramfs-xp a4f1e4a3...; backup artifacts/xp-pae/deploy-20260924-180604.
