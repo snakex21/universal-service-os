@@ -203,10 +203,13 @@ enforcing (`SecureBoot=1`, `SetupMode=0`):
 
 In the system list those rows get the badge "Requires Secure Boot off"
 ("Wymaga wyłączenia Secure Boot") and the detail "Turn Secure Boot off in the
-firmware setup to use it", and cannot be opened. The start summary checks the
+firmware setup to use it". They stay selectable (arrows, pad, wheel,
+touch) so the badge and the help panel can be read; only starting them is
+blocked, with the same text as a notice. The start summary checks the
 backend again (`backendRequiresSecureBootOff`) and shows a notice instead of
-starting. BIOS-only entries (Windows 98/2000/DOS...) are already hidden by
-the firmware-mode check. All strings exist in the 27 locales
+starting. BIOS-only entries (Windows 2000/98/DOS...) are shown the same way
+with the badge "Requires BIOS" (since 2026-09-24; before that the UEFI list
+skipped them, so nothing below Windows XP could be reached). All strings exist in the 27 locales
 (`boot.summary.secure_boot_*`, `boot.error.secure_boot_rejected`,
 `installer.secure_boot.enroll_note`); every locale except English is marked
 machine-translated (Polish via `machine_translated_prefixes`).
@@ -316,6 +319,20 @@ Run 2026-09-24 (QEMU 11.1, q35 + SMM, TCG), all 17 checks passed:
 | after enrollment | shim starts USOS; serial `[SECURE_BOOT] state=on shim_lock=yes shim_loader=yes` |
 | unsigned `grubx64.efi`, key enrolled | still refused |
 | probe as second stage | MOK-signed child EFI starts and returns safely; unsigned child rejected (`SecureBootRejected`); MOK-signed NTFS driver starts through the USOS PE loader; Microsoft-signed wimboot loads; MOK-signed kernel and systemd-boot load; systemd-boot boots the kernel and micro-Linux reaches its hardware panel (`[HARDWARE] READ-ONLY SESSION READY`) |
+
+Run 2026-09-24 afternoon (build B260924-121942-ABFC5366), all 24 checks
+passed, with three new scenarios:
+
+| Scenario | Result |
+| --- | --- |
+| `timeout`: signed USOS, empty MOK, one Enter, then no key | MokManager countdown shown; after 10 s shim retries `grubx64.efi` (second refusal) and gives up |
+| `repeat`: four Enters 120 ms apart | dialog, countdown and a second refusal all consumed, shim returns to the firmware (informational: the Ally symptom) |
+| `helper`: NVRAM seeded (virt-firmware `--set-json`) with `MokNew`/`MokAuth` from `usos-efisign mok-request -password usos` (the installer's code) | MokManager opens by itself before any verification; Enroll MOK, Continue, Yes, password `usos`, Reboot; MokManager accepts the hash and the MOK-signed USOS starts |
+
+The helper scenario needs `virt-firmware` without dependencies in
+`tools/cache/secure-boot/pylib` (`pip install --target ... --no-deps
+virt-firmware`; its `crypt_r` dependency does not build on Windows and is not
+needed for `--set-json`).
 
 `tools/tests/secure_boot/check_authenticode.ps1`: Windows reports the four
 USOS-signed files as `UnknownError` (self-signed root not trusted, hash and

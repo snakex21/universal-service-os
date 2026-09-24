@@ -223,3 +223,12 @@ package's `vmlinuz.efi` too when the ESP's XP kernel is not the base kernel
 (the package kernel must equal the base, which must equal the ESP's production
 kernel). EFI\BOOT\BOOTX64.EFI/grubx64.efi/mmx64.efi are protected in every mode
 that does not copy them, and the layout is re-checked after the copy.
+## 2026-09-24: rebuild for B260924-121942 (input hints)
+
+The micro-Linux base changed (usos-fb-ui: last-input-wins pad/keyboard hints),
+so the package was rebuilt in full (staging ESP from zig-out/micro-linux + the
+stick's usos-device.ini, --data L:/). compare_xp_packages.py against the
+previous package: 755 identical, 1 base update (usr/bin/usos-fb-ui), 0
+unexplained. initramfs-xp 53ac9098...; deployed with -DriversOnly -Language pl
+(backup artifacts/xp-pae/deploy-20260924-143516).
+
