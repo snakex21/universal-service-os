@@ -7,10 +7,18 @@
 //! handled per SYN_REPORT frame. A press released within a small distance
 //! is a click/tap; moving further while pressed is a drag (lists scroll with
 //! the finger). Gamepad directions repeat while held.
+//!
+//! Footer hints follow the last input (gamepad_active): a gamepad, or a
+//! handheld controller exposed as a keyboard (by EVIOCGID USB VID/PID, see
+//! src/gui/handheld.zig), means A/B; a keyboard means Enter/Esc. On a
+//! handheld (/sys/class/dmi/id) the hints start as A/B, a touch tap keeps
+//! them, and the i8042 keyboard (the EC, which may carry built-in buttons)
+//! only switches to Enter/Esc for keys a pad cannot produce.
 const std = @import("std");
 const linux = std.os.linux;
 const usos = @import("usos");
 const input_map = usos.gui.input_map;
+const handheld = usos.gui.handheld;
 
 pub const Event = extern struct { seconds: i64, micros: i64, kind: u16, code: u16, value: i32 };
 const AbsInfo = extern struct { value: i32 = 0, minimum: i32 = 0, maximum: i32 = 0, fuzz: i32 = 0, flat: i32 = 0, resolution: i32 = 0 };
@@ -52,6 +60,9 @@ const BTN_DPAD_LEFT = 0x222;
 const BTN_DPAD_RIGHT = 0x223;
 
 const EVIOCGRAB: u32 = 0x40044590;
+const EVIOCGID: u32 = 0x80084502; // struct input_id: bustype, vendor, product, version
+const BUS_USB = 0x03;
+const BUS_I8042 = 0x11;
 const EVIOCGBIT_KEY: u32 = 0x80604521; // EVIOCGBIT(EV_KEY, 96)
 const EVIOCGBIT_ABS: u32 = 0x80084523; // EVIOCGBIT(EV_ABS, 8)
 const EVIOCGBIT_REL: u32 = 0x80024522; // EVIOCGBIT(EV_REL, 2)
@@ -95,8 +106,19 @@ fn isGamepadButton(code: u16) bool {
     return (code >= BTN_SOUTH and code <= 0x13e) or (code >= BTN_DPAD_UP and code <= BTN_DPAD_RIGHT);
 }
 
+/// Where a device's key presses count for the hint style.
+pub fn keyOrigin(bustype: u16, vendor: u16, product: u16, on_handheld: bool) handheld.KeyOrigin {
+    if (handheld.padKeyboard(vendor, product) != null and (bustype == BUS_USB or bustype == 0x05)) return .pad;
+    if (bustype == BUS_I8042 and on_handheld) return .unattributed;
+    return .keyboard;
+}
+
 const Device = struct {
     gamepad: bool = false,
+    /// EVIOCGID: bus type and USB IDs.
+    bustype: u16 = 0,
+    vendor: u16 = 0,
+    product: u16 = 0,
     touch: bool = false,
     uses_mt: bool = false,
     hires: bool = false,
@@ -135,6 +157,9 @@ pub const Input = struct {
     has_position: bool = false,
     /// The last input came from a gamepad (show A/B hints).
     gamepad_active: bool = false,
+    /// The machine is a known handheld (DMI); read on the first scan.
+    on_handheld: bool = false,
+    dmi_read: bool = false,
     gesture: input_map.Gesture = .{},
     repeat: input_map.Repeat = .{},
     drag_dy: i32 = 0,
@@ -142,6 +167,10 @@ pub const Input = struct {
     queued: usize = 0,
 
     pub fn scan(self: *Input) void {
+        if (!self.dmi_read) {
+            self.dmi_read = true;
+            self.setHandheld(readDmiHandheld() != null);
+        }
         if (self.gesture.threshold == 12 and self.width > 0) self.gesture.threshold = input_map.tapThreshold(@intCast(self.width), @intCast(self.height));
         for (&self.fds, 0..) |*slot, index| {
             if (slot.fd >= 0) continue;
@@ -164,6 +193,12 @@ pub const Input = struct {
                 slot.fd = -1;
             }
         }
+    }
+
+    /// A handheld starts with pad hints.
+    pub fn setHandheld(self: *Input, value: bool) void {
+        self.on_handheld = value;
+        if (value) self.gamepad_active = true;
     }
 
     /// Pixels dragged since the last .drag action (negative = finger up).
@@ -289,10 +324,13 @@ pub const Input = struct {
             return;
         }
         const action = key(code, value);
-        if (action != .none) {
-            self.gamepad_active = false;
-            self.push(action);
+        // Keys with no menu action (volume, power) leave the style alone.
+        if (value == 1 and (action != .none or handheld.evdevKeyboardOnly(code))) {
+            const origin = keyOrigin(device.bustype, device.vendor, device.product, self.on_handheld);
+            self.gamepad_active = handheld.styleAfterKey(self.gamepad_active, self.on_handheld, origin, handheld.evdevKeyboardOnly(code));
+            if (origin == .pad) self.pointer_visible = false;
         }
+        if (action != .none) self.push(action);
     }
 
     fn handleAbs(self: *Input, device: *Device, code: u16, value: i32) void {
@@ -363,7 +401,10 @@ pub const Input = struct {
         }
         if (moved) {
             self.has_position = true;
-            self.gamepad_active = false;
+            // Pointer use means keyboard hints, except a touch on a handheld
+            // or a handheld controller's own pointer (stick as a mouse).
+            const from_pad = keyOrigin(device.bustype, device.vendor, device.product, self.on_handheld) == .pad;
+            self.gamepad_active = handheld.styleAfterPointer(self.gamepad_active, self.on_handheld, true, device.touch, from_pad);
         }
         if (device.primary_changed) {
             device.primary_changed = false;
@@ -436,6 +477,12 @@ fn probe(fd: i32) Device {
     _ = linux.ioctl(fd, EVIOCGBIT_KEY, @intFromPtr(&keys));
     _ = linux.ioctl(fd, EVIOCGBIT_ABS, @intFromPtr(&abs));
     _ = linux.ioctl(fd, EVIOCGBIT_REL, @intFromPtr(&rel));
+    var id: [4]u16 = @splat(0);
+    if (linux.errno(linux.ioctl(fd, EVIOCGID, @intFromPtr(&id))) == .SUCCESS) {
+        device.bustype = id[0];
+        device.vendor = id[1];
+        device.product = id[2];
+    }
     device.gamepad = testBit(&keys, BTN_SOUTH) or testBit(&keys, BTN_DPAD_UP);
     device.touch = testBit(&keys, BTN_TOUCH) or testBit(&abs, ABS_MT_POSITION_X);
     device.hires = testBit(&rel, REL_WHEEL_HI_RES);
@@ -451,6 +498,34 @@ fn probe(fd: i32) Device {
         device.stick_y = @divTrunc(device.abs_y.minimum + device.abs_y.maximum, 2);
     }
     return device;
+}
+
+/// The machine from /sys/class/dmi/id (same rules as SMBIOS on UEFI).
+fn readDmiHandheld() ?handheld.Handheld {
+    if (@import("builtin").os.tag != .linux) return null;
+    var buffers: [5][96]u8 = undefined;
+    const names = [5][:0]const u8{
+        "/sys/class/dmi/id/sys_vendor",
+        "/sys/class/dmi/id/product_name",
+        "/sys/class/dmi/id/product_version",
+        "/sys/class/dmi/id/board_vendor",
+        "/sys/class/dmi/id/board_name",
+    };
+    var values: [5][]const u8 = @splat("");
+    for (names, 0..) |name, index| values[index] = readSmall(name, &buffers[index]);
+    const found = handheld.fromDmi(.{ .manufacturer = values[0], .product = values[1], .version = values[2], .board_manufacturer = values[3], .board_product = values[4] });
+    std.debug.print("[FB_MENU] dmi vendor=\"{s}\" product=\"{s}\" handheld={s}\n", .{ values[0], values[1], if (found) |machine| machine.label() else "no" });
+    return found;
+}
+
+fn readSmall(path: [:0]const u8, buffer: []u8) []const u8 {
+    const result = linux.open(path, .{ .ACCMODE = .RDONLY }, 0);
+    if (linux.errno(result) != .SUCCESS) return "";
+    const fd: i32 = @intCast(result);
+    defer _ = linux.close(fd);
+    const n = linux.read(fd, buffer.ptr, buffer.len);
+    if (linux.errno(n) != .SUCCESS) return "";
+    return std.mem.trim(u8, buffer[0..n], " \t\r\n");
 }
 
 fn monotonicMs() u64 {
@@ -580,4 +655,64 @@ test "gamepad: A accepts, B goes back, D-pad and stick move with repeat" {
     try std.testing.expectEqualSlices(Action, &.{.previous}, drain(&input, &out));
     try std.testing.expectEqual(Action.page_down, gamepadButton(BTN_TR));
     try std.testing.expectEqual(Action.accept, gamepadButton(BTN_START));
+}
+
+test "hint style: last input wins between keyboards and pads" {
+    try std.testing.expectEqual(handheld.KeyOrigin.pad, keyOrigin(BUS_USB, 0x0B05, 0x1ABE, false));
+    try std.testing.expectEqual(handheld.KeyOrigin.pad, keyOrigin(BUS_USB, 0x28DE, 0x1205, true));
+    try std.testing.expectEqual(handheld.KeyOrigin.keyboard, keyOrigin(BUS_USB, 0x046D, 0xC31C, true));
+    try std.testing.expectEqual(handheld.KeyOrigin.keyboard, keyOrigin(BUS_I8042, 0x0001, 0x0001, false));
+    try std.testing.expectEqual(handheld.KeyOrigin.unattributed, keyOrigin(BUS_I8042, 0x0001, 0x0001, true));
+
+    var input = testInput();
+    var out: [16]Action = undefined;
+    var ally = Device{ .bustype = BUS_USB, .vendor = 0x0B05, .product = 0x1ABE };
+    var keyboard = Device{ .bustype = BUS_USB, .vendor = 0x046D, .product = 0xC31C };
+    var pad = Device{ .gamepad = true };
+    // The Ally's controller sends Enter as a keyboard: pad hints.
+    feed(&input, &ally, EV_KEY, 28, 1);
+    try std.testing.expect(input.gamepad_active);
+    // A real keyboard: keyboard hints; a gamepad button: pad hints again.
+    feed(&input, &keyboard, EV_KEY, 108, 1);
+    try std.testing.expect(!input.gamepad_active);
+    feed(&input, &pad, EV_KEY, BTN_SOUTH, 1);
+    try std.testing.expect(input.gamepad_active);
+    // Volume/power keys (no menu action) change nothing.
+    feed(&input, &keyboard, EV_KEY, 115, 1);
+    try std.testing.expect(input.gamepad_active);
+    // Releases and repeats do not switch either.
+    feed(&input, &keyboard, EV_KEY, 108, 0);
+    try std.testing.expect(input.gamepad_active);
+    try std.testing.expectEqualSlices(Action, &.{ .accept, .next, .accept }, drain(&input, &out));
+}
+
+test "hint style on a handheld: starts as pad, EC keyboard and touch keep it" {
+    var input = testInput();
+    input.setHandheld(true);
+    try std.testing.expect(input.gamepad_active);
+    var ec = Device{ .bustype = BUS_I8042, .vendor = 0x0001, .product = 0x0001 };
+    // Arrows/Enter/Esc from the EC keyboard may be built-in buttons.
+    feed(&input, &ec, EV_KEY, 103, 1);
+    feed(&input, &ec, EV_KEY, 28, 1);
+    try std.testing.expect(input.gamepad_active);
+    // A touch tap keeps the pad hints.
+    var touch = Device{ .touch = true, .abs_x = .{ .minimum = 0, .maximum = 639 }, .abs_y = .{ .minimum = 0, .maximum = 479 } };
+    feed(&input, &touch, EV_KEY, BTN_TOUCH, 1);
+    feed(&input, &touch, EV_ABS, ABS_X, 100);
+    feed(&input, &touch, EV_ABS, ABS_Y, 100);
+    feed(&input, &touch, EV_SYN, SYN_REPORT, 0);
+    feed(&input, &touch, EV_KEY, BTN_TOUCH, 0);
+    feed(&input, &touch, EV_SYN, SYN_REPORT, 0);
+    try std.testing.expect(input.gamepad_active);
+    // A letter only comes from a keyboard.
+    feed(&input, &ec, EV_KEY, 30, 1);
+    try std.testing.expect(!input.gamepad_active);
+
+    // Not a handheld: a touch means keyboard hints (as before).
+    var desktop = testInput();
+    desktop.gamepad_active = true;
+    feed(&desktop, &touch, EV_KEY, BTN_TOUCH, 1);
+    feed(&desktop, &touch, EV_ABS, ABS_X, 200);
+    feed(&desktop, &touch, EV_SYN, SYN_REPORT, 0);
+    try std.testing.expect(!desktop.gamepad_active);
 }

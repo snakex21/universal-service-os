@@ -110,6 +110,7 @@ var initialized = false;
 var simple_wheel: input_map.WheelSource = .positive_up;
 var vendor_buffer: [64]u8 = undefined;
 var vendor_len: usize = 0;
+var last_handle: ?uefi.Handle = null;
 
 pub fn configure(value: Settings) void {
     settings = value;
@@ -258,7 +259,14 @@ pub fn isDragging() bool {
     return gesture.dragging;
 }
 
+/// The EFI_SIMPLE_POINTER_PROTOCOL handle of the last polled event (null:
+/// PS/2 or an absolute device), to tell a handheld's stick-as-mouse apart.
+pub fn lastHandle() ?uefi.Handle {
+    return last_handle;
+}
+
 pub fn poll() ?Event {
+    last_handle = null;
     if (ps2_ready) {
         if (pollPs2()) |event| return event;
     }
@@ -273,7 +281,10 @@ pub fn poll() ?Event {
             simple_devices[index] = simple_devices[simple_count];
             continue;
         }
-        if (pollSimple(&simple_devices[index])) |event| return event;
+        if (pollSimple(&simple_devices[index])) |event| {
+            last_handle = simple_devices[index].handle;
+            return event;
+        }
         index += 1;
     }
     index = 0;

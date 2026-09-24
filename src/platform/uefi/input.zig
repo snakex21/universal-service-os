@@ -3,10 +3,17 @@
 //! device (pointer.zig) and USB gamepads read directly through
 //! EFI_USB_IO_PROTOCOL (usb_gamepad.zig). A tap on a footer key hint is
 //! turned into that key, so touch-only devices can go back and confirm.
+//!
+//! Footer hints follow the last input ("last input wins"): keys are read
+//! per keyboard device (text_input.zig), so a handheld controller that the
+//! firmware presents as a keyboard switches the hints to A/B like a USB
+//! pad does; on a handheld (SMBIOS) the hints start as A/B. The rules are
+//! in src/gui/handheld.zig.
 const std = @import("std");
 const uefi = std.os.uefi;
 const pointer = @import("pointer.zig");
 const usb_gamepad = @import("usb_gamepad.zig");
+const text_input = @import("text_input.zig");
 const usos = @import("usos");
 
 const idle_hook_interval_ticks: u16 = 250;
@@ -19,6 +26,7 @@ var last_key: Key = .{};
 var last_source: Source = .keyboard;
 var last_pad: ?usb_gamepad.Event = null;
 var pad_active = false;
+var style_ready = false;
 var mode_hook: ?*const fn () void = null;
 var dedupe = usos.gui.usb_gamepad.Dedupe{};
 
@@ -75,9 +83,23 @@ pub fn lastPad() ?usb_gamepad.Event {
     return last_pad;
 }
 
-/// A USB gamepad was used last: footers show A/B instead of Enter/Esc.
+/// A pad (a USB gamepad, or handheld controls the firmware presents as a
+/// keyboard) was used last: footers show A/B instead of Enter/Esc.
 pub fn padActive() bool {
+    ensureStyle();
     return pad_active;
+}
+
+/// The first footer: pad hints on a handheld (no redraw hook yet).
+fn ensureStyle() void {
+    if (style_ready) return;
+    style_ready = true;
+    text_input.init();
+    if (text_input.handheld() != null) pad_active = true;
+}
+
+fn onHandheld() bool {
+    return text_input.handheld() != null;
 }
 
 /// Called when padActive() changes, to redraw the footer hints.
@@ -87,11 +109,11 @@ pub fn setModeHook(hook: ?*const fn () void) void {
 
 /// Footer key names for the current input device.
 pub fn enterKey() []const u8 {
-    return if (pad_active) "A" else "Enter";
+    return if (padActive()) "A" else "Enter";
 }
 
 pub fn backKey() []const u8 {
-    return if (pad_active) "B" else "Esc";
+    return if (padActive()) "B" else "Esc";
 }
 
 /// Cancels the USB gamepad transfers before another loader starts.
@@ -117,6 +139,7 @@ pub fn readPending() ?Event {
 
 fn read(blocking: bool) ?Event {
     const keyboard = uefi.system_table.con_in;
+    ensureStyle();
 
     while (true) {
         if (pointer.poll()) |mouse| {
@@ -130,21 +153,23 @@ fn read(blocking: bool) ?Event {
             }
             if (mouse.moved or mouse.scroll != 0 or mouse.left_click or mouse.right_click or mouse.drag_dy != 0) {
                 last_source = .pointer;
-                if (mouse.left_click or mouse.right_click or mouse.scroll != 0) setPadActive(false);
+                const click_or_wheel = mouse.left_click or mouse.right_click or mouse.scroll != 0;
+                // A handheld's stick-as-mouse (e.g. the ROG Ally MCU's
+                // pointer interface) is the pad.
+                const from_pad = click_or_wheel and if (pointer.lastHandle()) |handle| text_input.isPadHandle(handle) else false;
+                setPadActive(usos.gui.handheld.styleAfterPointer(pad_active, onHandheld(), click_or_wheel, mouse.touch, from_pad));
                 return .{ .pointer = mouse };
             }
         }
 
+        // Physical keyboards first, so each key is attributed to its device;
+        // ConIn then delivers whatever else the firmware routes to it.
+        if (text_input.read()) |stroke| {
+            if (keyEvent(stroke.scan, stroke.unicode, stroke.origin)) |event| return event;
+        }
         if (keyboard) |device| {
             if (device.readKeyStroke()) |key| {
-                last_key = .{ .scan = key.scan_code, .unicode = key.unicode_char };
-                const event = mapKey(key.scan_code, key.unicode_char);
-                // Handheld firmware may send the same press as a key too.
-                if (accept(.keyboard, event)) {
-                    last_source = .keyboard;
-                    setPadActive(false);
-                    return event;
-                }
+                if (keyEvent(key.scan_code, key.unicode_char, .unattributed)) |event| return event;
             } else |err| switch (err) {
                 error.NotReady => {},
                 else => return .{ .other = .{} },
@@ -164,6 +189,17 @@ fn read(blocking: bool) ?Event {
         if (!blocking) return null;
         stall();
     }
+}
+
+fn keyEvent(scan: u16, unicode: u16, origin: usos.gui.handheld.KeyOrigin) ?Event {
+    last_key = .{ .scan = scan, .unicode = unicode };
+    const event = mapKey(scan, unicode);
+    // Handheld firmware may send the same press as a key too (dedupe
+    // against the USB pad path by channel, whatever the key's origin).
+    if (!accept(.keyboard, event)) return null;
+    last_source = .keyboard;
+    setPadActive(usos.gui.handheld.styleAfterKey(pad_active, onHandheld(), origin, usos.gui.handheld.uefiKeyboardOnly(scan, unicode)));
+    return event;
 }
 
 /// UEFI scan codes and characters to menu events. Enter, LF and Space
@@ -222,7 +258,10 @@ fn stall() void {
     if (idle_ticks < idle_hook_interval_ticks) return;
     idle_ticks = 0;
     rescan_ticks +%= 1;
-    if (rescan_ticks % 4 == 0) pointer.rescan();
+    if (rescan_ticks % 4 == 0) {
+        pointer.rescan();
+        text_input.rescan();
+    }
     if (idle_hook) |hook| hook();
 }
 

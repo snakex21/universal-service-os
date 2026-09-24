@@ -108,6 +108,61 @@ Diagnostics:
 - Power -> Input test (Test wejścia): live pointer/touch/wheel/key events;
   Esc twice leaves.
 
+### Footer hints: last input wins (2026-09-24)
+
+The footer names Enter/Esc after keyboard input and A/B after pad input
+(same key names as micro-Linux `footerHints`), and redraws as soon as the
+style changes. Rules and IDs: `src/gui/handheld.zig` (unit tested, shared
+with micro-Linux); UEFI device side: `src/platform/uefi/text_input.zig`.
+
+Evidence (ROG Ally, `artifacts/ally-logs/input-devices.txt`): AMI delivers
+the built-in pad as keys from the controller MCU 0B05:1ABE interface 0 (HID
+boot keyboard, `USB(0x2,0x0)`), while the XInput interface 045E:028E stays
+silent (reports_so_far=0). Reading only ConIn cannot tell that apart from a
+keyboard, so:
+
+- Every `EFI_SIMPLE_TEXT_INPUT_EX` handle except the ConIn splitter
+  (`console_in_handle`) is read directly with ReadKeyStrokeEx; ConIn is read
+  afterwards for anything else (e.g. devices with only SimpleTextInput).
+  Handles are re-listed every ~2 s (hot-plug) and re-validated before each
+  read.
+- Classification per handle: `EFI_USB_IO_PROTOCOL` on the same handle (EDK2
+  and AMI install text input on the USB interface handle), else
+  LocateDevicePath to an exact USB_IO match; the device descriptor VID/PID
+  of a known handheld controller = pad: 0B05:1ABE ROG Ally, 0B05:1B4C ROG
+  Ally X, 28DE:1205 Steam Deck, 17EF:6182..6185 Legion Go, 0DB0:1901..1903
+  MSI Claw (Legion Go and Claw IDs from Linux drivers / Handheld Daemon,
+  not verified on hardware). An ACPI PNP03xx node = the PS/2 (EC) keyboard.
+- SMBIOS (SMBIOS3 first, then 2.x) type 1/2: ROG Ally RC71L / Ally X
+  RC72LA, Valve Jupiter/Galileo, Lenovo 83E1 or "Legion Go" (Legion Go S:
+  83L3/83N6/83Q2/83Q3), MSI "Claw ...". On such a handheld the hints start
+  as A/B.
+- Key from a pad handle = A/B; from any other identified keyboard =
+  Enter/Esc. Unattributed keys (ConIn only, a handle without a device path,
+  or the PS/2 keyboard on a handheld) keep the current style on a handheld
+  unless a pad cannot produce them (printable characters other than Space);
+  on other machines they mean Enter/Esc as before.
+- A claimed USB pad (XInput/GIP/HID path) = A/B. Mouse clicks and wheel =
+  Enter/Esc, except a touch tap on a handheld (keeps the style) and clicks
+  from a handheld controller's own pointer interface (e.g. the Ally MCU's
+  `USB(0x2,0x1)` stick-as-mouse) = A/B. Footer hint taps keep the style.
+- The same menu action from the keyboard channel and the USB pad path within
+  150 ms is still dropped once (dedupe by channel, whatever the key's origin).
+- `input-devices.txt` adds `smbios:`, `handheld=yes (name)|no`,
+  `hints_now=`, and per text input handle `read_directly=yes class=pad|
+  keyboard (...) vid= pid=` (or `class=fallback` for the splitter).
+
+micro-Linux (`fb_menu_input.zig`): EVIOCGID gives each evdev device's bus
+and VID/PID; keys from a known handheld controller (USB/Bluetooth) = A/B,
+other keyboards = Enter/Esc, the i8042 keyboard on a handheld is
+unattributed (same rule as UEFI, `evdevKeyboardOnly`); gamepad buttons and
+sticks = A/B; keys without a menu action (volume, power) change nothing. The
+handheld default comes from `/sys/class/dmi/id` (sys_vendor, product_name,
+product_version, board_vendor, board_name; logged as `[FB_MENU] dmi ...`).
+Pointer moves switch to Enter/Esc except touch on a handheld and a handheld
+controller's pointer. The menu redraws when the style changes; footer taps
+are hit-tested against the hints on screen.
+
 ## Legacy BIOS menu
 
 PS/2 only (the Core talks to the 8042). The IntelliMouse knock enables the

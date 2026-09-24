@@ -96,11 +96,13 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
     var redraw = true;
     var ready = false;
     var drag_scroll = usos.gui.input_map.DragScroll{};
+    var shown_pad = input.gamepad_active;
     while (true) {
         const layout = renderer.Layout.init(&ui, state);
         if (redraw) {
+            shown_pad = input.gamepad_active;
             if (device) |*d| {
-                renderer.renderWith(&ui, state, input.x, input.y, false, input.gamepad_active);
+                renderer.renderWith(&ui, state, input.x, input.y, false, shown_pad);
                 presentMenu(&presenter, d, &sprite, &input);
                 d.present();
             } else {
@@ -114,6 +116,8 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
             redraw = false;
         }
         const action = input.next();
+        // Footer hints follow the last input (Enter/Esc or A/B).
+        if (input.gamepad_active != shown_pad) redraw = true;
         if (action != .none and action != .pointer) trace.write("action={s}", .{@tagName(action)});
         defer if (action != .none and action != .pointer) std.debug.print("[FB_MENU] action={s} selected={d} scroll={d} pad={s}\n", .{ @tagName(action), state.selected, state.scroll, if (input.gamepad_active) "yes" else "no" });
         switch (action) {
@@ -155,7 +159,7 @@ pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
                 if (input.has_position and input.x >= 0 and input.y >= 0) {
                     // The footer hints are touch targets: Enter/A and Esc/B.
                     var hint_buffer: [4]usos.gui.ui.Hint = undefined;
-                    const hints = renderer.footerHints(&hint_buffer, &ui, state, layout, input.gamepad_active);
+                    const hints = renderer.footerHints(&hint_buffer, &ui, state, layout, shown_pad);
                     if (ui.footerHit(hints, "", @intCast(input.x), @intCast(input.y))) |index| {
                         if (index == 1) return selected(state.selected);
                         if (index == 2) return 1;

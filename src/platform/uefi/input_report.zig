@@ -10,6 +10,8 @@ const uefi = std.os.uefi;
 const usos = @import("usos");
 const pointer = @import("pointer.zig");
 const usb_gamepad = @import("usb_gamepad.zig");
+const text_input = @import("text_input.zig");
+const input = @import("input.zig");
 const serial = @import("serial.zig");
 
 const capacity = 32 * 1024;
@@ -65,7 +67,14 @@ fn build(width: u32, height: u32) void {
         yesNo(pointer.Report.ps2SkippedForFirmware()),
     });
     print("firmware_vendor={s} simple_pointer_wheel_z={s}\n", .{ pointer.Report.firmwareVendor(), pointer.Report.simpleWheelSource() });
-    print("settings: wheel_invert={s}\n\n", .{yesNo(pointer.Report.wheelInverted())});
+    print("settings: wheel_invert={s}\n", .{yesNo(pointer.Report.wheelInverted())});
+    if (text_input.Report.smbios()) |info| {
+        print("smbios: manufacturer=\"{s}\" product=\"{s}\" version=\"{s}\" board_manufacturer=\"{s}\" board=\"{s}\"\n", .{ info.manufacturer, info.product, info.version, info.board_manufacturer, info.board_product });
+    } else print("smbios: (no SMBIOS table)\n", .{});
+    if (text_input.handheld()) |machine| {
+        print("handheld=yes ({s}) default_hints=pad\n", .{machine.label()});
+    } else print("handheld=no default_hints=keyboard\n", .{});
+    print("hints_now={s}\n\n", .{if (input.padActive()) "pad (A/B)" else "keyboard (Enter/Esc)"});
 
     if (services.locateHandleBuffer(.{ .by_protocol = &pointer.SimplePointer.guid }) catch null) |handles| {
         defer services.freePool(@ptrCast(handles.ptr)) catch {};
@@ -107,6 +116,13 @@ fn build(width: u32, height: u32) void {
             const ex = (services.handleProtocol(uefi.protocol.SimpleTextInputEx, handle) catch null) != null;
             print("- handle=0x{x}{s} text_input_ex={s}\n", .{ @intFromPtr(handle), if (console_in != null and handle == console_in.?) " (ConIn console splitter)" else "", yesNo(ex) });
             devicePath(services, to_text, handle);
+            if (console_in != null and handle == console_in.?) {
+                print("  class=fallback (keys seen only here are unattributed)\n", .{});
+            } else if (text_input.Report.classOf(handle)) |device| {
+                if (device.vid != 0 or device.pid != 0) {
+                    print("  read_directly=yes class={s} vid={x:0>4} pid={x:0>4}\n", .{ device.class.text(), device.vid, device.pid });
+                } else print("  read_directly=yes class={s}\n", .{device.class.text()});
+            } else print("  read_directly=no (ConIn only: no text_input_ex, or too many handles)\n", .{});
         }
     } else print("[EFI_SIMPLE_TEXT_INPUT_PROTOCOL] handles=0\n", .{});
     print("\n", .{});
