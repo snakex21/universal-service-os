@@ -277,8 +277,14 @@ pub const Key = enum(u16) {
     prep_step,
     prep_title,
     prep_xp_disks,
+    sbinfo_absent,
     sbinfo_add_needs_off,
+    sbinfo_add_needs_shim,
     sbinfo_desc,
+    sbinfo_guide_csm,
+    sbinfo_guide_default_keys,
+    sbinfo_guide_first,
+    sbinfo_guide_ms_ca,
     sbinfo_how,
     sbinfo_how_line1,
     sbinfo_how_line2,
@@ -295,6 +301,7 @@ pub const Key = enum(u16) {
     sbinfo_on,
     sbinfo_pk_no,
     sbinfo_pk_yes,
+    sbinfo_present,
     sbinfo_remind,
     sbinfo_remove_hint,
     sbinfo_sb_off,
@@ -671,8 +678,14 @@ pub const hashes = [_]u32{
     0x5a2661f6, // prep.step
     0x84ce2712, // prep.title
     0x87155e69, // prep.xp_disks
+    0x0d899acf, // sbinfo.absent
     0x9e2530dd, // sbinfo.add_needs_off
+    0xf5aa9821, // sbinfo.add_needs_shim
     0x491358b7, // sbinfo.desc
+    0x02c5df3c, // sbinfo.guide_csm
+    0xffe47e61, // sbinfo.guide_default_keys
+    0x1ce51827, // sbinfo.guide_first
+    0x51e10d64, // sbinfo.guide_ms_ca
     0x74355308, // sbinfo.how
     0xf8944fd2, // sbinfo.how_line1
     0xf7944e3f, // sbinfo.how_line2
@@ -689,6 +702,7 @@ pub const hashes = [_]u32{
     0xc82a9b4f, // sbinfo.on
     0x5bbf17eb, // sbinfo.pk_no
     0x237c6f57, // sbinfo.pk_yes
+    0x1f8e41a9, // sbinfo.present
     0xb8be361b, // sbinfo.remind
     0x96476e16, // sbinfo.remove_hint
     0xcc03016d, // sbinfo.sb_off
@@ -1110,6 +1124,13 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
     false,
     false,
     false,
@@ -1458,8 +1479,14 @@ pub const english = [_][]const u8{
     "Step {0} of {1}",
     "Preparing Windows installer",
     "Starting XP disk selection",
+    "Missing",
     "Available while Secure Boot is off",
+    "Available only when USOS is started by shim (EFI\\BOOT\\BOOTX64.EFI)",
     "Secure Boot state and the USOS key on this computer",
+    "On many boards Secure Boot needs CSM turned off.",
+    "After turning Secure Boot on in the BIOS, install the default keys (Install default Secure Boot keys / Factory keys), including the Microsoft UEFI CA.",
+    "Add the key now, before turning Secure Boot on: then the \"Verification failed\" screen never appears.",
+    "db has no Microsoft UEFI CA, so shim will not start with Secure Boot on. Install the default keys in the BIOS settings.",
     "Add the key with Secure Boot on",
     "1. Start the computer from the USOS drive. At \"Verification failed\" press Enter once.",
     "2. In the blue MokManager screen choose Enroll key from disk -> USOS_ESP -> USOS-KEY.cer.",
@@ -1476,6 +1503,7 @@ pub const english = [_][]const u8{
     "On",
     "Secure Boot cannot be turned on until the default keys are restored in the BIOS settings.",
     "Secure Boot can be turned on (a platform key is installed).",
+    "Present",
     "Remind on the home screen",
     "To remove it: MokManager -> Delete MOK, or reset the Secure Boot keys in the BIOS settings.",
     "Secure Boot: off",

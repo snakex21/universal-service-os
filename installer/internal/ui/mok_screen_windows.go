@@ -158,12 +158,14 @@ func (s *mokScreen) draw(f *Flow, w *win, area rect) {
 	y += w.wrapped(w.bodyFont(), i18n.T("installer.mok.intro"), view.Left, y, width, theme.Text) + w.px(16)
 
 	y += s.section(w, view.Left, y, width, "1", i18n.T("installer.mok.way1_title"))
-	y += w.wrapped(w.bodyFont(), i18n.T("installer.mok.way1_text"), view.Left+w.px(36), y, width-w.px(36), theme.Text) + w.px(20)
+	y += w.wrapped(w.bodyFont(), i18n.T("installer.mok.way1_text"), view.Left+w.px(36), y, width-w.px(36), theme.Text) + w.px(8)
+	y += w.wrapped(w.semiFont(), i18n.T("installer.mok.way1_note"), view.Left+w.px(36), y, width-w.px(36), theme.Accent) + w.px(20)
 
 	y += s.section(w, view.Left, y, width, "2", i18n.T("installer.mok.way2_title"))
 	y += w.wrapped(w.bodyFont(), i18n.T("installer.mok.way2_text"), view.Left+w.px(36), y, width-w.px(36), theme.Text) + w.px(12)
 	y += drawMokSteps(w, view.Left+w.px(36), y, width-w.px(36)) + w.px(12)
 	y += w.wrapped(w.semiFont(), i18n.T("installer.mok.tap_once"), view.Left+w.px(36), y, width-w.px(36), theme.Warning) + w.px(12)
+	y += w.wrapped(w.bodyFont(), i18n.T("installer.mok.clipped_hint"), view.Left+w.px(36), y, width-w.px(36), theme.Muted) + w.px(12)
 	y += w.wrapped(w.captionFont(), i18n.T("installer.mok.scope"), view.Left, y, width, theme.Muted)
 	_ = c
 	w.endScroll("mok.text", view, y+offset-view.Top)

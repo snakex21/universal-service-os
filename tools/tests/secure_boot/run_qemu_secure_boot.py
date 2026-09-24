@@ -30,6 +30,12 @@ Scenarios (each prints [PASS]/[FAIL]):
                already holds another key: the probe runs mok_key.save() (the
                menu's "Add the key"), MokList stays NV|BS with both keys; then
                Secure Boot ON: shim starts USOS with no MokManager at all.
+  setupmode    OVMF with NO keys (Setup Mode, SecureBoot=0, no PK, like
+               ASRock/AMI boards before "Install default keys"): the probe may
+               save the key; the release USOS offers it on its home screen and
+               saves it through the UI; then the Microsoft keys are enrolled
+               with Secure Boot on: MokList survives, shim starts USOS with no
+               MokManager.
   matrix       the same USOS disk behind AHCI, IDE (i440fx), NVMe, virtio-blk,
                virtio-scsi, USB xHCI and USB EHCI (Secure Boot off): the menu
                starts, reads DATA through that controller's Block I/O and
@@ -550,6 +556,125 @@ def scenario_direct(args, failures: list[str]) -> None:
         machine.stop()
 
 
+def blank_vars(name: str) -> Path:
+    """OVMF NVRAM with no Secure Boot keys at all: Setup Mode (SecureBoot=0,
+    SetupMode=1, no PK), what ASRock/AMI boards ship until "Install default
+    Secure Boot keys" (the X470 of 2026-09-24)."""
+    path = WORK / f"vars-{name}.fd"
+    shutil.copyfile(CACHE / "OVMF_VARS.blank.fd", path)
+    return path
+
+
+def scenario_setupmode(args, failures: list[str]) -> None:
+    """Setup Mode (no PK): the probe's mok_key.save() is allowed; the release
+    USOS offers the key on its home screen and saves it through the real UI
+    (banner -> Add the key -> Yes); then the Microsoft keys are enrolled and
+    Secure Boot turned on, as the user does in the BIOS: shim starts USOS
+    with no MokManager."""
+    der = (USB / "EFI" / "USOS" / CERT_NAME).read_bytes()
+
+    # 1. The probe: the gate itself in Setup Mode.
+    probe_src = ROOT / "zig-out" / "test-assets" / "secure-boot-probe-x86_64.efi"
+    probe = WORK / "grubx64-probe.efi"
+    efisign("sign", "-in", str(probe_src), "-out", str(probe), "-sbat", str(SBAT))
+    vars_probe = blank_vars("setupmode-probe")
+    machine = Machine("setupmode-probe", esp_tree("setupmode-probe", probe), vars_probe, args.keep_screens)
+    try:
+        wait_for(machine.serial, ["[SB_PROBE] mok-save end", "[SB_PROBE] mok-save FAIL", "[SB_PROBE] ESP OPEN FAIL"], 240)
+        time.sleep(2)
+        text = serial_text(machine.serial)
+    finally:
+        machine.stop()
+    expect("[SB_PROBE] begin state=setup mode shim_lock=yes" in text, "setupmode: OVMF without keys is in Setup Mode and USOS runs under shim", failures)
+    expect("[SB_PROBE] gate SecureBoot=0 SetupMode=1 pk=absent shim=yes refusal=none default_keys_hint=yes" in text,
+           "setupmode: the gate sees SecureBoot=0 SetupMode=1 and no PK, allows saving and asks for the default keys", failures)
+    expect("[SB_PROBE] mok-save PASS key=saved lists=1" in text, "setupmode: mok_key.save() writes MokList in Setup Mode", failures)
+
+    # 2. The release USOS: home banner -> Add the key -> Yes, save the key.
+    vars_ui = blank_vars("setupmode-ui")
+    esp = esp_tree("setupmode-ui", USB / "EFI" / "BOOT" / "grubx64.efi")
+    shutil.copytree(USB / "UI", esp / "UI", dirs_exist_ok=True)
+    data = WORK / "data-setupmode"
+    if data.exists():
+        shutil.rmtree(data)
+    (data / "Systems").mkdir(parents=True)
+    vhd = WORK / "setupmode.vhd"
+    subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(NEW_TEST_DISK),
+                    "-Vhd", str(vhd), "-EspSource", str(esp), "-DataSource", str(data)], check=True)
+    machine = Machine("setupmode-ui", None, vars_ui, args.keep_screens, disk=vhd)
+    try:
+        wait_for(machine.serial, ["[INPUT_REPORT END]", "Verification failed", "Security Violation"], 300)
+        time.sleep(3)
+        machine.shot("home-banner")
+        report = input_report(serial_text(machine.serial))
+        expect("SecureBoot=0 SetupMode=1" in report and "PK: status=not_found" in report,
+               "setupmode: input-devices.txt logs SecureBoot=0, SetupMode=1 and PK not_found", failures)
+        expect("gate: key=missing can_save=yes refusal=none remind=yes banner=yes" in report,
+               "setupmode: the home banner offers the key in Setup Mode", failures)
+        expect("guidance: install_default_keys=yes" in report, "setupmode: the page asks for the default keys after Secure Boot is on", failures)
+        expect("[SIMPLE_TEXT_OUTPUT] ConOut current_mode=" in report and "[GRAPHICS_OUTPUT_PROTOCOL] handles=" in report,
+               "setupmode: input-devices.txt lists the GOP and ConOut text modes", failures)
+        # The banner is the last item under the cards: Down moves two cards
+        # at a time and stops on it.
+        machine.keys("down", "down", "down", "down", "down", pause=0.8)
+        time.sleep(1)
+        machine.shot("banner-selected")
+        machine.keys("ret", pause=2.0)
+        machine.shot("offer")
+        machine.keys("ret", pause=2.0)
+        machine.shot("confirm")
+        # "No" is preselected.
+        machine.keys("up", "ret", pause=2.0)
+        saved = wait_for(machine.serial, ["[SECURE_BOOT] USOS key saved in MokList (NV|BS)", "[SECURE_BOOT] MokList"], 60)
+        time.sleep(2)
+        machine.shot("saved")
+        expect(saved == "[SECURE_BOOT] USOS key saved in MokList (NV|BS)", "setupmode: the home banner's Add the key -> Yes saves the key", failures)
+        if args.keep_screens:
+            # Back to the menu -> Utilities -> (no-utilities notice) -> Tools
+            # row 0 = Secure Boot: the page with the full state.
+            machine.keys("down", "ret", pause=1.5)
+            machine.keys("down", "down", "ret", pause=1.5)
+            time.sleep(2)
+            machine.keys("ret", pause=1.5)
+            machine.keys("ret", pause=2.0)
+            time.sleep(1)
+            machine.shot("secure-boot-page")
+    finally:
+        machine.stop()
+    variables = dump_vars(vars_ui)
+    mok = variables.get("MokList")
+    data_bytes = bytes.fromhex(mok["data"]) if mok else b""
+    attr = mok.get("attr", 0) if mok else 0
+    expect(mok is not None and der in data_bytes and attr & 0x7 == 0x3,
+           f"setupmode: MokList in NVRAM holds the USOS key, NV|BS without RT (0x{attr:x})", failures)
+
+    # 3. "Install default Secure Boot keys" + Secure Boot on (virt-fw-vars
+    # enrolls the Microsoft PK/KEK/db with the UEFI CA): MokList must survive
+    # and shim must start USOS directly.
+    vars_on = WORK / "vars-setupmode-on.fd"
+    virt_fw_vars("-i", str(vars_ui), "--enroll-microsoft", "--sb", "-o", str(vars_on))
+    after = dump_vars(vars_on)
+    expect("PK" in after and "MokList" in after and der in bytes.fromhex(after["MokList"]["data"]),
+           "setupmode: enrolling the default keys keeps MokList", failures)
+    machine = Machine("setupmode-on", None, vars_on, args.keep_screens, disk=vhd)
+    try:
+        hit = wait_for(machine.serial, ["[INPUT_REPORT END]", "Verification failed", "Security Violation"], 300)
+        time.sleep(3)
+        machine.shot("usos-secure-boot-on")
+        text = serial_text(machine.serial)
+        report = input_report(text)
+    finally:
+        machine.stop()
+    expect(hit == "[INPUT_REPORT END]" and "Verification failed" not in text and "Press any key to perform MOK management" not in text,
+           "setupmode: with the default keys and Secure Boot on, shim starts USOS without MokManager", failures)
+    expect("[SECURE_BOOT] state=on shim_lock=yes shim_loader=yes" in text and "USOS MANUAL FLOW BOOT PASS" in text,
+           "setupmode: USOS runs under Secure Boot", failures)
+    expect("microsoft_uefi_ca_2011=yes" in report and "gate: key=saved can_save=no" in report and "banner=no" in report,
+           "setupmode: the report sees the Microsoft UEFI CA in db, the saved key, and no banner", failures)
+    expect("MokListRT: status=success" in report and "usos_key=yes" in report,
+           "setupmode: shim mirrored the key to MokListRT (logged for key-loss diagnosis)", failures)
+
+
 def scenario_unsigned_after_mok(args, vars_file: Path, failures: list[str]) -> None:
     copy = WORK / "vars-unsigned-mok.fd"
     shutil.copyfile(vars_file, copy)
@@ -937,7 +1062,7 @@ def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser()
     parser.add_argument("--keep-screens", action="store_true")
-    parser.add_argument("--only", choices=["unsigned", "enroll", "probe", "timeout", "repeat", "helper", "noauth", "wait", "direct", "touch", "drivers", "matrix"], default=None)
+    parser.add_argument("--only", choices=["unsigned", "enroll", "probe", "timeout", "repeat", "helper", "noauth", "wait", "direct", "setupmode", "touch", "drivers", "matrix"], default=None)
     args = parser.parse_args()
     subprocess.run([sys.executable, str(Path(__file__).with_name("fetch_ovmf_secboot.py"))], check=True)
     WORK.mkdir(parents=True, exist_ok=True)
@@ -958,6 +1083,8 @@ def main() -> int:
         scenario_wait(args, failures)
     if args.only in (None, "direct"):
         scenario_direct(args, failures)
+    if args.only in (None, "setupmode"):
+        scenario_setupmode(args, failures)
     if args.only in (None, "drivers"):
         scenario_drivers(args, failures)
     if args.only in (None, "matrix"):

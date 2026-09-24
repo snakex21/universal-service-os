@@ -35,8 +35,9 @@ fn status() mok_key.Status {
 pub fn banner() ?[2][]const u8 {
     if (dismissed) return null;
     const current = status();
-    if (!usos.flow.mok_list.shouldOffer(current.state, current.key, current.certificate, !mok_key.remindEnabled(currentSettings()))) return null;
-    if (current.untrusted_list) return null;
+    // Secure Boot off, Setup Mode, no PK, CSM on or no SecureBoot variable
+    // alike: only SecureBoot=1 or no shim keeps the banner away.
+    if (!usos.flow.mok_list.shouldOffer(current.gate(), !mok_key.remindEnabled(currentSettings()))) return null;
     return .{ view.t(.sbkey_banner), view.t(.sbkey_banner_action) };
 }
 
@@ -87,8 +88,14 @@ fn addWithConfirmation() void {
         .{ .title = view.t(.sbkey_yes), .icon = .{ .vector = .check } },
         .{ .title = view.t(.sbkey_no), .icon = .{ .vector = .close } },
     };
-    const lines = [_][]const u8{ view.t(.sbkey_confirm_line1), view.t(.sbkey_confirm_line2) };
-    const help = usos.gui.menu_screens.Help{ .title = view.t(.sbkey_confirm_title), .lines = &lines };
+    var lines: [6][]const u8 = undefined;
+    var count: usize = 0;
+    lines[count] = view.t(.sbkey_confirm_line1);
+    count += 1;
+    lines[count] = view.t(.sbkey_confirm_line2);
+    count += 1;
+    count += guidanceLines(status(), lines[count..]);
+    const help = usos.gui.menu_screens.Help{ .title = view.t(.sbkey_confirm_title), .lines = lines[0..count] };
     // "No" is preselected: saving needs a deliberate move.
     var selected: usize = 1;
     var list: view.ListScreen = undefined;
@@ -128,8 +135,10 @@ fn savedScreen() void {
         .{ .title = view.t(.sbkey_back_menu), .icon = .{ .vector = .chevron_left } },
     };
     var selectable = [_]bool{ firmware_ui, true };
-    const lines = [_][]const u8{view.t(.sbkey_saved_line1)};
-    const help = usos.gui.menu_screens.Help{ .title = view.t(.sbkey_saved_title), .lines = &lines, .badge = .{ .text = view.t(.sbinfo_key_short_saved), .tone = .success } };
+    var lines: [5][]const u8 = undefined;
+    lines[0] = view.t(.sbkey_saved_line1);
+    const count = 1 + guidanceLines(status(), lines[1..]);
+    const help = usos.gui.menu_screens.Help{ .title = view.t(.sbkey_saved_title), .lines = lines[0..count], .badge = .{ .text = view.t(.sbinfo_key_short_saved), .tone = .success } };
     var selected: usize = if (firmware_ui) 0 else 1;
     var list: view.ListScreen = undefined;
     list.open(view.t(.sbkey_saved_title), view.t(.sbkey_title), &rows, selected, false, help);
@@ -186,7 +195,7 @@ pub fn page() void {
         };
         var selectable = [row_count]bool{ current.canSave(), firmware_ui, true, true };
         if (!selectable[selected]) selected = usos.gui.selectable_list.first(&selectable) orelse 2;
-        var lines: [6][]const u8 = undefined;
+        var lines: [12][]const u8 = undefined;
         const help = stateHelp(current, &lines);
         var list: view.ListScreen = undefined;
         list.open(view.t(.sbinfo_title), view.t(.sbinfo_desc), &rows, selected, false, help);
@@ -212,14 +221,66 @@ pub fn page() void {
 }
 
 fn addDetail(current: mok_key.Status) []const u8 {
-    if (!current.certificate) return view.t(.sbinfo_no_cert);
-    if (current.key == .saved) return view.t(.sbinfo_key_saved);
-    if (current.state != .disabled) return view.t(.sbinfo_add_needs_off);
-    return "";
+    const why = current.refusal() orelse return "";
+    return switch (why) {
+        .no_certificate => view.t(.sbinfo_no_cert),
+        .key_saved => view.t(.sbinfo_key_saved),
+        .no_shim => view.t(.sbinfo_add_needs_shim),
+        .secure_boot_on, .secure_boot_unreadable => view.t(.sbinfo_add_needs_off),
+        .untrusted_list, .key_unknown => view.t(.sbinfo_key_unknown),
+    };
 }
 
-/// Help panel: key status as the title, Secure Boot / platform key lines.
-fn stateHelp(current: mok_key.Status, lines: *[6][]const u8) usos.gui.menu_screens.Help {
+/// "After turning Secure Boot on, install the default keys", "CSM off",
+/// "db has no Microsoft UEFI CA" and "add the key before turning Secure
+/// Boot on", as they apply. Returns how many lines were written.
+fn guidanceLines(current: mok_key.Status, out: [][]const u8) usize {
+    var count: usize = 0;
+    const hints = current.guidance();
+    const candidates = [_]struct { bool, []const u8 }{
+        .{ current.canSave(), view.t(.sbinfo_guide_first) },
+        .{ hints.install_default_keys, view.t(.sbinfo_guide_default_keys) },
+        .{ hints.microsoft_ca_missing, view.t(.sbinfo_guide_ms_ca) },
+        .{ hints.disable_csm, view.t(.sbinfo_guide_csm) },
+    };
+    for (candidates) |candidate| {
+        if (!candidate[0] or count == out.len) continue;
+        out[count] = candidate[1];
+        count += 1;
+    }
+    return count;
+}
+
+var status_buffers: [3][160]u8 = undefined;
+
+fn word(value: bool) []const u8 {
+    return if (value) view.t(.sbinfo_present) else view.t(.sbinfo_absent);
+}
+
+/// The raw firmware state, one short technical line each: SecureBoot /
+/// SetupMode / PK, the Microsoft UEFI CA in db, shim and the MOK lists.
+fn statusLines(current: mok_key.Status, out: [][]const u8) usize {
+    if (out.len < 3) return 0;
+    var b1: [24]u8 = undefined;
+    var b2: [24]u8 = undefined;
+    const pk: []const u8 = if (current.pkPresent()) |present| word(present) else "?";
+    out[0] = std.fmt.bufPrint(&status_buffers[0], "SecureBoot={s}  SetupMode={s}  PK: {s}", .{ mok_key.byteText(current.secure_boot_var, &b1), mok_key.byteText(current.setup_mode, &b2), pk }) catch "";
+    out[1] = if (current.db_cas) |cas|
+        std.fmt.bufPrint(&status_buffers[1], "Microsoft UEFI CA (db): 2011 {s}, 2023 {s}", .{ word(cas.ca_2011), word(cas.ca_2023) }) catch ""
+    else if (current.db.status == .not_found)
+        // No db at all (Setup Mode): the CA is certainly not there.
+        std.fmt.bufPrint(&status_buffers[1], "Microsoft UEFI CA (db): {s}", .{word(false)}) catch ""
+    else
+        std.fmt.bufPrint(&status_buffers[1], "Microsoft UEFI CA (db): ?", .{}) catch "";
+    const in_list = current.mok_list.has_key orelse false;
+    const in_deny = current.mok_list_x.has_key orelse false;
+    out[2] = std.fmt.bufPrint(&status_buffers[2], "shim: {s}  MokList: {s}  MokListX: {s}", .{ word(current.shim), word(in_list), word(in_deny) }) catch "";
+    return 3;
+}
+
+/// Help panel: key status, Secure Boot state, the raw firmware values and
+/// the guidance for this computer.
+fn stateHelp(current: mok_key.Status, lines: *[12][]const u8) usos.gui.menu_screens.Help {
     var count: usize = 0;
     lines[count] = switch (current.key) {
         .saved => view.t(.sbinfo_key_saved),
@@ -234,14 +295,16 @@ fn stateHelp(current: mok_key.Status, lines: *[6][]const u8) usos.gui.menu_scree
         .unsupported => view.t(.sbinfo_sb_unsupported),
     };
     count += 1;
-    if (current.state != .unsupported) {
-        lines[count] = if (current.canEnable()) view.t(.sbinfo_pk_yes) else view.t(.sbinfo_pk_no);
+    count += statusLines(current, lines[count..]);
+    if (current.pkPresent() orelse false) {
+        lines[count] = view.t(.sbinfo_pk_yes);
         count += 1;
     }
     if (current.denied) {
         lines[count] = view.t(.sbinfo_key_denied);
         count += 1;
     }
+    count += guidanceLines(current, lines[count..]);
     if (current.key == .saved) {
         lines[count] = view.t(.sbinfo_remove_hint);
         count += 1;

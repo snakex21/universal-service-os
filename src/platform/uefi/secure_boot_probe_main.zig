@@ -54,8 +54,9 @@ pub fn main() uefi.Status {
     };
     defer root.close() catch {};
 
-    // Secure Boot off (PK present): the "Add the key" path of the menu.
-    if (secure_boot.state() == .disabled) return mokSave(root);
+    // Secure Boot not enforcing (off with a PK, or Setup Mode): the "Add the
+    // key" path of the menu.
+    if (!secure_boot.enforced()) return mokSave(root);
 
     startChild(root, "unsigned-child", "\\EFI\\USOS\\probe\\unsigned-child.efi");
 
@@ -110,9 +111,13 @@ fn countLists(name: [*:0]const u16) usize {
 /// call, reported on the serial port.
 fn mokSave(root: *uefi.protocol.File) uefi.Status {
     const name = std.unicode.utf8ToUtf16LeStringLiteral("MokList");
-    var line: [160]u8 = undefined;
+    var line: [256]u8 = undefined;
     const before = mok_key.status(root);
     say(std.fmt.bufPrint(&line, "[SB_PROBE] mok-save before key={s} lists={d} cert={s} can_save={s}\n", .{ @tagName(before.key), countLists(name), if (before.certificate) "yes" else "no", if (before.canSave()) "yes" else "no" }) catch "");
+    var b1: [24]u8 = undefined;
+    var b2: [24]u8 = undefined;
+    const hints = before.guidance();
+    say(std.fmt.bufPrint(&line, "[SB_PROBE] gate SecureBoot={s} SetupMode={s} pk={s} shim={s} refusal={s} default_keys_hint={s}\n", .{ mok_key.byteText(before.secure_boot_var, &b1), mok_key.byteText(before.setup_mode, &b2), if (before.pk.present()) "present" else "absent", if (before.shim) "yes" else "no", if (before.refusal()) |why| @tagName(why) else "none", if (hints.install_default_keys) "yes" else "no" }) catch "");
     mok_key.save(root) catch |err| {
         sayError("[SB_PROBE] mok-save FAIL error=", err);
         return .success;

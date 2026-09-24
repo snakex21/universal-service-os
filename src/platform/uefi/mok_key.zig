@@ -22,6 +22,7 @@ const serial = @import("serial.zig");
 
 const mok_list_name = std.unicode.utf8ToUtf16LeStringLiteral("MokList");
 const mok_list_x_name = std.unicode.utf8ToUtf16LeStringLiteral("MokListX");
+const mok_list_rt_name = std.unicode.utf8ToUtf16LeStringLiteral("MokListRT");
 const mok_timeout_name = std.unicode.utf8ToUtf16LeStringLiteral("MokTimeout");
 
 /// Certificate locations on the ESP: the short name for MokManager's file
@@ -32,6 +33,24 @@ pub const settings_path = "\\EFI\\USOS\\usos-settings.ini";
 pub const remind_key = mok_list.remind_key;
 
 const shim_guid align(8) = secure_boot.ShimLock.guid;
+
+/// One variable as read at this start: GetVariable status, size, attributes
+/// and (for the MOK lists) whether the USOS certificate is in it.
+pub const VariableInfo = struct {
+    status: uefi.Status = .not_found,
+    size: usize = 0,
+    attributes: u32 = 0,
+    /// The USOS certificate is in the list (null: not checked / unreadable).
+    has_key: ?bool = null,
+
+    pub fn present(self: VariableInfo) bool {
+        return self.status == .success or self.status == .buffer_too_small;
+    }
+
+    fn from(raw: secure_boot.RawVariable) VariableInfo {
+        return .{ .status = raw.status, .size = raw.size, .attributes = raw.attributes };
+    }
+};
 
 pub const Status = struct {
     state: policy.State = .unsupported,
@@ -46,13 +65,43 @@ pub const Status = struct {
     /// MokTimeout exists (MokManager will open its menu without countdown).
     timeout_pending: bool = false,
 
-    /// A platform key is enrolled, so Secure Boot can be turned on.
-    pub fn canEnable(self: Status) bool {
-        return self.state == .disabled or self.state == .enforcing;
+    // Raw values the gate and the guidance evaluate (logged every start).
+    secure_boot_var: mok_list.Byte = .absent,
+    setup_mode: mok_list.Byte = .absent,
+    audit_mode: mok_list.Byte = .absent,
+    deployed_mode: mok_list.Byte = .absent,
+    pk: VariableInfo = .{},
+    kek: VariableInfo = .{},
+    db: VariableInfo = .{},
+    dbx: VariableInfo = .{},
+    /// Microsoft UEFI CAs in db (null: db absent, too large or malformed).
+    db_cas: ?mok_list.DbCas = null,
+    mok_list: VariableInfo = .{},
+    mok_list_rt: VariableInfo = .{},
+    mok_list_x: VariableInfo = .{},
+    csm: secure_boot.Csm = .{},
+
+    pub fn gate(self: Status) mok_list.Gate {
+        return .{ .shim = self.shim, .secure_boot = self.secure_boot_var, .key = self.key, .certificate = self.certificate, .untrusted_list = self.untrusted_list };
+    }
+
+    pub fn refusal(self: Status) ?mok_list.Refusal {
+        return mok_list.saveRefusal(self.gate());
     }
 
     pub fn canSave(self: Status) bool {
-        return mok_list.canSave(self.state, self.key, self.certificate) and !self.untrusted_list;
+        return self.refusal() == null;
+    }
+
+    /// PK present (null: its read failed with something else than NOT_FOUND).
+    pub fn pkPresent(self: Status) ?bool {
+        if (self.pk.present()) return true;
+        if (self.pk.status == .not_found) return false;
+        return null;
+    }
+
+    pub fn guidance(self: Status) mok_list.Guidance {
+        return mok_list.guidance(self.setup_mode, self.pkPresent(), self.csm.likelyOn(), self.db_cas);
     }
 };
 
@@ -61,6 +110,8 @@ var cert_len: usize = 0;
 var list_buffer: [64 * 1024]u8 = undefined;
 var merged_buffer: [72 * 1024]u8 = undefined;
 var cached: ?Status = null;
+/// Size-only reads: a 1-byte buffer, never NULL (some firmware rejects NULL).
+var probe_byte: [1]u8 = undefined;
 
 fn certificate(root: *uefi.protocol.File) ?[]const u8 {
     if (cert_len != 0) return cert_buffer[0..cert_len];
@@ -96,25 +147,50 @@ pub fn refresh(root: *uefi.protocol.File) Status {
     return status(root);
 }
 
+/// A MOK list: status, size, attributes and whether `der` is in it.
+fn mokVariable(name: [*:0]const u16, der: ?[]const u8) VariableInfo {
+    const raw = secure_boot.readRaw(name, &shim_guid, &list_buffer);
+    var info = VariableInfo.from(raw);
+    if (raw.status == .success) {
+        if (der) |cert| info.has_key = mok_list.containsX509(raw.data, cert) catch false;
+    }
+    return info;
+}
+
 fn compute(root: *uefi.protocol.File) Status {
     var result = Status{ .state = secure_boot.state(), .shim = secure_boot.shimLock() != null };
-    const der = certificate(root);
-    result.certificate = der != null;
-    if (result.state == .unsupported) return result;
+    const global = &uefi.tables.global_variable;
+    result.secure_boot_var = secure_boot.globalByte(std.unicode.utf8ToUtf16LeStringLiteral("SecureBoot"));
+    result.setup_mode = secure_boot.globalByte(std.unicode.utf8ToUtf16LeStringLiteral("SetupMode"));
+    result.audit_mode = secure_boot.globalByte(std.unicode.utf8ToUtf16LeStringLiteral("AuditMode"));
+    result.deployed_mode = secure_boot.globalByte(std.unicode.utf8ToUtf16LeStringLiteral("DeployedMode"));
+    result.pk = VariableInfo.from(secure_boot.readRaw(std.unicode.utf8ToUtf16LeStringLiteral("PK"), global, &probe_byte));
+    result.kek = VariableInfo.from(secure_boot.readRaw(std.unicode.utf8ToUtf16LeStringLiteral("KEK"), global, &probe_byte));
+    result.dbx = VariableInfo.from(secure_boot.readRaw(std.unicode.utf8ToUtf16LeStringLiteral("dbx"), &secure_boot.image_security_guid, &probe_byte));
+    const db = secure_boot.readRaw(std.unicode.utf8ToUtf16LeStringLiteral("db"), &secure_boot.image_security_guid, &list_buffer);
+    result.db = VariableInfo.from(db);
+    if (db.status == .success) result.db_cas = mok_list.microsoftCas(db.data) catch null;
+    result.csm = secure_boot.csm();
+
     const rt = uefi.system_table.runtime_services;
     result.timeout_pending = (rt.getVariableSize(mok_timeout_name, &shim_guid) catch null) != null;
-    const cert = der orelse return result;
-    if (readShimVariable(mok_list_name, &list_buffer)) |maybe| {
-        if (maybe) |list| {
-            const trusted = mok_list.trustedAttributes(list.attributes.non_volatile, list.attributes.bootservice_access, list.attributes.runtime_access);
+    const der = certificate(root);
+    result.certificate = der != null;
+    result.mok_list_rt = mokVariable(mok_list_rt_name, der);
+    result.mok_list_x = mokVariable(mok_list_x_name, der);
+    result.denied = result.mok_list_x.has_key orelse false;
+    result.mok_list = mokVariable(mok_list_name, der);
+    if (der == null) return result;
+    switch (result.mok_list.status) {
+        .success => {
+            const attributes: uefi.tables.RuntimeServices.VariableAttributes = @bitCast(result.mok_list.attributes);
+            const trusted = mok_list.trustedAttributes(attributes.non_volatile, attributes.bootservice_access, attributes.runtime_access);
             result.untrusted_list = !trusted;
-            const present = mok_list.containsX509(list.data, cert) catch false;
-            result.key = if (present and trusted) .saved else .missing;
-        } else result.key = .missing;
-    } else |_| result.key = .unknown;
-    if (readShimVariable(mok_list_x_name, &list_buffer)) |maybe| {
-        if (maybe) |list| result.denied = mok_list.containsX509(list.data, cert) catch false;
-    } else |_| {}
+            result.key = if ((result.mok_list.has_key orelse false) and trusted) .saved else .missing;
+        },
+        .not_found => result.key = .missing,
+        else => result.key = .unknown,
+    }
     return result;
 }
 
@@ -179,6 +255,12 @@ pub fn writeReport(root: *uefi.protocol.File) void {
     var uuid_text: [36]u8 = undefined;
     const id = handheld_rules.formatUuid(uuid, &uuid_text);
     const current = status(root);
+    var b1: [24]u8 = undefined;
+    var b2: [24]u8 = undefined;
+    var b3: [24]u8 = undefined;
+    var b4: [24]u8 = undefined;
+    var b5: [24]u8 = undefined;
+    var b6: [24]u8 = undefined;
     const content = std.fmt.bufPrint(&report_buffer,
         \\; USOS Secure Boot state of one computer (written by USOS at every UEFI start)
         \\machine_uuid={s}
@@ -187,6 +269,14 @@ pub fn writeReport(root: *uefi.protocol.File) void {
         \\secure_boot={s}
         \\usos_key={s}
         \\shim={s}
+        \\secure_boot_var={s}
+        \\setup_mode_var={s}
+        \\pk={s}
+        \\mok_list={s}
+        \\mok_list_rt={s}
+        \\mok_list_x={s}
+        \\csm_likely={s}
+        \\can_save={s}
         \\build={s}
         \\
     , .{
@@ -201,6 +291,14 @@ pub fn writeReport(root: *uefi.protocol.File) void {
         },
         @tagName(current.key),
         if (current.shim) "yes" else "no",
+        byteText(current.secure_boot_var, &b1),
+        byteText(current.setup_mode, &b2),
+        presence(current.pk, &b3),
+        keyPresence(current.mok_list, &b4),
+        keyPresence(current.mok_list_rt, &b5),
+        keyPresence(current.mok_list_x, &b6),
+        if (current.csm.likelyOn()) "yes" else "no",
+        if (current.refusal()) |why| @tagName(why) else "yes",
         usos.build_info.id,
     }) catch return;
     var path_buffer: [96]u8 = undefined;
@@ -213,4 +311,93 @@ pub fn writeReport(root: *uefi.protocol.File) void {
         dir.close() catch {};
     } else |_| return;
     replaceFile(root, path, content) catch |err| logError("report", err);
+}
+
+// ------------------------------------------------------------ diagnostics
+
+/// "0", "1", "absent" or "error:<status>".
+pub fn byteText(value: mok_list.Byte, buffer: []u8) []const u8 {
+    return switch (value) {
+        .value => |byte| std.fmt.bufPrint(buffer, "{d}", .{byte}) catch "?",
+        .absent => "absent",
+        .failed => |why| std.fmt.bufPrint(buffer, "error:{s}", .{why}) catch "error",
+    };
+}
+
+/// "present(<size>)", "absent" or "error:<status>".
+pub fn presence(info: VariableInfo, buffer: []u8) []const u8 {
+    if (info.present()) return std.fmt.bufPrint(buffer, "present({d})", .{info.size}) catch "present";
+    if (info.status == .not_found) return "absent";
+    return std.fmt.bufPrint(buffer, "error:{s}", .{secure_boot.statusName(info.status)}) catch "error";
+}
+
+/// "key", "no_key", "absent", "unread(<size>)" or "error:<status>".
+pub fn keyPresence(info: VariableInfo, buffer: []u8) []const u8 {
+    if (info.has_key) |has| return if (has) "key" else "no_key";
+    if (info.status == .not_found) return "absent";
+    if (info.present()) return std.fmt.bufPrint(buffer, "unread({d})", .{info.size}) catch "unread";
+    return std.fmt.bufPrint(buffer, "error:{s}", .{secure_boot.statusName(info.status)}) catch "error";
+}
+
+fn variableLine(comptime print: anytype, label: []const u8, info: VariableInfo) void {
+    print("  {s}: status={s}", .{ label, secure_boot.statusName(info.status) });
+    if (info.present()) print(" size={d} attributes=0x{x}", .{ info.size, info.attributes });
+    if (info.has_key) |has| print(" usos_key={s}", .{if (has) "yes" else "no"});
+    print("\n", .{});
+}
+
+/// Lines for drivers.txt and input-devices.txt: every value the key gate
+/// and the guidance evaluate, with raw GetVariable statuses, so a lost key
+/// (MokList gone after a BIOS change) or a hidden variable can be told
+/// apart from Setup Mode.
+pub fn describe(comptime print: anytype) void {
+    const remind = mok_list.remindEnabled(@import("settings_store.zig").current());
+    const current = cached orelse {
+        print("[SECURE BOOT]\n  (not read at this start)\n", .{});
+        return;
+    };
+    var b1: [24]u8 = undefined;
+    var b2: [24]u8 = undefined;
+    var b3: [24]u8 = undefined;
+    var b4: [24]u8 = undefined;
+    print("[SECURE BOOT] (read once at this start)\n", .{});
+    print("  SecureBoot={s} SetupMode={s} AuditMode={s} DeployedMode={s} -> state={s}\n", .{
+        byteText(current.secure_boot_var, &b1),
+        byteText(current.setup_mode, &b2),
+        byteText(current.audit_mode, &b3),
+        byteText(current.deployed_mode, &b4),
+        secure_boot.label(current.state),
+    });
+    variableLine(print, "PK", current.pk);
+    variableLine(print, "KEK", current.kek);
+    variableLine(print, "db", current.db);
+    variableLine(print, "dbx", current.dbx);
+    if (current.db_cas) |cas| {
+        print("  db: microsoft_uefi_ca_2011={s} microsoft_uefi_ca_2023={s}\n", .{ yesNo(cas.ca_2011), yesNo(cas.ca_2023) });
+    } else print("  db: microsoft_uefi_ca=unknown (db not read)\n", .{});
+    print("  shim_lock={s} shim_loader={s} certificate={s}\n", .{ yesNo(current.shim), yesNo(secure_boot.shimOwnsLoadImage()), yesNo(current.certificate) });
+    variableLine(print, "MokList", current.mok_list);
+    variableLine(print, "MokListRT", current.mok_list_rt);
+    variableLine(print, "MokListX", current.mok_list_x);
+    print("  MokTimeout={s} untrusted_mok_list={s} denied={s}\n", .{ if (current.timeout_pending) "present" else "absent", yesNo(current.untrusted_list), yesNo(current.denied) });
+    print("  csm: legacy_bios_protocol={s} BootOrder={s} boot_options={d} legacy_boot_options={d} -> likely_on={s}\n", .{
+        yesNo(current.csm.legacy_bios_protocol),
+        secure_boot.statusName(current.csm.boot_order_status),
+        current.csm.boot_options,
+        current.csm.legacy_boot_options,
+        yesNo(current.csm.likelyOn()),
+    });
+    print("  gate: key={s} can_save={s} refusal={s} remind={s} banner={s}\n", .{
+        @tagName(current.key),
+        yesNo(current.canSave()),
+        if (current.refusal()) |why| why.text() else "none",
+        yesNo(remind),
+        yesNo(mok_list.shouldOffer(current.gate(), !remind)),
+    });
+    const hints = current.guidance();
+    print("  guidance: install_default_keys={s} disable_csm={s} microsoft_ca_missing={s}\n", .{ yesNo(hints.install_default_keys), yesNo(hints.disable_csm), yesNo(hints.microsoft_ca_missing) });
+}
+
+fn yesNo(value: bool) []const u8 {
+    return if (value) "yes" else "no";
 }

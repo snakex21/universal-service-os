@@ -326,11 +326,18 @@ needed. SBAT applies to the images, not to the list (grubx64.efi carries
 
 USOS therefore does what MokManager does, from its own menu, when:
 
-- Secure Boot is **off** and a platform key is installed (`SecureBoot` = 0,
-  `SetupMode` = 0: Secure Boot can be turned on). Never while Secure Boot is
-  enforcing and never in setup mode (`src/flow/mok_list.zig`
-  `shouldOffer`/`canSave`, unit-tested). With Secure Boot off anyone at the
-  keyboard can run any code anyway, so this adds no new trust path;
+- USOS was started by shim (the `SHIM_LOCK` protocol is installed) and the
+  `SecureBoot` variable is not 1: Secure Boot off with a PK, **Setup Mode**
+  (`SetupMode` = 1, no PK: the "Custom"/no-keys state ASRock/AMI boards ship
+  until "Install default Secure Boot keys"), CSM on, or no `SecureBoot`
+  variable at all. MokList is a plain NV|BS variable under the shim GUID,
+  not an authenticated one: writing it needs neither a PK nor db, and shim
+  honours it once Secure Boot is on. Never while Secure Boot is enforcing
+  (`SecureBoot` = 1), and never when `SecureBoot` cannot be read for any
+  reason other than `EFI_NOT_FOUND` (`src/flow/mok_list.zig`
+  `saveRefusal`/`canSave`/`shouldOffer`, unit-tested including the X470
+  state). With Secure Boot off anyone at the keyboard can run any code
+  anyway, so this adds no new trust path;
 - the certificate is on the stick (`\USOS-KEY.cer`, else
   `\EFI\USOS\ENROLL_THIS_KEY_IN_MOKMANAGER.cer`) and not yet in MokList;
 - the existing MokList (if any) has trusted attributes.
@@ -363,7 +370,82 @@ locales, all but English machine-translated or marked):
   build) when its content changed; the installer reads it.
 
 Previews: `zig build ui-preview`, screens `09`..`14`
-(artifacts/boot-ui/secure-boot). QEMU scenario `direct`.
+(artifacts/boot-ui/secure-boot). QEMU scenarios `direct` and `setupmode`.
+
+### The X470 report (2026-09-24): no offer in Setup Mode
+
+Until build B260924-181530 the gate was `state == .disabled`, i.e.
+`SecureBoot` = 0 **and** `SetupMode` = 0. The ASRock X470 (AMI Aptio) had
+no platform key: `EFI\USOS\Logs\secure-boot-2E4F2079-...ini` on the stick
+said `secure_boot=setup_mode usos_key=missing shim=yes`, and drivers.txt
+`secure_boot=setup mode` (the same with CSM on and off; a second ASRock
+board, D8A8A887-..., reported the same). The variables were read fine; the
+gate refused Setup Mode on purpose ("Secure Boot cannot be turned on without
+a PK"), which is wrong: the user turns Secure Boot on and installs the
+default keys afterwards, and MokList is independent of PK/db. Now:
+
+- the banner and "Add the key" appear in every state except `SecureBoot` = 1
+  or no shim (and "Don't ask again");
+- the Secure Boot page and the confirmation show the raw state
+  (`SecureBoot=0  SetupMode=1  PK: Missing`, Microsoft UEFI CA 2011/2023 in
+  db, shim, key in MokList/MokListX) and the guidance: in Setup Mode or
+  without a PK "after turning Secure Boot on in the BIOS, install the
+  default keys (Install default Secure Boot keys / Factory keys), including
+  the Microsoft UEFI CA"; when CSM looks enabled (the CSM's
+  `EFI_LEGACY_BIOS_PROTOCOL` is installed, or BootOrder has BBS/legacy
+  entries) "on many boards Secure Boot needs CSM turned off"; with a PK but
+  no Microsoft UEFI CA in db, that shim will not start; and while the key
+  can be saved "add the key now, before turning Secure Boot on";
+- `drivers.txt` and `input-devices.txt` get a `[SECURE BOOT]` section at
+  every start: `SecureBoot`, `SetupMode`, `AuditMode`, `DeployedMode` (value,
+  `absent` or `error:<EFI status>`), PK/KEK/db/dbx (GetVariable status, size,
+  attributes), the Microsoft UEFI CAs in db, `shim_lock`/`shim_loader`,
+  MokList/MokListRT/MokListX (status, size, attributes, whether the USOS
+  key is in each), MokTimeout, the CSM evidence, and the gate
+  (`can_save`, `refusal`, `remind`, `banner`) and guidance flags. The
+  per-machine `secure-boot-<UUID>.ini` also carries `secure_boot_var`,
+  `setup_mode_var`, `pk`, `mok_list`, `mok_list_rt`, `mok_list_x`,
+  `csm_likely` and `can_save`.
+
+### Does "Install default keys" / "Clear keys" remove the USOS key?
+
+Normally not. AMI's "Install default Secure Boot keys"/"Restore Factory
+Keys", "Clear Secure Boot keys"/"Reset To Setup Mode" and the Secure Boot
+on/off switch rewrite PK, KEK, db and dbx (the authenticated variables under
+the EFI global and image-security GUIDs). MokList is a separate,
+non-authenticated NV variable under the shim GUID
+(605dab50-e046-4300-abb6-3dd810dd8b23) that those operations do not touch.
+It is lost on an NVRAM reset: CMOS clear, a BIOS update that reinitialises
+NVRAM, or on some boards "Load UEFI defaults". If a key disappears, compare
+the `[SECURE BOOT]` sections of two drivers.txt/input-devices.txt copies:
+`MokList: status=not_found` with an unchanged PK means MokList itself was
+wiped; `MokListRT` is only a volatile copy shim makes at each start. (The
+strings `boot.sbinfo.remove_hint` and `boot.sbkey.confirm_line2` still name
+"resetting the Secure Boot keys" as a way to remove the key; open item.)
+
+### shim's clipped "Verification failed" box (X470 + BenQ over HDMI)
+
+After Secure Boot was turned on (without the key) shim showed its
+"Verification failed" box with the frame at the left edge and only "Ver"
+visible at the far right. shim 16.1 `lib/console.c`: `console_select()`
+takes `co->QueryMode(co, co->Mode->Mode, &cols, &rows)`, draws the title box
+at column 0 across `cols` x `rows-1`, and centres the text on `cols`; it
+never looks at GOP. `pe.c` `console_error(L"Verification failed", ...)`
+leads there. shim.c and fallback.c never call `SetMode`; MokManager calls
+`console_mode_handle()` (SetMode only above 1920x1080 with more than 200x100
+cells) and `console_reset()` (`Reset` + `SetMode(0)`) on exit. So the box is
+laid out for the firmware's text mode, and when that mode is wider than what
+the monitor shows (a text mode for another resolution, or HDMI overscan
+cropping the edges), the box is cut off. The Ally draws it fine. There is no
+UEFI or shim variable that selects the text mode for the next boot (a
+`SetMode` by USOS does not persist; `SHIM_VERBOSE` only switches shim to
+plain-text messages plus debug output), so USOS changes nothing here.
+Mitigation: add the key through USOS **before** turning Secure Boot on (the
+box then never appears); otherwise turn off overscan on the monitor ("Just
+Scan", "1:1", "Screen fit") and "Full Screen Logo" in the BIOS. To see the
+mismatch, input-devices.txt now lists every GOP mode (current marked),
+ConOut's current text mode with the pixels it needs at 8x19 per cell against
+the GOP resolution, and every text mode.
 
 ## Installer: proactive card
 
@@ -520,8 +602,10 @@ shim. Nothing needs changing (shim's binary must not be modified; its
 Microsoft signature would break).
 ## Limitations and risks
 
-- Each computer needs the one-time MokManager enrollment; a firmware reset of
-  Secure Boot keys removes it (MOK lives in shim's NVRAM variables).
+- Each computer needs the key once (USOS with Secure Boot off or in Setup
+  Mode, or MokManager). An NVRAM reset (CMOS clear, some "Load UEFI defaults",
+  BIOS updates) removes it; resetting only the Secure Boot keys normally
+  does not (MOK lives in shim's own NVRAM variables, see above).
 - Machines with the Microsoft third-party UEFI CA disabled (some Secured-core
   PCs) do not trust any distro shim; enable "3rd party UEFI CA" in the setup.
 - Windows 7, Vista and XP still need Secure Boot off.

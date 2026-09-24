@@ -696,6 +696,8 @@ pub fn writeReport(root: *uefi.protocol.File) void {
     touch_driver.describe(reportPrint);
     reportPrint("\n", .{});
     describe(reportPrint);
+    reportPrint("\n", .{});
+    @import("mok_key.zig").describe(reportPrint);
     if (root.open(wide("\\EFI\\USOS\\Logs"), .read_write_create, .{ .directory = true })) |logs| {
         logs.close() catch {};
     } else |_| return;

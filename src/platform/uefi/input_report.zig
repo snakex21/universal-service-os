@@ -83,6 +83,10 @@ fn build(width: u32, height: u32) void {
     print("\n", .{});
     @import("uefi_drivers.zig").describe(print);
     print("\n", .{});
+    @import("mok_key.zig").describe(print);
+    print("\n", .{});
+    display(services, width, height);
+    print("\n", .{});
 
     if (services.locateHandleBuffer(.{ .by_protocol = &pointer.SimplePointer.guid }) catch null) |handles| {
         defer services.freePool(@ptrCast(handles.ptr)) catch {};
@@ -282,4 +286,64 @@ fn save(root: *uefi.protocol.File) !void {
         written += n;
     }
     try file.flush();
+}
+
+/// GOP modes and the ConOut text modes. shim and MokManager lay their boxes
+/// out from ConOut's current QueryMode (columns x rows) and never look at
+/// GOP, so a text mode wider than the picture clips their dialogs (X470 +
+/// HDMI monitor, 2026-09-24). USOS changes neither mode, so these are the
+/// firmware's own, the ones shim saw before USOS started.
+fn display(services: *uefi.tables.BootServices, width: u32, height: u32) void {
+    if (services.locateHandleBuffer(.{ .by_protocol = &uefi.protocol.GraphicsOutput.guid }) catch null) |handles| {
+        defer services.freePool(@ptrCast(handles.ptr)) catch {};
+        print("[GRAPHICS_OUTPUT_PROTOCOL] handles={d}\n", .{handles.len});
+        const console_out = uefi.system_table.console_out_handle;
+        for (handles) |handle| {
+            const splitter = console_out != null and handle == console_out.?;
+            print("- handle=0x{x}{s}\n", .{ @intFromPtr(handle), if (splitter) " (ConOut console splitter)" else "" });
+            const gop = services.handleProtocol(uefi.protocol.GraphicsOutput, handle) catch null orelse continue;
+            const mode = gop.mode;
+            print("  current_mode={d} of max_mode={d} resolution={d}x{d} pixels_per_scan_line={d} format={s} frame_buffer=0x{x} size={d}\n", .{
+                mode.mode,
+                mode.max_mode,
+                mode.info.horizontal_resolution,
+                mode.info.vertical_resolution,
+                mode.info.pixels_per_scan_line,
+                @tagName(mode.info.pixel_format),
+                mode.frame_buffer_base,
+                mode.frame_buffer_size,
+            });
+            // The splitter repeats the modes of the GOP device behind it.
+            if (splitter and handles.len > 1) continue;
+            var index: u32 = 0;
+            while (index < mode.max_mode and index < 64) : (index += 1) {
+                if (gop.queryMode(index)) |info| {
+                    print("  mode {d}: {d}x{d}{s}\n", .{ index, info.horizontal_resolution, info.vertical_resolution, if (index == mode.mode) " (current)" else "" });
+                    services.freePool(@ptrCast(@alignCast(info))) catch {};
+                } else |err| print("  mode {d}: QueryMode failed ({s})\n", .{ index, @errorName(err) });
+            }
+        }
+    } else print("[GRAPHICS_OUTPUT_PROTOCOL] handles=0\n", .{});
+    print("\n", .{});
+    const out = uefi.system_table.con_out orelse {
+        print("[SIMPLE_TEXT_OUTPUT] ConOut=none\n", .{});
+        return;
+    };
+    const text_mode = out.mode.*;
+    print("[SIMPLE_TEXT_OUTPUT] ConOut current_mode={d} of max_mode={d}", .{ text_mode.mode, text_mode.max_mode });
+    if (out.queryMode(text_mode.mode)) |geometry| {
+        print(" -> {d}x{d} (columns x rows)", .{ geometry.columns, geometry.rows });
+        if (width != 0) {
+            // An 8x19 cell is the edk2/AMI console font.
+            const too_big = geometry.columns * 8 > width or geometry.rows * 19 > height;
+            print(" needs {d}x{d} px at 8x19; GOP shows {d}x{d}{s}", .{ geometry.columns * 8, geometry.rows * 19, width, height, if (too_big) " -> TEXT MODE LARGER THAN THE PICTURE" else "" });
+        }
+    } else |err| print(" -> QueryMode failed ({s})", .{@errorName(err)});
+    print("\n", .{});
+    var index: usize = 0;
+    while (index < text_mode.max_mode and index < 32) : (index += 1) {
+        if (out.queryMode(index)) |geometry| {
+            print("  text mode {d}: {d}x{d}{s}\n", .{ index, geometry.columns, geometry.rows, if (index == text_mode.mode) " (current)" else "" });
+        } else |err| print("  text mode {d}: {s}\n", .{ index, @errorName(err) });
+    }
 }
