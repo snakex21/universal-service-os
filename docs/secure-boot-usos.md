@@ -259,6 +259,36 @@ Not covered in QEMU: the full install flow with DATA/WORK and the Windows
 boot manager handoff under Secure Boot, and the menu badge rendering
 (needs a DATA volume); the policy is unit-tested.
 
+## Boot-time cost and what the screen shows (QEMU, 2026-09-24)
+
+Measured in QEMU/TCG (q35, Fedora SMM OVMF 20260812, vvfat ESP, build
+B260924-110301-FE1189E5), host timestamps on a live serial socket, 3 runs
+each. "Handoff" is OVMF's `BdsDxe: loading Boot0002`.
+
+| layout | handoff -> firmware StartImage | StartImage -> USOS entry | handoff -> USOS entry |
+| --- | --- | --- | --- |
+| USOS as BOOTX64.EFI (old), SB off | 13 ms | 1 ms | 14 ms |
+| shim -> grubx64.efi, SB off | 12 ms | 249-265 ms | ~270 ms |
+| shim -> grubx64.efi, SB on (MOK enrolled) | 168-181 ms (firmware checks shim's Microsoft signature) | 337-346 ms | ~515 ms |
+
+After USOS entry nothing changes: the splash starts 3 ms later and the first
+menu frame is presented ~59 ms after entry in every layout. On-launch
+verification (secure_boot_probe, `esp_image_start.load` of the 14.5 MB
+signed kernel and of wimboot): kernel 1316-1358 ms with SB on vs 144-151 ms
+with SB off (+~1.2 s), wimboot 131-137 vs 42-44 ms (+~90 ms). TCG runs the
+hashing far slower than hardware (shim's OpenSSL, no SHA-NI; on a Zen 3 the
+kernel hash is in the tens of ms), so these are upper bounds, not hardware
+numbers; reading grubx64.efi (971 KB) from a slow stick adds its own time.
+
+Screen: shim 16.1 does not touch the console on a normal boot. `setup_verbosity()`
+only queries the ConsoleControl mode (`setup_console(-1)` returns before any
+SetMode); ClearScreen/SetMode are reached only through `console_print` /
+`console_reset` (error messages, MokManager, `SHIM_VERBOSE`, "Booting in
+insecure mode" when MokSBState disables validation). Frames sampled every
+~100 ms show the firmware logo (plus OVMF's own `BdsDxe:` lines) unchanged
+from handoff until the USOS splash, SB off and on: no black gap caused by
+shim. Nothing needs changing (shim's binary must not be modified; its
+Microsoft signature would break).
 ## Limitations and risks
 
 - Each computer needs the one-time MokManager enrollment; a firmware reset of
@@ -272,5 +302,9 @@ boot manager handoff under Secure Boot, and the menu badge rendering
   Secure Boot is on (the same mechanism distributions use to chainload
   Windows); tested in QEMU up to the loader, not yet on the Ally.
 - Kernel not locked down, initramfs not verified (see above).
+- `deploy_xp_uefi_csm_trial.ps1` accepts only the shim layout: the ESP must
+  already have the vendored shim/MokManager and a USOS grubx64.efi; modes that
+  copy EFI\BOOT take all three from a verified release tree (shim and
+  MokManager hashes, derive-check of grubx64.efi), all other modes protect them.
 - `deploy_csmwrap_trial.ps1` refuses to replace the new shim entry (its hash
   check no longer matches); the CSMWrap trial needs Secure Boot off anyway.

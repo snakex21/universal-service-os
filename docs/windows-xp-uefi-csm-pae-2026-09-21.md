@@ -203,3 +203,23 @@ kreatora instalacji. Do tego czasu nie naciskaj żadnych klawiszy - dysk został
 już wybrany tutaj." and [Enter] Kontynuuj (boot.lx.* keys, 27 locales). The
 GUI wizard itself still asks its normal questions (ProvideDefault), so the
 notice does not say "until the desktop".
+
+## 2026-09-24: rebuild on the Secure Boot base
+
+The Secure Boot release signs the micro-Linux kernel in place (vmlinuz-virt
+155c0f9f...1670, was 77007123...6c54) and changes the base initramfs
+(b5e7fecc...e97b, was d853f6ed...a736), so the package was rebuilt in full
+(`build_xp_uefi_csm_trial.py --esp <staging ESP with zig-out/micro-linux and the
+stick's usos-device.ini> --data L:/`). Two builds are byte-identical
+(initramfs-xp 4c5716b8...). `compare_xp_packages.py` against the deployed
+package: 755 entries identical (both driver bundles, hives, cabinets, pae.exe and
+the PAE scripts byte for byte), 1 base update (`usr/bin/usos-fb-ui` = new base),
+0 unexplained. pae.exe (bab558bb...) and the three launchers are unchanged;
+vmlinuz.efi is the signed kernel.
+
+`deploy_xp_uefi_csm_trial.ps1` now requires the shim layout on the ESP (see
+docs/secure-boot-usos.md) and, in `-DriversOnly`/`-UnifiedMenu`, deploys the
+package's `vmlinuz.efi` too when the ESP's XP kernel is not the base kernel
+(the package kernel must equal the base, which must equal the ESP's production
+kernel). EFI\BOOT\BOOTX64.EFI/grubx64.efi/mmx64.efi are protected in every mode
+that does not copy them, and the layout is re-checked after the copy.

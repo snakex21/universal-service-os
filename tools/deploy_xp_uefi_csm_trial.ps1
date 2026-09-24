@@ -23,6 +23,24 @@ $protected=@('EFI\USOS\micro-linux\initramfs-usos','EFI\USOS\micro-linux\vmlinuz
 $protectedHashes=@{}
 foreach($p in $protected){$protectedHashes[$p]=Hash (Join-Path $espRoot $p)}
 if($protectedHashes['EFI\USOS\micro-linux\initramfs-usos'] -ne $manifest.base_initramfs_sha256 -or $protectedHashes['EFI\USOS\micro-linux\vmlinuz-virt'] -ne $manifest.base_kernel_sha256){throw 'Production base changed after trial build'}
+# Secure Boot layout (docs/secure-boot-usos.md): EFI\BOOT\BOOTX64.EFI is the vendored
+# Microsoft-signed shim, mmx64.efi its MokManager and grubx64.efi the MOK-signed USOS.
+# The production ESP must already be in that layout, and no mode may put any other
+# file in their place: either all three are copied from a verified release tree, or
+# all three are protected (hash unchanged after the deploy).
+$shim=Get-Content -LiteralPath (Join-Path $project 'tools\vendor\shim\16.1-7\manifest.json') -Raw|ConvertFrom-Json
+$bootFiles=@('BOOTX64.EFI',$shim.second_stage,$shim.mok_manager)
+function BootLayoutProblem($root){
+ $boot=Join-Path $root 'EFI\BOOT'
+ foreach($name in $bootFiles){if(!(Test-Path -LiteralPath (Join-Path $boot $name) -PathType Leaf)){return ('missing EFI\BOOT\'+$name)}}
+ $h=@{};foreach($name in $bootFiles){$h[$name]=Hash (Join-Path $boot $name)}
+ if($h['BOOTX64.EFI'] -ne $shim.files.'shimx64.efi'){return 'EFI\BOOT\BOOTX64.EFI is not the vendored shim'}
+ if($h[$shim.mok_manager] -ne $shim.files.'mmx64.efi'){return ('EFI\BOOT\'+$shim.mok_manager+' is not the vendored MokManager')}
+ if($h[$shim.second_stage] -eq $h['BOOTX64.EFI'] -or $h[$shim.second_stage] -eq $h[$shim.mok_manager]){return ('EFI\BOOT\'+$shim.second_stage+' is not USOS')}
+ return $null
+}
+$problem=BootLayoutProblem $espRoot
+if($problem){throw ('ESP is not in the Secure Boot (shim) layout: '+$problem+'; update the stick with usos-physical-update first')}
 $layout=$parts|Select-Object PartitionNumber,Guid,Offset,Size|ConvertTo-Json -Compress
 $backup=Join-Path $project ('artifacts\xp-pae\deploy-'+(Get-Date -Format yyyyMMdd-HHmmss))
 [IO.Directory]::CreateDirectory($backup)|Out-Null
@@ -43,16 +61,22 @@ if($SourceIso){
 }
 $payloadNames=@('initramfs-xp','vmlinuz.efi','manifest.json')
 if($DriversOnly -or $UnifiedMenu){
- if((Hash (Join-Path $espRoot 'EFI\USOS-XP\vmlinuz.efi')) -ne $manifest.base_kernel_sha256){throw 'Existing XP kernel does not match driver build'}
  $payloadNames=@('initramfs-xp','manifest.json')
+ $xpKernel=Join-Path $espRoot 'EFI\USOS-XP\vmlinuz.efi'
+ if(!(Test-Path -LiteralPath $xpKernel -PathType Leaf) -or (Hash $xpKernel) -ne $manifest.base_kernel_sha256){
+  # The XP kernel is a copy of the production micro-Linux kernel (checked above to be
+  # the package's base). After a base update (e.g. the kernel signed for Secure Boot)
+  # the matching copy from the package travels with the drivers; nothing else may.
+  if($manifest.sha256.'vmlinuz.efi' -ne $manifest.base_kernel_sha256){throw 'Existing XP kernel does not match driver build'}
+  $payloadNames+='vmlinuz.efi'
+  Write-Output 'XP_KERNEL_REFRESH: EFI\USOS-XP\vmlinuz.efi follows the production base kernel'
+ }
 }
 if($LaunchersOnly){
  foreach($name in @('initramfs-xp','vmlinuz.efi')){
   if((Hash (Join-Path $espRoot ('EFI\USOS-XP\'+$name))) -ne $manifest.sha256.$name){throw 'Existing XP payload does not match launcher build'}
  }
  $payloadNames=@('manifest.json')
- $protectedHashes['EFI\BOOT\BOOTX64.EFI']=Hash (Join-Path $espRoot 'EFI\BOOT\BOOTX64.EFI')
- $protected+= 'EFI\BOOT\BOOTX64.EFI'
 }
 foreach($name in $payloadNames){
  $files+=@{Source=(Join-Path $package $name);Target=(Join-Path $espRoot ('EFI\USOS-XP\'+$name))}
@@ -61,8 +85,7 @@ if(!$DriversOnly -and !$UnifiedMenu){foreach($name in $manifest.launchers){
  if($name -notmatch '^XP-SP[23](-NiKKA)?-UEFI-CSM-PAE\.efi$'){throw 'Unexpected launcher name'}
  foreach($drive in @($espRoot,$dataRoot)){$files+=@{Source=(Join-Path $package $name);Target=(Join-Path $drive ('Systems\Windows\Windows XP UEFI-CSM PAE\Images\'+$name))}}
 }
-# Secure Boot layout: BOOTX64.EFI is shim, USOS is grubx64.efi, mmx64.efi is MokManager; they travel together.
-$bootFiles=@('BOOTX64.EFI','grubx64.efi','mmx64.efi')
+# BOOTX64.EFI (shim), grubx64.efi (USOS) and mmx64.efi (MokManager) travel together.
 if(!$LaunchersOnly){foreach($name in $bootFiles){$files+=@{Source=(Join-Path $project ('zig-out\usb\EFI\BOOT\'+$name));Target=(Join-Path $espRoot ('EFI\BOOT\'+$name))}}}
 }
 if($UnifiedMenu){
@@ -93,6 +116,19 @@ if($Language){
   $files+=@{Source=$source;Target=(Join-Path $espRoot ('EFI\USOS\'+$name))}
  }
 }
+$copiesBoot=@($files|Where-Object {$_.Target -like ($espRoot+'EFI\BOOT\*')}).Count -gt 0
+if($copiesBoot){
+ # The release tree must be the shim layout too: shim and MokManager byte-identical to
+ # the vendored ones, grubx64.efi derived from the manual-test USOS (only .sbat,
+ # padding and signature added), so shim/grubx64 never receive anything else.
+ $release=Join-Path $project 'zig-out\usb'
+ $problem=BootLayoutProblem $release
+ if($problem){throw ('Release tree is not in the shim layout: '+$problem)}
+ Push-Location (Join-Path $project 'installer')
+ try{& go run ./cmd/usos-efisign derive-check -unsigned (Join-Path $project 'zig-out\manual-usb\EFI\BOOT\BOOTX64.EFI') -signed (Join-Path $release ('EFI\BOOT\'+$shim.second_stage)) -sbat (Join-Path $project 'assets\secure-boot\usos.sbat.csv')|Out-Null;if($LASTEXITCODE -ne 0){throw ('Release '+$shim.second_stage+' does not derive from the USOS build')}}finally{Pop-Location}
+}else{
+ foreach($name in $bootFiles){$p='EFI\BOOT\'+$name;$protectedHashes[$p]=Hash (Join-Path $espRoot $p);$protected+=$p}
+}
 $index=0
 foreach($f in $files){
  $f.Hash=Hash $f.Source;$f.Existed=Test-Path -LiteralPath $f.Target -PathType Leaf
@@ -106,6 +142,7 @@ try {
  Write-VolumeCache -DriveLetter $data[0].DriveLetter
  foreach($f in $files){if((Hash $f.Target) -ne $f.Hash){throw 'Deployment readback mismatch'}}
  foreach($p in $protected){if((Hash (Join-Path $espRoot $p)) -ne $protectedHashes[$p]){throw 'Protected production payload changed'}}
+ $problem=BootLayoutProblem $espRoot;if($problem){throw ('Secure Boot layout broken after deploy: '+$problem)}
  $after=Get-Partition -DiskNumber $disk.Number|Select-Object PartitionNumber,Guid,Offset,Size|ConvertTo-Json -Compress
  if($after -ne $layout){throw 'Partition layout changed'}
  $files|ConvertTo-Json -Depth 4|Set-Content -LiteralPath (Join-Path $backup 'files.json')
