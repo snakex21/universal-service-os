@@ -232,3 +232,14 @@ previous package: 755 identical, 1 base update (usr/bin/usos-fb-ui), 0
 unexplained. initramfs-xp 53ac9098...; deployed with -DriversOnly -Language pl
 (backup artifacts/xp-pae/deploy-20260924-143516).
 
+
+## 2026-09-24: rebuild for B260924-132627 (pad glyphs, Secure Boot key)
+
+usos-fb-ui changed again (coloured controller glyphs, D-pad hint), so the
+package was rebuilt in full (staging ESP zig-out/xp-staging-20260924-key from
+zig-out/micro-linux + the stick's usos-device.ini, --data L:/).
+compare_xp_packages.py against the deployed package (initramfs-xp
+53ac9098...): 755 identical, 1 base update (usr/bin/usos-fb-ui), 0
+unexplained (artifacts/xp-pae/compare-20260924-key.log). New initramfs-xp
+3d288525...0fd6, kernel unchanged (155c0f9f...). Deployed with -DriversOnly
+-Language pl (backup artifacts/xp-pae/deploy-20260924-154357).
