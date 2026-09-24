@@ -1,0 +1,28 @@
+{
+  "version": "16.1-7 (Fedora shim-x64)",
+  "upstream": "https://github.com/rhboot/shim/releases/tag/16.1",
+  "upstream_commit": "afc49558b34548644c1cd0ad1b6526a9470182ed",
+  "package": "shim-x64-16.1-7.x86_64",
+  "package_url": "https://kojipkgs.fedoraproject.org/packages/shim/16.1/7/x86_64/shim-x64-16.1-7.x86_64.rpm",
+  "package_sha256": "0a119f3488e5da27ca55c1864ee8e131afa5ecf27689385ba09b805eb00dd608",
+  "package_paths": {
+    "shimx64.efi": "/usr/lib/efi/shim/16.1-7/EFI/fedora/shimx64.efi",
+    "mmx64.efi": "/usr/lib/efi/shim/16.1-7/EFI/fedora/mmx64.efi"
+  },
+  "second_stage": "grubx64.efi",
+  "mok_manager": "mmx64.efi",
+  "signatures": {
+    "shimx64.efi": ["Microsoft Windows UEFI Driver Publisher / Microsoft Corporation UEFI CA 2011", "Microsoft UEFI CA 2023 signer / Microsoft UEFI CA 2023"],
+    "mmx64.efi": ["Fedora Secure Boot Signer / Fedora Secure Boot CA 20200709 (trusted through the vendor certificate built into shim)"]
+  },
+  "sbat": {
+    "shimx64.efi": "shim,4 / shim.rh,3 / shim.redhat,3 / shim.fedora,3 (shim 16.1-1)",
+    "sbatlevel_automatic": "sbat,1,2024040900 shim,4 grub,4 grub.peimage,2",
+    "sbatlevel_latest": "sbat,1,2025051000 shim,4 grub,5 grub.proxmox,2"
+  },
+  "files": {
+    "shimx64.efi": "351e131d3c4a636704e9cae7d1296baf8a05beca9922cfebbfa48933c9bf1ad3",
+    "mmx64.efi": "ed4442fa88cccba3a9e6a32d21a8f4c56bf5aab184f1fb9aadde8d3a9d04dc27",
+    "LICENSE": "15edf527919ddcb2f514ab9d16ad07ef219e4bb490e0b79560be510f0c159cc2"
+  }
+}

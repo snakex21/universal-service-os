@@ -1,14 +1,14 @@
 const std = @import("std");
 const uefi = std.os.uefi;
 const case_path = @import("case_path.zig");
+const verified_image = @import("verified_image.zig");
 
 pub fn start(root: *uefi.protocol.File, directory: []const u8, name: []const u8) !void {
     var path_storage: [512]u8 = undefined;
     const path = try joinedPath(&path_storage, directory, name);
     const image = try load(root, path);
-    const boot_services = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
-    const result = try boot_services.startImage(image);
-    if (result.code != .success) return error.EfiImageReturnedError;
+    const code = try verified_image.start(image);
+    if (code != .success) return error.EfiImageReturnedError;
     return error.EfiImageReturned;
 }
 
@@ -25,7 +25,9 @@ pub fn load(root: *uefi.protocol.File, path: []const u8) !uefi.Handle {
     var device_path_storage: [2048]u8 = undefined;
     var allocator_state = std.heap.FixedBufferAllocator.init(&device_path_storage);
     const image_path = try device_path.createFileDevicePath(allocator_state.allocator(), resolved);
-    return boot_services.loadImage(false, uefi.handle, .{ .device_path = image_path });
+    const file = try root.open(resolved, .read, .{});
+    defer file.close() catch {};
+    return verified_image.loadApplication(image_path, file);
 }
 
 fn joinedPath(storage: *[512]u8, directory: []const u8, name: []const u8) ![]const u8 {

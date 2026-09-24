@@ -61,10 +61,12 @@ if(!$DriversOnly -and !$UnifiedMenu){foreach($name in $manifest.launchers){
  if($name -notmatch '^XP-SP[23](-NiKKA)?-UEFI-CSM-PAE\.efi$'){throw 'Unexpected launcher name'}
  foreach($drive in @($espRoot,$dataRoot)){$files+=@{Source=(Join-Path $package $name);Target=(Join-Path $drive ('Systems\Windows\Windows XP UEFI-CSM PAE\Images\'+$name))}}
 }
-if(!$LaunchersOnly){$files+=@{Source=(Join-Path $project 'zig-out\usb\EFI\BOOT\BOOTX64.EFI');Target=(Join-Path $espRoot 'EFI\BOOT\BOOTX64.EFI')}}
+# Secure Boot layout: BOOTX64.EFI is shim, USOS is grubx64.efi, mmx64.efi is MokManager; they travel together.
+$bootFiles=@('BOOTX64.EFI','grubx64.efi','mmx64.efi')
+if(!$LaunchersOnly){foreach($name in $bootFiles){$files+=@{Source=(Join-Path $project ('zig-out\usb\EFI\BOOT\'+$name));Target=(Join-Path $espRoot ('EFI\BOOT\'+$name))}}}
 }
 if($UnifiedMenu){
- $files+=@{Source=(Join-Path $project 'zig-out\usb\EFI\BOOT\BOOTX64.EFI');Target=(Join-Path $espRoot 'EFI\BOOT\BOOTX64.EFI')}
+ foreach($name in $bootFiles){$files+=@{Source=(Join-Path $project ('zig-out\usb\EFI\BOOT\'+$name));Target=(Join-Path $espRoot ('EFI\BOOT\'+$name))}}
  foreach($name in @('legacy-xp-staging-status.txt','legacy-xp-disk-enumeration.txt','legacy-xp-staging-last-error.txt','menu-events.log','menu-hardware.txt','uefi-start.txt')){
   $log=Join-Path $espRoot ('EFI\USOS-XP\'+$name)
   if(Test-Path -LiteralPath $log){[IO.File]::Copy($log,(Join-Path $backup $name),$false)}

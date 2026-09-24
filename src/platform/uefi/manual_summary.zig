@@ -7,6 +7,7 @@ const esp_image_start = @import("esp_image_start.zig");
 const input = @import("input.zig");
 const view = @import("manual_view.zig");
 const windows_native_iso = @import("windows_native_iso.zig");
+const secure_boot = @import("secure_boot.zig");
 
 const Fields = struct {
     labels: [16][]const u8 = undefined,
@@ -34,6 +35,7 @@ pub fn show(
     const resolved = backend.method();
     const method_firmware = backend.firmwareRequirement();
     if (!method_firmware.accepts(firmware)) return showFirmwareUnavailable();
+    if (secure_boot.enforced() and usos.flow.secure_boot_policy.backendRequiresSecureBootOff(system.id, backend)) return showSecureBootRequired();
 
     var fields = Fields{};
     var notes: [2][]const u8 = undefined;
@@ -117,6 +119,7 @@ fn start(
     const resolved = backend.method();
     const method_firmware = backend.firmwareRequirement();
     if (!method_firmware.accepts(firmware)) return showFirmwareUnavailable();
+    if (secure_boot.enforced() and usos.flow.secure_boot_policy.backendRequiresSecureBootOff(system.id, backend)) return showSecureBootRequired();
 
     if (backend == .xp_uefi_staging) {
         // The progress page (like the Vista/7 ISO path) stays up while the
@@ -181,10 +184,17 @@ fn showUnsupported() void {
     view.waitForDismiss();
 }
 
+fn showSecureBootRequired() void {
+    const lines = [_][]const u8{ view.t(.summary_secure_boot_line1), view.t(.summary_secure_boot_line2) };
+    view.notice(view.t(.summary_secure_boot_title), .warning, .warning, view.t(.summary_secure_boot_badge), &lines);
+    view.waitForDismiss();
+}
+
 fn showError(title: []const u8, err: anyerror) void {
     // Keep the failure visible instead of immediately redrawing the method menu.
     var buffer: [96]u8 = undefined;
-    const lines = [_][]const u8{ std.fmt.bufPrint(&buffer, "{s}: {s}", .{ view.t(.summary_error), @errorName(err) }) catch @errorName(err), view.t(.error_stopped) };
+    const detail = if (err == error.SecureBootRejected) view.t(.error_secure_boot_rejected) else view.t(.error_stopped);
+    const lines = [_][]const u8{ std.fmt.bufPrint(&buffer, "{s}: {s}", .{ view.t(.summary_error), @errorName(err) }) catch @errorName(err), detail };
     view.notice(title, .error_circle, .danger, "", &lines);
     view.waitForDismiss();
 }

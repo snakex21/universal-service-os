@@ -2,6 +2,7 @@
 const std = @import("std");
 const usos = @import("usos");
 const view = @import("manual_view.zig");
+const secure_boot = @import("secure_boot.zig");
 
 pub const DetailBuffer = [48]u8;
 
@@ -20,6 +21,16 @@ pub fn system(
             .detail = view.t(if (requires_uefi) .system_requires_uefi_detail else .system_requires_bios_detail),
             .icon = row_icon,
             .badge = .{ .text = view.t(if (requires_uefi) .system_requires_uefi else .system_requires_bios), .tone = .warning },
+            .enabled = false,
+        };
+    }
+    if (firmware == .uefi and usos.flow.secure_boot_policy.blocked(secure_boot.state(), entry.id)) {
+        // CSM/UefiSeven/pre-Secure-Boot Windows: say why instead of failing later.
+        return .{
+            .title = entry.name,
+            .detail = view.t(.summary_secure_boot_detail),
+            .icon = row_icon,
+            .badge = .{ .text = view.t(.summary_secure_boot_badge), .tone = .warning },
             .enabled = false,
         };
     }

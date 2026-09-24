@@ -179,7 +179,7 @@ pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: 
     loaded.load_options_size = @intCast((option_ascii.len + 1) * 2);
     progress(.starting, if (external_pe10) "Starting external PE10; the install source remains the selected Windows ISO" else "Starting the hybrid ISO's own WinPE and Setup");
     serial.writeAscii("[WIN7_NATIVE] CORE -> WIMBOOT UEFI\r\n");
-    const result = try bs.startImage(image);
-    if (result.code != .success) return error.WimbootReturnedError;
+    const code = try @import("verified_image.zig").start(image);
+    if (code != .success) return error.WimbootReturnedError;
     return error.WimbootReturned;
 }

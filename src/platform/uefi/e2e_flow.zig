@@ -6,6 +6,7 @@ const case_path = @import("case_path.zig");
 const ntfs_driver = @import("ntfs_driver.zig");
 const persistent_state_file = @import("persistent_state_file.zig");
 const serial = @import("serial.zig");
+const verified_image = @import("verified_image.zig");
 const work_chainload = @import("work_chainload.zig");
 const work_volume = @import("work_volume.zig");
 
@@ -135,11 +136,10 @@ fn startMicroLinux(progress: ?ProgressFn) !void {
     const image = try loadEspImage(linux_loader_path);
     reportProgress(progress, .loader_ready);
     say("MICRO-LINUX EFI LOADIMAGE PASS\n");
-    const boot_services = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
     reportProgress(progress, .transferring_control);
     say("MICRO-LINUX STARTIMAGE BEGIN\n");
-    const result = try boot_services.startImage(image);
-    if (result.code != .success) return error.MicroLinuxReturnedError;
+    const code = try verified_image.start(image);
+    if (code != .success) return error.MicroLinuxReturnedError;
     return error.MicroLinuxReturned;
 }
 
@@ -182,15 +182,14 @@ fn handoffWindows(root: *uefi.protocol.File, method: usos.catalog.BootMethod, pr
     try persistent_state_file.write(root, .pending, null, null, null);
     say("ONE-SHOT PHASE PENDING PASS\n");
 
-    const boot_services = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
     reportResumeProgress(progress, .transferring_to_windows);
     say("WINDOWS STARTIMAGE BEGIN\n");
-    const result = boot_services.startImage(windows_image) catch |err| {
+    const code = verified_image.start(windows_image) catch |err| {
         persistent_state_file.write(root, .prepared, null, null, method.persistedValue()) catch {};
         say("WINDOWS STARTIMAGE ERROR; PHASE PREPARED RESTORED\n");
         return err;
     };
-    if (result.code != .success) {
+    if (code != .success) {
         persistent_state_file.write(root, .prepared, null, null, method.persistedValue()) catch {};
         return error.WindowsReturnedError;
     }
@@ -217,13 +216,12 @@ fn handoffChainload(root: *uefi.protocol.File, method: usos.catalog.BootMethod) 
 
     try persistent_state_file.write(root, .handoff, null, null, method.persistedValue());
     try persistent_state_file.write(root, .pending, null, null, null);
-    const boot_services = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
     say("CHAINLOAD STARTIMAGE BEGIN\n");
-    const result = boot_services.startImage(chained_image) catch |err| {
+    const code = verified_image.start(chained_image) catch |err| {
         persistent_state_file.write(root, .prepared, null, null, method.persistedValue()) catch {};
         return err;
     };
-    if (result.code != .success) {
+    if (code != .success) {
         persistent_state_file.write(root, .prepared, null, null, method.persistedValue()) catch {};
         return error.ChainloadedImageReturnedError;
     }
@@ -250,7 +248,9 @@ fn loadEspImage(path: []const u8) !uefi.Handle {
     var path_storage: [2048]u8 = undefined;
     var allocator_state = std.heap.FixedBufferAllocator.init(&path_storage);
     const image_path = try device_path.createFileDevicePath(allocator_state.allocator(), resolved);
-    return boot_services.loadImage(false, uefi.handle, .{ .device_path = image_path });
+    const file = try root.open(resolved, .read, .{});
+    defer file.close() catch {};
+    return verified_image.loadApplication(image_path, file);
 }
 
 fn dataPath(storage: *[512]u8, directory: []const u8, name: []const u8) ![]const u8 {
