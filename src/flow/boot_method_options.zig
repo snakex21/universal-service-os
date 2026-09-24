@@ -85,10 +85,11 @@ test "Windows 11 ISO keeps planned methods visible and enables implemented ISO p
 
     try std.testing.expectEqual(@as(usize, 6), len);
     try std.testing.expectEqual(@as(usize, 3), enabledCount(options[0..len]));
+    // Automatic / ISO: the native wimboot start (QEMU-validated so far).
     try std.testing.expect(options[0].method == .automatic and options[0].enabled);
-    try std.testing.expectEqual(validation.Status.validated_hardware, options[0].validation_status.?);
+    try std.testing.expectEqual(validation.Status.tested_in_vm, options[0].validation_status.?);
     try std.testing.expect(options[1].method == .direct_iso and options[1].enabled);
-    try std.testing.expectEqual(validation.Status.validated_hardware, options[1].validation_status.?);
+    try std.testing.expectEqual(validation.Status.tested_in_vm, options[1].validation_status.?);
     try std.testing.expect(options[2].method == .wimboot and !options[2].enabled);
     try std.testing.expectEqualStrings("[requires WIM]", options[2].reason);
     try std.testing.expect(options[3].method == .vhdboot and !options[3].enabled);

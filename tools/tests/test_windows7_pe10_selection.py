@@ -99,8 +99,10 @@ class StartupSelection(unittest.TestCase):
     def test_native_boot_and_install_sources_are_separate(self):
         native = (ROOT / 'src/platform/uefi/windows_native_iso.zig').read_text()
         self.assertIn('.file = if (external_pe10) &state.donor else source', native)
-        self.assertIn('udf.openPath(&boot_iso, boot_path', native)
-        self.assertIn('udf.readNodeAt(&boot_iso, &node', native)
+        # Boot files are read by addBootFiles from the chosen boot ISO.
+        self.assertIn('try addBootFiles(&boot_iso, volume, &owned, progress)', native)
+        self.assertIn('udf.openPath(boot_iso, boot_path', native)
+        self.assertIn('udf.readNodeAt(boot_iso, &node', native)
         # usos-source.ini always describes the selected install ISO (never the
         # PE10 donor) in its own folder; Vista shares this path since the
         # Vista SP2 x64 -> external PE10 route was added.
@@ -111,12 +113,14 @@ class StartupSelection(unittest.TestCase):
 
     def test_native_reader_state_has_owned_aligned_stable_storage(self):
         native = (ROOT / 'src/platform/uefi/windows_native_iso.zig').read_text()
-        self.assertEqual(2, native.count('uefi.pool_allocator.create(BootState)'))
-        self.assertEqual(2, native.count('defer uefi.pool_allocator.destroy(state)'))
+        # inspect, start, and the Windows 10/11 inspectModern/startModern.
+        self.assertEqual(4, native.count('uefi.pool_allocator.create(BootState)'))
+        self.assertEqual(4, native.count('defer uefi.pool_allocator.destroy(state)'))
         self.assertNotIn('allocatePool(.loader_data, @sizeOf(BootState))', native)
         self.assertIn('.catalog = &state.catalog, .file = &state.source', native)
         self.assertIn('.catalog = &self.state.catalog, .file = &self.state.donor', native)
-        self.assertIn('context.probeDonor(inspection.donor_name.slice())', native)
+        # The donor is reopened in the folder it was resolved from (managed or legacy).
+        self.assertIn('context.probeDonor(inspection.donor_directory, inspection.donor_name.slice())', native)
         self.assertIn('error.Windows10PeDonorChanged', native)
 
 

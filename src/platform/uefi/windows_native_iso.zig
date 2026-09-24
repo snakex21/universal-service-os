@@ -1,8 +1,18 @@
+//! Native Windows start from an ISO on DATA through wimboot: the ISO's boot
+//! files are loaded into a RAM file system and wimboot boots its WinPE; the
+//! injected helpers (support.cpio) mount the same ISO read-only in WinPE and
+//! run its own Setup. Nothing is copied to WORK.
+//!
+//!   Windows 7 / Vista   PE7 hybrid or the external PE10 donor (win7/vista-support.cpio)
+//!   Windows 10 / 11     the ISO's own PE; modern-support.cpio adds the user drivers,
+//!                       the answer file and the ESP guard/finalizer (/noreboot)
+//!   WinPE / rescue ISO  booted as it is, without any USOS helper
 const std = @import("std");
 const uefi = std.os.uefi;
 const usos = @import("usos");
 const udf = usos.image_probe.udf;
 const ntfs = usos.storage.ntfs;
+const wim = usos.wim_setup;
 const data_volume = @import("data_volume.zig");
 const files = @import("wimboot_files.zig");
 const source_config = usos.windows_iso_config;
@@ -38,6 +48,31 @@ fn widen(name: []const u8, buffer: []u16) []const u16 {
     for (name, 0..) |ch, i| buffer[i] = ch;
     return buffer[0..name.len];
 }
+/// NTFS path components of `directory` (either separator) plus `name`.
+pub const PathBuffer = struct {
+    storage: [512]u16 = undefined,
+    slices: [12][]const u16 = undefined,
+
+    pub fn build(self: *PathBuffer, directory: []const u8, name: []const u8) ![]const []const u16 {
+        if (directory.len + name.len > self.storage.len) return error.InvalidImageName;
+        var count: usize = 0;
+        var at: usize = 0;
+        var parts = std.mem.tokenizeAny(u8, directory, "\\/");
+        while (parts.next()) |part| {
+            if (count + 1 >= self.slices.len) return error.InvalidImageName;
+            self.slices[count] = widen(part, self.storage[at..]);
+            at += part.len;
+            count += 1;
+        }
+        self.slices[count] = widen(name, self.storage[at..]);
+        return self.slices[0 .. count + 1];
+    }
+};
+fn openIn(catalog: *data_volume.Catalog, directory: []const u8, name: []const u8, file: *ntfs.File) !void {
+    try source_config.validateName(name);
+    var path: PathBuffer = .{};
+    try ntfs.openFile(catalog.fs, catalog.reader(), try path.build(directory, name), file);
+}
 fn openIso(catalog: *data_volume.Catalog, folder: []const u16, name: []const u8, file: *ntfs.File) !void {
     try source_config.validateName(name);
     var name_buffer: [255]u16 = undefined;
@@ -46,8 +81,8 @@ fn openIso(catalog: *data_volume.Catalog, folder: []const u16, name: []const u8,
 }
 const DonorContext = struct {
     state: *BootState,
-    pub fn probeDonor(self: *DonorContext, name: []const u8) !usos.wim_setup.Setup {
-        try openIso(&self.state.catalog, wide("Windows 10"), name, &self.state.donor);
+    pub fn probeDonor(self: *DonorContext, directory: []const u8, name: []const u8) !usos.wim_setup.Setup {
+        try openIn(&self.state.catalog, directory, name, &self.state.donor);
         var iso = Iso{ .catalog = &self.state.catalog, .file = &self.state.donor };
         return scanner.inspectDonor(uefi.pool_allocator, &iso);
     }
@@ -67,7 +102,9 @@ pub noinline fn inspect(name: []const u8, vista: bool) !scanner.Inspection {
     const state = try uefi.pool_allocator.create(BootState);
     defer uefi.pool_allocator.destroy(state);
     try initBootState(state);
-    return inspectState(state, name, vista);
+    const inspection = try inspectState(state, name, vista);
+    if (inspection.mode == .original) try checkDonorRecord(state, &inspection, null, null);
+    return inspection;
 }
 pub fn externalDriverCount() !usize {
     var catalog = try data_volume.openCatalog();
@@ -75,17 +112,79 @@ pub fn externalDriverCount() !usize {
 }
 /// DATA\Drivers\Windows 7: [used, skipped] INFs, null when there are none.
 pub fn userDriverCounts() ?[2]usize {
+    return userDriverCountsFor("Windows 7");
+}
+/// DATA\Drivers\<folder>: [used, skipped] INFs, null when there are none.
+pub fn userDriverCountsFor(folder: []const u8) ?[2]usize {
     const catalog = uefi.pool_allocator.create(data_volume.Catalog) catch return null;
     defer uefi.pool_allocator.destroy(catalog);
     catalog.* = data_volume.openCatalog() catch return null;
-    return driver_files.userCounts(catalog);
+    return driver_files.userCountsFor(catalog, folder);
 }
+
+// ------------------------------------------------------------ donor record
+
+pub const donor_record_path = scanner.donor_record_path;
+pub const DonorRecord = scanner.DonorRecord;
+const parseDonorRecord = scanner.parseDonorRecord;
+
+fn readDonorRecord(root: *uefi.protocol.File) ?DonorRecord {
+    const file = root.open(wide(donor_record_path), .read, .{}) catch return null;
+    defer file.close() catch {};
+    var buffer: [1024]u8 = undefined;
+    const got = file.read(&buffer) catch return null;
+    return parseDonorRecord(buffer[0..got]);
+}
+
+var record_root: ?*uefi.protocol.File = null;
+
+/// Remembers the ESP root so the menu's inspection can read the record.
+pub fn setEspRoot(root: *uefi.protocol.File) void {
+    record_root = root;
+}
+
+/// The donor the menu resolved must be the one the installer recorded
+/// (same name and size). With `progress`, its whole content is hashed too
+/// (right before it is used). No record (older installs): structural checks only.
+fn checkDonorRecord(state: *BootState, inspection: *const scanner.Inspection, root: ?*uefi.protocol.File, progress: ?*const fn (IsoStage, []const u8) void) !void {
+    const esp = root orelse record_root orelse return;
+    const record = readDonorRecord(esp) orelse return;
+    if (!std.ascii.eqlIgnoreCase(record.nameSlice(), inspection.donor_name.slice())) return error.Windows10PeDonorNotRecorded;
+    try openIn(&state.catalog, inspection.donor_directory, inspection.donor_name.slice(), &state.donor);
+    const donor_bytes = ntfs.File.size(&state.donor);
+    if (donor_bytes != record.size) return error.Windows10PeDonorCorrupt;
+    const report = progress orelse return;
+    const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
+    const chunk = try bs.allocatePool(.loader_data, 8 * 1024 * 1024);
+    defer bs.freePool(chunk.ptr) catch {};
+    var hash = std.crypto.hash.sha2.Sha256.init(.{});
+    const total = donor_bytes;
+    var offset: u64 = 0;
+    var last_percent: u64 = 101;
+    while (offset < total) {
+        const amount: usize = @intCast(@min(total - offset, chunk.len));
+        try state.donor.readAt(state.catalog.fs, state.catalog.reader(), offset, chunk[0..amount]);
+        hash.update(chunk[0..amount]);
+        offset += amount;
+        const percent = offset * 100 / total;
+        if (percent != last_percent and percent % 5 == 0) {
+            last_percent = percent;
+            var message: [96]u8 = undefined;
+            report(.validating, std.fmt.bufPrint(&message, "Checking the WinPE helper image: {d}%", .{percent}) catch "Checking the WinPE helper image");
+        }
+    }
+    var digest: [32]u8 = undefined;
+    hash.final(&digest);
+    if (!std.mem.eql(u8, &digest, &record.sha256)) return error.Windows10PeDonorCorrupt;
+    serial.writeAscii("[WIN7_NATIVE] PE10 donor SHA-256 matches winpe-donor.ini\r\n");
+}
+
 const IsoStage = @import("usos").flow.preparation_boot_progress.DirectIsoStage;
 pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: ?[]const u8, vista: bool, progress: *const fn (IsoStage, []const u8) void) !void {
     if (@import("builtin").cpu.arch != .x86_64) return error.WindowsSetupRequiresX64;
     try source_config.validateName(name);
     if (answer_name) |answer| try source_config.validateName(answer);
-    const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
+    if (uefi.system_table.boot_services == null) return error.NoBootServices;
     const state = try uefi.pool_allocator.create(BootState);
     defer uefi.pool_allocator.destroy(state);
     try initBootState(state);
@@ -96,60 +195,173 @@ pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: 
     const source = &state.source;
     const external_pe10 = inspection.mode == .original;
     if (external_pe10) {
+        try checkDonorRecord(state, &inspection, root, progress);
         // Reopen the chosen donor: enumeration may have probed other candidates.
         var context = DonorContext{ .state = state };
-        const current = try context.probeDonor(inspection.donor_name.slice());
+        const current = try context.probeDonor(inspection.donor_directory, inspection.donor_name.slice());
         if (!std.meta.eql(current, inspection.boot_setup)) return error.Windows10PeDonorChanged;
     }
     var boot_iso = Iso{ .catalog = catalog, .file = if (external_pe10) &state.donor else source };
     const setup = inspection.boot_setup;
-    var node: udf.Node = undefined;
     var boot_message: [384]u8 = undefined;
     serial.writeAscii(try std.fmt.bufPrint(&boot_message, "[WIN7_NATIVE] {s}; boot ISO={s}; PE={d}.{d}.{d} x64 index={d}\r\n", .{
         if (vista) "Vista SP2 x64 -> external PE10" else inspection.mode.label(), inspection.bootName(name), setup.major, setup.minor, setup.build, setup.index,
     }));
     progress(.validating, inspection.bootName(name));
     const volume = &state.volume;
-    var owned: [10][]align(8) u8 = undefined;
-    var count: usize = 0;
-    defer for (owned[0..count]) |allocation| bs.freePool(allocation.ptr) catch {};
-    const support_file = try root.open(wide("\\EFI\\USOS\\windows-native\\support.cpio"), .read, .{});
-    defer support_file.close() catch {};
-    const support = try bs.allocatePool(.loader_data, 8 * 1024 * 1024);
-    owned[count] = support; count += 1;
-    const support_len = try support_file.read(support);
-    if (support_len == support.len) return error.SupportArchiveTooLarge;
-    try volume.addCpio(support[0..support_len]);
-    {
-        const stock_file = try root.open(if (vista) wide("\\EFI\\USOS\\windows-native\\vista-support.cpio") else wide("\\EFI\\USOS\\windows-native\\win7-support.cpio"), .read, .{});
-        defer stock_file.close() catch {};
-        const stock = try bs.allocatePool(.loader_data, 64 * 1024 * 1024);
-        owned[count] = stock; count += 1;
-        const stock_len = try stock_file.read(stock);
-        if (stock_len == stock.len) return error.SupportArchiveTooLarge;
-        try volume.addCpio(stock[0..stock_len]);
-    }
+    var owned = Owned{};
+    defer owned.release();
+    try addSupport(root, volume, &owned, "\\EFI\\USOS\\windows-native\\support.cpio", 8);
+    try addSupport(root, volume, &owned, if (vista) "\\EFI\\USOS\\windows-native\\vista-support.cpio" else "\\EFI\\USOS\\windows-native\\win7-support.cpio", 64);
     try volume.add(if (vista) "usos-modern-vista.flag" else "usos-modern-win7.flag", "1\r\n");
     if (external_pe10) try volume.add("usos-external-pe10.flag", "1\r\n");
     if (inspection.nvme_packages) try volume.add("usos-nvme-packages.flag", "1\r\n");
     if (!vista) {
         progress(.loading, "Reading optional Windows 7 x64 driver packages");
         const drivers = try driver_files.load(catalog);
-        owned[count] = drivers.bytes; count += 1;
+        try owned.keep(drivers.bytes);
         try volume.add("usos-drivers.bin", drivers.bytes);
         var driver_message: [128]u8 = undefined;
         serial.writeAscii(try std.fmt.bufPrint(&driver_message, "[WIN7_NATIVE] external driver INF files={d}; user INFs used={d} skipped={d}; Windows validates hardware match\r\n", .{ drivers.inf_count, drivers.user_infs, drivers.user_skipped }));
     }
-    const paths = scanner.boot_paths;
+    try addBootFiles(&boot_iso, volume, &owned, progress);
+    var config: [544]u8 = undefined;
+    try volume.add("usos-source.ini", try source_config.sourceConfigForFolder(&config, catalog.partition.part_guid, source.size(), if (vista) "Windows Vista" else "Windows 7", name));
+    if (answer_name) |answer| try addAnswer(state, volume, &owned, "Windows 7", answer);
+    return launch(root, volume, setup.index, if (external_pe10) "Starting external PE10; the install source remains the selected Windows ISO" else "Starting the hybrid ISO's own WinPE and Setup", progress);
+}
+
+// ------------------------------------------------- Windows 10/11 and WinPE
+
+pub const systemFolder = scanner.systemFolder;
+
+pub const ModernInspection = struct {
+    setup: wim.Setup,
+    install: []const u8,
+};
+
+/// Windows 10/11 Setup media: x64 boot.wim (its declared boot index) of
+/// version 10, BCD and boot.sdi, sources/setup.exe and an install image.
+fn inspectModernIso(iso: anytype) !ModernInspection {
+    const setup = try scanner.setupInfo(uefi.pool_allocator, iso);
+    if (setup.major != 10) return error.UnsupportedWindowsSetupVersion;
+    try scanner.validateBootFiles(iso);
+    var node: udf.Node = undefined;
+    if (!try udf.openPath(iso, "sources/setup.exe", &node) or node.is_directory or node.size == 0) return error.WindowsSetupMissing;
+    for (usos.image_probe.windows_detect.modern_install_images) |path| {
+        if (try udf.openPath(iso, path, &node) and !node.is_directory and node.size > 0) return .{ .setup = setup, .install = path };
+    }
+    return error.WindowsInstallImageMissing;
+}
+
+pub noinline fn inspectModern(image_directory: []const u8, name: []const u8) !ModernInspection {
+    if (uefi.system_table.boot_services == null) return error.NoBootServices;
+    const state = try uefi.pool_allocator.create(BootState);
+    defer uefi.pool_allocator.destroy(state);
+    try initBootState(state);
+    try openIn(&state.catalog, image_directory, name, &state.source);
+    var iso = Iso{ .catalog = &state.catalog, .file = &state.source };
+    return inspectModernIso(&iso);
+}
+
+/// Starts Windows 10/11 Setup from the selected ISO (`winpe == false`) or a
+/// WinPE/rescue ISO as it is (`winpe == true`, no USOS helpers, no Setup).
+pub noinline fn startModern(root: *uefi.protocol.File, image_directory: []const u8, name: []const u8, answer_name: ?[]const u8, winpe: bool, progress: *const fn (IsoStage, []const u8) void) !void {
+    if (@import("builtin").cpu.arch != .x86_64) return error.WindowsSetupRequiresX64;
+    try source_config.validateName(name);
+    if (answer_name) |answer| try source_config.validateName(answer);
+    if (winpe and answer_name != null) return error.WinPeHasNoAnswerFile;
+    const folder = try systemFolder(image_directory);
+    const state = try uefi.pool_allocator.create(BootState);
+    defer uefi.pool_allocator.destroy(state);
+    try initBootState(state);
+    const catalog = &state.catalog;
+    progress(.validating, "Reading the selected Windows ISO");
+    try openIn(catalog, image_directory, name, &state.source);
+    var iso = Iso{ .catalog = catalog, .file = &state.source };
+    const setup = if (winpe) blk: {
+        const pe = try scanner.setupInfo(uefi.pool_allocator, &iso);
+        try scanner.validateBootFiles(&iso);
+        break :blk pe;
+    } else (try inspectModernIso(&iso)).setup;
+    var message: [384]u8 = undefined;
+    serial.writeAscii(try std.fmt.bufPrint(&message, "[WIN_NATIVE] {s} {s}\\{s}; PE={d}.{d}.{d} x64 index={d}; no WORK copy\r\n", .{
+        if (winpe) "WinPE boot" else "Windows Setup", folder, name, setup.major, setup.minor, setup.build, setup.index,
+    }));
+    progress(.validating, name);
+    const volume = &state.volume;
+    var owned = Owned{};
+    defer owned.release();
+    if (!winpe) {
+        try addSupport(root, volume, &owned, "\\EFI\\USOS\\windows-native\\support.cpio", 8);
+        try addSupport(root, volume, &owned, "\\EFI\\USOS\\windows-native\\modern-support.cpio", 8);
+        try volume.add("usos-modern-uefi.flag", "1\r\n");
+        progress(.loading, "Reading your driver packages (DATA\\Drivers)");
+        if (try driver_files.loadUser(catalog, folder)) |drivers| {
+            try owned.keep(drivers.bytes);
+            try volume.add("usos-drivers.bin", drivers.bytes);
+            var driver_message: [128]u8 = undefined;
+            serial.writeAscii(try std.fmt.bufPrint(&driver_message, "[WIN_NATIVE] user INFs used={d} skipped={d} (Drivers\\{s})\r\n", .{ drivers.user_infs, drivers.user_skipped, folder }));
+        }
+        var config: [544]u8 = undefined;
+        try volume.add("usos-source.ini", try source_config.sourceConfigForFolder(&config, catalog.partition.part_guid, state.source.size(), folder, name));
+        if (answer_name) |answer| try addAnswer(state, volume, &owned, folder, answer);
+    }
+    try addBootFiles(&iso, volume, &owned, progress);
+    return launch(root, volume, setup.index, if (winpe) "Starting WinPE from the ISO; nothing is installed" else "Starting the ISO's own WinPE and Windows Setup", progress);
+}
+
+// ------------------------------------------------------------------ shared
+
+const Owned = struct {
+    items: [10][]align(8) u8 = undefined,
+    count: usize = 0,
+
+    fn keep(self: *Owned, bytes: []align(8) u8) !void {
+        if (self.count == self.items.len) return error.TooManyWimbootBuffers;
+        self.items[self.count] = bytes;
+        self.count += 1;
+    }
+
+    fn allocate(self: *Owned, size: usize) ![]align(8) u8 {
+        const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
+        const bytes = try bs.allocatePool(.loader_data, size);
+        self.keep(bytes) catch |err| {
+            bs.freePool(bytes.ptr) catch {};
+            return err;
+        };
+        return bytes;
+    }
+
+    fn release(self: *Owned) void {
+        const bs = uefi.system_table.boot_services orelse return;
+        for (self.items[0..self.count]) |allocation| bs.freePool(allocation.ptr) catch {};
+        self.count = 0;
+    }
+};
+
+fn addSupport(root: *uefi.protocol.File, volume: *files.Volume, owned: *Owned, path: []const u8, limit_mib: usize) !void {
+    var path16: [96:0]u16 = undefined;
+    const n = try std.unicode.utf8ToUtf16Le(&path16, path);
+    path16[n] = 0;
+    const file = try root.open(path16[0..n :0], .read, .{});
+    defer file.close() catch {};
+    const bytes = try owned.allocate(limit_mib * 1024 * 1024);
+    const len = try file.read(bytes);
+    if (len == bytes.len) return error.SupportArchiveTooLarge;
+    try volume.addCpio(bytes[0..len]);
+}
+
+fn addBootFiles(boot_iso: *Iso, volume: *files.Volume, owned: *Owned, progress: *const fn (IsoStage, []const u8) void) !void {
+    var node: udf.Node = undefined;
     const names = [_][]const u8{ "BCD", "boot.sdi", "boot.wim" };
-    for (paths, names) |boot_path, boot_name| {
-        if (!try udf.openPath(&boot_iso, boot_path, &node) or node.is_directory or node.size == 0 or node.size > scanner.max_boot_file_size) return error.InvalidWindowsBootFile;
-        const bytes = try bs.allocatePool(.loader_data, @intCast(node.size));
-        owned[count] = bytes; count += 1;
+    for (scanner.boot_paths, names) |boot_path, boot_name| {
+        if (!try udf.openPath(boot_iso, boot_path, &node) or node.is_directory or node.size == 0 or node.size > scanner.max_boot_file_size) return error.InvalidWindowsBootFile;
+        const bytes = try owned.allocate(@intCast(node.size));
         var offset: usize = 0;
         while (offset < bytes.len) {
             const amount = @min(bytes.len - offset, 1024 * 1024);
-            try udf.readNodeAt(&boot_iso, &node, offset, bytes[offset..][0..amount]);
+            try udf.readNodeAt(boot_iso, &node, offset, bytes[offset..][0..amount]);
             offset += amount;
             if (std.mem.eql(u8, boot_name, "boot.wim") and (offset % (8 * 1024 * 1024) == 0 or offset == bytes.len)) {
                 var message: [100]u8 = undefined;
@@ -158,19 +370,21 @@ pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: 
         }
         try volume.add(boot_name, bytes);
     }
-    var config: [544]u8 = undefined;
-    try volume.add("usos-source.ini", try source_config.sourceConfigForFolder(&config, catalog.partition.part_guid, source.size(), if (vista) "Windows Vista" else "Windows 7", name));
-    if (answer_name) |answer| {
-        var answer_wide: [255]u16 = undefined;
-        const answer_path = [_][]const u16{ wide("Systems"), wide("Windows"), wide("Windows 7"), wide("Unattended"), widen(answer, &answer_wide) };
-        const answer_file = &state.answer;
-        try ntfs.openFile(catalog.fs, catalog.reader(), &answer_path, answer_file);
-        if (answer_file.size() == 0 or answer_file.size() > 1024 * 1024) return error.InvalidAnswerFileSize;
-        const bytes = try bs.allocatePool(.loader_data, @intCast(answer_file.size()));
-        owned[count] = bytes; count += 1;
-        try answer_file.readAt(catalog.fs, catalog.reader(), 0, bytes);
-        try volume.add("usos-unattend.xml", bytes);
-    }
+}
+
+fn addAnswer(state: *BootState, volume: *files.Volume, owned: *Owned, folder: []const u8, answer: []const u8) !void {
+    const catalog = &state.catalog;
+    var directory: [96]u8 = undefined;
+    const path = try std.fmt.bufPrint(&directory, "Systems\\Windows\\{s}\\Unattended", .{folder});
+    try openIn(catalog, path, answer, &state.answer);
+    if (state.answer.size() == 0 or state.answer.size() > 1024 * 1024) return error.InvalidAnswerFileSize;
+    const bytes = try owned.allocate(@intCast(state.answer.size()));
+    try state.answer.readAt(catalog.fs, catalog.reader(), 0, bytes);
+    try volume.add("usos-unattend.xml", bytes);
+}
+
+fn launch(root: *uefi.protocol.File, volume: *files.Volume, index: u32, starting: []const u8, progress: *const fn (IsoStage, []const u8) void) !void {
+    const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
     const image = try esp_image.load(root, "\\EFI\\USOS\\windows-native\\wimboot");
     defer _ = bs._unloadImage(image);
     const handle = try files.install(volume);
@@ -178,15 +392,25 @@ pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: 
     const loaded = (try bs.handleProtocol(uefi.protocol.LoadedImage, image)) orelse return error.NoLoadedImage;
     loaded.device_handle = handle;
     var option_text: [32]u8 = undefined;
-    const option_ascii = try @import("diagnostic_boot.zig").wimbootOptions(&option_text, setup.index, @import("diagnostic_boot.zig").requested(root));
+    const option_ascii = try @import("diagnostic_boot.zig").wimbootOptions(&option_text, index, @import("diagnostic_boot.zig").requested(root));
     var options: [32:0]u16 = undefined;
     for (option_ascii, 0..) |ch, i| options[i] = ch;
     options[option_ascii.len] = 0;
     loaded.load_options = &options;
     loaded.load_options_size = @intCast((option_ascii.len + 1) * 2);
-    progress(.starting, if (external_pe10) "Starting external PE10; the install source remains the selected Windows ISO" else "Starting the hybrid ISO's own WinPE and Setup");
+    progress(.starting, starting);
     serial.writeAscii("[WIN7_NATIVE] CORE -> WIMBOOT UEFI\r\n");
     const code = try @import("verified_image.zig").start(image);
     if (code != .success) return error.WimbootReturnedError;
     return error.WimbootReturned;
+}
+
+test "path buffer splits either separator" {
+    var buffer: PathBuffer = .{};
+    const parts = try buffer.build("Programs/USOS/WinPE", "PE10.iso");
+    try std.testing.expectEqual(@as(usize, 4), parts.len);
+    try std.testing.expectEqualSlices(u16, wide("WinPE"), parts[2]);
+    const other = try buffer.build("\\Systems\\Windows\\Windows 10\\Images", "a.iso");
+    try std.testing.expectEqual(@as(usize, 5), other.len);
+    try std.testing.expectEqualSlices(u16, wide("a.iso"), other[4]);
 }

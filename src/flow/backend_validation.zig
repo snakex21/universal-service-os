@@ -49,6 +49,9 @@ pub fn statusSelection(backend: Backend, system_id: []const u8, image: @import("
     // Its QEMU result must not inherit Windows 10/11's physical validation.
     if (backend == .chainload and image == .iso and std.mem.eql(u8, system_id, "windows-7")) return .tested_in_vm;
     if (@import("builtin").os.tag != .freestanding and backend == .windows_iso and image == .iso and std.mem.eql(u8, system_id, "windows-7")) return .tested_in_vm;
+    // Windows 10/11 native wimboot start (no WORK copy): QEMU/OVMF only so far.
+    if (backend == .windows_iso and image == .iso and
+        (std.mem.eql(u8, system_id, "windows-10") or std.mem.eql(u8, system_id, "windows-11"))) return .tested_in_vm;
     return statusBackend(backend);
 }
 

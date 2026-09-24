@@ -42,6 +42,7 @@ pub fn run() void {
     splash.begin(info.framebuffer, splash.logoSetting(settings), "");
     manual_view.init(root, info, settings);
     manual_secure_boot.init(root);
+    @import("windows_native_iso.zig").setEspRoot(root);
     if (e2e_flow.resumePersistent(root, showResumeStatus)) return;
     boot_timing.mark("persistent state checked");
     splash.status(manual_view.t(.splash_images));
@@ -71,13 +72,19 @@ pub fn run() void {
 
 fn runEntry(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_discovery.Discovery, entry: *const usos.catalog.SystemEntry, firmware: usos.firmware.Firmware) void {
     while (manual_images.select(discovery, entry)) |image| {
+        // A WinPE / rescue ISO is not a Windows installer: it can only be
+        // started as it is (no method choice, no answer file, no Setup).
+        if (image.media) |info| if (info.content == .winpe) {
+            manual_summary.showWinPe(root, entry, image, firmware);
+            continue;
+        };
         while (manual_methods.select(entry, image, firmware)) |method| {
             if (entry.unattended_directory != null and (image.kind == .iso or image.kind == .wim)) {
                 const unattended = manual_unattended.select(discovery, entry);
                 if (unattended.back) continue;
-                manual_summary.show(root, entry, image, method, unattended.path, firmware);
+                manual_summary.show(root, entry, image, method, unattended.path, unattended.available, firmware);
             } else {
-                manual_summary.show(root, entry, image, method, null, firmware);
+                manual_summary.show(root, entry, image, method, null, 0, firmware);
             }
         }
     }

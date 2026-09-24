@@ -112,15 +112,43 @@ pub fn userCounts(catalog: *Catalog) ?[2]usize {
 }
 
 pub fn load(catalog: *Catalog) !Archive {
+    return loadFor(catalog, true, user_folder);
+}
+
+/// DATA\Drivers\<folder> only (Windows 10/11 native start: no bundled
+/// library). The archive layout is the same USOSDRV1 (entries "user\...")
+/// that usos-drivers.exe expands in WinPE. Null when there is nothing to use.
+pub fn loadUser(catalog: *Catalog, folder: []const u8) !?Archive {
+    const archive = try loadFor(catalog, false, folder);
+    if (archive.user_infs == 0) {
+        const bs = uefi.system_table.boot_services orelse return null;
+        bs.freePool(archive.bytes.ptr) catch {};
+        return null;
+    }
+    return archive;
+}
+
+/// Used and skipped user INFs of DATA\Drivers\<folder>, for the summary.
+pub fn userCountsFor(catalog: *Catalog, folder: []const u8) ?[2]usize {
+    const set = user_drivers.scan(catalog, folder, &user_targets, max_bytes) orelse return null;
+    defer user_drivers.release(set);
+    return .{ set.infs_used, set.infs_skipped };
+}
+
+fn loadFor(catalog: *Catalog, bundled: bool, folder: []const u8) !Archive {
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
     const memory = try bs.allocatePool(.loader_data, @sizeOf(Inventory));
     defer bs.freePool(memory.ptr) catch {};
     const info: *Inventory = @ptrCast(@alignCast(memory.ptr));
-    try inventory(catalog, info);
+    if (bundled) try inventory(catalog, info) else {
+        info.file_count = 0;
+        info.inf_count = 0;
+        info.total = 12;
+    }
     // User packages come after the bundled library and only use what is
     // left of the 64 MiB archive; they never fail the start.
     const log_reserve: usize = 6 + user_log_name.len + 16 * 1024;
-    const user = user_drivers.scan(catalog, user_folder, &user_targets, max_bytes -| (info.total + log_reserve));
+    const user = user_drivers.scan(catalog, folder, &user_targets, max_bytes -| (info.total + log_reserve));
     defer if (user) |set| user_drivers.release(set);
     var total = info.total;
     var count = info.file_count;
@@ -160,7 +188,9 @@ pub fn load(catalog: *Catalog) !Archive {
         var it = set.used();
         var path: [user_drivers.max_archive_path]u8 = undefined;
         var file: ntfs.File = undefined;
-        const root = [_][]const u16{ wide("Drivers"), wide(user_folder) };
+        var folder16: [64]u16 = undefined;
+        const folder_len = try std.unicode.utf8ToUtf16Le(&folder16, folder);
+        const root = [_][]const u16{ wide("Drivers"), folder16[0..folder_len] };
         while (it.next()) |entry| {
             const name = user_drivers.archivePath(set, entry, &path) orelse continue;
             const size: usize = @intCast(entry.size);

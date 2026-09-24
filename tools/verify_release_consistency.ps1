@@ -11,7 +11,7 @@ $payloadPath = Join-Path $ProjectRoot 'installer\internal\payload\assets\payload
 $buildInfoPath = Join-Path $ProjectRoot 'build\generated\build-info.ini'
 $microLinuxInitramfs = Join-Path $ProjectRoot 'zig-out\micro-linux\initramfs-usos'
 $strategyBMbr = Join-Path $ProjectRoot 'zig-out\xp-geometry-fix-mbr\xp-geometry-fix-mbr-440.bin'
-$win7NativeFiles = @('win7-support.cpio', 'vista-support.cpio', 'int10.efi', 'int10.original.efi', 'UefiSeven.ini', 'uefiseven-LICENSE.txt')
+$win7NativeFiles = @('win7-support.cpio', 'vista-support.cpio', 'modern-support.cpio', 'int10.efi', 'int10.original.efi', 'UefiSeven.ini', 'uefiseven-LICENSE.txt')
 $msDosFiles = @('HIMEMX.EXE', 'HIMEMX.TXT', 'HIMEMSRC.ZIP', 'LICENSE.TXT', 'manifest.json', 'INSTALL.BAT', 'LIVE.BAT', 'PREPDOS.BAT', 'COPYDOS.BAT', 'UNPACK.BAT', 'W3START.BAT', 'WINMENU.BAT', 'W3CONFIG.SYS', 'W3AUTO.BAT', 'REBOOT.COM')
 
 function Test-StaticEspPath([string]$Relative) {

@@ -44,6 +44,7 @@ echo Selected Windows installation ISO mounted at %USOS_SOURCE%
 echo [USOS] phase=source-ready install=%USOS_INSTALL%
 if exist "%~dp0usos-modern-vista.flag" goto modern_vista
 if exist "%~dp0usos-modern-win7.flag" goto modern_win7
+if exist "%~dp0usos-modern-uefi.flag" goto modern_uefi
 if exist "%~dp0usos-unattend.xml" (
     "%USOS_SOURCE%\sources\setup.exe" /installfrom:"%USOS_INSTALL%" /unattend:"%~dp0usos-unattend.xml"
 ) else (
@@ -52,6 +53,9 @@ if exist "%~dp0usos-unattend.xml" (
 exit /b %errorlevel%
 :modern_vista
 call "%~dp0usos-modern-vista.cmd"
+exit /b %errorlevel%
+:modern_uefi
+call "%~dp0usos-modern-uefi.cmd"
 exit /b %errorlevel%
 :modern_win7
 call "%~dp0usos-modern-win7.cmd"

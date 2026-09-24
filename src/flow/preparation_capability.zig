@@ -9,6 +9,19 @@ fn nativeLegacyNt(system_id: []const u8) bool {
     return native_windows7_enabled and (std.mem.eql(u8, system_id, "windows-7") or std.mem.eql(u8, system_id, "windows-vista"));
 }
 
+/// Windows 10 and 11 on UEFI start their own ISO's WinPE through wimboot,
+/// straight from DATA (src/platform/uefi/windows_native_iso.zig): no copy to
+/// WORK. Chainload (the whole ISO copied to WORK) stays selectable.
+pub fn nativeModernNt(system_id: []const u8) bool {
+    return std.mem.eql(u8, system_id, "windows-10") or std.mem.eql(u8, system_id, "windows-11");
+}
+
+/// Systems whose `windows_iso` backend is the native wimboot start on UEFI
+/// (rather than a WORK preparation).
+pub fn nativeUefiIso(system_id: []const u8) bool {
+    return nativeModernNt(system_id) or std.mem.eql(u8, system_id, "windows-7") or std.mem.eql(u8, system_id, "windows-vista");
+}
+
 pub const unavailable_reason = "No implemented boot backend supports this selection.";
 
 pub const Backend = enum {
@@ -69,7 +82,7 @@ pub fn resolveBackend(system: *const SystemEntry, image: ImageKind, method: Boot
         .automatic => switch (image) {
             .iso => if (is_xp)
                 .xp_staging
-            else if (std.mem.eql(u8, system.id, "windows-11") or nativeLegacyNt(system.id))
+            else if (nativeModernNt(system.id) or nativeLegacyNt(system.id))
                 .windows_iso
             else
                 .chainload,
@@ -78,7 +91,7 @@ pub fn resolveBackend(system: *const SystemEntry, image: ImageKind, method: Boot
             .efi => .direct_efi,
             else => null,
         },
-        .direct_iso => if (image == .iso and (std.mem.eql(u8, system.id, "windows-11") or nativeLegacyNt(system.id)))
+        .direct_iso => if (image == .iso and (nativeModernNt(system.id) or nativeLegacyNt(system.id)))
             .windows_iso
         else
             null,
@@ -199,8 +212,12 @@ test "Windows 10 BIOS ISO uses Windows PE without changing UEFI or other images"
     const win10 = systems.findById("windows-10").?;
     try std.testing.expectEqual(Backend.windows_bios_iso, resolveForFirmware(win10, .iso, .automatic, .bios).?);
     try std.testing.expectEqual(Backend.windows_bios_iso, resolveForFirmware(win10, .iso, .direct_iso, .bios).?);
-    try std.testing.expectEqual(Backend.chainload, resolveForFirmware(win10, .iso, .automatic, .uefi).?);
-    try std.testing.expect(resolveForFirmware(win10, .iso, .direct_iso, .uefi) == null);
+    // UEFI: native wimboot from the ISO by default, WORK chainload on request.
+    try std.testing.expectEqual(Backend.windows_iso, resolveForFirmware(win10, .iso, .automatic, .uefi).?);
+    try std.testing.expectEqual(Backend.windows_iso, resolveForFirmware(win10, .iso, .direct_iso, .uefi).?);
+    try std.testing.expectEqual(Backend.chainload, resolveForFirmware(win10, .iso, .chainload, .uefi).?);
+    try std.testing.expect(nativeUefiIso("windows-10") and nativeUefiIso("windows-11") and nativeUefiIso("windows-7"));
+    try std.testing.expect(!nativeUefiIso("windows-8-1"));
     try std.testing.expect(resolveForFirmware(win10, .wim, .direct_iso, .bios) == null);
     try std.testing.expect(resolveForFirmware(win10, .iso, .memdisk, .bios) == null);
     try std.testing.expectEqual(Backend.wimboot, resolveForFirmware(win10, .wim, .automatic, .bios).?);

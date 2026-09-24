@@ -4,6 +4,7 @@ import hashlib
 import json
 import shutil
 import os
+import subprocess
 from build_windows_native_cache import NewcWriter
 from build_windows_source_mount import build as build_helpers
 from build_windows7_uefi import build as build_win7_helpers
@@ -48,6 +49,7 @@ def build(root: Path):
     (out / 'support.cpio.tmp').replace(out / 'support.cpio')
     shutil.copyfile(wimboot, out / 'wimboot')
     build_stock_support(root, out)
+    build_modern_support(root, out)
     build_vista_support(root)
     print('[PASS] Native Windows support:', (out / 'support.cpio').stat().st_size, 'bytes')
 
@@ -96,6 +98,31 @@ def build_stock_support(root: Path, out: Path):
     shutil.copyfile(helpers / 'int10.original.efi', out / 'int10.original.efi')
     (out / 'UefiSeven.ini').write_bytes(b'[config]\r\nverbose=0\r\nlogfile=1\r\nskiperrors=0\r\n')
     shutil.copyfile(vendor / 'LICENSE.txt', out / 'uefiseven-LICENSE.txt')
+
+
+def build_modern_support(root: Path, out: Path):
+    """Windows 10/11 native UEFI start: startup script, ESP guard/finalizer and
+    the user-driver helpers shared with the Win7 path (built by build_stock_support)."""
+    helpers = root / 'zig-out/windows-modern'
+    helpers.mkdir(parents=True, exist_ok=True)
+    temp = helpers / 'tmp'
+    temp.mkdir(exist_ok=True)
+    env = dict(os.environ, TEMP=str(temp), TMP=str(temp), ZIG_GLOBAL_CACHE_DIR=str(root / 'tools/cache/zig-global'), ZIG_LOCAL_CACHE_DIR=str(helpers / 'zig-cache'))
+    subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86_64-windows.win10-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
+                    '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_modern_uefi_finalize.c'),
+                    '-Wl,--entry,entry', '-lkernel32', '-ladvapi32', '-o', str(helpers / 'usos-modern-finalize.exe')], env=env, check=True)
+    win7 = root / 'zig-out/windows7-uefi'
+    writer = NewcWriter(out / 'modern-support.cpio.tmp')
+    try:
+        writer.add_bytes('usos-modern-uefi.cmd', (root / 'tools/windows_modern_uefi_startup.cmd').read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
+        writer.add_file('usos-modern-finalize.exe', helpers / 'usos-modern-finalize.exe')
+        for name in ('usos-drivers.exe', 'usos-unattend-drivers.exe'):
+            writer.add_file(name, win7 / name)
+    finally:
+        writer.close()
+    (out / 'modern-support.cpio.tmp').replace(out / 'modern-support.cpio')
+    if (out / 'modern-support.cpio').stat().st_size >= 8 * 1024 * 1024:
+        raise ValueError('modern support archive exceeds the Core transport limit')
 
 
 if __name__ == '__main__':

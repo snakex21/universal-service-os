@@ -29,6 +29,7 @@ var payloadFiles = []payloadFile{
 	{`zig-out/windows-native/support.cpio`, `EFI/USOS/windows-native/support.cpio`},
 	{`zig-out/windows-native/win7-support.cpio`, `EFI/USOS/windows-native/win7-support.cpio`},
 	{`zig-out/windows-native/vista-support.cpio`, `EFI/USOS/windows-native/vista-support.cpio`},
+	{`zig-out/windows-native/modern-support.cpio`, `EFI/USOS/windows-native/modern-support.cpio`},
 	{`zig-out/windows-native/int10.efi`, `EFI/USOS/windows-native/int10.efi`},
 	{`zig-out/windows-native/int10.original.efi`, `EFI/USOS/windows-native/int10.original.efi`},
 	{`zig-out/windows-native/UefiSeven.ini`, `EFI/USOS/windows-native/UefiSeven.ini`},

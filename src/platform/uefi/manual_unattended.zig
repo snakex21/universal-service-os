@@ -8,6 +8,10 @@ const view = @import("manual_view.zig");
 pub const Result = struct {
     back: bool = false,
     path: ?[]const u8 = null,
+    /// Answer files found in the system's Unattended folder on DATA (read
+    /// directly with the NTFS reader; extensions match in any case). Zero
+    /// skips the screen; the summary then says where to put one.
+    available: usize = 0,
 };
 
 var file_storage: [8]usos.catalog.FixedText = undefined;
@@ -16,6 +20,7 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, system: *const
     const directory = system.unattended_directory orelse return .{};
     const found = discovery.listFilesWithExtension(directory, usos.flow.unattended_policy.extension(system), file_storage[0..]);
     if (found == 0) return .{};
+    const available = found;
 
     var options: [9]?[]const u8 = undefined;
     var rows: [9]usos.gui.ui.Row = undefined;
@@ -33,7 +38,7 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, system: *const
 
     while (true) {
         switch (navigation.handle(input.readBlocking(), &selected, len, &list)) {
-            .activate => return .{ .path = options[selected] },
+            .activate => return .{ .path = options[selected], .available = available },
             .back => return .{ .back = true },
             .changed => list.updateSelection(selected, help(selected)),
             .pointer_moved => view.updatePointer(),

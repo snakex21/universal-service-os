@@ -171,7 +171,8 @@ test "donor optical metadata rejects PE7 PE8 Windows11 x86 missing SDI and bad i
 
 const OpticalDirectory = struct {
     reader: Reader,
-    pub fn probeDonor(self: *OpticalDirectory, name: []const u8) !@import("image_probe/wim_setup.zig").Setup {
+    pub fn probeDonor(self: *OpticalDirectory, folder: []const u8, name: []const u8) !@import("image_probe/wim_setup.zig").Setup {
+        try std.testing.expectEqualStrings(scanner.donor_directory, folder);
         try std.testing.expectEqualStrings("renamed-not-windows.ISO", name);
         return scanner.inspectDonor(allocator, &self.reader);
     }

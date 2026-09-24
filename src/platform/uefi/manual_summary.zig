@@ -8,6 +8,7 @@ const input = @import("input.zig");
 const view = @import("manual_view.zig");
 const windows_native_iso = @import("windows_native_iso.zig");
 const secure_boot = @import("secure_boot.zig");
+const manual_images = @import("manual_images.zig");
 
 const Fields = struct {
     labels: [16][]const u8 = undefined,
@@ -28,9 +29,11 @@ pub fn show(
     image: usos.catalog.ImageItem,
     method: usos.catalog.BootMethod,
     unattended: ?[]const u8,
+    answers_available: usize,
     firmware: usos.firmware.Firmware,
 ) void {
     if (!system.firmware.accepts(firmware)) return showFirmwareUnavailable();
+    if (manual_images.blockReason(image)) |reason| return showMediaBlocked(image.name.slice(), reason);
     const backend = usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, firmware) orelse return showUnsupported();
     const resolved = backend.method();
     const method_firmware = backend.firmwareRequirement();
@@ -44,6 +47,12 @@ pub fn show(
     fields.add(view.t(.summary_image), image.name.slice());
     fields.add(view.t(.summary_method), view.tr(method.label()));
     if (unattended) |path| fields.add(view.t(.summary_answer_file), path);
+    var no_answer_text: [160]u8 = undefined;
+    // No answer file on DATA: say where one would be picked up (the
+    // selection screen is skipped when the folder is empty).
+    if (unattended == null and answers_available == 0 and image.kind == .iso and std.mem.startsWith(u8, system.id, "windows-")) {
+        if (system.unattended_directory) |directory| fields.add(view.t(.summary_answer_file), view.format(&no_answer_text, .summary_no_answer_files, &.{directory}));
+    }
     var can_start = true;
     if (backend == .xp_uefi_staging) {
         fields.add(view.t(.summary_preparation), view.t(.summary_xp_preparation));
@@ -60,6 +69,30 @@ pub fn show(
     var number_text: [12]u8 = undefined;
     var user_text: [120]u8 = undefined;
     const vista = std.mem.eql(u8, system.id, "windows-vista");
+    const modern_native = image.kind == .iso and backend == .windows_iso and usos.flow.preparation_capability.nativeModernNt(system.id);
+    var modern_pe_text: [96]u8 = undefined;
+    var modern_driver_text: [120]u8 = undefined;
+    if (modern_native) {
+        if (windows_native_iso.inspectModern(system.image_directory, image.name.slice())) |inspection| {
+            fields.add(view.t(.summary_iso_case), view.t(.summary_native_case));
+            const setup = inspection.setup;
+            fields.add(view.t(.summary_boot_pe), std.fmt.bufPrint(&modern_pe_text, "{d}.{d}.{d} x64 / WIM index {d}", .{ setup.major, setup.minor, setup.build, setup.index }) catch view.t(.summary_unavailable));
+            const folder = windows_native_iso.systemFolder(system.image_directory) catch "";
+            if (windows_native_iso.userDriverCountsFor(folder)) |counts| {
+                var used_text: [12]u8 = undefined;
+                var skipped_text: [12]u8 = undefined;
+                const used = std.fmt.bufPrint(&used_text, "{d}", .{counts[0]}) catch "?";
+                const skipped = std.fmt.bufPrint(&skipped_text, "{d}", .{counts[1]}) catch "?";
+                fields.add(view.t(.summary_user_drivers), view.format(&modern_driver_text, .summary_user_drivers_folder, &.{ folder, used, skipped }));
+            }
+            fields.add(view.t(.summary_esp_guard_label), view.t(.summary_esp_guard));
+        } else |err| {
+            can_start = false;
+            fields.add(view.t(.summary_iso_inspection), @errorName(err));
+            notes[note_count] = view.tr(usos.windows7_iso.errorDetail(err));
+            note_count += 1;
+        }
+    }
     if (image.kind == .iso and (vista or std.mem.eql(u8, system.id, "windows-7"))) {
         if (windows_native_iso.inspect(image.name.slice(), vista)) |inspection| {
             fields.add(view.t(.summary_iso_case), if (vista) view.t(.summary_vista_case) else inspection.mode.label());
@@ -88,7 +121,7 @@ pub fn show(
         } else |err| {
             can_start = false;
             fields.add(view.t(.summary_iso_inspection), @errorName(err));
-            notes[note_count] = usos.windows7_iso.errorDetail(err);
+            notes[note_count] = donorNote(err) orelse view.tr(usos.windows7_iso.errorDetail(err));
             note_count += 1;
         }
     }
@@ -154,6 +187,15 @@ fn start(
         return;
     }
 
+    if (manual_images.blockReason(image)) |reason| return showMediaBlocked(image.name.slice(), reason);
+    if (image.kind == .iso and backend == .windows_iso and usos.flow.preparation_capability.nativeModernNt(system.id)) {
+        view.windowsIsoStatus(.validating, "Reading the selected Windows ISO");
+        windows_native_iso.startModern(root, system.image_directory, image.name.slice(), unattended, false, view.windowsIsoStatus) catch |err| {
+            view.refreshFramebuffer();
+            showError(view.t(.error_iso), err);
+        };
+        return;
+    }
     const vista = std.mem.eql(u8, system.id, "windows-vista");
     if (image.kind == .iso and (vista or std.mem.eql(u8, system.id, "windows-7")) and resolved == .direct_iso) {
         view.windowsIsoStatus(.validating, "Reading the selected Windows ISO");
@@ -171,6 +213,71 @@ fn start(
 
     e2e_flow.requestPreparation(root, system, image, resolved, unattended, showPreparationProgress) catch |err| {
         showError(view.t(.error_preparation), err);
+    };
+}
+
+/// A WinPE / rescue ISO (boot.wim without an install image): started as
+/// it is through wimboot, straight from DATA; never prepared as an installer.
+pub fn showWinPe(
+    root: *std.os.uefi.protocol.File,
+    system: *const usos.catalog.SystemEntry,
+    image: usos.catalog.ImageItem,
+    firmware: usos.firmware.Firmware,
+) void {
+    if (!system.firmware.accepts(firmware) or firmware != .uefi) return showFirmwareUnavailable();
+    if (manual_images.blockReason(image)) |reason| return showMediaBlocked(image.name.slice(), reason);
+    var fields = Fields{};
+    fields.add(view.t(.summary_system), system.name);
+    fields.add(view.t(.summary_image), image.name.slice());
+    fields.add(view.t(.summary_iso_case), view.t(.media_winpe));
+    if (image.media) |info| {
+        if (info.arch != .unknown) fields.add(view.t(.summary_boot_pe), info.arch.label());
+    }
+    const notes = [_][]const u8{ view.t(.media_winpe_line1), view.t(.media_winpe_line2) };
+    const can_start = @import("builtin").cpu.arch == .x86_64;
+    view.summary(.{
+        .title = view.t(.summary_title),
+        .subtitle = view.t(.summary_subtitle),
+        .labels = fields.labels[0..fields.count],
+        .values = fields.values[0..fields.count],
+        .notes = &notes,
+        .action = if (can_start) view.t(.action_winpe) else view.t(.action_blocked),
+        .action_enabled = can_start,
+    });
+    while (true) switch (input.readBlocking()) {
+        .enter => if (can_start) return startWinPe(root, system, image),
+        .back => return,
+        .pointer => |mouse| {
+            if (mouse.right_click) return;
+            if (can_start and mouse.left_click and view.hitSummaryButton(mouse.x, mouse.y)) return startWinPe(root, system, image);
+            if (mouse.moved) view.updatePointer();
+        },
+        else => {},
+    };
+}
+
+fn startWinPe(root: *std.os.uefi.protocol.File, system: *const usos.catalog.SystemEntry, image: usos.catalog.ImageItem) void {
+    input.stopGamepads();
+    view.windowsIsoStatus(.validating, "Reading the selected WinPE ISO");
+    windows_native_iso.startModern(root, system.image_directory, image.name.slice(), null, true, view.windowsIsoStatus) catch |err| {
+        view.refreshFramebuffer();
+        showError(view.t(.error_iso), err);
+    };
+}
+
+fn showMediaBlocked(name: []const u8, reason: usos.image_probe.windows_media.Block) void {
+    const lines = [_][]const u8{ manual_images.blockText(reason), view.t(.media_blocked_line2) };
+    view.notice(name, .warning, .warning, view.t(.media_blocked_title), &lines);
+    view.waitForDismiss();
+}
+
+/// Missing or damaged PE10 donor (Programs/USOS/WinPE): a localized
+/// "run Repair in the USOS installer" message.
+fn donorNote(err: anyerror) ?[]const u8 {
+    return switch (err) {
+        error.Windows10PeDonorMissing, error.Windows10PeDonorInvalid, error.Windows10PeDonorNotRecorded => view.t(.donor_missing),
+        error.Windows10PeDonorCorrupt => view.t(.donor_corrupt),
+        else => null,
     };
 }
 
