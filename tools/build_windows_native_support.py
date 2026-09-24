@@ -76,6 +76,9 @@ def build_stock_support(root: Path, out: Path):
                 writer.add_bytes(name.split('/')[-1], content)
         writer.add_bytes('usos-win7-start.cmd', (root / 'tools/windows7_native_startup.cmd').read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
         writer.add_bytes('usos-modern-win7.cmd', (root / 'tools/windows7_modern_startup.cmd').read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
+        # Copied to <target>\Windows\Setup\Scripts\SetupComplete.cmd by the stock
+        # PE7 path when Setup ran without an answer file (user drivers).
+        writer.add_bytes('usos-win7-setupcomplete.cmd', (root / 'tools/windows7_setupcomplete.cmd').read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
         for name in ('usos-win7-finalize.exe', 'usos-drivers.exe', 'usos-unattend-drivers.exe'):
             writer.add_file(name, helpers / name)
         # WIMBoot treats .efi files as boot applications rather than injected

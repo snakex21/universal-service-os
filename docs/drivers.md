@@ -303,9 +303,18 @@ that cannot be written is skipped, never fatal.
   runs only when an answer file is used anyway (a user answer file or the
   NVMe packages): forcing `/unattend` on a manual stock-PE7 install makes
   Setup ask for a product key, so USOS does not do that for user drivers.
-  Without an answer file the target gets what Setup migrates by itself
-  (drivers of boot-critical devices in use) - put `Other\` drivers on the
-  installed system afterwards, or use an answer file.
+  Without an answer file, once Setup has applied the image (`/noreboot`),
+  `windows7_native_startup.cmd` copies `user\` (Storage, USB, Other) to
+  `<target>\USOS\Drivers` and writes `<target>\Windows\Setup\Scripts\
+  SetupComplete.cmd` (`tools/windows7_setupcomplete.cmd`): Windows 7 runs it
+  as SYSTEM before the first logon and it adds every package with
+  `pnputil -i -a` (log: `\USOS\Drivers\usos-pnputil.log`). No answer file, no
+  DISM, no product-key prompt. The target is the one Windows installation
+  that did not exist before Setup (`Windows\Panther\setupact.log` +
+  `System32\config\SOFTWARE`); with none or several, or when the image already
+  has its own `SetupComplete.cmd`, nothing is written and a warning is shown.
+  `\USOS\Drivers` stays on the installed system (delete it when done).
+  Not yet tried on real hardware.
 * **Windows Setup (PE10 donor, `windows7_modern_startup.cmd`)**: PE10 keeps
   its own storage/USB drivers (Windows 7 drivers are not loaded into a
   Windows 10 kernel; `tools/tests/test_windows7_pe10_selection.py` asserts

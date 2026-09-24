@@ -71,6 +71,7 @@ foreach ($relative in @(
     'tools\windows7_uefi_startup.cmd',
     'tools\windows7_native_startup.cmd',
     'tools\windows7_modern_startup.cmd',
+    'tools\windows7_setupcomplete.cmd',
     'tools\windows7_uefi_video_check.zig',
     'tools\windows_driver_archive.c',
     'tools\windows_unattend_drivers.c',
