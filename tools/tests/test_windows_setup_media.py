@@ -74,9 +74,60 @@ class SetupMediaHelpers(unittest.TestCase):
             ("ubuntu", "Systems/Windows/Windows 10/Images/x.iso"): "",
             ("", "Systems/Windows/Windows 8.1/Images/x.iso"): "Windows 8.1",
             ("", "Systems/Linux/Ubuntu/Images/x.iso"): "",
+            # Windows Server: its own DATA\Drivers folder; 2008 like Vista is not wired.
+            ("windows-server-2025", ""): "Windows Server 2025",
+            ("windows-server-2022", ""): "Windows Server 2022",
+            ("windows-server-2019", ""): "Windows Server 2019",
+            ("windows-server-2016", ""): "Windows Server 2016",
+            ("windows-server-2012-r2", ""): "Windows Server 2012 R2",
+            ("windows-server-2012", "Systems/Windows/Windows Server 2012/Images/s.iso"): "Windows Server 2012",
+            ("windows-server-2008-r2", ""): "Windows Server 2008 R2",
+            ("windows-server-2008", "Systems/Windows/Windows Server 2008/Images/s.iso"): "",
         }
         for (system, iso), folder in cases.items():
             self.assertEqual(folder, run(f"user_drivers_os '{system}' '{iso}'"), (system, iso))
+
+
+@unittest.skipIf(SH is None, "no POSIX sh")
+class BiosRequestFolder(unittest.TestCase):
+    """usos.legacy_folder_hex (Windows Server 2008 R2 / 2008 from the BIOS Core)."""
+
+    def request(self, action: str, folder: str | None) -> tuple[int, str]:
+        root = Path(tempfile.mkdtemp(prefix="usos-esp-"))
+        self.addCleanup(shutil.rmtree, root, True)
+        (root / "EFI/USOS").mkdir(parents=True)
+        # The request writes under /mnt/esp: a copy points it at the temp root.
+        text = (ROOT / "tools/legacy_windows_request.sh").read_text(encoding="utf-8")
+        request = root / "legacy_windows_request.sh"
+        request.write_text(text.replace("/mnt/esp", root.as_posix()), encoding="utf-8", newline="\n")
+        folder_hex = folder.encode("ascii").hex() if folder is not None else ""
+        script = (
+            "stop() { printf 'STOP %s\\n' \"$1\"; exit 3; }; "
+            f". '{request.as_posix()}'; "
+            f"LEGACY_ACTION='{action}'; LEGACY_IMAGE_HEX='{'s.iso'.encode().hex()}'; LEGACY_UNATTENDED_HEX=''; LEGACY_FOLDER_HEX='{folder_hex}'; "
+            "legacy_windows_request; "
+            f"cat '{root.as_posix()}/EFI/USOS/install-state.ini'"
+        )
+        result = subprocess.run([SH, "-c", script], capture_output=True, text=True)
+        return result.returncode, result.stdout
+
+    def test_server_folders(self):
+        code, out = self.request("windows7-iso", "Windows Server 2008 R2")
+        self.assertEqual(0, code, out)
+        self.assertIn("selected_system=windows-server-2008-r2", out)
+        self.assertIn("selected_iso=Systems/Windows/Windows Server 2008 R2/Images/s.iso", out)
+        code, out = self.request("windows-vista-iso", "Windows Server 2008")
+        self.assertEqual(0, code, out)
+        self.assertIn("selected_system=windows-server-2008", out)
+        code, out = self.request("windows7-iso", None)
+        self.assertEqual(0, code, out)
+        self.assertIn("selected_iso=Systems/Windows/Windows 7/Images/s.iso", out)
+
+    def test_other_folders_are_refused(self):
+        for action, folder in (("windows7-iso", "Windows Server 2008"), ("windows-vista-iso", "Windows 10"), ("windows7-iso", "../Windows 7")):
+            code, out = self.request(action, folder)
+            self.assertEqual(3, code, (action, folder, out))
+            self.assertIn("STOP", out)
 
 
 class Wiring(unittest.TestCase):

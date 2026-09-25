@@ -36,12 +36,16 @@ pub fn execute(
         .dos_bios_iso => try dos6_native_iso.run(context.esp_fs, context.reader, context.bulk_reader, context.bios_boot_drive, graphics, system_id, image_name),
         .win9x_dos => try dos_native_iso.run(context.esp_fs, context.reader, context.bulk_reader, context.bios_boot_drive, graphics, image_name),
         .windows_bios_iso => {
+            // Windows Server follows its client release (os_profiles
+            // route_as) with its own DATA folder.
+            const system = catalog.systems.findById(system_id) orelse return error.BackendUnavailable;
+            const folder = catalog.os_profiles.windowsFolder(system) orelse return error.BackendUnavailable;
+            const route = catalog.os_profiles.routeId(system_id);
             // Read the selected ISO while the BIOS is still intact.
-            const is_windows10 = std.mem.eql(u8, system_id, "windows-10");
-            if (is_windows10 or std.mem.eql(u8, system_id, "windows-vista")) {
-                try windows_native_iso.run(context.esp_fs, context.reader, context.bulk_reader, context.bios_boot_drive, graphics, if (is_windows10) .windows10 else .vista, image_name, unattended_name);
+            if (std.mem.eql(u8, route, "windows-10") or std.mem.eql(u8, route, "windows-vista")) {
+                try windows_native_iso.run(context.esp_fs, context.reader, context.bulk_reader, context.bios_boot_drive, graphics, folder, image_name, unattended_name);
             }
-            try linux_load_probe.runWindowsIso(context.esp_fs, context.reader, context.bulk_reader, context.esp_part_guid_disk, context.bios_boot_drive, graphics, system_id, image_name, unattended_name);
+            try linux_load_probe.runWindowsIso(context.esp_fs, context.reader, context.bulk_reader, context.esp_part_guid_disk, context.bios_boot_drive, graphics, route, if (system.server) folder else null, image_name, unattended_name);
         },
         .xp_staging => try linux_load_probe.runXpStaging(
             context.esp_fs,

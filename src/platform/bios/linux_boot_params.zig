@@ -63,6 +63,9 @@ pub const XpStagingRequest = struct {
     unattended_name: ?[]const u8 = null,
     bios_boot_drive: u8,
     bios_inventory: []const u8,
+    /// Windows 7/Vista ISO requests of Windows Server 2008 R2 / 2008: the
+    /// DATA system folder (usos.legacy_folder_hex); null for the client.
+    system_folder: ?[]const u8 = null,
 };
 
 pub const CommandRequest = union(enum) {
@@ -178,6 +181,10 @@ pub fn buildCommandLine(output: *[cmdline_capacity]u8, part_guid_disk: [16]u8, r
             if (xp.unattended_name) |name| {
                 used = try appendCommand(output, used, " usos.legacy_unattended_hex=");
                 used = try appendHex(output, used, name);
+            }
+            if (xp.system_folder) |folder| {
+                used = try appendCommand(output, used, " usos.legacy_folder_hex=");
+                used = try appendHex(output, used, folder);
             }
             used = try appendCommand(output, used, " usos.bios_boot_drive=");
             if (used + 2 >= output.len) return error.CommandLineTooLong;
@@ -479,6 +486,8 @@ test "golden: exact BIOS micro-Linux command line per request kind" {
         .{ .request = .{ .windows2000_staging = plain }, .expected = base ++ " usos.legacy_action=windows2000-staging usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80 usos.plan_profile=nt5-staging" },
         .{ .request = .{ .windows7_iso = plain }, .expected = base ++ " kexec_load_disabled=0 usos.legacy_action=windows7-iso usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80 usos.plan_profile=windows-pe-bios-iso" },
         .{ .request = .{ .windows_vista_iso = plain }, .expected = base ++ " kexec_load_disabled=0 usos.legacy_action=windows-vista-iso usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80 usos.plan_profile=windows-pe-bios-iso" },
+        // Windows Server 2008 R2 through the Windows 7 request: its folder is added.
+        .{ .request = .{ .windows7_iso = .{ .image_name = "W.iso", .bios_boot_drive = 0x80, .bios_inventory = "", .system_folder = "Windows Server 2008 R2" } }, .expected = base ++ " kexec_load_disabled=0 usos.legacy_action=windows7-iso usos.legacy_image_hex=572e69736f usos.legacy_folder_hex=57696e646f7773205365727665722032303038205232 usos.bios_boot_drive=80 usos.plan_profile=windows-pe-bios-iso" },
     };
     for (cases) |case| {
         var cmdline: [cmdline_capacity]u8 = undefined;

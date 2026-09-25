@@ -169,10 +169,12 @@ pub fn runXpStaging(
     try run(fs, reader, bulk_reader, esp_part_guid_disk, graphics_session, .boot, command);
 }
 
-pub fn runWindowsIso(fs: fat32.FileSystem, reader: random_reader.Reader, bulk_reader: random_reader.Reader, esp_guid: [16]u8, boot_drive: u8, graphics_session: ?vbe_probe.Session, system_id: []const u8, image_name: []const u8, unattended_name: ?[]const u8) Error!void {
+/// `system_id` is the routed client id (windows-7, windows-vista);
+/// `system_folder` names a Windows Server folder (null: the client's own).
+pub fn runWindowsIso(fs: fat32.FileSystem, reader: random_reader.Reader, bulk_reader: random_reader.Reader, esp_guid: [16]u8, boot_drive: u8, graphics_session: ?vbe_probe.Session, system_id: []const u8, system_folder: ?[]const u8, image_name: []const u8, unattended_name: ?[]const u8) Error!void {
     if (graphics_session) |session| graphics_menu.preparationStart(&session);
     const request = linux_boot_params.XpStagingRequest{
-        .image_name = image_name, .unattended_name = unattended_name, .bios_boot_drive = boot_drive, .bios_inventory = "",
+        .image_name = image_name, .unattended_name = unattended_name, .bios_boot_drive = boot_drive, .bios_inventory = "", .system_folder = system_folder,
     };
     const command: linux_boot_params.CommandRequest = if (std.mem.eql(u8, system_id, "windows-vista"))
         .{ .windows_vista_iso = request }
