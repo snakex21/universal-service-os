@@ -3,12 +3,14 @@ const Category = @import("category.zig").Category;
 const SystemEntry = @import("system_entry.zig").SystemEntry;
 const windows_modern = @import("windows_modern.zig");
 const windows_legacy = @import("windows_legacy.zig");
+const windows_server = @import("windows_server.zig");
 const linux_systems = @import("linux_systems.zig");
 const windows_betas = @import("windows_betas.zig");
 const dos_systems = @import("dos_systems.zig");
 
 pub const all = windows_modern.entries ++
     windows_legacy.entries ++
+    windows_server.entries ++
     linux_systems.entries ++
     windows_betas.entries ++
     dos_systems.entries;
@@ -36,6 +38,22 @@ pub fn byCategoryIndex(category: Category, wanted: usize) ?*const SystemEntry {
         found += 1;
     }
     return null;
+}
+
+test {
+    _ = windows_server;
+}
+
+test "Windows Server is its own section after the client versions" {
+    var seen_server = false;
+    var index: usize = 0;
+    while (byCategoryIndex(.windows, index)) |entry| : (index += 1) {
+        if (seen_server) try std.testing.expect(entry.server);
+        seen_server = seen_server or entry.server;
+    }
+    try std.testing.expect(seen_server);
+    try std.testing.expectEqualStrings("windows-server-2025", findById("windows-server-2025").?.id);
+    try std.testing.expect(findById("windows-server-2003") == null);
 }
 
 test "built-in system catalog contains fixed operating-system profiles" {

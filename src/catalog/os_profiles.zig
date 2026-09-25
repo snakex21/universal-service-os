@@ -61,6 +61,13 @@ pub const NativeUefi = enum {
 
 pub const SystemTraits = struct {
     system_id: []const u8,
+    /// This system is routed exactly like `route_as` (a client Windows that
+    /// shares its Setup): the traits below are taken from that entry and the
+    /// profile rules match its id. Only the DATA folders differ.
+    route_as: ?[]const u8 = null,
+    /// Setup has no inbox NVMe driver (Windows Server 2012): the summary
+    /// hints at DATA\Drivers\<folder>\Storage when the PC has an NVMe disk.
+    no_inbox_nvme: bool = false,
     answer: AnswerFormat = .autounattend_xml,
     /// Every UEFI path of this system needs Secure Boot off (CSM, UefiSeven,
     /// boot managers older than Secure Boot).
@@ -77,13 +84,49 @@ pub const traits_table = [_]SystemTraits{
     .{ .system_id = "windows-vista", .secure_boot_off = true, .native_uefi = .vista },
     .{ .system_id = "windows-10", .native_uefi = .modern },
     .{ .system_id = "windows-11", .native_uefi = .modern },
+    // Windows Server (src/catalog/windows_server.zig): the client release
+    // with the same Setup. 2016-2025: the Windows 10/11 native UEFI start and
+    // the Windows 10 BIOS Core start; 2012 R2 / 2012: Windows 8.1 / 8;
+    // 2008 R2: Windows 7; 2008: Vista.
+    .{ .system_id = "windows-server-2025", .route_as = "windows-10" },
+    .{ .system_id = "windows-server-2022", .route_as = "windows-10" },
+    .{ .system_id = "windows-server-2019", .route_as = "windows-10" },
+    .{ .system_id = "windows-server-2016", .route_as = "windows-10" },
+    .{ .system_id = "windows-server-2012-r2", .route_as = "windows-8-1" },
+    .{ .system_id = "windows-server-2012", .route_as = "windows-8", .no_inbox_nvme = true },
+    .{ .system_id = "windows-server-2008-r2", .route_as = "windows-7" },
+    .{ .system_id = "windows-server-2008", .route_as = "windows-vista" },
 };
 
-pub fn traits(system_id: []const u8) SystemTraits {
+fn ownTraits(system_id: []const u8) SystemTraits {
     for (traits_table) |entry| {
         if (std.mem.eql(u8, entry.system_id, system_id)) return entry;
     }
     return .{ .system_id = system_id };
+}
+
+pub fn traits(system_id: []const u8) SystemTraits {
+    const own = ownTraits(system_id);
+    const base_id = own.route_as orelse return own;
+    var result = ownTraits(base_id);
+    result.system_id = system_id;
+    result.route_as = base_id;
+    result.no_inbox_nvme = own.no_inbox_nvme;
+    return result;
+}
+
+/// The id the profile rules see: the `route_as` system, else the id itself.
+pub fn routeId(system_id: []const u8) []const u8 {
+    return ownTraits(system_id).route_as orelse system_id;
+}
+
+/// "<folder>" of a Windows system's "\Systems\Windows\<folder>\Images".
+pub fn windowsFolder(system: *const SystemEntry) ?[]const u8 {
+    const prefix = "\\Systems\\Windows\\";
+    const suffix = "\\Images";
+    const directory = system.image_directory;
+    if (!std.mem.startsWith(u8, directory, prefix) or !std.mem.endsWith(u8, directory, suffix) or directory.len <= prefix.len + suffix.len) return null;
+    return directory[prefix.len .. directory.len - suffix.len];
 }
 
 pub const Systems = union(enum) {
@@ -98,7 +141,7 @@ pub const Systems = union(enum) {
         return switch (self) {
             .any => true,
             .ids => |ids| for (ids) |id| {
-                if (std.mem.eql(u8, id, system.id)) break true;
+                if (std.mem.eql(u8, id, routeId(system.id))) break true;
             } else false,
             .nt5_staging => system.family == .windows_legacy and traits(system.id).nt5_staging,
             .native => |kind| traits(system.id).native_uefi == kind,
@@ -214,7 +257,14 @@ test "profile ids are unique and every trait names a catalog system" {
     for (profiles, 0..) |a, i| {
         for (profiles[i + 1 ..]) |b| try std.testing.expect(!std.mem.eql(u8, a.id, b.id));
     }
-    for (traits_table) |entry| try std.testing.expect(systems.findById(entry.system_id) != null);
+    for (traits_table) |entry| {
+        try std.testing.expect(systems.findById(entry.system_id) != null);
+        // A routed system names a catalog system that is not routed itself.
+        if (entry.route_as) |base| {
+            try std.testing.expect(systems.findById(base) != null);
+            try std.testing.expect(ownTraits(base).route_as == null);
+        }
+    }
     for (profiles) |profile| switch (profile.systems) {
         .ids => |ids| for (ids) |id| try std.testing.expect(systems.findById(id) != null),
         else => {},
@@ -241,4 +291,40 @@ test "Windows 10/11 and 7/Vista native UEFI profiles" {
     try std.testing.expectEqual(NativeUefi.vista, traits("windows-vista").native_uefi);
     try std.testing.expectEqual(NativeUefi.none, traits("windows-8-1").native_uefi);
     try std.testing.expectEqual(AnswerFormat.winnt_sif, traits("windows-2000").answer);
+}
+
+test "Windows Server follows the client release it shares a Setup with" {
+    const systems = @import("systems.zig");
+    const Case = struct { id: []const u8, base: []const u8 };
+    const cases = [_]Case{
+        .{ .id = "windows-server-2025", .base = "windows-10" },
+        .{ .id = "windows-server-2022", .base = "windows-10" },
+        .{ .id = "windows-server-2019", .base = "windows-10" },
+        .{ .id = "windows-server-2016", .base = "windows-10" },
+        .{ .id = "windows-server-2012-r2", .base = "windows-8-1" },
+        .{ .id = "windows-server-2012", .base = "windows-8" },
+        .{ .id = "windows-server-2008-r2", .base = "windows-7" },
+        .{ .id = "windows-server-2008", .base = "windows-vista" },
+    };
+    for (cases) |case| {
+        const server = systems.findById(case.id).?;
+        const client = systems.findById(case.base).?;
+        try std.testing.expectEqualStrings(case.base, routeId(case.id));
+        const a = traits(case.id);
+        const b = traits(case.base);
+        try std.testing.expectEqualStrings(case.id, a.system_id);
+        try std.testing.expectEqual(b.native_uefi, a.native_uefi);
+        try std.testing.expectEqual(b.secure_boot_off, a.secure_boot_off);
+        try std.testing.expectEqual(b.answer, a.answer);
+        try std.testing.expectEqualSlices(BootMethod, client.boot_methods, server.boot_methods);
+        for (std.enums.values(ImageKind)) |image| for (std.enums.values(BootMethod)) |method| for ([_]?Firmware{ .bios, .uefi, null }) |firmware| {
+            try std.testing.expectEqual(select(client, image, method, firmware), select(server, image, method, firmware));
+        };
+    }
+    try std.testing.expect(traits("windows-server-2012").no_inbox_nvme);
+    try std.testing.expect(!traits("windows-server-2012-r2").no_inbox_nvme);
+    try std.testing.expect(!traits("windows-8").no_inbox_nvme);
+    try std.testing.expectEqualStrings("windows-10", routeId("windows-10"));
+    try std.testing.expectEqualStrings("Windows Server 2008 R2", windowsFolder(systems.findById("windows-server-2008-r2").?).?);
+    try std.testing.expect(windowsFolder(systems.findById("ubuntu").?) == null);
 }

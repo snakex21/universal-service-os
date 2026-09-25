@@ -47,7 +47,11 @@ pub fn statusBackend(backend: Backend) Status {
 pub fn statusSelection(backend: Backend, system_id: []const u8, image: @import("../catalog/image_kind.zig").ImageKind) Status {
     // Win7's ISO preparation has its own EFI compatibility and driver path.
     // Its QEMU result must not inherit Windows 10/11's physical validation.
-    const native = @import("../catalog/os_profiles.zig").traits(system_id).native_uefi;
+    const system_traits = @import("../catalog/os_profiles.zig").traits(system_id);
+    // Windows Server reuses the client paths but has no validation run of its
+    // own yet: it must not inherit the client's badge.
+    if (system_traits.route_as != null) return .experimental;
+    const native = system_traits.native_uefi;
     if (backend == .chainload and image == .iso and native == .win7) return .tested_in_vm;
     if (@import("builtin").os.tag != .freestanding and backend == .windows_iso and image == .iso and native == .win7) return .tested_in_vm;
     // Windows 10/11 native wimboot start (no WORK copy): QEMU/OVMF only so far.
@@ -72,6 +76,12 @@ test "backend validation status is authoritative" {
     try std.testing.expectEqual(Status.experimental, status(.memdisk));
     try std.testing.expectEqual(Status.experimental, status(.disk_image));
     try std.testing.expectEqual(Status.experimental, status(.floppy_image));
+}
+
+test "Windows Server paths are experimental until validated" {
+    try std.testing.expectEqual(Status.experimental, statusSelection(.windows_iso, "windows-server-2022", .iso));
+    try std.testing.expectEqual(Status.experimental, statusSelection(.chainload, "windows-server-2012", .iso));
+    try std.testing.expectEqual(Status.tested_in_vm, statusSelection(.windows_iso, "windows-10", .iso));
 }
 
 test "validation badges are defined only here" {
