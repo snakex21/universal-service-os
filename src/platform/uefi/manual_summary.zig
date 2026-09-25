@@ -163,6 +163,8 @@ fn start(
     // the pads are picked up again if the launch fails and the menu returns.
     input.stopGamepads();
     const backend = usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, firmware) orelse return showUnsupported();
+    // Progress rows come from the selection's profile (plan).
+    view.setPlanLabels(if (usos.flow.plan.make(system, image.kind, method, firmware)) |plan| plan.labels() else null);
     const resolved = backend.method();
     const method_firmware = backend.firmwareRequirement();
     if (!method_firmware.accepts(firmware)) return showFirmwareUnavailable();
@@ -260,6 +262,7 @@ pub fn showWinPe(
 
 fn startWinPe(root: *std.os.uefi.protocol.File, system: *const usos.catalog.SystemEntry, image: usos.catalog.ImageItem) void {
     input.stopGamepads();
+    view.setPlanLabels(null);
     view.windowsIsoStatus(.validating, "Reading the selected WinPE ISO");
     windows_native_iso.startModern(root, system.image_directory, image.name.slice(), null, true, view.windowsIsoStatus) catch |err| {
         view.refreshFramebuffer();

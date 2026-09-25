@@ -790,15 +790,31 @@ pub fn hitSummaryButton(x: u32, y: u32) bool {
 
 // ------------------------------------------------------------------ progress
 
+/// Progress rows of the selection being started (its plan); null: the
+/// page's own default rows.
+var plan_labels: ?[]const []const u8 = null;
+
+/// Called with the plan of the selection before it starts (null for a
+/// start without a profile, e.g. a WinPE ISO).
+pub fn setPlanLabels(labels: ?[]const []const u8) void {
+    plan_labels = if (labels) |rows| (if (rows.len == 0) null else rows) else null;
+}
+
+fn stageRows(default: []const []const u8, current: u8) []const []const u8 {
+    const rows = plan_labels orelse return default;
+    return if (current >= 1 and current <= rows.len) rows else default;
+}
+
 pub fn windowsIsoStatus(stage: usos.flow.preparation_boot_progress.DirectIsoStage, detail: []const u8) void {
     const Stage = usos.flow.preparation_boot_progress.DirectIsoStage;
+    const rows = stageRows(&Stage.labels, stage.number());
     progress(.{
         .mode = .stage,
         .current = stage.number(),
-        .total = Stage.labels.len,
-        .labels = &Stage.labels,
+        .total = @intCast(rows.len),
+        .labels = rows,
         .heading = "Starting Windows from ISO",
-        .title = Stage.labels[stage.number() - 1],
+        .title = rows[stage.number() - 1],
         .detail = detail,
     });
 }
@@ -807,13 +823,14 @@ pub fn windowsIsoStatus(stage: usos.flow.preparation_boot_progress.DirectIsoStag
 /// headed by the chosen system's name, with only the steps the XP path runs.
 pub fn xpStatus(stage: usos.flow.preparation_boot_progress.XpStage, heading: []const u8) void {
     const Stage = usos.flow.preparation_boot_progress.XpStage;
+    const rows = stageRows(&Stage.labels, stage.number());
     progress(.{
         .mode = .stage,
         .current = stage.number(),
-        .total = Stage.labels.len,
-        .labels = &Stage.labels,
+        .total = @intCast(rows.len),
+        .labels = rows,
         .heading = heading,
-        .title = Stage.labels[stage.number() - 1],
+        .title = rows[stage.number() - 1],
         .detail = stage.detail(),
     });
 }
