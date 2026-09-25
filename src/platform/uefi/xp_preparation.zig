@@ -51,7 +51,7 @@ pub fn start(root: *uefi.protocol.File, name: []const u8, unattended: ?[]const u
         file.close() catch {};
         break :blk " initrd=\\EFI\\USOS\\lang.cpio";
     } else |_| "";
-    const command = try std.fmt.bufPrint(&cmd, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action=xp-staging usos.legacy_image_hex={s} {s}", .{ lang_initrd, id, hex[0 .. name.len * 2], diagnostic.xpConsoleOptions(diagnostic.requested(root)) });
+    const command = try std.fmt.bufPrint(&cmd, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action=xp-staging usos.legacy_image_hex={s} usos.plan_profile=xp-x86-sp3-uefi-csm {s}", .{ lang_initrd, id, hex[0 .. name.len * 2], diagnostic.xpConsoleOptions(diagnostic.requested(root)) });
     var options: [2049]u16 = @splat(0);
     for (command, 0..) |c, i| options[i] = c;
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;

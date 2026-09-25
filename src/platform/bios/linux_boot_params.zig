@@ -190,9 +190,24 @@ pub fn buildCommandLine(output: *[cmdline_capacity]u8, part_guid_disk: [16]u8, r
             }
         },
     }
+    // Pipeline profile for micro-Linux (tools/pipeline/run.sh; ids of
+    // src/catalog/os_profiles.zig, nt5-resume = CONTINUE XP).
+    if (planProfile(request)) |profile| {
+        used = try appendCommand(output, used, " usos.plan_profile=");
+        used = try appendCommand(output, used, profile);
+    }
     if (used >= output.len) return error.CommandLineTooLong;
     output[used] = 0;
     return used;
+}
+
+pub fn planProfile(request: CommandRequest) ?[]const u8 {
+    return switch (request) {
+        .none, .hardware => null,
+        .xp_resume => "nt5-resume",
+        .xp_staging, .windows2000_staging => "nt5-staging",
+        .windows7_iso, .windows_vista_iso => "windows-pe-bios-iso",
+    };
 }
 
 fn appendCommand(output: *[cmdline_capacity]u8, used: usize, text: []const u8) Error!usize {
@@ -446,9 +461,9 @@ test "Vista enables direct handoff and preserves the actual BIOS boot drive" {
 }
 
 // M0 characterization (docs/design/refactor-os-pipeline.md): the exact
-// micro-Linux command line for every BIOS request kind. A refactor that
-// moves the request to a plan file must keep these bytes until the plan
-// replaces them on purpose.
+// micro-Linux command line for every BIOS request kind. M3 appended the
+// usos.plan_profile token (the only intended change); everything before it
+// is byte-identical to the M0 golden.
 test "golden: exact BIOS micro-Linux command line per request kind" {
     const disk = [_]u8{ 0x75, 0xE1, 0x57, 0x02, 0x85, 0x16, 0x11, 0x43, 0x91, 0xAA, 0x5A, 0x83, 0xD8, 0xEB, 0x41, 0xE5 };
     const base = "console=tty0 console=ttyS0,115200 quiet loglevel=3 vt.global_cursor_default=0 rdinit=/usos-init usos.esp_partuuid=0257e175-1685-4311-91aa-5a83d8eb41e5";
@@ -458,12 +473,12 @@ test "golden: exact BIOS micro-Linux command line per request kind" {
     const cases = [_]Case{
         .{ .request = .none, .expected = base },
         .{ .request = .hardware, .expected = base ++ " usos.legacy_action=hardware" },
-        .{ .request = .xp_resume, .expected = base ++ " usos.legacy_action=xp-resume" },
-        .{ .request = .{ .xp_staging = staged }, .expected = base ++ " usos.legacy_action=xp-staging usos.legacy_image_hex=58502e69736f usos.legacy_unattended_hex=612e736966 usos.bios_boot_drive=81 usos.bios_disks=80:0000000000100000:512" },
-        .{ .request = .{ .xp_staging = plain }, .expected = base ++ " usos.legacy_action=xp-staging usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80" },
-        .{ .request = .{ .windows2000_staging = plain }, .expected = base ++ " usos.legacy_action=windows2000-staging usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80" },
-        .{ .request = .{ .windows7_iso = plain }, .expected = base ++ " kexec_load_disabled=0 usos.legacy_action=windows7-iso usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80" },
-        .{ .request = .{ .windows_vista_iso = plain }, .expected = base ++ " kexec_load_disabled=0 usos.legacy_action=windows-vista-iso usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80" },
+        .{ .request = .xp_resume, .expected = base ++ " usos.legacy_action=xp-resume usos.plan_profile=nt5-resume" },
+        .{ .request = .{ .xp_staging = staged }, .expected = base ++ " usos.legacy_action=xp-staging usos.legacy_image_hex=58502e69736f usos.legacy_unattended_hex=612e736966 usos.bios_boot_drive=81 usos.bios_disks=80:0000000000100000:512 usos.plan_profile=nt5-staging" },
+        .{ .request = .{ .xp_staging = plain }, .expected = base ++ " usos.legacy_action=xp-staging usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80 usos.plan_profile=nt5-staging" },
+        .{ .request = .{ .windows2000_staging = plain }, .expected = base ++ " usos.legacy_action=windows2000-staging usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80 usos.plan_profile=nt5-staging" },
+        .{ .request = .{ .windows7_iso = plain }, .expected = base ++ " kexec_load_disabled=0 usos.legacy_action=windows7-iso usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80 usos.plan_profile=windows-pe-bios-iso" },
+        .{ .request = .{ .windows_vista_iso = plain }, .expected = base ++ " kexec_load_disabled=0 usos.legacy_action=windows-vista-iso usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80 usos.plan_profile=windows-pe-bios-iso" },
     };
     for (cases) |case| {
         var cmdline: [cmdline_capacity]u8 = undefined;
