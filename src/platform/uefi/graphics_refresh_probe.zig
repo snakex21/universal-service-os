@@ -29,7 +29,7 @@ fn run() !void {
     try gop.setMode(large orelse return error.LargeModeMissing);
     const root = @import("filesystem.zig").openBootVolume() orelse return error.NoRoot;
     defer root.close() catch {};
-    view.init(root, .{ .architecture = .x86_64, .firmware = .uefi, .framebuffer = try framebuffer.locate(), .memory = .{ .descriptor_count = 0, .conventional_bytes = 0 } });
+    view.init(root, .{ .architecture = .x86_64, .firmware = .uefi, .framebuffer = try framebuffer.locate(), .memory = .{ .descriptor_count = 0, .conventional_bytes = 0 } }, view.readSettings(root));
     view.windowsIsoStatus(.validating, "Before firmware graphics mode change");
     try gop.setMode(small orelse return error.SmallModeMissing);
     original_blt = gop._blt;
