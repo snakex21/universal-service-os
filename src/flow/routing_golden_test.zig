@@ -29,6 +29,7 @@ const progress = @import("preparation_boot_progress.zig");
 const menu_model = @import("../gui/boot_method_model.zig");
 const golden = @import("../testing/golden.zig");
 const os_profiles = @import("../catalog/os_profiles.zig");
+const plan = @import("plan.zig");
 
 const images = std.enums.values(ImageKind);
 const methods = std.enums.values(BootMethod);
@@ -109,6 +110,37 @@ pub fn render(gpa: std.mem.Allocator) ![]u8 {
     for (&systems.all) |*system| for (images) |image| for (methods) |method| {
         const h = help.describeEntry(system, image, method);
         try out.print(gpa, "help\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\n", .{ system.id, @tagName(image), @tagName(method), h.title, h.line1, h.line2 });
+    };
+
+    try out.appendSlice(gpa, "# profile_def (M2): id backend progress stage labels\n");
+    for (&os_profiles.profiles) |*profile| {
+        try out.print(gpa, "profile_def\t{s}\t{s}\t{s}\t", .{ profile.id, opt(profile.backend), @tagName(profile.progress) });
+        for (plan.stageLabels(profile.progress), 0..) |label, i| try out.print(gpa, "{s}{s}", .{ if (i == 0) "" else "|", label });
+        try out.append(gpa, '\n');
+    }
+
+    try out.appendSlice(gpa, "# plan_state (M2): install-state.ini plan keys for WORK and WIM selections\n");
+    for ([_][]const u8{ "windows-10", "ubuntu" }) |id| {
+        const system = systems.findById(id).?;
+        for ([_]ImageKind{ .iso, .wim }) |image| {
+            const p = plan.make(system, image, .chainload, .uefi) orelse plan.make(system, image, .automatic, .uefi) orelse continue;
+            if (p.profile.progress != .micro_linux) continue;
+            var buffer: [512]u8 = undefined;
+            var lines = std.mem.splitSequence(u8, try p.stateKeys(&buffer), "\r\n");
+            while (lines.next()) |line| if (line.len != 0) try out.print(gpa, "plan_state\t{s}\t{s}\t{s}\n", .{ id, @tagName(image), line });
+        }
+    }
+
+    try out.appendSlice(gpa, "# wimboot (M2): kind external_pe10 nvme answer index injection\n");
+    for (std.enums.values(plan.WimbootKind)) |kind| for ([_]bool{ false, true }) |pe10| for ([_]bool{ false, true }) |nvme| for ([_]bool{ false, true }) |answer| {
+        const legacy = kind == .win7 or kind == .vista;
+        if (!legacy and (pe10 or nvme)) continue;
+        if (kind == .winpe and answer) continue;
+        const wp = plan.wimbootPlan(.{ .kind = kind, .folder = "Windows 11", .answer = answer, .external_pe10 = pe10, .nvme_packages = nvme });
+        for (wp.slice(), 0..) |item, index| {
+            var buffer: [160]u8 = undefined;
+            try out.print(gpa, "wimboot\t{s}\t{s}\t{s}\t{s}\t{d}\t{s}\n", .{ @tagName(kind), flag(pe10), flag(nvme), flag(answer), index, try plan.describe(item, &buffer) });
+        }
     };
 
     try out.appendSlice(gpa, "# progress\n");

@@ -63,6 +63,7 @@ pub const flow = struct {
     pub const boot_next_order = @import("flow/boot_next_order.zig");
     pub const preparation_state = @import("flow/preparation_state.zig");
     pub const preparation_capability = @import("flow/preparation_capability.zig");
+    pub const plan = @import("flow/plan.zig");
     pub const backend_validation = @import("flow/backend_validation.zig");
     pub const boot_method_options = @import("flow/boot_method_options.zig");
     pub const boot_method_help = @import("flow/boot_method_help.zig");
@@ -87,6 +88,7 @@ pub const selftest = struct {
 test {
     _ = @import("flow/routing_golden_test.zig");
     _ = @import("catalog/os_profiles.zig");
+    _ = @import("flow/plan.zig");
     _ = @import("platform/bios/windows_boot_contract.zig");
     _ = @import("platform/bios/windows_cpio.zig");
     _ = windows_iso_config;

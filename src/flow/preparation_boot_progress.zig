@@ -29,6 +29,15 @@ pub const Stage = enum {
 /// chainload, XP staging). The UEFI handoff is stage 1 of these five.
 pub const micro_linux_stage_count: u8 = 5;
 
+/// Equal to boot.prep.stage.1..5 (the micro-Linux progress rows).
+pub const micro_linux_labels = [_][]const u8{
+    "Starting environment",
+    "Verifying target device",
+    "Preparing workspace",
+    "Copying files",
+    "Verification and finalization",
+};
+
 /// Direct Windows Vista/7 ISO start from UEFI: only these three steps run
 /// before Windows PE takes over, so only these three are shown.
 pub const DirectIsoStage = enum(u8) {

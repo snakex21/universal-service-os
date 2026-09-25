@@ -106,6 +106,24 @@ pub const Systems = union(enum) {
     }
 };
 
+/// Which progress page runs the profile's stages, and with which rows.
+pub const Progress = enum {
+    /// Refused selection: nothing runs.
+    none,
+    /// The BIOS Core draws its own screens.
+    core,
+    /// UEFI handoff, then the micro-Linux preparation (WORK, WIM/VHD boot).
+    micro_linux,
+    /// Native wimboot start from the ISO (Windows 7, Vista, 10, 11).
+    direct_iso,
+    /// Windows XP from UEFI: UEFI stage 1, then the NT5 staging.
+    xp_uefi,
+    /// A UEFI application from Images, started directly.
+    efi_image,
+    // Rows: src/flow/plan.zig stageLabels (kept out of the catalog module,
+    // which the BIOS Core also links next to the graphics module).
+};
+
 pub const FirmwareMatch = enum {
     /// Also matches a firmware-less selection (e2e validation, help text).
     any,
@@ -125,6 +143,7 @@ pub const Profile = struct {
     backend: ?Backend,
     /// Rule exists only outside the freestanding BIOS Core.
     host_only: bool = false,
+    progress: Progress,
 
     pub fn matches(self: *const Profile, system: *const SystemEntry, image: ImageKind, method: BootMethod, firmware: ?Firmware) bool {
         if (self.host_only and !native_windows7_enabled) return false;
@@ -147,24 +166,24 @@ const auto_iso_memdisk = &[_]BootMethod{ .automatic, .direct_iso, .memdisk };
 /// ones (the former resolveBackend). First match wins.
 pub const profiles = [_]Profile{
     // ---- UEFI only
-    .{ .id = "xp-x86-sp3-uefi-csm", .systems = .{ .ids = &.{"windows-xp"} }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .xp_uefi_staging },
-    .{ .id = "xp-uefi-other", .systems = .{ .ids = &.{"windows-xp"} }, .firmware = .uefi, .backend = null },
+    .{ .id = "xp-x86-sp3-uefi-csm", .systems = .{ .ids = &.{"windows-xp"} }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .xp_uefi_staging, .progress = .xp_uefi },
+    .{ .id = "xp-uefi-other", .systems = .{ .ids = &.{"windows-xp"} }, .firmware = .uefi, .backend = null, .progress = .none },
     // ---- BIOS only
-    .{ .id = "linux-live-bios", .systems = .{ .ids = &.{"other-linux"} }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .linux_live_iso },
-    .{ .id = "dos-fat16-bios", .systems = .{ .ids = &.{ "ms-dos", "windows-3-1", "windows-3-11" } }, .images = iso, .methods = auto_iso_memdisk, .firmware = .bios, .backend = .dos_bios_iso },
-    .{ .id = "win98se-dos-bios", .systems = .{ .ids = &.{"windows-98-se"} }, .images = iso, .methods = auto_iso_memdisk, .firmware = .bios, .backend = .win9x_dos },
-    .{ .id = "windows-pe-bios-iso", .systems = .{ .ids = &.{ "windows-7", "windows-vista", "windows-10" } }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .windows_bios_iso },
+    .{ .id = "linux-live-bios", .systems = .{ .ids = &.{"other-linux"} }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .linux_live_iso, .progress = .core },
+    .{ .id = "dos-fat16-bios", .systems = .{ .ids = &.{ "ms-dos", "windows-3-1", "windows-3-11" } }, .images = iso, .methods = auto_iso_memdisk, .firmware = .bios, .backend = .dos_bios_iso, .progress = .core },
+    .{ .id = "win98se-dos-bios", .systems = .{ .ids = &.{"windows-98-se"} }, .images = iso, .methods = auto_iso_memdisk, .firmware = .bios, .backend = .win9x_dos, .progress = .core },
+    .{ .id = "windows-pe-bios-iso", .systems = .{ .ids = &.{ "windows-7", "windows-vista", "windows-10" } }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .windows_bios_iso, .progress = .core },
     // ---- any firmware
-    .{ .id = "win7-no-chainload", .systems = .{ .ids = &.{"windows-7"} }, .methods = &.{.chainload}, .backend = null },
-    .{ .id = "nt5-staging", .systems = .nt5_staging, .images = iso, .methods = &.{.automatic}, .backend = .xp_staging },
-    .{ .id = "win10-11-uefi-native", .systems = .{ .native = .modern }, .images = iso, .methods = auto_iso, .backend = .windows_iso },
-    .{ .id = "win7-uefi-native", .systems = .{ .native = .win7 }, .images = iso, .methods = auto_iso, .backend = .windows_iso, .host_only = true },
-    .{ .id = "vista-uefi-pe10", .systems = .{ .native = .vista }, .images = iso, .methods = auto_iso, .backend = .windows_iso, .host_only = true },
-    .{ .id = "iso-work-chainload", .images = iso, .methods = &.{ .automatic, .chainload }, .backend = .chainload },
-    .{ .id = "efi-chainload", .images = &.{.efi}, .methods = &.{.chainload}, .backend = .chainload },
-    .{ .id = "wim-wimboot", .images = &.{.wim}, .methods = &.{ .automatic, .wimboot }, .backend = .wimboot },
-    .{ .id = "vhd-vhdboot", .images = &.{ .vhd, .vhdx }, .methods = &.{ .automatic, .vhdboot }, .backend = .vhdboot },
-    .{ .id = "efi-direct", .images = &.{.efi}, .methods = &.{ .automatic, .direct_efi }, .backend = .direct_efi },
+    .{ .id = "win7-no-chainload", .systems = .{ .ids = &.{"windows-7"} }, .methods = &.{.chainload}, .backend = null, .progress = .none },
+    .{ .id = "nt5-staging", .systems = .nt5_staging, .images = iso, .methods = &.{.automatic}, .backend = .xp_staging, .progress = .core },
+    .{ .id = "win10-11-uefi-native", .systems = .{ .native = .modern }, .images = iso, .methods = auto_iso, .backend = .windows_iso, .progress = .direct_iso },
+    .{ .id = "win7-uefi-native", .systems = .{ .native = .win7 }, .images = iso, .methods = auto_iso, .backend = .windows_iso, .host_only = true, .progress = .direct_iso },
+    .{ .id = "vista-uefi-pe10", .systems = .{ .native = .vista }, .images = iso, .methods = auto_iso, .backend = .windows_iso, .host_only = true, .progress = .direct_iso },
+    .{ .id = "iso-work-chainload", .images = iso, .methods = &.{ .automatic, .chainload }, .backend = .chainload, .progress = .micro_linux },
+    .{ .id = "efi-chainload", .images = &.{.efi}, .methods = &.{.chainload}, .backend = .chainload, .progress = .efi_image },
+    .{ .id = "wim-wimboot", .images = &.{.wim}, .methods = &.{ .automatic, .wimboot }, .backend = .wimboot, .progress = .micro_linux },
+    .{ .id = "vhd-vhdboot", .images = &.{ .vhd, .vhdx }, .methods = &.{ .automatic, .vhdboot }, .backend = .vhdboot, .progress = .micro_linux },
+    .{ .id = "efi-direct", .images = &.{.efi}, .methods = &.{ .automatic, .direct_efi }, .backend = .direct_efi, .progress = .efi_image },
 };
 
 /// The profile that decides this selection, or null when no rule applies.

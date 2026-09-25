@@ -11624,6 +11624,167 @@ help	other-dos	efi	chainload	Chainload	Transfers control to another bootloader i
 help	other-dos	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
 help	other-dos	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
 help	other-dos	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+# profile_def (M2): id backend progress stage labels
+profile_def	xp-x86-sp3-uefi-csm	xp_uefi_staging	xp_uefi	Loading the preparation environment|Detecting disks|Choosing the target disk|Preparing workspace|Copying and verifying files
+profile_def	xp-uefi-other	-	none	
+profile_def	linux-live-bios	linux_live_iso	core	
+profile_def	dos-fat16-bios	dos_bios_iso	core	
+profile_def	win98se-dos-bios	win9x_dos	core	
+profile_def	windows-pe-bios-iso	windows_bios_iso	core	
+profile_def	win7-no-chainload	-	none	
+profile_def	nt5-staging	xp_staging	core	
+profile_def	win10-11-uefi-native	windows_iso	direct_iso	Validating installation ISO|Loading Windows boot files|Starting Windows Setup
+profile_def	win7-uefi-native	windows_iso	direct_iso	Validating installation ISO|Loading Windows boot files|Starting Windows Setup
+profile_def	vista-uefi-pe10	windows_iso	direct_iso	Validating installation ISO|Loading Windows boot files|Starting Windows Setup
+profile_def	iso-work-chainload	chainload	micro_linux	Starting environment|Verifying target device|Preparing workspace|Copying files|Verification and finalization
+profile_def	efi-chainload	chainload	efi_image	
+profile_def	wim-wimboot	wimboot	micro_linux	Starting environment|Verifying target device|Preparing workspace|Copying files|Verification and finalization
+profile_def	vhd-vhdboot	vhdboot	micro_linux	Starting environment|Verifying target device|Preparing workspace|Copying files|Verification and finalization
+profile_def	efi-direct	direct_efi	efi_image	
+# plan_state (M2): install-state.ini plan keys for WORK and WIM selections
+plan_state	windows-10	iso	plan_version=1
+plan_state	windows-10	iso	plan_profile=iso-work-chainload
+plan_state	windows-10	iso	plan_progress=micro_linux
+plan_state	windows-10	iso	plan_stages=Starting environment|Verifying target device|Preparing workspace|Copying files|Verification and finalization
+plan_state	windows-10	wim	plan_version=1
+plan_state	windows-10	wim	plan_profile=wim-wimboot
+plan_state	windows-10	wim	plan_progress=micro_linux
+plan_state	windows-10	wim	plan_stages=Starting environment|Verifying target device|Preparing workspace|Copying files|Verification and finalization
+plan_state	ubuntu	iso	plan_version=1
+plan_state	ubuntu	iso	plan_profile=iso-work-chainload
+plan_state	ubuntu	iso	plan_progress=micro_linux
+plan_state	ubuntu	iso	plan_stages=Starting environment|Verifying target device|Preparing workspace|Copying files|Verification and finalization
+plan_state	ubuntu	wim	plan_version=1
+plan_state	ubuntu	wim	plan_profile=wim-wimboot
+plan_state	ubuntu	wim	plan_progress=micro_linux
+plan_state	ubuntu	wim	plan_stages=Starting environment|Verifying target device|Preparing workspace|Copying files|Verification and finalization
+# wimboot (M2): kind external_pe10 nvme answer index injection
+wimboot	modern_setup	0	0	0	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	modern_setup	0	0	0	1	support \EFI\USOS\windows-native\modern-support.cpio limit=8MiB
+wimboot	modern_setup	0	0	0	2	flag usos-modern-uefi.flag
+wimboot	modern_setup	0	0	0	3	drivers usos-drivers.bin user Drivers\Windows 11 (if any)
+wimboot	modern_setup	0	0	0	4	file usos-source.ini folder=Windows 11
+wimboot	modern_setup	0	0	0	5	boot BCD boot.sdi boot.wim
+wimboot	modern_setup	0	0	1	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	modern_setup	0	0	1	1	support \EFI\USOS\windows-native\modern-support.cpio limit=8MiB
+wimboot	modern_setup	0	0	1	2	flag usos-modern-uefi.flag
+wimboot	modern_setup	0	0	1	3	drivers usos-drivers.bin user Drivers\Windows 11 (if any)
+wimboot	modern_setup	0	0	1	4	file usos-source.ini folder=Windows 11
+wimboot	modern_setup	0	0	1	5	file usos-unattend.xml from Systems\Windows\Windows 11\Unattended
+wimboot	modern_setup	0	0	1	6	boot BCD boot.sdi boot.wim
+wimboot	winpe	0	0	0	0	boot BCD boot.sdi boot.wim
+wimboot	win7	0	0	0	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	win7	0	0	0	1	support \EFI\USOS\windows-native\win7-support.cpio limit=64MiB
+wimboot	win7	0	0	0	2	flag usos-modern-win7.flag
+wimboot	win7	0	0	0	3	drivers usos-drivers.bin bundled+user
+wimboot	win7	0	0	0	4	boot BCD boot.sdi boot.wim
+wimboot	win7	0	0	0	5	file usos-source.ini folder=Windows 7
+wimboot	win7	0	0	1	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	win7	0	0	1	1	support \EFI\USOS\windows-native\win7-support.cpio limit=64MiB
+wimboot	win7	0	0	1	2	flag usos-modern-win7.flag
+wimboot	win7	0	0	1	3	drivers usos-drivers.bin bundled+user
+wimboot	win7	0	0	1	4	boot BCD boot.sdi boot.wim
+wimboot	win7	0	0	1	5	file usos-source.ini folder=Windows 7
+wimboot	win7	0	0	1	6	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
+wimboot	win7	0	1	0	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	win7	0	1	0	1	support \EFI\USOS\windows-native\win7-support.cpio limit=64MiB
+wimboot	win7	0	1	0	2	flag usos-modern-win7.flag
+wimboot	win7	0	1	0	3	flag usos-nvme-packages.flag
+wimboot	win7	0	1	0	4	drivers usos-drivers.bin bundled+user
+wimboot	win7	0	1	0	5	boot BCD boot.sdi boot.wim
+wimboot	win7	0	1	0	6	file usos-source.ini folder=Windows 7
+wimboot	win7	0	1	1	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	win7	0	1	1	1	support \EFI\USOS\windows-native\win7-support.cpio limit=64MiB
+wimboot	win7	0	1	1	2	flag usos-modern-win7.flag
+wimboot	win7	0	1	1	3	flag usos-nvme-packages.flag
+wimboot	win7	0	1	1	4	drivers usos-drivers.bin bundled+user
+wimboot	win7	0	1	1	5	boot BCD boot.sdi boot.wim
+wimboot	win7	0	1	1	6	file usos-source.ini folder=Windows 7
+wimboot	win7	0	1	1	7	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
+wimboot	win7	1	0	0	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	win7	1	0	0	1	support \EFI\USOS\windows-native\win7-support.cpio limit=64MiB
+wimboot	win7	1	0	0	2	flag usos-modern-win7.flag
+wimboot	win7	1	0	0	3	flag usos-external-pe10.flag
+wimboot	win7	1	0	0	4	drivers usos-drivers.bin bundled+user
+wimboot	win7	1	0	0	5	boot BCD boot.sdi boot.wim
+wimboot	win7	1	0	0	6	file usos-source.ini folder=Windows 7
+wimboot	win7	1	0	1	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	win7	1	0	1	1	support \EFI\USOS\windows-native\win7-support.cpio limit=64MiB
+wimboot	win7	1	0	1	2	flag usos-modern-win7.flag
+wimboot	win7	1	0	1	3	flag usos-external-pe10.flag
+wimboot	win7	1	0	1	4	drivers usos-drivers.bin bundled+user
+wimboot	win7	1	0	1	5	boot BCD boot.sdi boot.wim
+wimboot	win7	1	0	1	6	file usos-source.ini folder=Windows 7
+wimboot	win7	1	0	1	7	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
+wimboot	win7	1	1	0	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	win7	1	1	0	1	support \EFI\USOS\windows-native\win7-support.cpio limit=64MiB
+wimboot	win7	1	1	0	2	flag usos-modern-win7.flag
+wimboot	win7	1	1	0	3	flag usos-external-pe10.flag
+wimboot	win7	1	1	0	4	flag usos-nvme-packages.flag
+wimboot	win7	1	1	0	5	drivers usos-drivers.bin bundled+user
+wimboot	win7	1	1	0	6	boot BCD boot.sdi boot.wim
+wimboot	win7	1	1	0	7	file usos-source.ini folder=Windows 7
+wimboot	win7	1	1	1	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	win7	1	1	1	1	support \EFI\USOS\windows-native\win7-support.cpio limit=64MiB
+wimboot	win7	1	1	1	2	flag usos-modern-win7.flag
+wimboot	win7	1	1	1	3	flag usos-external-pe10.flag
+wimboot	win7	1	1	1	4	flag usos-nvme-packages.flag
+wimboot	win7	1	1	1	5	drivers usos-drivers.bin bundled+user
+wimboot	win7	1	1	1	6	boot BCD boot.sdi boot.wim
+wimboot	win7	1	1	1	7	file usos-source.ini folder=Windows 7
+wimboot	win7	1	1	1	8	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
+wimboot	vista	0	0	0	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	vista	0	0	0	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
+wimboot	vista	0	0	0	2	flag usos-modern-vista.flag
+wimboot	vista	0	0	0	3	boot BCD boot.sdi boot.wim
+wimboot	vista	0	0	0	4	file usos-source.ini folder=Windows Vista
+wimboot	vista	0	0	1	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	vista	0	0	1	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
+wimboot	vista	0	0	1	2	flag usos-modern-vista.flag
+wimboot	vista	0	0	1	3	boot BCD boot.sdi boot.wim
+wimboot	vista	0	0	1	4	file usos-source.ini folder=Windows Vista
+wimboot	vista	0	0	1	5	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
+wimboot	vista	0	1	0	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	vista	0	1	0	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
+wimboot	vista	0	1	0	2	flag usos-modern-vista.flag
+wimboot	vista	0	1	0	3	flag usos-nvme-packages.flag
+wimboot	vista	0	1	0	4	boot BCD boot.sdi boot.wim
+wimboot	vista	0	1	0	5	file usos-source.ini folder=Windows Vista
+wimboot	vista	0	1	1	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	vista	0	1	1	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
+wimboot	vista	0	1	1	2	flag usos-modern-vista.flag
+wimboot	vista	0	1	1	3	flag usos-nvme-packages.flag
+wimboot	vista	0	1	1	4	boot BCD boot.sdi boot.wim
+wimboot	vista	0	1	1	5	file usos-source.ini folder=Windows Vista
+wimboot	vista	0	1	1	6	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
+wimboot	vista	1	0	0	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	vista	1	0	0	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
+wimboot	vista	1	0	0	2	flag usos-modern-vista.flag
+wimboot	vista	1	0	0	3	flag usos-external-pe10.flag
+wimboot	vista	1	0	0	4	boot BCD boot.sdi boot.wim
+wimboot	vista	1	0	0	5	file usos-source.ini folder=Windows Vista
+wimboot	vista	1	0	1	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	vista	1	0	1	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
+wimboot	vista	1	0	1	2	flag usos-modern-vista.flag
+wimboot	vista	1	0	1	3	flag usos-external-pe10.flag
+wimboot	vista	1	0	1	4	boot BCD boot.sdi boot.wim
+wimboot	vista	1	0	1	5	file usos-source.ini folder=Windows Vista
+wimboot	vista	1	0	1	6	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
+wimboot	vista	1	1	0	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	vista	1	1	0	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
+wimboot	vista	1	1	0	2	flag usos-modern-vista.flag
+wimboot	vista	1	1	0	3	flag usos-external-pe10.flag
+wimboot	vista	1	1	0	4	flag usos-nvme-packages.flag
+wimboot	vista	1	1	0	5	boot BCD boot.sdi boot.wim
+wimboot	vista	1	1	0	6	file usos-source.ini folder=Windows Vista
+wimboot	vista	1	1	1	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot	vista	1	1	1	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
+wimboot	vista	1	1	1	2	flag usos-modern-vista.flag
+wimboot	vista	1	1	1	3	flag usos-external-pe10.flag
+wimboot	vista	1	1	1	4	flag usos-nvme-packages.flag
+wimboot	vista	1	1	1	5	boot BCD boot.sdi boot.wim
+wimboot	vista	1	1	1	6	file usos-source.ini folder=Windows Vista
+wimboot	vista	1	1	1	7	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
 # progress
 progress	micro_linux	request_saved	1/5 Starting environment - preparation request saved	Preparation request saved
 progress	micro_linux	return_boot_configured	1/5 Starting environment - return boot configured	Return boot configured
