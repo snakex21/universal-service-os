@@ -17,6 +17,7 @@ const splash = @import("splash.zig");
 const touch_driver = @import("touch_driver.zig");
 const uefi_drivers = @import("uefi_drivers.zig");
 const acpi_dump = @import("acpi_dump.zig");
+const theme_loader = @import("theme_loader.zig");
 
 const gui = usos.gui;
 const Ui = gui.ui.Ui;
@@ -25,9 +26,6 @@ const Hint = gui.ui.Hint;
 const screens = gui.menu_screens;
 pub const Key = usos.i18n.Key;
 
-const css_capacity = 2048;
-
-var css_buffer: [css_capacity]u8 = undefined;
 var lang_buffer: [usos.i18n.max_blob_bytes]u8 = undefined;
 var font_pack: ?gui.font.Pack = null;
 var strings: usos.i18n.Table = usos.i18n.Table.english_only;
@@ -93,8 +91,9 @@ pub fn init(root: *std.os.uefi.protocol.File, info: usos.boot_info.BootInfo, set
     boot_timing.mark("lang.bin read and parsed");
     splash.setStrings(&strings);
     splash.status(t(.splash_loading));
-    if (file_read.into(root, "\\UI\\theme.css", &css_buffer)) |css| theme = gui.Theme.parse(css);
-    boot_timing.mark("theme.css read");
+    theme = theme_loader.load(root, settings);
+    splash.setTheme(theme);
+    boot_timing.mark("theme resolved");
 
     runtime_firmware = info.firmware;
     input.setIdleHook(idle);
@@ -138,6 +137,14 @@ fn afterFirstFrame() void {
     input_report.write(root, if (video_surface) |canvas| canvas.framebuffer.width else 0, if (video_surface) |canvas| canvas.framebuffer.height else 0);
     boot_timing.mark("input-devices.txt written (after the menu)");
     boot_timing.report(root, "boot-timing.txt", serial_before);
+}
+
+/// Switches the menu (and the handover splash) to `value`; the next
+/// full screen draws with it.
+pub fn setTheme(value: gui.Theme) void {
+    theme = value;
+    splash.setTheme(value);
+    if (presenter) |*p| p.invalidate();
 }
 
 /// Replaces the screen with the "Starting…" splash before a handover to

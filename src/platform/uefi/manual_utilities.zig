@@ -8,15 +8,16 @@ const system_icons = @import("system_icons.zig");
 const view = @import("manual_view.zig");
 const manual_secure_boot = @import("manual_secure_boot.zig");
 const manual_drivers = @import("manual_drivers.zig");
+const manual_themes = @import("manual_themes.zig");
 
 const max_utilities: usize = usos.catalog.utility_catalog.max_items;
 
 var utility_list: usos.catalog.utility_catalog.List = .{};
 var entries: [max_utilities]usos.catalog.SystemEntry = undefined;
 
-/// Rows 0 and 1 are the built-in Secure Boot and Drivers pages; utilities
-/// from DATA follow.
-const builtin_rows = 2;
+/// Rows 0, 1 and 2 are the built-in Secure Boot, Drivers and Theme pages;
+/// utilities from DATA follow.
+const builtin_rows = 3;
 
 pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_discovery.Discovery, firmware: usos.firmware.Firmware) ?*const usos.catalog.SystemEntry {
     const count = scan(discovery);
@@ -25,6 +26,7 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
     var selectable: [max_utilities + builtin_rows]bool = undefined;
     selectable[0] = true;
     selectable[1] = true;
+    selectable[2] = true;
     var index: usize = 0;
     while (index < count) : (index += 1) {
         const entry = &entries[index];
@@ -40,6 +42,7 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
     var details: [max_utilities]rows_model.DetailBuffer = undefined;
     rows[0] = manual_secure_boot.toolsRow();
     rows[1] = manual_drivers.toolsRow();
+    rows[2] = manual_themes.toolsRow();
     index = 0;
     while (index < count) : (index += 1) {
         const entry = &entries[index];
@@ -55,9 +58,14 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
         switch (navigation.handleSelectable(input.readBlocking(), &selected, total, &list, selectable[0..total])) {
             .activate => {
                 if (selected < builtin_rows) {
-                    if (selected == 0) manual_secure_boot.page() else manual_drivers.page();
+                    switch (selected) {
+                        0 => manual_secure_boot.page(),
+                        1 => manual_drivers.page(),
+                        else => manual_themes.page(root),
+                    }
                     rows[0] = manual_secure_boot.toolsRow();
                     rows[1] = manual_drivers.toolsRow();
+                    rows[2] = manual_themes.toolsRow();
                     list.redrawFull(selected, null);
                     continue;
                 }

@@ -38,6 +38,7 @@ var frame: u32 = 0;
 var pack: ?gui.font.Pack = null;
 var english = usos.i18n.Table.english_only;
 var strings: *const usos.i18n.Table = &english;
+var theme: gui.Theme = .{};
 
 /// The parsed embedded font pack (shared with the menu view).
 pub fn fontPack() ?*const gui.font.Pack {
@@ -58,13 +59,18 @@ pub fn logoSetting(settings: []const u8) Logo {
     return .usos;
 }
 
+/// Colours of the next `begin` (the chosen menu theme).
+pub fn setTheme(value: gui.Theme) void {
+    theme = value;
+}
+
 /// Shows the splash on `framebuffer` (no-op without a linear framebuffer).
 /// `status_text` may be empty: the first status appears once the language
 /// is known (`setStrings`), so the screen never flashes English first.
 pub fn begin(framebuffer: ?usos.boot_info.Framebuffer, logo: Logo, status_text: []const u8) void {
     const fb = framebuffer orelse return;
     const surface = gui.Surface.init(fb) orelse return;
-    ui_state = gui.ui.Ui.init(surface, gui.Theme{}, fontPack(), strings);
+    ui_state = gui.ui.Ui.init(surface, theme, fontPack(), strings);
     var drew_firmware = false;
     if (logo == .firmware) {
         if (firmwareLogo(surface)) |bottom| {
