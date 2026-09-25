@@ -4,22 +4,19 @@ const FirmwareRequirement = @import("../catalog/firmware_requirement.zig").Firmw
 const ImageKind = @import("../catalog/image_kind.zig").ImageKind;
 const SystemEntry = @import("../catalog/system_entry.zig").SystemEntry;
 const systems = @import("../catalog/systems.zig");
-const native_windows7_enabled = @import("builtin").os.tag != .freestanding;
-fn nativeLegacyNt(system_id: []const u8) bool {
-    return native_windows7_enabled and (std.mem.eql(u8, system_id, "windows-7") or std.mem.eql(u8, system_id, "windows-vista"));
-}
+const os_profiles = @import("../catalog/os_profiles.zig");
 
 /// Windows 10 and 11 on UEFI start their own ISO's WinPE through wimboot,
 /// straight from DATA (src/platform/uefi/windows_native_iso.zig): no copy to
 /// WORK. Chainload (the whole ISO copied to WORK) stays selectable.
 pub fn nativeModernNt(system_id: []const u8) bool {
-    return std.mem.eql(u8, system_id, "windows-10") or std.mem.eql(u8, system_id, "windows-11");
+    return os_profiles.traits(system_id).native_uefi == .modern;
 }
 
 /// Systems whose `windows_iso` backend is the native wimboot start on UEFI
 /// (rather than a WORK preparation).
 pub fn nativeUefiIso(system_id: []const u8) bool {
-    return nativeModernNt(system_id) or std.mem.eql(u8, system_id, "windows-7") or std.mem.eql(u8, system_id, "windows-vista");
+    return os_profiles.traits(system_id).native_uefi != .none;
 }
 
 pub const unavailable_reason = "No implemented boot backend supports this selection.";
@@ -60,50 +57,15 @@ pub fn supportsSystem(system_id: []const u8) bool {
     return systems.findById(system_id) != null;
 }
 
+/// Backend for a selection on this firmware; the rules are the profile
+/// table in src/catalog/os_profiles.zig.
 pub fn resolveForFirmware(system: *const SystemEntry, image: ImageKind, method: BootMethod, firmware: @import("../core/firmware.zig").Firmware) ?Backend {
-    if (firmware == .uefi and std.mem.eql(u8, system.id, "windows-xp"))
-        return if (image == .iso and method == .automatic) .xp_uefi_staging else null;
-    if (firmware == .bios and std.mem.eql(u8, system.id, "other-linux") and image == .iso and
-        (method == .automatic or method == .direct_iso)) return .linux_live_iso;
-    if (firmware == .bios and (std.mem.eql(u8, system.id, "ms-dos") or std.mem.eql(u8, system.id, "windows-3-1") or std.mem.eql(u8, system.id, "windows-3-11")) and image == .iso and
-        (method == .automatic or method == .direct_iso or method == .memdisk)) return .dos_bios_iso;
-    if (firmware == .bios and std.mem.eql(u8, system.id, "windows-98-se") and image == .iso and
-        (method == .automatic or method == .direct_iso or method == .memdisk)) return .win9x_dos;
-    if (firmware == .bios and (std.mem.eql(u8, system.id, "windows-7") or std.mem.eql(u8, system.id, "windows-vista") or std.mem.eql(u8, system.id, "windows-10")) and image == .iso and
-        (method == .automatic or method == .direct_iso)) return .windows_bios_iso;
-    return resolveBackend(system, image, method);
+    return os_profiles.backend(system, image, method, firmware);
 }
 
+/// Firmware-independent backend (only the profile rules valid on any firmware).
 pub fn resolveBackend(system: *const SystemEntry, image: ImageKind, method: BootMethod) ?Backend {
-    if (method == .chainload and std.mem.eql(u8, system.id, "windows-7")) return null;
-    const is_xp = system.family == .windows_legacy and
-        (std.mem.eql(u8, system.id, "windows-xp") or std.mem.eql(u8, system.id, "windows-2000"));
-    return switch (method) {
-        .automatic => switch (image) {
-            .iso => if (is_xp)
-                .xp_staging
-            else if (nativeModernNt(system.id) or nativeLegacyNt(system.id))
-                .windows_iso
-            else
-                .chainload,
-            .wim => .wimboot,
-            .vhd, .vhdx => .vhdboot,
-            .efi => .direct_efi,
-            else => null,
-        },
-        .direct_iso => if (image == .iso and (nativeModernNt(system.id) or nativeLegacyNt(system.id)))
-            .windows_iso
-        else
-            null,
-        .wimboot => if (image == .wim) .wimboot else null,
-        .vhdboot => if (image == .vhd or image == .vhdx) .vhdboot else null,
-        .direct_efi => if (image == .efi) .direct_efi else null,
-        .chainload => switch (image) {
-            .iso, .efi => .chainload,
-            else => null,
-        },
-        else => null,
-    };
+    return os_profiles.backend(system, image, method, null);
 }
 
 pub fn resolve(system_id: []const u8, image: ImageKind, method: BootMethod) ?BootMethod {

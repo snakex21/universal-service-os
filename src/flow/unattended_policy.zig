@@ -1,14 +1,15 @@
 const std = @import("std");
 const SystemEntry = @import("../catalog/system_entry.zig").SystemEntry;
 
+const os_profiles = @import("../catalog/os_profiles.zig");
+
+/// Answer-file extension the selection screen lists (profile traits).
 pub fn extension(system: *const SystemEntry) []const u8 {
-    if (std.mem.eql(u8, system.id, "windows-xp") or std.mem.eql(u8, system.id, "windows-2000")) return ".sif";
-    return ".xml";
+    return os_profiles.traits(system.id).answer.extension();
 }
 
 pub fn fileKindLabel(system: *const SystemEntry) []const u8 {
-    if (std.mem.eql(u8, extension(system), ".sif")) return "WINNT.SIF";
-    return "unattend.xml";
+    return os_profiles.traits(system.id).answer.fileKindLabel();
 }
 
 test "Windows XP uses SIF while modern Windows keeps XML" {

@@ -35,11 +35,7 @@ pub const State = enum {
 /// CSMWrap/CSM; Windows 7 and Vista use UefiSeven (int10) and boot managers
 /// that predate Secure Boot.
 pub fn systemRequiresSecureBootOff(system_id: []const u8) bool {
-    const ids = [_][]const u8{ "windows-xp", "windows-7", "windows-vista" };
-    for (ids) |id| {
-        if (std.mem.eql(u8, system_id, id)) return true;
-    }
-    return false;
+    return @import("../catalog/os_profiles.zig").traits(system_id).secure_boot_off;
 }
 
 /// Backend-level check used again right before starting (defence in depth
