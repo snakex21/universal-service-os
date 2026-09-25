@@ -8,11 +8,11 @@
 //!   firmware-less path used by e2e_flow.requestPreparation), the menu rows
 //!   (boot_method_model.collect: label, enabled, selectable, reason, badge,
 //!   status) and the help text, the answer-file policy and the Secure Boot
-//!   block per system, and the progress stage labels.
+//!   block per system, the selected OS profile id, and the progress labels.
 //!
 //! Host build only: in the freestanding BIOS Core, Windows 7/Vista native
 //! ISO routing and their help/validation branches are compiled out (see
-//! `native_windows7_enabled` in preparation_capability.zig).
+//! `native_windows7_enabled` in src/catalog/os_profiles.zig).
 //!
 //! Regenerate after an intended change: USOS_UPDATE_GOLDEN=1 zig build test
 const std = @import("std");
@@ -28,6 +28,7 @@ const help = @import("boot_method_help.zig");
 const progress = @import("preparation_boot_progress.zig");
 const menu_model = @import("../gui/boot_method_model.zig");
 const golden = @import("../testing/golden.zig");
+const os_profiles = @import("../catalog/os_profiles.zig");
 
 const images = std.enums.values(ImageKind);
 const methods = std.enums.values(BootMethod);
@@ -70,6 +71,15 @@ pub fn render(gpa: std.mem.Allocator) ![]u8 {
             });
         } else {
             try out.print(gpa, "route\t{s}\t{s}\t{s}\t{s}\t-\n", .{ system.id, @tagName(image), @tagName(method), @tagName(firmware) });
+        }
+    };
+
+    try out.appendSlice(gpa, "# profile (M1): system image method firmware(-: firmware-less) selected profile id\n");
+    for (&systems.all) |*system| for (images) |image| for (methods) |method| {
+        const choices = [_]?Firmware{ .bios, .uefi, null };
+        for (choices) |firmware| {
+            const profile = os_profiles.select(system, image, method, firmware) orelse continue;
+            try out.print(gpa, "profile\t{s}\t{s}\t{s}\t{s}\t{s}\n", .{ system.id, @tagName(image), @tagName(method), opt(firmware), profile.id });
         }
     };
 
