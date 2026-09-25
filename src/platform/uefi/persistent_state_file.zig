@@ -35,6 +35,8 @@ pub fn write(
     /// Catalog system id (e.g. "windows-10"); micro-Linux's extract.sh takes
     /// the DATA\Drivers folder from it (docs/drivers.md).
     selected_system: ?[]const u8,
+    /// `plan_*` lines from usos.flow.plan.Plan.stateKeys (CRLF-terminated).
+    plan_keys: ?[]const u8,
 ) !void {
     var storage: [max_state_bytes]u8 = @splat('\n');
     var used: usize = 0;
@@ -63,6 +65,7 @@ pub fn write(
         try append(&storage, &used, id);
         try append(&storage, &used, "\r\n");
     }
+    if (plan_keys) |keys| try append(&storage, &used, keys);
 
     const file = try root.open(state_path, .read_write_create, .{});
     defer file.close() catch {};

@@ -42,7 +42,7 @@ pub fn resumePersistent(root: *uefi.protocol.File, progress: ?ResumeProgressFn) 
         .pending => return false,
         .prepare_requested => {
             say("PERSISTENT PHASE PREPARE-REQUESTED RECOVERY: PREVIOUS PREPARATION DID NOT COMMIT PREPARED; RESETTING TO PENDING\n");
-            persistent_state_file.write(root, .pending, null, null, null, null) catch |err| {
+            persistent_state_file.write(root, .pending, null, null, null, null, null) catch |err| {
                 say("PERSISTENT RECOVERY RESET FAIL: ");
                 say(@errorName(err));
                 say("\n");
@@ -74,7 +74,7 @@ pub fn resumePersistent(root: *uefi.protocol.File, progress: ?ResumeProgressFn) 
         .handoff => {
             say("PERSISTENT PHASE HANDOFF RECOVERY TO PREPARED\n");
             const method = persistedMethod(state.selected_method) orelse .direct_iso;
-            persistent_state_file.write(root, .prepared, null, null, method.persistedValue(), null) catch return true;
+            persistent_state_file.write(root, .prepared, null, null, method.persistedValue(), null, null) catch return true;
             if (method == .chainload or method == .wimboot or method == .vhdboot) {
                 handoffChainload(root, method) catch |err| {
                     say("CHAINLOAD HANDOFF RETRY FAIL: ");
@@ -112,8 +112,9 @@ pub fn requestPreparation(
         if (info.content == .winpe) return error.NotAWindowsInstaller;
     }
     // Same profile choice as the boot summary (UEFI rules included).
-    const backend = usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, .uefi) orelse return error.UnsupportedMethod;
-    const resolved_method = backend.method();
+    const plan = usos.flow.plan.make(system, image.kind, method, .uefi) orelse return error.UnsupportedMethod;
+    const resolved_method = plan.backend().method();
+    var plan_keys: [512]u8 = undefined;
     if (resolved_method == .direct_efi) return error.DirectEfiDoesNotUsePreparation;
 
     var iso_path_storage: [512]u8 = undefined;
@@ -124,11 +125,11 @@ pub fn requestPreparation(
         break :blk try dataPath(&unattended_path_storage, directory, name);
     } else null;
 
-    try persistent_state_file.write(root, .prepare_requested, iso_path, unattended_path, resolved_method.persistedValue(), system.id);
+    try persistent_state_file.write(root, .prepare_requested, iso_path, unattended_path, resolved_method.persistedValue(), system.id, try plan.stateKeys(&plan_keys));
     reportProgress(progress, .request_saved);
     say("PERSISTENT PHASE PREPARE-REQUESTED PASS\n");
     const current = boot_next.prepareReturnToCurrentBoot() catch |err| {
-        persistent_state_file.write(root, .pending, null, null, null, null) catch {};
+        persistent_state_file.write(root, .pending, null, null, null, null, null) catch {};
         return err;
     };
     _ = current;
@@ -136,7 +137,7 @@ pub fn requestPreparation(
     say("BOOTORDER BACKUP PASS\n");
     say("BOOTNEXT CURRENT PASS\n");
     startMicroLinux(progress) catch |err| {
-        persistent_state_file.write(root, .pending, null, null, null, null) catch {};
+        persistent_state_file.write(root, .pending, null, null, null, null, null) catch {};
         return err;
     };
 }
@@ -191,20 +192,20 @@ fn handoffWindows(root: *uefi.protocol.File, method: usos.catalog.BootMethod, pr
     say("WINDOWS LOADEDIMAGE CHECK PASS\n");
 
     reportResumeProgress(progress, .committing_windows_handoff);
-    try persistent_state_file.write(root, .handoff, null, null, method.persistedValue(), null);
+    try persistent_state_file.write(root, .handoff, null, null, method.persistedValue(), null, null);
     say("PERSISTENT PHASE HANDOFF PASS\n");
-    try persistent_state_file.write(root, .pending, null, null, null, null);
+    try persistent_state_file.write(root, .pending, null, null, null, null, null);
     say("ONE-SHOT PHASE PENDING PASS\n");
 
     reportResumeProgress(progress, .transferring_to_windows);
     say("WINDOWS STARTIMAGE BEGIN\n");
     const code = verified_image.start(windows_image) catch |err| {
-        persistent_state_file.write(root, .prepared, null, null, method.persistedValue(), null) catch {};
+        persistent_state_file.write(root, .prepared, null, null, method.persistedValue(), null, null) catch {};
         say("WINDOWS STARTIMAGE ERROR; PHASE PREPARED RESTORED\n");
         return err;
     };
     if (code != .success) {
-        persistent_state_file.write(root, .prepared, null, null, method.persistedValue(), null) catch {};
+        persistent_state_file.write(root, .prepared, null, null, method.persistedValue(), null, null) catch {};
         return error.WindowsReturnedError;
     }
 }
@@ -228,15 +229,15 @@ fn handoffChainload(root: *uefi.protocol.File, method: usos.catalog.BootMethod) 
     _ = try work_chainload.checkLoadedImage(chained_image, work.handle);
     say("CHAINLOAD LOADEDIMAGE CHECK PASS\n");
 
-    try persistent_state_file.write(root, .handoff, null, null, method.persistedValue(), null);
-    try persistent_state_file.write(root, .pending, null, null, null, null);
+    try persistent_state_file.write(root, .handoff, null, null, method.persistedValue(), null, null);
+    try persistent_state_file.write(root, .pending, null, null, null, null, null);
     say("CHAINLOAD STARTIMAGE BEGIN\n");
     const code = verified_image.start(chained_image) catch |err| {
-        persistent_state_file.write(root, .prepared, null, null, method.persistedValue(), null) catch {};
+        persistent_state_file.write(root, .prepared, null, null, method.persistedValue(), null, null) catch {};
         return err;
     };
     if (code != .success) {
-        persistent_state_file.write(root, .prepared, null, null, method.persistedValue(), null) catch {};
+        persistent_state_file.write(root, .prepared, null, null, method.persistedValue(), null, null) catch {};
         return error.ChainloadedImageReturnedError;
     }
 }
