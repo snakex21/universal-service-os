@@ -6,7 +6,7 @@ own, byte for byte (the UEFI-CSM differences are branches on
 USOS_PLAN_PROFILE=xp-x86-sp3-uefi-csm, set by pipeline step 100). Never
 modifies production files or ISOs. Does not boot a VM.
 
-  python tools/build_xp_uefi_csm_trial.py [--micro-linux zig-out/micro-linux] [--data L:/] [--out DIR]
+  python tools/build_xp_uefi_csm_trial.py [--micro-linux zig-out/micro-linux] [--data L:/] [--out DIR] [--release]
 """
 from pathlib import Path
 import argparse, gzip, hashlib, json, os, shutil, stat, struct, subprocess
@@ -144,7 +144,24 @@ def is_sp3(iso):
     name=iso.name.lower()
     return 'sp3' in name or 'service_pack_3' in name
 
-def build(micro, data):
+# --release: only these original Microsoft sources get a driver bundle; any
+# other ISO on DATA (e.g. third-party images) is skipped. Stick builds keep
+# taking every SP3 ISO on DATA.
+RELEASE_SOURCES={
+    'bd3234250a6e2f68fbacf0a46cf42a7d711811e428210c0d60649a054f28ff0b':'pl_windows_xp_professional_with_service_pack_3_x86_cd_x14-80476.iso',
+    '62b6c91563bad6cd12a352aa018627c314cfc5162d8e9f8af0756a642e602a46':'en_windows_xp_professional_with_service_pack_3_x86_cd_x14-80428.iso',
+}
+
+def release_selection(supported,hashes):
+    """Allowlisted sources in DATA order; every allowlisted source is required."""
+    chosen=[p for p in supported if hashes[p] in RELEASE_SOURCES]
+    for p in supported:
+        if p not in chosen:print('XP release: skipping source not on the allowlist:',p.name,flush=True)
+    missing=sorted(set(RELEASE_SOURCES)-{hashes[p] for p in chosen})
+    if missing:raise ValueError('XP release: allowlisted source missing on DATA: '+', '.join(RELEASE_SOURCES[h] for h in missing))
+    return chosen
+
+def build(micro, data, release=False):
     """Full package from a micro-Linux build (default zig-out/micro-linux) and
     the XP ISOs of a DATA folder (read only). No stick is read: the per-ISO
     launchers that needed the stick's ESP identity are gone (the UEFI menu
@@ -161,13 +178,16 @@ def build(micro, data):
     if not supported:raise ValueError('XP SP3 source required for modern driver integration')
     # One work folder per source ISO content (not per list position), so a
     # bundle always rebuilds from, and is checked against, its own source.
-    sources=[{'name':p.name,'sha256':digest(p),'size':p.stat().st_size} for p in supported]
+    hashes={p:digest(p) for p in supported}
+    if release:supported=release_selection(supported,hashes)
+    sources=[{'name':p.name,'sha256':hashes[p],'size':p.stat().st_size} for p in supported]
     driver_bundles=[build_driver_overlay(p,OUT/'drivers'/s['sha256']) for p,s in zip(supported,sources)]
     for s,(bundle_id,_) in zip(sources,driver_bundles):s['bundle']=bundle_id
     init=OUT/'initramfs-xp';init.write_bytes(overlay(base,helper,driver_bundles))
     shutil.copyfile(kernel,OUT/'vmlinuz.efi')
     for stale in OUT.glob('XP-SP*-UEFI-CSM-PAE.efi'):stale.unlink()
-    metadata={'experimental':True,'driver_bundles':[n for n,_ in driver_bundles],'driver_supported_sources':[p.name for p in supported],'driver_sources':sources,'firmware':'UEFI preparation; XP through firmware CSM','hardware_verified':False,'base_initramfs_sha256':digest(base),'base_kernel_sha256':digest(kernel),'launchers':[],'iso_names':[i.name for i in images],'profile':'xp-x86-sp3-uefi-csm','sha256':{p.name:digest(p) for p in [init,OUT/'vmlinuz.efi',helper]}}
+    metadata={'experimental':True,'driver_bundles':[n for n,_ in driver_bundles],'driver_supported_sources':[p.name for p in supported],'driver_sources':sources,'firmware':'UEFI preparation; XP through firmware CSM','hardware_verified':False,'base_initramfs_sha256':digest(base),'base_kernel_sha256':digest(kernel),'launchers':[],'iso_names':[i.name for i in (supported if release else images)],'profile':'xp-x86-sp3-uefi-csm','sha256':{p.name:digest(p) for p in [init,OUT/'vmlinuz.efi',helper]}}
+    if release:metadata['release']=True
     (OUT/'manifest.json').write_text(json.dumps(metadata,indent=2)+'\n')
     print('XP_UEFI_CSM_TRIAL_BUILT; base scripts unchanged (profile xp-x86-sp3-uefi-csm); no VM/E2E',flush=True)
 if __name__=='__main__':
@@ -176,6 +196,7 @@ if __name__=='__main__':
     p.add_argument('--data',type=Path,default=Path('L:/'),help='DATA folder with Systems/Windows/Windows XP/Images (read only)')
     p.add_argument('--out',type=Path,default=OUT,help='package folder (default zig-out/xp-uefi-csm)')
     p.add_argument('--esp',type=Path,default=Path('J:/'),help='--refresh-pae-flow only: ESP whose base the package was built from')
+    p.add_argument('--release',action='store_true',help='release package: only the RELEASE_SOURCES SHA-256 allowlist (original PL x14-80476 and EN x14-80428)')
     mode=p.add_mutually_exclusive_group();mode.add_argument('--menu-only',action='store_true');mode.add_argument('--add-source',type=Path);mode.add_argument('--refresh-pae-flow',action='store_true');a=p.parse_args()
     OUT=a.out.resolve()
     if a.menu_only:
@@ -184,4 +205,4 @@ if __name__=='__main__':
         print('PASS: Zig UEFI menu build and Zig tests; no BIOS build or VM/E2E')
     elif a.add_source:add_driver_source(a.add_source)
     elif a.refresh_pae_flow:refresh_pae_flow(a.esp)
-    else:build(a.micro_linux.resolve(),a.data)
+    else:build(a.micro_linux.resolve(),a.data,a.release)
