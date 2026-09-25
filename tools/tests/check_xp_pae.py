@@ -61,7 +61,17 @@ text=staged.read_text('latin1').replace('\r\n','\n').splitlines()
 assert ini.read_bytes()==original
 assert 'timeout=0' in text and 'timeout=30' not in text
 osi=text.index('[operating systems]')
-assert text[osi+1].startswith('multi(0)disk(0)rdisk(0)partition(1)\\WINDOWS="Windows XP - USOS PAE (experimental)"') and '/kernel=usospae.exe /hal=usoshal.dll' in text[osi+1]
+assert text[osi+1].startswith('multi(0)disk(0)rdisk(0)partition(1)\\WINDOWS="Windows XP - USOS PAE (experimental)"') and '/kernel=xpkrnpae.exe /hal=xphalpae.dll' in text[osi+1]
+# NTLDR and the kernel match boot switches as substrings of the upper-cased
+# options: the entry must not contain any switch it does not intend (v4's
+# usospae.exe/usoshal.dll contained "SOS" and enabled /SOS on every boot).
+options=text[osi+1].split('"')[2].upper()
+for switch in ('SOS','NOGUIBOOT','BOOTLOG','BASEVIDEO','SAFEBOOT','DEBUG','3GB','ONECPU','NUMPROC','MAXMEM','BURNMEMORY','NOPAE','REDIRECT','USERVA','NOLOWMEM'):
+    assert switch not in options,(switch,options)
+assert options.split()==['/FASTDETECT','/PAE','/NOEXECUTE=OPTIN','/KERNEL=XPKRNPAE.EXE','/HAL=XPHALPAE.DLL'],options
+# An install that already has the v4 entry is left alone (not a second entry).
+v4=staged.read_bytes().replace(b'xpkrnpae.exe',b'usospae.exe').replace(b'xphalpae.dll',b'usoshal.dll')
+v4ini=out/'boot-test-v4.ini';v4ini.write_bytes(v4);assert api.entry_present(os.fsencode(v4ini))
 assert text[osi+2]=='multi(0)disk(0)rdisk(0)partition(1)\\WINDOWS="Microsoft Windows XP Professional" /noexecute=optin /fastdetect'
 assert api.entry_present(os.fsencode(staged))
 # Re-staging overwrites a stale staged file instead of failing.

@@ -69,11 +69,23 @@ static BOOL patch(const char *input,const char *output,BOOL hal){
     sum=(sum&0xffff)+(sum>>16);pe->OptionalHeader.CheckSum=sum+n;
     ok=writefile(output,b,n);GlobalFree(b);return ok;
 }
-/* Case-insensitive: does boot.ini already carry the USOS PAE entry? */
+/* Kernel and HAL copies. NTLDR and the kernel look for boot options as
+   SUBSTRINGS of the upper-cased load options (strstr(options,"SOS") and so
+   on), so the file names must not contain a switch name: v4's
+   /kernel=usospae.exe /hal=usoshal.dll contain "SOS" and turned on /SOS
+   (driver list and text instead of the XP logo on every boot). */
+#define PAE_KERNEL "xpkrnpae.exe"
+#define PAE_HAL "xphalpae.dll"
+static BOOL contains_ci(const BYTE *b,DWORD n,const char *needle){
+    DWORD k=lstrlenA(needle);
+    for(DWORD i=0;i+k<=n;i++){DWORD j=0;while(j<k){BYTE c=b[i+j];if(c>='A'&&c<='Z')c+=32;if(c!=(BYTE)needle[j])break;j++;}if(j==k)return TRUE;}
+    return FALSE;
+}
+/* Case-insensitive: does boot.ini already carry a USOS PAE entry (v5, or the
+   v4 entry of an earlier install, which is left as it is)? */
 static BOOL pae_entry_present(const char *ini){
     DWORD n=0;BYTE *b=readfile(ini,&n);if(!b)return FALSE;
-    static const char needle[]="/kernel=usospae.exe";DWORD k=sizeof(needle)-1;BOOL found=FALSE;
-    for(DWORD i=0;!found&&i+k<=n;i++){DWORD j=0;while(j<k){BYTE c=b[i+j];if(c>='A'&&c<='Z')c+=32;if(c!=(BYTE)needle[j])break;j++;}found=j==k;}
+    BOOL found=contains_ci(b,n,"/kernel=" PAE_KERNEL)||contains_ci(b,n,"/kernel=usospae.exe");
     GlobalFree(b);return found;
 }
 /* Write staged = boot.ini with the PAE entry first in [operating systems] and
@@ -96,7 +108,7 @@ static BOOL stage_bootini(const char *ini,const char *staged){
         if(line_len>=19&&line_len<=20){char line[24]={0};for(DWORD j=0;j<line_len;j++)line[j]=old[i+j];if(line[line_len-1]=='\r')line[line_len-1]=0;
             if(lstrcmpiA(line,"[operating systems]")==0){
                 if(inserted){GlobalFree(out);GlobalFree(old);logline("REFUSED: duplicate operating systems section");return FALSE;}
-                p+=wsprintfA(out+p,"%s=\"Windows XP - USOS PAE (experimental)\" /fastdetect /pae /noexecute=optin /kernel=usospae.exe /hal=usoshal.dll\r\n",arc);inserted=TRUE;
+                p+=wsprintfA(out+p,"%s=\"Windows XP - USOS PAE (experimental)\" /fastdetect /pae /noexecute=optin /kernel=" PAE_KERNEL " /hal=" PAE_HAL "\r\n",arc);inserted=TRUE;
             }}i=end<n?end+1:end;
     }
     DeleteFileA(staged);
@@ -128,7 +140,7 @@ static int run(BOOL fallback){
     if(!GetSystemDirectoryA(system,sizeof(system))||lstrlenA(system)>200||system[1]!=':')return RUN_FAILED;
     wsprintfA(kernel,"%s\\ntkrnlpa.exe",system);wsprintfA(hal,"%s\\hal.dll",system);
     /* Own output names: no Setup- or WFP-protected file is replaced or created. */
-    wsprintfA(newkernel,"%s\\usospae.exe",system);wsprintfA(newhal,"%s\\usoshal.dll",system);
+    wsprintfA(newkernel,"%s\\" PAE_KERNEL,system);wsprintfA(newhal,"%s\\" PAE_HAL,system);
     wsprintfA(ini,"%c:\\boot.ini",system[0]);wsprintfA(backup,"%c:\\USOS\\XP\\boot-original.ini",system[0]);
     wsprintfA(staged,"%c:\\USOS\\XP\\boot-pae.ini",system[0]);
     if(pae_entry_present(ini)){logline("PAE entry already present in boot.ini; nothing changed");return RUN_ALREADY;}
@@ -205,7 +217,7 @@ static void open_log(void){
 void entry(void){
     int mode=parse_mode(GetCommandLineA());
     open_log();
-    logline("USOS XP PAE v4: originals retained; separate kernel/HAL; no host patching; crash dump off");
+    logline("USOS XP PAE v5: originals retained; separate kernel/HAL (xpkrnpae.exe, xphalpae.dll); no host patching; crash dump off");
     logline(mode==MODE_FIRST_LOGON?"path=first-logon (GuiRunOnce check)":mode==MODE_INTERACTIVE?"path=interactive":"path=setup-end (UserExecute, silent)");
     int r=run(mode==MODE_FIRST_LOGON);
     if(r==RUN_ENABLED)logline(mode==MODE_FIRST_LOGON?"RESULT: enabled by FIRST-LOGON FALLBACK; restart required":"RESULT: PAE ENTRY READY; default entry, timeout=0; used from the next boot");
