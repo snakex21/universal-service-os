@@ -19,7 +19,7 @@ pub fn describe(system_id: []const u8, image: ImageKind, method: BootMethod) Hel
 pub fn describeEntry(system: *const SystemEntry, image: ImageKind, method: BootMethod) Help {
     // The direct Win7 WIMBoot implementation is UEFI-only. Keep its extra help
     // outside the size-limited, freestanding 32-bit BIOS Core.
-    if (@import("builtin").os.tag != .freestanding and std.mem.eql(u8, system.id, "windows-7") and image == .iso and (method == .automatic or method == .direct_iso)) return .{
+    if (@import("builtin").os.tag != .freestanding and @import("../catalog/os_profiles.zig").traits(system.id).native_uefi == .win7 and image == .iso and (method == .automatic or method == .direct_iso)) return .{
         .title = "Windows ISO - WIMBoot UEFI",
         .line1 = "Detects the installer version and starts it directly from ISO in UEFI.",
         .line2 = "WinPE 7 receives UEFI compatibility and optional Drivers/x64 packages in RAM.",

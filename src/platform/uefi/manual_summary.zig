@@ -68,7 +68,8 @@ pub fn show(
     var count_text: [100]u8 = undefined;
     var number_text: [12]u8 = undefined;
     var user_text: [120]u8 = undefined;
-    const vista = std.mem.eql(u8, system.id, "windows-vista");
+    const native = usos.catalog.os_profiles.traits(system.id).native_uefi;
+    const vista = native == .vista;
     const modern_native = image.kind == .iso and backend == .windows_iso and usos.flow.preparation_capability.nativeModernNt(system.id);
     var modern_pe_text: [96]u8 = undefined;
     var modern_driver_text: [120]u8 = undefined;
@@ -93,7 +94,7 @@ pub fn show(
             note_count += 1;
         }
     }
-    if (image.kind == .iso and (vista or std.mem.eql(u8, system.id, "windows-7"))) {
+    if (image.kind == .iso and native.legacyPe()) {
         if (windows_native_iso.inspect(image.name.slice(), vista)) |inspection| {
             fields.add(view.t(.summary_iso_case), if (vista) view.t(.summary_vista_case) else inspection.mode.label());
             fields.add(view.t(.summary_boot_source), inspection.bootName(image.name.slice()));
@@ -196,8 +197,9 @@ fn start(
         };
         return;
     }
-    const vista = std.mem.eql(u8, system.id, "windows-vista");
-    if (image.kind == .iso and (vista or std.mem.eql(u8, system.id, "windows-7")) and resolved == .direct_iso) {
+    const native = usos.catalog.os_profiles.traits(system.id).native_uefi;
+    const vista = native == .vista;
+    if (image.kind == .iso and native.legacyPe() and resolved == .direct_iso) {
         view.windowsIsoStatus(.validating, "Reading the selected Windows ISO");
         windows_native_iso.start(root, image.name.slice(), unattended, vista, view.windowsIsoStatus) catch |err| {
             view.refreshFramebuffer();

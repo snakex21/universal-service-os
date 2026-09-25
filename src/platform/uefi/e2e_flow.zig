@@ -111,7 +111,9 @@ pub fn requestPreparation(
         if (usos.image_probe.windows_media.block(info, @import("windows_media_probe.zig").firmware()) != null) return error.ImageArchitectureNotSupportedHere;
         if (info.content == .winpe) return error.NotAWindowsInstaller;
     }
-    const resolved_method = usos.flow.preparation_capability.resolve(system.id, image.kind, method) orelse return error.UnsupportedMethod;
+    // Same profile choice as the boot summary (UEFI rules included).
+    const backend = usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, .uefi) orelse return error.UnsupportedMethod;
+    const resolved_method = backend.method();
     if (resolved_method == .direct_efi) return error.DirectEfiDoesNotUsePreparation;
 
     var iso_path_storage: [512]u8 = undefined;
