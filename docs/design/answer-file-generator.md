@@ -372,3 +372,72 @@ złym dysku (E2B ma wprost próbki `ZZDANGER_Auto_WipeDisk0`). Zasady:
 6. Tryb „dysk wybrany w USOS” z pomocnikiem WinPE.
 7. 98 `msbatch.inf` (po weryfikacji kluczy w VM), Vista (scalanie z
    odpowiedzią serwisową), 2003/XP x64 razem z rodziną NT5.
+
+## 9. Generator Schneegansa (dodane 2026-09-25)
+
+Użytkownik korzysta z <https://schneegans.de/windows/unattend-generator/>.
+Źródło: <https://github.com/cschneegans/unattend-generator>, biblioteka
+C#/.NET Core (katalogi `modifier/` i `resource/` z szablonami XML).
+**Licencja: MIT** (plik `LICENSE.txt` w repozytorium, sprawdzone na stronie
+GitHub 2026-09-25). MIT pozwala na użycie i przetwarzanie z zachowaniem
+noty o prawach autorskich i tekstu licencji.
+
+Decyzje:
+
+- **Nie osadzamy jego kodu ani .NET.** USOS nie dostaje zależności od
+  runtime .NET ani kopii biblioteki. Wykorzystujemy **wiedzę**: katalog
+  ustawień (co generator umie ustawić i pod jakimi nazwami) i kształt XML
+  dla każdej wersji Windows (pass, komponent, element). Jeżeli
+  przenosimy konkretne fragmenty (np. tabelę ustawień albo szablon XML)
+  do naszego kodu lub danych, dołączamy notę MIT i link do źródła
+  (plik `THIRD_PARTY` / `licenses/unattend-generator/LICENSE`, wzorem
+  `EFI/USOS/licenses/`). Sprawdzić licencję ponownie przed każdym takim
+  przeniesieniem; przy zmianie licencji na niezgodną zostaje tylko
+  zgodność formatu, bez kopiowania.
+- **Pliki z generatora Schneegansa muszą działać jako importowane pliki
+  odpowiedzi** (tryb „plik użytkownika 1:1” z sekcji 4 i baza do
+  scalania). Przypadek odniesienia: plik użytkownika
+  `L:\Systems\Windows\Windows 10\Unattended\win10-11 best-ustawienia.xml`
+  (sprawdzona kopia o tej samej nazwie w
+  `zig-out/usb/Systems/Windows/Windows 11/Unattended/`, 69 764 B):
+  - brak `DiskConfiguration` (wybór dysku zostaje w Setup, zgodnie
+    z sekcją 5),
+  - wszystkie 6 komponentów z `processorArchitecture="amd64"`,
+  - wszystkie 7 przebiegów (`windowsPE` … `oobeSystem`, także `audit*`),
+  - generyczny klucz edycji w `ProductKey` (nie tajny, ale i tak nie
+    logujemy treści),
+  - komentarz z pełnym adresem URL generatora z parametrami
+    (`...unattend-generator/?LanguageMode=...&ProcessorArchitecture=amd64...`)
+    i skryptami PowerShell zakodowanymi w URL. Import może z niego
+    odczytać ustawienia do podglądu, ale **nigdy go nie wykonuje** ani nie
+    przepisuje; plik idzie 1:1.
+  Test regresji: wektor z tym plikiem (lub jego zanonimizowaną kopią) przez
+  całą ścieżkę 10/11 (WORK i natywny wimboot), porównanie bajtowe
+  `Autounattend.xml` / `usos-unattend.xml` z oryginałem.
+- **Ostrzeżenie o architekturze.** Plik tylko z komponentami `amd64`
+  użyty z nośnikiem x86 (albo odwrotnie) nie robi nic: Setup pomija
+  komponenty o innej architekturze bez komunikatu. Podsumowanie startu
+  porównuje zbiór `processorArchitecture` z pliku z architekturą obrazu
+  (`MediaInfo.arch`, już wykrywaną z `boot.wim`) i pokazuje ostrzeżenie
+  (nie blokadę). Przypadek z X470 2026-09-25 (ISO Windows 10 x86) jest
+  dokładnie tym scenariuszem.
+- **Pełny kreator w instalatorze Go (Win32).** Ekran „Pliki odpowiedzi”
+  instalatora dostaje pełny formularz (wzorowany na katalogu ustawień
+  Schneegansa, w naszej kolejności) i zapisuje wynik do
+  `DATA\Systems\Windows\<system>\Unattended\`. To główna droga do
+  bogatych ustawień.
+- **Szybka opcja w menu USOS na urządzeniu:** tylko nazwa konta, język
+  (UI, locale, klawiatura, strefa czasowa z jednego wyboru) i „ręczny
+  wybór dysku” (brak `DiskConfiguration`). Plik jest generowany **w
+  chwili startu** (just in time) do RAM-dysku wimboot / WORK, bez zapisu
+  na DATA (menu czyta DATA tylko do odczytu, sekcja 0).
+- **Jeden model ustawień**, tłumaczony na `WINNT.SIF` dla XP/2000 i na
+  `autounattend.xml` dla 7/10/11 (tabela z sekcji 1 jest jego pierwszą
+  wersją). Model żyje w danych współdzielonych przez Zig (menu) i Go
+  (instalator), sprawdzanych testem zgodności jak `os_profiles`.
+- **Zakres na start: najczęściej używane opcje**: konto lokalne (nazwa,
+  opcjonalne hasło), język/region/klawiatura/strefa, nazwa komputera,
+  pominięcie ekranów OOBE i kont online, obejścia wymagań Win11
+  (jawnie), edycja z `install.wim`. Kosmetyka (pasek zadań, menu Start,
+  usuwanie aplikacji, skrypty) tylko przez import pliku albo kreator w Go,
+  później.
