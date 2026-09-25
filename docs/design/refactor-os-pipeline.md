@@ -1,6 +1,6 @@
 # Refaktor: wspólny pipeline systemów operacyjnych (projekt, 2026-09-24)
 
-Stan: **M0–M3 zrobione** na gałęzi `refactor/os-pipeline` (2026-09-25),
+Stan: **M0–M3 zrobione, M4 zrobione w QEMU (czeka na test na X470)** na gałęzi `refactor/os-pipeline` (2026-09-25),
 bez zmiany zachowania. Pozycja N2 w [ROADMAP.md](../ROADMAP.md).
 
 Postęp:
@@ -27,6 +27,22 @@ Postęp:
   (kroki są grube); sprawdzanie kolejności w `run.sh` dopiero przy rozbiciu
   kroków. Uwaga: zmiana `usos-init` zmienia bazę pakietu XP UEFI-CSM, więc
   po scaleniu trzeba go przebudować (M4 usuwa tę zależność).
+- M4 (QEMU): skrypty NT5 same obsługują profil `xp-x86-sp3-uefi-csm`
+  (`USOS_PLAN_PROFILE`): ścieżki `EFI/USOS-XP`, geometria 255/63, preflight
+  i integracja sterowników, PAE, weryfikacja read-only,
+  `xp_selected_partition_uefi_csm.sif`; `build_xp_uefi_csm_trial.py` tylko
+  **dodaje** pae.exe, licencję i pakiety sterowników do bazy
+  (`--micro-linux`, domyślnie `zig-out/micro-linux`), bez sticka; launchery
+  per ISO usunięte. Kryterium: `tools/tests/target_digest.py` — dysk
+  przygotowany przez pakiet M4 identyczny z baseline (UEFI-CSM 7009 plików),
+  profil BIOS NT5 identyczny przed/po (6976 plików), pakiet PL powtarzalny
+  i 0 niewyjaśnionych różnic względem wdrożonego; pakiet EN (x14-80428)
+  zbudowany tą samą metodą, tryb tekstowy do kopiowania
+  ([../research/xp-package-language-2026-09-25.md](../research/xp-package-language-2026-09-25.md)).
+  Odłożone: pakiet w `payload.zip` (pakiety sterowników zależą od ISO
+  użytkownika; zgodnie z decyzją 2026-09-25 PL jest gotowy, inne ISO
+  zbuduje instalator po porcie do Go); drugi wpis „XP (poprzedni pakiet)”.
+  Wymagany test na X470 (czysta instalacja, PAE) przed scaleniem.
 Powiązane: [answer-file-generator.md](answer-file-generator.md),
 [nt5-uefi-family.md](nt5-uefi-family.md), [drivers.md](../drivers.md),
 [BOOT_FLOW.md](../../BOOT_FLOW.md), [ARCHITECTURE.md](../../ARCHITECTURE.md).
