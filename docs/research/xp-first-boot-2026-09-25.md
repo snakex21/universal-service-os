@@ -104,3 +104,31 @@ v4 startował jak z `/SOS` (tekstowy ekran), a autochk zniknął razem z tą
 zmianą; mechanizm pozostaje niepotwierdzony. Jeśli wróci: `fsutil dirty query
 C:` po zalogowaniu i przed zamknięciem, `chkntfs C:`, BootExecute, zdarzenia
 Ntfs/Disk w Podglądzie zdarzeń.
+
+## Jednorazowy STOP 0x0A po resecie (X470, test 2)
+
+Kontekst: pierwsza sesja po instalacji EN x14-80428 (build B260925-190925),
+przycisk RESET na obudowie (twardy reset), niebieski ekran przy **następnym**
+starcie: `IRQL_NOT_LESS_OR_EQUAL`, STOP 0x0000000A (0x0D939AEC, 0x00000002,
+0x00000000, 0x8050923A). Kolejne resety bez błędu; **nie da się powtórzyć**,
+analiza przerwana.
+
+Co wiadomo: przy zwykłej bazie jądra XP SP3 (0x804D7000) adres 0x8050923A to
+RVA 0x3223A w `ntkrpamp.exe` 5.1.2600.5512 = `MmMapLockedPagesSpecifyCache+0x214`,
+instrukcja `mov edx,[ebx+0Ch]` z `ebx = PFN*0x1C + MmPfnDatabase` (odczyt
+atrybutu cache z bazy PFN). Odczyt spod 0x0D939AEC przy IRQL 2 oznacza PFN
+spoza bazy PFN w MDL, które sterownik mapował na DISPATCH_LEVEL (sterownik
+nazwany nie jest, bo IP jest w jądrze). Kandydaci bez rozstrzygnięcia:
+sterowniki DMA po ciepłym resecie (backport usbxhci/ucx01000, GenAHCI przez
+ntoskrn8, karta sieciowa/GPU), acpi.sys 7777.8. VirtualBox (PL i EN, 6 GB,
+`controlvm reset` na ekranie powitalnym) nie odtworzył błędu.
+
+Zrzut pamięci: `CrashDumpEnabled` zostaje **0**. STOP 0x50 w
+`dump_ntoskrn8.sys` z 2026-09-22 wystąpił przy `CrashDumpEnabled=3`, czyli
+właśnie przy małym zrzucie (64 KB): stos zrzutu (kopia `dump_` sterowników
+dysku z importem ntoskrn8) jest ładowany przy starcie niezależnie od rozmiaru
+zrzutu, a wymuszone wyłączenie po tym STOP zostawiło wyzerowane pliki WinSxS.
+Mały zrzut nie jest więc bezpieczny na tym stosie sterowników. Komentarz w
+`windows_xp_pae.c` („full dump”) jest nieprecyzyjny: chodziło o stos zrzutu,
+nie o jego rozmiar. Zanim zrzuty zostaną włączone, stos trzeba sprawdzić w
+QEMU z AHCI + GenAHCI (np. `CrashOnCtrlScroll` na klawiaturze PS/2).
