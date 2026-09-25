@@ -83,7 +83,7 @@ class Pipeline(unittest.TestCase):
             with self.subTest(action=action, token=token, uefi=uefi):
                 out = self.run_pipeline(action, token, uefi)
                 self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
-                self.assertIn('[PIPELINE] ' + resolved, out.stdout)
+                self.assertIn('[PIPELINE] ' + resolved + ' source=' + ('cmdline' if token else 'action') + chr(10), out.stdout)
                 self.assertIn(ran, out.stdout)
         # windows-pe-bios-iso continues into the WORK body after its request.
         out = self.run_pipeline('windows7-iso')

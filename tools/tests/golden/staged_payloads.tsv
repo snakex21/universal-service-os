@@ -23,7 +23,7 @@ initramfs	usr/lib/usos/partuuid.sh	100755	717393ba57556d5e9b11bcc545f36738c07cf4
 initramfs	usr/lib/usos/partuuid_diagnostics.sh	100755	a44c0ab7e222998cd56b205a9ce6c0f40319b8853ebae90ac533427db0c10c37
 initramfs	usr/lib/usos/pe-file-version	100755	76488c8bca34de00e502afa467cc77a7ce6af90235c467a89d23bb076f3d27da
 initramfs	usr/lib/usos/pipeline	40755	dir
-initramfs	usr/lib/usos/pipeline/run.sh	100755	81c1b58de378791a1a133e318ee90feb9c9bfa5722dc06ecaeed71a4fe4326bd
+initramfs	usr/lib/usos/pipeline/run.sh	100755	967ed2a52583764601d64d2a70d5dd0faf82680ff04d97c92b0c2f7ee12e80e2
 initramfs	usr/lib/usos/pipeline/steps	40755	dir
 initramfs	usr/lib/usos/pipeline/steps/100_nt5_staging.sh	100755	c37627124e58eb807f2bc598b9b57066be851dd9017ae892d5b7fabfd4cf5a70
 initramfs	usr/lib/usos/pipeline/steps/150_nt5_resume.sh	100755	294d3c34d5fc54c0d779fa07d57f9ef4aa46fba1a3acfa7ab4f30bd5ac462d81

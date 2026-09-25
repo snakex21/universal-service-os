@@ -99,7 +99,9 @@ usos_pipeline_resolve_action() {
     USOS_PLAN_PROFILE=$_pl_profile
     USOS_PLAN_STEPS=$_pl_steps
     export USOS_PLAN_PROFILE USOS_PLAN_STEPS
-    usos_pipeline_log "profile=$_pl_profile steps=$_pl_steps source=${_pl_token:+cmdline}${_pl_token:-action}"
+    _pl_source=action
+    [ -z "$_pl_token" ] || _pl_source=cmdline
+    usos_pipeline_log "profile=$_pl_profile steps=$_pl_steps source=$_pl_source"
 }
 
 # Runs the resolved steps. Returns 0 when step 200 is reached (the caller
