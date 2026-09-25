@@ -85,6 +85,7 @@ pub const selftest = struct {
 };
 
 test {
+    _ = @import("flow/routing_golden_test.zig");
     _ = @import("platform/bios/windows_boot_contract.zig");
     _ = @import("platform/bios/windows_cpio.zig");
     _ = windows_iso_config;
