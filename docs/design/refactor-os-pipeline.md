@@ -1,6 +1,21 @@
 # Refaktor: wspólny pipeline systemów operacyjnych (projekt, 2026-09-24)
 
-Stan: **projekt**, bez kodu. Pozycja N2 w [ROADMAP.md](../ROADMAP.md).
+Stan: **M0, M1 i M2 zrobione** na gałęzi `refactor/os-pipeline` (2026-09-25),
+bez zmiany zachowania. Pozycja N2 w [ROADMAP.md](../ROADMAP.md).
+
+Postęp:
+- M0: `src/flow/testdata/routing_golden.tsv` (tabela prawdy, `USOS_UPDATE_GOLDEN=1
+  zig build test`), dokładna linia poleceń BIOS, `tools/tests/golden/staged_payloads.py`
+  (odciski initramfs, pakietu XP UEFI-CSM z `zig-out`, archiwów WinPE, `WINNT.SIF`),
+  `check_xp_pae.py` bez sticka.
+- M1: `src/catalog/os_profiles.zig` (cechy systemów + uporządkowane reguły);
+  rozstrzyganie, polityki, podsumowanie i `e2e_flow` pytają profil.
+- M2: `src/flow/plan.zig`: plan (klucze `plan_*` w `install-state.ini`, na razie
+  nieczytane przez mikro-Linuksa), etapy postępu z profilu na ekranach UEFI,
+  `WimbootPlan` (lista plików RAM-dysku wimboot, wykonywana przez
+  `windows_native_iso.zig`, log `[WIMBOOT_PLAN]`). Odłożone: plan w linii poleceń
+  BIOS (`usos.plan_hex`), bo nikt go nie czyta przed M3, a linia poleceń XP BIOS
+  jest potwierdzona na sprzęcie.
 Powiązane: [answer-file-generator.md](answer-file-generator.md),
 [nt5-uefi-family.md](nt5-uefi-family.md), [drivers.md](../drivers.md),
 [BOOT_FLOW.md](../../BOOT_FLOW.md), [ARCHITECTURE.md](../../ARCHITECTURE.md).
