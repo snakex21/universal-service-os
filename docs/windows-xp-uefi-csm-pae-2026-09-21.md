@@ -316,3 +316,24 @@ against the deployed package (64426a81...): 759 identical, 1 base update
 (155c0f9f...). Previous package kept in
 artifacts/xp-pae/package-before-20260924-sbgate. (The intermediate build
 B260924-200740, initramfs-xp 18b7160b..., was never deployed.)
+
+## 2026-09-25: rebuild for B260925-084847-A23C795E (native Windows 10/11 release)
+
+The micro-Linux base changed (`usos-init` gained the UEFI architecture gate
+before any write, `work_boot_relocate.sh` gained `source-check`), so the
+package was rebuilt in full (staging ESP zig-out/xp-staging-20260925-release
+from zig-out/micro-linux + the stick's usos-device.ini, --data L:/). Two builds
+are byte-identical (initramfs-xp df616bf3...260d). compare_xp_packages.py
+against the deployed package (2beb9c5e..., kept in
+artifacts/xp-pae/package-before-20260925-release) with `--intended usos-init`:
+757 identical (both driver bundles, hives, cabinets and the PAE scripts byte
+for byte), 2 base updates (usr/bin/usos-fb-ui, usr/lib/usos/work_boot_relocate.sh),
+1 intended (usos-init: the architecture gate block), 0 unexplained
+(artifacts/xp-pae/compare-20260925-release.log). pae.exe (bab558bb...), the
+three launchers and the kernel (155c0f9f...) are unchanged.
+check_xp_driver_imports, check_xp_menu_overlay, check_xp_driver_integration
+(default and --added-source) PASS; check_xp_pae PASS against the new base
+(zig-out/micro-linux) and, as expected before the deploy, fails against the
+stick's older base (J:) only on work_boot_relocate.sh. Not deployed yet.
+Tests after the release build: test_modern_finalize PASS, run_stage_drivers_qemu
+0 failures, run_qemu_secure_boot.py --only matrix 0 failures (TCG).
