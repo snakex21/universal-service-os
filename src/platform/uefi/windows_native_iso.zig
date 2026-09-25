@@ -211,23 +211,9 @@ pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: 
     const volume = &state.volume;
     var owned = Owned{};
     defer owned.release();
-    try addSupport(root, volume, &owned, "\\EFI\\USOS\\windows-native\\support.cpio", 8);
-    try addSupport(root, volume, &owned, if (vista) "\\EFI\\USOS\\windows-native\\vista-support.cpio" else "\\EFI\\USOS\\windows-native\\win7-support.cpio", 64);
-    try volume.add(if (vista) "usos-modern-vista.flag" else "usos-modern-win7.flag", "1\r\n");
-    if (external_pe10) try volume.add("usos-external-pe10.flag", "1\r\n");
-    if (inspection.nvme_packages) try volume.add("usos-nvme-packages.flag", "1\r\n");
-    if (!vista) {
-        progress(.loading, "Reading optional Windows 7 x64 driver packages");
-        const drivers = try driver_files.load(catalog);
-        try owned.keep(drivers.bytes);
-        try volume.add("usos-drivers.bin", drivers.bytes);
-        var driver_message: [128]u8 = undefined;
-        serial.writeAscii(try std.fmt.bufPrint(&driver_message, "[WIN7_NATIVE] external driver INF files={d}; user INFs used={d} skipped={d}; Windows validates hardware match\r\n", .{ drivers.inf_count, drivers.user_infs, drivers.user_skipped }));
-    }
-    try addBootFiles(&boot_iso, volume, &owned, progress);
     var config: [544]u8 = undefined;
-    try volume.add("usos-source.ini", try source_config.sourceConfigForFolder(&config, catalog.partition.part_guid, source.size(), if (vista) "Windows Vista" else "Windows 7", name));
-    if (answer_name) |answer| try addAnswer(state, volume, &owned, "Windows 7", answer);
+    const plan = usos.flow.plan.wimbootPlan(.{ .kind = if (vista) .vista else .win7, .answer = answer_name != null, .external_pe10 = external_pe10, .nvme_packages = inspection.nvme_packages });
+    try inject(root, state, volume, &owned, &boot_iso, &plan, name, answer_name, &config, progress);
     return launch(root, volume, setup.index, if (external_pe10) "Starting external PE10; the install source remains the selected Windows ISO" else "Starting the hybrid ISO's own WinPE and Setup", progress);
 }
 
@@ -292,22 +278,9 @@ pub noinline fn startModern(root: *uefi.protocol.File, image_directory: []const 
     const volume = &state.volume;
     var owned = Owned{};
     defer owned.release();
-    if (!winpe) {
-        try addSupport(root, volume, &owned, "\\EFI\\USOS\\windows-native\\support.cpio", 8);
-        try addSupport(root, volume, &owned, "\\EFI\\USOS\\windows-native\\modern-support.cpio", 8);
-        try volume.add("usos-modern-uefi.flag", "1\r\n");
-        progress(.loading, "Reading your driver packages (DATA\\Drivers)");
-        if (try driver_files.loadUser(catalog, folder)) |drivers| {
-            try owned.keep(drivers.bytes);
-            try volume.add("usos-drivers.bin", drivers.bytes);
-            var driver_message: [128]u8 = undefined;
-            serial.writeAscii(try std.fmt.bufPrint(&driver_message, "[WIN_NATIVE] user INFs used={d} skipped={d} (Drivers\\{s})\r\n", .{ drivers.user_infs, drivers.user_skipped, folder }));
-        }
-        var config: [544]u8 = undefined;
-        try volume.add("usos-source.ini", try source_config.sourceConfigForFolder(&config, catalog.partition.part_guid, state.source.size(), folder, name));
-        if (answer_name) |answer| try addAnswer(state, volume, &owned, folder, answer);
-    }
-    try addBootFiles(&iso, volume, &owned, progress);
+    var config: [544]u8 = undefined;
+    const plan = usos.flow.plan.wimbootPlan(.{ .kind = if (winpe) .winpe else .modern_setup, .folder = folder, .answer = answer_name != null });
+    try inject(root, state, volume, &owned, &iso, &plan, name, answer_name, &config, progress);
     return launch(root, volume, setup.index, if (winpe) "Starting WinPE from the ISO; nothing is installed" else "Starting the ISO's own WinPE and Windows Setup", progress);
 }
 
@@ -339,6 +312,42 @@ const Owned = struct {
         self.count = 0;
     }
 };
+
+/// Fills the wimboot RAM disk exactly as `plan` lists it
+/// (src/flow/plan.zig, pinned by the routing golden). `config` must outlive
+/// the launch: the volume keeps references, not copies.
+fn inject(root: *uefi.protocol.File, state: *BootState, volume: *files.Volume, owned: *Owned, boot_iso: *Iso, plan: *const usos.flow.plan.WimbootPlan, name: []const u8, answer_name: ?[]const u8, config: *[544]u8, progress: *const fn (IsoStage, []const u8) void) !void {
+    const catalog = &state.catalog;
+    for (plan.slice(), 0..) |item, index| {
+        var line: [192]u8 = undefined;
+        var described: [160]u8 = undefined;
+        serial.writeAscii(std.fmt.bufPrint(&line, "[WIMBOOT_PLAN] {d}: {s}\r\n", .{ index, usos.flow.plan.describe(item, &described) catch "?" }) catch "[WIMBOOT_PLAN] ?\r\n");
+        switch (item) {
+            .support => |support| try addSupport(root, volume, owned, support.path, support.limit_mib),
+            .flag => |flag_name| try volume.add(flag_name, usos.flow.plan.flag_content),
+            .bundled_drivers => {
+                progress(.loading, "Reading optional Windows 7 x64 driver packages");
+                const drivers = try driver_files.load(catalog);
+                try owned.keep(drivers.bytes);
+                try volume.add("usos-drivers.bin", drivers.bytes);
+                var driver_message: [128]u8 = undefined;
+                serial.writeAscii(try std.fmt.bufPrint(&driver_message, "[WIN7_NATIVE] external driver INF files={d}; user INFs used={d} skipped={d}; Windows validates hardware match\r\n", .{ drivers.inf_count, drivers.user_infs, drivers.user_skipped }));
+            },
+            .user_drivers => |folder| {
+                progress(.loading, "Reading your driver packages (DATA\\Drivers)");
+                if (try driver_files.loadUser(catalog, folder)) |drivers| {
+                    try owned.keep(drivers.bytes);
+                    try volume.add("usos-drivers.bin", drivers.bytes);
+                    var driver_message: [128]u8 = undefined;
+                    serial.writeAscii(try std.fmt.bufPrint(&driver_message, "[WIN_NATIVE] user INFs used={d} skipped={d} (Drivers\\{s})\r\n", .{ drivers.user_infs, drivers.user_skipped, folder }));
+                }
+            },
+            .source_ini => |folder| try volume.add("usos-source.ini", try source_config.sourceConfigForFolder(config, catalog.partition.part_guid, state.source.size(), folder, name)),
+            .answer => |folder| try addAnswer(state, volume, owned, folder, answer_name orelse return error.AnswerFileMissing),
+            .boot_files => try addBootFiles(boot_iso, volume, owned, progress),
+        }
+    }
+}
 
 fn addSupport(root: *uefi.protocol.File, volume: *files.Volume, owned: *Owned, path: []const u8, limit_mib: usize) !void {
     var path16: [96:0]u16 = undefined;
