@@ -87,6 +87,23 @@ fn addHostTests(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
     test_step.dependOn(&run_unit_tests.step);
     test_step.dependOn(&run_framebuffer_tests.step);
     test_step.dependOn(&run_work_boot_path_tests.step);
+
+    // Tests inside UEFI-application files (these belong to the UEFI root
+    // module, so src/root.zig cannot import them). Only their pure parts are
+    // analysed on the host; nothing here calls UEFI services.
+    const uefi_test_files = [_][]const u8{
+        "src/platform/uefi/case_path.zig",
+        "src/platform/uefi/path.zig",
+        "src/platform/uefi/wimboot_files.zig",
+        "src/platform/uefi/windows_native_iso.zig",
+        "src/platform/uefi/windows_user_drivers.zig",
+    };
+    for (uefi_test_files) |file| {
+        const module = b.createModule(.{ .root_source_file = b.path(file), .target = target, .optimize = optimize });
+        module.addImport("usos", createUsosModule(b, target, optimize));
+        const run = b.addRunArtifact(b.addTest(.{ .root_module = module }));
+        test_step.dependOn(&run.step);
+    }
     b.default_step.dependOn(&run_unit_tests.step);
     b.default_step.dependOn(&run_framebuffer_tests.step);
     b.default_step.dependOn(&run_work_boot_path_tests.step);
