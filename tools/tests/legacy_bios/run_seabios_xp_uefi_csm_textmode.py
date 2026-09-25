@@ -20,7 +20,8 @@ import build_micro_linux as cpio
 QEMU=ROOT/'tools/qemu/qemu-system-x86_64.exe'
 QEMU_IMG=ROOT/'tools/qemu/qemu-img.exe'
 SEABIOS=ROOT/'tools/qemu/share/bios-256k.bin'
-PACKAGE=ROOT/'zig-out/xp-uefi-csm'
+# USOS_XP_PACKAGE_DIR: a package derived for tests (derive_xp_uefi_csm_package.py).
+PACKAGE=Path(__import__('os').environ.get('USOS_XP_PACKAGE_DIR',ROOT/'zig-out/xp-uefi-csm'))
 DEFAULT_ISO=Path('L:/Systems/Windows/Windows XP/Images/pl_windows_xp_professional_with_service_pack_3_x86_cd_x14-80476.iso')
 TARGET_BYTES=12*1024**3
 

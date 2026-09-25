@@ -23,6 +23,7 @@ tools/tests/uefi_drivers/new_test_disk.ps1) and zig-out/micro-linux from
 """
 from __future__ import annotations
 
+import os
 import shutil
 import socket
 import struct
@@ -33,8 +34,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 QEMU = ROOT / "tools" / "qemu" / "qemu-system-x86_64.exe"
-KERNEL = ROOT / "zig-out" / "micro-linux" / "vmlinuz-virt"
-INITRAMFS = ROOT / "zig-out" / "micro-linux" / "initramfs-usos"
+# USOS_MICRO_LINUX_DIR: test a micro-Linux build kept outside zig-out.
+MICRO_LINUX = Path(os.environ.get("USOS_MICRO_LINUX_DIR", ROOT / "zig-out" / "micro-linux"))
+KERNEL = MICRO_LINUX / "vmlinuz-virt"
+INITRAMFS = MICRO_LINUX / "initramfs-usos"
 WORK = ROOT / "tools" / "tests" / "artifacts" / "stage-drivers"
 NEW_TEST_DISK = ROOT / "tools" / "tests" / "uefi_drivers" / "new_test_disk.ps1"
 UNICODE = "Zażółć ünïcode"

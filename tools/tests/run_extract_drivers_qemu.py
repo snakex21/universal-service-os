@@ -19,6 +19,7 @@ No disk image, no admin rights.
 from __future__ import annotations
 
 import gzip
+import os
 import socket
 import stat
 import subprocess
@@ -33,8 +34,10 @@ from build_micro_linux import Entry, newc, put  # noqa: E402
 from run_stage_drivers_qemu import Console, fake_wim, inf  # noqa: E402
 
 QEMU = ROOT / "tools" / "qemu" / "qemu-system-x86_64.exe"
-KERNEL = ROOT / "zig-out" / "micro-linux" / "vmlinuz-virt"
-INITRAMFS = ROOT / "zig-out" / "micro-linux" / "initramfs-usos"
+# USOS_MICRO_LINUX_DIR: test a micro-Linux build kept outside zig-out.
+MICRO_LINUX = Path(os.environ.get("USOS_MICRO_LINUX_DIR", ROOT / "zig-out" / "micro-linux"))
+KERNEL = MICRO_LINUX / "vmlinuz-virt"
+INITRAMFS = MICRO_LINUX / "initramfs-usos"
 WORK = ROOT / "tools" / "tests" / "artifacts" / "extract-drivers"
 
 
