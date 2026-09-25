@@ -62,3 +62,5 @@ tools/zig/data/
 *.p12
 usos-secure-boot.key
 /signing/
+# Local Claude Code state (agent worktrees, settings)
+.claude/
