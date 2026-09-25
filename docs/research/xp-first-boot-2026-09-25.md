@@ -82,3 +82,25 @@ nie zakończył ich czysto:
 Rozstrzygnie to pytanie do użytkownika, czy między tymi startami był twardy
 restart albo start Windows 10. Autochk zgłosił „wolny od błędów”, więc nie ma
 uszkodzeń. Poprawka w USOS nie jest potrzebna.
+
+## Aktualizacja 2026-09-25 wieczorem: autochk przy każdym starcie
+
+Po teście 1 użytkownik zgłosił autochk na C: (i D:) przy **każdym** starcie,
+także bez dysku D:. Test 2 na X470 (build B260925-190925, pakiet XP z pae.exe
+v5, EN x14-80428 + usos-xp.ini) nie pokazał autochk przy 2–3 czystych
+startach, razem z zniknięciem ekranów /SOS. Stan: **rozwiązane, do
+obserwacji**.
+
+Sprawdzone w VirtualBox (PL x14-80476 i EN x14-80428, instalacja bez pytań,
+3 GB i 6 GB RAM, po 3 starty + twardy reset): za każdym razem logo XP, brak
+autochk, `$Volume` flags = 0 po każdym zamknięciu, `BootExecute = autocheck
+autochk *`, `CrashDumpEnabled = 0`, `SystemStartOptions = FASTDETECT PAE
+NOEXECUTE=OPTIN KERNEL=XPKRNPAE.EXE HAL=XPHALPAE.DLL`. VirtualBox ma inny
+kontroler (PIIX4 IDE) niż X470.
+
+Czy /SOS mógł to powodować: nie znalazłem dokumentacji, że `/SOS` zmienia
+decyzję autochk (ta zależy od bitu dirty i BootExecute). Pewne jest tylko, że
+v4 startował jak z `/SOS` (tekstowy ekran), a autochk zniknął razem z tą
+zmianą; mechanizm pozostaje niepotwierdzony. Jeśli wróci: `fsutil dirty query
+C:` po zalogowaniu i przed zamknięciem, `chkntfs C:`, BootExecute, zdarzenia
+Ntfs/Disk w Podglądzie zdarzeń.

@@ -98,6 +98,9 @@ def boot(a):
     try:
         while time.time() - start < a.minutes * 60:
             s = state(a.name)
+            if s == 'missing':
+                # VBoxManage can fail transiently while the VM session is busy.
+                time.sleep(1); s = state(a.name)
             if s in ('poweroff', 'aborted', 'missing'):
                 result = s; note('state ' + s); break
             if control.exists():

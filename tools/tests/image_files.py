@@ -26,7 +26,9 @@ def main() -> int:
     a = p.parse_args()
     out = a.out.resolve(); out.mkdir(parents=True, exist_ok=True)
     work = ROOT / 'zig-out' / 'image-files'; work.mkdir(parents=True, exist_ok=True)
-    vhd = work / (a.image.stem + '.copy.vhd'); vhd.unlink(missing_ok=True)
+    # Unique per image path: parallel runs must not share the temporary copy.
+    tag = __import__('hashlib').sha256(str(a.image.resolve()).lower().encode()).hexdigest()[:12]
+    vhd = work / f'{a.image.stem}-{tag}.copy.vhd'; vhd.unlink(missing_ok=True)
     fmt = {'.vdi': 'vdi', '.vhd': 'vpc', '.raw': 'raw'}.get(a.image.suffix.lower(), 'qcow2')
     subprocess.run([str(QEMU_IMG), 'convert', '-f', fmt, '-O', 'vpc', str(a.image.resolve()), str(vhd)], check=True)
     subprocess.run(['fsutil.exe', 'sparse', 'setflag', str(vhd), '0'], check=True, stdout=subprocess.DEVNULL)
