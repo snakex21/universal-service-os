@@ -23,3 +23,12 @@ installer/internal/payload/assets/*.zip filter=lfs diff=lfs merge=lfs -text
 # Exceptions: tiny test fixtures and bundled QEMU firmware stay plain git
 tools/tests/fixtures/** !filter !diff !merge !text
 tools/qemu/** !filter !diff !merge !text
+
+# Outputs of installer/cmd/usos-i18n-gen are written with LF; keep them LF in
+# the working tree too (core.autocrlf=true would otherwise check them out as
+# CRLF and every regeneration would show LF/CRLF noise).
+src/i18n/boot_strings.zig      text eol=lf
+src/i18n/linux_strings.zig     text eol=lf
+tools/windows_xp_pae_strings.h text eol=lf
+tools/windows_winpe_strings.h  text eol=lf
+src/i18n/testdata/lang-pl.bin  binary

@@ -18,6 +18,17 @@ legacy_windows_request() {
         windows-vista-iso) windows_folder='Windows Vista'; system_id=windows-vista; USOS_WINDOWS_BIOS_HANDOFF=direct; USOS_WINDOWS_SETUP_FROM_SOURCE=1; USOS_WINDOWS_BIOS_ORDERED=1 ;;
         *) stop 'Unsupported Windows BIOS request' ;;
     esac
+    # Windows Server 2008 R2 / 2008 use the Windows 7 / Vista request with
+    # their own DATA folder (usos.legacy_folder_hex); only these two.
+    if [ -n "${LEGACY_FOLDER_HEX:-}" ]; then
+        folder=$(legacy_windows_name "$LEGACY_FOLDER_HEX") || stop 'Invalid Windows system folder'
+        case "$LEGACY_ACTION:$folder" in
+            'windows7-iso:Windows Server 2008 R2') system_id=windows-server-2008-r2 ;;
+            'windows-vista-iso:Windows Server 2008') system_id=windows-server-2008 ;;
+            *) stop 'Unsupported Windows system folder' ;;
+        esac
+        windows_folder=$folder
+    fi
     export USOS_WINDOWS_BIOS_HANDOFF USOS_WINDOWS_SETUP_FROM_SOURCE USOS_WINDOWS_BIOS_ORDERED
     image=$(legacy_windows_name "$LEGACY_IMAGE_HEX") || stop 'Invalid Windows image name'
     case "$image" in *.iso|*.ISO) ;; *) stop 'Windows Setup requires an ISO image' ;; esac

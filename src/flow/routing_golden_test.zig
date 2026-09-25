@@ -136,12 +136,31 @@ pub fn render(gpa: std.mem.Allocator) ![]u8 {
         const legacy = kind == .win7 or kind == .vista;
         if (!legacy and (pe10 or nvme)) continue;
         if (kind == .winpe and answer) continue;
-        const wp = plan.wimbootPlan(.{ .kind = kind, .folder = "Windows 11", .answer = answer, .external_pe10 = pe10, .nvme_packages = nvme });
+        // Windows 7/Vista: the default folder (empty = "Windows 7" / "Windows Vista").
+        const wp = plan.wimbootPlan(.{ .kind = kind, .folder = if (legacy) "" else "Windows 11", .answer = answer, .external_pe10 = pe10, .nvme_packages = nvme });
         for (wp.slice(), 0..) |item, index| {
             var buffer: [160]u8 = undefined;
             try out.print(gpa, "wimboot\t{s}\t{s}\t{s}\t{s}\t{d}\t{s}\n", .{ @tagName(kind), flag(pe10), flag(nvme), flag(answer), index, try plan.describe(item, &buffer) });
         }
     };
+
+    try out.appendSlice(gpa, "# wimboot_server: system kind index injection (external PE10, NVMe packages and an answer file where the kind allows them)\n");
+    for (&systems.all) |*system| {
+        if (!system.server) continue;
+        const native = os_profiles.traits(system.id).native_uefi;
+        const kind: plan.WimbootKind = switch (native) {
+            .modern => .modern_setup,
+            .win7 => .win7,
+            .vista => .vista,
+            .none => continue,
+        };
+        const legacy = kind == .win7 or kind == .vista;
+        const wp = plan.wimbootPlan(.{ .kind = kind, .folder = os_profiles.windowsFolder(system).?, .answer = kind != .vista, .external_pe10 = legacy, .nvme_packages = kind == .win7 });
+        for (wp.slice(), 0..) |item, index| {
+            var buffer: [160]u8 = undefined;
+            try out.print(gpa, "wimboot_server\t{s}\t{s}\t{d}\t{s}\n", .{ system.id, @tagName(kind), index, try plan.describe(item, &buffer) });
+        }
+    }
 
     try out.appendSlice(gpa, "# progress\n");
     for (std.enums.values(progress.Stage)) |stage| {

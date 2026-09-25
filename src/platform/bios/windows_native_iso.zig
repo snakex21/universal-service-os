@@ -33,14 +33,19 @@ const IsoReader = struct {
     }
 };
 
-pub fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8, graphics: ?vbe.Session, system: iso_config.System, image_name: []const u8, unattended_name: ?[]const u8) !noreturn {
+/// `folder`: the DATA system folder ("Windows 10", "Windows Vista", "Windows
+/// Server 2022", ...) holding Images\<image_name> and Unattended\.
+pub fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8, graphics: ?vbe.Session, folder: []const u8, image_name: []const u8, unattended_name: ?[]const u8) !noreturn {
     try iso_config.validateName(image_name);
+    try iso_config.validateName(folder);
     if (unattended_name) |name| try iso_config.validateName(name);
+    var folder_storage: [255]u16 = undefined;
+    const folder_wide = widen(folder, &folder_storage);
     if (graphics) |session| graphics_menu.windowsSetupStart(&session);
     const data = try storage.gpt.findUsosData(reader);
     const fs = try ntfs.mount(reader, .{ .start_bytes = try multiply(data.start_lba, 512), .size_bytes = try multiply(data.sectorCount(), 512) });
     var image_wide: [255]u16 = undefined;
-    const image_path = [_][]const u16{ wide("Systems"), wide("Windows"), system.folderWide(), wide("Images"), widen(image_name, &image_wide) };
+    const image_path = [_][]const u16{ wide("Systems"), wide("Windows"), folder_wide, wide("Images"), widen(image_name, &image_wide) };
     var file: ntfs.File = undefined;
     try ntfs.openFile(fs, reader, &image_path, &file);
     var iso = IsoReader{ .fs = &fs, .disk = bulk, .file = &file };
@@ -66,14 +71,14 @@ pub fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8, graphic
     const support = try fat.fileInfo(esp, reader, &support_path);
     if (support.size < 512 or support.size > 8 * 1024 * 1024 or support.size % 4 != 0) return error.InvalidWindowsSupport;
     var config: [544]u8 = undefined;
-    const config_data = try iso_config.sourceConfig(&config, data.part_guid, file.size(), system, image_name);
+    const config_data = try iso_config.sourceConfigForFolder(&config, data.part_guid, file.size(), folder, image_name);
     var total: u64 = support.size;
     for (files, boot_names) |node, name| total += try cpio.entrySize(name, @intCast(node.size));
     total += try cpio.entrySize("usos-source.ini", @intCast(config_data.len));
     var answer: ntfs.File = undefined;
     if (unattended_name) |name| {
         var answer_wide: [255]u16 = undefined;
-        const answer_path = [_][]const u16{ wide("Systems"), wide("Windows"), system.folderWide(), wide("Unattended"), widen(name, &answer_wide) };
+        const answer_path = [_][]const u16{ wide("Systems"), wide("Windows"), folder_wide, wide("Unattended"), widen(name, &answer_wide) };
         try ntfs.openFile(fs, reader, &answer_path, &answer);
         if (answer.size() == 0 or answer.size() > 1024 * 1024) return error.InvalidAnswerFileSize;
         total += try cpio.entrySize("usos-unattend.xml", @intCast(answer.size()));

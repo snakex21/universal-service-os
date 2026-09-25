@@ -115,6 +115,12 @@ pub fn load(catalog: *Catalog) !Archive {
     return loadFor(catalog, true, user_folder);
 }
 
+/// The bundled Windows 7 x64 library plus DATA\Drivers\<folder> (Windows
+/// Server 2008 R2 shares the Windows 7 drivers, not its user folder).
+pub fn loadWithUser(catalog: *Catalog, folder: []const u8) !Archive {
+    return loadFor(catalog, true, folder);
+}
+
 /// DATA\Drivers\<folder> only (Windows 10/11 native start: no bundled
 /// library). The archive layout is the same USOSDRV1 (entries "user\...")
 /// that usos-drivers.exe expands in WinPE. Null when there is nothing to use.

@@ -26,6 +26,14 @@ user_drivers_os() {
         windows-8-1) printf 'Windows 8.1' ;;
         windows-10) printf 'Windows 10' ;;
         windows-11) printf 'Windows 11' ;;
+        # Windows Server (src/catalog/windows_server.zig); 2008 like Vista is not wired.
+        windows-server-2025) printf 'Windows Server 2025' ;;
+        windows-server-2022) printf 'Windows Server 2022' ;;
+        windows-server-2019) printf 'Windows Server 2019' ;;
+        windows-server-2016) printf 'Windows Server 2016' ;;
+        windows-server-2012-r2) printf 'Windows Server 2012 R2' ;;
+        windows-server-2012) printf 'Windows Server 2012' ;;
+        windows-server-2008-r2) printf 'Windows Server 2008 R2' ;;
         '')
             case "$2" in
                 'Systems/Windows/Windows 7/Images/'*) printf 'Windows 7' ;;

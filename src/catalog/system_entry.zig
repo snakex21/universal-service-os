@@ -12,4 +12,6 @@ pub const SystemEntry = struct {
     unattended_directory: ?[]const u8 = null,
     firmware: FirmwareRequirement = .any,
     boot_methods: []const BootMethod,
+    /// Windows Server: listed in the Server section of the Windows category.
+    server: bool = false,
 };

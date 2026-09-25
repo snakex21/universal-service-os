@@ -13,6 +13,7 @@ pub const SystemEntry = @import("catalog/system_entry.zig").SystemEntry;
 pub const SystemFamily = @import("catalog/system_family.zig").SystemFamily;
 pub const SystemMediaStatus = @import("catalog/system_media_status.zig").SystemMediaStatus;
 pub const systems = @import("catalog/systems.zig");
+pub const os_profiles = @import("catalog/os_profiles.zig");
 pub const utility_boot_methods = @import("catalog/utility_boot_methods.zig");
 pub const MediaStatus = @import("catalog/media_status.zig").MediaStatus;
 pub const Windows11Status = @import("catalog/windows_11_status.zig").Windows11Status;
