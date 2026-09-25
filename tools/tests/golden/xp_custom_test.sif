@@ -1,0 +1,11 @@
+; USOS test .sif (no product key)
+[Unattended]
+UnattendMode=DefaultHide
+[GuiUnattended]
+TimeZone=85
+OemSkipWelcome=1
+[UserData]
+FullName="Custom"
+ComputerName=CUSTOM-SIF
+[GuiRunOnce]
+Command0="notepad.exe"

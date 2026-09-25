@@ -13,7 +13,7 @@ work=$(mktemp -d)
 mounted=no
 cleanup() {
     [ "$mounted" = no ] || umount "$work/volume" || true
-    rm -f "$work/before" "$work/expected" "$work/after" "$work/boot" "$work/readback" "$work/sector"
+    rm -f "$work/before" "$work/expected" "$work/after" "$work/boot" "$work/readback" "$work/sector" "$work/accounts.cmd"
     rmdir "$work/volume" "$work" 2>/dev/null || true
 }
 trap cleanup EXIT HUP INT TERM
@@ -63,6 +63,15 @@ mkdir -p "$work/volume/USOS/XP"
 cp "$SCRIPT_DIR/xp-pae.exe" "$work/volume/USOS/XP/pae.exe"
 cp "$SCRIPT_DIR/xp-pae-LICENSE.txt" "$work/volume/USOS/XP/LICENSE.txt"
 cmp -s "$SCRIPT_DIR/xp-pae.exe" "$work/volume/USOS/XP/pae.exe" || fail 'PAE helper readback mismatch'
+# usos-xp.ini accounts: pae.exe runs this hidden at setup end and deletes it.
+if [ -n "${XP_USER_SETTINGS:-}" ] && [ -z "${XP_CUSTOM_SIF:-}" ]; then
+. "$SCRIPT_DIR/xp_user_settings.sh"
+usos_xp_settings_accounts "$XP_USER_SETTINGS" "$work/accounts.cmd" || fail 'cannot render usos-xp.ini accounts'
+cp "$work/accounts.cmd" "$work/volume/USOS/XP/usos-users.cmd"
+cmp -s "$work/accounts.cmd" "$work/volume/USOS/XP/usos-users.cmd" || fail 'usos-users.cmd readback mismatch'
+rm -f "$work/accounts.cmd"
+printf '[XP_PAE] usos-users.cmd staged (accounts from usos-xp.ini, run hidden by pae.exe)\n'
+fi
 # Installer-chosen language (only that one is on the ESP); pae.exe falls back to English.
 if [ -f /mnt/esp/EFI/USOS/lang-xp.ini ]; then
 cp /mnt/esp/EFI/USOS/lang-xp.ini "$work/volume/USOS/XP/pae-strings.ini"

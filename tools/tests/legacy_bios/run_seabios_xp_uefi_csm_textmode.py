@@ -55,6 +55,8 @@ sh /usr/lib/usos/probe_nt5_source.sh || finish 'FAIL source probe'
 . /usr/lib/usos/xp_driver_stage.sh; usos_xp_driver_preflight || finish 'FAIL driver preflight'
 # usos-xp.ini: legacy_xp_staging.sh validates DATA's file at this point (--settings).
 if [ -r /usr/lib/usos/xp_user_settings.sh ]; then . /usr/lib/usos/xp_user_settings.sh; usos_xp_settings_stage /probe-usos-xp.ini /mnt/source || finish 'FAIL settings'; fi
+# A .sif chosen in the menu: legacy_xp_staging.sh exports it as XP_CUSTOM_SIF (--sif).
+if [ -f /probe-custom.sif ]; then export XP_CUSTOM_SIF=/probe-custom.sif XP_USER_SETTINGS=; fi
 sh /usr/lib/usos/target_disk_guard.sh snapshot || finish 'FAIL snapshot'
 awk -f /usr/lib/usos/xp_windows_partition_plan.awk "$TARGET_SNAPSHOT" > /run/xp-windows.plan || finish 'FAIL plan'
 cat /run/xp-windows.plan; export XP_WINDOWS_PLAN=/run/xp-windows.plan
@@ -85,7 +87,7 @@ def vga_text(dump,rows_count):
         rows.append(''.join(chr(c) if 32<=c<127 else ' ' for c in b[r*160:r*160+160:2]).rstrip())
     return '\n'.join(rows)
 
-def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=()):
+def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),sif=None):
     usos=out/'usos-blank.qcow2';target=out/'target.qcow2'
     for disk,size in ((usos,256*1024**2),(target,TARGET_BYTES)):
         subprocess.run([str(QEMU_IMG),'create','-q','-f','qcow2',str(disk),str(size)],check=True)
@@ -97,6 +99,7 @@ def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=())
         probe=probe.replace("if [ -r /usr/lib/usos/xp_user_settings.sh ]; then . /usr/lib/usos/xp_user_settings.sh; usos_xp_settings_stage /probe-usos-xp.ini /mnt/source || finish 'FAIL settings'; fi"+chr(10),'')
     cpio.put(entries,cpio.Entry('probe-init',stat.S_IFREG|0o755,probe.encode()))
     if settings:cpio.put(entries,cpio.Entry('probe-usos-xp.ini',stat.S_IFREG|0o644,Path(settings).read_bytes()))
+    if sif:cpio.put(entries,cpio.Entry('probe-custom.sif',stat.S_IFREG|0o644,Path(sif).read_bytes()))
     # --tree-scripts: test the working tree's scripts in the package's kernel/initramfs.
     for name in tree_scripts:
         cpio.put(entries,cpio.Entry('usr/lib/usos/'+name,stat.S_IFREG|0o755,(ROOT/'tools'/name).read_bytes().replace(bytes([13,10]),bytes([10]))))
@@ -165,9 +168,9 @@ def textmode(out,target,keys,minutes):
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--iso',type=Path,default=DEFAULT_ISO)
     p.add_argument('--keys',default='');p.add_argument('--minutes',type=float,default=25);p.add_argument('--reuse-prepared',type=Path);p.add_argument('--prepare-only',action='store_true',help='stop after phase 1 (for tools/tests/target_digest.py)');p.add_argument('--profile',default='xp-x86-sp3-uefi-csm',choices=['xp-x86-sp3-uefi-csm','nt5-staging'],help='nt5-staging: the BIOS XP preparation of the same scripts')
-    p.add_argument('--settings',type=Path,help='usos-xp.ini to validate and merge (stand-in for the DATA Unattended file)');p.add_argument('--tree-scripts',default='',help='space-separated tools/*.sh names taken from the working tree')
+    p.add_argument('--settings',type=Path,help='usos-xp.ini to validate and merge (stand-in for the DATA Unattended file)');p.add_argument('--tree-scripts',default='',help='space-separated tools/*.sh names taken from the working tree');p.add_argument('--sif',type=Path,help='.sif chosen in the menu (merged into the automatic answer)')
     a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
-    prepared=a.reuse_prepared.resolve() if a.reuse_prepared else prepare(out,a.iso,a.profile,a.settings,a.tree_scripts.split())
+    prepared=a.reuse_prepared.resolve() if a.reuse_prepared else prepare(out,a.iso,a.profile,a.settings,a.tree_scripts.split(),a.sif)
     print('[PASS] prepared',prepared,flush=True)
     if a.prepare_only:sys.exit(0)
     # Boot an overlay so the prepared image stays pristine for further runs.

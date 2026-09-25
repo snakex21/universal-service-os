@@ -10,8 +10,19 @@ instalację XP (profil UEFI-CSM, automatyczny układ jednej partycji) bez
   jest nigdy nadpisywany.
 - Plik jest nieaktywny, dopóki `user=` jest puste. Wtedy `WINNT.SIF` jest
   bajt w bajt taki jak bez pliku.
-- Menu nie pokazuje `.ini` na liście plików odpowiedzi (tylko `.sif`). Gdy
-  użytkownik wybierze własny `.sif`, `usos-xp.ini` jest pomijany.
+- Ekran „Instalacja nienadzorowana” w menu UEFI dla XP pokazuje się zawsze.
+  Pierwszy wiersz to stan `usos-xp.ini`: „usos-xp.ini: Tester, USOS-XP-TEST”
+  (pierwsze konto i nazwa komputera; klucza i hasła menu nie pokazuje) albo
+  „Bez ustawień (instalacja interaktywna)”. Kolejne wiersze to pliki `.sif`
+  z `Unattended\`. Podsumowanie powtarza wybór w polu „Plik odpowiedzi”.
+- Wybrany `.sif` jest **łączony** z automatyczną odpowiedzią
+  (`usos_xp_custom_sif`): klucze użytkownika wygrywają poza tymi, których
+  wymaga ścieżka USOS (całe `[Data]`; `Repartition`, `FileSystem`,
+  `TargetPath`, `DriverSigningPolicy`, `NonDriverSigningPolicy`,
+  `WaitForReboot`, `OemPreinstall` w `[Unattended]`; `UserExecute` w
+  `[SetupParams]`); `[GuiRunOnce]` zachowuje polecenia użytkownika, a na końcu
+  dopisuje sprawdzenie pae.exe. Z `.sif` plik `usos-xp.ini` nie jest używany.
+  `AutoPartition=1`/`Repartition=Yes` są nadal odrzucane przed zapisem.
 
 ## Format
 
@@ -44,7 +55,7 @@ repozytorium.
 2. `prepare_xp_windows_partition.sh` łączy ją z automatycznym `WINNT.SIF`:
    - `[Unattended]`: `UnattendMode=FullUnattended` (z kluczem) albo
      `DefaultHide` (bez klucza: pokazana zostaje tylko strona klucza
-     produktu), `OemPreinstall=Yes`, `UnattendSwitch=Yes` (bez OOBE),
+     produktu), `UnattendSwitch=Yes` (bez OOBE),
      `OemSkipEula=Yes` jak dotąd;
    - `[GuiUnattended]`: `OEMSkipRegional=1`, `OemSkipWelcome=1`, `TimeZone`,
      `AdminPassword` (`*` = puste), `EncryptedAdminPassword=No`;
@@ -55,17 +66,21 @@ repozytorium.
    `DriverSigningPolicy`, `Repartition=No`, `FileSystem=LeaveAlone` i
    `TargetPath` zostają bez zmian; `boot.ini timeout` i `CrashDumpEnabled`
    dalej ustawia pae.exe.
-3. Konta: `$WIN_NT$.~LS\$OEM$\cmdlines.txt` uruchamia `usos-users.cmd` pod
-   koniec GUI Setup (`net user … /add` i `net localgroup` dla
-   zlokalizowanych nazw grupy Administratorzy/Administrators/…; log
-   `%SystemRoot%\usos-users.log`). Konta są na ekranie powitalnym,
-   automatyczne logowanie nie jest włączane. `$WIN_NT$.~LS` Setup usuwa na
-   końcu instalacji.
+3. Konta: `prepare_xp_ntfs_target.sh` zapisuje `C:\USOS\XP\usos-users.cmd`
+   (`net user … /add` i `net localgroup` dla zlokalizowanych nazw grupy
+   Administratorzy/Administrators/…; log `%SystemRoot%\usos-users.log`).
+   `pae.exe` uruchamia go **bez okna konsoli** na końcu GUI Setup
+   (UserExecute; przy pierwszym logowaniu ponownie, jeśli wcześniej się nie
+   udało), czeka do 180 s, zapisuje kod wyjścia w `pae-install.log` i usuwa
+   plik (może zawierać hasło). Konta są na ekranie powitalnym, automatyczne
+   logowanie nie jest włączane. `$OEM$`/`cmdlines.txt` nie są używane.
 
 ## Testy
 
 - host: `sh` + `tools/xp_user_settings.sh` (BOM, CRLF, błędne wartości,
-  scalony SIF, pliki `$OEM$`);
+  scalony SIF, skrypt kont, scalanie wybranego `.sif`); `check_xp_pae.py`
+  (pae.exe uruchamia skrypt kont i go usuwa); `src/flow/xp_settings_summary.zig`
+  (golden: plik -> wiersz ekranu);
 - `installer/internal/winhost/data_guide_xp_test.go` (szablon nieaktywny,
   CRLF, lista kluczy zgodna z parserem);
 - QEMU: `run_seabios_xp_uefi_csm_textmode.py --prepare-only --settings

@@ -81,6 +81,13 @@ assert not api.stage_copy(os.fsencode(ini),os.fsencode(staged)) and not staged.e
 # Crash dumps off (GUI setup re-enables 3); AutoReboot and other values untouched.
 # Exercised on a scratch HKCU key; the helper itself targets HKLM CrashControl.
 import winreg
+# usos-xp.ini accounts: usos-users.cmd runs hidden (no console), then is removed.
+api.accounts_script.argtypes=[ctypes.c_char_p]
+acc=out/'accounts';shutil.rmtree(acc,ignore_errors=True);acc.mkdir()
+script=acc/'usos-users.cmd';marker=acc/'ran.txt'
+assert api.accounts_script(os.fsencode(script))==0
+script.write_bytes(b'@echo off'+bytes([13,10])+b'echo ran> "'+os.fsencode(marker)+b'"'+bytes([13,10])+b'exit /b 0'+bytes([13,10]))
+assert api.accounts_script(os.fsencode(script))==1 and marker.read_text().strip()=='ran' and not script.exists()
 api.crash_dump_off.argtypes=[ctypes.c_char_p]
 test_key='Software\\USOS-XP-PAE-Test\\CrashControl'
 def reset_test_key():

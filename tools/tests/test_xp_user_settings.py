@@ -71,32 +71,45 @@ def main() -> int:
     lines = merged.splitlines()
     sections = [l for l in lines if l.startswith('[')]
     check('sections unique', len(sections) == len(set(s.lower() for s in sections)), str(sections))
-    for want in ('UnattendMode=FullUnattended', 'OemPreinstall=Yes', 'UnattendSwitch=Yes', 'OemSkipEula=Yes', 'OEMSkipRegional=1',
+    for want in ('UnattendMode=FullUnattended', 'OemPreinstall=No', 'UnattendSwitch=Yes', 'OemSkipEula=Yes', 'OEMSkipRegional=1',
                  'OemSkipWelcome=1', 'TimeZone=95', 'AdminPassword="Tajne1!"', 'EncryptedAdminPassword=No', 'FullName="Jan Kowalski"',
                  'OrgName="Firma X"', 'ComputerName=PC-1', 'ProductKey=ABCDE-12345-ABCDE-12345-ABCDE', 'JoinWorkgroup=WORKGROUP',
                  'InstallDefaultComponents=Yes', 'UserExecute="C:\\USOS\\XP\\pae.exe"', 'Command0="%SystemDrive%\\USOS\\XP\\pae.exe /firstlogon"',
                  'DriverSigningPolicy=Ignore', 'Repartition=No', 'FileSystem=LeaveAlone'):
         check('sif has ' + want, want in lines)
-    check('sif keeps no ProvideDefault', 'UnattendMode=ProvideDefault' not in lines and 'OemPreinstall=No' not in lines)
+    check('sif keeps no ProvideDefault', 'UnattendMode=ProvideDefault' not in lines and 'OemPreinstall=Yes' not in lines)
     unattended = lines[lines.index('[Unattended]') + 1:]
     unattended = unattended[:next(i for i, l in enumerate(unattended) if l.startswith('['))]
     check('UnattendSwitch inside [Unattended]', 'UnattendSwitch=Yes' in unattended)
-    base_lines = [l for l in BASE.read_text().splitlines() if not l.startswith(('UnattendMode=', 'OemPreinstall='))]
+    base_lines = [l for l in BASE.read_text().splitlines() if not l.startswith('UnattendMode=')]
     check('every other base line kept', all(l in lines for l in base_lines))
     nokey = OUT / 'defaults-us.out'
     merged2 = sh(f"usos_xp_settings_sif '{posix(BASE)}' '{posix(nokey)}'").stdout.decode().splitlines()
     check('no key -> DefaultHide, no ProductKey, AdminPassword=*', 'UnattendMode=DefaultHide' in merged2
           and not any(l.startswith('ProductKey') for l in merged2) and 'AdminPassword=*' in merged2)
-    # $OEM$ files
-    oem = OUT / 'oem'
-    r = sh(f"usos_xp_settings_oem '{posix(settings)}' '{posix(oem)}'")
-    cmdlines = (oem / 'cmdlines.txt').read_bytes(); users = (oem / 'usos-users.cmd').read_bytes()
-    check('oem rc', r.returncode == 0)
-    check('cmdlines.txt', cmdlines == b'[Commands]\r\n"usos-users.cmd"\r\n', repr(cmdlines))
+    # Accounts script (C:\USOS\XP\usos-users.cmd, run hidden by pae.exe)
+    users_file = OUT / 'usos-users.cmd'
+    r = sh(f"usos_xp_settings_accounts '{posix(settings)}' '{posix(users_file)}'")
+    users = users_file.read_bytes()
+    check('accounts rc', r.returncode == 0)
     check('usos-users.cmd CRLF', users.count(b'\n') == users.count(b'\r\n'))
     text = users.decode()
     check('usos-users.cmd accounts', 'net user "Jan Kowalski" "Tajne1!" /add' in text and 'net user "Ania" "Tajne1!" /add' in text
           and text.count('do net localgroup %%G') == 2 and 'Administratorzy' in text)
+    # A .sif chosen in the menu, merged into the automatic answer
+    user_sif = OUT / 'user.sif'
+    user_sif.write_bytes(b'[Data]\r\nAutoPartition=1\r\n[unattended]\r\nUnattendMode=FullUnattended\r\nRepartition=Yes\r\n'
+                         b'TargetPath=\\XP\r\nOemPreinstall=Yes\r\n[GuiUnattended]\r\nTimeZone=85\r\n[UserData]\r\nFullName="Me"\r\n'
+                         b'[SetupParams]\r\nUserExecute="other.exe"\r\n[GuiRunOnce]\r\nCommand0="notepad.exe"\r\n[Display]\r\nBitsPerPel=32\r\n')
+    custom = sh(f"usos_xp_custom_sif '{posix(BASE)}' '{posix(user_sif)}'").stdout.decode().splitlines()
+    sections = [l for l in custom if l.startswith('[')]
+    check('custom: sections unique', len(sections) == len(set(s.lower() for s in sections)), str(sections))
+    for want in ('UnattendMode=FullUnattended', 'Repartition=No', 'FileSystem=LeaveAlone', 'TargetPath=\\WINDOWS', 'OemPreinstall=No',
+                 'DriverSigningPolicy=Ignore', 'UserExecute="C:\\USOS\\XP\\pae.exe"', 'Command0="notepad.exe"',
+                 'Command1="%SystemDrive%\\USOS\\XP\\pae.exe /firstlogon"', 'TimeZone=85', 'FullName="Me"', 'BitsPerPel=32', 'msdosinitiated="1"'):
+        check('custom has ' + want, want in custom)
+    for unwanted in ('AutoPartition=1', 'Repartition=Yes', 'TargetPath=\\XP', 'OemPreinstall=Yes', 'UserExecute="other.exe"', 'UnattendMode=ProvideDefault'):
+        check('custom drops ' + unwanted, unwanted not in custom)
     print('FAILED' if failures else 'ALL PASS', len(failures))
     return 1 if failures else 0
 

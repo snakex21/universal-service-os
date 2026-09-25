@@ -116,7 +116,17 @@ usos_legacy_xp_staging() {
     else
         printf '[LEGACY_XP] UNATTENDED none; minimal WINNT.SIF will be generated without ProductKey\n'
     fi
-    export XP_WINNT_SIF
+    # XP UEFI-CSM: the selected .sif is merged into the automatic single-volume
+    # answer (tools/xp_user_settings.sh usos_xp_custom_sif) instead of the BIOS
+    # flow's separate XPSETUP partition with manual partition selection.
+    XP_CUSTOM_SIF=''
+    if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ] && [ -n "$XP_WINNT_SIF" ]; then
+        XP_CUSTOM_SIF=/run/usos-xp-custom.sif
+        cp "$XP_WINNT_SIF" "$XP_CUSTOM_SIF" || stop 'cannot read the selected XP .sif'
+        XP_WINNT_SIF=''
+        printf '[LEGACY_XP] UNATTENDED MERGE selected=%s into the automatic WINNT.SIF\n' "$XP_UNATTENDED_NAME"
+    fi
+    export XP_WINNT_SIF XP_CUSTOM_SIF
 
     xp_stage_set disk-enumeration
     usos_ui_stage 2 5 'Verifying target device' "Enumerating disks and validating the selected $NT5_NAME target." || true
@@ -431,7 +441,7 @@ usos_legacy_xp_staging() {
     usos_xp_driver_preflight || stop 'XP driver preflight failed; no target write occurred'
     # Hands-off Setup/OOBE (docs/xp-unattended.md); a selected custom .sif wins.
     . /usr/lib/usos/xp_user_settings.sh
-    if [ -z "$XP_WINNT_SIF" ]; then
+    if [ -z "$XP_WINNT_SIF" ] && [ -z "$XP_CUSTOM_SIF" ]; then
         usos_xp_settings_stage "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/usos-xp.ini" "$SOURCE_ROOT" || stop 'usos-xp.ini is invalid; fix it on DATA. No target write occurred'
     else
         XP_USER_SETTINGS=''; export XP_USER_SETTINGS

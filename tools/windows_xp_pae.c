@@ -214,11 +214,51 @@ static void open_log(void){
     log_file=CreateFileA(p,GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);
     if(log_file!=INVALID_HANDLE_VALUE)SetFilePointer(log_file,0,0,FILE_END);
 }
+/* usos-users.cmd (written next to pae.exe from DATA's usos-xp.ini) creates the
+   local accounts. It runs here, without a console window, at setup end (or at
+   the first logon if setup end did not get to it), and is deleted afterwards
+   because it may contain the password. Its own output goes to
+   %SystemRoot%\usos-users.log. */
+/* Returns 1 ran and removed, 0 no script, -1 not run or not removed. */
+static int run_accounts_script(const char *script){
+    static char cmd[MAX_PATH],line[3*MAX_PATH];char *p;DWORD n;
+    if(GetFileAttributesA(script)==INVALID_FILE_ATTRIBUTES)return 0;
+    n=GetSystemDirectoryA(cmd,MAX_PATH);if(n==0||n+9>=MAX_PATH){logline("accounts: system directory unknown; usos-users.cmd not run");return -1;}
+    lstrcatA(cmd,"\\cmd.exe");
+    wsprintfA(line,"\"%s\" /d /c \"\"%s\"\"",cmd,script);
+    STARTUPINFOA si;PROCESS_INFORMATION pi;DWORD code=0xffffffff;
+    for(p=(char*)&si;p<(char*)&si+sizeof(si);p++)*p=0;
+    si.cb=sizeof(si);si.dwFlags=STARTF_USESHOWWINDOW;si.wShowWindow=SW_HIDE;
+    if(CreateProcessA(cmd,line,0,0,FALSE,CREATE_NO_WINDOW,0,0,&si,&pi)){
+        DWORD w=WaitForSingleObject(pi.hProcess,180000);
+        if(w==WAIT_OBJECT_0)GetExitCodeProcess(pi.hProcess,&code);
+        CloseHandle(pi.hThread);CloseHandle(pi.hProcess);
+        wsprintfA(line,w==WAIT_OBJECT_0?"accounts: usos-users.cmd ran hidden, exit=%lu (see %%SystemRoot%%\\usos-users.log)":"accounts: usos-users.cmd still running after 180 s; left in place",code);
+        logline(line);
+        if(w!=WAIT_OBJECT_0)return -1;
+    }else{
+        wsprintfA(line,"accounts: cannot start cmd.exe (error %lu); usos-users.cmd kept for the first-logon retry",GetLastError());
+        logline(line);return -1;
+    }
+    SetFileAttributesA(script,FILE_ATTRIBUTE_NORMAL);
+    BOOL removed=DeleteFileA(script);
+    logline(removed?"accounts: usos-users.cmd removed":"accounts: WARNING usos-users.cmd could not be removed");
+    return removed?1:-1;
+}
+static void create_accounts(void){
+    static char script[MAX_PATH];
+    DWORD n=GetModuleFileNameA(0,script,MAX_PATH);if(n==0||n>=MAX_PATH)return;
+    while(n&&script[n-1]!='\\')n--;
+    if(n+16>=MAX_PATH)return;
+    script[n]=0;lstrcatA(script,"usos-users.cmd");
+    run_accounts_script(script);
+}
 void entry(void){
     int mode=parse_mode(GetCommandLineA());
     open_log();
     logline("USOS XP PAE v5: originals retained; separate kernel/HAL (xpkrnpae.exe, xphalpae.dll); no host patching; crash dump off");
     logline(mode==MODE_FIRST_LOGON?"path=first-logon (GuiRunOnce check)":mode==MODE_INTERACTIVE?"path=interactive":"path=setup-end (UserExecute, silent)");
+    if(mode!=MODE_INTERACTIVE)create_accounts();
     int r=run(mode==MODE_FIRST_LOGON);
     if(r==RUN_ENABLED)logline(mode==MODE_FIRST_LOGON?"RESULT: enabled by FIRST-LOGON FALLBACK; restart required":"RESULT: PAE ENTRY READY; default entry, timeout=0; used from the next boot");
     else if(r==RUN_ALREADY)logline(mode==MODE_FIRST_LOGON?"RESULT: already enabled at setup end; nothing shown":"RESULT: already enabled");

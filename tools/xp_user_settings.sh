@@ -14,10 +14,11 @@
 #       stderr, the values themselves are never printed).
 #   usos_xp_settings_sif BASE.SIF SETTINGS
 #       Prints BASE.SIF with the unattended sections merged in (stdout).
-#   usos_xp_settings_oem SETTINGS DIR
-#       Writes DIR/cmdlines.txt and DIR/usos-users.cmd ($OEM$ of the local
-#       source): the accounts are created by GUI Setup (cmdlines.txt) as local
-#       administrators, so the Welcome screen lists them.
+#   usos_xp_settings_accounts SETTINGS FILE
+#       Writes FILE (C:\USOS\XP\usos-users.cmd next to pae.exe): pae.exe runs
+#       it without a console window at setup end (UserExecute; first-logon
+#       retry) and deletes it. The accounts are local administrators, so the
+#       Welcome screen lists them.
 # Keys: user user2 computer org key timezone password (docs/xp-unattended.md).
 
 usos_xp_settings_load() {
@@ -116,7 +117,6 @@ usos_xp_settings_sif() {
             if (section == "setupparams" && !added) { extra(); added = 1 }
         }
         section == "unattended" && /^UnattendMode=/ { print "UnattendMode=" mode; next }
-        section == "unattended" && /^OemPreinstall=/ { print "OemPreinstall=Yes"; next }
         { print }
         END {
             if (section == "unattended") print "UnattendSwitch=Yes"
@@ -142,16 +142,14 @@ usos_xp_settings_sif() {
     ' "$_xs_base"
 }
 
-usos_xp_settings_oem() {
+usos_xp_settings_accounts() {
     _xs_set=$1
-    _xs_dir=$2
-    mkdir -p "$_xs_dir" || return 1
-    printf '[Commands]\r\n"usos-users.cmd"\r\n' > "$_xs_dir/cmdlines.txt" || return 1
+    _xs_file=$2
     awk -v settings="$_xs_set" '
         BEGIN {
             while ((getline line < settings) > 0) { eq = index(line, "="); v[substr(line, 1, eq - 1)] = substr(line, eq + 1) }
             printf "@echo off\r\n"
-            printf "rem USOS: local administrator accounts from usos-xp.ini, created by GUI Setup (cmdlines.txt).\r\n"
+            printf "rem USOS: local administrator accounts from usos-xp.ini, run hidden by pae.exe at setup end.\r\n"
             printf "set USOS_LOG=%%SystemRoot%%\\usos-users.log\r\n"
             account(v["user"])
             if (v["user2"] != "") account(v["user2"])
@@ -163,7 +161,68 @@ usos_xp_settings_oem() {
             # The Administrators group name is localized; the wrong names fail harmlessly.
             printf "for %%%%G in (Administrators Administratorzy Administratoren Administrateurs Administradores Administratori) do net localgroup %%%%G \"%s\" /add >> \"%%USOS_LOG%%\" 2>&1\r\n", name
         }
-    ' > "$_xs_dir/usos-users.cmd"
+    ' > "$_xs_file"
+}
+
+# usos_xp_custom_sif BASE.SIF USER.SIF
+#   A .sif chosen in the menu, merged into the automatic answer (stdout).
+#   The user's keys win, except the ones USOS needs for this flow: all of
+#   [Data], and Repartition, FileSystem, TargetPath, DriverSigningPolicy,
+#   NonDriverSigningPolicy, WaitForReboot, OemPreinstall in [Unattended] and
+#   UserExecute in [SetupParams]. [GuiRunOnce] keeps the user's commands
+#   (renumbered) followed by the pae.exe first-logon check. Sections and keys
+#   match case-insensitively; values are copied as they are.
+usos_xp_custom_sif() {
+    awk -v user="$2" '
+        function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
+        # No regex with [ or ]: BusyBox awk parses such bracket expressions differently.
+        function header(s,   e) { if (substr(s, 1, 1) != "[") return ""; s = substr(s, 2); e = index(s, "]"); return e ? tolower(trim(substr(s, 1, e - 1))) : "" }
+        function protected(sec, key) {
+            if (sec == "data") return 1
+            if (sec == "unattended" && key ~ /^(repartition|filesystem|targetpath|driversigningpolicy|nondriversigningpolicy|waitforreboot|oempreinstall)$/) return 1
+            if (sec == "setupparams" && key == "userexecute") return 1
+            return 0
+        }
+        BEGIN {
+            sec = ""
+            while ((getline line < user) > 0) {
+                sub(/\r$/, "", line); t = trim(line)
+                if (t == "" || substr(t, 1, 1) == ";") continue
+                h = header(t)
+                if (h != "") { sec = h; if (!(sec in usec)) { usec[sec] = 1; uorder[++nsec] = sec; uname[sec] = t }; continue }
+                eq = index(t, "="); if (eq == 0 || sec == "") continue
+                key = tolower(trim(substr(t, 1, eq - 1)))
+                if (sec == "guirunonce") { run[++nrun] = trim(substr(t, eq + 1)); continue }
+                if (!((sec, key) in uval)) { ukeys[sec, ++ukn[sec]] = key }
+                uval[sec, key] = trim(substr(t, 1, eq - 1)) "=" trim(substr(t, eq + 1))
+            }
+            close(user)
+        }
+        function flush_section(   i, k) {
+            if (cur == "") return
+            for (i = 1; i <= ukn[cur]; i++) { k = ukeys[cur, i]; if (!((cur, k) in seen) && !protected(cur, k)) print uval[cur, k] }
+            if (cur == "guirunonce") { for (i = 1; i <= nrun; i++) print "Command" (i - 1) "=" run[i]; print "Command" nrun "=" pae }
+            done[cur] = 1
+        }
+        { sub(/\r$/, "") }
+        header($0) != "" { flush_section(); cur = header($0); print; next }
+        {
+            eq = index($0, "="); key = eq ? tolower(trim(substr($0, 1, eq - 1))) : ""
+            if (cur == "guirunonce") { if (key ~ /^command/) pae = trim(substr($0, eq + 1)); next }
+            if (key != "") seen[cur, key] = 1
+            if (key != "" && !protected(cur, key) && ((cur, key) in uval)) { print uval[cur, key]; next }
+            print
+        }
+        END {
+            flush_section()
+            for (i = 1; i <= nsec; i++) {
+                s = uorder[i]; if (s in done || s == "guirunonce") continue
+                print uname[s]
+                for (j = 1; j <= ukn[s]; j++) { k = ukeys[s, j]; if (!protected(s, k)) print uval[s, k] }
+            }
+            if (!("guirunonce" in done) && nrun) { print "[GuiRunOnce]"; for (i = 1; i <= nrun; i++) print "Command" (i - 1) "=" run[i] }
+        }
+    ' "$1"
 }
 
 # usos_xp_settings_stage INI SOURCE_ROOT
