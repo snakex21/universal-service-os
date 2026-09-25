@@ -82,8 +82,9 @@ pub const Injection = union(enum) {
     support: struct { path: []const u8, limit_mib: usize },
     /// A marker file with `flag_content`.
     flag: []const u8,
-    /// usos-drivers.bin: bundled Drivers/x64 packages plus DATA\Drivers (Win7).
-    bundled_drivers,
+    /// usos-drivers.bin: the bundled Windows 7 Drivers/x64 packages plus
+    /// DATA\Drivers\<folder> (Windows 7, Windows Server 2008 R2).
+    bundled_drivers: []const u8,
     /// usos-drivers.bin from DATA\Drivers\<folder>, only when there is one.
     user_drivers: []const u8,
     /// usos-source.ini binding the DATA partition, size and ISO path.
@@ -96,7 +97,8 @@ pub const Injection = union(enum) {
 
 pub const WimbootOptions = struct {
     kind: WimbootKind,
-    /// Windows 10/11: the DATA system folder (Windows 10, Windows 11).
+    /// The DATA system folder (Windows 10, Windows Server 2022, ...). Empty
+    /// for Windows 7/Vista: "Windows 7" / "Windows Vista".
     folder: []const u8 = "",
     answer: bool = false,
     /// Windows 7/Vista inspection results.
@@ -135,16 +137,19 @@ pub fn wimbootPlan(options: WimbootOptions) WimbootPlan {
         },
         .win7, .vista => {
             const vista = options.kind == .vista;
+            // Windows Server 2008 R2 / 2008 pass their own folder.
+            const own_folder = options.folder.len != 0;
+            const folder = if (own_folder) options.folder else if (vista) "Windows Vista" else "Windows 7";
             plan.add(.{ .support = .{ .path = support_path, .limit_mib = 8 } });
             plan.add(.{ .support = .{ .path = if (vista) "\\EFI\\USOS\\windows-native\\vista-support.cpio" else "\\EFI\\USOS\\windows-native\\win7-support.cpio", .limit_mib = 64 } });
             plan.add(.{ .flag = if (vista) "usos-modern-vista.flag" else "usos-modern-win7.flag" });
             if (options.external_pe10) plan.add(.{ .flag = "usos-external-pe10.flag" });
             if (options.nvme_packages) plan.add(.{ .flag = "usos-nvme-packages.flag" });
-            if (!vista) plan.add(.bundled_drivers);
+            if (!vista) plan.add(.{ .bundled_drivers = folder });
             plan.add(.boot_files);
-            plan.add(.{ .source_ini = if (vista) "Windows Vista" else "Windows 7" });
-            // The answer file folder is "Windows 7" for both (Vista refuses one first).
-            if (options.answer) plan.add(.{ .answer = "Windows 7" });
+            plan.add(.{ .source_ini = folder });
+            // The Vista answer folder is "Windows 7" (Vista refuses one first).
+            if (options.answer) plan.add(.{ .answer = if (own_folder) folder else "Windows 7" });
         },
     }
     return plan;
@@ -155,7 +160,10 @@ pub fn describe(item: Injection, buffer: []u8) ![]const u8 {
     return switch (item) {
         .support => |s| std.fmt.bufPrint(buffer, "support {s} limit={d}MiB", .{ s.path, s.limit_mib }),
         .flag => |name| std.fmt.bufPrint(buffer, "flag {s}", .{name}),
-        .bundled_drivers => std.fmt.bufPrint(buffer, "drivers usos-drivers.bin bundled+user", .{}),
+        .bundled_drivers => |folder| if (std.mem.eql(u8, folder, "Windows 7"))
+            std.fmt.bufPrint(buffer, "drivers usos-drivers.bin bundled+user", .{})
+        else
+            std.fmt.bufPrint(buffer, "drivers usos-drivers.bin bundled+user Drivers\\{s}", .{folder}),
         .user_drivers => |folder| std.fmt.bufPrint(buffer, "drivers usos-drivers.bin user Drivers\\{s} (if any)", .{folder}),
         .source_ini => |folder| std.fmt.bufPrint(buffer, "file usos-source.ini folder={s}", .{folder}),
         .answer => |folder| std.fmt.bufPrint(buffer, "file usos-unattend.xml from Systems\\Windows\\{s}\\Unattended", .{folder}),
@@ -185,6 +193,20 @@ test "Vista never gets the Windows 7 driver archive" {
     try std.testing.expectEqualStrings("usos-nvme-packages.flag", win7.items[3].flag);
     try std.testing.expect(win7.items[4] == .bundled_drivers);
     try std.testing.expectEqualStrings("Windows 7", win7.items[win7.len - 1].answer);
+}
+
+test "Windows Server 2008 R2 / 2008 plans use their own DATA folder" {
+    const r2 = wimbootPlan(.{ .kind = .win7, .folder = "Windows Server 2008 R2", .answer = true });
+    const items = r2.slice();
+    try std.testing.expectEqualStrings("Windows Server 2008 R2", items[3].bundled_drivers);
+    try std.testing.expectEqualStrings("Windows Server 2008 R2", items[5].source_ini);
+    try std.testing.expectEqualStrings("Windows Server 2008 R2", items[6].answer);
+    var buffer: [160]u8 = undefined;
+    try std.testing.expectEqualStrings("drivers usos-drivers.bin bundled+user Drivers\\Windows Server 2008 R2", try describe(items[3], &buffer));
+    const vista = wimbootPlan(.{ .kind = .vista, .folder = "Windows Server 2008", .external_pe10 = true });
+    try std.testing.expectEqualStrings("Windows Server 2008", vista.items[vista.len - 1].source_ini);
+    // The client plans keep their fixed folders.
+    try std.testing.expectEqualStrings("Windows Vista", wimbootPlan(.{ .kind = .vista }).items[4].source_ini);
 }
 
 test "plan keys for the WORK preparation name the profile and its stages" {

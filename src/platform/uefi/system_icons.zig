@@ -56,25 +56,29 @@ pub fn get(root: *std.os.uefi.protocol.File, system: *const usos.catalog.SystemE
         }
 
         // Built-in icons come pre-scaled from bios-ui.bin (one small file
-        // read per boot); the 1254x1254 PNGs remain the fallback.
+        // read per boot); the 1254x1254 PNGs remain the fallback. A system
+        // without its own icon (Windows Server) shows the one of the client
+        // release it is routed as.
+        const ids = [_][]const u8{ system.id, usos.catalog.os_profiles.routeId(system.id) };
+        const id_count: usize = if (std.mem.eql(u8, ids[0], ids[1])) 1 else 2;
         if (builtinPack(root)) |pack| {
-            if (pack.icon(system.id, &entry.image.pixels)) {
+            for (ids[0..id_count]) |id| {
+                if (pack.icon(id, &entry.image.pixels)) {
+                    entry.state = .ready;
+                    return &entry.image;
+                }
+            }
+        }
+
+        for (ids[0..id_count]) |id| {
+            const builtin_path = buildBuiltinPath(id, &path_buffer) orelse continue;
+            if (decodePath(root, builtin_path, &entry.image)) {
                 entry.state = .ready;
                 return &entry.image;
             }
         }
-
-        const builtin_path = buildBuiltinPath(system.id, &path_buffer) orelse {
-            entry.state = .missing;
-            return null;
-        };
-        if (!decodePath(root, builtin_path, &entry.image)) {
-            entry.state = .missing;
-            return null;
-        }
-
-        entry.state = .ready;
-        return &entry.image;
+        entry.state = .missing;
+        return null;
     }
     return null;
 }

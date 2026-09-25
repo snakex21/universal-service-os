@@ -10,11 +10,40 @@ const secure_boot = @import("secure_boot.zig");
 
 var list_timing_reported = false;
 
-const max_rows = usos.catalog.systems.all.len;
+/// Every system plus the "Windows Server" section header.
+const max_rows = usos.catalog.systems.all.len + 1;
+
+/// List rows of a category: its systems in catalog order, with a
+/// non-selectable "Windows Server" header before the first Server entry.
+const Slots = struct {
+    entries: [max_rows]?*const usos.catalog.SystemEntry = undefined,
+    count: usize = 0,
+
+    fn build(category: usos.catalog.Category) Slots {
+        var slots = Slots{};
+        var index: usize = 0;
+        var header = false;
+        while (usos.catalog.systems.byCategoryIndex(category, index)) |entry| : (index += 1) {
+            if (entry.server and !header) {
+                header = true;
+                slots.entries[slots.count] = null;
+                slots.count += 1;
+            }
+            slots.entries[slots.count] = entry;
+            slots.count += 1;
+        }
+        return slots;
+    }
+
+    fn at(self: *const Slots, row: usize) ?*const usos.catalog.SystemEntry {
+        return if (row < self.count) self.entries[row] else null;
+    }
+};
 
 pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_discovery.Discovery, category: usos.catalog.Category, firmware: usos.firmware.Firmware) ?*const usos.catalog.SystemEntry {
-    const count = usos.catalog.systems.countInCategory(category);
-    if (count == 0) return null;
+    if (usos.catalog.systems.countInCategory(category) == 0) return null;
+    const slots = Slots.build(category);
+    const count = slots.count;
     if (!list_timing_reported) boot_timing.mark("first systems list requested");
 
     var selectable: [max_rows]bool = undefined;
@@ -23,15 +52,16 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
     var statuses: [max_rows]usos.catalog.SystemMediaStatus = undefined;
     var index: usize = 0;
     while (index < count) : (index += 1) {
-        const entry = usos.catalog.systems.byCategoryIndex(category, index) orelse continue;
+        const entry = slots.at(index) orelse continue;
         statuses[index] = discovery.mediaStatus(entry.image_directory);
     }
     if (!list_timing_reported) boot_timing.mark("systems media discovery (NTFS directories)");
     index = 0;
     while (index < count) : (index += 1) {
-        const entry = usos.catalog.systems.byCategoryIndex(category, index) orelse {
+        const entry = slots.at(index) orelse {
+            // Section header ("Windows Server"): shown, never selected.
             selectable[index] = false;
-            rows[index] = .{ .title = "", .enabled = false };
+            rows[index] = .{ .title = view.t(.server_section), .detail = view.t(.server_section_detail), .enabled = false };
             continue;
         };
         selectable[index] = access(entry, statuses[index], firmware).navigable();
@@ -41,7 +71,7 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
     if (!list_timing_reported) boot_timing.mark("systems icons loaded");
     var selected: usize = usos.gui.selectable_list.first(selectable[0..count]) orelse 0;
     var help_lines: HelpLines = undefined;
-    var shown_block = blockAt(category, selected, firmware);
+    var shown_block = blockAt(&slots, selected, firmware);
     var shown_help = blockedHelp(shown_block, &help_lines);
     var list: view.ListScreen = undefined;
     list.open(view.tr(category.label()), view.t(.systems_subtitle), rows[0..count], selected, true, shown_help);
@@ -54,13 +84,13 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
     while (true) {
         switch (navigation.handleSelectable(input.readBlocking(), &selected, count, &list, selectable[0..count])) {
             .activate => {
-                const entry = usos.catalog.systems.byCategoryIndex(category, selected) orelse continue;
+                const entry = slots.at(selected) orelse continue;
                 const media = discovery.mediaStatus(entry.image_directory);
                 switch (access(entry, media, firmware).activation()) {
                     .firmware_mismatch, .secure_boot_off_required => {
                         // Selectable so the reason can be read; never launched.
                         var notice_lines: HelpLines = undefined;
-                        if (blockedHelp(blockAt(category, selected, firmware), &notice_lines)) |help| {
+                        if (blockedHelp(blockAt(&slots, selected, firmware), &notice_lines)) |help| {
                             view.notice(entry.name, .warning, .warning, help.title, help.lines);
                             view.waitForDismiss();
                         }
@@ -79,7 +109,7 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
             },
             .back => return null,
             .changed => {
-                const block = blockAt(category, selected, firmware);
+                const block = blockAt(&slots, selected, firmware);
                 // The help panel takes list space: a panel appearing,
                 // disappearing or changing text needs a full relayout.
                 const relayout = block != shown_block;
@@ -97,8 +127,8 @@ const HelpLines = [2][]const u8;
 
 const Block = enum { none, requires_bios, requires_uefi, secure_boot_off };
 
-fn blockAt(category: usos.catalog.Category, index: usize, firmware: usos.firmware.Firmware) Block {
-    const entry = usos.catalog.systems.byCategoryIndex(category, index) orelse return .none;
+fn blockAt(slots: *const Slots, index: usize, firmware: usos.firmware.Firmware) Block {
+    const entry = slots.at(index) orelse return .none;
     if (!entry.firmware.accepts(firmware)) return if (entry.firmware == .uefi) .requires_uefi else .requires_bios;
     if (secureBootBlocked(entry, firmware)) return .secure_boot_off;
     return .none;

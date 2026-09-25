@@ -41,10 +41,35 @@ pub fn show(
     if (secure_boot.enforced() and usos.flow.secure_boot_policy.backendRequiresSecureBootOff(system.id, backend)) return showSecureBootRequired();
 
     var fields = Fields{};
-    var notes: [2][]const u8 = undefined;
+    var notes: [4][]const u8 = undefined;
     var note_count: usize = 0;
     fields.add(view.t(.summary_system), system.name);
     fields.add(view.t(.summary_image), image.name.slice());
+    // Windows Server media: its editions as Setup will list them.
+    var editions_text: [256]u8 = undefined;
+    if (image.media) |info| {
+        if (info.install.server) fields.add(view.t(.server_editions), usos.image_probe.windows_media.formatEditions(info.install, &editions_text, view.t(.server_core), view.t(.server_desktop)));
+    }
+    // Server media in a client folder or the reverse: where it belongs.
+    var folder_note: [256]u8 = undefined;
+    switch (manual_images.folderHint(system, image)) {
+        .none => {},
+        .server_in_client_folder, .client_in_server_folder => |hint| {
+            notes[note_count] = view.format(&folder_note, if (hint == .server_in_client_folder) .server_in_client_folder else .server_client_in_server_folder, &.{manual_images.suggestedFolder(image)});
+            note_count += 1;
+        },
+    }
+    // Setup without an inbox NVMe driver (Windows Server 2012), an NVMe
+    // controller in this PC and nothing in DATA\Drivers\<folder>\Storage.
+    var nvme_note: [256]u8 = undefined;
+    if (image.kind == .iso and usos.catalog.os_profiles.traits(system.id).no_inbox_nvme) {
+        if (usos.catalog.os_profiles.windowsFolder(system)) |folder| {
+            if (@import("uefi_drivers.zig").hasNvmeController() and windows_native_iso.userStorageEmpty(folder)) {
+                notes[note_count] = view.format(&nvme_note, .server_nvme_hint, &.{folder});
+                note_count += 1;
+            }
+        }
+    }
     fields.add(view.t(.summary_method), view.tr(method.label()));
     if (unattended) |path| fields.add(view.t(.summary_answer_file), path);
     var no_answer_text: [160]u8 = undefined;
@@ -95,7 +120,7 @@ pub fn show(
         }
     }
     if (image.kind == .iso and native.legacyPe()) {
-        if (windows_native_iso.inspect(image.name.slice(), vista)) |inspection| {
+        if (windows_native_iso.inspect(windows_native_iso.legacyFolder(system), image.name.slice(), vista)) |inspection| {
             fields.add(view.t(.summary_iso_case), if (vista) view.t(.summary_vista_case) else inspection.mode.label());
             fields.add(view.t(.summary_boot_source), inspection.bootName(image.name.slice()));
             const setup = inspection.boot_setup;
@@ -111,12 +136,16 @@ pub fn show(
                 fields.add(view.t(.summary_driver_inventory), @errorName(err));
             }
             if (!vista) {
-                if (windows_native_iso.userDriverCounts()) |counts| {
+                const folder = windows_native_iso.legacyFolder(system);
+                if (windows_native_iso.userDriverCountsFor(folder)) |counts| {
                     var used_text: [12]u8 = undefined;
                     var skipped_text: [12]u8 = undefined;
                     const used = std.fmt.bufPrint(&used_text, "{d}", .{counts[0]}) catch "?";
                     const skipped = std.fmt.bufPrint(&skipped_text, "{d}", .{counts[1]}) catch "?";
-                    fields.add(view.t(.summary_user_drivers), view.format(&user_text, .summary_user_drivers_count, &.{ used, skipped }));
+                    fields.add(view.t(.summary_user_drivers), if (std.mem.eql(u8, folder, "Windows 7"))
+                        view.format(&user_text, .summary_user_drivers_count, &.{ used, skipped })
+                    else
+                        view.format(&user_text, .summary_user_drivers_folder, &.{ folder, used, skipped }));
                 }
             }
         } else |err| {
@@ -203,7 +232,7 @@ fn start(
     const vista = native == .vista;
     if (image.kind == .iso and native.legacyPe() and resolved == .direct_iso) {
         view.windowsIsoStatus(.validating, "Reading the selected Windows ISO");
-        windows_native_iso.start(root, image.name.slice(), unattended, vista, view.windowsIsoStatus) catch |err| {
+        windows_native_iso.start(root, windows_native_iso.legacyFolder(system), image.name.slice(), unattended, vista, view.windowsIsoStatus) catch |err| {
             view.refreshFramebuffer();
             showError(view.t(.error_iso), err);
         };

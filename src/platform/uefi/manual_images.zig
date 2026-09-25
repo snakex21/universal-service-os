@@ -6,6 +6,8 @@ const probe = @import("windows_media_probe.zig");
 const media = usos.image_probe.windows_media;
 
 var list_storage: usos.catalog.ImageList = .{};
+/// Row detail text that is formatted (the "belongs in" folder hint).
+var detail_storage: [usos.catalog.image_list_max_items][96]u8 = undefined;
 
 pub fn select(discovery: *usos.catalog.media_discovery.Discovery, system: *const usos.catalog.SystemEntry) ?usos.catalog.ImageItem {
     list_storage = discovery.images(system.image_directory);
@@ -22,7 +24,7 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, system: *const
     var rows: [usos.catalog.image_list_max_items]usos.gui.ui.Row = undefined;
     var two_line = false;
     for (images.items[0..images.len], 0..) |*image, index| {
-        rows[index] = row(image);
+        rows[index] = row(system, image, &detail_storage[index]);
         if (rows[index].detail.len > 0) two_line = true;
     }
 
@@ -61,7 +63,23 @@ pub fn blockText(reason: media.Block) []const u8 {
         .needs_32bit_uefi_or_bios => view.t(.media_blocked_32bit),
         .arm64_media => view.t(.media_blocked_arm64),
         .no_uefi_loader => view.t(.media_blocked_no_uefi),
+        .ia64_media => view.t(.server_blocked_ia64),
     };
+}
+
+/// The image's install media and its folder disagree (Server media in a
+/// client folder or the reverse): where it belongs. A hint, never a block.
+pub fn folderHint(system: *const usos.catalog.SystemEntry, image: usos.catalog.ImageItem) media.FolderHint {
+    const info = image.media orelse return .none;
+    if (!probe.applies(system)) return .none;
+    return media.folderHint(info.install, system.server);
+}
+
+/// Folder name for the folder hint ("Windows Server 2022"), or a generic
+/// "Windows Server ..." / "Windows ..." when the version names none.
+pub fn suggestedFolder(image: usos.catalog.ImageItem) []const u8 {
+    const info = image.media orelse return "";
+    return media.suggestedFolder(info.install) orelse if (info.install.server) "Windows Server ..." else "Windows ...";
 }
 
 fn showBlocked(name: []const u8, reason: media.Block) void {
@@ -71,8 +89,9 @@ fn showBlocked(name: []const u8, reason: media.Block) void {
 }
 
 /// Badge: the architecture (warning when blocked); detail line: what the
-/// ISO is (Windows Setup, WinPE / rescue media) or why it cannot start.
-fn row(image: *const usos.catalog.ImageItem) usos.gui.ui.Row {
+/// ISO is (Windows Setup, Windows Server Setup, WinPE / rescue media), the
+/// folder it belongs in (Server/client mismatch) or why it cannot start.
+fn row(system: *const usos.catalog.SystemEntry, image: *const usos.catalog.ImageItem, detail: *[96]u8) usos.gui.ui.Row {
     var result = usos.gui.ui.Row{ .title = image.name.slice(), .icon = .{ .label = kindLabel(image.kind) } };
     const info = image.media orelse return result;
     if (info.unreadable) {
@@ -86,12 +105,14 @@ fn row(image: *const usos.catalog.ImageItem) usos.gui.ui.Row {
         return result;
     }
     result.detail = switch (info.content) {
-        .setup => view.t(.media_setup),
+        .setup => if (info.install.serverOnly()) view.t(.server_setup) else view.t(.media_setup),
         .winpe => view.t(.media_winpe),
         .not_windows => view.t(.media_not_windows),
         .unknown => "",
     };
-    if (arch) |text| result.badge = .{ .text = text, .tone = if (info.content == .setup) .success else .accent };
+    const hint = folderHint(system, image.*);
+    if (hint != .none) result.detail = view.format(detail, .server_belongs_in, &.{suggestedFolder(image.*)});
+    if (arch) |text| result.badge = .{ .text = text, .tone = if (hint != .none) .warning else if (info.content == .setup) .success else .accent };
     if (info.content == .winpe and arch == null) result.badge = .{ .text = view.t(.media_winpe_badge), .tone = .accent };
     return result;
 }

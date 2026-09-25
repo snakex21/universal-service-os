@@ -370,6 +370,21 @@ fn scanPci(out: []manifest_rules.PciId) usize {
     return n;
 }
 
+/// An NVM Express controller (PCI class 01h, subclass 08h) is present:
+/// config space dword 8 holds class, subclass and programming interface.
+pub fn hasNvmeController() bool {
+    const bs = uefi.system_table.boot_services orelse return false;
+    const handles = (bs.locateHandleBuffer(.{ .by_protocol = &PciIo.guid }) catch null) orelse return false;
+    defer bs.freePool(@ptrCast(handles.ptr)) catch {};
+    for (handles) |handle| {
+        const io = (bs.handleProtocol(PciIo, handle) catch continue) orelse continue;
+        var dword: u32 = 0;
+        if (io.pci_read(io, PciIo.width_uint32, 8, 1, @ptrCast(&dword)) != .success) continue;
+        if (dword >> 16 == 0x0108) return true;
+    }
+    return false;
+}
+
 var image_buffer: ?[]align(8) u8 = null;
 
 fn prepare(catalog: *data_volume.Catalog, entry: *Entry, environment: *Environment) void {

@@ -14379,6 +14379,50 @@ wimboot	vista	1	1	1	4	flag usos-nvme-packages.flag
 wimboot	vista	1	1	1	5	boot BCD boot.sdi boot.wim
 wimboot	vista	1	1	1	6	file usos-source.ini folder=Windows Vista
 wimboot	vista	1	1	1	7	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
+# wimboot_server: system kind index injection (external PE10, NVMe packages and an answer file where the kind allows them)
+wimboot_server	windows-server-2025	modern_setup	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot_server	windows-server-2025	modern_setup	1	support \EFI\USOS\windows-native\modern-support.cpio limit=8MiB
+wimboot_server	windows-server-2025	modern_setup	2	flag usos-modern-uefi.flag
+wimboot_server	windows-server-2025	modern_setup	3	drivers usos-drivers.bin user Drivers\Windows Server 2025 (if any)
+wimboot_server	windows-server-2025	modern_setup	4	file usos-source.ini folder=Windows Server 2025
+wimboot_server	windows-server-2025	modern_setup	5	file usos-unattend.xml from Systems\Windows\Windows Server 2025\Unattended
+wimboot_server	windows-server-2025	modern_setup	6	boot BCD boot.sdi boot.wim
+wimboot_server	windows-server-2022	modern_setup	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot_server	windows-server-2022	modern_setup	1	support \EFI\USOS\windows-native\modern-support.cpio limit=8MiB
+wimboot_server	windows-server-2022	modern_setup	2	flag usos-modern-uefi.flag
+wimboot_server	windows-server-2022	modern_setup	3	drivers usos-drivers.bin user Drivers\Windows Server 2022 (if any)
+wimboot_server	windows-server-2022	modern_setup	4	file usos-source.ini folder=Windows Server 2022
+wimboot_server	windows-server-2022	modern_setup	5	file usos-unattend.xml from Systems\Windows\Windows Server 2022\Unattended
+wimboot_server	windows-server-2022	modern_setup	6	boot BCD boot.sdi boot.wim
+wimboot_server	windows-server-2019	modern_setup	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot_server	windows-server-2019	modern_setup	1	support \EFI\USOS\windows-native\modern-support.cpio limit=8MiB
+wimboot_server	windows-server-2019	modern_setup	2	flag usos-modern-uefi.flag
+wimboot_server	windows-server-2019	modern_setup	3	drivers usos-drivers.bin user Drivers\Windows Server 2019 (if any)
+wimboot_server	windows-server-2019	modern_setup	4	file usos-source.ini folder=Windows Server 2019
+wimboot_server	windows-server-2019	modern_setup	5	file usos-unattend.xml from Systems\Windows\Windows Server 2019\Unattended
+wimboot_server	windows-server-2019	modern_setup	6	boot BCD boot.sdi boot.wim
+wimboot_server	windows-server-2016	modern_setup	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot_server	windows-server-2016	modern_setup	1	support \EFI\USOS\windows-native\modern-support.cpio limit=8MiB
+wimboot_server	windows-server-2016	modern_setup	2	flag usos-modern-uefi.flag
+wimboot_server	windows-server-2016	modern_setup	3	drivers usos-drivers.bin user Drivers\Windows Server 2016 (if any)
+wimboot_server	windows-server-2016	modern_setup	4	file usos-source.ini folder=Windows Server 2016
+wimboot_server	windows-server-2016	modern_setup	5	file usos-unattend.xml from Systems\Windows\Windows Server 2016\Unattended
+wimboot_server	windows-server-2016	modern_setup	6	boot BCD boot.sdi boot.wim
+wimboot_server	windows-server-2008-r2	win7	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot_server	windows-server-2008-r2	win7	1	support \EFI\USOS\windows-native\win7-support.cpio limit=64MiB
+wimboot_server	windows-server-2008-r2	win7	2	flag usos-modern-win7.flag
+wimboot_server	windows-server-2008-r2	win7	3	flag usos-external-pe10.flag
+wimboot_server	windows-server-2008-r2	win7	4	flag usos-nvme-packages.flag
+wimboot_server	windows-server-2008-r2	win7	5	drivers usos-drivers.bin bundled+user Drivers\Windows Server 2008 R2
+wimboot_server	windows-server-2008-r2	win7	6	boot BCD boot.sdi boot.wim
+wimboot_server	windows-server-2008-r2	win7	7	file usos-source.ini folder=Windows Server 2008 R2
+wimboot_server	windows-server-2008-r2	win7	8	file usos-unattend.xml from Systems\Windows\Windows Server 2008 R2\Unattended
+wimboot_server	windows-server-2008	vista	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot_server	windows-server-2008	vista	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
+wimboot_server	windows-server-2008	vista	2	flag usos-modern-vista.flag
+wimboot_server	windows-server-2008	vista	3	flag usos-external-pe10.flag
+wimboot_server	windows-server-2008	vista	4	boot BCD boot.sdi boot.wim
+wimboot_server	windows-server-2008	vista	5	file usos-source.ini folder=Windows Server 2008
 # progress
 progress	micro_linux	request_saved	1/5 Starting environment - preparation request saved	Preparation request saved
 progress	micro_linux	return_boot_configured	1/5 Starting environment - return boot configured	Return boot configured

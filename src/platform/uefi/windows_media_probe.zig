@@ -36,11 +36,10 @@ pub fn firmware() media.Firmware {
     };
 }
 
-/// Windows systems whose ISOs are probed (modern Windows boot media).
+/// Windows systems whose ISOs are probed (modern Windows boot media: the
+/// client versions Vista to 11 and Windows Server 2008 to 2025).
 pub fn applies(system: *const usos.catalog.SystemEntry) bool {
-    const ids = [_][]const u8{ "windows-11", "windows-10", "windows-8-1", "windows-8", "windows-7", "windows-vista" };
-    for (ids) |id| if (std.mem.eql(u8, system.id, id)) return true;
-    return false;
+    return system.family == .windows;
 }
 
 const State = struct {
@@ -93,9 +92,11 @@ fn probeOne(state: *State, directory: []const u8, directory_hash: u64, name: uso
         serial.writeAscii(std.fmt.bufPrint(&message, "[MEDIA] {s}: unreadable ({s})\r\n", .{ name.slice(), @errorName(err) }) catch "[MEDIA] unreadable\r\n");
         break :blk media.Info{ .unreadable = true };
     };
-    var message: [200]u8 = undefined;
-    serial.writeAscii(std.fmt.bufPrint(&message, "[MEDIA] {s}: arch={s} content={s} uefi_x64={} bios={}\r\n", .{
-        name.slice(), if (info.arch == .unknown) "unknown" else info.arch.label(), @tagName(info.content), info.uefi_x64, info.bios,
+    var message: [400]u8 = undefined;
+    serial.writeAscii(std.fmt.bufPrint(&message, "[MEDIA] {s}: arch={s} content={s} uefi_x64={} bios={} install_images={d} server={} client={} ia64={} version={d}.{d}.{d}\r\n", .{
+        name.slice(),         if (info.arch == .unknown) "unknown" else info.arch.label(), @tagName(info.content), info.uefi_x64, info.bios,
+        info.install.images,  info.install.server,                                     info.install.client,     info.install.ia64,
+        info.install.major,   info.install.minor,                                      info.install.build,
     }) catch "[MEDIA]\r\n");
     cache[cache_next] = .{ .used = true, .directory_hash = directory_hash, .name = name, .size = size, .info = info };
     cache_next = (cache_next + 1) % cache.len;
@@ -116,20 +117,39 @@ fn inspect(state: *State) !media.Info {
         .efi_x64 = try exists(&iso, media.efi_x64),
         .efi_ia32 = try exists(&iso, media.efi_ia32),
         .efi_aa64 = try exists(&iso, media.efi_aa64),
+        .efi_ia64 = try exists(&iso, media.efi_ia64),
         .bootmgr = try exists(&iso, media.bios_bootmgr),
         .boot_wim = try exists(&iso, media.boot_wim),
         .setup_exe = try exists(&iso, media.setup_exe),
     };
+    var install_path: ?[]const u8 = null;
     for (usos.image_probe.windows_detect.modern_install_images) |path| {
         if (try exists(&iso, path)) {
             presence.install_image = true;
+            install_path = path;
             break;
         }
     }
     // Only media without any EFI loader need the boot.wim metadata.
     if (presence.boot_wim and !presence.efi_x64 and !presence.efi_ia32 and !presence.efi_aa64)
         presence.wim_arch = bootWimArch(&iso) catch null;
-    return media.classify(presence);
+    var info = media.classify(presence);
+    // What the install image installs (client/Server, editions, IA64).
+    if (install_path) |path| info.install = installInfo(&iso, path) catch .{};
+    return info;
+}
+
+/// install.wim/esd/swm XML metadata (uncompressed in every WIM version).
+fn installInfo(iso: *const Iso, path: []const u8) !media.Install {
+    var node: udf.Node = undefined;
+    if (!try udf.openPath(iso, path, &node) or node.is_directory) return error.WindowsInstallImageMissing;
+    var header: [124]u8 = undefined;
+    try udf.readNodeAt(iso, &node, 0, &header);
+    const resource = try wim.xmlResource(&header, node.size);
+    const bytes = try uefi.pool_allocator.alloc(u8, resource.size);
+    defer uefi.pool_allocator.free(bytes);
+    try udf.readNodeAt(iso, &node, resource.offset, bytes);
+    return media.parseInstall(bytes);
 }
 
 fn bootWimArch(iso: *const Iso) !u32 {

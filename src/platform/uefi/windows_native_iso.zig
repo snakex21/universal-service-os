@@ -73,11 +73,21 @@ fn openIn(catalog: *data_volume.Catalog, directory: []const u8, name: []const u8
     var path: PathBuffer = .{};
     try ntfs.openFile(catalog.fs, catalog.reader(), try path.build(directory, name), file);
 }
-fn openIso(catalog: *data_volume.Catalog, folder: []const u16, name: []const u8, file: *ntfs.File) !void {
+fn openIso(catalog: *data_volume.Catalog, folder: []const u8, name: []const u8, file: *ntfs.File) !void {
     try source_config.validateName(name);
+    try source_config.validateName(folder);
     var name_buffer: [255]u16 = undefined;
-    const path = [_][]const u16{ wide("Systems"), wide("Windows"), folder, wide("Images"), widen(name, &name_buffer) };
+    var folder_buffer: [64]u16 = undefined;
+    if (folder.len > folder_buffer.len) return error.UnsupportedWindowsFolder;
+    const path = [_][]const u16{ wide("Systems"), wide("Windows"), widen(folder, &folder_buffer), wide("Images"), widen(name, &name_buffer) };
     try ntfs.openFile(catalog.fs, catalog.reader(), &path, file);
+}
+
+/// DATA folder of a Windows 7 / Vista route: "Windows 7", "Windows Vista"
+/// or the Server folder ("Windows Server 2008 R2", "Windows Server 2008").
+pub fn legacyFolder(system: *const usos.catalog.SystemEntry) []const u8 {
+    return usos.catalog.os_profiles.windowsFolder(system) orelse
+        if (usos.catalog.os_profiles.traits(system.id).native_uefi == .vista) "Windows Vista" else "Windows 7";
 }
 const DonorContext = struct {
     state: *BootState,
@@ -87,22 +97,22 @@ const DonorContext = struct {
         return scanner.inspectDonor(uefi.pool_allocator, &iso);
     }
 };
-fn inspectState(state: *BootState, name: []const u8, vista: bool) !scanner.Inspection {
-    try openIso(&state.catalog, if (vista) wide("Windows Vista") else wide("Windows 7"), name, &state.source);
+fn inspectState(state: *BootState, folder: []const u8, name: []const u8, vista: bool) !scanner.Inspection {
+    try openIso(&state.catalog, folder, name, &state.source);
     var iso = Iso{ .catalog = &state.catalog, .file = &state.source };
     const selected = if (vista) try scanner.inspectVista(uefi.pool_allocator, &iso) else try scanner.inspectSelected(uefi.pool_allocator, &iso);
     var adapter = directory_source.Adapter.init(state.catalog.fs, state.catalog.reader());
     var context = DonorContext{ .state = state };
     return scanner.resolveDonor(selected, adapter.source(), &context);
 }
-pub noinline fn inspect(name: []const u8, vista: bool) !scanner.Inspection {
+pub noinline fn inspect(folder: []const u8, name: []const u8, vista: bool) !scanner.Inspection {
     if (uefi.system_table.boot_services == null) return error.NoBootServices;
     // BootState inherits the BlockIo bounce buffer's 4096-byte alignment;
     // raw AllocatePool guarantees only 8 bytes. The typed allocator aligns it.
     const state = try uefi.pool_allocator.create(BootState);
     defer uefi.pool_allocator.destroy(state);
     try initBootState(state);
-    const inspection = try inspectState(state, name, vista);
+    const inspection = try inspectState(state, folder, name, vista);
     if (inspection.mode == .original) try checkDonorRecord(state, &inspection, null, null);
     return inspection;
 }
@@ -110,10 +120,20 @@ pub fn externalDriverCount() !usize {
     var catalog = try data_volume.openCatalog();
     return driver_files.infCount(&catalog);
 }
-/// DATA\Drivers\Windows 7: [used, skipped] INFs, null when there are none.
-pub fn userDriverCounts() ?[2]usize {
-    return userDriverCountsFor("Windows 7");
+/// DATA\Drivers\<folder>\Storage has nothing in it (a missing folder or a
+/// DATA that cannot be read counts as empty: the caller only shows a hint).
+pub fn userStorageEmpty(folder: []const u8) bool {
+    const catalog = uefi.pool_allocator.create(data_volume.Catalog) catch return true;
+    defer uefi.pool_allocator.destroy(catalog);
+    catalog.* = data_volume.openCatalog() catch return true;
+    var adapter = directory_source.Adapter.init(catalog.fs, catalog.reader());
+    var path: [128]u8 = undefined;
+    const directory = std.fmt.bufPrint(&path, "Drivers\\{s}\\Storage", .{folder}) catch return true;
+    var entries: [1]usos.catalog.directory_source.Entry = undefined;
+    const page = adapter.source().listPage(directory, 0, &entries) catch return true;
+    return page.count == 0;
 }
+
 /// DATA\Drivers\<folder>: [used, skipped] INFs, null when there are none.
 pub fn userDriverCountsFor(folder: []const u8) ?[2]usize {
     const catalog = uefi.pool_allocator.create(data_volume.Catalog) catch return null;
@@ -180,7 +200,7 @@ fn checkDonorRecord(state: *BootState, inspection: *const scanner.Inspection, ro
 }
 
 const IsoStage = @import("usos").flow.preparation_boot_progress.DirectIsoStage;
-pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: ?[]const u8, vista: bool, progress: *const fn (IsoStage, []const u8) void) !void {
+pub noinline fn start(root: *uefi.protocol.File, folder: []const u8, name: []const u8, answer_name: ?[]const u8, vista: bool, progress: *const fn (IsoStage, []const u8) void) !void {
     if (@import("builtin").cpu.arch != .x86_64) return error.WindowsSetupRequiresX64;
     try source_config.validateName(name);
     if (answer_name) |answer| try source_config.validateName(answer);
@@ -191,7 +211,7 @@ pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: 
     const catalog = &state.catalog;
     if (vista and answer_name != null) return error.VistaUnattendedNotSupported;
     progress(.validating, "Validating the installation ISO and resolving the boot source");
-    const inspection = try inspectState(state, name, vista);
+    const inspection = try inspectState(state, folder, name, vista);
     const source = &state.source;
     const external_pe10 = inspection.mode == .original;
     if (external_pe10) {
@@ -212,7 +232,9 @@ pub noinline fn start(root: *uefi.protocol.File, name: []const u8, answer_name: 
     var owned = Owned{};
     defer owned.release();
     var config: [544]u8 = undefined;
-    const plan = usos.flow.plan.wimbootPlan(.{ .kind = if (vista) .vista else .win7, .answer = answer_name != null, .external_pe10 = external_pe10, .nvme_packages = inspection.nvme_packages });
+    // The client folders keep the plan's defaults (hardware-tested order and names).
+    const client_folder = std.mem.eql(u8, folder, if (vista) "Windows Vista" else "Windows 7");
+    const plan = usos.flow.plan.wimbootPlan(.{ .kind = if (vista) .vista else .win7, .folder = if (client_folder) "" else folder, .answer = answer_name != null, .external_pe10 = external_pe10, .nvme_packages = inspection.nvme_packages });
     try inject(root, state, volume, &owned, &boot_iso, &plan, name, answer_name, &config, progress);
     return launch(root, volume, setup.index, if (external_pe10) "Starting external PE10; the install source remains the selected Windows ISO" else "Starting the hybrid ISO's own WinPE and Setup", progress);
 }
@@ -325,9 +347,9 @@ fn inject(root: *uefi.protocol.File, state: *BootState, volume: *files.Volume, o
         switch (item) {
             .support => |support| try addSupport(root, volume, owned, support.path, support.limit_mib),
             .flag => |flag_name| try volume.add(flag_name, usos.flow.plan.flag_content),
-            .bundled_drivers => {
+            .bundled_drivers => |user_folder| {
                 progress(.loading, "Reading optional Windows 7 x64 driver packages");
-                const drivers = try driver_files.load(catalog);
+                const drivers = try driver_files.loadWithUser(catalog, user_folder);
                 try owned.keep(drivers.bytes);
                 try volume.add("usos-drivers.bin", drivers.bytes);
                 var driver_message: [128]u8 = undefined;
