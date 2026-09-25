@@ -31,6 +31,16 @@ var windowsProfiles = []dataProfile{
 	{"windows-95", "Windows 95", true, false},
 	{"windows-3-11", "Windows 3.11", false, false},
 	{"windows-3-1", "Windows 3.1", false, false},
+	// Windows Server (src/catalog/windows_server.zig); 2003/2000 Server
+	// come with the NT5 staging.
+	{"windows-server-2025", "Windows Server 2025", true, true},
+	{"windows-server-2022", "Windows Server 2022", true, true},
+	{"windows-server-2019", "Windows Server 2019", true, true},
+	{"windows-server-2016", "Windows Server 2016", true, true},
+	{"windows-server-2012-r2", "Windows Server 2012 R2", true, true},
+	{"windows-server-2012", "Windows Server 2012", true, true},
+	{"windows-server-2008-r2", "Windows Server 2008 R2", true, true},
+	{"windows-server-2008", "Windows Server 2008", true, true},
 }
 
 var linuxProfiles = []dataProfile{
