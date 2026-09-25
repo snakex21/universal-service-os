@@ -386,8 +386,8 @@ pub const Key = enum(u16) {
     summary_vista_support,
     summary_vista_usb,
     summary_xp_disk,
-    summary_xp_no_unattended,
     summary_xp_preparation,
+    summary_xp_sif_merged,
     summary_xp_source,
     system_copy_to,
     system_image_count,
@@ -407,6 +407,11 @@ pub const Key = enum(u16) {
     unattended_none_detail,
     unattended_subtitle,
     unattended_title,
+    unattended_xp_file_detail,
+    unattended_xp_none,
+    unattended_xp_none_detail,
+    unattended_xp_settings,
+    unattended_xp_settings_detail,
     utilities_freedos_desc,
     utilities_hardware_desc,
     utilities_none_line1,
@@ -809,8 +814,8 @@ pub const hashes = [_]u32{
     0xa0987638, // summary.vista_support
     0x1e3154b1, // summary.vista_usb
     0xe262ce65, // summary.xp_disk
-    0xf02f95da, // summary.xp_no_unattended
     0xedd282b9, // summary.xp_preparation
+    0xa87889c3, // summary.xp_sif_merged
     0x6dfb98bd, // summary.xp_source
     0x6fd0eb35, // system.copy_to
     0x4961b793, // system.image_count
@@ -830,6 +835,11 @@ pub const hashes = [_]u32{
     0x16e5e868, // unattended.none.detail
     0x0404a4d7, // unattended.subtitle
     0x117edf4b, // unattended.title
+    0xc77e920d, // unattended.xp_file.detail
+    0x19b9a10e, // unattended.xp_none
+    0xce8f0701, // unattended.xp_none.detail
+    0x33bff8f1, // unattended.xp_settings
+    0x8b01f4fc, // unattended.xp_settings.detail
     0x90427850, // utilities.freedos.desc
     0xbe35b4e2, // utilities.hardware.desc
     0x89ec8a66, // utilities.none.line1
@@ -1258,6 +1268,11 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    true,
+    true,
+    true,
+    true,
+    true,
     false,
     true,
     true,
@@ -1654,8 +1669,8 @@ pub const english = [_][]const u8{
     "KB2864202 + signed USB package + pre-Setup v11",
     "PE10 native USB; the target uses Vista USB v11",
     "Selected and confirmed in the next graphical screen",
-    "Custom unattended files are not supported on this XP UEFI path.",
     "UEFI; installed XP requires firmware CSM and MBR",
+    "{0} (merged into the automatic answer)",
     "XP SP3 x86; ACPI / SATA / USB drivers; optional PAE boot entry",
     "Copy images to {0}",
     "Images: {0}",
@@ -1675,6 +1690,11 @@ pub const english = [_][]const u8{
     "Use the default setup options without a custom answer file.",
     "Choose an answer file or continue without one",
     "Unattended setup",
+    "The .sif is merged into the automatic answer; disk, PAE and driver settings stay automatic. usos-xp.ini is not used.",
+    "No settings (interactive Setup)",
+    "usos-xp.ini is empty or missing: XP Setup asks for the name, product key and time zone.",
+    "usos-xp.ini: {0}, {1}",
+    "Automatic XP Setup with the accounts and computer name from usos-xp.ini. The product key is not shown.",
     "DOS programs from USB, file manager and command prompt",
     "Built-in: CPU, RAM, motherboard and disks",
     "No utility folders were found on this USOS drive.",

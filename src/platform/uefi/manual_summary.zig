@@ -9,6 +9,8 @@ const view = @import("manual_view.zig");
 const windows_native_iso = @import("windows_native_iso.zig");
 const secure_boot = @import("secure_boot.zig");
 const manual_images = @import("manual_images.zig");
+const manual_unattended = @import("manual_unattended.zig");
+const xp_settings = @import("xp_settings.zig");
 
 const Fields = struct {
     labels: [16][]const u8 = undefined,
@@ -46,23 +48,33 @@ pub fn show(
     fields.add(view.t(.summary_system), system.name);
     fields.add(view.t(.summary_image), image.name.slice());
     fields.add(view.t(.summary_method), view.tr(method.label()));
-    if (unattended) |path| fields.add(view.t(.summary_answer_file), path);
     var no_answer_text: [160]u8 = undefined;
-    // No answer file on DATA: say where one would be picked up (the
-    // selection screen is skipped when the folder is empty).
-    if (unattended == null and answers_available == 0 and image.kind == .iso and std.mem.startsWith(u8, system.id, "windows-")) {
-        if (system.unattended_directory) |directory| fields.add(view.t(.summary_answer_file), view.format(&no_answer_text, .summary_no_answer_files, &.{directory}));
+    var answer_text: [200]u8 = undefined;
+    const settings_name = usos.catalog.os_profiles.traits(system.id).settings_file;
+    if (backend == .xp_uefi_staging) {
+        // XP UEFI-CSM: a .sif is merged into the automatic answer; without
+        // one, usos-xp.ini (if active) makes Setup hands-off.
+        if (unattended) |path| {
+            fields.add(view.t(.summary_answer_file), view.format(&answer_text, .summary_xp_sif_merged, &.{path}));
+        } else if (settings_name) |name| {
+            if (system.unattended_directory) |directory| {
+                const summary = xp_settings.read(directory, name);
+                fields.add(view.t(.summary_answer_file), manual_unattended.settingsText(&answer_text, &summary));
+            }
+        }
+    } else {
+        if (unattended) |path| fields.add(view.t(.summary_answer_file), path);
+        // No answer file on DATA: say where one would be picked up (the
+        // selection screen is skipped when the folder is empty).
+        if (unattended == null and answers_available == 0 and image.kind == .iso and std.mem.startsWith(u8, system.id, "windows-")) {
+            if (system.unattended_directory) |directory| fields.add(view.t(.summary_answer_file), view.format(&no_answer_text, .summary_no_answer_files, &.{directory}));
+        }
     }
     var can_start = true;
     if (backend == .xp_uefi_staging) {
         fields.add(view.t(.summary_preparation), view.t(.summary_xp_preparation));
         fields.add(view.t(.summary_source), view.t(.summary_xp_source));
         fields.add(view.t(.summary_disk), view.t(.summary_xp_disk));
-        if (unattended != null) {
-            can_start = false;
-            notes[note_count] = view.t(.summary_xp_no_unattended);
-            note_count += 1;
-        }
     }
     var version_text: [96]u8 = undefined;
     var count_text: [100]u8 = undefined;

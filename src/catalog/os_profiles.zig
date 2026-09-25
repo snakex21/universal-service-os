@@ -68,10 +68,13 @@ pub const SystemTraits = struct {
     native_uefi: NativeUefi = .none,
     /// An ISO of this system is prepared by the NT5 (XP/2000) staging.
     nt5_staging: bool = false,
+    /// USOS settings file in the Unattended folder (hands-off Setup without
+    /// an answer file; docs/xp-unattended.md). The answer screen shows it.
+    settings_file: ?[]const u8 = null,
 };
 
 pub const traits_table = [_]SystemTraits{
-    .{ .system_id = "windows-xp", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true },
+    .{ .system_id = "windows-xp", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini" },
     .{ .system_id = "windows-2000", .answer = .winnt_sif, .nt5_staging = true },
     .{ .system_id = "windows-7", .secure_boot_off = true, .native_uefi = .win7 },
     .{ .system_id = "windows-vista", .secure_boot_off = true, .native_uefi = .vista },

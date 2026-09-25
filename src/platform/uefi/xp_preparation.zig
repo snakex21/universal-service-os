@@ -14,8 +14,34 @@ fn mark(root: *uefi.protocol.File, stage: []const u8, name: []const u8) !void {
     try file.flush();
 }
 
+/// `usos.legacy_unattended_hex=` for a .sif chosen on the answer screen: the
+/// staging merges it into the automatic answer (tools/xp_user_settings.sh).
+pub fn unattendedOption(buffer: []u8, unattended: ?[]const u8) ![]const u8 {
+    const answer = unattended orelse return "";
+    if (answer.len == 0 or answer.len > 120 or std.mem.indexOfAny(u8, answer, "\\/\r\n\"") != null) return error.InvalidXpAnswerName;
+    if (answer.len < 4 or !std.ascii.eqlIgnoreCase(answer[answer.len - 4 ..], ".sif")) return error.InvalidXpAnswerName;
+    const prefix = " usos.legacy_unattended_hex=";
+    if (buffer.len < prefix.len + answer.len * 2) return error.InvalidXpAnswerName;
+    @memcpy(buffer[0..prefix.len], prefix);
+    for (answer, 0..) |c, i| {
+        buffer[prefix.len + i * 2] = "0123456789abcdef"[c >> 4];
+        buffer[prefix.len + i * 2 + 1] = "0123456789abcdef"[c & 15];
+    }
+    return buffer[0 .. prefix.len + answer.len * 2];
+}
+
+test "XP answer option carries only a .sif file name" {
+    var buffer: [300]u8 = undefined;
+    try std.testing.expectEqualStrings("", try unattendedOption(&buffer, null));
+    try std.testing.expectEqualStrings(" usos.legacy_unattended_hex=612e534946", try unattendedOption(&buffer, "a.SIF"));
+    try std.testing.expectError(error.InvalidXpAnswerName, unattendedOption(&buffer, "a.xml"));
+    try std.testing.expectError(error.InvalidXpAnswerName, unattendedOption(&buffer, "dir\\a.sif"));
+    try std.testing.expectEqualStrings(" usos.legacy_unattended_hex=6d7920612e736966", try unattendedOption(&buffer, "my a.sif"));
+}
+
 pub fn start(root: *uefi.protocol.File, name: []const u8, unattended: ?[]const u8, progress: *const fn (Stage) void) !void {
-    if (unattended != null) return error.XpUefiCustomUnattendedUnsupported;
+    var answer_buffer: [300]u8 = undefined;
+    const answer_option = try unattendedOption(&answer_buffer, unattended);
     if (name.len == 0 or name.len > 512 or std.mem.indexOfAny(u8, name, "\\/\r\n") != null) return error.InvalidXpImageName;
     // Require the isolated payload before creating any diagnostics.
     const initrd = try root.open(wide("\\EFI\\USOS-XP\\initramfs-xp"), .read, .{});
@@ -51,7 +77,7 @@ pub fn start(root: *uefi.protocol.File, name: []const u8, unattended: ?[]const u
         file.close() catch {};
         break :blk " initrd=\\EFI\\USOS\\lang.cpio";
     } else |_| "";
-    const command = try std.fmt.bufPrint(&cmd, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action=xp-staging usos.legacy_image_hex={s} usos.plan_profile=xp-x86-sp3-uefi-csm {s}", .{ lang_initrd, id, hex[0 .. name.len * 2], diagnostic.xpConsoleOptions(diagnostic.requested(root)) });
+    const command = try std.fmt.bufPrint(&cmd, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action=xp-staging usos.legacy_image_hex={s}{s} usos.plan_profile=xp-x86-sp3-uefi-csm {s}", .{ lang_initrd, id, hex[0 .. name.len * 2], answer_option, diagnostic.xpConsoleOptions(diagnostic.requested(root)) });
     var options: [2049]u16 = @splat(0);
     for (command, 0..) |c, i| options[i] = c;
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
