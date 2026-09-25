@@ -340,3 +340,21 @@ PE10 donor moved to DATA\Programs\USOS\WinPE, a44ab63a...; backup
 artifacts/xp-pae/deploy-20260925-105831); check_xp_pae against J: PASS.
 Tests after the release build: test_modern_finalize PASS, run_stage_drivers_qemu
 0 failures, run_qemu_secure_boot.py --only matrix 0 failures (TCG).
+
+## 2026-09-25: rebuild and deploy for B260925-143728-161B4279 (Win10/11 diagnostic logging)
+
+Staging ESP zig-out/xp-staging-20260925-log from zig-out/micro-linux (initramfs-usos
+d1b1af35...) + the stick's usos-device.ini, --data L:/. Two builds byte-identical
+(initramfs-xp d55971bf...b93f). compare_xp_packages.py against the deployed package
+(df616bf3..., kept in artifacts/xp-pae/package-before-20260925-log): 759 identical
+(driver bundles, hives, cabinets, PAE scripts), 1 base update (usr/bin/usos-fb-ui),
+0 intended, 0 unexplained (artifacts/xp-pae/compare-20260925-log.log). pae.exe
+(bab558bb...), the three launchers and the kernel (155c0f9f...) unchanged.
+check_xp_driver_imports, check_xp_menu_overlay, check_xp_driver_integration (default
+and --added-source) PASS. Deployed: usos-physical-update (RESULT=PASS,
+artifacts/physical-update-B260925-143728.log), then -DriversOnly -Language pl
+(HASH_READBACK=PASS, backup artifacts/xp-pae/deploy-20260925-164725). Readback:
+build-info B260925-143728-161B4279, J:\EFI\USOS-XP\initramfs-xp = d55971bf...,
+winpe-donor.ini and the PE10 donor (a44ab63a..., ReadOnly/Hidden/System) and every
+user ISO/answer file on L: identical to the pre-deploy record; check_xp_pae against
+J: PASS; J: and L: flushed.
