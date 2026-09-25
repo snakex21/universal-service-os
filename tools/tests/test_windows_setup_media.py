@@ -95,7 +95,7 @@ class Wiring(unittest.TestCase):
         state = (ROOT / "src/platform/uefi/persistent_state_file.zig").read_text(encoding="utf-8")
         self.assertIn('"selected_system="', state)
         flow = (ROOT / "src/platform/uefi/e2e_flow.zig").read_text(encoding="utf-8")
-        self.assertIn("resolved_method.persistedValue(), system.id);", flow)
+        self.assertIn("resolved_method.persistedValue(), system.id, try plan.stateKeys(&plan_keys));", flow)
         init = (ROOT / "tools/micro_linux_init.sh").read_text(encoding="utf-8")
         self.assertIn("SELECTED_SYSTEM=$(ini_value selected_system", init)
         self.assertIn("SELECTED_METHOD SELECTED_SYSTEM SELECTED_ISO WIM_FILE WIM_TEMPLATE", init)
