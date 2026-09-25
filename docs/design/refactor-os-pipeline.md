@@ -1,6 +1,6 @@
 # Refaktor: wspólny pipeline systemów operacyjnych (projekt, 2026-09-24)
 
-Stan: **M0, M1 i M2 zrobione** na gałęzi `refactor/os-pipeline` (2026-09-25),
+Stan: **M0–M3 zrobione** na gałęzi `refactor/os-pipeline` (2026-09-25),
 bez zmiany zachowania. Pozycja N2 w [ROADMAP.md](../ROADMAP.md).
 
 Postęp:
@@ -16,6 +16,17 @@ Postęp:
   `windows_native_iso.zig`, log `[WIMBOOT_PLAN]`). Odłożone: plan w linii poleceń
   BIOS (`usos.plan_hex`), bo nikt go nie czyta przed M3, a linia poleceń XP BIOS
   jest potwierdzona na sprzęcie.
+- M3: `tools/pipeline/run.sh` + kroki `steps/100_nt5_staging.sh`,
+  `150_nt5_resume.sh`, `500_windows_pe_bios_request.sh` (dawne gałęzie `case`
+  z `micro_linux_init.sh`, przeniesione bez zmian); krok 200 = ciało WORK
+  w `/usos-init`. Profil: token `usos.plan_profile=` (Core BIOS i launcher XP
+  UEFI), inaczej tabela akcji; ścieżka WORK sprawdza klucze `plan_*`
+  z `install-state.ini` (brak planu = starsze menu, akceptowane). Zamiast
+  `usos.plan_hex` jest sam identyfikator profilu, bo kroki wynikają z tabeli
+  w `run.sh`. Niezmiennik „guard przed zapisem” pilnują na razie same skrypty
+  (kroki są grube); sprawdzanie kolejności w `run.sh` dopiero przy rozbiciu
+  kroków. Uwaga: zmiana `usos-init` zmienia bazę pakietu XP UEFI-CSM, więc
+  po scaleniu trzeba go przebudować (M4 usuwa tę zależność).
 Powiązane: [answer-file-generator.md](answer-file-generator.md),
 [nt5-uefi-family.md](nt5-uefi-family.md), [drivers.md](../drivers.md),
 [BOOT_FLOW.md](../../BOOT_FLOW.md), [ARCHITECTURE.md](../../ARCHITECTURE.md).
