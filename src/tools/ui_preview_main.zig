@@ -1,6 +1,9 @@
 //! Host tool: renders the boot menu screens into BMP files for review
 //! without booting a VM.
-//!   usos-ui-preview <out-dir> <width> <height> [lang.bin]
+//!   usos-ui-preview <out-dir> <width> <height> [lang.bin|-] [theme]
+//! `theme` is a built-in theme name (src/gui/theme_presets.zig) or the
+//! path of a theme.ini (src/gui/theme_file.zig; an invalid one is
+//! reported and the default theme is used, as on the stick).
 const std = @import("std");
 const usos = @import("usos");
 const gui = usos.gui;
@@ -17,7 +20,21 @@ pub fn main(init: std.process.Init) !u8 {
 
     var blob: ?[]u8 = null;
     defer if (blob) |bytes| init.gpa.free(bytes);
-    if (args.next()) |path| blob = try cwd.readFileAlloc(io, path, init.gpa, .limited(256 * 1024));
+    if (args.next()) |path| {
+        if (!std.mem.eql(u8, path, "-")) blob = try cwd.readFileAlloc(io, path, init.gpa, .limited(256 * 1024));
+    }
+    var theme = gui.Theme{};
+    if (args.next()) |name| {
+        if (gui.theme_presets.find(name)) |preset| {
+            theme = preset;
+        } else {
+            const text = try cwd.readFileAlloc(io, name, init.gpa, .limited(gui.theme_file.max_bytes + 1));
+            defer init.gpa.free(text);
+            const outcome = gui.theme_file.resolve(text);
+            if (outcome.problem) |problem| std.debug.print("theme {s} not used: {s} (line {d}); default theme\n", .{ name, problem, outcome.line });
+            theme = outcome.theme;
+        }
+    }
 
     const pack = try gui.font.Pack.parse(gui.font_pack);
     const coverage = usos.i18n.Coverage{ .context = @ptrCast(&pack), .has = gui.font.coverageHas };
@@ -26,7 +43,7 @@ pub fn main(init: std.process.Init) !u8 {
     const pixels = try init.gpa.alloc(u32, @as(usize, width) * height);
     defer init.gpa.free(pixels);
     const buffer = gui.ScreenBuffer.init(@intFromPtr(pixels.ptr), pixels.len * 4, width, height, .bgrx8).?;
-    const ui = gui.ui.Ui.init(buffer.surface, gui.Theme{}, &pack, &table);
+    const ui = gui.ui.Ui.init(buffer.surface, theme, &pack, &table);
     const header = gui.ui.HeaderInfo{ .firmware = "UEFI", .build = "B260923-124620-62F8A603", .language = languageName(table.languageCode()), .clock = "Wed 23.09.2026 14:32" };
     const hints = [_]gui.ui.Hint{
         .{ .key = "\u{2191}\u{2193}", .label = ui.t(.key_select) },
@@ -185,6 +202,20 @@ pub fn main(init: std.process.Init) !u8 {
     };
     _ = gui.menu_screens.listScreen(&ui, header, .{ .title = ui.t(.sbinfo_title), .subtitle = ui.t(.sbinfo_desc), .rows = &enrolled_rows, .two_line = true, .selected = 1, .help = .{ .title = ui.t(.sbkey_title), .lines = &enrolled_lines, .badge = .{ .text = ui.t(.sbinfo_key_short_saved), .tone = .success } }, .hints = &hints }, 0);
     try save(io, cwd, init.gpa, out_dir, "14-tools-secure-boot-enrolled", pixels, width, height);
+
+    // Tools -> Theme (src/platform/uefi/manual_themes.zig): the built-in
+    // themes and one user theme, the second row current.
+    const current_badge = gui.ui.Badge{ .text = ui.t(.themes_current), .tone = .success };
+    const theme_rows = [_]gui.ui.Row{
+        .{ .title = ui.t(.themes_name_default), .detail = ui.t(.themes_builtin), .icon = .{ .vector = .gear } },
+        .{ .title = ui.t(.themes_name_dark), .detail = ui.t(.themes_builtin), .icon = .{ .vector = .gear }, .badge = current_badge },
+        .{ .title = ui.t(.themes_name_light), .detail = ui.t(.themes_builtin), .icon = .{ .vector = .gear } },
+        .{ .title = ui.t(.themes_name_high_contrast), .detail = ui.t(.themes_builtin), .icon = .{ .vector = .gear } },
+        .{ .title = ui.t(.themes_name_retro), .detail = ui.t(.themes_builtin), .icon = .{ .vector = .gear } },
+        .{ .title = "Sunset", .detail = ui.t(.themes_user), .icon = .{ .vector = .drive } },
+    };
+    _ = gui.menu_screens.listScreen(&ui, header, .{ .title = ui.t(.themes_title), .subtitle = ui.t(.themes_hint), .rows = &theme_rows, .selected = 1, .hover = 3, .hints = &hints }, 0);
+    try save(io, cwd, init.gpa, out_dir, "15-tools-theme", pixels, width, height);
     return 0;
 }
 
@@ -197,7 +228,7 @@ fn languageName(code: []const u8) []const u8 {
 }
 
 fn usage() u8 {
-    std.debug.print("usage: usos-ui-preview <out-dir> <width> <height> [lang.bin]\n", .{});
+    std.debug.print("usage: usos-ui-preview <out-dir> <width> <height> [lang.bin|-] [theme]\n", .{});
     return 2;
 }
 
