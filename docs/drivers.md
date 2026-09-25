@@ -11,6 +11,7 @@ Drivers\
     <Name>\driver.ini   optional manifest
   Windows 11\  Windows 10\  Windows 8.1\  Windows 8\  Windows 7\
   Windows Vista\  Windows XP\  Windows 2000\          <- NT setup systems:
+  Windows Server 2025\ ... Windows Server 2008\          (Server: docs/windows-server.md)
       Storage\  USB\  Other\                             boot-critical / USB 3 / everything else
   Windows NT 4.0\  Windows Me\  Windows 98 SE\  Windows 98\  Windows 95\
   Windows 3.11\  Windows 3.1\                          <- folder only (manual use)
