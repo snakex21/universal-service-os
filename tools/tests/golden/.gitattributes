@@ -1,0 +1,3 @@
+# Byte-exact goldens: never convert line endings.
+*.sif -text
+*.tsv -text
