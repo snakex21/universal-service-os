@@ -10,13 +10,14 @@ Core-style command line and checks the serial log:
   xp-staging + usos.plan_profile=nt5-staging  -> step 100 runs the NT5 staging
                                                 (stops: the ISO is not on DATA)
   xp-staging, no token (SeaBIOS: no EFI)      -> nt5-staging from the action table
+  xp-staging + xp-x86-sp3-uefi-csm            -> the UEFI launcher's token (same step 100)
   xp-resume + nt5-resume                      -> step 150 runs legacy_xp_resume.sh
                                                 (refused: nothing to resume)
   windows7-iso + windows-pe-bios-iso          -> step 500 request, then step 200
                                                 (the WORK body; stops: no Windows 7 ISO)
   xp-staging + windows-pe-bios-iso            -> refused before any step runs
-  no legacy action (WORK)                     -> no pipeline line before the state
-                                                check (stick state is phase=pending)
+  no legacy action (WORK)                     -> refused at phase=pending, or the
+                                                install-state.ini plan is read
 
     python tools/tests/run_pipeline_dispatch_qemu.py [--micro-linux DIR]
 
@@ -41,6 +42,8 @@ CASES = [
      ["[PIPELINE] profile=nt5-staging steps=100 source=cmdline", "[PIPELINE] step 100 nt5_staging", "[MICRO-LINUX] STOP:"], ["[PIPELINE] step 200"]),
     ("xp-action", "usos.legacy_action=xp-staging usos.legacy_image_hex=%s usos.bios_boot_drive=80",
      ["[PIPELINE] profile=nt5-staging steps=100 source=action", "[PIPELINE] step 100 nt5_staging", "[MICRO-LINUX] STOP:"], []),
+    ("xp-uefi-token", "usos.legacy_action=xp-staging usos.legacy_image_hex=%s usos.plan_profile=xp-x86-sp3-uefi-csm",
+     ["[PIPELINE] profile=xp-x86-sp3-uefi-csm steps=100 source=cmdline", "[PIPELINE] step 100 nt5_staging", "[MICRO-LINUX] STOP:"], []),
     ("xp-resume", "usos.legacy_action=xp-resume usos.plan_profile=nt5-resume",
      ["[PIPELINE] profile=nt5-resume steps=150 source=cmdline", "[PIPELINE] step 150 nt5_resume", "XP resume refused"], []),
     ("win7-bios", "kexec_load_disabled=0 usos.legacy_action=windows7-iso usos.legacy_image_hex=%s usos.bios_boot_drive=80 usos.plan_profile=windows-pe-bios-iso",
@@ -48,8 +51,12 @@ CASES = [
       "[WINDOWS_BIOS] REQUEST", "[PIPELINE] step 200 work_prepare", "[MICRO-LINUX] STOP:"], []),
     ("mismatch", "usos.legacy_action=xp-staging usos.legacy_image_hex=%s usos.plan_profile=windows-pe-bios-iso",
      ["profile token windows-pe-bios-iso does not match action xp-staging", "[MICRO-LINUX] STOP: unsupported Legacy action: xp-staging"], ["[PIPELINE] step"]),
+    # The stick's install-state.ini decides: phase=pending stops before the
+    # plan; a prepare-requested state left by a Chainload run is read with
+    # its plan ("A||B" = either fragment).
     ("work", "",
-     ["[MICRO-LINUX] STOP: refusing preparation from phase=pending"], ["[PIPELINE]"]),
+     ["[MICRO-LINUX] STOP: refusing preparation from phase=pending||[PIPELINE] profile=iso-work-chainload steps=200 source=install-state.ini"],
+     ["[PIPELINE] step", "source=cmdline", "source=action"]),
 ]
 
 
@@ -115,7 +122,7 @@ def main() -> int:
             continue
         text = run_case(label, tail, micro, uuid)
         for fragment in expected:
-            ok = fragment in text
+            ok = any(alternative in text for alternative in fragment.split("||"))
             failures += not ok
             print(("[PASS] " if ok else "[FAIL] ") + f"{label}: {fragment}")
         for fragment in forbidden:
