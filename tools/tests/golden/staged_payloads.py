@@ -91,7 +91,7 @@ def check_fresh(entries):
         if source.suffix in ('.sh', '.awk', '.sif') and source.is_file() and source.read_bytes().replace(b'\r\n', b'\n') != entry.data:
             stale.append(name)
     init = ROOT / 'tools/micro_linux_init.sh'
-    if entries['usos-init'].data != init.read_bytes():
+    if entries['usos-init'].data != init.read_bytes().replace(b'\r\n', b'\n'):
         stale.append('usos-init')
     return stale
 
@@ -120,7 +120,7 @@ def render():
     base = load_initramfs(BASE)
     stale = check_fresh(base)
     if stale:
-        raise SystemExit('stale build: zig-out/micro-linux differs from tools/ for ' + ', '.join(stale))
+        raise SystemExit('stale build: ' + str(BASE.parent) + ' differs from tools/ for ' + ', '.join(stale))
 
     lines.append('# initramfs: name mode sha256')
     for name in sorted(n for n in base if tracked(n)):
@@ -148,7 +148,10 @@ def render():
         lines.append(f'xp_csm_removed\t{name}')
 
     texts['xp_winnt_bios.sif'] = base['usr/lib/usos/xp_selected_partition.sif'].data
-    texts['xp_winnt_uefi_csm.sif'] = derived['usr/lib/usos/xp_selected_partition.sif'].data
+    # Since refactor M4 the UEFI-CSM answer is a base file of its own (the
+    # package no longer rewrites xp_selected_partition.sif).
+    uefi_sif = 'usr/lib/usos/xp_selected_partition_uefi_csm.sif'
+    texts['xp_winnt_uefi_csm.sif'] = (derived.get(uefi_sif) or derived['usr/lib/usos/xp_selected_partition.sif']).data
 
     lines.append('# native_cpio: archive member size sha256')
     for archive in ('support.cpio', 'win7-support.cpio', 'vista-support.cpio', 'modern-support.cpio'):

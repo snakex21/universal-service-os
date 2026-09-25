@@ -45,6 +45,8 @@ log "disks usos=$USOS_DEV target=$TARGET_DEV iso=$ISO_DEV"
 [ -n "$USOS_DEV" ] && [ -n "$TARGET_DEV" ] && [ -n "$ISO_DEV" ] || finish 'FAIL disk identification'
 mount -t iso9660 -o ro,map=off "$ISO_DEV" /mnt/source || finish 'FAIL iso mount'
 export SOURCE_ROOT=/mnt/source TARGET_DEVICE=$TARGET_DEV USOS_DISK_DEVICE=$USOS_DEV
+# Pipeline step 100 sets the profile in the real flow (refactor M3/M4).
+export USOS_PLAN_PROFILE=xp-x86-sp3-uefi-csm
 export TARGET_SNAPSHOT=/run/xp-target.snapshot XP_ALLOW_EMPTY=yes
 export XP_BIOS_DRIVE=80 XP_BIOS_CYLINDERS=1024 XP_BIOS_HEADS=255 XP_BIOS_SPT=63
 export XP_READY_FILE=/mnt/esp/EFI/USOS-XP/xp-target-ready.ini XPSETUP_MOUNT=/mnt/xpsetup
@@ -81,12 +83,16 @@ def vga_text(dump,rows_count):
         rows.append(''.join(chr(c) if 32<=c<127 else ' ' for c in b[r*160:r*160+160:2]).rstrip())
     return '\n'.join(rows)
 
-def prepare(out,iso):
+def prepare(out,iso,profile='xp-x86-sp3-uefi-csm'):
     usos=out/'usos-blank.qcow2';target=out/'target.qcow2'
     for disk,size in ((usos,256*1024**2),(target,TARGET_BYTES)):
         subprocess.run([str(QEMU_IMG),'create','-q','-f','qcow2',str(disk),str(size)],check=True)
     entries=cpio.parse_newc(gzip.decompress((PACKAGE/'initramfs-xp').read_bytes()))
-    cpio.put(entries,cpio.Entry('probe-init',stat.S_IFREG|0o755,PROBE_INIT.encode()))
+    probe=PROBE_INIT.replace('USOS_PLAN_PROFILE=xp-x86-sp3-uefi-csm','USOS_PLAN_PROFILE='+profile)
+    if profile!='xp-x86-sp3-uefi-csm':
+        # The BIOS NT5 profile has no driver preflight (and no bundles).
+        probe=probe.replace(". /usr/lib/usos/xp_driver_stage.sh; usos_xp_driver_preflight || finish 'FAIL driver preflight'"+chr(10),'')
+    cpio.put(entries,cpio.Entry('probe-init',stat.S_IFREG|0o755,probe.encode()))
     initrd=out/'initramfs-probe';initrd.write_bytes(gzip.compress(cpio.newc(entries),compresslevel=1,mtime=0))
     serial=out/'prepare-serial.log'
     cmd=[str(QEMU),'-machine','pc','-accel','tcg,thread=multi','-cpu','max','-m','1024','-smp','2','-display','none','-nic','none',
@@ -151,9 +157,9 @@ def textmode(out,target,keys,minutes):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--iso',type=Path,default=DEFAULT_ISO)
-    p.add_argument('--keys',default='');p.add_argument('--minutes',type=float,default=25);p.add_argument('--reuse-prepared',type=Path);p.add_argument('--prepare-only',action='store_true',help='stop after phase 1 (for tools/tests/target_digest.py)')
+    p.add_argument('--keys',default='');p.add_argument('--minutes',type=float,default=25);p.add_argument('--reuse-prepared',type=Path);p.add_argument('--prepare-only',action='store_true',help='stop after phase 1 (for tools/tests/target_digest.py)');p.add_argument('--profile',default='xp-x86-sp3-uefi-csm',choices=['xp-x86-sp3-uefi-csm','nt5-staging'],help='nt5-staging: the BIOS XP preparation of the same scripts')
     a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
-    prepared=a.reuse_prepared.resolve() if a.reuse_prepared else prepare(out,a.iso)
+    prepared=a.reuse_prepared.resolve() if a.reuse_prepared else prepare(out,a.iso,a.profile)
     print('[PASS] prepared',prepared,flush=True)
     if a.prepare_only:sys.exit(0)
     # Boot an overlay so the prepared image stays pristine for further runs.

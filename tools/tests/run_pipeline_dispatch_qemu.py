@@ -10,7 +10,8 @@ Core-style command line and checks the serial log:
   xp-staging + usos.plan_profile=nt5-staging  -> step 100 runs the NT5 staging
                                                 (stops: the ISO is not on DATA)
   xp-staging, no token (SeaBIOS: no EFI)      -> nt5-staging from the action table
-  xp-staging + xp-x86-sp3-uefi-csm            -> the UEFI launcher's token (same step 100)
+  xp-staging + xp-x86-sp3-uefi-csm            -> the UEFI launcher's token: refused on
+                                                SeaBIOS, staged under OVMF (xp-uefi-ovmf)
   xp-resume + nt5-resume                      -> step 150 runs legacy_xp_resume.sh
                                                 (refused: nothing to resume)
   windows7-iso + windows-pe-bios-iso          -> step 500 request, then step 200
@@ -42,8 +43,13 @@ CASES = [
      ["[PIPELINE] profile=nt5-staging steps=100 source=cmdline", "[PIPELINE] step 100 nt5_staging", "[MICRO-LINUX] STOP:"], ["[PIPELINE] step 200"]),
     ("xp-action", "usos.legacy_action=xp-staging usos.legacy_image_hex=%s usos.bios_boot_drive=80",
      ["[PIPELINE] profile=nt5-staging steps=100 source=action", "[PIPELINE] step 100 nt5_staging", "[MICRO-LINUX] STOP:"], []),
+    # The UEFI-CSM profile refuses to run without UEFI (SeaBIOS here) ...
     ("xp-uefi-token", "usos.legacy_action=xp-staging usos.legacy_image_hex=%s usos.plan_profile=xp-x86-sp3-uefi-csm",
-     ["[PIPELINE] profile=xp-x86-sp3-uefi-csm steps=100 source=cmdline", "[PIPELINE] step 100 nt5_staging", "[MICRO-LINUX] STOP:"], []),
+     ["[PIPELINE] profile=xp-x86-sp3-uefi-csm steps=100 source=cmdline", "[PIPELINE] step 100 nt5_staging", "[MICRO-LINUX] STOP: UEFI required"], []),
+    # ... and under OVMF it reaches the NT5 staging with its EFI/USOS-XP traces.
+    ("xp-uefi-ovmf", "usos.legacy_action=xp-staging usos.legacy_image_hex=%s usos.plan_profile=xp-x86-sp3-uefi-csm",
+     ["[PIPELINE] profile=xp-x86-sp3-uefi-csm steps=100 source=cmdline", "[PIPELINE] step 100 nt5_staging",
+      "[MICRO-LINUX] STOP: selected XP ISO not found on DATA", "EFI/USOS-XP/legacy-xp-staging-last-error.txt"], ["UEFI required"]),
     ("xp-resume", "usos.legacy_action=xp-resume usos.plan_profile=nt5-resume",
      ["[PIPELINE] profile=nt5-resume steps=150 source=cmdline", "[PIPELINE] step 150 nt5_resume", "XP resume refused"], []),
     ("win7-bios", "kexec_load_disabled=0 usos.legacy_action=windows7-iso usos.legacy_image_hex=%s usos.bios_boot_drive=80 usos.plan_profile=windows-pe-bios-iso",
@@ -77,6 +83,10 @@ def esp_partuuid() -> str:
     raise SystemExit("ESP GUID unknown: run tools/tests/windows_native/refresh_stick.ps1 first")
 
 
+OVMF_CODE = ROOT / "tools" / "qemu" / "share" / "edk2-x86_64-code.fd"
+OVMF_VARS = ROOT / "tools" / "qemu" / "share" / "edk2-i386-vars.fd"
+
+
 def run_case(label: str, tail: str, micro: Path, uuid: str, timeout: float = 240) -> str:
     serial = OUT / f"{label}.serial.log"
     serial.unlink(missing_ok=True)
@@ -88,6 +98,12 @@ def run_case(label: str, tail: str, micro: Path, uuid: str, timeout: float = 240
                "-kernel", str(micro / "vmlinuz-virt"), "-initrd", str(micro / "initramfs-usos"), "-append", append,
                "-drive", f"if=none,id=stick,format=vpc,snapshot=on,file={STICK.as_posix()}",
                "-device", "ide-hd,drive=stick,bus=ide.0,serial=USOSSTICK"]
+    if label.endswith("-ovmf"):
+        # UEFI: the kernel's EFI stub under OVMF (a scratch copy of the variables).
+        vars_copy = OUT / f"{label}.vars.fd"
+        vars_copy.write_bytes(OVMF_VARS.read_bytes())
+        command += ["-drive", f"if=pflash,format=raw,readonly=on,file={OVMF_CODE.as_posix()}",
+                    "-drive", f"if=pflash,format=raw,file={vars_copy.as_posix()}"]
     process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=open(OUT / f"{label}.stderr.log", "wb"))
     deadline = time.time() + timeout
     text = ""

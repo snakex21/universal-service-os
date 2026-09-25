@@ -1,9 +1,15 @@
 # Sourced by micro_linux_init.sh. It intentionally does not run on import.
+#
+# Profile-aware since refactor M4 (docs/design/refactor-os-pipeline.md): the
+# XP UEFI-CSM profile (USOS_PLAN_PROFILE=xp-x86-sp3-uefi-csm, set by
+# tools/pipeline/steps/100_nt5_staging.sh) keeps its traces under EFI/USOS-XP
+# (USOS_XP_ESP_DIR), uses the canonical 255/63 geometry and runs the driver
+# preflight; every other profile behaves as before.
 
 xp_stage_set() {
     XP_STAGE_STATE=$1
     export XP_STAGE_STATE
-    status_file=/mnt/esp/EFI/USOS/legacy-xp-staging-status.txt
+    status_file=${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/legacy-xp-staging-status.txt
     tmp_file="$status_file.tmp"
     {
         printf '[LEGACY_XP_STATUS]\n'
@@ -28,7 +34,7 @@ xp_run_logged() {
     ) 2>&1 | tee "$tmp_log"
     [ -r "$rc_file" ] || return 125
     command_rc=$(cat "$rc_file")
-    cp "$tmp_log" "/mnt/esp/EFI/USOS/$log_name" 2>/dev/null || true
+    cp "$tmp_log" "${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/$log_name" 2>/dev/null || true
     sync
     return "$command_rc"
 }
@@ -52,6 +58,7 @@ usos_hex_to_ascii() {
 }
 
 usos_legacy_xp_staging() {
+    [ "${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}" = /mnt/esp/EFI/USOS ] || mkdir -p "$USOS_XP_ESP_DIR"
     . /usr/lib/usos/nt5_profile.sh
     usos_nt5_profile || stop 'Unsupported NT5 source profile'
     image_hex=$1
@@ -260,9 +267,9 @@ usos_legacy_xp_staging() {
         lsblk -bnpo NAME,TYPE,SIZE,FSTYPE,LABEL "$candidate" 2>/dev/null | sed 's/^/[LEGACY_XP]   /' | tee -a "$XP_DISK_DIAG" || true
     done
     xp_disk_log "[LEGACY_XP] LINUX BLOCK INVENTORY END detected=$linux_disk_count candidates=$candidate_index usos=$USOS_DISK_DEVICE"
-    XP_DISK_DIAG_PERSIST=/mnt/esp/EFI/USOS/legacy-xp-disk-enumeration.txt
+    XP_DISK_DIAG_PERSIST=${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/legacy-xp-disk-enumeration.txt
 
-    STORAGE_PROBE_INI=/mnt/esp/EFI/USOS/lts-storage-probe.ini
+    STORAGE_PROBE_INI=${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/lts-storage-probe.ini
     if [ -f "$STORAGE_PROBE_INI" ]; then
         expected_vendor=$(awk -F= '$1 == "vendor" { sub(/^[^=]*=/, ""); gsub(/\r/, ""); print; exit }' "$STORAGE_PROBE_INI" 2>/dev/null || true)
         expected_device=$(awk -F= '$1 == "device" { sub(/^[^=]*=/, ""); gsub(/\r/, ""); print; exit }' "$STORAGE_PROBE_INI" 2>/dev/null || true)
@@ -313,7 +320,7 @@ usos_legacy_xp_staging() {
         xp_disk_log "[LTS_PROBE] CHECK3 candidate=$probe_candidate_ok candidates=$candidate_index device=$probe_candidate_device"
         xp_disk_log "[LTS_PROBE] RESULT=$probe_result"
         cp "$XP_DISK_DIAG" "$XP_DISK_DIAG_PERSIST" || stop 'cannot persist Legacy XP disk enumeration diagnostic to ESP'
-        cp "$XP_DISK_DIAG" /mnt/esp/EFI/USOS/lts-storage-probe.txt || stop 'cannot persist LTS storage probe result to ESP'
+        cp "$XP_DISK_DIAG" ${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/lts-storage-probe.txt || stop 'cannot persist LTS storage probe result to ESP'
         sync
         usos_ui_diagnostic "$XP_DISK_DIAG" || true
         printf '[LTS_PROBE] AUTOMATIC STORAGE PROBE %s - NO TARGET WRITE OR STAGING OCCURRED\n' "$probe_result"
@@ -342,7 +349,7 @@ usos_legacy_xp_staging() {
     cp "$XP_DISK_DIAG" "$XP_DISK_DIAG_PERSIST" || stop 'cannot persist Legacy XP disk enumeration diagnostic to ESP'
     sync
 
-    TEST_INI=/mnt/esp/EFI/USOS/legacy-xp-menu-test.ini
+    TEST_INI=${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/legacy-xp-menu-test.ini
     TARGET_DEVICE=''
     TEST_STOP_AFTER_PREPARE='no'
     . /usr/lib/usos/xp_menu_ui.sh
@@ -367,18 +374,32 @@ usos_legacy_xp_staging() {
         usos_xp_choose_disk
     fi
 
-    TARGET_SIZE_FOR_BIOS=$(usos_disk_size "$TARGET_DEVICE")
-    bios_geometry_matches=$(awk -F'|' -v wanted="$TARGET_SIZE_FOR_BIOS" '$1 == wanted { count++ } END { print count + 0 }' "$BIOS_GEOMETRY")
-    [ "$bios_geometry_matches" -eq 1 ] || stop "selected XP target size maps to $bios_geometry_matches BIOS geometry records; refusing guessed CHS"
-    bios_geometry_line=$(awk -F'|' -v wanted="$TARGET_SIZE_FOR_BIOS" '$1 == wanted { print; exit }' "$BIOS_GEOMETRY")
-    XP_BIOS_DRIVE=$(printf '%s' "$bios_geometry_line" | cut -d'|' -f2)
-    XP_BIOS_CYLINDERS=$(printf '%s' "$bios_geometry_line" | cut -d'|' -f3)
-    XP_BIOS_HEADS=$(printf '%s' "$bios_geometry_line" | cut -d'|' -f4)
-    XP_BIOS_SPT=$(printf '%s' "$bios_geometry_line" | cut -d'|' -f5)
-    [ "$XP_BIOS_HEADS" -ge 1 ] && [ "$XP_BIOS_HEADS" -le 256 ] || stop "invalid BIOS head count for selected XP target: $XP_BIOS_HEADS"
-    [ "$XP_BIOS_SPT" -ge 1 ] && [ "$XP_BIOS_SPT" -le 63 ] || stop "invalid BIOS sectors/track for selected XP target: $XP_BIOS_SPT"
-    [ "$XP_BIOS_CYLINDERS" -ge 1 ] && [ "$XP_BIOS_CYLINDERS" -le 1024 ] || stop "invalid BIOS cylinder count for selected XP target: $XP_BIOS_CYLINDERS"
-    printf '[LEGACY_XP] BIOS TARGET MATCH device=%s drive=0x%s size=%s chs=%s/%s/%s source=INT13-AH08\n' "$TARGET_DEVICE" "$XP_BIOS_DRIVE" "$TARGET_SIZE_FOR_BIOS" "$XP_BIOS_CYLINDERS" "$XP_BIOS_HEADS" "$XP_BIOS_SPT"
+    if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ]; then
+        [ -d /sys/firmware/efi ] || stop 'This experiment requires UEFI preparation'
+        [ -z "$XP_WINNT_SIF" ] || stop 'Experimental XP does not accept custom SIF files'
+        [ ! -f "$TEST_INI" ] || stop 'Test auto-confirm is forbidden in this experiment'
+        TARGET_SIZE_FOR_BIOS=$(usos_disk_size "$TARGET_DEVICE")
+        # Canonical on-disk geometry, NOT a claim about firmware AH08 geometry.
+        # The verified NT52 NTFS reader uses EDD; firmware CSM is used after poweroff.
+        XP_BIOS_DRIVE=80
+        XP_BIOS_CYLINDERS=1024
+        XP_BIOS_HEADS=255
+        XP_BIOS_SPT=63
+        printf '[XP_UEFI_CSM] geometry=canonical-255-63; NT52=EDD-only; future-CSM-geometry=unknown\n'
+    else
+        TARGET_SIZE_FOR_BIOS=$(usos_disk_size "$TARGET_DEVICE")
+        bios_geometry_matches=$(awk -F'|' -v wanted="$TARGET_SIZE_FOR_BIOS" '$1 == wanted { count++ } END { print count + 0 }' "$BIOS_GEOMETRY")
+        [ "$bios_geometry_matches" -eq 1 ] || stop "selected XP target size maps to $bios_geometry_matches BIOS geometry records; refusing guessed CHS"
+        bios_geometry_line=$(awk -F'|' -v wanted="$TARGET_SIZE_FOR_BIOS" '$1 == wanted { print; exit }' "$BIOS_GEOMETRY")
+        XP_BIOS_DRIVE=$(printf '%s' "$bios_geometry_line" | cut -d'|' -f2)
+        XP_BIOS_CYLINDERS=$(printf '%s' "$bios_geometry_line" | cut -d'|' -f3)
+        XP_BIOS_HEADS=$(printf '%s' "$bios_geometry_line" | cut -d'|' -f4)
+        XP_BIOS_SPT=$(printf '%s' "$bios_geometry_line" | cut -d'|' -f5)
+        [ "$XP_BIOS_HEADS" -ge 1 ] && [ "$XP_BIOS_HEADS" -le 256 ] || stop "invalid BIOS head count for selected XP target: $XP_BIOS_HEADS"
+        [ "$XP_BIOS_SPT" -ge 1 ] && [ "$XP_BIOS_SPT" -le 63 ] || stop "invalid BIOS sectors/track for selected XP target: $XP_BIOS_SPT"
+        [ "$XP_BIOS_CYLINDERS" -ge 1 ] && [ "$XP_BIOS_CYLINDERS" -le 1024 ] || stop "invalid BIOS cylinder count for selected XP target: $XP_BIOS_CYLINDERS"
+        printf '[LEGACY_XP] BIOS TARGET MATCH device=%s drive=0x%s size=%s chs=%s/%s/%s source=INT13-AH08\n' "$TARGET_DEVICE" "$XP_BIOS_DRIVE" "$TARGET_SIZE_FOR_BIOS" "$XP_BIOS_CYLINDERS" "$XP_BIOS_HEADS" "$XP_BIOS_SPT"
+    fi
 
     # Validate and mount the selected source before offering a destructive reset.
     if [ "$XP_SOURCE_OPEN" = no ]; then
@@ -405,6 +426,10 @@ usos_legacy_xp_staging() {
     SOURCE_ROOT=/mnt/source
     export SOURCE_ROOT TARGET_DEVICE USOS_DISK_DEVICE
     sh /usr/lib/usos/probe_nt5_source.sh || stop 'Invalid NT5 source; no target write occurred'
+    if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ]; then
+    . /usr/lib/usos/xp_driver_stage.sh
+    usos_xp_driver_preflight || stop 'XP driver preflight failed; no target write occurred'
+    fi
     XP_SOURCE_OPEN=yes
     fi
     export TARGET_DEVICE
@@ -480,7 +505,7 @@ usos_legacy_xp_staging() {
     done
 
     SOURCE_ROOT=/mnt/source
-    XP_READY_FILE=/mnt/esp/EFI/USOS/xp-target-ready.ini
+    XP_READY_FILE=${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/xp-target-ready.ini
     XPSETUP_MOUNT=/mnt/xpsetup
     export SOURCE_ROOT XP_READY_FILE XPSETUP_MOUNT
     xp_stage_set prepare-xpsetup
@@ -514,10 +539,10 @@ usos_legacy_xp_staging() {
     # in later cannot trigger the known-bad second-disk chainload path.
     [ -f "$XP_READY_FILE" ] || stop 'XP target ready marker missing after successful preparation'
     if [ -n "$XP_WINDOWS_PLAN" ]; then
-        mv "$XP_READY_FILE" /mnt/esp/EFI/USOS/xp-install-record.ini || stop 'cannot persist XP installation identity'
-        rm -f /mnt/esp/EFI/USOS/xp-resume.ini
+        mv "$XP_READY_FILE" ${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/xp-install-record.ini || stop 'cannot persist XP installation identity'
+        rm -f ${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/xp-resume.ini
     else
-        mv "$XP_READY_FILE" /mnt/esp/EFI/USOS/xp-resume.ini || stop 'cannot persist XP resume identity'
+        mv "$XP_READY_FILE" ${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/xp-resume.ini || stop 'cannot persist XP resume identity'
     fi
     [ ! -e "$XP_READY_FILE" ] || stop 'obsolete XP auto-chainload marker still exists after removal'
     printf '[LEGACY_XP] REMOVE-USOS HANDOFF PASS auto_chainload_marker=cleared target_boot=BIOS-0x80\n'

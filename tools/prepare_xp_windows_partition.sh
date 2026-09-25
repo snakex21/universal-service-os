@@ -32,11 +32,16 @@ put_verified() {
     mcopy -o -i "$MTOOLS_IMAGE" "::/\$WIN_NT\$.~BT/$2" "$work/readback"
     cmp -s "$1" "$work/readback" || fail "$2 readback mismatch"
 }
+# The XP UEFI-CSM profile has its own automatic answer (PAE at setup end,
+# unsigned-driver policy): tools/xp_selected_partition_uefi_csm.sif.
+XP_AUTOMATIC_SIF="$SCRIPT_DIR/xp_selected_partition.sif"
+[ "${USOS_PLAN_PROFILE:-}" != xp-x86-sp3-uefi-csm ] || XP_AUTOMATIC_SIF="$SCRIPT_DIR/xp_selected_partition_uefi_csm.sif"
+[ -r "$XP_AUTOMATIC_SIF" ] || fail "automatic WINNT.SIF missing: $XP_AUTOMATIC_SIF"
 awk -v directory="$NT5_INSTALL_DIR" '
     /^InstallDir=/ { print "InstallDir=\"\\" directory "\""; next }
     /^TargetPath=/ { print "TargetPath=\\" directory; next }
     { sub(/\r$/, ""); print }
-' "$SCRIPT_DIR/xp_selected_partition.sif" > "$work/winnt.sif"
+' "$XP_AUTOMATIC_SIF" > "$work/winnt.sif"
 put_verified "$work/winnt.sif" WINNT.SIF
 put_verified "$work/migrate.inf" MIGRATE.INF
 sync

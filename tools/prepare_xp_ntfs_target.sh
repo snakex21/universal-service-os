@@ -1,5 +1,7 @@
 #!/bin/sh
 # Prepare the shared volume directly as NTFS, avoiding XP's FAT/CHS successor.
+# The XP UEFI-CSM profile (USOS_PLAN_PROFILE=xp-x86-sp3-uefi-csm) also integrates
+# the driver bundle, stages the PAE helper and verifies the target read-only.
 set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 TARGET_DEVICE=${TARGET_DEVICE:?}
@@ -52,7 +54,32 @@ mkdir "$work/volume"
 mount -t ntfs3 "$node" "$work/volume"; mounted=yes
 export XP_TARGET_ROOT="$work/volume" MTOOLS_IMAGE="$node"
 sh "$SCRIPT_DIR/prepare_xp_local_source.sh"
+if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ]; then
+sh "$SCRIPT_DIR/xp_driver_stage.sh" apply || fail 'XP driver integration failed'
+fi
 XP_EXPECTED_MBR="$work/expected" sh "$SCRIPT_DIR/prepare_xp_windows_partition.sh"
+if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ]; then
+mkdir -p "$work/volume/USOS/XP"
+cp "$SCRIPT_DIR/xp-pae.exe" "$work/volume/USOS/XP/pae.exe"
+cp "$SCRIPT_DIR/xp-pae-LICENSE.txt" "$work/volume/USOS/XP/LICENSE.txt"
+cmp -s "$SCRIPT_DIR/xp-pae.exe" "$work/volume/USOS/XP/pae.exe" || fail 'PAE helper readback mismatch'
+# Installer-chosen language (only that one is on the ESP); pae.exe falls back to English.
+if [ -f /mnt/esp/EFI/USOS/lang-xp.ini ]; then
+cp /mnt/esp/EFI/USOS/lang-xp.ini "$work/volume/USOS/XP/pae-strings.ini"
+cmp -s /mnt/esp/EFI/USOS/lang-xp.ini "$work/volume/USOS/XP/pae-strings.ini" || fail 'PAE strings readback mismatch'
+printf '[XP_PAE] strings=lang-xp.ini
+'
+else
+printf '[XP_PAE] strings=built-in English (no lang-xp.ini on ESP)
+'
+fi
 sync
 umount "$work/volume"; mounted=no
+blockdev --flushbufs "$TARGET_DEVICE" || fail 'cannot flush target disk buffers'
+# Read-only remount: refuse zero-filled staged files, then flush again.
+sh "$SCRIPT_DIR/xp_verify_target.sh" "$node" "$SCRIPT_DIR/xp-pae.exe" || fail 'post-write read-only verification failed'
+else
+sync
+umount "$work/volume"; mounted=no
+fi
 printf '[XP_NTFS] PREPARED PASS native-NTFS=yes bootstrap=Microsoft-NT52 source-and-Windows=C:\n'

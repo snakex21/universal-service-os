@@ -1,0 +1,24 @@
+[Data]
+msdosinitiated="1"
+floppyless="1"
+UseSignatures="yes"
+InstallDir="\WINDOWS"
+EulaComplete="1"
+winntupgrade="no"
+win9xupgrade="no"
+OriSrc="C:\"
+OriTyp="5"
+[Unattended]
+DriverSigningPolicy=Ignore
+NonDriverSigningPolicy=Ignore
+UnattendMode=ProvideDefault
+OemSkipEula=Yes
+OemPreinstall=No
+Repartition=No
+FileSystem=LeaveAlone
+TargetPath=\WINDOWS
+WaitForReboot=No
+[SetupParams]
+UserExecute="C:\USOS\XP\pae.exe"
+[GuiRunOnce]
+Command0="%SystemDrive%\USOS\XP\pae.exe /firstlogon"

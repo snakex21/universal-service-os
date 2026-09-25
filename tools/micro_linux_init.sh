@@ -82,7 +82,7 @@ persist_legacy_xp_stop() {
     [ -r /proc/mounts ] || return 0
     awk '$2 == "/mnt/esp" { found=1 } END { exit(found ? 0 : 1) }' /proc/mounts || return 0
     [ -d /mnt/esp/EFI/USOS ] || return 0
-    error_file=/mnt/esp/EFI/USOS/legacy-xp-staging-last-error.txt
+    error_file=${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/legacy-xp-staging-last-error.txt
     tmp_file="$error_file.tmp"
     {
         printf '[LEGACY_XP_FAILURE]\n'
@@ -99,7 +99,7 @@ persist_legacy_xp_stop() {
     } > "$tmp_file" 2>/dev/null || return 0
     mv "$tmp_file" "$error_file" 2>/dev/null || return 0
     sync
-    printf '[MICRO-LINUX] persisted Legacy XP failure to EFI/USOS/legacy-xp-staging-last-error.txt\n'
+    printf '[MICRO-LINUX] persisted Legacy XP failure to %s\n' "${error_file#/mnt/esp/}"
 }
 
 stop() {
