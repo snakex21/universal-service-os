@@ -39,6 +39,7 @@ pub fn run() void {
     // (boot_logo=) is read first.
     const settings = manual_view.readSettings(root);
     boot_timing.mark("usos-settings.ini read");
+    splash.setTheme(@import("theme_loader.zig").splashTheme(settings));
     splash.begin(info.framebuffer, splash.logoSetting(settings), "");
     manual_view.init(root, info, settings);
     manual_secure_boot.init(root);

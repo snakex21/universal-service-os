@@ -402,6 +402,18 @@ pub const Key = enum(u16) {
     system_unavailable,
     system_unavailable_detail,
     systems_subtitle,
+    themes_builtin,
+    themes_current,
+    themes_desc,
+    themes_hint,
+    themes_invalid,
+    themes_name_dark,
+    themes_name_default,
+    themes_name_high_contrast,
+    themes_name_light,
+    themes_name_retro,
+    themes_title,
+    themes_user,
     unattended_file_detail,
     unattended_none,
     unattended_none_detail,
@@ -830,6 +842,18 @@ pub const hashes = [_]u32{
     0x31aec0c8, // system.unavailable
     0xa6ba9b83, // system.unavailable.detail
     0xab5ff4f5, // systems.subtitle
+    0xf0db4556, // themes.builtin
+    0xaef5a0d8, // themes.current
+    0x68214e12, // themes.desc
+    0x4f5530c6, // themes.hint
+    0x43c727ce, // themes.invalid
+    0x02a08382, // themes.name.dark
+    0x94b57963, // themes.name.default
+    0xa784564d, // themes.name.high_contrast
+    0x991efc02, // themes.name.light
+    0x1fe4168e, // themes.name.retro
+    0x8246578f, // themes.title
+    0xb4b7e3f4, // themes.user
     0x42cdb840, // unattended.file.detail
     0x9b91564d, // unattended.none
     0x16e5e868, // unattended.none.detail
@@ -1273,6 +1297,18 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
     false,
     true,
     true,
@@ -1685,6 +1721,18 @@ pub const english = [_][]const u8{
     "Unavailable",
     "No working boot backend supports this system yet.",
     "Select a system, distribution or utility group",
+    "built-in",
+    "in use",
+    "Colours of this menu",
+    "Enter/A applies it now and saves it on the stick",
+    "This theme cannot be used: {0}",
+    "Dark",
+    "Default",
+    "High contrast",
+    "Light",
+    "Retro (BIOS blue)",
+    "Theme",
+    "your theme",
     "The selected answer file is copied after the target safety check.",
     "No answer file",
     "Use the default setup options without a custom answer file.",

@@ -124,22 +124,18 @@ pub const PadButton = enum {
     }
 
     /// Xbox face button colours from the installer palette: A green
-    /// (Success), B red (Danger), X blue, Y yellow (Warning).
+    /// (Success), B red (Danger), X blue (the theme's pad_x: the installer
+    /// palette has no blue status colour), Y yellow (Warning).
     pub fn faceColor(self: PadButton, theme: Theme) Color {
         return switch (self) {
             .a => theme.success,
             .b => theme.danger,
-            .x => face_blue,
+            .x => theme.pad_x,
             .y => theme.warning,
             else => theme.panel_alt,
         };
     }
 };
-
-/// X button blue (the installer palette has no blue status colour).
-pub const face_blue = Color{ .r = 0x4a, .g = 0x9b, .b = 0xf0 };
-/// Letter colour on the face buttons (installer: color{0x0b, 0x0f, 0x14}).
-pub const face_letter = Color{ .r = 0x0b, .g = 0x0f, .b = 0x14 };
 
 pub const PadButtons = struct {
     items: [4]PadButton = undefined,
@@ -434,7 +430,7 @@ pub const Ui = struct {
                 const fill = kind.faceColor(theme);
                 const radius = @divTrunc(paint.s(w), 2);
                 paint.circle(surface, paint.s(x) + radius, paint.s(center_y), radius, fill, background);
-                self.fonts.drawCentered(surface, x + w / 2, self.fonts.centeredTop(.strong, center_y), .strong, kind.label(), face_letter, fill);
+                self.fonts.drawCentered(surface, x + w / 2, self.fonts.centeredTop(.strong, center_y), .strong, kind.label(), theme.on_pad, fill);
             },
             .dpad => {
                 const cx = paint.s(x) + @divTrunc(paint.s(w), 2);

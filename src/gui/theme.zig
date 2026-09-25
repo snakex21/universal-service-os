@@ -2,8 +2,11 @@ const std = @import("std");
 const Color = @import("color.zig").Color;
 
 /// The USOS palette, shared with the Windows installer
-/// (installer/internal/ui/theme.go). \UI\theme.css may override the base
-/// colours with CSS custom properties.
+/// (installer/internal/ui/theme.go). The field defaults are the "default"
+/// theme; the other built-in themes are in theme_presets.zig and a user
+/// theme file (theme_file.zig) sets fields by name. \UI\theme.css may
+/// override the base colours of the default theme with CSS custom
+/// properties.
 pub const Theme = struct {
     background: Color = .{ .r = 0x08, .g = 0x0d, .b = 0x14 },
     header: Color = .{ .r = 0x0c, .g = 0x14, .b = 0x1e },
@@ -28,9 +31,18 @@ pub const Theme = struct {
     warning_soft: Color = .{ .r = 0x2f, .g = 0x24, .b = 0x10 },
     success: Color = .{ .r = 0x4a, .g = 0xd6, .b = 0x8c },
     success_soft: Color = .{ .r = 0x0f, .g = 0x2b, .b = 0x21 },
+    /// Controller X face (A, B and Y use success, danger and warning).
+    pad_x: Color = .{ .r = 0x4a, .g = 0x9b, .b = 0xf0 },
+    /// Letter on the A/B/X/Y faces.
+    on_pad: Color = .{ .r = 0x0b, .g = 0x0f, .b = 0x14 },
 
     pub fn parse(css: []const u8) Theme {
-        var result = Theme{};
+        return parseOver(.{}, css);
+    }
+
+    /// `base` with the colours that `css` sets.
+    pub fn parseOver(base: Theme, css: []const u8) Theme {
+        var result = base;
         result.background = property(css, "--background") orelse result.background;
         result.panel = property(css, "--panel") orelse result.panel;
         result.panel_alt = property(css, "--panel-alt") orelse result.panel_alt;
