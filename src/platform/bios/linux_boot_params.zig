@@ -444,3 +444,31 @@ test "Vista enables direct handoff and preserves the actual BIOS boot drive" {
     try std.testing.expect(std.mem.indexOf(u8, text, "kexec_load_disabled=0") != null);
     try std.testing.expect(std.mem.indexOf(u8, text, "usos.bios_boot_drive=80") != null);
 }
+
+// M0 characterization (docs/design/refactor-os-pipeline.md): the exact
+// micro-Linux command line for every BIOS request kind. A refactor that
+// moves the request to a plan file must keep these bytes until the plan
+// replaces them on purpose.
+test "golden: exact BIOS micro-Linux command line per request kind" {
+    const disk = [_]u8{ 0x75, 0xE1, 0x57, 0x02, 0x85, 0x16, 0x11, 0x43, 0x91, 0xAA, 0x5A, 0x83, 0xD8, 0xEB, 0x41, 0xE5 };
+    const base = "console=tty0 console=ttyS0,115200 quiet loglevel=3 vt.global_cursor_default=0 rdinit=/usos-init usos.esp_partuuid=0257e175-1685-4311-91aa-5a83d8eb41e5";
+    const staged = XpStagingRequest{ .image_name = "XP.iso", .unattended_name = "a.sif", .bios_boot_drive = 0x81, .bios_inventory = "80:0000000000100000:512" };
+    const plain = XpStagingRequest{ .image_name = "W.iso", .bios_boot_drive = 0x80, .bios_inventory = "" };
+    const Case = struct { request: CommandRequest, expected: []const u8 };
+    const cases = [_]Case{
+        .{ .request = .none, .expected = base },
+        .{ .request = .hardware, .expected = base ++ " usos.legacy_action=hardware" },
+        .{ .request = .xp_resume, .expected = base ++ " usos.legacy_action=xp-resume" },
+        .{ .request = .{ .xp_staging = staged }, .expected = base ++ " usos.legacy_action=xp-staging usos.legacy_image_hex=58502e69736f usos.legacy_unattended_hex=612e736966 usos.bios_boot_drive=81 usos.bios_disks=80:0000000000100000:512" },
+        .{ .request = .{ .xp_staging = plain }, .expected = base ++ " usos.legacy_action=xp-staging usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80" },
+        .{ .request = .{ .windows2000_staging = plain }, .expected = base ++ " usos.legacy_action=windows2000-staging usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80" },
+        .{ .request = .{ .windows7_iso = plain }, .expected = base ++ " kexec_load_disabled=0 usos.legacy_action=windows7-iso usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80" },
+        .{ .request = .{ .windows_vista_iso = plain }, .expected = base ++ " kexec_load_disabled=0 usos.legacy_action=windows-vista-iso usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80" },
+    };
+    for (cases) |case| {
+        var cmdline: [cmdline_capacity]u8 = undefined;
+        const len = try buildCommandLine(&cmdline, disk, case.request);
+        try std.testing.expectEqualStrings(case.expected, cmdline[0..len]);
+        try std.testing.expectEqual(@as(u8, 0), cmdline[len]);
+    }
+}
