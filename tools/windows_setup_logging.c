@@ -1,8 +1,16 @@
 /* WinPE-only snapshots on the source ESP selected by usos-source --log-root.
  * The watcher blocks on filesystem notifications or launcher exit: no polling.
- * All writes stay in the explicitly created USB session directory. */
+ * All writes stay in the explicitly created USB session directory.
+ *
+ * --previous-install <USOS disk>: before Setup, look for an unfinished or
+ * aborted Windows installation on every other volume (State.ini not at
+ * IMAGE_STATE_COMPLETE, or a leftover $WINDOWS.~BT) and copy its diagnostics
+ * into <session>\previous-install\<letter>\. Diagnostic only: target files
+ * are opened for reading, nothing on those volumes is created or changed; the
+ * copy is capped (the stick's ESP is small). */
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <winioctl.h>
 void *memcpy(void *out,const void *in,size_t size){volatile BYTE *d=out;const BYTE *s=in;while(size--)*d++=*s++;return out;}
 static WCHAR base[MAX_PATH],root[MAX_PATH],src[MAX_PATH],dst[MAX_PATH];
 static BYTE data[65536],events[65536];
@@ -35,6 +43,109 @@ static void save(const WCHAR *from,const WCHAR *name){
   FlushFileBuffers(out);CloseHandle(out);
  }CloseHandle(in);
 }
+/* Capped copy into dir\name for the previous-install report. Text logs keep
+ * their newest part when too large; binary files (evtx, dmp) are copied whole
+ * or skipped. Returns the bytes written (0 = not copied). */
+#define PREVIOUS_FILE_LIMIT (8u*1024u*1024u)
+#define PREVIOUS_TOTAL_LIMIT (32u*1024u*1024u)
+static DWORD previous_budget=PREVIOUS_TOTAL_LIMIT;
+static HANDLE previous_summary=INVALID_HANDLE_VALUE;
+static void ascii(HANDLE out,const char *text){DWORD n=0,w;while(text[n])n++;if(out!=INVALID_HANDLE_VALUE)WriteFile(out,text,n,&w,0);}
+static void asciiw(HANDLE out,const WCHAR *text){char b[MAX_PATH];unsigned i=0;for(;text[i]&&i<MAX_PATH-1;i++)b[i]=text[i]<128?(char)text[i]:'?';b[i]=0;ascii(out,b);}
+static void decimal(HANDLE out,DWORD value){char b[16];int i=15;b[i]=0;do{b[--i]=(char)('0'+value%10);value/=10;}while(value&&i);ascii(out,b+i);}
+static void note(const char *what,const WCHAR *from,DWORD bytes){ascii(previous_summary,what);ascii(previous_summary," ");asciiw(previous_summary,from);if(bytes){ascii(previous_summary," bytes=");decimal(previous_summary,bytes);}ascii(previous_summary,"\r\n");}
+static void save_previous(const WCHAR *dir,const WCHAR *from,const WCHAR *name,int text){
+ if(length(dir)+length(name)+8>=MAX_PATH)return;
+ HANDLE in=CreateFileW(from,GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,0,OPEN_EXISTING,FILE_FLAG_SEQUENTIAL_SCAN,0);if(in==INVALID_HANDLE_VALUE)return;
+ LARGE_INTEGER size;if(!GetFileSizeEx(in,&size)||size.QuadPart<0){CloseHandle(in);return;}
+ LONGLONG want=size.QuadPart;int tail=0;
+ if(want>PREVIOUS_FILE_LIMIT){if(!text){CloseHandle(in);note("skipped (larger than 8 MiB)",from,0);return;}want=PREVIOUS_FILE_LIMIT;tail=1;}
+ if(want>previous_budget){CloseHandle(in);note("skipped (copy budget used up)",from,0);return;}
+ if(tail){LARGE_INTEGER at;at.QuadPart=size.QuadPart-want;SetFilePointerEx(in,at,0,FILE_BEGIN);}
+ copy(dst,dir);append(dst,L"\\");append(dst,name);if(tail)append(dst,L".tail");
+ HANDLE out=CreateFileW(dst,GENERIC_WRITE,FILE_SHARE_READ,0,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);
+ DWORD total=0;
+ if(out!=INVALID_HANDLE_VALUE){DWORD got,written;LONGLONG left=want;
+  while(left>0){DWORD chunk=left>sizeof(data)?sizeof(data):(DWORD)left;if(!ReadFile(in,data,chunk,&got,0)||!got)break;if(!WriteFile(out,data,got,&written,0)||got!=written)break;left-=got;total+=got;}
+  FlushFileBuffers(out);CloseHandle(out);
+ }
+ CloseHandle(in);previous_budget-=total;note(tail?"copied (newest 8 MiB)":"copied",from,total);
+}
+/* Every file of dir_path (one level, no sub-folders) as <prefix><name>. */
+static void save_previous_folder(const WCHAR *dir,const WCHAR *drive,const WCHAR *folder,const WCHAR *prefix,int text){
+ WCHAR pattern[MAX_PATH],from[MAX_PATH],name[MAX_PATH];copy(pattern,drive);append(pattern,folder);append(pattern,L"\\*");
+ WIN32_FIND_DATAW found;HANDLE find=FindFirstFileW(pattern,&found);if(find==INVALID_HANDLE_VALUE)return;
+ do{if(found.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)continue;if(length(found.cFileName)+length(prefix)+2>=64)continue;
+  copy(from,drive);append(from,folder);append(from,L"\\");append(from,found.cFileName);copy(name,prefix);append(name,found.cFileName);save_previous(dir,from,name,text);
+ }while(FindNextFileW(find,&found));
+ FindClose(find);
+}
+static int volume_disk(WCHAR letter,DWORD *disk){
+ WCHAR path[8]=L"\\\\.\\C:";path[4]=letter;
+ HANDLE h=CreateFileW(path,0,FILE_SHARE_READ|FILE_SHARE_WRITE,0,OPEN_EXISTING,0,0);if(h==INVALID_HANDLE_VALUE)return 0;
+ union{VOLUME_DISK_EXTENTS e;BYTE raw[sizeof(VOLUME_DISK_EXTENTS)+8*sizeof(DISK_EXTENT)];}extents;DWORD got=0;
+ BOOL ok=DeviceIoControl(h,IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS,0,0,&extents,sizeof(extents),&got,0);CloseHandle(h);
+ if(!ok||!extents.e.NumberOfDiskExtents)return 0;*disk=extents.e.Extents[0].DiskNumber;return 1;
+}
+static int file_contains(const WCHAR *path,const char *needle,int *exists){
+ *exists=0;HANDLE in=CreateFileW(path,GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,0,OPEN_EXISTING,0,0);if(in==INVALID_HANDLE_VALUE)return 0;
+ *exists=1;DWORD got=0;ReadFile(in,data,sizeof(data)-2,&got,0);CloseHandle(in);
+ unsigned n=0;while(needle[n])n++;
+ for(DWORD i=0;i+n<=got;i++){unsigned j=0;while(j<n&&data[i+j]==(BYTE)needle[j])j++;if(j==n)return 1;}
+ for(DWORD i=0;i+2*n<=got;i++){unsigned j=0;while(j<n&&data[i+2*j]==(BYTE)needle[j]&&data[i+2*j+1]==0)j++;if(j==n)return 1;}
+ return 0;
+}
+static DWORD parse_disk(const WCHAR *command,int *ok){
+ static const WCHAR flag[]=L"--previous-install";const WCHAR *at=command;*ok=0;
+ for(;*at;at++){unsigned k=0;while(flag[k]&&at[k]==flag[k])k++;if(!flag[k]){at+=k;break;}}
+ while(*at==' ')at++;DWORD value=0;
+ for(;*at>='0'&&*at<='9';at++){value=value*10+(DWORD)(*at-'0');*ok=1;}
+ return value;
+}
+/* One volume root (e.g. "D:\\"): 1 when it holds an unfinished install
+ * (its diagnostics are then copied under previous-install\\<letter>). */
+static int scan_volume(const WCHAR *drive,WCHAR letter,HANDLE out){
+ WCHAR state[MAX_PATH],bt[MAX_PATH];copy(state,drive);append(state,L"Windows\\Setup\\State\\State.ini");copy(bt,drive);append(bt,L"$WINDOWS.~BT");
+ int state_exists;int complete=file_contains(state,"IMAGE_STATE_COMPLETE",&state_exists);
+ DWORD bt_attr=GetFileAttributesW(bt);int bt_left=bt_attr!=INVALID_FILE_ATTRIBUTES&&(bt_attr&FILE_ATTRIBUTE_DIRECTORY);
+ if(!(state_exists&&!complete)&&!bt_left)return 0;
+ WCHAR dir[MAX_PATH];copy(dir,root);append(dir,L"\\previous-install");CreateDirectoryW(dir,0);
+ WCHAR sub[3]={letter,0,0};append(dir,L"\\");append(dir,sub);CreateDirectoryW(dir,0);
+ WCHAR summary[MAX_PATH];copy(summary,dir);append(summary,L"\\summary.txt");
+ previous_summary=CreateFileW(summary,GENERIC_WRITE,FILE_SHARE_READ,0,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);
+ ascii(previous_summary,"USOS: unfinished or aborted Windows installation on ");asciiw(previous_summary,drive);ascii(previous_summary,"\r\n");
+ ascii(previous_summary,state_exists?(complete?"State.ini: IMAGE_STATE_COMPLETE\r\n":"State.ini: not IMAGE_STATE_COMPLETE\r\n"):"State.ini: missing\r\n");
+ ascii(previous_summary,bt_left?"$WINDOWS.~BT: present\r\n":"$WINDOWS.~BT: absent\r\n");
+ WCHAR from[MAX_PATH];
+ static const WCHAR *texts[][2]={{L"Windows\\Panther\\setupact.log",L"panther-setupact.log"},{L"Windows\\Panther\\setuperr.log",L"panther-setuperr.log"},
+  {L"Windows\\Setup\\State\\State.ini",L"State.ini"},{L"$WINDOWS.~BT\\Sources\\Panther\\setupact.log",L"bt-panther-setupact.log"},
+  {L"$WINDOWS.~BT\\Sources\\Panther\\setuperr.log",L"bt-panther-setuperr.log"}};
+ for(unsigned j=0;j<sizeof(texts)/sizeof(texts[0]);j++){copy(from,drive);append(from,texts[j][0]);save_previous(dir,from,texts[j][1],1);}
+ save_previous_folder(dir,drive,L"Windows\\Panther\\UnattendGC",L"unattendgc-",1);
+ static const WCHAR *binaries[][2]={{L"Windows\\System32\\winevt\\Logs\\System.evtx",L"System.evtx"},{L"Windows\\System32\\winevt\\Logs\\Setup.evtx",L"Setup.evtx"}};
+ for(unsigned j=0;j<2;j++){copy(from,drive);append(from,binaries[j][0]);save_previous(dir,from,binaries[j][1],0);}
+ save_previous_folder(dir,drive,L"Windows\\Minidump",L"minidump-",0);
+ ascii(previous_summary,"(read-only copy; nothing on this volume was changed)\r\n");
+ if(previous_summary!=INVALID_HANDLE_VALUE){FlushFileBuffers(previous_summary);CloseHandle(previous_summary);}previous_summary=INVALID_HANDLE_VALUE;
+ ascii(out,"[USOS] WARNING: unfinished or aborted Windows installation found on ");asciiw(out,drive);
+ ascii(out,state_exists&&!complete?" (State.ini not IMAGE_STATE_COMPLETE":" (State.ini complete or missing");ascii(out,bt_left?", $WINDOWS.~BT present)":")");
+ ascii(out,"; its logs were copied to the USB log folder, previous-install\\");asciiw(out,sub);ascii(out,"\r\n");
+ return 1;
+}
+static int previous_install(const WCHAR *command){
+ int ok;DWORD usos_disk=parse_disk(command,&ok);if(!ok)return 2;
+ WCHAR windows[MAX_PATH];if(GetWindowsDirectoryW(windows,MAX_PATH)<3)return 2;
+ HANDLE out=GetStdHandle(STD_OUTPUT_HANDLE);int found_any=0;
+ DWORD drives=GetLogicalDrives();
+ for(unsigned i=2;i<26;i++){
+  WCHAR letter=(WCHAR)(L'A'+i);if(!(drives&(1u<<i))||letter==windows[0])continue;
+  WCHAR drive[4]={letter,':','\\',0};UINT type=GetDriveTypeW(drive);if(type!=DRIVE_FIXED&&type!=DRIVE_REMOVABLE)continue;
+  DWORD disk;if(!volume_disk(letter,&disk)||disk==usos_disk)continue;
+  if(scan_volume(drive,letter,out))found_any=1;
+ }
+ if(!found_any)ascii(out,"[USOS] No unfinished Windows installation found on the other disks.\r\n");
+ return 0;
+}
 static void local(const WCHAR *file,const WCHAR *name){copy(src,base);append(src,file);save(src,name);}
 static void snapshot(void){
  local(L"usos-startup.log",L"usos-startup.log");
@@ -64,9 +175,20 @@ static void snapshot(void){
 /* Setup moves Panther off X: after selecting/formatting the destination.
  * Export these logs at process completion, not on every RAM-log notification. */
 static void target_snapshots(void){
- copy(src,base);append(src,L"usos-modern-vista.flag");if(GetFileAttributesW(src)==INVALID_FILE_ATTRIBUTES)return;
  WCHAR windows[MAX_PATH];if(GetWindowsDirectoryW(windows,MAX_PATH)<3)return;
  DWORD drives=GetLogicalDrives();
+ /* Windows 10/11 native UEFI: Setup's own Panther logs on the target
+  * ($WINDOWS.~BT), like the Vista/7 paths; nothing else, the ESP is small. */
+ copy(src,base);append(src,L"usos-modern-uefi.flag");
+ if(GetFileAttributesW(src)!=INVALID_FILE_ATTRIBUTES){
+  for(unsigned i=2;i<26;i++)if((drives&(1u<<i))&&L'A'+i!=windows[0]){
+   WCHAR drive[4]={L'A'+i,':','\\',0};if(GetDriveTypeW(drive)!=DRIVE_FIXED)continue;
+   WCHAR name[64]=L"target-C";name[7]=drive[0];append(name,L"-bt-setupact.log");copy(src,drive);append(src,L"$WINDOWS.~BT\\Sources\\Panther\\setupact.log");save(src,name);
+   copy(name,L"target-C");name[7]=drive[0];append(name,L"-bt-setuperr.log");copy(src,drive);append(src,L"$WINDOWS.~BT\\Sources\\Panther\\setuperr.log");save(src,name);
+  }
+  return;
+ }
+ copy(src,base);append(src,L"usos-modern-vista.flag");if(GetFileAttributesW(src)==INVALID_FILE_ATTRIBUTES)return;
  for(unsigned i=2;i<26;i++)if((drives&(1u<<i))&&L'A'+i!=windows[0]){
   WCHAR drive[4]={L'A'+i,':','\\',0};if(GetDriveTypeW(drive)!=DRIVE_FIXED)continue;
   static const WCHAR *paths[]={L"$WINDOWS.~BT\\Sources\\Panther\\setupact.log",L"$WINDOWS.~BT\\Sources\\Panther\\setuperr.log",L"Windows\\Panther\\setupact.log",L"Windows\\Panther\\setuperr.log",L"Windows\\Logs\\CBS\\CBS.log"};
@@ -102,6 +224,8 @@ static void watch(HANDLE parent,HANDLE mutex){
 }
 void entry(void){
  if(!initialize())ExitProcess(1);
+ const WCHAR *arguments=GetCommandLineW();
+ if(contains(arguments,L"--previous-install"))ExitProcess((UINT)previous_install(arguments));
  DWORD pid=launcher();if(!pid)ExitProcess(1);
  WCHAR value[16],mutex_name[80];GetEnvironmentVariableW(L"USOS_LAUNCHER_PID",value,16);copy(mutex_name,L"Local\\USOSSetupLog-");append(mutex_name,value);
  HANDLE mutex=CreateMutexW(0,FALSE,mutex_name);if(!mutex)ExitProcess(1);

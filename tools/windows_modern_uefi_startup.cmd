@@ -8,6 +8,8 @@ rem      WinPE with drvload and handed to the target through offlineServicing
 rem      DriverPaths (the $WinPEDriver$ equivalent of the WORK path);
 rem   2. usos-modern-finalize before: inventory of the USOS stick's ESP, a copy of
 rem      its EFI\BOOT files and the start time, all in WinPE RAM;
+rem   2b. usos-log --previous-install: logs of an unfinished earlier install on
+rem      another disk, copied read-only to the USB log folder (diagnostic only);
 rem   3. Setup runs with /noreboot (edition, license and disk stay manual unless
 rem      the user's answer file says otherwise);
 rem   4. usos-modern-finalize after: boot files and BCD on an ESP of the TARGET
@@ -56,6 +58,12 @@ rem a user DiskID that points at the USOS stick is refused here.
 if errorlevel 1 exit /b 1
 set "USOS_UNATTEND=%~dp0usos-driver-unattend.xml"
 :answer_ready
+rem Diagnostic only: an unfinished or aborted Windows installation on another
+rem disk (State.ini not complete, leftover $WINDOWS.~BT) gets its logs copied,
+rem read-only and size-capped, to the USB log folder (previous-install\).
+rem Nothing on the target is written and the result does not change the install.
+echo [USOS] phase=previous-install-check
+"%~dp0usos-log-x86_64.exe" --previous-install %USOS_SOURCE_DISK%
 echo [USOS] phase=esp-guard-before
 "%~dp0usos-modern-finalize.exe" before %USOS_SOURCE_DISK%
 if errorlevel 1 exit /b 1
