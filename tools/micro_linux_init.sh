@@ -131,6 +131,8 @@ mount -t devpts devpts /dev/pts 2>/dev/null || true
 . /usr/lib/usos/partuuid_diagnostics.sh
 [ -r /usr/lib/usos/micro_linux_ui.sh ] || stop 'micro_linux_ui.sh is missing'
 . /usr/lib/usos/micro_linux_ui.sh
+[ -r /usr/lib/usos/pipeline/run.sh ] || stop 'pipeline/run.sh is missing'
+. /usr/lib/usos/pipeline/run.sh
 stty -echo < "$USOS_UI_TTY" 2>/dev/null || true
 case "$(cat /proc/cmdline)" in *usos.legacy_action=xp-staging*|*usos.legacy_action=windows2000-staging*) USOS_XP_CHOOSING=yes ;; esac
 # This marker is intentionally before simpledrm. It measures kernel/early
@@ -179,6 +181,7 @@ ESP_PARTUUID=''
 GUARD_TEST_BAD_PARTUUID=''
 TEST_STOP_AFTER_PREPARED=''
 LEGACY_ACTION=''
+PLAN_PROFILE_TOKEN=''
 LEGACY_IMAGE_HEX=''
 LEGACY_UNATTENDED_HEX=''
 BIOS_BOOT_DRIVE=''
@@ -189,6 +192,7 @@ for argument in $(cat /proc/cmdline); do
         usos.guard_test_bad_partuuid=*) GUARD_TEST_BAD_PARTUUID=${argument#*=} ;;
         usos.test_stop_after_prepared=*) TEST_STOP_AFTER_PREPARED=${argument#*=} ;;
         usos.legacy_action=*) LEGACY_ACTION=${argument#*=} ;;
+        usos.plan_profile=*) PLAN_PROFILE_TOKEN=${argument#*=} ;;
         usos.legacy_image_hex=*) LEGACY_IMAGE_HEX=${argument#*=} ;;
         usos.legacy_unattended_hex=*) LEGACY_UNATTENDED_HEX=${argument#*=} ;;
         usos.bios_boot_drive=*) BIOS_BOOT_DRIVE=${argument#*=} ;;
@@ -253,36 +257,10 @@ usos_ui_stage 1 5 'Opening USOS configuration' 'Mounting the verified EFI System
 mount -t vfat -o rw,noatime "$ESP_PATH" /mnt/esp || stop 'cannot mount ESP'
 
 if [ -n "$LEGACY_ACTION" ]; then
-    case "$LEGACY_ACTION" in
-        windows7-iso|windows-vista-iso)
-            . /usr/lib/usos/legacy_windows_request.sh
-            legacy_windows_request
-            ;;
-        xp-resume)
-            # Resume runs a single step; do not show four stages that never run.
-            usos_ui_declare_stages 'Continuing Windows XP installation'
-            usos_ui_stage 1 1 'Continuing Windows XP installation' 'Checking the prepared XP target.' || true
-            sh /usr/lib/usos/legacy_xp_resume.sh || stop 'XP resume refused; see EFI/USOS/legacy-xp-resume.log'
-            umount /mnt/esp || stop 'cannot unmount ESP after XP resume'
-            sync
-            enable_emergency_input || true
-            usos_ui_done 'XP - KONTYNUACJA GOTOWA' 'REMOVE USOS USB, THEN PRESS ENTER TO POWER OFF.' || true
-            printf '[XP_RESUME] Remove USOS USB, press ENTER, then start target disk.\n'
-            if [ -r "$USOS_UI_TTY" ]; then IFS= read -r _resume_poweroff < "$USOS_UI_TTY" || true; else IFS= read -r _resume_poweroff || true; fi
-            poweroff -f
-            while true; do sleep 3600; done
-            ;;
-        xp-staging|windows2000-staging)
-            NT5_SYSTEM=windows-xp
-            [ "$LEGACY_ACTION" != windows2000-staging ] || NT5_SYSTEM=windows-2000
-            export NT5_SYSTEM
-            [ -r /usr/lib/usos/legacy_xp_staging.sh ] || stop 'legacy_xp_staging.sh is missing'
-            . /usr/lib/usos/legacy_xp_staging.sh
-            usos_legacy_xp_staging "$LEGACY_IMAGE_HEX" "$LEGACY_UNATTENDED_HEX"
-            stop 'Legacy XP staging returned unexpectedly'
-            ;;
-        *) stop "unsupported Legacy action: $LEGACY_ACTION" ;;
-    esac
+    # tools/pipeline/run.sh: profile from usos.plan_profile or the action,
+    # then its steps (adapters over the scripts this block used to call).
+    usos_pipeline_resolve_action "$LEGACY_ACTION" "$PLAN_PROFILE_TOKEN" || stop "unsupported Legacy action: $LEGACY_ACTION"
+    usos_pipeline_run || stop "pipeline step failed for $LEGACY_ACTION"
 fi
 
 TARGET_GUARD_TEST_INI=/mnt/esp/EFI/USOS/target-guard-test.ini
@@ -502,6 +480,11 @@ SELECTED_METHOD=$(ini_value selected_method "$STATE_FILE" 2>/dev/null || true)
 # takes the DATA\Drivers folder from it. Empty in older requests.
 SELECTED_SYSTEM=$(ini_value selected_system "$STATE_FILE" 2>/dev/null || true)
 [ -n "$SELECTED_METHOD" ] || SELECTED_METHOD=iso
+# The menu's plan (plan_* keys) must agree with the request; a Core request
+# already resolved its profile from the command line (step 500).
+if [ -z "$USOS_PLAN_PROFILE" ]; then
+    usos_pipeline_check_work_plan "$STATE_FILE" "$SELECTED_METHOD" || stop 'preparation plan does not match the request'
+fi
 case "$SELECTED_METHOD" in
     iso|chainload|wimboot|vhdboot) ;;
     *) stop "unsupported preparation method: $SELECTED_METHOD" ;;

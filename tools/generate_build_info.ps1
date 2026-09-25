@@ -33,6 +33,7 @@ foreach ($required in @('build.zig', 'build.bat', 'installer\go.mod', 'installer
 
 Add-FilesFromDirectory $files (Join-Path $ProjectRoot 'src')
 Add-FilesFromDirectory $files (Join-Path $ProjectRoot 'media\UI')
+Add-FilesFromDirectory $files (Join-Path $ProjectRoot 'tools\pipeline')
 Add-FilesFromDirectory $files (Join-Path $ProjectRoot 'installer\cmd') @('.go')
 Add-FilesFromDirectory $files (Join-Path $ProjectRoot 'installer\internal') @('.go')
 

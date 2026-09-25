@@ -32,6 +32,7 @@ import argparse
 import difflib
 import gzip
 import hashlib
+import os
 import stat
 import sys
 import zipfile
@@ -42,7 +43,9 @@ from build_micro_linux import parse_newc  # noqa: E402
 import build_xp_uefi_csm_trial as xp_csm  # noqa: E402
 
 GOLDEN = Path(__file__).resolve().parent
-BASE = ROOT / 'zig-out/micro-linux/initramfs-usos'
+# USOS_MICRO_LINUX_DIR: a micro-Linux build outside zig-out (e.g. a branch
+# build kept apart from the release outputs).
+BASE = Path(os.environ.get('USOS_MICRO_LINUX_DIR', ROOT / 'zig-out/micro-linux')) / 'initramfs-usos'
 NATIVE = ROOT / 'zig-out/windows-native'
 PAYLOAD = ROOT / 'installer/internal/payload/assets/payload.zip'
 # Built from Zig UI code: its bytes change with any Zig refactor that keeps
@@ -79,10 +82,13 @@ def tracked(name):
 def check_fresh(entries):
     stale = []
     for name, entry in entries.items():
-        if not name.startswith('usr/lib/usos/') or name.count('/') != 3:
+        pipeline = name.startswith('usr/lib/usos/pipeline/')
+        if not name.startswith('usr/lib/usos/') or (name.count('/') != 3 and not pipeline):
             continue
         source = ROOT / 'tools' / name.rsplit('/', 1)[1]
-        if source.suffix in ('.sh', '.awk', '.sif') and source.is_file() and source.read_bytes() != entry.data:
+        if pipeline:
+            source = ROOT / 'tools' / name[len('usr/lib/usos/'):]
+        if source.suffix in ('.sh', '.awk', '.sif') and source.is_file() and source.read_bytes().replace(b'\r\n', b'\n') != entry.data:
             stale.append(name)
     init = ROOT / 'tools/micro_linux_init.sh'
     if entries['usos-init'].data != init.read_bytes():
@@ -130,6 +136,8 @@ def render():
     lines.append('# xp_csm: entries added or changed by the UEFI-CSM overlay (stand-in pae.exe)')
     for name in sorted(derived):
         entry = derived[name]
+        if name in UNHASHED:
+            continue
         before = base.get(name)
         if before is not None and before.mode == entry.mode and before.data == entry.data:
             continue
