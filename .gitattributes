@@ -1,0 +1,25 @@
+# Large binaries go to Git LFS from now on. This applies only to FUTURE
+# commits of these paths: existing history is not rewritten (no
+# `git lfs migrate`), so blobs already committed stay ordinary git objects.
+# There is no remote; LFS objects live in .git/lfs/objects. Keep the backup
+# (bundle) procedure in mind: `git bundle` does not carry LFS objects, so
+# copy .git/lfs as well when backing up.
+
+# Disk images and installation media
+*.iso   filter=lfs diff=lfs merge=lfs -text
+*.ISO   filter=lfs diff=lfs merge=lfs -text
+*.img   filter=lfs diff=lfs merge=lfs -text
+*.IMG   filter=lfs diff=lfs merge=lfs -text
+*.vhd   filter=lfs diff=lfs merge=lfs -text
+*.vhdx  filter=lfs diff=lfs merge=lfs -text
+*.vmdk  filter=lfs diff=lfs merge=lfs -text
+*.qcow2 filter=lfs diff=lfs merge=lfs -text
+*.wim   filter=lfs diff=lfs merge=lfs -text
+*.esd   filter=lfs diff=lfs merge=lfs -text
+
+# Embedded installer payload (EFI/boot payload zip, ~145 MB per release)
+installer/internal/payload/assets/*.zip filter=lfs diff=lfs merge=lfs -text
+
+# Exceptions: tiny test fixtures and bundled QEMU firmware stay plain git
+tools/tests/fixtures/** !filter !diff !merge !text
+tools/qemu/** !filter !diff !merge !text
