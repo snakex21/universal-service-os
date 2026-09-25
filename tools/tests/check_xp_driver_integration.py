@@ -4,7 +4,7 @@ import gzip,hashlib,json,os,subprocess,sys,ctypes as c,winreg,shutil,csv,argpars
 root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'tools'))
 from build_micro_linux import parse_newc
 from xp_driver_overlay import META,SELECTED,BUILTIN_USB,DRIVERS,registry_values,decode,edit_section
-base=root/'zig-out/xp-uefi-csm'
+base=Path(os.environ.get('USOS_XP_PACKAGE_DIR',root/'zig-out/xp-uefi-csm'))
 parser=argparse.ArgumentParser();parser.add_argument('--added-source',action='store_true',help='only the bundle of the later-added source ISO');args=parser.parse_args()
 manifest=json.loads((base/'manifest.json').read_text())
 # Every bundle in the archive is checked against the work folder of its own

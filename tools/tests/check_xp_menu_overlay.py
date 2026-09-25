@@ -4,9 +4,9 @@ import gzip, os, subprocess, sys
 root=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(root/'tools'))
 from build_micro_linux import parse_newc
-base=root/'zig-out/xp-uefi-csm'
+base=Path(os.environ.get('USOS_XP_PACKAGE_DIR',root/'zig-out/xp-uefi-csm'))
 entries=parse_newc(gzip.decompress((base/'initramfs-xp').read_bytes()))
-assert entries['usr/bin/usos-fb-ui'].data==(root/'zig-out/micro-linux/usos-fb-ui').read_bytes()
+assert entries['usr/bin/usos-fb-ui'].data==Path(os.environ.get('USOS_FB_UI',root/'zig-out/micro-linux/usos-fb-ui')).read_bytes()
 assert entries['usr/lib/usos/xp_menu_ui.sh'].data==(root/'tools/xp_menu_ui.sh').read_bytes()
 assert entries['usr/lib/usos/micro_linux_ui.sh'].data==(root/'tools/micro_linux_ui.sh').read_bytes()
 work=base/'menu-checks';work.mkdir(exist_ok=True)

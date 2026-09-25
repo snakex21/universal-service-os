@@ -1,6 +1,6 @@
 """Resolve driver import names against the actual SP3 source and payload."""
 from pathlib import Path
-import struct,sys,subprocess,json,argparse
+import struct,sys,subprocess,json,argparse,os
 r=Path(__file__).resolve().parents[2];sys.path.insert(0,str(r/'tools'))
 from xp_driver_overlay import SELECTED,BUILTIN_USB,DRIVERS
 def pe(path):
@@ -26,7 +26,7 @@ def pe(path):
     imports.append((mod,string(u(t)+2)));t+=4
    i+=20
  return exports,imports
-base=r/'zig-out/xp-uefi-csm'
+base=Path(os.environ.get('USOS_XP_PACKAGE_DIR',r/'zig-out/xp-uefi-csm'))
 parser=argparse.ArgumentParser();parser.add_argument('--source-iso',type=Path);args=parser.parse_args()
 iso=args.source_iso or next(Path('L:/Systems/Windows/Windows XP/Images').glob('*NiKKA.iso'))
 def source_hash(name):

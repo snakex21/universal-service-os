@@ -12,7 +12,7 @@ parser.add_argument('--base',type=Path,help='initramfs-usos the XP package was d
 parser.add_argument('--images',type=Path,help='folder with the XP ISOs (default: repository root, else L:)')
 args=parser.parse_args()
 def package_base():
-    expected=json.loads((root/'zig-out/xp-uefi-csm/manifest.json').read_text())['base_initramfs_sha256']
+    expected=json.loads((PACKAGE/'manifest.json').read_text())['base_initramfs_sha256']
     candidates=[args.base] if args.base else [root/'zig-out/micro-linux/initramfs-usos',Path('J:/EFI/USOS/micro-linux/initramfs-usos')]
     for path in candidates:
         if path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest()==expected:return path
@@ -21,7 +21,9 @@ def xp_images():
     if args.images:return sorted(args.images.glob('*.iso'))
     local=sorted(p for p in root.glob('*.iso') if 'xp' in p.name.lower())
     return local or sorted(Path('L:/Systems/Windows/Windows XP/Images').glob('*.iso'))
-out=root/'zig-out/xp-uefi-csm/checks';out.mkdir(parents=True,exist_ok=True)
+# USOS_XP_PACKAGE_DIR: check another package folder (e.g. a branch build).
+PACKAGE=Path(os.environ.get('USOS_XP_PACKAGE_DIR',root/'zig-out/xp-uefi-csm'))
+out=PACKAGE/'checks';out.mkdir(parents=True,exist_ok=True)
 env=dict(os.environ,TEMP=str(out),TMP=str(out),ZIG_GLOBAL_CACHE_DIR=str(root/'tools/cache/zig-global'),ZIG_LOCAL_CACHE_DIR=str(out/'cache'))
 dll=out/'xp-pae-tests.dll'
 subprocess.run([str(root/'tools/zig/zig.exe'),'cc','-target','x86_64-windows-gnu','-shared','-nostdlib','-fno-builtin','-fno-stack-protector','-Os','-I'+str(root/'tools/zig/lib/libc/include/any-windows-any'),str(root/'tools/tests/xp_pae_harness.c'),'-Wl,--entry,DllMain','-lkernel32','-luser32','-ladvapi32','-lversion','-o',str(dll)],env=env,check=True)
@@ -120,9 +122,12 @@ for idx,iso in enumerate(images):
         results.append({'iso':iso.name,'file':plain,'supported':bool(rc),'sha256':hashlib.sha256(before).hexdigest()})
         print(iso.name,plain,'PATCHED COPY' if rc else 'REFUSED (unsupported pattern)',flush=True)
 entries=parse_newc(gzip.decompress((out.parent/'initramfs-xp').read_bytes()))
-assert b'rdinit' not in entries['usr/lib/usos/xp_selected_partition.sif'].data
-assert b'[GuiRunOnce]' in entries['usr/lib/usos/xp_selected_partition.sif'].data
-sif_text=entries['usr/lib/usos/xp_selected_partition.sif'].data
+# Since refactor M4 the UEFI-CSM answer is its own base file; the BIOS one has no PAE.
+SIF='usr/lib/usos/xp_selected_partition_uefi_csm.sif'
+assert b'rdinit' not in entries[SIF].data
+assert b'[GuiRunOnce]' in entries[SIF].data
+assert b'[GuiRunOnce]' not in entries['usr/lib/usos/xp_selected_partition.sif'].data
+sif_text=entries[SIF].data
 assert b'[SetupParams]\nUserExecute="C:\\USOS\\XP\\pae.exe"\n' in sif_text and sif_text.count(b'[SetupParams]')==1
 assert b'Command0="%SystemDrive%\\USOS\\XP\\pae.exe /firstlogon"' in sif_text
 assert b'cmdlines' not in sif_text.lower() and b'detachedprogram' not in sif_text.lower()
@@ -138,19 +143,18 @@ for name,entry in entries.items():
         assert '\r\n' in hivesys,name
 # Physical-trial diagnostics must never ship in the USB flow.
 for marker in [b'NUMPROC',b'/BOOTLOG',b'd.cmd',b'usos-diag']:
-    for name in ['usos-init','usr/lib/usos/xp_selected_partition.sif','usr/lib/usos/prepare_xp_ntfs_target.sh','usr/lib/usos/legacy_xp_staging.sh']:
+    for name in ['usos-init',SIF,'usr/lib/usos/prepare_xp_ntfs_target.sh','usr/lib/usos/legacy_xp_staging.sh']:
         assert marker not in entries[name].data,(name,marker)
 assert entries['usr/lib/usos/xp-pae.exe'].data==(out.parent/'pae.exe').read_bytes()
 base_path=package_base();print('Package base:',base_path,flush=True)
 base=parse_newc(gzip.decompress(base_path.read_bytes()))
 changed={n for n in entries if n not in base or entries[n].data!=base[n].data}
 driver_entries={n for n in entries if n=='usr/lib/usos/xp-drivers' or n.startswith('usr/lib/usos/xp-drivers/')}
-# The overlay always rewrites these; the UI files are copied from the tree and
-# may equal the base when the base already ships the same UI build.
-overlay={'usos-init','usr/lib/usos/legacy_xp_staging.sh','usr/lib/usos/prepare_xp_ntfs_target.sh','usr/lib/usos/xp_selected_partition.sif','usr/lib/usos/xp-pae.exe','usr/lib/usos/xp-pae-LICENSE.txt','usr/lib/usos/xp_driver_stage.sh','usr/lib/usos/xp_verify_target.sh'}
-ui={'usr/bin/usos-fb-ui','usr/lib/usos/xp_menu_ui.sh','usr/lib/usos/micro_linux_ui.sh'}
-assert overlay|driver_entries<=changed<=overlay|ui|driver_entries,(changed-(overlay|ui|driver_entries),(overlay|driver_entries)-changed)
-for name in ui:assert name in base and entries[name].data==(root/({'usr/bin/usos-fb-ui':'zig-out/micro-linux/usos-fb-ui'}.get(name) or 'tools/'+Path(name).name)).read_bytes(),name
+# Refactor M4: the package only ADDS the PAE helper, its notice and the driver
+# bundles; every base entry (scripts, UI, init) is the base's own.
+overlay={'usr/lib/usos/xp-pae.exe','usr/lib/usos/xp-pae-LICENSE.txt'}
+assert changed==overlay|driver_entries,(changed-(overlay|driver_entries),(overlay|driver_entries)-changed)
+assert all(n not in base for n in overlay|driver_entries)
 assert driver_entries
 for name in ['usos-init','usr/lib/usos/legacy_xp_staging.sh','usr/lib/usos/prepare_xp_ntfs_target.sh','usr/lib/usos/xp_verify_target.sh']:
     script=out/(Path(name).name+'.sh');script.write_bytes(entries[name].data)
