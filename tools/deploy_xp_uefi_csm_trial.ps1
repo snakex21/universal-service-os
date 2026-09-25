@@ -81,10 +81,11 @@ if($LaunchersOnly){
 foreach($name in $payloadNames){
  $files+=@{Source=(Join-Path $package $name);Target=(Join-Path $espRoot ('EFI\USOS-XP\'+$name))}
 }
-if(!$DriversOnly -and !$UnifiedMenu){foreach($name in $manifest.launchers){
- if($name -notmatch '^XP-SP[23](-NiKKA)?-UEFI-CSM-PAE\.efi$'){throw 'Unexpected launcher name'}
- foreach($drive in @($espRoot,$dataRoot)){$files+=@{Source=(Join-Path $package $name);Target=(Join-Path $drive ('Systems\Windows\Windows XP UEFI-CSM PAE\Images\'+$name))}}
-}
+if(!$DriversOnly -and !$UnifiedMenu){
+# Per-ISO launchers (Systems\Windows\Windows XP UEFI-CSM PAE on DATA and ESP) are
+# gone: the unified menu starts EFI\USOS-XP itself and the updater removes the
+# old folder when it holds only those launchers.
+if(@($manifest.launchers).Count -ne 0){throw 'Package still lists per-ISO launchers; rebuild it with build_xp_uefi_csm_trial.py'}
 # BOOTX64.EFI (shim), grubx64.efi (USOS) and mmx64.efi (MokManager) travel together.
 if(!$LaunchersOnly){foreach($name in $bootFiles){$files+=@{Source=(Join-Path $project ('zig-out\usb\EFI\BOOT\'+$name));Target=(Join-Path $espRoot ('EFI\BOOT\'+$name))}}}
 }

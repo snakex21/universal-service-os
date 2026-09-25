@@ -116,6 +116,13 @@ func (b Backend) CopyInstallPayload(media install.MediaLayout, progress func(don
 			progress(globalDone, total)
 		}
 	}
+	// The 2026-09-21 XP trial's launcher folder: removed from DATA and the ESP
+	// only when it holds nothing but those generated launchers.
+	for _, root := range []string{resolved.DATA.VolumePath, resolved.ESP.VolumePath} {
+		if _, _, err := removeObsoleteXPTrialFolder(root); err != nil {
+			return err
+		}
+	}
 	if err := ensureXPSettingsFile(resolved.DATA.VolumePath); err != nil {
 		return err
 	}
