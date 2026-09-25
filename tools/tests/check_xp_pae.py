@@ -3,6 +3,24 @@ from pathlib import Path
 import ctypes,gzip,hashlib,json,os,shutil,struct,subprocess,sys
 root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'tools'))
 from build_micro_linux import parse_newc
+import argparse
+# No stick needed (refactor M0): the base is the build's micro-Linux image
+# when it is the one the package was built from; the XP ISOs default to the
+# copies in the repository root. --base/--images select others (e.g. J:/L:).
+parser=argparse.ArgumentParser()
+parser.add_argument('--base',type=Path,help='initramfs-usos the XP package was derived from')
+parser.add_argument('--images',type=Path,help='folder with the XP ISOs (default: repository root, else L:)')
+args=parser.parse_args()
+def package_base():
+    expected=json.loads((root/'zig-out/xp-uefi-csm/manifest.json').read_text())['base_initramfs_sha256']
+    candidates=[args.base] if args.base else [root/'zig-out/micro-linux/initramfs-usos',Path('J:/EFI/USOS/micro-linux/initramfs-usos')]
+    for path in candidates:
+        if path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest()==expected:return path
+    raise SystemExit('No initramfs-usos with the package base SHA-256 '+expected+' (tried '+', '.join(map(str,candidates))+')')
+def xp_images():
+    if args.images:return sorted(args.images.glob('*.iso'))
+    local=sorted(p for p in root.glob('*.iso') if 'xp' in p.name.lower())
+    return local or sorted(Path('L:/Systems/Windows/Windows XP/Images').glob('*.iso'))
 out=root/'zig-out/xp-uefi-csm/checks';out.mkdir(parents=True,exist_ok=True)
 env=dict(os.environ,TEMP=str(out),TMP=str(out),ZIG_GLOBAL_CACHE_DIR=str(root/'tools/cache/zig-global'),ZIG_LOCAL_CACHE_DIR=str(out/'cache'))
 dll=out/'xp-pae-tests.dll'
@@ -74,7 +92,8 @@ reset_test_key()
 try:winreg.DeleteKey(winreg.HKEY_CURRENT_USER,'Software\\USOS-XP-PAE-Test')
 except OSError:pass
 seven=Path('C:/Program Files/7-Zip/7z.exe')
-images=sorted(Path('L:/Systems/Windows/Windows XP/Images').glob('*.iso'))
+images=xp_images();assert images,'No XP ISO found'
+print('XP sources:',', '.join(i.name for i in images),flush=True)
 results=[]
 for idx,iso in enumerate(images):
     # Fresh scratch per ISO: the index-based folder may hold another ISO's CABs.
@@ -122,7 +141,8 @@ for marker in [b'NUMPROC',b'/BOOTLOG',b'd.cmd',b'usos-diag']:
     for name in ['usos-init','usr/lib/usos/xp_selected_partition.sif','usr/lib/usos/prepare_xp_ntfs_target.sh','usr/lib/usos/legacy_xp_staging.sh']:
         assert marker not in entries[name].data,(name,marker)
 assert entries['usr/lib/usos/xp-pae.exe'].data==(out.parent/'pae.exe').read_bytes()
-base=parse_newc(gzip.decompress(Path('J:/EFI/USOS/micro-linux/initramfs-usos').read_bytes()))
+base_path=package_base();print('Package base:',base_path,flush=True)
+base=parse_newc(gzip.decompress(base_path.read_bytes()))
 changed={n for n in entries if n not in base or entries[n].data!=base[n].data}
 driver_entries={n for n in entries if n=='usr/lib/usos/xp-drivers' or n.startswith('usr/lib/usos/xp-drivers/')}
 # The overlay always rewrites these; the UI files are copied from the tree and
