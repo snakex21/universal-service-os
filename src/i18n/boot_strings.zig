@@ -346,6 +346,17 @@ pub const Key = enum(u16) {
     sbkey_saved_title,
     sbkey_title,
     sbkey_yes,
+    server_belongs_in,
+    server_blocked_ia64,
+    server_client_in_server_folder,
+    server_core,
+    server_desktop,
+    server_editions,
+    server_in_client_folder,
+    server_nvme_hint,
+    server_section,
+    server_section_detail,
+    server_setup,
     splash_images,
     splash_loading,
     splash_starting,
@@ -769,6 +780,17 @@ pub const hashes = [_]u32{
     0xee1489b3, // sbkey.saved_title
     0xff5020b3, // sbkey.title
     0xd9dbe826, // sbkey.yes
+    0x50256306, // server.belongs_in
+    0xb1aaa349, // server.blocked_ia64
+    0x88ac4304, // server.client_in_server_folder
+    0x2a085b63, // server.core
+    0xab736064, // server.desktop
+    0x167e4e9f, // server.editions
+    0x57bd8b78, // server.in_client_folder
+    0x80dcc372, // server.nvme_hint
+    0x3474f2b3, // server.section
+    0xdd3ef586, // server.section.detail
+    0xd46db841, // server.setup
     0x4f9583c2, // splash.images
     0x35ce4a04, // splash.loading
     0x790f2c74, // splash.starting
@@ -1235,6 +1257,17 @@ pub const bios = [_]bool{
     false,
     false,
     false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
     true,
     true,
     true,
@@ -1614,6 +1647,17 @@ pub const english = [_][]const u8{
     "Key saved",
     "Secure Boot key",
     "Yes, save the key",
+    "Belongs in Systems\\Windows\\{0}",
+    "Itanium (IA64) image - it does not start on this PC",
+    "This is a client Windows image. It belongs in Systems\\Windows\\{0}; it can still be started from here.",
+    "Core",
+    "Desktop Experience",
+    "Server editions",
+    "This is a Windows Server image. It belongs in Systems\\Windows\\{0}; it can still be started from here.",
+    "This Setup has no built-in NVMe driver and this PC has an NVMe disk. Put the NVMe driver in DATA\\Drivers\\{0}\\Storage.",
+    "Windows Server",
+    "Server editions, 2008 to 2025",
+    "Windows Server Setup",
     "Loading system images\xe2\x80\xa6",
     "Loading\xe2\x80\xa6",
     "Starting\xe2\x80\xa6",
