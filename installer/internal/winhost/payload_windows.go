@@ -116,6 +116,9 @@ func (b Backend) CopyInstallPayload(media install.MediaLayout, progress func(don
 			progress(globalDone, total)
 		}
 	}
+	if err := ensureXPSettingsFile(resolved.DATA.VolumePath); err != nil {
+		return err
+	}
 	if err := syncDataCatalog(resolved); err != nil {
 		return fmt.Errorf("synchronize DATA catalog metadata to ESP: %w", err)
 	}

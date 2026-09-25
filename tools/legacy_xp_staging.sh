@@ -429,6 +429,14 @@ usos_legacy_xp_staging() {
     if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ]; then
     . /usr/lib/usos/xp_driver_stage.sh
     usos_xp_driver_preflight || stop 'XP driver preflight failed; no target write occurred'
+    # Hands-off Setup/OOBE (docs/xp-unattended.md); a selected custom .sif wins.
+    . /usr/lib/usos/xp_user_settings.sh
+    if [ -z "$XP_WINNT_SIF" ]; then
+        usos_xp_settings_stage "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/usos-xp.ini" "$SOURCE_ROOT" || stop 'usos-xp.ini is invalid; fix it on DATA. No target write occurred'
+    else
+        XP_USER_SETTINGS=''; export XP_USER_SETTINGS
+        printf '[XP_SETTINGS] ignored: custom WINNT.SIF selected\n'
+    fi
     fi
     XP_SOURCE_OPEN=yes
     fi

@@ -13,7 +13,7 @@ usos_nt5_profile
 fail() { printf '[XP_WINDOWS] STOP: %s\n' "$1" >&2; exit 1; }
 value() { awk -F= -v key="$2" '$1==key {sub(/^[^=]*=/, ""); print; found=1; exit} END {if(!found) exit 1}' "$1"; }
 work=$(mktemp -d)
-trap 'rm -f "$work/plan" "$work/mbr" "$work/migrate.inf" "$work/readback" "$work/winnt.sif"; rmdir "$work"' EXIT HUP INT TERM
+trap 'rm -f "$work/plan" "$work/mbr" "$work/migrate.inf" "$work/readback" "$work/winnt.sif" "$work/winnt.base"; rm -rf "$work/oem"; rmdir "$work"' EXIT HUP INT TERM
 awk -f "$SCRIPT_DIR/xp_windows_partition_plan.awk" "$TARGET_SNAPSHOT" > "$work/plan"
 printf '[XP_WINDOWS] shared volume plan checked\n'
 cmp -s "$work/plan" "$XP_WINDOWS_PLAN" || fail 'Windows reservation changed after confirmation'
@@ -42,6 +42,23 @@ awk -v directory="$NT5_INSTALL_DIR" '
     /^TargetPath=/ { print "TargetPath=\\" directory; next }
     { sub(/\r$/, ""); print }
 ' "$XP_AUTOMATIC_SIF" > "$work/winnt.sif"
+# usos-xp.ini (validated by legacy_xp_staging.sh): hands-off GUI Setup/OOBE.
+if [ -n "${XP_USER_SETTINGS:-}" ]; then
+    . "$SCRIPT_DIR/xp_user_settings.sh"
+    mv "$work/winnt.sif" "$work/winnt.base"
+    usos_xp_settings_sif "$work/winnt.base" "$XP_USER_SETTINGS" > "$work/winnt.sif" || fail 'cannot merge usos-xp.ini into WINNT.SIF'
+    rm -f "$work/winnt.base"
+    usos_xp_settings_oem "$XP_USER_SETTINGS" "$work/oem" || fail 'cannot render usos-xp.ini accounts'
+    mdir -i "$MTOOLS_IMAGE" '::/$WIN_NT$.~LS/$OEM$' >/dev/null 2>&1 || mmd -i "$MTOOLS_IMAGE" '::/$WIN_NT$.~LS/$OEM$' || fail 'cannot create $OEM$'
+    for file in cmdlines.txt usos-users.cmd; do
+        mcopy -o -i "$MTOOLS_IMAGE" "$work/oem/$file" "::/\$WIN_NT\$.~LS/\$OEM\$/$file"
+        rm -f "$work/readback"
+        mcopy -o -i "$MTOOLS_IMAGE" "::/\$WIN_NT\$.~LS/\$OEM\$/$file" "$work/readback"
+        cmp -s "$work/oem/$file" "$work/readback" || fail "\$OEM\$/$file readback mismatch"
+    done
+    rm -rf "$work/oem"
+    printf '[XP_WINDOWS] usos-xp.ini merged: WINNT.SIF unattended, $OEM$ accounts staged\n'
+fi
 put_verified "$work/winnt.sif" WINNT.SIF
 put_verified "$work/migrate.inf" MIGRATE.INF
 sync

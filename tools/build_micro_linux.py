@@ -431,6 +431,7 @@ def main() -> int:
             ("tools/legacy_xp_staging.sh", "usr/lib/usos/legacy_xp_staging.sh"),
             ("tools/legacy_xp_resume.sh", "usr/lib/usos/legacy_xp_resume.sh"),
             ("tools/xp_unattended_policy.sh", "usr/lib/usos/xp_unattended_policy.sh"),
+            ("tools/xp_user_settings.sh", "usr/lib/usos/xp_user_settings.sh"),
             ("tools/xp_windows_partition_plan.awk", "usr/lib/usos/xp_windows_partition_plan.awk"),
             ("tools/xp_selected_partition.sif", "usr/lib/usos/xp_selected_partition.sif"),
             ("tools/xp_selected_partition_uefi_csm.sif", "usr/lib/usos/xp_selected_partition_uefi_csm.sif"),

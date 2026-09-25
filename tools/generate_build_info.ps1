@@ -112,6 +112,7 @@ foreach ($relative in @(
     'tools\legacy_xp_staging.sh',
     'tools\legacy_xp_resume.sh',
     'tools\xp_unattended_policy.sh',
+    'tools\xp_user_settings.sh',
     'tools\xp_windows_partition_plan.awk',
     'tools\xp_selected_partition.sif',
     'tools\xp_disk_reset.sh',
