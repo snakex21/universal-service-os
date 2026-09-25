@@ -73,15 +73,15 @@ static void save_previous(const WCHAR *dir,const WCHAR *from,const WCHAR *name,i
 }
 /* Every file of dir_path (one level, no sub-folders) as <prefix><name>. */
 static void save_previous_folder(const WCHAR *dir,const WCHAR *drive,const WCHAR *folder,const WCHAR *prefix,int text){
- WCHAR pattern[MAX_PATH],from[MAX_PATH],name[MAX_PATH];copy(pattern,drive);append(pattern,folder);append(pattern,L"\\*");
- WIN32_FIND_DATAW found;HANDLE find=FindFirstFileW(pattern,&found);if(find==INVALID_HANDLE_VALUE)return;
+ static WCHAR pattern[MAX_PATH],from[MAX_PATH],name[MAX_PATH];static WIN32_FIND_DATAW found;copy(pattern,drive);append(pattern,folder);append(pattern,L"\\*");
+ HANDLE find=FindFirstFileW(pattern,&found);if(find==INVALID_HANDLE_VALUE)return;
  do{if(found.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)continue;if(length(found.cFileName)+length(prefix)+2>=64)continue;
   copy(from,drive);append(from,folder);append(from,L"\\");append(from,found.cFileName);copy(name,prefix);append(name,found.cFileName);save_previous(dir,from,name,text);
  }while(FindNextFileW(find,&found));
  FindClose(find);
 }
-static int volume_disk(WCHAR letter,DWORD *disk){
- WCHAR path[8]=L"\\\\.\\C:";path[4]=letter;
+static int volume_disk(const WCHAR *volume,DWORD *disk){
+ WCHAR path[MAX_PATH];copy(path,volume);unsigned n=length(path);if(n&&path[n-1]=='\\')path[n-1]=0;
  HANDLE h=CreateFileW(path,0,FILE_SHARE_READ|FILE_SHARE_WRITE,0,OPEN_EXISTING,0,0);if(h==INVALID_HANDLE_VALUE)return 0;
  union{VOLUME_DISK_EXTENTS e;BYTE raw[sizeof(VOLUME_DISK_EXTENTS)+8*sizeof(DISK_EXTENT)];}extents;DWORD got=0;
  BOOL ok=DeviceIoControl(h,IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS,0,0,&extents,sizeof(extents),&got,0);CloseHandle(h);
@@ -102,21 +102,22 @@ static DWORD parse_disk(const WCHAR *command,int *ok){
  for(;*at>='0'&&*at<='9';at++){value=value*10+(DWORD)(*at-'0');*ok=1;}
  return value;
 }
-/* One volume root (e.g. "D:\\"): 1 when it holds an unfinished install
- * (its diagnostics are then copied under previous-install\\<letter>). */
-static int scan_volume(const WCHAR *drive,WCHAR letter,HANDLE out){
- WCHAR state[MAX_PATH],bt[MAX_PATH];copy(state,drive);append(state,L"Windows\\Setup\\State\\State.ini");copy(bt,drive);append(bt,L"$WINDOWS.~BT");
+/* One volume root ("D:\\" or "\\\\?\\Volume{...}\\"): 1 when it holds an
+ * unfinished install (its diagnostics are then copied under
+ * previous-install\\<label>). */
+static int scan_volume(const WCHAR *drive,const WCHAR *label,HANDLE out){
+ static WCHAR state[MAX_PATH],bt[MAX_PATH];copy(state,drive);append(state,L"Windows\\Setup\\State\\State.ini");copy(bt,drive);append(bt,L"$WINDOWS.~BT");
  int state_exists;int complete=file_contains(state,"IMAGE_STATE_COMPLETE",&state_exists);
  DWORD bt_attr=GetFileAttributesW(bt);int bt_left=bt_attr!=INVALID_FILE_ATTRIBUTES&&(bt_attr&FILE_ATTRIBUTE_DIRECTORY);
  if(!(state_exists&&!complete)&&!bt_left)return 0;
- WCHAR dir[MAX_PATH];copy(dir,root);append(dir,L"\\previous-install");CreateDirectoryW(dir,0);
- WCHAR sub[3]={letter,0,0};append(dir,L"\\");append(dir,sub);CreateDirectoryW(dir,0);
- WCHAR summary[MAX_PATH];copy(summary,dir);append(summary,L"\\summary.txt");
+ static WCHAR dir[MAX_PATH];copy(dir,root);append(dir,L"\\previous-install");CreateDirectoryW(dir,0);
+ WCHAR sub[16];copy(sub,label);append(dir,L"\\");append(dir,sub);CreateDirectoryW(dir,0);
+ static WCHAR summary[MAX_PATH];copy(summary,dir);append(summary,L"\\summary.txt");
  previous_summary=CreateFileW(summary,GENERIC_WRITE,FILE_SHARE_READ,0,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);
  ascii(previous_summary,"USOS: unfinished or aborted Windows installation on ");asciiw(previous_summary,drive);ascii(previous_summary,"\r\n");
  ascii(previous_summary,state_exists?(complete?"State.ini: IMAGE_STATE_COMPLETE\r\n":"State.ini: not IMAGE_STATE_COMPLETE\r\n"):"State.ini: missing\r\n");
  ascii(previous_summary,bt_left?"$WINDOWS.~BT: present\r\n":"$WINDOWS.~BT: absent\r\n");
- WCHAR from[MAX_PATH];
+ static WCHAR from[MAX_PATH];
  static const WCHAR *texts[][2]={{L"Windows\\Panther\\setupact.log",L"panther-setupact.log"},{L"Windows\\Panther\\setuperr.log",L"panther-setuperr.log"},
   {L"Windows\\Setup\\State\\State.ini",L"State.ini"},{L"$WINDOWS.~BT\\Sources\\Panther\\setupact.log",L"bt-panther-setupact.log"},
   {L"$WINDOWS.~BT\\Sources\\Panther\\setuperr.log",L"bt-panther-setuperr.log"}};
@@ -132,17 +133,28 @@ static int scan_volume(const WCHAR *drive,WCHAR letter,HANDLE out){
  ascii(out,"; its logs were copied to the USB log folder, previous-install\\");asciiw(out,sub);ascii(out,"\r\n");
  return 1;
 }
+/* Every mounted volume, lettered or not (a target partition may have no drive
+ * letter in WinPE): skip WinPE's own X: and every volume of the USOS disk. */
 static int previous_install(const WCHAR *command){
  int ok;DWORD usos_disk=parse_disk(command,&ok);if(!ok)return 2;
  WCHAR windows[MAX_PATH];if(GetWindowsDirectoryW(windows,MAX_PATH)<3)return 2;
- HANDLE out=GetStdHandle(STD_OUTPUT_HANDLE);int found_any=0;
- DWORD drives=GetLogicalDrives();
- for(unsigned i=2;i<26;i++){
-  WCHAR letter=(WCHAR)(L'A'+i);if(!(drives&(1u<<i))||letter==windows[0])continue;
-  WCHAR drive[4]={letter,':','\\',0};UINT type=GetDriveTypeW(drive);if(type!=DRIVE_FIXED&&type!=DRIVE_REMOVABLE)continue;
-  DWORD disk;if(!volume_disk(letter,&disk)||disk==usos_disk)continue;
-  if(scan_volume(drive,letter,out))found_any=1;
- }
+ WCHAR system_root[4]={windows[0],':','\\',0},system_volume[MAX_PATH];static WCHAR volume[MAX_PATH],names[MAX_PATH];
+ if(!GetVolumeNameForVolumeMountPointW(system_root,system_volume,MAX_PATH))system_volume[0]=0;
+ HANDLE out=GetStdHandle(STD_OUTPUT_HANDLE);int found_any=0;unsigned unlettered=0;
+ HANDLE find=FindFirstVolumeW(volume,MAX_PATH);
+ if(find==INVALID_HANDLE_VALUE){ascii(out,"[USOS] previous-install: no volumes listed\r\n");return 0;}
+ do{
+  if(system_volume[0]&&equal(volume,system_volume))continue;
+  UINT type=GetDriveTypeW(volume);if(type!=DRIVE_FIXED&&type!=DRIVE_REMOVABLE)continue;
+  DWORD got=0;WCHAR label[16];
+  if(GetVolumePathNamesForVolumeNameW(volume,names,MAX_PATH,&got)&&names[0]&&names[1]==':'){label[0]=names[0];label[1]=0;}
+  else{copy(label,L"volume-");WCHAR number[3]={(WCHAR)('0'+(unlettered+1)/10%10),(WCHAR)('0'+(unlettered+1)%10),0};append(label,number);unlettered++;}
+  DWORD disk;if(!volume_disk(volume,&disk)){ascii(out,"[USOS] previous-install: ");asciiw(out,label);ascii(out," skipped (no disk number)\r\n");continue;}
+  if(disk==usos_disk)continue;
+  ascii(out,"[USOS] previous-install: checking ");asciiw(out,label);ascii(out," on disk ");decimal(out,disk);ascii(out,"\r\n");
+  if(scan_volume(volume,label,out))found_any=1;
+ }while(FindNextVolumeW(find,volume,MAX_PATH));
+ FindVolumeClose(find);
  if(!found_any)ascii(out,"[USOS] No unfinished Windows installation found on the other disks.\r\n");
  return 0;
 }

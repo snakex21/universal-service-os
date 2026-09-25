@@ -6,5 +6,5 @@
 int main(int argc,char **argv){
  WCHAR drive[MAX_PATH];if(argc!=3)return 2;
  if(!MultiByteToWideChar(CP_UTF8,0,argv[1],-1,drive,MAX_PATH)||!MultiByteToWideChar(CP_UTF8,0,argv[2],-1,root,MAX_PATH))return 2;
- return scan_volume(drive,L'T',GetStdHandle(STD_OUTPUT_HANDLE))?0:1;
+ return scan_volume(drive,L"T",GetStdHandle(STD_OUTPUT_HANDLE))?0:1;
 }
