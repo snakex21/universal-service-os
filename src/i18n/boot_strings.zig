@@ -1707,7 +1707,7 @@ pub const english = [_][]const u8{
     "No working boot backend supports this system yet.",
     "Select a system, distribution or utility group",
     "built-in",
-    "current",
+    "in use",
     "Colours of this menu",
     "Enter/A applies it now and saves it on the stick",
     "This theme cannot be used: {0}",

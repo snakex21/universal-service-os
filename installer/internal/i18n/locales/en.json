@@ -575,7 +575,7 @@
   "boot.drivers.toggle_unusable": "Rename the folder (no = [ ] ;) to switch it here",
   "boot.themes.title": "Theme",
   "boot.themes.desc": "Colours of this menu",
-  "boot.themes.current": "current",
+  "boot.themes.current": "in use",
   "boot.themes.builtin": "built-in",
   "boot.themes.user": "your theme",
   "boot.themes.invalid": "This theme cannot be used: {0}",
