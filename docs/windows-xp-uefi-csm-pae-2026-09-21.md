@@ -334,6 +334,9 @@ three launchers and the kernel (155c0f9f...) are unchanged.
 check_xp_driver_imports, check_xp_menu_overlay, check_xp_driver_integration
 (default and --added-source) PASS; check_xp_pae PASS against the new base
 (zig-out/micro-linux) and, as expected before the deploy, fails against the
-stick's older base (J:) only on work_boot_relocate.sh. Not deployed yet.
+stick's older base (J:) only on work_boot_relocate.sh before the deploy.
+Deployed with -DriversOnly -Language pl after usos-physical-update (RESULT=PASS,
+PE10 donor moved to DATA\Programs\USOS\WinPE, a44ab63a...; backup
+artifacts/xp-pae/deploy-20260925-105831); check_xp_pae against J: PASS.
 Tests after the release build: test_modern_finalize PASS, run_stage_drivers_qemu
 0 failures, run_qemu_secure_boot.py --only matrix 0 failures (TCG).
