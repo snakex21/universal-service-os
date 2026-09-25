@@ -57,6 +57,14 @@ def fixtures() -> bytes:
         add(f"{src}/{image}", fake_wim(9))
         if case != "nosetup":
             add(f"{src}/sources/setup.exe", b"MZ-setup")
+    init = (ROOT / "tools" / "micro_linux_init.sh").read_text(encoding="utf-8").splitlines()
+    start = init.index("ini_value() {")
+    add("test/ini_value.sh", "\n".join(init[start:init.index("}", start) + 1]) + "\n")
+    state = ("phase=prepare-requested\r\nselected_iso=\\Systems\\x.iso\r\nselected_unattend=none\r\n"
+             "selected_method=chainload\r\nselected_system=windows-10\r\nplan_version=1\r\n"
+             "plan_profile=iso-work-chainload\r\nplan_progress=micro_linux\r\n"
+             "plan_stages=Starting environment|Verifying target device|Preparing workspace|Copying files|Verification and finalization\r\n")
+    add("test/plan-state.ini", state.encode("ascii") + b"\n" * (2048 - len(state)))
     return newc(entries)
 
 
@@ -99,6 +107,14 @@ def main() -> int:
         console.run("export PATH=/usr/sbin:/usr/bin:/sbin:/bin; /bin/busybox --install -s; "
                     "mount -t proc proc /proc; mount -t sysfs sys /sys; mount -t devtmpfs dev /dev 2>/dev/null; "
                     "mkdir -p /tmp; mount -t tmpfs tmp /tmp", "SETUP-DONE", 60)
+        # M2: install-state.ini with the plan_* keys (fixture test/plan-state.ini),
+        # read by the real micro_linux_init.sh ini_value (fixture
+        # test/ini_value.sh) under the initramfs' busybox awk.
+        out = console.run(". /test/ini_value.sh; for k in phase selected_method selected_system plan_profile; do "
+                          "printf 'KV %s=[%s]\n' $k \"$(ini_value $k /test/plan-state.ini)\"; done", "DONE-plan-state", 60)
+        (WORK / "plan-state.log").write_text(out, encoding="utf-8")
+        for expected in ("KV phase=[prepare-requested]", "KV selected_method=[chainload]", "KV selected_system=[windows-10]", "KV plan_profile=[iso-work-chainload]"):
+            expect(expected in out, f"plan keys: {expected}")
         for label, source, method, system, iso, staged, driver in CASES:
             command = (f"rm -rf /test/work /test/state; mkdir -p /test/work /test/state; echo nonce=t > /test/work/.usos-work; "
                        f"SOURCE_ROOT=/test/src-{source} WORK_ROOT=/test/work STATE_FILE=/test/state/install-state.ini "
