@@ -43,8 +43,13 @@ const p_efi = [_]u16{ 'E', 'F', 'I' };
 const p_usos = [_]u16{ 'U', 'S', 'O', 'S' };
 const p_resource = [_]u16{ 'b', 'i', 'o', 's', '-', 'u', 'i', '.', 'b', 'i', 'n' };
 const p_lang = [_]u16{ 'l', 'a', 'n', 'g', '.', 'b', 'i', 'n' };
+const p_settings = [_]u16{ 'u', 's', 'o', 's', '-', 's', 'e', 't', 't', 'i', 'n', 'g', 's', '.', 'i', 'n', 'i' };
 const resource_path = [_][]const u16{ &p_efi, &p_usos, &p_resource };
 const lang_path = [_][]const u16{ &p_efi, &p_usos, &p_lang };
+const settings_path = [_][]const u16{ &p_efi, &p_usos, &p_settings };
+/// usos-settings.ini is read once, before the splash, into the (not yet
+/// used) language-table area of the window.
+const settings_capacity: u32 = 4096;
 
 var state: struct {
     fs: ?*const fat32.FileSystem = null,
@@ -58,16 +63,35 @@ var state: struct {
     icons: []const u8 = &.{},
     table_ok: bool = false,
     sprite_scale: u32 = 0,
+    /// Built-in theme (graphics.theme_presets.all) chosen by theme=.
+    theme: u8 = 0,
     marker: u8 = 1,
 } linksection(".data") = .{};
 
 const english_table = lang_file.Table.english_only;
 
+/// Reads `theme=` from EFI/USOS/usos-settings.ini (called before the
+/// splash). The BIOS menu has the built-in themes only: a user theme name
+/// (DATA\Themes, UEFI menu) or any read problem keeps the default.
+pub fn loadTheme(fs: *const fat32.FileSystem, reader: random_reader.Reader) void {
+    state.theme = 0;
+    if (!ramUsable(window_base, window_base + window_bytes)) return;
+    const buffer: [*]u8 = @ptrFromInt(table_addr);
+    const quiet = fat32.ReadProgress{ .context = undefined, .update_fn = ignoreProgress };
+    const len = fat32.readFileSequentialProgress(fs.*, reader, &settings_path, buffer[0..settings_capacity], quiet) catch return;
+    const index = graphics.theme_presets.index(graphics.theme_presets.settingValue(buffer[0..len])) orelse return;
+    state.theme = @intCast(index);
+}
+
+fn theme() graphics.Theme {
+    return graphics.theme_presets.all[state.theme].theme;
+}
+
 /// Minimal splash drawn right after the VBE mode is set (the font is not
 /// loaded yet): the menu background and the USOS logo tile. The first menu
 /// frame replaces it about 0.1 s later.
 pub fn splash(surface: graphics.Surface) void {
-    const ui = Ui.init(surface, graphics.Theme{}, null, &english_table);
+    const ui = Ui.init(surface, theme(), null, &english_table);
     surface.fill(ui.theme.background);
     const size = ui.px(84);
     graphics.ui.drawLogoOn(&ui, (ui.width() -| size) / 2, (ui.height() * 42 / 100) -| (size / 2), size, ui.theme.background);
@@ -225,7 +249,7 @@ pub fn partial(surface: graphics.Surface) Ui {
 
 fn make(surface: graphics.Surface, table: *const lang_file.Table) Ui {
     const strings: *const lang_file.Table = if (state.pack_ok and state.table_ok) table else &english_table;
-    return Ui.init(surface, graphics.Theme{}, if (state.pack_ok) &state.pack else null, strings);
+    return Ui.init(surface, theme(), if (state.pack_ok) &state.pack else null, strings);
 }
 
 pub const icon_slots: usize = 16;

@@ -247,7 +247,9 @@ fn runFrontend(context: *const BootContext) void {
     };
     var graphics = vbe_probe.init();
     if (graphics) |session| {
-        // Loading screen from the moment the VBE mode is set.
+        // Loading screen from the moment the VBE mode is set, in the
+        // theme= colours (a few sectors of usos-settings.ini first).
+        @import("boot_ui.zig").loadTheme(&fs, reader);
         @import("boot_ui.zig").splash(session.surface);
         @import("boot_ui.zig").init(&fs, reader, bulk_reader, session.surface);
     }
