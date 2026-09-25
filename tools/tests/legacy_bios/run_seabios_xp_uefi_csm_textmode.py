@@ -35,8 +35,16 @@ finish() { log "RESULT $1"; sync; poweroff -f; sleep 5; }
 for d in /sys/bus/pci/devices/*; do modprobe "$(cat "$d/modalias")" 2>/dev/null; done
 for m in sd_mod isofs ntfs3 loop; do modprobe $m 2>/dev/null; done
 sleep 3; mdev -s; cat /proc/partitions
-mount -t iso9660 -o ro,map=off /dev/sdc /mnt/source || finish 'FAIL iso mount'
-export SOURCE_ROOT=/mnt/source TARGET_DEVICE=/dev/sdb USOS_DISK_DEVICE=/dev/sda
+# The kernel may enumerate the three IDE disks in any order: pick them by size
+# (USOS stand-in 256 MiB, target 12 GiB, the rest is the ISO).
+USOS_DEV= TARGET_DEV= ISO_DEV=
+for b in /sys/block/sd?; do
+  case "$(cat "$b/size")" in 524288) USOS_DEV=/dev/${b##*/} ;; 25165824) TARGET_DEV=/dev/${b##*/} ;; *) ISO_DEV=/dev/${b##*/} ;; esac
+done
+log "disks usos=$USOS_DEV target=$TARGET_DEV iso=$ISO_DEV"
+[ -n "$USOS_DEV" ] && [ -n "$TARGET_DEV" ] && [ -n "$ISO_DEV" ] || finish 'FAIL disk identification'
+mount -t iso9660 -o ro,map=off "$ISO_DEV" /mnt/source || finish 'FAIL iso mount'
+export SOURCE_ROOT=/mnt/source TARGET_DEVICE=$TARGET_DEV USOS_DISK_DEVICE=$USOS_DEV
 export TARGET_SNAPSHOT=/run/xp-target.snapshot XP_ALLOW_EMPTY=yes
 export XP_BIOS_DRIVE=80 XP_BIOS_CYLINDERS=1024 XP_BIOS_HEADS=255 XP_BIOS_SPT=63
 export XP_READY_FILE=/mnt/esp/EFI/USOS-XP/xp-target-ready.ini XPSETUP_MOUNT=/mnt/xpsetup
@@ -143,10 +151,11 @@ def textmode(out,target,keys,minutes):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--iso',type=Path,default=DEFAULT_ISO)
-    p.add_argument('--keys',default='');p.add_argument('--minutes',type=float,default=25);p.add_argument('--reuse-prepared',type=Path)
+    p.add_argument('--keys',default='');p.add_argument('--minutes',type=float,default=25);p.add_argument('--reuse-prepared',type=Path);p.add_argument('--prepare-only',action='store_true',help='stop after phase 1 (for tools/tests/target_digest.py)')
     a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
     prepared=a.reuse_prepared.resolve() if a.reuse_prepared else prepare(out,a.iso)
     print('[PASS] prepared',prepared,flush=True)
+    if a.prepare_only:sys.exit(0)
     # Boot an overlay so the prepared image stays pristine for further runs.
     target=out/'boot-overlay.qcow2';target.unlink(missing_ok=True)
     subprocess.run([str(QEMU_IMG),'create','-q','-f','qcow2','-F','qcow2','-b',str(prepared),str(target)],check=True)
