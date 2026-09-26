@@ -67,7 +67,23 @@ built-in name or a `theme.ini` path. Screen `15-tools-theme` is the Tools
 
 - Background image and logo in `theme.ini` (not implemented: partial
   redraws fill with `background`, so an image needs toolkit changes).
-- User themes in the BIOS menu (e.g. copy the chosen `theme.ini` to the
-  ESP during "Update USOS").
+- User themes in the BIOS menu: planned (below), colours only, read from
+  the ESP.
 - The micro-Linux framebuffer UI still uses the default theme.
 - Not yet checked on hardware or in QEMU/OVMF (host previews only).
+
+## Plan: theme editor (ROADMAP N7)
+
+Agreed 2026-09-26. Order: after the answer-profile manager in the UEFI
+menu (docs/HANDOFF-2026-09-26.md, plan item 2), because the editor reuses
+its form / on-screen keyboard component.
+
+- **UEFI in-menu editor** (Tools -> Theme): live preview and live contrast
+  checking with the rules above (`src/gui/theme_contrast.zig`), built on
+  the same form / on-screen keyboard component as the answer-profile
+  manager. Saves go to the ESP.
+- **Editor in the Go installer**: mouse and colour picker, same
+  `theme.ini` format and contrast rules.
+- **Legacy BIOS uses user themes** (colours only, read from the ESP, where
+  the UEFI editor saves them) but gets **no editor**.
+- **2–3 example user themes** shipped on the stick.

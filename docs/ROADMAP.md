@@ -24,6 +24,7 @@ N1 kopia GitHub + LFS
       ├─> N3 sterowniki użytkownika XP/Vista ──┐
       ├─> N4 pliki-towarzysze + generator (10/11) ├─> L1 rodzina NT5 na UEFI ─> L2 XP bez CSM (CSMWrap)
       │                                          │        └─> L7 Longhorn pre-reset, L8 NT4
+      │    └─> menedżer profili odpowiedzi (UEFI) ─> N7 edytor motywów
       └─> N5 szybkie pomysły z E2B               └─> L6 Win98 na X470 (po ręcznym spike'u)
 N6 Secure Boot: kernel lockdown + UKI  (niezależne, po N1)
 L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB boot
@@ -37,6 +38,7 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | N4 | Pliki-towarzysze + generator plików odpowiedzi | **Next** | N2 (M1) | 3 dni (towarzysze) + 8–12 dni (generator, etapami) |
 | N5 | Pomysły z E2B (szybkie) | **Next** / **Later** per punkt | N2 (M1) dla części | 1–10 dni per punkt |
 | N6 | Secure Boot: zablokowany kernel, podpisany UKI | **Next** (niski priorytet w grupie) | N1 | 4–6 dni |
+| N7 | Edytor motywów (UEFI + instalator), motywy użytkownika w BIOS, przykładowe motywy | **Next** (po menedżerze profili) | menedżer profili odpowiedzi (formularz + klawiatura ekranowa) | do oszacowania |
 | L1 | Rodzina NT5 na UEFI (2000, 2003, XP x64) | **Later** | N2 (M4), N3 | 10–15 dni + sprzęt |
 | L2 | XP na UEFI bez CSM (CSMWrap) | **Later** | L1 (profil firmware) | 8–15 dni, wynik niepewny |
 | L3 | 32-bit CPU i mniejsze minimum RAM | **Later** | pomiary | 2 dni pomiarów, potem 5–15 dni |
@@ -135,7 +137,7 @@ Projekt: [design/answer-file-generator.md](design/answer-file-generator.md).
 | „Uruchom z pierwszego dysku” (bez wyjmowania pendrive'a) | **Next** | 1–2 dni | UEFI: `BootNext` na wpis dysku albo `LoadImage` `\EFI\Microsoft\Boot\bootmgfw.efi`/`\EFI\BOOT\BOOTX64.EFI` z ESP wybranego dysku; BIOS: odczyt MBR 0x80 do 0x7C00 z INT13 mapującym dysk USB poza kolejkę (wzorzec XP chainload) |
 | Ogólny wpis dla nieznanych ISO/IMG/EFI (Linux live, WinPE, narzędzia), oznaczony „niezweryfikowane” | **Next** | 8–10 dni | UEFI: obraz El Torito EFI + ISO w RAM przez `EFI_RAM_DISK_PROTOCOL` (jeśli firmware go ma) albo ISO z DATA dla Linuksów z `iso-scan`/`findiso`; BIOS: memdisk dla małych obrazów. Osobny wiersz w `Utilities`, bez przygotowania dysku, bez obietnicy działania |
 | Persistence dla Linux live | **Later** | 3–5 dni | plik `<obraz>.persist.img` obok ISO, parametr jądra per dystrybucja (casper `persistent`, Debian `persistence`); zależy od ogólnego wpisu Linux |
-| Motywy menu (`theme=`, `theme.ini`) | **Done** (gałąź `feature/themes`, bez testu na sprzęcie) | — | wbudowane: default, dark, light, high-contrast, retro (UEFI i BIOS); własny `DATA\Themes\<nazwa>\theme.ini` tylko w UEFI (kolory, walidacja kontrastu, fallback na domyślny); Tools → Motyw. Otwarte: tło/obraz i logo, kopiowanie `theme.ini` na ESP dla BIOS. Opis: `docs/menu-themes.md` |
+| Motywy menu (`theme=`, `theme.ini`) | **Done** (gałąź `feature/themes`, bez testu na sprzęcie) | — | wbudowane: default, dark, light, high-contrast, retro (UEFI i BIOS); własny `DATA\Themes\<nazwa>\theme.ini` tylko w UEFI (kolory, walidacja kontrastu, fallback na domyślny); Tools → Motyw. Otwarte: tło/obraz i logo; edytor i motywy użytkownika w BIOS: N7. Opis: `docs/menu-themes.md` |
 | Układy klawiatury dla pól tekstowych | **Later** (razem z generatorem) | 2–4 dni | tabele QWERTY-PL, QWERTZ, AZERTY; potrzebne dla generatora i parametrów DOS |
 | Folder `PostInstall` | **Later** | 3–5 dni | `DATA\PostInstall\<OS>\` kopiowany na cel, wywoływany z `FirstLogonCommands`/`GuiRunOnce`; wymaga generatora (scalanie tych kluczy) |
 | Test menu w QEMU jednym kliknięciem z instalatora | **Later** | 2–3 dni | QEMU z `-snapshot` na fizycznym pendrivie tylko do odczytu (wymaga admina), OVMF i SeaBIOS; zależy od odchudzonego `tools/qemu` (N1) |
@@ -161,6 +163,24 @@ zarejestrowała klucz.
    `dmidecode`, `kexec` tylko w BIOS).
 4. Konsekwencja: każda zmiana initramfs = nowy podpis; to wymusza
    deterministyczny build (już jest dla `initramfs-usos` i pakietu XP).
+
+### N7. Edytor motywów: **Next**, po menedżerze profili odpowiedzi
+
+Uzgodniony plan (2026-09-26). Kolejność: po menedżerze profili
+odpowiedzi w menu UEFI (docs/HANDOFF-2026-09-26.md, plan pkt 2), bo
+korzysta z jego komponentu formularza z klawiaturą ekranową.
+
+1. **Edytor w menu UEFI** (Tools → Motyw): podgląd na żywo i sprawdzanie
+   kontrastu na żywo (te same reguły co `src/gui/theme_contrast.zig`),
+   ten sam komponent formularza / klawiatury ekranowej co menedżer
+   profili. Zapis na ESP (tam czyta go też BIOS).
+2. **Edytor w instalatorze Go**: mysz i próbnik kolorów (color picker),
+   ten sam `theme.ini` i te same reguły kontrastu.
+3. **BIOS używa motywów użytkownika** (tylko kolory, czytane z ESP;
+   zapisy edytora UEFI trafiają na ESP), ale **bez edytora** w BIOS.
+4. **2–3 przykładowe motywy użytkownika** dostarczane na pendrivie.
+
+Opis motywów: [menu-themes.md](menu-themes.md).
 
 ### L1. Rodzina NT5 na UEFI: **Later**
 
