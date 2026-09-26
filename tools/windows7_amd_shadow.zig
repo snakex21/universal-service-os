@@ -211,20 +211,24 @@ const Hardware = struct {
         return writableRegion();
     }
 };
+const filename = std.unicode.utf8ToUtf16LeStringLiteral("usos-amd-shadow.log");
+fn note(device: uefi.Handle, directory: []const u16, message: []const u8) void {
+    trace.recordNamed(device, directory, filename, message);
+    trace.session.print("AMD shadow: {s}", .{message});
+}
 pub fn prepare(device: uefi.Handle, directory: []const u16) !void {
     if (!supported()) return;
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
-    const filename = std.unicode.utf8ToUtf16LeStringLiteral("usos-amd-shadow.log");
     if ((try bs.locateProtocol(probe.LegacyRegion, null)) != null or (try bs.locateProtocol(probe.LegacyRegion2, null)) != null) {
-        trace.recordNamed(device, directory, filename, "SKIPPED: firmware provides a LegacyRegion protocol; use standard UefiSeven path");
+        note(device, directory, "SKIPPED: firmware provides a LegacyRegion protocol; use standard UefiSeven path");
         return;
     }
     if (@as(*volatile u32, @ptrFromInt(0x40)).* != 0 or !reservedRegion()) {
-        trace.recordNamed(device, directory, filename, "SKIPPED: legacy region not empty/reserved, or Int10 already present");
+        note(device, directory, "SKIPPED: legacy region not empty/reserved, or Int10 already present");
         return;
     }
     const mp = (try bs.locateProtocol(Mp, null)) orelse {
-        trace.recordNamed(device, directory, filename, "STOP: AMD workaround requires MP Services");
+        note(device, directory, "STOP: AMD workaround requires MP Services");
         return error.NoMpServices;
     };
     var count: usize = 0;
@@ -244,21 +248,21 @@ pub fn prepare(device: uefi.Handle, directory: []const u16) !void {
             var buf: [400]u8 = undefined;
             const s = state[i].state;
             const msg = try std.fmt.bufPrint(&buf, "STOP: unsupported CPU state cpu={d} SYS_CFG={x} DEF={x} C0={x:0>16} C8={x:0>16}; routing unchanged", .{ i, s.syscfg, s.def, s.c0, s.c8 });
-            trace.recordNamed(device, directory, filename, msg);
+            note(device, directory, msg);
             return error.UnsupportedAmdMemoryState;
         }
     }
     if (seen != enabled or !active[bsp]) return error.InvalidCpuTopology;
-    trace.recordNamed(device, directory, filename, "BEGIN: captured all enabled CPUs; enabling DRAM read/write only at C0000-CFFFF");
+    note(device, directory, "BEGIN: captured all enabled CPUs; enabling DRAM read/write only at C0000-CFFFF");
     var hardware = Hardware{ .mp = mp, .bsp = bsp, .states = state[0..count] };
     const outcome = transition(&hardware, active[0..count]);
     if (outcome != .passed) {
-        trace.recordNamed(device, directory, filename, if (outcome == .failed_restored) "FAIL: DRAM routing/write verification failed; all CPU registers restored; Windows not started" else "FAIL: CPU register rollback incomplete; reboot required; Windows not started");
+        note(device, directory, if (outcome == .failed_restored) "FAIL: DRAM routing/write verification failed; all CPU registers restored; Windows not started" else "FAIL: CPU register rollback incomplete; reboot required; Windows not started");
         return error.AmdShadowFailed;
     }
     var buf: [400]u8 = undefined;
     const msg = try std.fmt.bufPrint(&buf, "PASS: enabled DRAM routing on {d} CPUs; C0/C8=1818181818181818; SYS_CFG restored; all 16 pages write/read/restore verified; continuing to UefiSeven", .{enabled});
-    trace.recordNamed(device, directory, filename, msg);
+    note(device, directory, msg);
 }
 const Fake = struct {
     fail_cpu: ?usize = null,

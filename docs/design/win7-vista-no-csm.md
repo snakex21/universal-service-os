@@ -102,9 +102,21 @@ Dispatcher sequence on each boot:
    still none), record a legacy-memory probe (`usos-memory.log`), unlock
    QEMU's PAM (`prepareEmulatedVga`, TCG + i440FX/Q35 only), and on AMD
    Vermeer try the fixed-MTRR RdMem/WrMem routing for C0000-CFFFF
-   (`windows7_amd_shadow.zig`). Then start `win7.efi` (UefiSeven), which
-   starts `win7.original.efi`.
-3. Each step writes `usos-boot.log` next to the dispatcher.
+   (`windows7_amd_shadow.zig`). Then route legacy VGA to the GOP
+   controller (`windows7_vga_routing.zig`, section 8.3). If the VGA
+   register read-back still fails, show a 5 s console note (PL + EN) that
+   the screen may stop at "Starting Windows" while Windows keeps working.
+   Then start `win7.efi` (UefiSeven), which starts `win7.original.efi`.
+3. Each step writes `usos-boot.log` next to the dispatcher (latest stage of
+   the latest boot only). The durable record is a per-path ring log:
+   `usos-boot-uefiseven.log` or `usos-boot-csm.log`, 8 boots each, fixed
+   32 832 bytes (64-byte header with `last_boot=N`, then 8 slots of 4 KiB;
+   boot N is in slot (N-1) mod 8). A CSM boot therefore never erases the
+   UefiSeven evidence (on the X470 on 2026-09-26 the CSM control boot
+   overwrote `usos-boot.log` and `usos-memory.log`). The slot holds the
+   decision, the memory diagnostic, the AMD shadow result and the VGA
+   routing log. Under QEMU TCG only, the lines are also mirrored to the
+   debugcon port 0x402 for the harness.
 
 ## 5. When the shim is enabled: detection
 
@@ -178,11 +190,13 @@ existing `wimboot` rows until Vista is switched on deliberately.
   0xA0000 window directly (PrimeExpert on FlashBoot). With CSM off, the
   firmware may leave "VGA Enable" clear in the Bridge Control register of
   the root port above the GPU, or the GPU's legacy decode off. Those
-  accesses then go nowhere. This is an **open hypothesis** for the X470
-  (RX 560) hang, which persisted after C0000 was unlocked and the handler
-  passed its check (windows7-int10-return doc). The next experiment is to
-  log, and optionally set, VGA Enable on the bridge path to the GOP device
-  before starting UefiSeven.
+  accesses then go nowhere. This is the **leading hypothesis** for the X470
+  (RX 560) hang: on 2026-09-26 UefiSeven, the AMD unlock and the Int10
+  check all passed with CSM off, Windows finished specialize, but
+  `vga`/vgapnp.sys failed with Code 10 within 47 ms (with CSM on the same
+  device starts as "AMD ATOMBIOS"). The dispatcher now logs and repairs
+  this routing (section 8.3). QEMU reproduces the failure mode and the fix;
+  whether the X470 is in exactly this state is for the hardware test.
 * **Servicing can undo it.** A Windows 7 update or `bcdboot` that rewrites
   `\EFI\Microsoft\Boot\bootmgfw.efi` removes the dispatcher from the main
   entry. `\EFI\Boot\bootx64.efi` still carries it, but a firmware entry
@@ -258,7 +272,133 @@ an installed system. The installed-system path (the same dispatcher on a
 target ESP) already passed a full QEMU install to the desktop in September
 (windows7-uefi.md).
 
+### 8.3 Legacy VGA routing in the dispatcher (2026-09-26)
+
+`tools/windows7_vga_routing.zig`, called by the dispatcher on the UefiSeven
+path only (never when a firmware Int10 exists, so never with CSM), after
+the AMD C0000 step and before UefiSeven:
+
+1. **Read-back probe "before"**: the registers vga.sys tests. Graphics
+   Controller index 0x08 (Bit Mask) written with BB, Read Map (04) with 03,
+   Set/Reset (00) with 05, and the index read back; Sequencer Memory Mode
+   (04) with the Chain-4 bit toggled. Every register is restored. Also
+   0x3CC and 8 bytes at A0000 (read only). Unrouted ports read FF.
+2. **Find the GOP controller**: the GOP handle's device path through
+   `LocateDevicePath(PciIo)`; fallback: a class-03 PciIo whose BAR resource
+   contains the GOP framebuffer. The upstream bridges come from the prefixes
+   of the controller's device path.
+3. **Log**: for each bridge CMD, BRIDGE_CTL (VGA, VGA16), I/O window,
+   PciIo attributes/supported; for the GPU CMD, BARs, attributes. On AMD
+   family 17h/19h also D18F0x80 (DF VGAEn, read only). Any bridge outside
+   the chain that already has VGA Enable is logged as a conflict.
+4. **`PciIo.Attributes(Enable)`** on the GPU with MEMORY, VGA_MEMORY,
+   VGA_IO, VGA_PALETTE_IO (the `_16` variant where only that is supported,
+   and a second try with `_16` if the first fails), and IO. An EDK2-style
+   PciBus propagates the VGA attributes to the upstream bridges (it sets
+   their VGA Enable). BUS_MASTER is not requested: legacy VGA does not
+   need it.
+5. **Raw fallback**, only for what is still missing afterwards: bridge
+   BRIDGE_CTL bit 3 (VGA Enable) and CMD memory/I/O, GPU CMD memory/I/O.
+   Safety rules: I/O Space Enable is never set on a bridge whose I/O window
+   is open below 0x1000 (it would claim motherboard ports); the GPU gets
+   I/O decode only when no I/O BAR could alias the legacy ports (or a
+   bridge with a closed/high window shields it); VGA Enable is not set when
+   another bridge already owns VGA.
+6. **Probe "after"**. Outcome `passed_before`, `passed_after` or `failed`.
+   On `failed` the console shows, for 5 s, a PL + EN note (ASCII only,
+   the firmware font may lack Polish letters) that the screen may stay at
+   "Starting Windows" while Windows keeps working, and not to power off.
+   On a pass nothing is shown. The menu summary is unchanged.
+
+QEMU cannot prove the X470 fix (QEMU's std VGA always decodes when it is
+routed), but it can **emulate the failure**: with the std VGA behind a PCIe
+root port and a test-only helper (`tools/tests/windows7_vga_break.zig`,
+never shipped) that clears the root port's VGA Enable and the GPU's I/O
+decode before chainloading the dispatcher. Results (Windows 7 SP1 x64
+Setup PE 6.1, OVMF, no CSM, TCG, same harness as 8.2; the release
+UefiSeven binary; screens and extracted logs in
+`docs/evidence/win7-no-csm-qemu-2026-09-26/vga-*`):
+
+| Variant | Emulated state | Dispatcher | 720 s |
+|---|---|---|---|
+| `usos` | std VGA on bus 0 | new | Setup (probe PASS before; regression check) |
+| `usosrp` | VGA behind root port 00:03.0 | new | Setup (PASS before) |
+| `oldbroken` | VGA Enable + GPU I/O cleared | **old** (e4e4ed0e build) | **"Starting Windows" freeze** |
+| `usosbroken` | as above | new | Setup: probe FAIL → `Attributes(Enable, 40308)` success → PASS |
+| `usosnoattr` | as above, `Attributes()` forced to EFI_UNSUPPORTED | new | Setup: raw fallback BRIDGE_CTL 0010→0018, CMD 0006→0007 → PASS |
+| `usosconflict` | as `usosnoattr` + another root port owns VGA | new | refuses to route, note shown, **"Starting Windows" freeze** |
+| `usoscsm` | fake firmware Int10 | new | CSM path: `usos-boot-csm.log`, no VGA routing (log check only) |
+
+So "legacy VGA not routed" alone reproduces the X470 symptom with a
+working Int10 shim, and the dispatcher's routing removes it. The ring log
+kept boots 1-3 across three QEMU starts (`last_boot=00000003`, fixed
+32 832 bytes).
+
+### 8.4 VBE framebuffer vs. faked legacy modes (evaluated, not changed)
+
+UefiSeven's handler answers `AH=00` for modes 03 and 12h with success
+(AL=30h/20h) without doing anything, and hangs on any other mode
+(`Int10hHandler.asm`, `SetModeLegacy`). The concern was that vga.sys picks
+a planar VGA mode that the Polaris display engine, left in GOP (non-VGA)
+scanout, cannot show. Findings:
+
+* The X470 failure is earlier: Code 10 within 47 ms most likely comes from `FindAdapter`
+  (the register probe of 8.3), before any mode set. Failing modes 03/12h
+  would not change it.
+* vga.sys programs the standard VGA modes through its own register tables,
+  not through Int10 `AH=00`. Making `AH=00` fail does not force the VBE
+  linear framebuffer; it would only turn a harmless no-op (the call made on
+  reset/shutdown/bugcheck paths) into an error.
+* `tools/build_windows7_int10_patch.py` (`tools/windows7_int10.S`) keeps
+  03/12h as they are and only returns 014F instead of hanging for unknown
+  functions. It is a robustness patch, not a mode-selection change, and its
+  hardware trial (2026-09-20, windows7-int10-return doc) did not fix the
+  X470 hang, consistent with the root cause being routing.
+* QEMU cannot show the difference (its VGA really implements mode 12h).
+
+Next step, only if the X470 still shows a black or frozen picture **after**
+the dispatcher logs `VGA probe after: PASS` and Windows reports vga.sys
+started (no Code 10): capture which mode vga.sys uses (`UefiSeven.ini`
+`verbose=1` logs every Int10 call to the screen) and then decide whether
+the handler should refuse 03/12h. Not implemented without that evidence.
+
 ## 9. Hardware tests needed
+
+**Next X470 test (VGA routing build).** CSM off, Secure Boot off, the SSD
+with the Win7 install from 2026-09-26 (or a fresh install). Replace only
+`\EFI\Microsoft\Boot\bootmgfw.efi` and `\EFI\Boot\bootx64.efi` on the target
+ESP with the new `win7-wrapper.efi` (the other files stay). Boot. Then read
+`EFI\Microsoft\Boot\usos-boot-uefiseven.log` (and `UefiSeven.log`). Expected
+lines, in this order:
+
+```
+=== USOS Windows 7 dispatcher boot 1 (uefiseven, firmware clock ...) ===
+USOS legacy memory diagnostic v1 ... (INT10=00000000, GOP_present=true ...)
+USOS: missing/invalid Int10; loading UefiSeven for pure UEFI
+AMD shadow: PASS: enabled DRAM routing on 16 CPUs; ...
+VGA probe before: FAIL|PASS GC(...) SEQ(...) MISC3CC=.. A0000=...
+AMD DF D18F0 id=14xx1022 VGAEn(0x80)=........
+VGA: GOP[0/n] fb=00000000d0000000 path=/PciRoot(0)/Pci(3,1)/Pci(0,0)/...
+PCI before bridge 0000:00:03.1 ... BRIDGE_CTL=....(vga=0|1 ...) IOwin=...
+PCI before gpu 0000:0x:00.0 id=67ef1002 class=030000 CMD=....(io=0|1 ...)
+VGA: GPU Attributes(Enable, ...) = success|unsupported ...
+[VGA: bridge .. BRIDGE_CTL a -> b / CMD a -> b / gpu CMD a -> b]   (fallback only)
+PCI after ...
+VGA probe after: PASS|FAIL ...
+USOS: VGA routing result: passed_before|passed_after|failed
+USOS: GOP already present; starting UefiSeven; details in UefiSeven.log
+```
+
+Reading it: `before: FAIL` + `after: PASS` confirms the hypothesis and the
+fix, then Windows should get past "Starting Windows" (check vga/vgapnp in
+Device Manager: no Code 10). `before: PASS` means routing was never the
+problem (look at 8.4 next). `after: FAIL` shows the frozen-display note
+on screen; the PCI lines say what refused (a conflict, an unsafe I/O
+window, or a GPU that does not answer on legacy ports although routed,
+e.g. its VGA core disabled under GOP). Then enable CSM once as a control:
+a `usos-boot-csm.log` entry appears and the UefiSeven log stays untouched.
+
+
 
 1. **X470 / 5700X / RX 560, CSM disabled, Secure Boot off.** Install
    Windows 7 SP1 x64 from the current stick to the SATA SSD. Then boot the

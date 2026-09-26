@@ -1,0 +1,121 @@
+Dispatcher lines (debugcon mirror) and break-helper lines (serial) per QEMU variant; tools/tests/windows7_int10_ab.py, 2026-09-26.
+
+##### variant usos
+======  ========  ========  ========
+=== USOS Windows 7 dispatcher boot 3 (uefiseven, firmware clock 2026-09-26 13:31:56) ===
+USOS legacy memory diagnostic v1 (before UefiSeven; no memory/MSR writes)
+AMD_SYS_CFG_read=false SYS_CFG=0000000000000000
+USOS: preparing GOP; connecting firmware controllers if GOP is absent
+USOS: missing/invalid Int10; loading UefiSeven for pure UEFI
+VGA probe before: PASS GC(idx08=08 SR05=05 BMbb=bb RM03=03) ok SEQ(MM=00 toggled=08) ok MISC3CC=01 A0000=0000000000000000
+VGA: GOP[0/2] fb=0000000080000000 path=/PciRoot(0)/Pci(1,0)/AcpiAdr(80010100)
+PCI before gpu 0000:00:01.0 id=11111234 class=030000 CMD=0007(io=1 mem=1 bm=1) BAR=80000008 00000000 81012000 00000000 00000000 00000000 attrs=40708/0 sup=4e708
+VGA: GPU Attributes(Enable, 40308) = success (supported 4e708, io requested)
+PCI after gpu 0000:00:01.0 id=11111234 class=030000 CMD=0007(io=1 mem=1 bm=1) BAR=80000008 00000000 81012000 00000000 00000000 00000000 attrs=40708/0 sup=4e708
+VGA probe after: PASS GC(idx08=08 SR05=05 BMbb=bb RM03=03) ok SEQ(MM=00 toggled=08) ok MISC3CC=01 A0000=0000000000000000
+USOS: VGA routing result: passed_before
+USOS: GOP already present; starting UefiSeven; details in UefiSeven.log
+
+##### variant usosrp
+======  ========  ========  ========
+=== USOS Windows 7 dispatcher boot 1 (uefiseven, firmware clock 2026-09-26 13:17:57) ===
+USOS legacy memory diagnostic v1 (before UefiSeven; no memory/MSR writes)
+AMD_SYS_CFG_read=false SYS_CFG=0000000000000000
+USOS: preparing GOP; connecting firmware controllers if GOP is absent
+USOS: missing/invalid Int10; loading UefiSeven for pure UEFI
+VGA probe before: PASS GC(idx08=08 SR05=05 BMbb=bb RM03=03) ok SEQ(MM=00 toggled=08) ok MISC3CC=01 A0000=0000000000000000
+VGA: GOP[0/2] fb=0000000080000000 path=/PciRoot(0)/Pci(3,0)/Pci(0,0)/AcpiAdr(80010100)
+PCI before bridge 0000:00:03.0 id=000c1b36 class=060400 CMD=0007(io=1 mem=1) BRIDGE_CTL=0018(vga=1 vga16=1) IOwin=off 0-0 attrs=44708/0 sup=6e768
+PCI before gpu 0000:01:00.0 id=11111234 class=030000 CMD=0007(io=1 mem=1 bm=1) BAR=80000008 00000000 81000000 00000000 00000000 00000000 attrs=40708/0 sup=4e708
+VGA: GPU Attributes(Enable, 40308) = success (supported 4e708, io requested)
+PCI after bridge 0000:00:03.0 id=000c1b36 class=060400 CMD=0007(io=1 mem=1) BRIDGE_CTL=0018(vga=1 vga16=1) IOwin=off 0-0 attrs=44708/0 sup=6e768
+PCI after gpu 0000:01:00.0 id=11111234 class=030000 CMD=0007(io=1 mem=1 bm=1) BAR=80000008 00000000 81000000 00000000 00000000 00000000 attrs=40708/0 sup=4e708
+VGA probe after: PASS GC(idx08=08 SR05=05 BMbb=bb RM03=03) ok SEQ(MM=00 toggled=08) ok MISC3CC=01 A0000=0000000000000000
+USOS: VGA routing result: passed_before
+USOS: GOP already present; starting UefiSeven; details in UefiSeven.log
+
+##### variant usosbroken
+[serial] VGA-BREAK: bridge 00:03.0 ctl 0018->0010; gpu 01:00.0 cmd 0007->0006
+======  ========  ========  ========
+=== USOS Windows 7 dispatcher boot 1 (uefiseven, firmware clock 2026-09-26 13:18:02) ===
+USOS legacy memory diagnostic v1 (before UefiSeven; no memory/MSR writes)
+AMD_SYS_CFG_read=false SYS_CFG=0000000000000000
+USOS: preparing GOP; connecting firmware controllers if GOP is absent
+USOS: missing/invalid Int10; loading UefiSeven for pure UEFI
+VGA probe before: FAIL GC(idx08=ff SR05=ff BMbb=ff RM03=ff) bad SEQ(MM=ff toggled=ff) bad MISC3CC=ff A0000=0000000000000000
+VGA: GOP[0/2] fb=0000000080000000 path=/PciRoot(0)/Pci(3,0)/Pci(0,0)/AcpiAdr(80010100)
+PCI before bridge 0000:00:03.0 id=000c1b36 class=060400 CMD=0007(io=1 mem=1) BRIDGE_CTL=0010(vga=0 vga16=1) IOwin=off 0-0 attrs=44708/0 sup=6e768
+PCI before gpu 0000:01:00.0 id=11111234 class=030000 CMD=0006(io=0 mem=1 bm=1) BAR=80000008 00000000 81000000 00000000 00000000 00000000 attrs=40708/0 sup=4e708
+VGA: GPU Attributes(Enable, 40308) = success (supported 4e708, io requested)
+PCI after bridge 0000:00:03.0 id=000c1b36 class=060400 CMD=0007(io=1 mem=1) BRIDGE_CTL=0018(vga=1 vga16=1) IOwin=off 0-0 attrs=44708/0 sup=6e768
+PCI after gpu 0000:01:00.0 id=11111234 class=030000 CMD=0007(io=1 mem=1 bm=1) BAR=80000008 00000000 81000000 00000000 00000000 00000000 attrs=40708/0 sup=4e708
+VGA probe after: PASS GC(idx08=08 SR05=05 BMbb=bb RM03=03) ok SEQ(MM=00 toggled=08) ok MISC3CC=01 A0000=0000000000000000
+USOS: VGA routing result: passed_after
+USOS: GOP already present; starting UefiSeven; details in UefiSeven.log
+
+##### variant usosnoattr
+[serial] VGA-BREAK: bridge 00:03.0 ctl 0018->0010; gpu 01:00.0 cmd 0007->0006
+[serial] VGA-BREAK: GPU PciIo.Attributes(Enable/Set) now returns EFI_UNSUPPORTED
+======  ========  ========  ========
+=== USOS Windows 7 dispatcher boot 1 (uefiseven, firmware clock 2026-09-26 13:18:01) ===
+USOS legacy memory diagnostic v1 (before UefiSeven; no memory/MSR writes)
+AMD_SYS_CFG_read=false SYS_CFG=0000000000000000
+USOS: preparing GOP; connecting firmware controllers if GOP is absent
+USOS: missing/invalid Int10; loading UefiSeven for pure UEFI
+VGA probe before: FAIL GC(idx08=ff SR05=ff BMbb=ff RM03=ff) bad SEQ(MM=ff toggled=ff) bad MISC3CC=ff A0000=0000000000000000
+VGA: GOP[0/2] fb=0000000080000000 path=/PciRoot(0)/Pci(3,0)/Pci(0,0)/AcpiAdr(80010100)
+PCI before bridge 0000:00:03.0 id=000c1b36 class=060400 CMD=0007(io=1 mem=1) BRIDGE_CTL=0010(vga=0 vga16=1) IOwin=off 0-0 attrs=44708/0 sup=6e768
+PCI before gpu 0000:01:00.0 id=11111234 class=030000 CMD=0006(io=0 mem=1 bm=1) BAR=80000008 00000000 81000000 00000000 00000000 00000000 attrs=40708/0 sup=4e708
+VGA: GPU Attributes(Enable, 40308) = unsupported (supported 4e708, io requested)
+VGA: GPU Attributes(Enable, 40308) _16 variants = unsupported
+VGA: bridge 00:03.0 BRIDGE_CTL 0010 -> 0018 (success)
+VGA: gpu CMD 0006 -> 0007 (success)
+PCI after bridge 0000:00:03.0 id=000c1b36 class=060400 CMD=0007(io=1 mem=1) BRIDGE_CTL=0018(vga=1 vga16=1) IOwin=off 0-0 attrs=44708/0 sup=6e768
+PCI after gpu 0000:01:00.0 id=11111234 class=030000 CMD=0007(io=1 mem=1 bm=1) BAR=80000008 00000000 81000000 00000000 00000000 00000000 attrs=40708/0 sup=4e708
+VGA probe after: PASS GC(idx08=08 SR05=05 BMbb=bb RM03=03) ok SEQ(MM=00 toggled=08) ok MISC3CC=01 A0000=0000000000000000
+USOS: VGA routing result: passed_after
+USOS: GOP already present; starting UefiSeven; details in UefiSeven.log
+
+##### variant usosconflict
+[serial] VGA-BREAK: bridge 00:03.0 ctl 0018->0010; gpu 01:00.0 cmd 0007->0006
+[serial] VGA-BREAK: GPU PciIo.Attributes(Enable/Set) now returns EFI_UNSUPPORTED
+[serial] VGA-BREAK: bridge 00:04.0 ctl 0000->0008 (foreign VGA owner)
+[screen] USOS: brak zgodnej grafiki VGA - ekran moze sie zatrzymac na "Uruchamianie systemu Windows",
+[screen]       a instalacja trwa w tle. Nie wylaczaj komputera.
+[screen] USOS: no compatible VGA graphics - the screen may stop at "Starting Windows"
+[screen]       while setup continues in the background. Do not power off.
+======  ========  ========  ========
+=== USOS Windows 7 dispatcher boot 1 (uefiseven, firmware clock 2026-09-26 13:18:10) ===
+USOS legacy memory diagnostic v1 (before UefiSeven; no memory/MSR writes)
+AMD_SYS_CFG_read=false SYS_CFG=0000000000000000
+USOS: preparing GOP; connecting firmware controllers if GOP is absent
+USOS: missing/invalid Int10; loading UefiSeven for pure UEFI
+VGA probe before: FAIL GC(idx08=ff SR05=ff BMbb=ff RM03=ff) bad SEQ(MM=ff toggled=ff) bad MISC3CC=ff A0000=0000000000000000
+VGA: GOP[0/2] fb=0000000080000000 path=/PciRoot(0)/Pci(3,0)/Pci(0,0)/AcpiAdr(80010100)
+PCI before bridge 0000:00:03.0 id=000c1b36 class=060400 CMD=0007(io=1 mem=1) BRIDGE_CTL=0010(vga=0 vga16=1) IOwin=off 0-0 attrs=44708/0 sup=6e768
+PCI before gpu 0000:01:00.0 id=11111234 class=030000 CMD=0006(io=0 mem=1 bm=1) BAR=80000008 00000000 81000000 00000000 00000000 00000000 attrs=40708/0 sup=4e708
+VGA: other bridge 00:04.0 already has VGA Enable
+VGA: GPU Attributes(Enable, 40308) = unsupported (supported 4e708, io requested)
+VGA: GPU Attributes(Enable, 40308) _16 variants = unsupported
+VGA: bridge 00:03.0 VGA Enable left off: another bridge owns VGA
+VGA: gpu CMD 0006 -> 0007 (success)
+PCI after bridge 0000:00:03.0 id=000c1b36 class=060400 CMD=0007(io=1 mem=1) BRIDGE_CTL=0010(vga=0 vga16=1) IOwin=off 0-0 attrs=44708/0 sup=6e768
+PCI after gpu 0000:01:00.0 id=11111234 class=030000 CMD=0007(io=1 mem=1 bm=1) BAR=80000008 00000000 81000000 00000000 00000000 00000000 attrs=40708/0 sup=4e708
+VGA probe after: FAIL GC(idx08=ff SR05=ff BMbb=ff RM03=ff) bad SEQ(MM=ff toggled=ff) bad MISC3CC=ff A0000=0000000000000000
+USOS: VGA routing result: failed
+USOS: VGA read-back still fails; showing the frozen-display note for 5 s
+USOS: GOP already present; starting UefiSeven; details in UefiSeven.log
+
+##### variant oldbroken
+[serial] VGA-BREAK: bridge 00:03.0 ctl 0018->0010; gpu 01:00.0 cmd 0007->0006
+======  ========  ========  ========
+
+##### variant usoscsm
+[serial] VGA-BREAK: bridge 00:03.0 ctl 0018->0010; gpu 01:00.0 cmd 0007->0006
+[serial] VGA-BREAK: fake Int10 vector C000:0000 (IRET stub, byte=cf)
+======  ========  ========  ========
+=== USOS Windows 7 dispatcher boot 1 (csm, firmware clock 2026-09-26 13:31:00) ===
+USOS legacy memory diagnostic v1 (before UefiSeven; no memory/MSR writes)
+AMD_SYS_CFG_read=false SYS_CFG=0000000000000000
+USOS: valid firmware Int10; loading original Windows 7 boot manager
+USOS: starting original Windows 7 boot manager; firmware Int10 retained

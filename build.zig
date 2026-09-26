@@ -99,6 +99,8 @@ fn addHostTests(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
         "src/platform/uefi/windows_native_iso.zig",
         "src/platform/uefi/windows_user_drivers.zig",
         "src/platform/uefi/theme_editor.zig",
+        "tools/windows7_uefi_trace.zig",
+        "tools/windows7_vga_routing.zig",
     };
     for (uefi_test_files) |file| {
         const module = b.createModule(.{ .root_source_file = b.path(file), .target = target, .optimize = optimize });

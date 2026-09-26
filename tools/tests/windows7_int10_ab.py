@@ -15,6 +15,22 @@ Variants (each a vvfat ESP with the ISO's BCD, fonts, boot.sdi and boot.wim):
   usosrel   as usos with the shipped release UefiSeven.efi
   upstream  UefiSeven (source build) as BOOTX64.EFI, BOOTX64.original.efi =
             bootmgfw.efi (UefiSeven's own install mode, no USOS PAM unlock)
+  usosrp    as usos, but the std VGA sits behind a PCIe root port at 00:03.0
+            (the X470 topology: GPU behind a bridge)
+  usosbroken  as usosrp, with tools/tests/windows7_vga_break.zig as
+            BOOTX64.EFI: it clears the root port's VGA Enable and the GPU's I/O
+            decode (the suspected X470 CSM-off state), then chainloads the
+            dispatcher (EFI/BOOT/usos-dispatch.efi)
+  usosnoattr  as usosbroken, and the GPU's PciIo.Attributes(Enable/Set) is
+            made to return EFI_UNSUPPORTED, so the raw bridge fallback must work
+  usosconflict  as usosnoattr, and an empty second root port (00:04.0) is
+            given VGA Enable: the dispatcher must not route, must show the
+            frozen-display note, and Windows then meets the X470 failure
+  usoscsm   as usosbroken with a fake IVT 0x10 into E0000: the dispatcher takes
+            its CSM path (checks usos-boot-csm.log and that no VGA routing
+            runs; Windows itself cannot boot on the fake vector)
+  oldbroken as usosbroken with OLD_WRAPPER (a dispatcher built before the VGA
+            routing change) to show the emulated failure
 Needs 7-Zip (%ProgramFiles%/7-Zip/7z.exe) for "extract", and Pillow.
 """
 import json, os, shutil, socket, subprocess, sys, time
@@ -29,7 +45,11 @@ UEFISEVEN = Path(os.environ.get('UEFISEVEN', str(SP / 'UefiSeven-src.efi')))
 RELEASE = REPO / 'tools/vendor/uefiseven/1.30/UefiSeven.efi'
 WRAPPER = REPO / 'zig-out/windows7-uefi/win7-wrapper.efi'
 INI = b'[config]\r\nverbose=0\r\nlogfile=1\r\nskiperrors=1\r\nforce_fakevesa=0\r\n'
-VARIANTS = ['plain', 'usos', 'upstream', 'usosrel']
+VARIANTS = ['plain', 'usos', 'upstream', 'usosrel', 'usosrp', 'usosbroken', 'oldbroken', 'usosnoattr', 'usosconflict', 'usoscsm']
+OLD_WRAPPER = Path(os.environ.get('OLD_WRAPPER', str(SP / 'win7-wrapper-old.efi')))
+BREAK = SP / 'vga-break.efi'
+ROOT_PORT_VGA = ['-vga', 'none', '-device', 'pcie-root-port,id=rp1,bus=pcie.0,chassis=1,addr=0x3',
+                 '-device', 'VGA,bus=rp1', '-device', 'pcie-root-port,id=rp2,bus=pcie.0,chassis=2,addr=0x4']
 
 
 def link(src, dst):
@@ -57,7 +77,20 @@ def esp(variant):
     bootmgfw = ISO / 'wimefi/bootmgfw.efi'
     if variant == 'plain':
         link(bootmgfw, boot / 'BOOTX64.EFI')
-    elif variant in ('usos', 'usosrel'):
+    elif variant in ('usosbroken', 'oldbroken', 'usosnoattr', 'usosconflict', 'usoscsm'):
+        build_break()
+        if variant == 'usoscsm':
+            (boot / 'vga-break-fakeint10').write_bytes(b'1')
+        if variant == 'usosconflict':
+            (boot / 'vga-break-conflict').write_bytes(b'1')
+        if variant in ('usosnoattr', 'usosconflict'):
+            (boot / 'vga-break-noattr').write_bytes(b'1')
+        shutil.copyfile(BREAK, boot / 'BOOTX64.EFI')
+        shutil.copyfile(OLD_WRAPPER if variant == 'oldbroken' else WRAPPER, boot / 'usos-dispatch.efi')
+        shutil.copyfile(RELEASE, boot / 'win7.efi')
+        link(bootmgfw, boot / 'win7.original.efi')
+        (boot / 'UefiSeven.ini').write_bytes(INI)
+    elif variant in ('usos', 'usosrel', 'usosrp'):
         shutil.copyfile(WRAPPER, boot / 'BOOTX64.EFI')
         shutil.copyfile(RELEASE if variant == 'usosrel' else UEFISEVEN, boot / 'win7.efi')
         link(bootmgfw, boot / 'win7.original.efi')
@@ -69,6 +102,16 @@ def esp(variant):
     else:
         raise SystemExit('unknown variant ' + variant)
     return root
+
+
+def build_break():
+    SP.mkdir(parents=True, exist_ok=True)
+    env = dict(os.environ, ZIG_GLOBAL_CACHE_DIR=str(REPO / 'tools/cache/zig-global'),
+               ZIG_LOCAL_CACHE_DIR=str(SP / 'zig-cache'))
+    subprocess.run([str(REPO / 'tools/zig/zig.exe'), 'build-exe', '-target', 'x86_64-uefi', '-O', 'ReleaseSmall',
+                    '--dep', 'windows7_vga_routing', '-Mroot=' + str(REPO / 'tools/tests/windows7_vga_break.zig'),
+                    '-Mwindows7_vga_routing=' + str(REPO / 'tools/windows7_vga_routing.zig'),
+                    '-femit-bin=' + str(BREAK)], env=env, check=True)
 
 
 def qmp(port):
@@ -104,12 +147,15 @@ def run(variant, minutes, shots):
     shutil.copyfile(QEMU / 'share/edk2-i386-vars.fd', vars_fd)
     port = 4450 + VARIANTS.index(variant)
     args = [str(QEMU / 'qemu-system-x86_64.exe'), '-machine', 'q35', '-accel', 'tcg', '-cpu', 'max',
-            '-m', '2048', '-smp', '2', '-display', 'none', '-nic', 'none', '-vga', 'std',
+            '-m', '2048', '-smp', '2', '-display', 'none', '-nic', 'none']
+    args += ROOT_PORT_VGA if variant in ('usosrp', 'usosbroken', 'oldbroken', 'usosnoattr', 'usosconflict', 'usoscsm') else ['-vga', 'std']
+    args += [
             '-drive', 'if=pflash,format=raw,readonly=on,file=' + str(QEMU / 'share/edk2-x86_64-code.fd'),
             '-drive', 'if=pflash,format=raw,file=' + str(vars_fd),
             '-drive', 'if=none,id=esp,format=raw,file=fat:rw:' + str(root),
             '-device', 'ahci,id=ahci', '-device', 'ide-hd,drive=esp,bus=ahci.0,bootindex=0',
             '-serial', 'file:' + str(out / 'serial.log'),
+            '-debugcon', 'file:' + str(out / 'debugcon.log'), '-global', 'isa-debugcon.iobase=0x402',
             '-qmp', f'tcp:127.0.0.1:{port},server=on,wait=off']
     log = (out / 'qemu.log').open('wb')
     proc = subprocess.Popen(args, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
@@ -139,7 +185,8 @@ def run(variant, minutes, shots):
         except subprocess.TimeoutExpired:
             proc.kill()
         log.close()
-    for name in ('usos-boot.log', 'UefiSeven.log', 'usos-memory.log', 'usos-amd-shadow.log'):
+    for name in ('usos-boot.log', 'usos-boot-uefiseven.log', 'usos-boot-csm.log', 'UefiSeven.log',
+                 'usos-memory.log', 'usos-amd-shadow.log'):
         for found in root.rglob(name):
             shutil.copyfile(found, out / found.name)
     return taken
