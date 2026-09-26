@@ -2,7 +2,9 @@ const std = @import("std");
 const uefi = std.os.uefi;
 const wide = std.unicode.utf8ToUtf16LeStringLiteral;
 const esp_image = @import("esp_image_start.zig");
-const Stage = @import("usos").flow.preparation_boot_progress.XpStage;
+const usos = @import("usos");
+const Stage = usos.flow.preparation_boot_progress.XpStage;
+const answer_screen = usos.flow.answer_screen;
 
 fn mark(root: *uefi.protocol.File, stage: []const u8, name: []const u8) !void {
     var data: [2048]u8 = @splat('\n');
@@ -14,34 +16,13 @@ fn mark(root: *uefi.protocol.File, stage: []const u8, name: []const u8) !void {
     try file.flush();
 }
 
-/// `usos.legacy_unattended_hex=` for a .sif chosen on the answer screen: the
-/// staging merges it into the automatic answer (tools/xp_user_settings.sh).
-pub fn unattendedOption(buffer: []u8, unattended: ?[]const u8) ![]const u8 {
-    const answer = unattended orelse return "";
-    if (answer.len == 0 or answer.len > 120 or std.mem.indexOfAny(u8, answer, "\\/\r\n\"") != null) return error.InvalidXpAnswerName;
-    if (answer.len < 4 or !std.ascii.eqlIgnoreCase(answer[answer.len - 4 ..], ".sif")) return error.InvalidXpAnswerName;
-    const prefix = " usos.legacy_unattended_hex=";
-    if (buffer.len < prefix.len + answer.len * 2) return error.InvalidXpAnswerName;
-    @memcpy(buffer[0..prefix.len], prefix);
-    for (answer, 0..) |c, i| {
-        buffer[prefix.len + i * 2] = "0123456789abcdef"[c >> 4];
-        buffer[prefix.len + i * 2 + 1] = "0123456789abcdef"[c & 15];
-    }
-    return buffer[0 .. prefix.len + answer.len * 2];
-}
-
-test "XP answer option carries only a .sif file name" {
-    var buffer: [300]u8 = undefined;
-    try std.testing.expectEqualStrings("", try unattendedOption(&buffer, null));
-    try std.testing.expectEqualStrings(" usos.legacy_unattended_hex=612e534946", try unattendedOption(&buffer, "a.SIF"));
-    try std.testing.expectError(error.InvalidXpAnswerName, unattendedOption(&buffer, "a.xml"));
-    try std.testing.expectError(error.InvalidXpAnswerName, unattendedOption(&buffer, "dir\\a.sif"));
-    try std.testing.expectEqualStrings(" usos.legacy_unattended_hex=6d7920612e736966", try unattendedOption(&buffer, "my a.sif"));
-}
-
-pub fn start(root: *uefi.protocol.File, name: []const u8, unattended: ?[]const u8, progress: *const fn (Stage) void) !void {
+/// `answer`: the answer-file screen's choice (src/flow/answer_screen.zig):
+/// a .sif (usos.legacy_unattended_hex=) or the manual installation
+/// (usos.xp_settings=off: the staging ignores usos-xp.ini).
+pub fn start(root: *uefi.protocol.File, name: []const u8, answer: answer_screen.Choice, progress: *const fn (Stage) void) !void {
     var answer_buffer: [300]u8 = undefined;
-    const answer_option = try unattendedOption(&answer_buffer, unattended);
+    const answer_option = try answer_screen.xpAnswerOption(&answer_buffer, answer.path);
+    const settings_option = answer_screen.xpSettingsOption(answer);
     if (name.len == 0 or name.len > 512 or std.mem.indexOfAny(u8, name, "\\/\r\n") != null) return error.InvalidXpImageName;
     // Require the isolated payload before creating any diagnostics.
     const initrd = try root.open(wide("\\EFI\\USOS-XP\\initramfs-xp"), .read, .{});
@@ -77,7 +58,12 @@ pub fn start(root: *uefi.protocol.File, name: []const u8, unattended: ?[]const u
         file.close() catch {};
         break :blk " initrd=\\EFI\\USOS\\lang.cpio";
     } else |_| "";
-    const command = try std.fmt.bufPrint(&cmd, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action=xp-staging usos.legacy_image_hex={s}{s} usos.plan_profile=xp-x86-sp3-uefi-csm {s}", .{ lang_initrd, id, hex[0 .. name.len * 2], answer_option, diagnostic.xpConsoleOptions(diagnostic.requested(root)) });
+    const command = try std.fmt.bufPrint(&cmd, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action=xp-staging usos.legacy_image_hex={s}{s}{s} usos.plan_profile=xp-x86-sp3-uefi-csm {s}", .{ lang_initrd, id, hex[0 .. name.len * 2], answer_option, settings_option, diagnostic.xpConsoleOptions(diagnostic.requested(root)) });
+    // Serial trace of the handover (QEMU tests read it; no secrets in it).
+    const serial = @import("serial.zig");
+    serial.writeAscii("[XP_CMDLINE] ");
+    serial.writeAscii(command);
+    serial.writeAscii("\n");
     var options: [2049]u16 = @splat(0);
     for (command, 0..) |c, i| options[i] = c;
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;

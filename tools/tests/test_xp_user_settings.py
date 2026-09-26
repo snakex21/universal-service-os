@@ -110,6 +110,19 @@ def main() -> int:
         check('custom has ' + want, want in custom)
     for unwanted in ('AutoPartition=1', 'Repartition=Yes', 'TargetPath=\\XP', 'OemPreinstall=Yes', 'UserExecute="other.exe"', 'UnattendMode=ProvideDefault'):
         check('custom drops ' + unwanted, unwanted not in custom)
+    # Which settings the staging uses (legacy_xp_staging.sh): the UEFI menu's
+    # "manual installation" row (usos.xp_settings=off) ignores even an active
+    # usos-xp.ini, a selected .sif wins, otherwise the file is staged.
+    active_ini = OUT / 'active.ini'
+    missing = OUT / 'missing.ini'
+    for name, args, want in (
+            ('manual install', f"'{posix(active_ini)}' /nonexistent '' off", '[XP_SETTINGS] ignored: manual install chosen'),
+            ('custom .sif', f"'{posix(active_ini)}' /nonexistent /x/a.sif ''", '[XP_SETTINGS] ignored: custom WINNT.SIF selected'),
+            ('custom .sif wins over off', f"'{posix(active_ini)}' /nonexistent /x/a.sif off", '[XP_SETTINGS] ignored: custom WINNT.SIF selected'),
+            ('default stages the file', f"'{posix(missing)}' /nonexistent '' ''", '[XP_SETTINGS] none (missing.ini absent)')):
+        r = sh(f"XP_USER_SETTINGS=stale; usos_xp_settings_select {args}; rc=$?; printf 'rc=%s settings=[%s]\\n' $rc \"$XP_USER_SETTINGS\"")
+        out = r.stdout.decode()
+        check('select: ' + name, want in out and 'rc=0 settings=[]' in out, out)
     print('FAILED' if failures else 'ALL PASS', len(failures))
     return 1 if failures else 0
 

@@ -1,0 +1,20 @@
+# UEFI XP answer-file screen click-through (tools/boot_answer_screen_qemu.py), language en
+open	screen	Unattended setup	selected=1	rows=3
+open	row0	xp_manual | No answer file (manual installation)
+open	row1	xp_settings | usos-xp.ini: Jan Kowalski, USOS-TEST
+open	row2	file | test.sif
+back-esc	screen	list Windows XP
+back-backspace	screen	list Windows XP
+back-right-click	screen	list Windows XP
+back-footer-tap	screen	list Windows XP
+manual	summary	Answer file = No answer file (manual installation)
+manual	cmdline	usos.xp_settings=off
+settings	summary	Answer file = usos-xp.ini: Jan Kowalski, USOS-TEST
+settings	cmdline	-
+sif	summary	Answer file = test.sif (merged into the automatic answer)
+sif	cmdline	usos.legacy_unattended_hex=746573742e736966
+images-esc	screen	list Windows
+win10-open	screen	list Boot method
+win10-method	screen	summary Ready to start
+win10-back	screen	list Boot method
+win10-back2	screen	list Windows 10

@@ -254,3 +254,22 @@ usos_xp_settings_stage() {
         "$(usos_xp_settings_value timezone "$XP_USER_SETTINGS")" "$(usos_xp_settings_value computer "$XP_USER_SETTINGS")"
     return 0
 }
+
+# usos_xp_settings_select INI SOURCE_ROOT CUSTOM_SIF MODE
+#   Which settings the staging uses: none when a custom WINNT.SIF was
+#   selected (non-empty CUSTOM_SIF) or the menu chose the manual installation
+#   (MODE=off, kernel option usos.xp_settings=off); otherwise
+#   usos_xp_settings_stage INI SOURCE_ROOT.
+usos_xp_settings_select() {
+    if [ -n "$3" ]; then
+        XP_USER_SETTINGS=''; export XP_USER_SETTINGS
+        printf '[XP_SETTINGS] ignored: custom WINNT.SIF selected\n'
+        return 0
+    fi
+    if [ "$4" = off ]; then
+        XP_USER_SETTINGS=''; export XP_USER_SETTINGS
+        printf '[XP_SETTINGS] ignored: manual install chosen\n'
+        return 0
+    fi
+    usos_xp_settings_stage "$1" "$2"
+}

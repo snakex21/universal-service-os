@@ -619,6 +619,7 @@ pub const ListScreen = struct {
         setFooter(self.spec.hints, self.spec.note);
         self.geometry = screens.listScreen(&u, headerInfo(&clock, &u), self.spec, self.first);
         self.first = self.geometry.first;
+        traceScreen("list", self.spec.title);
         self.trace();
         presentFullFrame(true);
     }
@@ -707,6 +708,15 @@ pub const ListScreen = struct {
     }
 };
 
+/// Serial trace of the screen on display (QEMU click-through tests read it).
+fn traceScreen(kind: []const u8, title: []const u8) void {
+    serial.writeAscii("[UI_SCREEN] ");
+    serial.writeAscii(kind);
+    serial.writeAscii(" ");
+    serial.writeAscii(title);
+    serial.writeAscii("\n");
+}
+
 /// Visible row index under the pointer on the active list screen.
 pub fn hitRow(x: u32, y: u32, visible_count: usize) ?usize {
     const list = active_list orelse return null;
@@ -771,6 +781,14 @@ pub fn summary(spec: screens.SummarySpec) void {
     active = .summary;
     header_clock_active = true;
     summary_spec = spec;
+    traceScreen("summary", spec.title);
+    for (spec.labels, spec.values) |label, value| {
+        serial.writeAscii("[UI_FIELD] ");
+        serial.writeAscii(label);
+        serial.writeAscii(" = ");
+        serial.writeAscii(value);
+        serial.writeAscii("\n");
+    }
     summary_hints = .{
         .{ .key = input.enterKey(), .label = t(.key_start) },
         .{ .key = input.backKey(), .label = t(.key_back) },

@@ -30,10 +30,11 @@ pub fn show(
     system: *const usos.catalog.SystemEntry,
     image: usos.catalog.ImageItem,
     method: usos.catalog.BootMethod,
-    unattended: ?[]const u8,
+    answer: manual_unattended.Choice,
     answers_available: usize,
     firmware: usos.firmware.Firmware,
 ) void {
+    const unattended = answer.path;
     if (!system.firmware.accepts(firmware)) return showFirmwareUnavailable();
     if (manual_images.blockReason(image)) |reason| return showMediaBlocked(image.name.slice(), reason);
     const backend = usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, firmware) orelse return showUnsupported();
@@ -78,9 +79,12 @@ pub fn show(
     const settings_name = usos.catalog.os_profiles.traits(system.id).settings_file;
     if (backend == .xp_uefi_staging) {
         // XP UEFI-CSM: a .sif is merged into the automatic answer; without
-        // one, usos-xp.ini (if active) makes Setup hands-off.
+        // one, usos-xp.ini (if active) makes Setup hands-off unless the
+        // manual installation was chosen.
         if (unattended) |path| {
             fields.add(view.t(.summary_answer_file), view.format(&answer_text, .summary_xp_sif_merged, &.{path}));
+        } else if (answer.ignore_settings) {
+            fields.add(view.t(.summary_answer_file), view.t(.unattended_xp_manual));
         } else if (settings_name) |name| {
             if (system.unattended_directory) |directory| {
                 const summary = xp_settings.read(directory, name);
@@ -178,12 +182,12 @@ pub fn show(
     });
 
     while (true) switch (input.readBlocking()) {
-        .enter => if (can_start) return start(root, system, image, method, unattended, firmware),
+        .enter => if (can_start) return start(root, system, image, method, answer, firmware),
         .back => return,
         .pointer => |mouse| {
             if (mouse.right_click) return;
             if (can_start and mouse.left_click and view.hitSummaryButton(mouse.x, mouse.y)) {
-                return start(root, system, image, method, unattended, firmware);
+                return start(root, system, image, method, answer, firmware);
             }
             if (mouse.moved) view.updatePointer();
         },
@@ -196,9 +200,10 @@ fn start(
     system: *const usos.catalog.SystemEntry,
     image: usos.catalog.ImageItem,
     method: usos.catalog.BootMethod,
-    unattended: ?[]const u8,
+    answer: manual_unattended.Choice,
     firmware: usos.firmware.Firmware,
 ) void {
+    const unattended = answer.path;
     if (!system.firmware.accepts(firmware)) return showFirmwareUnavailable();
     // No USB gamepad transfer may outlive the menu into another loader;
     // the pads are picked up again if the launch fails and the menu returns.
@@ -216,7 +221,7 @@ fn start(
         // firmware loads the XP kernel and initramfs, until usos-fb-ui draws
         // the disk selection.
         showXpProgress(.checking);
-        @import("xp_preparation.zig").start(root, image.name.slice(), unattended, showXpProgress) catch |err| {
+        @import("xp_preparation.zig").start(root, image.name.slice(), answer, showXpProgress) catch |err| {
             view.refreshFramebuffer();
             showError(view.t(.error_xp), err);
         };

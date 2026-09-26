@@ -1,7 +1,9 @@
 //! Boot method choice. Only methods that can actually run here are listed:
 //! methods that do not fit the image type, have no backend yet or need the
 //! other firmware mode are left out instead of shown as disabled filler.
-//! A single runnable method is used without asking.
+//! A single runnable method is used without asking (`automatic`): Back on
+//! the next screen then returns to the image list, since there is no method
+//! screen to go back to.
 const std = @import("std");
 const usos = @import("usos");
 const input = @import("input.zig");
@@ -10,15 +12,22 @@ const view = @import("manual_view.zig");
 
 const model_mod = usos.gui.boot_method_model;
 
+/// The last select() returned its single runnable method without a screen.
+pub var automatic = false;
+
 pub fn select(system: *const usos.catalog.SystemEntry, image: usos.catalog.ImageItem, firmware: usos.firmware.Firmware) ?usos.catalog.BootMethod {
     const model = model_mod.collect(system, image.kind, firmware);
+    automatic = false;
     if (model.enabledCount() == 0) {
         const lines = [_][]const u8{view.t(.methods_none)};
         view.notice(image.name.slice(), .warning, .warning, view.t(.error_unsupported_title), &lines);
         view.waitForDismiss();
         return null;
     }
-    if (model.singleEnabledIndex()) |index| return model.items[index].method;
+    if (model.singleEnabledIndex()) |index| {
+        automatic = true;
+        return model.items[index].method;
+    }
 
     var map: [model_mod.max_items]usize = undefined;
     var rows: [model_mod.max_items]usos.gui.ui.Row = undefined;

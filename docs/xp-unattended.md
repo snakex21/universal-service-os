@@ -11,10 +11,17 @@ instalację XP (profil UEFI-CSM, automatyczny układ jednej partycji) bez
 - Plik jest nieaktywny, dopóki `user=` jest puste. Wtedy `WINNT.SIF` jest
   bajt w bajt taki jak bez pliku.
 - Ekran „Instalacja nienadzorowana” w menu UEFI dla XP pokazuje się zawsze.
-  Pierwszy wiersz to stan `usos-xp.ini`: „usos-xp.ini: Tester, USOS-XP-TEST”
-  (pierwsze konto i nazwa komputera; klucza i hasła menu nie pokazuje) albo
-  „Bez ustawień (instalacja interaktywna)”. Kolejne wiersze to pliki `.sif`
+  Pierwszy wiersz jest zawsze: „Bez pliku odpowiedzi (instalacja ręczna)”;
+  pomija `usos-xp.ini` nawet wypełniony (linia poleceń
+  `usos.xp_settings=off`, log stagingu `[XP_SETTINGS] ignored: manual install
+  chosen`), Instalator XP pyta wtedy o nazwę, klucz i strefę czasową jak przed
+  tą funkcją. Drugi wiersz tylko przy aktywnym pliku: „usos-xp.ini: Tester,
+  USOS-XP-TEST” (pierwsze konto i nazwa komputera; klucza i hasła menu nie
+  pokazuje), domyślnie zaznaczony. Kolejne wiersze to pliki `.sif`
   z `Unattended\`. Podsumowanie powtarza wybór w polu „Plik odpowiedzi”.
+  Wstecz (Esc, B, prawy przycisk, dotknięcie „Esc” w stopce) wraca do listy
+  obrazów (metoda XP jest jedna i wybierana bez pytania). Wiersze:
+  `src/flow/answer_screen.zig`.
 - Wybrany `.sif` jest **łączony** z automatyczną odpowiedzią
   (`usos_xp_custom_sif`): klucze użytkownika wygrywają poza tymi, których
   wymaga ścieżka USOS (całe `[Data]`; `Repartition`, `FileSystem`,
@@ -80,7 +87,12 @@ repozytorium.
 - host: `sh` + `tools/xp_user_settings.sh` (BOM, CRLF, błędne wartości,
   scalony SIF, skrypt kont, scalanie wybranego `.sif`); `check_xp_pae.py`
   (pae.exe uruchamia skrypt kont i go usuwa); `src/flow/xp_settings_summary.zig`
-  (golden: plik -> wiersz ekranu);
+  (golden: plik -> wiersz ekranu); `src/flow/answer_screen.zig` (golden:
+  stan -> wiersze ekranu i opcje linii poleceń);
+- QEMU/OVMF klikanie ekranu: `tools/tests/run_uefi_answer_screen.ps1`
+  (klawiatura, prawy przycisk, stopka; zrzuty w
+  `tools/tests/artifacts/answer-screen`, golden
+  `tools/tests/golden/uefi_answer_screen.tsv`);
 - `installer/internal/winhost/data_guide_xp_test.go` (szablon nieaktywny,
   CRLF, lista kluczy zgodna z parserem);
 - QEMU: `run_seabios_xp_uefi_csm_textmode.py --prepare-only --settings

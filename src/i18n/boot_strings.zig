@@ -431,8 +431,8 @@ pub const Key = enum(u16) {
     unattended_subtitle,
     unattended_title,
     unattended_xp_file_detail,
-    unattended_xp_none,
-    unattended_xp_none_detail,
+    unattended_xp_manual,
+    unattended_xp_manual_detail,
     unattended_xp_settings,
     unattended_xp_settings_detail,
     utilities_freedos_desc,
@@ -882,8 +882,8 @@ pub const hashes = [_]u32{
     0x0404a4d7, // unattended.subtitle
     0x117edf4b, // unattended.title
     0xc77e920d, // unattended.xp_file.detail
-    0x19b9a10e, // unattended.xp_none
-    0xce8f0701, // unattended.xp_none.detail
+    0xd75cdb9a, // unattended.xp_manual
+    0x922274cd, // unattended.xp_manual.detail
     0x33bff8f1, // unattended.xp_settings
     0x8b01f4fc, // unattended.xp_settings.detail
     0x90427850, // utilities.freedos.desc
@@ -1783,8 +1783,8 @@ pub const english = [_][]const u8{
     "Choose an answer file or continue without one",
     "Unattended setup",
     "The .sif is merged into the automatic answer; disk, PAE and driver settings stay automatic. usos-xp.ini is not used.",
-    "No settings (interactive Setup)",
-    "usos-xp.ini is empty or missing: XP Setup asks for the name, product key and time zone.",
+    "No answer file (manual installation)",
+    "usos-xp.ini is not used: XP Setup asks for the name, product key and time zone.",
     "usos-xp.ini: {0}, {1}",
     "Automatic XP Setup with the accounts and computer name from usos-xp.ini. The product key is not shown.",
     "DOS programs from USB, file manager and command prompt",

@@ -185,6 +185,7 @@ PLAN_PROFILE_TOKEN=''
 LEGACY_IMAGE_HEX=''
 LEGACY_UNATTENDED_HEX=''
 LEGACY_FOLDER_HEX=''
+XP_SETTINGS_MODE=''
 BIOS_BOOT_DRIVE=''
 BIOS_DISKS=''
 for argument in $(cat /proc/cmdline); do
@@ -196,6 +197,7 @@ for argument in $(cat /proc/cmdline); do
         usos.plan_profile=*) PLAN_PROFILE_TOKEN=${argument#*=} ;;
         usos.legacy_image_hex=*) LEGACY_IMAGE_HEX=${argument#*=} ;;
         usos.legacy_unattended_hex=*) LEGACY_UNATTENDED_HEX=${argument#*=} ;;
+        usos.xp_settings=*) XP_SETTINGS_MODE=${argument#*=} ;;
         usos.legacy_folder_hex=*) LEGACY_FOLDER_HEX=${argument#*=} ;;
         usos.bios_boot_drive=*) BIOS_BOOT_DRIVE=${argument#*=} ;;
         usos.bios_disks=*) BIOS_DISKS=${argument#*=} ;;

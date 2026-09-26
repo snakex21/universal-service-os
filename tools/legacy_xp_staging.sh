@@ -441,12 +441,8 @@ usos_legacy_xp_staging() {
     usos_xp_driver_preflight || stop 'XP driver preflight failed; no target write occurred'
     # Hands-off Setup/OOBE (docs/xp-unattended.md); a selected custom .sif wins.
     . /usr/lib/usos/xp_user_settings.sh
-    if [ -z "$XP_WINNT_SIF" ] && [ -z "$XP_CUSTOM_SIF" ]; then
-        usos_xp_settings_stage "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/usos-xp.ini" "$SOURCE_ROOT" || stop 'usos-xp.ini is invalid; fix it on DATA. No target write occurred'
-    else
-        XP_USER_SETTINGS=''; export XP_USER_SETTINGS
-        printf '[XP_SETTINGS] ignored: custom WINNT.SIF selected\n'
-    fi
+    # XP_SETTINGS_MODE=off (usos.xp_settings=off): manual installation chosen in the menu.
+    usos_xp_settings_select "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/usos-xp.ini" "$SOURCE_ROOT" "$XP_WINNT_SIF$XP_CUSTOM_SIF" "${XP_SETTINGS_MODE:-}" || stop 'usos-xp.ini is invalid; fix it on DATA. No target write occurred'
     fi
     XP_SOURCE_OPEN=yes
     fi

@@ -80,14 +80,28 @@ fn runEntry(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_dis
             continue;
         };
         while (manual_methods.select(entry, image, firmware)) |method| {
-            if (entry.unattended_directory != null and (image.kind == .iso or image.kind == .wim)) {
-                const unattended = manual_unattended.select(discovery, entry);
-                if (unattended.back) continue;
-                manual_summary.show(root, entry, image, method, unattended.path, unattended.available, firmware);
-            } else {
-                manual_summary.show(root, entry, image, method, null, 0, firmware);
-            }
+            answerAndSummary(root, discovery, entry, image, method, firmware);
+            // Back from the first screen after the method: with a single
+            // method taken without asking there is no method screen, and
+            // selecting it again would reopen the same screen (Back looked
+            // dead on the XP answer-file screen), so return to the images.
+            if (manual_methods.automatic) break;
         }
+    }
+}
+
+/// Answer-file screen (when it applies) and summary; returns on Back from
+/// the first of them that was shown. Back from the summary goes to the
+/// answer-file screen when that was shown.
+fn answerAndSummary(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_discovery.Discovery, entry: *const usos.catalog.SystemEntry, image: usos.catalog.ImageItem, method: usos.catalog.BootMethod, firmware: usos.firmware.Firmware) void {
+    if (entry.unattended_directory == null or !(image.kind == .iso or image.kind == .wim)) {
+        return manual_summary.show(root, entry, image, method, .{}, 0, firmware);
+    }
+    while (true) {
+        const unattended = manual_unattended.select(discovery, entry);
+        if (unattended.back) return;
+        manual_summary.show(root, entry, image, method, unattended.choice, unattended.available, firmware);
+        if (!unattended.shown) return;
     }
 }
 
