@@ -5,5 +5,53 @@
   "files": {
     "LICENSE.txt": "30b044939b58ef5754ed7479e5ec930dd49d154dbf07f618825d4470c189f4dd",
     "UefiSeven.efi": "0a44a256cda725c22f1daadcf093fc4660b7214e6437968a4c8e119aed02a947"
+  },
+  "upstream_source": {
+    "repository": "https://github.com/manatails/uefiseven",
+    "tag": "1.30",
+    "commit": "b8f0baba63e60e74d4ed3e86b15b76319d316b83",
+    "commit_date": "2021-10-04T09:58:50Z",
+    "license": "BSD-2-Clause (UefiSevenPkg/License.txt); IntelFrameworkPkg files BSD-2-Clause-Patent (Intel)",
+    "tag_tar_gz_sha256": "6b51f07e4f8fe72ef20fbd4fccdab0b4cf55c658b09a3b566f8faffa6c88b528",
+    "omitted": [
+      "UefiSevenPkg/Conf (upstream GCC49 tools_def/target/build_rule, not used)",
+      ".gitignore"
+    ],
+    "sha256": {
+      "IntelFrameworkPkg/Include/Protocol/LegacyRegion.h": "244ba349196b5efbadd53357c28b24fb3eb357bcdcec7917d2c5256de9b212da",
+      "IntelFrameworkPkg/IntelFrameworkPkg.dec": "b6a89c30bc8077386588d21728b8b77653a44ae1af01ffa55f3d60c4ea905423",
+      "IntelFrameworkPkg/IntelFrameworkPkg.uni": "2acd069616beb90f9de2833811b91a3164f750b5afeedab969ccfc73906a1c5b",
+      "README.md": "6e7cad49a6db80df911b80de44e1ffdab687317f1dfd2e3c8c9afd8ff21bdaac",
+      "UefiSeven.ini": "7a4293182f93ae9537251b80de03308b2e9cb33e194711894ddf84377edf58bb",
+      "UefiSevenPkg/Include/Protocol/ConsoleControl.h": "40772e8ecaf92c7936a51a32da70ee8980c8ac9d603c26413ca6d3dcae107b35",
+      "UefiSevenPkg/License.txt": "30b044939b58ef5754ed7479e5ec930dd49d154dbf07f618825d4470c189f4dd",
+      "UefiSevenPkg/Platform/UefiSeven/Display.c": "6ecca576d0e51781f0925f6e9dc45615e0c8e6bb26ede53ea180e0fb9c3ac501",
+      "UefiSevenPkg/Platform/UefiSeven/Display.h": "e0c7fe6f706bec6ddb20dd23b3ed20da0b7808c5a92df53b6fea050a7262fc52",
+      "UefiSevenPkg/Platform/UefiSeven/Filesystem.c": "7defdd02360108c356ae64a5a08db1f03053595ea1b7670fcbab489b6a34ac68",
+      "UefiSevenPkg/Platform/UefiSeven/Filesystem.h": "17cf329028ed39c4fdcca5dcff2c8593bacc68472bcaf4f6a48ac28f497e0566",
+      "UefiSevenPkg/Platform/UefiSeven/Int10hHandler.asm": "5dc4d39d8f9ae1b0e73b99e48a8860b1e279f0875c595183aaabde2c710d3ae0",
+      "UefiSevenPkg/Platform/UefiSeven/Int10hHandler.h": "af1aa2e4823a9599474a969e37bd3b00b233a46702666b8a06bea0bd324e217f",
+      "UefiSevenPkg/Platform/UefiSeven/Int10hHandler.sh": "58f168935456a9d701194c670c28da8fe7208fb193f1622fee7bda80ed33a835",
+      "UefiSevenPkg/Platform/UefiSeven/UefiSeven.c": "754720c247080749c7e232dbc2d3f6b64a1eff9e4b1d1bc0658f9d8a5a9ddd95",
+      "UefiSevenPkg/Platform/UefiSeven/UefiSeven.h": "daf67abd01a0de4f2ff9eeb24ef1867976fdf7e3d0e4fd3e940ff90ae66422bc",
+      "UefiSevenPkg/Platform/UefiSeven/UefiSeven.inf": "289d1c663ca370a90206c4b9523dc0fad227ab1e0608e0dee881a3676375c800",
+      "UefiSevenPkg/Platform/UefiSeven/UefiSeven.uni": "40b197f760684138a47217c00836710ad50109ae03b67d6b919d53f08aa49543",
+      "UefiSevenPkg/Platform/UefiSeven/UefiSevenExtra.uni": "60a32db20970c1067de9c3c08eb9592e675d18565cff865c7e942491e32a607a",
+      "UefiSevenPkg/Platform/UefiSeven/Util.c": "3f1ee6ea9097949bbda06b517b4a2306b2ffc46886ed6439f8066ed98a3fef6f",
+      "UefiSevenPkg/Platform/UefiSeven/Util.h": "a690d3232bd67477be793731ffffc8f158e0f98ffff8a741b3c0e7608960039f",
+      "UefiSevenPkg/Platform/UefiSeven/Version.h": "56f152f0200b714bd0dd67e9fd11d86cb196f18431e0f956f7b112aa4a4babcf",
+      "UefiSevenPkg/UefiSevenPkg.dec": "70f6979bba0c013428427d6542dd7d863be37763f0918ba778ed48d97fc9ecf0",
+      "UefiSevenPkg/UefiSevenPkg.dsc": "c5322e39954e8026b8e3b0b2e3a5518368877a80bde348dcc3bf98b5e2c4e992",
+      "build_uefiseven.txt": "7e67b2fb581516c6442982a6ef07a012297b66899226b7ca6243c7556ecc17fa"
+    }
+  },
+  "source_build": {
+    "script": "tools/build_uefiseven.ps1",
+    "dsc_sha256": "9cde10959bded191d7ad8057ca2c26b751005f07f9e744ea5d6e114d77278fd2",
+    "edk2_tag": "edk2-stable202411",
+    "edk2_commit": "0f3867fa6ef0553e26c42f7d71ff6bdb98429742",
+    "toolchain": "VS2022",
+    "efi_sha256": "e601fdc482f96096625bc294f303eb984cdcbef989d24a51dbf9fce0cd0447c0",
+    "efi_size": 54784
   }
 }
