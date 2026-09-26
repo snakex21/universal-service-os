@@ -188,7 +188,9 @@ fn oobe(w: *W, input: Input) !void {
     try element(w, 4, "HideEULAPage", "true");
     if (family.client() != .vista) try element(w, 4, "HideOEMRegistrationScreen", "true");
     if (family.atLeast8() and p.local_account) try element(w, 4, "HideOnlineAccountScreens", "true");
-    if (family.client() != .vista and (p.no_network_oobe or family.legacyNt6())) try element(w, 4, "HideWirelessSetupInOOBE", "true");
+    // Without it an offline Windows 10 OOBE stops on "Let's connect you to a
+    // network" (VirtualBox test 2026-09-26); the page is only the Wi-Fi setup.
+    if (family.client() != .vista) try element(w, 4, "HideWirelessSetupInOOBE", "true");
     if (family.legacyNt6()) try element(w, 4, "NetworkLocation", "Work");
     try element(w, 4, "ProtectYourPC", "3");
     try close(w, 3, "OOBE");

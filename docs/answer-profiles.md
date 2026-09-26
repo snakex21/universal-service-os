@@ -34,7 +34,7 @@ bad values are refused with the field and the line, never the value.
 | `manual_disk` | the disk is chosen in Setup | only `yes` in this version: no `DiskConfiguration`, no `InstallTo`, never `WillWipeDisk` |
 | `local_account` | 8+: local account, online-account screens hidden | default `yes` |
 | `bypass_tpm`, `bypass_secure_boot`, `bypass_ram` | Windows 11 requirement checks (`LabConfig`) | default `no`, ignored on other systems |
-| `no_network_oobe` | Windows 11: OOBE without network (`BypassNRO`), wireless page hidden | default `no` |
+| `no_network_oobe` | Windows 11: OOBE without network (`BypassNRO`) | default `no`; the wireless page is hidden on 7+ anyway (`HideWirelessSetupInOOBE`: an offline Windows 10 OOBE otherwise stops on it) |
 
 The password (and, with `remember_key=yes`, the keys) are plain text on
 the stick. The menu never shows them in lists or logs.
