@@ -20,6 +20,7 @@ const ImageKind = @import("image_kind.zig").ImageKind;
 const SystemEntry = @import("system_entry.zig").SystemEntry;
 const Firmware = @import("../core/firmware.zig").Firmware;
 const Backend = @import("../flow/preparation_capability.zig").Backend;
+const windows_media = @import("../image_probe/windows_media.zig");
 
 /// The Windows 7 / Vista native wimboot start is UEFI-only code; the
 /// freestanding BIOS Core compiles those rules out.
@@ -121,6 +122,16 @@ pub fn traits(system_id: []const u8) SystemTraits {
 /// The id the profile rules see: the `route_as` system, else the id itself.
 pub fn routeId(system_id: []const u8) []const u8 {
     return ownTraits(system_id).route_as orelse system_id;
+}
+
+/// The start gate of a probed Windows ISO of this system (image list, boot
+/// summary, requestPreparation). Windows 7/Vista and Server 2008/2008 R2
+/// (route_as) start through the external PE10 donor on UEFI, so the media's
+/// own missing bootx64.efi does not block them; the architecture and IA64
+/// gates stay, and the donor/media rejections are windows7_iso's.
+pub fn mediaBlock(system_id: []const u8, info: windows_media.Info, firmware: windows_media.Firmware) ?windows_media.Block {
+    const loader: windows_media.UefiLoader = if (traits(system_id).native_uefi.legacyPe()) .pe_donor else .media;
+    return windows_media.blockWith(info, firmware, loader);
 }
 
 /// "<folder>" of a Windows system's "\Systems\Windows\<folder>\Images".
@@ -294,6 +305,30 @@ test "Windows 10/11 and 7/Vista native UEFI profiles" {
     try std.testing.expectEqual(NativeUefi.vista, traits("windows-vista").native_uefi);
     try std.testing.expectEqual(NativeUefi.none, traits("windows-8-1").native_uefi);
     try std.testing.expectEqual(AnswerFormat.winnt_sif, traits("windows-2000").answer);
+}
+
+test "x64 Windows 7/Vista media without an EFI loader starts through the PE donor" {
+    // Retail Win7 SP1 / Vista x64: bootmgr + boot.wim (x64), no efi\boot\bootx64.efi.
+    const bios_only_x64 = windows_media.classify(.{ .bootmgr = true, .boot_wim = true, .setup_exe = true, .install_image = true, .wim_arch = 9 });
+    try std.testing.expect(!bios_only_x64.uefi_x64);
+    for ([_][]const u8{ "windows-7", "windows-vista", "windows-server-2008-r2", "windows-server-2008" }) |id| {
+        try std.testing.expect(mediaBlock(id, bios_only_x64, .uefi_x64) == null);
+        try std.testing.expect(mediaBlock(id, bios_only_x64, .bios) == null);
+    }
+    // Windows 8+ and their Server releases keep the loader gate.
+    for ([_][]const u8{ "windows-10", "windows-11", "windows-8-1", "windows-8", "windows-server-2022", "windows-server-2012-r2" }) |id| {
+        try std.testing.expectEqual(windows_media.Block.no_uefi_loader, mediaBlock(id, bios_only_x64, .uefi_x64).?);
+    }
+    // 32-bit Windows 7 media is still blocked on x64 UEFI.
+    const x86 = windows_media.classify(.{ .bootmgr = true, .boot_wim = true, .setup_exe = true, .install_image = true, .wim_arch = 0 });
+    try std.testing.expectEqual(windows_media.Block.needs_32bit_uefi_or_bios, mediaBlock("windows-7", x86, .uefi_x64).?);
+    try std.testing.expect(mediaBlock("windows-7", x86, .bios) == null);
+    // ARM64 and IA64 stay blocked.
+    const arm = windows_media.classify(.{ .efi_aa64 = true, .boot_wim = true, .setup_exe = true, .install_image = true });
+    try std.testing.expectEqual(windows_media.Block.arm64_media, mediaBlock("windows-7", arm, .uefi_x64).?);
+    var ia64 = bios_only_x64;
+    ia64.install.ia64 = true;
+    try std.testing.expectEqual(windows_media.Block.ia64_media, mediaBlock("windows-server-2008-r2", ia64, .uefi_x64).?);
 }
 
 test "Windows Server follows the client release it shares a Setup with" {
