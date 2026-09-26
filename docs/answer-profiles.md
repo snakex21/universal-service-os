@@ -91,6 +91,42 @@ give byte-identical `WINNT.SIF` and accounts script.
   from Schneegans' generator, with 32-bit media) does nothing in Setup:
   USOS warns (not blocks) about it.
 
+## UEFI answer-profile manager
+
+The answer-file screen (`src/platform/uefi/manual_unattended.zig`, rows
+`src/flow/answer_screen.zig`), per the agreed mockup:
+
+| row | A (Enter) | X (F2) | Y (Delete) |
+|---|---|---|---|
+| No answer file (manual installation) | Setup asks everything (XP: `usos.xp_settings=off`) | | |
+| XP: `usos-xp.ini: <user>, <computer>` (active DATA file) | hands-off XP as before | import into a new ESP profile (`usos-xp`) | |
+| USOS profiles (`\EFI\USOS\profiles\<stem>.ini`) | use (rendered at start) | edit | delete, after a confirmation list (Keep is the default) |
+| files from `Unattended\` | used as they are | | |
+| + Add a new profile | editor with the menu language and its time zone | | |
+
+B / Esc / right click go back. The footer shows X/Y only on the rows they
+act on. Profiles are offered where the start can hand a rendered answer
+on (`answer_screen.profileCapable`: XP UEFI-CSM, the native wimboot starts
+of 7 and 10/11, WORK for 8/10/11 and WIM); Vista keeps its servicing answer
+and gets the file rows only. The screen now also appears for Windows 10/11
+with an empty `Unattended\` (it offers "+ Add a new profile").
+
+The editor (`profile_editor.zig`) is a form (`src/gui/form.zig`) with the
+on-screen keyboard: profile name, user, second user, computer name,
+organization, password (shown as bullets), time zone, Windows language,
+formats, keyboard (list pickers), the product key **of the system the
+editor was opened from** (`key.<system-id>`), "Remember the key on this
+stick", local account and, for Windows 11, the three requirement bypasses
+and "set up without network". Rules are the model's, checked live (a bad
+value turns the row red and the help panel says why; empty required fields
+turn red on Save). A key typed with "Remember" off is kept in memory for
+this boot only (`answer_profiles` session copy) and never written.
+
+The summary shows "Profile <name>: <user>, <computer> (<arch>)". For an
+answer file from `Unattended\` it warns when all its components are for
+another architecture than the media ("The answer file has no settings for
+x86 media: Setup ignores it").
+
 ## Where rendering runs (just in time)
 
 The UEFI menu renders the chosen profile when the installation starts
@@ -100,7 +136,10 @@ The UEFI menu renders the chosen profile when the installation starts
 |---|---|---|
 | XP UEFI-CSM (`xp-x86-sp3-uefi-csm`) | `usos-plan.ini` + `nt5-settings.ini`, kernel option `usos.xp_settings=plan` | `usos_xp_settings_plan`: checks the plan, validates the settings in profile mode, deletes the rendered file, merges into `WINNT.SIF` |
 | 8/10/11 via WORK | `usos-plan.ini` + `autounattend.xml`, `install-state.ini` `answer_plan=EFI/USOS/answer/usos-plan.ini` | `micro_linux_init.sh` -> `usos_answer_plan_take`: copies to `/run`, deletes it from the ESP; `extract.sh` writes `WORK:\Autounattend.xml` and compares it (`cmp`) as for a DATA file |
-| 7 and 10/11 native wimboot | the rendered XML goes straight into the RAM disk as `usos-unattend.xml` (the file the WinPE scripts already use), with `usos-plan.ini` next to it | WinPE, unchanged |
+| 7 and 10/11 native wimboot | the rendered XML (amd64) goes straight into the RAM disk as `usos-unattend.xml` (the file the WinPE scripts already use), with `usos-plan.ini` next to it | WinPE, unchanged |
+
+Before every start the menu deletes rendered files an earlier start may
+have left in `\EFI\USOS\answer` (`answer_profiles.clearRendered`).
 
 `usos-plan.ini` (`plan_file.zig`) never contains a key or a password:
 
@@ -129,6 +168,13 @@ separate step with a Vista/7 hardware test).
 - `zig build test`: model (round trip, keys only with `remember_key`,
   errors without values, usos-xp.ini import), tables (known pairs), NT5
   and XML renderers, XML checks, plan file.
+- QEMU/OVMF click-through `tools/tests/run_uefi_answer_screen.ps1`
+  (golden `tools/tests/golden/uefi_answer_screen.tsv`): the XP screen rows,
+  Back in every way, add a profile with the keyboard (Save with an empty
+  name selects it), use it (summary, `usos.xp_settings=plan`, `[PROFILE]
+  staged`), edit it with F2, Esc from the editor saves nothing, Delete asks
+  (Keep keeps it, Delete removes it); Windows 10 shows the manager with the
+  add row.
 - `python tools/tests/test_answer_render.py`: goldens in
   `src/flow/answer/testdata/golden` (20 version/architecture XMLs, minimal
   profile, NT5 settings + `WINNT.SIF` + accounts for XP/2000/2003), XML

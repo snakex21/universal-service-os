@@ -200,10 +200,21 @@ fn checkDonorRecord(state: *BootState, inspection: *const scanner.Inspection, ro
 }
 
 const IsoStage = @import("usos").flow.preparation_boot_progress.DirectIsoStage;
-pub noinline fn start(root: *uefi.protocol.File, folder: []const u8, name: []const u8, answer_name: ?[]const u8, vista: bool, progress: *const fn (IsoStage, []const u8) void) !void {
+
+/// An answer rendered from a USOS profile (docs/answer-profiles.md): goes
+/// into the RAM disk as usos-unattend.xml (the file the WinPE scripts use)
+/// with usos-plan.ini next to it, instead of a DATA answer file.
+pub const Rendered = struct {
+    xml: []const u8,
+    plan: []const u8,
+};
+
+pub noinline fn start(root: *uefi.protocol.File, folder: []const u8, name: []const u8, answer_name: ?[]const u8, rendered: ?Rendered, vista: bool, progress: *const fn (IsoStage, []const u8) void) !void {
     if (@import("builtin").cpu.arch != .x86_64) return error.WindowsSetupRequiresX64;
     try source_config.validateName(name);
     if (answer_name) |answer| try source_config.validateName(answer);
+    if (answer_name != null and rendered != null) return error.TwoAnswerSources;
+    if (vista and rendered != null) return error.VistaUnattendedNotSupported;
     if (uefi.system_table.boot_services == null) return error.NoBootServices;
     const state = try uefi.pool_allocator.create(BootState);
     defer uefi.pool_allocator.destroy(state);
@@ -234,8 +245,8 @@ pub noinline fn start(root: *uefi.protocol.File, folder: []const u8, name: []con
     var config: [544]u8 = undefined;
     // The client folders keep the plan's defaults (hardware-tested order and names).
     const client_folder = std.mem.eql(u8, folder, if (vista) "Windows Vista" else "Windows 7");
-    const plan = usos.flow.plan.wimbootPlan(.{ .kind = if (vista) .vista else .win7, .folder = if (client_folder) "" else folder, .answer = answer_name != null, .external_pe10 = external_pe10, .nvme_packages = inspection.nvme_packages });
-    try inject(root, state, volume, &owned, &boot_iso, &plan, name, answer_name, &config, progress);
+    const plan = usos.flow.plan.wimbootPlan(.{ .kind = if (vista) .vista else .win7, .folder = if (client_folder) "" else folder, .answer = answer_name != null or rendered != null, .external_pe10 = external_pe10, .nvme_packages = inspection.nvme_packages });
+    try inject(root, state, volume, &owned, &boot_iso, &plan, name, answer_name, rendered, &config, progress);
     return launch(root, volume, setup.index, if (external_pe10) "Starting external PE10; the install source remains the selected Windows ISO" else "Starting the hybrid ISO's own WinPE and Setup", progress);
 }
 
@@ -274,11 +285,12 @@ pub noinline fn inspectModern(image_directory: []const u8, name: []const u8) !Mo
 
 /// Starts Windows 10/11 Setup from the selected ISO (`winpe == false`) or a
 /// WinPE/rescue ISO as it is (`winpe == true`, no USOS helpers, no Setup).
-pub noinline fn startModern(root: *uefi.protocol.File, image_directory: []const u8, name: []const u8, answer_name: ?[]const u8, winpe: bool, progress: *const fn (IsoStage, []const u8) void) !void {
+pub noinline fn startModern(root: *uefi.protocol.File, image_directory: []const u8, name: []const u8, answer_name: ?[]const u8, rendered: ?Rendered, winpe: bool, progress: *const fn (IsoStage, []const u8) void) !void {
     if (@import("builtin").cpu.arch != .x86_64) return error.WindowsSetupRequiresX64;
     try source_config.validateName(name);
     if (answer_name) |answer| try source_config.validateName(answer);
-    if (winpe and answer_name != null) return error.WinPeHasNoAnswerFile;
+    if (answer_name != null and rendered != null) return error.TwoAnswerSources;
+    if (winpe and (answer_name != null or rendered != null)) return error.WinPeHasNoAnswerFile;
     const folder = try systemFolder(image_directory);
     const state = try uefi.pool_allocator.create(BootState);
     defer uefi.pool_allocator.destroy(state);
@@ -301,8 +313,8 @@ pub noinline fn startModern(root: *uefi.protocol.File, image_directory: []const 
     var owned = Owned{};
     defer owned.release();
     var config: [544]u8 = undefined;
-    const plan = usos.flow.plan.wimbootPlan(.{ .kind = if (winpe) .winpe else .modern_setup, .folder = folder, .answer = answer_name != null });
-    try inject(root, state, volume, &owned, &iso, &plan, name, answer_name, &config, progress);
+    const plan = usos.flow.plan.wimbootPlan(.{ .kind = if (winpe) .winpe else .modern_setup, .folder = folder, .answer = answer_name != null or rendered != null });
+    try inject(root, state, volume, &owned, &iso, &plan, name, answer_name, rendered, &config, progress);
     return launch(root, volume, setup.index, if (winpe) "Starting WinPE from the ISO; nothing is installed" else "Starting the ISO's own WinPE and Windows Setup", progress);
 }
 
@@ -338,7 +350,7 @@ const Owned = struct {
 /// Fills the wimboot RAM disk exactly as `plan` lists it
 /// (src/flow/plan.zig, pinned by the routing golden). `config` must outlive
 /// the launch: the volume keeps references, not copies.
-fn inject(root: *uefi.protocol.File, state: *BootState, volume: *files.Volume, owned: *Owned, boot_iso: *Iso, plan: *const usos.flow.plan.WimbootPlan, name: []const u8, answer_name: ?[]const u8, config: *[544]u8, progress: *const fn (IsoStage, []const u8) void) !void {
+fn inject(root: *uefi.protocol.File, state: *BootState, volume: *files.Volume, owned: *Owned, boot_iso: *Iso, plan: *const usos.flow.plan.WimbootPlan, name: []const u8, answer_name: ?[]const u8, rendered: ?Rendered, config: *[544]u8, progress: *const fn (IsoStage, []const u8) void) !void {
     const catalog = &state.catalog;
     for (plan.slice(), 0..) |item, index| {
         var line: [192]u8 = undefined;
@@ -365,7 +377,14 @@ fn inject(root: *uefi.protocol.File, state: *BootState, volume: *files.Volume, o
                 }
             },
             .source_ini => |folder| try volume.add("usos-source.ini", try source_config.sourceConfigForFolder(config, catalog.partition.part_guid, state.source.size(), folder, name)),
-            .answer => |folder| try addAnswer(state, volume, owned, folder, answer_name orelse return error.AnswerFileMissing),
+            .answer => |folder| if (rendered) |answer| {
+                // A USOS profile rendered just now: the same file name the
+                // WinPE scripts look for, plus the plan (no key in it).
+                try volume.add("usos-unattend.xml", answer.xml);
+                try volume.add("usos-plan.ini", answer.plan);
+                var answer_message: [96]u8 = undefined;
+                serial.writeAscii(try std.fmt.bufPrint(&answer_message, "[WIMBOOT_PLAN] answer rendered from a USOS profile: {d} bytes\r\n", .{answer.xml.len}));
+            } else try addAnswer(state, volume, owned, folder, answer_name orelse return error.AnswerFileMissing),
             .boot_files => try addBootFiles(boot_iso, volume, owned, progress),
         }
     }

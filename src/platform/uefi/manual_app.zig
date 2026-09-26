@@ -97,8 +97,9 @@ fn answerAndSummary(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.m
     if (entry.unattended_directory == null or !(image.kind == .iso or image.kind == .wim)) {
         return manual_summary.show(root, entry, image, method, .{}, 0, firmware);
     }
+    const profiles_allowed = usos.flow.answer_screen.profileCapable(entry, image.kind, method, firmware);
     while (true) {
-        const unattended = manual_unattended.select(discovery, entry);
+        const unattended = manual_unattended.select(discovery, .{ .root = root, .system = entry, .profiles_allowed = profiles_allowed });
         if (unattended.back) return;
         manual_summary.show(root, entry, image, method, unattended.choice, unattended.available, firmware);
         if (!unattended.shown) return;
@@ -129,9 +130,4 @@ fn showDataCatalogError(err: anyerror) void {
 fn showWindowsHandoffStatus(key: manual_view.Key) void {
     const lines = [_][]const u8{ manual_view.t(.handoff_line1), manual_view.t(key), manual_view.t(.handoff_line2) };
     manual_view.status(manual_view.t(.handoff_title), "", &lines);
-}
-
-// Step 2 compile check (the answer-profile manager uses it next).
-comptime {
-    _ = &@import("manual_form.zig").run;
 }

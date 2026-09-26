@@ -21,7 +21,13 @@ instalację XP (profil UEFI-CSM, automatyczny układ jednej partycji) bez
   z `Unattended\`. Podsumowanie powtarza wybór w polu „Plik odpowiedzi”.
   Wstecz (Esc, B, prawy przycisk, dotknięcie „Esc” w stopce) wraca do listy
   obrazów (metoda XP jest jedna i wybierana bez pytania). Wiersze:
-  `src/flow/answer_screen.zig`.
+  `src/flow/answer_screen.zig`. Od 2026-09-26 ekran jest menedżerem
+  profili odpowiedzi ([answer-profiles.md](answer-profiles.md)): po
+  `usos-xp.ini` są profile USOS z ESP (A użyj, X edytuj, Y usuń), potem pliki
+  `.sif` i „+ Dodaj nowy profil”; X na wierszu `usos-xp.ini` importuje go do
+  nowego profilu. Wybrany profil XP trafia do stagingu jako
+  `EFI/USOS/answer/nt5-settings.ini` (`usos.xp_settings=plan`), scalany tym
+  samym kodem co `usos-xp.ini`.
 - Wybrany `.sif` jest **łączony** z automatyczną odpowiedzią
   (`usos_xp_custom_sif`): klucze użytkownika wygrywają poza tymi, których
   wymaga ścieżka USOS (całe `[Data]`; `Repartition`, `FileSystem`,

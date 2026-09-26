@@ -235,6 +235,11 @@ fn inputModeChanged() void {
     }
 }
 
+/// Code of the menu language (installer locale code: pl, en, pt-BR, ...).
+pub fn languageCode() []const u8 {
+    return strings.languageCode();
+}
+
 /// The string table (for screens that format their own text).
 pub fn t(key: Key) []const u8 {
     return strings.get(key);
@@ -593,11 +598,18 @@ pub const ListScreen = struct {
     /// their reason can be read; they take hover like any other row.
     /// Set by manual_navigation.handleSelectable on every event.
     selectable: ?[]const bool = null,
+    /// Footer hints of the owner (answer-profile manager: X edit, Y delete);
+    /// null: the standard select/open/back hints.
+    custom_hints: ?[]const Hint = null,
 
     /// Opens a list in place (the view keeps a pointer for hover handling).
     pub fn open(self: *ListScreen, title: []const u8, subtitle: []const u8, rows: []const Row, selected: usize, two_line: bool, help: ?screens.Help) void {
-        self.* = .{ .spec = .{ .title = title, .subtitle = subtitle, .rows = rows, .selected = selected, .two_line = two_line, .help = help } };
-        self.spec.hints = listHints(&self.hint_storage);
+        self.openWithHints(title, subtitle, rows, selected, two_line, help, null);
+    }
+
+    pub fn openWithHints(self: *ListScreen, title: []const u8, subtitle: []const u8, rows: []const Row, selected: usize, two_line: bool, help: ?screens.Help, hints: ?[]const Hint) void {
+        self.* = .{ .spec = .{ .title = title, .subtitle = subtitle, .rows = rows, .selected = selected, .two_line = two_line, .help = help }, .custom_hints = hints };
+        self.spec.hints = hints orelse listHints(&self.hint_storage);
         self.redrawFull(selected, help);
     }
 
@@ -616,7 +628,7 @@ pub const ListScreen = struct {
         header_clock_active = true;
         self.spec.selected = selected;
         self.spec.help = help;
-        self.spec.hints = listHints(&self.hint_storage);
+        self.spec.hints = self.custom_hints orelse listHints(&self.hint_storage);
         beginFullFrame();
         var u = ui() orelse return self.console();
         var clock: [48]u8 = undefined;

@@ -103,6 +103,11 @@ pub fn listDirectories(root: *uefi.protocol.File, directory_path: []const u8, ou
 }
 
 pub fn listXmlFiles(root: *uefi.protocol.File, directory_path: []const u8, out: []usos.catalog.FixedText) usize {
+    return listFilesWithExtension(root, directory_path, ".xml", out);
+}
+
+/// Names of the files in an ESP directory ending in `extension` (any case).
+pub fn listFilesWithExtension(root: *uefi.protocol.File, directory_path: []const u8, extension: []const u8, out: []usos.catalog.FixedText) usize {
     var path_buffer: [path.max_path_units + 1]u16 = undefined;
     const directory_name = path.asciiZ(directory_path, &path_buffer) orelse return 0;
     const directory = root.open(directory_name, .read, .{}) catch return 0;
@@ -123,7 +128,7 @@ pub fn listXmlFiles(root: *uefi.protocol.File, directory_path: []const u8, out: 
             progressed = true;
             if (!info.attribute.directory) {
                 const utf16_name = std.mem.span(info.getFileName());
-                if (endsWithAsciiIgnoreCase(utf16_name, ".xml")) {
+                if (endsWithAsciiIgnoreCase(utf16_name, extension)) {
                     var name = usos.catalog.FixedText{};
                     if (name.setAsciiFromUtf16(utf16_name)) {
                         out[count] = name;

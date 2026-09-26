@@ -101,9 +101,13 @@ pub fn requestPreparation(
     image: usos.catalog.ImageItem,
     method: usos.catalog.BootMethod,
     unattended: ?[]const u8,
+    /// A USOS answer profile: rendered to \EFI\USOS\answer and named in
+    /// install-state.ini (answer_plan=), used instead of a DATA file.
+    profile: ?*const usos.flow.answer.Profile,
     progress: ?ProgressFn,
 ) !void {
     try usos.flow.preparation_capability.validate(system.id, image.kind, method);
+    if (profile != null and unattended != null) return error.TwoAnswerSources;
     // Never prepare (copy to WORK) media that cannot start here or that is
     // not a Windows installer: the menu blocks both, this is the last check
     // before install-state.ini is written.
@@ -125,7 +129,17 @@ pub fn requestPreparation(
         break :blk try dataPath(&unattended_path_storage, directory, name);
     } else null;
 
-    try persistent_state_file.write(root, .prepare_requested, iso_path, unattended_path, resolved_method.persistedValue(), system.id, try plan.stateKeys(&plan_keys));
+    var keys_len = (try plan.stateKeys(&plan_keys)).len;
+    const answer_profiles = @import("answer_profiles.zig");
+    answer_profiles.clearRendered(root);
+    if (profile) |p| {
+        _ = try answer_profiles.stage(root, p, system.id, answer_profiles.archOf(image.media), plan.profile.id);
+        const line = "answer_plan=" ++ usos.flow.answer.plan_file.plan_path_posix ++ "\r\n";
+        if (keys_len + line.len > plan_keys.len) return error.PlanKeysTooLong;
+        @memcpy(plan_keys[keys_len .. keys_len + line.len], line);
+        keys_len += line.len;
+    }
+    try persistent_state_file.write(root, .prepare_requested, iso_path, unattended_path, resolved_method.persistedValue(), system.id, plan_keys[0..keys_len]);
     reportProgress(progress, .request_saved);
     say("PERSISTENT PHASE PREPARE-REQUESTED PASS\n");
     const current = boot_next.prepareReturnToCurrentBoot() catch |err| {

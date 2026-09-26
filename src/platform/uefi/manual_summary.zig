@@ -11,6 +11,7 @@ const secure_boot = @import("secure_boot.zig");
 const manual_images = @import("manual_images.zig");
 const manual_unattended = @import("manual_unattended.zig");
 const xp_settings = @import("xp_settings.zig");
+const answer_profiles = @import("answer_profiles.zig");
 
 const Fields = struct {
     labels: [16][]const u8 = undefined,
@@ -77,7 +78,15 @@ pub fn show(
     var no_answer_text: [160]u8 = undefined;
     var answer_text: [200]u8 = undefined;
     const settings_name = usos.catalog.os_profiles.traits(system.id).settings_file;
-    if (backend == .xp_uefi_staging) {
+    var profile_text: [200]u8 = undefined;
+    var profile_detail: [120]u8 = undefined;
+    var arch_note: [200]u8 = undefined;
+    if (answer.profile) |index| {
+        // A USOS profile, rendered for this system when the start begins.
+        const p = answer_profiles.get(index);
+        const arch = if (backend == .xp_uefi_staging) "x86" else @tagName(answer_profiles.archOf(image.media));
+        fields.add(view.t(.summary_answer_file), view.format(&profile_text, .profile_summary, &.{ p.name.slice(), manual_unattended.profileDetail(&profile_detail, p), arch }));
+    } else if (backend == .xp_uefi_staging) {
         // XP UEFI-CSM: a .sif is merged into the automatic answer; without
         // one, usos-xp.ini (if active) makes Setup hands-off unless the
         // manual installation was chosen.
@@ -92,7 +101,17 @@ pub fn show(
             }
         }
     } else {
-        if (unattended) |path| fields.add(view.t(.summary_answer_file), path);
+        if (unattended) |path| {
+            fields.add(view.t(.summary_answer_file), path);
+            // An answer file for another architecture does nothing in Setup.
+            if (image.media) |info| if (info.arch == .x86 or info.arch == .x64 or info.arch == .arm64) {
+                const media_arch = answer_profiles.archOf(info);
+                if (system.unattended_directory) |directory| if (xp_settings.answerArchMismatch(directory, path, media_arch)) {
+                    notes[note_count] = view.format(&arch_note, .profile_arch_warning, &.{@tagName(media_arch)});
+                    note_count += 1;
+                };
+            };
+        }
         // No answer file on DATA: say where one would be picked up (the
         // selection screen is skipped when the folder is empty).
         if (unattended == null and answers_available == 0 and image.kind == .iso and std.mem.startsWith(u8, system.id, "windows-")) {
@@ -210,7 +229,12 @@ fn start(
     input.stopGamepads();
     const backend = usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, firmware) orelse return showUnsupported();
     // Progress rows come from the selection's profile (plan).
-    view.setPlanLabels(if (usos.flow.plan.make(system, image.kind, method, firmware)) |plan| plan.labels() else null);
+    const os_plan = usos.flow.plan.make(system, image.kind, method, firmware);
+    view.setPlanLabels(if (os_plan) |plan| plan.labels() else null);
+    // Rendered answers of an earlier start may hold a key or a password.
+    answer_profiles.clearRendered(root);
+    const profile: ?*const answer_profiles.Profile = if (answer.profile) |index| answer_profiles.get(index) else null;
+    const os_profile_id = if (os_plan) |plan| plan.profile.id else "unknown";
     const resolved = backend.method();
     const method_firmware = backend.firmwareRequirement();
     if (!method_firmware.accepts(firmware)) return showFirmwareUnavailable();
@@ -221,6 +245,9 @@ fn start(
         // firmware loads the XP kernel and initramfs, until usos-fb-ui draws
         // the disk selection.
         showXpProgress(.checking);
+        if (profile) |p| {
+            _ = answer_profiles.stage(root, p, system.id, .x86, os_profile_id) catch |err| return showError(view.t(.error_xp), err);
+        }
         @import("xp_preparation.zig").start(root, image.name.slice(), answer, showXpProgress) catch |err| {
             view.refreshFramebuffer();
             showError(view.t(.error_xp), err);
@@ -239,7 +266,8 @@ fn start(
     if (manual_images.blockReason(image)) |reason| return showMediaBlocked(image.name.slice(), reason);
     if (image.kind == .iso and backend == .windows_iso and usos.flow.preparation_capability.nativeModernNt(system.id)) {
         view.windowsIsoStatus(.validating, "Reading the selected Windows ISO");
-        windows_native_iso.startModern(root, system.image_directory, image.name.slice(), unattended, false, view.windowsIsoStatus) catch |err| {
+        const rendered = renderForWimboot(profile, system, os_profile_id) catch |err| return showError(view.t(.error_iso), err);
+        windows_native_iso.startModern(root, system.image_directory, image.name.slice(), unattended, rendered, false, view.windowsIsoStatus) catch |err| {
             view.refreshFramebuffer();
             showError(view.t(.error_iso), err);
         };
@@ -249,7 +277,8 @@ fn start(
     const vista = native == .vista;
     if (image.kind == .iso and native.legacyPe() and resolved == .direct_iso) {
         view.windowsIsoStatus(.validating, "Reading the selected Windows ISO");
-        windows_native_iso.start(root, windows_native_iso.legacyFolder(system), image.name.slice(), unattended, vista, view.windowsIsoStatus) catch |err| {
+        const rendered = renderForWimboot(profile, system, os_profile_id) catch |err| return showError(view.t(.error_iso), err);
+        windows_native_iso.start(root, windows_native_iso.legacyFolder(system), image.name.slice(), unattended, rendered, vista, view.windowsIsoStatus) catch |err| {
             view.refreshFramebuffer();
             showError(view.t(.error_iso), err);
         };
@@ -261,9 +290,18 @@ fn start(
     // Linux keeps the frame until usos-fb-ui takes over.
     view.handover(view.t(.splash_starting));
 
-    e2e_flow.requestPreparation(root, system, image, resolved, unattended, showPreparationProgress) catch |err| {
+    e2e_flow.requestPreparation(root, system, image, resolved, unattended, profile, showPreparationProgress) catch |err| {
         showError(view.t(.error_preparation), err);
     };
+}
+
+var wimboot_plan: [512]u8 = undefined;
+
+/// The native wimboot starts are x64 (amd64 components).
+fn renderForWimboot(profile: ?*const answer_profiles.Profile, system: *const usos.catalog.SystemEntry, os_profile_id: []const u8) !?windows_native_iso.Rendered {
+    const p = profile orelse return null;
+    const result = try answer_profiles.render(p, system.id, .amd64);
+    return .{ .xml = result.bytes, .plan = try answer_profiles.planText(p, system.id, .amd64, os_profile_id, &wimboot_plan) };
 }
 
 /// A WinPE / rescue ISO (boot.wim without an install image): started as
@@ -310,7 +348,7 @@ fn startWinPe(root: *std.os.uefi.protocol.File, system: *const usos.catalog.Syst
     input.stopGamepads();
     view.setPlanLabels(null);
     view.windowsIsoStatus(.validating, "Reading the selected WinPE ISO");
-    windows_native_iso.startModern(root, system.image_directory, image.name.slice(), null, true, view.windowsIsoStatus) catch |err| {
+    windows_native_iso.startModern(root, system.image_directory, image.name.slice(), null, null, true, view.windowsIsoStatus) catch |err| {
         view.refreshFramebuffer();
         showError(view.t(.error_iso), err);
     };

@@ -304,6 +304,74 @@ pub const Key = enum(u16) {
     prep_step,
     prep_title,
     prep_xp_disks,
+    profile_add,
+    profile_add_detail,
+    profile_arch_warning,
+    profile_badge,
+    profile_cancel,
+    profile_delete_confirm,
+    profile_delete_keep,
+    profile_delete_question,
+    profile_delete_title,
+    profile_editor_new,
+    profile_editor_subtitle,
+    profile_editor_title,
+    profile_field_bypass_ram,
+    profile_field_bypass_secure_boot,
+    profile_field_bypass_tpm,
+    profile_field_computer,
+    profile_field_key,
+    profile_field_keyboard,
+    profile_field_language,
+    profile_field_local_account,
+    profile_field_locale,
+    profile_field_name,
+    profile_field_no_network,
+    profile_field_org,
+    profile_field_password,
+    profile_field_remember_key,
+    profile_field_timezone,
+    profile_field_user,
+    profile_field_user2,
+    profile_file_detail,
+    profile_help_bypass,
+    profile_help_computer,
+    profile_help_key,
+    profile_help_keyboard,
+    profile_help_language,
+    profile_help_local_account,
+    profile_help_locale,
+    profile_help_name,
+    profile_help_no_network,
+    profile_help_org,
+    profile_help_password,
+    profile_help_remember_key,
+    profile_help_timezone,
+    profile_help_user,
+    profile_help_user2,
+    profile_key_delete,
+    profile_key_edit,
+    profile_key_import,
+    profile_key_use,
+    profile_manual_detail,
+    profile_problem_bad_characters,
+    profile_problem_bad_key_format,
+    profile_problem_duplicate,
+    profile_problem_empty,
+    profile_problem_only_digits,
+    profile_problem_reserved_name,
+    profile_problem_same_as_user,
+    profile_problem_too_long,
+    profile_row_detail,
+    profile_row_help,
+    profile_save,
+    profile_save_failed,
+    profile_summary,
+    profile_value_auto,
+    profile_value_same_language,
+    profile_value_same_locale,
+    profile_value_setup_asks,
+    profile_xp_ini_detail,
     sbinfo_absent,
     sbinfo_add_needs_off,
     sbinfo_add_needs_shim,
@@ -423,6 +491,61 @@ pub const Key = enum(u16) {
     system_unavailable,
     system_unavailable_detail,
     systems_subtitle,
+    theme_edit_blocked,
+    theme_edit_cancel,
+    theme_edit_contrast_bad,
+    theme_edit_contrast_ok,
+    theme_edit_element_accent,
+    theme_edit_element_accent_pressed,
+    theme_edit_element_accent_soft,
+    theme_edit_element_background,
+    theme_edit_element_border,
+    theme_edit_element_border_strong,
+    theme_edit_element_danger,
+    theme_edit_element_danger_soft,
+    theme_edit_element_disabled,
+    theme_edit_element_disabled_text,
+    theme_edit_element_faint,
+    theme_edit_element_field,
+    theme_edit_element_header,
+    theme_edit_element_muted,
+    theme_edit_element_on_accent,
+    theme_edit_element_on_pad,
+    theme_edit_element_pad_x,
+    theme_edit_element_panel,
+    theme_edit_element_panel_alt,
+    theme_edit_element_selected,
+    theme_edit_element_success,
+    theme_edit_element_success_soft,
+    theme_edit_element_text,
+    theme_edit_element_warning,
+    theme_edit_element_warning_soft,
+    theme_edit_field_base,
+    theme_edit_field_blue,
+    theme_edit_field_color,
+    theme_edit_field_element,
+    theme_edit_field_green,
+    theme_edit_field_name,
+    theme_edit_field_red,
+    theme_edit_help_base,
+    theme_edit_help_channel,
+    theme_edit_help_color,
+    theme_edit_help_element,
+    theme_edit_help_name,
+    theme_edit_open,
+    theme_edit_open_detail,
+    theme_edit_pair,
+    theme_edit_preview_button,
+    theme_edit_preview_disabled,
+    theme_edit_preview_row,
+    theme_edit_preview_text,
+    theme_edit_preview_title,
+    theme_edit_reset,
+    theme_edit_save,
+    theme_edit_save_failed,
+    theme_edit_saved,
+    theme_edit_subtitle,
+    theme_edit_title,
     themes_builtin,
     themes_current,
     themes_desc,
@@ -765,6 +888,74 @@ pub const hashes = [_]u32{
     0x5a2661f6, // prep.step
     0x84ce2712, // prep.title
     0x87155e69, // prep.xp_disks
+    0x19d32f03, // profile.add
+    0xf7030016, // profile.add.detail
+    0x0ed7f0df, // profile.arch_warning
+    0xc61083bb, // profile.badge
+    0x18d4431a, // profile.cancel
+    0xe272fe39, // profile.delete.confirm
+    0xde446e2e, // profile.delete.keep
+    0x92e5d06b, // profile.delete.question
+    0x584ba887, // profile.delete.title
+    0xac80d0a1, // profile.editor.new
+    0x6f2b3c09, // profile.editor.subtitle
+    0xde080639, // profile.editor.title
+    0x49862935, // profile.field.bypass_ram
+    0x1513f82f, // profile.field.bypass_secure_boot
+    0x50329252, // profile.field.bypass_tpm
+    0xa6b11e2b, // profile.field.computer
+    0x1d1b0b5d, // profile.field.key
+    0x40eff7a3, // profile.field.keyboard
+    0x7890b224, // profile.field.language
+    0x06522829, // profile.field.local_account
+    0x383d1338, // profile.field.locale
+    0x8dd802a5, // profile.field.name
+    0xe80859fc, // profile.field.no_network
+    0x7cebcb94, // profile.field.org
+    0x367e27db, // profile.field.password
+    0xf04168d9, // profile.field.remember_key
+    0xc97f214d, // profile.field.timezone
+    0xa0db31f9, // profile.field.user
+    0x040f6291, // profile.field.user2
+    0x39ab14e9, // profile.file.detail
+    0x0922c403, // profile.help.bypass
+    0x46264466, // profile.help.computer
+    0xcca2e39e, // profile.help.key
+    0x10f18736, // profile.help.keyboard
+    0x8e773749, // profile.help.language
+    0x7425bece, // profile.help.local_account
+    0x69474139, // profile.help.locale
+    0x33f53224, // profile.help.name
+    0x7cf8eb69, // profile.help.no_network
+    0x324f097b, // profile.help.org
+    0xfc88614e, // profile.help.password
+    0xa2076c1c, // profile.help.remember_key
+    0xf3284598, // profile.help.timezone
+    0xb1ef9f14, // profile.help.user
+    0x423788d2, // profile.help.user2
+    0x5f1c9d40, // profile.key.delete
+    0x4c0a173f, // profile.key.edit
+    0x4ce11c3a, // profile.key.import
+    0xb6f66d52, // profile.key.use
+    0xadbb5231, // profile.manual.detail
+    0xb6210153, // profile.problem.bad_characters
+    0x568a5598, // profile.problem.bad_key_format
+    0x94cec6cc, // profile.problem.duplicate
+    0x45a02e98, // profile.problem.empty
+    0xa0ced9c8, // profile.problem.only_digits
+    0x81e142e7, // profile.problem.reserved_name
+    0xa1001efc, // profile.problem.same_as_user
+    0x842984ea, // profile.problem.too_long
+    0xeb02a17f, // profile.row.detail
+    0x134a2641, // profile.row.help
+    0x4c6f4f3d, // profile.save
+    0x9f87b247, // profile.save_failed
+    0xea748758, // profile.summary
+    0x803f740e, // profile.value.auto
+    0x5f697fae, // profile.value.same_language
+    0x9a227b9e, // profile.value.same_locale
+    0x791012ad, // profile.value.setup_asks
+    0x8b09c640, // profile.xp_ini.detail
     0x0d899acf, // sbinfo.absent
     0x9e2530dd, // sbinfo.add_needs_off
     0xf5aa9821, // sbinfo.add_needs_shim
@@ -884,6 +1075,61 @@ pub const hashes = [_]u32{
     0x31aec0c8, // system.unavailable
     0xa6ba9b83, // system.unavailable.detail
     0xab5ff4f5, // systems.subtitle
+    0x1a62b0c1, // theme_edit.blocked
+    0xbe71b5e9, // theme_edit.cancel
+    0xf3bd28a8, // theme_edit.contrast.bad
+    0x4abc69ff, // theme_edit.contrast.ok
+    0xa984d2ef, // theme_edit.element.accent
+    0xbe6f7b46, // theme_edit.element.accent_pressed
+    0x252b9348, // theme_edit.element.accent_soft
+    0xc4870795, // theme_edit.element.background
+    0x3ff2f6af, // theme_edit.element.border
+    0x345238a7, // theme_edit.element.border_strong
+    0x2c1c55c6, // theme_edit.element.danger
+    0xfc31cce7, // theme_edit.element.danger_soft
+    0xdcb0986d, // theme_edit.element.disabled
+    0x7c46f8e5, // theme_edit.element.disabled_text
+    0xcf86e501, // theme_edit.element.faint
+    0x77ab421f, // theme_edit.element.field
+    0xf96abb98, // theme_edit.element.header
+    0x047541b8, // theme_edit.element.muted
+    0xe6233397, // theme_edit.element.on_accent
+    0xa043a10a, // theme_edit.element.on_pad
+    0x76e2038d, // theme_edit.element.pad_x
+    0xf0ee183d, // theme_edit.element.panel
+    0x55d45a8d, // theme_edit.element.panel_alt
+    0x8bf2ff0c, // theme_edit.element.selected
+    0x437be4a8, // theme_edit.element.success
+    0x3ad3c845, // theme_edit.element.success_soft
+    0x06d1e596, // theme_edit.element.text
+    0x839979d7, // theme_edit.element.warning
+    0xb8348be0, // theme_edit.element.warning_soft
+    0x64495800, // theme_edit.field.base
+    0xbbec99e5, // theme_edit.field.blue
+    0x263edb20, // theme_edit.field.color
+    0xb903293f, // theme_edit.field.element
+    0xef484324, // theme_edit.field.green
+    0xa542210e, // theme_edit.field.name
+    0xb9ed4334, // theme_edit.field.red
+    0x7286db3b, // theme_edit.help.base
+    0x20988a31, // theme_edit.help.channel
+    0x0d50e179, // theme_edit.help.color
+    0x730e824e, // theme_edit.help.element
+    0xa2a3cf75, // theme_edit.help.name
+    0xa73c6853, // theme_edit.open
+    0x1b284626, // theme_edit.open.detail
+    0x76aa10ff, // theme_edit.pair
+    0xc67214a1, // theme_edit.preview.button
+    0xbf9046b5, // theme_edit.preview.disabled
+    0x7aac066b, // theme_edit.preview.row
+    0x0367032e, // theme_edit.preview.text
+    0xef386ff9, // theme_edit.preview.title
+    0xd628c45e, // theme_edit.reset
+    0xc9bf181a, // theme_edit.save
+    0x24ddcf0a, // theme_edit.save_failed
+    0x15d38e5a, // theme_edit.saved
+    0x90ebe073, // theme_edit.subtitle
+    0xeec63a47, // theme_edit.title
     0xf0db4556, // themes.builtin
     0xaef5a0d8, // themes.current
     0x68214e12, // themes.desc
@@ -1226,6 +1472,74 @@ pub const bios = [_]bool{
     true,
     true,
     false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
     true,
     true,
     true,
@@ -1345,6 +1659,61 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
     true,
     true,
     true,
@@ -1686,6 +2055,74 @@ pub const english = [_][]const u8{
     "Step {0} of {1}",
     "Preparing Windows installer",
     "Starting XP disk selection",
+    "+ Add a new profile",
+    "A USOS profile: accounts, computer name, language and time zone for every Windows",
+    "The answer file has no settings for {0} media: Setup ignores it. Use a file made for this architecture.",
+    "USOS profile",
+    "Cancel",
+    "Delete the profile",
+    "Keep the profile",
+    "Delete the profile {0} from this stick?",
+    "Delete profile",
+    "New answer profile",
+    "One profile for every Windows: USOS writes the answer file when the installation starts",
+    "Answer profile",
+    "Windows 11: skip the RAM check",
+    "Windows 11: skip the Secure Boot check",
+    "Windows 11: skip the TPM check",
+    "Computer name",
+    "Product key ({0})",
+    "Keyboard",
+    "Windows language",
+    "Local account",
+    "Formats",
+    "Profile name",
+    "Windows 11: set up without network",
+    "Organization",
+    "Password",
+    "Remember the key on this stick",
+    "Time zone",
+    "User name",
+    "Second user",
+    "Answer file from the Unattended folder, used as it is",
+    "For hardware below the Windows 11 requirements. Microsoft does not support such installations; feature updates may need the bypass again.",
+    "1-15 characters A-Z a-z 0-9 and -, not only digits. Empty: USOS-XP on XP, a name chosen by Setup on newer Windows.",
+    "Product key for {0} (XXXXX-XXXXX-XXXXX-XXXXX-XXXXX). Empty: Setup asks for it or offers the edition list.",
+    "Keyboard layout of Windows. Same as the formats: the default keyboard of that language.",
+    "Language of Setup and of Windows; the installation media must contain it. Automatic: Setup asks.",
+    "Windows 8 and newer: create the accounts locally and hide the Microsoft account pages.",
+    "Date, time, number and currency formats.",
+    "Name of the profile on this stick: 1-32 characters A-Z a-z 0-9, space, . _ -",
+    "Windows 11: finish the setup without a network connection (BypassNRO).",
+    "Optional: up to 64 characters, without \" % ^ & | < >",
+    "Password of the accounts; empty means no password. It is stored as plain text on the stick.",
+    "Off: the key is used until this computer restarts and is never written to the stick.",
+    "Automatic: the default of the installation media.",
+    "First local account, an administrator: 1-20 characters A-Z a-z 0-9 . _ - and space.",
+    "Optional second administrator account.",
+    "Delete",
+    "Edit",
+    "Import",
+    "Use",
+    "Setup asks every question itself; no profile or file is used",
+    "It contains characters that are not allowed here.",
+    "A product key has the form XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
+    "A profile with this name exists already.",
+    "This field is required.",
+    "A computer name cannot be only digits.",
+    "This is the name of a built-in Windows account.",
+    "The second user must differ from the first.",
+    "Too long.",
+    "{0}, {1}",
+    "A USOS profile, turned into the answer file for this Windows when the installation starts. The target disk is always chosen in Setup.",
+    "Save",
+    "The profile could not be saved on the stick:",
+    "Profile {0}: {1} ({2})",
+    "Automatic",
+    "Same as the language",
+    "Same as the formats",
+    "(Setup asks)",
+    "usos-xp.ini on DATA (read only); Import makes a USOS profile of it",
     "Missing",
     "Available while Secure Boot is off",
     "Available only when USOS is started by shim (EFI\\BOOT\\BOOTX64.EFI)",
@@ -1805,6 +2242,61 @@ pub const english = [_][]const u8{
     "Unavailable",
     "No working boot backend supports this system yet.",
     "Select a system, distribution or utility group",
+    "Fix the contrast first: {0}",
+    "Cancel",
+    "Too little contrast: {0}",
+    "All readability rules pass",
+    "Accent",
+    "Accent (pressed)",
+    "Selection fill",
+    "Background",
+    "Borders",
+    "Strong borders",
+    "Danger, pad B",
+    "Danger badge fill",
+    "Disabled fill",
+    "Disabled text",
+    "Faint text",
+    "Input fields",
+    "Header and footer",
+    "Secondary text",
+    "Text on accent",
+    "Letters on pad buttons",
+    "Pad X",
+    "Panels",
+    "Hover and alternate panels",
+    "Selection (older screens)",
+    "Success, pad A",
+    "Success badge fill",
+    "Text",
+    "Warning, pad Y",
+    "Warning badge fill",
+    "Base theme",
+    "Blue",
+    "Colour (#rrggbb)",
+    "Element",
+    "Green",
+    "Theme name",
+    "Red",
+    "The built-in theme whose colours you start from.",
+    "Left/Right: -/+ 8; the preview changes at once.",
+    "Type #rrggbb, or step the red, green and blue values below.",
+    "The menu colour to change; Left/Right steps through them.",
+    "Name of the theme on this stick: 1-32 characters A-Z a-z 0-9 - _",
+    "Create or edit a theme",
+    "Start from a theme, change its colours with a live preview and contrast check, save it on this stick",
+    "{0} on {1}",
+    "Button",
+    "Disabled",
+    "Selected row",
+    "Text and secondary text",
+    "Preview",
+    "Reset this element",
+    "Save and use",
+    "The theme could not be saved on the stick:",
+    "Theme {0} saved on the stick and in use.",
+    "Base theme, element, colour: the preview and the contrast check follow every change",
+    "Theme editor",
     "built-in",
     "in use",
     "Colours of this menu",
