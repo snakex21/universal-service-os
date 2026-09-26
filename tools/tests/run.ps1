@@ -76,6 +76,11 @@ function Run-Unit {
     if ($LASTEXITCODE -ne 0) { throw 'UEFI graphics controller reconnect regression failed.' }
     & python.exe (Join-Path $root 'tools/tests/test_xp_reproducible.py')
     if ($LASTEXITCODE -ne 0) { throw 'XP cabinet/hive reproducibility tests failed.' }
+    # Answer profiles (docs/answer-profiles.md): rendered WINNT.SIF / autounattend.xml goldens.
+    & python.exe (Join-Path $root 'tools/tests/test_answer_render.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Answer renderer goldens failed.' }
+    & python.exe (Join-Path $root 'tools/tests/test_xp_user_settings.py')
+    if ($LASTEXITCODE -ne 0) { throw 'usos-xp.ini tests failed.' }
 }
 
 function Run-Selftest {

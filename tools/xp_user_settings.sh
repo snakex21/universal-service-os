@@ -19,12 +19,19 @@
 #       it without a console window at setup end (UserExecute; first-logon
 #       retry) and deletes it. The accounts are local administrators, so the
 #       Welcome screen lists them.
+#   usos_xp_settings_plan PLAN SOURCE_ROOT
+#       The menu chose a USOS answer profile (usos.xp_settings=plan): PLAN is
+#       the ESP's EFI/USOS/answer/usos-plan.ini; its rendered settings file
+#       (src/flow/answer/nt5.zig) is loaded in profile mode and deleted.
 # Keys: user user2 computer org key timezone password (docs/xp-unattended.md).
+# Profile mode (a rendered answer profile, docs/answer-profiles.md) also
+# accepts family (xp, 2000, 2003), locale, input_locale and language_group.
 
 usos_xp_settings_load() {
     _xs_file=$1
     _xs_out=$2
     _xs_layout=${3:-}
+    _xs_profile=${4:-}
     [ -r "$_xs_file" ] || { printf 'usos-xp.ini is not readable\n' >&2; return 1; }
     # A UTF-8 BOM (Notepad) is dropped byte-wise before awk sees the text.
     _xs_text=$_xs_out.text
@@ -33,7 +40,7 @@ usos_xp_settings_load() {
     else
         cp "$_xs_file" "$_xs_text" || return 1
     fi
-    LC_ALL=C awk -v layout="$_xs_layout" '
+    LC_ALL=C awk -v layout="$_xs_layout" -v profile="$_xs_profile" '
         function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
         function bad(message) { printf "usos-xp.ini: %s\n", message > "/dev/stderr"; failed = 1 }
         # Printable ASCII without the characters that break WINNT.SIF quoting or cmd.
@@ -51,7 +58,7 @@ usos_xp_settings_load() {
             key = tolower(trim(substr(line, 1, eq - 1)))
             value = trim(substr(line, eq + 1))
             if (value ~ /^".*"$/ && length(value) >= 2) value = substr(value, 2, length(value) - 2)
-            if (key !~ /^(user|user2|computer|org|key|timezone|password)$/) { bad("unknown key on line " NR); next }
+            if (key !~ /^(user|user2|computer|org|key|timezone|password)$/ && !(profile != "" && key ~ /^(family|locale|input_locale|language_group)$/)) { bad("unknown key on line " NR); next }
             values[key] = value
         }
         END {
@@ -80,8 +87,21 @@ usos_xp_settings_load() {
             if (timezone != "" && (timezone !~ /^[0-9]+$/ || timezone + 0 > 300)) bad("timezone= must be an XP time zone index (for example 95 = Warszawa, 85 = London, 35 = New York)")
             password = values["password"]
             if (length(password) > 64 || !clean(password, 0)) bad("password= must be up to 64 printable ASCII characters without spaces or \" % ^ & | < >")
+            if (profile != "") {
+                family = values["family"]
+                if (family == "") family = "xp"
+                if (family !~ /^(xp|2000|2003)$/) bad("family= must be xp, 2000 or 2003")
+                locale = toupper(values["locale"])
+                if (locale != "" && (length(locale) != 8 || locale !~ /^[0-9A-F]+$/)) bad("locale= must be 8 hex digits (for example 00000415)")
+                input = toupper(values["input_locale"])
+                if (input != "" && (length(input) != 13 || substr(input, 5, 1) != ":" || substr(input, 1, 4) !~ /^[0-9A-F]+$/ || substr(input, 6) !~ /^[0-9A-F]+$/)) bad("input_locale= must be LLLL:KKKKKKKK")
+                group = values["language_group"]
+                if (group != "" && group !~ /^[0-9]+(,[0-9]+)*$/) bad("language_group= must be numbers separated by commas")
+                if ((locale == "") != (input == "") || (locale == "") != (group == "")) bad("locale=, input_locale= and language_group= go together")
+            }
             if (failed) exit 1
             printf "user=%s\nuser2=%s\ncomputer=%s\norg=%s\nkey=%s\ntimezone=%s\npassword=%s\n", user, user2, computer, org, key, timezone, password
+            if (profile != "") printf "family=%s\nlocale=%s\ninput_locale=%s\nlanguage_group=%s\n", family, locale, input, group
         }
     ' "$_xs_text" > "$_xs_out.tmp"
     _xs_rc=$?
@@ -133,11 +153,21 @@ usos_xp_settings_sif() {
             print "FullName=\"" v["user"] "\""
             print "OrgName=\"" v["org"] "\""
             print "ComputerName=" v["computer"]
-            if (v["key"] != "") print "ProductKey=" v["key"]
+            # Windows 2000 names the key ProductID (profile mode only).
+            if (v["key"] != "") print (v["family"] == "2000" ? "ProductID=" : "ProductKey=") v["key"]
             print "[Identification]"
             print "JoinWorkgroup=WORKGROUP"
             print "[Networking]"
             print "InstallDefaultComponents=Yes"
+            # Profile mode: Server 2003 stops on the licensing page without this.
+            if (v["family"] == "2003") { print "[LicenseFilePrintData]"; print "AutoMode=PerServer"; print "AutoUsers=5" }
+            if (v["locale"] != "") {
+                print "[RegionalSettings]"
+                print "LanguageGroup=\"" v["language_group"] "\""
+                print "SystemLocale=" v["locale"]
+                print "UserLocale=" v["locale"]
+                print "InputLocale=" v["input_locale"]
+            }
         }
     ' "$_xs_base"
 }
@@ -255,10 +285,55 @@ usos_xp_settings_stage() {
     return 0
 }
 
-# usos_xp_settings_select INI SOURCE_ROOT CUSTOM_SIF MODE
+# usos_xp_settings_plan PLAN SOURCE_ROOT
+#   A USOS answer profile chosen in the menu: PLAN ([answer] source=profile,
+#   format=nt5_settings, file=EFI/USOS/answer/nt5-settings.ini) names the
+#   rendered settings next to it. Validated like usos-xp.ini (profile mode),
+#   kept in /run, and the file on the ESP is deleted (key, password).
+usos_xp_settings_plan() {
+    XP_USER_SETTINGS=''
+    export XP_USER_SETTINGS
+    _xs_plan=$1
+    [ -f "$_xs_plan" ] || { printf '[XP_SETTINGS] STOP: answer plan %s is missing\n' "$_xs_plan"; return 1; }
+    _xs_answer() {
+        awk -v wanted="$1" '
+            { sub(/\r$/, "") }
+            /^\[/ { section = tolower($0); next }
+            section == "[answer]" { eq = index($0, "="); if (eq && tolower(substr($0, 1, eq - 1)) == wanted) { print substr($0, eq + 1); exit } }
+        ' "$_xs_plan"
+    }
+    [ "$(_xs_answer source)" = profile ] || { printf '[XP_SETTINGS] STOP: answer plan has no profile\n'; return 1; }
+    [ "$(_xs_answer format)" = nt5_settings ] || { printf '[XP_SETTINGS] STOP: answer plan format is not nt5_settings\n'; return 1; }
+    [ "$(_xs_answer file)" = EFI/USOS/answer/nt5-settings.ini ] || { printf '[XP_SETTINGS] STOP: unexpected answer file in the plan\n'; return 1; }
+    _xs_rendered=${_xs_plan%/*}/nt5-settings.ini
+    [ -f "$_xs_rendered" ] || { printf '[XP_SETTINGS] STOP: rendered answer profile is missing\n'; return 1; }
+    _xs_layout=$(awk '
+        { sub(/\r$/, "") }
+        /^\[/ { section = tolower($0); next }
+        section == "[nls]" && tolower($0) ~ /^defaultlayout[ \t]*=/ { sub(/^[^=]*=[ \t]*/, ""); gsub(/[" \t]/, ""); print; exit }
+    ' "$2/I386/TXTSETUP.SIF" 2>/dev/null)
+    # USOS_XP_SETTINGS_OUT: host tests only (the initramfs keeps it in /run).
+    _xs_norm=${USOS_XP_SETTINGS_OUT:-/run/usos-xp-settings}
+    usos_xp_settings_load "$_xs_rendered" "$_xs_norm" "$_xs_layout" profile
+    _xs_rc=$?
+    rm -f "$_xs_rendered"
+    sync
+    [ "$_xs_rc" -eq 0 ] || { printf '[XP_SETTINGS] STOP: answer profile is invalid (details above); no target write occurred\n'; return 1; }
+    XP_USER_SETTINGS=$_xs_norm
+    _xs_yes() { [ -n "$(usos_xp_settings_value "$1" "$XP_USER_SETTINGS")" ] && printf yes || printf no; }
+    printf '[XP_SETTINGS] profile "%s" active layout=%s family=%s user2=%s key=%s password=%s timezone=%s computer=%s locale=%s\n' \
+        "$(_xs_answer name | tr -cd 'A-Za-z0-9 ._-')" "${_xs_layout:-unknown}" "$(usos_xp_settings_value family "$XP_USER_SETTINGS")" \
+        "$(_xs_yes user2)" "$(_xs_yes key)" "$(_xs_yes password)" \
+        "$(usos_xp_settings_value timezone "$XP_USER_SETTINGS")" "$(usos_xp_settings_value computer "$XP_USER_SETTINGS")" \
+        "$(usos_xp_settings_value locale "$XP_USER_SETTINGS")"
+    return 0
+}
+
+# usos_xp_settings_select INI SOURCE_ROOT CUSTOM_SIF MODE [PLAN]
 #   Which settings the staging uses: none when a custom WINNT.SIF was
 #   selected (non-empty CUSTOM_SIF) or the menu chose the manual installation
-#   (MODE=off, kernel option usos.xp_settings=off); otherwise
+#   (MODE=off, kernel option usos.xp_settings=off); a USOS answer profile
+#   (MODE=plan: usos_xp_settings_plan PLAN SOURCE_ROOT); otherwise
 #   usos_xp_settings_stage INI SOURCE_ROOT.
 usos_xp_settings_select() {
     if [ -n "$3" ]; then
@@ -270,6 +345,10 @@ usos_xp_settings_select() {
         XP_USER_SETTINGS=''; export XP_USER_SETTINGS
         printf '[XP_SETTINGS] ignored: manual install chosen\n'
         return 0
+    fi
+    if [ "$4" = plan ]; then
+        usos_xp_settings_plan "${5:-/mnt/esp/EFI/USOS/answer/usos-plan.ini}" "$2"
+        return
     fi
     usos_xp_settings_stage "$1" "$2"
 }

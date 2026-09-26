@@ -73,6 +73,7 @@ pub const flow = struct {
     pub const unattended_policy = @import("flow/unattended_policy.zig");
     pub const xp_settings_summary = @import("flow/xp_settings_summary.zig");
     pub const answer_screen = @import("flow/answer_screen.zig");
+    pub const answer = @import("flow/answer/root.zig");
     pub const preparation_boot_progress = @import("flow/preparation_boot_progress.zig");
     pub const persistent_phase = @import("flow/persistent_phase.zig");
     pub const boot_console = @import("flow/boot_console.zig");
@@ -95,6 +96,7 @@ test {
     _ = @import("catalog/os_profiles.zig");
     _ = @import("flow/xp_settings_summary.zig");
     _ = @import("flow/answer_screen.zig");
+    _ = @import("flow/answer/root.zig");
     _ = @import("flow/plan.zig");
     _ = @import("platform/bios/windows_boot_contract.zig");
     _ = @import("platform/bios/windows_cpio.zig");

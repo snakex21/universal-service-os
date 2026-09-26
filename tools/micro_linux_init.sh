@@ -574,6 +574,15 @@ if [ -n "$SELECTED_UNATTEND" ] && [ "$SELECTED_UNATTEND" != none ]; then
     UNATTEND_FILE="/mnt/data/$SELECTED_UNATTEND"
     [ -f "$UNATTEND_FILE" ] || stop "selected unattended file not found: $SELECTED_UNATTEND"
 fi
+# An answer profile chosen in the menu (docs/answer-profiles.md): the
+# autounattend.xml it rendered on the ESP is used instead of a DATA file.
+ANSWER_PLAN=$(ini_value answer_plan "$STATE_FILE" 2>/dev/null || true)
+if [ -n "$ANSWER_PLAN" ]; then
+    [ "$ANSWER_PLAN" = EFI/USOS/answer/usos-plan.ini ] || stop 'unexpected answer plan path in install-state.ini'
+    . /usr/lib/usos/answer_plan.sh
+    usos_answer_plan_take "/mnt/esp/$ANSWER_PLAN" autounattend_xml /run/usos-answer/Autounattend.xml || stop 'the chosen answer profile cannot be used; no target write occurred'
+    UNATTEND_FILE=/run/usos-answer/Autounattend.xml
+fi
 
 printf '[MICRO-LINUX] phase=prepare-requested PASS\n'
 printf '[MICRO-LINUX] DATA mounted by PARTUUID=%s\n' "$DATA_PARTUUID"

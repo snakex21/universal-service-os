@@ -8,6 +8,7 @@ pub fn build(b: *std.Build) void {
     addHostSelftest(b, target, optimize);
     addHostImageProbe(b, target, optimize);
     addHostUiPreview(b, target, optimize);
+    addHostAnswerTool(b, target, optimize);
     addHostLegacyFat32Probe(b, target, optimize);
     addHostLegacyNtfsProbe(b, target, optimize);
     const ntfs_driver = addFetchNtfsDriver(b);
@@ -119,6 +120,19 @@ fn addHostUiPreview(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
     const exe = b.addExecutable(.{ .name = "usos-ui-preview", .root_module = tool_module });
     const install = b.addInstallArtifact(exe, .{});
     const step = b.step("ui-preview", "Build the host boot menu preview renderer (writes BMP screens)");
+    step.dependOn(&install.step);
+}
+
+fn addHostAnswerTool(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
+    const tool_module = b.createModule(.{
+        .root_source_file = b.path("src/tools/answer_main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    tool_module.addImport("usos", createUsosModule(b, target, optimize));
+    const exe = b.addExecutable(.{ .name = "usos-answer", .root_module = tool_module });
+    const install = b.addInstallArtifact(exe, .{});
+    const step = b.step("answer-tool", "Build the host answer renderer (usos-answer: profile -> WINNT.SIF settings / autounattend.xml)");
     step.dependOn(&install.step);
 }
 
