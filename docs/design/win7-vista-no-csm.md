@@ -434,10 +434,64 @@ hybrid PE7 path). Result reported by the user:
 
 This is the first Windows 7 install on the X470 without CSM; the VGA
 routing hypothesis of 8.3 (legacy VGA not routed to the GOP controller
-behind the AMD root port) is confirmed in practice. The dispatcher logs
-(`EFI\Microsoft\Boot\usos-boot-uefiseven.log`, `UefiSeven.log`) of that
-install were not collected yet; read them on the next boot of that disk to
-record which branch (`passed_before` / `passed_after`) the routing took.
+behind the AMD root port) is confirmed in practice.
+
+**Logs from the installed SSD (read-only, collected 2026-09-26).** The
+ESP was read with a raw FAT32 parse and the Windows volume with 7-Zip on the
+raw volume device; nothing was written to the SSD. Copies and SHA-256 sums:
+`artifacts/win7-no-csm-x470-pass-20260926/` (not in git).
+
+- **Routing branch: `passed_after`, on every boot that reached UefiSeven.**
+  `VGA probe before: FAIL` (all ports FF: `GC idx08/SR05/BMbb/RM03=ff`,
+  `SEQ MM=ff`, `MISC3CC=ff`), then `GPU Attributes(Enable, 318) = success`,
+  then `VGA probe after: PASS` (`GC 08/05/bb/03`, `SEQ MM=00 toggled=08`,
+  `MISC3CC=00`). The raw fallback of step 5 did not run (no
+  `VGA: bridge ...` / `gpu CMD` lines): the firmware's `PciIo.Attributes()`
+  did the whole job. This is the X470 state the QEMU `usosbroken` variant
+  emulated.
+- **PCI state.** Bridge 00:03.1 (1022:1483): `BRIDGE_CTL 0010 -> 0018`
+  (VGA Enable 0 -> 1, VGA16 already 1), CMD 0007 unchanged, I/O window
+  E000-EFFF, attributes 700 -> 718. GPU 0a:00.0 (1002:67EF): `CMD 0006 ->
+  0007` (I/O decode on), BARs unchanged (I/O BAR E000), attributes 600 ->
+  718. AMD DF D18F0x80 (`VGAEn`) = `00000041` (VE=1) before routing; the
+  data fabric already forwarded legacy VGA, only the root port and the GPU
+  were closed.
+- **Display driver.** `setupapi.dev.log`: the RX 560 got `display.inf`
+  (`vga` service, `vgapnp.sys`), `Restarting device` 18:08:40.209 ->
+  .256 and **no** `Device has problem: 0x0a` line (the failing install had
+  `CM_PROB_FAILED_START` at the same spot). System log: UserPnp 20003 for
+  service `vga` on `PCI\VEN_1002&DEV_67EF...` with status 0; no display
+  errors. The device's Video key `{F5BBBEC3...}` now holds
+  `HardwareInformation.ChipType = "UefiSeven"`, `BiosString = "OVMF Int10h
+  (fake)"`, `MemorySize = 0x300000`: vgapnp.sys started and read its VBE
+  data through UefiSeven's Int10 handler (the CSM-on control showed "AMD
+  ATOMBIOS"). The runtime problem code itself is volatile and not in the
+  offline hive; the adapter stays on the inbox "Standard VGA" driver (no
+  AMD driver installed).
+- **Boots.** Ring log `last_boot=00000004`, all four entries on the
+  `uefiseven` path; no `usos-boot-csm.log` on the ESP, so no CSM boot.
+  Boots 1, 3 and 4 (18:07:38, 18:14:59, 18:16:01 firmware clock) match
+  the three Windows starts in the System log (specialize, OOBE, first
+  desktop). `usos-boot.log`, `usos-memory.log` and
+  `usos-amd-shadow.log` keep only the last boot (AMD shadow PASS on 16
+  CPUs, `C0/C8=1818181818181818`). `UefiSeven.log`: GOP 1024x768 (mode 3),
+  C0000 already unlocked, MTRR lock failed (not essential), Int10 at
+  C000:0200, pre-boot sanity check success.
+- **Unexpected: boot 2 (18:10:31) found no GOP.** Right after Setup's
+  specialize restart (18:10:16) the firmware exposed no GOP/UGA even after
+  `ConnectController`; the dispatcher logged `cannot start UefiSeven;
+  Windows boot manager was not started` and returned to the firmware.
+  The next start 4.5 minutes later had GOP again and continued with OOBE.
+  This most likely is the "finalizing took slightly longer" the user saw.
+  Cause unknown (the firmware did not initialize the RX 560 GOP on that
+  warm reset); it happened once in four boots.
+- Also noted: `A0000` still reads `ffffffffffffffff` after routing while
+  the registers pass (the GPU keeps its GOP scanout, the legacy memory
+  window is not needed by the probe); the 6in1 image carries two stale
+  "ATI ES1000" Video keys from its origin; after the last Windows restart
+  (18:18:27) there is no fifth dispatcher entry, so that restart did not
+  boot this ESP (or the machine was powered off); `bootmgfw.efi` and
+  `\EFI\Boot\bootx64.efi` still hash to the dispatcher (69086ec4...).
 
 Not yet tested on hardware:
 
