@@ -1,5 +1,7 @@
 //! Menu theme for the UEFI menu: `theme=` in usos-settings.ini names a
-//! built-in theme (src/gui/theme_presets.zig) or a user theme folder
+//! built-in theme (src/gui/theme_presets.zig) or a user theme: first
+//! \EFI\USOS\themes\<name>.ini on the ESP (written by the theme editor,
+//! read by the Legacy BIOS Core too), then the folder
 //! DATA\Themes\<name>\theme.ini (src/gui/theme_file.zig). A missing,
 //! unreadable, malformed or unreadable-looking user theme gives the
 //! default theme and a line on the serial port; the menu always starts.
@@ -36,8 +38,15 @@ pub const Name = struct {
 };
 
 var css_buffer: [2048]u8 = undefined;
-var file_buffer: [theme_file.max_bytes]u8 = undefined;
+var file_buffer: [theme_file.max_bytes + 1]u8 = undefined;
 var file: ntfs.File = .{};
+var esp_root: ?*uefi.protocol.File = null;
+
+/// User themes of the theme editor on the ESP: <name>.ini.
+pub const esp_directory = "\\EFI\\USOS\\themes";
+
+/// Where a user theme was found.
+pub const Source = enum { esp, data };
 
 /// Theme for the splash: the chosen built-in one, else the default.
 pub fn splashTheme(settings: []const u8) Theme {
@@ -50,6 +59,7 @@ pub fn load(root: *uefi.protocol.File, settings: []const u8) Theme {
 }
 
 pub fn forName(root: *uefi.protocol.File, name: []const u8) Theme {
+    esp_root = root;
     if (name.len == 0 or presets.index(name) == 0) return defaultTheme(root);
     if (presets.find(name)) |theme| return theme;
     const outcome = readUser(name);
@@ -78,9 +88,46 @@ fn say3(a: []const u8, b: []const u8, c: []const u8) void {
     serial.writeAscii(c);
 }
 
-/// Reads and validates DATA\Themes\<name>\theme.ini.
+/// Reads and validates the user theme `name` (ESP first, then DATA).
 pub fn readUser(name: []const u8) theme_file.Outcome {
     if (!presets.nameUsable(name)) return rejected("name is not A-Z, 0-9, - or _");
+    if (readEsp(name)) |text| {
+        if (text.len > theme_file.max_bytes) return rejected("file too large");
+        return theme_file.resolve(text);
+    }
+    return readData(name);
+}
+
+/// The text of the user theme file `name` (ESP first), for the editor.
+pub fn readUserText(name: []const u8) ?[]const u8 {
+    if (!presets.nameUsable(name)) return null;
+    if (readEsp(name)) |text| return text;
+    if (readData(name).problem != null) return null;
+    return file_buffer[0..last_data_len];
+}
+
+pub fn sourceOf(name: []const u8) ?Source {
+    if (!presets.nameUsable(name)) return null;
+    if (readEsp(name) != null) return .esp;
+    if (readData(name).problem == null) return .data;
+    return null;
+}
+
+pub fn setEspRoot(root: *uefi.protocol.File) void {
+    esp_root = root;
+}
+
+fn readEsp(name: []const u8) ?[]const u8 {
+    const root = esp_root orelse return null;
+    var path: [80]u8 = undefined;
+    const file_path = std.fmt.bufPrint(&path, "{s}\\{s}.ini", .{ esp_directory, name }) catch return null;
+    return file_read.into(root, file_path, &file_buffer);
+}
+
+var last_data_len: usize = 0;
+
+/// Reads and validates DATA\Themes\<name>\theme.ini.
+fn readData(name: []const u8) theme_file.Outcome {
     const catalog = uefi.pool_allocator.create(data_volume.Catalog) catch return rejected("out of memory");
     defer uefi.pool_allocator.destroy(catalog);
     catalog.* = data_volume.openCatalog() catch return rejected("DATA partition not readable");
@@ -89,9 +136,10 @@ pub fn readUser(name: []const u8) theme_file.Outcome {
     const path = [_][]const u16{ wide(theme_file.folder), name16[0..name.len], wide(theme_file.file_name) };
     ntfs.openFile(catalog.fs, catalog.reader(), &path, &file) catch return rejected("theme.ini not found");
     const size = file.size();
-    if (size > file_buffer.len) return rejected("file too large");
+    if (size > theme_file.max_bytes) return rejected("file too large");
     const n: usize = @intCast(size);
     file.readAt(catalog.fs, catalog.reader(), 0, file_buffer[0..n]) catch return rejected("theme.ini not readable");
+    last_data_len = n;
     return theme_file.resolve(file_buffer[0..n]);
 }
 
@@ -99,15 +147,43 @@ fn rejected(problem: []const u8) theme_file.Outcome {
     return .{ .theme = .{}, .problem = problem };
 }
 
-/// Folder names under DATA\Themes that can be theme names (usable
-/// names, sorted, at most `names.len`). Zero when DATA or the folder is
-/// missing.
+/// User theme names: <name>.ini on the ESP and folder names under
+/// DATA\Themes that can be theme names (usable names, each once, sorted,
+/// at most `names.len`).
 pub fn listUser(names: []Name) usize {
-    const catalog = uefi.pool_allocator.create(data_volume.Catalog) catch return 0;
-    defer uefi.pool_allocator.destroy(catalog);
-    catalog.* = data_volume.openCatalog() catch return 0;
-    const path = [_][]const u16{wide(theme_file.folder)};
     var count: usize = 0;
+    if (esp_root) |root| {
+        var files: [max_user_themes]usos.catalog.FixedText = undefined;
+        const found = @import("directory_scan.zig").listFilesWithExtension(root, esp_directory, ".ini", files[0..@min(files.len, names.len)]);
+        for (files[0..found]) |*entry| {
+            const full = entry.slice();
+            const stem = full[0 .. full.len - 4];
+            if (stem.len > presets.max_name_len or !presets.nameUsable(stem) or presets.index(stem) != null) continue;
+            var name = Name{};
+            @memcpy(name.buffer[0..stem.len], stem);
+            name.len = stem.len;
+            names[count] = name;
+            count += 1;
+        }
+    }
+    count = listData(names, count);
+    // Stable order independent of the directory order.
+    var i: usize = 1;
+    while (i < count) : (i += 1) {
+        var j = i;
+        while (j > 0 and std.ascii.lessThanIgnoreCase(names[j].slice(), names[j - 1].slice())) : (j -= 1) {
+            std.mem.swap(Name, &names[j], &names[j - 1]);
+        }
+    }
+    return count;
+}
+
+fn listData(names: []Name, start: usize) usize {
+    const catalog = uefi.pool_allocator.create(data_volume.Catalog) catch return start;
+    defer uefi.pool_allocator.destroy(catalog);
+    catalog.* = data_volume.openCatalog() catch return start;
+    const path = [_][]const u16{wide(theme_file.folder)};
+    var count: usize = start;
     var skip: usize = 0;
     while (count < names.len) {
         var items: [8]ntfs.DirectoryItem = undefined;
@@ -117,19 +193,16 @@ pub fn listUser(names: []Name) usize {
             var name = Name{};
             name.len = item.copyNameAscii(&name.buffer);
             if (!presets.nameUsable(name.slice()) or presets.index(name.slice()) != null) continue;
+            // An ESP theme of the same name wins (listed once).
+            const duplicate = for (names[0..start]) |*other| {
+                if (std.ascii.eqlIgnoreCase(other.slice(), name.slice())) break true;
+            } else false;
+            if (duplicate) continue;
             names[count] = name;
             count += 1;
         }
         if (!page.has_more or page.count == 0) break;
         skip += page.count;
-    }
-    // Stable order independent of the NTFS index.
-    var i: usize = 1;
-    while (i < count) : (i += 1) {
-        var j = i;
-        while (j > 0 and std.ascii.lessThanIgnoreCase(names[j].slice(), names[j - 1].slice())) : (j -= 1) {
-            std.mem.swap(Name, &names[j], &names[j - 1]);
-        }
     }
     return count;
 }

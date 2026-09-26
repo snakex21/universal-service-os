@@ -1,8 +1,9 @@
-# UEFI XP answer-file screen click-through (tools/boot_answer_screen_qemu.py), language en
-open	screen	Unattended setup	selected=1	rows=3
+# UEFI answer-file screen (answer-profile manager) and theme editor click-through (tools/boot_answer_screen_qemu.py), language en
+open	screen	Unattended setup	selected=1	rows=4
 open	row0	xp_manual | No answer file (manual installation)
 open	row1	xp_settings | usos-xp.ini: Jan Kowalski, USOS-TEST
 open	row2	file | test.sif
+open	row3	add | + Add a new profile
 back-esc	screen	list Windows XP
 back-backspace	screen	list Windows XP
 back-right-click	screen	list Windows XP
@@ -13,8 +14,22 @@ settings	summary	Answer file = usos-xp.ini: Jan Kowalski, USOS-TEST
 settings	cmdline	-
 sif	summary	Answer file = test.sif (merged into the automatic answer)
 sif	cmdline	usos.legacy_unattended_hex=746573742e736966
+profile-add	screen	form New answer profile
+profile-saved	rows	xp_manual,xp_settings,profile,file,add
+profile-use	summary	Answer file = Profile Test: Tester, Automatic (x86)
+profile-use	cmdline	usos.xp_settings=plan
+profile-edit	screen	form Answer profile
+profile-edit-esc	screen	list Unattended setup
+profile-delete	screen	list Delete profile
+profile-deleted	rows	xp_manual,xp_settings,file,add
 images-esc	screen	list Windows
 win10-open	screen	list Boot method
-win10-method	screen	summary Ready to start
+win10-method	screen	list Unattended setup
+win10-answer	rows	no_answer,add
+win10-summary	screen	summary Ready to start
+win10-back-summary	screen	list Unattended setup
 win10-back	screen	list Boot method
 win10-back2	screen	list Windows 10
+theme-editor	screen	form Theme editor
+theme-editor	contrast	on_accent on accent
+theme-editor	saved	mine

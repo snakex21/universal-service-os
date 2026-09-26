@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Click through the XP answer-file screen of the USOS UEFI menu in QEMU/OVMF.
+"""Click through the XP answer-file screen (the answer-profile manager) of the
+USOS UEFI menu in QEMU/OVMF.
 
 Called by tools/tests/run_uefi_answer_screen.ps1 with a copy of the boot-ui
 test disk whose DATA has an XP image, an active usos-xp.ini and test.sif
@@ -17,6 +18,14 @@ answer screen, [UI_FIELD] <label> = <value> on the summary and
 [XP_CMDLINE] <kernel options> when XP starts (the test ESP has no XP kernel,
 so the start stops right after). The observed rows are compared with
 tools/tests/golden/uefi_answer_screen.tsv (--update rewrites it).
+
+Answer profiles (docs/answer-profiles.md): "+ Add a new profile" opens the
+form ([UI_SCREEN] form <title>, [UI_FORM] ...); the test types a name and a
+user with the keyboard, saves ([PROFILE] saved <stem> on the ESP, which
+-snapshot keeps off the disk image), uses the profile (summary, command line
+usos.xp_settings=plan, [PROFILE] staged), edits it with F2 (pad X), leaves
+the editor with Esc without saving, and deletes it with Delete (pad Y) after
+the confirmation list.
 """
 from __future__ import annotations
 
@@ -85,6 +94,10 @@ def fields(chunk: str) -> dict[str, str]:
     return {m[0].strip(): m[1].strip() for m in re.findall(r"\[UI_FIELD\] ([^=\r\n]*) = ([^\r\n]*)", chunk)}
 
 
+def forms(chunk: str) -> list[str]:
+    return [m.strip() for m in re.findall(r"\[UI_FORM\] ([^\r\n]*)", chunk)]
+
+
 def cmdline(chunk: str) -> str:
     found = re.findall(r"\[XP_CMDLINE\] ([^\r\n]*)", chunk)
     return found[-1] if found else ""
@@ -148,7 +161,10 @@ def run(disk: Path, out: Path) -> list[str]:
         def back_to_images(chunk: str, how: str) -> None:
             seen = screens(chunk)
             check(f"back ({how}) returns to the image list", bool(seen) and seen[-1] == f"list {XP_TITLE}", str(seen))
-            check(f"back ({how}) does not reopen the answer screen", f"list {ANSWER_TITLE}" not in seen, str(seen))
+            # A pointer move may redraw the answer screen (footer hints follow
+            # the input device) before the Back; it must not come after it.
+            images = max((i for i, s in enumerate(seen) if s == f"list {XP_TITLE}"), default=-1)
+            check(f"back ({how}) does not reopen the answer screen", images >= 0 and f"list {ANSWER_TITLE}" not in seen[images:], str(seen))
             golden.append(f"back-{how}\tscreen\t{seen[-1] if seen else '-'}")
 
         wait_serial(serial_path, "USOS MANUAL FLOW BOOT PASS", 300)
@@ -177,9 +193,9 @@ def run(disk: Path, out: Path) -> list[str]:
         answer_screen(chunk, "open")
         state = last_list(chunk)
         observed = rows(chunk)
-        check("three rows: manual, usos-xp.ini, .sif", [r.split(" | ")[0] for r in observed] == ["xp_manual", "xp_settings", "file"], str(observed))
+        check("rows: manual, usos-xp.ini, .sif, add profile", [r.split(" | ")[0] for r in observed] == ["xp_manual", "xp_settings", "file", "add"], str(observed))
         check("manual installation row always present", bool(observed) and observed[0] == "xp_manual | No answer file (manual installation)", str(observed))
-        check("usos-xp.ini row selected by default", state == (1, 3), str(state))
+        check("usos-xp.ini row selected by default", state == (1, 4), str(state))
         check("key never on screen", "AAAAA" not in chunk, "")
         shot("answer-default")
 
@@ -233,6 +249,109 @@ def run(disk: Path, out: Path) -> list[str]:
         row_flow("settings", [], "usos-xp.ini: Jan Kowalski, USOS-TEST", [], ["usos.xp_settings", "usos.legacy_unattended_hex"])
         row_flow("sif", ["down"], "test.sif (merged into the automatic answer)", ["usos.legacy_unattended_hex=746573742e736966"], ["usos.xp_settings"])
 
+        # 3b. Answer profiles: add, use, edit, back from the editor, delete.
+        def type_text(text: str) -> None:
+            for c in text:
+                name = {"-": "minus", " ": "spc", ".": "dot", "#": "shift-3"}.get(c, c.lower())
+                monitor.key(("shift-" + name) if c.isupper() else name, 0.35)
+
+        chunk = key("ret", r"\[UI_ROW\]")
+        chunk = key("end", r"\[UI_ROW_SELECTED\]", 8)
+        check("profiles: End selects the add row", "[UI_ROW_SELECTED] add" in chunk, chunk[-300:])
+        chunk = key("ret", r"\[UI_SCREEN\] form", 15)
+        opened = screens(chunk)
+        check("profiles: + Add opens the editor", bool(opened) and opened[-1] == "form New answer profile", str(opened))
+        golden.append(f"profile-add\tscreen\t{opened[-1] if opened else '-'}")
+        check("profiles: editor starts on the user field", "selected index=1 label=User name" in "\n".join(forms(chunk)), str(forms(chunk)))
+        shot("profile-new")
+        # Save with an empty name: the name gets the selection (required).
+        key("end", None)
+        monitor.key("up", 0.5)
+        chunk = key("ret", r"\[UI_FORM\]", 8)
+        # Name field: Enter opens the keyboard, type, Enter closes.
+        chunk = key("home", r"\[UI_FORM\] selected", 8)
+        key("ret", r"\[UI_FORM\] edit", 8)
+        shot("profile-keyboard")
+        type_text("Test")
+        chunk = key("ret", r"\[UI_FORM\]", 5)
+        monitor.key("down", 0.5)
+        key("ret", r"\[UI_FORM\] edit", 8)
+        type_text("Tester")
+        chunk = key("ret", r"\[UI_FORM\]", 5)
+        values = "\n".join(forms(serial.text()))
+        check("profiles: name typed", "label=Profile name value=Test" in values, values[-500:])
+        check("profiles: user typed", "label=User name value=Tester" in values, values[-500:])
+        shot("profile-filled")
+        key("end", None)
+        monitor.key("up", 0.5)
+        chunk = key("ret", r"\[UI_ROW\]", 15)
+        check("profiles: Save writes the profile on the ESP", "[PROFILE] saved test" in chunk, chunk[-400:])
+        observed = rows(chunk)
+        golden.append("profile-saved\trows\t" + ",".join(r.split(" | ")[0] for r in observed))
+        check("profiles: the new profile is listed", [r.split(" | ")[0] for r in observed] == ["xp_manual", "xp_settings", "profile", "file", "add"], str(observed))
+        check("profiles: the row shows the name", "profile | Test" in observed, str(observed))
+        shot("profile-listed")
+
+        # Use it: summary, start, command line with usos.xp_settings=plan.
+        state = last_list(chunk)
+        check("profiles: the saved profile is selected", state is not None and state[0] == 2, str(state))
+        chunk = key("ret", r"\[UI_SCREEN\] summary")
+        answer = fields(chunk).get("Answer file", "")
+        check("profiles: summary names the profile", answer.startswith("Profile Test: Tester"), repr(answer))
+        golden.append(f"profile-use\tsummary\tAnswer file = {answer}")
+        chunk = key("ret", r"\[XP_CMDLINE\]", 30)
+        line = cmdline(chunk)
+        check("profiles: XP start passes usos.xp_settings=plan", "usos.xp_settings=plan" in line, line)
+        check("profiles: the profile was rendered on the ESP", "[PROFILE] staged Test for windows-xp format=nt5_settings" in chunk, chunk[-600:])
+        golden.append("profile-use\tcmdline\t" + (" ".join(t for t in line.split() if t.startswith(("usos.legacy_unattended_hex", "usos.xp_settings"))) or "-"))
+        time.sleep(4)
+        chunk = key("ret", r"\[UI_ROW\]")
+
+        # Edit (F2 = pad X): computer name, Save.
+        monitor.key("home", 0.5)
+        monitor.key("down", 0.5)
+        chunk = key("down", r"\[UI_ROW_SELECTED\]", 8)
+        check("profiles: profile row selected for editing", "[UI_ROW_SELECTED] profile" in chunk, chunk[-300:])
+        chunk = key("f2", r"\[UI_SCREEN\] form", 15)
+        check("profiles: F2 opens the editor", "form Answer profile" in screens(chunk), str(screens(chunk)))
+        golden.append(f"profile-edit\tscreen\t{screens(chunk)[-1] if screens(chunk) else '-'}")
+        for _ in range(3):
+            monitor.key("down", 0.4)
+        key("ret", r"\[UI_FORM\] edit", 8)
+        type_text("PC-1")
+        key("ret", r"\[UI_FORM\]", 5)
+        key("end", None)
+        monitor.key("up", 0.5)
+        chunk = key("ret", r"\[UI_ROW\]", 15)
+        check("profiles: edit saved", "[PROFILE] saved test" in chunk, chunk[-400:])
+        check("profiles: edited row detail", any(r.startswith("profile | Test") for r in rows(chunk)), str(rows(chunk)))
+        check("profiles: computer name in the saved profile", "label=Computer name value=PC-1" in "\n".join(forms(serial.text())), "")
+        shot("profile-edited")
+
+        # Back from the editor (Esc) saves nothing.
+        chunk = key("f2", r"\[UI_SCREEN\] form", 15)
+        chunk = key("esc", r"\[UI_ROW\]", 15)
+        check("profiles: Esc leaves the editor without saving", f"list {ANSWER_TITLE}" in screens(chunk) and "[PROFILE] saved" not in chunk, chunk[-300:])
+        golden.append(f"profile-edit-esc\tscreen\t{screens(chunk)[-1] if screens(chunk) else '-'}")
+
+        # Delete (Delete = pad Y): confirmation, Keep first, then Delete.
+        chunk = key("delete", r"\[UI_SCREEN\] list", 15)
+        check("profiles: Delete asks first", "list Delete profile" in screens(chunk), str(screens(chunk)))
+        golden.append(f"profile-delete\tscreen\t{screens(chunk)[-1] if screens(chunk) else '-'}")
+        shot("profile-delete-confirm")
+        chunk = key("ret", r"\[UI_ROW\]", 15)
+        check("profiles: Keep keeps the profile", "profile | Test" in rows(chunk) and "[PROFILE] deleted" not in chunk, str(rows(chunk)))
+        # The selection stays on the profile row after Keep.
+        chunk = key("delete", r"\[UI_SCREEN\] list", 15)
+        monitor.key("down", 0.5)
+        chunk = key("ret", r"\[UI_ROW\]", 15)
+        check("profiles: Delete removes the profile", "[PROFILE] deleted test" in chunk, chunk[-400:])
+        observed = rows(chunk)
+        check("profiles: list without the profile", [r.split(" | ")[0] for r in observed] == ["xp_manual", "xp_settings", "file", "add"], str(observed))
+        golden.append("profile-deleted\trows\t" + ",".join(r.split(" | ")[0] for r in observed))
+        shot("profile-deleted")
+        key("esc", r"\[UI_SCREEN\]")  # -> image list
+
         # 4. Image list -> Esc -> systems list.
         chunk = key("esc", r"\[UI_SCREEN\]")
         seen = screens(chunk)
@@ -240,9 +359,9 @@ def run(disk: Path, out: Path) -> list[str]:
         golden.append(f"images-esc\tscreen\t{seen[-1] if seen else '-'}")
         shot("systems")
 
-        # 5. The same pattern without an answer screen: Windows 10 (empty
-        # Unattended folder, one runnable UEFI method). Back from whatever
-        # follows the image must land on the image list, not reopen it.
+        # 5. Windows 10 (empty Unattended folder): the answer screen now
+        # offers the profiles; Back from whatever follows the image must land
+        # on the image list, not reopen it.
         key("home")
         chunk = key("down") + key("ret", r"\[UI_SCREEN\]", 8)
         seen = screens(chunk)
@@ -251,7 +370,15 @@ def run(disk: Path, out: Path) -> list[str]:
             opened = screens(chunk)
             golden.append(f"win10-open\tscreen\t{opened[-1] if opened else '-'}")
             shot("win10-next")
-            if opened and opened[-1].startswith("summary"):
+            if opened and opened[-1] == f"list {ANSWER_TITLE}":
+                observed = rows(chunk)
+                golden.append("win10-answer\trows\t" + ",".join(r.split(" | ")[0] for r in observed))
+                check("Windows 10: answer screen with manual and add rows", [r.split(" | ")[0] for r in observed] == ["no_answer", "add"], str(observed))
+                chunk = key("esc", r"\[UI_SCREEN\]")
+                seen = screens(chunk)
+                check("Windows 10: Back from the answer screen", bool(seen) and seen[-1] in ("list Windows 10", "list Boot method"), str(seen))
+                golden.append(f"win10-back\tscreen\t{seen[-1] if seen else '-'}")
+            elif opened and opened[-1].startswith("summary"):
                 chunk = key("esc", r"\[UI_SCREEN\]")
                 seen = screens(chunk)
                 check("Windows 10: Back from the summary returns to the image list", bool(seen) and seen[-1] == "list Windows 10", str(seen))
@@ -262,7 +389,26 @@ def run(disk: Path, out: Path) -> list[str]:
                 chunk = key("ret", r"\[UI_SCREEN\]", 15)
                 nxt = screens(chunk)
                 golden.append(f"win10-method\tscreen\t{nxt[-1] if nxt else '-'}")
-                if nxt and nxt[-1].startswith("summary"):
+                if nxt and nxt[-1] == f"list {ANSWER_TITLE}":
+                    observed = rows(chunk)
+                    golden.append("win10-answer\trows\t" + ",".join(r.split(" | ")[0] for r in observed))
+                    check("Windows 10: answer screen with manual and add rows", [r.split(" | ")[0] for r in observed] == ["no_answer", "add"], str(observed))
+                    chunk = key("ret", r"\[UI_SCREEN\] summary", 15)
+                    nxt = screens(chunk)
+                    golden.append(f"win10-summary\tscreen\t{nxt[-1] if nxt else '-'}")
+                    chunk = key("esc", r"\[UI_SCREEN\]")
+                    seen = screens(chunk)
+                    check("Windows 10: Back from the summary returns to the answer screen", bool(seen) and seen[-1] == f"list {ANSWER_TITLE}", str(seen))
+                    golden.append(f"win10-back-summary\tscreen\t{seen[-1] if seen else '-'}")
+                    chunk = key("esc", r"\[UI_SCREEN\]")
+                    seen = screens(chunk)
+                    check("Windows 10: Back from the answer screen returns to the method list", bool(seen) and seen[-1] == "list Boot method", str(seen))
+                    golden.append(f"win10-back\tscreen\t{seen[-1] if seen else '-'}")
+                    chunk = key("esc", r"\[UI_SCREEN\]")
+                    seen = screens(chunk)
+                    check("Windows 10: Back from the methods returns to the image list", bool(seen) and seen[-1] == "list Windows 10", str(seen))
+                    golden.append(f"win10-back2\tscreen\t{seen[-1] if seen else '-'}")
+                elif nxt and nxt[-1].startswith("summary"):
                     chunk = key("esc", r"\[UI_SCREEN\]")
                     seen = screens(chunk)
                     check("Windows 10: Back from the summary returns to the method list", bool(seen) and seen[-1] == "list Boot method", str(seen))
@@ -273,6 +419,69 @@ def run(disk: Path, out: Path) -> list[str]:
                     golden.append(f"win10-back2\tscreen\t{seen[-1] if seen else '-'}")
         else:
             golden.append(f"win10-open\tscreen\tnot reached {seen}")
+
+        # 6. Tools -> Theme -> Create or edit a theme (docs/menu-themes.md):
+        # name, accent colour, a contrast failure that blocks Save, then Save.
+        for _ in range(4):
+            key("esc")
+        key("left")
+        chunk = key("ret", r"\[UI_SCREEN\] list", 10)
+        check("themes: Utilities list", "list Utilities" in screens(chunk), str(screens(chunk)))
+        monitor.key("down", 0.4)
+        monitor.key("down", 0.4)
+        chunk = key("ret", r"\[UI_SCREEN\] list", 10)
+        check("themes: Theme page", "list Theme" in screens(chunk), str(screens(chunk)))
+        monitor.key("home", 0.5)
+        chunk = key("ret", r"\[UI_SCREEN\] form", 15)
+        check("themes: editor opens", "form Theme editor" in screens(chunk), str(screens(chunk)))
+        golden.append(f"theme-editor\tscreen\t{screens(chunk)[-1] if screens(chunk) else '-'}")
+        shot("theme-editor")
+        key("ret", r"\[UI_FORM\] edit", 8)
+        type_text("mine")
+        key("ret", r"\[UI_FORM\]", 5)
+        monitor.key("down", 0.4)
+        monitor.key("down", 0.4)
+        for _ in range(8):
+            monitor.key("right", 0.4)
+        chunk = key("down", r"\[UI_FORM\] selected", 8)
+        values = "\n".join(forms(serial.text()))
+        check("themes: element Accent chosen", "label=Element value=Accent\n" in values + "\n" or "label=Element value=Accent" in values, values[-400:])
+
+        def set_colour(hex_value: str) -> str:
+            key("ret", r"\[UI_FORM\] edit", 8)
+            for _ in range(7):
+                monitor.key("backspace", 0.3)
+            type_text(hex_value)
+            return key("ret", r"\[UI_FORM\]", 5)
+
+        def last_contrast() -> str:
+            found = re.findall(r"\[THEME_EDIT\] contrast ([^\r\n]*)", serial.text())
+            return found[-1].strip() if found else ""
+
+        chunk = set_colour("#101923")
+        check("themes: an accent like the panels breaks a contrast rule", last_contrast() not in ("", "ok"), last_contrast())
+        golden.append(f"theme-editor\tcontrast\t{last_contrast()}")
+        shot("theme-contrast-bad")
+        key("end", None)
+        monitor.key("up", 0.5)
+        chunk = key("ret", r"\[UI_SCREEN\]", 10)
+        check("themes: Save refused while a rule fails", "[THEME_EDIT] saved" not in serial.text(), "")
+        key("ret", r"\[UI_SCREEN\] form", 10)  # dismiss the notice
+        monitor.key("home", 0.5)
+        for _ in range(3):
+            monitor.key("down", 0.4)
+        chunk = set_colour("#FF9E40")
+        check("themes: contrast ok again", last_contrast() == "ok", last_contrast())
+        shot("theme-contrast-ok")
+        key("end", None)
+        monitor.key("up", 0.5)
+        chunk = key("ret", r"\[THEME_EDIT\] saved", 15)
+        check("themes: saved on the ESP", "[THEME_EDIT] saved mine" in chunk, chunk[-300:])
+        golden.append("theme-editor\tsaved\t" + ("mine" if "[THEME_EDIT] saved mine" in chunk else "-"))
+        shot("theme-saved")
+        chunk = key("ret", r"\[UI_SCREEN\] list", 10)
+        check("themes: back on the Theme page", "list Theme" in screens(chunk), str(screens(chunk)))
+        shot("theme-page-after")
         try:
             monitor.command("quit")
         except ConnectionError:
@@ -295,7 +504,7 @@ def main() -> int:
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     observed = run(args.disk, args.out)
-    text = "# UEFI XP answer-file screen click-through (tools/boot_answer_screen_qemu.py), language en\n" + "\n".join(observed) + "\n"
+    text = "# UEFI answer-file screen (answer-profile manager) and theme editor click-through (tools/boot_answer_screen_qemu.py), language en\n" + "\n".join(observed) + "\n"
     (args.out / "uefi_answer_screen.tsv").write_text(text, encoding="utf-8", newline="\n")
     if args.update:
         args.golden.write_text(text, encoding="utf-8", newline="\n")

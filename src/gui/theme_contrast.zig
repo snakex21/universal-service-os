@@ -94,23 +94,49 @@ pub const rules = [_]Rule{
     .{ .name = "pad X vs Y", .fore = "pad_x", .back = "warning", .min_distance = 120 },
 };
 
-fn field(theme: Theme, comptime name: []const u8) Color {
-    return @field(theme, name);
+/// The rules as field offsets: one small loop instead of 32 unrolled
+/// checks (the Legacy BIOS Core validates user themes too; every byte of
+/// its 240 KiB slot counts).
+const Check = struct { fore: u16, back: u16, min_ratio10: u16, min_distance: u16 };
+
+const checks = blk: {
+    var out: [rules.len]Check = undefined;
+    for (rules, 0..) |rule, i| out[i] = .{
+        .fore = @offsetOf(Theme, rule.fore),
+        .back = @offsetOf(Theme, rule.back),
+        .min_ratio10 = rule.min_ratio10,
+        .min_distance = rule.min_distance,
+    };
+    break :blk out;
+};
+
+pub fn colorAt(theme: *const Theme, offset: u16) Color {
+    const colour: *const Color = @ptrFromInt(@intFromPtr(theme) + offset);
+    return colour.*;
+}
+
+fn passesCheck(theme: *const Theme, check: Check) bool {
+    const fore = colorAt(theme, check.fore);
+    const back = colorAt(theme, check.back);
+    if (check.min_ratio10 != 0) return ratio10(fore, back) >= check.min_ratio10;
+    return distance(fore, back) >= check.min_distance;
 }
 
 pub fn passes(theme: Theme, comptime rule: Rule) bool {
-    const fore = field(theme, rule.fore);
-    const back = field(theme, rule.back);
-    if (rule.min_ratio10 != 0) return ratio10(fore, back) >= rule.min_ratio10;
-    return distance(fore, back) >= rule.min_distance;
+    return passesCheck(&theme, .{ .fore = @offsetOf(Theme, rule.fore), .back = @offsetOf(Theme, rule.back), .min_ratio10 = rule.min_ratio10, .min_distance = rule.min_distance });
+}
+
+/// Index into `rules` of the first rule `theme` breaks.
+pub fn firstProblemIndex(theme: Theme) ?usize {
+    for (checks, 0..) |check, i| {
+        if (!passesCheck(&theme, check)) return i;
+    }
+    return null;
 }
 
 /// The first rule `theme` breaks, or null when it is readable.
 pub fn firstProblem(theme: Theme) ?[]const u8 {
-    inline for (rules) |rule| {
-        if (!passes(theme, rule)) return rule.name;
-    }
-    return null;
+    return rules[firstProblemIndex(theme) orelse return null].name;
 }
 
 test "contrast ratios match WCAG reference values" {

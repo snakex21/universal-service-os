@@ -35,6 +35,7 @@ pub const gui = struct {
     pub const menu_screens = @import("gui/menu_screens.zig");
     pub const form = @import("gui/form.zig");
     pub const osk = @import("gui/osk.zig");
+    pub const theme_preview = @import("gui/theme_preview.zig");
     pub const splash_screen = @import("gui/splash_screen.zig");
     pub const bmp = @import("gui/bmp.zig");
     pub const ui_pack = @import("gui/ui_pack.zig");

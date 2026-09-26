@@ -38,7 +38,7 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | N4 | Pliki-towarzysze + generator plików odpowiedzi | **Next** | N2 (M1) | 3 dni (towarzysze) + 8–12 dni (generator, etapami) |
 | N5 | Pomysły z E2B (szybkie) | **Next** / **Later** per punkt | N2 (M1) dla części | 1–10 dni per punkt |
 | N6 | Secure Boot: zablokowany kernel, podpisany UKI | **Next** (niski priorytet w grupie) | N1 | 4–6 dni |
-| N7 | Edytor motywów (UEFI + instalator), motywy użytkownika w BIOS, przykładowe motywy | **Next** (po menedżerze profili) | menedżer profili odpowiedzi (formularz + klawiatura ekranowa) | do oszacowania |
+| N7 | Edytor motywów (UEFI + instalator), motywy użytkownika w BIOS, przykładowe motywy | UEFI, BIOS, przykłady: **Done** (QEMU, 2026-09-26); instalator: **Next** | menedżer profili odpowiedzi (formularz + klawiatura ekranowa) | instalator: do oszacowania |
 | L1 | Rodzina NT5 na UEFI (2000, 2003, XP x64) | **Later** | N2 (M4), N3 | 10–15 dni + sprzęt |
 | L2 | XP na UEFI bez CSM (CSMWrap) | **Later** | L1 (profil firmware) | 8–15 dni, wynik niepewny |
 | L3 | 32-bit CPU i mniejsze minimum RAM | **Later** | pomiary | 2 dni pomiarów, potem 5–15 dni |
@@ -164,7 +164,12 @@ zarejestrowała klucz.
 4. Konsekwencja: każda zmiana initramfs = nowy podpis; to wymusza
    deterministyczny build (już jest dla `initramfs-usos` i pakietu XP).
 
-### N7. Edytor motywów: **Next**, po menedżerze profili odpowiedzi
+### N7. Edytor motywów: UEFI/BIOS/przykłady **Done**, instalator **Next**
+
+Stan 2026-09-26: edytor w menu UEFI, motywy użytkownika z ESP w BIOS
+(koszt Core 3 616 B, zapas 19 740 B) i trzy przykłady (`usos-ocean`,
+`usos-sunset`, `usos-forest`) zrobione i sprawdzone w QEMU/OVMF;
+opis w [menu-themes.md](menu-themes.md). Otwarte: pkt 2 (instalator Go).
 
 Uzgodniony plan (2026-09-26). Kolejność: po menedżerze profili
 odpowiedzi w menu UEFI (docs/HANDOFF-2026-09-26.md, plan pkt 2), bo

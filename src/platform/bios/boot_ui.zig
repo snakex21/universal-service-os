@@ -44,12 +44,14 @@ const p_usos = [_]u16{ 'U', 'S', 'O', 'S' };
 const p_resource = [_]u16{ 'b', 'i', 'o', 's', '-', 'u', 'i', '.', 'b', 'i', 'n' };
 const p_lang = [_]u16{ 'l', 'a', 'n', 'g', '.', 'b', 'i', 'n' };
 const p_settings = [_]u16{ 'u', 's', 'o', 's', '-', 's', 'e', 't', 't', 'i', 'n', 'g', 's', '.', 'i', 'n', 'i' };
+const p_themes = [_]u16{ 't', 'h', 'e', 'm', 'e', 's' };
 const resource_path = [_][]const u16{ &p_efi, &p_usos, &p_resource };
 const lang_path = [_][]const u16{ &p_efi, &p_usos, &p_lang };
 const settings_path = [_][]const u16{ &p_efi, &p_usos, &p_settings };
 /// usos-settings.ini is read once, before the splash, into the (not yet
-/// used) language-table area of the window.
+/// used) language-table area of the window; a user theme file right after it.
 const settings_capacity: u32 = 4096;
+const theme_file_addr: u32 = table_addr + settings_capacity;
 
 var state: struct {
     fs: ?*const fat32.FileSystem = null,
@@ -63,28 +65,44 @@ var state: struct {
     icons: []const u8 = &.{},
     table_ok: bool = false,
     sprite_scale: u32 = 0,
-    /// Built-in theme (graphics.theme_presets.all) chosen by theme=.
-    theme: u8 = 0,
+    /// The theme chosen by theme=: built-in (graphics.theme_presets.all) or
+    /// a user theme from EFI/USOS/themes/<name>.ini (the UEFI theme editor).
+    theme: graphics.Theme = .{},
     marker: u8 = 1,
 } linksection(".data") = .{};
 
 const english_table = lang_file.Table.english_only;
 
 /// Reads `theme=` from EFI/USOS/usos-settings.ini (called before the
-/// splash). The BIOS menu has the built-in themes only: a user theme name
-/// (DATA\Themes, UEFI menu) or any read problem keeps the default.
+/// splash): a built-in theme, or a user theme saved by the UEFI theme
+/// editor on the ESP (EFI/USOS/themes/<name>.ini, colours only, validated
+/// by the same all-or-nothing rules as in the UEFI menu). DATA\Themes is not
+/// read (it needs the NTFS catalog, opened later); any problem keeps the
+/// default theme.
 pub fn loadTheme(fs: *const fat32.FileSystem, reader: random_reader.Reader) void {
-    state.theme = 0;
+    state.theme = .{};
     if (!ramUsable(window_base, window_base + window_bytes)) return;
     const buffer: [*]u8 = @ptrFromInt(table_addr);
     const quiet = fat32.ReadProgress{ .context = undefined, .update_fn = ignoreProgress };
     const len = fat32.readFileSequentialProgress(fs.*, reader, &settings_path, buffer[0..settings_capacity], quiet) catch return;
-    const index = graphics.theme_presets.index(graphics.theme_presets.settingValue(buffer[0..len])) orelse return;
-    state.theme = @intCast(index);
+    const name = graphics.theme_presets.settingValue(buffer[0..len]);
+    if (graphics.theme_presets.index(name)) |index| {
+        state.theme = graphics.theme_presets.all[index].theme;
+        return;
+    }
+    if (!graphics.theme_presets.nameUsable(name)) return;
+    var file16: [graphics.theme_presets.max_name_len + 4]u16 = undefined;
+    for (name, 0..) |c, i| file16[i] = c;
+    for (".ini", 0..) |c, i| file16[name.len + i] = c;
+    const path = [_][]const u16{ &p_efi, &p_usos, &p_themes, file16[0 .. name.len + 4] };
+    const text: [*]u8 = @ptrFromInt(theme_file_addr);
+    const theme_len = fat32.readFileSequentialProgress(fs.*, reader, &path, text[0 .. graphics.theme_file.max_bytes + 1], quiet) catch return;
+    if (theme_len > graphics.theme_file.max_bytes) return;
+    state.theme = graphics.theme_file.resolveTheme(text[0..theme_len]) orelse return;
 }
 
 fn theme() graphics.Theme {
-    return graphics.theme_presets.all[state.theme].theme;
+    return state.theme;
 }
 
 /// Minimal splash drawn right after the VBE mode is set (the font is not

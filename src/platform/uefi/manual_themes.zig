@@ -1,5 +1,6 @@
-//! Tools -> Theme: the built-in menu themes and the user themes found in
-//! DATA\Themes. Enter applies the theme at once and writes `theme=<name>`
+//! Tools -> Theme: "Create or edit a theme" (the theme editor,
+//! theme_editor.zig), the built-in menu themes and the user themes (ESP
+//! \EFI\USOS\themes, DATA\Themes). Enter applies the theme at once and writes `theme=<name>`
 //! to usos-settings.ini through settings_store (a merge: every other key
 //! and line stays). A user theme is validated before anything is saved;
 //! one that cannot be used shows why and changes nothing. The Legacy
@@ -16,7 +17,9 @@ const Row = usos.gui.ui.Row;
 const presets = usos.gui.theme_presets;
 
 const builtin_count = presets.all.len;
-const max_rows = builtin_count + theme_loader.max_user_themes;
+/// Row 0 opens the theme editor.
+const first_builtin = 1;
+const max_rows = first_builtin + builtin_count + theme_loader.max_user_themes;
 
 /// The chosen theme's name ("default" when none is set).
 fn currentName() []const u8 {
@@ -52,26 +55,28 @@ var details: [theme_loader.max_user_themes][96]u8 = undefined;
 var invalid_text: [160]u8 = undefined;
 
 pub fn page(root: *std.os.uefi.protocol.File) void {
-    const user_count = theme_loader.listUser(&user_names);
+    var user_count = theme_loader.listUser(&user_names);
     var selected: usize = 0;
     var first_open = true;
     while (true) {
         const current = currentName();
         var rows: [max_rows]Row = undefined;
         const current_badge = usos.gui.ui.Badge{ .text = view.t(.themes_current), .tone = .success };
+        rows[0] = .{ .title = view.t(.theme_edit_open), .detail = view.t(.theme_edit_open_detail), .icon = .{ .vector = .gear } };
         for (presets.all, 0..) |preset, index| {
             const is_current = std.ascii.eqlIgnoreCase(preset.name, current);
-            if (is_current and first_open) selected = index;
-            rows[index] = .{ .title = builtinTitle(index), .detail = view.t(.themes_builtin), .icon = .{ .vector = .gear }, .badge = if (is_current) current_badge else null };
+            if (is_current and first_open) selected = first_builtin + index;
+            rows[first_builtin + index] = .{ .title = builtinTitle(index), .detail = view.t(.themes_builtin), .icon = .{ .vector = .gear }, .badge = if (is_current) current_badge else null };
         }
         for (user_names[0..user_count], 0..) |*name, index| {
             const is_current = std.ascii.eqlIgnoreCase(name.slice(), current);
-            if (is_current and first_open) selected = builtin_count + index;
-            const detail = std.fmt.bufPrint(&details[index], "{s} · DATA\\Themes\\{s}", .{ view.t(.themes_user), name.slice() }) catch name.slice();
-            rows[builtin_count + index] = .{ .title = name.slice(), .detail = detail, .icon = .{ .vector = .drive }, .badge = if (is_current) current_badge else null };
+            if (is_current and first_open) selected = first_builtin + builtin_count + index;
+            const where = if (theme_loader.sourceOf(name.slice()) == .esp) "EFI\\USOS\\themes" else "DATA\\Themes";
+            const detail = std.fmt.bufPrint(&details[index], "{s} · {s}\\{s}", .{ view.t(.themes_user), where, name.slice() }) catch name.slice();
+            rows[first_builtin + builtin_count + index] = .{ .title = name.slice(), .detail = detail, .icon = .{ .vector = .drive }, .badge = if (is_current) current_badge else null };
         }
         first_open = false;
-        const total = builtin_count + user_count;
+        const total = first_builtin + builtin_count + user_count;
         var list: view.ListScreen = undefined;
         list.open(view.t(.themes_title), view.t(.themes_hint), rows[0..total], selected, true, null);
         const action: ?usize = loop: while (true) {
@@ -83,7 +88,13 @@ pub fn page(root: *std.os.uefi.protocol.File) void {
                 .ignored => {},
             }
         };
-        const index = action orelse return;
+        const row = action orelse return;
+        if (row == 0) {
+            @import("theme_editor.zig").edit(root, currentName());
+            user_count = theme_loader.listUser(&user_names);
+            continue;
+        }
+        const index = row - first_builtin;
         if (index < builtin_count) {
             choose(root, presets.all[index].name, null);
         } else {

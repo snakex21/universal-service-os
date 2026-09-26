@@ -7,6 +7,7 @@
 //!            physical keyboard
 //!   choice   value between chevrons; Left/Right step, A opens a list picker
 //!   toggle   switch pill
+//!   stepper  number between chevrons; Left/Right step it (colour channels)
 //!   action   button row (Save, Cancel, Delete)
 //!
 //! Pure drawing and hit testing; values are formatted by the caller. The
@@ -22,7 +23,7 @@ const Ui = ui_mod.Ui;
 const Rect = ui_mod.Rect;
 const RowState = ui_mod.RowState;
 
-pub const Kind = enum { text, choice, toggle, action };
+pub const Kind = enum { text, choice, toggle, stepper, action };
 
 pub const Item = struct {
     kind: Kind,
@@ -191,7 +192,7 @@ fn drawItem(ui: *const Ui, rect: Rect, spec: Spec, index: usize) void {
             const color = if (item.value.len > 0) (if (item.enabled) theme.text else theme.disabled_text) else theme.faint;
             _ = ui.fonts.drawFit(ui.surface, x, ui.fonts.centeredTop(.body, center), value.right() -| x -| ui.px(10), .body, shown, color, theme.field);
         },
-        .choice => {
+        .choice, .stepper => {
             const chevron = ui.px(14);
             const color = if (item.enabled) theme.accent else theme.disabled_text;
             icons.draw(ui.surface, .chevron_left, value.x, center -| chevron / 2, chevron, color, null);

@@ -21,8 +21,17 @@ that one key and keeps every other line.
 | `high-contrast` | white on black, yellow selection, white borders (accessibility) |
 | `retro` | white and yellow on VGA blue, like a BIOS setup |
 
-Any other name is a user theme: `DATA\Themes\<name>\theme.ini`, name of
-1-32 characters `A-Z a-z 0-9 - _`.
+Any other name is a user theme, name of 1-32 characters `A-Z a-z 0-9 - _`:
+
+1. `\EFI\USOS\themes\<name>.ini` on the ESP: written by the theme editor
+   (below) and the shipped examples; the UEFI menu **and the Legacy BIOS**
+   read it;
+2. `DATA\Themes\<name>\theme.ini`: UEFI menu only.
+
+Examples shipped on the stick (installer payload, `src/gui/themes/`):
+`usos-ocean` (deep blue, cyan), `usos-sunset` (warm dark brown, orange),
+`usos-forest` (light, green). Updates rewrite them; the editor saves a
+copy of an example under the user's own name.
 
 ## theme.ini
 
@@ -52,9 +61,14 @@ built-in theme is tested against the same rules.
   the choice; a user theme applies from the first menu frame (DATA is
   opened once more during menu start when a user theme is chosen).
   `\UI\theme.css` still overrides the default theme only.
-- Legacy BIOS: the Core reads `usos-settings.ini` once before the splash
-  and uses the built-in themes; a user theme name keeps the default.
-  Cost: 1 428 bytes of Core (headroom 29 884 -> 28 456).
+- Legacy BIOS: the Core reads `usos-settings.ini` once before the splash:
+  a built-in theme, or a user theme from `EFI\USOS\themes\<name>.ini`
+  (colours only; the same all-or-nothing parser and readability rules,
+  `theme_file.resolveTheme` without the problem texts). `DATA\Themes` is
+  not read by the BIOS (the NTFS catalog opens later). No editor in the
+  BIOS. Cost: 3 616 bytes of Core (headroom 23 356 -> 19 740 bytes,
+  build 2026-09-26; the rules and field names are tables, not unrolled
+  code, to keep it small). Earlier: built-in themes, 1 428 bytes.
 
 ## Preview
 
@@ -63,20 +77,43 @@ built-in theme is tested against the same rules.
 built-in name or a `theme.ini` path. Screen `15-tools-theme` is the Tools
 -> Theme page.
 
+## Theme editor (UEFI)
+
+Tools -> Theme -> "Create or edit a theme" (`src/platform/uefi/theme_editor.zig`),
+built on the shared form component (`src/gui/form.zig`, on-screen keyboard
+`src/gui/osk.zig`):
+
+- rows: theme name, base theme (a built-in; changing it starts from its
+  colours), element (every `Theme` field, with its colour swatch; Left/Right
+  step), colour `#rrggbb` (typed), red/green/blue (Left/Right -/+ 8),
+  reset this element, save and use, cancel;
+- beside the form a **live preview** drawn with the edited colours
+  (`src/gui/theme_preview.zig`: header, panel with a normal and a selected
+  row, secondary and disabled text, button, badges, the four pad faces),
+  while the form itself keeps the current menu theme (always readable);
+- **live contrast**: the first broken rule of `theme_contrast.zig` under
+  the preview ("Too little contrast: Text on accent on Accent"); Save is
+  refused while a rule fails;
+- Save writes `\EFI\USOS\themes\<name>.ini` (`base=` and the colours that
+  differ from the base), checks that `theme_file.resolve` reads back the
+  same theme, sets `theme=<name>` and applies it at once.
+
+Opening the editor with a user theme chosen loads that theme; with a
+built-in one it starts a new theme on that base.
+
 ## Open
 
+- Editor in the Go installer (mouse, colour picker): not started.
 - Background image and logo in `theme.ini` (not implemented: partial
   redraws fill with `background`, so an image needs toolkit changes).
-- User themes in the BIOS menu: planned (below), colours only, read from
-  the ESP.
 - The micro-Linux framebuffer UI still uses the default theme.
-- Not yet checked on hardware or in QEMU/OVMF (host previews only).
+- Checked in QEMU/OVMF (tools/tests/run_uefi_answer_screen.ps1, editor
+  section); not yet on hardware; BIOS user themes not yet run in QEMU.
 
 ## Plan: theme editor (ROADMAP N7)
 
-Agreed 2026-09-26. Order: after the answer-profile manager in the UEFI
-menu (docs/HANDOFF-2026-09-26.md, plan item 2), because the editor reuses
-its form / on-screen keyboard component.
+Agreed 2026-09-26. Status 2026-09-26: items 1, 3 and 4 done (above),
+item 2 (installer editor) open.
 
 - **UEFI in-menu editor** (Tools -> Theme): live preview and live contrast
   checking with the rules above (`src/gui/theme_contrast.zig`), built on

@@ -39,7 +39,23 @@ fn rejected(problem: []const u8, line: usize) Outcome {
 /// Parses and validates `text`; falls back to the default theme on any
 /// problem.
 pub fn resolve(text: []const u8) Outcome {
-    if (text.len > max_bytes) return rejected("file too large", 0);
+    return resolveWith(text, true);
+}
+
+/// The theme only (null on any problem), without the problem texts and
+/// rule names: the Legacy BIOS Core, which has no place to show them.
+pub fn resolveTheme(text: []const u8) ?Theme {
+    const outcome = resolveWith(text, false);
+    return if (outcome.problem == null) outcome.theme else null;
+}
+
+fn resolveWith(text: []const u8, comptime messages: bool) Outcome {
+    const Text = struct {
+        fn of(comptime value: []const u8) []const u8 {
+            return if (messages) value else "";
+        }
+    };
+    if (text.len > max_bytes) return rejected(Text.of("file too large"), 0);
     var theme = Theme{};
     var base_seen = false;
     var colours_seen: usize = 0;
@@ -51,35 +67,50 @@ pub fn resolve(text: []const u8) Outcome {
         if (line_number == 1 and std.mem.startsWith(u8, line, "\xef\xbb\xbf")) line = line[3..];
         if (line.len == 0 or line[0] == ';' or line[0] == '#') continue;
         if (line[0] == '[' and line[line.len - 1] == ']') continue;
-        const equals = std.mem.indexOfScalar(u8, line, '=') orelse return rejected("line without '='", line_number);
+        const equals = std.mem.indexOfScalar(u8, line, '=') orelse return rejected(Text.of("line without '='"), line_number);
         const key = std.mem.trim(u8, line[0..equals], " \t");
         const value = std.mem.trim(u8, line[equals + 1 ..], " \t");
         if (std.ascii.eqlIgnoreCase(key, "base")) {
             // The base must come first so it cannot undo colours set above.
-            if (base_seen or colours_seen != 0) return rejected("base= must be the first setting", line_number);
-            theme = presets.find(value) orelse return rejected("unknown base theme", line_number);
+            if (base_seen or colours_seen != 0) return rejected(Text.of("base= must be the first setting"), line_number);
+            theme = presets.find(value) orelse return rejected(Text.of("unknown base theme"), line_number);
             base_seen = true;
             continue;
         }
-        const colour = Color.fromHex(value) orelse return rejected("colour is not #rrggbb", line_number);
-        if (!setField(&theme, key, colour)) return rejected("unknown key", line_number);
+        const colour = Color.fromHex(value) orelse return rejected(Text.of("colour is not #rrggbb"), line_number);
+        if (!setField(&theme, key, colour)) return rejected(Text.of("unknown key"), line_number);
         colours_seen += 1;
     }
-    if (contrast.firstProblem(theme)) |problem| return rejected(problem, 0);
+    if (contrast.firstProblemIndex(theme)) |index| return rejected(if (messages) contrast.rules[index].name else "", 0);
     return .{ .theme = theme };
 }
 
+/// Theme field names and offsets (a table, not an unrolled comparison per
+/// field: the Legacy BIOS Core reads user themes too).
+const Slot = struct { name: []const u8, offset: u16 };
+const slots = blk: {
+    var out: [std.meta.fields(Theme).len]Slot = undefined;
+    var n: usize = 0;
+    for (std.meta.fields(Theme)) |f| {
+        if (f.type != Color) continue;
+        out[n] = .{ .name = f.name, .offset = @offsetOf(Theme, f.name) };
+        n += 1;
+    }
+    break :blk out[0..n].*;
+};
+
 fn setField(theme: *Theme, key: []const u8, colour: Color) bool {
-    inline for (std.meta.fields(Theme)) |f| {
-        if (f.type == Color and keyMatches(key, f.name)) {
-            @field(theme, f.name) = colour;
+    for (slots) |slot| {
+        if (keyMatches(key, slot.name)) {
+            const target: *Color = @ptrFromInt(@intFromPtr(theme) + slot.offset);
+            target.* = colour;
             return true;
         }
     }
     return false;
 }
 
-fn keyMatches(key: []const u8, comptime name: []const u8) bool {
+fn keyMatches(key: []const u8, name: []const u8) bool {
     if (key.len != name.len) return false;
     for (key, name) |k, n| {
         const normal = if (k == '-') '_' else std.ascii.toLower(k);
@@ -134,4 +165,17 @@ test "any error falls back to the default theme" {
     }
     const big = [_]u8{' '} ** (max_bytes + 1);
     try std.testing.expectEqualStrings("file too large", resolve(&big).problem.?);
+}
+
+test "the example themes on the stick pass every rule (UEFI and BIOS parsers)" {
+    inline for (.{ "usos-ocean", "usos-sunset", "usos-forest" }) |name| {
+        const text = @embedFile("themes/" ++ name ++ ".ini");
+        const outcome = resolve(text);
+        std.testing.expect(outcome.ok()) catch |err| {
+            std.debug.print("{s}: {s}\n", .{ name, outcome.problem.? });
+            return err;
+        };
+        try std.testing.expectEqualDeep(outcome.theme, resolveTheme(text).?);
+    }
+    try std.testing.expect(resolveTheme("base=light\ntext=#ffffff\n") == null);
 }

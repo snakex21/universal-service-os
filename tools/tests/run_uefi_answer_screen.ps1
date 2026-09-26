@@ -1,8 +1,13 @@
-# QEMU/OVMF click-through of the XP answer-file screen (UEFI menu):
-# rows with an active usos-xp.ini and one .sif, Back by Esc, Backspace
-# (handheld B), right click and a click on the footer Esc hint (the touch
-# tap hit test), the summary
-# for each row and the kernel command line handed to the XP micro-Linux.
+# QEMU/OVMF click-through of the XP answer-file screen (UEFI menu; since
+# 2026-09-26 the answer-profile manager, docs/answer-profiles.md): rows with
+# an active usos-xp.ini and one .sif, Back by Esc, Backspace (handheld B),
+# right click and a click on the footer Esc hint (the touch tap hit test),
+# the summary for each row and the kernel command line handed to the XP
+# micro-Linux; a USOS profile added with the keyboard, used
+# (usos.xp_settings=plan), edited (F2 = pad X), left with Esc, deleted
+# (Delete = pad Y, confirmed); Windows 10's manager; and the theme editor
+# (Tools -> Theme: contrast failure blocks Save, a valid theme is saved on
+# the ESP and used).
 #
 #   powershell -File tools/tests/run_uefi_answer_screen.ps1 [-Update]
 #

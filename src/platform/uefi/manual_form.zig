@@ -70,6 +70,9 @@ pub const Field = struct {
     index: ?*usize = null,
     // toggle
     flag: ?*bool = null,
+    // stepper (0..255, Left/Right by `step`)
+    number: ?*u8 = null,
+    step: u8 = 8,
     // action
     primary: bool = false,
     /// Returned by run() when the button is pressed.
@@ -142,6 +145,7 @@ fn refreshItems() void {
                 item.on = field.flag.?.*;
                 item.value = if (item.on) t(.form_on) else t(.form_off);
             },
+            .stepper => item.value = std.fmt.bufPrint(&value_text[index], "{d}", .{field.number.?.*}) catch "",
             .action => {},
         }
         items[index] = item;
@@ -216,6 +220,8 @@ fn rebuild(selected: usize) void {
     formHints();
 }
 
+var trace_number: [4]u8 = undefined;
+
 fn trace(kind: []const u8, index: usize) void {
     const field = &form_fields[index];
     var line: [160]u8 = undefined;
@@ -223,6 +229,7 @@ fn trace(kind: []const u8, index: usize) void {
         .text => if (field.secret) (if (field.text.?.len > 0) "(secret)" else "") else field.text.?.slice(),
         .choice => if (field.index) |i| (if (i.* < field.options.len) field.options[i.*] else "") else "",
         .toggle => if (field.flag.?.*) "on" else "off",
+        .stepper => std.fmt.bufPrint(&trace_number, "{d}", .{field.number.?.*}) catch "",
         .action => "",
     };
     view.traceForm(kind, std.fmt.bufPrint(&line, "index={d} label={s} value={s}", .{ index, field.label, value }) catch return);
@@ -277,6 +284,13 @@ pub fn run(title: []const u8, subtitle: []const u8, fields: []Field, hooks: ?Hoo
                         notifyChanged(selected.*);
                         rebuild(selected.*);
                         screen.redrawRows();
+                    },
+                    .stepper => {
+                        const value = field.number.?;
+                        value.* = if (event == .right) value.* +| field.step else value.* -| field.step;
+                        notifyChanged(selected.*);
+                        rebuild(selected.*);
+                        screen.redraw();
                     },
                     else => {},
                 }
@@ -358,6 +372,14 @@ fn activate(selected: *usize) ?Outcome {
             notifyChanged(index);
             rebuild(index);
             screen.redrawRows();
+        },
+        // A steps up (wrapping), like Right on a pad without the D-pad.
+        .stepper => {
+            const value = field.number.?;
+            value.* = if (value.* == 255) 0 else value.* +| field.step;
+            notifyChanged(index);
+            rebuild(index);
+            screen.redraw();
         },
         .choice => {
             if (pick(field)) {
