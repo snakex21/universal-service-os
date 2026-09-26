@@ -7,6 +7,13 @@ USOS_PLAN_PROFILE=xp-x86-sp3-uefi-csm, set by pipeline step 100). Never
 modifies production files or ISOs. Does not boot a VM.
 
   python tools/build_xp_uefi_csm_trial.py [--micro-linux zig-out/micro-linux] [--data L:/] [--out DIR] [--release]
+  python tools/build_xp_uefi_csm_trial.py --data DIR --bundles-from OLD_PACKAGE --out DIR
+
+--bundles-from rebuilds a package with the sources (and order) of OLD_PACKAGE
+when not every source ISO is at hand (the stick's DATA is not plugged in):
+each source whose ISO is in --data is rebuilt and its bundle must be
+byte-identical to OLD_PACKAGE's (reproducibility); the others reuse
+OLD_PACKAGE/drivers/<sha256>/bundle as it is.
 """
 from pathlib import Path
 import argparse, gzip, hashlib, json, os, shutil, stat, struct, subprocess
@@ -161,6 +168,45 @@ def release_selection(supported,hashes):
     if missing:raise ValueError('XP release: allowlisted source missing on DATA: '+', '.join(RELEASE_SOURCES[h] for h in missing))
     return chosen
 
+def same_tree(a, b):
+    files = lambda root: {p.relative_to(root).as_posix(): p.read_bytes() for p in root.rglob('*') if p.is_file()}
+    return files(a) == files(b)
+
+def build_from_old(micro, data, old):
+    """The stick package of `old` (same sources, same order) on a new base."""
+    old = old.resolve()
+    old_meta = json.loads((old/'manifest.json').read_text())
+    OUT.mkdir(parents=True,exist_ok=True);(OUT/'tmp').mkdir(exist_ok=True)
+    env=dict(os.environ,TEMP=str(OUT/'tmp'),TMP=str(OUT/'tmp'),ZIG_GLOBAL_CACHE_DIR=str(ROOT/'tools/cache/zig-global'),ZIG_LOCAL_CACHE_DIR=str(OUT/'zig-cache'))
+    helper=compile_helper(env)
+    base=micro/'initramfs-usos';kernel=micro/'vmlinuz-virt'
+    local={p.name:p for p in (data/'Systems/Windows/Windows XP/Images').glob('*.iso')} if data.exists() else {}
+    driver_bundles=[];sources=[]
+    for source in old_meta['driver_sources']:
+        old_bundle=old/'drivers'/source['sha256']/'bundle'
+        iso=local.get(source['name'])
+        if iso is not None:
+            if digest(iso)!=source['sha256']:raise ValueError('ISO differs from the old package source: '+iso.name)
+            bundle_id,bundle=build_driver_overlay(iso,OUT/'drivers'/source['sha256'])
+            if bundle_id!=source['bundle']:raise ValueError('driver bundle id differs: '+iso.name)
+            # Cabinet/hive timestamps may differ; compare_xp_packages.py judges the content.
+            print('XP_BUNDLE_REBUILT',iso.name,bundle_id,'identical' if same_tree(bundle,old_bundle) else 'bytes differ (see compare_xp_packages)',flush=True)
+        else:
+            # The whole work folder (the checks read its original/ files too).
+            target=OUT/'drivers'/source['sha256']
+            if target.resolve()!=old_bundle.parent:
+                shutil.rmtree(target,ignore_errors=True);shutil.copytree(old_bundle.parent,target)
+            bundle_id,bundle=source['bundle'],target/'bundle'
+            print('XP_BUNDLE_REUSED',source['name'],bundle_id,flush=True)
+        driver_bundles.append((bundle_id,bundle));sources.append(dict(source))
+    init=OUT/'initramfs-xp';init.write_bytes(overlay(base,helper,driver_bundles))
+    shutil.copyfile(kernel,OUT/'vmlinuz.efi')
+    metadata=dict(old_meta)
+    metadata.update({'driver_bundles':[n for n,_ in driver_bundles],'driver_sources':sources,'base_initramfs_sha256':digest(base),'base_kernel_sha256':digest(kernel),'hardware_verified':False,'sha256':{p.name:digest(p) for p in [init,OUT/'vmlinuz.efi',helper]}})
+    metadata.pop('added_source',None)
+    (OUT/'manifest.json').write_text(json.dumps(metadata,indent=2)+'\n')
+    print('XP_UEFI_CSM_PACKAGE_REBUILT from',old.name,'; base scripts unchanged (profile xp-x86-sp3-uefi-csm); no VM/E2E',flush=True)
+
 def build(micro, data, release=False):
     """Full package from a micro-Linux build (default zig-out/micro-linux) and
     the XP ISOs of a DATA folder (read only). No stick is read: the per-ISO
@@ -197,6 +243,7 @@ if __name__=='__main__':
     p.add_argument('--out',type=Path,default=OUT,help='package folder (default zig-out/xp-uefi-csm)')
     p.add_argument('--esp',type=Path,default=Path('J:/'),help='--refresh-pae-flow only: ESP whose base the package was built from')
     p.add_argument('--release',action='store_true',help='release package: only the RELEASE_SOURCES SHA-256 allowlist (original PL x14-80476 and EN x14-80428)')
+    p.add_argument('--bundles-from',type=Path,help='rebuild with the sources of this package; ISOs missing in --data reuse its driver bundles')
     mode=p.add_mutually_exclusive_group();mode.add_argument('--menu-only',action='store_true');mode.add_argument('--add-source',type=Path);mode.add_argument('--refresh-pae-flow',action='store_true');a=p.parse_args()
     OUT=a.out.resolve()
     if a.menu_only:
@@ -205,4 +252,5 @@ if __name__=='__main__':
         print('PASS: Zig UEFI menu build and Zig tests; no BIOS build or VM/E2E')
     elif a.add_source:add_driver_source(a.add_source)
     elif a.refresh_pae_flow:refresh_pae_flow(a.esp)
+    elif a.bundles_from:build_from_old(a.micro_linux.resolve(),a.data,a.bundles_from)
     else:build(a.micro_linux.resolve(),a.data,a.release)
