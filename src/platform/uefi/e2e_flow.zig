@@ -112,7 +112,7 @@ pub fn requestPreparation(
     // not a Windows installer: the menu blocks both, this is the last check
     // before install-state.ini is written.
     if (image.media) |info| {
-        if (usos.image_probe.windows_media.block(info, @import("windows_media_probe.zig").firmware()) != null) return error.ImageArchitectureNotSupportedHere;
+        if (usos.catalog.os_profiles.mediaBlock(system.id, info, @import("windows_media_probe.zig").firmware()) != null) return error.ImageArchitectureNotSupportedHere;
         if (info.content == .winpe) return error.NotAWindowsInstaller;
     }
     // Same profile choice as the boot summary (UEFI rules included).

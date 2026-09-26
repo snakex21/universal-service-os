@@ -37,7 +37,7 @@ pub fn show(
 ) void {
     const unattended = answer.path;
     if (!system.firmware.accepts(firmware)) return showFirmwareUnavailable();
-    if (manual_images.blockReason(image)) |reason| return showMediaBlocked(image.name.slice(), reason);
+    if (manual_images.blockReason(system, image)) |reason| return showMediaBlocked(image.name.slice(), reason);
     const backend = usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, firmware) orelse return showUnsupported();
     const resolved = backend.method();
     const method_firmware = backend.firmwareRequirement();
@@ -263,7 +263,7 @@ fn start(
         return;
     }
 
-    if (manual_images.blockReason(image)) |reason| return showMediaBlocked(image.name.slice(), reason);
+    if (manual_images.blockReason(system, image)) |reason| return showMediaBlocked(image.name.slice(), reason);
     if (image.kind == .iso and backend == .windows_iso and usos.flow.preparation_capability.nativeModernNt(system.id)) {
         view.windowsIsoStatus(.validating, "Reading the selected Windows ISO");
         const rendered = renderForWimboot(profile, system, os_profile_id) catch |err| return showError(view.t(.error_iso), err);
@@ -313,7 +313,7 @@ pub fn showWinPe(
     firmware: usos.firmware.Firmware,
 ) void {
     if (!system.firmware.accepts(firmware) or firmware != .uefi) return showFirmwareUnavailable();
-    if (manual_images.blockReason(image)) |reason| return showMediaBlocked(image.name.slice(), reason);
+    if (manual_images.blockReason(system, image)) |reason| return showMediaBlocked(image.name.slice(), reason);
     var fields = Fields{};
     fields.add(view.t(.summary_system), system.name);
     fields.add(view.t(.summary_image), image.name.slice());

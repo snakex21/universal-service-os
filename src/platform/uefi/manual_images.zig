@@ -37,7 +37,7 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, system: *const
             .activate => {
                 const image = images.items[selected];
                 // Selectable but blocked: explain why and stay in the list.
-                if (blockReason(image)) |reason| {
+                if (blockReason(system, image)) |reason| {
                     showBlocked(image.name.slice(), reason);
                     list.open(system.name, view.t(.images_subtitle), rows[0..images.len], selected, two_line, null);
                     continue;
@@ -53,9 +53,11 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, system: *const
 }
 
 /// Why this image cannot start on this firmware (null: no objection).
-pub fn blockReason(image: usos.catalog.ImageItem) ?media.Block {
+/// Windows 7/Vista (and Server 2008/2008 R2) start through the PE donor, so
+/// their media need no own UEFI loader (os_profiles.mediaBlock).
+pub fn blockReason(system: *const usos.catalog.SystemEntry, image: usos.catalog.ImageItem) ?media.Block {
     const info = image.media orelse return null;
-    return media.block(info, probe.firmware());
+    return usos.catalog.os_profiles.mediaBlock(system.id, info, probe.firmware());
 }
 
 pub fn blockText(reason: media.Block) []const u8 {
@@ -99,7 +101,7 @@ fn row(system: *const usos.catalog.SystemEntry, image: *const usos.catalog.Image
         return result;
     }
     const arch: ?[]const u8 = if (info.arch == .unknown) null else info.arch.label();
-    if (media.block(info, probe.firmware())) |reason| {
+    if (usos.catalog.os_profiles.mediaBlock(system.id, info, probe.firmware())) |reason| {
         result.detail = blockText(reason);
         result.badge = .{ .text = arch orelse view.t(.badge_unavailable), .tone = .warning };
         return result;
