@@ -32,3 +32,6 @@ src/i18n/linux_strings.zig     text eol=lf
 tools/windows_xp_pae_strings.h text eol=lf
 tools/windows_winpe_strings.h  text eol=lf
 src/i18n/testdata/lang-pl.bin  binary
+
+# Answer renderer goldens and vectors are compared byte for byte (LF and CRLF on purpose).
+src/flow/answer/testdata/** -text
