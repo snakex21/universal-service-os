@@ -874,5 +874,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "Стартовият дял на Vista не можа да бъде потвърден. Инсталирането не е стартирано. BCD журналите ще бъдат записани на USB устройството.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "Инсталаторът не подготви KMDF 1.11, необходим за USB. Все още не стартирайте Vista от диска. Журналите от инсталирането ще бъдат записани на USB устройството."
+  "winpe.vista_kmdf_failed": "Инсталаторът не подготви KMDF 1.11, необходим за USB. Все още не стартирайте Vista от диска. Журналите от инсталирането ще бъдат записани на USB устройството.",
+
+  "boot.form.empty": "(празно)",
+  "boot.form.on": "Вкл.",
+  "boot.form.off": "Изкл.",
+  "boot.form.key.change": "Промяна",
+  "boot.form.key.type": "Клавиши",
+  "boot.form.key.backspace": "Изтриване",
+  "boot.form.osk.shift": "Shift",
+  "boot.form.osk.space": "Интервал",
+  "boot.form.osk.done": "Готово",
+  "boot.form.picker.subtitle": "Изберете стойност"
 }

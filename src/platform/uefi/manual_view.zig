@@ -59,7 +59,8 @@ var last_pointer_present: u64 = 0;
 /// Pointer-driven redraws are limited to about 60 per second.
 const pointer_frame_ms: u64 = 16;
 
-const Active = enum { none, home, list, summary };
+const Active = enum { none, home, list, summary, form };
+var active_form: ?*FormScreen = null;
 var active: Active = .none;
 var active_home: ?*Home = null;
 var active_list: ?*ListScreen = null;
@@ -203,6 +204,8 @@ fn hintAt(x: u32, y: u32) ?input.Event {
     const key = footer_hints[index].key;
     if (std.mem.eql(u8, key, "Enter") or std.mem.eql(u8, key, "A")) return .enter;
     if (std.mem.eql(u8, key, "Esc") or std.mem.eql(u8, key, "B")) return .back;
+    if (std.mem.eql(u8, key, "F2") or std.mem.eql(u8, key, "X")) return .x_button;
+    if (std.mem.eql(u8, key, "Del") or std.mem.eql(u8, key, "Y")) return .y_button;
     return null;
 }
 
@@ -226,6 +229,7 @@ fn inputModeChanged() void {
         .home => if (active_home) |home| home.redraw(),
         .list => if (active_list) |list| list.redrawFull(list.spec.selected, list.spec.help),
         .summary => summary(summary_spec),
+        .form => if (active_form) |form| form.modeChanged(),
         // Notices and the input test build their hints on the next draw.
         .none => {},
     }
@@ -732,6 +736,122 @@ pub fn hitCategoryCard(x: u32, y: u32) ?usize {
     return home.hit(x, y);
 }
 
+// ------------------------------------------------------------------ forms
+
+/// A form screen (src/gui/form.zig) with an optional on-screen keyboard and
+/// an optional side panel drawn by the owner (theme preview). The owner
+/// (manual_form.zig) keeps the spec current and calls redraw.
+pub const FormScreen = struct {
+    spec: gui.form.Spec,
+    geometry: gui.form.Geometry = undefined,
+    first: usize = 0,
+    /// Draws into the side panel after the form (theme editor preview).
+    side: ?*const fn (u: *const Ui, rect: gui.ui.Rect) void = null,
+    /// Rebuilds the footer hints for the current input device.
+    rehint: ?*const fn () void = null,
+    key_hover: ?[2]u8 = null,
+
+    pub fn redraw(self: *FormScreen) void {
+        active = .form;
+        active_form = self;
+        active_list = null;
+        header_clock_active = true;
+        beginFullFrame();
+        var u = ui() orelse return self.console();
+        var clock: [48]u8 = undefined;
+        setFooter(self.spec.hints, self.spec.note);
+        if (self.spec.keyboard) |*k| k.hover = self.key_hover;
+        self.geometry = gui.form.screen(&u, headerInfo(&clock, &u), self.spec, self.first);
+        self.first = self.geometry.first;
+        if (self.geometry.side) |rect| if (self.side) |draw| draw(&u, rect);
+        presentFullFrame(true);
+    }
+
+    /// Redraws only the rows (selection or a value changed, same layout).
+    pub fn redrawRows(self: *FormScreen) void {
+        if (surface == null) return self.redraw();
+        var u = beginPartial() orelse return;
+        const g = gui.form.geometry(&u, self.spec, self.first);
+        if (g.first != self.first or g.list.visible != self.geometry.list.visible) {
+            endPartial();
+            return self.redraw();
+        }
+        self.geometry = g;
+        gui.form.drawRows(&u, g, self.spec);
+        if (g.side) |rect| if (self.side) |draw| draw(&u, rect);
+        endPartial();
+    }
+
+    fn console(self: *FormScreen) void {
+        console_clear(self.spec.title);
+        for (self.spec.items, 0..) |item, index| {
+            consoleLine(if (index == self.spec.selected) "> " else "  ", item.label, if (item.kind == .toggle) (if (item.on) "[x]" else "[ ]") else item.value);
+        }
+        if (self.spec.keyboard) |k| consoleLine("= ", k.label, k.value);
+    }
+
+    fn modeChanged(self: *FormScreen) void {
+        if (self.rehint) |hook| hook();
+        self.redraw();
+    }
+
+    pub fn hitRow(self: *const FormScreen, x: u32, y: u32) ?usize {
+        if (surface == null) return null;
+        return gui.form.hit(self.geometry, self.spec.items.len, x, y);
+    }
+
+    pub fn hitKey(self: *const FormScreen, x: u32, y: u32) ?[2]u8 {
+        if (surface == null) return null;
+        const k = self.geometry.keyboard orelse return null;
+        return k.hit(x, y);
+    }
+
+    pub fn inKeyboard(self: *const FormScreen, x: u32, y: u32) bool {
+        const k = self.geometry.keyboard orelse return false;
+        return k.contains(x, y);
+    }
+
+    /// More rows than fit: the wheel scrolls.
+    pub fn visibleRows(self: *const FormScreen) usize {
+        if (surface == null) return self.spec.items.len;
+        return self.geometry.list.visible;
+    }
+
+    fn pointerMoved(self: *FormScreen, x: u32, y: u32) void {
+        if (self.spec.keyboard) |*k| {
+            const key = self.hitKey(x, y);
+            if (std.meta.eql(key, self.key_hover)) return;
+            self.key_hover = key;
+            k.hover = key;
+            const g = self.geometry.keyboard orelse return;
+            var u = ui() orelse return;
+            _ = gui.osk.draw(&u, g.panel, k.*);
+            return;
+        }
+        const index = self.hitRow(x, y);
+        const hover: ?usize = if (index) |i| (if (i != self.spec.selected and self.spec.items[i].enabled) i else null) else null;
+        if (std.meta.eql(hover, self.spec.hover)) return;
+        const previous = self.spec.hover;
+        self.spec.hover = hover;
+        var u = ui() orelse return;
+        if (previous) |value| gui.form.drawRow(&u, self.geometry, self.spec, value);
+        if (hover) |value| gui.form.drawRow(&u, self.geometry, self.spec, value);
+    }
+};
+
+/// Serial trace line (QEMU click-through tests); never a secret value.
+pub fn traceForm(kind: []const u8, text: []const u8) void {
+    serial.writeAscii("[UI_FORM] ");
+    serial.writeAscii(kind);
+    serial.writeAscii(" ");
+    serial.writeAscii(text);
+    serial.writeAscii("\n");
+}
+
+pub fn traceFormScreen(title: []const u8) void {
+    traceScreen("form", title);
+}
+
 // ------------------------------------------------------------------ notices
 
 pub const NoticeLines = []const []const u8;
@@ -925,6 +1045,7 @@ pub fn updatePointer() void {
             const hit = if (pointer.isDragging()) null else screens.listHit(list.geometry, list.spec.rows.len, pos.x, pos.y);
             list.setHover(if (hit) |index| (if (index != list.spec.selected and list.hoverable(index)) index else null) else null);
         },
+        .form => if (active_form) |form| form.pointerMoved(pos.x, pos.y),
         .summary => {
             const hover = summary_button.contains(pos.x, pos.y) and summary_spec.action_enabled;
             if (hover != summary_spec.action_hover) {

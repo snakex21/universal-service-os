@@ -877,5 +877,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "Spúšťací oddiel systému Vista sa nepodarilo potvrdiť. Inštalácia sa nespustila. Protokoly BCD sa uložia na jednotku USB.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "Inštalácia nepripravila KMDF 1.11, ktoré vyžaduje USB. Zatiaľ nespúšťajte Vistu z disku. Protokoly inštalácie sa uložia na jednotku USB."
+  "winpe.vista_kmdf_failed": "Inštalácia nepripravila KMDF 1.11, ktoré vyžaduje USB. Zatiaľ nespúšťajte Vistu z disku. Protokoly inštalácie sa uložia na jednotku USB.",
+
+  "boot.form.empty": "(prázdne)",
+  "boot.form.on": "Zapnuté",
+  "boot.form.off": "Vypnuté",
+  "boot.form.key.change": "Zmeniť",
+  "boot.form.key.type": "Klávesy",
+  "boot.form.key.backspace": "Vymazať",
+  "boot.form.osk.shift": "Shift",
+  "boot.form.osk.space": "Medzera",
+  "boot.form.osk.done": "Hotovo",
+  "boot.form.picker.subtitle": "Vyberte hodnotu"
 }

@@ -874,5 +874,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "Die Vista-Startpartition konnte nicht bestätigt werden. Die Installation wurde nicht gestartet. Die BCD-Protokolle werden auf dem USB-Laufwerk gespeichert.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "Setup hat das für USB erforderliche KMDF 1.11 nicht vorbereitet. Starten Sie Vista noch nicht vom Datenträger. Die Installationsprotokolle werden auf dem USB-Laufwerk gespeichert."
+  "winpe.vista_kmdf_failed": "Setup hat das für USB erforderliche KMDF 1.11 nicht vorbereitet. Starten Sie Vista noch nicht vom Datenträger. Die Installationsprotokolle werden auf dem USB-Laufwerk gespeichert.",
+
+  "boot.form.empty": "(leer)",
+  "boot.form.on": "Ein",
+  "boot.form.off": "Aus",
+  "boot.form.key.change": "Ändern",
+  "boot.form.key.type": "Tasten",
+  "boot.form.key.backspace": "Löschen",
+  "boot.form.osk.shift": "Umschalt",
+  "boot.form.osk.space": "Leertaste",
+  "boot.form.osk.done": "Fertig",
+  "boot.form.picker.subtitle": "Wert auswählen"
 }

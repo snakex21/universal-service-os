@@ -25,7 +25,7 @@ var uefiOnlyPrefixes = []string{
 	"summary.", "handoff.", "iso.", "efi.", "chainload.", "error.", "action.",
 	"help.win7_wimboot.", "power.firmware", "notice.backend.", "utility.",
 	"prep.request_saved", "prep.return_boot", "prep.loader_ready", "prep.starting", "prep.xp_disks", "xp_prep.",
-	"header.no_mouse", "splash.", "server.",
+	"header.no_mouse", "splash.", "server.", "form.", "profile.", "theme_edit.",
 }
 
 // LinuxKeyPrefix marks boot strings shown only by the micro-Linux framebuffer

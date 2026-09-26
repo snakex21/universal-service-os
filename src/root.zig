@@ -33,6 +33,8 @@ pub const gui = struct {
     pub const handheld = @import("gui/handheld.zig");
     pub const ui = @import("gui/ui.zig");
     pub const menu_screens = @import("gui/menu_screens.zig");
+    pub const form = @import("gui/form.zig");
+    pub const osk = @import("gui/osk.zig");
     pub const splash_screen = @import("gui/splash_screen.zig");
     pub const bmp = @import("gui/bmp.zig");
     pub const ui_pack = @import("gui/ui_pack.zig");
@@ -97,6 +99,8 @@ test {
     _ = @import("flow/xp_settings_summary.zig");
     _ = @import("flow/answer_screen.zig");
     _ = @import("flow/answer/root.zig");
+    _ = @import("gui/form.zig");
+    _ = @import("gui/osk.zig");
     _ = @import("flow/plan.zig");
     _ = @import("platform/bios/windows_boot_contract.zig");
     _ = @import("platform/bios/windows_cpio.zig");

@@ -874,5 +874,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "Vistan käynnistysosiota ei voitu vahvistaa. Asennusta ei käynnistetty. BCD-lokit tallennetaan USB-asemalle.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "Asennusohjelma ei valmistellut USB:n vaatimaa KMDF 1.11:tä. Älä vielä käynnistä Vistaa levyltä. Asennuslokit tallennetaan USB-asemalle."
+  "winpe.vista_kmdf_failed": "Asennusohjelma ei valmistellut USB:n vaatimaa KMDF 1.11:tä. Älä vielä käynnistä Vistaa levyltä. Asennuslokit tallennetaan USB-asemalle.",
+
+  "boot.form.empty": "(tyhjä)",
+  "boot.form.on": "Päällä",
+  "boot.form.off": "Pois",
+  "boot.form.key.change": "Muuta",
+  "boot.form.key.type": "Näppäimet",
+  "boot.form.key.backspace": "Poista",
+  "boot.form.osk.shift": "Vaihto",
+  "boot.form.osk.space": "Välilyönti",
+  "boot.form.osk.done": "Valmis",
+  "boot.form.picker.subtitle": "Valitse arvo"
 }

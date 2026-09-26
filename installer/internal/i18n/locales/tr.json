@@ -874,5 +874,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "Vista önyükleme bölümü doğrulanamadı. Yükleme başlatılmadı. BCD günlükleri USB sürücüye kaydedilecek.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "Kurulum, USB için gereken KMDF 1.11'i hazırlamadı. Vista'yı henüz diskten başlatmayın. Yükleme günlükleri USB sürücüye kaydedilecek."
+  "winpe.vista_kmdf_failed": "Kurulum, USB için gereken KMDF 1.11'i hazırlamadı. Vista'yı henüz diskten başlatmayın. Yükleme günlükleri USB sürücüye kaydedilecek.",
+
+  "boot.form.empty": "(boş)",
+  "boot.form.on": "Açık",
+  "boot.form.off": "Kapalı",
+  "boot.form.key.change": "Değiştir",
+  "boot.form.key.type": "Tuşlar",
+  "boot.form.key.backspace": "Sil",
+  "boot.form.osk.shift": "Shift",
+  "boot.form.osk.space": "Boşluk",
+  "boot.form.osk.done": "Bitti",
+  "boot.form.picker.subtitle": "Bir değer seçin"
 }

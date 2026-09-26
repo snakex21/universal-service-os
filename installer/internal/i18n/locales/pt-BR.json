@@ -874,5 +874,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "Não foi possível confirmar a partição de inicialização do Vista. A instalação não foi iniciada. Os logs do BCD serão salvos na unidade USB.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "A instalação não preparou o KMDF 1.11 exigido pelo USB. Ainda não inicie o Vista pelo disco. Os logs de instalação serão salvos na unidade USB."
+  "winpe.vista_kmdf_failed": "A instalação não preparou o KMDF 1.11 exigido pelo USB. Ainda não inicie o Vista pelo disco. Os logs de instalação serão salvos na unidade USB.",
+
+  "boot.form.empty": "(vazio)",
+  "boot.form.on": "Ligado",
+  "boot.form.off": "Desligado",
+  "boot.form.key.change": "Alterar",
+  "boot.form.key.type": "Teclas",
+  "boot.form.key.backspace": "Apagar",
+  "boot.form.osk.shift": "Shift",
+  "boot.form.osk.space": "Espaço",
+  "boot.form.osk.done": "Concluído",
+  "boot.form.picker.subtitle": "Escolha um valor"
 }

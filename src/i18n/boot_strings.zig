@@ -134,6 +134,16 @@ pub const Key = enum(u16) {
     error_unsupported_line1,
     error_unsupported_title,
     error_xp,
+    form_empty,
+    form_key_backspace,
+    form_key_change,
+    form_key_type,
+    form_off,
+    form_on,
+    form_osk_done,
+    form_osk_shift,
+    form_osk_space,
+    form_picker_subtitle,
     handoff_bootmgr,
     handoff_commit,
     handoff_line1,
@@ -585,6 +595,16 @@ pub const hashes = [_]u32{
     0x96c6d0e3, // error.unsupported.line1
     0x471635f4, // error.unsupported.title
     0x74a11b6d, // error.xp
+    0xd2e92c28, // form.empty
+    0x068d58eb, // form.key.backspace
+    0x4f03dbc4, // form.key.change
+    0x33e2e09c, // form.key.type
+    0xae287c48, // form.off
+    0xcf665366, // form.on
+    0xafc445f4, // form.osk.done
+    0x97415b00, // form.osk.shift
+    0xccbac9aa, // form.osk.space
+    0x06577659, // form.picker.subtitle
     0x096158f9, // handoff.bootmgr
     0x12a81bf8, // handoff.commit
     0x23c3a3ee, // handoff.line1
@@ -1021,6 +1041,16 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
     false,
     false,
     false,
@@ -1486,6 +1516,16 @@ pub const english = [_][]const u8{
     "The selected method has no working backend.",
     "Boot method unavailable",
     "XP preparation failed",
+    "(empty)",
+    "Delete",
+    "Change",
+    "Keys",
+    "Off",
+    "On",
+    "Done",
+    "Shift",
+    "Space",
+    "Choose a value",
     "Loading Windows Boot Manager...",
     "Saving the one-shot handoff state...",
     "Windows installer preparation is complete.",

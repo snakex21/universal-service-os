@@ -874,5 +874,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "La partition de démarrage de Vista n'a pas pu être confirmée. L'installation n'a pas été lancée. Les journaux BCD seront enregistrés sur la clé USB.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "L'installation n'a pas préparé KMDF 1.11, requis pour l'USB. Ne démarrez pas encore Vista depuis le disque. Les journaux d'installation seront enregistrés sur la clé USB."
+  "winpe.vista_kmdf_failed": "L'installation n'a pas préparé KMDF 1.11, requis pour l'USB. Ne démarrez pas encore Vista depuis le disque. Les journaux d'installation seront enregistrés sur la clé USB.",
+
+  "boot.form.empty": "(vide)",
+  "boot.form.on": "Activé",
+  "boot.form.off": "Désactivé",
+  "boot.form.key.change": "Modifier",
+  "boot.form.key.type": "Touches",
+  "boot.form.key.backspace": "Effacer",
+  "boot.form.osk.shift": "Maj",
+  "boot.form.osk.space": "Espace",
+  "boot.form.osk.done": "Terminé",
+  "boot.form.picker.subtitle": "Choisissez une valeur"
 }

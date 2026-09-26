@@ -874,5 +874,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "De opstartpartitie van Vista kon niet worden bevestigd. De installatie is niet gestart. De BCD-logboeken worden op het USB-station opgeslagen.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "Setup heeft KMDF 1.11, dat USB nodig heeft, niet voorbereid. Start Vista nog niet vanaf de schijf. De installatielogboeken worden op het USB-station opgeslagen."
+  "winpe.vista_kmdf_failed": "Setup heeft KMDF 1.11, dat USB nodig heeft, niet voorbereid. Start Vista nog niet vanaf de schijf. De installatielogboeken worden op het USB-station opgeslagen.",
+
+  "boot.form.empty": "(leeg)",
+  "boot.form.on": "Aan",
+  "boot.form.off": "Uit",
+  "boot.form.key.change": "Wijzigen",
+  "boot.form.key.type": "Toetsen",
+  "boot.form.key.backspace": "Wissen",
+  "boot.form.osk.shift": "Shift",
+  "boot.form.osk.space": "Spatie",
+  "boot.form.osk.done": "Klaar",
+  "boot.form.picker.subtitle": "Kies een waarde"
 }

@@ -130,3 +130,8 @@ fn showWindowsHandoffStatus(key: manual_view.Key) void {
     const lines = [_][]const u8{ manual_view.t(.handoff_line1), manual_view.t(key), manual_view.t(.handoff_line2) };
     manual_view.status(manual_view.t(.handoff_title), "", &lines);
 }
+
+// Step 2 compile check (the answer-profile manager uses it next).
+comptime {
+    _ = &@import("manual_form.zig").run;
+}

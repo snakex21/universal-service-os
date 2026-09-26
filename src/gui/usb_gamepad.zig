@@ -794,7 +794,9 @@ pub fn hidReportDescriptorLength(configuration: []const u8, interface_number: u8
 
 // ------------------------------------------------------------ mapping
 
-pub const Action = enum { up, down, left, right, accept, back, page_up, page_down };
+/// X and Y are the secondary actions of a screen (edit, delete, backspace,
+/// shift on the on-screen keyboard); most screens ignore them.
+pub const Action = enum { up, down, left, right, accept, back, page_up, page_down, action_x, action_y };
 
 pub const Button = enum { a, b, x, y, lb, rb, back, start, guide, ls, rs, dpad, stick };
 
@@ -845,6 +847,8 @@ pub const Mapper = struct {
         if (pressed.back) queue.push(.{ .action = .back, .button = .back });
         if (pressed.lb) queue.push(.{ .action = .page_up, .button = .lb });
         if (pressed.rb) queue.push(.{ .action = .page_down, .button = .rb });
+        if (pressed.x) queue.push(.{ .action = .action_x, .button = .x });
+        if (pressed.y) queue.push(.{ .action = .action_y, .button = .y });
 
         const buttons = state.buttons;
         var direction: ?input_map.Direction = if (buttons.up) .up else if (buttons.down) .down else if (buttons.left) .left else if (buttons.right) .right else null;

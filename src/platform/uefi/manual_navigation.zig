@@ -55,7 +55,7 @@ fn handleInternal(
         .page_down => jump(selected, total, selectable, @intCast(@max(1, list.visibleCount()))),
         .home => jump(selected, total, selectable, -@as(i64, @intCast(total))),
         .end => jump(selected, total, selectable, @intCast(total)),
-        .left, .right => .ignored,
+        .left, .right, .x_button, .y_button => .ignored,
         .enter => if (isSelectable(selectable, selected.*)) .activate else .ignored,
         .back => .back,
         .pointer => |mouse| pointerEvent(mouse, selected, total, list, selectable),

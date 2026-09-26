@@ -877,5 +877,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "Не удалось подтвердить загрузочный раздел Vista. Установка не запущена. Журналы BCD будут сохранены на USB-накопителе.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "Программа установки не подготовила KMDF 1.11, необходимый для USB. Пока не запускайте Vista с диска. Журналы установки будут сохранены на USB-накопителе."
+  "winpe.vista_kmdf_failed": "Программа установки не подготовила KMDF 1.11, необходимый для USB. Пока не запускайте Vista с диска. Журналы установки будут сохранены на USB-накопителе.",
+
+  "boot.form.empty": "(пусто)",
+  "boot.form.on": "Вкл.",
+  "boot.form.off": "Выкл.",
+  "boot.form.key.change": "Изменить",
+  "boot.form.key.type": "Клавиши",
+  "boot.form.key.backspace": "Удалить",
+  "boot.form.osk.shift": "Shift",
+  "boot.form.osk.space": "Пробел",
+  "boot.form.osk.done": "Готово",
+  "boot.form.picker.subtitle": "Выберите значение"
 }

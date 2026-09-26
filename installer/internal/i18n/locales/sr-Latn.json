@@ -877,5 +877,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "Nije moguće potvrditi particiju za pokretanje sistema Vista. Instalacija nije pokrenuta. BCD evidencije biće sačuvane na USB disku.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "Instalacija nije pripremila KMDF 1.11 potreban za USB. Još ne pokrećite Vistu sa diska. Evidencije instalacije biće sačuvane na USB disku."
+  "winpe.vista_kmdf_failed": "Instalacija nije pripremila KMDF 1.11 potreban za USB. Još ne pokrećite Vistu sa diska. Evidencije instalacije biće sačuvane na USB disku.",
+
+  "boot.form.empty": "(prazno)",
+  "boot.form.on": "Uključeno",
+  "boot.form.off": "Isključeno",
+  "boot.form.key.change": "Promeni",
+  "boot.form.key.type": "Tasteri",
+  "boot.form.key.backspace": "Obriši",
+  "boot.form.osk.shift": "Shift",
+  "boot.form.osk.space": "Razmak",
+  "boot.form.osk.done": "Gotovo",
+  "boot.form.picker.subtitle": "Izaberite vrednost"
 }

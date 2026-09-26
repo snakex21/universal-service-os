@@ -877,5 +877,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "Nie można potwierdzić partycji startowej Visty. Instalacja nie została uruchomiona. Logi BCD zostaną zapisane na pendrivie.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "Instalator nie przygotował KMDF 1.11 wymaganego przez USB. Nie uruchamiaj jeszcze Visty z dysku. Logi instalacji zostaną zapisane na pendrivie."
+  "winpe.vista_kmdf_failed": "Instalator nie przygotował KMDF 1.11 wymaganego przez USB. Nie uruchamiaj jeszcze Visty z dysku. Logi instalacji zostaną zapisane na pendrivie.",
+
+  "boot.form.empty": "(puste)",
+  "boot.form.on": "Włączone",
+  "boot.form.off": "Wyłączone",
+  "boot.form.key.change": "Zmień",
+  "boot.form.key.type": "Klawisze",
+  "boot.form.key.backspace": "Usuń",
+  "boot.form.osk.shift": "Shift",
+  "boot.form.osk.space": "Spacja",
+  "boot.form.osk.done": "Gotowe",
+  "boot.form.picker.subtitle": "Wybierz wartość"
 }

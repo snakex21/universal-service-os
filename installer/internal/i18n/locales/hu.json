@@ -874,5 +874,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "A Vista rendszerindító partíciója nem erősíthető meg. A telepítés nem indult el. A BCD-naplók az USB-meghajtóra lesznek mentve.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "A telepítő nem készítette elő az USB-hez szükséges KMDF 1.11-et. Még ne indítsa a Vistát a lemezről. A telepítési naplók az USB-meghajtóra lesznek mentve."
+  "winpe.vista_kmdf_failed": "A telepítő nem készítette elő az USB-hez szükséges KMDF 1.11-et. Még ne indítsa a Vistát a lemezről. A telepítési naplók az USB-meghajtóra lesznek mentve.",
+
+  "boot.form.empty": "(üres)",
+  "boot.form.on": "Be",
+  "boot.form.off": "Ki",
+  "boot.form.key.change": "Módosítás",
+  "boot.form.key.type": "Billentyűk",
+  "boot.form.key.backspace": "Törlés",
+  "boot.form.osk.shift": "Shift",
+  "boot.form.osk.space": "Szóköz",
+  "boot.form.osk.done": "Kész",
+  "boot.form.picker.subtitle": "Válasszon értéket"
 }

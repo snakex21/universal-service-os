@@ -45,6 +45,10 @@ pub const Event = union(enum) {
     page_down,
     home,
     end,
+    /// Pad X or F2: the secondary action of a screen (edit).
+    x_button,
+    /// Pad Y or Delete: the tertiary action (delete).
+    y_button,
     pointer: pointer.Event,
     other: Key,
 };
@@ -108,6 +112,14 @@ pub fn setModeHook(hook: ?*const fn () void) void {
 }
 
 /// Footer key names for the current input device.
+pub fn xKey() []const u8 {
+    return if (padActive()) "X" else "F2";
+}
+
+pub fn yKey() []const u8 {
+    return if (padActive()) "Y" else "Del";
+}
+
 pub fn enterKey() []const u8 {
     return if (padActive()) "A" else "Enter";
 }
@@ -220,6 +232,8 @@ pub fn mapKey(scan: u16, unicode: u16) Event {
         0x06 => .end,
         0x09 => .page_up,
         0x0A => .page_down,
+        0x08 => .y_button,
+        0x0C => .x_button,
         0x17 => .back,
         else => switch (unicode) {
             13, 10, ' ' => .enter,
@@ -241,6 +255,8 @@ pub fn padEvent(action: usos.gui.usb_gamepad.Action) Event {
         .back => .back,
         .page_up => .page_up,
         .page_down => .page_down,
+        .action_x => .x_button,
+        .action_y => .y_button,
     };
 }
 

@@ -216,6 +216,40 @@ pub fn main(init: std.process.Init) !u8 {
     };
     _ = gui.menu_screens.listScreen(&ui, header, .{ .title = ui.t(.themes_title), .subtitle = ui.t(.themes_hint), .rows = &theme_rows, .selected = 1, .hover = 3, .hints = &hints }, 0);
     try save(io, cwd, init.gpa, out_dir, "15-tools-theme", pixels, width, height);
+
+    // The shared form component (src/gui/form.zig) and its on-screen
+    // keyboard (src/gui/osk.zig): the answer-profile editor's fields.
+    const form_items = [_]gui.form.Item{
+        .{ .kind = .text, .label = "Profile name", .value = "Dom" },
+        .{ .kind = .text, .label = "User name", .value = "Tester" },
+        .{ .kind = .text, .label = "Second user", .value = "", .placeholder = ui.t(.form_empty) },
+        .{ .kind = .text, .label = "Computer name", .value = "USOS-PC" },
+        .{ .kind = .text, .label = "Password", .value = "\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}" },
+        .{ .kind = .choice, .label = "Time zone", .value = "(UTC+01:00) Sarajevo, Skopje, Warsaw, Zagreb" },
+        .{ .kind = .choice, .label = "Windows language", .value = "Polish" },
+        .{ .kind = .text, .label = "Product key", .value = "ABCDE-12345", .invalid = true },
+        .{ .kind = .toggle, .label = "Remember the key", .on = false, .value = ui.t(.form_off) },
+        .{ .kind = .toggle, .label = "Local account", .on = true, .value = ui.t(.form_on) },
+        .{ .kind = .action, .label = "Save", .primary = true },
+        .{ .kind = .action, .label = "Cancel" },
+    };
+    const form_hints = [_]gui.ui.Hint{
+        .{ .key = "DPad", .label = ui.t(.key_select) },
+        .{ .key = "A", .label = ui.t(.form_key_change) },
+        .{ .key = "B", .label = ui.t(.key_back) },
+    };
+    const form_help_lines = [_][]const u8{"The first local account (administrator). 1-20 characters A-Z a-z 0-9 . _ - and space."};
+    _ = gui.form.screen(&ui, header, .{ .title = "Answer profile", .subtitle = "One profile for every Windows", .items = &form_items, .selected = 1, .hover = 5, .help = .{ .title = "User name", .lines = &form_help_lines }, .hints = &form_hints }, 0);
+    try save(io, cwd, init.gpa, out_dir, "16-form", pixels, width, height);
+    const allowed = gui.osk.allowAll();
+    const osk_hints = [_]gui.ui.Hint{
+        .{ .key = "DPad", .label = ui.t(.form_key_type) },
+        .{ .key = "X", .label = ui.t(.form_key_backspace) },
+        .{ .key = "Y", .label = ui.t(.form_osk_shift) },
+        .{ .key = "B", .label = ui.t(.form_osk_done) },
+    };
+    _ = gui.form.screen(&ui, header, .{ .title = "Answer profile", .items = &form_items, .selected = 1, .hints = &osk_hints, .keyboard = .{ .label = "User name", .value = "Tester", .state = .{ .row = 2, .col = 3, .shift = true }, .allowed = &allowed, .labels = .{ .shift = ui.t(.form_osk_shift), .space = ui.t(.form_osk_space), .done = ui.t(.form_osk_done) } } }, 0);
+    try save(io, cwd, init.gpa, out_dir, "17-form-keyboard", pixels, width, height);
     return 0;
 }
 

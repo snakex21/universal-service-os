@@ -877,5 +877,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "Neizdevās apstiprināt Vista sāknēšanas nodalījumu. Instalēšana netika palaista. BCD žurnāli tiks saglabāti USB diskā.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "Iestatīšana nesagatavoja USB nepieciešamo KMDF 1.11. Pagaidām nepalaidiet Vista no diska. Instalēšanas žurnāli tiks saglabāti USB diskā."
+  "winpe.vista_kmdf_failed": "Iestatīšana nesagatavoja USB nepieciešamo KMDF 1.11. Pagaidām nepalaidiet Vista no diska. Instalēšanas žurnāli tiks saglabāti USB diskā.",
+
+  "boot.form.empty": "(tukšs)",
+  "boot.form.on": "Ieslēgts",
+  "boot.form.off": "Izslēgts",
+  "boot.form.key.change": "Mainīt",
+  "boot.form.key.type": "Taustiņi",
+  "boot.form.key.backspace": "Dzēst",
+  "boot.form.osk.shift": "Shift",
+  "boot.form.osk.space": "Atstarpe",
+  "boot.form.osk.done": "Gatavs",
+  "boot.form.picker.subtitle": "Izvēlieties vērtību"
 }

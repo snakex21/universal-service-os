@@ -874,5 +874,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "Vista käivitussektsiooni ei õnnestunud kinnitada. Installimist ei käivitatud. BCD logid salvestatakse USB-draivile.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "Häälestus ei valmistanud ette USB jaoks vajalikku KMDF 1.11. Ärge käivitage Vistat veel kettalt. Installilogid salvestatakse USB-draivile."
+  "winpe.vista_kmdf_failed": "Häälestus ei valmistanud ette USB jaoks vajalikku KMDF 1.11. Ärge käivitage Vistat veel kettalt. Installilogid salvestatakse USB-draivile.",
+
+  "boot.form.empty": "(tühi)",
+  "boot.form.on": "Sees",
+  "boot.form.off": "Väljas",
+  "boot.form.key.change": "Muuda",
+  "boot.form.key.type": "Klahvid",
+  "boot.form.key.backspace": "Kustuta",
+  "boot.form.osk.shift": "Shift",
+  "boot.form.osk.space": "Tühik",
+  "boot.form.osk.done": "Valmis",
+  "boot.form.picker.subtitle": "Valige väärtus"
 }

@@ -877,5 +877,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "Partiția de pornire Vista nu a putut fi confirmată. Instalarea nu a fost pornită. Jurnalele BCD vor fi salvate pe unitatea USB.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "Instalarea nu a pregătit KMDF 1.11, necesar pentru USB. Nu porniți încă Vista de pe disc. Jurnalele de instalare vor fi salvate pe unitatea USB."
+  "winpe.vista_kmdf_failed": "Instalarea nu a pregătit KMDF 1.11, necesar pentru USB. Nu porniți încă Vista de pe disc. Jurnalele de instalare vor fi salvate pe unitatea USB.",
+
+  "boot.form.empty": "(gol)",
+  "boot.form.on": "Pornit",
+  "boot.form.off": "Oprit",
+  "boot.form.key.change": "Modificare",
+  "boot.form.key.type": "Taste",
+  "boot.form.key.backspace": "Ștergere",
+  "boot.form.osk.shift": "Shift",
+  "boot.form.osk.space": "Spațiu",
+  "boot.form.osk.done": "Gata",
+  "boot.form.picker.subtitle": "Alegeți o valoare"
 }

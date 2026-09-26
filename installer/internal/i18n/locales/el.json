@@ -874,5 +874,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "Δεν ήταν δυνατή η επιβεβαίωση του διαμερίσματος εκκίνησης των Vista. Η εγκατάσταση δεν ξεκίνησε. Τα αρχεία καταγραφής BCD θα αποθηκευτούν στη μονάδα USB.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "Η εγκατάσταση δεν προετοίμασε το KMDF 1.11 που απαιτείται για το USB. Μην εκκινήσετε ακόμη τα Vista από τον δίσκο. Τα αρχεία καταγραφής εγκατάστασης θα αποθηκευτούν στη μονάδα USB."
+  "winpe.vista_kmdf_failed": "Η εγκατάσταση δεν προετοίμασε το KMDF 1.11 που απαιτείται για το USB. Μην εκκινήσετε ακόμη τα Vista από τον δίσκο. Τα αρχεία καταγραφής εγκατάστασης θα αποθηκευτούν στη μονάδα USB.",
+
+  "boot.form.empty": "(κενό)",
+  "boot.form.on": "Ενεργό",
+  "boot.form.off": "Ανενεργό",
+  "boot.form.key.change": "Αλλαγή",
+  "boot.form.key.type": "Πλήκτρα",
+  "boot.form.key.backspace": "Διαγραφή",
+  "boot.form.osk.shift": "Shift",
+  "boot.form.osk.space": "Διάστημα",
+  "boot.form.osk.done": "Τέλος",
+  "boot.form.picker.subtitle": "Επιλέξτε τιμή"
 }

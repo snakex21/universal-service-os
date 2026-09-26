@@ -877,5 +877,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "Nepavyko patvirtinti Vista paleisties skaidinio. Diegimas nepaleistas. BCD žurnalai bus įrašyti į USB diską.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "Sąranka neparuošė USB reikalingo KMDF 1.11. Kol kas nepaleiskite Vista iš disko. Diegimo žurnalai bus įrašyti į USB diską."
+  "winpe.vista_kmdf_failed": "Sąranka neparuošė USB reikalingo KMDF 1.11. Kol kas nepaleiskite Vista iš disko. Diegimo žurnalai bus įrašyti į USB diską.",
+
+  "boot.form.empty": "(tuščia)",
+  "boot.form.on": "Įjungta",
+  "boot.form.off": "Išjungta",
+  "boot.form.key.change": "Keisti",
+  "boot.form.key.type": "Klavišai",
+  "boot.form.key.backspace": "Trinti",
+  "boot.form.osk.shift": "Shift",
+  "boot.form.osk.space": "Tarpas",
+  "boot.form.osk.done": "Baigta",
+  "boot.form.picker.subtitle": "Pasirinkite reikšmę"
 }

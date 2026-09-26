@@ -874,5 +874,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "Oppstartspartisjonen for Vista kunne ikke bekreftes. Installasjonen ble ikke startet. BCD-loggene lagres på USB-stasjonen.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "Installasjonen klargjorde ikke KMDF 1.11, som USB krever. Ikke start Vista fra disken ennå. Installasjonsloggene lagres på USB-stasjonen."
+  "winpe.vista_kmdf_failed": "Installasjonen klargjorde ikke KMDF 1.11, som USB krever. Ikke start Vista fra disken ennå. Installasjonsloggene lagres på USB-stasjonen.",
+
+  "boot.form.empty": "(tom)",
+  "boot.form.on": "På",
+  "boot.form.off": "Av",
+  "boot.form.key.change": "Endre",
+  "boot.form.key.type": "Taster",
+  "boot.form.key.backspace": "Slett",
+  "boot.form.osk.shift": "Shift",
+  "boot.form.osk.space": "Mellomrom",
+  "boot.form.osk.done": "Ferdig",
+  "boot.form.picker.subtitle": "Velg en verdi"
 }

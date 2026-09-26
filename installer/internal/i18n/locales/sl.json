@@ -880,5 +880,16 @@
   "winpe.vista_esp_title": "USOS - Vista UEFI",
   "winpe.vista_esp_failed": "Zagonske particije sistema Vista ni bilo mogoče potrditi. Namestitev se ni zagnala. Dnevniki BCD bodo shranjeni na pogon USB.",
   "winpe.vista_kmdf_title": "USOS - Vista KMDF",
-  "winpe.vista_kmdf_failed": "Namestitev ni pripravila KMDF 1.11, ki ga potrebuje USB. Viste še ne zaganjajte z diska. Dnevniki namestitve bodo shranjeni na pogon USB."
+  "winpe.vista_kmdf_failed": "Namestitev ni pripravila KMDF 1.11, ki ga potrebuje USB. Viste še ne zaganjajte z diska. Dnevniki namestitve bodo shranjeni na pogon USB.",
+
+  "boot.form.empty": "(prazno)",
+  "boot.form.on": "Vklopljeno",
+  "boot.form.off": "Izklopljeno",
+  "boot.form.key.change": "Spremeni",
+  "boot.form.key.type": "Tipke",
+  "boot.form.key.backspace": "Izbriši",
+  "boot.form.osk.shift": "Shift",
+  "boot.form.osk.space": "Presledek",
+  "boot.form.osk.done": "Končano",
+  "boot.form.picker.subtitle": "Izberite vrednost"
 }
