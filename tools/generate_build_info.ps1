@@ -70,6 +70,7 @@ foreach ($relative in @(
     'tools\windows7_amd_shadow.zig',
     'tools\windows7_uefi_trace.zig',
     'tools\windows7_vga_routing.zig',
+    'tools\windows7_gop_retry.zig',
     'tools\windows7_uefi_startup.cmd',
     'tools\windows7_native_startup.cmd',
     'tools\windows7_modern_startup.cmd',

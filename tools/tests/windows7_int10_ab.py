@@ -31,6 +31,14 @@ Variants (each a vvfat ESP with the ISO's BCD, fonts, boot.sdi and boot.wim):
             runs; Windows itself cannot boot on the fake vector)
   oldbroken as usosbroken with OLD_WRAPPER (a dispatcher built before the VGA
             routing change) to show the emulated failure
+  usosnogop as usosrel with no display device at all (-vga none): the
+            dispatcher's no-GOP recovery (section 8.5) must do its connect
+            passes, two cold resets (usos-nogop-resets.txt 1, 2), then hand
+            back to the firmware and clear the counter
+
+INT10_AB_SET=vista runs the same variants with Windows Vista SP2 x64 media
+(section 7): its own 6.0 boot manager from boot.wim, work folder
+zig-out/vista-int10-ab (extract once with the Vista ISO).
 Needs 7-Zip (%ProgramFiles%/7-Zip/7z.exe) for "extract", and Pillow.
 """
 import json, os, shutil, socket, subprocess, sys, time
@@ -38,14 +46,15 @@ from pathlib import Path
 from PIL import Image
 
 REPO = Path(__file__).resolve().parents[2]
-SP = REPO / 'zig-out/win7-int10-ab'
+SET = os.environ.get('INT10_AB_SET', 'win7')
+SP = REPO / ('zig-out/vista-int10-ab' if SET == 'vista' else 'zig-out/win7-int10-ab')
 QEMU = REPO / 'tools/qemu'
 ISO = SP / 'win7iso'
 UEFISEVEN = Path(os.environ.get('UEFISEVEN', str(SP / 'UefiSeven-src.efi')))
 RELEASE = REPO / 'tools/vendor/uefiseven/1.30/UefiSeven.efi'
 WRAPPER = REPO / 'zig-out/windows7-uefi/win7-wrapper.efi'
 INI = b'[config]\r\nverbose=0\r\nlogfile=1\r\nskiperrors=1\r\nforce_fakevesa=0\r\n'
-VARIANTS = ['plain', 'usos', 'upstream', 'usosrel', 'usosrp', 'usosbroken', 'oldbroken', 'usosnoattr', 'usosconflict', 'usoscsm']
+VARIANTS = ['plain', 'usos', 'upstream', 'usosrel', 'usosrp', 'usosbroken', 'oldbroken', 'usosnoattr', 'usosconflict', 'usoscsm', 'usosnogop']
 OLD_WRAPPER = Path(os.environ.get('OLD_WRAPPER', str(SP / 'win7-wrapper-old.efi')))
 BREAK = SP / 'vga-break.efi'
 ROOT_PORT_VGA = ['-vga', 'none', '-device', 'pcie-root-port,id=rp1,bus=pcie.0,chassis=1,addr=0x3',
@@ -70,7 +79,8 @@ def esp(variant):
     boot.mkdir(parents=True, exist_ok=True)
     (root / 'EFI/Microsoft/Boot').mkdir(parents=True, exist_ok=True)
     shutil.copyfile(ISO / 'efi/microsoft/boot/bcd', root / 'EFI/Microsoft/Boot/BCD')
-    for font in (ISO / 'efi/microsoft/boot/fonts').iterdir():
+    fonts = ISO / 'efi/microsoft/boot/fonts'
+    for font in (fonts.iterdir() if fonts.is_dir() else []):
         link(font, root / 'EFI/Microsoft/Boot/Fonts' / font.name)
     link(ISO / 'boot/boot.sdi', root / 'boot/boot.sdi')
     link(ISO / 'sources/boot.wim', root / 'sources/boot.wim')
@@ -90,9 +100,9 @@ def esp(variant):
         shutil.copyfile(RELEASE, boot / 'win7.efi')
         link(bootmgfw, boot / 'win7.original.efi')
         (boot / 'UefiSeven.ini').write_bytes(INI)
-    elif variant in ('usos', 'usosrel', 'usosrp'):
+    elif variant in ('usos', 'usosrel', 'usosrp', 'usosnogop'):
         shutil.copyfile(WRAPPER, boot / 'BOOTX64.EFI')
-        shutil.copyfile(RELEASE if variant == 'usosrel' else UEFISEVEN, boot / 'win7.efi')
+        shutil.copyfile(RELEASE if variant in ('usosrel', 'usosnogop') else UEFISEVEN, boot / 'win7.efi')
         link(bootmgfw, boot / 'win7.original.efi')
         (boot / 'UefiSeven.ini').write_bytes(INI)
     elif variant == 'upstream':
@@ -148,7 +158,10 @@ def run(variant, minutes, shots):
     port = 4450 + VARIANTS.index(variant)
     args = [str(QEMU / 'qemu-system-x86_64.exe'), '-machine', 'q35', '-accel', 'tcg', '-cpu', 'max',
             '-m', '2048', '-smp', '2', '-display', 'none', '-nic', 'none']
-    args += ROOT_PORT_VGA if variant in ('usosrp', 'usosbroken', 'oldbroken', 'usosnoattr', 'usosconflict', 'usoscsm') else ['-vga', 'std']
+    if variant == 'usosnogop':
+        args += ['-vga', 'none']
+    else:
+        args += ROOT_PORT_VGA if variant in ('usosrp', 'usosbroken', 'oldbroken', 'usosnoattr', 'usosconflict', 'usoscsm') else ['-vga', 'std']
     args += [
             '-drive', 'if=pflash,format=raw,readonly=on,file=' + str(QEMU / 'share/edk2-x86_64-code.fd'),
             '-drive', 'if=pflash,format=raw,file=' + str(vars_fd),
@@ -174,9 +187,10 @@ def run(variant, minutes, shots):
             cmd('screendump', filename=str(ppm))
             time.sleep(1)
             png = out / f't{at:04d}.png'
-            Image.open(ppm).save(png)
-            ppm.unlink()
-            taken.append(png.name)
+            if ppm.exists():
+                Image.open(ppm).save(png)
+                ppm.unlink()
+                taken.append(png.name)
             print(variant, at, png.name, flush=True)
         cmd('quit')
     finally:
@@ -186,7 +200,7 @@ def run(variant, minutes, shots):
             proc.kill()
         log.close()
     for name in ('usos-boot.log', 'usos-boot-uefiseven.log', 'usos-boot-csm.log', 'UefiSeven.log',
-                 'usos-memory.log', 'usos-amd-shadow.log'):
+                 'usos-memory.log', 'usos-amd-shadow.log', 'usos-nogop-resets.txt'):
         for found in root.rglob(name):
             shutil.copyfile(found, out / found.name)
     return taken

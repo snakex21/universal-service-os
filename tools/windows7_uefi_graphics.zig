@@ -6,6 +6,23 @@ const UgaDraw = opaque {
     pub const guid = uefi.Guid{ .time_low = 0x982c298b, .time_mid = 0xf4fa, .time_high_and_version = 0x41cb, .clock_seq_high_and_reserved = 0xb8, .clock_seq_low = 0x38, .node = .{ 0x77, 0xaa, 0x68, 0x8f, 0xb8, 0x39 } };
 };
 pub const Result = enum { present, connected, uga_present, unavailable };
+
+/// `ensure` up to `passes` times with a stall between the passes: a GPU
+/// that is still initialising after a warm restart (X470, boot 2 after
+/// specialize) may publish its GOP a moment later. `used` gets the number
+/// of passes that ran.
+pub fn ensureRetrying(passes: u32, stall_us: usize, used: *u32) !Result {
+    const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
+    var pass: u32 = 0;
+    while (pass < passes) : (pass += 1) {
+        used.* = pass + 1;
+        const result = try ensure();
+        if (result != .unavailable) return if (pass == 0) result else if (result == .present) .connected else result;
+        if (pass + 1 < passes) bs.stall(stall_us) catch {};
+    }
+    return .unavailable;
+}
+
 pub fn ensure() !Result {
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
     if (try bs.locateProtocol(uefi.protocol.GraphicsOutput, null) != null) return .present;

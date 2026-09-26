@@ -19,6 +19,23 @@ fn openFile(device: uefi.Handle, directory: []const u16, name: []const u16) ?*ue
     path[directory.len + name.len] = 0;
     return root.open(path[0 .. directory.len + name.len :0], .read_write_create, .{}) catch null;
 }
+/// Small text file beside the dispatcher (the no-GOP reset counter).
+pub fn readSmall(device: uefi.Handle, directory: []const u16, name: []const u16, buffer: []u8) []const u8 {
+    const file = openFile(device, directory, name) orelse return "";
+    defer file.close() catch {};
+    const got = file.read(buffer) catch 0;
+    return buffer[0..got];
+}
+
+pub fn writeSmall(device: uefi.Handle, directory: []const u16, name: []const u16, text: []const u8) void {
+    const file = openFile(device, directory, name) orelse return;
+    defer file.close() catch {};
+    var bytes = [_]u8{' '} ** 16;
+    @memcpy(bytes[0..@min(text.len, bytes.len)], text[0..@min(text.len, bytes.len)]);
+    _ = file.write(&bytes) catch return;
+    file.flush() catch {};
+}
+
 pub fn recordNamed(device: uefi.Handle, directory: []const u16, name: []const u16, message: []const u8) void {
     const file = openFile(device, directory, name) orelse return;
     defer file.close() catch {};

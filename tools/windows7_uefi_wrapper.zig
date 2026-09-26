@@ -8,6 +8,19 @@ const graphics = @import("windows7_uefi_graphics.zig");
 const memory_probe = @import("windows7_uefi_memory_probe.zig");
 const amd_shadow = @import("windows7_amd_shadow.zig");
 const vga_routing = @import("windows7_vga_routing.zig");
+const gop_retry = @import("windows7_gop_retry.zig");
+
+const counter_name = std.unicode.utf8ToUtf16LeStringLiteral(gop_retry.counter_name);
+
+fn readResets(device: uefi.Handle, dir: []const u16) u32 {
+    var buffer: [16]u8 = undefined;
+    return gop_retry.parseCounter(trace.readSmall(device, dir, counter_name, &buffer));
+}
+
+fn storeResets(device: uefi.Handle, dir: []const u16, value: u32) void {
+    var text: [16]u8 = undefined;
+    trace.writeSmall(device, dir, counter_name, std.fmt.bufPrint(&text, "{d}\r\n", .{value}) catch "0\r\n");
+}
 fn run() !uefi.Status {
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
     const loaded = (try bs.handleProtocol(uefi.protocol.LoadedImage, uefi.handle)) orelse return error.NoLoadedImage;
@@ -34,15 +47,37 @@ fn run() !uefi.Status {
     log.begin(device, dir, if (valid) .csm else .uefiseven);
     memory_probe.record(device, dir);
     var graphics_result: graphics.Result = .present;
+    const resets = readResets(device, dir);
     if (!valid) {
         trace.record(device, storage[0 .. slash + 1], "USOS: preparing GOP; connecting firmware controllers if GOP is absent");
         log.line("USOS: preparing GOP; connecting firmware controllers if GOP is absent");
-        graphics_result = try graphics.ensure();
+        var used: u32 = 0;
+        graphics_result = try graphics.ensureRetrying(gop_retry.passes, gop_retry.stall_us, &used);
+        if (used > 1 and graphics_result != .unavailable) log.print("USOS: GOP appeared on connect pass {d}/{d}", .{ used, gop_retry.passes });
         if (graphics_result == .unavailable) {
-            trace.record(device, storage[0 .. slash + 1], "USOS: GOP/UGA absent even after ConnectController; cannot start UefiSeven; Windows boot manager was not started");
-            log.line("USOS: GOP/UGA absent even after ConnectController; cannot start UefiSeven; Windows boot manager was not started");
-            return error.NoGraphicsOutput;
+            // UefiSeven needs a framebuffer and the original boot manager
+            // hangs without Int10: re-initialise the GPU by a cold reset
+            // (bounded), else hand back to the firmware as before.
+            const step = gop_retry.decide(resets);
+            storeResets(device, dir, step.store);
+            switch (step.action) {
+                .cold_reset => {
+                    log.print("USOS: GOP/UGA absent after {d} recursive connect passes; cold reset {d}/{d} to re-initialise the GPU", .{ used, step.store, gop_retry.max_resets });
+                    trace.record(device, dir, "USOS: GOP/UGA absent after the connect passes; cold reset (see the ring log)");
+                    uefi.system_table.runtime_services.resetSystem(.cold, .success, null);
+                },
+                .return_to_firmware => {
+                    log.print("USOS: GOP/UGA absent after {d} passes and {d} cold resets; returning to the firmware (next boot option); reset counter cleared", .{ used, gop_retry.max_resets });
+                    trace.record(device, dir, "USOS: GOP/UGA absent even after the connect passes and the cold resets; Windows boot manager was not started");
+                    return error.NoGraphicsOutput;
+                },
+            }
         }
+    }
+    // A boot that got this far has a display path: the no-GOP streak is over.
+    if (resets != 0) {
+        storeResets(device, dir, 0);
+        log.print("USOS: no-GOP reset counter cleared (was {d})", .{resets});
     }
     const decision = if (valid) "USOS: valid firmware Int10; loading original Windows 7 boot manager" else "USOS: missing/invalid Int10; loading UefiSeven for pure UEFI";
     trace.record(device, storage[0 .. slash + 1], decision);
