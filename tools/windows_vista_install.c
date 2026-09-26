@@ -34,8 +34,6 @@ static Esp original_esps[64],selected_esp;
 static DWORD original_esp_count;
 static DWORD profile_disk_count,profile_disk_number;
 static BOOL have_selected_esp;
-static WCHAR selected_alias[4];
-static DWORD selected_serial;
 void *memcpy(void *d,const void *s,size_t n){volatile BYTE *p=d;const BYTE *q=s;while(n--)*p++=*q++;return d;}
 void *memset(void *d,int v,size_t n){volatile BYTE *p=d;while(n--)*p++=(BYTE)v;return d;}
 static BOOL same(const void *a,const void *b,DWORD n){const BYTE *x=a,*y=b;while(n--)if(*x++!=*y++)return FALSE;return TRUE;}
@@ -200,21 +198,98 @@ static BOOL load_boot_profile(void){
  path(src,base,L"vista-bcdedit-mui.bin");path(dst,dir,L"\\bcdedit.exe.mui");if(!CopyFileW(src,dst,FALSE))return FALSE;
  pinned_esp=TRUE;logcode("Boot profile: exact disk GUID + size; replacement EFI allowed=",0);return TRUE;
 }
-/* Run the Vista tool in a fresh process, retaining the diagnostic output.
+/* Run a tool in a fresh process and APPEND its output (with the command line)
+ * to base\output_name, so every attempt stays in the USB log snapshot.
  * Never invoke this installer on the technician OS (entry requires MiniNT). */
-static DWORD vista_bcd_command(const WCHAR *arguments,const WCHAR *output_name){
+static DWORD run_capture(const WCHAR *executable,const WCHAR *arguments,const WCHAR *output_name){
  WCHAR output_path[MAX_PATH];path(output_path,base,output_name);
  SECURITY_ATTRIBUTES security={sizeof(security),0,TRUE};
- HANDLE output=CreateFileW(output_path,GENERIC_WRITE,FILE_SHARE_READ,&security,CREATE_ALWAYS,FILE_FLAG_WRITE_THROUGH,0);
+ HANDLE output=CreateFileW(output_path,FILE_APPEND_DATA|SYNCHRONIZE,FILE_SHARE_READ|FILE_SHARE_WRITE,&security,OPEN_ALWAYS,FILE_FLAG_WRITE_THROUGH,0);
  HANDLE input=CreateFileW(L"NUL",GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,&security,OPEN_EXISTING,0,0);
  if(output==INVALID_HANDLE_VALUE||input==INVALID_HANDLE_VALUE){if(output!=INVALID_HANDLE_VALUE)CloseHandle(output);if(input!=INVALID_HANDLE_VALUE)CloseHandle(input);return ERROR_OPEN_FAILED;}
+ lstrcpyW(command,L"\"");lstrcatW(command,executable);lstrcatW(command,L"\" ");lstrcatW(command,arguments);
+ {char line[600];DWORD n=0,written;line[n++]='>';line[n++]=' ';for(const WCHAR *p=command;*p&&n<596;p++)line[n++]=*p<128?(char)*p:'?';line[n++]='\r';line[n++]='\n';WriteFile(output,line,n,&written,0);}
  STARTUPINFOW si={0};PROCESS_INFORMATION pi={0};si.cb=sizeof(si);si.dwFlags=STARTF_USESTDHANDLES;si.hStdInput=input;si.hStdOutput=output;si.hStdError=output;
- lstrcpyW(command,L"\"");lstrcatW(command,vista_bcdedit);lstrcatW(command,L"\" ");lstrcatW(command,arguments);
  DWORD result=ERROR_GEN_FAILURE;
- if(CreateProcessW(vista_bcdedit,command,0,0,TRUE,CREATE_NO_WINDOW,0,base,&si,&pi)){
+ if(CreateProcessW(executable,command,0,0,TRUE,CREATE_NO_WINDOW,0,base,&si,&pi)){
   WaitForSingleObject(pi.hProcess,INFINITE);GetExitCodeProcess(pi.hProcess,&result);CloseHandle(pi.hThread);CloseHandle(pi.hProcess);
  }else result=GetLastError();
  FlushFileBuffers(output);CloseHandle(output);CloseHandle(input);return result;
+}
+static DWORD vista_bcd_command(const WCHAR *arguments,const WCHAR *output_name){return run_capture(vista_bcdedit,arguments,output_name);}
+/* Vista's own bcdedit.exe (6.0.x) and its MUI files from the selected ISO's
+ * boot.wim, unless a hardware boot profile already supplied them. Vista Setup
+ * resolves the system partition through Vista's BCD library, which ignores the
+ * hint PE10's bcdedit /sysstore sets (GetSystemDiskNTPath 0xc0000451, X470
+ * 2026-09-20/21): with only the PE10 hint it may create a second ESP next to
+ * an existing one. Single files are extracted with PE10's wimgapi
+ * (WIMExtractImagePath): no mount (a DISM mount fails in the wimboot PE10 with
+ * error 1), nothing written outside WinPE RAM, the ISO stays read-only. */
+typedef HANDLE (WINAPI *WimCreateFileFn)(PCWSTR,DWORD,DWORD,DWORD,DWORD,PDWORD);
+typedef BOOL (WINAPI *WimSetTemporaryPathFn)(HANDLE,PCWSTR);
+typedef HANDLE (WINAPI *WimLoadImageFn)(HANDLE,DWORD);
+typedef BOOL (WINAPI *WimExtractImagePathFn)(HANDLE,PCWSTR,PCWSTR,DWORD);
+typedef BOOL (WINAPI *WimCloseHandleFn)(HANDLE);
+static BOOL wim_extract(WimExtractImagePathFn extract,HANDLE image,const WCHAR *inner,const WCHAR *destination){
+ DeleteFileW(destination);BOOL ok=extract(image,inner,destination,0);
+ logcode(ok?"  WIM file extracted=":"  WIM file not extracted=",ok?0:GetLastError());return ok;
+}
+/* The UI languages listed in <ISO>\sources\lang.ini ([Available UI Languages],
+ * "pl-PL = 3"), ASCII, into names[] (at most 8, each at most 15 chars). */
+static DWORD iso_languages(const WCHAR *source,WCHAR names[8][16]){
+ static WCHAR ini[MAX_PATH];static char text[4096];path(ini,source,L"\\sources\\lang.ini");
+ HANDLE f=CreateFileW(ini,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);if(f==INVALID_HANDLE_VALUE)return 0;
+ DWORD got=0;BOOL ok=ReadFile(f,text,sizeof(text)-1,&got,0);CloseHandle(f);if(!ok)return 0;text[got]=0;
+ DWORD count=0;BOOL section=FALSE;
+ for(char *line=text;*line&&count<8;){
+  char *next=line;while(*next&&*next!='\n')next++;char *end=next;if(*next)next++;
+  while(end>line&&(end[-1]=='\r'||end[-1]==' '))end--;
+  if(line<end&&*line=='[')section=(end-line)==24&&same(line,"[Available UI Languages]",24);
+  else if(section&&line<end){
+   DWORD n=0;while(line+n<end&&n<15&&line[n]!=' '&&line[n]!='='&&line[n]>' ')n++;
+   if(n>=2){for(DWORD i=0;i<n;i++)names[count][i]=(WCHAR)(BYTE)line[i];names[count][n]=0;count++;}
+  }
+  line=next;
+ }
+ return count;
+}
+static BOOL load_vista_bcdedit(const WCHAR *source){
+ if(vista_bcdedit[0]){logcode("Vista BCDEdit: from the boot profile=",0);return TRUE;}
+ static WCHAR library[MAX_PATH],wim[MAX_PATH],dir[MAX_PATH],temp[MAX_PATH],inner[MAX_PATH],dst[MAX_PATH],languages[9][16];
+ UINT n=GetSystemDirectoryW(library,MAX_PATH);if(!n||n>MAX_PATH-16)return FALSE;lstrcatW(library,L"\\wimgapi.dll");
+ HMODULE module=LoadLibraryW(library);if(!module){logcode("Vista BCDEdit: wimgapi.dll missing in WinPE=",GetLastError());return FALSE;}
+ WimCreateFileFn create=(WimCreateFileFn)GetProcAddress(module,"WIMCreateFile");
+ WimSetTemporaryPathFn set_temp=(WimSetTemporaryPathFn)GetProcAddress(module,"WIMSetTemporaryPath");
+ WimLoadImageFn load=(WimLoadImageFn)GetProcAddress(module,"WIMLoadImage");
+ WimExtractImagePathFn extract=(WimExtractImagePathFn)GetProcAddress(module,"WIMExtractImagePath");
+ WimCloseHandleFn close_wim=(WimCloseHandleFn)GetProcAddress(module,"WIMCloseHandle");
+ if(!create||!set_temp||!load||!extract||!close_wim){logcode("Vista BCDEdit: wimgapi exports missing=",ERROR_PROC_NOT_FOUND);return FALSE;}
+ path(wim,source,L"\\sources\\boot.wim");path(dir,base,L"vista-tools");path(temp,base,L"vista-wimtemp");
+ if((!CreateDirectoryW(dir,0)&&GetLastError()!=ERROR_ALREADY_EXISTS)||(!CreateDirectoryW(temp,0)&&GetLastError()!=ERROR_ALREADY_EXISTS))return FALSE;
+ DWORD created=0;HANDLE file=create(wim,GENERIC_READ,OPEN_EXISTING,0,0,&created);
+ if(!file){logcode("Vista BCDEdit: cannot open the ISO boot.wim=",GetLastError());return FALSE;}
+ BOOL ok=FALSE;DWORD copied=0;HANDLE image=0;
+ if(set_temp(file,temp)&&(image=load(file,1))!=0){
+  path(vista_bcdedit,dir,L"\\bcdedit.exe");
+  ok=wim_extract(extract,image,L"\\Windows\\System32\\bcdedit.exe",vista_bcdedit)&&vista_file(vista_bcdedit,FALSE);
+  /* The ISO's UI languages, then en-US; a missing language is not fatal as
+   * long as one MUI file arrives. */
+  DWORD count=iso_languages(source,languages);lstrcpyW(languages[count++],L"en-US");
+  for(DWORD i=0;ok&&i<count;i++){
+   BOOL duplicate=FALSE;for(DWORD j=0;j<i;j++)if(lstrcmpiW(languages[i],languages[j])==0)duplicate=TRUE;
+   if(duplicate)continue;
+   path(dst,dir,L"\\");lstrcatW(dst,languages[i]);if(!CreateDirectoryW(dst,0)&&GetLastError()!=ERROR_ALREADY_EXISTS)continue;
+   lstrcatW(dst,L"\\bcdedit.exe.mui");
+   lstrcpyW(inner,L"\\Windows\\System32\\");lstrcatW(inner,languages[i]);lstrcatW(inner,L"\\bcdedit.exe.mui");
+   if(wim_extract(extract,image,inner,dst))copied++;
+  }
+ }else logcode("Vista BCDEdit: cannot load boot.wim image 1=",GetLastError());
+ if(image)close_wim(image);close_wim(file);
+ logcode("Vista BCDEdit: bcdedit.exe 6.0 extracted from the ISO boot.wim=",ok?0:ERROR_FILE_NOT_FOUND);
+ logcode("Vista BCDEdit: MUI languages extracted=",copied);
+ if(!copied)ok=FALSE;
+ if(!ok)vista_bcdedit[0]=0;
+ return ok;
 }
 static BOOL verify_vista_system_store(void){
  WCHAR args[MAX_PATH+32],export_path[MAX_PATH];
@@ -229,31 +304,87 @@ static BOOL verify_vista_system_store(void){
  RegCloseKey(hive);logcode("Vista system BCD bootmgr matches selected ESP=",bound?0:ERROR_INVALID_DATA);
  return bound;
 }
+/* Point both system-store hints (PE10's bcdedit for WinPE, Vista's bcdedit for
+ * Vista Setup's own BCD library) at one internal ESP through a raw DOS alias.
+ * The alias is only a symbolic link: it is defined at once, also on a new,
+ * still unformatted ESP, and the volume is never opened here (no
+ * GetVolumeInformation, no handle, no FAT32 test). The old guard refused a raw
+ * new ESP and kept re-mounting and probing it on every notification while
+ * Setup was formatting it; Vista Setup then failed with 0x1F at
+ * Callback_PrepareSystemVolume (X470 2026-09-26).
+ * Unlike the Windows 10/7 guards the alias must stay defined: Vista's hint is
+ * bound to it, and removing it right after /sysstore makes Vista's bcdedit
+ * /export fail with ERROR_FILE_INVALID ("the volume for a file has been
+ * externally altered", QEMU 2026-09-26). It is replaced when another ESP is
+ * selected and removed after Setup. */
+static WCHAR store_alias[3],store_device[80];
+static void release_store_alias(void){
+ if(!store_alias[0])return;
+ if(!DefineDosDeviceW(DDD_REMOVE_DEFINITION|DDD_EXACT_MATCH_ON_REMOVE|DDD_RAW_TARGET_PATH|DDD_NO_BROADCAST_SYSTEM,store_alias,store_device))logcode("ESP alias removal failed=",GetLastError());
+ store_alias[0]=0;
+}
+static DWORD point_system_store(const Esp *e){
+ release_store_alias();
+ lstrcpyW(store_device,L"\\Device\\Harddisk");decimal(store_device+lstrlenW(store_device),e->disk);lstrcatW(store_device,L"\\Partition");decimal(store_device+lstrlenW(store_device),e->number);
+ DWORD letters=GetLogicalDrives();WCHAR alias[3]={0,L':',0};
+ for(int i=25;i>=3;i--)if(!(letters&(1u<<i))){alias[0]=L'A'+i;break;}
+ if(!alias[0])return ERROR_NO_MORE_ITEMS;
+ if(!DefineDosDeviceW(DDD_RAW_TARGET_PATH|DDD_NO_BROADCAST_SYSTEM,alias,store_device))return GetLastError();
+ lstrcpyW(store_alias,alias);
+ /* An ESP that existed before Setup started is not Setup's: mount its file
+  * system once (volume query) before the BCD hive is loaded from it. Without
+  * this the first access mounts FAT under the freshly loaded system store and
+  * every later store operation fails with ERROR_FILE_INVALID (QEMU
+  * 2026-09-26; the old guard's FAT32 probe had done this implicitly). A new
+  * ESP Setup is creating is never touched. */
+ BOOL existing=FALSE;for(DWORD i=0;i<original_esp_count;i++)if(original_esps[i].disk==e->disk&&same(&original_esps[i].id,&e->id,16))existing=TRUE;
+ if(existing){WCHAR root[4]={alias[0],L':',L'\\',0};DWORD serial=0;logcode("Existing ESP file system mounted before /sysstore=",GetVolumeInformationW(root,0,0,&serial,0,0,0,0)?0:GetLastError());}
+ WCHAR args[32]=L"/sysstore ";lstrcatW(args,alias);
+ DWORD pe=bcd_command(0,args)?0:ERROR_GEN_FAILURE;
+ DWORD vista=vista_bcd_command(args,L"vista-bcd-sysstore.txt");logcode("Vista BCDEdit sysstore result=",vista);
+ return pe?pe:vista;
+}
+/* Every refresh decision is logged; an identical decision in a row (Setup
+ * writes its Panther log often) only increments a counter. */
+enum{ESP_INVENTORY_FAILED,ESP_WAITING,ESP_UNCHANGED,ESP_POINTED,ESP_STORE_FAILED,ESP_STORE_GAVE_UP};
+typedef struct{DWORD kind,disk,number,count,code;GUID id;}Decision;
+static Decision last_decision={0xffffffff};
+static DWORD repeated_decisions,store_attempts;
+static void decide(DWORD kind,const Esp *e,DWORD count,DWORD code){
+ static const char *const text[]={
+  "ESP refresh: internal disk inventory failed; no target ESP=",
+  "ESP refresh: waiting for a unique target ESP (none, or several new)=",
+  "ESP refresh: system store already points at this ESP; nothing opened=",
+  "ESP refresh: system stores pointed at the ESP (raw alias, volume not opened)=",
+  "ESP refresh: /sysstore failed; retried on the next change=",
+  "ESP refresh: /sysstore failed 3 times on this ESP; left to the finalizer check="};
+ Decision d={kind,e?e->disk:0,e?e->number:0,count,code};if(e)d.id=e->id;
+ if(same(&d,&last_decision,sizeof(d))){repeated_decisions++;return;}
+ if(repeated_decisions)logcode("ESP refresh: previous decision repeated (times)=",repeated_decisions);
+ repeated_decisions=0;last_decision=d;
+ logcode(text[kind],code);logcode("  internal ESPs=",count);
+ if(e){logcode("  candidate disk=",e->disk);logcode("  candidate partition=",e->number);}
+}
 static void refresh_esp(void){
  static Esp current[64];DWORD count=0;
- BOOL inventoried=esp_inventory(current,&count);
- int index=!inventoried||(pinned_esp&&profile_disk_count!=1)?-1:
+ if(!esp_inventory(current,&count)){store_ready=FALSE;have_selected_esp=FALSE;release_store_alias();store_error=ERROR_READ_FAULT;decide(ESP_INVENTORY_FAILED,0,0,ERROR_READ_FAULT);return;}
+ int index=(pinned_esp&&profile_disk_count!=1)?-1:
   (pinned_esp?choose_pinned_esp(&boot_profile,original_esps,original_esp_count,current,count):choose_esp(original_esps,original_esp_count,current,count));
- if(index<0){store_ready=FALSE;have_selected_esp=FALSE;unmount_esp(selected_alias);if(store_error!=ERROR_NOT_FOUND)logcode("Waiting for a unique EFI on the selected internal disk=",ERROR_NOT_FOUND);store_error=ERROR_NOT_FOUND;return;}
+ if(index<0){store_ready=FALSE;have_selected_esp=FALSE;release_store_alias();store_error=ERROR_NOT_FOUND;decide(ESP_WAITING,0,count,ERROR_NOT_FOUND);return;}
  Esp *candidate=&current[index];
- if(store_ready&&have_selected_esp&&selected_esp.disk==candidate->disk&&same(&selected_esp.id,&candidate->id,16)){
-  DWORD serial=0;if(GetVolumeInformationW(selected_alias,0,0,&serial,0,0,0,0)&&serial==selected_serial)return;
- }
- /* Keep the alias for the complete Setup process lifetime. Never retain a
-  * hint to a partition that Setup replaced, and never hint the USB ESP. */
- store_ready=FALSE;unmount_esp(selected_alias);selected_esp=*candidate;have_selected_esp=TRUE;
- if(!mount_esp(candidate->disk,selected_alias)){have_selected_esp=FALSE;return;}
- WCHAR fs[32];
- if(!GetVolumeInformationW(selected_alias,0,0,&selected_serial,0,0,fs,32)||lstrcmpiW(fs,L"FAT32")!=0){unmount_esp(selected_alias);have_selected_esp=FALSE;return;}
- WCHAR args[32]=L"/sysstore ";selected_alias[2]=0;lstrcatW(args,selected_alias);selected_alias[2]=L'\\';
- if(!bcd_command(0,args)){store_error=ERROR_GEN_FAILURE;unmount_esp(selected_alias);return;}
- if(pinned_esp){
-  DWORD code=vista_bcd_command(args,L"vista-bcd-sysstore.txt");logcode("Vista BCDEdit sysstore result=",code);
-  if(code){store_error=code;return;}
- }
+ BOOL same_esp=have_selected_esp&&selected_esp.disk==candidate->disk&&same(&selected_esp.id,&candidate->id,16);
+ if(same_esp&&store_ready){decide(ESP_UNCHANGED,candidate,count,0);return;}
+ if(!same_esp)store_attempts=0;
+ /* Never retain a hint to a partition that Setup replaced, and never hint
+  * the USB ESP (esp_inventory lists internal disks only). */
+ selected_esp=*candidate;have_selected_esp=TRUE;store_ready=FALSE;
+ if(store_attempts>=3){decide(ESP_STORE_GAVE_UP,candidate,count,store_error);return;}
+ store_attempts++;
+ DWORD code=point_system_store(candidate);
+ if(code){store_error=code;decide(ESP_STORE_FAILED,candidate,count,code);return;}
  /* A freshly formatted ESP has no BCD yet. Setup creates it; validate the
   * resulting store in configure_boot, never demand it before installation. */
- store_ready=TRUE;store_error=0;
+ store_ready=TRUE;store_error=0;decide(ESP_POINTED,candidate,count,0);
  logcode("Selected internal ESP disk=",candidate->disk);logcode("Selected internal ESP partition=",candidate->number);
 }
 static LRESULT CALLBACK device_window(HWND window,UINT message,WPARAM w,LPARAM l){
@@ -268,16 +399,21 @@ static DWORD run_setup(const WCHAR *executable,WCHAR *line){
  if((pinned_esp&&profile_disk_count!=1)||(!store_ready&&have_selected_esp)||(!pinned_esp&&!store_ready&&original_esp_count>1)){
   logcode("Setup not started: target EFI selection could not be verified=",store_error?store_error:ERROR_NOT_READY);
   MessageBoxW(0,USOS_UI_TEXT(VISTA_ESP_FAILED),USOS_UI_TEXT(VISTA_ESP_TITLE),MB_OK|MB_ICONERROR);
-  unmount_esp(selected_alias);return ERROR_NOT_READY;
+  release_store_alias();return ERROR_NOT_READY;
  }
+ /* An existing ESP: record whether Vista's BCD library resolves it (bootmgr
+  * device of the exported system store = this ESP). Log only: in QEMU the
+  * export fails with ERROR_FILE_INVALID even for a store Vista itself made,
+  * while it worked on the X470 (v3, 2026-09-21), so it cannot gate Setup. */
+ if(store_ready&&have_selected_esp)logcode("Pre-Setup check (log only): Vista resolves the existing ESP=",verify_vista_system_store()?0:ERROR_INVALID_DATA);
  WNDCLASSW wc={0};wc.lpfnWndProc=device_window;wc.hInstance=GetModuleHandleW(0);wc.lpszClassName=L"USOSVistaESP";
- if(!RegisterClassW(&wc)){DWORD error=GetLastError();unmount_esp(selected_alias);return error;}
- HWND window=CreateWindowExW(0,wc.lpszClassName,L"",0,0,0,0,0,0,0,wc.hInstance,0);if(!window){DWORD error=GetLastError();unmount_esp(selected_alias);return error;}
+ if(!RegisterClassW(&wc)){DWORD error=GetLastError();release_store_alias();return error;}
+ HWND window=CreateWindowExW(0,wc.lpszClassName,L"",0,0,0,0,0,0,0,wc.hInstance,0);if(!window){DWORD error=GetLastError();release_store_alias();return error;}
  DEV_BROADCAST_DEVICEINTERFACE_W filter={0};filter.dbcc_size=sizeof(filter);filter.dbcc_devicetype=DBT_DEVTYP_DEVICEINTERFACE;
  HDEVNOTIFY notification=RegisterDeviceNotificationW(window,&filter,DEVICE_NOTIFY_WINDOW_HANDLE|DEVICE_NOTIFY_ALL_INTERFACE_CLASSES);
  WCHAR panther[MAX_PATH];GetWindowsDirectoryW(panther,MAX_PATH);lstrcatW(panther,L"\\Panther");CreateDirectoryW(panther,0);
  HANDLE changes=FindFirstChangeNotificationW(panther,TRUE,FILE_NOTIFY_CHANGE_FILE_NAME|FILE_NOTIFY_CHANGE_LAST_WRITE);
- if(!notification||changes==INVALID_HANDLE_VALUE){if(notification)UnregisterDeviceNotification(notification);if(changes!=INVALID_HANDLE_VALUE)FindCloseChangeNotification(changes);DestroyWindow(window);unmount_esp(selected_alias);return ERROR_NOT_READY;}
+ if(!notification||changes==INVALID_HANDLE_VALUE){if(notification)UnregisterDeviceNotification(notification);if(changes!=INVALID_HANDLE_VALUE)FindCloseChangeNotification(changes);DestroyWindow(window);release_store_alias();return ERROR_NOT_READY;}
  if(pinned_esp)logcode("Install Vista on this physical disk; deleting all its partitions is supported=",profile_disk_number);
  STARTUPINFOW si={0};PROCESS_INFORMATION pi={0};si.cb=sizeof(si);DWORD result=ERROR_GEN_FAILURE;
  if(CreateProcessW(executable,line,0,0,FALSE,CREATE_NO_WINDOW,0,base,&si,&pi)){
@@ -296,7 +432,8 @@ static DWORD run_setup(const WCHAR *executable,WCHAR *line){
  FindCloseChangeNotification(changes);UnregisterDeviceNotification(notification);DestroyWindow(window);
  /* Consume final partition changes even if Setup exits before notification
   * dispatch. No timed polling, and no stale pre-deletion ESP at finalization. */
- refresh_esp();unmount_esp(selected_alias);
+ refresh_esp();release_store_alias();
+ if(repeated_decisions)logcode("ESP refresh: previous decision repeated (times)=",repeated_decisions);
  return result;
 }
 static BOOL mkdirs(WCHAR *file){
@@ -428,14 +565,12 @@ static BOOL configure_boot(const Target *t){
  path(inspect_store,base,L"vista-bcd-inspect.bin");
  WCHAR selection[32]=L"/sysstore ";alias[2]=0;lstrcatW(selection,alias);alias[2]=L'\\';
  if(!bcd_command(0,selection))goto done;
- if(pinned_esp){
+ /* Vista's own bcdedit is always present (boot profile or the ISO's boot.wim):
+  * read the store Vista Setup wrote through Vista's BCD library. */
+ {
   DWORD code=vista_bcd_command(selection,L"vista-bcd-sysstore.txt");logcode("Finalizer Vista BCDEdit sysstore result=",code);
   if(code||!verify_vista_system_store())goto done;
   path(inspect_store,base,L"vista-bcd-system.bin");
- }else{
-  static WCHAR export_args[MAX_PATH+32];lstrcpyW(export_args,L"/export \"");lstrcatW(export_args,inspect_store);lstrcatW(export_args,L"\"");
-  if(!DeleteFileW(inspect_store)&&GetLastError()!=ERROR_FILE_NOT_FOUND)goto done;
-  if(!bcd_command(0,export_args))goto done;
  }
  HKEY bcd=0;LONG load=RegLoadAppKeyW(inspect_store,&bcd,KEY_READ,REG_PROCESS_APPKEY,0);logcode("Read target BCD=",load);if(load!=ERROR_SUCCESS)goto done;
  DWORD size;BYTE element[512];WCHAR object[140],guid[40];
@@ -470,7 +605,7 @@ void entry(void){
  if(!real_version||real_version(&version)!=0||version.dwMajorVersion!=10||version.dwBuildNumber<10240||version.dwBuildNumber>=22000||!GetFirmwareType(&firmware)||firmware!=FirmwareTypeUefi)ExitProcess(2);
  DWORD n=GetModuleFileNameW(0,base,MAX_PATH);if(!n||n>=MAX_PATH-64)ExitProcess(2);while(n&&base[n-1]!=L'\\')n--;base[n]=0;
  path(scratch,base,L"usos-vista-install.log");log_file=CreateFileW(scratch,GENERIC_WRITE,FILE_SHARE_READ,0,CREATE_ALWAYS,FILE_FLAG_WRITE_THROUGH,0);
- logcode("Vista USB installer v8 / guarded OOBE recovery / KMDF before reboot / known firstboot v11=",0);
+ logcode("Vista USB installer v9 / Vista bcdedit from the ISO boot.wim / ESP hints without volume access / known firstboot v11=",0);
  logcode("Firmware type (2 = UEFI)=",firmware);
  WCHAR source[MAX_PATH];n=GetEnvironmentVariableW(L"USOS_SOURCE",source,MAX_PATH);
  if(n!=2||source[1]!=L':'||source[0]<L'C'||source[0]>L'Z')ExitProcess(2);
@@ -480,6 +615,11 @@ void entry(void){
   path(scratch,base,vista_files[i].source);if(!hash_file(scratch,hash)||!same(hash,vista_files[i].sha256,32)){logcode("Preflight payload hash failed at file=",i);ExitProcess(3);}
  }
  if(!privilege(L"SeBackupPrivilege")||!privilege(L"SeRestorePrivilege")||!load_boot_profile()||!inventory(before,&before_count))ExitProcess(4);
+ if(!load_vista_bcdedit(source)){
+  logcode("Setup not started: Vista's own bcdedit could not be taken from the ISO boot.wim=",ERROR_FILE_NOT_FOUND);
+  MessageBoxW(0,USOS_UI_TEXT(VISTA_ESP_FAILED),USOS_UI_TEXT(VISTA_ESP_TITLE),MB_OK|MB_ICONERROR);
+  ExitProcess(4);
+ }
  static WCHAR servicing_answer[MAX_PATH];if(!prepare_servicing_answer(servicing_answer))ExitProcess(10);
  lstrcpyW(command,L"\"");lstrcatW(command,setup_path);lstrcatW(command,L"\" /noreboot /installfrom:\"");lstrcatW(command,source);lstrcatW(command,L"\\sources\\install.wim\"");
  lstrcatW(command,L" /unattend:\"");lstrcatW(command,servicing_answer);lstrcatW(command,L"\"");

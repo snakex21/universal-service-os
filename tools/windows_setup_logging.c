@@ -30,17 +30,25 @@ static int initialize(void){
  const WCHAR *prefix=L"\\\\?\\GLOBALROOT\\Device\\Harddisk";for(unsigned i=0;prefix[i];i++)if(root[i]!=prefix[i])return 0;
  return GetFileAttributesW(root)!=INVALID_FILE_ATTRIBUTES;
 }
+/* Each snapshot is written beside the old one and then renamed over it: a
+ * copy cut short (reboot or power-off while the watcher rewrites the set) no
+ * longer leaves a truncated or 0-byte log, and an empty source never replaces
+ * a snapshot that already has content. */
+static WCHAR fresh[MAX_PATH];
 static void save(const WCHAR *from,const WCHAR *name){
- if(length(root)+length(name)+2>=MAX_PATH)return;
+ if(length(root)+length(name)+8>=MAX_PATH)return;
  HANDLE in=CreateFileW(from,GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,0,OPEN_EXISTING,0,0);if(in==INVALID_HANDLE_VALUE)return;
  LARGE_INTEGER size;if(!GetFileSizeEx(in,&size)||size.QuadPart<0){CloseHandle(in);return;}
  copy(dst,root);append(dst,L"\\");append(dst,name);
  /* Bound each snapshot and keep the newest diagnostics for very large logs. */
  if(size.QuadPart>16*1024*1024){LARGE_INTEGER at;at.QuadPart=size.QuadPart-16*1024*1024;SetFilePointerEx(in,at,0,FILE_BEGIN);append(dst,L".tail");size.QuadPart=16*1024*1024;}
- HANDLE out=CreateFileW(dst,GENERIC_WRITE,FILE_SHARE_READ,0,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);
- if(out!=INVALID_HANDLE_VALUE){DWORD got,written;LONGLONG left=size.QuadPart;
-  while(left>0){DWORD want=left>sizeof(data)?sizeof(data):(DWORD)left;if(!ReadFile(in,data,want,&got,0)||!got)break;if(!WriteFile(out,data,got,&written,0)||got!=written)break;left-=got;}
-  FlushFileBuffers(out);CloseHandle(out);
+ if(!size.QuadPart){WIN32_FILE_ATTRIBUTE_DATA old;if(GetFileAttributesExW(dst,GetFileExInfoStandard,&old)&&(old.nFileSizeLow||old.nFileSizeHigh)){CloseHandle(in);return;}}
+ copy(fresh,dst);append(fresh,L".new");
+ HANDLE out=CreateFileW(fresh,GENERIC_WRITE,FILE_SHARE_READ,0,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,0);
+ if(out!=INVALID_HANDLE_VALUE){DWORD got,written;LONGLONG left=size.QuadPart;int ok=1;
+  while(left>0){DWORD want=left>sizeof(data)?sizeof(data):(DWORD)left;if(!ReadFile(in,data,want,&got,0)||!got){ok=left==size.QuadPart?0:ok;break;}if(!WriteFile(out,data,got,&written,0)||got!=written){ok=0;break;}left-=got;}
+  ok=FlushFileBuffers(out)&&ok;CloseHandle(out);
+  if(!ok||!MoveFileExW(fresh,dst,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))DeleteFileW(fresh);
  }CloseHandle(in);
 }
 /* Capped copy into dir\name for the previous-install report. Text logs keep
@@ -159,6 +167,26 @@ static int previous_install(const WCHAR *command){
  return 0;
 }
 static void local(const WCHAR *file,const WCHAR *name){copy(src,base);append(src,file);save(src,name);}
+/* Setup's Panther logs wherever they appear on the WinPE drive: Vista Setup
+ * run from the ISO under PE10 does not use X:\Windows\Panther. The watcher
+ * records each setupact/setuperr path it sees (relative to X:\). */
+static WCHAR panther_seen[8][160];
+static unsigned panther_count;
+static void remember_panther(const WCHAR *lower_name,const FILE_NOTIFY_INFORMATION *item){
+ if(!contains(lower_name,L"panther\\")||(!contains(lower_name,L"setupact.log")&&!contains(lower_name,L"setuperr.log")))return;
+ unsigned chars=item->FileNameLength/sizeof(WCHAR);if(chars>=160)return;
+ WCHAR name[160];for(unsigned i=0;i<chars;i++)name[i]=item->FileName[i];name[chars]=0;
+ for(unsigned i=0;i<panther_count;i++)if(equal(panther_seen[i],name))return;
+ if(panther_count<8)copy(panther_seen[panther_count++],name);
+}
+static void save_panther_seen(void){
+ WCHAR windows[MAX_PATH];if(GetWindowsDirectoryW(windows,MAX_PATH)<3)return;
+ for(unsigned i=0;i<panther_count;i++){
+  static WCHAR name[200];copy(name,L"x-");unsigned n=2;
+  for(const WCHAR *p=panther_seen[i];*p&&n<190;p++)name[n++]=(*p==L'\\'||*p==L':'||*p==L'$'||*p==L'~')?L'_':*p;
+  name[n]=0;copy(src,L"X:\\");src[0]=windows[0];append(src,panther_seen[i]);save(src,name);
+ }
+}
 static void snapshot(void){
  local(L"usos-startup.log",L"usos-startup.log");
  local(L"usos-vista-install.log",L"vista-install.log");
@@ -166,6 +194,8 @@ static void snapshot(void){
  local(L"vista-bcd-export.txt",L"vista-bcd-export.txt");
  local(L"vista-bcd-system.bin",L"vista-bcd-system.bin");
  local(L"vista-servicing.xml",L"vista-servicing.xml");
+ local(L"usos-vista-dism.log",L"vista-dism.log");
+ save_panther_seen();
  local(L"usos-build.txt",L"build.txt");
  local(L"usos-source.ini",L"source-identity.bin");
  local(L"usos-source\\source.log",L"source-mount.log");
@@ -207,6 +237,22 @@ static void target_snapshots(void){
   static const WCHAR *names[]={L"-bt-setupact.log",L"-bt-setuperr.log",L"-windows-setupact.log",L"-windows-setuperr.log",L"-cbs.log"};
   for(unsigned j=0;j<5;j++){WCHAR name[64]=L"target-C";name[7]=drive[0];append(name,names[j]);copy(src,drive);append(src,paths[j]);save(src,name);}
  }
+ /* Vista Setup writes its Panther log only to <target>\$WINDOWS.~BT (seen in
+  * QEMU 2026-09-26: nothing on X:), and the target of a failed run may have no
+  * drive letter in WinPE: also every unlettered volume, as target-vol-N-*. */
+ static WCHAR volume[MAX_PATH],names_found[MAX_PATH];unsigned unlettered=0;
+ HANDLE find=FindFirstVolumeW(volume,MAX_PATH);if(find==INVALID_HANDLE_VALUE)return;
+ do{
+  DWORD got=0;if(GetVolumePathNamesForVolumeNameW(volume,names_found,MAX_PATH,&got)&&names_found[0])continue;
+  if(GetDriveTypeW(volume)!=DRIVE_FIXED)continue;
+  unlettered++;
+  for(unsigned j=0;j<2;j++){
+   static const WCHAR *bt[]={L"$WINDOWS.~BT\\Sources\\Panther\\setupact.log",L"$WINDOWS.~BT\\Sources\\Panther\\setuperr.log"};
+   WCHAR name[64]=L"target-vol-";WCHAR n[3]={(WCHAR)(L'0'+unlettered/10%10),(WCHAR)(L'0'+unlettered%10),0};append(name,n);append(name,j?L"-bt-setuperr.log":L"-bt-setupact.log");
+   copy(src,volume);append(src,bt[j]);save(src,name);
+  }
+ }while(FindNextVolumeW(find,volume,MAX_PATH));
+ FindVolumeClose(find);
 }
 static DWORD launcher(void){WCHAR value[16];DWORD n=GetEnvironmentVariableW(L"USOS_LAUNCHER_PID",value,16),pid=0;if(!n||n>=16)return 0;
  for(unsigned i=0;i<n;i++){if(value[i]<'0'||value[i]>'9'||pid>429496729)return 0;pid=pid*10+value[i]-'0';}return pid;
@@ -226,7 +272,8 @@ static void watch(HANDLE parent,HANDLE mutex){
   int relevant=bytes==0;
   for(DWORD offset=0;offset<bytes;){FILE_NOTIFY_INFORMATION *item=(void*)(events+offset);WCHAR name[512];unsigned chars=item->FileNameLength/sizeof(WCHAR);
    if(chars<512){for(unsigned i=0;i<chars;i++){WCHAR c=item->FileName[i];name[i]=c>='A'&&c<='Z'?c+32:c;}name[chars]=0;
-    if(contains(name,L"panther")||contains(name,L"setupapi.dev.log")||contains(name,L"dism.log")||contains(name,L"usos-startup.log"))relevant=1;
+    if(contains(name,L"panther")||contains(name,L"setupapi.dev.log")||contains(name,L"dism.log")||contains(name,L"usos-startup.log")||contains(name,L"usos-vista-install.log"))relevant=1;
+    remember_panther(name,item);
    }
    if(!item->NextEntryOffset)break;offset+=item->NextEntryOffset;
   }
