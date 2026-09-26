@@ -99,16 +99,20 @@ class StartupSelection(unittest.TestCase):
     def test_native_boot_and_install_sources_are_separate(self):
         native = (ROOT / 'src/platform/uefi/windows_native_iso.zig').read_text()
         self.assertIn('.file = if (external_pe10) &state.donor else source', native)
-        # Boot files are read by addBootFiles from the chosen boot ISO.
-        self.assertIn('try addBootFiles(&boot_iso, volume, &owned, progress)', native)
+        # Since refactor M2 the RAM disk is filled from the plan
+        # (src/flow/plan.zig wimbootPlan): the boot files come from the chosen
+        # boot ISO (the donor for external PE10).
+        self.assertIn('try inject(root, state, volume, &owned, &boot_iso, &plan,', native)
+        self.assertIn('.boot_files => try addBootFiles(boot_iso, volume, owned, progress)', native)
         self.assertIn('udf.openPath(boot_iso, boot_path', native)
         self.assertIn('udf.readNodeAt(boot_iso, &node', native)
         # usos-source.ini always describes the selected install ISO (never the
-        # PE10 donor) in its own folder; Vista shares this path since the
-        # Vista SP2 x64 -> external PE10 route was added.
-        self.assertIn('source.size(), if (vista) "Windows Vista" else "Windows 7", name)', native)
+        # PE10 donor), in the plan's folder (Windows 7, Vista or the Server folder).
+        self.assertIn('sourceConfigForFolder(config, catalog.partition.part_guid, state.source.size(), folder, name)', native)
         self.assertNotIn('donor.size()', native)
-        self.assertIn('if (external_pe10) try volume.add("usos-external-pe10.flag"', native)
+        plan = (ROOT / 'src/flow/plan.zig').read_text()
+        self.assertIn('if (options.external_pe10) plan.add(.{ .flag = "usos-external-pe10.flag" });', plan)
+        self.assertIn('.external_pe10 = external_pe10', native)
         self.assertNotIn('"usos-stock-win7.flag"', native)
 
     def test_native_reader_state_has_owned_aligned_stable_storage(self):
