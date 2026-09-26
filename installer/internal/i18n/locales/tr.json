@@ -415,7 +415,7 @@
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB sürücüleri; isteğe bağlı PAE önyükleme girdisi",
   "boot.summary.xp_disk": "Sonraki grafik ekranda seçilir ve onaylanır",
   "boot.summary.xp_sif_merged": "{0} (otomatik yanıtla birleştirildi)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; hedefte CSM etkin olmalıdır",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; CSM'i açık bırakın (CSM olmadan: deneysel Int10 yükleyici)",
   "boot.summary.vista_usb": "PE10 yerel USB; hedef Vista USB v11 kullanır",
   "boot.summary.vista_support": "KB2864202 + imzalı USB paketi + Setup öncesi v11",
   "boot.summary.no_drivers": "Drivers/x64 içinde yok; hedefte USB 3 kullanılamayabilir",

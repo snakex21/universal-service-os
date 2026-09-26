@@ -17,6 +17,9 @@ param(
     [string]$UnattendPath = '',
     [string]$Language = 'pl',
     [string]$DataDriversPath = '',
+    # PE10 donor for Vista / Windows 7 originals: copied to DATA\Programs\USOS\WinPE
+    # and recorded in EFI\USOS\winpe-donor.ini, as the installer does.
+    [string]$DonorPath = '',
     [int]$SizeGB = 20
 )
 $ErrorActionPreference = 'Stop'
@@ -102,6 +105,14 @@ try {
     Copy-Item -LiteralPath $IsoPath -Destination $isoTarget -Force
     if ((Get-Item -LiteralPath $isoTarget).Length -ne (Get-Item -LiteralPath $IsoPath).Length) { throw 'ISO copy size mismatch' }
     if ($UnattendPath) { Copy-Item -LiteralPath $UnattendPath -Destination (Join-Path $answers (Split-Path -Leaf $UnattendPath)) -Force }
+    if ($DonorPath) {
+        $donorName = Split-Path -Leaf $DonorPath
+        $donorTarget = Join-Path $dataRoot "Programs\USOS\WinPE\$donorName"
+        Copy-Item -LiteralPath $DonorPath -Destination $donorTarget -Force
+        $donorHash = (Get-FileHash -LiteralPath $donorTarget -Algorithm SHA256).Hash.ToLowerInvariant()
+        $donorSize = (Get-Item -LiteralPath $donorTarget).Length
+        [IO.File]::WriteAllText((Join-Path $espRoot 'EFI\USOS\winpe-donor.ini'), "; USOS-managed PE10 donor (test stick)`r`nname=$donorName`r`nsize=$donorSize`r`nsha256=$donorHash`r`n")
+    }
     if ($DataDriversPath) {
         & robocopy.exe $DataDriversPath (Join-Path $dataRoot 'Drivers') /E /R:0 /W:0 /NP /NJH /NJS | Out-Null
         if ($LASTEXITCODE -ge 8) { throw "robocopy of DATA drivers failed: $LASTEXITCODE" }

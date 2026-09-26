@@ -278,7 +278,7 @@ fn start(
     if (image.kind == .iso and native.legacyPe() and resolved == .direct_iso) {
         view.windowsIsoStatus(.validating, "Reading the selected Windows ISO");
         const rendered = renderForWimboot(profile, system, os_profile_id) catch |err| return showError(view.t(.error_iso), err);
-        windows_native_iso.start(root, windows_native_iso.legacyFolder(system), image.name.slice(), unattended, rendered, vista, view.windowsIsoStatus) catch |err| {
+        windows_native_iso.start(root, windows_native_iso.legacyFolder(system), image.name.slice(), unattended, rendered, vista, usos.catalog.os_profiles.traits(system.id).int10_dispatcher, view.windowsIsoStatus) catch |err| {
             view.refreshFramebuffer();
             showError(view.t(.error_iso), err);
         };

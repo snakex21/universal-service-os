@@ -387,6 +387,30 @@ done:
  LocalFree(system.p);
  return ok;
 }
+/* The Windows 7 Int10 dispatcher publisher (windows7_uefi_publish.h), shared:
+ * with usos-int10-dispatcher.flag the target ESP gets win7-wrapper.efi as
+ * bootmgfw.efi and bootx64.efi, UefiSeven as win7.efi and the Vista boot
+ * manager Setup wrote as win7.original.efi (docs/design/win7-vista-no-csm.md 7).
+ * The shims below give the header the names it uses. */
+static WCHAR a[MAX_PATH],b[MAX_PATH],chosen[MAX_PATH];
+static unsigned len(const WCHAR *p){return (unsigned)lstrlenW(p);}
+static void copy(WCHAR *p,const WCHAR *q){lstrcpyW(p,q);}
+static int say(const char *p){logcode(p,0);return 1;}
+static int same_file(const WCHAR *p,const WCHAR *q){BYTE x[32],y[32];return hash_file(p,x)&&hash_file(q,y)&&same(x,y,32);}
+#include "windows7_uefi_publish.h"
+static BOOL install_int10_dispatcher(const WCHAR *esp,const WCHAR *loader){
+ static WCHAR flag[MAX_PATH],original[MAX_PATH];
+ path(flag,base,L"usos-int10-dispatcher.flag");
+ if(GetFileAttributesW(flag)==INVALID_FILE_ATTRIBUTES)return TRUE;
+ /* The dispatcher only needs the file names; the loader stays the one Setup
+  * wrote (6.0.6001/6002, checked by vista_file before). */
+ path(original,base,L"win7.original.efi");
+ if(!CopyFileW(loader,original,FALSE)||!same_file(loader,original)){logcode("Int10 dispatcher: cannot stage the Vista boot manager=",GetLastError());return FALSE;}
+ lstrcpyW(chosen,esp);
+ if(publish_loaders()){logcode("Int10 dispatcher: publication failed; the Vista boot manager stays in place=",1);return FALSE;}
+ logcode("Int10 dispatcher installed on the target ESP (CSM on: pass-through; CSM off: experimental)=",0);
+ return TRUE;
+}
 static BOOL configure_boot(const Target *t){
  /* Single-threaded finalizer; keep path buffers off the no-CRT stack. */
  static WCHAR store[MAX_PATH],loader[MAX_PATH],inspect_store[MAX_PATH],fallback[MAX_PATH],backup[MAX_PATH];
@@ -433,6 +457,9 @@ static BOOL configure_boot(const Target *t){
  if(!mkdirs(fallback)||!hash_file(loader,expected)||!CopyFileW(loader,fallback,FALSE)||!hash_file(fallback,actual)||!same(expected,actual,32))goto done;
  HANDLE output=CreateFileW(fallback,GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
  if(output==INVALID_HANDLE_VALUE)goto done;ok=FlushFileBuffers(output);CloseHandle(output);
+ // Both entries now hold the Vista boot manager: the dispatcher replaces them
+ // only when the plan asked for it (flag), after staging and checking all assets.
+ if(ok)ok=install_int10_dispatcher(alias,loader);
 done:unmount_esp(alias);return ok;
 }
 void entry(void){

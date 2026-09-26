@@ -2222,7 +2222,7 @@ pub const english = [_][]const u8{
     "Your drivers",
     "Drivers\\Windows 7: {0} INF used, {1} skipped",
     "Drivers\\{0}: {1} INF used, {2} skipped",
-    "Vista SP2 x64 -> PE10; the target needs CSM enabled",
+    "Vista SP2 x64 -> PE10; keep CSM on (without CSM: experimental Int10 loader)",
     "KB2864202 + signed USB package + pre-Setup v11",
     "PE10 native USB; the target uses Vista USB v11",
     "Selected and confirmed in the next graphical screen",

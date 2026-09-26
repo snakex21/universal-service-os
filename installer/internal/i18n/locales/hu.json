@@ -415,7 +415,7 @@
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB illesztőprogramok; opcionális PAE rendszerindítási bejegyzés",
   "boot.summary.xp_disk": "A következő grafikus képernyőn kell kiválasztani és megerősíteni",
   "boot.summary.xp_sif_merged": "{0} (beolvasztva az automatikus válaszba)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; a célon engedélyezni kell a CSM-et",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; hagyja bekapcsolva a CSM-et (CSM nélkül: kísérleti Int10 betöltő)",
   "boot.summary.vista_usb": "PE10 natív USB; a cél a Vista USB v11-et használja",
   "boot.summary.vista_support": "KB2864202 + aláírt USB-csomag + pre-Setup v11",
   "boot.summary.no_drivers": "Nincs a Drivers/x64 mappában; a célon az USB 3 elérhetetlen lehet",

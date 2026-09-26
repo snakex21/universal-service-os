@@ -415,7 +415,7 @@
   "boot.summary.xp_source": "XP SP3 x86; ACPI-/SATA-/USB-drivere; valgfri PAE-startpost",
   "boot.summary.xp_disk": "Vælges og bekræftes på det næste grafiske skærmbillede",
   "boot.summary.xp_sif_merged": "{0} (flettet med det automatiske svar)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; målet skal have CSM aktiveret",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; lad CSM være slået til (uden CSM: eksperimentel Int10-indlæser)",
   "boot.summary.vista_usb": "PE10 med indbygget USB; målet bruger Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + signeret USB-pakke + pre-Setup v11",
   "boot.summary.no_drivers": "Ingen i Drivers/x64; USB 3 på målet er muligvis ikke tilgængelig",

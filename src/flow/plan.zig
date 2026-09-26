@@ -104,6 +104,9 @@ pub const WimbootOptions = struct {
     /// Windows 7/Vista inspection results.
     external_pe10: bool = false,
     nvme_packages: bool = false,
+    /// Vista: the finalizer puts the Int10 dispatcher on the target ESP
+    /// (os_profiles int10_dispatcher; Windows 7 always does).
+    int10_dispatcher: bool = false,
 };
 
 pub const WimbootPlan = struct {
@@ -145,6 +148,7 @@ pub fn wimbootPlan(options: WimbootOptions) WimbootPlan {
             plan.add(.{ .flag = if (vista) "usos-modern-vista.flag" else "usos-modern-win7.flag" });
             if (options.external_pe10) plan.add(.{ .flag = "usos-external-pe10.flag" });
             if (options.nvme_packages) plan.add(.{ .flag = "usos-nvme-packages.flag" });
+            if (vista and options.int10_dispatcher) plan.add(.{ .flag = "usos-int10-dispatcher.flag" });
             if (!vista) plan.add(.{ .bundled_drivers = folder });
             plan.add(.boot_files);
             plan.add(.{ .source_ini = folder });
@@ -218,4 +222,15 @@ test "plan keys for the WORK preparation name the profile and its stages" {
         try plan.stateKeys(&buffer),
     );
     try std.testing.expect(make(systems.findById("windows-xp").?, .iso, .chainload, .uefi) == null);
+}
+
+test "Vista gets the Int10 dispatcher flag only when asked; Windows 7 never needs it" {
+    const plain = wimbootPlan(.{ .kind = .vista, .external_pe10 = true });
+    const with_dispatcher = wimbootPlan(.{ .kind = .vista, .external_pe10 = true, .int10_dispatcher = true });
+    try std.testing.expectEqual(plain.len + 1, with_dispatcher.len);
+    try std.testing.expectEqualStrings("usos-int10-dispatcher.flag", with_dispatcher.items[4].flag);
+    // Everything else keeps its order (the hardware-tested Vista plan).
+    try std.testing.expect(with_dispatcher.items[plain.len] == .source_ini);
+    const win7 = wimbootPlan(.{ .kind = .win7, .int10_dispatcher = true });
+    try std.testing.expectEqual(wimbootPlan(.{ .kind = .win7 }).len, win7.len);
 }

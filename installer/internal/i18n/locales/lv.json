@@ -418,7 +418,7 @@
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB draiveri; neobligāts PAE sāknēšanas ieraksts",
   "boot.summary.xp_disk": "Tiek izvēlēts un apstiprināts nākamajā grafiskajā ekrānā",
   "boot.summary.xp_sif_merged": "{0} (apvienots ar automātisko atbildi)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; mērķim jābūt ieslēgtam CSM",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; atstājiet CSM ieslēgtu (bez CSM: eksperimentāls Int10 ielādētājs)",
   "boot.summary.vista_usb": "PE10 iebūvētais USB; mērķis izmanto Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + parakstīta USB pakotne + pirms-Setup v11",
   "boot.summary.no_drivers": "Drivers/x64 nav nekā; mērķī USB 3 var nebūt pieejams",

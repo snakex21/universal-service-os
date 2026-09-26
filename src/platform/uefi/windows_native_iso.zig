@@ -209,7 +209,9 @@ pub const Rendered = struct {
     plan: []const u8,
 };
 
-pub noinline fn start(root: *uefi.protocol.File, folder: []const u8, name: []const u8, answer_name: ?[]const u8, rendered: ?Rendered, vista: bool, progress: *const fn (IsoStage, []const u8) void) !void {
+/// `int10_dispatcher` (os_profiles trait): Vista's finalizer also installs
+/// the USOS Int10 dispatcher on the target ESP (Windows 7 always does).
+pub noinline fn start(root: *uefi.protocol.File, folder: []const u8, name: []const u8, answer_name: ?[]const u8, rendered: ?Rendered, vista: bool, int10_dispatcher: bool, progress: *const fn (IsoStage, []const u8) void) !void {
     if (@import("builtin").cpu.arch != .x86_64) return error.WindowsSetupRequiresX64;
     try source_config.validateName(name);
     if (answer_name) |answer| try source_config.validateName(answer);
@@ -245,7 +247,7 @@ pub noinline fn start(root: *uefi.protocol.File, folder: []const u8, name: []con
     var config: [544]u8 = undefined;
     // The client folders keep the plan's defaults (hardware-tested order and names).
     const client_folder = std.mem.eql(u8, folder, if (vista) "Windows Vista" else "Windows 7");
-    const plan = usos.flow.plan.wimbootPlan(.{ .kind = if (vista) .vista else .win7, .folder = if (client_folder) "" else folder, .answer = answer_name != null or rendered != null, .external_pe10 = external_pe10, .nvme_packages = inspection.nvme_packages });
+    const plan = usos.flow.plan.wimbootPlan(.{ .kind = if (vista) .vista else .win7, .folder = if (client_folder) "" else folder, .answer = answer_name != null or rendered != null, .external_pe10 = external_pe10, .nvme_packages = inspection.nvme_packages, .int10_dispatcher = int10_dispatcher });
     try inject(root, state, volume, &owned, &boot_iso, &plan, name, answer_name, rendered, &config, progress);
     return launch(root, volume, setup.index, if (external_pe10) "Starting external PE10; the install source remains the selected Windows ISO" else "Starting the hybrid ISO's own WinPE and Setup", progress);
 }

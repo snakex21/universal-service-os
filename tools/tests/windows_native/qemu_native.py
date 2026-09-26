@@ -29,7 +29,10 @@ QEMU = ROOT / "tools" / "qemu" / "qemu-system-x86_64.exe"
 QEMU_IMG = ROOT / "tools" / "qemu" / "qemu-img.exe"
 OVMF_CODE = ROOT / "tools" / "qemu" / "share" / "edk2-x86_64-code.fd"
 OVMF_VARS = ROOT / "tools" / "qemu" / "share" / "edk2-i386-vars.fd"
-RUN = ROOT / "tools" / "tests" / "artifacts" / "windows-native"
+# USOS_NATIVE_RUN: another run folder (e.g. windows-native-vista) so runs do not share NVRAM/state.
+RUN = ROOT / "tools" / "tests" / "artifacts" / os.environ.get("USOS_NATIVE_RUN", "windows-native")
+# USOS_NATIVE_TARGET_BUS=ahci: a SATA target (Vista has no inbox NVMe driver).
+TARGET_BUS = os.environ.get("USOS_NATIVE_TARGET_BUS", "nvme")
 STATE = RUN / "qemu-state.json"
 
 
@@ -82,7 +85,11 @@ def disk_args(stick: Path | None, target: Path) -> list[str]:
         fmt = "vpc" if stick.suffix.lower() == ".vhd" else "qcow2"
         args += ["-drive", f"if=none,id=stick,file={stick.as_posix()},format={fmt}",
                  "-device", "usb-storage,bus=xhci.0,drive=stick,removable=on,serial=USOSSTICK"]
-    args += ["-drive", f"if=none,id=target,file={target.as_posix()},format=qcow2", "-device", "nvme,drive=target,serial=USOSTARGET"]
+    target_fmt = "vpc" if target.suffix.lower() == ".vhd" else "qcow2"
+    if TARGET_BUS == "ahci":
+        args += ["-drive", f"if=none,id=target,file={target.as_posix()},format={target_fmt}", "-device", "ahci,id=sata", "-device", "ide-hd,bus=sata.0,drive=target,serial=USOSTARGET"]
+    else:
+        args += ["-drive", f"if=none,id=target,file={target.as_posix()},format=qcow2", "-device", "nvme,drive=target,serial=USOSTARGET"]
     return args
 
 

@@ -14423,6 +14423,40 @@ wimboot_server	windows-server-2008	vista	2	flag usos-modern-vista.flag
 wimboot_server	windows-server-2008	vista	3	flag usos-external-pe10.flag
 wimboot_server	windows-server-2008	vista	4	boot BCD boot.sdi boot.wim
 wimboot_server	windows-server-2008	vista	5	file usos-source.ini folder=Windows Server 2008
+# int10_dispatcher: systems whose installed copy boots through the USOS Int10 dispatcher (win7-vista-no-csm.md)
+int10_dispatcher	windows-7
+int10_dispatcher	windows-vista
+int10_dispatcher	windows-server-2008-r2
+int10_dispatcher	windows-server-2008
+# wimboot_int10: Vista plans with the dispatcher flag: external_pe10 answer index injection
+wimboot_int10	vista	0	0	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot_int10	vista	0	0	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
+wimboot_int10	vista	0	0	2	flag usos-modern-vista.flag
+wimboot_int10	vista	0	0	3	flag usos-int10-dispatcher.flag
+wimboot_int10	vista	0	0	4	boot BCD boot.sdi boot.wim
+wimboot_int10	vista	0	0	5	file usos-source.ini folder=Windows Vista
+wimboot_int10	vista	0	1	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot_int10	vista	0	1	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
+wimboot_int10	vista	0	1	2	flag usos-modern-vista.flag
+wimboot_int10	vista	0	1	3	flag usos-int10-dispatcher.flag
+wimboot_int10	vista	0	1	4	boot BCD boot.sdi boot.wim
+wimboot_int10	vista	0	1	5	file usos-source.ini folder=Windows Vista
+wimboot_int10	vista	0	1	6	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
+wimboot_int10	vista	1	0	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot_int10	vista	1	0	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
+wimboot_int10	vista	1	0	2	flag usos-modern-vista.flag
+wimboot_int10	vista	1	0	3	flag usos-external-pe10.flag
+wimboot_int10	vista	1	0	4	flag usos-int10-dispatcher.flag
+wimboot_int10	vista	1	0	5	boot BCD boot.sdi boot.wim
+wimboot_int10	vista	1	0	6	file usos-source.ini folder=Windows Vista
+wimboot_int10	vista	1	1	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot_int10	vista	1	1	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
+wimboot_int10	vista	1	1	2	flag usos-modern-vista.flag
+wimboot_int10	vista	1	1	3	flag usos-external-pe10.flag
+wimboot_int10	vista	1	1	4	flag usos-int10-dispatcher.flag
+wimboot_int10	vista	1	1	5	boot BCD boot.sdi boot.wim
+wimboot_int10	vista	1	1	6	file usos-source.ini folder=Windows Vista
+wimboot_int10	vista	1	1	7	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
 # progress
 progress	micro_linux	request_saved	1/5 Starting environment - preparation request saved	Preparation request saved
 progress	micro_linux	return_boot_configured	1/5 Starting environment - return boot configured	Return boot configured

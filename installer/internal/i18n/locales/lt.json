@@ -418,7 +418,7 @@
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB tvarkyklės; pasirenkamas PAE įkrovos įrašas",
   "boot.summary.xp_disk": "Pasirenkamas ir patvirtinamas kitame grafiniame ekrane",
   "boot.summary.xp_sif_merged": "{0} (sujungta su automatiniu atsakymu)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; paskirties kompiuteryje turi būti įjungtas CSM",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; palikite CSM įjungtą (be CSM: eksperimentinis Int10 įkėliklis)",
   "boot.summary.vista_usb": "PE10 integruotas USB; paskirtis naudoja Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + pasirašytas USB paketas + prieš Setup v11",
   "boot.summary.no_drivers": "Drivers/x64 tuščias; paskirtyje USB 3 gali neveikti",

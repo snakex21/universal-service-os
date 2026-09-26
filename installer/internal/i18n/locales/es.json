@@ -415,7 +415,7 @@
   "boot.summary.xp_source": "XP SP3 x86; controladores ACPI / SATA / USB; entrada de arranque PAE opcional",
   "boot.summary.xp_disk": "Se selecciona y confirma en la siguiente pantalla gráfica",
   "boot.summary.xp_sif_merged": "{0} (combinado con la respuesta automática)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; el destino necesita CSM activado",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; mantenga CSM activado (sin CSM: cargador Int10 experimental)",
   "boot.summary.vista_usb": "USB nativo de PE10; el destino usa Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + paquete USB firmado + pre-Setup v11",
   "boot.summary.no_drivers": "Ninguno en Drivers/x64; puede que el USB 3 del destino no esté disponible",

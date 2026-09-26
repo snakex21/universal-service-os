@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 from build_windows_native_cache import NewcWriter
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -58,6 +59,17 @@ def build(root=ROOT, intel_profile=False):
     exe=out/'usos-vista-install.exe'
     subprocess.run([str(root/'tools/zig/zig.exe'),'cc','-target','x86_64-windows.win10-gnu','-Os','-nostdlib','-fno-stack-protector','-fno-builtin','-I'+str(root/'tools/zig/lib/libc/include/any-windows-any'),'-I'+str(out),str(root/'tools/windows_vista_install.c'),'-Wl,--entry,entry','-lkernel32','-ladvapi32','-lversion','-luser32','-o',str(exe)],env=env,check=True)
     destination=root/'zig-out/windows-native';destination.mkdir(parents=True,exist_ok=True)
+    # Int10 dispatcher assets, shared with Windows 7 (docs/design/win7-vista-no-csm.md
+    # section 7): used only when the plan adds usos-int10-dispatcher.flag. The
+    # release UefiSeven binary (manifest-checked), never the source build.
+    wrapper=root/'zig-out/windows7-uefi/win7-wrapper.efi'
+    if not wrapper.is_file():
+        subprocess.run([sys.executable,str(root/'tools/build_windows7_uefi.py')],check=True)
+    uefiseven=root/'tools/vendor/uefiseven/1.30'
+    seven=json.loads((uefiseven/'manifest.json').read_text())
+    for name in ('UefiSeven.efi','LICENSE.txt'):
+        if hashlib.sha256((uefiseven/name).read_bytes()).hexdigest()!=seven['files'][name]:
+            raise ValueError('UefiSeven checksum mismatch: '+name)
     writer=NewcWriter(destination/'vista-support.cpio.tmp')
     try:
         writer.add_file('usos-vista-install.exe',exe)
@@ -66,6 +78,12 @@ def build(root=ROOT, intel_profile=False):
             writer.add_file('vista-payload-%02d.bin'%index,path)
         for path,name,_ in profile_files:
             writer.add_file(name,path)
+        # WIMBoot treats .efi files as boot applications: neutral names, as
+        # in win7-support.cpio; the startup script renames them.
+        writer.add_file('usos-win7-wrapper.bin',wrapper)
+        writer.add_file('usos-win7-video.bin',uefiseven/'UefiSeven.efi')
+        writer.add_file('uefiseven-LICENSE.txt',uefiseven/'LICENSE.txt')
+        writer.add_bytes('UefiSeven.ini',b'[config]\r\nverbose=0\r\nlogfile=1\r\nskiperrors=0\r\nforce_fakevesa=0\r\n')
     finally:
         writer.close()
     (destination/'vista-support.cpio.tmp').replace(destination/'vista-support.cpio')

@@ -415,7 +415,7 @@
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB draiverid; valikuline PAE käivituskirje",
   "boot.summary.xp_disk": "Valitakse ja kinnitatakse järgmisel graafilisel ekraanil",
   "boot.summary.xp_sif_merged": "{0} (ühendatud automaatse vastusega)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; sihtarvutis peab CSM olema lubatud",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; jäta CSM sisse (ilma CSM-ita: katseline Int10 laadur)",
   "boot.summary.vista_usb": "PE10 omane USB; sihtsüsteem kasutab Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + allkirjastatud USB-pakett + Setupi-eelne v11",
   "boot.summary.no_drivers": "Drivers/x64 on tühi; sihtsüsteemis ei pruugi USB 3 töötada",

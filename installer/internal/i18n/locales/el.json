@@ -415,7 +415,7 @@
   "boot.summary.xp_source": "XP SP3 x86, προγράμματα οδήγησης ACPI / SATA / USB, προαιρετική καταχώριση εκκίνησης PAE",
   "boot.summary.xp_disk": "Επιλέγεται και επιβεβαιώνεται στην επόμενη γραφική οθόνη",
   "boot.summary.xp_sif_merged": "{0} (συγχωνευμένο με την αυτόματη απάντηση)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10, ο προορισμός χρειάζεται ενεργοποιημένο CSM",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; αφήστε το CSM ενεργό (χωρίς CSM: πειραματικός φορτωτής Int10)",
   "boot.summary.vista_usb": "Εγγενές USB στο PE10, ο προορισμός χρησιμοποιεί Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + υπογεγραμμένο πακέτο USB + pre-Setup v11",
   "boot.summary.no_drivers": "Κανένα στο Drivers/x64, το USB 3 του προορισμού μπορεί να μην είναι διαθέσιμο",

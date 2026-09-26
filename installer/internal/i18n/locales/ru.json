@@ -418,7 +418,7 @@
   "boot.summary.xp_source": "XP SP3 x86; драйверы ACPI / SATA / USB; необязательный пункт загрузки PAE",
   "boot.summary.xp_disk": "Выбирается и подтверждается на следующем графическом экране",
   "boot.summary.xp_sif_merged": "{0} (объединён с автоматическим ответом)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; на целевом ПК должен быть включён CSM",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; оставьте CSM включённым (без CSM: экспериментальный загрузчик Int10)",
   "boot.summary.vista_usb": "Встроенный USB в PE10; цель использует Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + подписанный пакет USB + pre-Setup v11",
   "boot.summary.no_drivers": "Нет в Drivers/x64; USB 3 на целевом ПК может быть недоступен",

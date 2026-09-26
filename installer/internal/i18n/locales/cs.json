@@ -418,7 +418,7 @@
   "boot.summary.xp_source": "XP SP3 x86; ovladače ACPI / SATA / USB; volitelná spouštěcí položka PAE",
   "boot.summary.xp_disk": "Vybírá a potvrzuje se na další grafické obrazovce",
   "boot.summary.xp_sif_merged": "{0} (sloučeno s automatickou odpovědí)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; cíl vyžaduje zapnutý CSM",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; ponechte CSM zapnuté (bez CSM: experimentální zavaděč Int10)",
   "boot.summary.vista_usb": "Nativní USB v PE10; cíl používá Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + podepsaný balíček USB + pre-Setup v11",
   "boot.summary.no_drivers": "Žádné v Drivers/x64; USB 3 na cíli nemusí být dostupné",

@@ -79,13 +79,20 @@ pub const SystemTraits = struct {
     /// USOS settings file in the Unattended folder (hands-off Setup without
     /// an answer file; docs/xp-unattended.md). The answer screen shows it.
     settings_file: ?[]const u8 = null,
+    /// The installed system boots through the USOS Int10 dispatcher on the
+    /// target ESP (win7-wrapper.efi: firmware Int10 -> the original boot
+    /// manager, none -> VGA routing + UefiSeven), so it starts with or
+    /// without CSM (docs/design/win7-vista-no-csm.md sections 4, 5, 7).
+    /// Windows 7 always had it; for Vista it adds the dispatcher assets'
+    /// flag to the wimboot plan (usos-int10-dispatcher.flag).
+    int10_dispatcher: bool = false,
 };
 
 pub const traits_table = [_]SystemTraits{
     .{ .system_id = "windows-xp", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini" },
     .{ .system_id = "windows-2000", .answer = .winnt_sif, .nt5_staging = true },
-    .{ .system_id = "windows-7", .secure_boot_off = true, .native_uefi = .win7 },
-    .{ .system_id = "windows-vista", .secure_boot_off = true, .native_uefi = .vista },
+    .{ .system_id = "windows-7", .secure_boot_off = true, .native_uefi = .win7, .int10_dispatcher = true },
+    .{ .system_id = "windows-vista", .secure_boot_off = true, .native_uefi = .vista, .int10_dispatcher = true },
     .{ .system_id = "windows-10", .native_uefi = .modern },
     .{ .system_id = "windows-11", .native_uefi = .modern },
     // Windows Server (src/catalog/windows_server.zig): the client release

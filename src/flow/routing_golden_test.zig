@@ -162,6 +162,20 @@ pub fn render(gpa: std.mem.Allocator) ![]u8 {
         }
     }
 
+    try out.appendSlice(gpa, "# int10_dispatcher: systems whose installed copy boots through the USOS Int10 dispatcher (win7-vista-no-csm.md)\n");
+    for (&systems.all) |*system| {
+        if (os_profiles.traits(system.id).int10_dispatcher) try out.print(gpa, "int10_dispatcher\t{s}\n", .{system.id});
+    }
+
+    try out.appendSlice(gpa, "# wimboot_int10: Vista plans with the dispatcher flag: external_pe10 answer index injection\n");
+    for ([_]bool{ false, true }) |pe10| for ([_]bool{ false, true }) |answer| {
+        const wp = plan.wimbootPlan(.{ .kind = .vista, .answer = answer, .external_pe10 = pe10, .int10_dispatcher = true });
+        for (wp.slice(), 0..) |item, index| {
+            var buffer: [160]u8 = undefined;
+            try out.print(gpa, "wimboot_int10\tvista\t{s}\t{s}\t{d}\t{s}\n", .{ flag(pe10), flag(answer), index, try plan.describe(item, &buffer) });
+        }
+    };
+
     try out.appendSlice(gpa, "# progress\n");
     for (std.enums.values(progress.Stage)) |stage| {
         try out.print(gpa, "progress\tmicro_linux\t{s}\t{s}\t{s}\n", .{ @tagName(stage), stage.label(), stage.detail() });

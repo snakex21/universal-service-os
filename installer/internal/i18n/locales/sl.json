@@ -421,7 +421,7 @@
   "boot.summary.xp_source": "XP SP3 x86; gonilniki ACPI / SATA / USB; izbirni zagonski vnos PAE",
   "boot.summary.xp_disk": "Izbran in potrjen na naslednjem grafičnem zaslonu",
   "boot.summary.xp_sif_merged": "{0} (združeno s samodejnim odgovorom)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; na ciljnem računalniku mora biti omogočen CSM",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; pustite CSM vklopljen (brez CSM: poskusni nalagalnik Int10)",
   "boot.summary.vista_usb": "Izvorni USB v PE10; cilj uporablja Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + podpisan paket USB + pred-Setup v11",
   "boot.summary.no_drivers": "V Drivers/x64 ni nič; USB 3 na cilju morda ne bo na voljo",

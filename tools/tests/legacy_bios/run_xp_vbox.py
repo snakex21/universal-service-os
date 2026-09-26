@@ -2,6 +2,8 @@
 faster than QEMU TCG for GUI Setup and repeated boots).
 
   create  --name usos-test-X --disk target.qcow2|.vdi [--controller ide|ahci] [--memory 3072] [--extra-disk D.vdi]
+          [--firmware bios|efi] [--ostype WindowsXP|WindowsVista_64|Windows7_64] [--graphics vboxvga|vmsvga]
+          (--firmware efi: VirtualBox EFI has no CSM, i.e. a UEFI class 3 machine)
   boot    --name usos-test-X --output DIR [--minutes 120] [--interval 5]
   destroy --name usos-test-X          (unregister + delete the VM and its disks)
 
@@ -63,10 +65,10 @@ def create(a):
     if state(a.name) != 'missing':
         raise SystemExit('VM exists already: ' + a.name)
     base = a.base.resolve(); base.mkdir(parents=True, exist_ok=True)
-    vbox('createvm', '--name', a.name, '--ostype', 'WindowsXP', '--basefolder', base, '--register')
+    vbox('createvm', '--name', a.name, '--ostype', a.ostype, '--basefolder', base, '--register')
     folder = vm_folder(a.name)
-    vbox('modifyvm', a.name, '--memory', a.memory, '--cpus', a.cpus, '--firmware', 'bios', '--ioapic', 'on', '--pae', 'on',
-         '--acpi', 'on', '--nic1', 'none', '--audio-enabled', 'off', '--usb-ohci', 'off', '--graphicscontroller', 'vboxvga',
+    vbox('modifyvm', a.name, '--memory', a.memory, '--cpus', a.cpus, '--firmware', a.firmware, '--ioapic', 'on', '--pae', 'on',
+         '--acpi', 'on', '--nic1', 'none', '--audio-enabled', 'off', '--usb-ohci', 'off', '--graphicscontroller', a.graphics,
          '--vram', '32', '--boot1', 'disk', '--boot2', 'none', '--boot3', 'none', '--boot4', 'none', '--rtc-use-utc', 'off')
     if a.controller == 'ahci':
         vbox('storagectl', a.name, '--name', 'SATA', '--add', 'sata', '--controller', 'IntelAhci', '--portcount', '4')
@@ -152,6 +154,8 @@ if __name__ == '__main__':
     p = argparse.ArgumentParser(); sub = p.add_subparsers(dest='cmd', required=True)
     c = sub.add_parser('create'); c.add_argument('--name', required=True); c.add_argument('--disk', type=Path, required=True)
     c.add_argument('--extra-disk', type=Path, action='append', default=[]); c.add_argument('--controller', choices=['ide', 'ahci'], default='ide')
+    c.add_argument('--firmware', choices=['bios', 'efi'], default='bios'); c.add_argument('--ostype', default='WindowsXP')
+    c.add_argument('--graphics', choices=['vboxvga', 'vmsvga'], default='vboxvga')
     c.add_argument('--memory', default='3072'); c.add_argument('--cpus', default='2'); c.add_argument('--base', type=Path, default=ROOT / 'zig-out/vbox')
     b = sub.add_parser('boot'); b.add_argument('--name', required=True); b.add_argument('--output', type=Path, required=True)
     b.add_argument('--minutes', type=float, default=120); b.add_argument('--interval', type=float, default=5)
