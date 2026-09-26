@@ -203,6 +203,21 @@ pub const Block = enum {
 pub const Firmware = enum { uefi_x64, uefi_ia32, bios };
 
 pub fn block(info: Info, firmware: Firmware) ?Block {
+    return blockWith(info, firmware, .media);
+}
+
+/// Which UEFI loader starts Setup on x64 UEFI.
+pub const UefiLoader = enum {
+    /// The media's own efi\boot\bootx64.efi.
+    media,
+    /// An external PE donor (Windows 7/Vista, Server 2008/2008 R2: the
+    /// DATA\Programs\USOS\WinPE boot image, windows7_iso.resolveDonor). The
+    /// media's own UEFI loader is irrelevant; the donor and media checks are
+    /// windows7_iso.inspectSelected/resolveDonor's.
+    pe_donor,
+};
+
+pub fn blockWith(info: Info, firmware: Firmware, loader: UefiLoader) ?Block {
     if (info.unreadable) return null;
     if (info.arch == .ia64 or info.install.ia64) return .ia64_media;
     switch (firmware) {
@@ -211,7 +226,7 @@ pub fn block(info: Info, firmware: Firmware) ?Block {
             if (info.arch == .x86) return .needs_32bit_uefi_or_bios;
             // Windows boot media with a readable layout but no x64 loader
             // (and not identified as x86 above) cannot start here either.
-            if (info.content != .not_windows and info.content != .unknown and !info.uefi_x64 and info.arch == .x64) return .no_uefi_loader;
+            if (loader == .media and info.content != .not_windows and info.content != .unknown and !info.uefi_x64 and info.arch == .x64) return .no_uefi_loader;
             return null;
         },
         .uefi_ia32 => return if (info.arch == .x86 or info.arch == .multi) null else if (info.arch == .unknown) null else .no_uefi_loader,
@@ -451,6 +466,12 @@ test "32-bit media is blocked on x64 UEFI but allowed through BIOS/CSM" {
     // x64 BIOS-only Windows media (no EFI loader) cannot start on UEFI.
     const bios_only = classify(.{ .bootmgr = true, .boot_wim = true, .setup_exe = true, .install_image = true, .wim_arch = 9 });
     try std.testing.expectEqual(Block.no_uefi_loader, block(bios_only, .uefi_x64).?);
+
+    // An external PE donor starts it instead: only the loader gate goes.
+    try std.testing.expect(blockWith(bios_only, .uefi_x64, .pe_donor) == null);
+    try std.testing.expectEqual(Block.needs_32bit_uefi_or_bios, blockWith(x86, .uefi_x64, .pe_donor).?);
+    try std.testing.expectEqual(Block.arm64_media, blockWith(arm, .uefi_x64, .pe_donor).?);
+    try std.testing.expectEqual(Block.no_uefi_loader, blockWith(bios_only, .uefi_ia32, .pe_donor).?);
 
     // Unknown or unreadable media is never blocked here.
     try std.testing.expect(block(.{ .unreadable = true, .arch = .x86 }, .uefi_x64) == null);
