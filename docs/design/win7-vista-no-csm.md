@@ -4,8 +4,10 @@ Status: **Windows 7 x64 is already wired** (dispatcher + UefiSeven 1.30 on
 the target ESP, since the September 2026 Win7 UEFI work). **Confirmed on
 hardware without CSM on 2026-09-26** (X470 + RX 560, build
 B260926-134756-A6EF9DD9 with the VGA routing of section 8.3; section 10).
-**Vista x64 is not wired**:
-an installed Vista needs CSM today. This document records the licence
+**Vista x64 SP2 is wired since 2026-09-26** (section 7) but **not
+confirmed**: no emulator reached a Vista desktop through the shim, and the
+X470 test is pending, so USOS still tells the user to keep CSM on for
+Vista (the no-CSM start is labelled experimental). This document records the licence
 verdict and how USOS uses the shim. It covers where the shim runs, when it
 is enabled, the known limits, the gap for Vista and the hardware test plan.
 
@@ -84,7 +86,7 @@ has the result.
 | USOS menu → Vista Setup | wimboot → external PE10 donor | **No** | same |
 | End of Setup (`setup.exe /noreboot`) | `usos-win7-finalize after[-modern]` in PE10 | writes it | The target ESP gets the dispatcher (below) before the first reboot |
 | Installed Windows 7, every boot, with or without the stick | target ESP `\EFI\Microsoft\Boot\bootmgfw.efi` **and** `\EFI\Boot\bootx64.efi` = USOS dispatcher | **Runtime decision** | see below |
-| Installed Vista | target ESP: Microsoft `bootmgfw.efi`, copied to `\EFI\Boot\bootx64.efi` | **No: needs CSM** | gap, section 7 |
+| Installed Vista | target ESP: the same USOS dispatcher as Windows 7 (`int10_dispatcher` trait, section 7), `win7.original.efi` = the Vista 6.0 boot manager | **Runtime decision** | since 2026-09-26; before: Microsoft `bootmgfw.efi` only, CSM needed |
 
 Target ESP layout written by `tools/windows7_uefi_publish.h` (both
 directories): `bootmgfw.efi` / `bootx64.efi` = `win7-wrapper.efi`
@@ -152,6 +154,14 @@ and is left to the menu/i18n owner. It is not in this prototype.
 
 ### Profile flag
 
+**Implemented 2026-09-26:** `SystemTraits.int10_dispatcher`
+(`src/catalog/os_profiles.zig`) is true for `windows-7` and
+`windows-vista` (Server 2008 R2 / 2008 inherit through `route_as`). For
+Vista the wimboot plan adds `usos-int10-dispatcher.flag`
+(`plan.WimbootOptions.int10_dispatcher`, set from the trait by
+`manual_summary` -> `windows_native_iso.start`); the routing golden only
+gained rows (`int10_dispatcher`, `wimboot_int10`).
+
 The request was to put the shim "behind a profile flag". For Windows 7,
 a flag would switch nothing: the WinPE side never needs the shim, and the
 target side should decide at runtime (point 1). A flag earns its place when
@@ -206,12 +216,13 @@ existing `wimboot` rows until Vista is switched on deliberately.
   re-publish the dispatcher (a USOS "repair boot" utility is a candidate)
   or to enable CSM.
 * **GOP must exist when the dispatcher runs.** Without GOP there is no
-  framebuffer for the VBE table. The ConnectController pass covers boards
-  that connect graphics lazily on fast boot.
+  framebuffer for the VBE table. The ConnectController passes cover boards
+  that connect graphics lazily on fast boot; since 2026-09-26 the
+  dispatcher retries and then cold-resets before it gives up (8.5).
 
 ## 7. Vista x64: the gap and the plan
 
-The Vista finalizer (`tools/windows_vista_install.c`, `configure_boot`)
+Before 2026-09-26, the Vista finalizer (`tools/windows_vista_install.c`, `configure_boot`)
 copies Microsoft's `bootmgfw.efi` to the target fallback path and sets
 `testsigning` on the default entry. It installs no Int10 shim. Every
 hardware Vista success so far was with CSM on (windows-vista-*-2026-09-2x
@@ -219,7 +230,95 @@ docs). UefiSeven does not check the Windows version, and Vista SP1+'s
 basic display path is the same VideoPort/x86-emulator design. It should
 work, but that is **unverified**.
 
-Plan (not implemented here; it changes a hardware-confirmed path):
+**Implemented 2026-09-26 (QEMU/VirtualBox only; hardware test pending,
+section 9 test 4).** The Windows 7 dispatcher is reused unchanged:
+
+1. Trait `int10_dispatcher` (section 5) -> plan flag
+   `usos-int10-dispatcher.flag` for Vista (golden rows `wimboot_int10`).
+   `tools/build_windows_vista_support.py` adds the dispatcher
+   (`usos-win7-wrapper.bin`), the manifest-checked UefiSeven release binary
+   (`usos-win7-video.bin`, 0a44a256), `UefiSeven.ini` and the licence to
+   `vista-support.cpio`. `windows_vista_modern_startup.cmd` renames them only
+   when the flag is present; without it the Vista path is byte-for-byte the
+   old one (CSM message, Microsoft boot manager on both entries). The menu
+   summary (`boot.summary.vista_case`, 27 locales) and the Setup console
+   say "keep CSM on (without CSM: experimental Int10 loader)".
+2. `tools/windows_vista_install.c`, `configure_boot`: after BCD, test
+   signing and the fallback copy, `install_int10_dispatcher()` stages the
+   Vista boot manager Setup wrote as `win7.original.efi` (hash-checked) and
+   calls the shared publisher (`windows7_uefi_publish.h`, the same code the
+   Win7 finalizer uses). `vista_file(loader, FALSE)` already accepts 6.0.x,
+   so no version rule changed. Host tests:
+   `tools/tests/test_vista_int10_dispatcher.py` (no flag = no change; flag =
+   wrapper on both entries, originals = the Vista loader; a foreign fallback
+   = failure, loader kept).
+3. With CSM on, the dispatcher sees a valid firmware Int10 and starts
+   `win7.original.efi` (the Vista boot manager) directly, as for Win7; the
+   CSM-on install path is otherwise unchanged.
+
+Vista quirks checked:
+
+* **Media rules unchanged.** `inspectVista` still accepts only SP2 install
+  images (SP1 media is refused with the existing message); the loader
+  check accepts the 6.0.6001/6002 boot manager SP2 ships.
+* **Vista's own PE is never used on UEFI.** The plan boots the external
+  PE10 donor through wimboot; the Vista `boot.wim` is only a file source.
+  Confirmed again in QEMU: Setup ran inside PE10 on OVMF.
+* **Answer files:** Vista on UEFI still refuses unattended files
+  (unchanged; the summary keeps the "manual install" note).
+* **vga.sys / A0000:** Vista's display path is VideoPort + the HAL x86
+  emulator like Win7. The X470 routing log reads `A0000=FF..` after
+  routing (the GPU does not decode the legacy memory window under GOP
+  scanout). Windows 7's vga.sys started with that on the X470 (section 10),
+  so it is not fatal for Win7; for Vista it is untested and QEMU cannot show
+  it (its A0000 always decodes).
+
+**QEMU (OVMF, no CSM, TCG).**
+
+* Menu-driven e2e: USOS stick (VHD) -> Vista SP2 x64 PL via PE10 donor ->
+  `usos-int10-dispatcher.flag` injected -> Setup in PE10 installed to a GPT
+  AHCI disk (`qemu_native.py`, `USOS_NATIVE_TARGET_BUS=ahci`). The
+  finalizer published the dispatcher: both `bootmgfw.efi` and
+  `EFI\Boot\bootx64.efi` = wrapper 0c09600c, `win7.efi` = UefiSeven
+  0a44a256, `win7.original.efi` = Vista boot manager 6.0.6002 (b0f51dc4).
+* First boot: `usos-boot-uefiseven.log` boot 1 `missing/invalid Int10`,
+  `VGA routing result: passed_before`, UefiSeven `Pre-boot Int10h sanity
+  check success`, Vista boot manager loaded. The Vista kernel then runs
+  (it rewrites the SYSTEM hive; both CPUs later idle in `processr`) but the
+  screen stays black apart from bootvid's planar writes at the top of the
+  framebuffer, and the first-boot setup phase (`Windows\Panther`) never
+  advances. Setup media behave the same (A/B `INT10_AB_SET=vista`:
+  "Windows is loading files..." with a full bar, then nothing; plain = the
+  expected 0xc000000d).
+  A later run with `bootlog` set on the test disk's BCD wrote nothing in
+  13 minutes (no `ntbtlog.txt`, no hive change), so where Vista waits is
+  not known yet.
+* Controls: the same Vista ISO on SeaBIOS reaches Setup in under a minute
+  (QEMU runs Vista's kernel fine); Windows 7 through the same dispatcher
+  on OVMF reaches Setup (8.2). So on QEMU the stall is specific to Vista
+  **on the Int10 shim**, not to the dispatcher (all dispatcher steps log
+  PASS) and not to QEMU in general.
+* `usoscsm` (fake firmware Int10): CSM path taken, straight to the Vista
+  boot manager (log check only, as for Win7).
+* `usosbroken` (`windows7_vga_break.zig`): routing `passed_after`,
+  UefiSeven and the boot manager start; then the same Vista stall.
+
+**VirtualBox 7.2 EFI (no CSM, AMD-V)** is **not** a usable test bed for the
+Int10 shim: the hardware-proven Windows 7 path stops at "Starting Windows"
+there too (Win7 SP1 Setup media via the dispatcher, 5 min), and Vista
+behaves as in QEMU (installed disk: Error Recovery screen from the killed
+QEMU runs, then black and idle, no disk I/O; Setup media: "Windows is
+loading files..." then idle). The VirtualBox harness gained `--firmware
+efi` for this; VMs were `usos-test-*` and are deleted.
+
+**Verdict:** the plumbing is complete and safe (no flag = old path; CSM on
+= pass-through), but no emulator shows a Vista desktop without CSM. Only
+the X470 can decide (section 9 test 4). If Vista stalls there as well, the
+next suspects are Vista-specific: its HAL x86 emulator refusing the
+shimmed Int10 on EFI boots, or its bootvid/vga.sys mode handling; a
+`bootlog` run (`ntbtlog.txt`) is the first thing to collect.
+
+The original plan, for reference:
 
 1. Trait `int10_dispatcher` (section 5). When set for `windows-vista`, add
    `usos-win7-wrapper.bin`, `usos-win7-video.bin`, `UefiSeven.ini` and the
@@ -364,6 +463,35 @@ started (no Code 10): capture which mode vga.sys uses (`UefiSeven.ini`
 `verbose=1` logs every Int10 call to the screen) and then decide whether
 the handler should refuse 03/12h. Not implemented without that evidence.
 
+### 8.5 No GOP at dispatcher time: retries, cold reset, firmware (2026-09-26)
+
+The X470 log of the passing Windows 7 install showed one boot (boot 2,
+right after the specialize restart) where the firmware exposed no GOP/UGA
+even after one `ConnectController` pass; the dispatcher returned to the
+firmware and the next start came 4.5 minutes later. UefiSeven cannot start
+without a framebuffer, and the original boot manager hangs (Win7) or fails
+with 0xc000000d (Vista, section 7) without an Int10 handler, so there is
+no display path to fall through to. `tools/windows7_gop_retry.zig` now:
+
+1. connects every handle recursively and looks for GOP/UGA again, **three
+   passes** with a 1 s stall between them (`graphics.ensureRetrying`);
+   a GOP that appears on pass 2 or 3 is logged
+   (`GOP appeared on connect pass n/3`) and the boot goes on;
+2. still none: a **cold reset** (`ResetSystem(EfiResetCold)`), which makes
+   the firmware initialise the GPU again, logged as `cold reset k/2`; the
+   count is kept in `usos-nogop-resets.txt` beside the dispatcher;
+3. after **two** cold resets in a row: hand back to the firmware as before
+   (it tries the next boot option) and clear the counter, so a machine
+   without any display never loops through resets;
+4. any boot that finds a GOP (or a firmware Int10) clears the counter.
+
+QEMU (`windows7_int10_ab.py usosnogop`, `-vga none`, Vista set): ring log
+boot 1 `GOP/UGA absent after 3 recursive connect passes; cold reset 1/2`,
+boot 2 `cold reset 2/2`, boot 3 `returning to the firmware (next boot
+option); reset counter cleared`. A GOP that comes back after a reset (the
+X470 case) cannot be emulated in QEMU (the display device is fixed at
+start); the path is the ordinary one once `ensureRetrying` succeeds.
+
 ## 9. Hardware tests needed
 
 **Next X470 test (VGA routing build).** CSM off, Secure Boot off, the SSD
@@ -416,7 +544,17 @@ a `usos-boot-csm.log` entry appears and the UefiSeven log stays untouched.
    CPUID) and UefiSeven unable to unlock C0000. The logs will say whether
    the region happens to be writable. Windows 7 also has no Ally drivers
    (USB4/xHCI, display), so this is a shim test, not an installation target.
-4. **Vista**: only after section 7 is implemented, the same pair as test 1.
+4. **Vista x64 SP2** (section 7 implemented 2026-09-26, emulators show no
+   desktop): on the X470 install Vista from the stick with **CSM on** first
+   (regression: `usos-boot-csm.log` must show the pass-through and the
+   install must behave as the v11 success). Then boot the same SSD with
+   **CSM off** and collect `usos-boot-uefiseven.log`, `UefiSeven.log` and,
+   if it stalls, `Windows\ntbtlog.txt` (enable `bootlog` on the target BCD
+   first). A black or frozen screen with the OS alive is the emulator
+   result; a desktop would make Vista the second system on this path.
+5. **No GOP on boot (8.5)**: nothing to set up; if the X470 ever shows the
+   boot-2 case again, the ring log must show the connect passes and at most
+   two `cold reset k/2` entries before the boot continues.
 
 ## 10. Hardware results
 
@@ -497,5 +635,6 @@ Not yet tested on hardware:
 
 - the retail SP1 ISO (`pl_windows_7_professional_with_sp1_x64_dvd_u_676944.iso`)
   through the external **PE10 donor** (the other Win7 route);
-- **Vista x64 without CSM**: the dispatcher is not wired for Vista yet
-  (section 7); Vista still needs CSM on the installed system.
+- **Vista x64 without CSM**: wired since 2026-09-26 (section 7), but no
+  emulator reached a Vista desktop through the shim; the X470 test is
+  section 9 test 4. Until it passes, keep CSM on for Vista.

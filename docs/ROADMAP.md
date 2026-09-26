@@ -329,9 +329,14 @@ pozostaje.
 - Windows 7 na fizycznym X470: **potwierdzony 2026-09-26 bez CSM**
   (build B260926-134756, routing VGA w dyspozytorze, RX 560, ISO „6in1”,
   instalacja do pulpitu; `design/win7-vista-no-csm.md` sekcja 10).
-  Niepotwierdzone: ISO SP1 retail przez dawcę PE10 oraz Vista x64 bez CSM
-  (dyspozytor jeszcze nie obsługuje Visty). Vista na X470 z CSM: sukces
-  sprzętowy v11 (`windows-vista-usb-install-2026-09-21.md`).
+  Niepotwierdzone: ISO SP1 retail przez dawcę PE10 oraz Vista x64 bez CSM.
+  Vista SP2 x64 ma od 2026-09-26 ten sam dyspozytor Int10 na docelowym ESP
+  (flaga `int10_dispatcher`; z CSM przechodzi wprost do bootmgr), ale ani
+  QEMU, ani VirtualBox EFI nie doszły do pulpitu Visty przez shim (jądro
+  działa, obraz stoi), więc menu nadal zaleca CSM; rozstrzyga test X470
+  (sekcja 9, test 4). Dyspozytor przy braku GOP ponawia łączenie
+  kontrolerów i robi do dwóch zimnych restartów (sekcja 8.5). Vista na X470
+  z CSM: sukces sprzętowy v11 (`windows-vista-usb-install-2026-09-21.md`).
 - Linux Live poza SliTaz i narzędzia w UEFI: przez ogólny wpis (N5).
 
 ## 5. Zrobione: najważniejsze funkcje (skrócony changelog)
