@@ -60,7 +60,7 @@ initramfs	usr/lib/usos/usos-win7-unattend.exe	100644	192df25befc5c371f7962a24a46
 initramfs	usr/lib/usos/wimboot	100644	5f067ccdc4d084d5bf77b6c853bd0f8402dfc2b4cd1b103d358993ae97fae8e3
 initramfs	usr/lib/usos/wimboot-kexec	100644	f0c38d5b145b70d2156a37f62e3d97abdb5d75a3ab8703a718d43f777df0692a
 initramfs	usr/lib/usos/wimboot-kexec-ordered	100644	bf506f033e29ac09b338a1572d726e7d02a046f91ce3de59fc72905f1e1b89b5
-initramfs	usr/lib/usos/win7-wrapper.efi	100644	25470c7c20b29c86c9f74c90023412530b1d6d005f806381b1e00b02724b7a1c
+initramfs	usr/lib/usos/win7-wrapper.efi	100644	69086ec4ba673b288d0c8dcf251e5d424b3a5b849164364120c4871bc87cdb57
 initramfs	usr/lib/usos/windows7-nvme	40755	dir
 initramfs	usr/lib/usos/windows7-nvme/bootstrap	40755	dir
 initramfs	usr/lib/usos/windows7-nvme/bootstrap/gdr	40755	dir
@@ -300,7 +300,7 @@ native_cpio	win7-support.cpio	usos-win7-setupcomplete.cmd	939	e54545df7edb6f3817
 native_cpio	win7-support.cpio	usos-win7-finalize.exe	14336	8591c8a36138af4755e3280bf249af17cfea0905f1e48a609dff3a223df6671f
 native_cpio	win7-support.cpio	usos-drivers.exe	6656	f4c681d3554da1989277d43a2cbf68d8fc069e865e2a2ef4f6795a9b783ec08a
 native_cpio	win7-support.cpio	usos-unattend-drivers.exe	9216	7eb53c21cdf89b761755b1cfaf5c4b19e420590b75ad1ee7cb7e9af7e2ed3f3f
-native_cpio	win7-support.cpio	usos-win7-wrapper.bin	65536	25470c7c20b29c86c9f74c90023412530b1d6d005f806381b1e00b02724b7a1c
+native_cpio	win7-support.cpio	usos-win7-wrapper.bin	95232	69086ec4ba673b288d0c8dcf251e5d424b3a5b849164364120c4871bc87cdb57
 native_cpio	win7-support.cpio	usos-win7-video.bin	96896	0a44a256cda725c22f1daadcf093fc4660b7214e6437968a4c8e119aed02a947
 native_cpio	win7-support.cpio	uefiseven-LICENSE.txt	1328	30b044939b58ef5754ed7479e5ec930dd49d154dbf07f618825d4470c189f4dd
 native_cpio	win7-support.cpio	UefiSeven.ini	64	133bccbf46d52a60fb64b8f9a4bd8a5c3c5b40605b60048869d3173c841e61c7
