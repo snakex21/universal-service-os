@@ -27,30 +27,47 @@ fn run() !uefi.Status {
     const slash = last orelse return error.InvalidPath;
     if (slash + 32 >= storage.len) return error.InvalidPath;
     const valid = video.handlerValid();
-    memory_probe.record(device, storage[0 .. slash + 1]);
+    const dir = storage[0 .. slash + 1];
+    // Per-path ring log: a CSM boot never overwrites the UefiSeven evidence.
+    const log = &trace.session;
+    log.begin(device, dir, if (valid) .csm else .uefiseven);
+    memory_probe.record(device, dir);
     var graphics_result: graphics.Result = .present;
     if (!valid) {
         trace.record(device, storage[0 .. slash + 1], "USOS: preparing GOP; connecting firmware controllers if GOP is absent");
+        log.line("USOS: preparing GOP; connecting firmware controllers if GOP is absent");
         graphics_result = try graphics.ensure();
         if (graphics_result == .unavailable) {
             trace.record(device, storage[0 .. slash + 1], "USOS: GOP/UGA absent even after ConnectController; cannot start UefiSeven; Windows boot manager was not started");
+            log.line("USOS: GOP/UGA absent even after ConnectController; cannot start UefiSeven; Windows boot manager was not started");
             return error.NoGraphicsOutput;
         }
     }
-    trace.record(device, storage[0 .. slash + 1], if (valid) "USOS: valid firmware Int10; loading original Windows 7 boot manager" else "USOS: missing/invalid Int10; loading UefiSeven for pure UEFI");
+    const decision = if (valid) "USOS: valid firmware Int10; loading original Windows 7 boot manager" else "USOS: missing/invalid Int10; loading UefiSeven for pure UEFI";
+    trace.record(device, storage[0 .. slash + 1], decision);
+    log.line(decision);
     const name = if (valid) std.unicode.utf8ToUtf16LeStringLiteral("win7.original.efi") else std.unicode.utf8ToUtf16LeStringLiteral("win7.efi");
     @memcpy(storage[slash + 1 ..][0..name.len], name);
     const n = slash + 1 + name.len;
     storage[n] = 0;
     if (!valid) video.prepareEmulatedVga();
-    if (!valid) try amd_shadow.prepare(device, storage[0 .. slash + 1]);
+    if (!valid) {
+        amd_shadow.prepare(device, storage[0 .. slash + 1]) catch |err| {
+            log.print("USOS: AMD C0000 routing stopped the boot: {s}; see usos-amd-shadow.log", .{@errorName(err)});
+            return err;
+        };
+    }
     const dp = (try bs.handleProtocol(uefi.protocol.DevicePath, device)) orelse return error.NoDevicePath;
     var arena: [2048]u8 = undefined;
     var alloc = std.heap.FixedBufferAllocator.init(&arena);
     const path = try dp.createFileDevicePath(alloc.allocator(), storage[0..n :0]);
     const image = try bs.loadImage(false, uefi.handle, .{ .device_path = path });
-    trace.record(device, storage[0 .. slash + 1], if (valid) "USOS: starting original Windows 7 boot manager; firmware Int10 retained" else if (graphics_result == .connected) "USOS: GOP recovered by ConnectController; starting UefiSeven; details in UefiSeven.log" else if (graphics_result == .uga_present) "USOS: UGA present; starting UefiSeven; details in UefiSeven.log" else "USOS: GOP already present; starting UefiSeven; details in UefiSeven.log");
-    return (try bs.startImage(image)).code;
+    const start = if (valid) "USOS: starting original Windows 7 boot manager; firmware Int10 retained" else if (graphics_result == .connected) "USOS: GOP recovered by ConnectController; starting UefiSeven; details in UefiSeven.log" else if (graphics_result == .uga_present) "USOS: UGA present; starting UefiSeven; details in UefiSeven.log" else "USOS: GOP already present; starting UefiSeven; details in UefiSeven.log";
+    trace.record(device, storage[0 .. slash + 1], start);
+    log.line(start);
+    const result = try bs.startImage(image);
+    log.print("USOS: started image returned {s}", .{std.enums.tagName(uefi.Status, result.code) orelse "vendor status"});
+    return result.code;
 }
 pub fn main() uefi.Status {
     return run() catch {

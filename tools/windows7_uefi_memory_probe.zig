@@ -87,6 +87,7 @@ pub fn record(device: uefi.Handle, directory: []const u16) void {
         .{ features.a, features.c, features.d, lr, lr2, ivt, first, region_type, attributes, has_mtrr, cap, def, fixed, c0, c8, syscfg_read, syscfg, gop != null, if (gop) |g| g.mode.frame_buffer_base else 0, if (gop) |g| g.mode.frame_buffer_size else 0 },
     ) catch return;
     trace.recordNamed(device, directory, std.unicode.utf8ToUtf16LeStringLiteral("usos-memory.log"), message);
+    trace.session.line(message);
 }
 test "AMD SYS_CFG read is gated to supported bare-metal AMD families" {
     const amd = Cpu{ .a = 1, .b = 0x68747541, .d = 0x69746e65, .c = 0x444d4163 };
