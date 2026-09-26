@@ -137,6 +137,25 @@ separate step with a Vista/7 hardware test).
   file deleted, no key in the log, missing file stops), the mismatch warning
   on the user's Schneegans file when `zig-out/usb` has it.
 
+### Installation test (VirtualBox, 2026-09-26)
+
+`tools/tests/run_answer_vbox.py` renders `testdata/vbox.profile.ini` for
+Windows 10 x86 (the key is passed on the command line: the Microsoft generic
+installation key for Pro, never stored in the repo), writes it as
+`Autounattend.xml` on a FAT12 floppy and installs
+`pl-pl_windows_10_22h2_19045.6396 ... x86` in the VM `usos-test-answer`
+(BIOS, empty 40 GB disk, no network; deleted afterwards). Result:
+
+- asked by Setup: only the edition list (filtered to Pro by the key; the
+  profile never picks an edition) and the disk page (manual selection
+  kept, Enter on the unallocated disk);
+- answered: language page, key, EULA, the whole OOBE; the desktop came up
+  logged on as `Tester` (empty password), `hostname` = `USOS-VBOX`,
+  `tzutil /g` = `Central European Standard Time`, `Tester` in the Polish
+  `Administratorzy` group (the XML says `Administrators`).
+- First run found a gap: offline OOBE stopped on "Let's connect you to a
+  network"; `HideWirelessSetupInOOBE` is now set on 7+ (second run clean).
+
 ## Attribution
 
 The set of common settings follows the catalogue of Christoph Schneegans'
