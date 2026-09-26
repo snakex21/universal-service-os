@@ -7,6 +7,7 @@ const trace = @import("windows7_uefi_trace.zig");
 const graphics = @import("windows7_uefi_graphics.zig");
 const memory_probe = @import("windows7_uefi_memory_probe.zig");
 const amd_shadow = @import("windows7_amd_shadow.zig");
+const vga_routing = @import("windows7_vga_routing.zig");
 fn run() !uefi.Status {
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
     const loaded = (try bs.handleProtocol(uefi.protocol.LoadedImage, uefi.handle)) orelse return error.NoLoadedImage;
@@ -56,6 +57,13 @@ fn run() !uefi.Status {
             log.print("USOS: AMD C0000 routing stopped the boot: {s}; see usos-amd-shadow.log", .{@errorName(err)});
             return err;
         };
+        // Legacy VGA I/O + A0000 must reach the GOP device, or vga.sys fails (Code 10).
+        const routed = vga_routing.prepare(log);
+        log.print("USOS: VGA routing result: {s}", .{@tagName(routed)});
+        if (routed == .failed) {
+            log.line("USOS: VGA read-back still fails; showing the frozen-display note for 5 s");
+            vga_routing.warnFrozenDisplay();
+        }
     }
     const dp = (try bs.handleProtocol(uefi.protocol.DevicePath, device)) orelse return error.NoDevicePath;
     var arena: [2048]u8 = undefined;
@@ -66,7 +74,7 @@ fn run() !uefi.Status {
     trace.record(device, storage[0 .. slash + 1], start);
     log.line(start);
     const result = try bs.startImage(image);
-    log.print("USOS: started image returned {s}", .{std.enums.tagName(uefi.Status, result.code) orelse "vendor status"});
+    log.print("USOS: started image returned {s}", .{vga_routing.statusName(result.code)});
     return result.code;
 }
 pub fn main() uefi.Status {
