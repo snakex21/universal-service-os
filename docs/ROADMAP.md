@@ -168,7 +168,9 @@ zarejestrowała klucz.
 
 Stan 2026-09-26: edytor w menu UEFI, motywy użytkownika z ESP w BIOS
 (koszt Core 3 616 B, zapas 19 740 B) i trzy przykłady (`usos-ocean`,
-`usos-sunset`, `usos-forest`) zrobione i sprawdzone w QEMU/OVMF;
+`usos-sunset`, `usos-forest`) zrobione i sprawdzone w QEMU/OVMF; edytor
+potwierdzony przez użytkownika na X470 (B260926-134756; „sunset”
+szczególnie się podoba); motywy użytkownika w BIOS jeszcze nie na sprzęcie;
 opis w [menu-themes.md](menu-themes.md). Otwarte: pkt 2 (instalator Go).
 
 Uzgodniony plan (2026-09-26). Kolejność: po menedżerze profili
@@ -324,9 +326,11 @@ pozostaje.
   wpisu o naprawie; zweryfikować przy etapie komunikatów w N2 (M6).
 - Migracja na SanDisk 128 GB zamiast E2B: nadal nie wykonana (wymaga
   kopii nośnika E2B; operacja na dyskach tylko na wyraźne polecenie).
-- Windows 7 na fizycznym X470: nadal niepotwierdzony
-  (`windows7-x470-starting-windows.md`: „nie oznaczać jako działającego”;
-  int10 i AMD shadow wdrożone bez potwierdzenia). Vista na X470: sukces
+- Windows 7 na fizycznym X470: **potwierdzony 2026-09-26 bez CSM**
+  (build B260926-134756, routing VGA w dyspozytorze, RX 560, ISO „6in1”,
+  instalacja do pulpitu; `design/win7-vista-no-csm.md` sekcja 10).
+  Niepotwierdzone: ISO SP1 retail przez dawcę PE10 oraz Vista x64 bez CSM
+  (dyspozytor jeszcze nie obsługuje Visty). Vista na X470 z CSM: sukces
   sprzętowy v11 (`windows-vista-usb-install-2026-09-21.md`).
 - Linux Live poza SliTaz i narzędzia w UEFI: przez ogólny wpis (N5).
 
@@ -345,3 +349,4 @@ Szczegóły i dowody: `TESTING.md` i dokumenty w `docs/`.
 | 2026-09-22 | XP UEFI-CSM: czysta instalacja z pendrive'a na X470; `pae.exe` bez promptów, `CrashDumpEnabled=0`, kontrola zerowych plików |
 | 2026-09-23 | XP: PAE na końcu Setup (`UserExecute`), 31,9 GB na X470 potwierdzone; i18n: jeden katalog 27 locale (instalator, menu, mikro-Linux, XP, WinPE) i wybór języka; ekran ładowania i etapy postępu per ścieżka; łańcuch startowy WORK w `\EFI\USOS-WORK` |
 | 2026-09-24 | Powtarzalny build pakietu XP (`compare_xp_packages.py`); zapas 43 KiB w Legacy Core; pady USB w menu UEFI; **Secure Boot** (shim 16.1 + MOK, podpisane jądro, sterowniki, zapis klucza bez MokManagera); dotyk ROG Ally (TouchI2cDxe) potwierdzony; foldery `DATA\Drivers` (UEFI + INF dla 7/8/10/11); analizy E2B i Win98 |
+| 2026-09-26 | **Windows 7 x64 na X470 bez CSM** (routing VGA do kontrolera GOP w dyspozytorze, RX 560, ISO „6in1”: instalacja do pulpitu); **profile odpowiedzi** (jeden model → WINNT.SIF / autounattend.xml, menedżer profili w menu UEFI z klawiaturą ekranową: utworzenie profilu i instalacja z nim potwierdzone na sprzęcie); **edytor motywów** w UEFI (potwierdzony na sprzęcie), motywy użytkownika w BIOS, przykłady `usos-ocean`/`usos-sunset`/`usos-forest` (build B260926-134756) |

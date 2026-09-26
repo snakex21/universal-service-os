@@ -183,6 +183,11 @@ separate step with a Vista/7 hardware test).
   file deleted, no key in the log, missing file stops), the mismatch warning
   on the user's Schneegans file when `zig-out/usb` has it.
 
+### Hardware (X470, 2026-09-26)
+
+Build B260926-134756-A6EF9DD9: the user created a profile in the UEFI
+answer-profile manager and installed with it; confirmed working.
+
 ### Installation test (VirtualBox, 2026-09-26)
 
 `tools/tests/run_answer_vbox.py` renders `testdata/vbox.profile.ini` for

@@ -1,8 +1,10 @@
 # Windows 7 / Vista x64 on UEFI Class 3 (no CSM): the Int10h shim (design, 2026-09-26)
 
 Status: **Windows 7 x64 is already wired** (dispatcher + UefiSeven 1.30 on
-the target ESP, since the September 2026 Win7 UEFI work). It is proven in
-QEMU/OVMF, but not on hardware without CSM. **Vista x64 is not wired**:
+the target ESP, since the September 2026 Win7 UEFI work). **Confirmed on
+hardware without CSM on 2026-09-26** (X470 + RX 560, build
+B260926-134756-A6EF9DD9 with the VGA routing of section 8.3; section 10).
+**Vista x64 is not wired**:
 an installed Vista needs CSM today. This document records the licence
 verdict and how USOS uses the shim. It covers where the shim runs, when it
 is enabled, the known limits, the gap for Vista and the hardware test plan.
@@ -415,3 +417,31 @@ a `usos-boot-csm.log` entry appears and the UefiSeven log stays untouched.
    the region happens to be writable. Windows 7 also has no Ally drivers
    (USB4/xHCI, display), so this is a shim test, not an installation target.
 4. **Vista**: only after section 7 is implemented, the same pair as test 1.
+
+## 10. Hardware results
+
+**2026-09-26, PASS: Windows 7 x64 on the X470 without CSM.** Build
+B260926-134756-A6EF9DD9 (master `b29c9963`: dispatcher `win7-wrapper.efi`
+69086ec4... with the legacy VGA routing of 8.3, UefiSeven release binary
+0a44a256), ASRock X470 / Ryzen 7 5700X / Radeon RX 560, **CSM off, Secure
+Boot off**. Source: the "6in1" ISO (`WIN7X64.6in1.pl-PL.JULY2019.ISO`,
+hybrid PE7 path). Result reported by the user:
+
+- the display worked through the whole of Setup (the old failure: a frozen
+  "Starting Windows" screen, `windows7-x470-starting-windows.md`);
+- the finalizing step took slightly longer than usual;
+- the first boot reached the desktop.
+
+This is the first Windows 7 install on the X470 without CSM; the VGA
+routing hypothesis of 8.3 (legacy VGA not routed to the GOP controller
+behind the AMD root port) is confirmed in practice. The dispatcher logs
+(`EFI\Microsoft\Boot\usos-boot-uefiseven.log`, `UefiSeven.log`) of that
+install were not collected yet; read them on the next boot of that disk to
+record which branch (`passed_before` / `passed_after`) the routing took.
+
+Not yet tested on hardware:
+
+- the retail SP1 ISO (`pl_windows_7_professional_with_sp1_x64_dvd_u_676944.iso`)
+  through the external **PE10 donor** (the other Win7 route);
+- **Vista x64 without CSM**: the dispatcher is not wired for Vista yet
+  (section 7); Vista still needs CSM on the installed system.
