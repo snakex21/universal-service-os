@@ -1,0 +1,23 @@
+## @file
+# Intel Framework Package Reference Implementations
+#
+# This package provides definitions and libraries that comply to Intel Framework Specifications.
+# Copyright (c) 2007 - 2018, Intel Corporation. All rights reserved.<BR>
+#
+#    SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+##
+
+[Defines]
+  DEC_SPECIFICATION              = 0x00010005
+  PACKAGE_NAME                   = IntelFrameworkPkg
+  PACKAGE_UNI_FILE               = IntelFrameworkPkg.uni
+  PACKAGE_GUID                   = 2759ded5-bb57-4b06-af4f-c398fa552719
+  PACKAGE_VERSION                = 0.96
+
+[Includes]
+  Include                        # Root include for the package
+
+[Protocols]
+  ## Include/Protocol/LegacyRegion.h
+  gEfiLegacyRegionProtocolGuid   = { 0x0fc9013a, 0x0568, 0x4ba9, { 0x9b, 0x7e, 0xc9, 0xc3, 0x90, 0xa6, 0x60, 0x9b }}
