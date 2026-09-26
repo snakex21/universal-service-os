@@ -7,6 +7,7 @@ covered by run_seabios_xp_uefi_csm_textmode.py --prepare-only --settings.
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -16,6 +17,9 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'zig-out' / 'xp-user-settings-tests'
 BASE = ROOT / 'tools' / 'xp_selected_partition_uefi_csm.sif'
 SH = next((p for p in (r'C:\msys64\usr\bin\sh.exe', r'C:\Program Files\Git\usr\bin\sh.exe', shutil.which('sh') or '') if p and Path(p).exists()), None)
+# The shell's own coreutils (head, od, awk) first: PowerShell runs lack them on PATH.
+if SH:
+    os.environ['PATH'] = str(Path(SH).parent) + os.pathsep + os.environ.get('PATH', '')
 CRLF = b'\r\n'
 failures: list[str] = []
 

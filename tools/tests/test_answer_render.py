@@ -31,6 +31,10 @@ OUT = ROOT / 'zig-out' / 'answer-render-tests'
 TOOL = ROOT / 'zig-out' / 'bin' / 'usos-answer.exe'
 ZIG = ROOT / 'tools' / 'zig' / 'zig.exe'
 SH = next((p for p in (r'C:\msys64\usr\bin\sh.exe', r'C:\Program Files\Git\usr\bin\sh.exe', shutil.which('sh') or '') if p and Path(p).exists()), None)
+# The shell's own coreutils (head, od, awk) first: PowerShell runs lack them on PATH.
+if SH:
+    # cmp (tools/answer_plan.sh) may only be in Git's usr/bin: second.
+    os.environ['PATH'] = os.pathsep.join([str(Path(SH).parent), r'C:\Program Files\Git\usr\bin', os.environ.get('PATH', '')])
 UPDATE = os.environ.get('USOS_UPDATE_GOLDEN') == '1'
 NS = '{urn:schemas-microsoft-com:unattend}'
 failures: list[str] = []
