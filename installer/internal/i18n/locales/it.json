@@ -417,7 +417,7 @@
   "boot.summary.xp_source": "XP SP3 x86; driver ACPI / SATA / USB; voce di avvio PAE facoltativa",
   "boot.summary.xp_disk": "Selezionato e confermato nella schermata grafica successiva",
   "boot.summary.xp_sif_merged": "{0} (unito alla risposta automatica)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; lasciare CSM attivo (senza CSM: loader Int10 sperimentale)",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; il sistema installato richiede il CSM",
   "boot.summary.vista_usb": "USB nativo PE10; la destinazione usa Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + pacchetto USB firmato + pre-Setup v11",
   "boot.summary.no_drivers": "Nessuno in Drivers/x64; l'USB 3 della destinazione potrebbe non essere disponibile",
@@ -1037,5 +1037,7 @@
   "boot.lx.restarting_into_usos_choose_windows_vista_again": "Riavvio in USOS: scegliere di nuovo Windows Vista per avviare l'installazione.",
 
   "boot.unattended.vista_uefi": "File di risposta: non ancora supportati per Vista in UEFI",
-  "boot.unattended.vista_uefi_detail": "L'installazione di Vista in UEFI per ora si svolge senza i tuoi file di risposta e profili; scegli l'installazione manuale."
+  "boot.unattended.vista_uefi_detail": "L'installazione di Vista in UEFI per ora si svolge senza i tuoi file di risposta e profili; scegli l'installazione manuale.",
+
+  "boot.summary.vista_case_nocsm": "Windows Vista senza CSM: non ancora supportato (schermo nero) - attivare il CSM nelle impostazioni della scheda madre"
 }

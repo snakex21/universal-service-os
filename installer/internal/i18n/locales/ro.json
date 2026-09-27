@@ -420,7 +420,7 @@
   "boot.summary.xp_source": "XP SP3 x86; drivere ACPI / SATA / USB; intrare de pornire PAE opțională",
   "boot.summary.xp_disk": "Se selectează și se confirmă în următorul ecran grafic",
   "boot.summary.xp_sif_merged": "{0} (combinat cu răspunsul automat)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; lăsați CSM activat (fără CSM: încărcător Int10 experimental)",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; sistemul instalat necesită CSM",
   "boot.summary.vista_usb": "USB nativ PE10; ținta folosește Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + pachet USB semnat + pre-Setup v11",
   "boot.summary.no_drivers": "Niciunul în Drivers/x64; USB 3 poate fi indisponibil pe țintă",
@@ -1040,5 +1040,7 @@
   "boot.lx.restarting_into_usos_choose_windows_vista_again": "Repornire în USOS: alegeți din nou Windows Vista pentru a porni instalarea.",
 
   "boot.unattended.vista_uefi": "Fișiere de răspuns: încă neacceptate pentru Vista în UEFI",
-  "boot.unattended.vista_uefi_detail": "Instalarea Vista în UEFI rulează deocamdată fără fișierele de răspuns și profilurile dvs.; alegeți instalarea manuală."
+  "boot.unattended.vista_uefi_detail": "Instalarea Vista în UEFI rulează deocamdată fără fișierele de răspuns și profilurile dvs.; alegeți instalarea manuală.",
+
+  "boot.summary.vista_case_nocsm": "Windows Vista fără CSM: încă neacceptat (ecran negru) - activați CSM în setările plăcii de bază"
 }

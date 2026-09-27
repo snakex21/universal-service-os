@@ -420,7 +420,7 @@
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB tvarkyklės; pasirenkamas PAE įkrovos įrašas",
   "boot.summary.xp_disk": "Pasirenkamas ir patvirtinamas kitame grafiniame ekrane",
   "boot.summary.xp_sif_merged": "{0} (sujungta su automatiniu atsakymu)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; palikite CSM įjungtą (be CSM: eksperimentinis Int10 įkėliklis)",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; įdiegtai sistemai reikia CSM",
   "boot.summary.vista_usb": "PE10 integruotas USB; paskirtis naudoja Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + pasirašytas USB paketas + prieš Setup v11",
   "boot.summary.no_drivers": "Drivers/x64 tuščias; paskirtyje USB 3 gali neveikti",
@@ -1040,5 +1040,7 @@
   "boot.lx.restarting_into_usos_choose_windows_vista_again": "Paleidžiama iš naujo į USOS: dar kartą pasirinkite Windows Vista, kad pradėtumėte diegimą.",
 
   "boot.unattended.vista_uefi": "Atsakymų failai: Vista UEFI režimu dar nepalaikomi",
-  "boot.unattended.vista_uefi_detail": "Vista diegimas UEFI režimu kol kas vyksta be jūsų atsakymų failų ir profilių; pasirinkite rankinį diegimą."
+  "boot.unattended.vista_uefi_detail": "Vista diegimas UEFI režimu kol kas vyksta be jūsų atsakymų failų ir profilių; pasirinkite rankinį diegimą.",
+
+  "boot.summary.vista_case_nocsm": "Windows Vista be CSM: dar nepalaikoma (juodas ekranas) - įjunkite CSM pagrindinės plokštės nustatymuose"
 }

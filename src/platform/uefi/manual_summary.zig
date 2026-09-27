@@ -181,7 +181,9 @@ pub fn show(
     }
     if (image.kind == .iso and native.legacyPe()) {
         if (windows_native_iso.inspect(windows_native_iso.legacyFolder(system), image.name.slice(), vista)) |inspection| {
-            fields.add(view.t(.summary_iso_case), if (vista) view.t(.summary_vista_case) else inspection.mode.label());
+            // Vista without CSM: black screen after installation (vgapnp Code 10,
+            // no legacy VGA at A0000; X470 2026-09-27). Setup itself still works.
+            fields.add(view.t(.summary_iso_case), if (vista) (if (secure_boot.csm().likelyOn()) view.t(.summary_vista_case) else view.t(.summary_vista_case_nocsm)) else inspection.mode.label());
             fields.add(view.t(.summary_boot_source), inspection.bootName(image.name.slice()));
             const setup = inspection.boot_setup;
             fields.add(view.t(.summary_boot_pe), std.fmt.bufPrint(&version_text, "{d}.{d}.{d} x64 / WIM index {d}", .{ setup.major, setup.minor, setup.build, setup.index }) catch view.t(.summary_unavailable));

@@ -635,6 +635,25 @@ Not yet tested on hardware:
 
 - the retail SP1 ISO (`pl_windows_7_professional_with_sp1_x64_dvd_u_676944.iso`)
   through the external **PE10 donor** (the other Win7 route);
-- **Vista x64 without CSM**: wired since 2026-09-26 (section 7), but no
-  emulator reached a Vista desktop through the shim; the X470 test is
-  section 9 test 4. Until it passes, keep CSM on for Vista.
+- **Vista x64 without CSM**: wired since 2026-09-26 (section 7); the X470
+  test on 2026-09-27 gave a black screen (see below). Not supported yet;
+  keep CSM on for Vista.
+
+**2026-09-27, Vista x64 SP2 on the X470 (B260927-130833, installer v12).**
+Evidence: `artifacts/vista-x470-nocsm-20260927/` (not in git).
+
+- **CSM on: full success** - installation, USB in phase 2, OOBE, desktop.
+- **CSM off: black screen.** Even with CSM on, Vista's `vgapnp` fails with
+  Code 10 on the RX 560 (Standard VGA falls back to VgaSave). VgaSave needs
+  the legacy VGA memory at A0000, which reads FF with CSM off because the
+  card's legacy VBIOS never POSTs (the same A0000=FF the Windows 7 routing
+  log showed; Windows 7's vgapnp starts from UefiSeven's VBE data, Vista's
+  does not). The two no-CSM boots left no System event records (the last
+  clean record is the 16:01:11 shutdown), consistent with a hang/black
+  display before logging.
+- **Consequence:** Vista without CSM is "not supported yet". The UEFI summary
+  says so when the firmware shows no CSM (`boot.summary.vista_case_nocsm`,
+  27 locales), the WinPE console tells the user to keep CSM on, and the
+  installation stays allowed (Setup runs in PE10; the target is used with CSM
+  on). The finalizer still installs the dispatcher (a pass-through with CSM
+  on). The real fix is expected from CSMWrap (separate work).

@@ -417,7 +417,7 @@
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB drivers; optional PAE boot entry",
   "boot.summary.xp_disk": "Selected and confirmed in the next graphical screen",
   "boot.summary.xp_sif_merged": "{0} (merged into the automatic answer)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; keep CSM on (without CSM: experimental Int10 loader)",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; the installed system needs CSM",
   "boot.summary.vista_usb": "PE10 native USB; the target uses Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + signed USB package + pre-Setup v11",
   "boot.summary.no_drivers": "None in Drivers/x64; target USB 3 may be unavailable",
@@ -1037,5 +1037,7 @@
   "boot.lx.restarting_into_usos_choose_windows_vista_again": "Restarting into USOS: choose Windows Vista again to start Setup.",
 
   "boot.unattended.vista_uefi": "Answer files: not supported for Vista on UEFI yet",
-  "boot.unattended.vista_uefi_detail": "Vista Setup on UEFI runs without your answer files and profiles for now; choose the manual installation."
+  "boot.unattended.vista_uefi_detail": "Vista Setup on UEFI runs without your answer files and profiles for now; choose the manual installation.",
+
+  "boot.summary.vista_case_nocsm": "Windows Vista without CSM: not supported yet (black screen) - enable CSM in the board settings"
 }

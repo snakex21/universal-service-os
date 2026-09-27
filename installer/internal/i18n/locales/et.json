@@ -417,7 +417,7 @@
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB draiverid; valikuline PAE käivituskirje",
   "boot.summary.xp_disk": "Valitakse ja kinnitatakse järgmisel graafilisel ekraanil",
   "boot.summary.xp_sif_merged": "{0} (ühendatud automaatse vastusega)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; jäta CSM sisse (ilma CSM-ita: katseline Int10 laadur)",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; paigaldatud süsteem vajab CSM-i",
   "boot.summary.vista_usb": "PE10 omane USB; sihtsüsteem kasutab Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + allkirjastatud USB-pakett + Setupi-eelne v11",
   "boot.summary.no_drivers": "Drivers/x64 on tühi; sihtsüsteemis ei pruugi USB 3 töötada",
@@ -1037,5 +1037,7 @@
   "boot.lx.restarting_into_usos_choose_windows_vista_again": "Taaskäivitus USOS-i: valige häälestuse alustamiseks uuesti Windows Vista.",
 
   "boot.unattended.vista_uefi": "Vastusefailid: Vista jaoks UEFI-s veel toetamata",
-  "boot.unattended.vista_uefi_detail": "Vista häälestus UEFI-s töötab praegu ilma teie vastusefailide ja profiilideta; valige käsitsi installimine."
+  "boot.unattended.vista_uefi_detail": "Vista häälestus UEFI-s töötab praegu ilma teie vastusefailide ja profiilideta; valige käsitsi installimine.",
+
+  "boot.summary.vista_case_nocsm": "Windows Vista ilma CSM-ita: veel toetamata (must ekraan) - lubage CSM emaplaadi sätetes"
 }

@@ -489,6 +489,7 @@ pub const Key = enum(u16) {
     summary_user_drivers_count,
     summary_user_drivers_folder,
     summary_vista_case,
+    summary_vista_case_nocsm,
     summary_vista_support,
     summary_vista_usb,
     summary_xp_disk,
@@ -1092,6 +1093,7 @@ pub const hashes = [_]u32{
     0xb5aa5b1c, // summary.user_drivers_count
     0x39f92475, // summary.user_drivers_folder
     0x8e042d81, // summary.vista_case
+    0xe9c433ae, // summary.vista_case_nocsm
     0xa0987638, // summary.vista_support
     0x1e3154b1, // summary.vista_usb
     0xe262ce65, // summary.xp_disk
@@ -1645,6 +1647,7 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
     false,
     false,
     false,
@@ -2296,7 +2299,8 @@ pub const english = [_][]const u8{
     "Your drivers",
     "Drivers\\Windows 7: {0} INF used, {1} skipped",
     "Drivers\\{0}: {1} INF used, {2} skipped",
-    "Vista SP2 x64 -> PE10; keep CSM on (without CSM: experimental Int10 loader)",
+    "Vista SP2 x64 -> PE10; the installed system needs CSM",
+    "Windows Vista without CSM: not supported yet (black screen) - enable CSM in the board settings",
     "KB2864202 + signed USB package + pre-Setup v11",
     "PE10 native USB; the target uses Vista USB v11",
     "Selected and confirmed in the next graphical screen",

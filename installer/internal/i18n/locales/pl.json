@@ -420,7 +420,7 @@
   "boot.summary.xp_source": "XP SP3 x86; sterowniki ACPI / SATA / USB; opcjonalna pozycja startowa PAE",
   "boot.summary.xp_disk": "Wybierany i potwierdzany na następnym ekranie graficznym",
   "boot.summary.xp_sif_merged": "{0} (połączony z automatyczną odpowiedzią)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; pozostaw włączony CSM (bez CSM: eksperymentalny loader Int10)",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; zainstalowany system wymaga CSM",
   "boot.summary.vista_usb": "Natywne USB w PE10; system docelowy używa Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + podpisany pakiet USB + v11 przed instalacją",
   "boot.summary.no_drivers": "Brak w Drivers/x64; USB 3 na komputerze docelowym może nie działać",
@@ -1040,5 +1040,7 @@
   "boot.lx.restarting_into_usos_choose_windows_vista_again": "Ponowne uruchamianie USOS: wybierz ponownie Windows Vista, aby rozpocząć instalację.",
 
   "boot.unattended.vista_uefi": "Pliki odpowiedzi: jeszcze nieobsługiwane dla Visty w UEFI",
-  "boot.unattended.vista_uefi_detail": "Instalator Visty w UEFI działa na razie bez Twoich plików odpowiedzi i profili; wybierz instalację ręczną."
+  "boot.unattended.vista_uefi_detail": "Instalator Visty w UEFI działa na razie bez Twoich plików odpowiedzi i profili; wybierz instalację ręczną.",
+
+  "boot.summary.vista_case_nocsm": "Windows Vista bez CSM: jeszcze nieobsługiwane (czarny ekran) - włącz CSM w ustawieniach płyty"
 }

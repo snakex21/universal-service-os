@@ -417,7 +417,7 @@
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB illesztőprogramok; opcionális PAE rendszerindítási bejegyzés",
   "boot.summary.xp_disk": "A következő grafikus képernyőn kell kiválasztani és megerősíteni",
   "boot.summary.xp_sif_merged": "{0} (beolvasztva az automatikus válaszba)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; hagyja bekapcsolva a CSM-et (CSM nélkül: kísérleti Int10 betöltő)",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; a telepített rendszerhez CSM kell",
   "boot.summary.vista_usb": "PE10 natív USB; a cél a Vista USB v11-et használja",
   "boot.summary.vista_support": "KB2864202 + aláírt USB-csomag + pre-Setup v11",
   "boot.summary.no_drivers": "Nincs a Drivers/x64 mappában; a célon az USB 3 elérhetetlen lehet",
@@ -1037,5 +1037,7 @@
   "boot.lx.restarting_into_usos_choose_windows_vista_again": "Újraindítás a USOS-ba: a telepítés indításához válassza ismét a Windows Vistát.",
 
   "boot.unattended.vista_uefi": "Válaszfájlok: UEFI módban a Vistához még nem támogatottak",
-  "boot.unattended.vista_uefi_detail": "A Vista telepítője UEFI módban egyelőre a válaszfájlok és profilok nélkül fut; válassza a kézi telepítést."
+  "boot.unattended.vista_uefi_detail": "A Vista telepítője UEFI módban egyelőre a válaszfájlok és profilok nélkül fut; válassza a kézi telepítést.",
+
+  "boot.summary.vista_case_nocsm": "Windows Vista CSM nélkül: még nem támogatott (fekete képernyő) - kapcsolja be a CSM-et az alaplap beállításaiban"
 }

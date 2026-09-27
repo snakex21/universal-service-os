@@ -417,7 +417,7 @@
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB sürücüleri; isteğe bağlı PAE önyükleme girdisi",
   "boot.summary.xp_disk": "Sonraki grafik ekranda seçilir ve onaylanır",
   "boot.summary.xp_sif_merged": "{0} (otomatik yanıtla birleştirildi)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; CSM'i açık bırakın (CSM olmadan: deneysel Int10 yükleyici)",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; kurulu sistem CSM gerektirir",
   "boot.summary.vista_usb": "PE10 yerel USB; hedef Vista USB v11 kullanır",
   "boot.summary.vista_support": "KB2864202 + imzalı USB paketi + Setup öncesi v11",
   "boot.summary.no_drivers": "Drivers/x64 içinde yok; hedefte USB 3 kullanılamayabilir",
@@ -1037,5 +1037,7 @@
   "boot.lx.restarting_into_usos_choose_windows_vista_again": "USOS'a yeniden başlatılıyor: kurulumu başlatmak için Windows Vista'yı yeniden seçin.",
 
   "boot.unattended.vista_uefi": "Yanıt dosyaları: UEFI'de Vista için henüz desteklenmiyor",
-  "boot.unattended.vista_uefi_detail": "UEFI'de Vista kurulumu şimdilik yanıt dosyalarınız ve profilleriniz olmadan çalışır; el ile kurulumu seçin."
+  "boot.unattended.vista_uefi_detail": "UEFI'de Vista kurulumu şimdilik yanıt dosyalarınız ve profilleriniz olmadan çalışır; el ile kurulumu seçin.",
+
+  "boot.summary.vista_case_nocsm": "CSM olmadan Windows Vista: henüz desteklenmiyor (siyah ekran) - anakart ayarlarında CSM'i etkinleştirin"
 }

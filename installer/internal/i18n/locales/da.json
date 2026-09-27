@@ -417,7 +417,7 @@
   "boot.summary.xp_source": "XP SP3 x86; ACPI-/SATA-/USB-drivere; valgfri PAE-startpost",
   "boot.summary.xp_disk": "Vælges og bekræftes på det næste grafiske skærmbillede",
   "boot.summary.xp_sif_merged": "{0} (flettet med det automatiske svar)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; lad CSM være slået til (uden CSM: eksperimentel Int10-indlæser)",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; det installerede system kræver CSM",
   "boot.summary.vista_usb": "PE10 med indbygget USB; målet bruger Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + signeret USB-pakke + pre-Setup v11",
   "boot.summary.no_drivers": "Ingen i Drivers/x64; USB 3 på målet er muligvis ikke tilgængelig",
@@ -1037,5 +1037,7 @@
   "boot.lx.restarting_into_usos_choose_windows_vista_again": "Genstarter i USOS: vælg Windows Vista igen for at starte installationen.",
 
   "boot.unattended.vista_uefi": "Svarfiler: understøttes endnu ikke for Vista på UEFI",
-  "boot.unattended.vista_uefi_detail": "Vistas installation på UEFI kører indtil videre uden dine svarfiler og profiler; vælg manuel installation."
+  "boot.unattended.vista_uefi_detail": "Vistas installation på UEFI kører indtil videre uden dine svarfiler og profiler; vælg manuel installation.",
+
+  "boot.summary.vista_case_nocsm": "Windows Vista uden CSM: understøttes endnu ikke (sort skærm) - slå CSM til i bundkortets indstillinger"
 }

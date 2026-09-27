@@ -13,7 +13,7 @@ if exist "%~dp0usos-int10-dispatcher.flag" (
     copy /y "%~dp0usos-win7-video.bin" "%~dp0win7.efi" >nul
     if errorlevel 1 exit /b 1
     rem No parentheses in these echo texts: they would close the if block.
-    echo [USOS] Vista SP2 installation from USB. Keep CSM enabled; without CSM the installed system tries the experimental Int10 loader on its ESP.
+    echo [USOS] Vista SP2 installation from USB. Keep CSM enabled: Vista without CSM is not supported yet - black screen after installation.
 ) else (
     echo [USOS] Vista SP2 installation from USB. Keep CSM enabled for the installed system.
 )

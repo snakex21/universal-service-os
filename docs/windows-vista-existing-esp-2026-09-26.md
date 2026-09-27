@@ -217,3 +217,27 @@ fb3c46f1.
 * micro-Linux restart after "Disk prepared": works under TCG (20 s after
   the confirmation); under WHPX the guest never resets (`reboot -f` reached,
   QEMU WHPX reset issue, not USOS).
+
+## v13 (2026-09-27): Vista without CSM "not supported yet"; autochk limited to the system volume
+
+* X470 with B260927-130833: CSM on = full success; CSM off = black screen
+  (docs/design/win7-vista-no-csm.md section 10). The UEFI summary now shows
+  "Windows Vista without CSM: not supported yet (black screen) - enable CSM in
+  the board settings" when no CSM is detected (`boot.summary.vista_case_nocsm`,
+  27 locales; with CSM: "the installed system needs CSM"); the WinPE console
+  says the same. The installation stays allowed; the dispatcher is still
+  installed (pass-through with CSM on).
+* **Test signing stays on.** A trial boot with test signing off cannot work:
+  the Vista USB 3 package is signed with a local test certificate
+  (`local-driver-manifest.json`: "not vendor/WHQL signing"), and x64 Vista loads
+  such kernel drivers only with TESTSIGNING. With it off, usbxhci does not load,
+  so the check could never pass and on the X470 (all ports on xHCI) that boot
+  would have no keyboard or mouse. Windows 7 does not use test signing.
+* **Autochk (Vista only):** the first-boot gate (`USOS\oobe.exe`,
+  `tools/windows_vista_oobe_gate.c` v3, `tools/vista_autochk.h`) replaces the
+  untouched default BootExecute `autocheck autochk *` with
+  `autocheck autochk /k:D /k:E ... *` (every lettered fixed volume except the
+  system one, like `chkntfs /x`) and sets AutoChkTimeout to 3 s; logged in
+  `C:\USOS\oobe-prep.log`, never fatal. The system volume keeps its check
+  (only when dirty). Volumes without a letter cannot be excluded with /k:.
+  Windows 7 and XP are unchanged. Test: `tools/tests/test_vista_autochk.py`.

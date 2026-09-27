@@ -417,7 +417,7 @@
   "boot.summary.xp_source": "XP SP3 x86; ACPI-/SATA-/USB-stuurprogramma's; optionele PAE-opstartvermelding",
   "boot.summary.xp_disk": "Wordt gekozen en bevestigd in het volgende grafische scherm",
   "boot.summary.xp_sif_merged": "{0} (samengevoegd met het automatische antwoord)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; laat CSM aan (zonder CSM: experimentele Int10-lader)",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; het geïnstalleerde systeem heeft CSM nodig",
   "boot.summary.vista_usb": "PE10 met eigen USB; het doel gebruikt Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + ondertekend USB-pakket + pre-Setup v11",
   "boot.summary.no_drivers": "Geen in Drivers/x64; USB 3 op het doel is mogelijk niet beschikbaar",
@@ -1037,5 +1037,7 @@
   "boot.lx.restarting_into_usos_choose_windows_vista_again": "Opnieuw starten in USOS: kies opnieuw Windows Vista om Setup te starten.",
 
   "boot.unattended.vista_uefi": "Antwoordbestanden: nog niet ondersteund voor Vista op UEFI",
-  "boot.unattended.vista_uefi_detail": "Vista Setup op UEFI werkt voorlopig zonder uw antwoordbestanden en profielen; kies de handmatige installatie."
+  "boot.unattended.vista_uefi_detail": "Vista Setup op UEFI werkt voorlopig zonder uw antwoordbestanden en profielen; kies de handmatige installatie.",
+
+  "boot.summary.vista_case_nocsm": "Windows Vista zonder CSM: nog niet ondersteund (zwart scherm) - schakel CSM in bij de moederbordinstellingen"
 }

@@ -423,7 +423,7 @@
   "boot.summary.xp_source": "XP SP3 x86; gonilniki ACPI / SATA / USB; izbirni zagonski vnos PAE",
   "boot.summary.xp_disk": "Izbran in potrjen na naslednjem grafičnem zaslonu",
   "boot.summary.xp_sif_merged": "{0} (združeno s samodejnim odgovorom)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; pustite CSM vklopljen (brez CSM: poskusni nalagalnik Int10)",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; nameščeni sistem potrebuje CSM",
   "boot.summary.vista_usb": "Izvorni USB v PE10; cilj uporablja Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + podpisan paket USB + pred-Setup v11",
   "boot.summary.no_drivers": "V Drivers/x64 ni nič; USB 3 na cilju morda ne bo na voljo",
@@ -1043,5 +1043,7 @@
   "boot.lx.restarting_into_usos_choose_windows_vista_again": "Vnovični zagon v USOS: znova izberite Windows Vista, da zaženete namestitev.",
 
   "boot.unattended.vista_uefi": "Datoteke z odgovori: za Visto v UEFI še niso podprte",
-  "boot.unattended.vista_uefi_detail": "Namestitev Viste v UEFI zaenkrat poteka brez vaših datotek z odgovori in profilov; izberite ročno namestitev."
+  "boot.unattended.vista_uefi_detail": "Namestitev Viste v UEFI zaenkrat poteka brez vaših datotek z odgovori in profilov; izberite ročno namestitev.",
+
+  "boot.summary.vista_case_nocsm": "Windows Vista brez CSM: še ni podprto (črn zaslon) - omogočite CSM v nastavitvah plošče"
 }

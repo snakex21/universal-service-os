@@ -420,7 +420,7 @@
   "boot.summary.xp_source": "XP SP3 x86; драйверы ACPI / SATA / USB; необязательный пункт загрузки PAE",
   "boot.summary.xp_disk": "Выбирается и подтверждается на следующем графическом экране",
   "boot.summary.xp_sif_merged": "{0} (объединён с автоматическим ответом)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; оставьте CSM включённым (без CSM: экспериментальный загрузчик Int10)",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; установленной системе нужен CSM",
   "boot.summary.vista_usb": "Встроенный USB в PE10; цель использует Vista USB v11",
   "boot.summary.vista_support": "KB2864202 + подписанный пакет USB + pre-Setup v11",
   "boot.summary.no_drivers": "Нет в Drivers/x64; USB 3 на целевом ПК может быть недоступен",
@@ -1040,5 +1040,7 @@
   "boot.lx.restarting_into_usos_choose_windows_vista_again": "Перезапуск в USOS: снова выберите Windows Vista, чтобы начать установку.",
 
   "boot.unattended.vista_uefi": "Файлы ответов: для Vista в режиме UEFI пока не поддерживаются",
-  "boot.unattended.vista_uefi_detail": "Установка Vista в режиме UEFI пока выполняется без ваших файлов ответов и профилей; выберите ручную установку."
+  "boot.unattended.vista_uefi_detail": "Установка Vista в режиме UEFI пока выполняется без ваших файлов ответов и профилей; выберите ручную установку.",
+
+  "boot.summary.vista_case_nocsm": "Windows Vista без CSM: пока не поддерживается (чёрный экран) - включите CSM в настройках платы"
 }

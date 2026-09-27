@@ -332,9 +332,12 @@ pozostaje.
   Niepotwierdzone: ISO SP1 retail przez dawcę PE10 oraz Vista x64 bez CSM.
   Vista SP2 x64 ma od 2026-09-26 ten sam dyspozytor Int10 na docelowym ESP
   (flaga `int10_dispatcher`; z CSM przechodzi wprost do bootmgr), ale ani
-  QEMU, ani VirtualBox EFI nie doszły do pulpitu Visty przez shim (jądro
-  działa, obraz stoi), więc menu nadal zaleca CSM; rozstrzyga test X470
-  (sekcja 9, test 4). Dyspozytor przy braku GOP ponawia łączenie
+  QEMU, ani VirtualBox EFI nie doszły do pulpitu Visty przez shim. Test X470
+  2026-09-27 (B260927-130833): z CSM pełny sukces (instalacja, USB w fazie
+  2, OOBE, pulpit); bez CSM czarny ekran (vgapnp Code 10, VgaSave potrzebuje
+  A0000, które bez CSM czyta FF, bo VBIOS karty nie wykonuje POST). Vista bez
+  CSM: jeszcze nieobsługiwana (komunikat w menu, 27 języków); właściwa
+  poprawka: CSMWrap (osobna praca). Dyspozytor przy braku GOP ponawia łączenie
   kontrolerów i robi do dwóch zimnych restartów (sekcja 8.5). Vista na X470
   z CSM: sukces sprzętowy v11 (`windows-vista-usb-install-2026-09-21.md`).
 - Linux Live poza SliTaz i narzędzia w UEFI: przez ogólny wpis (N5).

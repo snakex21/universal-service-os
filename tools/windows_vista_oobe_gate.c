@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <lm.h>
 #include "vista_oobe_recovery_policy.h"
+#include "vista_autochk.h"
 static WCHAR windows[MAX_PATH],self[MAX_PATH],file[MAX_PATH];
 static HANDLE log_file=INVALID_HANDLE_VALUE;
 static const WCHAR native[]=L"oobe\\windeploy.exe";
@@ -96,6 +97,33 @@ static DWORD run(const WCHAR *path){
  if(!CreateProcessW(path,0,0,0,FALSE,0,0,0,&si,&pi))return GetLastError();
  CloseHandle(pi.hThread);if(WaitForSingleObject(pi.hProcess,INFINITE)==WAIT_OBJECT_0)GetExitCodeProcess(pi.hProcess,&result);CloseHandle(pi.hProcess);return result;
 }
+/* No boot-time autochk on fixed volumes other than the system volume
+ * (vista_autochk.h). Only the untouched Windows default is replaced; the
+ * system volume keeps its check (runs only when dirty). Never fatal. */
+static void limit_autochk(void){
+ static const WCHAR sm[]=L"SYSTEM\\CurrentControlSet\\Control\\Session Manager";
+ HKEY key=0;LONG e=RegOpenKeyExW(HKEY_LOCAL_MACHINE,sm,0,KEY_QUERY_VALUE|KEY_SET_VALUE,&key);
+ if(e){report("Autochk: Session Manager not opened=",e);return;}
+ static WCHAR current[512],wanted[128];DWORD type=0,bytes=sizeof(current);
+ e=RegQueryValueExW(key,L"BootExecute",0,&type,(BYTE*)current,&bytes);
+ DWORD mask=0,drives=GetLogicalDrives();
+ for(unsigned d=2;d<26;d++)if(drives&(1u<<d)){WCHAR root[4]={(WCHAR)(L'A'+d),L':',L'\\',0};if(GetDriveTypeW(root)==DRIVE_FIXED)mask|=1u<<d;}
+ report("Autochk: fixed drive letters (bit 2 = C:)=",mask);
+ if(e||type!=REG_MULTI_SZ||!usos_autochk_is_default(current,bytes/2)){report("Autochk: BootExecute is not the Windows default; left unchanged=",e?e:ERROR_INVALID_DATA);}
+ else{
+  unsigned chars=usos_autochk_value(wanted,128,mask,windows[0]);
+  if(!chars)report("Autochk: no other fixed volume with a letter; default kept=",0);
+  else{
+   e=RegSetValueExW(key,L"BootExecute",0,REG_MULTI_SZ,(const BYTE*)wanted,chars*2);if(!e)e=RegFlushKey(key);
+   bytes=sizeof(current);if(!e&&(RegQueryValueExW(key,L"BootExecute",0,&type,(BYTE*)current,&bytes)||bytes!=chars*2))e=ERROR_INVALID_DATA;
+   report("Autochk: other fixed volumes excluded (autocheck autochk /k:X *), readback=",e);
+  }
+ }
+ /* The countdown before a (dirty-volume) check: 3 s instead of 10. */
+ DWORD timeout=3;e=RegSetValueExW(key,L"AutoChkTimeout",0,REG_DWORD,(const BYTE*)&timeout,4);if(!e)e=RegFlushKey(key);
+ report("Autochk: AutoChkTimeout = 3 s=",e);
+ RegCloseKey(key);
+}
 void entry(void){
  static OSVERSIONINFOW os={sizeof(os)};
  if(!GetVersionExW(&os)||os.dwMajorVersion!=6||os.dwMinorVersion!=0||os.dwBuildNumber!=6002)ExitProcess(2);
@@ -105,7 +133,7 @@ void entry(void){
  BOOL watcher=!lstrcmpW(GetCommandLineW(),watch_command);
  lstrcpyW(file,L"C:\\USOS\\");file[0]=windows[0];lstrcatW(file,watcher?L"oobe-watch.log":L"oobe-prep.log");
  log_file=CreateFileW(file,GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_ALWAYS,FILE_FLAG_WRITE_THROUGH,0);if(log_file==INVALID_HANDLE_VALUE)ExitProcess(GetLastError());
- SetFilePointer(log_file,0,0,FILE_END);report("Vista OOBE gate v2 / guarded interruption recovery=",0);
+ SetFilePointer(log_file,0,0,FILE_END);report("Vista OOBE gate v3 / guarded interruption recovery / autochk limited to the system volume=",0);
  HKEY setup=0;LONG error=RegOpenKeyExW(HKEY_LOCAL_MACHINE,L"SYSTEM\\Setup",0,KEY_QUERY_VALUE|KEY_SET_VALUE|KEY_NOTIFY,&setup);if(error)ExitProcess(error);
  if(watcher)watch(setup);
  DWORD active=0,oobe=0,phase=0;
@@ -113,6 +141,7 @@ void entry(void){
  DWORD child=child_state(setup);
  if(!(oobe==1&&child==3)&&!(active==1&&child==0))ExitProcess(3);
  error=put(L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\WinSAT",L"MOOBE",2);report("Automatic WinSAT guard readback=",error);if(error)ExitProcess(error);
+ limit_autochk();
  if(oobe==1&&child==3){
   static WCHAR name[257];DWORD count=0;BOOL enumerated=account(name,&count),completed=enumerated&&count==1&&evidence(name);
   int decision=enumerated?vo_decide(oobe,child==3,count,completed):-1;

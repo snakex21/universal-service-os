@@ -417,7 +417,7 @@
   "boot.summary.xp_source": "XP SP3 x86; ACPI-/SATA-/USB-ajurit; valinnainen PAE-käynnistysmerkintä",
   "boot.summary.xp_disk": "Valitaan ja vahvistetaan seuraavassa graafisessa näkymässä",
   "boot.summary.xp_sif_merged": "{0} (yhdistetty automaattiseen vastaukseen)",
-  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; pidä CSM päällä (ilman CSM:ää: kokeellinen Int10-lataaja)",
+  "boot.summary.vista_case": "Vista SP2 x64 -> PE10; asennettu järjestelmä vaatii CSM:n",
   "boot.summary.vista_usb": "PE10:n oma USB-tuki; kohde käyttää Vista USB v11:tä",
   "boot.summary.vista_support": "KB2864202 + allekirjoitettu USB-paketti + pre-Setup v11",
   "boot.summary.no_drivers": "Ei yhtään kansiossa Drivers/x64; kohteen USB 3 ei ehkä ole käytettävissä",
@@ -1037,5 +1037,7 @@
   "boot.lx.restarting_into_usos_choose_windows_vista_again": "Käynnistetään uudelleen USOSiin: valitse Windows Vista uudelleen asennuksen aloittamiseksi.",
 
   "boot.unattended.vista_uefi": "Vastaustiedostot: ei vielä tuettu Vistalle UEFI-tilassa",
-  "boot.unattended.vista_uefi_detail": "Vistan asennus UEFI-tilassa toimii toistaiseksi ilman vastaustiedostojasi ja profiilejasi; valitse manuaalinen asennus."
+  "boot.unattended.vista_uefi_detail": "Vistan asennus UEFI-tilassa toimii toistaiseksi ilman vastaustiedostojasi ja profiilejasi; valitse manuaalinen asennus.",
+
+  "boot.summary.vista_case_nocsm": "Windows Vista ilman CSM:ää: ei vielä tuettu (musta näyttö) - ota CSM käyttöön emolevyn asetuksista"
 }
