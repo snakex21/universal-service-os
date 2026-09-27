@@ -249,7 +249,7 @@ initramfs	usr/lib/usos/xp-nt52-vbr-tail.bin	100644	ed455d345b4d02a2132f5ede10530
 initramfs	usr/lib/usos/xp-stage2.bin	100644	1f73f3a534edc6d5a1f365d3bb6de43aca7fe23c8511d8dfd7daf7f29872797a
 initramfs	usr/lib/usos/xp-vbr-code.bin	100644	6732885c24cc80d00f10093bb707fcfdd5e8755e8fc95734178f38b48ddb0059
 initramfs	usr/lib/usos/xp_confirmation_ui.sh	100755	83d24331a4cec19452def8de121dcdc94dc67ce6b755d1d6025520a95f3a152d
-initramfs	usr/lib/usos/xp_csmwrap_esp.sh	100755	5a19d782d17bfe534d1caa18e895c65dcaae1eb6bd4fe01075e9c7cfc31c3234
+initramfs	usr/lib/usos/xp_csmwrap_esp.sh	100755	83a6b9ebdcda1405e6cf27a110098f502383bd5ef7e0e4f449170b4a5b33d2bb
 initramfs	usr/lib/usos/xp_detect_system.sh	100755	c80b0918d6794112474a18e57ef309ee4d32f09f37ecde4224c74680611ee046
 initramfs	usr/lib/usos/xp_disk_overview.sh	100755	6859dd93672462c90cfe38a5e46e678ca3cf3f664f7af3e694f07be5adba2a06
 initramfs	usr/lib/usos/xp_disk_reset.sh	100755	b276d75d00ac5a0cb2fea21ffb53877db1336443ff5a398f40cc364eacbf6ff1
@@ -341,6 +341,7 @@ payload_zip	EFI/USOS/ENROLL_THIS_KEY_IN_MOKMANAGER.cer
 payload_zip	EFI/USOS/bios-ui.bin
 payload_zip	EFI/USOS/build-info.ini
 payload_zip	EFI/USOS/csmwrap/COPYING-SeaBIOS-GPLv3.txt
+payload_zip	EFI/USOS/csmwrap/COPYING-SeaBIOS-LGPLv3.txt
 payload_zip	EFI/USOS/csmwrap/LICENSE-CSMWrap-LGPL-2.1.txt
 payload_zip	EFI/USOS/csmwrap/SOURCES.txt
 payload_zip	EFI/USOS/csmwrap/csmwrapx64.efi

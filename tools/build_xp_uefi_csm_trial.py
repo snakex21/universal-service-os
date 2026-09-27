@@ -17,7 +17,7 @@ OLD_PACKAGE/drivers/<sha256>/bundle as it is.
 """
 from pathlib import Path
 import argparse, gzip, hashlib, json, os, shutil, stat, struct, subprocess
-from build_micro_linux import parse_newc, newc, Entry, put
+from build_micro_linux import parse_newc, newc, Entry, put, pad_initrd
 from xp_driver_overlay import build_driver_overlay
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -41,7 +41,7 @@ def add_driver_source(iso,out_dir=None):
     before={n:(e.mode,e.data) for n,e in entries.items() if unrelated(n)}
     for path in bundle.rglob('*'):
         if path.is_file():put(entries,Entry(prefix+path.relative_to(bundle).as_posix(),stat.S_IFREG|0o644,path.read_bytes()))
-    result=gzip.compress(newc(entries),compresslevel=6,mtime=0)
+    result=pad_initrd(gzip.compress(newc(entries),compresslevel=6,mtime=0))
     checked=parse_newc(gzip.decompress(result))
     after={n:(e.mode,e.data) for n,e in checked.items() if unrelated(n)}
     assert after==before,('Unrelated payload changed',[n for n in before.keys()|after.keys() if before.get(n)!=after.get(n)])
@@ -106,7 +106,7 @@ def refresh_pae_flow(esp):
     owned={'usr/lib/usos/'+n for n in PAE_FLOW_ENTRIES}
     before={n:(e.mode,e.data) for n,e in entries.items() if n not in owned}
     put_pae_flow(entries,base_entries=base,helper=helper)
-    result=gzip.compress(newc(entries),compresslevel=6,mtime=0)
+    result=pad_initrd(gzip.compress(newc(entries),compresslevel=6,mtime=0))
     checked=parse_newc(gzip.decompress(result))
     after={n:(e.mode,e.data) for n,e in checked.items() if n not in owned}
     assert after==before,('Unrelated payload changed',[n for n in before.keys()|after.keys() if before.get(n)!=after.get(n)])
@@ -144,7 +144,7 @@ def overlay(base, helper, driver_bundles):
     put(entries,Entry(prefix+'xp-pae-LICENSE.txt',stat.S_IFREG|0o644,credit+(vendor/'LICENSE').read_bytes()))
     changed=[n for n in before if not is_package_entry(n) and (entries[n].mode,entries[n].data)!=before[n]]
     if changed:raise ValueError('package would change base entries: '+', '.join(changed))
-    return gzip.compress(newc(entries),compresslevel=6,mtime=0)
+    return pad_initrd(gzip.compress(newc(entries),compresslevel=6,mtime=0))
 
 def is_sp3(iso):
     # Microsoft names it "..._with_service_pack_3_...", others "SP3".

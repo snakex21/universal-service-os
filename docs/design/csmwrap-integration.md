@@ -233,8 +233,10 @@ byte-for-byte), same package goldens.
 * **ESP** (`tools/xp_csmwrap_esp.sh`, after `prepare_xp_target.sh` PASS): a
   64 MiB FAT16 partition, MBR type 0xEF, in the first free MBR slot at the end
   of the disk, with `\EFI\BOOT\BOOTX64.EFI` = CSMWrap 3.1.2 (SHA-256 pinned,
-  read back), `\EFI\BOOT\csmwrap.ini` (`verbose = true` for the first hardware
-  test, `serial = false`) and `\CSMWRAP\` licence files + `SOURCES.txt`.
+  read back), `\EFI\BOOT\csmwrap.ini` (`serial = false`; `verbose = false`
+  since the hardware PASS, `verbose = true` when an empty
+  `EFI\USOS\csmwrap-verbose.flag` is on the USOS stick) and `\CSMWRAP\`
+  licence files + `SOURCES.txt`.
   Refuses if the tail area overlaps a partition, if an ESP already exists, or
   with a custom WINNT.SIF. No `Boot####` entry is written: the firmware's
   removable-path entry for the target disk boots it.
@@ -245,8 +247,37 @@ byte-for-byte), same package goldens.
   The QEMU prototype (section 7) used the same position.
 * **Payload:** `EFI\USOS\csmwrap\` (staged by `usos-efisign release`,
   hash-checked, unsigned): `csmwrapx64.efi`, `LICENSE-CSMWrap-LGPL-2.1.txt`,
+  `COPYING-SeaBIOS-LGPLv3.txt` (FSF LGPLv3 text, vendored as
+  `tools/vendor/csmwrap/3.1.2/COPYING.LESSER`, hash in its manifest),
   `COPYING-SeaBIOS-GPLv3.txt` (GPLv3 text from the wimlib vendor folder),
-  `SOURCES.txt`. **Open:** the SeaBIOS LGPLv3 text (`COPYING.LESSER`) itself is
-  not vendored yet; SOURCES.txt points to it.
+  `SOURCES.txt`.
 * Test: `tools/tests/legacy_bios/run_csmwrap_xp_prepared.py` (package chain in
   CSMWrap mode, then OVMF without CSM, TCG).
+
+## 9. Hardware results
+
+**2026-09-27, X470 Taichi / Ryzen 7 5700X, CSM OFF, Secure Boot OFF, build
+B260927-153019: PASS.** USOS (UEFI) prepared the Intel SSD in CSMWrap mode
+(`legacy-xp-csmwrap.log`: NTFS in MBR slot 1 at LBA 2048, CSMWrap ESP in slot
+2 at LBA 234309632, 131072 sectors, BOOTX64.EFI read back); the firmware then
+booted the target through CSMWrap, and XP SP3 (Polish) installed unattended
+with the user's answer profile. Still to be reported by the user: PAE /
+31.9 GB, CPU count (CSMWrap reserves one core), USB.
+
+Findings from that run, fixed afterwards:
+
+* **English micro-Linux UI.** This was not specific to CSMWrap. The command
+  line did carry `initrd=\EFI\USOS\lang.cpio`, but that build's
+  `initramfs-xp` was 114817435 bytes, not a multiple of 4. The EFI stub
+  concatenates the initrds without padding, and the kernel accepts a cpio
+  header only at a 4-aligned offset. So `lang.cpio` was dropped
+  (`menu-hardware.txt`: "rootfs image is not initramfs (invalid magic at
+  start of compressed archive)"), and the UI fell back to English whenever
+  `/mnt/esp/EFI/USOS/lang.bin` was not mounted. Earlier builds were
+  4-aligned by chance, and `initramfs-usos` (Vista disk prep, systemd-boot
+  entry) was exposed the same way. `pad_initrd` (tools/build_micro_linux.py)
+  now zero-pads both files to 4 bytes (`tools/tests/test_initrd_alignment.py`).
+  A Zig test in `xp_preparation.zig` pins the CSMWrap command line to the
+  default XP one plus `usos.xp_boot=csmwrap`.
+* **CSMWrap on-screen log** was on (`verbose = true`). It is now off by
+  default, with the flag-file switch above.

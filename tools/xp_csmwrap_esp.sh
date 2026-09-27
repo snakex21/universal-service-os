@@ -25,7 +25,7 @@ for tool in dd od mkfs.fat mmd mcopy mdir sha256sum awk blockdev sync wc; do
 done
 [ -r "$SRC/csmwrapx64.efi" ] || fail 'CSMWrap is missing on the USOS stick (EFI/USOS/csmwrap)'
 [ "$(sha256sum "$SRC/csmwrapx64.efi" | awk '{print $1}')" = "$PINNED" ] || fail 'CSMWrap binary does not match the pinned 3.1.2 hash'
-for file in LICENSE-CSMWrap-LGPL-2.1.txt COPYING-SeaBIOS-GPLv3.txt SOURCES.txt; do
+for file in LICENSE-CSMWrap-LGPL-2.1.txt COPYING-SeaBIOS-LGPLv3.txt COPYING-SeaBIOS-GPLv3.txt SOURCES.txt; do
     [ -r "$SRC/$file" ] || fail "$file is missing next to CSMWrap"
 done
 
@@ -62,12 +62,19 @@ dd if=/dev/zero of="$TARGET_DEVICE" bs=512 seek="$start" count=2048 conv=notrunc
 mkfs.fat -I -F 16 -n CSMWRAP --offset "$start" "$TARGET_DEVICE" $((ESP_SECTORS / 2)) >/dev/null || fail 'cannot format the CSMWrap ESP'
 image="$TARGET_DEVICE@@$((start * 512))"
 ini=/tmp/csmwrap.ini
-# First hardware test: on-screen log (verbose). Serial off (no port on most boards).
-printf 'serial = false\r\nverbose = true\r\n' > "$ini"
+# Quiet by default (X470 PASS 2026-09-27 with verbose on). Diagnostics: an
+# empty EFI\USOS\csmwrap-verbose.flag on the USOS stick turns CSMWrap's
+# on-screen log back on for the next prepared target. Serial stays off (no
+# port on most boards).
+VERBOSE_FLAG=${USOS_CSMWRAP_VERBOSE_FLAG:-/mnt/esp/EFI/USOS/csmwrap-verbose.flag}
+verbose=false
+[ ! -e "$VERBOSE_FLAG" ] || verbose=true
+log "csmwrap.ini verbose=$verbose"
+printf 'serial = false\r\nverbose = %s\r\n' "$verbose" > "$ini"
 mmd -i "$image" ::/EFI ::/EFI/BOOT ::/CSMWRAP || fail 'cannot create ESP folders'
 mcopy -i "$image" "$SRC/csmwrapx64.efi" ::/EFI/BOOT/BOOTX64.EFI || fail 'cannot copy CSMWrap'
 mcopy -i "$image" "$ini" ::/EFI/BOOT/csmwrap.ini || fail 'cannot copy csmwrap.ini'
-for file in LICENSE-CSMWrap-LGPL-2.1.txt COPYING-SeaBIOS-GPLv3.txt SOURCES.txt; do
+for file in LICENSE-CSMWrap-LGPL-2.1.txt COPYING-SeaBIOS-LGPLv3.txt COPYING-SeaBIOS-GPLv3.txt SOURCES.txt; do
     mcopy -i "$image" "$SRC/$file" "::/CSMWRAP/$file" || fail "cannot copy $file"
 done
 

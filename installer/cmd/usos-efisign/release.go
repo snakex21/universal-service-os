@@ -291,7 +291,8 @@ func copyVerified(source, target, expected string) error {
 }
 
 // stageCSMWrap copies the pinned CSMWrap binary (manifest hash), its LGPL-2.1
-// licence, the GPLv3 text (SeaBIOS) and a SOURCES.txt into EFI/USOS/csmwrap.
+// licence, the SeaBIOS LGPLv3 and GPLv3 texts and a SOURCES.txt into
+// EFI/USOS/csmwrap.
 func stageCSMWrap(vendorDir, gplv3, usb string) error {
 	var manifest touchManifest
 	data, err := os.ReadFile(filepath.Join(vendorDir, "manifest.json"))
@@ -301,8 +302,8 @@ func stageCSMWrap(vendorDir, gplv3, usb string) error {
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		return fmt.Errorf("vendored CSMWrap manifest: %w", err)
 	}
-	if manifest.Files["csmwrapx64.efi"] == "" || manifest.Files["LICENSE"] == "" {
-		return errors.New("vendored CSMWrap manifest lacks the csmwrapx64.efi or LICENSE hash")
+	if manifest.Files["csmwrapx64.efi"] == "" || manifest.Files["LICENSE"] == "" || manifest.Files["COPYING.LESSER"] == "" {
+		return errors.New("vendored CSMWrap manifest lacks the csmwrapx64.efi, LICENSE or COPYING.LESSER hash")
 	}
 	dir := filepath.Join(usb, filepath.FromSlash(csmwrapTargetDir))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -314,12 +315,15 @@ func stageCSMWrap(vendorDir, gplv3, usb string) error {
 	if err := copyVerified(filepath.Join(vendorDir, "LICENSE"), filepath.Join(dir, "LICENSE-CSMWrap-LGPL-2.1.txt"), manifest.Files["LICENSE"]); err != nil {
 		return err
 	}
+	if err := copyVerified(filepath.Join(vendorDir, "COPYING.LESSER"), filepath.Join(dir, "COPYING-SeaBIOS-LGPLv3.txt"), manifest.Files["COPYING.LESSER"]); err != nil {
+		return err
+	}
 	if err := copyVerified(gplv3, filepath.Join(dir, "COPYING-SeaBIOS-GPLv3.txt"), seabiosGPLv3SHA256); err != nil {
 		return err
 	}
 	sources := "CSMWrap " + manifest.Version + " (csmwrapx64.efi, unmodified release binary, unsigned)\r\n" +
 		"Source: https://github.com/CSMWrap/CSMWrap/releases/tag/" + manifest.Version + " (LGPL-2.1, LICENSE-CSMWrap-LGPL-2.1.txt)\r\n" +
-		"Contains SeaBIOS (LGPLv3; the LGPLv3 incorporates the GPLv3 text in COPYING-SeaBIOS-GPLv3.txt):\r\n" +
+		"Contains SeaBIOS (LGPLv3, COPYING-SeaBIOS-LGPLv3.txt; it incorporates the GPLv3 text in COPYING-SeaBIOS-GPLv3.txt):\r\n" +
 		"  https://github.com/CSMWrap/seabios-csmwrap (the SeaBIOS fork in the CSMWrap sources, submodule seabios)\r\n" +
 		"  https://www.seabios.org/ (COPYING.LESSER: GNU LGPL version 3)\r\n" +
 		"Used by Universal Service OS only for Windows XP without firmware CSM (experimental).\r\n"

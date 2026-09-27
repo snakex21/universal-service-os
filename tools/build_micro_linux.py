@@ -112,6 +112,17 @@ def pad4(stream: io.BytesIO) -> None:
         stream.write(b"\0" * missing)
 
 
+def pad_initrd(data: bytes) -> bytes:
+    """Zero-pads a compressed initramfs to a multiple of 4 bytes.
+
+    Loaders (the kernel EFI stub, systemd-boot) append EFI/USOS/lang.cpio
+    right after this file. The kernel accepts a cpio header only at a
+    4-byte-aligned offset: otherwise lang.cpio is dropped ("invalid magic
+    at start of compressed archive") and the UI falls back to English.
+    The kernel and gzip readers skip the trailing zeros."""
+    return data + b"\0" * ((-len(data)) % 4)
+
+
 def newc(entries: dict[str, Entry]) -> bytes:
     stream = io.BytesIO()
     inode = 1
@@ -585,7 +596,7 @@ def main() -> int:
         if systemd_boot is None:
             raise RuntimeError("systemd-boot EFI binary missing from pinned package")
         combined_cpio = newc(entries)
-        combined_initramfs = gzip.compress(combined_cpio, compresslevel=9, mtime=0)
+        combined_initramfs = pad_initrd(gzip.compress(combined_cpio, compresslevel=9, mtime=0))
 
         output.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(kernel, output / "vmlinuz-virt")

@@ -119,6 +119,7 @@ try {
         'EFI/USOS/csmwrap/csmwrapx64.efi',
         'EFI/USOS/csmwrap/LICENSE-CSMWrap-LGPL-2.1.txt',
         'EFI/USOS/csmwrap/COPYING-SeaBIOS-GPLv3.txt',
+        'EFI/USOS/csmwrap/COPYING-SeaBIOS-LGPLv3.txt',
         'EFI/USOS/csmwrap/SOURCES.txt',
         'EFI/USOS/bios-ui.bin',
         'EFI/USOS/licenses/fonts/LICENSE-OFL-1.1.txt',

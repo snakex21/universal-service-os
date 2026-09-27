@@ -40,7 +40,7 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | N6 | Secure Boot: zablokowany kernel, podpisany UKI | **Next** (niski priorytet w grupie) | N1 | 4–6 dni |
 | N7 | Edytor motywów (UEFI + instalator), motywy użytkownika w BIOS, przykładowe motywy | UEFI, BIOS, przykłady: **Done** (QEMU, 2026-09-26); instalator: **Next** | menedżer profili odpowiedzi (formularz + klawiatura ekranowa) | instalator: do oszacowania |
 | L1 | Rodzina NT5 na UEFI (2000, 2003, XP x64) | **Later** | N2 (M4), N3 | 10–15 dni + sprzęt |
-| L2 | XP na UEFI bez CSM (CSMWrap) | **Later** | L1 (profil firmware) | 8–15 dni, wynik niepewny |
+| L2 | XP na UEFI bez CSM (CSMWrap) | **Eksperymentalne, sprzęt PASS** (X470, 2026-09-27, B260927-153019) | — | do potwierdzenia: PAE/31,9 GB, liczba CPU, USB |
 | L3 | 32-bit CPU i mniejsze minimum RAM | **Later** | pomiary | 2 dni pomiarów, potem 5–15 dni |
 | L4 | Chainload w stylu Plop dla PC bez USB boot | **Later** | L3 (częściowo) | 5–10 dni |
 | L5 | Motywy, układy klawiatury, persistence, post-install, test QEMU | **Later** | N2 (M1) | 1–5 dni per punkt |
@@ -198,7 +198,17 @@ Windows 2000 (SP4), Server 2003 x86/x64, XP x64 przez tę samą ścieżkę
 dla x64, PAE natywnego (`/PAE`) dla 2000 AS i 2003 Enterprise.
 Kolejność testów: 2003 x86 Enterprise → XP x64 → 2003 x64 → 2000.
 
-### L2. XP na UEFI bez CSM przez CSMWrap: **Later**, eksperymentalne
+### L2. XP na UEFI bez CSM przez CSMWrap: eksperymentalne, **sprzęt PASS**
+
+2026-09-27, X470 z CSM i Secure Boot wyłączonymi (build B260927-153019): USOS
+przygotował dysk z ESP CSMWrap na końcu, firmware uruchomił XP przez
+CSMWrap i XP zainstalował się z profilem unattended. Do potwierdzenia przez
+użytkownika: PAE / 31,9 GB, liczba CPU (CSMWrap rezerwuje 1 rdzeń), USB.
+Poprawki po teście: angielski UI mikro-Linuksa (initramfs niewyrównany do
+4 bajtów gubił `lang.cpio`; dotyczyło to każdej ścieżki), `verbose = false` w
+`csmwrap.ini` (log włącza flaga `EFI\USOS\csmwrap-verbose.flag`), dołączony
+tekst LGPLv3 SeaBIOS. Szczegóły: `docs/design/csmwrap-integration.md`,
+sekcje 8–9. Historia:
 
 W tym samym dokumencie, sekcja 7. SeaBIOS jako CSM daje int13
 (AHCI/NVMe/USB) i VBE na GOP; główne problemy: prawdziwe VGA (text mode,
@@ -358,3 +368,4 @@ Szczegóły i dowody: `TESTING.md` i dokumenty w `docs/`.
 | 2026-09-23 | XP: PAE na końcu Setup (`UserExecute`), 31,9 GB na X470 potwierdzone; i18n: jeden katalog 27 locale (instalator, menu, mikro-Linux, XP, WinPE) i wybór języka; ekran ładowania i etapy postępu per ścieżka; łańcuch startowy WORK w `\EFI\USOS-WORK` |
 | 2026-09-24 | Powtarzalny build pakietu XP (`compare_xp_packages.py`); zapas 43 KiB w Legacy Core; pady USB w menu UEFI; **Secure Boot** (shim 16.1 + MOK, podpisane jądro, sterowniki, zapis klucza bez MokManagera); dotyk ROG Ally (TouchI2cDxe) potwierdzony; foldery `DATA\Drivers` (UEFI + INF dla 7/8/10/11); analizy E2B i Win98 |
 | 2026-09-26 | **Windows 7 x64 na X470 bez CSM** (routing VGA do kontrolera GOP w dyspozytorze, RX 560, ISO „6in1”: instalacja do pulpitu); **profile odpowiedzi** (jeden model → WINNT.SIF / autounattend.xml, menedżer profili w menu UEFI z klawiaturą ekranową: utworzenie profilu i instalacja z nim potwierdzone na sprzęcie); **edytor motywów** w UEFI (potwierdzony na sprzęcie), motywy użytkownika w BIOS, przykłady `usos-ocean`/`usos-sunset`/`usos-forest` (build B260926-134756) |
+| 2026-09-27 | **XP bez CSM przez CSMWrap na X470** (CSM i Secure Boot wyłączone, ESP CSMWrap na dysku docelowym, instalacja unattended; build B260927-153019); poprawka wyrównania initramfs (`lang.cpio`) |

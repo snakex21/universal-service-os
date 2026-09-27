@@ -6,6 +6,8 @@
   "files": {
     "csmwrapx64.efi": "96fdb387e177c6340287b7e07713dc09bf1f965dd404311eafd9c6eb99a02745",
     "README.md": "9c36640a7fd4eb3f8d3f3ffb54e91292d80dfe30a07d39cdfcc4a0774e703f66",
-    "LICENSE": "20c17d8b8c48a600800dfd14f95d5cb9ff47066a9641ddeab48dc54aec96e331"
-  }
+    "LICENSE": "20c17d8b8c48a600800dfd14f95d5cb9ff47066a9641ddeab48dc54aec96e331",
+    "COPYING.LESSER": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768"
+  },
+  "copying_lesser_note": "GNU LGPL version 3 (FSF text, https://www.gnu.org/licenses/lgpl-3.0.txt), the licence of SeaBIOS (COPYING.LESSER) inside csmwrapx64.efi"
 }

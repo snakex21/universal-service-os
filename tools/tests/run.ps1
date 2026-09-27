@@ -72,6 +72,8 @@ function Run-Unit {
     if ($LASTEXITCODE -ne 0) { throw 'Vista Int10 dispatcher step tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/test_vista_autochk.py')
     if ($LASTEXITCODE -ne 0) { throw 'Vista autochk exclusion tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/test_initrd_alignment.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Initramfs alignment (lang.cpio) tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/test_windows7_uefi_publish.py')
     if ($LASTEXITCODE -ne 0) { throw 'Windows 7 EFI publication tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/test_uefi_graphics_refresh.py')

@@ -19,8 +19,28 @@ fn mark(root: *uefi.protocol.File, stage: []const u8, name: []const u8) !void {
 /// No firmware CSM: profile xp-x86-sp3-uefi-csmwrap (experimental). The
 /// micro-Linux preparation is the UEFI-CSM one plus a CSMWrap ESP on the
 /// target (tools/xp_csmwrap_esp.sh). With a CSM the command line is unchanged.
-fn csmwrapOption() []const u8 {
-    return if (@import("secure_boot.zig").csm().likelyOn()) "" else " usos.xp_boot=csmwrap";
+fn csmwrapActive() bool {
+    return !@import("secure_boot.zig").csm().likelyOn();
+}
+
+pub const lang_initrd_option = " initrd=\\EFI\\USOS\\lang.cpio";
+
+pub const CommandParts = struct {
+    /// lang_initrd_option, or "" on installs from before lang.cpio.
+    lang_initrd: []const u8,
+    esp_partuuid: []const u8,
+    image_hex: []const u8,
+    answer_option: []const u8 = "",
+    settings_option: []const u8 = "",
+    csmwrap: bool = false,
+    console_options: []const u8 = "",
+};
+
+/// The kernel command line of the XP preparation. CSMWrap mode only adds
+/// usos.xp_boot=csmwrap: the language (lang.cpio) and everything else are
+/// the default path's.
+pub fn formatCommand(buffer: []u8, parts: CommandParts) ![]const u8 {
+    return std.fmt.bufPrint(buffer, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action=xp-staging usos.legacy_image_hex={s}{s}{s} usos.plan_profile=xp-x86-sp3-uefi-csm{s} {s}", .{ parts.lang_initrd, parts.esp_partuuid, parts.image_hex, parts.answer_option, parts.settings_option, if (parts.csmwrap) " usos.xp_boot=csmwrap" else "", parts.console_options });
 }
 
 /// `answer`: the answer-file screen's choice (src/flow/answer_screen.zig):
@@ -63,9 +83,17 @@ pub fn start(root: *uefi.protocol.File, name: []const u8, answer: answer_screen.
     // language; installs from before it existed boot without it.
     const lang_initrd = if (root.open(wide("\\EFI\\USOS\\lang.cpio"), .read, .{})) |file| blk: {
         file.close() catch {};
-        break :blk " initrd=\\EFI\\USOS\\lang.cpio";
+        break :blk lang_initrd_option;
     } else |_| "";
-    const command = try std.fmt.bufPrint(&cmd, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action=xp-staging usos.legacy_image_hex={s}{s}{s} usos.plan_profile=xp-x86-sp3-uefi-csm{s} {s}", .{ lang_initrd, id, hex[0 .. name.len * 2], answer_option, settings_option, csmwrapOption(), diagnostic.xpConsoleOptions(diagnostic.requested(root)) });
+    const command = try formatCommand(&cmd, .{
+        .lang_initrd = lang_initrd,
+        .esp_partuuid = id,
+        .image_hex = hex[0 .. name.len * 2],
+        .answer_option = answer_option,
+        .settings_option = settings_option,
+        .csmwrap = csmwrapActive(),
+        .console_options = diagnostic.xpConsoleOptions(diagnostic.requested(root)),
+    });
     // Serial trace of the handover (QEMU tests read it; no secrets in it).
     const serial = @import("serial.zig");
     serial.writeAscii("[XP_CMDLINE] ");
@@ -91,4 +119,33 @@ pub fn start(root: *uefi.protocol.File, name: []const u8, answer: answer_screen.
     try mark(root, "kernel-returned", name);
     if (code != .success) return error.XpKernelReturnedError;
     return error.XpKernelReturned;
+}
+
+test "CSMWrap command line keeps the default XP path's language initrd" {
+    var default_buffer: [2048]u8 = undefined;
+    var csmwrap_buffer: [2048]u8 = undefined;
+    const parts = CommandParts{
+        .lang_initrd = lang_initrd_option,
+        .esp_partuuid = "0257E175-1685-4311-91AA-5A83D8EB41E5",
+        .image_hex = "706c5f78702e69736f",
+        .settings_option = " usos.xp_settings=off",
+        .console_options = "quiet",
+    };
+    var with_csmwrap = parts;
+    with_csmwrap.csmwrap = true;
+    const default_command = try formatCommand(&default_buffer, parts);
+    const csmwrap_command = try formatCommand(&csmwrap_buffer, with_csmwrap);
+    const initrds = "initrd=\\EFI\\USOS-XP\\initramfs-xp initrd=\\EFI\\USOS\\lang.cpio ";
+    try std.testing.expect(std.mem.startsWith(u8, default_command, initrds));
+    try std.testing.expect(std.mem.startsWith(u8, csmwrap_command, initrds));
+    try std.testing.expectEqual(@as(usize, 1), std.mem.count(u8, csmwrap_command, "lang.cpio"));
+    try std.testing.expect(std.mem.indexOf(u8, default_command, "usos.xp_boot") == null);
+    // The only difference is the CSMWrap token.
+    const token = " usos.xp_boot=csmwrap";
+    const at = std.mem.indexOf(u8, csmwrap_command, token) orelse return error.TestUnexpectedResult;
+    var joined: [2048]u8 = undefined;
+    @memcpy(joined[0..at], csmwrap_command[0..at]);
+    const rest = csmwrap_command[at + token.len ..];
+    @memcpy(joined[at .. at + rest.len], rest);
+    try std.testing.expectEqualStrings(default_command, joined[0 .. at + rest.len]);
 }

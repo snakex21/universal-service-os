@@ -42,7 +42,7 @@ def main():
     out = a.output.resolve()
     out.mkdir(parents=True, exist_ok=True)
     files = {name: (CSMWRAP_FILES / name).read_bytes() for name in
-             ('csmwrapx64.efi', 'LICENSE-CSMWrap-LGPL-2.1.txt', 'COPYING-SeaBIOS-GPLv3.txt', 'SOURCES.txt')}
+             ('csmwrapx64.efi', 'LICENSE-CSMWrap-LGPL-2.1.txt', 'COPYING-SeaBIOS-LGPLv3.txt', 'COPYING-SeaBIOS-GPLv3.txt', 'SOURCES.txt')}
     textmode.PROBE_INIT = csmwrap_probe(textmode.PROBE_INIT)
     parse = textmode.cpio.parse_newc
 
