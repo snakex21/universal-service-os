@@ -97,9 +97,13 @@ fn answerAndSummary(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.m
     if (entry.unattended_directory == null or !(image.kind == .iso or image.kind == .wim)) {
         return manual_summary.show(root, entry, image, method, .{}, 0, firmware);
     }
-    const profiles_allowed = usos.flow.answer_screen.profileCapable(entry, image.kind, method, firmware);
+    // Vista without firmware CSM (vista-x64-sp2-uefi-csmwrap) hands profiles and
+    // answer files on; with CSM Vista keeps its servicing answer only.
+    const vista_csmwrap = usos.flow.answer_screen.vistaCsmwrap(entry, image.kind, method, firmware, @import("secure_boot.zig").csm().likelyOn());
+    const profiles_allowed = usos.flow.answer_screen.profileCapable(entry, image.kind, method, firmware) or vista_csmwrap;
+    const answers_unsupported = usos.flow.answer_screen.answersUnsupported(entry, firmware) and !vista_csmwrap;
     while (true) {
-        const unattended = manual_unattended.select(discovery, .{ .root = root, .system = entry, .profiles_allowed = profiles_allowed, .image = image, .answers_unsupported = usos.flow.answer_screen.answersUnsupported(entry, firmware) });
+        const unattended = manual_unattended.select(discovery, .{ .root = root, .system = entry, .profiles_allowed = profiles_allowed, .image = image, .answers_unsupported = answers_unsupported });
         if (unattended.back) return;
         manual_summary.show(root, entry, image, method, unattended.choice, unattended.available, firmware);
         if (!unattended.shown) return;

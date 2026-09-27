@@ -119,6 +119,11 @@ pub fn render(gpa: std.mem.Allocator) ![]u8 {
         try out.append(gpa, '\n');
     }
 
+    try out.appendSlice(gpa, "# csmwrap: UEFI without firmware CSM, base profile -> variant id, start\n");
+    for (&os_profiles.csmwrap_variants) |*variant| {
+        try out.print(gpa, "csmwrap\t{s}\t{s}\t{s}\n", .{ variant.base, variant.id, variant.start });
+    }
+
     try out.appendSlice(gpa, "# plan_state (M2): install-state.ini plan keys for WORK and WIM selections\n");
     for ([_][]const u8{ "windows-10", "ubuntu" }) |id| {
         const system = systems.findById(id).?;

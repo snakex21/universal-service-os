@@ -112,6 +112,28 @@ pub fn answersUnsupported(system: *const SystemEntry, firmware: Firmware) bool {
     return firmware == .uefi and os_profiles.traits(system.id).native_uefi == .vista;
 }
 
+/// Vista's ISO start on UEFI without a firmware CSM: the vista-x64-sp2-uefi-csmwrap
+/// preparation (legacy install through CSMWrap). The installer merges a user
+/// answer (a USOS profile or a DATA file) with its servicing answer there.
+pub fn vistaCsmwrap(system: *const SystemEntry, image: ImageKind, method: BootMethod, firmware: Firmware, csm_present: bool) bool {
+    if (csm_present or image != .iso or answer_target.familyFor(system.id) == null) return false;
+    if (!answersUnsupported(system, firmware)) return false;
+    const backend = preparation_capability.resolveForFirmware(system, image, method, firmware) orelse return false;
+    return backend == .windows_iso;
+}
+
+test "Vista takes answers only without firmware CSM" {
+    const systems = @import("../catalog/systems.zig");
+    const vista = systems.findById("windows-vista").?;
+    try std.testing.expect(vistaCsmwrap(vista, .iso, .automatic, .uefi, false));
+    try std.testing.expect(!vistaCsmwrap(vista, .iso, .automatic, .uefi, true));
+    try std.testing.expect(!vistaCsmwrap(vista, .iso, .automatic, .bios, false));
+    try std.testing.expect(!vistaCsmwrap(vista, .iso, .chainload, .uefi, false));
+    try std.testing.expect(vistaCsmwrap(systems.findById("windows-server-2008").?, .iso, .automatic, .uefi, false));
+    try std.testing.expect(!vistaCsmwrap(systems.findById("windows-7").?, .iso, .automatic, .uefi, false));
+    try std.testing.expect(!vistaCsmwrap(systems.findById("windows-xp").?, .iso, .automatic, .uefi, false));
+}
+
 /// Whether the screen is shown at all.
 pub fn shown(in: Input) bool {
     return in.unsupported or in.settings_file or in.profiles_allowed or in.files > 0;

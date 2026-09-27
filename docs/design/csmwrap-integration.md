@@ -281,3 +281,97 @@ Findings from that run, fixed afterwards:
   default XP one plus `usos.xp_boot=csmwrap`.
 * **CSMWrap on-screen log** was on (`verbose = true`). It is now off by
   default, with the flag-file switch above.
+
+## 10. Vista without firmware CSM (profile `vista-x64-sp2-uefi-csmwrap`, 2026-09-27)
+
+Status: **experimental, QEMU only.** Replaces the "full legacy boot"
+option 2 of section 5 (now chosen, because the X470 test of 2026-09-27
+gave a black screen on the UEFI path: vgapnp Code 10, VgaSave needs A0000,
+which only a POSTed legacy VBIOS provides; win7-vista-no-csm.md section 10).
+
+### 10.1 Chosen design: PE10 staged on the target, Setup in BIOS mode
+
+```
+UEFI menu (no CSM) -> Vista ISO + PE10 donor checked (hash), request on the ESP
+  -> micro-Linux step 610 (disk picker + wipe confirmation) -> target, MBR:
+       free space (Vista installs here)
+       slot 1  NTFS USOS-VISTA, active, 1 GiB: NT60 boot code, bootmgr
+               (PE10 Windows\Boot\PCAT), boot\bcd + boot.sdi (donor ISO),
+               sources\boot.wim = the donor's Setup image + the USOS helpers
+               in \Windows\System32 (what wimboot injects on the UEFI path)
+       slot 2  CSMWrap ESP, 64 MiB (tools/xp_csmwrap_esp.sh, unchanged)
+restart -> firmware boots the disk's UEFI entry -> CSMWrap -> SeaBIOS (card
+  VBIOS POSTed) -> MBR -> NT60 -> bootmgr -> PE10 in RAM (BIOS mode, own USB 3,
+  AHCI, NVMe) -> USOS Vista installer (usos-vista-csmwrap.flag):
+     staging partition marked inactive, Vista setup.exe from the ISO on the
+     stick (ImDisk, as on UEFI), the user picks the unallocated space
+  -> Setup in BIOS mode: MBR partition, bootmgr + \Boot\BCD on its own
+     partition (active), NT60 MBR
+  -> finalizer: test signing in that BCD, USB v11 first boot armed (MBR
+     identity in MountedDevices), staging entry removed, message "remove the
+     stick" -> restart -> CSMWrap -> Vista phase 2 / OOBE / desktop
+every later boot: firmware -> the disk's UEFI entry -> CSMWrap -> Vista
+```
+
+Why this one:
+
+| Option | Verdict |
+|---|---|
+| **A. PE10 staged on the target, Setup in BIOS mode (chosen)** | Setup itself makes a real legacy install (no conversion afterwards). PE10 has USB 3 (the X470 has only xHCI ports), so keyboard and mouse work in Setup; Vista's own PE does not. The proven installer (KMDF servicing, USB v11 arming, autochk) is reused; the ISO stays on the stick, nothing big is copied. The CSMWrap ESP is the XP one, on every later boot too. |
+| B. Vista's own boot.wim through CSMWrap (stick or target) | No xHCI driver in Vista's WinPE: no input in Setup on the X470. Injecting the test-signed USB 3 backport into Vista's WinPE needs KMDF 1.11 and test signing inside WinPE. Rejected. |
+| C. The UEFI path as today, then convert the installed disk (GPT to MBR, BCD for BIOS) | Setup phase 2 would run on a firmware type other than the one phase 1 prepared; GPT to MBR conversion with mounted volumes, MountedDevices rewrite. Too many unknowns. Rejected. |
+| D. USOS BIOS Core on the stick through CSMWrap | Runs the whole BIOS menu under SeaBIOS; the BIOS Vista path uses Vista's PE (no xHCI, see B). Rejected. |
+
+### 10.2 Details
+
+* **Selection** (`src/platform/uefi/manual_summary.zig`): Vista (and Server
+  2008, routed as Vista), ISO, UEFI and `secure_boot.csm().likelyOn()` false.
+  The routing rows are unchanged (`vista-uefi-pe10` still decides the
+  selection); `os_profiles.csmwrap_variants` names the variant and the golden
+  file lists it (`csmwrap` rows, additions only). With a CSM nothing changes.
+  Summary line `boot.summary.vista_csmwrap` (27 locales).
+* **Request** (`windows_native_iso.prepareCsmwrap`): the same ISO and PE10
+  donor checks as the wimboot start (the donor is hashed against
+  `winpe-donor.ini`), then `\EFI\USOS\vista-csmwrap\usos-source.ini` (the DATA
+  binding the wimboot start injects) and `request.ini` (DATA-relative ISO and
+  donor paths, folder, answer source; no secrets). The micro-Linux starts with
+  `usos.legacy_action=vista-csmwrap usos.plan_profile=vista-x64-sp2-uefi-csmwrap`
+  (`vista_preparation.formatCommand`; the `vista-disk` command line is pinned
+  byte-for-byte by a test).
+* **Disk** (`tools/vista_csmwrap_prepare.sh`, `tools/vista_csmwrap_target.sh`,
+  pipeline step 610): the XP disk picker (the stick and read-only disks are
+  never offered), wipe confirmation, >= 16 GiB and <= 2 TiB. MBR code: the
+  USOS MBR (`xp-geometry-fix-mbr-440.bin`, boots the active partition by EDD),
+  a random disk signature. NT60 NTFS boot code: extracted at build time from
+  the build host's `bootsect.exe` (`extract_xp_nt52_boot.py --nt60-ntfs-out`,
+  the NT52 precedent; nothing Microsoft in the repo). Every write is read
+  back (MBR, boot code, the helpers inside the WIM, the final table).
+* **Answers**: USOS profiles (rendered by the menu to `\EFI\USOS\answer`,
+  taken by `usos_answer_plan_take`) and DATA `Unattended` files are allowed
+  on this path only. The installer inserts its KMDF `<servicing>` block right
+  after `<unattend ...>` (`merge_user_answer`, UTF-8 only; a file with its own
+  `servicing` section is refused). Disk selection stays manual (the renderer
+  writes no DiskConfiguration/InstallTo).
+* **Installer** (`tools/windows_vista_install.c`, CSMWrap mode v1): BIOS
+  firmware is accepted only with `usos-vista-csmwrap.flag`; the target disk is
+  the one internal MBR disk with the recorded signature; no ESP hints and no
+  Vista bcdedit extraction; partition identity = signature + offset (what
+  MountedDevices stores); after Setup: exactly one active partition, its
+  `\Boot\BCD` default entry must name the new partition, then test signing on;
+  the staging entry is removed unless Setup made it the system partition; on
+  a failed Setup the staging partition is made active again when no other
+  partition is, so the next boot of the disk retries. Int10 dispatcher: not
+  used (SeaBIOS runs the card's real VBIOS).
+* **Unchanged**: the Vista UEFI path with CSM (same wimboot plan, same
+  installer behaviour: the new code runs only with the flag), the XP path and
+  its goldens, Vista disk preparation (still off by default), autochk
+  exclusion (Vista only, as before).
+
+### 10.3 Limits
+
+* CSMWrap limits of section 3: a card without a legacy VBIOS gives no
+  VgaSave (black screen); one CPU core is reserved for the BIOS proxy.
+* The target must be MBR (<= 2 TiB) and is wiped. Vista has no NVMe driver.
+* The firmware may list the stick first after each restart: the finalizer
+  says to remove it (or to start the disk's UEFI entry from the boot menu).
+* Secure Boot must be off (CSMWrap is unsigned).

@@ -50,7 +50,7 @@ class Pipeline(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp())
         self.steps = self.tmp / 'pipeline' / 'steps'
         self.steps.mkdir(parents=True)
-        for step, name in (('100', 'nt5_staging'), ('150', 'nt5_resume'), ('500', 'windows_pe_bios_request')):
+        for step, name in (('100', 'nt5_staging'), ('150', 'nt5_resume'), ('500', 'windows_pe_bios_request'), ('610', 'vista_csmwrap')):
             (self.steps / f'{step}_{name}.sh').write_text(
                 f'usos_step_{step}_run() {{ printf "RAN {step} action=%s\\n" "$LEGACY_ACTION"; }}\n', encoding='utf-8')
         self.efi = self.tmp / 'efi'
@@ -84,6 +84,8 @@ class Pipeline(unittest.TestCase):
             ('xp-staging', 'nt5-staging', True, 'profile=nt5-staging steps=100', 'RAN 100'),
             ('xp-staging', 'xp-x86-sp3-uefi-csm', False, 'profile=xp-x86-sp3-uefi-csm steps=100', 'RAN 100'),
             ('windows7-iso', 'windows-pe-bios-iso', False, 'profile=windows-pe-bios-iso steps=500 200', 'RAN 500'),
+            ('vista-csmwrap', '', True, 'profile=vista-x64-sp2-uefi-csmwrap steps=610', 'RAN 610 action=vista-csmwrap'),
+            ('vista-csmwrap', 'vista-x64-sp2-uefi-csmwrap', True, 'profile=vista-x64-sp2-uefi-csmwrap steps=610', 'RAN 610 action=vista-csmwrap'),
         ]
         for action, token, uefi, resolved, ran in cases:
             with self.subTest(action=action, token=token, uefi=uefi):
@@ -97,7 +99,7 @@ class Pipeline(unittest.TestCase):
         self.assertIn('CONTINUE profile=windows-pe-bios-iso', out.stdout)
 
     def test_unknown_actions_and_mismatched_tokens_are_refused(self):
-        for action, token in (('hardware', ''), ('bogus', ''), ('xp-staging', 'windows-pe-bios-iso'),
+        for action, token in (('hardware', ''), ('bogus', ''), ('xp-staging', 'windows-pe-bios-iso'), ('vista-csmwrap', 'vista-uefi-disk'), ('vista-disk', 'vista-x64-sp2-uefi-csmwrap'),
                               ('windows7-iso', 'nt5-staging'), ('xp-resume', 'iso-work-chainload'),
                               ('xp-staging', 'w2k-x86-sp4-uefi-csm'), ('windows2000-staging', 'xp-x86-sp3-uefi-csm'),
                               ('xp64-staging', 'w2k3-x86-sp2-uefi-csm'), ('windows2003-staging', 'xp-x64-sp2-uefi-csm')):
@@ -158,7 +160,11 @@ class Pipeline(unittest.TestCase):
         shell_profiles = set(re.findall(r'[a-z0-9]+(?:-[a-z0-9]+)+', steps_block))
         # Not menu profiles: the Core's XP resume and the Vista UEFI disk
         # preparation that runs before the vista wimboot profile.
-        self.assertEqual(shell_profiles - set(defined), {'nt5-resume', 'vista-uefi-disk'})
+        # The CSMWrap variants (routing golden csmwrap rows) replace a base
+        # profile's start when the firmware has no CSM.
+        variants = {row[2] for row in golden_rows('csmwrap')}
+        self.assertIn('vista-x64-sp2-uefi-csmwrap', variants)
+        self.assertEqual(shell_profiles - set(defined) - variants, {'nt5-resume', 'vista-uefi-disk'})
         # Every micro-Linux WORK profile is in the step table, with the method
         # the menu persists for it (backend method from the route rows).
         work = {pid for pid, row in defined.items() if row[3] == 'micro_linux'}

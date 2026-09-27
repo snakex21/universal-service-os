@@ -657,3 +657,8 @@ Evidence: `artifacts/vista-x470-nocsm-20260927/` (not in git).
   installation stays allowed (Setup runs in PE10; the target is used with CSM
   on). The finalizer still installs the dispatcher (a pass-through with CSM
   on). The real fix is expected from CSMWrap (separate work).
+
+**2026-09-27, follow-up:** Vista without CSM now goes the other way: a legacy
+MBR install booted through CSMWrap (profile `vista-x64-sp2-uefi-csmwrap`,
+[csmwrap-integration.md](csmwrap-integration.md) section 10). The UEFI Vista
+path above stays for machines with CSM.

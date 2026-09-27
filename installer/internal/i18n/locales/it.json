@@ -1045,5 +1045,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (sperimentale): nessun driver AHCI/NVMe/USB 3 per NT 5.0 (SATA in modalità IDE), max 4 GB di RAM e 2 CPU",
 
-  "boot.summary.nt52_limits": "NT 5.2 (sperimentale): AHCI tramite GenAHCI sullo StorPort del sistema; nessun driver NVMe/USB 3 nell'installazione"
+  "boot.summary.nt52_limits": "NT 5.2 (sperimentale): AHCI tramite GenAHCI sullo StorPort del sistema; nessun driver NVMe/USB 3 nell'installazione",
+  "boot.summary.vista_csmwrap": "Vista senza CSM (sperimentale): installazione legacy (MBR) tramite CSMWrap, scheda con VBIOS legacy",
+  "boot.lx.vista_csmwrap_confirm": "Vista senza CSM: USOS scrive l'assistente Windows PE e una piccola partizione CSMWrap alla fine di questo disco. Nel programma di installazione di Vista scegli lo spazio non allocato; non eliminare le piccole partizioni.",
+  "boot.lx.vista_csmwrap_copying": "Copia dell'assistente Windows PE e di CSMWrap sul disco scelto.",
+  "boot.lx.keep_the_usos_stick_connected": "Lascia collegata la chiavetta USOS.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: avvia il disco preparato",
+  "boot.lx.vista_csmwrap_restart_notice": "Lascia collegata la chiavetta USOS. Dopo il riavvio apri il menu di avvio del firmware e avvia la voce UEFI di questo disco (non Legacy); il CSM resta disattivato. L'installazione di Vista parte quindi da esso tramite CSMWrap.",
+  "boot.lx.restart": "Riavvia",
+  "winpe.vista_csmwrap_title": "USOS - Vista senza CSM",
+  "winpe.vista_csmwrap_done": "La prima parte dell'installazione di Vista è completata. Rimuovi ora la chiavetta USOS, poi scegli OK: il computer si riavvia e Vista prosegue dal disco tramite CSMWrap. Se la chiavetta resta collegata, avvia la voce UEFI di questo disco dal menu di avvio del firmware."
 }

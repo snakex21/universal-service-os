@@ -54,7 +54,36 @@ fn espPartuuid(root: *uefi.protocol.File, out: *[36]u8) !void {
     return error.EspIdentityMissing;
 }
 
+pub const Mode = enum {
+    /// vista-uefi-disk: fresh GPT (ESP + MSR) for the UEFI Vista install.
+    disk,
+    /// vista-x64-sp2-uefi-csmwrap: no firmware CSM; PE10 staging partition
+    /// and CSMWrap ESP on an MBR disk (tools/vista_csmwrap_prepare.sh), from
+    /// the request windows_native_iso.prepareCsmwrap wrote.
+    csmwrap,
+
+    fn tokens(self: Mode) []const u8 {
+        return switch (self) {
+            .disk => "usos.legacy_action=vista-disk usos.plan_profile=vista-uefi-disk",
+            .csmwrap => "usos.legacy_action=vista-csmwrap usos.plan_profile=vista-x64-sp2-uefi-csmwrap",
+        };
+    }
+};
+
+/// The base micro-Linux command line of a Vista preparation.
+pub fn formatCommand(buffer: []u8, lang_initrd: []const u8, esp_partuuid: []const u8, mode: Mode) ![]const u8 {
+    return std.fmt.bufPrint(buffer, "initrd=\\EFI\\USOS\\micro-linux\\initramfs-usos{s} rdinit=/usos-init quiet loglevel=3 vt.global_cursor_default=0 usos.esp_partuuid={s} {s}", .{ lang_initrd, esp_partuuid, mode.tokens() });
+}
+
 pub fn start(root: *uefi.protocol.File) !void {
+    return startMode(root, .disk);
+}
+
+pub fn startCsmwrap(root: *uefi.protocol.File) !void {
+    return startMode(root, .csmwrap);
+}
+
+fn startMode(root: *uefi.protocol.File, mode: Mode) !void {
     var id: [36]u8 = undefined;
     try espPartuuid(root, &id);
     const lang_initrd = if (root.open(wide("\\EFI\\USOS\\lang.cpio"), .read, .{})) |file| blk: {
@@ -62,9 +91,9 @@ pub fn start(root: *uefi.protocol.File) !void {
         break :blk " initrd=\\EFI\\USOS\\lang.cpio";
     } else |_| "";
     var cmd: [1024]u8 = undefined;
-    const command = try std.fmt.bufPrint(&cmd, "initrd=\\EFI\\USOS\\micro-linux\\initramfs-usos{s} rdinit=/usos-init quiet loglevel=3 vt.global_cursor_default=0 usos.esp_partuuid={s} usos.legacy_action=vista-disk usos.plan_profile=vista-uefi-disk", .{ lang_initrd, &id });
+    const command = try formatCommand(&cmd, lang_initrd, &id, mode);
     const serial = @import("serial.zig");
-    serial.writeAscii("[VISTA_DISK_CMDLINE] ");
+    serial.writeAscii(if (mode == .csmwrap) "[VISTA_CSMWRAP_CMDLINE] " else "[VISTA_DISK_CMDLINE] ");
     serial.writeAscii(command);
     serial.writeAscii("\n");
     var options: [1025]u16 = @splat(0);
@@ -79,4 +108,14 @@ pub fn start(root: *uefi.protocol.File) !void {
     const code = try @import("verified_image.zig").start(image);
     if (code != .success) return error.VistaDiskKernelReturnedError;
     return error.VistaDiskKernelReturned;
+}
+
+test "Vista disk preparation command line is unchanged; CSMWrap only swaps the action and profile" {
+    var a: [1024]u8 = undefined;
+    var b: [1024]u8 = undefined;
+    const id = "0257E175-1685-4311-91AA-5A83D8EB41E5";
+    const disk = try formatCommand(&a, " initrd=\\EFI\\USOS\\lang.cpio", id, .disk);
+    try std.testing.expectEqualStrings("initrd=\\EFI\\USOS\\micro-linux\\initramfs-usos initrd=\\EFI\\USOS\\lang.cpio rdinit=/usos-init quiet loglevel=3 vt.global_cursor_default=0 usos.esp_partuuid=0257E175-1685-4311-91AA-5A83D8EB41E5 usos.legacy_action=vista-disk usos.plan_profile=vista-uefi-disk", disk);
+    const csmwrap = try formatCommand(&b, "", id, .csmwrap);
+    try std.testing.expect(std.mem.endsWith(u8, csmwrap, " usos.legacy_action=vista-csmwrap usos.plan_profile=vista-x64-sp2-uefi-csmwrap"));
 }

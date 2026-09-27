@@ -476,6 +476,9 @@ def main() -> int:
             ("tools/pipeline/steps/500_windows_pe_bios_request.sh", "usr/lib/usos/pipeline/steps/500_windows_pe_bios_request.sh"),
             ("tools/pipeline/steps/600_vista_disk_prepare.sh", "usr/lib/usos/pipeline/steps/600_vista_disk_prepare.sh"),
             ("tools/vista_disk_prepare.sh", "usr/lib/usos/vista_disk_prepare.sh"),
+            ("tools/pipeline/steps/610_vista_csmwrap.sh", "usr/lib/usos/pipeline/steps/610_vista_csmwrap.sh"),
+            ("tools/vista_csmwrap_prepare.sh", "usr/lib/usos/vista_csmwrap_prepare.sh"),
+            ("tools/vista_csmwrap_target.sh", "usr/lib/usos/vista_csmwrap_target.sh"),
             ("tools/micro_linux_init.sh", "usos-init"),
         ):
             payload = (root / source_name).read_bytes().replace(b"\r\n", b"\n")
@@ -497,6 +500,11 @@ def main() -> int:
         put(entries, Entry("usr/lib/usos/xp-nt52-vbr-tail.bin", stat.S_IFREG | 0o644, xp_nt52_vbr.read_bytes()))
         put(entries, Entry("usr/lib/usos/xp-nt52-stage2.bin", stat.S_IFREG | 0o644, xp_nt52_stage2.read_bytes()))
         put(entries, Entry("usr/lib/usos/xp-nt52-ntfs.bin", stat.S_IFREG | 0o644, (root / "zig-out/xp-bios/xp-nt52-ntfs.bin").read_bytes()))
+        # Vista without CSM (vista_csmwrap_target.sh): NT60 NTFS boot code, from the host bootsect.exe at build time.
+        nt60 = (root / "zig-out/xp-bios/vista-nt60-ntfs.bin").read_bytes()
+        if len(nt60) != 8192:
+            raise RuntimeError(f"Vista NT60 NTFS bootstrap must be 8192 bytes, got {len(nt60)}")
+        put(entries, Entry("usr/lib/usos/vista-nt60-ntfs.bin", stat.S_IFREG | 0o644, nt60))
         from wimboot_kexec import (
             make_kexec_wimboot,
             make_ordered_kexec_wimboot,

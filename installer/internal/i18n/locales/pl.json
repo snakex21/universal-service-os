@@ -1048,5 +1048,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperymentalne): brak sterownika AHCI/NVMe/USB 3 dla NT 5.0 (SATA w trybie IDE), maks. 4 GB RAM i 2 procesory",
 
-  "boot.summary.nt52_limits": "NT 5.2 (eksperymentalne): AHCI przez GenAHCI na StorPort systemu; brak sterownika NVMe/USB 3 w instalatorze"
+  "boot.summary.nt52_limits": "NT 5.2 (eksperymentalne): AHCI przez GenAHCI na StorPort systemu; brak sterownika NVMe/USB 3 w instalatorze",
+  "boot.summary.vista_csmwrap": "Vista bez CSM (eksperymentalne): instalacja legacy (MBR) przez CSMWrap, karta z legacy VBIOS",
+  "boot.lx.vista_csmwrap_confirm": "Vista bez CSM: USOS zapisuje pomocnika Windows PE i małą partycję CSMWrap na końcu tego dysku. W instalatorze Visty wybierz nieprzydzielone miejsce; nie usuwaj małych partycji.",
+  "boot.lx.vista_csmwrap_copying": "Kopiowanie pomocnika Windows PE i CSMWrap na wybrany dysk.",
+  "boot.lx.keep_the_usos_stick_connected": "Nie odłączaj pendrive'a USOS.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: uruchom przygotowany dysk",
+  "boot.lx.vista_csmwrap_restart_notice": "Nie odłączaj pendrive'a USOS. Po restarcie otwórz menu rozruchu płyty i uruchom wpis UEFI tego dysku (nie Legacy); CSM pozostaje wyłączone. Instalator Visty wystartuje z niego przez CSMWrap.",
+  "boot.lx.restart": "Uruchom ponownie",
+  "winpe.vista_csmwrap_title": "USOS - Vista bez CSM",
+  "winpe.vista_csmwrap_done": "Pierwsza część instalacji Visty jest zakończona. Odłącz teraz pendrive USOS i wybierz OK: komputer uruchomi się ponownie, a Vista będzie kontynuowana z dysku przez CSMWrap. Jeśli pendrive zostanie podłączony, uruchom wpis UEFI tego dysku z menu rozruchu płyty."
 }

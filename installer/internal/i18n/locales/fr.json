@@ -1045,5 +1045,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (expérimental) : pas de pilote AHCI/NVMe/USB 3 pour NT 5.0 (SATA en mode IDE), 4 Go de RAM et 2 processeurs max.",
 
-  "boot.summary.nt52_limits": "NT 5.2 (expérimental) : AHCI via GenAHCI sur le StorPort du système ; pas de pilote NVMe/USB 3 pendant l'installation"
+  "boot.summary.nt52_limits": "NT 5.2 (expérimental) : AHCI via GenAHCI sur le StorPort du système ; pas de pilote NVMe/USB 3 pendant l'installation",
+  "boot.summary.vista_csmwrap": "Vista sans CSM (expérimental) : installation legacy (MBR) via CSMWrap, carte avec VBIOS legacy",
+  "boot.lx.vista_csmwrap_confirm": "Vista sans CSM : USOS écrit l'assistant Windows PE et une petite partition CSMWrap à la fin de ce disque. Dans l'installation de Vista, choisissez l'espace non alloué ; ne supprimez pas les petites partitions.",
+  "boot.lx.vista_csmwrap_copying": "Copie de l'assistant Windows PE et de CSMWrap sur le disque choisi.",
+  "boot.lx.keep_the_usos_stick_connected": "Laissez la clé USOS branchée.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista : démarrer le disque préparé",
+  "boot.lx.vista_csmwrap_restart_notice": "Laissez la clé USOS branchée. Après le redémarrage, ouvrez le menu de démarrage du micrologiciel et lancez l'entrée UEFI de ce disque (pas Legacy) ; le CSM reste désactivé. L'installation de Vista démarre alors depuis ce disque via CSMWrap.",
+  "boot.lx.restart": "Redémarrer",
+  "winpe.vista_csmwrap_title": "USOS - Vista sans CSM",
+  "winpe.vista_csmwrap_done": "La première partie de l'installation de Vista est terminée. Retirez maintenant la clé USOS, puis choisissez OK : l'ordinateur redémarre et Vista continue depuis le disque via CSMWrap. Si la clé reste branchée, lancez l'entrée UEFI de ce disque depuis le menu de démarrage du micrologiciel."
 }

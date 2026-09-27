@@ -252,6 +252,96 @@ pub noinline fn start(root: *uefi.protocol.File, folder: []const u8, name: []con
     return launch(root, volume, setup.index, if (external_pe10) "Starting external PE10; the install source remains the selected Windows ISO" else "Starting the hybrid ISO's own WinPE and Setup", progress);
 }
 
+// ------------------------------------ Vista without firmware CSM (CSMWrap)
+
+/// Where the UEFI menu leaves the Vista CSMWrap request for the micro-Linux
+/// preparation (tools/vista_csmwrap_prepare.sh).
+pub const csmwrap_directory = "\\EFI\\USOS\\vista-csmwrap";
+
+pub const CsmwrapAnswer = union(enum) {
+    none,
+    /// A USOS profile rendered to \EFI\USOS\answer (answer_profiles.stage).
+    profile,
+    /// A file from Systems\Windows\<folder>\Unattended.
+    file: []const u8,
+};
+
+/// request.ini: DATA-relative paths of the Vista ISO and the PE10 donor, the
+/// DATA system folder and the answer source. No key or password in it.
+pub fn formatCsmwrapRequest(buffer: []u8, folder: []const u8, name: []const u8, donor_directory: []const u8, donor_name: []const u8, answer: CsmwrapAnswer) ![]const u8 {
+    try source_config.validateName(folder);
+    try source_config.validateName(name);
+    try source_config.validateName(donor_name);
+    var donor_dir: [128]u8 = undefined;
+    if (donor_directory.len > donor_dir.len or donor_directory.len == 0) return error.InvalidImageName;
+    for (donor_directory, 0..) |c, i| donor_dir[i] = if (c == '\\') '/' else c;
+    const dir = std.mem.trim(u8, donor_dir[0..donor_directory.len], "/");
+    if (std.mem.indexOf(u8, dir, "..") != null) return error.InvalidImageName;
+    var answer_text: [300]u8 = undefined;
+    const answer_value = switch (answer) {
+        .none => "none",
+        .profile => "profile",
+        .file => |file| blk: {
+            try source_config.validateName(file);
+            break :blk try std.fmt.bufPrint(&answer_text, "file:{s}", .{file});
+        },
+    };
+    return std.fmt.bufPrint(buffer, "version=1\r\nprofile=vista-x64-sp2-uefi-csmwrap\r\niso=Systems/Windows/{s}/Images/{s}\r\ndonor={s}/{s}\r\nfolder={s}\r\nanswer={s}\r\n", .{ folder, name, dir, donor_name, folder, answer_value });
+}
+
+fn ensureEspDirectory(root: *uefi.protocol.File, path_text: []const u8) !void {
+    var name: [96]u16 = undefined;
+    const units = try std.unicode.utf8ToUtf16Le(name[0 .. name.len - 1], path_text);
+    name[units] = 0;
+    const z: [*:0]const u16 = @ptrCast(&name);
+    const dir = try root.open(z, .read_write_create, .{ .directory = true });
+    dir.close() catch {};
+}
+
+/// Vista without firmware CSM (profile vista-x64-sp2-uefi-csmwrap): the same
+/// ISO and PE10 donor checks as the wimboot start (donor hashed against
+/// winpe-donor.ini), then the request for the micro-Linux preparation:
+/// usos-source.ini (the DATA binding the wimboot start injects) and
+/// request.ini in \EFI\USOS\vista-csmwrap. Nothing is booted here.
+pub noinline fn prepareCsmwrap(root: *uefi.protocol.File, folder: []const u8, name: []const u8, answer: CsmwrapAnswer, progress: *const fn (IsoStage, []const u8) void) !void {
+    if (@import("builtin").cpu.arch != .x86_64) return error.WindowsSetupRequiresX64;
+    try source_config.validateName(name);
+    if (uefi.system_table.boot_services == null) return error.NoBootServices;
+    const state = try uefi.pool_allocator.create(BootState);
+    defer uefi.pool_allocator.destroy(state);
+    try initBootState(state);
+    progress(.validating, "Validating the installation ISO and resolving the boot source");
+    const inspection = try inspectState(state, folder, name, true);
+    // The CSMWrap path always boots the PE10 donor (it has the USB 3 stack).
+    if (inspection.mode != .original) return error.Windows10PeDonorMissing;
+    try checkDonorRecord(state, &inspection, root, progress);
+    var context = DonorContext{ .state = state };
+    const current = try context.probeDonor(inspection.donor_directory, inspection.donor_name.slice());
+    if (!std.meta.eql(current, inspection.boot_setup)) return error.Windows10PeDonorChanged;
+    var config: [544]u8 = undefined;
+    const binding = try source_config.sourceConfigForFolder(&config, state.catalog.partition.part_guid, state.source.size(), folder, name);
+    var request: [1024]u8 = undefined;
+    const text = try formatCsmwrapRequest(&request, folder, name, inspection.donor_directory, inspection.donor_name.slice(), answer);
+    const settings_store = @import("settings_store.zig");
+    try ensureEspDirectory(root, csmwrap_directory);
+    try settings_store.replaceFile(root, csmwrap_directory ++ "\\usos-source.ini", binding);
+    try settings_store.replaceFile(root, csmwrap_directory ++ "\\request.ini", text);
+    serial.writeAscii("[VISTA_CSMWRAP] request written: ");
+    serial.writeAscii(text);
+}
+
+test "Vista CSMWrap request names DATA-relative paths and the answer source" {
+    var buffer: [1024]u8 = undefined;
+    const text = try formatCsmwrapRequest(&buffer, "Windows Vista", "pl_vista.iso", "Programs/USOS/WinPE", "PE10.iso", .none);
+    try std.testing.expectEqualStrings("version=1\r\nprofile=vista-x64-sp2-uefi-csmwrap\r\niso=Systems/Windows/Windows Vista/Images/pl_vista.iso\r\ndonor=Programs/USOS/WinPE/PE10.iso\r\nfolder=Windows Vista\r\nanswer=none\r\n", text);
+    const legacy = try formatCsmwrapRequest(&buffer, "Windows Server 2008", "srv.iso", "Systems\\Windows\\Windows 10\\Images", "PE10.iso", .{ .file = "a.xml" });
+    try std.testing.expect(std.mem.indexOf(u8, legacy, "donor=Systems/Windows/Windows 10/Images/PE10.iso\r\n") != null);
+    try std.testing.expect(std.mem.endsWith(u8, legacy, "answer=file:a.xml\r\n"));
+    try std.testing.expect(std.mem.endsWith(u8, try formatCsmwrapRequest(&buffer, "Windows Vista", "v.iso", "Programs/USOS/WinPE", "PE10.iso", .profile), "answer=profile\r\n"));
+    try std.testing.expectError(error.InvalidImageName, formatCsmwrapRequest(&buffer, "Windows Vista", "v.iso", "../x", "PE10.iso", .none));
+    try std.testing.expectError(error.InvalidImageName, formatCsmwrapRequest(&buffer, "Windows Vista", "a/b.iso", "Programs/USOS/WinPE", "PE10.iso", .none));
+}
+
 // ------------------------------------------------- Windows 10/11 and WinPE
 
 pub const systemFolder = scanner.systemFolder;

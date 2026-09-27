@@ -1048,5 +1048,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentinė): nėra NT 5.0 AHCI/NVMe/USB 3 tvarkyklės (SATA IDE režimu), daugiausia 4 GB RAM ir 2 procesoriai",
 
-  "boot.summary.nt52_limits": "NT 5.2 (eksperimentinė): AHCI per GenAHCI sistemos StorPort; diegime nėra NVMe/USB 3 tvarkyklės"
+  "boot.summary.nt52_limits": "NT 5.2 (eksperimentinė): AHCI per GenAHCI sistemos StorPort; diegime nėra NVMe/USB 3 tvarkyklės",
+  "boot.summary.vista_csmwrap": "Vista be CSM (eksperimentinė): legacy (MBR) diegimas per CSMWrap, plokštė su legacy VBIOS",
+  "boot.lx.vista_csmwrap_confirm": "Vista be CSM: USOS įrašo Windows PE pagalbinę programą ir nedidelį CSMWrap skaidinį šio disko gale. Vista diegimo programoje pasirinkite nepaskirstytą vietą; neištrinkite mažų skaidinių.",
+  "boot.lx.vista_csmwrap_copying": "Windows PE pagalbinė programa ir CSMWrap kopijuojami į pasirinktą diską.",
+  "boot.lx.keep_the_usos_stick_connected": "Palikite USOS atmintuką prijungtą.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: paleiskite paruoštą diską",
+  "boot.lx.vista_csmwrap_restart_notice": "Palikite USOS atmintuką prijungtą. Po paleidimo iš naujo atidarykite programinės aparatinės įrangos paleidimo meniu ir paleiskite šio disko UEFI įrašą (ne Legacy); CSM lieka išjungtas. Tada Vista diegimo programa pasileis iš jo per CSMWrap.",
+  "boot.lx.restart": "Paleisti iš naujo",
+  "winpe.vista_csmwrap_title": "USOS - Vista be CSM",
+  "winpe.vista_csmwrap_done": "Pirmoji Vista diegimo dalis baigta. Dabar ištraukite USOS atmintuką ir pasirinkite Gerai: kompiuteris bus paleistas iš naujo, o Vista tęs diegimą iš disko per CSMWrap. Jei atmintukas liks prijungtas, paleiskite šio disko UEFI įrašą iš programinės aparatinės įrangos paleidimo meniu."
 }

@@ -1045,5 +1045,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (kokeellinen): ei AHCI/NVMe/USB 3 -ajuria NT 5.0:lle (SATA IDE-tilassa), enintään 4 Gt RAM ja 2 suoritinta",
 
-  "boot.summary.nt52_limits": "NT 5.2 (kokeellinen): AHCI GenAHCI:n kautta järjestelmän StorPortilla; asennuksessa ei NVMe/USB 3 -ajuria"
+  "boot.summary.nt52_limits": "NT 5.2 (kokeellinen): AHCI GenAHCI:n kautta järjestelmän StorPortilla; asennuksessa ei NVMe/USB 3 -ajuria",
+  "boot.summary.vista_csmwrap": "Vista ilman CSM:ää (kokeellinen): legacy-asennus (MBR) CSMWrapin kautta, näytönohjaimessa legacy-VBIOS",
+  "boot.lx.vista_csmwrap_confirm": "Vista ilman CSM:ää: USOS kirjoittaa Windows PE -apuohjelman ja pienen CSMWrap-osion tämän levyn loppuun. Valitse Vistan asennuksessa varaamaton tila; älä poista pieniä osioita.",
+  "boot.lx.vista_csmwrap_copying": "Kopioidaan Windows PE -apuohjelma ja CSMWrap valitulle levylle.",
+  "boot.lx.keep_the_usos_stick_connected": "Pidä USOS-tikku kytkettynä.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: käynnistä valmisteltu levy",
+  "boot.lx.vista_csmwrap_restart_notice": "Pidä USOS-tikku kytkettynä. Avaa uudelleenkäynnistyksen jälkeen laiteohjelmiston käynnistysvalikko ja käynnistä tämän levyn UEFI-merkintä (ei Legacy); CSM pysyy pois päältä. Vistan asennus käynnistyy sitten siltä CSMWrapin kautta.",
+  "boot.lx.restart": "Käynnistä uudelleen",
+  "winpe.vista_csmwrap_title": "USOS - Vista ilman CSM:ää",
+  "winpe.vista_csmwrap_done": "Vistan asennuksen ensimmäinen osa on valmis. Irrota nyt USOS-tikku ja valitse OK: tietokone käynnistyy uudelleen ja Vista jatkuu levyltä CSMWrapin kautta. Jos tikku jää kytketyksi, käynnistä tämän levyn UEFI-merkintä laiteohjelmiston käynnistysvalikosta."
 }

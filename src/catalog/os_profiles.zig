@@ -263,6 +263,43 @@ pub const profiles = [_]Profile{
     .{ .id = "efi-direct", .images = &.{.efi}, .methods = &.{ .automatic, .direct_efi }, .backend = .direct_efi, .progress = .efi_image },
 };
 
+/// No firmware CSM (the UEFI menu's secure_boot.csm() is not likely on): the
+/// profile that replaces a base profile's start. CSM presence is not a routing
+/// input, so these are not rules of `profiles`: the base row still decides the
+/// selection, the menu swaps the start (docs/design/csmwrap-integration.md).
+pub const CsmwrapVariant = struct {
+    base: []const u8,
+    id: []const u8,
+    /// How the start differs from the base profile's (golden text).
+    start: []const u8,
+};
+
+pub const csmwrap_variants = [_]CsmwrapVariant{
+    .{ .base = "xp-x86-sp3-uefi-csm", .id = "xp-x86-sp3-uefi-csmwrap", .start = "same micro-Linux staging + usos.xp_boot=csmwrap (CSMWrap ESP at the disk end)" },
+    .{ .base = "vista-uefi-pe10", .id = "vista-x64-sp2-uefi-csmwrap", .start = "micro-Linux step 610: MBR disk, PE10 staging partition + CSMWrap ESP; Vista Setup in BIOS mode" },
+};
+
+pub fn csmwrapVariant(base_id: []const u8) ?*const CsmwrapVariant {
+    for (&csmwrap_variants) |*variant| {
+        if (std.mem.eql(u8, variant.base, base_id)) return variant;
+    }
+    return null;
+}
+
+test "CSMWrap variants replace existing UEFI profiles and have their own ids" {
+    const systems = @import("systems.zig");
+    for (csmwrap_variants) |variant| {
+        const base = findById(variant.base) orelse return error.TestUnexpectedResult;
+        try std.testing.expect(base.firmware != .bios);
+        try std.testing.expect(findById(variant.id) == null);
+    }
+    const vista = select(systems.findById("windows-vista").?, .iso, .automatic, .uefi).?;
+    try std.testing.expectEqualStrings("vista-x64-sp2-uefi-csmwrap", csmwrapVariant(vista.id).?.id);
+    const server = select(systems.findById("windows-server-2008").?, .iso, .automatic, .uefi).?;
+    try std.testing.expectEqualStrings("vista-x64-sp2-uefi-csmwrap", csmwrapVariant(server.id).?.id);
+    try std.testing.expect(csmwrapVariant("win7-uefi-native") == null);
+}
+
 /// The profile that decides this selection, or null when no rule applies.
 /// `firmware == null` is the firmware-less choice (only `.any` rules).
 /// A returned profile with `backend == null` refuses the selection.

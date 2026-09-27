@@ -1045,5 +1045,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (experimentellt): ingen AHCI/NVMe/USB 3-drivrutin för NT 5.0 (SATA i IDE-läge), max 4 GB RAM och 2 processorer",
 
-  "boot.summary.nt52_limits": "NT 5.2 (experimentellt): AHCI via GenAHCI på systemets StorPort; ingen NVMe/USB 3-drivrutin i installationen"
+  "boot.summary.nt52_limits": "NT 5.2 (experimentellt): AHCI via GenAHCI på systemets StorPort; ingen NVMe/USB 3-drivrutin i installationen",
+  "boot.summary.vista_csmwrap": "Vista utan CSM (experimentellt): legacy-installation (MBR) via CSMWrap, grafikkort med legacy-VBIOS",
+  "boot.lx.vista_csmwrap_confirm": "Vista utan CSM: USOS skriver Windows PE-hjälpen och en liten CSMWrap-partition i slutet av den här disken. Välj det oallokerade utrymmet i Vista Setup; ta inte bort de små partitionerna.",
+  "boot.lx.vista_csmwrap_copying": "Kopierar Windows PE-hjälpen och CSMWrap till den valda disken.",
+  "boot.lx.keep_the_usos_stick_connected": "Låt USOS-stickan vara ansluten.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: starta den förberedda disken",
+  "boot.lx.vista_csmwrap_restart_notice": "Låt USOS-stickan vara ansluten. Öppna efter omstarten firmwarens startmeny och starta den här diskens UEFI-post (inte Legacy); CSM förblir avstängt. Vista Setup startar sedan från den via CSMWrap.",
+  "boot.lx.restart": "Starta om",
+  "winpe.vista_csmwrap_title": "USOS - Vista utan CSM",
+  "winpe.vista_csmwrap_done": "Den första delen av Vista-installationen är klar. Ta ut USOS-stickan nu och välj OK: datorn startas om och Vista fortsätter från disken via CSMWrap. Om stickan är kvar, starta den här diskens UEFI-post från firmwarens startmeny."
 }

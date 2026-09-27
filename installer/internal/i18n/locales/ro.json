@@ -1048,5 +1048,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (experimental): fără driver AHCI/NVMe/USB 3 pentru NT 5.0 (SATA în mod IDE), max. 4 GB RAM și 2 procesoare",
 
-  "boot.summary.nt52_limits": "NT 5.2 (experimental): AHCI prin GenAHCI pe StorPort-ul sistemului; fără driver NVMe/USB 3 în instalare"
+  "boot.summary.nt52_limits": "NT 5.2 (experimental): AHCI prin GenAHCI pe StorPort-ul sistemului; fără driver NVMe/USB 3 în instalare",
+  "boot.summary.vista_csmwrap": "Vista fără CSM (experimental): instalare legacy (MBR) prin CSMWrap, placă cu VBIOS legacy",
+  "boot.lx.vista_csmwrap_confirm": "Vista fără CSM: USOS scrie asistentul Windows PE și o partiție CSMWrap mică la sfârșitul acestui disc. În instalarea Vista alegeți spațiul nealocat; nu ștergeți partițiile mici.",
+  "boot.lx.vista_csmwrap_copying": "Se copiază asistentul Windows PE și CSMWrap pe discul ales.",
+  "boot.lx.keep_the_usos_stick_connected": "Lăsați stickul USOS conectat.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: porniți discul pregătit",
+  "boot.lx.vista_csmwrap_restart_notice": "Lăsați stickul USOS conectat. După repornire deschideți meniul de pornire al firmware-ului și porniți intrarea UEFI a acestui disc (nu Legacy); CSM rămâne oprit. Instalarea Vista pornește apoi de pe el prin CSMWrap.",
+  "boot.lx.restart": "Repornire",
+  "winpe.vista_csmwrap_title": "USOS - Vista fără CSM",
+  "winpe.vista_csmwrap_done": "Prima parte a instalării Vista s-a încheiat. Scoateți acum stickul USOS, apoi alegeți OK: computerul repornește și Vista continuă de pe disc prin CSMWrap. Dacă stickul rămâne conectat, porniți intrarea UEFI a acestui disc din meniul de pornire al firmware-ului."
 }

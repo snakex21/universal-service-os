@@ -47,6 +47,7 @@ usos_pipeline_profile_for_action() {
         windows7-iso|windows-vista-iso) printf 'windows-pe-bios-iso' ;;
         xp-resume) printf 'nt5-resume' ;;
         vista-disk) printf 'vista-uefi-disk' ;;
+        vista-csmwrap) printf 'vista-x64-sp2-uefi-csmwrap' ;;
         *) return 1 ;;
     esac
 }
@@ -57,6 +58,7 @@ usos_pipeline_steps() {
         nt5-staging|xp-x86-sp3-uefi-csm|w2k-x86-sp4-uefi-csm|w2k3-x86-sp2-uefi-csm|xp-x64-sp2-uefi-csm) printf '100' ;;
         nt5-resume) printf '150' ;;
         vista-uefi-disk) printf '600' ;;
+        vista-x64-sp2-uefi-csmwrap) printf '610' ;;
         windows-pe-bios-iso) printf '500 200' ;;
         iso-work-chainload|wim-wimboot|vhd-vhdboot) printf '200' ;;
         *) return 1 ;;
@@ -70,6 +72,7 @@ usos_pipeline_step_name() {
         200) printf 'work_prepare' ;;
         500) printf 'windows_pe_bios_request' ;;
         600) printf 'vista_disk_prepare' ;;
+        610) printf 'vista_csmwrap' ;;
         *) return 1 ;;
     esac
 }

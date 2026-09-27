@@ -1,6 +1,9 @@
 @echo off
 rem PE10 uses its own USB stack. The Vista stack is copied only to the new OS.
 if /i not "%PROCESSOR_ARCHITECTURE%"=="AMD64" exit /b 2
+rem Vista without CSM (usos-vista-csmwrap.flag): PE10 booted in BIOS mode from
+rem the prepared disk; the installer merges an answer file with its servicing answer.
+if exist "%~dp0usos-vista-csmwrap.flag" goto csmwrap
 if exist "%~dp0usos-unattend.xml" (
     echo Vista USB v1 requires manual edition and target selection; answer files are not supported.
     exit /b 2
@@ -17,6 +20,11 @@ if exist "%~dp0usos-int10-dispatcher.flag" (
 ) else (
     echo [USOS] Vista SP2 installation from USB. Keep CSM enabled for the installed system.
 )
+goto run
+:csmwrap
+echo [USOS] Vista SP2 without CSM: legacy MBR installation, the disk boots through CSMWrap.
+echo [USOS] Select the unallocated space in Setup. Do not delete the small USOS-VISTA and CSMWRAP partitions.
+:run
 echo [USOS] Mouse and keyboard use PE10 drivers; target USB v11 is prepared before reboot.
 echo [USOS] Setup installs Microsoft KMDF 1.11 before restart; USOS checks both framework files.
 echo [USOS] Select the intended target disk. You may delete all its partitions and install into unallocated space.

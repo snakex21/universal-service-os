@@ -1045,5 +1045,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (πειραματικό): χωρίς πρόγραμμα οδήγησης AHCI/NVMe/USB 3 για NT 5.0 (SATA σε λειτουργία IDE), έως 4 GB RAM και 2 CPU",
 
-  "boot.summary.nt52_limits": "NT 5.2 (πειραματικό): AHCI μέσω GenAHCI στο StorPort του συστήματος· χωρίς πρόγραμμα οδήγησης NVMe/USB 3 στην εγκατάσταση"
+  "boot.summary.nt52_limits": "NT 5.2 (πειραματικό): AHCI μέσω GenAHCI στο StorPort του συστήματος· χωρίς πρόγραμμα οδήγησης NVMe/USB 3 στην εγκατάσταση",
+  "boot.summary.vista_csmwrap": "Vista χωρίς CSM (πειραματικό): εγκατάσταση legacy (MBR) μέσω CSMWrap, κάρτα με legacy VBIOS",
+  "boot.lx.vista_csmwrap_confirm": "Vista χωρίς CSM: το USOS γράφει τον βοηθό Windows PE και ένα μικρό διαμέρισμα CSMWrap στο τέλος αυτού του δίσκου. Στην εγκατάσταση των Vista επιλέξτε τον μη εκχωρημένο χώρο· μη διαγράψετε τα μικρά διαμερίσματα.",
+  "boot.lx.vista_csmwrap_copying": "Αντιγραφή του βοηθού Windows PE και του CSMWrap στον επιλεγμένο δίσκο.",
+  "boot.lx.keep_the_usos_stick_connected": "Αφήστε συνδεδεμένο το USB USOS.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: εκκινήστε τον προετοιμασμένο δίσκο",
+  "boot.lx.vista_csmwrap_restart_notice": "Αφήστε συνδεδεμένο το USB USOS. Μετά την επανεκκίνηση ανοίξτε το μενού εκκίνησης του υλικολογισμικού και ξεκινήστε την καταχώριση UEFI αυτού του δίσκου (όχι Legacy)· το CSM μένει ανενεργό. Η εγκατάσταση των Vista ξεκινά τότε από αυτόν μέσω CSMWrap.",
+  "boot.lx.restart": "Επανεκκίνηση",
+  "winpe.vista_csmwrap_title": "USOS - Vista χωρίς CSM",
+  "winpe.vista_csmwrap_done": "Το πρώτο μέρος της εγκατάστασης των Vista ολοκληρώθηκε. Αφαιρέστε τώρα το USB USOS και επιλέξτε OK: ο υπολογιστής επανεκκινείται και τα Vista συνεχίζουν από τον δίσκο μέσω CSMWrap. Αν το USB μείνει συνδεδεμένο, ξεκινήστε την καταχώριση UEFI αυτού του δίσκου από το μενού εκκίνησης του υλικολογισμικού."
 }

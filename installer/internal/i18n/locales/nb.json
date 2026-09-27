@@ -1045,5 +1045,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentelt): ingen AHCI/NVMe/USB 3-driver for NT 5.0 (SATA i IDE-modus), maks. 4 GB RAM og 2 prosessorer",
 
-  "boot.summary.nt52_limits": "NT 5.2 (eksperimentelt): AHCI via GenAHCI på systemets StorPort; ingen NVMe/USB 3-driver i installasjonen"
+  "boot.summary.nt52_limits": "NT 5.2 (eksperimentelt): AHCI via GenAHCI på systemets StorPort; ingen NVMe/USB 3-driver i installasjonen",
+  "boot.summary.vista_csmwrap": "Vista uten CSM (eksperimentelt): legacy-installasjon (MBR) via CSMWrap, skjermkort med legacy-VBIOS",
+  "boot.lx.vista_csmwrap_confirm": "Vista uten CSM: USOS skriver Windows PE-hjelperen og en liten CSMWrap-partisjon på slutten av denne disken. Velg den ikke-tildelte plassen i Vista Setup; ikke slett de små partisjonene.",
+  "boot.lx.vista_csmwrap_copying": "Kopierer Windows PE-hjelperen og CSMWrap til den valgte disken.",
+  "boot.lx.keep_the_usos_stick_connected": "La USOS-pinnen være tilkoblet.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: start den forberedte disken",
+  "boot.lx.vista_csmwrap_restart_notice": "La USOS-pinnen være tilkoblet. Åpne fastvarens oppstartsmeny etter omstarten, og start denne diskens UEFI-oppføring (ikke Legacy); CSM forblir av. Vista Setup starter deretter fra den via CSMWrap.",
+  "boot.lx.restart": "Start på nytt",
+  "winpe.vista_csmwrap_title": "USOS - Vista uten CSM",
+  "winpe.vista_csmwrap_done": "Den første delen av Vista-installasjonen er ferdig. Ta ut USOS-pinnen nå, og velg OK: datamaskinen starter på nytt, og Vista fortsetter fra disken via CSMWrap. Hvis pinnen forblir tilkoblet, start denne diskens UEFI-oppføring fra fastvarens oppstartsmeny."
 }

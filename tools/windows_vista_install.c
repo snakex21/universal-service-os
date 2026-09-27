@@ -34,6 +34,14 @@ static Esp original_esps[64],selected_esp;
 static DWORD original_esp_count;
 static DWORD profile_disk_count,profile_disk_number;
 static BOOL have_selected_esp;
+/* Vista without firmware CSM (usos-vista-csmwrap.flag, profile
+ * vista-x64-sp2-uefi-csmwrap; docs/design/csmwrap-integration.md 10): PE10 was
+ * booted in BIOS mode through CSMWrap from the target's staging partition, so
+ * Vista Setup installs a legacy MBR system. The target disk is the one with
+ * the MBR signature of usos-vista-target.ini. */
+static BOOL csmwrap;
+static DWORD csm_signature,csm_disk=0xffffffff;
+static ULONGLONG csm_staging_start,csm_staging_sectors;
 void *memcpy(void *d,const void *s,size_t n){volatile BYTE *p=d;const BYTE *q=s;while(n--)*p++=*q++;return d;}
 void *memset(void *d,int v,size_t n){volatile BYTE *p=d;while(n--)*p++=(BYTE)v;return d;}
 static BOOL same(const void *a,const void *b,DWORD n){const BYTE *x=a,*y=b;while(n--)if(*x++!=*y++)return FALSE;return TRUE;}
@@ -82,10 +90,17 @@ static BOOL identity(const WCHAR *root,Target *t){
  if(h==INVALID_HANDLE_VALUE)return FALSE;
  VOLUME_DISK_EXTENTS e;BOOL ok=DeviceIoControl(h,IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS,0,0,&e,sizeof(e),&got,0)&&e.NumberOfDiskExtents==1;
  PARTITION_INFORMATION_EX p;
- if(ok)ok=DeviceIoControl(h,IOCTL_DISK_GET_PARTITION_INFO_EX,0,0,&p,sizeof(p),&got,0)&&p.PartitionStyle==PARTITION_STYLE_GPT;
+ if(ok)ok=DeviceIoControl(h,IOCTL_DISK_GET_PARTITION_INFO_EX,0,0,&p,sizeof(p),&got,0)&&p.PartitionStyle==(csmwrap?PARTITION_STYLE_MBR:PARTITION_STYLE_GPT);
  CloseHandle(h);if(!ok)return FALSE;
+ /* CSMWrap: only partitions of the prepared MBR disk. */
+ if(csmwrap&&e.Extents[0].DiskNumber!=csm_disk)return FALSE;
  h=disk_handle(e.Extents[0].DiskNumber);if(h==INVALID_HANDLE_VALUE)return FALSE;ok=internal(h);CloseHandle(h);
- if(!ok)return FALSE;lstrcpyW(t->root,root);t->disk=e.Extents[0].DiskNumber;t->id=p.Gpt.PartitionId;return TRUE;
+ if(!ok)return FALSE;lstrcpyW(t->root,root);t->disk=e.Extents[0].DiskNumber;
+ /* An MBR partition's identity is what MountedDevices stores for it: the
+  * disk signature (4 bytes) and the partition offset (8 bytes). */
+ if(csmwrap){ULONGLONG offset=(ULONGLONG)p.StartingOffset.QuadPart;memset(&t->id,0,16);memcpy(&t->id,&csm_signature,4);memcpy((BYTE*)&t->id+4,&offset,8);}
+ else t->id=p.Gpt.PartitionId;
+ return TRUE;
 }
 static BOOL inventory(Target *targets,DWORD *count){
  DWORD letters=GetLogicalDrives();if(!letters)return FALSE;*count=0;
@@ -235,6 +250,140 @@ static void retire_prepared_disk(const WCHAR *suffix){
  if(!prepared_record[0])return;WCHAR to[MAX_PATH];lstrcpyW(to,prepared_record);lstrcatW(to,suffix);
  logcode("Prepared-disk record retired=",MoveFileExW(prepared_record,to,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)?0:GetLastError());
  prepared_record[0]=0;
+}
+/* ---- Vista without firmware CSM (CSMWrap, legacy MBR install) ---------- */
+static DWORD run_capture(const WCHAR *executable,const WCHAR *arguments,const WCHAR *output_name);
+static ULONGLONG parse_decimal(const char *s){ULONGLONG v=0;for(;*s>='0'&&*s<='9';s++)v=v*10+(ULONGLONG)(*s-'0');return v;}
+/* usos-vista-target.ini (written by tools/vista_csmwrap_target.sh into this
+ * WinPE image): the disk signature and the staging partition's extent. */
+static BOOL load_csmwrap_target(void){
+ static char text[1024];WCHAR file[MAX_PATH];DWORD got=0;
+ path(file,base,L"usos-vista-target.ini");HANDLE h=CreateFileW(file,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
+ if(h==INVALID_HANDLE_VALUE){logcode("CSMWrap: usos-vista-target.ini missing=",GetLastError());return FALSE;}
+ BOOL ok=ReadFile(h,text,sizeof(text)-1,&got,0);CloseHandle(h);if(!ok)return FALSE;text[got]=0;
+ const char *sig=ini_value(text,"disk_signature"),*start=ini_value(text,"staging_start"),*count=ini_value(text,"staging_sectors");
+ if(!sig||!start||!count)return FALSE;
+ DWORD v=0;for(int i=0;i<8;i++){char c=sig[i];if(c>='0'&&c<='9')v=v*16+(DWORD)(c-'0');else if((c|32)>='a'&&(c|32)<='f')v=v*16+(DWORD)((c|32)-'a'+10);else return FALSE;}
+ csm_signature=v;csm_staging_start=parse_decimal(start);csm_staging_sectors=parse_decimal(count);
+ if(!csm_signature||!csm_staging_start||!csm_staging_sectors)return FALSE;
+ logcode("CSMWrap: target disk signature=",csm_signature);logcode("CSMWrap: staging partition start LBA (low)=",(DWORD)csm_staging_start);
+ return TRUE;
+}
+/* The one internal MBR disk with that signature. */
+static BOOL find_csmwrap_disk(void){
+ DWORD found=0;
+ for(DWORD disk=0;disk<64;disk++){
+  HANDLE h=disk_handle(disk);if(h==INVALID_HANDLE_VALUE)continue;
+  DWORD got=0;BOOL ok=internal(h)&&DeviceIoControl(h,IOCTL_DISK_GET_DRIVE_LAYOUT_EX,0,0,buffer,sizeof(buffer),&got,0)&&got>=offsetof(DRIVE_LAYOUT_INFORMATION_EX,PartitionEntry);CloseHandle(h);
+  if(!ok)continue;DRIVE_LAYOUT_INFORMATION_EX *layout=(void*)buffer;
+  if(layout->PartitionStyle==PARTITION_STYLE_MBR&&layout->Mbr.Signature==csm_signature){csm_disk=disk;found++;}
+ }
+ logcode("CSMWrap: disks with the prepared MBR signature=",found);
+ if(found!=1){csm_disk=0xffffffff;return FALSE;}
+ logcode("CSMWrap: target physical disk=",csm_disk);return TRUE;
+}
+static BOOL mbr_io(BYTE sector[512],BOOL write){
+ WCHAR name[40]=L"\\\\.\\PhysicalDrive";decimal(name+lstrlenW(name),csm_disk);
+ HANDLE h=CreateFileW(name,GENERIC_READ|(write?GENERIC_WRITE:0),FILE_SHARE_READ|FILE_SHARE_WRITE,0,OPEN_EXISTING,write?FILE_FLAG_WRITE_THROUGH:0,0);
+ if(h==INVALID_HANDLE_VALUE)return FALSE;DWORD got=0;BOOL ok;
+ if(write){ok=WriteFile(h,sector,512,&got,0)&&got==512&&FlushFileBuffers(h);if(ok)DeviceIoControl(h,IOCTL_DISK_UPDATE_PROPERTIES,0,0,0,0,&got,0);}
+ else ok=ReadFile(h,sector,512,&got,0)&&got==512;
+ CloseHandle(h);
+ return ok&&(write||(sector[510]==0x55&&sector[511]==0xAA&&same(sector+440,&csm_signature,4)));
+}
+static int staging_slot(const BYTE *s){
+ for(int i=0;i<4;i++){const BYTE *e=s+446+16*i;DWORD first,count;memcpy(&first,e+8,4);memcpy(&count,e+12,4);
+  if(e[4]==0x07&&first==csm_staging_start&&count==csm_staging_sectors)return i;}
+ return -1;
+}
+enum{STAGING_INACTIVE,STAGING_ACTIVE_IF_ALONE,STAGING_REMOVE};
+/* The staging partition's MBR entry: clear its active flag before Setup (Vista
+ * then makes its own partition the system partition), set it again after a
+ * failed Setup when no other partition is active (the next boot of this disk
+ * retries), remove it after a good installation (PE10 ran from RAM). Only the
+ * matching entry of this disk's sector 0 is touched; read back. */
+static BOOL staging_entry(int action){
+ BYTE s[512],check[512];if(!mbr_io(s,FALSE)){logcode("CSMWrap: cannot read the target MBR=",GetLastError());return FALSE;}
+ int slot=staging_slot(s);if(slot<0){logcode("CSMWrap: staging partition entry not found=",ERROR_NOT_FOUND);return FALSE;}
+ BYTE *e=s+446+16*slot;
+ if(action==STAGING_INACTIVE){if(e[0]==0){logcode("CSMWrap: staging partition already inactive=",0);return TRUE;}e[0]=0;}
+ else if(action==STAGING_ACTIVE_IF_ALONE){for(int i=0;i<4;i++)if(s[446+16*i]==0x80){logcode("CSMWrap: a partition is active; staging left inactive (slot)=",(DWORD)i);return TRUE;}e[0]=0x80;}
+ else memset(e,0,16);
+ if(!mbr_io(s,TRUE)||!mbr_io(check,FALSE)||!same(s,check,512)){logcode("CSMWrap: MBR write/readback failed=",GetLastError());return FALSE;}
+ logcode(action==STAGING_INACTIVE?"CSMWrap: staging partition marked inactive before Setup (slot)=":action==STAGING_REMOVE?"CSMWrap: staging partition entry removed (slot)=":"CSMWrap: staging partition active again for a retry (slot)=",(DWORD)slot);
+ return TRUE;
+}
+/* A user answer (USOS profile or DATA file, usos-unattend.xml, UTF-8) with
+ * the KMDF <servicing> block of the servicing answer inserted right after the
+ * <unattend ...> tag. Nothing of the user file is logged. */
+static WCHAR servicing_cab[MAX_PATH];
+static BOOL merge_user_answer(WCHAR *answer){
+ static WCHAR xml[2048];WCHAR user[MAX_PATH],merged[MAX_PATH];path(user,base,L"usos-unattend.xml");
+ HANDLE f=CreateFileW(user,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);if(f==INVALID_HANDLE_VALUE)return TRUE;
+ LARGE_INTEGER size;DWORD got=0;BOOL ok=GetFileSizeEx(f,&size)&&size.QuadPart>16&&size.QuadPart<=1024*1024;
+ char *text=ok?LocalAlloc(LMEM_FIXED,(SIZE_T)size.QuadPart+1):0;
+ ok=text&&ReadFile(f,text,(DWORD)size.QuadPart,&got,0)&&got==size.QuadPart;CloseHandle(f);
+ if(!ok){logcode("Answer merge: cannot read usos-unattend.xml=",GetLastError());if(text)LocalFree(text);return FALSE;}
+ text[got]=0;
+ if((BYTE)text[0]==0xFF||(BYTE)text[0]==0xFE||text[1]==0){logcode("Answer merge: only UTF-8 answer files are supported=",ERROR_INVALID_DATA);LocalFree(text);return FALSE;}
+ DWORD at=0,insert=0;BOOL has_servicing=FALSE;
+ for(DWORD i=0;i+10<got;i++){if(!insert&&same(text+i,"<unattend",9)&&(text[i+9]==' '||text[i+9]=='>')){for(at=i;at<got&&text[at]!='>';at++){}if(at<got)insert=at+1;}
+  if(same(text+i,"<servicing",10))has_servicing=TRUE;}
+ if(!insert||has_servicing){logcode(has_servicing?"Answer merge: the answer file has its own servicing section=":"Answer merge: no <unattend> element=",ERROR_INVALID_DATA);LocalFree(text);return FALSE;}
+ DWORD chars=vista_kmdf_answer(xml,2048,servicing_cab);DWORD from=0,to=0;
+ for(DWORD i=0;i+12<chars;i++){if(!from&&same(xml+i,L"<servicing>",11*sizeof(WCHAR)))from=i;if(same(xml+i,L"</servicing>",12*sizeof(WCHAR)))to=i+12;}
+ if(!from||to<=from){LocalFree(text);return FALSE;}
+ char block[1600];DWORD n=0;for(DWORD i=from;i<to;i++){if(xml[i]>127||n>=sizeof(block)-2){LocalFree(text);return FALSE;}block[n++]=(char)xml[i];}
+ path(merged,base,L"vista-answer.xml");
+ HANDLE o=CreateFileW(merged,GENERIC_WRITE,FILE_SHARE_READ,0,CREATE_ALWAYS,FILE_FLAG_WRITE_THROUGH,0);DWORD w1=0,w2=0,w3=0;
+ ok=o!=INVALID_HANDLE_VALUE&&WriteFile(o,text,insert,&w1,0)&&w1==insert&&WriteFile(o,block,n,&w2,0)&&w2==n&&WriteFile(o,text+insert,got-insert,&w3,0)&&w3==got-insert&&FlushFileBuffers(o);
+ if(o!=INVALID_HANDLE_VALUE)CloseHandle(o);LocalFree(text);
+ logcode("Answer merge: user answer + KMDF servicing written (bytes)=",ok?w1+w2+w3:0);
+ if(ok)lstrcpyW(answer,merged);return ok;
+}
+/* After Setup: the active partition of the target disk holds Vista's bootmgr
+ * and \Boot\BCD. Check its default entry names the new Windows partition
+ * (signature + offset in the device element), then set test signing there. */
+static BOOL configure_boot_bios(const Target *t,BOOL *system_is_staging){
+ static WCHAR store[MAX_PATH],inspect_store[MAX_PATH],file[MAX_PATH],device[80];
+ HANDLE h=disk_handle(t->disk);DWORD got=0;BOOL ok=h!=INVALID_HANDLE_VALUE&&DeviceIoControl(h,IOCTL_DISK_GET_DRIVE_LAYOUT_EX,0,0,buffer,sizeof(buffer),&got,0);
+ if(h!=INVALID_HANDLE_VALUE)CloseHandle(h);if(!ok)return FALSE;
+ DRIVE_LAYOUT_INFORMATION_EX *layout=(void*)buffer;DWORD number=0,actives=0;ULONGLONG offset=0;
+ if(layout->PartitionStyle!=PARTITION_STYLE_MBR)return FALSE;
+ for(DWORD i=0;i<layout->PartitionCount&&i<64;i++){PARTITION_INFORMATION_EX *p=&layout->PartitionEntry[i];if(p->PartitionNumber&&p->Mbr.BootIndicator){actives++;number=p->PartitionNumber;offset=(ULONGLONG)p->StartingOffset.QuadPart;}}
+ logcode("CSMWrap: active partitions after Setup=",actives);if(actives!=1)return FALSE;
+ *system_is_staging=offset==csm_staging_start*512;
+ logcode("CSMWrap: system partition is the staging partition (1 = yes)=",*system_is_staging);
+ lstrcpyW(device,L"\\Device\\Harddisk");decimal(device+lstrlenW(device),t->disk);lstrcatW(device,L"\\Partition");decimal(device+lstrlenW(device),number);
+ DWORD letters=GetLogicalDrives();WCHAR alias[4]={0,L':',0,0};
+ for(int i=25;i>=3;i--)if(!(letters&(1u<<i))){alias[0]=L'A'+i;break;}
+ if(!alias[0]||!DefineDosDeviceW(DDD_RAW_TARGET_PATH|DDD_NO_BROADCAST_SYSTEM,alias,device))return FALSE;
+ alias[2]=L'\\';ok=FALSE;
+ path(file,alias,L"bootmgr");path(store,alias,L"Boot\\BCD");
+ if(GetFileAttributesW(file)==INVALID_FILE_ATTRIBUTES||GetFileAttributesW(store)==INVALID_FILE_ATTRIBUTES){logcode("CSMWrap: bootmgr or Boot\\BCD missing on the system partition=",GetLastError());goto done;}
+ /* The store stays open after Setup (loaded as a registry hive: CopyFile gets
+  * a sharing violation and bcdedit cannot /export with /store; QEMU
+  * 2026-09-27), so read the default entry through PE10's bcdedit /enum: its
+  * device and osdevice must be the new Windows partition (partition=<its PE
+  * letter>) and the loader the BIOS winload.exe. */
+ path(inspect_store,base,L"vista-bcd-enum.txt");DeleteFileW(inspect_store);
+ {WCHAR exe[MAX_PATH],args[MAX_PATH+40];GetSystemDirectoryW(exe,MAX_PATH);lstrcatW(exe,L"\\bcdedit.exe");
+  lstrcpyW(args,L"/store \"");lstrcatW(args,store);lstrcatW(args,L"\" /enum {default}");
+  DWORD code=run_capture(exe,args,L"vista-bcd-enum.txt");logcode("BCDEdit /enum {default} result=",code);if(code)goto done;}
+ {static char text[16384];DWORD got=0;HANDLE f=CreateFileW(inspect_store,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
+  if(f==INVALID_HANDLE_VALUE)goto done;BOOL read=ReadFile(f,text,sizeof(text)-1,&got,0);CloseHandle(f);if(!read)goto done;text[got]=0;
+  char want[]="partition=C:";want[10]=(char)t->root[0];DWORD partitions=0;BOOL loader=FALSE;
+  for(DWORD i=0;i+12<=got;i++){
+   if(same(text+i,want,12)&&(text[i+12]=='\r'||text[i+12]=='\n'||text[i+12]==' '))partitions++;
+   if(same(text+i,"winload.exe",11))loader=TRUE;
+  }
+  logcode("BCD default: entries naming the new partition=",partitions);logcode("BCD default: BIOS winload.exe (1 = yes)=",loader);
+  if(partitions<2||!loader){logcode("BCD default does not identify the new Vista partition=",1);goto done;}}
+ WCHAR args[100];lstrcpyW(args,L"/set {default} testsigning on");
+ ok=bcd_command(store,args);
+done:
+ alias[2]=0;DefineDosDeviceW(DDD_REMOVE_DEFINITION|DDD_NO_BROADCAST_SYSTEM,alias,0);
+ return ok;
 }
 static BOOL load_boot_profile(void){
  BYTE hash[32];unsigned files=0;
@@ -451,6 +600,15 @@ static LRESULT CALLBACK device_window(HWND window,UINT message,WPARAM w,LPARAM l
  return DefWindowProcW(window,message,w,l);
 }
 static DWORD run_setup(const WCHAR *executable,WCHAR *line){
+ /* CSMWrap (BIOS mode): no ESP to select; Setup finds the system partition
+  * itself (the active partition of the boot disk, or the one it installs to). */
+ if(csmwrap){
+  STARTUPINFOW si={0};PROCESS_INFORMATION pi={0};si.cb=sizeof(si);DWORD result=ERROR_GEN_FAILURE;
+  if(CreateProcessW(executable,line,0,0,FALSE,CREATE_NO_WINDOW,0,base,&si,&pi)){
+   CloseHandle(pi.hThread);WaitForSingleObject(pi.hProcess,INFINITE);GetExitCodeProcess(pi.hProcess,&result);CloseHandle(pi.hProcess);
+  }else logcode("Create Vista Setup process failed=",GetLastError());
+  return result;
+ }
  if(!esp_inventory(original_esps,&original_esp_count))return ERROR_READ_FAULT;
  logcode("Initial internal ESP count=",original_esp_count);
  /* Before Setup owns anything: read each existing ESP's boot sector from the
@@ -536,6 +694,7 @@ static BOOL prepare_servicing_answer(WCHAR *answer){
  if(i==sizeof(vista_files)/sizeof(vista_files[0]))return FALSE;
  path(source,base,vista_files[i].source);path(cab,base,L"Windows6.0-KB2864202-x64.cab");
  if(!CopyFileW(source,cab,FALSE)||!hash_file(cab,digest)||!same(digest,vista_files[i].sha256,32))return FALSE;
+ lstrcpyW(servicing_cab,cab);
  DWORD chars=vista_kmdf_answer(xml,2048,cab);if(!chars)return FALSE;
  path(answer,base,L"vista-servicing.xml");
  HANDLE file=CreateFileW(answer,GENERIC_WRITE,FILE_SHARE_READ,0,CREATE_ALWAYS,FILE_FLAG_WRITE_THROUGH,0);if(file==INVALID_HANDLE_VALUE)return FALSE;
@@ -579,9 +738,11 @@ static BOOL arm_target(const Target *t){
     !vh_dword(&system,"Setup","SetupType",&type)||(type!=0&&type!=2)){logcode("Unexpected fresh Setup state; no boot hook changed=",1);logcode("SystemSetupInProgress=",active);logcode("SetupPhase=",phase);logcode("ChildCompletion=",child);goto done;}
  BYTE identity_bytes[24];uint32_t size=0;char name[]="\\DosDevices\\C:";name[12]=(char)runtime[0];
  memcpy(identity_bytes,"DMIO:ID:",8);memcpy(identity_bytes+8,&t->id,16);
+ /* MBR (CSMWrap): the value is the disk signature + partition offset. */
+ uint32_t want=24;if(csmwrap){memcpy(identity_bytes,&t->id,12);want=12;}
  BYTE *mapping=vh_data(&system,vh_value(&system,"MountedDevices",name),3,&size);
- if(!mapping||size!=24||!same(mapping,identity_bytes,24)){
-  logcode("Setup drive letter is not mapped to the identified GPT partition=",1);goto done;
+ if(!mapping||size!=want||!same(mapping,identity_bytes,want)){
+  logcode("Setup drive letter is not mapped to the identified partition=",1);goto done;
  }
  WCHAR old[MAX_PATH],launch[]=L"D:\\USOS\\oobe.exe";launch[0]=runtime[0];
  if(!vh_string(&system,"Setup","CmdLine",old,MAX_PATH)||lstrcmpiW(old,L"oobe\\windeploy.exe")!=0)goto done;
@@ -687,11 +848,15 @@ void entry(void){
  if(RegOpenKeyExW(HKEY_LOCAL_MACHINE,L"SYSTEM\\CurrentControlSet\\Control\\MiniNT",0,KEY_READ,&mini)!=ERROR_SUCCESS)ExitProcess(2);RegCloseKey(mini);
  typedef LONG (WINAPI *VersionFn)(OSVERSIONINFOW*);
  VersionFn real_version=(VersionFn)GetProcAddress(GetModuleHandleW(L"ntdll.dll"),"RtlGetVersion");
- if(!real_version||real_version(&version)!=0||version.dwMajorVersion!=10||version.dwBuildNumber<10240||version.dwBuildNumber>=22000||!GetFirmwareType(&firmware)||firmware!=FirmwareTypeUefi)ExitProcess(2);
+ if(!real_version||real_version(&version)!=0||version.dwMajorVersion!=10||version.dwBuildNumber<10240||version.dwBuildNumber>=22000||!GetFirmwareType(&firmware))ExitProcess(2);
  DWORD n=GetModuleFileNameW(0,base,MAX_PATH);if(!n||n>=MAX_PATH-64)ExitProcess(2);while(n&&base[n-1]!=L'\\')n--;base[n]=0;
+ /* UEFI as before; BIOS only for the CSMWrap preparation (its flag is in this image). */
+ path(scratch,base,L"usos-vista-csmwrap.flag");csmwrap=GetFileAttributesW(scratch)!=INVALID_FILE_ATTRIBUTES;
+ if(firmware!=(csmwrap?FirmwareTypeBios:FirmwareTypeUefi))ExitProcess(2);
  path(scratch,base,L"usos-vista-install.log");log_file=CreateFileW(scratch,GENERIC_WRITE,FILE_SHARE_READ,0,CREATE_ALWAYS,FILE_FLAG_WRITE_THROUGH,0);
- logcode("Vista USB installer v12 / USB armed before the optional dispatcher / disk preparation opt-in / no pre-Setup ESP gate / formatted ESP preferred / Vista bcdedit from the ISO boot.wim / ESP hints without volume access / known firstboot v11=",0);
- logcode("Firmware type (2 = UEFI)=",firmware);
+ logcode("Vista USB installer v12 / USB armed before the optional dispatcher / disk preparation opt-in / no pre-Setup ESP gate / formatted ESP preferred / Vista bcdedit from the ISO boot.wim / ESP hints without volume access / known firstboot v11 / CSMWrap legacy MBR mode v1=",0);
+ logcode("Firmware type (1 = BIOS, 2 = UEFI)=",firmware);
+ if(csmwrap)logcode("CSMWrap mode: PE10 booted in BIOS mode from the prepared disk; Vista installs as a legacy MBR system=",0);
  WCHAR source[MAX_PATH];n=GetEnvironmentVariableW(L"USOS_SOURCE",source,MAX_PATH);
  if(n!=2||source[1]!=L':'||source[0]<L'C'||source[0]>L'Z')ExitProcess(2);
  WCHAR setup_path[MAX_PATH];path(setup_path,source,L"\\sources\\setup.exe");
@@ -699,19 +864,24 @@ void entry(void){
  BYTE hash[32];for(unsigned i=0;i<sizeof(vista_files)/sizeof(vista_files[0]);i++){
   path(scratch,base,vista_files[i].source);if(!hash_file(scratch,hash)||!same(hash,vista_files[i].sha256,32)){logcode("Preflight payload hash failed at file=",i);ExitProcess(3);}
  }
- if(!privilege(L"SeBackupPrivilege")||!privilege(L"SeRestorePrivilege")||!load_boot_profile()||!inventory(before,&before_count))ExitProcess(4);
- if(!pinned_esp)load_prepared_disk();
- if(!load_vista_bcdedit(source)){
+ if(csmwrap&&(!load_csmwrap_target()||!find_csmwrap_disk())){logcode("Setup not started: the prepared CSMWrap disk was not found exactly once=",ERROR_NOT_FOUND);ExitProcess(4);}
+ if(!privilege(L"SeBackupPrivilege")||!privilege(L"SeRestorePrivilege")||(!csmwrap&&!load_boot_profile())||!inventory(before,&before_count))ExitProcess(4);
+ if(!pinned_esp&&!csmwrap)load_prepared_disk();
+ /* Vista's own bcdedit serves the UEFI system-store hints only. */
+ if(!csmwrap&&!load_vista_bcdedit(source)){
   logcode("Setup not started: Vista's own bcdedit could not be taken from the ISO boot.wim=",ERROR_FILE_NOT_FOUND);
   MessageBoxW(0,USOS_UI_TEXT(VISTA_ESP_FAILED),USOS_UI_TEXT(VISTA_ESP_TITLE),MB_OK|MB_ICONERROR);
   ExitProcess(4);
  }
  static WCHAR servicing_answer[MAX_PATH];if(!prepare_servicing_answer(servicing_answer))ExitProcess(10);
+ if(csmwrap&&!merge_user_answer(servicing_answer)){logcode("Setup not started: the answer file could not be merged with the servicing answer=",ERROR_INVALID_DATA);ExitProcess(11);}
+ if(csmwrap&&!staging_entry(STAGING_INACTIVE)){logcode("Setup not started: the staging partition could not be marked inactive=",ERROR_WRITE_FAULT);ExitProcess(12);}
  lstrcpyW(command,L"\"");lstrcatW(command,setup_path);lstrcatW(command,L"\" /noreboot /installfrom:\"");lstrcatW(command,source);lstrcatW(command,L"\\sources\\install.wim\"");
  lstrcatW(command,L" /unattend:\"");lstrcatW(command,servicing_answer);lstrcatW(command,L"\"");
  /* refresh_esp uses the command buffer too, so give Setup its own command. */
  static WCHAR setup_command[2048];lstrcpyW(setup_command,command);
  DWORD result=run_setup(setup_path,setup_command);logcode("Vista Setup returned=",result);
+ if(result&&csmwrap)staging_entry(STAGING_ACTIVE_IF_ALONE);
  if(result&&result!=ERROR_CANCELLED&&!store_ready)logcode("Setup failed and no unique target ESP was ever selected (delete all partitions of the target disk, or leave exactly one ESP)=",store_error?store_error:ERROR_NOT_FOUND);usos_record_setup_result(result);if(result)ExitProcess(result);
  if(!inventory(after,&after_count))ExitProcess(5);
  Target *target=0;DWORD candidates=0;
@@ -729,12 +899,18 @@ void entry(void){
   ExitProcess(10);
  }
  if(!copy_payload(target)){logcode("Copy target USB package failed=",GetLastError());ExitProcess(6);}
- if(!configure_boot(target)){logcode("Target BCD preparation failed (see the lines above)=",ERROR_GEN_FAILURE);ExitProcess(7);}
+ BOOL system_is_staging=FALSE;
+ if(csmwrap?!configure_boot_bios(target,&system_is_staging):!configure_boot(target)){logcode("Target BCD preparation failed (see the lines above)=",ERROR_GEN_FAILURE);ExitProcess(7);}
  if(!arm_target(target)){logcode("Arm pre-Setup USB failed=",GetLastError());ExitProcess(8);}
  install_optional_dispatcher(target);
+ /* PE10 runs from RAM: the staging partition is not needed any more unless
+  * Setup made it the system partition. Not fatal. */
+ if(csmwrap&&!system_is_staging&&!staging_entry(STAGING_REMOVE))logcode("CSMWrap: staging partition kept (not fatal)=",1);
  logcode("Vista target ready for first boot with USB v11=",0);
  retire_prepared_disk(L".done");
  CloseHandle(log_file);path(scratch,base,L"usos-vista-install.log");WCHAR target_log[MAX_PATH];path(target_log,target->root,L"USOS\\Vista\\installation-from-usb.log");
  if(!CopyFileW(scratch,target_log,FALSE))ExitProcess(9);
+ /* The firmware may list the USOS stick first: say how the disk continues. */
+ if(csmwrap)MessageBoxW(0,USOS_UI_TEXT(VISTA_CSMWRAP_DONE),USOS_UI_TEXT(VISTA_CSMWRAP_TITLE),MB_OK|MB_ICONINFORMATION);
  ExitProcess(0);
 }

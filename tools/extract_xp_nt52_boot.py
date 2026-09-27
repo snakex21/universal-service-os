@@ -55,6 +55,9 @@ def main() -> int:
     parser.add_argument("--vbr-tail-out", required=True)
     parser.add_argument("--stage2-out", required=True)
     parser.add_argument("--ntfs-out")
+    # Vista without firmware CSM (vista-x64-sp2-uefi-csmwrap): the NT60 NTFS
+    # boot code (loads BOOTMGR) for the PE10 staging partition on the target.
+    parser.add_argument("--nt60-ntfs-out")
     args = parser.parse_args()
 
     bootsect_path = Path(args.bootsect_exe)
@@ -85,6 +88,25 @@ def main() -> int:
         block[217:221] = b'\x90' * 4
         Path(args.ntfs_out).write_bytes(block)
         print('[PASS] NT52 NTFS EDD bootstrap 8192 bytes SHA256=' + sha256(block))
+    if args.nt60_ntfs_out:
+        prefix = b'\xeb\x52\x90NTFS    '
+        candidates = []
+        cursor = 0
+        while True:
+            candidate = payload.find(prefix, cursor)
+            if candidate < 0:
+                break
+            cursor = candidate + 1
+            block = payload[candidate:candidate + 8192]
+            if (len(block) == 8192 and block[510:512] == b'\x55\xaa'
+                    and b'BOOTMGR is compressed' in block[:512]
+                    and 'BOOTMGR'.encode('utf-16-le') in block[512:1024]
+                    and b'NTLDR' not in block[:512]):
+                candidates.append(block)
+        if len(candidates) != 1:
+            raise RuntimeError('Expected exactly one NT60 NTFS bootstrap')
+        Path(args.nt60_ntfs_out).write_bytes(candidates[0])
+        print('[PASS] NT60 NTFS bootstrap 8192 bytes SHA256=' + sha256(candidates[0]))
     pos, vbr, stage2 = find_fat32_nt52_template(payload)
     tail = vbr[VBR_CODE_OFFSET:VBR_CODE_END]
     if len(tail) != 420:

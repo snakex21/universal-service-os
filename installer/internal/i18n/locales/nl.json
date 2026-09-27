@@ -1045,5 +1045,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (experimenteel): geen AHCI/NVMe/USB 3-stuurprogramma voor NT 5.0 (SATA in IDE-modus), max. 4 GB RAM en 2 CPU's",
 
-  "boot.summary.nt52_limits": "NT 5.2 (experimenteel): AHCI via GenAHCI op de StorPort van het systeem; geen NVMe/USB 3-stuurprogramma in Setup"
+  "boot.summary.nt52_limits": "NT 5.2 (experimenteel): AHCI via GenAHCI op de StorPort van het systeem; geen NVMe/USB 3-stuurprogramma in Setup",
+  "boot.summary.vista_csmwrap": "Vista zonder CSM (experimenteel): legacy-installatie (MBR) via CSMWrap, kaart met legacy-VBIOS",
+  "boot.lx.vista_csmwrap_confirm": "Vista zonder CSM: USOS schrijft de Windows PE-hulp en een kleine CSMWrap-partitie naar het einde van deze schijf. Kies in Vista Setup de niet-toegewezen ruimte; verwijder de kleine partities niet.",
+  "boot.lx.vista_csmwrap_copying": "Windows PE-hulp en CSMWrap worden naar de gekozen schijf gekopieerd.",
+  "boot.lx.keep_the_usos_stick_connected": "Laat de USOS-stick aangesloten.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: de voorbereide schijf starten",
+  "boot.lx.vista_csmwrap_restart_notice": "Laat de USOS-stick aangesloten. Open na het opnieuw opstarten het opstartmenu van de firmware en start het UEFI-item van deze schijf (niet Legacy); CSM blijft uit. Vista Setup start daarna vanaf deze schijf via CSMWrap.",
+  "boot.lx.restart": "Opnieuw opstarten",
+  "winpe.vista_csmwrap_title": "USOS - Vista zonder CSM",
+  "winpe.vista_csmwrap_done": "Het eerste deel van de Vista-installatie is voltooid. Verwijder nu de USOS-stick en kies OK: de computer start opnieuw op en Vista gaat via CSMWrap verder vanaf de schijf. Blijft de stick aangesloten, start dan het UEFI-item van deze schijf vanuit het opstartmenu van de firmware."
 }

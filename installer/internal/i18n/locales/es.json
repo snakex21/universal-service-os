@@ -1045,5 +1045,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (experimental): sin controlador AHCI/NVMe/USB 3 para NT 5.0 (SATA en modo IDE), máx. 4 GB de RAM y 2 CPU",
 
-  "boot.summary.nt52_limits": "NT 5.2 (experimental): AHCI mediante GenAHCI sobre el StorPort del sistema; sin controlador NVMe/USB 3 en la instalación"
+  "boot.summary.nt52_limits": "NT 5.2 (experimental): AHCI mediante GenAHCI sobre el StorPort del sistema; sin controlador NVMe/USB 3 en la instalación",
+  "boot.summary.vista_csmwrap": "Vista sin CSM (experimental): instalación legacy (MBR) mediante CSMWrap, tarjeta con VBIOS legacy",
+  "boot.lx.vista_csmwrap_confirm": "Vista sin CSM: USOS escribe el asistente de Windows PE y una pequeña partición CSMWrap al final de este disco. En el programa de instalación de Vista elija el espacio sin asignar; no elimine las particiones pequeñas.",
+  "boot.lx.vista_csmwrap_copying": "Copiando el asistente de Windows PE y CSMWrap al disco elegido.",
+  "boot.lx.keep_the_usos_stick_connected": "Mantenga conectada la memoria USOS.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: iniciar el disco preparado",
+  "boot.lx.vista_csmwrap_restart_notice": "Mantenga conectada la memoria USOS. Tras el reinicio abra el menú de arranque del firmware e inicie la entrada UEFI de este disco (no Legacy); el CSM sigue desactivado. La instalación de Vista arranca entonces desde él mediante CSMWrap.",
+  "boot.lx.restart": "Reiniciar",
+  "winpe.vista_csmwrap_title": "USOS - Vista sin CSM",
+  "winpe.vista_csmwrap_done": "La primera parte de la instalación de Vista ha terminado. Retire ahora la memoria USOS y elija Aceptar: el equipo se reinicia y Vista continúa desde el disco mediante CSMWrap. Si la memoria sigue conectada, inicie la entrada UEFI de este disco desde el menú de arranque del firmware."
 }

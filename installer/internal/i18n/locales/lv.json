@@ -1048,5 +1048,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentāls): nav AHCI/NVMe/USB 3 draivera NT 5.0 (SATA IDE režīmā), maks. 4 GB RAM un 2 procesori",
 
-  "boot.summary.nt52_limits": "NT 5.2 (eksperimentāls): AHCI ar GenAHCI uz sistēmas StorPort; instalācijā nav NVMe/USB 3 draivera"
+  "boot.summary.nt52_limits": "NT 5.2 (eksperimentāls): AHCI ar GenAHCI uz sistēmas StorPort; instalācijā nav NVMe/USB 3 draivera",
+  "boot.summary.vista_csmwrap": "Vista bez CSM (eksperimentāli): legacy (MBR) instalēšana ar CSMWrap, karte ar legacy VBIOS",
+  "boot.lx.vista_csmwrap_confirm": "Vista bez CSM: USOS ieraksta Windows PE palīgu un nelielu CSMWrap nodalījumu šī diska beigās. Vista instalēšanā izvēlieties nepiešķirto vietu; neizdzēsiet mazos nodalījumus.",
+  "boot.lx.vista_csmwrap_copying": "Windows PE palīga un CSMWrap kopēšana uz izvēlēto disku.",
+  "boot.lx.keep_the_usos_stick_connected": "Atstājiet USOS zibatmiņu pievienotu.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: startējiet sagatavoto disku",
+  "boot.lx.vista_csmwrap_restart_notice": "Atstājiet USOS zibatmiņu pievienotu. Pēc restartēšanas atveriet aparātprogrammatūras sāknēšanas izvēlni un startējiet šī diska UEFI ierakstu (nevis Legacy); CSM paliek izslēgts. Vista instalēšana pēc tam startēsies no tā ar CSMWrap.",
+  "boot.lx.restart": "Restartēt",
+  "winpe.vista_csmwrap_title": "USOS - Vista bez CSM",
+  "winpe.vista_csmwrap_done": "Vista instalēšanas pirmā daļa ir pabeigta. Tagad atvienojiet USOS zibatmiņu un izvēlieties Labi: dators tiks restartēts, un Vista turpināsies no diska ar CSMWrap. Ja zibatmiņa paliek pievienota, startējiet šī diska UEFI ierakstu no aparātprogrammatūras sāknēšanas izvēlnes."
 }

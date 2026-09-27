@@ -1048,5 +1048,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentalno): nema upravljačkog programa AHCI/NVMe/USB 3 za NT 5.0 (SATA u IDE načinu), najviše 4 GB RAM-a i 2 procesora",
 
-  "boot.summary.nt52_limits": "NT 5.2 (eksperimentalno): AHCI putem GenAHCI na StorPortu sustava; nema upravljačkog programa NVMe/USB 3 u instalaciji"
+  "boot.summary.nt52_limits": "NT 5.2 (eksperimentalno): AHCI putem GenAHCI na StorPortu sustava; nema upravljačkog programa NVMe/USB 3 u instalaciji",
+  "boot.summary.vista_csmwrap": "Vista bez CSM-a (eksperimentalno): legacy instalacija (MBR) putem CSMWrapa, kartica s legacy VBIOS-om",
+  "boot.lx.vista_csmwrap_confirm": "Vista bez CSM-a: USOS zapisuje pomoćnika Windows PE i malu particiju CSMWrap na kraj ovog diska. U instalaciji Viste odaberite nedodijeljeni prostor; ne brišite male particije.",
+  "boot.lx.vista_csmwrap_copying": "Kopiranje pomoćnika Windows PE i CSMWrapa na odabrani disk.",
+  "boot.lx.keep_the_usos_stick_connected": "Ostavite USOS stick priključen.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: pokrenite pripremljeni disk",
+  "boot.lx.vista_csmwrap_restart_notice": "Ostavite USOS stick priključen. Nakon ponovnog pokretanja otvorite izbornik pokretanja firmvera i pokrenite UEFI unos ovog diska (ne Legacy); CSM ostaje isključen. Instalacija Viste tada se pokreće s njega putem CSMWrapa.",
+  "boot.lx.restart": "Ponovno pokreni",
+  "winpe.vista_csmwrap_title": "USOS - Vista bez CSM-a",
+  "winpe.vista_csmwrap_done": "Prvi dio instalacije Viste je dovršen. Sada izvadite USOS stick i odaberite U redu: računalo se ponovno pokreće i Vista nastavlja s diska putem CSMWrapa. Ako stick ostane priključen, pokrenite UEFI unos ovog diska iz izbornika pokretanja firmvera."
 }

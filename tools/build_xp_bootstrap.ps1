@@ -68,8 +68,9 @@ $extractor = Full 'tools/extract_xp_nt52_boot.py'
 $nt52Vbr = Join-Path $out 'xp-nt52-vbr-tail.bin'
 $nt52VbrEdd = Join-Path $out 'xp-nt52-vbr-tail-edd.bin'
 $nt52Stage2 = Join-Path $out 'xp-nt52-stage2.bin'
-& $python $extractor --bootsect-exe $bootsect --vbr-tail-out $nt52Vbr --stage2-out $nt52Stage2 --ntfs-out (Join-Path $out 'xp-nt52-ntfs.bin')
+& $python $extractor --bootsect-exe $bootsect --vbr-tail-out $nt52Vbr --stage2-out $nt52Stage2 --ntfs-out (Join-Path $out 'xp-nt52-ntfs.bin') --nt60-ntfs-out (Join-Path $out 'vista-nt60-ntfs.bin')
 if ($LASTEXITCODE -ne 0) { throw "XP NT52 bootstrap extraction failed: $LASTEXITCODE" }
+if ((Get-Item -LiteralPath (Join-Path $out 'vista-nt60-ntfs.bin')).Length -ne 8192) { throw 'Vista NT60 NTFS bootstrap must be exactly 8192 bytes' }
 if ((Get-Item -LiteralPath $nt52Vbr).Length -ne 420) { throw 'XP NT52 VBR tail must be exactly 420 bytes' }
 if ((Get-Item -LiteralPath $nt52Stage2).Length -ne 512) { throw 'XP NT52 stage2 must be exactly 512 bytes' }
 $eddPatcher = Full 'tools/patch_xp_nt52_edd.py'

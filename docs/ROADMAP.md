@@ -41,6 +41,7 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | N7 | Edytor motywów (UEFI + instalator), motywy użytkownika w BIOS, przykładowe motywy | UEFI, BIOS, przykłady: **Done** (QEMU, 2026-09-26); instalator: **Next** | menedżer profili odpowiedzi (formularz + klawiatura ekranowa) | instalator: do oszacowania |
 | L1 | Rodzina NT5 na UEFI (2000, 2003, XP x64) | 2000, 2003 x86, XP x64: **eksperymentalne** (QEMU do GUI Setup, 2026-09-27); 2003 x64: **Later** | N2 (M4), N3 | sprzęt (X470): do testu |
 | L2 | XP na UEFI bez CSM (CSMWrap) | **Eksperymentalne, sprzęt PASS** (X470, 2026-09-27, B260927-153019) | — | do potwierdzenia: PAE/31,9 GB, liczba CPU, USB |
+| L2b | Vista na UEFI bez CSM (CSMWrap, instalacja legacy MBR) | **Eksperymentalne, QEMU** (2026-09-27) | L2 | sprzęt (X470): do testu |
 | L3 | 32-bit CPU i mniejsze minimum RAM | **Later** | pomiary | 2 dni pomiarów, potem 5–15 dni |
 | L4 | Chainload w stylu Plop dla PC bez USB boot | **Later** | L3 (częściowo) | 5–10 dni |
 | L5 | Motywy, układy klawiatury, persistence, post-install, test QEMU | **Later** | N2 (M1) | 1–5 dni per punkt |
@@ -226,6 +227,18 @@ każdego startu. Secure Boot off; CSMWrap **nie** jest podpisywany
 kluczem USOS. Poprzednia próba (2026-09-20, Win7/Intel) zatrzymała się po
 `Booting drive`, więc najpierw QEMU.
 
+### L2b. Vista na UEFI bez CSM przez CSMWrap: eksperymentalne, QEMU
+
+2026-09-27, profil `vista-x64-sp2-uefi-csmwrap`, wybierany przez menu UEFI
+tylko gdy firmware nie ma CSM (z CSM ścieżka Vista UEFI bez zmian). Mikro-Linux
+(krok 610) zapisuje na wybrany dysk MBR z partycją USOS-VISTA (PE10 + pomocnicy
+USOS, rozruch NT60/bootmgr) i ESP CSMWrap na końcu; firmware startuje dysk przez
+CSMWrap, PE10 w trybie BIOS uruchamia instalator Visty, Vista instaluje się jako
+system legacy (MBR) na nieprzydzielonym miejscu, VgaSave działa na prawdziwym
+VBIOS karty. Profile odpowiedzi i pliki z `Unattended` dozwolone (scalane z
+odpowiedzią KMDF), wybór dysku ręczny. Szczegóły:
+`docs/design/csmwrap-integration.md`, sekcja 10. X470: do testu.
+
 ### L3. Starsze CPU i mniej RAM: **Later**, najpierw pomiary
 
 Dziś: mikro-Linux jest x86_64 (wymaga long mode), minimum 256 MiB RAM;
@@ -354,8 +367,8 @@ pozostaje.
   2026-09-27 (B260927-130833): z CSM pełny sukces (instalacja, USB w fazie
   2, OOBE, pulpit); bez CSM czarny ekran (vgapnp Code 10, VgaSave potrzebuje
   A0000, które bez CSM czyta FF, bo VBIOS karty nie wykonuje POST). Vista bez
-  CSM: jeszcze nieobsługiwana (komunikat w menu, 27 języków); właściwa
-  poprawka: CSMWrap (osobna praca). Dyspozytor przy braku GOP ponawia łączenie
+  CSM: od 2026-09-27 przez CSMWrap jako instalacja legacy MBR (L2b,
+  QEMU; X470 do testu). Dyspozytor przy braku GOP ponawia łączenie
   kontrolerów i robi do dwóch zimnych restartów (sekcja 8.5). Vista na X470
   z CSM: sukces sprzętowy v11 (`windows-vista-usb-install-2026-09-21.md`).
 - Linux Live poza SliTaz i narzędzia w UEFI: przez ogólny wpis (N5).

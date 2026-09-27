@@ -1045,5 +1045,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (experimental): sem driver AHCI/NVMe/USB 3 para NT 5.0 (SATA no modo IDE), máx. 4 GB de RAM e 2 CPUs",
 
-  "boot.summary.nt52_limits": "NT 5.2 (experimental): AHCI via GenAHCI no StorPort do sistema; sem driver NVMe/USB 3 na instalação"
+  "boot.summary.nt52_limits": "NT 5.2 (experimental): AHCI via GenAHCI no StorPort do sistema; sem driver NVMe/USB 3 na instalação",
+  "boot.summary.vista_csmwrap": "Vista sem CSM (experimental): instalação legacy (MBR) via CSMWrap, placa com VBIOS legacy",
+  "boot.lx.vista_csmwrap_confirm": "Vista sem CSM: o USOS grava o auxiliar do Windows PE e uma pequena partição CSMWrap no fim deste disco. Na instalação do Vista escolha o espaço não alocado; não exclua as partições pequenas.",
+  "boot.lx.vista_csmwrap_copying": "Copiando o auxiliar do Windows PE e o CSMWrap para o disco escolhido.",
+  "boot.lx.keep_the_usos_stick_connected": "Mantenha o pendrive USOS conectado.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: iniciar o disco preparado",
+  "boot.lx.vista_csmwrap_restart_notice": "Mantenha o pendrive USOS conectado. Após reiniciar, abra o menu de inicialização do firmware e inicie a entrada UEFI deste disco (não Legacy); o CSM continua desligado. A instalação do Vista então inicia a partir dele via CSMWrap.",
+  "boot.lx.restart": "Reiniciar",
+  "winpe.vista_csmwrap_title": "USOS - Vista sem CSM",
+  "winpe.vista_csmwrap_done": "A primeira parte da instalação do Vista foi concluída. Remova agora o pendrive USOS e escolha OK: o computador reinicia e o Vista continua a partir do disco via CSMWrap. Se o pendrive continuar conectado, inicie a entrada UEFI deste disco pelo menu de inicialização do firmware."
 }

@@ -1045,5 +1045,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (kísérleti): nincs AHCI/NVMe/USB 3 illesztőprogram NT 5.0-hoz (SATA IDE módban), legfeljebb 4 GB RAM és 2 processzor",
 
-  "boot.summary.nt52_limits": "NT 5.2 (kísérleti): AHCI a GenAHCI-val a rendszer StorPortján; a telepítőben nincs NVMe/USB 3 illesztőprogram"
+  "boot.summary.nt52_limits": "NT 5.2 (kísérleti): AHCI a GenAHCI-val a rendszer StorPortján; a telepítőben nincs NVMe/USB 3 illesztőprogram",
+  "boot.summary.vista_csmwrap": "Vista CSM nélkül (kísérleti): legacy (MBR) telepítés CSMWrap segítségével, legacy VBIOS-os kártya",
+  "boot.lx.vista_csmwrap_confirm": "Vista CSM nélkül: az USOS a lemez végére írja a Windows PE segédet és egy kis CSMWrap partíciót. A Vista telepítőjében a nem lefoglalt területet válassza; a kis partíciókat ne törölje.",
+  "boot.lx.vista_csmwrap_copying": "A Windows PE segéd és a CSMWrap másolása a kiválasztott lemezre.",
+  "boot.lx.keep_the_usos_stick_connected": "Hagyja csatlakoztatva az USOS pendrive-ot.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: az előkészített lemez indítása",
+  "boot.lx.vista_csmwrap_restart_notice": "Hagyja csatlakoztatva az USOS pendrive-ot. Újraindítás után nyissa meg a firmware rendszerindító menüjét, és indítsa el ennek a lemeznek az UEFI bejegyzését (nem Legacy); a CSM kikapcsolva marad. A Vista telepítője ezután CSMWrap segítségével indul róla.",
+  "boot.lx.restart": "Újraindítás",
+  "winpe.vista_csmwrap_title": "USOS - Vista CSM nélkül",
+  "winpe.vista_csmwrap_done": "A Vista telepítésének első része befejeződött. Most húzza ki az USOS pendrive-ot, majd válassza az OK gombot: a számítógép újraindul, és a Vista a lemezről folytatódik a CSMWrap segítségével. Ha a pendrive csatlakoztatva marad, indítsa el ennek a lemeznek az UEFI bejegyzését a firmware rendszerindító menüjéből."
 }

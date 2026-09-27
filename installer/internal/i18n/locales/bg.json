@@ -1045,5 +1045,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (експериментално): няма драйвер AHCI/NVMe/USB 3 за NT 5.0 (SATA в режим IDE), макс. 4 GB RAM и 2 процесора",
 
-  "boot.summary.nt52_limits": "NT 5.2 (експериментално): AHCI чрез GenAHCI върху StorPort на системата; няма драйвер NVMe/USB 3 в инсталацията"
+  "boot.summary.nt52_limits": "NT 5.2 (експериментално): AHCI чрез GenAHCI върху StorPort на системата; няма драйвер NVMe/USB 3 в инсталацията",
+  "boot.summary.vista_csmwrap": "Vista без CSM (експериментално): legacy инсталация (MBR) чрез CSMWrap, карта с legacy VBIOS",
+  "boot.lx.vista_csmwrap_confirm": "Vista без CSM: USOS записва помощника Windows PE и малък дял CSMWrap в края на този диск. В инсталацията на Vista изберете неразпределеното място; не изтривайте малките дялове.",
+  "boot.lx.vista_csmwrap_copying": "Копиране на помощника Windows PE и CSMWrap на избрания диск.",
+  "boot.lx.keep_the_usos_stick_connected": "Оставете флашката USOS свързана.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: стартирайте подготвения диск",
+  "boot.lx.vista_csmwrap_restart_notice": "Оставете флашката USOS свързана. След рестарта отворете менюто за зареждане на фърмуера и стартирайте UEFI записа на този диск (не Legacy); CSM остава изключен. Инсталацията на Vista след това стартира от него чрез CSMWrap.",
+  "boot.lx.restart": "Рестартиране",
+  "winpe.vista_csmwrap_title": "USOS - Vista без CSM",
+  "winpe.vista_csmwrap_done": "Първата част от инсталацията на Vista приключи. Извадете сега флашката USOS и изберете OK: компютърът се рестартира и Vista продължава от диска чрез CSMWrap. Ако флашката остане свързана, стартирайте UEFI записа на този диск от менюто за зареждане на фърмуера."
 }

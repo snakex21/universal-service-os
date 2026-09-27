@@ -1045,5 +1045,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (experimentell): kein AHCI/NVMe/USB-3-Treiber für NT 5.0 (SATA im IDE-Modus), max. 4 GB RAM und 2 CPUs",
 
-  "boot.summary.nt52_limits": "NT 5.2 (experimentell): AHCI über GenAHCI auf dem StorPort des Systems; kein NVMe/USB-3-Treiber im Setup"
+  "boot.summary.nt52_limits": "NT 5.2 (experimentell): AHCI über GenAHCI auf dem StorPort des Systems; kein NVMe/USB-3-Treiber im Setup",
+  "boot.summary.vista_csmwrap": "Vista ohne CSM (experimentell): Legacy-Installation (MBR) über CSMWrap, Grafikkarte mit Legacy-VBIOS",
+  "boot.lx.vista_csmwrap_confirm": "Vista ohne CSM: USOS schreibt die Windows-PE-Hilfe und eine kleine CSMWrap-Partition an das Ende dieses Datenträgers. Wählen Sie im Vista-Setup den nicht zugeordneten Speicherplatz; löschen Sie die kleinen Partitionen nicht.",
+  "boot.lx.vista_csmwrap_copying": "Windows-PE-Hilfe und CSMWrap werden auf den gewählten Datenträger kopiert.",
+  "boot.lx.keep_the_usos_stick_connected": "Lassen Sie den USOS-Stick angeschlossen.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: vorbereiteten Datenträger starten",
+  "boot.lx.vista_csmwrap_restart_notice": "Lassen Sie den USOS-Stick angeschlossen. Öffnen Sie nach dem Neustart das Bootmenü der Firmware und starten Sie den UEFI-Eintrag dieses Datenträgers (nicht Legacy); CSM bleibt aus. Das Vista-Setup startet dann über CSMWrap von ihm.",
+  "boot.lx.restart": "Neu starten",
+  "winpe.vista_csmwrap_title": "USOS - Vista ohne CSM",
+  "winpe.vista_csmwrap_done": "Der erste Teil der Vista-Installation ist abgeschlossen. Entfernen Sie jetzt den USOS-Stick und wählen Sie OK: Der Computer startet neu und Vista wird über CSMWrap vom Datenträger fortgesetzt. Bleibt der Stick angeschlossen, starten Sie den UEFI-Eintrag dieses Datenträgers aus dem Bootmenü der Firmware."
 }

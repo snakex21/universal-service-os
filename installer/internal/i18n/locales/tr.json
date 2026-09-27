@@ -1045,5 +1045,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (deneysel): NT 5.0 için AHCI/NVMe/USB 3 sürücüsü yok (SATA IDE modunda), en fazla 4 GB RAM ve 2 işlemci",
 
-  "boot.summary.nt52_limits": "NT 5.2 (deneysel): sistemin StorPort'u üzerinde GenAHCI ile AHCI; kurulumda NVMe/USB 3 sürücüsü yok"
+  "boot.summary.nt52_limits": "NT 5.2 (deneysel): sistemin StorPort'u üzerinde GenAHCI ile AHCI; kurulumda NVMe/USB 3 sürücüsü yok",
+  "boot.summary.vista_csmwrap": "CSM olmadan Vista (deneysel): CSMWrap ile legacy (MBR) kurulum, legacy VBIOS'lu kart",
+  "boot.lx.vista_csmwrap_confirm": "CSM olmadan Vista: USOS, Windows PE yardımcısını ve küçük bir CSMWrap bölümünü bu diskin sonuna yazar. Vista kurulumunda ayrılmamış alanı seçin; küçük bölümleri silmeyin.",
+  "boot.lx.vista_csmwrap_copying": "Windows PE yardımcısı ve CSMWrap seçilen diske kopyalanıyor.",
+  "boot.lx.keep_the_usos_stick_connected": "USOS belleğini takılı bırakın.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: hazırlanan diski başlatın",
+  "boot.lx.vista_csmwrap_restart_notice": "USOS belleğini takılı bırakın. Yeniden başlatmadan sonra ürün yazılımı önyükleme menüsünü açın ve bu diskin UEFI girişini (Legacy değil) başlatın; CSM kapalı kalır. Vista kurulumu ardından CSMWrap üzerinden bu diskten başlar.",
+  "boot.lx.restart": "Yeniden başlat",
+  "winpe.vista_csmwrap_title": "USOS - CSM olmadan Vista",
+  "winpe.vista_csmwrap_done": "Vista kurulumunun ilk bölümü tamamlandı. Şimdi USOS belleğini çıkarın ve Tamam'ı seçin: bilgisayar yeniden başlar ve Vista, CSMWrap üzerinden diskten devam eder. Bellek takılı kalırsa bu diskin UEFI girişini ürün yazılımı önyükleme menüsünden başlatın."
 }

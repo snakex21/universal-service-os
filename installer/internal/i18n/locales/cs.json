@@ -1048,5 +1048,14 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (experimentální): chybí ovladač AHCI/NVMe/USB 3 pro NT 5.0 (SATA v režimu IDE), max. 4 GB RAM a 2 procesory",
 
-  "boot.summary.nt52_limits": "NT 5.2 (experimentální): AHCI přes GenAHCI na StorPortu systému; bez ovladače NVMe/USB 3 v instalaci"
+  "boot.summary.nt52_limits": "NT 5.2 (experimentální): AHCI přes GenAHCI na StorPortu systému; bez ovladače NVMe/USB 3 v instalaci",
+  "boot.summary.vista_csmwrap": "Vista bez CSM (experimentální): legacy instalace (MBR) přes CSMWrap, karta s legacy VBIOS",
+  "boot.lx.vista_csmwrap_confirm": "Vista bez CSM: USOS zapíše pomocníka Windows PE a malý oddíl CSMWrap na konec tohoto disku. V instalaci Visty vyberte nepřidělené místo; malé oddíly nemažte.",
+  "boot.lx.vista_csmwrap_copying": "Kopírování pomocníka Windows PE a CSMWrap na vybraný disk.",
+  "boot.lx.keep_the_usos_stick_connected": "Nechte flash disk USOS připojený.",
+  "boot.lx.vista_start_the_prepared_disk": "Windows Vista: spusťte připravený disk",
+  "boot.lx.vista_csmwrap_restart_notice": "Nechte flash disk USOS připojený. Po restartu otevřete spouštěcí nabídku firmwaru a spusťte položku UEFI tohoto disku (ne Legacy); CSM zůstává vypnuté. Instalace Visty se z něj pak spustí přes CSMWrap.",
+  "boot.lx.restart": "Restartovat",
+  "winpe.vista_csmwrap_title": "USOS - Vista bez CSM",
+  "winpe.vista_csmwrap_done": "První část instalace Visty je dokončena. Nyní odpojte flash disk USOS a zvolte OK: počítač se restartuje a Vista pokračuje z disku přes CSMWrap. Pokud flash disk zůstane připojený, spusťte položku UEFI tohoto disku ze spouštěcí nabídky firmwaru."
 }

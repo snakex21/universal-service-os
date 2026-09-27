@@ -15014,6 +15014,9 @@ profile_def	efi-chainload	chainload	efi_image
 profile_def	wim-wimboot	wimboot	micro_linux	Starting environment|Verifying target device|Preparing workspace|Copying files|Verification and finalization
 profile_def	vhd-vhdboot	vhdboot	micro_linux	Starting environment|Verifying target device|Preparing workspace|Copying files|Verification and finalization
 profile_def	efi-direct	direct_efi	efi_image	
+# csmwrap: UEFI without firmware CSM, base profile -> variant id, start
+csmwrap	xp-x86-sp3-uefi-csm	xp-x86-sp3-uefi-csmwrap	same micro-Linux staging + usos.xp_boot=csmwrap (CSMWrap ESP at the disk end)
+csmwrap	vista-uefi-pe10	vista-x64-sp2-uefi-csmwrap	micro-Linux step 610: MBR disk, PE10 staging partition + CSMWrap ESP; Vista Setup in BIOS mode
 # plan_state (M2): install-state.ini plan keys for WORK and WIM selections
 plan_state	windows-10	iso	plan_version=1
 plan_state	windows-10	iso	plan_profile=iso-work-chainload

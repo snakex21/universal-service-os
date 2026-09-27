@@ -67,6 +67,7 @@ pub const hashes = [_]u32{
     0xa600211f, // lx.inspecting_disk
     0x8caa6891, // lx.install_x_in_unallocated_space
     0x06da9dd2, // lx.keep_existing_partitions
+    0xa8c66f00, // lx.keep_the_usos_stick_connected
     0x8173ebb9, // lx.keep_the_usos_usb_drive_connected_setup_will_sta
     0x752c33ab, // lx.loading_the_selected_boot_image_from_ntfs
     0x65fc5619, // lx.measured_byte_progress_transfer_speed_and_eta
@@ -113,6 +114,7 @@ pub const hashes = [_]u32{
     0xe4654156, // lx.refresh_smart
     0xa68b2644, // lx.remove_usos_usb_then_press_enter_to_power_off
     0xd41bf4b1, // lx.resolving_esp_data_and_work_by_partuuid
+    0x66d9280c, // lx.restart
     0x453d5268, // lx.restart_the_computer
     0x20b776e5, // lx.restarting_into_usos_choose_windows_vista_again
     0xb3a94cf0, // lx.restarting_to_windows_setup
@@ -157,6 +159,10 @@ pub const hashes = [_]u32{
     0x93b56f03, // lx.verifying_total_size
     0x9b309152, // lx.verifying_vhd_boot_files
     0x1a87a9e7, // lx.verifying_wim_file
+    0x596ff2d3, // lx.vista_csmwrap_confirm
+    0xc82094a0, // lx.vista_csmwrap_copying
+    0x5aa1da21, // lx.vista_csmwrap_restart_notice
+    0x59b2e029, // lx.vista_start_the_prepared_disk
     0xd2c4e12a, // lx.windows_c_x_gib_ntfs
     0xf4336aff, // lx.windows_xp
     0x1a650cd0, // lx.writing_autounattend_xml_to_the_prepared_work_pa
@@ -240,6 +246,7 @@ pub const english = [_][]const u8{
     "Inspecting disk",
     "Install {0} in unallocated space",
     "Keep existing partitions",
+    "Keep the USOS stick connected.",
     "Keep the USOS USB drive connected. Setup will start automatically.",
     "Loading the selected boot image from NTFS.",
     "Measured byte progress, transfer speed and ETA.",
@@ -286,6 +293,7 @@ pub const english = [_][]const u8{
     "Refresh SMART",
     "REMOVE USOS USB, THEN PRESS ENTER TO POWER OFF.",
     "Resolving ESP, DATA and WORK by PARTUUID.",
+    "Restart",
     "Restart the computer",
     "Restarting into USOS: choose Windows Vista again to start Setup.",
     "RESTARTING TO WINDOWS SETUP",
@@ -330,6 +338,10 @@ pub const english = [_][]const u8{
     "Verifying total size",
     "Verifying VHD boot files",
     "Verifying WIM file",
+    "Vista without CSM: USOS writes the Windows PE helper and a small CSMWrap partition to the end of this disk. In Vista Setup select the unallocated space; do not delete the small partitions.",
+    "Copying the Windows PE helper and CSMWrap to the selected disk.",
+    "Keep the USOS stick connected. After the restart open the firmware boot menu and start this disk's UEFI entry (not Legacy); CSM stays off. Vista Setup then starts from it through CSMWrap.",
+    "Windows Vista: start the prepared disk",
     "Windows C: {0} GiB NTFS.",
     "WINDOWS XP",
     "Writing Autounattend.xml to the prepared WORK partition.",
