@@ -119,7 +119,10 @@ def main() -> int:
             shots += 1
             monitor.shot(work / f"{'uefi' if args.uefi else 'bios'}-{shots:02d}.png")
     finally:
-        monitor.command("quit")
+        try:
+            monitor.command("quit")
+        except OSError:
+            pass
         proc.wait(timeout=30)
     log = serial.read_text(errors="replace") if serial.exists() else ""
     attached = "usos-init: iso attached" in log

@@ -40,6 +40,19 @@ profile model. Design: [design/linux-iso-boot.md](design/linux-iso-boot.md).
   `-kernel/-initrd` + helper, USB disk, BIOS or `--uefi`, screenshots in
   `tools/tests/artifacts/linux-iso/<name>/`), `iso9660_rr.py`.
 
+## First QEMU result (direct kernel boot, no menu)
+
+`python tools/tests/linux_iso/run_linux_iso_direct.py gparted` (SeaBIOS,
+WHPX, test VHD as USB disk on xHCI, `snapshot=on`): **helper PASS**.
+Serial: `usos-init: iso: 720371712 bytes in 1 extent(s)`, `iso found on
+/dev/sda`, `iso attached: /dev/usos-iso -> /dev/loop0`; live-boot then took
+`live-media=/dev/usos-iso`, mounted the squashfs and systemd started from the
+live root (screenshot `tools/tests/artifacts/linux-iso/gparted/bios-04.png`).
+GParted's own keymap/language prompt (console) was not answered, so the
+GParted UI itself is not shown yet. All ten ISOs on the test VHD are one
+extent each (fresh NTFS), so the dm path is not exercised yet (make a
+fragmented copy on purpose to test it).
+
 ## Not done (next, in this order)
 
 Design doc section 9: step 2 build.zig wiring of the helper + cpio, step 3
