@@ -19,9 +19,14 @@ profile model. Design: [design/linux-iso-boot.md](design/linux-iso-boot.md).
 
 ## Code on `feature/linux-iso` (WIP, not merged)
 
-- `src/flow/linux_iso/iso_map.zig` (writer/parser of `/usos/iso.map`, tests
-  pass: `zig test src/flow/linux_iso/iso_map.zig`), `cpio.zig` (newc writer,
-  test passes). Not yet wired into `src/root.zig` / build.zig tests.
+- `src/flow/linux_iso/` exported as `usos.flow.linux_iso`, tests run in
+  `zig build test` (green): `iso_map.zig` (writer/parser of `/usos/iso.map`),
+  `cpio.zig` (newc writer), `grub_cfg.zig` (first-entry parser: `$linux_cmd`,
+  `($root)`, several initrds, memtest skipped), `recipe.zig` (family by
+  structure, cmdline rules, answer format; tests for Ubuntu server, Mint,
+  Debian live, Debian netinst, Fedora 44, SystemRescue, unknown).
+- `src/image_probe/iso9660.zig`: Rock Ridge `NM` names matched next to the
+  primary names (additive; Windows ISO lookups unchanged).
 - `src/platform/linux/iso_init_main.zig`: the static helper `/usos/init`
   (loop or dm over the extents, `/dev/usos-iso`, init-bottom hook for Ubuntu
   answers). Compiles (21 KB) with
@@ -37,8 +42,8 @@ profile model. Design: [design/linux-iso-boot.md](design/linux-iso-boot.md).
 
 ## Not done (next, in this order)
 
-Design doc section 9: step 1 (recipe/grub.cfg/Rock Ridge), step 3 first
-QEMU runs (`run_linux_iso_direct.py gparted`, then each distro, BIOS and
+Design doc section 9: step 2 build.zig wiring of the helper + cpio, step 3
+first QEMU runs (`run_linux_iso_direct.py gparted`, then each distro, BIOS and
 `--uefi`), then 4-8. No catalog/routing change, no strings, no build.bat, no
 stick deploy yet (the stick was NOT touched this session).
 
