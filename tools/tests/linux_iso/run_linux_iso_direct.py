@@ -89,7 +89,11 @@ def main() -> int:
     pvd = iso.read(16 * 2048, 2048)
     lines = ["usos-iso-map 1", f"size {info['size']}", f"crc {zlib.crc32(pvd) & 0xffffffff:08x}"]
     lines += [f"extent {int(e[0])} {int(e[1])}" for e in info["extents"]]
-    combined += per_boot_cpio("\n".join(lines) + "\n", {})
+    extra = {}
+    if args.name.endswith("netinst"):
+        # d-i: the ISO shows up as a USB partition (BLKPG fallback of /usos/init).
+        extra["preseed.cfg"] = b"d-i cdrom-detect/try-usb boolean true\n"
+    combined += per_boot_cpio("\n".join(lines) + "\n", extra)
     (work / "initrd").write_bytes(combined)
     full = f"{cmdline} rdinit=/usos/init console=tty0 console=ttyS0,115200 ignore_loglevel {args.append}".strip()
     print(f"[INFO] {args.name}: {len(info['extents'])} extent(s), cmdline: {full}")
