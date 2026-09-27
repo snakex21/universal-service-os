@@ -121,7 +121,8 @@ def prepare(a) -> int:
     if vbox('showvminfo', NAME, check=False).returncode == 0:
         raise SystemExit('VM exists already: ' + NAME)
     base = WORK / 'vm'
-    vbox('createvm', '--name', NAME, '--ostype', 'Windows10' if a.arch == 'x86' else 'Windows10_64', '--basefolder', base, '--register')
+    family = {'windows-7': 'Windows7', 'windows-vista': 'WindowsVista'}.get(a.system, 'Windows10')
+    vbox('createvm', '--name', NAME, '--ostype', family if a.arch == 'x86' else family + '_64', '--basefolder', base, '--register')
     folder = base / NAME
     vbox('modifyvm', NAME, '--memory', a.memory, '--cpus', '2', '--firmware', 'bios', '--ioapic', 'on', '--pae', 'on', '--acpi', 'on',
          '--nic1', 'none', '--audio-enabled', 'off', '--usb-ohci', 'off', '--graphicscontroller', 'vboxsvga', '--vram', '64',
@@ -159,7 +160,7 @@ if __name__ == '__main__':
     c.add_argument('--iso', required=True)
     c.add_argument('--system', default='windows-10')
     c.add_argument('--arch', default='x86')
-    c.add_argument('--key', required=True)
+    c.add_argument('--key', default='', help='generic installation key; empty: none (Setup asks)')
     c.add_argument('--memory', default='3072')
     sub.add_parser('destroy')
     a = p.parse_args()
