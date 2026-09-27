@@ -12,6 +12,11 @@ pub const entries = [_]SystemEntry{
     linux("opensuse", "openSUSE", "openSUSE"),
     linux("manjaro", "Manjaro", "Manjaro"),
     linux("kali-linux", "Kali Linux", "Kali Linux"),
+    // Rescue ISOs (docs/design/linux-iso-boot.md); SystemRescue has no
+    // signed shim (Secure Boot off, os_profiles traits).
+    linux("systemrescue", "SystemRescue", "SystemRescue"),
+    linux("gparted-live", "GParted Live", "GParted Live"),
+    linux("clonezilla", "Clonezilla", "Clonezilla"),
     linux("other-linux", "Other Linux", "Other Linux"),
 };
 

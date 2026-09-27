@@ -32,6 +32,9 @@ system	arch-linux	linux	linux	any	\Systems\Linux\Arch Linux\Images	\Systems\Linu
 system	opensuse	linux	linux	any	\Systems\Linux\openSUSE\Images	\Systems\Linux\openSUSE\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,direct_efi,disk_image
 system	manjaro	linux	linux	any	\Systems\Linux\Manjaro\Images	\Systems\Linux\Manjaro\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,direct_efi,disk_image
 system	kali-linux	linux	linux	any	\Systems\Linux\Kali Linux\Images	\Systems\Linux\Kali Linux\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,direct_efi,disk_image
+system	systemrescue	linux	linux	any	\Systems\Linux\SystemRescue\Images	\Systems\Linux\SystemRescue\Unattended	.xml	unattend.xml	1	automatic,direct_iso,chainload,direct_efi,disk_image
+system	gparted-live	linux	linux	any	\Systems\Linux\GParted Live\Images	\Systems\Linux\GParted Live\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,direct_efi,disk_image
+system	clonezilla	linux	linux	any	\Systems\Linux\Clonezilla\Images	\Systems\Linux\Clonezilla\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,direct_efi,disk_image
 system	other-linux	linux	linux	any	\Systems\Linux\Other Linux\Images	\Systems\Linux\Other Linux\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,direct_efi,disk_image
 system	windows-whistler	windows_beta	beta	any	\Systems\Betas\Windows Whistler\Images	\Systems\Betas\Windows Whistler\Unattended	.xml	unattend.xml	0	automatic,direct_iso,wimboot,chainload,memdisk,disk_image,floppy_image
 system	windows-longhorn	windows_beta	beta	any	\Systems\Betas\Windows Longhorn\Images	\Systems\Betas\Windows Longhorn\Unattended	.xml	unattend.xml	0	automatic,direct_iso,wimboot,chainload,memdisk,disk_image,floppy_image
@@ -2747,9 +2750,9 @@ route	windows-server-2003	efi	disk_image	uefi	-
 route	windows-server-2003	efi	floppy_image	bios	-
 route	windows-server-2003	efi	floppy_image	uefi	-
 route	ubuntu	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
-route	ubuntu	iso	automatic	uefi	chainload	chainload	uefi	validated_hardware	0
+route	ubuntu	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
 route	ubuntu	iso	direct_iso	bios	-
-route	ubuntu	iso	direct_iso	uefi	-
+route	ubuntu	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	ubuntu	iso	wimboot	bios	-
 route	ubuntu	iso	wimboot	uefi	-
 route	ubuntu	iso	vhdboot	bios	-
@@ -2855,9 +2858,9 @@ route	ubuntu	efi	disk_image	uefi	-
 route	ubuntu	efi	floppy_image	bios	-
 route	ubuntu	efi	floppy_image	uefi	-
 route	debian	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
-route	debian	iso	automatic	uefi	chainload	chainload	uefi	validated_hardware	0
+route	debian	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
 route	debian	iso	direct_iso	bios	-
-route	debian	iso	direct_iso	uefi	-
+route	debian	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	debian	iso	wimboot	bios	-
 route	debian	iso	wimboot	uefi	-
 route	debian	iso	vhdboot	bios	-
@@ -2963,9 +2966,9 @@ route	debian	efi	disk_image	uefi	-
 route	debian	efi	floppy_image	bios	-
 route	debian	efi	floppy_image	uefi	-
 route	fedora	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
-route	fedora	iso	automatic	uefi	chainload	chainload	uefi	validated_hardware	0
+route	fedora	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
 route	fedora	iso	direct_iso	bios	-
-route	fedora	iso	direct_iso	uefi	-
+route	fedora	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	fedora	iso	wimboot	bios	-
 route	fedora	iso	wimboot	uefi	-
 route	fedora	iso	vhdboot	bios	-
@@ -3071,9 +3074,9 @@ route	fedora	efi	disk_image	uefi	-
 route	fedora	efi	floppy_image	bios	-
 route	fedora	efi	floppy_image	uefi	-
 route	linux-mint	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
-route	linux-mint	iso	automatic	uefi	chainload	chainload	uefi	validated_hardware	0
+route	linux-mint	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
 route	linux-mint	iso	direct_iso	bios	-
-route	linux-mint	iso	direct_iso	uefi	-
+route	linux-mint	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	linux-mint	iso	wimboot	bios	-
 route	linux-mint	iso	wimboot	uefi	-
 route	linux-mint	iso	vhdboot	bios	-
@@ -3179,9 +3182,9 @@ route	linux-mint	efi	disk_image	uefi	-
 route	linux-mint	efi	floppy_image	bios	-
 route	linux-mint	efi	floppy_image	uefi	-
 route	arch-linux	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
-route	arch-linux	iso	automatic	uefi	chainload	chainload	uefi	validated_hardware	0
+route	arch-linux	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
 route	arch-linux	iso	direct_iso	bios	-
-route	arch-linux	iso	direct_iso	uefi	-
+route	arch-linux	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	arch-linux	iso	wimboot	bios	-
 route	arch-linux	iso	wimboot	uefi	-
 route	arch-linux	iso	vhdboot	bios	-
@@ -3287,9 +3290,9 @@ route	arch-linux	efi	disk_image	uefi	-
 route	arch-linux	efi	floppy_image	bios	-
 route	arch-linux	efi	floppy_image	uefi	-
 route	opensuse	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
-route	opensuse	iso	automatic	uefi	chainload	chainload	uefi	validated_hardware	0
+route	opensuse	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
 route	opensuse	iso	direct_iso	bios	-
-route	opensuse	iso	direct_iso	uefi	-
+route	opensuse	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	opensuse	iso	wimboot	bios	-
 route	opensuse	iso	wimboot	uefi	-
 route	opensuse	iso	vhdboot	bios	-
@@ -3395,9 +3398,9 @@ route	opensuse	efi	disk_image	uefi	-
 route	opensuse	efi	floppy_image	bios	-
 route	opensuse	efi	floppy_image	uefi	-
 route	manjaro	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
-route	manjaro	iso	automatic	uefi	chainload	chainload	uefi	validated_hardware	0
+route	manjaro	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
 route	manjaro	iso	direct_iso	bios	-
-route	manjaro	iso	direct_iso	uefi	-
+route	manjaro	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	manjaro	iso	wimboot	bios	-
 route	manjaro	iso	wimboot	uefi	-
 route	manjaro	iso	vhdboot	bios	-
@@ -3503,9 +3506,9 @@ route	manjaro	efi	disk_image	uefi	-
 route	manjaro	efi	floppy_image	bios	-
 route	manjaro	efi	floppy_image	uefi	-
 route	kali-linux	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
-route	kali-linux	iso	automatic	uefi	chainload	chainload	uefi	validated_hardware	0
+route	kali-linux	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
 route	kali-linux	iso	direct_iso	bios	-
-route	kali-linux	iso	direct_iso	uefi	-
+route	kali-linux	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	kali-linux	iso	wimboot	bios	-
 route	kali-linux	iso	wimboot	uefi	-
 route	kali-linux	iso	vhdboot	bios	-
@@ -3610,10 +3613,334 @@ route	kali-linux	efi	disk_image	bios	-
 route	kali-linux	efi	disk_image	uefi	-
 route	kali-linux	efi	floppy_image	bios	-
 route	kali-linux	efi	floppy_image	uefi	-
+route	systemrescue	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	systemrescue	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	1
+route	systemrescue	iso	direct_iso	bios	-
+route	systemrescue	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	1
+route	systemrescue	iso	wimboot	bios	-
+route	systemrescue	iso	wimboot	uefi	-
+route	systemrescue	iso	vhdboot	bios	-
+route	systemrescue	iso	vhdboot	uefi	-
+route	systemrescue	iso	direct_efi	bios	-
+route	systemrescue	iso	direct_efi	uefi	-
+route	systemrescue	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	systemrescue	iso	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	systemrescue	iso	memdisk	bios	-
+route	systemrescue	iso	memdisk	uefi	-
+route	systemrescue	iso	disk_image	bios	-
+route	systemrescue	iso	disk_image	uefi	-
+route	systemrescue	iso	floppy_image	bios	-
+route	systemrescue	iso	floppy_image	uefi	-
+route	systemrescue	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	systemrescue	wim	automatic	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	systemrescue	wim	direct_iso	bios	-
+route	systemrescue	wim	direct_iso	uefi	-
+route	systemrescue	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	systemrescue	wim	wimboot	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	systemrescue	wim	vhdboot	bios	-
+route	systemrescue	wim	vhdboot	uefi	-
+route	systemrescue	wim	direct_efi	bios	-
+route	systemrescue	wim	direct_efi	uefi	-
+route	systemrescue	wim	chainload	bios	-
+route	systemrescue	wim	chainload	uefi	-
+route	systemrescue	wim	memdisk	bios	-
+route	systemrescue	wim	memdisk	uefi	-
+route	systemrescue	wim	disk_image	bios	-
+route	systemrescue	wim	disk_image	uefi	-
+route	systemrescue	wim	floppy_image	bios	-
+route	systemrescue	wim	floppy_image	uefi	-
+route	systemrescue	img	automatic	bios	-
+route	systemrescue	img	automatic	uefi	-
+route	systemrescue	img	direct_iso	bios	-
+route	systemrescue	img	direct_iso	uefi	-
+route	systemrescue	img	wimboot	bios	-
+route	systemrescue	img	wimboot	uefi	-
+route	systemrescue	img	vhdboot	bios	-
+route	systemrescue	img	vhdboot	uefi	-
+route	systemrescue	img	direct_efi	bios	-
+route	systemrescue	img	direct_efi	uefi	-
+route	systemrescue	img	chainload	bios	-
+route	systemrescue	img	chainload	uefi	-
+route	systemrescue	img	memdisk	bios	-
+route	systemrescue	img	memdisk	uefi	-
+route	systemrescue	img	disk_image	bios	-
+route	systemrescue	img	disk_image	uefi	-
+route	systemrescue	img	floppy_image	bios	-
+route	systemrescue	img	floppy_image	uefi	-
+route	systemrescue	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	systemrescue	vhd	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	systemrescue	vhd	direct_iso	bios	-
+route	systemrescue	vhd	direct_iso	uefi	-
+route	systemrescue	vhd	wimboot	bios	-
+route	systemrescue	vhd	wimboot	uefi	-
+route	systemrescue	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	systemrescue	vhd	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	systemrescue	vhd	direct_efi	bios	-
+route	systemrescue	vhd	direct_efi	uefi	-
+route	systemrescue	vhd	chainload	bios	-
+route	systemrescue	vhd	chainload	uefi	-
+route	systemrescue	vhd	memdisk	bios	-
+route	systemrescue	vhd	memdisk	uefi	-
+route	systemrescue	vhd	disk_image	bios	-
+route	systemrescue	vhd	disk_image	uefi	-
+route	systemrescue	vhd	floppy_image	bios	-
+route	systemrescue	vhd	floppy_image	uefi	-
+route	systemrescue	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	systemrescue	vhdx	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	systemrescue	vhdx	direct_iso	bios	-
+route	systemrescue	vhdx	direct_iso	uefi	-
+route	systemrescue	vhdx	wimboot	bios	-
+route	systemrescue	vhdx	wimboot	uefi	-
+route	systemrescue	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	systemrescue	vhdx	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	systemrescue	vhdx	direct_efi	bios	-
+route	systemrescue	vhdx	direct_efi	uefi	-
+route	systemrescue	vhdx	chainload	bios	-
+route	systemrescue	vhdx	chainload	uefi	-
+route	systemrescue	vhdx	memdisk	bios	-
+route	systemrescue	vhdx	memdisk	uefi	-
+route	systemrescue	vhdx	disk_image	bios	-
+route	systemrescue	vhdx	disk_image	uefi	-
+route	systemrescue	vhdx	floppy_image	bios	-
+route	systemrescue	vhdx	floppy_image	uefi	-
+route	systemrescue	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	systemrescue	efi	automatic	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	systemrescue	efi	direct_iso	bios	-
+route	systemrescue	efi	direct_iso	uefi	-
+route	systemrescue	efi	wimboot	bios	-
+route	systemrescue	efi	wimboot	uefi	-
+route	systemrescue	efi	vhdboot	bios	-
+route	systemrescue	efi	vhdboot	uefi	-
+route	systemrescue	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	systemrescue	efi	direct_efi	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	systemrescue	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	systemrescue	efi	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	systemrescue	efi	memdisk	bios	-
+route	systemrescue	efi	memdisk	uefi	-
+route	systemrescue	efi	disk_image	bios	-
+route	systemrescue	efi	disk_image	uefi	-
+route	systemrescue	efi	floppy_image	bios	-
+route	systemrescue	efi	floppy_image	uefi	-
+route	gparted-live	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	gparted-live	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
+route	gparted-live	iso	direct_iso	bios	-
+route	gparted-live	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
+route	gparted-live	iso	wimboot	bios	-
+route	gparted-live	iso	wimboot	uefi	-
+route	gparted-live	iso	vhdboot	bios	-
+route	gparted-live	iso	vhdboot	uefi	-
+route	gparted-live	iso	direct_efi	bios	-
+route	gparted-live	iso	direct_efi	uefi	-
+route	gparted-live	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	gparted-live	iso	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	gparted-live	iso	memdisk	bios	-
+route	gparted-live	iso	memdisk	uefi	-
+route	gparted-live	iso	disk_image	bios	-
+route	gparted-live	iso	disk_image	uefi	-
+route	gparted-live	iso	floppy_image	bios	-
+route	gparted-live	iso	floppy_image	uefi	-
+route	gparted-live	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	gparted-live	wim	automatic	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	gparted-live	wim	direct_iso	bios	-
+route	gparted-live	wim	direct_iso	uefi	-
+route	gparted-live	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	gparted-live	wim	wimboot	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	gparted-live	wim	vhdboot	bios	-
+route	gparted-live	wim	vhdboot	uefi	-
+route	gparted-live	wim	direct_efi	bios	-
+route	gparted-live	wim	direct_efi	uefi	-
+route	gparted-live	wim	chainload	bios	-
+route	gparted-live	wim	chainload	uefi	-
+route	gparted-live	wim	memdisk	bios	-
+route	gparted-live	wim	memdisk	uefi	-
+route	gparted-live	wim	disk_image	bios	-
+route	gparted-live	wim	disk_image	uefi	-
+route	gparted-live	wim	floppy_image	bios	-
+route	gparted-live	wim	floppy_image	uefi	-
+route	gparted-live	img	automatic	bios	-
+route	gparted-live	img	automatic	uefi	-
+route	gparted-live	img	direct_iso	bios	-
+route	gparted-live	img	direct_iso	uefi	-
+route	gparted-live	img	wimboot	bios	-
+route	gparted-live	img	wimboot	uefi	-
+route	gparted-live	img	vhdboot	bios	-
+route	gparted-live	img	vhdboot	uefi	-
+route	gparted-live	img	direct_efi	bios	-
+route	gparted-live	img	direct_efi	uefi	-
+route	gparted-live	img	chainload	bios	-
+route	gparted-live	img	chainload	uefi	-
+route	gparted-live	img	memdisk	bios	-
+route	gparted-live	img	memdisk	uefi	-
+route	gparted-live	img	disk_image	bios	-
+route	gparted-live	img	disk_image	uefi	-
+route	gparted-live	img	floppy_image	bios	-
+route	gparted-live	img	floppy_image	uefi	-
+route	gparted-live	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	gparted-live	vhd	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	gparted-live	vhd	direct_iso	bios	-
+route	gparted-live	vhd	direct_iso	uefi	-
+route	gparted-live	vhd	wimboot	bios	-
+route	gparted-live	vhd	wimboot	uefi	-
+route	gparted-live	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	gparted-live	vhd	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	gparted-live	vhd	direct_efi	bios	-
+route	gparted-live	vhd	direct_efi	uefi	-
+route	gparted-live	vhd	chainload	bios	-
+route	gparted-live	vhd	chainload	uefi	-
+route	gparted-live	vhd	memdisk	bios	-
+route	gparted-live	vhd	memdisk	uefi	-
+route	gparted-live	vhd	disk_image	bios	-
+route	gparted-live	vhd	disk_image	uefi	-
+route	gparted-live	vhd	floppy_image	bios	-
+route	gparted-live	vhd	floppy_image	uefi	-
+route	gparted-live	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	gparted-live	vhdx	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	gparted-live	vhdx	direct_iso	bios	-
+route	gparted-live	vhdx	direct_iso	uefi	-
+route	gparted-live	vhdx	wimboot	bios	-
+route	gparted-live	vhdx	wimboot	uefi	-
+route	gparted-live	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	gparted-live	vhdx	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	gparted-live	vhdx	direct_efi	bios	-
+route	gparted-live	vhdx	direct_efi	uefi	-
+route	gparted-live	vhdx	chainload	bios	-
+route	gparted-live	vhdx	chainload	uefi	-
+route	gparted-live	vhdx	memdisk	bios	-
+route	gparted-live	vhdx	memdisk	uefi	-
+route	gparted-live	vhdx	disk_image	bios	-
+route	gparted-live	vhdx	disk_image	uefi	-
+route	gparted-live	vhdx	floppy_image	bios	-
+route	gparted-live	vhdx	floppy_image	uefi	-
+route	gparted-live	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	gparted-live	efi	automatic	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	gparted-live	efi	direct_iso	bios	-
+route	gparted-live	efi	direct_iso	uefi	-
+route	gparted-live	efi	wimboot	bios	-
+route	gparted-live	efi	wimboot	uefi	-
+route	gparted-live	efi	vhdboot	bios	-
+route	gparted-live	efi	vhdboot	uefi	-
+route	gparted-live	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	gparted-live	efi	direct_efi	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	gparted-live	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	gparted-live	efi	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	gparted-live	efi	memdisk	bios	-
+route	gparted-live	efi	memdisk	uefi	-
+route	gparted-live	efi	disk_image	bios	-
+route	gparted-live	efi	disk_image	uefi	-
+route	gparted-live	efi	floppy_image	bios	-
+route	gparted-live	efi	floppy_image	uefi	-
+route	clonezilla	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	clonezilla	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
+route	clonezilla	iso	direct_iso	bios	-
+route	clonezilla	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
+route	clonezilla	iso	wimboot	bios	-
+route	clonezilla	iso	wimboot	uefi	-
+route	clonezilla	iso	vhdboot	bios	-
+route	clonezilla	iso	vhdboot	uefi	-
+route	clonezilla	iso	direct_efi	bios	-
+route	clonezilla	iso	direct_efi	uefi	-
+route	clonezilla	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	clonezilla	iso	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	clonezilla	iso	memdisk	bios	-
+route	clonezilla	iso	memdisk	uefi	-
+route	clonezilla	iso	disk_image	bios	-
+route	clonezilla	iso	disk_image	uefi	-
+route	clonezilla	iso	floppy_image	bios	-
+route	clonezilla	iso	floppy_image	uefi	-
+route	clonezilla	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	clonezilla	wim	automatic	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	clonezilla	wim	direct_iso	bios	-
+route	clonezilla	wim	direct_iso	uefi	-
+route	clonezilla	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	clonezilla	wim	wimboot	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	clonezilla	wim	vhdboot	bios	-
+route	clonezilla	wim	vhdboot	uefi	-
+route	clonezilla	wim	direct_efi	bios	-
+route	clonezilla	wim	direct_efi	uefi	-
+route	clonezilla	wim	chainload	bios	-
+route	clonezilla	wim	chainload	uefi	-
+route	clonezilla	wim	memdisk	bios	-
+route	clonezilla	wim	memdisk	uefi	-
+route	clonezilla	wim	disk_image	bios	-
+route	clonezilla	wim	disk_image	uefi	-
+route	clonezilla	wim	floppy_image	bios	-
+route	clonezilla	wim	floppy_image	uefi	-
+route	clonezilla	img	automatic	bios	-
+route	clonezilla	img	automatic	uefi	-
+route	clonezilla	img	direct_iso	bios	-
+route	clonezilla	img	direct_iso	uefi	-
+route	clonezilla	img	wimboot	bios	-
+route	clonezilla	img	wimboot	uefi	-
+route	clonezilla	img	vhdboot	bios	-
+route	clonezilla	img	vhdboot	uefi	-
+route	clonezilla	img	direct_efi	bios	-
+route	clonezilla	img	direct_efi	uefi	-
+route	clonezilla	img	chainload	bios	-
+route	clonezilla	img	chainload	uefi	-
+route	clonezilla	img	memdisk	bios	-
+route	clonezilla	img	memdisk	uefi	-
+route	clonezilla	img	disk_image	bios	-
+route	clonezilla	img	disk_image	uefi	-
+route	clonezilla	img	floppy_image	bios	-
+route	clonezilla	img	floppy_image	uefi	-
+route	clonezilla	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	clonezilla	vhd	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	clonezilla	vhd	direct_iso	bios	-
+route	clonezilla	vhd	direct_iso	uefi	-
+route	clonezilla	vhd	wimboot	bios	-
+route	clonezilla	vhd	wimboot	uefi	-
+route	clonezilla	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	clonezilla	vhd	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	clonezilla	vhd	direct_efi	bios	-
+route	clonezilla	vhd	direct_efi	uefi	-
+route	clonezilla	vhd	chainload	bios	-
+route	clonezilla	vhd	chainload	uefi	-
+route	clonezilla	vhd	memdisk	bios	-
+route	clonezilla	vhd	memdisk	uefi	-
+route	clonezilla	vhd	disk_image	bios	-
+route	clonezilla	vhd	disk_image	uefi	-
+route	clonezilla	vhd	floppy_image	bios	-
+route	clonezilla	vhd	floppy_image	uefi	-
+route	clonezilla	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	clonezilla	vhdx	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	clonezilla	vhdx	direct_iso	bios	-
+route	clonezilla	vhdx	direct_iso	uefi	-
+route	clonezilla	vhdx	wimboot	bios	-
+route	clonezilla	vhdx	wimboot	uefi	-
+route	clonezilla	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	clonezilla	vhdx	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	clonezilla	vhdx	direct_efi	bios	-
+route	clonezilla	vhdx	direct_efi	uefi	-
+route	clonezilla	vhdx	chainload	bios	-
+route	clonezilla	vhdx	chainload	uefi	-
+route	clonezilla	vhdx	memdisk	bios	-
+route	clonezilla	vhdx	memdisk	uefi	-
+route	clonezilla	vhdx	disk_image	bios	-
+route	clonezilla	vhdx	disk_image	uefi	-
+route	clonezilla	vhdx	floppy_image	bios	-
+route	clonezilla	vhdx	floppy_image	uefi	-
+route	clonezilla	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	clonezilla	efi	automatic	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	clonezilla	efi	direct_iso	bios	-
+route	clonezilla	efi	direct_iso	uefi	-
+route	clonezilla	efi	wimboot	bios	-
+route	clonezilla	efi	wimboot	uefi	-
+route	clonezilla	efi	vhdboot	bios	-
+route	clonezilla	efi	vhdboot	uefi	-
+route	clonezilla	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	clonezilla	efi	direct_efi	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	clonezilla	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	clonezilla	efi	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	clonezilla	efi	memdisk	bios	-
+route	clonezilla	efi	memdisk	uefi	-
+route	clonezilla	efi	disk_image	bios	-
+route	clonezilla	efi	disk_image	uefi	-
+route	clonezilla	efi	floppy_image	bios	-
+route	clonezilla	efi	floppy_image	uefi	-
 route	other-linux	iso	automatic	bios	linux_live_iso	direct_iso	bios	tested_in_vm	0
-route	other-linux	iso	automatic	uefi	chainload	chainload	uefi	validated_hardware	0
+route	other-linux	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
 route	other-linux	iso	direct_iso	bios	linux_live_iso	direct_iso	bios	tested_in_vm	0
-route	other-linux	iso	direct_iso	uefi	-
+route	other-linux	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	other-linux	iso	wimboot	bios	-
 route	other-linux	iso	wimboot	uefi	-
 route	other-linux	iso	vhdboot	bios	-
@@ -6073,8 +6400,9 @@ profile	windows-server-2003	efi	memdisk	uefi	w2k3-uefi-other
 profile	windows-server-2003	efi	disk_image	uefi	w2k3-uefi-other
 profile	windows-server-2003	efi	floppy_image	uefi	w2k3-uefi-other
 profile	ubuntu	iso	automatic	bios	iso-work-chainload
-profile	ubuntu	iso	automatic	uefi	iso-work-chainload
+profile	ubuntu	iso	automatic	uefi	linux-iso-uefi
 profile	ubuntu	iso	automatic	-	iso-work-chainload
+profile	ubuntu	iso	direct_iso	uefi	linux-iso-uefi
 profile	ubuntu	iso	chainload	bios	iso-work-chainload
 profile	ubuntu	iso	chainload	uefi	iso-work-chainload
 profile	ubuntu	iso	chainload	-	iso-work-chainload
@@ -6106,8 +6434,9 @@ profile	ubuntu	efi	chainload	bios	efi-chainload
 profile	ubuntu	efi	chainload	uefi	efi-chainload
 profile	ubuntu	efi	chainload	-	efi-chainload
 profile	debian	iso	automatic	bios	iso-work-chainload
-profile	debian	iso	automatic	uefi	iso-work-chainload
+profile	debian	iso	automatic	uefi	linux-iso-uefi
 profile	debian	iso	automatic	-	iso-work-chainload
+profile	debian	iso	direct_iso	uefi	linux-iso-uefi
 profile	debian	iso	chainload	bios	iso-work-chainload
 profile	debian	iso	chainload	uefi	iso-work-chainload
 profile	debian	iso	chainload	-	iso-work-chainload
@@ -6139,8 +6468,9 @@ profile	debian	efi	chainload	bios	efi-chainload
 profile	debian	efi	chainload	uefi	efi-chainload
 profile	debian	efi	chainload	-	efi-chainload
 profile	fedora	iso	automatic	bios	iso-work-chainload
-profile	fedora	iso	automatic	uefi	iso-work-chainload
+profile	fedora	iso	automatic	uefi	linux-iso-uefi
 profile	fedora	iso	automatic	-	iso-work-chainload
+profile	fedora	iso	direct_iso	uefi	linux-iso-uefi
 profile	fedora	iso	chainload	bios	iso-work-chainload
 profile	fedora	iso	chainload	uefi	iso-work-chainload
 profile	fedora	iso	chainload	-	iso-work-chainload
@@ -6172,8 +6502,9 @@ profile	fedora	efi	chainload	bios	efi-chainload
 profile	fedora	efi	chainload	uefi	efi-chainload
 profile	fedora	efi	chainload	-	efi-chainload
 profile	linux-mint	iso	automatic	bios	iso-work-chainload
-profile	linux-mint	iso	automatic	uefi	iso-work-chainload
+profile	linux-mint	iso	automatic	uefi	linux-iso-uefi
 profile	linux-mint	iso	automatic	-	iso-work-chainload
+profile	linux-mint	iso	direct_iso	uefi	linux-iso-uefi
 profile	linux-mint	iso	chainload	bios	iso-work-chainload
 profile	linux-mint	iso	chainload	uefi	iso-work-chainload
 profile	linux-mint	iso	chainload	-	iso-work-chainload
@@ -6205,8 +6536,9 @@ profile	linux-mint	efi	chainload	bios	efi-chainload
 profile	linux-mint	efi	chainload	uefi	efi-chainload
 profile	linux-mint	efi	chainload	-	efi-chainload
 profile	arch-linux	iso	automatic	bios	iso-work-chainload
-profile	arch-linux	iso	automatic	uefi	iso-work-chainload
+profile	arch-linux	iso	automatic	uefi	linux-iso-uefi
 profile	arch-linux	iso	automatic	-	iso-work-chainload
+profile	arch-linux	iso	direct_iso	uefi	linux-iso-uefi
 profile	arch-linux	iso	chainload	bios	iso-work-chainload
 profile	arch-linux	iso	chainload	uefi	iso-work-chainload
 profile	arch-linux	iso	chainload	-	iso-work-chainload
@@ -6238,8 +6570,9 @@ profile	arch-linux	efi	chainload	bios	efi-chainload
 profile	arch-linux	efi	chainload	uefi	efi-chainload
 profile	arch-linux	efi	chainload	-	efi-chainload
 profile	opensuse	iso	automatic	bios	iso-work-chainload
-profile	opensuse	iso	automatic	uefi	iso-work-chainload
+profile	opensuse	iso	automatic	uefi	linux-iso-uefi
 profile	opensuse	iso	automatic	-	iso-work-chainload
+profile	opensuse	iso	direct_iso	uefi	linux-iso-uefi
 profile	opensuse	iso	chainload	bios	iso-work-chainload
 profile	opensuse	iso	chainload	uefi	iso-work-chainload
 profile	opensuse	iso	chainload	-	iso-work-chainload
@@ -6271,8 +6604,9 @@ profile	opensuse	efi	chainload	bios	efi-chainload
 profile	opensuse	efi	chainload	uefi	efi-chainload
 profile	opensuse	efi	chainload	-	efi-chainload
 profile	manjaro	iso	automatic	bios	iso-work-chainload
-profile	manjaro	iso	automatic	uefi	iso-work-chainload
+profile	manjaro	iso	automatic	uefi	linux-iso-uefi
 profile	manjaro	iso	automatic	-	iso-work-chainload
+profile	manjaro	iso	direct_iso	uefi	linux-iso-uefi
 profile	manjaro	iso	chainload	bios	iso-work-chainload
 profile	manjaro	iso	chainload	uefi	iso-work-chainload
 profile	manjaro	iso	chainload	-	iso-work-chainload
@@ -6304,8 +6638,9 @@ profile	manjaro	efi	chainload	bios	efi-chainload
 profile	manjaro	efi	chainload	uefi	efi-chainload
 profile	manjaro	efi	chainload	-	efi-chainload
 profile	kali-linux	iso	automatic	bios	iso-work-chainload
-profile	kali-linux	iso	automatic	uefi	iso-work-chainload
+profile	kali-linux	iso	automatic	uefi	linux-iso-uefi
 profile	kali-linux	iso	automatic	-	iso-work-chainload
+profile	kali-linux	iso	direct_iso	uefi	linux-iso-uefi
 profile	kali-linux	iso	chainload	bios	iso-work-chainload
 profile	kali-linux	iso	chainload	uefi	iso-work-chainload
 profile	kali-linux	iso	chainload	-	iso-work-chainload
@@ -6336,10 +6671,113 @@ profile	kali-linux	efi	direct_efi	-	efi-direct
 profile	kali-linux	efi	chainload	bios	efi-chainload
 profile	kali-linux	efi	chainload	uefi	efi-chainload
 profile	kali-linux	efi	chainload	-	efi-chainload
+profile	systemrescue	iso	automatic	bios	iso-work-chainload
+profile	systemrescue	iso	automatic	uefi	linux-iso-uefi
+profile	systemrescue	iso	automatic	-	iso-work-chainload
+profile	systemrescue	iso	direct_iso	uefi	linux-iso-uefi
+profile	systemrescue	iso	chainload	bios	iso-work-chainload
+profile	systemrescue	iso	chainload	uefi	iso-work-chainload
+profile	systemrescue	iso	chainload	-	iso-work-chainload
+profile	systemrescue	wim	automatic	bios	wim-wimboot
+profile	systemrescue	wim	automatic	uefi	wim-wimboot
+profile	systemrescue	wim	automatic	-	wim-wimboot
+profile	systemrescue	wim	wimboot	bios	wim-wimboot
+profile	systemrescue	wim	wimboot	uefi	wim-wimboot
+profile	systemrescue	wim	wimboot	-	wim-wimboot
+profile	systemrescue	vhd	automatic	bios	vhd-vhdboot
+profile	systemrescue	vhd	automatic	uefi	vhd-vhdboot
+profile	systemrescue	vhd	automatic	-	vhd-vhdboot
+profile	systemrescue	vhd	vhdboot	bios	vhd-vhdboot
+profile	systemrescue	vhd	vhdboot	uefi	vhd-vhdboot
+profile	systemrescue	vhd	vhdboot	-	vhd-vhdboot
+profile	systemrescue	vhdx	automatic	bios	vhd-vhdboot
+profile	systemrescue	vhdx	automatic	uefi	vhd-vhdboot
+profile	systemrescue	vhdx	automatic	-	vhd-vhdboot
+profile	systemrescue	vhdx	vhdboot	bios	vhd-vhdboot
+profile	systemrescue	vhdx	vhdboot	uefi	vhd-vhdboot
+profile	systemrescue	vhdx	vhdboot	-	vhd-vhdboot
+profile	systemrescue	efi	automatic	bios	efi-direct
+profile	systemrescue	efi	automatic	uefi	efi-direct
+profile	systemrescue	efi	automatic	-	efi-direct
+profile	systemrescue	efi	direct_efi	bios	efi-direct
+profile	systemrescue	efi	direct_efi	uefi	efi-direct
+profile	systemrescue	efi	direct_efi	-	efi-direct
+profile	systemrescue	efi	chainload	bios	efi-chainload
+profile	systemrescue	efi	chainload	uefi	efi-chainload
+profile	systemrescue	efi	chainload	-	efi-chainload
+profile	gparted-live	iso	automatic	bios	iso-work-chainload
+profile	gparted-live	iso	automatic	uefi	linux-iso-uefi
+profile	gparted-live	iso	automatic	-	iso-work-chainload
+profile	gparted-live	iso	direct_iso	uefi	linux-iso-uefi
+profile	gparted-live	iso	chainload	bios	iso-work-chainload
+profile	gparted-live	iso	chainload	uefi	iso-work-chainload
+profile	gparted-live	iso	chainload	-	iso-work-chainload
+profile	gparted-live	wim	automatic	bios	wim-wimboot
+profile	gparted-live	wim	automatic	uefi	wim-wimboot
+profile	gparted-live	wim	automatic	-	wim-wimboot
+profile	gparted-live	wim	wimboot	bios	wim-wimboot
+profile	gparted-live	wim	wimboot	uefi	wim-wimboot
+profile	gparted-live	wim	wimboot	-	wim-wimboot
+profile	gparted-live	vhd	automatic	bios	vhd-vhdboot
+profile	gparted-live	vhd	automatic	uefi	vhd-vhdboot
+profile	gparted-live	vhd	automatic	-	vhd-vhdboot
+profile	gparted-live	vhd	vhdboot	bios	vhd-vhdboot
+profile	gparted-live	vhd	vhdboot	uefi	vhd-vhdboot
+profile	gparted-live	vhd	vhdboot	-	vhd-vhdboot
+profile	gparted-live	vhdx	automatic	bios	vhd-vhdboot
+profile	gparted-live	vhdx	automatic	uefi	vhd-vhdboot
+profile	gparted-live	vhdx	automatic	-	vhd-vhdboot
+profile	gparted-live	vhdx	vhdboot	bios	vhd-vhdboot
+profile	gparted-live	vhdx	vhdboot	uefi	vhd-vhdboot
+profile	gparted-live	vhdx	vhdboot	-	vhd-vhdboot
+profile	gparted-live	efi	automatic	bios	efi-direct
+profile	gparted-live	efi	automatic	uefi	efi-direct
+profile	gparted-live	efi	automatic	-	efi-direct
+profile	gparted-live	efi	direct_efi	bios	efi-direct
+profile	gparted-live	efi	direct_efi	uefi	efi-direct
+profile	gparted-live	efi	direct_efi	-	efi-direct
+profile	gparted-live	efi	chainload	bios	efi-chainload
+profile	gparted-live	efi	chainload	uefi	efi-chainload
+profile	gparted-live	efi	chainload	-	efi-chainload
+profile	clonezilla	iso	automatic	bios	iso-work-chainload
+profile	clonezilla	iso	automatic	uefi	linux-iso-uefi
+profile	clonezilla	iso	automatic	-	iso-work-chainload
+profile	clonezilla	iso	direct_iso	uefi	linux-iso-uefi
+profile	clonezilla	iso	chainload	bios	iso-work-chainload
+profile	clonezilla	iso	chainload	uefi	iso-work-chainload
+profile	clonezilla	iso	chainload	-	iso-work-chainload
+profile	clonezilla	wim	automatic	bios	wim-wimboot
+profile	clonezilla	wim	automatic	uefi	wim-wimboot
+profile	clonezilla	wim	automatic	-	wim-wimboot
+profile	clonezilla	wim	wimboot	bios	wim-wimboot
+profile	clonezilla	wim	wimboot	uefi	wim-wimboot
+profile	clonezilla	wim	wimboot	-	wim-wimboot
+profile	clonezilla	vhd	automatic	bios	vhd-vhdboot
+profile	clonezilla	vhd	automatic	uefi	vhd-vhdboot
+profile	clonezilla	vhd	automatic	-	vhd-vhdboot
+profile	clonezilla	vhd	vhdboot	bios	vhd-vhdboot
+profile	clonezilla	vhd	vhdboot	uefi	vhd-vhdboot
+profile	clonezilla	vhd	vhdboot	-	vhd-vhdboot
+profile	clonezilla	vhdx	automatic	bios	vhd-vhdboot
+profile	clonezilla	vhdx	automatic	uefi	vhd-vhdboot
+profile	clonezilla	vhdx	automatic	-	vhd-vhdboot
+profile	clonezilla	vhdx	vhdboot	bios	vhd-vhdboot
+profile	clonezilla	vhdx	vhdboot	uefi	vhd-vhdboot
+profile	clonezilla	vhdx	vhdboot	-	vhd-vhdboot
+profile	clonezilla	efi	automatic	bios	efi-direct
+profile	clonezilla	efi	automatic	uefi	efi-direct
+profile	clonezilla	efi	automatic	-	efi-direct
+profile	clonezilla	efi	direct_efi	bios	efi-direct
+profile	clonezilla	efi	direct_efi	uefi	efi-direct
+profile	clonezilla	efi	direct_efi	-	efi-direct
+profile	clonezilla	efi	chainload	bios	efi-chainload
+profile	clonezilla	efi	chainload	uefi	efi-chainload
+profile	clonezilla	efi	chainload	-	efi-chainload
 profile	other-linux	iso	automatic	bios	linux-live-bios
-profile	other-linux	iso	automatic	uefi	iso-work-chainload
+profile	other-linux	iso	automatic	uefi	linux-iso-uefi
 profile	other-linux	iso	automatic	-	iso-work-chainload
 profile	other-linux	iso	direct_iso	bios	linux-live-bios
+profile	other-linux	iso	direct_iso	uefi	linux-iso-uefi
 profile	other-linux	iso	chainload	bios	iso-work-chainload
 profile	other-linux	iso	chainload	uefi	iso-work-chainload
 profile	other-linux	iso	chainload	-	iso-work-chainload
@@ -8551,6 +8989,168 @@ resolve	kali-linux	efi	chainload	chainload	1	ok
 resolve	kali-linux	efi	memdisk	-	0	UnsupportedImage
 resolve	kali-linux	efi	disk_image	-	0	UnsupportedImage
 resolve	kali-linux	efi	floppy_image	-	0	UnsupportedImage
+resolve	systemrescue	iso	automatic	chainload	1	ok
+resolve	systemrescue	iso	direct_iso	-	0	UnsupportedMethod
+resolve	systemrescue	iso	wimboot	-	0	UnsupportedMethod
+resolve	systemrescue	iso	vhdboot	-	0	UnsupportedImage
+resolve	systemrescue	iso	direct_efi	-	0	UnsupportedImage
+resolve	systemrescue	iso	chainload	chainload	1	ok
+resolve	systemrescue	iso	memdisk	-	0	UnsupportedMethod
+resolve	systemrescue	iso	disk_image	-	0	UnsupportedImage
+resolve	systemrescue	iso	floppy_image	-	0	UnsupportedImage
+resolve	systemrescue	wim	automatic	wimboot	1	ok
+resolve	systemrescue	wim	direct_iso	-	0	UnsupportedImage
+resolve	systemrescue	wim	wimboot	wimboot	1	ok
+resolve	systemrescue	wim	vhdboot	-	0	UnsupportedImage
+resolve	systemrescue	wim	direct_efi	-	0	UnsupportedImage
+resolve	systemrescue	wim	chainload	-	0	UnsupportedImage
+resolve	systemrescue	wim	memdisk	-	0	UnsupportedImage
+resolve	systemrescue	wim	disk_image	-	0	UnsupportedImage
+resolve	systemrescue	wim	floppy_image	-	0	UnsupportedImage
+resolve	systemrescue	img	automatic	-	0	UnsupportedImage
+resolve	systemrescue	img	direct_iso	-	0	UnsupportedImage
+resolve	systemrescue	img	wimboot	-	0	UnsupportedImage
+resolve	systemrescue	img	vhdboot	-	0	UnsupportedImage
+resolve	systemrescue	img	direct_efi	-	0	UnsupportedImage
+resolve	systemrescue	img	chainload	-	0	UnsupportedMethod
+resolve	systemrescue	img	memdisk	-	0	UnsupportedMethod
+resolve	systemrescue	img	disk_image	-	0	UnsupportedMethod
+resolve	systemrescue	img	floppy_image	-	0	UnsupportedMethod
+resolve	systemrescue	vhd	automatic	vhdboot	1	ok
+resolve	systemrescue	vhd	direct_iso	-	0	UnsupportedImage
+resolve	systemrescue	vhd	wimboot	-	0	UnsupportedImage
+resolve	systemrescue	vhd	vhdboot	vhdboot	1	ok
+resolve	systemrescue	vhd	direct_efi	-	0	UnsupportedImage
+resolve	systemrescue	vhd	chainload	-	0	UnsupportedImage
+resolve	systemrescue	vhd	memdisk	-	0	UnsupportedImage
+resolve	systemrescue	vhd	disk_image	-	0	UnsupportedImage
+resolve	systemrescue	vhd	floppy_image	-	0	UnsupportedImage
+resolve	systemrescue	vhdx	automatic	vhdboot	1	ok
+resolve	systemrescue	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	systemrescue	vhdx	wimboot	-	0	UnsupportedImage
+resolve	systemrescue	vhdx	vhdboot	vhdboot	1	ok
+resolve	systemrescue	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	systemrescue	vhdx	chainload	-	0	UnsupportedImage
+resolve	systemrescue	vhdx	memdisk	-	0	UnsupportedImage
+resolve	systemrescue	vhdx	disk_image	-	0	UnsupportedImage
+resolve	systemrescue	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	systemrescue	efi	automatic	direct_efi	1	ok
+resolve	systemrescue	efi	direct_iso	-	0	UnsupportedImage
+resolve	systemrescue	efi	wimboot	-	0	UnsupportedImage
+resolve	systemrescue	efi	vhdboot	-	0	UnsupportedImage
+resolve	systemrescue	efi	direct_efi	direct_efi	1	ok
+resolve	systemrescue	efi	chainload	chainload	1	ok
+resolve	systemrescue	efi	memdisk	-	0	UnsupportedImage
+resolve	systemrescue	efi	disk_image	-	0	UnsupportedImage
+resolve	systemrescue	efi	floppy_image	-	0	UnsupportedImage
+resolve	gparted-live	iso	automatic	chainload	1	ok
+resolve	gparted-live	iso	direct_iso	-	0	UnsupportedMethod
+resolve	gparted-live	iso	wimboot	-	0	UnsupportedMethod
+resolve	gparted-live	iso	vhdboot	-	0	UnsupportedImage
+resolve	gparted-live	iso	direct_efi	-	0	UnsupportedImage
+resolve	gparted-live	iso	chainload	chainload	1	ok
+resolve	gparted-live	iso	memdisk	-	0	UnsupportedMethod
+resolve	gparted-live	iso	disk_image	-	0	UnsupportedImage
+resolve	gparted-live	iso	floppy_image	-	0	UnsupportedImage
+resolve	gparted-live	wim	automatic	wimboot	1	ok
+resolve	gparted-live	wim	direct_iso	-	0	UnsupportedImage
+resolve	gparted-live	wim	wimboot	wimboot	1	ok
+resolve	gparted-live	wim	vhdboot	-	0	UnsupportedImage
+resolve	gparted-live	wim	direct_efi	-	0	UnsupportedImage
+resolve	gparted-live	wim	chainload	-	0	UnsupportedImage
+resolve	gparted-live	wim	memdisk	-	0	UnsupportedImage
+resolve	gparted-live	wim	disk_image	-	0	UnsupportedImage
+resolve	gparted-live	wim	floppy_image	-	0	UnsupportedImage
+resolve	gparted-live	img	automatic	-	0	UnsupportedImage
+resolve	gparted-live	img	direct_iso	-	0	UnsupportedImage
+resolve	gparted-live	img	wimboot	-	0	UnsupportedImage
+resolve	gparted-live	img	vhdboot	-	0	UnsupportedImage
+resolve	gparted-live	img	direct_efi	-	0	UnsupportedImage
+resolve	gparted-live	img	chainload	-	0	UnsupportedMethod
+resolve	gparted-live	img	memdisk	-	0	UnsupportedMethod
+resolve	gparted-live	img	disk_image	-	0	UnsupportedMethod
+resolve	gparted-live	img	floppy_image	-	0	UnsupportedMethod
+resolve	gparted-live	vhd	automatic	vhdboot	1	ok
+resolve	gparted-live	vhd	direct_iso	-	0	UnsupportedImage
+resolve	gparted-live	vhd	wimboot	-	0	UnsupportedImage
+resolve	gparted-live	vhd	vhdboot	vhdboot	1	ok
+resolve	gparted-live	vhd	direct_efi	-	0	UnsupportedImage
+resolve	gparted-live	vhd	chainload	-	0	UnsupportedImage
+resolve	gparted-live	vhd	memdisk	-	0	UnsupportedImage
+resolve	gparted-live	vhd	disk_image	-	0	UnsupportedImage
+resolve	gparted-live	vhd	floppy_image	-	0	UnsupportedImage
+resolve	gparted-live	vhdx	automatic	vhdboot	1	ok
+resolve	gparted-live	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	gparted-live	vhdx	wimboot	-	0	UnsupportedImage
+resolve	gparted-live	vhdx	vhdboot	vhdboot	1	ok
+resolve	gparted-live	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	gparted-live	vhdx	chainload	-	0	UnsupportedImage
+resolve	gparted-live	vhdx	memdisk	-	0	UnsupportedImage
+resolve	gparted-live	vhdx	disk_image	-	0	UnsupportedImage
+resolve	gparted-live	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	gparted-live	efi	automatic	direct_efi	1	ok
+resolve	gparted-live	efi	direct_iso	-	0	UnsupportedImage
+resolve	gparted-live	efi	wimboot	-	0	UnsupportedImage
+resolve	gparted-live	efi	vhdboot	-	0	UnsupportedImage
+resolve	gparted-live	efi	direct_efi	direct_efi	1	ok
+resolve	gparted-live	efi	chainload	chainload	1	ok
+resolve	gparted-live	efi	memdisk	-	0	UnsupportedImage
+resolve	gparted-live	efi	disk_image	-	0	UnsupportedImage
+resolve	gparted-live	efi	floppy_image	-	0	UnsupportedImage
+resolve	clonezilla	iso	automatic	chainload	1	ok
+resolve	clonezilla	iso	direct_iso	-	0	UnsupportedMethod
+resolve	clonezilla	iso	wimboot	-	0	UnsupportedMethod
+resolve	clonezilla	iso	vhdboot	-	0	UnsupportedImage
+resolve	clonezilla	iso	direct_efi	-	0	UnsupportedImage
+resolve	clonezilla	iso	chainload	chainload	1	ok
+resolve	clonezilla	iso	memdisk	-	0	UnsupportedMethod
+resolve	clonezilla	iso	disk_image	-	0	UnsupportedImage
+resolve	clonezilla	iso	floppy_image	-	0	UnsupportedImage
+resolve	clonezilla	wim	automatic	wimboot	1	ok
+resolve	clonezilla	wim	direct_iso	-	0	UnsupportedImage
+resolve	clonezilla	wim	wimboot	wimboot	1	ok
+resolve	clonezilla	wim	vhdboot	-	0	UnsupportedImage
+resolve	clonezilla	wim	direct_efi	-	0	UnsupportedImage
+resolve	clonezilla	wim	chainload	-	0	UnsupportedImage
+resolve	clonezilla	wim	memdisk	-	0	UnsupportedImage
+resolve	clonezilla	wim	disk_image	-	0	UnsupportedImage
+resolve	clonezilla	wim	floppy_image	-	0	UnsupportedImage
+resolve	clonezilla	img	automatic	-	0	UnsupportedImage
+resolve	clonezilla	img	direct_iso	-	0	UnsupportedImage
+resolve	clonezilla	img	wimboot	-	0	UnsupportedImage
+resolve	clonezilla	img	vhdboot	-	0	UnsupportedImage
+resolve	clonezilla	img	direct_efi	-	0	UnsupportedImage
+resolve	clonezilla	img	chainload	-	0	UnsupportedMethod
+resolve	clonezilla	img	memdisk	-	0	UnsupportedMethod
+resolve	clonezilla	img	disk_image	-	0	UnsupportedMethod
+resolve	clonezilla	img	floppy_image	-	0	UnsupportedMethod
+resolve	clonezilla	vhd	automatic	vhdboot	1	ok
+resolve	clonezilla	vhd	direct_iso	-	0	UnsupportedImage
+resolve	clonezilla	vhd	wimboot	-	0	UnsupportedImage
+resolve	clonezilla	vhd	vhdboot	vhdboot	1	ok
+resolve	clonezilla	vhd	direct_efi	-	0	UnsupportedImage
+resolve	clonezilla	vhd	chainload	-	0	UnsupportedImage
+resolve	clonezilla	vhd	memdisk	-	0	UnsupportedImage
+resolve	clonezilla	vhd	disk_image	-	0	UnsupportedImage
+resolve	clonezilla	vhd	floppy_image	-	0	UnsupportedImage
+resolve	clonezilla	vhdx	automatic	vhdboot	1	ok
+resolve	clonezilla	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	clonezilla	vhdx	wimboot	-	0	UnsupportedImage
+resolve	clonezilla	vhdx	vhdboot	vhdboot	1	ok
+resolve	clonezilla	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	clonezilla	vhdx	chainload	-	0	UnsupportedImage
+resolve	clonezilla	vhdx	memdisk	-	0	UnsupportedImage
+resolve	clonezilla	vhdx	disk_image	-	0	UnsupportedImage
+resolve	clonezilla	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	clonezilla	efi	automatic	direct_efi	1	ok
+resolve	clonezilla	efi	direct_iso	-	0	UnsupportedImage
+resolve	clonezilla	efi	wimboot	-	0	UnsupportedImage
+resolve	clonezilla	efi	vhdboot	-	0	UnsupportedImage
+resolve	clonezilla	efi	direct_efi	direct_efi	1	ok
+resolve	clonezilla	efi	chainload	chainload	1	ok
+resolve	clonezilla	efi	memdisk	-	0	UnsupportedImage
+resolve	clonezilla	efi	disk_image	-	0	UnsupportedImage
+resolve	clonezilla	efi	floppy_image	-	0	UnsupportedImage
 resolve	other-linux	iso	automatic	chainload	1	ok
 resolve	other-linux	iso	direct_iso	-	0	UnsupportedMethod
 resolve	other-linux	iso	wimboot	-	0	UnsupportedMethod
@@ -11035,8 +11635,8 @@ menu	ubuntu	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not impl
 menu	ubuntu	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	ubuntu	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	ubuntu	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	ubuntu	iso	uefi	0	automatic	chainload	1	1	validated_hardware	Automatic (Chainload)		READY	-
-menu	ubuntu	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	ubuntu	iso	uefi	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	ubuntu	iso	uefi	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	ubuntu	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	ubuntu	iso	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
 menu	ubuntu	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -11095,8 +11695,8 @@ menu	debian	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not impl
 menu	debian	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	debian	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	debian	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	debian	iso	uefi	0	automatic	chainload	1	1	validated_hardware	Automatic (Chainload)		READY	-
-menu	debian	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	debian	iso	uefi	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	debian	iso	uefi	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	debian	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	debian	iso	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
 menu	debian	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -11155,8 +11755,8 @@ menu	fedora	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not impl
 menu	fedora	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	fedora	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	fedora	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	fedora	iso	uefi	0	automatic	chainload	1	1	validated_hardware	Automatic (Chainload)		READY	-
-menu	fedora	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	fedora	iso	uefi	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	fedora	iso	uefi	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	fedora	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	fedora	iso	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
 menu	fedora	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -11215,8 +11815,8 @@ menu	linux-mint	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not 
 menu	linux-mint	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	linux-mint	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	linux-mint	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	linux-mint	iso	uefi	0	automatic	chainload	1	1	validated_hardware	Automatic (Chainload)		READY	-
-menu	linux-mint	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	linux-mint	iso	uefi	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	linux-mint	iso	uefi	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	linux-mint	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	linux-mint	iso	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
 menu	linux-mint	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -11275,8 +11875,8 @@ menu	arch-linux	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not 
 menu	arch-linux	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	arch-linux	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	arch-linux	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	arch-linux	iso	uefi	0	automatic	chainload	1	1	validated_hardware	Automatic (Chainload)		READY	-
-menu	arch-linux	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	arch-linux	iso	uefi	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	arch-linux	iso	uefi	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	arch-linux	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	arch-linux	iso	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
 menu	arch-linux	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -11335,8 +11935,8 @@ menu	opensuse	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not im
 menu	opensuse	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	opensuse	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	opensuse	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	opensuse	iso	uefi	0	automatic	chainload	1	1	validated_hardware	Automatic (Chainload)		READY	-
-menu	opensuse	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	opensuse	iso	uefi	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	opensuse	iso	uefi	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	opensuse	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	opensuse	iso	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
 menu	opensuse	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -11395,8 +11995,8 @@ menu	manjaro	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not imp
 menu	manjaro	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	manjaro	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	manjaro	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	manjaro	iso	uefi	0	automatic	chainload	1	1	validated_hardware	Automatic (Chainload)		READY	-
-menu	manjaro	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	manjaro	iso	uefi	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	manjaro	iso	uefi	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	manjaro	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	manjaro	iso	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
 menu	manjaro	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -11455,8 +12055,8 @@ menu	kali-linux	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not 
 menu	kali-linux	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	kali-linux	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	kali-linux	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	kali-linux	iso	uefi	0	automatic	chainload	1	1	validated_hardware	Automatic (Chainload)		READY	-
-menu	kali-linux	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	kali-linux	iso	uefi	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	kali-linux	iso	uefi	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	kali-linux	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	kali-linux	iso	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
 menu	kali-linux	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -11510,13 +12110,193 @@ menu	kali-linux	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	
 menu	kali-linux	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	kali-linux	efi	uefi	3	direct_efi	direct_efi	1	1	tested_in_vm	EFI [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	kali-linux	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	systemrescue	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	systemrescue	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	systemrescue	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	systemrescue	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	systemrescue	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	systemrescue	iso	uefi	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	systemrescue	iso	uefi	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	systemrescue	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	systemrescue	iso	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	systemrescue	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	systemrescue	wim	bios	0	automatic	wimboot	0	0	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	systemrescue	wim	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	systemrescue	wim	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	systemrescue	wim	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	systemrescue	wim	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	systemrescue	wim	uefi	0	automatic	wimboot	1	1	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	systemrescue	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	systemrescue	wim	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	systemrescue	wim	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	systemrescue	wim	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	systemrescue	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	systemrescue	img	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	systemrescue	img	bios	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	systemrescue	img	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	systemrescue	img	bios	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	systemrescue	img	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	systemrescue	img	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	systemrescue	img	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	systemrescue	img	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	systemrescue	img	uefi	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	systemrescue	vhd	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	systemrescue	vhd	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	systemrescue	vhd	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	systemrescue	vhd	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	systemrescue	vhd	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	systemrescue	vhd	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	systemrescue	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	systemrescue	vhd	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	systemrescue	vhd	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	systemrescue	vhd	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	systemrescue	vhdx	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	systemrescue	vhdx	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	systemrescue	vhdx	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	systemrescue	vhdx	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	systemrescue	vhdx	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	systemrescue	vhdx	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	systemrescue	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	systemrescue	vhdx	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	systemrescue	vhdx	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	systemrescue	vhdx	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	systemrescue	efi	bios	0	automatic	direct_efi	0	0	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	systemrescue	efi	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	systemrescue	efi	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	systemrescue	efi	bios	3	direct_efi	direct_efi	0	0	tested_in_vm	EFI [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	systemrescue	efi	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	systemrescue	efi	uefi	0	automatic	direct_efi	1	1	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	systemrescue	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	systemrescue	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	systemrescue	efi	uefi	3	direct_efi	direct_efi	1	1	tested_in_vm	EFI [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	systemrescue	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	gparted-live	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	gparted-live	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	gparted-live	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	gparted-live	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	gparted-live	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	gparted-live	iso	uefi	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	gparted-live	iso	uefi	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	gparted-live	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	gparted-live	iso	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	gparted-live	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	gparted-live	wim	bios	0	automatic	wimboot	0	0	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	gparted-live	wim	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	gparted-live	wim	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	gparted-live	wim	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	gparted-live	wim	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	gparted-live	wim	uefi	0	automatic	wimboot	1	1	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	gparted-live	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	gparted-live	wim	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	gparted-live	wim	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	gparted-live	wim	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	gparted-live	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	gparted-live	img	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	gparted-live	img	bios	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	gparted-live	img	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	gparted-live	img	bios	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	gparted-live	img	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	gparted-live	img	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	gparted-live	img	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	gparted-live	img	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	gparted-live	img	uefi	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	gparted-live	vhd	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	gparted-live	vhd	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	gparted-live	vhd	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	gparted-live	vhd	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	gparted-live	vhd	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	gparted-live	vhd	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	gparted-live	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	gparted-live	vhd	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	gparted-live	vhd	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	gparted-live	vhd	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	gparted-live	vhdx	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	gparted-live	vhdx	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	gparted-live	vhdx	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	gparted-live	vhdx	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	gparted-live	vhdx	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	gparted-live	vhdx	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	gparted-live	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	gparted-live	vhdx	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	gparted-live	vhdx	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	gparted-live	vhdx	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	gparted-live	efi	bios	0	automatic	direct_efi	0	0	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	gparted-live	efi	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	gparted-live	efi	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	gparted-live	efi	bios	3	direct_efi	direct_efi	0	0	tested_in_vm	EFI [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	gparted-live	efi	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	gparted-live	efi	uefi	0	automatic	direct_efi	1	1	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	gparted-live	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	gparted-live	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	gparted-live	efi	uefi	3	direct_efi	direct_efi	1	1	tested_in_vm	EFI [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	gparted-live	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	clonezilla	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	clonezilla	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	clonezilla	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	clonezilla	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	clonezilla	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	clonezilla	iso	uefi	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	clonezilla	iso	uefi	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	clonezilla	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	clonezilla	iso	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	clonezilla	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	clonezilla	wim	bios	0	automatic	wimboot	0	0	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	clonezilla	wim	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	clonezilla	wim	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	clonezilla	wim	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	clonezilla	wim	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	clonezilla	wim	uefi	0	automatic	wimboot	1	1	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	clonezilla	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	clonezilla	wim	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	clonezilla	wim	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	clonezilla	wim	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	clonezilla	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	clonezilla	img	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	clonezilla	img	bios	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	clonezilla	img	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	clonezilla	img	bios	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	clonezilla	img	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	clonezilla	img	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	clonezilla	img	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	clonezilla	img	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	clonezilla	img	uefi	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	clonezilla	vhd	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	clonezilla	vhd	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	clonezilla	vhd	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	clonezilla	vhd	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	clonezilla	vhd	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	clonezilla	vhd	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	clonezilla	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	clonezilla	vhd	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	clonezilla	vhd	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	clonezilla	vhd	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	clonezilla	vhdx	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	clonezilla	vhdx	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	clonezilla	vhdx	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	clonezilla	vhdx	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	clonezilla	vhdx	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	clonezilla	vhdx	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	clonezilla	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	clonezilla	vhdx	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	clonezilla	vhdx	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	clonezilla	vhdx	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	clonezilla	efi	bios	0	automatic	direct_efi	0	0	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	clonezilla	efi	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	clonezilla	efi	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	clonezilla	efi	bios	3	direct_efi	direct_efi	0	0	tested_in_vm	EFI [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	clonezilla	efi	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	clonezilla	efi	uefi	0	automatic	direct_efi	1	1	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	clonezilla	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	clonezilla	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	clonezilla	efi	uefi	3	direct_efi	direct_efi	1	1	tested_in_vm	EFI [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	clonezilla	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	other-linux	iso	bios	0	automatic	linux_live_iso	1	1	tested_in_vm	Automatic (SliTaz Live) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	other-linux	iso	bios	1	direct_iso	linux_live_iso	1	1	tested_in_vm	ISO [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	other-linux	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	other-linux	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	other-linux	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	other-linux	iso	uefi	0	automatic	chainload	1	1	validated_hardware	Automatic (Chainload)		READY	-
-menu	other-linux	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	other-linux	iso	uefi	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	other-linux	iso	uefi	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	other-linux	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	other-linux	iso	uefi	3	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
 menu	other-linux	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -14289,6 +15069,168 @@ help	kali-linux	efi	chainload	Chainload	Transfers control to another bootloader 
 help	kali-linux	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
 help	kali-linux	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
 help	kali-linux	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	systemrescue	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	systemrescue	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	systemrescue	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	systemrescue	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	systemrescue	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	systemrescue	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	systemrescue	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	systemrescue	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	systemrescue	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	systemrescue	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	systemrescue	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	systemrescue	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	systemrescue	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	systemrescue	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	systemrescue	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	systemrescue	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	systemrescue	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	systemrescue	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	systemrescue	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	systemrescue	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	systemrescue	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	systemrescue	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	systemrescue	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	systemrescue	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	systemrescue	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	systemrescue	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	systemrescue	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	systemrescue	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	systemrescue	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	systemrescue	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	systemrescue	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	systemrescue	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	systemrescue	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	systemrescue	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	systemrescue	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	systemrescue	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	systemrescue	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	systemrescue	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	systemrescue	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	systemrescue	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	systemrescue	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	systemrescue	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	systemrescue	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	systemrescue	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	systemrescue	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	systemrescue	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	systemrescue	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	systemrescue	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	systemrescue	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	systemrescue	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	systemrescue	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	systemrescue	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	systemrescue	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	systemrescue	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	gparted-live	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	gparted-live	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	gparted-live	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	gparted-live	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	gparted-live	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	gparted-live	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	gparted-live	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	gparted-live	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	gparted-live	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	gparted-live	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	gparted-live	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	gparted-live	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	gparted-live	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	gparted-live	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	gparted-live	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	gparted-live	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	gparted-live	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	gparted-live	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	gparted-live	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	gparted-live	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	gparted-live	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	gparted-live	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	gparted-live	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	gparted-live	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	gparted-live	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	gparted-live	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	gparted-live	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	gparted-live	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	gparted-live	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	gparted-live	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	gparted-live	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	gparted-live	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	gparted-live	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	gparted-live	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	gparted-live	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	gparted-live	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	gparted-live	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	gparted-live	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	gparted-live	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	gparted-live	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	gparted-live	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	gparted-live	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	gparted-live	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	gparted-live	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	gparted-live	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	gparted-live	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	gparted-live	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	gparted-live	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	gparted-live	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	gparted-live	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	gparted-live	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	gparted-live	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	gparted-live	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	gparted-live	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	clonezilla	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	clonezilla	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	clonezilla	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	clonezilla	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	clonezilla	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	clonezilla	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	clonezilla	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	clonezilla	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	clonezilla	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	clonezilla	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	clonezilla	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	clonezilla	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	clonezilla	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	clonezilla	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	clonezilla	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	clonezilla	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	clonezilla	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	clonezilla	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	clonezilla	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	clonezilla	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	clonezilla	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	clonezilla	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	clonezilla	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	clonezilla	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	clonezilla	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	clonezilla	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	clonezilla	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	clonezilla	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	clonezilla	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	clonezilla	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	clonezilla	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	clonezilla	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	clonezilla	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	clonezilla	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	clonezilla	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	clonezilla	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	clonezilla	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	clonezilla	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	clonezilla	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	clonezilla	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	clonezilla	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	clonezilla	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	clonezilla	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	clonezilla	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	clonezilla	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	clonezilla	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	clonezilla	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	clonezilla	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	clonezilla	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	clonezilla	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	clonezilla	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	clonezilla	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	clonezilla	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	clonezilla	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
 help	other-linux	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
 help	other-linux	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
 help	other-linux	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
@@ -14992,6 +15934,7 @@ help	other-dos	efi	memdisk	Memdisk	Presents a small image as memory-backed boot 
 help	other-dos	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
 help	other-dos	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
 # profile_def (M2): id backend progress stage labels
+profile_def	linux-iso-uefi	linux_iso	linux_iso	
 profile_def	xp-x86-sp3-uefi-csm	xp_uefi_staging	xp_uefi	Loading the preparation environment|Detecting disks|Choosing the target disk|Preparing workspace|Copying and verifying files
 profile_def	xp-uefi-other	-	none	
 profile_def	w2k-x86-sp4-uefi-csm	xp_uefi_staging	xp_uefi	Loading the preparation environment|Detecting disks|Choosing the target disk|Preparing workspace|Copying and verifying files

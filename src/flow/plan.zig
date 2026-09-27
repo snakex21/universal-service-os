@@ -23,7 +23,7 @@ const boot_progress = @import("preparation_boot_progress.zig");
 /// Progress rows of a profile's progress page.
 pub fn stageLabels(progress: os_profiles.Progress) []const []const u8 {
     return switch (progress) {
-        .none, .core, .efi_image => &.{},
+        .none, .core, .efi_image, .linux_iso => &.{},
         .micro_linux => &boot_progress.micro_linux_labels,
         .direct_iso => &boot_progress.DirectIsoStage.labels,
         .xp_uefi => &boot_progress.XpStage.labels,

@@ -109,6 +109,8 @@ pub const traits_table = [_]SystemTraits{
     .{ .system_id = "windows-server-2012", .route_as = "windows-8", .no_inbox_nvme = true },
     .{ .system_id = "windows-server-2008-r2", .route_as = "windows-7" },
     .{ .system_id = "windows-server-2008", .route_as = "windows-vista" },
+    // Linux ISO from DATA: SystemRescue ships no Microsoft-signed shim.
+    .{ .system_id = "systemrescue", .secure_boot_off = true },
 };
 
 fn ownTraits(system_id: []const u8) SystemTraits {
@@ -186,6 +188,8 @@ pub const Progress = enum {
     xp_uefi,
     /// A UEFI application from Images, started directly.
     efi_image,
+    /// A Linux ISO from DATA: its kernel started directly with the USOS helper.
+    linux_iso,
     // Rows: src/flow/plan.zig stageLabels (kept out of the catalog module,
     // which the BIOS Core also links next to the graphics module).
 };
@@ -225,6 +229,8 @@ pub const Profile = struct {
 };
 
 const iso = &[_]ImageKind{.iso};
+/// Every catalog Linux system (src/catalog/linux_systems.zig).
+const linux_ids = &[_][]const u8{ "ubuntu", "debian", "fedora", "linux-mint", "arch-linux", "opensuse", "manjaro", "kali-linux", "systemrescue", "gparted-live", "clonezilla", "other-linux" };
 const auto_iso = &[_]BootMethod{ .automatic, .direct_iso };
 const auto_iso_memdisk = &[_]BootMethod{ .automatic, .direct_iso, .memdisk };
 
@@ -232,6 +238,10 @@ const auto_iso_memdisk = &[_]BootMethod{ .automatic, .direct_iso, .memdisk };
 /// ones (the former resolveBackend). First match wins.
 pub const profiles = [_]Profile{
     // ---- UEFI only
+    // Linux ISO from DATA (docs/design/linux-iso-boot.md): kernel + initrd from
+    // the ISO, /usos/init maps the ISO file as a block device. Replaces the WORK
+    // chainload for Linux ISOs, which never booted live media.
+    .{ .id = "linux-iso-uefi", .systems = .{ .ids = linux_ids }, .images = iso, .methods = auto_iso, .firmware = .uefi, .backend = .linux_iso, .progress = .linux_iso },
     .{ .id = "xp-x86-sp3-uefi-csm", .systems = .{ .ids = &.{"windows-xp"} }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .xp_uefi_staging, .progress = .xp_uefi },
     .{ .id = "xp-uefi-other", .systems = .{ .ids = &.{"windows-xp"} }, .firmware = .uefi, .backend = null, .progress = .none },
     // Windows 2000 from UEFI: the same micro-Linux preparation and package
