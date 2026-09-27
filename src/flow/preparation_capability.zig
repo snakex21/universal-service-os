@@ -29,6 +29,9 @@ pub const Backend = enum {
     win9x_dos,
     dos_bios_iso,
     linux_live_iso,
+    /// Linux ISO from DATA: kernel + initrd from the ISO, USOS helper maps
+    /// the ISO file as a block device (docs/design/linux-iso-boot.md).
+    linux_iso,
     wimboot,
     vhdboot,
     direct_efi,
@@ -36,6 +39,7 @@ pub const Backend = enum {
 
     pub fn firmwareRequirement(self: Backend) FirmwareRequirement {
         return switch (self) {
+            .linux_iso => .any,
             .xp_staging, .windows_bios_iso, .win9x_dos, .dos_bios_iso, .linux_live_iso => .bios,
             .xp_uefi_staging, .windows_iso, .wimboot, .vhdboot, .direct_efi, .chainload => .uefi,
         };
@@ -43,6 +47,7 @@ pub const Backend = enum {
 
     pub fn method(self: Backend) BootMethod {
         return switch (self) {
+            .linux_iso => .direct_iso,
             .windows_iso => .direct_iso,
             .xp_uefi_staging, .xp_staging, .windows_bios_iso, .win9x_dos, .dos_bios_iso, .linux_live_iso => .direct_iso,
             .wimboot => .wimboot,

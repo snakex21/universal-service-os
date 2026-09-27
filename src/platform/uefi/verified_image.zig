@@ -150,6 +150,24 @@ pub fn loadApplication(device_path: *const DevicePath, file: *uefi.protocol.File
     return loadWithOverride(bs, device_path, bytes);
 }
 
+/// Loads an EFI application held in `bytes` (a Linux kernel read from an
+/// ISO): plain LoadImage (shim 16 checks db/MOK/its vendor CA itself), or on
+/// shim 15.x SHIM_LOCK->Verify plus the security override.
+pub fn loadBuffer(bytes: []const u8) Error!uefi.Handle {
+    const bs = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
+    if (!secure_boot.enforced() or secure_boot.shimOwnsLoadImage()) return plainLoad(bs, .{ .buffer = bytes });
+    const lock = secure_boot.shimLock() orelse return plainLoad(bs, .{ .buffer = bytes });
+    try secure_boot.shimVerify(lock, bytes);
+    return loadWithOverride(bs, null, bytes);
+}
+
+/// LoadedImage->LoadOptions of a loaded image (UTF-16, NUL included);
+/// `options` must stay valid until the image has started.
+pub fn setLoadOptions(image: uefi.Handle, options: []const u16) void {
+    const bs = uefi.system_table.boot_services orelse return;
+    setLoadedImage(bs, image, null, options);
+}
+
 fn readWhole(bs: *uefi.tables.BootServices, file: *uefi.protocol.File) ![]align(8) u8 {
     try file.setPosition(0xffff_ffff_ffff_ffff);
     const size = try file.getPosition();

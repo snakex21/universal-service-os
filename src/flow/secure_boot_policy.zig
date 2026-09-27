@@ -44,6 +44,9 @@ pub fn backendRequiresSecureBootOff(system_id: []const u8, backend: Backend) boo
     return switch (backend) {
         .xp_uefi_staging => true,
         .windows_iso => systemRequiresSecureBootOff(system_id),
+        // Distro kernels: verified by shim (Fedora CA) or the distro-shim
+        // relay; ISOs without a signed shim (SystemRescue) are refused at start.
+        .linux_iso => systemRequiresSecureBootOff(system_id),
         // BIOS-only backends never run under UEFI Secure Boot; the firmware
         // check rejects them first.
         .xp_staging, .windows_bios_iso, .win9x_dos, .dos_bios_iso, .linux_live_iso => false,

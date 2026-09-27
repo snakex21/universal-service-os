@@ -107,6 +107,7 @@ fn baseLabel(method: BootMethod, backend: ?capability.Backend) []const u8 {
         .win9x_dos => "Automatic (DOS Setup)",
         .dos_bios_iso => "Automatic (MS-DOS / Windows 3.x)",
         .linux_live_iso => "Automatic (SliTaz Live)",
+        .linux_iso => "Automatic (Linux ISO)",
         .xp_staging => "Automatic (XP staging)",
         .xp_uefi_staging => "Automatic (UEFI preparation / XP via CSM)",
         .wimboot => "Automatic (WIMBoot)",

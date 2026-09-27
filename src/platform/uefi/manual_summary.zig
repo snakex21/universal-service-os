@@ -365,6 +365,15 @@ fn start(
     // Same "Starting…" splash for the micro-Linux preparation: systemd-boot
     // and the kernel's EFI stub load their files under the spinner, and
     // Linux keeps the frame until usos-fb-ui takes over.
+    if (image.kind == .iso and system.family == .linux and backend == .linux_iso) {
+        view.handover(view.t(.splash_starting));
+        @import("linux_iso_start.zig").start(root, system.image_directory, image.name.slice(), null, linuxProgress) catch |err| {
+            view.refreshFramebuffer();
+            showError(view.t(.error_iso), err);
+        };
+        return;
+    }
+
     view.handover(view.t(.splash_starting));
 
     e2e_flow.requestPreparation(root, system, image, resolved, unattended, profile, showPreparationProgress) catch |err| {
@@ -491,6 +500,8 @@ const xp_heading = "Windows XP";
 fn showXpProgress(stage: usos.flow.preparation_boot_progress.XpStage) void {
     view.xpStatus(stage, xp_heading);
 }
+
+fn linuxProgress(_: @import("linux_iso_start.zig").Status_) void {}
 
 fn showPreparationProgress(stage: usos.flow.preparation_boot_progress.Stage) void {
     view.handoverStatus(view.tr(stage.detail()));
