@@ -58,8 +58,9 @@ try {
         & robocopy.exe $EspSource $espPath /E /R:0 /W:0 /COPY:D /DCOPY:D /NP /NFL /NDL | Out-Null
         if ($LASTEXITCODE -ge 8) { throw "robocopy ESP failed: $LASTEXITCODE" }
     }
-    $cluster = (Get-Volume -Partition $data).AllocationUnitSize
-    $partStart = [uint64]$data.Offset
+    $cluster = [uint64]((Get-Volume -Partition $data | Select-Object -First 1).AllocationUnitSize)
+    $partStart = [uint64](($data | Select-Object -First 1).Offset)
+    Write-Host "DATA offset $partStart cluster $cluster"
     foreach ($prop in $manifest.PSObject.Properties) {
         $name = $prop.Name; $file = $prop.Value.file
         $folder = $folders[$name]
@@ -73,7 +74,7 @@ try {
         foreach ($line in (& fsutil.exe file queryextents $target)) {
             if ($line -match 'VCN:\s*0x([0-9a-fA-F]+)\s+Clusters:\s*0x([0-9a-fA-F]+)\s+LCN:\s*0x([0-9a-fA-F]+)') {
                 $lcn = [Convert]::ToUInt64($Matches[3], 16); $count = [Convert]::ToUInt64($Matches[2], 16)
-                $extents += , @(($partStart + $lcn * $cluster) / 512, $count * $cluster / 512)
+                $extents += , @([uint64](($partStart + $lcn * $cluster) / 512), [uint64]($count * $cluster / 512))
             }
         }
         $result[$name] = [ordered]@{ folder = $folder; file = $file; size = $prop.Value.size; extents = $extents }
