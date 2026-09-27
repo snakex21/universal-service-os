@@ -284,7 +284,8 @@ Findings from that run, fixed afterwards:
 
 ## 10. Vista without firmware CSM (profile `vista-x64-sp2-uefi-csmwrap`, 2026-09-27)
 
-Status: **experimental, QEMU only.** Replaces the "full legacy boot"
+Status: **experimental, hardware PASS** (X470, 2026-09-28, build
+B260927-205829-3C3E79FE; section 10.5). Replaces the "full legacy boot"
 option 2 of section 5 (now chosen, because the X470 test of 2026-09-27
 gave a black screen on the UEFI path: vgapnp Code 10, VgaSave needs A0000,
 which only a POSTed legacy VBIOS provides; win7-vista-no-csm.md section 10).
@@ -392,3 +393,31 @@ xHCI. Screens and logs: `tools/tests/artifacts/csmwrap-vista*` (not in git).
 | 1 (no answer) | OVMF boots the disk's `BOOTX64.EFI` = CSMWrap -> SeaBIOS -> USOS MBR -> NT60 -> bootmgr -> PE10 (Windows logo after 13 s) -> USOS installer in BIOS mode (`Firmware type = 1`, disk found by signature, staging made inactive) -> **Vista Setup language page** (PE10 USB keyboard works) -> disk page lists the unallocated space, USOS-VISTA and CSMWRAP -> the install runs to the end, `Vista Setup returned=0`, exactly **one active partition = the new Vista partition** (not the staging one), BIOS BCD `\Boot\BCD` with `winload.exe`, `BOOTSECT.BAK`. Finalizer failed at the BCD check (the store stays open after Setup: CopyFile sharing violation, `/store` + `/export` refused) -> fixed: `bcdedit /store ... /enum {default}` must name the new partition twice and `winload.exe`. With test signing set by hand and a restart: **phase 2 boots from the disk through CSMWrap** ("Windows is configuring the computer", Setup's finishing screen at 800x600) and reaches **OOBE** (user account page). |
 | 2 (answer merged: the Vista golden profile without its fake key) | Language page and EULA skipped (the merged answer was accepted), key/edition/disk pages manual. Finalizer PASS (BCD check, test signing, USB v11 armed, staging entry removed, log copied), "remove the stick" dialog. That dialog got no keyboard or tablet input in QEMU -> it is now foreground/topmost and the restart follows after 3 minutes anyway. After a reset: phase 2 in **test mode** (test signing active) runs the USB v11 first-boot gate; QEMU's `qemu-xhci` is not driven by the Vista USB 3 package, so the gate stops with "USB IS NOT READY" (the gate is the UEFI path's; on the X470 it passed with CSM, v11, where the ports are AMD xHCI). The installer now also removes the WinPE letters of the prepared disk's volumes (staging C:, CSMWrap ESP) before Setup and hides the staging partition (type 0x17; 0x07 again for a retry), so no stray letters reach the installed system. (The "D:\USOS\Vista\firstboot-usb.log" line on the gate screen is a fixed text of the USB bootstrap, not the real letter.) |
 | 3 (final installer, build B260927-205829) | Same flow with the answer: letters C: and F: removed, staging inactive + hidden, `Vista Setup returned=0`, the new partition had **C:** in WinPE, one active partition (the new one), BCD check PASS (2 entries name the partition, `winload.exe`), test signing set, staging entry removed, USB v11 armed; the notice timed out after 3 minutes and PE10 restarted by itself; the disk booted phase 2 through CSMWrap in test mode up to the USB v11 gate (QEMU xHCI, see run 2). Disk afterwards: Vista NTFS + CSMWrap ESP only. |
+
+### 10.5 Hardware result (X470, 2026-09-28)
+
+User report: Windows Vista SP2 x64 installed **without CSM** through CSMWrap
+on the ASRock X470 / Ryzen 7 5700X / Radeon RX 560, build
+B260927-205829-3C3E79FE, target a Biostar S100 120 GB SATA SSD.
+
+* PE10 Setup with the answer profile `vista-ultimate.ini` (Ultimate, user
+  Retro, no password, no key): PASS.
+* Phase 2 through CSMWrap: display OK.
+* USB keyboard and mouse work on the desktop (USB v11 gate passed on AMD
+  xHCI).
+* The disk boots on its own without the stick (firmware -> the disk's UEFI
+  entry -> CSMWrap -> Vista).
+* Test mode stays on, because the USB 3 backport is test-signed. Accepted by
+  the user and closed. There is no legitimately signed xHCI driver for the
+  X470 on Vista x64 (the AMD Win7 catalog is OSAttr 6.1 only, SHA-256
+  chain); **the only way to drop test mode is a Renesas uPD72020x PCIe USB 3
+  card**, whose vendor driver supports Vista.
+
+UX issues to fix before 1.0:
+
+* Step counter: the flow shows 1/3, then the XP-style "1/5" disk
+  confirmation screen of micro-Linux step 610; one counter for the whole
+  flow.
+* SeaBIOS text and a blinking cursor show during the CSMWrap boot; a quiet
+  CSMWrap build is pending.
+* A restart is needed between the disk preparation and Setup.

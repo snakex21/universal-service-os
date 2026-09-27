@@ -41,7 +41,7 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | N7 | Edytor motywów (UEFI + instalator), motywy użytkownika w BIOS, przykładowe motywy | UEFI, BIOS, przykłady: **Done** (QEMU, 2026-09-26); instalator: **Next** | menedżer profili odpowiedzi (formularz + klawiatura ekranowa) | instalator: do oszacowania |
 | L1 | Rodzina NT5 na UEFI (2000, 2003, XP x64) | 2000, 2003 x86, XP x64: **eksperymentalne** (QEMU do GUI Setup, 2026-09-27); 2003 x64: **Later** | N2 (M4), N3 | sprzęt (X470): do testu |
 | L2 | XP na UEFI bez CSM (CSMWrap) | **Eksperymentalne, sprzęt PASS** (X470, 2026-09-27, B260927-153019) | — | do potwierdzenia: PAE/31,9 GB, liczba CPU, USB |
-| L2b | Vista na UEFI bez CSM (CSMWrap, instalacja legacy MBR) | **Eksperymentalne, QEMU** (2026-09-27) | L2 | sprzęt (X470): do testu |
+| L2b | Vista na UEFI bez CSM (CSMWrap, instalacja legacy MBR) | **Eksperymentalne, sprzęt PASS** (X470, 2026-09-28, B260927-205829) | L2 | UX przed 1.0: licznik kroków, cichy CSMWrap, restart między przygotowaniem dysku a Setup |
 | L3 | 32-bit CPU i mniejsze minimum RAM | **Later** | pomiary | 2 dni pomiarów, potem 5–15 dni |
 | L4 | Chainload w stylu Plop dla PC bez USB boot | **Later** | L3 (częściowo) | 5–10 dni |
 | L5 | Motywy, układy klawiatury, persistence, post-install, test QEMU | **Later** | N2 (M1) | 1–5 dni per punkt |
@@ -227,7 +227,7 @@ każdego startu. Secure Boot off; CSMWrap **nie** jest podpisywany
 kluczem USOS. Poprzednia próba (2026-09-20, Win7/Intel) zatrzymała się po
 `Booting drive`, więc najpierw QEMU.
 
-### L2b. Vista na UEFI bez CSM przez CSMWrap: eksperymentalne, QEMU
+### L2b. Vista na UEFI bez CSM przez CSMWrap: eksperymentalne, sprzęt PASS
 
 2026-09-27, profil `vista-x64-sp2-uefi-csmwrap`, wybierany przez menu UEFI
 tylko gdy firmware nie ma CSM (z CSM ścieżka Vista UEFI bez zmian). Mikro-Linux
@@ -237,7 +237,21 @@ CSMWrap, PE10 w trybie BIOS uruchamia instalator Visty, Vista instaluje się jak
 system legacy (MBR) na nieprzydzielonym miejscu, VgaSave działa na prawdziwym
 VBIOS karty. Profile odpowiedzi i pliki z `Unattended` dozwolone (scalane z
 odpowiedzią KMDF), wybór dysku ręczny. Szczegóły:
-`docs/design/csmwrap-integration.md`, sekcja 10. X470: do testu.
+`docs/design/csmwrap-integration.md`, sekcja 10.
+
+**Sprzęt PASS 2026-09-28** (X470 / 5700X / RX 560, build
+B260927-205829-3C3E79FE, Biostar S100 120 GB SATA): PE10 Setup z profilem
+`vista-ultimate.ini` (Ultimate, użytkownik Retro, bez hasła i klucza), faza 2
+przez CSMWrap z obrazem, klawiatura i mysz USB na pulpicie, dysk startuje sam
+bez pendrive'a. Tryb testowy zostaje (backport USB 3 podpisany testowo);
+użytkownik to akceptuje, temat zamknięty (sekcja 3).
+
+Do poprawy przed 1.0 (UX):
+- licznik kroków: najpierw 1/3, potem ekran potwierdzenia dysku w stylu XP
+  „1/5” (krok 610); jeden wspólny licznik dla całego przebiegu;
+- tekst SeaBIOS i migający kursor przy starcie przez CSMWrap (czeka na cichy
+  build CSMWrap);
+- restart między przygotowaniem dysku a Setup.
 
 ### L3. Starsze CPU i mniej RAM: **Later**, najpierw pomiary
 
@@ -344,6 +358,10 @@ pozostaje.
   nie jest planowana. Ryzyka: AOAC, przyszły konflikt ze sterownikiem
   firmware, polling zamiast GPIO.
 - Windows XP, Vista i 7 wymagają wyłączonego Secure Boot.
+- **Vista x64 na X470 działa w trybie testowym** (backport USB 3 podpisany
+  testowo). Nie ma legalnie podpisanego sterownika xHCI dla X470 pod Vistę
+  x64 (katalog AMD dla Win7 ma tylko OSAttr 6.1 i łańcuch SHA-256). Jedyna
+  droga do wyłączenia trybu testowego: karta PCIe USB 3 Renesas uPD72020x.
 - Mikro-Linux wymaga x86-64 i 256 MiB RAM (do czasu L3).
 - Win98 i DOS: tylko Legacy BIOS (do czasu L6).
 - XP: brak NVMe (także przy CSM); XP w BIOS nie ma pakietu sterowników
@@ -368,7 +386,7 @@ pozostaje.
   2, OOBE, pulpit); bez CSM czarny ekran (vgapnp Code 10, VgaSave potrzebuje
   A0000, które bez CSM czyta FF, bo VBIOS karty nie wykonuje POST). Vista bez
   CSM: od 2026-09-27 przez CSMWrap jako instalacja legacy MBR (L2b,
-  QEMU; X470 do testu). Dyspozytor przy braku GOP ponawia łączenie
+  sprzęt PASS na X470 2026-09-28). Dyspozytor przy braku GOP ponawia łączenie
   kontrolerów i robi do dwóch zimnych restartów (sekcja 8.5). Vista na X470
   z CSM: sukces sprzętowy v11 (`windows-vista-usb-install-2026-09-21.md`).
 - Linux Live poza SliTaz i narzędzia w UEFI: przez ogólny wpis (N5).
@@ -390,3 +408,4 @@ Szczegóły i dowody: `TESTING.md` i dokumenty w `docs/`.
 | 2026-09-24 | Powtarzalny build pakietu XP (`compare_xp_packages.py`); zapas 43 KiB w Legacy Core; pady USB w menu UEFI; **Secure Boot** (shim 16.1 + MOK, podpisane jądro, sterowniki, zapis klucza bez MokManagera); dotyk ROG Ally (TouchI2cDxe) potwierdzony; foldery `DATA\Drivers` (UEFI + INF dla 7/8/10/11); analizy E2B i Win98 |
 | 2026-09-26 | **Windows 7 x64 na X470 bez CSM** (routing VGA do kontrolera GOP w dyspozytorze, RX 560, ISO „6in1”: instalacja do pulpitu); **profile odpowiedzi** (jeden model → WINNT.SIF / autounattend.xml, menedżer profili w menu UEFI z klawiaturą ekranową: utworzenie profilu i instalacja z nim potwierdzone na sprzęcie); **edytor motywów** w UEFI (potwierdzony na sprzęcie), motywy użytkownika w BIOS, przykłady `usos-ocean`/`usos-sunset`/`usos-forest` (build B260926-134756) |
 | 2026-09-27 | **XP bez CSM przez CSMWrap na X470** (CSM i Secure Boot wyłączone, ESP CSMWrap na dysku docelowym, instalacja unattended; build B260927-153019); poprawka wyrównania initramfs (`lang.cpio`) |
+| 2026-09-28 | **Vista SP2 x64 bez CSM przez CSMWrap na X470** (instalacja legacy MBR, PE10 Setup z profilem odpowiedzi, USB na pulpicie, start z dysku bez pendrive'a; build B260927-205829) |
