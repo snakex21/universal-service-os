@@ -59,7 +59,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Second stage $secondStage does not derive from $manualBoot" }
     if ((Get-Content -LiteralPath $secureBootIni -Raw) -match '(?m)^signed=1\r?$') {
         $enrollCert = Join-Path $usbRoot 'EFI\USOS\ENROLL_THIS_KEY_IN_MOKMANAGER.cer'
-        foreach ($signedFile in @($secondStage, (Join-Path $ProjectRoot 'zig-out\micro-linux\vmlinuz-virt'), (Join-Path $ProjectRoot 'zig-out\micro-linux\systemd-bootx64.efi'), (Join-Path $ProjectRoot 'zig-out\test-assets\ntfs_x64.efi'), (Join-Path $usbRoot 'EFI\USOS\touchi2c_x64.efi'))) {
+        foreach ($signedFile in @($secondStage, (Join-Path $ProjectRoot 'zig-out\micro-linux\vmlinuz-virt'), (Join-Path $ProjectRoot 'zig-out\micro-linux\systemd-bootx64.efi'), (Join-Path $ProjectRoot 'zig-out\test-assets\ntfs_x64.efi'), (Join-Path $usbRoot 'EFI\USOS\touchi2c_x64.efi'), (Join-Path $usbRoot 'EFI\USOS\shell\Shell.efi'))) {
             & go run ./cmd/usos-efisign verify -in $signedFile -cert $enrollCert
             if ($LASTEXITCODE -ne 0) { throw "Not signed with the enrolled USOS key: $signedFile" }
         }
@@ -121,6 +121,10 @@ try {
         'EFI/USOS/csmwrap/COPYING-SeaBIOS-GPLv3.txt',
         'EFI/USOS/csmwrap/COPYING-SeaBIOS-LGPLv3.txt',
         'EFI/USOS/csmwrap/SOURCES.txt',
+        'EFI/USOS/shell/Shell.efi',
+        'EFI/USOS/shell/startup.nsh',
+        'EFI/USOS/shell/License.txt',
+        'EFI/USOS/shell/SOURCES.txt',
         'EFI/USOS/bios-ui.bin',
         'EFI/USOS/licenses/fonts/LICENSE-OFL-1.1.txt',
         'UI/index.html',

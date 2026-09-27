@@ -314,6 +314,8 @@
   "boot.utilities.none.line2": "Legen Sie Utilities/<tool name>/Images auf DATA an und führen Sie dann USOS aktualisieren aus.",
   "boot.utilities.hardware.desc": "Integriert: CPU, RAM, Mainboard und Datenträger",
   "boot.utilities.freedos.desc": "DOS-Programme vom USB, Dateimanager und Eingabeaufforderung",
+  "boot.utilities.shell.title": "UEFI-Shell",
+  "boot.utilities.shell.desc": "Befehlszeile für EFI-Tools (Flasher, Tester) von DATA",
   "boot.images.title": "Image auswählen",
   "boot.images.subtitle": "ISO-, WIM-, IMG-, VHD-, VHDX- und EFI-Dateien werden automatisch erkannt",
   "boot.images.none.line1": "In Images wurden keine unterstützten Image-Dateien gefunden.",

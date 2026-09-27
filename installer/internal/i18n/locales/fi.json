@@ -314,6 +314,8 @@
   "boot.utilities.none.line2": "Luo Utilities/<tool name>/Images DATA-osioon ja suorita sitten Päivitä USOS.",
   "boot.utilities.hardware.desc": "Sisäänrakennettu: CPU, RAM, emolevy ja levyt",
   "boot.utilities.freedos.desc": "DOS-ohjelmat USB:ltä, tiedostonhallinta ja komentokehote",
+  "boot.utilities.shell.title": "UEFI-komentotulkki",
+  "boot.utilities.shell.desc": "Komentorivi EFI-työkaluille (flashaus, testaus) DATA-osiolta",
   "boot.images.title": "Valitse levykuva",
   "boot.images.subtitle": "ISO-, WIM-, IMG-, VHD-, VHDX- ja EFI-tiedostot tunnistetaan automaattisesti",
   "boot.images.none.line1": "Kansiosta Images ei löytynyt tuettuja levykuvatiedostoja.",

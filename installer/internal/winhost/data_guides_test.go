@@ -40,6 +40,31 @@ func TestDataGuidesTotalBytesMatchesContents(t *testing.T) {
 	}
 }
 
+func TestUefiShellGuideIsBilingualCRLFInItsFolder(t *testing.T) {
+	text := uefiShellGuide.contents
+	if !utf8.Valid(text) {
+		t.Fatal("UEFI Shell README is not valid UTF-8")
+	}
+	if bytes.Count(text, []byte("\n")) != bytes.Count(text, []byte("\r\n")) || bytes.Contains(text, []byte("\r\r")) {
+		t.Fatal("UEFI Shell README line endings are not CRLF")
+	}
+	if !containsDataDirectory(filepath.Join("Utilities", "UEFI Shell", "Tools")) {
+		t.Fatal(`DATA\Utilities\UEFI Shell\Tools is not a required DATA directory`)
+	}
+	s := string(text)
+	pl, en := strings.Index(s, "=== POLSKI ==="), strings.Index(s, "=== ENGLISH ===")
+	if pl < 0 || en < pl {
+		t.Fatal("UEFI Shell README must have the Polish part first, then English")
+	}
+	for _, part := range []string{s[pl:en], s[en:]} {
+		for _, want := range []string{`Utilities\UEFI Shell\Tools\`, "map -r", "exit", "USOS_ESP", "Secure Boot", `Utilities\<`} {
+			if !strings.Contains(part, want) {
+				t.Errorf("UEFI Shell README part %.20q lacks %q", part, want)
+			}
+		}
+	}
+}
+
 func TestDriversGuideIsBilingualCRLF(t *testing.T) {
 	text := driversGuide.contents
 	if !utf8.Valid(text) {

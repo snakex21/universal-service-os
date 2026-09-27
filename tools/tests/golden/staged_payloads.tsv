@@ -411,6 +411,10 @@ payload_zip	EFI/USOS/micro-linux/initramfs-usos
 payload_zip	EFI/USOS/micro-linux/vmlinuz-virt
 payload_zip	EFI/USOS/ntfs_x64.efi
 payload_zip	EFI/USOS/secure-boot.ini
+payload_zip	EFI/USOS/shell/License.txt
+payload_zip	EFI/USOS/shell/SOURCES.txt
+payload_zip	EFI/USOS/shell/Shell.efi
+payload_zip	EFI/USOS/shell/startup.nsh
 payload_zip	EFI/USOS/systemd-bootx64.efi
 payload_zip	EFI/USOS/themes/usos-forest.ini
 payload_zip	EFI/USOS/themes/usos-ocean.ini

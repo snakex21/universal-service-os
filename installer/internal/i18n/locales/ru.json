@@ -317,6 +317,8 @@
   "boot.utilities.none.line2": "Создайте Utilities/<tool name>/Images на DATA, затем выполните «Обновить USOS».",
   "boot.utilities.hardware.desc": "Встроено: CPU, RAM, материнская плата и диски",
   "boot.utilities.freedos.desc": "Программы DOS с USB, файловый менеджер и командная строка",
+  "boot.utilities.shell.title": "Оболочка UEFI",
+  "boot.utilities.shell.desc": "Командная строка для EFI-утилит (прошивка, тесты) с DATA",
   "boot.images.title": "Выбор образа",
   "boot.images.subtitle": "Файлы ISO, WIM, IMG, VHD, VHDX и EFI определяются автоматически",
   "boot.images.none.line1": "В Images не найдены поддерживаемые файлы образов.",

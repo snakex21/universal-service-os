@@ -314,6 +314,8 @@
   "boot.utilities.none.line2": "Looge DATA-le Utilities/<tool name>/Images ja käivitage seejärel Värskenda USOS-i.",
   "boot.utilities.hardware.desc": "Sisseehitatud: CPU, RAM, emaplaat ja kettad",
   "boot.utilities.freedos.desc": "DOS-programmid USB-lt, failihaldur ja käsuviip",
+  "boot.utilities.shell.title": "UEFI kest",
+  "boot.utilities.shell.desc": "Käsurida EFI tööriistadele (flashijad, testijad) DATA-lt",
   "boot.images.title": "Valige tõmmis",
   "boot.images.subtitle": "ISO-, WIM-, IMG-, VHD-, VHDX- ja EFI-failid tuvastatakse automaatselt",
   "boot.images.none.line1": "Kaustast Images ei leitud toetatud tõmmisefaile.",

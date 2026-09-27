@@ -314,6 +314,8 @@
   "boot.utilities.none.line2": "Създайте Utilities/<tool name>/Images на DATA, след това изпълнете „Обнови USOS“.",
   "boot.utilities.hardware.desc": "Вградено: CPU, RAM, дънна платка и дискове",
   "boot.utilities.freedos.desc": "DOS програми от USB, файлов мениджър и команден ред",
+  "boot.utilities.shell.title": "UEFI обвивка",
+  "boot.utilities.shell.desc": "Команден ред за EFI инструменти (флашъри, тестери) от DATA",
   "boot.images.title": "Избор на образ",
   "boot.images.subtitle": "Файловете ISO, WIM, IMG, VHD, VHDX и EFI се откриват автоматично",
   "boot.images.none.line1": "В Images не са намерени поддържани файлове с образи.",

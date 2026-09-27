@@ -314,6 +314,8 @@
   "boot.utilities.none.line2": "Opret Utilities/<tool name>/Images på DATA, og kør derefter Opdater USOS.",
   "boot.utilities.hardware.desc": "Indbygget: CPU, RAM, bundkort og diske",
   "boot.utilities.freedos.desc": "DOS-programmer fra USB, filhåndtering og kommandoprompt",
+  "boot.utilities.shell.title": "UEFI-shell",
+  "boot.utilities.shell.desc": "Kommandolinje til EFI-værktøjer (flashere, testere) fra DATA",
   "boot.images.title": "Vælg aftryk",
   "boot.images.subtitle": "ISO-, WIM-, IMG-, VHD-, VHDX- og EFI-filer registreres automatisk",
   "boot.images.none.line1": "Der blev ikke fundet nogen understøttede aftryksfiler i Images.",

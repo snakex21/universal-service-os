@@ -314,6 +314,8 @@
   "boot.utilities.none.line2": "Δημιουργήστε Utilities/<tool name>/Images στο DATA και εκτελέστε «Ενημέρωση USOS».",
   "boot.utilities.hardware.desc": "Ενσωματωμένο: CPU, RAM, μητρική πλακέτα και δίσκοι",
   "boot.utilities.freedos.desc": "Προγράμματα DOS από USB, διαχείριση αρχείων και γραμμή εντολών",
+  "boot.utilities.shell.title": "Κέλυφος UEFI",
+  "boot.utilities.shell.desc": "Γραμμή εντολών για εργαλεία EFI (flashers, testers) από το DATA",
   "boot.images.title": "Επιλογή ειδώλου",
   "boot.images.subtitle": "Τα αρχεία ISO, WIM, IMG, VHD, VHDX και EFI εντοπίζονται αυτόματα",
   "boot.images.none.line1": "Δεν βρέθηκαν υποστηριζόμενα αρχεία ειδώλων στο Images.",
