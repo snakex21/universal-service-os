@@ -56,19 +56,16 @@ Fedora Workstation Live 44 (`... fedora`): **PASS to the live desktop**
 ("Welcome to Fedora Linux", `.../fedora/bios-06.png`): dracut found
 `root=live:CDLABEL=Fedora-WS-Live-44` on the loop device through udev with
 no extra words, gdm started.
-Debian 13 netinst (`... debian13-netinst`): **FAIL at attach** — the d-i
-initrd (`install.amd/gtk/initrd.gz`, 4736 entries) has neither `loop.ko` nor
-`dm-mod` (only `usb-storage.ko.xz` among the needed modules), and the Debian
-kernel has loop as a module, so `/dev/loop-control` never appears. Planned
-fallback (not implemented): the helper adds an in-kernel partition over the
-contiguous ISO with `BLKPG_ADD_PARTITION` on the whole disk (block core, no
-module). The kernel refuses overlapping partitions, so it first removes the
-DATA partition from the *kernel's* table only (`BLKPG_DEL_PARTITION`, no disk
-write; DATA is not mounted in d-i). d-i then sees a USB partition with the ISO:
-preseed `cdrom-detect/try-usb=true` in the generated `/preseed.cfg`. Risk:
-partman re-reading that disk's table later drops the ISO partition (only if
-the user touches the USOS stick in partman). Needs a QEMU test; fragmented
-ISOs cannot use it (no dm in d-i): refuse with "copy the ISO again".
+Debian 13 netinst (`... debian13-netinst`): the d-i initrd has neither
+`loop.ko` nor `dm-mod` (Debian's kernel has loop as a module), so the loop
+path failed first. **Fixed** with the BLKPG fallback in `/usos/init`: the
+DATA partition is removed from the kernel's table only (no disk write) and
+partition 64 is added over the contiguous ISO: `iso attached: /dev/usos-iso
+-> /dev/sda64`, and the **graphical installer's first screen** came up
+(`.../debian13-netinst/bios-04.png`). Not yet verified: d-i's CD detection
+(after language/keyboard) finding `sda64`; the runner now adds a per-boot
+`/preseed.cfg` with `cdrom-detect/try-usb=true` (not run yet). Fragmented
+ISOs cannot use this path (no dm in d-i): refuse with "copy the ISO again".
 GParted's own keymap/language prompt (console) was not answered, so the
 GParted UI itself is not shown yet. All ten ISOs on the test VHD are one
 extent each (fresh NTFS), so the dm path is not exercised yet (make a
