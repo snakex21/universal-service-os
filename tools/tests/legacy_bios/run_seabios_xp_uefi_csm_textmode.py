@@ -87,15 +87,17 @@ def vga_text(dump,rows_count):
         rows.append(''.join(chr(c) if 32<=c<127 else ' ' for c in b[r*160:r*160+160:2]).rstrip())
     return '\n'.join(rows)
 
+NT5_UEFI_SYSTEMS={'w2k-x86-sp4-uefi-csm':'windows-2000','w2k3-x86-sp2-uefi-csm':'windows-server-2003','xp-x64-sp2-uefi-csm':'windows-xp-x64'}
+
 def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),sif=None):
     usos=out/'usos-blank.qcow2';target=out/'target.qcow2'
     for disk,size in ((usos,256*1024**2),(target,TARGET_BYTES)):
         subprocess.run([str(QEMU_IMG),'create','-q','-f','qcow2',str(disk),str(size)],check=True)
     entries=cpio.parse_newc(gzip.decompress((PACKAGE/'initramfs-xp').read_bytes()))
     probe=PROBE_INIT.replace('USOS_PLAN_PROFILE=xp-x86-sp3-uefi-csm','USOS_PLAN_PROFILE='+profile)
-    if profile=='w2k-x86-sp4-uefi-csm':
-        # Windows 2000 from UEFI: the 2000 NT5 profile, no XP driver bundle.
-        probe=probe.replace('. /usr/lib/usos/nt5_profile.sh; usos_nt5_profile','export NT5_SYSTEM=windows-2000; . /usr/lib/usos/nt5_profile.sh; usos_nt5_profile')
+    if profile in NT5_UEFI_SYSTEMS:
+        # Windows 2000 / Server 2003 / XP x64 from UEFI: their NT5 profile, no XP driver bundle.
+        probe=probe.replace('. /usr/lib/usos/nt5_profile.sh; usos_nt5_profile','export NT5_SYSTEM='+NT5_UEFI_SYSTEMS[profile]+'; . /usr/lib/usos/nt5_profile.sh; usos_nt5_profile')
         probe=probe.replace(". /usr/lib/usos/xp_driver_stage.sh; usos_xp_driver_preflight || finish 'FAIL driver preflight'"+chr(10),'')
     if profile=='nt5-staging':
         # The BIOS NT5 profile has no driver preflight (and no bundles).
@@ -103,6 +105,10 @@ def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),
         probe=probe.replace("if [ -r /usr/lib/usos/xp_user_settings.sh ]; then . /usr/lib/usos/xp_user_settings.sh; usos_xp_settings_stage /probe-usos-xp.ini /mnt/source || finish 'FAIL settings'; fi"+chr(10),'')
     cpio.put(entries,cpio.Entry('probe-init',stat.S_IFREG|0o755,probe.encode()))
     if settings:cpio.put(entries,cpio.Entry('probe-usos-xp.ini',stat.S_IFREG|0o644,Path(settings).read_bytes()))
+    if profile in ('w2k3-x86-sp2-uefi-csm','xp-x64-sp2-uefi-csm') and 'usr/lib/usos/nt5-storage/x86/genahci.sys' not in entries:
+        # A package from before the NT 5.2 storage files: add them as the builder does.
+        sys.path.insert(0,str(ROOT/'tools'));import build_xp_uefi_csm_trial as builder
+        for name,data in builder.nt5_storage_files().items():cpio.put(entries,cpio.Entry('usr/lib/usos/nt5-storage/'+name,stat.S_IFREG|0o644,data))
     if sif:cpio.put(entries,cpio.Entry('probe-custom.sif',stat.S_IFREG|0o644,Path(sif).read_bytes()))
     # --tree-scripts: test the working tree's scripts in the package's kernel/initramfs.
     for name in tree_scripts:
@@ -120,11 +126,13 @@ def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),
     if '[TEXTMODE_PROBE] RESULT PREPARED-PASS' not in log:raise SystemExit('preparation failed:\n'+log[-5000:])
     return target
 
-def textmode(out,target,keys,minutes):
+def textmode(out,target,keys,minutes,ahci=False):
     port=free_port()
+    # --ahci: the target on an AHCI controller (PCI class 010601, the X470 case).
+    disk=['-device','ahci,id=ahci','-drive','if=none,id=target,format=qcow2,file='+str(target),'-device','ide-hd,drive=target,bus=ahci.0'] if ahci else ['-drive','if=ide,index=0,format=qcow2,file='+str(target)]
     proc=subprocess.Popen([str(QEMU),'-machine','pc','-accel','tcg,thread=multi','-cpu','max','-m','512','-smp','1','-bios',str(SEABIOS),
         '-boot','order=c,strict=on','-display','none','-vga','std','-nic','none','-monitor',f'tcp:127.0.0.1:{port},server=on,wait=off',
-        '-drive','if=ide,index=0,format=qcow2,file='+str(target)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        *disk],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     screens=[];last=None;deadline=time.time()+minutes*60;shots=out/'screens';shots.mkdir(exist_ok=True)
     key_list=keys.split() if keys else [];key_index=0;result='timeout';copying_since=None
     try:
@@ -171,8 +179,8 @@ def textmode(out,target,keys,minutes):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--iso',type=Path,default=DEFAULT_ISO)
-    p.add_argument('--keys',default='');p.add_argument('--minutes',type=float,default=25);p.add_argument('--reuse-prepared',type=Path);p.add_argument('--prepare-only',action='store_true',help='stop after phase 1 (for tools/tests/target_digest.py)');p.add_argument('--profile',default='xp-x86-sp3-uefi-csm',choices=['xp-x86-sp3-uefi-csm','nt5-staging','w2k-x86-sp4-uefi-csm'],help='nt5-staging: the BIOS XP preparation of the same scripts; w2k-x86-sp4-uefi-csm: Windows 2000 from UEFI (--iso a 2000 ISO)')
-    p.add_argument('--settings',type=Path,help='usos-xp.ini to validate and merge (stand-in for the DATA Unattended file)');p.add_argument('--tree-scripts',default='',help='space-separated tools/*.sh names taken from the working tree');p.add_argument('--sif',type=Path,help='.sif chosen in the menu (merged into the automatic answer)')
+    p.add_argument('--keys',default='');p.add_argument('--minutes',type=float,default=25);p.add_argument('--reuse-prepared',type=Path);p.add_argument('--prepare-only',action='store_true',help='stop after phase 1 (for tools/tests/target_digest.py)');p.add_argument('--profile',default='xp-x86-sp3-uefi-csm',choices=['xp-x86-sp3-uefi-csm','nt5-staging','w2k-x86-sp4-uefi-csm','w2k3-x86-sp2-uefi-csm','xp-x64-sp2-uefi-csm'],help='nt5-staging: the BIOS XP preparation of the same scripts; w2k-x86-sp4-uefi-csm: Windows 2000 from UEFI (--iso a 2000 ISO)')
+    p.add_argument('--ahci',action='store_true',help='boot the prepared target from an AHCI controller');p.add_argument('--settings',type=Path,help='usos-xp.ini to validate and merge (stand-in for the DATA Unattended file)');p.add_argument('--tree-scripts',default='',help='space-separated tools/*.sh names taken from the working tree');p.add_argument('--sif',type=Path,help='.sif chosen in the menu (merged into the automatic answer)')
     a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
     prepared=a.reuse_prepared.resolve() if a.reuse_prepared else prepare(out,a.iso,a.profile,a.settings,a.tree_scripts.split(),a.sif)
     print('[PASS] prepared',prepared,flush=True)
@@ -180,6 +188,6 @@ if __name__=='__main__':
     # Boot an overlay so the prepared image stays pristine for further runs.
     target=out/'boot-overlay.qcow2';target.unlink(missing_ok=True)
     subprocess.run([str(QEMU_IMG),'create','-q','-f','qcow2','-F','qcow2','-b',str(prepared),str(target)],check=True)
-    r=textmode(out,target,a.keys,a.minutes)
+    r=textmode(out,target,a.keys,a.minutes,a.ahci)
     print('[RESULT]',r)
     sys.exit(0 if r=='copying' else 1)

@@ -167,7 +167,7 @@ assert entries['usr/lib/usos/xp-pae.exe'].data==(out.parent/'pae.exe').read_byte
 base_path=package_base();print('Package base:',base_path,flush=True)
 base=parse_newc(gzip.decompress(base_path.read_bytes()))
 changed={n for n in entries if n not in base or entries[n].data!=base[n].data}
-driver_entries={n for n in entries if n=='usr/lib/usos/xp-drivers' or n.startswith('usr/lib/usos/xp-drivers/')}
+driver_entries={n for n in entries if n in ('usr/lib/usos/xp-drivers','usr/lib/usos/nt5-storage') or n.startswith(('usr/lib/usos/xp-drivers/','usr/lib/usos/nt5-storage/'))}
 # Refactor M4: the package only ADDS the PAE helper, its notice and the driver
 # bundles; every base entry (scripts, UI, init) is the base's own.
 overlay={'usr/lib/usos/xp-pae.exe','usr/lib/usos/xp-pae-LICENSE.txt'}

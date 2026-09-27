@@ -21,6 +21,8 @@ USOS_UI_NT5=${USOS_UI_NT5:-no}
 case " $(cat /proc/cmdline 2>/dev/null) " in
     *' usos.legacy_action=xp-staging '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows XP' ;;
     *' usos.legacy_action=windows2000-staging '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows 2000' ;;
+    *' usos.legacy_action=windows2003-staging '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows Server 2003' ;;
+    *' usos.legacy_action=xp64-staging '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows XP x64' ;;
 esac
 if [ "$USOS_UI_NT5" = yes ] && [ -z "$USOS_UI_LABELS" ]; then
     USOS_UI_LABELS='Loading the preparation environment|Detecting disks|Choosing the target disk|Preparing workspace|Copying and verifying files'

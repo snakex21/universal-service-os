@@ -1046,5 +1046,7 @@
 
   "boot.summary.xp_csmwrap": "XP bez CSM-a (eksperimentalno): CSMWrap, kartica sa legacy VBIOS-om, 1 jezgro rezervisano",
 
-  "boot.summary.w2k_limits": "Windows 2000 (eksperimentalno): nema drajvera AHCI/NVMe/USB 3 za NT 5.0 (SATA u IDE režimu), najviše 4 GB RAM-a i 2 procesora"
+  "boot.summary.w2k_limits": "Windows 2000 (eksperimentalno): nema drajvera AHCI/NVMe/USB 3 za NT 5.0 (SATA u IDE režimu), najviše 4 GB RAM-a i 2 procesora",
+
+  "boot.summary.nt52_limits": "NT 5.2 (eksperimentalno): AHCI preko GenAHCI na StorPortu sistema; nema drajvera NVMe/USB 3 u instalaciji"
 }

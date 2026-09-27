@@ -1046,5 +1046,7 @@
 
   "boot.summary.xp_csmwrap": "XP be CSM (eksperimentinis): CSMWrap, plokštė su legacy VBIOS, 1 branduolys rezervuotas",
 
-  "boot.summary.w2k_limits": "Windows 2000 (eksperimentinė): nėra NT 5.0 AHCI/NVMe/USB 3 tvarkyklės (SATA IDE režimu), daugiausia 4 GB RAM ir 2 procesoriai"
+  "boot.summary.w2k_limits": "Windows 2000 (eksperimentinė): nėra NT 5.0 AHCI/NVMe/USB 3 tvarkyklės (SATA IDE režimu), daugiausia 4 GB RAM ir 2 procesoriai",
+
+  "boot.summary.nt52_limits": "NT 5.2 (eksperimentinė): AHCI per GenAHCI sistemos StorPort; diegime nėra NVMe/USB 3 tvarkyklės"
 }

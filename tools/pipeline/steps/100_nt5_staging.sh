@@ -2,12 +2,14 @@
 # Pipeline step 100: NT5 (XP / 2000) staging, BIOS and UEFI profiles. Adapter over the unchanged
 # legacy_xp_staging.sh; the code was the xp-staging branch of /usos-init.
 usos_step_100_run() {
-    if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ] || [ "${USOS_PLAN_PROFILE:-}" = w2k-x86-sp4-uefi-csm ]; then
+    case "${USOS_PLAN_PROFILE:-}" in *-uefi-csm) USOS_NT5_UEFI=yes ;; *) USOS_NT5_UEFI=no ;; esac
+    if [ "$USOS_NT5_UEFI" = yes ]; then
         # XP (and Windows 2000) from UEFI through the firmware CSM or CSMWrap
         # (formerly text edits of /usos-init by tools/build_xp_uefi_csm_trial.py):
         # UEFI only, and every trace of this session under EFI/USOS-XP.
         case "${USOS_PLAN_PROFILE}:$LEGACY_ACTION" in
             xp-x86-sp3-uefi-csm:xp-staging|w2k-x86-sp4-uefi-csm:windows2000-staging) ;;
+            w2k3-x86-sp2-uefi-csm:windows2003-staging|xp-x64-sp2-uefi-csm:xp64-staging) ;;
             *) stop 'Unexpected experimental action' ;;
         esac
         [ -d /sys/firmware/efi ] || stop 'UEFI required'
@@ -24,8 +26,12 @@ usos_step_100_run() {
         printf 'phase=init-mounted\nboot_id=%s\n' "$(cat /proc/sys/kernel/random/boot_id)" > "$USOS_XP_TRACE_DIR/menu-events.log"
         sync
     fi
-    NT5_SYSTEM=windows-xp
-    [ "$LEGACY_ACTION" != windows2000-staging ] || NT5_SYSTEM=windows-2000
+    case "$LEGACY_ACTION" in
+        windows2000-staging) NT5_SYSTEM=windows-2000 ;;
+        windows2003-staging) NT5_SYSTEM=windows-server-2003 ;;
+        xp64-staging) NT5_SYSTEM=windows-xp-x64 ;;
+        *) NT5_SYSTEM=windows-xp ;;
+    esac
     export NT5_SYSTEM
     [ -r /usr/lib/usos/legacy_xp_staging.sh ] || stop 'legacy_xp_staging.sh is missing'
     . /usr/lib/usos/legacy_xp_staging.sh

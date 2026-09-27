@@ -1043,5 +1043,7 @@
 
   "boot.summary.xp_csmwrap": "XP ilman CSM:ää (kokeellinen): CSMWrap, näytönohjain legacy-VBIOSilla, 1 ydin varattu",
 
-  "boot.summary.w2k_limits": "Windows 2000 (kokeellinen): ei AHCI/NVMe/USB 3 -ajuria NT 5.0:lle (SATA IDE-tilassa), enintään 4 Gt RAM ja 2 suoritinta"
+  "boot.summary.w2k_limits": "Windows 2000 (kokeellinen): ei AHCI/NVMe/USB 3 -ajuria NT 5.0:lle (SATA IDE-tilassa), enintään 4 Gt RAM ja 2 suoritinta",
+
+  "boot.summary.nt52_limits": "NT 5.2 (kokeellinen): AHCI GenAHCI:n kautta järjestelmän StorPortilla; asennuksessa ei NVMe/USB 3 -ajuria"
 }

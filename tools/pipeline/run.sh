@@ -40,6 +40,10 @@ usos_pipeline_profile_for_action() {
             if [ -d "${USOS_PIPELINE_EFI_DIR:-/sys/firmware/efi}" ]; then printf 'xp-x86-sp3-uefi-csm'; else printf 'nt5-staging'; fi ;;
         windows2000-staging)
             if [ -d "${USOS_PIPELINE_EFI_DIR:-/sys/firmware/efi}" ]; then printf 'w2k-x86-sp4-uefi-csm'; else printf 'nt5-staging'; fi ;;
+        windows2003-staging)
+            if [ -d "${USOS_PIPELINE_EFI_DIR:-/sys/firmware/efi}" ]; then printf 'w2k3-x86-sp2-uefi-csm'; else printf 'nt5-staging'; fi ;;
+        xp64-staging)
+            if [ -d "${USOS_PIPELINE_EFI_DIR:-/sys/firmware/efi}" ]; then printf 'xp-x64-sp2-uefi-csm'; else printf 'nt5-staging'; fi ;;
         windows7-iso|windows-vista-iso) printf 'windows-pe-bios-iso' ;;
         xp-resume) printf 'nt5-resume' ;;
         vista-disk) printf 'vista-uefi-disk' ;;
@@ -50,7 +54,7 @@ usos_pipeline_profile_for_action() {
 # Profile id -> ordered step ids.
 usos_pipeline_steps() {
     case "$1" in
-        nt5-staging|xp-x86-sp3-uefi-csm|w2k-x86-sp4-uefi-csm) printf '100' ;;
+        nt5-staging|xp-x86-sp3-uefi-csm|w2k-x86-sp4-uefi-csm|w2k3-x86-sp2-uefi-csm|xp-x64-sp2-uefi-csm) printf '100' ;;
         nt5-resume) printf '150' ;;
         vista-uefi-disk) printf '600' ;;
         windows-pe-bios-iso) printf '500 200' ;;
@@ -90,12 +94,13 @@ usos_pipeline_resolve_action() {
     _pl_profile=$_pl_from_action
     if [ -n "$_pl_token" ]; then
         # nt5-staging and the UEFI-CSM profile share the xp-staging action
-        # (windows2000-staging: the Windows 2000 UEFI-CSM profile).
+        # (windows2000/2003/xp64-staging: their own UEFI-CSM profiles).
         case "$_pl_from_action:$_pl_token" in
             "$_pl_token:$_pl_token") _pl_profile=$_pl_token ;;
-            nt5-staging:xp-x86-sp3-uefi-csm|xp-x86-sp3-uefi-csm:nt5-staging|nt5-staging:w2k-x86-sp4-uefi-csm|w2k-x86-sp4-uefi-csm:nt5-staging)
+            nt5-staging:*-uefi-csm|*-uefi-csm:nt5-staging)
                 case "$_pl_action:$_pl_token" in
                     xp-staging:xp-x86-sp3-uefi-csm|xp-staging:nt5-staging|windows2000-staging:w2k-x86-sp4-uefi-csm|windows2000-staging:nt5-staging) _pl_profile=$_pl_token ;;
+                    windows2003-staging:w2k3-x86-sp2-uefi-csm|windows2003-staging:nt5-staging|xp64-staging:xp-x64-sp2-uefi-csm|xp64-staging:nt5-staging) _pl_profile=$_pl_token ;;
                     *) usos_pipeline_log "profile token $_pl_token does not match action $_pl_action"; return 1 ;;
                 esac ;;
             *) usos_pipeline_log "profile token $_pl_token does not match action $_pl_action"; return 1 ;;

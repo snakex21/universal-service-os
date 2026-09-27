@@ -39,7 +39,7 @@ def main():
     p.add_argument('--iso', type=Path, default=textmode.DEFAULT_ISO)
     p.add_argument('--minutes', type=float, default=14)
     p.add_argument('--run-through', action='store_true')
-    p.add_argument('--profile', default='xp-x86-sp3-uefi-csm', choices=['xp-x86-sp3-uefi-csm', 'w2k-x86-sp4-uefi-csm'],
+    p.add_argument('--profile', default='xp-x86-sp3-uefi-csm', choices=['xp-x86-sp3-uefi-csm', 'w2k-x86-sp4-uefi-csm', 'w2k3-x86-sp2-uefi-csm', 'xp-x64-sp2-uefi-csm'],
                    help='w2k-x86-sp4-uefi-csm: Windows 2000 (--iso a 2000 SP4 ISO)')
     p.add_argument('--settings', type=Path, help='usos-xp.ini stand-in')
     p.add_argument('--tree-scripts', default='', help='more tools/* names taken from the working tree')

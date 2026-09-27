@@ -1043,5 +1043,7 @@
 
   "boot.summary.xp_csmwrap": "XP uden CSM (eksperimentelt): CSMWrap, kort med legacy-VBIOS, 1 kerne reserveret",
 
-  "boot.summary.w2k_limits": "Windows 2000 (eksperimentelt): ingen AHCI/NVMe/USB 3-driver til NT 5.0 (SATA i IDE-tilstand), maks. 4 GB RAM og 2 CPU'er"
+  "boot.summary.w2k_limits": "Windows 2000 (eksperimentelt): ingen AHCI/NVMe/USB 3-driver til NT 5.0 (SATA i IDE-tilstand), maks. 4 GB RAM og 2 CPU'er",
+
+  "boot.summary.nt52_limits": "NT 5.2 (eksperimentelt): AHCI via GenAHCI på systemets StorPort; ingen NVMe/USB 3-driver i installationen"
 }

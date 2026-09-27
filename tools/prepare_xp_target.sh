@@ -361,7 +361,7 @@ for required in \
     'NTLDR' 'NTDETECT.COM' 'TXTSETUP.SIF' '$LDR$' \
     '$WIN_NT$.~BT/SETUPLDR.BIN' '$WIN_NT$.~BT/TXTSETUP.SIF' '$WIN_NT$.~BT/WINNT.SIF' \
     '$WIN_NT$.~LS/I386/SETUPLDR.BIN' '$WIN_NT$.~LS/I386/NTLDR' \
-    '$WIN_NT$.~LS/I386/TXTSETUP.SIF' '$WIN_NT$.~LS/I386/SYSTEM32/SMSS.EXE'; do
+    "\$WIN_NT\$.~LS/${NT5_SOURCE_DIR:-I386}/TXTSETUP.SIF" "\$WIN_NT\$.~LS/${NT5_SOURCE_DIR:-I386}/SYSTEM32/SMSS.EXE"; do
     mdir -i "$MTOOLS_IMAGE" "::/$required" >/dev/null 2>&1 || fail "prepared XPSETUP missing: $required"
 done
 printf '[XP_TARGET] LOCAL SOURCE READBACK PASS markers=%s service_pack_marker=%s\n' "$XP_SOURCE_MARKERS" "$XP_SP_MARKER"

@@ -129,6 +129,7 @@ usos_xp_settings_sif() {
             close(settings)
             # usos-xp.ini has no family=: the staged system decides (Windows 2000).
             if (v["family"] == "" && nt5_system == "windows-2000") v["family"] = "2000"
+            if (v["family"] == "" && nt5_system == "windows-server-2003") v["family"] = "2003"
             mode = v["key"] != "" ? "FullUnattended" : "DefaultHide"
         }
         { sub(/\r$/, "") }
@@ -272,7 +273,7 @@ usos_xp_settings_stage() {
         { sub(/\r$/, "") }
         /^\[/ { section = tolower($0); next }
         section == "[nls]" && tolower($0) ~ /^defaultlayout[ \t]*=/ { sub(/^[^=]*=[ \t]*/, ""); gsub(/[" \t]/, ""); print; exit }
-    ' "$2/I386/TXTSETUP.SIF" 2>/dev/null)
+    ' "$2/${NT5_SOURCE_DIR:-I386}/TXTSETUP.SIF" 2>/dev/null)
     usos_xp_settings_load "$1" /run/usos-xp-settings "$_xs_layout"
     case $? in
         0) ;;
@@ -313,7 +314,7 @@ usos_xp_settings_plan() {
         { sub(/\r$/, "") }
         /^\[/ { section = tolower($0); next }
         section == "[nls]" && tolower($0) ~ /^defaultlayout[ \t]*=/ { sub(/^[^=]*=[ \t]*/, ""); gsub(/[" \t]/, ""); print; exit }
-    ' "$2/I386/TXTSETUP.SIF" 2>/dev/null)
+    ' "$2/${NT5_SOURCE_DIR:-I386}/TXTSETUP.SIF" 2>/dev/null)
     # USOS_XP_SETTINGS_OUT: host tests only (the initramfs keeps it in /run).
     _xs_norm=${USOS_XP_SETTINGS_OUT:-/run/usos-xp-settings}
     usos_xp_settings_load "$_xs_rendered" "$_xs_norm" "$_xs_layout" profile

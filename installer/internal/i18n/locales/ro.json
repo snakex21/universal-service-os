@@ -1046,5 +1046,7 @@
 
   "boot.summary.xp_csmwrap": "XP fără CSM (experimental): CSMWrap, placă cu VBIOS legacy, 1 nucleu rezervat",
 
-  "boot.summary.w2k_limits": "Windows 2000 (experimental): fără driver AHCI/NVMe/USB 3 pentru NT 5.0 (SATA în mod IDE), max. 4 GB RAM și 2 procesoare"
+  "boot.summary.w2k_limits": "Windows 2000 (experimental): fără driver AHCI/NVMe/USB 3 pentru NT 5.0 (SATA în mod IDE), max. 4 GB RAM și 2 procesoare",
+
+  "boot.summary.nt52_limits": "NT 5.2 (experimental): AHCI prin GenAHCI pe StorPort-ul sistemului; fără driver NVMe/USB 3 în instalare"
 }

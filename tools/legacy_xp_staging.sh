@@ -454,12 +454,17 @@ usos_legacy_xp_staging() {
     if [ "$NT5_SYSTEM" = windows-xp ]; then
     . /usr/lib/usos/xp_driver_stage.sh
     usos_xp_driver_preflight || stop 'XP driver preflight failed; no target write occurred'
-    else
+    elif [ "$NT5_SYSTEM" = windows-2000 ]; then
     # The XP driver bundle (GenAHCI on StorPort, KMDF, USB3, community ACPI)
     # needs NT 5.1 exports that the Windows 2000 kernel/HAL lack; 2000 keeps
     # its inbox drivers (docs/windows-2000-uefi-2026-09-27.md).
-    printf '[W2K_DRIVERS] none: the XP bundle is NT 5.1 only; inbox IDE/ACPI drivers
-'
+    printf '[W2K_DRIVERS] none: the XP bundle is NT 5.1 only; inbox IDE/ACPI drivers\n'
+    else
+    # NT 5.2 (Server 2003 x86, XP x64): GenAHCI on the system's own StorPort
+    # (nt5_storage_stage.sh, applied to the target after the source copy).
+    case "$NT5_SOURCE_DIR" in AMD64) nt5_storage_arch=amd64 ;; *) nt5_storage_arch=x86 ;; esac
+    [ -f "/usr/lib/usos/nt5-storage/$nt5_storage_arch/genahci.sys" ] || stop 'NT 5.2 AHCI driver (GenAHCI) is missing from the package; no target write occurred'
+    printf '[NT5_STORAGE] PREFLIGHT PASS genahci %s on the system StorPort\n' "$nt5_storage_arch"
     fi
     # Hands-off Setup/OOBE (docs/xp-unattended.md); a selected custom .sif wins.
     . /usr/lib/usos/xp_user_settings.sh

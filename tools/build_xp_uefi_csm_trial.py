@@ -122,7 +122,24 @@ def refresh_pae_flow(esp):
 # entry, scripts included, is the base's own, byte for byte: the UEFI-CSM
 # differences are profile branches in the scripts (USOS_PLAN_PROFILE).
 PACKAGE_ENTRIES=('usr/lib/usos/xp-pae.exe','usr/lib/usos/xp-pae-LICENSE.txt')
-PACKAGE_PREFIXES=('usr/lib/usos/xp-drivers/',)
+PACKAGE_PREFIXES=('usr/lib/usos/xp-drivers/','usr/lib/usos/nt5-storage/')
+
+# NT 5.2 (Server 2003 x86, XP x64) AHCI: GenAHCI 6.3.0.1 x86/x64 on the
+# system's own StorPort (tools/nt5_storage_stage.sh). Pinned archive.
+GENAHCI_ARCHIVE=ROOT/'tools/vendor/xp-modern/2026-09-21/GenAHCI_6.3.0.1.7z'
+GENAHCI_SHA256='f8dd54123934c176a2b6315df7b4a1dfe2ff6761fa3bc27cecfeedbe421b279f'
+
+def nt5_storage_files():
+    if digest(GENAHCI_ARCHIVE)!=GENAHCI_SHA256:raise ValueError('GenAHCI archive hash mismatch')
+    def member(name):
+        return subprocess.run(['C:/Program Files/7-Zip/7z.exe','e','-so',str(GENAHCI_ARCHIVE),name],check=True,capture_output=True).stdout
+    note=(b'GenAHCI 6.3.0.1 (x86 and x64 builds, unmodified), https://github.com/GeorgeK1ng/GenAHCI\n'
+          b'archive GenAHCI_6.3.0.1.7z sha256 '+GENAHCI_SHA256.encode()+b'; licence: gpl.txt of the archive.\n'
+          b'USOS uses it only for Windows Server 2003 x86 and XP x64 (NT 5.2) text-mode Setup.\n')
+    files={'x86/genahci.sys':member('x86/genahci.sys'),'amd64/genahci.sys':member('x64/genahci.sys'),'gpl.txt':member('gpl.txt'),'SOURCE.txt':note}
+    for name,data in files.items():
+        if not data:raise ValueError('GenAHCI member missing: '+name)
+    return files
 
 def is_package_entry(name):
     return name in PACKAGE_ENTRIES or name=='usr/lib/usos/xp-drivers' or name.startswith(PACKAGE_PREFIXES)
@@ -142,6 +159,7 @@ def overlay(base, helper, driver_bundles):
     vendor=ROOT/'tools/vendor/patchpae3/3e1d3b65f5c3c1ec0c4759f707d3017e51113103'
     credit=b'USOS XP PAE: adapted from evgen-b/PatchPAE3, commit 3e1d3b65f5c3c1ec0c4759f707d3017e51113103.\nhttps://github.com/evgen-b/PatchPAE3\nPatterns by evgen_b, based on wj32 and XP64G. USOS adds strict checks and separate output/boot entries.\n\n'
     put(entries,Entry(prefix+'xp-pae-LICENSE.txt',stat.S_IFREG|0o644,credit+(vendor/'LICENSE').read_bytes()))
+    for name,data in nt5_storage_files().items():put(entries,Entry(prefix+'nt5-storage/'+name,stat.S_IFREG|0o644,data))
     changed=[n for n in before if not is_package_entry(n) and (entries[n].mode,entries[n].data)!=before[n]]
     if changed:raise ValueError('package would change base entries: '+', '.join(changed))
     return pad_initrd(gzip.compress(newc(entries),compresslevel=6,mtime=0))

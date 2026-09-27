@@ -6,6 +6,7 @@ system	windows-8	windows	windows	any	\Systems\Windows\Windows 8\Images	\Systems\
 system	windows-7	windows	windows	any	\Systems\Windows\Windows 7\Images	\Systems\Windows\Windows 7\Unattended	.xml	unattend.xml	1	automatic,direct_iso,wimboot,vhdboot,direct_efi
 system	windows-vista	windows	windows	any	\Systems\Windows\Windows Vista\Images	\Systems\Windows\Windows Vista\Unattended	.xml	unattend.xml	1	automatic,direct_iso,wimboot,vhdboot,direct_efi,chainload
 system	windows-xp	windows_legacy	windows	any	\Systems\Windows\Windows XP\Images	\Systems\Windows\Windows XP\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
+system	windows-xp-x64	windows_legacy	windows	any	\Systems\Windows\Windows XP x64\Images	\Systems\Windows\Windows XP x64\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-2000	windows_legacy	windows	any	\Systems\Windows\Windows 2000\Images	\Systems\Windows\Windows 2000\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-nt-4	windows_legacy	windows	bios	\Systems\Windows\Windows NT 4.0\Images	\Systems\Windows\Windows NT 4.0\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-me	windows_legacy	windows	bios	\Systems\Windows\Windows Me\Images	\Systems\Windows\Windows Me\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
@@ -22,6 +23,7 @@ system	windows-server-2012-r2	windows	windows	any	\Systems\Windows\Windows Serve
 system	windows-server-2012	windows	windows	any	\Systems\Windows\Windows Server 2012\Images	\Systems\Windows\Windows Server 2012\Unattended	.xml	unattend.xml	0	automatic,direct_iso,wimboot,vhdboot,direct_efi,chainload
 system	windows-server-2008-r2	windows	windows	any	\Systems\Windows\Windows Server 2008 R2\Images	\Systems\Windows\Windows Server 2008 R2\Unattended	.xml	unattend.xml	1	automatic,direct_iso,wimboot,vhdboot,direct_efi
 system	windows-server-2008	windows	windows	any	\Systems\Windows\Windows Server 2008\Images	\Systems\Windows\Windows Server 2008\Unattended	.xml	unattend.xml	1	automatic,direct_iso,wimboot,vhdboot,direct_efi,chainload
+system	windows-server-2003	windows	windows	any	\Systems\Windows\Windows Server 2003\Images	\Systems\Windows\Windows Server 2003\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	ubuntu	linux	linux	any	\Systems\Linux\Ubuntu\Images	\Systems\Linux\Ubuntu\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,direct_efi,disk_image
 system	debian	linux	linux	any	\Systems\Linux\Debian\Images	\Systems\Linux\Debian\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,direct_efi,disk_image
 system	fedora	linux	linux	any	\Systems\Linux\Fedora\Images	\Systems\Linux\Fedora\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,direct_efi,disk_image
@@ -800,6 +802,114 @@ route	windows-xp	efi	disk_image	bios	-
 route	windows-xp	efi	disk_image	uefi	-
 route	windows-xp	efi	floppy_image	bios	-
 route	windows-xp	efi	floppy_image	uefi	-
+route	windows-xp-x64	iso	automatic	bios	xp_staging	direct_iso	bios	tested_in_vm	0
+route	windows-xp-x64	iso	automatic	uefi	xp_uefi_staging	direct_iso	uefi	experimental	1
+route	windows-xp-x64	iso	direct_iso	bios	-
+route	windows-xp-x64	iso	direct_iso	uefi	-
+route	windows-xp-x64	iso	wimboot	bios	-
+route	windows-xp-x64	iso	wimboot	uefi	-
+route	windows-xp-x64	iso	vhdboot	bios	-
+route	windows-xp-x64	iso	vhdboot	uefi	-
+route	windows-xp-x64	iso	direct_efi	bios	-
+route	windows-xp-x64	iso	direct_efi	uefi	-
+route	windows-xp-x64	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	windows-xp-x64	iso	chainload	uefi	-
+route	windows-xp-x64	iso	memdisk	bios	-
+route	windows-xp-x64	iso	memdisk	uefi	-
+route	windows-xp-x64	iso	disk_image	bios	-
+route	windows-xp-x64	iso	disk_image	uefi	-
+route	windows-xp-x64	iso	floppy_image	bios	-
+route	windows-xp-x64	iso	floppy_image	uefi	-
+route	windows-xp-x64	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-xp-x64	wim	automatic	uefi	-
+route	windows-xp-x64	wim	direct_iso	bios	-
+route	windows-xp-x64	wim	direct_iso	uefi	-
+route	windows-xp-x64	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-xp-x64	wim	wimboot	uefi	-
+route	windows-xp-x64	wim	vhdboot	bios	-
+route	windows-xp-x64	wim	vhdboot	uefi	-
+route	windows-xp-x64	wim	direct_efi	bios	-
+route	windows-xp-x64	wim	direct_efi	uefi	-
+route	windows-xp-x64	wim	chainload	bios	-
+route	windows-xp-x64	wim	chainload	uefi	-
+route	windows-xp-x64	wim	memdisk	bios	-
+route	windows-xp-x64	wim	memdisk	uefi	-
+route	windows-xp-x64	wim	disk_image	bios	-
+route	windows-xp-x64	wim	disk_image	uefi	-
+route	windows-xp-x64	wim	floppy_image	bios	-
+route	windows-xp-x64	wim	floppy_image	uefi	-
+route	windows-xp-x64	img	automatic	bios	-
+route	windows-xp-x64	img	automatic	uefi	-
+route	windows-xp-x64	img	direct_iso	bios	-
+route	windows-xp-x64	img	direct_iso	uefi	-
+route	windows-xp-x64	img	wimboot	bios	-
+route	windows-xp-x64	img	wimboot	uefi	-
+route	windows-xp-x64	img	vhdboot	bios	-
+route	windows-xp-x64	img	vhdboot	uefi	-
+route	windows-xp-x64	img	direct_efi	bios	-
+route	windows-xp-x64	img	direct_efi	uefi	-
+route	windows-xp-x64	img	chainload	bios	-
+route	windows-xp-x64	img	chainload	uefi	-
+route	windows-xp-x64	img	memdisk	bios	-
+route	windows-xp-x64	img	memdisk	uefi	-
+route	windows-xp-x64	img	disk_image	bios	-
+route	windows-xp-x64	img	disk_image	uefi	-
+route	windows-xp-x64	img	floppy_image	bios	-
+route	windows-xp-x64	img	floppy_image	uefi	-
+route	windows-xp-x64	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-xp-x64	vhd	automatic	uefi	-
+route	windows-xp-x64	vhd	direct_iso	bios	-
+route	windows-xp-x64	vhd	direct_iso	uefi	-
+route	windows-xp-x64	vhd	wimboot	bios	-
+route	windows-xp-x64	vhd	wimboot	uefi	-
+route	windows-xp-x64	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-xp-x64	vhd	vhdboot	uefi	-
+route	windows-xp-x64	vhd	direct_efi	bios	-
+route	windows-xp-x64	vhd	direct_efi	uefi	-
+route	windows-xp-x64	vhd	chainload	bios	-
+route	windows-xp-x64	vhd	chainload	uefi	-
+route	windows-xp-x64	vhd	memdisk	bios	-
+route	windows-xp-x64	vhd	memdisk	uefi	-
+route	windows-xp-x64	vhd	disk_image	bios	-
+route	windows-xp-x64	vhd	disk_image	uefi	-
+route	windows-xp-x64	vhd	floppy_image	bios	-
+route	windows-xp-x64	vhd	floppy_image	uefi	-
+route	windows-xp-x64	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-xp-x64	vhdx	automatic	uefi	-
+route	windows-xp-x64	vhdx	direct_iso	bios	-
+route	windows-xp-x64	vhdx	direct_iso	uefi	-
+route	windows-xp-x64	vhdx	wimboot	bios	-
+route	windows-xp-x64	vhdx	wimboot	uefi	-
+route	windows-xp-x64	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-xp-x64	vhdx	vhdboot	uefi	-
+route	windows-xp-x64	vhdx	direct_efi	bios	-
+route	windows-xp-x64	vhdx	direct_efi	uefi	-
+route	windows-xp-x64	vhdx	chainload	bios	-
+route	windows-xp-x64	vhdx	chainload	uefi	-
+route	windows-xp-x64	vhdx	memdisk	bios	-
+route	windows-xp-x64	vhdx	memdisk	uefi	-
+route	windows-xp-x64	vhdx	disk_image	bios	-
+route	windows-xp-x64	vhdx	disk_image	uefi	-
+route	windows-xp-x64	vhdx	floppy_image	bios	-
+route	windows-xp-x64	vhdx	floppy_image	uefi	-
+route	windows-xp-x64	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-xp-x64	efi	automatic	uefi	-
+route	windows-xp-x64	efi	direct_iso	bios	-
+route	windows-xp-x64	efi	direct_iso	uefi	-
+route	windows-xp-x64	efi	wimboot	bios	-
+route	windows-xp-x64	efi	wimboot	uefi	-
+route	windows-xp-x64	efi	vhdboot	bios	-
+route	windows-xp-x64	efi	vhdboot	uefi	-
+route	windows-xp-x64	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-xp-x64	efi	direct_efi	uefi	-
+route	windows-xp-x64	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	windows-xp-x64	efi	chainload	uefi	-
+route	windows-xp-x64	efi	memdisk	bios	-
+route	windows-xp-x64	efi	memdisk	uefi	-
+route	windows-xp-x64	efi	disk_image	bios	-
+route	windows-xp-x64	efi	disk_image	uefi	-
+route	windows-xp-x64	efi	floppy_image	bios	-
+route	windows-xp-x64	efi	floppy_image	uefi	-
 route	windows-2000	iso	automatic	bios	xp_staging	direct_iso	bios	tested_in_vm	0
 route	windows-2000	iso	automatic	uefi	xp_uefi_staging	direct_iso	uefi	experimental	1
 route	windows-2000	iso	direct_iso	bios	-
@@ -2528,6 +2638,114 @@ route	windows-server-2008	efi	disk_image	bios	-
 route	windows-server-2008	efi	disk_image	uefi	-
 route	windows-server-2008	efi	floppy_image	bios	-
 route	windows-server-2008	efi	floppy_image	uefi	-
+route	windows-server-2003	iso	automatic	bios	xp_staging	direct_iso	bios	tested_in_vm	0
+route	windows-server-2003	iso	automatic	uefi	xp_uefi_staging	direct_iso	uefi	experimental	1
+route	windows-server-2003	iso	direct_iso	bios	-
+route	windows-server-2003	iso	direct_iso	uefi	-
+route	windows-server-2003	iso	wimboot	bios	-
+route	windows-server-2003	iso	wimboot	uefi	-
+route	windows-server-2003	iso	vhdboot	bios	-
+route	windows-server-2003	iso	vhdboot	uefi	-
+route	windows-server-2003	iso	direct_efi	bios	-
+route	windows-server-2003	iso	direct_efi	uefi	-
+route	windows-server-2003	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	windows-server-2003	iso	chainload	uefi	-
+route	windows-server-2003	iso	memdisk	bios	-
+route	windows-server-2003	iso	memdisk	uefi	-
+route	windows-server-2003	iso	disk_image	bios	-
+route	windows-server-2003	iso	disk_image	uefi	-
+route	windows-server-2003	iso	floppy_image	bios	-
+route	windows-server-2003	iso	floppy_image	uefi	-
+route	windows-server-2003	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-server-2003	wim	automatic	uefi	-
+route	windows-server-2003	wim	direct_iso	bios	-
+route	windows-server-2003	wim	direct_iso	uefi	-
+route	windows-server-2003	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-server-2003	wim	wimboot	uefi	-
+route	windows-server-2003	wim	vhdboot	bios	-
+route	windows-server-2003	wim	vhdboot	uefi	-
+route	windows-server-2003	wim	direct_efi	bios	-
+route	windows-server-2003	wim	direct_efi	uefi	-
+route	windows-server-2003	wim	chainload	bios	-
+route	windows-server-2003	wim	chainload	uefi	-
+route	windows-server-2003	wim	memdisk	bios	-
+route	windows-server-2003	wim	memdisk	uefi	-
+route	windows-server-2003	wim	disk_image	bios	-
+route	windows-server-2003	wim	disk_image	uefi	-
+route	windows-server-2003	wim	floppy_image	bios	-
+route	windows-server-2003	wim	floppy_image	uefi	-
+route	windows-server-2003	img	automatic	bios	-
+route	windows-server-2003	img	automatic	uefi	-
+route	windows-server-2003	img	direct_iso	bios	-
+route	windows-server-2003	img	direct_iso	uefi	-
+route	windows-server-2003	img	wimboot	bios	-
+route	windows-server-2003	img	wimboot	uefi	-
+route	windows-server-2003	img	vhdboot	bios	-
+route	windows-server-2003	img	vhdboot	uefi	-
+route	windows-server-2003	img	direct_efi	bios	-
+route	windows-server-2003	img	direct_efi	uefi	-
+route	windows-server-2003	img	chainload	bios	-
+route	windows-server-2003	img	chainload	uefi	-
+route	windows-server-2003	img	memdisk	bios	-
+route	windows-server-2003	img	memdisk	uefi	-
+route	windows-server-2003	img	disk_image	bios	-
+route	windows-server-2003	img	disk_image	uefi	-
+route	windows-server-2003	img	floppy_image	bios	-
+route	windows-server-2003	img	floppy_image	uefi	-
+route	windows-server-2003	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-server-2003	vhd	automatic	uefi	-
+route	windows-server-2003	vhd	direct_iso	bios	-
+route	windows-server-2003	vhd	direct_iso	uefi	-
+route	windows-server-2003	vhd	wimboot	bios	-
+route	windows-server-2003	vhd	wimboot	uefi	-
+route	windows-server-2003	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-server-2003	vhd	vhdboot	uefi	-
+route	windows-server-2003	vhd	direct_efi	bios	-
+route	windows-server-2003	vhd	direct_efi	uefi	-
+route	windows-server-2003	vhd	chainload	bios	-
+route	windows-server-2003	vhd	chainload	uefi	-
+route	windows-server-2003	vhd	memdisk	bios	-
+route	windows-server-2003	vhd	memdisk	uefi	-
+route	windows-server-2003	vhd	disk_image	bios	-
+route	windows-server-2003	vhd	disk_image	uefi	-
+route	windows-server-2003	vhd	floppy_image	bios	-
+route	windows-server-2003	vhd	floppy_image	uefi	-
+route	windows-server-2003	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-server-2003	vhdx	automatic	uefi	-
+route	windows-server-2003	vhdx	direct_iso	bios	-
+route	windows-server-2003	vhdx	direct_iso	uefi	-
+route	windows-server-2003	vhdx	wimboot	bios	-
+route	windows-server-2003	vhdx	wimboot	uefi	-
+route	windows-server-2003	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-server-2003	vhdx	vhdboot	uefi	-
+route	windows-server-2003	vhdx	direct_efi	bios	-
+route	windows-server-2003	vhdx	direct_efi	uefi	-
+route	windows-server-2003	vhdx	chainload	bios	-
+route	windows-server-2003	vhdx	chainload	uefi	-
+route	windows-server-2003	vhdx	memdisk	bios	-
+route	windows-server-2003	vhdx	memdisk	uefi	-
+route	windows-server-2003	vhdx	disk_image	bios	-
+route	windows-server-2003	vhdx	disk_image	uefi	-
+route	windows-server-2003	vhdx	floppy_image	bios	-
+route	windows-server-2003	vhdx	floppy_image	uefi	-
+route	windows-server-2003	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-server-2003	efi	automatic	uefi	-
+route	windows-server-2003	efi	direct_iso	bios	-
+route	windows-server-2003	efi	direct_iso	uefi	-
+route	windows-server-2003	efi	wimboot	bios	-
+route	windows-server-2003	efi	wimboot	uefi	-
+route	windows-server-2003	efi	vhdboot	bios	-
+route	windows-server-2003	efi	vhdboot	uefi	-
+route	windows-server-2003	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-server-2003	efi	direct_efi	uefi	-
+route	windows-server-2003	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	windows-server-2003	efi	chainload	uefi	-
+route	windows-server-2003	efi	memdisk	bios	-
+route	windows-server-2003	efi	memdisk	uefi	-
+route	windows-server-2003	efi	disk_image	bios	-
+route	windows-server-2003	efi	disk_image	uefi	-
+route	windows-server-2003	efi	floppy_image	bios	-
+route	windows-server-2003	efi	floppy_image	uefi	-
 route	ubuntu	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
 route	ubuntu	iso	automatic	uefi	chainload	chainload	uefi	validated_hardware	0
 route	ubuntu	iso	direct_iso	bios	-
@@ -5095,6 +5313,82 @@ profile	windows-xp	efi	chainload	-	efi-chainload
 profile	windows-xp	efi	memdisk	uefi	xp-uefi-other
 profile	windows-xp	efi	disk_image	uefi	xp-uefi-other
 profile	windows-xp	efi	floppy_image	uefi	xp-uefi-other
+profile	windows-xp-x64	iso	automatic	bios	nt5-staging
+profile	windows-xp-x64	iso	automatic	uefi	xp-x64-sp2-uefi-csm
+profile	windows-xp-x64	iso	automatic	-	nt5-staging
+profile	windows-xp-x64	iso	direct_iso	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	iso	wimboot	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	iso	vhdboot	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	iso	direct_efi	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	iso	chainload	bios	iso-work-chainload
+profile	windows-xp-x64	iso	chainload	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	iso	chainload	-	iso-work-chainload
+profile	windows-xp-x64	iso	memdisk	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	iso	disk_image	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	iso	floppy_image	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	wim	automatic	bios	wim-wimboot
+profile	windows-xp-x64	wim	automatic	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	wim	automatic	-	wim-wimboot
+profile	windows-xp-x64	wim	direct_iso	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	wim	wimboot	bios	wim-wimboot
+profile	windows-xp-x64	wim	wimboot	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	wim	wimboot	-	wim-wimboot
+profile	windows-xp-x64	wim	vhdboot	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	wim	direct_efi	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	wim	chainload	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	wim	memdisk	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	wim	disk_image	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	wim	floppy_image	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	img	automatic	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	img	direct_iso	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	img	wimboot	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	img	vhdboot	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	img	direct_efi	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	img	chainload	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	img	memdisk	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	img	disk_image	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	img	floppy_image	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhd	automatic	bios	vhd-vhdboot
+profile	windows-xp-x64	vhd	automatic	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhd	automatic	-	vhd-vhdboot
+profile	windows-xp-x64	vhd	direct_iso	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhd	wimboot	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhd	vhdboot	bios	vhd-vhdboot
+profile	windows-xp-x64	vhd	vhdboot	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhd	vhdboot	-	vhd-vhdboot
+profile	windows-xp-x64	vhd	direct_efi	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhd	chainload	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhd	memdisk	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhd	disk_image	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhd	floppy_image	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhdx	automatic	bios	vhd-vhdboot
+profile	windows-xp-x64	vhdx	automatic	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhdx	automatic	-	vhd-vhdboot
+profile	windows-xp-x64	vhdx	direct_iso	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhdx	wimboot	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhdx	vhdboot	bios	vhd-vhdboot
+profile	windows-xp-x64	vhdx	vhdboot	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhdx	vhdboot	-	vhd-vhdboot
+profile	windows-xp-x64	vhdx	direct_efi	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhdx	chainload	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhdx	memdisk	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhdx	disk_image	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	vhdx	floppy_image	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	efi	automatic	bios	efi-direct
+profile	windows-xp-x64	efi	automatic	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	efi	automatic	-	efi-direct
+profile	windows-xp-x64	efi	direct_iso	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	efi	wimboot	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	efi	vhdboot	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	efi	direct_efi	bios	efi-direct
+profile	windows-xp-x64	efi	direct_efi	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	efi	direct_efi	-	efi-direct
+profile	windows-xp-x64	efi	chainload	bios	efi-chainload
+profile	windows-xp-x64	efi	chainload	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	efi	chainload	-	efi-chainload
+profile	windows-xp-x64	efi	memdisk	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	efi	disk_image	uefi	xp-x64-uefi-other
+profile	windows-xp-x64	efi	floppy_image	uefi	xp-x64-uefi-other
 profile	windows-2000	iso	automatic	bios	nt5-staging
 profile	windows-2000	iso	automatic	uefi	w2k-x86-sp4-uefi-csm
 profile	windows-2000	iso	automatic	-	nt5-staging
@@ -5702,6 +5996,82 @@ profile	windows-server-2008	efi	direct_efi	-	efi-direct
 profile	windows-server-2008	efi	chainload	bios	efi-chainload
 profile	windows-server-2008	efi	chainload	uefi	efi-chainload
 profile	windows-server-2008	efi	chainload	-	efi-chainload
+profile	windows-server-2003	iso	automatic	bios	nt5-staging
+profile	windows-server-2003	iso	automatic	uefi	w2k3-x86-sp2-uefi-csm
+profile	windows-server-2003	iso	automatic	-	nt5-staging
+profile	windows-server-2003	iso	direct_iso	uefi	w2k3-uefi-other
+profile	windows-server-2003	iso	wimboot	uefi	w2k3-uefi-other
+profile	windows-server-2003	iso	vhdboot	uefi	w2k3-uefi-other
+profile	windows-server-2003	iso	direct_efi	uefi	w2k3-uefi-other
+profile	windows-server-2003	iso	chainload	bios	iso-work-chainload
+profile	windows-server-2003	iso	chainload	uefi	w2k3-uefi-other
+profile	windows-server-2003	iso	chainload	-	iso-work-chainload
+profile	windows-server-2003	iso	memdisk	uefi	w2k3-uefi-other
+profile	windows-server-2003	iso	disk_image	uefi	w2k3-uefi-other
+profile	windows-server-2003	iso	floppy_image	uefi	w2k3-uefi-other
+profile	windows-server-2003	wim	automatic	bios	wim-wimboot
+profile	windows-server-2003	wim	automatic	uefi	w2k3-uefi-other
+profile	windows-server-2003	wim	automatic	-	wim-wimboot
+profile	windows-server-2003	wim	direct_iso	uefi	w2k3-uefi-other
+profile	windows-server-2003	wim	wimboot	bios	wim-wimboot
+profile	windows-server-2003	wim	wimboot	uefi	w2k3-uefi-other
+profile	windows-server-2003	wim	wimboot	-	wim-wimboot
+profile	windows-server-2003	wim	vhdboot	uefi	w2k3-uefi-other
+profile	windows-server-2003	wim	direct_efi	uefi	w2k3-uefi-other
+profile	windows-server-2003	wim	chainload	uefi	w2k3-uefi-other
+profile	windows-server-2003	wim	memdisk	uefi	w2k3-uefi-other
+profile	windows-server-2003	wim	disk_image	uefi	w2k3-uefi-other
+profile	windows-server-2003	wim	floppy_image	uefi	w2k3-uefi-other
+profile	windows-server-2003	img	automatic	uefi	w2k3-uefi-other
+profile	windows-server-2003	img	direct_iso	uefi	w2k3-uefi-other
+profile	windows-server-2003	img	wimboot	uefi	w2k3-uefi-other
+profile	windows-server-2003	img	vhdboot	uefi	w2k3-uefi-other
+profile	windows-server-2003	img	direct_efi	uefi	w2k3-uefi-other
+profile	windows-server-2003	img	chainload	uefi	w2k3-uefi-other
+profile	windows-server-2003	img	memdisk	uefi	w2k3-uefi-other
+profile	windows-server-2003	img	disk_image	uefi	w2k3-uefi-other
+profile	windows-server-2003	img	floppy_image	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhd	automatic	bios	vhd-vhdboot
+profile	windows-server-2003	vhd	automatic	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhd	automatic	-	vhd-vhdboot
+profile	windows-server-2003	vhd	direct_iso	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhd	wimboot	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhd	vhdboot	bios	vhd-vhdboot
+profile	windows-server-2003	vhd	vhdboot	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhd	vhdboot	-	vhd-vhdboot
+profile	windows-server-2003	vhd	direct_efi	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhd	chainload	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhd	memdisk	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhd	disk_image	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhd	floppy_image	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhdx	automatic	bios	vhd-vhdboot
+profile	windows-server-2003	vhdx	automatic	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhdx	automatic	-	vhd-vhdboot
+profile	windows-server-2003	vhdx	direct_iso	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhdx	wimboot	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhdx	vhdboot	bios	vhd-vhdboot
+profile	windows-server-2003	vhdx	vhdboot	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhdx	vhdboot	-	vhd-vhdboot
+profile	windows-server-2003	vhdx	direct_efi	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhdx	chainload	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhdx	memdisk	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhdx	disk_image	uefi	w2k3-uefi-other
+profile	windows-server-2003	vhdx	floppy_image	uefi	w2k3-uefi-other
+profile	windows-server-2003	efi	automatic	bios	efi-direct
+profile	windows-server-2003	efi	automatic	uefi	w2k3-uefi-other
+profile	windows-server-2003	efi	automatic	-	efi-direct
+profile	windows-server-2003	efi	direct_iso	uefi	w2k3-uefi-other
+profile	windows-server-2003	efi	wimboot	uefi	w2k3-uefi-other
+profile	windows-server-2003	efi	vhdboot	uefi	w2k3-uefi-other
+profile	windows-server-2003	efi	direct_efi	bios	efi-direct
+profile	windows-server-2003	efi	direct_efi	uefi	w2k3-uefi-other
+profile	windows-server-2003	efi	direct_efi	-	efi-direct
+profile	windows-server-2003	efi	chainload	bios	efi-chainload
+profile	windows-server-2003	efi	chainload	uefi	w2k3-uefi-other
+profile	windows-server-2003	efi	chainload	-	efi-chainload
+profile	windows-server-2003	efi	memdisk	uefi	w2k3-uefi-other
+profile	windows-server-2003	efi	disk_image	uefi	w2k3-uefi-other
+profile	windows-server-2003	efi	floppy_image	uefi	w2k3-uefi-other
 profile	ubuntu	iso	automatic	bios	iso-work-chainload
 profile	ubuntu	iso	automatic	uefi	iso-work-chainload
 profile	ubuntu	iso	automatic	-	iso-work-chainload
@@ -6777,6 +7147,60 @@ resolve	windows-xp	efi	chainload	chainload	1	ok
 resolve	windows-xp	efi	memdisk	-	0	UnsupportedImage
 resolve	windows-xp	efi	disk_image	-	0	UnsupportedImage
 resolve	windows-xp	efi	floppy_image	-	0	UnsupportedImage
+resolve	windows-xp-x64	iso	automatic	direct_iso	1	ok
+resolve	windows-xp-x64	iso	direct_iso	-	0	UnsupportedMethod
+resolve	windows-xp-x64	iso	wimboot	-	0	UnsupportedMethod
+resolve	windows-xp-x64	iso	vhdboot	-	0	UnsupportedImage
+resolve	windows-xp-x64	iso	direct_efi	-	0	UnsupportedImage
+resolve	windows-xp-x64	iso	chainload	chainload	1	ok
+resolve	windows-xp-x64	iso	memdisk	-	0	UnsupportedMethod
+resolve	windows-xp-x64	iso	disk_image	-	0	UnsupportedImage
+resolve	windows-xp-x64	iso	floppy_image	-	0	UnsupportedImage
+resolve	windows-xp-x64	wim	automatic	wimboot	1	ok
+resolve	windows-xp-x64	wim	direct_iso	-	0	UnsupportedImage
+resolve	windows-xp-x64	wim	wimboot	wimboot	1	ok
+resolve	windows-xp-x64	wim	vhdboot	-	0	UnsupportedImage
+resolve	windows-xp-x64	wim	direct_efi	-	0	UnsupportedImage
+resolve	windows-xp-x64	wim	chainload	-	0	UnsupportedImage
+resolve	windows-xp-x64	wim	memdisk	-	0	UnsupportedImage
+resolve	windows-xp-x64	wim	disk_image	-	0	UnsupportedImage
+resolve	windows-xp-x64	wim	floppy_image	-	0	UnsupportedImage
+resolve	windows-xp-x64	img	automatic	-	0	UnsupportedImage
+resolve	windows-xp-x64	img	direct_iso	-	0	UnsupportedImage
+resolve	windows-xp-x64	img	wimboot	-	0	UnsupportedImage
+resolve	windows-xp-x64	img	vhdboot	-	0	UnsupportedImage
+resolve	windows-xp-x64	img	direct_efi	-	0	UnsupportedImage
+resolve	windows-xp-x64	img	chainload	-	0	UnsupportedMethod
+resolve	windows-xp-x64	img	memdisk	-	0	UnsupportedMethod
+resolve	windows-xp-x64	img	disk_image	-	0	UnsupportedMethod
+resolve	windows-xp-x64	img	floppy_image	-	0	UnsupportedMethod
+resolve	windows-xp-x64	vhd	automatic	vhdboot	1	ok
+resolve	windows-xp-x64	vhd	direct_iso	-	0	UnsupportedImage
+resolve	windows-xp-x64	vhd	wimboot	-	0	UnsupportedImage
+resolve	windows-xp-x64	vhd	vhdboot	vhdboot	1	ok
+resolve	windows-xp-x64	vhd	direct_efi	-	0	UnsupportedImage
+resolve	windows-xp-x64	vhd	chainload	-	0	UnsupportedImage
+resolve	windows-xp-x64	vhd	memdisk	-	0	UnsupportedImage
+resolve	windows-xp-x64	vhd	disk_image	-	0	UnsupportedImage
+resolve	windows-xp-x64	vhd	floppy_image	-	0	UnsupportedImage
+resolve	windows-xp-x64	vhdx	automatic	vhdboot	1	ok
+resolve	windows-xp-x64	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	windows-xp-x64	vhdx	wimboot	-	0	UnsupportedImage
+resolve	windows-xp-x64	vhdx	vhdboot	vhdboot	1	ok
+resolve	windows-xp-x64	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	windows-xp-x64	vhdx	chainload	-	0	UnsupportedImage
+resolve	windows-xp-x64	vhdx	memdisk	-	0	UnsupportedImage
+resolve	windows-xp-x64	vhdx	disk_image	-	0	UnsupportedImage
+resolve	windows-xp-x64	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	windows-xp-x64	efi	automatic	direct_efi	1	ok
+resolve	windows-xp-x64	efi	direct_iso	-	0	UnsupportedImage
+resolve	windows-xp-x64	efi	wimboot	-	0	UnsupportedImage
+resolve	windows-xp-x64	efi	vhdboot	-	0	UnsupportedImage
+resolve	windows-xp-x64	efi	direct_efi	direct_efi	1	ok
+resolve	windows-xp-x64	efi	chainload	chainload	1	ok
+resolve	windows-xp-x64	efi	memdisk	-	0	UnsupportedImage
+resolve	windows-xp-x64	efi	disk_image	-	0	UnsupportedImage
+resolve	windows-xp-x64	efi	floppy_image	-	0	UnsupportedImage
 resolve	windows-2000	iso	automatic	direct_iso	1	ok
 resolve	windows-2000	iso	direct_iso	-	0	UnsupportedMethod
 resolve	windows-2000	iso	wimboot	-	0	UnsupportedMethod
@@ -7641,6 +8065,60 @@ resolve	windows-server-2008	efi	chainload	chainload	1	ok
 resolve	windows-server-2008	efi	memdisk	-	0	UnsupportedImage
 resolve	windows-server-2008	efi	disk_image	-	0	UnsupportedImage
 resolve	windows-server-2008	efi	floppy_image	-	0	UnsupportedImage
+resolve	windows-server-2003	iso	automatic	direct_iso	1	ok
+resolve	windows-server-2003	iso	direct_iso	-	0	UnsupportedMethod
+resolve	windows-server-2003	iso	wimboot	-	0	UnsupportedMethod
+resolve	windows-server-2003	iso	vhdboot	-	0	UnsupportedImage
+resolve	windows-server-2003	iso	direct_efi	-	0	UnsupportedImage
+resolve	windows-server-2003	iso	chainload	chainload	1	ok
+resolve	windows-server-2003	iso	memdisk	-	0	UnsupportedMethod
+resolve	windows-server-2003	iso	disk_image	-	0	UnsupportedImage
+resolve	windows-server-2003	iso	floppy_image	-	0	UnsupportedImage
+resolve	windows-server-2003	wim	automatic	wimboot	1	ok
+resolve	windows-server-2003	wim	direct_iso	-	0	UnsupportedImage
+resolve	windows-server-2003	wim	wimboot	wimboot	1	ok
+resolve	windows-server-2003	wim	vhdboot	-	0	UnsupportedImage
+resolve	windows-server-2003	wim	direct_efi	-	0	UnsupportedImage
+resolve	windows-server-2003	wim	chainload	-	0	UnsupportedImage
+resolve	windows-server-2003	wim	memdisk	-	0	UnsupportedImage
+resolve	windows-server-2003	wim	disk_image	-	0	UnsupportedImage
+resolve	windows-server-2003	wim	floppy_image	-	0	UnsupportedImage
+resolve	windows-server-2003	img	automatic	-	0	UnsupportedImage
+resolve	windows-server-2003	img	direct_iso	-	0	UnsupportedImage
+resolve	windows-server-2003	img	wimboot	-	0	UnsupportedImage
+resolve	windows-server-2003	img	vhdboot	-	0	UnsupportedImage
+resolve	windows-server-2003	img	direct_efi	-	0	UnsupportedImage
+resolve	windows-server-2003	img	chainload	-	0	UnsupportedMethod
+resolve	windows-server-2003	img	memdisk	-	0	UnsupportedMethod
+resolve	windows-server-2003	img	disk_image	-	0	UnsupportedMethod
+resolve	windows-server-2003	img	floppy_image	-	0	UnsupportedMethod
+resolve	windows-server-2003	vhd	automatic	vhdboot	1	ok
+resolve	windows-server-2003	vhd	direct_iso	-	0	UnsupportedImage
+resolve	windows-server-2003	vhd	wimboot	-	0	UnsupportedImage
+resolve	windows-server-2003	vhd	vhdboot	vhdboot	1	ok
+resolve	windows-server-2003	vhd	direct_efi	-	0	UnsupportedImage
+resolve	windows-server-2003	vhd	chainload	-	0	UnsupportedImage
+resolve	windows-server-2003	vhd	memdisk	-	0	UnsupportedImage
+resolve	windows-server-2003	vhd	disk_image	-	0	UnsupportedImage
+resolve	windows-server-2003	vhd	floppy_image	-	0	UnsupportedImage
+resolve	windows-server-2003	vhdx	automatic	vhdboot	1	ok
+resolve	windows-server-2003	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	windows-server-2003	vhdx	wimboot	-	0	UnsupportedImage
+resolve	windows-server-2003	vhdx	vhdboot	vhdboot	1	ok
+resolve	windows-server-2003	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	windows-server-2003	vhdx	chainload	-	0	UnsupportedImage
+resolve	windows-server-2003	vhdx	memdisk	-	0	UnsupportedImage
+resolve	windows-server-2003	vhdx	disk_image	-	0	UnsupportedImage
+resolve	windows-server-2003	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	windows-server-2003	efi	automatic	direct_efi	1	ok
+resolve	windows-server-2003	efi	direct_iso	-	0	UnsupportedImage
+resolve	windows-server-2003	efi	wimboot	-	0	UnsupportedImage
+resolve	windows-server-2003	efi	vhdboot	-	0	UnsupportedImage
+resolve	windows-server-2003	efi	direct_efi	direct_efi	1	ok
+resolve	windows-server-2003	efi	chainload	chainload	1	ok
+resolve	windows-server-2003	efi	memdisk	-	0	UnsupportedImage
+resolve	windows-server-2003	efi	disk_image	-	0	UnsupportedImage
+resolve	windows-server-2003	efi	floppy_image	-	0	UnsupportedImage
 resolve	ubuntu	iso	automatic	chainload	1	ok
 resolve	ubuntu	iso	direct_iso	-	0	UnsupportedMethod
 resolve	ubuntu	iso	wimboot	-	0	UnsupportedMethod
@@ -9268,6 +9746,78 @@ menu	windows-xp	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend
 menu	windows-xp	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-xp	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-xp	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	iso	bios	0	automatic	xp_staging	1	1	tested_in_vm	Automatic (XP staging) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-xp-x64	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-x64	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-xp-x64	iso	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-x64	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	iso	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	iso	uefi	0	automatic	xp_uefi_staging	1	1	experimental	Automatic (UEFI preparation / XP via CSM) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-xp-x64	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-x64	iso	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-x64	iso	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-x64	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	iso	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	wim	bios	0	automatic	wimboot	0	0	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-xp-x64	wim	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-x64	wim	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-xp-x64	wim	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-xp-x64	wim	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	wim	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-xp-x64	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-x64	wim	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-xp-x64	wim	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-xp-x64	wim	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	wim	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-xp-x64	img	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-x64	img	bios	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-x64	img	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-x64	img	bios	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-x64	img	bios	5	floppy_image	-	0	1	experimental	Floppy image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-x64	img	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-xp-x64	img	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-x64	img	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-x64	img	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-x64	img	uefi	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-x64	img	uefi	5	floppy_image	-	0	1	experimental	Floppy image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-x64	vhd	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-xp-x64	vhd	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-x64	vhd	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-xp-x64	vhd	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-xp-x64	vhd	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	vhd	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-xp-x64	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-x64	vhd	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-xp-x64	vhd	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-xp-x64	vhd	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	vhd	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	vhdx	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-xp-x64	vhdx	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-x64	vhdx	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-xp-x64	vhdx	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-xp-x64	vhdx	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	vhdx	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-xp-x64	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-x64	vhdx	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-xp-x64	vhdx	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-xp-x64	vhdx	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	vhdx	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	efi	bios	0	automatic	direct_efi	0	0	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-xp-x64	efi	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-x64	efi	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-xp-x64	efi	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-xp-x64	efi	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	efi	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-xp-x64	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-x64	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-x64	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-xp-x64	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-x64	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-2000	iso	bios	0	automatic	xp_staging	1	1	tested_in_vm	Automatic (Windows 2000 Setup) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	windows-2000	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-2000	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
@@ -10408,6 +10958,78 @@ menu	windows-server-2008	efi	uefi	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requ
 menu	windows-server-2008	efi	uefi	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
 menu	windows-server-2008	efi	uefi	4	direct_efi	direct_efi	1	1	experimental	EFI [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	windows-server-2008	efi	uefi	5	chainload	chainload	1	1	experimental	Chainload [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-server-2003	iso	bios	0	automatic	xp_staging	1	1	tested_in_vm	Automatic (XP staging) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-server-2003	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-server-2003	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-server-2003	iso	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-server-2003	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	iso	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	iso	uefi	0	automatic	xp_uefi_staging	1	1	experimental	Automatic (UEFI preparation / XP via CSM) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-server-2003	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-server-2003	iso	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-server-2003	iso	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-server-2003	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	iso	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	wim	bios	0	automatic	wimboot	0	0	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-server-2003	wim	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-server-2003	wim	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-server-2003	wim	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-server-2003	wim	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	wim	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-server-2003	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-server-2003	wim	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-server-2003	wim	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-server-2003	wim	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	wim	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-server-2003	img	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-server-2003	img	bios	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-server-2003	img	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-server-2003	img	bios	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-server-2003	img	bios	5	floppy_image	-	0	1	experimental	Floppy image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-server-2003	img	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-server-2003	img	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-server-2003	img	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-server-2003	img	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-server-2003	img	uefi	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-server-2003	img	uefi	5	floppy_image	-	0	1	experimental	Floppy image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-server-2003	vhd	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-server-2003	vhd	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-server-2003	vhd	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-server-2003	vhd	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-server-2003	vhd	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	vhd	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-server-2003	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-server-2003	vhd	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-server-2003	vhd	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-server-2003	vhd	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	vhd	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	vhdx	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-server-2003	vhdx	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-server-2003	vhdx	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-server-2003	vhdx	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-server-2003	vhdx	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	vhdx	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-server-2003	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-server-2003	vhdx	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-server-2003	vhdx	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-server-2003	vhdx	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	vhdx	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	efi	bios	0	automatic	direct_efi	0	0	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-server-2003	efi	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-server-2003	efi	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-server-2003	efi	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-server-2003	efi	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	efi	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-server-2003	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-server-2003	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-server-2003	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-server-2003	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-server-2003	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	ubuntu	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	ubuntu	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	ubuntu	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
@@ -12263,6 +12885,60 @@ help	windows-xp	efi	chainload	Chainload	Transfers control to another bootloader 
 help	windows-xp	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
 help	windows-xp	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
 help	windows-xp	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-xp-x64	iso	automatic	Automatic - Windows Setup	Copies installation files to the selected Windows partition.	After preparation, remove the USB drive and start the computer from that disk.
+help	windows-xp-x64	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-xp-x64	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-xp-x64	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-xp-x64	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-xp-x64	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-xp-x64	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-xp-x64	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-xp-x64	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-xp-x64	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-xp-x64	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-xp-x64	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-xp-x64	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-xp-x64	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-xp-x64	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-xp-x64	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-xp-x64	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-xp-x64	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-xp-x64	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-xp-x64	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-xp-x64	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-xp-x64	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-xp-x64	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-xp-x64	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-xp-x64	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-xp-x64	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-xp-x64	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-xp-x64	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-xp-x64	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-xp-x64	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-xp-x64	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-xp-x64	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-xp-x64	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-xp-x64	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-xp-x64	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-xp-x64	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-xp-x64	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-xp-x64	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-xp-x64	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-xp-x64	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-xp-x64	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-xp-x64	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-xp-x64	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-xp-x64	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-xp-x64	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-xp-x64	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-xp-x64	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-xp-x64	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-xp-x64	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-xp-x64	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-xp-x64	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-xp-x64	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-xp-x64	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-xp-x64	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
 help	windows-2000	iso	automatic	Automatic - Windows Setup	Copies installation files to the selected Windows partition.	After preparation, remove the USB drive and start the computer from that disk.
 help	windows-2000	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
 help	windows-2000	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
@@ -13127,6 +13803,60 @@ help	windows-server-2008	efi	chainload	Chainload	Transfers control to another bo
 help	windows-server-2008	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
 help	windows-server-2008	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
 help	windows-server-2008	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-server-2003	iso	automatic	Automatic - Windows Setup	Copies installation files to the selected Windows partition.	After preparation, remove the USB drive and start the computer from that disk.
+help	windows-server-2003	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-server-2003	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-server-2003	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-server-2003	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-server-2003	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-server-2003	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-server-2003	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-server-2003	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-server-2003	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-server-2003	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-server-2003	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-server-2003	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-server-2003	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-server-2003	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-server-2003	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-server-2003	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-server-2003	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-server-2003	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-server-2003	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-server-2003	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-server-2003	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-server-2003	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-server-2003	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-server-2003	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-server-2003	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-server-2003	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-server-2003	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-server-2003	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-server-2003	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-server-2003	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-server-2003	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-server-2003	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-server-2003	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-server-2003	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-server-2003	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-server-2003	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-server-2003	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-server-2003	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-server-2003	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-server-2003	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-server-2003	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-server-2003	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-server-2003	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-server-2003	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-server-2003	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-server-2003	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-server-2003	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-server-2003	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-server-2003	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-server-2003	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-server-2003	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-server-2003	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-server-2003	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
 help	ubuntu	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
 help	ubuntu	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
 help	ubuntu	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
@@ -14266,6 +14996,10 @@ profile_def	xp-x86-sp3-uefi-csm	xp_uefi_staging	xp_uefi	Loading the preparation 
 profile_def	xp-uefi-other	-	none	
 profile_def	w2k-x86-sp4-uefi-csm	xp_uefi_staging	xp_uefi	Loading the preparation environment|Detecting disks|Choosing the target disk|Preparing workspace|Copying and verifying files
 profile_def	w2k-uefi-other	-	none	
+profile_def	w2k3-x86-sp2-uefi-csm	xp_uefi_staging	xp_uefi	Loading the preparation environment|Detecting disks|Choosing the target disk|Preparing workspace|Copying and verifying files
+profile_def	w2k3-uefi-other	-	none	
+profile_def	xp-x64-sp2-uefi-csm	xp_uefi_staging	xp_uefi	Loading the preparation environment|Detecting disks|Choosing the target disk|Preparing workspace|Copying and verifying files
+profile_def	xp-x64-uefi-other	-	none	
 profile_def	linux-live-bios	linux_live_iso	core	
 profile_def	dos-fat16-bios	dos_bios_iso	core	
 profile_def	win98se-dos-bios	win9x_dos	core	

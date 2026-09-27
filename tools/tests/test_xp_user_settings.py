@@ -100,6 +100,16 @@ def main() -> int:
           and not any('pae.exe' in l for l in w2k), str(w2k))
     check('2000: sections unique', len([l for l in w2k if l.startswith('[')]) == len({l.lower() for l in w2k if l.startswith('[')}))
     check('XP default unchanged by NT5_SYSTEM=windows-xp', sh(f"NT5_SYSTEM=windows-xp usos_xp_settings_sif '{posix(BASE)}' '{posix(settings)}'").stdout.decode() == merged)
+    # Server 2003 x86 (w2k3-x86-sp2-uefi-csm): ProductKey, licensing mode, \WINDOWS.
+    w2k3_base = ROOT / 'tools' / 'w2k3_selected_partition_uefi_csm.sif'
+    w2k3 = sh(f"NT5_SYSTEM=windows-server-2003 usos_xp_settings_sif '{posix(w2k3_base)}' '{posix(settings)}'").stdout.decode().splitlines()
+    check('2003: ProductKey, licensing', 'ProductKey=ABCDE-12345-ABCDE-12345-ABCDE' in w2k3 and '[LicenseFilePrintData]' in w2k3
+          and 'AutoMode=PerServer' in w2k3 and 'AutoUsers=5' in w2k3, str(w2k3))
+    check('2003: \\WINDOWS, setup-end script', 'TargetPath=\\WINDOWS' in w2k3 and 'UserExecute="C:\\USOS\\W2K3\\usos-setup.cmd"' in w2k3)
+    xp64_base = ROOT / 'tools' / 'xp64_selected_partition_uefi_csm.sif'
+    xp64 = sh(f"NT5_SYSTEM=windows-xp-x64 usos_xp_settings_sif '{posix(xp64_base)}' '{posix(settings)}'").stdout.decode().splitlines()
+    check('XP x64: ProductKey, no licensing, no PAE', 'ProductKey=ABCDE-12345-ABCDE-12345-ABCDE' in xp64 and '[LicenseFilePrintData]' not in xp64
+          and 'UserExecute="C:\\USOS\\XP64\\usos-setup.cmd"' in xp64 and not any('pae.exe' in l for l in xp64), str(xp64))
     # Accounts script (C:\USOS\XP\usos-users.cmd, run hidden by pae.exe)
     users_file = OUT / 'usos-users.cmd'
     r = sh(f"usos_xp_settings_accounts '{posix(settings)}' '{posix(users_file)}'")

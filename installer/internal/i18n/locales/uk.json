@@ -1046,5 +1046,7 @@
 
   "boot.summary.xp_csmwrap": "XP без CSM (експериментально): CSMWrap, відеокарта з legacy VBIOS, 1 ядро зарезервовано",
 
-  "boot.summary.w2k_limits": "Windows 2000 (експериментально): немає драйвера AHCI/NVMe/USB 3 для NT 5.0 (SATA в режимі IDE), не більше 4 ГБ ОЗП і 2 процесорів"
+  "boot.summary.w2k_limits": "Windows 2000 (експериментально): немає драйвера AHCI/NVMe/USB 3 для NT 5.0 (SATA в режимі IDE), не більше 4 ГБ ОЗП і 2 процесорів",
+
+  "boot.summary.nt52_limits": "NT 5.2 (експериментально): AHCI через GenAHCI на StorPort системи; немає драйвера NVMe/USB 3 під час встановлення"
 }

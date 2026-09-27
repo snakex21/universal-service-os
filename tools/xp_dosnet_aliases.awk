@@ -19,8 +19,11 @@ function safe(s) { return s != "" && s !~ /[^A-Z0-9_.$~\/ -]/ && s !~ /^\// && s
     dir=dirs[disk]
     # Windows 2000 expresses d1 relative to DOSNET.INF inside I386.
     if ((nt5_system == "windows-2000") && (disk in dirs) && (dir == "/" || dir == "")) dir="/I386"
-    if (dir != "/I386" && dir !~ /^\/I386\//) { reject("Unsupported source directory " dir); next }
-    sub(/^\/I386\/?/, "", dir)
+    # src_dir: the Setup source directory (I386; AMD64 for XP x64), whose
+    # DOSNET.INF this is; aliases are relative to it.
+    top="/" (src_dir == "" ? "I386" : toupper(src_dir))
+    if (dir != top && index(dir, top "/") != 1) { reject("Unsupported source directory " dir); next }
+    dir=substr(dir, length(top) + 1); sub(/^\//, "", dir)
     if (!safe(src) || !safe(dst) || (dir != "" && !safe(dir))) { reject("Unsafe path"); next }
     prefix=(dir == "" ? "" : dir "/")
     source=prefix src; target=prefix dst

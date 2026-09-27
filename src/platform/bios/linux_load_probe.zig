@@ -162,6 +162,10 @@ pub fn runXpStaging(
     };
     const command: linux_boot_params.CommandRequest = if (std.mem.eql(u8, system_id, "windows-2000"))
         .{ .windows2000_staging = request }
+    else if (std.mem.eql(u8, system_id, "windows-server-2003"))
+        .{ .windows2003_staging = request }
+    else if (std.mem.eql(u8, system_id, "windows-xp-x64"))
+        .{ .xp64_staging = request }
     else if (std.mem.eql(u8, system_id, "windows-xp"))
         .{ .xp_staging = request }
     else

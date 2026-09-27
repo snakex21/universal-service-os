@@ -4,6 +4,11 @@ set -eu
 SOURCE_ROOT=${SOURCE_ROOT:?SOURCE_ROOT is required}
 MTOOLS_IMAGE=${MTOOLS_IMAGE:?MTOOLS_IMAGE is required}
 . "$(dirname -- "$0")/xp_source_io.sh"
+# Setup source directory: I386, or AMD64 for XP x64 (its I386 holds the
+# loader, NTDETECT and the WOW64 files and is copied as well).
+. "$(dirname -- "$0")/nt5_profile.sh"
+usos_nt5_profile
+SRC=$NT5_SOURCE_DIR
 
 fail() {
     printf '[XP_LOCAL_SOURCE] STOP: %s\n' "$1" >&2
@@ -14,13 +19,13 @@ for tool in awk cp mkdir mcopy mdir mmd mktemp tr; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
 
-DOSNET="$SOURCE_ROOT/I386/DOSNET.INF"
+DOSNET="$SOURCE_ROOT/$SRC/DOSNET.INF"
 for required in \
     "$DOSNET" \
     "$SOURCE_ROOT/I386/SETUPLDR.BIN" \
     "$SOURCE_ROOT/I386/NTDETECT.COM" \
-    "$SOURCE_ROOT/I386/TXTSETUP.SIF" \
-    "$SOURCE_ROOT/I386/USETUP.EXE"; do
+    "$SOURCE_ROOT/$SRC/TXTSETUP.SIF" \
+    "$SOURCE_ROOT/$SRC/USETUP.EXE"; do
     [ -f "$required" ] || fail "XP source missing required file: $required"
 done
 
@@ -73,6 +78,11 @@ case "$XP_LOCAL_SOURCE_TEST_MODE" in
         printf '[XP_LOCAL_SOURCE] copying complete I386 to %s\n' "$LS_DIR"
         mcopy -s -o -i "$MTOOLS_IMAGE" "$SOURCE_ROOT/I386" "::/$LS_DIR/" || fail 'cannot copy complete I386 into local source'
         printf '[XP_LOCAL_SOURCE] complete I386 copy PASS\n'
+        if [ "$SRC" != I386 ]; then
+            printf '[XP_LOCAL_SOURCE] copying complete %s to %s\n' "$SRC" "$LS_DIR"
+            mcopy -s -o -i "$MTOOLS_IMAGE" "$SOURCE_ROOT/$SRC" "::/$LS_DIR/" || fail "cannot copy complete $SRC into local source"
+            printf '[XP_LOCAL_SOURCE] complete %s copy PASS\n' "$SRC"
+        fi
         sh "$(dirname -- "$0")/prepare_xp_source_aliases.sh" || fail 'cannot prepare DOSNET local-source aliases'
         sh "$(dirname -- "$0")/prepare_nt5_media_markers.sh" || fail 'cannot prepare NT5 media markers'
         LS_MODE=complete
@@ -112,14 +122,19 @@ esac
 
 bt_rows=0
 while IFS='|' read -r disk logical explicit_dest; do
-    [ "$disk" = d1 ] || [ "$disk" = D1 ] || fail "unsupported FloppyFiles source directory: $disk"
+    # d1 = the Setup source directory; d2 = I386 on AMD64 media (loader).
+    case "$SRC:$disk" in
+        *:d1|*:D1) disk_dir=$SRC ;;
+        AMD64:d2|AMD64:D2) disk_dir=I386 ;;
+        *) fail "unsupported FloppyFiles source directory: $disk" ;;
+    esac
     logical_upper=$(printf '%s' "$logical" | tr '[:lower:]' '[:upper:]')
-    source_path="$SOURCE_ROOT/I386/$logical_upper"
+    source_path="$SOURCE_ROOT/$disk_dir/$logical_upper"
     physical_name=$logical_upper
     if [ ! -f "$source_path" ]; then
         [ -n "$logical_upper" ] || fail 'empty DOSNET source filename'
         physical_name="${logical_upper%?}_"
-        source_path="$SOURCE_ROOT/I386/$physical_name"
+        source_path="$SOURCE_ROOT/$disk_dir/$physical_name"
     fi
     [ -f "$source_path" ] || fail "DOSNET FloppyFiles source missing: $logical (tried $logical_upper and $physical_name)"
 
@@ -172,7 +187,7 @@ fi
 mcopy -o -i "$MTOOLS_IMAGE" "$SOURCE_ROOT/I386/SETUPLDR.BIN" ::/NTLDR || fail 'cannot install root NTLDR=SETUPLDR.BIN'
 mcopy -o -i "$MTOOLS_IMAGE" "$SOURCE_ROOT/I386/SETUPLDR.BIN" '::/$LDR$' || fail 'cannot install root $LDR$'
 mcopy -o -i "$MTOOLS_IMAGE" "$SOURCE_ROOT/I386/NTDETECT.COM" ::/NTDETECT.COM || fail 'cannot install root NTDETECT.COM'
-mcopy -o -i "$MTOOLS_IMAGE" "$SOURCE_ROOT/I386/TXTSETUP.SIF" ::/TXTSETUP.SIF || fail 'cannot install root TXTSETUP.SIF'
+mcopy -o -i "$MTOOLS_IMAGE" "$SOURCE_ROOT/$SRC/TXTSETUP.SIF" ::/TXTSETUP.SIF || fail 'cannot install root TXTSETUP.SIF'
 if [ -f "$SOURCE_ROOT/BOOTFONT.BIN" ]; then
     mcopy -o -i "$MTOOLS_IMAGE" "$SOURCE_ROOT/BOOTFONT.BIN" ::/BOOTFONT.BIN || fail 'cannot install root BOOTFONT.BIN'
 fi
@@ -182,8 +197,8 @@ for required in \
     "::/$BT_DIR/TXTSETUP.SIF" \
     "::/$BT_DIR/WINNT.SIF" \
     "::/$LS_DIR/I386/SETUPLDR.BIN" \
-    "::/$LS_DIR/I386/TXTSETUP.SIF" \
-    "::/$LS_DIR/I386/SYSTEM32/SMSS.EXE" \
+    "::/$LS_DIR/$SRC/TXTSETUP.SIF" \
+    "::/$LS_DIR/$SRC/SYSTEM32/SMSS.EXE" \
     ::/NTLDR ::/NTDETECT.COM ::/TXTSETUP.SIF '::/$LDR$'; do
     mdir -i "$MTOOLS_IMAGE" "$required" >/dev/null 2>&1 || fail "prepared local source missing: $required"
 done

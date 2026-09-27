@@ -1043,5 +1043,7 @@
 
   "boot.summary.xp_csmwrap": "XP zonder CSM (experimenteel): CSMWrap, kaart met legacy-VBIOS, 1 kern gereserveerd",
 
-  "boot.summary.w2k_limits": "Windows 2000 (experimenteel): geen AHCI/NVMe/USB 3-stuurprogramma voor NT 5.0 (SATA in IDE-modus), max. 4 GB RAM en 2 CPU's"
+  "boot.summary.w2k_limits": "Windows 2000 (experimenteel): geen AHCI/NVMe/USB 3-stuurprogramma voor NT 5.0 (SATA in IDE-modus), max. 4 GB RAM en 2 CPU's",
+
+  "boot.summary.nt52_limits": "NT 5.2 (experimenteel): AHCI via GenAHCI op de StorPort van het systeem; geen NVMe/USB 3-stuurprogramma in Setup"
 }

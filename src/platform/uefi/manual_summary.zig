@@ -90,7 +90,7 @@ pub fn show(
     if (answer.profile) |index| {
         // A USOS profile, rendered for this system when the start begins.
         const p = answer_profiles.get(index);
-        const arch = if (backend == .xp_uefi_staging) "x86" else @tagName(answer_profiles.archOf(image.media));
+        const arch = if (backend == .xp_uefi_staging) @tagName(nt5Arch(system.id)) else @tagName(answer_profiles.archOf(image.media));
         fields.add(view.t(.summary_answer_file), view.format(&profile_text, .profile_summary, &.{ p.name.slice(), manual_unattended.profileDetail(&profile_detail, p), arch }));
         // The profile's edition against this ISO's install images: found,
         // the answer names the image; not found, Setup asks as before.
@@ -150,9 +150,13 @@ pub fn show(
         fields.add(view.t(.summary_preparation), if (secure_boot.csm().likelyOn()) view.t(.summary_xp_preparation) else view.t(.summary_xp_csmwrap));
         fields.add(view.t(.summary_source), view.t(.summary_xp_source));
         fields.add(view.t(.summary_disk), view.t(.summary_xp_disk));
-        // Windows 2000 shares the preparation, not the XP driver bundle or PAE.
+        // Windows 2000 shares the preparation, not the XP driver bundle or PAE;
+        // Server 2003 and XP x64 (NT 5.2) get GenAHCI instead of the bundle.
         if (std.mem.eql(u8, system.id, "windows-2000")) {
             notes[note_count] = view.t(.summary_w2k_limits);
+            note_count += 1;
+        } else if (std.mem.eql(u8, system.id, "windows-server-2003") or std.mem.eql(u8, system.id, "windows-xp-x64")) {
+            notes[note_count] = view.t(.summary_nt52_limits);
             note_count += 1;
         }
     }
@@ -280,7 +284,7 @@ fn start(
         // the disk selection.
         showXpProgress(.checking);
         if (profile) |p| {
-            _ = answer_profiles.stage(root, p, system.id, .x86, os_profile_id) catch |err| return showError(view.t(.error_xp), err);
+            _ = answer_profiles.stage(root, p, system.id, nt5Arch(system.id), os_profile_id) catch |err| return showError(view.t(.error_xp), err);
         }
         @import("xp_preparation.zig").start(root, system.id, image.name.slice(), answer, showXpProgress) catch |err| {
             view.refreshFramebuffer();
@@ -464,4 +468,10 @@ fn showXpProgress(stage: usos.flow.preparation_boot_progress.XpStage) void {
 
 fn showPreparationProgress(stage: usos.flow.preparation_boot_progress.Stage) void {
     view.handoverStatus(view.tr(stage.detail()));
+}
+
+/// Answer-profile architecture of an NT5 system prepared from UEFI.
+fn nt5Arch(system_id: []const u8) usos.flow.answer.target.Arch {
+    const nt5 = @import("xp_preparation.zig").Nt5System.fromId(system_id) orelse return .x86;
+    return nt5.arch();
 }

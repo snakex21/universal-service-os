@@ -1043,5 +1043,7 @@
 
   "boot.summary.xp_csmwrap": "CSM olmadan XP (deneysel): CSMWrap, legacy VBIOS'lu kart, 1 çekirdek ayrılmış",
 
-  "boot.summary.w2k_limits": "Windows 2000 (deneysel): NT 5.0 için AHCI/NVMe/USB 3 sürücüsü yok (SATA IDE modunda), en fazla 4 GB RAM ve 2 işlemci"
+  "boot.summary.w2k_limits": "Windows 2000 (deneysel): NT 5.0 için AHCI/NVMe/USB 3 sürücüsü yok (SATA IDE modunda), en fazla 4 GB RAM ve 2 işlemci",
+
+  "boot.summary.nt52_limits": "NT 5.2 (deneysel): sistemin StorPort'u üzerinde GenAHCI ile AHCI; kurulumda NVMe/USB 3 sürücüsü yok"
 }

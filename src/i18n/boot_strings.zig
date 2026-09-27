@@ -472,6 +472,7 @@ pub const Key = enum(u16) {
     summary_native_case,
     summary_no_answer_files,
     summary_no_drivers,
+    summary_nt52_limits,
     summary_preparation,
     summary_secure_boot_badge,
     summary_secure_boot_detail,
@@ -1078,6 +1079,7 @@ pub const hashes = [_]u32{
     0x25344415, // summary.native_case
     0x34dc4dbb, // summary.no_answer_files
     0xe8143028, // summary.no_drivers
+    0xeefafc17, // summary.nt52_limits
     0x92637c78, // summary.preparation
     0xb2783d3b, // summary.secure_boot_badge
     0xfedbcf61, // summary.secure_boot_detail
@@ -1651,6 +1653,7 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
     false,
     false,
     false,
@@ -2289,6 +2292,7 @@ pub const english = [_][]const u8{
     "Windows Setup straight from the ISO (no copy to WORK)",
     "None found in {0}",
     "None in Drivers/x64; target USB 3 may be unavailable",
+    "NT 5.2 (experimental): AHCI through GenAHCI on the system's StorPort; no NVMe/USB 3 driver in Setup",
     "Preparation",
     "Requires Secure Boot off",
     "Turn Secure Boot off in the firmware setup to use it",

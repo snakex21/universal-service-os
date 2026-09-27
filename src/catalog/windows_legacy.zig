@@ -14,6 +14,18 @@ pub const entries = [_]SystemEntry{
         .firmware = .any,
         .boot_methods = &methods,
     },
+    // XP Professional x64 (NT 5.2 amd64): the NT5 staging with an AMD64
+    // source (profile xp-x64-sp2-uefi-csm from UEFI, experimental).
+    .{
+        .id = "windows-xp-x64",
+        .name = "Windows XP x64",
+        .category = .windows,
+        .family = .windows_legacy,
+        .image_directory = "\\Systems\\Windows\\Windows XP x64\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Windows XP x64\\Unattended",
+        .firmware = .any,
+        .boot_methods = &methods,
+    },
     // BIOS staging, and from UEFI the XP UEFI-CSM / CSMWrap preparation
     // (profile w2k-x86-sp4-uefi-csm, experimental).
     .{

@@ -91,6 +91,8 @@ pub const SystemTraits = struct {
 pub const traits_table = [_]SystemTraits{
     .{ .system_id = "windows-xp", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini" },
     .{ .system_id = "windows-2000", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini" },
+    .{ .system_id = "windows-xp-x64", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini" },
+    .{ .system_id = "windows-server-2003", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini" },
     .{ .system_id = "windows-7", .secure_boot_off = true, .native_uefi = .win7, .int10_dispatcher = true },
     .{ .system_id = "windows-vista", .secure_boot_off = true, .native_uefi = .vista, .int10_dispatcher = true },
     .{ .system_id = "windows-10", .native_uefi = .modern },
@@ -153,7 +155,7 @@ pub fn windowsFolder(system: *const SystemEntry) ?[]const u8 {
 pub const Systems = union(enum) {
     any,
     ids: []const []const u8,
-    /// NT5 staging systems of the Windows legacy family (XP, 2000).
+    /// NT5 staging systems (XP, XP x64, 2000, Server 2003).
     nt5_staging,
     /// Systems whose ISO starts natively on UEFI with this kind.
     native: NativeUefi,
@@ -164,7 +166,7 @@ pub const Systems = union(enum) {
             .ids => |ids| for (ids) |id| {
                 if (std.mem.eql(u8, id, routeId(system.id))) break true;
             } else false,
-            .nt5_staging => system.family == .windows_legacy and traits(system.id).nt5_staging,
+            .nt5_staging => traits(system.id).nt5_staging,
             .native => |kind| traits(system.id).native_uefi == kind,
         };
     }
@@ -237,6 +239,12 @@ pub const profiles = [_]Profile{
     // experimental. docs/windows-2000-uefi-2026-09-27.md.
     .{ .id = "w2k-x86-sp4-uefi-csm", .systems = .{ .ids = &.{"windows-2000"} }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .xp_uefi_staging, .progress = .xp_uefi },
     .{ .id = "w2k-uefi-other", .systems = .{ .ids = &.{"windows-2000"} }, .firmware = .uefi, .backend = null, .progress = .none },
+    // Server 2003 x86 and XP x64 (NT 5.2) from UEFI: the same preparation with
+    // GenAHCI on the system StorPort; experimental. docs/nt52-2003-xp64-2026-09-27.md.
+    .{ .id = "w2k3-x86-sp2-uefi-csm", .systems = .{ .ids = &.{"windows-server-2003"} }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .xp_uefi_staging, .progress = .xp_uefi },
+    .{ .id = "w2k3-uefi-other", .systems = .{ .ids = &.{"windows-server-2003"} }, .firmware = .uefi, .backend = null, .progress = .none },
+    .{ .id = "xp-x64-sp2-uefi-csm", .systems = .{ .ids = &.{"windows-xp-x64"} }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .xp_uefi_staging, .progress = .xp_uefi },
+    .{ .id = "xp-x64-uefi-other", .systems = .{ .ids = &.{"windows-xp-x64"} }, .firmware = .uefi, .backend = null, .progress = .none },
     // ---- BIOS only
     .{ .id = "linux-live-bios", .systems = .{ .ids = &.{"other-linux"} }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .linux_live_iso, .progress = .core },
     .{ .id = "dos-fat16-bios", .systems = .{ .ids = &.{ "ms-dos", "windows-3-1", "windows-3-11" } }, .images = iso, .methods = auto_iso_memdisk, .firmware = .bios, .backend = .dos_bios_iso, .progress = .core },

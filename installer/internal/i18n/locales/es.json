@@ -1043,5 +1043,7 @@
 
   "boot.summary.xp_csmwrap": "XP sin CSM (experimental): CSMWrap, tarjeta con VBIOS legacy, 1 núcleo reservado",
 
-  "boot.summary.w2k_limits": "Windows 2000 (experimental): sin controlador AHCI/NVMe/USB 3 para NT 5.0 (SATA en modo IDE), máx. 4 GB de RAM y 2 CPU"
+  "boot.summary.w2k_limits": "Windows 2000 (experimental): sin controlador AHCI/NVMe/USB 3 para NT 5.0 (SATA en modo IDE), máx. 4 GB de RAM y 2 CPU",
+
+  "boot.summary.nt52_limits": "NT 5.2 (experimental): AHCI mediante GenAHCI sobre el StorPort del sistema; sin controlador NVMe/USB 3 en la instalación"
 }

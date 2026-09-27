@@ -53,7 +53,8 @@ test "Windows Server is its own section after the client versions" {
     }
     try std.testing.expect(seen_server);
     try std.testing.expectEqualStrings("windows-server-2025", findById("windows-server-2025").?.id);
-    try std.testing.expect(findById("windows-server-2003") == null);
+    // Server 2003 (NT5 staging) is the last Server entry.
+    try std.testing.expect(findById("windows-server-2003").?.server);
 }
 
 test "built-in system catalog contains fixed operating-system profiles" {

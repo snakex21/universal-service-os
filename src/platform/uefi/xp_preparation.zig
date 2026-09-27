@@ -30,10 +30,14 @@ pub const lang_initrd_option = " initrd=\\EFI\\USOS\\lang.cpio";
 pub const Nt5System = enum {
     windows_xp,
     windows_2000,
+    windows_server_2003,
+    windows_xp_x64,
 
     pub fn fromId(system_id: []const u8) ?Nt5System {
         if (std.mem.eql(u8, system_id, "windows-xp")) return .windows_xp;
         if (std.mem.eql(u8, system_id, "windows-2000")) return .windows_2000;
+        if (std.mem.eql(u8, system_id, "windows-server-2003")) return .windows_server_2003;
+        if (std.mem.eql(u8, system_id, "windows-xp-x64")) return .windows_xp_x64;
         return null;
     }
 
@@ -41,6 +45,8 @@ pub const Nt5System = enum {
         return switch (self) {
             .windows_xp => "xp-staging",
             .windows_2000 => "windows2000-staging",
+            .windows_server_2003 => "windows2003-staging",
+            .windows_xp_x64 => "xp64-staging",
         };
     }
 
@@ -48,7 +54,14 @@ pub const Nt5System = enum {
         return switch (self) {
             .windows_xp => "xp-x86-sp3-uefi-csm",
             .windows_2000 => "w2k-x86-sp4-uefi-csm",
+            .windows_server_2003 => "w2k3-x86-sp2-uefi-csm",
+            .windows_xp_x64 => "xp-x64-sp2-uefi-csm",
         };
+    }
+
+    /// Answer-profile architecture of the staged system.
+    pub fn arch(self: Nt5System) usos.flow.answer.target.Arch {
+        return if (self == .windows_xp_x64) .amd64 else .x86;
     }
 };
 

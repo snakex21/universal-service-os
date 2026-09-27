@@ -39,7 +39,7 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | N5 | Pomysły z E2B (szybkie) | **Next** / **Later** per punkt | N2 (M1) dla części | 1–10 dni per punkt |
 | N6 | Secure Boot: zablokowany kernel, podpisany UKI | **Next** (niski priorytet w grupie) | N1 | 4–6 dni |
 | N7 | Edytor motywów (UEFI + instalator), motywy użytkownika w BIOS, przykładowe motywy | UEFI, BIOS, przykłady: **Done** (QEMU, 2026-09-26); instalator: **Next** | menedżer profili odpowiedzi (formularz + klawiatura ekranowa) | instalator: do oszacowania |
-| L1 | Rodzina NT5 na UEFI (2000, 2003, XP x64) | 2000: **eksperymentalne** (QEMU, 2026-09-27); 2003, XP x64: **Later** | N2 (M4), N3 | 2003/XP x64: 5–10 dni + sprzęt |
+| L1 | Rodzina NT5 na UEFI (2000, 2003, XP x64) | 2000, 2003 x86, XP x64: **eksperymentalne** (QEMU do GUI Setup, 2026-09-27); 2003 x64: **Later** | N2 (M4), N3 | sprzęt (X470): do testu |
 | L2 | XP na UEFI bez CSM (CSMWrap) | **Eksperymentalne, sprzęt PASS** (X470, 2026-09-27, B260927-153019) | — | do potwierdzenia: PAE/31,9 GB, liczba CPU, USB |
 | L3 | 32-bit CPU i mniejsze minimum RAM | **Later** | pomiary | 2 dni pomiarów, potem 5–15 dni |
 | L4 | Chainload w stylu Plop dla PC bez USB boot | **Later** | L3 (częściowo) | 5–10 dni |
@@ -201,7 +201,10 @@ Kolejność testów: 2003 x86 Enterprise → XP x64 → 2003 x64 → 2000.
 2026-09-27: Windows 2000 z UEFI (profil `w2k-x86-sp4-uefi-csm`, z CSM i
 przez CSMWrap) działa w QEMU do GUI Setup; na X470 potrzebny sterownik AHCI
 dla NT 5.0 (pakiet XP nie ładuje się na jądrze 5.0). Szczegóły:
-`docs/windows-2000-uefi-2026-09-27.md`.
+`docs/windows-2000-uefi-2026-09-27.md`. Server 2003 x86 i XP x64 (NT 5.2):
+profile `w2k3-x86-sp2-uefi-csm` / `xp-x64-sp2-uefi-csm`, AHCI przez GenAHCI
+na StorPort systemu, QEMU do GUI Setup (z CSM i przez CSMWrap); X470 do testu.
+Szczegóły: `docs/nt52-2003-xp64-2026-09-27.md`.
 
 ### L2. XP na UEFI bez CSM przez CSMWrap: eksperymentalne, **sprzęt PASS**
 

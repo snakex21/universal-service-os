@@ -118,6 +118,11 @@ nazwę pliku: do usunięcia): katalogi `I386`/`AMD64`, `TXTSETUP.SIF`
   QEMU do GUI Setup; pakiet sterowników XP **nie** ładuje się na NT 5.0
   (brak eksportów), więc 2000 idzie bez niego. Szczegóły, wyniki i cechy
   repacków CMA: [../windows-2000-uefi-2026-09-27.md](../windows-2000-uefi-2026-09-27.md).
+- **2026-09-27 (NT 5.2):** Server 2003 x86 (`w2k3-x86-sp2-uefi-csm`) i XP x64
+  (`xp-x64-sp2-uefi-csm`, staging z katalogu AMD64): QEMU do GUI Setup z CSM
+  i przez CSMWrap, dysk na AHCI przez GenAHCI na własnym StorPort systemu
+  (importy: 0 brakujących). Szczegóły:
+  [../nt52-2003-xp64-2026-09-27.md](../nt52-2003-xp64-2026-09-27.md).
 
 ### 3.2 Windows Server 2003 x86 (SP2)
 

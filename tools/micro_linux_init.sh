@@ -78,7 +78,7 @@ enable_emergency_input() {
 
 persist_legacy_xp_stop() {
     reason=$1
-    case "${LEGACY_ACTION:-}" in xp-staging|windows2000-staging) ;; *) return 0 ;; esac
+    case "${LEGACY_ACTION:-}" in xp-staging|windows2000-staging|windows2003-staging|xp64-staging) ;; *) return 0 ;; esac
     [ -r /proc/mounts ] || return 0
     awk '$2 == "/mnt/esp" { found=1 } END { exit(found ? 0 : 1) }' /proc/mounts || return 0
     [ -d /mnt/esp/EFI/USOS ] || return 0
@@ -134,7 +134,7 @@ mount -t devpts devpts /dev/pts 2>/dev/null || true
 [ -r /usr/lib/usos/pipeline/run.sh ] || stop 'pipeline/run.sh is missing'
 . /usr/lib/usos/pipeline/run.sh
 stty -echo < "$USOS_UI_TTY" 2>/dev/null || true
-case "$(cat /proc/cmdline)" in *usos.legacy_action=xp-staging*|*usos.legacy_action=windows2000-staging*) USOS_XP_CHOOSING=yes ;; esac
+case "$(cat /proc/cmdline)" in *usos.legacy_action=xp-staging*|*usos.legacy_action=windows2000-staging*|*usos.legacy_action=windows2003-staging*|*usos.legacy_action=xp64-staging*) USOS_XP_CHOOSING=yes ;; esac
 # This marker is intentionally before simpledrm. It measures kernel/early
 # userspace time while the last UEFI frame is still visible, not black time.
 usos_perf_mark 'micro-Linux userspace before framebuffer init'

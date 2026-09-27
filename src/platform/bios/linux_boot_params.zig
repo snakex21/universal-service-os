@@ -74,6 +74,8 @@ pub const CommandRequest = union(enum) {
     xp_resume,
     xp_staging: XpStagingRequest,
     windows2000_staging: XpStagingRequest,
+    windows2003_staging: XpStagingRequest,
+    xp64_staging: XpStagingRequest,
     windows7_iso: XpStagingRequest,
     windows_vista_iso: XpStagingRequest,
 };
@@ -169,12 +171,14 @@ pub fn buildCommandLine(output: *[cmdline_capacity]u8, part_guid_disk: [16]u8, r
         .none => {},
         .hardware => { used = try appendCommand(output, used, " usos.legacy_action=hardware"); },
         .xp_resume => { used = try appendCommand(output, used, " usos.legacy_action=xp-resume"); },
-        .xp_staging, .windows2000_staging, .windows7_iso, .windows_vista_iso => |xp| {
+        .xp_staging, .windows2000_staging, .windows2003_staging, .xp64_staging, .windows7_iso, .windows_vista_iso => |xp| {
             if (request == .windows7_iso or request == .windows_vista_iso) used = try appendCommand(output, used, " kexec_load_disabled=0");
             used = try appendCommand(output, used, switch (request) {
                 .windows7_iso => " usos.legacy_action=windows7-iso usos.legacy_image_hex=",
                 .windows_vista_iso => " usos.legacy_action=windows-vista-iso usos.legacy_image_hex=",
                 .windows2000_staging => " usos.legacy_action=windows2000-staging usos.legacy_image_hex=",
+                .windows2003_staging => " usos.legacy_action=windows2003-staging usos.legacy_image_hex=",
+                .xp64_staging => " usos.legacy_action=xp64-staging usos.legacy_image_hex=",
                 else => " usos.legacy_action=xp-staging usos.legacy_image_hex=",
             });
             used = try appendHex(output, used, xp.image_name);
@@ -212,7 +216,7 @@ pub fn planProfile(request: CommandRequest) ?[]const u8 {
     return switch (request) {
         .none, .hardware => null,
         .xp_resume => "nt5-resume",
-        .xp_staging, .windows2000_staging => "nt5-staging",
+        .xp_staging, .windows2000_staging, .windows2003_staging, .xp64_staging => "nt5-staging",
         .windows7_iso, .windows_vista_iso => "windows-pe-bios-iso",
     };
 }
@@ -484,6 +488,8 @@ test "golden: exact BIOS micro-Linux command line per request kind" {
         .{ .request = .{ .xp_staging = staged }, .expected = base ++ " usos.legacy_action=xp-staging usos.legacy_image_hex=58502e69736f usos.legacy_unattended_hex=612e736966 usos.bios_boot_drive=81 usos.bios_disks=80:0000000000100000:512 usos.plan_profile=nt5-staging" },
         .{ .request = .{ .xp_staging = plain }, .expected = base ++ " usos.legacy_action=xp-staging usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80 usos.plan_profile=nt5-staging" },
         .{ .request = .{ .windows2000_staging = plain }, .expected = base ++ " usos.legacy_action=windows2000-staging usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80 usos.plan_profile=nt5-staging" },
+        .{ .request = .{ .windows2003_staging = plain }, .expected = base ++ " usos.legacy_action=windows2003-staging usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80 usos.plan_profile=nt5-staging" },
+        .{ .request = .{ .xp64_staging = plain }, .expected = base ++ " usos.legacy_action=xp64-staging usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80 usos.plan_profile=nt5-staging" },
         .{ .request = .{ .windows7_iso = plain }, .expected = base ++ " kexec_load_disabled=0 usos.legacy_action=windows7-iso usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80 usos.plan_profile=windows-pe-bios-iso" },
         .{ .request = .{ .windows_vista_iso = plain }, .expected = base ++ " kexec_load_disabled=0 usos.legacy_action=windows-vista-iso usos.legacy_image_hex=572e69736f usos.bios_boot_drive=80 usos.plan_profile=windows-pe-bios-iso" },
         // Windows Server 2008 R2 through the Windows 7 request: its folder is added.

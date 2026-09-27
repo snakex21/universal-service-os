@@ -1043,5 +1043,7 @@
 
   "boot.summary.xp_csmwrap": "XP χωρίς CSM (πειραματικό): CSMWrap, κάρτα με legacy VBIOS, 1 πυρήνας δεσμευμένος",
 
-  "boot.summary.w2k_limits": "Windows 2000 (πειραματικό): χωρίς πρόγραμμα οδήγησης AHCI/NVMe/USB 3 για NT 5.0 (SATA σε λειτουργία IDE), έως 4 GB RAM και 2 CPU"
+  "boot.summary.w2k_limits": "Windows 2000 (πειραματικό): χωρίς πρόγραμμα οδήγησης AHCI/NVMe/USB 3 για NT 5.0 (SATA σε λειτουργία IDE), έως 4 GB RAM και 2 CPU",
+
+  "boot.summary.nt52_limits": "NT 5.2 (πειραματικό): AHCI μέσω GenAHCI στο StorPort του συστήματος· χωρίς πρόγραμμα οδήγησης NVMe/USB 3 στην εγκατάσταση"
 }
