@@ -52,6 +52,10 @@ Ubuntu Server 24.04.5 (`run_linux_iso_direct.py ubuntu-server`): **PASS to the
 installer** — casper took `live-media=/dev/usos-iso`, the subiquity snap
 mounted and the language screen came up (`.../ubuntu-server/bios-05.png`;
 the kernel line over it is the test's `ignore_loglevel`).
+Fedora Workstation Live 44 (`... fedora`): **PASS to the live desktop**
+("Welcome to Fedora Linux", `.../fedora/bios-06.png`): dracut found
+`root=live:CDLABEL=Fedora-WS-Live-44` on the loop device through udev with
+no extra words, gdm started.
 GParted's own keymap/language prompt (console) was not answered, so the
 GParted UI itself is not shown yet. All ten ISOs on the test VHD are one
 extent each (fresh NTFS), so the dm path is not exercised yet (make a
