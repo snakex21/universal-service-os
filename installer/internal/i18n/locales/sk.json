@@ -1059,5 +1059,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "Nechajte USB kľúč USOS pripojený. Po reštarte otvorte ponuku zavádzania firmvéru a spustite položku UEFI tohto disku (nie Legacy); CSM zostáva vypnuté. Inštalácia Visty sa z neho potom spustí cez CSMWrap.",
   "boot.lx.restart": "Reštartovať",
   "winpe.vista_csmwrap_title": "USOS - Vista bez CSM",
-  "winpe.vista_csmwrap_done": "Prvá časť inštalácie Visty je dokončená. Teraz odpojte USB kľúč USOS a zvoľte OK: počítač sa reštartuje a Vista pokračuje z disku cez CSMWrap. Ak kľúč zostane pripojený, spustite položku UEFI tohto disku z ponuky zavádzania firmvéru."
+  "winpe.vista_csmwrap_done": "Prvá časť inštalácie Visty je dokončená. Teraz odpojte USB kľúč USOS a zvoľte OK: počítač sa reštartuje a Vista pokračuje z disku cez CSMWrap. Ak kľúč zostane pripojený, spustite položku UEFI tohto disku z ponuky zavádzania firmvéru.",
+
+  "boot.lx.format_the_entire_disk_q": "NAFORMÁTOVAŤ CELÝ DISK?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Vymazať VŠETKY oddiely a údaje na vybranom disku",
+  "boot.lx.x_confirmation": "{0} - POTVRDENIE",
+  "boot.lx.prepare_x_installation": "Pripraviť inštaláciu {0}"
 }

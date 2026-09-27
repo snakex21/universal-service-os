@@ -61,6 +61,21 @@ if [ -n "${XP_CUSTOM_SIF:-}" ] || [ -n "${XP_USER_SETTINGS:-}" ]; then
     fi
     rm -f "$work/winnt.base"
 fi
+# Server 2003 x86 / XP x64 from UEFI: user packages from DATA\Drivers\<system>
+# (tools/nt5_user_drivers.sh) for GUI-mode Setup and the installed system.
+case "${USOS_PLAN_PROFILE:-}" in
+    w2k3-x86-sp2-uefi-csm|xp-x64-sp2-uefi-csm)
+        . "$SCRIPT_DIR/nt5_user_drivers.sh"
+        user_arch=x86
+        [ "${NT5_SOURCE_DIR:-I386}" != AMD64 ] || user_arch=amd64
+        user_paths=$(usos_nt5_user_drivers_stage "${USOS_USER_DRIVERS_DIR:-/mnt/data/Drivers/$NT5_NAME}" "${XP_TARGET_ROOT:?}" "$user_arch") || fail 'cannot stage the user drivers from DATA\Drivers'
+        if [ -n "$user_paths" ]; then
+            mv "$work/winnt.sif" "$work/winnt.base"
+            usos_nt5_user_drivers_sif "$user_paths" < "$work/winnt.base" > "$work/winnt.sif" || fail 'cannot add OemPnPDriversPath'
+            rm -f "$work/winnt.base"
+            printf '[XP_WINDOWS] user drivers: OemPnPDriversPath="%s"\n' "$user_paths"
+        fi ;;
+esac
 put_verified "$work/winnt.sif" WINNT.SIF
 put_verified "$work/migrate.inf" MIGRATE.INF
 sync

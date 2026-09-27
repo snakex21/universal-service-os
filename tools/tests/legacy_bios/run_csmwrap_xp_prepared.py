@@ -43,6 +43,9 @@ def main():
                    help='w2k-x86-sp4-uefi-csm: Windows 2000 (--iso a 2000 SP4 ISO)')
     p.add_argument('--settings', type=Path, help='usos-xp.ini stand-in')
     p.add_argument('--tree-scripts', default='', help='more tools/* names taken from the working tree')
+    p.add_argument('--usb-only', action='store_true', help='qemu-xhci + usb-kbd + usb-tablet, pointer routed to the USB tablet')
+    p.add_argument('--ahci', action='store_true', help='target on an AHCI controller')
+    p.add_argument('--type-at', default='', help='seconds after the CSMWrap boot start at which to type and move the pointer (space-separated)')
     a = p.parse_args()
     out = a.output.resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -64,7 +67,8 @@ def main():
     print('[PREPARE] CSMWrap ESP', 'PASS' if ok else 'MISSING')
     if not ok:
         raise SystemExit(log[-4000:])
-    result = csm.boot(out, target, 'csmwrap-boot', 'std', 'tcg,thread=multi', a.minutes, run_through=a.run_through)
+    result = csm.boot(out, target, 'csmwrap-boot', 'std', 'tcg,thread=multi', a.minutes, run_through=a.run_through,
+                      usb_only=a.usb_only, ahci=a.ahci, type_at=[float(t) for t in a.type_at.split()])
     serial = (out / 'csmwrap-boot/serial.log').read_text(errors='replace') if (out / 'csmwrap-boot/serial.log').exists() else ''
     summary = {'result': result, 'csmwrap_boots': serial.count('Unlock!'), 'seabios_banners': serial.count('SeaBIOS (version')}
     (out / 'summary.json').write_text(json.dumps(summary, indent=1), encoding='utf-8')

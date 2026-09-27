@@ -152,6 +152,9 @@ usos_xp_settings_sif() {
             print "TimeZone=" v["timezone"]
             print "AdminPassword=" (v["password"] != "" ? "\"" v["password"] "\"" : "*")
             print "EncryptedAdminPassword=No"
+            # Server 2003: one automatic Administrator logon, so a keyed
+            # answer ends on the desktop, not at Ctrl+Alt+Del (XP unchanged).
+            if (v["family"] == "2003") { print "AutoLogon=Yes"; print "AutoLogonCount=1" }
             print "[UserData]"
             print "FullName=\"" v["user"] "\""
             print "OrgName=\"" v["org"] "\""

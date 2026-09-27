@@ -1056,5 +1056,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "Laat de USOS-stick aangesloten. Open na het opnieuw opstarten het opstartmenu van de firmware en start het UEFI-item van deze schijf (niet Legacy); CSM blijft uit. Vista Setup start daarna vanaf deze schijf via CSMWrap.",
   "boot.lx.restart": "Opnieuw opstarten",
   "winpe.vista_csmwrap_title": "USOS - Vista zonder CSM",
-  "winpe.vista_csmwrap_done": "Het eerste deel van de Vista-installatie is voltooid. Verwijder nu de USOS-stick en kies OK: de computer start opnieuw op en Vista gaat via CSMWrap verder vanaf de schijf. Blijft de stick aangesloten, start dan het UEFI-item van deze schijf vanuit het opstartmenu van de firmware."
+  "winpe.vista_csmwrap_done": "Het eerste deel van de Vista-installatie is voltooid. Verwijder nu de USOS-stick en kies OK: de computer start opnieuw op en Vista gaat via CSMWrap verder vanaf de schijf. Blijft de stick aangesloten, start dan het UEFI-item van deze schijf vanuit het opstartmenu van de firmware.",
+
+  "boot.lx.format_the_entire_disk_q": "DE HELE SCHIJF FORMATTEREN?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "ALLE partities en gegevens op de geselecteerde schijf wissen",
+  "boot.lx.x_confirmation": "{0} - BEVESTIGING",
+  "boot.lx.prepare_x_installation": "Installatie van {0} voorbereiden"
 }

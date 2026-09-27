@@ -1059,5 +1059,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "Ostavite USOS stick priključen. Nakon ponovnog pokretanja otvorite izbornik pokretanja firmvera i pokrenite UEFI unos ovog diska (ne Legacy); CSM ostaje isključen. Instalacija Viste tada se pokreće s njega putem CSMWrapa.",
   "boot.lx.restart": "Ponovno pokreni",
   "winpe.vista_csmwrap_title": "USOS - Vista bez CSM-a",
-  "winpe.vista_csmwrap_done": "Prvi dio instalacije Viste je dovršen. Sada izvadite USOS stick i odaberite U redu: računalo se ponovno pokreće i Vista nastavlja s diska putem CSMWrapa. Ako stick ostane priključen, pokrenite UEFI unos ovog diska iz izbornika pokretanja firmvera."
+  "winpe.vista_csmwrap_done": "Prvi dio instalacije Viste je dovršen. Sada izvadite USOS stick i odaberite U redu: računalo se ponovno pokreće i Vista nastavlja s diska putem CSMWrapa. Ako stick ostane priključen, pokrenite UEFI unos ovog diska iz izbornika pokretanja firmvera.",
+
+  "boot.lx.format_the_entire_disk_q": "FORMATIRATI CIJELI DISK?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Izbriši SVE particije i podatke s odabranog diska",
+  "boot.lx.x_confirmation": "{0} - POTVRDA",
+  "boot.lx.prepare_x_installation": "Pripremi instalaciju {0}"
 }

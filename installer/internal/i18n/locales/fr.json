@@ -1056,5 +1056,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "Laissez la clé USOS branchée. Après le redémarrage, ouvrez le menu de démarrage du micrologiciel et lancez l'entrée UEFI de ce disque (pas Legacy) ; le CSM reste désactivé. L'installation de Vista démarre alors depuis ce disque via CSMWrap.",
   "boot.lx.restart": "Redémarrer",
   "winpe.vista_csmwrap_title": "USOS - Vista sans CSM",
-  "winpe.vista_csmwrap_done": "La première partie de l'installation de Vista est terminée. Retirez maintenant la clé USOS, puis choisissez OK : l'ordinateur redémarre et Vista continue depuis le disque via CSMWrap. Si la clé reste branchée, lancez l'entrée UEFI de ce disque depuis le menu de démarrage du micrologiciel."
+  "winpe.vista_csmwrap_done": "La première partie de l'installation de Vista est terminée. Retirez maintenant la clé USOS, puis choisissez OK : l'ordinateur redémarre et Vista continue depuis le disque via CSMWrap. Si la clé reste branchée, lancez l'entrée UEFI de ce disque depuis le menu de démarrage du micrologiciel.",
+
+  "boot.lx.format_the_entire_disk_q": "FORMATER TOUT LE DISQUE ?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Effacer TOUTES les partitions et données du disque sélectionné",
+  "boot.lx.x_confirmation": "{0} - CONFIRMATION",
+  "boot.lx.prepare_x_installation": "Préparer l'installation de {0}"
 }

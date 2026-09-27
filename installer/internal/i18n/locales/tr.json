@@ -1056,5 +1056,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "USOS belleğini takılı bırakın. Yeniden başlatmadan sonra ürün yazılımı önyükleme menüsünü açın ve bu diskin UEFI girişini (Legacy değil) başlatın; CSM kapalı kalır. Vista kurulumu ardından CSMWrap üzerinden bu diskten başlar.",
   "boot.lx.restart": "Yeniden başlat",
   "winpe.vista_csmwrap_title": "USOS - CSM olmadan Vista",
-  "winpe.vista_csmwrap_done": "Vista kurulumunun ilk bölümü tamamlandı. Şimdi USOS belleğini çıkarın ve Tamam'ı seçin: bilgisayar yeniden başlar ve Vista, CSMWrap üzerinden diskten devam eder. Bellek takılı kalırsa bu diskin UEFI girişini ürün yazılımı önyükleme menüsünden başlatın."
+  "winpe.vista_csmwrap_done": "Vista kurulumunun ilk bölümü tamamlandı. Şimdi USOS belleğini çıkarın ve Tamam'ı seçin: bilgisayar yeniden başlar ve Vista, CSMWrap üzerinden diskten devam eder. Bellek takılı kalırsa bu diskin UEFI girişini ürün yazılımı önyükleme menüsünden başlatın.",
+
+  "boot.lx.format_the_entire_disk_q": "TÜM DİSK BİÇİMLENDİRİLSİN Mİ?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Seçili diskteki TÜM bölümleri ve verileri sil",
+  "boot.lx.x_confirmation": "{0} - ONAY",
+  "boot.lx.prepare_x_installation": "{0} kurulumunu hazırla"
 }

@@ -1059,5 +1059,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "Palikite USOS atmintuką prijungtą. Po paleidimo iš naujo atidarykite programinės aparatinės įrangos paleidimo meniu ir paleiskite šio disko UEFI įrašą (ne Legacy); CSM lieka išjungtas. Tada Vista diegimo programa pasileis iš jo per CSMWrap.",
   "boot.lx.restart": "Paleisti iš naujo",
   "winpe.vista_csmwrap_title": "USOS - Vista be CSM",
-  "winpe.vista_csmwrap_done": "Pirmoji Vista diegimo dalis baigta. Dabar ištraukite USOS atmintuką ir pasirinkite Gerai: kompiuteris bus paleistas iš naujo, o Vista tęs diegimą iš disko per CSMWrap. Jei atmintukas liks prijungtas, paleiskite šio disko UEFI įrašą iš programinės aparatinės įrangos paleidimo meniu."
+  "winpe.vista_csmwrap_done": "Pirmoji Vista diegimo dalis baigta. Dabar ištraukite USOS atmintuką ir pasirinkite Gerai: kompiuteris bus paleistas iš naujo, o Vista tęs diegimą iš disko per CSMWrap. Jei atmintukas liks prijungtas, paleiskite šio disko UEFI įrašą iš programinės aparatinės įrangos paleidimo meniu.",
+
+  "boot.lx.format_the_entire_disk_q": "FORMATUOTI VISĄ DISKĄ?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Ištrinti VISUS pasirinkto disko skaidinius ir duomenis",
+  "boot.lx.x_confirmation": "{0} - PATVIRTINIMAS",
+  "boot.lx.prepare_x_installation": "Paruošti {0} diegimą"
 }

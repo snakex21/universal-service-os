@@ -1059,5 +1059,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "Lăsați stickul USOS conectat. După repornire deschideți meniul de pornire al firmware-ului și porniți intrarea UEFI a acestui disc (nu Legacy); CSM rămâne oprit. Instalarea Vista pornește apoi de pe el prin CSMWrap.",
   "boot.lx.restart": "Repornire",
   "winpe.vista_csmwrap_title": "USOS - Vista fără CSM",
-  "winpe.vista_csmwrap_done": "Prima parte a instalării Vista s-a încheiat. Scoateți acum stickul USOS, apoi alegeți OK: computerul repornește și Vista continuă de pe disc prin CSMWrap. Dacă stickul rămâne conectat, porniți intrarea UEFI a acestui disc din meniul de pornire al firmware-ului."
+  "winpe.vista_csmwrap_done": "Prima parte a instalării Vista s-a încheiat. Scoateți acum stickul USOS, apoi alegeți OK: computerul repornește și Vista continuă de pe disc prin CSMWrap. Dacă stickul rămâne conectat, porniți intrarea UEFI a acestui disc din meniul de pornire al firmware-ului.",
+
+  "boot.lx.format_the_entire_disk_q": "FORMATAȚI ÎNTREGUL DISC?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Șterge TOATE partițiile și datele de pe discul selectat",
+  "boot.lx.x_confirmation": "{0} - CONFIRMARE",
+  "boot.lx.prepare_x_installation": "Pregătește instalarea {0}"
 }

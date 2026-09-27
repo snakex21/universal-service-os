@@ -1056,5 +1056,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "Hoidke USOS-i mälupulk ühendatud. Pärast taaskäivitust avage püsivara alglaadimismenüü ja käivitage selle ketta UEFI-kirje (mitte Legacy); CSM jääb välja. Seejärel käivitub Vista paigaldusprogramm sellelt CSMWrapi kaudu.",
   "boot.lx.restart": "Taaskäivita",
   "winpe.vista_csmwrap_title": "USOS - Vista ilma CSM-ita",
-  "winpe.vista_csmwrap_done": "Vista paigalduse esimene osa on valmis. Eemaldage nüüd USOS-i mälupulk ja valige OK: arvuti taaskäivitub ja Vista jätkab kettalt CSMWrapi kaudu. Kui pulk jääb ühendatuks, käivitage selle ketta UEFI-kirje püsivara alglaadimismenüüst."
+  "winpe.vista_csmwrap_done": "Vista paigalduse esimene osa on valmis. Eemaldage nüüd USOS-i mälupulk ja valige OK: arvuti taaskäivitub ja Vista jätkab kettalt CSMWrapi kaudu. Kui pulk jääb ühendatuks, käivitage selle ketta UEFI-kirje püsivara alglaadimismenüüst.",
+
+  "boot.lx.format_the_entire_disk_q": "VORMINDADA KOGU KETAS?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Kustuta valitud kettalt KÕIK partitsioonid ja andmed",
+  "boot.lx.x_confirmation": "{0} - KINNITUS",
+  "boot.lx.prepare_x_installation": "Valmista ette {0} paigaldus"
 }

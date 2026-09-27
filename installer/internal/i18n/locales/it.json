@@ -1056,5 +1056,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "Lascia collegata la chiavetta USOS. Dopo il riavvio apri il menu di avvio del firmware e avvia la voce UEFI di questo disco (non Legacy); il CSM resta disattivato. L'installazione di Vista parte quindi da esso tramite CSMWrap.",
   "boot.lx.restart": "Riavvia",
   "winpe.vista_csmwrap_title": "USOS - Vista senza CSM",
-  "winpe.vista_csmwrap_done": "La prima parte dell'installazione di Vista è completata. Rimuovi ora la chiavetta USOS, poi scegli OK: il computer si riavvia e Vista prosegue dal disco tramite CSMWrap. Se la chiavetta resta collegata, avvia la voce UEFI di questo disco dal menu di avvio del firmware."
+  "winpe.vista_csmwrap_done": "La prima parte dell'installazione di Vista è completata. Rimuovi ora la chiavetta USOS, poi scegli OK: il computer si riavvia e Vista prosegue dal disco tramite CSMWrap. Se la chiavetta resta collegata, avvia la voce UEFI di questo disco dal menu di avvio del firmware.",
+
+  "boot.lx.format_the_entire_disk_q": "FORMATTARE L'INTERO DISCO?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Cancella TUTTE le partizioni e i dati del disco selezionato",
+  "boot.lx.x_confirmation": "{0} - CONFERMA",
+  "boot.lx.prepare_x_installation": "Prepara l'installazione di {0}"
 }

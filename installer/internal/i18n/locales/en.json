@@ -1056,5 +1056,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "Keep the USOS stick connected. After the restart open the firmware boot menu and start this disk's UEFI entry (not Legacy); CSM stays off. Vista Setup then starts from it through CSMWrap.",
   "boot.lx.restart": "Restart",
   "winpe.vista_csmwrap_title": "USOS - Vista without CSM",
-  "winpe.vista_csmwrap_done": "The first part of the Vista installation is complete. Remove the USOS stick now, then choose OK: the computer restarts and Vista continues from the disk through CSMWrap. If the stick stays connected, start this disk's UEFI entry from the firmware boot menu."
+  "winpe.vista_csmwrap_done": "The first part of the Vista installation is complete. Remove the USOS stick now, then choose OK: the computer restarts and Vista continues from the disk through CSMWrap. If the stick stays connected, start this disk's UEFI entry from the firmware boot menu.",
+
+  "boot.lx.format_the_entire_disk_q": "FORMAT THE ENTIRE DISK?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Erase ALL partitions and data on the selected disk",
+  "boot.lx.x_confirmation": "{0} - CONFIRMATION",
+  "boot.lx.prepare_x_installation": "Prepare {0} installation"
 }

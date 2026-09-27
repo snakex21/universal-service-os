@@ -1056,5 +1056,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "Mantenga conectada la memoria USOS. Tras el reinicio abra el menú de arranque del firmware e inicie la entrada UEFI de este disco (no Legacy); el CSM sigue desactivado. La instalación de Vista arranca entonces desde él mediante CSMWrap.",
   "boot.lx.restart": "Reiniciar",
   "winpe.vista_csmwrap_title": "USOS - Vista sin CSM",
-  "winpe.vista_csmwrap_done": "La primera parte de la instalación de Vista ha terminado. Retire ahora la memoria USOS y elija Aceptar: el equipo se reinicia y Vista continúa desde el disco mediante CSMWrap. Si la memoria sigue conectada, inicie la entrada UEFI de este disco desde el menú de arranque del firmware."
+  "winpe.vista_csmwrap_done": "La primera parte de la instalación de Vista ha terminado. Retire ahora la memoria USOS y elija Aceptar: el equipo se reinicia y Vista continúa desde el disco mediante CSMWrap. Si la memoria sigue conectada, inicie la entrada UEFI de este disco desde el menú de arranque del firmware.",
+
+  "boot.lx.format_the_entire_disk_q": "¿FORMATEAR TODO EL DISCO?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Borrar TODAS las particiones y datos del disco seleccionado",
+  "boot.lx.x_confirmation": "{0} - CONFIRMACIÓN",
+  "boot.lx.prepare_x_installation": "Preparar la instalación de {0}"
 }

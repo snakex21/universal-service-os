@@ -1056,5 +1056,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "Lad USOS-nøglen være tilsluttet. Åbn efter genstarten firmwarens startmenu, og start denne disks UEFI-post (ikke Legacy); CSM forbliver slået fra. Vista Setup starter derefter fra den via CSMWrap.",
   "boot.lx.restart": "Genstart",
   "winpe.vista_csmwrap_title": "USOS - Vista uden CSM",
-  "winpe.vista_csmwrap_done": "Den første del af Vista-installationen er færdig. Fjern nu USOS-nøglen, og vælg OK: computeren genstarter, og Vista fortsætter fra disken via CSMWrap. Hvis nøglen forbliver tilsluttet, skal du starte denne disks UEFI-post fra firmwarens startmenu."
+  "winpe.vista_csmwrap_done": "Den første del af Vista-installationen er færdig. Fjern nu USOS-nøglen, og vælg OK: computeren genstarter, og Vista fortsætter fra disken via CSMWrap. Hvis nøglen forbliver tilsluttet, skal du starte denne disks UEFI-post fra firmwarens startmenu.",
+
+  "boot.lx.format_the_entire_disk_q": "FORMATER HELE DISKEN?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Slet ALLE partitioner og data på den valgte disk",
+  "boot.lx.x_confirmation": "{0} - BEKRÆFTELSE",
+  "boot.lx.prepare_x_installation": "Forbered installation af {0}"
 }

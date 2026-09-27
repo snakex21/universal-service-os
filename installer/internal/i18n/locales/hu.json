@@ -1056,5 +1056,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "Hagyja csatlakoztatva az USOS pendrive-ot. Újraindítás után nyissa meg a firmware rendszerindító menüjét, és indítsa el ennek a lemeznek az UEFI bejegyzését (nem Legacy); a CSM kikapcsolva marad. A Vista telepítője ezután CSMWrap segítségével indul róla.",
   "boot.lx.restart": "Újraindítás",
   "winpe.vista_csmwrap_title": "USOS - Vista CSM nélkül",
-  "winpe.vista_csmwrap_done": "A Vista telepítésének első része befejeződött. Most húzza ki az USOS pendrive-ot, majd válassza az OK gombot: a számítógép újraindul, és a Vista a lemezről folytatódik a CSMWrap segítségével. Ha a pendrive csatlakoztatva marad, indítsa el ennek a lemeznek az UEFI bejegyzését a firmware rendszerindító menüjéből."
+  "winpe.vista_csmwrap_done": "A Vista telepítésének első része befejeződött. Most húzza ki az USOS pendrive-ot, majd válassza az OK gombot: a számítógép újraindul, és a Vista a lemezről folytatódik a CSMWrap segítségével. Ha a pendrive csatlakoztatva marad, indítsa el ennek a lemeznek az UEFI bejegyzését a firmware rendszerindító menüjéből.",
+
+  "boot.lx.format_the_entire_disk_q": "A TELJES LEMEZ FORMÁZÁSA?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "A kiválasztott lemez ÖSSZES partíciójának és adatának törlése",
+  "boot.lx.x_confirmation": "{0} - MEGERŐSÍTÉS",
+  "boot.lx.prepare_x_installation": "A(z) {0} telepítésének előkészítése"
 }

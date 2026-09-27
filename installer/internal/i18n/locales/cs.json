@@ -1059,5 +1059,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "Nechte flash disk USOS připojený. Po restartu otevřete spouštěcí nabídku firmwaru a spusťte položku UEFI tohoto disku (ne Legacy); CSM zůstává vypnuté. Instalace Visty se z něj pak spustí přes CSMWrap.",
   "boot.lx.restart": "Restartovat",
   "winpe.vista_csmwrap_title": "USOS - Vista bez CSM",
-  "winpe.vista_csmwrap_done": "První část instalace Visty je dokončena. Nyní odpojte flash disk USOS a zvolte OK: počítač se restartuje a Vista pokračuje z disku přes CSMWrap. Pokud flash disk zůstane připojený, spusťte položku UEFI tohoto disku ze spouštěcí nabídky firmwaru."
+  "winpe.vista_csmwrap_done": "První část instalace Visty je dokončena. Nyní odpojte flash disk USOS a zvolte OK: počítač se restartuje a Vista pokračuje z disku přes CSMWrap. Pokud flash disk zůstane připojený, spusťte položku UEFI tohoto disku ze spouštěcí nabídky firmwaru.",
+
+  "boot.lx.format_the_entire_disk_q": "NAFORMÁTOVAT CELÝ DISK?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Smazat VŠECHNY oddíly a data na vybraném disku",
+  "boot.lx.x_confirmation": "{0} - POTVRZENÍ",
+  "boot.lx.prepare_x_installation": "Připravit instalaci {0}"
 }

@@ -1062,5 +1062,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "Ključ USOS naj ostane priključen. Po ponovnem zagonu odprite zagonski meni vdelane programske opreme in zaženite vnos UEFI tega diska (ne Legacy); CSM ostane izklopljen. Namestitev Viste se nato zažene z njega prek CSMWrap.",
   "boot.lx.restart": "Znova zaženi",
   "winpe.vista_csmwrap_title": "USOS - Vista brez CSM",
-  "winpe.vista_csmwrap_done": "Prvi del namestitve Viste je končan. Zdaj odstranite ključ USOS in izberite V redu: računalnik se znova zažene in Vista nadaljuje z diska prek CSMWrap. Če ključ ostane priključen, zaženite vnos UEFI tega diska iz zagonskega menija vdelane programske opreme."
+  "winpe.vista_csmwrap_done": "Prvi del namestitve Viste je končan. Zdaj odstranite ključ USOS in izberite V redu: računalnik se znova zažene in Vista nadaljuje z diska prek CSMWrap. Če ključ ostane priključen, zaženite vnos UEFI tega diska iz zagonskega menija vdelane programske opreme.",
+
+  "boot.lx.format_the_entire_disk_q": "FORMATIRAM CELOTEN DISK?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Izbriši VSE particije in podatke na izbranem disku",
+  "boot.lx.x_confirmation": "{0} - POTRDITEV",
+  "boot.lx.prepare_x_installation": "Pripravi namestitev {0}"
 }

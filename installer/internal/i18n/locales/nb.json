@@ -1056,5 +1056,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "La USOS-pinnen være tilkoblet. Åpne fastvarens oppstartsmeny etter omstarten, og start denne diskens UEFI-oppføring (ikke Legacy); CSM forblir av. Vista Setup starter deretter fra den via CSMWrap.",
   "boot.lx.restart": "Start på nytt",
   "winpe.vista_csmwrap_title": "USOS - Vista uten CSM",
-  "winpe.vista_csmwrap_done": "Den første delen av Vista-installasjonen er ferdig. Ta ut USOS-pinnen nå, og velg OK: datamaskinen starter på nytt, og Vista fortsetter fra disken via CSMWrap. Hvis pinnen forblir tilkoblet, start denne diskens UEFI-oppføring fra fastvarens oppstartsmeny."
+  "winpe.vista_csmwrap_done": "Den første delen av Vista-installasjonen er ferdig. Ta ut USOS-pinnen nå, og velg OK: datamaskinen starter på nytt, og Vista fortsetter fra disken via CSMWrap. Hvis pinnen forblir tilkoblet, start denne diskens UEFI-oppføring fra fastvarens oppstartsmeny.",
+
+  "boot.lx.format_the_entire_disk_q": "FORMATERE HELE DISKEN?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Slett ALLE partisjoner og data på den valgte disken",
+  "boot.lx.x_confirmation": "{0} - BEKREFTELSE",
+  "boot.lx.prepare_x_installation": "Forbered installasjon av {0}"
 }

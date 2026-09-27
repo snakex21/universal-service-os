@@ -1059,5 +1059,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "Ostavite USOS fleš priključen. Posle ponovnog pokretanja otvorite meni za pokretanje firmvera i pokrenite UEFI stavku ovog diska (ne Legacy); CSM ostaje isključen. Instalacija Viste se tada pokreće sa njega preko CSMWrap-a.",
   "boot.lx.restart": "Ponovo pokreni",
   "winpe.vista_csmwrap_title": "USOS - Vista bez CSM-a",
-  "winpe.vista_csmwrap_done": "Prvi deo instalacije Viste je završen. Sada izvadite USOS fleš i izaberite U redu: računar se ponovo pokreće i Vista nastavlja sa diska preko CSMWrap-a. Ako fleš ostane priključen, pokrenite UEFI stavku ovog diska iz menija za pokretanje firmvera."
+  "winpe.vista_csmwrap_done": "Prvi deo instalacije Viste je završen. Sada izvadite USOS fleš i izaberite U redu: računar se ponovo pokreće i Vista nastavlja sa diska preko CSMWrap-a. Ako fleš ostane priključen, pokrenite UEFI stavku ovog diska iz menija za pokretanje firmvera.",
+
+  "boot.lx.format_the_entire_disk_q": "FORMATIRATI CEO DISK?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Obriši SVE particije i podatke na izabranom disku",
+  "boot.lx.x_confirmation": "{0} - POTVRDA",
+  "boot.lx.prepare_x_installation": "Pripremi instalaciju {0}"
 }

@@ -1059,5 +1059,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "Atstājiet USOS zibatmiņu pievienotu. Pēc restartēšanas atveriet aparātprogrammatūras sāknēšanas izvēlni un startējiet šī diska UEFI ierakstu (nevis Legacy); CSM paliek izslēgts. Vista instalēšana pēc tam startēsies no tā ar CSMWrap.",
   "boot.lx.restart": "Restartēt",
   "winpe.vista_csmwrap_title": "USOS - Vista bez CSM",
-  "winpe.vista_csmwrap_done": "Vista instalēšanas pirmā daļa ir pabeigta. Tagad atvienojiet USOS zibatmiņu un izvēlieties Labi: dators tiks restartēts, un Vista turpināsies no diska ar CSMWrap. Ja zibatmiņa paliek pievienota, startējiet šī diska UEFI ierakstu no aparātprogrammatūras sāknēšanas izvēlnes."
+  "winpe.vista_csmwrap_done": "Vista instalēšanas pirmā daļa ir pabeigta. Tagad atvienojiet USOS zibatmiņu un izvēlieties Labi: dators tiks restartēts, un Vista turpināsies no diska ar CSMWrap. Ja zibatmiņa paliek pievienota, startējiet šī diska UEFI ierakstu no aparātprogrammatūras sāknēšanas izvēlnes.",
+
+  "boot.lx.format_the_entire_disk_q": "FORMATĒT VISU DISKU?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Dzēst VISAS izvēlētā diska partīcijas un datus",
+  "boot.lx.x_confirmation": "{0} - APSTIPRINĀJUMS",
+  "boot.lx.prepare_x_installation": "Sagatavot {0} instalēšanu"
 }

@@ -1056,5 +1056,10 @@
   "boot.lx.vista_csmwrap_restart_notice": "Lassen Sie den USOS-Stick angeschlossen. Öffnen Sie nach dem Neustart das Bootmenü der Firmware und starten Sie den UEFI-Eintrag dieses Datenträgers (nicht Legacy); CSM bleibt aus. Das Vista-Setup startet dann über CSMWrap von ihm.",
   "boot.lx.restart": "Neu starten",
   "winpe.vista_csmwrap_title": "USOS - Vista ohne CSM",
-  "winpe.vista_csmwrap_done": "Der erste Teil der Vista-Installation ist abgeschlossen. Entfernen Sie jetzt den USOS-Stick und wählen Sie OK: Der Computer startet neu und Vista wird über CSMWrap vom Datenträger fortgesetzt. Bleibt der Stick angeschlossen, starten Sie den UEFI-Eintrag dieses Datenträgers aus dem Bootmenü der Firmware."
+  "winpe.vista_csmwrap_done": "Der erste Teil der Vista-Installation ist abgeschlossen. Entfernen Sie jetzt den USOS-Stick und wählen Sie OK: Der Computer startet neu und Vista wird über CSMWrap vom Datenträger fortgesetzt. Bleibt der Stick angeschlossen, starten Sie den UEFI-Eintrag dieses Datenträgers aus dem Bootmenü der Firmware.",
+
+  "boot.lx.format_the_entire_disk_q": "GESAMTE FESTPLATTE FORMATIEREN?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "ALLE Partitionen und Daten auf dem gewählten Datenträger löschen",
+  "boot.lx.x_confirmation": "{0} - BESTÄTIGUNG",
+  "boot.lx.prepare_x_installation": "Installation von {0} vorbereiten"
 }

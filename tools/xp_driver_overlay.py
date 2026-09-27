@@ -17,6 +17,25 @@ SELECTED=['ACPI/acpi.sys','Dependencies/ntoskrn8.sys','Dependencies/storport.sys
 # These original XP dependencies may otherwise be loaded by text setup but left
 # uncopied (SourceDisksFiles copy flags 1,3) before the GUI welcome prompt.
 BUILTIN_USB=('usbport.sys','usbd.sys','hidclass.sys','hidparse.sys')
+# Windows Server 2003 x86 SP2 (NT 5.2): the same KMDF + USB3 backport and
+# GenAHCI, on the system's OWN StorPort and ACPI (every import resolves on
+# 5.2 with export forwarders followed: tools/tests/check_nt52_driver_imports.py).
+# X470 (2026-09-27): stock 5.2 ACPI.SYS stops with 0xA5 (0x11, 0x8, ...,
+# 0x20120913) like XP's, so the community ACPI (0 missing imports on 2003
+# SP2, forwarders followed) replaces it; GenAHCI rides on the system's own
+# StorPort. The KMDF + USB3 xHCI backport stops text mode with 0xDEADBEEF in
+# QEMU (docs/nt52-usb3-2026-09-27.md): off until that is solved.
+NT52_USB3=False
+NT52_SELECTED_USB3=[n for n in SELECTED if n!='Dependencies/storport.sys']
+NT52_SELECTED=['ACPI/acpi.sys','SATA/genahci.sys','SATA/genahci.inf']
+NT52_MARKERS=('WIN51IS.SP2','WIN51IA.SP2','WIN51IB.SP2','WIN51ID.SP2','WIN51IC.SP2')
+
+def source_kind(iso):
+    """'xp-sp3' or 'w2k3-sp2' from the media's tag files."""
+    listing=subprocess.run([SEVEN,'l','-ba',str(iso)],check=True,capture_output=True,text=True,errors='replace').stdout.upper().split()
+    if 'WIN51IP.SP3' in listing:return 'xp-sp3'
+    if any(m in listing for m in NT52_MARKERS):return 'w2k3-sp2'
+    raise ValueError('Driver experiment requires XP Professional SP3 or Windows Server 2003 SP2 (x86)')
 
 def sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()
 def decode(b): return (b.decode('utf-16'), 'utf-16') if b.startswith(b'\xff\xfe') else (b.decode('latin1'),'latin1')
@@ -44,7 +63,14 @@ def drop_keys(text,section,names):
         if not inside or key(l) not in names:out.append(l)
     return '\r\n'.join(out)+'\r\n'
 
-def registry_values():
+def registry_values(usb3=True):
+    rows=registry_rows()
+    if usb3:return rows
+    # Server 2003 without the USB3/KMDF set: only GenAHCI's service and its
+    # CriticalDeviceDatabase entry.
+    return [r for r in rows if 'genahci' in r[0].lower() or 'cc_010601' in r[0].lower()]
+
+def registry_rows():
     rows=[]
     def add(path,name,value,typ=None):rows.append((path,name,typ or (4 if isinstance(value,int) else 1),value))
     for service,group in [('Wdf01000','Boot Bus Extender'),('Ucx01000','System Bus Extender'),('USBXHCI','Input Device Support'),('USBHUB3','Input Device Support'),('genahci','SCSI miniport')]:
@@ -69,7 +95,7 @@ def registry_values():
         add('Control\\CriticalDeviceDatabase\\'+hw,'ClassGUID','{'+guid+'}')
     return rows
 
-def patch_hive(path):
+def patch_hive(path,usb3=True):
     # Private app hive, not HKLM/HKU. Only the disposable build copy is modified.
     adv=c.WinDLL('advapi32',use_last_error=True)
     adv.RegLoadAppKeyW.argtypes=[c.c_wchar_p,c.POINTER(c.c_void_p),c.c_uint,c.c_uint,c.c_uint]
@@ -79,7 +105,7 @@ def patch_hive(path):
     if rc:raise OSError(rc,'RegLoadAppKeyW build copy')
     hive=handle.value
     try:
-        for p,n,t,v in registry_values():
+        for p,n,t,v in registry_values(usb3):
             with winreg.CreateKeyEx(hive,'ControlSet001\\'+p,0,winreg.KEY_ALL_ACCESS) as k:
                 winreg.SetValueEx(k,n,0,t,v)
                 assert winreg.QueryValueEx(k,n)==(v,t)
@@ -112,11 +138,17 @@ def build_driver_overlay(iso,out):
     # otherwise leak that ISO's extracted SP3.CAB files into this cabinet.
     for work in ('original','sp3-files','raw','native-usb','source-driver-cache','bundle'):shutil.rmtree(out/work,ignore_errors=True)
     original=out/'original';original.mkdir(exist_ok=True)
-    subprocess.run([SEVEN,'e',str(iso),*['I386\\'+n for n in META],r'I386\SP3.CAB','WIN51IP.SP3','-o'+str(original),'-y'],check=True,stdout=subprocess.DEVNULL)
-    if not (original/'WIN51IP.SP3').exists():raise ValueError('Driver experiment currently requires XP Professional SP3')
+    kind=source_kind(iso)
+    # XP SP3: SP3.CAB, community ACPI and the StorPort backport (unchanged);
+    # Server 2003 SP2: SP2.CAB only for the inbox USB files, nothing replaced in it.
+    sp_cab,selected,marker=('SP3.CAB',SELECTED,'WIN51IP.SP3') if kind=='xp-sp3' else ('SP2.CAB',NT52_SELECTED_USB3 if NT52_USB3 else NT52_SELECTED,'WIN51')
+    usb3=kind=='xp-sp3' or NT52_USB3
+    builtin_usb=BUILTIN_USB if usb3 else ()
+    subprocess.run([SEVEN,'e',str(iso),*['I386\\'+n for n in META],'I386\\'+sp_cab,marker,'-o'+str(original),'-y'],check=True,stdout=subprocess.DEVNULL)
+    if not (original/marker).exists():raise ValueError('Driver experiment currently requires XP Professional SP3')
     for n in META:assert (original/n).is_file(),n
     cabdir=out/'sp3-files';cabdir.mkdir(exist_ok=True)
-    subprocess.run([SEVEN,'e',str(original/'SP3.CAB'),'-o'+str(cabdir),'-y'],check=True,stdout=subprocess.DEVNULL)
+    subprocess.run([SEVEN,'e',str(original/sp_cab),'-o'+str(cabdir),'-y'],check=True,stdout=subprocess.DEVNULL)
     bundle=out/'bundle';bundle.mkdir(exist_ok=True)
     hashes=''.join(sha(original/n)+'  I386/'+n+'\n' for n in META)
     bundle_id=hashlib.sha256(hashes.encode()).hexdigest()
@@ -124,7 +156,7 @@ def build_driver_overlay(iso,out):
     i386=bundle/'I386';i386.mkdir(exist_ok=True)
     raw=out/'raw';raw.mkdir(exist_ok=True)
     expected={e['file']:e['sha256'] for e in json.loads((DRIVERS/'manifest.json').read_text())['files']}
-    for name in SELECTED:
+    for name in selected:
         src=DRIVERS/name
         if sha(src)!=expected[name]:raise ValueError('Driver package changed: '+name)
         p=raw/src.name.upper();shutil.copyfile(src,p)
@@ -137,20 +169,20 @@ def build_driver_overlay(iso,out):
         pack_file(p,i386/(p.name[:-1]+'_'))
     native=out/'native-usb';native.mkdir(exist_ok=True)
     fallback=out/'source-driver-cache';fallback.mkdir(exist_ok=True)
-    sp3_stamps=xp_cab.stamps((original/'SP3.CAB').read_bytes())
+    sp3_stamps=xp_cab.stamps((original/sp_cab).read_bytes())
     driver_stamps={}
-    if any(not (cabdir/n).is_file() for n in BUILTIN_USB):
+    if any(not (cabdir/n).is_file() for n in builtin_usb):
         # SP3.CAB contains updated files; unchanged XP files remain in DRIVER.CAB.
         subprocess.run([SEVEN,'e',str(iso),r'I386\DRIVER.CAB','-o'+str(original),'-y'],check=True,stdout=subprocess.DEVNULL)
         subprocess.run([SEVEN,'e',str(original/'DRIVER.CAB'),*BUILTIN_USB,'-o'+str(fallback),'-y'],check=True,stdout=subprocess.DEVNULL)
         driver_stamps=xp_cab.stamps((original/'DRIVER.CAB').read_bytes())
-    for name in BUILTIN_USB:
+    for name in builtin_usb:
         src=cabdir/name if (cabdir/name).is_file() else fallback/name
         if not src.is_file():raise ValueError('Source cabinets lack native USB dependency: '+name)
         shutil.copyfile(src,native/name)
         # Unchanged Microsoft file: keep the date/time of the cabinet it came from.
         pack_file(src,i386/(name[:-1]+'_').upper(),sp3_stamps if src.parent==cabdir else driver_stamps)
-    names=[Path(n).name.lower() for n in SELECTED]+list(BUILTIN_USB)
+    names=[Path(n).name.lower() for n in selected]+list(builtin_usb)
     sysnames=[n for n in names if n.endswith('.sys')]
     text,encoding=decode((original/'TXTSETUP.SIF').read_bytes())
     # Avoid x86-specific entries overriding changed generic entries (and vice versa).
@@ -159,14 +191,14 @@ def build_driver_overlay(iso,out):
     rows=[n+' = 1,,,,,,'+('3_' if n in ('ntoskrn8.sys','storport.sys','wdf01000.sys','wdfldr.sys','acpi.sys')+BUILTIN_USB else '4_')+',4,0,0,,1,4' if n.endswith('.sys') else n+' = 1,,,,,,,20,0,0' for n in names]
     text=edit_section(text,'SourceDisksFiles.x86',rows)
     text=edit_section(text,'FileFlags',[n+' = 16' for n in sysnames])
-    text=edit_section(text,'HardwareIdsDatabase',[r'PCI\CC_010601 = "genahci"',r'PCI\CC_0C0330 = "usbxhci"',r'USB\ROOT_HUB30 = "usbhub3"',r'USB\USB30_HUB = "usbhub3"',r'USB\USB20_HUB = "usbhub3"'])
+    text=edit_section(text,'HardwareIdsDatabase',[r'PCI\CC_010601 = "genahci"',r'PCI\CC_0C0330 = "usbxhci"',r'USB\ROOT_HUB30 = "usbhub3"',r'USB\USB30_HUB = "usbhub3"',r'USB\USB20_HUB = "usbhub3"'] if usb3 else [r'PCI\CC_010601 = "genahci"'])
     text=edit_section(text,'SCSI.Load',['genahci = genahci.sys,4'])
     text=edit_section(text,'SCSI',['genahci = "USOS Generic SATA AHCI"'])
     for group,svc,label,files in [
       ('BootBusExtenders','wdf01000','Kernel-Mode Driver Framework 1.11',['wdf01000.sys','wdfldr.sys','ntoskrn8.sys']),
       ('BusExtenders','ucx01000','USB Controller Extension',['ucx01000.sys','wdfldr.sys','wpprecor.sys']),
       ('InputDevicesSupport','usbxhci','USB 3 xHCI Controller',['usbxhci.sys','wdfldr.sys','usbport.sys','usbd.sys','hidparse.sys','hidclass.sys']),
-      ('InputDevicesSupport','usbhub3','USB 3 Hub',['usbhub3.sys','wdfldr.sys','ksecd8.sys','usbd8.sys'])]:
+      ('InputDevicesSupport','usbhub3','USB 3 Hub',['usbhub3.sys','wdfldr.sys','ksecd8.sys','usbd8.sys'])] if usb3 else []:
         text=edit_section(text,group+'.Load',[svc+' = '+svc+'.sys'])
         text=edit_section(text,group,[f'{svc} = "{label}",files.{svc},{svc}'])
         text=edit_section(text,'files.'+svc,[n+',4' for n in files])
@@ -178,7 +210,7 @@ def build_driver_overlay(iso,out):
     (i386/'DOSNET.INF').write_bytes(text.encode(encoding))
     text,encoding=decode((original/'HIVESYS.INF').read_bytes())
     reglines=[]
-    for p,n,t,v in registry_values():
+    for p,n,t,v in registry_values(usb3):
         flags={1:'0x00000000',2:'0x00020000',4:'0x00010001'}[t]
         encoded=hex(v) if t==4 else v
         reglines.append(f'HKLM,"SYSTEM\\CurrentControlSet\\{p}","{n}",{flags},"{encoded}"')
@@ -187,24 +219,27 @@ def build_driver_overlay(iso,out):
     (i386/'HIVESYS.INF').write_bytes(text.encode(encoding))
     # Only disposable build files; never reuse transaction logs from an earlier hive.
     for suffix in ('.LOG','.LOG1','.LOG2'):(i386/('SETUPREG.HIV'+suffix)).unlink(missing_ok=True)
-    shutil.copyfile(original/'SETUPREG.HIV',i386/'SETUPREG.HIV');patch_hive(i386/'SETUPREG.HIV')
+    shutil.copyfile(original/'SETUPREG.HIV',i386/'SETUPREG.HIV');patch_hive(i386/'SETUPREG.HIV',usb3)
     for suffix in ('.LOG','.LOG1','.LOG2'):(i386/('SETUPREG.HIV'+suffix)).unlink(missing_ok=True)
     # The registry engine stamps the build time into touched keys and header.
     hive=i386/'SETUPREG.HIV';hive.write_bytes(xp_hive.pin_hive(hive.read_bytes(),(original/'SETUPREG.HIV').read_bytes()))
     # PnP can extract ACPI from SP3.CAB later, so replace its copy too.
     acpi=[p for p in cabdir.iterdir() if p.name.lower()=='acpi.sys']
-    if len(acpi)!=1:raise ValueError('SP3.CAB lacks unique ACPI; refusing incomplete integration')
+    if len(acpi)!=1:raise ValueError(sp_cab+' lacks unique ACPI; refusing incomplete integration')
     shutil.copyfile(DRIVERS/'ACPI/acpi.sys',acpi[0])
     ddf=out/'sp3.ddf'
-    directives=['.OPTION EXPLICIT','.Set Cabinet=on','.Set Compress=on','.Set CompressionType=MSZIP','.Set MaxDiskSize=0','.Set CabinetNameTemplate=SP3.CAB',f'.Set DiskDirectoryTemplate="{i386}"',f'.Set RptFileName="{out / "sp3.rpt"}"',f'.Set InfFileName="{out / "sp3.inf"}"']
+    directives=['.OPTION EXPLICIT','.Set Cabinet=on','.Set Compress=on','.Set CompressionType=MSZIP','.Set MaxDiskSize=0','.Set CabinetNameTemplate='+sp_cab,f'.Set DiskDirectoryTemplate="{i386}"',f'.Set RptFileName="{out / "sp3.rpt"}"',f'.Set InfFileName="{out / "sp3.inf"}"']
     directives += ['"'+str(p)+'" '+p.name for p in sorted(cabdir.iterdir()) if p.is_file()]
     ddf.write_text('\n'.join(directives)+'\n',encoding='ascii')
     subprocess.run(['C:/Windows/System32/makecab.exe','/F',str(ddf)],check=True,stdout=subprocess.DEVNULL)
     # Unchanged files keep Microsoft's date/time; the replaced ACPI gets the pinned one.
-    xp_cab.pin(i386/'SP3.CAB',{n:t for n,t in sp3_stamps.items() if n!=acpi[0].name.lower()})
+    xp_cab.pin(i386/sp_cab,{n:t for n,t in sp3_stamps.items() if n!=acpi[0].name.lower()})
+    return finish_bundle(out,bundle,i386,native,names,selected,bundle_id,iso)
+
+def finish_bundle(out,bundle,i386,native,names,selected,bundle_id,iso):
     (bundle/'payload.sha256').write_text(''.join(sha(p)+'  I386/'+p.name+'\n' for p in sorted(i386.iterdir()) if p.is_file()),encoding='ascii',newline='\n')
     (bundle/'replace-names.txt').write_text('\n'.join(n.upper() for n in names)+'\n',encoding='ascii',newline='\n')
-    report={'id':bundle_id,'source':iso.name,'source_size':iso.stat().st_size,'drivers':SELECTED,'native_usb_dependencies':{n:sha(native/n) for n in BUILTIN_USB},'sha256':{p.relative_to(bundle).as_posix():sha(p) for p in bundle.rglob('*') if p.is_file() and p.name!='manifest.json'},'runtime_verified':False}
+    report={'id':bundle_id,'source':iso.name,'source_size':iso.stat().st_size,'drivers':selected,'native_usb_dependencies':{n:sha(native/n) for n in BUILTIN_USB if (native/n).is_file()},'sha256':{p.relative_to(bundle).as_posix():sha(p) for p in bundle.rglob('*') if p.is_file() and p.name!='manifest.json'},'runtime_verified':False}
     (bundle/'manifest.json').write_text(json.dumps(report,indent=2)+'\n')
     print('XP_DRIVER_OVERLAY_BUILT',bundle_id,'SYS/INF',len(names),flush=True)
     return bundle_id,bundle
