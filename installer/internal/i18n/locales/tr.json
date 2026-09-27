@@ -1039,5 +1039,7 @@
   "boot.unattended.vista_uefi": "Yanıt dosyaları: UEFI'de Vista için henüz desteklenmiyor",
   "boot.unattended.vista_uefi_detail": "UEFI'de Vista kurulumu şimdilik yanıt dosyalarınız ve profilleriniz olmadan çalışır; el ile kurulumu seçin.",
 
-  "boot.summary.vista_case_nocsm": "CSM olmadan Windows Vista: henüz desteklenmiyor (siyah ekran) - anakart ayarlarında CSM'i etkinleştirin"
+  "boot.summary.vista_case_nocsm": "CSM olmadan Windows Vista: henüz desteklenmiyor (siyah ekran) - anakart ayarlarında CSM'i etkinleştirin",
+
+  "boot.summary.xp_csmwrap": "CSM olmadan XP (deneysel): CSMWrap, legacy VBIOS'lu kart, 1 çekirdek ayrılmış"
 }

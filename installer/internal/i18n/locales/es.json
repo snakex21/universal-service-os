@@ -1039,5 +1039,7 @@
   "boot.unattended.vista_uefi": "Archivos de respuesta: aún no compatibles con Vista en UEFI",
   "boot.unattended.vista_uefi_detail": "La instalación de Vista en UEFI se ejecuta por ahora sin sus archivos de respuesta ni perfiles; elija la instalación manual.",
 
-  "boot.summary.vista_case_nocsm": "Windows Vista sin CSM: aún no compatible (pantalla negra) - active CSM en la configuración de la placa"
+  "boot.summary.vista_case_nocsm": "Windows Vista sin CSM: aún no compatible (pantalla negra) - active CSM en la configuración de la placa",
+
+  "boot.summary.xp_csmwrap": "XP sin CSM (experimental): CSMWrap, tarjeta con VBIOS legacy, 1 núcleo reservado"
 }

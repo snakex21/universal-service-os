@@ -145,7 +145,9 @@ pub fn show(
     }
     var can_start = true;
     if (backend == .xp_uefi_staging) {
-        fields.add(view.t(.summary_preparation), view.t(.summary_xp_preparation));
+        // No CSM: the experimental xp-x86-sp3-uefi-csmwrap preparation (CSMWrap on
+        // a small ESP of the target disk; docs/design/csmwrap-integration.md).
+        fields.add(view.t(.summary_preparation), if (secure_boot.csm().likelyOn()) view.t(.summary_xp_preparation) else view.t(.summary_xp_csmwrap));
         fields.add(view.t(.summary_source), view.t(.summary_xp_source));
         fields.add(view.t(.summary_disk), view.t(.summary_xp_disk));
     }

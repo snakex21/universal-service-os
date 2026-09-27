@@ -1039,5 +1039,7 @@
   "boot.unattended.vista_uefi": "Svarfiler: understøttes endnu ikke for Vista på UEFI",
   "boot.unattended.vista_uefi_detail": "Vistas installation på UEFI kører indtil videre uden dine svarfiler og profiler; vælg manuel installation.",
 
-  "boot.summary.vista_case_nocsm": "Windows Vista uden CSM: understøttes endnu ikke (sort skærm) - slå CSM til i bundkortets indstillinger"
+  "boot.summary.vista_case_nocsm": "Windows Vista uden CSM: understøttes endnu ikke (sort skærm) - slå CSM til i bundkortets indstillinger",
+
+  "boot.summary.xp_csmwrap": "XP uden CSM (eksperimentelt): CSMWrap, kort med legacy-VBIOS, 1 kerne reserveret"
 }

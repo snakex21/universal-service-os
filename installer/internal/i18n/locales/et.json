@@ -1039,5 +1039,7 @@
   "boot.unattended.vista_uefi": "Vastusefailid: Vista jaoks UEFI-s veel toetamata",
   "boot.unattended.vista_uefi_detail": "Vista häälestus UEFI-s töötab praegu ilma teie vastusefailide ja profiilideta; valige käsitsi installimine.",
 
-  "boot.summary.vista_case_nocsm": "Windows Vista ilma CSM-ita: veel toetamata (must ekraan) - lubage CSM emaplaadi sätetes"
+  "boot.summary.vista_case_nocsm": "Windows Vista ilma CSM-ita: veel toetamata (must ekraan) - lubage CSM emaplaadi sätetes",
+
+  "boot.summary.xp_csmwrap": "XP ilma CSM-ita (katseline): CSMWrap, legacy VBIOS-iga kaart, 1 tuum reserveeritud"
 }

@@ -1039,5 +1039,7 @@
   "boot.unattended.vista_uefi": "Αρχεία απαντήσεων: δεν υποστηρίζονται ακόμη για τα Vista σε UEFI",
   "boot.unattended.vista_uefi_detail": "Η εγκατάσταση των Vista σε UEFI προς το παρόν γίνεται χωρίς τα αρχεία απαντήσεων και τα προφίλ σας· επιλέξτε τη μη αυτόματη εγκατάσταση.",
 
-  "boot.summary.vista_case_nocsm": "Windows Vista χωρίς CSM: δεν υποστηρίζεται ακόμη (μαύρη οθόνη) - ενεργοποιήστε το CSM στις ρυθμίσεις της μητρικής"
+  "boot.summary.vista_case_nocsm": "Windows Vista χωρίς CSM: δεν υποστηρίζεται ακόμη (μαύρη οθόνη) - ενεργοποιήστε το CSM στις ρυθμίσεις της μητρικής",
+
+  "boot.summary.xp_csmwrap": "XP χωρίς CSM (πειραματικό): CSMWrap, κάρτα με legacy VBIOS, 1 πυρήνας δεσμευμένος"
 }

@@ -1039,5 +1039,7 @@
   "boot.unattended.vista_uefi": "Fichiers de réponse : pas encore pris en charge pour Vista en UEFI",
   "boot.unattended.vista_uefi_detail": "L'installation de Vista en UEFI se fait pour l'instant sans vos fichiers de réponse ni profils ; choisissez l'installation manuelle.",
 
-  "boot.summary.vista_case_nocsm": "Windows Vista sans CSM : pas encore pris en charge (écran noir) - activez le CSM dans les réglages de la carte mère"
+  "boot.summary.vista_case_nocsm": "Windows Vista sans CSM : pas encore pris en charge (écran noir) - activez le CSM dans les réglages de la carte mère",
+
+  "boot.summary.xp_csmwrap": "XP sans CSM (expérimental) : CSMWrap, carte avec VBIOS legacy, 1 noyau réservé"
 }

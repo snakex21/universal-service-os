@@ -61,6 +61,19 @@ usos_legacy_xp_staging() {
     [ "${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}" = /mnt/esp/EFI/USOS ] || mkdir -p "$USOS_XP_ESP_DIR"
     . /usr/lib/usos/nt5_profile.sh
     usos_nt5_profile || stop 'Unsupported NT5 source profile'
+    # XP without firmware CSM (xp-x86-sp3-uefi-csmwrap, experimental): the UEFI
+    # menu adds usos.xp_boot=csmwrap only when it found no CSM. The Windows
+    # plan then leaves the disk's last 65 MiB for the CSMWrap ESP
+    # (xp_csmwrap_esp.sh); without the argument nothing here changes.
+    USOS_XP_CSMWRAP=no
+    case " $(cat /proc/cmdline 2>/dev/null) " in
+        *' usos.xp_boot=csmwrap '*)
+            [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ] || stop 'CSMWrap mode needs the XP UEFI preparation'
+            USOS_XP_CSMWRAP=yes
+            USOS_XP_ESP_TAIL_SECTORS=133120
+            export USOS_XP_ESP_TAIL_SECTORS
+            printf '[LEGACY_XP] CSMWRAP MODE: no firmware CSM; a CSMWrap ESP is added to the target\n' ;;
+    esac
     image_hex=$1
     unattended_hex=${2:-}
     [ -n "$image_hex" ] || stop 'Legacy XP request has no image name'
@@ -528,6 +541,12 @@ usos_legacy_xp_staging() {
     printf '[LEGACY_XP] PREPARE_XP_TARGET BEGIN target=%s source=%s\n' "$TARGET_DEVICE" "$XP_IMAGE_NAME"
     xp_run_logged legacy-xp-prepare.log sh /usr/lib/usos/prepare_xp_target.sh || stop 'prepare_xp_target.sh failed'
     printf '[LEGACY_XP] PREPARE_XP_TARGET PASS\n'
+    if [ "$USOS_XP_CSMWRAP" = yes ]; then
+        [ -z "$XP_WINNT_SIF" ] || stop 'CSMWrap mode does not take a custom WINNT.SIF (it bypasses the Windows plan)'
+        [ -r /usr/lib/usos/xp_csmwrap_esp.sh ] || stop 'xp_csmwrap_esp.sh is missing'
+        xp_run_logged legacy-xp-csmwrap.log sh /usr/lib/usos/xp_csmwrap_esp.sh || stop 'The CSMWrap ESP could not be created on the target'
+        printf '[LEGACY_XP] CSMWRAP ESP PASS\n'
+    fi
     xp_stage_set prepare-xpsetup-pass
     usos_ui_stage 5 5 'Verification and finalization' 'Verifying the staged source, unmounting media and flushing writes.' || true
 

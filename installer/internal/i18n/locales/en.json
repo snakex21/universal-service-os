@@ -1039,5 +1039,7 @@
   "boot.unattended.vista_uefi": "Answer files: not supported for Vista on UEFI yet",
   "boot.unattended.vista_uefi_detail": "Vista Setup on UEFI runs without your answer files and profiles for now; choose the manual installation.",
 
-  "boot.summary.vista_case_nocsm": "Windows Vista without CSM: not supported yet (black screen) - enable CSM in the board settings"
+  "boot.summary.vista_case_nocsm": "Windows Vista without CSM: not supported yet (black screen) - enable CSM in the board settings",
+
+  "boot.summary.xp_csmwrap": "XP without CSM (experimental): CSMWrap, card with a legacy VBIOS, 1 core reserved"
 }

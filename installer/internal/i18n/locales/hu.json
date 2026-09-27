@@ -1039,5 +1039,7 @@
   "boot.unattended.vista_uefi": "Válaszfájlok: UEFI módban a Vistához még nem támogatottak",
   "boot.unattended.vista_uefi_detail": "A Vista telepítője UEFI módban egyelőre a válaszfájlok és profilok nélkül fut; válassza a kézi telepítést.",
 
-  "boot.summary.vista_case_nocsm": "Windows Vista CSM nélkül: még nem támogatott (fekete képernyő) - kapcsolja be a CSM-et az alaplap beállításaiban"
+  "boot.summary.vista_case_nocsm": "Windows Vista CSM nélkül: még nem támogatott (fekete képernyő) - kapcsolja be a CSM-et az alaplap beállításaiban",
+
+  "boot.summary.xp_csmwrap": "XP CSM nélkül (kísérleti): CSMWrap, legacy VBIOS-os kártya, 1 mag fenntartva"
 }

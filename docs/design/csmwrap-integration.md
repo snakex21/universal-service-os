@@ -213,3 +213,40 @@ ready (AP 1)`); `Video Initialisation Succeed with OpROM` (QEMU std VGA's
 with the loading disk first; E820 with 24 entries built from the UEFI map.
 Note `CMOS: ... ext=7168 KB` (the first OVMF NVS range at 8 MiB caps the
 CMOS extended-memory count; XP uses E820, unaffected).
+
+## 8. Implementation (2026-09-27, experimental)
+
+Profile `xp-x86-sp3-uefi-csmwrap`, used **only when the UEFI menu finds no
+firmware CSM** (`secure_boot.csm().likelyOn()` false). With a CSM nothing
+changes: same kernel command line, same Windows plan output (checked
+byte-for-byte), same package goldens.
+
+* **Menu** (`src/platform/uefi/xp_preparation.zig`, `manual_summary.zig`):
+  without CSM the XP micro-Linux gets ` usos.xp_boot=csmwrap` in addition to
+  the unchanged `usos.plan_profile=xp-x86-sp3-uefi-csm`, and the summary shows
+  "XP without CSM (experimental): CSMWrap, card with a legacy VBIOS, 1 core
+  reserved" (`boot.summary.xp_csmwrap`, 27 locales). Same disk picker and
+  confirmation as XP.
+* **Plan** (`tools/xp_windows_partition_plan.awk`): `USOS_XP_ESP_TAIL_SECTORS`
+  (133120 = 65 MiB, exported by `legacy_xp_staging.sh` only in CSMWrap mode)
+  keeps the disk's last sectors free; unset, the output is identical.
+* **ESP** (`tools/xp_csmwrap_esp.sh`, after `prepare_xp_target.sh` PASS): a
+  64 MiB FAT16 partition, MBR type 0xEF, in the first free MBR slot at the end
+  of the disk, with `\EFI\BOOT\BOOTX64.EFI` = CSMWrap 3.1.2 (SHA-256 pinned,
+  read back), `\EFI\BOOT\csmwrap.ini` (`verbose = true` for the first hardware
+  test, `serial = false`) and `\CSMWRAP\` licence files + `SOURCES.txt`.
+  Refuses if the tail area overlaps a partition, if an ESP already exists, or
+  with a custom WINNT.SIF. No `Boot####` entry is written: the firmware's
+  removable-path entry for the target disk boots it.
+* **Deviation from 2.1:** the ESP is **last**, not first. The NTFS Windows
+  partition stays MBR entry 1 at LBA 2048, so the ARC paths
+  (`multi(0)disk(0)rdisk(0)partition(1)`) in WINNT.SIF, boot.ini and pae.exe
+  and the MIGRATE.INF offset are exactly as in the proven UEFI-CSM layout.
+  The QEMU prototype (section 7) used the same position.
+* **Payload:** `EFI\USOS\csmwrap\` (staged by `usos-efisign release`,
+  hash-checked, unsigned): `csmwrapx64.efi`, `LICENSE-CSMWrap-LGPL-2.1.txt`,
+  `COPYING-SeaBIOS-GPLv3.txt` (GPLv3 text from the wimlib vendor folder),
+  `SOURCES.txt`. **Open:** the SeaBIOS LGPLv3 text (`COPYING.LESSER`) itself is
+  not vendored yet; SOURCES.txt points to it.
+* Test: `tools/tests/legacy_bios/run_csmwrap_xp_prepared.py` (package chain in
+  CSMWrap mode, then OVMF without CSM, TCG).

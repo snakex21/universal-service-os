@@ -1042,5 +1042,7 @@
   "boot.unattended.vista_uefi": "Файлы ответов: для Vista в режиме UEFI пока не поддерживаются",
   "boot.unattended.vista_uefi_detail": "Установка Vista в режиме UEFI пока выполняется без ваших файлов ответов и профилей; выберите ручную установку.",
 
-  "boot.summary.vista_case_nocsm": "Windows Vista без CSM: пока не поддерживается (чёрный экран) - включите CSM в настройках платы"
+  "boot.summary.vista_case_nocsm": "Windows Vista без CSM: пока не поддерживается (чёрный экран) - включите CSM в настройках платы",
+
+  "boot.summary.xp_csmwrap": "XP без CSM (экспериментально): CSMWrap, видеокарта с legacy VBIOS, 1 ядро зарезервировано"
 }

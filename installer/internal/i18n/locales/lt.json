@@ -1042,5 +1042,7 @@
   "boot.unattended.vista_uefi": "Atsakymų failai: Vista UEFI režimu dar nepalaikomi",
   "boot.unattended.vista_uefi_detail": "Vista diegimas UEFI režimu kol kas vyksta be jūsų atsakymų failų ir profilių; pasirinkite rankinį diegimą.",
 
-  "boot.summary.vista_case_nocsm": "Windows Vista be CSM: dar nepalaikoma (juodas ekranas) - įjunkite CSM pagrindinės plokštės nustatymuose"
+  "boot.summary.vista_case_nocsm": "Windows Vista be CSM: dar nepalaikoma (juodas ekranas) - įjunkite CSM pagrindinės plokštės nustatymuose",
+
+  "boot.summary.xp_csmwrap": "XP be CSM (eksperimentinis): CSMWrap, plokštė su legacy VBIOS, 1 branduolys rezervuotas"
 }

@@ -429,6 +429,7 @@ def main() -> int:
             ("tools/prepare_xp_local_source.sh", "usr/lib/usos/prepare_xp_local_source.sh"),
             ("tools/prepare_xp_target.sh", "usr/lib/usos/prepare_xp_target.sh"),
             ("tools/legacy_xp_staging.sh", "usr/lib/usos/legacy_xp_staging.sh"),
+            ("tools/xp_csmwrap_esp.sh", "usr/lib/usos/xp_csmwrap_esp.sh"),
             ("tools/legacy_xp_resume.sh", "usr/lib/usos/legacy_xp_resume.sh"),
             ("tools/xp_unattended_policy.sh", "usr/lib/usos/xp_unattended_policy.sh"),
             ("tools/xp_user_settings.sh", "usr/lib/usos/xp_user_settings.sh"),

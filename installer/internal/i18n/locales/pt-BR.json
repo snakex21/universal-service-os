@@ -1039,5 +1039,7 @@
   "boot.unattended.vista_uefi": "Arquivos de resposta: ainda não suportados para o Vista em UEFI",
   "boot.unattended.vista_uefi_detail": "Por enquanto a instalação do Vista em UEFI é feita sem seus arquivos de resposta e perfis; escolha a instalação manual.",
 
-  "boot.summary.vista_case_nocsm": "Windows Vista sem CSM: ainda não suportado (tela preta) - ative o CSM nas configurações da placa-mãe"
+  "boot.summary.vista_case_nocsm": "Windows Vista sem CSM: ainda não suportado (tela preta) - ative o CSM nas configurações da placa-mãe",
+
+  "boot.summary.xp_csmwrap": "XP sem CSM (experimental): CSMWrap, placa com VBIOS legado, 1 núcleo reservado"
 }

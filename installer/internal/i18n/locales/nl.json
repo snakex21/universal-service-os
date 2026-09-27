@@ -1039,5 +1039,7 @@
   "boot.unattended.vista_uefi": "Antwoordbestanden: nog niet ondersteund voor Vista op UEFI",
   "boot.unattended.vista_uefi_detail": "Vista Setup op UEFI werkt voorlopig zonder uw antwoordbestanden en profielen; kies de handmatige installatie.",
 
-  "boot.summary.vista_case_nocsm": "Windows Vista zonder CSM: nog niet ondersteund (zwart scherm) - schakel CSM in bij de moederbordinstellingen"
+  "boot.summary.vista_case_nocsm": "Windows Vista zonder CSM: nog niet ondersteund (zwart scherm) - schakel CSM in bij de moederbordinstellingen",
+
+  "boot.summary.xp_csmwrap": "XP zonder CSM (experimenteel): CSMWrap, kaart met legacy-VBIOS, 1 kern gereserveerd"
 }

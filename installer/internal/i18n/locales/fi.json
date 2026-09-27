@@ -1039,5 +1039,7 @@
   "boot.unattended.vista_uefi": "Vastaustiedostot: ei vielä tuettu Vistalle UEFI-tilassa",
   "boot.unattended.vista_uefi_detail": "Vistan asennus UEFI-tilassa toimii toistaiseksi ilman vastaustiedostojasi ja profiilejasi; valitse manuaalinen asennus.",
 
-  "boot.summary.vista_case_nocsm": "Windows Vista ilman CSM:ää: ei vielä tuettu (musta näyttö) - ota CSM käyttöön emolevyn asetuksista"
+  "boot.summary.vista_case_nocsm": "Windows Vista ilman CSM:ää: ei vielä tuettu (musta näyttö) - ota CSM käyttöön emolevyn asetuksista",
+
+  "boot.summary.xp_csmwrap": "XP ilman CSM:ää (kokeellinen): CSMWrap, näytönohjain legacy-VBIOSilla, 1 ydin varattu"
 }

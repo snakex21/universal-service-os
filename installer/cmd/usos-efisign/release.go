@@ -39,7 +39,15 @@ const (
 	// NTFS driver. USOS starts it only on matching SMBIOS (touch_driver.zig).
 	touchVendorDir    = "tools/vendor/touchi2cdxe/v1.3.1-usos1"
 	touchDriverTarget = "EFI/USOS/touchi2c_x64.efi"
-	touchLicenseDir   = "EFI/USOS/licenses/touchi2cdxe"
+	// CSMWrap 3.1.2 for XP without firmware CSM (xp-x86-sp3-uefi-csmwrap):
+	// copied hash-checked, never signed; the XP preparer puts it on the
+	// target's own ESP (tools/xp_csmwrap_esp.sh).
+	csmwrapVendorDir = "tools/vendor/csmwrap/3.1.2"
+	csmwrapTargetDir = "EFI/USOS/csmwrap"
+	// SeaBIOS (inside CSMWrap) is LGPLv3, which incorporates the GPLv3 text.
+	seabiosGPLv3Source = "tools/vendor/wimlib/1.14.5/COPYING.GPLv3.txt"
+	seabiosGPLv3SHA256 = "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809"
+	touchLicenseDir    = "EFI/USOS/licenses/touchi2cdxe"
 )
 
 // signedInPlace are the non-Microsoft EFI binaries USOS loads after itself.
@@ -140,6 +148,9 @@ func release(args []string) error {
 
 	touchDriver, err := stageTouchDriver(at(touchVendorDir), at(usbRoot))
 	if err != nil {
+		return err
+	}
+	if err := stageCSMWrap(at(csmwrapVendorDir), at(seabiosGPLv3Source), at(usbRoot)); err != nil {
 		return err
 	}
 
@@ -277,6 +288,46 @@ func copyVerified(source, target, expected string) error {
 		return fmt.Errorf("%s SHA-256 %s, manifest pins %s", source, actual, expected)
 	}
 	return writeFileAtomic(target, data)
+}
+
+// stageCSMWrap copies the pinned CSMWrap binary (manifest hash), its LGPL-2.1
+// licence, the GPLv3 text (SeaBIOS) and a SOURCES.txt into EFI/USOS/csmwrap.
+func stageCSMWrap(vendorDir, gplv3, usb string) error {
+	var manifest touchManifest
+	data, err := os.ReadFile(filepath.Join(vendorDir, "manifest.json"))
+	if err != nil {
+		return fmt.Errorf("vendored CSMWrap manifest: %w", err)
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return fmt.Errorf("vendored CSMWrap manifest: %w", err)
+	}
+	if manifest.Files["csmwrapx64.efi"] == "" || manifest.Files["LICENSE"] == "" {
+		return errors.New("vendored CSMWrap manifest lacks the csmwrapx64.efi or LICENSE hash")
+	}
+	dir := filepath.Join(usb, filepath.FromSlash(csmwrapTargetDir))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	if err := copyVerified(filepath.Join(vendorDir, "csmwrapx64.efi"), filepath.Join(dir, "csmwrapx64.efi"), manifest.Files["csmwrapx64.efi"]); err != nil {
+		return err
+	}
+	if err := copyVerified(filepath.Join(vendorDir, "LICENSE"), filepath.Join(dir, "LICENSE-CSMWrap-LGPL-2.1.txt"), manifest.Files["LICENSE"]); err != nil {
+		return err
+	}
+	if err := copyVerified(gplv3, filepath.Join(dir, "COPYING-SeaBIOS-GPLv3.txt"), seabiosGPLv3SHA256); err != nil {
+		return err
+	}
+	sources := "CSMWrap " + manifest.Version + " (csmwrapx64.efi, unmodified release binary, unsigned)\r\n" +
+		"Source: https://github.com/CSMWrap/CSMWrap/releases/tag/" + manifest.Version + " (LGPL-2.1, LICENSE-CSMWrap-LGPL-2.1.txt)\r\n" +
+		"Contains SeaBIOS (LGPLv3; the LGPLv3 incorporates the GPLv3 text in COPYING-SeaBIOS-GPLv3.txt):\r\n" +
+		"  https://github.com/CSMWrap/seabios-csmwrap (the SeaBIOS fork in the CSMWrap sources, submodule seabios)\r\n" +
+		"  https://www.seabios.org/ (COPYING.LESSER: GNU LGPL version 3)\r\n" +
+		"Used by Universal Service OS only for Windows XP without firmware CSM (experimental).\r\n"
+	if err := writeFileAtomic(filepath.Join(dir, "SOURCES.txt"), []byte(sources)); err != nil {
+		return err
+	}
+	fmt.Printf("[STAGE] %s <- %s (CSMWrap %s, unsigned)\n", csmwrapTargetDir, filepath.ToSlash(vendorDir), manifest.Version)
+	return nil
 }
 
 type touchManifest struct {

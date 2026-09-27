@@ -68,7 +68,11 @@ END {
         if(starts[i]<cursor) fail("overlapping reserved extents")
         consider(cursor,starts[i]); cursor=ends[i]
     }
-    consider(cursor,size/512)
+    # CSMWrap (xp-x86-sp3-uefi-csmwrap): keep the disk's last sectors free for
+    # its ESP. Unset (every other profile): the plan is exactly as before.
+    tail=ENVIRON["USOS_XP_ESP_TAIL_SECTORS"]
+    if(tail!="") { if(!number(tail)||tail+0<0||tail+0>=size/512) fail("invalid ESP tail reservation"); consider(cursor,size/512-tail) }
+    else consider(cursor,size/512)
     if(best_size<16777216) fail("need at least 8 GiB contiguous space for Windows and Setup")
     print "version=2"
     print "windows_slot=" windows_slot

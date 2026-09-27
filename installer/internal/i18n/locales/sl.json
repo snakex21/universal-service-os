@@ -1045,5 +1045,7 @@
   "boot.unattended.vista_uefi": "Datoteke z odgovori: za Visto v UEFI še niso podprte",
   "boot.unattended.vista_uefi_detail": "Namestitev Viste v UEFI zaenkrat poteka brez vaših datotek z odgovori in profilov; izberite ročno namestitev.",
 
-  "boot.summary.vista_case_nocsm": "Windows Vista brez CSM: še ni podprto (črn zaslon) - omogočite CSM v nastavitvah plošče"
+  "boot.summary.vista_case_nocsm": "Windows Vista brez CSM: še ni podprto (črn zaslon) - omogočite CSM v nastavitvah plošče",
+
+  "boot.summary.xp_csmwrap": "XP brez CSM (poskusno): CSMWrap, kartica z legacy VBIOS, 1 jedro rezervirano"
 }

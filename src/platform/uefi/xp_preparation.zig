@@ -16,6 +16,13 @@ fn mark(root: *uefi.protocol.File, stage: []const u8, name: []const u8) !void {
     try file.flush();
 }
 
+/// No firmware CSM: profile xp-x86-sp3-uefi-csmwrap (experimental). The
+/// micro-Linux preparation is the UEFI-CSM one plus a CSMWrap ESP on the
+/// target (tools/xp_csmwrap_esp.sh). With a CSM the command line is unchanged.
+fn csmwrapOption() []const u8 {
+    return if (@import("secure_boot.zig").csm().likelyOn()) "" else " usos.xp_boot=csmwrap";
+}
+
 /// `answer`: the answer-file screen's choice (src/flow/answer_screen.zig):
 /// a .sif (usos.legacy_unattended_hex=) or the manual installation
 /// (usos.xp_settings=off: the staging ignores usos-xp.ini).
@@ -58,7 +65,7 @@ pub fn start(root: *uefi.protocol.File, name: []const u8, answer: answer_screen.
         file.close() catch {};
         break :blk " initrd=\\EFI\\USOS\\lang.cpio";
     } else |_| "";
-    const command = try std.fmt.bufPrint(&cmd, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action=xp-staging usos.legacy_image_hex={s}{s}{s} usos.plan_profile=xp-x86-sp3-uefi-csm {s}", .{ lang_initrd, id, hex[0 .. name.len * 2], answer_option, settings_option, diagnostic.xpConsoleOptions(diagnostic.requested(root)) });
+    const command = try std.fmt.bufPrint(&cmd, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action=xp-staging usos.legacy_image_hex={s}{s}{s} usos.plan_profile=xp-x86-sp3-uefi-csm{s} {s}", .{ lang_initrd, id, hex[0 .. name.len * 2], answer_option, settings_option, csmwrapOption(), diagnostic.xpConsoleOptions(diagnostic.requested(root)) });
     // Serial trace of the handover (QEMU tests read it; no secrets in it).
     const serial = @import("serial.zig");
     serial.writeAscii("[XP_CMDLINE] ");

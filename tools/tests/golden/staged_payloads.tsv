@@ -17,7 +17,7 @@ initramfs	usr/lib/usos/imdisk-x86_64.exe	100644	3a6a94c98a4b87e59a136052c50da070
 initramfs	usr/lib/usos/imdisk-x86_64.sys	100644	72873d35ee3a9d9ef1311bbb6fdefd2dfea47b4752a6f1904bbdc6dc51afd820
 initramfs	usr/lib/usos/legacy_windows_request.sh	100755	86946245c2fcd93c7fc9ffef76cebe2f8a73f197a92958cd543d7644c97c657f
 initramfs	usr/lib/usos/legacy_xp_resume.sh	100755	50abdb4e5c844391889f4800f63a377b49f25ccf98aa8a62fd769caaaa107cb7
-initramfs	usr/lib/usos/legacy_xp_staging.sh	100755	49f485da6b92b87404583c53aaaf37253d5e9cad47de4811f935dfffefdc3c07
+initramfs	usr/lib/usos/legacy_xp_staging.sh	100755	83e7b1edc4d1c51266ca97a03f1f65f8dfe4f667283c8f0e18962082f597a3a6
 initramfs	usr/lib/usos/micro_linux_ui.sh	100755	9bb0bb614367b8aec26b8e888649defa0d71172fbba97bac6b152ec0cf4180a5
 initramfs	usr/lib/usos/nt5_profile.sh	100755	9a800b34841f0ed770445bdde57b85f1cfda6f5c0b45fff92251ba13259c068b
 initramfs	usr/lib/usos/partuuid.sh	100755	717393ba57556d5e9b11bcc545f36738c07cf4a084967ce807f55b03193f995e
@@ -249,6 +249,7 @@ initramfs	usr/lib/usos/xp-nt52-vbr-tail.bin	100644	ed455d345b4d02a2132f5ede10530
 initramfs	usr/lib/usos/xp-stage2.bin	100644	1f73f3a534edc6d5a1f365d3bb6de43aca7fe23c8511d8dfd7daf7f29872797a
 initramfs	usr/lib/usos/xp-vbr-code.bin	100644	6732885c24cc80d00f10093bb707fcfdd5e8755e8fc95734178f38b48ddb0059
 initramfs	usr/lib/usos/xp_confirmation_ui.sh	100755	83d24331a4cec19452def8de121dcdc94dc67ce6b755d1d6025520a95f3a152d
+initramfs	usr/lib/usos/xp_csmwrap_esp.sh	100755	5a19d782d17bfe534d1caa18e895c65dcaae1eb6bd4fe01075e9c7cfc31c3234
 initramfs	usr/lib/usos/xp_detect_system.sh	100755	c80b0918d6794112474a18e57ef309ee4d32f09f37ecde4224c74680611ee046
 initramfs	usr/lib/usos/xp_disk_overview.sh	100755	6859dd93672462c90cfe38a5e46e678ca3cf3f664f7af3e694f07be5adba2a06
 initramfs	usr/lib/usos/xp_disk_reset.sh	100755	b276d75d00ac5a0cb2fea21ffb53877db1336443ff5a398f40cc364eacbf6ff1
@@ -263,7 +264,7 @@ initramfs	usr/lib/usos/xp_source_io.sh	100755	5ee2e93d61ab46dc1e7606d4d672295da1
 initramfs	usr/lib/usos/xp_unattended_policy.sh	100755	c3565153a31e3a0ab02b95816b1a9fce80336750a475f6dd804d6aad9921dfe6
 initramfs	usr/lib/usos/xp_user_settings.sh	100755	f87f868fc88642d13df8a1df01196f5cb19b2fa32290f06d7c24fc2b24330c30
 initramfs	usr/lib/usos/xp_verify_target.sh	100755	a15439ab8f88fcd3506bace39833e4716b239a38dbd4ba498c3646bdbc2fd258
-initramfs	usr/lib/usos/xp_windows_partition_plan.awk	100755	bb9d0134c6e49ec7da97b43dfd31bb6d73aad9fa21a7d60e1980144b2e7130ed
+initramfs	usr/lib/usos/xp_windows_partition_plan.awk	100755	daf7a14c3428503518c31e9172b16bffe0b00e8a8c1c9b062169949db4cf626b
 # xp_csm: entries added or changed by the UEFI-CSM overlay (stand-in pae.exe)
 xp_csm	usr/lib/usos/xp-pae-LICENSE.txt	100644	65253ad371ef07ab6d3a3779a71ae195b54e0a3a05cac7ab99250c55ad0e01bd
 xp_csm	usr/lib/usos/xp-pae.exe	100644	stand-in
@@ -339,6 +340,10 @@ payload_zip	EFI/USOS/ENROLL-README.txt
 payload_zip	EFI/USOS/ENROLL_THIS_KEY_IN_MOKMANAGER.cer
 payload_zip	EFI/USOS/bios-ui.bin
 payload_zip	EFI/USOS/build-info.ini
+payload_zip	EFI/USOS/csmwrap/COPYING-SeaBIOS-GPLv3.txt
+payload_zip	EFI/USOS/csmwrap/LICENSE-CSMWrap-LGPL-2.1.txt
+payload_zip	EFI/USOS/csmwrap/SOURCES.txt
+payload_zip	EFI/USOS/csmwrap/csmwrapx64.efi
 payload_zip	EFI/USOS/dos-native/COPYING
 payload_zip	EFI/USOS/dos-native/freedos/BOOT16.BIN
 payload_zip	EFI/USOS/dos-native/freedos/COMMAND.COM
