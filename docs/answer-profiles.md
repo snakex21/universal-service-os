@@ -35,6 +35,9 @@ bad values are refused with the field and the line, never the value.
 | `local_account` | 8+: local account, online-account screens hidden | default `yes` |
 | `bypass_tpm`, `bypass_secure_boot`, `bypass_ram` | Windows 11 requirement checks (`LabConfig`) | default `no`, ignored on other systems |
 | `no_network_oobe` | Windows 11: OOBE without network (`BypassNRO`) | default `no`; the wireless page is hidden on 7+ anyway (`HideWirelessSetupInOOBE`: an offline Windows 10 OOBE otherwise stops on it) |
+| `protect_pc` | Vista+: the "Help protect Windows" page (`ProtectYourPC`) | `recommended` (1), `updates` (2, important updates only), `off` (3); default `off` |
+| `network_location` | Vista/7: the network location page (`NetworkLocation`) | `work`, `home`, `public` (`Other`); default `work` (private, no HomeGroup question); not written for 8+ |
+| `disable_wer` | Vista+: Windows Error Reporting off (`Microsoft-Windows-ErrorReportingCore/DisableWER=1`, specialize) | default `no` |
 
 The password (and, with `remember_key=yes`, the keys) are plain text on
 the stick. The menu never shows them in lists or logs.
@@ -85,6 +88,21 @@ give byte-identical `WINNT.SIF` and accounts script.
   `LocalAccounts` in `Administrators`). Nothing selects the disk or the
   edition: Setup shows its disk list (and its edition list when there is no
   key).
+- **Per version** (Microsoft unattend reference; `schema.zig` holds the
+  table of every setting the renderer writes with its pass, component and
+  the versions that have it, and `root.render` checks each rendered file
+  against it: Setup refuses the whole file for one element its version
+  does not know). OOBE: Vista `HideEULAPage`, `NetworkLocation`,
+  `ProtectYourPC`; 7 / 2008 R2 add `HideWirelessSetupInOOBE`; 8+ add
+  `HideOEMRegistrationScreen` and `HideOnlineAccountScreens` (before
+  2026-09-27 `HideOEMRegistrationScreen` was also written for 7 and 2008
+  R2, which their schema does not have). Windows 7 client also gets
+  `ShowWindowsLive=false` (specialize). Not used: the deprecated
+  `SkipMachineOOBE`/`SkipUserOOBE`, IE home page and search scopes. The
+  OOBE pages of Vista/7 are all answered: EULA, user name and password
+  (`LocalAccounts`), computer name, key (when the profile has one, else
+  7 asks for it in OOBE), "Help protect Windows", time zone, network
+  location.
 - **Checks** (`xml_check.zig`): well-formedness without a DOM; the
   architecture set of any answer file. An answer file whose components are
   all for another architecture than the media (an amd64-only file, e.g.
@@ -117,7 +135,9 @@ organization, password (shown as bullets), time zone, Windows language,
 formats, keyboard (list pickers), the product key **of the system the
 editor was opened from** (`key.<system-id>`), "Remember the key on this
 stick", local account and, for Windows 11, the three requirement bypasses
-and "set up without network". Rules are the model's, checked live (a bad
+and "set up without network"; for Vista and newer "Protection and
+updates" and "Turn off error reporting", for Vista/7 (and 2008/2008 R2)
+"network location". Rules are the model's, checked live (a bad
 value turns the row red and the help panel says why; empty required fields
 turn red on Save). A key typed with "Remember" off is kept in memory for
 this boot only (`answer_profiles` session copy) and never written.
@@ -206,6 +226,24 @@ installation key for Pro, never stored in the repo), writes it as
   `Administratorzy` group (the XML says `Administrators`).
 - First run found a gap: offline OOBE stopped on "Let's connect you to a
   network"; `HideWirelessSetupInOOBE` is now set on 7+ (second run clean).
+
+### Installation test, Windows 7 SP1 x64 (VirtualBox, 2026-09-27)
+
+Same script (`prepare --system windows-7 --arch amd64`, the Microsoft
+generic volume key for 7 Professional on the command line), ISO
+`pl_windows_7_professional_with_sp1_x64_dvd_u_676944.iso`, BIOS, SATA,
+empty 40 GB disk, plus a NAT network card so the network location page
+would appear. Result:
+
+- asked by Setup: only the edition list (this ISO has four editions; the
+  profile never picks one, Professional chosen) and the disk page (manual
+  selection kept, Enter on the unallocated disk);
+- answered: language page, EULA, and the whole OOBE: no user or computer
+  name page, no key page, no "Help protect Windows", no time zone page, no
+  network location page. From "preparing the computer for first use"
+  straight to the desktop, logged on as `Tester` (empty password);
+  `hostname` = `USOS-VBOX`, `tzutil /g` = `Central European Standard
+  Time`, `Tester` in `Administratorzy`. About 16 minutes; VM deleted.
 
 ## Attribution
 
