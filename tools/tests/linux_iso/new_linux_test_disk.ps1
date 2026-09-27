@@ -1,4 +1,4 @@
-# Builds the Linux ISO test disk: a sparse fixed VHD laid out like a USOS
+# Builds the Linux ISO test disk: a fixed VHD laid out like a USOS
 # stick (USOS_ESP FAT32 with -EspSource, USOS_DATA NTFS) with the verified
 # test ISOs (tools/linux_test_assets.py) copied to
 # DATA\Systems\Linux\<Folder>\Images. Writes <Vhd>.extents.json: per ISO the
@@ -6,14 +6,19 @@
 # run_linux_iso_direct.py (QEMU -kernel/-initrd without the menu).
 # Needs an elevated shell (Mount-DiskImage); touches only the VHD it creates.
 param(
-    [string]$Vhd = "$env:LOCALAPPDATA\USOS\test-assets\linux\usos-linux-test.vhd",
+    [string]$Vhd = "",
     [string]$EspSource = "",
     [int]$SizeGB = 40
 )
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
 $qemuImg = Join-Path $root 'tools\qemu\qemu-img.exe'
-$assets = Split-Path -Parent $Vhd
+# Mount-DiskImage refused files under %LOCALAPPDATA% here ("path not found"),
+# so the VHD lives in the git-ignored artifacts folder; the ISOs are copied
+# from the asset folder.
+if (-not $Vhd) { $Vhd = Join-Path $root 'tools\tests\artifacts\linux-iso\usos-linux-test.vhd' }
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Vhd) | Out-Null
+$assets = Join-Path $env:LOCALAPPDATA 'USOS\test-assets\linux'
 $manifest = Get-Content (Join-Path $assets 'manifest.json') -Raw | ConvertFrom-Json
 # test asset name -> DATA folder under Systems\Linux
 $folders = @{
@@ -29,6 +34,7 @@ if (Test-Path -LiteralPath $Vhd) {
 }
 & $qemuImg create -f vpc -o subformat=fixed $Vhd "$($SizeGB)G" | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "qemu-img create failed" }
+& fsutil.exe sparse setflag $Vhd 0 | Out-Null
 Mount-DiskImage -ImagePath $Vhd -StorageType VHD -NoDriveLetter | Out-Null
 Start-Sleep -Milliseconds 500
 $disk = Get-DiskImage -ImagePath $Vhd | Get-Disk

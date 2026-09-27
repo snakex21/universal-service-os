@@ -33,7 +33,7 @@ from iso9660_rr import Iso  # noqa: E402
 import build_linux_iso_helper as packer  # noqa: E402
 
 ASSETS = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "USOS" / "test-assets" / "linux"
-VHD = ASSETS / "usos-linux-test.vhd"
+VHD = ROOT / "tools" / "tests" / "artifacts" / "linux-iso" / "usos-linux-test.vhd"
 OUT = ROOT / "tools" / "tests" / "artifacts" / "linux-iso"
 
 # name: kernel, initrds, cmdline (what the USOS recipe produces for this ISO)

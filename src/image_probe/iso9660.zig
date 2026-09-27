@@ -65,7 +65,14 @@ fn findInDirectory(reader: anytype, block_size: u16, directory: Record, wanted: 
         try random_access.readExactAt(reader, absolute, record_buf[0..record_len]);
         const rec = recordInfo(record_buf[0..record_len]) orelse return error.InvalidIso9660;
         const raw_name = record_buf[rec.name_offset .. rec.name_offset + rec.name_len];
-        if (!isSpecialName(raw_name) and isoNameEquals(raw_name, wanted)) return rec;
+        if (!isSpecialName(raw_name)) {
+            if (isoNameEquals(raw_name, wanted)) return rec;
+            // Rock Ridge alternate name (Linux ISOs: long, mixed-case names).
+            var rr_buffer: [255]u8 = undefined;
+            if (rockRidgeName(record_buf[0..record_len], &rr_buffer)) |rr_name| {
+                if (std.ascii.eqlIgnoreCase(rr_name, wanted)) return rec;
+            }
+        }
         consumed += record_len;
     }
     return null;
@@ -84,6 +91,33 @@ pub fn recordInfo(bytes: []const u8) ?Record {
         .name_offset = 33,
         .name_len = name_len,
     };
+}
+
+/// The Rock Ridge `NM` name of a directory record (SUSP entries in the
+/// record's system use area; continuation areas are not followed).
+pub fn rockRidgeName(record: []const u8, out: []u8) ?[]const u8 {
+    if (record.len < 34) return null;
+    const name_len: usize = record[32];
+    var at: usize = 33 + name_len + @intFromBool(name_len % 2 == 0);
+    var len: usize = 0;
+    var found = false;
+    while (at + 4 <= record.len) {
+        const entry_len: usize = record[at + 2];
+        if (entry_len < 4 or at + entry_len > record.len) break;
+        if (record[at] == 'N' and record[at + 1] == 'M' and entry_len >= 5) {
+            const flags = record[at + 4];
+            // CURRENT/PARENT names carry no text.
+            if (flags & 0x06 == 0) {
+                const part = record[at + 5 .. at + entry_len];
+                if (len + part.len > out.len) return null;
+                @memcpy(out[len..][0..part.len], part);
+                len += part.len;
+                found = true;
+            }
+        }
+        at += entry_len;
+    }
+    return if (found and len != 0) out[0..len] else null;
 }
 
 fn isSpecialName(name: []const u8) bool {
@@ -149,4 +183,25 @@ fn writeRecord(dest: []u8, extent: u32, size: u32, is_dir: bool, name: []const u
     dest[32] = @intCast(name.len);
     @memcpy(dest[33 .. 33 + name.len], name);
     return len;
+}
+
+test "Rock Ridge NM names are matched next to the primary name" {
+    var image = [_]u8{0} ** (24 * descriptor_size);
+    writeTestImage(&image, "LIVE", "VMLINUZ_.;1", 4242);
+    // Append an NM entry to the file record in LIVE (extent 21).
+    const live = image[21 * descriptor_size .. 22 * descriptor_size];
+    const long = "vmlinuz-6.12.107+deb13-amd64";
+    const base_len: usize = live[0];
+    const nm_len: usize = 5 + long.len;
+    live[base_len] = 'N';
+    live[base_len + 1] = 'M';
+    live[base_len + 2] = @intCast(nm_len);
+    live[base_len + 3] = 1;
+    live[base_len + 4] = 0;
+    @memcpy(live[base_len + 5 ..][0..long.len], long);
+    live[0] = @intCast(base_len + nm_len);
+    var reader = random_access.SliceReader{ .bytes = &image };
+    try std.testing.expectEqual(@as(u64, 4242), (try findPath(&reader, "live/vmlinuz-6.12.107+deb13-amd64")).?.size);
+    try std.testing.expectEqual(@as(u64, 4242), (try findPath(&reader, "LIVE/VMLINUZ_")).?.size);
+    try std.testing.expect((try findPath(&reader, "live/vmlinuz")) == null);
 }
