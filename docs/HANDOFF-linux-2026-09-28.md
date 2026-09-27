@@ -45,11 +45,10 @@ Verified (SHA-256 equal to the distro-published value) at 01:04-01:10:
 | systemrescue | systemrescue-13.02-amd64.iso | ad4d670b72859d887c7960142a9a9d36a3e50446694a035e254442f65d6e7572 |
 | clonezilla | clonezilla-live-3.3.3-37-amd64.iso | 3079458d926a37d3533e5d5caeb61b6e49c2dc69e2c97e0332ef37986bb3414f |
 | ubuntu-desktop | ubuntu-24.04.5.1-desktop-amd64.iso | 4da4a0c9035da8e68a59a838674f403f0a54472c78a83b4fb7f78d03588f85a7 |
+| fedora | Fedora-Workstation-Live-44-1.7.x86_64.iso | 1620295f6a00c27c3208f0c00b8ece4eab1ec69b9002152d97488bf26a426ddf |
 
-Still downloading when this was written (may be lost at shutdown; the script
-resumes it): `fedora` (Fedora-Workstation-Live-44-1.7.x86_64.iso; one mirror
-redirect failed with an SSL certificate error, the script retries). Check `manifest.json`:
-an entry there means verified.
+All ten downloads finished and verified (01:04-01:20). `manifest.json`
+in the folder has URL, checksum URL, size and time per file.
 
 URLs: `python tools/linux_test_assets.py --list`.
 
