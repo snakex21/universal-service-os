@@ -116,7 +116,15 @@ def prepare(a) -> int:
     subprocess.run([str(ROOT / 'tools/zig/zig.exe'), 'build', '--cache-dir', str(ROOT / 'tools/cache/zig'), 'answer-tool'], check=True, cwd=ROOT)
     xml = WORK / 'Autounattend.xml'
     profile = ROOT / 'src/flow/answer/testdata/vbox.profile.ini'
-    subprocess.run([str(tool), 'render', str(profile), a.system, a.arch, str(xml), a.key], check=True, cwd=ROOT)
+    if a.edition:
+        # The same profile with an edition (docs/answer-profiles.md "Edition").
+        edited = WORK / 'vbox-edition.profile.ini'
+        edited.write_bytes(profile.read_bytes().rstrip() + ('\r\nedition=' + a.edition + '\r\n').encode())
+        profile = edited
+    render = [str(tool), 'render', str(profile), a.system, a.arch, str(xml), a.key or '-']
+    if a.install_xml:
+        render.append(str(Path(a.install_xml).resolve()))
+    subprocess.run(render, check=True, cwd=ROOT)
     (WORK / 'answer.img').write_bytes(floppy({'Autounattend.xml': xml.read_bytes()}))
     if vbox('showvminfo', NAME, check=False).returncode == 0:
         raise SystemExit('VM exists already: ' + NAME)
@@ -162,6 +170,8 @@ if __name__ == '__main__':
     c.add_argument('--arch', default='x86')
     c.add_argument('--key', default='', help='generic installation key; empty: none (Setup asks)')
     c.add_argument('--memory', default='3072')
+    c.add_argument('--edition', default='', help='edition= for the profile (matched against --install-xml)')
+    c.add_argument('--install-xml', default='', help="the ISO's install.wim XML metadata (UTF-16LE)")
     sub.add_parser('destroy')
     a = p.parse_args()
     sys.exit({'prepare': prepare, 'destroy': destroy}[a.cmd](a))
