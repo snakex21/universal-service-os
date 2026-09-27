@@ -293,21 +293,37 @@ static BOOL mbr_io(BYTE sector[512],BOOL write){
 }
 static int staging_slot(const BYTE *s){
  for(int i=0;i<4;i++){const BYTE *e=s+446+16*i;DWORD first,count;memcpy(&first,e+8,4);memcpy(&count,e+12,4);
-  if(e[4]==0x07&&first==csm_staging_start&&count==csm_staging_sectors)return i;}
+  if((e[4]==0x07||e[4]==0x17)&&first==csm_staging_start&&count==csm_staging_sectors)return i;}
  return -1;
 }
+/* The WinPE drive letters of the prepared disk's volumes (staging C:, the
+ * CSMWrap ESP) are removed before Setup: Vista Setup keeps the letters of
+ * existing volumes, so with them the new Windows got D: (QEMU 2026-09-27). */
+static void drop_staging_letter(void){
+ DWORD letters=GetLogicalDrives();
+ for(DWORD i=2;i<26;i++)if(letters&(1u<<i)){
+  WCHAR name[8]=L"\\\\.\\C:",root[4]={L'A'+i,L':',L'\\',0};name[4]=L'A'+i;DWORD got=0;
+  HANDLE h=CreateFileW(name,0,FILE_SHARE_READ|FILE_SHARE_WRITE,0,OPEN_EXISTING,0,0);if(h==INVALID_HANDLE_VALUE)continue;
+  VOLUME_DISK_EXTENTS e;BOOL match=DeviceIoControl(h,IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS,0,0,&e,sizeof(e),&got,0)&&e.NumberOfDiskExtents==1&&
+   e.Extents[0].DiskNumber==csm_disk;
+  CloseHandle(h);
+  if(match)logcode("CSMWrap: WinPE drive letter of a prepared volume (staging, CSMWrap ESP) removed before Setup (ASCII)=",DeleteVolumeMountPointW(root)?(DWORD)(L'A'+i):GetLastError());
+ }
+}
 enum{STAGING_INACTIVE,STAGING_ACTIVE_IF_ALONE,STAGING_REMOVE};
-/* The staging partition's MBR entry: clear its active flag before Setup (Vista
- * then makes its own partition the system partition), set it again after a
- * failed Setup when no other partition is active (the next boot of this disk
- * retries), remove it after a good installation (PE10 ran from RAM). Only the
- * matching entry of this disk's sector 0 is touched; read back. */
+/* The staging partition's MBR entry: before Setup it becomes inactive and
+ * hidden (type 0x17: Vista then makes its own partition the system partition
+ * and gives no letter to the staging volume); after a failed Setup it is made
+ * active and type 0x07 again when no other partition is active (the next boot
+ * of this disk retries); after a good installation it is removed (PE10 ran
+ * from RAM). Only the matching entry of this disk's sector 0 is touched; read
+ * back. */
 static BOOL staging_entry(int action){
  BYTE s[512],check[512];if(!mbr_io(s,FALSE)){logcode("CSMWrap: cannot read the target MBR=",GetLastError());return FALSE;}
  int slot=staging_slot(s);if(slot<0){logcode("CSMWrap: staging partition entry not found=",ERROR_NOT_FOUND);return FALSE;}
  BYTE *e=s+446+16*slot;
- if(action==STAGING_INACTIVE){if(e[0]==0){logcode("CSMWrap: staging partition already inactive=",0);return TRUE;}e[0]=0;}
- else if(action==STAGING_ACTIVE_IF_ALONE){for(int i=0;i<4;i++)if(s[446+16*i]==0x80){logcode("CSMWrap: a partition is active; staging left inactive (slot)=",(DWORD)i);return TRUE;}e[0]=0x80;}
+ if(action==STAGING_INACTIVE){drop_staging_letter();if(e[0]==0&&e[4]==0x17){logcode("CSMWrap: staging partition already inactive=",0);return TRUE;}e[0]=0;e[4]=0x17;}
+ else if(action==STAGING_ACTIVE_IF_ALONE){for(int i=0;i<4;i++)if(s[446+16*i]==0x80){logcode("CSMWrap: a partition is active; staging left inactive (slot)=",(DWORD)i);return TRUE;}e[0]=0x80;e[4]=0x07;}
  else memset(e,0,16);
  if(!mbr_io(s,TRUE)||!mbr_io(check,FALSE)||!same(s,check,512)){logcode("CSMWrap: MBR write/readback failed=",GetLastError());return FALSE;}
  logcode(action==STAGING_INACTIVE?"CSMWrap: staging partition marked inactive before Setup (slot)=":action==STAGING_REMOVE?"CSMWrap: staging partition entry removed (slot)=":"CSMWrap: staging partition active again for a retry (slot)=",(DWORD)slot);

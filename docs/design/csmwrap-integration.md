@@ -353,7 +353,9 @@ Why this one:
   `servicing` section is refused). Disk selection stays manual (the renderer
   writes no DiskConfiguration/InstallTo).
 * **Installer** (`tools/windows_vista_install.c`, CSMWrap mode v1): BIOS
-  firmware is accepted only with `usos-vista-csmwrap.flag`; the target disk is
+  firmware is accepted only with `usos-vista-csmwrap.flag`; before Setup the
+  WinPE letters of the prepared disk's volumes are removed and the staging
+  partition becomes inactive and hidden (type 0x17); the target disk is
   the one internal MBR disk with the recorded signature; no ESP hints and no
   Vista bcdedit extraction; partition identity = signature + offset (what
   MountedDevices stores); after Setup: exactly one active partition, its
@@ -375,3 +377,18 @@ Why this one:
 * The firmware may list the stick first after each restart: the finalizer
   says to remove it (or to start the disk's UEFI entry from the boot menu).
 * Secure Boot must be off (CSMWrap is unsigned).
+
+### 10.4 QEMU results (2026-09-27)
+
+Harness `tools/tests/legacy_bios/run_csmwrap_vista_prepared.py`: `prepare`
+runs `vista_csmwrap_target.sh` in the release micro-Linux on a blank 24 GiB
+disk with the PE10 donor ISO as a raw disk (37 s, every read-back PASS);
+`boot` starts OVMF **without CSM** (i440FX, TCG, std VGA) with the target on
+AHCI and the Vista test stick (`vista-esp-repro/stick-c.vhd`, overlay) on
+xHCI. Screens and logs: `tools/tests/artifacts/csmwrap-vista*` (not in git).
+
+| Run | Result |
+|---|---|
+| 1 (no answer) | OVMF boots the disk's `BOOTX64.EFI` = CSMWrap -> SeaBIOS -> USOS MBR -> NT60 -> bootmgr -> PE10 (Windows logo after 13 s) -> USOS installer in BIOS mode (`Firmware type = 1`, disk found by signature, staging made inactive) -> **Vista Setup language page** (PE10 USB keyboard works) -> disk page lists the unallocated space, USOS-VISTA and CSMWRAP -> the install runs to the end, `Vista Setup returned=0`, exactly **one active partition = the new Vista partition** (not the staging one), BIOS BCD `\Boot\BCD` with `winload.exe`, `BOOTSECT.BAK`. Finalizer failed at the BCD check (the store stays open after Setup: CopyFile sharing violation, `/store` + `/export` refused) -> fixed: `bcdedit /store ... /enum {default}` must name the new partition twice and `winload.exe`. With test signing set by hand and a restart: **phase 2 boots from the disk through CSMWrap** ("Windows is configuring the computer", Setup's finishing screen at 800x600) and reaches **OOBE** (user account page). |
+| 2 (answer merged: the Vista golden profile without its fake key) | Language page and EULA skipped (the merged answer was accepted), key/edition/disk pages manual. Finalizer PASS (BCD check, test signing, USB v11 armed, staging entry removed, log copied), "remove the stick" dialog. That dialog got no keyboard or tablet input in QEMU -> it is now foreground/topmost and the restart follows after 3 minutes anyway. After a reset: phase 2 in **test mode** (test signing active) runs the USB v11 first-boot gate; QEMU's `qemu-xhci` is not driven by the Vista USB 3 package, so the gate stops with "USB IS NOT READY" (the gate is the UEFI path's; on the X470 it passed with CSM, v11, where the ports are AMD xHCI). The installer now also removes the WinPE letters of the prepared disk's volumes (staging C:, CSMWrap ESP) before Setup and hides the staging partition (type 0x17; 0x07 again for a retry), so no stray letters reach the installed system. (The "D:\USOS\Vista\firstboot-usb.log" line on the gate screen is a fixed text of the USB bootstrap, not the real letter.) |
+| 3 (final installer, build B260927-205829) | Same flow with the answer: letters C: and F: removed, staging inactive + hidden, `Vista Setup returned=0`, the new partition had **C:** in WinPE, one active partition (the new one), BCD check PASS (2 entries name the partition, `winload.exe`), test signing set, staging entry removed, USB v11 armed; the notice timed out after 3 minutes and PE10 restarted by itself; the disk booted phase 2 through CSMWrap in test mode up to the USB v11 gate (QEMU xHCI, see run 2). Disk afterwards: Vista NTFS + CSMWrap ESP only. |
