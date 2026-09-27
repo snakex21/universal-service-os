@@ -71,6 +71,7 @@ def main() -> int:
     parser.add_argument("--init", default=str(ROOT / "zig-out" / "linux-iso" / "usos-init"))
     parser.add_argument("--memory", default="4096")
     parser.add_argument("--append", default="")
+    parser.add_argument("--keys", default="", help="comma list of seconds:key sent in order after start, e.g. 60:ret,5:ret")
     args = parser.parse_args()
 
     extents = json.loads((str(VHD) + ".extents.json") and Path(str(VHD) + ".extents.json").read_text(encoding="utf-8-sig"))
@@ -116,7 +117,14 @@ def main() -> int:
     proc = subprocess.Popen(cmd)
     monitor = Monitor(port)
     try:
-        deadline = time.time() + args.seconds
+        start = time.time()
+        for step in [k for k in args.keys.split(",") if k]:
+            delay, key = step.split(":", 1)
+            time.sleep(float(delay))
+            monitor.key(key, 0.2)
+        if args.keys:
+            monitor.shot(work / f"{'uefi' if args.uefi else 'bios'}-keys.png")
+        deadline = start + args.seconds
         shots = 0
         while time.time() < deadline and proc.poll() is None:
             time.sleep(30)

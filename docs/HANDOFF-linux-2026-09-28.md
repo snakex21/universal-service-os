@@ -64,7 +64,11 @@ partition 64 is added over the contiguous ISO: `iso attached: /dev/usos-iso
 -> /dev/sda64`, and the **graphical installer's first screen** came up
 (`.../debian13-netinst/bios-04.png`). Not yet verified: d-i's CD detection
 (after language/keyboard) finding `sda64`; the runner now adds a per-boot
-`/preseed.cfg` with `cdrom-detect/try-usb=true` (not run yet). Fragmented
+`/preseed.cfg` with `cdrom-detect/try-usb=true`. One keyboard-driven try
+(`--keys "70:ret,8:ret,8:ret,40:ret"`) ended on the text console: the first
+Enter probably arrived before the GTK frontend (it came up at ~120 s in the
+first run). Next: first key after >= 130 s, or test with the text installer
+initrd (`install.amd/initrd.gz`), which is easier to drive. Fragmented
 ISOs cannot use this path (no dm in d-i): refuse with "copy the ISO again".
 GParted's own keymap/language prompt (console) was not answered, so the
 GParted UI itself is not shown yet. All ten ISOs on the test VHD are one
