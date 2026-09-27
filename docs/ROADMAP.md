@@ -136,7 +136,7 @@ Projekt: [design/answer-file-generator.md](design/answer-file-generator.md).
 | Pomysł | Status | Nakład | Uwagi |
 |---|---|---|---|
 | „Uruchom z pierwszego dysku” (bez wyjmowania pendrive'a) | **Next** | 1–2 dni | UEFI: `BootNext` na wpis dysku albo `LoadImage` `\EFI\Microsoft\Boot\bootmgfw.efi`/`\EFI\BOOT\BOOTX64.EFI` z ESP wybranego dysku; BIOS: odczyt MBR 0x80 do 0x7C00 z INT13 mapującym dysk USB poza kolejkę (wzorzec XP chainload) |
-| Ogólny wpis dla nieznanych ISO/IMG/EFI (Linux live, WinPE, narzędzia), oznaczony „niezweryfikowane” | **Next** | 8–10 dni | UEFI: obraz El Torito EFI + ISO w RAM przez `EFI_RAM_DISK_PROTOCOL` (jeśli firmware go ma) albo ISO z DATA dla Linuksów z `iso-scan`/`findiso`; BIOS: memdisk dla małych obrazów. Osobny wiersz w `Utilities`, bez przygotowania dysku, bez obietnicy działania |
+| Ogólny wpis dla nieznanych ISO/IMG/EFI (Linux live, WinPE, narzędzia), oznaczony „niezweryfikowane” | **Next** (Linux: projekt gotowy 2026-09-28, `design/linux-iso-boot.md`) | 8–10 dni | UEFI: obraz El Torito EFI + ISO w RAM przez `EFI_RAM_DISK_PROTOCOL` (jeśli firmware go ma) albo ISO z DATA dla Linuksów z `iso-scan`/`findiso`; BIOS: memdisk dla małych obrazów. Osobny wiersz w `Utilities`, bez przygotowania dysku, bez obietnicy działania |
 | Persistence dla Linux live | **Later** | 3–5 dni | plik `<obraz>.persist.img` obok ISO, parametr jądra per dystrybucja (casper `persistent`, Debian `persistence`); zależy od ogólnego wpisu Linux |
 | Motywy menu (`theme=`, `theme.ini`) | **Done** (gałąź `feature/themes`, bez testu na sprzęcie) | — | wbudowane: default, dark, light, high-contrast, retro (UEFI i BIOS); własny `DATA\Themes\<nazwa>\theme.ini` tylko w UEFI (kolory, walidacja kontrastu, fallback na domyślny); Tools → Motyw. Otwarte: tło/obraz i logo; edytor i motywy użytkownika w BIOS: N7. Opis: `docs/menu-themes.md` |
 | Układy klawiatury dla pól tekstowych | **Later** (razem z generatorem) | 2–4 dni | tabele QWERTY-PL, QWERTZ, AZERTY; potrzebne dla generatora i parametrów DOS |
@@ -343,6 +343,20 @@ repozytorium, powtarzalnego buildu shim, klucza w HSM, SBAT, polityki
 reagowania na podatności, zablokowanego jądra (N6) i przeglądu na
 `rhboot/shim-review`. Do tego czasu model „shim dystrybucji + MOK”
 pozostaje.
+
+## 2a. Przed 1.0 (lista kontrolna)
+
+- **Vista**: pendrive'y USB niewidoczne przez backport USB 3 (czekamy na logi
+  od użytkownika).
+- **Profile odpowiedzi**: filtr zastosowania per system (profil pokazywany
+  tylko dla systemów, do których pasuje) oraz ostrzeżenie, gdy brakuje pola
+  wymaganego przez dany system (np. klucz Server 2003).
+- **Vista CSMWrap**: licznik kroków 1/3 vs 1/5 (jeden wspólny licznik).
+- **Ikony** dla XP x64 i Server 2003.
+- **Cichy przełącznik CSMWrap** (bez tekstu SeaBIOS i migającego kursora).
+- **Linux z ISO** (N5, ogólny wpis): projekt w
+  [design/linux-iso-boot.md](design/linux-iso-boot.md), stan w
+  [HANDOFF-linux-2026-09-28.md](HANDOFF-linux-2026-09-28.md).
 
 ## 3. Znane ograniczenia (zaakceptowane)
 
