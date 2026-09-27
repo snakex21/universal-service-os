@@ -37,10 +37,51 @@ bad values are refused with the field and the line, never the value.
 | `no_network_oobe` | Windows 11: OOBE without network (`BypassNRO`) | default `no`; the wireless page is hidden on 7+ anyway (`HideWirelessSetupInOOBE`: an offline Windows 10 OOBE otherwise stops on it) |
 | `protect_pc` | Vista+: the "Help protect Windows" page (`ProtectYourPC`) | `recommended` (1), `updates` (2, important updates only), `off` (3); default `off` |
 | `network_location` | Vista/7: the network location page (`NetworkLocation`) | `work`, `home`, `public` (`Other`); default `work` (private, no HomeGroup question); not written for 8+ |
+| `edition` | edition Setup installs, for every system without its own | optional, up to 64 ASCII characters; see "Edition" below |
+| `edition.<system-id>` | edition for one system (`edition.windows-7=Professional`) | up to 8; wins over `edition` |
 | `disable_wer` | Vista+: Windows Error Reporting off (`Microsoft-Windows-ErrorReportingCore/DisableWER=1`, specialize) | default `no` |
 
 The password (and, with `remember_key=yes`, the keys) are plain text on
 the stick. The menu never shows them in lists or logs.
+
+### Edition
+
+`src/flow/answer/editions.zig`. The edition is matched **at start** against
+the install images of the ISO being installed (`sources/install.wim`,
+`.esd` or `.swm` XML metadata, read by `windows_media_probe.readEditions`).
+Found: `windowsPE` / `Microsoft-Windows-Setup` gets
+`ImageInstall/OSImage/InstallFrom/MetaData` with `Key=/IMAGE/INDEX` and the
+image's index (the index, not `/IMAGE/NAME`: names can be non-ASCII, and
+WORK copies the install image unchanged). Never `InstallTo`: the disk page
+stays. Not found (or the image list unreadable): nothing is written, Setup
+shows its edition list as before, and the summary shows a note ("Edition
+... is not on this ISO: Setup asks for the edition"); found, the summary
+shows "Edition: <name> (image <n>)".
+
+Matching, in this order:
+
+1. the stored id: the image's `EDITIONID`, plus `Core` for a Server Core
+   image whose `EDITIONID` does not say so (2012 and later):
+   `Professional`, `ServerStandard`, `ServerStandardCore`. The editor
+   stores this id when the edition is picked from an ISO, so it works on
+   any language of the same release and across Server releases;
+2. the exact `NAME` or `DISPLAYNAME` (`Windows 7 PROFESSIONAL`,
+   `Windows Server 2016 Standard` = the Core image there);
+3. the edition words: product, version and packaging words dropped
+   (`Windows 7 Pro` -> `pro` -> `Professional`), a few short and localized
+   words (`Pro`, `Home` = `Core` on 8+, `Profesjonalny`, `Professionnel`,
+   `Profissional`, ...). Server: `Core` in the text wants Server Core,
+   `Desktop Experience` / `GUI` / `Full` the Desktop Experience; neither:
+   the Desktop Experience when the ISO has it, else Core.
+
+Windows 7 `Home` is ambiguous (Home Basic / Home Premium) and matches
+nothing: Setup asks.
+
+Editor: opened from an install flow with an ISO of a 6.x+ system, the
+edition is a list picker filled from that ISO (DISPLAYNAME, else NAME;
+"(Setup asks)" first; a stored value that is not on the ISO stays in the
+list as it is). Elsewhere it is a text field. The editor edits
+`edition.<system-id>` of the system it was opened from.
 
 ### Neutral ids
 
@@ -203,6 +244,14 @@ separate step with a Vista/7 hardware test).
   file deleted, no key in the log, missing file stops), the mismatch warning
   on the user's Schneegans file when `zig-out/usb` has it.
 
+- goldens `edition.windows-7.{amd64,x86}.xml` (profile
+  `testdata/edition.profile.ini`, `edition.windows-7=Windows 7
+  Profesjonalny` -> image 3 of `testdata/win7-sp1-x64-pl.install.xml`, the
+  real metadata of `pl_windows_7_professional_with_sp1_x64_dvd_u_676944.iso`)
+  and `edition.windows-vista.amd64.xml` (common `edition=Enterprise`, not
+  on the media: no `ImageInstall`). `usos-answer render ... [KEY|-]
+  [INSTALL-XML]` takes the install.wim XML.
+
 ### Hardware (X470, 2026-09-26)
 
 Build B260926-134756-A6EF9DD9: the user created a profile in the UEFI
@@ -244,6 +293,18 @@ would appear. Result:
   straight to the desktop, logged on as `Tester` (empty password);
   `hostname` = `USOS-VBOX`, `tzutil /g` = `Central European Standard
   Time`, `Tester` in `Administratorzy`. About 16 minutes; VM deleted.
+
+### Installation test, edition (VirtualBox, 2026-09-27)
+
+The same VM and ISO, profile `vbox.profile.ini` plus `edition=Professional`
+(`prepare ... --edition Professional --install-xml
+src/flow/answer/testdata/win7-sp1-x64-pl.install.xml`; the tool reports
+"edition: image 3 (Windows 7 Professional)"). Result: from "Setup is
+starting" straight to the disk page (no edition list; only the disk page
+was answered, Enter on the unallocated disk), then no OOBE page up to the
+desktop; `wmic os get caption` = `Microsoft Windows 7 Professional`,
+`hostname` = `USOS-VBOX`, `tzutil /g` = `Central European Standard Time`.
+About 17 minutes; VM deleted.
 
 ## Attribution
 
