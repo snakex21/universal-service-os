@@ -107,7 +107,7 @@ Debian's `/preseed.cfg` (a file at the root).
 
 Detection is by **structure**, not by file name (ARCHITECTURE.md rule). The
 cmdline starts from the ISO's own first `menuentry` in `/boot/grub/grub.cfg`
-(`linux`/`linuxefi`/`$linux_cmd` and `initrd` lines; up to 4 initrds), with
+(`linux`/`linuxefi`/`$linux_cmd` and `initrd` lines; up to 4 initrds; also `/boot/grub2/grub.cfg`, `($root)` prefixes stripped), with
 unresolvable `${...}` words dropped, then the family rule is applied. If the
 grub.cfg cannot be parsed, the fixed fallback in the table is used.
 
@@ -116,7 +116,7 @@ grub.cfg cannot be parsed, the fixed fallback in the table is used.
 | casper (`/casper/vmlinuz`, `/.disk/casper-uuid-*`) | Ubuntu 24.04 desktop/server, Mint 22.x | `/casper/vmlinuz`, `/casper/initrd` (Mint: `initrd.lz`) | `live-media=/dev/usos-iso` | `iso-scan/filename=*` | server 24.04.5: `linux /casper/vmlinuz ---`; Mint 22.3: `boot=casper uuid=... username=mint hostname=mint iso-scan/filename=${iso_path} quiet splash --` |
 | live-boot (`/live/vmlinuz*`, `/live/*.squashfs`) | Debian live 12/13, GParted Live, Clonezilla | `/live/vmlinuz[-ver]`, `/live/initrd.img[-ver]` | `live-media=/dev/usos-iso` | `findiso=*` | Debian live 13.7: `boot=live components quiet splash findiso=${iso_path}` (menu in `/boot/grub/config.cfg` via `source`); GParted/Clonezilla: `$linux_cmd /live/vmlinuz boot=live union=overlay ...` |
 | debian-installer (`/install.amd/vmlinuz`) | Debian 12/13 netinst | `/install.amd/vmlinuz`, `/install.amd/gtk/initrd.gz` (graphical) | `cdrom-detect/...` preseed (below), to verify | - | 13.7: `linux /install.amd/vmlinuz vga=788 --- quiet` |
-| dracut live (`/images/pxeboot/vmlinuz` + `/LiveOS/squashfs.img`) | Fedora Workstation Live 40+ | `/images/pxeboot/vmlinuz`, `/images/pxeboot/initrd.img` | none: `root=live:CDLABEL=<PVD label>` already finds the loop device through udev's by-label link | - | to read from 44-1.7 ISO (download was in progress) |
+| dracut live (`/LiveOS/` + `root=live:` in grub.cfg) | Fedora Workstation Live 40+ | 44 (kiwi): `/boot/x86_64/loader/linux`, `/boot/x86_64/loader/initrd`; 40-41: `/images/pxeboot/vmlinuz`, `initrd.img` | none: `root=live:CDLABEL=<PVD label>` already finds the loop device through udev's by-label link | `($root)` path prefix | 44-1.7: grub.cfg in `/boot/grub2/grub.cfg`, `linux ($root)/boot/x86_64/loader/linux quiet rhgb root=live:CDLABEL=Fedora-WS-Live-44 rd.live.image`; ISO also carries `fbx64.efi` |
 | anaconda (`/images/install.img`) | Fedora Everything/Server netinst | same | `inst.stage2=hd:LABEL=<label>` stays | - | not downloaded yet |
 | archiso (`/<base>/boot/x86_64/vmlinuz`, `archisobasedir=`) | SystemRescue 13 | `/sysresccd/boot/x86_64/vmlinuz`; initrds `intel_ucode.img amd_ucode.img x86_64/sysresccd.img` | `archisolabel=<PVD label>` (grub.cfg has `$archiso_param`) | `$archiso_param` | 13.02: label `RESCUE1302` |
 | slitaz (`/boot/rootfs1.gz`) | SliTaz (existing BIOS path) | unchanged `linux_live_iso` | - | - | - |
