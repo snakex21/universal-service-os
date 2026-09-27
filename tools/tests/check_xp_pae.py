@@ -19,7 +19,8 @@ def package_base():
     raise SystemExit('No initramfs-usos with the package base SHA-256 '+expected+' (tried '+', '.join(map(str,candidates))+')')
 def xp_images():
     if args.images:return sorted(args.images.glob('*.iso'))
-    local=sorted(p for p in root.glob('*.iso') if 'xp' in p.name.lower())
+    # PAE is x86 only: XP x64 media (AMD64 setup source) is not an input here.
+    local=sorted(p for p in root.glob('*.iso') if 'xp' in p.name.lower() and 'x64' not in p.name.lower())
     return local or sorted(Path('L:/Systems/Windows/Windows XP/Images').glob('*.iso'))
 # USOS_XP_PACKAGE_DIR: check another package folder (e.g. a branch build).
 PACKAGE=Path(os.environ.get('USOS_XP_PACKAGE_DIR',root/'zig-out/xp-uefi-csm'))

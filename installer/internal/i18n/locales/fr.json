@@ -1041,5 +1041,7 @@
 
   "boot.summary.vista_case_nocsm": "Windows Vista sans CSM : pas encore pris en charge (écran noir) - activez le CSM dans les réglages de la carte mère",
 
-  "boot.summary.xp_csmwrap": "XP sans CSM (expérimental) : CSMWrap, carte avec VBIOS legacy, 1 noyau réservé"
+  "boot.summary.xp_csmwrap": "XP sans CSM (expérimental) : CSMWrap, carte avec VBIOS legacy, 1 noyau réservé",
+
+  "boot.summary.w2k_limits": "Windows 2000 (expérimental) : pas de pilote AHCI/NVMe/USB 3 pour NT 5.0 (SATA en mode IDE), 4 Go de RAM et 2 processeurs max."
 }

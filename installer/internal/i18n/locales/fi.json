@@ -1041,5 +1041,7 @@
 
   "boot.summary.vista_case_nocsm": "Windows Vista ilman CSM:ää: ei vielä tuettu (musta näyttö) - ota CSM käyttöön emolevyn asetuksista",
 
-  "boot.summary.xp_csmwrap": "XP ilman CSM:ää (kokeellinen): CSMWrap, näytönohjain legacy-VBIOSilla, 1 ydin varattu"
+  "boot.summary.xp_csmwrap": "XP ilman CSM:ää (kokeellinen): CSMWrap, näytönohjain legacy-VBIOSilla, 1 ydin varattu",
+
+  "boot.summary.w2k_limits": "Windows 2000 (kokeellinen): ei AHCI/NVMe/USB 3 -ajuria NT 5.0:lle (SATA IDE-tilassa), enintään 4 Gt RAM ja 2 suoritinta"
 }

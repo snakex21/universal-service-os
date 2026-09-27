@@ -150,6 +150,11 @@ pub fn show(
         fields.add(view.t(.summary_preparation), if (secure_boot.csm().likelyOn()) view.t(.summary_xp_preparation) else view.t(.summary_xp_csmwrap));
         fields.add(view.t(.summary_source), view.t(.summary_xp_source));
         fields.add(view.t(.summary_disk), view.t(.summary_xp_disk));
+        // Windows 2000 shares the preparation, not the XP driver bundle or PAE.
+        if (std.mem.eql(u8, system.id, "windows-2000")) {
+            notes[note_count] = view.t(.summary_w2k_limits);
+            note_count += 1;
+        }
     }
     var version_text: [96]u8 = undefined;
     var count_text: [100]u8 = undefined;
@@ -277,7 +282,7 @@ fn start(
         if (profile) |p| {
             _ = answer_profiles.stage(root, p, system.id, .x86, os_profile_id) catch |err| return showError(view.t(.error_xp), err);
         }
-        @import("xp_preparation.zig").start(root, image.name.slice(), answer, showXpProgress) catch |err| {
+        @import("xp_preparation.zig").start(root, system.id, image.name.slice(), answer, showXpProgress) catch |err| {
             view.refreshFramebuffer();
             showError(view.t(.error_xp), err);
         };

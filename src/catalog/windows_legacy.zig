@@ -14,7 +14,18 @@ pub const entries = [_]SystemEntry{
         .firmware = .any,
         .boot_methods = &methods,
     },
-    legacy("windows-2000", "Windows 2000", "Windows 2000", true),
+    // BIOS staging, and from UEFI the XP UEFI-CSM / CSMWrap preparation
+    // (profile w2k-x86-sp4-uefi-csm, experimental).
+    .{
+        .id = "windows-2000",
+        .name = "Windows 2000",
+        .category = .windows,
+        .family = .windows_legacy,
+        .image_directory = "\\Systems\\Windows\\Windows 2000\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Windows 2000\\Unattended",
+        .firmware = .any,
+        .boot_methods = &methods,
+    },
     legacy("windows-nt-4", "Windows NT 4.0", "Windows NT 4.0", true),
     legacy("windows-me", "Windows Me", "Windows Me", true),
     legacy("windows-98-se", "Windows 98 SE", "Windows 98 SE", true),

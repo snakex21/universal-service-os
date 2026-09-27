@@ -1041,5 +1041,7 @@
 
   "boot.summary.vista_case_nocsm": "Windows Vista CSM nélkül: még nem támogatott (fekete képernyő) - kapcsolja be a CSM-et az alaplap beállításaiban",
 
-  "boot.summary.xp_csmwrap": "XP CSM nélkül (kísérleti): CSMWrap, legacy VBIOS-os kártya, 1 mag fenntartva"
+  "boot.summary.xp_csmwrap": "XP CSM nélkül (kísérleti): CSMWrap, legacy VBIOS-os kártya, 1 mag fenntartva",
+
+  "boot.summary.w2k_limits": "Windows 2000 (kísérleti): nincs AHCI/NVMe/USB 3 illesztőprogram NT 5.0-hoz (SATA IDE módban), legfeljebb 4 GB RAM és 2 processzor"
 }

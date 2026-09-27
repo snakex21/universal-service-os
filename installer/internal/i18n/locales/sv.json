@@ -1041,5 +1041,7 @@
 
   "boot.summary.vista_case_nocsm": "Windows Vista utan CSM: stöds ännu inte (svart skärm) - aktivera CSM i moderkortets inställningar",
 
-  "boot.summary.xp_csmwrap": "XP utan CSM (experimentellt): CSMWrap, kort med legacy-VBIOS, 1 kärna reserverad"
+  "boot.summary.xp_csmwrap": "XP utan CSM (experimentellt): CSMWrap, kort med legacy-VBIOS, 1 kärna reserverad",
+
+  "boot.summary.w2k_limits": "Windows 2000 (experimentellt): ingen AHCI/NVMe/USB 3-drivrutin för NT 5.0 (SATA i IDE-läge), max 4 GB RAM och 2 processorer"
 }

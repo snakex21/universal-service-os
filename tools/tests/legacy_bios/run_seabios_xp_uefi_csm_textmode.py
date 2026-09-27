@@ -93,7 +93,11 @@ def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),
         subprocess.run([str(QEMU_IMG),'create','-q','-f','qcow2',str(disk),str(size)],check=True)
     entries=cpio.parse_newc(gzip.decompress((PACKAGE/'initramfs-xp').read_bytes()))
     probe=PROBE_INIT.replace('USOS_PLAN_PROFILE=xp-x86-sp3-uefi-csm','USOS_PLAN_PROFILE='+profile)
-    if profile!='xp-x86-sp3-uefi-csm':
+    if profile=='w2k-x86-sp4-uefi-csm':
+        # Windows 2000 from UEFI: the 2000 NT5 profile, no XP driver bundle.
+        probe=probe.replace('. /usr/lib/usos/nt5_profile.sh; usos_nt5_profile','export NT5_SYSTEM=windows-2000; . /usr/lib/usos/nt5_profile.sh; usos_nt5_profile')
+        probe=probe.replace(". /usr/lib/usos/xp_driver_stage.sh; usos_xp_driver_preflight || finish 'FAIL driver preflight'"+chr(10),'')
+    if profile=='nt5-staging':
         # The BIOS NT5 profile has no driver preflight (and no bundles).
         probe=probe.replace(". /usr/lib/usos/xp_driver_stage.sh; usos_xp_driver_preflight || finish 'FAIL driver preflight'"+chr(10),'')
         probe=probe.replace("if [ -r /usr/lib/usos/xp_user_settings.sh ]; then . /usr/lib/usos/xp_user_settings.sh; usos_xp_settings_stage /probe-usos-xp.ini /mnt/source || finish 'FAIL settings'; fi"+chr(10),'')
@@ -167,7 +171,7 @@ def textmode(out,target,keys,minutes):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--iso',type=Path,default=DEFAULT_ISO)
-    p.add_argument('--keys',default='');p.add_argument('--minutes',type=float,default=25);p.add_argument('--reuse-prepared',type=Path);p.add_argument('--prepare-only',action='store_true',help='stop after phase 1 (for tools/tests/target_digest.py)');p.add_argument('--profile',default='xp-x86-sp3-uefi-csm',choices=['xp-x86-sp3-uefi-csm','nt5-staging'],help='nt5-staging: the BIOS XP preparation of the same scripts')
+    p.add_argument('--keys',default='');p.add_argument('--minutes',type=float,default=25);p.add_argument('--reuse-prepared',type=Path);p.add_argument('--prepare-only',action='store_true',help='stop after phase 1 (for tools/tests/target_digest.py)');p.add_argument('--profile',default='xp-x86-sp3-uefi-csm',choices=['xp-x86-sp3-uefi-csm','nt5-staging','w2k-x86-sp4-uefi-csm'],help='nt5-staging: the BIOS XP preparation of the same scripts; w2k-x86-sp4-uefi-csm: Windows 2000 from UEFI (--iso a 2000 ISO)')
     p.add_argument('--settings',type=Path,help='usos-xp.ini to validate and merge (stand-in for the DATA Unattended file)');p.add_argument('--tree-scripts',default='',help='space-separated tools/*.sh names taken from the working tree');p.add_argument('--sif',type=Path,help='.sif chosen in the menu (merged into the automatic answer)')
     a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
     prepared=a.reuse_prepared.resolve() if a.reuse_prepared else prepare(out,a.iso,a.profile,a.settings,a.tree_scripts.split(),a.sif)

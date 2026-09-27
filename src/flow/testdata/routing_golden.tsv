@@ -6,7 +6,7 @@ system	windows-8	windows	windows	any	\Systems\Windows\Windows 8\Images	\Systems\
 system	windows-7	windows	windows	any	\Systems\Windows\Windows 7\Images	\Systems\Windows\Windows 7\Unattended	.xml	unattend.xml	1	automatic,direct_iso,wimboot,vhdboot,direct_efi
 system	windows-vista	windows	windows	any	\Systems\Windows\Windows Vista\Images	\Systems\Windows\Windows Vista\Unattended	.xml	unattend.xml	1	automatic,direct_iso,wimboot,vhdboot,direct_efi,chainload
 system	windows-xp	windows_legacy	windows	any	\Systems\Windows\Windows XP\Images	\Systems\Windows\Windows XP\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
-system	windows-2000	windows_legacy	windows	bios	\Systems\Windows\Windows 2000\Images	\Systems\Windows\Windows 2000\Unattended	.sif	WINNT.SIF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
+system	windows-2000	windows_legacy	windows	any	\Systems\Windows\Windows 2000\Images	\Systems\Windows\Windows 2000\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-nt-4	windows_legacy	windows	bios	\Systems\Windows\Windows NT 4.0\Images	\Systems\Windows\Windows NT 4.0\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-me	windows_legacy	windows	bios	\Systems\Windows\Windows Me\Images	\Systems\Windows\Windows Me\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-98-se	windows_legacy	windows	bios	\Systems\Windows\Windows 98 SE\Images	\Systems\Windows\Windows 98 SE\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
@@ -801,7 +801,7 @@ route	windows-xp	efi	disk_image	uefi	-
 route	windows-xp	efi	floppy_image	bios	-
 route	windows-xp	efi	floppy_image	uefi	-
 route	windows-2000	iso	automatic	bios	xp_staging	direct_iso	bios	tested_in_vm	0
-route	windows-2000	iso	automatic	uefi	xp_staging	direct_iso	bios	tested_in_vm	0
+route	windows-2000	iso	automatic	uefi	xp_uefi_staging	direct_iso	uefi	experimental	1
 route	windows-2000	iso	direct_iso	bios	-
 route	windows-2000	iso	direct_iso	uefi	-
 route	windows-2000	iso	wimboot	bios	-
@@ -811,7 +811,7 @@ route	windows-2000	iso	vhdboot	uefi	-
 route	windows-2000	iso	direct_efi	bios	-
 route	windows-2000	iso	direct_efi	uefi	-
 route	windows-2000	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
-route	windows-2000	iso	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	windows-2000	iso	chainload	uefi	-
 route	windows-2000	iso	memdisk	bios	-
 route	windows-2000	iso	memdisk	uefi	-
 route	windows-2000	iso	disk_image	bios	-
@@ -819,11 +819,11 @@ route	windows-2000	iso	disk_image	uefi	-
 route	windows-2000	iso	floppy_image	bios	-
 route	windows-2000	iso	floppy_image	uefi	-
 route	windows-2000	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
-route	windows-2000	wim	automatic	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-2000	wim	automatic	uefi	-
 route	windows-2000	wim	direct_iso	bios	-
 route	windows-2000	wim	direct_iso	uefi	-
 route	windows-2000	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
-route	windows-2000	wim	wimboot	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-2000	wim	wimboot	uefi	-
 route	windows-2000	wim	vhdboot	bios	-
 route	windows-2000	wim	vhdboot	uefi	-
 route	windows-2000	wim	direct_efi	bios	-
@@ -855,13 +855,13 @@ route	windows-2000	img	disk_image	uefi	-
 route	windows-2000	img	floppy_image	bios	-
 route	windows-2000	img	floppy_image	uefi	-
 route	windows-2000	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-2000	vhd	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-2000	vhd	automatic	uefi	-
 route	windows-2000	vhd	direct_iso	bios	-
 route	windows-2000	vhd	direct_iso	uefi	-
 route	windows-2000	vhd	wimboot	bios	-
 route	windows-2000	vhd	wimboot	uefi	-
 route	windows-2000	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-2000	vhd	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-2000	vhd	vhdboot	uefi	-
 route	windows-2000	vhd	direct_efi	bios	-
 route	windows-2000	vhd	direct_efi	uefi	-
 route	windows-2000	vhd	chainload	bios	-
@@ -873,13 +873,13 @@ route	windows-2000	vhd	disk_image	uefi	-
 route	windows-2000	vhd	floppy_image	bios	-
 route	windows-2000	vhd	floppy_image	uefi	-
 route	windows-2000	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-2000	vhdx	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-2000	vhdx	automatic	uefi	-
 route	windows-2000	vhdx	direct_iso	bios	-
 route	windows-2000	vhdx	direct_iso	uefi	-
 route	windows-2000	vhdx	wimboot	bios	-
 route	windows-2000	vhdx	wimboot	uefi	-
 route	windows-2000	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-2000	vhdx	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-2000	vhdx	vhdboot	uefi	-
 route	windows-2000	vhdx	direct_efi	bios	-
 route	windows-2000	vhdx	direct_efi	uefi	-
 route	windows-2000	vhdx	chainload	bios	-
@@ -891,7 +891,7 @@ route	windows-2000	vhdx	disk_image	uefi	-
 route	windows-2000	vhdx	floppy_image	bios	-
 route	windows-2000	vhdx	floppy_image	uefi	-
 route	windows-2000	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
-route	windows-2000	efi	automatic	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-2000	efi	automatic	uefi	-
 route	windows-2000	efi	direct_iso	bios	-
 route	windows-2000	efi	direct_iso	uefi	-
 route	windows-2000	efi	wimboot	bios	-
@@ -899,9 +899,9 @@ route	windows-2000	efi	wimboot	uefi	-
 route	windows-2000	efi	vhdboot	bios	-
 route	windows-2000	efi	vhdboot	uefi	-
 route	windows-2000	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
-route	windows-2000	efi	direct_efi	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-2000	efi	direct_efi	uefi	-
 route	windows-2000	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
-route	windows-2000	efi	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	windows-2000	efi	chainload	uefi	-
 route	windows-2000	efi	memdisk	bios	-
 route	windows-2000	efi	memdisk	uefi	-
 route	windows-2000	efi	disk_image	bios	-
@@ -5096,38 +5096,81 @@ profile	windows-xp	efi	memdisk	uefi	xp-uefi-other
 profile	windows-xp	efi	disk_image	uefi	xp-uefi-other
 profile	windows-xp	efi	floppy_image	uefi	xp-uefi-other
 profile	windows-2000	iso	automatic	bios	nt5-staging
-profile	windows-2000	iso	automatic	uefi	nt5-staging
+profile	windows-2000	iso	automatic	uefi	w2k-x86-sp4-uefi-csm
 profile	windows-2000	iso	automatic	-	nt5-staging
+profile	windows-2000	iso	direct_iso	uefi	w2k-uefi-other
+profile	windows-2000	iso	wimboot	uefi	w2k-uefi-other
+profile	windows-2000	iso	vhdboot	uefi	w2k-uefi-other
+profile	windows-2000	iso	direct_efi	uefi	w2k-uefi-other
 profile	windows-2000	iso	chainload	bios	iso-work-chainload
-profile	windows-2000	iso	chainload	uefi	iso-work-chainload
+profile	windows-2000	iso	chainload	uefi	w2k-uefi-other
 profile	windows-2000	iso	chainload	-	iso-work-chainload
+profile	windows-2000	iso	memdisk	uefi	w2k-uefi-other
+profile	windows-2000	iso	disk_image	uefi	w2k-uefi-other
+profile	windows-2000	iso	floppy_image	uefi	w2k-uefi-other
 profile	windows-2000	wim	automatic	bios	wim-wimboot
-profile	windows-2000	wim	automatic	uefi	wim-wimboot
+profile	windows-2000	wim	automatic	uefi	w2k-uefi-other
 profile	windows-2000	wim	automatic	-	wim-wimboot
+profile	windows-2000	wim	direct_iso	uefi	w2k-uefi-other
 profile	windows-2000	wim	wimboot	bios	wim-wimboot
-profile	windows-2000	wim	wimboot	uefi	wim-wimboot
+profile	windows-2000	wim	wimboot	uefi	w2k-uefi-other
 profile	windows-2000	wim	wimboot	-	wim-wimboot
+profile	windows-2000	wim	vhdboot	uefi	w2k-uefi-other
+profile	windows-2000	wim	direct_efi	uefi	w2k-uefi-other
+profile	windows-2000	wim	chainload	uefi	w2k-uefi-other
+profile	windows-2000	wim	memdisk	uefi	w2k-uefi-other
+profile	windows-2000	wim	disk_image	uefi	w2k-uefi-other
+profile	windows-2000	wim	floppy_image	uefi	w2k-uefi-other
+profile	windows-2000	img	automatic	uefi	w2k-uefi-other
+profile	windows-2000	img	direct_iso	uefi	w2k-uefi-other
+profile	windows-2000	img	wimboot	uefi	w2k-uefi-other
+profile	windows-2000	img	vhdboot	uefi	w2k-uefi-other
+profile	windows-2000	img	direct_efi	uefi	w2k-uefi-other
+profile	windows-2000	img	chainload	uefi	w2k-uefi-other
+profile	windows-2000	img	memdisk	uefi	w2k-uefi-other
+profile	windows-2000	img	disk_image	uefi	w2k-uefi-other
+profile	windows-2000	img	floppy_image	uefi	w2k-uefi-other
 profile	windows-2000	vhd	automatic	bios	vhd-vhdboot
-profile	windows-2000	vhd	automatic	uefi	vhd-vhdboot
+profile	windows-2000	vhd	automatic	uefi	w2k-uefi-other
 profile	windows-2000	vhd	automatic	-	vhd-vhdboot
+profile	windows-2000	vhd	direct_iso	uefi	w2k-uefi-other
+profile	windows-2000	vhd	wimboot	uefi	w2k-uefi-other
 profile	windows-2000	vhd	vhdboot	bios	vhd-vhdboot
-profile	windows-2000	vhd	vhdboot	uefi	vhd-vhdboot
+profile	windows-2000	vhd	vhdboot	uefi	w2k-uefi-other
 profile	windows-2000	vhd	vhdboot	-	vhd-vhdboot
+profile	windows-2000	vhd	direct_efi	uefi	w2k-uefi-other
+profile	windows-2000	vhd	chainload	uefi	w2k-uefi-other
+profile	windows-2000	vhd	memdisk	uefi	w2k-uefi-other
+profile	windows-2000	vhd	disk_image	uefi	w2k-uefi-other
+profile	windows-2000	vhd	floppy_image	uefi	w2k-uefi-other
 profile	windows-2000	vhdx	automatic	bios	vhd-vhdboot
-profile	windows-2000	vhdx	automatic	uefi	vhd-vhdboot
+profile	windows-2000	vhdx	automatic	uefi	w2k-uefi-other
 profile	windows-2000	vhdx	automatic	-	vhd-vhdboot
+profile	windows-2000	vhdx	direct_iso	uefi	w2k-uefi-other
+profile	windows-2000	vhdx	wimboot	uefi	w2k-uefi-other
 profile	windows-2000	vhdx	vhdboot	bios	vhd-vhdboot
-profile	windows-2000	vhdx	vhdboot	uefi	vhd-vhdboot
+profile	windows-2000	vhdx	vhdboot	uefi	w2k-uefi-other
 profile	windows-2000	vhdx	vhdboot	-	vhd-vhdboot
+profile	windows-2000	vhdx	direct_efi	uefi	w2k-uefi-other
+profile	windows-2000	vhdx	chainload	uefi	w2k-uefi-other
+profile	windows-2000	vhdx	memdisk	uefi	w2k-uefi-other
+profile	windows-2000	vhdx	disk_image	uefi	w2k-uefi-other
+profile	windows-2000	vhdx	floppy_image	uefi	w2k-uefi-other
 profile	windows-2000	efi	automatic	bios	efi-direct
-profile	windows-2000	efi	automatic	uefi	efi-direct
+profile	windows-2000	efi	automatic	uefi	w2k-uefi-other
 profile	windows-2000	efi	automatic	-	efi-direct
+profile	windows-2000	efi	direct_iso	uefi	w2k-uefi-other
+profile	windows-2000	efi	wimboot	uefi	w2k-uefi-other
+profile	windows-2000	efi	vhdboot	uefi	w2k-uefi-other
 profile	windows-2000	efi	direct_efi	bios	efi-direct
-profile	windows-2000	efi	direct_efi	uefi	efi-direct
+profile	windows-2000	efi	direct_efi	uefi	w2k-uefi-other
 profile	windows-2000	efi	direct_efi	-	efi-direct
 profile	windows-2000	efi	chainload	bios	efi-chainload
-profile	windows-2000	efi	chainload	uefi	efi-chainload
+profile	windows-2000	efi	chainload	uefi	w2k-uefi-other
 profile	windows-2000	efi	chainload	-	efi-chainload
+profile	windows-2000	efi	memdisk	uefi	w2k-uefi-other
+profile	windows-2000	efi	disk_image	uefi	w2k-uefi-other
+profile	windows-2000	efi	floppy_image	uefi	w2k-uefi-other
 profile	windows-nt-4	iso	automatic	bios	iso-work-chainload
 profile	windows-nt-4	iso	automatic	uefi	iso-work-chainload
 profile	windows-nt-4	iso	automatic	-	iso-work-chainload
@@ -9231,9 +9274,9 @@ menu	windows-2000	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainloa
 menu	windows-2000	iso	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-2000	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-2000	iso	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-2000	iso	uefi	0	automatic	xp_staging	0	0	tested_in_vm	Automatic (Windows 2000 Setup) [TESTED IN VM]	[requires BIOS; running UEFI]	[requires BIOS; running UEFI]	[requires BIOS; running UEFI]
+menu	windows-2000	iso	uefi	0	automatic	xp_uefi_staging	1	1	experimental	Automatic (UEFI preparation / XP via CSM) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	windows-2000	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
-menu	windows-2000	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	windows-2000	iso	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-2000	iso	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-2000	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-2000	iso	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -9243,7 +9286,7 @@ menu	windows-2000	wim	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or E
 menu	windows-2000	wim	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-2000	wim	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-2000	wim	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-2000	wim	uefi	0	automatic	wimboot	1	1	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-2000	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-2000	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	windows-2000	wim	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	windows-2000	wim	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -9267,7 +9310,7 @@ menu	windows-2000	vhd	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or E
 menu	windows-2000	vhd	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-2000	vhd	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-2000	vhd	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-2000	vhd	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-2000	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-2000	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	windows-2000	vhd	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	windows-2000	vhd	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -9279,7 +9322,7 @@ menu	windows-2000	vhdx	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or 
 menu	windows-2000	vhdx	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-2000	vhdx	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-2000	vhdx	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-2000	vhdx	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-2000	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-2000	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	windows-2000	vhdx	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	windows-2000	vhdx	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -9291,9 +9334,9 @@ menu	windows-2000	efi	bios	2	chainload	chainload	0	0	validated_hardware	Chainloa
 menu	windows-2000	efi	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-2000	efi	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-2000	efi	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-2000	efi	uefi	0	automatic	direct_efi	1	1	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-2000	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-2000	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
-menu	windows-2000	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	windows-2000	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-2000	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-2000	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-2000	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -14221,6 +14264,8 @@ help	other-dos	efi	floppy_image	Floppy image	Treats an IMG file as a legacy flop
 # profile_def (M2): id backend progress stage labels
 profile_def	xp-x86-sp3-uefi-csm	xp_uefi_staging	xp_uefi	Loading the preparation environment|Detecting disks|Choosing the target disk|Preparing workspace|Copying and verifying files
 profile_def	xp-uefi-other	-	none	
+profile_def	w2k-x86-sp4-uefi-csm	xp_uefi_staging	xp_uefi	Loading the preparation environment|Detecting disks|Choosing the target disk|Preparing workspace|Copying and verifying files
+profile_def	w2k-uefi-other	-	none	
 profile_def	linux-live-bios	linux_live_iso	core	
 profile_def	dos-fat16-bios	dos_bios_iso	core	
 profile_def	win98se-dos-bios	win9x_dos	core	

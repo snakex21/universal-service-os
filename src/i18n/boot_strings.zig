@@ -492,6 +492,7 @@ pub const Key = enum(u16) {
     summary_vista_case_nocsm,
     summary_vista_support,
     summary_vista_usb,
+    summary_w2k_limits,
     summary_xp_csmwrap,
     summary_xp_disk,
     summary_xp_preparation,
@@ -1097,6 +1098,7 @@ pub const hashes = [_]u32{
     0xe9c433ae, // summary.vista_case_nocsm
     0xa0987638, // summary.vista_support
     0x1e3154b1, // summary.vista_usb
+    0xf657c7a8, // summary.w2k_limits
     0xac5a69f9, // summary.xp_csmwrap
     0xe262ce65, // summary.xp_disk
     0xedd282b9, // summary.xp_preparation
@@ -1649,6 +1651,7 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
     false,
     false,
     false,
@@ -2306,6 +2309,7 @@ pub const english = [_][]const u8{
     "Windows Vista without CSM: not supported yet (black screen) - enable CSM in the board settings",
     "KB2864202 + signed USB package + pre-Setup v11",
     "PE10 native USB; the target uses Vista USB v11",
+    "Windows 2000 (experimental): no AHCI/NVMe/USB 3 driver for NT 5.0 (SATA in IDE mode), max. 4 GB RAM and 2 CPUs",
     "XP without CSM (experimental): CSMWrap, card with a legacy VBIOS, 1 core reserved",
     "Selected and confirmed in the next graphical screen",
     "UEFI; installed XP requires firmware CSM and MBR",

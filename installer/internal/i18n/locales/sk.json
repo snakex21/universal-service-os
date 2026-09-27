@@ -1044,5 +1044,7 @@
 
   "boot.summary.vista_case_nocsm": "Windows Vista bez CSM: zatiaľ nepodporované (čierna obrazovka) - zapnite CSM v nastaveniach dosky",
 
-  "boot.summary.xp_csmwrap": "XP bez CSM (experimentálne): CSMWrap, karta s legacy VBIOS, 1 jadro rezervované"
+  "boot.summary.xp_csmwrap": "XP bez CSM (experimentálne): CSMWrap, karta s legacy VBIOS, 1 jadro rezervované",
+
+  "boot.summary.w2k_limits": "Windows 2000 (experimentálne): chýba ovládač AHCI/NVMe/USB 3 pre NT 5.0 (SATA v režime IDE), max. 4 GB RAM a 2 procesory"
 }

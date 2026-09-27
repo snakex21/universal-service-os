@@ -123,10 +123,12 @@ usos_xp_settings_value() {
 usos_xp_settings_sif() {
     _xs_base=$1
     _xs_set=$2
-    awk -v settings="$_xs_set" '
+    awk -v settings="$_xs_set" -v nt5_system="${NT5_SYSTEM:-windows-xp}" '
         BEGIN {
             while ((getline line < settings) > 0) { eq = index(line, "="); v[substr(line, 1, eq - 1)] = substr(line, eq + 1) }
             close(settings)
+            # usos-xp.ini has no family=: the staged system decides (Windows 2000).
+            if (v["family"] == "" && nt5_system == "windows-2000") v["family"] = "2000"
             mode = v["key"] != "" ? "FullUnattended" : "DefaultHide"
         }
         { sub(/\r$/, "") }
@@ -153,7 +155,7 @@ usos_xp_settings_sif() {
             print "FullName=\"" v["user"] "\""
             print "OrgName=\"" v["org"] "\""
             print "ComputerName=" v["computer"]
-            # Windows 2000 names the key ProductID (profile mode only).
+            # Windows 2000 names the key ProductID.
             if (v["key"] != "") print (v["family"] == "2000" ? "ProductID=" : "ProductKey=") v["key"]
             print "[Identification]"
             print "JoinWorkgroup=WORKGROUP"

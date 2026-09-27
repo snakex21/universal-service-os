@@ -25,7 +25,35 @@ fn csmwrapActive() bool {
 
 pub const lang_initrd_option = " initrd=\\EFI\\USOS\\lang.cpio";
 
+/// The NT5 system prepared from UEFI: its micro-Linux action and OS profile
+/// (src/catalog/os_profiles.zig). Windows 2000 shares the XP package.
+pub const Nt5System = enum {
+    windows_xp,
+    windows_2000,
+
+    pub fn fromId(system_id: []const u8) ?Nt5System {
+        if (std.mem.eql(u8, system_id, "windows-xp")) return .windows_xp;
+        if (std.mem.eql(u8, system_id, "windows-2000")) return .windows_2000;
+        return null;
+    }
+
+    pub fn action(self: Nt5System) []const u8 {
+        return switch (self) {
+            .windows_xp => "xp-staging",
+            .windows_2000 => "windows2000-staging",
+        };
+    }
+
+    pub fn planProfile(self: Nt5System) []const u8 {
+        return switch (self) {
+            .windows_xp => "xp-x86-sp3-uefi-csm",
+            .windows_2000 => "w2k-x86-sp4-uefi-csm",
+        };
+    }
+};
+
 pub const CommandParts = struct {
+    system: Nt5System = .windows_xp,
     /// lang_initrd_option, or "" on installs from before lang.cpio.
     lang_initrd: []const u8,
     esp_partuuid: []const u8,
@@ -40,13 +68,14 @@ pub const CommandParts = struct {
 /// usos.xp_boot=csmwrap: the language (lang.cpio) and everything else are
 /// the default path's.
 pub fn formatCommand(buffer: []u8, parts: CommandParts) ![]const u8 {
-    return std.fmt.bufPrint(buffer, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action=xp-staging usos.legacy_image_hex={s}{s}{s} usos.plan_profile=xp-x86-sp3-uefi-csm{s} {s}", .{ parts.lang_initrd, parts.esp_partuuid, parts.image_hex, parts.answer_option, parts.settings_option, if (parts.csmwrap) " usos.xp_boot=csmwrap" else "", parts.console_options });
+    return std.fmt.bufPrint(buffer, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action={s} usos.legacy_image_hex={s}{s}{s} usos.plan_profile={s}{s} {s}", .{ parts.lang_initrd, parts.esp_partuuid, parts.system.action(), parts.image_hex, parts.answer_option, parts.settings_option, parts.system.planProfile(), if (parts.csmwrap) " usos.xp_boot=csmwrap" else "", parts.console_options });
 }
 
 /// `answer`: the answer-file screen's choice (src/flow/answer_screen.zig):
 /// a .sif (usos.legacy_unattended_hex=) or the manual installation
 /// (usos.xp_settings=off: the staging ignores usos-xp.ini).
-pub fn start(root: *uefi.protocol.File, name: []const u8, answer: answer_screen.Choice, progress: *const fn (Stage) void) !void {
+pub fn start(root: *uefi.protocol.File, system_id: []const u8, name: []const u8, answer: answer_screen.Choice, progress: *const fn (Stage) void) !void {
+    const system = Nt5System.fromId(system_id) orelse return error.UnsupportedNt5System;
     var answer_buffer: [300]u8 = undefined;
     const answer_option = try answer_screen.xpAnswerOption(&answer_buffer, answer.path);
     const settings_option = answer_screen.xpSettingsOption(answer);
@@ -86,6 +115,7 @@ pub fn start(root: *uefi.protocol.File, name: []const u8, answer: answer_screen.
         break :blk lang_initrd_option;
     } else |_| "";
     const command = try formatCommand(&cmd, .{
+        .system = system,
         .lang_initrd = lang_initrd,
         .esp_partuuid = id,
         .image_hex = hex[0 .. name.len * 2],
@@ -148,4 +178,17 @@ test "CSMWrap command line keeps the default XP path's language initrd" {
     const rest = csmwrap_command[at + token.len ..];
     @memcpy(joined[at .. at + rest.len], rest);
     try std.testing.expectEqualStrings(default_command, joined[0 .. at + rest.len]);
+}
+
+test "Windows 2000 from UEFI keeps the XP command line except its action and profile" {
+    var xp_buffer: [2048]u8 = undefined;
+    var w2k_buffer: [2048]u8 = undefined;
+    const xp = try formatCommand(&xp_buffer, .{ .lang_initrd = lang_initrd_option, .esp_partuuid = "0257E175-1685-4311-91AA-5A83D8EB41E5", .image_hex = "77326b2e69736f", .csmwrap = true });
+    const w2k = try formatCommand(&w2k_buffer, .{ .system = .windows_2000, .lang_initrd = lang_initrd_option, .esp_partuuid = "0257E175-1685-4311-91AA-5A83D8EB41E5", .image_hex = "77326b2e69736f", .csmwrap = true });
+    try std.testing.expect(std.mem.indexOf(u8, w2k, " usos.legacy_action=windows2000-staging ") != null);
+    try std.testing.expect(std.mem.indexOf(u8, w2k, " usos.plan_profile=w2k-x86-sp4-uefi-csm usos.xp_boot=csmwrap ") != null);
+    try std.testing.expect(std.mem.startsWith(u8, w2k, "initrd=\\EFI\\USOS-XP\\initramfs-xp initrd=\\EFI\\USOS\\lang.cpio "));
+    try std.testing.expectEqual(@as(?Nt5System, .windows_2000), Nt5System.fromId("windows-2000"));
+    try std.testing.expect(Nt5System.fromId("windows-7") == null);
+    try std.testing.expect(std.mem.indexOf(u8, xp, " usos.legacy_action=xp-staging ") != null);
 }

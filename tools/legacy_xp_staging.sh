@@ -1,7 +1,8 @@
 # Sourced by micro_linux_init.sh. It intentionally does not run on import.
 #
 # Profile-aware since refactor M4 (docs/design/refactor-os-pipeline.md): the
-# XP UEFI-CSM profile (USOS_PLAN_PROFILE=xp-x86-sp3-uefi-csm, set by
+# XP UEFI-CSM profile (USOS_PLAN_PROFILE=xp-x86-sp3-uefi-csm, and for Windows
+# 2000 w2k-x86-sp4-uefi-csm: usos_nt5_uefi_profile in nt5_profile.sh; set by
 # tools/pipeline/steps/100_nt5_staging.sh) keeps its traces under EFI/USOS-XP
 # (USOS_XP_ESP_DIR), uses the canonical 255/63 geometry and runs the driver
 # preflight; every other profile behaves as before.
@@ -68,7 +69,7 @@ usos_legacy_xp_staging() {
     USOS_XP_CSMWRAP=no
     case " $(cat /proc/cmdline 2>/dev/null) " in
         *' usos.xp_boot=csmwrap '*)
-            [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ] || stop 'CSMWrap mode needs the XP UEFI preparation'
+            usos_nt5_uefi_profile || stop 'CSMWrap mode needs the XP/2000 UEFI preparation'
             USOS_XP_CSMWRAP=yes
             USOS_XP_ESP_TAIL_SECTORS=133120
             export USOS_XP_ESP_TAIL_SECTORS
@@ -133,7 +134,7 @@ usos_legacy_xp_staging() {
     # answer (tools/xp_user_settings.sh usos_xp_custom_sif) instead of the BIOS
     # flow's separate XPSETUP partition with manual partition selection.
     XP_CUSTOM_SIF=''
-    if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ] && [ -n "$XP_WINNT_SIF" ]; then
+    if usos_nt5_uefi_profile && [ -n "$XP_WINNT_SIF" ]; then
         XP_CUSTOM_SIF=/run/usos-xp-custom.sif
         cp "$XP_WINNT_SIF" "$XP_CUSTOM_SIF" || stop 'cannot read the selected XP .sif'
         XP_WINNT_SIF=''
@@ -397,7 +398,7 @@ usos_legacy_xp_staging() {
         usos_xp_choose_disk
     fi
 
-    if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ]; then
+    if usos_nt5_uefi_profile; then
         [ -d /sys/firmware/efi ] || stop 'This experiment requires UEFI preparation'
         [ -z "$XP_WINNT_SIF" ] || stop 'Experimental XP does not accept custom SIF files'
         [ ! -f "$TEST_INI" ] || stop 'Test auto-confirm is forbidden in this experiment'
@@ -449,9 +450,17 @@ usos_legacy_xp_staging() {
     SOURCE_ROOT=/mnt/source
     export SOURCE_ROOT TARGET_DEVICE USOS_DISK_DEVICE
     sh /usr/lib/usos/probe_nt5_source.sh || stop 'Invalid NT5 source; no target write occurred'
-    if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ]; then
+    if usos_nt5_uefi_profile; then
+    if [ "$NT5_SYSTEM" = windows-xp ]; then
     . /usr/lib/usos/xp_driver_stage.sh
     usos_xp_driver_preflight || stop 'XP driver preflight failed; no target write occurred'
+    else
+    # The XP driver bundle (GenAHCI on StorPort, KMDF, USB3, community ACPI)
+    # needs NT 5.1 exports that the Windows 2000 kernel/HAL lack; 2000 keeps
+    # its inbox drivers (docs/windows-2000-uefi-2026-09-27.md).
+    printf '[W2K_DRIVERS] none: the XP bundle is NT 5.1 only; inbox IDE/ACPI drivers
+'
+    fi
     # Hands-off Setup/OOBE (docs/xp-unattended.md); a selected custom .sif wins.
     . /usr/lib/usos/xp_user_settings.sh
     # XP_SETTINGS_MODE=off (usos.xp_settings=off): manual installation chosen in the menu;

@@ -1041,5 +1041,7 @@
 
   "boot.summary.vista_case_nocsm": "Windows Vista without CSM: not supported yet (black screen) - enable CSM in the board settings",
 
-  "boot.summary.xp_csmwrap": "XP without CSM (experimental): CSMWrap, card with a legacy VBIOS, 1 core reserved"
+  "boot.summary.xp_csmwrap": "XP without CSM (experimental): CSMWrap, card with a legacy VBIOS, 1 core reserved",
+
+  "boot.summary.w2k_limits": "Windows 2000 (experimental): no AHCI/NVMe/USB 3 driver for NT 5.0 (SATA in IDE mode), max. 4 GB RAM and 2 CPUs"
 }

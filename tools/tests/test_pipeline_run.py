@@ -72,6 +72,8 @@ class Pipeline(unittest.TestCase):
             ('xp-staging', '', False, 'profile=nt5-staging steps=100', 'RAN 100'),
             ('xp-staging', '', True, 'profile=xp-x86-sp3-uefi-csm steps=100', 'RAN 100'),
             ('windows2000-staging', '', False, 'profile=nt5-staging steps=100', 'RAN 100 action=windows2000-staging'),
+            ('windows2000-staging', '', True, 'profile=w2k-x86-sp4-uefi-csm steps=100', 'RAN 100 action=windows2000-staging'),
+            ('windows2000-staging', 'w2k-x86-sp4-uefi-csm', True, 'profile=w2k-x86-sp4-uefi-csm steps=100', 'RAN 100 action=windows2000-staging'),
             ('xp-resume', '', False, 'profile=nt5-resume steps=150', 'RAN 150'),
             ('windows7-iso', '', False, 'profile=windows-pe-bios-iso steps=500 200', 'RAN 500'),
             ('windows-vista-iso', '', False, 'profile=windows-pe-bios-iso steps=500 200', 'RAN 500'),
@@ -92,7 +94,8 @@ class Pipeline(unittest.TestCase):
 
     def test_unknown_actions_and_mismatched_tokens_are_refused(self):
         for action, token in (('hardware', ''), ('bogus', ''), ('xp-staging', 'windows-pe-bios-iso'),
-                              ('windows7-iso', 'nt5-staging'), ('xp-resume', 'iso-work-chainload')):
+                              ('windows7-iso', 'nt5-staging'), ('xp-resume', 'iso-work-chainload'),
+                              ('xp-staging', 'w2k-x86-sp4-uefi-csm'), ('windows2000-staging', 'xp-x86-sp3-uefi-csm')):
             with self.subTest(action=action, token=token):
                 out = self.run_pipeline(action, token)
                 self.assertEqual(out.returncode, 3, out.stdout + out.stderr)

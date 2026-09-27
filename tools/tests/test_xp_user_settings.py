@@ -91,6 +91,15 @@ def main() -> int:
     merged2 = sh(f"usos_xp_settings_sif '{posix(BASE)}' '{posix(nokey)}'").stdout.decode().splitlines()
     check('no key -> DefaultHide, no ProductKey, AdminPassword=*', 'UnattendMode=DefaultHide' in merged2
           and not any(l.startswith('ProductKey') for l in merged2) and 'AdminPassword=*' in merged2)
+    # Windows 2000 (UEFI profile w2k-x86-sp4-uefi-csm): usos-xp.ini has no
+    # family=, the staged system decides: ProductID, the 2000 base (no PAE).
+    w2k_base = ROOT / 'tools' / 'w2k_selected_partition_uefi_csm.sif'
+    w2k = sh(f"NT5_SYSTEM=windows-2000 usos_xp_settings_sif '{posix(w2k_base)}' '{posix(settings)}'").stdout.decode().splitlines()
+    check('2000: ProductID, no ProductKey', 'ProductID=ABCDE-12345-ABCDE-12345-ABCDE' in w2k and not any(l.startswith('ProductKey') for l in w2k), str(w2k))
+    check('2000: \\WINNT, setup-end script, no PAE', 'TargetPath=\\WINNT' in w2k and 'UserExecute="C:\\USOS\\W2K\\usos-setup.cmd"' in w2k
+          and not any('pae.exe' in l for l in w2k), str(w2k))
+    check('2000: sections unique', len([l for l in w2k if l.startswith('[')]) == len({l.lower() for l in w2k if l.startswith('[')}))
+    check('XP default unchanged by NT5_SYSTEM=windows-xp', sh(f"NT5_SYSTEM=windows-xp usos_xp_settings_sif '{posix(BASE)}' '{posix(settings)}'").stdout.decode() == merged)
     # Accounts script (C:\USOS\XP\usos-users.cmd, run hidden by pae.exe)
     users_file = OUT / 'usos-users.cmd'
     r = sh(f"usos_xp_settings_accounts '{posix(settings)}' '{posix(users_file)}'")

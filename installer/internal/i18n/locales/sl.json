@@ -1047,5 +1047,7 @@
 
   "boot.summary.vista_case_nocsm": "Windows Vista brez CSM: še ni podprto (črn zaslon) - omogočite CSM v nastavitvah plošče",
 
-  "boot.summary.xp_csmwrap": "XP brez CSM (poskusno): CSMWrap, kartica z legacy VBIOS, 1 jedro rezervirano"
+  "boot.summary.xp_csmwrap": "XP brez CSM (poskusno): CSMWrap, kartica z legacy VBIOS, 1 jedro rezervirano",
+
+  "boot.summary.w2k_limits": "Windows 2000 (poskusno): ni gonilnika AHCI/NVMe/USB 3 za NT 5.0 (SATA v načinu IDE), največ 4 GB RAM in 2 procesorja"
 }

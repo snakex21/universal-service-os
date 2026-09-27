@@ -448,6 +448,7 @@ def main() -> int:
             ("tools/xp_windows_partition_plan.awk", "usr/lib/usos/xp_windows_partition_plan.awk"),
             ("tools/xp_selected_partition.sif", "usr/lib/usos/xp_selected_partition.sif"),
             ("tools/xp_selected_partition_uefi_csm.sif", "usr/lib/usos/xp_selected_partition_uefi_csm.sif"),
+            ("tools/w2k_selected_partition_uefi_csm.sif", "usr/lib/usos/w2k_selected_partition_uefi_csm.sif"),
             ("tools/xp_driver_stage.sh", "usr/lib/usos/xp_driver_stage.sh"),
             ("tools/xp_verify_target.sh", "usr/lib/usos/xp_verify_target.sh"),
             ("tools/xp_drive_letters.awk", "usr/lib/usos/xp_drive_letters.awk"),

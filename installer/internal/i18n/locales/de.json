@@ -1041,5 +1041,7 @@
 
   "boot.summary.vista_case_nocsm": "Windows Vista ohne CSM: noch nicht unterstützt (schwarzer Bildschirm) - CSM in den Mainboard-Einstellungen aktivieren",
 
-  "boot.summary.xp_csmwrap": "XP ohne CSM (experimentell): CSMWrap, Grafikkarte mit Legacy-VBIOS, 1 Kern reserviert"
+  "boot.summary.xp_csmwrap": "XP ohne CSM (experimentell): CSMWrap, Grafikkarte mit Legacy-VBIOS, 1 Kern reserviert",
+
+  "boot.summary.w2k_limits": "Windows 2000 (experimentell): kein AHCI/NVMe/USB-3-Treiber für NT 5.0 (SATA im IDE-Modus), max. 4 GB RAM und 2 CPUs"
 }

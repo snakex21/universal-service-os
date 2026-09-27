@@ -1041,5 +1041,7 @@
 
   "boot.summary.vista_case_nocsm": "Windows Vista ilma CSM-ita: veel toetamata (must ekraan) - lubage CSM emaplaadi sätetes",
 
-  "boot.summary.xp_csmwrap": "XP ilma CSM-ita (katseline): CSMWrap, legacy VBIOS-iga kaart, 1 tuum reserveeritud"
+  "boot.summary.xp_csmwrap": "XP ilma CSM-ita (katseline): CSMWrap, legacy VBIOS-iga kaart, 1 tuum reserveeritud",
+
+  "boot.summary.w2k_limits": "Windows 2000 (katseline): NT 5.0 jaoks puudub AHCI/NVMe/USB 3 draiver (SATA IDE-režiimis), kuni 4 GB RAM-i ja 2 protsessorit"
 }

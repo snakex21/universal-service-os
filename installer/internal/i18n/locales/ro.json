@@ -1044,5 +1044,7 @@
 
   "boot.summary.vista_case_nocsm": "Windows Vista fără CSM: încă neacceptat (ecran negru) - activați CSM în setările plăcii de bază",
 
-  "boot.summary.xp_csmwrap": "XP fără CSM (experimental): CSMWrap, placă cu VBIOS legacy, 1 nucleu rezervat"
+  "boot.summary.xp_csmwrap": "XP fără CSM (experimental): CSMWrap, placă cu VBIOS legacy, 1 nucleu rezervat",
+
+  "boot.summary.w2k_limits": "Windows 2000 (experimental): fără driver AHCI/NVMe/USB 3 pentru NT 5.0 (SATA în mod IDE), max. 4 GB RAM și 2 procesoare"
 }

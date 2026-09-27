@@ -10,6 +10,7 @@ run_csmwrap_xp_ovmf.boot() (TCG). --run-through keeps going after the file
 copy until XP restarts and CSMWrap boots the disk a second time.
 
   python tools/tests/legacy_bios/run_csmwrap_xp_prepared.py --output zig-out/csmwrap-xp-prepared [--run-through] [--minutes 14]
+  ... --profile w2k-x86-sp4-uefi-csm --iso W2KPLCMA4.811.iso   (Windows 2000)
 Disposable images only; no physical disk access.
 """
 from pathlib import Path
@@ -38,6 +39,10 @@ def main():
     p.add_argument('--iso', type=Path, default=textmode.DEFAULT_ISO)
     p.add_argument('--minutes', type=float, default=14)
     p.add_argument('--run-through', action='store_true')
+    p.add_argument('--profile', default='xp-x86-sp3-uefi-csm', choices=['xp-x86-sp3-uefi-csm', 'w2k-x86-sp4-uefi-csm'],
+                   help='w2k-x86-sp4-uefi-csm: Windows 2000 (--iso a 2000 SP4 ISO)')
+    p.add_argument('--settings', type=Path, help='usos-xp.ini stand-in')
+    p.add_argument('--tree-scripts', default='', help='more tools/* names taken from the working tree')
     a = p.parse_args()
     out = a.output.resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -53,7 +58,7 @@ def main():
             textmode.cpio.put(entries, textmode.cpio.Entry('csmwrap-src/' + name, stat.S_IFREG | 0o644, blob))
         return entries
     textmode.cpio.parse_newc = parse_with_csmwrap
-    target = textmode.prepare(out, a.iso, tree_scripts=('xp_csmwrap_esp.sh', 'xp_windows_partition_plan.awk'))
+    target = textmode.prepare(out, a.iso, a.profile, a.settings, ('xp_csmwrap_esp.sh', 'xp_windows_partition_plan.awk', *a.tree_scripts.split()))
     log = (out / 'prepare-serial.log').read_text(errors='replace')
     ok = 'CSMWrap ESP PASS' in log
     print('[PREPARE] CSMWrap ESP', 'PASS' if ok else 'MISSING')

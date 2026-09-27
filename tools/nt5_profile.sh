@@ -16,3 +16,14 @@ usos_nt5_profile() {
     esac
     export NT5_SYSTEM NT5_NAME NT5_TITLE NT5_INSTALL_DIR
 }
+
+# The NT5 preparation from UEFI (installed system boots through the firmware
+# CSM or CSMWrap): XP (xp-x86-sp3-uefi-csm) and Windows 2000
+# (w2k-x86-sp4-uefi-csm, experimental). Both keep their traces under
+# EFI/USOS-XP and use the canonical 255/63 geometry.
+usos_nt5_uefi_profile() {
+    case "${USOS_PLAN_PROFILE:-}" in
+        xp-x86-sp3-uefi-csm|w2k-x86-sp4-uefi-csm) return 0 ;;
+    esac
+    return 1
+}

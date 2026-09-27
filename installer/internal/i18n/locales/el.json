@@ -1041,5 +1041,7 @@
 
   "boot.summary.vista_case_nocsm": "Windows Vista χωρίς CSM: δεν υποστηρίζεται ακόμη (μαύρη οθόνη) - ενεργοποιήστε το CSM στις ρυθμίσεις της μητρικής",
 
-  "boot.summary.xp_csmwrap": "XP χωρίς CSM (πειραματικό): CSMWrap, κάρτα με legacy VBIOS, 1 πυρήνας δεσμευμένος"
+  "boot.summary.xp_csmwrap": "XP χωρίς CSM (πειραματικό): CSMWrap, κάρτα με legacy VBIOS, 1 πυρήνας δεσμευμένος",
+
+  "boot.summary.w2k_limits": "Windows 2000 (πειραματικό): χωρίς πρόγραμμα οδήγησης AHCI/NVMe/USB 3 για NT 5.0 (SATA σε λειτουργία IDE), έως 4 GB RAM και 2 CPU"
 }

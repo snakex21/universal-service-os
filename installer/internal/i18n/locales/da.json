@@ -1041,5 +1041,7 @@
 
   "boot.summary.vista_case_nocsm": "Windows Vista uden CSM: understøttes endnu ikke (sort skærm) - slå CSM til i bundkortets indstillinger",
 
-  "boot.summary.xp_csmwrap": "XP uden CSM (eksperimentelt): CSMWrap, kort med legacy-VBIOS, 1 kerne reserveret"
+  "boot.summary.xp_csmwrap": "XP uden CSM (eksperimentelt): CSMWrap, kort med legacy-VBIOS, 1 kerne reserveret",
+
+  "boot.summary.w2k_limits": "Windows 2000 (eksperimentelt): ingen AHCI/NVMe/USB 3-driver til NT 5.0 (SATA i IDE-tilstand), maks. 4 GB RAM og 2 CPU'er"
 }

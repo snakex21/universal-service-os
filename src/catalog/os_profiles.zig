@@ -90,7 +90,7 @@ pub const SystemTraits = struct {
 
 pub const traits_table = [_]SystemTraits{
     .{ .system_id = "windows-xp", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini" },
-    .{ .system_id = "windows-2000", .answer = .winnt_sif, .nt5_staging = true },
+    .{ .system_id = "windows-2000", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini" },
     .{ .system_id = "windows-7", .secure_boot_off = true, .native_uefi = .win7, .int10_dispatcher = true },
     .{ .system_id = "windows-vista", .secure_boot_off = true, .native_uefi = .vista, .int10_dispatcher = true },
     .{ .system_id = "windows-10", .native_uefi = .modern },
@@ -232,6 +232,11 @@ pub const profiles = [_]Profile{
     // ---- UEFI only
     .{ .id = "xp-x86-sp3-uefi-csm", .systems = .{ .ids = &.{"windows-xp"} }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .xp_uefi_staging, .progress = .xp_uefi },
     .{ .id = "xp-uefi-other", .systems = .{ .ids = &.{"windows-xp"} }, .firmware = .uefi, .backend = null, .progress = .none },
+    // Windows 2000 from UEFI: the same micro-Linux preparation and package
+    // (EFI/USOS-XP), 2000 answer and no XP driver bundle (NT 5.1 only);
+    // experimental. docs/windows-2000-uefi-2026-09-27.md.
+    .{ .id = "w2k-x86-sp4-uefi-csm", .systems = .{ .ids = &.{"windows-2000"} }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .xp_uefi_staging, .progress = .xp_uefi },
+    .{ .id = "w2k-uefi-other", .systems = .{ .ids = &.{"windows-2000"} }, .firmware = .uefi, .backend = null, .progress = .none },
     // ---- BIOS only
     .{ .id = "linux-live-bios", .systems = .{ .ids = &.{"other-linux"} }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .linux_live_iso, .progress = .core },
     .{ .id = "dos-fat16-bios", .systems = .{ .ids = &.{ "ms-dos", "windows-3-1", "windows-3-11" } }, .images = iso, .methods = auto_iso_memdisk, .firmware = .bios, .backend = .dos_bios_iso, .progress = .core },

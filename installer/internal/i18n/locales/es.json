@@ -1041,5 +1041,7 @@
 
   "boot.summary.vista_case_nocsm": "Windows Vista sin CSM: aún no compatible (pantalla negra) - active CSM en la configuración de la placa",
 
-  "boot.summary.xp_csmwrap": "XP sin CSM (experimental): CSMWrap, tarjeta con VBIOS legacy, 1 núcleo reservado"
+  "boot.summary.xp_csmwrap": "XP sin CSM (experimental): CSMWrap, tarjeta con VBIOS legacy, 1 núcleo reservado",
+
+  "boot.summary.w2k_limits": "Windows 2000 (experimental): sin controlador AHCI/NVMe/USB 3 para NT 5.0 (SATA en modo IDE), máx. 4 GB de RAM y 2 CPU"
 }

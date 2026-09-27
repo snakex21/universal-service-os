@@ -1044,5 +1044,7 @@
 
   "boot.summary.vista_case_nocsm": "Windows Vista без CSM: поки не підтримується (чорний екран) - увімкніть CSM у налаштуваннях плати",
 
-  "boot.summary.xp_csmwrap": "XP без CSM (експериментально): CSMWrap, відеокарта з legacy VBIOS, 1 ядро зарезервовано"
+  "boot.summary.xp_csmwrap": "XP без CSM (експериментально): CSMWrap, відеокарта з legacy VBIOS, 1 ядро зарезервовано",
+
+  "boot.summary.w2k_limits": "Windows 2000 (експериментально): немає драйвера AHCI/NVMe/USB 3 для NT 5.0 (SATA в режимі IDE), не більше 4 ГБ ОЗП і 2 процесорів"
 }

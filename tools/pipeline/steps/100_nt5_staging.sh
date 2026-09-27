@@ -1,12 +1,15 @@
 #!/bin/sh
-# Pipeline step 100: NT5 (XP / 2000) staging. Adapter over the unchanged
+# Pipeline step 100: NT5 (XP / 2000) staging, BIOS and UEFI profiles. Adapter over the unchanged
 # legacy_xp_staging.sh; the code was the xp-staging branch of /usos-init.
 usos_step_100_run() {
-    if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ]; then
-        # XP from UEFI through the firmware CSM (formerly text edits of
-        # /usos-init by tools/build_xp_uefi_csm_trial.py): UEFI only, and
-        # every trace of this session under EFI/USOS-XP.
-        [ "$LEGACY_ACTION" = xp-staging ] || stop 'Unexpected experimental action'
+    if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ] || [ "${USOS_PLAN_PROFILE:-}" = w2k-x86-sp4-uefi-csm ]; then
+        # XP (and Windows 2000) from UEFI through the firmware CSM or CSMWrap
+        # (formerly text edits of /usos-init by tools/build_xp_uefi_csm_trial.py):
+        # UEFI only, and every trace of this session under EFI/USOS-XP.
+        case "${USOS_PLAN_PROFILE}:$LEGACY_ACTION" in
+            xp-x86-sp3-uefi-csm:xp-staging|w2k-x86-sp4-uefi-csm:windows2000-staging) ;;
+            *) stop 'Unexpected experimental action' ;;
+        esac
         [ -d /sys/firmware/efi ] || stop 'UEFI required'
         mkdir -p /mnt/esp/EFI/USOS-XP
         USOS_XP_ESP_DIR=/mnt/esp/EFI/USOS-XP

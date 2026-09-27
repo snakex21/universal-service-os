@@ -36,6 +36,8 @@ put_verified() {
 # unsigned-driver policy): tools/xp_selected_partition_uefi_csm.sif.
 XP_AUTOMATIC_SIF="$SCRIPT_DIR/xp_selected_partition.sif"
 [ "${USOS_PLAN_PROFILE:-}" != xp-x86-sp3-uefi-csm ] || XP_AUTOMATIC_SIF="$SCRIPT_DIR/xp_selected_partition_uefi_csm.sif"
+# Windows 2000 from UEFI: no PAE, a setup-end script for the usos-xp.ini accounts.
+[ "${USOS_PLAN_PROFILE:-}" != w2k-x86-sp4-uefi-csm ] || XP_AUTOMATIC_SIF="$SCRIPT_DIR/w2k_selected_partition_uefi_csm.sif"
 [ -r "$XP_AUTOMATIC_SIF" ] || fail "automatic WINNT.SIF missing: $XP_AUTOMATIC_SIF"
 awk -v directory="$NT5_INSTALL_DIR" '
     /^InstallDir=/ { print "InstallDir=\"\\" directory "\""; next }

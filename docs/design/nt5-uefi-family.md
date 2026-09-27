@@ -114,6 +114,10 @@ nazwę pliku: do usunięcia): katalogi `I386`/`AMD64`, `TXTSETUP.SIF`
   czasu załadowania stosu USB NT).
 - **Stan dziś:** BIOS potwierdzony (MS-7100, VirtualBox). Na X470
   (UEFI-CSM) **niesprawdzone**; oczekiwane ryzyko wysokie (ACPI).
+- **2026-09-27:** profil `w2k-x86-sp4-uefi-csm` (UEFI + CSM i CSMWrap),
+  QEMU do GUI Setup; pakiet sterowników XP **nie** ładuje się na NT 5.0
+  (brak eksportów), więc 2000 idzie bez niego. Szczegóły, wyniki i cechy
+  repacków CMA: [../windows-2000-uefi-2026-09-27.md](../windows-2000-uefi-2026-09-27.md).
 
 ### 3.2 Windows Server 2003 x86 (SP2)
 
