@@ -55,6 +55,7 @@ pub const Field = enum {
     protect_pc,
     network_location,
     disable_wer,
+    edition,
 };
 
 /// The "Help protect Windows" page (OOBE/ProtectYourPC, Vista and newer).
@@ -112,6 +113,14 @@ pub const SystemKey = struct {
 };
 
 pub const max_system_keys = 8;
+
+/// An edition for one catalog system (edition.windows-7=Professional).
+pub const SystemEdition = struct {
+    system: Text(32) = .{},
+    edition: Text(64) = .{},
+};
+
+pub const max_system_editions = 8;
 pub const max_file = 4096;
 
 pub const Profile = struct {
@@ -135,6 +144,11 @@ pub const Profile = struct {
     key: Text(29) = .{},
     system_keys: [max_system_keys]SystemKey = @splat(.{}),
     system_key_count: u8 = 0,
+    /// Edition for every system without its own (editions.zig: an id such
+    /// as Professional / ServerStandardCore, or a name); empty: Setup asks.
+    edition: Text(64) = .{},
+    system_editions: [max_system_editions]SystemEdition = @splat(.{}),
+    system_edition_count: u8 = 0,
     /// Keys are written to the ESP only when this is on.
     remember_key: bool = false,
     /// Always on in this version: no DiskConfiguration, no WillWipeDisk.
@@ -160,6 +174,34 @@ pub const Profile = struct {
             if (std.ascii.eqlIgnoreCase(entry.system.slice(), system_id)) return entry.key.slice();
         }
         return self.key.slice();
+    }
+
+    /// Edition for a catalog system id: its own, else the common one.
+    pub fn editionFor(self: *const Profile, system_id: []const u8) []const u8 {
+        for (self.system_editions[0..self.system_edition_count]) |*entry| {
+            if (std.ascii.eqlIgnoreCase(entry.system.slice(), system_id)) return entry.edition.slice();
+        }
+        return self.edition.slice();
+    }
+
+    /// Sets (empty: removes) the edition of one system.
+    pub fn setSystemEdition(self: *Profile, system_id: []const u8, edition: []const u8) !void {
+        for (self.system_editions[0..self.system_edition_count], 0..) |*entry, i| {
+            if (!std.ascii.eqlIgnoreCase(entry.system.slice(), system_id)) continue;
+            if (edition.len == 0) {
+                for (i + 1..self.system_edition_count) |j| self.system_editions[j - 1] = self.system_editions[j];
+                self.system_edition_count -= 1;
+                return;
+            }
+            return entry.edition.set(edition);
+        }
+        if (edition.len == 0) return;
+        if (self.system_edition_count == max_system_editions) return error.TooManyEditions;
+        var entry = &self.system_editions[self.system_edition_count];
+        entry.* = .{};
+        try entry.system.set(system_id);
+        try entry.edition.set(edition);
+        self.system_edition_count += 1;
     }
 
     pub fn hasAnyKey(self: *const Profile) bool {
@@ -302,6 +344,13 @@ pub fn checkPassword(value: []const u8) ?Problem {
     return null;
 }
 
+/// Edition: up to 64 ASCII characters without " % ^ & | < >. Empty = Setup asks.
+pub fn checkEdition(value: []const u8) ?Problem {
+    if (value.len > 64) return .too_long;
+    if (!cleanAscii(value, true)) return .bad_characters;
+    return null;
+}
+
 /// XXXXX-XXXXX-XXXXX-XXXXX-XXXXX (letters and digits, any case). Empty = none.
 pub fn checkKey(value: []const u8) ?Problem {
     if (value.len == 0) return null;
@@ -339,6 +388,10 @@ pub fn validate(p: *const Profile) ?Issue {
     if (checkKey(p.key.slice())) |problem| return .{ .field = .key, .problem = problem };
     for (p.system_keys[0..p.system_key_count]) |*entry| {
         if (checkKey(entry.key.slice())) |problem| return .{ .field = .key, .problem = problem };
+    }
+    if (checkEdition(p.edition.slice())) |problem| return .{ .field = .edition, .problem = problem };
+    for (p.system_editions[0..p.system_edition_count]) |*entry| {
+        if (checkEdition(entry.edition.slice())) |problem| return .{ .field = .edition, .problem = problem };
     }
     if (!p.manual_disk) return .{ .field = .manual_disk, .problem = .unsupported };
     return null;
@@ -433,6 +486,14 @@ fn applyField(p: *Profile, name: []const u8, value: []const u8) ?Issue {
         p.setSystemKey(system, upper.slice()) catch return .{ .field = .key, .problem = .too_many_keys };
         return null;
     }
+    if (std.ascii.startsWithIgnoreCase(name, "edition.")) {
+        const system = name[8..];
+        if (system.len == 0 or system.len > 32) return .{ .field = .edition, .problem = .unknown_field };
+        for (system) |c| if (!(std.ascii.isAlphanumeric(c) or c == '-')) return .{ .field = .edition, .problem = .unknown_field };
+        if (checkEdition(value)) |problem| return .{ .field = .edition, .problem = problem };
+        p.setSystemEdition(system, value) catch return .{ .field = .edition, .problem = .too_many_keys };
+        return null;
+    }
     const field = fieldByName(name) orelse return .{ .problem = .unknown_field };
     switch (field) {
         .name => p.name.set(value) catch return .{ .field = field, .problem = .too_long },
@@ -449,6 +510,10 @@ fn applyField(p: *Profile, name: []const u8, value: []const u8) ?Issue {
         .language => p.language = if (isAuto(value)) null else if (tables.language(value)) |entry| @intCast(entry - &tables.languages[0]) else return .{ .field = field, .problem = .unknown_language },
         .locale => p.locale = if (isAuto(value)) null else if (tables.language(value)) |entry| @intCast(entry - &tables.languages[0]) else return .{ .field = field, .problem = .unknown_language },
         .keyboard => p.keyboard = if (isAuto(value)) null else parseKeyboard(value) orelse return .{ .field = field, .problem = .bad_keyboard },
+        .edition => {
+            if (checkEdition(value)) |problem| return .{ .field = field, .problem = problem };
+            p.edition.set(value) catch return .{ .field = field, .problem = .too_long };
+        },
         .protect_pc => p.protect_pc = enumByName(ProtectPc, value) orelse return .{ .field = field, .problem = .bad_choice },
         .network_location => p.network_location = enumByName(NetworkLocation, value) orelse return .{ .field = field, .problem = .bad_choice },
         .remember_key, .manual_disk, .local_account, .bypass_tpm, .bypass_secure_boot, .bypass_ram, .no_network_oobe, .disable_wer => {
@@ -507,6 +572,8 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
         boolText(p.bypass_secure_boot), boolText(p.bypass_ram), boolText(p.no_network_oobe),
     });
     try w.print("protect_pc={s}\r\nnetwork_location={s}\r\ndisable_wer={s}\r\n", .{ @tagName(p.protect_pc), @tagName(p.network_location), boolText(p.disable_wer) });
+    try w.print("edition={s}\r\n", .{p.edition.slice()});
+    for (p.system_editions[0..p.system_edition_count]) |*entry| try w.print("edition.{s}={s}\r\n", .{ entry.system.slice(), entry.edition.slice() });
     return w.buffered();
 }
 
@@ -591,6 +658,8 @@ test "profile round trip keeps every field; keys only with remember_key" {
     p.protect_pc = .recommended;
     p.network_location = .home;
     p.disable_wer = true;
+    try p.edition.set("Pro");
+    try p.setSystemEdition("windows-server-2022", "ServerDatacenterCore");
     p.remember_key = true;
     var buffer: [max_file]u8 = undefined;
     const text = try write(&p, &buffer);
@@ -607,6 +676,10 @@ test "profile round trip keeps every field; keys only with remember_key" {
     try std.testing.expectEqual(ProtectPc.recommended, q.protect_pc);
     try std.testing.expectEqual(NetworkLocation.home, q.network_location);
     try std.testing.expect(q.disable_wer);
+    try std.testing.expectEqualStrings("Pro", q.editionFor("windows-7"));
+    try std.testing.expectEqualStrings("ServerDatacenterCore", q.editionFor("windows-server-2022"));
+    try q.setSystemEdition("windows-server-2022", "");
+    try std.testing.expectEqualStrings("Pro", q.editionFor("windows-server-2022"));
 
     p.remember_key = false;
     const forgotten = try write(&p, &buffer);
@@ -631,6 +704,7 @@ test "profile parse errors name the field and line, never the value" {
         .{ .text = "name=A\nuser=Bob\nbypass_tpm=maybe\n", .field = .bypass_tpm, .problem = .bad_boolean, .line = 3 },
         .{ .text = "name=A\nuser=Bob\nprotect_pc=2\n", .field = .protect_pc, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\nnetwork_location=office\n", .field = .network_location, .problem = .bad_choice, .line = 3 },
+        .{ .text = "name=A\nuser=Bob\nedition=A<B\n", .field = .edition, .problem = .bad_characters, .line = 3 },
         .{ .text = "name=A\nuser=Bob\npassword=a b\n", .field = .password, .problem = .bad_characters, .line = 0 },
         .{ .text = "name=A\njusttext\n", .field = null, .problem = .not_key_value, .line = 2 },
         .{ .text = "user=Bob\n", .field = .name, .problem = .empty, .line = 0 },

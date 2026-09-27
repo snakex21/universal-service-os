@@ -66,6 +66,8 @@ pub const settings = [_]Setting{
     .{ .pass = .windowsPE, .component = winpe_intl, .path = "UserLocale" },
     .{ .pass = .windowsPE, .component = setup, .path = "RunSynchronous/RunSynchronousCommand/Order" },
     .{ .pass = .windowsPE, .component = setup, .path = "RunSynchronous/RunSynchronousCommand/Path" },
+    .{ .pass = .windowsPE, .component = setup, .path = "ImageInstall/OSImage/InstallFrom/MetaData/Key" },
+    .{ .pass = .windowsPE, .component = setup, .path = "ImageInstall/OSImage/InstallFrom/MetaData/Value" },
     .{ .pass = .windowsPE, .component = setup, .path = "UserData/ProductKey/Key" },
     .{ .pass = .windowsPE, .component = setup, .path = "UserData/ProductKey/WillShowUI" },
     .{ .pass = .windowsPE, .component = setup, .path = "UserData/AcceptEula" },
@@ -221,7 +223,7 @@ test "schema: every family renders only settings its version has" {
         const family: Family = @enumFromInt(f.value);
         if (!family.nt5()) {
             for ([_]target.Arch{ .x86, .amd64 }) |arch| {
-                const xml = try autounattend.render(.{ .profile = &p, .family = family, .arch = arch, .key = "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE" }, &buffer);
+                const xml = try autounattend.render(.{ .profile = &p, .family = family, .arch = arch, .key = "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE", .image_index = 2 }, &buffer);
                 var finding: Finding = .{};
                 check(xml, family, &finding) catch |err| {
                     std.debug.print("{s}: {s} {s} {s}: {s}\n", .{ f.name, finding.pass, finding.component, finding.path, @errorName(err) });

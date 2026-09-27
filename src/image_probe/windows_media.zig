@@ -235,6 +235,12 @@ pub fn blockWith(info: Info, firmware: Firmware, loader: UefiLoader) ?Block {
 }
 
 /// UTF-16LE WIM XML (with BOM) to ASCII in place; returns the ASCII text.
+/// install.wim XML metadata (UTF-16LE with BOM) as ASCII, in place
+/// (non-ASCII characters become '?'), for answer.editions.parse.
+pub fn installXmlAscii(xml: []u8) ![]u8 {
+    return asciiXml(xml);
+}
+
 fn asciiXml(xml: []u8) ![]u8 {
     if (xml.len % 2 != 0 or xml.len < 4 or xml[0] != 0xff or xml[1] != 0xfe) return error.InvalidWimXml;
     const length = xml.len / 2 - 1;

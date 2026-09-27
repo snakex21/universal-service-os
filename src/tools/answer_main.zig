@@ -2,7 +2,9 @@
 //! for the golden tests (tools/tests/test_answer_render.py) and for
 //! rendering an answer file by hand.
 //!
-//!   usos-answer render PROFILE.ini SYSTEM-ID ARCH OUT [KEY]
+//!   usos-answer render PROFILE.ini SYSTEM-ID ARCH OUT [KEY|-] [INSTALL-XML]
+//!     INSTALL-XML: the XML metadata of the media's install.wim (UTF-16LE
+//!     with BOM, as stored in the WIM) for the profile's edition
 //!   usos-answer import-xp USOS-XP.ini OUT-PROFILE.ini
 //!   usos-answer normalize PROFILE.ini OUT-PROFILE.ini
 //!   usos-answer check-xml FILE.xml [MEDIA-ARCH]
@@ -15,7 +17,7 @@ const answer = usos.flow.answer;
 
 fn usage() u8 {
     std.debug.print(
-        \\usage: usos-answer render PROFILE.ini SYSTEM-ID ARCH OUT [KEY]
+        \\usage: usos-answer render PROFILE.ini SYSTEM-ID ARCH OUT [KEY|-] [INSTALL-XML]
         \\       usos-answer import-xp USOS-XP.ini OUT-PROFILE.ini
         \\       usos-answer normalize PROFILE.ini OUT-PROFILE.ini
         \\       usos-answer check-xml FILE.xml [MEDIA-ARCH]
@@ -44,7 +46,9 @@ pub fn main(init: std.process.Init) !u8 {
         const system_id = args.next() orelse return usage();
         const arch_text = args.next() orelse return usage();
         const out_path = args.next() orelse return usage();
-        const key = args.next();
+        const key_arg = args.next();
+        const key: ?[]const u8 = if (key_arg) |k| (if (std.mem.eql(u8, k, "-")) null else k) else null;
+        const images_path = args.next();
         const arch = answer.Arch.fromText(arch_text) orelse return usage();
         const text = try cwd.readFileAlloc(io, profile_path, init.gpa, .limited(answer.profile.max_file + 1));
         defer init.gpa.free(text);
@@ -54,8 +58,19 @@ pub fn main(init: std.process.Init) !u8 {
             .invalid => |issue| return report(issue),
         }
         if (key) |k| if (answer.profile.checkKey(k) != null) return report(.{ .field = .key, .problem = .bad_key_format });
+        var images: answer.editions.List = .{};
+        if (images_path) |path| {
+            const xml = try cwd.readFileAlloc(io, path, init.gpa, .limited(4 * 1024 * 1024));
+            defer init.gpa.free(xml);
+            answer.editions.parse(try usos.image_probe.windows_media.installXmlAscii(xml), &images);
+            switch (answer.matchEdition(&p, system_id, &images)) {
+                .none => {},
+                .found => |image| std.debug.print("edition: image {d} ({s})\n", .{ image.index, image.label() }),
+                .missing => std.debug.print("edition: not on the media, Setup asks\n", .{}),
+            }
+        }
         var buffer: [answer.autounattend.max_size]u8 = undefined;
-        const rendered = (try answer.render(&p, system_id, arch, key, &buffer)) orelse {
+        const rendered = (try answer.render(&p, system_id, arch, key, if (images_path != null) &images else null, &buffer)) orelse {
             std.debug.print("no generated answer for {s}\n", .{system_id});
             return 1;
         };

@@ -23,6 +23,9 @@ pub const Input = struct {
     /// Product key (the profile's for this system or one typed at start);
     /// empty: Setup asks (or selects the edition itself).
     key: []const u8 = "",
+    /// The install image (1-based index) matching the profile's edition on
+    /// the chosen media (editions.match); null: Setup shows its edition list.
+    image_index: ?u16 = null,
 };
 
 const W = std.Io.Writer;
@@ -126,6 +129,21 @@ fn setupComponent(w: *W, input: Input) !void {
             order += 1;
         }
         try close(w, 3, "RunSynchronous");
+    }
+    if (input.image_index) |index| {
+        // Only the source image: no InstallTo, the disk page stays.
+        try open(w, 3, "ImageInstall");
+        try open(w, 4, "OSImage");
+        try open(w, 5, "InstallFrom");
+        try indent(w, 6);
+        try w.writeAll("<MetaData wcm:action=\"add\">\n");
+        try element(w, 7, "Key", "/IMAGE/INDEX");
+        var number: [8]u8 = undefined;
+        try element(w, 7, "Value", try std.fmt.bufPrint(&number, "{d}", .{index}));
+        try close(w, 6, "MetaData");
+        try close(w, 5, "InstallFrom");
+        try close(w, 4, "OSImage");
+        try close(w, 3, "ImageInstall");
     }
     try open(w, 3, "UserData");
     if (input.key.len > 0) {
@@ -252,7 +270,14 @@ test "autounattend: manual disk, escaped values, arch on every component" {
     try std.testing.expect(std.mem.indexOf(u8, xml, "DiskConfiguration") == null);
     try std.testing.expect(std.mem.indexOf(u8, xml, "WillWipeDisk") == null);
     try std.testing.expect(std.mem.indexOf(u8, xml, "InstallTo") == null);
+    try std.testing.expect(std.mem.indexOf(u8, xml, "ImageInstall") == null);
     try std.testing.expect(std.mem.indexOf(u8, xml, "processorArchitecture=\"amd64\"") == null);
+    var second: [max_size]u8 = undefined;
+    const edition = try render(.{ .profile = &p, .family = .windows_7, .arch = .x86, .image_index = 3 }, &second);
+    try std.testing.expect(std.mem.indexOf(u8, edition, "<Key>/IMAGE/INDEX</Key>") != null);
+    try std.testing.expect(std.mem.indexOf(u8, edition, "<Value>3</Value>") != null);
+    try std.testing.expect(std.mem.indexOf(u8, edition, "InstallTo") == null);
+    try @import("xml_check.zig").wellFormed(edition);
     try std.testing.expect(std.mem.indexOf(u8, xml, "R&apos;n&apos;D Team") != null);
     try std.testing.expect(std.mem.indexOf(u8, xml, "<ProductKey>") == null);
     try std.testing.expect(std.mem.indexOf(u8, xml, "<ComputerName>*</ComputerName>") != null);
