@@ -55,7 +55,10 @@ fn run() void {
     info("iso found on /dev/{s}", .{disk});
 
     var target_buffer: [32]u8 = undefined;
-    const target = (if (map.len == 1) attachLoop(disk, &map, &target_buffer) else attachDm(disk, &map, &target_buffer)) orelse {
+    // loop (every live initrd has it), dm for fragmented files, and for the
+    // Debian installer (no loop.ko, no dm-mod in its initrd) an in-kernel
+    // partition over the contiguous ISO.
+    const target = (if (map.len == 1) attachLoop(disk, &map, &target_buffer) orelse attachPartition(disk, &map, &target_buffer) else attachDm(disk, &map, &target_buffer)) orelse {
         say(3, "USOS: the ISO could not be attached as a block device", .{});
         return;
     };
@@ -271,6 +274,79 @@ fn openWait(path: [*:0]const u8, flags: linux.O) ?i32 {
         sleepMs(50);
     }
     return null;
+}
+
+// ---------------------------------------------------------------- in-kernel partition
+
+const BLKPG = 0x1269;
+const BLKPG_ADD_PARTITION = 1;
+const BLKPG_DEL_PARTITION = 2;
+const iso_partition_number = 64;
+
+const BlkpgPartition = extern struct {
+    start: i64,
+    length: i64,
+    pno: i32,
+    devname: [64]u8 = @splat(0),
+    volname: [64]u8 = @splat(0),
+};
+
+const BlkpgIoctlArg = extern struct {
+    op: i32,
+    flags: i32 = 0,
+    datalen: i32 = @sizeOf(BlkpgPartition),
+    data: *BlkpgPartition,
+};
+
+/// Adds partition 64 over the ISO to the kernel's view of the disk. The
+/// kernel refuses overlapping partitions, so the ones that contain the ISO
+/// (DATA) are first removed from the kernel's table: nothing is written to
+/// the disk and DATA is not mounted in the initramfs.
+fn attachPartition(disk: []const u8, map: *const iso_map.Map, out: *[32]u8) ?[]const u8 {
+    var disk_path_buffer: [80]u8 = undefined;
+    const disk_path = devicePath(disk, &disk_path_buffer) orelse return null;
+    const fd = linux.open(disk_path, .{ .ACCMODE = .RDONLY, .CLOEXEC = true }, 0);
+    if (linux.errno(fd) != .SUCCESS) return null;
+    defer _ = linux.close(@intCast(fd));
+    const iso_start = map.extents[0].lba;
+    const iso_end = iso_start + (map.size + 511) / 512;
+    var number: u32 = 1;
+    while (number < iso_partition_number) : (number += 1) {
+        const range = partitionRange(disk, number) orelse continue;
+        if (range[0] < iso_end and iso_start < range[0] + range[1]) {
+            var part = BlkpgPartition{ .start = 0, .length = 0, .pno = @intCast(number) };
+            var arg = BlkpgIoctlArg{ .op = BLKPG_DEL_PARTITION, .data = &part };
+            if (linux.errno(linux.ioctl(@intCast(fd), BLKPG, @intFromPtr(&arg))) != .SUCCESS) {
+                info("partition {d} of {s} is busy: cannot map the ISO", .{ number, disk });
+                return null;
+            }
+            info("partition {d} of {s} hidden from the kernel (disk unchanged)", .{ number, disk });
+        }
+    }
+    var part = BlkpgPartition{ .start = @intCast(iso_start * 512), .length = @intCast(((map.size + 511) / 512) * 512), .pno = iso_partition_number };
+    var arg = BlkpgIoctlArg{ .op = BLKPG_ADD_PARTITION, .data = &part };
+    if (linux.errno(linux.ioctl(@intCast(fd), BLKPG, @intFromPtr(&arg))) != .SUCCESS) return null;
+    const separator: []const u8 = if (std.ascii.isDigit(disk[disk.len - 1])) "p" else "";
+    const path = std.fmt.bufPrint(out, "/dev/{s}{s}{d}", .{ disk, separator, iso_partition_number }) catch return null;
+    var z: [40]u8 = undefined;
+    const path_z = std.fmt.bufPrintZ(&z, "{s}", .{path}) catch return null;
+    const node = openWait(path_z.ptr, .{ .ACCMODE = .RDONLY, .CLOEXEC = true }) orelse return null;
+    _ = linux.close(node);
+    return path;
+}
+
+/// [start, size] in 512-byte sectors of partition `number` of `disk` (sysfs).
+fn partitionRange(disk: []const u8, number: u32) ?[2]u64 {
+    const separator: []const u8 = if (std.ascii.isDigit(disk[disk.len - 1])) "p" else "";
+    var values: [2]u64 = undefined;
+    for ([_][]const u8{ "start", "size" }, 0..) |field, i| {
+        var path_buffer: [128]u8 = undefined;
+        const path = std.fmt.bufPrintZ(&path_buffer, "/sys/block/{s}/{s}{s}{d}/{s}", .{ disk, disk, separator, number, field }) catch return null;
+        var text: [32]u8 = undefined;
+        const value = readFile(path.ptr, &text) orelse return null;
+        values[i] = std.fmt.parseInt(u64, std.mem.trim(u8, value, &std.ascii.whitespace), 10) catch return null;
+    }
+    return values;
 }
 
 // ---------------------------------------------------------------- device-mapper
