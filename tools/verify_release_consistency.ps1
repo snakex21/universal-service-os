@@ -125,6 +125,7 @@ try {
         'EFI/USOS/shell/startup.nsh',
         'EFI/USOS/shell/License.txt',
         'EFI/USOS/shell/SOURCES.txt',
+        'EFI/USOS/linux/usos-linux.cpio',
         'EFI/USOS/bios-ui.bin',
         'EFI/USOS/licenses/fonts/LICENSE-OFL-1.1.txt',
         'UI/index.html',

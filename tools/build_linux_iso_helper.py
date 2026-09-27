@@ -43,14 +43,15 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--init", required=True)
     parser.add_argument("--hook", default=str(ROOT / "assets" / "linux-iso" / "init-bottom"))
-    parser.add_argument("--out", required=True)
+    parser.add_argument("--out", required=True, action="append")
     args = parser.parse_args()
     hook = Path(args.hook).read_bytes().replace(b"\r\n", b"\n")
     data = build(Path(args.init).read_bytes(), hook)
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_bytes(data)
-    print(f"[PASS] {out} ({len(data)} bytes)")
+    for name in args.out:
+        out = Path(name)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(data)
+        print(f"[PASS] {out} ({len(data)} bytes)")
     return 0
 
 
