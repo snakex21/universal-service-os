@@ -94,6 +94,27 @@ GParted UI itself is not shown yet. All ten ISOs on the test VHD are one
 extent each (fresh NTFS), so the dm path is not exercised yet (make a
 fragmented copy on purpose to test it).
 
+## Menu test (UEFI, OVMF, Secure Boot off): in progress at shutdown
+
+`tools/tests/linux_iso/update_linux_test_esp.ps1 -EspSource zig-out/usb`
+refreshes only the ESP of the test VHD; `run_linux_iso_menu.py --name X
+--script "wait:22,right,ret,wait:3,ret,wait:3,ret,wait:3,shot"` drives the
+menu (Home, Linux, Ubuntu, first ISO, method page). The menu lists Ubuntu
+(2 ISOs), Debian (3), Fedora, Linux Mint as Ready. The first real start of
+`linux_iso_start.zig` has NOT been observed yet: look at
+`tools/tests/artifacts/linux-iso/menu/ubuntu-server/01.png`, press Enter on
+"Automatic (Linux ISO)" and check the serial `[LINUX-ISO]` lines.
+
+## Exact next steps
+
+1. Menu start with Secure Boot off (Ubuntu server, Fedora, GParted); fix.
+2. Secure Boot relay (design section 5) + OVMF SB test with MokList seeded.
+3. BIOS Core generic path (or micro-Linux kexec fallback), Core size check.
+4. d-i CD detection; dm path with a deliberately fragmented ISO.
+5. Answer renderers (autoinstall/preseed/kickstart) + goldens + injection.
+6. Strings (27 locales), answer-screen picker, docs, build.bat, merge,
+   release payload, stick deploy (only if attached: backup, readback, flush).
+
 ## Not done (next, in this order)
 
 Design doc section 9: finish step 3 (remaining distros BIOS + `--uefi`,
