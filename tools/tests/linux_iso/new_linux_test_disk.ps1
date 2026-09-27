@@ -68,7 +68,10 @@ try {
         $dir = Join-Path $dataPath "Systems\Linux\$folder\Images"
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
         Write-Host "copy $file -> $folder"
-        Copy-Item -LiteralPath (Join-Path $assets $file) -Destination $dir
+        # robocopy (unbuffered, retries): Copy-Item lost the access path on
+        # large files once.
+        & robocopy.exe $assets $dir $file /J /R:3 /W:2 /NP /NFL /NDL /NJH /NJS | Out-Null
+        if ($LASTEXITCODE -ge 8) { throw "robocopy $file failed: $LASTEXITCODE" }
         $target = Join-Path $dir $file
         $extents = @()
         foreach ($line in (& fsutil.exe file queryextents $target)) {
