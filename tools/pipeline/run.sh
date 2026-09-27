@@ -41,6 +41,7 @@ usos_pipeline_profile_for_action() {
         windows2000-staging) printf 'nt5-staging' ;;
         windows7-iso|windows-vista-iso) printf 'windows-pe-bios-iso' ;;
         xp-resume) printf 'nt5-resume' ;;
+        vista-disk) printf 'vista-uefi-disk' ;;
         *) return 1 ;;
     esac
 }
@@ -50,6 +51,7 @@ usos_pipeline_steps() {
     case "$1" in
         nt5-staging|xp-x86-sp3-uefi-csm) printf '100' ;;
         nt5-resume) printf '150' ;;
+        vista-uefi-disk) printf '600' ;;
         windows-pe-bios-iso) printf '500 200' ;;
         iso-work-chainload|wim-wimboot|vhd-vhdboot) printf '200' ;;
         *) return 1 ;;
@@ -62,6 +64,7 @@ usos_pipeline_step_name() {
         150) printf 'nt5_resume' ;;
         200) printf 'work_prepare' ;;
         500) printf 'windows_pe_bios_request' ;;
+        600) printf 'vista_disk_prepare' ;;
         *) return 1 ;;
     esac
 }

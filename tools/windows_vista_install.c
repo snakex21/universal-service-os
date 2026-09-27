@@ -188,6 +188,49 @@ static int choose_pinned_esp(const BootProfile *profile,const Esp *previous,DWOR
  DWORD initial=0;for(DWORD j=0;j<previous_count;j++)if(profile_matches(profile,&previous[j]))initial++;
  return matches==1&&initial<=1?only:-1;
 }
+/* EFI\USOS\vista-target.ini on the USOS ESP, written by the micro-Linux disk
+ * preparation (tools/vista_disk_prepare.sh): pin that disk and its fresh ESP
+ * like the hardware boot profile. The USOS ESP is found through
+ * usos-log-root.txt (\\?\GLOBALROOT\Device\HarddiskN\PartitionM\EFI\USOS\Logs\...). */
+static WCHAR prepared_record[MAX_PATH];
+static BOOL parse_guid(const char *t,GUID *g){
+ static const int at[16]={0,2,4,6,9,11,14,16,19,21,24,26,28,30,32,34};BYTE b[16];
+ for(int i=0;i<36;i++)if((i==8||i==13||i==18||i==23)?t[i]!='-':!((t[i]>='0'&&t[i]<='9')||(t[i]>='a'&&t[i]<='f')||(t[i]>='A'&&t[i]<='F')))return FALSE;
+ for(int i=0;i<16;i++){BYTE v=0;for(int k=0;k<2;k++){char c=t[at[i]+k];v=(BYTE)(v*16+(c<='9'?c-'0':(c|32)-'a'+10));}b[i]=v;}
+ g->Data1=((DWORD)b[0]<<24)|((DWORD)b[1]<<16)|((DWORD)b[2]<<8)|b[3];g->Data2=(WORD)((b[4]<<8)|b[5]);g->Data3=(WORD)((b[6]<<8)|b[7]);
+ for(int i=0;i<8;i++)g->Data4[i]=b[8+i];return TRUE;
+}
+static const char *ini_value(const char *text,const char *key){
+ unsigned n=lstrlenA(key);
+ for(const char *line=text;*line;){
+  if(same(line,key,n)&&line[n]=='=')return line+n+1;
+  while(*line&&*line!='\n')line++;if(*line)line++;
+ }return 0;
+}
+static BOOL load_prepared_disk(void){
+ static char root[MAX_PATH],text[1024];WCHAR file[MAX_PATH];DWORD got=0;
+ path(file,base,L"usos-log-root.txt");HANDLE h=CreateFileW(file,GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,0,OPEN_EXISTING,0,0);
+ if(h==INVALID_HANDLE_VALUE)return FALSE;BOOL ok=ReadFile(h,root,MAX_PATH-1,&got,0);CloseHandle(h);if(!ok)return FALSE;root[got]=0;
+ char *cut=0;for(char *p=root;*p;p++)if(same(p,"\\EFI\\USOS\\Logs\\",15)){cut=p;break;}
+ if(!cut||cut-root>MAX_PATH-40)return FALSE;*cut=0;
+ unsigned n=0;for(char *p=root;*p;p++)prepared_record[n++]=(WCHAR)(BYTE)*p;prepared_record[n]=0;lstrcatW(prepared_record,L"\\EFI\\USOS\\vista-target.ini");
+ h=CreateFileW(prepared_record,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);if(h==INVALID_HANDLE_VALUE){prepared_record[0]=0;return FALSE;}
+ ok=ReadFile(h,text,sizeof(text)-1,&got,0);CloseHandle(h);if(!ok)return FALSE;text[got]=0;
+ const char *state=ini_value(text,"state"),*disk=ini_value(text,"disk_guid"),*esp=ini_value(text,"esp_partuuid"),*size=ini_value(text,"disk_size");
+ if(!state||!same(state,"prepared",8)||!disk||!esp||!size){logcode("Prepared-disk record present but not in state=prepared; ignored=",ERROR_INVALID_DATA);return FALSE;}
+ BootProfile p={0};ULONGLONG bytes=0;
+ for(const char *s=size;*s>='0'&&*s<='9';s++)bytes=bytes*10+(ULONGLONG)(*s-'0');
+ if(!parse_guid(disk,&p.disk_id)||!parse_guid(esp,&p.esp_id)||!bytes){logcode("Prepared-disk record unreadable=",ERROR_INVALID_DATA);return FALSE;}
+ memcpy(p.magic,"VESP0001",8);p.disk_size=bytes;boot_profile=p;pinned_esp=TRUE;
+ logcode("USOS prepared the target disk (micro-Linux): fresh ESP pinned; disk size MiB=",(DWORD)(bytes>>20));
+ return TRUE;
+}
+/* Rename the record so the next Vista start prepares a disk again. */
+static void retire_prepared_disk(const WCHAR *suffix){
+ if(!prepared_record[0])return;WCHAR to[MAX_PATH];lstrcpyW(to,prepared_record);lstrcatW(to,suffix);
+ logcode("Prepared-disk record retired=",MoveFileExW(prepared_record,to,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)?0:GetLastError());
+ prepared_record[0]=0;
+}
 static BOOL load_boot_profile(void){
  BYTE hash[32];unsigned files=0;
  for(;vista_boot_files[files].name;files++){
@@ -424,6 +467,7 @@ static DWORD run_setup(const WCHAR *executable,WCHAR *line){
  if(!store_ready)logcode("No unique internal ESP yet; Setup starts and the ESP is selected when it appears=",store_error?store_error:ERROR_NOT_FOUND);
  if(pinned_esp&&profile_disk_count!=1){
   logcode("Setup not started: the boot profile disk was not found exactly once=",ERROR_NOT_READY);
+  retire_prepared_disk(L".stale");
   MessageBoxW(0,USOS_UI_TEXT(VISTA_ESP_FAILED),USOS_UI_TEXT(VISTA_ESP_TITLE),MB_OK|MB_ICONERROR);
   release_store_alias();return ERROR_NOT_READY;
  }
@@ -631,7 +675,7 @@ void entry(void){
  if(!real_version||real_version(&version)!=0||version.dwMajorVersion!=10||version.dwBuildNumber<10240||version.dwBuildNumber>=22000||!GetFirmwareType(&firmware)||firmware!=FirmwareTypeUefi)ExitProcess(2);
  DWORD n=GetModuleFileNameW(0,base,MAX_PATH);if(!n||n>=MAX_PATH-64)ExitProcess(2);while(n&&base[n-1]!=L'\\')n--;base[n]=0;
  path(scratch,base,L"usos-vista-install.log");log_file=CreateFileW(scratch,GENERIC_WRITE,FILE_SHARE_READ,0,CREATE_ALWAYS,FILE_FLAG_WRITE_THROUGH,0);
- logcode("Vista USB installer v10 / no pre-Setup ESP gate / formatted ESP preferred / Vista bcdedit from the ISO boot.wim / ESP hints without volume access / known firstboot v11=",0);
+ logcode("Vista USB installer v11 / USOS-prepared disk / no pre-Setup ESP gate / formatted ESP preferred / Vista bcdedit from the ISO boot.wim / ESP hints without volume access / known firstboot v11=",0);
  logcode("Firmware type (2 = UEFI)=",firmware);
  WCHAR source[MAX_PATH];n=GetEnvironmentVariableW(L"USOS_SOURCE",source,MAX_PATH);
  if(n!=2||source[1]!=L':'||source[0]<L'C'||source[0]>L'Z')ExitProcess(2);
@@ -641,6 +685,7 @@ void entry(void){
   path(scratch,base,vista_files[i].source);if(!hash_file(scratch,hash)||!same(hash,vista_files[i].sha256,32)){logcode("Preflight payload hash failed at file=",i);ExitProcess(3);}
  }
  if(!privilege(L"SeBackupPrivilege")||!privilege(L"SeRestorePrivilege")||!load_boot_profile()||!inventory(before,&before_count))ExitProcess(4);
+ if(!pinned_esp)load_prepared_disk();
  if(!load_vista_bcdedit(source)){
   logcode("Setup not started: Vista's own bcdedit could not be taken from the ISO boot.wim=",ERROR_FILE_NOT_FOUND);
   MessageBoxW(0,USOS_UI_TEXT(VISTA_ESP_FAILED),USOS_UI_TEXT(VISTA_ESP_TITLE),MB_OK|MB_ICONERROR);
@@ -672,6 +717,7 @@ void entry(void){
  if(!configure_boot(target)){logcode("Target BCD preparation failed=",GetLastError());ExitProcess(7);}
  if(!arm_target(target)){logcode("Arm pre-Setup USB failed=",GetLastError());ExitProcess(8);}
  logcode("Vista target ready for first boot with USB v11=",0);
+ retire_prepared_disk(L".done");
  CloseHandle(log_file);path(scratch,base,L"usos-vista-install.log");WCHAR target_log[MAX_PATH];path(target_log,target->root,L"USOS\\Vista\\installation-from-usb.log");
  if(!CopyFileW(scratch,target_log,FALSE))ExitProcess(9);
  ExitProcess(0);

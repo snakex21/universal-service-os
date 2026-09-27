@@ -132,3 +132,44 @@ user reached the disk page.
   boot-configuration failure on p2's Windows-10-made BCD (above);
   (b) blank disk: Setup starts, refuses "cannot verify a valid system volume"
   on Next (unchanged QEMU behaviour, no ESP to hint).
+
+## v11 (2026-09-27): USOS prepares the disk (default for Vista on UEFI)
+
+User decision: reuse the XP target-disk mechanism.
+
+* **Menu:** Vista, UEFI, method Automatic, and no pending record: the UEFI
+  menu starts the base micro-Linux (`src/platform/uefi/vista_preparation.zig`,
+  `usos.legacy_action=vista-disk`, pipeline profile `vista-uefi-disk`, step
+  600).
+* **micro-Linux** (`tools/vista_disk_prepare.sh`): the XP disk picker
+  (`usos_xp_choose_disk`) and confirmation (`usos_xp_confirm`, Cancel
+  preselected), same wording ("{0} - SELECT DISK", "{0} - CONFIRM
+  INSTALLATION", "All partitions ... will be erased."); the USOS stick and
+  read-only disks are never offered. Then: first and last MiB zeroed, a new
+  GPT with ESP 300 MiB (FAT32) + MSR 128 MiB (what Vista/7 Setup creates on
+  GPT), the rest unallocated; read back (2 partitions, FAT32 boot sector),
+  flushed; `EFI\USOS\vista-target.ini` (disk GUID, ESP PARTUUID, size)
+  written, then a restart into USOS. Six new `lx` strings, 27 locales.
+* **Second Vista start:** the record exists, so WinPE starts directly; the
+  installer (v11) reads the record through `usos-log-root.txt`, pins that disk
+  and ESP (the boot-profile logic), points both hints at the ESP and renames
+  the record `.done` after the finalizer (`.stale` if the disk is not found).
+* **No fresh BCD is created** before Setup (deviation from the request): the
+  empty FAT32 ESP lets Setup create the store with its own library (the QEMU
+  run below, and the 2026-09-26 e2e); a store created by Vista's own
+  `bcdedit /createstore` under PE10 failed the same way as the Windows-10-made
+  one in QEMU (1006).
+* The explicit **ISO** method skips the preparation (v10 behaviour).
+
+QEMU WHPX:
+- (a) blank disk: picker, confirmation, GPT, record, then Setup on the
+  unallocated space (no "partition order" question), **Setup returned 0**,
+  finalizer: Vista export/bootmgr check PASS, dispatcher installed, record
+  retired. The final WinPE reboot stalled under WHPX (seen before), so the
+  first boot was not run.
+- (b) X470-like disk (Windows 7 ESP + raw ESP + C:): the preparation replaced
+  it with ESP + MSR (read back), Setup started on the unallocated space and
+  expanded files, then the VM froze at 60 % (WHPX stall); not completed.
+- The micro-Linux restart after "Disk prepared" hung in the first build
+  (unmounting DATA); now sync + `reboot -f` + sysrq fallback, no unmount
+  (in the committed build, not yet re-run).

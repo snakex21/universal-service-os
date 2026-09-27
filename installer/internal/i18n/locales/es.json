@@ -1010,5 +1010,12 @@
   "boot.theme_edit.element.success": "Correcto, pad A",
   "boot.theme_edit.element.success_soft": "Relleno de la insignia de éxito",
   "boot.theme_edit.element.pad_x": "Pad X",
-  "boot.theme_edit.element.on_pad": "Letras de los botones del pad"
+  "boot.theme_edit.element.on_pad": "Letras de los botones del pad",
+
+  "boot.lx.usos_creates_an_efi_partition_vista": "USOS crea una partición EFI y deja libre el resto. En la instalación de Vista, seleccione el espacio sin asignar.",
+  "boot.lx.erase_this_disk_and_prepare_windows_vista": "Borrar este disco y preparar Windows Vista",
+  "boot.lx.preparing_the_disk": "Preparando el disco",
+  "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Borrando la tabla de particiones y creando la partición EFI.",
+  "boot.lx.disk_prepared": "Disco preparado",
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Reiniciando en USOS: vuelva a elegir Windows Vista para iniciar la instalación."
 }

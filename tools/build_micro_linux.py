@@ -458,6 +458,8 @@ def main() -> int:
             ("tools/pipeline/steps/100_nt5_staging.sh", "usr/lib/usos/pipeline/steps/100_nt5_staging.sh"),
             ("tools/pipeline/steps/150_nt5_resume.sh", "usr/lib/usos/pipeline/steps/150_nt5_resume.sh"),
             ("tools/pipeline/steps/500_windows_pe_bios_request.sh", "usr/lib/usos/pipeline/steps/500_windows_pe_bios_request.sh"),
+            ("tools/pipeline/steps/600_vista_disk_prepare.sh", "usr/lib/usos/pipeline/steps/600_vista_disk_prepare.sh"),
+            ("tools/vista_disk_prepare.sh", "usr/lib/usos/vista_disk_prepare.sh"),
             ("tools/micro_linux_init.sh", "usos-init"),
         ):
             payload = (root / source_name).read_bytes().replace(b"\r\n", b"\n")

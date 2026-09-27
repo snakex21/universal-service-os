@@ -1010,5 +1010,12 @@
   "boot.theme_edit.element.success": "Başarılı, pad A",
   "boot.theme_edit.element.success_soft": "Başarı rozeti dolgusu",
   "boot.theme_edit.element.pad_x": "Pad X",
-  "boot.theme_edit.element.on_pad": "Pad düğmelerindeki harfler"
+  "boot.theme_edit.element.on_pad": "Pad düğmelerindeki harfler",
+
+  "boot.lx.usos_creates_an_efi_partition_vista": "USOS bir EFI bölümü oluşturur ve kalanını boş bırakır. Vista kurulumunda ayrılmamış alanı seçin.",
+  "boot.lx.erase_this_disk_and_prepare_windows_vista": "Bu diski sil ve Windows Vista'yı hazırla",
+  "boot.lx.preparing_the_disk": "Disk hazırlanıyor",
+  "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Bölüm tablosu siliniyor ve EFI bölümü oluşturuluyor.",
+  "boot.lx.disk_prepared": "Disk hazırlandı",
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "USOS'a yeniden başlatılıyor: kurulumu başlatmak için Windows Vista'yı yeniden seçin."
 }

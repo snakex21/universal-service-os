@@ -148,7 +148,9 @@ class Pipeline(unittest.TestCase):
         defined = {row[1]: row for row in golden_rows('profile_def')}
         steps_block = text[text.index('usos_pipeline_steps() {'):text.index('usos_pipeline_step_name() {')]
         shell_profiles = set(re.findall(r'[a-z0-9]+(?:-[a-z0-9]+)+', steps_block))
-        self.assertEqual(shell_profiles - set(defined), {'nt5-resume'})
+        # Not menu profiles: the Core's XP resume and the Vista UEFI disk
+        # preparation that runs before the vista wimboot profile.
+        self.assertEqual(shell_profiles - set(defined), {'nt5-resume', 'vista-uefi-disk'})
         # Every micro-Linux WORK profile is in the step table, with the method
         # the menu persists for it (backend method from the route rows).
         work = {pid for pid, row in defined.items() if row[3] == 'micro_linux'}

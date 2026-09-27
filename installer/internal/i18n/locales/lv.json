@@ -1013,5 +1013,12 @@
   "boot.theme_edit.element.success": "Veiksmīgi, pad A",
   "boot.theme_edit.element.success_soft": "Veiksmes zīmes aizpildījums",
   "boot.theme_edit.element.pad_x": "Pad X",
-  "boot.theme_edit.element.on_pad": "Burti uz pad pogām"
+  "boot.theme_edit.element.on_pad": "Burti uz pad pogām",
+
+  "boot.lx.usos_creates_an_efi_partition_vista": "USOS izveido EFI nodalījumu un pārējo atstāj brīvu. Vista instalēšanā atlasiet nepiešķirto vietu.",
+  "boot.lx.erase_this_disk_and_prepare_windows_vista": "Dzēst šo disku un sagatavot Windows Vista",
+  "boot.lx.preparing_the_disk": "Sagatavo disku",
+  "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Dzēš nodalījumu tabulu un izveido EFI nodalījumu.",
+  "boot.lx.disk_prepared": "Disks sagatavots",
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Restartē USOS: vēlreiz izvēlieties Windows Vista, lai sāktu instalēšanu."
 }

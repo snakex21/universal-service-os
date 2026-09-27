@@ -1013,5 +1013,12 @@
   "boot.theme_edit.element.success": "Sukces, pad A",
   "boot.theme_edit.element.success_soft": "Tło plakietki sukcesu",
   "boot.theme_edit.element.pad_x": "Pad X",
-  "boot.theme_edit.element.on_pad": "Litery na przyciskach pada"
+  "boot.theme_edit.element.on_pad": "Litery na przyciskach pada",
+
+  "boot.lx.usos_creates_an_efi_partition_vista": "USOS utworzy partycję EFI, a resztę pozostawi wolną. W instalatorze Visty wybierz nieprzydzielone miejsce.",
+  "boot.lx.erase_this_disk_and_prepare_windows_vista": "Wyczyść ten dysk i przygotuj Windows Vista",
+  "boot.lx.preparing_the_disk": "Przygotowywanie dysku",
+  "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Usuwanie tablicy partycji i tworzenie partycji EFI.",
+  "boot.lx.disk_prepared": "Dysk przygotowany",
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Ponowne uruchamianie USOS: wybierz ponownie Windows Vista, aby rozpocząć instalację."
 }

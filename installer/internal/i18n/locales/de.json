@@ -1010,5 +1010,12 @@
   "boot.theme_edit.element.success": "Erfolg, Pad A",
   "boot.theme_edit.element.success_soft": "Füllung Erfolgs-Badge",
   "boot.theme_edit.element.pad_x": "Pad X",
-  "boot.theme_edit.element.on_pad": "Buchstaben auf Pad-Tasten"
+  "boot.theme_edit.element.on_pad": "Buchstaben auf Pad-Tasten",
+
+  "boot.lx.usos_creates_an_efi_partition_vista": "USOS legt eine EFI-Partition an und lässt den Rest frei. Wählen Sie im Vista-Setup den nicht zugewiesenen Speicherplatz.",
+  "boot.lx.erase_this_disk_and_prepare_windows_vista": "Diesen Datenträger löschen und Windows Vista vorbereiten",
+  "boot.lx.preparing_the_disk": "Datenträger wird vorbereitet",
+  "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Partitionstabelle wird gelöscht und die EFI-Partition angelegt.",
+  "boot.lx.disk_prepared": "Datenträger vorbereitet",
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Neustart in USOS: Wählen Sie erneut Windows Vista, um das Setup zu starten."
 }

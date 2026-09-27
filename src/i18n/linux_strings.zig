@@ -40,12 +40,15 @@ pub const hashes = [_]u32{
     0x1a755ab8, // lx.detecting_disks_no_installation_changes_have_sta
     0x0366a7d5, // lx.detecting_usos_partitions
     0x6d3ee2fe, // lx.device_guard_runs_before_the_first_destructive_o
+    0x42f61b3c, // lx.disk_prepared
     0x94ae85fb, // lx.disk_x
     0xf0f119eb, // lx.disks_smart
     0xb68b6f2a, // lx.disks_smart_2
     0xd50e6346, // lx.enumerating_disks_and_validating_the_selected_x
     0x6ef0db1f, // lx.erase_all_data_and_prepare_a_new_x_installation
     0x93990299, // lx.erase_all_data_on_this_disk
+    0xef735e24, // lx.erase_this_disk_and_prepare_windows_vista
+    0xb0ce6065, // lx.erasing_the_partition_table_and_creating_the_efi
     0xf33b0401, // lx.file_count_total_size_and_prepared_state_verifie
     0x4c372cd1, // lx.file_detection_does_not_verify_whether_a_system
     0xa07d7bcd, // lx.finalization_complete
@@ -91,6 +94,7 @@ pub const hashes = [_]u32{
     0xa46d636e, // lx.preparation_environment_started
     0xfc3ef41c, // lx.preparation_stopped
     0x27c6a2d4, // lx.prepare_windows_xp_installation
+    0x599c1fb1, // lx.preparing_the_disk
     0x702336a3, // lx.preparing_the_windows_partition_and_installation
     0xa3706ee2, // lx.preparing_uefi_startup_and_usb_drivers
     0xade2b7b3, // lx.preparing_windows_7
@@ -110,6 +114,7 @@ pub const hashes = [_]u32{
     0xa68b2644, // lx.remove_usos_usb_then_press_enter_to_power_off
     0xd41bf4b1, // lx.resolving_esp_data_and_work_by_partuuid
     0x453d5268, // lx.restart_the_computer
+    0x20b776e5, // lx.restarting_into_usos_choose_windows_vista_again
     0xb3a94cf0, // lx.restarting_to_windows_setup
     0x3de62306, // lx.return_to_disk_selection
     0xab419094, // lx.return_to_hardware_smart
@@ -140,6 +145,7 @@ pub const hashes = [_]u32{
     0xb35dc805, // lx.the_wim_boot_environment_will_be_assembled_next
     0x74abccc9, // lx.unknown_interface
     0x41cf0383, // lx.used_free_space_in_file_systems_unknown
+    0xc59b65ff, // lx.usos_creates_an_efi_partition_vista
     0xd5c6bc90, // lx.validating_free_space_mbr_state_and_the_xpsetup
     0xbc5ee284, // lx.validating_preparation_request
     0x8fd5d3aa, // lx.verified_boot_wim_bcd_boot_sdi_and_efi_boot_mana
@@ -207,12 +213,15 @@ pub const english = [_][]const u8{
     "Detecting disks. No installation changes have started.",
     "Detecting USOS partitions",
     "device_guard runs before the first destructive operation.",
+    "Disk prepared",
     "Disk: {0}",
     "DISKS & SMART",
     "Disks & SMART",
     "Enumerating disks and validating the selected {0} target.",
     "Erase all data and prepare a new {0} installation",
     "ERASE ALL DATA ON THIS DISK",
+    "Erase this disk and prepare Windows Vista",
+    "Erasing the partition table and creating the EFI partition.",
     "File count, total size and prepared state verified.",
     "File detection does not verify whether a system works.",
     "Finalization complete",
@@ -258,6 +267,7 @@ pub const english = [_][]const u8{
     "Preparation environment started",
     "Preparation stopped",
     "Prepare Windows XP installation",
+    "Preparing the disk",
     "Preparing the Windows partition and installation files.",
     "Preparing UEFI startup and USB drivers.",
     "Preparing Windows 7",
@@ -277,6 +287,7 @@ pub const english = [_][]const u8{
     "REMOVE USOS USB, THEN PRESS ENTER TO POWER OFF.",
     "Resolving ESP, DATA and WORK by PARTUUID.",
     "Restart the computer",
+    "Restarting into USOS: choose Windows Vista again to start Setup.",
     "RESTARTING TO WINDOWS SETUP",
     "Return to disk selection",
     "Return to Hardware & SMART",
@@ -307,6 +318,7 @@ pub const english = [_][]const u8{
     "The WIM boot environment will be assembled next.",
     "Unknown interface",
     "Used/free space in file systems: unknown.",
+    "USOS creates an EFI partition and leaves the rest free. In Vista Setup select the unallocated space.",
     "Validating free space, MBR state and the XPSETUP reservation.",
     "Validating preparation request",
     "Verified boot.wim, BCD, boot.sdi and EFI boot manager.",

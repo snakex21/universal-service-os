@@ -1013,5 +1013,12 @@
   "boot.theme_edit.element.success": "Успіх, кнопка A",
   "boot.theme_edit.element.success_soft": "Заливка значка успіху",
   "boot.theme_edit.element.pad_x": "Кнопка X",
-  "boot.theme_edit.element.on_pad": "Літери на кнопках геймпада"
+  "boot.theme_edit.element.on_pad": "Літери на кнопках геймпада",
+
+  "boot.lx.usos_creates_an_efi_partition_vista": "USOS створює розділ EFI, а решту залишає вільною. В інсталяції Vista виберіть нерозподілений простір.",
+  "boot.lx.erase_this_disk_and_prepare_windows_vista": "Стерти цей диск і підготувати Windows Vista",
+  "boot.lx.preparing_the_disk": "Підготовка диска",
+  "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Видалення таблиці розділів і створення розділу EFI.",
+  "boot.lx.disk_prepared": "Диск підготовлено",
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Перезапуск у USOS: знову виберіть Windows Vista, щоб розпочати інсталяцію."
 }

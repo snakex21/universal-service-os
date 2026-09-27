@@ -1010,5 +1010,12 @@
   "boot.theme_edit.element.success": "Onnistuminen, pad A",
   "boot.theme_edit.element.success_soft": "Onnistumismerkin täyttö",
   "boot.theme_edit.element.pad_x": "Pad X",
-  "boot.theme_edit.element.on_pad": "Kirjaimet pad-painikkeissa"
+  "boot.theme_edit.element.on_pad": "Kirjaimet pad-painikkeissa",
+
+  "boot.lx.usos_creates_an_efi_partition_vista": "USOS luo EFI-osion ja jättää loput vapaaksi. Valitse Vistan asennuksessa varaamaton tila.",
+  "boot.lx.erase_this_disk_and_prepare_windows_vista": "Tyhjennä tämä levy ja valmistele Windows Vista",
+  "boot.lx.preparing_the_disk": "Valmistellaan levyä",
+  "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Poistetaan osiotaulukko ja luodaan EFI-osio.",
+  "boot.lx.disk_prepared": "Levy valmisteltu",
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Käynnistetään uudelleen USOSiin: valitse Windows Vista uudelleen asennuksen aloittamiseksi."
 }

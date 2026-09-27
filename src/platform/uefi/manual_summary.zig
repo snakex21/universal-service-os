@@ -276,6 +276,17 @@ fn start(
     const native = usos.catalog.os_profiles.traits(system.id).native_uefi;
     const vista = native == .vista;
     if (image.kind == .iso and native.legacyPe() and resolved == .direct_iso) {
+        // Vista on UEFI, Automatic: USOS prepares the target disk first (XP
+        // disk picker in micro-Linux, fresh GPT with ESP + MSR). The explicit
+        // ISO method skips it (installer v10 ESP selection as the fallback).
+        if (vista and method == .automatic and !@import("vista_preparation.zig").prepared(root)) {
+            view.handover(view.t(.splash_starting));
+            @import("vista_preparation.zig").start(root) catch |err| {
+                view.refreshFramebuffer();
+                showError(view.t(.error_preparation), err);
+            };
+            return;
+        }
         view.windowsIsoStatus(.validating, "Reading the selected Windows ISO");
         const rendered = renderForWimboot(profile, system, os_profile_id) catch |err| return showError(view.t(.error_iso), err);
         windows_native_iso.start(root, windows_native_iso.legacyFolder(system), image.name.slice(), unattended, rendered, vista, usos.catalog.os_profiles.traits(system.id).int10_dispatcher, view.windowsIsoStatus) catch |err| {
