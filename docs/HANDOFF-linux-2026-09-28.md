@@ -48,6 +48,10 @@ Serial: `usos-init: iso: 720371712 bytes in 1 extent(s)`, `iso found on
 /dev/sda`, `iso attached: /dev/usos-iso -> /dev/loop0`; live-boot then took
 `live-media=/dev/usos-iso`, mounted the squashfs and systemd started from the
 live root (screenshot `tools/tests/artifacts/linux-iso/gparted/bios-04.png`).
+Ubuntu Server 24.04.5 (`run_linux_iso_direct.py ubuntu-server`): **PASS to the
+installer** — casper took `live-media=/dev/usos-iso`, the subiquity snap
+mounted and the language screen came up (`.../ubuntu-server/bios-05.png`;
+the kernel line over it is the test's `ignore_loglevel`).
 GParted's own keymap/language prompt (console) was not answered, so the
 GParted UI itself is not shown yet. All ten ISOs on the test VHD are one
 extent each (fresh NTFS), so the dm path is not exercised yet (make a
