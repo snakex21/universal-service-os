@@ -1048,5 +1048,10 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (experimentálne): chýba ovládač AHCI/NVMe/USB 3 pre NT 5.0 (SATA v režime IDE), max. 4 GB RAM a 2 procesory",
 
-  "boot.summary.nt52_limits": "NT 5.2 (experimentálne): AHCI cez GenAHCI na StorPorte systému; bez ovládača NVMe/USB 3 v inštalácii"
+  "boot.summary.nt52_limits": "NT 5.2 (experimentálne): AHCI cez GenAHCI na StorPorte systému; bez ovládača NVMe/USB 3 v inštalácii",
+
+  "boot.lx.format_the_entire_disk_q": "NAFORMÁTOVAŤ CELÝ DISK?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Vymazať VŠETKY oddiely a údaje na vybranom disku",
+  "boot.lx.x_confirmation": "{0} - POTVRDENIE",
+  "boot.lx.prepare_x_installation": "Pripraviť inštaláciu {0}"
 }

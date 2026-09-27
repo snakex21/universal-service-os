@@ -1045,5 +1045,10 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (kokeellinen): ei AHCI/NVMe/USB 3 -ajuria NT 5.0:lle (SATA IDE-tilassa), enintään 4 Gt RAM ja 2 suoritinta",
 
-  "boot.summary.nt52_limits": "NT 5.2 (kokeellinen): AHCI GenAHCI:n kautta järjestelmän StorPortilla; asennuksessa ei NVMe/USB 3 -ajuria"
+  "boot.summary.nt52_limits": "NT 5.2 (kokeellinen): AHCI GenAHCI:n kautta järjestelmän StorPortilla; asennuksessa ei NVMe/USB 3 -ajuria",
+
+  "boot.lx.format_the_entire_disk_q": "ALUSTETAANKO KOKO LEVY?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Poista KAIKKI osiot ja tiedot valitulta levyltä",
+  "boot.lx.x_confirmation": "{0} - VAHVISTUS",
+  "boot.lx.prepare_x_installation": "Valmistele {0} -asennus"
 }

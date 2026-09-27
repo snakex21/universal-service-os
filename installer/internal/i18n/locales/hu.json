@@ -1045,5 +1045,10 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (kísérleti): nincs AHCI/NVMe/USB 3 illesztőprogram NT 5.0-hoz (SATA IDE módban), legfeljebb 4 GB RAM és 2 processzor",
 
-  "boot.summary.nt52_limits": "NT 5.2 (kísérleti): AHCI a GenAHCI-val a rendszer StorPortján; a telepítőben nincs NVMe/USB 3 illesztőprogram"
+  "boot.summary.nt52_limits": "NT 5.2 (kísérleti): AHCI a GenAHCI-val a rendszer StorPortján; a telepítőben nincs NVMe/USB 3 illesztőprogram",
+
+  "boot.lx.format_the_entire_disk_q": "A TELJES LEMEZ FORMÁZÁSA?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "A kiválasztott lemez ÖSSZES partíciójának és adatának törlése",
+  "boot.lx.x_confirmation": "{0} - MEGERŐSÍTÉS",
+  "boot.lx.prepare_x_installation": "A(z) {0} telepítésének előkészítése"
 }

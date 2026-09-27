@@ -1045,5 +1045,10 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (πειραματικό): χωρίς πρόγραμμα οδήγησης AHCI/NVMe/USB 3 για NT 5.0 (SATA σε λειτουργία IDE), έως 4 GB RAM και 2 CPU",
 
-  "boot.summary.nt52_limits": "NT 5.2 (πειραματικό): AHCI μέσω GenAHCI στο StorPort του συστήματος· χωρίς πρόγραμμα οδήγησης NVMe/USB 3 στην εγκατάσταση"
+  "boot.summary.nt52_limits": "NT 5.2 (πειραματικό): AHCI μέσω GenAHCI στο StorPort του συστήματος· χωρίς πρόγραμμα οδήγησης NVMe/USB 3 στην εγκατάσταση",
+
+  "boot.lx.format_the_entire_disk_q": "ΜΟΡΦΟΠΟΙΗΣΗ ΟΛΟΚΛΗΡΟΥ ΤΟΥ ΔΙΣΚΟΥ;",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Διαγραφή ΟΛΩΝ των διαμερισμάτων και δεδομένων του επιλεγμένου δίσκου",
+  "boot.lx.x_confirmation": "{0} - ΕΠΙΒΕΒΑΙΩΣΗ",
+  "boot.lx.prepare_x_installation": "Προετοιμασία εγκατάστασης {0}"
 }

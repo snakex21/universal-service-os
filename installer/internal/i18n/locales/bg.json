@@ -1045,5 +1045,10 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (експериментално): няма драйвер AHCI/NVMe/USB 3 за NT 5.0 (SATA в режим IDE), макс. 4 GB RAM и 2 процесора",
 
-  "boot.summary.nt52_limits": "NT 5.2 (експериментално): AHCI чрез GenAHCI върху StorPort на системата; няма драйвер NVMe/USB 3 в инсталацията"
+  "boot.summary.nt52_limits": "NT 5.2 (експериментално): AHCI чрез GenAHCI върху StorPort на системата; няма драйвер NVMe/USB 3 в инсталацията",
+
+  "boot.lx.format_the_entire_disk_q": "ДА СЕ ФОРМАТИРА ЛИ ЦЕЛИЯТ ДИСК?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Изтриване на ВСИЧКИ дялове и данни от избрания диск",
+  "boot.lx.x_confirmation": "{0} - ПОТВЪРЖДЕНИЕ",
+  "boot.lx.prepare_x_installation": "Подготовка на инсталацията на {0}"
 }

@@ -1048,5 +1048,10 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperymentalne): brak sterownika AHCI/NVMe/USB 3 dla NT 5.0 (SATA w trybie IDE), maks. 4 GB RAM i 2 procesory",
 
-  "boot.summary.nt52_limits": "NT 5.2 (eksperymentalne): AHCI przez GenAHCI na StorPort systemu; brak sterownika NVMe/USB 3 w instalatorze"
+  "boot.summary.nt52_limits": "NT 5.2 (eksperymentalne): AHCI przez GenAHCI na StorPort systemu; brak sterownika NVMe/USB 3 w instalatorze",
+
+  "boot.lx.format_the_entire_disk_q": "SFORMATOWAĆ CAŁY DYSK?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Usuń WSZYSTKIE partycje i dane z wybranego dysku",
+  "boot.lx.x_confirmation": "{0} - POTWIERDZENIE",
+  "boot.lx.prepare_x_installation": "Przygotuj instalację {0}"
 }

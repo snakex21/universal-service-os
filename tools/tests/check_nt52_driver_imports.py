@@ -18,7 +18,7 @@ from xp_driver_overlay import DRIVERS  # noqa: E402
 SEVEN = 'C:/Program Files/7-Zip/7z.exe'
 # The USB3 backport and KMDF, as the NT 5.2 overlay ships them (the system's
 # own StorPort and ACPI are kept; GenAHCI rides on the system StorPort).
-NT52_SELECTED = ['Dependencies/ntoskrn8.sys', 'KMDF/wdf01000.sys', 'KMDF/wdfldr.sys', 'SATA/genahci.sys',
+NT52_SELECTED = ['ACPI/acpi.sys', 'Dependencies/ntoskrn8.sys', 'KMDF/wdf01000.sys', 'KMDF/wdfldr.sys', 'SATA/genahci.sys',
                  *['USB3/' + n for n in ('ksecd8.sys', 'ucx01000.sys', 'usbd8.sys', 'usbhub3.sys', 'usbxhci.sys', 'wpprecor.sys')]]
 INBOX = {'ntoskrnl.exe': 'NTKRNLMP.EX_', 'hal.dll': 'HALMACPI.DL_', 'wmilib.sys': 'WMILIB.SY_',
          'storport.sys': 'STORPORT.SY_', 'usbd.sys': 'USBD.SY_', 'usbport.sys': 'USBPORT.SY_',

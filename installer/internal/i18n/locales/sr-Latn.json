@@ -1048,5 +1048,10 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentalno): nema drajvera AHCI/NVMe/USB 3 za NT 5.0 (SATA u IDE režimu), najviše 4 GB RAM-a i 2 procesora",
 
-  "boot.summary.nt52_limits": "NT 5.2 (eksperimentalno): AHCI preko GenAHCI na StorPortu sistema; nema drajvera NVMe/USB 3 u instalaciji"
+  "boot.summary.nt52_limits": "NT 5.2 (eksperimentalno): AHCI preko GenAHCI na StorPortu sistema; nema drajvera NVMe/USB 3 u instalaciji",
+
+  "boot.lx.format_the_entire_disk_q": "FORMATIRATI CEO DISK?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Obriši SVE particije i podatke na izabranom disku",
+  "boot.lx.x_confirmation": "{0} - POTVRDA",
+  "boot.lx.prepare_x_installation": "Pripremi instalaciju {0}"
 }

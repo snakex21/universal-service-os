@@ -42,7 +42,8 @@ usos_xp_driver_apply() (
         name=${src##*/}
         for folder in "$ls" "$bt"; do
             # SP3.CAB is the installed system's source cache, not a boot file.
-            [ "$folder" != "$bt" ] || [ "$name" != SP3.CAB ] || continue
+            # (SP2.CAB for Server 2003.)
+            case "$folder:$name" in "$bt":SP3.CAB|"$bt":SP2.CAB) continue ;; esac
             find "$folder" -maxdepth 1 -type f -iname "$name" -exec rm -f '{}' \;
             cp "$src" "$folder/$name"
             cmp -s "$src" "$folder/$name"

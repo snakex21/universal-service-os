@@ -1048,5 +1048,10 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentalno): nema upravljačkog programa AHCI/NVMe/USB 3 za NT 5.0 (SATA u IDE načinu), najviše 4 GB RAM-a i 2 procesora",
 
-  "boot.summary.nt52_limits": "NT 5.2 (eksperimentalno): AHCI putem GenAHCI na StorPortu sustava; nema upravljačkog programa NVMe/USB 3 u instalaciji"
+  "boot.summary.nt52_limits": "NT 5.2 (eksperimentalno): AHCI putem GenAHCI na StorPortu sustava; nema upravljačkog programa NVMe/USB 3 u instalaciji",
+
+  "boot.lx.format_the_entire_disk_q": "FORMATIRATI CIJELI DISK?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Izbriši SVE particije i podatke s odabranog diska",
+  "boot.lx.x_confirmation": "{0} - POTVRDA",
+  "boot.lx.prepare_x_installation": "Pripremi instalaciju {0}"
 }

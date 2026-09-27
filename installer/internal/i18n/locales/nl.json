@@ -1045,5 +1045,10 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (experimenteel): geen AHCI/NVMe/USB 3-stuurprogramma voor NT 5.0 (SATA in IDE-modus), max. 4 GB RAM en 2 CPU's",
 
-  "boot.summary.nt52_limits": "NT 5.2 (experimenteel): AHCI via GenAHCI op de StorPort van het systeem; geen NVMe/USB 3-stuurprogramma in Setup"
+  "boot.summary.nt52_limits": "NT 5.2 (experimenteel): AHCI via GenAHCI op de StorPort van het systeem; geen NVMe/USB 3-stuurprogramma in Setup",
+
+  "boot.lx.format_the_entire_disk_q": "DE HELE SCHIJF FORMATTEREN?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "ALLE partities en gegevens op de geselecteerde schijf wissen",
+  "boot.lx.x_confirmation": "{0} - BEVESTIGING",
+  "boot.lx.prepare_x_installation": "Installatie van {0} voorbereiden"
 }

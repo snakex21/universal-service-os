@@ -1048,5 +1048,10 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentāls): nav AHCI/NVMe/USB 3 draivera NT 5.0 (SATA IDE režīmā), maks. 4 GB RAM un 2 procesori",
 
-  "boot.summary.nt52_limits": "NT 5.2 (eksperimentāls): AHCI ar GenAHCI uz sistēmas StorPort; instalācijā nav NVMe/USB 3 draivera"
+  "boot.summary.nt52_limits": "NT 5.2 (eksperimentāls): AHCI ar GenAHCI uz sistēmas StorPort; instalācijā nav NVMe/USB 3 draivera",
+
+  "boot.lx.format_the_entire_disk_q": "FORMATĒT VISU DISKU?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Dzēst VISAS izvēlētā diska partīcijas un datus",
+  "boot.lx.x_confirmation": "{0} - APSTIPRINĀJUMS",
+  "boot.lx.prepare_x_installation": "Sagatavot {0} instalēšanu"
 }

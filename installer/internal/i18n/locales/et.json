@@ -1045,5 +1045,10 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (katseline): NT 5.0 jaoks puudub AHCI/NVMe/USB 3 draiver (SATA IDE-režiimis), kuni 4 GB RAM-i ja 2 protsessorit",
 
-  "boot.summary.nt52_limits": "NT 5.2 (katseline): AHCI GenAHCI kaudu süsteemi StorPortil; paigalduses puudub NVMe/USB 3 draiver"
+  "boot.summary.nt52_limits": "NT 5.2 (katseline): AHCI GenAHCI kaudu süsteemi StorPortil; paigalduses puudub NVMe/USB 3 draiver",
+
+  "boot.lx.format_the_entire_disk_q": "VORMINDADA KOGU KETAS?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Kustuta valitud kettalt KÕIK partitsioonid ja andmed",
+  "boot.lx.x_confirmation": "{0} - KINNITUS",
+  "boot.lx.prepare_x_installation": "Valmista ette {0} paigaldus"
 }

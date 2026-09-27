@@ -1045,5 +1045,10 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentelt): ingen AHCI/NVMe/USB 3-driver til NT 5.0 (SATA i IDE-tilstand), maks. 4 GB RAM og 2 CPU'er",
 
-  "boot.summary.nt52_limits": "NT 5.2 (eksperimentelt): AHCI via GenAHCI på systemets StorPort; ingen NVMe/USB 3-driver i installationen"
+  "boot.summary.nt52_limits": "NT 5.2 (eksperimentelt): AHCI via GenAHCI på systemets StorPort; ingen NVMe/USB 3-driver i installationen",
+
+  "boot.lx.format_the_entire_disk_q": "FORMATER HELE DISKEN?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Slet ALLE partitioner og data på den valgte disk",
+  "boot.lx.x_confirmation": "{0} - BEKRÆFTELSE",
+  "boot.lx.prepare_x_installation": "Forbered installation af {0}"
 }

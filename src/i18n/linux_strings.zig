@@ -47,6 +47,7 @@ pub const hashes = [_]u32{
     0xd50e6346, // lx.enumerating_disks_and_validating_the_selected_x
     0x6ef0db1f, // lx.erase_all_data_and_prepare_a_new_x_installation
     0x93990299, // lx.erase_all_data_on_this_disk
+    0x3df1f19c, // lx.erase_all_partitions_and_data_on_the_selected_disk
     0xef735e24, // lx.erase_this_disk_and_prepare_windows_vista
     0xb0ce6065, // lx.erasing_the_partition_table_and_creating_the_efi
     0xf33b0401, // lx.file_count_total_size_and_prepared_state_verifie
@@ -55,6 +56,7 @@ pub const hashes = [_]u32{
     0x2bdf6c73, // lx.finishing_work_writes_before_closing_the_prepare
     0x88ba9af3, // lx.flushing_to_disk
     0x0660182a, // lx.format_entire_disk
+    0x337c47fa, // lx.format_the_entire_disk_q
     0xe85b755e, // lx.formatting_work
     0x7cf40d37, // lx.full_report
     0x0a8beb0d, // lx.full_smart_report
@@ -94,6 +96,7 @@ pub const hashes = [_]u32{
     0xa46d636e, // lx.preparation_environment_started
     0xfc3ef41c, // lx.preparation_stopped
     0x27c6a2d4, // lx.prepare_windows_xp_installation
+    0xaf484724, // lx.prepare_x_installation
     0x599c1fb1, // lx.preparing_the_disk
     0x702336a3, // lx.preparing_the_windows_partition_and_installation
     0xa3706ee2, // lx.preparing_uefi_startup_and_usb_drivers
@@ -167,6 +170,7 @@ pub const hashes = [_]u32{
     0x6735ea3a, // lx.writing_the_vhd_boot_environment_to_the_usb_driv
     0x7922f68d, // lx.writing_the_wim_boot_environment_to_the_usb_driv
     0xe8d9b17d, // lx.x_confirm_installation
+    0xa4edba55, // lx.x_confirmation
     0xe16bb36d, // lx.x_of_y_files
     0x02de0ef1, // lx.x_prepare_disk
     0x915c2db1, // lx.x_ready_to_install
@@ -220,6 +224,7 @@ pub const english = [_][]const u8{
     "Enumerating disks and validating the selected {0} target.",
     "Erase all data and prepare a new {0} installation",
     "ERASE ALL DATA ON THIS DISK",
+    "Erase ALL partitions and data on the selected disk",
     "Erase this disk and prepare Windows Vista",
     "Erasing the partition table and creating the EFI partition.",
     "File count, total size and prepared state verified.",
@@ -228,6 +233,7 @@ pub const english = [_][]const u8{
     "Finishing WORK writes before closing the prepared partition.",
     "Flushing to disk",
     "Format entire disk",
+    "FORMAT THE ENTIRE DISK?",
     "Formatting WORK",
     "Full report",
     "Full SMART report",
@@ -267,6 +273,7 @@ pub const english = [_][]const u8{
     "Preparation environment started",
     "Preparation stopped",
     "Prepare Windows XP installation",
+    "Prepare {0} installation",
     "Preparing the disk",
     "Preparing the Windows partition and installation files.",
     "Preparing UEFI startup and USB drivers.",
@@ -340,6 +347,7 @@ pub const english = [_][]const u8{
     "Writing the VHD boot environment to the USB drive.",
     "Writing the WIM boot environment to the USB drive.",
     "{0} - CONFIRM INSTALLATION",
+    "{0} - CONFIRMATION",
     "{0} of {1} files",
     "{0} - PREPARE DISK",
     "{0} READY TO INSTALL",

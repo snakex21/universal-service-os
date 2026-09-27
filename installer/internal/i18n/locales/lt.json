@@ -1048,5 +1048,10 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentinė): nėra NT 5.0 AHCI/NVMe/USB 3 tvarkyklės (SATA IDE režimu), daugiausia 4 GB RAM ir 2 procesoriai",
 
-  "boot.summary.nt52_limits": "NT 5.2 (eksperimentinė): AHCI per GenAHCI sistemos StorPort; diegime nėra NVMe/USB 3 tvarkyklės"
+  "boot.summary.nt52_limits": "NT 5.2 (eksperimentinė): AHCI per GenAHCI sistemos StorPort; diegime nėra NVMe/USB 3 tvarkyklės",
+
+  "boot.lx.format_the_entire_disk_q": "FORMATUOTI VISĄ DISKĄ?",
+  "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Ištrinti VISUS pasirinkto disko skaidinius ir duomenis",
+  "boot.lx.x_confirmation": "{0} - PATVIRTINIMAS",
+  "boot.lx.prepare_x_installation": "Paruošti {0} diegimą"
 }
