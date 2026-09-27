@@ -76,6 +76,8 @@ function Run-Unit {
     if ($LASTEXITCODE -ne 0) { throw 'Initramfs alignment (lang.cpio) tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/test_nt52_staging.py')
     if ($LASTEXITCODE -ne 0) { throw 'NT 5.2 (Server 2003 / XP x64) staging tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/test_nt5_user_drivers.py')
+    if ($LASTEXITCODE -ne 0) { throw 'NT 5.2 user driver (DATA\Drivers) tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/test_windows7_uefi_publish.py')
     if ($LASTEXITCODE -ne 0) { throw 'Windows 7 EFI publication tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/test_uefi_graphics_refresh.py')

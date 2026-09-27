@@ -452,6 +452,7 @@ def main() -> int:
             ("tools/w2k3_selected_partition_uefi_csm.sif", "usr/lib/usos/w2k3_selected_partition_uefi_csm.sif"),
             ("tools/xp64_selected_partition_uefi_csm.sif", "usr/lib/usos/xp64_selected_partition_uefi_csm.sif"),
             ("tools/nt5_storage_stage.sh", "usr/lib/usos/nt5_storage_stage.sh"),
+            ("tools/nt5_user_drivers.sh", "usr/lib/usos/nt5_user_drivers.sh"),
             ("tools/xp_driver_stage.sh", "usr/lib/usos/xp_driver_stage.sh"),
             ("tools/xp_verify_target.sh", "usr/lib/usos/xp_verify_target.sh"),
             ("tools/xp_drive_letters.awk", "usr/lib/usos/xp_drive_letters.awk"),

@@ -23,6 +23,7 @@ var windowsProfiles = []dataProfile{
 	{"windows-7", "Windows 7", true, true},
 	{"windows-vista", "Windows Vista", true, true},
 	{"windows-xp", "Windows XP", true, true},
+	{"windows-xp-x64", "Windows XP x64", true, true},
 	{"windows-2000", "Windows 2000", true, true},
 	{"windows-nt-4", "Windows NT 4.0", true, false},
 	{"windows-me", "Windows Me", true, false},
@@ -31,8 +32,8 @@ var windowsProfiles = []dataProfile{
 	{"windows-95", "Windows 95", true, false},
 	{"windows-3-11", "Windows 3.11", false, false},
 	{"windows-3-1", "Windows 3.1", false, false},
-	// Windows Server (src/catalog/windows_server.zig); 2003/2000 Server
-	// come with the NT5 staging.
+	// Windows Server (src/catalog/windows_server.zig); 2003 x86 uses the NT5
+	// staging.
 	{"windows-server-2025", "Windows Server 2025", true, true},
 	{"windows-server-2022", "Windows Server 2022", true, true},
 	{"windows-server-2019", "Windows Server 2019", true, true},
@@ -41,6 +42,7 @@ var windowsProfiles = []dataProfile{
 	{"windows-server-2012", "Windows Server 2012", true, true},
 	{"windows-server-2008-r2", "Windows Server 2008 R2", true, true},
 	{"windows-server-2008", "Windows Server 2008", true, true},
+	{"windows-server-2003", "Windows Server 2003", true, true},
 }
 
 var linuxProfiles = []dataProfile{

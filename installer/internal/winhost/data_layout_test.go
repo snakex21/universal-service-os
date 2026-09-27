@@ -32,7 +32,7 @@ func TestRequiredDataDirectoriesCoverEveryVisibleProfile(t *testing.T) {
 }
 
 func TestWindowsServerFoldersMirrorTheClientConvention(t *testing.T) {
-	for _, version := range []string{"2025", "2022", "2019", "2016", "2012 R2", "2012", "2008 R2", "2008"} {
+	for _, version := range []string{"2025", "2022", "2019", "2016", "2012 R2", "2012", "2008 R2", "2008", "2003"} {
 		root := filepath.Join("Systems", "Windows", "Windows Server "+version)
 		for _, path := range []string{filepath.Join(root, "Images"), filepath.Join(root, "Unattended"), filepath.Join("Drivers", "Windows Server "+version, "Storage")} {
 			if !containsDataDirectory(path) {
@@ -40,7 +40,7 @@ func TestWindowsServerFoldersMirrorTheClientConvention(t *testing.T) {
 			}
 		}
 	}
-	for _, name := range []string{"Windows Server 2003", "Windows Server 2000"} {
+	for _, name := range []string{"Windows Server 2000"} {
 		if containsDataDirectory(filepath.Join("Systems", "Windows", name, "Images")) {
 			t.Errorf("%s is precreated before NT5 Server support", name)
 		}
@@ -55,9 +55,9 @@ func TestWindows311DoesNotCreateUnattendedDirectory(t *testing.T) {
 }
 
 func TestDataProfileCountsStayInSyncWithCatalog(t *testing.T) {
-	// 15 client versions plus Windows Server 2008 to 2025.
-	if len(windowsProfiles) != 23 {
-		t.Fatalf("windows profile count=%d, want 23", len(windowsProfiles))
+	// 16 client versions (with XP x64) plus Windows Server 2003 to 2025.
+	if len(windowsProfiles) != 25 {
+		t.Fatalf("windows profile count=%d, want 25", len(windowsProfiles))
 	}
 	if len(linuxProfiles) != 9 {
 		t.Fatalf("linux profile count=%d, want 9", len(linuxProfiles))
@@ -109,7 +109,8 @@ func TestRequiredDataDirectoriesContainDriversTree(t *testing.T) {
 	nt := map[string]bool{}
 	for _, name := range []string{"Windows 11", "Windows 10", "Windows 8.1", "Windows 8", "Windows 7", "Windows Vista", "Windows XP", "Windows 2000",
 		"Windows Server 2025", "Windows Server 2022", "Windows Server 2019", "Windows Server 2016",
-		"Windows Server 2012 R2", "Windows Server 2012", "Windows Server 2008 R2", "Windows Server 2008"} {
+		"Windows Server 2012 R2", "Windows Server 2012", "Windows Server 2008 R2", "Windows Server 2008",
+		"Windows XP x64", "Windows Server 2003"} {
 		nt[name] = true
 	}
 	for _, profile := range windowsProfiles {
