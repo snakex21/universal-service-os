@@ -1,0 +1,10 @@
+#!/bin/sh
+# USOS (docs/design/linux-iso-boot.md): hand the rendered Ubuntu autoinstall
+# answer from the initramfs to the live root. Added to
+# /scripts/init-bottom/ORDER by /usos/init only when the answer exists.
+[ "$1" = prereqs ] && exit 0
+root="${rootmnt:-/root}"
+if [ -f /usos/answer/autoinstall.yaml ] && [ -d "$root" ]; then
+    cp /usos/answer/autoinstall.yaml "$root/autoinstall.yaml" && chmod 600 "$root/autoinstall.yaml"
+fi
+exit 0
