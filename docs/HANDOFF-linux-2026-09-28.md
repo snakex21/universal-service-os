@@ -17,11 +17,30 @@ profile model. Design: [design/linux-iso-boot.md](design/linux-iso-boot.md).
   applicability filter + missing-required-field warning, Vista CSMWrap step
   counter 1/3 vs 1/5, icons XP x64 / Server 2003, quiet CSMWrap, Linux ISO).
 
+## Code on `feature/linux-iso` (WIP, not merged)
+
+- `src/flow/linux_iso/iso_map.zig` (writer/parser of `/usos/iso.map`, tests
+  pass: `zig test src/flow/linux_iso/iso_map.zig`), `cpio.zig` (newc writer,
+  test passes). Not yet wired into `src/root.zig` / build.zig tests.
+- `src/platform/linux/iso_init_main.zig`: the static helper `/usos/init`
+  (loop or dm over the extents, `/dev/usos-iso`, init-bottom hook for Ubuntu
+  answers). Compiles (21 KB) with
+  `zig build-exe -target x86_64-linux-none -O ReleaseSmall -fstrip --dep iso_map -Mroot=src/platform/linux/iso_init_main.zig -Miso_map=src/flow/linux_iso/iso_map.zig`;
+  not yet a build.zig step; **never run yet**.
+- `assets/linux-iso/init-bottom`, `tools/build_linux_iso_helper.py` (cpio
+  packer, deterministic).
+- `tools/tests/linux_iso/new_linux_test_disk.ps1` (sparse fixed VHD, ESP +
+  NTFS DATA with all test ISOs, `<vhd>.extents.json` from
+  `fsutil file queryextents`), `run_linux_iso_direct.py` (QEMU
+  `-kernel/-initrd` + helper, USB disk, BIOS or `--uefi`, screenshots in
+  `tools/tests/artifacts/linux-iso/<name>/`), `iso9660_rr.py`.
+
 ## Not done (next, in this order)
 
-Design doc section 9, steps 1-8. Nothing of the implementation exists yet:
-no Zig code, no catalog/routing change, no strings, no build, no stick deploy
-(the stick was NOT touched this session).
+Design doc section 9: step 1 (recipe/grub.cfg/Rock Ridge), step 3 first
+QEMU runs (`run_linux_iso_direct.py gparted`, then each distro, BIOS and
+`--uefi`), then 4-8. No catalog/routing change, no strings, no build.bat, no
+stick deploy yet (the stick was NOT touched this session).
 
 Branch plan: WIP code on `feature/linux-iso`, merged into master only when
 build.bat and all suites are green.
