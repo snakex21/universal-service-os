@@ -597,6 +597,8 @@ pub const Key = enum(u16) {
     utilities_none_line1,
     utilities_none_line2,
     utilities_none_title,
+    utilities_shell_desc,
+    utilities_shell_title,
     utility_unavailable,
     wait,
     wait_usb,
@@ -1205,6 +1207,8 @@ pub const hashes = [_]u32{
     0x89ec8a66, // utilities.none.line1
     0x88ec88d3, // utilities.none.line2
     0x638b0125, // utilities.none.title
+    0x75bb3dee, // utilities.shell.desc
+    0x5242a903, // utilities.shell.title
     0x30ddf187, // utility.unavailable
     0x892e4ca0, // wait
     0x3e1f8ab9, // wait_usb
@@ -1814,6 +1818,8 @@ pub const bios = [_]bool{
     true,
     true,
     false,
+    false,
+    false,
     true,
     true,
     false,
@@ -2420,6 +2426,8 @@ pub const english = [_][]const u8{
     "No utility folders were found on this USOS drive.",
     "Create Utilities/<tool name>/Images on DATA, then run Update USOS.",
     "No utilities",
+    "Command line for EFI tools (flashers, testers) from DATA",
+    "UEFI Shell",
     "This utility stays visible while its boot backend is unavailable.",
     "Please wait",
     "Please wait - keep the USB drive connected",

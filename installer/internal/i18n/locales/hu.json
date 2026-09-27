@@ -314,6 +314,8 @@
   "boot.utilities.none.line2": "Hozza létre a Utilities/<tool name>/Images mappát a DATA partíción, majd futtassa a helyi frissítést.",
   "boot.utilities.hardware.desc": "Beépített: CPU, RAM, alaplap és lemezek",
   "boot.utilities.freedos.desc": "DOS-programok USB-ről, fájlkezelő és parancssor",
+  "boot.utilities.shell.title": "UEFI Shell",
+  "boot.utilities.shell.desc": "Parancssor EFI-eszközökhöz (flashelők, tesztelők) a DATA-ról",
   "boot.images.title": "Kép kiválasztása",
   "boot.images.subtitle": "Az ISO, WIM, IMG, VHD, VHDX és EFI fájlok felismerése automatikus",
   "boot.images.none.line1": "Az Images mappában nem található támogatott képfájl.",

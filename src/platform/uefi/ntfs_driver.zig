@@ -12,11 +12,18 @@ pub const Error = error{
     NoBlockHandles,
 } || uefi.UnexpectedError || verified_image.Error || uefi.tables.BootServices.StartImageError || uefi.tables.BootServices.LocateHandleBufferError;
 
+/// The driver stays resident once started; a second call (the UEFI Shell
+/// row and then a Windows handoff) only connects it again.
+var started = false;
+
 pub fn loadAndConnect(root: *uefi.protocol.File) !void {
     const boot_services = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
-    const bytes = file_read.into(root, "\\EFI\\USOS\\ntfs_x64.efi", &driver_buffer) orelse return error.DriverFileMissing;
-    // Signed with the USOS key; under Secure Boot it is verified through shim.
-    try verified_image.startDriver(bytes, null);
+    if (!started) {
+        const bytes = file_read.into(root, "\\EFI\\USOS\\ntfs_x64.efi", &driver_buffer) orelse return error.DriverFileMissing;
+        // Signed with the USOS key; under Secure Boot it is verified through shim.
+        try verified_image.startDriver(bytes, null);
+        started = true;
+    }
 
     const handles = (try boot_services.locateHandleBuffer(.{ .by_protocol = &uefi.protocol.BlockIo.guid })) orelse return error.NoBlockHandles;
     for (handles) |handle| {

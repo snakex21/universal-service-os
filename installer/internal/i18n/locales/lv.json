@@ -317,6 +317,8 @@
   "boot.utilities.none.line2": "Izveidojiet Utilities/<tool name>/Images nodalījumā DATA, pēc tam palaidiet Atjaunināt USOS.",
   "boot.utilities.hardware.desc": "Iebūvēts: CPU, RAM, mātesplate un diski",
   "boot.utilities.freedos.desc": "DOS programmas no USB, failu pārvaldnieks un komandrinda",
+  "boot.utilities.shell.title": "UEFI čaula",
+  "boot.utilities.shell.desc": "Komandrinda EFI rīkiem (flešotāji, testeri) no DATA",
   "boot.images.title": "Izvēlieties attēlu",
   "boot.images.subtitle": "ISO, WIM, IMG, VHD, VHDX un EFI faili tiek noteikti automātiski",
   "boot.images.none.line1": "Mapē Images netika atrasti atbalstīti attēlu faili.",

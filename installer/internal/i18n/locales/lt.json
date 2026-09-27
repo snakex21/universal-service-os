@@ -317,6 +317,8 @@
   "boot.utilities.none.line2": "Sukurkite Utilities/<tool name>/Images skaidinyje DATA, tada paleiskite Atnaujinti USOS.",
   "boot.utilities.hardware.desc": "Integruotas: CPU, RAM, pagrindinė plokštė ir diskai",
   "boot.utilities.freedos.desc": "DOS programos iš USB, failų tvarkyklė ir komandinė eilutė",
+  "boot.utilities.shell.title": "UEFI apvalkalas",
+  "boot.utilities.shell.desc": "Komandų eilutė EFI įrankiams (programatoriai, testeriai) iš DATA",
   "boot.images.title": "Pasirinkite atvaizdą",
   "boot.images.subtitle": "ISO, WIM, IMG, VHD, VHDX ir EFI failai aptinkami automatiškai",
   "boot.images.none.line1": "Aplanke Images nerasta palaikomų atvaizdų failų.",

@@ -38,3 +38,9 @@ src/flow/answer/testdata/** -text
 
 # Pinned by SHA-256 in tools/vendor/csmwrap/3.1.2/manifest.json (LF bytes).
 tools/vendor/csmwrap/3.1.2/COPYING.LESSER -text
+
+# Pinned by SHA-256 in tools/vendor/uefi-shell/edk2-stable202002/manifest.json
+# (upstream bytes: License.txt has CRLF line ends). The Shell start script is
+# copied to the ESP as is, CRLF like other files the firmware side reads.
+tools/vendor/uefi-shell/** -text
+assets/uefi-shell/startup.nsh -text

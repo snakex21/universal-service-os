@@ -314,6 +314,8 @@
   "boot.utilities.none.line2": "Maak Utilities/<tool name>/Images aan op DATA en voer daarna USOS bijwerken uit.",
   "boot.utilities.hardware.desc": "Ingebouwd: CPU, RAM, moederbord en schijven",
   "boot.utilities.freedos.desc": "DOS-programma's vanaf USB, bestandsbeheer en opdrachtprompt",
+  "boot.utilities.shell.title": "UEFI-shell",
+  "boot.utilities.shell.desc": "Opdrachtregel voor EFI-tools (flashers, testers) vanaf DATA",
   "boot.images.title": "Image kiezen",
   "boot.images.subtitle": "ISO-, WIM-, IMG-, VHD-, VHDX- en EFI-bestanden worden automatisch herkend",
   "boot.images.none.line1": "Er zijn geen ondersteunde imagebestanden gevonden in Images.",

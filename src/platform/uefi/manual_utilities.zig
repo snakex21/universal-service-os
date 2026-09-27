@@ -9,15 +9,17 @@ const view = @import("manual_view.zig");
 const manual_secure_boot = @import("manual_secure_boot.zig");
 const manual_drivers = @import("manual_drivers.zig");
 const manual_themes = @import("manual_themes.zig");
+const uefi_shell = @import("uefi_shell.zig");
 
 const max_utilities: usize = usos.catalog.utility_catalog.max_items;
 
 var utility_list: usos.catalog.utility_catalog.List = .{};
 var entries: [max_utilities]usos.catalog.SystemEntry = undefined;
 
-/// Rows 0, 1 and 2 are the built-in Secure Boot, Drivers and Theme pages;
-/// utilities from DATA follow.
-const builtin_rows = 3;
+/// Rows 0, 1 and 2 are the built-in Secure Boot, Drivers and Theme pages,
+/// row 3 the built-in UEFI Shell; utilities from DATA follow.
+const builtin_rows = 4;
+const shell_row = 3;
 
 pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_discovery.Discovery, firmware: usos.firmware.Firmware) ?*const usos.catalog.SystemEntry {
     const count = scan(discovery);
@@ -27,6 +29,7 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
     selectable[0] = true;
     selectable[1] = true;
     selectable[2] = true;
+    selectable[shell_row] = true;
     var index: usize = 0;
     while (index < count) : (index += 1) {
         const entry = &entries[index];
@@ -43,6 +46,7 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
     rows[0] = manual_secure_boot.toolsRow();
     rows[1] = manual_drivers.toolsRow();
     rows[2] = manual_themes.toolsRow();
+    rows[shell_row] = shellRow();
     index = 0;
     while (index < count) : (index += 1) {
         const entry = &entries[index];
@@ -57,6 +61,11 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
     while (true) {
         switch (navigation.handleSelectable(input.readBlocking(), &selected, total, &list, selectable[0..total])) {
             .activate => {
+                if (selected == shell_row) {
+                    startShell(root);
+                    list.redrawFull(selected, null);
+                    continue;
+                }
                 if (selected < builtin_rows) {
                     switch (selected) {
                         0 => manual_secure_boot.page(),
@@ -114,6 +123,25 @@ fn scan(discovery: *usos.catalog.media_discovery.Discovery) usize {
         };
     }
     return utility_list.len;
+}
+
+fn shellRow() usos.gui.ui.Row {
+    return .{ .title = view.t(.utilities_shell_title), .detail = view.t(.utilities_shell_desc), .icon = .{ .vector = .terminal } };
+}
+
+/// Hands the screen to the EDK2 Shell until the user types `exit`, then
+/// rebuilds the framebuffer state (the Shell may change the console mode).
+fn startShell(root: *std.os.uefi.protocol.File) void {
+    input.stopGamepads();
+    const result = uefi_shell.run(root);
+    view.refreshFramebuffer();
+    if (result) |_| {} else |err| {
+        var buffer: [96]u8 = undefined;
+        const detail = if (err == error.SecureBootRejected) view.t(.error_secure_boot_rejected) else view.t(.error_stopped);
+        const lines = [_][]const u8{ std.fmt.bufPrint(&buffer, "{s}: {s}", .{ view.t(.summary_error), @errorName(err) }) catch @errorName(err), detail };
+        view.notice(view.t(.utilities_shell_title), .error_circle, .danger, view.t(.error_efi), &lines);
+        view.waitForDismiss();
+    }
 }
 
 var empty_shown = false;

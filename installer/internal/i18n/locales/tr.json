@@ -314,6 +314,8 @@
   "boot.utilities.none.line2": "DATA üzerinde Utilities/<tool name>/Images oluşturun, ardından USOS'u güncelle işlemini çalıştırın.",
   "boot.utilities.hardware.desc": "Yerleşik: CPU, RAM, anakart ve diskler",
   "boot.utilities.freedos.desc": "USB'den DOS programları, dosya yöneticisi ve komut istemi",
+  "boot.utilities.shell.title": "UEFI Kabuğu",
+  "boot.utilities.shell.desc": "DATA'dan EFI araçları (flaşlayıcılar, test araçları) için komut satırı",
   "boot.images.title": "Görüntü seçin",
   "boot.images.subtitle": "ISO, WIM, IMG, VHD, VHDX ve EFI dosyaları otomatik olarak algılanır",
   "boot.images.none.line1": "Images klasöründe desteklenen görüntü dosyası bulunamadı.",

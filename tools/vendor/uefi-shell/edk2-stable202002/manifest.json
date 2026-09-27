@@ -1,0 +1,23 @@
+{
+  "name": "EDK2 UEFI Shell",
+  "version": "edk2-stable202002",
+  "shell_version": "2.2",
+  "license": "BSD-2-Clause-Patent",
+  "upstream": {
+    "repository": "https://github.com/tianocore/edk2.git",
+    "tag": "edk2-stable202002",
+    "commit": "4c0f6e349d32cf27a7104ddd3e729d6ebc88ea70",
+    "release_url": "https://github.com/tianocore/edk2/releases/tag/edk2-stable202002",
+    "asset_url": "https://github.com/tianocore/edk2/releases/download/edk2-stable202002/ShellBinPkg.zip",
+    "asset_sha256": "d6876ef9b9a48ca612149b888d4f4e923d1b8ccf495b8f6f6c3f83defb40b56a",
+    "asset_member": "ShellBinPkg/UefiShell/X64/Shell.efi",
+    "license_url": "https://raw.githubusercontent.com/tianocore/edk2/edk2-stable202002/License.txt",
+    "note": "edk2-stable202002 is the last EDK2 stable tag whose GitHub release carries ShellBinPkg.zip (official prebuilt Shell); later tags ship sources only."
+  },
+  "files": {
+    "Shell.efi": "24dcc034bf6a5158f43b23b71a16acbfdcf1597de55aa309f7f6ac5af90666e6",
+    "License.txt": "50ce20c9cfdb0e19ee34fe0a51fc0afe961f743697b068359ab2f862b494df80"
+  },
+  "esp_path": "EFI/USOS/shell/Shell.efi",
+  "signed_at_release": true
+}

@@ -317,6 +317,8 @@
   "boot.utilities.none.line2": "Napravite Utilities/<tool name>/Images na DATA, zatim pokrenite „Ažuriraj USOS“.",
   "boot.utilities.hardware.desc": "Ugrađeno: CPU, RAM, matična ploča i diskovi",
   "boot.utilities.freedos.desc": "DOS programi sa USB-a, upravljač datotekama i komandna linija",
+  "boot.utilities.shell.title": "UEFI školjka",
+  "boot.utilities.shell.desc": "Komandna linija za EFI alate (flešeri, testeri) sa DATA",
   "boot.images.title": "Izbor slike",
   "boot.images.subtitle": "ISO, WIM, IMG, VHD, VHDX i EFI datoteke se prepoznaju automatski",
   "boot.images.none.line1": "U Images nisu pronađene podržane datoteke slika.",

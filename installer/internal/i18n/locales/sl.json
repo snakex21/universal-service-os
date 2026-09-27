@@ -320,6 +320,8 @@
   "boot.utilities.none.line2": "Na DATA ustvarite Utilities/<tool name>/Images in nato zaženite Posodobi USOS.",
   "boot.utilities.hardware.desc": "Vgrajeno: CPU, RAM, matična plošča in diski",
   "boot.utilities.freedos.desc": "Programi DOS z USB, upravitelj datotek in ukazni poziv",
+  "boot.utilities.shell.title": "Lupina UEFI",
+  "boot.utilities.shell.desc": "Ukazna vrstica za orodja EFI (flasherji, testerji) z DATA",
   "boot.images.title": "Izberite sliko",
   "boot.images.subtitle": "Datoteke ISO, WIM, IMG, VHD, VHDX in EFI se zaznajo samodejno",
   "boot.images.none.line1": "V mapi Images ni bilo najdenih podprtih datotek slik.",

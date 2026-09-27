@@ -314,6 +314,8 @@
   "boot.utilities.none.line2": "Opprett Utilities/<tool name>/Images på DATA, og kjør deretter Oppdater USOS.",
   "boot.utilities.hardware.desc": "Innebygd: CPU, RAM, hovedkort og disker",
   "boot.utilities.freedos.desc": "DOS-programmer fra USB, filbehandler og ledetekst",
+  "boot.utilities.shell.title": "UEFI-skall",
+  "boot.utilities.shell.desc": "Kommandolinje for EFI-verktøy (flashere, testere) fra DATA",
   "boot.images.title": "Velg avbildning",
   "boot.images.subtitle": "ISO-, WIM-, IMG-, VHD-, VHDX- og EFI-filer oppdages automatisk",
   "boot.images.none.line1": "Fant ingen støttede avbildningsfiler i Images.",

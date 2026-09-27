@@ -317,6 +317,8 @@
   "boot.utilities.none.line2": "Izradite Utilities/<tool name>/Images na DATA, a zatim pokrenite lokalno ažuriranje.",
   "boot.utilities.hardware.desc": "Ugrađeno: CPU, RAM, matična ploča i diskovi",
   "boot.utilities.freedos.desc": "DOS programi s USB-a, upravitelj datoteka i naredbeni redak",
+  "boot.utilities.shell.title": "UEFI ljuska",
+  "boot.utilities.shell.desc": "Naredbeni redak za EFI alate (flasheri, testeri) s DATA",
   "boot.images.title": "Odaberite sliku",
   "boot.images.subtitle": "Datoteke ISO, WIM, IMG, VHD, VHDX i EFI prepoznaju se automatski",
   "boot.images.none.line1": "U mapi Images nisu pronađene podržane datoteke slika.",

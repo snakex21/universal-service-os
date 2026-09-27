@@ -317,6 +317,8 @@
   "boot.utilities.none.line2": "Creați Utilities/<tool name>/Images pe DATA, apoi rulați actualizarea locală.",
   "boot.utilities.hardware.desc": "Integrat: CPU, RAM, placă de bază și discuri",
   "boot.utilities.freedos.desc": "Programe DOS de pe USB, manager de fișiere și linie de comandă",
+  "boot.utilities.shell.title": "Shell UEFI",
+  "boot.utilities.shell.desc": "Linie de comandă pentru unelte EFI (flashere, testere) de pe DATA",
   "boot.images.title": "Selectați imaginea",
   "boot.images.subtitle": "Fișierele ISO, WIM, IMG, VHD, VHDX și EFI sunt detectate automat",
   "boot.images.none.line1": "Nu s-au găsit fișiere imagine acceptate în Images.",

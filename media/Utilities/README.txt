@@ -31,4 +31,20 @@ Opcjonalna ikona narzędzia:
 icon.png musi być prawidłowym plikiem PNG i mieć maksymalnie 1 MiB.
 Po dodaniu, usunięciu lub zmianie narzędzia albo icon.png uruchom Aktualizuj USOS. Aktualizator odświeży mały katalog metadanych na ESP bez kopiowania dużych obrazów.
 
+Powłoka UEFI (EDK2 UEFI Shell) jest wbudowana, tylko w trybie UEFI:
+Utilities -> Powłoka UEFI. Własne narzędzia EFI (flashery BIOS/VBIOS,
+testery GPU/VRAM typu NVIDIA MATS/MODS, memtest86 w wersji .efi) wrzuć
+razem z ich plikami do:
+
+  Utilities\UEFI Shell\Tools\
+
+Powłoka sama znajduje DATA (np. fs2:) i przechodzi do tego folderu;
+map -r pokazuje wszystkie dyski, exit wraca do menu. DATA jest w powłoce
+tylko do odczytu - kopię ROM zapisuj na USOS_ESP albo pendrive FAT32.
+Przy włączonym Secure Boot powłoka startuje, ale nie uruchamia narzędzi
+.efi - do flashowania/testów wyłącz Secure Boot.
+Szczegóły: Utilities\UEFI Shell\README.txt. Program .efi można też
+umieścić w Utilities\<Nazwa>\Images\ (osobna pozycja w menu po
+Aktualizuj USOS). USOS nie dołącza żadnego z tych narzędzi.
+
 Partycja robocza jest widoczna jako USOS_WORK. Nie wrzucaj tam żadnych plików — jej zawartość jest usuwana przed każdą instalacją.

@@ -7,6 +7,16 @@ const utilities_root = "\\Utilities";
 const path_prefix = "\\Utilities\\";
 const images_suffix = "\\Images";
 
+/// DATA\Utilities\UEFI Shell holds the user's files for the built-in UEFI
+/// Shell (Tools\: flashers, testers, ROMs), not a bootable image, so it is
+/// never listed as a utility: the UEFI menu shows its own "UEFI Shell" row
+/// and the Legacy BIOS menu, where the Shell cannot run, shows nothing.
+pub const uefi_shell_folder = "UEFI Shell";
+
+pub fn isReservedFolder(name: []const u8) bool {
+    return @import("std").ascii.eqlIgnoreCase(name, uefi_shell_folder);
+}
+
 pub const Entry = struct {
     builtin: enum { none, hardware, freedos } = .none,
     name: FixedText = .{},
@@ -56,6 +66,7 @@ pub fn discover(discovery: *media_discovery.Discovery, output: *List) void {
     var index: usize = 0;
     while (index < count and output.len < output.items.len) : (index += 1) {
         const name = names[index].slice();
+        if (isReservedFolder(name)) continue;
         const needed = path_prefix.len + name.len + images_suffix.len;
         if (needed > max_path_bytes) continue;
         var item = Entry{ .name = names[index] };
@@ -96,6 +107,14 @@ test "built-in hardware entry is independent of media and keeps utility order" {
     try std.testing.expectEqualStrings("M", list.items[0].name.slice());
     try std.testing.expectEqual(.none, list.items[0].builtin);
     try std.testing.expectEqualStrings("", list.items[1].imageDirectory());
+}
+
+test "the UEFI Shell tools folder is not a utility entry" {
+    const std = @import("std");
+    try std.testing.expect(isReservedFolder("UEFI Shell"));
+    try std.testing.expect(isReservedFolder("uefi shell"));
+    try std.testing.expect(!isReservedFolder("UEFI Shell 2"));
+    try std.testing.expect(!isReservedFolder("MemTest86"));
 }
 
 test "FreeDOS program folder becomes one built-in entry" {

@@ -314,6 +314,8 @@
   "boot.utilities.none.line2": "Cree Utilities/<tool name>/Images en DATA y luego ejecute Actualizar USOS.",
   "boot.utilities.hardware.desc": "Integrado: CPU, RAM, placa base y discos",
   "boot.utilities.freedos.desc": "Programas DOS desde USB, administrador de archivos y símbolo del sistema",
+  "boot.utilities.shell.title": "Shell UEFI",
+  "boot.utilities.shell.desc": "Línea de comandos para herramientas EFI (flasheadores, testers) desde DATA",
   "boot.images.title": "Seleccionar imagen",
   "boot.images.subtitle": "Los archivos ISO, WIM, IMG, VHD, VHDX y EFI se detectan automáticamente",
   "boot.images.none.line1": "No se encontraron archivos de imagen compatibles en Images.",

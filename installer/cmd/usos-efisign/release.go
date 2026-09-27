@@ -48,6 +48,15 @@ const (
 	seabiosGPLv3Source = "tools/vendor/wimlib/1.14.5/COPYING.GPLv3.txt"
 	seabiosGPLv3SHA256 = "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809"
 	touchLicenseDir    = "EFI/USOS/licenses/touchi2cdxe"
+	// EDK2 UEFI Shell (Utilities -> UEFI Shell, src/platform/uefi/uefi_shell.zig):
+	// the official edk2-stable202002 binary, copied hash-checked and signed
+	// like the NTFS driver, next to its start script, licence and
+	// SOURCES.txt. No .sbat: its headers have no room for another section,
+	// and shim requires SBAT only in the second stage it starts itself
+	// (images USOS loads later are verified against db/MOK without it).
+	uefiShellVendorDir   = "tools/vendor/uefi-shell/edk2-stable202002"
+	uefiShellTargetDir   = "EFI/USOS/shell"
+	uefiShellStartupPath = "assets/uefi-shell/startup.nsh"
 )
 
 // signedInPlace are the non-Microsoft EFI binaries USOS loads after itself.
@@ -153,6 +162,10 @@ func release(args []string) error {
 	if err := stageCSMWrap(at(csmwrapVendorDir), at(seabiosGPLv3Source), at(usbRoot)); err != nil {
 		return err
 	}
+	uefiShell, err := stageUefiShell(at(uefiShellVendorDir), at(uefiShellStartupPath), at(usbRoot))
+	if err != nil {
+		return err
+	}
 
 	secondStage := filepath.Join(bootDir, manifest.SecondStage)
 	options := efisign.SignOptions{SBAT: sbat}
@@ -170,6 +183,10 @@ func release(args []string) error {
 			return err
 		}
 		fmt.Printf("[SIGN] %s/%s\n", usbRoot, touchDriverTarget)
+		if err := signFile(uefiShell, uefiShell, pair, efisign.SignOptions{ReplaceSignature: true}); err != nil {
+			return err
+		}
+		fmt.Printf("[SIGN] %s/%s/Shell.efi\n", usbRoot, uefiShellTargetDir)
 		for _, target := range []string{filepath.Join(usosDir, enrollCertName), at(usbRoot + "/" + rootCertName)} {
 			if err := os.WriteFile(target, pair.Cert.Raw, 0o644); err != nil {
 				return err
@@ -332,6 +349,45 @@ func stageCSMWrap(vendorDir, gplv3, usb string) error {
 	}
 	fmt.Printf("[STAGE] %s <- %s (CSMWrap %s, unsigned)\n", csmwrapTargetDir, filepath.ToSlash(vendorDir), manifest.Version)
 	return nil
+}
+
+// stageUefiShell copies the pinned EDK2 Shell.efi (manifest hash), its
+// BSD-2-Clause-Patent licence, SOURCES.txt and the USOS startup.nsh into
+// EFI/USOS/shell and returns the Shell.efi path there (signed afterwards).
+func stageUefiShell(vendorDir, startup, usb string) (string, error) {
+	var manifest touchManifest
+	data, err := os.ReadFile(filepath.Join(vendorDir, "manifest.json"))
+	if err != nil {
+		return "", fmt.Errorf("vendored UEFI Shell manifest: %w", err)
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return "", fmt.Errorf("vendored UEFI Shell manifest: %w", err)
+	}
+	if manifest.Files["Shell.efi"] == "" || manifest.Files["License.txt"] == "" {
+		return "", errors.New("vendored UEFI Shell manifest lacks the Shell.efi or License.txt hash")
+	}
+	dir := filepath.Join(usb, filepath.FromSlash(uefiShellTargetDir))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	target := filepath.Join(dir, "Shell.efi")
+	if err := copyVerified(filepath.Join(vendorDir, "Shell.efi"), target, manifest.Files["Shell.efi"]); err != nil {
+		return "", err
+	}
+	if err := copyVerified(filepath.Join(vendorDir, "License.txt"), filepath.Join(dir, "License.txt"), manifest.Files["License.txt"]); err != nil {
+		return "", err
+	}
+	for _, item := range []struct{ source, name string }{{filepath.Join(vendorDir, "SOURCES.txt"), "SOURCES.txt"}, {startup, "startup.nsh"}} {
+		content, err := os.ReadFile(item.source)
+		if err != nil {
+			return "", err
+		}
+		if err := writeFileAtomic(filepath.Join(dir, item.name), content); err != nil {
+			return "", err
+		}
+	}
+	fmt.Printf("[STAGE] %s <- %s (EDK2 UEFI Shell %s)\n", uefiShellTargetDir, filepath.ToSlash(vendorDir), manifest.Version)
+	return target, nil
 }
 
 type touchManifest struct {

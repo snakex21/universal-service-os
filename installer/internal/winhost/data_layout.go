@@ -93,6 +93,9 @@ func buildRequiredDataDirectories() []string {
 	directories = append(directories, "Utilities", "Programs", filepath.Join("Programs", "USOS"))
 	directories = append(directories, filepath.Join("Systems", "DOS", "MS-DOS", "Programs"))
 	directories = append(directories, filepath.Join("Utilities", "FreeDOS", "Programs"))
+	// Files for the built-in UEFI Shell (flashers, testers, ROMs); the menu
+	// never lists this folder as a utility (src/catalog/utility_catalog.zig).
+	directories = append(directories, filepath.Join("Utilities", "UEFI Shell", "Tools"))
 	directories = append(directories, filepath.Join("Systems", "Windows", "Windows 7", "Drivers", "x64"))
 	directories = append(directories, driverDataDirectories()...)
 	return directories

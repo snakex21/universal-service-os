@@ -314,6 +314,8 @@
   "boot.utilities.none.line2": "Skapa Utilities/<tool name>/Images på DATA och kör sedan Uppdatera USOS.",
   "boot.utilities.hardware.desc": "Inbyggt: CPU, RAM, moderkort och diskar",
   "boot.utilities.freedos.desc": "DOS-program från USB, filhanterare och kommandotolk",
+  "boot.utilities.shell.title": "UEFI-skal",
+  "boot.utilities.shell.desc": "Kommandorad för EFI-verktyg (flashare, testare) från DATA",
   "boot.images.title": "Välj avbildning",
   "boot.images.subtitle": "ISO-, WIM-, IMG-, VHD-, VHDX- och EFI-filer identifieras automatiskt",
   "boot.images.none.line1": "Inga avbildningsfiler som stöds hittades i Images.",

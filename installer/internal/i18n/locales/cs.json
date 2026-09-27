@@ -317,6 +317,8 @@
   "boot.utilities.none.line2": "Vytvořte Utilities/<tool name>/Images na DATA a poté spusťte místní aktualizaci.",
   "boot.utilities.hardware.desc": "Vestavěné: CPU, RAM, základní deska a disky",
   "boot.utilities.freedos.desc": "Programy DOS z USB, správce souborů a příkazový řádek",
+  "boot.utilities.shell.title": "UEFI Shell",
+  "boot.utilities.shell.desc": "Příkazový řádek pro nástroje EFI (flashery, testery) z DATA",
   "boot.images.title": "Vyberte obraz",
   "boot.images.subtitle": "Soubory ISO, WIM, IMG, VHD, VHDX a EFI se rozpoznají automaticky",
   "boot.images.none.line1": "Ve složce Images nebyly nalezeny žádné podporované soubory obrazů.",

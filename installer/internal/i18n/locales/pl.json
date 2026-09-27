@@ -317,6 +317,8 @@
   "boot.utilities.none.line2": "Utwórz Utilities/<tool name>/Images na DATA, a potem uruchom aktualizację USOS.",
   "boot.utilities.hardware.desc": "Wbudowane: procesor, RAM, płyta główna i dyski",
   "boot.utilities.freedos.desc": "Programy DOS z USB, menedżer plików i wiersz poleceń",
+  "boot.utilities.shell.title": "Powłoka UEFI",
+  "boot.utilities.shell.desc": "Wiersz poleceń dla narzędzi EFI (flashery, testery) z DATA",
   "boot.images.title": "Wybierz obraz",
   "boot.images.subtitle": "Pliki ISO, WIM, IMG, VHD, VHDX i EFI są wykrywane automatycznie",
   "boot.images.none.line1": "W folderze Images nie znaleziono obsługiwanych plików obrazów.",
