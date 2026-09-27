@@ -320,15 +320,18 @@ pub const Key = enum(u16) {
     profile_field_bypass_secure_boot,
     profile_field_bypass_tpm,
     profile_field_computer,
+    profile_field_disable_wer,
     profile_field_key,
     profile_field_keyboard,
     profile_field_language,
     profile_field_local_account,
     profile_field_locale,
     profile_field_name,
+    profile_field_network_location,
     profile_field_no_network,
     profile_field_org,
     profile_field_password,
+    profile_field_protect_pc,
     profile_field_remember_key,
     profile_field_timezone,
     profile_field_user,
@@ -336,15 +339,18 @@ pub const Key = enum(u16) {
     profile_file_detail,
     profile_help_bypass,
     profile_help_computer,
+    profile_help_disable_wer,
     profile_help_key,
     profile_help_keyboard,
     profile_help_language,
     profile_help_local_account,
     profile_help_locale,
     profile_help_name,
+    profile_help_network_location,
     profile_help_no_network,
     profile_help_org,
     profile_help_password,
+    profile_help_protect_pc,
     profile_help_remember_key,
     profile_help_timezone,
     profile_help_user,
@@ -368,6 +374,12 @@ pub const Key = enum(u16) {
     profile_save_failed,
     profile_summary,
     profile_value_auto,
+    profile_value_network_home,
+    profile_value_network_public,
+    profile_value_network_work,
+    profile_value_protect_off,
+    profile_value_protect_recommended,
+    profile_value_protect_updates,
     profile_value_same_language,
     profile_value_same_locale,
     profile_value_setup_asks,
@@ -904,15 +916,18 @@ pub const hashes = [_]u32{
     0x1513f82f, // profile.field.bypass_secure_boot
     0x50329252, // profile.field.bypass_tpm
     0xa6b11e2b, // profile.field.computer
+    0x8015202b, // profile.field.disable_wer
     0x1d1b0b5d, // profile.field.key
     0x40eff7a3, // profile.field.keyboard
     0x7890b224, // profile.field.language
     0x06522829, // profile.field.local_account
     0x383d1338, // profile.field.locale
     0x8dd802a5, // profile.field.name
+    0x805be4da, // profile.field.network_location
     0xe80859fc, // profile.field.no_network
     0x7cebcb94, // profile.field.org
     0x367e27db, // profile.field.password
+    0xf251a013, // profile.field.protect_pc
     0xf04168d9, // profile.field.remember_key
     0xc97f214d, // profile.field.timezone
     0xa0db31f9, // profile.field.user
@@ -920,15 +935,18 @@ pub const hashes = [_]u32{
     0x39ab14e9, // profile.file.detail
     0x0922c403, // profile.help.bypass
     0x46264466, // profile.help.computer
+    0xa0ced3e4, // profile.help.disable_wer
     0xcca2e39e, // profile.help.key
     0x10f18736, // profile.help.keyboard
     0x8e773749, // profile.help.language
     0x7425bece, // profile.help.local_account
     0x69474139, // profile.help.locale
     0x33f53224, // profile.help.name
+    0x6dc95247, // profile.help.network_location
     0x7cf8eb69, // profile.help.no_network
     0x324f097b, // profile.help.org
     0xfc88614e, // profile.help.password
+    0x4d51ba86, // profile.help.protect_pc
     0xa2076c1c, // profile.help.remember_key
     0xf3284598, // profile.help.timezone
     0xb1ef9f14, // profile.help.user
@@ -952,6 +970,12 @@ pub const hashes = [_]u32{
     0x9f87b247, // profile.save_failed
     0xea748758, // profile.summary
     0x803f740e, // profile.value.auto
+    0x94a66e59, // profile.value.network_home
+    0x0742279f, // profile.value.network_public
+    0xce89b51b, // profile.value.network_work
+    0x7de03296, // profile.value.protect_off
+    0x6c457fe8, // profile.value.protect_recommended
+    0x9310ce39, // profile.value.protect_updates
     0x5f697fae, // profile.value.same_language
     0x9a227b9e, // profile.value.same_locale
     0x791012ad, // profile.value.setup_asks
@@ -1471,6 +1495,18 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
     false,
     false,
     false,
@@ -2071,15 +2107,18 @@ pub const english = [_][]const u8{
     "Windows 11: skip the Secure Boot check",
     "Windows 11: skip the TPM check",
     "Computer name",
+    "Turn off error reporting",
     "Product key ({0})",
     "Keyboard",
     "Windows language",
     "Local account",
     "Formats",
     "Profile name",
+    "Vista/7: network location",
     "Windows 11: set up without network",
     "Organization",
     "Password",
+    "Protection and updates",
     "Remember the key on this stick",
     "Time zone",
     "User name",
@@ -2087,15 +2126,18 @@ pub const english = [_][]const u8{
     "Answer file from the Unattended folder, used as it is",
     "For hardware below the Windows 11 requirements. Microsoft does not support such installations; feature updates may need the bypass again.",
     "1-15 characters A-Z a-z 0-9 and -, not only digits. Empty: USOS-XP on XP, a name chosen by Setup on newer Windows.",
+    "Vista and newer: Windows Error Reporting stays off (no problem reports are sent).",
     "Product key for {0} (XXXXX-XXXXX-XXXXX-XXXXX-XXXXX). Empty: Setup asks for it or offers the edition list.",
     "Keyboard layout of Windows. Same as the formats: the default keyboard of that language.",
     "Language of Setup and of Windows; the installation media must contain it. Automatic: Setup asks.",
     "Windows 8 and newer: create the accounts locally and hide the Microsoft account pages.",
     "Date, time, number and currency formats.",
     "Name of the profile on this stick: 1-32 characters A-Z a-z 0-9, space, . _ -",
+    "Vista and 7: answer to the network location page. Work or Home: a private network; Public: the strictest firewall.",
     "Windows 11: finish the setup without a network connection (BypassNRO).",
     "Optional: up to 64 characters, without \" % ^ & | < >",
     "Password of the accounts; empty means no password. It is stored as plain text on the stick.",
+    "Answer to the \"Help protect Windows\" page (Vista and newer). Off: no automatic updates until you turn them on.",
     "Off: the key is used until this computer restarts and is never written to the stick.",
     "Automatic: the default of the installation media.",
     "First local account, an administrator: 1-20 characters A-Z a-z 0-9 . _ - and space.",
@@ -2119,6 +2161,12 @@ pub const english = [_][]const u8{
     "The profile could not be saved on the stick:",
     "Profile {0}: {1} ({2})",
     "Automatic",
+    "Home",
+    "Public",
+    "Work",
+    "Off",
+    "Recommended settings",
+    "Important updates only",
     "Same as the language",
     "Same as the formats",
     "(Setup asks)",

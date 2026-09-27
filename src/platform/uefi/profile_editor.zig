@@ -35,6 +35,9 @@ const F = enum(u8) {
     bypass_secure_boot,
     bypass_ram,
     no_network,
+    protect_pc,
+    network_location,
+    disable_wer,
     save,
     cancel,
 };
@@ -59,6 +62,15 @@ var bypass_tpm = false;
 var bypass_secure_boot = false;
 var bypass_ram = false;
 var no_network = false;
+/// Index into ProtectPc order recommended, updates, off (protect_options).
+var protect_index: usize = 2;
+/// Index into NetworkLocation order work, home, public (network_options).
+var network_index: usize = 0;
+var disable_wer = false;
+var protect_options: [3][]const u8 = undefined;
+var network_options: [3][]const u8 = undefined;
+const protect_values = [_]answer.profile.ProtectPc{ .recommended, .updates, .off };
+const network_values = [_]answer.profile.NetworkLocation{ .work, .home, .public };
 
 var zone_options: [tables.time_zones.len + 1][]const u8 = undefined;
 var language_options: [tables.languages.len + 1][]const u8 = undefined;
@@ -101,6 +113,8 @@ fn setOptions() void {
     language_options[0] = t(.profile_value_auto);
     locale_options[0] = t(.profile_value_same_language);
     keyboard_options[0] = t(.profile_value_same_locale);
+    protect_options = .{ t(.profile_value_protect_recommended), t(.profile_value_protect_updates), t(.profile_value_protect_off) };
+    network_options = .{ t(.profile_value_network_work), t(.profile_value_network_home), t(.profile_value_network_public) };
     for (tables.languages, 0..) |entry, i| {
         language_options[i + 1] = entry.label;
         locale_options[i + 1] = entry.label;
@@ -140,6 +154,9 @@ fn load(p: *const Profile) void {
     bypass_secure_boot = p.bypass_secure_boot;
     bypass_ram = p.bypass_ram;
     no_network = p.no_network_oobe;
+    protect_index = std.mem.indexOfScalar(answer.profile.ProtectPc, &protect_values, p.protect_pc).?;
+    network_index = std.mem.indexOfScalar(answer.profile.NetworkLocation, &network_values, p.network_location).?;
+    disable_wer = p.disable_wer;
 }
 
 /// The profile as the form shows it (keys of other systems kept).
@@ -168,6 +185,9 @@ fn build(out: *Profile) void {
     out.bypass_secure_boot = bypass_secure_boot;
     out.bypass_ram = bypass_ram;
     out.no_network_oobe = no_network;
+    out.protect_pc = protect_values[protect_index];
+    out.network_location = network_values[network_index];
+    out.disable_wer = disable_wer;
     out.manual_disk = true;
 }
 
@@ -221,6 +241,9 @@ fn helpKey(id: F) view.Key {
         .local_account => .profile_help_local_account,
         .bypass_tpm, .bypass_secure_boot, .bypass_ram => .profile_help_bypass,
         .no_network => .profile_help_no_network,
+        .protect_pc => .profile_help_protect_pc,
+        .network_location => .profile_help_network_location,
+        .disable_wer => .profile_help_disable_wer,
         .save, .cancel => .profile_editor_subtitle,
     };
 }
@@ -263,6 +286,10 @@ fn addField(id: F, field: form.Field) void {
 fn buildFields() void {
     field_count = 0;
     const win11 = std.mem.eql(u8, system_id, "windows-11");
+    // Vista and newer (autounattend.xml); the NT5 settings have no such pages.
+    const family = answer.target.familyFor(system_id);
+    const nt6 = if (family) |f| !f.nt5() else false;
+    const legacy_nt6 = if (family) |f| !f.nt5() and f.legacyNt6() else false;
     addField(.name, .{ .kind = .text, .label = t(.profile_field_name), .text = &name_text, .allowed = &name_chars });
     addField(.user, .{ .kind = .text, .label = t(.profile_field_user), .text = &user_text, .allowed = &account_chars });
     addField(.user2, .{ .kind = .text, .label = t(.profile_field_user2), .text = &user2_text, .allowed = &account_chars });
@@ -282,6 +309,9 @@ fn buildFields() void {
         addField(.bypass_ram, .{ .kind = .toggle, .label = t(.profile_field_bypass_ram), .flag = &bypass_ram });
         addField(.no_network, .{ .kind = .toggle, .label = t(.profile_field_no_network), .flag = &no_network });
     }
+    if (nt6) addField(.protect_pc, .{ .kind = .choice, .label = t(.profile_field_protect_pc), .options = &protect_options, .index = &protect_index });
+    if (legacy_nt6) addField(.network_location, .{ .kind = .choice, .label = t(.profile_field_network_location), .options = &network_options, .index = &network_index });
+    if (nt6) addField(.disable_wer, .{ .kind = .toggle, .label = t(.profile_field_disable_wer), .flag = &disable_wer });
     addField(.save, .{ .kind = .action, .label = t(.profile_save), .primary = true, .id = save_id });
     addField(.cancel, .{ .kind = .action, .label = t(.profile_cancel), .id = cancel_id });
 }
