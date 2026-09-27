@@ -34,6 +34,9 @@ RUN = ROOT / "tools" / "tests" / "artifacts" / os.environ.get("USOS_NATIVE_RUN",
 # USOS_NATIVE_TARGET_BUS=ahci: a SATA target (Vista has no inbox NVMe driver).
 TARGET_BUS = os.environ.get("USOS_NATIVE_TARGET_BUS", "nvme")
 STATE = RUN / "qemu-state.json"
+# USOS_NATIVE_ACCEL=whpx: Windows Hypervisor Platform (much faster than TCG).
+ACCEL = (["-accel", "whpx,kernel-irqchip=off", "-cpu", "qemu64,+ssse3,+sse4.1,+sse4.2,+popcnt"]
+         if os.environ.get("USOS_NATIVE_ACCEL") == "whpx" else ["-accel", "tcg,thread=multi", "-cpu", "max"])
 
 
 def free_port() -> int:
@@ -63,7 +66,7 @@ def monitor(commands: list[str]) -> str:
 
 def launch(args: list[str], label: str, no_reboot: bool) -> None:
     port = free_port()
-    full = [str(QEMU), "-name", f"USOS-native-{label}", "-machine", "q35", "-accel", "tcg,thread=multi", "-cpu", "max",
+    full = [str(QEMU), "-name", f"USOS-native-{label}", "-machine", "q35", *ACCEL,
             "-m", "6144", "-smp", "4", "-nic", "none", "-display", "none", "-device", "VGA,xres=1280,yres=800",
             "-monitor", f"tcp:127.0.0.1:{port},server=on,wait=off",
             "-serial", f"file:{(RUN / f'serial-{label}.log').as_posix()}",

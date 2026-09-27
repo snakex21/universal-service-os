@@ -23,7 +23,7 @@ static HANDLE log_file=INVALID_HANDLE_VALUE;
 typedef struct { WCHAR root[4]; DWORD disk; GUID id; BYTE hash[32]; } Target;
 static Target before[26],after[26];
 static DWORD before_count,after_count;
-typedef struct { DWORD disk,number; GUID id,disk_id; ULONGLONG disk_size; } Esp;
+typedef struct { DWORD disk,number; GUID id,disk_id; ULONGLONG disk_size,offset; BOOL formatted; } Esp;
 typedef struct { BYTE magic[8]; GUID disk_id,esp_id; ULONGLONG disk_size; } BootProfile;
 _Static_assert(sizeof(BootProfile)==48,"Boot profile wire size");
 static BootProfile boot_profile;
@@ -145,7 +145,7 @@ static BOOL esp_inventory(Esp *esps,DWORD *count){
   if(layout->PartitionCount>(got - offsetof(DRIVE_LAYOUT_INFORMATION_EX,PartitionEntry))/sizeof(PARTITION_INFORMATION_EX))return FALSE;
   for(DWORD i=0;i<layout->PartitionCount;i++){
    PARTITION_INFORMATION_EX *p=&layout->PartitionEntry[i];if(p->PartitionStyle!=PARTITION_STYLE_GPT||!same(&p->Gpt.PartitionType,&esp_type,16))continue;
-   if(*count==64)return FALSE;Esp *e=&esps[(*count)++];e->disk=disk;e->number=p->PartitionNumber;e->id=p->Gpt.PartitionId;e->disk_id=layout->Gpt.DiskId;e->disk_size=length.Length.QuadPart;
+   if(*count==64)return FALSE;Esp *e=&esps[(*count)++];e->disk=disk;e->number=p->PartitionNumber;e->id=p->Gpt.PartitionId;e->disk_id=layout->Gpt.DiskId;e->disk_size=length.Length.QuadPart;e->offset=(ULONGLONG)p->StartingOffset.QuadPart;e->formatted=FALSE;
   }
  }return TRUE;
 }
@@ -156,6 +156,16 @@ static int choose_esp(const Esp *old_esps,DWORD old_count,const Esp *current,DWO
   if(!old){candidate=(int)i;new_count++;}
  }
  if(new_count==0&&count==1)return 0;
+ /* Several ESPs that all existed before Setup (X470 2026-09-27: the Windows 7
+  * ESP plus a raw ESP left by a failed run; Vista's disk page does not list
+  * ESPs, so the user cannot delete them): use the only one that carried a FAT
+  * file system before Setup started. */
+ if(new_count==0&&count>1){
+  int only=-1;DWORD formatted=0;
+  for(DWORD i=0;i<count;i++)for(DWORD j=0;j<old_count;j++)
+   if(current[i].disk==old_esps[j].disk&&same(&current[i].id,&old_esps[j].id,16)&&old_esps[j].formatted){only=(int)i;formatted++;}
+  if(formatted==1)return only;
+ }
  return new_count==1?candidate:-1;
 }
 static BOOL profile_matches(const BootProfile *profile,const Esp *esp){
@@ -395,9 +405,25 @@ static LRESULT CALLBACK device_window(HWND window,UINT message,WPARAM w,LPARAM l
 static DWORD run_setup(const WCHAR *executable,WCHAR *line){
  if(!esp_inventory(original_esps,&original_esp_count))return ERROR_READ_FAULT;
  logcode("Initial internal ESP count=",original_esp_count);
+ /* Before Setup owns anything: read each existing ESP's boot sector from the
+  * raw disk (no volume is opened) and remember whether it holds FAT. */
+ for(DWORD i=0;i<original_esp_count;i++){
+  Esp *e=&original_esps[i];HANDLE h=disk_handle(e->disk);BYTE sector[512];DWORD got=0;LARGE_INTEGER at;at.QuadPart=(LONGLONG)e->offset;
+  if(h!=INVALID_HANDLE_VALUE){
+   if(SetFilePointerEx(h,at,0,FILE_BEGIN)&&ReadFile(h,sector,512,&got,0)&&got==512&&sector[510]==0x55&&sector[511]==0xAA&&(same(sector+82,"FAT32",5)||same(sector+54,"FAT",3)))e->formatted=TRUE;
+   CloseHandle(h);
+  }
+  logcode("  existing ESP disk=",e->disk);logcode("  existing ESP partition=",e->number);logcode("  existing ESP has a FAT file system (1 = yes)=",e->formatted);
+ }
  refresh_esp();
- if((pinned_esp&&profile_disk_count!=1)||(!store_ready&&have_selected_esp)||(!pinned_esp&&!store_ready&&original_esp_count>1)){
-  logcode("Setup not started: target EFI selection could not be verified=",store_error?store_error:ERROR_NOT_READY);
+ /* v10: 0 or several internal ESPs before Setup is normal (a blank disk, or a
+  * leftover ESP from an earlier failed run; X470 2026-09-27 refused here with
+  * 2 ESPs before the user could delete anything). Setup starts; refresh_esp
+  * points the hints at the ESP once exactly one new (or one remaining) exists.
+  * Only the hardware boot profile keeps its exact-disk gate. */
+ if(!store_ready)logcode("No unique internal ESP yet; Setup starts and the ESP is selected when it appears=",store_error?store_error:ERROR_NOT_FOUND);
+ if(pinned_esp&&profile_disk_count!=1){
+  logcode("Setup not started: the boot profile disk was not found exactly once=",ERROR_NOT_READY);
   MessageBoxW(0,USOS_UI_TEXT(VISTA_ESP_FAILED),USOS_UI_TEXT(VISTA_ESP_TITLE),MB_OK|MB_ICONERROR);
   release_store_alias();return ERROR_NOT_READY;
  }
@@ -605,7 +631,7 @@ void entry(void){
  if(!real_version||real_version(&version)!=0||version.dwMajorVersion!=10||version.dwBuildNumber<10240||version.dwBuildNumber>=22000||!GetFirmwareType(&firmware)||firmware!=FirmwareTypeUefi)ExitProcess(2);
  DWORD n=GetModuleFileNameW(0,base,MAX_PATH);if(!n||n>=MAX_PATH-64)ExitProcess(2);while(n&&base[n-1]!=L'\\')n--;base[n]=0;
  path(scratch,base,L"usos-vista-install.log");log_file=CreateFileW(scratch,GENERIC_WRITE,FILE_SHARE_READ,0,CREATE_ALWAYS,FILE_FLAG_WRITE_THROUGH,0);
- logcode("Vista USB installer v9 / Vista bcdedit from the ISO boot.wim / ESP hints without volume access / known firstboot v11=",0);
+ logcode("Vista USB installer v10 / no pre-Setup ESP gate / formatted ESP preferred / Vista bcdedit from the ISO boot.wim / ESP hints without volume access / known firstboot v11=",0);
  logcode("Firmware type (2 = UEFI)=",firmware);
  WCHAR source[MAX_PATH];n=GetEnvironmentVariableW(L"USOS_SOURCE",source,MAX_PATH);
  if(n!=2||source[1]!=L':'||source[0]<L'C'||source[0]>L'Z')ExitProcess(2);
@@ -625,7 +651,8 @@ void entry(void){
  lstrcatW(command,L" /unattend:\"");lstrcatW(command,servicing_answer);lstrcatW(command,L"\"");
  /* refresh_esp uses the command buffer too, so give Setup its own command. */
  static WCHAR setup_command[2048];lstrcpyW(setup_command,command);
- DWORD result=run_setup(setup_path,setup_command);logcode("Vista Setup returned=",result);usos_record_setup_result(result);if(result)ExitProcess(result);
+ DWORD result=run_setup(setup_path,setup_command);logcode("Vista Setup returned=",result);
+ if(result&&result!=ERROR_CANCELLED&&!store_ready)logcode("Setup failed and no unique target ESP was ever selected (delete all partitions of the target disk, or leave exactly one ESP)=",store_error?store_error:ERROR_NOT_FOUND);usos_record_setup_result(result);if(result)ExitProcess(result);
  if(!inventory(after,&after_count))ExitProcess(5);
  Target *target=0;DWORD candidates=0;
  for(DWORD i=0;i<after_count;i++){

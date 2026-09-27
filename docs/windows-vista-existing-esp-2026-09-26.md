@@ -108,3 +108,27 @@ unless it is restored or merged afterwards.
   Expected in `vista-install.log`: `Vista BCDEdit: bcdedit.exe 6.0 extracted`,
   `ESP refresh: system stores pointed at the ESP` for p2, no second ESP, and a
   first boot.
+
+## v10 (2026-09-27): no pre-Setup ESP gate
+
+X470 with B260926-211821 (v9), CSM on: Setup never started. The SSD had two
+ESPs (Windows 7 p2 plus the raw p4 left by the 0x1F run), and the old
+pre-Setup gate refused (`waiting for a unique target ESP`, exit 21) before the
+user reached the disk page.
+
+* No refusal before Setup for 0 or several internal ESPs; only the hardware
+  boot profile keeps its exact-disk gate. If Setup fails with no ESP ever
+  selected, `vista-install.log` says so.
+* Vista's disk page does not list ESPs or the MSR (QEMU: only "Partition 5"
+  is shown), so the user cannot delete a leftover ESP there. Before Setup,
+  each existing ESP's boot sector is read from the raw disk (no volume
+  opened): when no new ESP appears and exactly one of the existing ones holds
+  FAT, it is selected.
+* QEMU with WHPX (`USOS_NATIVE_ACCEL=whpx` in `qemu_native.py`), Setup
+  through file expansion only:
+  (a) `make_vista_esp_repro_disk.py --raw-second-esp` (X470 layout: WinRE,
+  Windows 7 ESP, MSR, raw ESP, C:), C: deleted: Setup starts, p2 = FAT, p4
+  = raw, both hints on p2, Setup reaches the expand phase, then the known
+  boot-configuration failure on p2's Windows-10-made BCD (above);
+  (b) blank disk: Setup starts, refuses "cannot verify a valid system volume"
+  on Next (unchanged QEMU behaviour, no ESP to hint).

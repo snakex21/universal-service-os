@@ -75,6 +75,8 @@ def main() -> int:
     p.add_argument('--size-gb', type=int, default=40)
     p.add_argument('--esp-files', type=Path, default=DEFAULT_ESP)
     p.add_argument('--blank', action='store_true', help='GPT without partitions (the blank-disk case)')
+    p.add_argument('--raw-second-esp', action='store_true',
+                   help='X470 state after the failed 183931 run: a raw 200 MB ESP (p4) between the MSR and C: (p5)')
     a = p.parse_args()
     out = a.out.resolve()
     if out.exists():
@@ -90,6 +92,10 @@ def main() -> int:
         (MSR_TYPE, 1228800, 1261567, 0x8000000000000000, 'Microsoft reserved partition'),
         (DATA_TYPE, 1261568, total - 34 - 2048, 0, 'Basic data partition'),
     ]
+    if a.raw_second_esp:
+        parts[3:] = [(ESP_TYPE, 1261568, 1671167, 0x8000000000000000, 'EFI system partition'),
+                     (DATA_TYPE, 1671168, total - 34 - 2048, 0, 'Basic data partition')]
+    c_number = 5 if a.raw_second_esp else 4
     primary, backup, _ = gpt(total, parts)
     with open(out, 'r+b') as f:
         f.write(primary)
@@ -112,9 +118,9 @@ def main() -> int:
         ps(f"$d = Get-Disk -Number {number}; if ($d.Location -ne '{vhd}') {{ throw 'disk moved' }}; "
            f"Get-Partition -DiskNumber {number} -PartitionNumber 1 | Format-Volume -FileSystem NTFS -NewFileSystemLabel WinRE -Confirm:$false | Out-Null; "
            f"Get-Partition -DiskNumber {number} -PartitionNumber 2 | Format-Volume -FileSystem FAT32 -NewFileSystemLabel SYSTEM -Confirm:$false | Out-Null; "
-           f"Get-Partition -DiskNumber {number} -PartitionNumber 4 | Format-Volume -FileSystem NTFS -NewFileSystemLabel Win7 -Confirm:$false | Out-Null; "
+           f"Get-Partition -DiskNumber {number} -PartitionNumber {c_number} | Format-Volume -FileSystem NTFS -NewFileSystemLabel Win7 -Confirm:$false | Out-Null; "
            f"Add-PartitionAccessPath -DiskNumber {number} -PartitionNumber 2 -AccessPath '{esp_dir}\\'; "
-           f"Add-PartitionAccessPath -DiskNumber {number} -PartitionNumber 4 -AccessPath '{c_dir}\\'")
+           f"Add-PartitionAccessPath -DiskNumber {number} -PartitionNumber {c_number} -AccessPath '{c_dir}\\'")
         # Windows 7 boot files as bcdboot left them (logs and the BCD are rebuilt).
         for src in esp_files.rglob('*'):
             rel = src.relative_to(esp_files)
@@ -126,9 +132,9 @@ def main() -> int:
         # The Windows 7 BCD, bound to THIS disk's ESP and C: (store file only).
         store = esp_dir / 'EFI/Microsoft/Boot/BCD'
         store.parent.mkdir(parents=True, exist_ok=True)
-        esp_letter, c_letter = ps(f"$e = Get-Partition -DiskNumber {number} -PartitionNumber 2; $c = Get-Partition -DiskNumber {number} -PartitionNumber 4; "
+        esp_letter, c_letter = ps(f"$e = Get-Partition -DiskNumber {number} -PartitionNumber 2; $c = Get-Partition -DiskNumber {number} -PartitionNumber {c_number}; "
                                   f"$e | Add-PartitionAccessPath -AssignDriveLetter; $c | Add-PartitionAccessPath -AssignDriveLetter; "
-                                  f"(Get-Partition -DiskNumber {number} -PartitionNumber 2).DriveLetter; (Get-Partition -DiskNumber {number} -PartitionNumber 4).DriveLetter").split()
+                                  f"(Get-Partition -DiskNumber {number} -PartitionNumber 2).DriveLetter; (Get-Partition -DiskNumber {number} -PartitionNumber {c_number}).DriveLetter").split()
 
         def bcd(*args: str) -> str:
             r = subprocess.run(['bcdedit', '/store', str(store), *args], capture_output=True, text=True, errors='replace')
@@ -153,9 +159,9 @@ def main() -> int:
         (c_dir / 'Users/Public/Documents').mkdir(parents=True, exist_ok=True)
         (c_dir / 'Users/Public/Documents/data.txt').write_text('user data on the old C:\n')
         ps(f"Remove-PartitionAccessPath -DiskNumber {number} -PartitionNumber 2 -AccessPath '{esp_letter}:\\'; "
-           f"Remove-PartitionAccessPath -DiskNumber {number} -PartitionNumber 4 -AccessPath '{c_letter}:\\'; "
+           f"Remove-PartitionAccessPath -DiskNumber {number} -PartitionNumber {c_number} -AccessPath '{c_letter}:\\'; "
            f"Remove-PartitionAccessPath -DiskNumber {number} -PartitionNumber 2 -AccessPath '{esp_dir}\\'; "
-           f"Remove-PartitionAccessPath -DiskNumber {number} -PartitionNumber 4 -AccessPath '{c_dir}\\'")
+           f"Remove-PartitionAccessPath -DiskNumber {number} -PartitionNumber {c_number} -AccessPath '{c_dir}\\'")
     finally:
         ps(f"Dismount-DiskImage -ImagePath '{vhd}' | Out-Null")
     shutil.rmtree(work, ignore_errors=True)
