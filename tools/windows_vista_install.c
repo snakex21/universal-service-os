@@ -843,6 +843,9 @@ static BOOL configure_boot(const Target *t){
  // is published later (install_optional_dispatcher), after the USB arming.
 done:unmount_esp(alias);return ok;
 }
+static DWORD WINAPI done_notice(LPVOID unused){
+ (void)unused;MessageBoxW(0,USOS_UI_TEXT(VISTA_CSMWRAP_DONE),USOS_UI_TEXT(VISTA_CSMWRAP_TITLE),MB_OK|MB_ICONINFORMATION|MB_SETFOREGROUND|MB_TOPMOST|MB_SYSTEMMODAL);return 0;
+}
 void entry(void){
  HKEY mini;OSVERSIONINFOW version={sizeof(version)};FIRMWARE_TYPE firmware;
  if(RegOpenKeyExW(HKEY_LOCAL_MACHINE,L"SYSTEM\\CurrentControlSet\\Control\\MiniNT",0,KEY_READ,&mini)!=ERROR_SUCCESS)ExitProcess(2);RegCloseKey(mini);
@@ -910,7 +913,10 @@ void entry(void){
  retire_prepared_disk(L".done");
  CloseHandle(log_file);path(scratch,base,L"usos-vista-install.log");WCHAR target_log[MAX_PATH];path(target_log,target->root,L"USOS\\Vista\\installation-from-usb.log");
  if(!CopyFileW(scratch,target_log,FALSE))ExitProcess(9);
- /* The firmware may list the USOS stick first: say how the disk continues. */
- if(csmwrap)MessageBoxW(0,USOS_UI_TEXT(VISTA_CSMWRAP_DONE),USOS_UI_TEXT(VISTA_CSMWRAP_TITLE),MB_OK|MB_ICONINFORMATION);
+ /* The firmware may list the stick first: say how the disk continues. The
+  * dialog must never hold the restart: in QEMU it got no keyboard focus from
+  * this hidden-console process, so it is forced to the foreground and the
+  * restart follows after 3 minutes anyway (everything is written already). */
+ if(csmwrap){HANDLE notice=CreateThread(0,0,done_notice,0,0,0);if(notice){WaitForSingleObject(notice,180000);CloseHandle(notice);}}
  ExitProcess(0);
 }
