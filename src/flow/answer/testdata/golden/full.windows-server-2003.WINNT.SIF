@@ -23,6 +23,8 @@ OemSkipWelcome=1
 TimeZone=100
 AdminPassword="Test123!"
 EncryptedAdminPassword=No
+AutoLogon=Yes
+AutoLogonCount=1
 [UserData]
 FullName="Tester"
 OrgName="O'Brien Lab"

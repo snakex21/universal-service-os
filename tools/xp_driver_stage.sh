@@ -1,7 +1,13 @@
 #!/bin/sh
-# Experimental XP only. Source preflight runs BEFORE the disk-reset dialog.
+# Experimental XP (and Server 2003 x86 SP2: the same bundle format, built by
+# tools/xp_driver_overlay.py on the system's own StorPort/ACPI). Source
+# preflight runs BEFORE the disk-reset dialog.
 usos_xp_driver_preflight() {
+    if [ "${NT5_SYSTEM:-windows-xp}" = windows-server-2003 ]; then
+        ls "$SOURCE_ROOT"/WIN51I?.SP2 >/dev/null 2>&1 || { echo '[XP_DRIVERS] STOP: this driver set requires Windows Server 2003 SP2'; return 1; }
+    else
     [ -f "$SOURCE_ROOT/WIN51IP.SP3" ] || { echo '[XP_DRIVERS] STOP: this driver set requires XP Professional SP3'; return 1; }
+    fi
     XP_DRIVER_BUNDLE=''
     for bundle in /usr/lib/usos/xp-drivers/*; do
         [ -f "$bundle/source.sha256" ] || continue

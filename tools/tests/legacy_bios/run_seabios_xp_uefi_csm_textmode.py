@@ -80,6 +80,15 @@ class Monitor:
             while self.s.recv(65536):pass
         except OSError:pass
     def cmd(self,text):self.s.sendall(text.encode()+b'\n');time.sleep(0.15);self.drain()
+    def query(self,text):
+        self.drain();self.s.sendall(text.encode()+b'\n');time.sleep(0.5);out=b''
+        try:
+            while True:
+                chunk=self.s.recv(65536)
+                if not chunk:break
+                out+=chunk
+        except OSError:pass
+        return out.decode(errors='replace')
 
 def vga_text(dump,rows_count):
     b=dump.read_bytes();rows=[]
@@ -96,9 +105,11 @@ def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),
     entries=cpio.parse_newc(gzip.decompress((PACKAGE/'initramfs-xp').read_bytes()))
     probe=PROBE_INIT.replace('USOS_PLAN_PROFILE=xp-x86-sp3-uefi-csm','USOS_PLAN_PROFILE='+profile)
     if profile in NT5_UEFI_SYSTEMS:
-        # Windows 2000 / Server 2003 / XP x64 from UEFI: their NT5 profile, no XP driver bundle.
+        # Windows 2000 / Server 2003 / XP x64 from UEFI: their NT5 profile.
         probe=probe.replace('. /usr/lib/usos/nt5_profile.sh; usos_nt5_profile','export NT5_SYSTEM='+NT5_UEFI_SYSTEMS[profile]+'; . /usr/lib/usos/nt5_profile.sh; usos_nt5_profile')
-        probe=probe.replace(". /usr/lib/usos/xp_driver_stage.sh; usos_xp_driver_preflight || finish 'FAIL driver preflight'"+chr(10),'')
+        if profile!='w2k3-x86-sp2-uefi-csm':
+            # Only Server 2003 has a source-bound bundle (KMDF, USB3, GenAHCI).
+            probe=probe.replace(". /usr/lib/usos/xp_driver_stage.sh; usos_xp_driver_preflight || finish 'FAIL driver preflight'"+chr(10),'')
     if profile=='nt5-staging':
         # The BIOS NT5 profile has no driver preflight (and no bundles).
         probe=probe.replace(". /usr/lib/usos/xp_driver_stage.sh; usos_xp_driver_preflight || finish 'FAIL driver preflight'"+chr(10),'')
@@ -126,13 +137,14 @@ def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),
     if '[TEXTMODE_PROBE] RESULT PREPARED-PASS' not in log:raise SystemExit('preparation failed:\n'+log[-5000:])
     return target
 
-def textmode(out,target,keys,minutes,ahci=False):
-    port=free_port()
+def textmode(out,target,keys,minutes,ahci=False,usb_only=False,run_through=False,type_at=()):
+    port=free_port();pending=sorted(type_at)
     # --ahci: the target on an AHCI controller (PCI class 010601, the X470 case).
     disk=['-device','ahci,id=ahci','-drive','if=none,id=target,format=qcow2,file='+str(target),'-device','ide-hd,drive=target,bus=ahci.0'] if ahci else ['-drive','if=ide,index=0,format=qcow2,file='+str(target)]
+    usb=['-device','qemu-xhci,id=xhci','-device','usb-kbd,bus=xhci.0','-device','usb-tablet,bus=xhci.0'] if usb_only else []
     proc=subprocess.Popen([str(QEMU),'-machine','pc','-accel','tcg,thread=multi','-cpu','max','-m','512','-smp','1','-bios',str(SEABIOS),
         '-boot','order=c,strict=on','-display','none','-vga','std','-nic','none','-monitor',f'tcp:127.0.0.1:{port},server=on,wait=off',
-        *disk],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        *disk,*usb],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     screens=[];last=None;deadline=time.time()+minutes*60;shots=out/'screens';shots.mkdir(exist_ok=True)
     key_list=keys.split() if keys else [];key_index=0;result='timeout';copying_since=None
     try:
@@ -156,9 +168,17 @@ def textmode(out,target,keys,minutes,ahci=False):
             if time.time()-start<75 and time.time()-last_shot>=1.5:
                 last_shot=time.time();frame+=1
                 mon.cmd(f'screendump "{(shots/("boot-%03d.ppm"%frame)).as_posix()}"')
+            while pending and time.time()-start>=pending[0]:
+                import run_csmwrap_xp_ovmf as csm_harness
+                csm_harness.usb_input(mon,shots,'usb-%d'%int(pending.pop(0)))
+            if run_through and time.time()-last_shot>=3:
+                last_shot=time.time();frame+=1
+                mon.cmd(f'screendump "{(shots/("frame-%03d.ppm"%frame)).as_posix()}"')
             low=text.lower()
             copying=('kopiuje pliki' in low or 'copying files' in low) and '%' in low
-            if copying and not key_list:result='copying';break
+            if copying and not key_list:
+                result='copying'
+                if not run_through:break
             if copying and copying_since is None:copying_since=time.time()
             if copying_since is not None and time.time()-copying_since>45:
                 # Keys kept arriving for 45 s of copying: still copying = no effect.
@@ -180,7 +200,10 @@ def textmode(out,target,keys,minutes,ahci=False):
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--iso',type=Path,default=DEFAULT_ISO)
     p.add_argument('--keys',default='');p.add_argument('--minutes',type=float,default=25);p.add_argument('--reuse-prepared',type=Path);p.add_argument('--prepare-only',action='store_true',help='stop after phase 1 (for tools/tests/target_digest.py)');p.add_argument('--profile',default='xp-x86-sp3-uefi-csm',choices=['xp-x86-sp3-uefi-csm','nt5-staging','w2k-x86-sp4-uefi-csm','w2k3-x86-sp2-uefi-csm','xp-x64-sp2-uefi-csm'],help='nt5-staging: the BIOS XP preparation of the same scripts; w2k-x86-sp4-uefi-csm: Windows 2000 from UEFI (--iso a 2000 ISO)')
-    p.add_argument('--ahci',action='store_true',help='boot the prepared target from an AHCI controller');p.add_argument('--settings',type=Path,help='usos-xp.ini to validate and merge (stand-in for the DATA Unattended file)');p.add_argument('--tree-scripts',default='',help='space-separated tools/*.sh names taken from the working tree');p.add_argument('--sif',type=Path,help='.sif chosen in the menu (merged into the automatic answer)')
+    p.add_argument('--ahci',action='store_true',help='boot the prepared target from an AHCI controller')
+    p.add_argument('--usb-only',action='store_true',help='qemu-xhci + usb-kbd + usb-tablet; the pointer is routed to the USB tablet (the 8042 stays: the X470 has one, and NTDETECT hangs without it)')
+    p.add_argument('--run-through',action='store_true',help='keep running after text-mode copying (frames every 3 s)')
+    p.add_argument('--type-at',default='',help='seconds after the boot at which to type and move the pointer (space-separated)');p.add_argument('--settings',type=Path,help='usos-xp.ini to validate and merge (stand-in for the DATA Unattended file)');p.add_argument('--tree-scripts',default='',help='space-separated tools/*.sh names taken from the working tree');p.add_argument('--sif',type=Path,help='.sif chosen in the menu (merged into the automatic answer)')
     a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
     prepared=a.reuse_prepared.resolve() if a.reuse_prepared else prepare(out,a.iso,a.profile,a.settings,a.tree_scripts.split(),a.sif)
     print('[PASS] prepared',prepared,flush=True)
@@ -188,6 +211,6 @@ if __name__=='__main__':
     # Boot an overlay so the prepared image stays pristine for further runs.
     target=out/'boot-overlay.qcow2';target.unlink(missing_ok=True)
     subprocess.run([str(QEMU_IMG),'create','-q','-f','qcow2','-F','qcow2','-b',str(prepared),str(target)],check=True)
-    r=textmode(out,target,a.keys,a.minutes,a.ahci)
+    r=textmode(out,target,a.keys,a.minutes,a.ahci,a.usb_only,a.run_through,[float(t) for t in a.type_at.split()])
     print('[RESULT]',r)
     sys.exit(0 if r=='copying' else 1)

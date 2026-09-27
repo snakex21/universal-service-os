@@ -17,6 +17,18 @@ SELECTED=['ACPI/acpi.sys','Dependencies/ntoskrn8.sys','Dependencies/storport.sys
 # These original XP dependencies may otherwise be loaded by text setup but left
 # uncopied (SourceDisksFiles copy flags 1,3) before the GUI welcome prompt.
 BUILTIN_USB=('usbport.sys','usbd.sys','hidclass.sys','hidparse.sys')
+# Windows Server 2003 x86 SP2 (NT 5.2): the same KMDF + USB3 backport and
+# GenAHCI, on the system's OWN StorPort and ACPI (every import resolves on
+# 5.2 with export forwarders followed: tools/tests/check_nt52_driver_imports.py).
+NT52_SELECTED=[n for n in SELECTED if n not in ('ACPI/acpi.sys','Dependencies/storport.sys')]
+NT52_MARKERS=('WIN51IS.SP2','WIN51IA.SP2','WIN51IB.SP2','WIN51ID.SP2','WIN51IC.SP2')
+
+def source_kind(iso):
+    """'xp-sp3' or 'w2k3-sp2' from the media's tag files."""
+    listing=subprocess.run([SEVEN,'l','-ba',str(iso)],check=True,capture_output=True,text=True,errors='replace').stdout.upper().split()
+    if 'WIN51IP.SP3' in listing:return 'xp-sp3'
+    if any(m in listing for m in NT52_MARKERS):return 'w2k3-sp2'
+    raise ValueError('Driver experiment requires XP Professional SP3 or Windows Server 2003 SP2 (x86)')
 
 def sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()
 def decode(b): return (b.decode('utf-16'), 'utf-16') if b.startswith(b'\xff\xfe') else (b.decode('latin1'),'latin1')
@@ -112,11 +124,15 @@ def build_driver_overlay(iso,out):
     # otherwise leak that ISO's extracted SP3.CAB files into this cabinet.
     for work in ('original','sp3-files','raw','native-usb','source-driver-cache','bundle'):shutil.rmtree(out/work,ignore_errors=True)
     original=out/'original';original.mkdir(exist_ok=True)
-    subprocess.run([SEVEN,'e',str(iso),*['I386\\'+n for n in META],r'I386\SP3.CAB','WIN51IP.SP3','-o'+str(original),'-y'],check=True,stdout=subprocess.DEVNULL)
-    if not (original/'WIN51IP.SP3').exists():raise ValueError('Driver experiment currently requires XP Professional SP3')
+    kind=source_kind(iso)
+    # XP SP3: SP3.CAB, community ACPI and the StorPort backport (unchanged);
+    # Server 2003 SP2: SP2.CAB only for the inbox USB files, nothing replaced in it.
+    sp_cab,selected,marker=('SP3.CAB',SELECTED,'WIN51IP.SP3') if kind=='xp-sp3' else ('SP2.CAB',NT52_SELECTED,'WIN51')
+    subprocess.run([SEVEN,'e',str(iso),*['I386\\'+n for n in META],'I386\\'+sp_cab,marker,'-o'+str(original),'-y'],check=True,stdout=subprocess.DEVNULL)
+    if not (original/marker).exists():raise ValueError('Driver experiment currently requires XP Professional SP3')
     for n in META:assert (original/n).is_file(),n
     cabdir=out/'sp3-files';cabdir.mkdir(exist_ok=True)
-    subprocess.run([SEVEN,'e',str(original/'SP3.CAB'),'-o'+str(cabdir),'-y'],check=True,stdout=subprocess.DEVNULL)
+    subprocess.run([SEVEN,'e',str(original/sp_cab),'-o'+str(cabdir),'-y'],check=True,stdout=subprocess.DEVNULL)
     bundle=out/'bundle';bundle.mkdir(exist_ok=True)
     hashes=''.join(sha(original/n)+'  I386/'+n+'\n' for n in META)
     bundle_id=hashlib.sha256(hashes.encode()).hexdigest()
@@ -124,7 +140,7 @@ def build_driver_overlay(iso,out):
     i386=bundle/'I386';i386.mkdir(exist_ok=True)
     raw=out/'raw';raw.mkdir(exist_ok=True)
     expected={e['file']:e['sha256'] for e in json.loads((DRIVERS/'manifest.json').read_text())['files']}
-    for name in SELECTED:
+    for name in selected:
         src=DRIVERS/name
         if sha(src)!=expected[name]:raise ValueError('Driver package changed: '+name)
         p=raw/src.name.upper();shutil.copyfile(src,p)
@@ -137,7 +153,7 @@ def build_driver_overlay(iso,out):
         pack_file(p,i386/(p.name[:-1]+'_'))
     native=out/'native-usb';native.mkdir(exist_ok=True)
     fallback=out/'source-driver-cache';fallback.mkdir(exist_ok=True)
-    sp3_stamps=xp_cab.stamps((original/'SP3.CAB').read_bytes())
+    sp3_stamps=xp_cab.stamps((original/sp_cab).read_bytes())
     driver_stamps={}
     if any(not (cabdir/n).is_file() for n in BUILTIN_USB):
         # SP3.CAB contains updated files; unchanged XP files remain in DRIVER.CAB.
@@ -150,7 +166,7 @@ def build_driver_overlay(iso,out):
         shutil.copyfile(src,native/name)
         # Unchanged Microsoft file: keep the date/time of the cabinet it came from.
         pack_file(src,i386/(name[:-1]+'_').upper(),sp3_stamps if src.parent==cabdir else driver_stamps)
-    names=[Path(n).name.lower() for n in SELECTED]+list(BUILTIN_USB)
+    names=[Path(n).name.lower() for n in selected]+list(BUILTIN_USB)
     sysnames=[n for n in names if n.endswith('.sys')]
     text,encoding=decode((original/'TXTSETUP.SIF').read_bytes())
     # Avoid x86-specific entries overriding changed generic entries (and vice versa).
@@ -191,6 +207,9 @@ def build_driver_overlay(iso,out):
     for suffix in ('.LOG','.LOG1','.LOG2'):(i386/('SETUPREG.HIV'+suffix)).unlink(missing_ok=True)
     # The registry engine stamps the build time into touched keys and header.
     hive=i386/'SETUPREG.HIV';hive.write_bytes(xp_hive.pin_hive(hive.read_bytes(),(original/'SETUPREG.HIV').read_bytes()))
+    if kind=='w2k3-sp2':
+        # The system's own ACPI and StorPort stay: no cabinet to rebuild.
+        return finish_bundle(out,bundle,i386,native,names,selected,bundle_id,iso)
     # PnP can extract ACPI from SP3.CAB later, so replace its copy too.
     acpi=[p for p in cabdir.iterdir() if p.name.lower()=='acpi.sys']
     if len(acpi)!=1:raise ValueError('SP3.CAB lacks unique ACPI; refusing incomplete integration')
@@ -202,9 +221,12 @@ def build_driver_overlay(iso,out):
     subprocess.run(['C:/Windows/System32/makecab.exe','/F',str(ddf)],check=True,stdout=subprocess.DEVNULL)
     # Unchanged files keep Microsoft's date/time; the replaced ACPI gets the pinned one.
     xp_cab.pin(i386/'SP3.CAB',{n:t for n,t in sp3_stamps.items() if n!=acpi[0].name.lower()})
+    return finish_bundle(out,bundle,i386,native,names,selected,bundle_id,iso)
+
+def finish_bundle(out,bundle,i386,native,names,selected,bundle_id,iso):
     (bundle/'payload.sha256').write_text(''.join(sha(p)+'  I386/'+p.name+'\n' for p in sorted(i386.iterdir()) if p.is_file()),encoding='ascii',newline='\n')
     (bundle/'replace-names.txt').write_text('\n'.join(n.upper() for n in names)+'\n',encoding='ascii',newline='\n')
-    report={'id':bundle_id,'source':iso.name,'source_size':iso.stat().st_size,'drivers':SELECTED,'native_usb_dependencies':{n:sha(native/n) for n in BUILTIN_USB},'sha256':{p.relative_to(bundle).as_posix():sha(p) for p in bundle.rglob('*') if p.is_file() and p.name!='manifest.json'},'runtime_verified':False}
+    report={'id':bundle_id,'source':iso.name,'source_size':iso.stat().st_size,'drivers':selected,'native_usb_dependencies':{n:sha(native/n) for n in BUILTIN_USB},'sha256':{p.relative_to(bundle).as_posix():sha(p) for p in bundle.rglob('*') if p.is_file() and p.name!='manifest.json'},'runtime_verified':False}
     (bundle/'manifest.json').write_text(json.dumps(report,indent=2)+'\n')
     print('XP_DRIVER_OVERLAY_BUILT',bundle_id,'SYS/INF',len(names),flush=True)
     return bundle_id,bundle

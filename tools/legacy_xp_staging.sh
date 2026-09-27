@@ -451,7 +451,9 @@ usos_legacy_xp_staging() {
     export SOURCE_ROOT TARGET_DEVICE USOS_DISK_DEVICE
     sh /usr/lib/usos/probe_nt5_source.sh || stop 'Invalid NT5 source; no target write occurred'
     if usos_nt5_uefi_profile; then
-    if [ "$NT5_SYSTEM" = windows-xp ]; then
+    if [ "$NT5_SYSTEM" = windows-xp ] || [ "$NT5_SYSTEM" = windows-server-2003 ]; then
+    # XP SP3 and Server 2003 SP2: the source-bound bundle (Server 2003: KMDF,
+    # USB3 xHCI backport and GenAHCI on the system StorPort).
     . /usr/lib/usos/xp_driver_stage.sh
     usos_xp_driver_preflight || stop 'XP driver preflight failed; no target write occurred'
     elif [ "$NT5_SYSTEM" = windows-2000 ]; then
@@ -460,7 +462,7 @@ usos_legacy_xp_staging() {
     # its inbox drivers (docs/windows-2000-uefi-2026-09-27.md).
     printf '[W2K_DRIVERS] none: the XP bundle is NT 5.1 only; inbox IDE/ACPI drivers\n'
     else
-    # NT 5.2 (Server 2003 x86, XP x64): GenAHCI on the system's own StorPort
+    # XP x64 (NT 5.2 amd64): GenAHCI on the system's own StorPort
     # (nt5_storage_stage.sh, applied to the target after the source copy).
     case "$NT5_SOURCE_DIR" in AMD64) nt5_storage_arch=amd64 ;; *) nt5_storage_arch=x86 ;; esac
     [ -f "/usr/lib/usos/nt5-storage/$nt5_storage_arch/genahci.sys" ] || stop 'NT 5.2 AHCI driver (GenAHCI) is missing from the package; no target write occurred'

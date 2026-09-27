@@ -105,6 +105,9 @@ def main() -> int:
     w2k3 = sh(f"NT5_SYSTEM=windows-server-2003 usos_xp_settings_sif '{posix(w2k3_base)}' '{posix(settings)}'").stdout.decode().splitlines()
     check('2003: ProductKey, licensing', 'ProductKey=ABCDE-12345-ABCDE-12345-ABCDE' in w2k3 and '[LicenseFilePrintData]' in w2k3
           and 'AutoMode=PerServer' in w2k3 and 'AutoUsers=5' in w2k3, str(w2k3))
+    check('2003: keyed answer is FullUnattended with one AutoLogon', 'UnattendMode=FullUnattended' in w2k3 and 'AutoLogon=Yes' in w2k3
+          and 'AutoLogonCount=1' in w2k3, str(w2k3))
+    check('XP: no AutoLogon', 'AutoLogon=Yes' not in lines)
     check('2003: \\WINDOWS, setup-end script', 'TargetPath=\\WINDOWS' in w2k3 and 'UserExecute="C:\\USOS\\W2K3\\usos-setup.cmd"' in w2k3)
     xp64_base = ROOT / 'tools' / 'xp64_selected_partition_uefi_csm.sif'
     xp64 = sh(f"NT5_SYSTEM=windows-xp-x64 usos_xp_settings_sif '{posix(xp64_base)}' '{posix(settings)}'").stdout.decode().splitlines()

@@ -186,6 +186,23 @@ def release_selection(supported,hashes):
     if missing:raise ValueError('XP release: allowlisted source missing on DATA: '+', '.join(RELEASE_SOURCES[h] for h in missing))
     return chosen
 
+def nt52_bundles(data):
+    """Server 2003 x86 SP2 bundles (KMDF + USB3 backport + GenAHCI) for the
+    ISOs in DATA's Windows Server 2003 folder; other ISOs there are skipped."""
+    from xp_driver_overlay import source_kind
+    folder=data/'Systems/Windows/Windows Server 2003/Images'
+    bundles=[];sources=[]
+    for iso in sorted(folder.glob('*.iso')) if folder.exists() else []:
+        try:
+            if source_kind(iso)!='w2k3-sp2':continue
+        except ValueError:
+            print('NT52: skipping non-SP2 source',iso.name,flush=True);continue
+        h=digest(iso)
+        bundle_id,bundle=build_driver_overlay(iso,OUT/'drivers'/h)
+        bundles.append((bundle_id,bundle));sources.append({'name':iso.name,'sha256':h,'size':iso.stat().st_size,'bundle':bundle_id})
+        print('NT52_BUNDLE_BUILT',iso.name,bundle_id,flush=True)
+    return bundles,sources
+
 def same_tree(a, b):
     files = lambda root: {p.relative_to(root).as_posix(): p.read_bytes() for p in root.rglob('*') if p.is_file()}
     return files(a) == files(b)
@@ -217,9 +234,11 @@ def build_from_old(micro, data, old):
             bundle_id,bundle=source['bundle'],target/'bundle'
             print('XP_BUNDLE_REUSED',source['name'],bundle_id,flush=True)
         driver_bundles.append((bundle_id,bundle));sources.append(dict(source))
-    init=OUT/'initramfs-xp';init.write_bytes(overlay(base,helper,driver_bundles))
+    nt52,nt52_sources=nt52_bundles(data)
+    init=OUT/'initramfs-xp';init.write_bytes(overlay(base,helper,driver_bundles+nt52))
     shutil.copyfile(kernel,OUT/'vmlinuz.efi')
     metadata=dict(old_meta)
+    metadata['nt52_driver_sources']=nt52_sources
     metadata.update({'driver_bundles':[n for n,_ in driver_bundles],'driver_sources':sources,'base_initramfs_sha256':digest(base),'base_kernel_sha256':digest(kernel),'hardware_verified':False,'sha256':{p.name:digest(p) for p in [init,OUT/'vmlinuz.efi',helper]}})
     metadata.pop('added_source',None)
     (OUT/'manifest.json').write_text(json.dumps(metadata,indent=2)+'\n')
@@ -247,10 +266,12 @@ def build(micro, data, release=False):
     sources=[{'name':p.name,'sha256':hashes[p],'size':p.stat().st_size} for p in supported]
     driver_bundles=[build_driver_overlay(p,OUT/'drivers'/s['sha256']) for p,s in zip(supported,sources)]
     for s,(bundle_id,_) in zip(sources,driver_bundles):s['bundle']=bundle_id
-    init=OUT/'initramfs-xp';init.write_bytes(overlay(base,helper,driver_bundles))
+    nt52,nt52_sources=nt52_bundles(data)
+    init=OUT/'initramfs-xp';init.write_bytes(overlay(base,helper,driver_bundles+nt52))
     shutil.copyfile(kernel,OUT/'vmlinuz.efi')
     for stale in OUT.glob('XP-SP*-UEFI-CSM-PAE.efi'):stale.unlink()
     metadata={'experimental':True,'driver_bundles':[n for n,_ in driver_bundles],'driver_supported_sources':[p.name for p in supported],'driver_sources':sources,'firmware':'UEFI preparation; XP through firmware CSM','hardware_verified':False,'base_initramfs_sha256':digest(base),'base_kernel_sha256':digest(kernel),'launchers':[],'iso_names':[i.name for i in (supported if release else images)],'profile':'xp-x86-sp3-uefi-csm','sha256':{p.name:digest(p) for p in [init,OUT/'vmlinuz.efi',helper]}}
+    metadata['nt52_driver_sources']=nt52_sources
     if release:metadata['release']=True
     (OUT/'manifest.json').write_text(json.dumps(metadata,indent=2)+'\n')
     print('XP_UEFI_CSM_TRIAL_BUILT; base scripts unchanged (profile xp-x86-sp3-uefi-csm); no VM/E2E',flush=True)

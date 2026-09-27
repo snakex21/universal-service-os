@@ -176,7 +176,34 @@ def to_png(ppm):
         return ppm
 
 
-def boot(out, disk, tag, vga, accel, minutes, shots_every=3.0, run_through=False):
+
+USB_ONLY = ['-device', 'qemu-xhci,id=xhci', '-device', 'usb-kbd,bus=xhci.0', '-device', 'usb-tablet,bus=xhci.0']
+
+
+def usb_input(mon, shots, tag):
+    """Pointer through the USB tablet only (selected with mouse_set: an
+    absolute move lands only when the guest's xHCI + HID stack runs) and keys
+    (HMP sendkey goes to QEMU's active keyboard). The 8042 stays present:
+    the X470 has one, and NTDETECT hangs without any keyboard controller."""
+    mice = mon.query('info mice')
+    (shots / (tag + '-mice.txt')).write_text(mice, encoding='utf-8')
+    for line in mice.splitlines():
+        if 'Tablet' in line and 'Mouse #' in line:
+            mon.cmd('mouse_set ' + line.split('Mouse #')[1].split(':')[0].strip())
+    mon.cmd(f'screendump "{(shots / (tag + "-before.ppm")).as_posix()}"')
+    for key in ('q', 'w', 'e', 'r', 't', '1', '2', '3'):
+        mon.cmd('sendkey ' + key)
+        time.sleep(0.3)
+    time.sleep(2)
+    mon.cmd(f'screendump "{(shots / (tag + "-typed.ppm")).as_posix()}"')
+    for x, y in ((100, 100), (500, 400), (320, 240)):
+        mon.cmd(f'mouse_move {x} {y}')
+        time.sleep(0.5)
+    time.sleep(1)
+    mon.cmd(f'screendump "{(shots / (tag + "-pointer.ppm")).as_posix()}"')
+
+
+def boot(out, disk, tag, vga, accel, minutes, shots_every=3.0, run_through=False, usb_only=False, ahci=False, type_at=()):
     shots = out / tag
     shutil.rmtree(shots, ignore_errors=True)
     shots.mkdir(parents=True)
@@ -189,8 +216,11 @@ def boot(out, disk, tag, vga, accel, minutes, shots_every=3.0, run_through=False
            '-drive', f'if=pflash,unit=1,format=raw,file={vars_copy}',
            '-display', 'none', '-nic', 'none', '-serial', f'file:{serial}',
            '-monitor', f'tcp:127.0.0.1:{port},server=on,wait=off',
-           '-drive', f'if=ide,index=0,format=qcow2,file={disk}']
+           *(['-device', 'ahci,id=ahci', '-drive', f'if=none,id=target,format=qcow2,file={disk}', '-device', 'ide-hd,drive=target,bus=ahci.0']
+             if ahci else ['-drive', f'if=ide,index=0,format=qcow2,file={disk}'])]
     cmd += ['-vga', 'std'] if vga == 'std' else ['-vga', 'none', '-device', vga]
+    cmd += USB_ONLY if usb_only else []
+    pending = sorted(type_at)
     proc = subprocess.Popen([str(c) for c in cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     events, last, result = [], None, 'timeout'
     start = time.time()
@@ -221,6 +251,8 @@ def boot(out, disk, tag, vga, accel, minutes, shots_every=3.0, run_through=False
                 last_shot = time.time()
                 frame += 1
                 mon.cmd(f'screendump "{(shots / ("frame-%03d.ppm" % frame)).as_posix()}"')
+            while pending and time.time() - start >= pending[0]:
+                usb_input(mon, shots, 'usb-%d' % int(pending.pop(0)))
             low = text.lower()
             if ('copying files' in low or 'kopiuje pliki' in low) and '%' in low and result != 'copying':
                 result = 'copying'
@@ -249,7 +281,7 @@ def boot(out, disk, tag, vga, accel, minutes, shots_every=3.0, run_through=False
     (shots / 'cur.bin').unlink(missing_ok=True)
     vars_copy.unlink(missing_ok=True)
     summary = {'tag': tag, 'result': result, 'seconds': round(time.time() - start, 1), 'vga': vga,
-               'accel': accel, 'events': events}
+               'accel': accel, 'usb_only': usb_only, 'ahci': ahci, 'type_at': list(type_at), 'events': events}
     (shots / 'result.json').write_text(json.dumps(summary, indent=1, ensure_ascii=False), encoding='utf-8')
     return result
 

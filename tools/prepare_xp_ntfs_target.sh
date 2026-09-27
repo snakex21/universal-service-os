@@ -58,9 +58,9 @@ mkdir "$work/volume"
 mount -t ntfs3 "$node" "$work/volume"; mounted=yes
 export XP_TARGET_ROOT="$work/volume" MTOOLS_IMAGE="$node"
 sh "$SCRIPT_DIR/prepare_xp_local_source.sh"
-if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ]; then
+if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ] || [ "${USOS_PLAN_PROFILE:-}" = w2k3-x86-sp2-uefi-csm ]; then
 sh "$SCRIPT_DIR/xp_driver_stage.sh" apply || fail 'XP driver integration failed'
-elif usos_nt5_uefi_generic_profile && { [ "$NT5_SYSTEM" = windows-server-2003 ] || [ "$NT5_SYSTEM" = windows-xp-x64 ]; }; then
+elif usos_nt5_uefi_generic_profile && [ "$NT5_SYSTEM" = windows-xp-x64 ]; then
 sh "$SCRIPT_DIR/nt5_storage_stage.sh" apply || fail 'NT 5.2 AHCI driver integration failed'
 fi
 XP_EXPECTED_MBR="$work/expected" sh "$SCRIPT_DIR/prepare_xp_windows_partition.sh"
