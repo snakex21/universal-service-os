@@ -43,6 +43,22 @@ profile model. Design: [design/linux-iso-boot.md](design/linux-iso-boot.md).
   `-kernel/-initrd` + helper, USB disk, BIOS or `--uefi`, screenshots in
   `tools/tests/artifacts/linux-iso/<name>/`), `iso9660_rr.py`.
 
+- UEFI: `src/platform/uefi/linux_iso_start.zig` (open ISO on DATA, NTFS runs
+  -> `/usos/iso.map`, `recipe.plan`, kernel + initrds + ESP helper cpio +
+  per-boot cpio, initrd via `LINUX_EFI_INITRD_MEDIA_GUID` LoadFile2,
+  `LoadOptions`, start through `verified_image.loadBuffer`), dispatched from
+  `manual_summary.start` for `backend == .linux_iso`. Compiles; **never run**.
+  Secure Boot relay not written (a non-Fedora kernel under SB ends in
+  "Secure Boot rejected"). No answer rendering yet (`answer` is null).
+- Routing: backend `linux_iso` (firmware any, badge experimental), profile
+  `linux-iso-uefi` (UEFI only, all Linux ids, `automatic`/`direct_iso`,
+  progress `linux_iso`); new systems `systemrescue` (Secure Boot off trait),
+  `gparted-live`, `clonezilla`. Golden regenerated: removed/changed rows are
+  only the 9 existing Linux systems' UEFI `iso` rows (route/menu/profile, 45
+  rows); everything else is additions. BIOS still routes Linux as before
+  (`linux_live_iso` SliTaz for other-linux, chainload otherwise); the Core has
+  no generic Linux path yet.
+
 ## First QEMU result (direct kernel boot, no menu)
 
 `python tools/tests/linux_iso/run_linux_iso_direct.py gparted` (SeaBIOS,
