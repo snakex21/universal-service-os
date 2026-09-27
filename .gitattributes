@@ -35,3 +35,6 @@ src/i18n/testdata/lang-pl.bin  binary
 
 # Answer renderer goldens and vectors are compared byte for byte (LF and CRLF on purpose).
 src/flow/answer/testdata/** -text
+
+# Pinned by SHA-256 in tools/vendor/csmwrap/3.1.2/manifest.json (LF bytes).
+tools/vendor/csmwrap/3.1.2/COPYING.LESSER -text
