@@ -59,7 +59,32 @@ pub const Context = struct {
     system: *const usos.catalog.SystemEntry,
     /// USOS profiles can be handed on for this selection.
     profiles_allowed: bool,
+    /// The image chosen before this screen (the editor lists its editions).
+    image: ?usos.catalog.ImageItem = null,
 };
+
+var editor_images: usos.flow.answer.editions.List = .{};
+var editor_images_for: usos.catalog.FixedText = .{};
+var editor_images_known = false;
+var editor_images_system: ?*const usos.catalog.SystemEntry = null;
+
+/// The editions of the chosen ISO for the editor's list picker (read once
+/// per image); null: no ISO, NT5, or unreadable (the editor offers text).
+fn editorImages(context: Context) ?*const usos.flow.answer.editions.List {
+    const image = context.image orelse return null;
+    if (image.kind != .iso) return null;
+    const family = usos.flow.answer.target.familyFor(context.system.id) orelse return null;
+    if (family.nt5()) return null;
+    if (!(editor_images_known and editor_images_system == context.system and std.mem.eql(u8, editor_images_for.slice(), image.name.slice()))) {
+        editor_images_for = image.name;
+        editor_images_known = true;
+        editor_images_system = context.system;
+        @import("windows_media_probe.zig").readEditions(context.system, image.name.slice(), &editor_images) catch {
+            editor_images.len = 0;
+        };
+    }
+    return if (editor_images.len > 0) &editor_images else null;
+}
 
 pub fn select(discovery: *usos.catalog.media_discovery.Discovery, context: Context) Result {
     const system = context.system;
@@ -96,7 +121,7 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, context: Conte
                     var stem_copy: [32]u8 = undefined;
                     const s = answer_profiles.stem(index);
                     @memcpy(stem_copy[0..s.len], s);
-                    if (profile_editor.edit(context.root, &p, stem_copy[0..s.len], system.id, system.name)) |name| selected = rowOfProfile(name);
+                    if (profile_editor.edit(context.root, &p, stem_copy[0..s.len], system.id, system.name, editorImages(context))) |name| selected = rowOfProfile(name);
                 } else if (row == .xp_settings) {
                     selected = importXp(context, directory, settings_name.?) orelse outcome.index;
                 }
@@ -121,7 +146,7 @@ fn rowOfProfile(name: []const u8) ?usize {
 
 fn addProfile(context: Context) ?usize {
     const p = profile_editor.defaults(view.languageCode());
-    const name = profile_editor.edit(context.root, &p, null, context.system.id, context.system.name) orelse return null;
+    const name = profile_editor.edit(context.root, &p, null, context.system.id, context.system.name, editorImages(context)) orelse return null;
     return rowOfProfile(name);
 }
 
@@ -131,7 +156,7 @@ fn importXp(context: Context, directory: []const u8, name: []const u8) ?usize {
     const imported = xp_settings.importProfile(directory, name, &p) orelse return null;
     _ = imported;
     p.name.set("usos-xp") catch {};
-    const saved = profile_editor.edit(context.root, &p, null, context.system.id, context.system.name) orelse return null;
+    const saved = profile_editor.edit(context.root, &p, null, context.system.id, context.system.name, editorImages(context)) orelse return null;
     return rowOfProfile(saved);
 }
 

@@ -313,6 +313,7 @@ pub const Key = enum(u16) {
     profile_delete_keep,
     profile_delete_question,
     profile_delete_title,
+    profile_edition_missing,
     profile_editor_new,
     profile_editor_subtitle,
     profile_editor_title,
@@ -321,6 +322,7 @@ pub const Key = enum(u16) {
     profile_field_bypass_tpm,
     profile_field_computer,
     profile_field_disable_wer,
+    profile_field_edition,
     profile_field_key,
     profile_field_keyboard,
     profile_field_language,
@@ -340,6 +342,7 @@ pub const Key = enum(u16) {
     profile_help_bypass,
     profile_help_computer,
     profile_help_disable_wer,
+    profile_help_edition,
     profile_help_key,
     profile_help_keyboard,
     profile_help_language,
@@ -456,6 +459,8 @@ pub const Key = enum(u16) {
     summary_disk,
     summary_driver_inventory,
     summary_drivers,
+    summary_edition,
+    summary_edition_value,
     summary_error,
     summary_esp_guard,
     summary_esp_guard_label,
@@ -909,6 +914,7 @@ pub const hashes = [_]u32{
     0xde446e2e, // profile.delete.keep
     0x92e5d06b, // profile.delete.question
     0x584ba887, // profile.delete.title
+    0x919ddef5, // profile.edition_missing
     0xac80d0a1, // profile.editor.new
     0x6f2b3c09, // profile.editor.subtitle
     0xde080639, // profile.editor.title
@@ -917,6 +923,7 @@ pub const hashes = [_]u32{
     0x50329252, // profile.field.bypass_tpm
     0xa6b11e2b, // profile.field.computer
     0x8015202b, // profile.field.disable_wer
+    0x9c409bd4, // profile.field.edition
     0x1d1b0b5d, // profile.field.key
     0x40eff7a3, // profile.field.keyboard
     0x7890b224, // profile.field.language
@@ -936,6 +943,7 @@ pub const hashes = [_]u32{
     0x0922c403, // profile.help.bypass
     0x46264466, // profile.help.computer
     0xa0ced3e4, // profile.help.disable_wer
+    0xbe0d347f, // profile.help.edition
     0xcca2e39e, // profile.help.key
     0x10f18736, // profile.help.keyboard
     0x8e773749, // profile.help.language
@@ -1052,6 +1060,8 @@ pub const hashes = [_]u32{
     0x4c709436, // summary.disk
     0xc97409c2, // summary.driver_inventory
     0xacfd5f5a, // summary.drivers
+    0x1d60f5df, // summary.edition
+    0x99bfe691, // summary.edition_value
     0x5fb166d7, // summary.error
     0xf810572f, // summary.esp_guard
     0x4e8be16e, // summary.esp_guard_label
@@ -1576,6 +1586,9 @@ pub const bios = [_]bool{
     false,
     false,
     false,
+    false,
+    false,
+    false,
     true,
     true,
     true,
@@ -1628,6 +1641,8 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
+    false,
     false,
     false,
     false,
@@ -2100,6 +2115,7 @@ pub const english = [_][]const u8{
     "Keep the profile",
     "Delete the profile {0} from this stick?",
     "Delete profile",
+    "Edition \"{0}\" is not on this ISO: Setup asks for the edition.",
     "New answer profile",
     "One profile for every Windows: USOS writes the answer file when the installation starts",
     "Answer profile",
@@ -2108,6 +2124,7 @@ pub const english = [_][]const u8{
     "Windows 11: skip the TPM check",
     "Computer name",
     "Turn off error reporting",
+    "Edition",
     "Product key ({0})",
     "Keyboard",
     "Windows language",
@@ -2127,6 +2144,7 @@ pub const english = [_][]const u8{
     "For hardware below the Windows 11 requirements. Microsoft does not support such installations; feature updates may need the bypass again.",
     "1-15 characters A-Z a-z 0-9 and -, not only digits. Empty: USOS-XP on XP, a name chosen by Setup on newer Windows.",
     "Vista and newer: Windows Error Reporting stays off (no problem reports are sent).",
+    "Edition Setup installs, matched against the images of the chosen ISO (also across languages; Server: Core or Desktop Experience). Empty or not on the ISO: Setup shows its edition list.",
     "Product key for {0} (XXXXX-XXXXX-XXXXX-XXXXX-XXXXX). Empty: Setup asks for it or offers the edition list.",
     "Keyboard layout of Windows. Same as the formats: the default keyboard of that language.",
     "Language of Setup and of Windows; the installation media must contain it. Automatic: Setup asks.",
@@ -2243,6 +2261,8 @@ pub const english = [_][]const u8{
     "Disk",
     "Driver inventory",
     "External drivers",
+    "Edition",
+    "{0} (image {1})",
     "Error",
     "Written to the target disk; the USOS stick's ESP is checked",
     "Boot files",

@@ -199,9 +199,25 @@ pub fn archOf(info: ?usos.image_probe.windows_media.Info) answer.Arch {
     };
 }
 
+/// The install images of the media chosen for this start (the summary
+/// reads them; null: unknown, no edition is written).
+var media_images: answer.editions.List = .{};
+var media_images_known = false;
+
+pub fn useImages(list: ?*const answer.editions.List) void {
+    if (list) |l| {
+        media_images = l.*;
+        media_images_known = true;
+    } else media_images_known = false;
+}
+
+pub fn images() ?*const answer.editions.List {
+    return if (media_images_known) &media_images else null;
+}
+
 /// The answer rendered in memory (valid until the next render).
 pub fn render(profile: *const Profile, system_id: []const u8, arch: answer.Arch) !answer.Rendered {
-    return (try answer.render(profile, system_id, arch, null, &rendered)) orelse error.NoGeneratedAnswer;
+    return (try answer.render(profile, system_id, arch, null, images(), &rendered)) orelse error.NoGeneratedAnswer;
 }
 
 /// Removes rendered answers and the plan left on the ESP by an earlier

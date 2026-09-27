@@ -29,6 +29,7 @@ const F = enum(u8) {
     locale,
     keyboard,
     key,
+    edition,
     remember_key,
     local_account,
     bypass_tpm,
@@ -52,6 +53,15 @@ var computer_text = form.TextValue{ .max = 15 };
 var org_text = form.TextValue{ .max = 64 };
 var password_text = form.TextValue{ .max = 64 };
 var key_text = form.TextValue{ .max = 29 };
+/// Edition: typed (no ISO known) or picked from the chosen ISO's images.
+var edition_text = form.TextValue{ .max = 64 };
+var edition_images: ?*const answer.editions.List = null;
+var edition_index: usize = 0;
+var edition_options: [answer.editions.max_images + 2][]const u8 = undefined;
+var edition_option_count: usize = 0;
+/// A stored edition that is not on this ISO stays selectable as it is.
+var edition_custom: [64]u8 = undefined;
+var edition_custom_len: usize = 0;
 var timezone_index: usize = 0;
 var language_index: usize = 0;
 var locale_index: usize = 0;
@@ -121,6 +131,18 @@ fn setOptions() void {
         keyboard_options[i + 1] = entry.label;
     }
     keyboard_option_count = tables.languages.len + 1;
+    edition_options[0] = t(.profile_value_setup_asks);
+    edition_option_count = 1;
+    if (edition_images) |list| {
+        for (list.slice()) |*image| {
+            edition_options[edition_option_count] = image.label();
+            edition_option_count += 1;
+        }
+        if (edition_custom_len > 0) {
+            edition_options[edition_option_count] = edition_custom[0..edition_custom_len];
+            edition_option_count += 1;
+        }
+    }
     if (custom_keyboard) |k| {
         keyboard_options[keyboard_option_count] = std.fmt.bufPrint(&custom_keyboard_text, "{X:0>4}:{X:0>8}", .{ k.lcid, k.klid }) catch "custom";
         keyboard_option_count += 1;
@@ -135,6 +157,19 @@ fn load(p: *const Profile) void {
     org_text.set(p.org.slice());
     password_text.set(p.password.slice());
     key_text.set(p.keyFor(system_id));
+    const edition = p.editionFor(system_id);
+    edition_text.set(edition);
+    edition_index = 0;
+    edition_custom_len = 0;
+    if (edition_images) |list| if (edition.len > 0) {
+        if (answer.editions.match(edition, list)) |image| {
+            edition_index = @as(usize, @intCast(image - &list.items[0])) + 1;
+        } else {
+            edition_custom_len = @min(edition.len, edition_custom.len);
+            @memcpy(edition_custom[0..edition_custom_len], edition[0..edition_custom_len]);
+            edition_index = list.len + 1;
+        }
+    };
     timezone_index = if (p.timezone) |i| @as(usize, i) + 1 else 0;
     language_index = if (p.language) |i| @as(usize, i) + 1 else 0;
     locale_index = if (p.locale) |i| @as(usize, i) + 1 else 0;
@@ -179,6 +214,13 @@ fn build(out: *Profile) void {
     const key = key_text.slice();
     for (key, 0..) |c, i| upper[i] = std.ascii.toUpper(c);
     out.setSystemKey(system_id, upper[0..key.len]) catch {};
+    var id_buffer: [64]u8 = undefined;
+    const edition: []const u8 = if (edition_images) |list| blk: {
+        if (edition_index == 0) break :blk "";
+        if (edition_index <= list.len) break :blk list.items[edition_index - 1].id(&id_buffer);
+        break :blk edition_custom[0..edition_custom_len];
+    } else edition_text.slice();
+    out.setSystemEdition(system_id, edition) catch {};
     out.remember_key = remember_key;
     out.local_account = local_account;
     out.bypass_tpm = bypass_tpm;
@@ -200,6 +242,7 @@ fn problemOf(id: F) ?Problem {
         .org => answer.profile.checkOrg(org_text.slice()),
         .password => answer.profile.checkPassword(password_text.slice()),
         .key => answer.profile.checkKey(key_text.slice()),
+        .edition => if (edition_images == null) answer.profile.checkEdition(edition_text.slice()) else null,
         else => null,
     };
 }
@@ -237,6 +280,7 @@ fn helpKey(id: F) view.Key {
         .locale => .profile_help_locale,
         .keyboard => .profile_help_keyboard,
         .key => .profile_help_key,
+        .edition => .profile_help_edition,
         .remember_key => .profile_help_remember_key,
         .local_account => .profile_help_local_account,
         .bypass_tpm, .bypass_secure_boot, .bypass_ram => .profile_help_bypass,
@@ -301,6 +345,13 @@ fn buildFields() void {
     addField(.locale, .{ .kind = .choice, .label = t(.profile_field_locale), .options = &locale_options, .index = &locale_index });
     addField(.keyboard, .{ .kind = .choice, .label = t(.profile_field_keyboard), .options = keyboard_options[0..keyboard_option_count], .index = &keyboard_index });
     addField(.key, .{ .kind = .text, .label = view.format(&key_label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .placeholder = t(.profile_value_setup_asks) });
+    if (nt6) {
+        if (edition_images != null) {
+            addField(.edition, .{ .kind = .choice, .label = t(.profile_field_edition), .options = edition_options[0..edition_option_count], .index = &edition_index });
+        } else {
+            addField(.edition, .{ .kind = .text, .label = t(.profile_field_edition), .text = &edition_text, .allowed = &org_chars, .placeholder = t(.profile_value_setup_asks) });
+        }
+    }
     addField(.remember_key, .{ .kind = .toggle, .label = t(.profile_field_remember_key), .flag = &remember_key });
     addField(.local_account, .{ .kind = .toggle, .label = t(.profile_field_local_account), .flag = &local_account });
     if (win11) {
@@ -329,8 +380,11 @@ pub fn defaults(ui_language: []const u8) Profile {
 
 /// Edits `initial` (a new profile when `stem` is null, else the file with
 /// that stem). Returns the saved profile's name, or null on Cancel/Back.
-pub fn edit(root: *uefi.protocol.File, initial: *const Profile, stem: ?[]const u8, for_system_id: []const u8, for_system_name: []const u8) ?[]const u8 {
+/// `images`: the install images of the ISO chosen before the answer screen
+/// (the edition is then a list picker); null: the edition is typed.
+pub fn edit(root: *uefi.protocol.File, initial: *const Profile, stem: ?[]const u8, for_system_id: []const u8, for_system_name: []const u8, images: ?*const answer.editions.List) ?[]const u8 {
     base = initial.*;
+    edition_images = images;
     const n = @min(for_system_id.len, system_id_storage.len);
     @memcpy(system_id_storage[0..n], for_system_id[0..n]);
     system_id = system_id_storage[0..n];

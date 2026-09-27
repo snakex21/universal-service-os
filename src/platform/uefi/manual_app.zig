@@ -99,7 +99,7 @@ fn answerAndSummary(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.m
     }
     const profiles_allowed = usos.flow.answer_screen.profileCapable(entry, image.kind, method, firmware);
     while (true) {
-        const unattended = manual_unattended.select(discovery, .{ .root = root, .system = entry, .profiles_allowed = profiles_allowed });
+        const unattended = manual_unattended.select(discovery, .{ .root = root, .system = entry, .profiles_allowed = profiles_allowed, .image = image });
         if (unattended.back) return;
         manual_summary.show(root, entry, image, method, unattended.choice, unattended.available, firmware);
         if (!unattended.shown) return;
