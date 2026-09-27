@@ -29,6 +29,10 @@
       <RegisteredOwner>Tester</RegisteredOwner>
       <RegisteredOrganization>O&apos;Brien Lab</RegisteredOrganization>
       <TimeZone>Central European Standard Time</TimeZone>
+      <ShowWindowsLive>false</ShowWindowsLive>
+    </component>
+    <component name="Microsoft-Windows-ErrorReportingCore" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <DisableWER>1</DisableWER>
     </component>
   </settings>
   <settings pass="oobeSystem">
@@ -41,7 +45,6 @@
     <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
       <OOBE>
         <HideEULAPage>true</HideEULAPage>
-        <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
         <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
         <NetworkLocation>Work</NetworkLocation>
         <ProtectYourPC>3</ProtectYourPC>

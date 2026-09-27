@@ -98,7 +98,8 @@ def check_xml(name: str, data: bytes, arch: str) -> None:
     archs = {c.get('processorArchitecture') for c in components}
     check(name + ' one architecture', archs == {arch}, str(archs))
     text = data.decode()
-    check(name + ' manual disk', all(k not in text for k in ('DiskConfiguration', 'InstallTo', 'WillWipeDisk', 'ImageInstall')))
+    check(name + ' manual disk', all(k not in text for k in ('DiskConfiguration', 'InstallTo', 'WillWipeDisk')))
+    check(name + ' no edition without media', name.startswith('edition.') or 'ImageInstall' not in text)
     check(name + ' zig check-xml', tool('check-xml', str(OUT / name), arch).returncode == 0)
     other = 'x86' if arch != 'x86' else 'amd64'
     check(name + ' zig mismatch warning', tool('check-xml', str(OUT / name), other).returncode == 3)
@@ -145,6 +146,12 @@ def main() -> int:
     check('10 has no bypass', 'LabConfig' not in ten and 'BypassNRO' not in ten)
     check('10 local account, online screens hidden', '<HideOnlineAccountScreens>true' in ten and '<Name>Tester</Name>' in ten and '<Name>Drugi</Name>' in ten)
     check('7 no online screens, legacy network page', 'HideOnlineAccountScreens' not in seven and '<NetworkLocation>Work' in seven)
+    vista = (OUT / 'full.windows-vista.x86.xml').read_text()
+    r2 = (OUT / 'full.windows-server-2008-r2.amd64.xml').read_text()
+    check('7 has only the Windows 7 OOBE settings', 'HideOEMRegistrationScreen' not in seven and '<HideWirelessSetupInOOBE>true' in seven and '<ShowWindowsLive>false' in seven)
+    check('Vista has only the Vista OOBE settings', all(k not in vista for k in ('HideOEMRegistrationScreen', 'HideWirelessSetupInOOBE', 'ShowWindowsLive')) and '<NetworkLocation>Work' in vista)
+    check('2008 R2 without the client-only Windows Live link', 'ShowWindowsLive' not in r2 and '<AdministratorPassword>' in r2)
+    check('OOBE answers from the profile', '<ProtectYourPC>3' in seven and '<DisableWER>1' in seven and '<DisableWER>1' in ten)
     check('generic key used', '<Key>AAAAA-BBBBB-CCCCC-DDDDD-EEEEE</Key>' in ten)
     check('time zone name', '<TimeZone>Central European Standard Time</TimeZone>' in ten)
     check('escaped org', "O&apos;Brien Lab" in ten)
@@ -153,6 +160,26 @@ def main() -> int:
     check('minimal: no key, no language, Setup-chosen name', '<ProductKey>' not in minimal and 'International-Core' not in minimal and '<ComputerName>*</ComputerName>' in minimal)
     r = tool('render', str(DATA / 'full.profile.ini'), 'windows-10', 'amd64', str(OUT / 'typed.xml'), 'fffff-ggggg-hhhhh-jjjjj-kkkkk')
     check('typed key overrides the profile key', r.returncode == 0 and '<Key>FFFFF-GGGGG-HHHHH-JJJJJ-KKKKK</Key>' in (OUT / 'typed.xml').read_text())
+
+    # Edition against the Windows 7 SP1 x64 pl install.wim metadata: the
+    # per-system edition (localized name) is found by its EDITIONID and
+    # written as /IMAGE/INDEX; the common one (Enterprise) is not on it.
+    install_xml = DATA / 'win7-sp1-x64-pl.install.xml'
+    for system, arch, expect in (('windows-7', 'amd64', '3'), ('windows-7', 'x86', '3'), ('windows-vista', 'amd64', None)):
+        name = f'edition.{system}.{arch}.xml'
+        r = tool('render', str(DATA / 'edition.profile.ini'), system, arch, str(OUT / name), '-', str(install_xml))
+        check('render ' + name, r.returncode == 0, r.stderr.decode(errors='replace'))
+        if r.returncode != 0:
+            continue
+        data = (OUT / name).read_bytes()
+        golden(name, data)
+        check_xml(name, data, arch)
+        text = data.decode()
+        if expect:
+            check(name + ' edition by index', f'<Key>/IMAGE/INDEX</Key>' in text and f'<Value>{expect}</Value>' in text and 'image 3 (Windows 7 Professional)' in r.stderr.decode())
+        else:
+            check(name + ' edition not on the media: Setup asks', 'ImageInstall' not in text and 'not on the media' in r.stderr.decode())
+        check(name + ' still no disk settings', 'InstallTo' not in text and 'DiskConfiguration' not in text)
 
     # NT5 through the staging merge.
     for system, base, _layout in NT5:

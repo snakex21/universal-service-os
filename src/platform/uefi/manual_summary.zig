@@ -12,6 +12,10 @@ const manual_images = @import("manual_images.zig");
 const manual_unattended = @import("manual_unattended.zig");
 const xp_settings = @import("xp_settings.zig");
 const answer_profiles = @import("answer_profiles.zig");
+const windows_media_probe = @import("windows_media_probe.zig");
+
+/// The chosen ISO's install images (large for the stack).
+var edition_images: usos.flow.answer.editions.List = .{};
 
 const Fields = struct {
     labels: [16][]const u8 = undefined,
@@ -45,7 +49,7 @@ pub fn show(
     if (secure_boot.enforced() and usos.flow.secure_boot_policy.backendRequiresSecureBootOff(system.id, backend)) return showSecureBootRequired();
 
     var fields = Fields{};
-    var notes: [4][]const u8 = undefined;
+    var notes: [6][]const u8 = undefined;
     var note_count: usize = 0;
     fields.add(view.t(.summary_system), system.name);
     fields.add(view.t(.summary_image), image.name.slice());
@@ -81,11 +85,32 @@ pub fn show(
     var profile_text: [200]u8 = undefined;
     var profile_detail: [120]u8 = undefined;
     var arch_note: [200]u8 = undefined;
+    var edition_text: [160]u8 = undefined;
+    var edition_note: [200]u8 = undefined;
     if (answer.profile) |index| {
         // A USOS profile, rendered for this system when the start begins.
         const p = answer_profiles.get(index);
         const arch = if (backend == .xp_uefi_staging) "x86" else @tagName(answer_profiles.archOf(image.media));
         fields.add(view.t(.summary_answer_file), view.format(&profile_text, .profile_summary, &.{ p.name.slice(), manual_unattended.profileDetail(&profile_detail, p), arch }));
+        // The profile's edition against this ISO's install images: found,
+        // the answer names the image; not found, Setup asks as before.
+        answer_profiles.useImages(null);
+        const family = usos.flow.answer.target.familyFor(system.id);
+        if (family != null and !family.?.nt5() and image.kind == .iso) {
+            const known = if (windows_media_probe.readEditions(system, image.name.slice(), &edition_images)) true else |_| false;
+            if (known) answer_profiles.useImages(&edition_images);
+            switch (usos.flow.answer.matchEdition(p, system.id, answer_profiles.images())) {
+                .none => {},
+                .found => |found| {
+                    var number: [8]u8 = undefined;
+                    fields.add(view.t(.summary_edition), view.format(&edition_text, .summary_edition_value, &.{ found.label(), std.fmt.bufPrint(&number, "{d}", .{found.index}) catch "?" }));
+                },
+                .missing => |wanted| {
+                    notes[note_count] = view.format(&edition_note, .profile_edition_missing, &.{wanted});
+                    note_count += 1;
+                },
+            }
+        }
     } else if (backend == .xp_uefi_staging) {
         // XP UEFI-CSM: a .sif is merged into the automatic answer; without
         // one, usos-xp.ini (if active) makes Setup hands-off unless the

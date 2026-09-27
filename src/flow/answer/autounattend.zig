@@ -23,6 +23,9 @@ pub const Input = struct {
     /// Product key (the profile's for this system or one typed at start);
     /// empty: Setup asks (or selects the edition itself).
     key: []const u8 = "",
+    /// The install image (1-based index) matching the profile's edition on
+    /// the chosen media (editions.match); null: Setup shows its edition list.
+    image_index: ?u16 = null,
 };
 
 const W = std.Io.Writer;
@@ -127,6 +130,21 @@ fn setupComponent(w: *W, input: Input) !void {
         }
         try close(w, 3, "RunSynchronous");
     }
+    if (input.image_index) |index| {
+        // Only the source image: no InstallTo, the disk page stays.
+        try open(w, 3, "ImageInstall");
+        try open(w, 4, "OSImage");
+        try open(w, 5, "InstallFrom");
+        try indent(w, 6);
+        try w.writeAll("<MetaData wcm:action=\"add\">\n");
+        try element(w, 7, "Key", "/IMAGE/INDEX");
+        var number: [8]u8 = undefined;
+        try element(w, 7, "Value", try std.fmt.bufPrint(&number, "{d}", .{index}));
+        try close(w, 6, "MetaData");
+        try close(w, 5, "InstallFrom");
+        try close(w, 4, "OSImage");
+        try close(w, 3, "ImageInstall");
+    }
     try open(w, 3, "UserData");
     if (input.key.len > 0) {
         try open(w, 4, "ProductKey");
@@ -154,7 +172,15 @@ fn specialize(w: *W, input: Input) !void {
         const name = if (input.family.legacyNt6()) zone.windows_legacy orelse zone.windows else zone.windows;
         try element(w, 3, "TimeZone", name);
     }
+    // Windows 7 only (removed in 8; not in Vista's or Server's shell):
+    // no "Windows Live" link in Getting Started.
+    if (input.family == .windows_7) try element(w, 3, "ShowWindowsLive", "false");
     try endComponent(w);
+    if (p.disable_wer) {
+        try component(w, "Microsoft-Windows-ErrorReportingCore", input.arch);
+        try element(w, 3, "DisableWER", "1");
+        try endComponent(w);
+    }
     if (windows11(input.family) and p.no_network_oobe) {
         try component(w, "Microsoft-Windows-Deployment", input.arch);
         try open(w, 3, "RunSynchronous");
@@ -185,14 +211,19 @@ fn oobe(w: *W, input: Input) !void {
     try international(w, input, false);
     try component(w, "Microsoft-Windows-Shell-Setup", input.arch);
     try open(w, 3, "OOBE");
+    // Per version (Microsoft unattend reference, schema.zig): Vista has
+    // HideEULAPage, NetworkLocation and ProtectYourPC only; 7 adds
+    // HideWirelessSetupInOOBE; 8 adds the OEM registration and online
+    // account pages. An element unknown to the version makes Setup stop
+    // with "cannot parse or process the unattend answer file".
     try element(w, 4, "HideEULAPage", "true");
-    if (family.client() != .vista) try element(w, 4, "HideOEMRegistrationScreen", "true");
+    if (family.atLeast8()) try element(w, 4, "HideOEMRegistrationScreen", "true");
     if (family.atLeast8() and p.local_account) try element(w, 4, "HideOnlineAccountScreens", "true");
     // Without it an offline Windows 10 OOBE stops on "Let's connect you to a
     // network" (VirtualBox test 2026-09-26); the page is only the Wi-Fi setup.
     if (family.client() != .vista) try element(w, 4, "HideWirelessSetupInOOBE", "true");
-    if (family.legacyNt6()) try element(w, 4, "NetworkLocation", "Work");
-    try element(w, 4, "ProtectYourPC", "3");
+    if (family.legacyNt6()) try element(w, 4, "NetworkLocation", p.network_location.value());
+    try element(w, 4, "ProtectYourPC", p.protect_pc.value());
     try close(w, 3, "OOBE");
     try open(w, 3, "UserAccounts");
     if (family.server() and p.password.len > 0) {
@@ -239,7 +270,14 @@ test "autounattend: manual disk, escaped values, arch on every component" {
     try std.testing.expect(std.mem.indexOf(u8, xml, "DiskConfiguration") == null);
     try std.testing.expect(std.mem.indexOf(u8, xml, "WillWipeDisk") == null);
     try std.testing.expect(std.mem.indexOf(u8, xml, "InstallTo") == null);
+    try std.testing.expect(std.mem.indexOf(u8, xml, "ImageInstall") == null);
     try std.testing.expect(std.mem.indexOf(u8, xml, "processorArchitecture=\"amd64\"") == null);
+    var second: [max_size]u8 = undefined;
+    const edition = try render(.{ .profile = &p, .family = .windows_7, .arch = .x86, .image_index = 3 }, &second);
+    try std.testing.expect(std.mem.indexOf(u8, edition, "<Key>/IMAGE/INDEX</Key>") != null);
+    try std.testing.expect(std.mem.indexOf(u8, edition, "<Value>3</Value>") != null);
+    try std.testing.expect(std.mem.indexOf(u8, edition, "InstallTo") == null);
+    try @import("xml_check.zig").wellFormed(edition);
     try std.testing.expect(std.mem.indexOf(u8, xml, "R&apos;n&apos;D Team") != null);
     try std.testing.expect(std.mem.indexOf(u8, xml, "<ProductKey>") == null);
     try std.testing.expect(std.mem.indexOf(u8, xml, "<ComputerName>*</ComputerName>") != null);
@@ -262,4 +300,30 @@ test "autounattend: Windows 11 bypasses only when chosen, only on 11" {
     const ten = try render(.{ .profile = &p, .family = .windows_10, .arch = .amd64 }, &buffer);
     try std.testing.expect(std.mem.indexOf(u8, ten, "LabConfig") == null);
     try std.testing.expect(std.mem.indexOf(u8, ten, "BypassNRO") == null);
+}
+
+test "autounattend: Vista and 7 OOBE answers per version" {
+    var p = Profile{};
+    try p.name.set("A");
+    try p.user.set("Tester");
+    p.network_location = .home;
+    p.protect_pc = .recommended;
+    p.disable_wer = true;
+    var buffer: [max_size]u8 = undefined;
+    const seven = try render(.{ .profile = &p, .family = .windows_7, .arch = .amd64 }, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, seven, "<NetworkLocation>Home</NetworkLocation>") != null);
+    try std.testing.expect(std.mem.indexOf(u8, seven, "<ProtectYourPC>1</ProtectYourPC>") != null);
+    try std.testing.expect(std.mem.indexOf(u8, seven, "<ShowWindowsLive>false</ShowWindowsLive>") != null);
+    try std.testing.expect(std.mem.indexOf(u8, seven, "<DisableWER>1</DisableWER>") != null);
+    try std.testing.expect(std.mem.indexOf(u8, seven, "HideOEMRegistrationScreen") == null);
+    try std.testing.expect(std.mem.indexOf(u8, seven, "<HideWirelessSetupInOOBE>") != null);
+    const vista = try render(.{ .profile = &p, .family = .vista, .arch = .x86 }, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, vista, "ShowWindowsLive") == null);
+    try std.testing.expect(std.mem.indexOf(u8, vista, "HideWirelessSetupInOOBE") == null);
+    try std.testing.expect(std.mem.indexOf(u8, vista, "<NetworkLocation>Home</NetworkLocation>") != null);
+    const r2 = try render(.{ .profile = &p, .family = .server_2008_r2, .arch = .amd64 }, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, r2, "ShowWindowsLive") == null);
+    const ten = try render(.{ .profile = &p, .family = .windows_10, .arch = .amd64 }, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, ten, "NetworkLocation") == null);
+    try std.testing.expect(std.mem.indexOf(u8, ten, "<HideOEMRegistrationScreen>") != null);
 }

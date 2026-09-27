@@ -163,3 +163,33 @@ fn bootWimArch(iso: *const Iso) !u32 {
     try udf.readNodeAt(iso, &node, resource.offset, bytes);
     return media.wimArch(bytes, try wim.bootIndex(&header));
 }
+
+/// The install images (index, names, edition) of a Windows ISO of
+/// `system`, for the answer profile's edition (answer.editions). Read on
+/// demand from DATA (the install image's XML metadata only).
+pub fn readEditions(system: *const usos.catalog.SystemEntry, image_name: []const u8, out: *usos.flow.answer.editions.List) !void {
+    out.len = 0;
+    const state = try uefi.pool_allocator.create(State);
+    defer uefi.pool_allocator.destroy(state);
+    state.catalog = try data_volume.openCatalog();
+    var path: native.PathBuffer = .{};
+    const components = try path.build(system.image_directory, image_name);
+    try ntfs.openFile(state.catalog.fs, state.catalog.reader(), components, &state.file);
+    const iso = Iso{ .state = state };
+    for (usos.image_probe.windows_detect.modern_install_images) |install| {
+        if (!try exists(&iso, install)) continue;
+        var node: udf.Node = undefined;
+        if (!try udf.openPath(&iso, install, &node) or node.is_directory) return error.WindowsInstallImageMissing;
+        var header: [124]u8 = undefined;
+        try udf.readNodeAt(&iso, &node, 0, &header);
+        const resource = try wim.xmlResource(&header, node.size);
+        const bytes = try uefi.pool_allocator.alloc(u8, resource.size);
+        defer uefi.pool_allocator.free(bytes);
+        try udf.readNodeAt(&iso, &node, resource.offset, bytes);
+        usos.flow.answer.editions.parse(try media.installXmlAscii(bytes), out);
+        var message: [120]u8 = undefined;
+        serial.writeAscii(std.fmt.bufPrint(&message, "[MEDIA] {s}: {d} install images\r\n", .{ image_name, out.len }) catch "[MEDIA] install images\r\n");
+        return;
+    }
+    return error.WindowsInstallImageMissing;
+}
