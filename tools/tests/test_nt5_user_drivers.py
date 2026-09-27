@@ -5,7 +5,8 @@ from pathlib import Path
 import os, shutil, subprocess, tempfile, unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-SH = next((p for p in (r'C:\msys64\usr\bin\sh.exe', r'C:\Program Files\Git\usr\bin\sh.exe', shutil.which('sh') or '') if p and Path(p).exists()), None)
+# Git's sh first: its coreutils include cmp (like BusyBox in the initramfs).
+SH = next((p for p in (r'C:\Program Files\Git\usr\bin\sh.exe', r'C:\msys64\usr\bin\sh.exe', shutil.which('sh') or '') if p and Path(p).exists()), None)
 if SH:
     os.environ['PATH'] = str(Path(SH).parent) + os.pathsep + os.environ.get('PATH', '')
 
