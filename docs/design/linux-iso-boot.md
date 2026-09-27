@@ -129,6 +129,12 @@ devices in their automatic scan (`grep -vE "/(loop|ram|fd)"`, live-boot also
 (`60-persistent-storage.rules` handles `loop*` with a backing file, `dm-*`
 through the dm rules) so nothing is added.
 
+**Found 2026-09-28:** the d-i initrd has no `loop.ko` and no `dm-mod`, so
+neither loop nor dm is possible there; the plan below is replaced by an
+in-kernel partition (`BLKPG_ADD_PARTITION` over the contiguous ISO after
+`BLKPG_DEL_PARTITION` of DATA in the kernel's table only, no disk write) plus
+`cdrom-detect/try-usb=true` (see the handoff).
+
 Debian netinst (d-i) is the open risk: `cdrom-detect` only probes `cd` and
 `maybe-usb-floppy` devices. Plan: preseed in the generated `/preseed.cfg`
 (`cdrom-detect/manual_config=true`, `cdrom-detect/cdrom_module=none`,
