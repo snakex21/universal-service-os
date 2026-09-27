@@ -580,6 +580,8 @@ pub const Key = enum(u16) {
     unattended_none_detail,
     unattended_subtitle,
     unattended_title,
+    unattended_vista_uefi,
+    unattended_vista_uefi_detail,
     unattended_xp_file_detail,
     unattended_xp_manual,
     unattended_xp_manual_detail,
@@ -1181,6 +1183,8 @@ pub const hashes = [_]u32{
     0x16e5e868, // unattended.none.detail
     0x0404a4d7, // unattended.subtitle
     0x117edf4b, // unattended.title
+    0x318ddc7a, // unattended.vista_uefi
+    0xb090eb5e, // unattended.vista_uefi_detail
     0xc77e920d, // unattended.xp_file.detail
     0xd75cdb9a, // unattended.xp_manual
     0x922274cd, // unattended.xp_manual.detail
@@ -1765,6 +1769,8 @@ pub const bios = [_]bool{
     false,
     false,
     false,
+    true,
+    true,
     true,
     true,
     true,
@@ -2382,6 +2388,8 @@ pub const english = [_][]const u8{
     "Use the default setup options without a custom answer file.",
     "Choose an answer file or continue without one",
     "Unattended setup",
+    "Answer files: not supported for Vista on UEFI yet",
+    "Vista Setup on UEFI runs without your answer files and profiles for now; choose the manual installation.",
     "The .sif is merged into the automatic answer; disk, PAE and driver settings stay automatic. usos-xp.ini is not used.",
     "No answer file (manual installation)",
     "usos-xp.ini is not used: XP Setup asks for the name, product key and time zone.",

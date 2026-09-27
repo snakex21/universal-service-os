@@ -301,10 +301,12 @@ fn start(
     const native = usos.catalog.os_profiles.traits(system.id).native_uefi;
     const vista = native == .vista;
     if (image.kind == .iso and native.legacyPe() and resolved == .direct_iso) {
-        // Vista on UEFI, Automatic: USOS prepares the target disk first (XP
-        // disk picker in micro-Linux, fresh GPT with ESP + MSR). The explicit
-        // ISO method skips it (installer v10 ESP selection as the fallback).
-        if (vista and method == .automatic and !@import("vista_preparation.zig").prepared(root)) {
+        // Vista on UEFI: the USOS disk preparation (XP disk picker in
+        // micro-Linux, fresh GPT with ESP + MSR) is OFF by default; the user
+        // deletes/formats in Vista Setup and the installer selects the ESP.
+        // EFI\USOS\vista-disk-prep.flag on the USOS ESP turns it on (any method).
+        const vista_prep = @import("vista_preparation.zig");
+        if (vista and vista_prep.enabled(root) and !vista_prep.prepared(root)) {
             view.handover(view.t(.splash_starting));
             @import("vista_preparation.zig").start(root) catch |err| {
                 view.refreshFramebuffer();

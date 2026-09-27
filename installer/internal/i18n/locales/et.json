@@ -1034,5 +1034,8 @@
   "boot.lx.preparing_the_disk": "Ketta ettevalmistamine",
   "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Sektsioonitabeli kustutamine ja EFI-sektsiooni loomine.",
   "boot.lx.disk_prepared": "Ketas on ette valmistatud",
-  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Taaskäivitus USOS-i: valige häälestuse alustamiseks uuesti Windows Vista."
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Taaskäivitus USOS-i: valige häälestuse alustamiseks uuesti Windows Vista.",
+
+  "boot.unattended.vista_uefi": "Vastusefailid: Vista jaoks UEFI-s veel toetamata",
+  "boot.unattended.vista_uefi_detail": "Vista häälestus UEFI-s töötab praegu ilma teie vastusefailide ja profiilideta; valige käsitsi installimine."
 }

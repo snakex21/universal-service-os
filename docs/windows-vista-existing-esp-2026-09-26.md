@@ -173,3 +173,47 @@ QEMU WHPX:
 - The micro-Linux restart after "Disk prepared" hung in the first build
   (unmounting DATA); now sync + `reboot -f` + sysrq fallback, no unmount
   (in the committed build, not yet re-run).
+
+## v12 (2026-09-27): USB arming no longer blocked by the dispatcher; disk preparation opt-in
+
+X470 with B260927-115052, CSM on, ISO method (`artifacts/vista-x470-usb-20260927/`):
+the finalizer exited 7 ("Int10 dispatcher: publication failed"). The reused
+ESP p2 held the Windows 7 no-CSM files (`win7.original.efi` = the Win7 boot
+manager), `publish_loaders()` refused to mix them with Vista's boot manager,
+and because this happened inside `configure_boot()` **before
+`arm_target()`**, the USB v11 first-boot step was never armed (CmdLine still
+`oobe\windeploy.exe`, xHCI without driver in phase 2). Regression from
+fb3c46f1.
+
+* `tools/windows_vista_install.c` (v12): `configure_boot` (BCD, test signing,
+  fallback loader) -> `arm_target` -> `install_optional_dispatcher`. The
+  dispatcher is optional: a failure is logged and the Vista boot manager
+  stays on both entries (right with CSM on); it never changes the exit code.
+  The misleading `Target BCD preparation failed=0` (GetLastError) now says
+  "see the lines above".
+* `tools/windows7_uefi_publish.h` (shared with Windows 7): after both
+  existing loaders are confirmed to be the boot manager Setup just wrote, the
+  known USOS dispatcher files (`win7.original.efi`, `win7.efi`,
+  `UefiSeven.ini`, `uefiseven-LICENSE.txt`, `usos-win7-new.efi`) are removed
+  from those folders before the fresh ones are copied; nothing else is
+  touched, and a folder without its own loader is left alone. Windows 7
+  finalizer: it runs last in its script (after the USB steps), so it cannot
+  block them; the same cleanup fixes its reused-ESP case.
+  Test: `test_vista_int10_dispatcher.py` reused-Windows-7-ESP case.
+* **Disk preparation (v11) is off by default** (user decision: deleting and
+  formatting in Vista Setup's disk page is enough). To re-enable it for both
+  methods, create an empty `EFI\USOS\vista-disk-prep.flag` on the USOS ESP;
+  without that file the UEFI menu never starts it and the installer ignores
+  any leftover `vista-target.ini`. The default path is the v10 ESP selection:
+  Setup always starts, the ESP is picked when exactly one new or remaining
+  ESP exists or, with several pre-existing ESPs (Vista's disk page hides
+  them), the only formatted one.
+* **Answer files/profiles for Vista on UEFI** stay unsupported this round
+  (Setup already gets USOS's KMDF servicing answer through `/unattend`; merging
+  a user answer into it is not done yet). The answer screen now says so
+  instead of listing files the start script would then refuse: "No answer
+  file (manual installation)" and "Answer files: not supported for Vista on
+  UEFI yet" (27 locales).
+* micro-Linux restart after "Disk prepared": works under TCG (20 s after
+  the confirmation); under WHPX the guest never resets (`reboot -f` reached,
+  QEMU WHPX reset issue, not USOS).

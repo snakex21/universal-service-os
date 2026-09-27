@@ -1037,5 +1037,8 @@
   "boot.lx.preparing_the_disk": "Przygotowywanie dysku",
   "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Usuwanie tablicy partycji i tworzenie partycji EFI.",
   "boot.lx.disk_prepared": "Dysk przygotowany",
-  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Ponowne uruchamianie USOS: wybierz ponownie Windows Vista, aby rozpocząć instalację."
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Ponowne uruchamianie USOS: wybierz ponownie Windows Vista, aby rozpocząć instalację.",
+
+  "boot.unattended.vista_uefi": "Pliki odpowiedzi: jeszcze nieobsługiwane dla Visty w UEFI",
+  "boot.unattended.vista_uefi_detail": "Instalator Visty w UEFI działa na razie bez Twoich plików odpowiedzi i profili; wybierz instalację ręczną."
 }

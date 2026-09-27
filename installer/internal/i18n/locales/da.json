@@ -1034,5 +1034,8 @@
   "boot.lx.preparing_the_disk": "Forbereder disken",
   "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Sletter partitionstabellen og opretter EFI-partitionen.",
   "boot.lx.disk_prepared": "Disken er forberedt",
-  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Genstarter i USOS: vælg Windows Vista igen for at starte installationen."
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Genstarter i USOS: vælg Windows Vista igen for at starte installationen.",
+
+  "boot.unattended.vista_uefi": "Svarfiler: understøttes endnu ikke for Vista på UEFI",
+  "boot.unattended.vista_uefi_detail": "Vistas installation på UEFI kører indtil videre uden dine svarfiler og profiler; vælg manuel installation."
 }

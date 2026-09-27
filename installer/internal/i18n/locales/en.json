@@ -1034,5 +1034,8 @@
   "boot.lx.preparing_the_disk": "Preparing the disk",
   "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Erasing the partition table and creating the EFI partition.",
   "boot.lx.disk_prepared": "Disk prepared",
-  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Restarting into USOS: choose Windows Vista again to start Setup."
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Restarting into USOS: choose Windows Vista again to start Setup.",
+
+  "boot.unattended.vista_uefi": "Answer files: not supported for Vista on UEFI yet",
+  "boot.unattended.vista_uefi_detail": "Vista Setup on UEFI runs without your answer files and profiles for now; choose the manual installation."
 }

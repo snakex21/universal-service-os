@@ -1034,5 +1034,8 @@
   "boot.lx.preparing_the_disk": "Förbereder disken",
   "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Rensar partitionstabellen och skapar EFI-partitionen.",
   "boot.lx.disk_prepared": "Disken är förberedd",
-  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Startar om till USOS: välj Windows Vista igen för att starta installationen."
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Startar om till USOS: välj Windows Vista igen för att starta installationen.",
+
+  "boot.unattended.vista_uefi": "Svarsfiler: stöds ännu inte för Vista på UEFI",
+  "boot.unattended.vista_uefi_detail": "Vistas installation på UEFI körs tills vidare utan dina svarsfiler och profiler; välj manuell installation."
 }

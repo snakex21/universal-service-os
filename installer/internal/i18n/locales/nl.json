@@ -1034,5 +1034,8 @@
   "boot.lx.preparing_the_disk": "Schijf voorbereiden",
   "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Partitietabel wissen en de EFI-partitie maken.",
   "boot.lx.disk_prepared": "Schijf voorbereid",
-  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Opnieuw starten in USOS: kies opnieuw Windows Vista om Setup te starten."
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Opnieuw starten in USOS: kies opnieuw Windows Vista om Setup te starten.",
+
+  "boot.unattended.vista_uefi": "Antwoordbestanden: nog niet ondersteund voor Vista op UEFI",
+  "boot.unattended.vista_uefi_detail": "Vista Setup op UEFI werkt voorlopig zonder uw antwoordbestanden en profielen; kies de handmatige installatie."
 }

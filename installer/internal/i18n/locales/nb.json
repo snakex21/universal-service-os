@@ -1034,5 +1034,8 @@
   "boot.lx.preparing_the_disk": "Klargjør disken",
   "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Sletter partisjonstabellen og oppretter EFI-partisjonen.",
   "boot.lx.disk_prepared": "Disken er klargjort",
-  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Starter på nytt i USOS: velg Windows Vista igjen for å starte installasjonen."
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Starter på nytt i USOS: velg Windows Vista igjen for å starte installasjonen.",
+
+  "boot.unattended.vista_uefi": "Svarfiler: støttes ennå ikke for Vista på UEFI",
+  "boot.unattended.vista_uefi_detail": "Vista-installasjonen på UEFI kjører foreløpig uten svarfilene og profilene dine; velg manuell installasjon."
 }

@@ -39,6 +39,9 @@ pub const Row = enum {
     file,
     /// "+ Add a new profile".
     add,
+    /// Vista on UEFI: answer files and profiles are not supported yet
+    /// (information only; activating it is a manual installation).
+    unsupported,
 
     /// X (edit) acts on this row.
     pub fn editable(self: Row) bool {
@@ -82,7 +85,7 @@ pub const Layout = struct {
     pub fn choice(self: *const Layout, index: usize, files: []const []const u8) Choice {
         if (index >= self.len) return .{};
         return switch (self.rows[index]) {
-            .no_answer, .xp_settings, .add => .{},
+            .no_answer, .xp_settings, .add, .unsupported => .{},
             .xp_manual => .{ .ignore_settings = true },
             .profile => .{ .profile = index - self.first_profile },
             .file => .{ .path = files[index - self.first_file] },
@@ -98,15 +101,31 @@ pub const Input = struct {
     profiles_allowed: bool = false,
     profiles: usize = 0,
     files: usize = 0,
+    /// Vista on UEFI: show only "manual installation" and the note that
+    /// answer files are not supported there yet (instead of skipping the screen).
+    unsupported: bool = false,
 };
+
+/// Vista on UEFI: its Setup runs with USOS's own servicing answer, so user
+/// answer files and profiles are not handed on yet.
+pub fn answersUnsupported(system: *const SystemEntry, firmware: Firmware) bool {
+    return firmware == .uefi and os_profiles.traits(system.id).native_uefi == .vista;
+}
 
 /// Whether the screen is shown at all.
 pub fn shown(in: Input) bool {
-    return in.settings_file or in.profiles_allowed or in.files > 0;
+    return in.unsupported or in.settings_file or in.profiles_allowed or in.files > 0;
 }
 
 pub fn layout(in: Input) Layout {
     var result = Layout{};
+    if (in.unsupported) {
+        result.add(.no_answer);
+        result.add(.unsupported);
+        result.first_profile = result.len;
+        result.first_file = result.len;
+        return result;
+    }
     if (in.settings_file) {
         result.add(.xp_manual);
         if (in.settings_active) {
@@ -244,4 +263,13 @@ test "profiles only where a rendered answer can be handed on" {
         const system = systems.findById(case.id) orelse return error.TestSystemMissing;
         try std.testing.expectEqual(case.capable, profileCapable(system, case.image, case.method, .uefi));
     }
+}
+
+test "Vista on UEFI: manual installation and the not-supported note only" {
+    const in = Input{ .unsupported = true, .profiles_allowed = false, .profiles = 3, .files = 2 };
+    try std.testing.expect(shown(in));
+    const l = layout(in);
+    try std.testing.expectEqualSlices(Row, &.{ .no_answer, .unsupported }, l.slice());
+    try std.testing.expectEqual(@as(?usize, null), l.choice(1, &.{}).profile);
+    try std.testing.expectEqual(@as(?[]const u8, null), l.choice(1, &.{}).path);
 }

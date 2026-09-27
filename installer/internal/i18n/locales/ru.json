@@ -1037,5 +1037,8 @@
   "boot.lx.preparing_the_disk": "Подготовка диска",
   "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Удаление таблицы разделов и создание раздела EFI.",
   "boot.lx.disk_prepared": "Диск подготовлен",
-  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Перезапуск в USOS: снова выберите Windows Vista, чтобы начать установку."
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Перезапуск в USOS: снова выберите Windows Vista, чтобы начать установку.",
+
+  "boot.unattended.vista_uefi": "Файлы ответов: для Vista в режиме UEFI пока не поддерживаются",
+  "boot.unattended.vista_uefi_detail": "Установка Vista в режиме UEFI пока выполняется без ваших файлов ответов и профилей; выберите ручную установку."
 }

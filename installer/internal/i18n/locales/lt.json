@@ -1037,5 +1037,8 @@
   "boot.lx.preparing_the_disk": "Ruošiamas diskas",
   "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Trinama skaidinių lentelė ir kuriamas EFI skaidinys.",
   "boot.lx.disk_prepared": "Diskas paruoštas",
-  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Paleidžiama iš naujo į USOS: dar kartą pasirinkite Windows Vista, kad pradėtumėte diegimą."
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Paleidžiama iš naujo į USOS: dar kartą pasirinkite Windows Vista, kad pradėtumėte diegimą.",
+
+  "boot.unattended.vista_uefi": "Atsakymų failai: Vista UEFI režimu dar nepalaikomi",
+  "boot.unattended.vista_uefi_detail": "Vista diegimas UEFI režimu kol kas vyksta be jūsų atsakymų failų ir profilių; pasirinkite rankinį diegimą."
 }

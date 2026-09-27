@@ -1034,5 +1034,8 @@
   "boot.lx.preparing_the_disk": "Disk hazırlanıyor",
   "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Bölüm tablosu siliniyor ve EFI bölümü oluşturuluyor.",
   "boot.lx.disk_prepared": "Disk hazırlandı",
-  "boot.lx.restarting_into_usos_choose_windows_vista_again": "USOS'a yeniden başlatılıyor: kurulumu başlatmak için Windows Vista'yı yeniden seçin."
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "USOS'a yeniden başlatılıyor: kurulumu başlatmak için Windows Vista'yı yeniden seçin.",
+
+  "boot.unattended.vista_uefi": "Yanıt dosyaları: UEFI'de Vista için henüz desteklenmiyor",
+  "boot.unattended.vista_uefi_detail": "UEFI'de Vista kurulumu şimdilik yanıt dosyalarınız ve profilleriniz olmadan çalışır; el ile kurulumu seçin."
 }

@@ -59,6 +59,8 @@ pub const Context = struct {
     system: *const usos.catalog.SystemEntry,
     /// USOS profiles can be handed on for this selection.
     profiles_allowed: bool,
+    /// Vista on UEFI: the screen shows only the "not supported yet" note.
+    answers_unsupported: bool = false,
     /// The image chosen before this screen (the editor lists its editions).
     image: ?usos.catalog.ImageItem = null,
 };
@@ -92,13 +94,13 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, context: Conte
     const found = discovery.listFilesWithExtension(directory, usos.flow.unattended_policy.extension(system), file_storage[0..]);
     const settings_name = usos.catalog.os_profiles.traits(system.id).settings_file;
     if (context.profiles_allowed) answer_profiles.reload(context.root);
-    const in_first = answer_screen.Input{ .settings_file = settings_name != null, .profiles_allowed = context.profiles_allowed, .profiles = answer_profiles.len(), .files = found };
+    const in_first = answer_screen.Input{ .settings_file = settings_name != null, .profiles_allowed = context.profiles_allowed, .profiles = answer_profiles.len(), .files = found, .unsupported = context.answers_unsupported };
     if (!answer_screen.shown(in_first)) return .{};
     settings = if (settings_name) |name| xp_settings.read(directory, name) else .{};
 
     var selected: ?usize = null;
     while (true) {
-        const in = answer_screen.Input{ .settings_file = settings_name != null, .settings_active = settings.active, .profiles_allowed = context.profiles_allowed, .profiles = answer_profiles.len(), .files = found };
+        const in = answer_screen.Input{ .settings_file = settings_name != null, .settings_active = settings.active, .profiles_allowed = context.profiles_allowed, .profiles = answer_profiles.len(), .files = found, .unsupported = context.answers_unsupported };
         layout = answer_screen.layout(in);
         var names: [answer_screen.max_files][]const u8 = undefined;
         for (0..found) |index| names[index] = file_storage[index].slice();
@@ -200,6 +202,7 @@ fn screen(context: Context, names: []const []const u8, initial: usize) Outcome {
         },
         .file => .{ .title = names[index - layout.first_file], .detail = view.t(.profile_file_detail), .icon = .{ .label = usos.flow.unattended_policy.fileKindLabel(system) } },
         .add => .{ .title = view.t(.profile_add), .detail = view.t(.profile_add_detail), .icon = .{ .vector = .check } },
+        .unsupported => .{ .title = view.t(.unattended_vista_uefi), .detail = view.t(.unattended_vista_uefi_detail), .icon = .{ .label = "!" } },
     };
     const len = layout.len;
     var selected: usize = @min(initial, len - 1);
@@ -275,6 +278,7 @@ fn help(selected: usize) usos.gui.menu_screens.Help {
         .profile => view.t(.profile_row_help),
         .file => if (layout.rows[0] == .xp_manual) view.t(.unattended_xp_file_detail) else view.t(.unattended_file_detail),
         .add => view.t(.profile_add_detail),
+        .unsupported => view.t(.unattended_vista_uefi_detail),
     };
     return .{ .title = view.t(.unattended_title), .lines = &help_line };
 }

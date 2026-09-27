@@ -1037,5 +1037,8 @@
   "boot.lx.preparing_the_disk": "Se pregătește discul",
   "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Se șterge tabela de partiții și se creează partiția EFI.",
   "boot.lx.disk_prepared": "Disc pregătit",
-  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Repornire în USOS: alegeți din nou Windows Vista pentru a porni instalarea."
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Repornire în USOS: alegeți din nou Windows Vista pentru a porni instalarea.",
+
+  "boot.unattended.vista_uefi": "Fișiere de răspuns: încă neacceptate pentru Vista în UEFI",
+  "boot.unattended.vista_uefi_detail": "Instalarea Vista în UEFI rulează deocamdată fără fișierele de răspuns și profilurile dvs.; alegeți instalarea manuală."
 }

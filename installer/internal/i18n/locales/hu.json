@@ -1034,5 +1034,8 @@
   "boot.lx.preparing_the_disk": "A lemez előkészítése",
   "boot.lx.erasing_the_partition_table_and_creating_the_efi": "A partíciós tábla törlése és az EFI-partíció létrehozása.",
   "boot.lx.disk_prepared": "A lemez előkészítve",
-  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Újraindítás a USOS-ba: a telepítés indításához válassza ismét a Windows Vistát."
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Újraindítás a USOS-ba: a telepítés indításához válassza ismét a Windows Vistát.",
+
+  "boot.unattended.vista_uefi": "Válaszfájlok: UEFI módban a Vistához még nem támogatottak",
+  "boot.unattended.vista_uefi_detail": "A Vista telepítője UEFI módban egyelőre a válaszfájlok és profilok nélkül fut; válassza a kézi telepítést."
 }

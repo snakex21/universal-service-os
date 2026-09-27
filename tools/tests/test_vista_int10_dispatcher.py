@@ -61,6 +61,43 @@ class VistaInt10(unittest.TestCase):
             self.assertEqual(b'UefiSeven.ini', (directory / 'UefiSeven.ini').read_bytes())
         self.assertIn(b'Int10 dispatcher installed', r.stdout)
 
+    def test_reused_windows7_esp_leftovers_are_replaced(self):
+        # X470 2026-09-27: the ESP of an earlier Windows 7 no-CSM install kept
+        # the Win7 boot manager as win7.original.efi and older UefiSeven files.
+        (self.dir / 'usos-int10-dispatcher.flag').write_bytes(b'1\r\n')
+        for directory in (self.ms, self.fallback):
+            (directory / 'win7.original.efi').write_bytes(b'Windows 7 6.1 bootmgfw.efi')
+            (directory / 'win7.efi').write_bytes(b'old UefiSeven')
+            (directory / 'UefiSeven.ini').write_bytes(b'old ini')
+            (directory / 'uefiseven-LICENSE.txt').write_bytes(b'old licence')
+            (directory / 'usos-win7-new.efi').write_bytes(b'half-published wrapper')
+            (directory / 'user-file.txt').write_bytes(b'not a USOS file')
+        r = self.run_step()
+        self.assertEqual(0, r.returncode, r.stdout)
+        for directory, entry in [(self.ms, 'bootmgfw.efi'), (self.fallback, 'bootx64.efi')]:
+            self.assertEqual(b'win7-wrapper.efi', (directory / entry).read_bytes())
+            self.assertEqual(VISTA_LOADER, (directory / 'win7.original.efi').read_bytes())
+            self.assertEqual(b'win7.efi', (directory / 'win7.efi').read_bytes())
+            self.assertEqual(b'UefiSeven.ini', (directory / 'UefiSeven.ini').read_bytes())
+            self.assertFalse((directory / 'usos-win7-new.efi').exists())
+            self.assertEqual(b'not a USOS file', (directory / 'user-file.txt').read_bytes())
+        self.assertIn(b'removed a stale USOS dispatcher file', r.stdout)
+
+    def test_usb_is_armed_before_the_optional_dispatcher(self):
+        # X470 2026-09-27: a dispatcher failure inside configure_boot() ended
+        # the finalizer before arm_target(), so USB v11 was never armed.
+        source = (ROOT / 'tools/windows_vista_install.c').read_text(encoding='utf-8')
+        configure = source[source.index('static BOOL configure_boot('):]
+        configure = configure[:configure.index('done:unmount_esp(alias);return ok;')]
+        self.assertNotIn('install_int10_dispatcher(', configure)
+        entry = source[source.index('void entry(void){'):]
+        arm = entry.index('arm_target(target)')
+        dispatcher = entry.index('install_optional_dispatcher(target)')
+        self.assertLess(entry.index('configure_boot(target)'), arm)
+        self.assertLess(arm, dispatcher)
+        # The optional step returns nothing: it cannot change the exit code.
+        self.assertIn('static void install_optional_dispatcher(', source)
+
     def test_foreign_fallback_keeps_the_vista_loader(self):
         (self.dir / 'usos-int10-dispatcher.flag').write_bytes(b'1\r\n')
         (self.fallback / 'bootx64.efi').write_bytes(b'other OS')

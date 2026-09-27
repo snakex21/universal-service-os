@@ -11,6 +11,21 @@ static int publish_loaders(void){
   path(b,base,L"win7.original.efi");
   if((i==0&&!exists[i])||(exists[i]&&!same_file(targets[i],b)))return say("UEFI: existing boot entry differs; no boot loaders changed.\r\n");
  }
+ /* Every existing loader is now the boot manager Setup just wrote (checked above), so
+  * any dispatcher assets in these folders are leftovers of an earlier USOS
+  * install on a reused ESP (X470 2026-09-27: Windows 7's win7.original.efi
+  * made the Vista publication fail). Remove only these known USOS files. */
+ {
+  static const WCHAR *stale[]={L"win7.original.efi",L"win7.efi",L"UefiSeven.ini",L"uefiseven-LICENSE.txt",L"usos-win7-new.efi"};
+  /* Only in a folder whose own loader exists and was confirmed above. */
+  for(unsigned i=0;i<2;i++)for(unsigned j=0;exists[i]&&j<5;j++){
+   path(b,chosen,dirs[i]);copy(b+len(b),stale[j]);
+   if(GetFileAttributesW(b)==INVALID_FILE_ATTRIBUTES)continue;
+   SetFileAttributesW(b,FILE_ATTRIBUTE_NORMAL);
+   if(!DeleteFileW(b))return say("UEFI: a stale USOS dispatcher file could not be removed; original loaders retained.\r\n");
+   say("UEFI: removed a stale USOS dispatcher file from a reused ESP.\r\n");
+  }
+ }
  for(unsigned i=0;i<2;i++){
   path(b,chosen,dirs[i]);b[len(b)-1]=0;
   if(!CreateDirectoryW(b,0)&&GetLastError()!=ERROR_ALREADY_EXISTS)return 1;

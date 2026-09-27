@@ -12,6 +12,17 @@ const esp_image = @import("esp_image_start.zig");
 
 pub const record_path = wide("\\EFI\\USOS\\vista-target.ini");
 
+/// Off by default (user decision 2026-09-27: Vista Setup's own delete/format
+/// on the disk page is enough). To re-enable, put an empty file
+/// EFI\USOS\vista-disk-prep.flag on the USOS ESP; nothing else changes.
+pub const enable_flag_path = wide("\\EFI\\USOS\\vista-disk-prep.flag");
+
+pub fn enabled(root: *uefi.protocol.File) bool {
+    const file = root.open(enable_flag_path, .read, .{}) catch return false;
+    file.close() catch {};
+    return true;
+}
+
 /// True when micro-Linux prepared a disk and WinPE has not consumed it yet.
 pub fn prepared(root: *uefi.protocol.File) bool {
     const file = root.open(record_path, .read, .{}) catch return false;

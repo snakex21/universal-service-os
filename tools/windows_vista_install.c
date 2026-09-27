@@ -213,7 +213,12 @@ static BOOL load_prepared_disk(void){
  if(h==INVALID_HANDLE_VALUE)return FALSE;BOOL ok=ReadFile(h,root,MAX_PATH-1,&got,0);CloseHandle(h);if(!ok)return FALSE;root[got]=0;
  char *cut=0;for(char *p=root;*p;p++)if(same(p,"\\EFI\\USOS\\Logs\\",15)){cut=p;break;}
  if(!cut||cut-root>MAX_PATH-40)return FALSE;*cut=0;
- unsigned n=0;for(char *p=root;*p;p++)prepared_record[n++]=(WCHAR)(BYTE)*p;prepared_record[n]=0;lstrcatW(prepared_record,L"\\EFI\\USOS\\vista-target.ini");
+ unsigned n=0;for(char *p=root;*p;p++)prepared_record[n++]=(WCHAR)(BYTE)*p;prepared_record[n]=0;
+ /* The preparation is opt-in (EFI\USOS\vista-disk-prep.flag, user decision
+  * 2026-09-27): without the flag a leftover record is ignored. */
+ WCHAR enable[MAX_PATH];lstrcpyW(enable,prepared_record);lstrcatW(enable,L"\\EFI\\USOS\\vista-disk-prep.flag");
+ if(GetFileAttributesW(enable)==INVALID_FILE_ATTRIBUTES){prepared_record[0]=0;return FALSE;}
+ lstrcatW(prepared_record,L"\\EFI\\USOS\\vista-target.ini");
  h=CreateFileW(prepared_record,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);if(h==INVALID_HANDLE_VALUE){prepared_record[0]=0;return FALSE;}
  ok=ReadFile(h,text,sizeof(text)-1,&got,0);CloseHandle(h);if(!ok)return FALSE;text[got]=0;
  const char *state=ini_value(text,"state"),*disk=ini_value(text,"disk_guid"),*esp=ini_value(text,"esp_partuuid"),*size=ini_value(text,"disk_size");
@@ -618,6 +623,17 @@ static BOOL install_int10_dispatcher(const WCHAR *esp,const WCHAR *loader){
  logcode("Int10 dispatcher installed on the target ESP (CSM on: pass-through; CSM off: experimental)=",0);
  return TRUE;
 }
+/* Optional, after the target is armed for USB: never fails the installation
+ * (X470 2026-09-27: a failed publication before arm_target left USB unarmed).
+ * On failure the Vista boot manager stays on both entries (right for CSM on). */
+static void install_optional_dispatcher(const Target *t){
+ static WCHAR flag[MAX_PATH],loader[MAX_PATH];WCHAR alias[4]={0};
+ path(flag,base,L"usos-int10-dispatcher.flag");if(GetFileAttributesW(flag)==INVALID_FILE_ATTRIBUTES)return;
+ if(!mount_esp(t->disk,alias)){logcode("Int10 dispatcher skipped: target ESP not mounted; the Vista boot manager stays=",ERROR_NOT_FOUND);return;}
+ path(loader,alias,L"EFI\\Microsoft\\Boot\\bootmgfw.efi");
+ if(!install_int10_dispatcher(alias,loader))logcode("Int10 dispatcher not installed (not fatal); the Vista boot manager stays on both entries=",1);
+ unmount_esp(alias);
+}
 static BOOL configure_boot(const Target *t){
  /* Single-threaded finalizer; keep path buffers off the no-CRT stack. */
  static WCHAR store[MAX_PATH],loader[MAX_PATH],inspect_store[MAX_PATH],fallback[MAX_PATH],backup[MAX_PATH];
@@ -662,9 +678,8 @@ static BOOL configure_boot(const Target *t){
  if(!mkdirs(fallback)||!hash_file(loader,expected)||!CopyFileW(loader,fallback,FALSE)||!hash_file(fallback,actual)||!same(expected,actual,32))goto done;
  HANDLE output=CreateFileW(fallback,GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
  if(output==INVALID_HANDLE_VALUE)goto done;ok=FlushFileBuffers(output);CloseHandle(output);
- // Both entries now hold the Vista boot manager: the dispatcher replaces them
- // only when the plan asked for it (flag), after staging and checking all assets.
- if(ok)ok=install_int10_dispatcher(alias,loader);
+ // Both entries now hold the Vista boot manager. The optional Int10 dispatcher
+ // is published later (install_optional_dispatcher), after the USB arming.
 done:unmount_esp(alias);return ok;
 }
 void entry(void){
@@ -675,7 +690,7 @@ void entry(void){
  if(!real_version||real_version(&version)!=0||version.dwMajorVersion!=10||version.dwBuildNumber<10240||version.dwBuildNumber>=22000||!GetFirmwareType(&firmware)||firmware!=FirmwareTypeUefi)ExitProcess(2);
  DWORD n=GetModuleFileNameW(0,base,MAX_PATH);if(!n||n>=MAX_PATH-64)ExitProcess(2);while(n&&base[n-1]!=L'\\')n--;base[n]=0;
  path(scratch,base,L"usos-vista-install.log");log_file=CreateFileW(scratch,GENERIC_WRITE,FILE_SHARE_READ,0,CREATE_ALWAYS,FILE_FLAG_WRITE_THROUGH,0);
- logcode("Vista USB installer v11 / USOS-prepared disk / no pre-Setup ESP gate / formatted ESP preferred / Vista bcdedit from the ISO boot.wim / ESP hints without volume access / known firstboot v11=",0);
+ logcode("Vista USB installer v12 / USB armed before the optional dispatcher / disk preparation opt-in / no pre-Setup ESP gate / formatted ESP preferred / Vista bcdedit from the ISO boot.wim / ESP hints without volume access / known firstboot v11=",0);
  logcode("Firmware type (2 = UEFI)=",firmware);
  WCHAR source[MAX_PATH];n=GetEnvironmentVariableW(L"USOS_SOURCE",source,MAX_PATH);
  if(n!=2||source[1]!=L':'||source[0]<L'C'||source[0]>L'Z')ExitProcess(2);
@@ -714,8 +729,9 @@ void entry(void){
   ExitProcess(10);
  }
  if(!copy_payload(target)){logcode("Copy target USB package failed=",GetLastError());ExitProcess(6);}
- if(!configure_boot(target)){logcode("Target BCD preparation failed=",GetLastError());ExitProcess(7);}
+ if(!configure_boot(target)){logcode("Target BCD preparation failed (see the lines above)=",ERROR_GEN_FAILURE);ExitProcess(7);}
  if(!arm_target(target)){logcode("Arm pre-Setup USB failed=",GetLastError());ExitProcess(8);}
+ install_optional_dispatcher(target);
  logcode("Vista target ready for first boot with USB v11=",0);
  retire_prepared_disk(L".done");
  CloseHandle(log_file);path(scratch,base,L"usos-vista-install.log");WCHAR target_log[MAX_PATH];path(target_log,target->root,L"USOS\\Vista\\installation-from-usb.log");

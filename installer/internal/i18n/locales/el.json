@@ -1034,5 +1034,8 @@
   "boot.lx.preparing_the_disk": "Προετοιμασία του δίσκου",
   "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Διαγραφή του πίνακα διαμερισμάτων και δημιουργία του διαμερίσματος EFI.",
   "boot.lx.disk_prepared": "Ο δίσκος προετοιμάστηκε",
-  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Επανεκκίνηση στο USOS: επιλέξτε ξανά Windows Vista για να ξεκινήσει η εγκατάσταση."
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Επανεκκίνηση στο USOS: επιλέξτε ξανά Windows Vista για να ξεκινήσει η εγκατάσταση.",
+
+  "boot.unattended.vista_uefi": "Αρχεία απαντήσεων: δεν υποστηρίζονται ακόμη για τα Vista σε UEFI",
+  "boot.unattended.vista_uefi_detail": "Η εγκατάσταση των Vista σε UEFI προς το παρόν γίνεται χωρίς τα αρχεία απαντήσεων και τα προφίλ σας· επιλέξτε τη μη αυτόματη εγκατάσταση."
 }

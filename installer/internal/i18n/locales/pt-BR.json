@@ -1034,5 +1034,8 @@
   "boot.lx.preparing_the_disk": "Preparando o disco",
   "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Apagando a tabela de partições e criando a partição EFI.",
   "boot.lx.disk_prepared": "Disco preparado",
-  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Reiniciando no USOS: escolha o Windows Vista novamente para iniciar a instalação."
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Reiniciando no USOS: escolha o Windows Vista novamente para iniciar a instalação.",
+
+  "boot.unattended.vista_uefi": "Arquivos de resposta: ainda não suportados para o Vista em UEFI",
+  "boot.unattended.vista_uefi_detail": "Por enquanto a instalação do Vista em UEFI é feita sem seus arquivos de resposta e perfis; escolha a instalação manual."
 }

@@ -1037,5 +1037,8 @@
   "boot.lx.preparing_the_disk": "Priprema diska",
   "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Brisanje tabele particija i pravljenje EFI particije.",
   "boot.lx.disk_prepared": "Disk je pripremljen",
-  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Ponovno pokretanje u USOS: ponovo izaberite Windows Vista da biste pokrenuli instalaciju."
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Ponovno pokretanje u USOS: ponovo izaberite Windows Vista da biste pokrenuli instalaciju.",
+
+  "boot.unattended.vista_uefi": "Datoteke odgovora: za Vistu u UEFI režimu još nisu podržane",
+  "boot.unattended.vista_uefi_detail": "Instalacija Viste u UEFI režimu za sada radi bez vaših datoteka odgovora i profila; izaberite ručnu instalaciju."
 }

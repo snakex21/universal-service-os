@@ -1037,5 +1037,8 @@
   "boot.lx.preparing_the_disk": "Příprava disku",
   "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Mazání tabulky oddílů a vytváření oddílu EFI.",
   "boot.lx.disk_prepared": "Disk připraven",
-  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Restart do USOS: znovu zvolte Windows Vista a spusťte instalaci."
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Restart do USOS: znovu zvolte Windows Vista a spusťte instalaci.",
+
+  "boot.unattended.vista_uefi": "Soubory odpovědí: pro Vistu v UEFI zatím nepodporováno",
+  "boot.unattended.vista_uefi_detail": "Instalace Visty v UEFI zatím probíhá bez vašich souborů odpovědí a profilů; zvolte ruční instalaci."
 }

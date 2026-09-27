@@ -1037,5 +1037,8 @@
   "boot.lx.preparing_the_disk": "Sagatavo disku",
   "boot.lx.erasing_the_partition_table_and_creating_the_efi": "Dzēš nodalījumu tabulu un izveido EFI nodalījumu.",
   "boot.lx.disk_prepared": "Disks sagatavots",
-  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Restartē USOS: vēlreiz izvēlieties Windows Vista, lai sāktu instalēšanu."
+  "boot.lx.restarting_into_usos_choose_windows_vista_again": "Restartē USOS: vēlreiz izvēlieties Windows Vista, lai sāktu instalēšanu.",
+
+  "boot.unattended.vista_uefi": "Atbilžu faili: Vista UEFI režīmā vēl netiek atbalstīti",
+  "boot.unattended.vista_uefi_detail": "Vista instalēšana UEFI režīmā pagaidām notiek bez jūsu atbilžu failiem un profiliem; izvēlieties manuālo instalēšanu."
 }
