@@ -52,7 +52,51 @@ pub const Field = enum {
     bypass_secure_boot,
     bypass_ram,
     no_network_oobe,
+    protect_pc,
+    network_location,
+    disable_wer,
 };
+
+/// The "Help protect Windows" page (OOBE/ProtectYourPC, Vista and newer).
+pub const ProtectPc = enum(u2) {
+    /// 1: recommended settings (automatic updates on).
+    recommended = 1,
+    /// 2: only important updates (Vista/7; "updates only" on 8+).
+    updates = 2,
+    /// 3: automatic protection off (the least data sent; default).
+    off = 3,
+
+    pub fn value(self: ProtectPc) []const u8 {
+        return switch (self) {
+            .recommended => "1",
+            .updates => "2",
+            .off => "3",
+        };
+    }
+};
+
+/// The network location page of Vista and 7 (OOBE/NetworkLocation).
+pub const NetworkLocation = enum {
+    work,
+    home,
+    /// "Other" in the schema: a public network.
+    public,
+
+    pub fn value(self: NetworkLocation) []const u8 {
+        return switch (self) {
+            .work => "Work",
+            .home => "Home",
+            .public => "Other",
+        };
+    }
+};
+
+fn enumByName(comptime E: type, name: []const u8) ?E {
+    inline for (@typeInfo(E).@"enum".fields) |f| {
+        if (std.ascii.eqlIgnoreCase(name, f.name)) return @enumFromInt(f.value);
+    }
+    return null;
+}
 
 /// Keyboard: follow the locale (auto), or an explicit input profile
 /// `LLLL:KKKKKKKK` (language id : keyboard layout id).
@@ -103,6 +147,12 @@ pub const Profile = struct {
     bypass_ram: bool = false,
     /// Windows 11: OOBE without network (BypassNRO), wireless page hidden.
     no_network_oobe: bool = false,
+    /// Vista+: answer of the "Help protect Windows" page.
+    protect_pc: ProtectPc = .off,
+    /// Vista/7: answer of the network location page (Work: no HomeGroup).
+    network_location: NetworkLocation = .work,
+    /// Vista+: Windows Error Reporting off (ErrorReportingCore/DisableWER).
+    disable_wer: bool = false,
 
     /// Product key for a catalog system id: its own key, else the common one.
     pub fn keyFor(self: *const Profile, system_id: []const u8) []const u8 {
@@ -187,6 +237,7 @@ pub const Problem = enum {
     not_key_value,
     unsupported,
     too_many_keys,
+    bad_choice,
     duplicate,
 };
 
@@ -398,7 +449,9 @@ fn applyField(p: *Profile, name: []const u8, value: []const u8) ?Issue {
         .language => p.language = if (isAuto(value)) null else if (tables.language(value)) |entry| @intCast(entry - &tables.languages[0]) else return .{ .field = field, .problem = .unknown_language },
         .locale => p.locale = if (isAuto(value)) null else if (tables.language(value)) |entry| @intCast(entry - &tables.languages[0]) else return .{ .field = field, .problem = .unknown_language },
         .keyboard => p.keyboard = if (isAuto(value)) null else parseKeyboard(value) orelse return .{ .field = field, .problem = .bad_keyboard },
-        .remember_key, .manual_disk, .local_account, .bypass_tpm, .bypass_secure_boot, .bypass_ram, .no_network_oobe => {
+        .protect_pc => p.protect_pc = enumByName(ProtectPc, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .network_location => p.network_location = enumByName(NetworkLocation, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .remember_key, .manual_disk, .local_account, .bypass_tpm, .bypass_secure_boot, .bypass_ram, .no_network_oobe, .disable_wer => {
             const flag = parseBool(value) orelse return .{ .field = field, .problem = .bad_boolean };
             switch (field) {
                 .remember_key => p.remember_key = flag,
@@ -408,6 +461,7 @@ fn applyField(p: *Profile, name: []const u8, value: []const u8) ?Issue {
                 .bypass_secure_boot => p.bypass_secure_boot = flag,
                 .bypass_ram => p.bypass_ram = flag,
                 .no_network_oobe => p.no_network_oobe = flag,
+                .disable_wer => p.disable_wer = flag,
                 else => unreachable,
             }
         },
@@ -452,6 +506,7 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
         boolText(p.manual_disk),   boolText(p.local_account), boolText(p.bypass_tpm),
         boolText(p.bypass_secure_boot), boolText(p.bypass_ram), boolText(p.no_network_oobe),
     });
+    try w.print("protect_pc={s}\r\nnetwork_location={s}\r\ndisable_wer={s}\r\n", .{ @tagName(p.protect_pc), @tagName(p.network_location), boolText(p.disable_wer) });
     return w.buffered();
 }
 
@@ -533,6 +588,9 @@ test "profile round trip keeps every field; keys only with remember_key" {
     try p.key.set("AAAAA-BBBBB-CCCCC-DDDDD-EEEEE");
     try p.setSystemKey("windows-xp", "FFFFF-GGGGG-HHHHH-JJJJJ-KKKKK");
     p.bypass_tpm = true;
+    p.protect_pc = .recommended;
+    p.network_location = .home;
+    p.disable_wer = true;
     p.remember_key = true;
     var buffer: [max_file]u8 = undefined;
     const text = try write(&p, &buffer);
@@ -546,6 +604,9 @@ test "profile round trip keeps every field; keys only with remember_key" {
     try std.testing.expectEqualStrings("FFFFF-GGGGG-HHHHH-JJJJJ-KKKKK", q.keyFor("windows-xp"));
     try std.testing.expectEqualStrings("AAAAA-BBBBB-CCCCC-DDDDD-EEEEE", q.keyFor("windows-10"));
     try std.testing.expect(q.bypass_tpm and !q.bypass_ram and q.manual_disk and q.local_account);
+    try std.testing.expectEqual(ProtectPc.recommended, q.protect_pc);
+    try std.testing.expectEqual(NetworkLocation.home, q.network_location);
+    try std.testing.expect(q.disable_wer);
 
     p.remember_key = false;
     const forgotten = try write(&p, &buffer);
@@ -568,6 +629,8 @@ test "profile parse errors name the field and line, never the value" {
         .{ .text = "name=A\nuser=Bob\nkeyboard=0415-1\n", .field = .keyboard, .problem = .bad_keyboard, .line = 3 },
         .{ .text = "name=A\nuser=Bob\nmanual_disk=no\n", .field = .manual_disk, .problem = .unsupported, .line = 0 },
         .{ .text = "name=A\nuser=Bob\nbypass_tpm=maybe\n", .field = .bypass_tpm, .problem = .bad_boolean, .line = 3 },
+        .{ .text = "name=A\nuser=Bob\nprotect_pc=2\n", .field = .protect_pc, .problem = .bad_choice, .line = 3 },
+        .{ .text = "name=A\nuser=Bob\nnetwork_location=office\n", .field = .network_location, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\npassword=a b\n", .field = .password, .problem = .bad_characters, .line = 0 },
         .{ .text = "name=A\njusttext\n", .field = null, .problem = .not_key_value, .line = 2 },
         .{ .text = "user=Bob\n", .field = .name, .problem = .empty, .line = 0 },

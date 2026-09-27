@@ -7,6 +7,7 @@ pub const target = @import("target.zig");
 pub const nt5 = @import("nt5.zig");
 pub const autounattend = @import("autounattend.zig");
 pub const xml_check = @import("xml_check.zig");
+pub const schema = @import("schema.zig");
 pub const plan_file = @import("plan_file.zig");
 
 pub const Profile = profile.Profile;
@@ -27,6 +28,7 @@ pub fn render(p: *const Profile, system_id: []const u8, arch: Arch, key: ?[]cons
     if (family.nt5()) return .{ .format = .nt5_settings, .bytes = try nt5.render(p, family, use_key, buffer) };
     const xml = try autounattend.render(.{ .profile = p, .family = family, .arch = arch, .key = use_key }, buffer);
     try xml_check.wellFormed(xml);
+    try schema.check(xml, family, null);
     return .{ .format = .autounattend_xml, .bytes = xml };
 }
 
@@ -37,6 +39,7 @@ test {
     _ = nt5;
     _ = autounattend;
     _ = xml_check;
+    _ = schema;
     _ = plan_file;
 }
 
