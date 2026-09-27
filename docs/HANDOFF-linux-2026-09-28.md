@@ -31,7 +31,10 @@ profile model. Design: [design/linux-iso-boot.md](design/linux-iso-boot.md).
   (loop or dm over the extents, `/dev/usos-iso`, init-bottom hook for Ubuntu
   answers). Compiles (21 KB) with
   `zig build-exe -target x86_64-linux-none -O ReleaseSmall -fstrip --dep iso_map -Mroot=src/platform/linux/iso_init_main.zig -Miso_map=src/flow/linux_iso/iso_map.zig`;
-  not yet a build.zig step; **never run yet**.
+  since then run in QEMU (below); BLKPG partition fallback added for d-i.
+  Build: `zig build linux-iso-helper` (also part of `install`, so build.bat
+  makes it) -> `zig-out/usb|manual-usb/EFI/USOS/linux/usos-linux.cpio`
+  (22 360 bytes, deterministic); `verify_release_consistency.ps1` requires it.
 - `assets/linux-iso/init-bottom`, `tools/build_linux_iso_helper.py` (cpio
   packer, deterministic).
 - `tools/tests/linux_iso/new_linux_test_disk.ps1` (sparse fixed VHD, ESP +
@@ -77,8 +80,8 @@ fragmented copy on purpose to test it).
 
 ## Not done (next, in this order)
 
-Design doc section 9: step 2 build.zig wiring of the helper + cpio, step 3
-first QEMU runs (`run_linux_iso_direct.py gparted`, then each distro, BIOS and
+Design doc section 9: finish step 3 (remaining distros BIOS + `--uefi`,
+d-i CD detection, a fragmented ISO for the dm path) (`run_linux_iso_direct.py gparted`, then each distro, BIOS and
 `--uefi`), then 4-8. No catalog/routing change, no strings, no build.bat, no
 stick deploy yet (the stick was NOT touched this session).
 
