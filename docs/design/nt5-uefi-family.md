@@ -257,6 +257,12 @@ prawdziwe, bo `MIGRATE.INF` przypisuje C:), ale jako parametr profilu.
 
 ## 7. Wariant bez CSM: CSMWrap
 
+> 2026-09-27: aktualny projekt i wynik prototypu QEMU (OVMF bez CSM →
+> CSMWrap z ESP na dysku docelowym → XP text mode) są w
+> [csmwrap-integration.md](csmwrap-integration.md), fakty o CSMWrap w
+> [../research/csmwrap.md](../research/csmwrap.md). Tam, gdzie się różnią,
+> obowiązują tamte dokumenty.
+
 Cel: płyty bez CSM (Intel 12. gen+, część AM5, laptopy) i X470
 z wyłączonym CSM. **Zawsze eksperymentalny**, osobny wybór firmware
 w profilu (`.uefi_csmwrap`).
