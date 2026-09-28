@@ -80,11 +80,10 @@ pub const grub_paths = [_][]const u8{
 ///   exists(path) bool
 ///   read(path, buffer) ?[]const u8   (whole small file, null if missing/too big)
 ///   volumeLabel() []const u8         (ISO9660 primary volume id, trimmed)
-/// grub.cfg text; static, not on the stack (UEFI stacks can be 64-128 KiB and
-/// USOS runs below shim's frames under Secure Boot).
-var text_buf: [64 * 1024]u8 = undefined;
-
-pub fn plan(source: anytype, out: *Recipe) Error!void {
+/// `text_buf` holds one grub.cfg at a time (64 KiB is plenty). It is the
+/// caller's: not on the stack (UEFI stacks are small and USOS runs below
+/// shim's frames under Secure Boot) and not static (the BIOS Core has no BSS).
+pub fn plan(source: anytype, out: *Recipe, text_buf: []u8) Error!void {
     out.* = .{};
     const volume = source.volumeLabel();
     out.label_len = @min(volume.len, out.label_buf.len);
@@ -92,7 +91,7 @@ pub fn plan(source: anytype, out: *Recipe) Error!void {
 
     var found = false;
     for (grub_paths) |path| {
-        const text = source.read(path, &text_buf) orelse continue;
+        const text = source.read(path, text_buf) orelse continue;
         if (grub_cfg.firstEntry(text)) |entry| {
             out.entry = entry;
             found = true;
@@ -224,7 +223,8 @@ const FakeIso = struct {
 
 fn expectPlan(iso: FakeIso, family: Family, answer: AnswerFormat, cmdline: []const u8) !void {
     var r: Recipe = undefined;
-    try plan(&iso, &r);
+    var text: [4096]u8 = undefined;
+    try plan(&iso, &r, &text);
     try std.testing.expectEqual(family, r.family);
     try std.testing.expectEqual(answer, r.answer);
     try std.testing.expectEqualStrings(cmdline, r.cmdline());
@@ -264,5 +264,6 @@ test "live-boot, debian-installer, dracut, archiso, unknown" {
         .{ "boot/grub/grub.cfg", "menuentry 'x' {\n linux /k root=/dev/sr0\n initrd /i\n}\n" },
     } }, .unknown, .none, "rdinit=/usos/init root=/dev/sr0 live-media=/dev/usos-iso");
     var r: Recipe = undefined;
-    try std.testing.expectError(error.NoLinuxEntry, plan(&FakeIso{ .label = "", .files = &.{} }, &r));
+    var text: [64]u8 = undefined;
+    try std.testing.expectError(error.NoLinuxEntry, plan(&FakeIso{ .label = "", .files = &.{} }, &r, &text));
 }

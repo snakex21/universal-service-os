@@ -2749,9 +2749,9 @@ route	windows-server-2003	efi	disk_image	bios	-
 route	windows-server-2003	efi	disk_image	uefi	-
 route	windows-server-2003	efi	floppy_image	bios	-
 route	windows-server-2003	efi	floppy_image	uefi	-
-route	ubuntu	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	ubuntu	iso	automatic	bios	linux_iso	direct_iso	any	experimental	0
 route	ubuntu	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
-route	ubuntu	iso	direct_iso	bios	-
+route	ubuntu	iso	direct_iso	bios	linux_iso	direct_iso	any	experimental	0
 route	ubuntu	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	ubuntu	iso	wimboot	bios	-
 route	ubuntu	iso	wimboot	uefi	-
@@ -2857,9 +2857,9 @@ route	ubuntu	efi	disk_image	bios	-
 route	ubuntu	efi	disk_image	uefi	-
 route	ubuntu	efi	floppy_image	bios	-
 route	ubuntu	efi	floppy_image	uefi	-
-route	debian	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	debian	iso	automatic	bios	linux_iso	direct_iso	any	experimental	0
 route	debian	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
-route	debian	iso	direct_iso	bios	-
+route	debian	iso	direct_iso	bios	linux_iso	direct_iso	any	experimental	0
 route	debian	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	debian	iso	wimboot	bios	-
 route	debian	iso	wimboot	uefi	-
@@ -2965,9 +2965,9 @@ route	debian	efi	disk_image	bios	-
 route	debian	efi	disk_image	uefi	-
 route	debian	efi	floppy_image	bios	-
 route	debian	efi	floppy_image	uefi	-
-route	fedora	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	fedora	iso	automatic	bios	linux_iso	direct_iso	any	experimental	0
 route	fedora	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
-route	fedora	iso	direct_iso	bios	-
+route	fedora	iso	direct_iso	bios	linux_iso	direct_iso	any	experimental	0
 route	fedora	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	fedora	iso	wimboot	bios	-
 route	fedora	iso	wimboot	uefi	-
@@ -3073,9 +3073,9 @@ route	fedora	efi	disk_image	bios	-
 route	fedora	efi	disk_image	uefi	-
 route	fedora	efi	floppy_image	bios	-
 route	fedora	efi	floppy_image	uefi	-
-route	linux-mint	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	linux-mint	iso	automatic	bios	linux_iso	direct_iso	any	experimental	0
 route	linux-mint	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
-route	linux-mint	iso	direct_iso	bios	-
+route	linux-mint	iso	direct_iso	bios	linux_iso	direct_iso	any	experimental	0
 route	linux-mint	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	linux-mint	iso	wimboot	bios	-
 route	linux-mint	iso	wimboot	uefi	-
@@ -3181,9 +3181,9 @@ route	linux-mint	efi	disk_image	bios	-
 route	linux-mint	efi	disk_image	uefi	-
 route	linux-mint	efi	floppy_image	bios	-
 route	linux-mint	efi	floppy_image	uefi	-
-route	arch-linux	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	arch-linux	iso	automatic	bios	linux_iso	direct_iso	any	experimental	0
 route	arch-linux	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
-route	arch-linux	iso	direct_iso	bios	-
+route	arch-linux	iso	direct_iso	bios	linux_iso	direct_iso	any	experimental	0
 route	arch-linux	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	arch-linux	iso	wimboot	bios	-
 route	arch-linux	iso	wimboot	uefi	-
@@ -3289,9 +3289,9 @@ route	arch-linux	efi	disk_image	bios	-
 route	arch-linux	efi	disk_image	uefi	-
 route	arch-linux	efi	floppy_image	bios	-
 route	arch-linux	efi	floppy_image	uefi	-
-route	opensuse	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	opensuse	iso	automatic	bios	linux_iso	direct_iso	any	experimental	0
 route	opensuse	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
-route	opensuse	iso	direct_iso	bios	-
+route	opensuse	iso	direct_iso	bios	linux_iso	direct_iso	any	experimental	0
 route	opensuse	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	opensuse	iso	wimboot	bios	-
 route	opensuse	iso	wimboot	uefi	-
@@ -3397,9 +3397,9 @@ route	opensuse	efi	disk_image	bios	-
 route	opensuse	efi	disk_image	uefi	-
 route	opensuse	efi	floppy_image	bios	-
 route	opensuse	efi	floppy_image	uefi	-
-route	manjaro	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	manjaro	iso	automatic	bios	linux_iso	direct_iso	any	experimental	0
 route	manjaro	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
-route	manjaro	iso	direct_iso	bios	-
+route	manjaro	iso	direct_iso	bios	linux_iso	direct_iso	any	experimental	0
 route	manjaro	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	manjaro	iso	wimboot	bios	-
 route	manjaro	iso	wimboot	uefi	-
@@ -3505,9 +3505,9 @@ route	manjaro	efi	disk_image	bios	-
 route	manjaro	efi	disk_image	uefi	-
 route	manjaro	efi	floppy_image	bios	-
 route	manjaro	efi	floppy_image	uefi	-
-route	kali-linux	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	kali-linux	iso	automatic	bios	linux_iso	direct_iso	any	experimental	0
 route	kali-linux	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
-route	kali-linux	iso	direct_iso	bios	-
+route	kali-linux	iso	direct_iso	bios	linux_iso	direct_iso	any	experimental	0
 route	kali-linux	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	kali-linux	iso	wimboot	bios	-
 route	kali-linux	iso	wimboot	uefi	-
@@ -3613,9 +3613,9 @@ route	kali-linux	efi	disk_image	bios	-
 route	kali-linux	efi	disk_image	uefi	-
 route	kali-linux	efi	floppy_image	bios	-
 route	kali-linux	efi	floppy_image	uefi	-
-route	systemrescue	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	systemrescue	iso	automatic	bios	linux_iso	direct_iso	any	experimental	1
 route	systemrescue	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	1
-route	systemrescue	iso	direct_iso	bios	-
+route	systemrescue	iso	direct_iso	bios	linux_iso	direct_iso	any	experimental	1
 route	systemrescue	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	1
 route	systemrescue	iso	wimboot	bios	-
 route	systemrescue	iso	wimboot	uefi	-
@@ -3721,9 +3721,9 @@ route	systemrescue	efi	disk_image	bios	-
 route	systemrescue	efi	disk_image	uefi	-
 route	systemrescue	efi	floppy_image	bios	-
 route	systemrescue	efi	floppy_image	uefi	-
-route	gparted-live	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	gparted-live	iso	automatic	bios	linux_iso	direct_iso	any	experimental	0
 route	gparted-live	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
-route	gparted-live	iso	direct_iso	bios	-
+route	gparted-live	iso	direct_iso	bios	linux_iso	direct_iso	any	experimental	0
 route	gparted-live	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	gparted-live	iso	wimboot	bios	-
 route	gparted-live	iso	wimboot	uefi	-
@@ -3829,9 +3829,9 @@ route	gparted-live	efi	disk_image	bios	-
 route	gparted-live	efi	disk_image	uefi	-
 route	gparted-live	efi	floppy_image	bios	-
 route	gparted-live	efi	floppy_image	uefi	-
-route	clonezilla	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	clonezilla	iso	automatic	bios	linux_iso	direct_iso	any	experimental	0
 route	clonezilla	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
-route	clonezilla	iso	direct_iso	bios	-
+route	clonezilla	iso	direct_iso	bios	linux_iso	direct_iso	any	experimental	0
 route	clonezilla	iso	direct_iso	uefi	linux_iso	direct_iso	any	experimental	0
 route	clonezilla	iso	wimboot	bios	-
 route	clonezilla	iso	wimboot	uefi	-
@@ -6399,9 +6399,10 @@ profile	windows-server-2003	efi	chainload	-	efi-chainload
 profile	windows-server-2003	efi	memdisk	uefi	w2k3-uefi-other
 profile	windows-server-2003	efi	disk_image	uefi	w2k3-uefi-other
 profile	windows-server-2003	efi	floppy_image	uefi	w2k3-uefi-other
-profile	ubuntu	iso	automatic	bios	iso-work-chainload
+profile	ubuntu	iso	automatic	bios	linux-iso-bios
 profile	ubuntu	iso	automatic	uefi	linux-iso-uefi
 profile	ubuntu	iso	automatic	-	iso-work-chainload
+profile	ubuntu	iso	direct_iso	bios	linux-iso-bios
 profile	ubuntu	iso	direct_iso	uefi	linux-iso-uefi
 profile	ubuntu	iso	chainload	bios	iso-work-chainload
 profile	ubuntu	iso	chainload	uefi	iso-work-chainload
@@ -6433,9 +6434,10 @@ profile	ubuntu	efi	direct_efi	-	efi-direct
 profile	ubuntu	efi	chainload	bios	efi-chainload
 profile	ubuntu	efi	chainload	uefi	efi-chainload
 profile	ubuntu	efi	chainload	-	efi-chainload
-profile	debian	iso	automatic	bios	iso-work-chainload
+profile	debian	iso	automatic	bios	linux-iso-bios
 profile	debian	iso	automatic	uefi	linux-iso-uefi
 profile	debian	iso	automatic	-	iso-work-chainload
+profile	debian	iso	direct_iso	bios	linux-iso-bios
 profile	debian	iso	direct_iso	uefi	linux-iso-uefi
 profile	debian	iso	chainload	bios	iso-work-chainload
 profile	debian	iso	chainload	uefi	iso-work-chainload
@@ -6467,9 +6469,10 @@ profile	debian	efi	direct_efi	-	efi-direct
 profile	debian	efi	chainload	bios	efi-chainload
 profile	debian	efi	chainload	uefi	efi-chainload
 profile	debian	efi	chainload	-	efi-chainload
-profile	fedora	iso	automatic	bios	iso-work-chainload
+profile	fedora	iso	automatic	bios	linux-iso-bios
 profile	fedora	iso	automatic	uefi	linux-iso-uefi
 profile	fedora	iso	automatic	-	iso-work-chainload
+profile	fedora	iso	direct_iso	bios	linux-iso-bios
 profile	fedora	iso	direct_iso	uefi	linux-iso-uefi
 profile	fedora	iso	chainload	bios	iso-work-chainload
 profile	fedora	iso	chainload	uefi	iso-work-chainload
@@ -6501,9 +6504,10 @@ profile	fedora	efi	direct_efi	-	efi-direct
 profile	fedora	efi	chainload	bios	efi-chainload
 profile	fedora	efi	chainload	uefi	efi-chainload
 profile	fedora	efi	chainload	-	efi-chainload
-profile	linux-mint	iso	automatic	bios	iso-work-chainload
+profile	linux-mint	iso	automatic	bios	linux-iso-bios
 profile	linux-mint	iso	automatic	uefi	linux-iso-uefi
 profile	linux-mint	iso	automatic	-	iso-work-chainload
+profile	linux-mint	iso	direct_iso	bios	linux-iso-bios
 profile	linux-mint	iso	direct_iso	uefi	linux-iso-uefi
 profile	linux-mint	iso	chainload	bios	iso-work-chainload
 profile	linux-mint	iso	chainload	uefi	iso-work-chainload
@@ -6535,9 +6539,10 @@ profile	linux-mint	efi	direct_efi	-	efi-direct
 profile	linux-mint	efi	chainload	bios	efi-chainload
 profile	linux-mint	efi	chainload	uefi	efi-chainload
 profile	linux-mint	efi	chainload	-	efi-chainload
-profile	arch-linux	iso	automatic	bios	iso-work-chainload
+profile	arch-linux	iso	automatic	bios	linux-iso-bios
 profile	arch-linux	iso	automatic	uefi	linux-iso-uefi
 profile	arch-linux	iso	automatic	-	iso-work-chainload
+profile	arch-linux	iso	direct_iso	bios	linux-iso-bios
 profile	arch-linux	iso	direct_iso	uefi	linux-iso-uefi
 profile	arch-linux	iso	chainload	bios	iso-work-chainload
 profile	arch-linux	iso	chainload	uefi	iso-work-chainload
@@ -6569,9 +6574,10 @@ profile	arch-linux	efi	direct_efi	-	efi-direct
 profile	arch-linux	efi	chainload	bios	efi-chainload
 profile	arch-linux	efi	chainload	uefi	efi-chainload
 profile	arch-linux	efi	chainload	-	efi-chainload
-profile	opensuse	iso	automatic	bios	iso-work-chainload
+profile	opensuse	iso	automatic	bios	linux-iso-bios
 profile	opensuse	iso	automatic	uefi	linux-iso-uefi
 profile	opensuse	iso	automatic	-	iso-work-chainload
+profile	opensuse	iso	direct_iso	bios	linux-iso-bios
 profile	opensuse	iso	direct_iso	uefi	linux-iso-uefi
 profile	opensuse	iso	chainload	bios	iso-work-chainload
 profile	opensuse	iso	chainload	uefi	iso-work-chainload
@@ -6603,9 +6609,10 @@ profile	opensuse	efi	direct_efi	-	efi-direct
 profile	opensuse	efi	chainload	bios	efi-chainload
 profile	opensuse	efi	chainload	uefi	efi-chainload
 profile	opensuse	efi	chainload	-	efi-chainload
-profile	manjaro	iso	automatic	bios	iso-work-chainload
+profile	manjaro	iso	automatic	bios	linux-iso-bios
 profile	manjaro	iso	automatic	uefi	linux-iso-uefi
 profile	manjaro	iso	automatic	-	iso-work-chainload
+profile	manjaro	iso	direct_iso	bios	linux-iso-bios
 profile	manjaro	iso	direct_iso	uefi	linux-iso-uefi
 profile	manjaro	iso	chainload	bios	iso-work-chainload
 profile	manjaro	iso	chainload	uefi	iso-work-chainload
@@ -6637,9 +6644,10 @@ profile	manjaro	efi	direct_efi	-	efi-direct
 profile	manjaro	efi	chainload	bios	efi-chainload
 profile	manjaro	efi	chainload	uefi	efi-chainload
 profile	manjaro	efi	chainload	-	efi-chainload
-profile	kali-linux	iso	automatic	bios	iso-work-chainload
+profile	kali-linux	iso	automatic	bios	linux-iso-bios
 profile	kali-linux	iso	automatic	uefi	linux-iso-uefi
 profile	kali-linux	iso	automatic	-	iso-work-chainload
+profile	kali-linux	iso	direct_iso	bios	linux-iso-bios
 profile	kali-linux	iso	direct_iso	uefi	linux-iso-uefi
 profile	kali-linux	iso	chainload	bios	iso-work-chainload
 profile	kali-linux	iso	chainload	uefi	iso-work-chainload
@@ -6671,9 +6679,10 @@ profile	kali-linux	efi	direct_efi	-	efi-direct
 profile	kali-linux	efi	chainload	bios	efi-chainload
 profile	kali-linux	efi	chainload	uefi	efi-chainload
 profile	kali-linux	efi	chainload	-	efi-chainload
-profile	systemrescue	iso	automatic	bios	iso-work-chainload
+profile	systemrescue	iso	automatic	bios	linux-iso-bios
 profile	systemrescue	iso	automatic	uefi	linux-iso-uefi
 profile	systemrescue	iso	automatic	-	iso-work-chainload
+profile	systemrescue	iso	direct_iso	bios	linux-iso-bios
 profile	systemrescue	iso	direct_iso	uefi	linux-iso-uefi
 profile	systemrescue	iso	chainload	bios	iso-work-chainload
 profile	systemrescue	iso	chainload	uefi	iso-work-chainload
@@ -6705,9 +6714,10 @@ profile	systemrescue	efi	direct_efi	-	efi-direct
 profile	systemrescue	efi	chainload	bios	efi-chainload
 profile	systemrescue	efi	chainload	uefi	efi-chainload
 profile	systemrescue	efi	chainload	-	efi-chainload
-profile	gparted-live	iso	automatic	bios	iso-work-chainload
+profile	gparted-live	iso	automatic	bios	linux-iso-bios
 profile	gparted-live	iso	automatic	uefi	linux-iso-uefi
 profile	gparted-live	iso	automatic	-	iso-work-chainload
+profile	gparted-live	iso	direct_iso	bios	linux-iso-bios
 profile	gparted-live	iso	direct_iso	uefi	linux-iso-uefi
 profile	gparted-live	iso	chainload	bios	iso-work-chainload
 profile	gparted-live	iso	chainload	uefi	iso-work-chainload
@@ -6739,9 +6749,10 @@ profile	gparted-live	efi	direct_efi	-	efi-direct
 profile	gparted-live	efi	chainload	bios	efi-chainload
 profile	gparted-live	efi	chainload	uefi	efi-chainload
 profile	gparted-live	efi	chainload	-	efi-chainload
-profile	clonezilla	iso	automatic	bios	iso-work-chainload
+profile	clonezilla	iso	automatic	bios	linux-iso-bios
 profile	clonezilla	iso	automatic	uefi	linux-iso-uefi
 profile	clonezilla	iso	automatic	-	iso-work-chainload
+profile	clonezilla	iso	direct_iso	bios	linux-iso-bios
 profile	clonezilla	iso	direct_iso	uefi	linux-iso-uefi
 profile	clonezilla	iso	chainload	bios	iso-work-chainload
 profile	clonezilla	iso	chainload	uefi	iso-work-chainload
@@ -11630,8 +11641,8 @@ menu	windows-server-2003	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload
 menu	windows-server-2003	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-server-2003	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-server-2003	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	ubuntu	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
-menu	ubuntu	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	ubuntu	iso	bios	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	ubuntu	iso	bios	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	ubuntu	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	ubuntu	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	ubuntu	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -11690,8 +11701,8 @@ menu	ubuntu	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[req
 menu	ubuntu	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	ubuntu	efi	uefi	3	direct_efi	direct_efi	1	1	tested_in_vm	EFI [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	ubuntu	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	debian	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
-menu	debian	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	debian	iso	bios	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	debian	iso	bios	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	debian	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	debian	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	debian	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -11750,8 +11761,8 @@ menu	debian	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[req
 menu	debian	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	debian	efi	uefi	3	direct_efi	direct_efi	1	1	tested_in_vm	EFI [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	debian	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	fedora	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
-menu	fedora	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	fedora	iso	bios	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	fedora	iso	bios	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	fedora	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	fedora	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	fedora	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -11810,8 +11821,8 @@ menu	fedora	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[req
 menu	fedora	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	fedora	efi	uefi	3	direct_efi	direct_efi	1	1	tested_in_vm	EFI [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	fedora	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	linux-mint	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
-menu	linux-mint	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	linux-mint	iso	bios	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	linux-mint	iso	bios	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	linux-mint	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	linux-mint	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	linux-mint	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -11870,8 +11881,8 @@ menu	linux-mint	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	
 menu	linux-mint	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	linux-mint	efi	uefi	3	direct_efi	direct_efi	1	1	tested_in_vm	EFI [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	linux-mint	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	arch-linux	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
-menu	arch-linux	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	arch-linux	iso	bios	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	arch-linux	iso	bios	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	arch-linux	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	arch-linux	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	arch-linux	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -11930,8 +11941,8 @@ menu	arch-linux	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	
 menu	arch-linux	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	arch-linux	efi	uefi	3	direct_efi	direct_efi	1	1	tested_in_vm	EFI [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	arch-linux	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	opensuse	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
-menu	opensuse	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	opensuse	iso	bios	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	opensuse	iso	bios	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	opensuse	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	opensuse	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	opensuse	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -11990,8 +12001,8 @@ menu	opensuse	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[r
 menu	opensuse	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	opensuse	efi	uefi	3	direct_efi	direct_efi	1	1	tested_in_vm	EFI [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	opensuse	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	manjaro	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
-menu	manjaro	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	manjaro	iso	bios	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	manjaro	iso	bios	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	manjaro	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	manjaro	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	manjaro	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -12050,8 +12061,8 @@ menu	manjaro	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[re
 menu	manjaro	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	manjaro	efi	uefi	3	direct_efi	direct_efi	1	1	tested_in_vm	EFI [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	manjaro	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	kali-linux	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
-menu	kali-linux	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	kali-linux	iso	bios	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	kali-linux	iso	bios	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	kali-linux	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	kali-linux	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	kali-linux	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -12110,8 +12121,8 @@ menu	kali-linux	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	
 menu	kali-linux	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	kali-linux	efi	uefi	3	direct_efi	direct_efi	1	1	tested_in_vm	EFI [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	kali-linux	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	systemrescue	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
-menu	systemrescue	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	systemrescue	iso	bios	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	systemrescue	iso	bios	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	systemrescue	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	systemrescue	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	systemrescue	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -12170,8 +12181,8 @@ menu	systemrescue	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO
 menu	systemrescue	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	systemrescue	efi	uefi	3	direct_efi	direct_efi	1	1	tested_in_vm	EFI [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	systemrescue	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	gparted-live	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
-menu	gparted-live	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	gparted-live	iso	bios	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	gparted-live	iso	bios	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	gparted-live	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	gparted-live	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	gparted-live	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -12230,8 +12241,8 @@ menu	gparted-live	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO
 menu	gparted-live	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
 menu	gparted-live	efi	uefi	3	direct_efi	direct_efi	1	1	tested_in_vm	EFI [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	gparted-live	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	clonezilla	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
-menu	clonezilla	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	clonezilla	iso	bios	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	clonezilla	iso	bios	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	clonezilla	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	clonezilla	iso	bios	3	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	clonezilla	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -15944,6 +15955,7 @@ profile_def	w2k3-uefi-other	-	none
 profile_def	xp-x64-sp2-uefi-csm	xp_uefi_staging	xp_uefi	Loading the preparation environment|Detecting disks|Choosing the target disk|Preparing workspace|Copying and verifying files
 profile_def	xp-x64-uefi-other	-	none	
 profile_def	linux-live-bios	linux_live_iso	core	
+profile_def	linux-iso-bios	linux_iso	core	
 profile_def	dos-fat16-bios	dos_bios_iso	core	
 profile_def	win98se-dos-bios	win9x_dos	core	
 profile_def	windows-pe-bios-iso	windows_bios_iso	core	

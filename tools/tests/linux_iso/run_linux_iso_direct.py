@@ -88,8 +88,8 @@ def main() -> int:
         combined += data + b"\0" * (-len(data) % 4)
     combined += packer.build(Path(args.init).read_bytes(), (ROOT / "assets" / "linux-iso" / "init-bottom").read_bytes().replace(b"\r\n", b"\n"))
     pvd = iso.read(16 * 2048, 2048)
-    lines = ["usos-iso-map 1", f"size {info['size']}", f"crc {zlib.crc32(pvd) & 0xffffffff:08x}"]
-    lines += [f"extent {int(e[0])} {int(e[1])}" for e in info["extents"]]
+    lines = ["usos-iso-map 1", f"size {info['size']:x}", f"crc {zlib.crc32(pvd) & 0xffffffff:x}"]
+    lines += [f"extent {int(e[0]):x} {int(e[1]):x}" for e in info["extents"]]
     extra = {}
     if args.name.endswith("netinst"):
         # d-i: the ISO shows up as a USB partition (BLKPG fallback of /usos/init).

@@ -257,6 +257,9 @@ pub const profiles = [_]Profile{
     .{ .id = "xp-x64-uefi-other", .systems = .{ .ids = &.{"windows-xp-x64"} }, .firmware = .uefi, .backend = null, .progress = .none },
     // ---- BIOS only
     .{ .id = "linux-live-bios", .systems = .{ .ids = &.{"other-linux"} }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .linux_live_iso, .progress = .core },
+    // Linux ISO from DATA in the BIOS Core (other-linux keeps the SliTaz row;
+    // its backend falls back to this path for non-SliTaz ISOs).
+    .{ .id = "linux-iso-bios", .systems = .{ .ids = linux_ids }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .linux_iso, .progress = .core },
     .{ .id = "dos-fat16-bios", .systems = .{ .ids = &.{ "ms-dos", "windows-3-1", "windows-3-11" } }, .images = iso, .methods = auto_iso_memdisk, .firmware = .bios, .backend = .dos_bios_iso, .progress = .core },
     .{ .id = "win98se-dos-bios", .systems = .{ .ids = &.{"windows-98-se"} }, .images = iso, .methods = auto_iso_memdisk, .firmware = .bios, .backend = .win9x_dos, .progress = .core },
     .{ .id = "windows-pe-bios-iso", .systems = .{ .ids = &.{ "windows-7", "windows-vista", "windows-10" } }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .windows_bios_iso, .progress = .core },

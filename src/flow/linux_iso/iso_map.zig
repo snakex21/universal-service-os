@@ -5,8 +5,11 @@
 //!
 //!   usos-iso-map 1
 //!   size <iso bytes>
-//!   crc <crc32 of ISO bytes 32768..34815, 8 hex digits>
+//!   crc <crc32 of ISO bytes 32768..34815>
 //!   extent <first disk LBA, 512-byte sectors> <sector count>
+//!
+//! Every number is lowercase hexadecimal without prefix (written with shifts
+//! only: the i386 BIOS Core has no 64-bit division).
 //!   ...
 //!
 //! No allocator; fixed capacity.
@@ -64,12 +67,46 @@ pub const Map = struct {
     }
 
     pub fn write(self: *const Map, out: []u8) error{NoSpaceLeft}![]const u8 {
-        var at: usize = 0;
-        at += (try std.fmt.bufPrint(out[at..], "usos-iso-map 1\nsize {d}\ncrc {x:0>8}\n", .{ self.size, self.crc })).len;
+        var w = HexWriter{ .out = out };
+        try w.text("usos-iso-map 1\nsize ");
+        try w.hex(self.size);
+        try w.text("\ncrc ");
+        try w.hex(self.crc);
+        try w.text("\n");
         for (self.slice()) |extent| {
-            at += (try std.fmt.bufPrint(out[at..], "extent {d} {d}\n", .{ extent.lba, extent.sectors })).len;
+            try w.text("extent ");
+            try w.hex(extent.lba);
+            try w.text(" ");
+            try w.hex(extent.sectors);
+            try w.text("\n");
         }
-        return out[0..at];
+        return out[0..w.len];
+    }
+};
+
+const HexWriter = struct {
+    out: []u8,
+    len: usize = 0,
+
+    fn text(self: *HexWriter, bytes: []const u8) error{NoSpaceLeft}!void {
+        if (self.out.len - self.len < bytes.len) return error.NoSpaceLeft;
+        @memcpy(self.out[self.len..][0..bytes.len], bytes);
+        self.len += bytes.len;
+    }
+
+    fn hex(self: *HexWriter, value: u64) error{NoSpaceLeft}!void {
+        var digits: [16]u8 = undefined;
+        var n: usize = 0;
+        var v = value;
+        while (true) {
+            digits[n] = "0123456789abcdef"[@as(usize, @intCast(v & 0xf))];
+            n += 1;
+            v >>= 4;
+            if (v == 0) break;
+        }
+        if (self.out.len - self.len < n) return error.NoSpaceLeft;
+        for (0..n) |i| self.out[self.len + i] = digits[n - 1 - i];
+        self.len += n;
     }
 };
 
@@ -86,15 +123,15 @@ pub fn parse(text: []const u8) ParseError!Map {
         var words = std.mem.tokenizeScalar(u8, line, ' ');
         const key = words.next() orelse continue;
         if (std.mem.eql(u8, key, "size")) {
-            map.size = number(words.next(), 10) orelse return error.InvalidIsoMap;
+            map.size = number(words.next(), 16) orelse return error.InvalidIsoMap;
             have_size = true;
         } else if (std.mem.eql(u8, key, "crc")) {
             const value = number(words.next(), 16) orelse return error.InvalidIsoMap;
             map.crc = std.math.cast(u32, value) orelse return error.InvalidIsoMap;
             have_crc = true;
         } else if (std.mem.eql(u8, key, "extent")) {
-            const lba = number(words.next(), 10) orelse return error.InvalidIsoMap;
-            const sectors = number(words.next(), 10) orelse return error.InvalidIsoMap;
+            const lba = number(words.next(), 16) orelse return error.InvalidIsoMap;
+            const sectors = number(words.next(), 16) orelse return error.InvalidIsoMap;
             if (sectors == 0) return error.InvalidIsoMap;
             if (map.len == max_extents) return error.TooFragmented;
             map.extents[map.len] = .{ .lba = lba, .sectors = sectors };
@@ -122,7 +159,7 @@ test "iso map round trip, merge of adjacent runs, disk offsets" {
     try std.testing.expectEqual(@as(usize, 2), map.len);
     var buffer: [256]u8 = undefined;
     const text = try map.write(&buffer);
-    try std.testing.expectEqualStrings("usos-iso-map 1\nsize 41060\ncrc 0badcafe\nextent 2048 80\nextent 9000 1\n", text);
+    try std.testing.expectEqualStrings("usos-iso-map 1\nsize a064\ncrc badcafe\nextent 800 50\nextent 2328 1\n", text);
     const back = try parse(text);
     try std.testing.expectEqual(map.size, back.size);
     try std.testing.expectEqual(map.crc, back.crc);
@@ -136,10 +173,10 @@ test "iso map parser refuses short or broken maps" {
     try std.testing.expectError(error.InvalidIsoMap, parse(""));
     try std.testing.expectError(error.InvalidIsoMap, parse("usos-iso-map 2\n"));
     // size larger than the extents
-    try std.testing.expectError(error.InvalidIsoMap, parse("usos-iso-map 1\nsize 99999\ncrc 1\nextent 10 100\n"));
+    try std.testing.expectError(error.InvalidIsoMap, parse("usos-iso-map 1\nsize fffff\ncrc 1\nextent a 64\n"));
     // PVD not covered
-    try std.testing.expectError(error.InvalidIsoMap, parse("usos-iso-map 1\nsize 512\ncrc 1\nextent 10 1\n"));
-    const ok = try parse("usos-iso-map 1\r\nsize 36864\r\ncrc ffffffff\r\nextent 10 72\r\n");
+    try std.testing.expectError(error.InvalidIsoMap, parse("usos-iso-map 1\nsize 200\ncrc 1\nextent a 1\n"));
+    const ok = try parse("usos-iso-map 1\r\nsize 9000\r\ncrc ffffffff\r\nextent a 48\r\n");
     try std.testing.expectEqual(@as(u32, 0xffffffff), ok.crc);
 }
 

@@ -144,7 +144,7 @@ fn startMode(
     @memcpy(source.label_buf[0..source.label_len], label[0..source.label_len]);
     const recipe = try uefi.pool_allocator.create(linux_iso.recipe.Recipe);
     defer uefi.pool_allocator.destroy(recipe);
-    try linux_iso.recipe.plan(&source, recipe);
+    try linux_iso.recipe.plan(&source, recipe, &grub_text_buffer);
     logf("[LINUX-ISO] family={s} kernel={s} initrds={d} extents={d}\r\n", .{ @tagName(recipe.family), recipe.kernel(), recipe.initrdCount(), map.len });
 
     progress(.loading);
@@ -274,6 +274,7 @@ fn perBootCpio(map: *const linux_iso.iso_map.Map, answer: ?Answer, buffer: []u8)
 }
 
 var cmdline_utf16: [2048]u16 = undefined;
+var grub_text_buffer: [64 * 1024]u8 = undefined;
 var per_boot_buffer: [16 * 1024]u8 = undefined;
 var map_text_buffer: [4096]u8 = undefined;
 

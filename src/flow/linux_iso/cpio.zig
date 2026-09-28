@@ -34,12 +34,15 @@ pub const Writer = struct {
     fn entry(self: *Writer, path: []const u8, mode: u32, data: []const u8) Error!void {
         self.inode += 1;
         const nlink: u32 = if (mode & 0o170000 == 0o040000) 2 else 1;
-        const header = std.fmt.bufPrint(self.out[self.len..], "070701{x:0>8}{x:0>8}{x:0>8}{x:0>8}{x:0>8}{x:0>8}{x:0>8}{x:0>8}{x:0>8}{x:0>8}{x:0>8}{x:0>8}{x:0>8}", .{
-            if (mode == 0) 0 else self.inode, mode, @as(u32, 0), @as(u32, 0), nlink, @as(u32, 0),
-            @as(u32, @intCast(data.len)), @as(u32, 0), @as(u32, 0), @as(u32, 0), @as(u32, 0),
-            @as(u32, @intCast(path.len + 1)), @as(u32, 0),
-        }) catch return error.NoSpaceLeft;
-        self.len += header.len;
+        // No std.fmt: the i386 BIOS Core links this and pays for every byte.
+        // ino mode uid gid nlink mtime filesize devmajor devminor rdevmajor rdevminor namesize check
+        const fields = [13]u32{ if (mode == 0) 0 else self.inode, mode, 0, 0, nlink, 0, @intCast(data.len), 0, 0, 0, 0, @intCast(path.len + 1), 0 };
+        try self.put("070701");
+        for (fields) |value| {
+            var hex: [8]u8 = undefined;
+            for (0..8) |d| hex[d] = "0123456789abcdef"[@as(usize, @intCast((value >> @intCast(28 - d * 4)) & 0xf))];
+            try self.put(&hex);
+        }
         try self.put(path);
         try self.put(&.{0});
         try self.pad(4);
