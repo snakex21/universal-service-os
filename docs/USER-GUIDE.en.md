@@ -886,8 +886,10 @@ Patcher9x, wimlib, ImDisk, GenAHCI and TouchI2cDxe. The answer-profile
 settings follow the catalogue of Christoph Schneegans' unattend generator
 (knowledge only, no code).
 
-Full list, licences and sources: the files `THIRD-PARTY-NOTICES.txt` and
-`LICENSES` shipped with the release. Licence audit:
+USOS itself is free software under the GNU GPL, version 3 or later
+(`LICENSE.txt` and `NOTICE.txt` in the release). Full list of the other
+components, their licences and sources: the files `THIRD-PARTY-NOTICES.txt`
+and `LICENSES` shipped with the release. Licence audit:
 [LICENSES-AUDIT.md](LICENSES-AUDIT.md).
 
 Windows, MS-DOS and related names are trademarks of Microsoft. USOS is not

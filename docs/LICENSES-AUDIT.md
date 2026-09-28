@@ -39,7 +39,7 @@ texts that were missing now live in `tools/release/licenses/` (see its
 | Already compliant on the stick (licence and, where needed, source next to the binary) | 12 |
 | Gaps found | 18 (G1 to G18) plus 2 payload-level follow-ups (F1, F2) |
 | Gaps fixed in this audit (release-level licence texts, sources zip, written offer) | 8 (G1 to G6, G8, G9), covering 42 components: 35 Alpine packages, kernel, systemd-boot, EfiFs, wimboot, Zig and Go runtimes, FreeDOS texts |
-| Remaining GAPs | 7 (G10 to G13, G16 to G18), see section 7; G7 closed by the source pin, G14 and G15 closed by maintainer decisions (2026-09-28) |
+| Remaining GAPs | 6 (G10 to G13, G17, G18), see section 7; G7 closed by the source pin, G14 to G16 closed by maintainer decisions (2026-09-28) |
 
 Status legend: **OK**: nothing to do. **FIXED in this audit**: the release
 now carries the licence text and the source (sources zip) or a written offer
@@ -363,13 +363,22 @@ Remaining GAPs:
   decision.** The maintainer generated them with ChatGPT (OpenAI image
   generation). They depict Windows and MS-DOS logos, which are Microsoft
   trademarks; USOS is not affiliated with or endorsed by Microsoft.
-- **G16 USOS itself has no licence**: there is no `LICENSE`/`COPYING` for
-  the USOS code at the repository root, and README states none. The
-  third-party obligations above do not depend on it, but users of the 1.0
-  release get no terms for USOS's own code (decision pending; the
-  licence will be added as `LICENSE` at the repository root), and the modified wimboot
-  variants and the CSMWrap patches must at least be available under GPL /
-  LGPL (they are, as sources in the zip).
+- **G16 USOS's own licence: closed (2026-09-28).** USOS is
+  `GPL-3.0-or-later`: `LICENSE` (full GPL-3.0 text) and `NOTICE`
+  ("Copyright (C) 2026 The USOS Authors", SPDX line, scope) at the
+  repository root; `build-info.ini` records `license=GPL-3.0-or-later`;
+  contributions under `CONTRIBUTING.md` (contributor licence grant that
+  also allows other licence terms). Source files carry no per-file headers
+  (the repository never had them). The third-party components stay under
+  their own licences as separate programs aggregated with USOS
+  (THIRD-PARTY-NOTICES.txt says so). Linking check: USOS's own binaries
+  link only GPL-compatible code: the Zig menus with the Zig runtime /
+  compiler-rt (MIT) and musl (MIT, usos-fb-ui); the Go installer with the Go
+  runtime and golang.org/x/sys (BSD-3-Clause); embedded fonts Apache-2.0 /
+  OFL-1.1; the XP PAE helper is an adaptation of PatchPAE3 (CC-BY-4.0,
+  compatible with GPLv3). The modified wimboot kexec variants
+  (GPL-2.0-or-later) and CSMWrap (LGPL) are separate programs with their
+  sources in the sources zip.
 - **G17 reproducibility inputs outside git**: `vista-support.cpio` is built
   from the git-ignored `artifacts/vista/hardware-success-v11-20260920-235629`,
   and the Windows 7 CABs from git-ignored MSUs. Not a licence issue for the

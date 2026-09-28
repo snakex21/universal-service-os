@@ -883,8 +883,10 @@ NTFS), Alpine Linux (mikro-Linux), FreeDOS i Doszip, Patcher9x, wimlib,
 ImDisk, GenAHCI oraz TouchI2cDxe. Zestaw ustawień profili odpowiedzi opiera
 się na katalogu generatora Christopha Schneegansa (tylko wiedza, bez kodu).
 
-Pełna lista, licencje i źródła: pliki `THIRD-PARTY-NOTICES.txt` i `LICENSES`
-dołączone do wydania. Audyt licencji: [LICENSES-AUDIT.md](LICENSES-AUDIT.md).
+Sam USOS jest wolnym oprogramowaniem na licencji GNU GPL w wersji 3 lub
+nowszej (`LICENSE.txt` i `NOTICE.txt` w wydaniu). Pełna lista pozostałych
+składników, ich licencje i źródła: pliki `THIRD-PARTY-NOTICES.txt` i
+`LICENSES` dołączone do wydania. Audyt licencji: [LICENSES-AUDIT.md](LICENSES-AUDIT.md).
 
 Windows, MS-DOS i powiązane nazwy są znakami towarowymi Microsoft. USOS nie
 jest powiązany z Microsoft ani z autorami wymienionych projektów.
