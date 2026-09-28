@@ -33,7 +33,8 @@ usos_xp_menu() {
         USOS_MENU_RESULT=$xp_menu_result
         # Back on the progress page (stage 3 of 5, earlier stages done) while
         # the choice is checked, instead of a frozen menu.
-        if [ "${USOS_UI_NT5:-no}" = yes ]; then
+        # Vista without CSM: "Choosing the target disk" is stage 3 of 5 too.
+        if [ "${USOS_UI_NT5:-no}" = yes ] || [ "${USOS_UI_VISTA:-no}" = yes ]; then
             USOS_UI_CURRENT=3
             usos_ui_render_state stage 3 5 "$(usos_ui_stage_label 3)" '' '' 0 0 0 0 || true
         fi
@@ -63,6 +64,8 @@ usos_xp_choose_disk() {
             printf 'item=%s (%s GiB)|S/N: %s\n' "$(usos_disk_model "$candidate")" "$(( $(usos_disk_size "$candidate") / 1073741824 ))" "$(usos_disk_serial "$candidate")"
         done < "$CANDIDATES"
         printf 'item=Return to USOS|Restart the computer\n'
+        # A path that must say why the disk is chosen here (Vista without CSM).
+        [ -z "${USOS_XP_DISK_NOTE:-}" ] || printf 'info=%s\n' "$USOS_XP_DISK_NOTE"
         printf 'info=The disk will only be changed after your confirmation.\n'
     } > "$xp_choice"
     if usos_xp_menu "$xp_choice"; then

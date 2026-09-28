@@ -1007,6 +1007,23 @@ pub fn xpStatus(stage: usos.flow.preparation_boot_progress.XpStage, heading: []c
     });
 }
 
+/// Vista without firmware CSM: one stage list from the UEFI checks to the
+/// restart into Setup (micro-Linux step 610 continues the same page). The
+/// selection's plan rows (vista-uefi-pe10, three direct-ISO rows) are not
+/// used: this path runs other steps.
+pub fn vistaCsmwrapStatus(stage: usos.flow.preparation_boot_progress.VistaCsmwrapStage, detail: []const u8, heading: []const u8) void {
+    const Stage = usos.flow.preparation_boot_progress.VistaCsmwrapStage;
+    progress(.{
+        .mode = .stage,
+        .current = stage.number(),
+        .total = @intCast(Stage.labels.len),
+        .labels = &Stage.labels,
+        .heading = heading,
+        .title = Stage.labels[stage.number() - 1],
+        .detail = detail,
+    });
+}
+
 fn progress(state: gui.preparation_screen.State) void {
     active = .none;
     setFooter(&.{}, "");

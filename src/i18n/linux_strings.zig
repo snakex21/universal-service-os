@@ -164,7 +164,10 @@ pub const hashes = [_]u32{
     0x1a87a9e7, // lx.verifying_wim_file
     0x596ff2d3, // lx.vista_csmwrap_confirm
     0xc82094a0, // lx.vista_csmwrap_copying
+    0xf9786a7b, // lx.vista_csmwrap_layout
     0x5aa1da21, // lx.vista_csmwrap_restart_notice
+    0x53e526f6, // lx.vista_csmwrap_setup_hint
+    0xda567045, // lx.vista_csmwrap_why
     0x59b2e029, // lx.vista_start_the_prepared_disk
     0xd2c4e12a, // lx.windows_c_x_gib_ntfs
     0xf4336aff, // lx.windows_xp
@@ -347,7 +350,10 @@ pub const english = [_][]const u8{
     "Verifying WIM file",
     "Vista without CSM: USOS writes the Windows PE helper and a small CSMWrap partition to the end of this disk. In Vista Setup select the unallocated space; do not delete the small partitions.",
     "Copying the Windows PE helper and CSMWrap to the selected disk.",
+    "New layout (MBR): approx. {0} GiB unallocated for {1}, then a 1 GiB USOS-VISTA helper partition and a 64 MiB CSMWrap partition at the end of the disk.",
     "Keep the USOS stick connected. After the restart open the firmware boot menu and start this disk's UEFI entry (not Legacy); CSM stays off. Vista Setup then starts from it through CSMWrap.",
+    "In {0} Setup select the unallocated space; do not delete the two small partitions.",
+    "Without CSM, Vista starts through CSMWrap, so USOS must first prepare the target disk.",
     "Windows Vista: start the prepared disk",
     "Windows C: {0} GiB NTFS.",
     "WINDOWS XP",

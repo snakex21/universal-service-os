@@ -16213,3 +16213,10 @@ progress	xp_label	Detecting disks
 progress	xp_label	Choosing the target disk
 progress	xp_label	Preparing workspace
 progress	xp_label	Copying and verifying files
+progress	vista_csmwrap	validating	1
+progress	vista_csmwrap	loading	2
+progress	vista_csmwrap_label	Validating installation ISO
+progress	vista_csmwrap_label	Loading the preparation environment
+progress	vista_csmwrap_label	Choosing the target disk
+progress	vista_csmwrap_label	Preparing the disk
+progress	vista_csmwrap_label	Starting Windows Setup

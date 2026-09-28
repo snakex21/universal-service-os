@@ -28,7 +28,20 @@ if [ "$USOS_UI_NT5" = yes ] && [ -z "$USOS_UI_LABELS" ]; then
     USOS_UI_LABELS='Loading the preparation environment|Detecting disks|Choosing the target disk|Preparing workspace|Copying and verifying files'
     USOS_UI_TOTAL=5
 fi
-export USOS_UI_TTY USOS_FB_UI USOS_FB_STATE USOS_FB_MODULES USOS_FB_ACTIVE USOS_UI_CURRENT USOS_UI_LABELS USOS_UI_TOTAL USOS_UI_HEADING USOS_UI_NT5
+# Vista without firmware CSM (step 610) continues the UEFI menu's progress
+# page of the same flow (VistaCsmwrapStage in
+# src/flow/preparation_boot_progress.zig): UEFI drew stages 1 and 2, this
+# session runs 2 (environment) to 5 (restart into Setup). The generic stage
+# calls of /usos-init all belong to stage 2.
+USOS_UI_VISTA=${USOS_UI_VISTA:-no}
+case " $(cat /proc/cmdline 2>/dev/null) " in
+    *' usos.legacy_action=vista-csmwrap '*) USOS_UI_VISTA=yes; [ -n "$USOS_UI_HEADING" ] || USOS_UI_HEADING='Windows Vista' ;;
+esac
+if [ "$USOS_UI_VISTA" = yes ] && [ -z "$USOS_UI_LABELS" ]; then
+    USOS_UI_LABELS='Validating installation ISO|Loading the preparation environment|Choosing the target disk|Preparing the disk|Starting Windows Setup'
+    USOS_UI_TOTAL=5
+fi
+export USOS_UI_TTY USOS_FB_UI USOS_FB_STATE USOS_FB_MODULES USOS_FB_ACTIVE USOS_UI_CURRENT USOS_UI_LABELS USOS_UI_TOTAL USOS_UI_HEADING USOS_UI_NT5 USOS_UI_VISTA
 
 usos_ui_declare_stages() {
     USOS_UI_LABELS=$1
@@ -171,6 +184,22 @@ usos_ui_bootstrap_frame() {
         } | "$USOS_FB_UI" >/dev/null 2>&1
         return
     fi
+    # Vista without CSM: the UEFI menu left its page at stage 2 with this
+    # detail (VistaCsmwrapStage.loading_detail); the first frame is the same.
+    if [ "$USOS_UI_VISTA" = yes ]; then
+        {
+            printf 'mode=stage\n'
+            printf 'current=2\n'
+            printf 'total=5\n'
+            printf 'heading=%s\n' "$USOS_UI_HEADING"
+            printf 'title=%s\n' "$(usos_ui_stage_label 2)"
+            printf 'detail=%s\n' 'Loading the micro-Linux kernel from the USB drive'
+            printf '%s\n' "$USOS_UI_LABELS" | tr '|' '\n' | while IFS= read -r stage_name; do
+                printf 'label=%s\n' "$stage_name"
+            done
+        } | "$USOS_FB_UI" >/dev/null 2>&1
+        return
+    fi
     {
         printf 'mode=splash\n'
         printf 'current=1\n'
@@ -262,6 +291,9 @@ usos_ui_stage() {
         current=$(usos_ui_nt5_stage "$1")
         title=$(usos_ui_nt5_title "$current" "$title")
         USOS_UI_CURRENT=$current
+    elif [ "$USOS_UI_VISTA" = yes ]; then
+        [ "$current" -ge 2 ] || current=2
+        USOS_UI_CURRENT=$current
     elif [ "${USOS_XP_CHOOSING:-no}" = yes ]; then
         # Keep the selected menu visible while read-only checks run between
         # choices. The initial detection screen is shown only before a menu.
@@ -289,6 +321,9 @@ usos_ui_progress() {
     image=${9:-}
     if [ "$USOS_UI_NT5" = yes ]; then
         current=$(usos_ui_nt5_stage "$1")
+        USOS_UI_CURRENT=$current
+    elif [ "$USOS_UI_VISTA" = yes ]; then
+        [ "$current" -ge 2 ] || current=2
         USOS_UI_CURRENT=$current
     fi
     if usos_ui_render_state progress "$current" "$total" "$title" "$detail" "$image" "$percent" "$bytes_done" "$bytes_total" "$speed_bps"; then

@@ -193,6 +193,10 @@ pub fn render(gpa: std.mem.Allocator) ![]u8 {
         try out.print(gpa, "progress\txp\t{s}\t{d}\t{s}\n", .{ @tagName(stage), stage.number(), stage.detail() });
     }
     for (progress.XpStage.labels) |label| try out.print(gpa, "progress\txp_label\t{s}\n", .{label});
+    for (std.enums.values(progress.VistaCsmwrapStage)) |stage| {
+        try out.print(gpa, "progress\tvista_csmwrap\t{s}\t{d}\n", .{ @tagName(stage), stage.number() });
+    }
+    for (progress.VistaCsmwrapStage.labels) |label| try out.print(gpa, "progress\tvista_csmwrap_label\t{s}\n", .{label});
 
     return out.toOwnedSlice(gpa);
 }

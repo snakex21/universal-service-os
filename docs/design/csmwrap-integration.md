@@ -417,7 +417,54 @@ UX issues to fix before 1.0:
 
 * Step counter: the flow shows 1/3, then the XP-style "1/5" disk
   confirmation screen of micro-Linux step 610; one counter for the whole
-  flow.
+  flow. Fixed, section 10.6.
 * SeaBIOS text and a blinking cursor show during the CSMWrap boot; a quiet
   CSMWrap build is pending.
 * A restart is needed between the disk preparation and Setup.
+
+### 10.6 Preparation screens (2026-09-28, after the B260928-161042 X470 test)
+
+User report on B260928-161042: during step 610 micro-Linux text was visible
+on the USOS screens, the counter went 1/3 then "1/5", and the disk question
+came as a surprise (the Vista path with CSM has no USOS disk step) with a
+plain "OK" confirmation.
+
+* **Leak source**: `vista_preparation.formatCommand` started the kernel with
+  `quiet loglevel=3` and no `console=`, so /dev/console was tty0: every
+  `printf` of /usos-init, the pipeline and `vista_csmwrap_prepare.sh`
+  (`[MICRO-LINUX]`, `[PIPELINE]`, `[VISTA_CSMWRAP] ...`), the stderr of the
+  menus and mounts, and KERN_ERR and higher printk went to fbcon over the
+  usos-fb-ui frames. The CSMWrap mode now uses the XP preparation's options
+  (`boot_console.xpConsoleOptions`: `console=tty0 console=ttyS0,115200n8 rw
+  quiet loglevel=1 vt.global_cursor_default=0`; the USOS diagnostic flag
+  gives the verbose set). /dev/console is the serial port, fbcon never takes
+  the screen over, the VT cursor is off. `vista_csmwrap_target.sh` (dd, mkntfs, wimlib, cpio)
+  still writes only to `prepare.log`, now with stdin
+  from /dev/null; the disk overview's stderr goes there too. The vista-disk
+  command line (UEFI with CSM, off by default) is unchanged byte for byte.
+* **One counter**: `VistaCsmwrapStage` (5 stages, all labels already
+  translated): Validating installation ISO (UEFI: ISO + PE10 donor), Loading
+  the preparation environment (UEFI handover, kernel, /usos-init), Choosing
+  the target disk, Preparing the disk, Starting Windows Setup (the restart
+  notice). The UEFI page shows 1 and 2 (no "Starting..." splash in between,
+  as for XP); micro-Linux draws the same stage-2 page first
+  (`usos_ui_bootstrap_frame`, `USOS_UI_VISTA`) and continues with 2 to 5.
+  Golden rows `progress vista_csmwrap*` (additions only).
+* **Disk step**: kept (the MBR, the USOS-VISTA staging partition and the
+  CSMWrap ESP must exist before Setup can boot), never automatic. The summary
+  says so (`summary.vista_csmwrap_disk`: chosen in the next step, required
+  without CSM, that disk is erased completely). The picker says why in one
+  sentence (`lx.vista_csmwrap_why`); the confirmation is the XP
+  "FORMAT THE ENTIRE DISK?" screen: ERASE ALL DATA ON THIS DISK, the
+  read-only disk overview (model, S/N, size, partitions, systems found), "All
+  partitions, systems and files on this disk will be erased", the new layout
+  with the real free size (`lx.vista_csmwrap_layout`) and the Setup hint
+  (`lx.vista_csmwrap_setup_hint`); button "Erase ALL partitions and data on
+  the selected disk". What is erased, exactly: the whole disk's partitioning
+  (the first and the last MiB are zeroed: MBR and both GPT copies, then a new
+  MBR); the sectors in between are not overwritten, but no partition refers
+  to them any more and Setup formats its new partition. In Vista Setup the
+  user picks the unallocated space.
+* XP: unchanged behaviour (the picker's extra `info=` line appears only with
+  `USOS_XP_DISK_NOTE`, set only by step 610; `USOS_UI_VISTA` only with
+  `usos.legacy_action=vista-csmwrap`).

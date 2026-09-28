@@ -92,6 +92,47 @@ pub const XpStage = enum(u8) {
     }
 };
 
+/// Vista without firmware CSM (vista-x64-sp2-uefi-csmwrap): one progress page
+/// and one stage list from the UEFI summary to the restart into Setup
+/// (tools/micro_linux_ui.sh declares the same labels for micro-Linux step
+/// 610). UEFI runs stages 1 and 2; micro-Linux continues with 2 to 5.
+pub const VistaCsmwrapStage = enum(u8) {
+    /// The Vista ISO and the PE10 donor are checked, the request is written.
+    validating = 1,
+    /// The micro-Linux kernel is loaded and started.
+    loading = 2,
+
+    /// Equal to boot.iso.stage.1, boot.xp_prep.environment,
+    /// boot.xp_prep.choose_disk, boot.lx.preparing_the_disk and
+    /// boot.iso.stage.3 (all translated already).
+    pub const labels = [_][]const u8{
+        "Validating installation ISO",
+        "Loading the preparation environment",
+        "Choosing the target disk",
+        "Preparing the disk",
+        "Starting Windows Setup",
+    };
+
+    pub fn number(self: VistaCsmwrapStage) u8 {
+        return @intFromEnum(self);
+    }
+
+    /// The detail of the last UEFI frame (equal to boot.xp_prep.loading);
+    /// micro-Linux draws the same page first, so the takeover is invisible.
+    pub const loading_detail = "Loading the micro-Linux kernel from the USB drive";
+};
+
+test "Vista CSMWrap path has one five-stage list shared by UEFI and micro-Linux" {
+    try std.testing.expectEqual(@as(usize, 5), VistaCsmwrapStage.labels.len);
+    try std.testing.expectEqual(@as(u8, 1), VistaCsmwrapStage.validating.number());
+    try std.testing.expectEqual(@as(u8, 2), VistaCsmwrapStage.loading.number());
+    try std.testing.expectEqualStrings(XpStage.labels[0], VistaCsmwrapStage.labels[1]);
+    try std.testing.expectEqualStrings(XpStage.labels[2], VistaCsmwrapStage.labels[2]);
+    try std.testing.expectEqualStrings(DirectIsoStage.labels[0], VistaCsmwrapStage.labels[0]);
+    try std.testing.expectEqualStrings(DirectIsoStage.labels[2], VistaCsmwrapStage.labels[4]);
+    try std.testing.expectEqualStrings(XpStage.loading.detail(), VistaCsmwrapStage.loading_detail);
+}
+
 test "XP path declares its five stages and UEFI stays in stage 1" {
     try std.testing.expectEqual(@as(usize, 5), XpStage.labels.len);
     for ([_]XpStage{ .checking, .loading, .starting }) |stage| try std.testing.expectEqual(@as(u8, 1), stage.number());

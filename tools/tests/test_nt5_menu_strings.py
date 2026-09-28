@@ -11,7 +11,7 @@ from pathlib import Path
 import json, re, unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPTS = ['tools/xp_disk_reset_ui.sh', 'tools/xp_confirmation_ui.sh', 'tools/legacy_xp_staging.sh', 'tools/xp_disk_menu.sh']
+SCRIPTS = ['tools/xp_disk_reset_ui.sh', 'tools/xp_confirmation_ui.sh', 'tools/legacy_xp_staging.sh', 'tools/xp_disk_menu.sh', 'tools/vista_csmwrap_prepare.sh']
 
 
 def catalog():
@@ -63,6 +63,30 @@ class Nt5MenuStrings(unittest.TestCase):
         t = texts(ROOT / 'tools/xp_disk_reset_ui.sh')
         self.assertIn('FORMAT THE ENTIRE DISK?', t)
         self.assertIn('Erase ALL partitions and data on the selected disk', t)
+
+    def test_vista_csmwrap_screens_are_translated(self):
+        """Vista without CSM: the erase confirmation uses the XP wording and
+        every info line of its screens (printf literals, the picker note, the
+        stage titles and details) has a boot key."""
+        exact, templates = catalog()
+        src = (ROOT / 'tools/vista_csmwrap_prepare.sh').read_text(encoding='utf-8')
+        self.assertIn("usos_xp_confirm \"$screen\" 'FORMAT THE ENTIRE DISK?' 'Erase ALL partitions and data on the selected disk'", src)
+        found = []
+        for m in re.finditer(r"printf '([^']*)'", src):
+            found += m.group(1).split('\\n')
+        found += re.findall(r"USOS_XP_DISK_NOTE='([^']*)'", src)
+        for m in re.finditer(r"usos_ui_stage \d \d '([^']*)' '([^']*)'", src):
+            found += [m.group(1), m.group(2)]
+        missing = []
+        for t in found:
+            t = t.replace('%s', 'X').strip()
+            if not t or '=' in t or t.startswith('[') or not re.search('[A-Za-z]{3}', t):
+                continue
+            # Short templates such as 'Disk: {0}' count here (whole lines).
+            if t in exact or any(r.match(t) for r in templates) or any(re.fullmatch(re.sub(r'\\{\d\\}', '.+', re.escape(v)), t) for v in exact if '{' in v):
+                continue
+            missing.append(t)
+        self.assertEqual(missing, [])
 
 
 if __name__ == '__main__':
