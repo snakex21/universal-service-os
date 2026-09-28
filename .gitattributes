@@ -55,3 +55,5 @@ tools/csmwrap_build/guest_build.sh text eol=lf
 # check them out byte for byte as committed, whatever core.autocrlf says, so a
 # fresh clone builds the same payload (found by the offline build-kit test).
 tools/vendor/** -text
+# The XP driver sources read by tools/xp_driver_overlay.py are pinned too.
+"media/Systems/Windows/Windows XP UEFI-CSM PAE/**" -text
