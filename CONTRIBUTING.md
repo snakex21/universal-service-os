@@ -42,7 +42,7 @@ Harmony Agreements, shortened.
    documentation, translations, artwork) that You submit to the USOS project
    for inclusion, for example as a pull request, patch or issue attachment,
    unless You mark it in writing as "Not a Contribution". "Maintainer" is
-   Maksymilian, who runs the USOS project, and his successors as
+   Maksymilian, who runs the USOS project, and the Maintainer's successors as
    maintainer of the project.
 2. **Copyright licence.** You grant the Maintainer and the recipients of
    software distributed by the Maintainer a perpetual, worldwide,

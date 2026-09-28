@@ -334,7 +334,7 @@ do repozytorium.
   w wydaniu oraz [LICENSES-AUDIT.md](../LICENSES-AUDIT.md).
 - Pliki Microsoftu w wydaniu (pliki aktualizacji i sterowników, pliki
   w pakietach XP, dawca WinPE) są zachowane w celach archiwalnych,
-  rozpowszechniane na własne ryzyko opiekuna projektu, nie są objęte żadną
+  rozpowszechniane na własne ryzyko osoby prowadzącej projekt, nie są objęte żadną
   licencją USOS i zostaną usunięte na prośbę właściciela praw.
 - Wkład w projekt jest przyjmowany na zasadach z
   [CONTRIBUTING.md](../../CONTRIBUTING.md) (proste udzielenie licencji przez
