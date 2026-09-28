@@ -96,7 +96,7 @@ Windows 2000 has none (no `reg.exe` in its base system).
 | `skip_msn` | yes | yes | | | | `[Components]` `msnexplr=Off` (XP), `msmsgs=Off` |
 | `hide_outlook_express` | yes | yes | | | | `[Components]` `OEAccess=Off` (entry points; the program stays) |
 | `classic_start` | yes | | | | | `[Shell] DefaultStartPanelOff=Yes` |
-| `theme=classic` | yes | | | yes | | XP `[Shell] DefaultThemesOff=Yes`; 7 `Themes/CustomDefaultThemeFile` = `%WINDIR%\Resources\Ease of Access Themes\classic.theme` (oobeSystem) |
+| `theme=classic` | yes | | | yes | | XP `[Shell] DefaultThemesOff=Yes`; 7 `HKLM\...\Themes InstallTheme` = `%WINDIR%\Resources\Ease of Access Themes\classic.theme` (specialize; read by the first-logon theme setup of every new user; `Themes/CustomDefaultThemeFile` was ignored without Aero in the VirtualBox test) |
 | `theme=basic` | | | | yes | | 7 `basic.theme` (Windows 7 Basic); Vista has no reliable file for it |
 | `no_balloon_tips` | yes | yes | | | | Default User `Explorer\Advanced EnableBalloonTips=0`; XP also `Applets\Tour RunCount=0` |
 | `display` | yes | yes | | | | `[Display] BitsPerPel=32 Xresolution Yresolution` |

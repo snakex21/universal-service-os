@@ -104,8 +104,6 @@ pub const settings = [_]Setting{
     .{ .pass = .oobeSystem, .component = shell, .path = "UserAccounts/LocalAccounts/LocalAccount/DisplayName" },
     .{ .pass = .oobeSystem, .component = shell, .path = "UserAccounts/LocalAccounts/LocalAccount/Group" },
     .{ .pass = .oobeSystem, .component = shell, .path = "UserAccounts/LocalAccounts/LocalAccount/Name" },
-    // Tweak theme on Windows 7 (classic.theme / basic.theme of the client).
-    .{ .pass = .oobeSystem, .component = shell, .path = "Themes/CustomDefaultThemeFile", .since = .windows_7, .until = .windows_7, .client_only = true },
 };
 
 /// The optional tweaks of a profile (docs/answer-profiles.md, "Tweaks").

@@ -198,6 +198,12 @@ pub fn specializeCommands(p: *const Profile, family: Family, out: *Commands) !vo
     // Group Policy "Turn off Windows Sidebar" (Vista) / "Turn off desktop gadgets" (7).
     if (on(p, .no_sidebar, family)) try out.add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Windows\\Sidebar\" /v TurnOffSidebar /t REG_DWORD /d 1 /f", .{});
     if (on(p, .no_hibernation, family)) try out.add("powercfg.exe -h off", .{});
+    // Windows 7: the theme every new user gets at first logon (themeui's
+    // Active Setup reads InstallTheme). Themes/CustomDefaultThemeFile is
+    // not used: VirtualBox test 2026-09-28, Windows 7 SP1 without Aero
+    // ignored it and gave the user basic.theme; InstallTheme gave Classic.
+    const theme: ?[]const u8 = if (on(p, .theme_classic, family)) "classic" else if (on(p, .theme_basic, family)) "basic" else null;
+    if (theme) |name| try out.add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\" /v InstallTheme /t REG_EXPAND_SZ /d \"%WINDIR%\\Resources\\Ease of Access Themes\\{s}.theme\" /f", .{name});
     if (on(p, .skip_games, family)) {
         // The Games feature (InboxGames): pkgmgr on Vista, DISM on 7.
         if (family.client() == .vista) {
@@ -297,14 +303,6 @@ fn oobe(w: *W, input: Input) !void {
     if (p.user2.len > 0) try account(w, p.user2.slice(), p.password.slice());
     try close(w, 4, "LocalAccounts");
     try close(w, 3, "UserAccounts");
-    // Windows 7 client: the default theme of new users.
-    const theme_file: ?[]const u8 = if (schema.tweakOn(p, .theme_classic, family)) "classic" else if (schema.tweakOn(p, .theme_basic, family)) "basic" else null;
-    if (theme_file) |name| {
-        try open(w, 3, "Themes");
-        var path: [96]u8 = undefined;
-        try element(w, 4, "CustomDefaultThemeFile", try std.fmt.bufPrint(&path, "%WINDIR%\\Resources\\Ease of Access Themes\\{s}.theme", .{name}));
-        try close(w, 3, "Themes");
-    }
     try endComponent(w);
     try w.writeAll("  </settings>\n");
 }

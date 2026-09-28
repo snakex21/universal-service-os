@@ -15,6 +15,14 @@
       <RegisteredOwner>Jan</RegisteredOwner>
       <ShowWindowsLive>false</ShowWindowsLive>
     </component>
+    <component name="Microsoft-Windows-Deployment" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <RunSynchronous>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes&quot; /v InstallTheme /t REG_EXPAND_SZ /d &quot;%WINDIR%\Resources\Ease of Access Themes\basic.theme&quot; /f</Path>
+        </RunSynchronousCommand>
+      </RunSynchronous>
+    </component>
   </settings>
   <settings pass="oobeSystem">
     <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
@@ -37,9 +45,6 @@
           </LocalAccount>
         </LocalAccounts>
       </UserAccounts>
-      <Themes>
-        <CustomDefaultThemeFile>%WINDIR%\Resources\Ease of Access Themes\basic.theme</CustomDefaultThemeFile>
-      </Themes>
     </component>
   </settings>
 </unattend>

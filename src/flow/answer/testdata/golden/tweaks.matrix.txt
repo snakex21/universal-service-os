@@ -33,14 +33,24 @@ hide_outlook_express=yes	windows-server-2003	+[Components]
 hide_outlook_express=yes	windows-server-2003	+OEAccess=Off
 classic_start=yes	windows-xp	+[Shell]
 classic_start=yes	windows-xp	+DefaultStartPanelOff=Yes
-theme=classic	windows-7	+      <Themes>
-theme=classic	windows-7	+        <CustomDefaultThemeFile>%WINDIR%\Resources\Ease of Access Themes\classic.theme</CustomDefaultThemeFile>
-theme=classic	windows-7	+      </Themes>
+theme=classic	windows-7	+    </component>
+theme=classic	windows-7	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+theme=classic	windows-7	+      <RunSynchronous>
+theme=classic	windows-7	+        <RunSynchronousCommand wcm:action="add">
+theme=classic	windows-7	+          <Order>1</Order>
+theme=classic	windows-7	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes&quot; /v InstallTheme /t REG_EXPAND_SZ /d &quot;%WINDIR%\Resources\Ease of Access Themes\classic.theme&quot; /f</Path>
+theme=classic	windows-7	+        </RunSynchronousCommand>
+theme=classic	windows-7	+      </RunSynchronous>
 theme=classic	windows-xp	+[Shell]
 theme=classic	windows-xp	+DefaultThemesOff=Yes
-theme=basic	windows-7	+      <Themes>
-theme=basic	windows-7	+        <CustomDefaultThemeFile>%WINDIR%\Resources\Ease of Access Themes\basic.theme</CustomDefaultThemeFile>
-theme=basic	windows-7	+      </Themes>
+theme=basic	windows-7	+    </component>
+theme=basic	windows-7	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+theme=basic	windows-7	+      <RunSynchronous>
+theme=basic	windows-7	+        <RunSynchronousCommand wcm:action="add">
+theme=basic	windows-7	+          <Order>1</Order>
+theme=basic	windows-7	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes&quot; /v InstallTheme /t REG_EXPAND_SZ /d &quot;%WINDIR%\Resources\Ease of Access Themes\basic.theme&quot; /f</Path>
+theme=basic	windows-7	+        </RunSynchronousCommand>
+theme=basic	windows-7	+      </RunSynchronous>
 no_balloon_tips=yes	windows-xp	+rem USOS profile: Explorer settings for new users (Default User hive).
 no_balloon_tips=yes	windows-xp	+set USOS_PD=
 no_balloon_tips=yes	windows-xp	+set USOS_DU=
