@@ -896,6 +896,18 @@ fn drawNotice(title: []const u8, icon: gui.icons.Kind, tone: gui.ui.Tone, headin
 }
 
 /// Blocks until Enter, Esc or a mouse click.
+/// Like waitForDismiss, but any key or button closes the notice (the
+/// "Secure Boot must be off" notices: nothing else happens on that screen).
+pub fn waitForAnyKey() void {
+    while (true) switch (input.readBlocking()) {
+        .pointer => |mouse| {
+            if (mouse.left_click or mouse.right_click) return;
+            if (mouse.moved) updatePointer();
+        },
+        else => return,
+    };
+}
+
 pub fn waitForDismiss() void {
     while (true) switch (input.readBlocking()) {
         .enter, .back => return,

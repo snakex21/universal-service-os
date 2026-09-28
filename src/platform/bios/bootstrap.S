@@ -541,7 +541,23 @@ protected_entry:
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    mov esp, 0x0009E000
+    /* Stack top: 0x9E000, but never inside the EBDA. BIOSes with USB legacy
+     * emulation (old Award/AMI boards) grow the EBDA below 632 KiB and their
+     * int13 code then overwrote the outermost Core frames (the BIOS menu's
+     * image list: garbled long ISO names on a Socket 939 PC, 2026-09-28).
+     * BDA 0x413 = conventional memory in KiB below the EBDA. */
+    movzx eax, word ptr [0x413]
+    shl eax, 10
+    and eax, 0xFFFFFFF0
+    cmp eax, 0x0009E000
+    jbe 1f
+    mov eax, 0x0009E000
+1:
+    cmp eax, 0x00090000
+    jae 2f
+    mov eax, 0x0009E000        /* implausible BDA value: keep the old top */
+2:
+    mov esp, eax
     mov esi, CONTEXT_PHYS
     cld
     mov eax, CORE_LOAD_ADDRESS + CORE_ENTRY_OFFSET

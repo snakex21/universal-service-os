@@ -169,6 +169,19 @@ fn startMode(
     var handle: ?uefi.Handle = null;
     switch (mode) {
         .menu => {
+            // Ask the running shim first through SHIM_LOCK->Verify, which is
+            // silent: shim 16's hooked LoadImage prints "Verification failed"
+            // on the console for a kernel it does not trust (seen briefly on
+            // the X470 before the Mint relay, 2026-09-28).
+            if (secure_boot.enforced() and recipe.shim_layout) {
+                if (secure_boot.shimLock()) |lock| {
+                    secure_boot.shimVerify(lock, kernel) catch {
+                        logf("[LINUX-ISO] kernel not trusted by the USOS shim (checked silently)\r\n", .{});
+                        freeBytes(bs, kernel);
+                        return relay(root, &reader, image_directory, name, if (profile) |p| p.stem else "");
+                    };
+                }
+            }
             handle = verified_image.loadBuffer(kernel) catch |err| {
                 if (err == error.SecureBootRejected and secure_boot.enforced() and recipe.shim_layout) {
                     freeBytes(bs, kernel);

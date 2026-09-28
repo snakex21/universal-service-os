@@ -72,7 +72,7 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
     var selected: usize = usos.gui.selectable_list.first(selectable[0..count]) orelse 0;
     var help_lines: HelpLines = undefined;
     var shown_block = blockAt(&slots, selected, firmware);
-    var shown_help = blockedHelp(shown_block, &help_lines);
+    var shown_help = blockedHelp(shown_block, &help_lines, slots.at(selected));
     var list: view.ListScreen = undefined;
     list.open(view.tr(category.label()), view.t(.systems_subtitle), rows[0..count], selected, true, shown_help);
     if (!list_timing_reported) {
@@ -90,9 +90,9 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
                     .firmware_mismatch, .secure_boot_off_required => {
                         // Selectable so the reason can be read; never launched.
                         var notice_lines: HelpLines = undefined;
-                        if (blockedHelp(blockAt(&slots, selected, firmware), &notice_lines)) |help| {
+                        if (blockedHelp(blockAt(&slots, selected, firmware), &notice_lines, entry)) |help| {
                             view.notice(entry.name, .warning, .warning, help.title, help.lines);
-                            view.waitForDismiss();
+                            view.waitForAnyKey();
                         }
                         list.redrawFull(selected, shown_help);
                     },
@@ -114,7 +114,7 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
                 // disappearing or changing text needs a full relayout.
                 const relayout = block != shown_block;
                 shown_block = block;
-                shown_help = blockedHelp(block, &help_lines);
+                shown_help = blockedHelp(block, &help_lines, slots.at(selected));
                 if (relayout) list.redrawFull(selected, shown_help) else list.updateSelection(selected, shown_help);
             },
             .pointer_moved => view.updatePointer(),
@@ -137,7 +137,7 @@ fn blockAt(slots: *const Slots, index: usize, firmware: usos.firmware.Firmware) 
 /// Why a row cannot be started and what to do about it, for the help panel
 /// and the notice shown when it is activated anyway. Null for rows that
 /// can start (or only lack images, which the row detail already says).
-fn blockedHelp(block: Block, lines: *HelpLines) ?usos.gui.menu_screens.Help {
+fn blockedHelp(block: Block, lines: *HelpLines, entry: ?*const usos.catalog.SystemEntry) ?usos.gui.menu_screens.Help {
     switch (block) {
         .none => return null,
         .requires_bios, .requires_uefi => {
@@ -150,7 +150,8 @@ fn blockedHelp(block: Block, lines: *HelpLines) ?usos.gui.menu_screens.Help {
             return .{ .title = view.t(if (requires_uefi) .system_requires_uefi else .system_requires_bios), .lines = lines };
         },
         .secure_boot_off => {
-            lines.* = .{ view.t(.summary_secure_boot_line1), view.t(.summary_secure_boot_line2) };
+            const linux = if (entry) |e| e.family == .linux else false;
+            lines.* = .{ view.t(if (linux) .summary_secure_boot_linux_line1 else .summary_secure_boot_line1), view.t(.summary_secure_boot_line2) };
             return .{ .title = view.t(.summary_secure_boot_badge), .lines = lines };
         },
     }

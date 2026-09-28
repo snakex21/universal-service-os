@@ -1010,3 +1010,55 @@ test "signed mapping-pair deltas sign extend" {
     try @import("std").testing.expectEqual(@as(i64, -256), readSigned(&[_]u8{ 0x00, 0xff }));
     try @import("std").testing.expectEqual(@as(i64, 0x1234), readSigned(&[_]u8{ 0x34, 0x12 }));
 }
+
+fn testIndexEntry(out: []u8, reference: u64, namespace: u8, name: []const u8) usize {
+    const key_len = 66 + name.len * 2;
+    const entry_len = @import("std").mem.alignForward(usize, 16 + key_len, 8);
+    @memset(out[0..entry_len], 0);
+    @import("std").mem.writeInt(u64, out[0..8], reference, .little);
+    @import("std").mem.writeInt(u16, out[8..10], @intCast(entry_len), .little);
+    @import("std").mem.writeInt(u16, out[10..12], @intCast(key_len), .little);
+    const key = out[16..][0..key_len];
+    @import("std").mem.writeInt(u64, key[48..56], 1234, .little);
+    key[64] = @intCast(name.len);
+    key[65] = namespace;
+    for (name, 0..) |c, i| @import("std").mem.writeInt(u16, key[66 + i * 2 ..][0..2], c, .little);
+    return entry_len;
+}
+
+test "long Win32 names decode completely and DOS 8.3 aliases stay hidden (BIOS menu names, 2026-09-28)" {
+    const names = [_][]const u8{
+        "linuxmint-22.3-xfce-64bit.iso",
+        "ubuntu-24.04.5-live-server-amd64.iso",
+        "Fedora-Everything-netinst-x86_64-44-1.7.iso",
+        "pl_windows_7_professional_with_sp1_x64_dvd_u_676944.iso",
+        "debian-live-13.7.0-amd64-standard.iso",
+    };
+    var buffer: [4096]u8 = [_]u8{0} ** 4096;
+    const header_offset: usize = 0;
+    var at: usize = 16;
+    for (names, 0..) |name, i| {
+        // Windows with 8.3 creation on: a namespace-2 alias next to the
+        // namespace-1 Win32 name, both pointing at the same MFT record.
+        at += testIndexEntry(buffer[at..], 40 + i, 2, "LINUXM~1.ISO");
+        at += testIndexEntry(buffer[at..], 40 + i, 1, name);
+    }
+    // last entry
+    @import("std").mem.writeInt(u16, buffer[at + 8 ..][0..2], 16, .little);
+    @import("std").mem.writeInt(u16, buffer[at + 12 ..][0..2], 2, .little);
+    at += 16;
+    @import("std").mem.writeInt(u32, buffer[0..4], 16, .little);
+    @import("std").mem.writeInt(u32, buffer[4..8], @intCast(at), .little);
+    @import("std").mem.writeInt(u32, buffer[8..12], @intCast(buffer.len), .little);
+
+    var items: [8]DirectoryItem = undefined;
+    var scan = DirectoryScan{ .output = &items };
+    try consumeIndexEntries(&buffer, header_offset, &scan);
+    try @import("std").testing.expectEqual(names.len, scan.count);
+    for (names, 0..) |name, i| {
+        var ascii: [260]u8 = undefined;
+        const n = items[i].copyNameAscii(&ascii);
+        try @import("std").testing.expectEqualStrings(name, ascii[0..n]);
+        for (items[i].name[0..items[i].name_len]) |unit| try @import("std").testing.expect(unit <= 0x7f);
+    }
+}

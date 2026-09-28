@@ -312,6 +312,7 @@ pub const Key = enum(u16) {
     prep_xp_disks,
     profile_add,
     profile_add_detail,
+    profile_add_detail_linux,
     profile_arch_warning,
     profile_badge,
     profile_cancel,
@@ -322,6 +323,7 @@ pub const Key = enum(u16) {
     profile_edition_missing,
     profile_editor_new,
     profile_editor_subtitle,
+    profile_editor_subtitle_linux,
     profile_editor_title,
     profile_field_bypass_ram,
     profile_field_bypass_secure_boot,
@@ -484,6 +486,7 @@ pub const Key = enum(u16) {
     summary_secure_boot_detail,
     summary_secure_boot_line1,
     summary_secure_boot_line2,
+    summary_secure_boot_linux_line1,
     summary_secure_boot_title,
     summary_source,
     summary_subtitle,
@@ -928,6 +931,7 @@ pub const hashes = [_]u32{
     0x87155e69, // prep.xp_disks
     0x19d32f03, // profile.add
     0xf7030016, // profile.add.detail
+    0x5951406b, // profile.add.detail_linux
     0x0ed7f0df, // profile.arch_warning
     0xc61083bb, // profile.badge
     0x18d4431a, // profile.cancel
@@ -938,6 +942,7 @@ pub const hashes = [_]u32{
     0x919ddef5, // profile.edition_missing
     0xac80d0a1, // profile.editor.new
     0x6f2b3c09, // profile.editor.subtitle
+    0x39676f88, // profile.editor.subtitle_linux
     0xde080639, // profile.editor.title
     0x49862935, // profile.field.bypass_ram
     0x1513f82f, // profile.field.bypass_secure_boot
@@ -1100,6 +1105,7 @@ pub const hashes = [_]u32{
     0xfedbcf61, // summary.secure_boot_detail
     0x60a25811, // summary.secure_boot_line1
     0x5da25358, // summary.secure_boot_line2
+    0x4e7ff9d0, // summary.secure_boot_linux_line1
     0xaf249476, // summary.secure_boot_title
     0x46c71b92, // summary.source
     0xa12382cb, // summary.subtitle
@@ -1625,6 +1631,8 @@ pub const bios = [_]bool{
     false,
     false,
     false,
+    false,
+    false,
     true,
     true,
     true,
@@ -1677,6 +1685,7 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
     false,
     false,
     false,
@@ -2159,6 +2168,7 @@ pub const english = [_][]const u8{
     "Starting XP disk selection",
     "+ Add a new profile",
     "A USOS profile: accounts, computer name, language and time zone for every Windows",
+    "A USOS profile: user, computer name, language and time zone for the Linux installer; you always choose the disk",
     "The answer file has no settings for {0} media: Setup ignores it. Use a file made for this architecture.",
     "USOS profile",
     "Cancel",
@@ -2169,6 +2179,7 @@ pub const english = [_][]const u8{
     "Edition \"{0}\" is not on this ISO: Setup asks for the edition.",
     "New answer profile",
     "One profile for every Windows: USOS writes the answer file when the installation starts",
+    "One profile for Windows and Linux: USOS writes the answer file when the installation starts",
     "Answer profile",
     "Windows 11: skip the RAM check",
     "Windows 11: skip the Secure Boot check",
@@ -2331,6 +2342,7 @@ pub const english = [_][]const u8{
     "Turn Secure Boot off in the firmware setup to use it",
     "This system starts through a legacy path (CSM, UefiSeven or an old Windows boot manager) that Secure Boot blocks.",
     "Turn Secure Boot off in the firmware setup, then start USOS again.",
+    "This ISO has no boot loader signed for Secure Boot, so Secure Boot blocks it.",
     "Secure Boot is on",
     "Source",
     "Review the selected boot configuration",

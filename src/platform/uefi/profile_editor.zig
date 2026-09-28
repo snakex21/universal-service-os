@@ -288,7 +288,7 @@ fn helpKey(id: F) view.Key {
         .protect_pc => .profile_help_protect_pc,
         .network_location => .profile_help_network_location,
         .disable_wer => .profile_help_disable_wer,
-        .save, .cancel => .profile_editor_subtitle,
+        .save, .cancel => subtitleKey(),
     };
 }
 
@@ -382,6 +382,11 @@ pub fn defaults(ui_language: []const u8) Profile {
 /// that stem). Returns the saved profile's name, or null on Cancel/Back.
 /// `images`: the install images of the ISO chosen before the answer screen
 /// (the edition is then a list picker); null: the edition is typed.
+/// Opened from a Linux ISO start: the subtitle does not say "every Windows".
+fn subtitleKey() view.Key {
+    return if (usos.flow.answer_screen.linuxAnswerSystem(system_id)) .profile_editor_subtitle_linux else .profile_editor_subtitle;
+}
+
 pub fn edit(root: *uefi.protocol.File, initial: *const Profile, stem: ?[]const u8, for_system_id: []const u8, for_system_name: []const u8, images: ?*const answer.editions.List) ?[]const u8 {
     base = initial.*;
     edition_images = images;
@@ -402,7 +407,7 @@ pub fn edit(root: *uefi.protocol.File, initial: *const Profile, stem: ?[]const u
     const hooks = form.Hooks{ .context = @ptrCast(&dummy_context), .help = hookHelp, .invalid = hookInvalid };
     while (true) {
         const title = if (stem == null) t(.profile_editor_new) else t(.profile_editor_title);
-        switch (form.run(title, t(.profile_editor_subtitle), fields_storage[0..field_count], hooks, &selected)) {
+        switch (form.run(title, t(subtitleKey()), fields_storage[0..field_count], hooks, &selected)) {
             .back => return null,
             .x_on, .y_on => {},
             .action => |id| {

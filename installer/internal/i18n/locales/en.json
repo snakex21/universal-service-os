@@ -414,6 +414,7 @@
   "boot.summary.secure_boot_detail": "Turn Secure Boot off in the firmware setup to use it",
   "boot.summary.secure_boot_title": "Secure Boot is on",
   "boot.summary.secure_boot_line1": "This system starts through a legacy path (CSM, UefiSeven or an old Windows boot manager) that Secure Boot blocks.",
+  "boot.summary.secure_boot_linux_line1": "This ISO has no boot loader signed for Secure Boot, so Secure Boot blocks it.",
   "boot.summary.secure_boot_line2": "Turn Secure Boot off in the firmware setup, then start USOS again.",
   "boot.summary.xp_preparation": "UEFI; installed XP requires firmware CSM and MBR",
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB drivers; optional PAE boot entry",
@@ -899,6 +900,7 @@
 
   "boot.profile.add": "+ Add a new profile",
   "boot.profile.add.detail": "A USOS profile: accounts, computer name, language and time zone for every Windows",
+  "boot.profile.add.detail_linux": "A USOS profile: user, computer name, language and time zone for the Linux installer; you always choose the disk",
   "boot.profile.arch_warning": "The answer file has no settings for {0} media: Setup ignores it. Use a file made for this architecture.",
   "boot.profile.edition_missing": "Edition \"{0}\" is not on this ISO: Setup asks for the edition.",
   "boot.profile.badge": "USOS profile",
@@ -909,6 +911,7 @@
   "boot.profile.delete.title": "Delete profile",
   "boot.profile.editor.new": "New answer profile",
   "boot.profile.editor.subtitle": "One profile for every Windows: USOS writes the answer file when the installation starts",
+  "boot.profile.editor.subtitle_linux": "One profile for Windows and Linux: USOS writes the answer file when the installation starts",
   "boot.profile.editor.title": "Answer profile",
   "boot.profile.field.bypass_ram": "Windows 11: skip the RAM check",
   "boot.profile.field.bypass_secure_boot": "Windows 11: skip the Secure Boot check",

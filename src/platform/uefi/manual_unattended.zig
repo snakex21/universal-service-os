@@ -192,6 +192,7 @@ var hint_storage: [5]Hint = undefined;
 
 fn screen(context: Context, names: []const []const u8, initial: usize) Outcome {
     const system = context.system;
+    help_system = system;
     for (layout.slice(), 0..) |kind, index| rows[index] = switch (kind) {
         .no_answer => .{ .title = view.t(.unattended_xp_manual), .detail = view.t(.profile_manual_detail), .icon = .{ .vector = .close } },
         .xp_manual => .{ .title = view.t(.unattended_xp_manual), .detail = view.t(.profile_manual_detail), .icon = .{ .vector = .close } },
@@ -201,7 +202,7 @@ fn screen(context: Context, names: []const []const u8, initial: usize) Outcome {
             break :blk .{ .title = p.name.slice(), .detail = profileDetail(&profile_details[index - layout.first_profile], p), .icon = .{ .label = "USOS" }, .badge = .{ .text = view.t(.profile_badge), .tone = .accent } };
         },
         .file => .{ .title = names[index - layout.first_file], .detail = view.t(.profile_file_detail), .icon = .{ .label = usos.flow.unattended_policy.fileKindLabel(system) } },
-        .add => .{ .title = view.t(.profile_add), .detail = view.t(.profile_add_detail), .icon = .{ .vector = .check } },
+        .add => .{ .title = view.t(.profile_add), .detail = addDetail(system), .icon = .{ .vector = .check } },
         .unsupported => .{ .title = view.t(.unattended_vista_uefi), .detail = view.t(.unattended_vista_uefi_detail), .icon = .{ .label = "!" } },
     };
     const len = layout.len;
@@ -270,6 +271,14 @@ fn traceRows(list_rows: []const usos.gui.ui.Row) void {
 
 var help_line: [1][]const u8 = undefined;
 
+var help_system: ?*const usos.catalog.SystemEntry = null;
+
+/// The "+ Add a new profile" hint: Linux installers get their own wording.
+fn addDetail(system: ?*const usos.catalog.SystemEntry) []const u8 {
+    if (system) |s| if (s.family == .linux) return view.t(.profile_add_detail_linux);
+    return view.t(.profile_add_detail);
+}
+
 fn help(selected: usize) usos.gui.menu_screens.Help {
     help_line[0] = switch (layout.rows[selected]) {
         .no_answer => view.t(.unattended_none_detail),
@@ -277,7 +286,7 @@ fn help(selected: usize) usos.gui.menu_screens.Help {
         .xp_settings => view.t(.unattended_xp_settings_detail),
         .profile => view.t(.profile_row_help),
         .file => if (layout.rows[0] == .xp_manual) view.t(.unattended_xp_file_detail) else view.t(.unattended_file_detail),
-        .add => view.t(.profile_add_detail),
+        .add => addDetail(help_system),
         .unsupported => view.t(.unattended_vista_uefi_detail),
     };
     return .{ .title = view.t(.unattended_title), .lines = &help_line };

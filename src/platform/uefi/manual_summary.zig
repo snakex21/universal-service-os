@@ -46,7 +46,7 @@ pub fn show(
     const resolved = backend.method();
     const method_firmware = backend.firmwareRequirement();
     if (!method_firmware.accepts(firmware)) return showFirmwareUnavailable();
-    if (secure_boot.enforced() and usos.flow.secure_boot_policy.backendRequiresSecureBootOff(system.id, backend)) return showSecureBootRequired();
+    if (secure_boot.enforced() and usos.flow.secure_boot_policy.backendRequiresSecureBootOff(system.id, backend)) return showSecureBootRequired(system);
 
     var fields = Fields{};
     var notes: [6][]const u8 = undefined;
@@ -279,7 +279,7 @@ fn start(
     const resolved = backend.method();
     const method_firmware = backend.firmwareRequirement();
     if (!method_firmware.accepts(firmware)) return showFirmwareUnavailable();
-    if (secure_boot.enforced() and usos.flow.secure_boot_policy.backendRequiresSecureBootOff(system.id, backend)) return showSecureBootRequired();
+    if (secure_boot.enforced() and usos.flow.secure_boot_policy.backendRequiresSecureBootOff(system.id, backend)) return showSecureBootRequired(system);
 
     if (backend == .xp_uefi_staging) {
         // The progress page (like the Vista/7 ISO path) stays up while the
@@ -481,10 +481,11 @@ fn showUnsupported() void {
     view.waitForDismiss();
 }
 
-fn showSecureBootRequired() void {
-    const lines = [_][]const u8{ view.t(.summary_secure_boot_line1), view.t(.summary_secure_boot_line2) };
+fn showSecureBootRequired(system: *const usos.catalog.SystemEntry) void {
+    const line1 = if (system.family == .linux) view.t(.summary_secure_boot_linux_line1) else view.t(.summary_secure_boot_line1);
+    const lines = [_][]const u8{ line1, view.t(.summary_secure_boot_line2) };
     view.notice(view.t(.summary_secure_boot_title), .warning, .warning, view.t(.summary_secure_boot_badge), &lines);
-    view.waitForDismiss();
+    view.waitForAnyKey();
 }
 
 fn showError(title: []const u8, err: anyerror) void {
