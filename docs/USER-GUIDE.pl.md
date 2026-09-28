@@ -24,6 +24,8 @@ Spis treści:
 
 ## 1. Czym jest USOS i co jest potrzebne
 
+![Menu UEFI USOS (motyw domyślny)](images/menu-home-pl.png)
+
 **Universal Service OS (USOS)** to jeden pendrive, z którego można instalować
 i uruchamiać systemy od MS-DOS do Windows 11 oraz Linuksa. Działa na starych
 komputerach (BIOS) i nowych (UEFI, także z Secure Boot). Ma jedno menu dla
@@ -74,6 +76,9 @@ Na górze okna możesz wybrać język. Wybrany język trafia też na pendrive
 
 ### 2.1 Instalacja na nowym pendrivie
 
+![Instalator: wybór pendrive'a](images/installer-devices-pl.png)
+![Instalator: potwierdzenie kasowania](images/installer-confirm-pl.png)
+
 1. Podłącz pendrive. Odłącz inne pendrive'y i dyski USB, żeby się nie
    pomylić.
 2. Uruchom instalator i wybierz kartę **Instalacja**.
@@ -95,6 +100,8 @@ Pendrive, na którym USOS już jest, jest ukryty na liście instalacji.
 Dla niego używaj aktualizacji, naprawy albo deinstalacji.
 
 ### 2.2 Aktualizacja istniejącego pendrive'a („Aktualizuj USOS”)
+
+![Instalator: ekran startowy (instalacja, aktualizacja, naprawa, odinstalowanie)](images/installer-mode-pl.png)
 
 Użyj tego, gdy masz nowszy instalator albo dodałeś pliki, które USOS musi
 zarejestrować (ikony, dawca PE10).
@@ -210,6 +217,9 @@ Ten folder nie pojawia się w menu systemów.
 
 ### 3.3 Pakiet Windows XP (XP w trybie UEFI)
 
+![Wybór dysku docelowego](images/disk-pick-pl.png)
+![Potwierdzenie formatowania dysku w stylu XP](images/disk-confirm-pl.png)
+
 XP w trybie UEFI (z CSM i bez CSM) potrzebuje pakietu XP na ESP pendrive'a.
 Pakiety są zrobione dla **dokładnie tych dwóch obrazów**:
 
@@ -292,6 +302,8 @@ USOS_DATA\
 
 ### 4.1 Obrazy systemów
 
+![Systemy Windows znalezione na DATA](images/windows-list-pl.png)
+
 - Kopiuj obraz do folderu `Images` właściwego systemu, np.
   `Systems\Windows\Windows 11\Images\`.
 - Obsługiwane formaty: ISO, WIM, IMG, VHD, VHDX, EFI.
@@ -342,6 +354,9 @@ brakujące foldery i nadpisują `README.txt`. Nic innego nie jest usuwane.
 
 ### 4.4 Narzędzia
 
+![Narzędzia z powłoką UEFI (zrzut po angielsku)](images/utilities-uefi-shell.png)
+![Powłoka UEFI z zamapowaną partycją DATA](images/uefi-shell.png)
+
 - **Własne narzędzie bootowalne**: utwórz `Utilities\<Nazwa>\Images\`
   i włóż tam ISO/IMG/EFI. Nazwa folderu to nazwa w menu. Po dodaniu
   uruchom **Aktualizuj USOS**.
@@ -367,6 +382,8 @@ i BIOS). Rozdział 8.
 ---
 
 ## 5. Co działa w którym trybie firmware
+
+![Menu Legacy BIOS](images/bios-menu-pl.png)
 
 ### Jak czytać tabelę
 
@@ -519,6 +536,11 @@ nie wybiera ani nie kasuje dysku.
 
 ### 7.1 Menedżer profili (menu UEFI)
 
+![Profile odpowiedzi](images/answer-profiles-pl.png)
+![Edytor profilu](images/profile-editor-pl.png)
+![Edytor profilu: sekcja „Wygląd i dodatki”](images/profile-editor-extras-pl.png)
+![Klawiatura ekranowa](images/profile-keyboard-pl.png)
+
 Profile tworzysz i edytujesz tylko w menu UEFI (instalator Windows nie ma
 edytora). Ekran „Instalacja nienadzorowana” pojawia się po wybraniu obrazu.
 Wiersze:
@@ -612,6 +634,9 @@ Visty (tam pojawia się ewentualny błąd USB).
 
 ### 7.7 Linux
 
+![Dystrybucje Linuksa na DATA (zrzut po angielsku)](images/linux-list.png)
+![Fedora live uruchomiona z ISO](images/linux-fedora-live.png)
+
 Profile działają dla ISO Ubuntu, Debiana i Fedory w trybie UEFI (nie w BIOS).
 Hasło jest zapisywane tylko jako skrót SHA-512. Drugi użytkownik, organizacja
 i klucze są pomijane. Instalator Ubuntu (subiquity) zatrzyma się na wyborze
@@ -620,6 +645,9 @@ dysku; sprawdź, który dysk jest zaznaczony (rozdział 9).
 ---
 
 ## 8. Motywy
+
+![Motywy: dark, light, retro, sunset](images/themes-grid.png)
+![Edytor motywów](images/theme-editor-pl.png)
 
 Wybór: **Narzędzia -> Motyw** w menu UEFI. Enter/A od razu stosuje motyw
 i zapisuje go na pendrivie.

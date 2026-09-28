@@ -24,6 +24,8 @@ Contents:
 
 ## 1. What USOS is and what you need
 
+![The USOS UEFI menu (default theme)](images/menu-home.png)
+
 **Universal Service OS (USOS)** is one USB stick that installs and starts
 systems from MS-DOS to Windows 11 and Linux. It works on old computers
 (BIOS) and new ones (UEFI, also with Secure Boot). There is one menu for
@@ -75,6 +77,9 @@ built in.
 
 ### 2.1 Installing onto a new stick
 
+![Installer: choosing the stick](images/installer-devices.png)
+![Installer: confirming the erase](images/installer-confirm.png)
+
 1. Plug in the stick. Unplug other sticks and USB disks so you do not mix
    them up.
 2. Start the installer and choose the **Installation** card.
@@ -96,6 +101,8 @@ A stick that already has USOS is hidden from the installation list. Use
 update, repair or uninstall for it.
 
 ### 2.2 Updating an existing stick ("Update USOS")
+
+![Installer: the start screen with Install, Update USOS, Repair ESP and Uninstall](images/installer-mode.png)
 
 Use this when you have a newer installer or added files that USOS has to
 register (icons, the PE10 donor).
@@ -291,6 +298,8 @@ USOS_DATA\
 
 ### 4.1 System images
 
+![Windows systems found on DATA](images/windows-list.png)
+
 - Copy the image to the `Images` folder of the right system, e.g.
   `Systems\Windows\Windows 11\Images\`.
 - Supported formats: ISO, WIM, IMG, VHD, VHDX, EFI.
@@ -342,6 +351,9 @@ overwrite `README.txt`. Nothing else is deleted.
 
 ### 4.4 Tools
 
+![Utilities with the UEFI Shell](images/utilities-uefi-shell.png)
+![The UEFI Shell with DATA mapped](images/uefi-shell.png)
+
 - **Your own bootable tool**: create `Utilities\<Name>\Images\` and put the
   ISO/IMG/EFI there. The folder name is the name in the menu. Run
   **Update USOS** after adding it.
@@ -367,6 +379,8 @@ Section 8.
 ---
 
 ## 5. What works in which firmware mode
+
+![The Legacy BIOS menu](images/bios-menu.png)
 
 ### How to read the table
 
@@ -519,6 +533,11 @@ A profile never selects or wipes a disk.
 
 ### 7.1 The profile manager (UEFI menu)
 
+![Answer profiles](images/answer-profiles.png)
+![The profile editor](images/profile-editor.png)
+![Profile editor: appearance and extras](images/profile-editor-appearance.png)
+![On-screen keyboard](images/profile-keyboard.png)
+
 Profiles are made and edited in the UEFI menu only (the Windows installer
 has no editor). The "Unattended setup" screen appears after you pick
 an image. Rows:
@@ -612,6 +631,9 @@ first start (a USB failure is reported there).
 
 ### 7.7 Linux
 
+![Linux distributions on DATA](images/linux-list.png)
+![Fedora live started from its ISO](images/linux-fedora-live.png)
+
 Profiles work for Ubuntu, Debian and Fedora ISOs in UEFI mode (not BIOS).
 The password is written only as a SHA-512 hash. The second user,
 organization and keys are ignored. The Ubuntu installer (subiquity) stops at
@@ -620,6 +642,9 @@ the disk choice; check which disk is selected (section 9).
 ---
 
 ## 8. Themes
+
+![Themes: dark, light, retro, sunset](images/themes-grid.png)
+![The theme editor](images/theme-editor.png)
 
 Choose one in **Utilities -> Theme** in the UEFI menu. Enter/A applies it
 at once and saves it on the stick.

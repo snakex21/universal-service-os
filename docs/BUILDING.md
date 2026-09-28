@@ -77,9 +77,9 @@ With `USOS_BUILDKIT` set, `build.bat` first runs
   `USOS_7Z`, `PYTHONPATH` with Pillow, and `USOS_OFFLINE=1`, which makes
   every downloader fail instead of fetching.
 
-Tested 2026-09-28: a fresh clone at the 1.0.0 commit, the kit, the proxy
+Tested 2026-09-28: a fresh clone, the kit, the proxy
 set to a dead address (`HTTP_PROXY`/`HTTPS_PROXY=http://127.0.0.1:9`) and an
-empty Go module cache: `build.bat` completed (see
+empty Go module cache: `build.bat` passed (build B260928-214537-44024B22; see
 `docs/HANDOFF-2026-09-28-release.md` for the result).
 
 ## Kit contents
