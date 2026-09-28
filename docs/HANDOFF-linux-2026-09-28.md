@@ -165,15 +165,26 @@ Ubuntu/Debian/Fedora, `linux_iso_start` renders (salt from EFI_RNG / TSC) into
 the per-boot cpio; the relay path must carry it too (write it next to
 relay.ini or re-render in the relay instance).
 
+## State at the end of 2026-09-28 (daytime session)
+
+- Merged into master; final build **B260928-122908-E1145505** (build.bat green:
+  Zig + Go tests, signing, release consistency); release payload committed.
+- Kingston updated to that build (updater RESULT=PASS, profiles/themes kept,
+  flushed); DATA now holds Mint 22.3, Fedora WS 44, Debian 13.7 netinst,
+  GParted 1.8.1, SystemRescue 13.02, Clonezilla 3.3.3 (SHA-256 read back,
+  1 extent each); 2.02 GiB free. ESP backups in
+  `artifacts/stick-backup-20260928-*`.
+- Answer profiles wired in (UEFI answer screen for Ubuntu/Debian/Fedora) and
+  verified in QEMU per format (design doc section 11).
+
 ## Exact next steps
 
-1. Menu start with Secure Boot off (Ubuntu server, Fedora, GParted); fix.
-2. Secure Boot relay (design section 5) + OVMF SB test with MokList seeded.
-3. BIOS Core generic path (or micro-Linux kexec fallback), Core size check.
-4. d-i CD detection; dm path with a deliberately fragmented ISO.
-5. Answer renderers (autoinstall/preseed/kickstart) + goldens + injection.
-6. Strings (27 locales), answer-screen picker, docs, build.bat, merge,
-   release payload, stick deploy (only if attached: backup, readback, flush).
+1. X470 hardware test (list in the final report / design doc section 11).
+2. Ubuntu Desktop under Secure Boot: the installer error seen under TCG.
+3. Follow-ups in ROADMAP "Przed 1.0" (texts for SystemRescue/SB and the
+   "+ Add profile" hint, subiquity default disk, Core headroom, two stale
+   Python tests).
+4. Non-Linux unknown ISOs (WinPE/EFI-only) are still not covered.
 
 ## Not done (next, in this order)
 
