@@ -140,6 +140,31 @@ top of the first instance's live stack, so it now switches to its own 1 MiB
 stack (`callOnStack`). The relay plan is `EFI/USOS/linux/relay.ini`
 (one-shot, deleted when read, only `\Systems\Linux\...` paths accepted).
 
+## Menu test in Legacy BIOS (SeaBIOS, WHPX): ALL PASS
+
+`run_linux_iso_menu.py --bios` (PS/2 keyboard; the Core swallows the first
+Enter on a freshly opened list, so scripts send one extra Enter). The Core
+path (`src/platform/bios/linux_iso_boot.zig`) loads the kernel via the 32-bit
+boot protocol with the same recipe; Core headroom is now 4 424 bytes (was
+17 012; minimum 4 096). Found and fixed: a plain int13 `reader` call after
+bulk NTFS reads never returned, so the ESP helper is read first.
+
+Results: Ubuntu Server (subiquity), Ubuntu Desktop (installer on the live
+desktop), Mint (live desktop), Fedora 44 (live desktop), Debian live (shell),
+Debian 13 netinst (to the hostname page, media found), Debian 12 netinst
+(language screen), SystemRescue (root shell), GParted (console-data dialog),
+Clonezilla (language dialog).
+
+## Answer renderers (done by a sub-agent, not wired in yet)
+
+`src/flow/answer/sha512crypt.zig`, `src/flow/answer/linux.zig`
+(`render(profile, .autoinstall|.preseed|.kickstart, salt, buffer)`), goldens in
+`src/flow/answer/testdata/golden/linux/`, `usos-answer render-linux`, docs in
+`docs/answer-profiles.md`. Next: answer screen offers profiles for
+Ubuntu/Debian/Fedora, `linux_iso_start` renders (salt from EFI_RNG / TSC) into
+the per-boot cpio; the relay path must carry it too (write it next to
+relay.ini or re-render in the relay instance).
+
 ## Exact next steps
 
 1. Menu start with Secure Boot off (Ubuntu server, Fedora, GParted); fix.
