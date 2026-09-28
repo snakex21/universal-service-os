@@ -32,6 +32,7 @@ def main() -> int:
     parser.add_argument("--seconds", type=int, default=0, help="extra time with a shot every 30 s after the script")
     parser.add_argument("--tcg", action="store_true")
     parser.add_argument("--bios", action="store_true", help="SeaBIOS (Legacy BIOS Core menu) instead of OVMF")
+    parser.add_argument("--target-disk", type=int, default=0, help="attach a new blank qcow2 target disk of N GiB (virtio) for install tests")
     parser.add_argument("--secure-boot", action="store_true",
                         help="Fedora SMM OVMF with the Microsoft keys, Secure Boot on, MokList = USOS certificate (ESP must be the signed zig-out/usb layout)")
     args = parser.parse_args()
@@ -66,6 +67,12 @@ def main() -> int:
            # The BIOS Core reads the PS/2 controller: no USB keyboard there.
            *([] if args.bios else ["-device", "usb-kbd,bus=xhci.0"]), "-device", "usb-tablet,bus=xhci.0",
            "-netdev", "user,id=n0", "-device", "e1000,netdev=n0"]
+    if args.target_disk:
+        target = work / "target.qcow2"
+        if target.exists():
+            target.unlink()
+        subprocess.run([str(QEMU.parent / "qemu-img.exe"), "create", "-f", "qcow2", str(target), f"{args.target_disk}G"], check=True, capture_output=True)
+        cmd += ["-drive", f"file={target},if=none,id=target,format=qcow2", "-device", "virtio-blk-pci,drive=target"]
     proc = subprocess.Popen(cmd)
     monitor = Monitor(port)
     shots = 0

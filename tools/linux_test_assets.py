@@ -59,6 +59,11 @@ ASSETS: dict[str, tuple[str, str, str]] = {
         "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Workstation/x86_64/iso/Fedora-Workstation-44-1.7-x86_64-CHECKSUM",
         "Fedora-Workstation-Live-44-1.7.x86_64.iso",
     ),
+    "fedora-netinst": (
+        "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/iso/Fedora-Everything-netinst-x86_64-44-1.7.iso",
+        "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/iso/Fedora-Everything-44-1.7-x86_64-CHECKSUM",
+        "Fedora-Everything-netinst-x86_64-44-1.7.iso",
+    ),
     "systemrescue": (
         "https://sourceforge.net/projects/systemrescuecd/files/sysresccd-x86/13.02/systemrescue-13.02-amd64.iso/download",
         "https://sourceforge.net/projects/systemrescuecd/files/sysresccd-x86/13.02/systemrescue-13.02-amd64.iso.sha256/download",

@@ -5,7 +5,11 @@
 # ESP, Stage 1 in the MBR code area and the Core slot at LBA 64. Elevated.
 param(
     [string]$Vhd = "",
-    [string]$EspSource = ""
+    [string]$EspSource = "",
+    # Also put this answer profile into EFI\USOS\profiles (test runs only).
+    [string]$Profile = "",
+    # Extra ISOs for DATA: "<manifest.json name>=<Systems\Linux folder>".
+    [string[]]$AddIso = @()
 )
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
@@ -25,6 +29,32 @@ try {
     if ($LASTEXITCODE -ge 8) { throw "robocopy ESP failed: $LASTEXITCODE" }
     $ui = Join-Path $legacy 'bios-ui.bin'
     if (Test-Path -LiteralPath $ui) { Copy-Item -LiteralPath $ui -Destination (Join-Path $path 'EFI\USOS\bios-ui.bin') -Force }
+    if ($Profile) {
+        New-Item -ItemType Directory -Force -Path (Join-Path $path 'EFI\USOS\profiles') | Out-Null
+        Copy-Item -LiteralPath $Profile -Destination (Join-Path $path 'EFI\USOS\profiles') -Force
+    }
+    if ($AddIso.Count -gt 0) {
+        $assets = Join-Path $env:LOCALAPPDATA 'USOS\test-assets\linux'
+        $manifest = Get-Content (Join-Path $assets 'manifest.json') -Raw | ConvertFrom-Json
+        $data = Get-Partition -DiskNumber $disk.Number | Where-Object { $_.GptType -eq '{ebd0a0a2-b9e5-4433-87c0-68b6b72699c7}' } | Select-Object -First 1
+        $dataPath = "$Vhd.data"
+        New-Item -ItemType Directory -Force -Path $dataPath | Out-Null
+        Add-PartitionAccessPath -DiskNumber $disk.Number -PartitionNumber $data.PartitionNumber -AccessPath $dataPath
+        try {
+            foreach ($item in $AddIso) {
+                $name, $folder = $item.Split('=', 2)
+                $file = $manifest.$name.file
+                $dir = Join-Path $dataPath "Systems\Linux\$folder\Images"
+                New-Item -ItemType Directory -Force -Path $dir | Out-Null
+                & robocopy.exe $assets $dir $file /J /R:2 /W:2 /NP /NFL /NDL /NJH /NJS | Out-Null
+                if ($LASTEXITCODE -ge 8) { throw "robocopy $file failed: $LASTEXITCODE" }
+                Write-Host "[PASS] DATA += $folder\$file"
+            }
+        } finally {
+            Remove-PartitionAccessPath -DiskNumber $disk.Number -PartitionNumber $data.PartitionNumber -AccessPath $dataPath -Confirm:$false -ErrorAction SilentlyContinue
+            [IO.Directory]::Delete($dataPath)
+        }
+    }
 } finally {
     Remove-PartitionAccessPath -DiskNumber $disk.Number -PartitionNumber $esp.PartitionNumber -AccessPath $path -Confirm:$false -ErrorAction SilentlyContinue
     Dismount-DiskImage -ImagePath $Vhd -ErrorAction SilentlyContinue | Out-Null
