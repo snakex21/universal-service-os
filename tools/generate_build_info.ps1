@@ -31,8 +31,13 @@ if (-not (Test-Path -LiteralPath $versionPath -PathType Leaf)) { throw "Missing 
 $version = ([IO.File]::ReadAllText($versionPath)).Trim()
 if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "VERSION must be MAJOR.MINOR.PATCH, got '$version'" }
 
+# Licence of USOS itself (SPDX), from NOTICE: recorded in build-info.ini.
+$noticePath = Join-Path $ProjectRoot 'NOTICE'
+$spdx = if (Test-Path -LiteralPath $noticePath -PathType Leaf) { (Select-String -LiteralPath $noticePath -Pattern '^SPDX-License-Identifier:\s*(\S+)' | Select-Object -First 1).Matches.Groups[1].Value } else { '' }
+if (-not $spdx) { throw "NOTICE has no SPDX-License-Identifier line: $noticePath" }
+
 $files = [System.Collections.Generic.List[IO.FileInfo]]::new()
-foreach ($required in @('VERSION', 'build.zig', 'build.bat', 'installer\go.mod', 'installer\go.sum', 'installer\internal\payload\assets\README.md')) {
+foreach ($required in @('VERSION', 'NOTICE', 'build.zig', 'build.bat', 'installer\go.mod', 'installer\go.sum', 'installer\internal\payload\assets\README.md')) {
     $path = Join-Path $ProjectRoot $required
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing build fingerprint input: $path" }
     $files.Add((Get-Item -LiteralPath $path))
@@ -181,6 +186,7 @@ $info = @(
     '[build]',
     "id=$buildId",
     "version=$version",
+    "license=$spdx",
     "epoch=$epoch",
     "source_sha256=$fingerprint"
 ) -join "`r`n"

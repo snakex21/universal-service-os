@@ -40,6 +40,23 @@ ALLOWED_KEY_FILES = {
     # throw-away test certificate key of the upstream test suite.
     '6d92996e7cfc3a1f07747ea2801bdaff2752d7f6c8f02229e3af9aef83e2f836': 'wimboot test/testcert.key (upstream test key)',
 }
+# Pinned upstream archives whose content is not scanned (they are verified by
+# the SHA-256 their publisher lists; e.g. the Go distribution carries test
+# TLS keys): filled from tools/release/buildkit.lock.json.
+TRUSTED_ARCHIVES = set()
+
+
+def trust_buildkit_lock(lock_path):
+    import json
+    lock = json.loads(Path(lock_path).read_text(encoding='utf-8'))
+    for item in lock['fixed'] + lock['alpine_mirror']['indexes'] + lock['alpine_mirror']['packages']:
+        TRUSTED_ARCHIVES.add(item['sha256'])
+    # FreeDOS 1.4 LiteUSB (disk images of FreeDOS itself), pinned in the
+    # vendored FreeDOS manifest.
+    freedos = Path(lock_path).resolve().parents[2] / 'tools/vendor/freedos/1.4/manifest.json'
+    TRUSTED_ARCHIVES.add(json.loads(freedos.read_text(encoding='utf-8'))['upstream_image']['sha256'])
+
+
 ISO_MAGIC = (0x8001, b'CD001')
 UDF_MAGIC = (b'BEA01', b'NSR02', b'NSR03')
 MAX_SCAN = 1 << 30  # bytes of one member kept in memory for scanning
@@ -57,6 +74,8 @@ def is_disk_image(head):
 
 def scan_bytes(name, data, allowed, findings, depth=0):
     """Scan one file's content (name is the display path)."""
+    if len(data) > 4096 and sha256(data) in TRUSTED_ARCHIVES:
+        return  # pinned upstream archive (official toolchain or Alpine package), checked by hash
     lower = name.lower()
     base = lower.rsplit('/', 1)[-1]
     if KEY_STORE.search(base) and sha256(data) not in ALLOWED_KEY_FILES:

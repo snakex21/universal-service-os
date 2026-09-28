@@ -181,6 +181,14 @@ Install
 """
 
 
+def notice_copyright():
+    """The copyright line of NOTICE (the single place to change the holder)."""
+    for line in (ROOT / 'NOTICE').read_text(encoding='utf-8').splitlines():
+        if line.startswith('Copyright'):
+            return line.strip()
+    raise SystemExit('NOTICE has no Copyright line')
+
+
 def component_text(c):
     lines = [f"{c['name']} {c['version']}", f"  Licence: {c['license']}" + ('  (MODIFIED by USOS)' if c.get('modified') else '')]
     if c.get('notice'):
@@ -235,9 +243,13 @@ def licences(out, version, sources_zip, issues_url=ISSUES_URL):
             offers.append(c)
     header = f"""USOS {version} - third-party notices
 
-USOS (Universal Service OS) includes or ships alongside the third-party
-components below. Each keeps its own licence; the licence texts are in the
-LICENSES folder. Components marked MODIFIED were changed by USOS; their
+USOS itself: {notice_copyright()}, licensed under GPL-3.0-or-later (LICENSE,
+NOTICE). The third-party components below are separate programs that are
+aggregated with USOS on the stick and in the release (a "mere aggregation"
+in the sense of the GPL), not parts of USOS; each keeps its own licence, and
+the licence texts are in the LICENSES folder. USOS's own binaries link only
+GPL-compatible code (Zig runtime and musl: MIT; Go runtime and x/sys:
+BSD-3-Clause; fonts: Apache-2.0 / OFL-1.1). Components marked MODIFIED were changed by USOS; their
 sources and patches are in USOS-{version}-sources.zip. Microsoft files (the
 WinPE donor, driver bundles derived from the user's XP ISO, redistributable
 Microsoft drivers) remain Microsoft's property: the maintainer keeps them
@@ -348,6 +360,9 @@ def main():
         'README.md': ROOT / 'README.md',
         'USER-GUIDE.pl.md': ROOT / 'docs/USER-GUIDE.pl.md',
         'USER-GUIDE.en.md': ROOT / 'docs/USER-GUIDE.en.md',
+        'LICENSE.txt': ROOT / 'LICENSE',
+        'NOTICE.txt': ROOT / 'NOTICE',
+        'CONTRIBUTING.md': ROOT / 'CONTRIBUTING.md',
     }
     for name, source in docs.items():
         if not source.is_file():
@@ -360,6 +375,7 @@ def main():
             raise SystemExit(f'{f.name} is {f.stat().st_size} bytes: over the 2 GiB GitHub release asset limit')
 
     # Forbidden content, then checksums
+    scan_release.trust_buildkit_lock(ROOT / 'tools/release/buildkit.lock.json')
     findings = scan_release.scan(out, extra=[ROOT / 'installer/internal/payload/assets/payload.zip'],
                                  allowed_iso_sha256={WINPE_DONOR_SHA256, ALPINE_ISO_SHA256})
     if findings:

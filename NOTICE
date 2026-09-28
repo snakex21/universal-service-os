@@ -1,0 +1,30 @@
+Universal Service OS (USOS)
+Copyright (C) 2026 The USOS Authors
+SPDX-License-Identifier: GPL-3.0-or-later
+
+This file is the single place for the USOS copyright line; change the
+holder name here (the release notices and build-info.ini read it).
+
+USOS is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. USOS is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+(the file LICENSE) for more details.
+
+Scope: the USOS code in this repository (src/, installer/, tools/, build
+scripts, assets made for USOS). Third-party components under tools/vendor/,
+assets/fonts and the files USOS downloads or packs (shim, CSMWrap/SeaBIOS,
+EDK2 Shell, UefiSeven, TouchI2cDxe, EfiFs, wimboot, wimlib, ImDisk,
+Syslinux, FreeDOS, HimemX, Patcher9x, GenAHCI, Alpine Linux and its
+packages, the Linux kernel, ...) keep their own licences. On the USOS stick
+they are separate programs aggregated with USOS, not part of it; see
+THIRD-PARTY-NOTICES.txt in the release and docs/LICENSES-AUDIT.md.
+
+Microsoft files in the release (Windows update and driver files, the WinPE
+donor, files derived from the user's XP ISO) are Microsoft's property, are
+not covered by the GPL, are kept for preservation at the maintainer's own
+risk and are removed on request of the rights holder.
+
+Contributions: see CONTRIBUTING.md.

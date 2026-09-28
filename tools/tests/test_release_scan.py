@@ -76,3 +76,20 @@ def test_zip_is_deterministic(tmp_path):
     with zipfile.ZipFile(tmp_path / '0.zip') as z:
         assert z.namelist() == ['README.txt', 'a/f.bin']
         assert z.read('README.txt') == b'line\r\n'
+
+
+def test_trusted_archive_is_not_scanned(tmp_path):
+    inner = io.BytesIO()
+    with zipfile.ZipFile(inner, 'w') as z:
+        z.writestr('go/src/crypto/tls/testdata/key.pem', b'-----BEGIN RSA PRIVATE KEY-----' + b'A' * 5000)
+    archive = inner.getvalue()
+    outer = io.BytesIO()
+    with zipfile.ZipFile(outer, 'w') as z:
+        z.writestr('toolchains/go.zip', archive)
+    (tmp_path / 'kit.zip').write_bytes(outer.getvalue())
+    assert any('PEM private key' in f for f in scan_release.scan(tmp_path))
+    scan_release.TRUSTED_ARCHIVES.add(scan_release.sha256(archive))
+    try:
+        assert scan_release.scan(tmp_path) == []
+    finally:
+        scan_release.TRUSTED_ARCHIVES.discard(scan_release.sha256(archive))
