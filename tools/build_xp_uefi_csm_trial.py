@@ -177,13 +177,22 @@ RELEASE_SOURCES={
     '62b6c91563bad6cd12a352aa018627c314cfc5162d8e9f8af0756a642e602a46':'en_windows_xp_professional_with_service_pack_3_x86_cd_x14-80428.iso',
 }
 
-def release_selection(supported,hashes):
+# --release-lang: one language's source only (the 1.0 release ships the PL and
+# EN packages as separate assets); the name prefix picks the allowlist entry.
+RELEASE_LANGS={'pl':'pl_','en':'en_'}
+
+def release_allowlist(lang=None):
+    if lang is None:return dict(RELEASE_SOURCES)
+    return {h:n for h,n in RELEASE_SOURCES.items() if n.startswith(RELEASE_LANGS[lang])}
+
+def release_selection(supported,hashes,lang=None):
     """Allowlisted sources in DATA order; every allowlisted source is required."""
-    chosen=[p for p in supported if hashes[p] in RELEASE_SOURCES]
+    allow=release_allowlist(lang)
+    chosen=[p for p in supported if hashes[p] in allow]
     for p in supported:
         if p not in chosen:print('XP release: skipping source not on the allowlist:',p.name,flush=True)
-    missing=sorted(set(RELEASE_SOURCES)-{hashes[p] for p in chosen})
-    if missing:raise ValueError('XP release: allowlisted source missing on DATA: '+', '.join(RELEASE_SOURCES[h] for h in missing))
+    missing=sorted(set(allow)-{hashes[p] for p in chosen})
+    if missing:raise ValueError('XP release: allowlisted source missing on DATA: '+', '.join(allow[h] for h in missing))
     return chosen
 
 def nt52_bundles(data):
@@ -244,7 +253,7 @@ def build_from_old(micro, data, old):
     (OUT/'manifest.json').write_text(json.dumps(metadata,indent=2)+'\n')
     print('XP_UEFI_CSM_PACKAGE_REBUILT from',old.name,'; base scripts unchanged (profile xp-x86-sp3-uefi-csm); no VM/E2E',flush=True)
 
-def build(micro, data, release=False):
+def build(micro, data, release=False, release_lang=None):
     """Full package from a micro-Linux build (default zig-out/micro-linux) and
     the XP ISOs of a DATA folder (read only). No stick is read: the per-ISO
     launchers that needed the stick's ESP identity are gone (the UEFI menu
@@ -262,17 +271,20 @@ def build(micro, data, release=False):
     # One work folder per source ISO content (not per list position), so a
     # bundle always rebuilds from, and is checked against, its own source.
     hashes={p:digest(p) for p in supported}
-    if release:supported=release_selection(supported,hashes)
+    if release:supported=release_selection(supported,hashes,release_lang)
     sources=[{'name':p.name,'sha256':hashes[p],'size':p.stat().st_size} for p in supported]
     driver_bundles=[build_driver_overlay(p,OUT/'drivers'/s['sha256']) for p,s in zip(supported,sources)]
     for s,(bundle_id,_) in zip(sources,driver_bundles):s['bundle']=bundle_id
-    nt52,nt52_sources=nt52_bundles(data)
+    # The release carries only the allowlisted XP sources: no Server 2003 bundle.
+    nt52,nt52_sources=([],[]) if release else nt52_bundles(data)
     init=OUT/'initramfs-xp';init.write_bytes(overlay(base,helper,driver_bundles+nt52))
     shutil.copyfile(kernel,OUT/'vmlinuz.efi')
     for stale in OUT.glob('XP-SP*-UEFI-CSM-PAE.efi'):stale.unlink()
     metadata={'experimental':True,'driver_bundles':[n for n,_ in driver_bundles],'driver_supported_sources':[p.name for p in supported],'driver_sources':sources,'firmware':'UEFI preparation; XP through firmware CSM','hardware_verified':False,'base_initramfs_sha256':digest(base),'base_kernel_sha256':digest(kernel),'launchers':[],'iso_names':[i.name for i in (supported if release else images)],'profile':'xp-x86-sp3-uefi-csm','sha256':{p.name:digest(p) for p in [init,OUT/'vmlinuz.efi',helper]}}
     metadata['nt52_driver_sources']=nt52_sources
-    if release:metadata['release']=True
+    if release:
+        metadata['release']=True
+        if release_lang:metadata['release_lang']=release_lang
     (OUT/'manifest.json').write_text(json.dumps(metadata,indent=2)+'\n')
     print('XP_UEFI_CSM_TRIAL_BUILT; base scripts unchanged (profile xp-x86-sp3-uefi-csm); no VM/E2E',flush=True)
 if __name__=='__main__':
@@ -282,6 +294,7 @@ if __name__=='__main__':
     p.add_argument('--out',type=Path,default=OUT,help='package folder (default zig-out/xp-uefi-csm)')
     p.add_argument('--esp',type=Path,default=Path('J:/'),help='--refresh-pae-flow only: ESP whose base the package was built from')
     p.add_argument('--release',action='store_true',help='release package: only the RELEASE_SOURCES SHA-256 allowlist (original PL x14-80476 and EN x14-80428)')
+    p.add_argument('--release-lang',choices=sorted(RELEASE_LANGS),help='with --release: only the PL or only the EN allowlisted source')
     p.add_argument('--bundles-from',type=Path,help='rebuild with the sources of this package; ISOs missing in --data reuse its driver bundles')
     mode=p.add_mutually_exclusive_group();mode.add_argument('--menu-only',action='store_true');mode.add_argument('--add-source',type=Path);mode.add_argument('--refresh-pae-flow',action='store_true');a=p.parse_args()
     OUT=a.out.resolve()
@@ -292,4 +305,6 @@ if __name__=='__main__':
     elif a.add_source:add_driver_source(a.add_source)
     elif a.refresh_pae_flow:refresh_pae_flow(a.esp)
     elif a.bundles_from:build_from_old(a.micro_linux.resolve(),a.data,a.bundles_from)
-    else:build(a.micro_linux.resolve(),a.data,a.release)
+    else:
+        if a.release_lang and not a.release:p.error('--release-lang needs --release')
+        build(a.micro_linux.resolve(),a.data,a.release,a.release_lang)
