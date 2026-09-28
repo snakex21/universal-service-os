@@ -9,7 +9,7 @@ hardware. The stick is prepared on Windows with `USOS-Installer-1.0.0.exe`.
 
 The menu header shows "Universal Service OS 1.0.0" and the shortened build
 ID (hidden on narrow screens); the installer shows "1.0.0 (B...)". The first
-release candidate is build `B260928-203656-E90BB32F`; the full ID is in
+release candidate is build `B260928-214844-A6711A1F`; the full ID is in
 `EFI\USOS\build-info.ini` on the stick.
 
 > Status of this document: the release candidate. The git tag `v1.0.0` is

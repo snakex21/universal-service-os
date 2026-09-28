@@ -81,8 +81,8 @@ pendrive zapasowy.
 ## 3. Testy dymne
 
 Nagłówek menu na każdej maszynie powinien pokazywać **„Universal Service OS
-1.0.0”** i ten sam build (skrócony, np. `Build B260928-203656`; pierwszy
-kandydat: `B260928-203656-E90BB32F`). Na wąskim ekranie (np. 800x600) napis
+1.0.0”** i ten sam build (skrócony, np. `Build B260928-214844`; pierwszy
+kandydat: `B260928-214844-A6711A1F`). Na wąskim ekranie (np. 800x600) napis
 „Build” jest ukryty; pełny ID jest w `EFI\USOS\build-info.ini`. Zapisz go
 w tabeli z punktu 4.
 
