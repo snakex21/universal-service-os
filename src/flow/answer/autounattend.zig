@@ -197,6 +197,7 @@ pub fn specializeCommands(p: *const Profile, family: Family, out: *Commands) !vo
     if (on(p, .no_autorun, family)) try out.add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\" /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f", .{});
     // Group Policy "Turn off Windows Sidebar" (Vista) / "Turn off desktop gadgets" (7).
     if (on(p, .no_sidebar, family)) try out.add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Windows\\Sidebar\" /v TurnOffSidebar /t REG_DWORD /d 1 /f", .{});
+    if (on(p, .disable_uac, family) and family.client() == .vista) try out.add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v EnableLUA /t REG_DWORD /d 0 /f", .{});
     if (on(p, .no_hibernation, family)) try out.add("powercfg.exe -h off", .{});
     // Windows 7: the theme every new user gets at first logon (themeui's
     // Active Setup reads InstallTheme). Themes/CustomDefaultThemeFile is
@@ -240,7 +241,10 @@ fn specialize(w: *W, input: Input) !void {
         try element(w, 3, "DisableWER", "1");
         try endComponent(w);
     }
-    if (schema.tweakOn(p, .disable_uac, input.family)) {
+    // Windows 7 / 2008 R2: LUA-Settings. Vista / 2008 get the same registry
+    // value as a command (below): Vista SP2 Setup refused EnableLUA=false in
+    // specialize ("value is in invalid format", VirtualBox test 2026-09-28).
+    if (schema.tweakOn(p, .disable_uac, input.family) and input.family.client() == .windows_7) {
         try component(w, "Microsoft-Windows-LUA-Settings", input.arch);
         try element(w, 3, "EnableLUA", "false");
         try endComponent(w);
@@ -390,6 +394,8 @@ test "autounattend: tweaks per version, nothing for versions without them" {
     try @import("xml_check.zig").wellFormed(seven);
     const vista = try render(.{ .profile = &p, .family = .vista, .arch = .x86 }, &buffer);
     try std.testing.expect(std.mem.indexOf(u8, vista, "pkgmgr.exe /uu:InboxGames") != null);
+    try std.testing.expect(std.mem.indexOf(u8, vista, "<EnableLUA>") == null);
+    try std.testing.expect(std.mem.indexOf(u8, vista, "/v EnableLUA /t REG_DWORD /d 0") != null);
     try std.testing.expect(std.mem.indexOf(u8, vista, "WindowsWelcomeCenter") != null);
     try std.testing.expect(std.mem.indexOf(u8, vista, "Themes") == null);
     const ten = try render(.{ .profile = &p, .family = .windows_10, .arch = .amd64 }, &buffer);

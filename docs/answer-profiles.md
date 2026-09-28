@@ -100,7 +100,7 @@ Windows 2000 has none (no `reg.exe` in its base system).
 | `theme=basic` | | | | yes | | 7 `basic.theme` (Windows 7 Basic); Vista has no reliable file for it |
 | `no_balloon_tips` | yes | yes | | | | Default User `Explorer\Advanced EnableBalloonTips=0`; XP also `Applets\Tour RunCount=0` |
 | `display` | yes | yes | | | | `[Display] BitsPerPel=32 Xresolution Yresolution` |
-| `disable_uac` | | | yes | yes | | `Microsoft-Windows-LUA-Settings/EnableLUA=false` (specialize; also 2008 / 2008 R2) |
+| `disable_uac` | | | yes | yes | | 7 / 2008 R2: `Microsoft-Windows-LUA-Settings/EnableLUA=false` (specialize); Vista / 2008: the same value as `reg add HKLM\...\Policies\System EnableLUA=0` (specialize command; Vista SP2 Setup refused `EnableLUA=false`: "value is in invalid format", VirtualBox test 2026-09-28) |
 | `no_sidebar` | | | yes | yes | | policy `HKLM\...\Policies\Windows\Sidebar TurnOffSidebar=1` |
 | `no_welcome_center` | | | yes | | | Default User `Run\WindowsWelcomeCenter` removed (7 does not open Getting Started at logon) |
 | `no_hibernation` | | | yes | yes | | `powercfg.exe -h off` |
