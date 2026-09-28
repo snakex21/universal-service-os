@@ -283,8 +283,17 @@ The build runs on Windows. Full instructions: [docs/BUILDING.md](docs/BUILDING.m
 
 - `build.bat` builds the complete release (EFI program, micro-Linux, BIOS
   core, payload and `installer\USOS Installer.exe`) with one build id
-  (`BYYMMDD-HHMMSS-XXXXXXXX`). The portable Zig in `tools/zig` is used; Go
+  (`BYYMMDD-HHMMSS-XXXXXXXX`). It uses the portable Zig in `tools\zig`; Go
   and Python must be on `PATH`.
+- **Not in git:** Zig 0.16.0 (`tools\zig\zig.exe`) and QEMU 11.1
+  (`tools\qemu`, only for the QEMU tests). Take Zig from the build kit
+  (`toolchains\zig-x86_64-windows-0.16.0.zip`) or from
+  [ziglang.org](https://ziglang.org/download/), and QEMU 11.1 from
+  [qemu.org](https://www.qemu.org/download/#windows). The embedded payload
+  `installer\internal\payload\assets\payload.zip` is a build output:
+  `build.bat` regenerates it.
+- **Windows clone:** some media paths are long. Run
+  `git config --global core.longpaths true` **before** cloning.
 - `tools/tests/run.ps1` runs the automated tests, e.g.
   `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/tests/run.ps1 -Suite all`.
 - `powershell -ExecutionPolicy Bypass -File tools\release\make_release.ps1`

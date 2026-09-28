@@ -9,14 +9,29 @@ the release build kit (`USOS-<version>-buildkit.zip`).
 |---|---|---|
 | Windows | 10 or 11, x64 | — |
 | Windows PowerShell | 5.1 (built in) | — |
-| Zig | 0.16.0 | `tools\zig` in the repository (identical to the official `zig-x86_64-windows-0.16.0.zip`, also in the kit) |
+| Zig | 0.16.0 | `tools\zig` (not in git): extract the official `zig-x86_64-windows-0.16.0.zip` from [ziglang.org](https://ziglang.org/download/) or the kit so that `tools\zig\zig.exe` exists; with `USOS_BUILDKIT` set, `build.bat` unpacks it for you |
 | Go | 1.26.2 | installed Go, or the kit (`toolchains\go1.26.2.windows-amd64.zip`) |
 | Python | CPython 3.13 x64, with Pillow 10.4.0 | installed Python; Pillow from pip or the kit wheel |
 | 7-Zip | 25.01 x64 | `C:\Program Files\7-Zip`, or the kit (`USOS_7Z`) |
-| Git + Git LFS | any recent | to clone (`payload.zip` is in LFS) |
+| Git | any recent | to clone; on Windows run `git config --global core.longpaths true` first (some media paths exceed 260 characters) |
 
-No Node, .NET SDK, WSL or Docker is needed. QEMU (`tools\qemu`) is used by
-the QEMU tests and the CSMWrap VM build, not by `build.bat`.
+No Node, .NET SDK, WSL or Docker is needed. QEMU 11.1 (`tools\qemu`, not in
+git) is used by the QEMU tests and the CSMWrap VM build, not by `build.bat`:
+install the Windows build from [qemu.org](https://www.qemu.org/download/#windows)
+and copy (or link) its folder to `tools\qemu`, so that
+`tools\qemu\qemu-system-x86_64.exe` exists.
+
+Not in git, by design:
+
+- `tools\zig`, `tools\qemu`: toolchains, see above.
+- `installer\internal\payload\assets\payload.zip`: the embedded installer
+  payload (about 150 MB). It is a build output: `build.bat` regenerates it
+  with `usos-payload-pack` from the fresh `zig-out` trees and checks it with
+  `-verify-fresh-only` before `go build` embeds it. A plain `go build` of
+  the installer fails without it (missing `go:embed` file); run `build.bat`
+  first.
+- `installer\build\` and `installer\USOS Installer.exe`: installer outputs.
+  The released installer is a GitHub Release asset.
 
 The Secure Boot signing key lives outside the repository
 (`%APPDATA%\USOS\signing`). Without it `build.bat` emits the same layout
@@ -50,7 +65,7 @@ downloads of `tools\release\buildkit.lock.json`).
 
 ## Offline build with the build kit
 
-1. Clone the repository (with Git LFS) and extract
+1. Clone the repository and extract
    `USOS-<version>-buildkit.zip` somewhere with a short path, e.g.
    `C:\usos-kit`. If the kit was split, join the parts first:
    `copy /b USOS-<version>-buildkit.zip.001+USOS-<version>-buildkit.zip.002 USOS-<version>-buildkit.zip`.

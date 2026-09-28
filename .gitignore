@@ -64,3 +64,11 @@ usos-secure-boot.key
 /signing/
 # Local Claude Code state (agent worktrees, settings)
 .claude/
+# Not in git since the public repository (2026-09-29): toolchains, installer
+# outputs and the embedded payload (a build output of build.bat). See
+# docs/BUILDING.md for where to get Zig 0.16.0 and QEMU 11.1.
+tools/zig/
+tools/qemu/
+installer/build/
+installer/internal/payload/assets/*.zip
+/$tmp/
