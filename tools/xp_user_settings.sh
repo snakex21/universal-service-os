@@ -236,9 +236,12 @@ usos_xp_settings_accounts() {
             if (!(t["extensions"] || t["hidden"] || t["balloons"] || t["tour"])) return
             printf "rem USOS profile: Explorer settings for new users (Default User hive).\r\n"
             printf "set USOS_PD=\r\nset USOS_DU=\r\n"
-            # \047: a single quote (the awk program itself is single-quoted).
-            printf "for /f \"tokens=2*\" %%%%A in (\047reg query \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\" /v ProfilesDirectory ^| find \"REG_\"\047) do call set \"USOS_PD=%%%%B\"\r\n"
-            printf "for /f \"tokens=2*\" %%%%A in (\047reg query \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\" /v DefaultUserProfile ^| find \"REG_\"\047) do set \"USOS_DU=%%%%B\"\r\n"
+            # The value line is "Name TYPE data" (REG.EXE 3.0 header lines never
+            # have a REG_ type second). \047: a single quote (the awk program
+            # itself is single-quoted).
+            printf "for /f \"tokens=2*\" %%%%A in (\047reg query \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\" /v ProfilesDirectory 2^>nul\047) do if /i \"%%%%A\"==\"REG_EXPAND_SZ\" call set \"USOS_PD=%%%%B\"\r\n"
+            printf "for /f \"tokens=2*\" %%%%A in (\047reg query \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\" /v DefaultUserProfile 2^>nul\047) do if /i \"%%%%A\"==\"REG_SZ\" set \"USOS_DU=%%%%B\"\r\n"
+            printf "if not defined USOS_PD set \"USOS_PD=%%SystemDrive%%\\Documents and Settings\"\r\n"
             printf "if not defined USOS_DU set \"USOS_DU=Default User\"\r\n"
             printf "reg load HKU\\USOSDEF \"%%USOS_PD%%\\%%USOS_DU%%\\NTUSER.DAT\" >> \"%%USOS_LOG%%\" 2>&1\r\n"
             adv = "HKU\\USOSDEF\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced"

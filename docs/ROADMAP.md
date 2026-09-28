@@ -49,6 +49,7 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | L7 | Buildy Longhorn | **Later** | L1 (pre-reset), ścieżka Vista (post-reset) | 3–5 dni per build |
 | L8 | NT4 dla retro sprzętu | **Later** | profil NT5 (M4) | 5–8 dni |
 | L9 | shim-review (własny shim podpisany przez Microsoft) | **Later** (długoterminowo) | N6, publiczne repo | miesiące, proces zewnętrzny |
+| L10 | macOS jako opcjonalny dodatek („DLC”): własny OpenCore EFI z DATA, potem eksperymentalny generator konfiguracji | **Later** (na końcu, po wszystkim innym) | osobne pobranie, poza głównym wydaniem | do oszacowania |
 
 ## 2. Pozycje
 
@@ -343,6 +344,21 @@ repozytorium, powtarzalnego buildu shim, klucza w HSM, SBAT, polityki
 reagowania na podatności, zablokowanego jądra (N6) i przeglądu na
 `rhboot/shim-review`. Do tego czasu model „shim dystrybucji + MOK”
 pozostaje.
+
+### L10. macOS (opcjonalny dodatek, „DLC”): **Later**, na końcu
+
+Życzenie użytkownika (2026-09-28): macOS jako ostatni punkt, po wszystkim
+innym, w formie osobnego, opcjonalnego dodatku.
+
+- Osobne, opcjonalne pobranie; nie wchodzi do głównego wydania USOS.
+- Krok 1: launcher „przynieś własny OpenCore EFI” z DATA (USOS tylko
+  uruchamia gotowy folder EFI użytkownika).
+- Krok 2, eksperymentalny: automatyczna konfiguracja OpenCore z raportu
+  sprzętu zebranego w micro-Linuksie (w stylu OpCore-Simplify) oraz
+  pobranie oficjalnego obrazu recovery/instalatora Apple.
+- Ryzyka: EULA Apple (sprzęt inny niż Apple), wrażliwość VirtualSMC/OSK,
+  brak kart NVIDIA nowszych niż Kepler, Wi-Fi Intela tylko częściowo.
+- Sprzęt testowy: X470 + RX 560, B550 + 5800X3D.
 
 ## 2a. Przed 1.0 (lista kontrolna)
 

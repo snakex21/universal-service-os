@@ -44,8 +44,9 @@ theme=basic	windows-7	+      </Themes>
 no_balloon_tips=yes	windows-xp	+rem USOS profile: Explorer settings for new users (Default User hive).
 no_balloon_tips=yes	windows-xp	+set USOS_PD=
 no_balloon_tips=yes	windows-xp	+set USOS_DU=
-no_balloon_tips=yes	windows-xp	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v ProfilesDirectory ^| find "REG_"') do call set "USOS_PD=%%B"
-no_balloon_tips=yes	windows-xp	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v DefaultUserProfile ^| find "REG_"') do set "USOS_DU=%%B"
+no_balloon_tips=yes	windows-xp	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v ProfilesDirectory 2^>nul') do if /i "%%A"=="REG_EXPAND_SZ" call set "USOS_PD=%%B"
+no_balloon_tips=yes	windows-xp	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v DefaultUserProfile 2^>nul') do if /i "%%A"=="REG_SZ" set "USOS_DU=%%B"
+no_balloon_tips=yes	windows-xp	+if not defined USOS_PD set "USOS_PD=%SystemDrive%\Documents and Settings"
 no_balloon_tips=yes	windows-xp	+if not defined USOS_DU set "USOS_DU=Default User"
 no_balloon_tips=yes	windows-xp	+reg load HKU\USOSDEF "%USOS_PD%\%USOS_DU%\NTUSER.DAT" >> "%USOS_LOG%" 2>&1
 no_balloon_tips=yes	windows-xp	+reg add "HKU\USOSDEF\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v EnableBalloonTips /t REG_DWORD /d 0 /f >> "%USOS_LOG%" 2>&1
@@ -54,8 +55,9 @@ no_balloon_tips=yes	windows-xp	+reg unload HKU\USOSDEF >> "%USOS_LOG%" 2>&1
 no_balloon_tips=yes	windows-server-2003	+rem USOS profile: Explorer settings for new users (Default User hive).
 no_balloon_tips=yes	windows-server-2003	+set USOS_PD=
 no_balloon_tips=yes	windows-server-2003	+set USOS_DU=
-no_balloon_tips=yes	windows-server-2003	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v ProfilesDirectory ^| find "REG_"') do call set "USOS_PD=%%B"
-no_balloon_tips=yes	windows-server-2003	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v DefaultUserProfile ^| find "REG_"') do set "USOS_DU=%%B"
+no_balloon_tips=yes	windows-server-2003	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v ProfilesDirectory 2^>nul') do if /i "%%A"=="REG_EXPAND_SZ" call set "USOS_PD=%%B"
+no_balloon_tips=yes	windows-server-2003	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v DefaultUserProfile 2^>nul') do if /i "%%A"=="REG_SZ" set "USOS_DU=%%B"
+no_balloon_tips=yes	windows-server-2003	+if not defined USOS_PD set "USOS_PD=%SystemDrive%\Documents and Settings"
 no_balloon_tips=yes	windows-server-2003	+if not defined USOS_DU set "USOS_DU=Default User"
 no_balloon_tips=yes	windows-server-2003	+reg load HKU\USOSDEF "%USOS_PD%\%USOS_DU%\NTUSER.DAT" >> "%USOS_LOG%" 2>&1
 no_balloon_tips=yes	windows-server-2003	+reg add "HKU\USOSDEF\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v EnableBalloonTips /t REG_DWORD /d 0 /f >> "%USOS_LOG%" 2>&1
@@ -355,8 +357,9 @@ show_extensions=yes	windows-server-2025	+      </RunSynchronous>
 show_extensions=yes	windows-xp	+rem USOS profile: Explorer settings for new users (Default User hive).
 show_extensions=yes	windows-xp	+set USOS_PD=
 show_extensions=yes	windows-xp	+set USOS_DU=
-show_extensions=yes	windows-xp	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v ProfilesDirectory ^| find "REG_"') do call set "USOS_PD=%%B"
-show_extensions=yes	windows-xp	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v DefaultUserProfile ^| find "REG_"') do set "USOS_DU=%%B"
+show_extensions=yes	windows-xp	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v ProfilesDirectory 2^>nul') do if /i "%%A"=="REG_EXPAND_SZ" call set "USOS_PD=%%B"
+show_extensions=yes	windows-xp	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v DefaultUserProfile 2^>nul') do if /i "%%A"=="REG_SZ" set "USOS_DU=%%B"
+show_extensions=yes	windows-xp	+if not defined USOS_PD set "USOS_PD=%SystemDrive%\Documents and Settings"
 show_extensions=yes	windows-xp	+if not defined USOS_DU set "USOS_DU=Default User"
 show_extensions=yes	windows-xp	+reg load HKU\USOSDEF "%USOS_PD%\%USOS_DU%\NTUSER.DAT" >> "%USOS_LOG%" 2>&1
 show_extensions=yes	windows-xp	+reg add "HKU\USOSDEF\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v HideFileExt /t REG_DWORD /d 0 /f >> "%USOS_LOG%" 2>&1
@@ -364,8 +367,9 @@ show_extensions=yes	windows-xp	+reg unload HKU\USOSDEF >> "%USOS_LOG%" 2>&1
 show_extensions=yes	windows-server-2003	+rem USOS profile: Explorer settings for new users (Default User hive).
 show_extensions=yes	windows-server-2003	+set USOS_PD=
 show_extensions=yes	windows-server-2003	+set USOS_DU=
-show_extensions=yes	windows-server-2003	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v ProfilesDirectory ^| find "REG_"') do call set "USOS_PD=%%B"
-show_extensions=yes	windows-server-2003	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v DefaultUserProfile ^| find "REG_"') do set "USOS_DU=%%B"
+show_extensions=yes	windows-server-2003	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v ProfilesDirectory 2^>nul') do if /i "%%A"=="REG_EXPAND_SZ" call set "USOS_PD=%%B"
+show_extensions=yes	windows-server-2003	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v DefaultUserProfile 2^>nul') do if /i "%%A"=="REG_SZ" set "USOS_DU=%%B"
+show_extensions=yes	windows-server-2003	+if not defined USOS_PD set "USOS_PD=%SystemDrive%\Documents and Settings"
 show_extensions=yes	windows-server-2003	+if not defined USOS_DU set "USOS_DU=Default User"
 show_extensions=yes	windows-server-2003	+reg load HKU\USOSDEF "%USOS_PD%\%USOS_DU%\NTUSER.DAT" >> "%USOS_LOG%" 2>&1
 show_extensions=yes	windows-server-2003	+reg add "HKU\USOSDEF\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v HideFileExt /t REG_DWORD /d 0 /f >> "%USOS_LOG%" 2>&1
@@ -597,8 +601,9 @@ show_hidden=yes	windows-server-2025	+      </RunSynchronous>
 show_hidden=yes	windows-xp	+rem USOS profile: Explorer settings for new users (Default User hive).
 show_hidden=yes	windows-xp	+set USOS_PD=
 show_hidden=yes	windows-xp	+set USOS_DU=
-show_hidden=yes	windows-xp	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v ProfilesDirectory ^| find "REG_"') do call set "USOS_PD=%%B"
-show_hidden=yes	windows-xp	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v DefaultUserProfile ^| find "REG_"') do set "USOS_DU=%%B"
+show_hidden=yes	windows-xp	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v ProfilesDirectory 2^>nul') do if /i "%%A"=="REG_EXPAND_SZ" call set "USOS_PD=%%B"
+show_hidden=yes	windows-xp	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v DefaultUserProfile 2^>nul') do if /i "%%A"=="REG_SZ" set "USOS_DU=%%B"
+show_hidden=yes	windows-xp	+if not defined USOS_PD set "USOS_PD=%SystemDrive%\Documents and Settings"
 show_hidden=yes	windows-xp	+if not defined USOS_DU set "USOS_DU=Default User"
 show_hidden=yes	windows-xp	+reg load HKU\USOSDEF "%USOS_PD%\%USOS_DU%\NTUSER.DAT" >> "%USOS_LOG%" 2>&1
 show_hidden=yes	windows-xp	+reg add "HKU\USOSDEF\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Hidden /t REG_DWORD /d 1 /f >> "%USOS_LOG%" 2>&1
@@ -606,8 +611,9 @@ show_hidden=yes	windows-xp	+reg unload HKU\USOSDEF >> "%USOS_LOG%" 2>&1
 show_hidden=yes	windows-server-2003	+rem USOS profile: Explorer settings for new users (Default User hive).
 show_hidden=yes	windows-server-2003	+set USOS_PD=
 show_hidden=yes	windows-server-2003	+set USOS_DU=
-show_hidden=yes	windows-server-2003	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v ProfilesDirectory ^| find "REG_"') do call set "USOS_PD=%%B"
-show_hidden=yes	windows-server-2003	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v DefaultUserProfile ^| find "REG_"') do set "USOS_DU=%%B"
+show_hidden=yes	windows-server-2003	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v ProfilesDirectory 2^>nul') do if /i "%%A"=="REG_EXPAND_SZ" call set "USOS_PD=%%B"
+show_hidden=yes	windows-server-2003	+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v DefaultUserProfile 2^>nul') do if /i "%%A"=="REG_SZ" set "USOS_DU=%%B"
+show_hidden=yes	windows-server-2003	+if not defined USOS_PD set "USOS_PD=%SystemDrive%\Documents and Settings"
 show_hidden=yes	windows-server-2003	+if not defined USOS_DU set "USOS_DU=Default User"
 show_hidden=yes	windows-server-2003	+reg load HKU\USOSDEF "%USOS_PD%\%USOS_DU%\NTUSER.DAT" >> "%USOS_LOG%" 2>&1
 show_hidden=yes	windows-server-2003	+reg add "HKU\USOSDEF\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Hidden /t REG_DWORD /d 1 /f >> "%USOS_LOG%" 2>&1

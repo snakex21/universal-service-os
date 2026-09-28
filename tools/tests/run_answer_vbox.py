@@ -115,7 +115,7 @@ def prepare(a) -> int:
     tool = ROOT / 'zig-out' / 'bin' / 'usos-answer.exe'
     subprocess.run([str(ROOT / 'tools/zig/zig.exe'), 'build', '--cache-dir', str(ROOT / 'tools/cache/zig'), 'answer-tool'], check=True, cwd=ROOT)
     xml = WORK / 'Autounattend.xml'
-    profile = ROOT / 'src/flow/answer/testdata/vbox.profile.ini'
+    profile = Path(a.profile).resolve() if a.profile else ROOT / 'src/flow/answer/testdata/vbox.profile.ini'
     if a.edition:
         # The same profile with an edition (docs/answer-profiles.md "Edition").
         edited = WORK / 'vbox-edition.profile.ini'
@@ -172,6 +172,7 @@ if __name__ == '__main__':
     c.add_argument('--memory', default='3072')
     c.add_argument('--edition', default='', help='edition= for the profile (matched against --install-xml)')
     c.add_argument('--install-xml', default='', help="the ISO's install.wim XML metadata (UTF-16LE)")
+    c.add_argument('--profile', default='', help='answer profile to render (default testdata/vbox.profile.ini; vbox-tweaks.profile.ini: every tweak)')
     sub.add_parser('destroy')
     a = p.parse_args()
     sys.exit({'prepare': prepare, 'destroy': destroy}[a.cmd](a))
