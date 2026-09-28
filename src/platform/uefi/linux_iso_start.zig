@@ -84,6 +84,10 @@ const IsoSource = struct {
     }
 };
 
+/// Written into the per-boot cpio as /preseed.cfg for d-i when no profile is
+/// used; the rendered Debian answer file contains the same line.
+pub const debian_default_preseed = "d-i cdrom-detect/try-usb boolean true" ++ "\n";
+
 pub const Status_ = enum { reading, loading, starting };
 
 /// Reads, prepares and starts the ISO. Returns only on failure.
@@ -130,7 +134,11 @@ pub fn start(
     defer freeBytes(bs, helper_buffer);
     const helper = file_read.into(root, helper_path, helper_buffer) orelse return error.HelperMissing;
     var per_boot_buffer: [16 * 1024]u8 = undefined;
-    const per_boot = try perBootCpio(&map, answer, &per_boot_buffer);
+    // Debian installer: the ISO appears as a USB partition (BLKPG fallback of
+    // /usos/init); cdrom-detect only looks at USB partitions when asked.
+    const default_preseed = Answer{ .path = "preseed.cfg", .bytes = debian_default_preseed };
+    const effective = answer orelse if (recipe.family == .debian_installer) default_preseed else null;
+    const per_boot = try perBootCpio(&map, effective, &per_boot_buffer);
     var total: u64 = helper.len + per_boot.len;
     var records: [linux_iso.grub_cfg.max_initrds]iso9660.Record = undefined;
     for (0..recipe.initrdCount()) |i| {

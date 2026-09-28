@@ -369,7 +369,7 @@ fn start(
         view.handover(view.t(.splash_starting));
         @import("linux_iso_start.zig").start(root, system.image_directory, image.name.slice(), null, linuxProgress) catch |err| {
             view.refreshFramebuffer();
-            showError(view.t(.error_iso), err);
+            showError(view.t(.error_linux), err);
         };
         return;
     }
@@ -459,6 +459,7 @@ fn donorNote(err: anyerror) ?[]const u8 {
 fn actionLabel(kind: usos.catalog.ImageKind, resolved: usos.catalog.BootMethod, backend: usos.flow.preparation_capability.Backend) []const u8 {
     if (backend == .xp_uefi_staging) return view.t(.action_xp);
     if (kind == .efi and (resolved == .direct_efi or resolved == .chainload)) return view.t(.action_efi);
+    if (backend == .linux_iso) return view.t(.action_linux);
     return switch (resolved) {
         .chainload => view.t(.action_chainload),
         .wimboot => view.t(.action_wimboot),
@@ -488,7 +489,13 @@ fn showSecureBootRequired() void {
 fn showError(title: []const u8, err: anyerror) void {
     // Keep the failure visible instead of immediately redrawing the method menu.
     var buffer: [96]u8 = undefined;
-    const detail = if (err == error.SecureBootRejected) view.t(.error_secure_boot_rejected) else view.t(.error_stopped);
+    const detail = switch (err) {
+        error.SecureBootRejected => view.t(.error_secure_boot_rejected),
+        error.IsoNotContiguousEnough, error.IsoResidentOrSparse => view.t(.error_linux_fragmented),
+        error.NoLinuxEntry => view.t(.error_linux_no_entry),
+        error.HelperMissing => view.t(.error_linux_helper),
+        else => view.t(.error_stopped),
+    };
     const lines = [_][]const u8{ std.fmt.bufPrint(&buffer, "{s}: {s}", .{ view.t(.summary_error), @errorName(err) }) catch @errorName(err), detail };
     view.notice(title, .error_circle, .danger, "", &lines);
     view.waitForDismiss();
