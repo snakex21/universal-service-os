@@ -152,6 +152,13 @@ give byte-identical `WINNT.SIF` and accounts script.
 
 ## Linux answer files
 
+Wired into the UEFI menu since 2026-09-28: the answer screen offers the
+profiles for Ubuntu, Debian and Fedora ISO starts; QEMU results in
+[design/linux-iso-boot.md](design/linux-iso-boot.md) section 11 (Ubuntu
+Server autoinstall to the storage screen, Debian netinst preseed to "Partition
+disks", Fedora netinst kickstart to the hub with only Installation
+Destination open).
+
 `src/flow/answer/linux.zig` renders the same profile for the Linux
 installers USOS boots from ISO (design: [design/linux-iso-boot.md](design/linux-iso-boot.md)
 section 7): `linux.render(profile, format, salt, buffer)` with `format` =

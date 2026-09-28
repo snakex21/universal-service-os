@@ -7,8 +7,12 @@ and off) and on Legacy BIOS. No extraction to WORK, no copy of the ISO, no
 change to the ISO. Optional: a USOS answer profile rendered as the distro's
 answer file (autoinstall / preseed / kickstart), disk selection always manual.
 
-Status: **design + research done, implementation not started** (see
-`docs/HANDOFF-linux-2026-09-28.md`). Nothing here is hardware-verified.
+Status (2026-09-28, build B260928-114652 + answer wiring): **implemented and
+QEMU-verified** for ten ISOs through the real menu on UEFI with Secure Boot
+off and on, and in Legacy BIOS; Linux answer profiles verified in QEMU for
+Ubuntu (autoinstall), Debian (preseed) and Fedora netinst (kickstart). Not yet
+on hardware. Results and test commands: section 11 and
+`docs/HANDOFF-linux-2026-09-28.md`.
 
 ## 1. The problem
 
@@ -283,3 +287,52 @@ with the reference test vectors; salt from `EFI_RNG_PROTOCOL`, else TSC mix.
 `%LOCALAPPDATA%\USOS\test-assets\linux\` (outside the repo) and checks each
 against the distribution's published SHA-256; results in `manifest.json`
 there. List, URLs and hashes: `docs/HANDOFF-linux-2026-09-28.md`.
+
+## 11. Results (QEMU, 2026-09-28)
+
+What changed against the plan while implementing:
+
+- d-i (Debian netinst) has neither `loop.ko` nor `dm-mod`: `/usos/init` falls
+  back to an in-kernel partition (`BLKPG_ADD_PARTITION` 64 over the contiguous
+  ISO, after removing the overlapping DATA partition from the kernel's table
+  only; nothing is written to the disk) and USOS always adds
+  `cdrom-detect/try-usb=true` to `/preseed.cfg`. The installer then finds its
+  packages on the ISO.
+- Secure Boot relay: the relay instance runs on top of the first instance's
+  stack, so it switches to its own 1 MiB stack; the 64 KiB grub.cfg buffer
+  must not live on the stack either (both were real crashes under shim).
+- BIOS Core: an int13 read through the plain `reader` after bulk NTFS reads
+  never returned, so the ESP helper cpio is read first. `iso.map` numbers are
+  hexadecimal (the i386 Core has no 64-bit division). Core headroom 4 424 B.
+- Answer files: the answer screen offers profiles for Ubuntu, Debian and
+  Fedora ISO starts on UEFI (not BIOS: no profile manager in the Core); the
+  profile is rendered at start (salt from `EFI_RNG_PROTOCOL`, else TSC) for the
+  installer the ISO carries; ISOs without one (Mint, Debian live, Fedora
+  Workstation Live) ignore it (logged). Under Secure Boot the relay passes the
+  profile by name and the relay instance re-reads it from the ESP.
+
+| ISO | UEFI SB off | UEFI SB on | BIOS |
+|---|---|---|---|
+| Ubuntu Server 24.04.5 | installer | installer (relay: Ubuntu shim) | installer |
+| Ubuntu Desktop 24.04.5.1 | installer on live desktop | live desktop; installer error under TCG, check on hardware | installer on live desktop |
+| Linux Mint 22.3 Xfce | live desktop | live desktop (relay) | live desktop |
+| Fedora Workstation Live 44 | live desktop | live desktop (USOS shim, Fedora CA) | live desktop |
+| Debian live 13.7 standard | live shell | live shell (relay: Debian shim 16.1) | live shell |
+| Debian 13.7 netinst | to the hostname page (media found) | language page | to the hostname page |
+| Debian 12.15 netinst | language page | language page (relay: shim 15.8) | language page |
+| SystemRescue 13.02 | root shell | blocked: needs Secure Boot off | root shell |
+| GParted Live 1.8.1 | live system | live system (relay) | live system |
+| Clonezilla 3.3.3 | live system | live system (relay) | live system |
+
+Answer files (UEFI, Secure Boot off, profile `tools/tests/linux_iso/linux-test.profile.ini`, blank 20 GB target disk):
+
+| Format | ISO | Result |
+|---|---|---|
+| autoinstall | Ubuntu Server 24.04.5 | subiquity skipped language, keyboard, network and identity; stopped at the storage screen (subiquity preselects the largest disk: the user must pick the target) |
+| preseed | Debian 13.7 netinst | Polish installer, no key pressed: media, network, hostname, users, password, time zone answered; stopped at "Partition disks" |
+| kickstart | Fedora Everything netinst 44 | anaconda hub: keyboard/language pl, Europe/Warsaw, root locked, user tester (admin), network done; only "Installation Destination" left (kickstart insufficient, as intended); software selection defaults to "Fedora Custom Operating System" |
+
+Test commands: `tools/tests/linux_iso/new_linux_test_disk.ps1` (once),
+`update_linux_test_esp.ps1 [-Profile ...] [-AddIso name=Folder]`,
+`run_linux_iso_menu.py --name X --script "..." [--secure-boot --tcg] [--bios] [--target-disk 20]`,
+`run_linux_iso_direct.py <name>` (no menu).
