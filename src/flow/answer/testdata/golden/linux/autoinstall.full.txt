@@ -1,0 +1,19 @@
+# USOS answer profile "Dom" (docs/answer-profiles.md).
+# Disk selection always stays in the installer (storage is interactive).
+autoinstall:
+  version: 1
+  interactive-sections:
+    - storage
+  locale: "pl_PL.UTF-8"
+  keyboard:
+    layout: "pl"
+  timezone: "Europe/Warsaw"
+  identity:
+    hostname: "usos-pc"
+    realname: "Tester"
+    username: "tester"
+    password: "$6$usosgoldensalt00$SyGWlOqBZhYRPvSLnnk3UcylmKhx/IEvRvmMOppqMHb1dIYLyj0imHkABG5j0cZ8dPzoatvtYoNC3w8ihlK.O0"
+  ssh:
+    install-server: false
+  refresh-installer:
+    update: false

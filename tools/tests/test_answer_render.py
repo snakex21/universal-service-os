@@ -12,6 +12,10 @@ Builds zig-out/bin/usos-answer (zig build answer-tool) and checks:
   - usos-xp.ini keeps working: DATA's usos-xp.ini through the old path and
     the same file imported into a profile and rendered give byte-identical
     WINNT.SIF and accounts script;
+  - Linux answer files (autoinstall.yaml, preseed.cfg, ks.cfg): golden
+    bytes, structure, no disk settings, no plain password, the $6$ hash
+    checked against an independent Python sha512-crypt (and passlib if
+    installed);
   - the architecture-mismatch check (amd64-only file with x86 media), also
     on the user's Schneegans file when it is present in zig-out/usb.
 """
@@ -114,6 +118,124 @@ def nt5_merge(settings: Path, base: str, name: str, profile_mode: bool) -> tuple
     accounts = OUT / (name + '.accounts.cmd')
     sh(f"usos_xp_settings_accounts '{posix(normalized)}' '{posix(accounts)}'")
     return sif, accounts.read_bytes()
+
+
+CRYPT64 = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+
+
+def sha512_crypt(key: bytes, salt: bytes, rounds: int | None = None) -> str:
+    """Independent reimplementation of glibc $6$ crypt (Drepper's spec) to
+    check the Zig one (no crypt module on Windows / Python 3.13)."""
+    import hashlib
+    salt = salt[:16]
+    n = 5000 if rounds is None else min(max(rounds, 1000), 999999999)
+
+    def rep(block: bytes, length: int) -> bytes:
+        return (block * (length // len(block) + 1))[:length]
+
+    b = hashlib.sha512(key + salt + key).digest()
+    h = hashlib.sha512(key + salt + rep(b, len(key)))
+    bits = len(key)
+    while bits:
+        h.update(b if bits & 1 else key)
+        bits >>= 1
+    c = h.digest()
+    p = rep(hashlib.sha512(key * len(key)).digest(), len(key))
+    s = rep(hashlib.sha512(salt * (16 + c[0])).digest(), len(salt))
+    for i in range(n):
+        h = hashlib.sha512()
+        h.update(p if i & 1 else c)
+        if i % 3:
+            h.update(s)
+        if i % 7:
+            h.update(p)
+        h.update(c if i & 1 else p)
+        c = h.digest()
+    out = []
+    for i in range(21):
+        t = (i * 22) % 63, (i * 22 + 21) % 63, (i * 22 + 42) % 63
+        # glibc order: (0,21,42) (22,43,1) (44,2,23) ...
+        w = (c[t[0]] << 16) | (c[t[1]] << 8) | c[t[2]]
+        out.extend(CRYPT64[(w >> (6 * k)) & 63] for k in range(4))
+    w = c[63]
+    out.extend(CRYPT64[(w >> (6 * k)) & 63] for k in range(2))
+    prefix = '$6$' + (f'rounds={n}$' if rounds is not None else '')
+    return prefix + salt.decode() + '$' + ''.join(out)
+
+
+LINUX_SALT = 'usosgoldensalt00'
+LINUX_VECTORS = (('full', 'full.profile.ini', 'Test123!'), ('nopassword', 'linux-nopassword.profile.ini', ''))
+
+
+def check_linux() -> None:
+    """Linux answer files (src/flow/answer/linux.zig): goldens, no disk
+    settings, no plain password, the $6$ hash verified independently."""
+    reference = '$6$saltstring$svn8UoSVapNtMuq1ukKS4tPQd8iKwSMHWjl/O817G3uBnIFNjnQJuesI68u4OTLiBFdcbYEdFCoEOfaS35inz1'
+    check('linux: python sha512-crypt matches the reference vector', sha512_crypt(b'Hello world!', b'saltstring') == reference)
+    check('linux: python sha512-crypt rounds vector', sha512_crypt(b'Hello world!', b'saltstringsaltstring', 10000) ==
+          '$6$rounds=10000$saltstringsaltst$OW1/O6BYHV6BcXZu8QVeXbDWra3Oeqh0sbHbbMCVNSnCM/UrjmM0Dp8vOuZeHBy/YTBmSK6H9qs/y3RnOaw5v.')
+    try:
+        from passlib.hash import sha512_crypt as passlib_sha512  # optional
+    except ImportError:
+        passlib_sha512 = None
+        print('SKIP linux: passlib not installed (python reimplementation used)')
+    for vector, profile_file, password in LINUX_VECTORS:
+        for fmt in ('autoinstall', 'preseed', 'kickstart'):
+            name = f'linux/{fmt}.{vector}.txt'
+            out = OUT / f'linux.{fmt}.{vector}.txt'
+            r = tool('render-linux', str(DATA / profile_file), fmt, LINUX_SALT, str(out))
+            check('render ' + name, r.returncode == 0, r.stderr.decode(errors='replace'))
+            if r.returncode != 0:
+                continue
+            data = out.read_bytes()
+            golden(name, data)
+            text = data.decode()
+            notes = r.stderr.decode()
+            check(name + ' LF only, ASCII', b'\r' not in data and data.isascii())
+            if password:
+                check(name + ' no plain password', password not in text)
+                hashes = [w.strip('"').split('=', 1)[-1] for w in text.split() if '$6$' in w]
+                check(name + ' one $6$ hash', len(hashes) == 1, str(hashes))
+                if hashes:
+                    check(name + ' hash verifies', hashes[0] == sha512_crypt(password.encode(), LINUX_SALT.encode()))
+                    if passlib_sha512:
+                        check(name + ' hash verifies (passlib)', passlib_sha512.verify(password, hashes[0]))
+                check(name + ' identity answered', 'identity: interactive' not in notes and 'password_empty' not in notes)
+            else:
+                check(name + ' no hash without a password', '$6$' not in text)
+                check(name + ' identity interactive, noted', 'identity: interactive' in notes and 'note: password_empty' in notes)
+            check(name + ' disk noted', 'note: disk_interactive' in notes)
+            lines = [line for line in text.splitlines() if line and not line.startswith('#')]
+            if fmt == 'autoinstall':
+                # No yaml module in the standard library: structural checks.
+                check(name + ' yaml shape', lines[0] == 'autoinstall:' and lines[1] == '  version: 1' and all(
+                    line.startswith('  ') and '\t' not in line for line in lines[1:]))
+                sections = []
+                for line in lines[lines.index('  interactive-sections:') + 1:]:
+                    if not line.startswith('    - '):
+                        break
+                    sections.append(line[6:])
+                check(name + ' storage interactive', 'storage' in sections, str(sections))
+                check(name + ' identity section rule', ('identity' in sections) == (not password), str(sections))
+                check(name + ' no storage config', not any(line.startswith('  storage:') for line in lines))
+                check(name + ' quoted scalars', all(line.split(': ', 1)[1][0] == '"' for line in lines
+                                                   if ': ' in line and line.split(': ', 1)[1] not in ('1', 'false')))
+                check(name + ' no ssh server, no refresh', '  ssh:\n    install-server: false' in text and '  refresh-installer:\n    update: false' in text)
+            elif fmt == 'preseed':
+                check(name + ' only d-i lines', all(line.startswith('d-i ') for line in lines))
+                check(name + ' try-usb', 'd-i cdrom-detect/try-usb boolean true' in lines)
+                check(name + ' no partman/grub/bootdev', not any(k in text for k in ('partman', 'grub-installer', 'bootdev')))
+                check(name + ' no root login', 'd-i passwd/root-login boolean false' in lines)
+            else:
+                storage = ('ignoredisk', 'clearpart', 'autopart', 'part', 'partition', 'zerombr', 'bootloader', 'reqpart', 'raid', 'volgroup', 'logvol')
+                check(name + ' no storage commands', not any(line.split()[0] in storage for line in lines))
+                check(name + ' no %packages', '%packages' not in text)
+                check(name + ' root locked', 'rootpw --lock' in lines)
+                check(name + ' user line only with a password', any(line.startswith('user ') for line in lines) == bool(password))
+    full = (GOLDEN / 'linux' / 'autoinstall.full.txt').read_text()
+    check('linux: pl-PL locale, pl keyboard, Warsaw', 'locale: "pl_PL.UTF-8"' in full and 'layout: "pl"' in full and 'timezone: "Europe/Warsaw"' in full)
+    ks = (GOLDEN / 'linux' / 'kickstart.nopassword.txt').read_text()
+    check('linux: xkb variant in kickstart', "keyboard --xlayouts='us (intl)'" in ks)
 
 
 def main() -> int:
@@ -253,6 +375,8 @@ def main() -> int:
     check('WORK plan: refuses a missing rendered file', r.returncode == 1)
     r = subprocess.run([SH, '-c', f". '{ap}'; usos_answer_plan_take '{posix(esp / 'usos-plan.ini')}' nt5_settings '{posix(taken)}'"], capture_output=True)
     check('WORK plan: refuses another format', r.returncode == 1)
+
+    check_linux()
 
     # Architecture-mismatch warning on a user's (Schneegans) amd64-only file.
     for candidate in (ROOT / 'zig-out' / 'usb' / 'Systems' / 'Windows' / 'Windows 11' / 'Unattended').glob('*.xml') if (ROOT / 'zig-out' / 'usb').exists() else []:
