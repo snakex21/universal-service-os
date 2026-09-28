@@ -132,9 +132,11 @@ fn startMode(
     logf("[LINUX-ISO] opened, {d} bytes\r\n", .{state.file.size()});
     // Where the ISO lies on the disk.
     var map = try isoMap(state);
+    logf("[LINUX-ISO] map: {d} extent(s)\r\n", .{map.len});
     var pvd: [linux_iso.iso_map.pvd_bytes]u8 = undefined;
     _ = try reader.readAt(linux_iso.iso_map.pvd_offset, &pvd);
     map.crc = linux_iso.iso_map.pvdCrc(&pvd);
+    logf("[LINUX-ISO] pvd crc {x:0>8}\r\n", .{map.crc});
 
     var source = IsoSource{ .reader = &reader };
     const label = std.mem.trimEnd(u8, pvd[40..72], " \x00");
@@ -442,9 +444,42 @@ pub fn resumeRelay(root: *uefi.protocol.File) void {
     }
     if (!std.mem.startsWith(u8, directory, "\\Systems\\Linux\\") or name.len == 0) return;
     logf("[LINUX-ISO] relay instance: {s}\r\n", .{name});
-    startMode(root, directory, name, null, noProgress, .relay) catch |err| {
+    // This instance runs on top of the first one's live stack (menu, relay,
+    // the ISO's shim): give it a fresh stack of its own.
+    const bs = uefi.system_table.boot_services orelse return;
+    const stack = bs.allocatePages(.any, .loader_data, relay_stack_bytes / 4096) catch return;
+    relay_args = .{ .root = root, .directory = directory, .name = name };
+    const top = (@intFromPtr(stack.ptr) + relay_stack_bytes) & ~@as(usize, 15);
+    callOnStack(top, relayEntry);
+}
+
+const relay_stack_bytes = 1024 * 1024;
+
+var relay_args: struct {
+    root: *uefi.protocol.File = undefined,
+    directory: []const u8 = "",
+    name: []const u8 = "",
+} = .{};
+
+fn relayEntry() callconv(.c) void {
+    startMode(relay_args.root, relay_args.directory, relay_args.name, null, noProgress, .relay) catch |err| {
         logf("[LINUX-ISO] relay start failed: {s}\r\n", .{@errorName(err)});
     };
+}
+
+/// Calls `function` with rsp = `top` (16-byte aligned) and 32 bytes of MS x64
+/// shadow space, then restores the old stack (kept in the callee-saved rbx).
+fn callOnStack(top: usize, function: *const fn () callconv(.c) void) void {
+    asm volatile (
+        \\ mov %%rsp, %%rbx
+        \\ mov %[top], %%rsp
+        \\ sub $32, %%rsp
+        \\ call *%[function]
+        \\ mov %%rbx, %%rsp
+        :
+        : [top] "r" (top),
+          [function] "r" (function),
+        : .{ .rbx = true, .rax = true, .rcx = true, .rdx = true, .r8 = true, .r9 = true, .r10 = true, .r11 = true, .memory = true, .cc = true });
 }
 
 fn noProgress(_: Status_) void {}
