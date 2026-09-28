@@ -355,8 +355,8 @@ Why this one:
   the NT52 precedent; nothing Microsoft in the repo). Every write is read
   back (MBR, boot code, the helpers inside the WIM, the final table).
 * **Answers**: USOS profiles (rendered by the menu to `\EFI\USOS\answer`,
-  taken by `usos_answer_plan_take`) and DATA `Unattended` files are allowed
-  on this path only. The installer inserts its KMDF `<servicing>` block right
+  taken by `usos_answer_plan_take`) and DATA `Unattended` files; since
+  2026-09-28 also on the UEFI path with CSM (the same installer merge). The installer inserts its KMDF `<servicing>` block right
   after `<unattend ...>` (`merge_user_answer`, UTF-8 only; a file with its own
   `servicing` section is refused). Disk selection stays manual (the renderer
   writes no DiskConfiguration/InstallTo).

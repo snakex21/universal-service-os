@@ -7,15 +7,13 @@ PE10 paths: the installers merge it with their own servicing answer first.
 This test runs the real merge code on the rendered tweaks profile
 (testdata/tweaks.profile.ini, every tweak on):
 
-  - Vista / Server 2008 x64 without CSM (CSMWrap): windows_vista_install.c
-    merge_user_answer itself (tools/tests/vista_answer_merge_host.c includes
-    the installer source), i.e. vista-answer.xml;
+  - Vista / Server 2008 x64, UEFI with CSM (wimboot) and without CSM
+    (CSMWrap): windows_vista_install.c merge_user_answer itself
+    (tools/tests/vista_answer_merge_host.c includes the installer source),
+    i.e. vista-answer.xml; both paths run the same merge (2026-09-28);
   - Windows 7 x64 PE10 donor (windows7_modern_startup.cmd): the optional
     NVMe/SHA-2 servicing merge (usos-win7-unattend.exe) and the DriverPaths
     merge (usos-unattend-drivers.exe), i.e. usos-driver-unattend.xml;
-  - Vista on UEFI with CSM: the startup script refuses a user answer (the
-    menu offers only a manual installation there), so no profile setting can
-    be dropped silently.
 
 Every path also runs with the profile's commands wrapped for
 usos-run-hidden.exe (tools/windows_hidden_commands.h: no console windows;
@@ -331,17 +329,24 @@ class MergePaths(unittest.TestCase):
         self.golden('full.modern-uefi-hidden.windows-11.amd64.xml', merged.read_bytes())
         self.survives(wrapped, merged, {'no_network_oobe': 'OOBE" /v BypassNRO /t REG_DWORD /d 1'}, {'offlineServicing'})
 
-    def test_vista_uefi_refuses_a_user_answer(self):
-        # Vista with CSM (UEFI path): answers are not handed on (the menu
-        # shows only the manual installation, answer_screen.answersUnsupported);
-        # the startup script stops instead of dropping a profile silently.
+    def test_vista_uefi_takes_a_user_answer(self):
+        # Vista with CSM (UEFI path, wimboot): the startup script hands the
+        # answer to the installer, which wraps and merges it exactly as on the
+        # CSMWrap path (the goldens above cover both); the menu offers
+        # profiles there (answer_screen.profileCapable, no answersUnsupported).
         script = (ROOT / 'tools/windows_vista_modern_startup.cmd').read_text()
-        csmwrap = script.index('if exist "%~dp0usos-vista-csmwrap.flag" goto csmwrap')
-        refuse = script.index('if exist "%~dp0usos-unattend.xml" (')
-        self.assertLess(csmwrap, refuse)
-        self.assertIn('exit /b 2', script[refuse:script.index(')', refuse + 40) + 1])
+        self.assertNotIn('answer files are not supported', script)
+        # Only the architecture check exits with 2 before the Vista paths split.
+        self.assertEqual(1, script.count('exit /b 2'))
+        installer = (ROOT / 'tools/windows_vista_install.c').read_text()
+        self.assertIn(' if(!hide_answer_commands())', installer)
+        self.assertIn(' if(!merge_user_answer(servicing_answer))', installer)
+        self.assertNotIn('csmwrap&&!merge_user_answer', installer)
+        self.assertNotIn('csmwrap&&!hide_answer_commands', installer)
         screen = (ROOT / 'src/flow/answer_screen.zig').read_text()
-        self.assertIn('pub fn answersUnsupported', screen)
+        self.assertNotIn('pub fn answersUnsupported', screen)
+        native = (ROOT / 'src/platform/uefi/windows_native_iso.zig').read_text()
+        self.assertNotIn('VistaUnattendedNotSupported', native)
 
 
 if __name__ == '__main__':

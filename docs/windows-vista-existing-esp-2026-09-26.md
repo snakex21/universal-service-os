@@ -209,6 +209,8 @@ fb3c46f1.
   ESP exists or, with several pre-existing ESPs (Vista's disk page hides
   them), the only formatted one.
 * **Answer files/profiles for Vista on UEFI** stay unsupported this round
+  (superseded 2026-09-28: the installer merges them on both Vista paths,
+  docs/answer-profiles.md)
   (Setup already gets USOS's KMDF servicing answer through `/unattend`; merging
   a user answer into it is not done yet). The answer screen now says so
   instead of listing files the start script would then refuse: "No answer

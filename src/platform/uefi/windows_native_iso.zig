@@ -216,13 +216,11 @@ pub noinline fn start(root: *uefi.protocol.File, folder: []const u8, name: []con
     try source_config.validateName(name);
     if (answer_name) |answer| try source_config.validateName(answer);
     if (answer_name != null and rendered != null) return error.TwoAnswerSources;
-    if (vista and rendered != null) return error.VistaUnattendedNotSupported;
     if (uefi.system_table.boot_services == null) return error.NoBootServices;
     const state = try uefi.pool_allocator.create(BootState);
     defer uefi.pool_allocator.destroy(state);
     try initBootState(state);
     const catalog = &state.catalog;
-    if (vista and answer_name != null) return error.VistaUnattendedNotSupported;
     progress(.validating, "Validating the installation ISO and resolving the boot source");
     const inspection = try inspectState(state, folder, name, vista);
     const source = &state.source;

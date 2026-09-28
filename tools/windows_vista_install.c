@@ -332,7 +332,8 @@ static BOOL staging_entry(int action){
 }
 /* A user answer (USOS profile or DATA file, usos-unattend.xml, UTF-8) with
  * the KMDF <servicing> block of the servicing answer inserted right after the
- * <unattend ...> tag. Nothing of the user file is logged. */
+ * <unattend ...> tag, on the UEFI path (with CSM) and the CSMWrap path alike.
+ * Nothing of the user file is logged. */
 static WCHAR servicing_cab[MAX_PATH];
 /* The user answer the merge reads: usos-unattend.xml, or its copy with the
  * profile's commands wrapped (hide_answer_commands). */
@@ -926,8 +927,10 @@ void entry(void){
   ExitProcess(4);
  }
  static WCHAR servicing_answer[MAX_PATH];if(!prepare_servicing_answer(servicing_answer))ExitProcess(10);
- if(csmwrap&&!hide_answer_commands()){logcode("Setup not started: the answer commands could not be prepared=",ERROR_INVALID_DATA);ExitProcess(11);}
- if(csmwrap&&!merge_user_answer(servicing_answer)){logcode("Setup not started: the answer file could not be merged with the servicing answer=",ERROR_INVALID_DATA);ExitProcess(11);}
+ /* A user answer (profile or DATA file) on both paths: UEFI with CSM and
+  * CSMWrap (legacy MBR). The disk stays manual (no DiskConfiguration). */
+ if(!hide_answer_commands()){logcode("Setup not started: the answer commands could not be prepared=",ERROR_INVALID_DATA);ExitProcess(11);}
+ if(!merge_user_answer(servicing_answer)){logcode("Setup not started: the answer file could not be merged with the servicing answer=",ERROR_INVALID_DATA);ExitProcess(11);}
  if(csmwrap&&!staging_entry(STAGING_INACTIVE)){logcode("Setup not started: the staging partition could not be marked inactive=",ERROR_WRITE_FAULT);ExitProcess(12);}
  lstrcpyW(command,L"\"");lstrcatW(command,setup_path);lstrcatW(command,L"\" /noreboot /installfrom:\"");lstrcatW(command,source);lstrcatW(command,L"\\sources\\install.wim\"");
  lstrcatW(command,L" /unattend:\"");lstrcatW(command,servicing_answer);lstrcatW(command,L"\"");

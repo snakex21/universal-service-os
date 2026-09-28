@@ -39,8 +39,9 @@ pub const Row = enum {
     file,
     /// "+ Add a new profile".
     add,
-    /// Vista on UEFI: answer files and profiles are not supported yet
-    /// (information only; activating it is a manual installation).
+    /// A start that cannot hand an answer on (information only; activating
+    /// it is a manual installation). No selection uses it since Vista on
+    /// UEFI with CSM takes answers (2026-09-28).
     unsupported,
 
     /// X (edit) acts on this row.
@@ -106,23 +107,24 @@ pub const Input = struct {
     unsupported: bool = false,
 };
 
-/// Vista on UEFI: its Setup runs with USOS's own servicing answer, so user
-/// answer files and profiles are not handed on yet.
-pub fn answersUnsupported(system: *const SystemEntry, firmware: Firmware) bool {
+/// Vista (and Server 2008) started from UEFI: the external PE10 donor and
+/// the USOS Vista installer, which merges a user answer (a USOS profile or a
+/// DATA file) with its own KMDF servicing answer on both paths below.
+fn vistaUefi(system: *const SystemEntry, firmware: Firmware) bool {
     return firmware == .uefi and os_profiles.traits(system.id).native_uefi == .vista;
 }
 
 /// Vista's ISO start on UEFI without a firmware CSM: the vista-x64-sp2-uefi-csmwrap
-/// preparation (legacy install through CSMWrap). The installer merges a user
-/// answer (a USOS profile or a DATA file) with its servicing answer there.
+/// preparation (legacy install through CSMWrap). With a CSM the same ISO
+/// starts through wimboot (vista-x64-sp2-uefi-pe10); both take answers.
 pub fn vistaCsmwrap(system: *const SystemEntry, image: ImageKind, method: BootMethod, firmware: Firmware, csm_present: bool) bool {
     if (csm_present or image != .iso or answer_target.familyFor(system.id) == null) return false;
-    if (!answersUnsupported(system, firmware)) return false;
+    if (!vistaUefi(system, firmware)) return false;
     const backend = preparation_capability.resolveForFirmware(system, image, method, firmware) orelse return false;
     return backend == .windows_iso;
 }
 
-test "Vista takes answers only without firmware CSM" {
+test "Vista without firmware CSM is the CSMWrap preparation" {
     const systems = @import("../catalog/systems.zig");
     const vista = systems.findById("windows-vista").?;
     try std.testing.expect(vistaCsmwrap(vista, .iso, .automatic, .uefi, false));
@@ -169,8 +171,9 @@ pub fn layout(in: Input) Layout {
 
 /// A USOS profile can be rendered and handed on for this selection: a
 /// Windows with a generated answer, started through the XP UEFI-CSM
-/// staging, the native wimboot start (7, 10/11; not Vista, whose own
-/// servicing answer refuses one) or a WORK preparation (8/10/11, WIM).
+/// staging, the native wimboot start (Vista, 7, 10/11; the Vista installer
+/// merges the answer with its servicing answer) or a WORK preparation
+/// (8/10/11, WIM).
 pub fn profileCapable(system: *const SystemEntry, image: ImageKind, method: BootMethod, firmware: Firmware) bool {
     if (linuxAnswerSystem(system.id)) {
         // Linux ISO start (docs/design/linux-iso-boot.md section 7): the
@@ -185,7 +188,7 @@ pub fn profileCapable(system: *const SystemEntry, image: ImageKind, method: Boot
     const backend = preparation_capability.resolveForFirmware(system, image, method, firmware) orelse return false;
     return switch (backend) {
         .xp_uefi_staging => true,
-        .windows_iso => os_profiles.traits(system.id).native_uefi != .vista,
+        .windows_iso => true,
         .chainload, .wimboot => true,
         else => false,
     };
@@ -303,7 +306,8 @@ test "profiles only where a rendered answer can be handed on" {
         .{ .id = "windows-10", .image = .iso, .method = .automatic, .capable = true },
         .{ .id = "windows-11", .image = .iso, .method = .automatic, .capable = true },
         .{ .id = "windows-7", .image = .iso, .method = .automatic, .capable = true },
-        .{ .id = "windows-vista", .image = .iso, .method = .automatic, .capable = false },
+        .{ .id = "windows-vista", .image = .iso, .method = .automatic, .capable = true },
+        .{ .id = "windows-server-2008", .image = .iso, .method = .automatic, .capable = true },
         .{ .id = "windows-10", .image = .efi, .method = .automatic, .capable = false },
     };
     for (cases) |case| {
@@ -313,7 +317,7 @@ test "profiles only where a rendered answer can be handed on" {
     }
 }
 
-test "Vista on UEFI: manual installation and the not-supported note only" {
+test "a start without answers: manual installation and the not-supported note only" {
     const in = Input{ .unsupported = true, .profiles_allowed = false, .profiles = 3, .files = 2 };
     try std.testing.expect(shown(in));
     const l = layout(in);

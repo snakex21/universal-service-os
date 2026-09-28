@@ -2,12 +2,11 @@
 rem PE10 uses its own USB stack. The Vista stack is copied only to the new OS.
 if /i not "%PROCESSOR_ARCHITECTURE%"=="AMD64" exit /b 2
 rem Vista without CSM (usos-vista-csmwrap.flag): PE10 booted in BIOS mode from
-rem the prepared disk; the installer merges an answer file with its servicing answer.
+rem the prepared disk. On both paths the installer merges a user answer file
+rem (usos-unattend.xml: a USOS profile or a DATA file) with its servicing answer;
+rem the target disk is always chosen in Setup.
+if exist "%~dp0usos-unattend.xml" echo [USOS] Answer file supplied: merged with the KMDF servicing answer; the disk is chosen in Setup.
 if exist "%~dp0usos-vista-csmwrap.flag" goto csmwrap
-if exist "%~dp0usos-unattend.xml" (
-    echo Vista USB v1 requires manual edition and target selection; answer files are not supported.
-    exit /b 2
-)
 rem The plan adds usos-int10-dispatcher.flag (os_profiles int10_dispatcher):
 rem the finalizer then puts the Int10 dispatcher and UefiSeven on the target ESP.
 if exist "%~dp0usos-int10-dispatcher.flag" (

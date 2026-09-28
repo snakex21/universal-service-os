@@ -404,7 +404,7 @@ The UEFI menu renders the chosen profile when the installation starts
 |---|---|---|
 | XP UEFI-CSM (`xp-x86-sp3-uefi-csm`) | `usos-plan.ini` + `nt5-settings.ini`, kernel option `usos.xp_settings=plan` | `usos_xp_settings_plan`: checks the plan, validates the settings in profile mode, deletes the rendered file, merges into `WINNT.SIF` |
 | 8/10/11 via WORK | `usos-plan.ini` + `autounattend.xml`, `install-state.ini` `answer_plan=EFI/USOS/answer/usos-plan.ini` | `micro_linux_init.sh` -> `usos_answer_plan_take`: copies to `/run`, deletes it from the ESP; `extract.sh` writes `WORK:\Autounattend.xml` and compares it (`cmp`) as for a DATA file |
-| 7 and 10/11 native wimboot | the rendered XML (amd64) goes straight into the RAM disk as `usos-unattend.xml` (the file the WinPE scripts already use), with `usos-plan.ini` next to it | WinPE, unchanged |
+| Vista, 7 and 10/11 native wimboot | the rendered XML (amd64) goes straight into the RAM disk as `usos-unattend.xml` (the file the WinPE scripts already use), with `usos-plan.ini` next to it | WinPE, unchanged |
 
 Before every start the menu deletes rendered files an earlier start may
 have left in `\EFI\USOS\answer` (`answer_profiles.clearRendered`).
@@ -425,8 +425,11 @@ arch=x86
 key=yes
 ```
 
-Not wired: Legacy BIOS (no profile manager in the Core), Vista (its own
-servicing answer, a user answer file is refused there already). The WinPE
+Not wired: Legacy BIOS (no profile manager in the Core). Vista / Server
+2008 take a profile or a DATA answer on UEFI with CSM (wimboot,
+`usos-unattend.xml` in the RAM disk, since 2026-09-28) and without CSM
+(CSMWrap, `\EFI\USOS\answer`): on both the installer merges it with its KMDF
+servicing answer (`merge_user_answer`) and the disk stays manual. The WinPE
 flag files stay (M5 in the refactor plan wants them replaced by
 `usos-plan.ini`; that changes hardware-proven WinPE paths and is left for a
 separate step with a Vista/7 hardware test).
@@ -543,8 +546,9 @@ includes `windows_vista_install.c`) and the Windows 7 PE10 donor chain
 settings pass of the profile answer reaches Setup unchanged, each enabled
 tweak is in the merged specialize pass, and the commands keep their order;
 the merges only add servicing / offlineServicing content. Vista on UEFI
-with CSM takes no answer (the startup script refuses one), so nothing is
-dropped there either.
+with CSM runs the same installer merge since 2026-09-28 (the startup script
+no longer refuses an answer; `test_vista_uefi_takes_a_user_answer`), so the
+Vista goldens cover both Vista paths.
 
 ## Attribution
 
