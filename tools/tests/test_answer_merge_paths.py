@@ -127,6 +127,9 @@ class MergePaths(unittest.TestCase):
 
     def golden(self, name: str, data: bytes) -> None:
         path = GOLDEN / name
+        # The NVMe servicing merge writes absolute cab paths of the checkout;
+        # keep the goldens independent of where the tree (or worktree) lives.
+        data = data.replace(str(ROOT).encode(), b'@ROOT@')
         if UPDATE:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)
