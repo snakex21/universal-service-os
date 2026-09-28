@@ -35,15 +35,22 @@ $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 $repoVersion = ([IO.File]::ReadAllText((Join-Path $root 'VERSION'))).Trim()
 if ($manifest.usos_version -ne $repoVersion) { Write-Warning "Build kit is for USOS $($manifest.usos_version), the repository is $repoVersion" }
 
-function Hash([string]$Path) { (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant() }
+# Long paths (the XP integrator tree passes 260 characters): .NET with the
+# \\?\ prefix instead of the path-length-limited cmdlets.
+function Get-LongPath([string]$Path) { if ($Path.StartsWith('\\?\')) { $Path } else { '\\?\' + $Path } }
+function Hash([string]$Path) {
+    $sha = [Security.Cryptography.SHA256]::Create(); $stream = [IO.File]::OpenRead((Get-LongPath $Path))
+    try { ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace('-', '').ToLowerInvariant() } finally { $stream.Dispose(); $sha.Dispose() }
+}
+function Size([string]$Path) { ([IO.FileInfo]::new((Get-LongPath $Path))).Length }
 $tag = if ($DryRun) { '[DRY-RUN]' } else { '[BUILDKIT]' }
 
 # 1. Kit integrity
 $byPath = @{}
 foreach ($f in $manifest.files) {
     $path = Join-Path $Kit ($f.path -replace '/', '\')
-    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Build kit file missing: $($f.path)" }
-    if ((Get-Item -LiteralPath $path).Length -ne $f.size -or (Hash $path) -ne $f.sha256) { throw "Build kit file damaged: $($f.path)" }
+    if (-not [IO.File]::Exists((Get-LongPath $path))) { throw "Build kit file missing: $($f.path)" }
+    if ((Size $path) -ne $f.size -or (Hash $path) -ne $f.sha256) { throw "Build kit file damaged: $($f.path)" }
     $byPath[$f.path] = $path
 }
 Write-Output "$tag kit verified: $($manifest.files.Count) files (USOS $($manifest.usos_version), build $($manifest.usos_build))"
@@ -53,15 +60,15 @@ $restored = 0; $present = 0
 foreach ($f in $manifest.files | Where-Object { $_.path -like 'inputs/*' }) {
     $rel = $f.path.Substring(7)
     $target = Join-Path $root ($rel -replace '/', '\')
-    if (Test-Path -LiteralPath $target -PathType Leaf) {
+    if ([IO.File]::Exists((Get-LongPath $target))) {
         if ((Hash $target) -ne $f.sha256) { throw "Repository file differs from the build kit (not overwritten): $rel" }
         $present++
         continue
     }
     $restored++
     if ($DryRun) { Write-Output "$tag would restore $rel"; continue }
-    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
-    Copy-Item -LiteralPath $byPath[$f.path] -Destination $target
+    [IO.Directory]::CreateDirectory((Get-LongPath ([IO.Path]::GetDirectoryName($target)))) | Out-Null
+    [IO.File]::Copy((Get-LongPath $byPath[$f.path]), (Get-LongPath $target), $false)
 }
 Write-Output "$tag inputs: $present already in place, $restored $(if ($DryRun) { 'to restore' } else { 'restored' })"
 
