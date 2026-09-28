@@ -80,13 +80,16 @@ pub const grub_paths = [_][]const u8{
 ///   exists(path) bool
 ///   read(path, buffer) ?[]const u8   (whole small file, null if missing/too big)
 ///   volumeLabel() []const u8         (ISO9660 primary volume id, trimmed)
+/// grub.cfg text; static, not on the stack (UEFI stacks can be 64-128 KiB and
+/// USOS runs below shim's frames under Secure Boot).
+var text_buf: [64 * 1024]u8 = undefined;
+
 pub fn plan(source: anytype, out: *Recipe) Error!void {
     out.* = .{};
     const volume = source.volumeLabel();
     out.label_len = @min(volume.len, out.label_buf.len);
     @memcpy(out.label_buf[0..out.label_len], volume[0..out.label_len]);
 
-    var text_buf: [64 * 1024]u8 = undefined;
     var found = false;
     for (grub_paths) |path| {
         const text = source.read(path, &text_buf) orelse continue;

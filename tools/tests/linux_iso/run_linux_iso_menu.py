@@ -31,20 +31,34 @@ def main() -> int:
     parser.add_argument("--script", required=True)
     parser.add_argument("--seconds", type=int, default=0, help="extra time with a shot every 30 s after the script")
     parser.add_argument("--tcg", action="store_true")
+    parser.add_argument("--secure-boot", action="store_true",
+                        help="Fedora SMM OVMF with the Microsoft keys, Secure Boot on, MokList = USOS certificate (ESP must be the signed zig-out/usb layout)")
     args = parser.parse_args()
     work = OUT / args.name
     work.mkdir(parents=True, exist_ok=True)
     for old in work.glob("*.png"):
         old.unlink()
     vars_copy = work / "vars.fd"
-    vars_copy.write_bytes(OVMF_VARS.read_bytes())
+    code = OVMF_CODE
+    machine = "q35"
+    if args.secure_boot:
+        sys.path.insert(0, str(ROOT / "tools" / "tests" / "secure_boot"))
+        import run_qemu_secure_boot as sb  # noqa: E402
+        der = (ROOT / "assets" / "secure-boot" / "usos-secure-boot.cer").read_bytes()
+        seeded = sb.seeded_vars(f"linux-{args.name}", [{"name": "MokList", "guid": sb.SHIM_GUID, "attr": 3, "data": sb.x509_list(der).hex()}])
+        vars_copy.write_bytes(seeded.read_bytes())
+        code = sb.CACHE / "OVMF_CODE.secboot.fd"
+        machine = "q35,smm=on"
+    else:
+        vars_copy.write_bytes(OVMF_VARS.read_bytes())
     port = free_port()
     serial = work / "serial.log"
-    cmd = [str(QEMU), "-machine", "q35", "-m", "4096", "-smp", "2",
+    cmd = [str(QEMU), "-machine", machine, "-m", "4096", "-smp", "2",
+           *(["-global", "driver=cfi.pflash01,property=secure,value=on"] if args.secure_boot else []),
            "-accel", "tcg" if args.tcg else "whpx", "-accel", "tcg",
            "-display", "none", "-vga", "std", "-serial", f"file:{serial}",
            "-monitor", f"tcp:127.0.0.1:{port},server,nowait",
-           "-drive", f"if=pflash,format=raw,readonly=on,file={OVMF_CODE}",
+           "-drive", f"if=pflash,format=raw,readonly=on,file={code}",
            "-drive", f"if=pflash,format=raw,file={vars_copy}",
            "-drive", f"file={VHD},if=none,id=usos,format=raw,snapshot=on",
            "-device", "qemu-xhci,id=xhci", "-device", "usb-storage,bus=xhci.0,drive=usos,bootindex=1",

@@ -100,6 +100,7 @@ pub fn start(
 ) !void {
     const bs = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
     progress(.reading);
+    logf("[LINUX-ISO] open {s}\r\n", .{name});
     const state = try uefi.pool_allocator.create(State);
     defer uefi.pool_allocator.destroy(state);
     state.catalog = try data_volume.openCatalog();
@@ -107,6 +108,7 @@ pub fn start(
     try ntfs.openFile(state.catalog.fs, state.catalog.reader(), try path.build(image_directory, name), &state.file);
     var reader = IsoReader{ .state = state };
 
+    logf("[LINUX-ISO] opened, {d} bytes\r\n", .{state.file.size()});
     // Where the ISO lies on the disk.
     var map = try isoMap(state);
     var pvd: [linux_iso.iso_map.pvd_bytes]u8 = undefined;
@@ -132,8 +134,8 @@ pub fn start(
     // Initrd = distro initrds + helper cpio + per-boot cpio, each 4-byte aligned.
     const helper_buffer = try allocate(bs, max_helper_bytes);
     defer freeBytes(bs, helper_buffer);
+    logf("[LINUX-ISO] kernel read ({d} KiB)\r\n", .{kernel.len / 1024});
     const helper = file_read.into(root, helper_path, helper_buffer) orelse return error.HelperMissing;
-    var per_boot_buffer: [16 * 1024]u8 = undefined;
     // Debian installer: the ISO appears as a USB partition (BLKPG fallback of
     // /usos/init); cdrom-detect only looks at USB partitions when asked.
     const default_preseed = Answer{ .path = "preseed.cfg", .bytes = debian_default_preseed };
@@ -167,6 +169,7 @@ pub fn start(
     const cmdline = try utf16Cmdline(recipe.cmdline(), words);
 
     progress(.starting);
+    logf("[LINUX-ISO] initrd assembled; loading kernel (secure boot: {s})\r\n", .{if (@import("secure_boot.zig").enforced()) "on" else "off"});
     const handle = try verified_image.loadBuffer(kernel);
     verified_image.setLoadOptions(handle, cmdline);
     try installInitrd(bs);
@@ -215,8 +218,7 @@ fn isoMap(state: *State) !linux_iso.iso_map.Map {
 }
 
 fn perBootCpio(map: *const linux_iso.iso_map.Map, answer: ?Answer, buffer: []u8) ![]const u8 {
-    var text: [4096]u8 = undefined;
-    const map_text = try map.write(&text);
+    const map_text = try map.write(&map_text_buffer);
     var writer = linux_iso.cpio.Writer{ .out = buffer };
     try writer.directory("usos");
     try writer.file("usos/iso.map", 0o644, map_text);
@@ -228,6 +230,8 @@ fn perBootCpio(map: *const linux_iso.iso_map.Map, answer: ?Answer, buffer: []u8)
 }
 
 var cmdline_utf16: [2048]u16 = undefined;
+var per_boot_buffer: [16 * 1024]u8 = undefined;
+var map_text_buffer: [4096]u8 = undefined;
 
 fn utf16Cmdline(recipe_words: []const u8, extra: []const u8) ![]const u16 {
     var n: usize = 0;
