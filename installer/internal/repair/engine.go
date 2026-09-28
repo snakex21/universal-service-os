@@ -13,6 +13,10 @@ type Backend interface {
 	RevalidateInstalledUSOS(expected installed.Target) (installed.Target, error)
 	CopyESPPayload(media install.MediaLayout, progress func(done, total uint64)) error
 	RemoveObsoleteESPFiles(media install.MediaLayout) ([]obsolete.Result, error)
+	// RecordWinpeDonor records the PE10 donor of DATA\Programs\USOS\WinPE in
+	// EFI\USOS\winpe-donor.ini, as install and update do, and returns a log
+	// line describing the donor state.
+	RecordWinpeDonor(media install.MediaLayout) (string, error)
 	RestoreLegacyBoot(expected installed.Target) (legacyboot.Audit, error)
 	VerifyRepair(media install.MediaLayout, expected install.DeviceINI) (install.VerificationReport, error)
 }
@@ -134,7 +138,7 @@ func (e *Engine) run(expected installed.Target, events chan<- Event) {
 		}
 		return
 	}
-	e.log(events, "Naprawa zakończona: ESP oraz Legacy BIOS Stage 1/Core odtworzone, GPT, DATA i WORK niezmienione")
+	e.log(events, "Naprawa zakończona: ESP oraz Legacy BIOS Stage 1/Core odtworzone, dawca WinPE zapisany, GPT, WORK i pliki DATA niezmienione")
 	events <- Event{Kind: EventFinished, Verification: &report}
 }
 
@@ -178,6 +182,16 @@ func (e *Engine) runCopy(events chan<- Event, current installed.Target) error {
 		}
 		if err != nil {
 			err = fmt.Errorf("remove obsolete ESP files: %w", err)
+		}
+	}
+	if err == nil {
+		var donor string
+		donor, err = e.backend.RecordWinpeDonor(current.Media)
+		if donor != "" {
+			e.log(events, "WINPE_DONOR "+donor)
+		}
+		if err != nil {
+			err = fmt.Errorf("record the WinPE donor (Programs\\USOS\\WinPE): %w", err)
 		}
 	}
 	if err != nil {

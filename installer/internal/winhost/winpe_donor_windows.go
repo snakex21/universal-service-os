@@ -9,7 +9,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"golang.org/x/sys/windows"
 )
 
@@ -138,7 +140,8 @@ func isoFiles(dir string) []os.DirEntry {
 	return result
 }
 
-// ensureWinpeDonor runs on install, update and repair (CopyInstallPayload).
+// ensureWinpeDonor runs on install and update (CopyInstallPayload) and on
+// repair (RecordWinpeDonor).
 // It never deletes a donor and never overwrites a record that disagrees with
 // the file: a corrupt donor stays visible to the menu and to verification.
 func ensureWinpeDonor(dataRoot, espRoot string) (winpeDonorState, error) {
@@ -250,4 +253,33 @@ func verifyWinpeDonor(dataRoot, espRoot string) (string, bool) {
 		return files[0].Name() + " SHA-256 " + sha + " różni się od zapisanego " + record.sha256, false
 	}
 	return files[0].Name() + " SHA-256 " + sha, true
+}
+
+// RecordWinpeDonor is the repair step for the PE10 donor: the same
+// ensureWinpeDonor as install and update, so Repair (which rewrites only the
+// ESP payload) also records a donor copied to DATA\Programs\USOS\WinPE.
+func (b Backend) RecordWinpeDonor(media install.MediaLayout) (string, error) {
+	resolved, err := resolveFormattedMedia(media, 10*time.Second)
+	if err != nil {
+		return "", fmt.Errorf("resolve media for the WinPE donor: %w", err)
+	}
+	state, err := ensureWinpeDonor(resolved.DATA.VolumePath, resolved.ESP.VolumePath)
+	return state.logLine(), err
+}
+
+// logLine describes the donor state for the operation log.
+func (s winpeDonorState) logLine() string {
+	switch {
+	case s.Ambiguous:
+		return "ambiguous: more than one ISO in " + winpeDonorDir
+	case s.Name == "":
+		return "none in " + winpeDonorDir
+	case s.Corrupt:
+		return s.Name + " SHA-256 " + s.SHA256 + " differs from the record " + s.Recorded + " (record kept)"
+	}
+	line := s.Name + " SHA-256 " + s.SHA256 + " recorded in " + winpeDonorRecord
+	if s.MovedFrom != "" {
+		line += " (moved from " + s.MovedFrom + ")"
+	}
+	return line
 }
