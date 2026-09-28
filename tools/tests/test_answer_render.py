@@ -270,7 +270,7 @@ MARKERS = {
     'theme=basic': ('basic.theme',),
     'no_balloon_tips=yes': ('EnableBalloonTips',),
     'display=1280x1024': ('Xresolution=1280',),
-    'disable_uac=yes': ('<EnableLUA>false</EnableLUA>',),
+    'disable_uac=yes': ('<EnableLUA>false</EnableLUA>', '/v EnableLUA /t REG_DWORD /d 0'),
     'no_sidebar=yes': ('TurnOffSidebar',),
     'no_welcome_center=yes': ('WindowsWelcomeCenter',),
     'no_hibernation=yes': ('powercfg.exe -h off',),

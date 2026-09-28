@@ -83,8 +83,9 @@ pub const settings = [_]Setting{
     .{ .pass = .specialize, .component = deployment, .path = "RunSynchronous/RunSynchronousCommand/Order" },
     .{ .pass = .specialize, .component = deployment, .path = "RunSynchronous/RunSynchronousCommand/Path" },
     .{ .pass = .specialize, .component = wer, .path = "DisableWER" },
-    // Tweak disable_uac (Vista and 7 only in USOS: 8+ Store apps need UAC).
-    .{ .pass = .specialize, .component = lua, .path = "EnableLUA", .until = .windows_7 },
+    // Tweak disable_uac on 7 / 2008 R2 (8+ Store apps need UAC; Vista SP2
+    // Setup refused the value, Vista gets the registry value as a command).
+    .{ .pass = .specialize, .component = lua, .path = "EnableLUA", .since = .windows_7, .until = .windows_7 },
     // oobeSystem
     .{ .pass = .oobeSystem, .component = intl, .path = "InputLocale" },
     .{ .pass = .oobeSystem, .component = intl, .path = "SystemLocale" },
@@ -370,6 +371,12 @@ test "schema: Vista and 7 reject later OOBE settings" {
         \\<ShowWindowsLive>false</ShowWindowsLive></component></settings></unattend>
     ;
     try check(live, .windows_7, null);
+    const lua_setting =
+        \\<unattend><settings pass="specialize"><component name="Microsoft-Windows-LUA-Settings">
+        \\<EnableLUA>false</EnableLUA></component></settings></unattend>
+    ;
+    try check(lua_setting, .windows_7, null);
+    try std.testing.expectError(error.NotForThisVersion, check(lua_setting, .vista, null));
     try std.testing.expectError(error.NotForThisVersion, check(live, .server_2008_r2, null));
     try std.testing.expectError(error.NotForThisVersion, check(live, .vista, null));
     const misplaced =

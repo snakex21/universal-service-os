@@ -81,14 +81,24 @@ display=1280x1024	windows-server-2003	+BitsPerPel=32
 display=1280x1024	windows-server-2003	+Xresolution=1280
 display=1280x1024	windows-server-2003	+Yresolution=1024
 disable_uac=yes	windows-vista	+    </component>
-disable_uac=yes	windows-vista	+    <component name="Microsoft-Windows-LUA-Settings" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-disable_uac=yes	windows-vista	+      <EnableLUA>false</EnableLUA>
+disable_uac=yes	windows-vista	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+disable_uac=yes	windows-vista	+      <RunSynchronous>
+disable_uac=yes	windows-vista	+        <RunSynchronousCommand wcm:action="add">
+disable_uac=yes	windows-vista	+          <Order>1</Order>
+disable_uac=yes	windows-vista	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System&quot; /v EnableLUA /t REG_DWORD /d 0 /f</Path>
+disable_uac=yes	windows-vista	+        </RunSynchronousCommand>
+disable_uac=yes	windows-vista	+      </RunSynchronous>
 disable_uac=yes	windows-7	+    </component>
 disable_uac=yes	windows-7	+    <component name="Microsoft-Windows-LUA-Settings" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 disable_uac=yes	windows-7	+      <EnableLUA>false</EnableLUA>
 disable_uac=yes	windows-server-2008	+    </component>
-disable_uac=yes	windows-server-2008	+    <component name="Microsoft-Windows-LUA-Settings" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-disable_uac=yes	windows-server-2008	+      <EnableLUA>false</EnableLUA>
+disable_uac=yes	windows-server-2008	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+disable_uac=yes	windows-server-2008	+      <RunSynchronous>
+disable_uac=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
+disable_uac=yes	windows-server-2008	+          <Order>1</Order>
+disable_uac=yes	windows-server-2008	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System&quot; /v EnableLUA /t REG_DWORD /d 0 /f</Path>
+disable_uac=yes	windows-server-2008	+        </RunSynchronousCommand>
+disable_uac=yes	windows-server-2008	+      </RunSynchronous>
 disable_uac=yes	windows-server-2008-r2	+    </component>
 disable_uac=yes	windows-server-2008-r2	+    <component name="Microsoft-Windows-LUA-Settings" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 disable_uac=yes	windows-server-2008-r2	+      <EnableLUA>false</EnableLUA>
