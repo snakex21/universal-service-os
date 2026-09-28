@@ -22,7 +22,10 @@ param(
     [string]$Data = 'L:\',
     [string]$WinPEDonor = '',
     [switch]$SkipBuild,
-    [switch]$SkipChecks
+    [switch]$SkipChecks,
+    # Issue tracker named in SOURCE-OFFER.txt (the public repository, filled in
+    # at publish time; empty keeps the placeholder).
+    [string]$IssuesUrl = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -88,6 +91,16 @@ foreach ($lang in @('pl', 'en')) {
     $xpArgs += @('--xp', "$lang=$package")
 }
 
+Step "build kit (pinned downloads: tools\release\buildkit.lock.json)"
+Run 'fetch_buildkit_inputs' { python.exe (Join-Path $root 'tools\release\fetch_buildkit_inputs.py') }
+$epoch = (($info | Select-String '^epoch=(.+)$').Matches.Groups[1].Value)
+$kitDir = Join-Path $work 'buildkit'
+if (Test-Path -LiteralPath $kitDir) { Remove-Item -LiteralPath $kitDir -Recurse -Force }
+Run 'make_buildkit' { python.exe (Join-Path $root 'tools\release\make_buildkit.py') --out (Join-Path $kitDir "USOS-$version-buildkit.zip") --version $version --build-id $buildId --epoch $epoch }
+$kitArgs = @()
+foreach ($part in Get-ChildItem -LiteralPath $kitDir -File) { $kitArgs += @('--buildkit', $part.FullName) }
+
+if ($IssuesUrl -ne '') { $env:USOS_ISSUES_URL = $IssuesUrl }
 Step "assemble $out"
-Run 'assemble_release' { python.exe (Join-Path $root 'tools\release\assemble_release.py') --out $out --installer (Join-Path $root 'installer\USOS Installer.exe') --winpe $WinPEDonor @xpArgs }
+Run 'assemble_release' { python.exe (Join-Path $root 'tools\release\assemble_release.py') --out $out --installer (Join-Path $root 'installer\USOS Installer.exe') --winpe $WinPEDonor @xpArgs @kitArgs }
 Step "PASS: $out"

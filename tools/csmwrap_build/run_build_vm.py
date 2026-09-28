@@ -5,11 +5,14 @@ live ISO has no password), runs guest_build.sh and collects its output tar.
   python tools/csmwrap_build/run_build_vm.py --work zig-out/csmwrap-build [--accel whpx|tcg]
 
 Disks: vda = input tar (guest script, lock.env, patches), vdb = output tar.
-Needs network (apk and github.com through QEMU user networking).
+Needs network (apk and github.com through QEMU user networking), unless
+--offline MIRROR is given: the build kit's partial Alpine mirror is then
+served to the guest over HTTP from the host (10.0.2.2) and the source comes
+from tools/vendor/csmwrap/3.1.2-src/csmwrap-3.1.2-src.tar.xz (no git).
 Builds nothing on the host; touches no physical disk.
 """
 from pathlib import Path
-import argparse, hashlib, io, json, shlex, socket, subprocess, sys, tarfile, time
+import argparse, functools, hashlib, http.server, io, json, shlex, socket, subprocess, sys, tarfile, threading, time
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -25,10 +28,10 @@ def sha256(path):
     return h.hexdigest()
 
 
-def lock_env(lock):
+def lock_env(lock, mirror=None):
     c = lock['csmwrap']
     env = {
-        'ALPINE_MIRROR': lock['alpine_mirror'],
+        'ALPINE_MIRROR': mirror or lock['alpine_mirror'],
         'ALPINE_BRANCH': lock['alpine_branch'],
         'APK_PACKAGES': ' '.join(lock['apk_packages']),
         'CSMWRAP_URL': c['url'],
@@ -42,7 +45,7 @@ def lock_env(lock):
     return ''.join(f'{k}={shlex.quote(v)}\n' for k, v in env.items())
 
 
-def input_tar(lock, patches):
+def input_tar(lock, patches, mirror=None, source=None):
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode='w', format=tarfile.USTAR_FORMAT) as t:
         def add(name, data, mode=0o644):
@@ -50,7 +53,9 @@ def input_tar(lock, patches):
             info.size, info.mode, info.mtime = len(data), mode, 0
             t.addfile(info, io.BytesIO(data))
         add('guest_build.sh', (HERE / 'guest_build.sh').read_bytes().replace(b'\r\n', b'\n'), 0o755)
-        add('lock.env', lock_env(lock).encode())
+        add('lock.env', lock_env(lock, mirror).encode())
+        if source is not None:
+            add('source.tar.xz', source.read_bytes())
         for p in patches:
             add('patches/' + p.name, p.read_bytes().replace(b'\r\n', b'\n'))
     data = buf.getvalue()
@@ -104,6 +109,7 @@ def main():
     p.add_argument('--iso', type=Path, help='default: lock alpine_iso.file (repository or main-checkout cache)')
     p.add_argument('--accel', default='whpx')
     p.add_argument('--timeout-minutes', type=float, default=60)
+    p.add_argument('--offline', type=Path, help='partial Alpine mirror (build kit csmwrap-vm/apk): no network needed')
     a = p.parse_args()
     lock = json.loads((HERE / 'lock.json').read_text(encoding='utf-8'))
     work = a.work.resolve()
@@ -117,7 +123,18 @@ def main():
     if len(patches) != 3:
         raise SystemExit(f'expected 3 patches, found {len(patches)}')
     in_disk, out_disk = work / 'input.tar.img', work / 'output.tar.img'
-    in_disk.write_bytes(input_tar(lock, patches))
+    mirror = source = None
+    if a.offline:
+        mirror_root = a.offline.resolve()
+        if not (mirror_root / lock['alpine_branch'] / 'main/x86_64/APKINDEX.tar.gz').is_file():
+            raise SystemExit(f'no Alpine {lock["alpine_branch"]} mirror in {mirror_root}')
+        handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(mirror_root))
+        server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        mirror = f'http://10.0.2.2:{server.server_address[1]}'
+        source = ROOT / 'tools/vendor/csmwrap/3.1.2-src/csmwrap-3.1.2-src.tar.xz'
+        print('offline: Alpine mirror', mirror_root, 'as', mirror, '; source', source, flush=True)
+    in_disk.write_bytes(input_tar(lock, patches, mirror, source))
     with open(out_disk, 'wb') as f:
         f.truncate(OUT_DISK_BYTES)
     serial_log = work / 'serial.log'

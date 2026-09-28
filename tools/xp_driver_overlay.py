@@ -4,12 +4,12 @@ Recipe: Patch Integrator 4.2.3 (NTOSKRNL, StorPort, KMDF, GenAHCI,
 Microsoft USB3, ACPI sections). Changes are emitted only to the trial bundle.
 """
 from pathlib import Path
-import ctypes as c, hashlib, json, re, shutil, struct, subprocess, winreg
+import ctypes as c, hashlib, json, os, re, shutil, struct, subprocess, winreg
 import xp_cab, xp_hive
 
 ROOT=Path(__file__).resolve().parents[1]
 DRIVERS=ROOT/'media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86'
-SEVEN='C:/Program Files/7-Zip/7z.exe'
+SEVEN=os.environ.get('USOS_7Z','C:/Program Files/7-Zip/7z.exe')  # USOS_7Z: build kit copy
 META=('TXTSETUP.SIF','DOSNET.INF','HIVESYS.INF','SETUPREG.HIV')
 SELECTED=['ACPI/acpi.sys','Dependencies/ntoskrn8.sys','Dependencies/storport.sys',
  'KMDF/wdf01000.sys','KMDF/wdfldr.sys','SATA/genahci.sys','SATA/genahci.inf',

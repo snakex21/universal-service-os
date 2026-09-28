@@ -492,7 +492,7 @@ fn addMicroLinux(b: *std.Build, framebuffer_ui: *std.Build.Step.Compile) *std.Bu
         "--project-root",
         ".",
         "--seven-zip",
-        "C:/Program Files/7-Zip/7z.exe",
+        b.graph.environ_map.get("USOS_7Z") orelse "C:/Program Files/7-Zip/7z.exe",
         "--fb-ui",
         "zig-out/micro-linux/usos-fb-ui",
         "--output-dir",

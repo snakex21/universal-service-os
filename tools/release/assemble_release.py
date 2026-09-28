@@ -23,7 +23,7 @@ Zips are deterministic: sorted entries, fixed timestamps (the build epoch),
 fixed permissions. The folder is then checked by scan_release.py.
 """
 from pathlib import Path
-import argparse, datetime, hashlib, json, shutil, sys, zipfile
+import argparse, datetime, hashlib, json, os, shutil, sys, zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -43,7 +43,14 @@ XP_SOURCES = {
     'en': ('en_windows_xp_professional_with_service_pack_3_x86_cd_x14-80428.iso',
            '62b6c91563bad6cd12a352aa018627c314cfc5162d8e9f8af0756a642e602a46'),
 }
-GITHUB_ASSET_LIMIT = 2 * 1024 ** 3  # GitHub Releases: each asset must be under 2 GiB
+# Contact for the written source offer: the issue tracker of the public USOS
+# repository. Fill in at publish time (make_release.ps1 -IssuesUrl, the
+# USOS_ISSUES_URL environment variable, or this default).
+ISSUES_URL_PLACEHOLDER = 'https://github.com/OWNER/REPOSITORY/issues'
+ISSUES_URL = os.environ.get('USOS_ISSUES_URL', ISSUES_URL_PLACEHOLDER)
+GITHUB_ASSET_LIMIT = 2 * 1024 ** 3
+# Alpine virt 3.24.1 ISO in the build kit (micro-Linux lock, CSMWrap build VM).
+ALPINE_ISO_SHA256 = 'e73a6241bd5f3c5c2d4d38c02cc52c378c0415a7c888bd292066bf36e0f41a39'  # GitHub Releases: each asset must be under 2 GiB
 
 
 def sha256(path):
@@ -168,7 +175,7 @@ Install
   1. Copy the folder Programs from this zip to the root of the stick's
      USOS_DATA partition, so the file ends up in
      USOS_DATA:\\Programs\\USOS\\WinPE\\{WINPE_DONOR_NAME}
-  2. Run USOS-Installer-{version}.exe and choose "Update USOS" (Repair does not record the donor):
+  2. Run USOS-Installer-{version}.exe and choose "Update USOS" (or "Repair ESP"):
      it records the donor's SHA-256 on the ESP (EFI\\USOS\\winpe-donor.ini)
      and marks the file hidden and read-only.
 """
@@ -192,7 +199,7 @@ def component_text(c):
     return '\n'.join(lines)
 
 
-def licences(out, version, sources_zip):
+def licences(out, version, sources_zip, issues_url=ISSUES_URL):
     manifest = json.loads((ROOT / 'tools/release/third-party.json').read_text(encoding='utf-8'))
     components = manifest['components']
     ids = [c['id'] for c in components]
@@ -233,8 +240,10 @@ components below. Each keeps its own licence; the licence texts are in the
 LICENSES folder. Components marked MODIFIED were changed by USOS; their
 sources and patches are in USOS-{version}-sources.zip. Microsoft files (the
 WinPE donor, driver bundles derived from the user's XP ISO, redistributable
-Microsoft drivers) remain Microsoft's property; Windows ISOs and product keys
-are never included.
+Microsoft drivers) remain Microsoft's property: the maintainer keeps them
+deliberately, for preservation, redistributes them at the maintainer's own
+risk, and will remove them on request of the rights holder. Windows ISOs and
+product keys are never included.
 
 """
     body = '\n\n'.join(component_text(c).replace('<version>', version) for c in components)
@@ -252,7 +261,9 @@ years after the release date of USOS {version}, the USOS maintainer will
 provide anyone who asks with a complete machine-readable copy of the
 corresponding source code of these components, for no more than the cost of
 physically performing the distribution. Ask through the issue tracker of
-the USOS project repository (the page this release was downloaded from).
+the USOS project repository:
+
+  {issues_url}
 
 """
     offer += '\n\n'.join(component_text(c).replace('<version>', version) for c in offers) + '\n'
@@ -268,6 +279,7 @@ def main():
     p.add_argument('--installer', type=Path, default=ROOT / 'installer/USOS Installer.exe')
     p.add_argument('--xp', action='append', default=[], help='LANG=PACKAGE_DIR (pl, en)')
     p.add_argument('--winpe', type=Path, required=True)
+    p.add_argument('--buildkit', type=Path, action='append', default=[], help='USOS-VERSION-buildkit.zip (or its .001.. parts) from make_buildkit.py')
     a = p.parse_args()
 
     info = read_build_info()
@@ -317,6 +329,14 @@ def main():
         z.add_text('README.txt', xp_readme(lang, version, build_id, manifest))
         z.close()
 
+    # Build kit (made by make_buildkit.py; copied as it is)
+    if not a.buildkit:
+        raise SystemExit('need --buildkit (tools/release/make_buildkit.py)')
+    for part in a.buildkit:
+        if not part.name.startswith(f'USOS-{version}-buildkit.zip'):
+            raise SystemExit('unexpected build kit file name: ' + part.name)
+        shutil.copyfile(part, out / part.name)
+
     # Licences, notices, sources
     sources = Zip(out / f'USOS-{version}-sources.zip', epoch)
     licences(out, version, sources)
@@ -341,7 +361,7 @@ def main():
 
     # Forbidden content, then checksums
     findings = scan_release.scan(out, extra=[ROOT / 'installer/internal/payload/assets/payload.zip'],
-                                 allowed_iso_sha256={WINPE_DONOR_SHA256})
+                                 allowed_iso_sha256={WINPE_DONOR_SHA256, ALPINE_ISO_SHA256})
     if findings:
         for f in findings:
             print('SCAN FAIL:', f)
@@ -359,6 +379,9 @@ def main():
             print('%12d  %s' % (size, f.name))
     print('%12d  total (%d files incl. LICENSES/)' % (total, len(files) + 1))
     print('RELEASE PASS', version, build_id, out)
+    if ISSUES_URL == ISSUES_URL_PLACEHOLDER:
+        print('NOTE: SOURCE-OFFER.txt still names the placeholder', ISSUES_URL_PLACEHOLDER,
+              '- set -IssuesUrl (make_release.ps1) or USOS_ISSUES_URL before publishing')
 
 
 if __name__ == '__main__':

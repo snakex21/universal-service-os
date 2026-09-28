@@ -30,8 +30,15 @@ for p in $APK_PACKAGES; do
     case "$p" in *=*) grep -qx "$(echo "$p" | sed 's/=/-/')" "$OUT/apk-installed.txt" || { log "FAIL pinned package $p not installed"; exit 3; } ;; esac
 done
 
-log "source: $CSMWRAP_URL $CSMWRAP_COMMIT"
 cd /b
+if [ -f "$W/source.tar.xz" ]; then
+    # Offline build (build kit): the deterministic source archive of an
+    # earlier online run (tools/vendor/csmwrap/3.1.2-src) instead of git.
+    log "source: pinned archive $(sha256sum "$W/source.tar.xz" | cut -d' ' -f1) (offline, no git clone)"
+    cp "$W/source.tar.xz" "$OUT/$SRC_DIR-src.tar.xz"
+    echo "offline: submodule commits as pinned in lock.json" >"$OUT/submodules.txt"
+else
+log "source: $CSMWRAP_URL $CSMWRAP_COMMIT"
 git clone -q "$CSMWRAP_URL" git-src
 cd git-src
 git -c advice.detachedHead=false checkout -q "$CSMWRAP_COMMIT"
@@ -50,6 +57,7 @@ cd /b
 mv git-src "$SRC_DIR"
 tar --sort=name --mtime="@$SOURCE_EPOCH" --owner=0 --group=0 --numeric-owner --format=gnu \
     --exclude=.git -cf - "$SRC_DIR" | xz -9 -T1 >"$OUT/$SRC_DIR-src.tar.xz"
+fi
 
 build() { # name version [patches...]
     name=$1; version=$2; shift 2

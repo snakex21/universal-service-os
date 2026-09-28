@@ -4,6 +4,14 @@ set "ROOT=%~dp0"
 set "ZIG=%ROOT%tools\zig\zig.exe"
 set "ZIG_GLOBAL_CACHE_DIR=%ROOT%tools\cache\zig-global"
 
+rem Offline build from the USOS build kit (docs\BUILDING.md): restore the
+rem pinned inputs and use the kit's Go, Zig and 7-Zip, with downloads disabled.
+if defined USOS_BUILDKIT (
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%ROOT%tools\release\use_buildkit.ps1" -Kit "%USOS_BUILDKIT%"
+    if errorlevel 1 exit /b 1
+    call "%ROOT%build\generated\buildkit-env.cmd"
+)
+
 if not exist "%ZIG%" (
     echo [ERROR] Zig not found: %ZIG%
     exit /b 1

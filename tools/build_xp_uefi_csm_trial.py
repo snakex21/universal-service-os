@@ -132,7 +132,7 @@ GENAHCI_SHA256='f8dd54123934c176a2b6315df7b4a1dfe2ff6761fa3bc27cecfeedbe421b279f
 def nt5_storage_files():
     if digest(GENAHCI_ARCHIVE)!=GENAHCI_SHA256:raise ValueError('GenAHCI archive hash mismatch')
     def member(name):
-        return subprocess.run(['C:/Program Files/7-Zip/7z.exe','e','-so',str(GENAHCI_ARCHIVE),name],check=True,capture_output=True).stdout
+        return subprocess.run([os.environ.get('USOS_7Z','C:/Program Files/7-Zip/7z.exe'),'e','-so',str(GENAHCI_ARCHIVE),name],check=True,capture_output=True).stdout
     note=(b'GenAHCI 6.3.0.1 (x86 and x64 builds, unmodified), https://github.com/GeorgeK1ng/GenAHCI\n'
           b'archive GenAHCI_6.3.0.1.7z sha256 '+GENAHCI_SHA256.encode()+b'; licence: gpl.txt of the archive.\n'
           b'USOS uses it only for Windows Server 2003 x86 and XP x64 (NT 5.2) text-mode Setup.\n')

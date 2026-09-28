@@ -24,7 +24,10 @@ param(
     [ValidateSet('whpx', 'tcg')]
     [string]$Accel = 'whpx',
     [string]$Iso = '',
-    [switch]$Stage
+    [switch]$Stage,
+    # Offline build from the build kit: the kit's partial Alpine mirror
+    # (csmwrap-vm/apk) and the vendored source archive; no network.
+    [string]$OfflineMirror = ''
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -32,6 +35,7 @@ Set-Location $root
 $lock = Get-Content -Raw 'tools/csmwrap_build/lock.json' | ConvertFrom-Json
 if (-not $Iso) {
     $Iso = Join-Path $root $lock.alpine_iso.file
+    if (-not (Test-Path $Iso) -and $OfflineMirror) { throw "Alpine ISO missing: $Iso (use_buildkit.ps1 restores it)" }
     if (-not (Test-Path $Iso)) {
         New-Item -ItemType Directory -Force (Split-Path -Parent $Iso) | Out-Null
         Write-Output "Downloading $($lock.alpine_iso.url)"
@@ -39,6 +43,7 @@ if (-not $Iso) {
     }
 }
 $vmArgs = @('tools/csmwrap_build/run_build_vm.py', '--work', $Work, '--accel', $Accel, '--iso', $Iso)
+if ($OfflineMirror) { $vmArgs += @('--offline', $OfflineMirror) }
 & python @vmArgs
 if ($LASTEXITCODE -ne 0) { throw "guest build failed ($LASTEXITCODE)" }
 

@@ -33,6 +33,8 @@ def obtain(root: Path, record: dict[str, object], destination: Path) -> Path:
         return destination
     if destination.exists():
         destination.unlink()
+    if os.environ.get("USOS_OFFLINE") == "1":
+        raise RuntimeError(f"offline build: {destination} is missing or differs (restore it with tools/release/use_buildkit.ps1)")
     print(f"[MICRO-LINUX] download {record['url']}")
     urllib.request.urlretrieve(str(record["url"]), destination)
     actual = sha256(destination)
