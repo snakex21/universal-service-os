@@ -258,7 +258,7 @@ initramfs	usr/lib/usos/xp-stage2.bin	100644	1f73f3a534edc6d5a1f365d3bb6de43aca7f
 initramfs	usr/lib/usos/xp-vbr-code.bin	100644	6732885c24cc80d00f10093bb707fcfdd5e8755e8fc95734178f38b48ddb0059
 initramfs	usr/lib/usos/xp64_selected_partition_uefi_csm.sif	100755	d71bc6e824ebf15070445b4a17f6d5a0d18ff570e231a776d9af964f83922263
 initramfs	usr/lib/usos/xp_confirmation_ui.sh	100755	83d24331a4cec19452def8de121dcdc94dc67ce6b755d1d6025520a95f3a152d
-initramfs	usr/lib/usos/xp_csmwrap_esp.sh	100755	83a6b9ebdcda1405e6cf27a110098f502383bd5ef7e0e4f449170b4a5b33d2bb
+initramfs	usr/lib/usos/xp_csmwrap_esp.sh	100755	715cedb85cfe787b619db64d596f30f5a424732948369517492608808ccf8594
 initramfs	usr/lib/usos/xp_detect_system.sh	100755	c80b0918d6794112474a18e57ef309ee4d32f09f37ecde4224c74680611ee046
 initramfs	usr/lib/usos/xp_disk_overview.sh	100755	6859dd93672462c90cfe38a5e46e678ca3cf3f664f7af3e694f07be5adba2a06
 initramfs	usr/lib/usos/xp_disk_reset.sh	100755	b276d75d00ac5a0cb2fea21ffb53877db1336443ff5a398f40cc364eacbf6ff1
@@ -302,6 +302,7 @@ native_cpio	support.cpio	usos-launch-AMD64.exe	14848	8752b1f93101923514e4257ce68
 native_cpio	support.cpio	imdisk-x86_64.exe	55552	3a6a94c98a4b87e59a136052c50da070c99706db3bcd54ef5b148784b21f75dd
 native_cpio	support.cpio	imdisk-x86_64.cpl	129784	728cfaf2e2ba469cd4c7129cf7b343513f0ac67af68202d41fea287995b94988
 native_cpio	support.cpio	imdisk-x86_64.sys	54016	72873d35ee3a9d9ef1311bbb6fdefd2dfea47b4752a6f1904bbdc6dc51afd820
+native_cpio	support.cpio	usos-run-hidden.exe	11776	ffe2d1c249415b6899b4d9a0fd20af09318f924d947f03b77a2fb8ebe8d2b403
 native_cpio	support.cpio	usos-imdisk-README.txt	3998	a8f28d4742b45d2dc916f310c532b837bb6c192cfc6af3ee030a52d88994d122
 native_cpio	support.cpio	usos-imdisk-LICENSE.txt	18332	da0eca0fb517ac939d167924c9d4b3f8750a6b7191932ef2cb145acfa624ac7e
 native_cpio	support.cpio	usos-imdisk-source.zip	527329	a30a059ff09f700e60c4608103f5486eef276c07872f4085a6b4243df31ea1b4
@@ -313,8 +314,8 @@ native_cpio	win7-support.cpio	Windows6.1-KB2685811-x64.cab	672192	605d9434709367
 native_cpio	win7-support.cpio	usos-kmdf-required.flag	3	f1b2f662800122bed0ff255693df89c4487fbdcf453d3524a42d4ec20c3d9c04
 native_cpio	win7-support.cpio	Windows6.1-KB2990941-v3-x64.cab	6062245	3ecc3fe4e588cc308690093fa65e91b87161e806c2b784c093f6e67a5f3828aa
 native_cpio	win7-support.cpio	Windows6.1-KB3087873-v2-x64.cab	539077	3589d4f6fa3f024b7f9aa764f0f10d9fb4735f0c6a90cd11c52d4e5fc230ee22
-native_cpio	win7-support.cpio	usos-win7-start.cmd	7766	5b4bbdef2a519a63f250692fcfc168f429206849b477ae8f42f919bb893925c6
-native_cpio	win7-support.cpio	usos-modern-win7.cmd	3661	c8a78cf218ee847e34f1567c9216a4a3e59c0c1d50531b93102e82acf5128f6b
+native_cpio	win7-support.cpio	usos-win7-start.cmd	8763	5d5dd50af0bfb4b721961970fc98ad641293ccc9a1a311ac42424e85a6192a2b
+native_cpio	win7-support.cpio	usos-modern-win7.cmd	4658	cb56ceed1073d7f2a7f634af87985c2b6e85c6da5a0f55d78b6f6f86d1d4cb8c
 native_cpio	win7-support.cpio	usos-win7-setupcomplete.cmd	939	e54545df7edb6f3817a107696d2452ddfeb0d7aecea2695b94c20bc46c415a97
 native_cpio	win7-support.cpio	usos-win7-finalize.exe	14336	795a61802043ce3d55224de9d1c6b1f9e398939304e407042db20d01ff97fd0e
 native_cpio	win7-support.cpio	usos-drivers.exe	6656	f4c681d3554da1989277d43a2cbf68d8fc069e865e2a2ef4f6795a9b783ec08a
@@ -323,8 +324,8 @@ native_cpio	win7-support.cpio	usos-win7-wrapper.bin	97280	0c09600c3f2f97c2427e45
 native_cpio	win7-support.cpio	usos-win7-video.bin	96896	0a44a256cda725c22f1daadcf093fc4660b7214e6437968a4c8e119aed02a947
 native_cpio	win7-support.cpio	uefiseven-LICENSE.txt	1328	30b044939b58ef5754ed7479e5ec930dd49d154dbf07f618825d4470c189f4dd
 native_cpio	win7-support.cpio	UefiSeven.ini	64	133bccbf46d52a60fb64b8f9a4bd8a5c3c5b40605b60048869d3173c841e61c7
-native_cpio	vista-support.cpio	usos-vista-install.exe	55296	60bce2b8b6aa4634996312262c3d831da7fd277551663627be017e7c60574b2d
-native_cpio	vista-support.cpio	usos-modern-vista.cmd	2144	85c82c7a3483ab6b6a1fb2e8cae181129caa370dcf164cc3e6b52d95ef271285
+native_cpio	vista-support.cpio	usos-vista-install.exe	57856	f7e1eaeab7a339b7a91e025132a13a445d66a415deb34f2b285e4c6eef06c2b5
+native_cpio	vista-support.cpio	usos-modern-vista.cmd	2247	2aa2226018fa1c3f6fcc4193b82568bd2f728ece41a171d0d2e7294bad039dbf
 native_cpio	vista-support.cpio	vista-payload-00.bin	14336	07e7c37da805eaee08c95fbbcb15348f74e00f17f35d96c99b47a3f24514519e
 native_cpio	vista-support.cpio	vista-payload-01.bin	8704	8d7bf2a6cc58affbb2f72fc0ab528ca99a124796adb7281b93caf547083ea3a5
 native_cpio	vista-support.cpio	vista-payload-02.bin	8192	3a959651e861d013d22a86ed559f342ffb02126f03f7e4587f0e60edfd178f2d
@@ -343,7 +344,7 @@ native_cpio	vista-support.cpio	usos-win7-wrapper.bin	97280	0c09600c3f2f97c2427e4
 native_cpio	vista-support.cpio	usos-win7-video.bin	96896	0a44a256cda725c22f1daadcf093fc4660b7214e6437968a4c8e119aed02a947
 native_cpio	vista-support.cpio	uefiseven-LICENSE.txt	1328	30b044939b58ef5754ed7479e5ec930dd49d154dbf07f618825d4470c189f4dd
 native_cpio	vista-support.cpio	UefiSeven.ini	64	133bccbf46d52a60fb64b8f9a4bd8a5c3c5b40605b60048869d3173c841e61c7
-native_cpio	modern-support.cpio	usos-modern-uefi.cmd	4615	e6ce880f1d2886c424e24a4cf13467be1cbd902525379ff0d3ba2f61c7864e8d
+native_cpio	modern-support.cpio	usos-modern-uefi.cmd	5598	b1fd56139bb586fcf59aa05dd932b5b214e54b020ce8e339ce8c11aee1f28257
 native_cpio	modern-support.cpio	usos-modern-finalize.exe	24576	a18f318dd2538f51ff76a444153fbc1954de7aa8a4745df7f991ab54ea930922
 native_cpio	modern-support.cpio	usos-drivers.exe	6656	f4c681d3554da1989277d43a2cbf68d8fc069e865e2a2ef4f6795a9b783ec08a
 native_cpio	modern-support.cpio	usos-unattend-drivers.exe	9216	7eb53c21cdf89b761755b1cfaf5c4b19e420590b75ad1ee7cb7e9af7e2ed3f3f
@@ -360,7 +361,21 @@ payload_zip	EFI/USOS/csmwrap/COPYING-SeaBIOS-GPLv3.txt
 payload_zip	EFI/USOS/csmwrap/COPYING-SeaBIOS-LGPLv3.txt
 payload_zip	EFI/USOS/csmwrap/LICENSE-CSMWrap-LGPL-2.1.txt
 payload_zip	EFI/USOS/csmwrap/SOURCES.txt
+payload_zip	EFI/USOS/csmwrap/csmwrap-3.1.2-src.tar.xz
 payload_zip	EFI/USOS/csmwrap/csmwrapx64.efi
+payload_zip	EFI/USOS/csmwrap/licenses/CSMWrap-LICENSE-LGPL-2.1.txt
+payload_zip	EFI/USOS/csmwrap/licenses/SeaBIOS-COPYING-GPLv3.txt
+payload_zip	EFI/USOS/csmwrap/licenses/SeaBIOS-COPYING.LESSER-LGPLv3.txt
+payload_zip	EFI/USOS/csmwrap/licenses/cc-runtime-LICENSE.txt
+payload_zip	EFI/USOS/csmwrap/licenses/flanterm-LICENSE.txt
+payload_zip	EFI/USOS/csmwrap/licenses/freestnd-c-hdrs-LICENSE.txt
+payload_zip	EFI/USOS/csmwrap/licenses/nanoprintf-LICENSE.txt
+payload_zip	EFI/USOS/csmwrap/licenses/picoefi-COPYING.txt
+payload_zip	EFI/USOS/csmwrap/licenses/picoefi-LicenseRef-scancode-bsd-no-disclaimer-unmodified.txt
+payload_zip	EFI/USOS/csmwrap/licenses/uACPI-LICENSE.txt
+payload_zip	EFI/USOS/csmwrap/patches/0001-csmwrap-logo-only-when-verbose.patch
+payload_zip	EFI/USOS/csmwrap/patches/0002-quiet-flag-no-seabios-banner-or-boot-messages.patch
+payload_zip	EFI/USOS/csmwrap/patches/0003-seabios-no-boot-menu-when-quiet.patch
 payload_zip	EFI/USOS/dos-native/COPYING
 payload_zip	EFI/USOS/dos-native/freedos/BOOT16.BIN
 payload_zip	EFI/USOS/dos-native/freedos/COMMAND.COM
