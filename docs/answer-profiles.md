@@ -150,6 +150,69 @@ give byte-identical `WINNT.SIF` and accounts script.
   from Schneegans' generator, with 32-bit media) does nothing in Setup:
   USOS warns (not blocks) about it.
 
+## Linux answer files
+
+`src/flow/answer/linux.zig` renders the same profile for the Linux
+installers USOS boots from ISO (design: [design/linux-iso-boot.md](design/linux-iso-boot.md)
+section 7): `linux.render(profile, format, salt, buffer)` with `format` =
+`autoinstall` (Ubuntu subiquity, `autoinstall.yaml`, top-level
+`autoinstall:`, `version: 1`), `preseed` (Debian d-i, `preseed.cfg`) or
+`kickstart` (Fedora anaconda, `ks.cfg`). The result carries the bytes,
+`interactive_identity` and a set of notes (limitations) for the start
+summary. Host tool: `usos-answer render-linux PROFILE.ini FORMAT SALT OUT`.
+
+The password is written only as a glibc SHA-512 crypt (`$6$<salt>$...`,
+5000 rounds; `sha512crypt.zig`, checked against Drepper's reference
+vectors). The salt is a parameter: at start 16 characters from
+`sha512crypt.saltFromBytes` over 12 random bytes (firmware RNG, else a TSC
+mix); fixed (`usosgoldensalt00`) in the goldens. The plain password never
+appears in the output.
+
+| profile | Ubuntu autoinstall | Debian preseed | Fedora kickstart |
+|---|---|---|---|
+| `user` | `identity.username` (login, see below), `identity.realname` (as typed) | `passwd/username`, `passwd/user-fullname` | `user --name= --gecos= --groups=wheel` |
+| `password` | `identity.password` (`$6$`) | `passwd/user-password-crypted` | `user ... --iscrypted --password=`; always `rootpw --lock` |
+| empty password | `identity` in `interactive-sections`, no `identity` block (subiquity's schema requires a password, so no prefill) | no password key: d-i asks | no `user` line: the user spoke stays open |
+| `computer` | `identity.hostname` (lower case; empty: `ubuntu`) | `netcfg/get_hostname` + `netcfg/hostname` (empty: asked) | `network --hostname=` (empty: default) |
+| `timezone` | `timezone:` (auto: not set) | `time/zone` (+ `clock-setup/utc true`) | `timezone <IANA> --utc` |
+| `language` (else `locale`) | `locale: ll_CC.UTF-8` (auto: `locale` interactive) | `debian-installer/locale` | `lang` |
+| `keyboard` (auto: the language's) | `keyboard.layout` / `variant` (xkb) (none: `keyboard` interactive) | `keyboard-configuration/xkb-keymap` (layout only) | `keyboard --xlayouts='layout (variant)'` |
+| disk | `interactive-sections: [storage]` always, never a `storage:` block | no `partman*`, `grub-installer`, `bootdev` keys | no `ignoredisk/clearpart/autopart/part/zerombr/bootloader`, no `%packages` |
+| `user2`, `org`, keys, editions, Windows options | ignored (`user2_ignored` note) | ignored | ignored |
+
+Fixed parts: Ubuntu `ssh: {install-server: false}`,
+`refresh-installer: {update: false}`; Debian always
+`d-i cdrom-detect/try-usb boolean true` (the installer is on the stick) and
+`passwd/root-login false` (the user gets sudo), `netcfg/get_domain` empty.
+
+Login: the profile user in lower case, characters outside `a-z 0-9 _ -`
+become `_` (`Jan Kowalski` -> `jan_kowalski`), a leading digit gets `u`,
+reserved names (`root`, `admin`, `ubuntu`, ...) get `1`; any change sets
+the `username_adjusted` note. Language tags map to glibc locales
+(`pl-PL` -> `pl_PL.UTF-8`, `sr-Latn-RS` -> `sr_RS.UTF-8@latin`) and
+Windows keyboard ids to xkb (`00000415` -> `pl`, `00020409` -> `us(intl)`);
+both tables cover every entry of `tables.zig`. Formats that differ from
+the language are not separate on Linux (`formats_ignored`).
+
+Notes: `disk_interactive` (always), `password_empty`, `username_adjusted`,
+`user2_ignored`, `hostname_default`, `language_asked`, `keyboard_asked`,
+`keyboard_variant_dropped` (Debian), `timezone_not_set`, `formats_ignored`.
+
+Injection (per-boot cpio, docs/design/linux-iso-boot.md; never written to
+DATA): Ubuntu `/usos/answer/autoinstall.yaml`, copied to the live root
+`/autoinstall.yaml` by the `/usos/hooks/init-bottom` hook; subiquity finds
+it and asks for confirmation (no `autoinstall` kernel word). Debian
+`/preseed.cfg` at the initrd root (initrd preseeding, read before the
+language questions). Fedora `/usos/answer/ks.cfg` with
+`inst.ks=file:/usos/answer/ks.cfg` (`Format.cpioPath` /
+`Format.kernelArgument`).
+
+Status: renderers and goldens only
+(`src/flow/answer/testdata/golden/linux/`, Zig test plus
+`tools/tests/test_answer_render.py`). Wiring into the answer screen and
+`linux_iso_start` is a follow-up by the lead; no installer has consumed
+these files on hardware or in QEMU yet.
+
 ## UEFI answer-profile manager
 
 The answer-file screen (`src/platform/uefi/manual_unattended.zig`, rows
