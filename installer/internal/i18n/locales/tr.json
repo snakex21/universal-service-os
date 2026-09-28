@@ -982,6 +982,7 @@
   "boot.profile.value.same_language": "Dille aynı",
   "boot.profile.value.same_locale": "Biçimlerle aynı",
   "boot.profile.value.setup_asks": "(Kurulum sorar)",
+  "boot.profile.value.edition_manual": "Elle yaz…",
   "boot.profile.badge_incomplete": "Eksik",
   "boot.profile.missing.key": "{0} için ürün anahtarı yok: Kurulum ürün anahtarı sayfasında durur. Profili düzenleyin (X) ve anahtarı girin.",
   "boot.profile.missing.password": "{0} en az 7 karakterli ve şunlardan üçünü içeren bir parola ister: büyük harf, küçük harf, rakam, simge. Parola yoksa Kurulum Administrator parolası sayfasında durur.",

@@ -982,6 +982,7 @@
   "boot.profile.value.same_language": "Όπως η γλώσσα",
   "boot.profile.value.same_locale": "Όπως οι μορφές",
   "boot.profile.value.setup_asks": "(ρωτά η εγκατάσταση)",
+  "boot.profile.value.edition_manual": "Πληκτρολόγηση με το χέρι…",
   "boot.profile.badge_incomplete": "Ελλιπές",
   "boot.profile.missing.key": "Δεν υπάρχει Product Key για {0}: η εγκατάσταση σταματά στη σελίδα του κλειδιού. Επεξεργαστείτε το προφίλ (X) και εισαγάγετε το κλειδί.",
   "boot.profile.missing.password": "Τα {0} χρειάζονται κωδικό τουλάχιστον 7 χαρακτήρων με τρία από: κεφαλαία, πεζά, ψηφία, σύμβολα. Χωρίς αυτόν η εγκατάσταση σταματά στη σελίδα κωδικού του διαχειριστή.",

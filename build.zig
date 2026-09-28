@@ -113,7 +113,18 @@ fn addHostTests(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
     const work_boot_path_tests = b.addTest(.{ .root_module = work_boot_path_module });
     const run_work_boot_path_tests = b.addRunArtifact(work_boot_path_tests);
 
+    // Legacy BIOS menu rows (named "catalog"/"graphics" imports like the Core).
+    const bios_image_rows_module = b.createModule(.{
+        .root_source_file = b.path("src/platform/bios/image_rows.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    bios_image_rows_module.addImport("catalog", b.createModule(.{ .root_source_file = b.path("src/catalog_module.zig"), .target = target, .optimize = optimize }));
+    bios_image_rows_module.addImport("graphics", b.createModule(.{ .root_source_file = b.path("src/legacy_graphics_module.zig"), .target = target, .optimize = optimize }));
+    const run_bios_image_rows_tests = b.addRunArtifact(b.addTest(.{ .root_module = bios_image_rows_module }));
+
     const test_step = b.step("test", "Run all unit tests");
+    test_step.dependOn(&run_bios_image_rows_tests.step);
     test_step.dependOn(&run_unit_tests.step);
     test_step.dependOn(&run_framebuffer_tests.step);
     test_step.dependOn(&run_work_boot_path_tests.step);

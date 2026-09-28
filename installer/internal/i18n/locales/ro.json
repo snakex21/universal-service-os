@@ -985,6 +985,7 @@
   "boot.profile.value.same_language": "Ca limba",
   "boot.profile.value.same_locale": "Ca formatele",
   "boot.profile.value.setup_asks": "(întreabă instalarea)",
+  "boot.profile.value.edition_manual": "Introdu manual…",
   "boot.profile.badge_incomplete": "Incomplet",
   "boot.profile.missing.key": "Lipsește cheia de produs pentru {0}: instalarea se oprește la pagina cheii de produs. Editați profilul (X) și introduceți cheia.",
   "boot.profile.missing.password": "{0} necesită o parolă de cel puțin 7 caractere cu trei dintre: majuscule, minuscule, cifre, simboluri. Fără ea, instalarea se oprește la pagina parolei de administrator.",

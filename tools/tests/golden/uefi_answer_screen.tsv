@@ -26,6 +26,9 @@ images-esc	screen	list Windows
 win10-open	screen	list Boot method
 win10-method	screen	list Unattended setup
 win10-answer	rows	no_answer,add
+edition-row	form	label=Edition value=(Setup asks)
+edition-pick	form	Pro
+edition-typed	form	Home
 win10-summary	screen	summary Ready to start
 win10-back-summary	screen	list Unattended setup
 win10-back	screen	list Boot method

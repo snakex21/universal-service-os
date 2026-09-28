@@ -985,6 +985,7 @@
   "boot.profile.value.same_language": "Як мова",
   "boot.profile.value.same_locale": "Як формати",
   "boot.profile.value.setup_asks": "(інсталятор запитає)",
+  "boot.profile.value.edition_manual": "Ввести вручну…",
   "boot.profile.badge_incomplete": "Неповний",
   "boot.profile.missing.key": "Немає ключа продукту для {0}: інсталяція зупиниться на сторінці ключа. Змініть профіль (X) і введіть ключ.",
   "boot.profile.missing.password": "{0} потребує пароль щонайменше з 7 символів трьох груп: великі, малі літери, цифри, символи. Без нього інсталяція зупиниться на сторінці пароля адміністратора.",

@@ -982,6 +982,7 @@
   "boot.profile.value.same_language": "Sama kuin kieli",
   "boot.profile.value.same_locale": "Sama kuin muodot",
   "boot.profile.value.setup_asks": "(asennus kysyy)",
+  "boot.profile.value.edition_manual": "Kirjoita käsin…",
   "boot.profile.badge_incomplete": "Keskeneräinen",
   "boot.profile.missing.key": "Ei tuoteavainta: {0}. Asennus pysähtyy tuoteavainsivulle. Muokkaa profiilia (X) ja anna avain.",
   "boot.profile.missing.password": "{0} vaatii vähintään 7 merkin salasanan, jossa on kolme näistä: isot kirjaimet, pienet kirjaimet, numerot, symbolit. Ilman sitä asennus pysähtyy Administrator-salasanan sivulle.",

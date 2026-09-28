@@ -364,6 +364,56 @@ def run(disk: Path, out: Path) -> list[str]:
         golden.append(f"images-esc\tscreen\t{seen[-1] if seen else '-'}")
         shot("systems")
 
+        # 5a. The edition pick list of the Windows 10 editor (the placeholder
+        # ISO has no readable install image: the usual Windows 10 editions,
+        # then "Type manually..."): pick Pro, type a value, Y/Del back to
+        # "(Setup asks)", X/F2 types again, Esc saves nothing.
+        def edition_flow() -> None:
+            key("end", r"\[UI_ROW_SELECTED\]", 8)
+            chunk = key("ret", r"\[UI_SCREEN\] form", 15)
+            check("edition: + Add opens the Windows 10 editor", "form New answer profile" in screens(chunk), str(screens(chunk)))
+            last = (forms(chunk) or ["-"])[-1]
+            for _ in range(20):
+                if "label=Edition" in last:
+                    break
+                chunk = key("down", r"\[UI_FORM\] selected", 8)
+                last = (forms(chunk) or ["-"])[-1]
+            check("edition: the Edition row starts at Setup asks", "label=Edition value=(Setup asks)" in last, last)
+            golden.append("edition-row\tform\t" + re.sub(r"^selected index=\d+ ", "", last))
+            chunk = key("ret", r"\[UI_LIST\]", 10)
+            opened = screens(chunk)
+            check("edition: Enter opens the pick list", bool(opened) and opened[-1] == "list Edition", str(opened))
+            shot("edition-picker")
+            for _ in range(4):
+                monitor.key("down", 0.35)
+            chunk = key("ret", r"\[UI_FORM\] changed", 10)
+            picked = "label=Edition value=Pro" in "\n".join(forms(chunk))
+            check("edition: Pro picked from the list", picked, "\n".join(forms(chunk))[-300:])
+            golden.append("edition-pick\tform\t" + ("Pro" if picked else "-"))
+            # The last option types on the keyboard.
+            key("ret", r"\[UI_LIST\]", 10)
+            key("end", None)
+            chunk = key("ret", r"\[UI_FORM\] edit", 10)
+            check("edition: Type manually opens the keyboard", "[UI_FORM] edit" in chunk and "label=Edition" in chunk, chunk[-300:])
+            type_text("Pro N")
+            key("ret", r"\[UI_FORM\]", 5)
+            values = "\n".join(forms(serial.text()))
+            check("edition: typed value shown", "label=Edition value=Pro N" in values, values[-300:])
+            shot("edition-typed")
+            chunk = key("delete", r"\[UI_FORM\] changed", 8)
+            check("edition: Y/Del goes back to Setup asks", "label=Edition value=(Setup asks)" in "\n".join(forms(chunk)), "\n".join(forms(chunk))[-300:])
+            chunk = key("f2", r"\[UI_FORM\] edit", 8)
+            check("edition: X/F2 opens the keyboard", "[UI_FORM] edit" in chunk, chunk[-300:])
+            type_text("Home")
+            key("ret", r"\[UI_FORM\]", 5)
+            values = "\n".join(forms(serial.text()))
+            typed = "label=Edition value=Home" in values
+            check("edition: X/F2 typed value", typed, values[-300:])
+            golden.append("edition-typed\tform\t" + ("Home" if typed else "-"))
+            chunk = key("esc", r"\[UI_ROW\]", 15)
+            check("edition: Esc leaves the editor without saving", f"list {ANSWER_TITLE}" in screens(chunk) and "[PROFILE] saved" not in chunk, chunk[-300:])
+            key("home", r"\[UI_ROW_SELECTED\]", 8)
+
         # 5. Windows 10 (empty Unattended folder): the answer screen now
         # offers the profiles; Back from whatever follows the image must land
         # on the image list, not reopen it.
@@ -379,6 +429,7 @@ def run(disk: Path, out: Path) -> list[str]:
                 observed = rows(chunk)
                 golden.append("win10-answer\trows\t" + ",".join(r.split(" | ")[0] for r in observed))
                 check("Windows 10: answer screen with manual and add rows", [r.split(" | ")[0] for r in observed] == ["no_answer", "add"], str(observed))
+                edition_flow()
                 chunk = key("esc", r"\[UI_SCREEN\]")
                 seen = screens(chunk)
                 check("Windows 10: Back from the answer screen", bool(seen) and seen[-1] in ("list Windows 10", "list Boot method"), str(seen))
@@ -398,6 +449,7 @@ def run(disk: Path, out: Path) -> list[str]:
                     observed = rows(chunk)
                     golden.append("win10-answer\trows\t" + ",".join(r.split(" | ")[0] for r in observed))
                     check("Windows 10: answer screen with manual and add rows", [r.split(" | ")[0] for r in observed] == ["no_answer", "add"], str(observed))
+                    edition_flow()
                     chunk = key("ret", r"\[UI_SCREEN\] summary", 15)
                     nxt = screens(chunk)
                     golden.append(f"win10-summary\tscreen\t{nxt[-1] if nxt else '-'}")

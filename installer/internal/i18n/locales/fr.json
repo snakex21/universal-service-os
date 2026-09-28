@@ -982,6 +982,7 @@
   "boot.profile.value.same_language": "Comme la langue",
   "boot.profile.value.same_locale": "Comme les formats",
   "boot.profile.value.setup_asks": "(demandé à l'installation)",
+  "boot.profile.value.edition_manual": "Saisir manuellement…",
   "boot.profile.badge_incomplete": "Incomplet",
   "boot.profile.missing.key": "Aucune clé de produit pour {0} : le programme d'installation s'arrête à la page de la clé de produit. Modifiez le profil (X) et saisissez la clé.",
   "boot.profile.missing.password": "{0} exige un mot de passe d'au moins 7 caractères avec trois types parmi : majuscules, minuscules, chiffres, symboles. Sans lui, le programme d'installation s'arrête à la page du mot de passe Administrateur.",

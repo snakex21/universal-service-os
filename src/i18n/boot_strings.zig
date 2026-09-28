@@ -515,6 +515,7 @@ pub const Key = enum(u16) {
     profile_section_extras,
     profile_summary,
     profile_value_auto,
+    profile_value_edition_manual,
     profile_value_network_home,
     profile_value_network_public,
     profile_value_network_work,
@@ -1175,6 +1176,7 @@ pub const hashes = [_]u32{
     0xd52428ac, // profile.section.extras
     0xea748758, // profile.summary
     0x803f740e, // profile.value.auto
+    0x74eb2ac4, // profile.value.edition_manual
     0x94a66e59, // profile.value.network_home
     0x0742279f, // profile.value.network_public
     0xce89b51b, // profile.value.network_work
@@ -1649,6 +1651,7 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
     false,
     false,
     false,
@@ -2497,6 +2500,7 @@ pub const english = [_][]const u8{
     "Appearance and extras",
     "Profile {0}: {1} ({2})",
     "Automatic",
+    "Type manually\xe2\x80\xa6",
     "Home",
     "Public",
     "Work",

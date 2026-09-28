@@ -982,6 +982,7 @@
   "boot.profile.value.same_language": "Wie die Sprache",
   "boot.profile.value.same_locale": "Wie die Formate",
   "boot.profile.value.setup_asks": "(Setup fragt)",
+  "boot.profile.value.edition_manual": "Manuell eingeben…",
   "boot.profile.badge_incomplete": "Unvollständig",
   "boot.profile.missing.key": "Kein Produktschlüssel für {0}: Setup hält auf der Seite für den Produktschlüssel an. Bearbeiten Sie das Profil (X) und geben Sie den Schlüssel ein.",
   "boot.profile.missing.password": "{0} braucht ein Kennwort mit mindestens 7 Zeichen und drei von: Großbuchstaben, Kleinbuchstaben, Ziffern, Sonderzeichen. Ohne Kennwort hält Setup auf der Seite für das Administratorkennwort an.",

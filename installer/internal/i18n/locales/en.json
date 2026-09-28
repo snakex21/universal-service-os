@@ -982,6 +982,7 @@
   "boot.profile.value.same_language": "Same as the language",
   "boot.profile.value.same_locale": "Same as the formats",
   "boot.profile.value.setup_asks": "(Setup asks)",
+  "boot.profile.value.edition_manual": "Type manually…",
   "boot.profile.badge_incomplete": "Incomplete",
   "boot.profile.missing.key": "No product key for {0}: Setup stops on the product key page. Edit the profile (X) and enter the key.",
   "boot.profile.missing.password": "{0} needs a password of at least 7 characters with three of: capitals, small letters, digits, symbols. Without one Setup stops on the Administrator password page.",

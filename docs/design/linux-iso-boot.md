@@ -364,3 +364,23 @@ Fixed afterwards:
   USOS load; a photo of that screen is needed to go further.
 - Linux wording: Secure Boot notice ("This ISO has no boot loader signed for
   Secure Boot"), "+ Add a new profile" hint and editor subtitle, 27 locales.
+
+## 13. BIOS garbled names: the real cause (2026-09-28, evening)
+
+The EBDA stack change above did not fix it (B260928-150941 on the 939).
+Reproduced in QEMU/SeaBIOS on the Linux test VHD: Ubuntu (2 ISOs) showed
+`ubuntu-24.04.5.1??????????>????? ???` on **both** rows. Cause:
+`graphics_menu.imageRows` did `const image = images_list.items[index];` and
+stored `image.name.slice()` in the row: a slice into a 136-byte copy on
+imageRows' own stack frame (one slot for every row, so all rows showed the
+last name), dead once imageRows returned; `showList` then reused the frame
+and overwrote everything after the first 16 bytes. Nothing to do with NTFS:
+the DATA metadata on the Kingston is normal (read-only check: POSIX-namespace
+$FILE_NAME like the Windows ISOs, resident $I30, no name across a USA
+fixup), and the UEFI menu builds its rows from pointers. Fix:
+`src/platform/bios/image_rows.zig` (rows point into the caller's ImageList),
+host test in `zig build test` that checks the pointer identity after a stack
+clobber (fails with the old code in Debug and ReleaseSmall). QEMU after the
+fix: both Ubuntu names and the Mint name complete. The EBDA stack clamp stays
+(harmless). Windows lists were affected the same way (every row the last
+name); they looked fine only where one short name survived.

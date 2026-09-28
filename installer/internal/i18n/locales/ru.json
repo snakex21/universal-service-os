@@ -985,6 +985,7 @@
   "boot.profile.value.same_language": "Как язык",
   "boot.profile.value.same_locale": "Как форматы",
   "boot.profile.value.setup_asks": "(установка спросит)",
+  "boot.profile.value.edition_manual": "Ввести вручную…",
   "boot.profile.badge_incomplete": "Неполный",
   "boot.profile.missing.key": "Нет ключа продукта для {0}: установка остановится на странице ключа. Измените профиль (X) и введите ключ.",
   "boot.profile.missing.password": "{0} требует пароль не короче 7 символов из трёх групп: заглавные, строчные, цифры, символы. Без него установка остановится на странице пароля администратора.",

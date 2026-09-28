@@ -985,6 +985,7 @@
   "boot.profile.value.same_language": "Isto kao jezik",
   "boot.profile.value.same_locale": "Isto kao formati",
   "boot.profile.value.setup_asks": "(pita instalacija)",
+  "boot.profile.value.edition_manual": "Unesi ručno…",
   "boot.profile.badge_incomplete": "Nepotpun",
   "boot.profile.missing.key": "Nema ključa proizvoda za {0}: instalacija staje na stranici ključa proizvoda. Uredite profil (X) i unesite ključ.",
   "boot.profile.missing.password": "{0} traži lozinku od najmanje 7 znakova sa tri od: velika slova, mala slova, cifre, simboli. Bez nje instalacija staje na stranici lozinke administratora.",

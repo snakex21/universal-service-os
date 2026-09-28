@@ -68,6 +68,11 @@ pub const Field = struct {
     // choice
     options: []const []const u8 = &.{},
     index: ?*usize = null,
+    /// A choice whose last option ("Type manually...") is typed on the
+    /// keyboard into `text`: picking it (or X/F2 on the row) opens the
+    /// keyboard, Y/Del goes back to the first option, and the row shows the
+    /// typed value.
+    manual: bool = false,
     // toggle
     flag: ?*bool = null,
     // stepper (0..255, Left/Right by `step`)
@@ -140,7 +145,10 @@ fn refreshItems() void {
                 } else item.value = value;
                 if (item.placeholder.len == 0) item.placeholder = t(.form_empty);
             },
-            .choice => item.value = if (field.index) |i| (if (i.* < field.options.len) field.options[i.*] else "") else "",
+            .choice => {
+                item.value = if (field.index) |i| (if (i.* < field.options.len) field.options[i.*] else "") else "";
+                if (onManual(field) and field.text.?.len > 0) item.value = field.text.?.slice();
+            },
             .toggle => {
                 item.on = field.flag.?.*;
                 item.value = if (item.on) t(.form_on) else t(.form_off);
@@ -150,6 +158,24 @@ fn refreshItems() void {
         }
         items[index] = item;
     }
+}
+
+/// The field is a manual choice set to its "type manually" option.
+fn onManual(field: *const Field) bool {
+    return field.kind == .choice and field.manual and field.text != null and field.options.len > 0 and field.index.?.* == field.options.len - 1;
+}
+
+fn manualField(index: usize) bool {
+    if (index >= form_fields.len) return false;
+    const field = &form_fields[index];
+    return field.kind == .choice and field.manual and field.text != null and field.enabled;
+}
+
+/// Opens the keyboard for a manual choice (its last option).
+fn startManual(index: usize) void {
+    const field = &form_fields[index];
+    field.index.?.* = field.options.len - 1;
+    startEditing(index);
 }
 
 fn formHints() void {
@@ -170,6 +196,13 @@ fn formHints() void {
         n += 1;
         hints[n] = .{ .key = input.enterKey(), .label = t(.form_key_change) };
         n += 1;
+        const owner_xy = if (form_hooks) |h| h.x_label != null or h.y_label != null else false;
+        if (!owner_xy and manualField(screen.spec.selected)) {
+            hints[n] = .{ .key = input.xKey(), .label = t(.profile_key_edit) };
+            n += 1;
+            hints[n] = .{ .key = input.yKey(), .label = t(.profile_key_delete) };
+            n += 1;
+        }
         if (form_hooks) |h| {
             if (h.x_label) |label| {
                 hints[n] = .{ .key = input.xKey(), .label = label };
@@ -227,7 +260,7 @@ fn trace(kind: []const u8, index: usize) void {
     var line: [160]u8 = undefined;
     const value: []const u8 = switch (field.kind) {
         .text => if (field.secret) (if (field.text.?.len > 0) "(secret)" else "") else field.text.?.slice(),
-        .choice => if (field.index) |i| (if (i.* < field.options.len) field.options[i.*] else "") else "",
+        .choice => if (onManual(field) and field.text.?.len > 0) field.text.?.slice() else if (field.index) |i| (if (i.* < field.options.len) field.options[i.*] else "") else "",
         .toggle => if (field.flag.?.*) "on" else "off",
         .stepper => std.fmt.bufPrint(&trace_number, "{d}", .{field.number.?.*}) catch "",
         .action, .section => "",
@@ -271,14 +304,44 @@ pub fn run(title: []const u8, subtitle: []const u8, fields: []Field, hooks: ?Hoo
             if (keyboardEvent(event, index)) |closed| {
                 _ = closed;
                 editing = null;
+                // Nothing typed on "type manually": back to the first option.
+                const field = &fields[index];
+                if (onManual(field) and field.text.?.len == 0) {
+                    field.index.?.* = 0;
+                    notifyChanged(index);
+                }
                 rebuild(selected.*);
                 screen.redraw();
             }
             continue;
         }
         switch (event) {
-            .x_button => if (hooks != null and hooks.?.x_label != null) return .{ .x_on = selected.* },
-            .y_button => if (hooks != null and hooks.?.y_label != null) return .{ .y_on = selected.* },
+            .x_button => {
+                if (hooks != null and hooks.?.x_label != null) return .{ .x_on = selected.* };
+                if (manualField(selected.*)) {
+                    // Edit: the keyboard on the value shown now.
+                    const field = &fields[selected.*];
+                    if (!onManual(field)) {
+                        const shown = field.options[field.index.?.*];
+                        field.text.?.set(if (field.index.?.* == 0) "" else shown);
+                    }
+                    startManual(selected.*);
+                    rebuild(selected.*);
+                    screen.redraw();
+                }
+            },
+            .y_button => {
+                if (hooks != null and hooks.?.y_label != null) return .{ .y_on = selected.* };
+                if (manualField(selected.*)) {
+                    // Delete: back to the first option (e.g. "Setup asks").
+                    const field = &fields[selected.*];
+                    field.index.?.* = 0;
+                    field.text.?.set("");
+                    notifyChanged(selected.*);
+                    rebuild(selected.*);
+                    screen.redrawRows();
+                }
+            },
             .left, .right => {
                 const field = &fields[selected.*];
                 if (!field.enabled) continue;
@@ -342,7 +405,15 @@ pub fn run(title: []const u8, subtitle: []const u8, fields: []Field, hooks: ?Hoo
                     .other => |key| {
                         // A printable key on a text row starts editing with it.
                         const field = &fields[selected.*];
-                        if (field.kind == .text and field.enabled and key.unicode >= 0x20 and key.unicode < 0x7f) {
+                        const printable = key.unicode >= 0x20 and key.unicode < 0x7f;
+                        if (printable and manualField(selected.*)) {
+                            // Typing on a manual choice types a new value.
+                            if (!onManual(field)) field.text.?.set("");
+                            startManual(selected.*);
+                            _ = typeChar(selected.*, @intCast(key.unicode));
+                            rebuild(selected.*);
+                            screen.redraw();
+                        } else if (field.kind == .text and field.enabled and printable) {
                             startEditing(selected.*);
                             _ = typeChar(selected.*, @intCast(key.unicode));
                             rebuild(selected.*);
@@ -400,8 +471,11 @@ fn activate(selected: *usize) ?Outcome {
             screen.redraw();
         },
         .choice => {
-            if (pick(field)) {
-                notifyChanged(index);
+            const picked = pick(field);
+            if (picked) |changed| {
+                if (changed) notifyChanged(index);
+                // "Type manually": the keyboard on the typed value.
+                if (onManual(field)) startEditing(index);
             }
             rebuild(index);
             screen.redraw();
@@ -417,10 +491,11 @@ fn activate(selected: *usize) ?Outcome {
 
 var picker_rows: [96]gui.ui.Row = undefined;
 
-/// List picker for a choice (time zone, language). True when changed.
-fn pick(field: *Field) bool {
+/// List picker for a choice (time zone, language): null on Back, else
+/// whether the value changed.
+fn pick(field: *Field) ?bool {
     const count = @min(field.options.len, picker_rows.len);
-    if (count == 0) return false;
+    if (count == 0) return null;
     for (field.options[0..count], 0..) |option, i| picker_rows[i] = .{ .title = option };
     var selected: usize = @min(field.index.?.*, count - 1);
     var list: view.ListScreen = undefined;
@@ -432,7 +507,7 @@ fn pick(field: *Field) bool {
                 field.index.?.* = selected;
                 return changed;
             },
-            .back => return false,
+            .back => return null,
             .changed => list.updateSelection(selected, null),
             .pointer_moved => view.updatePointer(),
             .ignored => {},

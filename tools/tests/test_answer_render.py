@@ -419,6 +419,25 @@ def main() -> int:
             check(name + ' edition not on the media: Setup asks', 'ImageInstall' not in text and 'not on the media' in r.stderr.decode())
         check(name + ' still no disk settings', 'InstallTo' not in text and 'DiskConfiguration' not in text)
 
+    # Vista SP2 x64 pl (pl_windows_vista_with_sp2_x64_dvd_x15-36359.iso): no
+    # EDITIONID, the FLAGS carry the id; the short "Ultimate" is image 4 and
+    # the common "Professional" is not a Vista edition (Setup asks).
+    vista_xml = DATA / 'vista-sp2-x64-pl.install.xml'
+    for system, expect in (('windows-vista', '4'), ('windows-server-2008', None)):
+        name = f'edition.vista-sp2.{system}.amd64.xml'
+        r = tool('render', str(DATA / 'edition-vista.profile.ini'), system, 'amd64', str(OUT / name), '-', str(vista_xml))
+        check('render ' + name, r.returncode == 0, r.stderr.decode(errors='replace'))
+        if r.returncode != 0:
+            continue
+        data = (OUT / name).read_bytes()
+        golden(name, data)
+        check_xml(name, data, 'amd64')
+        text = data.decode()
+        if expect:
+            check(name + ' Ultimate by index', '<Key>/IMAGE/INDEX</Key>' in text and f'<Value>{expect}</Value>' in text and 'image 4 (Windows Vista Ultimate)' in r.stderr.decode(), r.stderr.decode(errors='replace'))
+        else:
+            check(name + ' Professional not on Vista media: Setup asks', 'ImageInstall' not in text and 'not on the media' in r.stderr.decode(), r.stderr.decode(errors='replace'))
+
     # NT5 through the staging merge.
     for system, base, _layout in NT5:
         rendered = OUT / f'full.{system}.nt5-settings.ini'

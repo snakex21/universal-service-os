@@ -982,6 +982,7 @@
   "boot.profile.value.same_language": "Sama mis keel",
   "boot.profile.value.same_locale": "Sama mis vormingud",
   "boot.profile.value.setup_asks": "(install küsib)",
+  "boot.profile.value.edition_manual": "Sisesta käsitsi…",
   "boot.profile.badge_incomplete": "Puudulik",
   "boot.profile.missing.key": "{0} jaoks pole tootevõtit: install peatub tootevõtme lehel. Muutke profiili (X) ja sisestage võti.",
   "boot.profile.missing.password": "{0} vajab vähemalt 7-märgilist parooli, milles on kolm neist: suurtähed, väiketähed, numbrid, sümbolid. Ilma selleta peatub install administraatori parooli lehel.",

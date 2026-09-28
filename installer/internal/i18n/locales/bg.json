@@ -982,6 +982,7 @@
   "boot.profile.value.same_language": "Както езика",
   "boot.profile.value.same_locale": "Както форматите",
   "boot.profile.value.setup_asks": "(инсталацията пита)",
+  "boot.profile.value.edition_manual": "Въведете ръчно…",
   "boot.profile.badge_incomplete": "Непълен",
   "boot.profile.missing.key": "Няма продуктов ключ за {0}: инсталацията спира на страницата за ключа. Редактирайте профила (X) и въведете ключа.",
   "boot.profile.missing.password": "{0} изисква парола от поне 7 знака с три от: главни букви, малки букви, цифри, символи. Без нея инсталацията спира на страницата за паролата на администратора.",

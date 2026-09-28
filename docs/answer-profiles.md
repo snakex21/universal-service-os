@@ -149,7 +149,9 @@ shows "Edition: <name> (image <n>)".
 
 Matching, in this order:
 
-1. the stored id: the image's `EDITIONID`, plus `Core` for a Server Core
+1. the stored id: the image's `EDITIONID` (Vista / Server 2008 media have
+   none: their `FLAGS`, e.g. `ULTIMATE`, `HOMEPREMIUM`; neither: the edition
+   words of the name), plus `Core` for a Server Core
    image whose `EDITIONID` does not say so (2012 and later):
    `Professional`, `ServerStandard`, `ServerStandardCore`. The editor
    stores this id when the edition is picked from an ISO, so it works on
@@ -163,14 +165,27 @@ Matching, in this order:
    `Desktop Experience` / `GUI` / `Full` the Desktop Experience; neither:
    the Desktop Experience when the ISO has it, else Core.
 
-Windows 7 `Home` is ambiguous (Home Basic / Home Premium) and matches
-nothing: Setup asks.
+The words are compared as a whole, never as a prefix: Windows 7 `Home` is
+ambiguous (Home Basic / Home Premium) and matches nothing, `Home Premium`
+never takes Home Basic, `Professional` never takes Professional N. Two images
+that fit equally well (an x86 + x64 ISO with the same edition) are ambiguous
+too. Ambiguous or not found: no edition is written and Setup asks.
+Vista SP2 x64 pl (`pl_windows_vista_with_sp2_x64_dvd_x15-36359.iso`, no
+`EDITIONID`): `Ultimate`, `ultimate`, `Windows Vista Ultimate` -> image 4
+(test data `testdata/vista-sp2-x64-pl.install.xml`, golden
+`edition.vista-sp2.windows-vista.amd64.xml`).
 
-Editor: opened from an install flow with an ISO of a 6.x+ system, the
-edition is a list picker filled from that ISO (DISPLAYNAME, else NAME;
-"(Setup asks)" first; a stored value that is not on the ISO stays in the
-list as it is). Elsewhere it is a text field. The editor edits
-`edition.<system-id>` of the system it was opened from.
+Editor (6.x+ systems; XP/2000/2003 have no edition row): the edition is a
+pick list: "(Setup asks)", then the images of the chosen ISO when the editor
+is opened from an install flow (DISPLAYNAME, else NAME; stored as the id
+above), then the usual editions of the release (`editions.known`: Vista
+Starter ... Enterprise, 7, 8/8.1, 10/11, Server 2008/R2 with Core, 2012+
+Desktop Experience / Server Core; those on the ISO are left out), and last
+"Type manually..." (the on-screen or physical keyboard). A stored value in
+no list is shown as the typed value. Pad: A opens the list, X (F2) types
+(starting from the value shown), Y (Del) goes back to "(Setup asks)", B
+back; typing on the row with a physical keyboard types a new value. The
+editor edits `edition.<system-id>` of the system it was opened from.
 
 ### Neutral ids
 
@@ -425,7 +440,15 @@ separate step with a Vista/7 hardware test).
   real metadata of `pl_windows_7_professional_with_sp1_x64_dvd_u_676944.iso`)
   and `edition.windows-vista.amd64.xml` (common `edition=Enterprise`, not
   on the media: no `ImageInstall`). `usos-answer render ... [KEY|-]
-  [INSTALL-XML]` takes the install.wim XML.
+  [INSTALL-XML]` takes the install.wim XML. Vista SP2 x64 pl
+  (`testdata/edition-vista.profile.ini`,
+  `testdata/vista-sp2-x64-pl.install.xml`, no EDITIONID):
+  `edition.vista-sp2.windows-vista.amd64.xml` (`Ultimate` -> image 4) and
+  `edition.vista-sp2.windows-server-2008.amd64.xml` (`Professional`: Setup
+  asks). Zig: `editions` tests (FLAGS, names only, Home Premium / Home
+  Basic, Professional / Professional N, x86 + x64 ties, known editions).
+- click-through step 5a: the Windows 10 editor's edition pick list (Pro
+  from the list, "Type manually", Del back to "(Setup asks)", F2 types).
 
 ### Hardware (X470, 2026-09-26)
 

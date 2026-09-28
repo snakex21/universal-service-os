@@ -985,6 +985,7 @@
   "boot.profile.value.same_language": "Jako jazyk",
   "boot.profile.value.same_locale": "Jako formáty",
   "boot.profile.value.setup_asks": "(zeptá se instalace)",
+  "boot.profile.value.edition_manual": "Zadat ručně…",
   "boot.profile.badge_incomplete": "Neúplný",
   "boot.profile.missing.key": "Chybí kód Product Key pro {0}: instalace se zastaví na stránce kódu Product Key. Upravte profil (X) a zadejte kód.",
   "boot.profile.missing.password": "{0} vyžaduje heslo o délce aspoň 7 znaků se třemi z: velká písmena, malá písmena, číslice, symboly. Bez něj se instalace zastaví na stránce hesla správce.",

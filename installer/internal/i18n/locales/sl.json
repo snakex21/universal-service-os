@@ -988,6 +988,7 @@
   "boot.profile.value.same_language": "Enako kot jezik",
   "boot.profile.value.same_locale": "Enako kot oblike zapisa",
   "boot.profile.value.setup_asks": "(vpraša namestitev)",
+  "boot.profile.value.edition_manual": "Vnesi ročno…",
   "boot.profile.badge_incomplete": "Nepopoln",
   "boot.profile.missing.key": "Ni ključa izdelka za {0}: namestitev se ustavi na strani ključa izdelka. Uredite profil (X) in vnesite ključ.",
   "boot.profile.missing.password": "{0} zahteva geslo z vsaj 7 znaki s tremi od: velike črke, male črke, števke, simboli. Brez njega se namestitev ustavi na strani gesla skrbnika.",

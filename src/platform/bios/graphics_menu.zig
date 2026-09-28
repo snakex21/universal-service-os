@@ -8,6 +8,7 @@ const graphics = @import("graphics");
 const vbe_probe = @import("vbe_probe.zig");
 const boot_ui = @import("boot_ui.zig");
 const menu_pointer = @import("menu_pointer.zig");
+const image_rows = @import("image_rows.zig");
 
 const Ui = graphics.ui.Ui;
 const Row = graphics.ui.Row;
@@ -239,11 +240,7 @@ pub fn utilitySelection(session: *const vbe_probe.Session, discovery: *catalog.m
 }
 
 fn imageRows(build: *ListBuild, images_list: *const catalog.ImageList) void {
-    build.count = @min(images_list.len, max_rows);
-    for (0..build.count) |index| {
-        const image = images_list.items[index];
-        build.rows[index] = .{ .title = image.name.slice(), .icon = .{ .label = kindLabel(image.kind) } };
-    }
+    build.count = image_rows.fill(&build.rows, images_list);
 }
 
 pub fn images(session: *const vbe_probe.Session, title: []const u8, images_list: *const catalog.ImageList, selected: usize) void {
@@ -533,16 +530,6 @@ pub fn windowsSetupProgress(session: *const vbe_probe.Session, percent: u8) void
     progressFrame(session, "Starting Windows Setup", "Reading the installer from USB", ui.format(&detail, .bios_setup_progress, &.{value}), percent, &setup_labels);
 }
 
-fn kindLabel(kind: catalog.ImageKind) []const u8 {
-    return switch (kind) {
-        .iso => "ISO",
-        .wim => "WIM",
-        .img => "IMG",
-        .vhd => "VHD",
-        .vhdx => "VHDX",
-        .efi => "EFI",
-    };
-}
 
 /// "Please wait" screen while a DOS/FreeDOS session is assembled in memory.
 pub fn busy(session: *const vbe_probe.Session, title: []const u8) void {

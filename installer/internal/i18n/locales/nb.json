@@ -982,6 +982,7 @@
   "boot.profile.value.same_language": "Samme som språket",
   "boot.profile.value.same_locale": "Samme som formatene",
   "boot.profile.value.setup_asks": "(Setup spør)",
+  "boot.profile.value.edition_manual": "Skriv inn manuelt…",
   "boot.profile.badge_incomplete": "Ufullstendig",
   "boot.profile.missing.key": "Ingen produktnøkkel for {0}: Setup stopper på siden for produktnøkkelen. Rediger profilen (X) og skriv inn nøkkelen.",
   "boot.profile.missing.password": "{0} krever et passord på minst 7 tegn med tre av: store bokstaver, små bokstaver, sifre, symboler. Uten passord stopper Setup på siden for Administrator-passordet.",

@@ -982,6 +982,7 @@
   "boot.profile.value.same_language": "Igual que el idioma",
   "boot.profile.value.same_locale": "Igual que los formatos",
   "boot.profile.value.setup_asks": "(lo pregunta la instalación)",
+  "boot.profile.value.edition_manual": "Escribir manualmente…",
   "boot.profile.badge_incomplete": "Incompleto",
   "boot.profile.missing.key": "Sin clave de producto para {0}: el programa de instalación se detiene en la página de la clave. Edite el perfil (X) e introduzca la clave.",
   "boot.profile.missing.password": "{0} necesita una contraseña de al menos 7 caracteres con tres de: mayúsculas, minúsculas, dígitos, símbolos. Sin ella, el programa de instalación se detiene en la página de contraseña del Administrador.",

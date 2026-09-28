@@ -982,6 +982,7 @@
   "boot.profile.value.same_language": "Zelfde als de taal",
   "boot.profile.value.same_locale": "Zelfde als de notaties",
   "boot.profile.value.setup_asks": "(Setup vraagt)",
+  "boot.profile.value.edition_manual": "Handmatig invoeren…",
   "boot.profile.badge_incomplete": "Onvolledig",
   "boot.profile.missing.key": "Geen productcode voor {0}: Setup stopt op de pagina voor de productcode. Bewerk het profiel (X) en voer de code in.",
   "boot.profile.missing.password": "{0} vereist een wachtwoord van minstens 7 tekens met drie van: hoofdletters, kleine letters, cijfers, symbolen. Zonder wachtwoord stopt Setup op de pagina voor het Administrator-wachtwoord.",

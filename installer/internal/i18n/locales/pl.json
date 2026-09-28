@@ -985,6 +985,7 @@
   "boot.profile.value.same_language": "Jak język",
   "boot.profile.value.same_locale": "Jak formaty",
   "boot.profile.value.setup_asks": "(Instalator zapyta)",
+  "boot.profile.value.edition_manual": "Wpisz ręcznie…",
   "boot.profile.badge_incomplete": "Niekompletny",
   "boot.profile.missing.key": "Brak klucza produktu dla {0}: Instalator zatrzyma się na stronie klucza produktu. Edytuj profil (X) i wpisz klucz.",
   "boot.profile.missing.password": "{0} wymaga hasła: co najmniej 7 znaków, trzy rodzaje z: wielkie litery, małe litery, cyfry, symbole. Bez niego Instalator zatrzyma się na stronie hasła Administratora.",

@@ -982,6 +982,7 @@
   "boot.profile.value.same_language": "Igual ao idioma",
   "boot.profile.value.same_locale": "Igual aos formatos",
   "boot.profile.value.setup_asks": "(a instalação pergunta)",
+  "boot.profile.value.edition_manual": "Digitar manualmente…",
   "boot.profile.badge_incomplete": "Incompleto",
   "boot.profile.missing.key": "Sem chave do produto para {0}: a instalação para na página da chave do produto. Edite o perfil (X) e digite a chave.",
   "boot.profile.missing.password": "{0} exige uma senha de pelo menos 7 caracteres com três de: maiúsculas, minúsculas, dígitos, símbolos. Sem ela, a instalação para na página da senha do Administrador.",

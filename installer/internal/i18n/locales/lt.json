@@ -985,6 +985,7 @@
   "boot.profile.value.same_language": "Kaip ir kalba",
   "boot.profile.value.same_locale": "Kaip ir formatai",
   "boot.profile.value.setup_asks": "(paklaus diegimo programa)",
+  "boot.profile.value.edition_manual": "Įvesti rankiniu būdu…",
   "boot.profile.badge_incomplete": "Neišsamus",
   "boot.profile.missing.key": "Nėra {0} produkto rakto: sąranka sustos produkto rakto puslapyje. Redaguokite profilį (X) ir įveskite raktą.",
   "boot.profile.missing.password": "{0} reikia bent 7 simbolių slaptažodžio su trimis iš: didžiosios raidės, mažosios raidės, skaitmenys, simboliai. Be jo sąranka sustos administratoriaus slaptažodžio puslapyje.",

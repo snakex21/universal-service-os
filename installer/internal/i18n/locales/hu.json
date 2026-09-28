@@ -982,6 +982,7 @@
   "boot.profile.value.same_language": "Mint a nyelv",
   "boot.profile.value.same_locale": "Mint a formátumok",
   "boot.profile.value.setup_asks": "(a telepítő kérdezi)",
+  "boot.profile.value.edition_manual": "Kézi megadás…",
   "boot.profile.badge_incomplete": "Hiányos",
   "boot.profile.missing.key": "Nincs termékkulcs ehhez: {0}; a telepítő megáll a termékkulcs oldalán. Szerkessze a profilt (X), és adja meg a kulcsot.",
   "boot.profile.missing.password": "{0}: legalább 7 karakteres jelszó kell, a következők közül hárommal: nagybetű, kisbetű, számjegy, szimbólum. Enélkül a telepítő megáll a rendszergazdai jelszó oldalán.",

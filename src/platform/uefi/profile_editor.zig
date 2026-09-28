@@ -99,15 +99,19 @@ var computer_text = form.TextValue{ .max = 15 };
 var org_text = form.TextValue{ .max = 64 };
 var password_text = form.TextValue{ .max = 64 };
 var key_text = form.TextValue{ .max = 29 };
-/// Edition: typed (no ISO known) or picked from the chosen ISO's images.
+/// Edition: a pick list. "(Setup asks)", the chosen ISO's images (when the
+/// editor is opened from a start with an ISO), the usual editions of the
+/// release (editions.known, the ones on the ISO left out), a stored value
+/// that is none of these, and last "Type manually..." (the keyboard, into
+/// edition_text). edition_values[i] is what option i stores.
 var edition_text = form.TextValue{ .max = 64 };
 var edition_images: ?*const answer.editions.List = null;
 var edition_index: usize = 0;
-var edition_options: [answer.editions.max_images + 2][]const u8 = undefined;
+const max_edition_options = answer.editions.max_images + 16;
+var edition_options: [max_edition_options][]const u8 = undefined;
+var edition_values: [max_edition_options][]const u8 = undefined;
 var edition_option_count: usize = 0;
-/// A stored edition that is not on this ISO stays selectable as it is.
-var edition_custom: [64]u8 = undefined;
-var edition_custom_len: usize = 0;
+var edition_id_storage: [answer.editions.max_images][80]u8 = undefined;
 var timezone_index: usize = 0;
 var language_index: usize = 0;
 var locale_index: usize = 0;
@@ -194,18 +198,6 @@ fn setOptions() void {
         keyboard_options[i + 1] = entry.label;
     }
     keyboard_option_count = tables.languages.len + 1;
-    edition_options[0] = t(.profile_value_setup_asks);
-    edition_option_count = 1;
-    if (edition_images) |list| {
-        for (list.slice()) |*image| {
-            edition_options[edition_option_count] = image.label();
-            edition_option_count += 1;
-        }
-        if (edition_custom_len > 0) {
-            edition_options[edition_option_count] = edition_custom[0..edition_custom_len];
-            edition_option_count += 1;
-        }
-    }
     if (custom_keyboard) |k| {
         keyboard_options[keyboard_option_count] = std.fmt.bufPrint(&custom_keyboard_text, "{X:0>4}:{X:0>8}", .{ k.lcid, k.klid }) catch "custom";
         keyboard_option_count += 1;
@@ -220,19 +212,7 @@ fn load(p: *const Profile) void {
     org_text.set(p.org.slice());
     password_text.set(p.password.slice());
     key_text.set(p.keyFor(system_id));
-    const edition = p.editionFor(system_id);
-    edition_text.set(edition);
-    edition_index = 0;
-    edition_custom_len = 0;
-    if (edition_images) |list| if (edition.len > 0) {
-        if (answer.editions.match(edition, list)) |image| {
-            edition_index = @as(usize, @intCast(image - &list.items[0])) + 1;
-        } else {
-            edition_custom_len = @min(edition.len, edition_custom.len);
-            @memcpy(edition_custom[0..edition_custom_len], edition[0..edition_custom_len]);
-            edition_index = list.len + 1;
-        }
-    };
+    loadEdition(p.editionFor(system_id));
     timezone_index = if (p.timezone) |i| @as(usize, i) + 1 else 0;
     language_index = if (p.language) |i| @as(usize, i) + 1 else 0;
     locale_index = if (p.locale) |i| @as(usize, i) + 1 else 0;
@@ -259,6 +239,54 @@ fn load(p: *const Profile) void {
     display_index = @intFromEnum(p.display);
     loadTheme(p.theme);
     loadSystems(answer.applies.effective(p));
+}
+
+fn addEdition(label: []const u8, value: []const u8) void {
+    if (edition_option_count == edition_options.len) return;
+    edition_options[edition_option_count] = label;
+    edition_values[edition_option_count] = value;
+    edition_option_count += 1;
+}
+
+fn editionManual() bool {
+    return edition_index + 1 == edition_option_count;
+}
+
+/// The edition pick list for this system and ISO, and the option of the
+/// stored value (a value in no list: "Type manually" with that text).
+fn loadEdition(stored: []const u8) void {
+    edition_option_count = 0;
+    addEdition(t(.profile_value_setup_asks), "");
+    const image_count: usize = if (edition_images) |list| list.len else 0;
+    if (edition_images) |list| {
+        for (list.slice(), 0..) |*image, i| addEdition(image.label(), image.id(&edition_id_storage[i]));
+    }
+    if (familyOfEditor()) |family| {
+        for (answer.editions.known(family)) |edition| {
+            // On the ISO: already listed under the ISO's own name.
+            if (edition_images) |list| if (answer.editions.match(edition.id, list) != null) continue;
+            addEdition(edition.label, edition.id);
+        }
+    }
+    edition_options[@min(edition_option_count, edition_options.len - 1)] = t(.profile_value_edition_manual);
+    edition_values[@min(edition_option_count, edition_options.len - 1)] = "";
+    edition_option_count = @min(edition_option_count + 1, edition_options.len);
+    edition_text.set("");
+    edition_index = 0;
+    const wanted = std.mem.trim(u8, stored, " \t");
+    if (wanted.len == 0) return;
+    if (edition_images) |list| if (answer.editions.match(wanted, list)) |image| {
+        edition_index = 1 + @as(usize, @intCast(image - &list.items[0]));
+        return;
+    };
+    for (1 + image_count..edition_option_count - 1) |i| {
+        if (std.ascii.eqlIgnoreCase(edition_values[i], wanted) or std.ascii.eqlIgnoreCase(edition_options[i], wanted)) {
+            edition_index = i;
+            return;
+        }
+    }
+    edition_index = edition_option_count - 1;
+    edition_text.set(wanted);
 }
 
 fn familyOfEditor() ?answer.Family {
@@ -326,12 +354,7 @@ fn build(out: *Profile) void {
     const key = key_text.slice();
     for (key, 0..) |c, i| upper[i] = std.ascii.toUpper(c);
     out.setSystemKey(system_id, upper[0..key.len]) catch {};
-    var id_buffer: [64]u8 = undefined;
-    const edition: []const u8 = if (edition_images) |list| blk: {
-        if (edition_index == 0) break :blk "";
-        if (edition_index <= list.len) break :blk list.items[edition_index - 1].id(&id_buffer);
-        break :blk edition_custom[0..edition_custom_len];
-    } else edition_text.slice();
+    const edition: []const u8 = if (editionManual()) std.mem.trim(u8, edition_text.slice(), " ") else edition_values[edition_index];
     out.setSystemEdition(system_id, edition) catch {};
     out.remember_key = remember_key;
     out.local_account = local_account;
@@ -358,7 +381,7 @@ fn problemOf(id: F) ?Problem {
         .org => answer.profile.checkOrg(org_text.slice()),
         .password => answer.profile.checkPassword(password_text.slice()),
         .key => answer.profile.checkKey(key_text.slice()),
-        .edition => if (edition_images == null) answer.profile.checkEdition(edition_text.slice()) else null,
+        .edition => if (editionManual()) answer.profile.checkEdition(edition_text.slice()) else null,
         else => null,
     };
 }
@@ -467,13 +490,8 @@ fn buildFields() void {
     addField(.locale, .{ .kind = .choice, .label = t(.profile_field_locale), .options = &locale_options, .index = &locale_index });
     addField(.keyboard, .{ .kind = .choice, .label = t(.profile_field_keyboard), .options = keyboard_options[0..keyboard_option_count], .index = &keyboard_index });
     addField(.key, .{ .kind = .text, .label = view.format(&key_label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .placeholder = t(.profile_value_setup_asks) });
-    if (nt6) {
-        if (edition_images != null) {
-            addField(.edition, .{ .kind = .choice, .label = t(.profile_field_edition), .options = edition_options[0..edition_option_count], .index = &edition_index });
-        } else {
-            addField(.edition, .{ .kind = .text, .label = t(.profile_field_edition), .text = &edition_text, .allowed = &org_chars, .placeholder = t(.profile_value_setup_asks) });
-        }
-    }
+    // Edition: a pick list with "Type manually" last (manual_form.Field.manual).
+    if (nt6) addField(.edition, .{ .kind = .choice, .label = t(.profile_field_edition), .options = edition_options[0..edition_option_count], .index = &edition_index, .manual = true, .text = &edition_text, .allowed = &org_chars });
     addField(.remember_key, .{ .kind = .toggle, .label = t(.profile_field_remember_key), .flag = &remember_key });
     addField(.local_account, .{ .kind = .toggle, .label = t(.profile_field_local_account), .flag = &local_account });
     if (win11) {
@@ -519,7 +537,8 @@ pub fn defaults(ui_language: []const u8) Profile {
 /// Edits `initial` (a new profile when `stem` is null, else the file with
 /// that stem). Returns the saved profile's name, or null on Cancel/Back.
 /// `images`: the install images of the ISO chosen before the answer screen
-/// (the edition is then a list picker); null: the edition is typed.
+/// (listed first in the edition picker); null: only the usual editions of
+/// the release and "Type manually".
 /// Opened from a Linux ISO start: the subtitle does not say "every Windows".
 fn subtitleKey() view.Key {
     return if (usos.flow.answer_screen.linuxAnswerSystem(system_id)) .profile_editor_subtitle_linux else .profile_editor_subtitle;

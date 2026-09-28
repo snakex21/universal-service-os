@@ -985,6 +985,7 @@
   "boot.profile.value.same_language": "Tāpat kā valoda",
   "boot.profile.value.same_locale": "Tāpat kā formāti",
   "boot.profile.value.setup_asks": "(jautās instalēšanas programma)",
+  "boot.profile.value.edition_manual": "Ievadīt manuāli…",
   "boot.profile.badge_incomplete": "Nepilnīgs",
   "boot.profile.missing.key": "Nav {0} produkta atslēgas: instalēšana apstāsies produkta atslēgas lapā. Rediģējiet profilu (X) un ievadiet atslēgu.",
   "boot.profile.missing.password": "{0} vajag vismaz 7 rakstzīmju paroli ar trim no: lielie burti, mazie burti, cipari, simboli. Bez tās instalēšana apstāsies administratora paroles lapā.",
