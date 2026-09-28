@@ -24,8 +24,15 @@ function Add-FilesFromDirectory([System.Collections.Generic.List[IO.FileInfo]]$L
     }
 }
 
+# Product version (semantic version, one line): shown in the menus and the
+# installer next to the build ID, and recorded in build-info.ini.
+$versionPath = Join-Path $ProjectRoot 'VERSION'
+if (-not (Test-Path -LiteralPath $versionPath -PathType Leaf)) { throw "Missing product version file: $versionPath" }
+$version = ([IO.File]::ReadAllText($versionPath)).Trim()
+if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "VERSION must be MAJOR.MINOR.PATCH, got '$version'" }
+
 $files = [System.Collections.Generic.List[IO.FileInfo]]::new()
-foreach ($required in @('build.zig', 'build.bat', 'installer\go.mod', 'installer\go.sum', 'installer\internal\payload\assets\README.md')) {
+foreach ($required in @('VERSION', 'build.zig', 'build.bat', 'installer\go.mod', 'installer\go.sum', 'installer\internal\payload\assets\README.md')) {
     $path = Join-Path $ProjectRoot $required
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing build fingerprint input: $path" }
     $files.Add((Get-Item -LiteralPath $path))
@@ -173,6 +180,7 @@ $utf8NoBom = [Text.UTF8Encoding]::new($false)
 $info = @(
     '[build]',
     "id=$buildId",
+    "version=$version",
     "epoch=$epoch",
     "source_sha256=$fingerprint"
 ) -join "`r`n"
@@ -181,11 +189,12 @@ $info = @(
 $cmd = @(
     '@echo off',
     ('set "USOS_BUILD_ID={0}"' -f $buildId),
+    ('set "USOS_VERSION={0}"' -f $version),
     ('set "USOS_BUILD_EPOCH={0}"' -f $epoch),
     ('set "USOS_BUILD_SOURCE_SHA256={0}"' -f $fingerprint)
 ) -join "`r`n"
 [IO.File]::WriteAllText($envPath, $cmd + "`r`n", [Text.Encoding]::ASCII)
 
-Write-Host "[PASS] build id=$buildId epoch=$epoch source_sha256=$fingerprint"
+Write-Host "[PASS] build id=$buildId version=$version epoch=$epoch source_sha256=$fingerprint"
 Write-Host "[PASS] build info: $infoPath"
 Write-Host "[PASS] build env:  $envPath"

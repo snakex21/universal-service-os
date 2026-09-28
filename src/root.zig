@@ -118,6 +118,7 @@ test {
     _ = @import("platform/bios/dos_fat16_format.zig");
     _ = @import("platform/bios/dos_fat16_seed.zig");
     _ = build_info.id;
+    _ = build_info.version;
     _ = build_info.epoch;
     _ = build_info.source_sha256;
     _ = architecture;

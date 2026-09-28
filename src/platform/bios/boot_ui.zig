@@ -320,7 +320,7 @@ pub fn clock(ui: *const Ui, buffer: []u8) []const u8 {
 }
 
 pub fn header(ui: *const Ui, clock_buffer: []u8) graphics.ui.HeaderInfo {
-    return .{ .firmware = "BIOS", .build = build_id, .language = ui.t(.language_name), .clock = clock(ui, clock_buffer) };
+    return .{ .firmware = "BIOS", .build = build_id, .version = @import("build_info").version, .language = ui.t(.language_name), .clock = clock(ui, clock_buffer) };
 }
 
 const build_id = @import("build_info").id;

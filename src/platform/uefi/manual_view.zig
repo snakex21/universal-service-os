@@ -372,6 +372,7 @@ fn headerInfo(clock_buffer: []u8, u: *const Ui) gui.ui.HeaderInfo {
     return .{
         .firmware = if (runtime_firmware) |firmware| firmware.label() else "",
         .build = usos.build_info.id,
+        .version = usos.build_info.version,
         .language = t(.language_name),
         .clock = clockNow(clock_buffer, u),
     };

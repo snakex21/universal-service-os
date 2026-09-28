@@ -68,7 +68,8 @@ function Build-CorePayload {
     & $python $biosUiGenerator --icons $legacyIconSource --output $biosUiPack | ForEach-Object { Write-Host $_ }
     if ($LASTEXITCODE -ne 0) { throw "Legacy BIOS UI pack generation failed with exit code $LASTEXITCODE" }
     $buildId = if ($env:USOS_BUILD_ID) { $env:USOS_BUILD_ID } else { 'DEV' }
-    [IO.File]::WriteAllText($buildInfoModule, "pub const id = `"$buildId`";`n", [Text.UTF8Encoding]::new($false))
+    $productVersion = if ($env:USOS_VERSION) { $env:USOS_VERSION } else { '' }
+    [IO.File]::WriteAllText($buildInfoModule, "pub const id = `"$buildId`";`npub const version = `"$productVersion`";`n", [Text.UTF8Encoding]::new($false))
     $forceEsp = if ($CatalogMode -eq 'esp-fallback') { 'true' } else { 'false' }
     [IO.File]::WriteAllText($catalogModeModule, "pub const force_esp_catalog = $forceEsp;`n", [Text.UTF8Encoding]::new($false))
     $xpMenuAuto = if ($XpMenuAutoTest) { 'true' } else { 'false' }

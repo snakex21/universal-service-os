@@ -58,6 +58,9 @@ pub const HeaderInfo = struct {
     firmware: []const u8 = "",
     /// Build identifier (usos.build_info.id); shown shortened.
     build: []const u8 = "",
+    /// Product version (usos.build_info.version, e.g. "1.0.0"); shown after
+    /// the product name. Empty in development builds.
+    version: []const u8 = "",
     /// Native language name shown in the language pill.
     language: []const u8 = "English",
     /// Pre-formatted clock, e.g. "Wed 23.09.2026 14:32" (may be empty).
@@ -269,13 +272,25 @@ pub const Ui = struct {
         const title_x = margin + logo + self.px(14);
         const title_y = self.fonts.centeredTop(.strong, h / 2);
         var x = title_x + self.fonts.draw(self.surface, title_x, title_y, .strong, "Universal Service OS", theme.text, theme.header);
+        if (info.version.len > 0) {
+            x += self.px(6);
+            x += self.fonts.draw(self.surface, x, title_y, .strong, info.version, theme.text, theme.header);
+        }
+        // Subtitle and build are dropped (build first) when they would run
+        // into the clock area on narrow screens (640x480, 800x600).
+        const limit = self.headerClockRight(info) -| self.headerClockWidth() -| self.px(12);
+        const subtitle = self.t(.header_subtitle);
         x += self.px(10);
-        x += self.fonts.draw(self.surface, x, self.fonts.centeredTop(.body, h / 2), .body, self.t(.header_subtitle), theme.muted, theme.header);
-        if (info.build.len > 0) {
-            x += self.px(12);
-            var buffer: [64]u8 = undefined;
-            const build = self.format(&buffer, .header_build, &.{shortBuild(info.build)});
-            _ = self.fonts.draw(self.surface, x, self.fonts.centeredTop(.small, h / 2), .small, build, theme.faint, theme.header);
+        if (x + self.fonts.width(.body, subtitle) <= limit) {
+            x += self.fonts.draw(self.surface, x, self.fonts.centeredTop(.body, h / 2), .body, subtitle, theme.muted, theme.header);
+            if (info.build.len > 0) {
+                x += self.px(12);
+                var buffer: [64]u8 = undefined;
+                const build = self.format(&buffer, .header_build, &.{shortBuild(info.build)});
+                if (x + self.fonts.width(.small, build) <= limit) {
+                    _ = self.fonts.draw(self.surface, x, self.fonts.centeredTop(.small, h / 2), .small, build, theme.faint, theme.header);
+                }
+            }
         }
 
         var right = self.width() -| margin;
@@ -296,9 +311,13 @@ pub const Ui = struct {
     }
 
     /// Redraws only the clock (the header background must be solid there).
+    fn headerClockWidth(self: *const Ui) u32 {
+        return self.fonts.width(.body, "Www 00.00.0000 00:00") + self.px(8);
+    }
+
     pub fn headerClockAt(self: *const Ui, right: u32, clock: []const u8) void {
         const h = self.headerHeight();
-        const sample_width = self.fonts.width(.body, "Www 00.00.0000 00:00") + self.px(8);
+        const sample_width = self.headerClockWidth();
         const area_x = right -| sample_width;
         const area_h = self.fonts.lineHeight(.body);
         const y = self.fonts.centeredTop(.body, h / 2);

@@ -12,12 +12,18 @@ var (
 	ID           = "DEV"
 	EpochText    = "0"
 	SourceSHA256 = "DEV"
+	// Version is the product version from VERSION (e.g. "1.0.0"), set with
+	// -ldflags -X by build.bat; empty in development builds.
+	Version = ""
 )
 
 type Info struct {
 	ID           string
 	Epoch        int64
 	SourceSHA256 string
+	// Version is informational only: Compare and the payload identity check
+	// use ID, Epoch and SourceSHA256. Media written before 1.0 have none.
+	Version string
 }
 
 func Current() Info {
@@ -26,6 +32,7 @@ func Current() Info {
 		ID:           strings.TrimSpace(ID),
 		Epoch:        epoch,
 		SourceSHA256: strings.ToLower(strings.TrimSpace(SourceSHA256)),
+		Version:      strings.TrimSpace(Version),
 	}
 }
 
@@ -36,6 +43,9 @@ func (i Info) Valid() bool {
 func (i Info) Display() string {
 	if strings.TrimSpace(i.ID) == "" {
 		return "nieznana"
+	}
+	if version := strings.TrimSpace(i.Version); version != "" {
+		return version + " (" + i.ID + ")"
 	}
 	return i.ID
 }
@@ -89,6 +99,8 @@ func Parse(r io.Reader) (Info, error) {
 			info.Epoch = epoch
 		case "source_sha256":
 			info.SourceSHA256 = strings.ToLower(value)
+		case "version":
+			info.Version = value
 		}
 	}
 	if err := scanner.Err(); err != nil {

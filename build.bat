@@ -16,7 +16,7 @@ if not defined USOS_BUILD_ID (
     echo [ERROR] Build identifier was not generated.
     exit /b 1
 )
-echo [BUILD] %USOS_BUILD_ID%
+echo [BUILD] %USOS_BUILD_ID% version %USOS_VERSION%
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%ROOT%tools\clean_release_outputs.ps1"
 if errorlevel 1 exit /b %ERRORLEVEL%
@@ -88,7 +88,7 @@ rem artifacts and must carry the generated build-info.ini.
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%ROOT%tools\verify_release_consistency.ps1"
 if errorlevel 1 exit /b %ERRORLEVEL%
 
-set "USOS_GO_BUILDINFO=-X github.com/snakex21/universal-service-os/installer/internal/buildinfo.ID=%USOS_BUILD_ID% -X github.com/snakex21/universal-service-os/installer/internal/buildinfo.EpochText=%USOS_BUILD_EPOCH% -X github.com/snakex21/universal-service-os/installer/internal/buildinfo.SourceSHA256=%USOS_BUILD_SOURCE_SHA256%"
+set "USOS_GO_BUILDINFO=-X github.com/snakex21/universal-service-os/installer/internal/buildinfo.ID=%USOS_BUILD_ID% -X github.com/snakex21/universal-service-os/installer/internal/buildinfo.EpochText=%USOS_BUILD_EPOCH% -X github.com/snakex21/universal-service-os/installer/internal/buildinfo.SourceSHA256=%USOS_BUILD_SOURCE_SHA256% -X github.com/snakex21/universal-service-os/installer/internal/buildinfo.Version=%USOS_VERSION%"
 pushd "%ROOT%installer"
 go test -ldflags "%USOS_GO_BUILDINFO%" ./...
 if errorlevel 1 (

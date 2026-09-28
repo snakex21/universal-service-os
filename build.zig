@@ -838,6 +838,8 @@ fn createUsosModule(
     const source_sha256 = b.graph.environ_map.get("USOS_BUILD_SOURCE_SHA256") orelse "DEV";
     const epoch = std.fmt.parseInt(u64, epoch_text, 10) catch 0;
     options.addOption([]const u8, "id", id);
+    // Product version from VERSION via build-env.cmd; empty in plain dev builds.
+    options.addOption([]const u8, "version", b.graph.environ_map.get("USOS_VERSION") orelse "");
     options.addOption(u64, "epoch", epoch);
     options.addOption([]const u8, "source_sha256", source_sha256);
     module.addOptions("build_info", options);

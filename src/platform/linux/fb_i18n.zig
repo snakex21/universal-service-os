@@ -66,5 +66,5 @@ pub fn clock(ui: *const usos.gui.ui.Ui, buffer: []u8) []const u8 {
 }
 
 pub fn header(ui: *const usos.gui.ui.Ui, clock_buffer: []u8) usos.gui.ui.HeaderInfo {
-    return .{ .build = usos.build_info.id, .language = ui.t(.language_name), .clock = clock(ui, clock_buffer) };
+    return .{ .build = usos.build_info.id, .version = usos.build_info.version, .language = ui.t(.language_name), .clock = clock(ui, clock_buffer) };
 }

@@ -44,7 +44,7 @@ pub fn main(init: std.process.Init) !u8 {
     defer init.gpa.free(pixels);
     const buffer = gui.ScreenBuffer.init(@intFromPtr(pixels.ptr), pixels.len * 4, width, height, .bgrx8).?;
     const ui = gui.ui.Ui.init(buffer.surface, theme, &pack, &table);
-    const header = gui.ui.HeaderInfo{ .firmware = "UEFI", .build = "B260923-124620-62F8A603", .language = languageName(table.languageCode()), .clock = "Wed 23.09.2026 14:32" };
+    const header = gui.ui.HeaderInfo{ .firmware = "UEFI", .build = "B260923-124620-62F8A603", .version = "1.0.0", .language = languageName(table.languageCode()), .clock = "Wed 23.09.2026 14:32" };
     const hints = [_]gui.ui.Hint{
         .{ .key = "\u{2191}\u{2193}", .label = ui.t(.key_select) },
         .{ .key = "Enter", .label = ui.t(.key_open) },
