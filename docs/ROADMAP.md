@@ -362,8 +362,9 @@ innym, w formie osobnego, opcjonalnego dodatku.
 
 ## 2a. Przed 1.0 (lista kontrolna)
 
-- **Vista**: pendrive'y USB niewidoczne przez backport USB 3 (czekamy na logi
-  od użytkownika).
+- **Vista**: pendrive'y USB niewidoczne przez backport USB 3: na 1.0
+  zostaje jako znane ograniczenie (sekcja 3, `release-notes-1.0.md`
+  „Known issues”); analiza po logach od użytkownika.
 - **Profile odpowiedzi**: filtr zastosowania per system (profil pokazywany
   tylko dla systemów, do których pasuje) oraz ostrzeżenie, gdy brakuje pola
   wymaganego przez dany system (np. klucz Server 2003).
@@ -398,6 +399,14 @@ innym, w formie osobnego, opcjonalnego dodatku.
   testowo). Nie ma legalnie podpisanego sterownika xHCI dla X470 pod Vistę
   x64 (katalog AMD dla Win7 ma tylko OSAttr 6.1 i łańcuch SHA-256). Jedyna
   droga do wyłączenia trybu testowego: karta PCIe USB 3 Renesas uPD72020x.
+- **Vista: pendrive'y USB niewidoczne w zainstalowanym systemie** (płyty
+  tylko z USB 3/xHCI, np. X470; backport USB 3): klawiatura i mysz działają,
+  pamięci masowe USB nie pojawiają się. Obejście dla użytkownika: pliki przez
+  sieć, drugi dysk wewnętrzny (SATA) albo napęd optyczny; karta PCIe USB 3
+  z układem Renesas uPD72020x i sterownikiem producenta dla Visty (ten sam,
+  który pozwala wyjść z trybu testowego). Przyczyna w analizie (logi z X470).
+  Opis dla użytkownika: [release-notes-1.0.md](release-notes-1.0.md),
+  „Known issues”.
 - Mikro-Linux wymaga x86-64 i 256 MiB RAM (do czasu L3).
 - Win98 i DOS: tylko Legacy BIOS (do czasu L6).
 - XP: brak NVMe (także przy CSM); XP w BIOS nie ma pakietu sterowników
