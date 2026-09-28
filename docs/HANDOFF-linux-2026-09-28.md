@@ -94,16 +94,28 @@ GParted UI itself is not shown yet. All ten ISOs on the test VHD are one
 extent each (fresh NTFS), so the dm path is not exercised yet (make a
 fragmented copy on purpose to test it).
 
-## Menu test (UEFI, OVMF, Secure Boot off): in progress at shutdown
+## Menu test (UEFI, OVMF, Secure Boot off): ALL PASS (2026-09-28 morning)
 
-`tools/tests/linux_iso/update_linux_test_esp.ps1 -EspSource zig-out/usb`
-refreshes only the ESP of the test VHD; `run_linux_iso_menu.py --name X
---script "wait:22,right,ret,wait:3,ret,wait:3,ret,wait:3,shot"` drives the
-menu (Home, Linux, Ubuntu, first ISO, method page). The menu lists Ubuntu
-(2 ISOs), Debian (3), Fedora, Linux Mint as Ready. The first real start of
-`linux_iso_start.zig` has NOT been observed yet: look at
-`tools/tests/artifacts/linux-iso/menu/ubuntu-server/01.png`, press Enter on
-"Automatic (Linux ISO)" and check the serial `[LINUX-ISO]` lines.
+`update_linux_test_esp.ps1` + `run_linux_iso_menu.py` (Home, Linux, system,
+ISO, Automatic (Linux ISO), summary "Start Linux", start), OVMF, test VHD as
+USB disk, WHPX. Serial: `[LINUX-ISO] family=... extents=1`, then:
+
+| ISO | family | result (screenshot in `tools/tests/artifacts/linux-iso/menu/<name>/`) |
+|---|---|---|
+| Ubuntu Server 24.04.5 | casper | subiquity language screen |
+| Ubuntu Desktop 24.04.5.1 | casper | "Welcome to Ubuntu" installer on the live desktop |
+| Linux Mint 22.3 Xfce | casper | live desktop |
+| Fedora WS Live 44 | dracut_live | live desktop, "Welcome to Fedora Linux" |
+| Debian live 13.7 standard | live_boot | auto-login shell of the live system |
+| Debian 13.7 netinst | debian_installer | language, country, keyboard, then media detection and component load from the ISO (BLKPG partition + default `/preseed.cfg` try-usb), up to the hostname page |
+| Debian 12.15 netinst | debian_installer | installer language screen |
+| SystemRescue 13.02 | archiso (3 initrds) | root shell of the live system |
+| GParted Live 1.8.1 | live_boot | console-data keymap dialog (live system running) |
+| Clonezilla 3.3.3 | live_boot | Clonezilla language dialog |
+
+Fixes made for this: summary button "Start Linux" (was "Load the Windows
+ISO"), specific error details (fragmented ISO, no Linux entry, helper
+missing), Linux strings in all 27 locales, default d-i preseed.
 
 ## Exact next steps
 
