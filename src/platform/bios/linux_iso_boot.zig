@@ -20,10 +20,13 @@ const ntfs = storage.ntfs;
 const Reader = storage.random_reader.Reader;
 extern fn core_linux_jump(entry: u32, boot_params: u32) callconv(.c) noreturn;
 
-/// grub.cfg scratch (64 KiB) at the kernel load address: free until the kernel
-/// is copied there, after planning.
-const grub_scratch_phys: usize = memory.kernel_load_start;
+/// grub.cfg scratch (64 KiB) at 64 MiB: above the BIOS UI window (32-48 MiB)
+/// and only used while planning, before anything is loaded (at 1 MiB it
+/// broke the next int13 call in QEMU/SeaBIOS).
+const grub_scratch_phys: usize = 0x04000000;
 const grub_scratch_bytes: usize = 64 * 1024;
+/// The ESP helper cpio, read first (see run), right after the grub scratch.
+const helper_scratch_phys: usize = grub_scratch_phys + grub_scratch_bytes;
 const helper_max_bytes: usize = 1024 * 1024;
 const per_boot_max_bytes: usize = 16 * 1024;
 
@@ -58,6 +61,13 @@ const Iso = struct {
 
 pub fn run(esp_fs: storage.fat32.FileSystem, reader: Reader, bulk: Reader, image_directory: []const u8, image_name: []const u8, graphics: ?vbe.Session) !void {
     try @import("windows_iso_config.zig").validateName(image_name);
+    // The ESP helper is read before any bulk NTFS read of the ISO: a plain
+    // `reader` call after bulk reads never returned in QEMU/SeaBIOS (the DOS
+    // paths read their ESP files first too).
+    const helper_components = [_][]const u16{ w("EFI"), w("USOS"), w("linux"), w("usos-linux.cpio") };
+    const helper_scratch: [*]u8 = @ptrFromInt(helper_scratch_phys);
+    const helper_len = storage.fat32.readFile(esp_fs, reader, &helper_components, helper_scratch[0..helper_max_bytes]) catch return error.LinuxHelperMissing;
+    if (helper_len == 0 or helper_len == helper_max_bytes) return error.LinuxHelperMissing;
     const data = try storage.gpt.findUsosData(reader);
     const fs = try ntfs.mount(reader, .{ .start_bytes = data.start_lba * 512, .size_bytes = data.sectorCount() * 512 });
     var names: [12][]const u16 = undefined;
@@ -87,6 +97,7 @@ pub fn run(esp_fs: storage.fat32.FileSystem, reader: Reader, bulk: Reader, image
     var setup: [header_module.minimum_header_bytes]u8 = undefined;
     _ = try iso.readAt(@as(u64, kernel.extent_lba) * 2048, &setup);
     const header = try header_module.parse(&setup);
+    console.line("[LINUX-ISO] kernel header ok");
     if (header.protocol < 0x020a or !header.isLoadedHigh() or header.init_size == 0 or header.initrd_addr_max == 0)
         return error.UnsupportedLinuxKernel;
 
@@ -97,14 +108,14 @@ pub fn run(esp_fs: storage.fat32.FileSystem, reader: Reader, bulk: Reader, image
         records[i] = (try iso9660.findRecord(&iso, recipe.initrd(i))) orelse return error.FileNotFound;
         total += records[i].size + linux_iso.cpio.padding(records[i].size);
     }
-    const helper_components = [_][]const u16{ w("EFI"), w("USOS"), w("linux"), w("usos-linux.cpio") };
-    const helper_info = storage.fat32.fileInfo(esp_fs, reader, &helper_components) catch return error.LinuxHelperMissing;
-    if (helper_info.size == 0 or helper_info.size > helper_max_bytes) return error.LinuxHelperMissing;
-    total += helper_info.size + per_boot_max_bytes;
+    console.line("[LINUX-ISO] initrd records found");
+    total += helper_len + per_boot_max_bytes;
 
     var entries: [e820.max_entries]e820.Entry = undefined;
     const e820_map = entries[0..try e820.probe(&entries)];
+    console.line("[LINUX-ISO] sizes ok");
     const layout = try memory.plan(e820_map, header, kernel.size, total);
+    console.line("[LINUX-ISO] layout ok");
     if (!memory.rangeIsUsable(e820_map, .{ .start = params.boot_params_phys, .end = params.cmdline_phys + params.cmdline_capacity }))
         return error.LiveBootParametersMemoryUnavailable;
     if (graphics) |session| menu.environmentStart(&session, "STARTING LINUX");
@@ -121,8 +132,9 @@ pub fn run(esp_fs: storage.fat32.FileSystem, reader: Reader, bulk: Reader, image
         cursor += pad;
         if (graphics) |session| menu.preparationProgress(&session, @intCast(10 + index * 60 / recipe.initrdCount()));
     }
+    console.line("[LINUX-ISO] initrds read");
     const helper_out: [*]u8 = @ptrFromInt(cursor);
-    const helper_len = try storage.fat32.readFile(esp_fs, reader, &helper_components, helper_out[0..@intCast(helper_info.size)]);
+    @memmove(helper_out[0..helper_len], helper_scratch[0..helper_len]);
     cursor += helper_len;
     const per_boot_out: [*]u8 = @ptrFromInt(cursor);
     var map_text: [2048]u8 = undefined;
@@ -134,6 +146,7 @@ pub fn run(esp_fs: storage.fat32.FileSystem, reader: Reader, bulk: Reader, image
     cursor += (try writer.finish()).len;
     const initrd_size: u64 = cursor - @as(usize, @intCast(layout.initramfs.start));
 
+    console.line("[LINUX-ISO] helper and map appended");
     // Kernel (protected-mode part) at 1 MiB.
     const dest: [*]u8 = @ptrFromInt(memory.kernel_load_start);
     _ = try iso.readAt(@as(u64, kernel.extent_lba) * 2048 + header.protected_file_offset, dest[0..@intCast(layout.kernel_protected.size())]);
