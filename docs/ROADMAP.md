@@ -369,17 +369,40 @@ innym, w formie osobnego, opcjonalnego dodatku.
   tylko dla systemów, do których pasuje) oraz ostrzeżenie, gdy brakuje pola
   wymaganego przez dany system (np. klucz Server 2003).
 - **Vista CSMWrap**: licznik kroków 1/3 vs 1/5 (jeden wspólny licznik).
-- **Ikony** dla XP x64 i Server 2003.
-- **Cichy przełącznik CSMWrap** (bez tekstu SeaBIOS i migającego kursora).
+- **Ikony** dla XP x64 i Server 2003: zrobione (2026-09-28, B260928-193034):
+  ikona XP (`os_profiles.icon_as`), w menu UEFI i BIOS; routowane Servery
+  mają teraz ikonę klienta także w BIOS. Do sprawdzenia na X470.
+- **Cichy CSMWrap**: zrobione (2026-09-28, B260928-193034): wydanie ma
+  CSMWrap 3.1.2-usos1 (MODIFIED, źródła i łatki na pendrivie i na ESP
+  CSMWrap dysku, `research/csmwrap.md` sekcja 7). QEMU: bez logo CSMWrap,
+  banera SeaBIOS i „Press ESC” (XP i Vista); `csmwrap-verbose.flag` działa
+  jak dotąd. **Zostaje** migający kursor tekstowy VGA (lewy górny róg) do
+  chwili, gdy loader zmieni tryb: wymaga kolejnej łatki SeaBIOS (usos3).
+  Do sprawdzenia na X470 (XP i Vista).
+- **Konsole podczas instalacji** (2026-09-28, B260928-193034): polecenia
+  profilu odpowiedzi (specialize, LabConfig Win11) idą przez
+  `usos-run-hidden.exe` (bez okna, log
+  `%WINDIR%\Panther\usos-hidden-commands.log`) na ścieżkach PE10/WinPE
+  z `/noreboot` (Vista, 7, 10/11, Server); QEMU Vista: 10 poleceń
+  opakowanych w `Panther\unattend.xml` celu, runner w `System32`.
+  Niezakryte: starty BIOS wimboot i WORK (Setup restartuje sam). Zostają
+  (nie nasze albo zamrożone): mignięcie konsoli `winpeshl.exe` (ok. 1 s)
+  zaraz po starcie PE10, przed Setupem (konsola samego Windows PE; ukrycie
+  wymaga zmiany `Setup\CmdLine` w obrazie PE) oraz konsola „USOS - Vista
+  USB diagnostics” przy pierwszym starcie Visty (zamrożony pomocnik v11,
+  pokazuje tam błąd USB). Do sprawdzenia na X470.
+- **Vista UEFI + CSM z profilem odpowiedzi** (2026-09-28, B260928-193034):
+  profil/plik łączony przez instalator z odpowiedzią KMDF, jak w CSMWrap;
+  dysk ręcznie. Bez odpowiedzi zachowanie bez zmian. Do sprawdzenia na X470.
 - **Linux z ISO** (N5): zrobione w QEMU (UEFI z Secure Boot i bez, BIOS;
   profile odpowiedzi Ubuntu/Debian/Fedora), wyniki w
   [design/linux-iso-boot.md](design/linux-iso-boot.md) sekcja 11. Przed 1.0:
   test na X470; Ubuntu Desktop z SB (błąd instalatora pod TCG); tekst „Wymaga
   wyłączenia Secure Boot” dla SystemRescue jest windowsowy; opis „+ Dodaj
   profil” mówi „dla każdego Windows”; subiquity domyślnie zaznacza największy
-  dysk (może to być pendrive USOS); zapas Legacy Core 4 424 B (minimum 4 096);
-  dwa stare testy Pythona (test_windows7_pe10_selection,
-  test_windows_setup_media) nie przechodziły już przed tą zmianą.
+  dysk (może to być pendrive USOS); zapas Legacy Core 7 448 B przy
+  B260928-193034 (minimum 4 096); pełny pytest (236) przechodzi od
+  9f95b3f1.
 
 ## 3. Znane ograniczenia (zaakceptowane)
 
@@ -454,4 +477,5 @@ Szczegóły i dowody: `TESTING.md` i dokumenty w `docs/`.
 | 2026-09-26 | **Windows 7 x64 na X470 bez CSM** (routing VGA do kontrolera GOP w dyspozytorze, RX 560, ISO „6in1”: instalacja do pulpitu); **profile odpowiedzi** (jeden model → WINNT.SIF / autounattend.xml, menedżer profili w menu UEFI z klawiaturą ekranową: utworzenie profilu i instalacja z nim potwierdzone na sprzęcie); **edytor motywów** w UEFI (potwierdzony na sprzęcie), motywy użytkownika w BIOS, przykłady `usos-ocean`/`usos-sunset`/`usos-forest` (build B260926-134756) |
 | 2026-09-27 | **XP bez CSM przez CSMWrap na X470** (CSM i Secure Boot wyłączone, ESP CSMWrap na dysku docelowym, instalacja unattended; build B260927-153019); poprawka wyrównania initramfs (`lang.cpio`) |
 | 2026-09-28 | **Linux z ISO na DATA** (QEMU: Ubuntu, Mint, Fedora, Debian live/netinst, SystemRescue, GParted, Clonezilla; UEFI z Secure Boot przez shim dystrybucji i bez, BIOS; profile odpowiedzi autoinstall/preseed/kickstart z ręcznym wyborem dysku; build B260928-114652) |
+| 2026-09-28 | Przed 1.0 (B260928-193034): polecenia profili odpowiedzi bez okien konsoli (`usos-run-hidden.exe`), cichy CSMWrap 3.1.2-usos1 w wydaniu, ikony XP x64 / Server 2003, profile odpowiedzi dla Visty UEFI z CSM, pendrive'y w Viście jako znane ograniczenie |
 | 2026-09-28 | **Vista SP2 x64 bez CSM przez CSMWrap na X470** (instalacja legacy MBR, PE10 Setup z profilem odpowiedzi, USB na pulpicie, start z dysku bez pendrive'a; build B260927-205829) |
