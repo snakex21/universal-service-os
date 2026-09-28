@@ -57,9 +57,10 @@ pub fn get(root: *std.os.uefi.protocol.File, system: *const usos.catalog.SystemE
 
         // Built-in icons come pre-scaled from bios-ui.bin (one small file
         // read per boot); the 1254x1254 PNGs remain the fallback. A system
-        // without its own icon (Windows Server) shows the one of the client
-        // release it is routed as.
-        const ids = [_][]const u8{ system.id, usos.catalog.os_profiles.routeId(system.id) };
+        // without its own icon shows the one of the client release it is
+        // routed as (Windows Server) or its icon_as (XP x64 and Server 2003:
+        // the XP icon).
+        const ids = [_][]const u8{ system.id, usos.catalog.os_profiles.iconId(system.id) };
         const id_count: usize = if (std.mem.eql(u8, ids[0], ids[1])) 1 else 2;
         if (builtinPack(root)) |pack| {
             for (ids[0..id_count]) |id| {

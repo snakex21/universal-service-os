@@ -160,7 +160,10 @@ fn systemRows(ui: *const Ui, build: *ListBuild, discovery: *catalog.media_discov
 }
 
 fn systemRow(ui: *const Ui, slot: usize, id: []const u8, name: []const u8, firmware: catalog.FirmwareRequirement, media: catalog.SystemMediaStatus, detail: *[48]u8) Row {
-    const icon: graphics.ui.RowIcon = if (boot_ui.icon(id, slot)) |rgba| .{ .rgba = rgba } else .{ .label = name[0..@min(name.len, 1)] };
+    // A system without its own icon: its client release's (os_profiles.iconId:
+    // Server -> route_as, XP x64 / Server 2003 -> the XP icon), as in UEFI.
+    const own = boot_ui.icon(id, slot) orelse boot_ui.icon(catalog.os_profiles.iconId(id), slot);
+    const icon: graphics.ui.RowIcon = if (own) |rgba| .{ .rgba = rgba } else .{ .label = name[0..@min(name.len, 1)] };
     if (!firmware.accepts(.bios)) return .{
         .title = name,
         .detail = ui.t(.system_requires_uefi_detail),

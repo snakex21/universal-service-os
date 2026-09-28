@@ -86,13 +86,17 @@ pub const SystemTraits = struct {
     /// Windows 7 always had it; for Vista it adds the dispatcher assets'
     /// flag to the wimboot plan (usos-int10-dispatcher.flag).
     int10_dispatcher: bool = false,
+    /// The built-in menu icon (UI\Icons\Systems\<id>.png) of another entry,
+    /// for a system without its own: XP x64 and Server 2003 (NT 5.2) show
+    /// the XP icon, as the routed Servers show their client release's.
+    icon_as: ?[]const u8 = null,
 };
 
 pub const traits_table = [_]SystemTraits{
     .{ .system_id = "windows-xp", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini" },
     .{ .system_id = "windows-2000", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini" },
-    .{ .system_id = "windows-xp-x64", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini" },
-    .{ .system_id = "windows-server-2003", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini" },
+    .{ .system_id = "windows-xp-x64", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini", .icon_as = "windows-xp" },
+    .{ .system_id = "windows-server-2003", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini", .icon_as = "windows-xp" },
     .{ .system_id = "windows-7", .secure_boot_off = true, .native_uefi = .win7, .int10_dispatcher = true },
     .{ .system_id = "windows-vista", .secure_boot_off = true, .native_uefi = .vista, .int10_dispatcher = true },
     .{ .system_id = "windows-10", .native_uefi = .modern },
@@ -133,6 +137,25 @@ pub fn traits(system_id: []const u8) SystemTraits {
 /// The id the profile rules see: the `route_as` system, else the id itself.
 pub fn routeId(system_id: []const u8) []const u8 {
     return ownTraits(system_id).route_as orelse system_id;
+}
+
+/// The built-in icon a system without its own falls back to: `icon_as`,
+/// else the `route_as` system (Server entries show their client's icon),
+/// else the id itself.
+pub fn iconId(system_id: []const u8) []const u8 {
+    const own = ownTraits(system_id);
+    return own.icon_as orelse own.route_as orelse system_id;
+}
+
+test "NT 5.2 entries and the routed Servers fall back to a client icon" {
+    try std.testing.expectEqualStrings("windows-xp", iconId("windows-xp-x64"));
+    try std.testing.expectEqualStrings("windows-xp", iconId("windows-server-2003"));
+    try std.testing.expectEqualStrings("windows-vista", iconId("windows-server-2008"));
+    try std.testing.expectEqualStrings("windows-10", iconId("windows-server-2022"));
+    try std.testing.expectEqualStrings("windows-xp", iconId("windows-xp"));
+    // The icon alias never changes the routing.
+    try std.testing.expectEqualStrings("windows-server-2003", routeId("windows-server-2003"));
+    try std.testing.expectEqualStrings("windows-xp-x64", routeId("windows-xp-x64"));
 }
 
 /// The start gate of a probed Windows ISO of this system (image list, boot
