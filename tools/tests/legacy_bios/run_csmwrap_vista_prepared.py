@@ -84,13 +84,16 @@ def prepare(run, answer=None, verbose=False):
     entries = cpio.parse_newc(gzip.decompress((MICRO / 'initramfs-usos').read_bytes()) if (MICRO / 'initramfs-usos').read_bytes()[:2] == b'\x1f\x8b' else (MICRO / 'initramfs-usos').read_bytes())
     put = lambda name, data, mode=0o644: cpio.put(entries, cpio.Entry(name, stat.S_IFREG | mode, data))
     put('probe-init', PROBE_INIT.encode(), 0o755)
-    for d in ('probe-request', 'probe-support', 'csmwrap-src'):
+    for d in ('probe-request', 'probe-support', 'csmwrap-src', 'csmwrap-src/patches', 'csmwrap-src/licenses'):
         cpio.put(entries, cpio.Entry(d, stat.S_IFDIR | 0o755, b''))
     put('probe-request/usos-source.ini', source_binding())
     for name in ('support.cpio', 'vista-support.cpio'):
         put('probe-support/' + name, (SUPPORT / name).read_bytes())
-    for name in ('csmwrapx64.efi', 'LICENSE-CSMWrap-LGPL-2.1.txt', 'COPYING-SeaBIOS-LGPLv3.txt', 'COPYING-SeaBIOS-GPLv3.txt', 'SOURCES.txt'):
-        put('csmwrap-src/' + name, (CSMWRAP / name).read_bytes())
+    # The staged tree as the release has it (binary, licences, SOURCES.txt,
+    # source archive, patches/, licenses/).
+    for f in sorted(CSMWRAP.rglob('*')):
+        if f.is_file():
+            put('csmwrap-src/' + f.relative_to(CSMWRAP).as_posix(), f.read_bytes())
     if answer:
         put('probe-answer.xml', Path(answer).read_bytes())
     if verbose:

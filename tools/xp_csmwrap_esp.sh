@@ -3,8 +3,10 @@
 # docs/design/csmwrap-integration.md). Runs after prepare_xp_target.sh PASSED
 # on the same target: adds a small FAT16 EFI system partition (MBR type 0xEF)
 # in the space the Windows plan left free at the end of the disk
-# (USOS_XP_ESP_TAIL_SECTORS), with the pinned CSMWrap 3.1.2 as
-# \EFI\BOOT\BOOTX64.EFI. The firmware then boots the target through
+# (USOS_XP_ESP_TAIL_SECTORS), with the pinned CSMWrap 3.1.2-usos1 (a MODIFIED
+# CSMWrap 3.1.2: quiet unless verbose = true, docs/research/csmwrap.md 6 and 7)
+# as \EFI\BOOT\BOOTX64.EFI, its licences, source and patches in \CSMWRAP.
+# The firmware then boots the target through
 #   UEFI removable path -> CSMWrap -> SeaBIOS -> MBR (DL=80h) -> XP.
 # The NTFS Windows partition stays the first MBR entry, so the ARC paths
 # (multi(0)disk(0)rdisk(0)partition(1)) of WINNT.SIF, boot.ini and pae.exe are
@@ -15,7 +17,10 @@ TARGET_DEVICE=${TARGET_DEVICE:?TARGET_DEVICE is required}
 TAIL=${USOS_XP_ESP_TAIL_SECTORS:?USOS_XP_ESP_TAIL_SECTORS is required}
 SRC=${USOS_CSMWRAP_DIR:-/mnt/esp/EFI/USOS/csmwrap}
 ESP_SECTORS=131072
-PINNED=96fdb387e177c6340287b7e07713dc09bf1f965dd404311eafd9c6eb99a02745
+PINNED=0146cc90c7c30be79115f0a0b86e1077c8df73057c94007fd036ebfbd20762a4
+# The LGPL obligations travel with the binary: licence texts, SOURCES.txt
+# (MODIFIED), the complete source archive and the USOS patches.
+CSMWRAP_FILES='LICENSE-CSMWrap-LGPL-2.1.txt COPYING-SeaBIOS-LGPLv3.txt COPYING-SeaBIOS-GPLv3.txt SOURCES.txt csmwrap-3.1.2-src.tar.xz'
 
 log() { printf '[XP_CSMWRAP] %s\n' "$*"; }
 fail() { printf '[XP_CSMWRAP] STOP: %s\n' "$1" >&2; exit 1; }
@@ -24,10 +29,12 @@ for tool in dd od mkfs.fat mmd mcopy mdir sha256sum awk blockdev sync wc; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
 [ -r "$SRC/csmwrapx64.efi" ] || fail 'CSMWrap is missing on the USOS stick (EFI/USOS/csmwrap)'
-[ "$(sha256sum "$SRC/csmwrapx64.efi" | awk '{print $1}')" = "$PINNED" ] || fail 'CSMWrap binary does not match the pinned 3.1.2 hash'
-for file in LICENSE-CSMWrap-LGPL-2.1.txt COPYING-SeaBIOS-LGPLv3.txt COPYING-SeaBIOS-GPLv3.txt SOURCES.txt; do
+[ "$(sha256sum "$SRC/csmwrapx64.efi" | awk '{print $1}')" = "$PINNED" ] || fail 'CSMWrap binary does not match the pinned 3.1.2-usos1 hash'
+for file in $CSMWRAP_FILES; do
     [ -r "$SRC/$file" ] || fail "$file is missing next to CSMWrap"
 done
+ls "$SRC"/patches/*.patch >/dev/null 2>&1 || fail 'the CSMWrap patches are missing next to CSMWrap'
+ls "$SRC"/licenses/*.txt >/dev/null 2>&1 || fail 'the CSMWrap licence notices are missing next to CSMWrap'
 
 size=$(blockdev --getsize64 "$TARGET_DEVICE") || fail 'cannot read the target size'
 total=$((size / 512))
@@ -71,11 +78,15 @@ verbose=false
 [ ! -e "$VERBOSE_FLAG" ] || verbose=true
 log "csmwrap.ini verbose=$verbose"
 printf 'serial = false\r\nverbose = %s\r\n' "$verbose" > "$ini"
-mmd -i "$image" ::/EFI ::/EFI/BOOT ::/CSMWRAP || fail 'cannot create ESP folders'
+mmd -i "$image" ::/EFI ::/EFI/BOOT ::/CSMWRAP ::/CSMWRAP/patches ::/CSMWRAP/licenses || fail 'cannot create ESP folders'
 mcopy -i "$image" "$SRC/csmwrapx64.efi" ::/EFI/BOOT/BOOTX64.EFI || fail 'cannot copy CSMWrap'
 mcopy -i "$image" "$ini" ::/EFI/BOOT/csmwrap.ini || fail 'cannot copy csmwrap.ini'
-for file in LICENSE-CSMWrap-LGPL-2.1.txt COPYING-SeaBIOS-LGPLv3.txt COPYING-SeaBIOS-GPLv3.txt SOURCES.txt; do
+for file in $CSMWRAP_FILES; do
     mcopy -i "$image" "$SRC/$file" "::/CSMWRAP/$file" || fail "cannot copy $file"
+done
+for file in "$SRC"/patches/*.patch "$SRC"/licenses/*.txt; do
+    sub=${file%/*}; sub=${sub##*/}
+    mcopy -i "$image" "$file" "::/CSMWRAP/$sub/${file##*/}" || fail "cannot copy $sub/${file##*/}"
 done
 
 le32() {

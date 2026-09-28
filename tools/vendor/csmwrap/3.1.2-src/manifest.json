@@ -1,0 +1,30 @@
+{
+  "what": "Complete corresponding source of CSMWrap 3.1.2 (LGPL-2.1) with its SeaBIOS fork (LGPLv3) and the other submodules, for the LGPL source offer of the USOS 3.1.2-usos1 build (patches in ../3.1.2-usos1/patches).",
+  "archive": {
+    "file": "csmwrap-3.1.2-src.tar.xz",
+    "sha256": "9be5b839d64d25021037096b6cf928cfcf444db587a40a06d50bc4863991ff72",
+    "made_by": "tools/csmwrap_build/guest_build.sh: git clone at the pinned commits, .git removed, seabios/.version = 'git describe --always --tags' (578d260b), GNU tar --sort=name --mtime=@1778284800 --owner=0 --group=0 --numeric-owner --format=gnu | xz -9 -T1"
+  },
+  "upstream": {
+    "CSMWrap": {"url": "https://github.com/CSMWrap/CSMWrap.git", "tag": "3.1.2", "commit": "808ac8ea5393db9052044fb0f74aa55e0d719afc", "license": "LGPL-2.1"},
+    "seabios": {"url": "https://github.com/CSMWrap/seabios-csmwrap.git", "commit": "578d260b94f62150bf6ab9149784287bd1154f06", "license": "LGPL-3.0 (COPYING.LESSER) with GPL-3.0 text (COPYING)"},
+    "cc-runtime": {"url": "https://github.com/osdev0/cc-runtime.git", "commit": "dae79833b57a01b9fd3e359ee31def69f5ae899b", "license": "Apache-2.0 WITH LLVM-exception"},
+    "flanterm": {"url": "https://github.com/Mintsuki/Flanterm.git", "commit": "dfa1922c0749faf64c4423a81b233a20c08a7db7", "license": "BSD-2-Clause"},
+    "freestnd-c-hdrs": {"url": "https://github.com/osdev0/freestnd-c-hdrs-0bsd.git", "commit": "097259a899d30f0a4b7a694de2de5fdda942e923", "license": "0BSD"},
+    "nanoprintf": {"url": "https://github.com/charlesnicholson/nanoprintf.git", "commit": "526cbca59d23fcb4e4aee3a93beaf22bc63e67a5", "license": "Unlicense or 0BSD"},
+    "picoefi": {"url": "https://github.com/PicoEFI/PicoEFI.git", "commit": "af14129ec21ba482873289e36311ec02f1e19964", "license": "see licenses/picoefi-COPYING.txt"},
+    "uACPI": {"url": "https://github.com/uACPI/uACPI.git", "commit": "338dc389ef38c5264e317c61d8121aace5ac865d", "license": "MIT"}
+  },
+  "licenses": {
+    "licenses/CSMWrap-LICENSE-LGPL-2.1.txt": "20c17d8b8c48a600800dfd14f95d5cb9ff47066a9641ddeab48dc54aec96e331",
+    "licenses/SeaBIOS-COPYING.LESSER-LGPLv3.txt": "a853c2ffec17057872340eee242ae4d96cbf2b520ae27d903e1b2fef1a5f9d1c",
+    "licenses/SeaBIOS-COPYING-GPLv3.txt": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+    "licenses/cc-runtime-LICENSE.txt": "1a8f1058753f1ba890de984e48f0242a3a5c29a6a8f2ed9fd813f36985387e8d",
+    "licenses/flanterm-LICENSE.txt": "4d1e2a6be17497c194c916c9c53b9a4371868b9861367099fecc319ee32da0d5",
+    "licenses/freestnd-c-hdrs-LICENSE.txt": "ff7ea00a764e90de714436e89585fe4cc6fc5235241f2b1b44d0939771db3129",
+    "licenses/nanoprintf-LICENSE.txt": "161c07e5ac2244db45e53b7923df8364c2d96fd1dd59804faf7f817e32a6ca98",
+    "licenses/picoefi-COPYING.txt": "cb04faf9e77880504160aae38d8a7cee59c038c5f1c1de95d0c133c85ecb25ef",
+    "licenses/picoefi-LicenseRef-scancode-bsd-no-disclaimer-unmodified.txt": "6c9f956b69757821cbc3dfe33d84707dcc00c405c7da921b0e6ad268f1f6672a",
+    "licenses/uACPI-LICENSE.txt": "4df79580512f5c0f701d18fe4d87cb05383a214b9f64d85abe0d55200fd98f3f"
+  }
+}

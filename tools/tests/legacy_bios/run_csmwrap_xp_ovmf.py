@@ -29,7 +29,7 @@ QEMU = ROOT / 'tools/qemu/qemu-system-x86_64.exe'
 QEMU_IMG = ROOT / 'tools/qemu/qemu-img.exe'
 OVMF_CODE = ROOT / 'tools/qemu/share/edk2-x86_64-code.fd'
 OVMF_VARS = ROOT / 'tools/qemu/share/edk2-i386-vars.fd'
-CSMWRAP_DIR = ROOT / 'tools/vendor/csmwrap/3.1.2'
+CSMWRAP_DIR = ROOT / 'tools/vendor/csmwrap/3.1.2-usos1'  # the release binary since 2026-09-28
 
 SECTOR = 512
 ESP_SECTORS = 65536          # 32 MiB FAT16
@@ -129,7 +129,7 @@ def run(cmd, **kw):
     return subprocess.run([str(c) for c in cmd], check=True, **kw)
 
 
-def make_overlay(prepared, path, esp, ini):
+def make_overlay(prepared, path, esp, ini, efi_path=None):
     path.unlink(missing_ok=True)
     run([QEMU_IMG, 'create', '-q', '-f', 'qcow2', '-F', 'qcow2', '-b', prepared.resolve(), path])
     if not esp:
@@ -146,9 +146,13 @@ def make_overlay(prepared, path, esp, ini):
     assert mbr[446 + 16:446 + 32] == b'\0' * 16, 'partition slot 2 is not free'
     mbr[446 + 16:446 + 32] = struct.pack('<B3sB3sII', 0, b'\xfe\xff\xff', 0xEF, b'\xfe\xff\xff', start, ESP_SECTORS)
     mbr_file.write_bytes(mbr)
-    efi = (CSMWRAP_DIR / 'csmwrapx64.efi').read_bytes()
-    pinned = json.loads((CSMWRAP_DIR / 'manifest.json').read_text())['files']['csmwrapx64.efi']
-    assert hashlib.sha256(efi).hexdigest() == pinned, 'CSMWrap binary does not match manifest'
+    if efi_path is None:
+        efi = (CSMWRAP_DIR / 'csmwrapx64.efi').read_bytes()
+        pinned = json.loads((CSMWRAP_DIR / 'manifest.json').read_text())['files']['csmwrapx64.efi']
+        assert hashlib.sha256(efi).hexdigest() == pinned, 'CSMWrap binary does not match manifest'
+    else:
+        efi = efi_path.read_bytes()
+    print('[ESP] CSMWrap', efi_path or 'pinned 3.1.2-usos1', hashlib.sha256(efi).hexdigest(), flush=True)
     part = path.with_suffix('.esp')
     part.write_bytes(build_fat16({'EFI/BOOT/BOOTX64.EFI': efi, 'EFI/BOOT/CSMWRAP.INI': ini.encode()}, start))
     # qemu-io 'write -s' reads its pattern file in text mode on Windows (stops at
@@ -296,19 +300,23 @@ def main():
     p.add_argument('--before-minutes', type=float, default=1.0)
     p.add_argument('--skip-before', action='store_true')
     p.add_argument('--run-through', action='store_true', help='keep running after text-mode copying (reboots, GUI Setup); frames every 20 s')
+    p.add_argument('--csmwrap-efi', type=Path, help='CSMWrap binary to test instead of the pinned 3.1.2-usos1 (e.g. tools/vendor/csmwrap/3.1.2/csmwrapx64.efi, upstream)')
+    p.add_argument('--verbose', choices=('true', 'false'), default='true', help='csmwrap.ini verbose value')
+    p.add_argument('--tag', default='', help='suffix of the after-* screenshot folder')
+    p.add_argument('--shots-every', type=float, default=0, help='seconds between frame-*.png (default 3, 20 with --run-through; 0.2 catches the CSMWrap screen)')
     a = p.parse_args()
     out = a.output.resolve()
     out.mkdir(parents=True, exist_ok=True)
-    ini = 'serial = true\nserial_port = 0x3f8\nverbose = true\n'
+    ini = f'serial = true\nserial_port = 0x3f8\nverbose = {a.verbose}\n'
     results = {}
     if not a.skip_before:
         before = out / 'before.qcow2'
         make_overlay(a.prepared, before, esp=False, ini=ini)
         results['before'] = boot(out, before, 'before', a.vga, a.accel, a.before_minutes)
     after = out / 'after.qcow2'
-    make_overlay(a.prepared, after, esp=True, ini=ini)
-    results['after'] = boot(out, after, 'after-' + a.vga.split(',')[0] + ('-norom' if 'romfile=' in a.vga else ''), a.vga, a.accel, a.minutes,
-                             shots_every=20.0 if a.run_through else 3.0, run_through=a.run_through)
+    make_overlay(a.prepared, after, esp=True, ini=ini, efi_path=a.csmwrap_efi)
+    results['after'] = boot(out, after, 'after-' + a.vga.split(',')[0] + ('-norom' if 'romfile=' in a.vga else '') + a.tag, a.vga, a.accel, a.minutes,
+                             shots_every=a.shots_every or (20.0 if a.run_through else 3.0), run_through=a.run_through)
     print(json.dumps(results))
     return 0 if results['after'] == 'copying' else 1
 

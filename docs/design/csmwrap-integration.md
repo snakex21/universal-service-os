@@ -281,6 +281,13 @@ Findings from that run, fixed afterwards:
   default XP one plus `usos.xp_boot=csmwrap`.
 * **CSMWrap on-screen log** was on (`verbose = true`). It is now off by
   default, with the flag-file switch above.
+  `verbose = false` still left the upstream CSMWrap logo (always printed),
+  the SeaBIOS banner and the "Press ESC for boot menu" prompt (2.5 s wait)
+  on screen. The release now ships a patched source build, **CSMWrap
+  3.1.2-usos1** (since 2026-09-28; staged 2026-09-27), which removes them on
+  a `verbose = false` boot and keeps all of it with `verbose = true` (so the
+  flag file restores the full diagnostics); see
+  [../research/csmwrap.md](../research/csmwrap.md) sections 6 and 7.
 
 ## 10. Vista without firmware CSM (profile `vista-x64-sp2-uefi-csmwrap`, 2026-09-27)
 

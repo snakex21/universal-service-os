@@ -155,9 +155,10 @@ a legacy BIOS machine for the rest of that power cycle.
   no Docker and only MinGW GCC (PE target, unusable for SeaBIOS). A source
   build therefore needs a Linux environment: the path of least effort is
   the micro-Linux build host USOS already uses for its kernel, or a
-  pinned Arch/Debian container on another machine. **Not done in this
-  change** (time box); USOS keeps the pinned upstream release binary, whose
-  SHA-256 equals the GitHub release digest, like `UefiSeven.efi`.
+  pinned Arch/Debian container on another machine. The release keeps the
+  pinned upstream release binary, whose SHA-256 equals the GitHub release
+  digest, like `UefiSeven.efi`. A source build now exists (2026-09-27): an
+  Alpine VM in QEMU, section 6.
 - **Signing:** CSMWrap must run with Secure Boot **off**: its whole purpose
   is to execute unsigned 16-bit BIOS code and a legacy boot sector outside
   any verification. Signing it with the USOS MOK would let anyone with the
@@ -165,3 +166,198 @@ a legacy BIOS machine for the rest of that power cycle.
   (`docs/secure-boot-usos.md`). Keep the existing decision: **never sign
   CSMWrap**; `usos-efisign` already lists it as unsigned on purpose
   (`installer/cmd/usos-efisign/release.go`).
+
+## 6. USOS build 3.1.2-usos1: quiet boot (2026-09-27; the release binary since 2026-09-28, section 7)
+
+With `csmwrap.ini` `verbose = false` (the release default since the X470
+PASS), the upstream 3.1.2 binary still shows three things before XP:
+
+| Upstream behaviour | Where |
+|---|---|
+| CSMWrap ASCII logo and credits, **always** | `efi_main` sets `gConfig.verbose = true` around `printf(banner)`, before `csmwrap.ini` is even read |
+| `SeaBIOS (version 578d260b-CSMWrap-3.1.2)` (and a `Machine UUID` line when SMBIOS has one) | `enable_vga_console()` (`bootsplash.c`), called by the CSM `Legacy16PrepareToBoot` handler after the int 10h mode-3 switch |
+| `Press ESC for boot menu.` plus a 2.5 s wait, then `Booting from Hard Disk...` | `interactive_bootmenu()` and `do_boot()` (`boot.c`) |
+
+### 6.1 Patches (`tools/vendor/csmwrap/3.1.2-usos1/patches`)
+
+Three small patches on the unpatched source archive, applied in order with
+`patch -p1` (they span CSMWrap and its `seabios` submodule):
+
+1. **`0001-csmwrap-logo-only-when-verbose.patch`** (CSMWrap): drops the
+   forced-verbose logo print and prints the logo after `config_load()`
+   through the normal `printf`, so it reaches the screen only with
+   `verbose = true` (and serial with `serial = true`).
+2. **`0002-quiet-flag-no-seabios-banner-or-boot-messages.patch`** (both):
+   the loader-to-SeaBIOS channel. A new byte `CsmwrapFlags` after
+   `ExtraPciRootListCount` at the end of `EFI_COMPATIBILITY16_TABLE` (both
+   copies of `LegacyBios.h`), bit `CSMWRAP_FLAG_QUIET`; CSMWrap sets it
+   when `verbose` is false, next to the extra-PCI-roots fields it already
+   fills. SeaBIOS gets `csm_quiet()`; `enable_vga_console()` still switches
+   to text mode 3 but skips the banner and UUID line, and the five
+   `Booting from ...` lines are skipped. Error messages (`Boot failed`,
+   `No bootable device`) stay visible.
+3. **`0003-seabios-no-boot-menu-when-quiet.patch`** (SeaBIOS): in
+   `csm_maininit`, next to `etc/extra-pci-roots`, a quiet boot adds the
+   romfiles `etc/show-boot-menu = 0` and `etc/boot-menu-wait = 0`, so
+   `interactive_bootmenu()` returns at once (no prompt, no wait). Chosen
+   over `CONFIG_BOOTMENU=n` because it keeps the menu for a
+   `verbose = true` boot.
+
+`verbose = true` gives back exactly the upstream screens (logo, CSMWrap
+log, SeaBIOS banner, ESC prompt and menu), so the existing
+`EFI\USOS\csmwrap-verbose.flag` switch of `tools/xp_csmwrap_esp.sh` stays
+the diagnostics path. Cosmetic leftover on a quiet boot: Flanterm's cursor
+block in the top-left corner during the CSMWrap phase (under a second).
+
+### 6.2 Build (`tools/build_csmwrap.ps1`)
+
+No WSL/Docker/ELF GCC here, so the build host is a throwaway **Alpine
+Linux 3.24.1 virt live ISO** (the hash-pinned ISO of
+`tools/micro_linux.lock.json`) in the repository's QEMU 11.1.0 with WHPX
+(TCG fallback). `tools/csmwrap_build/run_build_vm.py` logs in on the serial
+console, hands `tools/csmwrap_build/guest_build.sh`, the lock and the
+patches over as a tar on a raw virtio disk, and reads the results back from
+a second one. The guest:
+
+1. installs exact apk versions from the `v3.24` branch
+   (`tools/csmwrap_build/lock.json`): gcc 15.2.0-r5, binutils 2.45.1-r1,
+   musl-dev 1.2.6-r2, make 4.4.1-r4, nasm 3.01-r0, xxd 9.2.1091-r0,
+   python3 3.14.7-r1, git 2.54.0-r0, tar 1.35-r5, xz 5.8.4-r0, patch 2.8-r0
+   (stable branches keep only the newest build; a superseded pin fails the
+   build and must be bumped deliberately);
+2. clones CSMWrap at `808ac8ea5393db9052044fb0f74aa55e0d719afc` (tag 3.1.2)
+   and checks all seven submodule commits against the lock (SeaBIOS fork
+   `578d260b94f62150bf6ab9149784287bd1154f06`);
+3. writes `seabios/.version` (`578d260b`, what `git describe` gives, so the
+   version string matches upstream without `.git`) and the **source
+   archive** `csmwrap-3.1.2-src.tar.xz` (GNU tar, sorted, mtime 2026-05-09,
+   owner 0, no `.git`);
+4. builds from that archive with `make ARCH=x86_64 BUILD_VERSION=...`:
+   `3.1.2` unpatched, and `3.1.2-usos1` with the patches, twice.
+
+Two separate VM runs gave the same archive and the same unpatched build;
+the usos1 build is identical when built twice:
+
+| File | SHA-256 |
+|---|---|
+| `csmwrap-3.1.2-src.tar.xz` (1.0 MB, vendored in `tools/vendor/csmwrap/3.1.2-src/` with the licence files) | `9be5b839d64d25021037096b6cf928cfcf444db587a40a06d50bc4863991ff72` |
+| unpatched rebuild `3.1.2` (not kept) | `62d617fc02e0bf983f4d62c7f9a95d31bcfd4b049d3b0bc46b988434502856da` |
+| **`3.1.2-usos1/csmwrapx64.efi`** (471040 bytes, unsigned) | **`0146cc90c7c30be79115f0a0b86e1077c8df73057c94007fd036ebfbd20762a4`** |
+| upstream release `3.1.2/csmwrapx64.efi` (Arch GCC 16.1.1, binutils 2.46) | `96fdb387e177c6340287b7e07713dc09bf1f965dd404311eafd9c6eb99a02745` |
+
+The rebuild is not byte-identical to the release (different compiler), so
+"same as upstream" is a functional check (below). Version strings:
+`CSMWrap Version 3.1.2-usos1`, `SeaBIOS (version 578d260b-CSMWrap-3.1.2-usos1)`.
+`tools/build_csmwrap.ps1` compares a rebuild with
+`3.1.2-usos1/manifest.json`; `-Stage` copies it in only when it matches.
+
+### 6.3 Tests (OVMF without CSM, TCG, std VGA)
+
+Prepared English XP disk (`zig-out/xp-uefi-textmode-en-v5/target.qcow2`)
+through `tools/tests/legacy_bios/run_csmwrap_xp_ovmf.py` (new options
+`--csmwrap-efi`, `--verbose`, `--tag`, `--shots-every`), and the new
+`tools/tests/legacy_bios/capture_csmwrap_screen.py`, which pauses the VM at
+CSMWrap's `Unlock!` serial line to screenshot the CSMWrap phase itself:
+
+| Binary, `verbose` | Screens before XP Setup | Result |
+|---|---|---|
+| upstream release, true | logo + log; SeaBIOS banner + ESC prompt | text-mode copying, 51.5 s |
+| upstream release, false (current release) | logo; SeaBIOS banner + ESC prompt + `Booting from Hard Disk...` | copying, 52.4 s |
+| **unpatched rebuild**, true | same as the release binary | copying, 52.4 s (**functional check PASS**) |
+| **3.1.2-usos1, false** | none: the first text is `Setup is inspecting your computer's hardware configuration...` | copying, 41.0 s |
+| **3.1.2-usos1, true** | logo + CSMWrap log (`verbose = true`, unlock path, `Unlock!`); SeaBIOS `...-3.1.2-usos1` banner + ESC prompt | copying, 43.2 s |
+
+Screenshots in [csmwrap-quiet/](csmwrap-quiet/): `before-1-csmwrap-logo.png`,
+`before-2-seabios-banner.png` (release binary, `verbose = false`);
+`after-quiet-1-csmwrap.png`, `after-quiet-2-first-text.png`,
+`after-quiet-3-copying.png` (usos1, quiet); `after-verbose-1-csmwrap-log.png`,
+`after-verbose-2-seabios-banner.png` (usos1, `verbose = true`).
+Not tested on hardware (X470) yet.
+
+### 6.4 LGPL obligations for shipping 3.1.2-usos1
+
+Shipping the modified binary is allowed (LGPL-2.1 section 2 for CSMWrap,
+LGPLv3 with GPLv3 for SeaBIOS) if USOS:
+
+- **marks it as modified**: the version strings above, and a `SOURCES.txt`
+  saying "modified by the USOS project", with the date and the list of
+  changes (the patch headers say the same);
+- **provides the complete corresponding source**: the vendored
+  `csmwrap-3.1.2-src.tar.xz` plus the three patches, shipped next to the
+  binary (preferred, 1 MB) or offered in writing for as long as the binary
+  is distributed, plus the scripts used to control compilation
+  (`tools/build_csmwrap.ps1`, `tools/csmwrap_build/`);
+- keeps shipping the LGPL-2.1, LGPLv3 and GPLv3 texts (already staged by
+  `usos-efisign`) and the permissive notices of the other components
+  (`tools/vendor/csmwrap/3.1.2-src/licenses/`);
+- leaves the modified files under their licences (the patches are
+  LGPL-2.1 for CSMWrap files, LGPLv3 for SeaBIOS files).
+
+### 6.5 What switching the release to 3.1.2-usos1 would take
+
+Done on 2026-09-28 (section 7). The binary stays unsigned either way.
+
+1. `installer/cmd/usos-efisign/release.go`: `csmwrapVendorDir` ->
+   `tools/vendor/csmwrap/3.1.2-usos1` (its manifest has the binary hash; the
+   `LICENSE`/`COPYING.LESSER` hashes `stageCSMWrap` checks must be added, or
+   read from `3.1.2/`), a new `SOURCES.txt` text, for example:
+   "CSMWrap 3.1.2-usos1 (csmwrapx64.efi, unsigned): a MODIFIED version of
+   CSMWrap 3.1.2 and its SeaBIOS fork, changed by the USOS project on
+   2026-09-27 (quiet boot unless csmwrap.ini sets verbose = true). Source:
+   csmwrap-3.1.2-src.tar.xz (CSMWrap 808ac8e, SeaBIOS 578d260b) plus
+   patches/0001..0003", and staging of the patches and the archive into
+   `EFI/USOS/csmwrap/`.
+2. `tools/xp_csmwrap_esp.sh`: `PINNED=` -> `0146cc90...62a4`, the
+   "pinned 3.1.2 hash" message, and the licence/source loop that copies
+   files to `\CSMWRAP\` on the target ESP (add the patches, and the archive
+   or the offer).
+3. Allowlists and goldens: `tools/tests/golden/staged_payloads.tsv` (the new
+   `xp_csmwrap_esp.sh` hash in its initramfs row, new `EFI/USOS/csmwrap/`
+   rows), `tools/verify_release_consistency.ps1` (the `EFI/USOS/csmwrap/`
+   list); `installer/internal/payload/bundle_test.go` and the unsigned list
+   in `usos-efisign` keep the same file name.
+4. Test tools that default to `3.1.2`: `run_csmwrap_xp_ovmf.py`
+   (`CSMWRAP_DIR`) and `run_csmwrap_xp_prepared.py` (reads the staged files).
+5. X470 check with `verbose = false` and with the flag file, then a release
+   build and payload commit.
+
+## 7. Release switch to 3.1.2-usos1 (2026-09-28)
+
+The release ships 3.1.2-usos1 (section 6) instead of the upstream binary;
+the usos2 `system_thread_visible` experiment of `feature/csmwrap-quiet`
+(it resets the installed XP) is not part of it.
+
+- `installer/cmd/usos-efisign/release.go` stages from
+  `tools/vendor/csmwrap/3.1.2-usos1` (binary by its manifest hash), the
+  licence texts as before (LGPL-2.1 of CSMWrap and LGPLv3 of SeaBIOS from
+  `3.1.2/`, GPLv3), and now also the complete source: the unpatched archive
+  `csmwrap-3.1.2-src.tar.xz` (hash shared by both manifests), `patches/`
+  (the three patches, hashes from the usos1 manifest) and `licenses/` (the
+  notices of every component, from `3.1.2-src/manifest.json`) into
+  `EFI/USOS/csmwrap/`. `SOURCES.txt` says "MODIFIED", what changed and when,
+  where the source and the patches are, and offers the source on request.
+- `tools/xp_csmwrap_esp.sh` (XP, 2000, 2003, XP x64 and Vista through
+  CSMWrap) pins `0146cc90...62a4`, and copies the licences, `SOURCES.txt`,
+  the source archive, `patches\` and `licenses\` into `\CSMWRAP\` of the
+  target's CSMWrap ESP (about 1.1 MB of 64 MiB), so every installed disk
+  carries its source. `csmwrap-verbose.flag` still writes `verbose = true`,
+  which gives back every upstream screen (section 6.3).
+- Allowlists: `tools/verify_release_consistency.ps1` (new required paths),
+  the staged-payload golden (new `EFI/USOS/csmwrap/` rows, the new hashes of
+  `xp_csmwrap_esp.sh` and of the payload); the QEMU harnesses copy the whole
+  staged `EFI/USOS/csmwrap` tree.
+
+QEMU (OVMF without CSM, TCG, std VGA), release staging of this commit:
+
+| Harness | Result |
+|---|---|
+| `run_csmwrap_xp_prepared.py` (XP SP3 PL, prepared by the package scripts) | OVMF logo, then no text before XP Setup: the first text screen is "Instalator systemu Windows XP Professional" (28.5 s); `SeaBIOS (version` appears 0 times; text-mode copying reached (40 s) |
+| `run_csmwrap_vista_prepared.py` (Vista SP2 x64, tweaks profile answer) | no CSMWrap logo, no SeaBIOS banner, no ESC prompt; PE10 boots, Vista Setup starts with the merged answer |
+
+Left over on a quiet boot: the VGA text-mode cursor (a blinking underline in
+the top-left corner) from SeaBIOS's mode-3 switch until the boot loader
+changes the video mode (about 20 s for bootmgr loading PE10 under TCG,
+under a few seconds on hardware). Hiding it needs another SeaBIOS change
+(cursor off in `enable_vga_console()` on a quiet boot), i.e. a new build;
+not done here. Not tested on the X470 yet.
+

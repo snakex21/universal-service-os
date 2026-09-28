@@ -1,0 +1,52 @@
+{
+  "version": "3.1.2-usos1",
+  "status": "the release binary since 2026-09-28 (installer/cmd/usos-efisign/release.go stages it with the source archive, the patches and the licence notices; tools/xp_csmwrap_esp.sh pins its hash)",
+  "modified": "MODIFIED version of CSMWrap 3.1.2 and of its SeaBIOS fork: quiet boot unless csmwrap.ini sets verbose = true (no CSMWrap logo, no SeaBIOS banner or UUID line, no 'Booting from ...' lines, no boot-menu prompt or wait)",
+  "signed": false,
+  "base": {
+    "url": "https://github.com/CSMWrap/CSMWrap",
+    "tag": "3.1.2",
+    "commit": "808ac8ea5393db9052044fb0f74aa55e0d719afc",
+    "seabios_url": "https://github.com/CSMWrap/seabios-csmwrap",
+    "seabios_commit": "578d260b94f62150bf6ab9149784287bd1154f06",
+    "submodules": "submodules.txt (all pinned in tools/csmwrap_build/lock.json)"
+  },
+  "source_archive": {
+    "file": "../3.1.2-src/csmwrap-3.1.2-src.tar.xz",
+    "sha256": "9be5b839d64d25021037096b6cf928cfcf444db587a40a06d50bc4863991ff72",
+    "note": "unpatched 3.1.2 tree with all submodules and seabios/.version, deterministic GNU tar (sorted, mtime 2026-05-09, owner 0); the usos1 source is this archive plus patches/*.patch applied in order with patch -p1"
+  },
+  "patches": {
+    "0001-csmwrap-logo-only-when-verbose.patch": "7b6b90c5b414eda41da6236a6a779b796949aa396a518e07010413f72d5cb3e8",
+    "0002-quiet-flag-no-seabios-banner-or-boot-messages.patch": "9666705cbe6feb5eff0fe1f2c50f330c69717d06ecffcbaf216b519cc224763d",
+    "0003-seabios-no-boot-menu-when-quiet.patch": "e07436766cb3c799ecaa98e95a740548d6c0292b9e7a9e7c1d0282b6c68d4790"
+  },
+  "files": {
+    "csmwrapx64.efi": "0146cc90c7c30be79115f0a0b86e1077c8df73057c94007fd036ebfbd20762a4",
+    "toolchain.txt": "c681944546e95a3306bd2bd93304db8b2751ba11a1324e2571fddc715532c76f",
+    "apk-installed.txt": "2ccac7f01c2f746715dc183e0557b6b68bc3f9028571c38bac716fd12e86aee7",
+    "submodules.txt": "767c20f188c35c07f4cc460d3184a6bffaf03226e4048b379f5709b3896151e4"
+  },
+  "embedded_blobs": {
+    "Csm16.bin": "6c300676ff429fc9d81d4ace600618933d5cb2c36275b94a7b160052e7c70e5e",
+    "vgabios.bin": "5956a1f560a09be01fba6d2779798621427b65d75a505ef31ea49320bc582dc6"
+  },
+  "upstream_rebuild": {
+    "note": "the same source and toolchain built WITHOUT patches (BUILD_VERSION=3.1.2): functional check against the release binary; not byte-identical to it (upstream used Arch GCC 16.1.1 / binutils 2.46)",
+    "sha256": "62d617fc02e0bf983f4d62c7f9a95d31bcfd4b049d3b0bc46b988434502856da",
+    "Csm16.bin": "e21b8320b4b5e05f2a8f9a9062fc9f7e6dc7820bce772bf4500172c00df12c3b",
+    "vgabios.bin": "7f11d1e0af838bb28ee0530d06715b6ae0eb54de69d46048f04ad99f635cefdf",
+    "release_binary_sha256": "96fdb387e177c6340287b7e07713dc09bf1f965dd404311eafd9c6eb99a02745"
+  },
+  "build": {
+    "script": "tools/build_csmwrap.ps1 (host) + tools/csmwrap_build/guest_build.sh (guest)",
+    "host": "Alpine Linux 3.24.1 virt live ISO in QEMU 11.1.0 (WHPX), kernel 6.18.35-0-virt",
+    "command": "make -j4 ARCH=x86_64 BUILD_VERSION=3.1.2-usos1",
+    "toolchain": "gcc 15.2.0-r5 (Alpine), binutils 2.45.1-r1, nasm 3.01-r0, xxd 9.2.1091-r0, make 4.4.1-r4, python3 3.14.7-r1, patch 2.8-r0, GNU tar 1.35-r5, xz 5.8.4-r0, git 2.54.0-r0",
+    "repeatable": "usos1 built twice from fresh trees in one VM run: identical; two separate VM runs (2026-09-27) gave identical source archive and upstream rebuild"
+  },
+  "version_strings": {
+    "csmwrap": "CSMWrap Version 3.1.2-usos1",
+    "seabios": "578d260b-CSMWrap-3.1.2-usos1"
+  }
+}

@@ -1,0 +1,162 @@
+USOS 3.1.2-usos1 patch 2/3: quiet flag; no SeaBIOS banner or "Booting from" lines
+
+Adds CsmwrapFlags (CSMWRAP_FLAG_QUIET) after ExtraPciRootListCount in
+EFI_COMPATIBILITY16_TABLE (both copies of LegacyBios.h). CSMWrap sets it
+when verbose is false. SeaBIOS csm_quiet() reads it; enable_vga_console
+still sets text mode 3 but skips "SeaBIOS (version ...)" and the UUID line,
+and the "Booting from ..." lines are skipped. Error messages stay.
+
+Applies to CSMWrap 3.1.2 (808ac8e) with its seabios submodule (578d260b),
+patch -p1 from the top of the tree. Part of CSMWrap 3.1.2-usos1, a MODIFIED
+version made by the USOS project (LGPL-2.1 / SeaBIOS LGPLv3).
+
+diff -ruN a/seabios/src/boot.c b/seabios/src/boot.c
+--- a/seabios/src/boot.c
++++ b/seabios/src/boot.c
+@@ -922,7 +922,8 @@
+ {
+     if (! CONFIG_CDROM_BOOT)
+         return;
+-    printf("Booting from DVD/CD...\n");
++    if (!csm_quiet())
++        printf("Booting from DVD/CD...\n");
+ 
+     int status = cdrom_boot(drive);
+     if (status) {
+@@ -948,7 +949,8 @@
+ {
+     if (!CONFIG_COREBOOT_FLASH)
+         return;
+-    printf("Booting from CBFS...\n");
++    if (!csm_quiet())
++        printf("Booting from CBFS...\n");
+     cbfs_run_payload(file);
+ }
+ 
+@@ -956,7 +958,8 @@
+ static void
+ boot_rom(u32 vector)
+ {
+-    printf("Booting from ROM...\n");
++    if (!csm_quiet())
++        printf("Booting from ROM...\n");
+     struct segoff_s so;
+     so.segoff = vector;
+     call_boot_entry(so, 0);
+@@ -996,11 +999,13 @@
+     struct bev_s *ie = &BEV[seq_nr];
+     switch (ie->type) {
+     case IPL_TYPE_FLOPPY:
+-        printf("Booting from Floppy...\n");
++        if (!csm_quiet())
++            printf("Booting from Floppy...\n");
+         boot_disk(0x00, CheckFloppySig);
+         break;
+     case IPL_TYPE_HARDDISK:
+-        printf("Booting from Hard Disk...\n");
++        if (!csm_quiet())
++            printf("Booting from Hard Disk...\n");
+         boot_disk(0x80, 1);
+         break;
+     case IPL_TYPE_CDROM:
+diff -ruN a/seabios/src/bootsplash.c b/seabios/src/bootsplash.c
+--- a/seabios/src/bootsplash.c
++++ b/seabios/src/bootsplash.c
+@@ -47,7 +47,9 @@
+     br.ax = 0x0003;
+     call16_int10(&br);
+ 
+-    // Write to screen.
++    // Write to screen (not on a CSMWrap quiet boot).
++    if (csm_quiet())
++        return;
+     printf("SeaBIOS (version %s)\n", VERSION);
+     display_uuid();
+ }
+diff -ruN a/seabios/src/fw/csm.c b/seabios/src/fw/csm.c
+--- a/seabios/src/fw/csm.c
++++ b/seabios/src/fw/csm.c
+@@ -41,6 +41,13 @@
+     .AcpiRsdPtrPointer = (u32)&csm_rsdp,
+ };
+ 
++// CSMWrap USOS extension: the loader asked for a quiet boot.
++int
++csm_quiet(void)
++{
++    return CONFIG_CSM && (csm_compat_table.CsmwrapFlags & CSMWRAP_FLAG_QUIET);
++}
++
+ EFI_TO_COMPATIBILITY16_INIT_TABLE *csm_init_table;
+ EFI_TO_COMPATIBILITY16_BOOT_TABLE *csm_boot_table;
+ 
+diff -ruN a/seabios/src/std/LegacyBios.h b/seabios/src/std/LegacyBios.h
+--- a/seabios/src/std/LegacyBios.h
++++ b/seabios/src/std/LegacyBios.h
+@@ -261,9 +261,19 @@
+   /// ExtraPciRootListPointer.
+   ///
+   UINT8                             ExtraPciRootListCount;
++
++  ///
++  /// CSMWrap USOS extension. CSMWRAP_FLAG_* bits set by the loader.
++  ///
++  UINT8                             CsmwrapFlags;
+ } EFI_COMPATIBILITY16_TABLE;
+ 
+ ///
++/// CsmwrapFlags: quiet boot (no SeaBIOS banner, no boot menu prompt).
++///
++#define CSMWRAP_FLAG_QUIET  0x01
++
++///
+ /// Functions provided by the CSM binary which communicate between the EfiCompatibility 
+ /// and Compatability16 code.
+ ///
+diff -ruN a/seabios/src/util.h b/seabios/src/util.h
+--- a/seabios/src/util.h
++++ b/seabios/src/util.h
+@@ -125,6 +125,7 @@
+ int csm_bootprio_fdc(struct pci_device *pci, int port, int fdid);
+ int csm_bootprio_ata(struct pci_device *pci, int chanid, int slave);
+ int csm_bootprio_pci(struct pci_device *pci);
++int csm_quiet(void);
+ 
+ // fw/mptable.c
+ void mptable_setup(void);
+diff -ruN a/src/csmwrap.c b/src/csmwrap.c
+--- a/src/csmwrap.c
++++ b/src/csmwrap.c
+@@ -767,6 +767,9 @@
+         printf("\n");
+     }
+ 
++    /* USOS: ask SeaBIOS for a quiet boot unless verbose = true */
++    priv.csm_efi_table->CsmwrapFlags = gConfig.verbose ? 0 : CSMWRAP_FLAG_QUIET;
++
+     /* Disable 8259 PIC */
+     outb(0x21, 0xff);
+     outb(0xa1, 0xff);
+diff -ruN a/src/edk2/LegacyBios.h b/src/edk2/LegacyBios.h
+--- a/src/edk2/LegacyBios.h
++++ b/src/edk2/LegacyBios.h
+@@ -262,9 +262,19 @@
+   /// ExtraPciRootListPointer.
+   ///
+   UINT8                             ExtraPciRootListCount;
++
++  ///
++  /// CSMWrap USOS extension. CSMWRAP_FLAG_* bits set by the loader.
++  ///
++  UINT8                             CsmwrapFlags;
+ } EFI_COMPATIBILITY16_TABLE;
+ 
+ ///
++/// CsmwrapFlags: quiet boot (no SeaBIOS banner, no boot menu prompt).
++///
++#define CSMWRAP_FLAG_QUIET  0x01
++
++///
+ /// Functions provided by the CSM binary which communicate between the EfiCompatibility
+ /// and Compatibility16 code.
+ ///

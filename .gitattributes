@@ -44,3 +44,9 @@ tools/vendor/csmwrap/3.1.2/COPYING.LESSER -text
 # copied to the ESP as is, CRLF like other files the firmware side reads.
 tools/vendor/uefi-shell/** -text
 assets/uefi-shell/startup.nsh -text
+
+# CSMWrap 3.1.2-usos1 source build: patches, the guest script and the source
+# archive are hashed byte for byte (LF), see tools/vendor/csmwrap/3.1.2-usos1/manifest.json.
+tools/vendor/csmwrap/3.1.2-usos1/** -text
+tools/vendor/csmwrap/3.1.2-src/** -text
+tools/csmwrap_build/guest_build.sh text eol=lf

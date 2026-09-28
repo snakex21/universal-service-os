@@ -49,14 +49,17 @@ def main():
     a = p.parse_args()
     out = a.output.resolve()
     out.mkdir(parents=True, exist_ok=True)
-    files = {name: (CSMWRAP_FILES / name).read_bytes() for name in
-             ('csmwrapx64.efi', 'LICENSE-CSMWrap-LGPL-2.1.txt', 'COPYING-SeaBIOS-LGPLv3.txt', 'COPYING-SeaBIOS-GPLv3.txt', 'SOURCES.txt')}
+    # The staged tree as the release has it (binary, licences, SOURCES.txt,
+    # source archive, patches/, licenses/).
+    files = {f.relative_to(CSMWRAP_FILES).as_posix(): f.read_bytes() for f in sorted(CSMWRAP_FILES.rglob('*')) if f.is_file()}
     textmode.PROBE_INIT = csmwrap_probe(textmode.PROBE_INIT)
     parse = textmode.cpio.parse_newc
 
     def parse_with_csmwrap(data):
         entries = parse(data)
         textmode.cpio.put(entries, textmode.cpio.Entry('csmwrap-src', stat.S_IFDIR | 0o755, b''))
+        for sub in sorted({name.rsplit('/', 1)[0] for name in files if '/' in name}):
+            textmode.cpio.put(entries, textmode.cpio.Entry('csmwrap-src/' + sub, stat.S_IFDIR | 0o755, b''))
         for name, blob in files.items():
             textmode.cpio.put(entries, textmode.cpio.Entry('csmwrap-src/' + name, stat.S_IFREG | 0o644, blob))
         return entries

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/snakex21/universal-service-os/installer/internal/efisign"
@@ -39,11 +40,16 @@ const (
 	// NTFS driver. USOS starts it only on matching SMBIOS (touch_driver.zig).
 	touchVendorDir    = "tools/vendor/touchi2cdxe/v1.3.1-usos1"
 	touchDriverTarget = "EFI/USOS/touchi2c_x64.efi"
-	// CSMWrap 3.1.2 for XP without firmware CSM (xp-x86-sp3-uefi-csmwrap):
-	// copied hash-checked, never signed; the XP preparer puts it on the
-	// target's own ESP (tools/xp_csmwrap_esp.sh).
-	csmwrapVendorDir = "tools/vendor/csmwrap/3.1.2"
-	csmwrapTargetDir = "EFI/USOS/csmwrap"
+	// CSMWrap 3.1.2-usos1 (a MODIFIED CSMWrap 3.1.2: quiet boot unless
+	// csmwrap.ini sets verbose = true; docs/research/csmwrap.md sections 6
+	// and 7) for XP / Vista without firmware CSM: copied hash-checked, never
+	// signed; the preparers put it on the target's own ESP
+	// (tools/xp_csmwrap_esp.sh). The LGPL source (the unpatched archive plus
+	// the patches) and every licence notice travel with it.
+	csmwrapVendorDir  = "tools/vendor/csmwrap/3.1.2-usos1"
+	csmwrapLicenseDir = "tools/vendor/csmwrap/3.1.2"
+	csmwrapSourceDir  = "tools/vendor/csmwrap/3.1.2-src"
+	csmwrapTargetDir  = "EFI/USOS/csmwrap"
 	// SeaBIOS (inside CSMWrap) is LGPLv3, which incorporates the GPLv3 text.
 	seabiosGPLv3Source = "tools/vendor/wimlib/1.14.5/COPYING.GPLv3.txt"
 	seabiosGPLv3SHA256 = "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809"
@@ -159,7 +165,7 @@ func release(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := stageCSMWrap(at(csmwrapVendorDir), at(seabiosGPLv3Source), at(usbRoot)); err != nil {
+	if err := stageCSMWrap(at(csmwrapVendorDir), at(csmwrapLicenseDir), at(csmwrapSourceDir), at(seabiosGPLv3Source), at(usbRoot)); err != nil {
 		return err
 	}
 	uefiShell, err := stageUefiShell(at(uefiShellVendorDir), at(uefiShellStartupPath), at(usbRoot))
@@ -307,47 +313,124 @@ func copyVerified(source, target, expected string) error {
 	return writeFileAtomic(target, data)
 }
 
-// stageCSMWrap copies the pinned CSMWrap binary (manifest hash), its LGPL-2.1
-// licence, the SeaBIOS LGPLv3 and GPLv3 texts and a SOURCES.txt into
-// EFI/USOS/csmwrap.
-func stageCSMWrap(vendorDir, gplv3, usb string) error {
-	var manifest touchManifest
-	data, err := os.ReadFile(filepath.Join(vendorDir, "manifest.json"))
+// csmwrapBuild is the manifest of the USOS CSMWrap build (3.1.2-usos1).
+type csmwrapBuild struct {
+	Version       string            `json:"version"`
+	Files         map[string]string `json:"files"`
+	Patches       map[string]string `json:"patches"`
+	SourceArchive struct {
+		File   string `json:"file"`
+		SHA256 string `json:"sha256"`
+	} `json:"source_archive"`
+}
+
+// csmwrapSource is the manifest of the vendored complete source (the
+// unpatched archive and the licence texts of every component).
+type csmwrapSource struct {
+	Archive struct {
+		File   string `json:"file"`
+		SHA256 string `json:"sha256"`
+	} `json:"archive"`
+	Licenses map[string]string `json:"licenses"`
+}
+
+func readJSON(path string, into any) error {
+	data, err := os.ReadFile(path)
 	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, into)
+}
+
+// stageCSMWrap copies the USOS CSMWrap build (manifest hash), its LGPL-2.1
+// licence, the SeaBIOS LGPLv3 and GPLv3 texts, the complete corresponding
+// source (the unpatched archive and the USOS patches), the licence notices
+// of the other components and a SOURCES.txt that marks the binary as
+// MODIFIED into EFI/USOS/csmwrap.
+func stageCSMWrap(vendorDir, licenseDir, sourceDir, gplv3, usb string) error {
+	var build csmwrapBuild
+	if err := readJSON(filepath.Join(vendorDir, "manifest.json"), &build); err != nil {
+		return fmt.Errorf("vendored CSMWrap build manifest: %w", err)
+	}
+	var upstream touchManifest
+	if err := readJSON(filepath.Join(licenseDir, "manifest.json"), &upstream); err != nil {
 		return fmt.Errorf("vendored CSMWrap manifest: %w", err)
 	}
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		return fmt.Errorf("vendored CSMWrap manifest: %w", err)
+	var source csmwrapSource
+	if err := readJSON(filepath.Join(sourceDir, "manifest.json"), &source); err != nil {
+		return fmt.Errorf("vendored CSMWrap source manifest: %w", err)
 	}
-	if manifest.Files["csmwrapx64.efi"] == "" || manifest.Files["LICENSE"] == "" || manifest.Files["COPYING.LESSER"] == "" {
-		return errors.New("vendored CSMWrap manifest lacks the csmwrapx64.efi, LICENSE or COPYING.LESSER hash")
+	if build.Files["csmwrapx64.efi"] == "" || upstream.Files["LICENSE"] == "" || upstream.Files["COPYING.LESSER"] == "" {
+		return errors.New("vendored CSMWrap manifests lack the csmwrapx64.efi, LICENSE or COPYING.LESSER hash")
+	}
+	if len(build.Patches) == 0 || build.SourceArchive.SHA256 == "" || !strings.EqualFold(build.SourceArchive.SHA256, source.Archive.SHA256) || len(source.Licenses) == 0 {
+		return errors.New("vendored CSMWrap build: patches, source archive or licence notices missing, or the archive hashes disagree")
 	}
 	dir := filepath.Join(usb, filepath.FromSlash(csmwrapTargetDir))
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
+	for _, sub := range []string{"", "patches", "licenses"} {
+		if err := os.MkdirAll(filepath.Join(dir, sub), 0o755); err != nil {
+			return err
+		}
 	}
-	if err := copyVerified(filepath.Join(vendorDir, "csmwrapx64.efi"), filepath.Join(dir, "csmwrapx64.efi"), manifest.Files["csmwrapx64.efi"]); err != nil {
-		return err
+	copies := [][3]string{
+		{filepath.Join(vendorDir, "csmwrapx64.efi"), "csmwrapx64.efi", build.Files["csmwrapx64.efi"]},
+		{filepath.Join(licenseDir, "LICENSE"), "LICENSE-CSMWrap-LGPL-2.1.txt", upstream.Files["LICENSE"]},
+		{filepath.Join(licenseDir, "COPYING.LESSER"), "COPYING-SeaBIOS-LGPLv3.txt", upstream.Files["COPYING.LESSER"]},
+		{gplv3, "COPYING-SeaBIOS-GPLv3.txt", seabiosGPLv3SHA256},
+		{filepath.Join(sourceDir, source.Archive.File), source.Archive.File, source.Archive.SHA256},
 	}
-	if err := copyVerified(filepath.Join(vendorDir, "LICENSE"), filepath.Join(dir, "LICENSE-CSMWrap-LGPL-2.1.txt"), manifest.Files["LICENSE"]); err != nil {
-		return err
+	patches := make([]string, 0, len(build.Patches))
+	for name := range build.Patches {
+		patches = append(patches, name)
 	}
-	if err := copyVerified(filepath.Join(vendorDir, "COPYING.LESSER"), filepath.Join(dir, "COPYING-SeaBIOS-LGPLv3.txt"), manifest.Files["COPYING.LESSER"]); err != nil {
-		return err
+	sort.Strings(patches)
+	for _, name := range patches {
+		copies = append(copies, [3]string{filepath.Join(vendorDir, "patches", name), "patches/" + name, build.Patches[name]})
 	}
-	if err := copyVerified(gplv3, filepath.Join(dir, "COPYING-SeaBIOS-GPLv3.txt"), seabiosGPLv3SHA256); err != nil {
-		return err
+	notices := make([]string, 0, len(source.Licenses))
+	for name := range source.Licenses {
+		notices = append(notices, name)
 	}
-	sources := "CSMWrap " + manifest.Version + " (csmwrapx64.efi, unmodified release binary, unsigned)\r\n" +
-		"Source: https://github.com/CSMWrap/CSMWrap/releases/tag/" + manifest.Version + " (LGPL-2.1, LICENSE-CSMWrap-LGPL-2.1.txt)\r\n" +
-		"Contains SeaBIOS (LGPLv3, COPYING-SeaBIOS-LGPLv3.txt; it incorporates the GPLv3 text in COPYING-SeaBIOS-GPLv3.txt):\r\n" +
-		"  https://github.com/CSMWrap/seabios-csmwrap (the SeaBIOS fork in the CSMWrap sources, submodule seabios)\r\n" +
-		"  https://www.seabios.org/ (COPYING.LESSER: GNU LGPL version 3)\r\n" +
-		"Used by Universal Service OS only for Windows XP without firmware CSM (experimental).\r\n"
+	sort.Strings(notices)
+	for _, name := range notices {
+		copies = append(copies, [3]string{filepath.Join(sourceDir, filepath.FromSlash(name)), "licenses/" + filepath.Base(filepath.FromSlash(name)), source.Licenses[name]})
+	}
+	for _, c := range copies {
+		if err := copyVerified(c[0], filepath.Join(dir, filepath.FromSlash(c[1])), c[2]); err != nil {
+			return err
+		}
+	}
+	patchList := ""
+	for _, name := range patches {
+		patchList += "  patches/" + name + "\r\n"
+	}
+	sources := "CSMWrap " + build.Version + " (csmwrapx64.efi, unsigned)\r\n" +
+		"MODIFIED: this is a modified version of CSMWrap 3.1.2 and of its SeaBIOS fork,\r\n" +
+		"changed by the Universal Service OS project on 2026-09-27: quiet boot unless\r\n" +
+		"csmwrap.ini sets verbose = true (no CSMWrap logo, no SeaBIOS banner or UUID\r\n" +
+		"line, no 'Booting from ...' lines, no boot-menu prompt or wait). Version\r\n" +
+		"strings: CSMWrap Version 3.1.2-usos1, SeaBIOS 578d260b-CSMWrap-3.1.2-usos1.\r\n" +
+		"\r\n" +
+		"Complete corresponding source, next to this file:\r\n" +
+		"  " + source.Archive.File + " (unpatched CSMWrap 3.1.2, commit 808ac8e, with all\r\n" +
+		"  submodules; SeaBIOS fork commit 578d260b; SHA-256 " + source.Archive.SHA256 + ")\r\n" +
+		"plus the USOS patches, applied in order with patch -p1:\r\n" + patchList +
+		"Build scripts: tools/build_csmwrap.ps1 and tools/csmwrap_build/ in the USOS\r\n" +
+		"sources. The USOS project provides the same source on request for as long as\r\n" +
+		"it distributes this binary.\r\n" +
+		"\r\n" +
+		"Licences: CSMWrap LGPL-2.1 (LICENSE-CSMWrap-LGPL-2.1.txt); SeaBIOS LGPLv3\r\n" +
+		"(COPYING-SeaBIOS-LGPLv3.txt; it incorporates the GPLv3 text in\r\n" +
+		"COPYING-SeaBIOS-GPLv3.txt); the other components' notices in the licenses folder.\r\n" +
+		"The modified files stay under their licences (LGPL-2.1 for CSMWrap files,\r\n" +
+		"LGPLv3 for SeaBIOS files).\r\n" +
+		"Upstream: https://github.com/CSMWrap/CSMWrap (tag 3.1.2),\r\n" +
+		"  https://github.com/CSMWrap/seabios-csmwrap, https://www.seabios.org/\r\n" +
+		"Used by Universal Service OS only for Windows XP / Vista without firmware CSM.\r\n"
 	if err := writeFileAtomic(filepath.Join(dir, "SOURCES.txt"), []byte(sources)); err != nil {
 		return err
 	}
-	fmt.Printf("[STAGE] %s <- %s (CSMWrap %s, unsigned)\n", csmwrapTargetDir, filepath.ToSlash(vendorDir), manifest.Version)
+	fmt.Printf("[STAGE] %s <- %s (CSMWrap %s, MODIFIED, unsigned; source + %d patches)\n",csmwrapTargetDir, filepath.ToSlash(vendorDir), build.Version, len(patches))
 	return nil
 }
 
