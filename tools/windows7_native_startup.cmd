@@ -55,6 +55,19 @@ set "USOS_NEED_UNATTEND=0"
 if exist "%~dp0usos-unattend.xml" set "USOS_ANSWER=%~dp0usos-unattend.xml"
 if exist "%~dp0usos-unattend.xml" set "USOS_NEED_UNATTEND=1"
 if exist "%~dp0usos-nvme-packages.flag" set "USOS_NEED_UNATTEND=1"
+rem A USOS profile answer: its commands run without console windows through
+rem usos-run-hidden.exe (tools/windows_hidden_commands.h); 10 = nothing to wrap
+rem (a DATA answer file, or no commands). The runner goes to the target after Setup.
+set "USOS_HIDDEN="
+if not exist "%~dp0usos-unattend.xml" goto hidden_done
+"%~dp0usos-run-hidden.exe" --wrap "%~dp0usos-unattend.xml" "%~dp0usos-hidden-unattend.xml"
+if errorlevel 11 exit /b 1
+if errorlevel 10 goto hidden_done
+if errorlevel 1 exit /b 1
+set "USOS_ANSWER=%~dp0usos-hidden-unattend.xml"
+set "USOS_HIDDEN=1"
+echo [USOS] Profile answer commands run without console windows.
+:hidden_done
 rem Manual SATA install: bundled usos-win7-drivers are pre-loaded via drvload above (when present), they must NOT force /unattend (Win7 SP1 Setup hosted from WinPE10 then demands <ProductKey>).
 if "%USOS_NEED_UNATTEND%"=="1" (
     if exist "%~dp0usos-nvme-packages.flag" (
@@ -76,6 +89,14 @@ if "%USOS_NEED_UNATTEND%"=="1" (
     "%~dp0usos-win7-finalize.exe" run /noreboot /installfrom:"%USOS_SOURCE%\sources\install.wim"
 )
 if errorlevel 1 exit /b 1
+if defined USOS_HIDDEN (
+    "%~dp0usos-run-hidden.exe" --install "%~dp0usos-driver-unattend.xml" %USOS_SOURCE_DISK%
+    if errorlevel 1 (
+        echo [USOS] The runner for the answer commands could not be copied to the installed Windows.
+        exit /b 1
+    )
+    echo [USOS] Answer command runner copied to the installed Windows.
+)
 if "%USOS_NEED_UNATTEND%"=="0" call :user_drivers_setupcomplete
 "%~dp0usos-win7-finalize.exe" after
 if errorlevel 1 exit /b 1

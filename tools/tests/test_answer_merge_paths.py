@@ -17,6 +17,12 @@ This test runs the real merge code on the rendered tweaks profile
     menu offers only a manual installation there), so no profile setting can
     be dropped silently.
 
+Every path also runs with the profile's commands wrapped for
+usos-run-hidden.exe (tools/windows_hidden_commands.h: no console windows;
+the startup scripts wrap before the merges, the Vista installer inside):
+the "-hidden" goldens, and the wrapped answer differs from the rendered one
+only by the runner prefix of each RunSynchronousCommand Path.
+
 Checks: golden bytes of each merged file; every settings pass of the rendered
 answer is in the merged file unchanged (element by element); each enabled
 tweak's setting is present in the merged specialize pass; the specialize
@@ -44,6 +50,8 @@ NS = '{urn:schemas-microsoft-com:unattend}'
 CAB = r'X:\Windows\System32\Windows6.0-KB2864202-x64.cab'
 DRIVERS = r'X:\Windows\System32\usos-win7-drivers'
 SOURCE_DISK = '1'
+RUNNER = OUT / 'windows-source-mount' / 'usos-run-hidden.exe'
+PREFIX = b'<Path>usos-run-hidden.exe '
 
 # Each tweak's setting in the specialize pass, per system: a command
 # substring, or (component, element, text) for a component setting.
@@ -117,10 +125,12 @@ class MergePaths(unittest.TestCase):
         build(ROOT, cls.win7)
         cls.nvme = OUT / 'windows7-nvme'
         build_helpers(ROOT, cls.nvme)
+        from build_windows_source_mount import build as build_source_helpers
+        build_source_helpers(ROOT, RUNNER.parent)
 
-    def render(self, system: str) -> Path:
-        out = OUT / f'tweaks.{system}.amd64.xml'
-        r = subprocess.run([str(TOOL), 'render', str(DATA / 'tweaks.profile.ini'), system, 'amd64', str(out), '-'],
+    def render(self, system: str, profile: str = 'tweaks') -> Path:
+        out = OUT / f'{profile}.{system}.amd64.xml'
+        r = subprocess.run([str(TOOL), 'render', str(DATA / f'{profile}.profile.ini'), system, 'amd64', str(out), '-'],
                            capture_output=True)
         self.assertEqual(0, r.returncode, r.stderr)
         return out
@@ -150,8 +160,9 @@ class MergePaths(unittest.TestCase):
         self.assertEqual(commands(b['specialize']), paths)
         orders = [int(o.text) for o in specialize.iter(NS + 'Order')]
         self.assertEqual(list(range(1, len(orders) + 1)), orders)
-        loads = [i for i, p in enumerate(paths) if p.startswith('reg.exe load ')]
-        unloads = [i for i, p in enumerate(paths) if p.startswith('reg.exe unload ')]
+        bare = [p.removeprefix('usos-run-hidden.exe ') for p in paths]
+        loads = [i for i, p in enumerate(bare) if p.startswith('reg.exe load ')]
+        unloads = [i for i, p in enumerate(bare) if p.startswith('reg.exe unload ')]
         hive = [i for i, p in enumerate(paths) if 'HKU\\USOSDefault\\' in p]
         if hive:
             self.assertEqual(1, len(loads))
@@ -169,7 +180,38 @@ class MergePaths(unittest.TestCase):
         # relies on it) and there is exactly one servicing block.
         self.assertTrue(a['oobeSystem'].iter(NS + 'LocalAccount'))
 
-    def merge_vista(self, name: str, data: bytes) -> tuple[int, Path]:
+    def wrap(self, rendered: Path) -> Path:
+        """usos-run-hidden.exe --wrap, as the startup scripts call it."""
+        out = rendered.with_name(rendered.stem + '.hidden.xml')
+        out.unlink(missing_ok=True)
+        r = subprocess.run([str(RUNNER), '--wrap', str(rendered), str(out)], capture_output=True)
+        self.assertEqual(0, r.returncode, r.stdout)
+        self.wrapped_only(rendered.read_bytes(), out.read_bytes())
+        return out
+
+    def wrapped_only(self, original: bytes, wrapped: bytes) -> None:
+        # Every RunSynchronousCommand Path carries the runner, nothing else changed.
+        self.assertEqual(original, wrapped.replace(PREFIX, b'<Path>'))
+        root = ET.fromstring(wrapped)
+        paths = [p.text or '' for c in root.iter(NS + 'RunSynchronousCommand') for p in c.iter(NS + 'Path')]
+        self.assertTrue(paths)
+        for path in paths:
+            self.assertTrue(path.startswith('usos-run-hidden.exe '), path)
+            self.assertLessEqual(len(path), 259)
+        self.assertEqual(len(paths), wrapped.count(PREFIX))
+
+    def test_wrap_leaves_other_answers(self):
+        # A DATA answer file (no renderer marker) is not changed: exit 10.
+        rendered = self.render('windows-7')
+        plain = OUT / 'plain.windows-7.xml'
+        plain.write_bytes(rendered.read_bytes().replace(b'<!-- USOS answer profile rendered for', b'<!-- a file rendered for'))
+        out = OUT / 'plain.hidden.xml'
+        out.unlink(missing_ok=True)
+        r = subprocess.run([str(RUNNER), '--wrap', str(plain), str(out)], capture_output=True)
+        self.assertEqual(10, r.returncode)
+        self.assertFalse(out.exists())
+
+    def merge_vista(self, name: str, data: bytes, hidden: bool = False) -> tuple[int, Path]:
         """The harness in a folder of its own (its base, like the PE's System32)."""
         work = OUT / f'vista-{name}'
         work.mkdir(exist_ok=True)
@@ -177,7 +219,7 @@ class MergePaths(unittest.TestCase):
             old.unlink()
         shutil.copyfile(self.vista_merge, work / 'harness.exe')
         (work / 'usos-unattend.xml').write_bytes(data)
-        r = subprocess.run([str(work / 'harness.exe')], cwd=work, capture_output=True)
+        r = subprocess.run([str(work / 'harness.exe')] + (['--hidden'] if hidden else []), cwd=work, capture_output=True)
         self.assertEqual(data, (work / 'usos-unattend.xml').read_bytes())
         return r.returncode, work / 'vista-answer.xml'
 
@@ -200,6 +242,24 @@ class MergePaths(unittest.TestCase):
     def test_vista_csmwrap(self):
         self.vista_csmwrap('windows-vista', VISTA)
 
+    def vista_hidden(self, system: str, markers: dict) -> None:
+        rendered = self.render(system)
+        code, merged = self.merge_vista(system + '-hidden', rendered.read_bytes(), hidden=True)
+        self.assertEqual(0, code)
+        wrapped = merged.with_name('usos-hidden-unattend.xml')
+        self.wrapped_only(rendered.read_bytes(), wrapped.read_bytes())
+        data = merged.read_bytes()
+        start, end = data.index(b'<servicing>'), data.index(b'</servicing>') + len(b'</servicing>')
+        self.assertEqual(wrapped.read_bytes(), data[:start] + data[end:])
+        self.golden(f'tweaks.vista-csmwrap-hidden.{system}.amd64.xml', data)
+        self.survives(wrapped, merged, markers, set())
+
+    def test_vista_hidden(self):
+        self.vista_hidden('windows-vista', VISTA)
+
+    def test_server_2008_hidden(self):
+        self.vista_hidden('windows-server-2008', SERVER_2008)
+
     def test_server_2008_csmwrap(self):
         self.vista_csmwrap('windows-server-2008', SERVER_2008)
 
@@ -216,10 +276,12 @@ class MergePaths(unittest.TestCase):
             self.assertEqual(1, code, name)
             self.assertFalse(merged.exists(), name)
 
-    def win7_donor(self, nvme: bool) -> None:
+    def win7_donor(self, nvme: bool, hidden: bool = False) -> None:
         rendered = self.render('windows-7')
+        if hidden:
+            rendered = self.wrap(rendered)
         answer = rendered
-        tag = 'win7-pe10-nvme' if nvme else 'win7-pe10'
+        tag = ('win7-pe10-nvme' if nvme else 'win7-pe10') + ('-hidden' if hidden else '')
         work = OUT / tag
         work.mkdir(exist_ok=True)
         for old in work.glob('*.xml'):
@@ -242,6 +304,32 @@ class MergePaths(unittest.TestCase):
 
     def test_win7_pe10_donor_nvme(self):
         self.win7_donor(True)
+
+    def test_win7_pe10_donor_hidden(self):
+        self.win7_donor(False, hidden=True)
+
+    def test_win7_pe10_donor_nvme_hidden(self):
+        self.win7_donor(True, hidden=True)
+
+    def test_windows_11_modern_hidden(self):
+        # windows_modern_uefi_startup.cmd: wrap, then the DriverPaths merge.
+        # The windowsPE LabConfig checks and the specialize commands carry the runner.
+        # full.profile.ini: the Windows 11 checks and BypassNRO are on.
+        rendered = self.render('windows-11', 'full')
+        wrapped = self.wrap(rendered)
+        work = OUT / 'modern-uefi-hidden'
+        work.mkdir(exist_ok=True)
+        merged = work / 'usos-driver-unattend.xml'
+        merged.unlink(missing_ok=True)
+        r = subprocess.run([str(self.win7 / 'usos-unattend-drivers.exe'), str(wrapped), str(merged), DRIVERS, SOURCE_DISK], capture_output=True)
+        self.assertEqual(0, r.returncode, r.stdout)
+        root = ET.parse(merged).getroot()
+        pe = [p.text for s in root.findall(NS + 'settings') if s.get('pass') == 'windowsPE' for p in s.iter(NS + 'Path')
+              if 'LabConfig' in (p.text or '')]
+        self.assertTrue(pe)
+        self.assertTrue(all(p.startswith('usos-run-hidden.exe reg.exe add ') for p in pe))
+        self.golden('full.modern-uefi-hidden.windows-11.amd64.xml', merged.read_bytes())
+        self.survives(wrapped, merged, {'no_network_oobe': 'OOBE" /v BypassNRO /t REG_DWORD /d 1'}, {'offlineServicing'})
 
     def test_vista_uefi_refuses_a_user_answer(self):
         # Vista with CSM (UEFI path): answers are not handed on (the menu

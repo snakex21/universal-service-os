@@ -128,6 +128,34 @@ rendered for the Server releases of the same schema level.
   command stays under the schema's 259-character `Path` limit. The DISM
   / `offlineServicing` package route is not used (the renderer has no
   servicing pass; package identities are version specific).
+- **No console windows (6.x+, 2026-09-28)**: Windows Setup gives every
+  console program of a `RunSynchronous` command (`reg.exe`, `powercfg`,
+  `dism`, `cmd`) a visible console window: in specialize (Vista/7: over the
+  "Setup is completing installation" screen; 8-11: over "Getting ready") and
+  in windowsPE (the Windows 11 `LabConfig` checks). On the PE10/WinPE paths
+  that run Setup with `/noreboot` the commands of a USOS profile answer
+  therefore go through `usos-run-hidden.exe` (`tools/windows_hidden_run.c`,
+  GUI subsystem, no C runtime): `usos-run-hidden.exe --wrap` prefixes each
+  `RunSynchronousCommand` `Path` of an answer with the renderer's marker
+  comment (`tools/windows_hidden_commands.h`; a DATA answer file keeps its
+  commands; a command that would pass 259 characters stays as it is), and
+  after Setup `--install` copies the runner into `System32` of the one
+  Windows volume Setup wrote in this run (fatal when there is not exactly
+  one: the start stops with the diagnostics instead of losing the tweaks).
+  The runner starts the command with `CREATE_NO_WINDOW`, appends the
+  command, its output and its exit code to
+  `%WINDIR%\Panther\usos-hidden-commands.log`, returns the exit code to
+  Setup, and marks itself for deletion at the next restart. Paths:
+  Windows 10/11 and Server 2016+ native UEFI (`windows_modern_uefi_startup.cmd`),
+  Windows 7 / 2008 R2 PE10 donor (`windows7_modern_startup.cmd`) and the
+  stock Win7 PE (`windows7_native_startup.cmd`), Vista / 2008 (the installer
+  wraps before its merge and copies the runner itself, next to its payload).
+  Not covered (Setup reboots by itself there, no USOS step between the
+  WinPE phase and specialize): the Legacy BIOS wimboot starts and the
+  8/10/11 WORK preparation. XP/2000/2003 already run their commands hidden
+  (`pae.exe`, `usos-setup.cmd`). The Vista first-boot USB helper's console
+  ("USOS - Vista USB diagnostics", frozen v11 payload) stays visible: it is
+  where a USB failure is reported.
 - **Display and VGA**: `[Display]` is applied by Setup only when the display
   driver offers that mode. Without a display driver (the VGA driver, e.g.
   XP through CSMWrap without a GOP-capable driver) Windows keeps its basic

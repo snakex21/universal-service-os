@@ -16,6 +16,7 @@
 #include "vista_servicing_answer.h"
 #include "windows_setup_result.h"
 #include "windows_winpe_ui.h"
+#include "windows_hidden_commands.h"
 
 static WCHAR base[MAX_PATH], scratch[MAX_PATH], command[2048];
 static BYTE buffer[65536];
@@ -333,8 +334,12 @@ static BOOL staging_entry(int action){
  * the KMDF <servicing> block of the servicing answer inserted right after the
  * <unattend ...> tag. Nothing of the user file is logged. */
 static WCHAR servicing_cab[MAX_PATH];
+/* The user answer the merge reads: usos-unattend.xml, or its copy with the
+ * profile's commands wrapped (hide_answer_commands). */
+static const WCHAR *user_answer_name=L"usos-unattend.xml";
+static BOOL hidden_commands;
 static BOOL merge_user_answer(WCHAR *answer){
- static WCHAR xml[2048];WCHAR user[MAX_PATH],merged[MAX_PATH];path(user,base,L"usos-unattend.xml");
+ static WCHAR xml[2048];WCHAR user[MAX_PATH],merged[MAX_PATH];path(user,base,user_answer_name);
  HANDLE f=CreateFileW(user,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);if(f==INVALID_HANDLE_VALUE)return TRUE;
  LARGE_INTEGER size;DWORD got=0;BOOL ok=GetFileSizeEx(f,&size)&&size.QuadPart>16&&size.QuadPart<=1024*1024;
  char *text=ok?LocalAlloc(LMEM_FIXED,(SIZE_T)size.QuadPart+1):0;
@@ -356,6 +361,34 @@ static BOOL merge_user_answer(WCHAR *answer){
  if(o!=INVALID_HANDLE_VALUE)CloseHandle(o);LocalFree(text);
  logcode("Answer merge: user answer + KMDF servicing written (bytes)=",ok?w1+w2+w3:0);
  if(ok)lstrcpyW(answer,merged);return ok;
+}
+/* A USOS profile answer: its RunSynchronous commands run through
+ * usos-run-hidden.exe (tools/windows_hidden_commands.h), so specialize shows
+ * no console windows; the runner is copied to the target after Setup
+ * (install_hidden_runner). A DATA answer file is left as it is. */
+static BOOL hide_answer_commands(void){
+ WCHAR user[MAX_PATH],wrapped[MAX_PATH];path(user,base,L"usos-unattend.xml");path(wrapped,base,L"usos-hidden-unattend.xml");
+ HANDLE f=CreateFileW(user,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);if(f==INVALID_HANDLE_VALUE)return TRUE;
+ LARGE_INTEGER size;DWORD got=0,commands=0;BOOL ok=GetFileSizeEx(f,&size)&&size.QuadPart>16&&size.QuadPart<=1024*1024;
+ DWORD cap=ok?(DWORD)size.QuadPart+65536:0;char *text=ok?LocalAlloc(LMEM_FIXED,(SIZE_T)size.QuadPart):0,*out=ok?LocalAlloc(LMEM_FIXED,cap):0;
+ ok=text&&out&&ReadFile(f,text,(DWORD)size.QuadPart,&got,0)&&got==size.QuadPart;CloseHandle(f);
+ DWORD n=ok?usos_hidden_wrap(text,got,out,cap,&commands):0;
+ if(ok&&n&&commands){
+  HANDLE o=CreateFileW(wrapped,GENERIC_WRITE,FILE_SHARE_READ,0,CREATE_ALWAYS,FILE_FLAG_WRITE_THROUGH,0);DWORD w=0;
+  ok=o!=INVALID_HANDLE_VALUE&&WriteFile(o,out,n,&w,0)&&w==n&&FlushFileBuffers(o);if(o!=INVALID_HANDLE_VALUE)CloseHandle(o);
+  if(ok){user_answer_name=L"usos-hidden-unattend.xml";hidden_commands=TRUE;}
+ }else if(ok&&!n)ok=FALSE;
+ if(text)LocalFree(text);if(out)LocalFree(out);
+ logcode("Answer commands run without console windows (commands)=",ok?commands:0xffffffff);
+ return ok;
+}
+static BOOL install_hidden_runner(const Target *t){
+ if(!hidden_commands)return TRUE;
+ WCHAR src[MAX_PATH],dst[MAX_PATH];BYTE x[32],y[32];path(src,base,USOS_HIDDEN_RUNNER_W);path(dst,t->root,L"Windows\\System32\\" USOS_HIDDEN_RUNNER_W);
+ BOOL ok=CopyFileW(src,dst,FALSE)&&hash_file(src,x)&&hash_file(dst,y)&&same(x,y,32);
+ if(ok){HANDLE f=CreateFileW(dst,GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);ok=f!=INVALID_HANDLE_VALUE&&FlushFileBuffers(f);if(f!=INVALID_HANDLE_VALUE)CloseHandle(f);}
+ logcode("Answer command runner copied to the target System32=",ok?0:GetLastError());
+ return ok;
 }
 /* After Setup: the active partition of the target disk holds Vista's bootmgr
  * and \Boot\BCD. Check its default entry names the new Windows partition
@@ -893,6 +926,7 @@ void entry(void){
   ExitProcess(4);
  }
  static WCHAR servicing_answer[MAX_PATH];if(!prepare_servicing_answer(servicing_answer))ExitProcess(10);
+ if(csmwrap&&!hide_answer_commands()){logcode("Setup not started: the answer commands could not be prepared=",ERROR_INVALID_DATA);ExitProcess(11);}
  if(csmwrap&&!merge_user_answer(servicing_answer)){logcode("Setup not started: the answer file could not be merged with the servicing answer=",ERROR_INVALID_DATA);ExitProcess(11);}
  if(csmwrap&&!staging_entry(STAGING_INACTIVE)){logcode("Setup not started: the staging partition could not be marked inactive=",ERROR_WRITE_FAULT);ExitProcess(12);}
  lstrcpyW(command,L"\"");lstrcatW(command,setup_path);lstrcatW(command,L"\" /noreboot /installfrom:\"");lstrcatW(command,source);lstrcatW(command,L"\\sources\\install.wim\"");
@@ -918,6 +952,7 @@ void entry(void){
   ExitProcess(10);
  }
  if(!copy_payload(target)){logcode("Copy target USB package failed=",GetLastError());ExitProcess(6);}
+ if(!install_hidden_runner(target))ExitProcess(6);
  BOOL system_is_staging=FALSE;
  if(csmwrap?!configure_boot_bios(target,&system_is_staging):!configure_boot(target)){logcode("Target BCD preparation failed (see the lines above)=",ERROR_GEN_FAILURE);ExitProcess(7);}
  if(!arm_target(target)){logcode("Arm pre-Setup USB failed=",GetLastError());ExitProcess(8);}

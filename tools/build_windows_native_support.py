@@ -41,6 +41,8 @@ def build(root: Path):
             for ext in ('exe', 'cpl', 'sys'):
                 name = 'imdisk-' + arch + '.' + ext
                 writer.add_file(name, vendor / name)
+        # tools/windows_hidden_commands.h: profile answer commands without consoles.
+        writer.add_file('usos-run-hidden.exe', helpers / 'usos-run-hidden.exe')
         for src, dst in [('README.md', 'usos-imdisk-README.txt'), ('LICENSE.md', 'usos-imdisk-LICENSE.txt'), ('source.zip', 'usos-imdisk-source.zip')]:
             writer.add_file(dst, vendor / src)
         # Core appends the chosen ISO's files/configuration and one trailer.
