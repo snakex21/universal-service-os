@@ -504,6 +504,20 @@ desktop; `wmic os get caption` = `Microsoft Windows 7 Professional`,
 `hostname` = `USOS-VBOX`, `tzutil /g` = `Central European Standard Time`.
 About 17 minutes; VM deleted.
 
+### Installer merges (host test, 2026-09-28)
+
+`tools/tests/test_answer_merge_paths.py` runs the real merge code on the
+rendered `tweaks.profile.ini` (every tweak on): the Vista / Server 2008
+CSMWrap installer's `merge_user_answer` (`tools/tests/vista_answer_merge_host.c`
+includes `windows_vista_install.c`) and the Windows 7 PE10 donor chain
+(`usos-win7-unattend.exe` when NVMe packages are staged, then
+`usos-unattend-drivers.exe`). Goldens in `testdata/golden/merged/`. Every
+settings pass of the profile answer reaches Setup unchanged, each enabled
+tweak is in the merged specialize pass, and the commands keep their order;
+the merges only add servicing / offlineServicing content. Vista on UEFI
+with CSM takes no answer (the startup script refuses one), so nothing is
+dropped there either.
+
 ## Attribution
 
 The set of common settings follows the catalogue of Christoph Schneegans'
