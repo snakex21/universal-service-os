@@ -1,0 +1,25 @@
+Linux kernel - EFI/USOS/micro-linux/vmlinuz-virt, EFI/USOS-XP/vmlinuz.efi,
+kernel modules in initramfs-usos / initramfs-xp
+
+Component: Linux 6.18.35 as built by Alpine Linux (linux-lts 6.18.35-r0,
+           uname 6.18.35-0-lts), from the Alpine 3.24.1 netboot set
+Licence:   GNU General Public License version 2 only, with the Linux
+           syscall note (GPL-2.0-only WITH Linux-syscall-note); full GPL text
+           in GPL-2.0.txt next to this file, the syscall note is in
+           LICENSES/exceptions/Linux-syscall-note of the kernel source
+Binaries:  https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/netboot-3.24.1/vmlinuz-lts
+           SHA-256 77007123c0591ab4b2a5434ffa1b6a3985b3037d534be78bccfb30f3c9536c54
+           https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/netboot-3.24.1/modloop-lts
+           SHA-256 871ef51ed6378283db9462947bb7fb84c1ec31376611eb1a2281b02b9404c0f6
+           (pinned in tools/micro_linux.lock.json). The kernel code is
+           unmodified; both ESP copies carry an appended USOS Secure Boot
+           signature. Only a subset of modules is copied; firmware is pruned.
+
+Corresponding source:
+  https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.18.35.tar.xz
+  Alpine config and patches: https://gitlab.alpinelinux.org/alpine/aports/-/tree/3.24-stable/main/linux-lts
+  (use the aports commit that produced linux-lts 6.18.35-r0; the netboot
+  files carry no PKGINFO, so the release maintainer records it before 1.0)
+
+Written offer: the USOS maintainer provides the complete corresponding source
+(kernel tarball, Alpine config and patches) on request, see SOURCE-OFFER.txt.

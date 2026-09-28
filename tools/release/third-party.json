@@ -1,0 +1,1431 @@
+{
+  "components": [
+    {
+      "id": "shim",
+      "name": "shim (Fedora signed shim-x64) and MokManager",
+      "version": "16.1-7",
+      "license": "BSD-2-Clause",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/shim/16.1-7/LICENSE"
+      ],
+      "source": {
+        "urls": [
+          "https://github.com/rhboot/shim/releases/tag/16.1",
+          "https://github.com/rhboot/shim/tree/afc49558b34548644c1cd0ad1b6526a9470182ed",
+          "https://kojipkgs.fedoraproject.org/packages/shim/16.1/7/x86_64/shim-x64-16.1-7.x86_64.rpm"
+        ],
+        "bundle_paths": [],
+        "offer": false
+      },
+      "notice": "EFI/BOOT/BOOTX64.EFI and mmx64.efi, Microsoft/Fedora-signed binaries redistributed unmodified; shim links OpenSSL (Cryptlib) and gnu-efi, whose notices are in the shim source tree."
+    },
+    {
+      "id": "edk2-uefi-shell",
+      "name": "EDK2 UEFI Shell",
+      "version": "edk2-stable202002 (Shell 2.2)",
+      "license": "BSD-2-Clause-Patent",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/uefi-shell/edk2-stable202002/License.txt",
+        "tools/vendor/uefi-shell/edk2-stable202002/SOURCES.txt"
+      ],
+      "source": {
+        "urls": [
+          "https://github.com/tianocore/edk2/tree/4c0f6e349d32cf27a7104ddd3e729d6ebc88ea70",
+          "https://github.com/tianocore/edk2/releases/download/edk2-stable202002/ShellBinPkg.zip"
+        ],
+        "bundle_paths": [],
+        "offer": false
+      },
+      "notice": "Official prebuilt Shell.efi, unmodified; signed with the USOS key at release (signature appended, code unchanged)."
+    },
+    {
+      "id": "efifs-ntfs",
+      "name": "EfiFs NTFS driver (ntfs_x64.efi)",
+      "version": "1.12",
+      "license": "GPL-3.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-3.0.txt",
+        "tools/release/licenses/efifs-ntfs/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://github.com/pbatard/efifs/releases/tag/v1.12",
+          "https://github.com/pbatard/efifs/archive/refs/tags/v1.12.tar.gz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified release binary by Pete Batard (EfiFs, built on GRUB 2 file system code); the ESP copy is USOS-signed."
+    },
+    {
+      "id": "systemd-boot",
+      "name": "systemd-boot",
+      "version": "260.2-r0 (Alpine)",
+      "license": "LGPL-2.1-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/LGPL-2.1.txt",
+        "tools/release/licenses/systemd-boot/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://github.com/systemd/systemd/archive/refs/tags/v260.2.tar.gz",
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/c329463d3dbe6b28360180706f843e605c97575b/main/systemd-boot",
+          "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/systemd-boot-260.2-r0.apk"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "EFI/USOS/systemd-bootx64.efi, taken unmodified from the Alpine systemd-boot package."
+    },
+    {
+      "id": "linux-lts",
+      "name": "Linux kernel (Alpine linux-lts) and modules",
+      "version": "6.18.35-0-lts (Alpine 3.24.1 netboot)",
+      "license": "GPL-2.0-only WITH Linux-syscall-note",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/linux-lts/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.18.35.tar.xz",
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/3.24-stable/main/linux-lts",
+          "https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/netboot-3.24.1/vmlinuz-lts",
+          "https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/netboot-3.24.1/modloop-lts"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "EFI/USOS/micro-linux/vmlinuz-virt (and EFI/USOS-XP/vmlinuz.efi) plus a subset of modules from modloop-lts, unmodified code with an appended USOS Secure Boot signature; firmware files are pruned."
+    },
+    {
+      "id": "alpine-busybox",
+      "name": "busybox (Alpine v3.24 package)",
+      "version": "busybox 1.37.0-r31, busybox-binsh 1.37.0-r31, ssl_client 1.37.0-r31",
+      "license": "GPL-2.0-only",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/c3ef5d10e6ef6528852c51f0564963e2f8c1be19/main/busybox",
+          "https://busybox.net/downloads/busybox-1.37.0.tar.bz2"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; from the Alpine initramfs-lts base (version from the 3.24.1 ISO APKINDEX)"
+    },
+    {
+      "id": "alpine-musl",
+      "name": "musl (Alpine v3.24 package)",
+      "version": "musl 1.2.6-r2",
+      "license": "MIT",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/zig/lib/libc/musl/COPYRIGHT",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/f5640d3a10f664c9119720c60515265d3d6f6d01/main/musl",
+          "https://musl.libc.org/releases/musl-1.2.6.tar.gz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; COPYRIGHT text taken from the musl copy bundled with Zig 0.16.0 (same upstream notice)"
+    },
+    {
+      "id": "alpine-apk-tools",
+      "name": "apk-tools (Alpine v3.24 package)",
+      "version": "apk-tools 3.0.6-r0, libapk 3.0.6-r0",
+      "license": "GPL-2.0-only",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/1403ea7a8ae3fb8e5a11207ddb1ff536eb8de912/main/apk-tools",
+          "https://gitlab.alpinelinux.org/alpine/apk-tools/-/archive/v3.0.6/apk-tools-v3.0.6.tar.gz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; from the initramfs-lts base"
+    },
+    {
+      "id": "alpine-openssl",
+      "name": "openssl (Alpine v3.24 package)",
+      "version": "libcrypto3 3.5.7-r0, libssl3 3.5.7-r0",
+      "license": "Apache-2.0",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/Apache-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/4a4352d83ab03720965454a8c7b30b1b6a996c84/main/openssl",
+          "https://www.openssl.org/source/openssl-3.5.7.tar.gz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; from the initramfs-lts base"
+    },
+    {
+      "id": "alpine-alpine-baselayout",
+      "name": "alpine-baselayout (Alpine v3.24 package)",
+      "version": "alpine-baselayout 3.7.2-r1, alpine-baselayout-data 3.7.2-r1",
+      "license": "GPL-2.0-only",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/60a7585bbab2fa0f762504eb617dbca90216e31f/main/alpine-baselayout"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; from the initramfs-lts base"
+    },
+    {
+      "id": "alpine-alpine-keys",
+      "name": "alpine-keys (Alpine v3.24 package)",
+      "version": "alpine-keys 2.6-r0",
+      "license": "MIT",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/b9f23becced4d7b3ccc0fa0f28530243ccd314a0/main/alpine-keys"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; public signing keys only; licence text not collected (GAP, see audit)"
+    },
+    {
+      "id": "alpine-mdev-conf",
+      "name": "mdev-conf (Alpine v3.24 package)",
+      "version": "mdev-conf 4.10-r0",
+      "license": "MIT",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/203310a84fe34bc9b8dad2c97cba2f5189303415/main/mdev-conf"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; licence text not collected (GAP, see audit)"
+    },
+    {
+      "id": "alpine-ca-certificates",
+      "name": "ca-certificates (Alpine v3.24 package)",
+      "version": "ca-certificates-bundle 20260611-r0",
+      "license": "MPL-2.0 AND MIT",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/e41cbd2ae991adfe8df298ba8e8e777e90bd0e03/main/ca-certificates"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; MPL-2.0 text not in the repo yet (GAP, see audit)"
+    },
+    {
+      "id": "alpine-kmod",
+      "name": "kmod (Alpine v3.24 package)",
+      "version": "kmod 3.24 base, kmod-libs 3.24 base",
+      "license": "LGPL-2.1-or-later AND GPL-2.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/LGPL-2.1.txt",
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/3.24-stable/main/kmod"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; from the initramfs-lts base; exact version not recorded locally"
+    },
+    {
+      "id": "alpine-cryptsetup",
+      "name": "cryptsetup (Alpine v3.24 package)",
+      "version": "cryptsetup-libs 3.24 base",
+      "license": "GPL-2.0-or-later WITH cryptsetup-OpenSSL-exception AND LGPL-2.1-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/spdx/LGPL-2.1.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/3.24-stable/main/cryptsetup"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; from the initramfs-lts base (nlplug-findfs dependency); exact version not recorded locally"
+    },
+    {
+      "id": "alpine-lvm2",
+      "name": "lvm2 (Alpine v3.24 package)",
+      "version": "device-mapper-libs 3.24 base",
+      "license": "LGPL-2.1-only",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/LGPL-2.1.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/3.24-stable/main/lvm2"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; from the initramfs-lts base; exact version not recorded locally"
+    },
+    {
+      "id": "alpine-json-c",
+      "name": "json-c (Alpine v3.24 package)",
+      "version": "json-c 3.24 base",
+      "license": "MIT",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/3.24-stable/main/json-c"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; from the initramfs-lts base; licence text not collected (GAP)"
+    },
+    {
+      "id": "alpine-xz",
+      "name": "xz (Alpine v3.24 package)",
+      "version": "xz-libs 3.24 base",
+      "license": "0BSD",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/3.24-stable/main/xz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; from the initramfs-lts base; 0BSD needs no notice"
+    },
+    {
+      "id": "alpine-mkinitfs",
+      "name": "mkinitfs (Alpine v3.24 package)",
+      "version": "mkinitfs (nlplug-findfs) 3.24 base",
+      "license": "GPL-2.0-only",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/3.24-stable/main/mkinitfs"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; from the initramfs-lts base; exact version not recorded locally"
+    },
+    {
+      "id": "alpine-kexec-tools",
+      "name": "kexec-tools (Alpine v3.24 package)",
+      "version": "kexec-tools 2.0.32-r2",
+      "license": "GPL-2.0-only",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/151ef8efcb01d1282c74773d54b0305eb06776bb/community/kexec-tools",
+          "https://www.kernel.org/pub/linux/utils/kernel/kexec/kexec-tools-2.0.32.tar.xz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp."
+    },
+    {
+      "id": "alpine-acl",
+      "name": "acl (Alpine v3.24 package)",
+      "version": "acl-libs 2.3.2-r1",
+      "license": "LGPL-2.1-or-later AND GPL-2.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/LGPL-2.1.txt",
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/8bac74716d06c84627ab02d101fd9d2bafd0a34c/main/acl",
+          "https://download.savannah.nongnu.org/releases/acl/acl-2.3.2.tar.gz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp."
+    },
+    {
+      "id": "alpine-util-linux",
+      "name": "util-linux (Alpine v3.24 package)",
+      "version": "blkid 2.42.1-r0, findmnt 2.42.1-r0, sfdisk 2.42.1-r0, lsblk 2.42.1-r0, libblkid 2.42.1-r0, libfdisk 2.42.1-r0, libmount 2.42.1-r0, libsmartcols 2.42.1-r0, libuuid 2.42.1-r0",
+      "license": "GPL-2.0-or-later AND GPL-1.0-or-later AND LGPL-2.1-or-later AND LGPL-1.0-only AND BSD-3-Clause",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/spdx/LGPL-2.1.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/58e8609cc84989eeb6f07b86d79b10321eacca9f/main/util-linux",
+          "https://www.kernel.org/pub/linux/utils/util-linux/v2.42/util-linux-2.42.1.tar.xz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; per-package licences from PKGINFO; libuuid BSD-3-Clause notice not collected (GAP)"
+    },
+    {
+      "id": "alpine-mtools",
+      "name": "mtools (Alpine v3.24 package)",
+      "version": "mtools 4.0.49-r0",
+      "license": "GPL-3.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-3.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/efa1c7cac97401469414a36748f0f3f46d98b976/main/mtools",
+          "https://ftp.gnu.org/gnu/mtools/mtools-4.0.49.tar.bz2"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp."
+    },
+    {
+      "id": "alpine-dosfstools",
+      "name": "dosfstools (Alpine v3.24 package)",
+      "version": "dosfstools 4.2-r2",
+      "license": "GPL-3.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-3.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/9024026ee6838388f8b87e52a17495786ed85d4e/main/dosfstools",
+          "https://github.com/dosfstools/dosfstools/releases/download/v4.2/dosfstools-4.2.tar.gz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp."
+    },
+    {
+      "id": "alpine-libeconf",
+      "name": "libeconf (Alpine v3.24 package)",
+      "version": "libeconf 0.8.3-r0",
+      "license": "MIT",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/62db33049768522f381410614d59c7d732f72c3a/main/libeconf",
+          "https://github.com/openSUSE/libeconf/archive/refs/tags/v0.8.3.tar.gz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; licence text not collected (GAP)"
+    },
+    {
+      "id": "alpine-ncurses",
+      "name": "ncurses (Alpine v3.24 package)",
+      "version": "libncursesw 6.6_p20260516-r0, ncurses-terminfo-base 6.6_p20260516-r0",
+      "license": "X11",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/2cee8a7328d061418336ad327b512d96bcd7bc5e/main/ncurses"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; licence text not collected (GAP)"
+    },
+    {
+      "id": "alpine-xxhash",
+      "name": "xxhash (Alpine v3.24 package)",
+      "version": "libxxhash 0.8.3-r1",
+      "license": "BSD-2-Clause",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/3b2e469e223a5cb31932b1eae30c266e26b30148/main/xxhash",
+          "https://github.com/Cyan4973/xxHash/archive/v0.8.3.tar.gz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; licence text not collected (GAP)"
+    },
+    {
+      "id": "alpine-lz4",
+      "name": "lz4 (Alpine v3.24 package)",
+      "version": "lz4-libs 1.10.0-r1",
+      "license": "BSD-2-Clause AND GPL-2.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/1f16962f34234a77fab0f4651459c4381b4a0cd6/main/lz4",
+          "https://github.com/lz4/lz4/archive/v1.10.0.tar.gz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; BSD-2-Clause notice of liblz4 not collected (GAP)"
+    },
+    {
+      "id": "alpine-ntfs-3g",
+      "name": "ntfs-3g (Alpine v3.24 package)",
+      "version": "ntfs-3g 2026.2.25-r0, ntfs-3g-libs 2026.2.25-r0, ntfs-3g-progs 2026.2.25-r0",
+      "license": "GPL-2.0-only",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/6e0f4ace9c11c2ce0a132d763507d1898e707ba2/main/ntfs-3g"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; upstream tarball as named in the APKBUILD at that commit"
+    },
+    {
+      "id": "alpine-popt",
+      "name": "popt (Alpine v3.24 package)",
+      "version": "popt 1.19-r4",
+      "license": "MIT",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/d3abe30d43524bed75a29a3006e703ab51836548/main/popt",
+          "https://ftp.osuosl.org/pub/rpm/popt/releases/popt-1.x/popt-1.19.tar.gz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; licence text not collected (GAP)"
+    },
+    {
+      "id": "alpine-rsync",
+      "name": "rsync (Alpine v3.24 package)",
+      "version": "rsync 3.5.0-r0",
+      "license": "GPL-3.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-3.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/8cc5798059868c71d4c2efa296afe835c6602689/main/rsync",
+          "https://download.samba.org/pub/rsync/src/rsync-3.5.0.tar.gz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp."
+    },
+    {
+      "id": "alpine-zlib",
+      "name": "zlib (Alpine v3.24 package)",
+      "version": "zlib 1.3.2-r0",
+      "license": "Zlib",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/f248b33b5943c7dc69bf691031d7612ab2e8ed93/main/zlib",
+          "https://zlib.net/zlib-1.3.2.tar.gz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; licence text not collected (GAP)"
+    },
+    {
+      "id": "alpine-zstd",
+      "name": "zstd (Alpine v3.24 package)",
+      "version": "zstd-libs 1.5.7-r2",
+      "license": "BSD-3-Clause OR GPL-2.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/3c6e2ee2b16f403d53eab39c4426eb61f003c322/main/zstd",
+          "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; dual licence; USOS uses the GPL-2.0-or-later option"
+    },
+    {
+      "id": "alpine-smartmontools",
+      "name": "smartmontools (Alpine v3.24 package)",
+      "version": "smartmontools 7.5-r0",
+      "license": "GPL-2.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/58d667cdf3ede3c43a229418c135d07d25983a44/main/smartmontools",
+          "https://downloads.sourceforge.net/sourceforge/smartmontools/smartmontools-7.5.tar.gz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp."
+    },
+    {
+      "id": "alpine-dmidecode",
+      "name": "dmidecode (Alpine v3.24 package)",
+      "version": "dmidecode 3.7-r0",
+      "license": "GPL-2.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/639806892e3f8c8225a15326b40548e053350d41/main/dmidecode",
+          "https://download.savannah.gnu.org/releases/dmidecode/dmidecode-3.7.tar.xz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp."
+    },
+    {
+      "id": "alpine-pciutils",
+      "name": "pciutils (Alpine v3.24 package)",
+      "version": "pciutils 3.15.0-r0, pciutils-libs 3.15.0-r0",
+      "license": "GPL-2.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/6f2cdac966e30da20250e59cb11b899fbc03a957/main/pciutils",
+          "https://www.kernel.org/pub/software/utils/pciutils/pciutils-3.15.0.tar.xz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp."
+    },
+    {
+      "id": "alpine-hwdata",
+      "name": "hwdata (Alpine v3.24 package)",
+      "version": "hwdata-pci 0.408-r0",
+      "license": "GPL-2.0-or-later OR XFree86-1.1",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/6f27b0b36ae7a3874f59cedf8c361b4016ee30ac/main/hwdata",
+          "https://github.com/vcrhonek/hwdata/archive/v0.408.tar.gz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; dual licence; USOS uses the GPL-2.0-or-later option"
+    },
+    {
+      "id": "alpine-gcc",
+      "name": "gcc (Alpine v3.24 package)",
+      "version": "libgcc 15.2.0-r5, libstdc++ 15.2.0-r5",
+      "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/spdx/LGPL-2.1.txt",
+        "tools/release/licenses/spdx/GPL-3.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/423a8ad043d07f2c7546c8ec3e2b0384cda360ae/main/gcc",
+          "https://gcc.gnu.org/pub/gcc/releases/gcc-15.2.0/gcc-15.2.0.tar.xz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp; licence string as in the Alpine PKGINFO; upstream libgcc/libstdc++ are GPL-3.0-or-later WITH GCC-exception-3.1 (exception text not in the repo yet)"
+    },
+    {
+      "id": "alpine-wimlib",
+      "name": "wimlib (Alpine v3.24 package)",
+      "version": "wimlib 1.14.4-r1",
+      "license": "GPL-3.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-3.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/21d0c4c5f6252e58685fd9665238ded4ec4d5a9b/community/wimlib",
+          "https://wimlib.net/downloads/wimlib-1.14.4.tar.gz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp."
+    },
+    {
+      "id": "alpine-fuse3",
+      "name": "fuse3 (Alpine v3.24 package)",
+      "version": "fuse3-libs 3.18.3-r0",
+      "license": "GPL-2.0-only AND LGPL-2.1-only",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/spdx/LGPL-2.1.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/0adb5f52202c5e2d5029f50a27a972479b3d98b5/main/fuse3",
+          "https://github.com/libfuse/libfuse/releases/download/fuse-3.18.3/fuse-3.18.3.tar.gz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp."
+    },
+    {
+      "id": "zig-runtime",
+      "name": "Zig standard library / compiler-rt and statically linked musl",
+      "version": "Zig 0.16.0",
+      "license": "MIT",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/zig/LICENSE",
+        "tools/zig/lib/libc/musl/COPYRIGHT"
+      ],
+      "source": {
+        "urls": [
+          "https://ziglang.org/download/0.16.0/zig-0.16.0.tar.xz"
+        ],
+        "bundle_paths": [],
+        "offer": false
+      },
+      "notice": "Compiled into the USOS Zig binaries (UEFI menu, Legacy BIOS core, usos-fb-ui, helpers); usos-fb-ui links musl statically."
+    },
+    {
+      "id": "fonts",
+      "name": "Roboto and Noto Sans symbol subset (boot UI font pack)",
+      "version": "Roboto 2.137, Go Noto Current 2.012 subset",
+      "license": "Apache-2.0 AND OFL-1.1",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "assets/fonts/LICENSE-Apache-2.0.txt",
+        "assets/fonts/LICENSE-OFL-1.1.txt",
+        "assets/fonts/README.md"
+      ],
+      "source": {
+        "bundle_paths": [
+          "assets/fonts"
+        ],
+        "urls": [
+          "https://github.com/googlefonts/roboto/releases/tag/v2.137",
+          "https://github.com/satbyy/go-noto-universal"
+        ],
+        "offer": false
+      },
+      "notice": "Rasterized into src/gui/fonts/usos-font.bin (derived rendering) and bios-ui.bin; licence texts are on the ESP in EFI/USOS/licenses/fonts."
+    },
+    {
+      "id": "wimboot",
+      "name": "wimboot (iPXE) and the USOS kexec variants",
+      "version": "2.9.0 (+ usos kexec variants)",
+      "license": "GPL-2.0-or-later",
+      "modified": true,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/vendor/wimboot/2.9.0/LICENSE.txt",
+        "tools/vendor/wimboot/2.9.0/README.md",
+        "tools/vendor/wimboot/2.9.0/USOS-KEXEC.md"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/wimboot/2.9.0/source.tar.gz",
+          "tools/vendor/wimboot/2.9.0/README.md",
+          "tools/vendor/wimboot/2.9.0/USOS-KEXEC.md",
+          "tools/wimboot_kexec.py",
+          "src/platform/bios/windows_kexec_bridge.S",
+          "src/platform/bios/windows_kexec_cpu_reset.S",
+          "src/platform/bios/windows_disk_order.S"
+        ],
+        "urls": [
+          "https://github.com/ipxe/wimboot/releases/tag/v2.9.0",
+          "https://codeload.github.com/ipxe/wimboot/tar.gz/refs/tags/v2.9.0"
+        ],
+        "offer": false
+      },
+      "notice": "EFI/USOS/windows-native/wimboot is the unmodified 2.9.0 binary; usr/lib/usos/wimboot-kexec and wimboot-kexec-ordered in the initramfs are MODIFIED by USOS (2026-09-10, tools/wimboot_kexec.py)."
+    },
+    {
+      "id": "imdisk",
+      "name": "ImDisk Virtual Disk Driver",
+      "version": "2.1.2",
+      "license": "GPL-2.0-only",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/vendor/imdisk/2.1.2/LICENSE.md",
+        "tools/vendor/imdisk/2.1.2/README.md"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/imdisk/2.1.2/source.zip"
+        ],
+        "urls": [
+          "https://github.com/LTRData/ImDisk/tree/06658631441be3f2d560cf58d503532a7ebe67f4",
+          "https://static.ltr-data.se/files/imdisk.zip"
+        ],
+        "offer": false
+      },
+      "notice": "Unmodified signed ImDisk binaries in support.cpio and the initramfs; licence and source.zip travel with them (usos-imdisk-*)."
+    },
+    {
+      "id": "uefiseven",
+      "name": "UefiSeven",
+      "version": "1.30",
+      "license": "BSD-2-Clause AND BSD-2-Clause-Patent",
+      "modified": false,
+      "ships_in": [
+        "stick-esp",
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/vendor/uefiseven/1.30/LICENSE.txt",
+        "tools/vendor/uefiseven/1.30/PROVENANCE.md"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/uefiseven/1.30"
+        ],
+        "urls": [
+          "https://github.com/manatails/uefiseven/tree/b8f0baba63e60e74d4ed3e86b15b76319d316b83",
+          "https://github.com/manatails/uefiseven/releases/tag/1.30"
+        ],
+        "offer": false
+      },
+      "notice": "Unmodified release binary (int10.efi, usos-win7-video.bin, usr/lib/usos/UefiSeven.efi); Copyright (c) 2020 Seungjoo Kim, (c) 2016 Dawid Ciecierski."
+    },
+    {
+      "id": "csmwrap",
+      "name": "CSMWrap with its SeaBIOS fork",
+      "version": "3.1.2-usos1",
+      "license": "LGPL-2.1-only AND LGPL-3.0-only",
+      "modified": true,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/csmwrap/3.1.2/LICENSE",
+        "tools/vendor/csmwrap/3.1.2/COPYING.LESSER",
+        "tools/vendor/csmwrap/3.1.2-src/licenses/CSMWrap-LICENSE-LGPL-2.1.txt",
+        "tools/vendor/csmwrap/3.1.2-src/licenses/SeaBIOS-COPYING.LESSER-LGPLv3.txt",
+        "tools/vendor/csmwrap/3.1.2-src/licenses/SeaBIOS-COPYING-GPLv3.txt",
+        "tools/vendor/csmwrap/3.1.2-src/licenses/cc-runtime-LICENSE.txt",
+        "tools/vendor/csmwrap/3.1.2-src/licenses/flanterm-LICENSE.txt",
+        "tools/vendor/csmwrap/3.1.2-src/licenses/freestnd-c-hdrs-LICENSE.txt",
+        "tools/vendor/csmwrap/3.1.2-src/licenses/nanoprintf-LICENSE.txt",
+        "tools/vendor/csmwrap/3.1.2-src/licenses/picoefi-COPYING.txt",
+        "tools/vendor/csmwrap/3.1.2-src/licenses/picoefi-LicenseRef-scancode-bsd-no-disclaimer-unmodified.txt",
+        "tools/vendor/csmwrap/3.1.2-src/licenses/uACPI-LICENSE.txt"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/csmwrap/3.1.2-src",
+          "tools/vendor/csmwrap/3.1.2-usos1",
+          "tools/csmwrap_build",
+          "tools/build_csmwrap.ps1",
+          "docs/research/csmwrap.md"
+        ],
+        "urls": [
+          "https://github.com/CSMWrap/CSMWrap/tree/808ac8ea5393db9052044fb0f74aa55e0d719afc",
+          "https://github.com/CSMWrap/seabios-csmwrap/tree/578d260b94f62150bf6ab9149784287bd1154f06"
+        ],
+        "offer": false
+      },
+      "notice": "MODIFIED by USOS on 2026-09-27 (quiet boot unless csmwrap.ini sets verbose = true; three patches in 3.1.2-usos1/patches). Submodules: cc-runtime (Apache-2.0 WITH LLVM-exception), flanterm (BSD-2-Clause), freestnd-c-hdrs (0BSD), nanoprintf (Unlicense OR 0BSD), PicoEFI, uACPI (MIT)."
+    },
+    {
+      "id": "touchi2cdxe",
+      "name": "TouchI2cDxe",
+      "version": "v1.3.1-usos1",
+      "license": "BSD-2-Clause-Patent",
+      "modified": true,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/touchi2cdxe/v1.3.1-usos1/LICENSE",
+        "tools/vendor/touchi2cdxe/v1.3.1-usos1/PROVENANCE.md"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/touchi2cdxe/v1.3.1-usos1/usos-rc71l.patch",
+          "tools/vendor/touchi2cdxe/v1.3.1-usos1/UsosTouchPkg.dsc",
+          "tools/vendor/touchi2cdxe/v1.3.1-usos1/PROVENANCE.md",
+          "tools/vendor/touchi2cdxe/v1.3.1-usos1/manifest.json",
+          "tools/build_touchi2cdxe.ps1"
+        ],
+        "urls": [
+          "https://github.com/jlobue10/TouchI2cDxe/tree/cd673f65049f4bd34dd511ca7a28c345f41efac0",
+          "https://github.com/tianocore/edk2/tree/0f3867fa6ef0553e26c42f7d71ff6bdb98429742"
+        ],
+        "offer": false
+      },
+      "notice": "MODIFIED by USOS (usos-rc71l.patch, ROG Ally RC71L support); built against EDK2 edk2-stable202411 MdePkg (BSD-2-Clause-Patent)."
+    },
+    {
+      "id": "syslinux-memdisk",
+      "name": "Syslinux MEMDISK",
+      "version": "6.03",
+      "license": "GPL-2.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/syslinux/6.03/COPYING"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/syslinux/6.03/source.zip"
+        ],
+        "urls": [
+          "https://www.kernel.org/pub/linux/utils/boot/syslinux/syslinux-6.03.zip"
+        ],
+        "offer": false
+      },
+      "notice": "Unmodified memdisk; COPYING and source.zip are on the ESP next to it (EFI/USOS/dos-native)."
+    },
+    {
+      "id": "patcher9x",
+      "name": "Patcher9x (with the R. Loew RAM patch)",
+      "version": "0.9.91",
+      "license": "MIT",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/patcher9x/0.9.91/LICENSE.TXT",
+        "tools/vendor/patcher9x/0.9.91/NOTICE.TXT"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/patcher9x/0.9.91/source.zip"
+        ],
+        "urls": [
+          "https://github.com/JHRobotics/patcher9x/releases/tag/v0.9.91"
+        ],
+        "offer": false
+      },
+      "notice": "Unmodified PATCH9X.EXE by JHRobotics; source.zip includes libmspack (LGPL-2.1) and its licence."
+    },
+    {
+      "id": "cwsdpmi",
+      "name": "CWSDPMI",
+      "version": "r7",
+      "license": "LicenseRef-CWSDPMI",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/patcher9x/0.9.91/CWSDPMI.TXT"
+      ],
+      "source": {
+        "urls": [
+          "https://www.delorie.com/pub/djgpp/current/v2misc/csdpmi7s.zip"
+        ],
+        "bundle_paths": [],
+        "offer": false
+      },
+      "notice": "Copyright (C) 1995-2010 Charles W. Sandmann; unmodified binary under the binary redistribution permission in CWSDPMI.TXT."
+    },
+    {
+      "id": "himemx",
+      "name": "HimemX",
+      "version": "3.40",
+      "license": "GPL-2.0-only OR Artistic-1.0",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/himemx/3.40/COPYING",
+        "tools/vendor/himemx/3.40/README.TXT"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/himemx/3.40/source-and-binaries.zip"
+        ],
+        "urls": [
+          "https://github.com/Baron-von-Riedesel/HimemX/releases/tag/v3.40"
+        ],
+        "offer": false
+      },
+      "notice": "By Japheth; derived from FreeDOS HIMEM (Till Gerken, Tom Ehlert, GPL and/or Artistic licence); unmodified, source on the ESP (HIMEMSRC.ZIP)."
+    },
+    {
+      "id": "freedos",
+      "name": "FreeDOS kernel, FreeCOM and Doszip",
+      "version": "FreeDOS 1.4 (kernel 20250409.9, FreeCOM 0.86a, Doszip 2.68)",
+      "license": "GPL-2.0-only",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/release/licenses/freedos/FreeDOS-kernel-COPYING.txt",
+        "tools/release/licenses/freedos/Doszip-LICENSE.txt",
+        "tools/release/licenses/spdx/GPL-2.0.txt"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/freedos/1.4/kernel.zip",
+          "tools/vendor/freedos/1.4/freecom.zip",
+          "tools/vendor/freedos/1.4/doszip.zip",
+          "tools/vendor/freedos/1.4/manifest.json"
+        ],
+        "urls": [
+          "https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/repositories/1.4/base/kernel/20250409.9/kernel.zip",
+          "https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/repositories/1.4/base/freecom.zip",
+          "https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/repositories/1.4/apps/doszip/20251128.7/doszip.zip",
+          "https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/distributions/1.4/FD14-LiteUSB.zip"
+        ],
+        "offer": false
+      },
+      "notice": "Unmodified binaries; the FreeDOS package zips (with SOURCE/*/SOURCES.ZIP) are on the ESP next to them. BOOT16.BIN is the FreeDOS FAT16 boot sector from FD14-LiteUSB."
+    },
+    {
+      "id": "patchpae3",
+      "name": "PatchPAE3 (adapted as the USOS XP PAE helper)",
+      "version": "3e1d3b65f5c3c1ec0c4759f707d3017e51113103",
+      "license": "CC-BY-4.0",
+      "modified": true,
+      "ships_in": [
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/vendor/patchpae3/3e1d3b65f5c3c1ec0c4759f707d3017e51113103/LICENSE",
+        "tools/vendor/patchpae3/3e1d3b65f5c3c1ec0c4759f707d3017e51113103/README.md"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/patchpae3/3e1d3b65f5c3c1ec0c4759f707d3017e51113103",
+          "tools/windows_xp_pae.c",
+          "tools/windows_xp_pae_strings.h"
+        ],
+        "urls": [
+          "https://github.com/evgen-b/PatchPAE3/tree/3e1d3b65f5c3c1ec0c4759f707d3017e51113103",
+          "https://creativecommons.org/licenses/by/4.0/legalcode"
+        ],
+        "offer": false
+      },
+      "notice": "xp-pae.exe / pae.exe: patterns by evgen_b (based on wj32 and XP64G), adapted by USOS with strict checks; attribution in usr/lib/usos/xp-pae-LICENSE.txt."
+    },
+    {
+      "id": "genahci",
+      "name": "GenAHCI",
+      "version": "6.3.0.1",
+      "license": "GPL-3.0-only",
+      "modified": false,
+      "ships_in": [
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/release/licenses/genahci/gpl.txt",
+        "tools/release/licenses/genahci/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "urls": [
+          "https://github.com/GeorgeK1ng/GenAHCI",
+          "https://github.com/GeorgeK1ng/GenAHCI/releases/download/GenAHCI/GenAHCI_6.3.0.1.7z"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified x86/x64 genahci.sys in the XP driver bundles and usr/lib/usos/nt5-storage; the release archive carries no source (GAP, see LICENSES-AUDIT.md)."
+    },
+    {
+      "id": "go-runtime",
+      "name": "Go runtime and standard library, golang.org/x/sys",
+      "version": "Go 1.26.2, x/sys v0.47.0",
+      "license": "BSD-3-Clause",
+      "modified": false,
+      "ships_in": [
+        "installer",
+        "stick-data"
+      ],
+      "license_files": [
+        "tools/release/licenses/go/LICENSE"
+      ],
+      "source": {
+        "urls": [
+          "https://go.dev/dl/go1.26.2.src.tar.gz",
+          "https://cs.opensource.google/go/x/sys/+/refs/tags/v0.47.0"
+        ],
+        "bundle_paths": [],
+        "offer": false
+      },
+      "notice": "Compiled into USOS-Installer.exe; Copyright 2009 The Go Authors (the same BSD-3-Clause text covers golang.org/x/sys)."
+    },
+    {
+      "id": "microsoft-winpe-pe10",
+      "name": "Microsoft Windows PE 10.0.19041 x64 donor (PE10_x64_19041_USOS.iso)",
+      "version": "10.0.19041",
+      "license": "LicenseRef-Microsoft-redistributed-by-user",
+      "modified": false,
+      "ships_in": [
+        "winpe-asset"
+      ],
+      "license_files": [],
+      "source": {
+        "bundle_paths": [],
+        "offer": false,
+        "urls": []
+      },
+      "notice": "Microsoft files (boot.wim, setup.exe, bcd, boot.sdi), redistributed by the USOS maintainer at their own responsibility; not covered by any USOS licence; no product key."
+    },
+    {
+      "id": "microsoft-win7-updates",
+      "name": "Microsoft Windows 7 SP1 x64 update packages",
+      "version": "KB4474419 v3, KB2685811, KB2990941 v3, KB3087873 v2",
+      "license": "LicenseRef-Microsoft-redistributed-by-user",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [],
+      "source": {
+        "bundle_paths": [],
+        "offer": false,
+        "urls": []
+      },
+      "notice": "Original Microsoft CABs (SHA-2 code signing, KMDF 1.11, NVMe) in EFI/USOS/windows-native/win7-support.cpio, plus KB2990941/KB3087873 files in the micro-Linux initramfs; Microsoft property, unmodified, not covered by any USOS licence."
+    },
+    {
+      "id": "microsoft-vista-updates",
+      "name": "Microsoft Windows Vista update and USB 3 driver files",
+      "version": "KB2864202 + Windows 8-family USB 3 stack (usbxhci, ucx01000, usbhub3, usbd8)",
+      "license": "LicenseRef-Microsoft-redistributed-by-user",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [],
+      "source": {
+        "bundle_paths": [],
+        "offer": false,
+        "urls": []
+      },
+      "notice": "Microsoft binaries packed in EFI/USOS/windows-native/vista-support.cpio (vista-payload-*.bin) with a USOS test-signing catalog; Microsoft property, not covered by any USOS licence."
+    },
+    {
+      "id": "microsoft-xp-driver-bundles",
+      "name": "Windows XP / Server 2003 driver bundles derived from Microsoft ISOs",
+      "version": "per source ISO (see XP package manifest.json)",
+      "license": "LicenseRef-Microsoft-redistributed-by-user",
+      "modified": false,
+      "ships_in": [
+        "xp-package"
+      ],
+      "license_files": [],
+      "source": {
+        "bundle_paths": [],
+        "offer": false,
+        "urls": []
+      },
+      "notice": "Files taken from the named Microsoft XP SP3 ISO (SP3.CAB, TXTSETUP.SIF, HIVESYS.INF, SETUPREG.HIV, ...) and the community Integral Edition 2025.8.19 patch set (modified Microsoft drivers: USB 3 stack, WDF, ntoskrn8, ksecd8, ACPI, storport); Microsoft/community property, not covered by any USOS licence."
+    },
+    {
+      "id": "system-icons",
+      "name": "Operating system logos in UI/Icons/Systems",
+      "version": "2026-09-03",
+      "license": "LicenseRef-trademark-logos-provenance-unrecorded",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [],
+      "source": {
+        "bundle_paths": [],
+        "offer": false,
+        "urls": []
+      },
+      "notice": "Windows, MS-DOS and Windows beta logos (and their Legacy BIOS renderings in bios-ui.bin) are trademarks of Microsoft Corporation; their source and licence are not recorded (GAP, see LICENSES-AUDIT.md)."
+    }
+  ]
+}

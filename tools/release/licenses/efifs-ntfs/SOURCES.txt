@@ -1,0 +1,19 @@
+EfiFs NTFS driver - EFI/USOS/ntfs_x64.efi
+
+Component: EfiFs 1.12, ntfs_x64.efi (x64 NTFS UEFI file system driver)
+Author:    Pete Batard and contributors; file system code from GNU GRUB 2
+Licence:   GNU General Public License version 3 or later (GPL-3.0-or-later),
+           full text in GPL-3.0.txt next to this file
+Binary:    https://github.com/pbatard/efifs/releases/download/v1.12/ntfs_x64.efi
+           SHA-256 59c37d5026ca14553a158939e3f2cf20286b6135a713a62c08b569ac9caedcb7
+           (pinned by tools/fetch_ntfs_driver.ps1); redistributed unmodified,
+           USOS appends its Secure Boot signature to the ESP copy.
+
+Corresponding source:
+  https://github.com/pbatard/efifs/releases/tag/v1.12
+  https://github.com/pbatard/efifs/archive/refs/tags/v1.12.tar.gz
+  The EfiFs tree pins GNU GRUB as a git submodule at the commit used for the
+  release (see .gitmodules in the tag); both are needed to rebuild the driver.
+
+Written offer: the USOS maintainer provides the complete corresponding source
+of this binary on request, see SOURCE-OFFER.txt in the release.

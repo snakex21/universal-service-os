@@ -1,0 +1,17 @@
+systemd-boot - EFI/USOS/systemd-bootx64.efi
+
+Component: systemd-boot 260.2 (Alpine package systemd-boot-260.2-r0, x86_64)
+Licence:   GNU Lesser General Public License version 2.1 or later
+           (LGPL-2.1-or-later), full text in LGPL-2.1.txt next to this file
+Binary:    https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/systemd-boot-260.2-r0.apk
+           SHA-256 eeef3a0919785d1993dc699f2ca455ad1a84dded86050d7ddfdabdaf954406ce
+           (pinned in tools/micro_linux.lock.json); only the EFI binary is
+           used, unmodified.
+
+Corresponding source:
+  systemd v260.2: https://github.com/systemd/systemd/archive/refs/tags/v260.2.tar.gz
+  Alpine build recipe and patches (aports commit from the package PKGINFO):
+  https://gitlab.alpinelinux.org/alpine/aports/-/tree/c329463d3dbe6b28360180706f843e605c97575b/main/systemd-boot
+
+Written offer: the USOS maintainer provides the complete corresponding source
+of this binary on request, see SOURCE-OFFER.txt in the release.
