@@ -22,6 +22,7 @@ const verified_image = @import("verified_image.zig");
 const file_read = @import("file_read.zig");
 const serial = @import("serial.zig");
 const PathBuffer = @import("windows_native_iso.zig").PathBuffer;
+const secure_boot = @import("secure_boot.zig");
 
 pub const helper_path = "\\EFI\\USOS\\linux\\usos-linux.cpio";
 const max_helper_bytes = 1024 * 1024;
@@ -37,6 +38,8 @@ pub const Error = error{
     InitrdTooLarge,
     HelperMissing,
     LinuxKernelReturned,
+    RelayFailed,
+    NoDistroShim,
 };
 
 /// An answer file rendered for this start (design section 7): the cpio path
@@ -98,6 +101,24 @@ pub fn start(
     answer: ?Answer,
     progress: *const fn (Status_) void,
 ) !void {
+    return startMode(root, image_directory, name, answer, progress, .menu);
+}
+
+const Mode = enum {
+    /// Started from the USOS menu (USOS shim, or no Secure Boot).
+    menu,
+    /// This USOS instance is the second stage of the ISO's own shim.
+    relay,
+};
+
+fn startMode(
+    root: *uefi.protocol.File,
+    image_directory: []const u8,
+    name: []const u8,
+    answer: ?Answer,
+    progress: *const fn (Status_) void,
+    mode: Mode,
+) !void {
     const bs = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
     progress(.reading);
     logf("[LINUX-ISO] open {s}\r\n", .{name});
@@ -130,6 +151,24 @@ pub fn start(
     if (kernel_record.size > max_kernel_bytes) return error.KernelTooLarge;
     const kernel = try allocate(bs, @intCast(kernel_record.size));
     _ = try reader.readAt(@as(u64, kernel_record.extent_lba) * 2048, kernel);
+
+    // Secure Boot: the running shim verifies the kernel (menu mode: USOS's
+    // Fedora shim, e.g. Fedora kernels); a kernel it rejects is handed to the
+    // ISO's own Microsoft-signed shim (design section 5). Relay mode: any
+    // installed SHIM_LOCK must accept it.
+    var handle: ?uefi.Handle = null;
+    switch (mode) {
+        .menu => {
+            handle = verified_image.loadBuffer(kernel) catch |err| {
+                if (err == error.SecureBootRejected and secure_boot.enforced() and recipe.shim_layout) {
+                    freeBytes(bs, kernel);
+                    return relay(root, &reader, image_directory, name);
+                }
+                return err;
+            };
+        },
+        .relay => try verified_image.verifyWithAnyShim(kernel),
+    }
 
     // Initrd = distro initrds + helper cpio + per-boot cpio, each 4-byte aligned.
     const helper_buffer = try allocate(bs, max_helper_bytes);
@@ -170,12 +209,15 @@ pub fn start(
 
     progress(.starting);
     logf("[LINUX-ISO] initrd assembled; loading kernel (secure boot: {s})\r\n", .{if (@import("secure_boot.zig").enforced()) "on" else "off"});
-    const handle = try verified_image.loadBuffer(kernel);
-    verified_image.setLoadOptions(handle, cmdline);
     try installInitrd(bs);
     defer uninstallInitrd(bs);
     logf("[LINUX-ISO] starting kernel ({d} KiB initrd)\r\n", .{at / 1024});
-    _ = verified_image.start(handle) catch {};
+    if (handle) |loaded| {
+        verified_image.setLoadOptions(loaded, cmdline);
+        _ = verified_image.start(loaded) catch {};
+    } else {
+        verified_image.startApplicationManually(kernel, cmdline) catch {};
+    }
     return error.LinuxKernelReturned;
 }
 
@@ -319,4 +361,109 @@ fn uninstallInitrd(bs: *uefi.tables.BootServices) void {
     _ = uninstall(handle, &load_file2_guid, @ptrCast(&initrd_protocol));
     _ = uninstall(handle, &uefi.protocol.DevicePath.guid, @ptrCast(&initrd_path));
     initrd_handle = null;
+}
+
+// ---------------------------------------------------------------- distro-shim relay
+
+pub const relay_plan_path = "\\EFI\\USOS\\linux\\relay.ini";
+const relay_plan_file = std.unicode.utf8ToUtf16LeStringLiteral("\\EFI\\USOS\\linux\\relay.ini");
+/// shim takes its second stage from its own directory: on the USOS ESP that is
+/// \EFI\BOOT\grubx64.efi = USOS. The name is not BOOT*.EFI (no fallback).
+const relay_file_node = std.unicode.utf8ToUtf16LeStringLiteral("\\EFI\\BOOT\\USOSRELAY.EFI");
+
+/// Starts the ISO's Microsoft-signed shim (\EFI\BOOT\BOOTX64.EFI of the ISO)
+/// as if it were \EFI\BOOT\USOSRELAY.EFI on the USOS ESP. It starts USOS
+/// again as its second stage; that instance finds relay.ini (resumeRelay).
+fn relay(root: *uefi.protocol.File, reader: *IsoReader, image_directory: []const u8, name: []const u8) !void {
+    const bs = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
+    const record = (iso9660.findRecord(reader, "EFI/BOOT/BOOTX64.EFI") catch null) orelse return error.NoDistroShim;
+    if (record.size > 8 * 1024 * 1024) return error.NoDistroShim;
+    const shim = try allocate(bs, @intCast(record.size));
+    defer freeBytes(bs, shim);
+    _ = try reader.readAt(@as(u64, record.extent_lba) * 2048, shim);
+
+    var plan: [700]u8 = undefined;
+    const text = try std.fmt.bufPrint(&plan, "[relay]\r\nversion=1\r\ndirectory={s}\r\nname={s}\r\n", .{ image_directory, name });
+    try writeEspFile(root, relay_plan_file, text);
+    errdefer deleteEspFile(root, relay_plan_file);
+
+    const path = try relayDevicePath(bs);
+    logf("[LINUX-ISO] Secure Boot: kernel not trusted by the USOS shim; relaying through the ISO's shim ({d} bytes)\r\n", .{shim.len});
+    const image = try verified_image.loadBufferAt(shim, path);
+    _ = verified_image.start(image) catch {};
+    // The relay instance normally never returns (it starts the kernel).
+    deleteEspFile(root, relay_plan_file);
+    return error.RelayFailed;
+}
+
+var relay_path_buffer: [512]u8 align(8) = undefined;
+
+/// <device path of the USOS ESP> + File(\EFI\BOOT\USOSRELAY.EFI) + End.
+fn relayDevicePath(bs: *uefi.tables.BootServices) !*const uefi.protocol.DevicePath {
+    const loaded = (try bs.handleProtocol(uefi.protocol.LoadedImage, uefi.handle)) orelse return error.RelayFailed;
+    const device = loaded.device_handle orelse return error.RelayFailed;
+    const device_path = (try bs.handleProtocol(uefi.protocol.DevicePath, device)) orelse return error.RelayFailed;
+    const bytes: [*]const u8 = @ptrCast(device_path);
+    var at: usize = 0;
+    while (true) {
+        const node_type = bytes[at];
+        const len = std.mem.readInt(u16, bytes[at + 2 ..][0..2], .little);
+        if (node_type == 0x7f or len < 4) break;
+        at += len;
+        if (at > 400) return error.RelayFailed;
+    }
+    @memcpy(relay_path_buffer[0..at], bytes[0..at]);
+    const name_bytes = (relay_file_node.len + 1) * 2;
+    const node_len: u16 = @intCast(4 + name_bytes);
+    relay_path_buffer[at] = 4; // media
+    relay_path_buffer[at + 1] = 4; // file path
+    std.mem.writeInt(u16, relay_path_buffer[at + 2 ..][0..2], node_len, .little);
+    for (relay_file_node, 0..) |unit, i| std.mem.writeInt(u16, relay_path_buffer[at + 4 + i * 2 ..][0..2], unit, .little);
+    std.mem.writeInt(u16, relay_path_buffer[at + 4 + relay_file_node.len * 2 ..][0..2], 0, .little);
+    at += node_len;
+    @memcpy(relay_path_buffer[at..][0..4], &[4]u8{ 0x7f, 0xff, 4, 0 });
+    return @ptrCast(&relay_path_buffer);
+}
+
+/// Second USOS instance (the ISO's shim started \EFI\BOOT\grubx64.efi): when
+/// relay.ini exists, delete it and start that ISO's kernel, verified by the
+/// shim that started us. Returns (to the menu) when there is no plan or the
+/// start fails.
+pub fn resumeRelay(root: *uefi.protocol.File) void {
+    var buffer: [700]u8 = undefined;
+    const text = file_read.into(root, relay_plan_path, &buffer) orelse return;
+    deleteEspFile(root, relay_plan_file);
+    var directory: []const u8 = "";
+    var name: []const u8 = "";
+    var lines = std.mem.tokenizeAny(u8, text, "\r\n");
+    while (lines.next()) |line| {
+        if (std.mem.startsWith(u8, line, "directory=")) directory = line["directory=".len..];
+        if (std.mem.startsWith(u8, line, "name=")) name = line["name=".len..];
+    }
+    if (!std.mem.startsWith(u8, directory, "\\Systems\\Linux\\") or name.len == 0) return;
+    logf("[LINUX-ISO] relay instance: {s}\r\n", .{name});
+    startMode(root, directory, name, null, noProgress, .relay) catch |err| {
+        logf("[LINUX-ISO] relay start failed: {s}\r\n", .{@errorName(err)});
+    };
+}
+
+fn noProgress(_: Status_) void {}
+
+fn writeEspFile(root: *uefi.protocol.File, name: [*:0]const u16, bytes: []const u8) !void {
+    deleteEspFile(root, name);
+    const file = try root.open(name, .read_write_create, .{});
+    defer file.close() catch {};
+    var written: usize = 0;
+    while (written < bytes.len) {
+        const n = try file.write(bytes[written..]);
+        if (n == 0) return error.RelayFailed;
+        written += n;
+    }
+    try file.flush();
+}
+
+fn deleteEspFile(root: *uefi.protocol.File, name: [*:0]const u16) void {
+    if (root.open(name, .read_write, .{})) |old| {
+        _ = old.delete() catch {};
+    } else |_| {}
 }

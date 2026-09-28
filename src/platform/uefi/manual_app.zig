@@ -35,6 +35,9 @@ pub fn run() void {
     const root = filesystem.openBootVolume() orelse return;
     defer root.close() catch {};
     boot_timing.mark("ESP volume open");
+    // Linux ISO under Secure Boot: this instance may be the second stage of
+    // the ISO's own shim (docs/design/linux-iso-boot.md section 5).
+    @import("linux_iso_start.zig").resumeRelay(root);
     // The splash goes up before any slow I/O; only the tiny settings file
     // (boot_logo=) is read first.
     const settings = manual_view.readSettings(root);
