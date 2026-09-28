@@ -256,3 +256,17 @@ URLs: `python tools/linux_test_assets.py --list`.
 - Disk selection always manual in every answer format.
 - Passwords only as SHA-512 crypt, never logged; nothing on DATA.
 - No distro ISOs in the repo; third-party code vendored with licence + hash.
+
+## Hardware round 1 fixes (afternoon 2026-09-28)
+
+Build **B260928-134508-50881FDB** on master (build.bat green; Python suites:
+only the known stale test_windows7_pe10_selection / test_windows_setup_media
+and test_windows_native_iso_io, which needs a raw image argument). NOT on the
+Kingston yet: the stick was not attached when the deploy started. Deploy
+with the usual updater (backup, then `usos-physical-update`, readback,
+flush); the six Linux ISOs on DATA stay. Fixes: BIOS stack top below the
+EBDA (garbled long names on the Socket 939 PC, to confirm there), silent
+SHIM_LOCK pre-check before the relay (no "Verification failed", QEMU
+verified), Secure Boot notices close on any key, Linux wording in 27 locales.
+Open: the SystemRescue firmware screen and 30 s wait on the X470 (USOS
+does not load anything there in QEMU; need a photo).
