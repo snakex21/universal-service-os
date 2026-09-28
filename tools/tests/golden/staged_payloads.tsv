@@ -271,7 +271,7 @@ initramfs	usr/lib/usos/xp_selected_partition.sif	100755	7c49dde9dc1968f8964a8003
 initramfs	usr/lib/usos/xp_selected_partition_uefi_csm.sif	100755	62a9584c0e7541dfcbafc63bd7f9383b0f775739e46c2e1d62ff182d4b338035
 initramfs	usr/lib/usos/xp_source_io.sh	100755	5ee2e93d61ab46dc1e7606d4d672295da12520dd972bd2fd9597df512626790a
 initramfs	usr/lib/usos/xp_unattended_policy.sh	100755	c3565153a31e3a0ab02b95816b1a9fce80336750a475f6dd804d6aad9921dfe6
-initramfs	usr/lib/usos/xp_user_settings.sh	100755	cf9eb05ec1d791191f423c45d96041f07b897bab14cb52ef76e2183f32f65767
+initramfs	usr/lib/usos/xp_user_settings.sh	100755	1dc53a4d3c70071ddde85101cd985077487308658b45d2d600834cd24e1b12b7
 initramfs	usr/lib/usos/xp_verify_target.sh	100755	a15439ab8f88fcd3506bace39833e4716b239a38dbd4ba498c3646bdbc2fd258
 initramfs	usr/lib/usos/xp_windows_partition_plan.awk	100755	daf7a14c3428503518c31e9172b16bffe0b00e8a8c1c9b062169949db4cf626b
 # xp_csm: entries added or changed by the UEFI-CSM overlay (stand-in pae.exe)
@@ -412,6 +412,7 @@ payload_zip	EFI/USOS/licenses/fonts/README.md
 payload_zip	EFI/USOS/licenses/shim/LICENSE
 payload_zip	EFI/USOS/licenses/shim/README.md
 payload_zip	EFI/USOS/licenses/touchi2cdxe/LICENSE
+payload_zip	EFI/USOS/linux/usos-linux.cpio
 payload_zip	EFI/USOS/micro-linux/initramfs-usos
 payload_zip	EFI/USOS/micro-linux/vmlinuz-virt
 payload_zip	EFI/USOS/ntfs_x64.efi

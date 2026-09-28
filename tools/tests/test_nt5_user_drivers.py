@@ -7,8 +7,15 @@ import os, shutil, subprocess, tempfile, unittest
 ROOT = Path(__file__).resolve().parents[2]
 # Git's sh first: its coreutils include cmp (like BusyBox in the initramfs).
 SH = next((p for p in (r'C:\Program Files\Git\usr\bin\sh.exe', r'C:\msys64\usr\bin\sh.exe', shutil.which('sh') or '') if p and Path(p).exists()), None)
-if SH:
-    os.environ['PATH'] = str(Path(SH).parent) + os.pathsep + os.environ.get('PATH', '')
+
+
+def env() -> dict:
+    # Per call, not os.environ: other test modules put C:\msys64 first on the
+    # shared PATH at import time, and Git's sh running MSYS2's awk loses the
+    # ENVIRON value (a mixed-runtime host artefact; BusyBox has no such split).
+    e = dict(os.environ)
+    e['PATH'] = str(Path(SH).parent) + os.pathsep + e.get('PATH', '')
+    return e
 
 
 def posix(path: Path) -> str:
@@ -42,7 +49,7 @@ class Nt5UserDrivers(unittest.TestCase):
 
     def run_stage(self, arch):
         lib = posix(ROOT / 'tools' / 'nt5_user_drivers.sh')
-        return subprocess.run([SH, '-c', f". '{lib}'; usos_nt5_user_drivers_stage '{posix(self.drivers)}' '{posix(self.target)}' {arch}"], capture_output=True)
+        return subprocess.run([SH, '-c', f". '{lib}'; usos_nt5_user_drivers_stage '{posix(self.drivers)}' '{posix(self.target)}' {arch}"], capture_output=True, env=env())
 
     def test_amd64(self):
         r = self.run_stage('amd64')
@@ -70,12 +77,12 @@ class Nt5UserDrivers(unittest.TestCase):
     def test_sif_key(self):
         lib = posix(ROOT / 'tools' / 'nt5_user_drivers.sh')
         base = b'[Data]\r\nx=1\r\n[Unattended]\r\nOemPnPDriversPath="old"\r\nOemSkipEula=Yes\r\n'
-        r = subprocess.run([SH, '-c', f". '{lib}'; usos_nt5_user_drivers_sif 'USOS\\Drivers\\User\\USB-01'"], input=base, capture_output=True)
+        r = subprocess.run([SH, '-c', f". '{lib}'; usos_nt5_user_drivers_sif 'USOS\\Drivers\\User\\USB-01'"], input=base, capture_output=True, env=env())
         self.assertEqual(r.returncode, 0, r.stderr)
         lines = [l.rstrip('\r') for l in r.stdout.decode().split('\n')]
         self.assertEqual(lines[lines.index('[Unattended]') + 1], 'OemPnPDriversPath="USOS\\Drivers\\User\\USB-01"')
         self.assertNotIn('OemPnPDriversPath="old"', lines)
-        self.assertEqual(subprocess.run([SH, '-c', f". '{lib}'; usos_nt5_user_drivers_sif x"], input=b'[Data]\r\n', capture_output=True).returncode, 3)
+        self.assertEqual(subprocess.run([SH, '-c', f". '{lib}'; usos_nt5_user_drivers_sif x"], input=b'[Data]\r\n', capture_output=True, env=env()).returncode, 3)
 
 
 if __name__ == '__main__':
