@@ -331,7 +331,7 @@ partie du dépôt.
 
 - Le code propre à USOS est distribué sous la **GNU General Public License,
   version 3 ou ultérieure** (GPL-3.0-or-later) : voir [LICENSE](../../LICENSE)
-  et [NOTICE](../../NOTICE). Copyright (C) 2026 The USOS Authors.
+  et [NOTICE](../../NOTICE). Copyright (C) 2026 Maksymilian and the USOS Authors.
 - Les composants tiers conservent leurs propres licences. Ce sont des
   programmes distincts regroupés sur la clé ; voir
   `THIRD-PARTY-NOTICES.txt` et `LICENSES/` dans la version ainsi que

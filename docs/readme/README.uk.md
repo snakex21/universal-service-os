@@ -329,7 +329,7 @@ ISO-образи Windows, драйвери та інші сторонні нос
 
 - Власний код USOS поширюється за ліцензією **GNU General Public License
   версії 3 або новішої** (GPL-3.0-or-later): див. [LICENSE](../../LICENSE)
-  і [NOTICE](../../NOTICE). Copyright (C) 2026 The USOS Authors.
+  і [NOTICE](../../NOTICE). Copyright (C) 2026 Maksymilian and the USOS Authors.
 - Сторонні компоненти зберігають власні ліцензії. Це окремі програми,
   зібрані разом на флешці; див. `THIRD-PARTY-NOTICES.txt` і `LICENSES/`
   у випуску та [LICENSES-AUDIT.md](../LICENSES-AUDIT.md).

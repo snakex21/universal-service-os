@@ -325,7 +325,7 @@ parçası değildir.
 
 - USOS'un kendi kodu **GNU General Public License, sürüm 3 veya üzeri**
   (GPL-3.0-or-later) ile lisanslanmıştır: bkz. [LICENSE](../../LICENSE) ve
-  [NOTICE](../../NOTICE). Copyright (C) 2026 The USOS Authors.
+  [NOTICE](../../NOTICE). Copyright (C) 2026 Maksymilian and the USOS Authors.
 - Üçüncü taraf bileşenler kendi lisanslarını korur. Bunlar bellekte bir
   araya getirilmiş ayrı programlardır; sürümdeki `THIRD-PARTY-NOTICES.txt`
   ve `LICENSES/` ile [LICENSES-AUDIT.md](../LICENSES-AUDIT.md) dosyasına

@@ -330,7 +330,7 @@ Repositorys.
 
 - Der eigene Code von USOS steht unter der **GNU General Public License,
   Version 3 oder später** (GPL-3.0-or-later): siehe [LICENSE](../../LICENSE)
-  und [NOTICE](../../NOTICE). Copyright (C) 2026 The USOS Authors.
+  und [NOTICE](../../NOTICE). Copyright (C) 2026 Maksymilian and the USOS Authors.
 - Fremdkomponenten behalten ihre eigenen Lizenzen. Es sind eigenständige
   Programme, die auf dem Stick zusammengestellt werden; siehe
   `THIRD-PARTY-NOTICES.txt` und `LICENSES/` im Release sowie

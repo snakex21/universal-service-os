@@ -316,7 +316,7 @@ repositoriet.
 
 - USOS egen kod är licensierad under **GNU General Public License,
   version 3 eller senare** (GPL-3.0-or-later): se [LICENSE](../../LICENSE)
-  och [NOTICE](../../NOTICE). Copyright (C) 2026 The USOS Authors.
+  och [NOTICE](../../NOTICE). Copyright (C) 2026 Maksymilian and the USOS Authors.
 - Tredjepartskomponenter behåller sina egna licenser. De är separata
   program som samlats på minnet; se `THIRD-PARTY-NOTICES.txt` och
   `LICENSES/` i utgåvan samt [LICENSES-AUDIT.md](../LICENSES-AUDIT.md).

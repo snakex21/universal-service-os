@@ -332,7 +332,7 @@ tárolónak.
 
 - Az USOS saját kódja a **GNU General Public License 3-as vagy későbbi
   verziója** (GPL-3.0-or-later) alatt érhető el: lásd [LICENSE](../../LICENSE)
-  és [NOTICE](../../NOTICE). Copyright (C) 2026 The USOS Authors.
+  és [NOTICE](../../NOTICE). Copyright (C) 2026 Maksymilian and the USOS Authors.
 - A külső komponensek megtartják saját licencüket. Ezek a pendrive-on
   összegyűjtött, különálló programok; lásd a kiadásban a
   `THIRD-PARTY-NOTICES.txt` fájlt és a `LICENSES/` mappát, valamint a

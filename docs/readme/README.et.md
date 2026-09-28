@@ -322,7 +322,7 @@ kunagi hoidla osa.
 
 - USOS-i enda kood on litsentsitud **GNU General Public License'i versiooni
   3 või uuema** alusel (GPL-3.0-or-later): vt [LICENSE](../../LICENSE) ja
-  [NOTICE](../../NOTICE). Copyright (C) 2026 The USOS Authors.
+  [NOTICE](../../NOTICE). Copyright (C) 2026 Maksymilian and the USOS Authors.
 - Kolmandate osapoolte komponendid säilitavad oma litsentsid. Need on
   pulgal koondatud eraldiseisvad programmid; vt väljalaskes
   `THIRD-PARTY-NOTICES.txt` ja `LICENSES/` ning

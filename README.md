@@ -305,7 +305,7 @@ repository.
 
 - USOS's own code is licensed under the **GNU General Public License,
   version 3 or later** (GPL-3.0-or-later): see [LICENSE](LICENSE) and
-  [NOTICE](NOTICE). Copyright (C) 2026 The USOS Authors.
+  [NOTICE](NOTICE). Copyright (C) 2026 Maksymilian and the USOS Authors.
 - Third-party components keep their own licences. They are separate
   programs aggregated on the stick; see `THIRD-PARTY-NOTICES.txt` and
   `LICENSES/` in the release and [docs/LICENSES-AUDIT.md](docs/LICENSES-AUDIT.md).

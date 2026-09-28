@@ -355,7 +355,7 @@ run on real hardware:
 
 USOS itself is free software under the GNU General Public License, version
 3 or later (`GPL-3.0-or-later`): `LICENSE` and `NOTICE` in the release and
-the repository ("Copyright (C) 2026 The USOS Authors"). The third-party
+the repository ("Copyright (C) 2026 Maksymilian and the USOS Authors"). The third-party
 components are separate programs aggregated with USOS and keep their own
 licences (`THIRD-PARTY-NOTICES.txt`, `LICENSES/`). Contributions are
 accepted under `CONTRIBUTING.md`.

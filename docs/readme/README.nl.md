@@ -324,7 +324,7 @@ uit van de repository.
 
 - De eigen code van USOS valt onder de **GNU General Public License,
   versie 3 of later** (GPL-3.0-or-later): zie [LICENSE](../../LICENSE) en
-  [NOTICE](../../NOTICE). Copyright (C) 2026 The USOS Authors.
+  [NOTICE](../../NOTICE). Copyright (C) 2026 Maksymilian and the USOS Authors.
 - Componenten van derden behouden hun eigen licenties. Het zijn aparte
   programma's die samen op de stick staan; zie `THIRD-PARTY-NOTICES.txt` en
   `LICENSES/` in de release en [LICENSES-AUDIT.md](../LICENSES-AUDIT.md).

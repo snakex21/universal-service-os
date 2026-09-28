@@ -365,7 +365,7 @@ Remaining GAPs:
   trademarks; USOS is not affiliated with or endorsed by Microsoft.
 - **G16 USOS's own licence: closed (2026-09-28).** USOS is
   `GPL-3.0-or-later`: `LICENSE` (full GPL-3.0 text) and `NOTICE`
-  ("Copyright (C) 2026 The USOS Authors", SPDX line, scope) at the
+  ("Copyright (C) 2026 Maksymilian and the USOS Authors", SPDX line, scope) at the
   repository root; `build-info.ini` records `license=GPL-3.0-or-later`;
   contributions under `CONTRIBUTING.md` (contributor licence grant that
   also allows other licence terms). Source files carry no per-file headers

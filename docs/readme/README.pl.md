@@ -328,7 +328,7 @@ do repozytorium.
 
 - Własny kod USOS jest objęty licencją **GNU General Public License
   w wersji 3 lub nowszej** (GPL-3.0-or-later): zobacz [LICENSE](../../LICENSE)
-  i [NOTICE](../../NOTICE). Copyright (C) 2026 The USOS Authors.
+  i [NOTICE](../../NOTICE). Copyright (C) 2026 Maksymilian and the USOS Authors.
 - Komponenty zewnętrzne zachowują własne licencje. To osobne programy,
   zebrane razem na pendrivie; zobacz `THIRD-PARTY-NOTICES.txt` i `LICENSES/`
   w wydaniu oraz [LICENSES-AUDIT.md](../LICENSES-AUDIT.md).

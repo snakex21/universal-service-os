@@ -328,7 +328,7 @@ ISO образи на Windows, драйвери и други носители �
 
 - Собственият код на USOS е лицензиран под **GNU General Public License,
   версия 3 или по-нова** (GPL-3.0-or-later): вижте [LICENSE](../../LICENSE)
-  и [NOTICE](../../NOTICE). Copyright (C) 2026 The USOS Authors.
+  и [NOTICE](../../NOTICE). Copyright (C) 2026 Maksymilian and the USOS Authors.
 - Компонентите на трети страни запазват собствените си лицензи. Те са
   отделни програми, събрани заедно на флашката; вижте
   `THIRD-PARTY-NOTICES.txt` и `LICENSES/` в изданието и

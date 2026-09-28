@@ -324,7 +324,7 @@ nisu dio repozitorija.
 
 - Vlastiti kod USOS-a licenciran je pod **GNU General Public License,
   verzija 3 ili novija** (GPL-3.0-or-later): pogledajte [LICENSE](../../LICENSE)
-  i [NOTICE](../../NOTICE). Copyright (C) 2026 The USOS Authors.
+  i [NOTICE](../../NOTICE). Copyright (C) 2026 Maksymilian and the USOS Authors.
 - Komponente trećih strana zadržavaju vlastite licence. To su zasebni
   programi skupljeni na memoriji; pogledajte `THIRD-PARTY-NOTICES.txt`
   i `LICENSES/` u izdanju te [LICENSES-AUDIT.md](../LICENSES-AUDIT.md).

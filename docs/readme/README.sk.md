@@ -322,7 +322,7 @@ repozitára.
 
 - Vlastný kód USOS je licencovaný pod **GNU General Public License verzie 3
   alebo novšej** (GPL-3.0-or-later): pozri [LICENSE](../../LICENSE)
-  a [NOTICE](../../NOTICE). Copyright (C) 2026 The USOS Authors.
+  a [NOTICE](../../NOTICE). Copyright (C) 2026 Maksymilian and the USOS Authors.
 - Komponenty tretích strán si ponechávajú vlastné licencie. Sú to samostatné
   programy zhromaždené na USB kľúči; pozri `THIRD-PARTY-NOTICES.txt`
   a `LICENSES/` vo vydaní a [LICENSES-AUDIT.md](../LICENSES-AUDIT.md).

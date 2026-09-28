@@ -339,7 +339,7 @@ Windows 7 SP1 μέσω του δότη PE10), βρίσκονται στις
 - Ο δικός κώδικας του USOS διατίθεται με άδεια **GNU General Public
   License, έκδοση 3 ή νεότερη** (GPL-3.0-or-later): δείτε
   [LICENSE](../../LICENSE) και [NOTICE](../../NOTICE). Copyright (C) 2026
-  The USOS Authors.
+  Maksymilian and the USOS Authors.
 - Τα στοιχεία τρίτων διατηρούν τις δικές τους άδειες. Είναι ξεχωριστά
   προγράμματα που συγκεντρώνονται στο στικ· δείτε
   `THIRD-PARTY-NOTICES.txt` και `LICENSES/` στην έκδοση και

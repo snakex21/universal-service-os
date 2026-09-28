@@ -329,7 +329,7 @@ saugyklos dalis.
 
 - Paties USOS kodas licencijuojamas pagal **GNU General Public License
   3 ar vėlesnę versiją** (GPL-3.0-or-later): žr. [LICENSE](../../LICENSE) ir
-  [NOTICE](../../NOTICE). Copyright (C) 2026 The USOS Authors.
+  [NOTICE](../../NOTICE). Copyright (C) 2026 Maksymilian and the USOS Authors.
 - Trečiųjų šalių komponentai išlaiko savo licencijas. Tai atskiros
   programos, sujungtos atmintinėje; žr. laidoje esančius
   `THIRD-PARTY-NOTICES.txt` ir `LICENSES/` bei
