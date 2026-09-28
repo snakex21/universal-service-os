@@ -14,6 +14,12 @@ def build(root=ROOT, intel_profile=False):
     # Keep the physically successful binaries: changing the installer must not
     # silently rebuild or alter firstboot, certificates or the driver package.
     frozen = root / 'artifacts/vista/hardware-success-v11-20260920-235629'
+    # Git-ignored (/artifacts/) but a REQUIRED build input: never clean it up
+    # (docs/HANDOFF-2026-09-28-release.md).
+    if not (frozen / 'manifest.json').is_file():
+        raise SystemExit('Missing required build input ' + str(frozen) + ': the frozen Vista v11 payload '
+                         '(git-ignored, must never be cleaned up). Restore it from a backup, e.g. '
+                         'zig-out/protected-build-inputs/artifacts/vista/ (docs/HANDOFF-2026-09-28-release.md).')
     manifest = json.loads((frozen / 'manifest.json').read_text(encoding='utf-8'))
     files = []
     for relative, expected in manifest['sha256'].items():
