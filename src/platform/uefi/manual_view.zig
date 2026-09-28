@@ -784,12 +784,15 @@ pub const FormScreen = struct {
         if (surface == null) return self.redraw();
         var u = beginPartial() orelse return;
         const g = gui.form.geometry(&u, self.spec, self.first);
-        if (g.first != self.first or g.list.visible != self.geometry.list.visible) {
+        const help_moved = if (g.help) |h| (if (self.geometry.help) |old| h.h != old.h or h.y != old.y else true) else self.geometry.help != null;
+        if (g.first != self.first or g.list.visible != self.geometry.list.visible or help_moved) {
             endPartial();
             return self.redraw();
         }
         self.geometry = g;
         gui.form.drawRows(&u, g, self.spec);
+        // The help panel follows the selection (it was left stale before).
+        if (g.help) |rect| gui.menu_screens.drawHelp(&u, rect, self.spec.help.?);
         if (g.side) |rect| if (self.side) |draw| draw(&u, rect);
         endPartial();
     }

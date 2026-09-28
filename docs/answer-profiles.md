@@ -40,9 +40,98 @@ bad values are refused with the field and the line, never the value.
 | `edition` | edition Setup installs, for every system without its own | optional, up to 64 ASCII characters; see "Edition" below |
 | `edition.<system-id>` | edition for one system (`edition.windows-7=Professional`) | up to 8; wins over `edition` |
 | `disable_wer` | Vista+: Windows Error Reporting off (`Microsoft-Windows-ErrorReportingCore/DisableWER=1`, specialize) | default `no` |
+| `systems` | which systems offer the profile (see "Use for") | comma-separated catalog ids (`windows-vista`, `ubuntu`) and groups `windows`, `windows-nt5`, `windows-nt6`, `linux`; absent: see below |
+| tweaks | `skip_games`, `skip_msn`, `hide_outlook_express`, `classic_start`, `no_balloon_tips`, `disable_uac`, `no_sidebar`, `no_welcome_center`, `no_hibernation`, `show_extensions`, `show_hidden`, `no_autorun` (yes/no); `theme` (`default`, `classic`, `basic`); `display` (`auto`, `1024x768`, `1280x1024`, `1920x1080`) | default off / `default` / `auto`; see "Tweaks" |
 
 The password (and, with `remember_key=yes`, the keys) are plain text on
 the stick. The menu never shows them in lists or logs.
+
+`systems` and the tweaks are written only when set, so a profile without
+them stays readable by the builds before 2026-09-28 (they refuse unknown
+keys).
+
+### Use for (`systems=`)
+
+`src/flow/answer/applies.zig`. The answer screen lists only the profiles
+offered for its system (`answer_profiles.filter`); every file is still
+read, so a new name never overwrites another system's profile.
+
+- `systems=` set: the listed ids and groups (`windows` = every Windows with
+  a generated answer, `windows-nt5` = 2000/XP/2003/XP x64,
+  `windows-nt6` = Vista and newer, `linux` = Ubuntu, Debian, Fedora).
+- Absent (a profile saved before the field existed): every Windows, never
+  Linux. One exception, a read-time default: when the profile's only
+  per-system edition names one Windows, it was made there (the editor stores
+  the edition of the system it was opened from), so it applies to that
+  system only. The X470 stick's `vista-ultimate.ini` (user Retro, no key,
+  `edition.windows-vista=Ultimate`) is therefore offered for Vista only.
+  Saving a profile in the editor writes `systems=` explicitly.
+- The editor's "Use for" row: "Only <system>" (the default for a new
+  profile), "Every Windows" or "Every Linux installer", "Windows and Linux";
+  a stored list that is none of these is kept and shown as it is.
+
+### Missing answers (warnings before the start)
+
+`applies.missing`: the profile row gets an "Incomplete" badge (warning
+tone) with the reason in the help panel, and the summary shows the same
+note. The start is not blocked.
+
+- 2000 / XP / 2003: no product key for this system (`key.<id>` or `key`,
+  also a key typed this boot): Setup stops on the product key page.
+- Server 2008 and newer: the password does not meet the default Server
+  policy (7+ characters, three of upper case, lower case, digits,
+  symbols): Setup stops on the Administrator password page.
+
+### Tweaks
+
+Optional, off by default (nothing in the Win10 defaults suggested
+otherwise). `schema.tweak_support` is the one table of where each tweak is
+rendered; everywhere else the tweak writes nothing, and the editor's
+"Appearance and extras" section offers only the tweaks of its system.
+Windows 2000 has none (no `reg.exe` in its base system).
+
+| tweak | XP | 2003 | Vista | 7 | 8 .. 11, Server 2012+ | how |
+|---|---|---|---|---|---|---|
+| `skip_games` | yes | | yes | yes | | XP `[Components]` freecell, hearts, minesweeper, pinball, solitaire, spider, zonegames `=Off`; Vista `pkgmgr /uu:InboxGames`, 7 `dism /Disable-Feature /FeatureName:InboxGames` (specialize) |
+| `skip_msn` | yes | yes | | | | `[Components]` `msnexplr=Off` (XP), `msmsgs=Off` |
+| `hide_outlook_express` | yes | yes | | | | `[Components]` `OEAccess=Off` (entry points; the program stays) |
+| `classic_start` | yes | | | | | `[Shell] DefaultStartPanelOff=Yes` |
+| `theme=classic` | yes | | | yes | | XP `[Shell] DefaultThemesOff=Yes`; 7 `HKLM\...\Themes InstallTheme` = `%WINDIR%\Resources\Ease of Access Themes\classic.theme` (specialize; read by the first-logon theme setup of every new user; `Themes/CustomDefaultThemeFile` was ignored without Aero in the VirtualBox test) |
+| `theme=basic` | | | | yes | | 7 `basic.theme` (Windows 7 Basic); Vista has no reliable file for it |
+| `no_balloon_tips` | yes | yes | | | | Default User `Explorer\Advanced EnableBalloonTips=0`; XP also `Applets\Tour RunCount=0` |
+| `display` | yes | yes | | | | `[Display] BitsPerPel=32 Xresolution Yresolution` |
+| `disable_uac` | | | yes | yes | | `Microsoft-Windows-LUA-Settings/EnableLUA=false` (specialize; also 2008 / 2008 R2) |
+| `no_sidebar` | | | yes | yes | | policy `HKLM\...\Policies\Windows\Sidebar TurnOffSidebar=1` |
+| `no_welcome_center` | | | yes | | | Default User `Run\WindowsWelcomeCenter` removed (7 does not open Getting Started at logon) |
+| `no_hibernation` | | | yes | yes | | `powercfg.exe -h off` |
+| `show_extensions` | yes | yes | yes | yes | yes | Default User `Explorer\Advanced HideFileExt=0` |
+| `show_hidden` | yes | yes | yes | yes | yes | Default User `Explorer\Advanced Hidden=1` |
+| `no_autorun` | yes | yes | yes | yes | yes | `HKLM\...\Policies\Explorer NoDriveTypeAutoRun=255` (every drive type, KB967715) |
+
+Client-only tweaks (games, sidebar, welcome, hibernation, theme) are not
+rendered for the Server releases of the same schema level.
+
+- **NT5**: `nt5.zig` adds `tweaks=<tokens>` and `display=WxH` to the
+  rendered settings (profile mode only; `usos-xp.ini` refuses them) only
+  when set, so a default profile gives the same settings, `WINNT.SIF` and
+  accounts script as before (byte identity kept by the goldens).
+  `usos_xp_settings_sif` writes `[Components]`, `[Shell]`, `[Display]`;
+  `usos_xp_settings_accounts` appends the registry lines to
+  `usos-users.cmd` (run hidden at setup end by `pae.exe` on XP, by
+  `usos-setup.cmd` on 2003/XP x64): HKLM directly, the Explorer values in
+  the Default User hive (`reg load` of `<ProfilesDirectory>\<DefaultUserProfile>\NTUSER.DAT`,
+  read from `ProfileList`), from which every new account's profile is made.
+- **6.x+**: `Microsoft-Windows-Deployment` `RunSynchronous` in specialize
+  (as SYSTEM, before OOBE creates the accounts): HKLM policies, `powercfg`,
+  the Games feature, then `reg load HKU\USOSDefault
+  C:\Users\Default\NTUSER.DAT`, the Explorer values, `reg unload`. Every
+  command stays under the schema's 259-character `Path` limit. The DISM
+  / `offlineServicing` package route is not used (the renderer has no
+  servicing pass; package identities are version specific).
+- **Display and VGA**: `[Display]` is applied by Setup only when the display
+  driver offers that mode. Without a display driver (the VGA driver, e.g.
+  XP through CSMWrap without a GOP-capable driver) Windows keeps its basic
+  mode; "Automatic" writes nothing.
 
 ### Edition
 
@@ -248,10 +337,15 @@ editor was opened from** (`key.<system-id>`), "Remember the key on this
 stick", local account and, for Windows 11, the three requirement bypasses
 and "set up without network"; for Vista and newer "Protection and
 updates" and "Turn off error reporting", for Vista/7 (and 2008/2008 R2)
-"network location". Rules are the model's, checked live (a bad
+"network location"; then "Use for" and the "Appearance and extras"
+section (a form section heading row, never selected) with the tweaks of
+that system. Rules are the model's, checked live (a bad
 value turns the row red and the help panel says why; empty required fields
 turn red on Save). A key typed with "Remember" off is kept in memory for
 this boot only (`answer_profiles` session copy) and never written.
+
+The Go installer has no profile editor: profiles are made and edited in
+the UEFI menu only.
 
 The summary shows "Profile <name>: <user>, <computer> (<arch>)". For an
 answer file from `Unattended\` it warns when all its components are for
@@ -314,6 +408,17 @@ separate step with a Vista/7 hardware test).
   file deleted, no key in the log, missing file stops), the mismatch warning
   on the user's Schneegans file when `zig-out/usb` has it.
 
+- tweaks (`check_tweaks`): `tweaks.matrix.txt`, one golden with the lines
+  each tweak adds on each system (every tweak x every version, from
+  `minimal.profile.ini` plus that one tweak; NT5: merged `WINNT.SIF` and
+  `usos-users.cmd`); a system outside the tweak's row must render byte for
+  byte the baseline (no leak), one where it applies must show its marker;
+  `tweaks.<system>.<arch>.{xml,sif-cmd.txt}` with every tweak on
+  (`testdata/tweaks.profile.ini`), each XML parsed, checked by `zig
+  check-xml` and by `schema.check` inside `root.render`;
+  `tweaks-basic.windows-7.x86.xml`. Zig: `schema` (one support row per
+  tweak, none for 2000), `autounattend` (tweaks per version, command
+  length), `nt5`, `applies` (filter, legacy default, missing answers).
 - goldens `edition.windows-7.{amd64,x86}.xml` (profile
   `testdata/edition.profile.ini`, `edition.windows-7=Windows 7
   Profesjonalny` -> image 3 of `testdata/win7-sp1-x64-pl.install.xml`, the

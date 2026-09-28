@@ -47,6 +47,15 @@ func BootKeyHash(name string) uint32 {
 	return hash
 }
 
+func uefiOnlyKey(key string) bool {
+	for _, prefix := range uefiOnlyPrefixes {
+		if strings.HasPrefix(strings.TrimPrefix(key, BootKeyPrefix), prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 // GenerateZigTable renders the English boot menu strings compiled into the
 // EFI, the BIOS Core and usos-fb-ui, with the key enum and name hashes used
 // to read lang.bin. boot.lx.* strings go to GenerateZigLinuxTable instead.
@@ -69,6 +78,21 @@ func generateZigStrings(linux bool) ([]byte, error) {
 		if strings.HasPrefix(key, LinuxKeyPrefix) == linux {
 			keys = append(keys, key)
 		}
+	}
+	// The strings the BIOS Core shows come first (each group sorted): the
+	// size-limited Core keeps only the first bios_count slots of its tables.
+	biosCount := len(keys)
+	if !linux {
+		shown, uefiOnly := make([]string, 0, len(keys)), make([]string, 0, len(keys))
+		for _, key := range keys {
+			if uefiOnlyKey(key) {
+				uefiOnly = append(uefiOnly, key)
+			} else {
+				shown = append(shown, key)
+			}
+		}
+		biosCount = len(shown)
+		keys = append(shown, uefiOnly...)
 	}
 	if len(keys) == 0 || len(keys) > 65535 {
 		return nil, fmt.Errorf("unexpected boot key count %d", len(keys))
@@ -110,15 +134,11 @@ func generateZigStrings(linux bool) ([]byte, error) {
 		b.WriteString("/// False for strings only the UEFI menu shows (left out of the BIOS Core).\n")
 		b.WriteString("pub const bios = [_]bool{\n")
 		for _, key := range keys {
-			used := true
-			for _, prefix := range uefiOnlyPrefixes {
-				if strings.HasPrefix(strings.TrimPrefix(key, BootKeyPrefix), prefix) {
-					used = false
-				}
-			}
-			fmt.Fprintf(&b, "    %v,\n", used)
+			fmt.Fprintf(&b, "    %v,\n", !uefiOnlyKey(key))
 		}
 		b.WriteString("};\n\n")
+		b.WriteString("/// The BIOS Core's strings are the first bios_count keys.\n")
+		fmt.Fprintf(&b, "pub const bios_count = %d;\n\n", biosCount)
 	}
 	b.WriteString("pub const english = [_][]const u8{\n")
 	for _, key := range keys {

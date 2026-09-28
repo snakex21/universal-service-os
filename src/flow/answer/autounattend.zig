@@ -12,6 +12,7 @@ const std = @import("std");
 const Profile = @import("profile.zig").Profile;
 const target = @import("target.zig");
 const tables = @import("tables.zig");
+const schema = @import("schema.zig");
 
 pub const Arch = target.Arch;
 pub const Family = target.Family;
@@ -161,6 +162,64 @@ fn setupComponent(w: *W, input: Input) !void {
     try endComponent(w);
 }
 
+/// The default user's hive while specialize runs (new accounts are
+/// created from it in oobeSystem), as in Schneegans' generator.
+const default_hive = "HKU\\USOSDefault";
+const explorer_advanced = "reg.exe add \"" ++ default_hive ++ "\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v {s} /t REG_DWORD /d {d} /f";
+
+/// The specialize commands of the profile for this version (Deployment
+/// RunSynchronous, run as SYSTEM before OOBE). Each command is at most 259
+/// characters (the schema's limit of Path).
+pub const Commands = struct {
+    items: [16][]const u8 = undefined,
+    storage: [16][200]u8 = undefined,
+    len: usize = 0,
+
+    fn add(self: *Commands, comptime format: []const u8, args: anytype) !void {
+        self.items[self.len] = try std.fmt.bufPrint(&self.storage[self.len], format, args);
+        self.len += 1;
+    }
+
+    pub fn slice(self: *const Commands) []const []const u8 {
+        return self.items[0..self.len];
+    }
+};
+
+pub fn specializeCommands(p: *const Profile, family: Family, out: *Commands) !void {
+    out.len = 0;
+    if (windows11(family) and p.no_network_oobe) try out.add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OOBE\" /v BypassNRO /t REG_DWORD /d 1 /f", .{});
+    const on = struct {
+        fn f(profile: *const Profile, tweak: schema.Tweak, fam: Family) bool {
+            return schema.tweakOn(profile, tweak, fam);
+        }
+    }.f;
+    // AutoRun and AutoPlay off on every drive type (KB967715: 0xFF).
+    if (on(p, .no_autorun, family)) try out.add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\" /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f", .{});
+    // Group Policy "Turn off Windows Sidebar" (Vista) / "Turn off desktop gadgets" (7).
+    if (on(p, .no_sidebar, family)) try out.add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Windows\\Sidebar\" /v TurnOffSidebar /t REG_DWORD /d 1 /f", .{});
+    if (on(p, .no_hibernation, family)) try out.add("powercfg.exe -h off", .{});
+    // Windows 7: the theme every new user gets at first logon (themeui's
+    // Active Setup reads InstallTheme). Themes/CustomDefaultThemeFile is
+    // not used: VirtualBox test 2026-09-28, Windows 7 SP1 without Aero
+    // ignored it and gave the user basic.theme; InstallTheme gave Classic.
+    const theme: ?[]const u8 = if (on(p, .theme_classic, family)) "classic" else if (on(p, .theme_basic, family)) "basic" else null;
+    if (theme) |name| try out.add("reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\" /v InstallTheme /t REG_EXPAND_SZ /d \"%WINDIR%\\Resources\\Ease of Access Themes\\{s}.theme\" /f", .{name});
+    if (on(p, .skip_games, family)) {
+        // The Games feature (InboxGames): pkgmgr on Vista, DISM on 7.
+        if (family.client() == .vista) {
+            try out.add("cmd.exe /c start /w pkgmgr.exe /uu:InboxGames /quiet /norestart", .{});
+        } else try out.add("dism.exe /Online /NoRestart /Disable-Feature /FeatureName:InboxGames", .{});
+    }
+    const hive = on(p, .show_extensions, family) or on(p, .show_hidden, family) or on(p, .no_welcome_center, family);
+    if (hive) {
+        try out.add("reg.exe load \"" ++ default_hive ++ "\" \"C:\\Users\\Default\\NTUSER.DAT\"", .{});
+        if (on(p, .show_extensions, family)) try out.add(explorer_advanced, .{ "HideFileExt", 0 });
+        if (on(p, .show_hidden, family)) try out.add(explorer_advanced, .{ "Hidden", 1 });
+        if (on(p, .no_welcome_center, family)) try out.add("reg.exe delete \"" ++ default_hive ++ "\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /v WindowsWelcomeCenter /f", .{});
+        try out.add("reg.exe unload \"" ++ default_hive ++ "\"", .{});
+    }
+}
+
 fn specialize(w: *W, input: Input) !void {
     const p = input.profile;
     try w.writeAll("  <settings pass=\"specialize\">\n");
@@ -181,10 +240,17 @@ fn specialize(w: *W, input: Input) !void {
         try element(w, 3, "DisableWER", "1");
         try endComponent(w);
     }
-    if (windows11(input.family) and p.no_network_oobe) {
+    if (schema.tweakOn(p, .disable_uac, input.family)) {
+        try component(w, "Microsoft-Windows-LUA-Settings", input.arch);
+        try element(w, 3, "EnableLUA", "false");
+        try endComponent(w);
+    }
+    var commands: Commands = .{};
+    try specializeCommands(p, input.family, &commands);
+    if (commands.len > 0) {
         try component(w, "Microsoft-Windows-Deployment", input.arch);
         try open(w, 3, "RunSynchronous");
-        try runCommand(w, 4, "RunSynchronousCommand", 1, "reg.exe add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OOBE\" /v BypassNRO /t REG_DWORD /d 1 /f");
+        for (commands.slice(), 1..) |command, order| try runCommand(w, 4, "RunSynchronousCommand", order, command);
         try close(w, 3, "RunSynchronous");
         try endComponent(w);
     }
@@ -300,6 +366,44 @@ test "autounattend: Windows 11 bypasses only when chosen, only on 11" {
     const ten = try render(.{ .profile = &p, .family = .windows_10, .arch = .amd64 }, &buffer);
     try std.testing.expect(std.mem.indexOf(u8, ten, "LabConfig") == null);
     try std.testing.expect(std.mem.indexOf(u8, ten, "BypassNRO") == null);
+}
+
+fn allTweaks() !Profile {
+    var p = Profile{};
+    try p.name.set("A");
+    try p.user.set("Tester");
+    for (@import("profile.zig").tweak_fields) |field| p.flag(field).?.* = true;
+    p.theme = .classic;
+    p.display = .@"1024x768";
+    return p;
+}
+
+test "autounattend: tweaks per version, nothing for versions without them" {
+    const p = try allTweaks();
+    var buffer: [max_size]u8 = undefined;
+    const seven = try render(.{ .profile = &p, .family = .windows_7, .arch = .amd64 }, &buffer);
+    for ([_][]const u8{ "<EnableLUA>false</EnableLUA>", "NoDriveTypeAutoRun /t REG_DWORD /d 255", "TurnOffSidebar", "powercfg.exe -h off", "/FeatureName:InboxGames", "/v HideFileExt /t REG_DWORD /d 0", "/v Hidden /t REG_DWORD /d 1", "reg.exe unload", "Ease of Access Themes\\classic.theme" }) |k| {
+        errdefer std.debug.print("missing on 7: {s}\n", .{k});
+        try std.testing.expect(std.mem.indexOf(u8, seven, k) != null);
+    }
+    try std.testing.expect(std.mem.indexOf(u8, seven, "WindowsWelcomeCenter") == null);
+    try @import("xml_check.zig").wellFormed(seven);
+    const vista = try render(.{ .profile = &p, .family = .vista, .arch = .x86 }, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, vista, "pkgmgr.exe /uu:InboxGames") != null);
+    try std.testing.expect(std.mem.indexOf(u8, vista, "WindowsWelcomeCenter") != null);
+    try std.testing.expect(std.mem.indexOf(u8, vista, "Themes") == null);
+    const ten = try render(.{ .profile = &p, .family = .windows_10, .arch = .amd64 }, &buffer);
+    for ([_][]const u8{ "EnableLUA", "TurnOffSidebar", "powercfg", "InboxGames", "Themes", "WindowsWelcomeCenter" }) |k| {
+        errdefer std.debug.print("leaked to 10: {s}\n", .{k});
+        try std.testing.expect(std.mem.indexOf(u8, ten, k) == null);
+    }
+    try std.testing.expect(std.mem.indexOf(u8, ten, "HideFileExt") != null and std.mem.indexOf(u8, ten, "NoDriveTypeAutoRun") != null);
+    const r2 = try render(.{ .profile = &p, .family = .server_2008_r2, .arch = .amd64 }, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, r2, "<EnableLUA>false</EnableLUA>") != null);
+    for ([_][]const u8{ "TurnOffSidebar", "powercfg", "InboxGames", "Themes" }) |k| try std.testing.expect(std.mem.indexOf(u8, r2, k) == null);
+    var commands: Commands = .{};
+    try specializeCommands(&p, .windows_7, &commands);
+    for (commands.slice()) |command| try std.testing.expect(command.len <= 259);
 }
 
 test "autounattend: Vista and 7 OOBE answers per version" {

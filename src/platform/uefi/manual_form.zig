@@ -105,7 +105,7 @@ pub const Outcome = union(enum) {
     y_on: usize,
 };
 
-const max_fields = 32;
+const max_fields = 40;
 
 var items: [max_fields]gui.form.Item = undefined;
 var value_text: [max_fields][80]u8 = undefined;
@@ -146,7 +146,7 @@ fn refreshItems() void {
                 item.value = if (item.on) t(.form_on) else t(.form_off);
             },
             .stepper => item.value = std.fmt.bufPrint(&value_text[index], "{d}", .{field.number.?.*}) catch "",
-            .action => {},
+            .action, .section => {},
         }
         items[index] = item;
     }
@@ -230,7 +230,7 @@ fn trace(kind: []const u8, index: usize) void {
         .choice => if (field.index) |i| (if (i.* < field.options.len) field.options[i.*] else "") else "",
         .toggle => if (field.flag.?.*) "on" else "off",
         .stepper => std.fmt.bufPrint(&trace_number, "{d}", .{field.number.?.*}) catch "",
-        .action => "",
+        .action, .section => "",
     };
     view.traceForm(kind, std.fmt.bufPrint(&line, "index={d} label={s} value={s}", .{ index, field.label, value }) catch return);
 }
@@ -238,6 +238,17 @@ fn trace(kind: []const u8, index: usize) void {
 fn notifyChanged(index: usize) void {
     if (form_hooks) |h| if (h.changed) |f| f(h.context, index);
     trace("changed", index);
+}
+
+/// Section headings are never selected: the next selectable row from
+/// `index` in the direction of travel (wrapping), or `index` itself.
+fn selectable(fields: []const Field, index: usize, down: bool) usize {
+    var i = index;
+    for (0..fields.len) |_| {
+        if (fields[i].kind != .section) return i;
+        i = if (down) (i + 1) % fields.len else (i + fields.len - 1) % fields.len;
+    }
+    return index;
 }
 
 /// Runs the form until an action button, Back, or X/Y. `selected` is kept
@@ -248,6 +259,7 @@ pub fn run(title: []const u8, subtitle: []const u8, fields: []Field, hooks: ?Hoo
     form_hooks = hooks;
     editing = null;
     if (selected.* >= fields.len) selected.* = 0;
+    selected.* = selectable(fields, selected.*, true);
     screen = .{ .spec = .{ .title = title, .subtitle = subtitle, .items = &.{}, .side_w = if (hooks) |h| h.side_w else 0 }, .side = if (hooks) |h| h.side else null, .rehint = rehint };
     rebuild(selected.*);
     view.traceFormScreen(title);
@@ -302,12 +314,13 @@ pub fn run(title: []const u8, subtitle: []const u8, fields: []Field, hooks: ?Hoo
                 if (mouse.scroll != 0) {
                     const before = selected.*;
                     selected.* = usos.gui.selectable_list.stepLinearBy(null, fields.len, selected.*, mouse.scroll < 0, @abs(mouse.scroll));
+                    selected.* = selectable(fields, selected.*, mouse.scroll > 0);
                     if (before != selected.*) select(selected.*);
                     continue;
                 }
                 if (mouse.left_click) {
                     if (screen.hitRow(mouse.x, mouse.y)) |index| {
-                        if (!fields[index].enabled) continue;
+                        if (!fields[index].enabled or fields[index].kind == .section) continue;
                         selected.* = index;
                         select(index);
                         if (activate(selected)) |outcome| return outcome;
@@ -338,6 +351,11 @@ pub fn run(title: []const u8, subtitle: []const u8, fields: []Field, hooks: ?Hoo
                     },
                     else => {},
                 }
+                const down = switch (event) {
+                    .up, .end, .page_up => false,
+                    else => true,
+                };
+                selected.* = selectable(fields, selected.*, down);
                 if (before != selected.*) select(selected.*);
             },
         }
@@ -392,6 +410,7 @@ fn activate(selected: *usize) ?Outcome {
             trace("action", index);
             return .{ .action = field.id };
         },
+        .section => {},
     }
     return null;
 }

@@ -238,6 +238,122 @@ def check_linux() -> None:
     check('linux: xkb variant in kickstart', "keyboard --xlayouts='us (intl)'" in ks)
 
 
+# Where each tweak may appear (docs/answer-profiles.md "Tweaks"; an
+# independent copy of src/flow/answer/schema.zig tweak_support). Every other
+# system must render byte for byte what it renders without the tweak.
+NT6_ALL = {s for s, _ in NT6}
+NT5_BASE = {system: base for system, base, _ in NT5}
+TWEAKS = {
+    'skip_games=yes': {'windows-xp', 'windows-vista', 'windows-7'},
+    'skip_msn=yes': {'windows-xp', 'windows-server-2003'},
+    'hide_outlook_express=yes': {'windows-xp', 'windows-server-2003'},
+    'classic_start=yes': {'windows-xp'},
+    'theme=classic': {'windows-xp', 'windows-7'},
+    'theme=basic': {'windows-7'},
+    'no_balloon_tips=yes': {'windows-xp', 'windows-server-2003'},
+    'display=1280x1024': {'windows-xp', 'windows-server-2003'},
+    'disable_uac=yes': {'windows-vista', 'windows-7', 'windows-server-2008', 'windows-server-2008-r2'},
+    'no_sidebar=yes': {'windows-vista', 'windows-7'},
+    'no_welcome_center=yes': {'windows-vista'},
+    'no_hibernation=yes': {'windows-vista', 'windows-7'},
+    'show_extensions=yes': {'windows-xp', 'windows-server-2003'} | NT6_ALL,
+    'show_hidden=yes': {'windows-xp', 'windows-server-2003'} | NT6_ALL,
+    'no_autorun=yes': {'windows-xp', 'windows-server-2003'} | NT6_ALL,
+}
+# Text each tweak must bring where it applies (one marker per tweak).
+MARKERS = {
+    'skip_games=yes': ('minesweeper=Off', 'InboxGames'),
+    'skip_msn=yes': ('msmsgs=Off',),
+    'hide_outlook_express=yes': ('OEAccess=Off',),
+    'classic_start=yes': ('DefaultStartPanelOff=Yes',),
+    'theme=classic': ('DefaultThemesOff=Yes', 'classic.theme'),
+    'theme=basic': ('basic.theme',),
+    'no_balloon_tips=yes': ('EnableBalloonTips',),
+    'display=1280x1024': ('Xresolution=1280',),
+    'disable_uac=yes': ('<EnableLUA>false</EnableLUA>',),
+    'no_sidebar=yes': ('TurnOffSidebar',),
+    'no_welcome_center=yes': ('WindowsWelcomeCenter',),
+    'no_hibernation=yes': ('powercfg.exe -h off',),
+    'show_extensions=yes': ('HideFileExt',),
+    'show_hidden=yes': ('/v Hidden ',),
+    'no_autorun=yes': ('NoDriveTypeAutoRun',),
+}
+
+
+def render_any(profile: Path, system: str, arch: str, name: str) -> bytes | None:
+    """autounattend.xml, or for NT5 the merged WINNT.SIF + accounts script."""
+    out = OUT / name
+    r = tool('render', str(profile), system, arch, str(out))
+    check('render ' + name, r.returncode == 0, r.stderr.decode(errors='replace'))
+    if r.returncode != 0:
+        return None
+    if system in NT5_BASE:
+        sif, accounts = nt5_merge(out, NT5_BASE[system], name, True)
+        return sif + b'\n----- usos-users.cmd -----\n' + accounts
+    data = out.read_bytes()
+    check_xml(name, data, arch)
+    return data
+
+
+def check_tweaks() -> None:
+    import difflib
+    base_text = (DATA / 'minimal.profile.ini').read_text()
+    first: dict[str, str] = {}
+    for s, a in NT6:
+        first.setdefault(s, a)
+    systems = list(first.items()) + [('windows-xp', 'x86'), ('windows-2000', 'x86'), ('windows-server-2003', 'x86')]
+    baseline = {s: render_any(DATA / 'minimal.profile.ini', s, a, f'tw-base.{s}') for s, a in systems}
+    matrix = []
+    for tweak, where in TWEAKS.items():
+        profile = OUT / ('tw-' + tweak.replace('=', '-') + '.profile.ini')
+        profile.write_text(base_text + tweak + '\n')
+        for system, arch in systems:
+            data = render_any(profile, system, arch, f'tw-{tweak.replace("=", "-")}.{system}')
+            if data is None or baseline[system] is None:
+                continue
+            added = [line for line in difflib.unified_diff(baseline[system].decode().splitlines(), data.decode().splitlines(), lineterm='', n=0)
+                     if line[:1] in '+-' and not line.startswith(('+++', '---'))]
+            if system in where:
+                check(f'tweak {tweak} renders on {system}', bool(added) and any(m in data.decode() for m in MARKERS[tweak]), '\n'.join(added))
+            else:
+                check(f'tweak {tweak} leaves {system} unchanged', data == baseline[system], '\n'.join(added))
+            for line in added:
+                matrix.append(f'{tweak}\t{system}\t{line}')
+    golden('tweaks.matrix.txt', ('\n'.join(matrix) + '\n').encode())
+    # Every tweak on: one golden per system; nothing a version lacks.
+    for system, arch in systems:
+        data = render_any(DATA / 'tweaks.profile.ini', system, arch, f'tweaks.{system}.{arch}')
+        if data is None:
+            continue
+        golden(f'tweaks.{system}.{arch}.{"sif-cmd.txt" if system in NT5_BASE else "xml"}', data)
+        text = data.decode()
+        for tweak, where in TWEAKS.items():
+            if tweak == 'theme=basic' or tweak.startswith('display='):
+                continue
+            present = any(m in text for m in MARKERS[tweak])
+            check(f'all tweaks: {tweak} {"on" if system in where else "absent"} on {system}', present == (system in where))
+    # Windows 7 basic theme; the Vista XML carries the Vista commands.
+    basic = OUT / 'tw-basic.profile.ini'
+    basic.write_text(base_text + 'theme=basic\n')
+    data = render_any(basic, 'windows-7', 'x86', 'tweaks-basic.windows-7.x86.xml')
+    if data is not None:
+        golden('tweaks-basic.windows-7.x86.xml', data)
+    vista = (OUT / 'tweaks.windows-vista.x86').read_text()
+    check('Vista games through pkgmgr, 7 through DISM', 'pkgmgr.exe /uu:InboxGames' in vista and 'dism.exe' not in vista
+          and 'dism.exe /Online /NoRestart /Disable-Feature /FeatureName:InboxGames' in (OUT / 'tweaks.windows-7.x86').read_text())
+    check('specialize commands are at most 259 characters', all(len(p.text or '') <= 259 for f in OUT.glob('tweaks.windows-*') if f.suffix == '' and f.read_bytes().startswith(b'<?xml')
+                                                               for p in ET.fromstring(f.read_bytes()).iter(NS + 'Path')))
+    xp = (OUT / 'tweaks.windows-xp.x86').read_text()
+    check('XP tweaks in the normalized settings only when set', 'tweaks=games,msn_explorer,messenger,outlook_express,classic_start,classic_theme,balloons,tour,extensions,hidden,autorun' in xp and 'display=1024x768' in xp)
+    bad = OUT / 'bad-tweak.ini'
+    bad.write_bytes(b'user=Bob\ntweaks=games\n')
+    check('usos-xp.ini refuses the tweak keys', sh(f"usos_xp_settings_load '{posix(bad)}' '{posix(OUT / 'bad.out')}' 00000415").returncode == 1)
+    bad.write_bytes(b'user=Bob\nfamily=xp\ntweaks=games,rm_rf\n')
+    check('profile mode refuses an unknown tweak', sh(f"usos_xp_settings_load '{posix(bad)}' '{posix(OUT / 'bad.out')}' 00000415 profile").returncode == 1)
+    bad.write_bytes(b'user=Bob\nfamily=xp\ndisplay=640x480\n')
+    check('profile mode refuses an unknown display mode', sh(f"usos_xp_settings_load '{posix(bad)}' '{posix(OUT / 'bad.out')}' 00000415 profile").returncode == 1)
+
+
 def main() -> int:
     if SH is None:
         print('sh not found')
@@ -377,6 +493,7 @@ def main() -> int:
     check('WORK plan: refuses another format', r.returncode == 1)
 
     check_linux()
+    check_tweaks()
 
     # Architecture-mismatch warning on a user's (Schneegans) amd64-only file.
     for candidate in (ROOT / 'zig-out' / 'usb' / 'Systems' / 'Windows' / 'Windows 11' / 'Unattended').glob('*.xml') if (ROOT / 'zig-out' / 'usb').exists() else []:

@@ -1,0 +1,71 @@
+[Data]
+msdosinitiated="1"
+floppyless="1"
+UseSignatures="yes"
+InstallDir="\WINDOWS"
+EulaComplete="1"
+winntupgrade="no"
+win9xupgrade="no"
+OriSrc="C:\"
+OriTyp="5"
+[Unattended]
+UnattendMode=DefaultHide
+OemSkipEula=Yes
+OemPreinstall=No
+Repartition=No
+FileSystem=LeaveAlone
+TargetPath=\WINDOWS
+WaitForReboot=No
+UnattendSwitch=Yes
+[GuiUnattended]
+OEMSkipRegional=1
+OemSkipWelcome=1
+TimeZone=100
+AdminPassword="Test123!"
+EncryptedAdminPassword=No
+AutoLogon=Yes
+AutoLogonCount=1
+[UserData]
+FullName="Tester"
+OrgName=""
+ComputerName=USOS-XP
+[Identification]
+JoinWorkgroup=WORKGROUP
+[Networking]
+InstallDefaultComponents=Yes
+[LicenseFilePrintData]
+AutoMode=PerServer
+AutoUsers=5
+[RegionalSettings]
+LanguageGroup="2"
+SystemLocale=00000415
+UserLocale=00000415
+InputLocale=0415:00000415
+[Components]
+msmsgs=Off
+OEAccess=Off
+[Display]
+BitsPerPel=32
+Xresolution=1024
+Yresolution=768
+
+----- usos-users.cmd -----
+@echo off
+rem USOS: local administrator accounts from usos-xp.ini, run hidden by pae.exe at setup end.
+set USOS_LOG=%SystemRoot%\usos-users.log
+net user "Tester" "Test123!" /add >> "%USOS_LOG%" 2>&1
+for %%G in (Administrators Administratorzy Administratoren Administrateurs Administradores Administratori) do net localgroup %%G "Tester" /add >> "%USOS_LOG%" 2>&1
+reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f >> "%USOS_LOG%" 2>&1
+rem USOS profile: Explorer settings for new users (Default User hive).
+set USOS_PD=
+set USOS_DU=
+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v ProfilesDirectory 2^>nul') do if /i "%%A"=="REG_EXPAND_SZ" call set "USOS_PD=%%B"
+for /f "tokens=2*" %%A in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" /v DefaultUserProfile 2^>nul') do if /i "%%A"=="REG_SZ" set "USOS_DU=%%B"
+if not defined USOS_PD set "USOS_PD=%SystemDrive%\Documents and Settings"
+if not defined USOS_DU set "USOS_DU=Default User"
+reg load HKU\USOSDEF "%USOS_PD%\%USOS_DU%\NTUSER.DAT" >> "%USOS_LOG%" 2>&1
+reg add "HKU\USOSDEF\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v HideFileExt /t REG_DWORD /d 0 /f >> "%USOS_LOG%" 2>&1
+reg add "HKU\USOSDEF\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Hidden /t REG_DWORD /d 1 /f >> "%USOS_LOG%" 2>&1
+reg add "HKU\USOSDEF\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v EnableBalloonTips /t REG_DWORD /d 0 /f >> "%USOS_LOG%" 2>&1
+reg unload HKU\USOSDEF >> "%USOS_LOG%" 2>&1
+exit /b 0

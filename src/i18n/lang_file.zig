@@ -24,7 +24,12 @@ pub const linux_path = "/etc/usos/lang.bin";
 pub const magic = "USOSLANG";
 pub const format_version: u16 = 1;
 pub const header_size: usize = 28;
-pub const key_count = strings.english.len;
+/// The BIOS Core keeps only the strings it shows: the generator puts them
+/// first (strings.bios_count), so its tables end there. The UEFI menu and
+/// usos-fb-ui keep every key.
+pub const key_count = if (with_linux_strings) strings.english.len else strings.bios_count;
+/// Name hashes of the kept keys.
+const kept_hashes = strings.hashes[0..key_count];
 pub const linux_key_count = linux_strings.english.len;
 pub const max_blob_bytes: usize = 256 * 1024;
 
@@ -48,14 +53,15 @@ pub const Coverage = struct {
     }
 };
 
-/// Built-in English. The BIOS Core keeps only the strings it can show.
-const english_values = if (with_linux_strings) strings.english else blk: {
-    var values = strings.english;
+/// Built-in English (the BIOS Core: only the strings it can show).
+const english_values: [key_count][]const u8 = strings.english[0..key_count].*;
+
+comptime {
+    // The BIOS strings are exactly the first bios_count keys.
     for (strings.bios, 0..) |used, index| {
-        if (!used) values[index] = "";
+        if (used != (index < strings.bios_count)) @compileError("boot_strings.zig: BIOS keys must come first (regenerate with usos-i18n-gen)");
     }
-    break :blk values;
-};
+}
 
 pub const Table = struct {
     /// The validated blob the values point into.
@@ -103,7 +109,7 @@ pub const Table = struct {
             // Unknown keys (newer installer) are ignored; undrawable values stay English.
             if (!cover.covers(value)) continue;
             const hash = nameHash(name);
-            if (indexOfHash(&strings.hashes, hash)) |slot| {
+            if (indexOfHash(kept_hashes, hash)) |slot| {
                 table.values[slot] = value_offset;
             } else if (with_linux_strings) {
                 if (indexOfHash(&linux_strings.hashes, hash)) |slot| table.linux_values[slot] = value_offset;
@@ -126,7 +132,10 @@ pub const Table = struct {
     }
 
     pub fn get(self: *const Table, key: Key) []const u8 {
-        return self.at(self.values[@intFromEnum(key)]) orelse english_values[@intFromEnum(key)];
+        const index = @intFromEnum(key);
+        // A UEFI-only string in the BIOS Core: empty, as before.
+        if (index >= key_count) return "";
+        return self.at(self.values[index]) orelse english_values[index];
     }
 
     pub fn languageCode(self: *const Table) []const u8 {

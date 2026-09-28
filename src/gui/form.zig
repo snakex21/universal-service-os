@@ -9,6 +9,7 @@
 //!   toggle   switch pill
 //!   stepper  number between chevrons; Left/Right step it (colour channels)
 //!   action   button row (Save, Cancel, Delete)
+//!   section  heading of a group of rows; never selected
 //!
 //! Pure drawing and hit testing; values are formatted by the caller. The
 //! UEFI loop is src/platform/uefi/manual_form.zig.
@@ -23,7 +24,7 @@ const Ui = ui_mod.Ui;
 const Rect = ui_mod.Rect;
 const RowState = ui_mod.RowState;
 
-pub const Kind = enum { text, choice, toggle, stepper, action };
+pub const Kind = enum { text, choice, toggle, stepper, action, section };
 
 pub const Item = struct {
     kind: Kind,
@@ -154,6 +155,13 @@ fn drawItem(ui: *const Ui, rect: Rect, spec: Spec, index: usize) void {
         .hover => theme.panel_alt,
         .normal => theme.panel,
     };
+    if (item.kind == .section) {
+        // A group heading: accent text on the panel, a rule under it.
+        const pad = ui.px(14);
+        _ = ui.fonts.drawFit(ui.surface, rect.x + pad, ui.fonts.centeredTop(.strong, rect.y + rect.h / 2), rect.w -| 2 * pad, .strong, item.label, theme.accent, theme.panel);
+        ui.surface.fillRect(rect.x + pad, rect.bottom() -| ui.line(2), rect.w -| 2 * pad, ui.line(1), theme.border);
+        return;
+    }
     if (item.kind == .action) {
         const size = ui.buttonSize("", item.label);
         const w = @min(@max(size.w, rect.w / 3), rect.w);
@@ -217,7 +225,7 @@ fn drawItem(ui: *const Ui, rect: Rect, spec: Spec, index: usize) void {
             paint.circle(ui.surface, paint.s(knob_x) + @divTrunc(paint.s(knob), 2), paint.s(center), @divTrunc(paint.s(knob), 2), if (item.on) theme.on_accent else theme.muted, on_fill);
             _ = ui.fonts.drawFit(ui.surface, x + w + ui.px(12), ui.fonts.centeredTop(.body, center), value.right() -| x -| w -| ui.px(12), .body, item.value, if (item.enabled) theme.muted else theme.disabled_text, fill);
         },
-        .action => unreachable,
+        .action, .section => unreachable,
     }
 }
 
@@ -236,7 +244,7 @@ test "form geometry keeps the selection visible and makes room for the keyboard"
     const table = lang_file.Table.english_only;
     const ui = Ui.init(buffer.surface, Theme{}, &pack, &table);
     var items: [20]Item = undefined;
-    for (&items, 0..) |*item, i| item.* = .{ .kind = if (i % 4 == 0) .toggle else if (i % 4 == 1) .choice else if (i % 4 == 2) .text else .action, .label = "Label", .value = "Value", .on = i % 8 == 0 };
+    for (&items, 0..) |*item, i| item.* = .{ .kind = if (i == 5) .section else if (i % 4 == 0) .toggle else if (i % 4 == 1) .choice else if (i % 4 == 2) .text else .action, .label = "Label", .value = "Value", .on = i % 8 == 0 };
     const allowed = osk.allowAll();
     const plain = screen(&ui, .{}, .{ .title = "Form", .items = &items, .selected = 19 }, 0);
     try testing.expect(plain.first + plain.list.visible > 19);
