@@ -9,6 +9,10 @@
 //! the micro-Linux (XP staging, WORK), render() returns the XML for the
 //! wimboot RAM disk. clearRendered() removes rendered files left behind
 //! (they may carry a key or a password) before any start.
+//!
+//! Every file is loaded (names stay unique across systems), but the
+//! manager sees only the profiles offered for its system (`systems=`,
+//! answer.applies): len/get/stem/find work on that filtered list.
 const std = @import("std");
 const uefi = std.os.uefi;
 const usos = @import("usos");
@@ -22,13 +26,21 @@ pub const Profile = answer.Profile;
 const plan_file = answer.plan_file;
 
 pub const directory = "\\EFI\\USOS\\profiles";
+/// Profiles listed for one system (the answer screen's limit).
 pub const max = usos.flow.answer_screen.max_profiles;
+/// Profile files read from the stick (for every system together).
+const max_files = 2 * max;
 
 const Stem = answer.profile.Text(32);
 
-var loaded: [max]Profile = undefined;
-var stems: [max]Stem = undefined;
+var loaded: [max_files]Profile = undefined;
+var stems: [max_files]Stem = undefined;
+var loaded_count: usize = 0;
+/// Indices into `loaded` of the profiles offered for `filter_system`.
+var visible: [max]usize = undefined;
 var count: usize = 0;
+var filter_storage: [48]u8 = undefined;
+var filter_system: ?[]const u8 = null;
 /// Keys typed this boot without remember_key, by file stem.
 var session: [max]Profile = undefined;
 var session_stems: [max]Stem = undefined;
@@ -39,11 +51,41 @@ pub fn len() usize {
 }
 
 pub fn get(index: usize) *Profile {
-    return &loaded[index];
+    return &loaded[visible[index]];
 }
 
 pub fn stem(index: usize) []const u8 {
-    return stems[index].slice();
+    return stems[visible[index]].slice();
+}
+
+/// Lists only the profiles offered for `system_id` (null: all, up to max).
+pub fn filter(system_id: ?[]const u8) void {
+    if (system_id) |id| {
+        const n = @min(id.len, filter_storage.len);
+        @memcpy(filter_storage[0..n], id[0..n]);
+        filter_system = filter_storage[0..n];
+    } else filter_system = null;
+    applyFilter();
+}
+
+fn applyFilter() void {
+    count = 0;
+    for (0..loaded_count) |i| {
+        if (filter_system) |id| if (!answer.applies.appliesTo(&loaded[i], id)) continue;
+        if (count == max) break;
+        visible[count] = i;
+        count += 1;
+    }
+}
+
+/// The stem of any profile file (offered here or not) with the file stem
+/// of `name`: a new name must not overwrite another system's profile.
+pub fn stemInUse(name: []const u8) ?[]const u8 {
+    const wanted = stemOf(name);
+    for (stems[0..loaded_count]) |*s| {
+        if (std.ascii.eqlIgnoreCase(s.slice(), wanted.slice())) return s.slice();
+    }
+    return null;
 }
 
 fn stemOf(name: []const u8) Stem {
@@ -53,19 +95,20 @@ fn stemOf(name: []const u8) Stem {
     return result;
 }
 
-/// Index of a profile whose file stem equals that of `name`.
+/// Index (in the filtered list) of a profile whose file stem equals that of `name`.
 pub fn find(name: []const u8) ?usize {
     const wanted = stemOf(name);
-    for (stems[0..count], 0..) |*s, i| {
-        if (std.ascii.eqlIgnoreCase(s.slice(), wanted.slice())) return i;
+    for (visible[0..count], 0..) |i, index| {
+        if (std.ascii.eqlIgnoreCase(stems[i].slice(), wanted.slice())) return index;
     }
     return null;
 }
 
 /// Re-reads every profile file (invalid files are skipped and traced).
 pub fn reload(root: *uefi.protocol.File) void {
-    var names: [max]usos.catalog.FixedText = undefined;
+    var names: [max_files]usos.catalog.FixedText = undefined;
     const found = directory_scan.listFilesWithExtension(root, directory, ".ini", &names);
+    loaded_count = 0;
     count = 0;
     var bytes: [answer.profile.max_file]u8 = undefined;
     var path: [96]u8 = undefined;
@@ -82,29 +125,30 @@ pub fn reload(root: *uefi.protocol.File) void {
             },
         }
         const file_stem = name.slice()[0 .. name.slice().len - 4];
-        stems[count] = .{};
-        stems[count].set(file_stem) catch continue;
-        loaded[count] = profile;
+        stems[loaded_count] = .{};
+        stems[loaded_count].set(file_stem) catch continue;
+        loaded[loaded_count] = profile;
         // Keys typed this boot (not remembered).
         if (!profile.remember_key) {
             for (session_stems[0..session_count], 0..) |*s, i| {
                 if (std.ascii.eqlIgnoreCase(s.slice(), file_stem)) {
-                    loaded[count].key = session[i].key;
-                    loaded[count].system_keys = session[i].system_keys;
-                    loaded[count].system_key_count = session[i].system_key_count;
+                    loaded[loaded_count].key = session[i].key;
+                    loaded[loaded_count].system_keys = session[i].system_keys;
+                    loaded[loaded_count].system_key_count = session[i].system_key_count;
                 }
             }
         }
-        count += 1;
-        if (count == max) break;
+        loaded_count += 1;
+        if (loaded_count == max_files) break;
     }
     // Stable order: by name.
     sortByName();
+    applyFilter();
 }
 
 fn sortByName() void {
     var i: usize = 1;
-    while (i < count) : (i += 1) {
+    while (i < loaded_count) : (i += 1) {
         var j = i;
         while (j > 0 and lessThan(j, j - 1)) : (j -= 1) {
             std.mem.swap(Profile, &loaded[j], &loaded[j - 1]);
@@ -176,10 +220,10 @@ fn rememberSession(profile: *const Profile, new_stem: Stem, previous_stem: ?[]co
 
 pub fn delete(root: *uefi.protocol.File, index: usize) void {
     var path: [96]u8 = undefined;
-    const file_path = std.fmt.bufPrint(&path, "{s}\\{s}.ini", .{ directory, stems[index].slice() }) catch return;
+    const file_path = std.fmt.bufPrint(&path, "{s}\\{s}.ini", .{ directory, stem(index) }) catch return;
     deleteFile(root, file_path);
     serial.writeAscii("[PROFILE] deleted ");
-    serial.writeAscii(stems[index].slice());
+    serial.writeAscii(stem(index));
     serial.writeAscii("\n");
     reload(root);
 }

@@ -56,6 +56,7 @@ const setup = "Microsoft-Windows-Setup";
 const shell = "Microsoft-Windows-Shell-Setup";
 const deployment = "Microsoft-Windows-Deployment";
 const wer = "Microsoft-Windows-ErrorReportingCore";
+const lua = "Microsoft-Windows-LUA-Settings";
 
 pub const settings = [_]Setting{
     // windowsPE
@@ -82,6 +83,8 @@ pub const settings = [_]Setting{
     .{ .pass = .specialize, .component = deployment, .path = "RunSynchronous/RunSynchronousCommand/Order" },
     .{ .pass = .specialize, .component = deployment, .path = "RunSynchronous/RunSynchronousCommand/Path" },
     .{ .pass = .specialize, .component = wer, .path = "DisableWER" },
+    // Tweak disable_uac (Vista and 7 only in USOS: 8+ Store apps need UAC).
+    .{ .pass = .specialize, .component = lua, .path = "EnableLUA", .until = .windows_7 },
     // oobeSystem
     .{ .pass = .oobeSystem, .component = intl, .path = "InputLocale" },
     .{ .pass = .oobeSystem, .component = intl, .path = "SystemLocale" },
@@ -101,7 +104,100 @@ pub const settings = [_]Setting{
     .{ .pass = .oobeSystem, .component = shell, .path = "UserAccounts/LocalAccounts/LocalAccount/DisplayName" },
     .{ .pass = .oobeSystem, .component = shell, .path = "UserAccounts/LocalAccounts/LocalAccount/Group" },
     .{ .pass = .oobeSystem, .component = shell, .path = "UserAccounts/LocalAccounts/LocalAccount/Name" },
+    // Tweak theme on Windows 7 (classic.theme / basic.theme of the client).
+    .{ .pass = .oobeSystem, .component = shell, .path = "Themes/CustomDefaultThemeFile", .since = .windows_7, .until = .windows_7, .client_only = true },
 };
+
+/// The optional tweaks of a profile (docs/answer-profiles.md, "Tweaks").
+/// `theme_classic` / `theme_basic` are the two non-default values of the
+/// profile's theme, `display` a resolution other than auto.
+pub const Tweak = enum {
+    skip_games,
+    skip_msn,
+    hide_outlook_express,
+    classic_start,
+    theme_classic,
+    theme_basic,
+    no_balloon_tips,
+    display,
+    disable_uac,
+    no_sidebar,
+    no_welcome_center,
+    no_hibernation,
+    show_extensions,
+    show_hidden,
+    no_autorun,
+};
+
+pub const TweakSupport = struct {
+    tweak: Tweak,
+    /// NT5 families that render it (WINNT.SIF / the setup-end script).
+    nt5: []const Family = &.{},
+    /// 6.x+ schema levels that render it (null: none).
+    since: ?Level = null,
+    until: Level = .windows_11,
+    client_only: bool = false,
+};
+
+const xp_2003 = &[_]Family{ .windows_xp, .windows_2003 };
+
+/// Which versions render each tweak. Everything else ignores it (the
+/// editor does not offer it there, the renderers write nothing): never a
+/// setting, component, Setup component name or command a version lacks.
+/// Windows 2000 has none (no reg.exe in the base system).
+pub const tweak_support = [_]TweakSupport{
+    // XP [Components]; Vista pkgmgr / 7 DISM: the InboxGames feature.
+    .{ .tweak = .skip_games, .nt5 = &.{.windows_xp}, .since = .vista, .until = .windows_7, .client_only = true },
+    // XP: msnexplr + msmsgs; 2003 has only msmsgs.
+    .{ .tweak = .skip_msn, .nt5 = xp_2003 },
+    .{ .tweak = .hide_outlook_express, .nt5 = xp_2003 },
+    // [Shell]: XP only (2003 starts classic already).
+    .{ .tweak = .classic_start, .nt5 = &.{.windows_xp} },
+    .{ .tweak = .theme_classic, .nt5 = &.{.windows_xp}, .since = .windows_7, .until = .windows_7, .client_only = true },
+    .{ .tweak = .theme_basic, .since = .windows_7, .until = .windows_7, .client_only = true },
+    .{ .tweak = .no_balloon_tips, .nt5 = xp_2003 },
+    .{ .tweak = .display, .nt5 = xp_2003 },
+    .{ .tweak = .disable_uac, .since = .vista, .until = .windows_7 },
+    .{ .tweak = .no_sidebar, .since = .vista, .until = .windows_7, .client_only = true },
+    // Windows 7 no longer opens Getting Started at logon.
+    .{ .tweak = .no_welcome_center, .since = .vista, .until = .vista, .client_only = true },
+    .{ .tweak = .no_hibernation, .since = .vista, .until = .windows_7, .client_only = true },
+    .{ .tweak = .show_extensions, .nt5 = xp_2003, .since = .vista },
+    .{ .tweak = .show_hidden, .nt5 = xp_2003, .since = .vista },
+    .{ .tweak = .no_autorun, .nt5 = xp_2003, .since = .vista },
+};
+
+pub fn tweakAvailable(tweak: Tweak, family: Family) bool {
+    for (tweak_support) |entry| {
+        if (entry.tweak != tweak) continue;
+        if (family.nt5()) return std.mem.indexOfScalar(Family, entry.nt5, family) != null;
+        const since = entry.since orelse return false;
+        const level = Level.of(family);
+        if (@intFromEnum(level) < @intFromEnum(since) or @intFromEnum(level) > @intFromEnum(entry.until)) return false;
+        return !(entry.client_only and family.server());
+    }
+    unreachable;
+}
+
+/// The profile field of a tweak (theme and display are choices).
+pub fn tweakField(tweak: Tweak) @import("profile.zig").Field {
+    return switch (tweak) {
+        .theme_classic, .theme_basic => .theme,
+        .display => .display,
+        inline else => |t| @field(@import("profile.zig").Field, @tagName(t)),
+    };
+}
+
+/// The tweak is on in the profile and rendered for this version.
+pub fn tweakOn(p: *const @import("profile.zig").Profile, tweak: Tweak, family: Family) bool {
+    const on = switch (tweak) {
+        .theme_classic => p.theme == .classic,
+        .theme_basic => p.theme == .basic,
+        .display => p.display != .auto,
+        inline else => |t| @field(p, @tagName(t)),
+    };
+    return on and tweakAvailable(tweak, family);
+}
 
 pub const Error = error{ UnknownPass, UnknownSetting, NotForThisVersion, BadShape };
 
@@ -213,6 +309,9 @@ fn everything() !Profile {
     p.no_network_oobe = true;
     p.disable_wer = true;
     p.protect_pc = .recommended;
+    for (@import("profile.zig").tweak_fields) |field| p.flag(field).?.* = true;
+    p.theme = .basic;
+    p.display = .@"1920x1080";
     return p;
 }
 
@@ -232,6 +331,26 @@ test "schema: every family renders only settings its version has" {
             }
         }
     }
+}
+
+test "schema: every tweak has one support row; 2000 has none" {
+    inline for (@typeInfo(Tweak).@"enum".fields) |f| {
+        var rows: usize = 0;
+        for (tweak_support) |entry| {
+            if (entry.tweak == @as(Tweak, @enumFromInt(f.value))) rows += 1;
+        }
+        try std.testing.expectEqual(@as(usize, 1), rows);
+        try std.testing.expect(!tweakAvailable(@enumFromInt(f.value), .windows_2000));
+    }
+    try std.testing.expect(tweakAvailable(.skip_games, .windows_7));
+    try std.testing.expect(!tweakAvailable(.skip_games, .server_2008_r2));
+    try std.testing.expect(!tweakAvailable(.skip_games, .windows_8));
+    try std.testing.expect(!tweakAvailable(.skip_games, .windows_2003));
+    try std.testing.expect(tweakAvailable(.disable_uac, .server_2008));
+    try std.testing.expect(!tweakAvailable(.disable_uac, .windows_10));
+    try std.testing.expect(tweakAvailable(.no_welcome_center, .vista) and !tweakAvailable(.no_welcome_center, .windows_7));
+    try std.testing.expect(tweakAvailable(.theme_basic, .windows_7) and !tweakAvailable(.theme_basic, .windows_xp) and !tweakAvailable(.theme_basic, .vista));
+    try std.testing.expect(tweakAvailable(.show_extensions, .windows_11) and tweakAvailable(.show_extensions, .server_2025));
 }
 
 test "schema: Vista and 7 reject later OOBE settings" {

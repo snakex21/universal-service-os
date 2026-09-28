@@ -49,7 +49,7 @@ pub fn show(
     if (secure_boot.enforced() and usos.flow.secure_boot_policy.backendRequiresSecureBootOff(system.id, backend)) return showSecureBootRequired(system);
 
     var fields = Fields{};
-    var notes: [6][]const u8 = undefined;
+    var notes: [8][]const u8 = undefined;
     var note_count: usize = 0;
     fields.add(view.t(.summary_system), system.name);
     fields.add(view.t(.summary_image), image.name.slice());
@@ -87,11 +87,17 @@ pub fn show(
     var arch_note: [200]u8 = undefined;
     var edition_text: [160]u8 = undefined;
     var edition_note: [200]u8 = undefined;
+    var missing_note: [240]u8 = undefined;
     if (answer.profile) |index| {
         // A USOS profile, rendered for this system when the start begins.
         const p = answer_profiles.get(index);
         const arch = if (backend == .xp_uefi_staging) @tagName(nt5Arch(system.id)) else @tagName(answer_profiles.archOf(image.media));
         fields.add(view.t(.summary_answer_file), view.format(&profile_text, .profile_summary, &.{ p.name.slice(), manual_unattended.profileDetail(&profile_detail, p), arch }));
+        // An answer this system needs is missing (NT5 key, Server password).
+        if (manual_unattended.missingText(&missing_note, p, system)) |text| {
+            notes[note_count] = text;
+            note_count += 1;
+        }
         // The profile's edition against this ISO's install images: found,
         // the answer names the image; not found, Setup asks as before.
         answer_profiles.useImages(null);

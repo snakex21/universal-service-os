@@ -25,7 +25,12 @@
 #       (src/flow/answer/nt5.zig) is loaded in profile mode and deleted.
 # Keys: user user2 computer org key timezone password (docs/xp-unattended.md).
 # Profile mode (a rendered answer profile, docs/answer-profiles.md) also
-# accepts family (xp, 2000, 2003), locale, input_locale and language_group.
+# accepts family (xp, 2000, 2003), locale, input_locale and language_group,
+# and the tweaks (src/flow/answer/nt5.zig): tweaks= a comma-separated list
+# of games msn_explorer messenger outlook_express classic_start
+# classic_theme balloons tour extensions hidden autorun, display=WxH
+# (1024x768, 1280x1024, 1920x1080). Both are written only when set, so a
+# profile without tweaks gives the same WINNT.SIF and accounts script.
 
 usos_xp_settings_load() {
     _xs_file=$1
@@ -58,7 +63,7 @@ usos_xp_settings_load() {
             key = tolower(trim(substr(line, 1, eq - 1)))
             value = trim(substr(line, eq + 1))
             if (value ~ /^".*"$/ && length(value) >= 2) value = substr(value, 2, length(value) - 2)
-            if (key !~ /^(user|user2|computer|org|key|timezone|password)$/ && !(profile != "" && key ~ /^(family|locale|input_locale|language_group)$/)) { bad("unknown key on line " NR); next }
+            if (key !~ /^(user|user2|computer|org|key|timezone|password)$/ && !(profile != "" && key ~ /^(family|locale|input_locale|language_group|tweaks|display)$/)) { bad("unknown key on line " NR); next }
             values[key] = value
         }
         END {
@@ -98,10 +103,17 @@ usos_xp_settings_load() {
                 group = values["language_group"]
                 if (group != "" && group !~ /^[0-9]+(,[0-9]+)*$/) bad("language_group= must be numbers separated by commas")
                 if ((locale == "") != (input == "") || (locale == "") != (group == "")) bad("locale=, input_locale= and language_group= go together")
+                tweaks = tolower(values["tweaks"])
+                n = split(tweaks, parts, ",")
+                for (i = 1; i <= n; i++) if (parts[i] !~ /^(games|msn_explorer|messenger|outlook_express|classic_start|classic_theme|balloons|tour|extensions|hidden|autorun)$/) bad("tweaks= has an unknown tweak")
+                display = tolower(values["display"])
+                if (display != "" && display !~ /^(1024x768|1280x1024|1920x1080)$/) bad("display= must be 1024x768, 1280x1024 or 1920x1080")
             }
             if (failed) exit 1
             printf "user=%s\nuser2=%s\ncomputer=%s\norg=%s\nkey=%s\ntimezone=%s\npassword=%s\n", user, user2, computer, org, key, timezone, password
             if (profile != "") printf "family=%s\nlocale=%s\ninput_locale=%s\nlanguage_group=%s\n", family, locale, input, group
+            if (profile != "" && tweaks != "") printf "tweaks=%s\n", tweaks
+            if (profile != "" && display != "") printf "display=%s\n", display
         }
     ' "$_xs_text" > "$_xs_out.tmp"
     _xs_rc=$?
@@ -174,6 +186,29 @@ usos_xp_settings_sif() {
                 print "UserLocale=" v["locale"]
                 print "InputLocale=" v["input_locale"]
             }
+            # Profile tweaks (unattend reference, ref.chm): optional components off,
+            # the classic shell for new users, the display mode.
+            nt = split(v["tweaks"], tw, ",")
+            for (i = 1; i <= nt; i++) t[tw[i]] = 1
+            if (t["games"] || t["msn_explorer"] || t["messenger"] || t["outlook_express"]) {
+                print "[Components]"
+                if (t["games"]) { print "freecell=Off"; print "hearts=Off"; print "minesweeper=Off"; print "pinball=Off"; print "solitaire=Off"; print "spider=Off"; print "zonegames=Off" }
+                if (t["msn_explorer"]) print "msnexplr=Off"
+                if (t["messenger"]) print "msmsgs=Off"
+                if (t["outlook_express"]) print "OEAccess=Off"
+            }
+            if (t["classic_start"] || t["classic_theme"]) {
+                print "[Shell]"
+                if (t["classic_start"]) print "DefaultStartPanelOff=Yes"
+                if (t["classic_theme"]) print "DefaultThemesOff=Yes"
+            }
+            if (v["display"] != "") {
+                x = index(v["display"], "x")
+                print "[Display]"
+                print "BitsPerPel=32"
+                print "Xresolution=" substr(v["display"], 1, x - 1)
+                print "Yresolution=" substr(v["display"], x + 1)
+            }
         }
     ' "$_xs_base"
 }
@@ -189,7 +224,29 @@ usos_xp_settings_accounts() {
             printf "set USOS_LOG=%%SystemRoot%%\\usos-users.log\r\n"
             account(v["user"])
             if (v["user2"] != "") account(v["user2"])
+            tweaks()
             printf "exit /b 0\r\n"
+        }
+        # Profile tweaks: HKLM directly; the Explorer settings in the Default User
+        # hive (every new profile, the accounts above included, is copied from it).
+        function tweaks(   n, i, t, tw, adv) {
+            n = split(v["tweaks"], tw, ",")
+            for (i = 1; i <= n; i++) t[tw[i]] = 1
+            if (t["autorun"]) printf "reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\" /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f >> \"%%USOS_LOG%%\" 2>&1\r\n"
+            if (!(t["extensions"] || t["hidden"] || t["balloons"] || t["tour"])) return
+            printf "rem USOS profile: Explorer settings for new users (Default User hive).\r\n"
+            printf "set USOS_PD=\r\nset USOS_DU=\r\n"
+            # \047: a single quote (the awk program itself is single-quoted).
+            printf "for /f \"tokens=2*\" %%%%A in (\047reg query \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\" /v ProfilesDirectory ^| find \"REG_\"\047) do call set \"USOS_PD=%%%%B\"\r\n"
+            printf "for /f \"tokens=2*\" %%%%A in (\047reg query \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\" /v DefaultUserProfile ^| find \"REG_\"\047) do set \"USOS_DU=%%%%B\"\r\n"
+            printf "if not defined USOS_DU set \"USOS_DU=Default User\"\r\n"
+            printf "reg load HKU\\USOSDEF \"%%USOS_PD%%\\%%USOS_DU%%\\NTUSER.DAT\" >> \"%%USOS_LOG%%\" 2>&1\r\n"
+            adv = "HKU\\USOSDEF\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced"
+            if (t["extensions"]) printf "reg add \"%s\" /v HideFileExt /t REG_DWORD /d 0 /f >> \"%%USOS_LOG%%\" 2>&1\r\n", adv
+            if (t["hidden"]) printf "reg add \"%s\" /v Hidden /t REG_DWORD /d 1 /f >> \"%%USOS_LOG%%\" 2>&1\r\n", adv
+            if (t["balloons"]) printf "reg add \"%s\" /v EnableBalloonTips /t REG_DWORD /d 0 /f >> \"%%USOS_LOG%%\" 2>&1\r\n", adv
+            if (t["tour"]) printf "reg add \"HKU\\USOSDEF\\Software\\Microsoft\\Windows\\CurrentVersion\\Applets\\Tour\" /v RunCount /t REG_DWORD /d 0 /f >> \"%%USOS_LOG%%\" 2>&1\r\n"
+            printf "reg unload HKU\\USOSDEF >> \"%%USOS_LOG%%\" 2>&1\r\n"
         }
         function account(name) {
             if (v["password"] != "") printf "net user \"%s\" \"%s\" /add >> \"%%USOS_LOG%%\" 2>&1\r\n", name, v["password"]

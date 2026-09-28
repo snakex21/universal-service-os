@@ -2,16 +2,6 @@
 // English is built in; lang.bin on the ESP carries only the chosen language.
 
 pub const Key = enum(u16) {
-    action_blocked,
-    action_chainload,
-    action_efi,
-    action_hint,
-    action_iso,
-    action_linux,
-    action_vhdboot,
-    action_wimboot,
-    action_winpe,
-    action_xp,
     badge_experimental,
     badge_ready,
     badge_recommended,
@@ -47,9 +37,6 @@ pub const Key = enum(u16) {
     category_utilities,
     category_utilities_desc,
     category_windows_desc,
-    chainload_line1,
-    chainload_line2,
-    chainload_title,
     day_0,
     day_1,
     day_2,
@@ -120,47 +107,7 @@ pub const Key = enum(u16) {
     drivers_toggle_unusable,
     drivers_touch_match,
     drivers_type,
-    efi_line1,
-    efi_title,
-    error_catalog_line1,
-    error_catalog_line2,
-    error_catalog_title,
-    error_efi,
-    error_firmware_line1,
-    error_firmware_title,
-    error_iso,
-    error_linux,
-    error_linux_fragmented,
-    error_linux_helper,
-    error_linux_no_entry,
-    error_preparation,
-    error_secure_boot_rejected,
-    error_stopped,
-    error_unsupported_line1,
-    error_unsupported_title,
-    error_xp,
-    form_empty,
-    form_key_backspace,
-    form_key_change,
-    form_key_type,
-    form_off,
-    form_on,
-    form_osk_done,
-    form_osk_shift,
-    form_osk_space,
-    form_picker_subtitle,
-    handoff_bootmgr,
-    handoff_commit,
-    handoff_line1,
-    handoff_line2,
-    handoff_ntfs,
-    handoff_setup,
-    handoff_title,
-    handoff_transfer,
-    handoff_verify,
-    handoff_work,
     header_build,
-    header_no_mouse,
     header_subtitle,
     help_auto_title,
     help_auto_iso_line1,
@@ -196,9 +143,6 @@ pub const Key = enum(u16) {
     help_wimboot_title,
     help_win10_wimboot_line1,
     help_win10_wimboot_line2,
-    help_win7_wimboot_line1,
-    help_win7_wimboot_line2,
-    help_win7_wimboot_title,
     help_windows_setup_title,
     images_none_line1,
     images_none_line2,
@@ -206,16 +150,6 @@ pub const Key = enum(u16) {
     images_title,
     input_test_help,
     input_test_title,
-    iso_drivers,
-    iso_external_pe,
-    iso_hybrid_pe,
-    iso_loading_wim,
-    iso_reading,
-    iso_stage_1,
-    iso_stage_2,
-    iso_stage_3,
-    iso_title,
-    iso_validating,
     key_back,
     key_boot_method,
     key_cancel,
@@ -269,16 +203,10 @@ pub const Key = enum(u16) {
     methods_none,
     methods_subtitle,
     methods_title,
-    notice_backend_line1,
-    notice_backend_line2,
     notice_no_image_line1,
     notice_no_image_title,
     power_apm_line1,
     power_apm_line2,
-    power_firmware,
-    power_firmware_error_line1,
-    power_firmware_error_title,
-    power_firmware_unsupported,
     power_input_test,
     power_restart,
     power_shutdown,
@@ -291,110 +219,20 @@ pub const Key = enum(u16) {
     prep_eta,
     prep_footer_done,
     prep_footer_running,
-    prep_loader_ready,
     prep_next_boot,
     prep_remove_usb,
-    prep_request_saved,
-    prep_return_boot,
     prep_speed,
     prep_stage_1,
     prep_stage_2,
     prep_stage_3,
     prep_stage_4,
     prep_stage_5,
-    prep_starting,
     prep_status_done,
     prep_status_failed,
     prep_status_running,
     prep_status_waiting,
     prep_step,
     prep_title,
-    prep_xp_disks,
-    profile_add,
-    profile_add_detail,
-    profile_add_detail_linux,
-    profile_arch_warning,
-    profile_badge,
-    profile_cancel,
-    profile_delete_confirm,
-    profile_delete_keep,
-    profile_delete_question,
-    profile_delete_title,
-    profile_edition_missing,
-    profile_editor_new,
-    profile_editor_subtitle,
-    profile_editor_subtitle_linux,
-    profile_editor_title,
-    profile_field_bypass_ram,
-    profile_field_bypass_secure_boot,
-    profile_field_bypass_tpm,
-    profile_field_computer,
-    profile_field_disable_wer,
-    profile_field_edition,
-    profile_field_key,
-    profile_field_keyboard,
-    profile_field_language,
-    profile_field_local_account,
-    profile_field_locale,
-    profile_field_name,
-    profile_field_network_location,
-    profile_field_no_network,
-    profile_field_org,
-    profile_field_password,
-    profile_field_protect_pc,
-    profile_field_remember_key,
-    profile_field_timezone,
-    profile_field_user,
-    profile_field_user2,
-    profile_file_detail,
-    profile_help_bypass,
-    profile_help_computer,
-    profile_help_disable_wer,
-    profile_help_edition,
-    profile_help_key,
-    profile_help_keyboard,
-    profile_help_language,
-    profile_help_local_account,
-    profile_help_locale,
-    profile_help_name,
-    profile_help_network_location,
-    profile_help_no_network,
-    profile_help_org,
-    profile_help_password,
-    profile_help_protect_pc,
-    profile_help_remember_key,
-    profile_help_timezone,
-    profile_help_user,
-    profile_help_user2,
-    profile_key_delete,
-    profile_key_edit,
-    profile_key_import,
-    profile_key_use,
-    profile_manual_detail,
-    profile_problem_bad_characters,
-    profile_problem_bad_key_format,
-    profile_problem_duplicate,
-    profile_problem_empty,
-    profile_problem_only_digits,
-    profile_problem_reserved_name,
-    profile_problem_same_as_user,
-    profile_problem_too_long,
-    profile_row_detail,
-    profile_row_help,
-    profile_save,
-    profile_save_failed,
-    profile_summary,
-    profile_value_auto,
-    profile_value_network_home,
-    profile_value_network_public,
-    profile_value_network_work,
-    profile_value_protect_off,
-    profile_value_protect_recommended,
-    profile_value_protect_updates,
-    profile_value_same_language,
-    profile_value_same_locale,
-    profile_value_setup_asks,
-    profile_xp_ini_detail,
     sbinfo_absent,
     sbinfo_add_needs_off,
     sbinfo_add_needs_shim,
@@ -447,6 +285,253 @@ pub const Key = enum(u16) {
     sbkey_saved_title,
     sbkey_title,
     sbkey_yes,
+    system_copy_to,
+    system_image_count,
+    system_no_image,
+    system_ready,
+    system_requires_bios,
+    system_requires_bios_detail,
+    system_requires_bios_hint,
+    system_requires_uefi,
+    system_requires_uefi_detail,
+    system_requires_uefi_hint,
+    system_unavailable,
+    system_unavailable_detail,
+    systems_subtitle,
+    themes_builtin,
+    themes_current,
+    themes_desc,
+    themes_hint,
+    themes_invalid,
+    themes_name_dark,
+    themes_name_default,
+    themes_name_high_contrast,
+    themes_name_light,
+    themes_name_retro,
+    themes_title,
+    themes_user,
+    unattended_file_detail,
+    unattended_none,
+    unattended_none_detail,
+    unattended_subtitle,
+    unattended_title,
+    unattended_vista_uefi,
+    unattended_vista_uefi_detail,
+    unattended_xp_file_detail,
+    unattended_xp_manual,
+    unattended_xp_manual_detail,
+    unattended_xp_settings,
+    unattended_xp_settings_detail,
+    utilities_freedos_desc,
+    utilities_hardware_desc,
+    utilities_none_line1,
+    utilities_none_line2,
+    utilities_none_title,
+    wait,
+    wait_usb,
+    action_blocked,
+    action_chainload,
+    action_efi,
+    action_hint,
+    action_iso,
+    action_linux,
+    action_vhdboot,
+    action_wimboot,
+    action_winpe,
+    action_xp,
+    chainload_line1,
+    chainload_line2,
+    chainload_title,
+    efi_line1,
+    efi_title,
+    error_catalog_line1,
+    error_catalog_line2,
+    error_catalog_title,
+    error_efi,
+    error_firmware_line1,
+    error_firmware_title,
+    error_iso,
+    error_linux,
+    error_linux_fragmented,
+    error_linux_helper,
+    error_linux_no_entry,
+    error_preparation,
+    error_secure_boot_rejected,
+    error_stopped,
+    error_unsupported_line1,
+    error_unsupported_title,
+    error_xp,
+    form_empty,
+    form_key_backspace,
+    form_key_change,
+    form_key_type,
+    form_off,
+    form_on,
+    form_osk_done,
+    form_osk_shift,
+    form_osk_space,
+    form_picker_subtitle,
+    handoff_bootmgr,
+    handoff_commit,
+    handoff_line1,
+    handoff_line2,
+    handoff_ntfs,
+    handoff_setup,
+    handoff_title,
+    handoff_transfer,
+    handoff_verify,
+    handoff_work,
+    header_no_mouse,
+    help_win7_wimboot_line1,
+    help_win7_wimboot_line2,
+    help_win7_wimboot_title,
+    iso_drivers,
+    iso_external_pe,
+    iso_hybrid_pe,
+    iso_loading_wim,
+    iso_reading,
+    iso_stage_1,
+    iso_stage_2,
+    iso_stage_3,
+    iso_title,
+    iso_validating,
+    notice_backend_line1,
+    notice_backend_line2,
+    power_firmware,
+    power_firmware_error_line1,
+    power_firmware_error_title,
+    power_firmware_unsupported,
+    prep_loader_ready,
+    prep_request_saved,
+    prep_return_boot,
+    prep_starting,
+    prep_xp_disks,
+    profile_add,
+    profile_add_detail,
+    profile_add_detail_linux,
+    profile_arch_warning,
+    profile_badge,
+    profile_badge_incomplete,
+    profile_cancel,
+    profile_delete_confirm,
+    profile_delete_keep,
+    profile_delete_question,
+    profile_delete_title,
+    profile_edition_missing,
+    profile_editor_new,
+    profile_editor_subtitle,
+    profile_editor_subtitle_linux,
+    profile_editor_title,
+    profile_field_bypass_ram,
+    profile_field_bypass_secure_boot,
+    profile_field_bypass_tpm,
+    profile_field_classic_start,
+    profile_field_computer,
+    profile_field_disable_uac,
+    profile_field_disable_wer,
+    profile_field_display,
+    profile_field_edition,
+    profile_field_hide_outlook_express,
+    profile_field_key,
+    profile_field_keyboard,
+    profile_field_language,
+    profile_field_local_account,
+    profile_field_locale,
+    profile_field_name,
+    profile_field_network_location,
+    profile_field_no_autorun,
+    profile_field_no_balloon_tips,
+    profile_field_no_hibernation,
+    profile_field_no_network,
+    profile_field_no_sidebar,
+    profile_field_no_welcome_center,
+    profile_field_org,
+    profile_field_password,
+    profile_field_protect_pc,
+    profile_field_remember_key,
+    profile_field_show_extensions,
+    profile_field_show_hidden,
+    profile_field_skip_games,
+    profile_field_skip_msn,
+    profile_field_systems,
+    profile_field_theme,
+    profile_field_timezone,
+    profile_field_user,
+    profile_field_user2,
+    profile_file_detail,
+    profile_help_bypass,
+    profile_help_classic_start,
+    profile_help_computer,
+    profile_help_disable_uac,
+    profile_help_disable_wer,
+    profile_help_display,
+    profile_help_edition,
+    profile_help_hide_outlook_express,
+    profile_help_key,
+    profile_help_keyboard,
+    profile_help_language,
+    profile_help_local_account,
+    profile_help_locale,
+    profile_help_name,
+    profile_help_network_location,
+    profile_help_no_autorun,
+    profile_help_no_balloon_tips,
+    profile_help_no_hibernation,
+    profile_help_no_network,
+    profile_help_no_sidebar,
+    profile_help_no_welcome_center,
+    profile_help_org,
+    profile_help_password,
+    profile_help_protect_pc,
+    profile_help_remember_key,
+    profile_help_show_extensions,
+    profile_help_show_hidden,
+    profile_help_skip_games,
+    profile_help_skip_msn,
+    profile_help_systems,
+    profile_help_theme,
+    profile_help_timezone,
+    profile_help_user,
+    profile_help_user2,
+    profile_key_delete,
+    profile_key_edit,
+    profile_key_import,
+    profile_key_use,
+    profile_manual_detail,
+    profile_missing_key,
+    profile_missing_password,
+    profile_problem_bad_characters,
+    profile_problem_bad_key_format,
+    profile_problem_duplicate,
+    profile_problem_empty,
+    profile_problem_only_digits,
+    profile_problem_reserved_name,
+    profile_problem_same_as_user,
+    profile_problem_too_long,
+    profile_row_detail,
+    profile_row_help,
+    profile_save,
+    profile_save_failed,
+    profile_section_extras,
+    profile_summary,
+    profile_value_auto,
+    profile_value_network_home,
+    profile_value_network_public,
+    profile_value_network_work,
+    profile_value_protect_off,
+    profile_value_protect_recommended,
+    profile_value_protect_updates,
+    profile_value_same_language,
+    profile_value_same_locale,
+    profile_value_setup_asks,
+    profile_value_systems_all,
+    profile_value_systems_linux,
+    profile_value_systems_only,
+    profile_value_systems_windows,
+    profile_value_theme_basic,
+    profile_value_theme_classic,
+    profile_value_theme_default,
+    profile_xp_ini_detail,
     server_belongs_in,
     server_blocked_ia64,
     server_client_in_server_folder,
@@ -509,19 +594,6 @@ pub const Key = enum(u16) {
     summary_xp_preparation,
     summary_xp_sif_merged,
     summary_xp_source,
-    system_copy_to,
-    system_image_count,
-    system_no_image,
-    system_ready,
-    system_requires_bios,
-    system_requires_bios_detail,
-    system_requires_bios_hint,
-    system_requires_uefi,
-    system_requires_uefi_detail,
-    system_requires_uefi_hint,
-    system_unavailable,
-    system_unavailable_detail,
-    systems_subtitle,
     theme_edit_blocked,
     theme_edit_cancel,
     theme_edit_contrast_bad,
@@ -577,40 +649,9 @@ pub const Key = enum(u16) {
     theme_edit_saved,
     theme_edit_subtitle,
     theme_edit_title,
-    themes_builtin,
-    themes_current,
-    themes_desc,
-    themes_hint,
-    themes_invalid,
-    themes_name_dark,
-    themes_name_default,
-    themes_name_high_contrast,
-    themes_name_light,
-    themes_name_retro,
-    themes_title,
-    themes_user,
-    unattended_file_detail,
-    unattended_none,
-    unattended_none_detail,
-    unattended_subtitle,
-    unattended_title,
-    unattended_vista_uefi,
-    unattended_vista_uefi_detail,
-    unattended_xp_file_detail,
-    unattended_xp_manual,
-    unattended_xp_manual_detail,
-    unattended_xp_settings,
-    unattended_xp_settings_detail,
-    utilities_freedos_desc,
-    utilities_hardware_desc,
-    utilities_none_line1,
-    utilities_none_line2,
-    utilities_none_title,
     utilities_shell_desc,
     utilities_shell_title,
     utility_unavailable,
-    wait,
-    wait_usb,
     xp_prep_checking,
     xp_prep_choose_disk,
     xp_prep_copy_verify,
@@ -621,16 +662,6 @@ pub const Key = enum(u16) {
 
 /// FNV-1a 32 of the key names stored in lang.bin (without the "boot." prefix).
 pub const hashes = [_]u32{
-    0xb9a53ded, // action.blocked
-    0x67542164, // action.chainload
-    0x4743492f, // action.efi
-    0x8d1362d2, // action.hint
-    0xf7710f28, // action.iso
-    0x972002f3, // action.linux
-    0x351f129f, // action.vhdboot
-    0x3979b582, // action.wimboot
-    0xb3fd0db4, // action.winpe
-    0x45058703, // action.xp
     0xe81a21c0, // badge.experimental
     0x70416b89, // badge.ready
     0xc1e902c9, // badge.recommended
@@ -666,9 +697,6 @@ pub const hashes = [_]u32{
     0x0443aa4f, // category.utilities
     0x977550ee, // category.utilities.desc
     0xb473adb5, // category.windows.desc
-    0xfc4d4ef9, // chainload.line1
-    0xf94d4a40, // chainload.line2
-    0xb38e898e, // chainload.title
     0xe039545b, // day.0
     0xdf3952c8, // day.1
     0xe2395781, // day.2
@@ -739,47 +767,7 @@ pub const hashes = [_]u32{
     0x8033a4b0, // drivers.toggle_unusable
     0x2e0de3cb, // drivers.touch_match
     0x28c59d9e, // drivers.type
-    0x23541dfa, // efi.line1
-    0xf4cad9b1, // efi.title
-    0x35820aab, // error.catalog.line1
-    0x36820c3e, // error.catalog.line2
-    0x9807296c, // error.catalog.title
-    0x31ce0c49, // error.efi
-    0x1ec31a4f, // error.firmware.line1
-    0xaeecd888, // error.firmware.title
-    0x5f16a066, // error.iso
-    0x71170d15, // error.linux
-    0x4cffd5cf, // error.linux_fragmented
-    0xb3a23c5a, // error.linux_helper
-    0x5f65566e, // error.linux_no_entry
-    0xacc67c62, // error.preparation
-    0x18cdd544, // error.secure_boot_rejected
-    0xfe82b516, // error.stopped
-    0x96c6d0e3, // error.unsupported.line1
-    0x471635f4, // error.unsupported.title
-    0x74a11b6d, // error.xp
-    0xd2e92c28, // form.empty
-    0x068d58eb, // form.key.backspace
-    0x4f03dbc4, // form.key.change
-    0x33e2e09c, // form.key.type
-    0xae287c48, // form.off
-    0xcf665366, // form.on
-    0xafc445f4, // form.osk.done
-    0x97415b00, // form.osk.shift
-    0xccbac9aa, // form.osk.space
-    0x06577659, // form.picker.subtitle
-    0x096158f9, // handoff.bootmgr
-    0x12a81bf8, // handoff.commit
-    0x23c3a3ee, // handoff.line1
-    0x22c3a25b, // handoff.line2
-    0x1020d73c, // handoff.ntfs
-    0x715fcb22, // handoff.setup
-    0x8496255d, // handoff.title
-    0x40ae76c2, // handoff.transfer
-    0x467b2d38, // handoff.verify
-    0x3359246c, // handoff.work
     0x9d2e5b72, // header.build
-    0x2b0a3151, // header.no_mouse
     0xf19fe29e, // header.subtitle
     0xf6a9e837, // help.auto.title
     0x5353cd3a, // help.auto_iso.line1
@@ -815,9 +803,6 @@ pub const hashes = [_]u32{
     0x212fbc8f, // help.wimboot.title
     0xf5a59c4c, // help.win10_wimboot.line1
     0xf8a5a105, // help.win10_wimboot.line2
-    0x4bf3a4b0, // help.win7_wimboot.line1
-    0x4ef3a969, // help.win7_wimboot.line2
-    0xc579f0eb, // help.win7_wimboot.title
     0x18900e83, // help.windows_setup.title
     0xa083adfa, // images.none.line1
     0x9f83ac67, // images.none.line2
@@ -825,16 +810,6 @@ pub const hashes = [_]u32{
     0x403d0617, // images.title
     0x3f42c8f5, // input_test.help
     0xeccf9134, // input_test.title
-    0x646697d7, // iso.drivers
-    0x2482ded7, // iso.external_pe
-    0x244161e4, // iso.hybrid_pe
-    0x9f2ad69c, // iso.loading_wim
-    0xac900584, // iso.reading
-    0xd364e7f3, // iso.stage.1
-    0xd464e986, // iso.stage.2
-    0xd564eb19, // iso.stage.3
-    0x1fdc1e96, // iso.title
-    0xd22ab261, // iso.validating
     0x5bf90715, // key.back
     0x1282304e, // key.boot_method
     0xeee5a29c, // key.cancel
@@ -888,16 +863,10 @@ pub const hashes = [_]u32{
     0x9593c94b, // methods.none
     0x88241669, // methods.subtitle
     0x616e0619, // methods.title
-    0x48a2a970, // notice.backend.line1
-    0x4ba2ae29, // notice.backend.line2
     0xe2e6f917, // notice.no_image.line1
     0x2b57a9a0, // notice.no_image.title
     0x4542418f, // power.apm.line1
     0x46424322, // power.apm.line2
-    0x69b9a301, // power.firmware
-    0x8aa47bc2, // power.firmware.error.line1
-    0xe35e84a9, // power.firmware.error.title
-    0x80093ad8, // power.firmware.unsupported
     0x94bdee21, // power.input_test
     0x77e5c8b3, // power.restart
     0x61976512, // power.shutdown
@@ -910,110 +879,20 @@ pub const hashes = [_]u32{
     0xec0a0b0c, // prep.eta
     0xfa71f86f, // prep.footer.done
     0x6c030272, // prep.footer.running
-    0x48d1e0f7, // prep.loader_ready
     0x848caac2, // prep.next_boot
     0xc7e6fd7d, // prep.remove_usb
-    0xce2deea5, // prep.request_saved
-    0x6a7e2473, // prep.return_boot
     0x6f11970f, // prep.speed
     0x7e12c69f, // prep.stage.1
     0x7f12c832, // prep.stage.2
     0x8012c9c5, // prep.stage.3
     0x7912bec0, // prep.stage.4
     0x7a12c053, // prep.stage.5
-    0x416d9ce0, // prep.starting
     0x96053b70, // prep.status.done
     0x739921d5, // prep.status.failed
     0x0773ae1f, // prep.status.running
     0x5de2d29f, // prep.status.waiting
     0x5a2661f6, // prep.step
     0x84ce2712, // prep.title
-    0x87155e69, // prep.xp_disks
-    0x19d32f03, // profile.add
-    0xf7030016, // profile.add.detail
-    0x5951406b, // profile.add.detail_linux
-    0x0ed7f0df, // profile.arch_warning
-    0xc61083bb, // profile.badge
-    0x18d4431a, // profile.cancel
-    0xe272fe39, // profile.delete.confirm
-    0xde446e2e, // profile.delete.keep
-    0x92e5d06b, // profile.delete.question
-    0x584ba887, // profile.delete.title
-    0x919ddef5, // profile.edition_missing
-    0xac80d0a1, // profile.editor.new
-    0x6f2b3c09, // profile.editor.subtitle
-    0x39676f88, // profile.editor.subtitle_linux
-    0xde080639, // profile.editor.title
-    0x49862935, // profile.field.bypass_ram
-    0x1513f82f, // profile.field.bypass_secure_boot
-    0x50329252, // profile.field.bypass_tpm
-    0xa6b11e2b, // profile.field.computer
-    0x8015202b, // profile.field.disable_wer
-    0x9c409bd4, // profile.field.edition
-    0x1d1b0b5d, // profile.field.key
-    0x40eff7a3, // profile.field.keyboard
-    0x7890b224, // profile.field.language
-    0x06522829, // profile.field.local_account
-    0x383d1338, // profile.field.locale
-    0x8dd802a5, // profile.field.name
-    0x805be4da, // profile.field.network_location
-    0xe80859fc, // profile.field.no_network
-    0x7cebcb94, // profile.field.org
-    0x367e27db, // profile.field.password
-    0xf251a013, // profile.field.protect_pc
-    0xf04168d9, // profile.field.remember_key
-    0xc97f214d, // profile.field.timezone
-    0xa0db31f9, // profile.field.user
-    0x040f6291, // profile.field.user2
-    0x39ab14e9, // profile.file.detail
-    0x0922c403, // profile.help.bypass
-    0x46264466, // profile.help.computer
-    0xa0ced3e4, // profile.help.disable_wer
-    0xbe0d347f, // profile.help.edition
-    0xcca2e39e, // profile.help.key
-    0x10f18736, // profile.help.keyboard
-    0x8e773749, // profile.help.language
-    0x7425bece, // profile.help.local_account
-    0x69474139, // profile.help.locale
-    0x33f53224, // profile.help.name
-    0x6dc95247, // profile.help.network_location
-    0x7cf8eb69, // profile.help.no_network
-    0x324f097b, // profile.help.org
-    0xfc88614e, // profile.help.password
-    0x4d51ba86, // profile.help.protect_pc
-    0xa2076c1c, // profile.help.remember_key
-    0xf3284598, // profile.help.timezone
-    0xb1ef9f14, // profile.help.user
-    0x423788d2, // profile.help.user2
-    0x5f1c9d40, // profile.key.delete
-    0x4c0a173f, // profile.key.edit
-    0x4ce11c3a, // profile.key.import
-    0xb6f66d52, // profile.key.use
-    0xadbb5231, // profile.manual.detail
-    0xb6210153, // profile.problem.bad_characters
-    0x568a5598, // profile.problem.bad_key_format
-    0x94cec6cc, // profile.problem.duplicate
-    0x45a02e98, // profile.problem.empty
-    0xa0ced9c8, // profile.problem.only_digits
-    0x81e142e7, // profile.problem.reserved_name
-    0xa1001efc, // profile.problem.same_as_user
-    0x842984ea, // profile.problem.too_long
-    0xeb02a17f, // profile.row.detail
-    0x134a2641, // profile.row.help
-    0x4c6f4f3d, // profile.save
-    0x9f87b247, // profile.save_failed
-    0xea748758, // profile.summary
-    0x803f740e, // profile.value.auto
-    0x94a66e59, // profile.value.network_home
-    0x0742279f, // profile.value.network_public
-    0xce89b51b, // profile.value.network_work
-    0x7de03296, // profile.value.protect_off
-    0x6c457fe8, // profile.value.protect_recommended
-    0x9310ce39, // profile.value.protect_updates
-    0x5f697fae, // profile.value.same_language
-    0x9a227b9e, // profile.value.same_locale
-    0x791012ad, // profile.value.setup_asks
-    0x8b09c640, // profile.xp_ini.detail
     0x0d899acf, // sbinfo.absent
     0x9e2530dd, // sbinfo.add_needs_off
     0xf5aa9821, // sbinfo.add_needs_shim
@@ -1066,6 +945,253 @@ pub const hashes = [_]u32{
     0xee1489b3, // sbkey.saved_title
     0xff5020b3, // sbkey.title
     0xd9dbe826, // sbkey.yes
+    0x6fd0eb35, // system.copy_to
+    0x4961b793, // system.image_count
+    0x2a578ca3, // system.no_image
+    0xd3048155, // system.ready
+    0xab6c36c8, // system.requires_bios
+    0x47e54d83, // system.requires_bios.detail
+    0xb33e3eff, // system.requires_bios.hint
+    0xeb00f308, // system.requires_uefi
+    0xc483f543, // system.requires_uefi.detail
+    0xa4c837bf, // system.requires_uefi.hint
+    0x31aec0c8, // system.unavailable
+    0xa6ba9b83, // system.unavailable.detail
+    0xab5ff4f5, // systems.subtitle
+    0xf0db4556, // themes.builtin
+    0xaef5a0d8, // themes.current
+    0x68214e12, // themes.desc
+    0x4f5530c6, // themes.hint
+    0x43c727ce, // themes.invalid
+    0x02a08382, // themes.name.dark
+    0x94b57963, // themes.name.default
+    0xa784564d, // themes.name.high_contrast
+    0x991efc02, // themes.name.light
+    0x1fe4168e, // themes.name.retro
+    0x8246578f, // themes.title
+    0xb4b7e3f4, // themes.user
+    0x42cdb840, // unattended.file.detail
+    0x9b91564d, // unattended.none
+    0x16e5e868, // unattended.none.detail
+    0x0404a4d7, // unattended.subtitle
+    0x117edf4b, // unattended.title
+    0x318ddc7a, // unattended.vista_uefi
+    0xb090eb5e, // unattended.vista_uefi_detail
+    0xc77e920d, // unattended.xp_file.detail
+    0xd75cdb9a, // unattended.xp_manual
+    0x922274cd, // unattended.xp_manual.detail
+    0x33bff8f1, // unattended.xp_settings
+    0x8b01f4fc, // unattended.xp_settings.detail
+    0x90427850, // utilities.freedos.desc
+    0xbe35b4e2, // utilities.hardware.desc
+    0x89ec8a66, // utilities.none.line1
+    0x88ec88d3, // utilities.none.line2
+    0x638b0125, // utilities.none.title
+    0x892e4ca0, // wait
+    0x3e1f8ab9, // wait_usb
+    0xb9a53ded, // action.blocked
+    0x67542164, // action.chainload
+    0x4743492f, // action.efi
+    0x8d1362d2, // action.hint
+    0xf7710f28, // action.iso
+    0x972002f3, // action.linux
+    0x351f129f, // action.vhdboot
+    0x3979b582, // action.wimboot
+    0xb3fd0db4, // action.winpe
+    0x45058703, // action.xp
+    0xfc4d4ef9, // chainload.line1
+    0xf94d4a40, // chainload.line2
+    0xb38e898e, // chainload.title
+    0x23541dfa, // efi.line1
+    0xf4cad9b1, // efi.title
+    0x35820aab, // error.catalog.line1
+    0x36820c3e, // error.catalog.line2
+    0x9807296c, // error.catalog.title
+    0x31ce0c49, // error.efi
+    0x1ec31a4f, // error.firmware.line1
+    0xaeecd888, // error.firmware.title
+    0x5f16a066, // error.iso
+    0x71170d15, // error.linux
+    0x4cffd5cf, // error.linux_fragmented
+    0xb3a23c5a, // error.linux_helper
+    0x5f65566e, // error.linux_no_entry
+    0xacc67c62, // error.preparation
+    0x18cdd544, // error.secure_boot_rejected
+    0xfe82b516, // error.stopped
+    0x96c6d0e3, // error.unsupported.line1
+    0x471635f4, // error.unsupported.title
+    0x74a11b6d, // error.xp
+    0xd2e92c28, // form.empty
+    0x068d58eb, // form.key.backspace
+    0x4f03dbc4, // form.key.change
+    0x33e2e09c, // form.key.type
+    0xae287c48, // form.off
+    0xcf665366, // form.on
+    0xafc445f4, // form.osk.done
+    0x97415b00, // form.osk.shift
+    0xccbac9aa, // form.osk.space
+    0x06577659, // form.picker.subtitle
+    0x096158f9, // handoff.bootmgr
+    0x12a81bf8, // handoff.commit
+    0x23c3a3ee, // handoff.line1
+    0x22c3a25b, // handoff.line2
+    0x1020d73c, // handoff.ntfs
+    0x715fcb22, // handoff.setup
+    0x8496255d, // handoff.title
+    0x40ae76c2, // handoff.transfer
+    0x467b2d38, // handoff.verify
+    0x3359246c, // handoff.work
+    0x2b0a3151, // header.no_mouse
+    0x4bf3a4b0, // help.win7_wimboot.line1
+    0x4ef3a969, // help.win7_wimboot.line2
+    0xc579f0eb, // help.win7_wimboot.title
+    0x646697d7, // iso.drivers
+    0x2482ded7, // iso.external_pe
+    0x244161e4, // iso.hybrid_pe
+    0x9f2ad69c, // iso.loading_wim
+    0xac900584, // iso.reading
+    0xd364e7f3, // iso.stage.1
+    0xd464e986, // iso.stage.2
+    0xd564eb19, // iso.stage.3
+    0x1fdc1e96, // iso.title
+    0xd22ab261, // iso.validating
+    0x48a2a970, // notice.backend.line1
+    0x4ba2ae29, // notice.backend.line2
+    0x69b9a301, // power.firmware
+    0x8aa47bc2, // power.firmware.error.line1
+    0xe35e84a9, // power.firmware.error.title
+    0x80093ad8, // power.firmware.unsupported
+    0x48d1e0f7, // prep.loader_ready
+    0xce2deea5, // prep.request_saved
+    0x6a7e2473, // prep.return_boot
+    0x416d9ce0, // prep.starting
+    0x87155e69, // prep.xp_disks
+    0x19d32f03, // profile.add
+    0xf7030016, // profile.add.detail
+    0x5951406b, // profile.add.detail_linux
+    0x0ed7f0df, // profile.arch_warning
+    0xc61083bb, // profile.badge
+    0x4d6d6420, // profile.badge_incomplete
+    0x18d4431a, // profile.cancel
+    0xe272fe39, // profile.delete.confirm
+    0xde446e2e, // profile.delete.keep
+    0x92e5d06b, // profile.delete.question
+    0x584ba887, // profile.delete.title
+    0x919ddef5, // profile.edition_missing
+    0xac80d0a1, // profile.editor.new
+    0x6f2b3c09, // profile.editor.subtitle
+    0x39676f88, // profile.editor.subtitle_linux
+    0xde080639, // profile.editor.title
+    0x49862935, // profile.field.bypass_ram
+    0x1513f82f, // profile.field.bypass_secure_boot
+    0x50329252, // profile.field.bypass_tpm
+    0xa13d2795, // profile.field.classic_start
+    0xa6b11e2b, // profile.field.computer
+    0x67b0880e, // profile.field.disable_uac
+    0x8015202b, // profile.field.disable_wer
+    0xe8e3e9d4, // profile.field.display
+    0x9c409bd4, // profile.field.edition
+    0xf69d863d, // profile.field.hide_outlook_express
+    0x1d1b0b5d, // profile.field.key
+    0x40eff7a3, // profile.field.keyboard
+    0x7890b224, // profile.field.language
+    0x06522829, // profile.field.local_account
+    0x383d1338, // profile.field.locale
+    0x8dd802a5, // profile.field.name
+    0x805be4da, // profile.field.network_location
+    0x2852f76e, // profile.field.no_autorun
+    0xe31c9ca0, // profile.field.no_balloon_tips
+    0xa22f6351, // profile.field.no_hibernation
+    0xe80859fc, // profile.field.no_network
+    0x1cafbf72, // profile.field.no_sidebar
+    0xc6afb682, // profile.field.no_welcome_center
+    0x7cebcb94, // profile.field.org
+    0x367e27db, // profile.field.password
+    0xf251a013, // profile.field.protect_pc
+    0xf04168d9, // profile.field.remember_key
+    0x228b6a96, // profile.field.show_extensions
+    0x57fc2cd0, // profile.field.show_hidden
+    0xea43708d, // profile.field.skip_games
+    0xf47b87f8, // profile.field.skip_msn
+    0x66eb02dc, // profile.field.systems
+    0xacd6085f, // profile.field.theme
+    0xc97f214d, // profile.field.timezone
+    0xa0db31f9, // profile.field.user
+    0x040f6291, // profile.field.user2
+    0x39ab14e9, // profile.file.detail
+    0x0922c403, // profile.help.bypass
+    0x2218a4ea, // profile.help.classic_start
+    0x46264466, // profile.help.computer
+    0x8b080fad, // profile.help.disable_uac
+    0xa0ced3e4, // profile.help.disable_wer
+    0xdfc03dcf, // profile.help.display
+    0xbe0d347f, // profile.help.edition
+    0x08ba0e0c, // profile.help.hide_outlook_express
+    0xcca2e39e, // profile.help.key
+    0x10f18736, // profile.help.keyboard
+    0x8e773749, // profile.help.language
+    0x7425bece, // profile.help.local_account
+    0x69474139, // profile.help.locale
+    0x33f53224, // profile.help.name
+    0x6dc95247, // profile.help.network_location
+    0x7e4da903, // profile.help.no_autorun
+    0x2248d9c3, // profile.help.no_balloon_tips
+    0x65b474ac, // profile.help.no_hibernation
+    0x7cf8eb69, // profile.help.no_network
+    0xdda310d3, // profile.help.no_sidebar
+    0x69a6ce19, // profile.help.no_welcome_center
+    0x324f097b, // profile.help.org
+    0xfc88614e, // profile.help.password
+    0x4d51ba86, // profile.help.protect_pc
+    0xa2076c1c, // profile.help.remember_key
+    0xa9724261, // profile.help.show_extensions
+    0x2872a44f, // profile.help.show_hidden
+    0xe0f94590, // profile.help.skip_games
+    0xfb1b5659, // profile.help.skip_msn
+    0xd953794f, // profile.help.systems
+    0x65191388, // profile.help.theme
+    0xf3284598, // profile.help.timezone
+    0xb1ef9f14, // profile.help.user
+    0x423788d2, // profile.help.user2
+    0x5f1c9d40, // profile.key.delete
+    0x4c0a173f, // profile.key.edit
+    0x4ce11c3a, // profile.key.import
+    0xb6f66d52, // profile.key.use
+    0xadbb5231, // profile.manual.detail
+    0xeea04301, // profile.missing.key
+    0x02d02387, // profile.missing.password
+    0xb6210153, // profile.problem.bad_characters
+    0x568a5598, // profile.problem.bad_key_format
+    0x94cec6cc, // profile.problem.duplicate
+    0x45a02e98, // profile.problem.empty
+    0xa0ced9c8, // profile.problem.only_digits
+    0x81e142e7, // profile.problem.reserved_name
+    0xa1001efc, // profile.problem.same_as_user
+    0x842984ea, // profile.problem.too_long
+    0xeb02a17f, // profile.row.detail
+    0x134a2641, // profile.row.help
+    0x4c6f4f3d, // profile.save
+    0x9f87b247, // profile.save_failed
+    0xd52428ac, // profile.section.extras
+    0xea748758, // profile.summary
+    0x803f740e, // profile.value.auto
+    0x94a66e59, // profile.value.network_home
+    0x0742279f, // profile.value.network_public
+    0xce89b51b, // profile.value.network_work
+    0x7de03296, // profile.value.protect_off
+    0x6c457fe8, // profile.value.protect_recommended
+    0x9310ce39, // profile.value.protect_updates
+    0x5f697fae, // profile.value.same_language
+    0x9a227b9e, // profile.value.same_locale
+    0x791012ad, // profile.value.setup_asks
+    0xdb76978d, // profile.value.systems_all
+    0xd11c4254, // profile.value.systems_linux
+    0x95a3a608, // profile.value.systems_only
+    0xfc2781a3, // profile.value.systems_windows
+    0x84c34547, // profile.value.theme_basic
+    0xcb765071, // profile.value.theme_classic
+    0x87382378, // profile.value.theme_default
+    0x8b09c640, // profile.xp_ini.detail
     0x50256306, // server.belongs_in
     0xb1aaa349, // server.blocked_ia64
     0x88ac4304, // server.client_in_server_folder
@@ -1128,19 +1254,6 @@ pub const hashes = [_]u32{
     0xedd282b9, // summary.xp_preparation
     0xa87889c3, // summary.xp_sif_merged
     0x6dfb98bd, // summary.xp_source
-    0x6fd0eb35, // system.copy_to
-    0x4961b793, // system.image_count
-    0x2a578ca3, // system.no_image
-    0xd3048155, // system.ready
-    0xab6c36c8, // system.requires_bios
-    0x47e54d83, // system.requires_bios.detail
-    0xb33e3eff, // system.requires_bios.hint
-    0xeb00f308, // system.requires_uefi
-    0xc483f543, // system.requires_uefi.detail
-    0xa4c837bf, // system.requires_uefi.hint
-    0x31aec0c8, // system.unavailable
-    0xa6ba9b83, // system.unavailable.detail
-    0xab5ff4f5, // systems.subtitle
     0x1a62b0c1, // theme_edit.blocked
     0xbe71b5e9, // theme_edit.cancel
     0xf3bd28a8, // theme_edit.contrast.bad
@@ -1196,40 +1309,9 @@ pub const hashes = [_]u32{
     0x15d38e5a, // theme_edit.saved
     0x90ebe073, // theme_edit.subtitle
     0xeec63a47, // theme_edit.title
-    0xf0db4556, // themes.builtin
-    0xaef5a0d8, // themes.current
-    0x68214e12, // themes.desc
-    0x4f5530c6, // themes.hint
-    0x43c727ce, // themes.invalid
-    0x02a08382, // themes.name.dark
-    0x94b57963, // themes.name.default
-    0xa784564d, // themes.name.high_contrast
-    0x991efc02, // themes.name.light
-    0x1fe4168e, // themes.name.retro
-    0x8246578f, // themes.title
-    0xb4b7e3f4, // themes.user
-    0x42cdb840, // unattended.file.detail
-    0x9b91564d, // unattended.none
-    0x16e5e868, // unattended.none.detail
-    0x0404a4d7, // unattended.subtitle
-    0x117edf4b, // unattended.title
-    0x318ddc7a, // unattended.vista_uefi
-    0xb090eb5e, // unattended.vista_uefi_detail
-    0xc77e920d, // unattended.xp_file.detail
-    0xd75cdb9a, // unattended.xp_manual
-    0x922274cd, // unattended.xp_manual.detail
-    0x33bff8f1, // unattended.xp_settings
-    0x8b01f4fc, // unattended.xp_settings.detail
-    0x90427850, // utilities.freedos.desc
-    0xbe35b4e2, // utilities.hardware.desc
-    0x89ec8a66, // utilities.none.line1
-    0x88ec88d3, // utilities.none.line2
-    0x638b0125, // utilities.none.title
     0x75bb3dee, // utilities.shell.desc
     0x5242a903, // utilities.shell.title
     0x30ddf187, // utility.unavailable
-    0x892e4ca0, // wait
-    0x3e1f8ab9, // wait_usb
     0xd1d3d8e5, // xp_prep.checking
     0x72ed5eb8, // xp_prep.choose_disk
     0x8a502c84, // xp_prep.copy_verify
@@ -1240,16 +1322,6 @@ pub const hashes = [_]u32{
 
 /// False for strings only the UEFI menu shows (left out of the BIOS Core).
 pub const bios = [_]bool{
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
     true,
     true,
     true,
@@ -1285,9 +1357,6 @@ pub const bios = [_]bool{
     true,
     true,
     true,
-    false,
-    false,
-    false,
     true,
     true,
     true,
@@ -1358,47 +1427,7 @@ pub const bios = [_]bool{
     true,
     true,
     true,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
     true,
-    false,
     true,
     true,
     true,
@@ -1434,9 +1463,6 @@ pub const bios = [_]bool{
     true,
     true,
     true,
-    false,
-    false,
-    false,
     true,
     true,
     true,
@@ -1444,16 +1470,6 @@ pub const bios = [_]bool{
     true,
     true,
     true,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
     true,
     true,
     true,
@@ -1507,16 +1523,10 @@ pub const bios = [_]bool{
     true,
     true,
     true,
-    false,
-    false,
     true,
     true,
     true,
     true,
-    false,
-    false,
-    false,
-    false,
     true,
     true,
     true,
@@ -1529,24 +1539,116 @@ pub const bios = [_]bool{
     true,
     true,
     true,
-    false,
     true,
     true,
-    false,
-    false,
     true,
     true,
     true,
     true,
     true,
     true,
-    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
     true,
     true,
     true,
     true,
     true,
     true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
     false,
     false,
     false,
@@ -1633,58 +1735,6 @@ pub const bios = [_]bool{
     false,
     false,
     false,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
     false,
     false,
     false,
@@ -1747,19 +1797,6 @@ pub const bios = [_]bool{
     false,
     false,
     false,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
     false,
     false,
     false,
@@ -1815,40 +1852,126 @@ pub const bios = [_]bool{
     false,
     false,
     false,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
     false,
     false,
     false,
-    true,
-    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
     false,
     false,
     false,
@@ -1857,17 +1980,10 @@ pub const bios = [_]bool{
     false,
 };
 
+/// The BIOS Core's strings are the first bios_count keys.
+pub const bios_count = 327;
+
 pub const english = [_][]const u8{
-    "Start is not possible with these settings",
-    "Prepare and chainload",
-    "Start the EFI application",
-    "Press Enter or click the button to start.",
-    "Load the Windows ISO",
-    "Start Linux",
-    "Prepare native VHD/VHDX boot",
-    "Build and boot the WIM environment",
-    "Start WinPE",
-    "Prepare the Windows XP installation",
     "Experimental",
     "Ready",
     "Recommended",
@@ -1903,9 +2019,6 @@ pub const english = [_][]const u8{
     "Utilities",
     "Diagnostics, recovery and firmware tools",
     "Install and repair Microsoft Windows",
-    "Boot media preparation is complete.",
-    "Starting EFI/BOOT from the prepared WORK partition...",
-    "Starting chained bootloader",
     "Sun",
     "Mon",
     "Tue",
@@ -1976,47 +2089,7 @@ pub const english = [_][]const u8{
     "Rename the folder (no = [ ] ;) to switch it here",
     "Only on ROG Ally and Steam Deck (SMBIOS)",
     "Type: {0}",
-    "Transferring control through UEFI LoadImage/StartImage...",
-    "Starting EFI application",
-    "USOS could not open the NTFS USOS_DATA volume.",
-    "Images are read directly from DATA; ESP marker files are not used.",
-    "DATA catalog unavailable",
-    "EFI start failed",
-    "This selection cannot start in the current firmware mode.",
-    "Firmware mismatch",
-    "Windows ISO start failed",
-    "Linux ISO start failed",
-    "The ISO file is too fragmented on DATA. Copy it to DATA again.",
-    "USOS files on the stick are incomplete. Run Repair in the USOS installer.",
-    "No Linux boot entry was found in this ISO.",
-    "Preparation failed",
-    "Secure Boot rejected the file: it is not signed by Microsoft or by an enrolled key.",
-    "The operation stopped safely. Check the serial log if needed.",
-    "The selected method has no working backend.",
-    "Boot method unavailable",
-    "XP preparation failed",
-    "(empty)",
-    "Delete",
-    "Change",
-    "Keys",
-    "Off",
-    "On",
-    "Done",
-    "Shift",
-    "Space",
-    "Choose a value",
-    "Loading Windows Boot Manager...",
-    "Saving the one-shot handoff state...",
-    "Windows installer preparation is complete.",
-    "Please wait. The Windows logo will appear shortly.",
-    "Loading the NTFS driver...",
-    "Preparing the Windows Setup handoff...",
-    "Starting Windows Setup",
-    "Transferring control to Windows Setup...",
-    "Verifying install.wim and EFI boot files...",
-    "Locating the prepared WORK partition...",
     "Build {0}",
-    "No mouse",
     "Boot menu",
     "Automatic - recommended",
     "USOS selects the supported boot path for this image automatically.",
@@ -2052,9 +2125,6 @@ pub const english = [_][]const u8{
     "WIMBoot",
     "Starts Windows Setup directly from the ISO on DATA; nothing is copied to WORK.",
     "Boot files go to the target disk; the USOS stick's ESP is checked and restored.",
-    "Detects the installer version and starts it directly from ISO in UEFI.",
-    "WinPE 7 receives UEFI compatibility and optional Drivers/x64 packages in RAM.",
-    "Windows ISO - WIMBoot UEFI",
     "Windows Setup",
     "No supported image files were found in Images.",
     "Copy ISO, WIM, IMG, VHD, VHDX or EFI files into Images and try again.",
@@ -2062,16 +2132,6 @@ pub const english = [_][]const u8{
     "Select image",
     "Shows mouse, touch and key events live. Press Esc twice to leave.",
     "Input test",
-    "Reading optional Windows 7 x64 driver packages",
-    "Starting external PE10; the install source remains the selected Windows ISO",
-    "Starting the hybrid ISO's own WinPE and Setup",
-    "Loading boot-source boot.wim: {0}%",
-    "Reading the selected Windows ISO",
-    "Validating installation ISO",
-    "Loading Windows boot files",
-    "Starting Windows Setup",
-    "Starting Windows from ISO",
-    "Validating the installation ISO and resolving the boot source",
     "Back",
     "Boot method",
     "Cancel",
@@ -2125,16 +2185,10 @@ pub const english = [_][]const u8{
     "No boot methods are configured for this system.",
     "Choose how the selected image should be started",
     "Boot method",
-    "No implemented boot backend supports this selection.",
-    "This system stays visible because its backend is planned.",
     "No supported image files were found. Copy a file to:",
     "No images found",
     "APM power-off is unavailable on this computer.",
     "Turn off the computer manually.",
-    "Firmware setup (BIOS/UEFI)",
-    "Could not request firmware setup on the next restart.",
-    "Firmware setup",
-    "Not supported by this firmware",
     "Check the mouse, touchscreen and keys",
     "Restart",
     "Shut down",
@@ -2147,110 +2201,20 @@ pub const english = [_][]const u8{
     "Time left",
     "Ready - remove the USOS USB drive, then press Enter to power off.",
     "Do not disconnect the drive or turn off the computer.",
-    "Preparation environment ready",
     "Next power-on: boot the target disk without USOS.",
     "Remove the USOS USB drive before powering off.",
-    "Preparation request saved",
-    "Return boot configured",
     "Speed",
     "Starting environment",
     "Verifying target device",
     "Preparing workspace",
     "Copying files",
     "Verification and finalization",
-    "Starting preparation environment",
     "Done",
     "Failed",
     "In progress",
     "Waiting",
     "Step {0} of {1}",
     "Preparing Windows installer",
-    "Starting XP disk selection",
-    "+ Add a new profile",
-    "A USOS profile: accounts, computer name, language and time zone for every Windows",
-    "A USOS profile: user, computer name, language and time zone for the Linux installer; you always choose the disk",
-    "The answer file has no settings for {0} media: Setup ignores it. Use a file made for this architecture.",
-    "USOS profile",
-    "Cancel",
-    "Delete the profile",
-    "Keep the profile",
-    "Delete the profile {0} from this stick?",
-    "Delete profile",
-    "Edition \"{0}\" is not on this ISO: Setup asks for the edition.",
-    "New answer profile",
-    "One profile for every Windows: USOS writes the answer file when the installation starts",
-    "One profile for Windows and Linux: USOS writes the answer file when the installation starts",
-    "Answer profile",
-    "Windows 11: skip the RAM check",
-    "Windows 11: skip the Secure Boot check",
-    "Windows 11: skip the TPM check",
-    "Computer name",
-    "Turn off error reporting",
-    "Edition",
-    "Product key ({0})",
-    "Keyboard",
-    "Windows language",
-    "Local account",
-    "Formats",
-    "Profile name",
-    "Vista/7: network location",
-    "Windows 11: set up without network",
-    "Organization",
-    "Password",
-    "Protection and updates",
-    "Remember the key on this stick",
-    "Time zone",
-    "User name",
-    "Second user",
-    "Answer file from the Unattended folder, used as it is",
-    "For hardware below the Windows 11 requirements. Microsoft does not support such installations; feature updates may need the bypass again.",
-    "1-15 characters A-Z a-z 0-9 and -, not only digits. Empty: USOS-XP on XP, a name chosen by Setup on newer Windows.",
-    "Vista and newer: Windows Error Reporting stays off (no problem reports are sent).",
-    "Edition Setup installs, matched against the images of the chosen ISO (also across languages; Server: Core or Desktop Experience). Empty or not on the ISO: Setup shows its edition list.",
-    "Product key for {0} (XXXXX-XXXXX-XXXXX-XXXXX-XXXXX). Empty: Setup asks for it or offers the edition list.",
-    "Keyboard layout of Windows. Same as the formats: the default keyboard of that language.",
-    "Language of Setup and of Windows; the installation media must contain it. Automatic: Setup asks.",
-    "Windows 8 and newer: create the accounts locally and hide the Microsoft account pages.",
-    "Date, time, number and currency formats.",
-    "Name of the profile on this stick: 1-32 characters A-Z a-z 0-9, space, . _ -",
-    "Vista and 7: answer to the network location page. Work or Home: a private network; Public: the strictest firewall.",
-    "Windows 11: finish the setup without a network connection (BypassNRO).",
-    "Optional: up to 64 characters, without \" % ^ & | < >",
-    "Password of the accounts; empty means no password. It is stored as plain text on the stick.",
-    "Answer to the \"Help protect Windows\" page (Vista and newer). Off: no automatic updates until you turn them on.",
-    "Off: the key is used until this computer restarts and is never written to the stick.",
-    "Automatic: the default of the installation media.",
-    "First local account, an administrator: 1-20 characters A-Z a-z 0-9 . _ - and space.",
-    "Optional second administrator account.",
-    "Delete",
-    "Edit",
-    "Import",
-    "Use",
-    "Setup asks every question itself; no profile or file is used",
-    "It contains characters that are not allowed here.",
-    "A product key has the form XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
-    "A profile with this name exists already.",
-    "This field is required.",
-    "A computer name cannot be only digits.",
-    "This is the name of a built-in Windows account.",
-    "The second user must differ from the first.",
-    "Too long.",
-    "{0}, {1}",
-    "A USOS profile, turned into the answer file for this Windows when the installation starts. The target disk is always chosen in Setup.",
-    "Save",
-    "The profile could not be saved on the stick:",
-    "Profile {0}: {1} ({2})",
-    "Automatic",
-    "Home",
-    "Public",
-    "Work",
-    "Off",
-    "Recommended settings",
-    "Important updates only",
-    "Same as the language",
-    "Same as the formats",
-    "(Setup asks)",
-    "usos-xp.ini on DATA (read only); Import makes a USOS profile of it",
     "Missing",
     "Available while Secure Boot is off",
     "Available only when USOS is started by shim (EFI\\BOOT\\BOOTX64.EFI)",
@@ -2303,6 +2267,253 @@ pub const english = [_][]const u8{
     "Key saved",
     "Secure Boot key",
     "Yes, save the key",
+    "Copy images to {0}",
+    "Images: {0}",
+    "No image",
+    "Ready",
+    "Requires BIOS",
+    "This system starts only in BIOS mode; USOS is running in UEFI mode.",
+    "To use it, start the USB stick in Legacy BIOS (CSM) mode: pick its non-UEFI entry in the firmware boot menu.",
+    "Requires UEFI",
+    "This system starts only in UEFI mode; USOS is running in BIOS mode.",
+    "To use it, start the USB stick in UEFI mode: pick its UEFI entry in the firmware boot menu.",
+    "Unavailable",
+    "No working boot backend supports this system yet.",
+    "Select a system, distribution or utility group",
+    "built-in",
+    "in use",
+    "Colours of this menu",
+    "Enter/A applies it now and saves it on the stick",
+    "This theme cannot be used: {0}",
+    "Dark",
+    "Default",
+    "High contrast",
+    "Light",
+    "Retro (BIOS blue)",
+    "Theme",
+    "your theme",
+    "The selected answer file is copied after the target safety check.",
+    "No answer file",
+    "Use the default setup options without a custom answer file.",
+    "Choose an answer file or continue without one",
+    "Unattended setup",
+    "Answer files: not supported for Vista on UEFI yet",
+    "Vista Setup on UEFI runs without your answer files and profiles for now; choose the manual installation.",
+    "The .sif is merged into the automatic answer; disk, PAE and driver settings stay automatic. usos-xp.ini is not used.",
+    "No answer file (manual installation)",
+    "usos-xp.ini is not used: XP Setup asks for the name, product key and time zone.",
+    "usos-xp.ini: {0}, {1}",
+    "Automatic XP Setup with the accounts and computer name from usos-xp.ini. The product key is not shown.",
+    "DOS programs from USB, file manager and command prompt",
+    "Built-in: CPU, RAM, motherboard and disks",
+    "No utility folders were found on this USOS drive.",
+    "Create Utilities/<tool name>/Images on DATA, then run Update USOS.",
+    "No utilities",
+    "Please wait",
+    "Please wait - keep the USB drive connected",
+    "Start is not possible with these settings",
+    "Prepare and chainload",
+    "Start the EFI application",
+    "Press Enter or click the button to start.",
+    "Load the Windows ISO",
+    "Start Linux",
+    "Prepare native VHD/VHDX boot",
+    "Build and boot the WIM environment",
+    "Start WinPE",
+    "Prepare the Windows XP installation",
+    "Boot media preparation is complete.",
+    "Starting EFI/BOOT from the prepared WORK partition...",
+    "Starting chained bootloader",
+    "Transferring control through UEFI LoadImage/StartImage...",
+    "Starting EFI application",
+    "USOS could not open the NTFS USOS_DATA volume.",
+    "Images are read directly from DATA; ESP marker files are not used.",
+    "DATA catalog unavailable",
+    "EFI start failed",
+    "This selection cannot start in the current firmware mode.",
+    "Firmware mismatch",
+    "Windows ISO start failed",
+    "Linux ISO start failed",
+    "The ISO file is too fragmented on DATA. Copy it to DATA again.",
+    "USOS files on the stick are incomplete. Run Repair in the USOS installer.",
+    "No Linux boot entry was found in this ISO.",
+    "Preparation failed",
+    "Secure Boot rejected the file: it is not signed by Microsoft or by an enrolled key.",
+    "The operation stopped safely. Check the serial log if needed.",
+    "The selected method has no working backend.",
+    "Boot method unavailable",
+    "XP preparation failed",
+    "(empty)",
+    "Delete",
+    "Change",
+    "Keys",
+    "Off",
+    "On",
+    "Done",
+    "Shift",
+    "Space",
+    "Choose a value",
+    "Loading Windows Boot Manager...",
+    "Saving the one-shot handoff state...",
+    "Windows installer preparation is complete.",
+    "Please wait. The Windows logo will appear shortly.",
+    "Loading the NTFS driver...",
+    "Preparing the Windows Setup handoff...",
+    "Starting Windows Setup",
+    "Transferring control to Windows Setup...",
+    "Verifying install.wim and EFI boot files...",
+    "Locating the prepared WORK partition...",
+    "No mouse",
+    "Detects the installer version and starts it directly from ISO in UEFI.",
+    "WinPE 7 receives UEFI compatibility and optional Drivers/x64 packages in RAM.",
+    "Windows ISO - WIMBoot UEFI",
+    "Reading optional Windows 7 x64 driver packages",
+    "Starting external PE10; the install source remains the selected Windows ISO",
+    "Starting the hybrid ISO's own WinPE and Setup",
+    "Loading boot-source boot.wim: {0}%",
+    "Reading the selected Windows ISO",
+    "Validating installation ISO",
+    "Loading Windows boot files",
+    "Starting Windows Setup",
+    "Starting Windows from ISO",
+    "Validating the installation ISO and resolving the boot source",
+    "No implemented boot backend supports this selection.",
+    "This system stays visible because its backend is planned.",
+    "Firmware setup (BIOS/UEFI)",
+    "Could not request firmware setup on the next restart.",
+    "Firmware setup",
+    "Not supported by this firmware",
+    "Preparation environment ready",
+    "Preparation request saved",
+    "Return boot configured",
+    "Starting preparation environment",
+    "Starting XP disk selection",
+    "+ Add a new profile",
+    "A USOS profile: accounts, computer name, language and time zone for every Windows",
+    "A USOS profile: user, computer name, language and time zone for the Linux installer; you always choose the disk",
+    "The answer file has no settings for {0} media: Setup ignores it. Use a file made for this architecture.",
+    "USOS profile",
+    "Incomplete",
+    "Cancel",
+    "Delete the profile",
+    "Keep the profile",
+    "Delete the profile {0} from this stick?",
+    "Delete profile",
+    "Edition \"{0}\" is not on this ISO: Setup asks for the edition.",
+    "New answer profile",
+    "One profile for every Windows: USOS writes the answer file when the installation starts",
+    "One profile for Windows and Linux: USOS writes the answer file when the installation starts",
+    "Answer profile",
+    "Windows 11: skip the RAM check",
+    "Windows 11: skip the Secure Boot check",
+    "Windows 11: skip the TPM check",
+    "Classic Start menu",
+    "Computer name",
+    "Turn off UAC",
+    "Turn off error reporting",
+    "Screen resolution",
+    "Edition",
+    "Hide Outlook Express",
+    "Product key ({0})",
+    "Keyboard",
+    "Windows language",
+    "Local account",
+    "Formats",
+    "Profile name",
+    "Vista/7: network location",
+    "Turn off AutoRun",
+    "No balloon tips",
+    "Turn off hibernation",
+    "Windows 11: set up without network",
+    "Turn off Sidebar and gadgets",
+    "No Welcome Center",
+    "Organization",
+    "Password",
+    "Protection and updates",
+    "Remember the key on this stick",
+    "Show file extensions",
+    "Show hidden files",
+    "No games",
+    "No MSN Explorer and Messenger",
+    "Use for",
+    "Theme",
+    "Time zone",
+    "User name",
+    "Second user",
+    "Answer file from the Unattended folder, used as it is",
+    "For hardware below the Windows 11 requirements. Microsoft does not support such installations; feature updates may need the bypass again.",
+    "XP: the Windows 2000 style Start menu for new users.",
+    "1-15 characters A-Z a-z 0-9 and -, not only digits. Empty: USOS-XP on XP, a name chosen by Setup on newer Windows.",
+    "Vista and 7: User Account Control off. Less safe: every program of an administrator runs with full rights.",
+    "Vista and newer: Windows Error Reporting stays off (no problem reports are sent).",
+    "XP and Server 2003: 32-bit colour at this resolution when the display driver offers it. Automatic: unchanged; without a display driver (the VGA driver, e.g. through CSMWrap) Windows keeps its basic mode.",
+    "Edition Setup installs, matched against the images of the chosen ISO (also across languages; Server: Core or Desktop Experience). Empty or not on the ISO: Setup shows its edition list.",
+    "XP and Server 2003: the Outlook Express shortcuts are removed; the program itself stays.",
+    "Product key for {0} (XXXXX-XXXXX-XXXXX-XXXXX-XXXXX). Empty: Setup asks for it or offers the edition list.",
+    "Keyboard layout of Windows. Same as the formats: the default keyboard of that language.",
+    "Language of Setup and of Windows; the installation media must contain it. Automatic: Setup asks.",
+    "Windows 8 and newer: create the accounts locally and hide the Microsoft account pages.",
+    "Date, time, number and currency formats.",
+    "Name of the profile on this stick: 1-32 characters A-Z a-z 0-9, space, . _ -",
+    "Vista and 7: answer to the network location page. Work or Home: a private network; Public: the strictest firewall.",
+    "AutoRun and AutoPlay stay off on every drive, USB sticks and CDs included (NoDriveTypeAutoRun).",
+    "XP and Server 2003: no balloon tips in the notification area; XP also skips the \"Tour Windows XP\" prompt.",
+    "Vista and 7: no hibernation and no hybrid sleep; the disk space of hiberfil.sys is freed.",
+    "Windows 11: finish the setup without a network connection (BypassNRO).",
+    "Vista: Windows Sidebar, 7: desktop gadgets, turned off by policy.",
+    "Vista: the Welcome Center does not open at every logon.",
+    "Optional: up to 64 characters, without \" % ^ & | < >",
+    "Password of the accounts; empty means no password. It is stored as plain text on the stick.",
+    "Answer to the \"Help protect Windows\" page (Vista and newer). Off: no automatic updates until you turn them on.",
+    "Off: the key is used until this computer restarts and is never written to the stick.",
+    "Explorer shows file name extensions such as .exe (for every new user).",
+    "Explorer shows hidden files and folders (for every new user); protected system files stay hidden.",
+    "XP: the games are not installed. Vista and 7: the Games feature is turned off during Setup.",
+    "XP and Server 2003: MSN Explorer and Windows Messenger are not installed.",
+    "The systems whose answer screen offers this profile. Profiles saved without this setting are offered for every Windows, never for Linux.",
+    "Theme of new users. XP: Windows Classic instead of Luna. 7: Windows Classic or Windows 7 Basic.",
+    "Automatic: the default of the installation media.",
+    "First local account, an administrator: 1-20 characters A-Z a-z 0-9 . _ - and space.",
+    "Optional second administrator account.",
+    "Delete",
+    "Edit",
+    "Import",
+    "Use",
+    "Setup asks every question itself; no profile or file is used",
+    "No product key for {0}: Setup stops on the product key page. Edit the profile (X) and enter the key.",
+    "{0} needs a password of at least 7 characters with three of: capitals, small letters, digits, symbols. Without one Setup stops on the Administrator password page.",
+    "It contains characters that are not allowed here.",
+    "A product key has the form XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.",
+    "A profile with this name exists already.",
+    "This field is required.",
+    "A computer name cannot be only digits.",
+    "This is the name of a built-in Windows account.",
+    "The second user must differ from the first.",
+    "Too long.",
+    "{0}, {1}",
+    "A USOS profile, turned into the answer file for this Windows when the installation starts. The target disk is always chosen in Setup.",
+    "Save",
+    "The profile could not be saved on the stick:",
+    "Appearance and extras",
+    "Profile {0}: {1} ({2})",
+    "Automatic",
+    "Home",
+    "Public",
+    "Work",
+    "Off",
+    "Recommended settings",
+    "Important updates only",
+    "Same as the language",
+    "Same as the formats",
+    "(Setup asks)",
+    "Windows and Linux",
+    "Every Linux installer",
+    "Only {0}",
+    "Every Windows",
+    "Windows 7 Basic",
+    "Windows Classic",
+    "Default",
+    "usos-xp.ini on DATA (read only); Import makes a USOS profile of it",
     "Belongs in Systems\\Windows\\{0}",
     "Itanium (IA64) image - it does not start on this PC",
     "This is a client Windows image. It belongs in Systems\\Windows\\{0}; it can still be started from here.",
@@ -2365,19 +2576,6 @@ pub const english = [_][]const u8{
     "UEFI; installed XP requires firmware CSM and MBR",
     "{0} (merged into the automatic answer)",
     "XP SP3 x86; ACPI / SATA / USB drivers; optional PAE boot entry",
-    "Copy images to {0}",
-    "Images: {0}",
-    "No image",
-    "Ready",
-    "Requires BIOS",
-    "This system starts only in BIOS mode; USOS is running in UEFI mode.",
-    "To use it, start the USB stick in Legacy BIOS (CSM) mode: pick its non-UEFI entry in the firmware boot menu.",
-    "Requires UEFI",
-    "This system starts only in UEFI mode; USOS is running in BIOS mode.",
-    "To use it, start the USB stick in UEFI mode: pick its UEFI entry in the firmware boot menu.",
-    "Unavailable",
-    "No working boot backend supports this system yet.",
-    "Select a system, distribution or utility group",
     "Fix the contrast first: {0}",
     "Cancel",
     "Too little contrast: {0}",
@@ -2433,40 +2631,9 @@ pub const english = [_][]const u8{
     "Theme {0} saved on the stick and in use.",
     "Base theme, element, colour: the preview and the contrast check follow every change",
     "Theme editor",
-    "built-in",
-    "in use",
-    "Colours of this menu",
-    "Enter/A applies it now and saves it on the stick",
-    "This theme cannot be used: {0}",
-    "Dark",
-    "Default",
-    "High contrast",
-    "Light",
-    "Retro (BIOS blue)",
-    "Theme",
-    "your theme",
-    "The selected answer file is copied after the target safety check.",
-    "No answer file",
-    "Use the default setup options without a custom answer file.",
-    "Choose an answer file or continue without one",
-    "Unattended setup",
-    "Answer files: not supported for Vista on UEFI yet",
-    "Vista Setup on UEFI runs without your answer files and profiles for now; choose the manual installation.",
-    "The .sif is merged into the automatic answer; disk, PAE and driver settings stay automatic. usos-xp.ini is not used.",
-    "No answer file (manual installation)",
-    "usos-xp.ini is not used: XP Setup asks for the name, product key and time zone.",
-    "usos-xp.ini: {0}, {1}",
-    "Automatic XP Setup with the accounts and computer name from usos-xp.ini. The product key is not shown.",
-    "DOS programs from USB, file manager and command prompt",
-    "Built-in: CPU, RAM, motherboard and disks",
-    "No utility folders were found on this USOS drive.",
-    "Create Utilities/<tool name>/Images on DATA, then run Update USOS.",
-    "No utilities",
     "Command line for EFI tools (flashers, testers) from DATA",
     "UEFI Shell",
     "This utility stays visible while its boot backend is unavailable.",
-    "Please wait",
-    "Please wait - keep the USB drive connected",
     "Checking the XP kernel, initramfs and USB drive identity",
     "Choosing the target disk",
     "Copying and verifying files",

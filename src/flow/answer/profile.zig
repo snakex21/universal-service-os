@@ -56,7 +56,26 @@ pub const Field = enum {
     network_location,
     disable_wer,
     edition,
+    systems,
+    skip_games,
+    skip_msn,
+    hide_outlook_express,
+    classic_start,
+    theme,
+    no_balloon_tips,
+    display,
+    disable_uac,
+    no_sidebar,
+    no_welcome_center,
+    no_hibernation,
+    show_extensions,
+    show_hidden,
+    no_autorun,
 };
+
+/// The optional look and extras toggles (docs/answer-profiles.md,
+/// "Tweaks"); schema.tweak_support says which versions render each.
+pub const tweak_fields = [_]Field{ .skip_games, .skip_msn, .hide_outlook_express, .classic_start, .no_balloon_tips, .disable_uac, .no_sidebar, .no_welcome_center, .no_hibernation, .show_extensions, .show_hidden, .no_autorun };
 
 /// The "Help protect Windows" page (OOBE/ProtectYourPC, Vista and newer).
 pub const ProtectPc = enum(u2) {
@@ -88,6 +107,31 @@ pub const NetworkLocation = enum {
             .work => "Work",
             .home => "Home",
             .public => "Other",
+        };
+    }
+};
+
+/// Theme for new users: XP Windows Classic ([Shell] DefaultThemesOff),
+/// Windows 7 Windows Classic or Windows 7 Basic (Themes/CustomDefaultThemeFile).
+pub const Theme = enum {
+    default,
+    classic,
+    basic,
+};
+
+/// XP / Server 2003 [Display]: 32-bit colour at this resolution; auto: unchanged.
+pub const Display = enum {
+    auto,
+    @"1024x768",
+    @"1280x1024",
+    @"1920x1080",
+
+    pub fn size(self: Display) ?[2]u16 {
+        return switch (self) {
+            .auto => null,
+            .@"1024x768" => .{ 1024, 768 },
+            .@"1280x1024" => .{ 1280, 1024 },
+            .@"1920x1080" => .{ 1920, 1080 },
         };
     }
 };
@@ -167,6 +211,56 @@ pub const Profile = struct {
     network_location: NetworkLocation = .work,
     /// Vista+: Windows Error Reporting off (ErrorReportingCore/DisableWER).
     disable_wer: bool = false,
+    /// Systems that offer this profile (applies.zig): normalized, lower
+    /// case, comma-separated catalog ids and groups (windows, windows-nt5,
+    /// windows-nt6, linux). Empty: saved before the field existed (every
+    /// Windows, see applies.effective).
+    systems: Text(160) = .{},
+    // Tweaks (off = unchanged); schema.tweak_support gates them per version.
+    skip_games: bool = false,
+    skip_msn: bool = false,
+    hide_outlook_express: bool = false,
+    classic_start: bool = false,
+    theme: Theme = .default,
+    no_balloon_tips: bool = false,
+    display: Display = .auto,
+    disable_uac: bool = false,
+    no_sidebar: bool = false,
+    no_welcome_center: bool = false,
+    no_hibernation: bool = false,
+    show_extensions: bool = false,
+    show_hidden: bool = false,
+    no_autorun: bool = false,
+
+    pub fn flag(self: *Profile, field: Field) ?*bool {
+        return switch (field) {
+            .remember_key => &self.remember_key,
+            .manual_disk => &self.manual_disk,
+            .local_account => &self.local_account,
+            .bypass_tpm => &self.bypass_tpm,
+            .bypass_secure_boot => &self.bypass_secure_boot,
+            .bypass_ram => &self.bypass_ram,
+            .no_network_oobe => &self.no_network_oobe,
+            .disable_wer => &self.disable_wer,
+            .skip_games => &self.skip_games,
+            .skip_msn => &self.skip_msn,
+            .hide_outlook_express => &self.hide_outlook_express,
+            .classic_start => &self.classic_start,
+            .no_balloon_tips => &self.no_balloon_tips,
+            .disable_uac => &self.disable_uac,
+            .no_sidebar => &self.no_sidebar,
+            .no_welcome_center => &self.no_welcome_center,
+            .no_hibernation => &self.no_hibernation,
+            .show_extensions => &self.show_extensions,
+            .show_hidden => &self.show_hidden,
+            .no_autorun => &self.no_autorun,
+            else => null,
+        };
+    }
+
+    pub fn flagValue(self: *const Profile, field: Field) bool {
+        return @constCast(self).flag(field).?.*;
+    }
 
     /// Product key for a catalog system id: its own key, else the common one.
     pub fn keyFor(self: *const Profile, system_id: []const u8) []const u8 {
@@ -476,6 +570,52 @@ pub fn parse(text: []const u8, out: *Profile) ParseResult {
     return .ok;
 }
 
+/// Group tokens of `systems=` (applies.zig).
+pub const system_groups = [_][]const u8{ "windows", "windows-nt5", "windows-nt6", "linux" };
+/// Linux installers that take a profile (answer_screen.linuxAnswerSystem).
+pub const linux_systems = [_][]const u8{ "ubuntu", "debian", "fedora" };
+
+pub fn knownSystemToken(token: []const u8) bool {
+    if (@import("target.zig").familyFor(token) != null) return true;
+    for (system_groups ++ linux_systems) |known| {
+        if (std.mem.eql(u8, known, token)) return true;
+    }
+    return false;
+}
+
+/// `systems=`: comma-separated catalog ids and groups, spaces allowed,
+/// any case; stored lower case without spaces or duplicates. Empty stays
+/// empty (a profile saved before the field existed).
+pub fn normalizeSystems(value: []const u8, out: *Text(160)) ?Problem {
+    out.* = .{};
+    var parts = std.mem.splitScalar(u8, value, ',');
+    var buffer: [160]u8 = undefined;
+    var n: usize = 0;
+    while (parts.next()) |raw| {
+        const token = trim(raw);
+        if (token.len == 0) continue;
+        if (token.len > 32) return .bad_choice;
+        var lower: [32]u8 = undefined;
+        for (token, 0..) |c, i| lower[i] = std.ascii.toLower(c);
+        const t = lower[0..token.len];
+        if (!knownSystemToken(t)) return .bad_choice;
+        var existing = std.mem.splitScalar(u8, buffer[0..n], ',');
+        const dup = while (existing.next()) |e| {
+            if (std.mem.eql(u8, e, t)) break true;
+        } else false;
+        if (dup) continue;
+        if (n + @intFromBool(n > 0) + t.len > buffer.len) return .too_long;
+        if (n > 0) {
+            buffer[n] = ',';
+            n += 1;
+        }
+        @memcpy(buffer[n .. n + t.len], t);
+        n += t.len;
+    }
+    out.set(buffer[0..n]) catch return .too_long;
+    return null;
+}
+
 fn applyField(p: *Profile, name: []const u8, value: []const u8) ?Issue {
     if (std.ascii.startsWithIgnoreCase(name, "key.")) {
         const system = name[4..];
@@ -516,19 +656,16 @@ fn applyField(p: *Profile, name: []const u8, value: []const u8) ?Issue {
         },
         .protect_pc => p.protect_pc = enumByName(ProtectPc, value) orelse return .{ .field = field, .problem = .bad_choice },
         .network_location => p.network_location = enumByName(NetworkLocation, value) orelse return .{ .field = field, .problem = .bad_choice },
-        .remember_key, .manual_disk, .local_account, .bypass_tpm, .bypass_secure_boot, .bypass_ram, .no_network_oobe, .disable_wer => {
+        .theme => p.theme = enumByName(Theme, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .display => p.display = if (value.len == 0) .auto else enumByName(Display, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .systems => {
+            var normalized: Text(160) = .{};
+            if (normalizeSystems(value, &normalized)) |problem| return .{ .field = field, .problem = problem };
+            p.systems = normalized;
+        },
+        else => {
             const flag = parseBool(value) orelse return .{ .field = field, .problem = .bad_boolean };
-            switch (field) {
-                .remember_key => p.remember_key = flag,
-                .manual_disk => p.manual_disk = flag,
-                .local_account => p.local_account = flag,
-                .bypass_tpm => p.bypass_tpm = flag,
-                .bypass_secure_boot => p.bypass_secure_boot = flag,
-                .bypass_ram => p.bypass_ram = flag,
-                .no_network_oobe => p.no_network_oobe = flag,
-                .disable_wer => p.disable_wer = flag,
-                else => unreachable,
-            }
+            (p.flag(field) orelse unreachable).* = flag;
         },
     }
     return null;
@@ -574,6 +711,14 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
     try w.print("protect_pc={s}\r\nnetwork_location={s}\r\ndisable_wer={s}\r\n", .{ @tagName(p.protect_pc), @tagName(p.network_location), boolText(p.disable_wer) });
     try w.print("edition={s}\r\n", .{p.edition.slice()});
     for (p.system_editions[0..p.system_edition_count]) |*entry| try w.print("edition.{s}={s}\r\n", .{ entry.system.slice(), entry.edition.slice() });
+    // Written only when set: a profile without them stays readable by the
+    // builds before these keys (they refuse unknown keys).
+    if (p.systems.len > 0) try w.print("systems={s}\r\n", .{p.systems.slice()});
+    for (tweak_fields) |field| {
+        if (p.flagValue(field)) try w.print("{s}=yes\r\n", .{@tagName(field)});
+    }
+    if (p.theme != .default) try w.print("theme={s}\r\n", .{@tagName(p.theme)});
+    if (p.display != .auto) try w.print("display={s}\r\n", .{@tagName(p.display)});
     return w.buffered();
 }
 
@@ -661,6 +806,11 @@ test "profile round trip keeps every field; keys only with remember_key" {
     try p.edition.set("Pro");
     try p.setSystemEdition("windows-server-2022", "ServerDatacenterCore");
     p.remember_key = true;
+    try std.testing.expect(normalizeSystems(" Windows-Vista , LINUX,linux", &p.systems) == null);
+    p.show_extensions = true;
+    p.no_autorun = true;
+    p.theme = .basic;
+    p.display = .@"1280x1024";
     var buffer: [max_file]u8 = undefined;
     const text = try write(&p, &buffer);
     var q: Profile = undefined;
@@ -676,6 +826,10 @@ test "profile round trip keeps every field; keys only with remember_key" {
     try std.testing.expectEqual(ProtectPc.recommended, q.protect_pc);
     try std.testing.expectEqual(NetworkLocation.home, q.network_location);
     try std.testing.expect(q.disable_wer);
+    try std.testing.expectEqualStrings("windows-vista,linux", q.systems.slice());
+    try std.testing.expect(q.show_extensions and q.no_autorun and !q.show_hidden and !q.skip_games);
+    try std.testing.expectEqual(Theme.basic, q.theme);
+    try std.testing.expectEqual(Display.@"1280x1024", q.display);
     try std.testing.expectEqualStrings("Pro", q.editionFor("windows-7"));
     try std.testing.expectEqualStrings("ServerDatacenterCore", q.editionFor("windows-server-2022"));
     try q.setSystemEdition("windows-server-2022", "");
@@ -705,6 +859,10 @@ test "profile parse errors name the field and line, never the value" {
         .{ .text = "name=A\nuser=Bob\nprotect_pc=2\n", .field = .protect_pc, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\nnetwork_location=office\n", .field = .network_location, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\nedition=A<B\n", .field = .edition, .problem = .bad_characters, .line = 3 },
+        .{ .text = "name=A\nuser=Bob\nsystems=windows-vista,amiga\n", .field = .systems, .problem = .bad_choice, .line = 3 },
+        .{ .text = "name=A\nuser=Bob\ntheme=aero\n", .field = .theme, .problem = .bad_choice, .line = 3 },
+        .{ .text = "name=A\nuser=Bob\ndisplay=800x600\n", .field = .display, .problem = .bad_choice, .line = 3 },
+        .{ .text = "name=A\nuser=Bob\nskip_games=maybe\n", .field = .skip_games, .problem = .bad_boolean, .line = 3 },
         .{ .text = "name=A\nuser=Bob\npassword=a b\n", .field = .password, .problem = .bad_characters, .line = 0 },
         .{ .text = "name=A\njusttext\n", .field = null, .problem = .not_key_value, .line = 2 },
         .{ .text = "user=Bob\n", .field = .name, .problem = .empty, .line = 0 },
@@ -716,6 +874,17 @@ test "profile parse errors name the field and line, never the value" {
         try std.testing.expectEqual(case.field, result.invalid.field);
         try std.testing.expectEqual(case.problem, result.invalid.problem);
         try std.testing.expectEqual(case.line, result.invalid.line);
+    }
+}
+
+test "defaults write no new keys (older builds refuse unknown keys)" {
+    var p = Profile{};
+    try p.name.set("A");
+    try p.user.set("Bob");
+    var buffer: [max_file]u8 = undefined;
+    const text = try write(&p, &buffer);
+    for ([_][]const u8{ "systems=", "theme=", "display=", "skip_games", "show_extensions", "no_autorun" }) |k| {
+        try std.testing.expect(std.mem.indexOf(u8, text, k) == null);
     }
 }
 

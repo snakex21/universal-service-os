@@ -5,6 +5,10 @@
 //! answer_profiles.save. The product key edited here is the one for the
 //! system the editor was opened from (key.<system-id>); it is written only
 //! with "Remember the key".
+//!
+//! "Use for" (`systems=`) says which systems offer the profile; the
+//! "Appearance and extras" section lists only the tweaks the system has
+//! (answer.schema.tweak_support).
 const std = @import("std");
 const uefi = std.os.uefi;
 const usos = @import("usos");
@@ -13,6 +17,7 @@ const view = @import("manual_view.zig");
 const answer_profiles = @import("answer_profiles.zig");
 
 const answer = usos.flow.answer;
+const schema = answer.schema;
 const tables = answer.tables;
 const Profile = answer.Profile;
 const Problem = answer.profile.Problem;
@@ -39,9 +44,50 @@ const F = enum(u8) {
     protect_pc,
     network_location,
     disable_wer,
+    systems,
+    section_extras,
+    show_extensions,
+    show_hidden,
+    no_autorun,
+    disable_uac,
+    skip_games,
+    skip_msn,
+    hide_outlook_express,
+    classic_start,
+    no_balloon_tips,
+    no_sidebar,
+    no_welcome_center,
+    no_hibernation,
+    theme,
+    display,
     save,
     cancel,
 };
+
+/// The tweak toggles in the order of the "Appearance and extras" section.
+const TweakRow = struct { id: F, field: answer.profile.Field, tweak: schema.Tweak, label: view.Key, help: view.Key };
+const tweak_rows = [_]TweakRow{
+    .{ .id = .show_extensions, .field = .show_extensions, .tweak = .show_extensions, .label = .profile_field_show_extensions, .help = .profile_help_show_extensions },
+    .{ .id = .show_hidden, .field = .show_hidden, .tweak = .show_hidden, .label = .profile_field_show_hidden, .help = .profile_help_show_hidden },
+    .{ .id = .no_autorun, .field = .no_autorun, .tweak = .no_autorun, .label = .profile_field_no_autorun, .help = .profile_help_no_autorun },
+    .{ .id = .disable_uac, .field = .disable_uac, .tweak = .disable_uac, .label = .profile_field_disable_uac, .help = .profile_help_disable_uac },
+    .{ .id = .skip_games, .field = .skip_games, .tweak = .skip_games, .label = .profile_field_skip_games, .help = .profile_help_skip_games },
+    .{ .id = .skip_msn, .field = .skip_msn, .tweak = .skip_msn, .label = .profile_field_skip_msn, .help = .profile_help_skip_msn },
+    .{ .id = .hide_outlook_express, .field = .hide_outlook_express, .tweak = .hide_outlook_express, .label = .profile_field_hide_outlook_express, .help = .profile_help_hide_outlook_express },
+    .{ .id = .classic_start, .field = .classic_start, .tweak = .classic_start, .label = .profile_field_classic_start, .help = .profile_help_classic_start },
+    .{ .id = .no_balloon_tips, .field = .no_balloon_tips, .tweak = .no_balloon_tips, .label = .profile_field_no_balloon_tips, .help = .profile_help_no_balloon_tips },
+    .{ .id = .no_sidebar, .field = .no_sidebar, .tweak = .no_sidebar, .label = .profile_field_no_sidebar, .help = .profile_help_no_sidebar },
+    .{ .id = .no_welcome_center, .field = .no_welcome_center, .tweak = .no_welcome_center, .label = .profile_field_no_welcome_center, .help = .profile_help_no_welcome_center },
+    .{ .id = .no_hibernation, .field = .no_hibernation, .tweak = .no_hibernation, .label = .profile_field_no_hibernation, .help = .profile_help_no_hibernation },
+};
+var tweak_values: [tweak_rows.len]bool = @splat(false);
+
+fn tweakRow(id: F) ?usize {
+    for (tweak_rows, 0..) |row, i| {
+        if (row.id == id) return i;
+    }
+    return null;
+}
 
 const save_id: u8 = 1;
 const cancel_id: u8 = 2;
@@ -78,6 +124,21 @@ var protect_index: usize = 2;
 var network_index: usize = 0;
 var disable_wer = false;
 var protect_options: [3][]const u8 = undefined;
+/// "Use for": this system, its kind (every Windows / every Linux installer),
+/// Windows and Linux, and a stored list that is none of these (kept).
+var systems_options: [4][]const u8 = undefined;
+var systems_values: [4][]const u8 = undefined;
+var systems_option_count: usize = 0;
+var systems_index: usize = 0;
+var systems_only_text: [96]u8 = undefined;
+var systems_custom: [160]u8 = undefined;
+/// Theme values offered for this system (default first).
+var theme_options: [3][]const u8 = undefined;
+var theme_values: [3]answer.profile.Theme = undefined;
+var theme_option_count: usize = 0;
+var theme_index: usize = 0;
+var display_options: [@typeInfo(answer.profile.Display).@"enum".fields.len][]const u8 = undefined;
+var display_index: usize = 0;
 var network_options: [3][]const u8 = undefined;
 const protect_values = [_]answer.profile.ProtectPc{ .recommended, .updates, .off };
 const network_values = [_]answer.profile.NetworkLocation{ .work, .home, .public };
@@ -124,6 +185,8 @@ fn setOptions() void {
     locale_options[0] = t(.profile_value_same_language);
     keyboard_options[0] = t(.profile_value_same_locale);
     protect_options = .{ t(.profile_value_protect_recommended), t(.profile_value_protect_updates), t(.profile_value_protect_off) };
+    display_options[0] = t(.profile_value_auto);
+    inline for (@typeInfo(answer.profile.Display).@"enum".fields[1..], 1..) |f, i| display_options[i] = f.name;
     network_options = .{ t(.profile_value_network_work), t(.profile_value_network_home), t(.profile_value_network_public) };
     for (tables.languages, 0..) |entry, i| {
         language_options[i + 1] = entry.label;
@@ -192,6 +255,55 @@ fn load(p: *const Profile) void {
     protect_index = std.mem.indexOfScalar(answer.profile.ProtectPc, &protect_values, p.protect_pc).?;
     network_index = std.mem.indexOfScalar(answer.profile.NetworkLocation, &network_values, p.network_location).?;
     disable_wer = p.disable_wer;
+    for (tweak_rows, 0..) |row, i| tweak_values[i] = p.flagValue(row.field);
+    display_index = @intFromEnum(p.display);
+    loadTheme(p.theme);
+    loadSystems(answer.applies.effective(p));
+}
+
+fn familyOfEditor() ?answer.Family {
+    return answer.target.familyFor(system_id);
+}
+
+fn loadTheme(current: answer.profile.Theme) void {
+    theme_option_count = 0;
+    const family = familyOfEditor();
+    const offered = [_]struct { theme: answer.profile.Theme, key: view.Key, tweak: ?schema.Tweak }{
+        .{ .theme = .default, .key = .profile_value_theme_default, .tweak = null },
+        .{ .theme = .classic, .key = .profile_value_theme_classic, .tweak = .theme_classic },
+        .{ .theme = .basic, .key = .profile_value_theme_basic, .tweak = .theme_basic },
+    };
+    theme_index = 0;
+    for (offered) |o| {
+        const available = if (o.tweak) |tw| (if (family) |f| schema.tweakAvailable(tw, f) else false) else true;
+        // A stored theme this system lacks stays as it is (other systems use it).
+        if (!available and o.theme != current) continue;
+        if (o.theme == current) theme_index = theme_option_count;
+        theme_options[theme_option_count] = t(o.key);
+        theme_values[theme_option_count] = o.theme;
+        theme_option_count += 1;
+    }
+}
+
+fn loadSystems(current: []const u8) void {
+    const linux = usos.flow.answer_screen.linuxAnswerSystem(system_id);
+    systems_options[0] = view.format(&systems_only_text, .profile_value_systems_only, &.{system_name});
+    systems_values[0] = system_id;
+    systems_options[1] = t(if (linux) .profile_value_systems_linux else .profile_value_systems_windows);
+    systems_values[1] = if (linux) "linux" else "windows";
+    systems_options[2] = t(.profile_value_systems_all);
+    systems_values[2] = "windows,linux";
+    systems_option_count = 3;
+    systems_index = for (systems_values[0..3], 0..) |value, i| {
+        if (std.ascii.eqlIgnoreCase(value, current)) break i;
+    } else blk: {
+        const n = @min(current.len, systems_custom.len);
+        @memcpy(systems_custom[0..n], current[0..n]);
+        systems_options[3] = systems_custom[0..n];
+        systems_values[3] = systems_custom[0..n];
+        systems_option_count = 4;
+        break :blk 3;
+    };
 }
 
 /// The profile as the form shows it (keys of other systems kept).
@@ -230,6 +342,10 @@ fn build(out: *Profile) void {
     out.protect_pc = protect_values[protect_index];
     out.network_location = network_values[network_index];
     out.disable_wer = disable_wer;
+    for (tweak_rows, 0..) |row, i| out.flag(row.field).?.* = tweak_values[i];
+    out.theme = theme_values[theme_index];
+    out.display = @enumFromInt(display_index);
+    _ = answer.profile.normalizeSystems(systems_values[systems_index], &out.systems);
     out.manual_disk = true;
 }
 
@@ -248,9 +364,10 @@ fn problemOf(id: F) ?Problem {
 }
 
 fn duplicateName() bool {
-    const index = answer_profiles.find(name_text.slice()) orelse return false;
+    // Every profile file counts, also those made for other systems.
+    const other = answer_profiles.stemInUse(name_text.slice()) orelse return false;
     const current = previous_stem orelse return true;
-    return !std.ascii.eqlIgnoreCase(answer_profiles.stem(index), current);
+    return !std.ascii.eqlIgnoreCase(other, current);
 }
 
 fn problemText(problem: Problem) []const u8 {
@@ -288,6 +405,11 @@ fn helpKey(id: F) view.Key {
         .protect_pc => .profile_help_protect_pc,
         .network_location => .profile_help_network_location,
         .disable_wer => .profile_help_disable_wer,
+        .systems => .profile_help_systems,
+        .section_extras => .profile_section_extras,
+        .theme => .profile_help_theme,
+        .display => .profile_help_display,
+        .show_extensions, .show_hidden, .no_autorun, .disable_uac, .skip_games, .skip_msn, .hide_outlook_express, .classic_start, .no_balloon_tips, .no_sidebar, .no_welcome_center, .no_hibernation => tweak_rows[tweakRow(id).?].help,
         .save, .cancel => subtitleKey(),
     };
 }
@@ -363,6 +485,22 @@ fn buildFields() void {
     if (nt6) addField(.protect_pc, .{ .kind = .choice, .label = t(.profile_field_protect_pc), .options = &protect_options, .index = &protect_index });
     if (legacy_nt6) addField(.network_location, .{ .kind = .choice, .label = t(.profile_field_network_location), .options = &network_options, .index = &network_index });
     if (nt6) addField(.disable_wer, .{ .kind = .toggle, .label = t(.profile_field_disable_wer), .flag = &disable_wer });
+    // Where the profile is offered (after the general settings, so the
+    // rows above keep their places).
+    addField(.systems, .{ .kind = .choice, .label = t(.profile_field_systems), .options = systems_options[0..systems_option_count], .index = &systems_index });
+    // Appearance and extras: only what this system has.
+    if (family) |f| {
+        var any = false;
+        inline for (@typeInfo(schema.Tweak).@"enum".fields) |tf| any = any or schema.tweakAvailable(@enumFromInt(tf.value), f);
+        if (any) {
+            addField(.section_extras, .{ .kind = .section, .label = t(.profile_section_extras) });
+            for (tweak_rows, 0..) |row, i| {
+                if (schema.tweakAvailable(row.tweak, f)) addField(row.id, .{ .kind = .toggle, .label = t(row.label), .flag = &tweak_values[i] });
+            }
+            if (theme_option_count > 1) addField(.theme, .{ .kind = .choice, .label = t(.profile_field_theme), .options = theme_options[0..theme_option_count], .index = &theme_index });
+            if (schema.tweakAvailable(.display, f)) addField(.display, .{ .kind = .choice, .label = t(.profile_field_display), .options = &display_options, .index = &display_index });
+        }
+    }
     addField(.save, .{ .kind = .action, .label = t(.profile_save), .primary = true, .id = save_id });
     addField(.cancel, .{ .kind = .action, .label = t(.profile_cancel), .id = cancel_id });
 }
@@ -401,6 +539,8 @@ pub fn edit(root: *uefi.protocol.File, initial: *const Profile, stem: ?[]const u
     } else null;
     show_all = false;
     load(initial);
+    // A new profile is offered for the system it is made on (Use for).
+    if (stem == null and initial.systems.len == 0) systems_index = 0;
     setOptions();
     buildFields();
     var selected: usize = if (stem == null) 1 else 0;

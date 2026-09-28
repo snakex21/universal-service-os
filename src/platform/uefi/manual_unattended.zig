@@ -93,7 +93,11 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, context: Conte
     const directory = system.unattended_directory orelse return .{};
     const found = discovery.listFilesWithExtension(directory, usos.flow.unattended_policy.extension(system), file_storage[0..]);
     const settings_name = usos.catalog.os_profiles.traits(system.id).settings_file;
-    if (context.profiles_allowed) answer_profiles.reload(context.root);
+    if (context.profiles_allowed) {
+        answer_profiles.reload(context.root);
+        // Only the profiles made for this system (systems=, answer.applies).
+        answer_profiles.filter(system.id);
+    }
     const in_first = answer_screen.Input{ .settings_file = settings_name != null, .profiles_allowed = context.profiles_allowed, .profiles = answer_profiles.len(), .files = found, .unsupported = context.answers_unsupported };
     if (!answer_screen.shown(in_first)) return .{};
     settings = if (settings_name) |name| xp_settings.read(directory, name) else .{};
@@ -199,7 +203,10 @@ fn screen(context: Context, names: []const []const u8, initial: usize) Outcome {
         .xp_settings => .{ .title = settingsText(&settings_title, &settings), .detail = view.t(.profile_xp_ini_detail), .icon = .{ .label = "INI" } },
         .profile => blk: {
             const p = answer_profiles.get(index - layout.first_profile);
-            break :blk .{ .title = p.name.slice(), .detail = profileDetail(&profile_details[index - layout.first_profile], p), .icon = .{ .label = "USOS" }, .badge = .{ .text = view.t(.profile_badge), .tone = .accent } };
+            // A required answer is missing for this system: a warning badge
+            // on the row and the reason in the help panel.
+            const badge: usos.gui.ui.Badge = if (usos.flow.answer.applies.missing(p, system.id) != null) .{ .text = view.t(.profile_badge_incomplete), .tone = .warning } else .{ .text = view.t(.profile_badge), .tone = .accent };
+            break :blk .{ .title = p.name.slice(), .detail = profileDetail(&profile_details[index - layout.first_profile], p), .icon = .{ .label = "USOS" }, .badge = badge };
         },
         .file => .{ .title = names[index - layout.first_file], .detail = view.t(.profile_file_detail), .icon = .{ .label = usos.flow.unattended_policy.fileKindLabel(system) } },
         .add => .{ .title = view.t(.profile_add), .detail = addDetail(system), .icon = .{ .vector = .check } },
@@ -269,7 +276,18 @@ fn traceRows(list_rows: []const usos.gui.ui.Row) void {
     }
 }
 
-var help_line: [1][]const u8 = undefined;
+var help_line: [2][]const u8 = undefined;
+var missing_text: [240]u8 = undefined;
+
+/// The warning for a profile that lacks an answer `system` needs (answer
+/// screen and summary); null: nothing missing.
+pub fn missingText(buffer: []u8, p: *const answer_profiles.Profile, system: *const usos.catalog.SystemEntry) ?[]const u8 {
+    const what = usos.flow.answer.applies.missing(p, system.id) orelse return null;
+    return switch (what) {
+        .product_key => view.format(buffer, .profile_missing_key, &.{system.name}),
+        .server_password => view.format(buffer, .profile_missing_password, &.{system.name}),
+    };
+}
 
 var help_system: ?*const usos.catalog.SystemEntry = null;
 
@@ -280,6 +298,13 @@ fn addDetail(system: ?*const usos.catalog.SystemEntry) []const u8 {
 }
 
 fn help(selected: usize) usos.gui.menu_screens.Help {
+    var lines: usize = 1;
+    if (layout.rows[selected] == .profile) if (help_system) |system| {
+        if (missingText(&missing_text, answer_profiles.get(selected - layout.first_profile), system)) |text| {
+            help_line[1] = text;
+            lines = 2;
+        }
+    };
     help_line[0] = switch (layout.rows[selected]) {
         .no_answer => view.t(.unattended_none_detail),
         .xp_manual => view.t(.unattended_xp_manual_detail),
@@ -289,5 +314,5 @@ fn help(selected: usize) usos.gui.menu_screens.Help {
         .add => addDetail(help_system),
         .unsupported => view.t(.unattended_vista_uefi_detail),
     };
-    return .{ .title = view.t(.unattended_title), .lines = &help_line };
+    return .{ .title = view.t(.unattended_title), .lines = help_line[0..lines] };
 }
