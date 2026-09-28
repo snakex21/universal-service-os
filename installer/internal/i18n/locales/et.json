@@ -414,6 +414,7 @@
   "boot.summary.secure_boot_detail": "Lülitage Secure Boot püsivaras välja",
   "boot.summary.secure_boot_title": "Secure Boot on sees",
   "boot.summary.secure_boot_line1": "See süsteem käivitub pärandteed pidi (CSM, UefiSeven või vana Windowsi alglaadur), mille Secure Boot blokeerib.",
+  "boot.summary.secure_boot_linux_line1": "Selles ISO-s pole Secure Booti jaoks allkirjastatud alglaadurit, seega Secure Boot blokeerib selle.",
   "boot.summary.secure_boot_line2": "Lülitage Secure Boot püsivara seadetes välja ja käivitage USOS uuesti.",
   "boot.summary.xp_preparation": "UEFI; installitud XP vajab püsivara CSM-i ja MBR-i",
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB draiverid; valikuline PAE käivituskirje",
@@ -899,6 +900,7 @@
 
   "boot.profile.add": "+ Lisa uus profiil",
   "boot.profile.add.detail": "USOS-i profiil: kontod, arvuti nimi, keel ja ajavöönd iga Windowsi jaoks",
+  "boot.profile.add.detail_linux": "USOS-i profiil: kasutaja, arvuti nimi, keel ja ajavöönd Linuxi installija jaoks; ketta valite alati ise",
   "boot.profile.arch_warning": "Vastusefailis pole sätteid {0} andmekandja jaoks: install eirab seda. Kasutage selle arhitektuuri jaoks tehtud faili.",
   "boot.profile.edition_missing": "Väljaannet \"{0}\" sellel ISO-l pole: install küsib väljaannet.",
   "boot.profile.badge": "USOS-i profiil",
@@ -909,6 +911,7 @@
   "boot.profile.delete.title": "Profiili kustutamine",
   "boot.profile.editor.new": "Uus vastuseprofiil",
   "boot.profile.editor.subtitle": "Üks profiil iga Windowsi jaoks: USOS kirjutab vastusefaili installi alguses",
+  "boot.profile.editor.subtitle_linux": "Üks profiil Windowsi ja Linuxi jaoks: USOS kirjutab vastusefaili installi alguses",
   "boot.profile.editor.title": "Vastuseprofiil",
   "boot.profile.field.bypass_ram": "Windows 11: jäta RAM-i kontroll vahele",
   "boot.profile.field.bypass_secure_boot": "Windows 11: jäta Secure Boot kontroll vahele",

@@ -414,6 +414,7 @@
   "boot.summary.secure_boot_detail": "Изключете Secure Boot в настройките на фърмуера",
   "boot.summary.secure_boot_title": "Secure Boot е включен",
   "boot.summary.secure_boot_line1": "Тази система стартира по стар път (CSM, UefiSeven или стар мениджър за зареждане на Windows), който Secure Boot блокира.",
+  "boot.summary.secure_boot_linux_line1": "Този ISO няма зареждащ модул, подписан за Secure Boot, затова Secure Boot го блокира.",
   "boot.summary.secure_boot_line2": "Изключете Secure Boot в настройките на фърмуера и стартирайте USOS отново.",
   "boot.summary.xp_preparation": "UEFI; инсталираната XP изисква CSM на фърмуера и MBR",
   "boot.summary.xp_source": "XP SP3 x86; драйвери ACPI / SATA / USB; незадължителен запис за зареждане с PAE",
@@ -899,6 +900,7 @@
 
   "boot.profile.add": "+ Добавяне на нов профил",
   "boot.profile.add.detail": "USOS профил: акаунти, име на компютъра, език и часова зона за всеки Windows",
+  "boot.profile.add.detail_linux": "USOS профил: потребител, име на компютъра, език и часова зона за инсталатора на Linux; дискът винаги се избира от вас",
   "boot.profile.arch_warning": "Файлът с отговори няма настройки за носител {0}: инсталацията го пренебрегва. Използвайте файл, създаден за тази архитектура.",
   "boot.profile.edition_missing": "Изданието \"{0}\" го няма в това ISO: инсталацията ще попита за изданието.",
   "boot.profile.badge": "USOS профил",
@@ -909,6 +911,7 @@
   "boot.profile.delete.title": "Изтриване на профил",
   "boot.profile.editor.new": "Нов профил с отговори",
   "boot.profile.editor.subtitle": "Един профил за всеки Windows: USOS записва файла с отговори при стартиране на инсталацията",
+  "boot.profile.editor.subtitle_linux": "Един профил за Windows и Linux: USOS записва файла с отговори при стартиране на инсталацията",
   "boot.profile.editor.title": "Профил с отговори",
   "boot.profile.field.bypass_ram": "Windows 11: пропускане на проверката на RAM",
   "boot.profile.field.bypass_secure_boot": "Windows 11: пропускане на проверката на Secure Boot",

@@ -414,6 +414,7 @@
   "boot.summary.secure_boot_detail": "Poista Secure Boot käytöstä laiteohjelmistossa",
   "boot.summary.secure_boot_title": "Secure Boot on päällä",
   "boot.summary.secure_boot_line1": "Tämä järjestelmä käynnistyy vanhaa reittiä (CSM, UefiSeven tai vanha Windowsin käynnistyksenhallinta), jonka Secure Boot estää.",
+  "boot.summary.secure_boot_linux_line1": "Tässä ISO:ssa ei ole Secure Bootia varten allekirjoitettua käynnistyslatainta, joten Secure Boot estää sen.",
   "boot.summary.secure_boot_line2": "Poista Secure Boot käytöstä laiteohjelmistossa ja käynnistä USOS uudelleen.",
   "boot.summary.xp_preparation": "UEFI; asennettu XP vaatii laiteohjelmiston CSM:n ja MBR:n",
   "boot.summary.xp_source": "XP SP3 x86; ACPI-/SATA-/USB-ajurit; valinnainen PAE-käynnistysmerkintä",
@@ -899,6 +900,7 @@
 
   "boot.profile.add": "+ Lisää uusi profiili",
   "boot.profile.add.detail": "USOS-profiili: tilit, tietokoneen nimi, kieli ja aikavyöhyke jokaiselle Windowsille",
+  "boot.profile.add.detail_linux": "USOS-profiili: käyttäjä, tietokoneen nimi, kieli ja aikavyöhyke Linux-asennusohjelmalle; levyn valitset aina itse",
   "boot.profile.arch_warning": "Vastaustiedostossa ei ole asetuksia {0}-medialle: asennus ohittaa sen. Käytä tälle arkkitehtuurille tehtyä tiedostoa.",
   "boot.profile.edition_missing": "Versiota \"{0}\" ei ole tällä ISO:lla: asennus kysyy version.",
   "boot.profile.badge": "USOS-profiili",
@@ -909,6 +911,7 @@
   "boot.profile.delete.title": "Poista profiili",
   "boot.profile.editor.new": "Uusi vastausprofiili",
   "boot.profile.editor.subtitle": "Yksi profiili jokaiselle Windowsille: USOS kirjoittaa vastaustiedoston asennuksen alkaessa",
+  "boot.profile.editor.subtitle_linux": "Yksi profiili Windowsille ja Linuxille: USOS kirjoittaa vastaustiedoston asennuksen alkaessa",
   "boot.profile.editor.title": "Vastausprofiili",
   "boot.profile.field.bypass_ram": "Windows 11: ohita RAM-tarkistus",
   "boot.profile.field.bypass_secure_boot": "Windows 11: ohita Secure Boot -tarkistus",

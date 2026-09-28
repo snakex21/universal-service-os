@@ -417,6 +417,7 @@
   "boot.summary.secure_boot_detail": "Отключите Secure Boot в настройках прошивки",
   "boot.summary.secure_boot_title": "Secure Boot включён",
   "boot.summary.secure_boot_line1": "Эта система запускается устаревшим путём (CSM, UefiSeven или старый загрузчик Windows), который Secure Boot блокирует.",
+  "boot.summary.secure_boot_linux_line1": "В этом ISO нет загрузчика, подписанного для Secure Boot, поэтому Secure Boot его блокирует.",
   "boot.summary.secure_boot_line2": "Отключите Secure Boot в настройках прошивки и снова запустите USOS.",
   "boot.summary.xp_preparation": "UEFI; установленной XP нужны CSM прошивки и MBR",
   "boot.summary.xp_source": "XP SP3 x86; драйверы ACPI / SATA / USB; необязательный пункт загрузки PAE",
@@ -902,6 +903,7 @@
 
   "boot.profile.add": "+ Добавить новый профиль",
   "boot.profile.add.detail": "Профиль USOS: учётные записи, имя компьютера, язык и часовой пояс для любой версии Windows",
+  "boot.profile.add.detail_linux": "Профиль USOS: пользователь, имя компьютера, язык и часовой пояс для установщика Linux; диск вы всегда выбираете сами",
   "boot.profile.arch_warning": "В файле ответов нет параметров для носителя {0}: установка его игнорирует. Используйте файл, созданный для этой архитектуры.",
   "boot.profile.edition_missing": "Выпуска \"{0}\" нет на этом ISO: установка спросит выпуск.",
   "boot.profile.badge": "Профиль USOS",
@@ -912,6 +914,7 @@
   "boot.profile.delete.title": "Удаление профиля",
   "boot.profile.editor.new": "Новый профиль ответов",
   "boot.profile.editor.subtitle": "Один профиль для любой версии Windows: USOS записывает файл ответов при запуске установки",
+  "boot.profile.editor.subtitle_linux": "Один профиль для Windows и Linux: USOS записывает файл ответов при запуске установки",
   "boot.profile.editor.title": "Профиль ответов",
   "boot.profile.field.bypass_ram": "Windows 11: пропустить проверку RAM",
   "boot.profile.field.bypass_secure_boot": "Windows 11: пропустить проверку Secure Boot",

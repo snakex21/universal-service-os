@@ -414,6 +414,7 @@
   "boot.summary.secure_boot_detail": "Desactive Secure Boot en el firmware para usarlo",
   "boot.summary.secure_boot_title": "Secure Boot está activado",
   "boot.summary.secure_boot_line1": "Este sistema arranca por una ruta heredada (CSM, UefiSeven o un gestor de arranque de Windows antiguo) que Secure Boot bloquea.",
+  "boot.summary.secure_boot_linux_line1": "Esta ISO no tiene un cargador de arranque firmado para Secure Boot, por eso Secure Boot la bloquea.",
   "boot.summary.secure_boot_line2": "Desactive Secure Boot en el firmware y vuelva a iniciar USOS.",
   "boot.summary.xp_preparation": "UEFI; XP instalado requiere CSM del firmware y MBR",
   "boot.summary.xp_source": "XP SP3 x86; controladores ACPI / SATA / USB; entrada de arranque PAE opcional",
@@ -899,6 +900,7 @@
 
   "boot.profile.add": "+ Añadir un perfil nuevo",
   "boot.profile.add.detail": "Perfil USOS: cuentas, nombre del equipo, idioma y zona horaria para cualquier Windows",
+  "boot.profile.add.detail_linux": "Perfil USOS: usuario, nombre del equipo, idioma y zona horaria para el instalador de Linux; el disco siempre lo elige usted",
   "boot.profile.arch_warning": "El archivo de respuestas no tiene ajustes para medios {0}: el programa de instalación lo ignora. Use un archivo creado para esta arquitectura.",
   "boot.profile.edition_missing": "La edición \"{0}\" no está en esta ISO: el programa de instalación preguntará la edición.",
   "boot.profile.badge": "Perfil USOS",
@@ -909,6 +911,7 @@
   "boot.profile.delete.title": "Eliminar perfil",
   "boot.profile.editor.new": "Nuevo perfil de respuestas",
   "boot.profile.editor.subtitle": "Un perfil para cualquier Windows: USOS escribe el archivo de respuestas al iniciar la instalación",
+  "boot.profile.editor.subtitle_linux": "Un perfil para Windows y Linux: USOS escribe el archivo de respuestas al iniciar la instalación",
   "boot.profile.editor.title": "Perfil de respuestas",
   "boot.profile.field.bypass_ram": "Windows 11: omitir la comprobación de RAM",
   "boot.profile.field.bypass_secure_boot": "Windows 11: omitir la comprobación de Secure Boot",

@@ -414,6 +414,7 @@
   "boot.summary.secure_boot_detail": "Slå Secure Boot fra i firmwaren for at bruge det",
   "boot.summary.secure_boot_title": "Secure Boot er slået til",
   "boot.summary.secure_boot_line1": "Dette system starter via en ældre sti (CSM, UefiSeven eller en gammel Windows-opstartsstyring), som Secure Boot blokerer.",
+  "boot.summary.secure_boot_linux_line1": "Denne ISO har ingen bootloader signeret til Secure Boot, så Secure Boot blokerer den.",
   "boot.summary.secure_boot_line2": "Slå Secure Boot fra i firmwaren, og start USOS igen.",
   "boot.summary.xp_preparation": "UEFI; installeret XP kræver firmware-CSM og MBR",
   "boot.summary.xp_source": "XP SP3 x86; ACPI-/SATA-/USB-drivere; valgfri PAE-startpost",
@@ -899,6 +900,7 @@
 
   "boot.profile.add": "+ Tilføj en ny profil",
   "boot.profile.add.detail": "En USOS-profil: konti, computernavn, sprog og tidszone til alle Windows",
+  "boot.profile.add.detail_linux": "En USOS-profil: bruger, computernavn, sprog og tidszone til Linux-installationsprogrammet; du vælger altid disken",
   "boot.profile.arch_warning": "Svarfilen har ingen indstillinger for {0}-medier: Setup ignorerer den. Brug en fil lavet til denne arkitektur.",
   "boot.profile.edition_missing": "Udgaven \"{0}\" findes ikke på denne ISO: Installationen spørger om udgaven.",
   "boot.profile.badge": "USOS-profil",
@@ -909,6 +911,7 @@
   "boot.profile.delete.title": "Slet profil",
   "boot.profile.editor.new": "Ny svarprofil",
   "boot.profile.editor.subtitle": "En profil til alle Windows: USOS skriver svarfilen, når installationen starter",
+  "boot.profile.editor.subtitle_linux": "En profil til Windows og Linux: USOS skriver svarfilen, når installationen starter",
   "boot.profile.editor.title": "Svarprofil",
   "boot.profile.field.bypass_ram": "Windows 11: spring RAM-kontrollen over",
   "boot.profile.field.bypass_secure_boot": "Windows 11: spring Secure Boot-kontrollen over",

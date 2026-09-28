@@ -414,6 +414,7 @@
   "boot.summary.secure_boot_detail": "Kullanmak için ürün yazılımında Secure Boot'u kapatın",
   "boot.summary.secure_boot_title": "Secure Boot açık",
   "boot.summary.secure_boot_line1": "Bu sistem, Secure Boot'un engellediği eski bir yoldan (CSM, UefiSeven veya eski bir Windows önyükleme yöneticisi) başlar.",
+  "boot.summary.secure_boot_linux_line1": "Bu ISO'da Secure Boot için imzalı bir önyükleyici yok, bu yüzden Secure Boot onu engeller.",
   "boot.summary.secure_boot_line2": "Ürün yazılımı ayarlarında Secure Boot'u kapatın ve USOS'u yeniden başlatın.",
   "boot.summary.xp_preparation": "UEFI; kurulu XP, ürün yazılımında CSM ve MBR gerektirir",
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB sürücüleri; isteğe bağlı PAE önyükleme girdisi",
@@ -899,6 +900,7 @@
 
   "boot.profile.add": "+ Yeni profil ekle",
   "boot.profile.add.detail": "USOS profili: her Windows için hesaplar, bilgisayar adı, dil ve saat dilimi",
+  "boot.profile.add.detail_linux": "USOS profili: Linux yükleyicisi için kullanıcı, bilgisayar adı, dil ve saat dilimi; diski her zaman siz seçersiniz",
   "boot.profile.arch_warning": "Yanıt dosyasında {0} medyası için ayar yok: Kurulum bunu yok sayar. Bu mimari için hazırlanmış bir dosya kullanın.",
   "boot.profile.edition_missing": "\"{0}\" sürümü bu ISO'da yok: Kurulum sürümü soracak.",
   "boot.profile.badge": "USOS profili",
@@ -909,6 +911,7 @@
   "boot.profile.delete.title": "Profili sil",
   "boot.profile.editor.new": "Yeni yanıt profili",
   "boot.profile.editor.subtitle": "Her Windows için tek profil: USOS, kurulum başladığında yanıt dosyasını yazar",
+  "boot.profile.editor.subtitle_linux": "Windows ve Linux için tek profil: USOS, kurulum başladığında yanıt dosyasını yazar",
   "boot.profile.editor.title": "Yanıt profili",
   "boot.profile.field.bypass_ram": "Windows 11: RAM denetimini atla",
   "boot.profile.field.bypass_secure_boot": "Windows 11: Secure Boot denetimini atla",

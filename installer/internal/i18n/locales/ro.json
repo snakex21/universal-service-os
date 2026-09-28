@@ -417,6 +417,7 @@
   "boot.summary.secure_boot_detail": "Dezactivați Secure Boot din firmware pentru a-l folosi",
   "boot.summary.secure_boot_title": "Secure Boot este activat",
   "boot.summary.secure_boot_line1": "Acest sistem pornește pe o cale veche (CSM, UefiSeven sau un manager de pornire Windows vechi) pe care Secure Boot o blochează.",
+  "boot.summary.secure_boot_linux_line1": "Acest ISO nu are un încărcător de pornire semnat pentru Secure Boot, așa că Secure Boot îl blochează.",
   "boot.summary.secure_boot_line2": "Dezactivați Secure Boot din firmware, apoi porniți din nou USOS.",
   "boot.summary.xp_preparation": "UEFI; XP instalat necesită CSM în firmware și MBR",
   "boot.summary.xp_source": "XP SP3 x86; drivere ACPI / SATA / USB; intrare de pornire PAE opțională",
@@ -902,6 +903,7 @@
 
   "boot.profile.add": "+ Adăugare profil nou",
   "boot.profile.add.detail": "Un profil USOS: conturi, nume computer, limbă și fus orar pentru orice Windows",
+  "boot.profile.add.detail_linux": "Un profil USOS: utilizator, nume computer, limbă și fus orar pentru programul de instalare Linux; discul îl alegeți mereu dvs.",
   "boot.profile.arch_warning": "Fișierul de răspuns nu are setări pentru suportul {0}: instalarea îl ignoră. Folosiți un fișier creat pentru această arhitectură.",
   "boot.profile.edition_missing": "Ediția \"{0}\" nu este pe acest ISO: instalarea va cere ediția.",
   "boot.profile.badge": "Profil USOS",
@@ -912,6 +914,7 @@
   "boot.profile.delete.title": "Ștergere profil",
   "boot.profile.editor.new": "Profil de răspuns nou",
   "boot.profile.editor.subtitle": "Un singur profil pentru orice Windows: USOS scrie fișierul de răspuns la pornirea instalării",
+  "boot.profile.editor.subtitle_linux": "Un singur profil pentru Windows și Linux: USOS scrie fișierul de răspuns la pornirea instalării",
   "boot.profile.editor.title": "Profil de răspuns",
   "boot.profile.field.bypass_ram": "Windows 11: fără verificarea RAM",
   "boot.profile.field.bypass_secure_boot": "Windows 11: fără verificarea Secure Boot",

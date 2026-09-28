@@ -414,6 +414,7 @@
   "boot.summary.secure_boot_detail": "Stäng av Secure Boot i firmware för att använda det",
   "boot.summary.secure_boot_title": "Secure Boot är på",
   "boot.summary.secure_boot_line1": "Det här systemet startar via en äldre väg (CSM, UefiSeven eller en gammal Windows-starthanterare) som Secure Boot blockerar.",
+  "boot.summary.secure_boot_linux_line1": "Den här ISO-filen har ingen startladdare signerad för Secure Boot, så Secure Boot blockerar den.",
   "boot.summary.secure_boot_line2": "Stäng av Secure Boot i firmware och starta USOS igen.",
   "boot.summary.xp_preparation": "UEFI; installerat XP kräver firmware-CSM och MBR",
   "boot.summary.xp_source": "XP SP3 x86; ACPI-/SATA-/USB-drivrutiner; valfri PAE-startpost",
@@ -899,6 +900,7 @@
 
   "boot.profile.add": "+ Lägg till en ny profil",
   "boot.profile.add.detail": "En USOS-profil: konton, datornamn, språk och tidszon för alla Windows",
+  "boot.profile.add.detail_linux": "En USOS-profil: användare, datornamn, språk och tidszon för Linux-installationsprogrammet; disken väljer du alltid själv",
   "boot.profile.arch_warning": "Svarsfilen har inga inställningar för {0}-media: Setup ignorerar den. Använd en fil gjord för den här arkitekturen.",
   "boot.profile.edition_missing": "Utgåvan \"{0}\" finns inte på denna ISO: Installationen frågar efter utgåvan.",
   "boot.profile.badge": "USOS-profil",
@@ -909,6 +911,7 @@
   "boot.profile.delete.title": "Ta bort profil",
   "boot.profile.editor.new": "Ny svarsprofil",
   "boot.profile.editor.subtitle": "En profil för alla Windows: USOS skriver svarsfilen när installationen startar",
+  "boot.profile.editor.subtitle_linux": "En profil för Windows och Linux: USOS skriver svarsfilen när installationen startar",
   "boot.profile.editor.title": "Svarsprofil",
   "boot.profile.field.bypass_ram": "Windows 11: hoppa över RAM-kontrollen",
   "boot.profile.field.bypass_secure_boot": "Windows 11: hoppa över Secure Boot-kontrollen",

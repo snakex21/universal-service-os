@@ -417,6 +417,7 @@
   "boot.summary.secure_boot_detail": "Wyłącz Secure Boot w ustawieniach firmware, aby go użyć",
   "boot.summary.secure_boot_title": "Secure Boot jest włączony",
   "boot.summary.secure_boot_line1": "Ten system startuje starszą ścieżką (CSM, UefiSeven lub stary menedżer rozruchu Windows), którą Secure Boot blokuje.",
+  "boot.summary.secure_boot_linux_line1": "To ISO nie ma programu rozruchowego podpisanego dla Secure Boot, więc Secure Boot je blokuje.",
   "boot.summary.secure_boot_line2": "Wyłącz Secure Boot w ustawieniach firmware i uruchom USOS ponownie.",
   "boot.summary.xp_preparation": "UEFI; zainstalowany XP wymaga CSM w firmware i MBR",
   "boot.summary.xp_source": "XP SP3 x86; sterowniki ACPI / SATA / USB; opcjonalna pozycja startowa PAE",
@@ -902,6 +903,7 @@
 
   "boot.profile.add": "+ Dodaj nowy profil",
   "boot.profile.add.detail": "Profil USOS: konta, nazwa komputera, język i strefa czasowa dla każdego Windows",
+  "boot.profile.add.detail_linux": "Profil USOS: użytkownik, nazwa komputera, język i strefa czasowa dla instalatora Linuksa; dysk zawsze wybierasz sam",
   "boot.profile.arch_warning": "Plik odpowiedzi nie ma ustawień dla nośnika {0}: Instalator go pominie. Użyj pliku dla tej architektury.",
   "boot.profile.edition_missing": "Wydania \"{0}\" nie ma na tym ISO: Instalator zapyta o wydanie.",
   "boot.profile.badge": "Profil USOS",
@@ -912,6 +914,7 @@
   "boot.profile.delete.title": "Usuwanie profilu",
   "boot.profile.editor.new": "Nowy profil odpowiedzi",
   "boot.profile.editor.subtitle": "Jeden profil dla każdego Windows: USOS tworzy plik odpowiedzi przy starcie instalacji",
+  "boot.profile.editor.subtitle_linux": "Jeden profil dla Windows i Linuksa: USOS tworzy plik odpowiedzi przy starcie instalacji",
   "boot.profile.editor.title": "Profil odpowiedzi",
   "boot.profile.field.bypass_ram": "Windows 11: pomiń sprawdzanie RAM",
   "boot.profile.field.bypass_secure_boot": "Windows 11: pomiń sprawdzanie Secure Boot",

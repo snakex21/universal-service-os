@@ -417,6 +417,7 @@
   "boot.summary.secure_boot_detail": "Вимкніть Secure Boot у налаштуваннях прошивки",
   "boot.summary.secure_boot_title": "Secure Boot увімкнено",
   "boot.summary.secure_boot_line1": "Ця система запускається застарілим шляхом (CSM, UefiSeven або старий завантажувач Windows), який Secure Boot блокує.",
+  "boot.summary.secure_boot_linux_line1": "У цьому ISO немає завантажувача, підписаного для Secure Boot, тому Secure Boot його блокує.",
   "boot.summary.secure_boot_line2": "Вимкніть Secure Boot у налаштуваннях прошивки та знову запустіть USOS.",
   "boot.summary.xp_preparation": "UEFI; встановленій XP потрібні CSM мікропрограми та MBR",
   "boot.summary.xp_source": "XP SP3 x86; драйвери ACPI / SATA / USB; необов'язковий пункт завантаження PAE",
@@ -902,6 +903,7 @@
 
   "boot.profile.add": "+ Додати новий профіль",
   "boot.profile.add.detail": "Профіль USOS: облікові записи, ім'я комп'ютера, мова та часовий пояс для будь-якої версії Windows",
+  "boot.profile.add.detail_linux": "Профіль USOS: користувач, ім'я комп'ютера, мова та часовий пояс для інсталятора Linux; диск ви завжди вибираєте самі",
   "boot.profile.arch_warning": "У файлі відповідей немає параметрів для носія {0}: інсталятор його ігнорує. Використайте файл, створений для цієї архітектури.",
   "boot.profile.edition_missing": "Випуску \"{0}\" немає на цьому ISO: інсталяція запитає випуск.",
   "boot.profile.badge": "Профіль USOS",
@@ -912,6 +914,7 @@
   "boot.profile.delete.title": "Видалення профілю",
   "boot.profile.editor.new": "Новий профіль відповідей",
   "boot.profile.editor.subtitle": "Один профіль для будь-якої версії Windows: USOS записує файл відповідей під час запуску встановлення",
+  "boot.profile.editor.subtitle_linux": "Один профіль для Windows і Linux: USOS записує файл відповідей під час запуску встановлення",
   "boot.profile.editor.title": "Профіль відповідей",
   "boot.profile.field.bypass_ram": "Windows 11: пропустити перевірку RAM",
   "boot.profile.field.bypass_secure_boot": "Windows 11: пропустити перевірку Secure Boot",

@@ -414,6 +414,7 @@
   "boot.summary.secure_boot_detail": "Απενεργοποιήστε το Secure Boot στο υλικολογισμικό",
   "boot.summary.secure_boot_title": "Το Secure Boot είναι ενεργό",
   "boot.summary.secure_boot_line1": "Αυτό το σύστημα ξεκινά από παλαιά διαδρομή (CSM, UefiSeven ή παλιός διαχειριστής εκκίνησης Windows) που μπλοκάρει το Secure Boot.",
+  "boot.summary.secure_boot_linux_line1": "Αυτό το ISO δεν έχει φορτωτή εκκίνησης υπογεγραμμένο για Secure Boot, οπότε το Secure Boot το μπλοκάρει.",
   "boot.summary.secure_boot_line2": "Απενεργοποιήστε το Secure Boot στις ρυθμίσεις υλικολογισμικού και ξεκινήστε ξανά το USOS.",
   "boot.summary.xp_preparation": "UEFI, τα εγκατεστημένα XP απαιτούν CSM υλικολογισμικού και MBR",
   "boot.summary.xp_source": "XP SP3 x86, προγράμματα οδήγησης ACPI / SATA / USB, προαιρετική καταχώριση εκκίνησης PAE",
@@ -899,6 +900,7 @@
 
   "boot.profile.add": "+ Προσθήκη νέου προφίλ",
   "boot.profile.add.detail": "Προφίλ USOS: λογαριασμοί, όνομα υπολογιστή, γλώσσα και ζώνη ώρας για κάθε Windows",
+  "boot.profile.add.detail_linux": "Προφίλ USOS: χρήστης, όνομα υπολογιστή, γλώσσα και ζώνη ώρας για το πρόγραμμα εγκατάστασης Linux, τον δίσκο τον επιλέγετε πάντα εσείς",
   "boot.profile.arch_warning": "Το αρχείο απαντήσεων δεν έχει ρυθμίσεις για μέσο {0}: η εγκατάσταση το αγνοεί. Χρησιμοποιήστε αρχείο φτιαγμένο για αυτή την αρχιτεκτονική.",
   "boot.profile.edition_missing": "Η έκδοση \"{0}\" δεν υπάρχει σε αυτό το ISO: η Εγκατάσταση θα ρωτήσει για την έκδοση.",
   "boot.profile.badge": "Προφίλ USOS",
@@ -909,6 +911,7 @@
   "boot.profile.delete.title": "Διαγραφή προφίλ",
   "boot.profile.editor.new": "Νέο προφίλ απαντήσεων",
   "boot.profile.editor.subtitle": "Ένα προφίλ για κάθε Windows: το USOS γράφει το αρχείο απαντήσεων όταν ξεκινά η εγκατάσταση",
+  "boot.profile.editor.subtitle_linux": "Ένα προφίλ για Windows και Linux: το USOS γράφει το αρχείο απαντήσεων όταν ξεκινά η εγκατάσταση",
   "boot.profile.editor.title": "Προφίλ απαντήσεων",
   "boot.profile.field.bypass_ram": "Windows 11: παράλειψη ελέγχου RAM",
   "boot.profile.field.bypass_secure_boot": "Windows 11: παράλειψη ελέγχου Secure Boot",

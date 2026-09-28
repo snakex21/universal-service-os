@@ -414,6 +414,7 @@
   "boot.summary.secure_boot_detail": "Disattiva Secure Boot nel firmware per usarlo",
   "boot.summary.secure_boot_title": "Secure Boot è attivo",
   "boot.summary.secure_boot_line1": "Questo sistema si avvia tramite un percorso legacy (CSM, UefiSeven o un vecchio boot manager di Windows) che Secure Boot blocca.",
+  "boot.summary.secure_boot_linux_line1": "Questa ISO non ha un boot loader firmato per Secure Boot, quindi Secure Boot la blocca.",
   "boot.summary.secure_boot_line2": "Disattiva Secure Boot nel firmware, poi riavvia USOS.",
   "boot.summary.xp_preparation": "UEFI; XP installato richiede CSM del firmware e MBR",
   "boot.summary.xp_source": "XP SP3 x86; driver ACPI / SATA / USB; voce di avvio PAE facoltativa",
@@ -899,6 +900,7 @@
 
   "boot.profile.add": "+ Aggiungi un nuovo profilo",
   "boot.profile.add.detail": "Un profilo USOS: account, nome del computer, lingua e fuso orario per ogni Windows",
+  "boot.profile.add.detail_linux": "Un profilo USOS: utente, nome del computer, lingua e fuso orario per il programma di installazione Linux; il disco lo scegli sempre tu",
   "boot.profile.arch_warning": "Il file di risposte non ha impostazioni per supporti {0}: l'installazione lo ignora. Usa un file creato per questa architettura.",
   "boot.profile.edition_missing": "L'edizione \"{0}\" non è su questa ISO: il programma di installazione chiederà l'edizione.",
   "boot.profile.badge": "Profilo USOS",
@@ -909,6 +911,7 @@
   "boot.profile.delete.title": "Elimina profilo",
   "boot.profile.editor.new": "Nuovo profilo di risposte",
   "boot.profile.editor.subtitle": "Un solo profilo per ogni Windows: USOS scrive il file di risposte all'avvio dell'installazione",
+  "boot.profile.editor.subtitle_linux": "Un solo profilo per Windows e Linux: USOS scrive il file di risposte all'avvio dell'installazione",
   "boot.profile.editor.title": "Profilo di risposte",
   "boot.profile.field.bypass_ram": "Windows 11: salta il controllo della RAM",
   "boot.profile.field.bypass_secure_boot": "Windows 11: salta il controllo di Secure Boot",

@@ -414,6 +414,7 @@
   "boot.summary.secure_boot_detail": "Kapcsolja ki a Secure Bootot a firmware-beállításokban",
   "boot.summary.secure_boot_title": "A Secure Boot be van kapcsolva",
   "boot.summary.secure_boot_line1": "Ez a rendszer régi útvonalon indul (CSM, UefiSeven vagy régi Windows rendszerbetöltő), amelyet a Secure Boot blokkol.",
+  "boot.summary.secure_boot_linux_line1": "Ebben az ISO-ban nincs Secure Boothoz aláírt rendszerbetöltő, ezért a Secure Boot blokkolja.",
   "boot.summary.secure_boot_line2": "Kapcsolja ki a Secure Bootot a firmware-beállításokban, majd indítsa újra az USOS-t.",
   "boot.summary.xp_preparation": "UEFI; a telepített XP-hez firmware CSM és MBR szükséges",
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB illesztőprogramok; opcionális PAE rendszerindítási bejegyzés",
@@ -899,6 +900,7 @@
 
   "boot.profile.add": "+ Új profil hozzáadása",
   "boot.profile.add.detail": "USOS-profil: fiókok, számítógépnév, nyelv és időzóna minden Windowshoz",
+  "boot.profile.add.detail_linux": "USOS-profil: felhasználó, számítógépnév, nyelv és időzóna a Linux-telepítőhöz; a lemezt mindig Ön választja ki",
   "boot.profile.arch_warning": "A válaszfájl nem tartalmaz beállításokat a(z) {0} adathordozóhoz: a telepítő figyelmen kívül hagyja. Használjon ehhez az architektúrához készült fájlt.",
   "boot.profile.edition_missing": "A(z) \"{0}\" kiadás nincs ezen az ISO-n: a telepítő rákérdez a kiadásra.",
   "boot.profile.badge": "USOS-profil",
@@ -909,6 +911,7 @@
   "boot.profile.delete.title": "Profil törlése",
   "boot.profile.editor.new": "Új válaszprofil",
   "boot.profile.editor.subtitle": "Egy profil minden Windowshoz: a USOS a telepítés indulásakor elkészíti a válaszfájlt",
+  "boot.profile.editor.subtitle_linux": "Egy profil Windowshoz és Linuxhoz: a USOS a telepítés indulásakor elkészíti a válaszfájlt",
   "boot.profile.editor.title": "Válaszprofil",
   "boot.profile.field.bypass_ram": "Windows 11: RAM-ellenőrzés kihagyása",
   "boot.profile.field.bypass_secure_boot": "Windows 11: Secure Boot-ellenőrzés kihagyása",

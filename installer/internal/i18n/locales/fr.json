@@ -414,6 +414,7 @@
   "boot.summary.secure_boot_detail": "Désactivez Secure Boot dans le firmware pour l'utiliser",
   "boot.summary.secure_boot_title": "Secure Boot est activé",
   "boot.summary.secure_boot_line1": "Ce système démarre par un chemin hérité (CSM, UefiSeven ou un ancien gestionnaire de démarrage Windows) que Secure Boot bloque.",
+  "boot.summary.secure_boot_linux_line1": "Cette ISO n'a pas de chargeur de démarrage signé pour Secure Boot, donc Secure Boot la bloque.",
   "boot.summary.secure_boot_line2": "Désactivez Secure Boot dans le firmware, puis redémarrez USOS.",
   "boot.summary.xp_preparation": "UEFI ; XP installé nécessite le CSM du firmware et MBR",
   "boot.summary.xp_source": "XP SP3 x86 ; pilotes ACPI / SATA / USB ; entrée de démarrage PAE facultative",
@@ -899,6 +900,7 @@
 
   "boot.profile.add": "+ Ajouter un nouveau profil",
   "boot.profile.add.detail": "Profil USOS : comptes, nom de l'ordinateur, langue et fuseau horaire pour tous les Windows",
+  "boot.profile.add.detail_linux": "Profil USOS : utilisateur, nom de l'ordinateur, langue et fuseau horaire pour l'installateur Linux ; vous choisissez toujours le disque",
   "boot.profile.arch_warning": "Le fichier de réponses n'a aucun paramètre pour un support {0} : le programme d'installation l'ignore. Utilisez un fichier conçu pour cette architecture.",
   "boot.profile.edition_missing": "L'édition \"{0}\" n'est pas sur cette ISO : le programme d'installation demandera l'édition.",
   "boot.profile.badge": "Profil USOS",
@@ -909,6 +911,7 @@
   "boot.profile.delete.title": "Supprimer le profil",
   "boot.profile.editor.new": "Nouveau profil de réponses",
   "boot.profile.editor.subtitle": "Un seul profil pour tous les Windows : USOS écrit le fichier de réponses au démarrage de l'installation",
+  "boot.profile.editor.subtitle_linux": "Un seul profil pour Windows et Linux : USOS écrit le fichier de réponses au démarrage de l'installation",
   "boot.profile.editor.title": "Profil de réponses",
   "boot.profile.field.bypass_ram": "Windows 11 : ignorer la vérification de la RAM",
   "boot.profile.field.bypass_secure_boot": "Windows 11 : ignorer la vérification Secure Boot",

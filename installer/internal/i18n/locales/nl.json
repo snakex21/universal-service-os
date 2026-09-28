@@ -414,6 +414,7 @@
   "boot.summary.secure_boot_detail": "Zet Secure Boot uit in de firmware om dit te gebruiken",
   "boot.summary.secure_boot_title": "Secure Boot staat aan",
   "boot.summary.secure_boot_line1": "Dit systeem start via een legacy-pad (CSM, UefiSeven of een oude Windows-opstartbeheerder) dat Secure Boot blokkeert.",
+  "boot.summary.secure_boot_linux_line1": "Deze ISO heeft geen voor Secure Boot ondertekende bootloader, dus Secure Boot blokkeert hem.",
   "boot.summary.secure_boot_line2": "Zet Secure Boot uit in de firmware en start USOS opnieuw.",
   "boot.summary.xp_preparation": "UEFI; geïnstalleerde XP vereist firmware-CSM en MBR",
   "boot.summary.xp_source": "XP SP3 x86; ACPI-/SATA-/USB-stuurprogramma's; optionele PAE-opstartvermelding",
@@ -899,6 +900,7 @@
 
   "boot.profile.add": "+ Nieuw profiel toevoegen",
   "boot.profile.add.detail": "Een USOS-profiel: accounts, computernaam, taal en tijdzone voor elke Windows",
+  "boot.profile.add.detail_linux": "Een USOS-profiel: gebruiker, computernaam, taal en tijdzone voor het Linux-installatieprogramma; de schijf kiest u altijd zelf",
   "boot.profile.arch_warning": "Het antwoordbestand heeft geen instellingen voor {0}-media: Setup negeert het. Gebruik een bestand voor deze architectuur.",
   "boot.profile.edition_missing": "Editie \"{0}\" staat niet op deze ISO: Setup vraagt om de editie.",
   "boot.profile.badge": "USOS-profiel",
@@ -909,6 +911,7 @@
   "boot.profile.delete.title": "Profiel verwijderen",
   "boot.profile.editor.new": "Nieuw antwoordprofiel",
   "boot.profile.editor.subtitle": "Een profiel voor elke Windows: USOS schrijft het antwoordbestand wanneer de installatie start",
+  "boot.profile.editor.subtitle_linux": "Een profiel voor Windows en Linux: USOS schrijft het antwoordbestand wanneer de installatie start",
   "boot.profile.editor.title": "Antwoordprofiel",
   "boot.profile.field.bypass_ram": "Windows 11: RAM-controle overslaan",
   "boot.profile.field.bypass_secure_boot": "Windows 11: Secure Boot-controle overslaan",

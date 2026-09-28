@@ -417,6 +417,7 @@
   "boot.summary.secure_boot_detail": "Išjunkite Secure Boot programinės aparatinės įrangos nustatymuose",
   "boot.summary.secure_boot_title": "Secure Boot įjungtas",
   "boot.summary.secure_boot_line1": "Ši sistema paleidžiama senuoju keliu (CSM, UefiSeven arba senas Windows paleidimo tvarkytuvas), kurį Secure Boot blokuoja.",
+  "boot.summary.secure_boot_linux_line1": "Šiame ISO nėra Secure Boot pasirašytos įkrovos programos, todėl Secure Boot jį blokuoja.",
   "boot.summary.secure_boot_line2": "Išjunkite Secure Boot programinės aparatinės įrangos nustatymuose ir vėl paleiskite USOS.",
   "boot.summary.xp_preparation": "UEFI; įdiegtai XP reikia programinės aparatinės įrangos CSM ir MBR",
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB tvarkyklės; pasirenkamas PAE įkrovos įrašas",
@@ -902,6 +903,7 @@
 
   "boot.profile.add": "+ Pridėti naują profilį",
   "boot.profile.add.detail": "USOS profilis: paskyros, kompiuterio vardas, kalba ir laiko juosta kiekvienai Windows",
+  "boot.profile.add.detail_linux": "USOS profilis: naudotojas, kompiuterio vardas, kalba ir laiko juosta Linux diegimo programai; diską visada pasirenkate patys",
   "boot.profile.arch_warning": "Atsakymų faile nėra nustatymų {0} laikmenai: diegimo programa jo nepaisys. Naudokite šiai architektūrai skirtą failą.",
   "boot.profile.edition_missing": "Leidimo \"{0}\" šiame ISO nėra: sąranka paklaus leidimo.",
   "boot.profile.badge": "USOS profilis",
@@ -912,6 +914,7 @@
   "boot.profile.delete.title": "Profilio trynimas",
   "boot.profile.editor.new": "Naujas atsakymų profilis",
   "boot.profile.editor.subtitle": "Vienas profilis kiekvienai Windows: USOS įrašo atsakymų failą, kai prasideda diegimas",
+  "boot.profile.editor.subtitle_linux": "Vienas profilis Windows ir Linux: USOS įrašo atsakymų failą, kai prasideda diegimas",
   "boot.profile.editor.title": "Atsakymų profilis",
   "boot.profile.field.bypass_ram": "Windows 11: praleisti RAM patikrą",
   "boot.profile.field.bypass_secure_boot": "Windows 11: praleisti Secure Boot patikrą",

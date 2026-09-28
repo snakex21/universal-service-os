@@ -414,6 +414,7 @@
   "boot.summary.secure_boot_detail": "Secure Boot in der Firmware-Einrichtung ausschalten",
   "boot.summary.secure_boot_title": "Secure Boot ist aktiv",
   "boot.summary.secure_boot_line1": "Dieses System startet über einen Legacy-Pfad (CSM, UefiSeven oder ein alter Windows-Boot-Manager), den Secure Boot blockiert.",
+  "boot.summary.secure_boot_linux_line1": "Diese ISO hat keinen für Secure Boot signierten Bootloader, daher blockiert Secure Boot sie.",
   "boot.summary.secure_boot_line2": "Schalten Sie Secure Boot in der Firmware-Einrichtung aus und starten Sie USOS erneut.",
   "boot.summary.xp_preparation": "UEFI; installiertes XP erfordert Firmware-CSM und MBR",
   "boot.summary.xp_source": "XP SP3 x86; ACPI-/SATA-/USB-Treiber; optionaler PAE-Starteintrag",
@@ -899,6 +900,7 @@
 
   "boot.profile.add": "+ Neues Profil hinzufügen",
   "boot.profile.add.detail": "Ein USOS-Profil: Konten, Computername, Sprache und Zeitzone für jedes Windows",
+  "boot.profile.add.detail_linux": "Ein USOS-Profil: Benutzer, Computername, Sprache und Zeitzone für den Linux-Installer; den Datenträger wählen Sie immer selbst",
   "boot.profile.arch_warning": "Die Antwortdatei enthält keine Einstellungen für {0}-Medien: Setup ignoriert sie. Verwenden Sie eine Datei für diese Architektur.",
   "boot.profile.edition_missing": "Edition \"{0}\" ist nicht auf dieser ISO: Setup fragt nach der Edition.",
   "boot.profile.badge": "USOS-Profil",
@@ -909,6 +911,7 @@
   "boot.profile.delete.title": "Profil löschen",
   "boot.profile.editor.new": "Neues Antwortprofil",
   "boot.profile.editor.subtitle": "Ein Profil für jedes Windows: USOS schreibt die Antwortdatei beim Start der Installation",
+  "boot.profile.editor.subtitle_linux": "Ein Profil für Windows und Linux: USOS schreibt die Antwortdatei beim Start der Installation",
   "boot.profile.editor.title": "Antwortprofil",
   "boot.profile.field.bypass_ram": "Windows 11: RAM-Prüfung überspringen",
   "boot.profile.field.bypass_secure_boot": "Windows 11: Secure-Boot-Prüfung überspringen",

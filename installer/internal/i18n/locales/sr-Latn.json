@@ -417,6 +417,7 @@
   "boot.summary.secure_boot_detail": "Isključite Secure Boot u podešavanjima firmvera",
   "boot.summary.secure_boot_title": "Secure Boot je uključen",
   "boot.summary.secure_boot_line1": "Ovaj sistem se pokreće starijim putem (CSM, UefiSeven ili stari Windows menadžer pokretanja) koji Secure Boot blokira.",
+  "boot.summary.secure_boot_linux_line1": "Ovaj ISO nema program za pokretanje potpisan za Secure Boot, pa ga Secure Boot blokira.",
   "boot.summary.secure_boot_line2": "Isključite Secure Boot u podešavanjima firmvera, pa ponovo pokrenite USOS.",
   "boot.summary.xp_preparation": "UEFI; instalirani XP zahteva CSM firmvera i MBR",
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB drajveri; opciona PAE stavka za pokretanje",
@@ -902,6 +903,7 @@
 
   "boot.profile.add": "+ Dodaj novi profil",
   "boot.profile.add.detail": "USOS profil: nalozi, ime računara, jezik i vremenska zona za svaki Windows",
+  "boot.profile.add.detail_linux": "USOS profil: korisnik, ime računara, jezik i vremenska zona za Linux instalacioni program; disk uvek birate sami",
   "boot.profile.arch_warning": "Datoteka odgovora nema podešavanja za medijum {0}: instalacija je zanemaruje. Koristite datoteku napravljenu za ovu arhitekturu.",
   "boot.profile.edition_missing": "Izdanja \"{0}\" nema na ovom ISO-u: instalacija će pitati za izdanje.",
   "boot.profile.badge": "USOS profil",
@@ -912,6 +914,7 @@
   "boot.profile.delete.title": "Brisanje profila",
   "boot.profile.editor.new": "Novi profil odgovora",
   "boot.profile.editor.subtitle": "Jedan profil za svaki Windows: USOS upisuje datoteku odgovora kada instalacija počne",
+  "boot.profile.editor.subtitle_linux": "Jedan profil za Windows i Linux: USOS upisuje datoteku odgovora kada instalacija počne",
   "boot.profile.editor.title": "Profil odgovora",
   "boot.profile.field.bypass_ram": "Windows 11: preskoči proveru RAM-a",
   "boot.profile.field.bypass_secure_boot": "Windows 11: preskoči proveru za Secure Boot",

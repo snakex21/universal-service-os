@@ -417,6 +417,7 @@
   "boot.summary.secure_boot_detail": "Pro použití vypněte Secure Boot ve firmwaru",
   "boot.summary.secure_boot_title": "Secure Boot je zapnutý",
   "boot.summary.secure_boot_line1": "Tento systém startuje starší cestou (CSM, UefiSeven nebo starý správce spouštění Windows), kterou Secure Boot blokuje.",
+  "boot.summary.secure_boot_linux_line1": "Toto ISO nemá zavaděč podepsaný pro Secure Boot, proto ho Secure Boot blokuje.",
   "boot.summary.secure_boot_line2": "Vypněte Secure Boot ve firmwaru a spusťte USOS znovu.",
   "boot.summary.xp_preparation": "UEFI; nainstalovaný XP vyžaduje CSM ve firmwaru a MBR",
   "boot.summary.xp_source": "XP SP3 x86; ovladače ACPI / SATA / USB; volitelná spouštěcí položka PAE",
@@ -902,6 +903,7 @@
 
   "boot.profile.add": "+ Přidat nový profil",
   "boot.profile.add.detail": "Profil USOS: účty, název počítače, jazyk a časové pásmo pro každý Windows",
+  "boot.profile.add.detail_linux": "Profil USOS: uživatel, název počítače, jazyk a časové pásmo pro instalátor Linuxu; disk vždy volíte vy",
   "boot.profile.arch_warning": "Soubor odpovědí nemá nastavení pro médium {0}: instalace ho ignoruje. Použijte soubor pro tuto architekturu.",
   "boot.profile.edition_missing": "Edice \"{0}\" na tomto ISO není: Instalace se na edici zeptá.",
   "boot.profile.badge": "Profil USOS",
@@ -912,6 +914,7 @@
   "boot.profile.delete.title": "Odstranění profilu",
   "boot.profile.editor.new": "Nový profil odpovědí",
   "boot.profile.editor.subtitle": "Jeden profil pro každý Windows: USOS vytvoří soubor odpovědí při spuštění instalace",
+  "boot.profile.editor.subtitle_linux": "Jeden profil pro Windows i Linux: USOS vytvoří soubor odpovědí při spuštění instalace",
   "boot.profile.editor.title": "Profil odpovědí",
   "boot.profile.field.bypass_ram": "Windows 11: přeskočit kontrolu RAM",
   "boot.profile.field.bypass_secure_boot": "Windows 11: přeskočit kontrolu Secure Boot",
