@@ -136,7 +136,7 @@ Projekt: [design/answer-file-generator.md](design/answer-file-generator.md).
 | Pomysł | Status | Nakład | Uwagi |
 |---|---|---|---|
 | „Uruchom z pierwszego dysku” (bez wyjmowania pendrive'a) | **Next** | 1–2 dni | UEFI: `BootNext` na wpis dysku albo `LoadImage` `\EFI\Microsoft\Boot\bootmgfw.efi`/`\EFI\BOOT\BOOTX64.EFI` z ESP wybranego dysku; BIOS: odczyt MBR 0x80 do 0x7C00 z INT13 mapującym dysk USB poza kolejkę (wzorzec XP chainload) |
-| Ogólny wpis dla nieznanych ISO/IMG/EFI (Linux live, WinPE, narzędzia), oznaczony „niezweryfikowane” | **Next** (Linux: projekt gotowy 2026-09-28, `design/linux-iso-boot.md`) | 8–10 dni | UEFI: obraz El Torito EFI + ISO w RAM przez `EFI_RAM_DISK_PROTOCOL` (jeśli firmware go ma) albo ISO z DATA dla Linuksów z `iso-scan`/`findiso`; BIOS: memdisk dla małych obrazów. Osobny wiersz w `Utilities`, bez przygotowania dysku, bez obietnicy działania |
+| Ogólny wpis dla nieznanych ISO/IMG/EFI (Linux live, WinPE, narzędzia), oznaczony „niezweryfikowane” | Linux: **Done w QEMU** (2026-09-28: 10 ISO, UEFI SB on/off, BIOS; nieznane ISO z wpisem GRUB jako „unverified”), sprzęt: do testu; nie-Linux (WinPE/EFI-only): **Next** | Linux: `design/linux-iso-boot.md` | UEFI: obraz El Torito EFI + ISO w RAM przez `EFI_RAM_DISK_PROTOCOL` (jeśli firmware go ma) albo ISO z DATA dla Linuksów z `iso-scan`/`findiso`; BIOS: memdisk dla małych obrazów. Osobny wiersz w `Utilities`, bez przygotowania dysku, bez obietnicy działania |
 | Persistence dla Linux live | **Later** | 3–5 dni | plik `<obraz>.persist.img` obok ISO, parametr jądra per dystrybucja (casper `persistent`, Debian `persistence`); zależy od ogólnego wpisu Linux |
 | Motywy menu (`theme=`, `theme.ini`) | **Done** (gałąź `feature/themes`, bez testu na sprzęcie) | — | wbudowane: default, dark, light, high-contrast, retro (UEFI i BIOS); własny `DATA\Themes\<nazwa>\theme.ini` tylko w UEFI (kolory, walidacja kontrastu, fallback na domyślny); Tools → Motyw. Otwarte: tło/obraz i logo; edytor i motywy użytkownika w BIOS: N7. Opis: `docs/menu-themes.md` |
 | Układy klawiatury dla pól tekstowych | **Later** (razem z generatorem) | 2–4 dni | tabele QWERTY-PL, QWERTZ, AZERTY; potrzebne dla generatora i parametrów DOS |
@@ -354,9 +354,15 @@ pozostaje.
 - **Vista CSMWrap**: licznik kroków 1/3 vs 1/5 (jeden wspólny licznik).
 - **Ikony** dla XP x64 i Server 2003.
 - **Cichy przełącznik CSMWrap** (bez tekstu SeaBIOS i migającego kursora).
-- **Linux z ISO** (N5, ogólny wpis): projekt w
-  [design/linux-iso-boot.md](design/linux-iso-boot.md), stan w
-  [HANDOFF-linux-2026-09-28.md](HANDOFF-linux-2026-09-28.md).
+- **Linux z ISO** (N5): zrobione w QEMU (UEFI z Secure Boot i bez, BIOS;
+  profile odpowiedzi Ubuntu/Debian/Fedora), wyniki w
+  [design/linux-iso-boot.md](design/linux-iso-boot.md) sekcja 11. Przed 1.0:
+  test na X470; Ubuntu Desktop z SB (błąd instalatora pod TCG); tekst „Wymaga
+  wyłączenia Secure Boot” dla SystemRescue jest windowsowy; opis „+ Dodaj
+  profil” mówi „dla każdego Windows”; subiquity domyślnie zaznacza największy
+  dysk (może to być pendrive USOS); zapas Legacy Core 4 424 B (minimum 4 096);
+  dwa stare testy Pythona (test_windows7_pe10_selection,
+  test_windows_setup_media) nie przechodziły już przed tą zmianą.
 
 ## 3. Znane ograniczenia (zaakceptowane)
 
@@ -422,4 +428,5 @@ Szczegóły i dowody: `TESTING.md` i dokumenty w `docs/`.
 | 2026-09-24 | Powtarzalny build pakietu XP (`compare_xp_packages.py`); zapas 43 KiB w Legacy Core; pady USB w menu UEFI; **Secure Boot** (shim 16.1 + MOK, podpisane jądro, sterowniki, zapis klucza bez MokManagera); dotyk ROG Ally (TouchI2cDxe) potwierdzony; foldery `DATA\Drivers` (UEFI + INF dla 7/8/10/11); analizy E2B i Win98 |
 | 2026-09-26 | **Windows 7 x64 na X470 bez CSM** (routing VGA do kontrolera GOP w dyspozytorze, RX 560, ISO „6in1”: instalacja do pulpitu); **profile odpowiedzi** (jeden model → WINNT.SIF / autounattend.xml, menedżer profili w menu UEFI z klawiaturą ekranową: utworzenie profilu i instalacja z nim potwierdzone na sprzęcie); **edytor motywów** w UEFI (potwierdzony na sprzęcie), motywy użytkownika w BIOS, przykłady `usos-ocean`/`usos-sunset`/`usos-forest` (build B260926-134756) |
 | 2026-09-27 | **XP bez CSM przez CSMWrap na X470** (CSM i Secure Boot wyłączone, ESP CSMWrap na dysku docelowym, instalacja unattended; build B260927-153019); poprawka wyrównania initramfs (`lang.cpio`) |
+| 2026-09-28 | **Linux z ISO na DATA** (QEMU: Ubuntu, Mint, Fedora, Debian live/netinst, SystemRescue, GParted, Clonezilla; UEFI z Secure Boot przez shim dystrybucji i bez, BIOS; profile odpowiedzi autoinstall/preseed/kickstart z ręcznym wyborem dysku; build B260928-114652) |
 | 2026-09-28 | **Vista SP2 x64 bez CSM przez CSMWrap na X470** (instalacja legacy MBR, PE10 Setup z profilem odpowiedzi, USB na pulpicie, start z dysku bez pendrive'a; build B260927-205829) |
