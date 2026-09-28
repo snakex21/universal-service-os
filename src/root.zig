@@ -86,6 +86,7 @@ pub const flow = struct {
     pub const driver_manifest = @import("flow/driver_manifest.zig");
     pub const inf_package = @import("flow/inf_package.zig");
     pub const acpi_dump = @import("flow/acpi_dump.zig");
+    pub const linux_iso = @import("flow/linux_iso/root.zig");
 };
 pub const selftest = struct {
     pub const Case = @import("selftest/case.zig").Case;
@@ -100,6 +101,7 @@ test {
     _ = @import("flow/xp_settings_summary.zig");
     _ = @import("flow/answer_screen.zig");
     _ = @import("flow/answer/root.zig");
+    _ = @import("flow/linux_iso/root.zig");
     _ = @import("gui/form.zig");
     _ = @import("gui/osk.zig");
     _ = @import("flow/plan.zig");

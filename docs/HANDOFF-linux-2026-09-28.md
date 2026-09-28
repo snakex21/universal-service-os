@@ -94,16 +94,76 @@ GParted UI itself is not shown yet. All ten ISOs on the test VHD are one
 extent each (fresh NTFS), so the dm path is not exercised yet (make a
 fragmented copy on purpose to test it).
 
-## Menu test (UEFI, OVMF, Secure Boot off): in progress at shutdown
+## Menu test (UEFI, OVMF, Secure Boot off): ALL PASS (2026-09-28 morning)
 
-`tools/tests/linux_iso/update_linux_test_esp.ps1 -EspSource zig-out/usb`
-refreshes only the ESP of the test VHD; `run_linux_iso_menu.py --name X
---script "wait:22,right,ret,wait:3,ret,wait:3,ret,wait:3,shot"` drives the
-menu (Home, Linux, Ubuntu, first ISO, method page). The menu lists Ubuntu
-(2 ISOs), Debian (3), Fedora, Linux Mint as Ready. The first real start of
-`linux_iso_start.zig` has NOT been observed yet: look at
-`tools/tests/artifacts/linux-iso/menu/ubuntu-server/01.png`, press Enter on
-"Automatic (Linux ISO)" and check the serial `[LINUX-ISO]` lines.
+`update_linux_test_esp.ps1` + `run_linux_iso_menu.py` (Home, Linux, system,
+ISO, Automatic (Linux ISO), summary "Start Linux", start), OVMF, test VHD as
+USB disk, WHPX. Serial: `[LINUX-ISO] family=... extents=1`, then:
+
+| ISO | family | result (screenshot in `tools/tests/artifacts/linux-iso/menu/<name>/`) |
+|---|---|---|
+| Ubuntu Server 24.04.5 | casper | subiquity language screen |
+| Ubuntu Desktop 24.04.5.1 | casper | "Welcome to Ubuntu" installer on the live desktop |
+| Linux Mint 22.3 Xfce | casper | live desktop |
+| Fedora WS Live 44 | dracut_live | live desktop, "Welcome to Fedora Linux" |
+| Debian live 13.7 standard | live_boot | auto-login shell of the live system |
+| Debian 13.7 netinst | debian_installer | language, country, keyboard, then media detection and component load from the ISO (BLKPG partition + default `/preseed.cfg` try-usb), up to the hostname page |
+| Debian 12.15 netinst | debian_installer | installer language screen |
+| SystemRescue 13.02 | archiso (3 initrds) | root shell of the live system |
+| GParted Live 1.8.1 | live_boot | console-data keymap dialog (live system running) |
+| Clonezilla 3.3.3 | live_boot | Clonezilla language dialog |
+
+Fixes made for this: summary button "Start Linux" (was "Load the Windows
+ISO"), specific error details (fragmented ISO, no Linux entry, helper
+missing), Linux strings in all 27 locales, default d-i preseed.
+
+## Menu test with Secure Boot ON (Fedora SMM OVMF, MS keys, MokList = USOS cert, TCG)
+
+`run_linux_iso_menu.py --secure-boot --tcg` (WHPX cannot run the SMM OVMF).
+
+| ISO | chain | result |
+|---|---|---|
+| Fedora WS Live 44 | USOS shim (Fedora CA) verifies the kernel directly | live desktop |
+| Ubuntu Server 24.04.5 | relay: Ubuntu shim 15.8 -> USOS (MOK) -> Canonical kernel via its SHIM_LOCK | subiquity language screen |
+| Ubuntu Desktop 24.04.5.1 | relay | live desktop; the desktop installer then showed "Something went wrong" under TCG (not seen with WHPX and SB off; TCG is very slow, a TCG SB-off control run did not reach GNOME in time): check on hardware |
+| Linux Mint 22.3 | relay (Ubuntu shim) | live desktop |
+| Debian live 13.7 | relay (Debian shim 16.1) | live shell |
+| Debian 13.7 netinst | relay | installer language screen |
+| Debian 12.15 netinst | relay (Debian shim 15.8) | installer language screen |
+| GParted Live 1.8.1 | relay (Debian shim) | console-data dialog |
+| Clonezilla 3.3.3 | relay (Debian shim) | language dialog |
+| SystemRescue 13.02 | no signed shim | blocked in the list: "Requires Secure Boot off" (the explanation text is the generic Windows one: follow-up) |
+
+Two bugs found and fixed on the way: a 64 KiB grub.cfg buffer on the stack
+overflowed under shim (now caller-provided), and the relay instance runs on
+top of the first instance's live stack, so it now switches to its own 1 MiB
+stack (`callOnStack`). The relay plan is `EFI/USOS/linux/relay.ini`
+(one-shot, deleted when read, only `\Systems\Linux\...` paths accepted).
+
+## Menu test in Legacy BIOS (SeaBIOS, WHPX): ALL PASS
+
+`run_linux_iso_menu.py --bios` (PS/2 keyboard; the Core swallows the first
+Enter on a freshly opened list, so scripts send one extra Enter). The Core
+path (`src/platform/bios/linux_iso_boot.zig`) loads the kernel via the 32-bit
+boot protocol with the same recipe; Core headroom is now 4 424 bytes (was
+17 012; minimum 4 096). Found and fixed: a plain int13 `reader` call after
+bulk NTFS reads never returned, so the ESP helper is read first.
+
+Results: Ubuntu Server (subiquity), Ubuntu Desktop (installer on the live
+desktop), Mint (live desktop), Fedora 44 (live desktop), Debian live (shell),
+Debian 13 netinst (to the hostname page, media found), Debian 12 netinst
+(language screen), SystemRescue (root shell), GParted (console-data dialog),
+Clonezilla (language dialog).
+
+## Answer renderers (done by a sub-agent, not wired in yet)
+
+`src/flow/answer/sha512crypt.zig`, `src/flow/answer/linux.zig`
+(`render(profile, .autoinstall|.preseed|.kickstart, salt, buffer)`), goldens in
+`src/flow/answer/testdata/golden/linux/`, `usos-answer render-linux`, docs in
+`docs/answer-profiles.md`. Next: answer screen offers profiles for
+Ubuntu/Debian/Fedora, `linux_iso_start` renders (salt from EFI_RNG / TSC) into
+the per-boot cpio; the relay path must carry it too (write it next to
+relay.ini or re-render in the relay instance).
 
 ## Exact next steps
 

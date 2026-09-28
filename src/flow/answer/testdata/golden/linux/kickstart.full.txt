@@ -1,0 +1,8 @@
+# USOS answer profile "Dom" (docs/answer-profiles.md).
+# No storage commands: Installation Destination always stays in the installer.
+lang pl_PL.UTF-8
+keyboard --xlayouts='pl'
+timezone Europe/Warsaw --utc
+network --hostname=usos-pc
+rootpw --lock
+user --name=tester --gecos="Tester" --groups=wheel --iscrypted --password=$6$usosgoldensalt00$SyGWlOqBZhYRPvSLnnk3UcylmKhx/IEvRvmMOppqMHb1dIYLyj0imHkABG5j0cZ8dPzoatvtYoNC3w8ihlK.O0

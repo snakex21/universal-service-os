@@ -1,0 +1,14 @@
+# USOS answer profile "Dom" (docs/answer-profiles.md).
+# No disk or boot loader keys: partitioning always stays in the installer.
+d-i cdrom-detect/try-usb boolean true
+d-i debian-installer/locale string pl_PL.UTF-8
+d-i keyboard-configuration/xkb-keymap select pl
+d-i netcfg/get_hostname string usos-pc
+d-i netcfg/hostname string usos-pc
+d-i netcfg/get_domain string
+d-i passwd/root-login boolean false
+d-i passwd/user-fullname string Tester
+d-i passwd/username string tester
+d-i passwd/user-password-crypted password $6$usosgoldensalt00$SyGWlOqBZhYRPvSLnnk3UcylmKhx/IEvRvmMOppqMHb1dIYLyj0imHkABG5j0cZ8dPzoatvtYoNC3w8ihlK.O0
+d-i time/zone string Europe/Warsaw
+d-i clock-setup/utc boolean true

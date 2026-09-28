@@ -32,7 +32,12 @@ pub fn execute(
     graphics: ?vbe_probe.Session,
 ) !void {
     switch (backend) {
-        .linux_live_iso => try @import("linux_live_iso.zig").run(context.reader, context.bulk_reader, image_name, graphics),
+        .linux_live_iso => @import("linux_live_iso.zig").run(context.reader, context.bulk_reader, image_name, graphics) catch |err| switch (err) {
+            // Other Linux: an ISO that is not SliTaz goes through the generic path.
+            error.SliTazCookingIsoRequired => try linuxIso(context, system_id, image_name, graphics),
+            else => return err,
+        },
+        .linux_iso => try linuxIso(context, system_id, image_name, graphics),
         .dos_bios_iso => try dos6_native_iso.run(context.esp_fs, context.reader, context.bulk_reader, context.bios_boot_drive, graphics, system_id, image_name),
         .win9x_dos => try dos_native_iso.run(context.esp_fs, context.reader, context.bulk_reader, context.bios_boot_drive, graphics, image_name),
         .windows_bios_iso => {
@@ -60,4 +65,9 @@ pub fn execute(
         ),
         else => return error.BackendUnavailable,
     }
+}
+
+fn linuxIso(context: Context, system_id: []const u8, image_name: []const u8, graphics: ?vbe_probe.Session) !void {
+    const system = catalog.systems.findById(system_id) orelse return error.BackendUnavailable;
+    try @import("linux_iso_boot.zig").run(context.esp_fs, context.reader, context.bulk_reader, system.image_directory, image_name, graphics);
 }

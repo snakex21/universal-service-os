@@ -16,6 +16,7 @@ pub fn build(b: *std.Build) void {
     const x86_64_app = addInteractiveX86UefiApp(b, optimize);
     _ = addBootstrapUefiApp(b, optimize, .aarch64, "usos-aarch64", "usb/EFI/BOOT/BOOTAA64.EFI");
     addReleaseMediaLayout(b);
+    addLinuxIsoHelper(b);
     const manual_image = addQemuX86ManualImage(b, x86_64_app);
     const framebuffer_ui = addFramebufferUi(b, optimize);
     const micro_linux = addMicroLinux(b, framebuffer_ui);
@@ -58,6 +59,34 @@ fn addReleaseMediaLayout(b: *std.Build) void {
         .install_subdir = "usb",
     });
     b.getInstallStep().dependOn(&install_media.step);
+}
+
+/// /usos/init (docs/design/linux-iso-boot.md): static x86_64 Linux helper
+/// packed into EFI/USOS/linux/usos-linux.cpio, appended by the menu/Core to a
+/// distro initramfs when a Linux ISO boots from DATA.
+fn addLinuxIsoHelper(b: *std.Build) void {
+    const target = b.resolveTargetQuery(.{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .none });
+    const map_module = b.createModule(.{
+        .root_source_file = b.path("src/flow/linux_iso/iso_map.zig"),
+        .target = target,
+        .optimize = .ReleaseSmall,
+    });
+    const module = b.createModule(.{
+        .root_source_file = b.path("src/platform/linux/iso_init_main.zig"),
+        .target = target,
+        .optimize = .ReleaseSmall,
+        .strip = true,
+    });
+    module.addImport("iso_map", map_module);
+    const exe = b.addExecutable(.{ .name = "usos-init", .root_module = module, .linkage = .static });
+    const install_exe = b.addInstallFile(exe.getEmittedBin(), "linux-iso/usos-init");
+    const pack = b.addSystemCommand(&.{ "python", "tools/build_linux_iso_helper.py", "--init" });
+    pack.addFileArg(exe.getEmittedBin());
+    pack.addArgs(&.{ "--out", "zig-out/usb/EFI/USOS/linux/usos-linux.cpio", "--out", "zig-out/manual-usb/EFI/USOS/linux/usos-linux.cpio" });
+    pack.step.dependOn(&install_exe.step);
+    b.getInstallStep().dependOn(&pack.step);
+    const step = b.step("linux-iso-helper", "Build /usos/init and EFI/USOS/linux/usos-linux.cpio");
+    step.dependOn(&pack.step);
 }
 
 fn addHostTests(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {

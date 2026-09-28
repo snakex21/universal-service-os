@@ -5,6 +5,9 @@
 //!   usos-answer render PROFILE.ini SYSTEM-ID ARCH OUT [KEY|-] [INSTALL-XML]
 //!     INSTALL-XML: the XML metadata of the media's install.wim (UTF-16LE
 //!     with BOM, as stored in the WIM) for the profile's edition
+//!   usos-answer render-linux PROFILE.ini FORMAT SALT OUT
+//!     FORMAT: autoinstall | preseed | kickstart; SALT: 1-16 characters of
+//!     [./0-9A-Za-z] (fixed for the goldens); the notes go to stderr
 //!   usos-answer import-xp USOS-XP.ini OUT-PROFILE.ini
 //!   usos-answer normalize PROFILE.ini OUT-PROFILE.ini
 //!   usos-answer check-xml FILE.xml [MEDIA-ARCH]
@@ -18,6 +21,7 @@ const answer = usos.flow.answer;
 fn usage() u8 {
     std.debug.print(
         \\usage: usos-answer render PROFILE.ini SYSTEM-ID ARCH OUT [KEY|-] [INSTALL-XML]
+        \\       usos-answer render-linux PROFILE.ini autoinstall|preseed|kickstart SALT OUT
         \\       usos-answer import-xp USOS-XP.ini OUT-PROFILE.ini
         \\       usos-answer normalize PROFILE.ini OUT-PROFILE.ini
         \\       usos-answer check-xml FILE.xml [MEDIA-ARCH]
@@ -75,6 +79,30 @@ pub fn main(init: std.process.Init) !u8 {
             return 1;
         };
         try cwd.writeFile(io, .{ .sub_path = out_path, .data = rendered.bytes });
+        return 0;
+    }
+    if (std.mem.eql(u8, command, "render-linux")) {
+        const profile_path = args.next() orelse return usage();
+        const format_text = args.next() orelse return usage();
+        const salt = args.next() orelse return usage();
+        const out_path = args.next() orelse return usage();
+        const format = std.meta.stringToEnum(answer.linux.Format, format_text) orelse return usage();
+        const text = try cwd.readFileAlloc(io, profile_path, init.gpa, .limited(answer.profile.max_file + 1));
+        defer init.gpa.free(text);
+        var p: answer.Profile = undefined;
+        switch (answer.profile.parse(text, &p)) {
+            .ok => {},
+            .invalid => |issue| return report(issue),
+        }
+        var buffer: [answer.linux.max_size]u8 = undefined;
+        const result = answer.linux.render(&p, format, salt, &buffer) catch |err| {
+            std.debug.print("render failed: {s}\n", .{@errorName(err)});
+            return 1;
+        };
+        var notes = result.notes.iterator();
+        while (notes.next()) |note| std.debug.print("note: {s}\n", .{@tagName(note)});
+        if (result.interactive_identity) std.debug.print("identity: interactive\n", .{});
+        try cwd.writeFile(io, .{ .sub_path = out_path, .data = result.bytes });
         return 0;
     }
     if (std.mem.eql(u8, command, "import-xp") or std.mem.eql(u8, command, "normalize")) {

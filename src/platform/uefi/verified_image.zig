@@ -150,6 +150,24 @@ pub fn loadApplication(device_path: *const DevicePath, file: *uefi.protocol.File
     return loadWithOverride(bs, device_path, bytes);
 }
 
+/// Loads an EFI application held in `bytes` (a Linux kernel read from an
+/// ISO): plain LoadImage (shim 16 checks db/MOK/its vendor CA itself), or on
+/// shim 15.x SHIM_LOCK->Verify plus the security override.
+pub fn loadBuffer(bytes: []const u8) Error!uefi.Handle {
+    const bs = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
+    if (!secure_boot.enforced() or secure_boot.shimOwnsLoadImage()) return plainLoad(bs, .{ .buffer = bytes });
+    const lock = secure_boot.shimLock() orelse return plainLoad(bs, .{ .buffer = bytes });
+    try secure_boot.shimVerify(lock, bytes);
+    return loadWithOverride(bs, null, bytes);
+}
+
+/// LoadedImage->LoadOptions of a loaded image (UTF-16, NUL included);
+/// `options` must stay valid until the image has started.
+pub fn setLoadOptions(image: uefi.Handle, options: []const u16) void {
+    const bs = uefi.system_table.boot_services orelse return;
+    setLoadedImage(bs, image, null, options);
+}
+
 fn readWhole(bs: *uefi.tables.BootServices, file: *uefi.protocol.File) ![]align(8) u8 {
     try file.setPosition(0xffff_ffff_ffff_ffff);
     const size = try file.getPosition();
@@ -279,4 +297,80 @@ fn startDriverManually(bs: *uefi.tables.BootServices, bytes: []const u8, device_
     const Entry = *const fn (uefi.Handle, *uefi.tables.SystemTable) callconv(cc) Status;
     const entry: Entry = @ptrFromInt(@intFromPtr(memory.ptr) + layout.entry_rva);
     if (entry(handle, uefi.system_table) != .success) return error.DriverStartFailed;
+}
+
+/// Distro-shim relay (docs/design/linux-iso-boot.md section 5): verifies
+/// `bytes` with every SHIM_LOCK instance installed (the distro's shim that
+/// started this USOS instance trusts its own kernels; the USOS shim may still
+/// be present too). Succeeds when one of them accepts the image.
+pub fn verifyWithAnyShim(bytes: []const u8) Error!void {
+    const bs = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
+    const handles = (bs.locateHandleBuffer(.{ .by_protocol = &secure_boot.ShimLock.guid }) catch return error.SecureBootRejected) orelse return error.SecureBootRejected;
+    defer bs.freePool(@ptrCast(handles.ptr)) catch {};
+    for (handles) |handle| {
+        const lock = (bs.handleProtocol(secure_boot.ShimLock, handle) catch continue) orelse continue;
+        secure_boot.shimVerify(lock, bytes) catch continue;
+        return;
+    }
+    return error.SecureBootRejected;
+}
+
+/// Starts an EFI application (a Linux kernel) held in `bytes` without
+/// gBS->LoadImage, after the caller verified it: copies and relocates it into
+/// loader-code pages, installs a LoadedImage (with `options` as LoadOptions)
+/// on a new handle and calls the entry point. A Linux kernel does not return.
+pub fn startApplicationManually(bytes: []const u8, options: []const u16) Error!void {
+    const bs = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
+    const layout = try pe_loader.parse(bytes);
+    if (layout.subsystem != pe_loader.subsystem_efi_application) return error.Unsupported;
+    const pages = try bs.allocatePages(.any, .loader_code, (@as(usize, layout.size_of_image) + 4095) / 4096);
+    const memory = std.mem.sliceAsBytes(pages);
+    try pe_loader.load(bytes, layout, memory, @intFromPtr(memory.ptr));
+    if (bs.locateProtocol(MemoryAttribute, null) catch null) |attributes| {
+        _ = attributes.clear(attributes, @intFromPtr(memory.ptr), memory.len, MemoryAttribute.execute_protect);
+    }
+    const loaded = try uefi.pool_allocator.create(uefi.protocol.LoadedImage);
+    loaded.* = .{
+        .revision = 0x1000,
+        .parent_handle = uefi.handle,
+        .system_table = uefi.system_table,
+        .device_handle = null,
+        .file_path = @ptrCast(@constCast(&end_of_path)),
+        .reserved = @ptrCast(&reserved_word),
+        .load_options_size = @intCast(options.len * 2),
+        .load_options = @ptrCast(@constCast(options.ptr)),
+        .image_base = memory.ptr,
+        .image_size = layout.size_of_image,
+        .image_code_type = .loader_code,
+        .image_data_type = .loader_data,
+        ._unload = unloadUnsupported,
+    };
+    const Install = *const fn (*?uefi.Handle, *const uefi.Guid, uefi.tables.InterfaceType, *anyopaque) callconv(cc) Status;
+    const install: Install = @ptrCast(bs._installProtocolInterface);
+    var new_handle: ?uefi.Handle = null;
+    if (install(&new_handle, &uefi.protocol.LoadedImage.guid, .native, loaded) != .success) return error.DriverStartFailed;
+    const handle = new_handle orelse return error.DriverStartFailed;
+    const Entry = *const fn (uefi.Handle, *uefi.tables.SystemTable) callconv(cc) Status;
+    const entry: Entry = @ptrFromInt(@intFromPtr(memory.ptr) + layout.entry_rva);
+    _ = entry(handle, uefi.system_table);
+    return error.DriverStartFailed;
+}
+
+/// Loads (does not start) an image held in `bytes` with the given device
+/// path, through gBS->LoadImage (shim 16's hook under Secure Boot: db, MOK,
+/// vendor CA). Used for the distro's Microsoft-signed shim of the relay.
+pub fn loadBufferAt(bytes: []const u8, device_path: *const DevicePath) Error!uefi.Handle {
+    const bs = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
+    var handle: uefi.Handle = undefined;
+    return switch (bs._loadImage(false, uefi.handle, device_path, bytes.ptr, bytes.len, &handle)) {
+        .success => handle,
+        .security_violation, .access_denied => error.SecureBootRejected,
+        .not_found => error.NotFound,
+        .invalid_parameter => error.InvalidParameter,
+        .unsupported => error.Unsupported,
+        .out_of_resources => error.OutOfResources,
+        .load_error => error.LoadError,
+        .device_error => error.DeviceError,
+        else => |status| uefi.unexpectedStatus(status),
+    };
 }

@@ -10,6 +10,8 @@ pub const xml_check = @import("xml_check.zig");
 pub const schema = @import("schema.zig");
 pub const plan_file = @import("plan_file.zig");
 pub const editions = @import("editions.zig");
+pub const sha512crypt = @import("sha512crypt.zig");
+pub const linux = @import("linux.zig");
 
 pub const Profile = profile.Profile;
 pub const Arch = target.Arch;
@@ -67,6 +69,8 @@ test {
     _ = schema;
     _ = plan_file;
     _ = editions;
+    _ = sha512crypt;
+    _ = linux;
 }
 
 test "render dispatch per system" {

@@ -22,6 +22,7 @@ pub const DiscoveredImage = @import("catalog/discovered_image.zig").DiscoveredIm
 pub const image_catalog = @import("catalog/image_catalog.zig");
 pub const udf = @import("image_probe/udf.zig");
 pub const iso9660 = @import("image_probe/iso9660.zig");
+pub const linux_iso = @import("flow/linux_iso/root.zig");
 pub const directory_source = @import("catalog/directory_source.zig");
 pub const media_discovery = @import("catalog/media_discovery.zig");
 pub const utility_catalog = @import("catalog/utility_catalog.zig");

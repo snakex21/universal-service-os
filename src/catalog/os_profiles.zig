@@ -109,6 +109,8 @@ pub const traits_table = [_]SystemTraits{
     .{ .system_id = "windows-server-2012", .route_as = "windows-8", .no_inbox_nvme = true },
     .{ .system_id = "windows-server-2008-r2", .route_as = "windows-7" },
     .{ .system_id = "windows-server-2008", .route_as = "windows-vista" },
+    // Linux ISO from DATA: SystemRescue ships no Microsoft-signed shim.
+    .{ .system_id = "systemrescue", .secure_boot_off = true },
 };
 
 fn ownTraits(system_id: []const u8) SystemTraits {
@@ -186,6 +188,8 @@ pub const Progress = enum {
     xp_uefi,
     /// A UEFI application from Images, started directly.
     efi_image,
+    /// A Linux ISO from DATA: its kernel started directly with the USOS helper.
+    linux_iso,
     // Rows: src/flow/plan.zig stageLabels (kept out of the catalog module,
     // which the BIOS Core also links next to the graphics module).
 };
@@ -225,6 +229,8 @@ pub const Profile = struct {
 };
 
 const iso = &[_]ImageKind{.iso};
+/// Every catalog Linux system (src/catalog/linux_systems.zig).
+const linux_ids = &[_][]const u8{ "ubuntu", "debian", "fedora", "linux-mint", "arch-linux", "opensuse", "manjaro", "kali-linux", "systemrescue", "gparted-live", "clonezilla", "other-linux" };
 const auto_iso = &[_]BootMethod{ .automatic, .direct_iso };
 const auto_iso_memdisk = &[_]BootMethod{ .automatic, .direct_iso, .memdisk };
 
@@ -232,6 +238,10 @@ const auto_iso_memdisk = &[_]BootMethod{ .automatic, .direct_iso, .memdisk };
 /// ones (the former resolveBackend). First match wins.
 pub const profiles = [_]Profile{
     // ---- UEFI only
+    // Linux ISO from DATA (docs/design/linux-iso-boot.md): kernel + initrd from
+    // the ISO, /usos/init maps the ISO file as a block device. Replaces the WORK
+    // chainload for Linux ISOs, which never booted live media.
+    .{ .id = "linux-iso-uefi", .systems = .{ .ids = linux_ids }, .images = iso, .methods = auto_iso, .firmware = .uefi, .backend = .linux_iso, .progress = .linux_iso },
     .{ .id = "xp-x86-sp3-uefi-csm", .systems = .{ .ids = &.{"windows-xp"} }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .xp_uefi_staging, .progress = .xp_uefi },
     .{ .id = "xp-uefi-other", .systems = .{ .ids = &.{"windows-xp"} }, .firmware = .uefi, .backend = null, .progress = .none },
     // Windows 2000 from UEFI: the same micro-Linux preparation and package
@@ -247,6 +257,9 @@ pub const profiles = [_]Profile{
     .{ .id = "xp-x64-uefi-other", .systems = .{ .ids = &.{"windows-xp-x64"} }, .firmware = .uefi, .backend = null, .progress = .none },
     // ---- BIOS only
     .{ .id = "linux-live-bios", .systems = .{ .ids = &.{"other-linux"} }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .linux_live_iso, .progress = .core },
+    // Linux ISO from DATA in the BIOS Core (other-linux keeps the SliTaz row;
+    // its backend falls back to this path for non-SliTaz ISOs).
+    .{ .id = "linux-iso-bios", .systems = .{ .ids = linux_ids }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .linux_iso, .progress = .core },
     .{ .id = "dos-fat16-bios", .systems = .{ .ids = &.{ "ms-dos", "windows-3-1", "windows-3-11" } }, .images = iso, .methods = auto_iso_memdisk, .firmware = .bios, .backend = .dos_bios_iso, .progress = .core },
     .{ .id = "win98se-dos-bios", .systems = .{ .ids = &.{"windows-98-se"} }, .images = iso, .methods = auto_iso_memdisk, .firmware = .bios, .backend = .win9x_dos, .progress = .core },
     .{ .id = "windows-pe-bios-iso", .systems = .{ .ids = &.{ "windows-7", "windows-vista", "windows-10" } }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .windows_bios_iso, .progress = .core },
