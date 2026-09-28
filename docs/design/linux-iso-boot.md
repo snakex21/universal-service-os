@@ -336,3 +336,31 @@ Test commands: `tools/tests/linux_iso/new_linux_test_disk.ps1` (once),
 `update_linux_test_esp.ps1 [-Profile ...] [-AddIso name=Folder]`,
 `run_linux_iso_menu.py --name X --script "..." [--secure-boot --tcg] [--bios] [--target-disk 20]`,
 `run_linux_iso_direct.py <name>` (no menu).
+
+## 12. First hardware results and fixes (2026-09-28, build B260928-122908)
+
+X470, Secure Boot off: Mint desktop, Fedora desktop (USB sticks visible),
+Debian netinst with a profile to the disk step, SystemRescue shell, Clonezilla
+language dialog (keyboard works), GParted console-data. Secure Boot on: Fedora
+OK, Mint boots. Socket 939 PC, Legacy BIOS, USB 2: Mint desktop.
+
+Fixed afterwards:
+
+- **Garbled long names in the BIOS menu** (`linuxmint-22.3-x???...` on the
+  Socket 939 PC): the NTFS decode is correct (test
+  `long Win32 names decode completely...` in `src/storage/ntfs.zig`), and the
+  names are ASCII-checked when listed, so they were overwritten later. The
+  PM32 stack started at a fixed 0x9E000 (632 KiB); the image list is a local
+  of the outermost menu frames right below it. BIOSes with USB legacy
+  emulation grow the EBDA below 632 KiB and their int13 code writes there.
+  The bootstrap now starts the stack at min(0x9E000, BDA 0x413 x 1 KiB).
+  Not reproducible in QEMU (SeaBIOS reports 639 KiB); to confirm on the PC.
+- **"Verification failed" before the Mint relay**: printed by the USOS shim's
+  hooked LoadImage when it rejected the Canonical kernel. USOS now asks
+  `SHIM_LOCK->Verify` first (silent) and relays without any LoadImage attempt.
+- **SystemRescue under Secure Boot**: in QEMU USOS shows the notice, never
+  calls LoadImage, and the notice closes on Enter/Esc. Now it closes on any
+  key. The firmware screen and 30 s wait seen on the X470 did not come from a
+  USOS load; a photo of that screen is needed to go further.
+- Linux wording: Secure Boot notice ("This ISO has no boot loader signed for
+  Secure Boot"), "+ Add a new profile" hint and editor subtitle, 27 locales.
