@@ -72,3 +72,6 @@ tools/qemu/
 installer/build/
 installer/internal/payload/assets/*.zip
 /$tmp/
+
+# Maintainer-only local notes (machine paths, sticks); never published
+/docs/local/

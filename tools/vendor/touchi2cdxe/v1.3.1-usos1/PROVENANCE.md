@@ -95,7 +95,7 @@ for the driver after a 2-minute BaseTools build.
   (`35d511bc...4ff5`, 23 040 bytes). The PE timestamp is 0 (GenFw) and no
   build path or PDB path is embedded.
 - A from-scratch run of `tools/build_touchi2cdxe.ps1` in a different folder
-  (`C:\Users\ASRock\usos-edk2v`, fresh clones and NASM download) produced the
+  (a short `-WorkDir` under the user profile, fresh clones and NASM download) produced the
   same SHA-256 on 2026-09-24.
 - Another MSVC version can change the code bytes. That is expected: the
   vendored file is the reference and the release signs exactly it; rebuild
