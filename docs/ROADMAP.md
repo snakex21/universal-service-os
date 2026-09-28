@@ -404,6 +404,18 @@ innym, w formie osobnego, opcjonalnego dodatku.
   B260928-193034 (minimum 4 096); pełny pytest (236) przechodzi od
   9f95b3f1.
 
+- **Wydanie 1.0.0** (2026-09-28): wersja produktu w pliku `VERSION`
+  (menu UEFI/BIOS/mikro-Linux: „Universal Service OS 1.0.0” w nagłówku,
+  instalator: „1.0.0 (B…)”, `build-info.ini`: `version=`); jedno polecenie
+  `tools\release\make_release.ps1` → `zig-out\release-1.0\` (instalator,
+  dawca PE10, pakiety XP PL i EN osobno z listy SHA-256, bez pakietu
+  Server 2003, źródła, licencje, skan zakazanych treści, SHA256SUMS);
+  hosting: [release-hosting.md](release-hosting.md); audyt licencji:
+  [LICENSES-AUDIT.md](LICENSES-AUDIT.md); dokumentacja użytkownika:
+  [USER-GUIDE.pl.md](USER-GUIDE.pl.md), [USER-GUIDE.en.md](USER-GUIDE.en.md);
+  test świeżej instalacji na SanDisku: [RELEASE-TEST-1.0.md](RELEASE-TEST-1.0.md).
+  Tag `v1.0.0` dopiero po zaliczeniu tego testu.
+
 ## 3. Znane ograniczenia (zaakceptowane)
 
 - **AMI pokazuje każdą montowalną partycję** pendrive'a jako osobny
