@@ -367,7 +367,8 @@ fn start(
     // Linux keeps the frame until usos-fb-ui takes over.
     if (image.kind == .iso and system.family == .linux and backend == .linux_iso) {
         view.handover(view.t(.splash_starting));
-        @import("linux_iso_start.zig").start(root, system.image_directory, image.name.slice(), null, linuxProgress) catch |err| {
+        const linux_profile: ?@import("linux_iso_start.zig").ProfileChoice = if (answer.profile) |index| .{ .profile = answer_profiles.get(index), .stem = answer_profiles.stem(index) } else null;
+        @import("linux_iso_start.zig").start(root, system.image_directory, image.name.slice(), linux_profile, linuxProgress) catch |err| {
             view.refreshFramebuffer();
             showError(view.t(.error_linux), err);
         };

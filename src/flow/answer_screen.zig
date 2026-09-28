@@ -172,6 +172,14 @@ pub fn layout(in: Input) Layout {
 /// staging, the native wimboot start (7, 10/11; not Vista, whose own
 /// servicing answer refuses one) or a WORK preparation (8/10/11, WIM).
 pub fn profileCapable(system: *const SystemEntry, image: ImageKind, method: BootMethod, firmware: Firmware) bool {
+    if (linuxAnswerSystem(system.id)) {
+        // Linux ISO start (docs/design/linux-iso-boot.md section 7): the
+        // profile is rendered at start as autoinstall / preseed / kickstart
+        // for the installer the ISO turns out to carry.
+        if (image != .iso) return false;
+        const linux_backend = preparation_capability.resolveForFirmware(system, image, method, firmware) orelse return false;
+        return linux_backend == .linux_iso and firmware == .uefi;
+    }
     if (answer_target.familyFor(system.id) == null) return false;
     if (image != .iso and image != .wim) return false;
     const backend = preparation_capability.resolveForFirmware(system, image, method, firmware) orelse return false;
@@ -181,6 +189,24 @@ pub fn profileCapable(system: *const SystemEntry, image: ImageKind, method: Boot
         .chainload, .wimboot => true,
         else => false,
     };
+}
+
+/// Linux systems whose installers take a USOS profile (Ubuntu autoinstall,
+/// Debian preseed, Fedora kickstart).
+pub fn linuxAnswerSystem(system_id: []const u8) bool {
+    for ([_][]const u8{ "ubuntu", "debian", "fedora" }) |id| {
+        if (std.mem.eql(u8, id, system_id)) return true;
+    }
+    return false;
+}
+
+test "Linux profiles only for Ubuntu, Debian and Fedora ISOs on UEFI" {
+    const systems = @import("../catalog/systems.zig");
+    try std.testing.expect(profileCapable(systems.findById("ubuntu").?, .iso, .automatic, .uefi));
+    try std.testing.expect(profileCapable(systems.findById("fedora").?, .iso, .direct_iso, .uefi));
+    try std.testing.expect(!profileCapable(systems.findById("debian").?, .iso, .automatic, .bios));
+    try std.testing.expect(!profileCapable(systems.findById("linux-mint").?, .iso, .automatic, .uefi));
+    try std.testing.expect(!profileCapable(systems.findById("ubuntu").?, .iso, .chainload, .uefi));
 }
 
 /// ` usos.legacy_unattended_hex=` for a .sif chosen on the answer screen: the

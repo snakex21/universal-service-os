@@ -98,11 +98,19 @@ pub fn start(
     root: *uefi.protocol.File,
     image_directory: []const u8,
     name: []const u8,
-    answer: ?Answer,
+    profile: ?ProfileChoice,
     progress: *const fn (Status_) void,
 ) !void {
-    return startMode(root, image_directory, name, answer, progress, .menu);
+    return startMode(root, image_directory, name, profile, progress, .menu);
 }
+
+/// A USOS answer profile chosen on the answer screen: rendered at start for
+/// the installer the ISO carries (design section 7); `stem` names it for the
+/// Secure Boot relay instance, which re-reads it from \EFI\USOS\profiles.
+pub const ProfileChoice = struct {
+    profile: *const usos.flow.answer.Profile,
+    stem: []const u8,
+};
 
 const Mode = enum {
     /// Started from the USOS menu (USOS shim, or no Secure Boot).
@@ -115,7 +123,7 @@ fn startMode(
     root: *uefi.protocol.File,
     image_directory: []const u8,
     name: []const u8,
-    answer: ?Answer,
+    profile: ?ProfileChoice,
     progress: *const fn (Status_) void,
     mode: Mode,
 ) !void {
@@ -164,7 +172,7 @@ fn startMode(
             handle = verified_image.loadBuffer(kernel) catch |err| {
                 if (err == error.SecureBootRejected and secure_boot.enforced() and recipe.shim_layout) {
                     freeBytes(bs, kernel);
-                    return relay(root, &reader, image_directory, name);
+                    return relay(root, &reader, image_directory, name, if (profile) |p| p.stem else "");
                 }
                 return err;
             };
@@ -180,6 +188,7 @@ fn startMode(
     // Debian installer: the ISO appears as a USB partition (BLKPG fallback of
     // /usos/init); cdrom-detect only looks at USB partitions when asked.
     const default_preseed = Answer{ .path = "preseed.cfg", .bytes = debian_default_preseed };
+    const answer = try renderAnswer(profile, recipe.answer);
     const effective = answer orelse if (recipe.family == .debian_installer) default_preseed else null;
     const per_boot = try perBootCpio(&map, effective, &per_boot_buffer);
     var total: u64 = helper.len + per_boot.len;
@@ -221,6 +230,58 @@ fn startMode(
         verified_image.startApplicationManually(kernel, cmdline) catch {};
     }
     return error.LinuxKernelReturned;
+}
+
+var answer_buffer: [usos.flow.answer.linux.max_size]u8 = undefined;
+
+/// Renders the chosen profile for the ISO's installer (null: no profile, or
+/// an ISO whose installer takes no answer file: the profile is ignored).
+/// The password is only ever written as a SHA-512 crypt; nothing is logged.
+fn renderAnswer(profile: ?ProfileChoice, format: linux_iso.recipe.AnswerFormat) !?Answer {
+    const choice = profile orelse return null;
+    const linux_format: usos.flow.answer.linux.Format = switch (format) {
+        .none => {
+            logf("[LINUX-ISO] profile ignored: this ISO's installer takes no answer file\r\n", .{});
+            return null;
+        },
+        .autoinstall => .autoinstall,
+        .preseed => .preseed,
+        .kickstart => .kickstart,
+    };
+    const salt = usos.flow.answer.sha512crypt.saltFromBytes(randomBytes());
+    const result = try usos.flow.answer.linux.render(choice.profile, linux_format, &salt, &answer_buffer);
+    logf("[LINUX-ISO] profile rendered as {s} ({d} bytes)\r\n", .{ linux_format.fileName(), result.bytes.len });
+    return .{ .path = linux_format.cpioPath(), .bytes = result.bytes, .cmdline = linux_format.kernelArgument() orelse "" };
+}
+
+/// EFI_RNG_PROTOCOL when the firmware has it, else TSC and time mixed.
+fn randomBytes() [12]u8 {
+    var out: [12]u8 = undefined;
+    const rng_guid align(8) = uefi.Guid{ .time_low = 0x3152bca5, .time_mid = 0xeade, .time_high_and_version = 0x433d, .clock_seq_high_and_reserved = 0x86, .clock_seq_low = 0x2e, .node = .{ 0xc0, 0x1c, 0xdc, 0x29, 0x1f, 0x44 } };
+    const Rng = extern struct {
+        get_info: *const anyopaque,
+        get_rng: *const fn (*const anyopaque, ?*const uefi.Guid, usize, [*]u8) callconv(cc) Status,
+    };
+    if (uefi.system_table.boot_services) |bs| {
+        var interface: ?*const anyopaque = null;
+        if (bs._locateProtocol(&rng_guid, null, &interface) == .success and interface != null) {
+            const rng: *const Rng = @ptrCast(@alignCast(interface.?));
+            if (rng.get_rng(interface.?, null, out.len, &out) == .success) return out;
+        }
+    }
+    var state: u64 = 0x9e3779b97f4a7c15;
+    for (0..3) |round| {
+        var low: u32 = undefined;
+        var high: u32 = undefined;
+        asm volatile ("rdtsc"
+            : [low] "={eax}" (low),
+              [high] "={edx}" (high),
+        );
+        state ^= (@as(u64, high) << 32 | low) +% round;
+        state = std.hash.Wyhash.hash(state, std.mem.asBytes(&out));
+        std.mem.writeInt(u32, out[round * 4 ..][0..4], @truncate(state), .little);
+    }
+    return out;
 }
 
 fn logf(comptime format: []const u8, args: anytype) void {
@@ -377,7 +438,7 @@ const relay_file_node = std.unicode.utf8ToUtf16LeStringLiteral("\\EFI\\BOOT\\USO
 /// Starts the ISO's Microsoft-signed shim (\EFI\BOOT\BOOTX64.EFI of the ISO)
 /// as if it were \EFI\BOOT\USOSRELAY.EFI on the USOS ESP. It starts USOS
 /// again as its second stage; that instance finds relay.ini (resumeRelay).
-fn relay(root: *uefi.protocol.File, reader: *IsoReader, image_directory: []const u8, name: []const u8) !void {
+fn relay(root: *uefi.protocol.File, reader: *IsoReader, image_directory: []const u8, name: []const u8, profile_stem: []const u8) !void {
     const bs = uefi.system_table.boot_services orelse return error.BootServicesUnavailable;
     const record = (iso9660.findRecord(reader, "EFI/BOOT/BOOTX64.EFI") catch null) orelse return error.NoDistroShim;
     if (record.size > 8 * 1024 * 1024) return error.NoDistroShim;
@@ -386,7 +447,7 @@ fn relay(root: *uefi.protocol.File, reader: *IsoReader, image_directory: []const
     _ = try reader.readAt(@as(u64, record.extent_lba) * 2048, shim);
 
     var plan: [700]u8 = undefined;
-    const text = try std.fmt.bufPrint(&plan, "[relay]\r\nversion=1\r\ndirectory={s}\r\nname={s}\r\n", .{ image_directory, name });
+    const text = try std.fmt.bufPrint(&plan, "[relay]\r\nversion=1\r\ndirectory={s}\r\nname={s}\r\nprofile={s}\r\n", .{ image_directory, name, profile_stem });
     try writeEspFile(root, relay_plan_file, text);
     errdefer deleteEspFile(root, relay_plan_file);
 
@@ -438,10 +499,12 @@ pub fn resumeRelay(root: *uefi.protocol.File) void {
     deleteEspFile(root, relay_plan_file);
     var directory: []const u8 = "";
     var name: []const u8 = "";
+    var profile_stem: []const u8 = "";
     var lines = std.mem.tokenizeAny(u8, text, "\r\n");
     while (lines.next()) |line| {
         if (std.mem.startsWith(u8, line, "directory=")) directory = line["directory=".len..];
         if (std.mem.startsWith(u8, line, "name=")) name = line["name=".len..];
+        if (std.mem.startsWith(u8, line, "profile=")) profile_stem = line["profile=".len..];
     }
     if (!std.mem.startsWith(u8, directory, "\\Systems\\Linux\\") or name.len == 0) return;
     logf("[LINUX-ISO] relay instance: {s}\r\n", .{name});
@@ -450,6 +513,11 @@ pub fn resumeRelay(root: *uefi.protocol.File) void {
     const bs = uefi.system_table.boot_services orelse return;
     const stack = bs.allocatePages(.any, .loader_data, relay_stack_bytes / 4096) catch return;
     relay_args = .{ .root = root, .directory = directory, .name = name };
+    if (profile_stem.len != 0) {
+        const profiles = @import("answer_profiles.zig");
+        profiles.reload(root);
+        if (profiles.find(profile_stem)) |index| relay_args.profile = .{ .profile = profiles.get(index), .stem = profiles.stem(index) };
+    }
     const top = (@intFromPtr(stack.ptr) + relay_stack_bytes) & ~@as(usize, 15);
     callOnStack(top, relayEntry);
 }
@@ -460,10 +528,11 @@ var relay_args: struct {
     root: *uefi.protocol.File = undefined,
     directory: []const u8 = "",
     name: []const u8 = "",
+    profile: ?ProfileChoice = null,
 } = .{};
 
 fn relayEntry() callconv(.c) void {
-    startMode(relay_args.root, relay_args.directory, relay_args.name, null, noProgress, .relay) catch |err| {
+    startMode(relay_args.root, relay_args.directory, relay_args.name, relay_args.profile, noProgress, .relay) catch |err| {
         logf("[LINUX-ISO] relay start failed: {s}\r\n", .{@errorName(err)});
     };
 }
