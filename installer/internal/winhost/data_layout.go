@@ -54,6 +54,9 @@ var linuxProfiles = []dataProfile{
 	{"opensuse", "openSUSE", true, false},
 	{"manjaro", "Manjaro", true, false},
 	{"kali-linux", "Kali Linux", true, false},
+	{"systemrescue", "SystemRescue", true, false},
+	{"gparted-live", "GParted Live", true, false},
+	{"clonezilla", "Clonezilla", true, false},
 	{"other-linux", "Other Linux", true, false},
 }
 

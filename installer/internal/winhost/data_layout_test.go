@@ -59,8 +59,9 @@ func TestDataProfileCountsStayInSyncWithCatalog(t *testing.T) {
 	if len(windowsProfiles) != 25 {
 		t.Fatalf("windows profile count=%d, want 25", len(windowsProfiles))
 	}
-	if len(linuxProfiles) != 9 {
-		t.Fatalf("linux profile count=%d, want 9", len(linuxProfiles))
+	// Nine distributions plus the SystemRescue, GParted Live and Clonezilla rescue ISOs.
+	if len(linuxProfiles) != 12 {
+		t.Fatalf("linux profile count=%d, want 12", len(linuxProfiles))
 	}
 	if len(betaProfiles) != 6 {
 		t.Fatalf("beta profile count=%d, want 6", len(betaProfiles))
