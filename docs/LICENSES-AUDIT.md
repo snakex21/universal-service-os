@@ -39,7 +39,7 @@ texts that were missing now live in `tools/release/licenses/` (see its
 | Already compliant on the stick (licence and, where needed, source next to the binary) | 12 |
 | Gaps found | 18 (G1 to G18) plus 2 payload-level follow-ups (F1, F2) |
 | Gaps fixed in this audit (release-level licence texts, sources zip, written offer) | 8 (G1 to G6, G8, G9), covering 42 components: 35 Alpine packages, kernel, systemd-boot, EfiFs, wimboot, Zig and Go runtimes, FreeDOS texts |
-| Remaining GAPs | 10 (G7, G10 to G18), see section 7 |
+| Remaining GAPs | 7 (G10 to G13, G16 to G18), see section 7; G7 closed by the source pin, G14 and G15 closed by maintainer decisions (2026-09-28) |
 
 Status legend: **OK**: nothing to do. **FIXED in this audit**: the release
 now carries the licence text and the source (sources zip) or a written offer
@@ -108,13 +108,13 @@ Where it ships: *stick ESP* = the installer payload on `USOS_ESP`
 | HimemX | 3.40 | `GPL-2.0-only OR Artistic-1.0` | stick ESP | sources zip: `tools/vendor/himemx/3.40/source-and-binaries.zip`; <https://github.com/Baron-von-Riedesel/HimemX/releases/tag/v3.40> | OK (licence text + HIMEMSRC.ZIP on the ESP) |
 | FreeDOS kernel, FreeCOM and Doszip | FreeDOS 1.4 (kernel 20250409.9, FreeCOM 0.86a, Doszip 2.68) | `GPL-2.0-only` | stick ESP | sources zip: `tools/vendor/freedos/1.4/kernel.zip`, `tools/vendor/freedos/1.4/freecom.zip`, `tools/vendor/freedos/1.4/doszip.zip`, `tools/vendor/freedos/1.4/manifest.json`; <https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/repositories/1.4/base/kernel/20250409.9/kernel.zip> | OK on the ESP (COPYING + package zips with sources); FIXED: licence texts extracted for the release |
 | PatchPAE3 (adapted as the USOS XP PAE helper) (MODIFIED) | 3e1d3b65f5c3c1ec0c4759f707d3017e51113103 | `CC-BY-4.0` | XP package | sources zip: `tools/vendor/patchpae3/3e1d3b65f5c3c1ec0c4759f707d3017e51113103`, `tools/windows_xp_pae.c`, `tools/windows_xp_pae_strings.h`; <https://github.com/evgen-b/PatchPAE3/tree/3e1d3b65f5c3c1ec0c4759f707d3017e51113103> | OK (attribution + licence reference in xp-pae-LICENSE.txt) |
-| GenAHCI | 6.3.0.1 | `GPL-3.0-only` | XP package | <https://github.com/GeorgeK1ng/GenAHCI> | GAP: no corresponding source available locally (archive is binary-only); blocks a GPL-compliant XP package |
+| GenAHCI | 6.3.0.1 | `GPL-3.0-only` | XP package | sources zip: `tools/vendor/genahci/6.3.0.1-src` (tag `GenAHCI` = commit b936a0d8); <https://github.com/GeorgeK1ng/GenAHCI/tree/b936a0d8bdf410928aefa9e0f373fb1d6c7c8240> | FIXED (source pinned and bundled); consistent with the binaries, not byte-verified (needs WDK 7600), see G7 |
 | Go runtime and standard library, golang.org/x/sys | Go 1.26.2, x/sys v0.47.0 | `BSD-3-Clause` | installer, DATA | <https://go.dev/dl/go1.26.2.src.tar.gz> | FIXED in this audit (release LICENSES); the installer itself shows no notice (F2) |
 | Microsoft Windows PE 10.0.19041 x64 donor (PE10_x64_19041_USOS.iso) | 10.0.19041 | `LicenseRef-Microsoft-redistributed-by-user` | WinPE asset | n/a (proprietary) | Microsoft, see section 5 (maintainer responsibility) |
-| Microsoft Windows 7 SP1 x64 update packages | KB4474419 v3, KB2685811, KB2990941 v3, KB3087873 v2 | `LicenseRef-Microsoft-redistributed-by-user` | stick ESP | n/a (proprietary) | GAP / decision: Microsoft CABs embedded in the USOS payload, see section 5 |
-| Microsoft Windows Vista update and USB 3 driver files | KB2864202 + Windows 8-family USB 3 stack (usbxhci, ucx01000, usbhub3, usbd8) | `LicenseRef-Microsoft-redistributed-by-user` | stick ESP | n/a (proprietary) | GAP / decision: Microsoft binaries embedded in the USOS payload, see section 5 |
-| Windows XP / Server 2003 driver bundles derived from Microsoft ISOs | per source ISO (see XP package manifest.json) | `LicenseRef-Microsoft-redistributed-by-user` | XP package | n/a (proprietary) | GAP / decision: Microsoft and community-modified Microsoft files, see section 5 |
-| Operating system logos in UI/Icons/Systems | 2026-09-03 | `LicenseRef-trademark-logos-provenance-unrecorded` | stick ESP | n/a (proprietary) | GAP: Microsoft trademark logos, provenance and licence not recorded |
+| Microsoft Windows 7 SP1 x64 update packages | KB4474419 v3, KB2685811, KB2990941 v3, KB3087873 v2 | `LicenseRef-Microsoft-redistributed-by-user` | stick ESP | n/a (proprietary) | KEPT by maintainer decision (preservation), see section 5 |
+| Microsoft Windows Vista update and USB 3 driver files | KB2864202 + Windows 8-family USB 3 stack (usbxhci, ucx01000, usbhub3, usbd8) | `LicenseRef-Microsoft-redistributed-by-user` | stick ESP | n/a (proprietary) | KEPT by maintainer decision (preservation), see section 5 |
+| Windows XP / Server 2003 driver bundles derived from Microsoft ISOs | per source ISO (see XP package manifest.json) | `LicenseRef-Microsoft-redistributed-by-user` | XP package | n/a (proprietary) | KEPT by maintainer decision (preservation), see section 5 |
+| Operating system icons in UI/Icons/Systems | 2026-09-03 | `LicenseRef-USOS-generated-icons` | stick ESP | generated by the maintainer with ChatGPT (OpenAI image generation) | OK: origin recorded, kept by maintainer decision; they depict Microsoft trademark logos (G15) |
 
 Notes on individual entries:
 
@@ -253,6 +253,14 @@ Microsoft files would be to take the packages from the user's DATA
 (`Systems\Windows\Windows 7\Updates`, `Systems\Windows\Windows Vista`)
 at install time instead of embedding them.
 
+**Maintainer decision (2026-09-28): keep items 2 to 4 in the release.**
+The reason is preservation: the original downloads may disappear. These are
+Microsoft files (item 4 also community-modified Microsoft files),
+redistributed by the USOS maintainer at the maintainer's own risk; they are
+not covered by any USOS licence, and they will be removed on request of the
+rights holder. The same note is in `THIRD-PARTY-NOTICES.txt` and the release
+notes.
+
 ## 6. Obligations checklist (GPL / LGPL)
 
 **Sources bundled in `USOS-<version>-sources.zip`** (all exist in the repo;
@@ -290,7 +298,7 @@ Table: `tools/release/licenses/alpine/SOURCES.txt`. The offer text in
 maintainer must be able to honour it, i.e. keep copies of these tarballs
 (they are not in the repository).
 
-**Not coverable today**: GenAHCI 6.3.0.1 (GPL-3.0, see G7).
+GenAHCI 6.3.0.1 (GPL-3.0): the upstream source at commit b936a0d8 is in the sources zip (G7).
 
 ## 7. Gaps
 
@@ -316,12 +324,21 @@ Fixed in this audit (no payload change):
 
 Remaining GAPs:
 
-- **G7 GenAHCI 6.3.0.1 (GPL-3.0), XP package**: the upstream release is
-  binary-only and the repository holds no corresponding source, so neither
-  the sources zip nor an honest written offer can cover it. Either pin the
-  upstream source matching 6.3.0.1 and bundle it, or drop GenAHCI from the
-  XP package (it is only needed for the NT 5.2 path, but the XP SP3 bundles
-  carry `GENAHCI.SY_` too).
+- **G7 GenAHCI 6.3.0.1 (GPL-3.0), XP package: closed by the source pin.**
+  <https://github.com/GeorgeK1ng/GenAHCI> has no LICENSE file; its tree and
+  the release archive carry the same `gpl.txt` (GPL-3.0). The only tag
+  (`GenAHCI`) is commit b936a0d8bdf4 (2023-08-21 21:34 UTC); the release
+  with `GenAHCI_6.3.0.1.7z` was published 21:42 from it. The binaries are
+  FileVersion 6.3.0.1 with PE link times 21:40:00/01, between the last
+  source upload and the release; `gpl.txt` is identical, `genahci.inf`
+  differs only by a dropped copyright header, and `txtsetup.oem` only by the
+  storahci -> GenAHCI rename. A byte-exact rebuild was not possible: the
+  build needs the Microsoft WDK 7600.16385.1 (not redistributable, not
+  installed) and the binaries are self-signed at build time. Pinned in
+  `tools/vendor/genahci/6.3.0.1-src/` (tarball SHA-256 4dda80ca...,
+  `SOURCES.txt`, `gpl.txt`) and bundled in the sources zip. Proposal: build
+  the USOS copy from this pinned source with WDK 7600 and ship that build,
+  so the binary provably corresponds to the offered source.
 - **G10 shim**: the OpenSSL/SSLeay licence of the OpenSSL copy linked into
   shim (Cryptlib) is not reproduced; take `Cryptlib/OpenSSL/LICENSE` from
   the shim 16.1 source and add it to the `shim` entry.
@@ -338,17 +355,19 @@ Remaining GAPs:
   device-mapper-libs, json-c, xz-libs, mkinitfs) have no recorded version:
   the netboot initramfs carries no apk database. Remedy: read them from the
   3.24.1 `APKINDEX` of `main` (not only the ISO subset).
-- **G14 Microsoft files inside the USOS payload** (section 5, items 2 and 3)
-  and **in the XP package** (item 4): shipped by USOS, not supplied by the
-  user; redistribution rights are not established. Maintainer decision.
+- **G14 Microsoft files inside the USOS payload and the XP package: closed
+  by maintainer decision** (kept for preservation, at the maintainer's own
+  risk, removed on request; section 5).
 - **G15 system icons** (`UI/Icons/Systems/*.png`, 22 files, and their
-  renderings in `bios-ui.bin`): Windows and MS-DOS logos, Microsoft
-  trademarks; origin and licence of the artwork are not recorded anywhere
-  in the repository. Record the source or replace them with USOS artwork.
+  renderings in `bios-ui.bin`): **origin recorded, kept by maintainer
+  decision.** The maintainer generated them with ChatGPT (OpenAI image
+  generation). They depict Windows and MS-DOS logos, which are Microsoft
+  trademarks; USOS is not affiliated with or endorsed by Microsoft.
 - **G16 USOS itself has no licence**: there is no `LICENSE`/`COPYING` for
   the USOS code at the repository root, and README states none. The
   third-party obligations above do not depend on it, but users of the 1.0
-  release get no terms for USOS's own code, and the modified wimboot
+  release get no terms for USOS's own code (decision pending; the
+  licence will be added as `LICENSE` at the repository root), and the modified wimboot
   variants and the CSMWrap patches must at least be available under GPL /
   LGPL (they are, as sources in the zip).
 - **G17 reproducibility inputs outside git**: `vista-support.cpio` is built

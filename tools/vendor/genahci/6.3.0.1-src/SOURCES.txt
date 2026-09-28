@@ -1,0 +1,38 @@
+GenAHCI 6.3.0.1 - source pin (USOS 1.0 audit, 2026-09-28)
+
+Upstream repository: https://github.com/GeorgeK1ng/GenAHCI
+Tag "GenAHCI" = commit b936a0d8bdf410928aefa9e0f373fb1d6c7c8240
+  (2023-08-21 21:34 UTC, the last commit; the release "GenAHCI" with
+  GenAHCI_6.3.0.1.7z was published 2023-08-21 21:42 UTC from this tag).
+Archive: GenAHCI-b936a0d8bdf410928aefa9e0f373fb1d6c7c8240.tar.gz
+  (GitHub tarball of that commit)
+  SHA-256 4dda80ca7252e4b148d6137aacea7a4746ee30c63896b6aeb6f4902eeb337bde
+Binary used by USOS: tools/vendor/xp-modern/2026-09-21/GenAHCI_6.3.0.1.7z
+  SHA-256 f8dd54123934c176a2b6315df7b4a1dfe2ff6761fa3bc27cecfeedbe421b279f
+
+Licence: the repository has no LICENSE file; the source tree and the
+release archive both carry the same gpl.txt (GNU GPL version 3,
+SHA-256 3972dc97...), used here as the licence (GPL-3.0-only). The code is
+based on the Microsoft WDK 8.1 StorAhci sample (msdn-code-gallery-microsoft)
+and Kai Schtrom's storahci-for-windows-2003 patch; the file headers keep
+"Copyright (C) Microsoft Corporation".
+
+Match between source and binaries (what could be checked):
+- genahci.sys x86/x64: FileVersion 6.3.0.1 ("built by: WinDDK"), PE link
+  times 2023-08-21 21:40:00/01 UTC: after the last source upload (21:17) and
+  before the release (21:42). sources: TARGETNAME = genahci.
+- gpl.txt: byte-identical in source and release.
+- genahci.inf: identical content except that the release copy drops the
+  5-line "Copyright Kai Schtrom 2020" header.
+- txtsetup.oem: the source copy still names storahci.*; the release copy is
+  the same file with storahci renamed to GenAHCI.
+- genahci.sys was NOT rebuilt byte for byte: the build (make_fre.cmd) needs
+  the Windows Driver Kit 7600.16385.1 (Microsoft, not redistributable, not
+  installed here), and the binaries are self-signed at build time, so a
+  rebuild would differ anyway in the signature.
+
+Conclusion: commit b936a0d is the only published source and is consistent
+with the 6.3.0.1 binaries, but the match is not byte-verified. Proposal:
+build the USOS copy from this pinned source with WDK 7600.16385.1
+(make_fre.cmd without the self-signing step) and ship that build, so the
+binary provably corresponds to the offered source.
