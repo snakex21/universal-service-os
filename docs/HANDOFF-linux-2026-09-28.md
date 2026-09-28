@@ -117,6 +117,29 @@ Fixes made for this: summary button "Start Linux" (was "Load the Windows
 ISO"), specific error details (fragmented ISO, no Linux entry, helper
 missing), Linux strings in all 27 locales, default d-i preseed.
 
+## Menu test with Secure Boot ON (Fedora SMM OVMF, MS keys, MokList = USOS cert, TCG)
+
+`run_linux_iso_menu.py --secure-boot --tcg` (WHPX cannot run the SMM OVMF).
+
+| ISO | chain | result |
+|---|---|---|
+| Fedora WS Live 44 | USOS shim (Fedora CA) verifies the kernel directly | live desktop |
+| Ubuntu Server 24.04.5 | relay: Ubuntu shim 15.8 -> USOS (MOK) -> Canonical kernel via its SHIM_LOCK | subiquity language screen |
+| Ubuntu Desktop 24.04.5.1 | relay | live desktop; the desktop installer then showed "Something went wrong" under TCG (not seen with WHPX and SB off; TCG is very slow, a TCG SB-off control run did not reach GNOME in time): check on hardware |
+| Linux Mint 22.3 | relay (Ubuntu shim) | live desktop |
+| Debian live 13.7 | relay (Debian shim 16.1) | live shell |
+| Debian 13.7 netinst | relay | installer language screen |
+| Debian 12.15 netinst | relay (Debian shim 15.8) | installer language screen |
+| GParted Live 1.8.1 | relay (Debian shim) | console-data dialog |
+| Clonezilla 3.3.3 | relay (Debian shim) | language dialog |
+| SystemRescue 13.02 | no signed shim | blocked in the list: "Requires Secure Boot off" (the explanation text is the generic Windows one: follow-up) |
+
+Two bugs found and fixed on the way: a 64 KiB grub.cfg buffer on the stack
+overflowed under shim (now caller-provided), and the relay instance runs on
+top of the first instance's live stack, so it now switches to its own 1 MiB
+stack (`callOnStack`). The relay plan is `EFI/USOS/linux/relay.ini`
+(one-shot, deleted when read, only `\Systems\Linux\...` paths accepted).
+
 ## Exact next steps
 
 1. Menu start with Secure Boot off (Ubuntu server, Fedora, GParted); fix.
