@@ -50,3 +50,8 @@ assets/uefi-shell/startup.nsh -text
 tools/vendor/csmwrap/3.1.2-usos1/** -text
 tools/vendor/csmwrap/3.1.2-src/** -text
 tools/csmwrap_build/guest_build.sh text eol=lf
+
+# Vendored third-party files are pinned by SHA-256 (manifest.json, payload):
+# check them out byte for byte as committed, whatever core.autocrlf says, so a
+# fresh clone builds the same payload (found by the offline build-kit test).
+tools/vendor/** -text
