@@ -77,3 +77,6 @@ installer/internal/payload/assets/*.zip
 
 # Maintainer-only local notes (machine paths, sticks); never published
 /docs/local/
+# WDK 7.1 (7600.16385.1), unpacked from the user-downloaded GRMWDK_EN_7600_1.ISO
+# with msiexec /a; see docs/BUILDING.md (never redistributed)
+tools/WinDDK71/

@@ -205,6 +205,34 @@ of cloning. Tested 2026-09-28: the offline rebuild gave byte-identical
 `csmwrapx64.efi` (usos1 and upstream) and source archive hashes
 (`tools/vendor/csmwrap/3.1.2-usos1/manifest.json`).
 
+## Rebuilding xhci98 1.1.1.0-usos1 (optional)
+
+The XP package uses the vendored, hash-pinned binaries in
+`tools\vendor\xhci98\1.1.1.0-usos1\` (manifest.json); `build.bat` does not
+rebuild them. To rebuild from source (upstream tag tarball in
+`tools\vendor\xhci98\1.1.1.0-src\` plus `patches\*.patch`):
+
+```
+tools\vendor\xhci98\1.1.1.0-usos1\build.cmd [workdir]
+```
+
+It needs **WDK 7.1** in `tools\WinDDK71` (git-ignored; `WDKROOT` overrides),
+a user-downloaded input that is **not in the kit and never redistributed**
+(the WDK licence does not allow USOS to ship the kit):
+
+| Input | Source | SHA-256 |
+|---|---|---|
+| `GRMWDK_EN_7600_1.ISO` (649,877,504 bytes, WDK 7.1.0 7600.16385.1) | <https://download.microsoft.com/download/4/A/2/4A25C7D5-EFBE-4182-B6A9-AE6850409A78/GRMWDK_EN_7600_1.ISO> | `5edc723b50ea28a070cad361dd0927df402b7a861a036bbcf11d27ebba77657d` |
+
+Unpack without installing: extract the ISO (7-Zip), then for every
+`WDK\*.msi` except the samples, ia64, DSF, docs and debug-file packages run
+`msiexec /a <msi> /qn TARGETDIR=<tmp>` and move
+`<tmp>\WinDDK\7600.16385.win7_wdk.100208-1538\*` to `tools\WinDDK71`. This
+writes files only (no Programs entry, no registry). Also needed: Git (for
+`git apply`) and the Windows `tar.exe`. The same WDK rebuilds GenAHCI.
+The output is functionally identical but not byte-identical (PE time stamp,
+PDB GUID); compare with the pinned binaries by behaviour, not hash.
+
 ## Not in the kit
 
 - **Windows ISOs** (never shipped), the WinPE PE10 donor (a separate release
@@ -212,6 +240,8 @@ of cloning. Tested 2026-09-28: the offline rebuild gave byte-identical
 - **TouchI2cDxe** is built outside the repository from an EDK2 checkout
   (`tools\build_touchi2cdxe.ps1`, network); the release uses the vendored,
   MOK-signed binary.
+- **WDK 7.1** (`GRMWDK_EN_7600_1.ISO`, see above): user-downloaded, not
+  redistributable; only needed to rebuild xhci98 1.1.1.0-usos1 or GenAHCI.
 - **GenAHCI** needs the Microsoft WDK 7600.16385.1 to rebuild
   (`tools/vendor/genahci/6.3.0.1-src/SOURCES.txt`); the release uses the
   upstream 6.3.0.1 binaries.
