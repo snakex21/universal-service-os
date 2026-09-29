@@ -9,7 +9,9 @@ hardware. The stick is prepared on Windows with `USOS-Installer-1.0.0.exe`.
 
 The menu header shows "Universal Service OS 1.0.0" and the shortened build
 ID (hidden on narrow screens); the installer shows "1.0.0 (B...)". The first
-release candidate is build `B260928-214844-A6711A1F`; the full ID is in
+release candidate is build `B260928-214844-A6711A1F`; the second (RC2)
+adds the full and online installers described under
+[Release assets](#release-assets). The full ID is in
 `EFI\USOS\build-info.ini` on the stick.
 
 > Status of this document: the release candidate. The git tag `v1.0.0` is
@@ -178,9 +180,10 @@ not been started on physical hardware.
 
 | File | Content |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | Windows installer. It embeds the whole stick payload: install, update, repair, uninstall. |
-| `USOS-1.0.0-WinPE-PE10-donor.zip` | PE10 donor (`PE10_x64_19041_USOS.iso`, WinPE 10 x64 with Setup, no install image). Vista and original Windows 7 need it on UEFI, and Vista needs it without CSM. Copy its `Programs` folder to the root of `USOS_DATA` (the file lands in `Programs\USOS\WinPE`), then run the installer's Update: it records the SHA-256 in `EFI\USOS\winpe-donor.ini`. |
-| `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | XP x86 SP3 UEFI package (micro-Linux preparation, driver bundle, `pae.exe`). Each one works with **exactly one** original ISO: PL `pl_windows_xp_professional_with_service_pack_3_x86_cd_x14-80476.iso` or EN `en_windows_xp_professional_with_service_pack_3_x86_cd_x14-80428.iso` (SHA-256 allowlist). The included `install-xp-package.ps1` (run as administrator) installs it to `EFI\USOS-XP` on the stick's ESP. Only one package can be installed at a time. The release packages carry no Server 2003 driver bundle. |
+| `USOS-Installer-1.0.0.exe` | **Full installer** (all-in-one, works offline). The whole stick payload (install, update, repair, uninstall) plus the WinPE donor and both XP packages below. Its **Components** step, after Install, Update and Repair, copies them straight to the stick: WinPE and the XP package in the installer language are preselected, the other language can be chosen or kept on DATA, and everything can be skipped. Each embedded zip is checked against the SHA-256 list compiled into the installer. |
+| `USOS-Installer-1.0.0-online.exe` | **Online installer** (small download). The same program without the embedded components: its Components step downloads the WinPE donor and XP packages from this GitHub release when needed (progress, resume, retry), and each download must match both `SHA256SUMS` and the compiled SHA-256 list. "I already have the file" takes a zip from disk, verified the same way. |
+| `USOS-1.0.0-WinPE-PE10-donor.zip` | PE10 donor (`PE10_x64_19041_USOS.iso`, WinPE 10 x64 with Setup, no install image). Vista and original Windows 7 need it on UEFI, and Vista needs it without CSM. Included in the full installer; this zip is for manual or offline use: copy its `Programs` folder to the root of `USOS_DATA` (the file lands in `Programs\USOS\WinPE`), then run the installer's Update: it records the SHA-256 in `EFI\USOS\winpe-donor.ini`. |
+| `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | XP x86 SP3 UEFI package (micro-Linux preparation, driver bundle, `pae.exe`). Each one works with **exactly one** original ISO: PL `pl_windows_xp_professional_with_service_pack_3_x86_cd_x14-80476.iso` or EN `en_windows_xp_professional_with_service_pack_3_x86_cd_x14-80428.iso` (SHA-256 allowlist). Included in the full installer; by hand, the included `install-xp-package.ps1` (run as administrator) installs it to `EFI\USOS-XP` on the stick's ESP. Only one package can be installed at a time. The release packages carry no Server 2003 driver bundle. |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | Sources of the third-party components that are available locally (among them the modified CSMWrap 3.1.2-usos1 with SeaBIOS and its patches), and the written offer with the upstream source locations for the other (L)GPL components. USOS's own source is the git repository. |
 | `LICENSE.txt`, `NOTICE.txt`, `CONTRIBUTING.md` | USOS's own licence (GPL-3.0-or-later), copyright notice and contribution terms. |
 | `LICENSES/` + `THIRD-PARTY-NOTICES.txt` | Licence texts and notices of every bundled component. |

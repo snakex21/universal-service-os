@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 )
 
 // Source is where a component comes from.
@@ -13,6 +14,7 @@ const (
 	SourceDownload Source = iota // from the installer's GitHub release
 	SourceLocal                  // "I already have the file"
 	SourceSkip
+	SourceEmbedded // included in the all-in-one installer (Runner.Bundle)
 )
 
 // Choice is the user's decision for one component.
@@ -59,6 +61,20 @@ type Runner struct {
 	Downloader *Downloader
 	Installer  Installer
 	Log        func(string)
+	// Bundle is the all-in-one installer's overlay (SourceEmbedded); its
+	// zips are extracted to Dir (else Downloader.Dir) and removed after use.
+	Bundle *Bundle
+	Dir    string
+}
+
+func (r *Runner) workDir() string {
+	if r.Dir != "" {
+		return r.Dir
+	}
+	if r.Downloader != nil && r.Downloader.Dir != "" {
+		return r.Downloader.Dir
+	}
+	return DefaultDir(r.Release)
 }
 
 func (r *Runner) log(format string, args ...any) {
@@ -150,9 +166,26 @@ func (r *Runner) Run(ctx context.Context, choices []Choice, emit func(Event)) ma
 			}
 			r.log("[COMPONENTS] %s: local file %s verified", id, choice.LocalPath)
 			zipPath = choice.LocalPath
+		case SourceEmbedded:
+			emit(Event{ID: id, Phase: PhaseVerify})
+			if !r.Bundle.Has(asset) {
+				fail(fmt.Errorf("%s is not included in this installer", asset))
+				continue
+			}
+			path, err := r.Bundle.Extract(asset, r.workDir(), r.Release.Pinned)
+			if err != nil {
+				fail(err)
+				continue
+			}
+			r.log("[COMPONENTS] %s: embedded copy verified against the compiled hash list", id)
+			zipPath = path
 		}
 		emit(Event{ID: id, Phase: PhaseInstall})
-		if err := r.Installer.InstallComponent(id, zipPath, choice.StoreOnly, r.Log); err != nil {
+		err := r.Installer.InstallComponent(id, zipPath, choice.StoreOnly, r.Log)
+		if choice.Source == SourceEmbedded {
+			_ = os.Remove(zipPath) // the installer still has it
+		}
+		if err != nil {
 			fail(err)
 			continue
 		}

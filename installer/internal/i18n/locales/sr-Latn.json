@@ -156,6 +156,8 @@
   "installer.final.open_drivers_failed": "Fascikla sa drajverima nije mogla da se otvori: %s",
   "installer.components.title": "Komponente",
   "installer.components.subtitle": "Delovi izdanja USOS %s koji se preuzimaju zasebno. Preuzimaju se na ovaj računar, proveravaju prema SHA256SUMS izdanja i prema zbirovima ugrađenim u ovaj instalater, a zatim kopiraju na uređaj.",
+  "installer.components.subtitle_embedded": "Ovi delovi izdanja USOS %s su uključeni u ovaj instalater: nije potrebno preuzimanje. Svaki se proverava prema ugrađenim zbirovima, a zatim kopira na uređaj.",
+  "installer.components.source.embedded": "Uključeno",
   "installer.components.no_release": "Ova verzija instalatera ne zna svoje izdanje na GitHubu, pa ne može da preuzima. Izaberite datoteke koje već imate ili preskočite.",
   "installer.components.checking": "Proveravam koje komponente uređaj ima…",
   "installer.components.check_failed": "Nije moguće proveriti komponente uređaja: %s",

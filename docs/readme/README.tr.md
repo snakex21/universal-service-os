@@ -146,7 +146,8 @@ Sürüm dosyaları:
 
 | Dosya | Amaç |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | yükleyici; USOS'un tamamını içerir |
+| `USOS-Installer-1.0.0.exe` | **Tam yükleyici**: USOS'un tamamı, WinPE donörü ve iki XP paketi; çevrimdışı çalışır |
+| `USOS-Installer-1.0.0-online.exe` | **Çevrimiçi yükleyici**: küçük indirme; WinPE donörünü ve XP paketlerini gerektiğinde bu sürümden indirip doğrular |
 | `USOS-1.0.0-WinPE-PE10-donor.zip` | PE10 donörü; UEFI'de Vista ve orijinal Windows 7 ISO'ları için gerekli |
 | `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | Windows XP x86 SP3 UEFI paketi, her biri tam olarak bir orijinal ISO için (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`), birlikte gelen `install-xp-package.ps1` ile kurulur |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | üçüncü taraf bileşenlerin kaynak kodları ve yazılı kaynak kodu teklifi |

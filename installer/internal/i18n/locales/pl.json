@@ -156,6 +156,8 @@
   "installer.final.open_drivers_failed": "Nie udało się otworzyć folderu sterowników: %s",
   "installer.components.title": "Komponenty",
   "installer.components.subtitle": "Części wydania USOS %s pobierane osobno. Trafiają najpierw na ten komputer, są sprawdzane z SHA256SUMS wydania i z sumami wbudowanymi w ten instalator, a potem kopiowane na nośnik.",
+  "installer.components.subtitle_embedded": "Te części wydania USOS %s są zawarte w tym instalatorze: nie trzeba nic pobierać. Każda jest sprawdzana z sumami wbudowanymi w instalator, a potem kopiowana na nośnik.",
+  "installer.components.source.embedded": "W zestawie",
   "installer.components.no_release": "Ta kompilacja instalatora nie zna swojego wydania na GitHubie, więc nie może pobierać. Wskaż pliki, które już masz, albo pomiń.",
   "installer.components.checking": "Sprawdzanie, które komponenty są na nośniku…",
   "installer.components.check_failed": "Nie udało się sprawdzić komponentów nośnika: %s",

@@ -147,7 +147,8 @@ Arquivos da versão:
 
 | Arquivo | Finalidade |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | o instalador; contém todo o USOS |
+| `USOS-Installer-1.0.0.exe` | **Instalador completo**: todo o USOS mais o doador WinPE e os dois pacotes XP; funciona offline |
+| `USOS-Installer-1.0.0-online.exe` | **Instalador online**: download pequeno; baixa o doador WinPE e os pacotes XP desta versão quando necessário e os verifica |
 | `USOS-1.0.0-WinPE-PE10-donor.zip` | doador PE10, necessário para o Vista e as ISOs originais do Windows 7 em UEFI |
 | `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | pacote UEFI para Windows XP x86 SP3, cada um para exatamente uma ISO original (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`), instalado com o `install-xp-package.ps1` incluído |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | código-fonte dos componentes de terceiros e a oferta escrita do código-fonte |

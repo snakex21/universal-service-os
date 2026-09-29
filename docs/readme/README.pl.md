@@ -148,7 +148,8 @@ Pliki wydania:
 
 | Plik | Do czego służy |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | instalator; zawiera cały USOS |
+| `USOS-Installer-1.0.0.exe` | **Pełny instalator**: cały USOS oraz dawca WinPE i oba pakiety XP; działa bez internetu |
+| `USOS-Installer-1.0.0-online.exe` | **Instalator online**: mały plik; pobiera dawcę WinPE i pakiety XP z tego wydania, gdy są potrzebne, i je weryfikuje |
 | `USOS-1.0.0-WinPE-PE10-donor.zip` | dawca PE10, potrzebny dla Visty i oryginalnych ISO Windows 7 w UEFI |
 | `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | pakiet UEFI dla Windows XP x86 SP3; każdy pasuje do dokładnie jednego oryginalnego ISO (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`), instalowany dołączonym skryptem `install-xp-package.ps1` |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | źródła komponentów zewnętrznych i pisemna oferta udostępnienia źródeł |
@@ -171,11 +172,12 @@ w PowerShell), porównując wynik z wierszem w `SHA256SUMS`.
    I INSTALACJĘ**.
 3. Skopiuj swoje obrazy ISO na partycję DATA, do folderu `Images`
    odpowiedniego systemu, np. `Systems\Windows\Windows 11\Images\`.
-4. Opcjonalnie: dla Visty lub oryginalnego Windows 7 w UEFI skopiuj folder
-   `Programs` z archiwum dawcy PE10 do katalogu głównego DATA i uruchom
-   **Aktualizuj USOS**; dla XP w UEFI uruchom jako administrator
-   `install-xp-package.ps1` z pakietu XP pasującego do Twojego ISO (na
-   pendrivie może być tylko jeden pakiet naraz).
+4. Po instalacji krok **Komponenty** instalatora kopiuje na pendrive
+   dawcę WinPE (Vista i oryginalny Windows 7 w UEFI) oraz pakiet XP (XP
+   w UEFI, w języku Twojego ISO): z pełnego instalatora od razu,
+   z instalatora online przez pobranie; oba sprawdzane przez SHA-256.
+   Możesz je pominąć i dodać później przez **Aktualizuj USOS** albo
+   **Naprawę**.
 5. Uruchom docelowy komputer z pendrive'a (BIOS albo UEFI). Przy włączonym
    Secure Boot dodaj raz klucz USOS ([Secure Boot](#secure-boot)). Wybierz
    system i obraz, ewentualnie profil odpowiedzi, potwierdź dysk docelowy

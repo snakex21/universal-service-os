@@ -153,6 +153,8 @@
   "installer.final.open_drivers_failed": "Mappen med drivere kunne ikke åbnes: %s",
   "installer.components.title": "Komponenter",
   "installer.components.subtitle": "Dele af USOS-udgivelsen %s, der hentes separat. De hentes til denne pc, kontrolleres mod udgivelsens SHA256SUMS og mod de kontrolsummer, der er indbygget i dette installationsprogram, og kopieres derefter til drevet.",
+  "installer.components.subtitle_embedded": "Disse dele af USOS-udgivelsen %s er inkluderet i dette installationsprogram: ingen download nødvendig. Hver del kontrolleres mod de indbyggede kontrolsummer og kopieres derefter til drevet.",
+  "installer.components.source.embedded": "Inkluderet",
   "installer.components.no_release": "Denne udgave af installationsprogrammet kender ikke sin GitHub-udgivelse og kan derfor ikke hente. Vælg filer, du allerede har, eller spring over.",
   "installer.components.checking": "Kontrollerer, hvilke komponenter drevet har…",
   "installer.components.check_failed": "Drevets komponenter kunne ikke kontrolleres: %s",

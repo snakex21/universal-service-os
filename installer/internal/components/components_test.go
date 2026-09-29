@@ -351,3 +351,80 @@ func TestUnpackAndInspect(t *testing.T) {
 		t.Fatal("zip-slip entry accepted")
 	}
 }
+
+func writeTemp(t *testing.T, name string, data []byte) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// The all-in-one installer: zips appended to the exe install without any
+// network, verified against the compiled hash list.
+func TestEmbeddedBundleInstallsOffline(t *testing.T) {
+	fx := newFixture(t)
+	fx.server.Close() // no network at all
+	exe := writeTemp(t, "installer.exe", []byte("MZ fake installer image"))
+	winpe := writeTemp(t, AssetName(WinPE, testVersion), fx.winpe)
+	xp := writeTemp(t, AssetName(XPPL, testVersion), fx.xp)
+	allInOne := filepath.Join(t.TempDir(), "USOS-Installer.exe")
+	if err := WriteBundle(allInOne, exe, []string{winpe, xp}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenBundle(exe); !errors.Is(err, ErrNoBundle) {
+		t.Fatalf("plain exe: %v", err)
+	}
+	bundle, err := OpenBundle(allInOne)
+	if err != nil || !bundle.Has(AssetName(WinPE, testVersion)) || bundle.Has(AssetName(XPEN, testVersion)) {
+		t.Fatalf("bundle %+v %v", bundle, err)
+	}
+	// The PE image itself is untouched at the start of the file.
+	if data, _ := os.ReadFile(allInOne); !bytes.HasPrefix(data, []byte("MZ fake installer image")) {
+		t.Fatal("exe prefix changed")
+	}
+	r := fx.runner(&fakeInstaller{installed: map[ID]string{}, stored: map[ID]string{}})
+	inst := r.Installer.(*fakeInstaller)
+	r.Bundle = bundle
+	results := r.Run(context.Background(), []Choice{{ID: WinPE, Source: SourceEmbedded}, {ID: XPPL, Source: SourceEmbedded}, {ID: XPEN, Source: SourceEmbedded, StoreOnly: true}}, nil)
+	if results[WinPE] != nil || results[XPPL] != nil || inst.installed[WinPE] != sum(fx.winpe) || inst.installed[XPPL] != sum(fx.xp) {
+		t.Fatalf("embedded install: %v %v", results, inst.installed)
+	}
+	if results[XPEN] == nil {
+		t.Fatal("a component missing from the bundle was reported as installed")
+	}
+	if files, _ := filepath.Glob(filepath.Join(fx.dir, "*")); len(files) != 0 {
+		t.Fatalf("extracted copies left in the temp folder: %v", files)
+	}
+}
+
+func TestEmbeddedBundleTamperedOrUnpinned(t *testing.T) {
+	fx := newFixture(t)
+	exe := writeTemp(t, "installer.exe", []byte("MZ"))
+	evil := append([]byte(nil), fx.winpe...)
+	evil[10] ^= 0xff
+	allInOne := filepath.Join(t.TempDir(), "USOS-Installer.exe")
+	if err := WriteBundle(allInOne, exe, []string{writeTemp(t, AssetName(WinPE, testVersion), evil)}); err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := OpenBundle(allInOne)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := bundle.Extract(AssetName(WinPE, testVersion), fx.dir, fx.release.Pinned); !errors.Is(err, ErrHashMismatch) {
+		t.Fatalf("tampered overlay: %v", err)
+	}
+	if _, err := bundle.Extract(AssetName(WinPE, testVersion), fx.dir, nil); !errors.Is(err, ErrUnverifiable) {
+		t.Fatalf("no compiled list: %v", err)
+	}
+	if files, _ := filepath.Glob(filepath.Join(fx.dir, "*")); len(files) != 0 {
+		t.Fatalf("rejected copy kept: %v", files)
+	}
+	// A cut-off download of the all-in-one has no valid trailer.
+	data, _ := os.ReadFile(allInOne)
+	cut := writeTemp(t, "cut.exe", data[:len(data)-5])
+	if _, err := OpenBundle(cut); err == nil {
+		t.Fatal("truncated bundle accepted")
+	}
+}

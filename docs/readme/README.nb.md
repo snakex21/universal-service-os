@@ -145,7 +145,8 @@ Filer i utgivelsen:
 
 | Fil | Formål |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | installasjonsprogrammet; inneholder hele USOS |
+| `USOS-Installer-1.0.0.exe` | **Fullt installasjonsprogram**: hele USOS pluss WinPE-donoren og begge XP-pakkene; fungerer uten nett |
+| `USOS-Installer-1.0.0-online.exe` | **Nettbasert installasjonsprogram**: liten nedlasting; henter WinPE-donoren og XP-pakkene fra denne utgivelsen ved behov og kontrollerer dem |
 | `USOS-1.0.0-WinPE-PE10-donor.zip` | PE10-donor, nødvendig for Vista og originale Windows 7-ISO-er på UEFI |
 | `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | UEFI-pakke for Windows XP x86 SP3, hver for nøyaktig én original ISO (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`), installeres med det medfølgende `install-xp-package.ps1` |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | kildekode for tredjepartskomponentene og det skriftlige tilbudet om kildekode |

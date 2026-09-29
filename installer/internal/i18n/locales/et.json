@@ -153,6 +153,8 @@
   "installer.final.open_drivers_failed": "Draiverite kausta ei saanud avada: %s",
   "installer.components.title": "Komponendid",
   "installer.components.subtitle": "USOS-i väljalaske %s eraldi allalaaditavad osad. Need laaditakse sellesse arvutisse, kontrollitakse väljalaske SHA256SUMS-i ja sellesse paigaldajasse sisse ehitatud kontrollsummade järgi ning kopeeritakse seejärel kettale.",
+  "installer.components.subtitle_embedded": "Need USOS-i väljalaske %s osad on selles paigaldajas kaasas: allalaadimist pole vaja. Iga osa kontrollitakse sisseehitatud kontrollsummade järgi ja kopeeritakse seejärel kettale.",
+  "installer.components.source.embedded": "Kaasas",
   "installer.components.no_release": "See paigaldaja järk ei tea oma GitHubi väljalaset, seega ei saa see alla laadida. Valige olemasolevad failid või jätke vahele.",
   "installer.components.checking": "Kontrollin, millised komponendid kettal on…",
   "installer.components.check_failed": "Ketta komponente ei õnnestunud kontrollida: %s",

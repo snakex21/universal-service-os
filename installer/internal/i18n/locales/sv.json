@@ -153,6 +153,8 @@
   "installer.final.open_drivers_failed": "Det gick inte att öppna drivrutinsmappen: %s",
   "installer.components.title": "Komponenter",
   "installer.components.subtitle": "Delar av USOS-versionen %s som laddas ned separat. De laddas ned till den här datorn, kontrolleras mot versionens SHA256SUMS och mot kontrollsummorna som är inbyggda i det här installationsprogrammet och kopieras sedan till enheten.",
+  "installer.components.subtitle_embedded": "Dessa delar av USOS-versionen %s ingår i det här installationsprogrammet: ingen nedladdning behövs. Varje del kontrolleras mot de inbyggda kontrollsummorna och kopieras sedan till enheten.",
+  "installer.components.source.embedded": "Ingår",
   "installer.components.no_release": "Den här versionen av installationsprogrammet känner inte till sin GitHub-version och kan därför inte ladda ned. Välj filer du redan har, eller hoppa över.",
   "installer.components.checking": "Kontrollerar vilka komponenter enheten har…",
   "installer.components.check_failed": "Det gick inte att kontrollera enhetens komponenter: %s",

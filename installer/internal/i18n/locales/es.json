@@ -153,6 +153,8 @@
   "installer.final.open_drivers_failed": "No se pudo abrir la carpeta de controladores: %s",
   "installer.components.title": "Componentes",
   "installer.components.subtitle": "Partes de la versión USOS %s que se descargan por separado. Se descargan a este PC, se comprueban con el SHA256SUMS de la versión y con las sumas integradas en este instalador y después se copian a la unidad.",
+  "installer.components.subtitle_embedded": "Estas partes de la versión USOS %s están incluidas en este instalador: no hace falta descargar nada. Cada una se comprueba con las sumas integradas y después se copia a la unidad.",
+  "installer.components.source.embedded": "Incluido",
   "installer.components.no_release": "Esta compilación del instalador no conoce su versión de GitHub, así que no puede descargar. Elija archivos que ya tenga u omita.",
   "installer.components.checking": "Comprobando qué componentes tiene la unidad…",
   "installer.components.check_failed": "No se pudieron comprobar los componentes de la unidad: %s",

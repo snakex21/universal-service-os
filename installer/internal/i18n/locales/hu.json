@@ -153,6 +153,8 @@
   "installer.final.open_drivers_failed": "Az illesztőprogram-mappa nem nyitható meg: %s",
   "installer.components.title": "Összetevők",
   "installer.components.subtitle": "Az USOS %s kiadás külön letöltendő részei. Erre a gépre töltődnek le, a kiadás SHA256SUMS fájlja és a telepítőbe épített ellenőrzőösszegek alapján ellenőrződnek, majd a meghajtóra másolódnak.",
+  "installer.components.subtitle_embedded": "Az USOS %s kiadás ezen részei benne vannak ebben a telepítőben: nincs szükség letöltésre. Mindegyik a beépített ellenőrzőösszegekkel ellenőrződik, majd a meghajtóra másolódik.",
+  "installer.components.source.embedded": "Mellékelve",
   "installer.components.no_release": "A telepítő ezen buildje nem ismeri a GitHub-kiadását, ezért nem tud letölteni. Válasszon meglévő fájlokat, vagy hagyja ki.",
   "installer.components.checking": "A meghajtón lévő összetevők ellenőrzése…",
   "installer.components.check_failed": "Nem sikerült ellenőrizni a meghajtó összetevőit: %s",

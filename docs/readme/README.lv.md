@@ -145,7 +145,8 @@ Laidiena faili:
 
 | Fails | Nolūks |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | instalētājs; satur visu USOS |
+| `USOS-Installer-1.0.0.exe` | **Pilnais instalētājs**: viss USOS kopā ar WinPE donoru un abām XP pakotnēm; darbojas bezsaistē |
+| `USOS-Installer-1.0.0-online.exe` | **Tiešsaistes instalētājs**: neliela lejupielāde; pēc vajadzības lejupielādē WinPE donoru un XP pakotnes no šī laidiena un tās pārbauda |
 | `USOS-1.0.0-WinPE-PE10-donor.zip` | PE10 donors, nepieciešams Vista un oriģinālajiem Windows 7 ISO UEFI režīmā |
 | `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | Windows XP x86 SP3 UEFI pakotne, katra tieši vienam oriģinālajam ISO (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`), instalē ar pievienoto `install-xp-package.ps1` |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | trešo pušu komponentu pirmkods un rakstisks pirmkoda piedāvājums |

@@ -153,6 +153,8 @@
   "installer.final.open_drivers_failed": "Não foi possível abrir a pasta de drivers: %s",
   "installer.components.title": "Componentes",
   "installer.components.subtitle": "Partes da versão USOS %s baixadas separadamente. Elas são baixadas para este PC, conferidas com o SHA256SUMS da versão e com as somas embutidas neste instalador e depois copiadas para a unidade.",
+  "installer.components.subtitle_embedded": "Estas partes da versão USOS %s estão incluídas neste instalador: não é preciso baixar nada. Cada uma é conferida com as somas embutidas e depois copiada para a unidade.",
+  "installer.components.source.embedded": "Incluído",
   "installer.components.no_release": "Esta compilação do instalador não conhece sua versão no GitHub, então não pode baixar. Escolha arquivos que você já tem ou pule.",
   "installer.components.checking": "Verificando quais componentes a unidade tem…",
   "installer.components.check_failed": "Não foi possível verificar os componentes da unidade: %s",

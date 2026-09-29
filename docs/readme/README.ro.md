@@ -146,7 +146,8 @@ Fișierele lansării:
 
 | Fișier | Scop |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | programul de instalare; conține tot USOS |
+| `USOS-Installer-1.0.0.exe` | **Program de instalare complet**: tot USOS plus donorul WinPE și ambele pachete XP; funcționează offline |
+| `USOS-Installer-1.0.0-online.exe` | **Program de instalare online**: descărcare mică; aduce donorul WinPE și pachetele XP din această versiune când e nevoie și le verifică |
 | `USOS-1.0.0-WinPE-PE10-donor.zip` | donorul PE10, necesar pentru Vista și ISO-urile originale Windows 7 pe UEFI |
 | `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | pachet UEFI pentru Windows XP x86 SP3, fiecare pentru exact un ISO original (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`), instalat cu scriptul inclus `install-xp-package.ps1` |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | sursele componentelor terțe și oferta scrisă privind sursele |

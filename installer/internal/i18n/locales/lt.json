@@ -156,6 +156,8 @@
   "installer.final.open_drivers_failed": "Nepavyko atidaryti tvarkyklių aplanko: %s",
   "installer.components.title": "Komponentai",
   "installer.components.subtitle": "USOS leidimo %s dalys, atsisiunčiamos atskirai. Jos atsisiunčiamos į šį kompiuterį, patikrinamos pagal leidimo SHA256SUMS ir į šią diegimo programą įtrauktas kontrolines sumas, tada nukopijuojamos į diską.",
+  "installer.components.subtitle_embedded": "Šios USOS leidimo %s dalys yra įtrauktos į šią diegimo programą: nieko atsisiųsti nereikia. Kiekviena patikrinama pagal įtrauktas kontrolines sumas ir tada nukopijuojama į diską.",
+  "installer.components.source.embedded": "Įtraukta",
   "installer.components.no_release": "Ši diegimo programos versija nežino savo GitHub leidimo, todėl negali atsisiųsti. Pasirinkite turimus failus arba praleiskite.",
   "installer.components.checking": "Tikrinama, kokie komponentai yra diske…",
   "installer.components.check_failed": "Nepavyko patikrinti disko komponentų: %s",

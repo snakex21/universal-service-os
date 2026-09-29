@@ -88,6 +88,9 @@ type Config struct {
 	// log); ComponentsRelease overrides the installer's own release (tests).
 	ComponentsLog     func(string)
 	ComponentsRelease *components.Release
+	// ComponentsBundle overrides the running installer's embedded components
+	// (all-in-one overlay); nil reads it from the executable.
+	ComponentsBundle *components.Bundle
 
 	// Test harness only (cmd/usos-installer-uidemo).
 	ForceDPI         uint32

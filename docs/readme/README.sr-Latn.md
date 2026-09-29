@@ -146,7 +146,8 @@ Datoteke izdanja:
 
 | Datoteka | Namena |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | instalacioni program; sadrži ceo USOS |
+| `USOS-Installer-1.0.0.exe` | **Pun instalater**: ceo USOS plus WinPE donor i oba XP paketa; radi bez interneta |
+| `USOS-Installer-1.0.0-online.exe` | **Onlajn instalater**: malo preuzimanje; po potrebi preuzima WinPE donor i XP pakete iz ovog izdanja i proverava ih |
 | `USOS-1.0.0-WinPE-PE10-donor.zip` | PE10 donor, potreban za Vistu i originalne ISO slike Windowsa 7 u UEFI-ju |
 | `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | UEFI paket za Windows XP x86 SP3, svaki za tačno jednu originalnu ISO sliku (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`), instalira se priloženom skriptom `install-xp-package.ps1` |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | izvorni kod komponenti trećih strana i pisana ponuda izvornog koda |

@@ -156,6 +156,8 @@
   "installer.final.open_drivers_failed": "Priečinok ovládačov sa nepodarilo otvoriť: %s",
   "installer.components.title": "Komponenty",
   "installer.components.subtitle": "Časti vydania USOS %s, ktoré sa sťahujú osobitne. Stiahnu sa do tohto počítača, overia sa podľa SHA256SUMS vydania a podľa súčtov zabudovaných v tomto inštalátore a potom sa skopírujú na jednotku.",
+  "installer.components.subtitle_embedded": "Tieto časti vydania USOS %s sú súčasťou tohto inštalátora: nič netreba sťahovať. Každá sa overí podľa zabudovaných súčtov a potom sa skopíruje na jednotku.",
+  "installer.components.source.embedded": "Súčasťou",
   "installer.components.no_release": "Táto zostava inštalátora nepozná svoje vydanie na GitHube, preto nemôže sťahovať. Vyberte súbory, ktoré už máte, alebo preskočte.",
   "installer.components.checking": "Zisťujem, ktoré komponenty jednotka má…",
   "installer.components.check_failed": "Komponenty jednotky sa nepodarilo skontrolovať: %s",

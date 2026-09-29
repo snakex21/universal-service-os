@@ -159,6 +159,8 @@
   "installer.final.open_drivers_failed": "Mape z gonilniki ni bilo mogoče odpreti: %s",
   "installer.components.title": "Komponente",
   "installer.components.subtitle": "Deli izdaje USOS %s, ki se prenašajo posebej. Prenesejo se na ta računalnik, preverijo glede na SHA256SUMS izdaje in kontrolne vsote, vgrajene v ta namestitveni program, nato pa se kopirajo na pogon.",
+  "installer.components.subtitle_embedded": "Ti deli izdaje USOS %s so vključeni v ta namestitveni program: prenos ni potreben. Vsak se preveri glede na vgrajene kontrolne vsote in nato kopira na pogon.",
+  "installer.components.source.embedded": "Vključeno",
   "installer.components.no_release": "Ta različica namestitvenega programa ne pozna svoje izdaje na GitHubu, zato ne more prenašati. Izberite datoteke, ki jih že imate, ali preskočite.",
   "installer.components.checking": "Preverjam, katere komponente ima pogon…",
   "installer.components.check_failed": "Komponent pogona ni bilo mogoče preveriti: %s",

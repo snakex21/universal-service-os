@@ -153,6 +153,8 @@
   "installer.final.open_drivers_failed": "Could not open the drivers folder: %s",
   "installer.components.title": "Components",
   "installer.components.subtitle": "Parts of the USOS release %s that are separate downloads. They are downloaded to this PC, checked against the release's SHA256SUMS and the checksums built into this installer, then copied to the drive.",
+  "installer.components.subtitle_embedded": "These parts of the USOS release %s are included in this installer: no download needed. Each is checked against the checksums built into the installer, then copied to the drive.",
+  "installer.components.source.embedded": "Included",
   "installer.components.no_release": "This installer build does not know its GitHub release, so it cannot download. Choose files you already have, or skip.",
   "installer.components.checking": "Checking which components the drive has…",
   "installer.components.check_failed": "Could not check the drive's components: %s",

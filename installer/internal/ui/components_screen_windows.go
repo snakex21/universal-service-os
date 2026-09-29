@@ -55,6 +55,7 @@ type componentsScreen struct {
 	f       *Flow
 	after   finalArgs
 	release components.Release
+	bundle  *components.Bundle // all-in-one installer overlay, nil online
 	// forced: opened from the final screen (show even when complete).
 	forced bool
 
@@ -84,12 +85,42 @@ func (f *Flow) showComponents(after finalArgs, forced bool) {
 	s := &componentsScreen{f: f, after: after, forced: forced, release: f.componentsRelease(), checking: true,
 		local: map[components.ID]string{}, phase: map[components.ID]components.Phase{},
 		prog: map[components.ID]components.Progress{}, errs: map[components.ID]error{}}
+	s.bundle = f.componentsBundle()
 	if !s.release.CanDownload() {
 		s.winpeSource, s.xpSource = components.SourceLocal, components.SourceLocal
+	}
+	// The all-in-one installer preselects its own copies (no network).
+	if s.embedded(components.WinPE) {
+		s.winpeSource = components.SourceEmbedded
+	}
+	if s.embedded(components.PreferredXP(i18n.Current())) {
+		s.xpSource = components.SourceEmbedded
 	}
 	f.busy = false
 	f.show(s, "components.primary")
 	s.check()
+}
+
+// xpEmbedded: every XP package of the current language choice is included.
+func (s *componentsScreen) xpEmbedded() bool {
+	for _, id := range s.xpIDs() {
+		if !s.embedded(id) {
+			return false
+		}
+	}
+	return true
+}
+
+// embedded reports whether this installer carries the component itself.
+func (s *componentsScreen) embedded(id components.ID) bool {
+	return s.bundle.Has(s.release.Asset(id))
+}
+
+func (f *Flow) componentsBundle() *components.Bundle {
+	if f.cfg.ComponentsBundle != nil {
+		return f.cfg.ComponentsBundle
+	}
+	return components.EmbeddedBundle()
 }
 
 func (f *Flow) componentsRelease() components.Release {
@@ -203,6 +234,7 @@ func (s *componentsScreen) start(choices []components.Choice) {
 		Release:    s.release,
 		Downloader: &components.Downloader{Release: s.release, Dir: components.DefaultDir(s.release), Log: func(l string) { f.w.post(func() { s.log(l) }) }},
 		Installer:  componentsInstaller{backend: f.cfg.Components, media: s.target.Media},
+		Bundle:     s.bundle,
 		Log:        func(l string) { f.w.post(func() { s.log(l) }) },
 	}
 	s.log(fmt.Sprintf("[COMPONENTS] release %s, download folder %s", s.release.Tag, components.DefaultDir(s.release)))
@@ -268,7 +300,9 @@ func (s *componentsScreen) pick(id components.ID) {
 func (s *componentsScreen) draw(f *Flow, w *win, area rect) {
 	bar, body := w.actionBar(area)
 	subtitle := i18n.T("installer.components.subtitle", s.release.Tag)
-	if !s.release.CanDownload() {
+	if s.bundle != nil && len(s.bundle.Entries) > 0 {
+		subtitle = i18n.T("installer.components.subtitle_embedded", s.release.Tag)
+	} else if !s.release.CanDownload() {
 		subtitle = i18n.T("installer.components.no_release")
 	}
 	body = w.pageTitle(body, i18n.T("installer.components.title"), subtitle, color{}, glyphDownload)
@@ -381,8 +415,14 @@ func (s *componentsScreen) segments(w *win, x, y, right int32, items []segment, 
 	return rowY - y + h
 }
 
-func (s *componentsScreen) sourceSegments(w *win, prefix string, x, y, right int32, source *components.Source, disabled bool) int32 {
+func (s *componentsScreen) sourceSegments(w *win, prefix string, x, y, right int32, source *components.Source, disabled, embedded bool) int32 {
 	var items []segment
+	if embedded {
+		items = append(items, segment{prefix + ".embedded", i18n.T("installer.components.source.embedded"), *source == components.SourceEmbedded, func() { *source = components.SourceEmbedded }})
+	} else if *source == components.SourceEmbedded {
+		// e.g. "Both" chosen and one language is not included
+		*source = components.SourceDownload
+	}
 	if s.release.CanDownload() {
 		items = append(items, segment{prefix + ".download", i18n.T("installer.components.source.download"), *source == components.SourceDownload, func() { *source = components.SourceDownload }})
 	}
@@ -503,7 +543,7 @@ func (s *componentsScreen) winpeContent(w *win, r rect) int32 {
 		y += s.progressLine(w, components.WinPE, inner.Left, y, inner.Right)
 		return y - r.Top + w.px(8)
 	}
-	y += s.sourceSegments(w, "components.winpe", inner.Left, y, inner.Right, &s.winpeSource, s.running) + w.px(10)
+	y += s.sourceSegments(w, "components.winpe", inner.Left, y, inner.Right, &s.winpeSource, s.running, s.embedded(components.WinPE)) + w.px(10)
 	switch s.winpeSource {
 	case components.SourceLocal:
 		y += s.localRow(w, components.WinPE, inner.Left, y, inner.Right, i18n.T("installer.components.choose_file")) + w.px(10)
@@ -543,7 +583,7 @@ func (s *componentsScreen) xpContent(w *win, r rect) int32 {
 	if s.xpLang == xpBoth {
 		y += w.wrapped(w.captionFont(), i18n.T("installer.components.xp.both_note", strings.ToUpper(preferred.XPLang())), inner.Left, y, inner.w(), theme.Muted) + w.px(8)
 	}
-	y += s.sourceSegments(w, "components.xp", inner.Left, y, inner.Right, &s.xpSource, s.running) + w.px(10)
+	y += s.sourceSegments(w, "components.xp", inner.Left, y, inner.Right, &s.xpSource, s.running, s.xpEmbedded()) + w.px(10)
 	switch s.xpSource {
 	case components.SourceLocal:
 		for _, id := range s.xpIDs() {

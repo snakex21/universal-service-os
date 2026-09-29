@@ -144,7 +144,8 @@ Soubory vydání:
 
 | Soubor | Účel |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | instalátor; obsahuje celý USOS |
+| `USOS-Installer-1.0.0.exe` | **Úplný instalátor**: celý USOS včetně dárce WinPE a obou balíčků XP; funguje offline |
+| `USOS-Installer-1.0.0-online.exe` | **Online instalátor**: malé stažení; dárce WinPE a balíčky XP stáhne z tohoto vydání, až budou potřeba, a ověří je |
 | `USOS-1.0.0-WinPE-PE10-donor.zip` | dárce PE10, potřebný pro Vistu a originální ISO Windows 7 v UEFI |
 | `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | balíček UEFI pro Windows XP x86 SP3, každý pro právě jedno originální ISO (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`), instaluje se přiloženým skriptem `install-xp-package.ps1` |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | zdrojové kódy komponent třetích stran a písemná nabídka zdrojových kódů |

@@ -156,6 +156,8 @@
   "installer.final.open_drivers_failed": "Folderul de drivere nu a putut fi deschis: %s",
   "installer.components.title": "Componente",
   "installer.components.subtitle": "Părți ale versiunii USOS %s care se descarcă separat. Sunt descărcate pe acest PC, verificate cu SHA256SUMS al versiunii și cu sumele integrate în acest program de instalare, apoi copiate pe unitate.",
+  "installer.components.subtitle_embedded": "Aceste părți ale versiunii USOS %s sunt incluse în acest program de instalare: nu este nevoie de descărcare. Fiecare este verificată cu sumele integrate, apoi copiată pe unitate.",
+  "installer.components.source.embedded": "Inclus",
   "installer.components.no_release": "Această versiune a programului de instalare nu își cunoaște versiunea de pe GitHub, deci nu poate descărca. Alegeți fișiere pe care le aveți deja sau omiteți.",
   "installer.components.checking": "Se verifică ce componente are unitatea…",
   "installer.components.check_failed": "Componentele unității nu au putut fi verificate: %s",

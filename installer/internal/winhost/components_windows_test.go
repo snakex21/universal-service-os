@@ -4,6 +4,7 @@ package winhost
 
 import (
 	"archive/zip"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
@@ -130,5 +131,56 @@ func TestInstallWinpeComponentRecordsDonor(t *testing.T) {
 	// Running it again (Repair offering it once more) keeps the donor.
 	if err := installComponentAt(esp, data, components.WinPE, zipPath, false, nil); err != nil {
 		t.Fatal(err)
+	}
+}
+
+type fakeESPInstaller struct{ esp, data string }
+
+func (f fakeESPInstaller) InstallComponent(id components.ID, zipPath string, storeOnly bool, log func(string)) error {
+	return installComponentAt(f.esp, f.data, id, zipPath, storeOnly, log)
+}
+
+// All-in-one installer: the zips come out of the exe overlay, are checked
+// against the compiled list and installed onto a fake ESP/DATA, offline.
+func TestEmbeddedComponentsInstallOnFakeESP(t *testing.T) {
+	base := []byte("micro-linux of this build")
+	esp, data := fakeESP(t, base), t.TempDir()
+	unprotect(t, data)
+	winpe := filepath.Join(t.TempDir(), components.AssetName(components.WinPE, "9.9.9"))
+	writeZip(t, winpe, map[string][]byte{"Programs/USOS/WinPE/PE10_x64_19041_USOS.iso": []byte("donor"), "README.txt": []byte("r")})
+	xpPL, xpEN := xpPackageZip(t, "pl", base), xpPackageZip(t, "en", base)
+	exe := filepath.Join(t.TempDir(), "installer.exe")
+	os.WriteFile(exe, []byte("MZ"), 0o644)
+	allInOne := filepath.Join(t.TempDir(), "USOS-Installer-9.9.9.exe")
+	if err := components.WriteBundle(allInOne, exe, []string{winpe, xpPL, xpEN}); err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := components.OpenBundle(allInOne)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pins := ""
+	for _, z := range []string{winpe, xpPL, xpEN} {
+		sum, _ := components.HashFile(z)
+		pins += filepath.Base(z) + "=" + sum + ";"
+	}
+	release := components.Release{Version: "9.9.9", Tag: "v9.9.9-rc2", BaseURL: "http://127.0.0.1:1", Pinned: components.ParsePinned(pins)}
+	runner := &components.Runner{Release: release, Bundle: bundle, Dir: t.TempDir(), Installer: fakeESPInstaller{esp, data}}
+	results := runner.Run(context.Background(), []components.Choice{
+		{ID: components.WinPE, Source: components.SourceEmbedded},
+		{ID: components.XPPL, Source: components.SourceEmbedded},
+		{ID: components.XPEN, Source: components.SourceEmbedded, StoreOnly: true},
+	}, nil)
+	for id, err := range results {
+		if err != nil {
+			t.Fatalf("%s: %v", id, err)
+		}
+	}
+	status := components.Inspect(esp, data)
+	if !status.WinPE || !status.Present(components.XPPL) {
+		t.Fatalf("status %+v", status)
+	}
+	if _, err := os.Stat(filepath.Join(data, components.XPStoreDir, filepath.Base(xpEN))); err != nil {
+		t.Fatal("second XP language not kept on DATA:", err)
 	}
 }

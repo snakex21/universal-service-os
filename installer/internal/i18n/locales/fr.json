@@ -153,6 +153,8 @@
   "installer.final.open_drivers_failed": "Impossible d'ouvrir le dossier des pilotes : %s",
   "installer.components.title": "Composants",
   "installer.components.subtitle": "Éléments de la version USOS %s téléchargés séparément. Ils sont téléchargés sur ce PC, vérifiés avec le SHA256SUMS de la version et les sommes intégrées à ce programme d'installation, puis copiés sur le support.",
+  "installer.components.subtitle_embedded": "Ces éléments de la version USOS %s sont inclus dans ce programme d'installation : aucun téléchargement nécessaire. Chacun est vérifié avec les sommes intégrées, puis copié sur le support.",
+  "installer.components.source.embedded": "Inclus",
   "installer.components.no_release": "Cette version du programme d'installation ne connaît pas sa version GitHub et ne peut donc pas télécharger. Choisissez des fichiers que vous avez déjà, ou ignorez.",
   "installer.components.checking": "Vérification des composants présents sur le support…",
   "installer.components.check_failed": "Impossible de vérifier les composants du support : %s",

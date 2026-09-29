@@ -156,6 +156,8 @@
   "installer.final.open_drivers_failed": "Složku ovladačů nelze otevřít: %s",
   "installer.components.title": "Komponenty",
   "installer.components.subtitle": "Části vydání USOS %s, které se stahují zvlášť. Stáhnou se do tohoto počítače, ověří se podle SHA256SUMS vydání a podle součtů zabudovaných v tomto instalátoru a pak se zkopírují na jednotku.",
+  "installer.components.subtitle_embedded": "Tyto části vydání USOS %s jsou součástí tohoto instalátoru: nic není třeba stahovat. Každá se ověří podle zabudovaných součtů a pak se zkopíruje na jednotku.",
+  "installer.components.source.embedded": "Součástí",
   "installer.components.no_release": "Toto sestavení instalátoru nezná své vydání na GitHubu, proto nemůže stahovat. Vyberte soubory, které už máte, nebo přeskočte.",
   "installer.components.checking": "Zjišťuji, které komponenty jednotka má…",
   "installer.components.check_failed": "Komponenty jednotky se nepodařilo zkontrolovat: %s",

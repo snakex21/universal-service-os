@@ -153,6 +153,8 @@
   "installer.final.open_drivers_failed": "Sürücü klasörü açılamadı: %s",
   "installer.components.title": "Bileşenler",
   "installer.components.subtitle": "USOS %s sürümünün ayrıca indirilen parçaları. Bu bilgisayara indirilir, sürümün SHA256SUMS dosyası ve bu yükleyiciye gömülü sağlama toplamlarıyla doğrulanır, ardından sürücüye kopyalanır.",
+  "installer.components.subtitle_embedded": "USOS %s sürümünün bu parçaları bu yükleyiciye dahildir: indirme gerekmez. Her biri gömülü sağlama toplamlarıyla doğrulanır, ardından sürücüye kopyalanır.",
+  "installer.components.source.embedded": "Dahil",
   "installer.components.no_release": "Bu yükleyici derlemesi GitHub sürümünü bilmediği için indirme yapamaz. Elinizdeki dosyaları seçin veya atlayın.",
   "installer.components.checking": "Sürücüde hangi bileşenlerin olduğu denetleniyor…",
   "installer.components.check_failed": "Sürücünün bileşenleri denetlenemedi: %s",

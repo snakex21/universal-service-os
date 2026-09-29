@@ -147,7 +147,8 @@ Releasebestanden:
 
 | Bestand | Doel |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | het installatieprogramma; bevat heel USOS |
+| `USOS-Installer-1.0.0.exe` | **Volledig installatieprogramma**: heel USOS plus de WinPE-donor en beide XP-pakketten; werkt offline |
+| `USOS-Installer-1.0.0-online.exe` | **Online installatieprogramma**: kleine download; haalt de WinPE-donor en XP-pakketten zo nodig uit deze release en controleert ze |
 | `USOS-1.0.0-WinPE-PE10-donor.zip` | PE10-donor, nodig voor Vista en originele Windows 7-ISO's op UEFI |
 | `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | UEFI-pakket voor Windows XP x86 SP3, elk voor precies één originele ISO (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`), te installeren met het meegeleverde `install-xp-package.ps1` |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | broncode van de componenten van derden en het schriftelijke aanbod voor de broncode |

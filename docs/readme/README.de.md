@@ -149,7 +149,8 @@ Dateien des Release:
 
 | Datei | Zweck |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | der Installer; enthält das gesamte USOS |
+| `USOS-Installer-1.0.0.exe` | **Vollständiger Installer**: das gesamte USOS samt WinPE-Spender und beiden XP-Paketen; funktioniert offline |
+| `USOS-Installer-1.0.0-online.exe` | **Online-Installer**: kleiner Download; lädt WinPE-Spender und XP-Pakete bei Bedarf aus diesem Release und prüft sie |
 | `USOS-1.0.0-WinPE-PE10-donor.zip` | PE10-Spender, nötig für Vista und originale Windows-7-ISOs unter UEFI |
 | `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | UEFI-Paket für Windows XP x86 SP3, jeweils für genau ein originales ISO (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`), installiert mit dem beiliegenden `install-xp-package.ps1` |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | Quellen der Fremdkomponenten und das schriftliche Quellcode-Angebot |

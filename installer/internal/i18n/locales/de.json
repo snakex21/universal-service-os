@@ -153,6 +153,8 @@
   "installer.final.open_drivers_failed": "Der Treiberordner konnte nicht geöffnet werden: %s",
   "installer.components.title": "Komponenten",
   "installer.components.subtitle": "Teile des USOS-Release %s, die separat heruntergeladen werden. Sie werden auf diesen PC geladen, mit den SHA256SUMS des Release und den in dieses Installationsprogramm eingebauten Prüfsummen verglichen und dann auf das Laufwerk kopiert.",
+  "installer.components.subtitle_embedded": "Diese Teile des USOS-Release %s sind in diesem Installationsprogramm enthalten: kein Download nötig. Jeder Teil wird mit den eingebauten Prüfsummen verglichen und dann auf das Laufwerk kopiert.",
+  "installer.components.source.embedded": "Enthalten",
   "installer.components.no_release": "Dieser Build des Installationsprogramms kennt sein GitHub-Release nicht und kann daher nichts herunterladen. Wählen Sie vorhandene Dateien oder überspringen Sie.",
   "installer.components.checking": "Prüfe, welche Komponenten das Laufwerk hat…",
   "installer.components.check_failed": "Die Komponenten des Laufwerks konnten nicht geprüft werden: %s",

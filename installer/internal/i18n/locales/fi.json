@@ -153,6 +153,8 @@
   "installer.final.open_drivers_failed": "Ohjainkansiota ei voitu avata: %s",
   "installer.components.title": "Komponentit",
   "installer.components.subtitle": "USOS-julkaisun %s erikseen ladattavat osat. Ne ladataan tähän tietokoneeseen, tarkistetaan julkaisun SHA256SUMS-tiedostoa ja tähän asennusohjelmaan sisäänrakennettuja tarkistussummia vasten ja kopioidaan sitten asemalle.",
+  "installer.components.subtitle_embedded": "Nämä USOS-julkaisun %s osat sisältyvät tähän asennusohjelmaan: latausta ei tarvita. Jokainen tarkistetaan sisäänrakennettuja tarkistussummia vasten ja kopioidaan sitten asemalle.",
+  "installer.components.source.embedded": "Mukana",
   "installer.components.no_release": "Tämä asennusohjelman versio ei tunne GitHub-julkaisuaan, joten se ei voi ladata. Valitse tiedostot, jotka sinulla jo on, tai ohita.",
   "installer.components.checking": "Tarkistetaan aseman komponentteja…",
   "installer.components.check_failed": "Aseman komponentteja ei voitu tarkistaa: %s",

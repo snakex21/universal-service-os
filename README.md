@@ -141,9 +141,10 @@ Release assets:
 
 | File | Purpose |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | the installer; contains all of USOS |
-| `USOS-1.0.0-WinPE-PE10-donor.zip` | PE10 donor, needed for Vista and original Windows 7 ISOs on UEFI |
-| `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | Windows XP x86 SP3 UEFI package for exactly one original ISO each (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`), installed with the included `install-xp-package.ps1` |
+| `USOS-Installer-1.0.0.exe` | **Full installer**: all of USOS plus the WinPE donor and both XP packages; works offline |
+| `USOS-Installer-1.0.0-online.exe` | **Online installer**: small download; fetches the WinPE donor and XP packages from this release when needed and verifies them |
+| `USOS-1.0.0-WinPE-PE10-donor.zip` | PE10 donor, needed for Vista and original Windows 7 ISOs on UEFI (included in the full installer; separate for manual or offline use) |
+| `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | Windows XP x86 SP3 UEFI package for exactly one original ISO each (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`); included in the full installer, or installed by hand with the included `install-xp-package.ps1` |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | sources of the third-party components and the written source offer |
 | `USOS-1.0.0-buildkit.zip` | pinned toolchains and build inputs for an offline rebuild |
 | `LICENSES/`, `THIRD-PARTY-NOTICES.txt` | licence texts and notices |
@@ -161,10 +162,12 @@ Check a download with `certutil -hashfile USOS-Installer-1.0.0.exe SHA256`
    confirmation text and click **ERASE AND INSTALL**.
 3. Copy your ISO images to the DATA partition, into the `Images` folder of
    each system, e.g. `Systems\Windows\Windows 11\Images\`.
-4. Optional: for Vista or original Windows 7 on UEFI, copy the `Programs`
-   folder from the PE10 donor zip to the root of DATA and run **Update
-   USOS**; for XP on UEFI, run `install-xp-package.ps1` as administrator
-   from the XP package that matches your ISO (one package at a time).
+4. After the install, the installer's **Components** step puts the WinPE
+   donor (Vista and original Windows 7 on UEFI) and the XP package (XP on
+   UEFI, in the language of your ISO) on the stick: from the full installer
+   directly, from the online installer by download, both verified by
+   SHA-256. You can skip them and add them later with **Update USOS** or
+   **Repair**.
 5. Boot the target PC from the stick (BIOS or UEFI). With Secure Boot on,
    enroll the USOS key once ([Secure Boot](#secure-boot)). Pick the system
    and the image, optionally an answer profile, confirm the target disk and

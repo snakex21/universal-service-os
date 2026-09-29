@@ -148,7 +148,8 @@ Laidos failai:
 
 | Failas | Paskirtis |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | diegimo programa; joje yra visas USOS |
+| `USOS-Installer-1.0.0.exe` | **Pilna diegimo programa**: visas USOS kartu su WinPE donoru ir abiem XP paketais; veikia be interneto |
+| `USOS-Installer-1.0.0-online.exe` | **Internetinė diegimo programa**: mažas atsisiuntimas; prireikus atsisiunčia WinPE donorą ir XP paketus iš šio leidimo ir juos patikrina |
 | `USOS-1.0.0-WinPE-PE10-donor.zip` | PE10 donoras, reikalingas Vista ir originaliems Windows 7 ISO UEFI režimu |
 | `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | Windows XP x86 SP3 UEFI paketas, kiekvienas tiksliai vienam originaliam ISO (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`), diegiamas pridėtu `install-xp-package.ps1` |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | trečiųjų šalių komponentų išeitinis kodas ir rašytinis išeitinio kodo pasiūlymas |

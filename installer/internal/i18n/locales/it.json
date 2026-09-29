@@ -153,6 +153,8 @@
   "installer.final.open_drivers_failed": "Impossibile aprire la cartella dei driver: %s",
   "installer.components.title": "Componenti",
   "installer.components.subtitle": "Parti della release USOS %s scaricate separatamente. Vengono scaricate su questo PC, verificate con lo SHA256SUMS della release e con le somme integrate in questo programma di installazione, poi copiate sull'unità.",
+  "installer.components.subtitle_embedded": "Queste parti della release USOS %s sono incluse in questo programma di installazione: nessun download necessario. Ognuna viene verificata con le somme integrate e poi copiata sull'unità.",
+  "installer.components.source.embedded": "Incluso",
   "installer.components.no_release": "Questa build del programma di installazione non conosce la sua release GitHub, quindi non può scaricare. Scegli file che hai già oppure salta.",
   "installer.components.checking": "Verifica dei componenti presenti sull'unità…",
   "installer.components.check_failed": "Impossibile verificare i componenti dell'unità: %s",

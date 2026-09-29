@@ -9,7 +9,8 @@ builds; it never builds anything itself and never touches a USB stick.
       --winpe L:/Programs/USOS/WinPE/PE10_x64_19041_USOS.iso
 
 Layout (VERSION = build-info.ini version, e.g. 1.0.0):
-  USOS-Installer-VERSION.exe
+  USOS-Installer-VERSION.exe          full installer: the online one + the component zips as overlay
+  USOS-Installer-VERSION-online.exe   downloads the component zips from the GitHub release
   USOS-VERSION-WinPE-PE10-donor.zip   Programs/USOS/WinPE/<donor ISO> + README.txt
   USOS-VERSION-XP-package-PL.zip      EFI/USOS-XP/* + install-xp-package.ps1 + README.txt
   USOS-VERSION-XP-package-EN.zip
@@ -322,10 +323,51 @@ def check_installer_pins(installer, folder, version):
             raise SystemExit(f'{installer} does not embed {pin.decode()} (build it with make_release.ps1)')
 
 
+def check_full_installer(full, online, folder, version):
+    """The full installer is the online one plus every component zip as an
+    overlay (installer/internal/components/bundle.go); check it byte for byte."""
+    full, online = Path(full), Path(online)
+    size = online.stat().st_size
+    with open(full, 'rb') as f, open(online, 'rb') as g:
+        done = 0
+        while done < size:
+            a, b = f.read(min(1 << 20, size - done)), g.read(1 << 20)
+            if a != b[:len(a)] or not a:
+                raise SystemExit(f'{full} does not start with {online}')
+            done += len(a)
+        f.seek(-24, os.SEEK_END)
+        trailer = f.read(24)
+        if trailer[:8] != b'USOSCMP1':
+            raise SystemExit(f'{full} has no component overlay')
+        index_offset = int.from_bytes(trailer[8:16], 'little')
+        index_size = int.from_bytes(trailer[16:24], 'little')
+        f.seek(index_offset)
+        index = json.loads(f.read(index_size))
+        entries = {e['name']: e for e in index['files']}
+        if sorted(entries) != sorted(component_names(version)):
+            raise SystemExit(f'{full} overlay holds {sorted(entries)}, expected {component_names(version)}')
+        for name, e in entries.items():
+            if e['offset'] < size:
+                raise SystemExit(f'{full}: {name} overlaps the executable')
+            f.seek(e['offset'])
+            h, left = hashlib.sha256(), e['size']
+            while left:
+                block = f.read(min(1 << 20, left))
+                if not block:
+                    raise SystemExit(f'{full}: {name} is cut off')
+                h.update(block)
+                left -= len(block)
+            if h.hexdigest() != sha256(folder / name):
+                raise SystemExit(f'{full}: embedded {name} differs from the release asset')
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--out', type=Path, default=ROOT / 'zig-out/release-1.0')
-    p.add_argument('--installer', type=Path, default=ROOT / 'installer/USOS Installer.exe')
+    p.add_argument('--installer', type=Path, default=ROOT / 'installer/USOS Installer.exe',
+                   help='the full installer (with --installer-online: the all-in-one build)')
+    p.add_argument('--installer-online', type=Path,
+                   help='the online installer; --installer must then be it plus the component overlay')
     p.add_argument('--xp', action='append', default=[], help='LANG=PACKAGE_DIR (pl, en)')
     p.add_argument('--winpe', type=Path)
     p.add_argument('--buildkit', type=Path, action='append', default=[], help='USOS-VERSION-buildkit.zip (or its .001.. parts) from make_buildkit.py')
@@ -362,9 +404,14 @@ def main():
             print('COMPONENTS PASS', out)
             return
 
-    # Installer
+    # Installers: full (components embedded) and online (downloads them)
     installer = out / f'USOS-Installer-{version}.exe'
     shutil.copyfile(a.installer, installer)
+    if a.installer_online:
+        folder = a.components.resolve() if a.components else out
+        check_installer_pins(a.installer_online, folder, version)
+        check_full_installer(a.installer, a.installer_online, folder, version)
+        shutil.copyfile(a.installer_online, out / f'USOS-Installer-{version}-online.exe')
     if a.components:
         for name in component_names(version):
             shutil.copyfile(components / name, out / name)

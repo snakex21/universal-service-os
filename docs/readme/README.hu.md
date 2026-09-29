@@ -149,7 +149,8 @@ Kiadási fájlok:
 
 | Fájl | Rendeltetés |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | a telepítő; a teljes USOS-t tartalmazza |
+| `USOS-Installer-1.0.0.exe` | **Teljes telepítő**: a teljes USOS a WinPE donorral és mindkét XP csomaggal; internet nélkül is működik |
+| `USOS-Installer-1.0.0-online.exe` | **Online telepítő**: kis letöltés; szükség esetén letölti a WinPE donort és az XP csomagokat ebből a kiadásból, és ellenőrzi őket |
 | `USOS-1.0.0-WinPE-PE10-donor.zip` | PE10-donor, a Vistához és az eredeti Windows 7 ISO-khoz szükséges UEFI-n |
 | `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | Windows XP x86 SP3 UEFI-csomag, mindegyik pontosan egy eredeti ISO-hoz (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`), a mellékelt `install-xp-package.ps1` szkripttel telepíthető |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | a külső komponensek forráskódja és az írásos forráskód-ajánlat |

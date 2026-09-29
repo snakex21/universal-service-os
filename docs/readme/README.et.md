@@ -146,7 +146,8 @@ Väljalaske failid:
 
 | Fail | Otstarve |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | installer; sisaldab kogu USOS-i |
+| `USOS-Installer-1.0.0.exe` | **Täispaigaldaja**: kogu USOS koos WinPE doonori ja mõlema XP paketiga; töötab võrguta |
+| `USOS-Installer-1.0.0-online.exe` | **Võrgupaigaldaja**: väike allalaadimine; laadib WinPE doonori ja XP paketid vajadusel sellest väljalaskest ning kontrollib neid |
 | `USOS-1.0.0-WinPE-PE10-donor.zip` | PE10 doonor, vajalik Vista ja Windows 7 originaal-ISO-de jaoks UEFI-l |
 | `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | Windows XP x86 SP3 UEFI-pakett, kumbki täpselt ühele originaal-ISO-le (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`), installitakse kaasasoleva skriptiga `install-xp-package.ps1` |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | kolmandate osapoolte komponentide lähtekood ja kirjalik lähtekoodi pakkumine |

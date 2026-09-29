@@ -13,8 +13,10 @@ Builds the USOS release folder zig-out\release-<major.minor>\ in one command.
    (unless -SkipChecks);
 4. the WinPE donor zip and XP package zips (assemble_release.py
    --components-only), then the installer rebuilt with -Tag (the GitHub
-   release it downloads them from) and their SHA-256 list compiled in;
-5. tools/release/assemble_release.py: installer, those zips, LICENSES,
+   release it downloads them from) and their SHA-256 list compiled in:
+   USOS-Installer-VERSION-online.exe, and USOS-Installer-VERSION.exe, the
+   full build with the zips appended (cmd/usos-component-bundle);
+5. tools/release/assemble_release.py: both installers, those zips, LICENSES,
    THIRD-PARTY-NOTICES, SOURCE-OFFER, sources zip, docs, forbidden-content
    scan, SHA256SUMS; it refuses an installer without the hash list.
 
@@ -115,6 +117,11 @@ $ldflags = "-H=windowsgui -X $buildInfoPackage.ID=$buildId -X $buildInfoPackage.
 Push-Location -LiteralPath (Join-Path $root 'installer')
 try {
     Run 'go build installer' { go.exe build -trimpath -ldflags $ldflags -o 'USOS Installer.exe' ./cmd/usos-installer }
+    # Full (all-in-one) installer: the same executable with the component
+    # zips appended as a verified overlay; the plain one ships as -online.
+    $allInOne = Join-Path $work 'USOS-Installer-full.exe'
+    $componentZips = @(Get-ChildItem -LiteralPath $componentsDir -Filter '*.zip' | Sort-Object Name | ForEach-Object { $_.FullName })
+    Run 'usos-component-bundle' { go.exe run ./cmd/usos-component-bundle -exe 'USOS Installer.exe' -out $allInOne @componentZips }
 } finally {
     Pop-Location
 }
@@ -130,5 +137,5 @@ foreach ($part in Get-ChildItem -LiteralPath $kitDir -File) { $kitArgs += @('--b
 
 if ($IssuesUrl -ne '') { $env:USOS_ISSUES_URL = $IssuesUrl }
 Step "assemble $out"
-Run 'assemble_release' { python.exe (Join-Path $root 'tools\release\assemble_release.py') --out $out --installer (Join-Path $root 'installer\USOS Installer.exe') --components $componentsDir @kitArgs }
+Run 'assemble_release' { python.exe (Join-Path $root 'tools\release\assemble_release.py') --out $out --installer $allInOne --installer-online (Join-Path $root 'installer\USOS Installer.exe') --components $componentsDir @kitArgs }
 Step "PASS: $out"

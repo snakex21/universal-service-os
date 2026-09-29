@@ -148,7 +148,8 @@ File del rilascio:
 
 | File | Scopo |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | il programma di installazione; contiene tutto USOS |
+| `USOS-Installer-1.0.0.exe` | **Installer completo**: tutto USOS più il donatore WinPE ed entrambi i pacchetti XP; funziona offline |
+| `USOS-Installer-1.0.0-online.exe` | **Installer online**: download piccolo; scarica il donatore WinPE e i pacchetti XP da questa release quando servono e li verifica |
 | `USOS-1.0.0-WinPE-PE10-donor.zip` | donatore PE10, necessario per Vista e le ISO originali di Windows 7 su UEFI |
 | `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | pacchetto UEFI per Windows XP x86 SP3, ciascuno per esattamente una ISO originale (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`), installato con l'incluso `install-xp-package.ps1` |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | sorgenti dei componenti di terze parti e l'offerta scritta dei sorgenti |

@@ -153,6 +153,8 @@
   "installer.final.open_drivers_failed": "De stuurprogrammamap kan niet worden geopend: %s",
   "installer.components.title": "Onderdelen",
   "installer.components.subtitle": "Delen van USOS-release %s die apart worden gedownload. Ze worden naar deze pc gedownload, gecontroleerd met de SHA256SUMS van de release en met de controlesommen in dit installatieprogramma, en daarna naar de schijf gekopieerd.",
+  "installer.components.subtitle_embedded": "Deze delen van USOS-release %s zitten in dit installatieprogramma: downloaden is niet nodig. Elk deel wordt gecontroleerd met de ingebouwde controlesommen en daarna naar de schijf gekopieerd.",
+  "installer.components.source.embedded": "Inbegrepen",
   "installer.components.no_release": "Deze build van het installatieprogramma kent zijn GitHub-release niet en kan dus niet downloaden. Kies bestanden die je al hebt, of sla over.",
   "installer.components.checking": "Controleren welke onderdelen de schijf heeft…",
   "installer.components.check_failed": "Kan de onderdelen van de schijf niet controleren: %s",

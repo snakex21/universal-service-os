@@ -65,7 +65,11 @@ from `https://github.com/snakex21/universal-service-os/releases/download/<tag>/`
 (`installer\internal\components`), so `make_release.ps1` builds those zips
 first and rebuilds the installer with the tag and their SHA-256 compiled in;
 a download must match both that list and the release's `SHA256SUMS`. Publish
-the release under exactly that tag.
+the release under exactly that tag. That rebuilt installer ships as
+`USOS-Installer-<version>-online.exe`; `USOS-Installer-<version>.exe` is the
+full build, the same executable with the three zips appended as an overlay
+(`installer\cmd\usos-component-bundle`), which `assemble_release.py` checks
+byte for byte.
 
 It also builds the build kit (`tools\release\make_buildkit.py`, after
 `tools\release\fetch_buildkit_inputs.py` has checked or fetched the pinned

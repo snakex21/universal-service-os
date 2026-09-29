@@ -156,6 +156,8 @@
   "installer.final.open_drivers_failed": "Mapu upravljačkih programa nije moguće otvoriti: %s",
   "installer.components.title": "Komponente",
   "installer.components.subtitle": "Dijelovi izdanja USOS %s koji se preuzimaju zasebno. Preuzimaju se na ovo računalo, provjeravaju prema SHA256SUMS izdanja i prema zbrojevima ugrađenima u ovaj instalacijski program, a zatim kopiraju na pogon.",
+  "installer.components.subtitle_embedded": "Ovi dijelovi izdanja USOS %s uključeni su u ovaj instalacijski program: preuzimanje nije potrebno. Svaki se provjerava prema ugrađenim zbrojevima, a zatim kopira na pogon.",
+  "installer.components.source.embedded": "Uključeno",
   "installer.components.no_release": "Ova inačica instalacijskog programa ne zna svoje izdanje na GitHubu pa ne može preuzimati. Odaberite datoteke koje već imate ili preskočite.",
   "installer.components.checking": "Provjeravam koje komponente pogon ima…",
   "installer.components.check_failed": "Nije moguće provjeriti komponente pogona: %s",

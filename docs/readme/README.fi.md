@@ -147,7 +147,8 @@ Julkaisun tiedostot:
 
 | Tiedosto | Tarkoitus |
 |---|---|
-| `USOS-Installer-1.0.0.exe` | asennusohjelma; sisältää koko USOSin |
+| `USOS-Installer-1.0.0.exe` | **Täysi asennusohjelma**: koko USOS sekä WinPE-luovuttaja ja molemmat XP-paketit; toimii ilman verkkoa |
+| `USOS-Installer-1.0.0-online.exe` | **Verkkoasennusohjelma**: pieni lataus; hakee WinPE-luovuttajan ja XP-paketit tästä julkaisusta tarvittaessa ja tarkistaa ne |
 | `USOS-1.0.0-WinPE-PE10-donor.zip` | PE10-luovuttaja, tarvitaan Vistaan ja alkuperäisiin Windows 7 -ISO:ihin UEFI-tilassa |
 | `USOS-1.0.0-XP-package-PL.zip`, `USOS-1.0.0-XP-package-EN.zip` | Windows XP x86 SP3:n UEFI-paketti, kukin täsmälleen yhdelle alkuperäiselle ISO:lle (`pl_..._x14-80476.iso` / `en_..._x14-80428.iso`), asennetaan mukana tulevalla `install-xp-package.ps1`:llä |
 | `USOS-1.0.0-sources.zip` + `SOURCE-OFFER.txt` | kolmannen osapuolen komponenttien lähdekoodit ja kirjallinen lähdekooditarjous |

@@ -156,6 +156,8 @@
   "installer.final.open_drivers_failed": "Neizdevās atvērt draiveru mapi: %s",
   "installer.components.title": "Komponentes",
   "installer.components.subtitle": "USOS laidiena %s atsevišķi lejupielādējamās daļas. Tās tiek lejupielādētas šajā datorā, pārbaudītas pēc laidiena SHA256SUMS un šajā instalētājā iebūvētajām kontrolsummām un pēc tam nokopētas uz diska.",
+  "installer.components.subtitle_embedded": "Šīs USOS laidiena %s daļas ir iekļautas šajā instalētājā: lejupielāde nav vajadzīga. Katra tiek pārbaudīta pēc iebūvētajām kontrolsummām un pēc tam nokopēta uz diska.",
+  "installer.components.source.embedded": "Iekļauts",
   "installer.components.no_release": "Šī instalētāja versija nezina savu GitHub laidienu, tāpēc nevar lejupielādēt. Izvēlieties failus, kas jums jau ir, vai izlaidiet.",
   "installer.components.checking": "Pārbauda, kādas komponentes ir diskā…",
   "installer.components.check_failed": "Neizdevās pārbaudīt diska komponentes: %s",
