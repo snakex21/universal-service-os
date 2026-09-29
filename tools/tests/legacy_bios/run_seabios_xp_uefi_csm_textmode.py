@@ -116,10 +116,16 @@ def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),
         probe=probe.replace("if [ -r /usr/lib/usos/xp_user_settings.sh ]; then . /usr/lib/usos/xp_user_settings.sh; usos_xp_settings_stage /probe-usos-xp.ini /mnt/source || finish 'FAIL settings'; fi"+chr(10),'')
     cpio.put(entries,cpio.Entry('probe-init',stat.S_IFREG|0o755,probe.encode()))
     if settings:cpio.put(entries,cpio.Entry('probe-usos-xp.ini',stat.S_IFREG|0o644,Path(settings).read_bytes()))
-    if profile in ('w2k3-x86-sp2-uefi-csm','xp-x64-sp2-uefi-csm') and 'usr/lib/usos/nt5-storage/x86/genahci.sys' not in entries:
-        # A package from before the NT 5.2 storage files: add them as the builder does.
+    if profile in ('w2k3-x86-sp2-uefi-csm','xp-x64-sp2-uefi-csm') and 'usr/lib/usos/nt5-storage/amd64/genahci.inf' not in entries:
+        # A package from before the NT 5.2 storage files (or before genahci.inf): add them as the builder does.
         sys.path.insert(0,str(ROOT/'tools'));import build_xp_uefi_csm_trial as builder
         for name,data in builder.nt5_storage_files().items():cpio.put(entries,cpio.Entry('usr/lib/usos/nt5-storage/'+name,stat.S_IFREG|0o644,data))
+    # USOS_TREE_NT52_USB=1: the working tree's xhci98 files replace the package's.
+    tree_usb=__import__('os').environ.get('USOS_TREE_NT52_USB')=='1'
+    if profile in ('w2k3-x86-sp2-uefi-csm','xp-x64-sp2-uefi-csm') and (tree_usb or 'usr/lib/usos/nt52-usb/x86/xhci98.sys' not in entries):
+        # A package from before xhci98 (NT 5.2 USB), or the tree's: add the files as the builder does.
+        sys.path.insert(0,str(ROOT/'tools'));import build_xp_uefi_csm_trial as builder
+        for name,data in builder.nt52_usb_files().items():cpio.put(entries,cpio.Entry('usr/lib/usos/nt52-usb/'+name,stat.S_IFREG|0o644,data))
     if sif:cpio.put(entries,cpio.Entry('probe-custom.sif',stat.S_IFREG|0o644,Path(sif).read_bytes()))
     # --tree-scripts: test the working tree's scripts in the package's kernel/initramfs.
     for name in tree_scripts:
@@ -171,7 +177,8 @@ def textmode(out,target,keys,minutes,ahci=False,usb_only=False,run_through=False
             while pending and time.time()-start>=pending[0]:
                 import run_csmwrap_xp_ovmf as csm_harness
                 csm_harness.usb_input(mon,shots,'usb-%d'%int(pending.pop(0)))
-            if run_through and time.time()-last_shot>=3:
+            # --run-through: a frame every 20 s (the run lasts the whole GUI Setup).
+            if run_through and time.time()-last_shot>=20:
                 last_shot=time.time();frame+=1
                 mon.cmd(f'screendump "{(shots/("frame-%03d.ppm"%frame)).as_posix()}"')
             low=text.lower()
@@ -180,7 +187,7 @@ def textmode(out,target,keys,minutes,ahci=False,usb_only=False,run_through=False
                 result='copying'
                 if not run_through:break
             if copying and copying_since is None:copying_since=time.time()
-            if copying_since is not None and time.time()-copying_since>45:
+            if key_list and copying_since is not None and time.time()-copying_since>45:
                 # Keys kept arriving for 45 s of copying: still copying = no effect.
                 result='copying';break
             if key_list and ('instalator' in low or 'setup' in low):

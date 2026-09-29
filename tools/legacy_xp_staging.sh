@@ -452,8 +452,8 @@ usos_legacy_xp_staging() {
     sh /usr/lib/usos/probe_nt5_source.sh || stop 'Invalid NT5 source; no target write occurred'
     if usos_nt5_uefi_profile; then
     if [ "$NT5_SYSTEM" = windows-xp ] || [ "$NT5_SYSTEM" = windows-server-2003 ]; then
-    # XP SP3 and Server 2003 SP2: the source-bound bundle (Server 2003: KMDF,
-    # USB3 xHCI backport and GenAHCI on the system StorPort).
+    # XP SP3 and Server 2003 SP2: the source-bound bundle (Server 2003: the
+    # community ACPI and GenAHCI on the system StorPort; USB is xhci98 below).
     . /usr/lib/usos/xp_driver_stage.sh
     usos_xp_driver_preflight || stop 'XP driver preflight failed; no target write occurred'
     elif [ "$NT5_SYSTEM" = windows-2000 ]; then
@@ -467,6 +467,12 @@ usos_legacy_xp_staging() {
     case "$NT5_SOURCE_DIR" in AMD64) nt5_storage_arch=amd64 ;; *) nt5_storage_arch=x86 ;; esac
     [ -f "/usr/lib/usos/nt5-storage/$nt5_storage_arch/genahci.sys" ] || stop 'NT 5.2 AHCI driver (GenAHCI) is missing from the package; no target write occurred'
     printf '[NT5_STORAGE] PREFLIGHT PASS genahci %s on the system StorPort\n' "$nt5_storage_arch"
+    fi
+    if [ "$NT5_SYSTEM" = windows-server-2003 ] || [ "$NT5_SYSTEM" = windows-xp-x64 ]; then
+    # NT 5.2: USB on xHCI through xhci98 (nt52_usb_stage.sh, after the source copy).
+    case "$NT5_SOURCE_DIR" in AMD64) nt52_usb_arch=amd64 ;; *) nt52_usb_arch=x86 ;; esac
+    [ -f "/usr/lib/usos/nt52-usb/$nt52_usb_arch/xhci98.sys" ] && [ -f "/usr/lib/usos/nt52-usb/$nt52_usb_arch/xhci98.inf" ] || stop 'NT 5.2 USB driver (xhci98) is missing from the package; no target write occurred'
+    printf '[NT52_USB] PREFLIGHT PASS xhci98 %s\n' "$nt52_usb_arch"
     fi
     # Hands-off Setup/OOBE (docs/xp-unattended.md); a selected custom .sif wins.
     . /usr/lib/usos/xp_user_settings.sh

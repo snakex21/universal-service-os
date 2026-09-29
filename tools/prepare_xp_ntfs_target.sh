@@ -3,7 +3,8 @@
 # The XP UEFI-CSM profile (USOS_PLAN_PROFILE=xp-x86-sp3-uefi-csm) also integrates
 # the driver bundle, stages the PAE helper and verifies the target read-only.
 # Windows 2000, Server 2003 and XP x64 from UEFI get the setup-end script, the
-# read-only verification and, on NT 5.2, the AHCI driver (nt5_storage_stage.sh).
+# read-only verification and, on NT 5.2, the AHCI driver (nt5_storage_stage.sh)
+# and USB on xHCI (xhci98, nt52_usb_stage.sh).
 set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 . "$SCRIPT_DIR/nt5_profile.sh"
@@ -63,6 +64,11 @@ sh "$SCRIPT_DIR/xp_driver_stage.sh" apply || fail 'XP driver integration failed'
 elif usos_nt5_uefi_generic_profile && [ "$NT5_SYSTEM" = windows-xp-x64 ]; then
 sh "$SCRIPT_DIR/nt5_storage_stage.sh" apply || fail 'NT 5.2 AHCI driver integration failed'
 fi
+# NT 5.2 (Server 2003 x86, XP x64): USB 2.0 input/storage on xHCI through
+# xhci98 (nt52_usb_stage.sh), after the storage step. XP x86 keeps its bundle.
+case "${USOS_PLAN_PROFILE:-}" in w2k3-x86-sp2-uefi-csm|xp-x64-sp2-uefi-csm)
+sh "$SCRIPT_DIR/nt52_usb_stage.sh" apply || fail 'NT 5.2 USB (xhci98) integration failed' ;;
+esac
 XP_EXPECTED_MBR="$work/expected" sh "$SCRIPT_DIR/prepare_xp_windows_partition.sh"
 if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ]; then
 mkdir -p "$work/volume/USOS/XP"

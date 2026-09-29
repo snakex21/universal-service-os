@@ -53,6 +53,8 @@ __pycache__/
 tools/vendor/xp-modern/*/integrator/
 tools/vendor/**/*.zip
 tools/vendor/**/*.7z
+# xhci98 source tarball (9 MB, pinned by commit and SHA-256 in SOURCES.txt)
+tools/vendor/xhci98/*-src/*.tar.gz
 # Zig compiler cache inside the bundled toolchain
 tools/zig/data/
 # Secure Boot signing keys never enter the repository (key custody:
@@ -75,3 +77,6 @@ installer/internal/payload/assets/*.zip
 
 # Maintainer-only local notes (machine paths, sticks); never published
 /docs/local/
+# WDK 7.1 (7600.16385.1), unpacked from the user-downloaded GRMWDK_EN_7600_1.ISO
+# with msiexec /a; see docs/BUILDING.md (never redistributed)
+tools/WinDDK71/

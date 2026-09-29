@@ -109,6 +109,7 @@ Where it ships: *stick ESP* = the installer payload on `USOS_ESP`
 | FreeDOS kernel, FreeCOM and Doszip | FreeDOS 1.4 (kernel 20250409.9, FreeCOM 0.86a, Doszip 2.68) | `GPL-2.0-only` | stick ESP | sources zip: `tools/vendor/freedos/1.4/kernel.zip`, `tools/vendor/freedos/1.4/freecom.zip`, `tools/vendor/freedos/1.4/doszip.zip`, `tools/vendor/freedos/1.4/manifest.json`; <https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/repositories/1.4/base/kernel/20250409.9/kernel.zip> | OK on the ESP (COPYING + package zips with sources); FIXED: licence texts extracted for the release |
 | PatchPAE3 (adapted as the USOS XP PAE helper) (MODIFIED) | 3e1d3b65f5c3c1ec0c4759f707d3017e51113103 | `CC-BY-4.0` | XP package | sources zip: `tools/vendor/patchpae3/3e1d3b65f5c3c1ec0c4759f707d3017e51113103`, `tools/windows_xp_pae.c`, `tools/windows_xp_pae_strings.h`; <https://github.com/evgen-b/PatchPAE3/tree/3e1d3b65f5c3c1ec0c4759f707d3017e51113103> | OK (attribution + licence reference in xp-pae-LICENSE.txt) |
 | GenAHCI | 6.3.0.1 | `GPL-3.0-only` | XP package | sources zip: `tools/vendor/genahci/6.3.0.1-src` (tag `GenAHCI` = commit b936a0d8); <https://github.com/GeorgeK1ng/GenAHCI/tree/b936a0d8bdf410928aefa9e0f373fb1d6c7c8240> | FIXED (source pinned and bundled); consistent with the binaries, not byte-verified (needs WDK 7600), see G7 |
+| xhci98 | 1.1.1.0-usos2 (**MODIFIED**) | `GPL-2.0-only` | XP package (branch `feature/nt52-xhci98`, 1.1 work) | sources zip: `tools/vendor/xhci98/1.1.1.0-src` (tag `v1.1.1.0` = commit 7d0dd9d4, git-ignored tarball pinned in `tools/vendor/xhci98/1.1.1.0/SOURCES.txt`) plus `tools/vendor/xhci98/1.1.1.0-usos2/` (patch, `build.cmd`, `toolchain.txt`, `MODIFIED.txt`); <https://github.com/yeokm1/xhci98/tree/7d0dd9d440e9716a87e0882f905bf8e99fa443ac> | USOS-built (WDK 7.1) x86/amd64 `xhci98.sys` + `.inf`, `LICENSE`, `MODIFIED.txt`, `SOURCE.txt` in `usr/lib/usos/nt52-usb/`; Server 2003 x86 and XP x64 only. The unmodified 1.1.1.0 pin stays in `tools/vendor/xhci98/1.1.1.0` as the reference |
 | Go runtime and standard library, golang.org/x/sys | Go 1.26.2, x/sys v0.47.0 | `BSD-3-Clause` | installer, DATA | <https://go.dev/dl/go1.26.2.src.tar.gz> | FIXED in this audit (release LICENSES); the installer itself shows no notice (F2) |
 | Microsoft Windows PE 10.0.19041 x64 donor (PE10_x64_19041_USOS.iso) | 10.0.19041 | `LicenseRef-Microsoft-redistributed-by-user` | WinPE asset | n/a (proprietary) | Microsoft, see section 5 (maintainer responsibility) |
 | Microsoft Windows 7 SP1 x64 update packages | KB4474419 v3, KB2685811, KB2990941 v3, KB3087873 v2 | `LicenseRef-Microsoft-redistributed-by-user` | stick ESP | n/a (proprietary) | KEPT by maintainer decision (preservation), see section 5 |
@@ -186,6 +187,7 @@ Notes on individual entries:
 XP package (`initramfs-xp` = `initramfs-usos` + 114 entries):
 `usr/lib/usos/xp-pae.exe` + `xp-pae-LICENSE.txt` (PatchPAE3 adaptation),
 `usr/lib/usos/nt5-storage/` (GenAHCI x86/x64 + `gpl.txt` + `SOURCE.txt`),
+`usr/lib/usos/nt52-usb/` (xhci98 1.1.1.0-usos2, MODIFIED, x86/amd64 `.sys` + `.inf`, `LICENSE`, `MODIFIED.txt`, `SOURCE.txt`; branch `feature/nt52-xhci98`),
 `usr/lib/usos/xp-drivers/<bundle>/I386/*` (per-ISO bundles: `SP3.CAB`,
 `TXTSETUP.SIF`, `DOSNET.INF`, `HIVESYS.INF`, `SETUPREG.HIV` and the added
 drivers, largely from the Integral Edition patch set: `USBXHCI`, `UCX01000`, `USBHUB3`, `USBD8`,
@@ -205,7 +207,7 @@ kernel as `vmlinuz-virt`.
 | EDK2, Visual Studio 2022 Build Tools, NASM 2.16.03 | edk2-stable202411 | BSD-2-Clause-Patent / Microsoft EULA / BSD-2-Clause | builds of TouchI2cDxe and the UefiSeven source check |
 | Alpine build VM (GCC 15, binutils) | Alpine 3.24 | GPL | reproducible CSMWrap build (`tools/csmwrap_build`) |
 | wimlib for Windows | 1.14.5 (`tools/vendor/wimlib`) | GPL-3.0-or-later / LGPL-3.0-or-later | host-side WIM tooling; only its GPLv3 text is reused (SeaBIOS GPLv3 copy on the ESP) |
-| xhci98 | 1.1.0.0 (`tools/vendor/xp-modern`) | see upstream | Vista/9x research (`tools/prepare_vista_xhci98.py`); not packed |
+| xhci98 | 1.1.0.0 (`tools/vendor/xp-modern`) | see upstream | Vista/9x research (`tools/prepare_vista_xhci98.py`); not packed (1.1.1.0 in `tools/vendor/xhci98` is the packed NT 5.2 copy) |
 | Windows XP Integral Edition 2025.8.19 archive | `tools/vendor/xp-modern/.../integrator` | none stated | only the driver files listed in section 3 reach the XP package |
 | Microsoft MSU/CAB sources | `tools/vendor/windows7-kmdf`, `tools/vendor/windows7-nvme`, `media/Systems/Windows/Windows 7/Updates` | Microsoft | git-ignored inputs of the CABs in section 5 |
 

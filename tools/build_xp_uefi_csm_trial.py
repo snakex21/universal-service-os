@@ -122,23 +122,76 @@ def refresh_pae_flow(esp):
 # entry, scripts included, is the base's own, byte for byte: the UEFI-CSM
 # differences are profile branches in the scripts (USOS_PLAN_PROFILE).
 PACKAGE_ENTRIES=('usr/lib/usos/xp-pae.exe','usr/lib/usos/xp-pae-LICENSE.txt')
-PACKAGE_PREFIXES=('usr/lib/usos/xp-drivers/','usr/lib/usos/nt5-storage/')
+PACKAGE_PREFIXES=('usr/lib/usos/xp-drivers/','usr/lib/usos/nt5-storage/','usr/lib/usos/nt52-usb/')
 
 # NT 5.2 (Server 2003 x86, XP x64) AHCI: GenAHCI 6.3.0.1 x86/x64 on the
 # system's own StorPort (tools/nt5_storage_stage.sh). Pinned archive.
 GENAHCI_ARCHIVE=ROOT/'tools/vendor/xp-modern/2026-09-21/GenAHCI_6.3.0.1.7z'
 GENAHCI_SHA256='f8dd54123934c176a2b6315df7b4a1dfe2ff6761fa3bc27cecfeedbe421b279f'
 
+# GenAHCI's INF (UTF-16LE, the same text for both builds) has
+# [SourceDisksNames] "1 = %SERVICEDESCRIPTION%,,," : GUI-mode Setup would look
+# for genahci.sys next to TXTSETUP.SIF, where text mode has MOVED it from
+# (X470 2026-09-29: no INF at all -> NULL driver -> STOP 0x7B on every later
+# boot). The package INF points row 1 at <source dir>\genahci instead, where
+# tools/nt5_storage_stage.sh puts a second genahci.sys (as for xhci98).
+GENAHCI_DISK_ROW='1 = %SERVICEDESCRIPTION%,,,'
+
+def genahci_inf(data,subdir):
+    """The archive's genahci.inf with row 1 = \\<subdir>\\genahci (i386 or amd64)."""
+    if not data.startswith(b'\xff\xfe'):raise ValueError('genahci.inf is not UTF-16LE')
+    text=data[2:].decode('utf-16-le')
+    for needed in ('[Models.NTx86]','[Models.NTamd64]','%MANUFACTURER% = Models, NTx86, NTamd64','CatalogFile = genahci.cat','genahci.sys = 1',r'ServiceBinary  = %12%\genahci.sys'):
+        if needed not in text:raise ValueError('genahci.inf layout changed: '+needed)
+    if text.count(GENAHCI_DISK_ROW+'\r\n')!=1:raise ValueError('genahci.inf [SourceDisksNames] row 1 changed')
+    return b'\xff\xfe'+text.replace(GENAHCI_DISK_ROW+'\r\n',GENAHCI_DISK_ROW+'\\'+subdir+'\\genahci\r\n').encode('utf-16-le')
+
 def nt5_storage_files():
     if digest(GENAHCI_ARCHIVE)!=GENAHCI_SHA256:raise ValueError('GenAHCI archive hash mismatch')
     def member(name):
         return subprocess.run([os.environ.get('USOS_7Z','C:/Program Files/7-Zip/7z.exe'),'e','-so',str(GENAHCI_ARCHIVE),name],check=True,capture_output=True).stdout
-    note=(b'GenAHCI 6.3.0.1 (x86 and x64 builds, unmodified), https://github.com/GeorgeK1ng/GenAHCI\n'
+    note=(b'GenAHCI 6.3.0.1 (x86 and x64 builds), https://github.com/GeorgeK1ng/GenAHCI\n'
           b'archive GenAHCI_6.3.0.1.7z sha256 '+GENAHCI_SHA256.encode()+b'; licence: gpl.txt of the archive.\n'
-          b'USOS uses it only for Windows Server 2003 x86 and XP x64 (NT 5.2) text-mode Setup.\n')
-    files={'x86/genahci.sys':member('x86/genahci.sys'),'amd64/genahci.sys':member('x64/genahci.sys'),'gpl.txt':member('gpl.txt'),'SOURCE.txt':note}
+          b'genahci.sys and genahci.cat unmodified; genahci.inf changed in one line only:\n'
+          b'[SourceDisksNames] row 1 gets the path \\i386\\genahci (x86) or \\amd64\\genahci (amd64),\n'
+          b'the folder of the Setup source where USOS puts the GUI-mode copy of genahci.sys.\n'
+          b'USOS uses it only for Windows Server 2003 x86 and XP x64 (NT 5.2) Setup.\n')
+    files={'x86/genahci.sys':member('x86/genahci.sys'),'amd64/genahci.sys':member('x64/genahci.sys'),
+           'x86/genahci.inf':genahci_inf(member('x86/genahci.inf'),'i386'),'amd64/genahci.inf':genahci_inf(member('x64/genahci.inf'),'amd64'),
+           'x86/genahci.cat':member('x86/genahci.cat'),'amd64/genahci.cat':member('x64/genahci.cat'),
+           'gpl.txt':member('gpl.txt'),'SOURCE.txt':note}
     for name,data in files.items():
         if not data:raise ValueError('GenAHCI member missing: '+name)
+    machine=lambda b:struct.unpack_from('<H',b,struct.unpack_from('<I',b,60)[0]+4)[0]
+    if (machine(files['x86/genahci.sys']),machine(files['amd64/genahci.sys']))!=(0x14c,0x8664):raise ValueError('GenAHCI build architectures changed')
+    return files
+
+# NT 5.2 (Server 2003 x86, XP x64) USB 2.0 on xHCI: xhci98 1.1.1.0-usos2,
+# the MODIFIED x86 and amd64 builds (AMD CPU xHCI start, xhci98.log; see
+# tools/vendor/xhci98/1.1.1.0-usos2/MODIFIED.txt; tools/nt52_usb_stage.sh).
+# Every file pinned by its manifest.
+XHCI98_DIR=ROOT/'tools/vendor/xhci98/1.1.1.0-usos2'
+
+def nt52_usb_files():
+    pins=json.loads((XHCI98_DIR/'manifest.json').read_text())
+    files={}
+    for arch,build in (('x86','release-x86'),('amd64','release-x64')):
+        for name in ('xhci98.sys','xhci98.inf'):
+            files[arch+'/'+name]=(XHCI98_DIR/build/name).read_bytes()
+            if hashlib.sha256(files[arch+'/'+name]).hexdigest()!=pins['files'][build+'/'+name]:raise ValueError('xhci98 file hash mismatch: '+build+'/'+name)
+    files['LICENSE']=(XHCI98_DIR/'LICENSE').read_bytes()
+    if hashlib.sha256(files['LICENSE']).hexdigest()!=pins['files']['LICENSE']:raise ValueError('xhci98 LICENSE hash mismatch')
+    files['MODIFIED.txt']=(XHCI98_DIR/'MODIFIED.txt').read_bytes()
+    if hashlib.sha256(files['MODIFIED.txt']).hexdigest()!=pins['files']['MODIFIED.txt']:raise ValueError('xhci98 MODIFIED.txt hash mismatch')
+    files['SOURCE.txt']=('xhci98 %s (x86 and amd64, MODIFIED by USOS, see MODIFIED.txt), %s\n'
+        'base: tag %s = commit %s (source tarball sha256 %s)\n'
+        'plus %s, built with WDK 7.1 (7600.16385.1).\n'
+        'Licence: GPL-2.0-only (LICENSE). Corresponding source: the USOS sources zip\n'
+        '(tools/vendor/xhci98/1.1.1.0-src and tools/vendor/xhci98/1.1.1.0-usos2).\n'
+        'USOS uses it only for Windows Server 2003 x86 and XP x64 (NT 5.2) Setup; staging\n'
+        'points the INF [SourceDisksNames] row 1 at the Setup source directory.\n'
+        'Log: C:\\WINDOWS\\xhci98.log (every controller start, start refusal and stop).\n'
+        %(pins['version'],pins['upstream'],pins['tag'],pins['commit'],pins['source_archive']['sha256'],', '.join(sorted(pins['patches'])))).encode()
     return files
 
 def is_package_entry(name):
@@ -160,6 +213,7 @@ def overlay(base, helper, driver_bundles):
     credit=b'USOS XP PAE: adapted from evgen-b/PatchPAE3, commit 3e1d3b65f5c3c1ec0c4759f707d3017e51113103.\nhttps://github.com/evgen-b/PatchPAE3\nPatterns by evgen_b, based on wj32 and XP64G. USOS adds strict checks and separate output/boot entries.\n\n'
     put(entries,Entry(prefix+'xp-pae-LICENSE.txt',stat.S_IFREG|0o644,credit+(vendor/'LICENSE').read_bytes()))
     for name,data in nt5_storage_files().items():put(entries,Entry(prefix+'nt5-storage/'+name,stat.S_IFREG|0o644,data))
+    for name,data in nt52_usb_files().items():put(entries,Entry(prefix+'nt52-usb/'+name,stat.S_IFREG|0o644,data))
     changed=[n for n in before if not is_package_entry(n) and (entries[n].mode,entries[n].data)!=before[n]]
     if changed:raise ValueError('package would change base entries: '+', '.join(changed))
     return pad_initrd(gzip.compress(newc(entries),compresslevel=6,mtime=0))
