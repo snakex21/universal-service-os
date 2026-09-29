@@ -1,7 +1,7 @@
 ; xhci98.inf - xHCI USB host controller miniport, the 32-bit package
 ;
 ; MODIFIED by USOS (Universal Service OS) on 2026-09-29: package
-; 1.1.1.0-usos1, see MODIFIED.txt beside this file. Not an upstream release.
+; 1.1.1.0-usos2, see MODIFIED.txt beside this file. Not an upstream release.
 ;
 ; One file, two setup engines, one xhci98.sys. Windows 98 SE and Windows ME
 ; read only the undecorated sections and load the driver through
@@ -108,7 +108,7 @@ HKR,,XhciImodInterval250ns,0x00010001,500
 ; drawn by usbui.dll, as the NT references write them for EHCI. On Vista and
 ; Windows 7 the value is only read when the devnode is built: to test it,
 ; reinstall the package rather than adding it by hand.
-; MODIFIED (USOS 1.1.1.0-usos1): the log ring on (2) and the file sink
+; MODIFIED (USOS 1.1.1.0-usos1/2): the log ring on (2) and the file sink
 ; XhciLogFile on (1): every start refusal, successful start and stop is
 ; appended to %SystemRoot%\xhci98.log. 0 turns either off.
 [Xhci.AddReg.NT]

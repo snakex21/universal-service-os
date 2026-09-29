@@ -205,15 +205,15 @@ of cloning. Tested 2026-09-28: the offline rebuild gave byte-identical
 `csmwrapx64.efi` (usos1 and upstream) and source archive hashes
 (`tools/vendor/csmwrap/3.1.2-usos1/manifest.json`).
 
-## Rebuilding xhci98 1.1.1.0-usos1 (optional)
+## Rebuilding xhci98 1.1.1.0-usos2 (optional)
 
 The XP package uses the vendored, hash-pinned binaries in
-`tools\vendor\xhci98\1.1.1.0-usos1\` (manifest.json); `build.bat` does not
+`tools\vendor\xhci98\1.1.1.0-usos2\` (manifest.json); `build.bat` does not
 rebuild them. To rebuild from source (upstream tag tarball in
 `tools\vendor\xhci98\1.1.1.0-src\` plus `patches\*.patch`):
 
 ```
-tools\vendor\xhci98\1.1.1.0-usos1\build.cmd [workdir]
+tools\vendor\xhci98\1.1.1.0-usos2\build.cmd [workdir]
 ```
 
 It needs **WDK 7.1** in `tools\WinDDK71` (git-ignored; `WDKROOT` overrides),
@@ -241,7 +241,7 @@ PDB GUID); compare with the pinned binaries by behaviour, not hash.
   (`tools\build_touchi2cdxe.ps1`, network); the release uses the vendored,
   MOK-signed binary.
 - **WDK 7.1** (`GRMWDK_EN_7600_1.ISO`, see above): user-downloaded, not
-  redistributable; only needed to rebuild xhci98 1.1.1.0-usos1 or GenAHCI.
+  redistributable; only needed to rebuild xhci98 1.1.1.0-usos2 or GenAHCI.
 - **GenAHCI** needs the Microsoft WDK 7600.16385.1 to rebuild
   (`tools/vendor/genahci/6.3.0.1-src/SOURCES.txt`); the release uses the
   upstream 6.3.0.1 binaries.

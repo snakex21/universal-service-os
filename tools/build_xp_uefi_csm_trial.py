@@ -166,11 +166,11 @@ def nt5_storage_files():
     if (machine(files['x86/genahci.sys']),machine(files['amd64/genahci.sys']))!=(0x14c,0x8664):raise ValueError('GenAHCI build architectures changed')
     return files
 
-# NT 5.2 (Server 2003 x86, XP x64) USB 2.0 on xHCI: xhci98 1.1.1.0-usos1,
+# NT 5.2 (Server 2003 x86, XP x64) USB 2.0 on xHCI: xhci98 1.1.1.0-usos2,
 # the MODIFIED x86 and amd64 builds (AMD CPU xHCI start, xhci98.log; see
-# tools/vendor/xhci98/1.1.1.0-usos1/MODIFIED.txt; tools/nt52_usb_stage.sh).
+# tools/vendor/xhci98/1.1.1.0-usos2/MODIFIED.txt; tools/nt52_usb_stage.sh).
 # Every file pinned by its manifest.
-XHCI98_DIR=ROOT/'tools/vendor/xhci98/1.1.1.0-usos1'
+XHCI98_DIR=ROOT/'tools/vendor/xhci98/1.1.1.0-usos2'
 
 def nt52_usb_files():
     pins=json.loads((XHCI98_DIR/'manifest.json').read_text())
@@ -187,7 +187,7 @@ def nt52_usb_files():
         'base: tag %s = commit %s (source tarball sha256 %s)\n'
         'plus %s, built with WDK 7.1 (7600.16385.1).\n'
         'Licence: GPL-2.0-only (LICENSE). Corresponding source: the USOS sources zip\n'
-        '(tools/vendor/xhci98/1.1.1.0-src and tools/vendor/xhci98/1.1.1.0-usos1).\n'
+        '(tools/vendor/xhci98/1.1.1.0-src and tools/vendor/xhci98/1.1.1.0-usos2).\n'
         'USOS uses it only for Windows Server 2003 x86 and XP x64 (NT 5.2) Setup; staging\n'
         'points the INF [SourceDisksNames] row 1 at the Setup source directory.\n'
         'Log: C:\\WINDOWS\\xhci98.log (every controller start, start refusal and stop).\n'

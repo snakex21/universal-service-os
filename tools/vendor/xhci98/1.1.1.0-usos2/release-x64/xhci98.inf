@@ -1,7 +1,7 @@
 ; xhci98-amd64.inf - xHCI USB host controller miniport, the 64-bit package
 ;
 ; MODIFIED by USOS (Universal Service OS) on 2026-09-29: package
-; 1.1.1.0-usos1, see MODIFIED.txt beside this file. Not an upstream release.
+; 1.1.1.0-usos2, see MODIFIED.txt beside this file. Not an upstream release.
 ;
 ; A separate package from src\xhci98.inf, not a third path inside it, so
 ; that file's [Manufacturer] line, which Windows 98's engine parses, never
@@ -95,7 +95,7 @@ LoadOrderGroup=Base
 ; the interrupt moderation interval in 250 ns units, 500 here, and 4000 when
 ; absent or outside 10-4000; EnumPropPages32 and Controller give the
 ; controller its Advanced tab.
-; MODIFIED (USOS 1.1.1.0-usos1): the log ring on (2) and the file sink
+; MODIFIED (USOS 1.1.1.0-usos1/2): the log ring on (2) and the file sink
 ; XhciLogFile on (1): every start refusal, successful start and stop is
 ; appended to %SystemRoot%\xhci98.log. 0 turns either off.
 [Xhci.AddReg.NT]

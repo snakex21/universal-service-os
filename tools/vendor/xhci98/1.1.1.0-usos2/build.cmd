@@ -1,12 +1,12 @@
 @echo off
-rem build.cmd - build xhci98 1.1.1.0-usos1 (x86 and amd64, free/release) with
+rem build.cmd - build xhci98 1.1.1.0-usos2 (x86 and amd64, free/release) with
 rem WDK 7.1 (7600.16385.1) from the upstream v1.1.1.0 source plus patches\*.patch.
 rem
-rem   tools\vendor\xhci98\1.1.1.0-usos1\build.cmd [workdir]
+rem   tools\vendor\xhci98\1.1.1.0-usos2\build.cmd [workdir]
 rem
 rem Inputs (all local, no network):
 rem   tools\vendor\xhci98\1.1.1.0-src\xhci98-7d0dd9d4...tar.gz  (upstream tag)
-rem   tools\vendor\xhci98\1.1.1.0-usos1\patches\*.patch           (in order)
+rem   tools\vendor\xhci98\1.1.1.0-usos2\patches\*.patch           (in order)
 rem   tools\WinDDK71 (or %WDKROOT%)  - WDK 7.1 unpacked with msiexec /a from
 rem       GRMWDK_EN_7600_1.ISO, see docs\BUILDING.md
 rem   git (for "git apply") and Windows 10+ tar.exe (System32)
@@ -29,7 +29,7 @@ if not exist "%WDKROOT%\bin\setenv.bat" (
   exit /b 2
 )
 set "WORK=%~1"
-if "%WORK%"=="" set "WORK=%TEMP%\xhci98-usos1-build"
+if "%WORK%"=="" set "WORK=%TEMP%\xhci98-usos2-build"
 if exist "%WORK%" rmdir /s /q "%WORK%"
 mkdir "%WORK%" || exit /b 2
 set "TARBALL=%REPO%\tools\vendor\xhci98\1.1.1.0-src\xhci98-7d0dd9d440e9716a87e0882f905bf8e99fa443ac.tar.gz"

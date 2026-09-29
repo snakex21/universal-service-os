@@ -264,7 +264,7 @@ class Nt52Usb(unittest.TestCase):
 
     def test_inf_source_directory(self):
         for build, sub in (('release-x86', 'i386'), ('release-x64', 'amd64')):
-            src = (ROOT / 'tools/vendor/xhci98/1.1.1.0-usos1' / build / 'xhci98.inf').read_bytes()
+            src = (ROOT / 'tools/vendor/xhci98/1.1.1.0-usos2' / build / 'xhci98.inf').read_bytes()
             r = self.run_fn(f'usos_nt52_usb_inf {sub}', src)
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertEqual(r.stdout, src.replace(b'1=%DiskName%,xhci98.sys,,\r\n', b'1=%DiskName%,,,\\' + sub.encode() + b'\\xhci98\r\n'))
@@ -299,7 +299,7 @@ class Nt52Usb(unittest.TestCase):
                 r = sh(f"XP_TARGET_ROOT='{posix(t / 'root')}' NT5_SOURCE_DIR={source_dir} USOS_NT52_USB_DIR='{posix(t / 'pkg')}' "
                        f"sh '{self.LIB}' apply")
                 self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-                self.assertIn(b'[NT52_USB] APPLIED PASS xhci98 1.1.1.0-usos1 (' + arch.encode() + b')', r.stdout)
+                self.assertIn(b'[NT52_USB] APPLIED PASS xhci98 1.1.1.0-usos2 (' + arch.encode() + b')', r.stdout)
                 sif = self.run_fn('usos_nt52_usb_sif', USB_TXTSETUP).stdout
                 for folder in (bt, ls):
                     self.assertEqual((folder / 'xhci98.sys').read_bytes(), pkg[arch + '/xhci98.sys'])
@@ -327,7 +327,7 @@ class Nt52Usb(unittest.TestCase):
         self.assertIn(b'DriverVer=09/29/2026,1.1.1.0', files['amd64/xhci98.inf'])
         for arch in ('x86', 'amd64'):
             self.assertIn(b'HKR,,XhciLogFile,0x00010001,1', files[arch + '/xhci98.inf'])
-            self.assertIn('1.1.1.0-usos1'.encode('utf-16-le'), files[arch + '/xhci98.sys'])
+            self.assertIn('1.1.1.0-usos2'.encode('utf-16-le'), files[arch + '/xhci98.sys'])
             self.assertIn('xhci98.log'.encode('utf-16-le'), files[arch + '/xhci98.sys'])
         self.assertIn(b'MODIFIED version of xhci98', files['MODIFIED.txt'])
         self.assertIn(b'[XhciModels.NTamd64]', files['amd64/xhci98.inf'])
