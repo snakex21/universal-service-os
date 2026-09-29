@@ -1323,6 +1323,32 @@
       "notice": "Unmodified x86/x64 genahci.sys in the XP package. Source: upstream tag GenAHCI = commit b936a0d8 (in the sources zip); consistent with the 6.3.0.1 binaries but not byte-verified (needs WDK 7600), see SOURCES.txt."
     },
     {
+      "id": "xhci98",
+      "name": "xhci98",
+      "version": "1.1.1.0",
+      "license": "GPL-2.0-only",
+      "modified": false,
+      "ships_in": [
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/vendor/xhci98/1.1.1.0/LICENSE",
+        "tools/vendor/xhci98/1.1.1.0/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "bundle_paths": [
+          "tools/vendor/xhci98/1.1.1.0-src/xhci98-7d0dd9d440e9716a87e0882f905bf8e99fa443ac.tar.gz",
+          "tools/vendor/xhci98/1.1.1.0/SOURCES.txt"
+        ],
+        "urls": [
+          "https://github.com/yeokm1/xhci98/tree/7d0dd9d440e9716a87e0882f905bf8e99fa443ac",
+          "https://github.com/yeokm1/xhci98/releases/download/v1.1.1.0/xhci98-1.1.1.0.zip"
+        ]
+      },
+      "notice": "Unmodified x86/amd64 xhci98.sys and xhci98.inf (release-x86/, release-x64/) in the XP package, for Server 2003 x86 and XP x64 only. Staging points the INF's [SourceDisksNames] row 1 at the Setup source directory on the target disk. Source: tag v1.1.1.0 = commit 7d0dd9d4 (in the sources zip)."
+    },
+    {
       "id": "go-runtime",
       "name": "Go runtime and standard library, golang.org/x/sys",
       "version": "Go 1.26.2, x/sys v0.47.0",

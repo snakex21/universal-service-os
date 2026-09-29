@@ -53,6 +53,8 @@ __pycache__/
 tools/vendor/xp-modern/*/integrator/
 tools/vendor/**/*.zip
 tools/vendor/**/*.7z
+# xhci98 source tarball (9 MB, pinned by commit and SHA-256 in SOURCES.txt)
+tools/vendor/xhci98/*-src/*.tar.gz
 # Zig compiler cache inside the bundled toolchain
 tools/zig/data/
 # Secure Boot signing keys never enter the repository (key custody:

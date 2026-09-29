@@ -1,0 +1,33 @@
+xhci98 1.1.1.0 - binary and source pin (USOS 1.1 work, 2026-09-29)
+
+Upstream repository: https://github.com/yeokm1/xhci98 (Yeo Kheng Meng)
+Tag v1.1.1.0 = commit 7d0dd9d440e9716a87e0882f905bf8e99fa443ac
+  (release published 2026-09-23 16:32 UTC; DriverVer 09/24/2026,1.1.1.0).
+Release archive: xhci98-1.1.1.0.zip (not tracked; *.zip is git-ignored)
+  https://github.com/yeokm1/xhci98/releases/download/v1.1.1.0/xhci98-1.1.1.0.zip
+  SHA-256 4d29346712e25b5adbf6c55915092f77483eacffeef9e3770b2acada561a525f, 377889 bytes
+Tracked here, unmodified members of that archive:
+  release-x86/xhci98.sys  (i386, NT 5.x .NTx86 path and 98/ME)   90dd7823...7cc27847
+  release-x86/xhci98.inf                                          3b1e38a7...7638cd51
+  release-x64/xhci98.sys  (amd64, XP x64 / Server 2003 x64)       4d8a1a57...4233adb
+  release-x64/xhci98.inf                                          ced018d7...aecb58a9
+  LICENSE (GPL-2.0-only header + full GPLv2 text)                 a5d0a99d...5f3f73be
+The same four driver files are committed in the upstream tree under
+releases/1.1.1.0/ at the tag, byte-identical (SHA-256 compared 2026-09-29).
+Not used by USOS: debug-x86/, debug-x64/, xhciqual/ and xhcisnap/ (the DOS
+and Win32 tools carry third-party runtimes, see their NOTICE.TXT).
+
+Corresponding source (GPLv2 section 3): the GitHub tarball of the tag,
+  https://github.com/yeokm1/xhci98/archive/refs/tags/v1.1.1.0.tar.gz
+  kept locally as tools/vendor/xhci98/1.1.1.0-src/
+  xhci98-7d0dd9d440e9716a87e0882f905bf8e99fa443ac.tar.gz (git-ignored, 9 MB)
+  SHA-256 4f2653d00ee757c5edefcda6f7101526edf5b0778a07ebf5babbb59805088af3
+  (GitHub tarballs are not guaranteed stable byte for byte; the commit id
+  is the authoritative pin). A release that ships xhci98.sys must ship this
+  source archive next to it or carry a written offer.
+
+USOS changes when staging (tools/nt52_usb_stage.sh): the INF's
+[SourceDisksNames] row 1 becomes 1=%DiskName%,,,\<i386|amd64>\xhci98 (no
+tag file), and a second xhci98.sys goes to that folder of the local source
+(text-mode Setup moves the first one), so GUI-mode Setup finds it. Nothing
+else in the INF and nothing in the .sys is changed.
