@@ -74,6 +74,8 @@ pub const CommandParts = struct {
     answer_option: []const u8 = "",
     settings_option: []const u8 = "",
     csmwrap: bool = false,
+    /// usos.theme= of the menu theme (src/gui/theme_cmdline.zig), or "".
+    theme_option: []const u8 = "",
     console_options: []const u8 = "",
 };
 
@@ -81,7 +83,7 @@ pub const CommandParts = struct {
 /// usos.xp_boot=csmwrap: the language (lang.cpio) and everything else are
 /// the default path's.
 pub fn formatCommand(buffer: []u8, parts: CommandParts) ![]const u8 {
-    return std.fmt.bufPrint(buffer, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action={s} usos.legacy_image_hex={s}{s}{s} usos.plan_profile={s}{s} {s}", .{ parts.lang_initrd, parts.esp_partuuid, parts.system.action(), parts.image_hex, parts.answer_option, parts.settings_option, parts.system.planProfile(), if (parts.csmwrap) " usos.xp_boot=csmwrap" else "", parts.console_options });
+    return std.fmt.bufPrint(buffer, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action={s} usos.legacy_image_hex={s}{s}{s} usos.plan_profile={s}{s}{s} {s}", .{ parts.lang_initrd, parts.esp_partuuid, parts.system.action(), parts.image_hex, parts.answer_option, parts.settings_option, parts.system.planProfile(), if (parts.csmwrap) " usos.xp_boot=csmwrap" else "", parts.theme_option, parts.console_options });
 }
 
 /// `answer`: the answer-file screen's choice (src/flow/answer_screen.zig):
@@ -127,8 +129,11 @@ pub fn start(root: *uefi.protocol.File, system_id: []const u8, name: []const u8,
         file.close() catch {};
         break :blk lang_initrd_option;
     } else |_| "";
+    // usos-fb-ui keeps the menu theme (src/gui/theme_cmdline.zig).
+    var theme_buffer: [usos.gui.theme_cmdline.option_len]u8 = undefined;
     const command = try formatCommand(&cmd, .{
         .system = system,
+        .theme_option = usos.gui.theme_cmdline.option(&theme_buffer, @import("manual_view.zig").currentTheme()),
         .lang_initrd = lang_initrd,
         .esp_partuuid = id,
         .image_hex = hex[0 .. name.len * 2],
@@ -204,4 +209,22 @@ test "Windows 2000 from UEFI keeps the XP command line except its action and pro
     try std.testing.expectEqual(@as(?Nt5System, .windows_2000), Nt5System.fromId("windows-2000"));
     try std.testing.expect(Nt5System.fromId("windows-7") == null);
     try std.testing.expect(std.mem.indexOf(u8, xp, " usos.legacy_action=xp-staging ") != null);
+}
+
+test "the menu theme reaches the NT5 micro-Linux command line" {
+    const theme_cmdline = usos.gui.theme_cmdline;
+    const outcome = usos.gui.theme_file.resolve("base=dark\nbackground=#15100d\nheader=#1d1612\naccent=#ff9e40\n");
+    try std.testing.expect(outcome.ok());
+    const sunset = outcome.theme;
+    var theme_buffer: [theme_cmdline.option_len]u8 = undefined;
+    for ([_]Nt5System{ .windows_xp, .windows_2000, .windows_server_2003, .windows_xp_x64 }) |system| {
+        for ([_]bool{ false, true }) |csmwrap| {
+            var buffer: [2048]u8 = undefined;
+            const command = try formatCommand(&buffer, .{ .system = system, .lang_initrd = lang_initrd_option, .esp_partuuid = "0257E175-1685-4311-91AA-5A83D8EB41E5", .image_hex = "77326b2e69736f", .csmwrap = csmwrap, .theme_option = theme_cmdline.option(&theme_buffer, sunset), .console_options = "quiet" });
+            try std.testing.expectEqualDeep(sunset, theme_cmdline.fromCmdline(command));
+            try std.testing.expect(std.mem.endsWith(u8, command, " quiet"));
+        }
+    }
+    // The default theme adds nothing (the command line is unchanged).
+    try std.testing.expectEqualStrings("", theme_cmdline.option(&theme_buffer, .{}));
 }

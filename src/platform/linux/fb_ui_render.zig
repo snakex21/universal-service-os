@@ -3,8 +3,8 @@ const std = @import("std");
 const model = @import("fb_ui_state.zig");
 const fb_i18n = @import("fb_i18n.zig");
 
-pub fn fillBackground(surface: usos.gui.Surface) void {
-    surface.fill((usos.gui.Theme{}).background);
+pub fn fillBackground(surface: usos.gui.Surface, theme: usos.gui.Theme) void {
+    surface.fill(theme.background);
 }
 
 pub fn render(surface: usos.gui.Surface, context: *const fb_i18n.Context, state: model.State) void {
@@ -82,4 +82,28 @@ test "every framebuffer UI mode renders" {
         render(buffer.surface, context, state);
         try std.testing.expect(std.mem.indexOfNone(u32, pixels, pixels[0..1]) != null);
     }
+}
+
+test "framebuffer UI screens use the theme from the kernel command line" {
+    const pixels = try std.testing.allocator.alloc(u32, 1024 * 768);
+    defer std.testing.allocator.free(pixels);
+    const buffer = usos.gui.ScreenBuffer.init(@intFromPtr(pixels.ptr), pixels.len * 4, 1024, 768, .bgrx8).?;
+    const context = try std.testing.allocator.create(fb_i18n.Context);
+    defer std.testing.allocator.destroy(context);
+    context.* = .{};
+    context.load();
+    const retro = usos.gui.theme_presets.find("retro").?;
+    var option: [usos.gui.theme_cmdline.option_len]u8 = undefined;
+    context.theme = usos.gui.theme_cmdline.fromCmdline(usos.gui.theme_cmdline.option(&option, retro));
+    for ([_][]const u8{ "progress", "notice" }) |mode| {
+        var text: [64]u8 = undefined;
+        render(buffer.surface, context, try model.parse(try std.fmt.bufPrint(&text, "mode={s}\ntitle=Copying files", .{mode})));
+        // Most of the screen is retro background, none is the default one.
+        const background = buffer.surface.packColor(retro.background);
+        const default_background = buffer.surface.packColor((usos.gui.Theme{}).background);
+        try std.testing.expect(std.mem.count(u32, pixels, &.{background}) > pixels.len / 4);
+        try std.testing.expectEqual(@as(usize, 0), std.mem.count(u32, pixels, &.{default_background}));
+    }
+    fillBackground(buffer.surface, retro);
+    try std.testing.expectEqual(buffer.surface.packColor(retro.background), pixels[0]);
 }

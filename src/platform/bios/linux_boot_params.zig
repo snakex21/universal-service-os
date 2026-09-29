@@ -90,6 +90,8 @@ pub fn build(
     esp_part_guid_disk: [16]u8,
     graphics_session: ?vbe_probe.Session,
     request: CommandRequest,
+    /// " usos.theme=..." of the menu theme (src/gui/theme_cmdline.zig) or "".
+    theme_option: []const u8,
 ) Error!Result {
     try buildStandalone(params, setup_header, memory_map, graphics_session);
     if (initrd_start > std.math.maxInt(u32)) return error.InitrdAbove32Bit;
@@ -98,7 +100,8 @@ pub fn build(
     writeU32(params, setup_ramdisk_image_offset, @intCast(initrd_start));
     writeU32(params, setup_ramdisk_size_offset, @intCast(initrd_size));
     writeU32(params, setup_cmd_line_ptr_offset, cmdline_phys);
-    const cmdline_len = try buildCommandLine(cmdline, esp_part_guid_disk, request);
+    var cmdline_len = try buildCommandLine(cmdline, esp_part_guid_disk, request);
+    cmdline_len = try appendTheme(cmdline, cmdline_len, theme_option);
     return .{ .cmdline_len = cmdline_len, .e820_count = memory_map.len };
 }
 
@@ -219,6 +222,14 @@ pub fn planProfile(request: CommandRequest) ?[]const u8 {
         .xp_staging, .windows2000_staging, .windows2003_staging, .xp64_staging => "nt5-staging",
         .windows7_iso, .windows_vista_iso => "windows-pe-bios-iso",
     };
+}
+
+/// Appends `theme_option` to a finished command line of `used` bytes (the
+/// usos-fb-ui screens keep the menu theme).
+pub fn appendTheme(output: *[cmdline_capacity]u8, used: usize, theme_option: []const u8) Error!usize {
+    const total = try appendCommand(output, used, theme_option);
+    output[total] = 0;
+    return total;
 }
 
 fn appendCommand(output: *[cmdline_capacity]u8, used: usize, text: []const u8) Error!usize {
@@ -383,7 +394,7 @@ test "boot params copy setup header and install initrd cmdline E820" {
         .{ .base = 0x100000, .length = 0x7EE0000, .kind = 1, .attributes = 1 },
     };
     const disk = [_]u8{ 0x75, 0xE1, 0x57, 0x02, 0x85, 0x16, 0x11, 0x43, 0x91, 0xAA, 0x5A, 0x83, 0xD8, 0xEB, 0x41, 0xE5 };
-    const result = try build(&params, &cmdline, &setup, 0x071D3000, 14_730_054, &map, disk, null, .none);
+    const result = try build(&params, &cmdline, &setup, 0x071D3000, 14_730_054, &map, disk, null, .none, "");
     try std.testing.expectEqual(@as(u8, 0xFF), params[setup_type_loader_offset]);
     try std.testing.expect((params[setup_loadflags_offset] & linux_boot_header.load_flag_loaded_high) != 0);
     try std.testing.expect((params[setup_loadflags_offset] & quiet_flag) != 0);
@@ -501,4 +512,15 @@ test "golden: exact BIOS micro-Linux command line per request kind" {
         try std.testing.expectEqualStrings(case.expected, cmdline[0..len]);
         try std.testing.expectEqual(@as(u8, 0), cmdline[len]);
     }
+}
+
+test "the menu theme is appended to the micro-Linux command line" {
+    var output: [cmdline_capacity]u8 = undefined;
+    const len = try buildCommandLine(&output, [_]u8{0x11} ** 16, .hardware);
+    const themed = try appendTheme(&output, len, " usos.theme=0000aa");
+    try std.testing.expect(std.mem.endsWith(u8, output[0..themed], " usos.theme=0000aa"));
+    try std.testing.expectEqual(@as(u8, 0), output[themed]);
+    // The default theme leaves the line as it was.
+    try std.testing.expectEqual(len, try appendTheme(&output, len, ""));
+    try std.testing.expectError(error.CommandLineTooLong, appendTheme(&output, len, &([_]u8{'x'} ** cmdline_capacity)));
 }
