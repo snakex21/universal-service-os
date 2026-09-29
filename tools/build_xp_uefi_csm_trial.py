@@ -166,10 +166,11 @@ def nt5_storage_files():
     if (machine(files['x86/genahci.sys']),machine(files['amd64/genahci.sys']))!=(0x14c,0x8664):raise ValueError('GenAHCI build architectures changed')
     return files
 
-# NT 5.2 (Server 2003 x86, XP x64) USB 2.0 on xHCI: xhci98 1.1.1.0, the
-# unmodified x86 and amd64 release builds (tools/nt52_usb_stage.sh). Tracked
-# in tools/vendor/xhci98/1.1.1.0, every file pinned by its manifest.
-XHCI98_DIR=ROOT/'tools/vendor/xhci98/1.1.1.0'
+# NT 5.2 (Server 2003 x86, XP x64) USB 2.0 on xHCI: xhci98 1.1.1.0-usos1,
+# the MODIFIED x86 and amd64 builds (AMD CPU xHCI start, xhci98.log; see
+# tools/vendor/xhci98/1.1.1.0-usos1/MODIFIED.txt; tools/nt52_usb_stage.sh).
+# Every file pinned by its manifest.
+XHCI98_DIR=ROOT/'tools/vendor/xhci98/1.1.1.0-usos1'
 
 def nt52_usb_files():
     pins=json.loads((XHCI98_DIR/'manifest.json').read_text())
@@ -180,12 +181,17 @@ def nt52_usb_files():
             if hashlib.sha256(files[arch+'/'+name]).hexdigest()!=pins['files'][build+'/'+name]:raise ValueError('xhci98 file hash mismatch: '+build+'/'+name)
     files['LICENSE']=(XHCI98_DIR/'LICENSE').read_bytes()
     if hashlib.sha256(files['LICENSE']).hexdigest()!=pins['files']['LICENSE']:raise ValueError('xhci98 LICENSE hash mismatch')
-    files['SOURCE.txt']=('xhci98 %s (x86 and amd64 release builds, unmodified), %s\n'
-        'tag %s = commit %s; release archive %s sha256 %s.\n'
-        'Licence: GPL-2.0-only (LICENSE). Corresponding source: %s/archive/%s.tar.gz\n'
+    files['MODIFIED.txt']=(XHCI98_DIR/'MODIFIED.txt').read_bytes()
+    if hashlib.sha256(files['MODIFIED.txt']).hexdigest()!=pins['files']['MODIFIED.txt']:raise ValueError('xhci98 MODIFIED.txt hash mismatch')
+    files['SOURCE.txt']=('xhci98 %s (x86 and amd64, MODIFIED by USOS, see MODIFIED.txt), %s\n'
+        'base: tag %s = commit %s (source tarball sha256 %s)\n'
+        'plus %s, built with WDK 7.1 (7600.16385.1).\n'
+        'Licence: GPL-2.0-only (LICENSE). Corresponding source: the USOS sources zip\n'
+        '(tools/vendor/xhci98/1.1.1.0-src and tools/vendor/xhci98/1.1.1.0-usos1).\n'
         'USOS uses it only for Windows Server 2003 x86 and XP x64 (NT 5.2) Setup; staging\n'
         'points the INF [SourceDisksNames] row 1 at the Setup source directory.\n'
-        %(pins['version'],pins['upstream'],pins['tag'],pins['commit'],pins['release_zip']['file'],pins['release_zip']['sha256'],pins['upstream'],pins['commit'])).encode()
+        'Log: C:\\WINDOWS\\xhci98.log (every controller start, start refusal and stop).\n'
+        %(pins['version'],pins['upstream'],pins['tag'],pins['commit'],pins['source_archive']['sha256'],', '.join(sorted(pins['patches'])))).encode()
     return files
 
 def is_package_entry(name):

@@ -4,6 +4,8 @@ Status: 2026-09-26. Research only. No code changes and no disk writes.
 Update 2026-09-29: the NT 5.2 systems (Server 2003 x86, XP x64) use xhci98
 1.1.1.0 in Setup on branch `feature/nt52-xhci98`:
 [../nt52-xhci98-2026-09-29.md](../nt52-xhci98-2026-09-29.md). The 9x notes below are unchanged.
+Since the evening of 2026-09-29 USOS stages its own MODIFIED 1.1.1.0-usos1
+(AMD CPU xHCI 149C start, `C:\WINDOWS\xhci98.log`; section 5 there).
 Context: [win98-feasibility.md](win98-feasibility.md) §5 (USB) and §11 (plan),
 [drivers.md](../drivers.md) (DATA\Drivers), [answer-file-generator.md](../design/answer-file-generator.md) §3.3 (msbatch.inf).
 Source: <https://github.com/yeokm1/xhci98> (README, `LICENSE`, `src/xhci98.inf`,

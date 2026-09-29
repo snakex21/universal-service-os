@@ -120,8 +120,10 @@ def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),
         # A package from before the NT 5.2 storage files (or before genahci.inf): add them as the builder does.
         sys.path.insert(0,str(ROOT/'tools'));import build_xp_uefi_csm_trial as builder
         for name,data in builder.nt5_storage_files().items():cpio.put(entries,cpio.Entry('usr/lib/usos/nt5-storage/'+name,stat.S_IFREG|0o644,data))
-    if profile in ('w2k3-x86-sp2-uefi-csm','xp-x64-sp2-uefi-csm') and 'usr/lib/usos/nt52-usb/x86/xhci98.sys' not in entries:
-        # A package from before xhci98 (NT 5.2 USB): add the files as the builder does.
+    # USOS_TREE_NT52_USB=1: the working tree's xhci98 files replace the package's.
+    tree_usb=__import__('os').environ.get('USOS_TREE_NT52_USB')=='1'
+    if profile in ('w2k3-x86-sp2-uefi-csm','xp-x64-sp2-uefi-csm') and (tree_usb or 'usr/lib/usos/nt52-usb/x86/xhci98.sys' not in entries):
+        # A package from before xhci98 (NT 5.2 USB), or the tree's: add the files as the builder does.
         sys.path.insert(0,str(ROOT/'tools'));import build_xp_uefi_csm_trial as builder
         for name,data in builder.nt52_usb_files().items():cpio.put(entries,cpio.Entry('usr/lib/usos/nt52-usb/'+name,stat.S_IFREG|0o644,data))
     if sif:cpio.put(entries,cpio.Entry('probe-custom.sif',stat.S_IFREG|0o644,Path(sif).read_bytes()))
