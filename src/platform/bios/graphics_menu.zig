@@ -287,7 +287,7 @@ fn methodBadge(ui: *const Ui, item: *const boot_method_model.Item) ?graphics.ui.
     const status = item.validation_status orelse return null;
     return switch (status) {
         .validated_hardware => .{ .text = ui.t(.badge_ready), .tone = .success },
-        .tested_in_vm => .{ .text = ui.t(.badge_tested_in_vm), .tone = .accent },
+        .tested_in_vm => .{ .text = "", .dot = true },
         .experimental => .{ .text = ui.t(.badge_experimental), .tone = .warning },
     };
 }
@@ -300,9 +300,10 @@ fn methodRows(ui: *const Ui, build: *ListBuild, model: *const boot_method_model.
     }
 }
 
-fn methodHelp(ui: *const Ui, item: *const boot_method_model.Item, lines: *[2][]const u8) screens.Help {
-    lines.* = .{ ui.strings.lookup(item.help.line1), ui.strings.lookup(item.help.line2) };
-    return .{ .title = ui.strings.lookup(item.help.title), .lines = lines, .badge = methodBadge(ui, item) };
+fn methodHelp(ui: *const Ui, item: *const boot_method_model.Item, lines: *[3][]const u8) screens.Help {
+    const status = item.validation_status;
+    lines.* = .{ ui.strings.lookup(item.help.line1), ui.strings.lookup(item.help.line2), if (status == .validated_hardware) ui.t(.verify_hardware) else if (status == .tested_in_vm) ui.t(.verify_vm) else "" };
+    return .{ .title = ui.strings.lookup(item.help.title), .lines = lines, .badge = if (status == .tested_in_vm) null else methodBadge(ui, item) };
 }
 
 /// `runnable` lists the model indices of the methods that can run here;
@@ -311,7 +312,7 @@ pub fn methods(session: *const vbe_probe.Session, image_name: []const u8, model:
     var ui = boot_ui.menu(session.surface);
     var build: ListBuild = .{};
     methodRows(&ui, &build, model, runnable);
-    var lines: [2][]const u8 = undefined;
+    var lines: [3][]const u8 = undefined;
     var hints: [4]Hint = undefined;
     showList(session, &ui, .{
         .title = ui.t(.methods_title),
@@ -330,7 +331,7 @@ pub fn methodSelection(session: *const vbe_probe.Session, image_name: []const u8
     var ui = boot_ui.partial(session.surface);
     var build: ListBuild = .{};
     methodRows(&ui, &build, model, runnable);
-    var lines: [2][]const u8 = undefined;
+    var lines: [3][]const u8 = undefined;
     updateList(session, &ui, .{ .title = "", .rows = build.rows[0..build.count], .selected = now, .two_line = false, .help = methodHelp(&ui, &model.items[runnable[now]], &lines) }, previous);
 }
 

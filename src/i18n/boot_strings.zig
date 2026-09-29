@@ -5,7 +5,6 @@ pub const Key = enum(u16) {
     badge_experimental,
     badge_ready,
     badge_recommended,
-    badge_tested_in_vm,
     badge_unavailable,
     bios_backend_failed_line1,
     bios_backend_failed_title,
@@ -327,6 +326,8 @@ pub const Key = enum(u16) {
     utilities_none_line1,
     utilities_none_line2,
     utilities_none_title,
+    verify_hardware,
+    verify_vm,
     wait,
     wait_usb,
     action_blocked,
@@ -667,7 +668,6 @@ pub const hashes = [_]u32{
     0xe81a21c0, // badge.experimental
     0x70416b89, // badge.ready
     0xc1e902c9, // badge.recommended
-    0xa07f0359, // badge.tested_in_vm
     0xf502a3ec, // badge.unavailable
     0x1dc0f3e7, // bios.backend_failed.line1
     0x175fbc90, // bios.backend_failed.title
@@ -989,6 +989,8 @@ pub const hashes = [_]u32{
     0x89ec8a66, // utilities.none.line1
     0x88ec88d3, // utilities.none.line2
     0x638b0125, // utilities.none.title
+    0x7372fafa, // verify.hardware
+    0xd32c94ef, // verify.vm
     0x892e4ca0, // wait
     0x3e1f8ab9, // wait_usb
     0xb9a53ded, // action.blocked
@@ -1653,6 +1655,7 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    true,
     false,
     false,
     false,
@@ -1987,13 +1990,12 @@ pub const bios = [_]bool{
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
-pub const bios_count = 327;
+pub const bios_count = 328;
 
 pub const english = [_][]const u8{
     "Experimental",
     "Ready",
     "Recommended",
-    "Tested in VM",
     "Unavailable",
     "The selected Legacy backend returned an error.",
     "Boot method failed: {0}",
@@ -2315,6 +2317,8 @@ pub const english = [_][]const u8{
     "No utility folders were found on this USOS drive.",
     "Create Utilities/<tool name>/Images on DATA, then run Update USOS.",
     "No utilities",
+    "Tested on hardware",
+    "Tested in a virtual machine",
     "Please wait",
     "Please wait - keep the USB drive connected",
     "Start is not possible with these settings",

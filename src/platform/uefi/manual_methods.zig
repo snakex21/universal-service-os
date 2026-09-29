@@ -40,7 +40,7 @@ pub fn select(system: *const usos.catalog.SystemEntry, image: usos.catalog.Image
     }
 
     var selected: usize = 0;
-    var help_lines: [2][]const u8 = undefined;
+    var help_lines: [3][]const u8 = undefined;
     var list: view.ListScreen = undefined;
     list.open(view.t(.methods_title), image.name.slice(), rows[0..count], selected, false, help(&model.items[map[selected]], &help_lines));
 
@@ -69,12 +69,24 @@ pub fn badge(item: *const model_mod.Item, recommended: bool) ?usos.gui.ui.Badge 
     const status = item.validation_status orelse return if (recommended) .{ .text = view.t(.badge_recommended), .tone = .accent } else null;
     return switch (status) {
         .validated_hardware => if (recommended and item.method == .automatic) .{ .text = view.t(.badge_recommended), .tone = .accent } else .{ .text = view.t(.badge_ready), .tone = .success },
-        .tested_in_vm => .{ .text = view.t(.badge_tested_in_vm), .tone = .accent },
+        // A dimmed dot, no label: the details pane says "Tested in a virtual machine".
+        .tested_in_vm => .{ .text = "", .dot = true },
         .experimental => .{ .text = view.t(.badge_experimental), .tone = .warning },
     };
 }
 
-fn help(item: *const model_mod.Item, lines: *[2][]const u8) usos.gui.menu_screens.Help {
-    lines.* = .{ view.tr(item.help.line1), view.tr(item.help.line2) };
-    return .{ .title = view.tr(item.help.title), .lines = lines, .badge = badge(item, false) };
+fn help(item: *const model_mod.Item, lines: *[3][]const u8) usos.gui.menu_screens.Help {
+    lines.* = .{ view.tr(item.help.line1), view.tr(item.help.line2), verification(item) };
+    const pill = badge(item, false);
+    return .{ .title = view.tr(item.help.title), .lines = lines, .badge = if (pill != null and pill.?.dot) null else pill };
+}
+
+/// Where the method was verified, in words (the list row shows a pill or a dot).
+fn verification(item: *const model_mod.Item) []const u8 {
+    const status = item.validation_status orelse return "";
+    return switch (status) {
+        .validated_hardware => view.t(.verify_hardware),
+        .tested_in_vm => view.t(.verify_vm),
+        .experimental => "",
+    };
 }

@@ -51,6 +51,10 @@ pub const Tone = enum { neutral, accent, success, warning, danger };
 pub const Badge = struct {
     text: []const u8,
     tone: Tone = .neutral,
+    /// A small dimmed dot instead of a labelled pill (low-key status such
+    /// as "tested in a VM"; the details pane carries the words). `text`
+    /// and `tone` are ignored.
+    dot: bool = false,
 };
 
 pub const HeaderInfo = struct {
@@ -730,7 +734,11 @@ pub const Ui = struct {
             right -|= chevron + self.px(10);
         }
         if (item.badge) |badge| {
-            if (self.badgeWidth(badge.text) + self.px(120) < right -| x) {
+            if (badge.dot) {
+                const d = self.px(6);
+                paint.roundRect(self.surface, right -| d, center_y -| d / 2, d, d, d / 2, if (item.enabled) theme.muted else theme.disabled_text, fill);
+                right -|= d + self.px(12);
+            } else if (self.badgeWidth(badge.text) + self.px(120) < right -| x) {
                 right = self.badgeRight(right, center_y, badge, fill) -| self.px(12);
             }
         }
@@ -766,8 +774,10 @@ pub const Ui = struct {
         if (title.len > 0) {
             var title_w = w;
             if (badge) |value| {
-                _ = self.badgeRight(rect.right() -| pad, y + self.fonts.lineHeight(.strong) / 2, value, theme.panel);
-                title_w -|= self.badgeWidth(value.text) + self.px(12);
+                if (!value.dot) {
+                    _ = self.badgeRight(rect.right() -| pad, y + self.fonts.lineHeight(.strong) / 2, value, theme.panel);
+                    title_w -|= self.badgeWidth(value.text) + self.px(12);
+                }
             }
             _ = self.fonts.drawFit(self.surface, x, y, title_w, .strong, title, if (tone == .neutral) theme.text else colors.text, theme.panel);
             y += self.fonts.lineHeight(.strong) + self.px(8);
