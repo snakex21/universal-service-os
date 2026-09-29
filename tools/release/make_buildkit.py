@@ -13,7 +13,8 @@ build.bat without network (docs/BUILDING.md):
   inputs/<repo path>                  pinned inputs outside git: tools/cache/alpine
                                       (micro-Linux), tools/cache/efifs, tools/cache/freedos,
                                       git-ignored vendor archives, Windows 7 MSUs, the frozen
-                                      Vista v11 payload folder
+                                      Vista v11 payload folder, the xhci98 source tarball and
+                                      the check_vista_oobe_policy.py fixtures (REQUIRED_INPUTS)
   csmwrap-vm/apk/<branch>/...         partial Alpine mirror for tools/build_csmwrap.ps1 -OfflineMirror
 
 Inputs come from tools/cache/buildkit-downloads (tools/release/fetch_buildkit_inputs.py)
@@ -30,6 +31,18 @@ from assemble_release import Zip, sha256, GITHUB_ASSET_LIMIT  # noqa: E402
 CACHE = ROOT / 'tools/cache/buildkit-downloads'
 SEVEN_ZIP_DIR = Path('C:/Program Files/7-Zip')
 VISTA_FROZEN = 'artifacts/vista/hardware-success-v11-20260920-235629'
+# Inputs that must be in the kit even though nothing in build.bat reads them:
+# a missing one stops the kit instead of silently leaving it out.
+REQUIRED_INPUTS = [
+    # GPL-2.0 corresponding source of the shipped xhci98.sys (make_release
+    # puts it in the sources zip; tools/release/third-party.json). Fetched by
+    # tools/release/fetch_buildkit_inputs.py (REPO_INPUTS).
+    ('tools/vendor/xhci98/1.1.1.0-src/xhci98-7d0dd9d440e9716a87e0882f905bf8e99fa443ac.tar.gz', 'xhci98-1.1.1.0-source'),
+    # Fixtures of tools/tests/check_vista_oobe_policy.py (captured on
+    # hardware 2026-09-21, maintainer-only; cannot be regenerated).
+    ('artifacts/vista/oobe-resume-20260921-190133/Windows/Panther/UnattendGC/setupact.log', 'vista-check-fixtures'),
+    ('artifacts/vista/winsat-stall-20260921-184000/USOS/Vista/SYSTEM.before-usb', 'vista-check-fixtures'),
+]
 
 
 def git_ignored(paths):
@@ -56,7 +69,12 @@ def input_files():
     for p in sorted((ROOT / VISTA_FROZEN).rglob('*')):
         if p.is_file():
             items.append((p.relative_to(ROOT).as_posix(), 'vista-v11-frozen-payload'))
-    return items
+    required = dict(REQUIRED_INPUTS)
+    for rel in required:
+        if not (ROOT / rel).is_file():
+            raise SystemExit(f'build kit input missing: {rel} (docs/BUILDING.md, "Untracked inputs")')
+    items = [(rel, required.pop(rel, component)) for rel, component in items]
+    return items + sorted(required.items())
 
 
 def main():
@@ -98,7 +116,9 @@ def main():
     for rel, component in input_files():
         if rel == 'tools/cache/efifs/ntfs_x64.efi':
             continue
-        licence = 'LicenseRef-Microsoft-redistributed-by-maintainer' if component in ('microsoft-win7-updates', 'vista-v11-frozen-payload') else 'see docs/LICENSES-AUDIT.md'
+        licence = ('LicenseRef-Microsoft-redistributed-by-maintainer'
+                   if component in ('microsoft-win7-updates', 'vista-v11-frozen-payload', 'vista-check-fixtures')
+                   else 'GPL-2.0-only' if component == 'xhci98-1.1.1.0-source' else 'see docs/LICENSES-AUDIT.md')
         add('inputs/' + rel, ROOT / rel, component, licence)
 
     manifest = {

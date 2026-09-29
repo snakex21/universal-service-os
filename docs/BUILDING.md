@@ -134,11 +134,11 @@ inside an existing clone, then `git checkout -f`).
 | `tools\cache\freedos`, `buildkit-downloads`, `go-mod` | FreeDOS provenance, build kit assembly, Go modules | the kit, or fetched by `tools\release\fetch_buildkit_inputs.py` and `go mod download` |
 | `tools\cache\secure-boot` (OVMF Secure Boot firmware) | QEMU Secure Boot tests only | fetched by `tools\tests\secure_boot\fetch_ovmf_secboot.py` |
 | `tools\cache\registry-reader` (python-registry) | offline hive inspection scripts only | `pip install --target tools\cache\registry-reader python-registry` |
-egistry-reader` (python-registry) | offline hive inspection scripts only | `pip install --target tools\cache
-egistry-reader python-registry` |
 | git-ignored `tools\vendor\**` archives, incl. the XP integrator tree | payload, release sources, build kit | the kit (`inputs\tools\vendor\...`) |
 | `media\Systems\Windows\Windows 7\Updates\*.msu` | Windows 7 payload | the kit (`inputs\media\...`) |
 | `artifacts\vista\hardware-success-v11-20260920-235629\` | frozen Vista payload (`tools\build_windows_vista_support.py` stops without it) | the kit (`inputs\artifacts\...`). It was captured from a hardware-verified install (`tools\snapshot_vista_working_usb.py`) and cannot be regenerated without such a stick: without the kit, get it from the maintainer; there is no substitute |
+| `tools\vendor\xhci98\1.1.1.0-src\xhci98-7d0dd9d4...tar.gz` | GPL-2.0 source of the shipped `xhci98.sys` (`make_release.ps1` sources zip, the xhci98 rebuild); not `build.bat` | the kit, or `tools\release\fetch_buildkit_inputs.py`, which downloads the tag tarball into place against its pinned SHA-256 (`REPO_INPUTS`) |
+| `artifacts\vista\oobe-resume-20260921-190133\Windows\Panther\UnattendGC\setupact.log`, `artifacts\vista\winsat-stall-20260921-184000\USOS\Vista\SYSTEM.before-usb` | fixtures of `tools\tests\check_vista_oobe_policy.py` | the kit (`inputs\artifacts\...`). Captured on hardware on 2026-09-21, maintainer-only like the frozen payload. `make_buildkit.py` stops when one of these or the xhci98 tarball is missing (`REQUIRED_INPUTS`) |
 | `installer\build\` | installer outputs | written by `build.bat`; nothing to fetch |
 | `installer\internal\payload\assets\payload.zip` | installer `go:embed` | written by `build.bat` (see above) |
 | XP package for `tools\build_xp_uefi_csm_trial.py --bundles-from` | rebuilding the XP UEFI-CSM package without every source XP ISO | an earlier package (`zig-out\xp-uefi-csm\` of a previous build, or the XP package from a release); a full rebuild from the XP ISOs needs none. Only `make_release.ps1` and XP package work need it, not `build.bat` |
@@ -180,6 +180,8 @@ files in place: the change would reach both trees.
 | `inputs\tools\vendor\...` | git-ignored vendor archives: FreeDOS, HimemX, ImDisk, Patcher9x, Syslinux and wimlib source zips, Windows 7 NVMe assets, GenAHCI, the XP integrator tree | their own licences |
 | `inputs\media\Systems\Windows\Windows 7\Updates\*.msu`, `inputs\tools\vendor\windows7-kmdf\*.msu` | Windows 7 SHA-2, NVMe and KMDF updates | Microsoft; kept for preservation at the maintainer's own risk, removed on request |
 | `inputs\artifacts\vista\hardware-success-v11-20260920-235629\` | frozen Vista v11 payload (hardware-verified) | USOS code + Microsoft files, as above |
+| `inputs\artifacts\vista\oobe-resume-...\setupact.log`, `inputs\artifacts\vista\winsat-stall-...\SYSTEM.before-usb` | the two `check_vista_oobe_policy.py` fixtures | Microsoft files (a Setup log and a hive), as above |
+| `inputs\tools\vendor\xhci98\1.1.1.0-src\*.tar.gz` | xhci98 1.1.1.0 tag tarball, the corresponding source of the shipped driver | GPL-2.0-only |
 | `csmwrap-vm\apk\v3.24\` | partial Alpine v3.24 mirror (signed `APKINDEX.tar.gz` of main and community + 52 packages) for the CSMWrap build VM | per package |
 
 Toolchain licences and sources: the Zig and Go archives carry their own
