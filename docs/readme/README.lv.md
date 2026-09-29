@@ -143,6 +143,8 @@ valodā).
 
 Laidiena faili:
 
+**Nezināt, kuru? Lejupielādējiet pilno instalētāju.**
+
 | Fails | Nolūks |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Pilnais instalētājs**: viss USOS kopā ar WinPE donoru un abām XP pakotnēm; darbojas bezsaistē |

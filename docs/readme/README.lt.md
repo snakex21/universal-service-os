@@ -146,6 +146,8 @@ kalba).
 
 Laidos failai:
 
+**Nežinote, kurią? Atsisiųskite pilną diegimo programą.**
+
 | Failas | Paskirtis |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Pilna diegimo programa**: visas USOS kartu su WinPE donoru ir abiem XP paketais; veikia be interneto |

@@ -144,6 +144,8 @@ ja [väljalaskemärkmetes](../release-notes-1.0.md#supported-systems)
 
 Väljalaske failid:
 
+**Ei tea, kumba? Laadige alla täispaigaldaja.**
+
 | Fail | Otstarve |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Täispaigaldaja**: kogu USOS koos WinPE doonori ja mõlema XP paketiga; töötab võrguta |

@@ -147,6 +147,8 @@ und in den [Versionshinweisen](../release-notes-1.0.md#supported-systems)
 
 Dateien des Release:
 
+**Unsicher, welchen? Laden Sie den vollständigen Installer herunter.**
+
 | Datei | Zweck |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Vollständiger Installer**: das gesamte USOS samt WinPE-Spender und beiden XP-Paketen; funktioniert offline |

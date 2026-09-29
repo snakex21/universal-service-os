@@ -146,6 +146,8 @@ inglese).
 
 File del rilascio:
 
+**Non sai quale scegliere? Scarica l'installer completo.**
+
 | File | Scopo |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Installer completo**: tutto USOS più il donatore WinPE ed entrambi i pacchetti XP; funziona offline |

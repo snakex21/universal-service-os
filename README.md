@@ -139,6 +139,8 @@ and the [release notes](docs/release-notes-1.0.md#supported-systems).
 
 Release assets:
 
+**Not sure which one? Download the Full installer.**
+
 | File | Purpose |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Full installer**: all of USOS plus the WinPE donor and both XP packages; works offline |

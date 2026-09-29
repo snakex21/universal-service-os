@@ -144,6 +144,8 @@ engleză).
 
 Fișierele lansării:
 
+**Nu știți pe care? Descărcați programul de instalare complet.**
+
 | Fișier | Scop |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Program de instalare complet**: tot USOS plus donorul WinPE și ambele pachete XP; funcționează offline |

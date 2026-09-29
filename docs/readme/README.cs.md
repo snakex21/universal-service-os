@@ -142,6 +142,8 @@ a v [poznámkách k vydání](../release-notes-1.0.md#supported-systems)
 
 Soubory vydání:
 
+**Nevíte, který? Stáhněte úplný instalátor.**
+
 | Soubor | Účel |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Úplný instalátor**: celý USOS včetně dárce WinPE a obou balíčků XP; funguje offline |

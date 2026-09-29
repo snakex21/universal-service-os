@@ -145,6 +145,8 @@ inglês).
 
 Arquivos da versão:
 
+**Na dúvida? Baixe o instalador completo.**
+
 | Arquivo | Finalidade |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Instalador completo**: todo o USOS mais o doador WinPE e os dois pacotes XP; funciona offline |

@@ -147,6 +147,8 @@ anglais).
 
 Fichiers de la version :
 
+**Vous hésitez ? Téléchargez l'installateur complet.**
+
 | Fichier | Rôle |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Installateur complet** : tout USOS avec le donneur WinPE et les deux paquets XP ; fonctionne hors ligne |

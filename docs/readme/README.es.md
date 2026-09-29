@@ -146,6 +146,8 @@ y en las [notas de la versión](../release-notes-1.0.md#supported-systems)
 
 Archivos de la versión:
 
+**¿No sabes cuál? Descarga el instalador completo.**
+
 | Archivo | Finalidad |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Instalador completo**: todo USOS más el donante WinPE y ambos paquetes XP; funciona sin conexión |

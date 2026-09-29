@@ -142,6 +142,8 @@ engelsk).
 
 Udgivelsesfiler:
 
+**I tvivl? Hent det fulde installationsprogram.**
+
 | Fil | Formål |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Fuldt installationsprogram**: hele USOS plus WinPE-donoren og begge XP-pakker; virker offline |

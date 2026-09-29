@@ -146,6 +146,8 @@ angielsku).
 
 Pliki wydania:
 
+**Nie wiesz, który? Pobierz pełny instalator.**
+
 | Plik | Do czego służy |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Pełny instalator**: cały USOS oraz dawca WinPE i oba pakiety XP; działa bez internetu |

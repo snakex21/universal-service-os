@@ -143,6 +143,8 @@ in v [opombah ob izdaji](../release-notes-1.0.md#supported-systems)
 
 Datoteke izdaje:
 
+**Ne veste, katerega? Prenesite polni namestitveni program.**
+
 | Datoteka | Namen |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Polni namestitveni program**: celoten USOS z darovalcem WinPE in obema paketoma XP; deluje brez povezave |

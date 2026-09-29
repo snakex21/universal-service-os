@@ -144,6 +144,8 @@ i u [napomenama uz izdanje](../release-notes-1.0.md#supported-systems)
 
 Datoteke izdanja:
 
+**Niste sigurni koji? Preuzmite pun instalater.**
+
 | Datoteka | Namena |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Pun instalater**: ceo USOS plus WinPE donor i oba XP paketa; radi bez interneta |

@@ -145,6 +145,8 @@ Engels).
 
 Releasebestanden:
 
+**Twijfel je? Download het volledige installatieprogramma.**
+
 | Bestand | Doel |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Volledig installatieprogramma**: heel USOS plus de WinPE-donor en beide XP-pakketten; werkt offline |

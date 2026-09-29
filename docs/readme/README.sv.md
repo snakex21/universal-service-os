@@ -145,6 +145,8 @@ och i [versionsinformationen](../release-notes-1.0.md#supported-systems)
 
 Filer i utgåvan:
 
+**Osäker på vilken? Ladda ned det fullständiga installationsprogrammet.**
+
 | Fil | Syfte |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Fullständigt installationsprogram**: hela USOS plus WinPE-donatorn och båda XP-paketen; fungerar offline |

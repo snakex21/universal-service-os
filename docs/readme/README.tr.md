@@ -144,6 +144,8 @@ tablo ve derleme başına donanım sonuçları
 
 Sürüm dosyaları:
 
+**Hangisi olduğundan emin değil misiniz? Tam yükleyiciyi indirin.**
+
 | Dosya | Amaç |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Tam yükleyici**: USOS'un tamamı, WinPE donörü ve iki XP paketi; çevrimdışı çalışır |

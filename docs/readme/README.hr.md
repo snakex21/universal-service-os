@@ -145,6 +145,8 @@ i u [bilješkama o izdanju](../release-notes-1.0.md#supported-systems)
 
 Datoteke izdanja:
 
+**Niste sigurni koji? Preuzmite puni instalacijski program.**
+
 | Datoteka | Namjena |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Puni instalacijski program**: cijeli USOS uz WinPE donor i oba XP paketa; radi izvanmrežno |

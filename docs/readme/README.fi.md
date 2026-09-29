@@ -145,6 +145,8 @@ ja [julkaisutiedoista](../release-notes-1.0.md#supported-systems)
 
 Julkaisun tiedostot:
 
+**Et tiedä kumpi? Lataa täysi asennusohjelma.**
+
 | Tiedosto | Tarkoitus |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Täysi asennusohjelma**: koko USOS sekä WinPE-luovuttaja ja molemmat XP-paketit; toimii ilman verkkoa |

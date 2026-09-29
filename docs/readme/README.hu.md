@@ -147,6 +147,8 @@ megjegyzésekkel és buildenkénti hardvereredményekkel:
 
 Kiadási fájlok:
 
+**Nem tudja, melyiket? Töltse le a teljes telepítőt.**
+
 | Fájl | Rendeltetés |
 |---|---|
 | `USOS-Installer-1.0.0.exe` | **Teljes telepítő**: a teljes USOS a WinPE donorral és mindkét XP csomaggal; internet nélkül is működik |
