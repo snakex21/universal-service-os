@@ -100,11 +100,12 @@ Where it ships: *stick ESP* = the installer payload on `USOS_ESP`
 | wimboot (iPXE) and the USOS kexec variants (MODIFIED) | 2.9.0 (+ usos kexec variants) | `GPL-2.0-or-later` | stick ESP, XP package | sources zip: `tools/vendor/wimboot/2.9.0/source.tar.gz`, `tools/vendor/wimboot/2.9.0/README.md`, `tools/vendor/wimboot/2.9.0/USOS-KEXEC.md`, `tools/wimboot_kexec.py`, `src/platform/bios/windows_kexec_bridge.S`, `src/platform/bios/windows_kexec_cpu_reset.S`, `src/platform/bios/windows_disk_order.S`; <https://github.com/ipxe/wimboot/releases/tag/v2.9.0> | FIXED in this audit (source + generator in the sources zip); the ESP wimboot has no licence next to it (F1) |
 | ImDisk Virtual Disk Driver | 2.1.2 | `GPL-2.0-only` | stick ESP, XP package | sources zip: `tools/vendor/imdisk/2.1.2/source.zip`; <https://github.com/LTRData/ImDisk/tree/06658631441be3f2d560cf58d503532a7ebe67f4> | OK (licence + source.zip travel in support.cpio and the initramfs) |
 | UefiSeven | 1.30 | `BSD-2-Clause AND BSD-2-Clause-Patent` | stick ESP, XP package | sources zip: `tools/vendor/uefiseven/1.30`; <https://github.com/manatails/uefiseven/tree/b8f0baba63e60e74d4ed3e86b15b76319d316b83> | OK (uefiseven-LICENSE.txt next to every copy) |
-| CSMWrap with its SeaBIOS fork (MODIFIED) | 3.1.2-usos1 | `LGPL-2.1-only AND LGPL-3.0-only` | stick ESP | sources zip: `tools/vendor/csmwrap/3.1.2-src`, `tools/vendor/csmwrap/3.1.2-usos1`, `tools/csmwrap_build`, `tools/build_csmwrap.ps1`, `docs/research/csmwrap.md`; <https://github.com/CSMWrap/CSMWrap/tree/808ac8ea5393db9052044fb0f74aa55e0d719afc> | OK (LGPL texts, source archive, patches, SOURCES.txt on the ESP and on every CSMWrap target ESP) |
+| CSMWrap with its SeaBIOS fork (MODIFIED) | 3.1.2-usos3 (1.1; 1.0 ships 3.1.2-usos1) | `LGPL-2.1-only AND LGPL-3.0-only` | stick ESP | sources zip: `tools/vendor/csmwrap/3.1.2-src`, `tools/vendor/csmwrap/3.1.2-usos3`, `tools/csmwrap_build`, `tools/build_csmwrap.ps1`, `docs/research/csmwrap.md`; <https://github.com/CSMWrap/CSMWrap/tree/808ac8ea5393db9052044fb0f74aa55e0d719afc> | OK (LGPL texts, source archive, patches, SOURCES.txt on the ESP and on every CSMWrap target ESP) |
 | TouchI2cDxe (MODIFIED) | v1.3.1-usos1 | `BSD-2-Clause-Patent` | stick ESP | sources zip: `tools/vendor/touchi2cdxe/v1.3.1-usos1/usos-rc71l.patch`, `tools/vendor/touchi2cdxe/v1.3.1-usos1/UsosTouchPkg.dsc`, `tools/vendor/touchi2cdxe/v1.3.1-usos1/PROVENANCE.md`, `tools/vendor/touchi2cdxe/v1.3.1-usos1/manifest.json`, `tools/build_touchi2cdxe.ps1`; <https://github.com/jlobue10/TouchI2cDxe/tree/cd673f65049f4bd34dd511ca7a28c345f41efac0> | OK (licence on the ESP; patch in the sources zip) |
 | Syslinux MEMDISK | 6.03 | `GPL-2.0-or-later` | stick ESP | sources zip: `tools/vendor/syslinux/6.03/source.zip`; <https://www.kernel.org/pub/linux/utils/boot/syslinux/syslinux-6.03.zip> | OK (COPYING + source.zip on the ESP) |
 | Patcher9x (with the R. Loew RAM patch) | 0.9.91 | `MIT` | stick ESP | sources zip: `tools/vendor/patcher9x/0.9.91/source.zip`; <https://github.com/JHRobotics/patcher9x/releases/tag/v0.9.91> | OK (LICENSE, NOTICE, source.zip on the ESP) |
 | CWSDPMI | r7 | `LicenseRef-CWSDPMI` | stick ESP | <https://www.delorie.com/pub/djgpp/current/v2misc/csdpmi7s.zip> | OK (CWSDPMI.TXT on the ESP; source URL in NOTICE.TXT) |
+| VBADOS (VBMOUSE.EXE, VBMOUSE.DRV) | 0.67 | `GPL-2.0-or-later` | stick ESP; MS-DOS / Windows 3.x disks installed under CSMWrap | sources zip: `tools/vendor/vbados/0.67/vbados-0.67.tar.gz`; <https://git.javispedro.com/cgit/vbados.git/tag/?h=v0.67> | OK (source VBADOS.TGZ on the ESP; VBADOS.TXT = SOURCES + GPL next to the binaries on the target) |
 | HimemX | 3.40 | `GPL-2.0-only OR Artistic-1.0` | stick ESP | sources zip: `tools/vendor/himemx/3.40/source-and-binaries.zip`; <https://github.com/Baron-von-Riedesel/HimemX/releases/tag/v3.40> | OK (licence text + HIMEMSRC.ZIP on the ESP) |
 | FreeDOS kernel, FreeCOM and Doszip | FreeDOS 1.4 (kernel 20250409.9, FreeCOM 0.86a, Doszip 2.68) | `GPL-2.0-only` | stick ESP | sources zip: `tools/vendor/freedos/1.4/kernel.zip`, `tools/vendor/freedos/1.4/freecom.zip`, `tools/vendor/freedos/1.4/doszip.zip`, `tools/vendor/freedos/1.4/manifest.json`; <https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/repositories/1.4/base/kernel/20250409.9/kernel.zip> | OK on the ESP (COPYING + package zips with sources); FIXED: licence texts extracted for the release |
 | PatchPAE3 (adapted as the USOS XP PAE helper) (MODIFIED) | 3e1d3b65f5c3c1ec0c4759f707d3017e51113103 | `CC-BY-4.0` | XP package | sources zip: `tools/vendor/patchpae3/3e1d3b65f5c3c1ec0c4759f707d3017e51113103`, `tools/windows_xp_pae.c`, `tools/windows_xp_pae_strings.h`; <https://github.com/evgen-b/PatchPAE3/tree/3e1d3b65f5c3c1ec0c4759f707d3017e51113103> | OK (attribution + licence reference in xp-pae-LICENSE.txt) |
@@ -118,11 +119,13 @@ Where it ships: *stick ESP* = the installer payload on `USOS_ESP`
 
 Notes on individual entries:
 
-- **CSMWrap 3.1.2-usos1** is recorded as `LGPL-2.1-only AND LGPL-3.0-only`:
+- **CSMWrap 3.1.2-usos3** (1.1; 1.0: 3.1.2-usos1, the same three quiet-boot
+  patches without 0004) is recorded as `LGPL-2.1-only AND LGPL-3.0-only`:
   the upstream `LICENSE` is the LGPL 2.1 text with no "or any later
   version" statement and no per-file notices, and SeaBIOS states LGPLv3.
   "Only" is the conservative reading. The build is MODIFIED (three patches
-  of 2026-09-27, `tools/vendor/csmwrap/3.1.2-usos1/patches`); the complete
+  of 2026-09-27 and the SeaBIOS boot-priority patch 0004 of 2026-09-29,
+  `tools/vendor/csmwrap/3.1.2-usos3/patches`); the complete
   corresponding source is the unpatched archive
   `tools/vendor/csmwrap/3.1.2-src/csmwrap-3.1.2-src.tar.xz`
   (SHA-256 `9be5b839...ff72`, all submodules pinned) plus those patches,
@@ -177,7 +180,10 @@ Notes on individual entries:
 | `EFI/USOS/dos-native/ram-patch/*` | Patcher9x 0.9.91, CWSDPMI r7 (+ USOS BAT files) |
 | `EFI/USOS/dos-native/msdos/HIMEMX.*`, `HIMEMSRC.ZIP`, `LICENSE.TXT` | HimemX 3.40 (+ USOS BAT files and REBOOT.COM) |
 | `EFI/USOS/dos-native/freedos/*` | FreeDOS kernel, FreeCOM, Doszip (+ USOS BAT files) |
-| `EFI/USOS/csmwrap/*` | CSMWrap 3.1.2-usos1 with source and licences |
+| `EFI/USOS/csmwrap/*` | CSMWrap 3.1.2-usos3 with source and licences |
+| `EFI/USOS/dos-native/msdos/CSMESP.IMG` | the same CSMWrap build, licences, source and patches as a FAT16 image for DOS / Windows 3.x targets (1.1) |
+| `EFI/USOS/dos-native/msdos/VBMOUSE.*`, `VBADOS.TXT`, `VBADOS.TGZ` | VBADOS 0.67 with its GPL text and source (1.1) |
+| `EFI/USOS/dos-native/msdos/USOSKEY.COM`, `USOSKEY.DRV` | USOS code (GPL-3.0-or-later); the driver is built with OpenWatcom 2.0 but links no OpenWatcom library code (1.1) |
 | `EFI/USOS/shell/*` | EDK2 UEFI Shell (+ USOS `startup.nsh`) |
 | `EFI/USOS/touchi2c_x64.efi`, `EFI/USOS/licenses/touchi2cdxe/LICENSE` | TouchI2cDxe v1.3.1-usos1 |
 | `EFI/USOS/linux/usos-linux.cpio`, `EFI/USOS/themes/*`, `ENROLL*`, `secure-boot.ini`, `build-info.ini`, `USOS-KEY.cer`, `UI/index.html`, `UI/theme.css` | USOS only |
@@ -268,11 +274,12 @@ about 21 MB):
 
 | Component | Paths |
 |---|---|
-| CSMWrap 3.1.2-usos1 (MODIFIED, LGPL-2.1 + SeaBIOS LGPLv3) | `tools/vendor/csmwrap/3.1.2-src` (archive + licences), `tools/vendor/csmwrap/3.1.2-usos1` (patches, toolchain, binary manifest), `tools/csmwrap_build`, `tools/build_csmwrap.ps1`, `docs/research/csmwrap.md` |
+| CSMWrap 3.1.2-usos3 (MODIFIED, LGPL-2.1 + SeaBIOS LGPLv3) | `tools/vendor/csmwrap/3.1.2-src` (archive + licences), `tools/vendor/csmwrap/3.1.2-usos3` (patches, toolchain, binary manifest), `tools/csmwrap_build`, `tools/build_csmwrap.ps1`, `docs/research/csmwrap.md` |
 | wimboot 2.9.0 + kexec variants (MODIFIED, GPL-2.0-or-later) | `tools/vendor/wimboot/2.9.0/source.tar.gz`, `README.md`, `USOS-KEXEC.md`, `tools/wimboot_kexec.py`, `src/platform/bios/windows_kexec_bridge.S`, `windows_kexec_cpu_reset.S`, `windows_disk_order.S` |
 | ImDisk 2.1.2 (GPL-2.0) | `tools/vendor/imdisk/2.1.2/source.zip` |
 | Syslinux MEMDISK 6.03 (GPL-2.0-or-later) | `tools/vendor/syslinux/6.03/source.zip` |
 | HimemX 3.40 (GPL-2.0 / Artistic) | `tools/vendor/himemx/3.40/source-and-binaries.zip` |
+| VBADOS 0.67 (GPL-2.0-or-later) | `tools/vendor/vbados/0.67/vbados-0.67.tar.gz` |
 | FreeDOS kernel, FreeCOM, Doszip (GPL-2.0) | `tools/vendor/freedos/1.4/{kernel,freecom,doszip}.zip` (each with `SOURCE/*/SOURCES.ZIP`), `manifest.json` |
 | Patcher9x 0.9.91 (MIT, with libmspack LGPL-2.1) | `tools/vendor/patcher9x/0.9.91/source.zip` |
 | UefiSeven 1.30, TouchI2cDxe usos1, PatchPAE3, fonts (permissive, bundled for completeness) | `tools/vendor/uefiseven/1.30`, the TouchI2cDxe patch/DSC/provenance, `tools/vendor/patchpae3/<commit>`, `tools/windows_xp_pae.c`, `assets/fonts` |

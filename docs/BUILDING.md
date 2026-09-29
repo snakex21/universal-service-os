@@ -187,7 +187,7 @@ Toolchain licences and sources: the Zig and Go archives carry their own
 ziglang.org and go.dev); the GPL/LGPL source offer for the Alpine packages
 and the kernel is in `SOURCE-OFFER.txt` of the release.
 
-## Rebuilding CSMWrap 3.1.2-usos1 (optional)
+## Rebuilding CSMWrap 3.1.2-usos3 (optional)
 
 The release uses the vendored, hash-pinned CSMWrap binary; `build.bat`
 does not rebuild it. To rebuild it from source in a throwaway Alpine VM:
@@ -201,9 +201,24 @@ Offline, the host serves the kit's Alpine mirror to the VM over HTTP and
 the VM builds from the vendored source archive
 (`tools\vendor\csmwrap\3.1.2-src\csmwrap-3.1.2-src.tar.xz`, the
 deterministic archive of the pinned CSMWrap commit and submodules) instead
-of cloning. Tested 2026-09-28: the offline rebuild gave byte-identical
-`csmwrapx64.efi` (usos1 and upstream) and source archive hashes
-(`tools/vendor/csmwrap/3.1.2-usos1/manifest.json`).
+of cloning. Tested 2026-09-28 with 3.1.2-usos1 (the 1.0 build): the
+offline rebuild gave byte-identical `csmwrapx64.efi` (usos1 and upstream)
+and source archive hashes. Since 1.1 the default is 3.1.2-usos3
+(`tools/vendor/csmwrap/3.1.2-usos3/manifest.json`, three online VM runs with
+the same hash); `tools/csmwrap_build/run_build_vm.py --patches
+tools/vendor/csmwrap/3.1.2-usos1/patches --usos-version 3.1.2-usos1` still
+rebuilds usos1.
+
+## OpenWatcom (Windows 3.x USB keyboard driver)
+
+`build.bat` builds `USOSKEY.DRV` (src/platform/win3) with OpenWatcom 2.0,
+snapshot 2026-09-01 (`ow-snapshot.tar.xz`, SHA-256 `bac354f3...9bdf`, pinned
+in `tools/build_win3_usb_keyboard.py` and `tools/release/buildkit.lock.json`).
+The script takes the archive from `tools\cache\openwatcom` (where the build
+kit restores it) or `tools\cache\buildkit-downloads`, else downloads it once
+from the pinned URL, and extracts only `binnt64`, `h` and `lib286\win`. The
+driver links no OpenWatcom library code. The TSR `USOSKEY.COM` is built with
+the repository's Zig (ld.lld, `src/platform/bios/msdos/com.ld`).
 
 ## Not in the kit
 

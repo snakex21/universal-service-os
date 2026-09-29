@@ -49,6 +49,7 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | L7 | Buildy Longhorn | **Later** | L1 (pre-reset), ścieżka Vista (post-reset) | 3–5 dni per build |
 | L8 | NT4 dla retro sprzętu | **Later** | profil NT5 (M4) | 5–8 dni |
 | L9 | shim-review (własny shim podpisany przez Microsoft) | **Later** (długoterminowo) | N6, publiczne repo | miesiące, proces zewnętrzny |
+| L11 | Tryb BIOS przez CSMWrap (DOS, FreeDOS, Windows 3.x bez CSM) + klawiatura i mysz USB w Windows 3.x | **1.1**: zrobione na gałęzi `feature/bios-via-csmwrap`, QEMU PASS (2026-09-29); X470: do testu | L2, L2b | test sprzętowy 1 dzień |
 | L10 | macOS jako opcjonalny dodatek („DLC”): własny OpenCore EFI z DATA, potem eksperymentalny generator konfiguracji | **Later** (na końcu, po wszystkim innym) | osobne pobranie, poza głównym wydaniem | do oszacowania |
 
 ## 2. Pozycje
@@ -360,6 +361,32 @@ innym, w formie osobnego, opcjonalnego dodatku.
   brak kart NVIDIA nowszych niż Kepler, Wi-Fi Intela tylko częściowo.
 - Sprzęt testowy: X470 + RX 560, B550 + 5800X3D.
 
+## 2b. Wydanie 1.1 (w przygotowaniu)
+
+### L11. Tryb BIOS przez CSMWrap: **1.1**, QEMU PASS, sprzęt do testu
+
+Projekt, implementacja i macierz testów: [design/bios-via-csmwrap.md](design/bios-via-csmwrap.md)
+(sekcja 8). Gałąź `feature/bios-via-csmwrap` (commity `1b4daba`, `19c65c2`,
+`6af4ba3` i dokumentacja), nie scalona z 1.0.
+
+- **Menu UEFI → Narzędzia → „Tryb BIOS (CSMWrap)”**: tylko bez CSM w
+  firmware; przy włączonym Secure Boot wyszarzone z wyjaśnieniem; strona
+  potwierdzenia (restart wraca do UEFI, jeden wątek CPU zarezerwowany,
+  potrzebny klasyczny BIOS karty graficznej); 27 języków.
+- **CSMWrap 3.1.2-usos3** = usos1 + łatka SeaBIOS 0004 (priorytety startu
+  według tabeli BBS CSMWrap, także USB): pendrive startuje mimo dysku SATA.
+  Hash `bbf05216...de5f`, powtarzalny build w VM Alpine. Regresja XP i Vista
+  (ESP celu, z pendrive'em i bez): PASS w QEMU.
+- **Instalacja MS-DOS / Windows 3.x pod CSMWrap**: ESP CSMWrap 64 MiB na
+  końcu dysku (MBR 0xEF), `HIMEM /M:2`, VBADOS (mysz USB), USOSKEY
+  (klawiatura USB w Windows 3.x w trybie standardowym i rozszerzonym 386,
+  także okna DOS). Na zwykłym BIOS-ie nic się nie zmienia.
+- Setup Windows 3.x pod CSMWrap w trybie wsadowym (`SETUP /H:USOS.SHH`):
+  cała instalacja z samą klawiaturą USB (QEMU PASS).
+- **Zostaje**: diody klawiatury; test na X470; tryb wsadowy także na
+  zwykłym BIOS-ie (po teście MS-7100); Windows 3.11 EN, memtest BIOS i 98/ME
+  przez tryb BIOS.
+
 ## 2a. Przed 1.0 (lista kontrolna)
 
 - **Vista**: pendrive'y USB niewidoczne przez backport USB 3: na 1.0
@@ -377,7 +404,7 @@ innym, w formie osobnego, opcjonalnego dodatku.
   CSMWrap dysku, `research/csmwrap.md` sekcja 7). QEMU: bez logo CSMWrap,
   banera SeaBIOS i „Press ESC” (XP i Vista); `csmwrap-verbose.flag` działa
   jak dotąd. **Zostaje** migający kursor tekstowy VGA (lewy górny róg) do
-  chwili, gdy loader zmieni tryb: wymaga kolejnej łatki SeaBIOS (usos3).
+  chwili, gdy loader zmieni tryb: wymaga kolejnej łatki SeaBIOS (późniejszy build; usos3 to łatka 0004 z 1.1).
   Do sprawdzenia na X470 (XP i Vista).
 - **Konsole podczas instalacji** (2026-09-28, B260928-193034): polecenia
   profilu odpowiedzi (specialize, LabConfig Win11) idą przez
