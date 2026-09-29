@@ -1,0 +1,36 @@
+USOS 3.1.2-usos1 patch 1/3: CSMWrap logo only with verbose = true
+
+efi_main forced verbose on to print the logo on every boot. Print it after
+config_load through the normal printf, so the screen shows it only when
+csmwrap.ini says verbose = true (serial gets it when serial = true).
+
+Applies to CSMWrap 3.1.2 (808ac8e) with its seabios submodule (578d260b),
+patch -p1 from the top of the tree. Part of CSMWrap 3.1.2-usos1, a MODIFIED
+version made by the USOS project (LGPL-2.1 / SeaBIOS LGPLv3).
+
+diff -ruN a/src/csmwrap.c b/src/csmwrap.c
+--- a/src/csmwrap.c
++++ b/src/csmwrap.c
+@@ -542,11 +542,6 @@
+ 
+     gBS->SetWatchdogTimer(0, 0, 0, NULL);
+ 
+-    /* Banner is always shown on screen */
+-    gConfig.verbose = true;
+-    printf("%s", banner);
+-    gConfig.verbose = false;
+-
+     for (EFI_PHYSICAL_ADDRESS i = 0; i < 0x100000; i += EFI_PAGE_SIZE) {
+         EFI_PHYSICAL_ADDRESS j = i;
+         if (gBS->AllocatePages(AllocateAddress, EfiLoaderData, 1, &j) != EFI_SUCCESS) {
+@@ -582,6 +577,10 @@
+         config_load(sfs_dir, loaded_image->FilePath);
+     }
+ 
++    /* USOS: the logo is part of the verbose output (csmwrap.ini
++     * verbose = true); a default boot shows nothing on screen. */
++    printf("%s", banner);
++
+     /* Load custom VGABIOS from config path if specified */
+     EFI_FILE_PROTOCOL *vgabios_file_handle = NULL;
+     if (sfs_dir != NULL && gConfig.vgabios_path[0] != 0) {

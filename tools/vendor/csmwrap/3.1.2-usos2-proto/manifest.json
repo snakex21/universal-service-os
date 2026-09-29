@@ -1,0 +1,25 @@
+{
+  "version": "3.1.2-usos2-proto",
+  "status": "PROTOTYPE for docs/design/bios-via-csmwrap.md, NOT in the release (the release stages 3.1.2-usos1). Built by tools/csmwrap_build/run_build_vm.py --patches tools/vendor/csmwrap/3.1.2-usos2-proto/patches --usos-version 3.1.2-usos2-proto, twice with the same hash; the unpatched rebuild of that run matched 3.1.2-usos1/manifest.json upstream_rebuild",
+  "modified": "MODIFIED version of CSMWrap 3.1.2 and of its SeaBIOS fork: the three usos1 patches plus 0004 (SeaBIOS CSM boot priorities looked up in CSMWrap's BBS table by PCI address, USB mass storage included)",
+  "signed": false,
+  "source_archive": {
+    "file": "../3.1.2-src/csmwrap-3.1.2-src.tar.xz",
+    "sha256": "9be5b839d64d25021037096b6cf928cfcf444db587a40a06d50bc4863991ff72"
+  },
+  "patches": {
+    "0001-csmwrap-logo-only-when-verbose.patch": "7b6b90c5b414eda41da6236a6a779b796949aa396a518e07010413f72d5cb3e8",
+    "0002-quiet-flag-no-seabios-banner-or-boot-messages.patch": "9666705cbe6feb5eff0fe1f2c50f330c69717d06ecffcbaf216b519cc224763d",
+    "0003-seabios-no-boot-menu-when-quiet.patch": "e07436766cb3c799ecaa98e95a740548d6c0292b9e7a9e7c1d0282b6c68d4790",
+    "0004-seabios-csm-bbs-priority-by-pci-address.patch": "4d1eeed4faaa5f0c47154455850656b9190b4dbc50bc2495dda17859ccf6e136"
+  },
+  "files": {
+    "csmwrapx64.efi": "07ca9779b4ad0940f5708b353a086a7a2823de0865b57336b3257edfe971801f",
+    "toolchain.txt": "c681944546e95a3306bd2bd93304db8b2751ba11a1324e2571fddc715532c76f"
+  },
+  "embedded_blobs": {
+    "Csm16.bin": "2b76360b83e655d559a4e6fc2a49398b6534efc79add025bfabe3385b7b7ad64",
+    "vgabios.bin": "6de783208674dd56f8545a918bfe81741cdfcf0ba1ba9598c7de4461019b69e6"
+  },
+  "upstream_rebuild_same_run": "62d617fc02e0bf983f4d62c7f9a95d31bcfd4b049d3b0bc46b988434502856da"
+}

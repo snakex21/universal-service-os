@@ -43,7 +43,7 @@ Why this and not the alternatives:
 | Option | Verdict |
 |---|---|
 | **A. CSMWrap on the target ESP (chosen)** | Needed anyway: the installed XP must boot without the stick, and every boot needs CSMWrap. CSMWrap's own BBS rule (the drive it was loaded from goes first) makes the target MBR the boot device with no configuration. `DL=80h` matches the prepared bootstrap (`XP_BIOS_DRIVE=80`). |
-| B. CSMWrap on the stick, SeaBIOS boots the stick's BIOS MBR -> USOS BIOS Core -> existing BIOS XP path | Works in principle (the stick is BIOS-bootable), and useful as a *diagnostic* (USOS BIOS menu on a CSM-less board). But then SeaBIOS numbers the stick 80h and the target 81h during preparation, the installed system still needs A for later boots, and the BIOS Core path duplicates the UEFI preparer. Not the install path. |
+| B. CSMWrap on the stick, SeaBIOS boots the stick's BIOS MBR -> USOS BIOS Core -> existing BIOS XP path | Works in principle (the stick is BIOS-bootable), and useful as a *diagnostic* (USOS BIOS menu on a CSM-less board). But then SeaBIOS numbers the stick 80h and the target 81h during preparation, the installed system still needs A for later boots, and the BIOS Core path duplicates the UEFI preparer. Not the install path. For the DOS, FreeDOS and Windows 3.x paths this is the chosen entry: [bios-via-csmwrap.md](bios-via-csmwrap.md). |
 | C. CSMWrap on the stick, chaining to the target | CSMWrap has no boot-device option in 3.1.2 (only BBS "own drive first"). Would need an `int 18h`/chain boot sector on the stick ESP and still A for later boots. Rejected. |
 
 ### 2.1 Partition plan (profile `uefi_csmwrap_target`)

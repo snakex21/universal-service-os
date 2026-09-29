@@ -1,0 +1,11 @@
+uname: Linux 6.18.35-0-virt x86_64
+gcc: gcc (Alpine 15.2.0) 15.2.0
+ld: GNU ld (GNU Binutils) 2.45.1
+objcopy: GNU objcopy (GNU Binutils) 2.45.1
+nasm: NASM version 3.01 compiled on Mar  3 2026
+xxd: xxd 2026-06-16 by Juergen Weigert et al.
+make: GNU Make 4.4.1
+python3: Python 3.14.7
+git: git version 2.54.0
+tar: tar (GNU tar) 1.35
+xz: xz (XZ Utils) 5.8.4
