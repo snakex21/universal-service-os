@@ -45,6 +45,7 @@ def main():
     p.add_argument('--tree-scripts', default='', help='more tools/* names taken from the working tree')
     p.add_argument('--usb-only', action='store_true', help='qemu-xhci + usb-kbd + usb-tablet, pointer routed to the USB tablet')
     p.add_argument('--ahci', action='store_true', help='target on an AHCI controller')
+    p.add_argument('--usb-storage', type=Path, help='with --usb-only and --type-at: raw image hot-plugged as usb-storage at the first input step')
     p.add_argument('--type-at', default='', help='seconds after the CSMWrap boot start at which to type and move the pointer (space-separated)')
     a = p.parse_args()
     out = a.output.resolve()
@@ -70,6 +71,7 @@ def main():
     print('[PREPARE] CSMWrap ESP', 'PASS' if ok else 'MISSING')
     if not ok:
         raise SystemExit(log[-4000:])
+    csm.USB_STICK['path'] = a.usb_storage
     result = csm.boot(out, target, 'csmwrap-boot', 'std', 'tcg,thread=multi', a.minutes, run_through=a.run_through,
                       usb_only=a.usb_only, ahci=a.ahci, type_at=[float(t) for t in a.type_at.split()])
     serial = (out / 'csmwrap-boot/serial.log').read_text(errors='replace') if (out / 'csmwrap-boot/serial.log').exists() else ''

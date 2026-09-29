@@ -182,6 +182,9 @@ def to_png(ppm):
 
 
 USB_ONLY = ['-device', 'qemu-xhci,id=xhci', '-device', 'usb-kbd,bus=xhci.0', '-device', 'usb-tablet,bus=xhci.0']
+# --usb-storage: a disposable raw image hot-plugged as usb-storage on the xHCI
+# at the first input step (not at boot: the firmware would enumerate it).
+USB_STICK = {'path': None, 'done': False}
 
 
 def usb_input(mon, shots, tag):
@@ -189,6 +192,11 @@ def usb_input(mon, shots, tag):
     absolute move lands only when the guest's xHCI + HID stack runs) and keys
     (HMP sendkey goes to QEMU's active keyboard). The 8042 stays present:
     the X470 has one, and NTDETECT hangs without any keyboard controller."""
+    if USB_STICK['path'] and not USB_STICK['done']:
+        USB_STICK['done'] = True
+        mon.cmd(f'drive_add 0 if=none,id=ustick,format=raw,file={Path(USB_STICK["path"]).as_posix()}')
+        mon.cmd('device_add usb-storage,bus=xhci.0,drive=ustick,id=ustickdev')
+        (shots / (tag + '-usb-storage.txt')).write_text(mon.query('info usb'), encoding='utf-8')
     mice = mon.query('info mice')
     (shots / (tag + '-mice.txt')).write_text(mice, encoding='utf-8')
     for line in mice.splitlines():
@@ -200,7 +208,8 @@ def usb_input(mon, shots, tag):
         time.sleep(0.3)
     time.sleep(2)
     mon.cmd(f'screendump "{(shots / (tag + "-typed.ppm")).as_posix()}"')
-    for x, y in ((100, 100), (500, 400), (320, 240)):
+    # Ends off-centre: the Setup pointer starts in the middle of the screen.
+    for x, y in ((100, 100), (500, 400), (160, 360)):
         mon.cmd(f'mouse_move {x} {y}')
         time.sleep(0.5)
     time.sleep(1)

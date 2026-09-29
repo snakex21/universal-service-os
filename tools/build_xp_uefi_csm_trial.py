@@ -122,7 +122,7 @@ def refresh_pae_flow(esp):
 # entry, scripts included, is the base's own, byte for byte: the UEFI-CSM
 # differences are profile branches in the scripts (USOS_PLAN_PROFILE).
 PACKAGE_ENTRIES=('usr/lib/usos/xp-pae.exe','usr/lib/usos/xp-pae-LICENSE.txt')
-PACKAGE_PREFIXES=('usr/lib/usos/xp-drivers/','usr/lib/usos/nt5-storage/')
+PACKAGE_PREFIXES=('usr/lib/usos/xp-drivers/','usr/lib/usos/nt5-storage/','usr/lib/usos/nt52-usb/')
 
 # NT 5.2 (Server 2003 x86, XP x64) AHCI: GenAHCI 6.3.0.1 x86/x64 on the
 # system's own StorPort (tools/nt5_storage_stage.sh). Pinned archive.
@@ -139,6 +139,28 @@ def nt5_storage_files():
     files={'x86/genahci.sys':member('x86/genahci.sys'),'amd64/genahci.sys':member('x64/genahci.sys'),'gpl.txt':member('gpl.txt'),'SOURCE.txt':note}
     for name,data in files.items():
         if not data:raise ValueError('GenAHCI member missing: '+name)
+    return files
+
+# NT 5.2 (Server 2003 x86, XP x64) USB 2.0 on xHCI: xhci98 1.1.1.0, the
+# unmodified x86 and amd64 release builds (tools/nt52_usb_stage.sh). Tracked
+# in tools/vendor/xhci98/1.1.1.0, every file pinned by its manifest.
+XHCI98_DIR=ROOT/'tools/vendor/xhci98/1.1.1.0'
+
+def nt52_usb_files():
+    pins=json.loads((XHCI98_DIR/'manifest.json').read_text())
+    files={}
+    for arch,build in (('x86','release-x86'),('amd64','release-x64')):
+        for name in ('xhci98.sys','xhci98.inf'):
+            files[arch+'/'+name]=(XHCI98_DIR/build/name).read_bytes()
+            if hashlib.sha256(files[arch+'/'+name]).hexdigest()!=pins['files'][build+'/'+name]:raise ValueError('xhci98 file hash mismatch: '+build+'/'+name)
+    files['LICENSE']=(XHCI98_DIR/'LICENSE').read_bytes()
+    if hashlib.sha256(files['LICENSE']).hexdigest()!=pins['files']['LICENSE']:raise ValueError('xhci98 LICENSE hash mismatch')
+    files['SOURCE.txt']=('xhci98 %s (x86 and amd64 release builds, unmodified), %s\n'
+        'tag %s = commit %s; release archive %s sha256 %s.\n'
+        'Licence: GPL-2.0-only (LICENSE). Corresponding source: %s/archive/%s.tar.gz\n'
+        'USOS uses it only for Windows Server 2003 x86 and XP x64 (NT 5.2) Setup; staging\n'
+        'points the INF [SourceDisksNames] row 1 at the Setup source directory.\n'
+        %(pins['version'],pins['upstream'],pins['tag'],pins['commit'],pins['release_zip']['file'],pins['release_zip']['sha256'],pins['upstream'],pins['commit'])).encode()
     return files
 
 def is_package_entry(name):
@@ -160,6 +182,7 @@ def overlay(base, helper, driver_bundles):
     credit=b'USOS XP PAE: adapted from evgen-b/PatchPAE3, commit 3e1d3b65f5c3c1ec0c4759f707d3017e51113103.\nhttps://github.com/evgen-b/PatchPAE3\nPatterns by evgen_b, based on wj32 and XP64G. USOS adds strict checks and separate output/boot entries.\n\n'
     put(entries,Entry(prefix+'xp-pae-LICENSE.txt',stat.S_IFREG|0o644,credit+(vendor/'LICENSE').read_bytes()))
     for name,data in nt5_storage_files().items():put(entries,Entry(prefix+'nt5-storage/'+name,stat.S_IFREG|0o644,data))
+    for name,data in nt52_usb_files().items():put(entries,Entry(prefix+'nt52-usb/'+name,stat.S_IFREG|0o644,data))
     changed=[n for n in before if not is_package_entry(n) and (entries[n].mode,entries[n].data)!=before[n]]
     if changed:raise ValueError('package would change base entries: '+', '.join(changed))
     return pad_initrd(gzip.compress(newc(entries),compresslevel=6,mtime=0))
