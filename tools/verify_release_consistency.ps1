@@ -125,6 +125,7 @@ try {
         'EFI/USOS/csmwrap/patches/0001-csmwrap-logo-only-when-verbose.patch',
         'EFI/USOS/csmwrap/patches/0002-quiet-flag-no-seabios-banner-or-boot-messages.patch',
         'EFI/USOS/csmwrap/patches/0003-seabios-no-boot-menu-when-quiet.patch',
+        'EFI/USOS/csmwrap/patches/0004-seabios-csm-bbs-priority-by-pci-address.patch',
         'EFI/USOS/csmwrap/licenses/CSMWrap-LICENSE-LGPL-2.1.txt',
         'EFI/USOS/shell/Shell.efi',
         'EFI/USOS/shell/startup.nsh',

@@ -281,7 +281,7 @@ product keys are never included.
     (out / 'THIRD-PARTY-NOTICES.txt').write_text((header + body + '\n').replace('\n', '\r\n'), encoding='utf-8', newline='')
     offer = f"""USOS {version} - written offer for source code (GPL / LGPL)
 
-Sources that USOS modified (for example CSMWrap 3.1.2-usos1 with SeaBIOS)
+Sources that USOS modified (for example CSMWrap 3.1.2-usos3 with SeaBIOS)
 and the other sources available locally are included in
 USOS-{version}-sources.zip next to this file.
 

@@ -1,5 +1,5 @@
 {
-  "comment": "Pinned inputs of tools/build_csmwrap.ps1 (CSMWrap 3.1.2-usos1 source build in an Alpine VM).",
+  "comment": "Pinned inputs of tools/build_csmwrap.ps1 (CSMWrap 3.1.2-usos3 source build in an Alpine VM; the 1.0 build 3.1.2-usos1 with run_build_vm.py --patches tools/vendor/csmwrap/3.1.2-usos1/patches --usos-version 3.1.2-usos1).",
   "alpine_iso": {
     "file": "tools/cache/alpine/alpine-virt-3.24.1-x86_64.iso",
     "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-virt-3.24.1-x86_64.iso",
@@ -7,7 +7,7 @@
   },
   "alpine_mirror": "https://dl-cdn.alpinelinux.org/alpine",
   "alpine_branch": "v3.24",
-  "apk_packages_note": "Exact versions from the v3.24 branch on 2026-09-27; a stable branch keeps only its newest build, so when one is superseded, update the pin and rebuild (the output hashes in tools/vendor/csmwrap/3.1.2-usos1/manifest.json tell whether the result changed).",
+  "apk_packages_note": "Exact versions from the v3.24 branch on 2026-09-27; a stable branch keeps only its newest build, so when one is superseded, update the pin and rebuild (the output hashes in tools/vendor/csmwrap/3.1.2-usos3/manifest.json tell whether the result changed).",
   "apk_packages": ["gcc=15.2.0-r5", "binutils=2.45.1-r1", "musl-dev=1.2.6-r2", "make=4.4.1-r4", "nasm=3.01-r0", "xxd=9.2.1091-r0", "python3=3.14.7-r1", "git=2.54.0-r0", "tar=1.35-r5", "xz=5.8.4-r0", "patch=2.8-r0"],
   "csmwrap": {
     "url": "https://github.com/CSMWrap/CSMWrap.git",
@@ -26,5 +26,5 @@
   "source_dir": "csmwrap-3.1.2",
   "source_epoch": 1778284800,
   "upstream_version": "3.1.2",
-  "usos_version": "3.1.2-usos1"
+  "usos_version": "3.1.2-usos3"
 }

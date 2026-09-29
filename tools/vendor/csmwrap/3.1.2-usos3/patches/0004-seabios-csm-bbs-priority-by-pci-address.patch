@@ -1,6 +1,20 @@
-USOS patch 0004 (SeaBIOS, LGPLv3): CSM boot priorities from CSMWrap's BBS table by PCI address,
-including USB mass storage, so the drive CSMWrap was loaded from boots first also when it is a USB
-stick next to a bootable SATA/NVMe disk. docs/design/bios-via-csmwrap.md.
+USOS 3.1.2-usos3 patch 4/4 (2026-09-29): SeaBIOS CSM boot priorities by PCI address, USB included
+
+CSMWrap builds its own BBS table (one entry per boot controller, the one
+CSMWrap was loaded from first) and does not follow EDK2's fixed layout
+(0 = floppy, 1-4 = IDE channels, 5+ = PCI) that csm_bootprio_ata/pci
+assume, and USB mass storage asked only the bootorder file, which a CSM
+boot does not have. csm_bootprio_ata and csm_bootprio_pci now look the
+controller up in the BBS table by PCI address, and the new
+csm_bootprio_usb gives USB mass storage the priority of its xHCI/EHCI
+controller. Result: the drive CSMWrap was loaded from boots first, a USB
+stick next to a bootable SATA/NVMe disk included
+(docs/design/bios-via-csmwrap.md).
+
+Applies to CSMWrap 3.1.2 (808ac8e) with its seabios submodule (578d260b)
+after patches 0001-0003, patch -p1 from the top of the tree. Part of
+CSMWrap 3.1.2-usos3, a MODIFIED version made by the USOS project
+(LGPL-2.1 / SeaBIOS LGPLv3).
 
 --- a/seabios/src/boot.c
 +++ b/seabios/src/boot.c

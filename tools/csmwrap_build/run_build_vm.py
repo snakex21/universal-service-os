@@ -110,7 +110,7 @@ def main():
     p.add_argument('--accel', default='whpx')
     p.add_argument('--timeout-minutes', type=float, default=60)
     p.add_argument('--offline', type=Path, help='partial Alpine mirror (build kit csmwrap-vm/apk): no network needed')
-    p.add_argument('--patches', type=Path, help='prototype patch folder instead of 3.1.2-usos1/patches (e.g. 3.1.2-usos2-proto/patches)')
+    p.add_argument('--patches', type=Path, help='patch folder instead of 3.1.2-usos3/patches (e.g. 3.1.2-usos1/patches for the 1.0 build)')
     p.add_argument('--usos-version', help='BUILD_VERSION of the patched build (default: lock usos_version)')
     a = p.parse_args()
     lock = json.loads((HERE / 'lock.json').read_text(encoding='utf-8'))
@@ -123,9 +123,9 @@ def main():
         raise SystemExit(f'Alpine ISO missing: {iso} (download {lock["alpine_iso"]["url"]})')
     if sha256(iso) != lock['alpine_iso']['sha256']:
         raise SystemExit(f'Alpine ISO hash mismatch: {iso}')
-    patches = sorted(((a.patches or ROOT / 'tools/vendor/csmwrap/3.1.2-usos1/patches')).glob('*.patch'))
-    if not a.patches and len(patches) != 3:
-        raise SystemExit(f'expected 3 patches, found {len(patches)}')
+    patches = sorted(((a.patches or ROOT / 'tools/vendor/csmwrap/3.1.2-usos3/patches')).glob('*.patch'))
+    if not a.patches and len(patches) != 4:
+        raise SystemExit(f'expected 4 patches, found {len(patches)}')
     in_disk, out_disk = work / 'input.tar.img', work / 'output.tar.img'
     mirror = source = None
     if a.offline:
