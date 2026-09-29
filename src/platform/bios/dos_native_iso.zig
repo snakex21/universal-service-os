@@ -24,7 +24,9 @@ const Iso = struct {
     }
 };
 
-pub fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8, graphics: ?vbe.Session, image_name: []const u8) !void {
+/// noinline: its locals must not add to legacy_boot_actions.execute's frame (the PM32
+/// stack below 0x9E000 ends at the Core .data; docs/design/bios-via-csmwrap.md).
+pub noinline fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8, graphics: ?vbe.Session, image_name: []const u8) !void {
     const session = graphics orelse return error.DosPartitionScreenNeedsGraphics;
     const action = target_ui.action(session) orelse return;
     try config.validateName(image_name);

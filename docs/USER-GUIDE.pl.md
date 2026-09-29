@@ -447,6 +447,46 @@ Uwagi do tabeli:
 - Menu przy każdym systemie pokazuje odznakę, np. „Wymaga wyłączenia
   Secure Boot” albo „Wymaga BIOS”.
 
+### 5.1 Tryb BIOS (CSMWrap) na komputerach bez CSM (szkic dla 1.1)
+
+> Szkic: ta sekcja opisuje funkcję wersji 1.1 z gałęzi
+> `feature/bios-via-csmwrap`. Jest przetestowana w QEMU, jeszcze nie na
+> sprzęcie, i nie jest częścią 1.0.
+
+Na komputerze UEFI bez CSM (albo z wyłączonym CSM) pozycja **Narzędzia ->
+Tryb BIOS (CSMWrap)** w menu UEFI uruchamia CSMWrap z pendrive'a. Komputer
+działa wtedy jak stary PC z BIOS-em aż do następnego restartu i otwiera
+menu **BIOS** USOS, w którym FreeDOS, MS-DOS i Windows 3.1 / 3.11 działają
+jak na komputerze z BIOS-em.
+
+- Pozycja jest widoczna tylko wtedy, gdy firmware nie ma CSM. Z CSM uruchom
+  pendrive w trybie Legacy (własny tryb BIOS firmware).
+- **Secure Boot musi być wyłączony**: CSMWrap nie jest podpisany. Przy
+  włączonym Secure Boot pozycja jest wyszarzona i wyjaśnia dlaczego.
+- CSMWrap rezerwuje dla siebie jeden wątek procesora. DOS i Windows 3.x i
+  tak używają jednego wątku.
+- Karta graficzna musi mieć klasyczny BIOS wideo (mają go karty, które
+  potrafią jeszcze startować z CSM). Bez niego ekrany DOS zostają czarne.
+- Restart (także REBOOT w DOS albo Ctrl+Alt+Del) zawsze wraca do UEFI.
+
+**Instalacja MS-DOS lub Windows 3.x w tym trybie.** Instalator działa jak na
+komputerze z BIOS-em. Dodatkowo zakłada na dysku docelowym małą partycję EFI
+(64 MiB, na końcu dysku), dzięki czemu zainstalowany DOS/Windows startuje
+później sam: wybierz pozycję UEFI tego dysku w menu startowym firmware
+(Secure Boot wyłączony). Mówi o tym strona potwierdzenia. Nie usuwaj
+partycji „Non-DOS” w FDISK: bez niej dysk wystartuje tylko z CSM.
+
+Na takim dysku USOS ustawia też:
+
+- mysz USB w DOS i Windows 3.x (VBADOS VBMOUSE);
+- klawiaturę USB w Windows 3.x po ostatnim restarcie, w trybie
+  standardowym i rozszerzonym 386 oraz w oknach DOS (USOSKEY);
+- `HIMEM.SYS /M:2`, którego ten tryb wymaga.
+
+Setup Windows 3.x działa tu w trybie wsadowym: po dwóch naciśnięciach
+Enter w jego części DOS instaluje bez pytań (użytkownik „USOS”, bez
+samouczka i drukarki), więc do całej instalacji wystarczy klawiatura USB.
+
 ---
 
 ## 6. Secure Boot i klucz USOS (MOK)

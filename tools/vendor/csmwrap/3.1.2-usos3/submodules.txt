@@ -1,0 +1,7 @@
+ dae79833b57a01b9fd3e359ee31def69f5ae899b cc-runtime (heads/packed)
+ dfa1922c0749faf64c4423a81b233a20c08a7db7 flanterm (v3.1.1)
+ 097259a899d30f0a4b7a694de2de5fdda942e923 freestnd-c-hdrs (097259a)
+ 526cbca59d23fcb4e4aee3a93beaf22bc63e67a5 nanoprintf (v0.6.0-1-g526cbca)
+ af14129ec21ba482873289e36311ec02f1e19964 picoefi (af14129)
+ 578d260b94f62150bf6ab9149784287bd1154f06 seabios (remotes/origin/csmwrap-20260505)
+ 338dc389ef38c5264e317c61d8121aace5ac865d uACPI (4.0.0-9-g338dc38)

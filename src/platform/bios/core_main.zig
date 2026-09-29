@@ -5,6 +5,7 @@ const test_mode = @import("test_mode");
 const catalog_directory_source = @import("catalog_directory_source.zig");
 const catalog_ntfs_directory_source = @import("catalog_ntfs_directory_source.zig");
 const console = @import("console.zig");
+const seabios = @import("seabios.zig");
 const diagnostics = @import("diagnostics.zig");
 const hardware_state = @import("hardware_state.zig");
 const linux_load_probe = @import("linux_load_probe.zig");
@@ -104,6 +105,11 @@ export fn core_main(context: *const BootContext) callconv(.c) void {
     console.print("BOOT CONTEXT OK drive=0x");
     console.printHex8(context.bios_drive);
     console.line("");
+    seabios.detect();
+    if (seabios.present) {
+        console.bios_keyboard_fallback = true;
+        console.line(if (seabios.csmwrap) "[BIOS_INPUT] CSMWrap SeaBIOS: INT 16h keyboard fallback on" else "[BIOS_INPUT] SeaBIOS: INT 16h keyboard fallback on");
+    }
 
     runFrontend(context);
     console.screen_output = true;

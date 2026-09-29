@@ -7,6 +7,8 @@ const formatter = @import("dos_fat32_format.zig");
 const formatter16 = @import("dos_fat16_format.zig");
 const seeder16 = @import("dos_fat16_seed.zig");
 const menu = @import("graphics_menu.zig");
+const seabios = @import("seabios.zig");
+const csmwrap_esp = @import("dos_csmwrap_esp.zig");
 const Raw = extern struct { sectors_low: u32 = 0, sectors_high: u32 = 0, bytes_per_sector: u16 = 0, cylinders: u16 = 0, heads: u16 = 0, sectors_per_track: u16 = 0 };
 extern fn bios_drive_info(drive: u32, output: *Raw) callconv(.c) u32;
 extern fn bios_read_sector_drive(drive: u32, lba: u64, out: [*]u8) callconv(.c) u32;
@@ -89,7 +91,7 @@ pub fn choose(source: u8, session: vbe.Session, selected_action: Action) !?Selec
         if (number == source) continue;
         var raw = Raw{};
         if (bios_drive_info(@intCast(number), &raw) != 0 or raw.bytes_per_sector != 512 or raw.sectors_high != 0 or raw.sectors_low < (if (fat16) @as(u32, 264226) else 4_196_386)) continue;
-        if (fat16) _ = partition.planFat16(@intCast(number), source, raw.sectors_low, 128, raw.cylinders, raw.heads, raw.sectors_per_track, [_]u8{0} ** 512) catch continue;
+        if (fat16) _ = partition.planFat16(@intCast(number), source, planSectors(raw.sectors_low), 128, raw.cylinders, raw.heads, raw.sectors_per_track, [_]u8{0} ** 512) catch continue;
         var sector: [512]u8 = undefined;
         if (bios_read_sector_drive(@intCast(number), 1, &sector) != 0) continue;
         if (std.mem.eql(u8, sector[0..8], "EFI PART") and std.mem.eql(u8, sector[56..72], source_gpt[56..72])) continue;
@@ -190,9 +192,10 @@ pub fn choose(source: u8, session: vbe.Session, selected_action: Action) !?Selec
                     .{ .title = confirm_ui.t(.key_cancel), .icon = .{ .vector = .close } },
                     .{ .title = confirm_ui.t(.dos_confirm_go), .icon = .{ .vector = .warning } },
                 };
-                const confirm_notes = [_][]const u8{ detail, confirm_ui.t(.dos_confirm_note1), confirm_ui.t(.dos_confirm_note2) };
+                const confirm_notes = [_][]const u8{ detail, confirm_ui.t(.dos_confirm_note1), confirm_ui.t(.dos_confirm_note2), confirm_ui.t(.dos_confirm_csmwrap) };
+                const shown_notes: usize = if (fat16 and seabios.csmwrap) 4 else 3;
                 var confirm_hints: [3]graphics.ui.Hint = undefined;
-                menu.choice(&session, confirm_ui.t(.dos_confirm_title), disk.label[0..disk.len], &choices, confirm, &confirm_notes, hints(&confirm_ui, &confirm_hints, .key_confirm));
+                menu.choice(&session, confirm_ui.t(.dos_confirm_title), disk.label[0..disk.len], &choices, confirm, confirm_notes[0..shown_notes], hints(&confirm_ui, &confirm_hints, .key_confirm));
                 const confirm_key = console.readKey();
                 if (confirm_key.ascii == 27) break;
                 if (confirm_key.scan == 0x48) confirm = 0;
@@ -205,9 +208,14 @@ pub fn choose(source: u8, session: vbe.Session, selected_action: Action) !?Selec
         }
     }
 }
+/// Under CSMWrap the DOS partition must end before the disk's CSMWrap ESP
+/// (dos_csmwrap_esp.zig), so sizes are checked against its start.
+fn planSectors(total: u32) u32 {
+    return if (seabios.csmwrap) csmwrap_esp.start(total) else total;
+}
 fn sizeAvailable(disk: *const Disk, source: u8, size: u32, fat16: bool) bool {
     if (fat16) {
-        _ = partition.planFat16(disk.drive, source, disk.sectors, size, disk.cylinders, disk.heads, disk.spt, disk.before) catch return false;
+        _ = partition.planFat16(disk.drive, source, planSectors(disk.sectors), size, disk.cylinders, disk.heads, disk.spt, disk.before) catch return false;
         return true;
     }
     return disk.sectors >= size * 2 * 1024 * 1024 + 2082;
@@ -219,6 +227,14 @@ pub fn commit(plan: partition.Plan) !void {
     var writer = Writer{ .drive = plan.drive };
     try partition.apply(&writer, plan, &dos_mbr_start);
     if (plan.fat16) try formatter16.format(&writer, plan) else try formatter.format(&writer, plan);
+}
+/// Under CSMWrap, after commitDos: the disk's own CSMWrap ESP at its tail
+/// (dos_csmwrap_esp.zig). 32 KiB image chunks at 0x320000 (the scratch
+/// area Writer.zero also uses; the boot floppy there is consumed by now).
+pub fn addCsmwrapEsp(plan: partition.Plan, source: anytype, image_bytes: u32) !u32 {
+    var writer = Writer{ .drive = plan.drive };
+    const buffer: [*]u8 = @ptrFromInt(0x320000);
+    return csmwrap_esp.write(&writer, source, buffer[0 .. 64 * 512], image_bytes, plan.disk_sectors, 2048 + plan.partition_sectors);
 }
 pub fn commitDos(plan: partition.Plan, seed: seeder16.Seed) !void {
     try seed.validate();

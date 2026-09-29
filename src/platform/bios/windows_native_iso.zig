@@ -35,7 +35,9 @@ const IsoReader = struct {
 
 /// `folder`: the DATA system folder ("Windows 10", "Windows Vista", "Windows
 /// Server 2022", ...) holding Images\<image_name> and Unattended\.
-pub fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8, graphics: ?vbe.Session, folder: []const u8, image_name: []const u8, unattended_name: ?[]const u8) !noreturn {
+/// noinline: its locals must not add to legacy_boot_actions.execute's frame (the PM32
+/// stack below 0x9E000 ends at the Core .data; docs/design/bios-via-csmwrap.md).
+pub noinline fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8, graphics: ?vbe.Session, folder: []const u8, image_name: []const u8, unattended_name: ?[]const u8) !noreturn {
     try iso_config.validateName(image_name);
     try iso_config.validateName(folder);
     if (unattended_name) |name| try iso_config.validateName(name);

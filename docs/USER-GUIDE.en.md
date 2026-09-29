@@ -444,6 +444,46 @@ Notes on the table:
 - The menu shows a badge next to each system, e.g. "Requires Secure Boot
   off" or "Requires BIOS".
 
+### 5.1 Legacy BIOS mode (CSMWrap) on PCs without CSM (draft for 1.1)
+
+> Draft: this section describes the 1.1 feature on the branch
+> `feature/bios-via-csmwrap`. It is tested in QEMU, not yet on hardware, and
+> is not part of 1.0.
+
+On a UEFI computer without CSM (or with CSM switched off), **Utilities ->
+Legacy BIOS mode (CSMWrap)** in the UEFI menu starts CSMWrap from the stick.
+The computer then works like an old BIOS PC until the next restart and
+opens the USOS **BIOS** menu, where FreeDOS, MS-DOS and Windows 3.1 / 3.11
+work as on a BIOS machine.
+
+- The entry is shown only when the firmware has no CSM. With a CSM, start
+  the stick in Legacy mode instead (the firmware's own BIOS mode).
+- **Secure Boot must be off**: CSMWrap is not signed. With Secure Boot on
+  the entry is greyed out and says why.
+- CSMWrap keeps one CPU thread for itself. DOS and Windows 3.x use one
+  thread anyway.
+- The graphics card needs a legacy video BIOS (cards that can still boot
+  with CSM have one). Without it the DOS screens stay black.
+- A restart (also REBOOT in DOS or Ctrl+Alt+Del) always returns to UEFI.
+
+**Installing MS-DOS or Windows 3.x in this mode.** The installer works as
+on a BIOS PC. Additionally it puts a small EFI partition (64 MiB, at the end
+of the disk) on the target disk, so the installed DOS/Windows disk starts on
+its own later: choose the disk's UEFI entry in the firmware boot menu
+(Secure Boot off). The confirmation page mentions this. Do not delete the
+"Non-DOS" partition in FDISK: without it the disk boots only with a CSM.
+
+On such a disk USOS also sets up:
+
+- the USB mouse in DOS and Windows 3.x (VBADOS VBMOUSE);
+- the USB keyboard in Windows 3.x after the final restart, in standard and
+  386 enhanced mode and in DOS windows (USOSKEY);
+- `HIMEM.SYS /M:2`, which this mode needs.
+
+Windows 3.x Setup runs in batch mode here: after two Enter presses in its
+DOS part it installs without questions (user name "USOS", no tutorial, no
+printer), so a USB keyboard is enough for the whole installation.
+
 ---
 
 ## 6. Secure Boot and the USOS key (MOK)

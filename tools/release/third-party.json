@@ -1081,7 +1081,7 @@
     {
       "id": "csmwrap",
       "name": "CSMWrap with its SeaBIOS fork",
-      "version": "3.1.2-usos1",
+      "version": "3.1.2-usos3",
       "license": "LGPL-2.1-only AND LGPL-3.0-only",
       "modified": true,
       "ships_in": [
@@ -1104,7 +1104,7 @@
       "source": {
         "bundle_paths": [
           "tools/vendor/csmwrap/3.1.2-src",
-          "tools/vendor/csmwrap/3.1.2-usos1",
+          "tools/vendor/csmwrap/3.1.2-usos3",
           "tools/csmwrap_build",
           "tools/build_csmwrap.ps1",
           "docs/research/csmwrap.md"
@@ -1115,7 +1115,7 @@
         ],
         "offer": false
       },
-      "notice": "MODIFIED by USOS on 2026-09-27 (quiet boot unless csmwrap.ini sets verbose = true; three patches in 3.1.2-usos1/patches). Submodules: cc-runtime (Apache-2.0 WITH LLVM-exception), flanterm (BSD-2-Clause), freestnd-c-hdrs (0BSD), nanoprintf (Unlicense OR 0BSD), PicoEFI, uACPI (MIT)."
+      "notice": "MODIFIED by USOS on 2026-09-27 (quiet boot unless csmwrap.ini sets verbose = true; patches 0001-0003) and 2026-09-29 (SeaBIOS boot priorities from the CSMWrap BBS table by PCI address, USB included; patch 0004); four patches in 3.1.2-usos3/patches. Submodules: cc-runtime (Apache-2.0 WITH LLVM-exception), flanterm (BSD-2-Clause), freestnd-c-hdrs (0BSD), nanoprintf (Unlicense OR 0BSD), PicoEFI, uACPI (MIT)."
     },
     {
       "id": "touchi2cdxe",
@@ -1237,6 +1237,31 @@
         "offer": false
       },
       "notice": "By Japheth; derived from FreeDOS HIMEM (Till Gerken, Tom Ehlert, GPL and/or Artistic licence); unmodified, source on the ESP (HIMEMSRC.ZIP)."
+    },
+    {
+      "id": "vbados",
+      "name": "VBADOS (VBMOUSE.EXE, VBMOUSE.DRV)",
+      "version": "0.67",
+      "license": "GPL-2.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/vbados/0.67/COPYING",
+        "tools/vendor/vbados/0.67/SOURCES.txt"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/vbados/0.67/vbados-0.67.tar.gz",
+          "tools/vendor/vbados/0.67/manifest.json"
+        ],
+        "urls": [
+          "https://git.javispedro.com/cgit/vbados.git/tag/?h=v0.67"
+        ],
+        "offer": false
+      },
+      "notice": "By Javier S. Pedro; unmodified release binaries, source on the ESP (VBADOS.TGZ) and VBADOS.TXT (SOURCES + GPL text) next to them on MS-DOS / Windows 3.x disks installed under CSMWrap."
     },
     {
       "id": "freedos",

@@ -8,6 +8,7 @@
 .global bios_drive_info
 .global bios_read_key
 .global bios_read_key_timeout
+.global bios_poll_key
 .global bios_power_off
 .global bios_restart
 .global bios_vbe_probe
@@ -492,6 +493,23 @@ bios_read_key_timeout:
     jmp enter_bios
 
 /*
+ * cdecl: u32 bios_poll_key(void). Non-blocking INT 16h poll for firmware
+ * without 8042 emulation of USB keyboards (SeaBIOS, also as CSMWrap's CSM):
+ * returns scan code in AH / ASCII in AL, or 0xFFFFFFFF when no key is ready.
+ * IRQ1 and IRQ12 stay masked meanwhile, so PS/2 keyboard and mouse bytes are
+ * left in the 8042 for core_poll_scancode (docs/design/bios-via-csmwrap.md).
+ */
+bios_poll_key:
+    push ebp
+    push ebx
+    push esi
+    push edi
+    mov dword ptr [THUNK_SAVED_ESP], esp
+    mov byte ptr [THUNK_STATUS], 1
+    mov byte ptr [THUNK_OP], 16
+    jmp enter_bios
+
+/*
  * cdecl: u32 bios_power_off(void).
  * Uses the real-mode APM interface. Success does not return because firmware
  * removes power; any return to PM32 is reported as failure so the UI can tell
@@ -669,6 +687,8 @@ real_entry:
     je .wimboot_jump
     cmp byte ptr [THUNK_OP], 15
     je .dos_jump
+    cmp byte ptr [THUNK_OP], 16
+    je .keyboard_poll_masked
     mov dl, byte ptr [CONTEXT_BIOS_DRIVE]
     jmp .disk_read_common
 .disk_read_explicit:
@@ -1097,6 +1117,38 @@ real_entry:
     mov byte ptr [THUNK_STATUS], 0
     jmp .bios_done
 
+.keyboard_poll_masked:
+    /* Pending IRQ0 runs SeaBIOS's timer handler, which polls USB HID and
+     * queues keys in the BDA; AH=01 then reports them without waiting. */
+    in al, 0x21
+    mov bl, al
+    in al, 0xA1
+    mov bh, al
+    mov al, bl
+    or al, 0x02
+    out 0x21, al
+    mov al, bh
+    or al, 0x10
+    out 0xA1, al
+    mov byte ptr [THUNK_STATUS], 2
+    sti
+    nop
+    nop
+    mov ah, 0x01
+    int 0x16
+    jz .keyboard_poll_masked_done
+    xor ah, ah
+    int 0x16
+    mov word ptr [THUNK_KEY], ax
+    mov byte ptr [THUNK_STATUS], 0
+.keyboard_poll_masked_done:
+    cli
+    mov al, bl
+    out 0x21, al
+    mov al, bh
+    out 0xA1, al
+    jmp .bios_done
+
 .keyboard_read_timeout:
     mov eax, dword ptr [0x046C]
     mov dword ptr [THUNK_KEY_START_TICK], eax
@@ -1146,6 +1198,8 @@ pm32_resume:
     cmp byte ptr [THUNK_OP], 1
     je .return_key
     cmp byte ptr [THUNK_OP], 2
+    je .return_key
+    cmp byte ptr [THUNK_OP], 16
     je .return_key
     cmp byte ptr [THUNK_OP], 3
     je .return_failure
@@ -1377,6 +1431,10 @@ core_poll_scancode:
     mov dx, 0x0064
     in al, dx
     mov byte ptr [THUNK_LAST_KEYBOARD_STATUS], al
+    /* 0xFF = no 8042 at all (floating bus, e.g. i8042-less UEFI machines
+     * under CSMWrap): nothing to read, keep the INT 16h fallback usable. */
+    cmp al, 0xFF
+    je .no_scancode
     test al, 0x01
     jz .no_scancode
     mov cl, al

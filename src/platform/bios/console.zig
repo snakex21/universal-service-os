@@ -1,4 +1,5 @@
 extern fn core_poll_scancode() callconv(.c) u32;
+extern fn bios_poll_key() callconv(.c) u32;
 extern fn core_scancode_count() callconv(.c) u32;
 extern fn core_last_scancode() callconv(.c) u32;
 extern fn core_keyboard_poll_count() callconv(.c) u32;
@@ -216,14 +217,35 @@ pub fn printRawTail() void {
     }
 }
 
+/// SeaBIOS (plain, or as the CSM inside CSMWrap) handles USB keyboards only
+/// through INT 16h and has no 8042 emulation, so the 8042 polling below never
+/// sees them. When set (core_main, SeaBIOS signature found), an empty 8042 is
+/// followed by one non-blocking INT 16h poll, until the 8042 has delivered
+/// its first keyboard byte: from then on a PS/2 keyboard is in use and only
+/// the 8042 path reads keys, so no key arrives twice (once through the port,
+/// once through SeaBIOS's IRQ1 handler during a disk thunk).
+/// docs/design/bios-via-csmwrap.md.
+pub var bios_keyboard_fallback: bool linksection(".data") = false;
+
 fn pollKey() ?Key {
     const raw = core_poll_scancode();
-    if (raw == no_scancode) return null;
+    if (raw == no_scancode) {
+        if (!bios_keyboard_fallback or core_scancode_count() != 0) return null;
+        const bios_key = bios_poll_key();
+        if (bios_key == no_scancode) return null;
+        return biosKey(@truncate(bios_key >> 8));
+    }
     if (raw & 0x100 != 0) {
         if (auxiliary.hook) |hook| return hook(@truncate(raw));
         return null;
     }
     return scan_decoder.feed(@truncate(raw));
+}
+
+/// INT 16h AH=00 returns the Set 1 make code in AH (0 or E0 in AL for the
+/// grey keys), so the menu keys map through the same table.
+fn biosKey(scan: u8) ?Key {
+    return decodeSet1(scan, false);
 }
 
 fn isResponseLike(byte: u8) bool {

@@ -1,0 +1,107 @@
+USOS 3.1.2-usos3 patch 4/4 (2026-09-29): SeaBIOS CSM boot priorities by PCI address, USB included
+
+CSMWrap builds its own BBS table (one entry per boot controller, the one
+CSMWrap was loaded from first) and does not follow EDK2's fixed layout
+(0 = floppy, 1-4 = IDE channels, 5+ = PCI) that csm_bootprio_ata/pci
+assume, and USB mass storage asked only the bootorder file, which a CSM
+boot does not have. csm_bootprio_ata and csm_bootprio_pci now look the
+controller up in the BBS table by PCI address, and the new
+csm_bootprio_usb gives USB mass storage the priority of its xHCI/EHCI
+controller. Result: the drive CSMWrap was loaded from boots first, a USB
+stick next to a bootable SATA/NVMe disk included
+(docs/design/bios-via-csmwrap.md).
+
+Applies to CSMWrap 3.1.2 (808ac8e) with its seabios submodule (578d260b)
+after patches 0001-0003, patch -p1 from the top of the tree. Part of
+CSMWrap 3.1.2-usos3, a MODIFIED version made by the USOS project
+(LGPL-2.1 / SeaBIOS LGPLv3).
+
+--- a/seabios/src/boot.c
++++ b/seabios/src/boot.c
+@@ -421,6 +421,12 @@
+ 
+ int bootprio_find_usb(struct usbdevice_s *usbdev, int lun)
+ {
++    if (CONFIG_CSM && usbdev->hub->cntl->pci) {
++        // CSMWrap's BBS table names the USB controller it was loaded from.
++        int prio = csm_bootprio_usb(usbdev->hub->cntl->pci);
++        if (prio >= 0)
++            return prio;
++    }
+     if (!CONFIG_BOOTORDER)
+         return -1;
+     // Find usb - examples:
+--- a/seabios/src/fw/csm.c
++++ b/seabios/src/fw/csm.c
+@@ -411,15 +411,36 @@
+     }
+ }
+ 
+-int csm_bootprio_ata(struct pci_device *pci, int chanid, int slave)
++// CSMWrap builds its own BBS table: one entry per boot controller, in UEFI
++// enumeration order, the controller CSMWrap was loaded from first (priority
++// 0). It does not follow EDK2's fixed layout (0 = floppy, 1-4 = IDE
++// channels, 5+ = PCI), so look entries up by PCI address. USOS patch 0004.
++static int csm_bootprio_bdf(struct pci_device *pci, const char *what)
+ {
+-    if (!csm_boot_table)
++    if (!csm_boot_table || !pci)
+         return -1;
+     BBS_TABLE *bbs = (void *)csm_boot_table->BbsTable;
+-    int index = 1 + (chanid * 2) + slave;
+-    dprintf(3, "CSM bootprio for ATA%d,%d (index %d) is %d\n", chanid, slave,
+-            index, bbs[index].BootPriority);
+-    return csm_prio_to_seabios(bbs[index].BootPriority);
++    int i;
++
++    for (i = 0; i < csm_boot_table->NumberBbsEntries; i++) {
++        if (pci->bdf == pci_to_bdf(bbs[i].Bus, bbs[i].Device, bbs[i].Function)) {
++            dprintf(3, "CSM bootprio for %s PCI(%d,%d,%d) (index %d) is %d\n",
++                    what, bbs[i].Bus, bbs[i].Device, bbs[i].Function, i,
++                    bbs[i].BootPriority);
++            return csm_prio_to_seabios(bbs[i].BootPriority);
++        }
++    }
++    return -1;
++}
++
++int csm_bootprio_ata(struct pci_device *pci, int chanid, int slave)
++{
++    return csm_bootprio_bdf(pci, "ATA");
++}
++
++int csm_bootprio_usb(struct pci_device *pci)
++{
++    return csm_bootprio_bdf(pci, "USB");
+ }
+ 
+ int csm_bootprio_fdc(struct pci_device *pci, int port, int fdid)
+@@ -433,17 +454,5 @@
+ 
+ int csm_bootprio_pci(struct pci_device *pci)
+ {
+-    if (!csm_boot_table)
+-        return -1;
+-    BBS_TABLE *bbs = (void *)csm_boot_table->BbsTable;
+-    int i;
+-
+-    for (i = 5; i < csm_boot_table->NumberBbsEntries; i++) {
+-        if (pci->bdf == pci_to_bdf(bbs[i].Bus, bbs[i].Device, bbs[i].Function)) {
+-            dprintf(3, "CSM bootprio for PCI(%d,%d,%d) is %d\n", bbs[i].Bus,
+-                    bbs[i].Device, bbs[i].Function, bbs[i].BootPriority);
+-            return csm_prio_to_seabios(bbs[i].BootPriority);
+-        }
+-    }
+-    return -1;
++    return csm_bootprio_bdf(pci, "PCI");
+ }
+--- a/seabios/src/util.h
++++ b/seabios/src/util.h
+@@ -125,6 +125,7 @@
+ int csm_bootprio_fdc(struct pci_device *pci, int port, int fdid);
+ int csm_bootprio_ata(struct pci_device *pci, int chanid, int slave);
+ int csm_bootprio_pci(struct pci_device *pci);
++int csm_bootprio_usb(struct pci_device *pci);
+ int csm_quiet(void);
+ 
+ // fw/mptable.c

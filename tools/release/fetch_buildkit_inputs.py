@@ -14,6 +14,8 @@ Pinned here:
     GOPROXY=file:// tree;
   - Pillow 10.4.0 for CPython 3.13 win_amd64 (tools/generate_legacy_icons.py);
   - EfiFs 1.12 ntfs_x64.efi (tools/fetch_ntfs_driver.ps1);
+  - the OpenWatcom 2.0 snapshot of 2026-09-01 (tools/build_win3_usb_keyboard.py:
+    USOSKEY.DRV, the Windows 3.x USB keyboard driver);
   - a partial Alpine v3.24 x86_64 mirror for the CSMWrap build VM
     (tools/csmwrap_build): the signed APKINDEX.tar.gz of main and community
     and every package of the dependency closure of lock.json apk_packages.
@@ -35,6 +37,9 @@ FIXED = [
      'sha256': '030abdbe43ee02e0de642aee345efa443740aa4d828bfe8e2eb11922ea6a21ea', 'license': 'MIT-CMU (HPND)', 'version': '10.4.0'},
     {'id': 'efifs-ntfs', 'file': 'ntfs_x64.efi', 'url': 'https://github.com/pbatard/efifs/releases/download/v1.12/ntfs_x64.efi',
      'sha256': '59c37d5026ca14553a158939e3f2cf20286b6135a713a62c08b569ac9caedcb7', 'license': 'GPL-3.0-or-later', 'version': '1.12'},
+    # OpenWatcom 2.0 for the Windows 3.x USB keyboard driver (tools/build_win3_usb_keyboard.py).
+    {'id': 'openwatcom', 'file': 'ow-snapshot-2026-09-01.tar.xz', 'url': 'https://github.com/open-watcom/open-watcom-v2/releases/download/2026-09-01-Build/ow-snapshot.tar.xz',
+     'sha256': 'bac354f3c75ffa49ff8d70a44e475de7e7c1823fff04b80c14787bd0792c9bdf', 'license': 'Sybase Open Watcom Public License 1.0 (build tool only; nothing linked into USOS)', 'version': '2.0 2026-09-01-Build'},
 ]
 GO_MODULES = ['golang.org/x/sys@v0.47.0']
 

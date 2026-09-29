@@ -32,6 +32,14 @@
       "sha256": "59c37d5026ca14553a158939e3f2cf20286b6135a713a62c08b569ac9caedcb7",
       "license": "GPL-3.0-or-later",
       "version": "1.12"
+    },
+    {
+      "id": "openwatcom",
+      "file": "ow-snapshot-2026-09-01.tar.xz",
+      "url": "https://github.com/open-watcom/open-watcom-v2/releases/download/2026-09-01-Build/ow-snapshot.tar.xz",
+      "sha256": "bac354f3c75ffa49ff8d70a44e475de7e7c1823fff04b80c14787bd0792c9bdf",
+      "license": "Sybase Open Watcom Public License 1.0 (build tool only; nothing linked into USOS)",
+      "version": "2.0 2026-09-01-Build"
     }
   ],
   "go_modules": [

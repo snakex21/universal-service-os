@@ -361,3 +361,18 @@ under a few seconds on hardware). Hiding it needs another SeaBIOS change
 (cursor off in `enable_vga_console()` on a quiet boot), i.e. a new build;
 not done here. Not tested on the X470 yet.
 
+
+## 8. 3.1.2-usos3 for 1.1 (2026-09-29, branch `feature/bios-via-csmwrap`)
+
+usos1 plus SeaBIOS patch 0004 (CSM boot priorities looked up in CSMWrap's
+BBS table by PCI address, USB mass storage included), so the drive CSMWrap
+was loaded from boots first also when it is a USB stick next to a bootable
+SATA disk. Needed by the UEFI menu's "Legacy BIOS mode (CSMWrap)"; details,
+naming (no clash with the failed usos2 `system_thread_visible` experiment)
+and tests in [../design/bios-via-csmwrap.md](../design/bios-via-csmwrap.md)
+section 8.2. `csmwrapx64.efi` SHA-256
+`bbf05216af896e24e5dd9da21d89bd063c17d1dab42f83561abc8cd49844de5f`, repeatable
+over three VM runs; staged by `release.go`, pinned in `xp_csmwrap_esp.sh`
+and in the DOS target ESP image. XP and Vista target-ESP boots with and
+without the stick: PASS in QEMU. The blinking-cursor patch mentioned in
+section 7 is still not done (it would be a later build).
