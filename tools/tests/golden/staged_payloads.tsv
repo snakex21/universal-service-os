@@ -21,7 +21,7 @@ initramfs	usr/lib/usos/legacy_xp_staging.sh	100755	d07047f77890544303e069f197a55
 initramfs	usr/lib/usos/micro_linux_ui.sh	100755	2746a51c0a03bd2503b4c5d0d5f334141b09adbfd43909f91256c6d304a57d6f
 initramfs	usr/lib/usos/nt52_usb_stage.sh	100755	1a51e01bb1c50b9687cd56de5575ce7f1721dd5bdcad7ef73d97361b72c41127
 initramfs	usr/lib/usos/nt5_profile.sh	100755	7d13f35fe285de2e73a0bc70708e0ce744328bba7ac5bbbdca56892e5dfaf38a
-initramfs	usr/lib/usos/nt5_storage_stage.sh	100755	270e214f1887d508cd1d29ccca42c52b87c8f578d0694053dbf048fc424fe288
+initramfs	usr/lib/usos/nt5_storage_stage.sh	100755	2b656da845fb69abf6ba304ab97a3d3f32d8c19611e7a254120f8b133ee26f8d
 initramfs	usr/lib/usos/nt5_user_drivers.sh	100755	f119d30029bf0e34aa65a791509df186d00ce41d31c445efc1a89eefa5110ab0
 initramfs	usr/lib/usos/partuuid.sh	100755	717393ba57556d5e9b11bcc545f36738c07cf4a084967ce807f55b03193f995e
 initramfs	usr/lib/usos/partuuid_diagnostics.sh	100755	a44c0ab7e222998cd56b205a9ce6c0f40319b8853ebae90ac533427db0c10c37
@@ -259,7 +259,7 @@ initramfs	usr/lib/usos/xp-stage2.bin	100644	1f73f3a534edc6d5a1f365d3bb6de43aca7f
 initramfs	usr/lib/usos/xp-vbr-code.bin	100644	6732885c24cc80d00f10093bb707fcfdd5e8755e8fc95734178f38b48ddb0059
 initramfs	usr/lib/usos/xp64_selected_partition_uefi_csm.sif	100755	d71bc6e824ebf15070445b4a17f6d5a0d18ff570e231a776d9af964f83922263
 initramfs	usr/lib/usos/xp_confirmation_ui.sh	100755	83d24331a4cec19452def8de121dcdc94dc67ce6b755d1d6025520a95f3a152d
-initramfs	usr/lib/usos/xp_csmwrap_esp.sh	100755	715cedb85cfe787b619db64d596f30f5a424732948369517492608808ccf8594
+initramfs	usr/lib/usos/xp_csmwrap_esp.sh	100755	e49c5b465189cc0d736ff791d3e8acff0f829d1ed5f086bf0ede2bf4d21004b3
 initramfs	usr/lib/usos/xp_detect_system.sh	100755	c80b0918d6794112474a18e57ef309ee4d32f09f37ecde4224c74680611ee046
 initramfs	usr/lib/usos/xp_disk_overview.sh	100755	6859dd93672462c90cfe38a5e46e678ca3cf3f664f7af3e694f07be5adba2a06
 initramfs	usr/lib/usos/xp_disk_reset.sh	100755	b276d75d00ac5a0cb2fea21ffb53877db1336443ff5a398f40cc364eacbf6ff1
@@ -279,6 +279,9 @@ initramfs	usr/lib/usos/xp_windows_partition_plan.awk	100755	daf7a14c3428503518c3
 xp_csm	usr/lib/usos/nt5-storage	40755	dir
 xp_csm	usr/lib/usos/nt5-storage/SOURCE.txt	100644	5811426b50249ae9d3e196dad543cd10df7dc33ec56943678b323121daf42d1b
 xp_csm	usr/lib/usos/nt5-storage/amd64	40755	dir
+xp_csm	usr/lib/usos/nt5-storage/amd64/acpi	40755	dir
+xp_csm	usr/lib/usos/nt5-storage/amd64/acpi/ReadMe.txt	100644	7970f7d88118ab745fced58c79b39637fda4e141357f875b0b51a5b0afd8252a
+xp_csm	usr/lib/usos/nt5-storage/amd64/acpi/acpi.sys	100644	2aaac644abd3b94d8e1f41d1ea98ba88a18fe8c7273ba423796f0fdac20b6202
 xp_csm	usr/lib/usos/nt5-storage/amd64/genahci.cat	100644	73402b6c51b1e12e1e6ce509726badf1d12208f719ad8472af9caeef8e914e07
 xp_csm	usr/lib/usos/nt5-storage/amd64/genahci.inf	100644	afd2f9277e8ad990511e4fc2088ae39dde90ef91217f7292d48ecf8eb4d7eb7d
 xp_csm	usr/lib/usos/nt5-storage/amd64/genahci.sys	100644	e79cc1f13a9eed115ab4e6db74131f3ceb5741104058d2054fbd7a7cd6f16042
@@ -391,6 +394,7 @@ payload_zip	EFI/USOS/csmwrap/licenses/uACPI-LICENSE.txt
 payload_zip	EFI/USOS/csmwrap/patches/0001-csmwrap-logo-only-when-verbose.patch
 payload_zip	EFI/USOS/csmwrap/patches/0002-quiet-flag-no-seabios-banner-or-boot-messages.patch
 payload_zip	EFI/USOS/csmwrap/patches/0003-seabios-no-boot-menu-when-quiet.patch
+payload_zip	EFI/USOS/csmwrap/patches/0004-seabios-csm-bbs-priority-by-pci-address.patch
 payload_zip	EFI/USOS/dos-native/COPYING
 payload_zip	EFI/USOS/dos-native/freedos/BOOT16.BIN
 payload_zip	EFI/USOS/dos-native/freedos/COMMAND.COM
@@ -411,6 +415,7 @@ payload_zip	EFI/USOS/dos-native/freedos/manifest.json
 payload_zip	EFI/USOS/dos-native/manifest.json
 payload_zip	EFI/USOS/dos-native/memdisk
 payload_zip	EFI/USOS/dos-native/msdos/COPYDOS.BAT
+payload_zip	EFI/USOS/dos-native/msdos/CSMESP.IMG
 payload_zip	EFI/USOS/dos-native/msdos/HIMEMSRC.ZIP
 payload_zip	EFI/USOS/dos-native/msdos/HIMEMX.EXE
 payload_zip	EFI/USOS/dos-native/msdos/HIMEMX.TXT
@@ -420,8 +425,18 @@ payload_zip	EFI/USOS/dos-native/msdos/LIVE.BAT
 payload_zip	EFI/USOS/dos-native/msdos/PREPDOS.BAT
 payload_zip	EFI/USOS/dos-native/msdos/REBOOT.COM
 payload_zip	EFI/USOS/dos-native/msdos/UNPACK.BAT
+payload_zip	EFI/USOS/dos-native/msdos/USOS.SHH
+payload_zip	EFI/USOS/dos-native/msdos/USOSKEY.COM
+payload_zip	EFI/USOS/dos-native/msdos/USOSKEY.DRV
+payload_zip	EFI/USOS/dos-native/msdos/VBADOS.TGZ
+payload_zip	EFI/USOS/dos-native/msdos/VBADOS.TXT
+payload_zip	EFI/USOS/dos-native/msdos/VBMOUSE.DRV
+payload_zip	EFI/USOS/dos-native/msdos/VBMOUSE.EXE
 payload_zip	EFI/USOS/dos-native/msdos/W3AUTO.BAT
+payload_zip	EFI/USOS/dos-native/msdos/W3AUTO.CSM
+payload_zip	EFI/USOS/dos-native/msdos/W3CONFIG.CSM
 payload_zip	EFI/USOS/dos-native/msdos/W3CONFIG.SYS
+payload_zip	EFI/USOS/dos-native/msdos/W3INI.BAS
 payload_zip	EFI/USOS/dos-native/msdos/W3START.BAT
 payload_zip	EFI/USOS/dos-native/msdos/WINMENU.BAT
 payload_zip	EFI/USOS/dos-native/msdos/manifest.json

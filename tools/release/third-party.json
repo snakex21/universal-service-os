@@ -1471,6 +1471,25 @@
       "notice": "Files taken from the named Microsoft XP SP3 ISO (SP3.CAB, TXTSETUP.SIF, HIVESYS.INF, SETUPREG.HIV, ...) and the community Integral Edition 2025.8.19 patch set (modified Microsoft drivers: USB 3 stack, WDF, ntoskrn8, ksecd8, ACPI, storport); Microsoft/community property, not covered by any USOS licence. Kept deliberately by the maintainer (preservation: the original downloads may disappear); redistributed at the maintainer's own risk and removed on request of the rights holder."
     },
     {
+      "id": "xp64-community-acpi",
+      "name": "Community ACPI 2.0 driver for Windows XP x64 (acpi.sys 5.2.3790.7777.4, amd64)",
+      "version": "5.2.3790.7777.4 (amd64 free build, SHA-256 2aaac644abd3b94d8e1f41d1ea98ba88a18fe8c7273ba423796f0fdac20b6202)",
+      "license": "LicenseRef-Microsoft-redistributed-by-user",
+      "modified": false,
+      "ships_in": [
+        "xp-package"
+      ],
+      "license_files": [
+        "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x64/ACPI/ReadMe.txt"
+      ],
+      "source": {
+        "bundle_paths": [],
+        "offer": false,
+        "urls": []
+      },
+      "notice": "Community-built ACPI 2.0 driver for XP x64 SP2 (MSFN/WinCert community ACPI 2.0 project, 7777.4 build set), derived from Microsoft code, in usr/lib/usos/nt5-storage/amd64/acpi of the XP package, together with a copy of the named XP x64 SP2 ISO's AMD64\\SP2.CAB that holds it (sp2/<sha256>/SP2.CAB). Community/Microsoft property, not covered by any USOS licence. Kept deliberately by the maintainer (without it XP x64 cannot be installed on modern boards); redistributed at the maintainer's own decision and risk and removed on request of the rights holder."
+    },
+    {
       "id": "system-icons",
       "name": "Operating system logos in UI/Icons/Systems",
       "version": "2026-09-03",

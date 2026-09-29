@@ -75,30 +75,35 @@ def resolve(tables, mod, name, depth=0):
     return resolve(tables, tmod, tname, depth + 1)
 
 
-def check(iso: Path, work: Path) -> dict:
-    subprocess.run([SEVEN, 'e', '-y', str(iso), *['I386\\' + n for n in INBOX.values()], '-o' + str(work)], check=True, stdout=subprocess.DEVNULL)
+# --driver checks one XP x64 driver (e.g. the community x64 ACPI) against AMD64.
+INBOX_AMD64 = {'ntoskrnl.exe': 'NTOSKRNL.EX_', 'hal.dll': 'HAL.DL_', 'wmilib.sys': 'WMILIB.SY_'}
+
+
+def check(iso: Path, work: Path, driver: Path | None = None) -> dict:
+    top, inbox, selected = (('AMD64', INBOX_AMD64, {driver.name.lower(): driver}) if driver else
+                            ('I386', INBOX, {Path(r).name.lower(): DRIVERS / r for r in NT52_SELECTED}))
+    subprocess.run([SEVEN, 'e', '-y', str(iso), *[top + '\\' + n for n in inbox.values()], '-o' + str(work)], check=True, stdout=subprocess.DEVNULL)
     tables = {}
-    for name, packed in INBOX.items():
+    for name, packed in inbox.items():
         subprocess.run([SEVEN, 'e', '-y', str(work / packed), '-o' + str(work)], check=True, stdout=subprocess.DEVNULL)
         # The expanded file keeps its own name (NTKRNLMP.EX_ -> ntkrnlmp.exe).
         stem = packed.rsplit('.', 1)[0].lower()
         plain = next(p for p in work.iterdir() if p.stem.lower() == stem and not p.name.endswith('_'))
         tables[name] = pe(plain)
-    for rel in NT52_SELECTED:
-        tables[Path(rel).name.lower()] = pe(DRIVERS / rel)
+    for name, path in selected.items():
+        tables[name] = pe(path)
     report = {}
-    for rel in NT52_SELECTED:
-        name = Path(rel).name.lower()
+    for name in selected:
         missing = sorted({m for m in (resolve(tables, mod, fn) for mod, fn in tables[name][1]) if m})
         report[name] = {'imports': len(tables[name][1]), 'missing': missing}
     return report
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(); p.add_argument('--source-iso', type=Path, required=True); p.add_argument('--json', type=Path)
+    p = argparse.ArgumentParser(); p.add_argument('--source-iso', type=Path, required=True); p.add_argument('--json', type=Path); p.add_argument('--driver', type=Path)
     a = p.parse_args()
     with tempfile.TemporaryDirectory() as tmp:
-        report = check(a.source_iso, Path(tmp))
+        report = check(a.source_iso, Path(tmp), a.driver)
     if a.json:
         a.json.write_text(json.dumps(report, indent=2))
     bad = {k: v['missing'] for k, v in report.items() if v['missing']}

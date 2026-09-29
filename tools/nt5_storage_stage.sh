@@ -25,7 +25,8 @@
 #     NT 5.2 has no inbox AHCI driver (no msahci/storahci entry to clash);
 #   - DOSNET.INF of the local source lists genahci.sys and genahci.inf.
 # No Microsoft file is added or changed except the TXTSETUP.SIF, DOSNET.INF
-# and HIVESYS.INF copies on the target.
+# and HIVESYS.INF copies on the target, and for XP x64 the ACPI driver and
+# SP2.CAB (usos_nt5_acpi below).
 #   sh nt5_storage_stage.sh apply     (XP_TARGET_ROOT, NT5_SOURCE_DIR)
 usos_nt5_storage_apply() (
     set -eu
@@ -69,7 +70,65 @@ usos_nt5_storage_apply() (
     fi
     sync
     printf '[NT5_STORAGE] APPLIED PASS genahci.sys+inf (%s) boot+local source, TXTSETUP.SIF PCI\\CC_010601, HIVESYS.INF CriticalDeviceDatabase\n' "$arch"
+    # XP x64 (amd64): the community x64 ACPI (tools/xp64_acpi.py).
+    if [ "$arch" = amd64 ]; then usos_nt5_acpi "${USOS_NT5_STORAGE_DIR:-/usr/lib/usos/nt5-storage}/amd64/acpi" "$bt" "$ls"; fi
 )
+
+# XP x64 SP2: the stock 5.2 ACPI.SYS stops with 0xA5 on new AMD boards
+# (X470), so the community ACPI 2.0 build 5.2.3790.7777.4 (amd64) replaces
+# it, as the community ACPI does for XP x86 (tools/xp_driver_overlay.py):
+#   - acpi.sys uncompressed in $WIN_NT$.~BT (loaded by SETUPLDR) and
+#     ~LS\AMD64 (copied by text mode), any acpi.sys / acpi.sy_ removed;
+#   - SP2.CAB (GUI-phase PnP and the driver cache) replaced by the package's
+#     copy for this source: sp2/<SHA-256 of the source's own SP2.CAB>/SP2.CAB,
+#     the ISO's cabinet with only acpi.sys changed (tools/xp64_acpi.py);
+#   - TXTSETUP.SIF (the three copies) [FileFlags] acpi.sys = 16.
+# A source whose SP2.CAB the package does not know keeps the stock ACPI
+# (logged as SKIP): nothing half-applied.
+USOS_XP64_ACPI_SHA256=2aaac644abd3b94d8e1f41d1ea98ba88a18fe8c7273ba423796f0fdac20b6202
+usos_nt5_acpi() {
+    acpi=$1 bt=$2 ls=$3
+    [ -f "$acpi/acpi.sys" ] || { echo "[NT5_ACPI] STOP: $acpi/acpi.sys missing from the package"; exit 1; }
+    [ "$(sha256sum "$acpi/acpi.sys" | awk '{print $1}')" = "$USOS_XP64_ACPI_SHA256" ] || { echo '[NT5_ACPI] STOP: packaged acpi.sys does not match the pinned hash'; exit 1; }
+    have=$(sha256sum "$ls/SP2.CAB" 2>/dev/null | awk '{print $1}')
+    cab="$acpi/sp2/$have/SP2.CAB"
+    if [ -z "$have" ] || [ ! -f "$cab" ]; then
+        printf '[NT5_ACPI] SKIP: no packaged SP2.CAB for this source (SP2.CAB sha256=%s); stock ACPI.SYS kept\n' "${have:-missing}"
+        return 0
+    fi
+    found=0
+    for folder in "$bt" "$ls"; do
+        n=$(find "$folder" -maxdepth 1 -type f \( -iname acpi.sys -o -iname acpi.sy_ \) | wc -l)
+        [ "$n" -ge 1 ] || { echo "[NT5_ACPI] STOP: no acpi.sys/acpi.sy_ in $folder"; exit 1; }
+        find "$folder" -maxdepth 1 -type f \( -iname acpi.sys -o -iname acpi.sy_ \) -exec rm -f '{}' \;
+        cp "$acpi/acpi.sys" "$folder/acpi.sys"
+        cmp -s "$acpi/acpi.sys" "$folder/acpi.sys"
+        found=$((found + n))
+    done
+    cp "$cab" "$ls/SP2.CAB.usos"
+    cmp -s "$cab" "$ls/SP2.CAB.usos"
+    mv "$ls/SP2.CAB.usos" "$ls/SP2.CAB"
+    for sif in "$bt/TXTSETUP.SIF" "$ls/TXTSETUP.SIF" "$XP_TARGET_ROOT/TXTSETUP.SIF"; do
+        [ -f "$sif" ] || continue
+        usos_nt5_acpi_sif < "$sif" > "$sif.usos" || { rm -f "$sif.usos"; echo "[NT5_ACPI] STOP: cannot patch $sif"; exit 1; }
+        mv "$sif.usos" "$sif"
+    done
+    sync
+    printf '[NT5_ACPI] APPLIED PASS acpi.sys 5.2.3790.7777.4 sha256=%s (replaced %s), SP2.CAB, FileFlags\n' "$USOS_XP64_ACPI_SHA256" "$found"
+}
+
+# stdin TXTSETUP.SIF -> stdout with [FileFlags] acpi.sys = 16 (refused when
+# an acpi.sys row is already there or the section is missing).
+usos_nt5_acpi_sif() {
+    awk '
+        { line = $0; sub(/\r$/, "", line); low = tolower(line) }
+        /^\[/ { inside = (low == "[fileflags]") }
+        inside && low ~ /^acpi\.sys[ \t]*=/ { dup = 1 }
+        { print line "\r" }
+        low == "[fileflags]" && !f { print "acpi.sys = 16\r"; f = 1 }
+        END { if (dup || !f) exit 3 }
+    '
+}
 
 # Every output line ends in CRLF, as the NT5 setup files do (BusyBox awk
 # keeps the input CR, other awks drop it; both give the same bytes here).

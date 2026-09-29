@@ -19,6 +19,7 @@ from pathlib import Path
 import argparse, gzip, hashlib, json, os, shutil, stat, struct, subprocess
 from build_micro_linux import parse_newc, newc, Entry, put, pad_initrd
 from xp_driver_overlay import build_driver_overlay
+import xp64_acpi
 
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'zig-out/xp-uefi-csm'
@@ -146,7 +147,9 @@ def genahci_inf(data,subdir):
     if text.count(GENAHCI_DISK_ROW+'\r\n')!=1:raise ValueError('genahci.inf [SourceDisksNames] row 1 changed')
     return b'\xff\xfe'+text.replace(GENAHCI_DISK_ROW+'\r\n',GENAHCI_DISK_ROW+'\\'+subdir+'\\genahci\r\n').encode('utf-16-le')
 
-def nt5_storage_files():
+def nt5_storage_files(xp64_isos=()):
+    """GenAHCI x86/amd64 and, for XP x64, the community x64 ACPI with one
+    SP2.CAB per XP x64 SP2 ISO in `xp64_isos` (tools/xp64_acpi.py)."""
     if digest(GENAHCI_ARCHIVE)!=GENAHCI_SHA256:raise ValueError('GenAHCI archive hash mismatch')
     def member(name):
         return subprocess.run([os.environ.get('USOS_7Z','C:/Program Files/7-Zip/7z.exe'),'e','-so',str(GENAHCI_ARCHIVE),name],check=True,capture_output=True).stdout
@@ -164,6 +167,7 @@ def nt5_storage_files():
         if not data:raise ValueError('GenAHCI member missing: '+name)
     machine=lambda b:struct.unpack_from('<H',b,struct.unpack_from('<I',b,60)[0]+4)[0]
     if (machine(files['x86/genahci.sys']),machine(files['amd64/genahci.sys']))!=(0x14c,0x8664):raise ValueError('GenAHCI build architectures changed')
+    files.update(xp64_acpi.files(xp64_isos))
     return files
 
 # NT 5.2 (Server 2003 x86, XP x64) USB 2.0 on xHCI: xhci98 1.1.1.0-usos2,
@@ -197,7 +201,9 @@ def nt52_usb_files():
 def is_package_entry(name):
     return name in PACKAGE_ENTRIES or name=='usr/lib/usos/xp-drivers' or name.startswith(PACKAGE_PREFIXES)
 
-def overlay(base, helper, driver_bundles):
+def overlay(base, helper, driver_bundles, xp64_isos=(), xp64_extra=None):
+    """xp64_extra: XP x64 ACPI SP2.CAB entries (nt5-storage relative) carried
+    over from an older package whose XP x64 ISO is not at hand."""
     entries=parse_newc(gzip.decompress(base.read_bytes()))
     prefix='usr/lib/usos/'
     before={n:(e.mode,e.data) for n,e in entries.items()}
@@ -212,7 +218,9 @@ def overlay(base, helper, driver_bundles):
     vendor=ROOT/'tools/vendor/patchpae3/3e1d3b65f5c3c1ec0c4759f707d3017e51113103'
     credit=b'USOS XP PAE: adapted from evgen-b/PatchPAE3, commit 3e1d3b65f5c3c1ec0c4759f707d3017e51113103.\nhttps://github.com/evgen-b/PatchPAE3\nPatterns by evgen_b, based on wj32 and XP64G. USOS adds strict checks and separate output/boot entries.\n\n'
     put(entries,Entry(prefix+'xp-pae-LICENSE.txt',stat.S_IFREG|0o644,credit+(vendor/'LICENSE').read_bytes()))
-    for name,data in nt5_storage_files().items():put(entries,Entry(prefix+'nt5-storage/'+name,stat.S_IFREG|0o644,data))
+    storage=nt5_storage_files(xp64_isos)
+    for name,data in (xp64_extra or {}).items():storage.setdefault(name,data)
+    for name,data in storage.items():put(entries,Entry(prefix+'nt5-storage/'+name,stat.S_IFREG|0o644,data))
     for name,data in nt52_usb_files().items():put(entries,Entry(prefix+'nt52-usb/'+name,stat.S_IFREG|0o644,data))
     changed=[n for n in before if not is_package_entry(n) and (entries[n].mode,entries[n].data)!=before[n]]
     if changed:raise ValueError('package would change base entries: '+', '.join(changed))
@@ -230,6 +238,36 @@ RELEASE_SOURCES={
     'bd3234250a6e2f68fbacf0a46cf42a7d711811e428210c0d60649a054f28ff0b':'pl_windows_xp_professional_with_service_pack_3_x86_cd_x14-80476.iso',
     '62b6c91563bad6cd12a352aa018627c314cfc5162d8e9f8af0756a642e602a46':'en_windows_xp_professional_with_service_pack_3_x86_cd_x14-80428.iso',
 }
+
+# XP x64 SP2 sources that get the community x64 ACPI's SP2.CAB (tools/xp64_acpi.py).
+# The release requires these (every language's package carries XP x64);
+# stick builds take every XP x64 SP2 ISO in DATA's Windows XP x64 folder.
+RELEASE_XP64_SOURCES={
+    'ace108a116ed33ddbfd6b7e2c5f21bcef9b3ba777ca9a8052730138341a3d67d':'en_win_xp_pro_x64_with_sp2_vl_x13-41611.iso',
+}
+
+def xp64_sources(data, release=False):
+    """XP x64 SP2 ISOs (read only) whose SP2.CAB gets the x64 community ACPI."""
+    folder=data/'Systems/Windows/Windows XP x64/Images'
+    isos=[];sources=[]
+    for iso in sorted(folder.glob('*.iso')) if folder.exists() else []:
+        h=digest(iso)
+        if release and h not in RELEASE_XP64_SOURCES:
+            print('XP x64 release: skipping source not on the allowlist:',iso.name,flush=True);continue
+        if not xp64_acpi.is_xp64_sp2(iso):
+            print('XP x64: skipping non-SP2 source',iso.name,flush=True);continue
+        isos.append(iso);sources.append({'name':iso.name,'sha256':h,'size':iso.stat().st_size})
+    if release:
+        missing=sorted(set(RELEASE_XP64_SOURCES)-{s['sha256'] for s in sources})
+        if missing:raise ValueError('XP release: allowlisted XP x64 source missing on DATA: '+', '.join(RELEASE_XP64_SOURCES[h] for h in missing))
+    return isos,sources
+
+XP64_SP2_PREFIX='usr/lib/usos/nt5-storage/'+xp64_acpi.PREFIX+'sp2/'
+
+def old_xp64_cabs(old):
+    """The XP x64 ACPI SP2.CAB entries of an older package (nt5-storage relative)."""
+    entries=parse_newc(gzip.decompress((old/'initramfs-xp').read_bytes()))
+    return {n[len('usr/lib/usos/nt5-storage/'):]:e.data for n,e in entries.items() if n.startswith(XP64_SP2_PREFIX)}
 
 # --release-lang: one language's source only (the 1.0 release ships the PL and
 # EN packages as separate assets); the name prefix picks the allowlist entry.
@@ -298,10 +336,16 @@ def build_from_old(micro, data, old):
             print('XP_BUNDLE_REUSED',source['name'],bundle_id,flush=True)
         driver_bundles.append((bundle_id,bundle));sources.append(dict(source))
     nt52,nt52_sources=nt52_bundles(data)
-    init=OUT/'initramfs-xp';init.write_bytes(overlay(base,helper,driver_bundles+nt52))
+    xp64,xp64_list=xp64_sources(data)
+    # XP x64 ISOs not at hand: the old package's SP2.CAB entries as they are.
+    carried=old_xp64_cabs(old) if (old/'initramfs-xp').is_file() else {}
+    for s in old_meta.get('xp64_acpi_sources',[]):
+        if s['sha256'] not in {x['sha256'] for x in xp64_list}:xp64_list.append(dict(s));print('XP64_ACPI_REUSED',s['name'],flush=True)
+    init=OUT/'initramfs-xp';init.write_bytes(overlay(base,helper,driver_bundles+nt52,xp64,carried))
     shutil.copyfile(kernel,OUT/'vmlinuz.efi')
     metadata=dict(old_meta)
     metadata['nt52_driver_sources']=nt52_sources
+    metadata['xp64_acpi_sources']=xp64_list
     metadata.update({'driver_bundles':[n for n,_ in driver_bundles],'driver_sources':sources,'base_initramfs_sha256':digest(base),'base_kernel_sha256':digest(kernel),'hardware_verified':False,'sha256':{p.name:digest(p) for p in [init,OUT/'vmlinuz.efi',helper]}})
     metadata.pop('added_source',None)
     (OUT/'manifest.json').write_text(json.dumps(metadata,indent=2)+'\n')
@@ -331,11 +375,14 @@ def build(micro, data, release=False, release_lang=None):
     for s,(bundle_id,_) in zip(sources,driver_bundles):s['bundle']=bundle_id
     # The release carries only the allowlisted XP sources: no Server 2003 bundle.
     nt52,nt52_sources=([],[]) if release else nt52_bundles(data)
-    init=OUT/'initramfs-xp';init.write_bytes(overlay(base,helper,driver_bundles+nt52))
+    # XP x64: the community x64 ACPI with the SP2.CAB of each XP x64 source.
+    xp64,xp64_list=xp64_sources(data,release)
+    init=OUT/'initramfs-xp';init.write_bytes(overlay(base,helper,driver_bundles+nt52,xp64))
     shutil.copyfile(kernel,OUT/'vmlinuz.efi')
     for stale in OUT.glob('XP-SP*-UEFI-CSM-PAE.efi'):stale.unlink()
     metadata={'experimental':True,'driver_bundles':[n for n,_ in driver_bundles],'driver_supported_sources':[p.name for p in supported],'driver_sources':sources,'firmware':'UEFI preparation; XP through firmware CSM','hardware_verified':False,'base_initramfs_sha256':digest(base),'base_kernel_sha256':digest(kernel),'launchers':[],'iso_names':[i.name for i in (supported if release else images)],'profile':'xp-x86-sp3-uefi-csm','sha256':{p.name:digest(p) for p in [init,OUT/'vmlinuz.efi',helper]}}
     metadata['nt52_driver_sources']=nt52_sources
+    metadata['xp64_acpi_sources']=xp64_list
     if release:
         metadata['release']=True
         if release_lang:metadata['release_lang']=release_lang

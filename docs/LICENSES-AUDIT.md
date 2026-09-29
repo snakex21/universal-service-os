@@ -192,7 +192,7 @@ Notes on individual entries:
 
 XP package (`initramfs-xp` = `initramfs-usos` + 114 entries):
 `usr/lib/usos/xp-pae.exe` + `xp-pae-LICENSE.txt` (PatchPAE3 adaptation),
-`usr/lib/usos/nt5-storage/` (GenAHCI x86/x64 + `gpl.txt` + `SOURCE.txt`),
+`usr/lib/usos/nt5-storage/` (GenAHCI x86/x64 + `gpl.txt` + `SOURCE.txt`; since 1.1 also `amd64/acpi/`: the community x64 ACPI 2.0 `acpi.sys` 5.2.3790.7777.4 for XP x64 with its `ReadMe.txt` and, per XP x64 SP2 source ISO, `sp2/<sha256>/SP2.CAB` = that ISO's `AMD64\SP2.CAB` with `acpi.sys` replaced),
 `usr/lib/usos/nt52-usb/` (xhci98 1.1.1.0-usos2, MODIFIED, x86/amd64 `.sys` + `.inf`, `LICENSE`, `MODIFIED.txt`, `SOURCE.txt`; branch `feature/nt52-xhci98`),
 `usr/lib/usos/xp-drivers/<bundle>/I386/*` (per-ISO bundles: `SP3.CAB`,
 `TXTSETUP.SIF`, `DOSNET.INF`, `HIVESYS.INF`, `SETUPREG.HIV` and the added
@@ -251,6 +251,13 @@ USOS licence:
    Microsoft drivers from the Windows XP Integral Edition 2025.8.19 patch set
    (Windows 8 USB 3 stack backports, WDF, `ntoskrn8`, `ksecd8`, modified
    ACPI and storport). The community patch set states no licence.
+   Since 1.1 also, for XP x64: the **community x64 ACPI** `acpi.sys`
+   5.2.3790.7777.4 (amd64 free build, SHA-256 `2aaac644...6202`, the
+   MSFN/WinCert community ACPI 2.0 project, 7777.4 build set; provenance in
+   `media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x64/ACPI/ReadMe.txt`)
+   and the named XP x64 SP2 ISO's `AMD64\SP2.CAB` with that file replaced.
+   Like the x86 community ACPI it is community-built, derived from Microsoft
+   code, and states no licence.
 
 `third-party.json` lists these as `LicenseRef-Microsoft-redistributed-by-user`
 with an explicit notice each. Whether items 2 to 4 may be redistributed is a
@@ -268,6 +275,14 @@ redistributed by the USOS maintainer at the maintainer's own risk; they are
 not covered by any USOS licence, and they will be removed on request of the
 rights holder. The same note is in `THIRD-PARTY-NOTICES.txt` and the release
 notes.
+
+**Maintainer decision (2026-09-30): the community x64 ACPI for XP x64 is
+shipped too** (item 4, `third-party.json` id `xp64-community-acpi`), with the
+same wording as the x86 community ACPI: community-built, derived from
+Microsoft code, redistributed at the maintainer's own decision and risk, not
+covered by any USOS licence, removed on request of the rights holder. Without
+it XP x64 cannot be installed on modern boards (STOP 0xA5 on the X470). Until
+1.1 it lived only on the local branch `private/xp64-acpi`.
 
 ## 6. Obligations checklist (GPL / LGPL)
 

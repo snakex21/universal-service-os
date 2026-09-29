@@ -12,11 +12,14 @@
   package files.
 """
 from pathlib import Path
-import os, shutil, struct, subprocess, sys, tempfile, unittest
+import hashlib, os, shutil, struct, subprocess, sys, tempfile, unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
-SH = next((p for p in (r'C:\msys64\usr\bin\sh.exe', r'C:\Program Files\Git\usr\bin\sh.exe', shutil.which('sh') or '') if p and Path(p).exists()), None)
+# A shell whose folder also has cmp (the staging scripts use it; an MSYS2
+# without diffutils lacks it).
+SH = next((p for p in (r'C:\msys64\usr\bin\sh.exe', r'C:\Program Files\Git\usr\bin\sh.exe', shutil.which('sh') or '')
+           if p and Path(p).exists() and any((Path(p).parent / n).exists() for n in ('cmp.exe', 'cmp'))), None)
 # The shell's own coreutils (awk) first: PowerShell runs lack them on PATH.
 if SH:
     os.environ['PATH'] = str(Path(SH).parent) + os.pathsep + os.environ.get('PATH', '')
@@ -82,6 +85,7 @@ HIVESYS = (b'\r\n[Version]\r\nSignature = "$Windows NT$"\r\n\r\n[AddReg]\r\n'
            b'HKLM,"SYSTEM\\CurrentControlSet\\Control\\CriticalDeviceDatabase\\gendisk",Service,0x00000000,disk\r\n'
            b'[AddReg.Fresh]\r\nHKLM,"SYSTEM\\Setup","SystemSetupInProgress",0x00010001,1\r\n[AddReg]\r\nHKLM,"SYSTEM\\Other",x,0x00000000,y\r\n')
 CDDB = 'HKLM,"SYSTEM\\CurrentControlSet\\Control\\CriticalDeviceDatabase\\'
+ACPI_FILEFLAGS = b'[FileFlags]\r\nntoskrnl.exe = 16\r\n'
 STORAGE_DOSNET = b'[Files]\r\nd1,storport.sys\r\n[FloppyFiles.1]\r\nd1,storport.sys\r\n[FloppyFiles.1]\r\nd1,hal.dll\r\n'
 
 
@@ -122,8 +126,13 @@ class Nt52Storage(unittest.TestCase):
     def test_package_files(self):
         import build_xp_uefi_csm_trial as builder
         files = builder.nt5_storage_files()
-        self.assertEqual(sorted(files), ['SOURCE.txt', 'amd64/genahci.cat', 'amd64/genahci.inf', 'amd64/genahci.sys',
-                                         'gpl.txt', 'x86/genahci.cat', 'x86/genahci.inf', 'x86/genahci.sys'])
+        self.assertEqual(sorted(files), ['SOURCE.txt', 'amd64/acpi/ReadMe.txt', 'amd64/acpi/acpi.sys', 'amd64/genahci.cat', 'amd64/genahci.inf',
+                                         'amd64/genahci.sys', 'gpl.txt', 'x86/genahci.cat', 'x86/genahci.inf', 'x86/genahci.sys'])
+        # The XP x64 community ACPI: pinned, x64 native driver (tools/xp64_acpi.py).
+        import hashlib, xp64_acpi
+        self.assertEqual(hashlib.sha256(files['amd64/acpi/acpi.sys']).hexdigest(), xp64_acpi.ACPI_SHA256)
+        self.assertEqual(xp64_acpi.check_pe(files['amd64/acpi/acpi.sys'])['machine'], 0x8664)
+        self.assertIn(xp64_acpi.ACPI_SHA256.encode(), (ROOT / 'tools/nt5_storage_stage.sh').read_bytes())
         for arch, sub in (('x86', 'i386'), ('amd64', 'amd64')):
             inf = files[arch + '/genahci.inf']
             self.assertTrue(inf.startswith(b'\xff\xfe'))
@@ -183,6 +192,68 @@ class Nt52Storage(unittest.TestCase):
                 # A second apply refuses (already integrated) and leaves the files.
                 self.assertNotEqual(self.apply(t, source_dir).returncode, 0)
                 self.assertEqual((ls / 'TXTSETUP.SIF').read_bytes(), sif)
+
+    def xp64_stand_in(self, t: Path, cab: bytes, known: bool) -> tuple:
+        import build_xp_uefi_csm_trial as builder
+        pkg = dict(builder.nt5_storage_files())
+        if known:
+            pkg['amd64/acpi/sp2/' + hashlib.sha256(cab).hexdigest() + '/SP2.CAB'] = b'MSCF usos sp2 with the community acpi'
+        bt, ls = self.stand_in(t, 'AMD64', pkg)
+        for sif in (bt / 'TXTSETUP.SIF', ls / 'TXTSETUP.SIF', t / 'root/TXTSETUP.SIF'):
+            sif.write_bytes(TXTSETUP + ACPI_FILEFLAGS)
+        (bt / 'ACPI.SYS').write_bytes(b'stock uncompressed')
+        (ls / 'ACPI.SY_').write_bytes(b'stock compressed')
+        (ls / 'SP2.CAB').write_bytes(cab)
+        return pkg, bt, ls
+
+    def test_xp64_acpi(self):
+        cab = b'MSCF the source iso sp2.cab'
+        with tempfile.TemporaryDirectory() as tmp:
+            t = Path(tmp)
+            pkg, bt, ls = self.xp64_stand_in(t, cab, known=True)
+            r = self.apply(t, 'AMD64')
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn(b'[NT5_ACPI] APPLIED PASS acpi.sys 5.2.3790.7777.4 sha256=2aaac644', r.stdout)
+            self.assertIn(b'(replaced 2)', r.stdout)
+            for folder in (bt, ls):
+                self.assertEqual((folder / 'acpi.sys').read_bytes(), pkg['amd64/acpi/acpi.sys'])
+                self.assertEqual([p.name for p in folder.iterdir() if p.name.lower().startswith('acpi.')], ['acpi.sys'])
+            self.assertEqual((ls / 'SP2.CAB').read_bytes(), pkg['amd64/acpi/sp2/' + hashlib.sha256(cab).hexdigest() + '/SP2.CAB'])
+            for sif in (bt / 'TXTSETUP.SIF', ls / 'TXTSETUP.SIF', t / 'root/TXTSETUP.SIF'):
+                self.assertIn(b'[FileFlags]\r\nacpi.sys = 16\r\n', sif.read_bytes())
+                self.assertEqual(sif.read_bytes().count(b'acpi.sys = 16'), 1)
+
+    def test_xp64_acpi_unknown_source_keeps_stock(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            t = Path(tmp)
+            pkg, bt, ls = self.xp64_stand_in(t, b'MSCF another sp2.cab', known=False)
+            r = self.apply(t, 'AMD64')
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn(b'[NT5_ACPI] SKIP', r.stdout)
+            self.assertEqual((bt / 'ACPI.SYS').read_bytes(), b'stock uncompressed')
+            self.assertEqual((ls / 'ACPI.SY_').read_bytes(), b'stock compressed')
+            self.assertEqual((ls / 'SP2.CAB').read_bytes(), b'MSCF another sp2.cab')
+            self.assertNotIn(b'acpi.sys = 16', (ls / 'TXTSETUP.SIF').read_bytes())
+
+    def test_x86_sources_never_get_the_x64_acpi(self):
+        # Server 2003 x86 (I386): nothing of the XP x64 ACPI step runs.
+        import build_xp_uefi_csm_trial as builder
+        with tempfile.TemporaryDirectory() as tmp:
+            t = Path(tmp)
+            bt, ls = self.stand_in(t, 'I386', builder.nt5_storage_files())
+            (ls / 'ACPI.SY_').write_bytes(b'stock compressed')
+            r = self.apply(t, 'I386')
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertNotIn(b'NT5_ACPI', r.stdout)
+            self.assertEqual((ls / 'ACPI.SY_').read_bytes(), b'stock compressed')
+            self.assertNotIn(b'acpi.sys', (ls / 'TXTSETUP.SIF').read_bytes())
+
+    def test_xp64_acpi_fileflags_rows(self):
+        r = self.run_fn('usos_nt5_acpi_sif', ACPI_FILEFLAGS)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(rows(r.stdout)[:3], ['[FileFlags]', 'acpi.sys = 16', 'ntoskrnl.exe = 16'])
+        self.assertEqual(self.run_fn('usos_nt5_acpi_sif', r.stdout).returncode, 3)
+        self.assertEqual(self.run_fn('usos_nt5_acpi_sif', TXTSETUP).returncode, 3)
 
     def test_apply_refusals(self):
         import build_xp_uefi_csm_trial as builder

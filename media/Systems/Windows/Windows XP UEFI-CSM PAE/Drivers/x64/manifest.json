@@ -1,0 +1,24 @@
+{
+  "status": "selected",
+  "target": "Windows XP Professional x64 SP2 (NT 5.2 amd64), profile xp-x64-sp2-uefi-csm",
+  "activation": "tools/xp64_acpi.py (XP package, usr/lib/usos/nt5-storage/amd64/acpi) and tools/nt5_storage_stage.sh",
+  "files": [
+    {
+      "file": "ACPI/acpi.sys",
+      "sha256": "2aaac644abd3b94d8e1f41d1ea98ba88a18fe8c7273ba423796f0fdac20b6202",
+      "size": 327680,
+      "version": "5.2.3790.7777.4 (amd64 free)",
+      "source": "MSFN/WinCert community ACPI 2.0 project, 7777.4 build set: 5.2.3790.7777.4/amd64_free/acpi.sys (user download 2026-09-30)",
+      "machine": "amd64",
+      "imports": [
+        "ntoskrnl.exe",
+        "hal.dll",
+        "wmilib.sys"
+      ]
+    },
+    {
+      "file": "ACPI/ReadMe.txt",
+      "source": "USOS provenance note"
+    }
+  ]
+}
