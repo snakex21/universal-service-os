@@ -180,7 +180,8 @@ func TestEmbeddedComponentsInstallOnFakeESP(t *testing.T) {
 	if !status.WinPE || !status.Present(components.XPPL) {
 		t.Fatalf("status %+v", status)
 	}
-	if _, err := os.Stat(filepath.Join(data, components.XPStoreDir, filepath.Base(xpEN))); err != nil {
-		t.Fatal("second XP language not kept on DATA:", err)
+	// Named after this build's release asset (or the zip itself in dev builds).
+	if kept, _ := filepath.Glob(filepath.Join(data, components.XPStoreDir, "*-XP-package-EN.zip")); len(kept) != 1 {
+		t.Fatal("second XP language not kept on DATA:", kept)
 	}
 }
