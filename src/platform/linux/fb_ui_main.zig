@@ -52,11 +52,13 @@ pub fn main(init: std.process.Init) !u8 {
             }
         }
     }
+    // The theme of the screens before micro-Linux (fb_i18n.activeTheme).
+    const theme = fb_i18n.activeTheme();
     if (back) |buffer| {
-        renderer.fillBackground(buffer.surface);
+        renderer.fillBackground(buffer.surface, theme);
         buffer.copyTo(device.surface);
     } else {
-        renderer.fillBackground(device.surface);
+        renderer.fillBackground(device.surface, theme);
     }
 
     var state_fd: i32 = 0;

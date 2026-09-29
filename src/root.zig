@@ -13,6 +13,7 @@ pub const gui = struct {
     pub const theme_presets = @import("gui/theme_presets.zig");
     pub const theme_file = @import("gui/theme_file.zig");
     pub const theme_contrast = @import("gui/theme_contrast.zig");
+    pub const theme_cmdline = @import("gui/theme_cmdline.zig");
     pub const Surface = @import("gui/surface.zig").Surface;
     pub const RgbaImage = @import("gui/rgba_image.zig").RgbaImage;
     pub const rgba_image = @import("gui/rgba_image.zig");
@@ -131,6 +132,7 @@ test {
     _ = gui.theme_presets;
     _ = gui.theme_file;
     _ = gui.theme_contrast;
+    _ = gui.theme_cmdline;
     _ = gui.Surface;
     _ = gui.RgbaImage;
     _ = gui.png_rgba;

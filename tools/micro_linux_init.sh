@@ -259,6 +259,9 @@ else
 fi
 usos_ui_stage 1 5 'Opening USOS configuration' 'Mounting the verified EFI System Partition.'
 mount -t vfat -o rw,noatime "$ESP_PATH" /mnt/esp || stop 'cannot mount ESP'
+# usos-fb-ui keeps the menu theme after the ESP is unmounted, when the
+# loader gave no usos.theme= (src/platform/linux/fb_i18n.zig).
+mkdir -p /run/usos-theme && cp -f /mnt/esp/EFI/USOS/usos-settings.ini /run/usos-theme/ 2>/dev/null && cp -rf /mnt/esp/EFI/USOS/themes /run/usos-theme/ 2>/dev/null || true
 
 if [ -n "$LEGACY_ACTION" ]; then
     # tools/pipeline/run.sh: profile from usos.plan_profile or the action,

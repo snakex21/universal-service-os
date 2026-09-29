@@ -101,6 +101,12 @@ pub fn loadTheme(fs: *const fat32.FileSystem, reader: random_reader.Reader) void
     state.theme = graphics.theme_file.resolveTheme(text[0..theme_len]) orelse return;
 }
 
+/// The menu theme, for the micro-Linux command line (usos.theme=,
+/// src/gui/theme_cmdline.zig).
+pub fn activeTheme() graphics.Theme {
+    return state.theme;
+}
+
 fn theme() graphics.Theme {
     return state.theme;
 }

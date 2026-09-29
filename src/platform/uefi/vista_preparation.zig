@@ -78,12 +78,14 @@ const disk_console = "quiet loglevel=3 vt.global_cursor_default=0";
 /// preparation's console options (/dev/console on serial, printk limited to
 /// emergencies, no VT cursor), so no script, tool or kernel text reaches the
 /// usos-fb-ui screens; the vista-disk line is unchanged.
-pub fn formatCommand(buffer: []u8, lang_initrd: []const u8, esp_partuuid: []const u8, mode: Mode, verbose: bool) ![]const u8 {
+/// `theme_option`: usos.theme= of the menu theme (src/gui/theme_cmdline.zig)
+/// or "".
+pub fn formatCommand(buffer: []u8, lang_initrd: []const u8, esp_partuuid: []const u8, mode: Mode, verbose: bool, theme_option: []const u8) ![]const u8 {
     const console = switch (mode) {
         .disk => disk_console,
         .csmwrap => @import("usos").flow.boot_console.xpConsoleOptions(verbose),
     };
-    return std.fmt.bufPrint(buffer, "initrd=\\EFI\\USOS\\micro-linux\\initramfs-usos{s} rdinit=/usos-init {s} usos.esp_partuuid={s} {s}", .{ lang_initrd, console, esp_partuuid, mode.tokens() });
+    return std.fmt.bufPrint(buffer, "initrd=\\EFI\\USOS\\micro-linux\\initramfs-usos{s} rdinit=/usos-init {s} usos.esp_partuuid={s} {s}{s}", .{ lang_initrd, console, esp_partuuid, mode.tokens(), theme_option });
 }
 
 pub fn start(root: *uefi.protocol.File) !void {
@@ -102,7 +104,9 @@ fn startMode(root: *uefi.protocol.File, mode: Mode) !void {
         break :blk " initrd=\\EFI\\USOS\\lang.cpio";
     } else |_| "";
     var cmd: [1024]u8 = undefined;
-    const command = try formatCommand(&cmd, lang_initrd, &id, mode, mode == .csmwrap and @import("diagnostic_boot.zig").requested(root));
+    var theme_buffer: [@import("usos").gui.theme_cmdline.option_len]u8 = undefined;
+    const theme_option = @import("usos").gui.theme_cmdline.option(&theme_buffer, @import("manual_view.zig").currentTheme());
+    const command = try formatCommand(&cmd, lang_initrd, &id, mode, mode == .csmwrap and @import("diagnostic_boot.zig").requested(root), theme_option);
     const serial = @import("serial.zig");
     serial.writeAscii(if (mode == .csmwrap) "[VISTA_CSMWRAP_CMDLINE] " else "[VISTA_DISK_CMDLINE] ");
     serial.writeAscii(command);
@@ -125,13 +129,25 @@ test "Vista disk preparation command line is unchanged; CSMWrap keeps its consol
     var a: [1024]u8 = undefined;
     var b: [1024]u8 = undefined;
     const id = "0257E175-1685-4311-91AA-5A83D8EB41E5";
-    const disk = try formatCommand(&a, " initrd=\\EFI\\USOS\\lang.cpio", id, .disk, true);
+    const disk = try formatCommand(&a, " initrd=\\EFI\\USOS\\lang.cpio", id, .disk, true, "");
     try std.testing.expectEqualStrings("initrd=\\EFI\\USOS\\micro-linux\\initramfs-usos initrd=\\EFI\\USOS\\lang.cpio rdinit=/usos-init quiet loglevel=3 vt.global_cursor_default=0 usos.esp_partuuid=0257E175-1685-4311-91AA-5A83D8EB41E5 usos.legacy_action=vista-disk usos.plan_profile=vista-uefi-disk", disk);
-    const csmwrap = try formatCommand(&b, "", id, .csmwrap, false);
+    const csmwrap = try formatCommand(&b, "", id, .csmwrap, false, "");
     try std.testing.expect(std.mem.endsWith(u8, csmwrap, " usos.legacy_action=vista-csmwrap usos.plan_profile=vista-x64-sp2-uefi-csmwrap"));
     // Quiet: /dev/console is the LAST console= (serial), printk emergencies only.
     try std.testing.expectEqualStrings("initrd=\\EFI\\USOS\\micro-linux\\initramfs-usos rdinit=/usos-init console=tty0 console=ttyS0,115200n8 rw quiet loglevel=1 vt.global_cursor_default=0 usos.esp_partuuid=0257E175-1685-4311-91AA-5A83D8EB41E5 usos.legacy_action=vista-csmwrap usos.plan_profile=vista-x64-sp2-uefi-csmwrap", csmwrap);
     var c: [1024]u8 = undefined;
-    const verbose = try formatCommand(&c, "", id, .csmwrap, true);
+    const verbose = try formatCommand(&c, "", id, .csmwrap, true, "");
     try std.testing.expect(std.mem.indexOf(u8, verbose, " quiet ") == null);
+}
+
+test "the menu theme reaches the Vista micro-Linux command line" {
+    const usos = @import("usos");
+    const theme_cmdline = usos.gui.theme_cmdline;
+    const retro = usos.gui.theme_presets.find("retro").?;
+    var theme_buffer: [theme_cmdline.option_len]u8 = undefined;
+    for ([_]Mode{ .disk, .csmwrap }) |mode| {
+        var buffer: [1024]u8 = undefined;
+        const command = try formatCommand(&buffer, "", "0257E175-1685-4311-91AA-5A83D8EB41E5", mode, false, theme_cmdline.option(&theme_buffer, retro));
+        try std.testing.expectEqualDeep(retro, theme_cmdline.fromCmdline(command));
+    }
 }

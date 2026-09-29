@@ -7,6 +7,7 @@ const linux_boot_params = @import("linux_boot_params.zig");
 const linux_memory = @import("linux_memory.zig");
 const vbe_probe = @import("vbe_probe.zig");
 const graphics_menu = @import("graphics_menu.zig");
+const theme_cmdline = @import("graphics").theme_cmdline;
 
 const fat32 = storage.fat32;
 const random_reader = storage.random_reader;
@@ -302,6 +303,7 @@ fn run(
 
     const params: *[linux_boot_params.boot_params_bytes]u8 = @ptrFromInt(linux_boot_params.boot_params_phys);
     const cmdline: *[linux_boot_params.cmdline_capacity]u8 = @ptrFromInt(linux_boot_params.cmdline_phys);
+    var theme_buffer: [theme_cmdline.option_len]u8 = undefined;
     const built = try linux_boot_params.build(
         params,
         cmdline,
@@ -312,6 +314,7 @@ fn run(
         esp_part_guid_disk,
         graphics_session,
         request,
+        theme_cmdline.option(&theme_buffer, @import("boot_ui.zig").activeTheme()),
     );
 
     console.print("LINUX BOOT_PARAMS addr=0x");

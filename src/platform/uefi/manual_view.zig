@@ -142,6 +142,12 @@ fn afterFirstFrame() void {
 
 /// Switches the menu (and the handover splash) to `value`; the next
 /// full screen draws with it.
+/// The theme the menu draws with (micro-Linux gets it on its command line,
+/// src/gui/theme_cmdline.zig).
+pub fn currentTheme() gui.Theme {
+    return theme;
+}
+
 pub fn setTheme(value: gui.Theme) void {
     theme = value;
     splash.setTheme(value);

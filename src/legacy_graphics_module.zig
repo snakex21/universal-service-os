@@ -7,6 +7,7 @@ pub const Color = @import("gui/color.zig").Color;
 pub const Theme = @import("gui/theme.zig").Theme;
 pub const theme_presets = @import("gui/theme_presets.zig");
 pub const theme_file = @import("gui/theme_file.zig");
+pub const theme_cmdline = @import("gui/theme_cmdline.zig");
 pub const text = @import("gui/text.zig");
 pub const font = @import("gui/font.zig");
 pub const paint = @import("gui/paint.zig");
@@ -31,6 +32,7 @@ test {
     _ = lang_file;
     _ = @import("gui/theme.zig");
     _ = theme_presets;
+    _ = theme_cmdline;
     _ = @import("gui/surface.zig");
     _ = @import("gui/preparation_screen.zig");
     _ = @import("gui/menu_screens.zig");
