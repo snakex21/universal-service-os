@@ -158,7 +158,8 @@ var custom_keyboard_text: [48]u8 = undefined;
 const name_chars = form.charset(" ._-", true);
 const account_chars = form.charset(" ._-", true);
 const computer_chars = form.charset("-", true);
-const key_chars = form.charset("-", true);
+/// Letters and digits; the dashes of a product key come on their own.
+const key_chars = form.charset("", true);
 const org_chars = form.cleanAscii(true);
 const password_chars = form.cleanAscii(false);
 
@@ -211,7 +212,8 @@ fn load(p: *const Profile) void {
     computer_text.set(p.computer.slice());
     org_text.set(p.org.slice());
     password_text.set(p.password.slice());
-    key_text.set(p.keyFor(system_id));
+    var key: [29]u8 = undefined;
+    key_text.set(answer.profile.normalizeKey(p.keyFor(system_id), &key));
     loadEdition(p.editionFor(system_id));
     timezone_index = if (p.timezone) |i| @as(usize, i) + 1 else 0;
     language_index = if (p.language) |i| @as(usize, i) + 1 else 0;
@@ -350,10 +352,9 @@ fn build(out: *Profile) void {
         const entry = &tables.languages[keyboard_index - 1];
         break :blk .{ .lcid = entry.lcid, .klid = entry.keyboard };
     } else custom_keyboard;
-    var upper: [29]u8 = undefined;
-    const key = key_text.slice();
-    for (key, 0..) |c, i| upper[i] = std.ascii.toUpper(c);
-    out.setSystemKey(system_id, upper[0..key.len]) catch {};
+    // Already XXXXX-XXXXX-... in capitals (answer.profile.keyTyped).
+    var key: [29]u8 = undefined;
+    out.setSystemKey(system_id, answer.profile.normalizeKey(key_text.slice(), &key)) catch {};
     const edition: []const u8 = if (editionManual()) std.mem.trim(u8, edition_text.slice(), " ") else edition_values[edition_index];
     out.setSystemEdition(system_id, edition) catch {};
     out.remember_key = remember_key;
@@ -444,6 +445,10 @@ fn hookHelp(_: *anyopaque, index: usize) usos.gui.menu_screens.Help {
     if (problemOf(id)) |problem| {
         if (show_all or !isEmptyRequired(id)) {
             help_lines[1] = problemText(problem);
+            // A key being typed: how far it is (the count, never the key).
+            if (id == .key and problem == .bad_key_format) {
+                help_lines[1] = std.fmt.bufPrint(&help_text[1], "{s} ({d}/{d})", .{ problemText(problem), answer.profile.keySymbolCount(key_text.slice()), answer.profile.key_symbols }) catch help_lines[1];
+            }
             n = 2;
         }
     }
@@ -489,7 +494,7 @@ fn buildFields() void {
     addField(.language, .{ .kind = .choice, .label = t(.profile_field_language), .options = &language_options, .index = &language_index });
     addField(.locale, .{ .kind = .choice, .label = t(.profile_field_locale), .options = &locale_options, .index = &locale_index });
     addField(.keyboard, .{ .kind = .choice, .label = t(.profile_field_keyboard), .options = keyboard_options[0..keyboard_option_count], .index = &keyboard_index });
-    addField(.key, .{ .kind = .text, .label = view.format(&key_label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .placeholder = t(.profile_value_setup_asks) });
+    addField(.key, .{ .kind = .text, .label = view.format(&key_label, .profile_field_key, &.{system_name}), .text = &key_text, .allowed = &key_chars, .uppercase = true, .product_key = true, .placeholder = t(.profile_value_setup_asks) });
     // Edition: a pick list with "Type manually" last (manual_form.Field.manual).
     if (nt6) addField(.edition, .{ .kind = .choice, .label = t(.profile_field_edition), .options = edition_options[0..edition_option_count], .index = &edition_index, .manual = true, .text = &edition_text, .allowed = &org_chars });
     addField(.remember_key, .{ .kind = .toggle, .label = t(.profile_field_remember_key), .flag = &remember_key });

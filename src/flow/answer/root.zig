@@ -90,6 +90,22 @@ test "render dispatch per system" {
     try std.testing.expect((try render(&p, "windows-98-se", .x86, null, null, &buffer)) == null);
 }
 
+test "a key typed without dashes renders dashed in WINNT.SIF settings and autounattend.xml" {
+    var p = Profile{};
+    try p.name.set("A");
+    try p.user.set("Tester");
+    var key: [29]u8 = undefined;
+    const typed = profile.normalizeKey("abcde 12345fghij-67890klmno", &key);
+    try p.setSystemKey("windows-xp", typed);
+    try p.setSystemKey("windows-10", typed);
+    try std.testing.expect(profile.validate(&p) == null);
+    var buffer: [autounattend.max_size]u8 = undefined;
+    const xp = (try render(&p, "windows-xp", .x86, null, null, &buffer)).?;
+    try std.testing.expect(std.mem.indexOf(u8, xp.bytes, "key=ABCDE-12345-FGHIJ-67890-KLMNO\n") != null);
+    const ten = (try render(&p, "windows-10", .amd64, null, null, &buffer)).?;
+    try std.testing.expect(std.mem.indexOf(u8, ten.bytes, "<Key>ABCDE-12345-FGHIJ-67890-KLMNO</Key>") != null);
+}
+
 test "edition from the media: found, missing, per system" {
     var p = Profile{};
     try p.name.set("A");

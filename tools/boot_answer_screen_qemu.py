@@ -282,6 +282,56 @@ def run(disk: Path, out: Path) -> list[str]:
         check("profiles: name typed", "label=Profile name value=Test" in values, values[-500:])
         check("profiles: user typed", "label=User name value=Tester" in values, values[-500:])
         shot("profile-filled")
+
+        # Mouse wheel: down from the user row through "Use for", over the
+        # "Appearance and extras" heading and on to Cancel (it used to stop
+        # at the end of the first section), then back up to the top.
+        def wheel(direction: str, notches: int) -> list[str]:
+            serial.reset()
+            for _ in range(notches):
+                qmp.click(direction, None)
+            serial.wait(r"\[UI_FORM\] selected", 8)
+            time.sleep(1.5)
+            return [f for f in forms(serial.since()) if f.startswith("selected")]
+
+        point(qmp, "mouse", WIDTH, HEIGHT, WIDTH // 3, HEIGHT // 2)
+        down = wheel("wheel-down", 45)
+        check("profiles: the wheel crosses into Appearance and extras", any("label=Screen resolution" in f for f in down), str(down[-6:]))
+        check("profiles: the wheel reaches the last row", bool(down) and "label=Cancel" in down[-1], str(down[-3:]))
+        shot("profile-wheel-bottom")
+        up = wheel("wheel-up", 45)
+        check("profiles: the wheel goes back up across the sections", bool(up) and "index=0 label=Profile name" in up[-1], str(up[-3:]))
+        golden.append("profile-wheel\tform\t" + ("crosses sections" if down and "label=Cancel" in down[-1] and up and "index=0" in up[-1] else "-"))
+
+        # Product key (physical keyboard): lower case, no dashes, a space
+        # and a dash typed by hand; the dashes come on their own, Backspace
+        # over one removes the character before it. The key never reaches
+        # the serial log.
+        for _ in range(10):
+            monitor.key("down", 0.4)
+        chunk = key("ret", r"\[UI_FORM\] edit", 8)
+        check("profiles: key row opens the keyboard", "label=Product key" in "\n".join(forms(chunk)), "\n".join(forms(chunk))[-300:])
+        serial.reset()
+        type_text("abcde")
+        time.sleep(1)
+        check("profiles: key counts five", "value=(key 5/25)" in serial.since(), serial.since()[-300:])
+        chunk = key("backspace", r"\[UI_FORM\] changed", 8)
+        check("profiles: Backspace over the dash removes the fifth character", "value=(key 4/25)" in chunk, chunk[-300:])
+        shot("profile-key-partial")
+        type_text("e12345-fghij 67890klmnoXYZ")
+        chunk = key("ret", r"\[UI_FORM\]", 5)
+        shot("profile-key-full")
+        text = serial.text()
+        check("profiles: key typed in full", "label=Product key (Windows XP) value=(key 25/25)" in text, "\n".join(forms(text))[-400:])
+        leaked = [k for k in ("ABCDE", "abcde", "FGHIJ", "KLMNO", "67890") if k in text]
+        check("profiles: the product key is not in the serial log", not leaked, str(leaked))
+        # Leave the key empty again (the rest of the flow saves without one).
+        key("ret", r"\[UI_FORM\] edit", 8)
+        for _ in range(26):
+            monitor.key("backspace", 0.2)
+        chunk = key("ret", r"\[UI_FORM\]", 5)
+        last_key = [f for f in forms(serial.text()) if "label=Product key" in f]
+        check("profiles: key cleared", bool(last_key) and last_key[-1].endswith("value="), str(last_key[-1:]))
         # The bottom of the XP form: "Use for" and "Appearance and extras".
         key("end", r"\[UI_FORM\] selected", 8)
         monitor.key("up", 0.5)

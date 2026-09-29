@@ -139,6 +139,7 @@ fn addHostTests(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
         "src/platform/uefi/windows_native_iso.zig",
         "src/platform/uefi/windows_user_drivers.zig",
         "src/platform/uefi/theme_editor.zig",
+        "src/platform/uefi/manual_form.zig",
         "src/platform/uefi/xp_preparation.zig",
         "src/platform/uefi/vista_preparation.zig",
         "src/platform/uefi/uefi_shell.zig",
