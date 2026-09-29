@@ -329,6 +329,12 @@ func (s *finalScreen) draw(f *Flow, w *win, area rect) {
 	if s.offersDrivers() {
 		left = append(left, action{"final.drivers", buttonSpec{label: i18n.T("installer.final.open_drivers"), glyph: glyphFolder, disabled: s.drivers == "", onClick: s.openDrivers}})
 	}
+	if f.compMissing && f.offersComponents(finalArgs{op: s.op, report: &s.report, err: s.err}) {
+		report := s.report
+		left = append(left, action{"final.components", buttonSpec{label: i18n.T("installer.components.final_button"), glyph: glyphDownload, onClick: func() {
+			f.showComponents(finalArgs{op: s.op, report: &report, err: s.err, log: s.log.text.String()}, true)
+		}}})
+	}
 	w.actions(bar, left, []action{{"action.primary", buttonSpec{label: i18n.T("installer.final.back"), style: buttonPrimary, onClick: f.showModes}}})
 }
 

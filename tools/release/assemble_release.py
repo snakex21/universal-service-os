@@ -21,6 +21,12 @@ Layout (VERSION = build-info.ini version, e.g. 1.0.0):
 
 Zips are deterministic: sorted entries, fixed timestamps (the build epoch),
 fixed permissions. The folder is then checked by scan_release.py.
+
+The installer downloads the WinPE and XP zips itself and pins their SHA-256
+(buildinfo.ComponentSHA256). make_release.ps1 therefore runs this script
+twice: --components-only writes the zips and component-sha256.txt, the
+installer is rebuilt with that list, and the full run (--components DIR)
+copies the zips and refuses an installer that does not embed every hash.
 """
 from pathlib import Path
 import argparse, datetime, hashlib, json, os, shutil, sys, zipfile
@@ -140,7 +146,13 @@ What it is
   product key. Windows 2000, XP x64 and Server 2003 from UEFI stay
   experimental; this package carries no Server 2003 driver bundle.
 
-Install (Windows, PowerShell as administrator, USOS stick plugged in)
+Install with the installer (recommended)
+  USOS-Installer-{version}.exe downloads and installs this package itself
+  in its "Components" step after Install, Update USOS or Repair. Offline,
+  choose "I already have the file" there and pick this zip (it is checked
+  by SHA-256 like a download).
+
+Install by hand (Windows, PowerShell as administrator, USOS stick plugged in)
   1. Update the stick to USOS {version} first (USOS-Installer-{version}.exe,
      "Update USOS"). The package matches only that build's micro-Linux.
   2. Extract this zip to a folder, open PowerShell as administrator there:
@@ -171,7 +183,13 @@ What it is
   It consists of Microsoft files, redistributed by the USOS maintainer at
   their own responsibility. No product key, no activation change.
 
-Install
+Install with the installer (recommended)
+  USOS-Installer-{version}.exe downloads and installs this donor itself in
+  its "Components" step after Install, Update USOS or Repair. Offline,
+  choose "I already have the file" there and pick this zip (it is checked
+  by SHA-256 like a download).
+
+Install by hand
   1. Copy the folder Programs from this zip to the root of the stick's
      USOS_DATA partition, so the file ends up in
      USOS_DATA:\\Programs\\USOS\\WinPE\\{WINPE_DONOR_NAME}
@@ -285,28 +303,75 @@ the USOS project repository:
     return components
 
 
+def component_names(version):
+    """The optional component zips the installer downloads (internal/components)."""
+    return [f'USOS-{version}-WinPE-PE10-donor.zip'] + [f'USOS-{version}-XP-package-{lang.upper()}.zip' for lang in sorted(XP_SOURCES)]
+
+
+def pin_text(folder, version):
+    """ASSET=sha256;... as injected into the installer (buildinfo.ComponentSHA256)."""
+    return ';'.join('%s=%s' % (name, sha256(folder / name)) for name in component_names(version))
+
+
+def check_installer_pins(installer, folder, version):
+    """The installer must carry the SHA-256 of every component zip it may download."""
+    data = Path(installer).read_bytes()
+    for name in component_names(version):
+        pin = ('%s=%s' % (name, sha256(folder / name))).encode('ascii')
+        if pin not in data:
+            raise SystemExit(f'{installer} does not embed {pin.decode()} (build it with make_release.ps1)')
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--out', type=Path, default=ROOT / 'zig-out/release-1.0')
     p.add_argument('--installer', type=Path, default=ROOT / 'installer/USOS Installer.exe')
     p.add_argument('--xp', action='append', default=[], help='LANG=PACKAGE_DIR (pl, en)')
-    p.add_argument('--winpe', type=Path, required=True)
+    p.add_argument('--winpe', type=Path)
     p.add_argument('--buildkit', type=Path, action='append', default=[], help='USOS-VERSION-buildkit.zip (or its .001.. parts) from make_buildkit.py')
+    p.add_argument('--components-only', action='store_true',
+                   help='write only the WinPE and XP zips (and component-sha256.txt) to --out, for the installer build')
+    p.add_argument('--components', type=Path,
+                   help='folder from --components-only: copy those zips and require their hashes in the installer')
     a = p.parse_args()
 
     info = read_build_info()
     version, build_id, epoch = info['version'], info['id'], info['epoch']
     out = a.out.resolve()
-    if out.parent != (ROOT / 'zig-out').resolve():
+    allowed = {(ROOT / 'zig-out').resolve(), (ROOT / 'zig-out/release-work').resolve()} if a.components_only else {(ROOT / 'zig-out').resolve()}
+    if out.parent not in allowed:
         raise SystemExit('refusing to write outside zig-out: ' + str(out))
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
 
+    if a.components:
+        components = a.components.resolve()
+        for name in component_names(version):
+            if not (components / name).is_file():
+                raise SystemExit(f'--components {components}: missing {name}')
+        check_installer_pins(a.installer, components, version)
+    else:
+        if a.winpe is None:
+            raise SystemExit('need --winpe (or --components)')
+        build_components(a, out, version, build_id, epoch)
+        if not a.components_only:
+            check_installer_pins(a.installer, out, version)
+        if a.components_only:
+            (out / 'component-sha256.txt').write_text(pin_text(out, version) + '\n', encoding='ascii', newline='\n')
+            print('COMPONENTS PASS', out)
+            return
+
     # Installer
     installer = out / f'USOS-Installer-{version}.exe'
     shutil.copyfile(a.installer, installer)
+    if a.components:
+        for name in component_names(version):
+            shutil.copyfile(components / name, out / name)
+    finish_release(a, out, version, build_id, epoch)
 
+
+def build_components(a, out, version, build_id, epoch):
     # WinPE donor
     donor = a.winpe.resolve()
     if donor.name != WINPE_DONOR_NAME or donor.stat().st_size != WINPE_DONOR_SIZE or sha256(donor) != WINPE_DONOR_SHA256:
@@ -341,6 +406,8 @@ def main():
         z.add_text('README.txt', xp_readme(lang, version, build_id, manifest))
         z.close()
 
+
+def finish_release(a, out, version, build_id, epoch):
     # Build kit (made by make_buildkit.py; copied as it is)
     if not a.buildkit:
         raise SystemExit('need --buildkit (tools/release/make_buildkit.py)')

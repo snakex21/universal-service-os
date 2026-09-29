@@ -15,6 +15,13 @@ var (
 	// Version is the product version from VERSION (e.g. "1.0.0"), set with
 	// -ldflags -X by build.bat; empty in development builds.
 	Version = ""
+	// ReleaseTag is the GitHub release this installer belongs to (e.g.
+	// "v1.0.0-rc2"); empty means "v"+Version. Set by make_release.ps1.
+	ReleaseTag = ""
+	// ComponentSHA256 pins the optional component assets of that release
+	// ("ASSET=sha256;ASSET=sha256"), injected by make_release.ps1 after it
+	// built the zips. Empty in build.bat and development builds.
+	ComponentSHA256 = ""
 )
 
 type Info struct {

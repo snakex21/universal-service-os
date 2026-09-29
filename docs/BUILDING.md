@@ -56,8 +56,16 @@ build kit.
 The release folder (`zig-out\release-1.0\`):
 
 ```
-powershell -ExecutionPolicy Bypass -File tools\release\make_release.ps1 [-Data L:\] [-SkipBuild] [-IssuesUrl https://github.com/<owner>/<repo>/issues]
+powershell -ExecutionPolicy Bypass -File tools\release\make_release.ps1 [-Data L:\] [-Tag v1.0.0-rc2] [-SkipBuild] [-IssuesUrl https://github.com/<owner>/<repo>/issues]
 ```
+
+`-Tag` is the GitHub release the assets will be published under (default
+`v<VERSION>`). The installer downloads the WinPE donor and XP package zips
+from `https://github.com/snakex21/universal-service-os/releases/download/<tag>/`
+(`installer\internal\components`), so `make_release.ps1` builds those zips
+first and rebuilds the installer with the tag and their SHA-256 compiled in;
+a download must match both that list and the release's `SHA256SUMS`. Publish
+the release under exactly that tag.
 
 It also builds the build kit (`tools\release\make_buildkit.py`, after
 `tools\release\fetch_buildkit_inputs.py` has checked or fetched the pinned

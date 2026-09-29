@@ -3,7 +3,7 @@
 Builds the USOS release folder zig-out\release-<major.minor>\ in one command.
 
 .DESCRIPTION
-  powershell -NoProfile -ExecutionPolicy Bypass -File tools\release\make_release.ps1 [-Data L:\] [-WinPEDonor PATH] [-SkipBuild] [-SkipChecks]
+  powershell -NoProfile -ExecutionPolicy Bypass -File tools\release\make_release.ps1 [-Data L:\] [-WinPEDonor PATH] [-Tag v1.0.0-rc2] [-SkipBuild] [-SkipChecks]
 
 1. build.bat (full release build, payload and installer; unless -SkipBuild);
 2. the XP UEFI packages, one per language, from the allowlisted original ISOs
@@ -11,9 +11,12 @@ Builds the USOS release folder zig-out\release-<major.minor>\ in one command.
    read from -Data (default L:\, the DATA partition; read only);
 3. the XP package checks (tools/tests/check_xp_*.py) on each package
    (unless -SkipChecks);
-4. tools/release/assemble_release.py: installer, WinPE donor zip, XP package
-   zips, LICENSES, THIRD-PARTY-NOTICES, SOURCE-OFFER, sources zip, docs,
-   forbidden-content scan, SHA256SUMS.
+4. the WinPE donor zip and XP package zips (assemble_release.py
+   --components-only), then the installer rebuilt with -Tag (the GitHub
+   release it downloads them from) and their SHA-256 list compiled in;
+5. tools/release/assemble_release.py: installer, those zips, LICENSES,
+   THIRD-PARTY-NOTICES, SOURCE-OFFER, sources zip, docs, forbidden-content
+   scan, SHA256SUMS; it refuses an installer without the hash list.
 
 Nothing is written to a USB stick. Windows ISOs are only read (to derive the
 XP driver bundles) and never copied into the release.
@@ -25,7 +28,10 @@ param(
     [switch]$SkipChecks,
     # Issue tracker named in SOURCE-OFFER.txt (the public repository, filled in
     # at publish time; empty keeps the placeholder).
-    [string]$IssuesUrl = ''
+    [string]$IssuesUrl = '',
+    # GitHub release tag the installer downloads its components from
+    # (e.g. v1.0.0-rc2); empty means v<VERSION>.
+    [string]$Tag = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -91,6 +97,28 @@ foreach ($lang in @('pl', 'en')) {
     $xpArgs += @('--xp', "$lang=$package")
 }
 
+# The installer downloads the WinPE and XP zips from its own GitHub release
+# and pins their SHA-256: build the zips first, then rebuild the installer
+# (same build, same payload) with the release tag and that hash list.
+$componentsDir = Join-Path $work 'components'
+Step "component zips (WinPE, XP) -> $componentsDir"
+Run 'assemble components' { python.exe (Join-Path $root 'tools\release\assemble_release.py') --components-only --out $componentsDir --winpe $WinPEDonor @xpArgs }
+$pins = ([IO.File]::ReadAllText((Join-Path $componentsDir 'component-sha256.txt'))).Trim()
+if ($Tag -eq '') { $Tag = "v$version" }
+if ($Tag -notmatch '^v\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$') { throw "-Tag must look like v1.0.0 or v1.0.0-rc2, got '$Tag'" }
+if (-not $Tag.StartsWith("v$version")) { throw "-Tag $Tag does not match VERSION $version" }
+Step "installer for release $Tag with the component hash list"
+$buildInfoPackage = 'github.com/snakex21/universal-service-os/installer/internal/buildinfo'
+$sourceSha = (($info | Select-String '^source_sha256=(.+)$').Matches.Groups[1].Value)
+$buildEpoch = (($info | Select-String '^epoch=(.+)$').Matches.Groups[1].Value)
+$ldflags = "-H=windowsgui -X $buildInfoPackage.ID=$buildId -X $buildInfoPackage.EpochText=$buildEpoch -X $buildInfoPackage.SourceSHA256=$sourceSha -X $buildInfoPackage.Version=$version -X $buildInfoPackage.ReleaseTag=$Tag -X $buildInfoPackage.ComponentSHA256=$pins"
+Push-Location -LiteralPath (Join-Path $root 'installer')
+try {
+    Run 'go build installer' { go.exe build -trimpath -ldflags $ldflags -o 'USOS Installer.exe' ./cmd/usos-installer }
+} finally {
+    Pop-Location
+}
+
 Step "build kit (pinned downloads: tools\release\buildkit.lock.json)"
 Run 'fetch_buildkit_inputs' { python.exe (Join-Path $root 'tools\release\fetch_buildkit_inputs.py') }
 $epoch = (($info | Select-String '^epoch=(.+)$').Matches.Groups[1].Value)
@@ -102,5 +130,5 @@ foreach ($part in Get-ChildItem -LiteralPath $kitDir -File) { $kitArgs += @('--b
 
 if ($IssuesUrl -ne '') { $env:USOS_ISSUES_URL = $IssuesUrl }
 Step "assemble $out"
-Run 'assemble_release' { python.exe (Join-Path $root 'tools\release\assemble_release.py') --out $out --installer (Join-Path $root 'installer\USOS Installer.exe') --winpe $WinPEDonor @xpArgs @kitArgs }
+Run 'assemble_release' { python.exe (Join-Path $root 'tools\release\assemble_release.py') --out $out --installer (Join-Path $root 'installer\USOS Installer.exe') --components $componentsDir @kitArgs }
 Step "PASS: $out"

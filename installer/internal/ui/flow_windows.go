@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
+	"github.com/snakex21/universal-service-os/installer/internal/components"
 	"github.com/snakex21/universal-service-os/installer/internal/domain"
 	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
@@ -80,6 +81,13 @@ type Config struct {
 	// screen); nil = create it if missing and open it in Explorer. The UI
 	// demo passes a fake.
 	OpenDriversFolder func(path string) error
+	// Components installs the optional release components (WinPE donor, XP
+	// package) after install, update and repair; nil hides the step.
+	Components ComponentsBackend
+	// ComponentsLog receives the component step's log lines (the operation
+	// log); ComponentsRelease overrides the installer's own release (tests).
+	ComponentsLog     func(string)
+	ComponentsRelease *components.Release
 
 	// Test harness only (cmd/usos-installer-uidemo).
 	ForceDPI         uint32
@@ -123,6 +131,11 @@ type Flow struct {
 	// final screen's "Open drivers folder"); opHasDisk is false otherwise.
 	opDisk    uint32
 	opHasDisk bool
+	// compDisk is the disk of the last install/update/repair (the drive the
+	// components step works on); compMissing is true while a component is
+	// missing there, so the final screen offers the step again.
+	compDisk    uint32
+	compMissing bool
 }
 
 // Run creates the installer window and blocks until it is closed.
@@ -517,6 +530,7 @@ func (f *Flow) showInstallConfirmation(disk domain.Disk) {
 func (f *Flow) showInstallProgress(disk domain.Disk) {
 	f.busy = true
 	f.opDisk, f.opHasDisk = disk.Number, true
+	f.compDisk = disk.Number
 	events := normalizeInstall(f.cfg.Install.RunAsync(disk))
 	f.show(newProgressScreen(f, opInstall, events), "")
 }
@@ -533,6 +547,7 @@ func (f *Flow) showUpdateConfirmation(target installed.Target) {
 func (f *Flow) showUpdateProgress(target installed.Target, allowDowngrade bool) {
 	f.busy = true
 	f.opDisk, f.opHasDisk = target.Disk.Number, true
+	f.compDisk = target.Disk.Number
 	var events <-chan localupdate.Event
 	if allowDowngrade {
 		events = f.cfg.Update.RunAsyncConfirmedDowngrade(target)
@@ -549,6 +564,7 @@ func (f *Flow) showRepairConfirmation(target installed.Target) {
 func (f *Flow) showRepairProgress(target installed.Target) {
 	f.busy = true
 	f.opHasDisk = false
+	f.compDisk = target.Disk.Number
 	f.show(newProgressScreen(f, opRepair, normalizeRepair(f.cfg.Repair.RunAsync(target))), "")
 }
 
@@ -562,8 +578,26 @@ func (f *Flow) showUninstallProgress(target installed.Target) {
 	f.show(newProgressScreen(f, opUninstall, normalizeUninstall(f.cfg.Uninstall.RunAsync(target))), "")
 }
 
+// showFinal follows a finished operation: a successful install, update or
+// repair first goes through the components step (it moves on by itself when
+// the drive already has every component).
 func (f *Flow) showFinal(op operation, report *install.VerificationReport, err error, log string) {
+	args := finalArgs{op: op, report: report, err: err, log: log}
+	f.compMissing = false
+	if f.offersComponents(args) {
+		f.showComponents(args, false)
+		return
+	}
+	f.showFinalScreen(args)
+}
+
+func (f *Flow) offersComponents(a finalArgs) bool {
+	ok := a.err == nil && (a.report == nil || a.report.OK())
+	return ok && a.op != opUninstall && f.cfg.Components != nil && f.cfg.Installed != nil
+}
+
+func (f *Flow) showFinalScreen(a finalArgs) {
 	f.busy = false
-	f.show(newFinalScreen(f, op, report, err, log), "action.primary")
+	f.show(newFinalScreen(f, a.op, a.report, a.err, a.log), "action.primary")
 	f.refreshSecureBoot(nil)
 }

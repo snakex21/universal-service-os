@@ -83,5 +83,8 @@ func run(prefsPath string) error {
 		Uninstall:   uninstallEngine,
 		PrefsPath:   prefsPath,
 		VolumeInUse: volumeInUse,
+		// WinPE donor and XP package from this installer's GitHub release.
+		Components:    backend,
+		ComponentsLog: func(line string) { _ = logger.WriteLine(line) },
 	})
 }

@@ -65,6 +65,8 @@ func main() {
 		Restart:           func() error { return errors.New("demo: restart skipped") },
 		RestartToFirmware: func() error { return errors.New("demo: restart into firmware settings skipped") },
 		OpenDriversFolder: func(path string) error { return fmt.Errorf("demo: opening %s skipped", path) },
+		Components:        &fakeComponents{},
+		ComponentsRelease: fakeRelease(),
 		ForceDPI:          uint32(*dpi),
 		ClientW:           int32(*width),
 		ClientH:           int32(*height),
@@ -275,6 +277,9 @@ func tour(d *ui.Driver, e *fakeEngines, dir, suffix string, startupError bool, l
 	}
 	close(e.installHold)
 	waitIdle(d)
+	if err := componentsTour(d, shot); err != nil {
+		return err
+	}
 	for deadline := time.Now().Add(10 * time.Second); !d.Enabled("final.drivers"); time.Sleep(20 * time.Millisecond) {
 		if time.Now().After(deadline) {
 			return fmt.Errorf("open drivers folder button stayed disabled")
@@ -708,4 +713,47 @@ func (f *fakeUninstall) RunAsync(installed.Target) <-chan uninstall.Event {
 		}
 	}()
 	return ch
+}
+
+// componentsTour: the Components step after the install (fake drive without
+// WinPE and XP package, fake local release server).
+func componentsTour(d *ui.Driver, shot func(string) error) error {
+	wait := func(what string, ok func() bool) error {
+		for deadline := time.Now().Add(20 * time.Second); !ok(); time.Sleep(20 * time.Millisecond) {
+			if time.Now().After(deadline) {
+				return fmt.Errorf("components: %s", what)
+			}
+		}
+		d.Idle()
+		return nil
+	}
+	if err := wait("step did not appear", func() bool { return d.Enabled("components.xp.both") }); err != nil {
+		return err
+	}
+	if err := shot("install-components"); err != nil {
+		return err
+	}
+	if err := errors.Join(d.Activate("components.xp.both"), d.Activate("components.winpe.local")); err != nil {
+		return err
+	}
+	if err := shot("install-components-choices"); err != nil {
+		return err
+	}
+	if err := errors.Join(d.Activate("components.winpe.download"), d.Activate("components.primary")); err != nil {
+		return err
+	}
+	time.Sleep(900 * time.Millisecond)
+	d.Idle()
+	if err := shot("install-components-download"); err != nil {
+		return err
+	}
+	if err := wait("run did not finish", func() bool { return !d.Busy() && d.Enabled("components.primary") }); err != nil {
+		return err
+	}
+	time.Sleep(300 * time.Millisecond) // status re-read
+	d.Idle()
+	if err := shot("install-components-done"); err != nil {
+		return err
+	}
+	return d.Activate("components.primary")
 }
