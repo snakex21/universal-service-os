@@ -94,6 +94,7 @@ def build_csmwrap_variants(root: Path, dos_out: Path):
         raise ValueError('windows_auto.cmd: TEMP line not found once')
     (dos_out / 'W3AUTO.CSM').write_bytes(dos_text(auto.replace(temp, temp + 'C:\\DOS\\VBMOUSE.EXE\nC:\\DOS\\USOSKEY.COM\n')))
     (dos_out / 'W3INI.BAS').write_bytes(dos_text((msdos / 'windows_ini.bas').read_text(encoding='ascii')))
+    (dos_out / 'USOS.SHH').write_bytes(dos_text((msdos / 'windows_setup.shh').read_text(encoding='ascii')))
     vendor = root / 'tools/vendor/vbados/0.67'
     manifest = json.loads((vendor / 'manifest.json').read_text())
     for name, expected in manifest['files'].items():

@@ -68,6 +68,8 @@ copy D:\VBMOUSE.DRV C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
 copy D:\USOSKEY.DRV C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
+copy D:\USOS.SHH C:\WINSETUP /y >nul
+if errorlevel 1 goto failed
 :csm_w3_done
 rem Windows Setup needs the original DOS XMS manager after a cold restart.
 rem Under CSMWrap HIMEM picks A20 handler 3, which leaves A20 off: /M:2.

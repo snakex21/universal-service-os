@@ -66,7 +66,7 @@ pub noinline fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8
     for ([_][]const u8{ "HIMEMX.EXE", "INSTALL.BAT", "LIVE.BAT", "PREPDOS.BAT", "COPYDOS.BAT", "UNPACK.BAT", "HIMEMX.TXT", "HIMEMSRC.ZIP", "LICENSE.TXT", "REBOOT.COM", "VBMOUSE.EXE", "VBADOS.TXT", "USOSKEY.COM" }) |filename|
         try helper(esp, reader, bulk, &builder, filename);
     if (windows) {
-        for ([_][]const u8{ "W3START.BAT", "WINMENU.BAT", "W3CONFIG.SYS", "W3AUTO.BAT", "VBMOUSE.DRV", "USOSKEY.DRV", "W3CONFIG.CSM", "W3AUTO.CSM", "W3INI.BAS" }) |filename|
+        for ([_][]const u8{ "W3START.BAT", "WINMENU.BAT", "W3CONFIG.SYS", "W3AUTO.BAT", "VBMOUSE.DRV", "USOSKEY.DRV", "USOS.SHH", "W3CONFIG.CSM", "W3AUTO.CSM", "W3INI.BAS" }) |filename|
             try helper(esp, reader, bulk, &builder, filename);
     }
     // Installed under CSMWrap (no firmware CSM; docs/design/bios-via-csmwrap.md):

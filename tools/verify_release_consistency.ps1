@@ -12,7 +12,7 @@ $buildInfoPath = Join-Path $ProjectRoot 'build\generated\build-info.ini'
 $microLinuxInitramfs = Join-Path $ProjectRoot 'zig-out\micro-linux\initramfs-usos'
 $strategyBMbr = Join-Path $ProjectRoot 'zig-out\xp-geometry-fix-mbr\xp-geometry-fix-mbr-440.bin'
 $win7NativeFiles = @('win7-support.cpio', 'vista-support.cpio', 'modern-support.cpio', 'int10.efi', 'int10.original.efi', 'UefiSeven.ini', 'uefiseven-LICENSE.txt')
-$msDosFiles = @('HIMEMX.EXE', 'HIMEMX.TXT', 'HIMEMSRC.ZIP', 'LICENSE.TXT', 'manifest.json', 'INSTALL.BAT', 'LIVE.BAT', 'PREPDOS.BAT', 'COPYDOS.BAT', 'UNPACK.BAT', 'W3START.BAT', 'WINMENU.BAT', 'W3CONFIG.SYS', 'W3AUTO.BAT', 'REBOOT.COM', 'W3CONFIG.CSM', 'W3AUTO.CSM', 'W3INI.BAS', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT', 'VBADOS.TGZ', 'CSMESP.IMG', 'USOSKEY.COM', 'USOSKEY.DRV')
+$msDosFiles = @('HIMEMX.EXE', 'HIMEMX.TXT', 'HIMEMSRC.ZIP', 'LICENSE.TXT', 'manifest.json', 'INSTALL.BAT', 'LIVE.BAT', 'PREPDOS.BAT', 'COPYDOS.BAT', 'UNPACK.BAT', 'W3START.BAT', 'WINMENU.BAT', 'W3CONFIG.SYS', 'W3AUTO.BAT', 'REBOOT.COM', 'W3CONFIG.CSM', 'W3AUTO.CSM', 'W3INI.BAS', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT', 'VBADOS.TGZ', 'CSMESP.IMG', 'USOSKEY.COM', 'USOSKEY.DRV', 'USOS.SHH')
 
 function Test-StaticEspPath([string]$Relative) {
     # USOS-KEY.cer: the Secure Boot certificate at the ESP root (short path in MokManager).
