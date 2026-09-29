@@ -314,7 +314,7 @@ fn run(
         esp_part_guid_disk,
         graphics_session,
         request,
-        theme_cmdline.option(&theme_buffer, @import("boot_ui.zig").activeTheme()),
+        theme_cmdline.encode(&theme_buffer, @import("boot_ui.zig").activeTheme()),
     );
 
     console.print("LINUX BOOT_PARAMS addr=0x");

@@ -9,7 +9,8 @@
 //! resolved (built-in, \EFI\USOS\themes\<name>.ini, DATA\Themes or
 //! \UI\theme.css), so micro-Linux needs neither the settings file nor the
 //! DATA partition and has the theme from its first frame. The default
-//! theme sends nothing. Micro-Linux applies the same all-or-nothing rule
+//! theme sends nothing from UEFI (option); the Legacy BIOS Core always
+//! sends its theme (encode). Micro-Linux applies the same all-or-nothing rule
 //! as theme_file.zig: a malformed value or a theme that breaks a
 //! readability rule (theme_contrast.zig) gives the default theme.
 const std = @import("std");
@@ -20,7 +21,7 @@ const contrast = @import("theme_contrast.zig");
 pub const key = "usos.theme=";
 
 const offsets = blk: {
-    var out: [std.meta.fields(Theme).len]u16 = undefined;
+    var out: [std.meta.fields(Theme).len]u8 = undefined;
     var n: usize = 0;
     for (std.meta.fields(Theme)) |f| {
         if (f.type != Color) continue;
@@ -40,13 +41,23 @@ const digits = "0123456789abcdef";
 /// `buffer` must hold option_len bytes.
 pub fn option(buffer: []u8, theme: Theme) []const u8 {
     const plain = Theme{};
-    if (std.mem.eql(u8, std.mem.asBytes(&theme), std.mem.asBytes(&plain)) or buffer.len < option_len) return "";
-    buffer[0] = ' ';
-    @memcpy(buffer[1 .. 1 + key.len], key);
-    var at: usize = 1 + key.len;
+    if (std.mem.eql(u8, std.mem.asBytes(&theme), std.mem.asBytes(&plain))) return "";
+    return encode(buffer, theme);
+}
+
+/// " usos.theme=<value>" for `theme`, the default theme included (it
+/// decodes to the same Theme{}), or "" when `buffer` is shorter than
+/// option_len. The Legacy BIOS Core uses this form: it has a fixed size
+/// budget (tools/build_legacy_bios.ps1, at least 4 KiB free), so it skips
+/// the default-theme comparison and encodes byte-wise over the theme.
+pub fn encode(buffer: []u8, theme: Theme) []const u8 {
+    if (buffer.len < option_len) return "";
+    const head = " " ++ key;
+    @memcpy(buffer[0..head.len], head);
+    const bytes = std.mem.asBytes(&theme);
+    var at: usize = head.len;
     for (offsets) |offset| {
-        const colour = contrast.colorAt(&theme, offset);
-        for ([_]u8{ colour.r, colour.g, colour.b }) |byte| {
+        for (bytes[offset..][0..3]) |byte| {
             buffer[at] = digits[byte >> 4];
             buffer[at + 1] = digits[byte & 15];
             at += 2;
@@ -102,6 +113,14 @@ test "every built-in theme round-trips through the command line" {
         defer std.testing.allocator.free(cmdline);
         try std.testing.expectEqualDeep(preset.theme, fromCmdline(cmdline));
     }
+}
+
+test "the always-encoded default theme decodes to the default theme" {
+    var buffer: [option_len]u8 = undefined;
+    const text = encode(&buffer, .{});
+    try std.testing.expectEqual(@as(usize, option_len), text.len);
+    try std.testing.expectEqualDeep(Theme{}, fromCmdline(text));
+    try std.testing.expectEqualStrings("", encode(buffer[0 .. option_len - 1], .{}));
 }
 
 test "the usos-sunset user theme reaches micro-Linux unchanged" {

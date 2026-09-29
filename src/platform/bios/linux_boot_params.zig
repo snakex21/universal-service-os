@@ -90,7 +90,7 @@ pub fn build(
     esp_part_guid_disk: [16]u8,
     graphics_session: ?vbe_probe.Session,
     request: CommandRequest,
-    /// " usos.theme=..." of the menu theme (src/gui/theme_cmdline.zig) or "".
+    /// " usos.theme=..." of the menu theme (src/gui/theme_cmdline.zig encode) or "".
     theme_option: []const u8,
 ) Error!Result {
     try buildStandalone(params, setup_header, memory_map, graphics_session);
@@ -225,11 +225,11 @@ pub fn planProfile(request: CommandRequest) ?[]const u8 {
 }
 
 /// Appends `theme_option` to a finished command line of `used` bytes (the
-/// usos-fb-ui screens keep the menu theme).
+/// usos-fb-ui screens keep the menu theme). buildCommandLine zero-fills the
+/// buffer and appendCommand keeps one byte free, so the line stays
+/// NUL-terminated.
 pub fn appendTheme(output: *[cmdline_capacity]u8, used: usize, theme_option: []const u8) Error!usize {
-    const total = try appendCommand(output, used, theme_option);
-    output[total] = 0;
-    return total;
+    return appendCommand(output, used, theme_option);
 }
 
 fn appendCommand(output: *[cmdline_capacity]u8, used: usize, text: []const u8) Error!usize {
