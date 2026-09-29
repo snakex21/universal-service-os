@@ -65,10 +65,46 @@ def build(root: Path):
                 raise ValueError('MS-DOS command line exceeds 127 bytes: ' + source)
         (dos_out / name).write_bytes(text.replace('\r\n', '\n').replace('\n', '\r\n').encode('ascii'))
     print('[PASS] MS-DOS support: verified HimemX 3.40, sources, license and DOS helpers')
+    build_csmwrap_variants(root, dos_out)
     build_reboot(root)
     print('[PASS] MS-DOS restart helper: built REBOOT.COM')
     from build_freedos_support import build as build_freedos
     build_freedos(root)
+
+
+def dos_text(text: str) -> bytes:
+    return text.replace('\r\n', '\n').replace('\n', '\r\n').encode('ascii')
+
+
+def build_csmwrap_variants(root: Path, dos_out: Path):
+    """Files the MS-DOS / Windows 3.x installer adds only under CSMWrap
+    (docs/design/bios-via-csmwrap.md): the start-menu variants with HIMEM /M:2
+    and VBMOUSE, the SYSTEM.INI editor, and VBADOS 0.67 (GPL-2.0-or-later,
+    source on the stick as VBADOS.TGZ). CSMESP.IMG follows after the release
+    staging (tools/build_csmwrap_dos_esp.py)."""
+    msdos = root / 'src/platform/bios/msdos'
+    config = (msdos / 'windows_config.sys').read_text(encoding='ascii')
+    himem = 'DEVICE=C:\\DOS\\HIMEM.SYS /TESTMEM:OFF\n'
+    if config.count(himem) != 1:
+        raise ValueError('windows_config.sys: HIMEM line not found once')
+    (dos_out / 'W3CONFIG.CSM').write_bytes(dos_text(config.replace(himem, 'DEVICE=C:\\DOS\\HIMEM.SYS /TESTMEM:OFF /M:2\n')))
+    auto = (msdos / 'windows_auto.cmd').read_text(encoding='ascii')
+    temp = 'set TEMP=C:\\TEMP\n'
+    if auto.count(temp) != 1:
+        raise ValueError('windows_auto.cmd: TEMP line not found once')
+    (dos_out / 'W3AUTO.CSM').write_bytes(dos_text(auto.replace(temp, temp + 'C:\\DOS\\VBMOUSE.EXE\n')))
+    (dos_out / 'W3INI.BAS').write_bytes(dos_text((msdos / 'windows_ini.bas').read_text(encoding='ascii')))
+    vendor = root / 'tools/vendor/vbados/0.67'
+    manifest = json.loads((vendor / 'manifest.json').read_text())
+    for name, expected in manifest['files'].items():
+        if hashlib.sha256((vendor / name).read_bytes()).hexdigest() != expected:
+            raise ValueError('VBADOS checksum mismatch: ' + name)
+    shutil.copyfile(vendor / 'VBMOUSE.EXE', dos_out / 'VBMOUSE.EXE')
+    shutil.copyfile(vendor / 'VBMOUSE.DRV', dos_out / 'VBMOUSE.DRV')
+    shutil.copyfile(vendor / 'vbados-0.67.tar.gz', dos_out / 'VBADOS.TGZ')
+    notice = (vendor / 'SOURCES.txt').read_text(encoding='ascii') + '\n' + '-' * 72 + '\n\n' + (vendor / 'COPYING').read_text(encoding='ascii')
+    (dos_out / 'VBADOS.TXT').write_bytes(dos_text(notice))
+    print('[PASS] MS-DOS CSMWrap variants: W3CONFIG.CSM (HIMEM /M:2), W3AUTO.CSM, W3INI.BAS, VBADOS 0.67')
 
 
 if __name__ == '__main__':

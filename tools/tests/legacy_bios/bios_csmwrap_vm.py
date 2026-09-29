@@ -9,6 +9,8 @@ AHCI; std VGA (carries a PC-AT VGA option ROM, like the RX 560).
 
   python bios_csmwrap_vm.py --out DIR start --fw ovmf --stick S.vhd [--target T.qcow2] [--i8042 off]
   python bios_csmwrap_vm.py --out DIR key ret | shot NAME | type "text" | text | hmp "info ..." | stop
+  python bios_csmwrap_vm.py --out DIR mouse DX DY [--steps N] | click [--button 1|2] [--double]
+  (start ... --mouse usb adds a relative usb-mouse on the same xHCI)
 
 Disposable images only; nothing here opens a physical disk.
 """
@@ -80,6 +82,9 @@ def start(out, a):
         cmd += ['-device', 'usb-kbd,bus=xhci.0']
     if a.tablet:
         cmd += ['-device', 'usb-tablet,bus=xhci.0']
+    if a.mouse == 'usb':
+        # Relative USB mouse (SeaBIOS: INT 15h C2 / PS/2-BIOS events).
+        cmd += ['-device', 'usb-mouse,bus=xhci.0']
     if a.target:
         cmd += ['-device', 'ahci,id=ahci', '-drive', f'if=none,id=target,format={a.target_format},file={a.target}',
                 '-device', f'ide-hd,drive=target,bus=ahci.0,bootindex={2 if a.stick else 0}']
@@ -135,6 +140,7 @@ def main():
     s.add_argument('--target-format', default='qcow2')
     s.add_argument('--target-first', action='store_true')
     s.add_argument('--tablet', action='store_true')
+    s.add_argument('--mouse', choices=('none', 'usb'), default='none')
     s.add_argument('--kbd', choices=('usb', 'ps2'), default='usb')
     s.add_argument('--i8042', choices=('on', 'off'), default='on')
     s.add_argument('--accel', default='tcg,thread=multi')
@@ -147,6 +153,8 @@ def main():
     t = sub.add_parser('type'); t.add_argument('text')
     sub.add_parser('text')
     hm = sub.add_parser('hmp'); hm.add_argument('command')
+    mo = sub.add_parser('mouse'); mo.add_argument('dx', type=int); mo.add_argument('dy', type=int); mo.add_argument('--steps', type=int, default=1)
+    cl = sub.add_parser('click'); cl.add_argument('--button', type=int, default=1); cl.add_argument('--double', action='store_true')
     sub.add_parser('stop')
     a = p.parse_args()
     out = a.out.resolve()
@@ -168,6 +176,15 @@ def main():
     elif a.action == 'hmp':
         h, _ = hmp(out)
         print(h.cmd(a.command, 1.0))
+    elif a.action == 'mouse':
+        h, _ = hmp(out)
+        for _ in range(a.steps):
+            h.cmd(f'mouse_move {a.dx} {a.dy}', 0.15)
+    elif a.action == 'click':
+        h, _ = hmp(out)
+        for _ in range(2 if a.double else 1):
+            h.cmd(f'mouse_button {a.button}', 0.1)
+            h.cmd('mouse_button 0', 0.15)
     elif a.action == 'stop':
         h, st = hmp(out)
         h.cmd('quit', 1.0)

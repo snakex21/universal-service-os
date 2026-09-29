@@ -1,0 +1,13 @@
+VBADOS 0.67 (VBMOUSE.EXE, VBMOUSE.DRV) - GPL-2.0-or-later
+Copyright (C) 2022 Javier S. Pedro.
+
+Unmodified binaries from the upstream release
+  https://depot.javispedro.com/vbox/vbados/releases/vbados_0_67.zip
+Complete corresponding source (tag v0.67), next to the binaries:
+  vbados-0.67.tar.gz  (https://git.javispedro.com/cgit/vbados.git/snapshot/vbados-0.67.tar.gz)
+Licence: COPYING (GNU GPL version 2; "or (at your option) any later version").
+
+Universal Service OS copies VBMOUSE.EXE and VBMOUSE.DRV to MS-DOS / Windows 3.x
+disks that its installer prepares on a UEFI PC without a firmware CSM (through
+CSMWrap), where USB mice reach DOS only through the BIOS (SeaBIOS INT 15h C2).
+The stick carries the source as EFI\USOS\dos-native\msdos\VBADOS.TGZ.

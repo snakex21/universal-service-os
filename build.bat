@@ -57,6 +57,11 @@ if errorlevel 1 (
 )
 popd
 
+rem CSMWrap ESP image for MS-DOS / Windows 3.x disks installed under CSMWrap:
+rem built from the CSMWrap tree just staged (pinned hash, licences, source).
+python "%ROOT%tools\build_csmwrap_dos_esp.py"
+if errorlevel 1 exit /b %ERRORLEVEL%
+
 rem Legacy BIOS boots the same pinned micro-Linux kernel without systemd-boot.
 rem Fail the release build if its Linux/x86 setup header no longer matches the
 rem protocol contract expected by the PM32 loader.

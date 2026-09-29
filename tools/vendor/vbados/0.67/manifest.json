@@ -1,0 +1,19 @@
+{
+  "name": "VBADOS (VBMOUSE.EXE DOS mouse driver and VBMOUSE.DRV Windows 3.x driver)",
+  "version": "0.67",
+  "license": "GPL-2.0-or-later",
+  "upstream": "https://git.javispedro.com/cgit/vbados.git/ (tag v0.67; author Javier S. Pedro)",
+  "binaries": "https://depot.javispedro.com/vbox/vbados/releases/vbados_0_67.zip (sha256 824d74731d719ff4c8ca7914f6f93e554812fca3a9ef8c44317c1da728184d27); the four files below extracted unmodified",
+  "source": "https://git.javispedro.com/cgit/vbados.git/snapshot/vbados-0.67.tar.gz (vbados-0.67.tar.gz here); built upstream with OpenWatcom (makefile, *.lnk)",
+  "used_by": "the MS-DOS / Windows 3.x installer when it runs under CSMWrap (docs/design/bios-via-csmwrap.md): VBMOUSE.EXE in AUTOEXEC.BAT, VBMOUSE.DRV as mouse.drv in SYSTEM.INI",
+  "note": "The GitHub name javispedro/vbados does not exist; the upstream repository is Javier S. Pedro's cgit. VBSF.EXE (VirtualBox shared folders) and the NLS tables of the release zip are not used.",
+  "files": {
+    "VBMOUSE.EXE": "eb34c5fc0a215d310bd486cfd63dd747df63481db0bbb18635b57e67585b8c91",
+    "VBMOUSE.DRV": "6d55493289a71fc99e99f8f8cce9232b74bdeac9ac85abc4724a2381900f7c72",
+    "OEMSETUP.INF": "83d1c4b926fe3428a7453e6590f846bc1bb47d22c4fd70f4a6804a6160e5ee5b",
+    "VBMOUSE.EN": "c4ce40fd9a0c7e04a57af095ab252f0b30e791d58b0324cd7b4bad691953a3de",
+    "COPYING": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+    "README.md": "b54d83b575caf761bba611e80085d31e4d8abe3274a6ed0ecefd5fedacb97d29",
+    "vbados-0.67.tar.gz": "ad93163858a943b2f75e4ecde2839a06c7341fe90f11503508f860d74c2e0cf7"
+  }
+}

@@ -26,6 +26,14 @@ echo prompt $p$g>>C:\AUTOEXEC.BAT
 echo path C:\DOS;C:\WINDOWS;C:\PROGRAMS>>C:\AUTOEXEC.BAT
 echo set TEMP=C:\TEMP>>C:\AUTOEXEC.BAT
 echo ver>>C:\AUTOEXEC.BAT
+rem Prepared under CSMWrap (UEFI PC without CSM): USB mouse through VBADOS.
+if not exist D:\CSMWRAP.TAG goto csm_dos_done
+copy D:\VBMOUSE.EXE C:\DOS /y >nul
+if errorlevel 1 goto failed
+copy D:\VBADOS.TXT C:\DOS /y >nul
+if errorlevel 1 goto failed
+echo C:\DOS\VBMOUSE.EXE>>C:\AUTOEXEC.BAT
+:csm_dos_done
 if not exist D:\PROGRAMS\nul goto programs_done
 md C:\PROGRAMS
 C:\DOS\XCOPY.EXE D:\PROGRAMS\*.* C:\PROGRAMS /s /e /v >nul
@@ -45,8 +53,21 @@ copy D:\W3CONFIG.SYS C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
 copy D:\W3AUTO.BAT C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
+rem CSMWrap: HIMEM /M:2 and VBMOUSE in the start menu, SYSTEM.INI changes.
+if not exist D:\CSMWRAP.TAG goto csm_w3_done
+copy D:\W3CONFIG.CSM C:\USOSW3\W3CONFIG.SYS /y >nul
+if errorlevel 1 goto failed
+copy D:\W3AUTO.CSM C:\USOSW3\W3AUTO.BAT /y >nul
+if errorlevel 1 goto failed
+copy D:\W3INI.BAS C:\USOSW3 /y >nul
+if errorlevel 1 goto failed
+copy D:\VBMOUSE.DRV C:\USOSW3 /y >nul
+if errorlevel 1 goto failed
+:csm_w3_done
 rem Windows Setup needs the original DOS XMS manager after a cold restart.
-echo DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF>C:\CONFIG.SYS
+rem Under CSMWrap HIMEM picks A20 handler 3, which leaves A20 off: /M:2.
+if not exist D:\CSMWRAP.TAG echo DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF>C:\CONFIG.SYS
+if exist D:\CSMWRAP.TAG echo DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF /M:2>C:\CONFIG.SYS
 echo DOS=HIGH>>C:\CONFIG.SYS
 echo FILES=40>>C:\CONFIG.SYS
 echo BUFFERS=20>>C:\CONFIG.SYS

@@ -8,6 +8,8 @@ const programs = @import("dos_programs.zig");
 const memdisk = @import("dos_memdisk.zig");
 const target_ui = @import("dos_target_ui.zig");
 const console = @import("console.zig");
+const seabios = @import("seabios.zig");
+const csmwrap_esp = @import("dos_csmwrap_esp.zig");
 const vbe = @import("vbe_probe.zig");
 const fat = storage.fat32;
 const ntfs = storage.ntfs;
@@ -57,12 +59,20 @@ pub fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8, graphic
         try win.copyRoot(&builder, &directory, false);
     }
     try programs.copy(fs, reader, bulk, &builder);
-    for ([_][]const u8{ "HIMEMX.EXE", "INSTALL.BAT", "LIVE.BAT", "PREPDOS.BAT", "COPYDOS.BAT", "UNPACK.BAT", "HIMEMX.TXT", "HIMEMSRC.ZIP", "LICENSE.TXT", "REBOOT.COM" }) |filename|
+    // VBMOUSE/VBADOS and the *.CSM start-menu variants are always in the RAM
+    // disk (small); INSTALL.BAT uses them only when CSMWRAP.TAG is there.
+    for ([_][]const u8{ "HIMEMX.EXE", "INSTALL.BAT", "LIVE.BAT", "PREPDOS.BAT", "COPYDOS.BAT", "UNPACK.BAT", "HIMEMX.TXT", "HIMEMSRC.ZIP", "LICENSE.TXT", "REBOOT.COM", "VBMOUSE.EXE", "VBADOS.TXT" }) |filename|
         try helper(esp, reader, bulk, &builder, filename);
     if (windows) {
-        for ([_][]const u8{ "W3START.BAT", "WINMENU.BAT", "W3CONFIG.SYS", "W3AUTO.BAT" }) |filename|
+        for ([_][]const u8{ "W3START.BAT", "WINMENU.BAT", "W3CONFIG.SYS", "W3AUTO.BAT", "VBMOUSE.DRV", "W3CONFIG.CSM", "W3AUTO.CSM", "W3INI.BAS" }) |filename|
             try helper(esp, reader, bulk, &builder, filename);
     }
+    // Installed under CSMWrap (no firmware CSM; docs/design/bios-via-csmwrap.md):
+    // INSTALL.BAT sees CSMWRAP.TAG and adds HIMEM /M:2, VBADOS (USB mouse
+    // through SeaBIOS INT 15h C2) and the Windows 3.x start-menu variants.
+    // Real BIOS PCs get none of it.
+    const csmwrap = install and seabios.csmwrap;
+    if (csmwrap) try builder.add("CSMWRAP.TAG", "1");
     var config: [256]u8 = undefined;
     const letter: u8 = if (install) 'D' else 'C';
     const config_text = try std.fmt.bufPrint(&config, "DEVICE={c}:\\HIMEMX.EXE /MAX=32768 /X2MAX32\r\nDOS=HIGH\r\nFILES=40\r\nBUFFERS=20\r\nLASTDRIVE=Z\r\nSHELL={c}:\\COMMAND.COM {c}:\\ /E:2048 /P\r\n", .{ letter, letter, letter });
@@ -79,11 +89,26 @@ pub fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8, graphic
         const plan = selected.format_plan orelse return error.MissingDosPartitionPlan;
         try target_ui.commitDos(plan, seed);
         console.line("[DOS16] USER CONFIRMED FAT16 TARGET COMMITTED");
+        if (csmwrap) {
+            const image_path = [_][]const u16{ wide("EFI"), wide("USOS"), wide("dos-native"), wide("msdos"), wide(csmwrap_esp.image_name) };
+            const info = try fat.fileInfo(esp, reader, &image_path);
+            _ = try target_ui.addCsmwrapEsp(plan, EspImage{ .esp = esp, .bulk = bulk, .path = &image_path }, info.size);
+            console.line("[DOS16] CSMWRAP ESP OK");
+        }
         memdisk.start(selected.drive);
     }
     console.line("[DOS16] LIVE SESSION; PHYSICAL HARD DISKS HIDDEN");
     memdisk.start(0xff);
 }
+
+const EspImage = struct {
+    esp: fat.FileSystem,
+    bulk: Reader,
+    path: []const []const u16,
+    pub fn read(self: EspImage, offset: u32, out: []u8) !void {
+        if (try fat.readFileRange(self.esp, self.bulk, self.path, offset, out) != out.len) return error.InvalidCsmwrapEspImage;
+    }
+};
 
 fn helper(esp: fat.FileSystem, reader: Reader, bulk: Reader, builder: *dos.Builder, filename: []const u8) !void {
     var name: [12]u16 = undefined;

@@ -10,6 +10,8 @@ const manual_secure_boot = @import("manual_secure_boot.zig");
 const manual_drivers = @import("manual_drivers.zig");
 const manual_themes = @import("manual_themes.zig");
 const uefi_shell = @import("uefi_shell.zig");
+const bios_mode = @import("bios_mode.zig");
+const secure_boot = @import("secure_boot.zig");
 
 const max_utilities: usize = usos.catalog.utility_catalog.max_items;
 
@@ -17,19 +19,25 @@ var utility_list: usos.catalog.utility_catalog.List = .{};
 var entries: [max_utilities]usos.catalog.SystemEntry = undefined;
 
 /// Rows 0, 1 and 2 are the built-in Secure Boot, Drivers and Theme pages,
-/// row 3 the built-in UEFI Shell; utilities from DATA follow.
-const builtin_rows = 4;
+/// row 3 the built-in UEFI Shell, row 4 "Legacy BIOS mode (CSMWrap)" when
+/// the firmware has no CSM (bios_mode.zig); utilities from DATA follow.
+const max_builtin_rows = 5;
 const shell_row = 3;
+const bios_mode_row = 4;
 
 pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_discovery.Discovery, firmware: usos.firmware.Firmware) ?*const usos.catalog.SystemEntry {
     const count = scan(discovery);
+    const bios = bios_mode.availability(secure_boot.csm().likelyOn(), secure_boot.enforced());
+    const builtin_rows: usize = if (bios == .hidden) max_builtin_rows - 1 else max_builtin_rows;
     const total = count + builtin_rows;
 
-    var selectable: [max_utilities + builtin_rows]bool = undefined;
+    var selectable: [max_utilities + max_builtin_rows]bool = undefined;
     selectable[0] = true;
     selectable[1] = true;
     selectable[2] = true;
     selectable[shell_row] = true;
+    // Greyed out with Secure Boot on, but still selectable: Enter explains why.
+    if (bios != .hidden) selectable[bios_mode_row] = true;
     var index: usize = 0;
     while (index < count) : (index += 1) {
         const entry = &entries[index];
@@ -41,12 +49,13 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
         }).navigable();
     }
 
-    var rows: [max_utilities + builtin_rows]usos.gui.ui.Row = undefined;
+    var rows: [max_utilities + max_builtin_rows]usos.gui.ui.Row = undefined;
     var details: [max_utilities]rows_model.DetailBuffer = undefined;
     rows[0] = manual_secure_boot.toolsRow();
     rows[1] = manual_drivers.toolsRow();
     rows[2] = manual_themes.toolsRow();
     rows[shell_row] = shellRow();
+    if (bios != .hidden) rows[bios_mode_row] = biosModeRow(bios);
     index = 0;
     while (index < count) : (index += 1) {
         const entry = &entries[index];
@@ -63,6 +72,11 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
             .activate => {
                 if (selected == shell_row) {
                     startShell(root);
+                    list.redrawFull(selected, null);
+                    continue;
+                }
+                if (bios != .hidden and selected == bios_mode_row) {
+                    biosMode(root, bios);
                     list.redrawFull(selected, null);
                     continue;
                 }
@@ -123,6 +137,55 @@ fn scan(discovery: *usos.catalog.media_discovery.Discovery) usize {
         };
     }
     return utility_list.len;
+}
+
+fn biosModeRow(bios: bios_mode.Availability) usos.gui.ui.Row {
+    return .{
+        .title = view.t(.utilities_bios_mode_title),
+        .detail = if (bios == .secure_boot_on) view.t(.utilities_bios_mode_secure_boot) else view.t(.utilities_bios_mode_desc),
+        .icon = .{ .vector = .chip },
+        .badge = .{ .text = view.t(.badge_experimental), .tone = .warning },
+        .enabled = bios == .available,
+    };
+}
+
+/// Secure Boot on: the reason. Otherwise a confirmation page with the notes
+/// (one CPU thread, legacy video BIOS, restart returns to UEFI), then
+/// CSMWrap; it only comes back here when it could not start.
+fn biosMode(root: *std.os.uefi.protocol.File, bios: bios_mode.Availability) void {
+    if (bios == .secure_boot_on) {
+        const lines = [_][]const u8{ view.t(.bios_mode_secure_boot_line1), view.t(.bios_mode_secure_boot_line2) };
+        view.notice(view.t(.utilities_bios_mode_title), .shield, .warning, view.t(.utilities_bios_mode_secure_boot), &lines);
+        view.waitForDismiss();
+        return;
+    }
+    var confirm_rows = [_]usos.gui.ui.Row{
+        .{ .title = view.t(.key_cancel), .icon = .{ .vector = .close } },
+        .{ .title = view.t(.bios_mode_start), .icon = .{ .vector = .chip } },
+    };
+    const notes = [_][]const u8{ view.t(.bios_mode_note_restart), view.t(.bios_mode_note_cpu), view.t(.bios_mode_note_video) };
+    const help = usos.gui.menu_screens.Help{ .title = view.t(.utilities_bios_mode_title), .lines = &notes, .badge = .{ .text = view.t(.badge_experimental), .tone = .warning } };
+    var selected: usize = 0;
+    var list: view.ListScreen = undefined;
+    list.open(view.t(.utilities_bios_mode_title), view.t(.bios_mode_question), &confirm_rows, selected, false, help);
+    while (true) {
+        switch (navigation.handle(input.readBlocking(), &selected, confirm_rows.len, &list)) {
+            .activate => if (selected == 1) break else return,
+            .back => return,
+            .changed => list.updateSelection(selected, help),
+            .pointer_moved => view.updatePointer(),
+            .ignored => {},
+        }
+    }
+    input.stopGamepads();
+    view.handover(view.t(.bios_mode_starting));
+    bios_mode.start(root) catch |err| {
+        view.refreshFramebuffer();
+        var buffer: [96]u8 = undefined;
+        const lines = [_][]const u8{ std.fmt.bufPrint(&buffer, "{s}: {s}", .{ view.t(.summary_error), @errorName(err) }) catch @errorName(err), view.t(.error_stopped) };
+        view.notice(view.t(.utilities_bios_mode_title), .error_circle, .danger, view.t(.error_efi), &lines);
+        view.waitForDismiss();
+    };
 }
 
 fn shellRow() usos.gui.ui.Row {

@@ -12,6 +12,21 @@ if exist C:\USOSW3\AUTOEXEC.OLD goto install
 copy C:\AUTOEXEC.BAT C:\USOSW3\AUTOEXEC.OLD /y >nul
 if errorlevel 1 goto failed
 :install
+rem CSMWrap: VBMOUSE.DRV and SYSTEM.INI (mouse.drv) once, with a backup.
+if not exist C:\USOSW3\W3INI.BAS goto ini_done
+if exist C:\USOSW3\W3INI.OK goto ini_done
+copy C:\USOSW3\VBMOUSE.DRV C:\WINDOWS\SYSTEM /y >nul
+if errorlevel 1 goto failed
+if exist C:\USOSW3\SYSTEM.NEW del C:\USOSW3\SYSTEM.NEW
+C:\DOS\QBASIC.EXE /RUN C:\USOSW3\W3INI.BAS
+if not exist C:\USOSW3\SYSTEM.NEW goto failed
+if not exist C:\USOSW3\SYSTEM.OLD copy C:\WINDOWS\SYSTEM.INI C:\USOSW3\SYSTEM.OLD /y >nul
+copy C:\USOSW3\SYSTEM.NEW C:\WINDOWS\SYSTEM.INI /y >nul
+if errorlevel 1 goto failed
+C:\DOS\FC.EXE /b C:\USOSW3\SYSTEM.NEW C:\WINDOWS\SYSTEM.INI >nul
+if errorlevel 1 goto failed
+echo SYSTEM.INI updated for CSMWrap>C:\USOSW3\W3INI.OK
+:ini_done
 copy C:\USOSW3\W3CONFIG.SYS C:\CONFIG.SYS /y >nul
 if errorlevel 1 goto failed
 copy C:\USOSW3\W3AUTO.BAT C:\AUTOEXEC.BAT /y >nul
@@ -52,6 +67,9 @@ if exist C:\USOSW3\MENU.TAG del C:\USOSW3\MENU.TAG
 echo USOS: zapis menu nie powiodl sie. Przywracanie konfiguracji.
 if exist C:\USOSW3\CONFIG.OLD copy C:\USOSW3\CONFIG.OLD C:\CONFIG.SYS /y
 if exist C:\USOSW3\AUTOEXEC.OLD copy C:\USOSW3\AUTOEXEC.OLD C:\AUTOEXEC.BAT /y
+if exist C:\USOSW3\W3INI.OK goto restore_done
+if exist C:\USOSW3\SYSTEM.OLD copy C:\USOSW3\SYSTEM.OLD C:\WINDOWS\SYSTEM.INI /y
+:restore_done
 if exist C:\WINDOWS\SMARTDRV.EXE C:\WINDOWS\SMARTDRV.EXE /C
 echo Sprawdz bledy zapisu. Zrestartuj komputer, aby ponowic probe.
 :end

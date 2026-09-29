@@ -45,6 +45,7 @@ pub const Key = enum(u16) {
     day_6,
     donor_corrupt,
     donor_missing,
+    dos_confirm_csmwrap,
     dos_confirm_go,
     dos_confirm_note1,
     dos_confirm_note2,
@@ -340,6 +341,14 @@ pub const Key = enum(u16) {
     action_wimboot,
     action_winpe,
     action_xp,
+    bios_mode_note_cpu,
+    bios_mode_note_restart,
+    bios_mode_note_video,
+    bios_mode_question,
+    bios_mode_secure_boot_line1,
+    bios_mode_secure_boot_line2,
+    bios_mode_start,
+    bios_mode_starting,
     chainload_line1,
     chainload_line2,
     chainload_title,
@@ -652,6 +661,9 @@ pub const Key = enum(u16) {
     theme_edit_saved,
     theme_edit_subtitle,
     theme_edit_title,
+    utilities_bios_mode_desc,
+    utilities_bios_mode_secure_boot,
+    utilities_bios_mode_title,
     utilities_shell_desc,
     utilities_shell_title,
     utility_unavailable,
@@ -708,6 +720,7 @@ pub const hashes = [_]u32{
     0xe6395dcd, // day.6
     0x0b01efb8, // donor.corrupt
     0xa7ab84a5, // donor.missing
+    0xaa1fb284, // dos.confirm.csmwrap
     0xebddf16d, // dos.confirm.go
     0x44551082, // dos.confirm.note1
     0x43550eef, // dos.confirm.note2
@@ -1003,6 +1016,14 @@ pub const hashes = [_]u32{
     0x3979b582, // action.wimboot
     0xb3fd0db4, // action.winpe
     0x45058703, // action.xp
+    0xc6026856, // bios_mode.note.cpu
+    0x33394f47, // bios_mode.note.restart
+    0x643e4f67, // bios_mode.note.video
+    0xfd68991e, // bios_mode.question
+    0xc1a2d4cf, // bios_mode.secure_boot.line1
+    0xc2a2d662, // bios_mode.secure_boot.line2
+    0x2fc0f46e, // bios_mode.start
+    0xa26e99a2, // bios_mode.starting
     0xfc4d4ef9, // chainload.line1
     0xf94d4a40, // chainload.line2
     0xb38e898e, // chainload.title
@@ -1315,6 +1336,9 @@ pub const hashes = [_]u32{
     0x15d38e5a, // theme_edit.saved
     0x90ebe073, // theme_edit.subtitle
     0xeec63a47, // theme_edit.title
+    0x68132895, // utilities.bios_mode.desc
+    0x89d38e4a, // utilities.bios_mode.secure_boot
+    0xc29d3c62, // utilities.bios_mode.title
     0x75bb3dee, // utilities.shell.desc
     0x5242a903, // utilities.shell.title
     0x30ddf187, // utility.unavailable
@@ -1656,6 +1680,18 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
     false,
     false,
     false,
@@ -1990,7 +2026,7 @@ pub const bios = [_]bool{
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
-pub const bios_count = 328;
+pub const bios_count = 329;
 
 pub const english = [_][]const u8{
     "Experimental",
@@ -2036,6 +2072,7 @@ pub const english = [_][]const u8{
     "Sat",
     "WinPE helper image is damaged (checksum mismatch). Run Repair in the USOS installer.",
     "WinPE helper image missing (needed for Vista/Windows 7). Run Repair in the USOS installer.",
+    "No firmware CSM: a 64 MiB EFI partition at the disk end starts DOS through CSMWrap (Secure Boot off).",
     "Delete partitions and install",
     "All current data on the selected disk will be lost.",
     "Formatting and the installer then start automatically.",
@@ -2331,6 +2368,14 @@ pub const english = [_][]const u8{
     "Build and boot the WIM environment",
     "Start WinPE",
     "Prepare the Windows XP installation",
+    "CSMWrap reserves one CPU thread for itself; DOS and Windows 3.x do not need it.",
+    "Opens the USOS BIOS menu (FreeDOS, MS-DOS, Windows 3.x). A restart returns to UEFI.",
+    "Needs a graphics card with a legacy video BIOS; without one the DOS screens stay black.",
+    "Switch this PC to BIOS mode until the next restart?",
+    "CSMWrap is not signed, so Secure Boot blocks it.",
+    "Turn Secure Boot off in the firmware settings to use the BIOS mode.",
+    "Start BIOS mode",
+    "Starting the BIOS mode (CSMWrap)...",
     "Boot media preparation is complete.",
     "Starting EFI/BOOT from the prepared WORK partition...",
     "Starting chained bootloader",
@@ -2643,6 +2688,9 @@ pub const english = [_][]const u8{
     "Theme {0} saved on the stick and in use.",
     "Base theme, element, colour: the preview and the contrast check follow every change",
     "Theme editor",
+    "USOS BIOS menu on this UEFI PC: FreeDOS, MS-DOS, Windows 3.x",
+    "Unavailable: Secure Boot is on",
+    "Legacy BIOS mode (CSMWrap)",
     "Command line for EFI tools (flashers, testers) from DATA",
     "UEFI Shell",
     "This utility stays visible while its boot backend is unavailable.",

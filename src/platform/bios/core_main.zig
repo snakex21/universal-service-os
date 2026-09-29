@@ -5,6 +5,7 @@ const test_mode = @import("test_mode");
 const catalog_directory_source = @import("catalog_directory_source.zig");
 const catalog_ntfs_directory_source = @import("catalog_ntfs_directory_source.zig");
 const console = @import("console.zig");
+const seabios = @import("seabios.zig");
 const diagnostics = @import("diagnostics.zig");
 const hardware_state = @import("hardware_state.zig");
 const linux_load_probe = @import("linux_load_probe.zig");
@@ -104,32 +105,15 @@ export fn core_main(context: *const BootContext) callconv(.c) void {
     console.print("BOOT CONTEXT OK drive=0x");
     console.printHex8(context.bios_drive);
     console.line("");
-    if (seabiosPresent()) {
+    seabios.detect();
+    if (seabios.present) {
         console.bios_keyboard_fallback = true;
-        console.line("[BIOS_INPUT] SeaBIOS found: INT 16h keyboard fallback on (USB keyboards)");
+        console.line(if (seabios.csmwrap) "[BIOS_INPUT] CSMWrap SeaBIOS: INT 16h keyboard fallback on" else "[BIOS_INPUT] SeaBIOS: INT 16h keyboard fallback on");
     }
 
     runFrontend(context);
     console.screen_output = true;
     console.line("USOS startup stopped. Check the diagnostic output.");
-}
-
-/// SeaBIOS (plain, coreboot payload, or the CSM16 that CSMWrap copies to
-/// 0xE0000) carries "SeaBIOS (version" in its image below 1 MiB. Vendor
-/// BIOSes do not, and they keep the 8042-only input path unchanged.
-fn seabiosPresent() bool {
-    const needle = "SeaBIOS (version";
-    const rom: [*]const volatile u8 = @ptrFromInt(0xE0000);
-    const len: usize = 0x20000 - needle.len;
-    var i: usize = 0;
-    outer: while (i < len) : (i += 1) {
-        if (rom[i] != needle[0]) continue;
-        for (needle[1..], 1..) |byte, j| {
-            if (rom[i + j] != byte) continue :outer;
-        }
-        return true;
-    }
-    return false;
 }
 
 fn runFrontend(context: *const BootContext) void {
