@@ -194,8 +194,14 @@ def usb_input(mon, shots, tag):
     the X470 has one, and NTDETECT hangs without any keyboard controller."""
     if USB_STICK['path'] and not USB_STICK['done']:
         USB_STICK['done'] = True
+        # Behind a USB 1.1 hub: QEMU puts a bare usb-storage (SuperSpeed
+        # capable) on a USB 3 port, which xhci98 leaves unpowered by design.
         mon.cmd(f'drive_add 0 if=none,id=ustick,format=raw,file={Path(USB_STICK["path"]).as_posix()}')
-        mon.cmd('device_add usb-storage,bus=xhci.0,drive=ustick,id=ustickdev')
+        time.sleep(1)
+        mon.cmd('device_add usb-hub,bus=xhci.0,port=3,id=uhub')
+        time.sleep(1)
+        mon.cmd('device_add usb-storage,bus=xhci.0,port=3.1,drive=ustick,id=ustickdev')
+        time.sleep(1)
         (shots / (tag + '-usb-storage.txt')).write_text(mon.query('info usb'), encoding='utf-8')
     mice = mon.query('info mice')
     (shots / (tag + '-mice.txt')).write_text(mice, encoding='utf-8')
