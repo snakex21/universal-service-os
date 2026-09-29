@@ -39,7 +39,7 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | N5 | Pomysły z E2B (szybkie) | **Next** / **Later** per punkt | N2 (M1) dla części | 1–10 dni per punkt |
 | N6 | Secure Boot: zablokowany kernel, podpisany UKI | **Next** (niski priorytet w grupie) | N1 | 4–6 dni |
 | N7 | Edytor motywów (UEFI + instalator), motywy użytkownika w BIOS, przykładowe motywy | UEFI, BIOS, przykłady: **Done** (QEMU, 2026-09-26); instalator: **Next** | menedżer profili odpowiedzi (formularz + klawiatura ekranowa) | instalator: do oszacowania |
-| L1 | Rodzina NT5 na UEFI (2000, 2003, XP x64) | 2000, 2003 x86, XP x64: **eksperymentalne** (QEMU do GUI Setup, 2026-09-27); 2003 x64: **Later** | N2 (M4), N3 | sprzęt (X470): do testu |
+| L1 | Rodzina NT5 na UEFI (2000, 2003, XP x64) | 2003 x86, XP x64 bez CSM (CSMWrap): **sprzęt PASS** (X470, 2026-09-29, B260929-191942, xhci98 1.1.1.0-usos2; XP x64 z ACPI społeczności x64, w wydaniu od 1.1); 2000: **eksperymentalne** (QEMU do GUI Setup); 2003 x64: **Later** | N2 (M4), N3 | własne ACPI dla XP x64; pendrive'y USB w XP x64 / 2003 |
 | L2 | XP na UEFI bez CSM (CSMWrap) | **Eksperymentalne, sprzęt PASS** (X470, 2026-09-27, B260927-153019) | — | do potwierdzenia: PAE/31,9 GB, liczba CPU, USB |
 | L2b | Vista na UEFI bez CSM (CSMWrap, instalacja legacy MBR) | **Eksperymentalne, sprzęt PASS** (X470, 2026-09-28, B260927-205829) | L2 | UX przed 1.0: licznik kroków, cichy CSMWrap, restart między przygotowaniem dysku a Setup |
 | L3 | 32-bit CPU i mniejsze minimum RAM | **Later** | pomiary | 2 dni pomiarów, potem 5–15 dni |
@@ -50,7 +50,7 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | L7 | Buildy Longhorn | **Later** | L1 (pre-reset), ścieżka Vista (post-reset) | 3–5 dni per build |
 | L8 | NT4 dla retro sprzętu | **Later** | profil NT5 (M4) | 5–8 dni |
 | L9 | shim-review (własny shim podpisany przez Microsoft) | **Later** (długoterminowo) | N6, publiczne repo | miesiące, proces zewnętrzny |
-| L11 | Tryb BIOS przez CSMWrap (DOS, FreeDOS, Windows 3.x bez CSM) + klawiatura i mysz USB w Windows 3.x | **1.1**: zrobione na gałęzi `feature/bios-via-csmwrap`, QEMU PASS (2026-09-29); X470: do testu | L2, L2b | test sprzętowy 1 dzień |
+| L11 | Tryb BIOS przez CSMWrap (DOS, FreeDOS, Windows 3.x bez CSM) + klawiatura i mysz USB w Windows 3.x | **Done (1.1)**: w `master` (2026-09-29), QEMU PASS; X470: do testu | L2, L2b | test sprzętowy 1 dzień |
 | L10 | macOS jako opcjonalny dodatek („DLC”): własny OpenCore EFI z DATA, potem eksperymentalny generator konfiguracji | **Later** (na końcu, po wszystkim innym) | osobne pobranie, poza głównym wydaniem | do oszacowania |
 
 ## 2. Pozycje
@@ -210,10 +210,24 @@ profile `w2k3-x86-sp2-uefi-csm` / `xp-x64-sp2-uefi-csm`, AHCI przez GenAHCI
 na StorPort systemu, QEMU do GUI Setup (z CSM i przez CSMWrap); X470 do testu.
 Szczegóły: `docs/nt52-2003-xp64-2026-09-27.md`.
 
+2026-09-29 (1.1): **XP x64 SP2 i Server 2003 R2 SP2 x86 bez CSM na X470
+(CSMWrap): pełny PASS**, instalacja do pulpitu, klawiatura i mysz USB na
+wszystkich tylnych portach (xHCI chipsetu `1022:43D0` i CPU `1022:149C`)
+przez xhci98 1.1.1.0-usos2 (MODIFIED, GPL-2.0), GenAHCI + `genahci.inf`
+(koniec pętli 0x7B w XP x64); build B260929-191942. XP x64 wymaga
+**ACPI społeczności x64** (`acpi.sys` 5.2.3790.7777.4, amd64): test sprzętowy
+szedł z nim z lokalnej gałęzi `private/xp64-acpi`; **od 1.1 jest w publicznym
+repozytorium i wydaniu** (decyzja użytkownika 2026-09-30, jak ACPI x86;
+`tools/xp64_acpi.py`, `nt5_storage_stage.sh`). Nadal tymczasowy most:
+**do zastąpienia własną implementacją**. Zostaje: pendrive'y
+USB w XP x64 (ponowny test z usos2), USB storage w Server 2003, smugi przy
+przeciąganiu okien (ogólny sterownik VGA/VESA). Szczegóły:
+[nt52-xhci98-2026-09-29.md](nt52-xhci98-2026-09-29.md).
+
 ACPI dla NT 5.2 (XP x64 / Server 2003) na nowym sprzęcie: do czasu własnej
-implementacji USOS tymczasowo wykrywa ACPI społeczności dostarczone przez
-użytkownika w `DATA\Drivers` / `DATA\Fixes`: **do zastąpienia własną
-implementacją** (zasada L6, pkt 3).
+implementacji USOS dołącza ACPI społeczności (Server 2003 x86: pakiet x86;
+XP x64: build x64 7777.4, od 1.1) i stosuje je automatycznie: **do
+zastąpienia własną implementacją** (zasada L6).
 
 ### L2. XP na UEFI bez CSM przez CSMWrap: eksperymentalne, **sprzęt PASS**
 
@@ -335,7 +349,8 @@ automatycznie, bez ręcznej konfiguracji. Kolejność:
    może wykryć plik dostarczony przez użytkownika (`DATA\Drivers` /
    `DATA\Fixes`) i zastosować go sam. Każdy taki przypadek ma na roadmapie
    oznaczenie **„do zastąpienia własną implementacją”**:
-   - ACPI społeczności dla XP x64 / Server 2003 (L1);
+   - ACPI społeczności dla XP x64 / Server 2003 (L1; od 1.1 dołączone do
+     wydania decyzją użytkownika z 2026-09-30, nadal do zastąpienia);
    - poprawka szybkiego CPU dla Win95 (L6b);
    - USB 3 dla Visty (backport podpisany testowo, sekcja 3).
 
@@ -417,13 +432,13 @@ innym, w formie osobnego, opcjonalnego dodatku.
   brak kart NVIDIA nowszych niż Kepler, Wi-Fi Intela tylko częściowo.
 - Sprzęt testowy: X470 + RX 560, B550 + 5800X3D.
 
-## 2b. Wydanie 1.1 (w przygotowaniu)
+## 2b. Wydanie 1.1 (scalone do `master` 2026-09-29, bez tagu)
 
-### L11. Tryb BIOS przez CSMWrap: **1.1**, QEMU PASS, sprzęt do testu
+### L11. Tryb BIOS przez CSMWrap: **Done (1.1)**, QEMU PASS, sprzęt do testu
 
 Projekt, implementacja i macierz testów: [design/bios-via-csmwrap.md](design/bios-via-csmwrap.md)
 (sekcja 8). Gałąź `feature/bios-via-csmwrap` (commity `1b4daba`, `19c65c2`,
-`6af4ba3` i dokumentacja), nie scalona z 1.0.
+`6af4ba3`, `32725b8` i dokumentacja), scalona do `master` 2026-09-29.
 
 - **Menu UEFI → Narzędzia → „Tryb BIOS (CSMWrap)”**: tylko bez CSM w
   firmware; przy włączonym Secure Boot wyszarzone z wyjaśnieniem; strona
@@ -439,9 +454,22 @@ Projekt, implementacja i macierz testów: [design/bios-via-csmwrap.md](design/bi
   także okna DOS). Na zwykłym BIOS-ie nic się nie zmienia.
 - Setup Windows 3.x pod CSMWrap w trybie wsadowym (`SETUP /H:USOS.SHH`):
   cała instalacja z samą klawiaturą USB (QEMU PASS).
+- **CSMWrap 3.1.2-usos3 jest jedyną wersją w wydaniu** (także XP i Vista
+  bez CSM); 3.1.2-usos1 zostaje tylko jako źródło do przebudowy 1.0.
 - **Zostaje**: diody klawiatury; test na X470; tryb wsadowy także na
   zwykłym BIOS-ie (po teście MS-7100); Windows 3.11 EN, memtest BIOS i 98/ME
   przez tryb BIOS.
+
+### Pozostałe pozycje 1.1 (zrobione)
+
+- **NT 5.2 USB przez xhci98** (L1): xhci98 1.1.1.0-usos2 dla XP x64 i
+  Server 2003, staging `genahci.inf`; X470 bez CSM: pełny PASS (L1).
+- **ACPI społeczności x64 dla XP x64** w publicznym wydaniu (decyzja
+  2026-09-30): `acpi.sys` 5.2.3790.7777.4, tekstowy Setup, `SP2.CAB` źródła,
+  `[FileFlags]`; gałąź `private/xp64-acpi` jest przez to zbędna.
+- **Motyw ekranów mikro-Linuksa** z linii poleceń (ekrany zachowują motyw
+  menu) i **edytor profili**: automatyczne myślniki w kluczu produktu,
+  przewijanie kółkiem przez sekcje formularza; potwierdzone na X470.
 
 ## 2a. Przed 1.0 (lista kontrolna)
 
@@ -576,3 +604,4 @@ Szczegóły i dowody: `TESTING.md` i dokumenty w `docs/`.
 | 2026-09-28 | **Linux z ISO na DATA** (QEMU: Ubuntu, Mint, Fedora, Debian live/netinst, SystemRescue, GParted, Clonezilla; UEFI z Secure Boot przez shim dystrybucji i bez, BIOS; profile odpowiedzi autoinstall/preseed/kickstart z ręcznym wyborem dysku; build B260928-114652) |
 | 2026-09-28 | Przed 1.0 (B260928-193034): polecenia profili odpowiedzi bez okien konsoli (`usos-run-hidden.exe`), cichy CSMWrap 3.1.2-usos1 w wydaniu, ikony XP x64 / Server 2003, profile odpowiedzi dla Visty UEFI z CSM, pendrive'y w Viście jako znane ograniczenie |
 | 2026-09-28 | **Vista SP2 x64 bez CSM przez CSMWrap na X470** (instalacja legacy MBR, PE10 Setup z profilem odpowiedzi, USB na pulpicie, start z dysku bez pendrive'a; build B260927-205829) |
+| 2026-09-29 | **1.1 w `master`**: tryb BIOS przez CSMWrap (MS-DOS, FreeDOS, Windows 3.x bez CSM, USOSKEY, VBADOS, wsadowy Setup Windows 3.x; QEMU), CSMWrap 3.1.2-usos3 w wydaniu; **XP x64 SP2 i Server 2003 R2 SP2 x86 bez CSM na X470: pełny PASS** (xhci98 1.1.1.0-usos2, GenAHCI, ACPI społeczności x64 w wydaniu; build B260929-191942); motyw mikro-Linuksa, poprawki edytora profili |
