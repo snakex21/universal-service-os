@@ -1,3 +1,11 @@
+# Line endings: the working tree holds exactly the bytes in git, on every
+# OS and whatever core.autocrlf says. The staged payloads, the Core and
+# the goldens (tools/tests/golden, src/flow/answer/testdata) hash these
+# files byte for byte, so a CRLF checkout on Windows built a different
+# payload than the one the goldens pin. Most files are stored with LF;
+# the few stored with CRLF (answer-file goldens, vendor scripts) keep it.
+* -text
+
 # Large binaries go to Git LFS from now on. This applies only to FUTURE
 # commits of these paths: existing history is not rewritten (no
 # `git lfs migrate`), so blobs already committed stay ordinary git objects.
@@ -21,8 +29,8 @@
 installer/internal/payload/assets/*.zip filter=lfs diff=lfs merge=lfs -text
 
 # Exceptions: tiny test fixtures and bundled QEMU firmware stay plain git
-tools/tests/fixtures/** !filter !diff !merge !text
-tools/qemu/** !filter !diff !merge !text
+tools/tests/fixtures/** !filter !diff !merge -text
+tools/qemu/** !filter !diff !merge -text
 
 # Outputs of installer/cmd/usos-i18n-gen are written with LF; keep them LF in
 # the working tree too (core.autocrlf=true would otherwise check them out as

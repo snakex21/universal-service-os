@@ -734,15 +734,25 @@ fn renderMethods(model: *const boot_method_model.List, runnable: []const usize, 
     console.line("");
     for (runnable, 0..) |index, row| {
         console.print(if (row == selected) "> " else "  ");
-        console.line(model.items[index].label.slice());
+        console.line(textLabel(&model.items[index]));
     }
     const current = &model.items[runnable[selected]];
     console.line("");
     console.line(current.help.title);
     console.line(current.help.line1);
     console.line(current.help.line2);
+    if (current.validation_status == .tested_in_vm) console.line("Tested in a virtual machine");
     console.line("");
     console.line("ARROWS: MOVE   ENTER: SELECT   ESC/BACKSPACE: BACK   D: DIAGNOSTICS   AUTO-RETURN: 30s");
+}
+
+/// The method label without the "[TESTED IN VM]" suffix: the details
+/// below the list say where the method was verified.
+fn textLabel(item: *const boot_method_model.Item) []const u8 {
+    const text = item.label.slice();
+    const suffix = if (item.validation_status) |status| status.badge() else "";
+    if (suffix.len == 0 or !std.mem.endsWith(u8, text, suffix)) return text;
+    return std.mem.trimEnd(u8, text[0 .. text.len - suffix.len], " ");
 }
 
 fn showBackendFailureNotice(diag: diagnostics.Info, method_label: []const u8, err: anyerror, graphics: *?vbe_probe.Session) void {
