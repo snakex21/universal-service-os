@@ -46,6 +46,7 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | L4 | Chainload w stylu Plop dla PC bez USB boot | **Later** | L3 (częściowo) | 5–10 dni |
 | L5 | Motywy, układy klawiatury, persistence, post-install, test QEMU | **Later** | N2 (M1) | 1–5 dni per punkt |
 | L6 | Windows 98 na X470 (eksperymentalne) | **Later** | ręczny spike, N4 (msbatch) | spike 2–3 dni, automatyzacja 8–12 dni |
+| L6b | Windows 95 (RTM/A, OSR2/2.1/2.5) na UEFI bez CSM (eksperymentalne) | **Later** (po 1.0) | L6 (ścieżka 98/ME), tryb BIOS przez CSMWrap (1.1), wejście USOSKEY/VBADOS | do oszacowania (głównie reużycie L6) |
 | L7 | Buildy Longhorn | **Later** | L1 (pre-reset), ścieżka Vista (post-reset) | 3–5 dni per build |
 | L8 | NT4 dla retro sprzętu | **Later** | profil NT5 (M4) | 5–8 dni |
 | L9 | shim-review (własny shim podpisany przez Microsoft) | **Later** (długoterminowo) | N6, publiczne repo | miesiące, proces zewnętrzny |
@@ -311,6 +312,27 @@ Radeon X8xx, PS/2), potem ścieżkę „UEFI → mikro-Linux (MBR/FAT32,
 Patcher9x `tlb,creg,mem,speed`, `msbatch.inf`, sterowniki użytkownika)
 → natywny CSM”, jako profil 9x w pipeline. Wszystkie sterowniki 9x
 i pliki Microsoft są user-supplied (licencje).
+
+### L6b. Windows 95: **Later** (po 1.0), eksperymentalne
+
+Obok L6, bo dzieli z nią większość ścieżki: DOS Setup, a na UEFI bez CSM
+przez „tryb BIOS przez CSMWrap” (`feature/bios-via-csmwrap`, 1.1).
+Wersje: 95 RTM/A oraz OSR2/2.1/2.5 (FAT32 dopiero od OSR2, USB dopiero
+od OSR2.1). Znane problemy na nowym sprzęcie:
+
+- **RAM powyżej ~480 MB**: ograniczenie przez `MaxPhysPage` w `SYSTEM.INI`
+  albo `HIMEM /MAX`;
+- **CPU powyżej ~2,1 GHz**: „Windows protection error” (timing IOS/NDIS);
+  potrzebne znane łatki społeczności (np. FIX95CPU), user-supplied;
+- **dyski**: limity LBA, dla bezpieczeństwa ≤32 GB;
+- **USB**: brak przed OSR2.1, więc wejście USB pod CSMWrap działa w DOS
+  tylko przez emulację legacy SeaBIOS, a GUI Win95 potrzebuje PS/2 albo
+  rozwiązania jak USOSKEY/VBADOS z Win3.x;
+- **grafika**: tylko sterowniki VGA lub VESA (np. VBEMP 9x).
+
+Zależności: reużycie ścieżki 98/ME (L6) i pracy nad wejściem
+USOSKEY/VBADOS. Pliki Microsoft, łatki i sterowniki są user-supplied
+(licencje).
 
 ### L7. Buildy Longhorn: **Later**
 
