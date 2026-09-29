@@ -129,16 +129,41 @@ PACKAGE_PREFIXES=('usr/lib/usos/xp-drivers/','usr/lib/usos/nt5-storage/','usr/li
 GENAHCI_ARCHIVE=ROOT/'tools/vendor/xp-modern/2026-09-21/GenAHCI_6.3.0.1.7z'
 GENAHCI_SHA256='f8dd54123934c176a2b6315df7b4a1dfe2ff6761fa3bc27cecfeedbe421b279f'
 
+# GenAHCI's INF (UTF-16LE, the same text for both builds) has
+# [SourceDisksNames] "1 = %SERVICEDESCRIPTION%,,," : GUI-mode Setup would look
+# for genahci.sys next to TXTSETUP.SIF, where text mode has MOVED it from
+# (X470 2026-09-29: no INF at all -> NULL driver -> STOP 0x7B on every later
+# boot). The package INF points row 1 at <source dir>\genahci instead, where
+# tools/nt5_storage_stage.sh puts a second genahci.sys (as for xhci98).
+GENAHCI_DISK_ROW='1 = %SERVICEDESCRIPTION%,,,'
+
+def genahci_inf(data,subdir):
+    """The archive's genahci.inf with row 1 = \\<subdir>\\genahci (i386 or amd64)."""
+    if not data.startswith(b'\xff\xfe'):raise ValueError('genahci.inf is not UTF-16LE')
+    text=data[2:].decode('utf-16-le')
+    for needed in ('[Models.NTx86]','[Models.NTamd64]','%MANUFACTURER% = Models, NTx86, NTamd64','CatalogFile = genahci.cat','genahci.sys = 1',r'ServiceBinary  = %12%\genahci.sys'):
+        if needed not in text:raise ValueError('genahci.inf layout changed: '+needed)
+    if text.count(GENAHCI_DISK_ROW+'\r\n')!=1:raise ValueError('genahci.inf [SourceDisksNames] row 1 changed')
+    return b'\xff\xfe'+text.replace(GENAHCI_DISK_ROW+'\r\n',GENAHCI_DISK_ROW+'\\'+subdir+'\\genahci\r\n').encode('utf-16-le')
+
 def nt5_storage_files():
     if digest(GENAHCI_ARCHIVE)!=GENAHCI_SHA256:raise ValueError('GenAHCI archive hash mismatch')
     def member(name):
         return subprocess.run([os.environ.get('USOS_7Z','C:/Program Files/7-Zip/7z.exe'),'e','-so',str(GENAHCI_ARCHIVE),name],check=True,capture_output=True).stdout
-    note=(b'GenAHCI 6.3.0.1 (x86 and x64 builds, unmodified), https://github.com/GeorgeK1ng/GenAHCI\n'
+    note=(b'GenAHCI 6.3.0.1 (x86 and x64 builds), https://github.com/GeorgeK1ng/GenAHCI\n'
           b'archive GenAHCI_6.3.0.1.7z sha256 '+GENAHCI_SHA256.encode()+b'; licence: gpl.txt of the archive.\n'
-          b'USOS uses it only for Windows Server 2003 x86 and XP x64 (NT 5.2) text-mode Setup.\n')
-    files={'x86/genahci.sys':member('x86/genahci.sys'),'amd64/genahci.sys':member('x64/genahci.sys'),'gpl.txt':member('gpl.txt'),'SOURCE.txt':note}
+          b'genahci.sys and genahci.cat unmodified; genahci.inf changed in one line only:\n'
+          b'[SourceDisksNames] row 1 gets the path \\i386\\genahci (x86) or \\amd64\\genahci (amd64),\n'
+          b'the folder of the Setup source where USOS puts the GUI-mode copy of genahci.sys.\n'
+          b'USOS uses it only for Windows Server 2003 x86 and XP x64 (NT 5.2) Setup.\n')
+    files={'x86/genahci.sys':member('x86/genahci.sys'),'amd64/genahci.sys':member('x64/genahci.sys'),
+           'x86/genahci.inf':genahci_inf(member('x86/genahci.inf'),'i386'),'amd64/genahci.inf':genahci_inf(member('x64/genahci.inf'),'amd64'),
+           'x86/genahci.cat':member('x86/genahci.cat'),'amd64/genahci.cat':member('x64/genahci.cat'),
+           'gpl.txt':member('gpl.txt'),'SOURCE.txt':note}
     for name,data in files.items():
         if not data:raise ValueError('GenAHCI member missing: '+name)
+    machine=lambda b:struct.unpack_from('<H',b,struct.unpack_from('<I',b,60)[0]+4)[0]
+    if (machine(files['x86/genahci.sys']),machine(files['amd64/genahci.sys']))!=(0x14c,0x8664):raise ValueError('GenAHCI build architectures changed')
     return files
 
 # NT 5.2 (Server 2003 x86, XP x64) USB 2.0 on xHCI: xhci98 1.1.1.0, the

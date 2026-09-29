@@ -1,7 +1,9 @@
 """NT 5.2 (Server 2003 x86, XP x64) staging pieces, host-only, no Microsoft files:
 
-- tools/nt5_storage_stage.sh usos_nt5_storage_sif: the four GenAHCI rows go
-  into the first block of each section, CRLF kept, a second run is refused.
+- tools/nt5_storage_stage.sh usos_nt5_storage_sif: the GenAHCI rows go
+  into the first block of each section, CRLF kept, a second run is refused;
+  genahci.inf (package copy, GUI-mode source folder), HIVESYS.INF
+  CriticalDeviceDatabase and DOSNET rows, apply on a stand-in target.
 - tools/xp_dosnet_aliases.awk: aliases relative to the Setup source directory
   (I386 unchanged, AMD64 for XP x64, other directories refused).
 - tools/nt5_profile.sh: one row per system (source dir, install dir, setup dir).
@@ -47,7 +49,8 @@ class Nt52Staging(unittest.TestCase):
         # the text; the inserted rows always end in CRLF.
         lines = [l.rstrip('\r') for l in out.split('\n')]
         self.assertTrue(all(l.endswith('\r') for l in out.split('\n') if l.startswith('genahci') or l.startswith('PCI\\CC_010601')))
-        self.assertEqual(lines[lines.index('[SourceDisksFiles]') + 1], 'genahci.sys = 1,,,,,,4_,4,1,,,1,4')
+        self.assertEqual(lines[lines.index('[SourceDisksFiles]') + 1:lines.index('[SourceDisksFiles]') + 3],
+                         ['genahci.sys = 1,,,,,,4_,4,1,,,1,4', 'genahci.inf = 1,,,,,,,20,0,0'])
         self.assertEqual(out.count('genahci.sys = 1'), 1)
         self.assertEqual(lines[lines.index('[HardwareIdsDatabase]') + 1], 'PCI\\CC_010601 = "genahci"')
         self.assertEqual(lines[lines.index('[SCSI.Load]') + 1], 'genahci = genahci.sys,4')
@@ -73,6 +76,127 @@ class Nt52Staging(unittest.TestCase):
         for profile, generic in (('xp-x86-sp3-uefi-csm', 1), ('w2k3-x86-sp2-uefi-csm', 0), ('xp-x64-sp2-uefi-csm', 0), ('nt5-staging', 1)):
             r = sh(f"USOS_PLAN_PROFILE={profile}; . '{lib}'; usos_nt5_uefi_generic_profile")
             self.assertEqual(r.returncode, generic, profile)
+
+
+HIVESYS = (b'\r\n[Version]\r\nSignature = "$Windows NT$"\r\n\r\n[AddReg]\r\n'
+           b'HKLM,"SYSTEM\\CurrentControlSet\\Control\\CriticalDeviceDatabase\\gendisk",Service,0x00000000,disk\r\n'
+           b'[AddReg.Fresh]\r\nHKLM,"SYSTEM\\Setup","SystemSetupInProgress",0x00010001,1\r\n[AddReg]\r\nHKLM,"SYSTEM\\Other",x,0x00000000,y\r\n')
+CDDB = 'HKLM,"SYSTEM\\CurrentControlSet\\Control\\CriticalDeviceDatabase\\'
+STORAGE_DOSNET = b'[Files]\r\nd1,storport.sys\r\n[FloppyFiles.1]\r\nd1,storport.sys\r\n[FloppyFiles.1]\r\nd1,hal.dll\r\n'
+
+
+@unittest.skipIf(SH is None, 'sh not found')
+class Nt52Storage(unittest.TestCase):
+    """tools/nt5_storage_stage.sh: GenAHCI for text mode AND GUI mode (X470
+    2026-09-29: without genahci.inf GUI-mode PnP installed a NULL driver and
+    every later boot stopped with 0x7B)."""
+    LIB = posix(ROOT / 'tools' / 'nt5_storage_stage.sh')
+
+    def run_fn(self, fn: str, data: bytes) -> subprocess.CompletedProcess:
+        return sh(f". '{self.LIB}'; {fn}", data)
+
+    def test_hivesys_rows(self):
+        r = self.run_fn('usos_nt5_storage_hivesys', HIVESYS)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.count(b'\r\n'), r.stdout.count(b'\n'))
+        out = rows(r.stdout)
+        first = out.index('[AddReg]')
+        guid = '{4D36E97B-E325-11CE-BFC1-08002BE10318}'
+        self.assertEqual(out[first + 1:first + 5], [
+            CDDB + 'pci#cc_010601",Service,0x00000000,genahci', CDDB + 'pci#cc_010601",ClassGUID,0x00000000,' + guid,
+            CDDB + 'pci#ven_1022&dev_43c8",Service,0x00000000,genahci', CDDB + 'pci#ven_1022&dev_43c8",ClassGUID,0x00000000,' + guid])
+        # Only the first [AddReg] block; everything else unchanged, in order.
+        self.assertEqual(sum('genahci' in l for l in out), 2)
+        self.assertEqual(out[:first + 1] + out[first + 5:], rows(HIVESYS))
+        self.assertEqual(self.run_fn('usos_nt5_storage_hivesys', r.stdout).returncode, 3)
+        self.assertEqual(self.run_fn('usos_nt5_storage_hivesys', HIVESYS.replace(b'[AddReg]', b'[Other]')).returncode, 3)
+
+    def test_dosnet(self):
+        r = self.run_fn('usos_nt5_storage_dosnet', STORAGE_DOSNET)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout, b'[Files]\r\nd1,genahci.sys\r\nd1,genahci.inf\r\nd1,storport.sys\r\n[FloppyFiles.1]\r\n'
+                                   b'd1,genahci.sys\r\nd1,genahci.inf\r\nd1,storport.sys\r\n[FloppyFiles.1]\r\nd1,hal.dll\r\n')
+        self.assertEqual(self.run_fn('usos_nt5_storage_dosnet', r.stdout).returncode, 3)
+        self.assertEqual(self.run_fn('usos_nt5_storage_dosnet', b'[Files]\r\n').returncode, 3)
+
+    def test_package_files(self):
+        import build_xp_uefi_csm_trial as builder
+        files = builder.nt5_storage_files()
+        self.assertEqual(sorted(files), ['SOURCE.txt', 'amd64/genahci.cat', 'amd64/genahci.inf', 'amd64/genahci.sys',
+                                         'gpl.txt', 'x86/genahci.cat', 'x86/genahci.inf', 'x86/genahci.sys'])
+        for arch, sub in (('x86', 'i386'), ('amd64', 'amd64')):
+            inf = files[arch + '/genahci.inf']
+            self.assertTrue(inf.startswith(b'\xff\xfe'))
+            text = inf[2:].decode('utf-16-le')
+            # One line differs from the archive's INF: the GUI-mode source folder.
+            self.assertIn('\r\n1 = %SERVICEDESCRIPTION%,,,\\' + sub + '\\genahci\r\n', text)
+            self.assertIn('[Models.NT' + ('x86' if arch == 'x86' else 'amd64') + ']', text)
+            self.assertIn('CatalogFile = genahci.cat', text)
+            self.assertIn('%ADAPTERNAME% = genahci, "PCI\\CC_010601"', text)
+        self.assertNotEqual(files['x86/genahci.cat'], files['amd64/genahci.cat'])
+
+    def stand_in(self, t: Path, source_dir: str, pkg: dict) -> tuple:
+        for rel, data in pkg.items():
+            (t / 'pkg' / rel).parent.mkdir(parents=True, exist_ok=True)
+            (t / 'pkg' / rel).write_bytes(data)
+        bt, ls = t / 'root/$WIN_NT$.~BT', t / 'root/$WIN_NT$.~LS' / source_dir
+        for folder in (bt, ls):
+            folder.mkdir(parents=True)
+            (folder / 'TXTSETUP.SIF').write_bytes(TXTSETUP)
+            (folder / 'GENAHCI.SY_').write_bytes(b'stale')
+        (t / 'root/TXTSETUP.SIF').write_bytes(TXTSETUP)
+        (ls / 'DOSNET.INF').write_bytes(STORAGE_DOSNET)
+        (ls / 'HIVESYS.INF').write_bytes(HIVESYS)
+        return bt, ls
+
+    def apply(self, t: Path, source_dir: str) -> subprocess.CompletedProcess:
+        return sh(f"XP_TARGET_ROOT='{posix(t / 'root')}' NT5_SOURCE_DIR={source_dir} USOS_NT5_STORAGE_DIR='{posix(t / 'pkg')}' "
+                  f"sh '{self.LIB}' apply")
+
+    def test_apply(self):
+        import build_xp_uefi_csm_trial as builder
+        pkg = builder.nt5_storage_files()
+        for source_dir, arch in (('I386', 'x86'), ('AMD64', 'amd64')):
+            with tempfile.TemporaryDirectory() as tmp:
+                t = Path(tmp)
+                bt, ls = self.stand_in(t, source_dir, pkg)
+                r = self.apply(t, source_dir)
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+                self.assertIn(b'[NT5_STORAGE] APPLIED PASS genahci.sys+inf (' + arch.encode() + b')', r.stdout)
+                sif = self.run_fn('usos_nt5_storage_sif', TXTSETUP).stdout
+                # genahci.inf must be in the staged tree AND in TXTSETUP/DOSNET, or
+                # GUI-mode PnP gives the boot controller a NULL driver (STOP 0x7B).
+                for folder in (bt, ls):
+                    self.assertEqual((folder / 'genahci.sys').read_bytes(), pkg[arch + '/genahci.sys'])
+                    self.assertEqual((folder / 'genahci.inf').read_bytes(), pkg[arch + '/genahci.inf'])
+                    self.assertFalse((folder / 'GENAHCI.SY_').exists())
+                    self.assertEqual((folder / 'TXTSETUP.SIF').read_bytes(), sif)
+                    self.assertIn(b'\r\ngenahci.inf = 1,,,,,,,20,0,0\r\n', (folder / 'TXTSETUP.SIF').read_bytes())
+                self.assertEqual((t / 'root/TXTSETUP.SIF').read_bytes(), sif)
+                # The GUI-mode source copy (text mode moves the one above).
+                self.assertEqual((ls / 'GENAHCI/genahci.sys').read_bytes(), pkg[arch + '/genahci.sys'])
+                self.assertEqual((ls / 'GENAHCI/genahci.cat').read_bytes(), pkg[arch + '/genahci.cat'])
+                dosnet = (ls / 'DOSNET.INF').read_bytes()
+                self.assertIn(b'[Files]\r\nd1,genahci.sys\r\nd1,genahci.inf\r\n', dosnet)
+                self.assertIn(b'[FloppyFiles.1]\r\nd1,genahci.sys\r\nd1,genahci.inf\r\n', dosnet)
+                self.assertEqual((ls / 'HIVESYS.INF').read_bytes(), self.run_fn('usos_nt5_storage_hivesys', HIVESYS).stdout)
+                # A second apply refuses (already integrated) and leaves the files.
+                self.assertNotEqual(self.apply(t, source_dir).returncode, 0)
+                self.assertEqual((ls / 'TXTSETUP.SIF').read_bytes(), sif)
+
+    def test_apply_refusals(self):
+        import build_xp_uefi_csm_trial as builder
+        pkg = builder.nt5_storage_files()
+        for missing in ('amd64/genahci.inf', 'amd64/genahci.cat', 'HIVESYS.INF'):
+            with tempfile.TemporaryDirectory() as tmp:
+                t = Path(tmp)
+                bt, ls = self.stand_in(t, 'AMD64', {k: v for k, v in pkg.items() if k != missing})
+                if missing == 'HIVESYS.INF':
+                    (ls / 'HIVESYS.INF').unlink()
+                r = self.apply(t, 'AMD64')
+                self.assertNotEqual(r.returncode, 0, missing)
+                self.assertIn(b'STOP', r.stdout, missing)
+                self.assertEqual((ls / 'TXTSETUP.SIF').read_bytes(), TXTSETUP, missing)
 
 
 # The USB/HID rows as Microsoft's 5.2 media carry them (",4,1,3": do not

@@ -116,8 +116,8 @@ def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),
         probe=probe.replace("if [ -r /usr/lib/usos/xp_user_settings.sh ]; then . /usr/lib/usos/xp_user_settings.sh; usos_xp_settings_stage /probe-usos-xp.ini /mnt/source || finish 'FAIL settings'; fi"+chr(10),'')
     cpio.put(entries,cpio.Entry('probe-init',stat.S_IFREG|0o755,probe.encode()))
     if settings:cpio.put(entries,cpio.Entry('probe-usos-xp.ini',stat.S_IFREG|0o644,Path(settings).read_bytes()))
-    if profile in ('w2k3-x86-sp2-uefi-csm','xp-x64-sp2-uefi-csm') and 'usr/lib/usos/nt5-storage/x86/genahci.sys' not in entries:
-        # A package from before the NT 5.2 storage files: add them as the builder does.
+    if profile in ('w2k3-x86-sp2-uefi-csm','xp-x64-sp2-uefi-csm') and 'usr/lib/usos/nt5-storage/amd64/genahci.inf' not in entries:
+        # A package from before the NT 5.2 storage files (or before genahci.inf): add them as the builder does.
         sys.path.insert(0,str(ROOT/'tools'));import build_xp_uefi_csm_trial as builder
         for name,data in builder.nt5_storage_files().items():cpio.put(entries,cpio.Entry('usr/lib/usos/nt5-storage/'+name,stat.S_IFREG|0o644,data))
     if profile in ('w2k3-x86-sp2-uefi-csm','xp-x64-sp2-uefi-csm') and 'usr/lib/usos/nt52-usb/x86/xhci98.sys' not in entries:
