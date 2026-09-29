@@ -457,6 +457,81 @@ pub fn checkKey(value: []const u8) ?Problem {
     return null;
 }
 
+/// Letters and digits in a product key.
+pub const key_symbols = 25;
+
+/// A product key as the editor shows and the profile stores it: the letters
+/// and digits of `value` (spaces, dashes and anything else dropped, at most
+/// 25), in capitals, with a dash after every group of five that has more
+/// after it or is being typed (so a partial key "ABCDE" reads "ABCDE-").
+/// A full key is the XXXXX-XXXXX-XXXXX-XXXXX-XXXXX form of checkKey, which
+/// is what WINNT.SIF ProductKey/ProductID and autounattend.xml take.
+pub fn normalizeKey(value: []const u8, out: *[29]u8) []const u8 {
+    var symbols: [key_symbols]u8 = undefined;
+    return renderKey(keySymbols(value, &symbols), out);
+}
+
+/// Number of letters and digits typed so far (for the "12/25" hint).
+pub fn keySymbolCount(value: []const u8) usize {
+    var symbols: [key_symbols]u8 = undefined;
+    return keySymbols(value, &symbols).len;
+}
+
+/// One character typed (or pasted) into a key being edited in
+/// `buf[0..len]` (`buf.len` >= 29): a letter or digit is added in capitals
+/// (up to 25), anything else is ignored; the dashes follow on their own.
+/// Returns the new length.
+pub fn keyTyped(buf: []u8, len: usize, c: u8) usize {
+    std.debug.assert(buf.len >= 29);
+    var symbols: [key_symbols]u8 = undefined;
+    const have = keySymbols(buf[0..len], &symbols);
+    if (!std.ascii.isAlphanumeric(c) or have.len == key_symbols) return len;
+    symbols[have.len] = std.ascii.toUpper(c);
+    return rewrite(buf, symbols[0 .. have.len + 1]);
+}
+
+/// Backspace in a key being edited: removes the last letter or digit (so
+/// backspace over a dash also removes the character before it). Returns
+/// the new length.
+pub fn keyBackspace(buf: []u8, len: usize) usize {
+    std.debug.assert(buf.len >= 29);
+    var symbols: [key_symbols]u8 = undefined;
+    const have = keySymbols(buf[0..len], &symbols);
+    if (have.len == 0) return 0;
+    return rewrite(buf, have[0 .. have.len - 1]);
+}
+
+fn keySymbols(value: []const u8, out: *[key_symbols]u8) []const u8 {
+    var n: usize = 0;
+    for (value) |c| {
+        if (!std.ascii.isAlphanumeric(c)) continue;
+        if (n == key_symbols) break;
+        out[n] = std.ascii.toUpper(c);
+        n += 1;
+    }
+    return out[0..n];
+}
+
+fn renderKey(symbols: []const u8, out: *[29]u8) []const u8 {
+    var n: usize = 0;
+    for (symbols, 1..) |c, count| {
+        out[n] = c;
+        n += 1;
+        if (count % 5 == 0 and count < key_symbols) {
+            out[n] = '-';
+            n += 1;
+        }
+    }
+    return out[0..n];
+}
+
+fn rewrite(buf: []u8, symbols: []const u8) usize {
+    var out: [29]u8 = undefined;
+    const text = renderKey(symbols, &out);
+    @memcpy(buf[0..text.len], text);
+    return text.len;
+}
+
 /// Profile name: 1-32 characters A-Z a-z 0-9 space . _ - (also a FAT file stem).
 pub fn checkName(value: []const u8) ?Problem {
     if (value.len == 0) return .empty;
@@ -915,3 +990,42 @@ test "field checks follow the XP staging rules" {
     var stem: [32]u8 = undefined;
     try std.testing.expectEqualStrings("moj-profil-1", fileStem("Moj profil.1", &stem));
 }
+
+test "product key: normalised from any case, with or without dashes and spaces" {
+    var out: [29]u8 = undefined;
+    const full = "ABCDE-12345-FGHIJ-67890-KLMNO";
+    try std.testing.expectEqualStrings(full, normalizeKey("abcde12345fghij67890klmno", &out));
+    try std.testing.expectEqualStrings(full, normalizeKey("ABCDE-12345-FGHIJ-67890-KLMNO", &out));
+    try std.testing.expectEqualStrings(full, normalizeKey(" abcde 12345-fghij 67890 - klmno ", &out));
+    try std.testing.expectEqualStrings(full, normalizeKey("abcde12345fghij67890klmnoXYZ", &out));
+    try std.testing.expect(checkKey(normalizeKey("abcde12345fghij67890klmno", &out)) == null);
+    try std.testing.expectEqualStrings("", normalizeKey("", &out));
+    try std.testing.expectEqualStrings("ABCDE-", normalizeKey("abcde", &out));
+    try std.testing.expectEqualStrings("ABCDE-F", normalizeKey("abcdef", &out));
+    try std.testing.expectEqual(@as(usize, 12), keySymbolCount("ABCDE-12345-XY"));
+}
+
+test "product key: typing inserts the dashes, backspace over a dash removes the character before it" {
+    var buf: [64]u8 = undefined;
+    var len: usize = 0;
+    for ("abcde") |c| len = keyTyped(&buf, len, c);
+    try std.testing.expectEqualStrings("ABCDE-", buf[0..len]);
+    // A typed or pasted dash or space changes nothing.
+    len = keyTyped(&buf, len, '-');
+    len = keyTyped(&buf, len, ' ');
+    try std.testing.expectEqualStrings("ABCDE-", buf[0..len]);
+    len = keyBackspace(&buf, len);
+    try std.testing.expectEqualStrings("ABCD", buf[0..len]);
+    for ("e-12345 fghij6789") |c| len = keyTyped(&buf, len, c);
+    try std.testing.expectEqualStrings("ABCDE-12345-FGHIJ-6789", buf[0..len]);
+    try std.testing.expect(checkKey(buf[0..len]) == .bad_key_format);
+    for ("0klmnoPQ") |c| len = keyTyped(&buf, len, c);
+    // 25 symbols: no trailing dash, extra characters refused.
+    try std.testing.expectEqualStrings("ABCDE-12345-FGHIJ-67890-KLMNO", buf[0..len]);
+    try std.testing.expect(checkKey(buf[0..len]) == null);
+    len = keyBackspace(&buf, len);
+    try std.testing.expectEqualStrings("ABCDE-12345-FGHIJ-67890-KLMN", buf[0..len]);
+    while (len > 0) len = keyBackspace(&buf, len);
+    try std.testing.expectEqual(@as(usize, 0), keyBackspace(&buf, 0));
+}
+

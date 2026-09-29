@@ -22,6 +22,7 @@ const navigation = @import("manual_navigation.zig");
 const view = @import("manual_view.zig");
 
 const gui = usos.gui;
+const answer_profile = usos.flow.answer.profile;
 const osk = gui.osk;
 const Hint = gui.ui.Hint;
 
@@ -64,6 +65,9 @@ pub const Field = struct {
     allowed: ?*const osk.Allowed = null,
     /// Typed letters become capitals (product keys, colours).
     uppercase: bool = false,
+    /// A product key: letters and digits only, in capitals, the dashes put
+    /// in on their own (answer.profile.keyTyped); never traced.
+    product_key: bool = false,
     placeholder: []const u8 = "",
     // choice
     options: []const []const u8 = &.{},
@@ -255,11 +259,23 @@ fn rebuild(selected: usize) void {
 
 var trace_number: [4]u8 = undefined;
 
+var trace_key: [16]u8 = undefined;
+
+/// What the serial trace shows of a text value: a password as "(secret)",
+/// a product key only as how far it is typed ("(key 12/25)").
+fn traceText(field: *const Field, out: *[16]u8) []const u8 {
+    const value = field.text.?.slice();
+    if (value.len == 0) return "";
+    if (field.secret) return "(secret)";
+    if (field.product_key) return std.fmt.bufPrint(out, "(key {d}/{d})", .{ answer_profile.keySymbolCount(value), answer_profile.key_symbols }) catch "(key)";
+    return value;
+}
+
 fn trace(kind: []const u8, index: usize) void {
     const field = &form_fields[index];
     var line: [160]u8 = undefined;
     const value: []const u8 = switch (field.kind) {
-        .text => if (field.secret) (if (field.text.?.len > 0) "(secret)" else "") else field.text.?.slice(),
+        .text => traceText(field, &trace_key),
         .choice => if (onManual(field) and field.text.?.len > 0) field.text.?.slice() else if (field.index) |i| (if (i.* < field.options.len) field.options[i.*] else "") else "",
         .toggle => if (field.flag.?.*) "on" else "off",
         .stepper => std.fmt.bufPrint(&trace_number, "{d}", .{field.number.?.*}) catch "",
@@ -282,6 +298,17 @@ fn selectable(fields: []const Field, index: usize, down: bool) usize {
         i = if (down) (i + 1) % fields.len else (i + fields.len - 1) % fields.len;
     }
     return index;
+}
+
+/// The row the wheel lands on: `notches` rows (positive turns the wheel
+/// away, towards the top) over the selectable rows, stopping at the ends.
+/// Section headings are passed over, so the wheel crosses from one section
+/// into the next like the arrows do.
+fn wheelTarget(fields: []const Field, current: usize, notches: i32) usize {
+    var mask: [max_fields]bool = undefined;
+    for (fields, 0..) |field, i| mask[i] = field.kind != .section;
+    const target = usos.gui.selectable_list.stepLinearBy(mask[0..fields.len], fields.len, current, notches < 0, @abs(notches));
+    return target;
 }
 
 /// Runs the form until an action button, Back, or X/Y. `selected` is kept
@@ -376,8 +403,7 @@ pub fn run(title: []const u8, subtitle: []const u8, fields: []Field, hooks: ?Hoo
                 if (mouse.right_click) return .back;
                 if (mouse.scroll != 0) {
                     const before = selected.*;
-                    selected.* = usos.gui.selectable_list.stepLinearBy(null, fields.len, selected.*, mouse.scroll < 0, @abs(mouse.scroll));
-                    selected.* = selectable(fields, selected.*, mouse.scroll > 0);
+                    selected.* = wheelTarget(fields, selected.*, mouse.scroll);
                     if (before != selected.*) select(selected.*);
                     continue;
                 }
@@ -523,6 +549,14 @@ fn allowedChar(index: usize, c: u8) bool {
 
 fn typeChar(index: usize, raw: u8) bool {
     const field = &form_fields[index];
+    if (field.product_key) {
+        const text = field.text.?;
+        const before = text.len;
+        text.len = answer_profile.keyTyped(&text.bytes, text.len, raw);
+        if (text.len == before) return false;
+        notifyChanged(index);
+        return true;
+    }
     const c = if (field.uppercase) std.ascii.toUpper(raw) else raw;
     if (!allowedChar(index, c)) return false;
     if (!field.text.?.push(c)) return false;
@@ -531,7 +565,15 @@ fn typeChar(index: usize, raw: u8) bool {
 }
 
 fn backspace(index: usize) void {
-    if (form_fields[index].text.?.pop()) notifyChanged(index);
+    const field = &form_fields[index];
+    if (field.product_key) {
+        const text = field.text.?;
+        const before = text.len;
+        text.len = answer_profile.keyBackspace(&text.bytes, text.len);
+        if (text.len != before) notifyChanged(index);
+        return;
+    }
+    if (field.text.?.pop()) notifyChanged(index);
 }
 
 /// One event while the keyboard is open; non-null when it closes.
@@ -641,4 +683,55 @@ pub fn cleanAscii(space: bool) osk.Allowed {
     for ("\"%^&|<>") |c| set.unset(c);
     if (!space) set.unset(' ');
     return set;
+}
+
+// ------------------------------------------------------------------- tests
+
+fn testFields(comptime kinds: []const gui.form.Kind) [kinds.len]Field {
+    var fields: [kinds.len]Field = undefined;
+    for (kinds, 0..) |kind, i| fields[i] = .{ .kind = kind, .label = "" };
+    return fields;
+}
+
+test "wheel crosses section headings in both directions and stops at the ends" {
+    // The XP profile editor: general rows, "Use for", the "Appearance and
+    // extras" heading, its toggles, Save, Cancel.
+    const fields = testFields(&.{ .text, .text, .choice, .section, .toggle, .toggle, .choice, .action, .action });
+    // One notch down from "Use for" goes past the heading, not back up.
+    try std.testing.expectEqual(@as(usize, 4), wheelTarget(&fields, 2, -1));
+    try std.testing.expectEqual(@as(usize, 5), wheelTarget(&fields, 2, -2));
+    // One notch up from the first toggle lands on "Use for".
+    try std.testing.expectEqual(@as(usize, 2), wheelTarget(&fields, 4, 1));
+    // Turning on reaches every row down to Cancel and back to the top.
+    var at: usize = 0;
+    var seen: usize = 1;
+    while (true) : (seen += 1) {
+        const next = wheelTarget(&fields, at, -1);
+        if (next == at) break;
+        try std.testing.expect(fields[next].kind != .section);
+        at = next;
+    }
+    try std.testing.expectEqual(fields.len - 1, at);
+    try std.testing.expectEqual(fields.len - 1, seen);
+    try std.testing.expectEqual(fields.len - 1, wheelTarget(&fields, at, -3));
+    try std.testing.expectEqual(@as(usize, 0), wheelTarget(&fields, at, 20));
+}
+
+test "the trace never shows a product key or a password" {
+    var key = TextValue{ .max = 29 };
+    const secret = "ABCDE-12345-FGHIJ-67890-KLMNO";
+    key.set(secret);
+    var out: [16]u8 = undefined;
+    const key_field = Field{ .kind = .text, .label = "Product key", .text = &key, .product_key = true };
+    const shown = traceText(&key_field, &out);
+    try std.testing.expectEqualStrings("(key 25/25)", shown);
+    try std.testing.expect(std.mem.indexOf(u8, shown, "ABCDE") == null);
+    key.set("ABCDE-12");
+    try std.testing.expectEqualStrings("(key 7/25)", traceText(&key_field, &out));
+    var password = TextValue{};
+    password.set(secret);
+    const password_field = Field{ .kind = .text, .label = "Password", .text = &password, .secret = true };
+    try std.testing.expectEqualStrings("(secret)", traceText(&password_field, &out));
+    key.set("");
+    try std.testing.expectEqualStrings("", traceText(&key_field, &out));
 }

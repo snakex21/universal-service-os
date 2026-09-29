@@ -15,6 +15,7 @@ settings	cmdline	-
 sif	summary	Answer file = test.sif (merged into the automatic answer)
 sif	cmdline	usos.legacy_unattended_hex=746573742e736966
 profile-add	screen	form New answer profile
+profile-wheel	form	crosses sections
 profile-saved	rows	xp_manual,xp_settings,profile,file,add
 profile-use	summary	Answer file = Profile Test: Tester, Automatic (x86)
 profile-use	cmdline	usos.xp_settings=plan
