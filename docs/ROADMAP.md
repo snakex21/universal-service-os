@@ -209,6 +209,11 @@ profile `w2k3-x86-sp2-uefi-csm` / `xp-x64-sp2-uefi-csm`, AHCI przez GenAHCI
 na StorPort systemu, QEMU do GUI Setup (z CSM i przez CSMWrap); X470 do testu.
 Szczegóły: `docs/nt52-2003-xp64-2026-09-27.md`.
 
+ACPI dla NT 5.2 (XP x64 / Server 2003) na nowym sprzęcie: do czasu własnej
+implementacji USOS tymczasowo wykrywa ACPI społeczności dostarczone przez
+użytkownika w `DATA\Drivers` / `DATA\Fixes`: **do zastąpienia własną
+implementacją** (zasada L6, pkt 3).
+
 ### L2. XP na UEFI bez CSM przez CSMWrap: eksperymentalne, **sprzęt PASS**
 
 2026-09-27, X470 z CSM i Secure Boot wyłączonymi (build B260927-153019): USOS
@@ -316,10 +321,25 @@ zwykłą częścią instalacji: celem USOS jest system, który da się używać
 na nowym sprzęcie, więc USOS stosuje je automatycznie.
 
 **Zasada:** Poprawki zgodności są częścią instalacji USOS i są stosowane
-automatycznie. Jeśli licencja pozwala, dołączamy je do USOS; jeśli nie,
-USOS wykrywa plik dostarczony przez użytkownika (`DATA\Drivers` /
-`DATA\Fixes`) i stosuje go sam, bez ręcznej konfiguracji. Nośnik
-instalacyjny Windows (pliki Microsoft) dostarcza użytkownik.
+automatycznie, bez ręcznej konfiguracji. Kolejność:
+
+1. **Dołączamy**, jeśli licencja pozwala na redystrybucję z USOS.
+2. **Jeśli nie, USOS ma własną implementację**: clean-room, na licencji
+   GPL-3.0-or-later, pisaną z publicznej dokumentacji i obserwowanego
+   zachowania, nigdy z wycieków kodu źródłowego. Tak powstały lub powstaną
+   m.in.: USOSKEY (klawiatura USB dla Windows 3.x), wybór xhci98 (własny
+   sterownik xHCI na GPL) zamiast przeniesionego stosu USB z Windows 8,
+   dyspozytor USOS i routing VGA.
+3. **Tylko jako tymczasowy most**, dopóki własnej implementacji nie ma, USOS
+   może wykryć plik dostarczony przez użytkownika (`DATA\Drivers` /
+   `DATA\Fixes`) i zastosować go sam. Każdy taki przypadek ma na roadmapie
+   oznaczenie **„do zastąpienia własną implementacją”**:
+   - ACPI społeczności dla XP x64 / Server 2003 (L1);
+   - poprawka szybkiego CPU dla Win95 (L6b);
+   - USB 3 dla Visty (backport podpisany testowo, sekcja 3).
+
+Nośnik instalacyjny Windows (pliki Microsoft) zawsze dostarcza użytkownik;
+to nie jest „poprawka” w rozumieniu tej zasady.
 
 ### L6b. Windows 95: **Later** (po 1.0), eksperymentalne
 
@@ -332,9 +352,10 @@ automatycznie podczas instalacji (zasada jak w L6):
 - **RAM powyżej ~480 MB**: USOS ustawia limit przez `MaxPhysPage` w
   `SYSTEM.INI` albo `HIMEM /MAX`;
 - **CPU powyżej ~2,1 GHz**: bez poprawki „Windows protection error”
-  (timing IOS/NDIS); USOS stosuje znaną poprawkę szybkiego CPU (np.
-  FIX95CPU): dołączoną, jeśli licencja pozwala, albo wykrytą w
-  `DATA\Fixes`;
+  (timing IOS/NDIS); USOS stosuje poprawkę szybkiego CPU: dołączoną, jeśli
+  licencja pozwala, inaczej własną (clean-room, GPL); do tego czasu
+  tymczasowo wykrywa plik użytkownika (np. FIX95CPU) w `DATA\Fixes`:
+  **do zastąpienia własną implementacją** (zasada L6, pkt 3);
 - **dyski**: USOS pilnuje limitów LBA (dla bezpieczeństwa ≤32 GB);
 - **wejście**: USB brak przed OSR2.1, więc pod CSMWrap DOS korzysta z
   emulacji legacy SeaBIOS, a dla GUI Win95 USOS konfiguruje PS/2 albo
@@ -342,8 +363,9 @@ automatycznie podczas instalacji (zasada jak w L6):
 - **grafika**: USOS instaluje sterownik VGA lub VESA (np. VBEMP 9x).
 
 Zależności: reużycie ścieżki 98/ME (L6) i pracy nad wejściem
-USOSKEY/VBADOS. Poprawki i sterowniki: dołączone do USOS albo wykrywane
-w `DATA\Drivers` / `DATA\Fixes` i stosowane automatycznie; nośnik
+USOSKEY/VBADOS. Poprawki i sterowniki według zasady z L6: dołączone, jeśli
+licencja pozwala, inaczej własna implementacja USOS; pliki użytkownika z
+`DATA\Drivers` / `DATA\Fixes` tylko jako tymczasowy most. Nośnik
 instalacyjny Windows dostarcza użytkownik.
 
 ### L7. Buildy Longhorn: **Later**
@@ -468,6 +490,8 @@ innym, w formie osobnego, opcjonalnego dodatku.
   testowo). Nie ma legalnie podpisanego sterownika xHCI dla X470 pod Vistę
   x64 (katalog AMD dla Win7 ma tylko OSAttr 6.1 i łańcuch SHA-256). Jedyna
   droga do wyłączenia trybu testowego: karta PCIe USB 3 Renesas uPD72020x.
+  Backport USB 3 to tymczasowy most: **do zastąpienia własną
+  implementacją** (zasada L6, pkt 3).
 - **Vista: pendrive'y USB niewidoczne w zainstalowanym systemie** (płyty
   tylko z USB 3/xHCI, np. X470; backport USB 3): klawiatura i mysz działają,
   pamięci masowe USB nie pojawiają się. Obejście dla użytkownika: pliki przez

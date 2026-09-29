@@ -21,6 +21,12 @@ results, translations and code are all welcome.
   licence, its source (or `SOURCES.txt` with an exact upstream revision) and
   an entry in `tools/release/third-party.json`. Its licence must allow
   redistribution with USOS.
+- **Compatibility fixes** whose licence does not allow bundling get an own
+  USOS implementation: clean-room, `GPL-3.0-or-later`, written from public
+  documentation and observed behaviour, never from leaked source code.
+  User-supplied files in `DATA\Drivers` / `DATA\Fixes` are only a temporary
+  bridge until that exists (see [docs/ROADMAP.md](docs/ROADMAP.md), L6,
+  "Zasada").
 
 ## Licence of contributions
 
