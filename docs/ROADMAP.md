@@ -310,29 +310,41 @@ MS-7100 ([win98-native](win98-native-2026-09-12.md)). Dla X470 analiza
 najpierw **ręczny spike** na osobnym dysku (CSM on, AHCI, GeForce 7 /
 Radeon X8xx, PS/2), potem ścieżkę „UEFI → mikro-Linux (MBR/FAT32,
 Patcher9x `tlb,creg,mem,speed`, `msbatch.inf`, sterowniki użytkownika)
-→ natywny CSM”, jako profil 9x w pipeline. Wszystkie sterowniki 9x
-i pliki Microsoft są user-supplied (licencje).
+→ natywny CSM”, jako profil 9x w pipeline. Poprawki zgodności z nowym
+sprzętem (limit RAM, szybki CPU, limity dysków, wejście, grafika) są
+zwykłą częścią instalacji: celem USOS jest system, który da się używać
+na nowym sprzęcie, więc USOS stosuje je automatycznie.
+
+**Zasada:** Poprawki zgodności są częścią instalacji USOS i są stosowane
+automatycznie. Jeśli licencja pozwala, dołączamy je do USOS; jeśli nie,
+USOS wykrywa plik dostarczony przez użytkownika (`DATA\Drivers` /
+`DATA\Fixes`) i stosuje go sam, bez ręcznej konfiguracji. Nośnik
+instalacyjny Windows (pliki Microsoft) dostarcza użytkownik.
 
 ### L6b. Windows 95: **Later** (po 1.0), eksperymentalne
 
 Obok L6, bo dzieli z nią większość ścieżki: DOS Setup, a na UEFI bez CSM
 przez „tryb BIOS przez CSMWrap” (`feature/bios-via-csmwrap`, 1.1).
 Wersje: 95 RTM/A oraz OSR2/2.1/2.5 (FAT32 dopiero od OSR2, USB dopiero
-od OSR2.1). Znane problemy na nowym sprzęcie:
+od OSR2.1). Poprawki zgodności z nowym sprzętem, które USOS stosuje
+automatycznie podczas instalacji (zasada jak w L6):
 
-- **RAM powyżej ~480 MB**: ograniczenie przez `MaxPhysPage` w `SYSTEM.INI`
-  albo `HIMEM /MAX`;
-- **CPU powyżej ~2,1 GHz**: „Windows protection error” (timing IOS/NDIS);
-  potrzebne znane łatki społeczności (np. FIX95CPU), user-supplied;
-- **dyski**: limity LBA, dla bezpieczeństwa ≤32 GB;
-- **USB**: brak przed OSR2.1, więc wejście USB pod CSMWrap działa w DOS
-  tylko przez emulację legacy SeaBIOS, a GUI Win95 potrzebuje PS/2 albo
-  rozwiązania jak USOSKEY/VBADOS z Win3.x;
-- **grafika**: tylko sterowniki VGA lub VESA (np. VBEMP 9x).
+- **RAM powyżej ~480 MB**: USOS ustawia limit przez `MaxPhysPage` w
+  `SYSTEM.INI` albo `HIMEM /MAX`;
+- **CPU powyżej ~2,1 GHz**: bez poprawki „Windows protection error”
+  (timing IOS/NDIS); USOS stosuje znaną poprawkę szybkiego CPU (np.
+  FIX95CPU): dołączoną, jeśli licencja pozwala, albo wykrytą w
+  `DATA\Fixes`;
+- **dyski**: USOS pilnuje limitów LBA (dla bezpieczeństwa ≤32 GB);
+- **wejście**: USB brak przed OSR2.1, więc pod CSMWrap DOS korzysta z
+  emulacji legacy SeaBIOS, a dla GUI Win95 USOS konfiguruje PS/2 albo
+  USOSKEY/VBADOS jak w Win3.x;
+- **grafika**: USOS instaluje sterownik VGA lub VESA (np. VBEMP 9x).
 
 Zależności: reużycie ścieżki 98/ME (L6) i pracy nad wejściem
-USOSKEY/VBADOS. Pliki Microsoft, łatki i sterowniki są user-supplied
-(licencje).
+USOSKEY/VBADOS. Poprawki i sterowniki: dołączone do USOS albo wykrywane
+w `DATA\Drivers` / `DATA\Fixes` i stosowane automatycznie; nośnik
+instalacyjny Windows dostarcza użytkownik.
 
 ### L7. Buildy Longhorn: **Later**
 
