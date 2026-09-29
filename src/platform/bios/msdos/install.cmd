@@ -32,7 +32,10 @@ copy D:\VBMOUSE.EXE C:\DOS /y >nul
 if errorlevel 1 goto failed
 copy D:\VBADOS.TXT C:\DOS /y >nul
 if errorlevel 1 goto failed
+copy D:\USOSKEY.COM C:\DOS /y >nul
+if errorlevel 1 goto failed
 echo C:\DOS\VBMOUSE.EXE>>C:\AUTOEXEC.BAT
+echo C:\DOS\USOSKEY.COM>>C:\AUTOEXEC.BAT
 :csm_dos_done
 if not exist D:\PROGRAMS\nul goto programs_done
 md C:\PROGRAMS
@@ -63,11 +66,18 @@ copy D:\W3INI.BAS C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
 copy D:\VBMOUSE.DRV C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
+copy D:\USOSKEY.DRV C:\USOSW3 /y >nul
+if errorlevel 1 goto failed
 :csm_w3_done
 rem Windows Setup needs the original DOS XMS manager after a cold restart.
 rem Under CSMWrap HIMEM picks A20 handler 3, which leaves A20 off: /M:2.
-if not exist D:\CSMWRAP.TAG echo DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF>C:\CONFIG.SYS
-if exist D:\CSMWRAP.TAG echo DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF /M:2>C:\CONFIG.SYS
+rem (No IF with a redirection: COMMAND.COM opens the file even when false.)
+if exist D:\CSMWRAP.TAG goto himem_csmwrap
+echo DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF>C:\CONFIG.SYS
+goto himem_done
+:himem_csmwrap
+echo DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF /M:2>C:\CONFIG.SYS
+:himem_done
 echo DOS=HIGH>>C:\CONFIG.SYS
 echo FILES=40>>C:\CONFIG.SYS
 echo BUFFERS=20>>C:\CONFIG.SYS

@@ -92,7 +92,7 @@ def build_csmwrap_variants(root: Path, dos_out: Path):
     temp = 'set TEMP=C:\\TEMP\n'
     if auto.count(temp) != 1:
         raise ValueError('windows_auto.cmd: TEMP line not found once')
-    (dos_out / 'W3AUTO.CSM').write_bytes(dos_text(auto.replace(temp, temp + 'C:\\DOS\\VBMOUSE.EXE\n')))
+    (dos_out / 'W3AUTO.CSM').write_bytes(dos_text(auto.replace(temp, temp + 'C:\\DOS\\VBMOUSE.EXE\nC:\\DOS\\USOSKEY.COM\n')))
     (dos_out / 'W3INI.BAS').write_bytes(dos_text((msdos / 'windows_ini.bas').read_text(encoding='ascii')))
     vendor = root / 'tools/vendor/vbados/0.67'
     manifest = json.loads((vendor / 'manifest.json').read_text())
@@ -105,6 +105,8 @@ def build_csmwrap_variants(root: Path, dos_out: Path):
     notice = (vendor / 'SOURCES.txt').read_text(encoding='ascii') + '\n' + '-' * 72 + '\n\n' + (vendor / 'COPYING').read_text(encoding='ascii')
     (dos_out / 'VBADOS.TXT').write_bytes(dos_text(notice))
     print('[PASS] MS-DOS CSMWrap variants: W3CONFIG.CSM (HIMEM /M:2), W3AUTO.CSM, W3INI.BAS, VBADOS 0.67')
+    from build_win3_usb_keyboard import build as build_usb_keyboard
+    build_usb_keyboard(root, dos_out)
 
 
 if __name__ == '__main__':

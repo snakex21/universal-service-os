@@ -12,10 +12,12 @@ if exist C:\USOSW3\AUTOEXEC.OLD goto install
 copy C:\AUTOEXEC.BAT C:\USOSW3\AUTOEXEC.OLD /y >nul
 if errorlevel 1 goto failed
 :install
-rem CSMWrap: VBMOUSE.DRV and SYSTEM.INI (mouse.drv) once, with a backup.
+rem CSMWrap: VBMOUSE.DRV, USOSKEY.DRV and SYSTEM.INI once, with a backup.
 if not exist C:\USOSW3\W3INI.BAS goto ini_done
 if exist C:\USOSW3\W3INI.OK goto ini_done
 copy C:\USOSW3\VBMOUSE.DRV C:\WINDOWS\SYSTEM /y >nul
+if errorlevel 1 goto failed
+copy C:\USOSW3\USOSKEY.DRV C:\WINDOWS\SYSTEM /y >nul
 if errorlevel 1 goto failed
 if exist C:\USOSW3\SYSTEM.NEW del C:\USOSW3\SYSTEM.NEW
 C:\DOS\QBASIC.EXE /RUN C:\USOSW3\W3INI.BAS

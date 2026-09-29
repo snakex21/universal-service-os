@@ -81,6 +81,8 @@ def main():
     add('toolchains/' + fixed['go']['file'], CACHE / fixed['go']['file'], 'go-1.26.2', 'BSD-3-Clause')
     add('python/' + fixed['pillow']['file'], CACHE / fixed['pillow']['file'], 'pillow-10.4.0', 'MIT-CMU')
     add('inputs/tools/cache/efifs/ntfs_x64.efi', CACHE / fixed['efifs-ntfs']['file'], 'efifs-1.12', 'GPL-3.0-or-later')
+    # Restored to tools/cache/openwatcom, where tools/build_win3_usb_keyboard.py looks first.
+    add('inputs/tools/cache/openwatcom/' + fixed['openwatcom']['file'], CACHE / fixed['openwatcom']['file'], 'openwatcom-2.0-2026-09-01', 'OWPL-1.0 (build tool)')
     seven = subprocess.run([str(SEVEN_ZIP_DIR / '7z.exe')], capture_output=True, text=True).stdout.splitlines()
     seven_version = next((l.strip() for l in seven if l.strip().startswith('7-Zip')), '7-Zip')
     for name in ('7z.exe', '7z.dll', 'License.txt', 'readme.txt'):

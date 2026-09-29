@@ -76,6 +76,8 @@ var payloadFiles = []payloadFile{
 	{`zig-out/dos-native/msdos/VBADOS.TXT`, `EFI/USOS/dos-native/msdos/VBADOS.TXT`},
 	{`zig-out/dos-native/msdos/VBADOS.TGZ`, `EFI/USOS/dos-native/msdos/VBADOS.TGZ`},
 	{`zig-out/dos-native/msdos/CSMESP.IMG`, `EFI/USOS/dos-native/msdos/CSMESP.IMG`},
+	{`zig-out/dos-native/msdos/USOSKEY.COM`, `EFI/USOS/dos-native/msdos/USOSKEY.COM`},
+	{`zig-out/dos-native/msdos/USOSKEY.DRV`, `EFI/USOS/dos-native/msdos/USOSKEY.DRV`},
 	{`zig-out/dos-native/freedos/BOOT16.BIN`, `EFI/USOS/dos-native/freedos/BOOT16.BIN`},
 	{`zig-out/dos-native/freedos/KERNEL.SYS`, `EFI/USOS/dos-native/freedos/KERNEL.SYS`},
 	{`zig-out/dos-native/freedos/COMMAND.COM`, `EFI/USOS/dos-native/freedos/COMMAND.COM`},

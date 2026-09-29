@@ -65,7 +65,9 @@ def start(out, a):
     out.mkdir(parents=True, exist_ok=True)
     port = 45500 + (abs(hash(str(out))) % 400)
     serial = out / (a.tag + '-serial.log')
-    machine = 'pc' + (',i8042=off' if a.i8042 == 'off' else '')
+    # vmport=off: no VMware backdoor, so VBMOUSE uses the BIOS (SeaBIOS
+    # INT 15h C2 = the USB mouse) as on real hardware.
+    machine = 'pc' + (',i8042=off' if a.i8042 == 'off' else '') + (',vmport=off' if a.vmport == 'off' else '')
     cmd = [QEMU, '-machine', machine, '-accel', a.accel, '-cpu', a.cpu, '-m', str(a.mem), '-smp', str(a.smp),
            '-display', 'none', '-nic', 'none', '-rtc', 'base=localtime', '-serial', f'file:{serial}',
            '-monitor', f'tcp:127.0.0.1:{port},server=on,wait=off', '-vga', 'std']
@@ -88,6 +90,11 @@ def start(out, a):
     if a.target:
         cmd += ['-device', 'ahci,id=ahci', '-drive', f'if=none,id=target,format={a.target_format},file={a.target}',
                 '-device', f'ide-hd,drive=target,bus=ahci.0,bootindex={2 if a.stick else 0}']
+    if a.extra_disk:
+        # A second AHCI disk (e.g. make_fat16_transfer_disk.py): D: in DOS.
+        if not a.target:
+            cmd += ['-device', 'ahci,id=ahci']
+        cmd += ['-drive', f'if=none,id=extra,format=raw,file={a.extra_disk}', '-device', 'ide-hd,drive=extra,bus=ahci.1']
     if a.stick:
         fmt = 'vpc' if str(a.stick).lower().endswith('.vhd') else 'qcow2'
         cmd += ['-drive', f'if=none,id=stick,format={fmt},file={a.stick},readonly={"on" if a.stick_ro else "off"}',
@@ -139,10 +146,12 @@ def main():
     s.add_argument('--target', type=Path)
     s.add_argument('--target-format', default='qcow2')
     s.add_argument('--target-first', action='store_true')
+    s.add_argument('--extra-disk', type=Path, help='raw image as a second AHCI disk')
     s.add_argument('--tablet', action='store_true')
     s.add_argument('--mouse', choices=('none', 'usb'), default='none')
     s.add_argument('--kbd', choices=('usb', 'ps2'), default='usb')
     s.add_argument('--i8042', choices=('on', 'off'), default='on')
+    s.add_argument('--vmport', choices=('on', 'off'), default='off')
     s.add_argument('--accel', default='tcg,thread=multi')
     s.add_argument('--cpu', default='max')
     s.add_argument('--mem', type=int, default=1024)

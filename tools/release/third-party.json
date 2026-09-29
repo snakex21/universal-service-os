@@ -1239,6 +1239,31 @@
       "notice": "By Japheth; derived from FreeDOS HIMEM (Till Gerken, Tom Ehlert, GPL and/or Artistic licence); unmodified, source on the ESP (HIMEMSRC.ZIP)."
     },
     {
+      "id": "vbados",
+      "name": "VBADOS (VBMOUSE.EXE, VBMOUSE.DRV)",
+      "version": "0.67",
+      "license": "GPL-2.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/vbados/0.67/COPYING",
+        "tools/vendor/vbados/0.67/SOURCES.txt"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/vbados/0.67/vbados-0.67.tar.gz",
+          "tools/vendor/vbados/0.67/manifest.json"
+        ],
+        "urls": [
+          "https://git.javispedro.com/cgit/vbados.git/tag/?h=v0.67"
+        ],
+        "offer": false
+      },
+      "notice": "By Javier S. Pedro; unmodified release binaries, source on the ESP (VBADOS.TGZ) and VBADOS.TXT (SOURCES + GPL text) next to them on MS-DOS / Windows 3.x disks installed under CSMWrap."
+    },
+    {
       "id": "freedos",
       "name": "FreeDOS kernel, FreeCOM and Doszip",
       "version": "FreeDOS 1.4 (kernel 20250409.9, FreeCOM 0.86a, Doszip 2.68)",

@@ -13,7 +13,9 @@ const Reader = storage.random_reader.Reader;
 const wide = std.unicode.utf8ToUtf16LeStringLiteral;
 extern fn core_linux_jump(entry: u32, boot_params: u32) callconv(.c) noreturn;
 
-pub fn run(reader: Reader, bulk: Reader, image_name: []const u8, graphics: ?vbe.Session) !void {
+/// noinline: its locals must not add to legacy_boot_actions.execute's frame (the PM32
+/// stack below 0x9E000 ends at the Core .data; docs/design/bios-via-csmwrap.md).
+pub noinline fn run(reader: Reader, bulk: Reader, image_name: []const u8, graphics: ?vbe.Session) !void {
     try @import("windows_iso_config.zig").validateName(image_name);
     var name: [255]u16 = undefined;
     for (image_name, 0..) |ch, i| name[i] = ch;

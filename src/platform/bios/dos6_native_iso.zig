@@ -18,7 +18,9 @@ const wide = std.unicode.utf8ToUtf16LeStringLiteral;
 extern const dos_mbr_start: [512]u8;
 extern const dos_source_mbr_start: [512]u8;
 
-pub fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8, graphics: ?vbe.Session, system_id: []const u8, image_name: []const u8) !void {
+/// noinline: its locals must not add to legacy_boot_actions.execute's frame (the PM32
+/// stack below 0x9E000 ends at the Core .data; docs/design/bios-via-csmwrap.md).
+pub noinline fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8, graphics: ?vbe.Session, system_id: []const u8, image_name: []const u8) !void {
     const session = graphics orelse return error.DosPartitionScreenNeedsGraphics;
     const windows = !std.mem.eql(u8, system_id, "ms-dos");
     const install = if (windows) true else target_ui.dosAction(session) orelse return;
@@ -61,10 +63,10 @@ pub fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8, graphic
     try programs.copy(fs, reader, bulk, &builder);
     // VBMOUSE/VBADOS and the *.CSM start-menu variants are always in the RAM
     // disk (small); INSTALL.BAT uses them only when CSMWRAP.TAG is there.
-    for ([_][]const u8{ "HIMEMX.EXE", "INSTALL.BAT", "LIVE.BAT", "PREPDOS.BAT", "COPYDOS.BAT", "UNPACK.BAT", "HIMEMX.TXT", "HIMEMSRC.ZIP", "LICENSE.TXT", "REBOOT.COM", "VBMOUSE.EXE", "VBADOS.TXT" }) |filename|
+    for ([_][]const u8{ "HIMEMX.EXE", "INSTALL.BAT", "LIVE.BAT", "PREPDOS.BAT", "COPYDOS.BAT", "UNPACK.BAT", "HIMEMX.TXT", "HIMEMSRC.ZIP", "LICENSE.TXT", "REBOOT.COM", "VBMOUSE.EXE", "VBADOS.TXT", "USOSKEY.COM" }) |filename|
         try helper(esp, reader, bulk, &builder, filename);
     if (windows) {
-        for ([_][]const u8{ "W3START.BAT", "WINMENU.BAT", "W3CONFIG.SYS", "W3AUTO.BAT", "VBMOUSE.DRV", "W3CONFIG.CSM", "W3AUTO.CSM", "W3INI.BAS" }) |filename|
+        for ([_][]const u8{ "W3START.BAT", "WINMENU.BAT", "W3CONFIG.SYS", "W3AUTO.BAT", "VBMOUSE.DRV", "USOSKEY.DRV", "W3CONFIG.CSM", "W3AUTO.CSM", "W3INI.BAS" }) |filename|
             try helper(esp, reader, bulk, &builder, filename);
     }
     // Installed under CSMWrap (no firmware CSM; docs/design/bios-via-csmwrap.md):

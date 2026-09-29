@@ -1,0 +1,14 @@
+# wlink directives for USOSKEY.DRV (tools/build_win3_usb_keyboard.py adds
+# "file usoskey.obj name USOSKEY.DRV"). No OpenWatcom runtime: own entry
+# point, only import records from windows.lib.
+format windows dll initglobal
+option modname=USOSKEY
+option description 'USOS USB keyboard for Windows 3.x under CSMWrap (GPL-3.0-or-later)'
+option start=__DLLstart_
+option nodefaultlibs
+option stack=0
+option quiet
+libpath '%WATCOM%/lib286/win'
+library windows
+segment type code fixed
+segment type data fixed
