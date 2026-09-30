@@ -4,7 +4,8 @@
  * zig cc. GPL-3.0-or-later.
  *
  *   usosadd_host selftest
- *   usosadd_host plan <manifest> <os> <lang> <ntsp|-> <full 0|1> <options|->
+ *   usosadd_host plan <manifest> <os> <lang> <ntsp|-> <full 0|1> <options|-> <exclude|->
+ *   usosadd_host select <manifest> <select.ini>
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,17 +98,17 @@ static int selftest(void) {
 
     /* plan: b needs msi (a, earlier) and ie 5.01 (98 SE has only 5.0) */
     strcpy(s.os, "98SE"); strcpy(s.lang, "PL"); s.ntsp[0] = 0;
-    ua_resolve(&ini, &pk, &s, 1, "", &plan);
+    ua_resolve(&ini, &pk, &s, 1, "", "", &plan);
     CHECK(plan.count == 1 && plan.idx[0] == 0);
     CHECK(plan.why[1] == UA_OUT_NEEDS && strcmp(plan.unmet[1], "ie:5.01") == 0);
     /* NT4 SP3: the SP comes first, c is planned behind it */
     strcpy(s.os, "NT4"); strcpy(s.lang, "EN"); strcpy(s.ntsp, "3");
-    ua_resolve(&ini, &pk, &s, 1, "", &plan);
+    ua_resolve(&ini, &pk, &s, 1, "", "", &plan);
     CHECK(plan.count == 2 && plan.idx[0] == 2 && plan.idx[1] == 3);
     CHECK(strcmp(plan.eff_ntsp, "6a") == 0);
     /* NT4 SP6a: no SP, c alone */
     strcpy(s.ntsp, "6a");
-    ua_resolve(&ini, &pk, &s, 1, "", &plan);
+    ua_resolve(&ini, &pk, &s, 1, "", "", &plan);
     CHECK(plan.count == 1 && plan.idx[0] == 3);
 
     /* detection table (docs/design/legacy-compat-pack.md 2.2) */
@@ -170,11 +171,15 @@ static int selftest(void) {
     /* state round trip and resume */
     ua_state_load(&st, 0, &pk);
     st.st[0] = UA_ST_DONE; st.st[2] = UA_ST_RUNNING; st.tries[2] = 1; st.pending_reboot = 1; st.starts = 3;
+    st.st[1] = UA_ST_SKIPPED; strcpy(st.why[1], "needs ie:5.01");
     ua_state_write(&st, &pk, stbuf, sizeof stbuf);
-    CHECK(strstr(stbuf, "a=done\r\n") && strstr(stbuf, "sp=running:1\r\n") && !strstr(stbuf, "b="));
+    CHECK(strstr(stbuf, "a=done\r\n") && strstr(stbuf, "sp=running:1\r\n") && strstr(stbuf, "b=skipped\r\n"));
+    CHECK(strstr(stbuf, "[why]\r\nb=needs ie:5.01\r\n") != 0);
     ua_ini_parse(&sti, stbuf, (int)strlen(stbuf));
     ua_state_load(&st2, &sti, &pk);
-    CHECK(st2.st[0] == UA_ST_DONE && st2.st[1] == UA_ST_NEW && st2.st[2] == UA_ST_RUNNING && st2.tries[2] == 1);
+    CHECK(st2.st[0] == UA_ST_DONE && st2.st[1] == UA_ST_SKIPPED && st2.st[2] == UA_ST_RUNNING && st2.tries[2] == 1);
+    CHECK(strcmp(st2.why[1], "needs ie:5.01") == 0 && st2.why[0][0] == 0);
+    st2.st[1] = UA_ST_NEW;
     CHECK(st2.pending_reboot == 1 && st2.starts == 3);
     CHECK(ua_resume_decision(1, 1, 1) == 1);
     CHECK(ua_resume_decision(1, 0, 0) == 2);
@@ -200,7 +205,7 @@ static int plan_cmd(int argc, char **argv) {
     ua_system s;
     int len, i;
     char *buf;
-    if (argc < 8) return 2;
+    if (argc < 9) return 2;
     buf = slurp(argv[2], &len);
     if (!buf) return 2;
     ua_ini_parse(&m, buf, len);
@@ -209,7 +214,7 @@ static int plan_cmd(int argc, char **argv) {
     strcpy(s.os, argv[3]);
     strcpy(s.lang, argv[4]);
     if (strcmp(argv[5], "-")) strcpy(s.ntsp, argv[5]);
-    ua_resolve(&m, &pk, &s, atoi(argv[6]), strcmp(argv[7], "-") ? argv[7] : "", &plan);
+    ua_resolve(&m, &pk, &s, atoi(argv[6]), strcmp(argv[7], "-") ? argv[7] : "", strcmp(argv[8], "-") ? argv[8] : "", &plan);
     for (i = 0; i < plan.count; i++) printf("IN %s\n", pk.pkg[plan.idx[i]].id);
     for (i = 0; i < pk.count; i++) {
         static const char *const why[] = { "", "full", "option", "needed", "out-system", "out-needs", "out-status", "out-unknown" };
@@ -219,7 +224,24 @@ static int plan_cmd(int argc, char **argv) {
     return 0;
 }
 
+static int select_cmd(int argc, char **argv) {
+    static ua_ini m, sel;
+    ua_choice c;
+    int len, len2;
+    char *buf, *sbuf;
+    if (argc < 4) return 2;
+    buf = slurp(argv[2], &len);
+    sbuf = slurp(argv[3], &len2);
+    if (!buf || !sbuf) return 2;
+    ua_ini_parse(&m, buf, len);
+    ua_ini_parse(&sel, sbuf, len2);
+    ua_selection(&m, &sel, &c);
+    printf("PRESET %s\nFULL %d\nOPTIONS %s\nEXCLUDE %s\n", c.preset, c.full, c.options, c.exclude);
+    return 0;
+}
+
 int main(int argc, char **argv) {
+    if (argc >= 2 && strcmp(argv[1], "select") == 0) return select_cmd(argc, argv);
     if (argc >= 2 && strcmp(argv[1], "selftest") == 0) return selftest();
     if (argc >= 2 && strcmp(argv[1], "plan") == 0) return plan_cmd(argc, argv);
     fprintf(stderr, "usage: usosadd_host selftest | plan <manifest> <os> <lang> <ntsp|-> <full> <options|->\n");

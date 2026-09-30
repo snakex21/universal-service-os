@@ -442,15 +442,25 @@ Branch `feature/legacy-compat-pack`, design and full per-package table in
 manifest `src/addons/legacy-pack.ini` records `source`, `redist` and
 `license` for every package.
 
-- **Shipped by USOS:** only its own files: the runner `USOSADD.EXE`
-  (GPL-3.0-or-later, built with OpenWatcom 2.0 without its C library, like
-  `USOSKEY.DRV`), the manifest, the host tools. No third-party binary.
+- **In the stick payload / git:** only USOS's own files: the runner
+  `USOSADD.EXE` (GPL-3.0-or-later, built with OpenWatcom 2.0 without its C
+  library, like `USOSKEY.DRV`), the manifest, the host tools. The Microsoft
+  files below live only in a release asset.
 - **Microsoft runtimes with redistribution terms** (DirectX 8.0/9.0c, VB6
-  and VC6 runtimes, Windows Installer 2.0, MDAC 2.8 SP1, MSLU, .NET 1.1/2.0):
-  their terms allow redistribution *with an application that uses them*;
-  a stand-alone installer pack does not clearly qualify, so they stay
-  **user-supplied** (matched by SHA-256 in `DATA\Addons`). For these the
-  user's file (or a pinned download) is the permanent source, not a bridge.
+  and VC6 runtimes, Windows Installer 2.0, MDAC 2.8 SP1, MSLU, .NET 1.1/2.0
+  with the Polish language packs and .NET 1.1 SP1; 13 packages,
+  `source=release` in the manifest): their terms allow redistribution
+  *with an application that uses them*, which a stand-alone installer pack
+  does not clearly meet. **Maintainer decision (2026-09-30): ship them**,
+  unmodified, in the separate release asset
+  `USOS-<version>-Legacy-pack-MS.zip` (embedded in the full installer,
+  downloaded by the online one; SHA-256 in `SHA256SUMS` and compiled into
+  the installer; never in git), at the maintainer's own risk, for the same
+  reason as the Windows 7/Vista update files (§5, preservation: the
+  original downloads are gone, archive copies may disappear), not covered
+  by any USOS licence, removed on request of the rights holder.
+  `third-party.json` id `microsoft-legacy-pack-redist`. For these the
+  shipped file is the permanent source, not a bridge.
 - **Other Microsoft packages** (IE, DCOM, DUN, WMP, RDP, DSClient, NT4 SP6a
   and SRP, hotfixes) and community repacks of Microsoft files (NUSB, Movie
   Maker 98): no redistribution grant; **user-supplied only**.
@@ -461,6 +471,6 @@ manifest `src/addons/legacy-pack.ini` records `source`, `redist` and
 - **KernelEx 4.0 Final 2** (GPL-2.0): may be bundled once the matching
   source is vendored next to it (then a `third-party.json` entry); user file
   until then.
-- The maintainer decision of 2026-09-28 (§5, Microsoft files shipped at the
-  maintainer's own risk) is **not** applied to this pack; open question
-  for the maintainer.
+- The other Microsoft packages (IE, DCOM, DUN, WMP, RDP, DSClient, NT4
+  SP6a/SRP, hotfixes) are **not** covered by the 2026-09-30 decision and
+  stay user-supplied.

@@ -61,9 +61,10 @@ def build_host() -> Path:
     return exe
 
 
-def c_plan(exe: Path, manifest: Path, os_: str, lang: str, ntsp: str, full: bool, options: list[str]):
+def c_plan(exe: Path, manifest: Path, os_: str, lang: str, ntsp: str, full: bool, options: list[str],
+           exclude: list[str] | None = None):
     r = subprocess.run([str(exe), 'plan', str(manifest), os_, lang, ntsp or '-', '1' if full else '0',
-                        ','.join(options) or '-'], capture_output=True, text=True)
+                        ','.join(options) or '-', ','.join(exclude or []) or '-'], capture_output=True, text=True)
     if r.returncode:
         raise RuntimeError(r.stdout + r.stderr)
     order, why, unmet, eff = [], {}, {}, ''
@@ -88,16 +89,18 @@ def test_validate(m: lm.Manifest) -> None:
 def test_cross_check(exe: Path, m: lm.Manifest) -> int:
     options_sets = [[], [p.id for p in m.packages if p.tier == 'option'], ['kernelex', 'rdp51-pl', 'nosuch-id'],
                     ['dotnet20-pl'], ['hf98-q831167']]
+    options_sets += [lm.selection(m, {'preset': pr})[2] for pr in lm.list_items(m.get('presets', 'order'))]
+    exclude_sets = [[], ['msi20-9x', 'ie6sp1-pl-9x', 'msi20-nt4']]
     n = 0
     for os_ in m.os_tokens():
         for lang in ('PL', 'EN', 'XX'):
             for ntsp in (['0', '3', '5', '6', '6a'] if os_ == 'NT4' else ['']):
                 for full in (True, False):
-                    for opts in options_sets:
-                        py = lm.resolve(m, os_, lang, ntsp, full, opts)
-                        order, why, unmet, eff = c_plan(exe, lm.MANIFEST, os_, lang, ntsp, full, opts)
+                    for opts, excl in [(o, e) for o in options_sets for e in exclude_sets]:
+                        py = lm.resolve(m, os_, lang, ntsp, full, opts, excl)
+                        order, why, unmet, eff = c_plan(exe, lm.MANIFEST, os_, lang, ntsp, full, opts, excl)
                         n += 1
-                        where = f'{os_}/{lang}/sp{ntsp or "-"}/full={int(full)}/opts={",".join(opts) or "-"}'
+                        where = f'{os_}/{lang}/sp{ntsp or "-"}/full={int(full)}/opts={",".join(opts) or "-"}/excl={",".join(excl) or "-"}'
                         if order != py.order:
                             fail(f'plan differs {where}:\n  C  {order}\n  py {py.order}')
                         if why != py.why:
@@ -126,6 +129,31 @@ EXPECTED_FULL = {
     # English NT4: no English IE 6 set locally, so MDAC/.NET (need IE 5.01) stay out
     ('NT4', 'EN', '6a'): ['msi20-nt4', 'vbrun6sp6', 'vcredist6sp6'],
 }
+
+
+def test_selection(exe: Path, m: lm.Manifest) -> None:
+    cases = [{}, {'preset': 'retro'}, {'preset': 'minimal', 'options': 'kernelex'},
+             {'preset': 'praca', 'full': '0', 'options': 'rdp51-pl,kernelex', 'exclude': 'dotnet20, wmp9-pl'},
+             {'options': 'dx9c'}]
+    with tempfile.TemporaryDirectory() as t:
+        for i, case in enumerate(cases):
+            f = Path(t) / f's{i}.ini'
+            f.write_text('[select]\n' + ''.join(f'{k}={v}\n' for k, v in case.items()), encoding='ascii')
+            r = subprocess.run([str(exe), 'select', str(lm.MANIFEST), str(f)], capture_output=True, text=True)
+            got = {}
+            for line in r.stdout.splitlines():
+                k, _, v = line.partition(' ')
+                got[k] = v
+            preset, full, options, exclude = lm.selection(m, case)
+            want = {'PRESET': preset, 'FULL': str(int(full)), 'OPTIONS': ','.join(options), 'EXCLUDE': ','.join(exclude)}
+            if got != want:
+                fail(f'selection {case}: C {got} py {want}')
+    if lm.selection(m)[:2] != ('praca', True):
+        fail('the default preset must be "praca" with the full pack')
+    # excluding a dependency drops its dependents instead of pulling it back
+    plan = lm.resolve(m, '98SE', 'PL', '', True, [], ['msi20-9x'])
+    if 'msi20-9x' in plan.order or 'dotnet20' in plan.order or plan.why.get('dotnet20') != 'out-needs':
+        fail(f'exclude msi20-9x: {plan.order}')
 
 
 def test_presets(m: lm.Manifest) -> None:
@@ -236,6 +264,7 @@ def main() -> int:
     if r.returncode:
         fail('C selftest')
     n = test_cross_check(exe, m)
+    test_selection(exe, m)
     test_presets(m)
     test_staging(m)
     test_target_build()

@@ -112,6 +112,10 @@ def build(out: Path | None = None) -> Path:
                PATH=str(ow / 'binnt64') + os.pathsep + os.environ.get('PATH', ''))
     objs = []
     for name in SOURCES:
+        # The runner calls the ANSI API: Polish strings are written as cp1250
+        # escapes, so the sources stay ASCII (no editor or code page surprises).
+        if not (SRC / name).read_bytes().isascii():
+            raise ValueError(f'{name}: non-ASCII bytes; write Polish letters as cp1250 octal escapes')
         obj = work / (Path(name).stem + '.obj')
         subprocess.run([str(ow / 'binnt64/wcc386.exe'), '-q', '-bt=nt', '-mf', '-3r', '-zl', '-s', '-os', '-zq',
                         '-w4', '-we', '-wcd=202', '-fo=' + str(obj), str(SRC / name)], env=env, check=True, cwd=work)

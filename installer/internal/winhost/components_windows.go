@@ -53,6 +53,13 @@ func installComponentAt(espRoot, dataRoot string, id components.ID, zipPath stri
 		return storeXPComponent(dataRoot, id, zipPath, log)
 	case id.IsXP():
 		return installXPComponent(espRoot, zipPath, log)
+	case id == components.LegacyMS:
+		n, err := components.ExtractLegacyMS(zipPath, dataRoot)
+		if err != nil {
+			return fmt.Errorf("copy the legacy pack files to DATA: %w", err)
+		}
+		log(fmt.Sprintf("[COMPONENTS] legacy pack: %d Microsoft redistributables in %s", n, components.LegacyMSDataDir))
+		return nil
 	}
 	return fmt.Errorf("unknown component %q", id)
 }

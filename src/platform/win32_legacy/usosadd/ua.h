@@ -123,8 +123,20 @@ int ua_applicable(const ua_ini *m, const ua_pkg *p, const ua_system *s, const ch
  * plus ntsp:<level> on NT). */
 int ua_os_provides(const ua_ini *m, const ua_system *s, const char *cap);
 int ua_cap_satisfies(const char *provided, const char *needed);
+/* exclude: ids never planned (not even as providers of a need). */
 void ua_resolve(const ua_ini *m, const ua_pkgs *p, const ua_system *s,
-                int full, const char *options, ua_plan *out);
+                int full, const char *options, const char *exclude, ua_plan *out);
+
+/* The choice from SELECT.INI [select]: preset= (default [presets]
+ * default=), full= overrides the preset's, options= adds to the preset's,
+ * exclude= removes. options/exclude are written as comma lists. */
+typedef struct {
+    char preset[24];
+    int full;
+    char options[1024];
+    char exclude[512];
+} ua_choice;
+void ua_selection(const ua_ini *m, const ua_ini *sel, ua_choice *out);
 
 /* ---- commands (cmd.c) ------------------------------------------------------ */
 typedef struct {
@@ -164,6 +176,7 @@ enum { UA_ST_NEW, UA_ST_RUNNING, UA_ST_DONE, UA_ST_PRESENT, UA_ST_FAILED, UA_ST_
 typedef struct {
     int st[UA_MAX_PKGS];
     int tries[UA_MAX_PKGS];
+    char why[UA_MAX_PKGS][48]; /* reason for failed / skipped (STATE.INI [why]) */
     int pending_reboot;
     int starts;
 } ua_state;

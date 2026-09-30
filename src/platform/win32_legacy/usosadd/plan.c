@@ -117,26 +117,28 @@ int ua_os_provides(const ua_ini *m, const ua_system *s, const char *cap) {
 /* Provider of need among in[] (in = 1), or a new applicable one (in = 0,
  * status empty, lowest order), or -1. */
 static int provider(const ua_ini *m, const ua_pkgs *p, const ua_system *s, const char *ntsp,
-                    const int *in, const char *need, int want_new) {
+                    const int *in, const char *need, int want_new, const char *exclude) {
     int i, best = -1;
+    if (!exclude) exclude = "";
     for (i = 0; i < p->count; i++) {
         const ua_pkg *q = &p->pkg[i];
         if (!list_satisfies(q->provides, need)) continue;
         if (!want_new) { if (in[i]) return i; continue; }
-        if (in[i] || *q->status || !ua_applicable(m, q, s, ntsp)) continue;
+        if (in[i] || *q->status || ua_list_has(exclude, q->id) || !ua_applicable(m, q, s, ntsp)) continue;
         if (best < 0 || q->order < p->pkg[best].order) best = i;
     }
     return best;
 }
 
 static void select_candidates(const ua_ini *m, const ua_pkgs *p, const ua_system *s, const char *ntsp,
-                              int full, const char *options, int *in, ua_plan *out) {
+                              int full, const char *options, const char *exclude, int *in, ua_plan *out) {
     int i, changed;
     char item[48];
     for (i = 0; i < p->count; i++) { in[i] = 0; out->why[i] = 0; out->unmet[i][0] = 0; }
     for (i = 0; i < p->count; i++) {
         const ua_pkg *q = &p->pkg[i];
         int wanted = (full && (q->tier == UA_TIER_FULL || q->tier == UA_TIER_GROUP)) ? UA_WHY_FULL : 0;
+        if (ua_list_has(exclude, q->id)) continue;
         if (!wanted && ua_list_has(options, q->id)) wanted = UA_WHY_OPTION;
         if (!wanted) continue;
         if (!ua_applicable(m, q, s, ntsp)) { out->why[i] = UA_OUT_SYSTEM; continue; }
@@ -153,8 +155,8 @@ static void select_candidates(const ua_ini *m, const ua_pkgs *p, const ua_system
             for (k = 0; ua_list_item(p->pkg[i].needs, k, item, sizeof item); k++) {
                 int q;
                 if (ua_os_provides(m, s, item)) continue;
-                if (provider(m, p, s, ntsp, in, item, 0) >= 0) continue;
-                q = provider(m, p, s, ntsp, in, item, 1);
+                if (provider(m, p, s, ntsp, in, item, 0, exclude) >= 0) continue;
+                q = provider(m, p, s, ntsp, in, item, 1, exclude);
                 if (q >= 0) { in[q] = 1; out->why[q] = UA_WHY_NEEDED; changed = 1; }
             }
         }
@@ -162,7 +164,7 @@ static void select_candidates(const ua_ini *m, const ua_pkgs *p, const ua_system
 }
 
 void ua_resolve(const ua_ini *m, const ua_pkgs *p, const ua_system *s,
-                int full, const char *options, ua_plan *out) {
+                int full, const char *options, const char *exclude, ua_plan *out) {
     int in[UA_MAX_PKGS];
     int i, j, pass;
     char item[48];
@@ -171,7 +173,7 @@ void ua_resolve(const ua_ini *m, const ua_pkgs *p, const ua_system *s,
      * (the runner re-resolves after its restart anyway). */
     for (pass = 0; pass < 2; pass++) {
         char best[8];
-        select_candidates(m, p, s, out->eff_ntsp, full, options, in, out);
+        select_candidates(m, p, s, out->eff_ntsp, full, options, exclude ? exclude : "", in, out);
         if (!s->ntsp[0]) break;
         best[0] = 0;
         for (i = 0; i < p->count; i++) {
@@ -210,4 +212,36 @@ void ua_resolve(const ua_ini *m, const ua_pkgs *p, const ua_system *s,
         else out->why[x] = UA_OUT_NEEDS;
     }
     out->count = j;
+}
+
+static void list_add(char *list, int cap, const char *items) {
+    char item[48];
+    int i;
+    for (i = 0; ua_list_item(items, i, item, sizeof item); i++) {
+        if (ua_list_has(list, item)) continue;
+        if (*list) ua_append(list, cap, ",");
+        ua_append(list, cap, item);
+    }
+}
+
+void ua_selection(const ua_ini *m, const ua_ini *sel, ua_choice *out) {
+    const char *v = sel ? ua_ini_get(sel, "select", "preset") : 0;
+    char sec[40];
+    out->options[0] = out->exclude[0] = 0;
+    if (!v || !*v) v = ua_ini_get(m, "presets", "default");
+    ua_copy(out->preset, sizeof out->preset, v ? v : "");
+    sec[0] = 0;
+    ua_append(sec, sizeof sec, "preset:");
+    ua_append(sec, sizeof sec, out->preset);
+    v = ua_ini_get(m, sec, "full");
+    out->full = v ? ua_atoi(v) == 1 : 0;
+    v = ua_ini_get(m, sec, "options");
+    if (v) list_add(out->options, sizeof out->options, v);
+    if (!sel) return;
+    v = ua_ini_get(sel, "select", "full");
+    if (v && *v) out->full = ua_atoi(v) == 1;
+    v = ua_ini_get(sel, "select", "options");
+    if (v) list_add(out->options, sizeof out->options, v);
+    v = ua_ini_get(sel, "select", "exclude");
+    if (v) list_add(out->exclude, sizeof out->exclude, v);
 }

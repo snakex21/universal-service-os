@@ -22,7 +22,8 @@ MANIFEST = ROOT / 'src/addons/legacy-pack.ini'
 TIERS = ('full', 'option', 'group', 'none')
 REBOOTS = ('now', 'end', 'no')
 REDIST = ('yes', 'no', 'conditional', 'unknown')
-SOURCES = ('bundled', 'user')
+SOURCES = ('bundled', 'release', 'user')
+DECISIONS = ('', 'maintainer-2026-09-30')
 STATUSES = ('', 'missing', 'needs-iss')
 LANGS = ('PL', 'EN', '*')
 BUILTINS = ('copy', 'force', 'attrib', 'append', 'cd', 'inf', 'msi')
@@ -225,13 +226,35 @@ class Plan:
     eff_ntsp: str
 
 
-def resolve(m: Manifest, os: str, lang: str, ntsp: str = '', full: bool = True, options: list[str] | None = None) -> Plan:
+def selection(m: Manifest, select: dict[str, str] | None = None) -> tuple[str, bool, list[str], list[str]]:
+    """Same as plan.c ua_selection: (preset, full, options, exclude)."""
+    select = select or {}
+    preset = select.get('preset') or m.get('presets', 'default') or ''
+    full = (m.get('preset:' + preset, 'full') or '0').strip() == '1'
+    options: list[str] = []
+    for o in list_items(m.get('preset:' + preset, 'options') or '') + list_items(select.get('options', '')):
+        if o.lower() not in (x.lower() for x in options):
+            options.append(o)
+    if select.get('full', '') != '':
+        full = select['full'].strip() == '1'
+    exclude: list[str] = []
+    for o in list_items(select.get('exclude', '')):
+        if o.lower() not in (x.lower() for x in exclude):
+            exclude.append(o)
+    return preset, full, options, exclude
+
+
+def resolve(m: Manifest, os: str, lang: str, ntsp: str = '', full: bool = True, options: list[str] | None = None,
+            exclude: list[str] | None = None) -> Plan:
     options = [o.lower() for o in (options or [])]
+    exclude_l = [o.lower() for o in (exclude or [])]
     pk = m.packages
 
     def select(eff: str):
         inn, why = [False] * len(pk), {}
         for i, p in enumerate(pk):
+            if p.id.lower() in exclude_l:
+                continue
             wanted = 'full' if full and p.tier in ('full', 'group') else ''
             if not wanted and p.id.lower() in options:
                 wanted = 'option'
@@ -257,7 +280,7 @@ def resolve(m: Manifest, os: str, lang: str, ntsp: str = '', full: bool = True, 
                         continue
                     best = None
                     for j, q in enumerate(pk):
-                        if inn[j] or q.get('status') or not applicable(m, q, os, lang, ntsp, eff):
+                        if inn[j] or q.get('status') or q.id.lower() in exclude_l or not applicable(m, q, os, lang, ntsp, eff):
                             continue
                         if not any(cap_satisfies(c, need) for c in q.provides):
                             continue
@@ -392,7 +415,20 @@ def validate(m: Manifest) -> list[str]:
             errors.append(f'{where}: a bridge must say "do zastąpienia własną implementacją" in note=')
         if p.get('source') == 'bundled' and p.get('redist') != 'yes':
             errors.append(f'{where}: bundled but redist={p.get("redist")}')
+        if p.get('decision') not in DECISIONS:
+            errors.append(f'{where}: decision {p.get("decision")!r}')
+        if p.get('source') == 'release' and p.get('redist') != 'yes' and not p.get('decision'):
+            errors.append(f'{where}: source=release needs redist=yes or a decision=')
     # needs must be provided by an earlier order (per package, statically)
+    presets = list_items(m.get('presets', 'order') or '')
+    if not presets or (m.get('presets', 'default') or '') not in presets:
+        errors.append('[presets] order= and a default= from it are required')
+    for pr in presets:
+        if m.get('preset:' + pr, 'name_pl') is None or m.get('preset:' + pr, 'full') not in ('0', '1'):
+            errors.append(f'[preset:{pr}] needs name_pl= and full=0|1')
+        for o in list_items(m.get('preset:' + pr, 'options') or ''):
+            if not m.find(o):
+                errors.append(f'[preset:{pr}] unknown package {o}')
     for p in m.packages:
         for need in p.needs:
             name = cap_split(need)[0].lower()
@@ -413,6 +449,8 @@ def main(argv: list[str] | None = None) -> int:
     pl.add_argument('--ntsp', default='')
     pl.add_argument('--no-full', action='store_true')
     pl.add_argument('--options', default='')
+    pl.add_argument('--exclude', default='')
+    pl.add_argument('--preset', default='')
     pl.add_argument('--manifest', type=Path, default=MANIFEST)
     a = ap.parse_args(argv)
     if a.cmd == 'validate':
@@ -423,7 +461,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f'[PASS] {a.manifest.name}: {len(Manifest.load(a.manifest).packages)} packages')
         return 1 if errors else 0
     m = Manifest.load(a.manifest)
-    plan = resolve(m, a.os, a.lang, a.ntsp, not a.no_full, list_items(a.options))
+    if a.preset:
+        _, full, options, exclude = selection(m, {'preset': a.preset, 'options': a.options, 'exclude': a.exclude})
+    else:
+        full, options, exclude = not a.no_full, list_items(a.options), list_items(a.exclude)
+    plan = resolve(m, a.os, a.lang, a.ntsp, full, options, exclude)
     for pid in plan.order:
         p = m.find(pid)
         print(f'{p.order:>4} {pid:<24} {plan.why.get(pid, ""):<7} {p.get("name_en")}')

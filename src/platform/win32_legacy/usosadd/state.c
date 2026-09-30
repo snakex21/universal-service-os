@@ -11,7 +11,7 @@ void ua_state_load(ua_state *s, const ua_ini *ini, const ua_pkgs *p) {
     const char *v;
     s->pending_reboot = 0;
     s->starts = 0;
-    for (i = 0; i < p->count; i++) { s->st[i] = UA_ST_NEW; s->tries[i] = 0; }
+    for (i = 0; i < p->count; i++) { s->st[i] = UA_ST_NEW; s->tries[i] = 0; s->why[i][0] = 0; }
     if (!ini) return;
     v = ua_ini_get(ini, "state", "starts");
     if (v) s->starts = ua_atoi(v);
@@ -19,6 +19,8 @@ void ua_state_load(ua_state *s, const ua_ini *ini, const ua_pkgs *p) {
     if (v) s->pending_reboot = ua_atoi(v);
     for (i = 0; i < p->count; i++) {
         int k;
+        v = ua_ini_get(ini, "why", p->pkg[i].id);
+        if (v) ua_copy(s->why[i], sizeof s->why[i], v);
         v = ua_ini_get(ini, "state", p->pkg[i].id);
         if (!v) continue;
         for (k = 0; k <= UA_ST_SKIPPED; k++) {
@@ -52,6 +54,14 @@ int ua_state_write(const ua_state *s, const ua_pkgs *p, char *out, int cap) {
             ua_append(out, cap, ":");
             ua_append(out, cap, num);
         }
+        ua_append(out, cap, "\r\n");
+    }
+    ua_append(out, cap, "[why]\r\n");
+    for (i = 0; i < p->count; i++) {
+        if (!s->why[i][0] || (s->st[i] != UA_ST_FAILED && s->st[i] != UA_ST_SKIPPED)) continue;
+        ua_append(out, cap, p->pkg[i].id);
+        ua_append(out, cap, "=");
+        ua_append(out, cap, s->why[i]);
         ua_append(out, cap, "\r\n");
     }
     return ua_len(out);

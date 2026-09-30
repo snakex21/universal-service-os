@@ -31,6 +31,7 @@ static struct big {
     ua_pkgs p;
     ua_plan plan;
     ua_state state;
+    ua_choice choice;
 } *g_big;
 #define g_manifest (g_big->manifest)
 #define g_select (g_big->select)
@@ -43,6 +44,7 @@ static struct big {
 #define g_p (g_big->p)
 #define g_plan (g_big->plan)
 #define g_state (g_big->state)
+#define g_choice (g_big->choice)
 static ua_system g_sys;
 static ua_facts g_facts;
 
@@ -51,6 +53,7 @@ static char g_log[UA_PATH];
 static char g_win[UA_PATH], g_sysdir[UA_PATH], g_pf[UA_PATH];
 static int g_pl;                 /* Polish messages */
 static HWND g_wnd, g_text;
+static DWORD g_last_code;       /* exit code of the last command */
 
 /* ---- small helpers -------------------------------------------------------- */
 
@@ -401,6 +404,7 @@ static int run_one(const ua_pkg *p, const char *raw) {
     }
     ua_itoa(num, sizeof num, (int)code);
     log2("    exit code ", num);
+    g_last_code = code;
     return code_ok(p, code);
 }
 
@@ -418,6 +422,16 @@ static void set_state(int i, int st) {
     save_state();
     log2("  -> ", ua_state_name(st));
 }
+
+/* failed / skipped with the reason shown in the final summary */
+static void set_why(int i, int st, const char *why, const char *detail) {
+    g_state.why[i][0] = 0;
+    ua_append(g_state.why[i], sizeof g_state.why[i], why);
+    if (detail && *detail) ua_append(g_state.why[i], sizeof g_state.why[i], detail);
+    log2("  reason: ", g_state.why[i]);
+    set_state(i, st);
+}
+
 
 static void register_runonce(void) {
     HKEY k;
@@ -534,22 +548,21 @@ static void run_chain(void) {
         if (st == UA_ST_RUNNING) {
             int d = ua_resume_decision(g_state.tries[x], check >= 0, check == 1);
             if (d == 1) { set_state(x, UA_ST_DONE); continue; }
-            if (d == 3) { log_line("  interrupted twice, failed"); set_state(x, UA_ST_FAILED); continue; }
+            if (d == 3) { set_why(x, UA_ST_FAILED, g_pl ? "przerwana dwa razy" : "interrupted twice", 0); continue; }
         } else if (check == 1) {
             log_line("  already installed");
             set_state(x, UA_ST_PRESENT);
             continue;
         }
-        if (*p->status) { log2("  status: ", p->status); set_state(x, UA_ST_SKIPPED); continue; }
+        if (*p->status) { set_why(x, UA_ST_SKIPPED, "status: ", p->status); continue; }
         if (!ua_needs_met(&g_m, &g_p, &g_state, &g_sys, x, unmet, sizeof unmet)) {
-            log2("  skipped, needs ", unmet);
-            set_state(x, UA_ST_SKIPPED);
+            set_why(x, UA_ST_SKIPPED, g_pl ? "wymaga " : "needs ", unmet);
             continue;
         }
-        if (!files_present(p)) { set_state(x, UA_ST_SKIPPED); continue; }
+        if (!files_present(p)) { set_why(x, UA_ST_SKIPPED, g_pl ? "brak pliku" : "file missing", 0); continue; }
         if (p->reboot == UA_REBOOT_NOW && g_state.pending_reboot) restart();
         line[0] = 0;
-        ua_append(line, sizeof line, g_pl ? "USOS: instalowanie dodatków (" : "USOS: installing add-ons (");
+        ua_append(line, sizeof line, g_pl ? "USOS: instalowanie dodatk\363w (" : "USOS: installing add-ons (");
         ua_itoa(num, sizeof num, pos + 1);
         ua_append(line, sizeof line, num);
         ua_append(line, sizeof line, "/");
@@ -564,6 +577,7 @@ static void run_chain(void) {
         g_state.tries[x]++;
         set_state(x, UA_ST_RUNNING);
         ok = 1;
+        g_last_code = 0;
         for (k = 1; ok && k < 64; k++) {
             const char *cmd;
             key[0] = 0;
@@ -576,28 +590,62 @@ static void run_chain(void) {
         }
         check = run_check(p);
         if (check >= 0) ok = check;
-        set_state(x, ok ? UA_ST_DONE : UA_ST_FAILED);
+        if (ok) {
+            set_state(x, UA_ST_DONE);
+        } else {
+            ua_itoa(num, sizeof num, (int)g_last_code);
+            set_why(x, UA_ST_FAILED, check == 0 ? (g_pl ? "nie zainstalowano, kod " : "not installed, exit code ")
+                                                 : (g_pl ? "b\263\271d, kod " : "error, exit code "), num);
+        }
         if (ok && p->reboot == UA_REBOOT_NOW) restart();
         if (ok && p->reboot == UA_REBOOT_END) { g_state.pending_reboot = 1; save_state(); }
     }
 }
 
+/* After the last restart: log and show "zainstalowano X/Y, pominieto Z
+ * (pow\363d)". A failed package never stops the chain (run_chain goes on). */
 static void finish(void) {
-    int i, done = 0, failed = 0, skipped = 0;
-    char line[160], num[8];
+    static char text[4096];
+    int i, done = 0, failed = 0, skipped = 0, listed = 0;
+    char num[8];
+    const char *name_key = g_pl ? "name_pl" : "name_en";
+    if (g_state.pending_reboot) restart();
     for (i = 0; i < g_plan.count; i++) {
         int st = g_state.st[g_plan.idx[i]];
+        if (g_p.pkg[g_plan.idx[i]].tier == UA_TIER_GROUP) continue;
         if (st == UA_ST_DONE || st == UA_ST_PRESENT) done++;
         else if (st == UA_ST_FAILED) failed++;
         else skipped++;
     }
-    line[0] = 0;
-    ua_append(line, sizeof line, "Finished: ");
-    ua_itoa(num, sizeof num, done); ua_append(line, sizeof line, num); ua_append(line, sizeof line, " installed, ");
-    ua_itoa(num, sizeof num, failed); ua_append(line, sizeof line, num); ua_append(line, sizeof line, " failed, ");
-    ua_itoa(num, sizeof num, skipped); ua_append(line, sizeof line, num); ua_append(line, sizeof line, " skipped");
-    log_line(line);
-    if (g_state.pending_reboot) restart();
+    text[0] = 0;
+    ua_append(text, sizeof text, g_pl ? "Pakiet zgodno\234ci USOS: zainstalowano " : "USOS compatibility pack: installed ");
+    ua_itoa(num, sizeof num, done); ua_append(text, sizeof text, num);
+    ua_append(text, sizeof text, "/");
+    ua_itoa(num, sizeof num, done + failed + skipped); ua_append(text, sizeof text, num);
+    ua_append(text, sizeof text, g_pl ? ", b\263\352dy: " : ", failed: ");
+    ua_itoa(num, sizeof num, failed); ua_append(text, sizeof text, num);
+    ua_append(text, sizeof text, g_pl ? ", pomini\352to: " : ", skipped: ");
+    ua_itoa(num, sizeof num, skipped); ua_append(text, sizeof text, num);
+    log_line(text);
+    ua_append(text, sizeof text, "\r\n");
+    for (i = 0; i < g_plan.count; i++) {
+        int x = g_plan.idx[i], st = g_state.st[x];
+        const char *name = ua_ini_get(&g_m, g_p.pkg[x].section, name_key);
+        char line[200];
+        if (st != UA_ST_FAILED && st != UA_ST_SKIPPED) continue;
+        if (g_p.pkg[x].tier == UA_TIER_GROUP) continue;
+        line[0] = 0;
+        ua_append(line, sizeof line, "- ");
+        ua_append(line, sizeof line, name ? name : g_p.pkg[x].id);
+        ua_append(line, sizeof line, " (");
+        ua_append(line, sizeof line, g_state.why[x][0] ? g_state.why[x] : ua_state_name(st));
+        ua_append(line, sizeof line, ")");
+        log_line(line);
+        if (listed++ < 15) { ua_append(text, sizeof text, "\r\n"); ua_append(text, sizeof text, line); }
+    }
+    ua_append(text, sizeof text, g_pl ? "\r\n\r\nDziennik: C:\\USOS\\addons.log" : "\r\n\r\nLog: C:\\USOS\\addons.log");
+    if (g_wnd) ShowWindow(g_wnd, SW_HIDE);
+    MessageBoxA(0, text, "USOS", MB_OK | (failed ? MB_ICONWARNING : MB_ICONINFORMATION) | MB_SETFOREGROUND);
 }
 
 /* ---- entry ----------------------------------------------------------------------- */
@@ -612,7 +660,7 @@ static int has_switch(const char *cmdline, const char *sw) {
 void __cdecl ua_start(void) {
     char path[UA_PATH], line[UA_LINE];
     const char *cmdline = GetCommandLineA(), *v;
-    int n, i, full, dry = has_switch(cmdline, "dry");
+    int n, i, dry = has_switch(cmdline, "dry");
     DWORD type;
 
     g_big = (struct big *)VirtualAlloc(0, sizeof *g_big, MEM_COMMIT, PAGE_READWRITE);
@@ -672,10 +720,9 @@ void __cdecl ua_start(void) {
     if (v && *v && !ua_ieq(v, g_sys.os)) log2("  note: USOS expected ", v);
     if (ua_ieq(g_sys.os, "?")) { log_line("USOSADD: unsupported system, nothing done"); ExitProcess(1); }
 
-    v = ua_ini_get(&g_sel, "select", "full");
-    full = v && ua_atoi(v) == 1;
-    v = ua_ini_get(&g_sel, "select", "options");
-    ua_resolve(&g_m, &g_p, &g_sys, full, v ? v : "", &g_plan);
+    ua_selection(&g_m, &g_sel, &g_choice);
+    log2("  preset: ", g_choice.preset[0] ? g_choice.preset : "-");
+    ua_resolve(&g_m, &g_p, &g_sys, g_choice.full, g_choice.options, g_choice.exclude, &g_plan);
     if (g_state.starts == 0 || dry) log_plan();
     if (dry) ExitProcess(0);
 

@@ -1,7 +1,7 @@
 # Legacy Compatibility / Post-Install Pack (Windows 95, 98, 98 SE, Me, NT 4.0)
 
-Status: **design + manifest + runner, branch `feature/legacy-compat-pack`,
-2026-09-30.** Not yet wired into the 9x DOS Setup path (branch
+Status: **design + manifest + runner + MS release asset + installer
+component, branch `feature/legacy-compat-pack`, 2026-09-30.** Not yet wired into the 9x DOS Setup path (branch
 `feature/win9x-modern`) or an NT4 flow (not built yet).
 
 Goal: after an install through USOS the user ticks *Pełny pakiet zgodności
@@ -21,6 +21,9 @@ Pieces:
 | Build (OpenWatcom 2.0, pinned snapshot) | `tools/build_usosadd.py` |
 | Tests | `tools/tests/addons/` |
 | Licence decisions | this document §3, `docs/LICENSES-AUDIT.md` §8, `tools/release/third-party.json` |
+| Microsoft redistributables asset | `tools/addons/legacy_ms_asset.py`, `tools/release/assemble_release.py`, `make_release.ps1 -LegacyAddons` |
+| Installer component (Components screen) | `installer/internal/components/legacy.go` |
+| QEMU test helper (98 SE) | `tools/tests/addons/win98se_vm.py`, `fat_image.py` |
 
 ## 1. Inventory of the user's add-on folder
 
@@ -183,42 +186,70 @@ runner trusts the detected system. Detection is pure code
 (`detect.c`, host-tested); the OSR2.1 rule is to be confirmed on the
 user's 95 OSR2.1 PL ISO in QEMU.
 
-### 2.3 Presets and options
+### 2.3 Presets, full pack and options
 
-- **Pełny pakiet zgodności Windows <version>** = every package with
-  `tier=full` whose `os`/`lang`/`ntsp` fit the detected system, plus
-  everything their `needs` pull in. Per system this gives (Polish system):
-  - 95: DCOM95, (Winsock 2: file missing), IE 5.5 SP2 + Q810847, MSI 2.0,
-    DirectX 8.0, VB6 SP6, VC6 SP6, MSLU (DUN 1.4 only on English 95).
+The user picks **one preset** instead of a long checkbox list (details
+expandable); the manifest's `[presets]` / `[preset:<id>]` sections define
+them, `SELECT.INI` carries `preset=`, extra `options=` and `exclude=`:
+
+| Preset | Contents |
+|---|---|
+| **Do pracy** (default for every 9x/NT4 install, user can untick) | the full pack (`tier=full`) of the detected system |
+| **Retro gry** | DirectX, VB6/VC6 runtimes, MSLU, MSI, ASPI (CD images, period copy protection), Me real DOS mode, USB sticks (NUSB), the period Windows Media Player |
+| **Minimalny** | NT4 SP6a + SRP, USB sticks (NUSB), the 98 security updates |
+
+- **Full pack** (*Pełny pakiet zgodności Windows <version>*) = every package
+  with `tier=full` whose `os`/`lang`/`ntsp` fit the detected system, plus
+  everything their `needs` pull in. Per system (Polish system):
+  - 95: DCOM95, Winsock 2, IE 5.5 SP2 + Q810847, MSI 2.0, DirectX 8.0, VB6
+    SP6, VC6 SP6, MSLU (DUN 1.4 is English-only: in *full* on English 95, an
+    option on Polish 95, since Microsoft released no other language).
   - 98: IE 6 SP1, DCOM98, DUN 1.4, MSI 2.0, DirectX 9.0c, MDAC 2.8 SP1,
     VB6, VC6, MSLU, WMP 7.1, .NET 2.0 + PL, NUSB 3.3a, 13 hotfixes.
   - 98 SE: as 98 with DUN 1.4 SE + Q243199, WMP 9 + KB819639.
   - Me: IE 6 SP1, MSI 2.0, DirectX 9.0c, MDAC 2.8 SP1, VB6, VC6, MSLU,
-    WMP 9, .NET 2.0 + PL.
+    WMP 9, .NET 2.0 + PL (no DUN: Me has 1.4 built in; user decision).
   - NT4: SP6a, SRP, IE 6 SP1, MSI 2.0, MDAC 2.8 SP1, VB6, VC6, .NET 1.1 +
     PL + SP1.
-- **Options** (`tier=option`, separate checkboxes): KernelEx, Movie Maker,
-  Speech SDK, RDP client, DSClient, ASPI, HP IP printing, MSCONFIG (95),
-  DCOMCNFG, WMP 6.4, WMP 9 skin, Me real DOS mode, NT4 USB, extra 98
-  updates (IE/OE cumulative, MSXML, MS VM, IDE cache, storage).
-- The resolver (`plan.c`, mirrored in `tools/addons/legacy_manifest.py` and
-  cross-checked by the tests for every system × language): candidates →
-  add providers for unmet `needs` → drop inapplicable ones and those whose
-  needs stay unmet (logged with the reason) → sort by `order`.
+- **Options** (`tier=option`, checkboxes under *Szczegóły*): KernelEx, Movie
+  Maker, Speech SDK, RDP client, DSClient, ASPI, HP IP printing, MSCONFIG
+  (95), DCOMCNFG, WMP 6.4, WMP 9 skin, Me real DOS mode, NT4 USB, extra 98
+  updates (IE/OE cumulative, MSXML, MS VM, IDE cache, storage). Split
+  confirmed by the user on 2026-09-30.
+- `exclude=` removes a package; it is never pulled back in as a
+  dependency, its dependents are dropped with the reason instead.
+- The resolver (`plan.c`, mirrored in `tools/addons/legacy_manifest.py`,
+  cross-checked by the tests for every system × language × NT SP level ×
+  option/exclude sets and every preset): candidates → add providers for
+  unmet `needs` → drop inapplicable ones and those whose needs stay unmet
+  (logged with the reason) → sort by `order`.
 
 ### 2.4 Files on the stick
 
-- The user copies the add-on files **in any layout** to `DATA\Addons\`
-  (e.g. the whole `łatki` folder, archives unpacked or not). Nothing is
-  renamed by hand: the staging step finds each manifest file by size +
-  SHA-256, also inside `.zip` and `.iso` containers named in `fileN`.
-- Staging writes `DATA\Addons\.usos\store\<dir>\<8.3 files>` and
-  `store.ini` (what is present, verified). Proposed owner: the Go installer
-  (*Aktualizuj USOS* and the Components screen), on the Windows host where
-  zip/ISO reading and hashing are cheap. `tools/addons/stage_legacy_pack.py`
-  is the reference implementation (used by the tests and the QEMU run).
-- Bundled items (today: only USOS's own `USOSADD.EXE` and the manifest)
-  come from the USOS payload as a component zip, `legacy-pack.zip`.
+Three sources, all matched by size + SHA-256 (nothing is renamed by hand):
+
+1. **USOS's own files** (`source=bundled`): `USOSADD.EXE`, the manifest.
+2. **Microsoft redistributables** (`source=release`, 13 packages: DirectX
+   8.0/9.0c, MSI 2.0 A/W, MDAC 2.8 SP1, VB6/VC6 runtimes, MSLU, .NET 2.0 +
+   PL, .NET 1.1 + PL + SP1): one release asset
+   `USOS-<version>-Legacy-pack-MS.zip` (~148 MB,
+   `tools/addons/legacy_ms_asset.py`), built by `make_release.ps1
+   -LegacyAddons <folder>` from the maintainer's local copy, **never in
+   git**. It follows the existing two-installer model exactly like the WinPE
+   and XP components: SHA-256 in `SHA256SUMS` and compiled into the
+   installer (`buildinfo.ComponentSHA256`), embedded in the full installer,
+   downloaded by the online installer from the USOS release; the Components
+   screen card *Pakiet zgodności Windows 95/98/Me/NT 4.0* unpacks it to
+   `DATA\Addons\USOS\MS\<dir>\<8.3 file>` (every file re-checked against
+   `legacy-ms.json`). An archive.org copy may be added later only as an
+   extra fallback; the primary source is our own release.
+3. **The user's files** (`source=user`): copied **in any layout** to
+   `DATA\Addons\` (e.g. the whole `łatki` folder, archives unpacked or not);
+   found inside `.zip` and `.iso` containers named in `fileN` too.
+
+Staging (`tools/addons/stage_legacy_pack.py` is the reference
+implementation, used by the tests and the QEMU run; the installer / Legacy
+Core port follows) writes the target tree of §2.5 for the chosen system.
 
 ### 2.5 From the stick to the target
 
@@ -267,9 +298,15 @@ its C library (own entry point, no CRT), PE subsystem 4.0, i386: loads on
    (`ExitWindowsEx(EWX_REBOOT)`, on NT after `SeShutdownPrivilege`);
    `reboot=end` restarts are collected and done once before the next
    `now` package or at the end;
-6. when nothing is left: final log line, `TMP` removed, RunOnce not
-   re-registered. A failed package never stops the chain; packages that
-   need what it provides are skipped with the reason.
+6. fault tolerance: a failing package is marked `failed` with its reason
+   (exit code, "not installed" when its check stays false, "interrupted
+   twice") and the chain goes on; packages that need what it provides are
+   skipped with the reason ("wymaga msi:2.0"), missing files as "brak
+   pliku"; reasons persist in `STATE.INI` `[why]` across restarts;
+7. when nothing is left (after the last pending restart): the summary
+   *Pakiet zgodności USOS: zainstalowano X/Y, błędy: F, pominięto: Z* with
+   one line per failed/skipped package and its reason, in the log and in a
+   message box; RunOnce is not registered again.
 
 A small window shows `USOS: instalowanie dodatków (3/14): DirectX 9.0c`
 (English on non-Polish systems). The log (append) holds date/time, system
@@ -280,15 +317,17 @@ logs the plan another system would get), `/reset` (forget `STATE.INI`).
 ### 2.7 UI
 
 - Answer profile (`docs/answer-profiles.md`), group *Wygląd i dodatki*:
-  `addons=full` / `none`, `addons_options=kernelex,rdp51-pl,...`. The UEFI
-  menu's profile page shows *Pełny pakiet zgodności Windows 98 SE* (the
-  chosen system's name) and one checkbox per option applicable to that
-  system; greyed out with *brak pliku w DATA\Addons* when the store does
-  not have the files, *wymaga nagrania odpowiedzi* for `needs-iss`.
-- Installer, Components screen: a row *Pakiet zgodności dla starszych
-  Windows (95/98/Me/NT4)* installs `legacy-pack.zip` (runner + manifest) and
-  a button *Sprawdź pliki w DATA\Addons* that runs the staging and lists
-  found / missing per system.
+  `addons_preset=praca|retro|minimal|none` (default `praca` for 9x/NT4),
+  `addons_options=kernelex,rdp51-pl,...`, `addons_exclude=...`. The UEFI
+  menu's profile page shows one line per preset (*Do pracy (pełny pakiet
+  zgodności)* preselected, *Retro gry*, *Minimalny*, *Bez dodatków*) and an
+  expandable *Szczegóły* list with the packages the preset gives this
+  system plus the options applicable to it; greyed out with *brak pliku*
+  when the file is neither on DATA nor in the MS asset, *wymaga nagrania
+  odpowiedzi* for `needs-iss`.
+- Installer, Components screen: the card *Pakiet zgodności Windows
+  95/98/Me/NT 4.0* (embedded / download / local file / skip, like WinPE and
+  XP; implemented, `installer/internal/components/legacy.go`).
 
 ### 2.8 Integration with the 9x agent's work
 
@@ -297,35 +336,39 @@ logs the plan another system would get), `/reset` (forget `STATE.INI`).
 written from the component list only; this document replaces it). This
 branch is based on `master` and touches no file of that branch, so it
 merges before or after it without conflicts; the hook (one MSBATCH line +
-the copy step) is a small follow-up once both are in.
+the C: seeding step) is a small follow-up once both are in. The QEMU run
+(§6) uses exactly that hook: C: seeded by the host, the RunOnce line in
+MSBATCH.
 
 ### 2.9 Later
 
-- Hotfix layers for 95 / 98 SE / Me / NT4 from the WinSPatcher sets:
-  the IExpress containers can be unpacked on the host like the zips; each
-  hotfix then becomes a `tier=none` member of a `hotfixes-<os>` group, as
-  done for the Win98 help disc.
+- Hotfix layers for 95 / 98 SE / Me / NT4 from the WinSPatcher sets
+  (inventory of the Inno Setup ones with innoextract, pending the user's
+  download approval): each hotfix becomes a `tier=none` member of a
+  `hotfixes-<os>` group, as done for the Win98 help disc.
 - Clean-room replacements for the two bridges: MSCONFIG for 95 and the Me
   real DOS mode patch.
 
 ## 3. Redistribution decisions (per package)
 
-Rule: bundle only when the licence clearly allows it for USOS's use (a
-separate tool that installs them into another system, not "your
-application" using them); otherwise the user's file or a pinned download
-(SHA-256 from the user's copy). For Microsoft runtimes the user's file or a
-download is the **permanent** source: a clean-room DirectX, MDAC, .NET or
-IE is not a sensible goal, so they are not marked as bridges.
+Rule: bundle when the licence clearly allows it; Microsoft runtime
+redistributables are shipped by **maintainer decision (2026-09-30)** in the
+separate MS asset (their terms allow redistribution *with an application*,
+which a stand-alone pack does not clearly meet; the user decided to ship
+them anyway, at the maintainer's own risk, because original downloads are
+gone and archives may disappear). For Microsoft runtimes the shipped or
+user-supplied file is the **permanent** source (a clean-room DirectX, MDAC,
+.NET or IE is not a sensible goal), so they are not bridges.
 
 | Package | Terms | Decision |
 |---|---|---|
-| DirectX 8.0 / 9.0c redist | DirectX SDK redistributable terms: redistribute unmodified with *your application*, under an EULA as protective | conditional: not satisfied by a stand-alone pack; **user file** |
-| VB6 runtime, VC6 runtime | VB6/VS6 redistributable code: only as part of an application built with them | conditional; **user file** |
-| MSI 2.0 (InstMsiA/W) | Windows Installer redistributable, with applications that use it | conditional; **user file** |
-| MDAC 2.8 SP1 | MDAC redistributable, with applications | conditional; **user file** |
-| MSLU | Platform SDK redistributable (1.1.3790 fixed the "ambiguous EULA"): with your application | conditional; **user file** |
-| .NET 1.1 / 2.0 + langpacks | .NET Framework redistributable, with your application | conditional; **user file** |
-| DCOM95 / DCOM98, DUN 1.4, WMP, RDP client, DSClient, IE, hotfixes, SP6a, SRP | end-user EULAs / download terms; no redistribution grant | **user file** |
+| DirectX 8.0 / 9.0c redist | DirectX redistributable: unmodified, with *your application* | **MS asset** (maintainer decision 2026-09-30) |
+| VB6 runtime, VC6 runtime | VB6/VS6 redistributable code, with applications built with them | **MS asset** (decision) |
+| MSI 2.0 (InstMsiA/W) | Windows Installer redistributable, with applications | **MS asset** (decision) |
+| MDAC 2.8 SP1 | MDAC redistributable, with applications | **MS asset** (decision) |
+| MSLU | Platform SDK redistributable, with your application | **MS asset** (decision) |
+| .NET 1.1 / 2.0 + langpacks, .NET 1.1 SP1 | .NET redistributable, with your application | **MS asset** (decision) |
+| DCOM95 / DCOM98, DUN 1.4, WMP, RDP client, DSClient, IE, hotfixes, SP6a, SRP | end-user EULAs / download terms; no redistribution grant | **user file** (not part of the 2026-09-30 decision, which covers the redistributables; extending it is one manifest line per package) |
 | IE 5.5 / 6 sets | IE EULA; redistribution only through IEAK licensing | **user file** |
 | Movie Maker 98, NUSB 3.3a | community repacks of Microsoft binaries, no licence | **user file** only |
 | KernelEx 4.0 Final 2 | GPL-2.0 (its `License.txt`) | **may be bundled** once the matching source is vendored (`tools/vendor/kernelex/4.0-final2` + SOURCES.txt); until then user file |
@@ -337,45 +380,86 @@ IE is not a sensible goal, so they are not marked as bridges.
 | USB for NT4 (Inside Out/Dell) | commercial OEM driver | **user file** |
 | USOSADD.EXE, manifest, response files, docs | USOS, GPL-3.0-or-later | **bundled** |
 
-Downloads: the manifest has room for a pinned `download=` URL, but none is
-filled in: the original `download.microsoft.com` links of these packages
-are gone, and archive copies must be checked one by one against the pinned
-SHA-256 before they are listed (Q4). The staging tool never downloads by
-itself.
+## 4. User decisions (2026-09-30) and what is still open
 
-Precedent: the maintainer decided on 2026-09-28 to ship some Microsoft
-update files in the payload at the maintainer's own risk (LICENSES-AUDIT
-§5). This pack does **not** extend that decision on its own (Q3).
+Answered: (1) the full/option split stays as designed; (2) no DUN 1.4 on
+Me; (3) ship the Microsoft redistributables in a release asset under the
+maintainer's own-risk decision, not in git (done, §2.4); (4) primary
+download source is our own release, archive.org only an extra fallback;
+(5) look for the full Speech SDK (found: Microsoft still hosts
+`SpeechSDK51.exe` and `SpeechSDK51LangPack.exe`), wrapper MSI only as a
+last resort; (6) innoextract into the build kit (it is zlib-licensed, not
+GPL); (7) look for the missing files: found on archive.org `Q299444i.exe`
+(English SRP, 14,883,736 B) and `w95ws2setup.exe` (Winsock 2 for 95,
+986,400 B), an English IE 6 SP1 offline ISO (82,536,448 B); a Polish DUN
+1.4 for 95 does not exist (Microsoft made only English). The full pack is
+the default for 9x/NT4 installs.
 
-## 4. Open questions for the user
+Open: the downloads of (5)-(7) wait for the user's explicit approval;
+after download each is pinned by SHA-256 and checked for a Microsoft
+Authenticode signature, then added to the manifest.
 
-1. **Full vs option**: is the split in §2.3 right? In particular KernelEx
-   (option now, it changes system behaviour), RDP client and DSClient
-   (options), WMP upgrade (in *full*), the Win98 help disc hotfixes (in
-   *full*, Polish only).
-2. `Dial_up_networking_v14\Win98SEpl_MEpl`: Me already has DUN 1.4; should
-   the 98 SE PL package really be offered on Me?
-3. Should any Microsoft redistributable (DirectX, VB6/VC6, MSI, MDAC, MSLU,
-   .NET) ship in the USOS release under the same maintainer decision as the
-   Windows 7/Vista update files, or stay user-supplied (current design)?
-4. Pinned archive downloads (e.g. archive.org copies of the original
-   Microsoft URLs): wanted? They need a network check per file.
-5. Speech SDK 5.1: the local file has only merge modules. Provide the full
-   `SpeechSDK51.exe`, or should USOS build a wrapper MSI from the modules
-   at build time?
-6. WinSPatcher 98 (FE) and NT are Inno Setup installers; listing them needs
-   `innoextract` (GPL, a download). OK to add it to the build kit?
-7. Missing files: Winsock 2 for 95 (`W95ws2setup.exe`), English IE 5.5/6 and
-   SRP for English systems, a Polish DUN 1.4 for 95.
-8. The 95 preset on a Polish 95 has no DUN (only an English package):
-   acceptable?
+## 5. Verification (host)
 
-## 5. Verification
+`tools/tests/addons/test_legacy_pack.py`: manifest validation; the
+runner's pure C built with `zig cc` for the host (INI parser, versions,
+detection table, variables, builtins, checks, state incl. reasons); 1248
+plan comparisons C vs Python over every system × language × NT SP level ×
+option/exclude sets and every preset; preset selection C vs Python;
+expected full packs; staging on a synthetic folder; the OpenWatcom target
+build with its PE checks; wired into `tools/tests/run.ps1`. Go:
+`internal/components` (asset name, extraction with hash checks, bad names,
+status), `internal/i18n` (the three new strings in all 27 catalogs).
 
-Host: `tools/tests/addons/test_legacy_pack.py` (manifest validation; the
-runner's pure C built with `zig cc` for the host: INI parser, versions,
-detection table, variables, builtins, checks, state; 390 plan comparisons
-C vs Python over every system × language × NT SP level × option sets;
-expected presets; staging on a synthetic folder; the OpenWatcom target
-build with its PE checks), wired into `tools/tests/run.ps1`. VM: QEMU 98 SE PL (the 9x agent's image and helpers)
-with the store of the 98 SE plan; results in §6 once run.
+## 6. Usability acceptance (per system) and QEMU results
+
+"Sama instalacja to połowa sukcesu": after USOS the system must be ready
+for work. Checklist, checked automatically in QEMU where the emulated
+hardware allows it, and by hand on the X470 (RX 560, USB-only input):
+
+| Check | 95 | 98 FE | 98 SE | Me | NT4 | How (QEMU) | X470 |
+|---|---|---|---|---|---|---|---|
+| Desktop reached without questions (after key/licence pages) | | | | | | screenshot | by hand |
+| Resolution >= 1024x768, 32-bit if possible | | | | | | Cirrus 5446 driver (QEMU); vmdisp9x VESA on 9x (win9x branch) | RX 560 VESA modes |
+| USB keyboard / mouse | | | | | | usb-kbd/usb-tablet | CSMWrap bridge (98/98 SE), none on Me/95 |
+| USB stick readable | | | | | | usb-storage + NUSB (98) | NUSB on 98, native on Me |
+| Network | | | | | | rtl8139/ne2k_pci (98 has drivers) | no 9x driver for the onboard NIC (gap) |
+| Sound | | | | | | sb16 (98 driver) | no HD Audio driver on 9x (gap) |
+| Clean shutdown / restart | | | | | | ACPI power-off in QEMU | by hand |
+| Period apps start: IE 6, WMP, a DirectX app (dxdiag), a VB6 app, a .NET 2.0 app | | | | | | USOS test apps (to write) | by hand |
+| Pack summary: `zainstalowano X/Y` with reasons | | | | | | `C:\USOS\addons.log`, message box | by hand |
+
+QEMU results: see §6.1 (98 SE PL run of 2026-09-30).
+
+### 6.1 QEMU 98 SE PL, 2026-09-30
+
+Setup: `tools/tests/addons/win98se_vm.py` (fresh 4 GiB disk seeded on the
+host: C:\WIN98 from the user's 98 SE PL OEM ISO, MSBATCH.INF with the
+USOSADD RunOnce line, C:\USOS\ADDONS staged for preset *Do pracy* +
+KernelEx + RDP; the CD's startup floppy with FDISK /MBR, SYS C:, SETUP;
+QEMU 11.1 i440FX TCG, Pentium III, 256 MiB, Cirrus, no network). Product
+key from a local file outside the repository; the VM disk was deleted
+after the run. Results: pending (the run stops at the OEM first-boot
+licence page until the user approves accepting it).
+
+## 7. Known usability gaps (future work, not implemented)
+
+- **Network on modern PCs**: no Windows 9x/NT4 driver for current Realtek
+  (RTL8111/8125) or Intel (I211/I219/I225) NICs; options: a USB-to-Ethernet
+  adapter with a 9x driver (e.g. old ASIX/Pegasus chips), a PCI(e) card
+  with a period chip (RTL8139, Intel PRO/100), or an own NDIS driver.
+- **Sound**: no HD Audio driver for 9x (only community experiments);
+  options: a PCI sound card with a 9x driver, USB audio (Me/98 SE with a
+  USB audio class driver), or nothing.
+- **Modern web**: IE 6 cannot open today's HTTPS sites (TLS 1.2/1.3, SNI,
+  SHA-2 certificates). Options: a period-compatible browser build (e.g.
+  community forks for 9x through KernelEx), or a local HTTPS proxy on
+  another machine / the USOS micro-Linux that terminates modern TLS.
+- **Storage**: AHCI only through MS-DOS compatibility mode on 9x (slow);
+  an own IOS port driver is future work (win9x doc §2).
+- **USB 3 (xHCI)** on 9x: none; on NT4: none; USB 2 only through NUSB/EHCI
+  when the board still has EHCI (the X470 has only xHCI).
+- **Display acceleration**: VESA only (vmdisp9x), no 3D; NT4: VGA / VESA
+  through a community driver (to evaluate).
+- **Windows 95**: no USB input under CSMWrap in Setup phase 1 (licence/COA
+  pages), see the win9x doc.
