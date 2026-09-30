@@ -29,11 +29,14 @@ pub const native_windows7_enabled = builtin.os.tag != .freestanding;
 pub const AnswerFormat = enum {
     winnt_sif,
     autounattend_xml,
+    /// Windows 95/98/Me DOS Setup (docs/win9x-modern-2026-09-30.md).
+    msbatch_inf,
 
     pub fn extension(self: AnswerFormat) []const u8 {
         return switch (self) {
             .winnt_sif => ".sif",
             .autounattend_xml => ".xml",
+            .msbatch_inf => ".inf",
         };
     }
 
@@ -41,6 +44,7 @@ pub const AnswerFormat = enum {
         return switch (self) {
             .winnt_sif => "WINNT.SIF",
             .autounattend_xml => "unattend.xml",
+            .msbatch_inf => "MSBATCH.INF",
         };
     }
 };
@@ -97,6 +101,10 @@ pub const traits_table = [_]SystemTraits{
     .{ .system_id = "windows-2000", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini" },
     .{ .system_id = "windows-xp-x64", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini", .icon_as = "windows-xp" },
     .{ .system_id = "windows-server-2003", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini", .icon_as = "windows-xp" },
+    .{ .system_id = "windows-98-se", .answer = .msbatch_inf },
+    .{ .system_id = "windows-98", .answer = .msbatch_inf },
+    .{ .system_id = "windows-me", .answer = .msbatch_inf },
+    .{ .system_id = "windows-95", .answer = .msbatch_inf },
     .{ .system_id = "windows-7", .secure_boot_off = true, .native_uefi = .win7, .int10_dispatcher = true },
     .{ .system_id = "windows-vista", .secure_boot_off = true, .native_uefi = .vista, .int10_dispatcher = true },
     .{ .system_id = "windows-10", .native_uefi = .modern },
@@ -284,7 +292,9 @@ pub const profiles = [_]Profile{
     // its backend falls back to this path for non-SliTaz ISOs).
     .{ .id = "linux-iso-bios", .systems = .{ .ids = linux_ids }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .linux_iso, .progress = .core },
     .{ .id = "dos-fat16-bios", .systems = .{ .ids = &.{ "ms-dos", "windows-3-1", "windows-3-11" } }, .images = iso, .methods = auto_iso_memdisk, .firmware = .bios, .backend = .dos_bios_iso, .progress = .core },
-    .{ .id = "win98se-dos-bios", .systems = .{ .ids = &.{"windows-98-se"} }, .images = iso, .methods = auto_iso_memdisk, .firmware = .bios, .backend = .win9x_dos, .progress = .core },
+    // Windows 95/98/Me: the ISO's own DOS boot floppy + DOS Setup from a RAM
+    // disk (docs/win9x-modern-2026-09-30.md); also under CSMWrap.
+    .{ .id = "win9x-dos-bios", .systems = .{ .ids = &.{ "windows-98-se", "windows-98", "windows-me", "windows-95" } }, .images = iso, .methods = auto_iso_memdisk, .firmware = .bios, .backend = .win9x_dos, .progress = .core },
     .{ .id = "windows-pe-bios-iso", .systems = .{ .ids = &.{ "windows-7", "windows-vista", "windows-10" } }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .windows_bios_iso, .progress = .core },
     // ---- any firmware
     .{ .id = "win7-no-chainload", .systems = .{ .ids = &.{"windows-7"} }, .methods = &.{.chainload}, .backend = null, .progress = .none },

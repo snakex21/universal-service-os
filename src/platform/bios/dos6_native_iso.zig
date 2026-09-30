@@ -87,7 +87,7 @@ pub noinline fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8
     try seed.validate();
     console.line("[DOS16] ORIGINAL DOS, SOURCE FILES AND PROGRAMS READY IN RAM");
     if (install) {
-        const selected = (try target_ui.choose(drive, session, .dos_install)) orelse return;
+        const selected = (try target_ui.choose(drive, session, .dos_install, "")) orelse return;
         const plan = selected.format_plan orelse return error.MissingDosPartitionPlan;
         try target_ui.commitDos(plan, seed);
         console.line("[DOS16] USER CONFIRMED FAT16 TARGET COMMITTED");
@@ -103,7 +103,7 @@ pub noinline fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8
     memdisk.start(0xff);
 }
 
-const EspImage = struct {
+pub const EspImage = struct {
     esp: fat.FileSystem,
     bulk: Reader,
     path: []const []const u16,

@@ -1,24 +1,75 @@
 @ECHO OFF
-PATH=A:\;A:\WIN98
+CALL A:\U9ENV.BAT
+PATH=A:\;A:\%U9SRC%
 CLS
-ECHO USOS - Windows 98 SE
+ECHO USOS - Windows %U9SYS%
 ECHO Przygotowanie wybranego dysku. Nie wylaczaj komputera.
+REM 98/Me startup floppies keep SYS/ATTRIB in EBD.CAB; 95 disks have them loose.
+IF NOT EXIST A:\EBD.CAB GOTO EBDDONE
 A:\EXTRACT.EXE /Y /E /L A:\ A:\EBD.CAB >NUL
 IF ERRORLEVEL 1 GOTO FAILED
+:EBDDONE
+REM The Me SYS only repairs an installed C: (it refuses a new disk); Me Setup
+REM makes C: bootable itself (and writes its own MSDOS.SYS).
+IF "%U9SYS%"=="ME" GOTO SYSDONE
 A:\SYS.COM C:
 IF ERRORLEVEL 1 GOTO FAILED
-MD C:\WIN98
+REM Text boot instead of the logo (Setup keeps the line): start messages stay
+REM visible, and the logo hangs QEMU's SMM path. SYS wrote MSDOS.SYS.
+A:\ATTRIB.EXE -H -S -R C:\MSDOS.SYS
+ECHO [Options]>>C:\MSDOS.SYS
+ECHO Logo=0>>C:\MSDOS.SYS
+A:\ATTRIB.EXE +H +S +R C:\MSDOS.SYS
+:SYSDONE
+MD C:\%U9SRC%
 ECHO Kopiowanie plikow instalacyjnych na dysk...
-COPY /Y A:\WIN98\*.* C:\WIN98 >NUL
+COPY /Y A:\%U9SRC%\*.* C:\%U9SRC% >NUL
 IF ERRORLEVEL 1 GOTO FAILED
-IF NOT EXIST C:\WIN98\SETUP.EXE GOTO FAILED
-ECHO Dodawanie poprawki RAM dla Windows 98 SE...
+IF NOT EXIST C:\%U9SRC%\SETUP.EXE GOTO FAILED
+COPY /Y A:\MSBATCH.INF C:\%U9SRC%\MSBATCH.INF >NUL
+IF ERRORLEVEL 1 GOTO FAILED
+MD C:\USOS9X
+COPY /Y A:\U9FIX.COM C:\USOS9X >NUL
+IF ERRORLEVEL 1 GOTO FAILED
+COPY /Y A:\U9FIX.TXT C:\USOS9X >NUL
+IF ERRORLEVEL 1 GOTO FAILED
+REM VESA display driver (vmdisp9x, MIT) next to Setup: DevicePath=1 finds it.
+FOR %%F IN (USOSVESA.INF VESAMINI.DRV VESAMINI.VXD VMHAL9X.DLL) DO COPY /Y A:\%%F C:\%U9SRC% >NUL
+FOR %%F IN (VMHAL486.DLL VMDISP9X.DLL) DO COPY /Y A:\%%F C:\%U9SRC% >NUL
+COPY /Y A:\VMDISP9X.TXT C:\USOS9X >NUL
+IF NOT EXIST C:\%U9SRC%\VMDISP9X.DLL GOTO FAILED
+REM Hardware IDs of this PC's display cards: they outrank Standard VGA.
+A:\U9FIX.COM /VGA C:\%U9SRC%\USOSVESA.INF
+REM Under CSMWrap HIMEM needs A20 through port 92h (/M:2), else DOS=HIGH hangs.
+REM Setup keeps the line; the file exists from its first restart on.
+REM (No IF with a redirection: COMMAND.COM opens the file even when false.)
+IF NOT "%U9CSM%"=="1" GOTO NOCSM
+ECHO DEVICE=C:\WINDOWS\HIMEM.SYS /TESTMEM:OFF /M:2>C:\CONFIG.SYS
+:NOCSM
+REM Every Windows start: MaxPhysPage / MaxFileCache in SYSTEM.INI (U9FIX.TXT).
+IF "%U9CSM%"=="1" GOTO CSMAUTO
+ECHO @C:\USOS9X\U9FIX.COM C:\WINDOWS\SYSTEM.INI>C:\AUTOEXEC.BAT
+GOTO AUTODONE
+:CSMAUTO
+REM No firmware CSM: USB keyboard (USOSKEY bridge) and mouse (VBADOS) in
+REM Windows through the SeaBIOS services; U9FIX /CSM adds their drivers.
+FOR %%F IN (USOSKEY.COM USOSKEY.DRV VBMOUSE.EXE VBMOUSE.DRV VBADOS.TXT) DO COPY /Y A:\%%F C:\USOS9X >NUL
+IF NOT EXIST C:\USOS9X\VBMOUSE.DRV GOTO FAILED
+ECHO @C:\USOS9X\U9FIX.COM /CSM C:\WINDOWS\SYSTEM.INI>C:\AUTOEXEC.BAT
+ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\NUL GOTO USOSDRV>>C:\AUTOEXEC.BAT
+ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\USOSKEY.DRV COPY C:\USOS9X\*.DRV C:\WINDOWS\SYSTEM>>C:\AUTOEXEC.BAT
+ECHO :USOSDRV>>C:\AUTOEXEC.BAT
+ECHO @C:\USOS9X\USOSKEY.COM>>C:\AUTOEXEC.BAT
+ECHO @C:\USOS9X\VBMOUSE.EXE>>C:\AUTOEXEC.BAT
+:AUTODONE
+ECHO Poprawki zgodnosci (Patcher9x: TLB, CPU, RAM, rejestry CPU)...
 A:\CWSDPMI.EXE -s-
-A:\PATCH9X.EXE -auto -select mem C:\WIN98
+A:\PATCH9X.EXE -auto -select all C:\%U9SRC%
 IF ERRORLEVEL 1 GOTO FAILED
 C:
-CD \WIN98
-C:\WIN98\SETUP.EXE /IS
+CD \%U9SRC%
+REM /IS no ScanDisk, /IE no startup disk, /NM no RAM/CPU check (MEMDISK).
+C:\%U9SRC%\SETUP.EXE C:\%U9SRC%\MSBATCH.INF /IS /IE /NM
 GOTO STOP
 :FAILED
 ECHO Przygotowanie dysku nie powiodlo sie. Instalator nie zostanie uruchomiony.
