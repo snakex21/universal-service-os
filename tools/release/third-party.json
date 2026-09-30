@@ -1264,6 +1264,32 @@
       "notice": "By Javier S. Pedro; unmodified release binaries, source on the ESP (VBADOS.TGZ) and VBADOS.TXT (SOURCES + GPL text) next to them on MS-DOS / Windows 3.x disks installed under CSMWrap."
     },
     {
+      "id": "vmdisp9x",
+      "name": "vmdisp9x VESA display driver and VMHal9x (Windows 95/98/Me)",
+      "version": "1.2025.0.119",
+      "license": "MIT",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/vmdisp9x/1.2025.0.119/license.txt",
+        "tools/vendor/vmdisp9x/1.2025.0.119/SOURCES.txt"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/vmdisp9x/1.2025.0.119/vmdisp9x-1.2025.0.119.tar.gz",
+          "tools/vendor/vmdisp9x/1.2025.0.119/manifest.json"
+        ],
+        "urls": [
+          "https://github.com/JHRobotics/vmdisp9x/releases/tag/v1.2025.0.119",
+          "https://github.com/JHRobotics/vmhal9x"
+        ],
+        "offer": false
+      },
+      "notice": "By Jaroslav Hensl (JHRobotics), parts The OS/2 Museum; unmodified release binaries (vesamini.drv/.vxd, vmhal9x.dll, vmhal486.dll, vmdisp9x.dll) with USOS's own INF (src/platform/bios/win9x/usosvesa.inf, MODIFIED from vmdisp9x.inf) in EFI/USOS/dos-native/win9x; VMDISP9X.TXT (SOURCES + MIT text) and VMDISP9X.TGZ (source) next to them; Windows 95/98/Me disks get the driver files and VMDISP9X.TXT."
+    },
+    {
       "id": "freedos",
       "name": "FreeDOS kernel, FreeCOM and Doszip",
       "version": "FreeDOS 1.4 (kernel 20250409.9, FreeCOM 0.86a, Doszip 2.68)",

@@ -1,0 +1,18 @@
+vmdisp9x 1.2025.0.119 (VESA display driver for Windows 95/98/Me) - MIT
+Copyright (c) 2022 JHRobotics (Jaroslav Hensl); parts (C) 2012-2022 The OS/2 Museum.
+
+Unmodified files from the upstream release
+  https://github.com/JHRobotics/vmdisp9x/releases/download/v1.2025.0.119/vmdisp9x-1.2025.0.119b-driver-2d.zip
+  (sha256 e0d698a6089347a6a619ed439c092f247392fbafac6b342f4651c1380911fb23)
+  vesamini.drv, vesamini.vxd  - vmdisp9x (https://github.com/JHRobotics/vmdisp9x, MIT)
+  vmhal9x.dll, vmhal486.dll, vmdisp9x.dll - VMHal9x DirectDraw HAL
+                                (https://github.com/JHRobotics/vmhal9x, MIT)
+  vmdisp9x.inf, license.txt, readme.txt, version.txt
+Source of the driver (tag v1.2025.0.119), next to the binaries:
+  vmdisp9x-1.2025.0.119.tar.gz (https://github.com/JHRobotics/vmdisp9x/archive/refs/tags/v1.2025.0.119.tar.gz)
+
+Universal Service OS installs the VESA part on Windows 95/98/Me disks it
+prepares (docs/win9x-modern-2026-09-30.md) with its own INF,
+src/platform/bios/win9x/usosvesa.inf, a MODIFIED copy of vmdisp9x.inf that
+keeps only the VESA model (PCI display class, *PNP0900). The stick carries
+these files in EFI\USOS\dos-native\win9x\ with this text as VMDISP9X.TXT.

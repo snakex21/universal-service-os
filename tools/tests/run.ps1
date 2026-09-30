@@ -40,6 +40,8 @@ function Run-Unit {
     if ($LASTEXITCODE -ne 0) { throw 'Legacy icon compression tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_windows3_media.py')
     if ($LASTEXITCODE -ne 0) { throw 'Windows 3.x media conversion tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_win9x_u9fix.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Windows 9x U9FIX tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_xp_dosnet_aliases.py')
     if ($LASTEXITCODE -ne 0) { throw 'XP DOSNET alias tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_nt5_source.py')

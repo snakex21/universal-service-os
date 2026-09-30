@@ -70,6 +70,9 @@ def build(root: Path):
     print('[PASS] MS-DOS restart helper: built REBOOT.COM')
     from build_freedos_support import build as build_freedos
     build_freedos(root)
+    # After the MS-DOS support: it reuses USOSKEY and VBADOS from there.
+    from build_win9x_support import build as build_win9x
+    build_win9x(root, out / 'win9x')
 
 
 def dos_text(text: str) -> bytes:

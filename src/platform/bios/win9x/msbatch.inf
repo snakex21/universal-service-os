@@ -1,0 +1,61 @@
+; MSBATCH.INF - USOS default answer for the Windows 95/98/Me DOS Setup.
+; Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
+; Used when no answer file was chosen (docs/win9x-modern-2026-09-30.md).
+; No product key: Setup asks for it on its own page. Everything else is
+; answered: typical install, no startup disk, no licence page, no network
+; wizard, restarts without a prompt, no Welcome screen. DevicePath=1: Setup
+; also reads the INFs next to it (the USOS VESA display driver).
+[Version]
+Signature="$CHICAGO$"
+
+[Setup]
+Express=1
+InstallDir="C:\WINDOWS"
+InstallType=1
+EBD=0
+ShowEula=0
+ChangeDir=0
+OptionalComponents=1
+Network=1
+System=0
+CCP=0
+CleanBoot=0
+Display=0
+DevicePath=1
+NoDirWarn=1
+NoPrompt2Boot=1
+Uninstall=0
+VRC=1
+
+[NameAndOrg]
+Name="USOS"
+Org=""
+Display=0
+
+[Network]
+ComputerName="USOS-9X"
+Workgroup="WORKGROUP"
+Description="USOS"
+Display=0
+; No network client, protocol or service: no logon dialog at the first start
+; (the PCs USOS targets have no Windows 9x network driver anyway).
+Clients=
+Protocols=
+Services=
+
+[Install]
+AddReg=USOS.RunOnce
+
+[USOS.RunOnce]
+HKLM,"Software\Microsoft\Windows\CurrentVersion\RunOnce",USOSWelcome,,"%25%\rundll.exe setupx.dll,InstallHinfSection USOS.NoWelcome 4 %10%\msbatch.inf"
+
+[USOS.NoWelcome]
+DelReg=USOS.Welcome.Del
+AddReg=USOS.Regwiz
+
+[USOS.Welcome.Del]
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Run",Welcome
+
+[USOS.Regwiz]
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Welcome\Regwiz",,1,01,00,00,00
+HKLM,"Software\Microsoft\Windows\CurrentVersion",RegDone,1,01,00,00,00
