@@ -122,12 +122,13 @@ EXPECTED_FULL = {
                          'hotfixes-98-pl'],
     ('ME', 'PL', ''): ['ie6sp1-pl-9x', 'msi20-9x', 'dx9c', 'mdac28sp1-pl', 'vbrun6sp6', 'vcredist6sp6', 'mslu',
                        'wmp9-pl', 'dotnet20', 'dotnet20-pl'],
-    ('95OSR21', 'PL', ''): ['dcom95', 'ie55sp2-pl', 'ie55sp2-q810847-pl', 'msi20-9x', 'dx80-pl', 'vbrun6sp6',
+    ('95OSR21', 'PL', ''): ['dcom95', 'ws2-95', 'ie55sp2-pl', 'ie55sp2-q810847-pl', 'msi20-9x', 'dx80-pl', 'vbrun6sp6',
                             'vcredist6sp6', 'mslu'],
     ('NT4', 'PL', '3'): ['nt4-sp6a-pl', 'nt4-srp-pl', 'ie6sp1-pl-nt4', 'msi20-nt4', 'mdac28sp1-pl', 'vbrun6sp6',
-                         'vcredist6sp6', 'dotnet11', 'dotnet11-pl', 'dotnet11-sp1'],
-    # English NT4: no English IE 6 set locally, so MDAC/.NET (need IE 5.01) stay out
-    ('NT4', 'EN', '6a'): ['msi20-nt4', 'vbrun6sp6', 'vcredist6sp6'],
+                         'vcredist6sp6', 'dotnet11', 'dotnet11-pl', 'dotnet11-sp1', 'hotfixes-nt4-pl']
+                        + ['<hfnt>'],
+    # English NT4 SP6a: English SRP and IE 6 (downloaded 2026-09-30); MDAC 2.8 SP1 is Polish only
+    ('NT4', 'EN', '6a'): ['nt4-srp-en', 'ie6sp1-en-nt4', 'msi20-nt4', 'vbrun6sp6', 'vcredist6sp6', 'dotnet11', 'dotnet11-sp1'],
 }
 
 
@@ -159,6 +160,8 @@ def test_selection(exe: Path, m: lm.Manifest) -> None:
 def test_presets(m: lm.Manifest) -> None:
     for (os_, lang, sp), want in EXPECTED_FULL.items():
         got = lm.resolve(m, os_, lang, sp, True, []).order
+        if '<hfnt>' in want:  # every generated NT4 hotfix of the group
+            want = [w for w in want if w != '<hfnt>'] + [p.id for p in m.packages if p.id.startswith('hfnt-')]
         if [x for x in got] != sorted(want, key=got.index) or set(got) != set(want):
             fail(f'full pack {os_} {lang} sp{sp}: got {got}')
     # an option pulls in what it needs; an option for another system stays out
@@ -168,7 +171,7 @@ def test_presets(m: lm.Manifest) -> None:
     plan = lm.resolve(m, 'ME', 'PL', '', False, ['nusb33-pl', 'winmedos'])
     if plan.order != ['winmedos'] or plan.why.get('nusb33-pl') != 'out-system':
         fail(f'Me options: {plan.order} {plan.why}')
-    plan = lm.resolve(m, '98SE', 'PL', '', False, ['usb-nt4-ionetworks', 'speechsdk51'])
+    plan = lm.resolve(m, '98SE', 'PL', '', False, ['usb-nt4-ionetworks', 'speechsdk51-langpack'])
     if plan.order:
         fail(f'status/other-system options must stay out: {plan.order}')
 

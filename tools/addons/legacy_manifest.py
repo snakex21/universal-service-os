@@ -394,7 +394,7 @@ def validate(m: Manifest) -> list[str]:
                 errors.append(f'{where}: sha256 of {f["stage"]} missing or malformed')
             if not f['size']:
                 errors.append(f'{where}: size of {f["stage"]} missing')
-        if p.get('unpack') not in ('', 'zip'):
+        if p.get('unpack') not in ('', 'zip', 'iso'):
             errors.append(f'{where}: unpack {p.get("unpack")!r}')
         runs = p.runs()
         if not runs:

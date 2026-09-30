@@ -101,6 +101,9 @@ def main():
     add('inputs/tools/cache/efifs/ntfs_x64.efi', CACHE / fixed['efifs-ntfs']['file'], 'efifs-1.12', 'GPL-3.0-or-later')
     # Restored to tools/cache/openwatcom, where tools/build_win3_usb_keyboard.py looks first.
     add('inputs/tools/cache/openwatcom/' + fixed['openwatcom']['file'], CACHE / fixed['openwatcom']['file'], 'openwatcom-2.0-2026-09-01', 'OWPL-1.0 (build tool)')
+    # innoextract for the legacy pack (tools/addons/stage_legacy_pack.py unpacks it from tools/cache/innoextract).
+    add('inputs/tools/cache/innoextract/' + fixed['innoextract']['file'], CACHE / fixed['innoextract']['file'], 'innoextract-1.9', 'Zlib (tool)')
+    add('sources/' + fixed['innoextract-source']['file'], CACHE / fixed['innoextract-source']['file'], 'innoextract-1.9 source', 'Zlib')
     seven = subprocess.run([str(SEVEN_ZIP_DIR / '7z.exe')], capture_output=True, text=True).stdout.splitlines()
     seven_version = next((l.strip() for l in seven if l.strip().startswith('7-Zip')), '7-Zip')
     for name in ('7z.exe', '7z.dll', 'License.txt', 'readme.txt'):

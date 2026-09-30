@@ -505,7 +505,8 @@ static int files_present(const ua_pkg *p) {
     char key[16], path[UA_PATH], dir[UA_PATH], name[16], num[4];
     int k;
     const char *v;
-    if (ua_ieq(ua_ini_get(&g_m, p->section, "unpack") ? ua_ini_get(&g_m, p->section, "unpack") : "", "zip")) {
+    v = ua_ini_get(&g_m, p->section, "unpack");
+    if (v && *v) { /* zip / iso: staged as a folder of files */
         path_join(dir, g_root, "PKG");
         path_join(path, dir, p->dir);
         return exists(path);

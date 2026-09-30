@@ -3,7 +3,8 @@
 
 Reference implementation of what the installer does on the host: find every
 manifest file among the user's files by size + SHA-256 (in any folder
-layout, also inside .zip archives and, with 7-Zip, inside .iso images),
+layout, also inside .zip archives, with 7-Zip inside .iso images and with
+innoextract inside Inno Setup installers such as WinSPatcher),
 and write the target tree:
 
   <target>\\USOSADD.EXE, LEGACY.INI (ANSI), SELECT.INI, PKG\\<dir>\\<8.3 files>
@@ -33,6 +34,26 @@ import legacy_manifest as lm  # noqa: E402
 
 SEVEN_ZIP = [Path(r'C:\Program Files\7-Zip\7z.exe'), Path(r'C:\Program Files (x86)\7-Zip\7z.exe')]
 NESTED_LIMIT = 700 * 1024 * 1024
+
+
+INNOEXTRACT_ZIP = ('innoextract-1.9-windows.zip', '6989342c9b026a00a72a38f23b62a8e6a22cc5de69805cf47d68ac2fec993065')
+
+
+def innoextract_tool() -> Path | None:
+    """tools/cache/innoextract/innoextract.exe, unpacked from the pinned build
+    kit zip (tools/release/buildkit.lock.json) when needed."""
+    root = Path(__file__).resolve().parents[2] / 'tools/cache'
+    exe = root / 'innoextract/innoextract.exe'
+    if exe.is_file():
+        return exe
+    for folder in (root / 'innoextract', root / 'buildkit-downloads'):
+        z = folder / INNOEXTRACT_ZIP[0]
+        if z.is_file() and hashlib.sha256(z.read_bytes()).hexdigest() == INNOEXTRACT_ZIP[1]:
+            with zipfile.ZipFile(z) as zf:
+                exe.parent.mkdir(parents=True, exist_ok=True)
+                exe.write_bytes(zf.read('innoextract.exe'))
+            return exe
+    return None
 
 
 def seven_zip() -> Path | None:
@@ -89,6 +110,19 @@ class Finder:
                     self.scan_zip(zipfile.ZipFile(io.BytesIO(zf.read(info))), depth + 1)
                 except zipfile.BadZipFile:
                     pass
+            elif low.endswith('.exe') and info.file_size > (8 << 20) and len(self.data) < len(self.wanted):
+                with zf.open(info) as src:
+                    inno = b'Inno Setup' in src.read(4 << 20)
+                if inno:
+                    fd, name = tempfile.mkstemp(suffix='.exe')
+                    os.close(fd)
+                    tmp = Path(name)
+                    with open(tmp, 'wb') as out, zf.open(info) as src:
+                        shutil.copyfileobj(src, out, 1 << 20)
+                    try:
+                        self.scan_inno(tmp)
+                    finally:
+                        tmp.unlink(missing_ok=True)
             elif depth < 2 and low.endswith('.iso') and self.seven and len(self.data) < len(self.wanted):
                 fd, name = tempfile.mkstemp(suffix='.iso')
                 os.close(fd)
@@ -116,6 +150,23 @@ class Finder:
                 self._offer(size, lambda: subprocess.run([str(self.seven), 'e', '-so', str(iso), member],
                                                          capture_output=True).stdout)
 
+    def scan_inno(self, exe: Path) -> None:
+        """Inno Setup containers (WinSPatcher 98/NT) through innoextract."""
+        tool = innoextract_tool()
+        if tool is None:
+            return
+        with open(exe, 'rb') as f:
+            if b'Inno Setup' not in f.read(4 << 20):
+                return
+        work = Path(tempfile.mkdtemp(prefix='usos-inno-'))
+        try:
+            if subprocess.run([str(tool), '-q', '-s', '-e', '-d', str(work), str(exe)], capture_output=True).returncode == 0:
+                for f in work.rglob('*'):
+                    if f.is_file():
+                        self._offer(f.stat().st_size, f.read_bytes)
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+
     def scan(self, root: Path) -> None:
         for f in sorted(root.rglob('*')):
             if not f.is_file() or len(self.data) == len(self.wanted):
@@ -123,7 +174,8 @@ class Finder:
             size = f.stat().st_size
             self._offer(size, f.read_bytes)
             low = f.name.lower()
-            if low.endswith('.zip'):
+            if low.endswith('.zip') or (low.endswith('.exe') and zipfile.is_zipfile(f)):
+                # .exe: WinZip self-extractors (Speech SDK) are zips too
                 try:
                     with zipfile.ZipFile(f) as zf:
                         self.scan_zip(zf, 1)
@@ -131,6 +183,8 @@ class Finder:
                     pass
             elif low.endswith('.iso') and self.seven:
                 self.scan_iso(f)
+            elif low.endswith('.exe') and size > (8 << 20) and len(self.data) < len(self.wanted):
+                self.scan_inno(f)
 
 
 def unpack_zip(data: bytes, dest: Path) -> int:
@@ -151,6 +205,28 @@ def unpack_zip(data: bytes, dest: Path) -> int:
         out.write_bytes(zf.read(info))
         count += 1
     return count
+
+
+def unpack_iso(data: bytes, dest: Path) -> int:
+    """The ISO's root files with 8.3 names into dest (7-Zip)."""
+    seven = seven_zip()
+    if not seven:
+        raise SystemExit('7-Zip is needed to unpack an ISO package')
+    fd, name = tempfile.mkstemp(suffix='.iso')
+    os.close(fd)
+    iso, out = Path(name), Path(tempfile.mkdtemp(prefix='usos-iso-'))
+    try:
+        iso.write_bytes(data)
+        subprocess.run([str(seven), 'e', '-y', f'-o{out}', str(iso), '*', '-x!*/*'], check=True, capture_output=True)
+        count = 0
+        for f in out.iterdir():
+            if f.is_file() and lm.NAME83.fullmatch(f.name.upper()):
+                shutil.copyfile(f, dest / f.name.upper())
+                count += 1
+        return count
+    finally:
+        iso.unlink(missing_ok=True)
+        shutil.rmtree(out, ignore_errors=True)
 
 
 def stage(manifest: Path, sources: list[Path], target: Path, os_: str, lang: str, preset: str = '',
@@ -187,6 +263,8 @@ def stage(manifest: Path, sources: list[Path], target: Path, os_: str, lang: str
         for f, k in zip(files, keys):
             if p.get('unpack') == 'zip':
                 unpack_zip(finder.data[k], dest)
+            elif p.get('unpack') == 'iso':
+                unpack_iso(finder.data[k], dest)
             else:
                 (dest / f['stage']).write_bytes(finder.data[k])
         report['packages'][p.id] = 'staged'

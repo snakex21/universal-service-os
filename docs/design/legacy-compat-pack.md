@@ -96,7 +96,7 @@ package's *quiet* command), `/Q:A` (accept everything), `/R:N` (no restart),
 | Bundle | Type | Contents | Use in the pack |
 |---|---|---|---|
 | WinSPatcher 95 v1.0a (G. Skulimowski, freeware) | IExpress (`setup.exe`), 95 MB | 121 files: IE 5.5 set + `IE5SETUP.EXE`, `DCOM95.EXE`, `InstMsiA.exe`, `dx8.EXE`, `wmp71_95.EXE`, `w95y2k.exe`, `w95euro.exe`, `amdk6upd.exe`, `pccardupd.exe`, MS Agent, ~15 hotfixes | not run as a whole (own UI, installs "only on genuine copies"); a future hotfix source for 95 (§2.9) |
-| WinSPatcher 98 v1.0 | **Inno Setup** | not listable without innoextract | not used (Q6) |
+| WinSPatcher 98 v1.0 (98 FE PL, 20050817) | **Inno Setup** 5.0.4 (innoextract 1.9) | `app\wpsetup.dat` lists every item with its silent switch: 21 security updates (`upd_c`, `/Q:A /R:N`, some through its wrapper `wpaicc.exe`), Windows Update client pieces, IE 6 SP1 PL, DirectX 9.0c, MS Agent + PL, JScript 5.6, MSI 2.0, .NET 1.1 + SP1 + PL (unpacked), WMP 7.1 (unpacked), JRE 1.5.0_04, two registry tweaks | its 13 updates that no other package carries (same SHA-256 = duplicate: 9 are the help disc's) became group `hotfixes-98-pl-extra` (98 FE only) via `tools/addons/import_winspatcher.py`; each item installs individually and silently |
 | WinSPatcher 98 SE v1.0 | IExpress (`setup.exe`), 96 MB | 96 files: IE 6 SP1 PL set, DirectX 9 files, `MPsetup.exe`, `msjavwu.exe`, `KB837009`, `KB885492`, `KB891711`, `KB891781`, 10 Q-hotfixes, `rootsupd`, `WUCrtUp` | as above, hotfix source for 98 SE |
 | WinSPatcher Me v1.1 | IExpress (`wsetup.exe`), 135 MB | 79 files: IE 6 SP1 PL set, ~30 Me/IE/WMP hotfixes (KB891711, KB918547, KB908519, KB896358, KB904706 DX9, ...), .NET 1.1 and 2.0 (`dotnetfx.exe`, `dotnetfx2.exe`, langpacks), JRE 1.5.0_07, TweakUI 1.33 | as above, hotfix source for Me (no other Me hotfixes in the set) |
 | Service Pack Plus 4.8r / 5.0b (98 SE, unofficial, PL) | RAR archives: `INFEX.EXE` + `SP.cab`, `FixIR.reg` first | IE 5-only; needs `C:\WINDOWS` and a `G:` drive for its System Restore | **not combined with the pack** (conflicts with IE 6; modifies shell) |
@@ -114,17 +114,36 @@ package's *quiet* command), `/Q:A` (accept everything), `/R:N` (no restart),
 | USB for NT4 (`usb-nt4-ionetworks`) | `USB_NT4.zip`: Inside Out Networks USB 1.x driver 2.32, Dell A00 (Latitude D400/D600), EN | NT4 has no USB stack; this commercial OEM driver adds one | NT4 | InstallShield 6: `setup.exe -s -f1<iss>` after recording a response file | yes |
 | DSClient NT4 (`dsclient-nt4-pl`) | from `Win9x.zip` (above) | AD client | NT4 SP6a, IE 4.01+ | `/Q:A /R:N` | yes |
 | RDP client, VB6, VC6, MDAC 2.8 SP1, ASPI | from `Win9x.zip` | shared with 9x | NT4 | as above | |
-| WinSPatcher NT v1.0 | `WinSPatcher_NT_v1.0.exe` (134 MB), **Inno Setup** | Polish NT4 update bundle (freeware) | NT4 PL | Inno's `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART` applies only to the outer installer; contents unknown without innoextract | - |
+| WinSPatcher NT v1.0 (NT4 Workstation PL, 20070409) | `WinSPatcher_NT_v1.0.exe` (134 MB), **Inno Setup** 5.1.10 | `SP6I386.EXE` (identical to the PL SP6a CD's), the PL SRP (identical to `POLQ299444i.exe`), 31 post-SRP updates with their switches in `wpsetup.dat` (NT hotfix installers `-m -z -q -o`, IExpress `/Q:A /R:N`), IE 6 SP1 PL (NT set), MS Agent, .NET 1.1 + SP1 + PL (identical to the user's), MS VM update | 28 updates not carried otherwise became group `hotfixes-nt4-pl` (after the SRP, in *full*); each has its Hotfix registry check where the file names a KB/Q number | batched |
 
 NT4 order (preset `full` on NT4): SP6a (PL or EN by system language) →
-restart → SRP (PL) → restart → IE 6 SP1 → restart → MSI 2.0 → MDAC 2.8 SP1
-→ restart → VB6, VC6 → .NET 1.1 → PL pack → SP1 → restart. DirectX: none
+restart → SRP (PL or EN) → restart → IE 6 SP1 (PL or EN) → restart → MSI
+2.0 → MDAC 2.8 SP1 (PL) → restart → VB6, VC6 → .NET 1.1 → PL pack → SP1 →
+28 post-SRP updates (PL) → restart. DirectX: none
 beyond the DirectX 3.0a that SP3+ already carries. Options: RDP, DSClient,
-WMP 6.4, ASPI, USB (Inside Out), HP printing. Missing locally: the English
-SRP, an English IE 6 SP1 set, post-SRP hotfixes (perhaps inside WinSPatcher
-NT), a Y2K/DST update check (SP6a + SRP cover Y2K).
+WMP 6.4, ASPI, USB (Inside Out), HP printing. Found on 2026-09-30 (user-approved
+downloads, §1.5): the English SRP and an English IE 6 SP1 set; English
+post-SRP hotfixes are still missing (the WinSPatcher NT ones are Polish).
 
-### 1.4 Files the pack does not use
+### 1.5 Downloaded on 2026-09-30 (user approval)
+
+All outside git (scratchpad / `tools/cache`), SHA-256 pinned in the manifest;
+the user puts them into `DATA\Addons` like the rest (found by hash).
+
+| File | Size | SHA-256 | Source | Check | Package |
+|---|---|---|---|---|---|
+| `w95ws2setup.exe` (Winsock 2 for 95) | 986,400 | `48c82825...4d4922` | archive.org/details/w95ws2setup | Authenticode Microsoft Corporation, valid; SHA-1 as listed | `ws2-95` |
+| `Q299444i.exe` (NT4 SRP, English) | 14,883,736 | `92386543...dafd843c` | archive.org/details/Q299444 | Authenticode Microsoft Windows 2000 Publisher, valid; SHA-1 as listed | `nt4-srp-en` |
+| IE 6 SP1 English offline ISO | 82,536,448 | `9e6c3ea3...4cbf4a` | archive.org/details/microsoft-internet-explorer-6-sp1-iso | SHA-1 as listed; `iesetup.cif` LBASE=EN, 6.0.2800.1106 | `ie6sp1-en-9x`, `ie6sp1-en-nt4` (`unpack=iso`) |
+| `SpeechSDK51.exe` | 71,278,472 | `826ba6df...386ba` | Microsoft Download Center (still live) | Authenticode Microsoft Corporation, valid | `speechsdk51` (MSI + Data.Cab taken out of the WinZip SFX) |
+| `SpeechSDK51LangPack.exe` | 85,498,776 | `346afc3a...99256` | Microsoft Download Center | Authenticode Microsoft Corporation, valid | `speechsdk51-langpack` (`status=missing` until its long cabinet names are handled) |
+| `innoextract-1.9-windows.zip` + source `.tar.gz` | 520,705 / 206,931 | `6989342c...93065` / `6344a69f...88126` | github.com/dscharrer/innoextract 1.9 | zip hash = the one published by the author; Zlib licence | build kit (`buildkit.lock.json`) |
+
+Not found: a Polish DUN 1.4 for Windows 95 (Microsoft released it in
+English only), so the English package is an option on a Polish 95
+(`dun14-95-en-on-pl`).
+
+### 1.6 Files the pack does not use
 
 DirectX 5, 6, 8.1 and 8.1 NT, the IE 4.01 CD, `vbrun60sp5.exe`,
 `PLK_Q832483_MDAC_x86.EXE`, `NetFx20SP1_x86.exe`, `NetFx20SP2_x86.exe`,
@@ -395,9 +414,24 @@ GPL); (7) look for the missing files: found on archive.org `Q299444i.exe`
 1.4 for 95 does not exist (Microsoft made only English). The full pack is
 the default for 9x/NT4 installs.
 
-Open: the downloads of (5)-(7) wait for the user's explicit approval;
-after download each is pinned by SHA-256 and checked for a Microsoft
-Authenticode signature, then added to the manifest.
+Done: the downloads of (5)-(7) were approved by the user, pinned and
+checked (§1.5); WinSPatcher 98/NT inventoried with innoextract (§1.2, 1.3).
+
+### 4.1 OEM licence page (product item)
+
+Windows 98 SE OEM media ignore `ShowEula=0`: the first-boot wizard always
+shows *Umowa Licencyjna* (and asks for user name and key again, prefilled
+from MSBATCH). Unattended installs therefore stop there. Design: the user
+accepts the Windows licence **once, consciously, in USOS** (the answer
+profile field `accept_eula=yes`, shown as a checkbox *Akceptuję umowę
+licencyjną systemu Windows (wymagane przy nośnikach OEM)* on the
+profile/confirmation screen, never preselected); only then USOS answers the
+wizard for the user: the MSBATCH `[Setup]` keys that OEM mode honours are
+set, and the remaining wizard pages are closed by a tiny first-boot helper
+(the same RunOnce slot as USOSADD) that presses *Dalej / Akceptuję /
+Zakończ* on the wizard windows by their class and control IDs; without the
+acceptance the wizard is left to the user. QEMU run of 2026-09-30: the
+agent accepted it by hand with the user's explicit approval.
 
 ## 5. Verification (host)
 
