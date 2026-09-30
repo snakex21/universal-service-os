@@ -191,6 +191,16 @@ def start(a) -> None:
             '-drive', f'file={a.work / "floppy.img"},format=raw,if=floppy,index=0',
             '-boot', 'order=ac', '-vga', 'cirrus', '-nic', 'none', '-rtc', 'base=localtime',
             '-display', 'none', '-monitor', f'tcp:127.0.0.1:{port},server=on,wait=off']
+    if a.acceptance:
+        # Usability checks (docs/design/legacy-compat-pack.md section 6): a USB
+        # stick with a marker file on EHCI (NUSB), a Sound Blaster 16.
+        stick = a.work / 'stick.raw'
+        if not stick.exists():
+            w = fat_image.Fat32Writer(stick, 300 * 1024 ** 2, label='USOSSTICK')
+            w.add_file(('USOSTEST.TXT',), b'USOS legacy pack USB stick check' + bytes([13, 10]))
+            w.finish()
+        args += ['-device', 'usb-ehci,id=ehci', '-drive', f'if=none,id=stick,file={stick},format=raw',
+                 '-device', 'usb-storage,bus=ehci.0,drive=stick', '-device', 'sb16']
     log = open(a.work / 'qemu.log', 'w')
     p = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT,
                          creationflags=getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0))
@@ -248,7 +258,7 @@ def log(a) -> None:
 
 
 def clean(a) -> None:
-    for name in ('disk.raw', 'floppy.img', 'vm.json'):
+    for name in ('disk.raw', 'floppy.img', 'vm.json', 'stick.raw'):
         (a.work / name).unlink(missing_ok=True)
     print('removed VM disk and floppy (they held the product key)')
 
@@ -266,6 +276,7 @@ def main() -> None:
             s.add_argument('--size-gb', type=int, default=4)
         if name == 'start':
             s.add_argument('--port', type=int, default=4471)
+            s.add_argument('--acceptance', action='store_true', help='add a USB stick (EHCI) and a Sound Blaster 16')
         if name == 'shot':
             s.add_argument('name')
         if name == 'keys':
