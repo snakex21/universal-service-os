@@ -68,6 +68,8 @@ def start(out, a):
     # vmport=off: no VMware backdoor, so VBMOUSE uses the BIOS (SeaBIOS
     # INT 15h C2 = the USB mouse) as on real hardware.
     machine = 'pc' + (',i8042=off' if a.i8042 == 'off' else '') + (',vmport=off' if a.vmport == 'off' else '')
+    # smm=off: Windows 9x's boot logo hangs QEMU's i440FX SMM path (docs/win9x-modern-2026-09-30.md).
+    machine += ',smm=off' if a.smm == 'off' else ''
     cmd = [QEMU, '-machine', machine, '-accel', a.accel, '-cpu', a.cpu, '-m', str(a.mem), '-smp', str(a.smp),
            '-display', 'none', '-nic', 'none', '-rtc', 'base=localtime', '-serial', f'file:{serial}',
            '-monitor', f'tcp:127.0.0.1:{port},server=on,wait=off', '-vga', 'std']
@@ -152,6 +154,7 @@ def main():
     s.add_argument('--kbd', choices=('usb', 'ps2'), default='usb')
     s.add_argument('--i8042', choices=('on', 'off'), default='on')
     s.add_argument('--vmport', choices=('on', 'off'), default='off')
+    s.add_argument('--smm', choices=('on', 'off'), default='on')
     s.add_argument('--accel', default='tcg,thread=multi')
     s.add_argument('--cpu', default='max')
     s.add_argument('--mem', type=int, default=1024)
