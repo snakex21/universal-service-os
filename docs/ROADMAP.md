@@ -45,8 +45,8 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | L3 | 32-bit CPU i mniejsze minimum RAM | **Later** | pomiary | 2 dni pomiarów, potem 5–15 dni |
 | L4 | Chainload w stylu Plop dla PC bez USB boot | **Later** | L3 (częściowo) | 5–10 dni |
 | L5 | Motywy, układy klawiatury, persistence, post-install, test QEMU | **Later** | N2 (M1) | 1–5 dni per punkt |
-| L6 | Windows 98 na X470 (eksperymentalne) | **Later** | ręczny spike, N4 (msbatch) | spike 2–3 dni, automatyzacja 8–12 dni |
-| L6b | Windows 95 (RTM/A, OSR2/2.1/2.5) na UEFI bez CSM (eksperymentalne) | **Later** (po 1.0) | L6 (ścieżka 98/ME), tryb BIOS przez CSMWrap (1.1), wejście USOSKEY/VBADOS | do oszacowania (głównie reużycie L6) |
+| L6 | Windows 98 SE / 98 / Me na X470 (eksperymentalne) | **W toku** (`feature/win9x-modern`, 2026-09-30): QEMU 98 SE do pulpitu (SeaBIOS), przez CSMWrap do klucza z klawiaturą i myszą USB; Me do klucza; X470: do testu | – | test sprzętowy 1–2 dni |
+| L6b | Windows 95 (RTM/A, OSR2/2.1/2.5) na UEFI bez CSM (eksperymentalne) | **W toku**: OSR2.1 w QEMU do klucza (obraz dyskietki startowej jako tymczasowy most); RTM/A (FAT16): Later | L6 | własne środowisko startowe z CAB-ów: do oszacowania |
 | L7 | Buildy Longhorn | **Later** | L1 (pre-reset), ścieżka Vista (post-reset) | 3–5 dni per build |
 | L8 | NT4 dla retro sprzętu | **Later** | profil NT5 (M4) | 5–8 dni |
 | L9 | shim-review (własny shim podpisany przez Microsoft) | **Later** (długoterminowo) | N6, publiczne repo | miesiące, proces zewnętrzny |
@@ -322,7 +322,12 @@ test QEMU). Dodatkowo z porównania E2B: lista PCI ID kontrolerów z
 informacją, czy USOS ma dla nich sterownik XP/7, ostrzeżenie o baterii
 CMOS (zły rok), opcjonalna blokada menu hasłem.
 
-### L6. Windows 98 na X470: **Later**, eksperymentalne
+### L6. Windows 98 na X470: **W toku**, eksperymentalne
+
+Stan 2026-09-30 (`feature/win9x-modern`): [win9x-modern-2026-09-30.md](win9x-modern-2026-09-30.md)
+(95/98/98 SE/Me z menu BIOS i przez CSMWrap, MSBATCH.INF z profilu, Patcher9x
+`all`, U9FIX: MaxPhysPage/MaxFileCache, VESA vmdisp9x, klawiatura i mysz USB
+pod CSMWrap przez USOSKEY/VBADOS). Historia:
 
 Działa dziś w Legacy BIOS (DOS Setup, Patcher9x `mem`) i na retro PC
 MS-7100 ([win98-native](win98-native-2026-09-12.md)). Dla X470 analiza
@@ -351,7 +356,10 @@ automatycznie, bez ręcznej konfiguracji. Kolejność:
    oznaczenie **„do zastąpienia własną implementacją”**:
    - ACPI społeczności dla XP x64 / Server 2003 (L1; od 1.1 dołączone do
      wydania decyzją użytkownika z 2026-09-30, nadal do zastąpienia);
-   - poprawka szybkiego CPU dla Win95 (L6b);
+   - dyskietka startowa Windows 95 (`Windows 95\Boot\BOOTDISK.IMG`, L6b): płyta 95
+     nie startuje; własne środowisko z CAB-ów płyty (`winboot.sys`, `sys.com`)
+     wymaga MSZIP i własnego sektora startowego DOS 7 (poprawka szybkiego CPU
+     nie jest już mostem: Patcher9x, MIT, ma własną);
    - USB 3 dla Visty (backport podpisany testowo, sekcja 3).
 
 Nośnik instalacyjny Windows (pliki Microsoft) zawsze dostarcza użytkownik;

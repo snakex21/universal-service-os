@@ -40,7 +40,7 @@ bad values are refused with the field and the line, never the value.
 | `edition` | edition Setup installs, for every system without its own | optional, up to 64 ASCII characters; see "Edition" below |
 | `edition.<system-id>` | edition for one system (`edition.windows-7=Professional`) | up to 8; wins over `edition` |
 | `disable_wer` | Vista+: Windows Error Reporting off (`Microsoft-Windows-ErrorReportingCore/DisableWER=1`, specialize) | default `no` |
-| `systems` | which systems offer the profile (see "Use for") | comma-separated catalog ids (`windows-vista`, `ubuntu`) and groups `windows`, `windows-nt5`, `windows-nt6`, `linux`; absent: see below |
+| `systems` | which systems offer the profile (see "Use for") | comma-separated catalog ids (`windows-vista`, `ubuntu`) and groups `windows`, `windows-9x`, `windows-nt5`, `windows-nt6`, `linux`; absent: see below |
 | tweaks | `skip_games`, `skip_msn`, `hide_outlook_express`, `classic_start`, `no_balloon_tips`, `disable_uac`, `no_sidebar`, `no_welcome_center`, `no_hibernation`, `show_extensions`, `show_hidden`, `no_autorun` (yes/no); `theme` (`default`, `classic`, `basic`); `display` (`auto`, `1024x768`, `1280x1024`, `1920x1080`) | default off / `default` / `auto`; see "Tweaks" |
 
 The password (and, with `remember_key=yes`, the keys) are plain text on
@@ -57,7 +57,9 @@ offered for its system (`answer_profiles.filter`); every file is still
 read, so a new name never overwrites another system's profile.
 
 - `systems=` set: the listed ids and groups (`windows` = every Windows with
-  a generated answer, `windows-nt5` = 2000/XP/2003/XP x64,
+  a generated answer, 95/98/Me included, `windows-9x` = 95, 98, 98 SE, Me
+  (MSBATCH.INF, [win9x-modern-2026-09-30.md](win9x-modern-2026-09-30.md)),
+  `windows-nt5` = 2000/XP/2003/XP x64,
   `windows-nt6` = Vista and newer, `linux` = Ubuntu, Debian, Fedora).
 - Absent (a profile saved before the field existed): every Windows, never
   Linux. One exception, a read-time default: when the profile's only
@@ -425,7 +427,10 @@ arch=x86
 key=yes
 ```
 
-Not wired: Legacy BIOS (no profile manager in the Core). Vista / Server
+Not wired: Legacy BIOS (no profile manager in the Core); Windows 95/98/Me
+take a profile through the UEFI BIOS mode page instead (rendered to
+`\EFI\USOS\answer\<98SE|98|ME|95>.INF`, read by the Core, removed at the next
+UEFI start). Vista / Server
 2008 take a profile or a DATA answer on UEFI with CSM (wimboot,
 `usos-unattend.xml` in the RAM disk, since 2026-09-28) and without CSM
 (CSMWrap, `\EFI\USOS\answer`): on both the installer merges it with its KMDF
