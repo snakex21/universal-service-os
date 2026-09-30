@@ -1,5 +1,10 @@
 # Windows 2000 on AMD AHCI (X470): driver options
 
+**Outcome (2026-09-30):** AHCINT **1.3.0.0** (released 2026-09-29, same
+GPL-3.0 licence, still matches 1022:7901/43C8/43EB) is bundled for the
+Windows 2000 UEFI profile; UniATA 0.47b stays the documented fallback. See
+[../windows-2000-modern-2026-09-30.md](../windows-2000-modern-2026-09-30.md).
+
 Research, 2026-09-27. Nothing was downloaded or installed. Local checks used
 only files already in the repo and the user's `W2KPLCMA4.811.iso` (kernel and
 HAL extracted to the session scratchpad).

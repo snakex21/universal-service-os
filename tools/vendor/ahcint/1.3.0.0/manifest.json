@@ -1,0 +1,31 @@
+{
+  "name": "AHCINT",
+  "version": "1.3.0.0",
+  "upstream": "https://github.com/ages2001/AHCINT",
+  "tag": "v1.3.0.0",
+  "commit": "7be9c9b81ef10979cf1e2c37d08a2e2e3e166066",
+  "licence": "GPL-3.0 (repository LICENSE = GPLv3 text, README: GPL-3.0, copyright 2026 ages2001; no per-file notices)",
+  "release_zip": {
+    "file": "AHCINT-v1.3.0.0.zip",
+    "url": "https://github.com/ages2001/AHCINT/releases/download/v1.3.0.0/AHCINT-v1.3.0.0.zip",
+    "sha256": "e0930ac2928e299548aa9a82749d42fc6c8cff10b4a590a7d312445ff1cf85ea",
+    "size": 140341,
+    "tracked": false
+  },
+  "files": {
+    "bin/2KXP/ahcint.inf": "c8dea5fd3839b8f9298a7925f6ba8c6451588638a42f24e10c4c8542915a6e21",
+    "bin/2KXP/i386/ahcint.sys": "94ef734c4ba942debe990958917880f1995c08266600dc2014392bdaa22fac25",
+    "bin/2KXP/txtsetup.oem": "bad4e8c7fc94b877acbf5638c0f4f256f2a88415a32884ed12b6227109a55434",
+    "LICENSE": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
+    "src/2KXP/ahcint.rc": "3407db078cdbebe3c6806206f13c9cd806efbeca66e9c354776378f73af13d2a",
+    "src/2KXP/makefile": "272431810da48231039ac4fcfa245628b6b6c3dc39054b908c26c97d313ccf97",
+    "src/2KXP/sources": "b7a975972be97486aaff3cb0e1c0407cbcb0f4c78b084e1ba9683a438099fe24",
+    "src/9X/ahcint9x.lnk": "f6e9f66dfe8bfad3d23274c49304597a480a34ea19f129354e188735896ca6c1",
+    "src/9X/build.bat": "ab8f19b5f282b3bc2a3d9dcc0c24e75e541a325f7caec528fd3893a4c8f875f5",
+    "src/9X/makefile": "0dd9d6acd03ad012ccbd40562bf52ee0f929a67bb46062f7f62d8b511f635666",
+    "src/ahcimain.c": "5271ffa7f9114fbe0e20992b0874830e0e934d30458631335c3c1e70080b4bd0",
+    "src/ahcint.h": "3562f638fecba75f79e91a93d2fad07e80fd0c92e24039f1f5821c98080e1d6f",
+    "src/ahcisatl.c": "8035f376669d92c9ffcf9b6f14e3451f84908d564a9facae1c556ecb1ca2d99a",
+    "src/NT/build.bat": "592a19badaeaca36fc9c02dd9c520d9aa12f431ba0d3e07933abddbf4c70a560"
+  }
+}

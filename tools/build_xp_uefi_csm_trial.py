@@ -123,7 +123,7 @@ def refresh_pae_flow(esp):
 # entry, scripts included, is the base's own, byte for byte: the UEFI-CSM
 # differences are profile branches in the scripts (USOS_PLAN_PROFILE).
 PACKAGE_ENTRIES=('usr/lib/usos/xp-pae.exe','usr/lib/usos/xp-pae-LICENSE.txt')
-PACKAGE_PREFIXES=('usr/lib/usos/xp-drivers/','usr/lib/usos/nt5-storage/','usr/lib/usos/nt52-usb/')
+PACKAGE_PREFIXES=('usr/lib/usos/xp-drivers/','usr/lib/usos/nt5-storage/','usr/lib/usos/nt52-usb/','usr/lib/usos/w2k-drivers/')
 
 # NT 5.2 (Server 2003 x86, XP x64) AHCI: GenAHCI 6.3.0.1 x86/x64 on the
 # system's own StorPort (tools/nt5_storage_stage.sh). Pinned archive.
@@ -192,10 +192,31 @@ def nt52_usb_files():
         'plus %s, built with WDK 7.1 (7600.16385.1).\n'
         'Licence: GPL-2.0-only (LICENSE). Corresponding source: the USOS sources zip\n'
         '(tools/vendor/xhci98/1.1.1.0-src and tools/vendor/xhci98/1.1.1.0-usos2).\n'
-        'USOS uses it only for Windows Server 2003 x86 and XP x64 (NT 5.2) Setup; staging\n'
+        'USOS uses it only for Windows 2000, Server 2003 x86 and XP x64 Setup; staging\n'
         'points the INF [SourceDisksNames] row 1 at the Setup source directory.\n'
-        'Log: C:\\WINDOWS\\xhci98.log (every controller start, start refusal and stop).\n'
+        'Log: %%SystemRoot%%\\xhci98.log (every controller start, start refusal and stop).\n'
         %(pins['version'],pins['upstream'],pins['tag'],pins['commit'],pins['source_archive']['sha256'],', '.join(sorted(pins['patches'])))).encode()
+    return files
+
+# Windows 2000 SP4 AHCI: AHCINT 1.3.0.0 (GPL-3.0, unmodified ScsiPort miniport,
+# polling I/O; tools/w2k_stage.sh adapts only the INF's source path when
+# staging). Every file pinned by its manifest.
+AHCINT_DIR=ROOT/'tools/vendor/ahcint/1.3.0.0'
+
+def w2k_driver_files():
+    pins=json.loads((AHCINT_DIR/'manifest.json').read_text())
+    files={}
+    for name,member in (('ahcint.sys','bin/2KXP/i386/ahcint.sys'),('ahcint.inf','bin/2KXP/ahcint.inf'),('LICENSE','LICENSE')):
+        files[name]=(AHCINT_DIR/member).read_bytes()
+        if hashlib.sha256(files[name]).hexdigest()!=pins['files'][member]:raise ValueError('AHCINT file hash mismatch: '+member)
+    if struct.unpack_from('<H',files['ahcint.sys'],struct.unpack_from('<I',files['ahcint.sys'],60)[0]+4)[0]!=0x14c:raise ValueError('AHCINT build is not i386')
+    files['SOURCE.txt']=('AHCINT %s (i386 ScsiPort miniport, unmodified), %s\n'
+        'tag %s = commit %s; release archive sha256 %s\n'
+        'Licence: GPL-3.0 (LICENSE). Corresponding source: tools/vendor/ahcint/1.3.0.0/src\n'
+        'in the USOS sources zip (identical to src/ of the release archive).\n'
+        'USOS uses it only for Windows 2000 SP4 Setup; staging points the INF\n'
+        '[SourceDisksNames] row 1 at the Setup source directory (\\i386\\ahcint).\n'
+        %(pins['version'],pins['upstream'],pins['tag'],pins['commit'],pins['release_zip']['sha256'])).encode()
     return files
 
 def is_package_entry(name):
@@ -222,6 +243,7 @@ def overlay(base, helper, driver_bundles, xp64_isos=(), xp64_extra=None):
     for name,data in (xp64_extra or {}).items():storage.setdefault(name,data)
     for name,data in storage.items():put(entries,Entry(prefix+'nt5-storage/'+name,stat.S_IFREG|0o644,data))
     for name,data in nt52_usb_files().items():put(entries,Entry(prefix+'nt52-usb/'+name,stat.S_IFREG|0o644,data))
+    for name,data in w2k_driver_files().items():put(entries,Entry(prefix+'w2k-drivers/'+name,stat.S_IFREG|0o644,data))
     changed=[n for n in before if not is_package_entry(n) and (entries[n].mode,entries[n].data)!=before[n]]
     if changed:raise ValueError('package would change base entries: '+', '.join(changed))
     return pad_initrd(gzip.compress(newc(entries),compresslevel=6,mtime=0))

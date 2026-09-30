@@ -63,11 +63,21 @@ if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ] || [ "${USOS_PLAN_PROFILE:
 sh "$SCRIPT_DIR/xp_driver_stage.sh" apply || fail 'XP driver integration failed'
 elif usos_nt5_uefi_generic_profile && [ "$NT5_SYSTEM" = windows-xp-x64 ]; then
 sh "$SCRIPT_DIR/nt5_storage_stage.sh" apply || fail 'NT 5.2 AHCI driver integration failed'
+elif [ "${USOS_PLAN_PROFILE:-}" = w2k-x86-sp4-uefi-csm ]; then
+# Windows 2000: AHCINT (ScsiPort, polling) and ACPI off (w2k_stage.sh).
+sh "$SCRIPT_DIR/w2k_stage.sh" apply || fail 'Windows 2000 AHCI/ACPI integration failed'
 fi
-# NT 5.2 (Server 2003 x86, XP x64): USB 2.0 input/storage on xHCI through
-# xhci98 (nt52_usb_stage.sh), after the storage step. XP x86 keeps its bundle.
-case "${USOS_PLAN_PROFILE:-}" in w2k3-x86-sp2-uefi-csm|xp-x64-sp2-uefi-csm)
-sh "$SCRIPT_DIR/nt52_usb_stage.sh" apply || fail 'NT 5.2 USB (xhci98) integration failed' ;;
+# NT 5.2 (Server 2003 x86, XP x64) and Windows 2000: USB 2.0 input/storage on
+# xHCI through xhci98 (nt52_usb_stage.sh), after the storage step. XP x86
+# keeps its bundle.
+# Windows 2000 before SP3/SP4 (the Server RTM media) has no usbport.sys,
+# which xhci98 imports: skipped, the installed system keeps its own USB.
+case "${USOS_PLAN_PROFILE:-}" in w2k3-x86-sp2-uefi-csm|xp-x64-sp2-uefi-csm|w2k-x86-sp4-uefi-csm)
+if [ "$NT5_SYSTEM" = windows-2000 ] && [ -z "$(find "$work/volume/\$WIN_NT\$.~LS/I386" -maxdepth 1 -type f \( -iname usbport.sys -o -iname usbport.sy_ \) | head -n 1)" ]; then
+printf '[NT52_USB] SKIP: this Windows 2000 source has no usbport.sys (before SP3); no xhci98\n'
+else
+sh "$SCRIPT_DIR/nt52_usb_stage.sh" apply || fail 'NT 5.2 USB (xhci98) integration failed'
+fi ;;
 esac
 XP_EXPECTED_MBR="$work/expected" sh "$SCRIPT_DIR/prepare_xp_windows_partition.sh"
 if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ]; then

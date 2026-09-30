@@ -34,10 +34,22 @@
 #     [FloppyFiles.1] for the .sys), so the local source stays consistent.
 # No Microsoft file is added or changed except the TXTSETUP.SIF and
 # DOSNET.INF copies on the target.
-#   sh nt52_usb_stage.sh apply     (XP_TARGET_ROOT, NT5_SOURCE_DIR)
+#
+# Windows 2000 SP4 (NT5_SYSTEM=windows-2000, x86 build; upstream supports
+# 2000 SP4 and tests it in VMs; every import resolves on the SP4 kernel,
+# HAL and usbport): the same files and forced stack plus usbhub20.sys
+# (2000's USB 2.0 root hub driver; xhci98's root hub is USB\ROOT_HUB20),
+# but NO text-mode load: 2000's text mode runs the old openhci/uhcd stack,
+# its boot folder has no usbport.sys, and text mode needs no keys. So no
+# [HardwareIdsDatabase], [InputDevicesSupport(.Load)] or [files.xhci98]
+# rows: GUI-mode PnP installs the controller from %windir%\inf\xhci98.inf
+# in its first stage ("Installing devices"), before the pages that take
+# input (docs/windows-2000-modern-2026-09-30.md).
+#   sh nt52_usb_stage.sh apply     (XP_TARGET_ROOT, NT5_SOURCE_DIR, NT5_SYSTEM)
 
 # The Microsoft USB/HID files whose text-mode rows are forced to copy.
 USOS_NT52_USB_STACK='usbport.sys usbd.sys usbhub.sys hidclass.sys hidparse.sys hidusb.sys kbdhid.sys'
+USOS_W2K_USB_STACK="$USOS_NT52_USB_STACK usbhub20.sys"
 
 usos_nt52_usb_apply() (
     set -eu
@@ -64,9 +76,14 @@ usos_nt52_usb_apply() (
     cp "$pkg/xhci98.sys" "$ls/XHCI98/xhci98.sys"
     cmp -s "$pkg/xhci98.sys" "$ls/XHCI98/xhci98.sys"
     usos_nt52_usb_inf "$subdir" < "$pkg/xhci98.inf" > "$ls/xhci98.inf" || { echo '[NT52_USB] STOP: cannot adapt xhci98.inf'; exit 1; }
+    if [ "${NT5_SYSTEM:-}" = windows-2000 ]; then
+        stack=$USOS_W2K_USB_STACK textmode=no
+    else
+        stack=$USOS_NT52_USB_STACK textmode=yes
+    fi
     for sif in "$bt/TXTSETUP.SIF" "$ls/TXTSETUP.SIF" "$XP_TARGET_ROOT/TXTSETUP.SIF"; do
         [ -f "$sif" ] || continue
-        usos_nt52_usb_sif < "$sif" > "$sif.usos" || { rm -f "$sif.usos"; echo "[NT52_USB] STOP: cannot patch $sif"; exit 1; }
+        usos_nt52_usb_sif "$stack" "$textmode" < "$sif" > "$sif.usos" || { rm -f "$sif.usos"; echo "[NT52_USB] STOP: cannot patch $sif"; exit 1; }
         mv "$sif.usos" "$sif"
     done
     if [ -f "$ls/DOSNET.INF" ]; then
@@ -74,7 +91,11 @@ usos_nt52_usb_apply() (
         mv "$ls/DOSNET.INF.usos" "$ls/DOSNET.INF"
     fi
     sync
-    printf '[NT52_USB] APPLIED PASS xhci98 1.1.1.0-usos2 (%s) boot+local source, TXTSETUP.SIF PCI\\CC_0C0330, USB/HID stack forced\n' "$arch"
+    if [ "$textmode" = yes ]; then
+        printf '[NT52_USB] APPLIED PASS xhci98 1.1.1.0-usos2 (%s) boot+local source, TXTSETUP.SIF PCI\\CC_0C0330, USB/HID stack forced\n' "$arch"
+    else
+        printf '[NT52_USB] APPLIED PASS xhci98 1.1.1.0-usos2 (%s) local source, GUI-mode PnP only (no text-mode load), USB/HID stack forced incl. usbhub20\n' "$arch"
+    fi
 )
 
 # Every output line ends in CRLF, as the NT5 setup files do (BusyBox awk
@@ -84,10 +105,12 @@ usos_nt52_usb_apply() (
 # section) and the USB/HID stack rows forced to copy (every
 # [SourceDisksFiles*] block). Exit 3: already integrated, a section is
 # missing, or a stack row is missing or not in the expected form.
+# $1: the stack (default USOS_NT52_USB_STACK); $2 = no: only the
+# [SourceDisksFiles] rows and the stack (Windows 2000, no text-mode load).
 usos_nt52_usb_sif() {
-    awk -v stack="$USOS_NT52_USB_STACK" '
+    awk -v stack="${1:-$USOS_NT52_USB_STACK}" -v textmode="${2:-yes}" '
         function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
-        BEGIN { bs = sprintf("%c", 92); n = split(stack, want, " "); for (i = 1; i <= n; i++) need[want[i]] = 1 }
+        BEGIN { bs = sprintf("%c", 92); if (stack == "none") stack = ""; n = split(stack, want, " "); for (i = 1; i <= n; i++) need[want[i]] = 1 }
         { line = $0; sub(/\r$/, "", line); low = tolower(line) }
         low ~ /^[ \t]*\[/ { section = trim(low) }
         low ~ /^[ \t]*xhci98/ || index(low, "pci" bs "cc_0c0330") || section == "[files.xhci98]" { dup = 1 }
@@ -111,11 +134,13 @@ usos_nt52_usb_sif() {
             print "xhci98.sys = 1,,,,,,4_,4,1,,,1,4\r"
             print "xhci98.inf = 1,,,,,,,20,0,0\r"; f = 1
         }
+        textmode == "no" { next }
         low == "[hardwareidsdatabase]" && !h { print "PCI" bs "CC_0C0330 = \"xhci98\"\r"; h = 1 }
         low == "[inputdevicessupport.load]" && !l { print "xhci98 = xhci98.sys\r"; l = 1 }
         low == "[inputdevicessupport]" && !s { print "xhci98 = \"USB 2.0 xHCI Host Controller (xhci98)\",files.xhci98,xhci98\r"; s = 1 }
         END {
             for (k in need) if (!(k in forced)) bad = 1
+            if (textmode == "no") { if (dup || bad || !f) exit 3; exit 0 }
             if (dup || bad || !(f && h && l && s)) exit 3
             print "\r"
             print "[files.xhci98]\r"

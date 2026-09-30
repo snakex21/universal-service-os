@@ -459,8 +459,10 @@ usos_legacy_xp_staging() {
     elif [ "$NT5_SYSTEM" = windows-2000 ]; then
     # The XP driver bundle (GenAHCI on StorPort, KMDF, USB3, community ACPI)
     # needs NT 5.1 exports that the Windows 2000 kernel/HAL lack; 2000 keeps
-    # its inbox drivers (docs/windows-2000-uefi-2026-09-27.md).
-    printf '[W2K_DRIVERS] none: the XP bundle is NT 5.1 only; inbox IDE/ACPI drivers\n'
+    # its own set instead (w2k_stage.sh, after the source copy): AHCINT and
+    # ACPI off (MPS HAL), plus xhci98 below (docs/windows-2000-modern-2026-09-30.md).
+    [ -f /usr/lib/usos/w2k-drivers/ahcint.sys ] && [ -f /usr/lib/usos/w2k-drivers/ahcint.inf ] || stop 'Windows 2000 AHCI driver (AHCINT) is missing from the package; no target write occurred'
+    printf '[W2K_DRIVERS] AHCINT 1.3.0.0 (ScsiPort), ACPI %s, xhci98 x86; the XP bundle is NT 5.1 only\n' "${USOS_W2K_ACPI:-off}"
     else
     # XP x64 (NT 5.2 amd64): GenAHCI on the system's own StorPort
     # (nt5_storage_stage.sh, applied to the target after the source copy).
@@ -468,8 +470,8 @@ usos_legacy_xp_staging() {
     [ -f "/usr/lib/usos/nt5-storage/$nt5_storage_arch/genahci.sys" ] || stop 'NT 5.2 AHCI driver (GenAHCI) is missing from the package; no target write occurred'
     printf '[NT5_STORAGE] PREFLIGHT PASS genahci %s on the system StorPort\n' "$nt5_storage_arch"
     fi
-    if [ "$NT5_SYSTEM" = windows-server-2003 ] || [ "$NT5_SYSTEM" = windows-xp-x64 ]; then
-    # NT 5.2: USB on xHCI through xhci98 (nt52_usb_stage.sh, after the source copy).
+    if [ "$NT5_SYSTEM" = windows-server-2003 ] || [ "$NT5_SYSTEM" = windows-xp-x64 ] || [ "$NT5_SYSTEM" = windows-2000 ]; then
+    # NT 5.2 and 2000: USB on xHCI through xhci98 (nt52_usb_stage.sh, after the source copy).
     case "$NT5_SOURCE_DIR" in AMD64) nt52_usb_arch=amd64 ;; *) nt52_usb_arch=x86 ;; esac
     [ -f "/usr/lib/usos/nt52-usb/$nt52_usb_arch/xhci98.sys" ] && [ -f "/usr/lib/usos/nt52-usb/$nt52_usb_arch/xhci98.inf" ] || stop 'NT 5.2 USB driver (xhci98) is missing from the package; no target write occurred'
     printf '[NT52_USB] PREFLIGHT PASS xhci98 %s\n' "$nt52_usb_arch"
