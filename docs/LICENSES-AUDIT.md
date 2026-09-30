@@ -434,3 +434,33 @@ golden tests):
 Release blockers in the audit's view: G7 (for the XP package), G14 (for
 the stick payload and the XP package), G15 and G16 need a maintainer
 decision before 1.0 is published; the rest are documentation completions.
+
+## 8. Legacy compatibility pack (Windows 95/98/Me/NT 4.0), 2026-09-30
+
+Branch `feature/legacy-compat-pack`, design and full per-package table in
+[design/legacy-compat-pack.md](design/legacy-compat-pack.md) §3; the
+manifest `src/addons/legacy-pack.ini` records `source`, `redist` and
+`license` for every package.
+
+- **Shipped by USOS:** only its own files: the runner `USOSADD.EXE`
+  (GPL-3.0-or-later, built with OpenWatcom 2.0 without its C library, like
+  `USOSKEY.DRV`), the manifest, the host tools. No third-party binary.
+- **Microsoft runtimes with redistribution terms** (DirectX 8.0/9.0c, VB6
+  and VC6 runtimes, Windows Installer 2.0, MDAC 2.8 SP1, MSLU, .NET 1.1/2.0):
+  their terms allow redistribution *with an application that uses them*;
+  a stand-alone installer pack does not clearly qualify, so they stay
+  **user-supplied** (matched by SHA-256 in `DATA\Addons`). For these the
+  user's file (or a pinned download) is the permanent source, not a bridge.
+- **Other Microsoft packages** (IE, DCOM, DUN, WMP, RDP, DSClient, NT4 SP6a
+  and SRP, hotfixes) and community repacks of Microsoft files (NUSB, Movie
+  Maker 98): no redistribution grant; **user-supplied only**.
+- **Third-party freeware without a licence text** (Adaptec ASPI, HP printing
+  wizard, WinMeDOS, a WMP skin, the Dell/Inside Out NT4 USB driver):
+  **user-supplied only**. WinMeDOS and MSCONFIG-on-95 are marked as bridges
+  "do zastąpienia własną implementacją".
+- **KernelEx 4.0 Final 2** (GPL-2.0): may be bundled once the matching
+  source is vendored next to it (then a `third-party.json` entry); user file
+  until then.
+- The maintainer decision of 2026-09-28 (§5, Microsoft files shipped at the
+  maintainer's own risk) is **not** applied to this pack; open question
+  for the maintainer.
