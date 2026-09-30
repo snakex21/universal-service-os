@@ -51,16 +51,30 @@ case "$NT5_SYSTEM" in
         printf 'markers=WIN51,WIN51AP\nservice_pack_markers=%s\n' "${sp:-none}"
         exit 0 ;;
 esac
-[ -f "$SOURCE_ROOT/CDROM_NT.5" ] && [ -f "$SOURCE_ROOT/CDROM_IP.5" ] || fail 'Windows 2000 Professional CD markers are missing'
+# Windows 2000: Professional (CDROM_IP.5, ProductType 0) with SP4 slipstreamed,
+# or Server / Advanced Server (CDROM_IS.5 / CDROM_IA.5, ProductType 1) at any
+# service pack level (the user's Server 2000 PL Standard is RTM 5.00.2195.1;
+# RTM has no usbport.sys, so the xhci98 step skips it: nt52_usb_stage.sh).
+[ -f "$SOURCE_ROOT/CDROM_NT.5" ] || fail 'Windows 2000 CD marker CDROM_NT.5 is missing'
 [ ! -e "$SOURCE_ROOT/WIN51" ] || fail 'XP source selected as Windows 2000'
-[ -f "$SOURCE_ROOT/CDROMSP4.TST" ] || [ -f "$SOURCE_ROOT/cdromsp4.tst" ] || fail 'Windows 2000 SP4 source is required'
-for required in \
-    I386/DOSNET.INF I386/SETUPLDR.BIN I386/NTLDR I386/NTDETECT.COM \
-    I386/TXTSETUP.SIF I386/USETUP.EXE I386/SETUPDD.SY_ \
-    I386/NTOSKRNL.EX_ I386/NTKRNLMP.EX_ I386/BOOTVID.DL_ I386/SP4.CAB; do
+edition=''
+for marker in CDROM_IP.5 CDROM_IS.5 CDROM_IA.5; do
+    [ ! -f "$SOURCE_ROOT/$marker" ] || { [ -z "$edition" ] || fail 'more than one Windows 2000 edition marker'; edition=$marker; }
+done
+case "$edition" in
+    CDROM_IP.5) want_product=0; name='Windows 2000 Professional' ;;
+    CDROM_IS.5|CDROM_IA.5) want_product=1; name='Windows 2000 Server' ;;
+    *) fail 'Windows 2000 edition marker (CDROM_IP.5, CDROM_IS.5 or CDROM_IA.5) is missing' ;;
+esac
+sp=''
+[ ! -f "$SOURCE_ROOT/CDROMSP4.TST" ] && [ ! -f "$SOURCE_ROOT/cdromsp4.tst" ] || sp=CDROMSP4.TST
+[ -n "$sp" ] || [ "$want_product" = 1 ] || fail 'Windows 2000 SP4 source is required'
+required_files='I386/DOSNET.INF I386/SETUPLDR.BIN I386/NTLDR I386/NTDETECT.COM I386/TXTSETUP.SIF I386/USETUP.EXE I386/SETUPDD.SY_ I386/NTOSKRNL.EX_ I386/NTKRNLMP.EX_ I386/BOOTVID.DL_'
+[ -z "$sp" ] || required_files="$required_files I386/SP4.CAB"
+for required in $required_files; do
     [ -f "$SOURCE_ROOT/$required" ] || fail "Windows 2000 source missing required file: $required"
 done
-awk '
+awk -v want="$want_product" '
 function trim(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); return s }
 {
     line=$0; sub(/;.*/, "", line); line=trim(line)
@@ -72,6 +86,9 @@ function trim(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); return s }
     if(key=="minorversion") { minor=value; minors++ }
     if(key=="producttype") { product=value; products++ }
 }
-END { exit !(majors==1 && minors==1 && products==1 && major==5 && minor==0 && product==0) }
-' "$SOURCE_ROOT/I386/TXTSETUP.SIF" || fail 'Expected Windows 2000 Professional SetupData version 5.0'
-printf 'markers=CDROM_NT.5,CDROM_IP.5\nservice_pack_markers=CDROMSP4.TST\n'
+END { exit !(majors==1 && minors==1 && products==1 && major==5 && minor==0 && product==want) }
+' "$SOURCE_ROOT/I386/TXTSETUP.SIF" || fail "Expected $name SetupData version 5.0"
+printf 'markers=CDROM_NT.5,%s
+service_pack_markers=%s
+edition=%s
+' "$edition" "${sp:-none}" "$name"
