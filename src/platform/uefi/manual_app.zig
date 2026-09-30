@@ -48,6 +48,8 @@ pub fn run() void {
     manual_secure_boot.init(root);
     @import("windows_native_iso.zig").setEspRoot(root);
     if (e2e_flow.resumePersistent(root, showResumeStatus)) return;
+    // Windows 9x answers staged for an earlier BIOS mode start may hold a key.
+    @import("answer_profiles.zig").clearWin9x(root);
     boot_timing.mark("persistent state checked");
     splash.status(manual_view.t(.splash_images));
 

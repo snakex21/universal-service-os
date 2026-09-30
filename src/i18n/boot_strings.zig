@@ -344,6 +344,7 @@ pub const Key = enum(u16) {
     bios_mode_note_cpu,
     bios_mode_note_restart,
     bios_mode_note_video,
+    bios_mode_profile_detail,
     bios_mode_question,
     bios_mode_secure_boot_line1,
     bios_mode_secure_boot_line2,
@@ -1019,6 +1020,7 @@ pub const hashes = [_]u32{
     0xc6026856, // bios_mode.note.cpu
     0x33394f47, // bios_mode.note.restart
     0x643e4f67, // bios_mode.note.video
+    0x9761d865, // bios_mode.profile_detail
     0xfd68991e, // bios_mode.question
     0xc1a2d4cf, // bios_mode.secure_boot.line1
     0xc2a2d662, // bios_mode.secure_boot.line2
@@ -2023,6 +2025,7 @@ pub const bios = [_]bool{
     false,
     false,
     false,
+    false,
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
@@ -2093,13 +2096,13 @@ pub const english = [_][]const u8{
     "Patcher9x / RAM fix",
     "The system and partitions stay. Changed files are backed up first.",
     "Repairs the installation in C:\\WINDOWS, also after the first restart.",
-    "Windows 98 RAM repair",
+    "Windows 95/98/Me RAM repair",
     "The remaining space stays unallocated.",
     "Existing partitions on this disk will be deleted.",
     "Size of the new partition",
-    "New Windows 98 SE installation",
-    "Repair RAM support in an installed Windows 98",
-    "Install Windows 98 or repair its support for more RAM",
+    "New Windows 95/98/Me installation",
+    "Repair RAM support in an installed Windows 95/98/Me",
+    "Install Windows 95/98/Me or repair its support for more RAM",
     "Blocked",
     "Switch it on to try again.",
     "built-in",
@@ -2371,6 +2374,7 @@ pub const english = [_][]const u8{
     "CSMWrap reserves one CPU thread for itself; DOS and Windows 3.x do not need it.",
     "Opens the USOS BIOS menu (FreeDOS, MS-DOS, Windows 3.x). A restart returns to UEFI.",
     "Needs a graphics card with a legacy video BIOS; without one the DOS screens stay black.",
+    "Also gives this answer profile to Windows 95/98/Me Setup",
     "Switch this PC to BIOS mode until the next restart?",
     "CSMWrap is not signed, so Secure Boot blocks it.",
     "Turn Secure Boot off in the firmware settings to use the BIOS mode.",

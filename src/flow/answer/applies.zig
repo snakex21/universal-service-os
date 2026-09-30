@@ -39,7 +39,10 @@ pub fn appliesTo(p: *const Profile, system_id: []const u8) bool {
 fn tokenMatches(token: []const u8, system_id: []const u8) bool {
     if (std.ascii.eqlIgnoreCase(token, system_id)) return true;
     const family = target.familyFor(system_id);
-    if (std.mem.eql(u8, token, "windows")) return family != null;
+    // Windows 95/98/Me render MSBATCH.INF (msbatch.zig) without an NT family.
+    const win9x = @import("msbatch.zig").releaseFor(system_id) != null;
+    if (std.mem.eql(u8, token, "windows")) return family != null or win9x;
+    if (std.mem.eql(u8, token, "windows-9x")) return win9x;
     if (std.mem.eql(u8, token, "windows-nt5")) return if (family) |f| f.nt5() else false;
     if (std.mem.eql(u8, token, "windows-nt6")) return if (family) |f| !f.nt5() else false;
     if (std.mem.eql(u8, token, "linux")) return isLinux(system_id);
@@ -102,6 +105,12 @@ test "systems: groups and ids" {
     try std.testing.expect(!appliesTo(&p, "windows-vista") and !appliesTo(&p, "ubuntu"));
     const nt6 = try profileFrom("name=A\nuser=Bob\nsystems=windows-nt6,linux\nedition.windows-vista=Ultimate\n");
     try std.testing.expect(appliesTo(&nt6, "windows-11") and appliesTo(&nt6, "debian") and !appliesTo(&nt6, "windows-2000"));
+    try std.testing.expect(!appliesTo(&nt6, "windows-98-se"));
+    const nine = try profileFrom("name=A\nuser=Bob\nsystems=windows-9x\n");
+    try std.testing.expect(appliesTo(&nine, "windows-98-se") and appliesTo(&nine, "windows-95") and appliesTo(&nine, "windows-me"));
+    try std.testing.expect(!appliesTo(&nine, "windows-xp") and !appliesTo(&nine, "windows-3-1"));
+    const every = try profileFrom("name=A\nuser=Bob\n");
+    try std.testing.expect(appliesTo(&every, "windows-98") and !appliesTo(&every, "windows-3-11"));
 }
 
 test "missing answers: NT5 key, Server password" {

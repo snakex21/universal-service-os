@@ -646,7 +646,7 @@ pub fn parse(text: []const u8, out: *Profile) ParseResult {
 }
 
 /// Group tokens of `systems=` (applies.zig).
-pub const system_groups = [_][]const u8{ "windows", "windows-nt5", "windows-nt6", "linux" };
+pub const system_groups = [_][]const u8{ "windows", "windows-9x", "windows-nt5", "windows-nt6", "linux" };
 /// Linux installers that take a profile (answer_screen.linuxAnswerSystem).
 pub const linux_systems = [_][]const u8{ "ubuntu", "debian", "fedora" };
 

@@ -27,11 +27,14 @@ pub const plan_path_posix = "EFI/USOS/answer/usos-plan.ini";
 pub const Format = enum {
     nt5_settings,
     autounattend_xml,
+    /// Windows 95/98/Me: read by the BIOS Core's DOS Setup path.
+    msbatch_inf,
 
     pub fn fileName(self: Format) []const u8 {
         return switch (self) {
             .nt5_settings => "nt5-settings.ini",
             .autounattend_xml => "autounattend.xml",
+            .msbatch_inf => "MSBATCH.INF",
         };
     }
 };

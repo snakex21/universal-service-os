@@ -272,6 +272,33 @@ pub fn clearRendered(root: *uefi.protocol.File) void {
         deleteFile(root, plan_file.filePathEsp(format, &path) catch continue);
     }
     deleteFile(root, plan_file.plan_path);
+    clearWin9x(root);
+}
+
+/// The MSBATCH.INF files of stageWin9x: the BIOS mode read them before the
+/// restart that brought the menu back, so every UEFI start removes them.
+pub fn clearWin9x(root: *uefi.protocol.File) void {
+    var path: [96]u8 = undefined;
+    for (answer.msbatch.staged) |entry| {
+        deleteFile(root, std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }) catch continue);
+    }
+}
+
+/// Windows 95/98/Me through the BIOS mode (docs/win9x-modern-2026-09-30.md):
+/// MSBATCH.INF for every 9x system, \EFI\USOS\answer\<98SE|98|ME|95>.INF,
+/// which the BIOS Core's DOS Setup path copies into its RAM disk. The next
+/// UEFI start removes them (clearRendered).
+pub fn stageWin9x(root: *uefi.protocol.File, profile: *const Profile) !void {
+    clearRendered(root);
+    try ensureDirectory(root, "\\EFI\\USOS");
+    try ensureDirectory(root, plan_file.directory);
+    var path: [96]u8 = undefined;
+    for (answer.msbatch.staged) |entry| {
+        const result = (try answer.render(profile, entry.system_id, .x86, null, null, &rendered)) orelse return error.NoGeneratedAnswer;
+        try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }), result.bytes);
+    }
+    var line: [96]u8 = undefined;
+    serial.writeAscii(std.fmt.bufPrint(&line, "[PROFILE] staged {s} for Windows 95/98/Me\n", .{profile.name.slice()}) catch "[PROFILE] staged 9x\n");
 }
 
 /// Renders `profile` for the system and writes usos-plan.ini with the
