@@ -29,7 +29,7 @@ VRC=1
 
 [NameAndOrg]
 Name="USOS"
-Org=""
+Org="USOS"
 Display=0
 
 [Network]
@@ -45,6 +45,13 @@ Services=
 
 [Install]
 AddReg=USOS.RunOnce
+UpdateInis=USOS.Memory
+
+; The memory limits at Setup time, for every 9x (Me ignores the AUTOEXEC.BAT
+; that runs U9FIX on 95/98; U9FIX keeps them there after later changes).
+[USOS.Memory]
+system.ini,386Enh,,"MaxPhysPage=40000"
+system.ini,vcache,,"MaxFileCache=262144"
 
 [USOS.RunOnce]
 HKLM,"Software\Microsoft\Windows\CurrentVersion\RunOnce",USOSWelcome,,"%25%\rundll.exe setupx.dll,InstallHinfSection USOS.NoWelcome 4 %10%\msbatch.inf"

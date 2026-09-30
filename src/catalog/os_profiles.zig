@@ -101,10 +101,6 @@ pub const traits_table = [_]SystemTraits{
     .{ .system_id = "windows-2000", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini" },
     .{ .system_id = "windows-xp-x64", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini", .icon_as = "windows-xp" },
     .{ .system_id = "windows-server-2003", .answer = .winnt_sif, .secure_boot_off = true, .nt5_staging = true, .settings_file = "usos-xp.ini", .icon_as = "windows-xp" },
-    .{ .system_id = "windows-98-se", .answer = .msbatch_inf },
-    .{ .system_id = "windows-98", .answer = .msbatch_inf },
-    .{ .system_id = "windows-me", .answer = .msbatch_inf },
-    .{ .system_id = "windows-95", .answer = .msbatch_inf },
     .{ .system_id = "windows-7", .secure_boot_off = true, .native_uefi = .win7, .int10_dispatcher = true },
     .{ .system_id = "windows-vista", .secure_boot_off = true, .native_uefi = .vista, .int10_dispatcher = true },
     .{ .system_id = "windows-10", .native_uefi = .modern },
@@ -129,7 +125,10 @@ fn ownTraits(system_id: []const u8) SystemTraits {
     for (traits_table) |entry| {
         if (std.mem.eql(u8, entry.system_id, system_id)) return entry;
     }
-    return .{ .system_id = system_id };
+    // Windows 95/98/98 SE/Me (no table rows: the Legacy Core has no room).
+    const win9x = std.mem.eql(u8, system_id, "windows-98-se") or std.mem.eql(u8, system_id, "windows-98") or
+        std.mem.eql(u8, system_id, "windows-me") or std.mem.eql(u8, system_id, "windows-95");
+    return .{ .system_id = system_id, .answer = if (win9x) .msbatch_inf else .autounattend_xml };
 }
 
 pub fn traits(system_id: []const u8) SystemTraits {

@@ -8,10 +8,11 @@
 //! The UEFI menu writes the result to \EFI\USOS\answer\MSBATCH.INF before
 //! it starts the BIOS mode; the Core copies it into the RAM disk, and
 //! clearRendered() removes it at the next UEFI start (it may hold a key).
-//! Windows 95 keys have another format (ProductID, not the 5x5 profile
-//! key), so 95 Setup asks for its key itself.
+//! Windows 95 keys have another format (ddddd-OEM-ddddddd-ddddd or
+//! ddd-ddddddd) and go to ProductID.
 const std = @import("std");
-const Profile = @import("profile.zig").Profile;
+const profile_mod = @import("profile.zig");
+const Profile = profile_mod.Profile;
 const tables = @import("tables.zig");
 
 pub const file_name = "MSBATCH.INF";
@@ -78,15 +79,24 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
     try w.writeAll("Express=1\r\nInstallDir=\"C:\\WINDOWS\"\r\nInstallType=1\r\nEBD=0\r\nShowEula=0\r\nChangeDir=0\r\n");
     try w.writeAll("OptionalComponents=1\r\nNetwork=1\r\nSystem=0\r\nCCP=0\r\nCleanBoot=0\r\nDisplay=0\r\n");
     try w.writeAll("DevicePath=1\r\nNoDirWarn=1\r\nNoPrompt2Boot=1\r\nUninstall=0\r\nVRC=1\r\n");
-    if (release != .windows_95 and key.len > 0) {
-        try w.writeAll("ProductKey=\"");
+    // 98/Me: ProductKey (5x5); 95: ProductID (OEM ddddd-OEM-ddddddd-ddddd or
+    // retail ddd-ddddddd). A key of the other kind is left out (Setup asks).
+    const shape = profile_mod.keyShape(key);
+    const key_field: ?[]const u8 = if (shape) |s| switch (s) {
+        .five_by_five => if (release != .windows_95) "ProductKey" else null,
+        .win95_oem, .win95_retail => if (release == .windows_95) "ProductID" else null,
+    } else null;
+    if (key_field) |field| {
+        try w.print("{s}=\"", .{field});
         for (key) |c| try w.writeByte(std.ascii.toUpper(c));
         try w.writeAll("\"\r\n");
     }
     if (p.timeZone()) |zone| {
         if (timeZoneName(zone)) |name| try w.print("TimeZone=\"{s}\"\r\n", .{name});
     }
-    try w.print("\r\n[NameAndOrg]\r\nName=\"{s}\"\r\nOrg=\"{s}\"\r\nDisplay=0\r\n", .{ p.user.slice(), p.org.slice() });
+    // An empty field makes Setup show the user page (it needs a key press).
+    const org = if (p.org.slice().len > 0) p.org.slice() else "USOS";
+    try w.print("\r\n[NameAndOrg]\r\nName=\"{s}\"\r\nOrg=\"{s}\"\r\nDisplay=0\r\n", .{ p.user.slice(), org });
     const computer = if (p.computer.slice().len > 0) p.computer.slice() else "USOS-9X";
     try w.print("\r\n[Network]\r\nComputerName=\"{s}\"\r\nWorkgroup=\"WORKGROUP\"\r\nDescription=\"{s}\"\r\nDisplay=0\r\n", .{ computer, p.user.slice() });
     try w.writeAll("Clients=\r\nProtocols=\r\nServices=\r\n");
@@ -94,6 +104,11 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
         \\
         \\[Install]
         \\AddReg=USOS.RunOnce
+        \\UpdateInis=USOS.Memory
+        \\
+        \\[USOS.Memory]
+        \\system.ini,386Enh,,"MaxPhysPage=40000"
+        \\system.ini,vcache,,"MaxFileCache=262144"
         \\
         \\[USOS.RunOnce]
         \\HKLM,"Software\Microsoft\Windows\CurrentVersion\RunOnce",USOSWelcome,,"%25%\rundll.exe setupx.dll,InstallHinfSection USOS.NoWelcome 4 %10%\msbatch.inf"
@@ -165,9 +180,18 @@ test "MSBATCH.INF carries the profile, CRLF, the key only for 98 and Me" {
         if (c == '\n') try std.testing.expectEqual(@as(u8, '\r'), text[i - 1]);
     }
     const ninety_five = try render(&p, .windows_95, key, &buffer);
-    try std.testing.expect(std.mem.indexOf(u8, ninety_five, "ProductKey") == null);
+    try std.testing.expect(std.mem.indexOf(u8, ninety_five, "ProductKey") == null and std.mem.indexOf(u8, ninety_five, "ProductID") == null);
+    const oem = try render(&p, .windows_95, "12345-oem-0012345-12345", &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, oem, "\r\nProductID=\"12345-OEM-0012345-12345\"\r\n") != null);
+    const retail = try render(&p, .windows_95, "123-4567890", &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, retail, "\r\nProductID=\"123-4567890\"\r\n") != null);
+    const wrong = try render(&p, .windows_98, "123-4567890", &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, wrong, "Product") == null);
     const no_key = try render(&p, .windows_me, "", &buffer);
     try std.testing.expect(std.mem.indexOf(u8, no_key, "ProductKey") == null);
+    p.org = .{};
+    const no_org = try render(&p, .windows_me, "", &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, no_org, "\r\nOrg=\"USOS\"\r\n") != null);
     var small: [64]u8 = undefined;
     try std.testing.expectError(error.WriteFailed, render(&p, .windows_98, key, &small));
 }

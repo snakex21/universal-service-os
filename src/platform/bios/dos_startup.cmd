@@ -69,7 +69,13 @@ IF ERRORLEVEL 1 GOTO FAILED
 C:
 CD \%U9SRC%
 REM /IS no ScanDisk, /IE no startup disk, /NM no RAM/CPU check (MEMDISK).
+REM Windows 95 Setup knows only /IS of these (and ignored the batch file
+REM with the 98 switches in QEMU): MSBATCH.INF first, then /IS.
+IF "%U9SYS%"=="95" GOTO SETUP95
 C:\%U9SRC%\SETUP.EXE C:\%U9SRC%\MSBATCH.INF /IS /IE /NM
+GOTO STOP
+:SETUP95
+C:\%U9SRC%\SETUP.EXE C:\%U9SRC%\MSBATCH.INF /IS
 GOTO STOP
 :FAILED
 ECHO Przygotowanie dysku nie powiodlo sie. Instalator nie zostanie uruchomiony.

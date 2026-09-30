@@ -51,12 +51,14 @@ pub fn render(p: *const Profile, system_id: []const u8, arch: Arch, key: ?[]cons
     const use_key = key orelse p.keyFor(system_id);
     if (msbatch.releaseFor(system_id)) |release| return .{ .format = .msbatch_inf, .bytes = try msbatch.render(p, release, use_key, buffer) };
     const family = target.familyFor(system_id) orelse return null;
-    if (family.nt5()) return .{ .format = .nt5_settings, .bytes = try nt5.render(p, family, use_key, buffer) };
+    // NT keys are 5x5 only (a Windows 95 key in the profile's `key=` is not theirs).
+    const nt_key = if (profile.keyShape(use_key) == .five_by_five) use_key else "";
+    if (family.nt5()) return .{ .format = .nt5_settings, .bytes = try nt5.render(p, family, nt_key, buffer) };
     const image_index: ?u16 = switch (matchEdition(p, system_id, images)) {
         .found => |image| image.index,
         else => null,
     };
-    const xml = try autounattend.render(.{ .profile = p, .family = family, .arch = arch, .key = use_key, .image_index = image_index }, buffer);
+    const xml = try autounattend.render(.{ .profile = p, .family = family, .arch = arch, .key = nt_key, .image_index = image_index }, buffer);
     try xml_check.wellFormed(xml);
     try schema.check(xml, family, null);
     return .{ .format = .autounattend_xml, .bytes = xml };

@@ -445,16 +445,43 @@ pub fn checkEdition(value: []const u8) ?Problem {
     return null;
 }
 
-/// XXXXX-XXXXX-XXXXX-XXXXX-XXXXX (letters and digits, any case). Empty = none.
+/// XXXXX-XXXXX-XXXXX-XXXXX-XXXXX (letters and digits, any case), or a
+/// Windows 95 key: OEM ddddd-OEM-ddddddd-ddddd or retail ddd-ddddddd
+/// (keyShape). Empty = none.
 pub fn checkKey(value: []const u8) ?Problem {
     if (value.len == 0) return null;
-    if (value.len != 29) return .bad_key_format;
-    for (value, 0..) |c, i| {
-        if (i % 6 == 5) {
-            if (c != '-') return .bad_key_format;
-        } else if (!std.ascii.isAlphanumeric(c)) return .bad_key_format;
-    }
+    return if (keyShape(value) == null) .bad_key_format else null;
+}
+
+/// The kinds of product keys a profile holds.
+pub const KeyShape = enum {
+    /// XXXXX-XXXXX-XXXXX-XXXXX-XXXXX: Windows 98 and later.
+    five_by_five,
+    /// ddddd-OEM-ddddddd-ddddd: Windows 95 OEM (MSBATCH.INF ProductID).
+    win95_oem,
+    /// ddd-ddddddd: Windows 95 retail (MSBATCH.INF ProductID).
+    win95_retail,
+};
+
+pub fn keyShape(value: []const u8) ?KeyShape {
+    if (matchesPattern(value, "AAAAA-AAAAA-AAAAA-AAAAA-AAAAA")) return .five_by_five;
+    if (matchesPattern(value, "DDDDD-OEM-DDDDDDD-DDDDD")) return .win95_oem;
+    if (matchesPattern(value, "DDD-DDDDDDD")) return .win95_retail;
     return null;
+}
+
+/// A: letter or digit, D: digit, anything else literally (case-insensitive).
+fn matchesPattern(value: []const u8, pattern: []const u8) bool {
+    if (value.len != pattern.len) return false;
+    for (value, pattern) |c, want| {
+        const ok = switch (want) {
+            'A' => std.ascii.isAlphanumeric(c),
+            'D' => std.ascii.isDigit(c),
+            else => std.ascii.toUpper(c) == want,
+        };
+        if (!ok) return false;
+    }
+    return true;
 }
 
 /// Letters and digits in a product key.
@@ -468,7 +495,18 @@ pub const key_symbols = 25;
 /// is what WINNT.SIF ProductKey/ProductID and autounattend.xml take.
 pub fn normalizeKey(value: []const u8, out: *[29]u8) []const u8 {
     var symbols: [key_symbols]u8 = undefined;
-    return renderKey(keySymbols(value, &symbols), out);
+    const have = keySymbols(value, &symbols);
+    // Windows 95 retail: exactly ten digits -> ddd-ddddddd.
+    if (have.len == 10) {
+        for (have) |c| {
+            if (!std.ascii.isDigit(c)) return renderKey(have, out);
+        }
+        @memcpy(out[0..3], have[0..3]);
+        out[3] = '-';
+        @memcpy(out[4..11], have[3..10]);
+        return out[0..11];
+    }
+    return renderKey(have, out);
 }
 
 /// Number of letters and digits typed so far (for the "12/25" hint).
@@ -513,6 +551,19 @@ fn keySymbols(value: []const u8, out: *[key_symbols]u8) []const u8 {
 }
 
 fn renderKey(symbols: []const u8, out: *[29]u8) []const u8 {
+    // Windows 95 OEM: ddddd-OEM-ddddddd-ddddd (dashes after 5, 8, 15).
+    if (symbols.len > 5 and symbols.len <= 20 and std.mem.startsWith(u8, "OEM", symbols[5..@min(8, symbols.len)])) {
+        var n: usize = 0;
+        for (symbols, 1..) |c, count| {
+            out[n] = c;
+            n += 1;
+            if ((count == 5 or count == 8 or count == 15) and count < 20) {
+                out[n] = '-';
+                n += 1;
+            }
+        }
+        return out[0..n];
+    }
     var n: usize = 0;
     for (symbols, 1..) |c, count| {
         out[n] = c;
@@ -1002,6 +1053,18 @@ test "product key: normalised from any case, with or without dashes and spaces" 
     try std.testing.expectEqualStrings("", normalizeKey("", &out));
     try std.testing.expectEqualStrings("ABCDE-", normalizeKey("abcde", &out));
     try std.testing.expectEqualStrings("ABCDE-F", normalizeKey("abcdef", &out));
+    // Windows 95 keys: OEM and retail.
+    try std.testing.expectEqualStrings("34567-OEM-0012345-12345", normalizeKey("34567oem001234512345", &out));
+    try std.testing.expectEqualStrings("34567-OEM-0012345-12345", normalizeKey("34567-OEM-0012345-12345", &out));
+    try std.testing.expectEqualStrings("12345-OEM-00", normalizeKey("12345oem00", &out));
+    try std.testing.expectEqualStrings("123-4567890", normalizeKey("123 4567890", &out));
+    try std.testing.expectEqual(KeyShape.win95_oem, keyShape("34567-OEM-0012345-12345").?);
+    try std.testing.expectEqual(KeyShape.win95_oem, keyShape("34567-oem-0012345-12345").?);
+    try std.testing.expectEqual(KeyShape.win95_retail, keyShape("123-4567890").?);
+    try std.testing.expectEqual(KeyShape.five_by_five, keyShape("ABCDE-12345-FGHIJ-67890-KLMNO").?);
+    try std.testing.expect(keyShape("34567-OEM-001234A-12345") == null);
+    try std.testing.expect(checkKey("123-456789") == .bad_key_format);
+    try std.testing.expect(checkKey("123-4567890") == null);
     try std.testing.expectEqual(@as(usize, 12), keySymbolCount("ABCDE-12345-XY"));
 }
 
