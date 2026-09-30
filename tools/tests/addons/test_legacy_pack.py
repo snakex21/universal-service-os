@@ -210,7 +210,7 @@ def test_staging(m: lm.Manifest) -> None:
         target = tmp / 'C' / 'USOS' / 'ADDONS'
         exe = tmp / 'USOSADD.EXE'
         exe.write_bytes(b'MZ fake')
-        report = stage.stage(manifest, [tmp / 'user'], target, os_='98SE', lang='PL', full=True,
+        report = stage.stage(manifest, [tmp / 'user'], target, os_='98SE', lang='PL', preset='praca',
                              options=['kernelex'], runner=exe)
         for pid in ids:
             if report['packages'].get(pid) != 'staged':
@@ -224,7 +224,7 @@ def test_staging(m: lm.Manifest) -> None:
         if not (target / 'PKG/MSLU/UNICOWS.EXE').is_file():
             fail('staging: MSLU not staged under its 8.3 name')
         sel = (target / 'SELECT.INI').read_text(encoding='ascii')
-        if 'full=1' not in sel or 'options=kernelex' not in sel or 'expect=98SE' not in sel:
+        if 'preset=praca' not in sel or 'options=kernelex' not in sel or 'expect=98SE' not in sel:
             fail('staging: SELECT.INI ' + repr(sel))
         ansi = (target / 'LEGACY.INI').read_bytes()
         try:
@@ -239,7 +239,7 @@ def test_staging(m: lm.Manifest) -> None:
         bad = tmp / 'user2'
         bad.mkdir()
         (bad / 'DCOM98.EXE').write_bytes(b'not the real file')
-        report = stage.stage(manifest, [bad], tmp / 'T2', os_='98SE', lang='PL', full=True, options=[], runner=exe)
+        report = stage.stage(manifest, [bad], tmp / 'T2', os_='98SE', lang='PL', options=[], runner=exe)
         if report['packages'].get('dcom98') != 'missing':
             fail('staging: a wrong-hash file was accepted')
 

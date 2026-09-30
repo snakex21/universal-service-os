@@ -12,8 +12,8 @@ Nothing is downloaded. Copyright (C) 2026 Maksymilian and the USOS Authors,
 GPL-3.0-or-later.
 
   python tools/addons/stage_legacy_pack.py --source <user folder> [--source ...]
-      --target <dir> --os 98SE --lang PL [--ntsp 3] [--no-full]
-      [--options kernelex,rdp51-pl] [--runner zig-out/legacy-pack/USOSADD.EXE]
+      --target <dir> --os 98SE --lang PL [--ntsp 3] [--preset praca|retro|minimal]
+      [--options kernelex,rdp51-pl] [--exclude dotnet20] [--runner zig-out/legacy-pack/USOSADD.EXE]
 """
 from __future__ import annotations
 
@@ -43,7 +43,8 @@ def seven_zip() -> Path | None:
     return Path(found) if found else None
 
 
-def candidates(m: lm.Manifest, os_: str, lang: str, ntsp: str, full: bool, options: list[str]) -> list[lm.Package]:
+def candidates(m: lm.Manifest, os_: str, lang: str, ntsp: str, full: bool, options: list[str],
+               exclude: list[str] | None = None) -> list[lm.Package]:
     """Every package the runner may plan on the target: for a group (95) the
     union over its members, for NT4 over the SP levels before/after SP6a."""
     tokens = [os_]
@@ -54,7 +55,7 @@ def candidates(m: lm.Manifest, os_: str, lang: str, ntsp: str, full: bool, optio
     for t in tokens:
         levels = [ntsp] if ntsp or t != 'NT4' else ['0', '6a']
         for level in levels:
-            for pid in lm.resolve(m, t, lang, level if t == 'NT4' else '', full, options).order:
+            for pid in lm.resolve(m, t, lang, level if t == 'NT4' else '', full, options, exclude).order:
                 ids[pid] = None
     return [m.find(pid) for pid in ids]
 
@@ -152,11 +153,13 @@ def unpack_zip(data: bytes, dest: Path) -> int:
     return count
 
 
-def stage(manifest: Path, sources: list[Path], target: Path, os_: str, lang: str, full: bool = True,
-          options: list[str] | None = None, runner: Path | None = None, ntsp: str = '') -> dict:
+def stage(manifest: Path, sources: list[Path], target: Path, os_: str, lang: str, preset: str = '',
+          options: list[str] | None = None, runner: Path | None = None, ntsp: str = '',
+          exclude: list[str] | None = None) -> dict:
     m = lm.Manifest.load(manifest)
-    options = options or []
-    pkgs = candidates(m, os_, lang, ntsp, full, options)
+    select = {'preset': preset, 'options': ','.join(options or []), 'exclude': ','.join(exclude or [])}
+    preset, full, all_options, all_exclude = lm.selection(m, select)
+    pkgs = candidates(m, os_, lang, ntsp, full, all_options, all_exclude)
     wanted: dict[tuple[int, str], str] = {}
     for p in pkgs:
         for f in p.files():
@@ -191,7 +194,8 @@ def stage(manifest: Path, sources: list[Path], target: Path, os_: str, lang: str
     text = manifest.read_text(encoding='utf-8').replace('\r\n', '\n').replace('\n', '\r\n')
     (target / 'LEGACY.INI').write_bytes(text.encode(encoding, errors='replace'))
     select = ['; USOS legacy pack selection (tools/addons/stage_legacy_pack.py)', '[select]',
-              f'full={1 if full else 0}', 'options=' + ','.join(options), f'expect={os_}', f'lang={lang}']
+              f'preset={preset}', 'options=' + ','.join(options or []), 'exclude=' + ','.join(exclude or []),
+              f'expect={os_}', f'lang={lang}']
     (target / 'SELECT.INI').write_bytes(('\r\n'.join(select) + '\r\n').encode('ascii'))
     if runner:
         shutil.copyfile(runner, target / 'USOSADD.EXE')
@@ -205,13 +209,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument('--os', required=True)
     ap.add_argument('--lang', required=True)
     ap.add_argument('--ntsp', default='')
-    ap.add_argument('--no-full', action='store_true')
+    ap.add_argument('--preset', default='')
+    ap.add_argument('--exclude', default='')
     ap.add_argument('--options', default='')
     ap.add_argument('--manifest', type=Path, default=lm.MANIFEST)
     ap.add_argument('--runner', type=Path)
     a = ap.parse_args(argv)
-    report = stage(a.manifest, a.source, a.target, a.os, a.lang, not a.no_full, lm.list_items(a.options),
-                   a.runner, a.ntsp)
+    report = stage(a.manifest, a.source, a.target, a.os, a.lang, a.preset, lm.list_items(a.options),
+                   a.runner, a.ntsp, lm.list_items(a.exclude))
     for pid, st in report['packages'].items():
         print(f'{st:<10} {pid}')
     missing = [p for p, s in report['packages'].items() if s == 'missing']
