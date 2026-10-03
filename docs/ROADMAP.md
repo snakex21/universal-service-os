@@ -51,6 +51,8 @@ L3 32-bit CPU / mniej RAM (najpierw pomiary) ─> L4 chainload dla PC bez USB bo
 | L8 | NT4 dla retro sprzętu | **Later** | profil NT5 (M4) | 5–8 dni |
 | L9 | shim-review (własny shim podpisany przez Microsoft) | **Later** (długoterminowo) | N6, publiczne repo | miesiące, proces zewnętrzny |
 | L11 | Tryb BIOS przez CSMWrap (DOS, FreeDOS, Windows 3.x bez CSM) + klawiatura i mysz USB w Windows 3.x | **Done (1.1)**: w `master` (2026-09-29), QEMU PASS; X470: do testu | L2, L2b | test sprzętowy 1 dzień |
+| L12 | Instalator z Linuksa (CLI, potem AppImage); macOS: CLI przy DLC | **Later** (po 1.0) | 1.0, L10 (część macOS) | do oszacowania |
+| L13 | Inne systemy / Custom OS: ISO/IMG z RAM-u, Multiboot/Multiboot2, przepisy FreeBSD/OpenBSD/Haiku/ReactOS | **Later** (po 1.0, przed L10) | N5 (wpis dla nieznanych ISO), L12 (niezależne) | poziomy 1+2: 5–8 dni, poziom 3: 3–5 dni per system |
 | L10 | macOS jako opcjonalny dodatek („DLC”): własny OpenCore EFI z DATA, potem eksperymentalny generator konfiguracji | **Later** (na końcu, po wszystkim innym) | osobne pobranie, poza głównym wydaniem | do oszacowania |
 
 ## 2. Pozycje
@@ -416,6 +418,31 @@ repozytorium, powtarzalnego buildu shim, klucza w HSM, SBAT, polityki
 reagowania na podatności, zablokowanego jądra (N6) i przeglądu na
 `rhboot/shim-review`. Do tego czasu model „shim dystrybucji + MOK”
 pozostaje.
+
+### L12. Instalator z Linuksa: **Later**, po 1.0
+
+Instalator USOS działa dziś tylko z Windowsa. Plan: wersja CLI dla
+Linuksa (przygotowanie pendrive'a z poziomu terminala), potem AppImage
+z GUI; macOS CLI dopiero przy dodatku macOS (L10). Testy w VM i na
+runnerach macOS w GitHub Actions. Kolejność: po 1.0, przed Custom OS (L13).
+
+### L13. Inne systemy / Custom OS: **Later**, po 1.0, przed macOS DLC
+
+Prostsze niż macOS (L10), więc wcześniej. Trzy poziomy:
+
+1. **Uniwersalny start dowolnego ISO/IMG z RAM-u.** BIOS: osobny moduł
+   w stylu memdisk (Syslinux, GPL-2+); UEFI: RAM disk
+   (`EFI_RAM_DISK_PROTOCOL`). Dla małych systemów (TempleOS, KolibriOS,
+   MenuetOS, FreeDOS, narzędzia ratunkowe). Limit: obraz musi zmieścić
+   się w RAM.
+2. **Własne/autorskie systemy przez Multiboot/Multiboot2.** Kernel
+   prosto z pendrive'a, dla twórców hobbystycznych OS.
+3. **Przepisy dla popularnych systemów** jak przy Linuksie: FreeBSD,
+   OpenBSD, Haiku, ReactOS.
+
+Zasada: Core BIOS tylko przekazuje start do osobnego modułu na pendrivie
+(logika poza Core, jak CSMWrap i mikro-Linux), bo Core ma mało miejsca.
+Kolejność: najpierw poziomy 1 i 2, potem FreeBSD i ReactOS.
 
 ### L10. macOS (opcjonalny dodatek, „DLC”): **Later**, na końcu
 
