@@ -287,8 +287,14 @@ writes `STATE.INI`, `TMP\` and the log `C:\USOS\addons.log`.
   `INSTALL.BAT` copies it (`XCOPY` is on the startup floppy; the RAM disk
   would need about 150 MB more for a full 98 SE pack). The answer file:
   the MSBATCH renderer (`src/flow/answer/msbatch.zig`) adds one line to its
-  `[USOS.RunOnce]` section when addons are selected:
-  `HKLM,"Software\Microsoft\Windows\CurrentVersion\RunOnce",USOSAddons,,"C:\USOS\ADDONS\USOSADD.EXE"`.
+  `[USOS.RunOnce]` AddReg section when addons are selected:
+  `HKLM,"Software\Microsoft\Windows\CurrentVersion\Run",USOSAddons,,"C:\USOS\ADDONS\USOSADD.EXE"`.
+  **Run, not RunOnce**: Windows 98 Setup processes HKLM RunOnce entries in
+  its own last phase ("Trwa aktualizowanie ustawień systemowych"), before
+  the desktop; a package restart there leaves Setup unfinished and the next
+  boot hangs (found in QEMU on 2026-10-03). Run entries start after the
+  shell; USOSADD additionally waits while `RunOnce\Setup` has entries or
+  there is no taskbar, and removes its Run value when the chain is done.
   The static default `msbatch.inf` stays without addons.
 - **NT4 flow** (future): `$OEM$\$1\USOS\ADDONS` (8.3 names) with
   `OemPreinstall=Yes`, and `[GuiRunOnce]` `"C:\USOS\ADDONS\USOSADD.EXE"`
@@ -313,7 +319,7 @@ its C library (own entry point, no CRT), PE subsystem 4.0, i386: loads on
    ends (`done` / `failed` / `present` / `skipped`), so a package that
    restarts the PC on its own is resumed: `running` + check true = done,
    `running` twice = failed, move on;
-5. `reboot=now` → re-register itself in `HKLM\...\RunOnce`, restart
+5. `reboot=now` → keep its `HKLM\...\Run` value, restart
    (`ExitWindowsEx(EWX_REBOOT)`, on NT after `SeShutdownPrivilege`);
    `reboot=end` restarts are collected and done once before the next
    `now` package or at the end;
@@ -325,7 +331,7 @@ its C library (own entry point, no CRT), PE subsystem 4.0, i386: loads on
 7. when nothing is left (after the last pending restart): the summary
    *Pakiet zgodności USOS: zainstalowano X/Y, błędy: F, pominięto: Z* with
    one line per failed/skipped package and its reason, in the log and in a
-   message box; RunOnce is not registered again.
+   message box; the Run value is removed.
 
 A small window shows `USOS: instalowanie dodatków (3/14): DirectX 9.0c`
 (English on non-Polish systems). The log (append) holds date/time, system
@@ -356,7 +362,7 @@ written from the component list only; this document replaces it). This
 branch is based on `master` and touches no file of that branch, so it
 merges before or after it without conflicts; the hook (one MSBATCH line +
 the C: seeding step) is a small follow-up once both are in. The QEMU run
-(§6) uses exactly that hook: C: seeded by the host, the RunOnce line in
+(§6) uses exactly that hook: C: seeded by the host, the Run line in
 MSBATCH.
 
 ### 2.9 Later
@@ -428,7 +434,7 @@ licencyjną systemu Windows (wymagane przy nośnikach OEM)* on the
 profile/confirmation screen, never preselected); only then USOS answers the
 wizard for the user: the MSBATCH `[Setup]` keys that OEM mode honours are
 set, and the remaining wizard pages are closed by a tiny first-boot helper
-(the same RunOnce slot as USOSADD) that presses *Dalej / Akceptuję /
+(started like USOSADD) that presses *Dalej / Akceptuję /
 Zakończ* on the wizard windows by their class and control IDs; without the
 acceptance the wizard is left to the user. QEMU run of 2026-09-30: the
 agent accepted it by hand with the user's explicit approval.
@@ -469,7 +475,7 @@ QEMU results: see §6.1 (98 SE PL run of 2026-09-30).
 
 Setup: `tools/tests/addons/win98se_vm.py` (fresh 4 GiB disk seeded on the
 host: C:\WIN98 from the user's 98 SE PL OEM ISO, MSBATCH.INF with the
-USOSADD RunOnce line, C:\USOS\ADDONS staged for preset *Do pracy* +
+USOSADD Run line, C:\USOS\ADDONS staged for preset *Do pracy* +
 KernelEx + RDP; the CD's startup floppy with FDISK /MBR, SYS C:, SETUP;
 QEMU 11.1 i440FX TCG, Pentium III, 256 MiB, Cirrus, no network). Product
 key from a local file outside the repository; the VM disk was deleted
