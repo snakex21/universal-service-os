@@ -1,28 +1,39 @@
 # Windows 2000 SP4 on modern boards (X470): AHCI, ACPI, USB (2026-09-30)
 
-Status: **experimental, blocked** on AHCI in GUI Setup (section 5), branch `feature/win2000-modern`. QEMU results in
-section 5; the X470 run is still to do (section 6). Earlier state:
-[windows-2000-uefi-2026-09-27.md](windows-2000-uefi-2026-09-27.md) (the
-paths, the CMA repacks), [research/win2000-ahci.md](research/win2000-ahci.md)
+Status: **experimental; QEMU PASS to the first-boot logon (2026-10-03)**,
+branch `feature/win2000-modern`. The X470 run is next (section 6). Earlier
+state: [windows-2000-uefi-2026-09-27.md](windows-2000-uefi-2026-09-27.md)
+(the paths, the CMA repacks), [research/win2000-ahci.md](research/win2000-ahci.md)
 (storage options).
 
 The UEFI profile `w2k-x86-sp4-uefi-csm` (UEFI + firmware CSM, and UEFI
-without CSM through CSMWrap) now stages three things on the target after the
+without CSM through CSMWrap) stages these on the target after the
 local-source copy (`prepare_xp_ntfs_target.sh`):
 
 | Piece | Solution | Licence | Script |
 |---|---|---|---|
-| AHCI (X470 `1022:43C8`, no IDE mode) | **AHCINT 1.3.0.0**, unmodified i386 ScsiPort miniport | GPL-3.0, bundled (source tracked in `tools/vendor/ahcint/1.3.0.0/src`) | `tools/w2k_stage.sh` |
-| ACPI (2000's `ACPI.SYS` 5.0.2195 cannot parse modern tables) | **ACPI off**: `TXTSETUP.SIF [ACPIOptions] ACPIEnable = 0`, so Setup installs the **MPS Multiprocessor HAL** (`halmps.dll`) from the MP table | nothing to bundle (Microsoft's own HAL, one INF value on the target copy) | `tools/w2k_stage.sh` |
-| USB (xHCI only: CPU `1022:149C`, chipset `43D0`) | **xhci98 1.1.1.0-usos2** x86 (the NT 5.2 build), GUI-mode PnP install, forced USB/HID stack incl. `usbhub20.sys` | GPL-2.0-only, bundled (already in the 1.1 package) | `tools/nt52_usb_stage.sh` (2000 mode) |
+| AHCI (X470 `1022:43C8`, no IDE mode) | **AHCINT 1.3.0.0-usos1**: i386 ScsiPort miniport, MODIFIED by USOS (real FLUSH CACHE, FUA, caching mode page), **legacy (non-PnP) mode** | GPL-3.0, bundled; upstream and patched source in `tools/vendor/ahcint/` | `tools/w2k_stage.sh` |
+| ACPI (2000's `ACPI.SYS` 5.0.2195, ACPI 1.0b era) | **kept** (Microsoft's rule, ACPI HAL). Fallback for a STOP 0xA5: `acpi-off.txt` in `Systems\Windows\Windows 2000\Unattended` on DATA -> `ACPIEnable = 0` (MPS HAL) | nothing to bundle | `tools/w2k_stage.sh`, `legacy_xp_staging.sh` |
+| USB (xHCI only: CPU `1022:149C`, chipset `43D0`) | **xhci98 1.1.1.0-usos2** x86 (the NT 5.2 build), GUI-mode PnP install, forced USB/HID stack incl. `usbhub20.sys`; skipped on media without `usbport.sys` (2000 RTM) | GPL-2.0-only, bundled (already in the 1.1 package) | `tools/nt52_usb_stage.sh` (2000 mode) |
 | Display | VGA/VESA (inbox) | | |
 | Answer file | the existing `w2k_selected_partition_uefi_csm.sif` (`\WINNT`, `ProductID`) | | unchanged |
+| Sources | Professional SP4, and Server / Advanced Server at any service pack (`CDROM_IS.5` / `CDROM_IA.5`) | | `probe_nt5_source.sh` |
 
 The BIOS path (`nt5-staging`) is unchanged: the BIOS micro-Linux carries no
 driver package, and the old boards it was tested on (MS-7100) have IDE and a
 working ACPI. On the X470 use the UEFI entries (with or without CSM).
 
 ## 1. AHCI: AHCINT
+
+**Since 2026-10-03** the package carries **1.3.0.0-usos1**
+(`tools/vendor/ahcint/1.3.0.0-usos1`, MODIFIED.txt): SYNCHRONIZE CACHE,
+SRB_FUNCTION_FLUSH and SHUTDOWN send FLUSH CACHE (EXT) to the drive, FUA
+writes are followed by a flush, MODE SENSE returns the caching page. Built
+with WDK 7.1 (`build.cmd`, x86 WXP target); its 12 imports (ntoskrnl incl.
+`memset`, scsiport) all resolve on the 2000 SP4 kernel and scsiport. AHCINT
+runs in **legacy mode**: staging comments out ahcint.inf's `PnpInterface`
+row and does not write it (the `usosw2k.inf` bullet below describes the
+2026-09-30 PnP variant, still available as `USOS_W2K_AHCINT_MODE=pnp`).
 
 Candidates (details in [research/win2000-ahci.md](research/win2000-ahci.md)):
 
@@ -60,7 +71,7 @@ pattern with the 2000 differences:
   the same HBA. `HIVESYS.INF` itself is UTF-16 on 2000 and stays as is;
 - DOSNET.INF lists the three files.
 
-## 2. ACPI: off, MPS HAL
+## 2. ACPI: kept, MPS HAL as the 0xA5 fallback
 
 - 2000's `ACPI.SYS` is from the ACPI 1.0b era, older than the 5.1/5.2
   drivers that stop with STOP 0xA5 (0x11, 0x8, ...) on the X470's iASL
@@ -76,11 +87,17 @@ pattern with the 2000 differences:
   Microsoft-derived binary, and the XP ACPI driver's private interface with
   the 2000 HAL is unknown. Not done (policy: own implementation or
   maintainer decision).
-- **What USOS does:** `ACPIEnable = 0` (Microsoft's own switch; 2 = the
-  1999 BIOS-date rule). SETUPLDR then never picks an ACPI HAL; NTDETECT finds
-  the MP table and Setup installs "MPS Multiprocessor PC" (`halmps.dll`,
-  I/O APIC, 2 CPUs on Professional). Without an MP table it would be
-  "Standard PC" (PIC, one CPU).
+- **What USOS does (since 2026-10-03):** `ACPIEnable` stays Microsoft's
+  value (2, the 1999 BIOS-date rule), so Setup picks an ACPI HAL. In QEMU
+  that is the only setting with which GUI Setup completes (section 5).
+- **Fallback for the X470 if 2000 stops with 0xA5:** put an empty file
+  `acpi-off.txt` into `Systems\Windows\Windows 2000\Unattended` on DATA and
+  prepare again. `legacy_xp_staging.sh` then sets `USOS_W2K_ACPI=off` and
+  `w2k_stage.sh` writes `ACPIEnable = 0`: SETUPLDR never picks an ACPI HAL;
+  NTDETECT finds the MP table and Setup installs "MPS Multiprocessor PC"
+  (`halmps.dll`, I/O APIC, 2 CPUs on Professional), without MP table
+  "Standard PC" (PIC, one CPU). In QEMU this variant failed in GUI Setup
+  (section 5), so it is untested ground on hardware.
 - **Where the MP table comes from on the X470:** without CSM, **CSMWrap
   builds one** from the ACPI MADT and the `_PRT` of every PCI root bridge
   and bridge with its own `_PRT` (`csmwrap/src/mptable.c`, uACPI), and a
@@ -89,8 +106,6 @@ pattern with the 2000 differences:
 - Costs: no ACPI power-off ("It is now safe to turn off your computer"), no
   power button, no sleep. AHCINT needs no interrupt at all; xhci98 needs its
   INTx pin routed through the MP table (section 6).
-- `USOS_W2K_ACPI=on` keeps Microsoft's rule (for a later opt-in; nothing
-  sets it yet).
 
 ## 3. USB: xhci98 on 2000
 
@@ -118,7 +133,48 @@ pattern with the 2000 differences:
   path, DOSNET, apply with ACPI off/on, refusals, pinned package files,
   2000 USB mode).
 
-## 5. QEMU (2026-09-30)
+## 5. QEMU (2026-09-30 .. 2026-10-03)
+
+### Final configuration (2026-10-03): PASS to the first-boot logon
+
+AHCINT 1.3.0.0-usos1 in legacy mode, ACPI kept, xhci98, target on
+`ich9-ahci`, `qemu-xhci` + `usb-kbd`/`usb-tablet` only, disk cache
+writethrough (`USOS_QEMU_DISK_CACHE`).
+
+| Run | Result |
+|---|---|
+| Pro SP4, SeaBIOS (firmware-CSM stand-in), 2 CPUs | **PASS**: text mode, GUI Setup (device install, components, final tasks), automatic restart, **first boot to the logon screen**. The repack asks for no key. Keys typed only through the USB keyboard reach the logon password field (xhci98 -> usbport -> usbhub20 -> HID). Offline: HAL `halmacpi.dll`, `PCI\VEN_8086&DEV_2922` bound to `AHCINT` (SCSIAdapter), CriticalDeviceDatabase `pci#cc_010601` / AMD IDs -> ahcint, `setuperr.log` empty, no `edb*.log` flood, `xhci98.log` with two driver loads (GUI Setup and first boot) |
+| Pro SP4, mid-GUI reboot (copy of the disk during "Final tasks", booted alone on AHCI) | **PASS**: boots from AHCINT, no 0x7B, GUI Setup resumes (network, components) |
+| Pro SP4, OVMF without CSM -> CSMWrap | **PASS**: the same, to the logon screen with USB typing; HAL `halaacpi.dll` (one CPU: CSMWrap keeps a helper core), AHCINT bound, no log flood |
+| Server 2000 RTM, SeaBIOS (xhci98 skipped: RTM has no `usbport.sys`) | **PASS** to the licensing page (needs keys; no USB on RTM). Mid-GUI reboot: GUI Setup resumes, read-only chkdsk of the disk finds no problems (the earlier `$MFT` damage came from killing a VM whose driver never flushed, before writethrough and usos1) |
+| Pro SP4, IDE (atapi), ACPI kept | **PASS** to the logon screen, HAL `halmacpi.dll` |
+
+What decided it (A/B runs on the same prepared source):
+
+- **ACPI off (MPS HAL) is what broke GUI Setup in QEMU.** Every ACPI-off
+  run failed: on AHCI with AHCINT 1.3.0.0 and usos1, PnP and legacy mode,
+  with and without xhci98, the GUI-mode device install hit
+  `ERROR_NO_SYSTEM_RESOURCES` (1450) and the security configuration engine
+  then wrote more than 10,000 ESENT logs (`%windir%\security\edb*.log`)
+  until the disk was full ("initializing the security subsystem failed");
+  on IDE it restarted and hung. The same sources with ACPI kept pass on IDE
+  and on AHCI. ESENT's flood is a consequence (SCE `error 1208` after the
+  resource errors), not a storage request AHCINT fails: no SRB/IOCTL error
+  was involved, and AHCINT answers MODE SENSE, READ CAPACITY and the
+  read/write/flush commands disk.sys sends.
+- **AHCINT in PnP mode** (ahcint.inf's `PnpInterface`) hung at the first GUI
+  boot with ACPI kept (1.3.0.0); legacy mode passes. Staging therefore
+  comments the row out by default (`USOS_W2K_AHCINT_MODE=pnp` restores it).
+- **usos1's flushes** were not the cause of the flood, but they are kept:
+  1.3.0.0 never flushed the drive's write cache, which loses data on a
+  power-off after shutdown and left killed QEMU images corrupt.
+- **UniATA 0.47b** as a drop-in under the AHCINT service name stops with
+  0x7B at the first boot (it is a legacy miniport with its own INF and
+  registry layout); a proper integration was not needed and was not done.
+  It stays the documented alternative.
+- VirtualBox 7.2 does not run the 2000 MPS HAL here (hangs in phase 1).
+
+### First round (2026-09-30)
 
 TCG, SeaBIOS (the firmware-CSM stand-in) and OVMF without CSM -> CSMWrap,
 target on `ich9-ahci`, `qemu-xhci` + `usb-kbd`/`usb-tablet` only (`--ahci
@@ -135,20 +191,8 @@ target on `ich9-ahci`, `qemu-xhci` + `usb-kbd`/`usb-tablet` only (`--ahci
 | Server RTM, SeaBIOS, AHCI, ACPI off (xhci98 skipped: no usbport) | PASS | **PASS** to the licensing page | a hard reset and reboot mid-GUI returns to GUI Setup (no 0x7B: AHCINT stays bound), but reports a damaged `$MFT` |
 | VirtualBox 7.2, AHCI or PIIX, ACPI off (MPS HAL + IOAPIC) | PASS | hangs in kernel phase 1 | VirtualBox does not run the MPS HAL here |
 
-**Blocker (2026-09-30):** on every Pro AHCI run the volume fills up with
-more than 10,000 ESENT transaction logs of 1 MB each
-(`%windir%\security\edb*.log`, the security configuration database) until
-the disk is full; the "security subsystem" error follows from that. The
-same Setup on IDE writes none, and runs without xhci98 show the same flood,
-so xhci98 is not the cause. The prime suspect is AHCINT's cache handling:
-SYNCHRONIZE CACHE and SRB_FUNCTION_FLUSH / SHUTDOWN are completed as
-success **without sending FLUSH CACHE** (`src/ahcisatl.c`
-`AhciProcessAtaSrb`, `src/ahcimain.c` `HwStartIo`). That is also a
-data-safety issue on hardware (power-off after shutdown). Next step: a
-USOS patch 1.3.0.0-usos1 (FLUSH CACHE / FLUSH CACHE EXT for those requests)
-built with the WDK, then a QEMU rerun; UniATA 0.47b as the alternative.
-Until then **2000 Pro on AHCI does not finish GUI Setup in QEMU**; the X470
-test waits.
+These runs used AHCINT 1.3.0.0, PnP mode and ACPI off; the cause and the
+fix are above.
 
 The ACPI-on and VirtualBox rows also show that QEMU/VirtualBox are weak
 witnesses for the 2000 HAL question; the X470 decides that.
@@ -168,12 +212,19 @@ and GUI Setup (welcome page). The XP x86 SP3 target digest is unchanged.
 
 ## 6. X470 test plan
 
-Not yet: first the AHCI blocker in section 5. After the fix: UEFI without
-CSM (CSMWrap) and with CSM, Windows 2000 SP4 Pro, target on the chipset SATA
-(`1022:43C8`). Expect text mode, GUI Setup with USB keyboard and mouse on
-the chipset (`43D0`) and CPU (`149C`) rear ports, the MPS HAL (2 CPUs in
-Task Manager), no 0xA5, no 0x7B after Setup, `%windir%\xhci98.log`; then
-shut down and power off by hand (no ACPI soft-off).
+Windows 2000 SP4 Professional, target on the chipset SATA (`1022:43C8`),
+first UEFI without CSM (CSMWrap), then with CSM. Expect: text mode (AHCINT),
+GUI Setup with USB keyboard and mouse on the chipset (`43D0`) and CPU
+(`149C`) rear ports, no 0x7B after Setup, `%windir%\xhci98.log`.
+
+- **If text mode or the first GUI boot stops with STOP 0xA5** (2000's ACPI
+  driver and the X470 tables): put an empty `acpi-off.txt` into
+  `Systems\Windows\Windows 2000\Unattended` on DATA and prepare again (MPS
+  HAL, section 2). Then also note the CPU count and whether power-off
+  works (it will not without ACPI).
+- Note the HAL (`%windir%\system32\hal.dll` version info or the Device
+  Manager "Computer" entry), which rear ports work, and the result of a
+  normal shutdown.
 
 Windows 2000 Server: the probe now accepts Server/Advanced Server
 (`CDROM_IS.5`/`CDROM_IA.5`, ProductType 1) at any service pack; SP4 stays

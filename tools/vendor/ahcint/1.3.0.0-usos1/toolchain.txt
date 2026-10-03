@@ -1,0 +1,9 @@
+Windows Driver Kit 7.1.0 (7600.16385.1), see ../../xhci98/1.1.1.0-usos2/toolchain.txt
+(GRMWDK_EN_7600_1.ISO, user-downloaded, not redistributed; unpacked to
+tools\WinDDK71). build.cmd: setenv.bat <root> fre x86 WXP no_oacr,
+BUILD_ALT_DIR=fre; build -cZ in src\2KXP (sources: _NT_TARGET_VERSION WS03,
+TARGETTYPE MINIPORT, scsiport.lib + ntoskrnl.lib).
+Imports of the pinned build (12): ntoskrnl (incl. memset) and scsiport; all
+resolve on the Windows 2000 SP4 ntkrnlmp/ntoskrnl and scsiport.sys
+(tools/tests/test_w2k_staging.py). Not byte-reproducible (PE time stamp, PDB
+GUID); manifest.json pins the committed binary.

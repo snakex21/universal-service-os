@@ -460,9 +460,12 @@ usos_legacy_xp_staging() {
     # The XP driver bundle (GenAHCI on StorPort, KMDF, USB3, community ACPI)
     # needs NT 5.1 exports that the Windows 2000 kernel/HAL lack; 2000 keeps
     # its own set instead (w2k_stage.sh, after the source copy): AHCINT and
-    # ACPI off (MPS HAL), plus xhci98 below (docs/windows-2000-modern-2026-09-30.md).
+    # ACPI kept (or off with DATA's acpi-off.txt, the STOP 0xA5 fallback),
+    # plus xhci98 below (docs/windows-2000-modern-2026-09-30.md).
     [ -f /usr/lib/usos/w2k-drivers/ahcint.sys ] && [ -f /usr/lib/usos/w2k-drivers/ahcint.inf ] || stop 'Windows 2000 AHCI driver (AHCINT) is missing from the package; no target write occurred'
-    printf '[W2K_DRIVERS] AHCINT 1.3.0.0 (ScsiPort), ACPI %s, xhci98 x86; the XP bundle is NT 5.1 only\n' "${USOS_W2K_ACPI:-off}"
+    if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/acpi-off.txt" ]; then USOS_W2K_ACPI=off; else USOS_W2K_ACPI=on; fi
+    export USOS_W2K_ACPI
+    printf '[W2K_DRIVERS] AHCINT 1.3.0.0-usos1 (ScsiPort), ACPI %s, xhci98 x86; the XP bundle is NT 5.1 only\n' "$USOS_W2K_ACPI"
     else
     # XP x64 (NT 5.2 amd64): GenAHCI on the system's own StorPort
     # (nt5_storage_stage.sh, applied to the target after the source copy).

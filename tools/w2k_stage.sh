@@ -4,8 +4,9 @@
 # Applied on the target after the local source copy, before xhci98
 # (nt52_usb_stage.sh):
 #
-# 1. AHCI: AHCINT 1.3.0.0 (https://github.com/ages2001/AHCINT, GPL-3.0,
-#    tools/vendor/ahcint/1.3.0.0, unmodified), a ScsiPort miniport with
+# 1. AHCI: AHCINT 1.3.0.0-usos1 (https://github.com/ages2001/AHCINT, GPL-3.0,
+#    MODIFIED by USOS: real FLUSH CACHE, FUA, caching mode page;
+#    tools/vendor/ahcint/1.3.0.0-usos1), a ScsiPort miniport with
 #    polling I/O (no interrupt needed, so it also runs without ACPI). Every
 #    import (ntoskrnl, scsiport) resolves on the 2000 SP4 kernel. The
 #    GenAHCI/StorPort route of NT 5.2 does not exist on 2000 (no StorPort).
@@ -23,28 +24,31 @@
 #        text mode writes the CriticalDeviceDatabase entries for the boot
 #        controller; [SCSI.Load], [SCSI].
 #      - usosw2k.inf (ASCII, written here) in ~BT and I386, added to
-#        TXTSETUP.SIF [HiveInfs.Fresh]: text mode applies its [AddReg] to
-#        the new system hive. It sets Services\ahcint\Parameters\
-#        PnpInterface "5" = 1 (what ahcint.inf sets) from the first boot,
-#        and the CriticalDeviceDatabase rows (pci#cc_010601 and the three
-#        AMD IDs -> ahcint). Without PnpInterface the first boots run
-#        AHCINT as a LEGACY miniport (its own PCI scan, a root-enumerated
-#        instance); GUI-mode PnP then installs ahcint.inf on the PCI
-#        devnode and ScsiPort starts a SECOND, PnP instance on the same
-#        HBA, which resets it (GHC.HR) under the first: QEMU 2026-09-30,
-#        both SeaBIOS and CSMWrap, GUI Setup hung halfway through
-#        "Installing devices" with a zeroed NTFS boot sector or a corrupt
-#        SYSTEM hive. HIVESYS.INF itself is UTF-16 on 2000 and stays as is.
+#        TXTSETUP.SIF [HiveInfs.Fresh] and [SourceDisksFiles] (text mode
+#        refuses a hive INF without a row): the CriticalDeviceDatabase rows
+#        (pci#cc_010601 and the three AMD IDs -> ahcint) in the new system.
+#      - AHCINT mode (USOS_W2K_AHCINT_MODE): "legacy" (default) comments out
+#        ahcint.inf's PnpInterface row, so AHCINT stays the legacy
+#        (non-PnP) ScsiPort miniport it is in text mode and GUI-mode PnP
+#        only records the INF; "pnp" also writes PnpInterface "5" = 1
+#        through usosw2k.inf. QEMU 2026-09-30..10-03: the PnP variants ran
+#        "Installing devices" into ERROR_NO_SYSTEM_RESOURCES and an ESENT
+#        log flood or hung; legacy mode with the ACPI HAL completes Setup.
+#        HIVESYS.INF itself is UTF-16 on 2000 and stays as is.
 #      - DOSNET.INF lists ahcint.sys, ahcint.inf and usosw2k.inf.
-# 2. ACPI: the 2000 ACPI.SYS (5.0.2195, ACPI 1.0b) is expected to stop with
-#    0xA5 on modern tables (as the stock 5.1/5.2 drivers do on the X470),
-#    and no ACPI 2.0 driver exists for NT 5.0. With USOS_W2K_ACPI=off (the
-#    default of this profile) TXTSETUP.SIF [ACPIOptions] ACPIEnable becomes
-#    0: SETUPLDR then never selects an ACPI HAL, NTDETECT's MP table (the
-#    firmware's, or CSMWrap's, which builds one from MADT and _PRT) gives
-#    the "MPS Multiprocessor PC" HAL (halmps.dll, I/O APIC), and without MP
-#    table "Standard PC". Costs: no ACPI power-off, power button or sleep.
-#    USOS_W2K_ACPI=on keeps Microsoft's date rule (ACPIEnable = 2).
+# 2. ACPI: the 2000 ACPI.SYS (5.0.2195, ACPI 1.0b) may stop with 0xA5 on
+#    modern tables (as the stock 5.1/5.2 drivers do on the X470), and no
+#    ACPI 2.0 driver exists for NT 5.0. Default USOS_W2K_ACPI=on keeps
+#    Microsoft's rule (ACPIEnable = 2, the ACPI HAL): in QEMU it is the only
+#    setting that completes GUI Setup on AHCI (2026-10-03). USOS_W2K_ACPI=off
+#    (legacy_xp_staging.sh sets it when DATA has
+#    Systems\Windows\Windows 2000\Unattended\acpi-off.txt) writes
+#    ACPIEnable = 0: SETUPLDR never selects an ACPI HAL and NTDETECT's MP
+#    table (the firmware's, or CSMWrap's, built from MADT and _PRT) gives
+#    the MPS HAL. In QEMU that GUI Setup failed in "Installing devices"
+#    (ERROR_NO_SYSTEM_RESOURCES, ESENT log flood) with AHCINT and hung with
+#    IDE, so it is the X470 fallback for a STOP 0xA5, not the default.
+#    Costs: no ACPI power-off, power button or sleep.
 # No Microsoft file is added or changed except the TXTSETUP.SIF and
 # DOSNET.INF copies on the target.
 #   sh w2k_stage.sh apply     (XP_TARGET_ROOT, NT5_SOURCE_DIR=I386)
@@ -56,7 +60,9 @@ usos_w2k_apply() (
     for name in ahcint.sys ahcint.inf; do
         [ -f "$pkg/$name" ] || { echo "[W2K_STAGE] STOP: $pkg/$name missing"; exit 1; }
     done
-    acpi=${USOS_W2K_ACPI:-off}
+    acpi=${USOS_W2K_ACPI:-on}
+    mode=${USOS_W2K_AHCINT_MODE:-legacy}
+    case "$mode" in legacy|pnp) ;; *) echo "[W2K_STAGE] STOP: USOS_W2K_AHCINT_MODE must be legacy or pnp"; exit 1 ;; esac
     case "$acpi" in on|off) ;; *) echo "[W2K_STAGE] STOP: USOS_W2K_ACPI must be on or off"; exit 1 ;; esac
     bt="$XP_TARGET_ROOT/\$WIN_NT\$.~BT"
     ls="$XP_TARGET_ROOT/\$WIN_NT\$.~LS/I386"
@@ -65,8 +71,8 @@ usos_w2k_apply() (
         find "$folder" -maxdepth 1 -type f \( -iname ahcint.sys -o -iname ahcint.sy_ -o -iname ahcint.inf -o -iname ahcint.in_ -o -iname usosw2k.inf \) -exec rm -f '{}' \;
         cp "$pkg/ahcint.sys" "$folder/ahcint.sys"
         cmp -s "$pkg/ahcint.sys" "$folder/ahcint.sys"
-        usos_w2k_ahcint_inf < "$pkg/ahcint.inf" > "$folder/ahcint.inf" || { echo '[W2K_STAGE] STOP: cannot adapt ahcint.inf'; exit 1; }
-        usos_w2k_hive_inf > "$folder/usosw2k.inf"
+        usos_w2k_ahcint_inf "$mode" < "$pkg/ahcint.inf" > "$folder/ahcint.inf" || { echo '[W2K_STAGE] STOP: cannot adapt ahcint.inf'; exit 1; }
+        usos_w2k_hive_inf "$mode" > "$folder/usosw2k.inf"
     done
     find "$ls" -maxdepth 1 -type d -iname ahcint -exec rm -rf '{}' +
     mkdir "$ls/AHCINT"
@@ -86,8 +92,8 @@ usos_w2k_apply() (
         mv "$ls/DOSNET.INF.usos" "$ls/DOSNET.INF"
     fi
     sync
-    printf '[W2K_STAGE] APPLIED PASS ahcint 1.3.0.0 boot+local source, TXTSETUP.SIF PCI\\CC_010601, usosw2k.inf (PnpInterface, CriticalDeviceDatabase); ACPI %s\n' \
-        "$([ "$acpi" = off ] && echo 'off (ACPIEnable = 0: MPS or Standard PC HAL)' || echo 'kept (ACPIEnable unchanged)')"
+    printf '[W2K_STAGE] APPLIED PASS ahcint 1.3.0.0-usos1 boot+local source, TXTSETUP.SIF PCI\\CC_010601, usosw2k.inf (CriticalDeviceDatabase), AHCINT %s mode; ACPI %s\n' \
+        "$mode" "$([ "$acpi" = off ] && echo 'off (ACPIEnable = 0: MPS or Standard PC HAL)' || echo 'kept (ACPIEnable unchanged)')"
 )
 
 # Every output line ends in CRLF, as the NT5 setup files do (BusyBox awk
@@ -107,7 +113,7 @@ usos_w2k_storage_sif() {
         low == "[sourcedisksfiles]" && !f { print "ahcint.sys = 1,,,,,,4_,4,1,,,1,4\r"; print "ahcint.inf = 1,,,,,,,20,0,0\r"; print "usosw2k.inf = 1,,,,,,_x,20,3,3\r"; f = 1 }
         low == "[hardwareidsdatabase]" && !h { for (i = 1; i <= n; i++) print "PCI" bs id[i] " = \"ahcint\"\r"; h = 1 }
         low == "[scsi.load]" && !l { print "ahcint = ahcint.sys,4\r"; l = 1 }
-        low == "[scsi]" && !s { print "ahcint = \"AHCI SATA Controller (AHCINT 1.3.0.0, USOS)\"\r"; s = 1 }
+        low == "[scsi]" && !s { print "ahcint = \"AHCI SATA Controller (AHCINT 1.3.0.0-usos1, USOS)\"\r"; s = 1 }
         low == "[hiveinfs.fresh]" && !r { print "AddReg = usosw2k.inf,AddReg\r"; r = 1 }
         END { if (dup || !(f && h && l && s && r)) exit 3 }
     '
@@ -117,14 +123,14 @@ usos_w2k_storage_sif() {
 # PnpInterface for AHCINT and the CriticalDeviceDatabase entries of
 # USOS_W2K_AHCI_IDS. Loaded through TXTSETUP.SIF [HiveInfs.Fresh].
 usos_w2k_hive_inf() {
-    awk -v ids="$USOS_W2K_AHCI_IDS" '
+    awk -v ids="$USOS_W2K_AHCI_IDS" -v mode="${1:-legacy}" '
         BEGIN {
             bs = sprintf("%c", 92); q = sprintf("%c", 34); n = split(ids, id, " ")
             base = "HKLM," q "SYSTEM" bs "CurrentControlSet" bs
             cddb = base "Control" bs "CriticalDeviceDatabase" bs "pci#"
             print "; USOS: Windows 2000 AHCINT registry rows (tools/w2k_stage.sh)\r"
             print "[Version]\r"; print "Signature = " q "$Windows NT$" q "\r"; print "\r"; print "[AddReg]\r"
-            print base "Services" bs "ahcint" bs "Parameters" bs "PnpInterface" q "," q "5" q ",0x00010001,1\r"
+            if (mode == "pnp") print base "Services" bs "ahcint" bs "Parameters" bs "PnpInterface" q "," q "5" q ",0x00010001,1\r"
             for (i = 1; i <= n; i++) {
                 key = tolower(id[i])
                 print cddb key q "," q "Service" q ",0x00000000," q "ahcint" q "\r"
@@ -151,16 +157,18 @@ usos_w2k_acpi_off_sif() {
 # the local source that holds the GUI-mode copy). Exit 3 unless both rows
 # changed.
 usos_w2k_ahcint_inf() {
-    awk '
+    awk -v mode="${1:-legacy}" '
         BEGIN { bs = sprintf("%c", 92); dir = bs "i386" bs "ahcint" }
         { line = $0; sub(/\r$/, "", line); low = tolower(line) }
         low ~ /^[ \t]*\[/ { section = low; sub(/[ \t]+$/, "", section) }
+        # legacy mode: the PnpInterface row is commented out (see the header).
+        mode == "legacy" && index(low, "pnpinterface") && low !~ /^[ \t]*;/ { line = "; USOS legacy mode: " line; pnp++ }
         (section == "[sourcedisksnames]" || section == "[sourcedisksnames.x86]") && line ~ /^[ \t]*1[ \t]*=/ {
             m = split(line, v, ",")
             if (m != 4) { bad = 1 } else { line = v[1] ",," v[3] "," dir; done[section] = 1 }
         }
         { print line "\r" }
-        END { if (bad || !done["[sourcedisksnames]"] || !done["[sourcedisksnames.x86]"]) exit 3 }
+        END { if (bad || !done["[sourcedisksnames]"] || !done["[sourcedisksnames.x86]"] || (mode == "legacy" && pnp != 1)) exit 3 }
     '
 }
 

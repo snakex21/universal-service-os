@@ -1,0 +1,146 @@
+diff --git a/src/ahcimain.c b/src/ahcimain.c
+index 75d2c12..046200f 100644
+--- a/src/ahcimain.c
++++ b/src/ahcimain.c
+@@ -830,9 +830,14 @@ AhciStartIo(IN PVOID DeviceExtension, IN PSCSI_REQUEST_BLOCK Srb)
+         break;
+ 
+     case SRB_FUNCTION_RESET_DEVICE:
++        Srb->SrbStatus = SRB_STATUS_SUCCESS;
++        break;
++
+     case SRB_FUNCTION_SHUTDOWN:
+     case SRB_FUNCTION_FLUSH:
+-        Srb->SrbStatus = SRB_STATUS_SUCCESS;
++        /* MODIFIED (USOS 1.3.0.0-usos1): FLUSH CACHE (EXT) on the target's
++           port instead of completing without telling the drive. */
++        Srb->SrbStatus = AhciFlushPort(hwInit, Srb->TargetId) ? SRB_STATUS_SUCCESS : SRB_STATUS_ERROR;
+         break;
+ 
+     default:
+diff --git a/src/ahcint.h b/src/ahcint.h
+index 7c63b68..5842b3e 100644
+--- a/src/ahcint.h
++++ b/src/ahcint.h
+@@ -216,6 +216,12 @@ ULONG __cdecl DbgPrint(PCH Format, ...);
+ #define IDW83_VALID                     0x4000
+ #define IDW83_LBA48                     0x0400
+ #define IDW86_LBA48                     0x0400
++/* MODIFIED (USOS 1.3.0.0-usos1): write cache and FLUSH CACHE (EXT) bits */
++#define IDW_CMDSET_ENABLED_1            85
++#define IDW85_WRITE_CACHE               0x0020
++#define IDW83_FLUSH_CACHE_EXT           0x2000
++#define AHCI_ATA_FLUSH_CACHE            0xE7
++#define AHCI_ATA_FLUSH_CACHE_EXT        0xEA
+ 
+ /* 28-bit commands: LBA 0..0x0FFFFFFF, 1..256 sectors (count 0 = 256).
+    48-bit commands: 1..65536 sectors (count 0 = 65536). */
+@@ -434,5 +440,7 @@ VOID    AhciRestartPort(IN PHW_DEVICE_EXTENSION HwInit, IN PUCHAR PortBase);
+ /* ahcisatl.c */
+ VOID    AhciParseIdentify(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port);
+ VOID    AhciSatlProcessSrb(IN PHW_DEVICE_EXTENSION HwInit, IN PSCSI_REQUEST_BLOCK Srb);
++/* MODIFIED (USOS 1.3.0.0-usos1) */
++BOOLEAN AhciFlushPort(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port);
+ 
+ #endif /* _AHCINT_H_ */
+diff --git a/src/ahcisatl.c b/src/ahcisatl.c
+index bdd3f3a..26c45a2 100644
+--- a/src/ahcisatl.c
++++ b/src/ahcisatl.c
+@@ -628,7 +628,7 @@ AhciHandleModeSenseAta(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port, IN PSCSI_R
+     BOOLEAN llba = (BOOLEAN)(ten && (Srb->Cdb[1] & 0x10) != 0);    /* LLBAA */
+     UCHAR pageCode = (UCHAR)(Srb->Cdb[2] & 0x3F);
+     ULONG allocLen;
+-    UCHAR buf[64];
++    UCHAR buf[96];      /* MODIFIED (USOS 1.3.0.0-usos1): 64 -> 96, room for page 08h */
+     ULONG hdrLen, len, descLen;
+     ULONG blocks, cyls, heads, spt;
+     PUCHAR p;
+@@ -689,6 +689,17 @@ AhciHandleModeSenseAta(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port, IN PSCSI_R
+         len += 24;
+     }
+ 
++    /* MODIFIED (USOS 1.3.0.0-usos1): the caching page (08h), WCE from
++       IDENTIFY word 85 bit 5, so the class driver knows about the write
++       cache and sends SYNCHRONIZE CACHE for flushes. */
++    if ((pageCode == 0x08 || pageCode == 0x3F) && len + 20 <= sizeof(buf)) {
++        p = &buf[len];
++        p[0] = 0x08;
++        p[1] = 0x12;
++        if (pi->IdentifyValid && (id[IDW_CMDSET_ENABLED_1] & IDW85_WRITE_CACHE)) p[2] = 0x04;  /* WCE */
++        len += 20;
++    }
++
+     if (ten) {
+         buf[0] = (UCHAR)((len - 2) >> 8);
+         buf[1] = (UCHAR)(len - 2);
+@@ -709,6 +720,33 @@ AhciHandleModeSenseAta(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port, IN PSCSI_R
+ /* ATA disk read/write                                                 */
+ /* ------------------------------------------------------------------ */
+ 
++/* MODIFIED (USOS 1.3.0.0-usos1): FLUSH CACHE (EXT). 1.3.0.0 completed
++   SYNCHRONIZE CACHE, SRB_FUNCTION_FLUSH and SRB_FUNCTION_SHUTDOWN without
++   telling the drive, so data in the drive's write cache was never forced
++   out (lost on power-off after shutdown; FUA writes not honoured). A drive
++   that aborts the command (no FLUSH CACHE support) counts as flushed. */
++BOOLEAN
++AhciFlushPort(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port)
++{
++    PAHCI_PORT_INFO pi;
++    ATA_REQUEST req;
++    ULONG result;
++
++    if (Port >= MAX_SUPPORTED_PORTS) return FALSE;
++    pi = &HwInit->Ports[Port];
++    if (!pi->Present || pi->IsAtapi) return TRUE;
++
++    ZeroMemoryBytes(&req, sizeof(req));
++    req.Command = (UCHAR)(pi->Lba48 ? AHCI_ATA_FLUSH_CACHE_EXT : AHCI_ATA_FLUSH_CACHE);
++    req.Is48Bit = pi->Lba48;
++    result = AhciRunCommand(HwInit, Port, NULL, &req);
++    if (result == AHCI_CMD_DEVICE_ERROR && (pi->LastTfd & 0x0400)) {
++        /* ERR with ABRT in the error register (TFD bits 15:8): not supported */
++        return TRUE;
++    }
++    return (BOOLEAN)(result == AHCI_CMD_OK);
++}
++
+ static VOID
+ AhciAtaReadWrite(
+     IN PHW_DEVICE_EXTENSION HwInit,
+@@ -766,6 +804,13 @@ AhciAtaReadWrite(
+ 
+     result = AhciRunCommand(HwInit, Port, Srb, &req);
+ 
++    /* MODIFIED (USOS 1.3.0.0-usos1): FUA (WRITE(10)/(16) byte 1 bit 3) is
++       honoured with a FLUSH CACHE after the write. */
++    if (result == AHCI_CMD_OK && IsWrite && Srb->CdbLength >= 10 && (Srb->Cdb[1] & 0x08) &&
++        !AhciFlushPort(HwInit, Port)) {
++        result = AHCI_CMD_DEVICE_ERROR;
++    }
++
+     switch (result) {
+     case AHCI_CMD_OK:
+         Srb->SrbStatus = SRB_STATUS_SUCCESS;
+@@ -797,10 +842,19 @@ AhciProcessAtaSrb(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port, IN PSCSI_REQUES
+         AhciHandleRequestSenseAta(HwInit, Port, Srb);
+         return;
+ 
+-    case SCSIOP_TEST_UNIT_READY:
+-    case SCSIOP_MEDIUM_REMOVAL:
+     case SCSIOP_SYNCHRONIZE_CACHE:
+     case AHCI_SCSIOP_SYNC_CACHE16:
++        /* MODIFIED (USOS 1.3.0.0-usos1): a real FLUSH CACHE (EXT) */
++        if (AhciFlushPort(HwInit, Port)) {
++            Srb->SrbStatus = SRB_STATUS_SUCCESS;
++            Srb->ScsiStatus = SCSISTAT_GOOD;
++        } else {
++            AhciFailWithSense(HwInit, Port, Srb, SCSI_SENSE_HARDWARE_ERROR, 0x44, 0);
++        }
++        return;
++
++    case SCSIOP_TEST_UNIT_READY:
++    case SCSIOP_MEDIUM_REMOVAL:
+     case SCSIOP_VERIFY:
+     case AHCI_SCSIOP_VERIFY16:
+         Srb->SrbStatus = SRB_STATUS_SUCCESS;

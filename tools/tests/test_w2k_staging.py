@@ -71,8 +71,12 @@ class W2kStorage(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout.count(b'\r\n'), r.stdout.count(b'\n'))
         out = rows(r.stdout)
-        self.assertEqual(out[1:6], ['[Version]', 'Signature = "$Windows NT$"', '', '[AddReg]',
-                                    'HKLM,"SYSTEM\\CurrentControlSet\\Services\\ahcint\\Parameters\\PnpInterface","5",0x00010001,1'])
+        pnp = 'HKLM,"SYSTEM\\CurrentControlSet\\Services\\ahcint\\Parameters\\PnpInterface","5",0x00010001,1'
+        # Default legacy mode: no PnpInterface (a PnP-mode AHCINT ran the GUI-mode
+        # device install into ERROR_NO_SYSTEM_RESOURCES in QEMU, 2026-09-30).
+        self.assertEqual(out[1:5], ['[Version]', 'Signature = "$Windows NT$"', '', '[AddReg]'])
+        self.assertNotIn(pnp, out)
+        self.assertIn(pnp, rows(run_fn('usos_w2k_hive_inf pnp', b'').stdout))
         cddb = 'HKLM,"SYSTEM\\CurrentControlSet\\Control\\CriticalDeviceDatabase\\pci#'
         for key in ('cc_010601', 'ven_1022&dev_7901', 'ven_1022&dev_43c8', 'ven_1022&dev_43eb'):
             self.assertIn(cddb + key + '","Service",0x00000000,"ahcint"', out)
@@ -85,7 +89,7 @@ class W2kStorage(unittest.TestCase):
         # Upstream ships the INF with LF line ends; the staged one is CRLF.
         raw = (ROOT / 'tools/vendor/ahcint/1.3.0.0/bin/2KXP/ahcint.inf').read_bytes()
         src = raw.replace(b'\r\n', b'\n').replace(b'\n', b'\r\n')
-        r = run_fn('usos_w2k_ahcint_inf', raw)
+        r = run_fn('usos_w2k_ahcint_inf pnp', raw)
         self.assertEqual(r.returncode, 0, r.stderr)
         want = (src.replace(b'[SourceDisksNames]\r\n1 = %DiskName%,,,\r\n', b'[SourceDisksNames]\r\n1 = %DiskName%,,,\\i386\\ahcint\r\n')
                 .replace(b'[SourceDisksNames.x86]\r\n1 = %DiskName%,,,\\i386\r\n', b'[SourceDisksNames.x86]\r\n1 = %DiskName%,,,\\i386\\ahcint\r\n'))
@@ -93,6 +97,11 @@ class W2kStorage(unittest.TestCase):
         self.assertEqual(r.stdout, want)
         self.assertIn(b'[SourceDisksNames.amd64]\r\n1 = %DiskName%,,,\\amd64\r\n', r.stdout)
         self.assertEqual(run_fn('usos_w2k_ahcint_inf', b'[Version]\r\n').returncode, 3)
+        # Legacy mode (default): the PnpInterface row is commented out, nothing else differs.
+        legacy = run_fn('usos_w2k_ahcint_inf', raw)
+        self.assertEqual(legacy.returncode, 0, legacy.stderr)
+        row = b'HKR, "Parameters\\PnpInterface", "5", %REG_DWORD%, 0x00000001\r\n'
+        self.assertEqual(legacy.stdout, want.replace(row, b'; USOS legacy mode: ' + row))
 
     def test_dosnet(self):
         r = run_fn('usos_w2k_dosnet', W2K_DOSNET)
@@ -104,17 +113,22 @@ class W2kStorage(unittest.TestCase):
     def test_package_files(self):
         import build_xp_uefi_csm_trial as builder
         files = builder.w2k_driver_files()
-        self.assertEqual(sorted(files), ['LICENSE', 'SOURCE.txt', 'ahcint.inf', 'ahcint.sys'])
+        self.assertEqual(sorted(files), ['LICENSE', 'MODIFIED.txt', 'SOURCE.txt', 'ahcint.inf', 'ahcint.sys'])
+        self.assertIn(b'MODIFIED version of AHCINT 1.3.0.0', files['MODIFIED.txt'])
+        self.assertIn(b'1.3.0.0-usos1', files['SOURCE.txt'])
         self.assertEqual(struct.unpack_from('<H', files['ahcint.sys'], struct.unpack_from('<I', files['ahcint.sys'], 60)[0] + 4)[0], 0x14c)
         self.assertIn(b'DriverVer=09/29/2026,1.3.0.0', files['ahcint.inf'])
         self.assertIn(b'GNU GENERAL PUBLIC LICENSE', files['LICENSE'])
         self.assertIn(b'Version 3, 29 June 2007', files['LICENSE'])
         self.assertIn('usr/lib/usos/w2k-drivers/', builder.PACKAGE_PREFIXES)
         # The corresponding source is tracked next to the binary, every file pinned.
-        pins = json.loads((ROOT / 'tools/vendor/ahcint/1.3.0.0/manifest.json').read_text())
-        for rel, digest in pins['files'].items():
-            self.assertEqual(hashlib.sha256((ROOT / 'tools/vendor/ahcint/1.3.0.0' / rel).read_bytes()).hexdigest(), digest, rel)
-        self.assertIn('src/ahcimain.c', pins['files'])
+        for folder in ('1.3.0.0', '1.3.0.0-usos1'):
+            pins = json.loads((ROOT / 'tools/vendor/ahcint' / folder / 'manifest.json').read_text())
+            for rel, digest in pins['files'].items():
+                self.assertEqual(hashlib.sha256((ROOT / 'tools/vendor/ahcint' / folder / rel).read_bytes()).hexdigest(), digest, rel)
+            self.assertIn('src/ahcimain.c', pins['files'])
+        # The patched source carries the USOS markers.
+        self.assertIn(b'MODIFIED (USOS 1.3.0.0-usos1)', (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos1/src/ahcisatl.c').read_bytes())
 
     def stand_in(self, t: Path) -> tuple:
         import build_xp_uefi_csm_trial as builder
@@ -146,7 +160,7 @@ class W2kStorage(unittest.TestCase):
                 self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
                 self.assertIn(b'[W2K_STAGE] APPLIED PASS ahcint 1.3.0.0', r.stdout)
                 sif = run_fn('usos_w2k_storage_sif', W2K_TXTSETUP).stdout
-                if acpi != 'on':
+                if acpi == 'off':  # default (empty) keeps ACPI since 2026-10-03
                     sif = run_fn('usos_w2k_acpi_off_sif', sif).stdout
                     self.assertIn(b'ACPI off', r.stdout)
                 inf = run_fn('usos_w2k_ahcint_inf', pkg['ahcint.inf']).stdout
@@ -157,7 +171,7 @@ class W2kStorage(unittest.TestCase):
                     self.assertEqual((folder / 'usosw2k.inf').read_bytes(), run_fn('usos_w2k_hive_inf', b'').stdout)
                     self.assertEqual((folder / 'TXTSETUP.SIF').read_bytes(), sif)
                 self.assertEqual((t / 'root/TXTSETUP.SIF').read_bytes(), sif)
-                self.assertIn(b'ACPIEnable = ' + (b'2' if acpi == 'on' else b'0') + b'\r\n', sif)
+                self.assertIn(b'ACPIEnable = ' + (b'0' if acpi == 'off' else b'2') + b'\r\n', sif)
                 # The GUI-mode source copy (text mode moves the one above).
                 self.assertEqual((ls / 'AHCINT/ahcint.sys').read_bytes(), pkg['ahcint.sys'])
                 self.assertIn(b'd1,ahcint.inf', (ls / 'DOSNET.INF').read_bytes())

@@ -222,6 +222,22 @@ from the pinned URL, and extracts only `binnt64`, `h` and `lib286\win`. The
 driver links no OpenWatcom library code. The TSR `USOSKEY.COM` is built with
 the repository's Zig (ld.lld, `src/platform/bios/msdos/com.ld`).
 
+## Rebuilding AHCINT 1.3.0.0-usos1 (optional)
+
+The XP package uses the pinned `tools\vendor\ahcint\1.3.0.0-usos1\bin\2KXP\i386\ahcint.sys`
+(manifest.json); `build.bat` does not rebuild it. To rebuild from the
+patched source in that folder (`src\`, upstream v1.3.0.0 plus
+`patches\0001-usos1-flush-cache.patch`):
+
+```
+tools\vendor\ahcint\1.3.0.0-usos1\build.cmd [workdir]
+```
+
+It needs the same WDK 7.1 as xhci98 below (`tools\WinDDK71` or `WDKROOT`,
+x86 WXP target). The output is functionally identical but not
+byte-identical; before pinning a new build, check that its imports
+(ntoskrnl, scsiport) resolve on the Windows 2000 SP4 kernel.
+
 ## Rebuilding xhci98 1.1.1.0-usos2 (optional)
 
 The XP package uses the vendored, hash-pinned binaries in

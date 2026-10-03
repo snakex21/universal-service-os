@@ -114,6 +114,10 @@ def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),
         # The BIOS NT5 profile has no driver preflight (and no bundles).
         probe=probe.replace(". /usr/lib/usos/xp_driver_stage.sh; usos_xp_driver_preflight || finish 'FAIL driver preflight'"+chr(10),'')
         probe=probe.replace("if [ -r /usr/lib/usos/xp_user_settings.sh ]; then . /usr/lib/usos/xp_user_settings.sh; usos_xp_settings_stage /probe-usos-xp.ini /mnt/source || finish 'FAIL settings'; fi"+chr(10),'')
+    # USOS_TEST_PROBE_EXPORTS="NAME=value ...": test-only variables for the staging scripts
+    # (e.g. USOS_W2K_ACPI=on, USOS_W2K_AHCINT_MODE=pnp), exported before the chain runs.
+    extra=__import__('os').environ.get('USOS_TEST_PROBE_EXPORTS','').split()
+    if extra:probe=probe.replace('export USOS_PLAN_PROFILE=','export '+' '.join(extra)+chr(10)+'export USOS_PLAN_PROFILE=',1)
     cpio.put(entries,cpio.Entry('probe-init',stat.S_IFREG|0o755,probe.encode()))
     if settings:cpio.put(entries,cpio.Entry('probe-usos-xp.ini',stat.S_IFREG|0o644,Path(settings).read_bytes()))
     if profile in ('w2k3-x86-sp2-uefi-csm','xp-x64-sp2-uefi-csm') and 'usr/lib/usos/nt5-storage/amd64/genahci.inf' not in entries:
@@ -134,6 +138,10 @@ def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),
         # A package from before the Windows 2000 set (AHCINT): add it as the builder does.
         sys.path.insert(0,str(ROOT/'tools'));import build_xp_uefi_csm_trial as builder
         for name,data in builder.w2k_driver_files().items():cpio.put(entries,cpio.Entry('usr/lib/usos/w2k-drivers/'+name,stat.S_IFREG|0o644,data))
+    # USOS_TEST_W2K_AHCI_SYS: a test-only binary staged under the name ahcint.sys
+    # (A/B controls of the AHCI miniport, e.g. UniATA or a rebuilt AHCINT).
+    alt=__import__('os').environ.get('USOS_TEST_W2K_AHCI_SYS')
+    if profile=='w2k-x86-sp4-uefi-csm' and alt:cpio.put(entries,cpio.Entry('usr/lib/usos/w2k-drivers/ahcint.sys',stat.S_IFREG|0o644,Path(alt).read_bytes()))
     if sif:cpio.put(entries,cpio.Entry('probe-custom.sif',stat.S_IFREG|0o644,Path(sif).read_bytes()))
     # --tree-scripts: test the working tree's scripts in the package's kernel/initramfs.
     for name in tree_scripts:

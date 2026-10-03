@@ -198,25 +198,30 @@ def nt52_usb_files():
         %(pins['version'],pins['upstream'],pins['tag'],pins['commit'],pins['source_archive']['sha256'],', '.join(sorted(pins['patches'])))).encode()
     return files
 
-# Windows 2000 SP4 AHCI: AHCINT 1.3.0.0 (GPL-3.0, unmodified ScsiPort miniport,
-# polling I/O; tools/w2k_stage.sh adapts only the INF's source path when
-# staging). Every file pinned by its manifest.
-AHCINT_DIR=ROOT/'tools/vendor/ahcint/1.3.0.0'
+# Windows 2000 SP4 AHCI: AHCINT 1.3.0.0-usos1 (GPL-3.0, MODIFIED by USOS: real
+# FLUSH CACHE for SYNCHRONIZE CACHE / FLUSH / SHUTDOWN, FUA, caching mode page;
+# tools/vendor/ahcint/1.3.0.0-usos1/MODIFIED.txt), a polling ScsiPort
+# miniport built with WDK 7.1. tools/w2k_stage.sh adapts only the INF when
+# staging. Every file pinned by its manifest.
+AHCINT_DIR=ROOT/'tools/vendor/ahcint/1.3.0.0-usos1'
+AHCINT_BASE=ROOT/'tools/vendor/ahcint/1.3.0.0'
 
 def w2k_driver_files():
     pins=json.loads((AHCINT_DIR/'manifest.json').read_text())
+    base=json.loads((AHCINT_BASE/'manifest.json').read_text())
     files={}
-    for name,member in (('ahcint.sys','bin/2KXP/i386/ahcint.sys'),('ahcint.inf','bin/2KXP/ahcint.inf'),('LICENSE','LICENSE')):
+    for name,member in (('ahcint.sys','bin/2KXP/i386/ahcint.sys'),('ahcint.inf','bin/2KXP/ahcint.inf'),('LICENSE','LICENSE'),('MODIFIED.txt','MODIFIED.txt')):
         files[name]=(AHCINT_DIR/member).read_bytes()
         if hashlib.sha256(files[name]).hexdigest()!=pins['files'][member]:raise ValueError('AHCINT file hash mismatch: '+member)
     if struct.unpack_from('<H',files['ahcint.sys'],struct.unpack_from('<I',files['ahcint.sys'],60)[0]+4)[0]!=0x14c:raise ValueError('AHCINT build is not i386')
-    files['SOURCE.txt']=('AHCINT %s (i386 ScsiPort miniport, unmodified), %s\n'
-        'tag %s = commit %s; release archive sha256 %s\n'
-        'Licence: GPL-3.0 (LICENSE). Corresponding source: tools/vendor/ahcint/1.3.0.0/src\n'
-        'in the USOS sources zip (identical to src/ of the release archive).\n'
+    files['SOURCE.txt']=('AHCINT %s (i386 ScsiPort miniport, MODIFIED by USOS, see MODIFIED.txt), %s\n'
+        'base: tag %s = commit %s (release archive sha256 %s) plus %s,\n'
+        'built with WDK 7.1 (7600.16385.1). Licence: GPL-3.0 (LICENSE).\n'
+        'Corresponding source: tools/vendor/ahcint/1.3.0.0-usos1/src (patched) and\n'
+        'tools/vendor/ahcint/1.3.0.0/src (upstream) in the USOS sources zip.\n'
         'USOS uses it only for Windows 2000 SP4 Setup; staging points the INF\n'
         '[SourceDisksNames] row 1 at the Setup source directory (\\i386\\ahcint).\n'
-        %(pins['version'],pins['upstream'],pins['tag'],pins['commit'],pins['release_zip']['sha256'])).encode()
+        %(pins['version'],base['upstream'],base['tag'],base['commit'],base['release_zip']['sha256'],', '.join(pins['patches']))).encode()
     return files
 
 def is_package_entry(name):

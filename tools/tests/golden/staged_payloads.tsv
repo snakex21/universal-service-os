@@ -17,7 +17,7 @@ initramfs	usr/lib/usos/imdisk-x86_64.exe	100644	3a6a94c98a4b87e59a136052c50da070
 initramfs	usr/lib/usos/imdisk-x86_64.sys	100644	72873d35ee3a9d9ef1311bbb6fdefd2dfea47b4752a6f1904bbdc6dc51afd820
 initramfs	usr/lib/usos/legacy_windows_request.sh	100755	86946245c2fcd93c7fc9ffef76cebe2f8a73f197a92958cd543d7644c97c657f
 initramfs	usr/lib/usos/legacy_xp_resume.sh	100755	50abdb4e5c844391889f4800f63a377b49f25ccf98aa8a62fd769caaaa107cb7
-initramfs	usr/lib/usos/legacy_xp_staging.sh	100755	2367f8a79a59b0cd8f8d162531af2638bdaa7946b4715de9d146c06e9c1b705a
+initramfs	usr/lib/usos/legacy_xp_staging.sh	100755	f13849ebeb3e6049ddc24994ece8b72399153d71f3e79a77fc4b2fce58d28756
 initramfs	usr/lib/usos/micro_linux_ui.sh	100755	2746a51c0a03bd2503b4c5d0d5f334141b09adbfd43909f91256c6d304a57d6f
 initramfs	usr/lib/usos/nt52_usb_stage.sh	100755	0bb49dc37fbc899e5a5b21fab234785c785f97d2079e3ae121a041e741236271
 initramfs	usr/lib/usos/nt5_profile.sh	100755	7d13f35fe285de2e73a0bc70708e0ce744328bba7ac5bbbdca56892e5dfaf38a
@@ -68,7 +68,7 @@ initramfs	usr/lib/usos/vista_csmwrap_target.sh	100755	0690b03e56ee84a2a1422faf21
 initramfs	usr/lib/usos/vista_disk_prepare.sh	100755	f41d1790480b90e0ca3e578dadc2ed0c4aa20acc1a5b403f5b2b01e2013b464d
 initramfs	usr/lib/usos/w2k3_selected_partition_uefi_csm.sif	100755	d986de98a02dd6c9454db8e37d54999f9213b3d1fb5a8205ac996dc9f391f538
 initramfs	usr/lib/usos/w2k_selected_partition_uefi_csm.sif	100755	4081b007b280efb31c85ce519abbfcb18ac8f09482add26a7de1c8b3520de04e
-initramfs	usr/lib/usos/w2k_stage.sh	100755	8c1dad12af8e66489705d1559d340cf0f9a8187d620fb6a73bd6d50a8514c3ce
+initramfs	usr/lib/usos/w2k_stage.sh	100755	50eb5107b6d140fef7c69f7df0d69d6db7e4893797b52879fe510ba26ad5acd4
 initramfs	usr/lib/usos/wimboot	100644	5f067ccdc4d084d5bf77b6c853bd0f8402dfc2b4cd1b103d358993ae97fae8e3
 initramfs	usr/lib/usos/wimboot-kexec	100644	f0c38d5b145b70d2156a37f62e3d97abdb5d75a3ab8703a718d43f777df0692a
 initramfs	usr/lib/usos/wimboot-kexec-ordered	100644	bf506f033e29ac09b338a1572d726e7d02a046f91ce3de59fc72905f1e1b89b5
@@ -303,9 +303,10 @@ xp_csm	usr/lib/usos/nt52-usb/x86/xhci98.inf	100644	88ecbce637a81c361f8ae0c35df58
 xp_csm	usr/lib/usos/nt52-usb/x86/xhci98.sys	100644	01adf36d75eccebf9365a169fa47e5f1cd64cf40f43bcad4ba069210abd651ad
 xp_csm	usr/lib/usos/w2k-drivers	40755	dir
 xp_csm	usr/lib/usos/w2k-drivers/LICENSE	100644	230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809
-xp_csm	usr/lib/usos/w2k-drivers/SOURCE.txt	100644	4588395eb4d556d9caaf66f1ff9023d906cc5522e552047253e0c3526db5a2f8
+xp_csm	usr/lib/usos/w2k-drivers/MODIFIED.txt	100644	8dd22a2c7bdbe3a8155dc050377f055ddc5224fb431161094ffe4d88920724d2
+xp_csm	usr/lib/usos/w2k-drivers/SOURCE.txt	100644	733ac5f6ae0f8675e6936f0cc705c351f5d97785d12f19750522a25da03a6e01
 xp_csm	usr/lib/usos/w2k-drivers/ahcint.inf	100644	c8dea5fd3839b8f9298a7925f6ba8c6451588638a42f24e10c4c8542915a6e21
-xp_csm	usr/lib/usos/w2k-drivers/ahcint.sys	100644	94ef734c4ba942debe990958917880f1995c08266600dc2014392bdaa22fac25
+xp_csm	usr/lib/usos/w2k-drivers/ahcint.sys	100644	01ac4a6e58566fb47d6ec3087a45d07daa0c1887454565162f6c093f8bd39780
 xp_csm	usr/lib/usos/xp-pae-LICENSE.txt	100644	65253ad371ef07ab6d3a3779a71ae195b54e0a3a05cac7ab99250c55ad0e01bd
 xp_csm	usr/lib/usos/xp-pae.exe	100644	stand-in
 # native_cpio: archive member size sha256
