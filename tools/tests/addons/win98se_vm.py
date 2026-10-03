@@ -87,7 +87,7 @@ AddReg=USOS.RunOnce
 
 [USOS.RunOnce]
 HKLM,"Software\Microsoft\Windows\CurrentVersion\RunOnce",USOSWelcome,,"%25%\rundll.exe setupx.dll,InstallHinfSection USOS.NoWelcome 4 %10%\msbatch.inf"
-HKLM,"Software\Microsoft\Windows\CurrentVersion\RunOnce",USOSAddons,,"C:\USOS\ADDONS\USOSADD.EXE"
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Run",USOSAddons,,"C:\USOS\ADDONS\USOSADD.EXE"
 
 [USOS.NoWelcome]
 DelReg=USOS.Welcome.Del

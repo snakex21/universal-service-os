@@ -6,7 +6,9 @@
  * C runtime (own entry point ua_start, built by tools/build_usosadd.py).
  * Behaviour: docs/design/legacy-compat-pack.md section 2.6.
  *
- *   USOSADD.EXE          run / resume the chain (started from RunOnce)
+ *   USOSADD.EXE          run / resume the chain (started from HKLM Run after
+ *                        the shell is up; never from RunOnce, which Windows 98
+ *                        Setup processes while it is still finishing)
  *   USOSADD.EXE /dry     detect and log the plan only
  *   USOSADD.EXE /reset   forget the state (STATE.INI)
  */
@@ -433,18 +435,60 @@ static void set_why(int i, int st, const char *why, const char *detail) {
 }
 
 
-static void register_runonce(void) {
+#define RUN_KEY "Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+#define RUNONCE_KEY "Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce"
+
+/* HKLM Run "USOSAddons" = this program, until the chain is finished. Run
+ * (not RunOnce): Run entries start after the shell, and RunOnce entries of
+ * the first boot run inside Windows 98 Setup's last phase, where a restart
+ * breaks Setup (QEMU run 2026-10-03). */
+static void register_run(void) {
     HKEY k;
     char exe[UA_PATH + 4];
     exe[0] = 0;
     ua_append(exe, sizeof exe, "\"");
     path_join(exe + 1, g_root, "USOSADD.EXE");
     ua_append(exe, sizeof exe, "\"");
-    if (RegCreateKeyExA(HKEY_LOCAL_MACHINE, "Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce", 0, 0, 0,
-                        KEY_WRITE, 0, &k, 0) == ERROR_SUCCESS) {
+    if (RegCreateKeyExA(HKEY_LOCAL_MACHINE, RUN_KEY, 0, 0, 0, KEY_WRITE, 0, &k, 0) == ERROR_SUCCESS) {
         RegSetValueExA(k, "USOSAddons", 0, REG_SZ, (const BYTE *)exe, (DWORD)ua_len(exe) + 1);
         RegCloseKey(k);
     }
+}
+
+static void unregister(void) {
+    HKEY k;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, RUN_KEY, 0, KEY_WRITE, &k) == ERROR_SUCCESS) {
+        RegDeleteValueA(k, "USOSAddons");
+        RegCloseKey(k);
+    }
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, RUNONCE_KEY, 0, KEY_WRITE, &k) == ERROR_SUCCESS) {
+        RegDeleteValueA(k, "USOSAddons");
+        RegCloseKey(k);
+    }
+}
+
+/* Windows Setup still finishing: its RunOnce\Setup list is not empty, or
+ * there is no taskbar yet. */
+static int setup_busy(void) {
+    HKEY k;
+    DWORD values = 0;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, RUNONCE_KEY "\\Setup", 0, KEY_READ, &k) == ERROR_SUCCESS) {
+        if (RegQueryInfoKeyA(k, 0, 0, 0, 0, 0, 0, &values, 0, 0, 0, 0) != ERROR_SUCCESS) values = 0;
+        RegCloseKey(k);
+        if (values) return 1;
+    }
+    return FindWindowA("Shell_TrayWnd", 0) == 0;
+}
+
+/* Waits (up to 30 minutes) until Setup is done and the desktop is there.
+ * Returns 0 when it never got there: the chain then waits for the next boot. */
+static int wait_for_desktop(void) {
+    int i;
+    for (i = 0; i < 360 && setup_busy(); i++) {
+        if (i == 0) log_line("  waiting for Windows Setup to finish / the desktop");
+        Sleep(5000);
+    }
+    return !setup_busy();
 }
 
 typedef BOOL (WINAPI *PFN_OPT)(HANDLE, DWORD, PHANDLE);
@@ -454,7 +498,7 @@ typedef BOOL (WINAPI *PFN_ATP)(HANDLE, BOOL, PTOKEN_PRIVILEGES, DWORD, PTOKEN_PR
 static void restart(void) {
     g_state.pending_reboot = 1;
     save_state();
-    register_runonce();
+    register_run();
     log_line(g_pl ? "Ponowne uruchomienie komputera" : "Restarting the computer");
     status(g_pl ? "Ponowne uruchomienie komputera..." : "Restarting the computer...");
     if (g_facts.nt) {
@@ -645,6 +689,7 @@ static void finish(void) {
         if (listed++ < 15) { ua_append(text, sizeof text, "\r\n"); ua_append(text, sizeof text, line); }
     }
     ua_append(text, sizeof text, g_pl ? "\r\n\r\nDziennik: C:\\USOS\\addons.log" : "\r\n\r\nLog: C:\\USOS\\addons.log");
+    unregister();
     if (g_wnd) ShowWindow(g_wnd, SW_HIDE);
     MessageBoxA(0, text, "USOS", MB_OK | (failed ? MB_ICONWARNING : MB_ICONINFORMATION) | MB_SETFOREGROUND);
 }
@@ -727,6 +772,13 @@ void __cdecl ua_start(void) {
     if (g_state.starts == 0 || dry) log_plan();
     if (dry) ExitProcess(0);
 
+    /* Started from Run after the shell; still wait while Setup finishes
+     * (an older RunOnce entry, or a slow first boot). */
+    register_run();
+    if (!wait_for_desktop()) {
+        log_line("USOSADD: Windows Setup is still running, trying again at the next start");
+        ExitProcess(0);
+    }
     g_state.starts++;
     g_state.pending_reboot = 0; /* we are running after the restart */
     save_state();
