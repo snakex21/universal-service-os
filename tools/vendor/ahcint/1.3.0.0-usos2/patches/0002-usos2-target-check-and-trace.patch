@@ -1,6 +1,6 @@
 diff -ruN --strip-trailing-cr 1.3.0.0-usos1/src/ahcimain.c new/ahcimain.c
 --- 1.3.0.0-usos1/src/ahcimain.c	2026-10-03 19:47:32.000000000 +0200
-+++ new/ahcimain.c	2026-10-03 23:32:45.112913300 +0200
++++ new/ahcimain.c	2026-10-04 00:09:13.681989900 +0200
 @@ -519,6 +519,8 @@
      }
  
@@ -10,9 +10,18 @@ diff -ruN --strip-trailing-cr 1.3.0.0-usos1/src/ahcimain.c new/ahcimain.c
      return TRUE;
  }
  
+@@ -838,6 +840,8 @@
+         /* MODIFIED (USOS 1.3.0.0-usos1): FLUSH CACHE (EXT) on the target's
+            port instead of completing without telling the drive. */
+         Srb->SrbStatus = AhciFlushPort(hwInit, Srb->TargetId) ? SRB_STATUS_SUCCESS : SRB_STATUS_ERROR;
++        /* MODIFIED (USOS 1.3.0.0-usos2): the trace at shutdown */
++        if (Srb->Function == SRB_FUNCTION_SHUTDOWN) AhciUsosTrace(hwInit, "shutdown");
+         break;
+ 
+     default:
 diff -ruN --strip-trailing-cr 1.3.0.0-usos1/src/ahcint.h new/ahcint.h
 --- 1.3.0.0-usos1/src/ahcint.h	2026-10-03 19:47:32.000000000 +0200
-+++ new/ahcint.h	2026-10-03 23:32:45.100316200 +0200
++++ new/ahcint.h	2026-10-04 00:09:13.666350400 +0200
 @@ -385,6 +385,18 @@
      AHCI_PORT_INFO          Ports[MAX_SUPPORTED_PORTS];
      PAHCI_DMA_RESOURCES     DmaArea;
@@ -51,7 +60,7 @@ diff -ruN --strip-trailing-cr 1.3.0.0-usos1/src/ahcint.h new/ahcint.h
  #endif /* _AHCINT_H_ */
 diff -ruN --strip-trailing-cr 1.3.0.0-usos1/src/ahcisatl.c new/ahcisatl.c
 --- 1.3.0.0-usos1/src/ahcisatl.c	2026-10-03 19:47:32.000000000 +0200
-+++ new/ahcisatl.c	2026-10-03 23:32:45.111906500 +0200
++++ new/ahcisatl.c	2026-10-04 00:09:13.675935300 +0200
 @@ -300,6 +300,29 @@
      acmd = pi->CommandTable + AHCI_CMDTBL_ACMD_OFFSET;
      prdt = (PAHCI_PRDT_ENTRY)(pi->CommandTable + AHCI_CMDTBL_PRDT_OFFSET);
@@ -103,9 +112,9 @@ diff -ruN --strip-trailing-cr 1.3.0.0-usos1/src/ahcisatl.c new/ahcisatl.c
      req.Command = (UCHAR)(pi->Lba48 ? AHCI_ATA_FLUSH_CACHE_EXT : AHCI_ATA_FLUSH_CACHE);
      req.Is48Bit = pi->Lba48;
      result = AhciRunCommand(HwInit, Port, NULL, &req);
-+    /* MODIFIED (USOS 1.3.0.0-usos2): every flush updates the trace */
++    /* MODIFIED (USOS 1.3.0.0-usos2): flushes are counted (the trace is
++       written at start, every 2048 writes and at shutdown) */
 +    HwInit->UsosFlushes++;
-+    AhciUsosTrace(HwInit, "flush");
      if (result == AHCI_CMD_DEVICE_ERROR && (pi->LastTfd & 0x0400)) {
          /* ERR with ABRT in the error register (TFD bits 15:8): not supported */
          return TRUE;

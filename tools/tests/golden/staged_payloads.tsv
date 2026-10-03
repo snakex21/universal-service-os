@@ -303,10 +303,10 @@ xp_csm	usr/lib/usos/nt52-usb/x86/xhci98.inf	100644	88ecbce637a81c361f8ae0c35df58
 xp_csm	usr/lib/usos/nt52-usb/x86/xhci98.sys	100644	01adf36d75eccebf9365a169fa47e5f1cd64cf40f43bcad4ba069210abd651ad
 xp_csm	usr/lib/usos/w2k-drivers	40755	dir
 xp_csm	usr/lib/usos/w2k-drivers/LICENSE	100644	230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809
-xp_csm	usr/lib/usos/w2k-drivers/MODIFIED.txt	100644	551433d2a245d722cc2bd44e72ee827ac162d50f5071f04e1e2342b02f8851ed
+xp_csm	usr/lib/usos/w2k-drivers/MODIFIED.txt	100644	f374e23d40468f986c1b19a03888949df517fd9cfe39b99fc45edc357ab8a4ef
 xp_csm	usr/lib/usos/w2k-drivers/SOURCE.txt	100644	67dc48986e328227f4a04007bc0ee4582e591ec3a99f2ae9827be50537922aea
 xp_csm	usr/lib/usos/w2k-drivers/ahcint.inf	100644	c8dea5fd3839b8f9298a7925f6ba8c6451588638a42f24e10c4c8542915a6e21
-xp_csm	usr/lib/usos/w2k-drivers/ahcint.sys	100644	45d414e26488887e06cbba85c95d456430d19d3ef8f630c1191d0e4bc7e1d531
+xp_csm	usr/lib/usos/w2k-drivers/ahcint.sys	100644	0c807f42df13e1dfddad8f6a3f0399db7ba2a115b2975ee4609f138a5eb412c1
 xp_csm	usr/lib/usos/w2k-drivers/uniata	40755	dir
 xp_csm	usr/lib/usos/w2k-drivers/uniata/COPYING-GPL-2.0.txt	100644	162eb961bb30cf48b46be205aae1def8450ebbd6d9cd88fcb405b6379ac13d26
 xp_csm	usr/lib/usos/w2k-drivers/uniata/SOURCES.txt	100644	78556e7139f4336045dd34e5f209e40d0dacf35d4dfcfd23b0f4d7161e39bdcc

@@ -840,6 +840,8 @@ AhciStartIo(IN PVOID DeviceExtension, IN PSCSI_REQUEST_BLOCK Srb)
         /* MODIFIED (USOS 1.3.0.0-usos1): FLUSH CACHE (EXT) on the target's
            port instead of completing without telling the drive. */
         Srb->SrbStatus = AhciFlushPort(hwInit, Srb->TargetId) ? SRB_STATUS_SUCCESS : SRB_STATUS_ERROR;
+        /* MODIFIED (USOS 1.3.0.0-usos2): the trace at shutdown */
+        if (Srb->Function == SRB_FUNCTION_SHUTDOWN) AhciUsosTrace(hwInit, "shutdown");
         break;
 
     default:

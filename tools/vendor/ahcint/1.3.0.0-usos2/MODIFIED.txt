@@ -23,7 +23,7 @@ run, where text-mode Setup copied files but nothing reached the disk:
   mismatch hides the port from Setup ("no hard disk" instead of copying
   into nothing). It increments the boot counter in the marker and writes an
   ASCII trace (counters, every port's SSTS/CMD/SIG/TFD and model) to LBA
-  2040 + boot % 4, again after every flush. Other disks are only read at LBA
+  2040 + boot % 4, again every 2048 writes and at shutdown. Other disks are only read at LBA
   2046.
 
 Every changed spot in src/ is marked "MODIFIED (USOS 1.3.0.0-usosN)".

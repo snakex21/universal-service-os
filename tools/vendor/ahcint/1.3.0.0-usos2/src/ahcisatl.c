@@ -773,9 +773,9 @@ AhciFlushPort(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port)
     req.Command = (UCHAR)(pi->Lba48 ? AHCI_ATA_FLUSH_CACHE_EXT : AHCI_ATA_FLUSH_CACHE);
     req.Is48Bit = pi->Lba48;
     result = AhciRunCommand(HwInit, Port, NULL, &req);
-    /* MODIFIED (USOS 1.3.0.0-usos2): every flush updates the trace */
+    /* MODIFIED (USOS 1.3.0.0-usos2): flushes are counted (the trace is
+       written at start, every 2048 writes and at shutdown) */
     HwInit->UsosFlushes++;
-    AhciUsosTrace(HwInit, "flush");
     if (result == AHCI_CMD_DEVICE_ERROR && (pi->LastTfd & 0x0400)) {
         /* ERR with ABRT in the error register (TFD bits 15:8): not supported */
         return TRUE;

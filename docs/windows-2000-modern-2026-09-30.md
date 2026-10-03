@@ -250,9 +250,15 @@ a blinking cursor; no visible restart, nothing for 15 minutes.
   the disk: Setup says it found no hard disk instead of copying into
   nothing**), increments the boot counter in the marker, and writes an ASCII
   trace (counters, every port's SSTS/CMD/SIG/TFD and model) to LBA
-  2040-2043, again every 2048 writes and on every flush. Other disks are
-  only read at LBA 2046. QEMU: verify PASS, boot counter and records as
-  expected, install unchanged.
+  2040-2043, again every 2048 writes and at shutdown. Other disks are
+  only read at LBA 2046. QEMU (2026-10-04, SeaBIOS, AHCI, 2 CPUs): verify
+  PASS, three boots counted, records with growing counters, **install to the
+  logon screen unchanged**.
+- **Open QEMU issue:** the same run with **one CPU** (ACPI uniprocessor HAL)
+  stalls in "Installing devices" while the disk fills (25 million sectors
+  written in the GUI boot, the ESENT log flood of section 5). The usos1
+  CSMWrap run with one CPU passed, so this is not deterministic; it needs
+  its own investigation. The X470 runs 2000 with 2 CPUs (ACPI or MPS HAL).
 - Read it on the dev PC, read-only: `python tools\w2k_gap_trace.py \\.\PhysicalDriveN`
   (or a `.qcow2`). Boot counter still 0 = the driver's writes never reached
   the disk; records with growing `wr` = writes arrive.
