@@ -89,7 +89,11 @@ def start(out, a):
     if a.mouse == 'usb':
         # Relative USB mouse (SeaBIOS: INT 15h C2 / PS/2-BIOS events).
         cmd += ['-device', 'usb-mouse,bus=xhci.0']
-    if a.target:
+    if a.target and a.target_bus == 'ide':
+        # Legacy IDE (PIIX) instead of AHCI: for comparing Windows 9x disk drivers.
+        cmd += ['-drive', f'if=none,id=target,format={a.target_format},file={a.target}',
+                '-device', f'ide-hd,drive=target,bus=ide.0,bootindex={2 if a.stick else 0}']
+    elif a.target:
         cmd += ['-device', 'ahci,id=ahci', '-drive', f'if=none,id=target,format={a.target_format},file={a.target}',
                 '-device', f'ide-hd,drive=target,bus=ahci.0,bootindex={2 if a.stick else 0}']
     if a.extra_disk:
@@ -147,6 +151,7 @@ def main():
     s.add_argument('--stick-ro', action='store_true')
     s.add_argument('--target', type=Path)
     s.add_argument('--target-format', default='qcow2')
+    s.add_argument('--target-bus', choices=('ahci', 'ide'), default='ahci')
     s.add_argument('--target-first', action='store_true')
     s.add_argument('--extra-disk', type=Path, help='raw image as a second AHCI disk')
     s.add_argument('--tablet', action='store_true')
