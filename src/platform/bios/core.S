@@ -107,6 +107,9 @@
 .equ THUNK_GEOM_CYLINDERS, THUNK_STATE + 144
 .equ THUNK_GEOM_HEADS, THUNK_STATE + 146
 .equ THUNK_GEOM_SPT, THUNK_STATE + 148
+.equ THUNK_PIC1_SAVED, THUNK_STATE + 150
+.equ THUNK_PIC2_SAVED, THUNK_STATE + 151
+.equ THUNK_PIC_MASKED, THUNK_STATE + 152
 .equ DRIVE_PARAMS, 0x00009500
 .equ VBE_CONTROLLER_INFO, 0x00009600
 .equ VBE_MODE_INFO, 0x00009800
@@ -657,6 +660,37 @@ real_entry:
     mov es, ax
     mov ss, ax
     mov sp, REAL_STACK
+    /* PS/2 input belongs to the Core's 8042 polling. IRQ1/IRQ12 stay masked
+     * during every BIOS call that is not a keyboard wait or a hand-over, so
+     * the firmware's keyboard/mouse handlers cannot take bytes that arrive
+     * meanwhile (lost or doubled menu keys on BIOS PCs with a PS/2 keyboard).
+     * SeaBIOS's USB keyboard is served from IRQ0 and is not affected. */
+    mov byte ptr [THUNK_PIC_MASKED], 0
+    mov al, byte ptr [THUNK_OP]
+    cmp al, 1
+    je .pic_mask_done
+    cmp al, 2
+    je .pic_mask_done
+    cmp al, 3
+    je .pic_mask_done
+    cmp al, 11
+    je .pic_mask_done
+    cmp al, 14
+    je .pic_mask_done
+    cmp al, 15
+    je .pic_mask_done
+    cmp al, 16
+    je .pic_mask_done
+    in al, 0x21
+    mov byte ptr [THUNK_PIC1_SAVED], al
+    or al, 0x02
+    out 0x21, al
+    in al, 0xA1
+    mov byte ptr [THUNK_PIC2_SAVED], al
+    or al, 0x10
+    out 0xA1, al
+    mov byte ptr [THUNK_PIC_MASKED], 1
+.pic_mask_done:
     cmp byte ptr [THUNK_OP], 1
     je .keyboard_read
     cmp byte ptr [THUNK_OP], 2
@@ -1173,6 +1207,23 @@ real_entry:
     mov byte ptr [THUNK_STATUS], 0
 .bios_done:
     cli
+    cmp byte ptr [THUNK_PIC_MASKED], 0
+    je .pic_restore_done
+    /* Only IRQ1/IRQ12 change back; other bits keep what the BIOS set. */
+    in al, 0x21
+    and al, 0xFD
+    mov ah, byte ptr [THUNK_PIC1_SAVED]
+    and ah, 0x02
+    or al, ah
+    out 0x21, al
+    in al, 0xA1
+    and al, 0xEF
+    mov ah, byte ptr [THUNK_PIC2_SAVED]
+    and ah, 0x10
+    or al, ah
+    out 0xA1, al
+    mov byte ptr [THUNK_PIC_MASKED], 0
+.pic_restore_done:
     /* BIOS may have used its own GDT; reload ours from low-memory scratch. */
     lgdt [THUNK_GDTR]
     mov eax, cr0

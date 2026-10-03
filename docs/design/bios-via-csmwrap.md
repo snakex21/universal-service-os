@@ -139,6 +139,17 @@ QEMU + `usb-kbd`). Prototype:
 * `console.zig`: after an empty 8042 poll, one INT 16h poll while the 8042 has
   not yet delivered any keyboard byte (a PS/2 keyboard in use disables the
   fallback; without that rule a PS/2 key was once seen twice on plain SeaBIOS).
+* `core.S` (2026-10-03): every other BIOS call (INT 13h reads and writes,
+  drive info, VBE, E820) also runs with IRQ1/IRQ12 masked; only the blocking
+  key reads, power off and the hand-overs (chainload, DOS, wimboot) keep the
+  firmware's mask. Before, a PS/2 byte that arrived during a disk read went to
+  SeaBIOS's IRQ1 handler (into the BDA buffer the Core no longer reads once
+  the 8042 delivered a byte), so menu keys got lost on BIOS PCs with a PS/2
+  keyboard: Enter on a Windows 95/98/Me image or on Automatic was ignored or
+  the next screen closed. Regression test:
+  `tools/tests/legacy_bios/bios_menu_input_regression.py --stick S.vhd
+  --system-row 13` (PS/2 on plain SeaBIOS and USB through CSMWrap; the old
+  Core fails the image / Automatic steps, the fixed one passes both paths).
 * Core payload 239132 bytes (+436), headroom 6628 (minimum 4096).
   `installer/internal/payload/legacy_boot_generated.go` is **not** regenerated
   on this branch; the prototype Core is `zig-out/legacy-bios-proto/core-slot.bin`
