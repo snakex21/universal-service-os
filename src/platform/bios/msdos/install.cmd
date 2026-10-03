@@ -1,18 +1,30 @@
 @echo off
+rem Two modes. BIOS Core: everything on the RAM disk D:, booted from it.
+rem Disk mode (UDISK=1, prepared from UEFI by tools/dos_csmwrap_target.sh):
+rem A: is the MS-DOS boot floppy (MEMDISK), the sources are in C:\USOSDOS.
+if "%USRC%"=="" set USRC=D:
+if "%USYS%"=="" set USYS=D:\
 echo USOS - installing MS-DOS on the confirmed FAT16 target C:
-D:\DOSFILES\SYS.COM D:\ C:
+%USRC%\DOSFILES\SYS.COM %USYS% C:
 if errorlevel 1 goto failed
-call D:\PREPDOS.BAT D:\DOSFILES C:\DOS D:
+rem Disk mode: the one-time syslinux start goes (SYS replaced its boot sector).
+if not "%UDISK%"=="1" goto sl_done
+%USRC%\DOSFILES\ATTRIB.EXE -r -h -s C:\LDLINUX.SYS
+del C:\LDLINUX.SYS
+del C:\LDLINUX.C32
+del C:\SYSLINUX.CFG
+:sl_done
+call %USRC%\PREPDOS.BAT %USRC%\DOSFILES C:\DOS %USRC%
 if not exist C:\DOS\READY.TAG goto failed
-copy D:\REBOOT.COM C:\DOS /y >nul
+copy %USRC%\REBOOT.COM C:\DOS /y >nul
 if errorlevel 1 goto failed
-copy D:\HIMEMX.EXE C:\DOS /y >nul
+copy %USRC%\HIMEMX.EXE C:\DOS /y >nul
 if errorlevel 1 goto failed
-copy D:\HIMEMX.TXT C:\DOS /y >nul
+copy %USRC%\HIMEMX.TXT C:\DOS /y >nul
 if errorlevel 1 goto failed
-copy D:\HIMEMSRC.ZIP C:\DOS /y >nul
+copy %USRC%\HIMEMSRC.ZIP C:\DOS /y >nul
 if errorlevel 1 goto failed
-copy D:\LICENSE.TXT C:\DOS /y >nul
+copy %USRC%\LICENSE.TXT C:\DOS /y >nul
 if errorlevel 1 goto failed
 md C:\TEMP
 echo DEVICE=C:\DOS\HIMEMX.EXE /MAX=32768 /X2MAX32>C:\CONFIG.SYS
@@ -27,54 +39,54 @@ echo path C:\DOS;C:\WINDOWS;C:\PROGRAMS>>C:\AUTOEXEC.BAT
 echo set TEMP=C:\TEMP>>C:\AUTOEXEC.BAT
 echo ver>>C:\AUTOEXEC.BAT
 rem Prepared under CSMWrap (UEFI PC without CSM): USB mouse through VBADOS.
-if not exist D:\CSMWRAP.TAG goto csm_dos_done
-copy D:\VBMOUSE.EXE C:\DOS /y >nul
+if not exist %USRC%\CSMWRAP.TAG goto csm_dos_done
+copy %USRC%\VBMOUSE.EXE C:\DOS /y >nul
 if errorlevel 1 goto failed
-copy D:\VBADOS.TXT C:\DOS /y >nul
+copy %USRC%\VBADOS.TXT C:\DOS /y >nul
 if errorlevel 1 goto failed
-copy D:\USOSKEY.COM C:\DOS /y >nul
+copy %USRC%\USOSKEY.COM C:\DOS /y >nul
 if errorlevel 1 goto failed
 echo C:\DOS\VBMOUSE.EXE>>C:\AUTOEXEC.BAT
 echo C:\DOS\USOSKEY.COM>>C:\AUTOEXEC.BAT
 :csm_dos_done
-if not exist D:\PROGRAMS\nul goto programs_done
+if not exist %USRC%\PROGRAMS\nul goto programs_done
 md C:\PROGRAMS
-C:\DOS\XCOPY.EXE D:\PROGRAMS\*.* C:\PROGRAMS /s /e /v >nul
+C:\DOS\XCOPY.EXE %USRC%\PROGRAMS\*.* C:\PROGRAMS /s /e /v >nul
 if errorlevel 2 goto failed
 :programs_done
-if not exist D:\WINSETUP\SETUP.EXE goto dos_done
+if not exist %USRC%\WINSETUP\SETUP.EXE goto dos_done
 md C:\WINSETUP
-C:\DOS\XCOPY.EXE D:\WINSETUP\*.* C:\WINSETUP /s /e /v >nul
+C:\DOS\XCOPY.EXE %USRC%\WINSETUP\*.* C:\WINSETUP /s /e /v >nul
 if errorlevel 1 goto failed
 if not exist C:\WINSETUP\SETUP.EXE goto failed
 md C:\USOSW3
-copy D:\W3START.BAT C:\USOSW3 /y >nul
+copy %USRC%\W3START.BAT C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
-copy D:\WINMENU.BAT C:\USOSW3 /y >nul
+copy %USRC%\WINMENU.BAT C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
-copy D:\W3CONFIG.SYS C:\USOSW3 /y >nul
+copy %USRC%\W3CONFIG.SYS C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
-copy D:\W3AUTO.BAT C:\USOSW3 /y >nul
+copy %USRC%\W3AUTO.BAT C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
 rem CSMWrap: HIMEM /M:2 and VBMOUSE in the start menu, SYSTEM.INI changes.
-if not exist D:\CSMWRAP.TAG goto csm_w3_done
-copy D:\W3CONFIG.CSM C:\USOSW3\W3CONFIG.SYS /y >nul
+if not exist %USRC%\CSMWRAP.TAG goto csm_w3_done
+copy %USRC%\W3CONFIG.CSM C:\USOSW3\W3CONFIG.SYS /y >nul
 if errorlevel 1 goto failed
-copy D:\W3AUTO.CSM C:\USOSW3\W3AUTO.BAT /y >nul
+copy %USRC%\W3AUTO.CSM C:\USOSW3\W3AUTO.BAT /y >nul
 if errorlevel 1 goto failed
-copy D:\W3INI.BAS C:\USOSW3 /y >nul
+copy %USRC%\W3INI.BAS C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
-copy D:\VBMOUSE.DRV C:\USOSW3 /y >nul
+copy %USRC%\VBMOUSE.DRV C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
-copy D:\USOSKEY.DRV C:\USOSW3 /y >nul
+copy %USRC%\USOSKEY.DRV C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
-copy D:\USOS.SHH C:\WINSETUP /y >nul
+copy %USRC%\USOS.SHH C:\WINSETUP /y >nul
 if errorlevel 1 goto failed
 :csm_w3_done
 rem Windows Setup needs the original DOS XMS manager after a cold restart.
 rem Under CSMWrap HIMEM picks A20 handler 3, which leaves A20 off: /M:2.
 rem (No IF with a redirection: COMMAND.COM opens the file even when false.)
-if exist D:\CSMWRAP.TAG goto himem_csmwrap
+if exist %USRC%\CSMWRAP.TAG goto himem_csmwrap
 echo DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF>C:\CONFIG.SYS
 goto himem_done
 :himem_csmwrap
@@ -106,9 +118,14 @@ echo.
 echo REBOOT is prepared below. Press Enter when ready, or Esc to clear it.
 echo.
 prompt $p$g
+if "%UDISK%"=="1" goto restart_now
 D:
 cd \
 D:\REBOOT.COM /P
+goto end
+:restart_now
+echo Restarting from the target disk...
+%USRC%\REBOOT.COM
 goto end
 :failed
 echo.
