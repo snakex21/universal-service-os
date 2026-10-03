@@ -4,9 +4,9 @@
 # Applied on the target after the local source copy, before xhci98
 # (nt52_usb_stage.sh):
 #
-# 1. AHCI: AHCINT 1.3.0.0-usos1 (https://github.com/ages2001/AHCINT, GPL-3.0,
+# 1. AHCI: AHCINT 1.3.0.0-usos2 (https://github.com/ages2001/AHCINT, GPL-3.0,
 #    MODIFIED by USOS: real FLUSH CACHE, FUA, caching mode page;
-#    tools/vendor/ahcint/1.3.0.0-usos1), a ScsiPort miniport with
+#    tools/vendor/ahcint/1.3.0.0-usos2), a ScsiPort miniport with
 #    polling I/O (no interrupt needed, so it also runs without ACPI). Every
 #    import (ntoskrnl, scsiport) resolves on the 2000 SP4 kernel. The
 #    GenAHCI/StorPort route of NT 5.2 does not exist on 2000 (no StorPort).
@@ -57,9 +57,19 @@ usos_w2k_apply() (
     : "${XP_TARGET_ROOT:?}" "${NT5_SOURCE_DIR:?}"
     [ "$NT5_SOURCE_DIR" = I386 ] || { echo '[W2K_STAGE] STOP: Windows 2000 needs the I386 source'; exit 1; }
     pkg=${USOS_W2K_DIR:-/usr/lib/usos/w2k-drivers}
-    for name in ahcint.sys ahcint.inf; do
+    # USOS_W2K_STORAGE: ahcint (default) or uniata (legacy_xp_staging.sh sets
+    # it from DATA's Windows 2000\Unattended\storage-uniata.txt).
+    drv=${USOS_W2K_STORAGE:-ahcint}
+    case "$drv" in
+        ahcint) need='ahcint.sys ahcint.inf' ;;
+        uniata) need='uniata/uniata.sys'; pkg="$pkg" ;;
+        *) echo '[W2K_STAGE] STOP: USOS_W2K_STORAGE must be ahcint or uniata'; exit 1 ;;
+    esac
+    for name in $need; do
         [ -f "$pkg/$name" ] || { echo "[W2K_STAGE] STOP: $pkg/$name missing"; exit 1; }
     done
+    [ "$drv" = ahcint ] && sys="$pkg/ahcint.sys" || sys="$pkg/uniata/uniata.sys"
+    USOS_W2K_DRV=$drv; export USOS_W2K_DRV
     acpi=${USOS_W2K_ACPI:-on}
     mode=${USOS_W2K_AHCINT_MODE:-legacy}
     case "$mode" in legacy|pnp) ;; *) echo "[W2K_STAGE] STOP: USOS_W2K_AHCINT_MODE must be legacy or pnp"; exit 1 ;; esac
@@ -68,16 +78,21 @@ usos_w2k_apply() (
     ls="$XP_TARGET_ROOT/\$WIN_NT\$.~LS/I386"
     for folder in "$bt" "$ls"; do
         [ -f "$folder/TXTSETUP.SIF" ] || { echo "[W2K_STAGE] STOP: $folder/TXTSETUP.SIF missing"; exit 1; }
-        find "$folder" -maxdepth 1 -type f \( -iname ahcint.sys -o -iname ahcint.sy_ -o -iname ahcint.inf -o -iname ahcint.in_ -o -iname usosw2k.inf \) -exec rm -f '{}' \;
-        cp "$pkg/ahcint.sys" "$folder/ahcint.sys"
-        cmp -s "$pkg/ahcint.sys" "$folder/ahcint.sys"
-        usos_w2k_ahcint_inf "$mode" < "$pkg/ahcint.inf" > "$folder/ahcint.inf" || { echo '[W2K_STAGE] STOP: cannot adapt ahcint.inf'; exit 1; }
+        find "$folder" -maxdepth 1 -type f \( -iname "$drv.sys" -o -iname "$drv.sy_" -o -iname "$drv.inf" -o -iname "$drv.in_" -o -iname usosw2k.inf \) -exec rm -f '{}' \;
+        cp "$sys" "$folder/$drv.sys"
+        cmp -s "$sys" "$folder/$drv.sys"
+        if [ "$drv" = ahcint ]; then
+            usos_w2k_ahcint_inf "$mode" < "$pkg/ahcint.inf" > "$folder/ahcint.inf" || { echo '[W2K_STAGE] STOP: cannot adapt ahcint.inf'; exit 1; }
+        else
+            usos_w2k_uniata_inf > "$folder/uniata.inf"
+        fi
         usos_w2k_hive_inf "$mode" > "$folder/usosw2k.inf"
     done
-    find "$ls" -maxdepth 1 -type d -iname ahcint -exec rm -rf '{}' +
-    mkdir "$ls/AHCINT"
-    cp "$pkg/ahcint.sys" "$ls/AHCINT/ahcint.sys"
-    cmp -s "$pkg/ahcint.sys" "$ls/AHCINT/ahcint.sys"
+    upper=$(printf '%s' "$drv" | tr '[:lower:]' '[:upper:]')
+    find "$ls" -maxdepth 1 -type d -iname "$drv" -exec rm -rf '{}' +
+    mkdir "$ls/$upper"
+    cp "$sys" "$ls/$upper/$drv.sys"
+    cmp -s "$sys" "$ls/$upper/$drv.sys"
     for sif in "$bt/TXTSETUP.SIF" "$ls/TXTSETUP.SIF" "$XP_TARGET_ROOT/TXTSETUP.SIF"; do
         [ -f "$sif" ] || continue
         usos_w2k_storage_sif < "$sif" > "$sif.usos" || { rm -f "$sif.usos"; echo "[W2K_STAGE] STOP: cannot patch $sif"; exit 1; }
@@ -92,8 +107,8 @@ usos_w2k_apply() (
         mv "$ls/DOSNET.INF.usos" "$ls/DOSNET.INF"
     fi
     sync
-    printf '[W2K_STAGE] APPLIED PASS ahcint 1.3.0.0-usos1 boot+local source, TXTSETUP.SIF PCI\\CC_010601, usosw2k.inf (CriticalDeviceDatabase), AHCINT %s mode; ACPI %s\n' \
-        "$mode" "$([ "$acpi" = off ] && echo 'off (ACPIEnable = 0: MPS or Standard PC HAL)' || echo 'kept (ACPIEnable unchanged)')"
+    printf '[W2K_STAGE] APPLIED PASS %s boot+local source, TXTSETUP.SIF PCI\\CC_010601, usosw2k.inf (CriticalDeviceDatabase), %s mode; ACPI %s\n' \
+        "$(usos_w2k_driver_title)" "$mode" "$([ "$acpi" = off ] && echo 'off (ACPIEnable = 0: MPS or Standard PC HAL)' || echo 'kept (ACPIEnable unchanged)')"
 )
 
 # Every output line ends in CRLF, as the NT5 setup files do (BusyBox awk
@@ -102,18 +117,26 @@ usos_w2k_apply() (
 # The PCI IDs that get a [HardwareIdsDatabase] row (the class code first).
 USOS_W2K_AHCI_IDS='CC_010601 VEN_1022&DEV_7901 VEN_1022&DEV_43C8 VEN_1022&DEV_43EB'
 
+# The text-mode title of the selected driver (USOS_W2K_DRV, default ahcint).
+usos_w2k_driver_title() {
+    case "${USOS_W2K_DRV:-ahcint}" in
+        uniata) echo 'UniATA 0.47b' ;;
+        *) echo 'AHCINT 1.3.0.0-usos2' ;;
+    esac
+}
+
 # stdin TXTSETUP.SIF -> stdout with the AHCINT rows (first block of each
 # section; the same rows twice are refused).
 usos_w2k_storage_sif() {
-    awk -v ids="$USOS_W2K_AHCI_IDS" '
+    awk -v ids="$USOS_W2K_AHCI_IDS" -v drv="${USOS_W2K_DRV:-ahcint}" -v title="$(usos_w2k_driver_title)" '
         BEGIN { bs = sprintf("%c", 92); n = split(ids, id, " ") }
         { line = $0; sub(/\r$/, "", line); low = tolower(line) }
-        low ~ /^[ \t]*ahcint/ || index(low, "pci" bs "cc_010601") || index(low, "usosw2k.inf") { dup = 1 }
+        index(low, drv) == 1 || low ~ "^[ \t]+" drv || index(low, "pci" bs "cc_010601") || index(low, "usosw2k.inf") { dup = 1 }
         { print line "\r" }
-        low == "[sourcedisksfiles]" && !f { print "ahcint.sys = 1,,,,,,4_,4,1,,,1,4\r"; print "ahcint.inf = 1,,,,,,,20,0,0\r"; print "usosw2k.inf = 1,,,,,,_x,20,3,3\r"; f = 1 }
-        low == "[hardwareidsdatabase]" && !h { for (i = 1; i <= n; i++) print "PCI" bs id[i] " = \"ahcint\"\r"; h = 1 }
-        low == "[scsi.load]" && !l { print "ahcint = ahcint.sys,4\r"; l = 1 }
-        low == "[scsi]" && !s { print "ahcint = \"AHCI SATA Controller (AHCINT 1.3.0.0-usos1, USOS)\"\r"; s = 1 }
+        low == "[sourcedisksfiles]" && !f { print drv ".sys = 1,,,,,,4_,4,1,,,1,4\r"; print drv ".inf = 1,,,,,,,20,0,0\r"; print "usosw2k.inf = 1,,,,,,_x,20,3,3\r"; f = 1 }
+        low == "[hardwareidsdatabase]" && !h { for (i = 1; i <= n; i++) print "PCI" bs id[i] " = \"" drv "\"\r"; h = 1 }
+        low == "[scsi.load]" && !l { print drv " = " drv ".sys,4\r"; l = 1 }
+        low == "[scsi]" && !s { print drv " = \"AHCI SATA Controller (" title ", USOS)\"\r"; s = 1 }
         low == "[hiveinfs.fresh]" && !r { print "AddReg = usosw2k.inf,AddReg\r"; r = 1 }
         END { if (dup || !(f && h && l && s && r)) exit 3 }
     '
@@ -123,17 +146,25 @@ usos_w2k_storage_sif() {
 # PnpInterface for AHCINT and the CriticalDeviceDatabase entries of
 # USOS_W2K_AHCI_IDS. Loaded through TXTSETUP.SIF [HiveInfs.Fresh].
 usos_w2k_hive_inf() {
-    awk -v ids="$USOS_W2K_AHCI_IDS" -v mode="${1:-legacy}" '
+    awk -v ids="$USOS_W2K_AHCI_IDS" -v mode="${1:-legacy}" -v drv="${USOS_W2K_DRV:-ahcint}" '
         BEGIN {
             bs = sprintf("%c", 92); q = sprintf("%c", 34); n = split(ids, id, " ")
             base = "HKLM," q "SYSTEM" bs "CurrentControlSet" bs
             cddb = base "Control" bs "CriticalDeviceDatabase" bs "pci#"
-            print "; USOS: Windows 2000 AHCINT registry rows (tools/w2k_stage.sh)\r"
+            print "; USOS: Windows 2000 " toupper(drv) " registry rows (tools/w2k_stage.sh)\r"
             print "[Version]\r"; print "Signature = " q "$Windows NT$" q "\r"; print "\r"; print "[AddReg]\r"
-            if (mode == "pnp") print base "Services" bs "ahcint" bs "Parameters" bs "PnpInterface" q "," q "5" q ",0x00010001,1\r"
+            # UniATA drives PCI IDE controllers too (its own uniata_w2k.reg):
+            # SkipRaids as shipped, and pciide/atapi off so the two never
+            # claim the same channel (modern boards have no IDE mode anyway).
+            if (drv == "uniata") {
+                print base "Services" bs "uniata" bs "Parameters" q "," q "SkipRaids" q ",0x00010001,1\r"
+                print base "Services" bs "PciIde" q "," q "Start" q ",0x00010001,4\r"
+                print base "Services" bs "atapi" q "," q "Start" q ",0x00010001,4\r"
+            }
+            if (mode == "pnp") print base "Services" bs drv bs "Parameters" bs "PnpInterface" q "," q "5" q ",0x00010001,1\r"
             for (i = 1; i <= n; i++) {
                 key = tolower(id[i])
-                print cddb key q "," q "Service" q ",0x00000000," q "ahcint" q "\r"
+                print cddb key q "," q "Service" q ",0x00000000," q drv q "\r"
                 print cddb key q "," q "ClassGUID" q ",0x00000000," q "{4D36E97B-E325-11CE-BFC1-08002BE10318}" q "\r"
             }
         }
@@ -175,14 +206,59 @@ usos_w2k_ahcint_inf() {
 # stdin DOSNET.INF -> stdout with d1,ahcint.sys, d1,ahcint.inf and d1,usosw2k.inf in the
 # first [Files] and [FloppyFiles.1] blocks.
 usos_w2k_dosnet() {
-    awk '
+    awk -v drv="${USOS_W2K_DRV:-ahcint}" '
         { line = $0; sub(/\r$/, "", line); low = tolower(line) }
-        index(low, "ahcint") { dup = 1 }
+        index(low, drv) || index(low, "usosw2k") { dup = 1 }
         { print line "\r" }
-        low == "[files]" && !f { print "d1,ahcint.sys\r"; print "d1,ahcint.inf\r"; print "d1,usosw2k.inf\r"; f = 1 }
-        low == "[floppyfiles.1]" && !b { print "d1,ahcint.sys\r"; print "d1,ahcint.inf\r"; print "d1,usosw2k.inf\r"; b = 1 }
+        low == "[files]" && !f { print "d1," drv ".sys\r"; print "d1," drv ".inf\r"; print "d1,usosw2k.inf\r"; f = 1 }
+        low == "[floppyfiles.1]" && !b { print "d1," drv ".sys\r"; print "d1," drv ".inf\r"; print "d1,usosw2k.inf\r"; b = 1 }
         END { if (dup || !(f && b)) exit 3 }
     '
+}
+
+# stdout: uniata.inf, written by USOS for UniATA 0.47b (the package's own
+# uata_2k.inf targets IDE controllers of 2006 and lists no AHCI class code).
+# A legacy ScsiPort miniport like AHCINT in legacy mode: PCI\CC_010601 and
+# the AMD SATA IDs, service uniata, boot start, GUI-mode copy in
+# \i386\uniata. No PnpInterface row.
+usos_w2k_uniata_inf() {
+    awk -v ids="$USOS_W2K_AHCI_IDS" '
+        BEGIN {
+            bs = sprintf("%c", 92); q = sprintf("%c", 34); n = split(ids, id, " ")
+            print "; uniata.inf - UniATA 0.47b for Windows 2000, written by USOS (tools/w2k_stage.sh)\r"
+            print "[Version]\r"; print "Signature=" q "$Windows NT$" q "\r"; print "Class=SCSIAdapter\r"
+            print "ClassGUID={4D36E97B-E325-11CE-BFC1-08002BE10318}\r"; print "Provider=%Provider%\r"
+            print "DriverVer=10/16/2021,0.47.2.0\r"; print "\r"
+            print "[DestinationDirs]\r"; print "DefaultDestDir = 12\r"; print "\r"
+            print "[SourceDisksNames]\r"; print "1 = %DiskName%,,," bs "i386" bs "uniata\r"; print "\r"
+            print "[SourceDisksNames.x86]\r"; print "1 = %DiskName%,,," bs "i386" bs "uniata\r"; print "\r"
+            print "[SourceDisksFiles]\r"; print "uniata.sys=1\r"; print "\r"
+            print "[Manufacturer]\r"; print "%Mfg%=UniATA_Models\r"; print "\r"
+            print "[UniATA_Models]\r"
+            for (i = 1; i <= n; i++) print "%Desc% = UniATA_Inst, PCI" bs id[i] "\r"
+            print "\r"
+            print "[UniATA_Inst]\r"; print "CopyFiles = UniATA_Files\r"; print "\r"
+            print "[UniATA_Files]\r"; print "uniata.sys\r"; print "\r"
+            print "[UniATA_Inst.Services]\r"; print "AddService = uniata, 0x00000002, UniATA_Service\r"; print "\r"
+            print "[UniATA_Service]\r"; print "ServiceType    = 1\r"; print "StartType      = 0\r"
+            print "ErrorControl   = 1\r"; print "ServiceBinary  = %12%" bs "uniata.sys\r"
+            print "LoadOrderGroup = SCSI Miniport\r"; print "\r"
+            print "[Strings]\r"; print "Provider = " q "Alexander A. Telyatnikov (UniATA), packaged by USOS" q "\r"
+            print "Mfg = " q "UniATA" q "\r"; print "Desc = " q "AHCI SATA Controller (UniATA 0.47b)" q "\r"
+            print "DiskName = " q "UniATA 0.47b" q "\r"
+        }
+    '
+}
+
+# stdout: the 512-byte marker sector USOS writes at LBA 2046 of the prepared
+# disk ("USOSW2KTRACE", boot counter 0 at offset 16, the MBR disk signature
+# $1 as hex at offset 32). AHCINT usos2 only touches a disk with this marker
+# (write/read-back test at 2045, trace ring at 2040-2043; ahcint.h).
+usos_w2k_gap_marker() {
+    printf 'USOSW2KTRACE'
+    printf '\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000'
+    printf '%-8s' "${1:-00000000}" | cut -c1-8 | tr -d '\n'
+    head -c 472 /dev/zero
 }
 
 if [ "${1:-}" = apply ]; then usos_w2k_apply; fi

@@ -385,6 +385,18 @@ typedef struct _HW_DEVICE_EXTENSION {
     AHCI_PORT_INFO          Ports[MAX_SUPPORTED_PORTS];
     PAHCI_DMA_RESOURCES     DmaArea;
     SCSI_PHYSICAL_ADDRESS   DmaAreaPhysical;
+
+    /* MODIFIED (USOS 1.3.0.0-usos2): diagnostics and the USOS target check */
+    ULONG                   UsosReads;
+    ULONG                   UsosWrites;
+    ULONG                   UsosWriteSectors;
+    ULONG                   UsosErrors;
+    ULONG                   UsosPrdbcBad;
+    ULONG                   UsosEngineDown;
+    ULONG                   UsosFlushes;
+    ULONG                   UsosBoot;
+    ULONG                   UsosVerify;         /* 0 none, 1 pass, 2 FAIL */
+    ULONG                   UsosTracePortPlus1; /* 0: no USOS target found */
 } HW_DEVICE_EXTENSION, *PHW_DEVICE_EXTENSION;
 
 /* One ATA/ATAPI command to put on the wire */
@@ -442,5 +454,16 @@ VOID    AhciParseIdentify(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port);
 VOID    AhciSatlProcessSrb(IN PHW_DEVICE_EXTENSION HwInit, IN PSCSI_REQUEST_BLOCK Srb);
 /* MODIFIED (USOS 1.3.0.0-usos1) */
 BOOLEAN AhciFlushPort(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port);
+/* MODIFIED (USOS 1.3.0.0-usos2): the USOS gap (LBA 2040-2046 of a disk that
+   USOS prepared, before the first partition at 2048). USOS writes a marker
+   at USOS_GAP_MARKER_LBA ("USOSW2KTRACE"); only a disk with that marker is
+   touched: a write/read-back test at USOS_GAP_TEST_LBA (a port that fails
+   it is hidden from Setup) and an ASCII trace ring at USOS_GAP_TRACE_LBA. */
+#define USOS_GAP_MARKER_LBA             2046
+#define USOS_GAP_TEST_LBA               2045
+#define USOS_GAP_TRACE_LBA              2040
+#define USOS_GAP_TRACE_SLOTS            4
+VOID    AhciUsosProbe(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port);
+VOID    AhciUsosTrace(IN PHW_DEVICE_EXTENSION HwInit, IN PCHAR Why);
 
 #endif /* _AHCINT_H_ */

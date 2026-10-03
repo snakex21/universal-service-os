@@ -66,6 +66,16 @@ sh "$SCRIPT_DIR/nt5_storage_stage.sh" apply || fail 'NT 5.2 AHCI driver integrat
 elif [ "${USOS_PLAN_PROFILE:-}" = w2k-x86-sp4-uefi-csm ]; then
 # Windows 2000: AHCINT (ScsiPort, polling) and ACPI off (w2k_stage.sh).
 sh "$SCRIPT_DIR/w2k_stage.sh" apply || fail 'Windows 2000 AHCI/ACPI integration failed'
+# The USOS gap marker at LBA 2046 (AHCINT usos2's target check and trace ring,
+# LBA 2040-2045 cleared); the partition starts at 2048, the gap is USOS's.
+. "$SCRIPT_DIR/w2k_stage.sh"
+disk_sig=$(dd if="$TARGET_DEVICE" bs=1 skip=440 count=4 2>/dev/null | od -An -tx4 | tr -d ' \n')
+dd if=/dev/zero of="$TARGET_DEVICE" bs=512 seek=2040 count=6 conv=notrunc,fsync 2>/dev/null || fail 'cannot clear the USOS gap trace sectors'
+usos_w2k_gap_marker "$disk_sig" > "$work/gap-marker"
+dd if="$work/gap-marker" of="$TARGET_DEVICE" bs=512 seek=2046 count=1 conv=notrunc,fsync 2>/dev/null || fail 'cannot write the USOS gap marker'
+dd if="$TARGET_DEVICE" of="$work/gap-readback" bs=512 skip=2046 count=1 2>/dev/null
+cmp -s "$work/gap-marker" "$work/gap-readback" || fail 'USOS gap marker readback mismatch'
+printf '[W2K_STAGE] USOS gap marker PASS lba=2046 disk_signature=%s (AHCINT trace ring 2040-2043, test 2045)\n' "$disk_sig"
 fi
 # NT 5.2 (Server 2003 x86, XP x64) and Windows 2000: USB 2.0 input/storage on
 # xHCI through xhci98 (nt52_usb_stage.sh), after the storage step. XP x86

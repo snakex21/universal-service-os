@@ -464,8 +464,11 @@ usos_legacy_xp_staging() {
     # plus xhci98 below (docs/windows-2000-modern-2026-09-30.md).
     [ -f /usr/lib/usos/w2k-drivers/ahcint.sys ] && [ -f /usr/lib/usos/w2k-drivers/ahcint.inf ] || stop 'Windows 2000 AHCI driver (AHCINT) is missing from the package; no target write occurred'
     if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/acpi-off.txt" ]; then USOS_W2K_ACPI=off; else USOS_W2K_ACPI=on; fi
-    export USOS_W2K_ACPI
-    printf '[W2K_DRIVERS] AHCINT 1.3.0.0-usos1 (ScsiPort), ACPI %s, xhci98 x86; the XP bundle is NT 5.1 only\n' "$USOS_W2K_ACPI"
+    # storage-uniata.txt: UniATA 0.47b instead of AHCINT (the X470 A/B option).
+    if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/storage-uniata.txt" ]; then USOS_W2K_STORAGE=uniata; else USOS_W2K_STORAGE=ahcint; fi
+    [ "$USOS_W2K_STORAGE" = ahcint ] || [ -f /usr/lib/usos/w2k-drivers/uniata/uniata.sys ] || stop 'Windows 2000 UniATA driver is missing from the package; no target write occurred'
+    export USOS_W2K_ACPI USOS_W2K_STORAGE
+    printf '[W2K_DRIVERS] storage %s, ACPI %s, xhci98 x86; the XP bundle is NT 5.1 only\n' "$USOS_W2K_STORAGE" "$USOS_W2K_ACPI"
     else
     # XP x64 (NT 5.2 amd64): GenAHCI on the system's own StorPort
     # (nt5_storage_stage.sh, applied to the target after the source copy).

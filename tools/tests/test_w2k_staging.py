@@ -113,22 +113,32 @@ class W2kStorage(unittest.TestCase):
     def test_package_files(self):
         import build_xp_uefi_csm_trial as builder
         files = builder.w2k_driver_files()
-        self.assertEqual(sorted(files), ['LICENSE', 'MODIFIED.txt', 'SOURCE.txt', 'ahcint.inf', 'ahcint.sys'])
+        self.assertEqual(sorted(files), ['LICENSE', 'MODIFIED.txt', 'SOURCE.txt', 'ahcint.inf', 'ahcint.sys',
+                                         'uniata/COPYING-GPL-2.0.txt', 'uniata/SOURCES.txt', 'uniata/uniata.sys'])
         self.assertIn(b'MODIFIED version of AHCINT 1.3.0.0', files['MODIFIED.txt'])
-        self.assertIn(b'1.3.0.0-usos1', files['SOURCE.txt'])
+        self.assertIn(b'usos2', files['MODIFIED.txt'])
+        self.assertIn(b'1.3.0.0-usos2', files['SOURCE.txt'])
+        self.assertEqual(struct.unpack_from('<H', files['uniata/uniata.sys'], struct.unpack_from('<I', files['uniata/uniata.sys'], 60)[0] + 4)[0], 0x14c)
+        self.assertIn(b'Version 2, June 1991', files['uniata/COPYING-GPL-2.0.txt'])
         self.assertEqual(struct.unpack_from('<H', files['ahcint.sys'], struct.unpack_from('<I', files['ahcint.sys'], 60)[0] + 4)[0], 0x14c)
         self.assertIn(b'DriverVer=09/29/2026,1.3.0.0', files['ahcint.inf'])
         self.assertIn(b'GNU GENERAL PUBLIC LICENSE', files['LICENSE'])
         self.assertIn(b'Version 3, 29 June 2007', files['LICENSE'])
         self.assertIn('usr/lib/usos/w2k-drivers/', builder.PACKAGE_PREFIXES)
         # The corresponding source is tracked next to the binary, every file pinned.
-        for folder in ('1.3.0.0', '1.3.0.0-usos1'):
+        for folder in ('1.3.0.0', '1.3.0.0-usos2'):
             pins = json.loads((ROOT / 'tools/vendor/ahcint' / folder / 'manifest.json').read_text())
             for rel, digest in pins['files'].items():
                 self.assertEqual(hashlib.sha256((ROOT / 'tools/vendor/ahcint' / folder / rel).read_bytes()).hexdigest(), digest, rel)
             self.assertIn('src/ahcimain.c', pins['files'])
         # The patched source carries the USOS markers.
-        self.assertIn(b'MODIFIED (USOS 1.3.0.0-usos1)', (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos1/src/ahcisatl.c').read_bytes())
+        src = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos2/src/ahcisatl.c').read_bytes()
+        self.assertIn(b'MODIFIED (USOS 1.3.0.0-usos1)', src)
+        self.assertIn(b'MODIFIED (USOS 1.3.0.0-usos2)', src)
+        self.assertIn(b'USOSW2KTRACE'[:4], (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos2/src/ahcisatl.c').read_bytes())
+        pins = json.loads((ROOT / 'tools/vendor/uniata/0.47b/manifest.json').read_text())
+        for rel, digest in pins['files'].items():
+            self.assertEqual(hashlib.sha256((ROOT / 'tools/vendor/uniata/0.47b' / rel).read_bytes()).hexdigest(), digest, rel)
 
     def stand_in(self, t: Path) -> tuple:
         import build_xp_uefi_csm_trial as builder
@@ -158,7 +168,7 @@ class W2kStorage(unittest.TestCase):
                 hivesys = (ls / 'HIVESYS.INF').read_bytes()
                 r = self.apply(t, f'USOS_W2K_ACPI={acpi}' if acpi else '')
                 self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-                self.assertIn(b'[W2K_STAGE] APPLIED PASS ahcint 1.3.0.0', r.stdout)
+                self.assertIn(b'[W2K_STAGE] APPLIED PASS AHCINT 1.3.0.0-usos2', r.stdout)
                 sif = run_fn('usos_w2k_storage_sif', W2K_TXTSETUP).stdout
                 if acpi == 'off':  # default (empty) keeps ACPI since 2026-10-03
                     sif = run_fn('usos_w2k_acpi_off_sif', sif).stdout
@@ -179,6 +189,49 @@ class W2kStorage(unittest.TestCase):
                 self.assertEqual((ls / 'HIVESYS.INF').read_bytes(), hivesys)
                 self.assertNotEqual(self.apply(t).returncode, 0)
                 self.assertEqual((ls / 'TXTSETUP.SIF').read_bytes(), sif)
+
+    def test_gap_marker(self):
+        r = run_fn('usos_w2k_gap_marker edc187d4', b'')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(len(r.stdout), 512)
+        self.assertEqual(r.stdout[:12], b'USOSW2KTRACE')
+        self.assertEqual(r.stdout[12:32], bytes(20))       # boot counter 0 at 16
+        self.assertEqual(r.stdout[32:40], b'edc187d4')
+        self.assertEqual(r.stdout[40:], bytes(472))
+        # The driver uses the same magic and LBAs.
+        h = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos2/src/ahcint.h').read_bytes()
+        for want in (b'USOS_GAP_MARKER_LBA             2046', b'USOS_GAP_TEST_LBA               2045', b'USOS_GAP_TRACE_LBA              2040'):
+            self.assertIn(want, h)
+        c = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos2/src/ahcisatl.c').read_bytes()
+        self.assertIn(b"'U','S','O','S','W','2','K','T','R','A','C','E'", c)
+
+    def test_uniata(self):
+        import build_xp_uefi_csm_trial as builder
+        env = 'USOS_W2K_STORAGE=uniata'
+        with tempfile.TemporaryDirectory() as tmp:
+            t = Path(tmp)
+            bt, ls = self.stand_in(t)
+            r = self.apply(t, env)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn(b'APPLIED PASS UniATA 0.47b', r.stdout)
+            pkg = builder.w2k_driver_files()
+            for folder in (bt, ls):
+                self.assertEqual((folder / 'uniata.sys').read_bytes(), pkg['uniata/uniata.sys'])
+                self.assertFalse((folder / 'ahcint.sys').exists())
+                inf = rows((folder / 'uniata.inf').read_bytes())
+                self.assertIn('1 = %DiskName%,,,\\i386\\uniata', inf)
+                self.assertIn('%Desc% = UniATA_Inst, PCI\\VEN_1022&DEV_43C8', inf)
+                self.assertIn('AddService = uniata, 0x00000002, UniATA_Service', inf)
+                sif = rows((folder / 'TXTSETUP.SIF').read_bytes())
+                self.assertIn('uniata.sys = 1,,,,,,4_,4,1,,,1,4', sif)
+                self.assertIn('PCI\\CC_010601 = "uniata"', sif)
+                self.assertIn('uniata = uniata.sys,4', sif)
+                hive = (folder / 'usosw2k.inf').read_bytes()
+                self.assertIn(b'"Service",0x00000000,"uniata"', hive)
+                self.assertNotIn(b'ahcint', hive)
+            self.assertEqual((ls / 'UNIATA/uniata.sys').read_bytes(), pkg['uniata/uniata.sys'])
+            self.assertIn(b'd1,uniata.sys', (ls / 'DOSNET.INF').read_bytes())
+            self.assertIn(b'USOS_W2K_STORAGE must be', self.apply(t, 'USOS_W2K_STORAGE=other').stdout)
 
     def test_apply_refusals(self):
         with tempfile.TemporaryDirectory() as tmp:

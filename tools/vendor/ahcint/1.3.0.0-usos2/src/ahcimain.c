@@ -519,6 +519,8 @@ AhciInitializePort(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG PortNumber)
     }
 
     AhciParseIdentify(HwInit, PortNumber);
+    /* MODIFIED (USOS 1.3.0.0-usos2): USOS target check, see ahcint.h */
+    AhciUsosProbe(HwInit, PortNumber);
     return TRUE;
 }
 

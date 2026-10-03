@@ -1,6 +1,6 @@
 # Windows 2000 SP4 on modern boards (X470): AHCI, ACPI, USB (2026-09-30)
 
-Status: **experimental; QEMU PASS to the first-boot logon (2026-10-03)**,
+Status: **experimental; QEMU PASS to the first-boot logon, X470 run 1 failed (writes lost, no restart; section 6)**,
 branch `feature/win2000-modern`. The X470 run is next (section 6). Earlier
 state: [windows-2000-uefi-2026-09-27.md](windows-2000-uefi-2026-09-27.md)
 (the paths, the CMA repacks), [research/win2000-ahci.md](research/win2000-ahci.md)
@@ -210,7 +210,79 @@ iaStor.sys could not be found"), and quoted DOSNET destinations are unquoted
 (nLite-style `"system32\smss.exe"`: STOP 0x6B C000003A). Then text-mode copy
 and GUI Setup (welcome page). The XP x86 SP3 target digest is unchanged.
 
-## 6. X470 test plan
+## 6. X470 run 1 (2026-10-03, B261003-180320, CSM off) and the usos2 diagnostics
+
+**What the user saw:** USOS prepared the BIOSTAR S100 (chipset SATA
+connector 3 = AHCI port 2 of `1022:43C8`; the DVD drive sits on port 0),
+restart, Windows 2000 text-mode Setup copied files, then a black screen with
+a blinking cursor; no visible restart, nothing for 15 minutes.
+
+**What the disks show (read-only on the dev PC):**
+
+- BIOSTAR: exactly as prepared. USOS MBR and NT52 boot sector unchanged,
+  `$WIN_NT$.~LS\I386` complete (5,455 files), no `WINNT`, no `BOOT.INI`, no
+  file newer than the preparation, NTFS not dirty. **No write of text-mode
+  Setup reached the disk**, not even NTFS's own journal.
+- Kingston (USOS stick): no Windows files, only USOS's own logs. Not
+  touched by Setup.
+
+**Two separate problems:**
+
+1. **Writes disappear.** Text mode read the local source through AHCINT
+   (it copied), but nothing it wrote is on the disk, and AHCINT reported
+   success. Cause unknown; QEMU's AHCI never shows it.
+2. **The restart at the end of text mode does nothing.** Linux on the same
+   boot reports `i8042: PNP: No PS/2 controller found`: with CSM off the
+   firmware exposes no keyboard controller. Windows 2000's HAL restarts the
+   machine through the keyboard controller (port 64h, FEh) only, so the
+   machine sits at a black screen. XP and Server 2003 restarted fine on this
+   board via CSMWrap; their HALs presumably also use the FADT reset register
+   (unconfirmed). With CSM on, AMI's CSM emulates the controller.
+
+**usos2 diagnostics and options (this branch):**
+
+- AHCINT **1.3.0.0-usos2**: link and command-engine checks before every
+  command (fail instead of issuing into a stopped engine); counters
+  (reads, writes, sectors, errors, PRD byte-count mismatches, engine
+  restarts, flushes); and the **USOS gap**: USOS writes a marker at LBA 2046
+  of the prepared disk (`USOSW2KTRACE`, disk signature). At every start the
+  driver writes and reads back a test sector at LBA 2045 (**a mismatch hides
+  the disk: Setup says it found no hard disk instead of copying into
+  nothing**), increments the boot counter in the marker, and writes an ASCII
+  trace (counters, every port's SSTS/CMD/SIG/TFD and model) to LBA
+  2040-2043, again every 2048 writes and on every flush. Other disks are
+  only read at LBA 2046. QEMU: verify PASS, boot counter and records as
+  expected, install unchanged.
+- Read it on the dev PC, read-only: `python tools\w2k_gap_trace.py \\.\PhysicalDriveN`
+  (or a `.qcow2`). Boot counter still 0 = the driver's writes never reached
+  the disk; records with growing `wr` = writes arrive.
+- `storage-uniata.txt` in `Systems\Windows\Windows 2000\Unattended` on DATA:
+  UniATA 0.47b instead of AHCINT (USOS-written `uniata.inf`, service
+  `uniata`, PciIde/atapi off). **In QEMU it stops with 0x7B at the first GUI
+  boot** (text mode passes); not ready, kept for diagnosis only.
+- AMD's own XP AHCI driver (`amd_sata.sys` 1.2.001.0337 in the XP integrator
+  tree) is a StorPort miniport, and 2000 has no StorPort: not an option. XP
+  x86 used GenAHCI on the StorPort backport, which also does not load on
+  2000 (section 1).
+- `csmwrap-verbose.flag` (empty file in `EFI\USOS` on the stick, existing
+  mechanism) puts CSMWrap's and SeaBIOS's messages on screen for the next
+  prepared target: shows whether a restart reaches CSMWrap and which disk
+  SeaBIOS boots.
+
+**Next X470 run (after deploying a build with usos2):**
+
+1. Prepare the BIOSTAR again (CSM off; DVD drive unplugged if possible).
+2. If text mode says it found no hard disk: the write test failed, which is
+   the answer to problem 1. Bring the disk to the dev PC for the trace.
+3. If it copies and then shows the black screen: wait about 1 minute
+   (periodic traces), then **press the reset button** (2000 cannot restart
+   the board itself without CSM). GUI Setup should start if the writes
+   arrived; either way bring the disk for the trace.
+4. Then the same with CSM on (the firmware's keyboard controller makes the
+   2000 restart work).
+
+## 7. X470 test plan (first plan, 2026-10-03)
+
 
 Windows 2000 SP4 Professional, target on the chipset SATA (`1022:43C8`),
 first UEFI without CSM (CSMWrap), then with CSM. Expect: text mode (AHCINT),
