@@ -77,7 +77,7 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
                     continue;
                 }
                 if (bios != .hidden and selected == bios_mode_row) {
-                    biosMode(root, bios);
+                    biosMode(root, bios, null);
                     list.redrawFull(selected, null);
                     continue;
                 }
@@ -153,7 +153,9 @@ fn biosModeRow(bios: bios_mode.Availability) usos.gui.ui.Row {
 /// Secure Boot on: the reason. Otherwise a confirmation page with the notes
 /// (one CPU thread, legacy video BIOS, restart returns to UEFI), then
 /// CSMWrap; it only comes back here when it could not start.
-fn biosMode(root: *std.os.uefi.protocol.File, bios: bios_mode.Availability) void {
+/// `system`: started from a BIOS-only system row (manual_systems.zig); the
+/// profiles are those offered for it and a note names it for the BIOS menu.
+pub fn biosMode(root: *std.os.uefi.protocol.File, bios: bios_mode.Availability, system: ?*const usos.catalog.SystemEntry) void {
     if (bios == .secure_boot_on) {
         const lines = [_][]const u8{ view.t(.bios_mode_secure_boot_line1), view.t(.bios_mode_secure_boot_line2) };
         view.notice(view.t(.utilities_bios_mode_title), .shield, .warning, view.t(.utilities_bios_mode_secure_boot), &lines);
@@ -163,18 +165,22 @@ fn biosMode(root: *std.os.uefi.protocol.File, bios: bios_mode.Availability) void
     // Answer profiles offered for Windows 95/98/Me: a row each starts the BIOS
     // mode with that profile staged as MSBATCH.INF (docs/win9x-modern-2026-09-30.md).
     answer_profiles.reload(root);
-    answer_profiles.filter("windows-98-se");
+    const win9x = if (system) |entry| usos.flow.answer.msbatch.releaseFor(entry.id) != null else true;
+    answer_profiles.filter(if (system) |entry| entry.id else "windows-98-se");
     var rows_storage: [2 + answer_profiles.max]usos.gui.ui.Row = undefined;
     rows_storage[0] = .{ .title = view.t(.key_cancel), .icon = .{ .vector = .close } };
     rows_storage[1] = .{ .title = view.t(.bios_mode_start), .icon = .{ .vector = .chip } };
-    const profiles = answer_profiles.len();
+    const profiles = if (win9x) answer_profiles.len() else 0;
     for (0..profiles) |i| rows_storage[2 + i] = .{ .title = answer_profiles.get(i).name.slice(), .detail = view.t(.bios_mode_profile_detail), .icon = .{ .vector = .windows } };
     const confirm_rows = rows_storage[0 .. 2 + profiles];
-    const notes = [_][]const u8{ view.t(.bios_mode_note_restart), view.t(.bios_mode_note_cpu), view.t(.bios_mode_note_video) };
-    const help = usos.gui.menu_screens.Help{ .title = view.t(.utilities_bios_mode_title), .lines = &notes, .badge = .{ .text = view.t(.badge_experimental), .tone = .warning } };
+    var pick_buffer: [160]u8 = undefined;
+    const pick = if (system) |entry| view.format(&pick_buffer, .bios_mode_note_pick, &.{entry.name}) else "";
+    const all_notes = [_][]const u8{ pick, view.t(.bios_mode_note_restart), view.t(.bios_mode_note_cpu), view.t(.bios_mode_note_video) };
+    const notes = if (system != null) all_notes[0..] else all_notes[1..];
+    const help = usos.gui.menu_screens.Help{ .title = view.t(.utilities_bios_mode_title), .lines = notes, .badge = .{ .text = view.t(.badge_experimental), .tone = .warning } };
     var selected: usize = 0;
     var list: view.ListScreen = undefined;
-    list.open(view.t(.utilities_bios_mode_title), view.t(.bios_mode_question), confirm_rows, selected, false, help);
+    list.open(if (system) |entry| entry.name else view.t(.utilities_bios_mode_title), view.t(.bios_mode_question), confirm_rows, selected, false, help);
     while (true) {
         switch (navigation.handle(input.readBlocking(), &selected, confirm_rows.len, &list)) {
             .activate => if (selected >= 1) break else return,
