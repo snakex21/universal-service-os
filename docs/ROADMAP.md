@@ -357,9 +357,12 @@ automatycznie, bez ręcznej konfiguracji. Kolejność:
    - ACPI społeczności dla XP x64 / Server 2003 (L1; od 1.1 dołączone do
      wydania decyzją użytkownika z 2026-09-30, nadal do zastąpienia);
    - dyskietka startowa Windows 95 (`Windows 95\Boot\BOOTDISK.IMG`, L6b): płyta 95
-     nie startuje; własne środowisko z CAB-ów płyty (`winboot.sys`, `sys.com`)
-     wymaga MSZIP i własnego sektora startowego DOS 7 (poprawka szybkiego CPU
-     nie jest już mostem: Patcher9x, MIT, ma własną);
+     nie startuje; własne środowisko: pliki DOS 7 z CAB-ów płyty wyciąga jej
+     własny EXTRACT.EXE pod FreeDOS (sprawdzone), brakuje sektora startowego:
+     dołączony FreeDOS SYS 3.6 jest zbudowany bez sektorów OEM (`/OEM:W9x`),
+     a SYS.COM z płyty nie działa pod FreeDOS; następny krok: własny build
+     FreeDOS SYS z sektorami OEM (GPL) w zestawie buildu (poprawka szybkiego
+     CPU nie jest już mostem: Patcher9x, MIT, ma własną);
    - USB 3 dla Visty (backport podpisany testowo, sekcja 3).
 
 Nośnik instalacyjny Windows (pliki Microsoft) zawsze dostarcza użytkownik;
