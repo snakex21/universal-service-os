@@ -176,7 +176,7 @@ enum { UA_ST_NEW, UA_ST_RUNNING, UA_ST_DONE, UA_ST_PRESENT, UA_ST_FAILED, UA_ST_
 typedef struct {
     int st[UA_MAX_PKGS];
     int tries[UA_MAX_PKGS];
-    char why[UA_MAX_PKGS][48]; /* reason for failed / skipped (STATE.INI [why]) */
+    char why[UA_MAX_PKGS][80]; /* reason for failed / skipped (STATE.INI [why]) */
     int pending_reboot;
     int starts;
 } ua_state;

@@ -665,7 +665,7 @@ static int files_present(const ua_pkg *p) {
 }
 
 static void run_chain(void) {
-    char line[UA_LINE], num[8], unmet[48], key[12], tmpdir[UA_PATH], dir[UA_PATH];
+    char line[UA_LINE], num[16], unmet[48], key[12], tmpdir[UA_PATH], dir[UA_PATH];
     const char *name_key = g_pl ? "name_pl" : "name_en";
     int pos;
     for (pos = 0; pos < g_plan.count; pos++) {
@@ -780,7 +780,8 @@ static void finish(void) {
         log_line(line);
         if (listed++ < 15) { ua_append(text, sizeof text, "\r\n"); ua_append(text, sizeof text, line); }
     }
-    ua_append(text, sizeof text, g_pl ? "\r\n\r\nDziennik: C:\\USOS\\addons.log" : "\r\n\r\nLog: C:\\USOS\\addons.log");
+    ua_append(text, sizeof text, g_pl ? "\r\n\r\nDziennik: " : "\r\n\r\nLog: ");
+    ua_append(text, sizeof text, g_log);
     unregister();
     if (g_wnd) ShowWindow(g_wnd, SW_HIDE);
     MessageBoxA(0, text, "USOS", MB_OK | (failed ? MB_ICONWARNING : MB_ICONINFORMATION) | MB_SETFOREGROUND);
@@ -815,9 +816,13 @@ void __cdecl ua_start(void) {
                     g_pf, sizeof g_pf, &type))
         ua_copy(g_pf, sizeof g_pf, "C:\\Program Files");
 
+    /* the log sits next to the ADDONS folder: C:\USOS\addons.log */
+    ua_copy(path, sizeof path, g_root);
+    for (i = ua_len(path) - 1; i > 2 && path[i] != '\\'; i--) ;
+    if (i > 2) path[i] = 0;
+    path_join(g_log, path, "addons.log");
     path_join(path, g_root, "LEGACY.INI");
     n = read_file(path, g_manifest, sizeof g_manifest);
-    path_join(g_log, g_root, "..\\addons.log");
     if (n <= 0) { log2("USOSADD: manifest not found: ", path); ExitProcess(2); }
     ua_ini_parse(&g_m, g_manifest, n);
     if (has_switch(cmdline, "reset")) {

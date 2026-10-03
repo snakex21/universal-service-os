@@ -333,7 +333,17 @@ its C library (own entry point, no CRT), PE subsystem 4.0, i386: loads on
    one line per failed/skipped package and its reason, in the log and in a
    message box; the Run value is removed.
 
-A small window shows `USOS: instalowanie dodatków (3/14): DirectX 9.0c`
+While a package runs, USOSADD answers the questions some installers ask
+even in quiet mode (`answerN` rules in `[pack]` and per package: dialog
+title prefix → button, e.g. *Zmiana ustawień systemu* → **Nie**, since
+USOS restarts itself; *Kopiowanie plików* → the Windows source folder from
+`HKLM\...\Setup\SourcePath`, then OK), each logged. On 9x it sets the
+Winlogon auto-logon values (installing user, empty password) before every
+restart, because network components (DUN 1.4) make Windows ask for a user
+name and password at each start.
+
+A small window (top-left, **not** topmost, so installer questions stay
+visible) shows `USOS: instalowanie dodatków (3/14): DirectX 9.0c`
 (English on non-Polish systems). The log (append) holds date/time, system
 detection, the plan, every command line with its exit code and every state
 change. Switches: `/dry` (detect and log the plan only; `/dry /as:98SE,PL[,6a]`
@@ -459,28 +469,76 @@ hardware allows it, and by hand on the X470 (RX 560, USB-only input):
 
 | Check | 95 | 98 FE | 98 SE | Me | NT4 | How (QEMU) | X470 |
 |---|---|---|---|---|---|---|---|
-| Desktop reached without questions (after key/licence pages) | | | | | | screenshot | by hand |
-| Resolution >= 1024x768, 32-bit if possible | | | | | | Cirrus 5446 driver (QEMU); vmdisp9x VESA on 9x (win9x branch) | RX 560 VESA modes |
+| Desktop reached without questions (after key/licence pages) | | | PASS* | | | screenshot | by hand |
+| Resolution >= 1024x768, 32-bit if possible | | | FAIL (640x480) | | | Cirrus 5446 driver (QEMU); vmdisp9x VESA on 9x (win9x branch) | RX 560 VESA modes |
 | USB keyboard / mouse | | | | | | usb-kbd/usb-tablet | CSMWrap bridge (98/98 SE), none on Me/95 |
-| USB stick readable | | | | | | usb-storage + NUSB (98) | NUSB on 98, native on Me |
+| USB stick readable | | | FAIL (QEMU EHCI) | | | usb-storage + NUSB (98) | NUSB on 98, native on Me |
 | Network | | | | | | rtl8139/ne2k_pci (98 has drivers) | no 9x driver for the onboard NIC (gap) |
-| Sound | | | | | | sb16 (98 driver) | no HD Audio driver on 9x (gap) |
-| Clean shutdown / restart | | | | | | ACPI power-off in QEMU | by hand |
+| Sound | | | SB16 found, warning | | | sb16 (98 driver) | no HD Audio driver on 9x (gap) |
+| Clean shutdown / restart | | | PASS | | | ACPI power-off in QEMU | by hand |
 | Period apps start: IE 6, WMP, a DirectX app (dxdiag), a VB6 app, a .NET 2.0 app | | | | | | USOS test apps (to write) | by hand |
-| Pack summary: `zainstalowano X/Y` with reasons | | | | | | `C:\USOS\addons.log`, message box | by hand |
+| Pack summary: `zainstalowano X/Y` with reasons | | | PASS | | | `C:\USOS\addons.log`, message box | by hand |
 
-QEMU results: see §6.1 (98 SE PL run of 2026-09-30).
+QEMU results: see §6.1 (98 SE PL; * = after the fixes found in that run; the other systems are still to run).
 
-### 6.1 QEMU 98 SE PL, 2026-09-30
+### 6.1 QEMU 98 SE PL, 2026-09-30 to 2026-10-03
 
 Setup: `tools/tests/addons/win98se_vm.py` (fresh 4 GiB disk seeded on the
 host: C:\WIN98 from the user's 98 SE PL OEM ISO, MSBATCH.INF with the
-USOSADD Run line, C:\USOS\ADDONS staged for preset *Do pracy* +
-KernelEx + RDP; the CD's startup floppy with FDISK /MBR, SYS C:, SETUP;
-QEMU 11.1 i440FX TCG, Pentium III, 256 MiB, Cirrus, no network). Product
-key from a local file outside the repository; the VM disk was deleted
-after the run. Results: pending (the run stops at the OEM first-boot
-licence page until the user approves accepting it).
+USOSADD Run line, C:\USOS\ADDONS staged for preset *Do pracy* + KernelEx +
+RDP; the CD's startup floppy with FDISK /MBR, SYS C:, SETUP; QEMU 11.1
+i440FX TCG, `-cpu max`, 256 MiB, Cirrus, no network; `--acceptance` adds a
+USB stick on EHCI and a Sound Blaster 16). Product key from a local file
+outside the repository; VM disks, floppy and key file deleted after the
+run. The OEM wizard's licence page was accepted by hand with the user's
+explicit approval (see §4.1).
+
+**Pack run (full pack + 2 options, 31 packages, 13 USOSADD starts, ~70
+minutes under TCG): 27/30 installed, 3 failed, summary shown:**
+
+| Package | Result | Notes |
+|---|---|---|
+| DCOM98 | done (3010) | |
+| DUN 1.4 SE PL | done | asked for a file from the Windows source and whether to restart, hidden behind the (then topmost) USOS window: answered by hand; now answered by the `answerN` rules (§2.6) |
+| Q243199 | done | |
+| IE 6 SP1 PL | done (3010) | ~2 min |
+| MSI 2.0, DirectX 9.0c, MDAC 2.8 SP1 | done | DXSETUP returned 1, the version check passed |
+| VB6 SP6 runtime | **failed** → fixed | the package only extracts (no IExpress command); fixed to extract + inner installer, verified in a second run (done) |
+| VC6 SP6, MSLU, WMP 9 | done | |
+| .NET 2.0 + PL | done | 20 min |
+| NUSB 3.3a | done | |
+| RDP 5.1 PL (option) | **failed** → fixed | installed fine; the check looked in Program Files, 9x puts MSTSC.EXE into SYSTEM; fixed, second run: present |
+| 13 help-disc hotfixes, KB819639 | done | 1-5 s each |
+| KernelEx (option) | **failed** → fixed | installed fine (verify dialog after the restart says "installed successfully"); check pointed to SYSTEM instead of `%WIN%\KernelEx`; fixed, second run: present |
+
+Findings fixed on the way (all in USOSADD / the manifest / the helper):
+
+1. **Start from HKLM Run, not RunOnce**: Setup's last phase runs HKLM
+   RunOnce entries; DCOM98's restart there broke Setup and the next boot
+   hung (§2.5).
+2. `-cpu pentium3` under TCG hangs 98 SE at "trwa ładowanie systemu
+   Windows" on the first boot after Setup (a VxD busy loop), with or
+   without the pack: a **QEMU-only** issue; the helper uses `-cpu max`.
+   Logo=0 was kept in MSDOS.SYS, so it is not the known logo/SMM hang.
+3. Installer questions in quiet mode (DUN): `answerN` rules; progress
+   window no longer topmost/centred.
+4. Logon prompt after network components: auto-logon on 9x (§2.6).
+5. Exit codes in the summary were cut (buffer), log path in the message.
+
+**Usability acceptance, 98 SE PL in QEMU:**
+
+| Check | Result |
+|---|---|
+| Desktop without questions after the key/licence pages | PASS after the fixes (Run start, auto-logon); one KernelEx info box after its restart |
+| Resolution | **FAIL (gap)**: Cirrus driver installed, Windows stays at 640x480 16 colours; USOS sets no display mode yet (follow-up: a `display` step that sets 1024x768/16-bit when the driver supports it) |
+| USB keyboard / mouse | not tested here (PS/2 in QEMU; the CSMWrap bridge is the win9x branch's) |
+| USB stick | **FAIL in QEMU**: NUSB installed, no drive for the stick on QEMU's EHCI (no UHCI companion configured); to retest with UHCI and on hardware |
+| Network | not tested (no NIC in the VM; gap on modern boards, §7) |
+| Sound | SB16 found by Setup, Device Manager shows a resource warning (QEMU ISA SB16); not a pack item |
+| Clean shutdown | PASS (Start → Zamknij system → ACPI power-off) |
+| Period apps | IE 6 SP1 desktop icons present; DirectX/.NET/VB6 apps not started yet (test apps to write) |
+| Pack summary | PASS: *zainstalowano 27/30, błędy: 3, pominięto: 0* with reasons; second run *4/4* |
+| Resume across restarts | PASS: 13 starts, state kept, pending restarts batched before `reboot=now` packages |
 
 ## 7. Known usability gaps (future work, not implemented)
 
@@ -501,5 +559,8 @@ licence page until the user approves accepting it).
   when the board still has EHCI (the X470 has only xHCI).
 - **Display acceleration**: VESA only (vmdisp9x), no 3D; NT4: VGA / VESA
   through a community driver (to evaluate).
+- **Display mode**: Windows keeps 640x480 16 colours after Setup; USOS
+  should set a sensible mode (1024x768, 16/32-bit) once a driver that
+  supports it is installed.
 - **Windows 95**: no USB input under CSMWrap in Setup phase 1 (licence/COA
   pages), see the win9x doc.

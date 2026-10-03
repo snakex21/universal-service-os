@@ -194,6 +194,9 @@ def start(a) -> None:
     # (a floppy left in would run INSTALL again: SYS C: and SETUP).
     if not a.disk_only:
         args[args.index('-boot'):args.index('-boot')] = ['-drive', f'file={a.work / "floppy.img"},format=raw,if=floppy,index=0']
+    if a.extra_disk:
+        # a second IDE disk (D:), e.g. a re-staged USOS/ADDONS tree to run by hand
+        args += ['-drive', f'file={a.extra_disk},format=raw,if=ide,index=1']
     if a.acceptance:
         # Usability checks (docs/design/legacy-compat-pack.md section 6): a USB
         # stick with a marker file on EHCI (NUSB), a Sound Blaster 16.
@@ -250,6 +253,14 @@ def quit_vm(a) -> None:
         pass
 
 
+def make_disk(a) -> None:
+    """A FAT32 disk image holding a staged USOS/ADDONS tree (for --extra-disk)."""
+    w = fat_image.Fat32Writer(a.out, a.size_mb * 1024 ** 2, label='USOSADD')
+    n = w.add_tree(a.stage, ('USOS', 'ADDONS'))
+    w.finish()
+    print(f'[PASS] {a.out}: {n} files')
+
+
 def log(a) -> None:
     r = fat_image.Fat32Reader(a.work / 'disk.raw')
     for parts in (('USOS', 'ADDONS.LOG'), ('USOS', 'ADDONS', 'STATE.INI')):
@@ -261,7 +272,7 @@ def log(a) -> None:
 
 
 def clean(a) -> None:
-    for name in ('disk.raw', 'floppy.img', 'vm.json', 'stick.raw'):
+    for name in ('disk.raw', 'floppy.img', 'vm.json', 'stick.raw', 'disk2.raw'):
         (a.work / name).unlink(missing_ok=True)
     print('removed VM disk and floppy (they held the product key)')
 
@@ -269,6 +280,10 @@ def clean(a) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest='cmd', required=True)
+    md = sub.add_parser('make-disk')
+    md.add_argument('--stage', type=Path, required=True)
+    md.add_argument('--out', type=Path, required=True)
+    md.add_argument('--size-mb', type=int, default=600)
     for name in ('prepare', 'start', 'shot', 'keys', 'type', 'eject', 'quit', 'log', 'clean'):
         s = sub.add_parser(name)
         s.add_argument('--work', type=Path, required=True)
@@ -281,6 +296,7 @@ def main() -> None:
             s.add_argument('--port', type=int, default=4471)
             s.add_argument('--acceptance', action='store_true', help='add a USB stick (EHCI) and a Sound Blaster 16')
             s.add_argument('--disk-only', action='store_true', help='no floppy: boot the installed C:')
+            s.add_argument('--extra-disk', type=Path)
             s.add_argument('--cpu', default='max', help='pentium3 hangs Windows 98 SE under TCG after Setup (2026-10-03)')
             s.add_argument('--mem', type=int, default=256)
         if name == 'shot':
@@ -292,7 +308,7 @@ def main() -> None:
             s.add_argument('text')
     a = ap.parse_args()
     {'prepare': prepare, 'start': start, 'shot': shot, 'keys': keys, 'type': type_text, 'eject': eject, 'quit': quit_vm,
-     'log': log, 'clean': clean}[a.cmd](a)
+     'log': log, 'clean': clean, 'make-disk': make_disk}[a.cmd](a)
 
 
 if __name__ == '__main__':
