@@ -71,9 +71,10 @@ unit-tested), not yet seen on a desktop (the desktop run predates it).
    another PC. Also useful before the run: in the X470 setup disable unused
    controllers (second SATA/ASMedia, HDA, onboard LAN), Above 4G and ReBAR off.
    What cannot be answered with USB only: Me (no bridge) and 95 (licence/COA in
-   Setup phase 1): Me needs its key in the profile (all pages answered) and
-   works hands-off; 95 is not possible without PS/2 on the X470 today.
-3. Me the same way with its key in the profile (no page should need input); 95 only on a PC with a PS/2 keyboard or a firmware CSM.
+   Setup phase 1): Me still shows the OEM wizard pages (user, licence, finish) even with its key
+   in the profile, so a USB-only Me install stops there until the wizard is
+   answered by USOS; 95 is not possible without PS/2 on the X470 today.
+3. Me only once the OEM wizard is answered by USOS (or on a PC with PS/2); 95 only on a PC with a PS/2 keyboard or a firmware CSM.
 4. Regression: MS-DOS / Windows 3.1 install under CSMWrap still boots.
 
 ## 4b. OEM CDs, product keys, editions (2026-09-30 evening)
