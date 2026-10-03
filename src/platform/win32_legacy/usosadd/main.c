@@ -280,9 +280,10 @@ static void window_open(void) {
     wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
     wc.lpszClassName = "USOSADD";
     RegisterClassA(&wc);
-    g_wnd = CreateWindowExA(WS_EX_TOPMOST, "USOSADD", "USOS", WS_POPUP | WS_CAPTION | WS_VISIBLE,
-                            (GetSystemMetrics(SM_CXSCREEN) - w) / 2, (GetSystemMetrics(SM_CYSCREEN) - h) / 2,
-                            w, h, 0, 0, inst, 0);
+    /* Not topmost and not centred: package installers' own questions must
+     * stay visible (QEMU 2026-10-03: DUN 1.4 dialogs were hidden). */
+    g_wnd = CreateWindowExA(0, "USOSADD", "USOS", WS_POPUP | WS_CAPTION | WS_VISIBLE,
+                            8, 8, w, h, 0, 0, inst, 0);
     g_text = CreateWindowExA(0, "STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT, 12, 12, w - 30, h - 45,
                              g_wnd, 0, inst, 0);
     pump();
@@ -294,6 +295,74 @@ static void status(const char *text) {
 }
 
 /* ---- running commands --------------------------------------------------------- */
+
+/* ---- answering installer questions ------------------------------------------ */
+
+/* Rules "title|action" from [pack] answerN and the running package's
+ * answerN: a visible top-level dialog (class #32770) whose title starts with
+ * <title> gets <action>: a button ID (7 = No, 6 = Yes, 1 = OK, 2 = Cancel) is
+ * pressed; "source" types the Windows source folder (HKLM ...\Setup
+ * SourcePath) into the dialog's edit/combo field and presses OK (the
+ * "Kopiowanie plikow / Copying Files" prompt for a file from the CD). */
+static const ua_pkg *g_answer_pkg;
+static char g_source[UA_PATH];
+
+static int rule_for(const char *title, char *action, int cap) {
+    char key[16], num[8], rule[200];
+    const char *sections[2], *v;
+    int s, k;
+    sections[0] = "pack";
+    sections[1] = g_answer_pkg ? g_answer_pkg->section : 0;
+    for (s = 1; s >= 0; s--) {
+        if (!sections[s]) continue;
+        for (k = 1; k < 32; k++) {
+            int i;
+            key[0] = 0;
+            ua_append(key, sizeof key, "answer");
+            ua_itoa(num, sizeof num, k);
+            ua_append(key, sizeof key, num);
+            v = ua_ini_get(&g_m, sections[s], key);
+            if (!v) break;
+            ua_copy(rule, sizeof rule, v);
+            for (i = 0; rule[i] && rule[i] != '|'; i++) ;
+            if (!rule[i]) continue;
+            rule[i] = 0;
+            if (ua_ieqn(title, rule, ua_len(rule))) { ua_copy(action, cap, rule + i + 1); return 1; }
+        }
+    }
+    return 0;
+}
+
+static BOOL CALLBACK find_field(HWND w, LPARAM lp) {
+    char cls[32];
+    GetClassNameA(w, cls, sizeof cls);
+    if ((ua_ieq(cls, "Edit") || ua_ieq(cls, "ComboBox")) && IsWindowVisible(w)) { *(HWND *)lp = w; return FALSE; }
+    return TRUE;
+}
+
+static BOOL CALLBACK answer_window(HWND w, LPARAM lp) {
+    char cls[16], title[128], action[64];
+    (void)lp;
+    if (!IsWindowVisible(w) || w == g_wnd) return TRUE;
+    GetClassNameA(w, cls, sizeof cls);
+    if (!ua_ieq(cls, "#32770")) return TRUE;
+    GetWindowTextA(w, title, sizeof title);
+    if (!title[0] || !rule_for(title, action, sizeof action)) return TRUE;
+    if (ua_ieq(action, "source")) {
+        HWND field = 0;
+        EnumChildWindows(w, find_field, (LPARAM)&field);
+        if (!field || !g_source[0]) return TRUE; /* e.g. the progress window of the same title */
+        SendMessageA(field, WM_SETTEXT, 0, (LPARAM)g_source);
+        log2("    answered (source folder): ", title);
+        PostMessageA(w, WM_COMMAND, IDOK, 0);
+    } else {
+        int id = ua_atoi(action);
+        if (id <= 0) return TRUE;
+        log2("    answered: ", title);
+        PostMessageA(w, WM_COMMAND, (WPARAM)id, 0);
+    }
+    return TRUE;
+}
 
 static DWORD spawn(char *cmdline, const char *cwd) {
     STARTUPINFOA si;
@@ -308,9 +377,10 @@ static DWORD spawn(char *cmdline, const char *cwd) {
         return (DWORD)-1;
     }
     for (;;) {
-        DWORD r = MsgWaitForMultipleObjects(1, &pi.hProcess, FALSE, INFINITE, QS_ALLINPUT);
+        DWORD r = MsgWaitForMultipleObjects(1, &pi.hProcess, FALSE, 1000, QS_ALLINPUT);
         if (r == WAIT_OBJECT_0) break;
         pump();
+        if (r == WAIT_TIMEOUT) EnumWindows(answer_window, 0);
     }
     GetExitCodeProcess(pi.hProcess, &code);
     CloseHandle(pi.hThread);
@@ -495,10 +565,31 @@ typedef BOOL (WINAPI *PFN_OPT)(HANDLE, DWORD, PHANDLE);
 typedef BOOL (WINAPI *PFN_LPV)(LPCSTR, LPCSTR, PLUID);
 typedef BOOL (WINAPI *PFN_ATP)(HANDLE, BOOL, PTOKEN_PRIVILEGES, DWORD, PTOKEN_PRIVILEGES, PDWORD);
 
+/* Windows 9x: after network components (DUN 1.4) Windows asks for a
+ * user name and password at every start, which stops an unattended chain.
+ * USOS logs the installing user on automatically (the Winlogon values that
+ * TweakUI uses on 9x; empty password, as USOS installs the system without
+ * one); kept after the chain so the system starts straight to the desktop. */
+static void auto_logon(void) {
+    HKEY k;
+    char user[64];
+    DWORD n = sizeof user;
+    if (g_facts.nt) return;
+    if (!GetUserNameA(user, &n) || !user[0]) ua_copy(user, sizeof user, "USOS");
+    if (RegCreateKeyExA(HKEY_LOCAL_MACHINE, "Software\\Microsoft\\Windows\\CurrentVersion\\Winlogon", 0, 0, 0,
+                        KEY_WRITE, 0, &k, 0) != ERROR_SUCCESS)
+        return;
+    RegSetValueExA(k, "DefaultUserName", 0, REG_SZ, (const BYTE *)user, (DWORD)ua_len(user) + 1);
+    RegSetValueExA(k, "DefaultPassword", 0, REG_SZ, (const BYTE *)"", 1);
+    RegSetValueExA(k, "AutoAdminLogon", 0, REG_SZ, (const BYTE *)"1", 2);
+    RegCloseKey(k);
+}
+
 static void restart(void) {
     g_state.pending_reboot = 1;
     save_state();
     register_run();
+    auto_logon();
     log_line(g_pl ? "Ponowne uruchomienie komputera" : "Restarting the computer");
     status(g_pl ? "Ponowne uruchomienie komputera..." : "Restarting the computer...");
     if (g_facts.nt) {
@@ -623,6 +714,7 @@ static void run_chain(void) {
         set_state(x, UA_ST_RUNNING);
         ok = 1;
         g_last_code = 0;
+        g_answer_pkg = p;
         for (k = 1; ok && k < 64; k++) {
             const char *cmd;
             key[0] = 0;
@@ -716,6 +808,9 @@ void __cdecl ua_start(void) {
     g_root[i] = 0;
     GetWindowsDirectoryA(g_win, sizeof g_win);
     GetSystemDirectoryA(g_sysdir, sizeof g_sysdir);
+    if (!reg_string(HKEY_LOCAL_MACHINE, "Software\\Microsoft\\Windows\\CurrentVersion\\Setup", "SourcePath",
+                    g_source, sizeof g_source, &type))
+        g_source[0] = 0;
     if (!reg_string(HKEY_LOCAL_MACHINE, "Software\\Microsoft\\Windows\\CurrentVersion", "ProgramFilesDir",
                     g_pf, sizeof g_pf, &type))
         ua_copy(g_pf, sizeof g_pf, "C:\\Program Files");

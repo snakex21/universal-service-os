@@ -186,7 +186,7 @@ def state(work: Path) -> dict:
 
 def start(a) -> None:
     port = a.port
-    args = [str(qemu()), '-machine', 'pc,smm=off', '-cpu', 'pentium3', '-m', '256', '-accel', 'tcg',
+    args = [str(qemu()), '-machine', 'pc,smm=off', '-cpu', a.cpu, '-m', str(a.mem), '-accel', 'tcg',
             '-drive', f'file={a.work / "disk.raw"},format=raw,if=ide,index=0',
             '-boot', 'order=ac', '-vga', 'cirrus', '-nic', 'none', '-rtc', 'base=localtime',
             '-display', 'none', '-monitor', f'tcp:127.0.0.1:{port},server=on,wait=off']
@@ -281,6 +281,8 @@ def main() -> None:
             s.add_argument('--port', type=int, default=4471)
             s.add_argument('--acceptance', action='store_true', help='add a USB stick (EHCI) and a Sound Blaster 16')
             s.add_argument('--disk-only', action='store_true', help='no floppy: boot the installed C:')
+            s.add_argument('--cpu', default='max', help='pentium3 hangs Windows 98 SE under TCG after Setup (2026-10-03)')
+            s.add_argument('--mem', type=int, default=256)
         if name == 'shot':
             s.add_argument('name')
         if name == 'keys':

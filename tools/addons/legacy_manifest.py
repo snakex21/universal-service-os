@@ -420,6 +420,11 @@ def validate(m: Manifest) -> list[str]:
         if p.get('source') == 'release' and p.get('redist') != 'yes' and not p.get('decision'):
             errors.append(f'{where}: source=release needs redist=yes or a decision=')
     # needs must be provided by an earlier order (per package, statically)
+    answer_keys = [(s_, k, v) for s_, k, v in m.entries if re.fullmatch(r'answer\d+', k.lower())]
+    for s_, k, v in answer_keys:
+        title, _, action = v.partition('|')
+        if not title or not (action.isdigit() or action == 'source'):
+            errors.append(f'[{s_}] {k}: want "title|button id" or "title|source", got {v!r}')
     presets = list_items(m.get('presets', 'order') or '')
     if not presets or (m.get('presets', 'default') or '') not in presets:
         errors.append('[presets] order= and a default= from it are required')
