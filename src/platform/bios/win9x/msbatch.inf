@@ -46,6 +46,7 @@ Services=
 [Install]
 AddReg=USOS.RunOnce
 UpdateInis=USOS.Memory
+UpdateIniFields=USOS.Csm
 
 ; The memory limits at Setup time, for every 9x (Me ignores the AUTOEXEC.BAT
 ; that runs U9FIX on 95/98; U9FIX keeps them there after later changes).
@@ -66,3 +67,7 @@ HKLM,"Software\Microsoft\Windows\CurrentVersion\Run",Welcome
 [USOS.Regwiz]
 HKLM,"Software\Microsoft\Windows\CurrentVersion\Welcome\Regwiz",,1,01,00,00,00
 HKLM,"Software\Microsoft\Windows\CurrentVersion",RegDone,1,01,00,00,00
+
+; Last section: under CSMWrap INSTALL.BAT appends the Windows Me USB keyboard
+; driver lines here (95/98 get them from U9FIX /CSM at every start).
+[USOS.Csm]

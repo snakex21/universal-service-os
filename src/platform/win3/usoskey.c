@@ -17,10 +17,16 @@
  *     layouts keep their VKs; a fixed table for the rest) and calls USER's
  *     keyboard event procedure (keybd_event, USER.289) like KEYBOARD.DRV's
  *     interrupt handler does; ToAscii stays the stock driver's.
+ * Without the TSR (Windows Me starts no real-mode program from AUTOEXEC.BAT
+ * and has no WINSTART.BAT) the driver installs the TSR's resident part
+ * itself: a copy in DOS memory (GlobalDosAlloc) with INT 09h/15h/1Ch/2Fh
+ * hooked in the system VM's real-mode vector table (DPMI 0200h/0201h); the
+ * vectors are restored when the driver is freed.
  * No OpenWatcom runtime is linked (own entry point, -zl): the binary is only
  * this file plus import records. docs/design/bios-via-csmwrap.md.
  */
 #include <windows.h>
+#include "usoskey_tsr.h"            /* generated: USOSKEY.COM resident part */
 
 typedef struct {
     char magic[4];
@@ -185,7 +191,66 @@ void __far __loadds __saveregs poll(void)
     busy = 0;
 }
 
-static int find_bridge(void)
+static const BYTE tsr_ints[4] = { 0x09, 0x15, 0x1C, 0x2F };
+static const WORD tsr_handler[4] = { TSR_INT09, TSR_INT15, TSR_INT1C, TSR_INT2F };
+static const WORD tsr_old_slot[4] = { TSR_OLD09, TSR_OLD15, TSR_OLD1C, TSR_OLD2F };
+static DWORD tsr_mem;               /* GlobalDosAlloc: segment:selector */
+
+static DWORD get_rm_vector(BYTE n)
+{
+    WORD s = 0, o = 0;
+    _asm {
+        mov ax, 0200h
+        mov bl, n
+        int 31h
+        mov s, cx
+        mov o, dx
+    }
+    return ((DWORD)s << 16) | o;
+}
+
+static void set_rm_vector(BYTE n, DWORD v)
+{
+    WORD s = HIWORD(v), o = LOWORD(v);
+    _asm {
+        mov ax, 0201h
+        mov bl, n
+        mov cx, s
+        mov dx, o
+        int 31h
+    }
+}
+
+/* The TSR's resident part at offset 0100h of a DOS block, as if loaded. */
+static void install_resident(void)
+{
+    BYTE FAR *p;
+    WORD i, seg;
+    tsr_mem = GlobalDosAlloc(0x100 + sizeof(tsr_image));
+    if (!tsr_mem) return;
+    seg = HIWORD(tsr_mem);
+    p = (BYTE FAR *)MAKELP(LOWORD(tsr_mem), 0);
+    for (i = 0; i < sizeof(tsr_image); i++) p[0x100 + i] = tsr_image[i];
+    for (i = 0; i < 4; i++) *(DWORD FAR *)(p + tsr_old_slot[i]) = get_rm_vector(tsr_ints[i]);
+    _asm cli
+    for (i = 0; i < 4; i++) set_rm_vector(tsr_ints[i], ((DWORD)seg << 16) | tsr_handler[i]);
+    _asm sti
+}
+
+static void remove_resident(void)
+{
+    BYTE FAR *p;
+    WORD i, seg;
+    if (!tsr_mem) return;
+    seg = HIWORD(tsr_mem);
+    p = (BYTE FAR *)MAKELP(LOWORD(tsr_mem), 0);
+    /* Only vectors that still point at the copy go back. */
+    for (i = 0; i < 4; i++)
+        if (get_rm_vector(tsr_ints[i]) == (((DWORD)seg << 16) | tsr_handler[i]))
+            set_rm_vector(tsr_ints[i], *(DWORD FAR *)(p + tsr_old_slot[i]));
+}
+
+static int query_bridge(void)
 {
     WORD al_out = 0, rseg = 0, roff = 0, magic = 0;
     _asm {
@@ -204,12 +269,21 @@ static int find_bridge(void)
         pop si
     }
     if ((al_out & 0xFF) != 0xFF || magic != 0x554B) return 0;
+    if (shared_sel) FreeSelector(shared_sel);
     shared_sel = AllocSelector(HIWORD((DWORD)(void FAR *)&shared));
     if (!shared_sel) return 0;
     SetSelectorBase(shared_sel, (DWORD)rseg << 4);
     SetSelectorLimit(shared_sel, 0xFFFFL);
     shared = (SHARED FAR *)MAKELP(shared_sel, roff);
     return shared->magic[0] == 'U' && shared->magic[1] == 'S' && shared->magic[2] == 'K' && shared->magic[3] == 'Y';
+}
+
+static int find_bridge(void)
+{
+    if (query_bridge()) return 1;
+    shared = 0;
+    install_resident();
+    return tsr_mem && query_bridge();
 }
 
 static void find_vkd(void)
@@ -285,7 +359,7 @@ LRESULT FAR PASCAL __export __loadds DriverProc(DWORD id, HANDLE driver, UINT ms
     case DRV_LOAD:    return init() ? 1L : 0L;
     case DRV_ENABLE:  start(); return 1L;
     case DRV_DISABLE: stop(); return 1L;
-    case DRV_FREE:    stop(); return 1L;
+    case DRV_FREE:    stop(); remove_resident(); return 1L;
     case DRV_OPEN:
     case DRV_CLOSE:   return 1L;
     }
@@ -296,6 +370,7 @@ int FAR PASCAL __export __loadds WEP(int exit_type)
 {
     (void)exit_type;
     stop();
+    remove_resident();
     return 1;
 }
 

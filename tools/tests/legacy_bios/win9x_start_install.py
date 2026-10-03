@@ -21,7 +21,7 @@ def vm(out, *args):
 
 
 def keys(out, *names, wait=2.0):
-    vm(out, 'key', *names)
+    vm(out, 'key', '--delay', '0.8', *names)
     time.sleep(wait)
 
 

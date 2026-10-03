@@ -83,7 +83,7 @@ def start(out, a):
     cmd += ['-device', 'qemu-xhci,id=xhci']
     if a.kbd == 'usb':
         # With usb-kbd present QEMU routes sendkey to it, not to the i8042.
-        cmd += ['-device', 'usb-kbd,bus=xhci.0']
+        cmd += ['-device', 'usb-kbd,bus=xhci.0,id=ukbd']
     if a.tablet:
         cmd += ['-device', 'usb-tablet,bus=xhci.0']
     if a.mouse == 'usb':

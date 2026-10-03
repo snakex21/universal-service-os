@@ -61,6 +61,17 @@ ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\USOSKEY.DRV COPY C:\USOS9X\*.DRV C:\WINDOWS
 ECHO :USOSDRV>>C:\AUTOEXEC.BAT
 ECHO @C:\USOS9X\USOSKEY.COM>>C:\AUTOEXEC.BAT
 ECHO @C:\USOS9X\VBMOUSE.EXE>>C:\AUTOEXEC.BAT
+REM Me starts no real-mode program from AUTOEXEC.BAT and has no WINSTART.BAT:
+REM USOSKEY.DRV installs the bridge itself (in DOS memory of the system VM).
+REM Me has no *VMD for VBMOUSE.DRV, so the mouse stays the stock driver.
+REM The driver goes to SYSTEM before Setup; MSBATCH.INF [USOS.Csm] names it.
+IF NOT "%U9SYS%"=="ME" GOTO AUTODONE
+MD C:\WINDOWS
+MD C:\WINDOWS\SYSTEM
+COPY /Y C:\USOS9X\USOSKEY.DRV C:\WINDOWS\SYSTEM >NUL
+REM A user's own answer file is copied 1:1 (it ends with its own section).
+IF "%U9ANS%"=="USER" GOTO AUTODONE
+ECHO system.ini,boot,drivers,,usoskey.drv>>C:\%U9SRC%\MSBATCH.INF
 :AUTODONE
 ECHO Poprawki zgodnosci (Patcher9x: TLB, CPU, RAM, rejestry CPU)...
 A:\CWSDPMI.EXE -s-

@@ -105,6 +105,7 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
         \\[Install]
         \\AddReg=USOS.RunOnce
         \\UpdateInis=USOS.Memory
+        \\UpdateIniFields=USOS.Csm
         \\
         \\[USOS.Memory]
         \\system.ini,386Enh,,"MaxPhysPage=40000"
@@ -123,6 +124,9 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
         \\[USOS.Regwiz]
         \\HKLM,"Software\Microsoft\Windows\CurrentVersion\Welcome\Regwiz",,1,01,00,00,00
         \\HKLM,"Software\Microsoft\Windows\CurrentVersion",RegDone,1,01,00,00,00
+        \\
+        \\; Last section: under CSMWrap INSTALL.BAT appends the Me USB input lines.
+        \\[USOS.Csm]
         \\
     );
     // The multiline literal ends lines with LF only: make every line CRLF.
