@@ -61,11 +61,15 @@ pub const Mode = enum {
     /// and CSMWrap ESP on an MBR disk (tools/vista_csmwrap_prepare.sh), from
     /// the request windows_native_iso.prepareCsmwrap wrote.
     csmwrap,
+    /// w9x-uefi-csmwrap: Windows 95/98/Me Setup disk with a CSMWrap ESP
+    /// (tools/w9x_csmwrap_prepare.sh), from win9x_preparation's request.
+    win9x,
 
     fn tokens(self: Mode) []const u8 {
         return switch (self) {
             .disk => "usos.legacy_action=vista-disk usos.plan_profile=vista-uefi-disk",
             .csmwrap => "usos.legacy_action=vista-csmwrap usos.plan_profile=vista-x64-sp2-uefi-csmwrap",
+            .win9x => "usos.legacy_action=w9x-csmwrap usos.plan_profile=w9x-uefi-csmwrap",
         };
     }
 };
@@ -83,7 +87,7 @@ const disk_console = "quiet loglevel=3 vt.global_cursor_default=0";
 pub fn formatCommand(buffer: []u8, lang_initrd: []const u8, esp_partuuid: []const u8, mode: Mode, verbose: bool, theme_option: []const u8) ![]const u8 {
     const console = switch (mode) {
         .disk => disk_console,
-        .csmwrap => @import("usos").flow.boot_console.xpConsoleOptions(verbose),
+        .csmwrap, .win9x => @import("usos").flow.boot_console.xpConsoleOptions(verbose),
     };
     return std.fmt.bufPrint(buffer, "initrd=\\EFI\\USOS\\micro-linux\\initramfs-usos{s} rdinit=/usos-init {s} usos.esp_partuuid={s} {s}{s}", .{ lang_initrd, console, esp_partuuid, mode.tokens(), theme_option });
 }
@@ -96,6 +100,11 @@ pub fn startCsmwrap(root: *uefi.protocol.File) !void {
     return startMode(root, .csmwrap);
 }
 
+/// Windows 95/98/Me (step 620): the same base micro-Linux start.
+pub fn startWin9x(root: *uefi.protocol.File) !void {
+    return startMode(root, .win9x);
+}
+
 fn startMode(root: *uefi.protocol.File, mode: Mode) !void {
     var id: [36]u8 = undefined;
     try espPartuuid(root, &id);
@@ -106,9 +115,13 @@ fn startMode(root: *uefi.protocol.File, mode: Mode) !void {
     var cmd: [1024]u8 = undefined;
     var theme_buffer: [@import("usos").gui.theme_cmdline.option_len]u8 = undefined;
     const theme_option = @import("usos").gui.theme_cmdline.option(&theme_buffer, @import("manual_view.zig").currentTheme());
-    const command = try formatCommand(&cmd, lang_initrd, &id, mode, mode == .csmwrap and @import("diagnostic_boot.zig").requested(root), theme_option);
+    const command = try formatCommand(&cmd, lang_initrd, &id, mode, mode != .disk and @import("diagnostic_boot.zig").requested(root), theme_option);
     const serial = @import("serial.zig");
-    serial.writeAscii(if (mode == .csmwrap) "[VISTA_CSMWRAP_CMDLINE] " else "[VISTA_DISK_CMDLINE] ");
+    serial.writeAscii(switch (mode) {
+        .csmwrap => "[VISTA_CSMWRAP_CMDLINE] ",
+        .win9x => "[W9X_CSMWRAP_CMDLINE] ",
+        .disk => "[VISTA_DISK_CMDLINE] ",
+    });
     serial.writeAscii(command);
     serial.writeAscii("\n");
     var options: [1025]u16 = @splat(0);

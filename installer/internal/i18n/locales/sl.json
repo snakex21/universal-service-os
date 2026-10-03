@@ -400,6 +400,7 @@
   "boot.method.auto_slitaz": "Samodejno (SliTaz Live)",
   "boot.method.auto_xp": "Samodejno (priprava XP)",
   "boot.method.auto_xp_uefi": "Samodejno (priprava UEFI / XP prek CSM)",
+  "boot.method.auto_w9x_uefi": "Samodejno (priprava UEFI / namestitev DOS prek CSMWrap)",
   "boot.method.auto_wimboot": "Samodejno (WIMBoot)",
   "boot.method.auto_vhdboot": "Samodejno (VHDBoot)",
   "boot.method.auto_efi": "Samodejno (EFI)",
@@ -486,6 +487,7 @@
   "boot.summary.xp_preparation": "UEFI; nameščeni XP zahteva CSM vdelane programske opreme in MBR",
   "boot.summary.xp_source": "XP SP3 x86; gonilniki ACPI / SATA / USB; izbirni zagonski vnos PAE",
   "boot.summary.xp_disk": "Izbran in potrjen na naslednjem grafičnem zaslonu",
+  "boot.summary.w9x_disk": "Izbere in potrdi se na naslednjem grafičnem zaslonu; celoten disk se izbriše",
   "boot.summary.xp_sif_merged": "{0} (združeno s samodejnim odgovorom)",
   "boot.summary.vista_case": "Vista SP2 x64 -> PE10; nameščeni sistem potrebuje CSM",
   "boot.summary.vista_usb": "Izvorni USB v PE10; cilj uporablja Vista USB v11",
@@ -1163,6 +1165,7 @@
   "boot.summary.vista_case_nocsm": "Windows Vista brez CSM: še ni podprto (črn zaslon) - omogočite CSM v nastavitvah plošče",
 
   "boot.summary.xp_csmwrap": "XP brez CSM (poskusno): CSMWrap, kartica z legacy VBIOS, 1 jedro rezervirano",
+  "boot.summary.w9x_csmwrap": "Brez CSM (preizkusno): USOS pripravi disk FAT32 z namestitvijo in CSMWrap; namestitev se nato zažene z njega",
 
   "boot.summary.w2k_limits": "Windows 2000 (poskusno): ni gonilnika AHCI/NVMe/USB 3 za NT 5.0 (SATA v načinu IDE), največ 4 GB RAM in 2 procesorja",
 

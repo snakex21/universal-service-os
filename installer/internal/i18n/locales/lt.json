@@ -397,6 +397,7 @@
   "boot.method.auto_slitaz": "Automatinis (SliTaz Live)",
   "boot.method.auto_xp": "Automatinis (XP paruošimas)",
   "boot.method.auto_xp_uefi": "Automatinis (UEFI paruošimas / XP per CSM)",
+  "boot.method.auto_w9x_uefi": "Automatiškai (UEFI paruošimas / DOS diegimas per CSMWrap)",
   "boot.method.auto_wimboot": "Automatinis (WIMBoot)",
   "boot.method.auto_vhdboot": "Automatinis (VHDBoot)",
   "boot.method.auto_efi": "Automatinis (EFI)",
@@ -483,6 +484,7 @@
   "boot.summary.xp_preparation": "UEFI; įdiegtai XP reikia programinės aparatinės įrangos CSM ir MBR",
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB tvarkyklės; pasirenkamas PAE įkrovos įrašas",
   "boot.summary.xp_disk": "Pasirenkamas ir patvirtinamas kitame grafiniame ekrane",
+  "boot.summary.w9x_disk": "Pasirenkamas ir patvirtinamas kitame grafiniame ekrane; visas diskas ištrinamas",
   "boot.summary.xp_sif_merged": "{0} (sujungta su automatiniu atsakymu)",
   "boot.summary.vista_case": "Vista SP2 x64 -> PE10; įdiegtai sistemai reikia CSM",
   "boot.summary.vista_usb": "PE10 integruotas USB; paskirtis naudoja Vista USB v11",
@@ -1160,6 +1162,7 @@
   "boot.summary.vista_case_nocsm": "Windows Vista be CSM: dar nepalaikoma (juodas ekranas) - įjunkite CSM pagrindinės plokštės nustatymuose",
 
   "boot.summary.xp_csmwrap": "XP be CSM (eksperimentinis): CSMWrap, plokštė su legacy VBIOS, 1 branduolys rezervuotas",
+  "boot.summary.w9x_csmwrap": "Be CSM (eksperimentinis): USOS paruošia FAT32 diegimo diską su CSMWrap; diegimas paleidžiamas iš jo",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentinė): nėra NT 5.0 AHCI/NVMe/USB 3 tvarkyklės (SATA IDE režimu), daugiausia 4 GB RAM ir 2 procesoriai",
 

@@ -188,6 +188,7 @@ pub fn profileCapable(system: *const SystemEntry, image: ImageKind, method: Boot
     const backend = preparation_capability.resolveForFirmware(system, image, method, firmware) orelse return false;
     return switch (backend) {
         .xp_uefi_staging => true,
+        .win9x_uefi => true,
         .windows_iso => true,
         .chainload, .wimboot => true,
         else => false,

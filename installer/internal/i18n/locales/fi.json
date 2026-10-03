@@ -394,6 +394,7 @@
   "boot.method.auto_slitaz": "Automaattinen (SliTaz Live)",
   "boot.method.auto_xp": "Automaattinen (XP:n valmistelu)",
   "boot.method.auto_xp_uefi": "Automaattinen (UEFI-valmistelu / XP CSM:n kautta)",
+  "boot.method.auto_w9x_uefi": "Automaattinen (UEFI-valmistelu / DOS-asennus CSMWrapin kautta)",
   "boot.method.auto_wimboot": "Automaattinen (WIMBoot)",
   "boot.method.auto_vhdboot": "Automaattinen (VHDBoot)",
   "boot.method.auto_efi": "Automaattinen (EFI)",
@@ -480,6 +481,7 @@
   "boot.summary.xp_preparation": "UEFI; asennettu XP vaatii laiteohjelmiston CSM:n ja MBR:n",
   "boot.summary.xp_source": "XP SP3 x86; ACPI-/SATA-/USB-ajurit; valinnainen PAE-käynnistysmerkintä",
   "boot.summary.xp_disk": "Valitaan ja vahvistetaan seuraavassa graafisessa näkymässä",
+  "boot.summary.w9x_disk": "Valitaan ja vahvistetaan seuraavassa graafisessa näkymässä; koko levy tyhjennetään",
   "boot.summary.xp_sif_merged": "{0} (yhdistetty automaattiseen vastaukseen)",
   "boot.summary.vista_case": "Vista SP2 x64 -> PE10; asennettu järjestelmä vaatii CSM:n",
   "boot.summary.vista_usb": "PE10:n oma USB-tuki; kohde käyttää Vista USB v11:tä",
@@ -1157,6 +1159,7 @@
   "boot.summary.vista_case_nocsm": "Windows Vista ilman CSM:ää: ei vielä tuettu (musta näyttö) - ota CSM käyttöön emolevyn asetuksista",
 
   "boot.summary.xp_csmwrap": "XP ilman CSM:ää (kokeellinen): CSMWrap, näytönohjain legacy-VBIOSilla, 1 ydin varattu",
+  "boot.summary.w9x_csmwrap": "Ilman CSM:ää (kokeellinen): USOS valmistelee FAT32-asennuslevyn ja CSMWrapin; asennus käynnistyy siltä",
 
   "boot.summary.w2k_limits": "Windows 2000 (kokeellinen): ei AHCI/NVMe/USB 3 -ajuria NT 5.0:lle (SATA IDE-tilassa), enintään 4 Gt RAM ja 2 suoritinta",
 

@@ -397,6 +397,7 @@
   "boot.method.auto_slitaz": "Автоматически (SliTaz Live)",
   "boot.method.auto_xp": "Автоматически (подготовка XP)",
   "boot.method.auto_xp_uefi": "Автоматически (подготовка в UEFI / XP через CSM)",
+  "boot.method.auto_w9x_uefi": "Автоматически (подготовка UEFI / установка DOS через CSMWrap)",
   "boot.method.auto_wimboot": "Автоматически (WIMBoot)",
   "boot.method.auto_vhdboot": "Автоматически (VHDBoot)",
   "boot.method.auto_efi": "Автоматически (EFI)",
@@ -483,6 +484,7 @@
   "boot.summary.xp_preparation": "UEFI; установленной XP нужны CSM прошивки и MBR",
   "boot.summary.xp_source": "XP SP3 x86; драйверы ACPI / SATA / USB; необязательный пункт загрузки PAE",
   "boot.summary.xp_disk": "Выбирается и подтверждается на следующем графическом экране",
+  "boot.summary.w9x_disk": "Выбирается и подтверждается на следующем графическом экране; весь диск будет очищен",
   "boot.summary.xp_sif_merged": "{0} (объединён с автоматическим ответом)",
   "boot.summary.vista_case": "Vista SP2 x64 -> PE10; установленной системе нужен CSM",
   "boot.summary.vista_usb": "Встроенный USB в PE10; цель использует Vista USB v11",
@@ -1160,6 +1162,7 @@
   "boot.summary.vista_case_nocsm": "Windows Vista без CSM: пока не поддерживается (чёрный экран) - включите CSM в настройках платы",
 
   "boot.summary.xp_csmwrap": "XP без CSM (экспериментально): CSMWrap, видеокарта с legacy VBIOS, 1 ядро зарезервировано",
+  "boot.summary.w9x_csmwrap": "Без CSM (экспериментально): USOS готовит диск FAT32 с установкой и CSMWrap; затем установка запускается с него",
 
   "boot.summary.w2k_limits": "Windows 2000 (экспериментально): нет драйвера AHCI/NVMe/USB 3 для NT 5.0 (SATA в режиме IDE), не более 4 ГБ ОЗУ и 2 процессоров",
 

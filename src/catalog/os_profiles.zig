@@ -285,6 +285,11 @@ pub const profiles = [_]Profile{
     .{ .id = "w2k3-uefi-other", .systems = .{ .ids = &.{"windows-server-2003"} }, .firmware = .uefi, .backend = null, .progress = .none },
     .{ .id = "xp-x64-sp2-uefi-csm", .systems = .{ .ids = &.{"windows-xp-x64"} }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .xp_uefi_staging, .progress = .xp_uefi },
     .{ .id = "xp-x64-uefi-other", .systems = .{ .ids = &.{"windows-xp-x64"} }, .firmware = .uefi, .backend = null, .progress = .none },
+    // Windows 95/98/Me from UEFI: micro-Linux step 620 writes a FAT32 Setup
+    // disk with a one-time DOS start and a CSMWrap ESP; Setup then runs from
+    // that disk in BIOS mode (docs/win9x-modern-2026-09-30.md 4c).
+    .{ .id = "w9x-uefi-csmwrap", .systems = .{ .ids = &.{ "windows-98-se", "windows-98", "windows-me", "windows-95" } }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .win9x_uefi, .progress = .direct_iso },
+    .{ .id = "w9x-uefi-other", .systems = .{ .ids = &.{ "windows-98-se", "windows-98", "windows-me", "windows-95" } }, .firmware = .uefi, .backend = null, .progress = .none },
     // ---- BIOS only
     .{ .id = "linux-live-bios", .systems = .{ .ids = &.{"other-linux"} }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .linux_live_iso, .progress = .core },
     // Linux ISO from DATA in the BIOS Core (other-linux keeps the SliTaz row;

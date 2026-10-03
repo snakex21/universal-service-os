@@ -72,6 +72,10 @@ try {
         if ($EspOverlay) { Copy-Item -Path (Join-Path $EspOverlay '*') -Destination $espPath -Recurse -Force }
         if ($CsmwrapEfi) { Copy-Item -LiteralPath $CsmwrapEfi -Destination (Join-Path $espPath 'EFI\USOS\csmwrap\csmwrapx64.efi') -Force }
         if ($CsmwrapIni) { Copy-Item -LiteralPath $CsmwrapIni -Destination (Join-Path $espPath 'EFI\USOS\csmwrap\csmwrap.ini') -Force }
+        # The installer's identity record: the UEFI menu's micro-Linux starts (XP, Vista,
+        # Windows 9x CSMWrap preparation) find the ESP and DATA by these partition GUIDs.
+        $device = @('[device]', "esp_partuuid=$($esp.Guid.Trim('{}'))", "data_partuuid=$($data.Guid.Trim('{}'))", 'data_label=USOS_DATA') -join "`r`n"
+        [IO.File]::WriteAllText((Join-Path $espPath 'EFI\USOS\usos-device.ini'), $device + "`r`n")
         foreach ($folder in @('Programs', 'Systems', 'Utilities', 'Utilities\FreeDOS\Programs', 'Systems\DOS\MS-DOS\Programs')) {
             New-Item -ItemType Directory -Force -Path (Join-Path $dataPath $folder) | Out-Null
         }

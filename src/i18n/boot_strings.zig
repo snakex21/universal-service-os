@@ -191,6 +191,7 @@ pub const Key = enum(u16) {
     method_auto_msdos,
     method_auto_slitaz,
     method_auto_vhdboot,
+    method_auto_w9x_uefi,
     method_auto_wimboot,
     method_auto_win2000,
     method_auto_windows_setup,
@@ -605,6 +606,8 @@ pub const Key = enum(u16) {
     summary_vista_support,
     summary_vista_usb,
     summary_w2k_limits,
+    summary_w9x_csmwrap,
+    summary_w9x_disk,
     summary_xp_csmwrap,
     summary_xp_disk,
     summary_xp_preparation,
@@ -870,6 +873,7 @@ pub const hashes = [_]u32{
     0xdf251230, // method.auto_msdos
     0xdc54235f, // method.auto_slitaz
     0xd0d5afbc, // method.auto_vhdboot
+    0x66f6edd4, // method.auto_w9x_uefi
     0xaaec70e9, // method.auto_wimboot
     0x1fcc2a9a, // method.auto_win2000
     0xabbaa3a1, // method.auto_windows_setup
@@ -1284,6 +1288,8 @@ pub const hashes = [_]u32{
     0xa0987638, // summary.vista_support
     0x1e3154b1, // summary.vista_usb
     0xf657c7a8, // summary.w2k_limits
+    0xb1cdcd1f, // summary.w9x_csmwrap
+    0xdb6f9367, // summary.w9x_disk
     0xac5a69f9, // summary.xp_csmwrap
     0xe262ce65, // summary.xp_disk
     0xedd282b9, // summary.xp_preparation
@@ -1691,6 +1697,9 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    true,
+    false,
+    false,
     false,
     false,
     false,
@@ -2038,7 +2047,7 @@ pub const bios = [_]bool{
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
-pub const bios_count = 331;
+pub const bios_count = 332;
 
 pub const english = [_][]const u8{
     "Experimental",
@@ -2230,6 +2239,7 @@ pub const english = [_][]const u8{
     "Automatic (MS-DOS / Windows 3.x)",
     "Automatic (SliTaz Live)",
     "Automatic (VHDBoot)",
+    "Automatic (UEFI preparation / DOS Setup via CSMWrap)",
     "Automatic (WIMBoot)",
     "Automatic (Windows 2000 Setup)",
     "Automatic (Windows Setup)",
@@ -2644,6 +2654,8 @@ pub const english = [_][]const u8{
     "KB2864202 + signed USB package + pre-Setup v11",
     "PE10 native USB; the target uses Vista USB v11",
     "Windows 2000 (experimental): no AHCI/NVMe/USB 3 driver for NT 5.0 (SATA in IDE mode), max. 4 GB RAM and 2 CPUs",
+    "Without CSM (experimental): USOS prepares a FAT32 Setup disk with CSMWrap; Setup then runs from it",
+    "Selected and confirmed in the next graphical screen; the whole disk is erased",
     "XP without CSM (experimental): CSMWrap, card with a legacy VBIOS, 1 core reserved",
     "Selected and confirmed in the next graphical screen",
     "UEFI; installed XP requires firmware CSM and MBR",

@@ -412,7 +412,11 @@ def main() -> int:
                     source = archive.extractfile(member)
                     systemd_boot = source.read() if source else None
                 continue
+            only = record.get("files")
             for entry in archive_entries(package):
+                # "files": take only these paths (and their folders) from the package.
+                if only is not None and entry.name not in only:
+                    continue
                 normalized = merged_usr_entry(entry)
                 if normalized is not None:
                     put(entries, normalized)
@@ -443,6 +447,8 @@ def main() -> int:
             ("tools/prepare_xp_target.sh", "usr/lib/usos/prepare_xp_target.sh"),
             ("tools/legacy_xp_staging.sh", "usr/lib/usos/legacy_xp_staging.sh"),
             ("tools/xp_csmwrap_esp.sh", "usr/lib/usos/xp_csmwrap_esp.sh"),
+            ("tools/w9x_csmwrap_prepare.sh", "usr/lib/usos/w9x_csmwrap_prepare.sh"),
+            ("tools/w9x_csmwrap_target.sh", "usr/lib/usos/w9x_csmwrap_target.sh"),
             ("tools/legacy_xp_resume.sh", "usr/lib/usos/legacy_xp_resume.sh"),
             ("tools/xp_unattended_policy.sh", "usr/lib/usos/xp_unattended_policy.sh"),
             ("tools/xp_user_settings.sh", "usr/lib/usos/xp_user_settings.sh"),
@@ -481,6 +487,7 @@ def main() -> int:
             ("tools/pipeline/steps/600_vista_disk_prepare.sh", "usr/lib/usos/pipeline/steps/600_vista_disk_prepare.sh"),
             ("tools/vista_disk_prepare.sh", "usr/lib/usos/vista_disk_prepare.sh"),
             ("tools/pipeline/steps/610_vista_csmwrap.sh", "usr/lib/usos/pipeline/steps/610_vista_csmwrap.sh"),
+            ("tools/pipeline/steps/620_w9x_csmwrap.sh", "usr/lib/usos/pipeline/steps/620_w9x_csmwrap.sh"),
             ("tools/vista_csmwrap_prepare.sh", "usr/lib/usos/vista_csmwrap_prepare.sh"),
             ("tools/vista_csmwrap_target.sh", "usr/lib/usos/vista_csmwrap_target.sh"),
             ("tools/micro_linux_init.sh", "usos-init"),

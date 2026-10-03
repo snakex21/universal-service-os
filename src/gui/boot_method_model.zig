@@ -110,6 +110,7 @@ fn baseLabel(method: BootMethod, backend: ?capability.Backend) []const u8 {
         .linux_iso => "Automatic (Linux ISO)",
         .xp_staging => "Automatic (XP staging)",
         .xp_uefi_staging => "Automatic (UEFI preparation / XP via CSM)",
+        .win9x_uefi => "Automatic (UEFI preparation / DOS Setup via CSMWrap)",
         .wimboot => "Automatic (WIMBoot)",
         .vhdboot => "Automatic (VHDBoot)",
         .direct_efi => "Automatic (EFI)",

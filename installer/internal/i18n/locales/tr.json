@@ -394,6 +394,7 @@
   "boot.method.auto_slitaz": "Otomatik (SliTaz Live)",
   "boot.method.auto_xp": "Otomatik (XP hazırlığı)",
   "boot.method.auto_xp_uefi": "Otomatik (UEFI hazırlığı / CSM üzerinden XP)",
+  "boot.method.auto_w9x_uefi": "Otomatik (UEFI hazırlığı / CSMWrap ile DOS kurulumu)",
   "boot.method.auto_wimboot": "Otomatik (WIMBoot)",
   "boot.method.auto_vhdboot": "Otomatik (VHDBoot)",
   "boot.method.auto_efi": "Otomatik (EFI)",
@@ -480,6 +481,7 @@
   "boot.summary.xp_preparation": "UEFI; kurulu XP, ürün yazılımında CSM ve MBR gerektirir",
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB sürücüleri; isteğe bağlı PAE önyükleme girdisi",
   "boot.summary.xp_disk": "Sonraki grafik ekranda seçilir ve onaylanır",
+  "boot.summary.w9x_disk": "Sonraki grafik ekranda seçilir ve onaylanır; tüm disk silinir",
   "boot.summary.xp_sif_merged": "{0} (otomatik yanıtla birleştirildi)",
   "boot.summary.vista_case": "Vista SP2 x64 -> PE10; kurulu sistem CSM gerektirir",
   "boot.summary.vista_usb": "PE10 yerel USB; hedef Vista USB v11 kullanır",
@@ -1157,6 +1159,7 @@
   "boot.summary.vista_case_nocsm": "CSM olmadan Windows Vista: henüz desteklenmiyor (siyah ekran) - anakart ayarlarında CSM'i etkinleştirin",
 
   "boot.summary.xp_csmwrap": "CSM olmadan XP (deneysel): CSMWrap, legacy VBIOS'lu kart, 1 çekirdek ayrılmış",
+  "boot.summary.w9x_csmwrap": "CSM olmadan (deneysel): USOS kurulumlu bir FAT32 disk ve CSMWrap hazırlar; kurulum daha sonra bu diskten başlar",
 
   "boot.summary.w2k_limits": "Windows 2000 (deneysel): NT 5.0 için AHCI/NVMe/USB 3 sürücüsü yok (SATA IDE modunda), en fazla 4 GB RAM ve 2 işlemci",
 

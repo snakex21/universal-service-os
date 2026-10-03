@@ -798,6 +798,29 @@
       "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp."
     },
     {
+      "id": "alpine-syslinux",
+      "name": "syslinux installer (Alpine v3.24 package)",
+      "version": "syslinux 6.04_pre1-r19",
+      "license": "GPL-2.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/d5dfca89b19916b8369b7322bfda4bf396742332/main/syslinux",
+          "https://www.zytor.com/pub/syslinux/Testing/6.04/syslinux-6.04-pre1.tar.xz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine /usr/bin/syslinux (mtools installer with LDLINUX built in) inside initramfs-usos: makes the Windows 9x Setup disk start once (docs/win9x-modern-2026-09-30.md 4c)."
+    },
+    {
       "id": "alpine-dmidecode",
       "name": "dmidecode (Alpine v3.24 package)",
       "version": "dmidecode 3.7-r0",

@@ -394,6 +394,7 @@
   "boot.method.auto_slitaz": "Automatico (SliTaz Live)",
   "boot.method.auto_xp": "Automatico (preparazione XP)",
   "boot.method.auto_xp_uefi": "Automatico (preparazione UEFI / XP tramite CSM)",
+  "boot.method.auto_w9x_uefi": "Automatico (preparazione UEFI / installazione DOS tramite CSMWrap)",
   "boot.method.auto_wimboot": "Automatico (WIMBoot)",
   "boot.method.auto_vhdboot": "Automatico (VHDBoot)",
   "boot.method.auto_efi": "Automatico (EFI)",
@@ -480,6 +481,7 @@
   "boot.summary.xp_preparation": "UEFI; XP installato richiede CSM del firmware e MBR",
   "boot.summary.xp_source": "XP SP3 x86; driver ACPI / SATA / USB; voce di avvio PAE facoltativa",
   "boot.summary.xp_disk": "Selezionato e confermato nella schermata grafica successiva",
+  "boot.summary.w9x_disk": "Scelto e confermato nella schermata grafica successiva; l’intero disco viene cancellato",
   "boot.summary.xp_sif_merged": "{0} (unito alla risposta automatica)",
   "boot.summary.vista_case": "Vista SP2 x64 -> PE10; il sistema installato richiede il CSM",
   "boot.summary.vista_usb": "USB nativo PE10; la destinazione usa Vista USB v11",
@@ -1157,6 +1159,7 @@
   "boot.summary.vista_case_nocsm": "Windows Vista senza CSM: non ancora supportato (schermo nero) - attivare il CSM nelle impostazioni della scheda madre",
 
   "boot.summary.xp_csmwrap": "XP senza CSM (sperimentale): CSMWrap, scheda con VBIOS legacy, 1 core riservato",
+  "boot.summary.w9x_csmwrap": "Senza CSM (sperimentale): USOS prepara un disco FAT32 con l’installazione e CSMWrap; l’installazione parte poi da esso",
 
   "boot.summary.w2k_limits": "Windows 2000 (sperimentale): nessun driver AHCI/NVMe/USB 3 per NT 5.0 (SATA in modalità IDE), max 4 GB di RAM e 2 CPU",
 

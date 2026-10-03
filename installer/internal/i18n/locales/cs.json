@@ -397,6 +397,7 @@
   "boot.method.auto_slitaz": "Automaticky (SliTaz Live)",
   "boot.method.auto_xp": "Automaticky (příprava XP)",
   "boot.method.auto_xp_uefi": "Automaticky (příprava v UEFI / XP přes CSM)",
+  "boot.method.auto_w9x_uefi": "Automaticky (příprava UEFI / instalace DOS přes CSMWrap)",
   "boot.method.auto_wimboot": "Automaticky (WIMBoot)",
   "boot.method.auto_vhdboot": "Automaticky (VHDBoot)",
   "boot.method.auto_efi": "Automaticky (EFI)",
@@ -483,6 +484,7 @@
   "boot.summary.xp_preparation": "UEFI; nainstalovaný XP vyžaduje CSM ve firmwaru a MBR",
   "boot.summary.xp_source": "XP SP3 x86; ovladače ACPI / SATA / USB; volitelná spouštěcí položka PAE",
   "boot.summary.xp_disk": "Vybírá a potvrzuje se na další grafické obrazovce",
+  "boot.summary.w9x_disk": "Vybírá se a potvrzuje na další grafické obrazovce; celý disk bude vymazán",
   "boot.summary.xp_sif_merged": "{0} (sloučeno s automatickou odpovědí)",
   "boot.summary.vista_case": "Vista SP2 x64 -> PE10; nainstalovaný systém vyžaduje CSM",
   "boot.summary.vista_usb": "Nativní USB v PE10; cíl používá Vista USB v11",
@@ -1160,6 +1162,7 @@
   "boot.summary.vista_case_nocsm": "Windows Vista bez CSM: zatím nepodporováno (černá obrazovka) - zapněte CSM v nastavení desky",
 
   "boot.summary.xp_csmwrap": "XP bez CSM (experimentální): CSMWrap, karta s legacy VBIOS, 1 jádro rezervováno",
+  "boot.summary.w9x_csmwrap": "Bez CSM (experimentální): USOS připraví disk FAT32 s instalací a CSMWrap; instalace pak běží z něj",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimentální): chybí ovladač AHCI/NVMe/USB 3 pro NT 5.0 (SATA v režimu IDE), max. 4 GB RAM a 2 procesory",
 

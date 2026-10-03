@@ -394,6 +394,7 @@
   "boot.method.auto_slitaz": "Automatisk (SliTaz Live)",
   "boot.method.auto_xp": "Automatisk (XP-klargjøring)",
   "boot.method.auto_xp_uefi": "Automatisk (UEFI-klargjøring / XP via CSM)",
+  "boot.method.auto_w9x_uefi": "Automatisk (UEFI-forberedelse / DOS-installasjon via CSMWrap)",
   "boot.method.auto_wimboot": "Automatisk (WIMBoot)",
   "boot.method.auto_vhdboot": "Automatisk (VHDBoot)",
   "boot.method.auto_efi": "Automatisk (EFI)",
@@ -480,6 +481,7 @@
   "boot.summary.xp_preparation": "UEFI; installert XP krever fastvare-CSM og MBR",
   "boot.summary.xp_source": "XP SP3 x86; ACPI-/SATA-/USB-drivere; valgfri PAE-oppstartsoppføring",
   "boot.summary.xp_disk": "Velges og bekreftes på neste grafiske skjermbilde",
+  "boot.summary.w9x_disk": "Velges og bekreftes på neste grafiske skjerm; hele disken slettes",
   "boot.summary.xp_sif_merged": "{0} (slått sammen med det automatiske svaret)",
   "boot.summary.vista_case": "Vista SP2 x64 -> PE10; det installerte systemet krever CSM",
   "boot.summary.vista_usb": "PE10 med innebygd USB; målet bruker Vista USB v11",
@@ -1157,6 +1159,7 @@
   "boot.summary.vista_case_nocsm": "Windows Vista uten CSM: støttes ennå ikke (svart skjerm) - slå på CSM i hovedkortinnstillingene",
 
   "boot.summary.xp_csmwrap": "XP uten CSM (eksperimentelt): CSMWrap, kort med legacy-VBIOS, 1 kjerne reservert",
+  "boot.summary.w9x_csmwrap": "Uten CSM (eksperimentelt): USOS forbereder en FAT32-installasjonsdisk med CSMWrap; installasjonen starter så fra den",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentelt): ingen AHCI/NVMe/USB 3-driver for NT 5.0 (SATA i IDE-modus), maks. 4 GB RAM og 2 prosessorer",
 

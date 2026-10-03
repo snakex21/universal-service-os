@@ -397,6 +397,7 @@
   "boot.method.auto_slitaz": "Automat (SliTaz Live)",
   "boot.method.auto_xp": "Automat (pregătire XP)",
   "boot.method.auto_xp_uefi": "Automat (pregătire UEFI / XP prin CSM)",
+  "boot.method.auto_w9x_uefi": "Automat (pregătire UEFI / instalare DOS prin CSMWrap)",
   "boot.method.auto_wimboot": "Automat (WIMBoot)",
   "boot.method.auto_vhdboot": "Automat (VHDBoot)",
   "boot.method.auto_efi": "Automat (EFI)",
@@ -483,6 +484,7 @@
   "boot.summary.xp_preparation": "UEFI; XP instalat necesită CSM în firmware și MBR",
   "boot.summary.xp_source": "XP SP3 x86; drivere ACPI / SATA / USB; intrare de pornire PAE opțională",
   "boot.summary.xp_disk": "Se selectează și se confirmă în următorul ecran grafic",
+  "boot.summary.w9x_disk": "Se alege și se confirmă pe următorul ecran grafic; tot discul este șters",
   "boot.summary.xp_sif_merged": "{0} (combinat cu răspunsul automat)",
   "boot.summary.vista_case": "Vista SP2 x64 -> PE10; sistemul instalat necesită CSM",
   "boot.summary.vista_usb": "USB nativ PE10; ținta folosește Vista USB v11",
@@ -1160,6 +1162,7 @@
   "boot.summary.vista_case_nocsm": "Windows Vista fără CSM: încă neacceptat (ecran negru) - activați CSM în setările plăcii de bază",
 
   "boot.summary.xp_csmwrap": "XP fără CSM (experimental): CSMWrap, placă cu VBIOS legacy, 1 nucleu rezervat",
+  "boot.summary.w9x_csmwrap": "Fără CSM (experimental): USOS pregătește un disc FAT32 cu instalarea și CSMWrap; instalarea pornește apoi de pe el",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimental): fără driver AHCI/NVMe/USB 3 pentru NT 5.0 (SATA în mod IDE), max. 4 GB RAM și 2 procesoare",
 

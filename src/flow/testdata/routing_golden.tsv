@@ -9,10 +9,10 @@ system	windows-xp	windows_legacy	windows	any	\Systems\Windows\Windows XP\Images	
 system	windows-xp-x64	windows_legacy	windows	any	\Systems\Windows\Windows XP x64\Images	\Systems\Windows\Windows XP x64\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-2000	windows_legacy	windows	any	\Systems\Windows\Windows 2000\Images	\Systems\Windows\Windows 2000\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-nt-4	windows_legacy	windows	bios	\Systems\Windows\Windows NT 4.0\Images	\Systems\Windows\Windows NT 4.0\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
-system	windows-me	windows_legacy	windows	bios	\Systems\Windows\Windows Me\Images	\Systems\Windows\Windows Me\Unattended	.inf	MSBATCH.INF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
-system	windows-98-se	windows_legacy	windows	bios	\Systems\Windows\Windows 98 SE\Images	\Systems\Windows\Windows 98 SE\Unattended	.inf	MSBATCH.INF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
-system	windows-98	windows_legacy	windows	bios	\Systems\Windows\Windows 98\Images	\Systems\Windows\Windows 98\Unattended	.inf	MSBATCH.INF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
-system	windows-95	windows_legacy	windows	bios	\Systems\Windows\Windows 95\Images	\Systems\Windows\Windows 95\Unattended	.inf	MSBATCH.INF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
+system	windows-me	windows_legacy	windows	any	\Systems\Windows\Windows Me\Images	\Systems\Windows\Windows Me\Unattended	.inf	MSBATCH.INF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
+system	windows-98-se	windows_legacy	windows	any	\Systems\Windows\Windows 98 SE\Images	\Systems\Windows\Windows 98 SE\Unattended	.inf	MSBATCH.INF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
+system	windows-98	windows_legacy	windows	any	\Systems\Windows\Windows 98\Images	\Systems\Windows\Windows 98\Unattended	.inf	MSBATCH.INF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
+system	windows-95	windows_legacy	windows	any	\Systems\Windows\Windows 95\Images	\Systems\Windows\Windows 95\Unattended	.inf	MSBATCH.INF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-3-11	windows_legacy	windows	bios	\Systems\Windows\Windows 3.11\Images	-	.xml	unattend.xml	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-3-1	windows_legacy	windows	bios	\Systems\Windows\Windows 3.1\Images	-	.xml	unattend.xml	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-server-2025	windows	windows	any	\Systems\Windows\Windows Server 2025\Images	\Systems\Windows\Windows Server 2025\Unattended	.xml	unattend.xml	0	automatic,direct_iso,wimboot,vhdboot,direct_efi,chainload
@@ -1130,7 +1130,7 @@ route	windows-nt-4	efi	disk_image	uefi	-
 route	windows-nt-4	efi	floppy_image	bios	-
 route	windows-nt-4	efi	floppy_image	uefi	-
 route	windows-me	iso	automatic	bios	win9x_dos	direct_iso	bios	experimental	0
-route	windows-me	iso	automatic	uefi	chainload	chainload	uefi	validated_hardware	0
+route	windows-me	iso	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
 route	windows-me	iso	direct_iso	bios	win9x_dos	direct_iso	bios	experimental	0
 route	windows-me	iso	direct_iso	uefi	-
 route	windows-me	iso	wimboot	bios	-
@@ -1140,7 +1140,7 @@ route	windows-me	iso	vhdboot	uefi	-
 route	windows-me	iso	direct_efi	bios	-
 route	windows-me	iso	direct_efi	uefi	-
 route	windows-me	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
-route	windows-me	iso	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	windows-me	iso	chainload	uefi	-
 route	windows-me	iso	memdisk	bios	win9x_dos	direct_iso	bios	experimental	0
 route	windows-me	iso	memdisk	uefi	-
 route	windows-me	iso	disk_image	bios	-
@@ -1148,11 +1148,11 @@ route	windows-me	iso	disk_image	uefi	-
 route	windows-me	iso	floppy_image	bios	-
 route	windows-me	iso	floppy_image	uefi	-
 route	windows-me	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
-route	windows-me	wim	automatic	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-me	wim	automatic	uefi	-
 route	windows-me	wim	direct_iso	bios	-
 route	windows-me	wim	direct_iso	uefi	-
 route	windows-me	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
-route	windows-me	wim	wimboot	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-me	wim	wimboot	uefi	-
 route	windows-me	wim	vhdboot	bios	-
 route	windows-me	wim	vhdboot	uefi	-
 route	windows-me	wim	direct_efi	bios	-
@@ -1184,13 +1184,13 @@ route	windows-me	img	disk_image	uefi	-
 route	windows-me	img	floppy_image	bios	-
 route	windows-me	img	floppy_image	uefi	-
 route	windows-me	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-me	vhd	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-me	vhd	automatic	uefi	-
 route	windows-me	vhd	direct_iso	bios	-
 route	windows-me	vhd	direct_iso	uefi	-
 route	windows-me	vhd	wimboot	bios	-
 route	windows-me	vhd	wimboot	uefi	-
 route	windows-me	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-me	vhd	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-me	vhd	vhdboot	uefi	-
 route	windows-me	vhd	direct_efi	bios	-
 route	windows-me	vhd	direct_efi	uefi	-
 route	windows-me	vhd	chainload	bios	-
@@ -1202,13 +1202,13 @@ route	windows-me	vhd	disk_image	uefi	-
 route	windows-me	vhd	floppy_image	bios	-
 route	windows-me	vhd	floppy_image	uefi	-
 route	windows-me	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-me	vhdx	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-me	vhdx	automatic	uefi	-
 route	windows-me	vhdx	direct_iso	bios	-
 route	windows-me	vhdx	direct_iso	uefi	-
 route	windows-me	vhdx	wimboot	bios	-
 route	windows-me	vhdx	wimboot	uefi	-
 route	windows-me	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-me	vhdx	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-me	vhdx	vhdboot	uefi	-
 route	windows-me	vhdx	direct_efi	bios	-
 route	windows-me	vhdx	direct_efi	uefi	-
 route	windows-me	vhdx	chainload	bios	-
@@ -1220,7 +1220,7 @@ route	windows-me	vhdx	disk_image	uefi	-
 route	windows-me	vhdx	floppy_image	bios	-
 route	windows-me	vhdx	floppy_image	uefi	-
 route	windows-me	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
-route	windows-me	efi	automatic	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-me	efi	automatic	uefi	-
 route	windows-me	efi	direct_iso	bios	-
 route	windows-me	efi	direct_iso	uefi	-
 route	windows-me	efi	wimboot	bios	-
@@ -1228,9 +1228,9 @@ route	windows-me	efi	wimboot	uefi	-
 route	windows-me	efi	vhdboot	bios	-
 route	windows-me	efi	vhdboot	uefi	-
 route	windows-me	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
-route	windows-me	efi	direct_efi	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-me	efi	direct_efi	uefi	-
 route	windows-me	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
-route	windows-me	efi	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	windows-me	efi	chainload	uefi	-
 route	windows-me	efi	memdisk	bios	-
 route	windows-me	efi	memdisk	uefi	-
 route	windows-me	efi	disk_image	bios	-
@@ -1238,7 +1238,7 @@ route	windows-me	efi	disk_image	uefi	-
 route	windows-me	efi	floppy_image	bios	-
 route	windows-me	efi	floppy_image	uefi	-
 route	windows-98-se	iso	automatic	bios	win9x_dos	direct_iso	bios	experimental	0
-route	windows-98-se	iso	automatic	uefi	chainload	chainload	uefi	validated_hardware	0
+route	windows-98-se	iso	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
 route	windows-98-se	iso	direct_iso	bios	win9x_dos	direct_iso	bios	experimental	0
 route	windows-98-se	iso	direct_iso	uefi	-
 route	windows-98-se	iso	wimboot	bios	-
@@ -1248,7 +1248,7 @@ route	windows-98-se	iso	vhdboot	uefi	-
 route	windows-98-se	iso	direct_efi	bios	-
 route	windows-98-se	iso	direct_efi	uefi	-
 route	windows-98-se	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
-route	windows-98-se	iso	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	windows-98-se	iso	chainload	uefi	-
 route	windows-98-se	iso	memdisk	bios	win9x_dos	direct_iso	bios	experimental	0
 route	windows-98-se	iso	memdisk	uefi	-
 route	windows-98-se	iso	disk_image	bios	-
@@ -1256,11 +1256,11 @@ route	windows-98-se	iso	disk_image	uefi	-
 route	windows-98-se	iso	floppy_image	bios	-
 route	windows-98-se	iso	floppy_image	uefi	-
 route	windows-98-se	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
-route	windows-98-se	wim	automatic	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-98-se	wim	automatic	uefi	-
 route	windows-98-se	wim	direct_iso	bios	-
 route	windows-98-se	wim	direct_iso	uefi	-
 route	windows-98-se	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
-route	windows-98-se	wim	wimboot	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-98-se	wim	wimboot	uefi	-
 route	windows-98-se	wim	vhdboot	bios	-
 route	windows-98-se	wim	vhdboot	uefi	-
 route	windows-98-se	wim	direct_efi	bios	-
@@ -1292,13 +1292,13 @@ route	windows-98-se	img	disk_image	uefi	-
 route	windows-98-se	img	floppy_image	bios	-
 route	windows-98-se	img	floppy_image	uefi	-
 route	windows-98-se	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-98-se	vhd	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-98-se	vhd	automatic	uefi	-
 route	windows-98-se	vhd	direct_iso	bios	-
 route	windows-98-se	vhd	direct_iso	uefi	-
 route	windows-98-se	vhd	wimboot	bios	-
 route	windows-98-se	vhd	wimboot	uefi	-
 route	windows-98-se	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-98-se	vhd	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-98-se	vhd	vhdboot	uefi	-
 route	windows-98-se	vhd	direct_efi	bios	-
 route	windows-98-se	vhd	direct_efi	uefi	-
 route	windows-98-se	vhd	chainload	bios	-
@@ -1310,13 +1310,13 @@ route	windows-98-se	vhd	disk_image	uefi	-
 route	windows-98-se	vhd	floppy_image	bios	-
 route	windows-98-se	vhd	floppy_image	uefi	-
 route	windows-98-se	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-98-se	vhdx	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-98-se	vhdx	automatic	uefi	-
 route	windows-98-se	vhdx	direct_iso	bios	-
 route	windows-98-se	vhdx	direct_iso	uefi	-
 route	windows-98-se	vhdx	wimboot	bios	-
 route	windows-98-se	vhdx	wimboot	uefi	-
 route	windows-98-se	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-98-se	vhdx	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-98-se	vhdx	vhdboot	uefi	-
 route	windows-98-se	vhdx	direct_efi	bios	-
 route	windows-98-se	vhdx	direct_efi	uefi	-
 route	windows-98-se	vhdx	chainload	bios	-
@@ -1328,7 +1328,7 @@ route	windows-98-se	vhdx	disk_image	uefi	-
 route	windows-98-se	vhdx	floppy_image	bios	-
 route	windows-98-se	vhdx	floppy_image	uefi	-
 route	windows-98-se	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
-route	windows-98-se	efi	automatic	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-98-se	efi	automatic	uefi	-
 route	windows-98-se	efi	direct_iso	bios	-
 route	windows-98-se	efi	direct_iso	uefi	-
 route	windows-98-se	efi	wimboot	bios	-
@@ -1336,9 +1336,9 @@ route	windows-98-se	efi	wimboot	uefi	-
 route	windows-98-se	efi	vhdboot	bios	-
 route	windows-98-se	efi	vhdboot	uefi	-
 route	windows-98-se	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
-route	windows-98-se	efi	direct_efi	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-98-se	efi	direct_efi	uefi	-
 route	windows-98-se	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
-route	windows-98-se	efi	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	windows-98-se	efi	chainload	uefi	-
 route	windows-98-se	efi	memdisk	bios	-
 route	windows-98-se	efi	memdisk	uefi	-
 route	windows-98-se	efi	disk_image	bios	-
@@ -1346,7 +1346,7 @@ route	windows-98-se	efi	disk_image	uefi	-
 route	windows-98-se	efi	floppy_image	bios	-
 route	windows-98-se	efi	floppy_image	uefi	-
 route	windows-98	iso	automatic	bios	win9x_dos	direct_iso	bios	experimental	0
-route	windows-98	iso	automatic	uefi	chainload	chainload	uefi	validated_hardware	0
+route	windows-98	iso	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
 route	windows-98	iso	direct_iso	bios	win9x_dos	direct_iso	bios	experimental	0
 route	windows-98	iso	direct_iso	uefi	-
 route	windows-98	iso	wimboot	bios	-
@@ -1356,7 +1356,7 @@ route	windows-98	iso	vhdboot	uefi	-
 route	windows-98	iso	direct_efi	bios	-
 route	windows-98	iso	direct_efi	uefi	-
 route	windows-98	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
-route	windows-98	iso	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	windows-98	iso	chainload	uefi	-
 route	windows-98	iso	memdisk	bios	win9x_dos	direct_iso	bios	experimental	0
 route	windows-98	iso	memdisk	uefi	-
 route	windows-98	iso	disk_image	bios	-
@@ -1364,11 +1364,11 @@ route	windows-98	iso	disk_image	uefi	-
 route	windows-98	iso	floppy_image	bios	-
 route	windows-98	iso	floppy_image	uefi	-
 route	windows-98	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
-route	windows-98	wim	automatic	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-98	wim	automatic	uefi	-
 route	windows-98	wim	direct_iso	bios	-
 route	windows-98	wim	direct_iso	uefi	-
 route	windows-98	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
-route	windows-98	wim	wimboot	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-98	wim	wimboot	uefi	-
 route	windows-98	wim	vhdboot	bios	-
 route	windows-98	wim	vhdboot	uefi	-
 route	windows-98	wim	direct_efi	bios	-
@@ -1400,13 +1400,13 @@ route	windows-98	img	disk_image	uefi	-
 route	windows-98	img	floppy_image	bios	-
 route	windows-98	img	floppy_image	uefi	-
 route	windows-98	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-98	vhd	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-98	vhd	automatic	uefi	-
 route	windows-98	vhd	direct_iso	bios	-
 route	windows-98	vhd	direct_iso	uefi	-
 route	windows-98	vhd	wimboot	bios	-
 route	windows-98	vhd	wimboot	uefi	-
 route	windows-98	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-98	vhd	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-98	vhd	vhdboot	uefi	-
 route	windows-98	vhd	direct_efi	bios	-
 route	windows-98	vhd	direct_efi	uefi	-
 route	windows-98	vhd	chainload	bios	-
@@ -1418,13 +1418,13 @@ route	windows-98	vhd	disk_image	uefi	-
 route	windows-98	vhd	floppy_image	bios	-
 route	windows-98	vhd	floppy_image	uefi	-
 route	windows-98	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-98	vhdx	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-98	vhdx	automatic	uefi	-
 route	windows-98	vhdx	direct_iso	bios	-
 route	windows-98	vhdx	direct_iso	uefi	-
 route	windows-98	vhdx	wimboot	bios	-
 route	windows-98	vhdx	wimboot	uefi	-
 route	windows-98	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-98	vhdx	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-98	vhdx	vhdboot	uefi	-
 route	windows-98	vhdx	direct_efi	bios	-
 route	windows-98	vhdx	direct_efi	uefi	-
 route	windows-98	vhdx	chainload	bios	-
@@ -1436,7 +1436,7 @@ route	windows-98	vhdx	disk_image	uefi	-
 route	windows-98	vhdx	floppy_image	bios	-
 route	windows-98	vhdx	floppy_image	uefi	-
 route	windows-98	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
-route	windows-98	efi	automatic	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-98	efi	automatic	uefi	-
 route	windows-98	efi	direct_iso	bios	-
 route	windows-98	efi	direct_iso	uefi	-
 route	windows-98	efi	wimboot	bios	-
@@ -1444,9 +1444,9 @@ route	windows-98	efi	wimboot	uefi	-
 route	windows-98	efi	vhdboot	bios	-
 route	windows-98	efi	vhdboot	uefi	-
 route	windows-98	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
-route	windows-98	efi	direct_efi	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-98	efi	direct_efi	uefi	-
 route	windows-98	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
-route	windows-98	efi	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	windows-98	efi	chainload	uefi	-
 route	windows-98	efi	memdisk	bios	-
 route	windows-98	efi	memdisk	uefi	-
 route	windows-98	efi	disk_image	bios	-
@@ -1454,7 +1454,7 @@ route	windows-98	efi	disk_image	uefi	-
 route	windows-98	efi	floppy_image	bios	-
 route	windows-98	efi	floppy_image	uefi	-
 route	windows-95	iso	automatic	bios	win9x_dos	direct_iso	bios	experimental	0
-route	windows-95	iso	automatic	uefi	chainload	chainload	uefi	validated_hardware	0
+route	windows-95	iso	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
 route	windows-95	iso	direct_iso	bios	win9x_dos	direct_iso	bios	experimental	0
 route	windows-95	iso	direct_iso	uefi	-
 route	windows-95	iso	wimboot	bios	-
@@ -1464,7 +1464,7 @@ route	windows-95	iso	vhdboot	uefi	-
 route	windows-95	iso	direct_efi	bios	-
 route	windows-95	iso	direct_efi	uefi	-
 route	windows-95	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
-route	windows-95	iso	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	windows-95	iso	chainload	uefi	-
 route	windows-95	iso	memdisk	bios	win9x_dos	direct_iso	bios	experimental	0
 route	windows-95	iso	memdisk	uefi	-
 route	windows-95	iso	disk_image	bios	-
@@ -1472,11 +1472,11 @@ route	windows-95	iso	disk_image	uefi	-
 route	windows-95	iso	floppy_image	bios	-
 route	windows-95	iso	floppy_image	uefi	-
 route	windows-95	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
-route	windows-95	wim	automatic	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-95	wim	automatic	uefi	-
 route	windows-95	wim	direct_iso	bios	-
 route	windows-95	wim	direct_iso	uefi	-
 route	windows-95	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
-route	windows-95	wim	wimboot	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-95	wim	wimboot	uefi	-
 route	windows-95	wim	vhdboot	bios	-
 route	windows-95	wim	vhdboot	uefi	-
 route	windows-95	wim	direct_efi	bios	-
@@ -1508,13 +1508,13 @@ route	windows-95	img	disk_image	uefi	-
 route	windows-95	img	floppy_image	bios	-
 route	windows-95	img	floppy_image	uefi	-
 route	windows-95	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-95	vhd	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-95	vhd	automatic	uefi	-
 route	windows-95	vhd	direct_iso	bios	-
 route	windows-95	vhd	direct_iso	uefi	-
 route	windows-95	vhd	wimboot	bios	-
 route	windows-95	vhd	wimboot	uefi	-
 route	windows-95	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-95	vhd	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-95	vhd	vhdboot	uefi	-
 route	windows-95	vhd	direct_efi	bios	-
 route	windows-95	vhd	direct_efi	uefi	-
 route	windows-95	vhd	chainload	bios	-
@@ -1526,13 +1526,13 @@ route	windows-95	vhd	disk_image	uefi	-
 route	windows-95	vhd	floppy_image	bios	-
 route	windows-95	vhd	floppy_image	uefi	-
 route	windows-95	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-95	vhdx	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-95	vhdx	automatic	uefi	-
 route	windows-95	vhdx	direct_iso	bios	-
 route	windows-95	vhdx	direct_iso	uefi	-
 route	windows-95	vhdx	wimboot	bios	-
 route	windows-95	vhdx	wimboot	uefi	-
 route	windows-95	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	windows-95	vhdx	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-95	vhdx	vhdboot	uefi	-
 route	windows-95	vhdx	direct_efi	bios	-
 route	windows-95	vhdx	direct_efi	uefi	-
 route	windows-95	vhdx	chainload	bios	-
@@ -1544,7 +1544,7 @@ route	windows-95	vhdx	disk_image	uefi	-
 route	windows-95	vhdx	floppy_image	bios	-
 route	windows-95	vhdx	floppy_image	uefi	-
 route	windows-95	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
-route	windows-95	efi	automatic	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-95	efi	automatic	uefi	-
 route	windows-95	efi	direct_iso	bios	-
 route	windows-95	efi	direct_iso	uefi	-
 route	windows-95	efi	wimboot	bios	-
@@ -1552,9 +1552,9 @@ route	windows-95	efi	wimboot	uefi	-
 route	windows-95	efi	vhdboot	bios	-
 route	windows-95	efi	vhdboot	uefi	-
 route	windows-95	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
-route	windows-95	efi	direct_efi	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-95	efi	direct_efi	uefi	-
 route	windows-95	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
-route	windows-95	efi	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	windows-95	efi	chainload	uefi	-
 route	windows-95	efi	memdisk	bios	-
 route	windows-95	efi	memdisk	uefi	-
 route	windows-95	efi	disk_image	bios	-
@@ -5826,145 +5826,317 @@ profile	windows-nt-4	efi	chainload	bios	efi-chainload
 profile	windows-nt-4	efi	chainload	uefi	efi-chainload
 profile	windows-nt-4	efi	chainload	-	efi-chainload
 profile	windows-me	iso	automatic	bios	win9x-dos-bios
-profile	windows-me	iso	automatic	uefi	iso-work-chainload
+profile	windows-me	iso	automatic	uefi	w9x-uefi-csmwrap
 profile	windows-me	iso	automatic	-	iso-work-chainload
 profile	windows-me	iso	direct_iso	bios	win9x-dos-bios
+profile	windows-me	iso	direct_iso	uefi	w9x-uefi-other
+profile	windows-me	iso	wimboot	uefi	w9x-uefi-other
+profile	windows-me	iso	vhdboot	uefi	w9x-uefi-other
+profile	windows-me	iso	direct_efi	uefi	w9x-uefi-other
 profile	windows-me	iso	chainload	bios	iso-work-chainload
-profile	windows-me	iso	chainload	uefi	iso-work-chainload
+profile	windows-me	iso	chainload	uefi	w9x-uefi-other
 profile	windows-me	iso	chainload	-	iso-work-chainload
 profile	windows-me	iso	memdisk	bios	win9x-dos-bios
+profile	windows-me	iso	memdisk	uefi	w9x-uefi-other
+profile	windows-me	iso	disk_image	uefi	w9x-uefi-other
+profile	windows-me	iso	floppy_image	uefi	w9x-uefi-other
 profile	windows-me	wim	automatic	bios	wim-wimboot
-profile	windows-me	wim	automatic	uefi	wim-wimboot
+profile	windows-me	wim	automatic	uefi	w9x-uefi-other
 profile	windows-me	wim	automatic	-	wim-wimboot
+profile	windows-me	wim	direct_iso	uefi	w9x-uefi-other
 profile	windows-me	wim	wimboot	bios	wim-wimboot
-profile	windows-me	wim	wimboot	uefi	wim-wimboot
+profile	windows-me	wim	wimboot	uefi	w9x-uefi-other
 profile	windows-me	wim	wimboot	-	wim-wimboot
+profile	windows-me	wim	vhdboot	uefi	w9x-uefi-other
+profile	windows-me	wim	direct_efi	uefi	w9x-uefi-other
+profile	windows-me	wim	chainload	uefi	w9x-uefi-other
+profile	windows-me	wim	memdisk	uefi	w9x-uefi-other
+profile	windows-me	wim	disk_image	uefi	w9x-uefi-other
+profile	windows-me	wim	floppy_image	uefi	w9x-uefi-other
+profile	windows-me	img	automatic	uefi	w9x-uefi-other
+profile	windows-me	img	direct_iso	uefi	w9x-uefi-other
+profile	windows-me	img	wimboot	uefi	w9x-uefi-other
+profile	windows-me	img	vhdboot	uefi	w9x-uefi-other
+profile	windows-me	img	direct_efi	uefi	w9x-uefi-other
+profile	windows-me	img	chainload	uefi	w9x-uefi-other
+profile	windows-me	img	memdisk	uefi	w9x-uefi-other
+profile	windows-me	img	disk_image	uefi	w9x-uefi-other
+profile	windows-me	img	floppy_image	uefi	w9x-uefi-other
 profile	windows-me	vhd	automatic	bios	vhd-vhdboot
-profile	windows-me	vhd	automatic	uefi	vhd-vhdboot
+profile	windows-me	vhd	automatic	uefi	w9x-uefi-other
 profile	windows-me	vhd	automatic	-	vhd-vhdboot
+profile	windows-me	vhd	direct_iso	uefi	w9x-uefi-other
+profile	windows-me	vhd	wimboot	uefi	w9x-uefi-other
 profile	windows-me	vhd	vhdboot	bios	vhd-vhdboot
-profile	windows-me	vhd	vhdboot	uefi	vhd-vhdboot
+profile	windows-me	vhd	vhdboot	uefi	w9x-uefi-other
 profile	windows-me	vhd	vhdboot	-	vhd-vhdboot
+profile	windows-me	vhd	direct_efi	uefi	w9x-uefi-other
+profile	windows-me	vhd	chainload	uefi	w9x-uefi-other
+profile	windows-me	vhd	memdisk	uefi	w9x-uefi-other
+profile	windows-me	vhd	disk_image	uefi	w9x-uefi-other
+profile	windows-me	vhd	floppy_image	uefi	w9x-uefi-other
 profile	windows-me	vhdx	automatic	bios	vhd-vhdboot
-profile	windows-me	vhdx	automatic	uefi	vhd-vhdboot
+profile	windows-me	vhdx	automatic	uefi	w9x-uefi-other
 profile	windows-me	vhdx	automatic	-	vhd-vhdboot
+profile	windows-me	vhdx	direct_iso	uefi	w9x-uefi-other
+profile	windows-me	vhdx	wimboot	uefi	w9x-uefi-other
 profile	windows-me	vhdx	vhdboot	bios	vhd-vhdboot
-profile	windows-me	vhdx	vhdboot	uefi	vhd-vhdboot
+profile	windows-me	vhdx	vhdboot	uefi	w9x-uefi-other
 profile	windows-me	vhdx	vhdboot	-	vhd-vhdboot
+profile	windows-me	vhdx	direct_efi	uefi	w9x-uefi-other
+profile	windows-me	vhdx	chainload	uefi	w9x-uefi-other
+profile	windows-me	vhdx	memdisk	uefi	w9x-uefi-other
+profile	windows-me	vhdx	disk_image	uefi	w9x-uefi-other
+profile	windows-me	vhdx	floppy_image	uefi	w9x-uefi-other
 profile	windows-me	efi	automatic	bios	efi-direct
-profile	windows-me	efi	automatic	uefi	efi-direct
+profile	windows-me	efi	automatic	uefi	w9x-uefi-other
 profile	windows-me	efi	automatic	-	efi-direct
+profile	windows-me	efi	direct_iso	uefi	w9x-uefi-other
+profile	windows-me	efi	wimboot	uefi	w9x-uefi-other
+profile	windows-me	efi	vhdboot	uefi	w9x-uefi-other
 profile	windows-me	efi	direct_efi	bios	efi-direct
-profile	windows-me	efi	direct_efi	uefi	efi-direct
+profile	windows-me	efi	direct_efi	uefi	w9x-uefi-other
 profile	windows-me	efi	direct_efi	-	efi-direct
 profile	windows-me	efi	chainload	bios	efi-chainload
-profile	windows-me	efi	chainload	uefi	efi-chainload
+profile	windows-me	efi	chainload	uefi	w9x-uefi-other
 profile	windows-me	efi	chainload	-	efi-chainload
+profile	windows-me	efi	memdisk	uefi	w9x-uefi-other
+profile	windows-me	efi	disk_image	uefi	w9x-uefi-other
+profile	windows-me	efi	floppy_image	uefi	w9x-uefi-other
 profile	windows-98-se	iso	automatic	bios	win9x-dos-bios
-profile	windows-98-se	iso	automatic	uefi	iso-work-chainload
+profile	windows-98-se	iso	automatic	uefi	w9x-uefi-csmwrap
 profile	windows-98-se	iso	automatic	-	iso-work-chainload
 profile	windows-98-se	iso	direct_iso	bios	win9x-dos-bios
+profile	windows-98-se	iso	direct_iso	uefi	w9x-uefi-other
+profile	windows-98-se	iso	wimboot	uefi	w9x-uefi-other
+profile	windows-98-se	iso	vhdboot	uefi	w9x-uefi-other
+profile	windows-98-se	iso	direct_efi	uefi	w9x-uefi-other
 profile	windows-98-se	iso	chainload	bios	iso-work-chainload
-profile	windows-98-se	iso	chainload	uefi	iso-work-chainload
+profile	windows-98-se	iso	chainload	uefi	w9x-uefi-other
 profile	windows-98-se	iso	chainload	-	iso-work-chainload
 profile	windows-98-se	iso	memdisk	bios	win9x-dos-bios
+profile	windows-98-se	iso	memdisk	uefi	w9x-uefi-other
+profile	windows-98-se	iso	disk_image	uefi	w9x-uefi-other
+profile	windows-98-se	iso	floppy_image	uefi	w9x-uefi-other
 profile	windows-98-se	wim	automatic	bios	wim-wimboot
-profile	windows-98-se	wim	automatic	uefi	wim-wimboot
+profile	windows-98-se	wim	automatic	uefi	w9x-uefi-other
 profile	windows-98-se	wim	automatic	-	wim-wimboot
+profile	windows-98-se	wim	direct_iso	uefi	w9x-uefi-other
 profile	windows-98-se	wim	wimboot	bios	wim-wimboot
-profile	windows-98-se	wim	wimboot	uefi	wim-wimboot
+profile	windows-98-se	wim	wimboot	uefi	w9x-uefi-other
 profile	windows-98-se	wim	wimboot	-	wim-wimboot
+profile	windows-98-se	wim	vhdboot	uefi	w9x-uefi-other
+profile	windows-98-se	wim	direct_efi	uefi	w9x-uefi-other
+profile	windows-98-se	wim	chainload	uefi	w9x-uefi-other
+profile	windows-98-se	wim	memdisk	uefi	w9x-uefi-other
+profile	windows-98-se	wim	disk_image	uefi	w9x-uefi-other
+profile	windows-98-se	wim	floppy_image	uefi	w9x-uefi-other
+profile	windows-98-se	img	automatic	uefi	w9x-uefi-other
+profile	windows-98-se	img	direct_iso	uefi	w9x-uefi-other
+profile	windows-98-se	img	wimboot	uefi	w9x-uefi-other
+profile	windows-98-se	img	vhdboot	uefi	w9x-uefi-other
+profile	windows-98-se	img	direct_efi	uefi	w9x-uefi-other
+profile	windows-98-se	img	chainload	uefi	w9x-uefi-other
+profile	windows-98-se	img	memdisk	uefi	w9x-uefi-other
+profile	windows-98-se	img	disk_image	uefi	w9x-uefi-other
+profile	windows-98-se	img	floppy_image	uefi	w9x-uefi-other
 profile	windows-98-se	vhd	automatic	bios	vhd-vhdboot
-profile	windows-98-se	vhd	automatic	uefi	vhd-vhdboot
+profile	windows-98-se	vhd	automatic	uefi	w9x-uefi-other
 profile	windows-98-se	vhd	automatic	-	vhd-vhdboot
+profile	windows-98-se	vhd	direct_iso	uefi	w9x-uefi-other
+profile	windows-98-se	vhd	wimboot	uefi	w9x-uefi-other
 profile	windows-98-se	vhd	vhdboot	bios	vhd-vhdboot
-profile	windows-98-se	vhd	vhdboot	uefi	vhd-vhdboot
+profile	windows-98-se	vhd	vhdboot	uefi	w9x-uefi-other
 profile	windows-98-se	vhd	vhdboot	-	vhd-vhdboot
+profile	windows-98-se	vhd	direct_efi	uefi	w9x-uefi-other
+profile	windows-98-se	vhd	chainload	uefi	w9x-uefi-other
+profile	windows-98-se	vhd	memdisk	uefi	w9x-uefi-other
+profile	windows-98-se	vhd	disk_image	uefi	w9x-uefi-other
+profile	windows-98-se	vhd	floppy_image	uefi	w9x-uefi-other
 profile	windows-98-se	vhdx	automatic	bios	vhd-vhdboot
-profile	windows-98-se	vhdx	automatic	uefi	vhd-vhdboot
+profile	windows-98-se	vhdx	automatic	uefi	w9x-uefi-other
 profile	windows-98-se	vhdx	automatic	-	vhd-vhdboot
+profile	windows-98-se	vhdx	direct_iso	uefi	w9x-uefi-other
+profile	windows-98-se	vhdx	wimboot	uefi	w9x-uefi-other
 profile	windows-98-se	vhdx	vhdboot	bios	vhd-vhdboot
-profile	windows-98-se	vhdx	vhdboot	uefi	vhd-vhdboot
+profile	windows-98-se	vhdx	vhdboot	uefi	w9x-uefi-other
 profile	windows-98-se	vhdx	vhdboot	-	vhd-vhdboot
+profile	windows-98-se	vhdx	direct_efi	uefi	w9x-uefi-other
+profile	windows-98-se	vhdx	chainload	uefi	w9x-uefi-other
+profile	windows-98-se	vhdx	memdisk	uefi	w9x-uefi-other
+profile	windows-98-se	vhdx	disk_image	uefi	w9x-uefi-other
+profile	windows-98-se	vhdx	floppy_image	uefi	w9x-uefi-other
 profile	windows-98-se	efi	automatic	bios	efi-direct
-profile	windows-98-se	efi	automatic	uefi	efi-direct
+profile	windows-98-se	efi	automatic	uefi	w9x-uefi-other
 profile	windows-98-se	efi	automatic	-	efi-direct
+profile	windows-98-se	efi	direct_iso	uefi	w9x-uefi-other
+profile	windows-98-se	efi	wimboot	uefi	w9x-uefi-other
+profile	windows-98-se	efi	vhdboot	uefi	w9x-uefi-other
 profile	windows-98-se	efi	direct_efi	bios	efi-direct
-profile	windows-98-se	efi	direct_efi	uefi	efi-direct
+profile	windows-98-se	efi	direct_efi	uefi	w9x-uefi-other
 profile	windows-98-se	efi	direct_efi	-	efi-direct
 profile	windows-98-se	efi	chainload	bios	efi-chainload
-profile	windows-98-se	efi	chainload	uefi	efi-chainload
+profile	windows-98-se	efi	chainload	uefi	w9x-uefi-other
 profile	windows-98-se	efi	chainload	-	efi-chainload
+profile	windows-98-se	efi	memdisk	uefi	w9x-uefi-other
+profile	windows-98-se	efi	disk_image	uefi	w9x-uefi-other
+profile	windows-98-se	efi	floppy_image	uefi	w9x-uefi-other
 profile	windows-98	iso	automatic	bios	win9x-dos-bios
-profile	windows-98	iso	automatic	uefi	iso-work-chainload
+profile	windows-98	iso	automatic	uefi	w9x-uefi-csmwrap
 profile	windows-98	iso	automatic	-	iso-work-chainload
 profile	windows-98	iso	direct_iso	bios	win9x-dos-bios
+profile	windows-98	iso	direct_iso	uefi	w9x-uefi-other
+profile	windows-98	iso	wimboot	uefi	w9x-uefi-other
+profile	windows-98	iso	vhdboot	uefi	w9x-uefi-other
+profile	windows-98	iso	direct_efi	uefi	w9x-uefi-other
 profile	windows-98	iso	chainload	bios	iso-work-chainload
-profile	windows-98	iso	chainload	uefi	iso-work-chainload
+profile	windows-98	iso	chainload	uefi	w9x-uefi-other
 profile	windows-98	iso	chainload	-	iso-work-chainload
 profile	windows-98	iso	memdisk	bios	win9x-dos-bios
+profile	windows-98	iso	memdisk	uefi	w9x-uefi-other
+profile	windows-98	iso	disk_image	uefi	w9x-uefi-other
+profile	windows-98	iso	floppy_image	uefi	w9x-uefi-other
 profile	windows-98	wim	automatic	bios	wim-wimboot
-profile	windows-98	wim	automatic	uefi	wim-wimboot
+profile	windows-98	wim	automatic	uefi	w9x-uefi-other
 profile	windows-98	wim	automatic	-	wim-wimboot
+profile	windows-98	wim	direct_iso	uefi	w9x-uefi-other
 profile	windows-98	wim	wimboot	bios	wim-wimboot
-profile	windows-98	wim	wimboot	uefi	wim-wimboot
+profile	windows-98	wim	wimboot	uefi	w9x-uefi-other
 profile	windows-98	wim	wimboot	-	wim-wimboot
+profile	windows-98	wim	vhdboot	uefi	w9x-uefi-other
+profile	windows-98	wim	direct_efi	uefi	w9x-uefi-other
+profile	windows-98	wim	chainload	uefi	w9x-uefi-other
+profile	windows-98	wim	memdisk	uefi	w9x-uefi-other
+profile	windows-98	wim	disk_image	uefi	w9x-uefi-other
+profile	windows-98	wim	floppy_image	uefi	w9x-uefi-other
+profile	windows-98	img	automatic	uefi	w9x-uefi-other
+profile	windows-98	img	direct_iso	uefi	w9x-uefi-other
+profile	windows-98	img	wimboot	uefi	w9x-uefi-other
+profile	windows-98	img	vhdboot	uefi	w9x-uefi-other
+profile	windows-98	img	direct_efi	uefi	w9x-uefi-other
+profile	windows-98	img	chainload	uefi	w9x-uefi-other
+profile	windows-98	img	memdisk	uefi	w9x-uefi-other
+profile	windows-98	img	disk_image	uefi	w9x-uefi-other
+profile	windows-98	img	floppy_image	uefi	w9x-uefi-other
 profile	windows-98	vhd	automatic	bios	vhd-vhdboot
-profile	windows-98	vhd	automatic	uefi	vhd-vhdboot
+profile	windows-98	vhd	automatic	uefi	w9x-uefi-other
 profile	windows-98	vhd	automatic	-	vhd-vhdboot
+profile	windows-98	vhd	direct_iso	uefi	w9x-uefi-other
+profile	windows-98	vhd	wimboot	uefi	w9x-uefi-other
 profile	windows-98	vhd	vhdboot	bios	vhd-vhdboot
-profile	windows-98	vhd	vhdboot	uefi	vhd-vhdboot
+profile	windows-98	vhd	vhdboot	uefi	w9x-uefi-other
 profile	windows-98	vhd	vhdboot	-	vhd-vhdboot
+profile	windows-98	vhd	direct_efi	uefi	w9x-uefi-other
+profile	windows-98	vhd	chainload	uefi	w9x-uefi-other
+profile	windows-98	vhd	memdisk	uefi	w9x-uefi-other
+profile	windows-98	vhd	disk_image	uefi	w9x-uefi-other
+profile	windows-98	vhd	floppy_image	uefi	w9x-uefi-other
 profile	windows-98	vhdx	automatic	bios	vhd-vhdboot
-profile	windows-98	vhdx	automatic	uefi	vhd-vhdboot
+profile	windows-98	vhdx	automatic	uefi	w9x-uefi-other
 profile	windows-98	vhdx	automatic	-	vhd-vhdboot
+profile	windows-98	vhdx	direct_iso	uefi	w9x-uefi-other
+profile	windows-98	vhdx	wimboot	uefi	w9x-uefi-other
 profile	windows-98	vhdx	vhdboot	bios	vhd-vhdboot
-profile	windows-98	vhdx	vhdboot	uefi	vhd-vhdboot
+profile	windows-98	vhdx	vhdboot	uefi	w9x-uefi-other
 profile	windows-98	vhdx	vhdboot	-	vhd-vhdboot
+profile	windows-98	vhdx	direct_efi	uefi	w9x-uefi-other
+profile	windows-98	vhdx	chainload	uefi	w9x-uefi-other
+profile	windows-98	vhdx	memdisk	uefi	w9x-uefi-other
+profile	windows-98	vhdx	disk_image	uefi	w9x-uefi-other
+profile	windows-98	vhdx	floppy_image	uefi	w9x-uefi-other
 profile	windows-98	efi	automatic	bios	efi-direct
-profile	windows-98	efi	automatic	uefi	efi-direct
+profile	windows-98	efi	automatic	uefi	w9x-uefi-other
 profile	windows-98	efi	automatic	-	efi-direct
+profile	windows-98	efi	direct_iso	uefi	w9x-uefi-other
+profile	windows-98	efi	wimboot	uefi	w9x-uefi-other
+profile	windows-98	efi	vhdboot	uefi	w9x-uefi-other
 profile	windows-98	efi	direct_efi	bios	efi-direct
-profile	windows-98	efi	direct_efi	uefi	efi-direct
+profile	windows-98	efi	direct_efi	uefi	w9x-uefi-other
 profile	windows-98	efi	direct_efi	-	efi-direct
 profile	windows-98	efi	chainload	bios	efi-chainload
-profile	windows-98	efi	chainload	uefi	efi-chainload
+profile	windows-98	efi	chainload	uefi	w9x-uefi-other
 profile	windows-98	efi	chainload	-	efi-chainload
+profile	windows-98	efi	memdisk	uefi	w9x-uefi-other
+profile	windows-98	efi	disk_image	uefi	w9x-uefi-other
+profile	windows-98	efi	floppy_image	uefi	w9x-uefi-other
 profile	windows-95	iso	automatic	bios	win9x-dos-bios
-profile	windows-95	iso	automatic	uefi	iso-work-chainload
+profile	windows-95	iso	automatic	uefi	w9x-uefi-csmwrap
 profile	windows-95	iso	automatic	-	iso-work-chainload
 profile	windows-95	iso	direct_iso	bios	win9x-dos-bios
+profile	windows-95	iso	direct_iso	uefi	w9x-uefi-other
+profile	windows-95	iso	wimboot	uefi	w9x-uefi-other
+profile	windows-95	iso	vhdboot	uefi	w9x-uefi-other
+profile	windows-95	iso	direct_efi	uefi	w9x-uefi-other
 profile	windows-95	iso	chainload	bios	iso-work-chainload
-profile	windows-95	iso	chainload	uefi	iso-work-chainload
+profile	windows-95	iso	chainload	uefi	w9x-uefi-other
 profile	windows-95	iso	chainload	-	iso-work-chainload
 profile	windows-95	iso	memdisk	bios	win9x-dos-bios
+profile	windows-95	iso	memdisk	uefi	w9x-uefi-other
+profile	windows-95	iso	disk_image	uefi	w9x-uefi-other
+profile	windows-95	iso	floppy_image	uefi	w9x-uefi-other
 profile	windows-95	wim	automatic	bios	wim-wimboot
-profile	windows-95	wim	automatic	uefi	wim-wimboot
+profile	windows-95	wim	automatic	uefi	w9x-uefi-other
 profile	windows-95	wim	automatic	-	wim-wimboot
+profile	windows-95	wim	direct_iso	uefi	w9x-uefi-other
 profile	windows-95	wim	wimboot	bios	wim-wimboot
-profile	windows-95	wim	wimboot	uefi	wim-wimboot
+profile	windows-95	wim	wimboot	uefi	w9x-uefi-other
 profile	windows-95	wim	wimboot	-	wim-wimboot
+profile	windows-95	wim	vhdboot	uefi	w9x-uefi-other
+profile	windows-95	wim	direct_efi	uefi	w9x-uefi-other
+profile	windows-95	wim	chainload	uefi	w9x-uefi-other
+profile	windows-95	wim	memdisk	uefi	w9x-uefi-other
+profile	windows-95	wim	disk_image	uefi	w9x-uefi-other
+profile	windows-95	wim	floppy_image	uefi	w9x-uefi-other
+profile	windows-95	img	automatic	uefi	w9x-uefi-other
+profile	windows-95	img	direct_iso	uefi	w9x-uefi-other
+profile	windows-95	img	wimboot	uefi	w9x-uefi-other
+profile	windows-95	img	vhdboot	uefi	w9x-uefi-other
+profile	windows-95	img	direct_efi	uefi	w9x-uefi-other
+profile	windows-95	img	chainload	uefi	w9x-uefi-other
+profile	windows-95	img	memdisk	uefi	w9x-uefi-other
+profile	windows-95	img	disk_image	uefi	w9x-uefi-other
+profile	windows-95	img	floppy_image	uefi	w9x-uefi-other
 profile	windows-95	vhd	automatic	bios	vhd-vhdboot
-profile	windows-95	vhd	automatic	uefi	vhd-vhdboot
+profile	windows-95	vhd	automatic	uefi	w9x-uefi-other
 profile	windows-95	vhd	automatic	-	vhd-vhdboot
+profile	windows-95	vhd	direct_iso	uefi	w9x-uefi-other
+profile	windows-95	vhd	wimboot	uefi	w9x-uefi-other
 profile	windows-95	vhd	vhdboot	bios	vhd-vhdboot
-profile	windows-95	vhd	vhdboot	uefi	vhd-vhdboot
+profile	windows-95	vhd	vhdboot	uefi	w9x-uefi-other
 profile	windows-95	vhd	vhdboot	-	vhd-vhdboot
+profile	windows-95	vhd	direct_efi	uefi	w9x-uefi-other
+profile	windows-95	vhd	chainload	uefi	w9x-uefi-other
+profile	windows-95	vhd	memdisk	uefi	w9x-uefi-other
+profile	windows-95	vhd	disk_image	uefi	w9x-uefi-other
+profile	windows-95	vhd	floppy_image	uefi	w9x-uefi-other
 profile	windows-95	vhdx	automatic	bios	vhd-vhdboot
-profile	windows-95	vhdx	automatic	uefi	vhd-vhdboot
+profile	windows-95	vhdx	automatic	uefi	w9x-uefi-other
 profile	windows-95	vhdx	automatic	-	vhd-vhdboot
+profile	windows-95	vhdx	direct_iso	uefi	w9x-uefi-other
+profile	windows-95	vhdx	wimboot	uefi	w9x-uefi-other
 profile	windows-95	vhdx	vhdboot	bios	vhd-vhdboot
-profile	windows-95	vhdx	vhdboot	uefi	vhd-vhdboot
+profile	windows-95	vhdx	vhdboot	uefi	w9x-uefi-other
 profile	windows-95	vhdx	vhdboot	-	vhd-vhdboot
+profile	windows-95	vhdx	direct_efi	uefi	w9x-uefi-other
+profile	windows-95	vhdx	chainload	uefi	w9x-uefi-other
+profile	windows-95	vhdx	memdisk	uefi	w9x-uefi-other
+profile	windows-95	vhdx	disk_image	uefi	w9x-uefi-other
+profile	windows-95	vhdx	floppy_image	uefi	w9x-uefi-other
 profile	windows-95	efi	automatic	bios	efi-direct
-profile	windows-95	efi	automatic	uefi	efi-direct
+profile	windows-95	efi	automatic	uefi	w9x-uefi-other
 profile	windows-95	efi	automatic	-	efi-direct
+profile	windows-95	efi	direct_iso	uefi	w9x-uefi-other
+profile	windows-95	efi	wimboot	uefi	w9x-uefi-other
+profile	windows-95	efi	vhdboot	uefi	w9x-uefi-other
 profile	windows-95	efi	direct_efi	bios	efi-direct
-profile	windows-95	efi	direct_efi	uefi	efi-direct
+profile	windows-95	efi	direct_efi	uefi	w9x-uefi-other
 profile	windows-95	efi	direct_efi	-	efi-direct
 profile	windows-95	efi	chainload	bios	efi-chainload
-profile	windows-95	efi	chainload	uefi	efi-chainload
+profile	windows-95	efi	chainload	uefi	w9x-uefi-other
 profile	windows-95	efi	chainload	-	efi-chainload
+profile	windows-95	efi	memdisk	uefi	w9x-uefi-other
+profile	windows-95	efi	disk_image	uefi	w9x-uefi-other
+profile	windows-95	efi	floppy_image	uefi	w9x-uefi-other
 profile	windows-3-11	iso	automatic	bios	dos-fat16-bios
 profile	windows-3-11	iso	automatic	uefi	iso-work-chainload
 profile	windows-3-11	iso	automatic	-	iso-work-chainload
@@ -10585,9 +10757,9 @@ menu	windows-me	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	
 menu	windows-me	iso	bios	3	memdisk	win9x_dos	1	1	experimental	Memdisk [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	windows-me	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-me	iso	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-me	iso	uefi	0	automatic	chainload	1	1	validated_hardware	Automatic (Chainload)		READY	-
+menu	windows-me	iso	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	windows-me	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
-menu	windows-me	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	windows-me	iso	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-me	iso	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-me	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-me	iso	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -10597,7 +10769,7 @@ menu	windows-me	wim	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI
 menu	windows-me	wim	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-me	wim	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-me	wim	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-me	wim	uefi	0	automatic	wimboot	1	1	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-me	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-me	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	windows-me	wim	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	windows-me	wim	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -10621,7 +10793,7 @@ menu	windows-me	vhd	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI
 menu	windows-me	vhd	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-me	vhd	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-me	vhd	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-me	vhd	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-me	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-me	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	windows-me	vhd	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	windows-me	vhd	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -10633,7 +10805,7 @@ menu	windows-me	vhdx	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EF
 menu	windows-me	vhdx	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-me	vhdx	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-me	vhdx	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-me	vhdx	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-me	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-me	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	windows-me	vhdx	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	windows-me	vhdx	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -10645,9 +10817,9 @@ menu	windows-me	efi	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	
 menu	windows-me	efi	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-me	efi	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-me	efi	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-me	efi	uefi	0	automatic	direct_efi	1	1	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-me	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-me	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
-menu	windows-me	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	windows-me	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-me	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-me	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-me	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -10657,9 +10829,9 @@ menu	windows-98-se	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainlo
 menu	windows-98-se	iso	bios	3	memdisk	win9x_dos	1	1	experimental	Memdisk [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	windows-98-se	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-98-se	iso	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-98-se	iso	uefi	0	automatic	chainload	1	1	validated_hardware	Automatic (Chainload)		READY	-
+menu	windows-98-se	iso	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	windows-98-se	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
-menu	windows-98-se	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	windows-98-se	iso	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-98-se	iso	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-98-se	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-98-se	iso	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -10669,7 +10841,7 @@ menu	windows-98-se	wim	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or 
 menu	windows-98-se	wim	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-98-se	wim	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-98-se	wim	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-98-se	wim	uefi	0	automatic	wimboot	1	1	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-98-se	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-98-se	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	windows-98-se	wim	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	windows-98-se	wim	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -10693,7 +10865,7 @@ menu	windows-98-se	vhd	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or 
 menu	windows-98-se	vhd	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-98-se	vhd	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-98-se	vhd	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-98-se	vhd	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-98-se	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-98-se	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	windows-98-se	vhd	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	windows-98-se	vhd	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -10705,7 +10877,7 @@ menu	windows-98-se	vhdx	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or
 menu	windows-98-se	vhdx	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-98-se	vhdx	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-98-se	vhdx	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-98-se	vhdx	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-98-se	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-98-se	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	windows-98-se	vhdx	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	windows-98-se	vhdx	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -10717,9 +10889,9 @@ menu	windows-98-se	efi	bios	2	chainload	chainload	0	0	validated_hardware	Chainlo
 menu	windows-98-se	efi	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-98-se	efi	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-98-se	efi	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-98-se	efi	uefi	0	automatic	direct_efi	1	1	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-98-se	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-98-se	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
-menu	windows-98-se	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	windows-98-se	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-98-se	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-98-se	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-98-se	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -10729,9 +10901,9 @@ menu	windows-98	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	
 menu	windows-98	iso	bios	3	memdisk	win9x_dos	1	1	experimental	Memdisk [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	windows-98	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-98	iso	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-98	iso	uefi	0	automatic	chainload	1	1	validated_hardware	Automatic (Chainload)		READY	-
+menu	windows-98	iso	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	windows-98	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
-menu	windows-98	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	windows-98	iso	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-98	iso	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-98	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-98	iso	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -10741,7 +10913,7 @@ menu	windows-98	wim	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI
 menu	windows-98	wim	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-98	wim	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-98	wim	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-98	wim	uefi	0	automatic	wimboot	1	1	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-98	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-98	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	windows-98	wim	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	windows-98	wim	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -10765,7 +10937,7 @@ menu	windows-98	vhd	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI
 menu	windows-98	vhd	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-98	vhd	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-98	vhd	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-98	vhd	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-98	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-98	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	windows-98	vhd	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	windows-98	vhd	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -10777,7 +10949,7 @@ menu	windows-98	vhdx	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EF
 menu	windows-98	vhdx	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-98	vhdx	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-98	vhdx	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-98	vhdx	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-98	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-98	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	windows-98	vhdx	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	windows-98	vhdx	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -10789,9 +10961,9 @@ menu	windows-98	efi	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	
 menu	windows-98	efi	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-98	efi	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-98	efi	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-98	efi	uefi	0	automatic	direct_efi	1	1	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-98	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-98	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
-menu	windows-98	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	windows-98	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-98	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-98	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-98	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -10801,9 +10973,9 @@ menu	windows-95	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	
 menu	windows-95	iso	bios	3	memdisk	win9x_dos	1	1	experimental	Memdisk [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	windows-95	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-95	iso	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-95	iso	uefi	0	automatic	chainload	1	1	validated_hardware	Automatic (Chainload)		READY	-
+menu	windows-95	iso	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	windows-95	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
-menu	windows-95	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	windows-95	iso	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-95	iso	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-95	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-95	iso	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -10813,7 +10985,7 @@ menu	windows-95	wim	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI
 menu	windows-95	wim	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-95	wim	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-95	wim	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-95	wim	uefi	0	automatic	wimboot	1	1	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-95	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-95	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	windows-95	wim	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	windows-95	wim	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -10837,7 +11009,7 @@ menu	windows-95	vhd	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI
 menu	windows-95	vhd	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-95	vhd	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-95	vhd	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-95	vhd	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-95	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-95	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	windows-95	vhd	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	windows-95	vhd	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -10849,7 +11021,7 @@ menu	windows-95	vhdx	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EF
 menu	windows-95	vhdx	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-95	vhdx	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-95	vhdx	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-95	vhdx	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-95	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-95	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	windows-95	vhdx	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	windows-95	vhdx	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -10861,9 +11033,9 @@ menu	windows-95	efi	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	
 menu	windows-95	efi	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-95	efi	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-95	efi	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	windows-95	efi	uefi	0	automatic	direct_efi	1	1	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-95	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	windows-95	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
-menu	windows-95	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	windows-95	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-95	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-95	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-95	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -15960,6 +16132,8 @@ profile_def	w2k3-x86-sp2-uefi-csm	xp_uefi_staging	xp_uefi	Loading the preparatio
 profile_def	w2k3-uefi-other	-	none	
 profile_def	xp-x64-sp2-uefi-csm	xp_uefi_staging	xp_uefi	Loading the preparation environment|Detecting disks|Choosing the target disk|Preparing workspace|Copying and verifying files
 profile_def	xp-x64-uefi-other	-	none	
+profile_def	w9x-uefi-csmwrap	win9x_uefi	direct_iso	Validating installation ISO|Loading Windows boot files|Starting Windows Setup
+profile_def	w9x-uefi-other	-	none	
 profile_def	linux-live-bios	linux_live_iso	core	
 profile_def	linux-iso-bios	linux_iso	core	
 profile_def	dos-fat16-bios	dos_bios_iso	core	

@@ -394,6 +394,7 @@
   "boot.method.auto_slitaz": "Automatikus (SliTaz Live)",
   "boot.method.auto_xp": "Automatikus (XP előkészítése)",
   "boot.method.auto_xp_uefi": "Automatikus (UEFI-előkészítés / XP CSM-mel)",
+  "boot.method.auto_w9x_uefi": "Automatikus (UEFI előkészítés / DOS telepítő CSMWrapen át)",
   "boot.method.auto_wimboot": "Automatikus (WIMBoot)",
   "boot.method.auto_vhdboot": "Automatikus (VHDBoot)",
   "boot.method.auto_efi": "Automatikus (EFI)",
@@ -480,6 +481,7 @@
   "boot.summary.xp_preparation": "UEFI; a telepített XP-hez firmware CSM és MBR szükséges",
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB illesztőprogramok; opcionális PAE rendszerindítási bejegyzés",
   "boot.summary.xp_disk": "A következő grafikus képernyőn kell kiválasztani és megerősíteni",
+  "boot.summary.w9x_disk": "A következő grafikus képernyőn választható és erősíthető meg; az egész lemez törlődik",
   "boot.summary.xp_sif_merged": "{0} (beolvasztva az automatikus válaszba)",
   "boot.summary.vista_case": "Vista SP2 x64 -> PE10; a telepített rendszerhez CSM kell",
   "boot.summary.vista_usb": "PE10 natív USB; a cél a Vista USB v11-et használja",
@@ -1157,6 +1159,7 @@
   "boot.summary.vista_case_nocsm": "Windows Vista CSM nélkül: még nem támogatott (fekete képernyő) - kapcsolja be a CSM-et az alaplap beállításaiban",
 
   "boot.summary.xp_csmwrap": "XP CSM nélkül (kísérleti): CSMWrap, legacy VBIOS-os kártya, 1 mag fenntartva",
+  "boot.summary.w9x_csmwrap": "CSM nélkül (kísérleti): az USOS FAT32 telepítőlemezt készít CSMWrappel; a telepítő ezután erről indul",
 
   "boot.summary.w2k_limits": "Windows 2000 (kísérleti): nincs AHCI/NVMe/USB 3 illesztőprogram NT 5.0-hoz (SATA IDE módban), legfeljebb 4 GB RAM és 2 processzor",
 

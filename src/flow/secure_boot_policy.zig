@@ -42,7 +42,7 @@ pub fn systemRequiresSecureBootOff(system_id: []const u8) bool {
 /// for selections that bypass the system list).
 pub fn backendRequiresSecureBootOff(system_id: []const u8, backend: Backend) bool {
     return switch (backend) {
-        .xp_uefi_staging => true,
+        .xp_uefi_staging, .win9x_uefi => true,
         .windows_iso => systemRequiresSecureBootOff(system_id),
         // Distro kernels: verified by shim (Fedora CA) or the distro-shim
         // relay; ISOs without a signed shim (SystemRescue) are refused at start.

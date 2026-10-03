@@ -397,6 +397,7 @@
   "boot.method.auto_slitaz": "Automātiski (SliTaz Live)",
   "boot.method.auto_xp": "Automātiski (XP sagatavošana)",
   "boot.method.auto_xp_uefi": "Automātiski (UEFI sagatavošana / XP caur CSM)",
+  "boot.method.auto_w9x_uefi": "Automātiski (UEFI sagatavošana / DOS instalēšana caur CSMWrap)",
   "boot.method.auto_wimboot": "Automātiski (WIMBoot)",
   "boot.method.auto_vhdboot": "Automātiski (VHDBoot)",
   "boot.method.auto_efi": "Automātiski (EFI)",
@@ -483,6 +484,7 @@
   "boot.summary.xp_preparation": "UEFI; instalētajai XP nepieciešams aparātprogrammatūras CSM un MBR",
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB draiveri; neobligāts PAE sāknēšanas ieraksts",
   "boot.summary.xp_disk": "Tiek izvēlēts un apstiprināts nākamajā grafiskajā ekrānā",
+  "boot.summary.w9x_disk": "Izvēlas un apstiprina nākamajā grafiskajā ekrānā; viss disks tiek dzēsts",
   "boot.summary.xp_sif_merged": "{0} (apvienots ar automātisko atbildi)",
   "boot.summary.vista_case": "Vista SP2 x64 -> PE10; instalētajai sistēmai vajag CSM",
   "boot.summary.vista_usb": "PE10 iebūvētais USB; mērķis izmanto Vista USB v11",
@@ -1160,6 +1162,7 @@
   "boot.summary.vista_case_nocsm": "Windows Vista bez CSM: vēl netiek atbalstīts (melns ekrāns) - ieslēdziet CSM mātesplates iestatījumos",
 
   "boot.summary.xp_csmwrap": "XP bez CSM (eksperimentāli): CSMWrap, karte ar legacy VBIOS, 1 kodols rezervēts",
+  "boot.summary.w9x_csmwrap": "Bez CSM (eksperimentāli): USOS sagatavo FAT32 instalēšanas disku ar CSMWrap; instalēšana tad sākas no tā",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentāls): nav AHCI/NVMe/USB 3 draivera NT 5.0 (SATA IDE režīmā), maks. 4 GB RAM un 2 procesori",
 

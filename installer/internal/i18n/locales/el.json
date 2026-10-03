@@ -394,6 +394,7 @@
   "boot.method.auto_slitaz": "Αυτόματα (SliTaz Live)",
   "boot.method.auto_xp": "Αυτόματα (προετοιμασία XP)",
   "boot.method.auto_xp_uefi": "Αυτόματα (προετοιμασία σε UEFI / XP μέσω CSM)",
+  "boot.method.auto_w9x_uefi": "Αυτόματα (προετοιμασία UEFI / εγκατάσταση DOS μέσω CSMWrap)",
   "boot.method.auto_wimboot": "Αυτόματα (WIMBoot)",
   "boot.method.auto_vhdboot": "Αυτόματα (VHDBoot)",
   "boot.method.auto_efi": "Αυτόματα (EFI)",
@@ -480,6 +481,7 @@
   "boot.summary.xp_preparation": "UEFI, τα εγκατεστημένα XP απαιτούν CSM υλικολογισμικού και MBR",
   "boot.summary.xp_source": "XP SP3 x86, προγράμματα οδήγησης ACPI / SATA / USB, προαιρετική καταχώριση εκκίνησης PAE",
   "boot.summary.xp_disk": "Επιλέγεται και επιβεβαιώνεται στην επόμενη γραφική οθόνη",
+  "boot.summary.w9x_disk": "Επιλέγεται και επιβεβαιώνεται στην επόμενη γραφική οθόνη· ολόκληρος ο δίσκος διαγράφεται",
   "boot.summary.xp_sif_merged": "{0} (συγχωνευμένο με την αυτόματη απάντηση)",
   "boot.summary.vista_case": "Vista SP2 x64 -> PE10· το εγκατεστημένο σύστημα χρειάζεται CSM",
   "boot.summary.vista_usb": "Εγγενές USB στο PE10, ο προορισμός χρησιμοποιεί Vista USB v11",
@@ -1157,6 +1159,7 @@
   "boot.summary.vista_case_nocsm": "Windows Vista χωρίς CSM: δεν υποστηρίζεται ακόμη (μαύρη οθόνη) - ενεργοποιήστε το CSM στις ρυθμίσεις της μητρικής",
 
   "boot.summary.xp_csmwrap": "XP χωρίς CSM (πειραματικό): CSMWrap, κάρτα με legacy VBIOS, 1 πυρήνας δεσμευμένος",
+  "boot.summary.w9x_csmwrap": "Χωρίς CSM (πειραματικό): το USOS προετοιμάζει δίσκο FAT32 με την εγκατάσταση και CSMWrap· η εγκατάσταση εκτελείται από αυτόν",
 
   "boot.summary.w2k_limits": "Windows 2000 (πειραματικό): χωρίς πρόγραμμα οδήγησης AHCI/NVMe/USB 3 για NT 5.0 (SATA σε λειτουργία IDE), έως 4 GB RAM και 2 CPU",
 

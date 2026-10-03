@@ -394,6 +394,7 @@
   "boot.method.auto_slitaz": "Automaatne (SliTaz Live)",
   "boot.method.auto_xp": "Automaatne (XP ettevalmistus)",
   "boot.method.auto_xp_uefi": "Automaatne (UEFI ettevalmistus / XP CSM-i kaudu)",
+  "boot.method.auto_w9x_uefi": "Automaatne (UEFI ettevalmistus / DOS-i paigaldus CSMWrapi kaudu)",
   "boot.method.auto_wimboot": "Automaatne (WIMBoot)",
   "boot.method.auto_vhdboot": "Automaatne (VHDBoot)",
   "boot.method.auto_efi": "Automaatne (EFI)",
@@ -480,6 +481,7 @@
   "boot.summary.xp_preparation": "UEFI; installitud XP vajab püsivara CSM-i ja MBR-i",
   "boot.summary.xp_source": "XP SP3 x86; ACPI / SATA / USB draiverid; valikuline PAE käivituskirje",
   "boot.summary.xp_disk": "Valitakse ja kinnitatakse järgmisel graafilisel ekraanil",
+  "boot.summary.w9x_disk": "Valitakse ja kinnitatakse järgmisel graafilisel ekraanil; kogu ketas kustutatakse",
   "boot.summary.xp_sif_merged": "{0} (ühendatud automaatse vastusega)",
   "boot.summary.vista_case": "Vista SP2 x64 -> PE10; paigaldatud süsteem vajab CSM-i",
   "boot.summary.vista_usb": "PE10 omane USB; sihtsüsteem kasutab Vista USB v11",
@@ -1157,6 +1159,7 @@
   "boot.summary.vista_case_nocsm": "Windows Vista ilma CSM-ita: veel toetamata (must ekraan) - lubage CSM emaplaadi sätetes",
 
   "boot.summary.xp_csmwrap": "XP ilma CSM-ita (katseline): CSMWrap, legacy VBIOS-iga kaart, 1 tuum reserveeritud",
+  "boot.summary.w9x_csmwrap": "Ilma CSM-ita (katseline): USOS valmistab ette FAT32 paigaldusketta CSMWrapiga; paigaldus käivitub sealt",
 
   "boot.summary.w2k_limits": "Windows 2000 (katseline): NT 5.0 jaoks puudub AHCI/NVMe/USB 3 draiver (SATA IDE-režiimis), kuni 4 GB RAM-i ja 2 protsessorit",
 

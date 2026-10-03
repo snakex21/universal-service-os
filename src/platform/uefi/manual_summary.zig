@@ -150,6 +150,11 @@ pub fn show(
         }
     }
     var can_start = true;
+    if (backend == .win9x_uefi) {
+        // Windows 95/98/Me from UEFI (w9x-uefi-csmwrap, experimental).
+        fields.add(view.t(.summary_preparation), view.t(.summary_w9x_csmwrap));
+        fields.add(view.t(.summary_disk), view.t(.summary_w9x_disk));
+    }
     if (backend == .xp_uefi_staging) {
         // No CSM: the experimental xp-x86-sp3-uefi-csmwrap preparation (CSMWrap on
         // a small ESP of the target disk; docs/design/csmwrap-integration.md).
@@ -301,6 +306,25 @@ fn start(
         @import("xp_preparation.zig").start(root, system.id, image.name.slice(), answer, showXpProgress) catch |err| {
             view.refreshFramebuffer();
             showError(view.t(.error_xp), err);
+        };
+        return;
+    }
+    if (backend == .win9x_uefi) {
+        // Windows 95/98/Me from UEFI (w9x-uefi-csmwrap): request + profile on
+        // the ESP, then micro-Linux step 620 writes the Setup disk.
+        vista_csmwrap_heading = windows_native_iso.legacyFolder(system);
+        view.vistaCsmwrapStatus(.validating, "Reading the selected Windows ISO", vista_csmwrap_heading);
+        const win9x = @import("win9x_preparation.zig");
+        var request_answer: win9x.Answer = .none;
+        if (profile) |p| {
+            answer_profiles.stageWin9x(root, p) catch |err| return showError(view.t(.error_preparation), err);
+            request_answer = .profile;
+        } else if (unattended) |name| request_answer = .{ .file = name };
+        win9x.writeRequest(root, system.id, windows_native_iso.legacyFolder(system), image.name.slice(), request_answer) catch |err| return showError(view.t(.error_preparation), err);
+        view.vistaCsmwrapStatus(.loading, usos.flow.preparation_boot_progress.VistaCsmwrapStage.loading_detail, vista_csmwrap_heading);
+        @import("vista_preparation.zig").startWin9x(root) catch |err| {
+            view.refreshFramebuffer();
+            showError(view.t(.error_preparation), err);
         };
         return;
     }
