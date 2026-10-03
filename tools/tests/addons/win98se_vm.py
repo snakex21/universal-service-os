@@ -13,7 +13,7 @@ it ends up only in the VM disk and the floppy image in --work, which the
 caller deletes after the test (`clean`).
 
   python win98se_vm.py prepare --work DIR --iso 98SE.iso --stage STAGED_ADDONS --key-file F
-  python win98se_vm.py start --work DIR [--port 4471]
+  python win98se_vm.py start --work DIR [--port 4471] [--disk-only] [--acceptance]
   python win98se_vm.py shot  --work DIR NAME        (PNG in DIR/shots)
   python win98se_vm.py keys  --work DIR ret tab ...
   python win98se_vm.py type  --work DIR "text"
@@ -188,9 +188,12 @@ def start(a) -> None:
     port = a.port
     args = [str(qemu()), '-machine', 'pc,smm=off', '-cpu', 'pentium3', '-m', '256', '-accel', 'tcg',
             '-drive', f'file={a.work / "disk.raw"},format=raw,if=ide,index=0',
-            '-drive', f'file={a.work / "floppy.img"},format=raw,if=floppy,index=0',
             '-boot', 'order=ac', '-vga', 'cirrus', '-nic', 'none', '-rtc', 'base=localtime',
             '-display', 'none', '-monitor', f'tcp:127.0.0.1:{port},server=on,wait=off']
+    # The startup floppy only for the first boot (Setup); later starts boot C:
+    # (a floppy left in would run INSTALL again: SYS C: and SETUP).
+    if not a.disk_only:
+        args[args.index('-boot'):args.index('-boot')] = ['-drive', f'file={a.work / "floppy.img"},format=raw,if=floppy,index=0']
     if a.acceptance:
         # Usability checks (docs/design/legacy-compat-pack.md section 6): a USB
         # stick with a marker file on EHCI (NUSB), a Sound Blaster 16.
@@ -277,6 +280,7 @@ def main() -> None:
         if name == 'start':
             s.add_argument('--port', type=int, default=4471)
             s.add_argument('--acceptance', action='store_true', help='add a USB stick (EHCI) and a Sound Blaster 16')
+            s.add_argument('--disk-only', action='store_true', help='no floppy: boot the installed C:')
         if name == 'shot':
             s.add_argument('name')
         if name == 'keys':
