@@ -64,6 +64,19 @@
  *    The 8254 PIT and the RTC then drive IRQ 0 and IRQ 8 again, as the
  *    pre-ACPI HALs expect. Row 9 shows "leg:1>0" when this was done.
  *
+ * 7. Experiment (1.4, off by default): with "USOSRTCFIX" in the load
+ *    options or the Parameters value RtcFix = 1, the driver reads the CMOS
+ *    clock itself (register B: binary or BCD, 12 or 24 hours; century from
+ *    the FADT CENTURY byte) and redirects ntoskrnl's import slots for
+ *    HalQueryRealTimeClock (to this decode, the HAL's routine as the
+ *    fallback) and HalSetRealTimeClock (to a no-op, so the CMOS clock is
+ *    never written), then sets the system time with ZwSetSystemTime. On the
+ *    X470 the HAL's decode gave a year of about 14773 and, in GUI Setup, a
+ *    negative system time. The raw registers, both decodes and the system
+ *    time before and after go to Parameters\RtcDiag (REG_BINARY,
+ *    USOS_RTC_DIAG) for offline reading; the load line shows "rtco" (fixed)
+ *    or "rtcx" (failed).
+ *
  * Screen rows: 0 AHCINT, 1 heartbeat, 2 load line, 3-4 stall snapshot,
  * 5-7 STOP, 8 a second AHCINT HBA, 9-10 clock.
  */
@@ -85,7 +98,7 @@ void __cdecl _enable(void);
 #define USOS_HAL_REBOOT_ROUTINE   3
 __declspec(dllimport) VOID NTAPI HalReturnToFirmware(IN ULONG Routine);
 
-#define USOSRST_VERSION "usosrst 1.3"
+#define USOSRST_VERSION "usosrst 1.4"
 #define ROW_HB          1
 #define ROW_LOAD        2
 #define ROW_STALL       3
@@ -104,6 +117,7 @@ static PUCHAR g_ResetMapped;
 static ULONG g_AcpiRevision = 0xFF;    /* RSDP revision, FFh = no RSDP found */
 static ULONG g_HpetTable;           /* physical address of the HPET table */
 static ULONG g_MadtTable;           /* physical address of the MADT ("APIC") */
+static UCHAR g_CenturyIndex;        /* FADT CENTURY: CMOS index of the century byte, 0 = none */
 
 typedef VOID (NTAPI *USOS_RETURN_TO_FIRMWARE)(IN ULONG Routine);
 static USOS_RETURN_TO_FIRMWARE g_HalReturnToFirmware;  /* the HAL's routine */
@@ -303,6 +317,8 @@ FindResetRegister(VOID)
 
     fadt = MapPhys(fadtAddr, 129);
     if (fadt == NULL) return;
+    /* CENTURY (CMOS index of the century byte) at 108, ACPI 1.0+ */
+    if (*(PULONG)(fadt + 4) >= 109) g_CenturyIndex = fadt[108];
     /* ACPI 2.0+: Flags at 112 (bit 10 RESET_REG_SUP), RESET_REG (GAS) at
        116, RESET_VALUE at 128 */
     if (*(PULONG)(fadt + 4) >= 129 && (*(PULONG)(fadt + 112) & (1UL << 10)) &&
@@ -463,37 +479,50 @@ WriteSlot(PULONG Slot, ULONG Value)
    table of setupdd.sys is searched for the HAL's HalReturnToFirmware
    address (the value our own import of it holds), so no import names or
    hint tables are needed. */
-static CHAR
-RedirectSetupRestart(VOID)
+/* Points every import slot of the image at Base that holds Target at
+   Replacement. Returns the number of slots changed, or -1 when the image
+   headers are unusable or a write failed. */
+static LONG
+PatchImports(PUCHAR Base, ULONG Target, ULONG Replacement)
 {
-    PUCHAR base, nt;
-    ULONG target = (ULONG)HalReturnToFirmware;
-    ULONG size, rva, dir, dirSize, i, found = 0;
+    PUCHAR nt;
+    ULONG size, rva, dir, dirSize, i;
+    LONG found = 0;
 
-    base = FindModule("setupdd.sys");
-    if (base == NULL) return '-';
-    if (!MmIsAddressValid(base + 0x3C)) return 'x';
-    nt = base + *(PULONG)(base + 0x3C);
-    if (!MmIsAddressValid(nt) || !MmIsAddressValid(nt + 0x87) || *(PULONG)nt != 0x00004550) return 'x';
+    if (!MmIsAddressValid(Base + 0x3C)) return -1;
+    nt = Base + *(PULONG)(Base + 0x3C);
+    if (!MmIsAddressValid(nt) || !MmIsAddressValid(nt + 0x87) || *(PULONG)nt != 0x00004550) return -1;
     size = *(PULONG)(nt + 0x50);                  /* SizeOfImage */
     dir = *(PULONG)(nt + 0x80);                   /* import directory */
     dirSize = *(PULONG)(nt + 0x84);
-    if (dir == 0 || dirSize < 20 || dir >= size || dirSize > size - dir) return 'x';
+    if (dir == 0 || dirSize < 20 || dir >= size || dirSize > size - dir) return -1;
     for (i = 0; i + 20 <= dirSize; i += 20) {
-        PUCHAR desc = base + dir + i;
+        PUCHAR desc = Base + dir + i;
         PULONG slot;
         if (!MmIsAddressValid(desc) || !MmIsAddressValid(desc + 19)) break;
         rva = *(PULONG)(desc + 16);               /* FirstThunk */
         if (rva == 0 && *(PULONG)(desc + 12) == 0) break;
         if (rva == 0 || rva >= size) continue;
-        for (slot = (PULONG)(base + rva); (PUCHAR)slot + 4 <= base + size && MmIsAddressValid(slot) && *slot != 0; slot++) {
-            if (*slot != target) continue;
-            g_HalReturnToFirmware = (USOS_RETURN_TO_FIRMWARE)target;
-            if (!WriteSlot(slot, (ULONG)SetupReturnToFirmware)) return 'x';
+        for (slot = (PULONG)(Base + rva); (PUCHAR)slot + 4 <= Base + size && MmIsAddressValid(slot) && *slot != 0; slot++) {
+            if (*slot != Target) continue;
+            if (!WriteSlot(slot, Replacement)) return -1;
             found++;
         }
     }
-    return (CHAR)(found ? 'o' : 'x');
+    return found;
+}
+
+static CHAR
+RedirectSetupRestart(VOID)
+{
+    PUCHAR base;
+    LONG n;
+
+    base = FindModule("setupdd.sys");
+    if (base == NULL) return '-';
+    g_HalReturnToFirmware = (USOS_RETURN_TO_FIRMWARE)(ULONG)HalReturnToFirmware;
+    n = PatchImports(base, (ULONG)HalReturnToFirmware, (ULONG)SetupReturnToFirmware);
+    return (CHAR)(n > 0 ? 'o' : 'x');
 }
 
 static BOOLEAN
@@ -530,11 +559,12 @@ static ULONG g_TscPer100ms;         /* TSC cycles in 100 ms (KeStallExecutionPro
 static ULONG g_HpetCfg = 0xFFFFFFFF, g_HpetT0 = 0xFFFFFFFF, g_HpetBase;
 static BOOLEAN g_HpetRuns, g_HpetLegCleared, g_HpetWanted;
 
-/* "USOSHPETLEGOFF" in the load options, or Parameters\HpetLegacyOff = 1. */
+/* Option Want (upper case) in the load options, or the Parameters value
+   Value = 1. */
 static BOOLEAN
-HpetLegacyOffWanted(IN PUNICODE_STRING RegistryPath)
+OptionWanted(IN PUNICODE_STRING RegistryPath, IN const WCHAR *Want, IN PCWSTR Value)
 {
-    static WCHAR want[] = L"USOSHPETLEGOFF";
+    ULONG wantLen = 0;
     UNICODE_STRING name;
     OBJECT_ATTRIBUTES oa;
     HANDLE key;
@@ -543,6 +573,7 @@ HpetLegacyOffWanted(IN PUNICODE_STRING RegistryPath)
     ULONG length, i, j, n;
     BOOLEAN result = FALSE;
 
+    while (Want[wantLen]) wantLen++;
     RtlInitUnicodeString(&name, L"\\Registry\\Machine\\SYSTEM\\CurrentControlSet\\Control");
     InitializeObjectAttributes(&oa, &name, OBJ_CASE_INSENSITIVE, NULL, NULL);
     if (NT_SUCCESS(ZwOpenKey(&key, KEY_READ, &oa))) {
@@ -551,13 +582,13 @@ HpetLegacyOffWanted(IN PUNICODE_STRING RegistryPath)
             info->Type == REG_SZ) {
             PWCHAR text = (PWCHAR)info->Data;
             n = info->DataLength / 2;
-            for (i = 0; i + 14 <= n && !result; i++) {
-                for (j = 0; j < 14; j++) {
+            for (i = 0; i + wantLen <= n && !result; i++) {
+                for (j = 0; j < wantLen; j++) {
                     WCHAR c = text[i + j];
                     if (c >= 'a' && c <= 'z') c = (WCHAR)(c - 32);
-                    if (c != want[j]) break;
+                    if (c != Want[j]) break;
                 }
-                if (j == 14) result = TRUE;
+                if (j == wantLen) result = TRUE;
             }
         }
         ZwClose(key);
@@ -573,7 +604,7 @@ HpetLegacyOffWanted(IN PUNICODE_STRING RegistryPath)
             !NT_SUCCESS(RtlAppendUnicodeToString(&full, L"\\Parameters"))) return FALSE;
         InitializeObjectAttributes(&oa, &full, OBJ_CASE_INSENSITIVE, NULL, NULL);
         if (!NT_SUCCESS(ZwOpenKey(&key, KEY_READ, &oa))) return FALSE;
-        RtlInitUnicodeString(&name, L"HpetLegacyOff");
+        RtlInitUnicodeString(&name, Value);
         if (NT_SUCCESS(ZwQueryValueKey(key, &name, KeyValuePartialInformation, info, sizeof(buffer), &length)) &&
             info->Type == REG_DWORD && info->DataLength == sizeof(ULONG) && *(PULONG)info->Data == 1) result = TRUE;
         ZwClose(key);
@@ -779,6 +810,177 @@ WallSeconds(VOID)
     ULONG div = (ULONG)(((ULONGLONG)g_TscPer100ms * 10) >> 16);
     if (div == 0) return 0;
     return (ULONG)((__rdtsc() - g_Tsc0) >> 16) / div;
+}
+
+/* ------------------------------------------------------------------ */
+/* RTC fix (1.4, opt-in: USOSRTCFIX / Parameters\RtcFix = 1)           */
+/* ------------------------------------------------------------------ */
+
+/* Exported by every NT HAL and kernel; the WDK 7.1 headers do not declare
+   them for drivers. */
+__declspec(dllimport) BOOLEAN NTAPI HalQueryRealTimeClock(OUT PTIME_FIELDS TimeFields);
+__declspec(dllimport) BOOLEAN NTAPI HalSetRealTimeClock(IN PTIME_FIELDS TimeFields);
+NTSYSAPI NTSTATUS NTAPI ZwSetSystemTime(IN PLARGE_INTEGER SystemTime, OUT PLARGE_INTEGER PreviousTime OPTIONAL);
+
+typedef BOOLEAN (NTAPI *USOS_RTC_ROUTINE)(IN OUT PTIME_FIELDS TimeFields);
+static USOS_RTC_ROUTINE g_HalQueryRtc;  /* the HAL's routine (fallback) */
+static volatile LONG g_RtcQueries, g_RtcWritesSkipped;
+static CHAR g_RtcState = '-';           /* load line: '-' off, 'o' fixed, 'x' failed */
+
+#pragma pack(push, 1)
+typedef struct _USOS_RTC_DIAG {
+    ULONG Version;                      /* 0x00000104 */
+    UCHAR Raw[7];                       /* CMOS 0,2,4,6,7,8,9: s m h wday day month year */
+    UCHAR RegA, RegB, CenturyIndex, CenturyByte, HalOk, OwnOk, Pad;
+    TIME_FIELDS Hal;                    /* what HalQueryRealTimeClock returned */
+    TIME_FIELDS Own;                    /* our decode */
+    LARGE_INTEGER Before;               /* system time at load */
+    LARGE_INTEGER After;                /* system time after the fix */
+    LONG QuerySlots, SetSlots;          /* ntoskrnl import slots redirected */
+    NTSTATUS SetStatus;                 /* ZwSetSystemTime */
+} USOS_RTC_DIAG;
+#pragma pack(pop)
+
+static ULONG
+RtcBcd(UCHAR RegB, UCHAR v)
+{
+    return (RegB & 0x04) ? v : (ULONG)((v >> 4) * 10 + (v & 0x0F));
+}
+
+/* Reads the CMOS clock and decodes it by register B (binary or BCD, 12 or
+   24 hours). The century comes from the FADT CENTURY byte when it holds a
+   plausible value, else 19xx/20xx by the year. Raw (12 bytes, optional)
+   receives the registers. FALSE: no stable read or an impossible date. */
+static BOOLEAN
+ReadRtc(OUT PTIME_FIELDS Time, OUT PUCHAR Raw OPTIONAL)
+{
+    static const UCHAR idx[7] = { 0x00, 0x02, 0x04, 0x06, 0x07, 0x08, 0x09 };
+    UCHAR a[7], b[7], rA = 0, rB = 0, cen = 0xFF;
+    ULONG tries, i, year, hour, c;
+    BOOLEAN stable = FALSE;
+
+    for (tries = 0; tries < 100 && !stable; tries++) {
+        _disable();
+        rA = CmosRead(0x0A);
+        if (rA & 0x80) {                        /* update in progress (< 2 ms) */
+            _enable();
+            KeStallExecutionProcessor(100);
+            continue;
+        }
+        for (i = 0; i < 7; i++) a[i] = CmosRead(idx[i]);
+        rB = CmosRead(0x0B);
+        if (g_CenturyIndex >= 0x0E && g_CenturyIndex < 0x80) cen = CmosRead(g_CenturyIndex);
+        for (i = 0; i < 7; i++) b[i] = CmosRead(idx[i]);
+        _enable();
+        stable = (BOOLEAN)(RtlCompareMemory(a, b, 7) == 7);
+    }
+    if (Raw != NULL) {
+        for (i = 0; i < 7; i++) Raw[i] = a[i];
+        Raw[7] = rA;
+        Raw[8] = rB;
+        Raw[9] = g_CenturyIndex;
+        Raw[10] = cen;
+    }
+    if (!stable) return FALSE;
+
+    year = RtcBcd(rB, a[6]);
+    c = (cen != 0xFF) ? RtcBcd(rB, cen) : 0;
+    if (c < 19 || c > 21) c = (year < 80) ? 20 : 19;
+    if (rB & 0x02) {
+        hour = RtcBcd(rB, a[2]);
+    } else {                                    /* 12-hour mode, bit 7 = PM */
+        hour = RtcBcd(rB, (UCHAR)(a[2] & 0x7F)) % 12;
+        if (a[2] & 0x80) hour += 12;
+    }
+    Time->Year = (CSHORT)(c * 100 + year);
+    Time->Month = (CSHORT)RtcBcd(rB, a[5]);
+    Time->Day = (CSHORT)RtcBcd(rB, a[4]);
+    Time->Hour = (CSHORT)hour;
+    Time->Minute = (CSHORT)RtcBcd(rB, a[1]);
+    Time->Second = (CSHORT)RtcBcd(rB, a[0]);
+    Time->Milliseconds = 0;
+    Time->Weekday = (CSHORT)((RtcBcd(rB, a[3]) + 6) % 7);  /* CMOS 1 = Sunday */
+    return (BOOLEAN)(year <= 99 && Time->Month >= 1 && Time->Month <= 12 && Time->Day >= 1 && Time->Day <= 31 &&
+                     hour <= 23 && Time->Minute <= 59 && Time->Second <= 59);
+}
+
+/* ntoskrnl calls these instead of the HAL's routines once FixRtc ran. */
+static BOOLEAN NTAPI
+UsosQueryRtc(OUT PTIME_FIELDS Time)
+{
+    InterlockedIncrement(&g_RtcQueries);
+    if (ReadRtc(Time, NULL)) return TRUE;
+    return g_HalQueryRtc(Time);
+}
+
+/* The CMOS clock is never written while the fix is active: the HAL would
+   encode it the same wrong way it decodes it. */
+static BOOLEAN NTAPI
+UsosSetRtc(IN PTIME_FIELDS Time)
+{
+    UNREFERENCED_PARAMETER(Time);
+    InterlockedIncrement(&g_RtcWritesSkipped);
+    return TRUE;
+}
+
+static VOID
+FixRtc(IN PUNICODE_STRING RegistryPath)
+{
+    static const char *kernels[4] = { "ntoskrnl.exe", "ntkrnlmp.exe", "ntkrnlpa.exe", "ntkrpamp.exe" };
+    USOS_RTC_DIAG d;
+    UCHAR raw[11];
+    LARGE_INTEGER local, utc;
+    PUCHAR kernel = NULL;
+    ULONG i;
+
+    RtlZeroMemory(&d, sizeof(d));
+    d.Version = 0x104;
+    d.SetStatus = STATUS_NOT_SUPPORTED;
+    KeQuerySystemTime(&d.Before);
+    g_HalQueryRtc = (USOS_RTC_ROUTINE)(ULONG)HalQueryRealTimeClock;
+    d.HalOk = HalQueryRealTimeClock(&d.Hal);
+    d.OwnOk = ReadRtc(&d.Own, raw);
+    for (i = 0; i < 7; i++) d.Raw[i] = raw[i];
+    d.RegA = raw[7];
+    d.RegB = raw[8];
+    d.CenturyIndex = raw[9];
+    d.CenturyByte = raw[10];
+
+    for (i = 0; i < 4 && kernel == NULL; i++) kernel = FindModule(kernels[i]);
+    if (kernel != NULL && d.OwnOk) {
+        d.SetSlots = PatchImports(kernel, (ULONG)HalSetRealTimeClock, (ULONG)UsosSetRtc);
+        if (d.SetSlots > 0) {
+            d.QuerySlots = PatchImports(kernel, (ULONG)HalQueryRealTimeClock, (ULONG)UsosQueryRtc);
+            /* Only with the CMOS write redirected: ZwSetSystemTime also
+               writes the RTC through HalSetRealTimeClock. */
+            if (RtlTimeFieldsToTime(&d.Own, &local)) {
+                ExLocalTimeToSystemTime(&local, &utc);
+                d.SetStatus = ZwSetSystemTime(&utc, NULL);
+            }
+        }
+    }
+    KeQuerySystemTime(&d.After);
+    g_RtcState = (CHAR)(NT_SUCCESS(d.SetStatus) && d.QuerySlots > 0 ? 'o' : 'x');
+
+    /* Parameters\RtcDiag: read back offline from the SYSTEM hive. */
+    if (RegistryPath != NULL) {
+        WCHAR path[256];
+        UNICODE_STRING full, name;
+        OBJECT_ATTRIBUTES oa;
+        HANDLE key;
+        full.Buffer = path;
+        full.Length = 0;
+        full.MaximumLength = sizeof(path);
+        if (NT_SUCCESS(RtlAppendUnicodeStringToString(&full, RegistryPath)) &&
+            NT_SUCCESS(RtlAppendUnicodeToString(&full, L"\\Parameters"))) {
+            InitializeObjectAttributes(&oa, &full, OBJ_CASE_INSENSITIVE, NULL, NULL);
+            if (NT_SUCCESS(ZwCreateKey(&key, KEY_WRITE, &oa, 0, NULL, REG_OPTION_NON_VOLATILE, NULL))) {
+                RtlInitUnicodeString(&name, L"RtcDiag");
+                ZwSetValueKey(key, &name, 0, REG_BINARY, &d, sizeof(d));
+                ZwClose(key);
+            }
+        }
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -1129,7 +1331,8 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     /* The experiment applies to every boot that asks for it; the clock
        rows and the heartbeat are text-mode Setup only (a graphics desktop
        must not get text-buffer writes). */
-    g_HpetWanted = HpetLegacyOffWanted(RegistryPath);
+    g_HpetWanted = OptionWanted(RegistryPath, L"USOSHPETLEGOFF", L"HpetLegacyOff");
+    if (OptionWanted(RegistryPath, L"USOSRTCFIX", L"RtcFix")) FixRtc(RegistryPath);
     if (restart != '-') CalibrateTsc();
     ProbeHpet(g_HpetWanted);
     if (restart != '-') {
@@ -1159,6 +1362,8 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     p = PutStr(p, end, g_InSetup ? "1" : "0");
     p = PutStr(p, end, shutdownHandler ? " handler=on" : " handler=off");
     p = PutStr(p, end, restart == 'o' ? " txt=on" : restart == '-' ? " txt=no" : " txt=err");
+    p = PutStr(p, end, " rtc");
+    p = PutStr(p, end, g_RtcState == 'o' ? "o" : g_RtcState == 'x' ? "x" : "-");
     p = PutStr(p, end, " hb");
     p = PutHex(p, end, g_Hbas, 1);
     p = PutStr(p, end, "/");
