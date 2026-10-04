@@ -110,6 +110,51 @@ unit-tested), not yet seen on a desktop (the desktop run predates it).
 * **Windows 95 key**: `ProductID` did not fill the COA page of the OSR2.1 OEM
   Setup in QEMU; a 95 install needs the key typed (three fields) today.
 
+## 4c. Install from the UEFI menu without CSM (2026-10-04)
+
+The normal flow, like XP x64 / Server 2003: Windows 95/98/Me, MS-DOS 6.22 and
+Windows 3.1/3.11 rows are `firmware=any`; on a UEFI PC the automatic method
+is the backend `win9x_uefi` (profile `w9x-uefi-csmwrap`, experimental). No
+BIOS mode is offered from system rows (user decision); the Legacy BIOS mode
+stays an advanced tool under Utilities. BIOS-only systems without a UEFI
+flow (FreeDOS, PC DOS, NT 4.0, betas) show "Unavailable".
+
+* UEFI: summary -> Enter writes `EFI\USOS\win9x\request.ini` (system, name,
+  DATA image path, answer, size; a profile is staged as MSBATCH.INF) and
+  starts the base micro-Linux with `usos.legacy_action=w9x-csmwrap`.
+* micro-Linux step 620 (`tools/w9x_csmwrap_prepare.sh`): the XP/Vista disk
+  picker and erase confirmation, then one of two writers (only the chosen
+  disk; USOS MBR, CSMWrap ESP at the end via `xp_csmwrap_esp.sh`):
+  * `tools/w9x_csmwrap_target.sh` (95/98/Me): FAT32 C: (<= 32 GiB), the CD's
+    Setup folder, `C:\USOS9X` (INSTALL.BAT, U9ENV.BAT, MSBATCH.INF, helpers,
+    Patcher9x, MEMDISK, BOOT.IMG = the CD's El Torito floppy with our
+    AUTOEXEC/CONFIG, without JO.SYS; 95: the BOOTDISK.IMG bridge);
+  * `tools/dos_csmwrap_target.sh` (MS-DOS, Windows 3.x): FAT16 06h 256 MiB,
+    no volume label, IO.SYS/MSDOS.SYS placed first with mtools (MS-DOS SYS
+    needs them at root entry 0 / cluster 2), `C:\USOSDOS` (msdos helpers,
+    DOSFILES, WINSETUP, DATA programs, CSMWRAP.TAG), the MS-DOS 6.22 floppy.
+
+  Both start the floppy once through syslinux (Alpine's mtools installer,
+  GPL-2.0-or-later) + MEMDISK; INSTALL.BAT runs in disk mode, SYS replaces
+  syslinux, the syslinux files are deleted.
+* REBOOT.COM resets the platform (CF9h, then 8042) before the old jump to
+  FFFF:0: under CSMWrap that jump only re-entered SeaBIOS, which kept MEMDISK
+  hooked and booted the RAM floppy again (endless install loop).
+* QEMU OVMF: Windows 3.1 to its desktop (MS-DOS installs, Win 3.1 Setup:
+  two Enter presses in its DOS part, then batch Setup, USOS start menu);
+  98 SE: phase 1, restart through CSMWrap, wizard with the USB keyboard,
+  hardware setup, final restart.
+* 98 SE finding: VBADOS VBMOUSE.EXE next to the PS/2 mouse VxD that Setup
+  installs in its last phase stops the installed system with a protection
+  error at KERNEL init (bisected on the disk). The CSMWrap bridge is now
+  keyboard-only (U9FIX /CSM adds only usoskey.drv). **A USB mouse in the
+  installed Windows 9x under CSMWrap is open** (planned: a VxD-level mouse).
+* Safe mode under CSMWrap hangs (Windows loads HIMEM without /M:2), so
+  MSDOS.SYS gets `BootMenuDefault=1`: after a failed start the menu offers
+  Normal.
+* MS-DOS media: an ISO in `Systems\DOS\MS-DOS\Images` (Windows 3.x needs it
+  as `MS-DOS 6.22.iso`); a .zip holding the ISO is a planned convenience.
+
 ## 5. Open points
 
 * Own Windows 95 boot environment from the CD's CABs (bridge today).
