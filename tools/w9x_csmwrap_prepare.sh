@@ -28,7 +28,7 @@ usos_w9x_csmwrap_prepare() {
     [ -f "$request" ] || stop 'the Windows 9x request is missing on the USOS ESP'
     : > "$W9X_DIR/prepare.log" 2>/dev/null || true
     [ -d /sys/firmware/efi ] || stop 'the Windows 9x preparation requires UEFI'
-    for helper in target_disk_identity.sh xp_confirmation_ui.sh xp_menu_ui.sh xp_disk_overview.sh xp_detect_system.sh w9x_csmwrap_target.sh xp_csmwrap_esp.sh; do
+    for helper in target_disk_identity.sh xp_confirmation_ui.sh xp_menu_ui.sh xp_disk_overview.sh xp_detect_system.sh w9x_csmwrap_target.sh dos_csmwrap_target.sh xp_csmwrap_esp.sh; do
         [ -r "/usr/lib/usos/$helper" ] || stop "$helper is missing"
     done
     . /usr/lib/usos/target_disk_identity.sh
@@ -48,6 +48,10 @@ usos_w9x_csmwrap_prepare() {
         windows-98) tag=98 setup=WIN98 ;;
         windows-me) tag=ME setup=WIN9X ;;
         windows-95) tag=95 setup=WIN95 ;;
+        # DOS family (tools/dos_csmwrap_target.sh): MS-DOS 6.22, and Windows
+        # 3.x on top of the MS-DOS 6.22 ISO from Systems\DOS\MS-DOS\Images.
+        ms-dos) tag=DOS setup='' ;;
+        windows-3-1|windows-3-11) tag=W3 setup='' ;;
         *) stop "request.ini names an unsupported system: $system" ;;
     esac
     w9x_csmwrap_log "REQUEST system=$system iso=$iso folder=$folder answer=${answer%%:*} size=$size_gib"
@@ -68,6 +72,15 @@ usos_w9x_csmwrap_prepare() {
     mount -t ntfs3 -o ro,noatime "$DATA_PATH" /mnt/data || stop 'cannot mount USOS_DATA read-only'
     [ -f "/mnt/data/$iso" ] || stop "the Windows ISO is not on DATA: $iso"
     floppy=''
+    dos_iso=''
+    win3_iso=''
+    case "$tag" in
+        DOS) dos_iso="/mnt/data/$iso" ;;
+        W3)
+            dos_iso='/mnt/data/Systems/DOS/MS-DOS/Images/MS-DOS 6.22.iso'
+            [ -f "$dos_iso" ] || stop 'Windows 3.x needs the MS-DOS 6.22 ISO as Systems\DOS\MS-DOS\Images\MS-DOS 6.22.iso'
+            win3_iso="/mnt/data/$iso" ;;
+    esac
     if [ "$tag" = 95 ]; then
         # Windows 95 CDs do not boot: the startup disk image next to the ISO
         # folder (Systems\Windows\Windows 95\Boot\BOOTDISK.IMG, bridge).
@@ -77,7 +90,9 @@ usos_w9x_csmwrap_prepare() {
 
     answer_inf=/run/w9x-msbatch.inf
     answer_kind=USOS
+    [ -z "$dos_iso" ] || answer=dos
     case "$answer" in
+        dos) : > "$answer_inf" ;;
         none) cp /mnt/esp/EFI/USOS/dos-native/win9x/MSBATCH.INF "$answer_inf" || stop 'the default MSBATCH.INF is missing' ;;
         profile)
             # Rendered by the UEFI menu (answer_profiles.stageWin9x); it may
@@ -138,12 +153,14 @@ usos_w9x_csmwrap_prepare() {
         esp_start=$(( (total - 133120 + 2047) / 2048 * 2048 ))
         part_gib=$size_gib
         [ $((2048 + part_gib * 2097152)) -le "$esp_start" ] || part_gib=$(( (esp_start - 2048) / 2097152 ))
+        layout="one FAT32 partition of $part_gib GiB"
+        [ -z "$dos_iso" ] || layout='one FAT16 partition of 256 MiB'
         {
             printf 'ERASE ALL DATA ON THIS DISK\n\n'
             cat "$overview"
             printf '\n'
             printf 'All partitions, systems and files on this disk will be erased.\n'
-            printf 'New layout (MBR): one FAT32 partition of %s GiB (drive C:) for %s, then a 64 MiB CSMWrap partition at the end of the disk; the rest stays unallocated.\n' "$part_gib" "$folder"
+            printf 'New layout (MBR): %s (drive C:) for %s, then a 64 MiB CSMWrap partition at the end of the disk; the rest stays unallocated.\n' "$layout" "$folder"
             printf 'After the restart the disk starts by itself and %s Setup continues on it.\n' "$folder"
         } > "$screen"
         w9x_csmwrap_log "CONFIRM $TARGET_DEVICE model=$model serial=$serial size=$size part_gib=$part_gib"
@@ -154,9 +171,15 @@ usos_w9x_csmwrap_prepare() {
     w9x_csmwrap_log "TARGET $TARGET_DEVICE model=$model serial=$serial size=$size confirmed"
 
     usos_ui_stage 4 5 'Preparing the disk' "Copying $folder Setup, the USOS helpers and CSMWrap to the selected disk." || true
-    if ! TARGET_DEVICE=$TARGET_DEVICE W9X_SOURCE_ISO="/mnt/data/$iso" W9X_SETUP_FOLDER=$setup W9X_TAG=$tag \
-        W9X_ANSWER_INF=$answer_inf W9X_ANSWER_KIND=$answer_kind W9X_BOOT_FLOPPY=$floppy W9X_SIZE_GIB=$size_gib \
-        sh /usr/lib/usos/w9x_csmwrap_target.sh >> "$W9X_DIR/prepare.log" 2>&1 < /dev/null; then
+    if [ -n "$dos_iso" ]; then
+        set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="$dos_iso" DOS_WIN3_ISO="$win3_iso" \
+            DOS_PROGRAMS_DIR=/mnt/data/Systems/DOS/MS-DOS/Programs sh /usr/lib/usos/dos_csmwrap_target.sh
+    else
+        set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="/mnt/data/$iso" W9X_SETUP_FOLDER="$setup" W9X_TAG="$tag" \
+            W9X_ANSWER_INF="$answer_inf" W9X_ANSWER_KIND="$answer_kind" W9X_BOOT_FLOPPY="$floppy" W9X_SIZE_GIB="$size_gib" \
+            sh /usr/lib/usos/w9x_csmwrap_target.sh
+    fi
+    if ! "$@" >> "$W9X_DIR/prepare.log" 2>&1 < /dev/null; then
         rm -f "$answer_inf"
         tail -n 5 "$W9X_DIR/prepare.log" 2>/dev/null || true
         stop 'The Windows 9x preparation failed; see EFI/USOS/win9x/prepare.log'
@@ -166,7 +189,7 @@ usos_w9x_csmwrap_prepare() {
     umount /mnt/data 2>/dev/null || true
     sync
     w9x_csmwrap_log 'DONE; waiting for the restart'
-    usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry (CSMWrap; CSM stays off) and $folder Setup continues on it. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true
+    usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry (CSMWrap; CSM stays off) and the $folder installation continues on it. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true
     if [ -r "${USOS_UI_TTY:-}" ]; then
         IFS= read -r _w9x_ack < "$USOS_UI_TTY" || true
     else

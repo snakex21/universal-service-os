@@ -46,8 +46,8 @@ pub const entries = [_]SystemEntry{
     win9x("windows-98-se", "Windows 98 SE"),
     win9x("windows-98", "Windows 98"),
     win9x("windows-95", "Windows 95"),
-    legacy("windows-3-11", "Windows 3.11", "Windows 3.11", false),
-    legacy("windows-3-1", "Windows 3.1", "Windows 3.1", false),
+    anyFirmware(legacy("windows-3-11", "Windows 3.11", "Windows 3.11", false)),
+    anyFirmware(legacy("windows-3-1", "Windows 3.1", "Windows 3.1", false)),
 };
 
 fn legacy(
@@ -69,7 +69,13 @@ fn legacy(
 }
 
 fn win9x(comptime id: []const u8, comptime name: []const u8) SystemEntry {
-    var entry = legacy(id, name, name, true);
-    entry.firmware = .any;
-    return entry;
+    return anyFirmware(legacy(id, name, name, true));
+}
+
+/// BIOS-only installers that UEFI starts through the DOS-family CSMWrap
+/// preparation (profile w9x-uefi-csmwrap).
+fn anyFirmware(entry: SystemEntry) SystemEntry {
+    var result = entry;
+    result.firmware = .any;
+    return result;
 }

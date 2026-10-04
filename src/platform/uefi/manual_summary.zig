@@ -312,15 +312,15 @@ fn start(
     if (backend == .win9x_uefi) {
         // Windows 95/98/Me from UEFI (w9x-uefi-csmwrap): request + profile on
         // the ESP, then micro-Linux step 620 writes the Setup disk.
-        vista_csmwrap_heading = windows_native_iso.legacyFolder(system);
-        view.vistaCsmwrapStatus(.validating, "Reading the selected Windows ISO", vista_csmwrap_heading);
+        vista_csmwrap_heading = system.name;
+        view.vistaCsmwrapStatus(.validating, "Reading the selected ISO", vista_csmwrap_heading);
         const win9x = @import("win9x_preparation.zig");
         var request_answer: win9x.Answer = .none;
         if (profile) |p| {
             answer_profiles.stageWin9x(root, p) catch |err| return showError(view.t(.error_preparation), err);
             request_answer = .profile;
         } else if (unattended) |name| request_answer = .{ .file = name };
-        win9x.writeRequest(root, system.id, windows_native_iso.legacyFolder(system), image.name.slice(), request_answer) catch |err| return showError(view.t(.error_preparation), err);
+        win9x.writeRequest(root, system.id, system.name, system.image_directory, image.name.slice(), request_answer) catch |err| return showError(view.t(.error_preparation), err);
         view.vistaCsmwrapStatus(.loading, usos.flow.preparation_boot_progress.VistaCsmwrapStage.loading_detail, vista_csmwrap_heading);
         @import("vista_preparation.zig").startWin9x(root) catch |err| {
             view.refreshFramebuffer();

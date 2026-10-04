@@ -449,6 +449,7 @@ def main() -> int:
             ("tools/xp_csmwrap_esp.sh", "usr/lib/usos/xp_csmwrap_esp.sh"),
             ("tools/w9x_csmwrap_prepare.sh", "usr/lib/usos/w9x_csmwrap_prepare.sh"),
             ("tools/w9x_csmwrap_target.sh", "usr/lib/usos/w9x_csmwrap_target.sh"),
+            ("tools/dos_csmwrap_target.sh", "usr/lib/usos/dos_csmwrap_target.sh"),
             ("tools/legacy_xp_resume.sh", "usr/lib/usos/legacy_xp_resume.sh"),
             ("tools/xp_unattended_policy.sh", "usr/lib/usos/xp_unattended_policy.sh"),
             ("tools/xp_user_settings.sh", "usr/lib/usos/xp_user_settings.sh"),

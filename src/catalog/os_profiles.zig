@@ -267,6 +267,9 @@ const auto_iso_memdisk = &[_]BootMethod{ .automatic, .direct_iso, .memdisk };
 /// UEFI-only rules. The freestanding BIOS Core never runs with UEFI firmware,
 /// so it leaves them out of its image (Core size budget); the order of
 /// `profiles` is unchanged on every other target.
+/// The DOS-family CSMWrap preparation from UEFI (micro-Linux step 620).
+const dos_family_ids = &[_][]const u8{ "windows-98-se", "windows-98", "windows-me", "windows-95", "ms-dos", "windows-3-1", "windows-3-11" };
+
 const uefi_profiles = [_]Profile{
     // ---- UEFI only
     // Linux ISO from DATA (docs/design/linux-iso-boot.md): kernel + initrd from
@@ -289,8 +292,8 @@ const uefi_profiles = [_]Profile{
     // Windows 95/98/Me from UEFI: micro-Linux step 620 writes a FAT32 Setup
     // disk with a one-time DOS start and a CSMWrap ESP; Setup then runs from
     // that disk in BIOS mode (docs/win9x-modern-2026-09-30.md 4c).
-    .{ .id = "w9x-uefi-csmwrap", .systems = .{ .ids = &.{ "windows-98-se", "windows-98", "windows-me", "windows-95" } }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .win9x_uefi, .progress = .direct_iso },
-    .{ .id = "w9x-uefi-other", .systems = .{ .ids = &.{ "windows-98-se", "windows-98", "windows-me", "windows-95" } }, .firmware = .uefi, .backend = null, .progress = .none },
+    .{ .id = "w9x-uefi-csmwrap", .systems = .{ .ids = dos_family_ids }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .win9x_uefi, .progress = .direct_iso },
+    .{ .id = "w9x-uefi-other", .systems = .{ .ids = dos_family_ids }, .firmware = .uefi, .backend = null, .progress = .none },
 };
 
 /// Ordered: firmware-specific rules first, then the firmware-independent

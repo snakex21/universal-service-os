@@ -73,6 +73,22 @@ dos_reboot_start:
     mov ax, 0x40
     mov ds, ax
     mov word ptr [0x72], 0x1234
+    /* A full platform reset first: under CSMWrap (UEFI PC without CSM) a
+     * jump to the reset vector only re-enters SeaBIOS, which keeps MEMDISK's
+     * INT 13h hook and boots the RAM floppy again. Reset control register
+     * (CF9h: system reset, then full reset), then the 8042 reset line; PCs
+     * without either fall through to BIOS POST as before. */
+    mov dx, 0xcf9
+    mov al, 0x02
+    out dx, al
+    mov al, 0x06
+    out dx, al
+    mov cx, 0
+1:  loop 1b
+    mov al, 0xfe
+    out 0x64, al
+    mov cx, 0
+2:  loop 2b
     /* Re-enter BIOS POST, not INT 19h with MEMDISK hooks still installed. */
     .byte 0xea
     .word 0, 0xffff

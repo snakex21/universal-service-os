@@ -11,6 +11,7 @@ rem Disk mode: the one-time syslinux start goes (SYS replaced its boot sector).
 if not "%UDISK%"=="1" goto sl_done
 %USRC%\DOSFILES\ATTRIB.EXE -r -h -s C:\LDLINUX.SYS
 del C:\LDLINUX.SYS
+%USRC%\DOSFILES\ATTRIB.EXE -r -h -s C:\LDLINUX.C32
 del C:\LDLINUX.C32
 del C:\SYSLINUX.CFG
 :sl_done

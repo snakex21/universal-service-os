@@ -27,8 +27,14 @@ fn safeName(name: []const u8) bool {
 }
 
 /// request.ini of tools/w9x_csmwrap_prepare.sh (CRLF, DATA-relative paths).
-pub fn formatRequest(buffer: []u8, system_id: []const u8, folder: []const u8, name: []const u8, answer: Answer, size_gib: u8) ![]const u8 {
+/// `folder`: the system's name (heading, DATA Unattended/Boot folders);
+/// `images`: its DATA image folder ("\Systems\...\Images").
+pub fn formatRequest(buffer: []u8, system_id: []const u8, folder: []const u8, images: []const u8, name: []const u8, answer: Answer, size_gib: u8) ![]const u8 {
     if (!safeName(folder) or !safeName(name) or !safeName(system_id)) return error.InvalidImageName;
+    var path_buffer: [160]u8 = undefined;
+    if (images.len < 2 or images.len > path_buffer.len or images[0] != '\\' or std.mem.indexOf(u8, images, "..") != null) return error.InvalidImageName;
+    const path = path_buffer[0 .. images.len - 1];
+    for (images[1..], 0..) |c, i| path[i] = if (c == '\\') '/' else c;
     var answer_text: [300]u8 = undefined;
     const answer_value = switch (answer) {
         .none => "none",
@@ -38,7 +44,7 @@ pub fn formatRequest(buffer: []u8, system_id: []const u8, folder: []const u8, na
             break :blk try std.fmt.bufPrint(&answer_text, "file:{s}", .{file});
         },
     };
-    return std.fmt.bufPrint(buffer, "version=1\r\nprofile=w9x-uefi-csmwrap\r\nsystem={s}\r\nfolder={s}\r\niso=Systems/Windows/{s}/Images/{s}\r\nanswer={s}\r\nsize={d}\r\n", .{ system_id, folder, folder, name, answer_value, size_gib });
+    return std.fmt.bufPrint(buffer, "version=1\r\nprofile=w9x-uefi-csmwrap\r\nsystem={s}\r\nfolder={s}\r\niso={s}/{s}\r\nanswer={s}\r\nsize={d}\r\n", .{ system_id, folder, path, name, answer_value, size_gib });
 }
 
 fn ensureDirectory(root: *uefi.protocol.File, path: [*:0]const u16) !void {
@@ -46,9 +52,9 @@ fn ensureDirectory(root: *uefi.protocol.File, path: [*:0]const u16) !void {
     dir.close() catch {};
 }
 
-pub fn writeRequest(root: *uefi.protocol.File, system_id: []const u8, folder: []const u8, name: []const u8, answer: Answer) !void {
+pub fn writeRequest(root: *uefi.protocol.File, system_id: []const u8, folder: []const u8, images: []const u8, name: []const u8, answer: Answer) !void {
     var buffer: [1024]u8 = undefined;
-    const text = try formatRequest(&buffer, system_id, folder, name, answer, 32);
+    const text = try formatRequest(&buffer, system_id, folder, images, name, answer, 32);
     try ensureDirectory(root, wide("\\EFI\\USOS"));
     try ensureDirectory(root, wide(directory));
     try @import("settings_store.zig").replaceFile(root, directory ++ "\\request.ini", text);
@@ -57,11 +63,12 @@ pub fn writeRequest(root: *uefi.protocol.File, system_id: []const u8, folder: []
 
 test "Windows 9x request names the DATA ISO, the answer source and the size" {
     var buffer: [1024]u8 = undefined;
-    const text = try formatRequest(&buffer, "windows-98-se", "Windows 98 SE", "Windows_98_SE_PL_OEM.iso", .none, 32);
+    const text = try formatRequest(&buffer, "windows-98-se", "Windows 98 SE", "\\Systems\\Windows\\Windows 98 SE\\Images", "Windows_98_SE_PL_OEM.iso", .none, 32);
     try std.testing.expectEqualStrings("version=1\r\nprofile=w9x-uefi-csmwrap\r\nsystem=windows-98-se\r\nfolder=Windows 98 SE\r\niso=Systems/Windows/Windows 98 SE/Images/Windows_98_SE_PL_OEM.iso\r\nanswer=none\r\nsize=32\r\n", text);
-    try std.testing.expect(std.mem.endsWith(u8, try formatRequest(&buffer, "windows-me", "Windows Me", "me.iso", .profile, 8), "answer=profile\r\nsize=8\r\n"));
-    try std.testing.expect(std.mem.indexOf(u8, try formatRequest(&buffer, "windows-95", "Windows 95", "95.iso", .{ .file = "home.inf" }, 32), "answer=file:home.inf\r\n") != null);
-    try std.testing.expectError(error.InvalidImageName, formatRequest(&buffer, "windows-95", "Windows 95", "../x.iso", .none, 32));
-    try std.testing.expectError(error.InvalidImageName, formatRequest(&buffer, "windows-95", "Windows 95", "a/b.iso", .none, 32));
-    try std.testing.expectError(error.InvalidImageName, formatRequest(&buffer, "windows-95", "Windows 95", "x.iso", .{ .file = "a\r\nsize=2" }, 32));
+    try std.testing.expect(std.mem.endsWith(u8, try formatRequest(&buffer, "windows-me", "Windows Me", "\\Systems\\Windows\\Windows Me\\Images", "me.iso", .profile, 8), "answer=profile\r\nsize=8\r\n"));
+    try std.testing.expect(std.mem.indexOf(u8, try formatRequest(&buffer, "windows-95", "Windows 95", "\\Systems\\Windows\\Windows 95\\Images", "95.iso", .{ .file = "home.inf" }, 32), "answer=file:home.inf\r\n") != null);
+    try std.testing.expectError(error.InvalidImageName, formatRequest(&buffer, "windows-95", "Windows 95", "\\Systems\\Windows\\Windows 95\\Images", "../x.iso", .none, 32));
+    try std.testing.expectError(error.InvalidImageName, formatRequest(&buffer, "windows-95", "Windows 95", "\\Systems\\Windows\\Windows 95\\Images", "a/b.iso", .none, 32));
+    try std.testing.expect(std.mem.indexOf(u8, try formatRequest(&buffer, "ms-dos", "MS-DOS", "\\Systems\\DOS\\MS-DOS\\Images", "MS-DOS 6.22.iso", .none, 32), "iso=Systems/DOS/MS-DOS/Images/MS-DOS 6.22.iso\r\n") != null);
+    try std.testing.expectError(error.InvalidImageName, formatRequest(&buffer, "windows-95", "Windows 95", "\\Systems\\Windows\\Windows 95\\Images", "x.iso", .{ .file = "a\r\nsize=2" }, 32));
 }
