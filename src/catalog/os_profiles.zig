@@ -264,9 +264,10 @@ const linux_ids = &[_][]const u8{ "ubuntu", "debian", "fedora", "linux-mint", "a
 const auto_iso = &[_]BootMethod{ .automatic, .direct_iso };
 const auto_iso_memdisk = &[_]BootMethod{ .automatic, .direct_iso, .memdisk };
 
-/// Ordered: firmware-specific rules first, then the firmware-independent
-/// ones (the former resolveBackend). First match wins.
-pub const profiles = [_]Profile{
+/// UEFI-only rules. The freestanding BIOS Core never runs with UEFI firmware,
+/// so it leaves them out of its image (Core size budget); the order of
+/// `profiles` is unchanged on every other target.
+const uefi_profiles = [_]Profile{
     // ---- UEFI only
     // Linux ISO from DATA (docs/design/linux-iso-boot.md): kernel + initrd from
     // the ISO, /usos/init maps the ISO file as a block device. Replaces the WORK
@@ -290,6 +291,11 @@ pub const profiles = [_]Profile{
     // that disk in BIOS mode (docs/win9x-modern-2026-09-30.md 4c).
     .{ .id = "w9x-uefi-csmwrap", .systems = .{ .ids = &.{ "windows-98-se", "windows-98", "windows-me", "windows-95" } }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .win9x_uefi, .progress = .direct_iso },
     .{ .id = "w9x-uefi-other", .systems = .{ .ids = &.{ "windows-98-se", "windows-98", "windows-me", "windows-95" } }, .firmware = .uefi, .backend = null, .progress = .none },
+};
+
+/// Ordered: firmware-specific rules first, then the firmware-independent
+/// ones (the former resolveBackend). First match wins.
+pub const profiles = (if (native_windows7_enabled) uefi_profiles else [_]Profile{}) ++ [_]Profile{
     // ---- BIOS only
     .{ .id = "linux-live-bios", .systems = .{ .ids = &.{"other-linux"} }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .linux_live_iso, .progress = .core },
     // Linux ISO from DATA in the BIOS Core (other-linux keeps the SliTaz row;
