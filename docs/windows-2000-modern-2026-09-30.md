@@ -432,10 +432,21 @@ restarts (`txt=on`) and GUI Setup starts. **GUI Setup still fails with ACPI
 off on both HALs**, as in section 5: from the third device on, every
 device install fails with 1450 (`ERROR_NO_SYSTEM_RESOURCES`), then
 "RegisteredProcessors" cannot be written, ~11,000 `edb*.log` files, "Critical
-error: initializing the security subsystem failed". The first failures
-follow right after the root-enumerated ISAPNP read-data-port device was
-installed (it exists only with ACPI off); this is the next suspect (test:
-`isapnp` Start = 4 through usosw2k.inf), not yet confirmed.
+error: initializing the security subsystem failed". The hives stay small
+(SYSTEM 421 KB, 62 device instances), so the registry quota / paged pool
+was the suspect.
+
+**Run D (MPS, ACPI off):** usosw2k.inf now writes (ACPI off only)
+`Memory Management\PagedPoolSize = 0xFFFFFFFF` (largest the system allows)
+and `Control\RegistrySizeLimit = 0x08000000` (clamped by the kernel). Result:
+no 1450 at all, `setuperr.log` empty, device install and the security setup
+passed, GUI Setup reached "Wykonywanie zadań końcowych" (registering
+components). The run was stopped there after ~20 minutes on that step
+(TCG); `%windir%\security` held ~10,700 `edb*.log` files, so an ESENT log
+flood still happens in QEMU with ACPI off and is the open risk for the
+X470. `isapnp` Start = 4 was also tried: text mode overwrites it (Start 0),
+and leaving isapnp out of text mode makes text mode stop with "no keyboard",
+so it is not used.
 
 ## 8. X470 test plan (first plan, 2026-10-03)
 

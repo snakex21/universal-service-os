@@ -204,7 +204,7 @@ usos_w2k_storage_sif() {
 # PnpInterface for AHCINT and the CriticalDeviceDatabase entries of
 # USOS_W2K_AHCI_IDS. Loaded through TXTSETUP.SIF [HiveInfs.Fresh].
 usos_w2k_hive_inf() {
-    awk -v ids="$USOS_W2K_AHCI_IDS" -v mode="${1:-legacy}" -v drv="${USOS_W2K_DRV:-ahcint}" -v helper="${USOS_W2K_USOSRST:-on}" '
+    awk -v ids="$USOS_W2K_AHCI_IDS" -v mode="${1:-legacy}" -v drv="${USOS_W2K_DRV:-ahcint}" -v helper="${USOS_W2K_USOSRST:-on}" -v acpi="${USOS_W2K_ACPI:-on}" '
         BEGIN {
             bs = sprintf("%c", 92); q = sprintf("%c", 34); n = split(ids, id, " ")
             base = "HKLM," q "SYSTEM" bs "CurrentControlSet" bs
@@ -220,6 +220,18 @@ usos_w2k_hive_inf() {
                 print base "Services" bs "atapi" q "," q "Start" q ",0x00010001,4\r"
             }
             if (mode == "pnp") print base "Services" bs drv bs "Parameters" bs "PnpInterface" q "," q "5" q ",0x00010001,1\r"
+            # ACPI off: in QEMU every ACPI-off GUI Setup failed its registry
+            # writes with 1450 (ERROR_NO_SYSTEM_RESOURCES) while the hives were
+            # small (SYSTEM 421 KB): the largest paged pool (FFFFFFFF = as large
+            # as the system allows) and a 128 MB registry quota (clamped by the
+            # kernel to what paged pool permits), both documented values. With
+            # them the same run had no 1450 and passed device install and the
+            # security setup (2026-10-04). (isapnp Start = 4 was tried too: text
+            # mode overwrites it, and text mode needs isapnp for the keyboard.)
+            if (acpi == "off") {
+                print base "Control" q "," q "RegistrySizeLimit" q ",0x00010001,0x08000000\r"
+                print base "Control" bs "Session Manager" bs "Memory Management" q "," q "PagedPoolSize" q ",0x00010001,0xFFFFFFFF\r"
+            }
             # usosrst: a boot driver of the first group, ErrorControl 0 (a
             # failed start never stops the boot).
             if (helper == "on") {
@@ -240,7 +252,10 @@ usos_w2k_hive_inf() {
 }
 
 # stdin TXTSETUP.SIF -> stdout with [ACPIOptions] ACPIEnable = 0. Exit 3
-# unless exactly one ACPIEnable row was found in that section.
+# unless exactly one ACPIEnable row was found in that section. (isapnp stays
+# a text-mode boot bus extender: without ACPI it enumerates the legacy
+# devices, and text mode stops with "no keyboard" without it; QEMU
+# 2026-10-04.)
 usos_w2k_acpi_off_sif() {
     awk '
         { line = $0; sub(/\r$/, "", line); low = tolower(line) }

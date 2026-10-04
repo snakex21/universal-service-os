@@ -232,7 +232,9 @@ class W2kStorage(unittest.TestCase):
                     self.assertEqual((folder / 'usosrst.sys').read_bytes(), pkg['usosrst.sys'])
                     self.assertEqual((folder / 'ahcint.inf').read_bytes(), inf)
                     self.assertFalse((folder / 'AHCINT.SY_').exists())
-                    self.assertEqual((folder / 'usosw2k.inf').read_bytes(), run_fn('usos_w2k_hive_inf', b'').stdout)
+                    self.assertEqual((folder / 'usosw2k.inf').read_bytes(),
+                                     run_fn(f'USOS_W2K_ACPI={acpi or "on"} usos_w2k_hive_inf', b'').stdout)
+                    self.assertEqual(b'"PagedPoolSize",0x00010001,0xFFFFFFFF' in (folder / 'usosw2k.inf').read_bytes(), acpi == 'off')
                     self.assertEqual((folder / 'TXTSETUP.SIF').read_bytes(), sif)
                 self.assertEqual((t / 'root/TXTSETUP.SIF').read_bytes(), sif)
                 self.assertIn(b'ACPIEnable = ' + (b'0' if acpi == 'off' else b'2') + b'\r\n', sif)
@@ -254,6 +256,24 @@ class W2kStorage(unittest.TestCase):
                 self.assertEqual((ls / 'HIVESYS.INF').read_bytes(), hivesys)
                 self.assertNotEqual(self.apply(t).returncode, 0)
                 self.assertEqual((ls / 'TXTSETUP.SIF').read_bytes(), sif)
+
+    def test_acpi_off_isapnp(self):
+        # ACPI off: isapnp stays a text-mode boot bus extender (text mode needs it
+        # for the keyboard); only the installed system's Start = 4 comes from usosw2k.inf.
+        sif = (b'[BootBusExtenders.Load]\r\npci      = pci.sys\r\nisapnp   = isapnp.sys\r\n[BootBusExtenders]\r\n'
+               b'isapnp   = "ISA PnP",files.isapnp,isapnp \r\n[ACPIOptions]\r\nACPIEnable = 2\r\n')
+        r = run_fn('usos_w2k_acpi_off_sif', sif)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout, sif.replace(b'ACPIEnable = 2', b'ACPIEnable = 0'))
+        # ACPI off: paged pool and registry quota rows (QEMU: no more 1450), nothing with ACPI kept.
+        on, off = run_fn('usos_w2k_hive_inf', b'').stdout, run_fn('USOS_W2K_ACPI=off usos_w2k_hive_inf', b'').stdout
+        rows_off = [b'HKLM,"SYSTEM\\CurrentControlSet\\Control","RegistrySizeLimit",0x00010001,0x08000000\r\n',
+                    b'HKLM,"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management","PagedPoolSize",0x00010001,0xFFFFFFFF\r\n']
+        for row in rows_off:
+            self.assertIn(row, off)
+            self.assertNotIn(row, on)
+        self.assertEqual(off.replace(b''.join(rows_off), b''), on)
+        self.assertNotIn(b'isapnp', off)
 
     def test_answer_rows(self):
         # The descriptions exactly as the source spells them (localized, ANSI).
