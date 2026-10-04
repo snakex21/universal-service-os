@@ -379,10 +379,26 @@ copy, and again at the black screen.
 - A STOP line from usosrst: that names the failing driver.
 - Then press reset and bring the disk for the trace (`tools\w2k_gap_trace.py`).
 
-In parallel, the user runs the **UniATA experiment** with the existing
-build: `storage-uniata.txt` plus a re-prepare. It swaps the whole
-miniport, so a `WINNT` folder after that run puts the fault in AHCINT's
-write path.
+**X470 run 3 (2026-10-04, UniATA via `storage-uniata.txt`, CSM off):**
+the same result: the copy bar, then a black "_". Read-only checks on the dev
+PC:
+- UniATA was staged in `~BT` and `~LS`, with no AHCINT; the prepare log says
+  `APPLIED PASS UniATA 0.47b`.
+- Nothing from Setup is on the disk: no WINNT, and all 5555 `~LS` files are
+  still there (text mode moves them).
+- The CSMWrap ESP and the Kingston hold only USOS's own files.
+
+So the cause does not depend on the miniport.
+
+**Memory-map check in QEMU (2026-10-04):** text mode completes with
+AHCINT usos3, no errors and the VBR written, in all three setups:
+- SeaBIOS with 8 GB;
+- SeaBIOS with 32 GB;
+- CSMWrap on OVMF with 32 GB, using `USOS_QEMU_EXTRA="-m 32G"` (the
+  harnesses accept it).
+
+So memory above 4 GB in the E820 alone does not reproduce the X470
+failure. No CSMWrap E820 change was made.
 
 ## 8. X470 test plan (first plan, 2026-10-03)
 
