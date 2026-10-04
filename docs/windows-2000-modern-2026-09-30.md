@@ -704,6 +704,21 @@ files, a temporary bridge until USOS has its own implementation. Staging
 - `usosw2k.inf` writes `PollMode = 1` with ACPI off.
 - The BIOSTAR got usos3 and PollMode by an offline hive edit.
 
+**Run 13 (2026-10-05):** USB input worked until "Installing devices" restarted both xHCI controllers.
+- GUI Setup restores SYSTEM from `system.sav` on every restart, so `PollMode` was gone.
+- The restarted controllers then failed with Code 10.
+- Since `f746754`, usos3 polls by default (`PollMode = 0` turns it off).
+
+**Run 14 (2026-10-05): HARDWARE PASS.** The Windows 2000 SP4 installation completed on the X470, and the USB keyboard and mouse work.
+- Platform: CSM off (CSMWrap), MPS HAL.
+- Drivers: AHCINT usos4, usosrst 1.4 (RTC and HPET fixes), xhci98 1.1.1.0-usos3 polling.
+
+**Open items:**
+- Turn the diagnostics off for release: the AHCINT watchdog/trace, the usosrst rows and RtcDiag.
+- The `xhci98.log` writer never creates its file under 2000 Setup.
+- ACPI through KB979683.
+- Retest NT 5.2 on usos3; until then it stays on usos2.
+
 ## 8. X470 test plan (first plan, 2026-10-03)
 
 
