@@ -77,8 +77,26 @@
 #    with ACPI off; standard = "Standard PC", hal.dll, PIC, one CPU; DATA's
 #    Windows 2000\Unattended\hal-standard.txt selects it). With ACPI kept no
 #    ComputerType is written (Setup's own ACPI choice).
+# 5. User ACPI package (opt-in, an X470 bridge "do zastapienia wlasna
+#    implementacja"): DATA's Systems\Windows\Windows 2000\Unattended\acpi\
+#    (legacy_xp_staging.sh sets USOS_W2K_ACPI_PKG). Needs ACPI kept (with
+#    acpi-off.txt it is refused). Every .sys/.dll in that folder or one
+#    level below is used as the user provided it; nothing else (sources,
+#    READMEs) is read:
+#      - a name the source already has (acpi.sys, halacpi.dll, ... plain or
+#        compressed) replaces that file in $WIN_NT$.~BT and ~LS\I386 (the
+#        compressed copy is removed); no TXTSETUP change;
+#      - a new .sys becomes an extra boot driver exactly like usosrst:
+#        [SourceDisksFiles], [BootBusExtenders.Load] (after usosrst),
+#        [BootBusExtenders], its own [files.<name>] section, DOSNET d1 rows
+#        and a usosw2k.inf service (boot start, group Boot Bus Extender,
+#        ErrorControl 0: a failed start never stops the boot). Name rules:
+#        [a-z0-9_], at most 32 characters, not a USOS driver's name.
+#      A new .dll, two files with one name, or a folder without any .sys or
+#      .dll is refused before anything is written.
 # No Microsoft file is added or changed except the TXTSETUP.SIF and
-# DOSNET.INF copies on the target (and USOS's own WINNT.SIF).
+# DOSNET.INF copies on the target (and USOS's own WINNT.SIF); with a user
+# ACPI package, the user's own files replace the ones they name.
 #   sh w2k_stage.sh apply     (XP_TARGET_ROOT, NT5_SOURCE_DIR=I386)
 usos_w2k_apply() (
     set -eu
@@ -116,6 +134,16 @@ usos_w2k_apply() (
     bt="$XP_TARGET_ROOT/\$WIN_NT\$.~BT"
     ls="$XP_TARGET_ROOT/\$WIN_NT\$.~LS/I386"
     [ -f "$ls/TXTSETUP.SIF" ] || { echo "[W2K_STAGE] STOP: $ls/TXTSETUP.SIF missing"; exit 1; }
+    # The user ACPI package (see 5.): resolved before anything is written.
+    acpipkg=${USOS_W2K_ACPI_PKG:-}
+    pkgplan=
+    USOS_W2K_ACPI_EXTRA=
+    if [ -n "$acpipkg" ]; then
+        [ "$acpi" = on ] || { echo '[W2K_STAGE] STOP: the user ACPI package (Unattended\acpi) needs ACPI on; remove acpi-off.txt or the package'; exit 1; }
+        pkgplan=$(usos_w2k_acpi_pkg_plan "$acpipkg" "$ls") || { echo "$pkgplan"; exit 1; }
+        USOS_W2K_ACPI_EXTRA=$(printf '%s\n' "$pkgplan" | awk -F '\t' '$1 == "extra" { sub(/\.sys$/, "", $2); printf "%s%s", sep, $2; sep = " " }')
+    fi
+    export USOS_W2K_ACPI_EXTRA
     # The WINNT.SIF answers (see 4.; prepare_xp_windows_partition.sh writes
     # them): checked here, before anything is written.
     printf '[Unattended]\r\n' | usos_w2k_answer_sif "$ls/TXTSETUP.SIF" 2>&1 > /dev/null || exit 1
@@ -127,6 +155,15 @@ usos_w2k_apply() (
         if [ "$helper" = on ]; then
             cp "$pkg/usosrst.sys" "$folder/usosrst.sys"
             cmp -s "$pkg/usosrst.sys" "$folder/usosrst.sys"
+        fi
+        # The user ACPI package: replaced and extra files, uncompressed.
+        if [ -n "$pkgplan" ]; then
+            printf '%s\n' "$pkgplan" | while IFS="$(printf '\t')" read -r kind name src; do
+                stem=${name%?}
+                find "$folder" -maxdepth 1 -type f \( -iname "$name" -o -iname "${stem}_" \) -exec rm -f '{}' \;
+                cp "$src" "$folder/$name"
+                cmp -s "$src" "$folder/$name" || exit 1
+            done || { echo "[W2K_STAGE] STOP: cannot copy the user ACPI package into $folder"; exit 1; }
         fi
         if [ "$drv" = ahcint ]; then
             usos_w2k_ahcint_inf "$mode" < "$pkg/ahcint.inf" > "$folder/ahcint.inf" || { echo '[W2K_STAGE] STOP: cannot adapt ahcint.inf'; exit 1; }
@@ -161,8 +198,49 @@ usos_w2k_apply() (
     printf '[W2K_STAGE] APPLIED PASS %s boot+local source, TXTSETUP.SIF PCI\\CC_010601, usosw2k.inf (CriticalDeviceDatabase), %s mode; ACPI %s; HAL %s; WINNT.SIF answers: standard keyboard; usosrst %s\n' \
         "$(usos_w2k_driver_title)" "$mode" "$([ "$acpi" = off ] && echo 'off (ACPIEnable = 0)' || echo 'kept (ACPIEnable unchanged)')" \
         "$(case "$hal" in mps) echo 'MPS Multiprocessor (ComputerType)' ;; standard) echo 'Standard PC (ComputerType)' ;; *) echo 'chosen by Setup' ;; esac)" \
-        "$([ "$helper" = on ] && echo 'on (STOP screen, Setup and text-mode restart via FADT/CF9/8042)' || echo off)$([ "$hpet" = legacy-off ] && echo '; HPET LegacyReplacement off (experiment)')"
+        "$([ "$helper" = on ] && echo 'on (STOP screen, Setup and text-mode restart via FADT/CF9/8042)' || echo off)$([ "$hpet" = legacy-off ] && echo '; HPET LegacyReplacement off (experiment)')$([ -n "$pkgplan" ] && printf '; user ACPI package: %s' "$(printf '%s\n' "$pkgplan" | awk -F '\t' '{ printf "%s%s %s", sep, ($1 == "extra" ? "boot driver" : "replaces"), $2; sep = ", " }')")"
 )
+
+# stdout: the plan for the user ACPI package folder $1 (see 5.) against the
+# local source $2 (~LS\I386), one line per file: kind<TAB>name<TAB>path, kind
+# "replace" (the source has that name, plain or compressed) or "extra" (a
+# new boot driver); names in lower case. A message on stdout and status 1
+# for a refused package (nothing usable, a new .dll, a bad or duplicate
+# name, a USOS driver's name).
+usos_w2k_acpi_pkg_plan() {
+    [ -d "$1" ] || { echo "[W2K_STAGE] STOP: user ACPI package $1 is not a folder"; return 1; }
+    found=$(find "$1" -maxdepth 2 -type f \( -iname '*.sys' -o -iname '*.dll' \) | LC_ALL=C sort)
+    [ -n "$found" ] || { echo '[W2K_STAGE] STOP: the user ACPI package (Unattended\acpi) has no .sys or .dll file (sources are not built on the target)'; return 1; }
+    printf '%s\n' "$found" | {
+        seen=' '
+        out=
+        tab=$(printf '\t')
+        while IFS= read -r path; do
+            name=$(basename "$path" | tr '[:upper:]' '[:lower:]')
+            case "$seen" in *" $name "*) echo "[W2K_STAGE] STOP: user ACPI package has $name twice"; exit 1 ;; esac
+            seen="$seen$name "
+            stem=${name%?}
+            if [ -n "$(find "$2" -maxdepth 1 -type f \( -iname "$name" -o -iname "${stem}_" \) 2>/dev/null)" ]; then
+                kind=replace
+            else
+                case "$name" in
+                    *.dll) echo "[W2K_STAGE] STOP: user ACPI package: $name is not a file of this source (only a new .sys can be added)"; exit 1 ;;
+                esac
+                base=${name%.sys}
+                case "$base" in
+                    ahcint|uniata|usosrst|usosw2k|xhci98) echo "[W2K_STAGE] STOP: user ACPI package: $name is a USOS driver name"; exit 1 ;;
+                esac
+                if [ "${#base}" -gt 32 ] || [ -z "$base" ] || [ -n "$(printf '%s' "$base" | tr -d 'a-z0-9_')" ]; then
+                    echo "[W2K_STAGE] STOP: user ACPI package: $name is not a valid service name ([a-z0-9_], at most 32)"; exit 1
+                fi
+                kind=extra
+            fi
+            out="$out$kind$tab$name$tab$path
+"
+        done
+        printf '%s' "$out"
+    }
+}
 
 # Every output line ends in CRLF, as the NT5 setup files do (BusyBox awk
 # keeps the input CR, other awks drop it; both give the same bytes here).
@@ -184,28 +262,37 @@ usos_w2k_driver_title() {
 # (SETUPLDR loads it from ~BT, the kernel starts it before the storage
 # drivers), [BootBusExtenders] and its own [files.usosrst] section.
 usos_w2k_storage_sif() {
-    awk -v ids="$USOS_W2K_AHCI_IDS" -v drv="${USOS_W2K_DRV:-ahcint}" -v title="$(usos_w2k_driver_title)" -v helper="${USOS_W2K_USOSRST:-on}" '
-        BEGIN { bs = sprintf("%c", 92); q = sprintf("%c", 34); n = split(ids, id, " ") }
+    awk -v ids="$USOS_W2K_AHCI_IDS" -v drv="${USOS_W2K_DRV:-ahcint}" -v title="$(usos_w2k_driver_title)" -v helper="${USOS_W2K_USOSRST:-on}" -v extra="${USOS_W2K_ACPI_EXTRA:-}" '
+        BEGIN { bs = sprintf("%c", 92); q = sprintf("%c", 34); n = split(ids, id, " "); ne = split(extra, ex, " ") }
         { line = $0; sub(/\r$/, "", line); low = tolower(line) }
         index(low, drv) == 1 || low ~ "^[ \t]+" drv || index(low, "pci" bs "cc_010601") || index(low, "usosw2k.inf") || index(low, "usosrst") { dup = 1 }
+        { for (i = 1; i <= ne; i++) if (index(low, ex[i] ".sys") || index(low, ex[i] " ") == 1 || index(low, "[files." ex[i] "]")) dup = 1 }
         { print line "\r" }
         low == "[sourcedisksfiles]" && !f {
             print drv ".sys = 1,,,,,,4_,4,1,,,1,4\r"; print drv ".inf = 1,,,,,,,20,0,0\r"; print "usosw2k.inf = 1,,,,,,_x,20,3,3\r"
             if (helper == "on") print "usosrst.sys = 1,,,,,,4_,4,1,,,1,4\r"
+            for (i = 1; i <= ne; i++) print ex[i] ".sys = 1,,,,,,4_,4,1,,,1,4\r"
             f = 1
         }
         low == "[hardwareidsdatabase]" && !h { for (i = 1; i <= n; i++) print "PCI" bs id[i] " = " q drv q "\r"; h = 1 }
         low == "[scsi.load]" && !l { print drv " = " drv ".sys,4\r"; l = 1 }
         low == "[scsi]" && !s { print drv " = " q "AHCI SATA Controller (" title ", USOS)" q "\r"; s = 1 }
         low == "[hiveinfs.fresh]" && !r { print "AddReg = usosw2k.inf,AddReg\r"; r = 1 }
-        helper == "on" && low == "[bootbusextenders.load]" && !bl { print "usosrst  = usosrst.sys\r"; bl = 1 }
-        helper == "on" && low == "[bootbusextenders]" && !bb { print "usosrst  = " q "USOS STOP screen and restart helper" q ",files.usosrst,usosrst\r"; bb = 1 }
+        low == "[bootbusextenders.load]" && !bl {
+            if (helper == "on") print "usosrst  = usosrst.sys\r"
+            for (i = 1; i <= ne; i++) print ex[i] " = " ex[i] ".sys\r"
+            bl = 1
+        }
+        low == "[bootbusextenders]" && !bb {
+            if (helper == "on") print "usosrst  = " q "USOS STOP screen and restart helper" q ",files.usosrst,usosrst\r"
+            for (i = 1; i <= ne; i++) print ex[i] " = " q "User ACPI package driver " ex[i] ".sys (DATA, USOS)" q ",files." ex[i] "," ex[i] "\r"
+            bb = 1
+        }
         END {
             if (dup || !(f && h && l && s && r)) exit 3
-            if (helper == "on") {
-                if (!(bl && bb)) exit 3
-                print "\r"; print "[files.usosrst]\r"; print "usosrst.sys,4\r"
-            }
+            if ((helper == "on" || ne) && !(bl && bb)) exit 3
+            if (helper == "on") { print "\r"; print "[files.usosrst]\r"; print "usosrst.sys,4\r" }
+            for (i = 1; i <= ne; i++) { print "\r"; print "[files." ex[i] "]\r"; print ex[i] ".sys,4\r" }
         }
     '
 }
@@ -214,7 +301,7 @@ usos_w2k_storage_sif() {
 # PnpInterface for AHCINT and the CriticalDeviceDatabase entries of
 # USOS_W2K_AHCI_IDS. Loaded through TXTSETUP.SIF [HiveInfs.Fresh].
 usos_w2k_hive_inf() {
-    awk -v ids="$USOS_W2K_AHCI_IDS" -v mode="${1:-legacy}" -v drv="${USOS_W2K_DRV:-ahcint}" -v helper="${USOS_W2K_USOSRST:-on}" -v acpi="${USOS_W2K_ACPI:-on}" -v hpet="${USOS_W2K_HPET:-keep}" '
+    awk -v ids="$USOS_W2K_AHCI_IDS" -v mode="${1:-legacy}" -v drv="${USOS_W2K_DRV:-ahcint}" -v helper="${USOS_W2K_USOSRST:-on}" -v acpi="${USOS_W2K_ACPI:-on}" -v hpet="${USOS_W2K_HPET:-keep}" -v extra="${USOS_W2K_ACPI_EXTRA:-}" '
         BEGIN {
             bs = sprintf("%c", 92); q = sprintf("%c", 34); n = split(ids, id, " ")
             base = "HKLM," q "SYSTEM" bs "CurrentControlSet" bs
@@ -254,6 +341,16 @@ usos_w2k_hive_inf() {
                 # Experiment (DATA hpet-legacy-off.txt): usosrst clears HPET
                 # LegacyReplacement on every later boot too.
                 if (hpet == "legacy-off") print base "Services" bs "usosrst" bs "Parameters" q "," q "HpetLegacyOff" q ",0x00010001,1\r"
+            }
+            # The extra drivers of the user ACPI package (see 5.): the same boot service rows.
+            ne = split(extra, ex, " ")
+            for (i = 1; i <= ne; i++) {
+                svc = base "Services" bs ex[i] q ","
+                print svc q "Type" q ",0x00010001,1\r"
+                print svc q "Start" q ",0x00010001,0\r"
+                print svc q "ErrorControl" q ",0x00010001,0\r"
+                print svc q "Group" q ",0x00000000," q "Boot Bus Extender" q "\r"
+                print svc q "ImagePath" q ",0x00020000," q "System32" bs "DRIVERS" bs ex[i] ".sys" q "\r"
             }
             for (i = 1; i <= n; i++) {
                 key = tolower(id[i])
@@ -400,13 +497,15 @@ usos_w2k_ahcint_inf() {
 # (and d1,usosrst.sys unless USOS_W2K_USOSRST=off) in the first [Files] and
 # [FloppyFiles.1] blocks.
 usos_w2k_dosnet() {
-    awk -v drv="${USOS_W2K_DRV:-ahcint}" -v helper="${USOS_W2K_USOSRST:-on}" '
+    awk -v drv="${USOS_W2K_DRV:-ahcint}" -v helper="${USOS_W2K_USOSRST:-on}" -v extra="${USOS_W2K_ACPI_EXTRA:-}" '
+        BEGIN { ne = split(extra, ex, " ") }
         { line = $0; sub(/\r$/, "", line); low = tolower(line) }
         index(low, drv) || index(low, "usosw2k") || index(low, "usosrst") { dup = 1 }
+        { for (i = 1; i <= ne; i++) if (index(low, "d1," ex[i] ".sys")) dup = 1 }
         { print line "\r" }
         low == "[files]" && !f { rowsfor(); f = 1 }
         low == "[floppyfiles.1]" && !b { rowsfor(); b = 1 }
-        function rowsfor() { print "d1," drv ".sys\r"; print "d1," drv ".inf\r"; print "d1,usosw2k.inf\r"; if (helper == "on") print "d1,usosrst.sys\r" }
+        function rowsfor() { print "d1," drv ".sys\r"; print "d1," drv ".inf\r"; print "d1,usosw2k.inf\r"; if (helper == "on") print "d1,usosrst.sys\r"; for (i = 1; i <= ne; i++) print "d1," ex[i] ".sys\r" }
         END { if (dup || !(f && b)) exit 3 }
     '
 }

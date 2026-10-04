@@ -475,8 +475,15 @@ usos_legacy_xp_staging() {
     # hpet-legacy-off.txt: usosrst clears HPET LegacyReplacement (X470 clock
     # experiment, docs/windows-2000-modern-2026-09-30.md 7c).
     if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/hpet-legacy-off.txt" ]; then USOS_W2K_HPET=legacy-off; else USOS_W2K_HPET=keep; fi
-    export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL USOS_W2K_HPET
-    printf '[W2K_DRIVERS] storage %s, ACPI %s, HAL %s, HPET %s, usosrst, xhci98 x86; the XP bundle is NT 5.1 only\n' "$USOS_W2K_STORAGE" "$USOS_W2K_ACPI" "$USOS_W2K_HAL" "$USOS_W2K_HPET"
+    # Unattended\acpi\ (the user's own ACPI package, w2k_stage.sh 5.): ACPI
+    # stays on, so it never combines with acpi-off.txt.
+    USOS_W2K_ACPI_PKG=
+    if [ -d "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/acpi" ]; then
+        [ "$USOS_W2K_ACPI" = on ] || stop 'Windows 2000: acpi-off.txt and the user ACPI package (Unattended\acpi) exclude each other; remove one. No target write occurred'
+        USOS_W2K_ACPI_PKG="/mnt/data/Systems/Windows/$NT5_NAME/Unattended/acpi"
+    fi
+    export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL USOS_W2K_HPET USOS_W2K_ACPI_PKG
+    printf '[W2K_DRIVERS] storage %s, ACPI %s, HAL %s, HPET %s, usosrst, xhci98 x86%s; the XP bundle is NT 5.1 only\n' "$USOS_W2K_STORAGE" "$USOS_W2K_ACPI" "$USOS_W2K_HAL" "$USOS_W2K_HPET" "$([ -n "$USOS_W2K_ACPI_PKG" ] && echo ', user ACPI package')"
     else
     # XP x64 (NT 5.2 amd64): GenAHCI on the system's own StorPort
     # (nt5_storage_stage.sh, applied to the target after the source copy).

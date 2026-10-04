@@ -284,6 +284,84 @@ class W2kStorage(unittest.TestCase):
                 self.assertNotEqual(self.apply(t).returncode, 0)
                 self.assertEqual((ls / 'TXTSETUP.SIF').read_bytes(), sif)
 
+    def test_user_acpi_package(self):
+        # DATA Unattended\acpi\ (w2k_stage.sh 5.): a new .sys is an extra boot driver
+        # (usosrst-style rows after usosrst), a name the source has replaces that file
+        # (compressed copy removed), sources/READMEs are ignored; ACPI stays on.
+        import build_xp_uefi_csm_trial as builder
+        pkg = builder.w2k_driver_files()
+        with tempfile.TemporaryDirectory() as tmp:
+            t = Path(tmp)
+            bt, ls = self.stand_in(t)
+            for folder in (bt, ls):
+                (folder / 'ACPI.SY_').write_bytes(b'stock')
+            acpi = t / 'acpi'
+            (acpi / 'TestX470').mkdir(parents=True)
+            (acpi / 'TestX470/acpi_w2k.sys').write_bytes(b'MZ user driver')
+            (acpi / 'acpi.sys').write_bytes(b'MZ user acpi')
+            (acpi / 'README.txt').write_bytes(b'readme')
+            (acpi / 'acpi_w2k_main.c').write_bytes(b'int x;')
+            env = f"USOS_W2K_ACPI_PKG='{posix(acpi)}'"
+            r = self.apply(t, env)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn(b'; user ACPI package: boot driver acpi_w2k.sys, replaces acpi.sys', r.stdout)
+            self.assertIn(b'ACPI kept', r.stdout)
+            extra = 'USOS_W2K_ACPI_EXTRA=acpi_w2k'
+            sif = run_fn(f'{extra} usos_w2k_storage_sif', W2K_TXTSETUP).stdout
+            for folder in (bt, ls):
+                self.assertEqual((folder / 'acpi_w2k.sys').read_bytes(), b'MZ user driver')
+                self.assertEqual((folder / 'acpi.sys').read_bytes(), b'MZ user acpi')
+                self.assertFalse((folder / 'ACPI.SY_').exists())
+                self.assertFalse((folder / 'README.txt').exists())
+                self.assertEqual((folder / 'TXTSETUP.SIF').read_bytes(), sif)
+                self.assertEqual((folder / 'usosw2k.inf').read_bytes(), run_fn(f'{extra} usos_w2k_hive_inf', b'').stdout)
+            out = rows(sif)
+            self.assertIn('acpi_w2k.sys = 1,,,,,,4_,4,1,,,1,4', out)
+            load = out.index('[BootBusExtenders.Load]')
+            self.assertEqual(out[load + 1:load + 3], ['usosrst  = usosrst.sys', 'acpi_w2k = acpi_w2k.sys'])
+            bb = out.index('[BootBusExtenders]')
+            self.assertEqual(out[bb + 2], 'acpi_w2k = "User ACPI package driver acpi_w2k.sys (DATA, USOS)",files.acpi_w2k,acpi_w2k')
+            self.assertEqual(out[-7:], ['', '[files.usosrst]', 'usosrst.sys,4', '', '[files.acpi_w2k]', 'acpi_w2k.sys,4', ''])
+            self.assertIn('ACPIEnable = 2', out)
+            self.assertEqual(run_fn(f'{extra} usos_w2k_storage_sif', sif).returncode, 3)
+            # Without usosrst the extra driver still gets its rows.
+            alone = rows(run_fn(f'{extra} USOS_W2K_USOSRST=off usos_w2k_storage_sif', W2K_TXTSETUP).stdout)
+            self.assertEqual(alone[alone.index('[BootBusExtenders.Load]') + 1], 'acpi_w2k = acpi_w2k.sys')
+            svc = 'HKLM,"SYSTEM\\CurrentControlSet\\Services\\acpi_w2k",'
+            hive = rows((ls / 'usosw2k.inf').read_bytes())
+            for row in ('"Type",0x00010001,1', '"Start",0x00010001,0', '"ErrorControl",0x00010001,0',
+                        '"Group",0x00000000,"Boot Bus Extender"', '"ImagePath",0x00020000,"System32\\DRIVERS\\acpi_w2k.sys"'):
+                self.assertIn(svc + row, hive)
+            dosnet = (ls / 'DOSNET.INF').read_bytes()
+            self.assertEqual(dosnet.count(b'd1,acpi_w2k.sys\r\n'), 2)
+            self.assertEqual(run_fn(f'{extra} usos_w2k_dosnet', dosnet).returncode, 3)
+            # The default (no package) is unchanged by the new code.
+            self.assertNotIn(b'acpi_w2k', run_fn('usos_w2k_storage_sif', W2K_TXTSETUP).stdout)
+            self.assertEqual((bt / 'ahcint.sys').read_bytes(), pkg['ahcint.sys'])
+        # Refusals, before anything is written.
+        for setup, env2, msg in (
+                (lambda a: None, 'USOS_W2K_ACPI=off', b'needs ACPI on'),
+                (lambda a: (a / 'x.txt').write_bytes(b'x'), '', b'has no .sys or .dll file'),
+                (lambda a: (a / 'newhal.dll').write_bytes(b'MZ'), '', b'newhal.dll is not a file of this source'),
+                (lambda a: (a / 'usosrst.sys').write_bytes(b'MZ'), '', b'usosrst.sys is a USOS driver name'),
+                (lambda a: (a / 'bad-name.sys').write_bytes(b'MZ'), '', b'is not a valid service name'),
+                (lambda a: ((a / 'd').mkdir(), (a / 'd/one.sys').write_bytes(b'MZ'), (a / 'ONE.SYS').write_bytes(b'MZ')), '', b'has one.sys twice')):
+            with tempfile.TemporaryDirectory() as tmp:
+                t = Path(tmp)
+                bt, ls = self.stand_in(t)
+                acpi = t / 'acpi'
+                acpi.mkdir()
+                (acpi / 'ok.sys').write_bytes(b'MZ') if msg == b'needs ACPI on' else setup(acpi)
+                r = self.apply(t, f"{env2} USOS_W2K_ACPI_PKG='{posix(acpi)}'")
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn(msg, r.stdout)
+                self.assertEqual((ls / 'TXTSETUP.SIF').read_bytes(), W2K_TXTSETUP)
+                self.assertFalse((bt / 'ahcint.sys').exists())
+        stage = (ROOT / 'tools/legacy_xp_staging.sh').read_text()
+        self.assertIn('USOS_W2K_ACPI_PKG="/mnt/data/Systems/Windows/$NT5_NAME/Unattended/acpi"', stage)
+        self.assertIn("acpi-off.txt and the user ACPI package (Unattended\\acpi) exclude each other", stage)
+        self.assertIn('export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL USOS_W2K_HPET USOS_W2K_ACPI_PKG', stage)
+
     def test_acpi_off_isapnp(self):
         # ACPI off: isapnp stays a text-mode boot bus extender (text mode needs it
         # for the keyboard); only the installed system's Start = 4 comes from usosw2k.inf.

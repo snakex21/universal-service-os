@@ -601,6 +601,50 @@ Rows 9-10, written once at load in text mode:
 - `leg:0` and `t` ≪ `w`: check `rte` pin 2 (masked, or the wrong vector or
   trigger) and the `pit` status (mode 2/3, counting).
 
+## 7d. User ACPI package (opt-in, 2026-10-04)
+
+DATA `Systems\Windows\Windows 2000\Unattended\acpi\`: the user's own ACPI
+files, a temporary bridge until USOS has its own implementation. Staging
+(`w2k_stage.sh` section 5):
+- ACPI stays on (`ACPIEnable = 2`). Combined with `acpi-off.txt` the
+  preparation stops before writing anything.
+- Every `.sys`/`.dll` in that folder or one level below is used exactly as
+  provided. Nothing else in the folder (sources, READMEs) is read.
+  - A name the source already has (for example `acpi.sys` or `halacpi.dll`)
+    replaces that file in `$WIN_NT$.~BT` and `~LS\I386`. The compressed
+    copy is removed.
+  - A new `.sys` becomes an extra boot driver set up like usosrst. It gets
+    TXTSETUP `[BootBusExtenders(.Load)]` rows after usosrst, its own
+    `[files.<name>]` section, DOSNET rows, and a boot-start service with
+    ErrorControl 0 in `usosw2k.inf`.
+- A new `.dll`, a duplicate name, or a folder with no binaries is refused.
+- AHCINT usos4, usosrst 1.3 and the unattended keyboard answers are
+  unchanged.
+
+**First package, `acpi_w2k_x470` Stage0 (user's GPL source, 2026-10-04):**
+- It is a separate WDM driver, `acpi_w2k.sys`. It does not replace the
+  stock `acpi.sys`; the user's README asks for exactly that in Stage0.
+- USOS built it with WDK 7.1 (x86 WXP environment). The C sources are
+  unchanged; only the build glue was adapted:
+  - `_WIN32_WINNT`/`WINVER 0x0500` conflict with that environment and were
+    dropped.
+  - `DRIVERTYPE=WDM` was dropped. With it, WDK 7.1 silently discarded the
+    `HalGetInterruptVector` import, and the call became `call [ImageBase]`.
+- All 18 imports resolve on the 2000 SP4 ntoskrnl/ntkrnlmp and on all six
+  HALs.
+- It is not bound to any device, so only its DriverEntry runs. That code
+  reads the RSDP, RSDT/XSDT, FADT, DSDT header and MADT, sends ACPI_ENABLE
+  if SCI_EN is clear, and writes its markers to:
+  - VGA text rows 0-4, top left, two yellow-on-blue hex digits per row;
+  - port 80h;
+  - COM1.
+- Markers: `A0`-`AB` mean DriverEntry got through. `EE` followed by a code
+  is a table failure. AddDevice and START never run (no device binds the
+  driver), so `AC`-`AE` are not expected.
+- In text mode it starts after the stock `acpi.sys` (SETUPLDR loads ACPI
+  first), the same as usosrst. So if the stock `acpi.sys` hangs, these
+  markers will not appear either.
+
 ## 8. X470 test plan (first plan, 2026-10-03)
 
 
