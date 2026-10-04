@@ -1,4 +1,4 @@
-xhci98 1.1.1.0-usos2 - MODIFIED version of xhci98 1.1.1.0 (GPL-2.0-only)
+xhci98 1.1.1.0-usos3 - MODIFIED version of xhci98 1.1.1.0 (GPL-2.0-only)
 
 This is NOT an upstream release. It was modified by the Universal Service OS
 (USOS) project on 2026-09-29 (GPL-2.0 section 2a notice). Upstream:
@@ -8,10 +8,10 @@ USOS, not upstream.
 
 Corresponding source: the upstream tag tarball
 (tools/vendor/xhci98/1.1.1.0-src/, pinned in ../1.1.1.0/SOURCES.txt) plus
-patches/0001-usos1-*.patch and patches/0002-usos2-*.patch, applied in order
+patches/0001-usos1-*.patch, patches/0002-usos2-*.patch and patches/0003-usos3-*.patch, applied in order
 with "git apply" in the unpacked xhci98-1.1.1.0 directory; build.cmd does both and
 builds with WDK 7.1 (toolchain.txt). Every changed spot in the source carries
-a "MODIFIED (USOS 1.1.1.0-usos1)" or "(... usos2)" comment; src/xhci_usos.c is new.
+a "MODIFIED (USOS 1.1.1.0-usos1)", "(... usos2)" or "(... usos3)" comment; src/xhci_usos.c is new.
 
 Why: on an ASRock X470 + Ryzen 7 5700X (Server 2003 x86 SP2 under CSMWrap)
 xhci98 1.1.1.0 started the Promontory chipset xHCI (1022:43D0) but never the
@@ -62,3 +62,21 @@ Changes:
 Scope: built for NT 5.2 only (WDK 7.1 WNET target, x86 and amd64). Upstream's
 x86 build also serves Windows 98/ME/2000; this one does not and is not
 tested there.
+
+ 7. usos3 (after the X470 Windows 2000 run of 2026-10-05): under the 2000
+    MPS HAL (CSMWrap's MP table has no PCI INTx entries) PCI.SYS gives both
+    xHCI functions no interrupt resource, so usbport refused the start
+    (Code 10, no xhci98.log). Services\xhci98\Parameters\PollMode = 1
+    (DWORD) now registers without USB_MINIPORT_FLAGS_INTERRUPT and drops the
+    interrupt bit from the start's resource check; USBCMD.INTE/IMAN.IE are
+    never enabled and PCI INTx is disabled (command bit 10). A periodic
+    kernel timer (4 ms, i.e. every clock tick) asks usbport for a soft
+    interrupt (USBPORT_INVALIDATE_CONTROLLER_SOFT_INTERRUPT), which runs the
+    normal InterruptDpc path and drains the event ring; if usbport answers
+    eight soft interrupts in a row with no InterruptDpc, the timer runs the
+    miniport's InterruptDpc body itself. Without PollMode (default) the
+    same timer only steps in when the event ring has held events for three
+    ticks with no claimed interrupt (a routed but dead line). Counters
+    usos.poll.* (ticks, softints, direct, rescues, dpcs) are logged at stop;
+    usos.poll.mode at start. src/xhci_usos.c, src/xhci_dispatch.c,
+    src/xhci.h, src/xhci_hw.h; version string 1.1.1.0-usos3.

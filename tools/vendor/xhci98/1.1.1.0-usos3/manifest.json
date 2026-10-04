@@ -1,0 +1,30 @@
+{
+  "name": "xhci98",
+  "version": "1.1.1.0-usos3",
+  "modified": "MODIFIED version of xhci98 1.1.1.0: PCI D0 + Memory Space/Bus Master Enable before the bus-master gate (AMD CPU xHCI 1022:149C), CNR wait, 10 s reset timeout, forced USBLEGSUP handoff, 16 Supported Protocol groups (was 4), xECP chain log, scratchpad cap 256, %SystemRoot%\\xhci98.log file sink, polling engine for controllers without a usable interrupt (Parameters PollMode, soft-interrupt timer) (MODIFIED.txt)",
+  "upstream": "https://github.com/yeokm1/xhci98",
+  "tag": "v1.1.1.0",
+  "commit": "7d0dd9d440e9716a87e0882f905bf8e99fa443ac",
+  "licence": "GPL-2.0-only",
+  "source_archive": {
+    "file": "../1.1.1.0-src/xhci98-7d0dd9d440e9716a87e0882f905bf8e99fa443ac.tar.gz",
+    "sha256": "4f2653d00ee757c5edefcda6f7101526edf5b0778a07ebf5babbb59805088af3",
+    "note": "upstream tag tarball; the usos3 source is this archive plus patches/*.patch applied in order with git apply (build.cmd)"
+  },
+  "patches": {
+    "0001-usos1-amd-cpu-xhci-start-and-file-log.patch": "bbd1fe68948c247fc5eacecd4c207179f3d55219c4f9fc54e7d6f6665dc208c7",
+    "0002-usos2-sixteen-protocol-groups-and-cap-chain-log.patch": "9d35d70968832feb3ff493fa1eaebeeddaf18ab6fff92e45c25b6c52851f724a",
+    "0003-usos3-polling-engine.patch": "d54af4f58facf68a399375f073bfeccc8d9c5b1ab899ea4f8d070da39d3b9ff0"
+  },
+  "toolchain": "WDK 7.1 7600.16385.1, GRMWDK_EN_7600_1.ISO sha256 5edc723b50ea28a070cad361dd0927df402b7a861a036bbcf11d27ebba77657d (toolchain.txt)",
+  "files": {
+    "LICENSE": "a5d0a99d4194fbb3dd913bba267dc71d4088691ea920f92fb6354d315f3f73be",
+    "MODIFIED.txt": "646dcaa4c2d5507b3817a2fb9e319f67c0f77986396922e5de7f49e80806ed34",
+    "toolchain.txt": "c90d0b2b41e5cb2d957ee74ea78222da5eb9e272d596623ef2a0c3ea71747a7f",
+    "build.cmd": "544145b87ede557353312e43288a996c6100882faa269183a0e2f180fcc6b384",
+    "release-x86/xhci98.sys": "40af654d8d4a4b4f6307e64706a9644710c6534b379d7c9041e554c43881e695",
+    "release-x86/xhci98.inf": "88ecbce637a81c361f8ae0c35df58fc03429aeb860e3ad62164185d1f9c6b5b8",
+    "release-x64/xhci98.sys": "c1f95c6914e8358cc1c5e5c907446fce357c29e3261bfa81657554d65272f979",
+    "release-x64/xhci98.inf": "350a2dd077bb650876291f03963d496fb39c1554c8e11b315b89f4e0fa1a74b7"
+  }
+}

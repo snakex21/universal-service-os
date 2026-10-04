@@ -14,7 +14,7 @@ local-source copy (`prepare_xp_ntfs_target.sh`):
 |---|---|---|---|
 | AHCI (X470 `1022:43C8`, no IDE mode) | **AHCINT 1.3.0.0-usos1**: i386 ScsiPort miniport, MODIFIED by USOS (real FLUSH CACHE, FUA, caching mode page), **legacy (non-PnP) mode** | GPL-3.0, bundled; upstream and patched source in `tools/vendor/ahcint/` | `tools/w2k_stage.sh` |
 | ACPI (2000's `ACPI.SYS` 5.0.2195, ACPI 1.0b era) | **kept** (Microsoft's rule, ACPI HAL). Fallback for a STOP 0xA5: `acpi-off.txt` in `Systems\Windows\Windows 2000\Unattended` on DATA -> `ACPIEnable = 0` (MPS HAL) | nothing to bundle | `tools/w2k_stage.sh`, `legacy_xp_staging.sh` |
-| USB (xHCI only: CPU `1022:149C`, chipset `43D0`) | **xhci98 1.1.1.0-usos2** x86 (the NT 5.2 build), GUI-mode PnP install, forced USB/HID stack incl. `usbhub20.sys`; skipped on media without `usbport.sys` (2000 RTM) | GPL-2.0-only, bundled (already in the 1.1 package) | `tools/nt52_usb_stage.sh` (2000 mode) |
+| USB (xHCI only: CPU `1022:149C`, chipset `43D0`) | **xhci98 1.1.1.0-usos3** x86 (the NT 5.2 build; polls under the MPS HAL), GUI-mode PnP install, forced USB/HID stack incl. `usbhub20.sys`; skipped on media without `usbport.sys` (2000 RTM) | GPL-2.0-only, bundled (already in the 1.1 package) | `tools/nt52_usb_stage.sh` (2000 mode) |
 | Display | VGA/VESA (inbox) | | |
 | Answer file | the existing `w2k_selected_partition_uefi_csm.sif` (`\WINNT`, `ProductID`) | | unchanged |
 | Sources | Professional SP4, and Server / Advanced Server at any service pack (`CDROM_IS.5` / `CDROM_IA.5`) | | `probe_nt5_source.sh` |
@@ -692,6 +692,17 @@ files, a temporary bridge until USOS has its own implementation. Staging
 **Side effect of the readback:**
 - Every Windows 10 mount of the BIOSTAR discards Windows 2000's NTFS log.
 - chkdsk then removes index entries that were never committed (SAM, SECURITY, `*.LOG`) or recovers orphans.
+
+**Run 12 (2026-10-05):** GUI Setup passed "Installing devices", but both xHCI controllers (149C, 43D0) ended with Code 10, and there was no USB input and no `xhci98.log`.
+- Their requirement lists (LogConf `BasicConfigVector`) hold memory only and no interrupt: under the MPS HAL, the CSMWrap MP table has no PCI INTx entries.
+- usbport refuses a start without an interrupt when the miniport declares `USB_MINIPORT_FLAGS_INTERRUPT`.
+
+**xhci98 1.1.1.0-usos3** (patch 0003, `MODIFIED.txt` section 7):
+- `Services\xhci98\Parameters` `PollMode = 1` registers without that flag, and a 4 ms periodic timer requests usbport soft interrupts.
+- If usbport does not answer them, the timer runs InterruptDpc directly.
+- Interrupt mode keeps the same timer as a rescue for a routed but dead line.
+- `usosw2k.inf` writes `PollMode = 1` with ACPI off.
+- The BIOSTAR got usos3 and PollMode by an offline hive edit.
 
 ## 8. X470 test plan (first plan, 2026-10-03)
 

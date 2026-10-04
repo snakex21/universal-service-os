@@ -144,6 +144,10 @@ class W2kStorage(unittest.TestCase):
             self.assertIn(k + '"ClassGUID",0x00000000,"' + cls + '"', out)
         self.assertNotIn(b'cc_0c0330', run_fn('usos_w2k_hive_inf', b'').stdout)
         self.assertNotIn(b'mouhid', run_fn('USOS_W2K_USB=on usos_w2k_hive_inf', b'').stdout)   # DRIVER.CAB only
+        # MPS HAL (ACPI off): no interrupt resource for the xHCI functions, so xhci98 usos3 polls.
+        poll = base + 'Services\\xhci98\\Parameters","PollMode",0x00010001,1'
+        self.assertIn(poll, rows(run_fn('USOS_W2K_USB=on USOS_W2K_ACPI=off usos_w2k_hive_inf', b'').stdout))
+        self.assertNotIn(poll, out)
 
     def test_hive_inf(self):
         r = run_fn('usos_w2k_hive_inf', b'')

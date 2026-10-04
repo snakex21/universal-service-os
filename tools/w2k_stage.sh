@@ -116,6 +116,10 @@
 #    in DRIVER.CAB/SP4.CAB, so GUI-mode PnP installs it later. The answer
 #    file also gets [GuiUnattended] OemSkipWelcome=1 (the Welcome page waits
 #    for a click before "Installing devices") unless it already decides.
+#    With ACPI off (MPS HAL) the xHCI functions get no interrupt resource, so
+#    usosw2k.inf also writes Services\xhci98\Parameters PollMode = 1:
+#    xhci98 1.1.1.0-usos3 then registers without an interrupt and collects
+#    its events from a periodic timer.
 # No Microsoft file is added or changed except the TXTSETUP.SIF and
 # DOSNET.INF copies on the target (and USOS's own WINNT.SIF); with a user
 # ACPI package, the user's own files replace the ones they name.
@@ -386,6 +390,10 @@ usos_w2k_hive_inf() {
                     print svc q "Group" q ",0x00000000," q fl[2] q "\r"
                     print svc q "ImagePath" q ",0x00020000," q "System32" bs "DRIVERS" bs fl[4] q "\r"
                 }
+                # MPS HAL (ACPI off): PCI.SYS gives the xHCI functions no
+                # interrupt (the CSMWrap MP table has no PCI INTx entries; X470
+                # 2026-10-05, Code 10), so xhci98 1.1.1.0-usos3 polls.
+                if (acpi == "off") print base "Services" bs "xhci98" bs "Parameters" q "," q "PollMode" q ",0x00010001,1\r"
                 usbc = "{36FC9E60-C465-11CF-8056-444553540000}"
                 nc = split("pci#cc_0c0330:xhci98:" usbc " usb#root_hub20:usbhub20:" usbc " usb#hubclass:usbhub20:" usbc " usb#class_03:HidUsb:{745a17a0-74d3-11d0-b6fe-00a0c90f57da} hid_device_system_keyboard:kbdhid:{4D36E96B-E325-11CE-BFC1-08002BE10318}", cv, " ")
                 for (i = 1; i <= nc; i++) {
