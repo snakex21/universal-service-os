@@ -99,17 +99,18 @@ index 62ce3c7..71b68ed 100644
  
          /*
 diff --git a/src/xhci_hw.h b/src/xhci_hw.h
-index 93c2352..c44818f 100644
+index 93c2352..eb26141 100644
 --- a/src/xhci_hw.h
 +++ b/src/xhci_hw.h
-@@ -1713,5 +1713,20 @@ VOID XhciUsosFileAppend(const UCHAR *bytes, ULONG count);
+@@ -1713,5 +1713,21 @@ VOID XhciUsosFileAppend(const UCHAR *bytes, ULONG count);
  VOID XhciUsosFileAppendText(const char *text);
  VOID XhciUsosFileHeader(PXHCI_EXTENSION ext, ULONG reason);
  VOID XhciUsosFileKick(VOID);
 +/*
 + * usos3: the polling engine. XhciUsosPollMode is settled once in DriverEntry
 + * (XhciUsosReadPollMode, PASSIVE_LEVEL) from Services\xhci98\Parameters
-+ * PollMode: 0 (default) interrupts with a stall rescue, 1 polling only.
++ * PollMode: 1 (default, also when absent) polling only, 0 interrupts with a
++ * stall rescue.
 + * XhciUsosPollStart/Stop: PASSIVE_LEVEL (StartController/StopController).
 + */
 +extern ULONG XhciUsosPollMode;
@@ -124,7 +125,7 @@ index 93c2352..c44818f 100644
  
  #endif /* XHCI_HW_H */
 diff --git a/src/xhci_usos.c b/src/xhci_usos.c
-index 4b60d3c..753432b 100644
+index 4b60d3c..4bdcd97 100644
 --- a/src/xhci_usos.c
 +++ b/src/xhci_usos.c
 @@ -28,6 +28,21 @@
@@ -134,8 +135,8 @@ index 4b60d3c..753432b 100644
 + * 3. (usos3) A polling engine for controllers whose interrupt never arrives:
 + *    on the X470 under Windows 2000's MPS HAL (CSMWrap's MP table has no PCI
 + *    INTx entries) PCI.SYS gives the xHCI functions no interrupt resource at
-+ *    all, so usbport refused the start (Code 10). With
-+ *    Services\xhci98\Parameters\PollMode = 1 the driver registers without
++ *    all, so usbport refused the start (Code 10). By default (no
++ *    Services\xhci98\Parameters\PollMode = 0) the driver registers without
 + *    the INTERRUPT miniport flag (usbport then neither requires nor connects
 + *    one), keeps USBCMD.INTE and PCI INTx off, and a periodic kernel timer
 + *    asks usbport for a soft interrupt on every tick
@@ -168,7 +169,7 @@ index 4b60d3c..753432b 100644
      if (wanted != command) {
          (VOID)XhciWritePciConfig(ext, XHCI_PCI_COMMAND, &wanted,
                                   sizeof(wanted));
-@@ -500,6 +520,171 @@ VOID XhciUsosFileKick(VOID)
+@@ -500,6 +520,180 @@ VOID XhciUsosFileKick(VOID)
      ZwClose(thread);
  }
  
@@ -182,7 +183,16 @@ index 4b60d3c..753432b 100644
 +
 +ULONG XhciUsosPollMode;
 +
-+/* DriverEntry, before registration. IRQL: PASSIVE_LEVEL. */
++/*
++ * DriverEntry, before registration. IRQL: PASSIVE_LEVEL.
++ *
++ * Polling is the DEFAULT of this build (USOS stages usos3 only for Windows
++ * 2000): the interrupt flag is fixed at registration, before any controller's
++ * resources are known, and a registry value cannot be relied on - GUI-mode
++ * Setup restores the SYSTEM hive from system.sav whenever it restarts, and
++ * the X470 lost USB input that way when "Installing devices" restarted both
++ * controllers (2026-10-05). PollMode = 0 (DWORD) turns interrupts back on.
++ */
 +VOID XhciUsosReadPollMode(PUNICODE_STRING registryPath)
 +{
 +    WCHAR buffer[200];
@@ -194,7 +204,7 @@ index 4b60d3c..753432b 100644
 +    PKEY_VALUE_PARTIAL_INFORMATION value;
 +    ULONG length;
 +
-+    XhciUsosPollMode = 0;
++    XhciUsosPollMode = 1;
 +    if (registryPath == NULL || registryPath->Buffer == NULL) {
 +        return;
 +    }
@@ -216,8 +226,8 @@ index 4b60d3c..753432b 100644
 +    if (NT_SUCCESS(ZwQueryValueKey(key, &name, KeyValuePartialInformation,
 +                                   info, sizeof(info), &length)) &&
 +        value->Type == REG_DWORD && value->DataLength == sizeof(ULONG) &&
-+        *(PULONG)value->Data == 1) {
-+        XhciUsosPollMode = 1;
++        *(PULONG)value->Data == 0) {
++        XhciUsosPollMode = 0;
 +    }
 +    ZwClose(key);
 +}
@@ -340,7 +350,7 @@ index 4b60d3c..753432b 100644
  #else /* XHCI_HOST_TEST */
  
  /* The host suite has no PCI, no file system and no threads. */
-@@ -511,5 +696,8 @@ VOID XhciUsosFileAppendText(const char *text) { (void)text; }
+@@ -511,5 +705,8 @@ VOID XhciUsosFileAppendText(const char *text) { (void)text; }
  VOID XhciUsosFileHeader(PXHCI_EXTENSION ext, ULONG reason)
  { (void)ext; (void)reason; }
  VOID XhciUsosFileKick(VOID) { }

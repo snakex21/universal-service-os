@@ -66,15 +66,16 @@ tested there.
  7. usos3 (after the X470 Windows 2000 run of 2026-10-05): under the 2000
     MPS HAL (CSMWrap's MP table has no PCI INTx entries) PCI.SYS gives both
     xHCI functions no interrupt resource, so usbport refused the start
-    (Code 10, no xhci98.log). Services\xhci98\Parameters\PollMode = 1
-    (DWORD) now registers without USB_MINIPORT_FLAGS_INTERRUPT and drops the
+    (Code 10, no xhci98.log). Polling is the default (Parameters\PollMode
+    = 0 turns it off; GUI Setup restores SYSTEM from system.sav on every
+    restart, so a registry switch did not survive): the driver registers without USB_MINIPORT_FLAGS_INTERRUPT and drops the
     interrupt bit from the start's resource check; USBCMD.INTE/IMAN.IE are
     never enabled and PCI INTx is disabled (command bit 10). A periodic
     kernel timer (4 ms, i.e. every clock tick) asks usbport for a soft
     interrupt (USBPORT_INVALIDATE_CONTROLLER_SOFT_INTERRUPT), which runs the
     normal InterruptDpc path and drains the event ring; if usbport answers
     eight soft interrupts in a row with no InterruptDpc, the timer runs the
-    miniport's InterruptDpc body itself. Without PollMode (default) the
+    miniport's InterruptDpc body itself. With PollMode = 0 the
     same timer only steps in when the event ring has held events for three
     ticks with no claimed interrupt (a routed but dead line). Counters
     usos.poll.* (ticks, softints, direct, rescues, dpcs) are logged at stop;
