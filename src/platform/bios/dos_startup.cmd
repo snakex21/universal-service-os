@@ -30,6 +30,9 @@ REM visible, and the logo hangs QEMU's SMM path. SYS wrote MSDOS.SYS.
 %U9X%\ATTRIB.EXE -H -S -R C:\MSDOS.SYS
 ECHO [Options]>>C:\MSDOS.SYS
 ECHO Logo=0>>C:\MSDOS.SYS
+REM After a failed start the menu defaults to Normal, not Safe mode: safe
+REM mode loads HIMEM without /M:2 and hangs under CSMWrap.
+ECHO BootMenuDefault=1>>C:\MSDOS.SYS
 %U9X%\ATTRIB.EXE +H +S +R C:\MSDOS.SYS
 :SYSDONE
 REM Disk mode: the one-time syslinux start goes (98/95: SYS replaced its boot
@@ -74,18 +77,17 @@ IF "%U9CSM%"=="1" GOTO CSMAUTO
 ECHO @C:\USOS9X\U9FIX.COM C:\WINDOWS\SYSTEM.INI>C:\AUTOEXEC.BAT
 GOTO AUTODONE
 :CSMAUTO
-REM No firmware CSM: USB keyboard (USOSKEY bridge) and mouse (VBADOS) in
-REM Windows through the SeaBIOS services; U9FIX /CSM adds their drivers.
-IF NOT EXIST C:\USOS9X\VBMOUSE.DRV GOTO FAILED
+REM No firmware CSM: USB keyboard (USOSKEY bridge) in Windows through the
+REM SeaBIOS services; U9FIX /CSM adds its driver. No VBADOS mouse: VBMOUSE.EXE
+REM next to the PS/2 mouse VxD of the installed system stops Windows.
+IF NOT EXIST C:\USOS9X\USOSKEY.DRV GOTO FAILED
 ECHO @C:\USOS9X\U9FIX.COM /CSM C:\WINDOWS\SYSTEM.INI>C:\AUTOEXEC.BAT
 ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\NUL GOTO USOSDRV>>C:\AUTOEXEC.BAT
 ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\USOSKEY.DRV COPY C:\USOS9X\*.DRV C:\WINDOWS\SYSTEM>>C:\AUTOEXEC.BAT
 ECHO :USOSDRV>>C:\AUTOEXEC.BAT
 ECHO @C:\USOS9X\USOSKEY.COM>>C:\AUTOEXEC.BAT
-ECHO @C:\USOS9X\VBMOUSE.EXE>>C:\AUTOEXEC.BAT
 REM Me starts no real-mode program from AUTOEXEC.BAT and has no WINSTART.BAT:
 REM USOSKEY.DRV installs the bridge itself (in DOS memory of the system VM).
-REM Me has no *VMD for VBMOUSE.DRV, so the mouse stays the stock driver.
 REM The driver goes to SYSTEM before Setup; MSBATCH.INF [USOS.Csm] names it.
 IF NOT "%U9SYS%"=="ME" GOTO AUTODONE
 MD C:\WINDOWS

@@ -171,21 +171,21 @@ class U9Fix(unittest.TestCase):
         st = self.run_fix({inf: text}, command=' /VGA ' + inf, pci={(0, 1): (0x8086, 0x7000, 0x060100)})
         self.assertEqual((st['exit'], st['writes']), (0, 0))
 
-    def test_csm_mode_adds_the_usb_keyboard_and_mouse_drivers(self):
+    def test_csm_mode_adds_the_usb_keyboard_driver_only(self):
         text = (b'[boot]\r\nshell=Explorer.exe\r\ndrivers=mmsystem.dll\r\nmouse.drv=mouse.drv\r\n'
                 b'[boot.description]\r\nmouse.drv=Standard mouse\r\n[386Enh]\r\nMaxPhysPage=40000\r\n[vcache]\r\nMaxFileCache=1\r\n')
         files = {INI: text}
         st = self.run_fix(files, command=' /CSM ' + INI)
         self.assertEqual(st['exit'], 0)
-        self.assertEqual(files[INI], b'[boot]\r\nshell=Explorer.exe\r\ndrivers=mmsystem.dll usoskey.drv\r\nmouse.drv=vbmouse.drv\r\n'
+        self.assertEqual(files[INI], b'[boot]\r\nshell=Explorer.exe\r\ndrivers=mmsystem.dll usoskey.drv\r\nmouse.drv=mouse.drv\r\n'
                          b'[boot.description]\r\nmouse.drv=Standard mouse\r\n[386Enh]\r\nMaxPhysPage=40000\r\n[vcache]\r\nMaxFileCache=1\r\n')
         again = dict(files)
         st = self.run_fix(again, command=' /csm ' + INI)
         self.assertEqual((st['exit'], st['writes'], again), (0, 0, files))
-        # No drivers= and no mouse.drv= in [boot]: both lines are added there.
+        # No drivers= in [boot]: the line is added; mouse.drv stays as it is.
         files = {INI: b'[boot]\r\nshell=Explorer.exe\r\n[boot.description]\r\nmouse.drv=Standard mouse\r\n'}
         self.run_fix(files, command=' /CSM ' + INI)
-        self.assertEqual(files[INI], b'[boot]\r\nmouse.drv=vbmouse.drv\r\ndrivers=usoskey.drv\r\nshell=Explorer.exe\r\n'
+        self.assertEqual(files[INI], b'[boot]\r\ndrivers=usoskey.drv\r\nshell=Explorer.exe\r\n'
                          b'[boot.description]\r\nmouse.drv=Standard mouse\r\n[386Enh]\r\nMaxPhysPage=40000\r\n[vcache]\r\nMaxFileCache=262144\r\n')
 
 

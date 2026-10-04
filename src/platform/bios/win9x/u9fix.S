@@ -32,13 +32,14 @@
  *   U9FIX /CSM C:\WINDOWS\SYSTEM.INI
  *
  * The memory rules, and for a PC without a firmware CSM (CSMWrap: USB
- * keyboard and mouse reach DOS only through the SeaBIOS services) in [boot]:
+ * keyboard reaches DOS only through the SeaBIOS services) in [boot]:
  *   drivers=... usoskey.drv    USOSKEY.DRV feeds the USB keys that
  *                              USOSKEY.COM collected to VKD (Windows 3.x
  *                              bridge, docs/design/bios-via-csmwrap.md 8.5)
- *   mouse.drv=vbmouse.drv      VBADOS: the mouse through INT 33h/INT 15h C2
- * The token is appended to an existing drivers= line; a mouse.drv line with
- * another driver is replaced.
+ * The token is appended to an existing drivers= line. No mouse line: VBADOS's
+ * VBMOUSE.EXE next to Windows 98's own PS/2 mouse VxD stops the installed
+ * system with a protection error at KERNEL init (docs/win9x-modern-2026-09-30.md);
+ * a USB mouse in Windows 9x under CSMWrap is open.
  *
  * No file, a file above 48 KiB or any DOS error: exit code 1, file unchanged.
  * Built with tools/build_win9x_support.py (zig cc, linked at 0100h).
@@ -460,39 +461,6 @@ csm_drivers_new:
     call insert
     jc csm_full
 csm_mouse:
-    /* mouse.drv=vbmouse.drv: replace another mouse.drv line */
-    mov si, offset key_mouse
-    mov cx, 10
-    call find_key_in_section
-    jc csm_mouse_new
-    push di
-    add di, cx
-    mov si, offset tok_vbmouse
-    mov cx, 11
-    call match_at
-    pop di
-    je csm_ok
-    /* delete the old line (up to and with its LF) */
-    mov bx, di
-csm_line_end:
-    cmp bx, word ptr [limit]
-    jae csm_delete
-    mov al, byte ptr [bx]
-    inc bx
-    cmp al, 10
-    jne csm_line_end
-csm_delete:
-    mov cx, bx
-    sub cx, di
-    call delete
-    jmp csm_mouse_insert
-csm_mouse_new:
-    mov di, word ptr [sec_start]
-csm_mouse_insert:
-    mov si, offset line_mouse
-    mov cx, word ptr [line_mouse_len]
-    call insert
-    jc csm_full
 csm_ok:
     clc
     ret
@@ -727,14 +695,10 @@ vga_dev_end:
 crlf: .ascii "\r\n"
 sec_boot: .ascii "[boot]"
 key_drivers: .ascii "drivers="
-key_mouse: .ascii "mouse.drv="
 tok_usoskey: .ascii "usoskey.drv"
-tok_vbmouse: .ascii "vbmouse.drv"
 add_usoskey: .ascii " usoskey.drv"
 line_drivers: .ascii "drivers=usoskey.drv\r\n"
 line_drivers_end:
-line_mouse: .ascii "mouse.drv=vbmouse.drv\r\n"
-line_mouse_end:
 temp_name: .asciz "SYSTEM.U9$"
 msg_done: .ascii "USOS: settings added (U9FIX)\r\n$"
     .p2align 1
@@ -745,7 +709,6 @@ limit: .word 0
 changed: .byte 0
     .p2align 1
 line_drivers_len: .word line_drivers_end - line_drivers
-line_mouse_len: .word line_mouse_end - line_mouse
 sec_start: .word 0
 csm_mode: .byte 0
     .p2align 1
