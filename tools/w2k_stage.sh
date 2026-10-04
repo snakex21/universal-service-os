@@ -57,9 +57,28 @@
 #    STOP); while Setup runs (SystemSetupInProgress = 1) a last-chance
 #    shutdown handler restarts through the FADT reset register, CF9h and
 #    the 8042 (the 2000 HALs know only the 8042, which those boards lack).
+#    In text mode it also redirects setupdd.sys's HalReturnToFirmware
+#    import (in memory) to the same reset, so the restart at the end of
+#    text mode works without an 8042 as well.
 #    USOS_W2K_USOSRST=off leaves it out.
+# 4. Answer file (WINNT.SIF in $WIN_NT$.~BT, written by
+#    prepare_xp_windows_partition.sh through usos_w2k_answer_sif after this
+#    step; apply only checks the rows): text-mode Setup stops on its
+#    "computer type" confirmation screen whenever a component is unknown,
+#    even unattended. On boards without a PS/2 keyboard (USB only, no CSM)
+#    NTDETECT reports no keyboard, so the X470 stopped there with
+#    "Klawiatura: Nieznane" (2026-10-04). [KeyboardDrivers] names the
+#    standard keyboard ("Retail", read only with OemPreinstall=Yes, which
+#    is therefore set; from this source's own TXTSETUP.SIF
+#    [Keyboard] STANDARD description, so localized media match), which
+#    answers the screen; the USB keyboard itself works in GUI mode through
+#    xhci98. With ACPI off, [Unattended] ComputerType pins the HAL the same
+#    way (USOS_W2K_HAL: mps = "MPS Multiprocessor PC", halmps, the default
+#    with ACPI off; standard = "Standard PC", hal.dll, PIC, one CPU; DATA's
+#    Windows 2000\Unattended\hal-standard.txt selects it). With ACPI kept no
+#    ComputerType is written (Setup's own ACPI choice).
 # No Microsoft file is added or changed except the TXTSETUP.SIF and
-# DOSNET.INF copies on the target.
+# DOSNET.INF copies on the target (and USOS's own WINNT.SIF).
 #   sh w2k_stage.sh apply     (XP_TARGET_ROOT, NT5_SOURCE_DIR=I386)
 usos_w2k_apply() (
     set -eu
@@ -87,8 +106,13 @@ usos_w2k_apply() (
     mode=${USOS_W2K_AHCINT_MODE:-legacy}
     case "$mode" in legacy|pnp) ;; *) echo "[W2K_STAGE] STOP: USOS_W2K_AHCINT_MODE must be legacy or pnp"; exit 1 ;; esac
     case "$acpi" in on|off) ;; *) echo "[W2K_STAGE] STOP: USOS_W2K_ACPI must be on or off"; exit 1 ;; esac
+    hal=$(usos_w2k_hal) || { echo "$hal"; exit 1; }
     bt="$XP_TARGET_ROOT/\$WIN_NT\$.~BT"
     ls="$XP_TARGET_ROOT/\$WIN_NT\$.~LS/I386"
+    [ -f "$ls/TXTSETUP.SIF" ] || { echo "[W2K_STAGE] STOP: $ls/TXTSETUP.SIF missing"; exit 1; }
+    # The WINNT.SIF answers (see 4.; prepare_xp_windows_partition.sh writes
+    # them): checked here, before anything is written.
+    printf '[Unattended]\r\n' | usos_w2k_answer_sif "$ls/TXTSETUP.SIF" 2>&1 > /dev/null || exit 1
     for folder in "$bt" "$ls"; do
         [ -f "$folder/TXTSETUP.SIF" ] || { echo "[W2K_STAGE] STOP: $folder/TXTSETUP.SIF missing"; exit 1; }
         find "$folder" -maxdepth 1 -type f \( -iname "$drv.sys" -o -iname "$drv.sy_" -o -iname "$drv.inf" -o -iname "$drv.in_" -o -iname usosw2k.inf -o -iname usosrst.sys -o -iname usosrst.sy_ \) -exec rm -f '{}' \;
@@ -124,9 +148,10 @@ usos_w2k_apply() (
         mv "$ls/DOSNET.INF.usos" "$ls/DOSNET.INF"
     fi
     sync
-    printf '[W2K_STAGE] APPLIED PASS %s boot+local source, TXTSETUP.SIF PCI\\CC_010601, usosw2k.inf (CriticalDeviceDatabase), %s mode; ACPI %s; usosrst %s\n' \
-        "$(usos_w2k_driver_title)" "$mode" "$([ "$acpi" = off ] && echo 'off (ACPIEnable = 0: MPS or Standard PC HAL)' || echo 'kept (ACPIEnable unchanged)')" \
-        "$([ "$helper" = on ] && echo 'on (STOP screen, Setup restart via FADT/CF9/8042)' || echo off)"
+    printf '[W2K_STAGE] APPLIED PASS %s boot+local source, TXTSETUP.SIF PCI\\CC_010601, usosw2k.inf (CriticalDeviceDatabase), %s mode; ACPI %s; HAL %s; WINNT.SIF answers: standard keyboard; usosrst %s\n' \
+        "$(usos_w2k_driver_title)" "$mode" "$([ "$acpi" = off ] && echo 'off (ACPIEnable = 0)' || echo 'kept (ACPIEnable unchanged)')" \
+        "$(case "$hal" in mps) echo 'MPS Multiprocessor (ComputerType)' ;; standard) echo 'Standard PC (ComputerType)' ;; *) echo 'chosen by Setup' ;; esac)" \
+        "$([ "$helper" = on ] && echo 'on (STOP screen, Setup and text-mode restart via FADT/CF9/8042)' || echo off)"
 )
 
 # Every output line ends in CRLF, as the NT5 setup files do (BusyBox awk
@@ -223,6 +248,84 @@ usos_w2k_acpi_off_sif() {
         section == "[acpioptions]" && low ~ /^[ \t]*acpienable[ \t]*=/ { line = "ACPIEnable = 0"; done++ }
         { print line "\r" }
         END { if (done != 1) exit 3 }
+    '
+}
+
+# stdout: the HAL the answer file pins (none, mps or standard) from
+# USOS_W2K_ACPI (default on) and USOS_W2K_HAL (auto: mps with ACPI off, none
+# with ACPI kept). A message on stdout and status 1 for a bad value.
+usos_w2k_hal() {
+    case "${USOS_W2K_HAL:-auto}:${USOS_W2K_ACPI:-on}" in
+        auto:off|mps:off) echo mps ;;
+        standard:off) echo standard ;;
+        auto:on) echo none ;;
+        mps:on|standard:on) echo '[W2K_STAGE] STOP: USOS_W2K_HAL needs ACPI off (acpi-off.txt)'; return 1 ;;
+        *) echo '[W2K_STAGE] STOP: USOS_W2K_HAL must be auto, mps or standard'; return 1 ;;
+    esac
+}
+
+# stdin WINNT.SIF -> stdout with the hardware answers of section 4, the
+# descriptions taken from TXTSETUP.SIF $1 (the source's own, localized).
+# Messages on stderr; status 1 if a row is missing or a value is bad.
+usos_w2k_answer_sif() {
+    hal=$(usos_w2k_hal) || { echo "$hal" >&2; return 1; }
+    kbd=$(usos_w2k_sif_desc keyboard STANDARD < "$1") || { echo '[W2K_STAGE] STOP: no [Keyboard] STANDARD row in TXTSETUP.SIF' >&2; return 1; }
+    computer=
+    case "$hal" in
+        mps) computer=$(usos_w2k_sif_desc computer mps_mp < "$1") || { echo '[W2K_STAGE] STOP: no [Computer] mps_mp row in TXTSETUP.SIF' >&2; return 1; } ;;
+        standard) computer=$(usos_w2k_sif_desc computer e_isa_up < "$1") || { echo '[W2K_STAGE] STOP: no [Computer] e_isa_up row in TXTSETUP.SIF' >&2; return 1; } ;;
+    esac
+    usos_w2k_hw_sif "$computer" "$kbd" || { echo '[W2K_STAGE] STOP: no [Unattended] section in WINNT.SIF' >&2; return 1; }
+}
+
+# stdin TXTSETUP.SIF -> stdout: the quoted description (without the quotes,
+# bytes as in the file: localized media are ANSI) of row $2 in section [$1]
+# (both case-insensitive), e.g. "computer mps_mp" or "keyboard STANDARD".
+# The first such row counts. Exit 3 if there is none.
+usos_w2k_sif_desc() {
+    LC_ALL=C awk -v want="[$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')]" -v key="$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')" '
+        BEGIN { q = sprintf("%c", 34) }
+        { line = $0; sub(/\r$/, "", line); low = tolower(line) }
+        low ~ /^[ \t]*\[/ { section = low; sub(/^[ \t]+/, "", section); sub(/[ \t]+$/, "", section); next }
+        section != want || found { next }
+        {
+            eq = index(line, "="); if (!eq) next
+            name = tolower(substr(line, 1, eq - 1)); gsub(/[ \t]/, "", name)
+            if (name != key) next
+            rest = substr(line, eq + 1); a = index(rest, q); if (!a) next
+            rest = substr(rest, a + 1); b = index(rest, q); if (b < 2) next
+            printf "%s", substr(rest, 1, b - 1); found = 1
+        }
+        END { if (!found) exit 3 }
+    '
+}
+
+# stdin WINNT.SIF -> stdout (CRLF): [Unattended] OemPreinstall=Yes and
+# ComputerType = "$1","Retail" (no ComputerType row when $1 is empty;
+# existing rows are replaced) and a [KeyboardDrivers] section with
+# "$2" = "Retail" (an existing section is replaced). Text-mode Setup reads
+# the component sections and ComputerType only in preinstall mode
+# (setupdd.sys checks its OemPreinstall flag first; QEMU 2026-10-04: with
+# OemPreinstall=No the "Klawiatura: Nieznane" screen stayed). "Retail"
+# entries need no $OEM$ files. Exit 3 without an [Unattended] section.
+usos_w2k_hw_sif() {
+    LC_ALL=C awk -v computer="$1" -v keyboard="$2" '
+        BEGIN { q = sprintf("%c", 34) }
+        { line = $0; sub(/\r$/, "", line); low = tolower(line) }
+        low ~ /^[ \t]*\[/ { section = low; sub(/^[ \t]+/, "", section); sub(/[ \t]+$/, "", section) }
+        section == "[keyboarddrivers]" { next }
+        section == "[unattended]" && low ~ /^[ \t]*(computertype|oempreinstall)[ \t]*=/ { next }
+        { print line "\r" }
+        section == "[unattended]" && low ~ /^[ \t]*\[/ && !u {
+            u = 1
+            print "OemPreinstall=Yes\r"
+            if (computer != "") print "ComputerType = " q computer q "," q "Retail" q "\r"
+        }
+        END {
+            if (!u) exit 3
+            print "[KeyboardDrivers]\r"
+            print q keyboard q " = " q "Retail" q "\r"
+        }
     '
 }
 

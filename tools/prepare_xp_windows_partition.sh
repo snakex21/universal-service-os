@@ -76,6 +76,16 @@ case "${USOS_PLAN_PROFILE:-}" in
             printf '[XP_WINDOWS] user drivers: OemPnPDriversPath="%s"\n' "$user_paths"
         fi ;;
 esac
+# Windows 2000 from UEFI: the hardware answers text-mode Setup would stop to
+# confirm on a USB-only board (standard keyboard; with ACPI off the HAL), with
+# the source's own descriptions (w2k_stage.sh, section 4).
+if [ "${USOS_PLAN_PROFILE:-}" = w2k-x86-sp4-uefi-csm ]; then
+    . "$SCRIPT_DIR/w2k_stage.sh"
+    mv "$work/winnt.sif" "$work/winnt.base"
+    usos_w2k_answer_sif "${XP_TARGET_ROOT:?}/\$WIN_NT\$.~LS/I386/TXTSETUP.SIF" < "$work/winnt.base" > "$work/winnt.sif" || fail 'cannot add the Windows 2000 hardware answers to WINNT.SIF'
+    rm -f "$work/winnt.base"
+    printf '[XP_WINDOWS] Windows 2000 answers: [KeyboardDrivers] standard keyboard, HAL %s\n' "$(usos_w2k_hal)"
+fi
 put_verified "$work/winnt.sif" WINNT.SIF
 put_verified "$work/migrate.inf" MIGRATE.INF
 sync

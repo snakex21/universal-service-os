@@ -400,6 +400,43 @@ AHCINT usos3, no errors and the VBR written, in all three setups:
 So memory above 4 GB in the E820 alone does not reproduce the X470
 failure. No CSMWrap E820 change was made.
 
+## 7a. X470 run 5 (2026-10-04, acpi-off.txt) and the unattended fixes
+
+**X470 (CSM off, CSMWrap, `acpi-off.txt`):** with the ACPI HAL the kernel
+hung right after SETUPLDR (black "_"). With ACPI off (MPS HAL) and also
+with F5 "Standard PC", text-mode Setup starts: AHCINT usos3 works
+(`AHCINT3 1022:43C8 p2 MK:OK T:OK R:000007A8 W:0000000E E:0000`), usosrst
+loads (`reset=io:00B2=BE+cf9+8042`). Setup then stops on the "computer
+type" confirmation screen: "Klawiatura: Nieznane" (USB-only board, no PS/2
+keyboard, so NTDETECT reports none) and the USB keyboard does not work in
+text mode.
+
+**Fixes (this branch):**
+- WINNT.SIF (`usos_w2k_answer_sif`, written by
+  `prepare_xp_windows_partition.sh`): `[KeyboardDrivers]` with the
+  source's own `[Keyboard] STANDARD` description = "Retail", and with ACPI
+  off `ComputerType` = the source's `mps_mp` description (default) or
+  `e_isa_up` ("Standard PC", `hal-standard.txt` on DATA), "Retail".
+  Text-mode Setup only honours these in preinstall mode, so
+  `OemPreinstall=Yes` is set (no `$OEM$` files are needed for "Retail").
+- usosrst 1.1: in text mode it redirects setupdd.sys's
+  `HalReturnToFirmware` import (in memory only) to its own reset (FADT
+  reset register, CF9h, 8042), so the end-of-text-mode restart works
+  without an 8042. Load line: `txt=on`.
+
+**QEMU (OVMF -> CSMWrap, AHCI, USB-only input, ACPI off, 2026-10-04):**
+the X470 screen was reproduced by removing the STANDARD rows of
+`[Map.Keyboard]` (test only). With `OemPreinstall=No` the screen stayed;
+with the fix it is skipped for both MPS and Standard PC, text mode copies,
+restarts (`txt=on`) and GUI Setup starts. **GUI Setup still fails with ACPI
+off on both HALs**, as in section 5: from the third device on, every
+device install fails with 1450 (`ERROR_NO_SYSTEM_RESOURCES`), then
+"RegisteredProcessors" cannot be written, ~11,000 `edb*.log` files, "Critical
+error: initializing the security subsystem failed". The first failures
+follow right after the root-enumerated ISAPNP read-data-port device was
+installed (it exists only with ACPI off); this is the next suspect (test:
+`isapnp` Start = 4 through usosw2k.inf), not yet confirmed.
+
 ## 8. X470 test plan (first plan, 2026-10-03)
 
 

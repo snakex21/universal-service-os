@@ -23,16 +23,31 @@
  *    machine itself: the FADT reset register when the firmware declares one
  *    (ACPI 2.0+, RESET_REG_SUP), then port CF9h (02h, 06h, then 0Eh), then
  *    the 8042 (FEh to port 64h). After Setup the handler is not registered,
- *    so a shutdown stays a power-off. Text-mode Setup restarts through
- *    HalReturnToFirmware directly, without shutdown notifications; that
- *    restart is not covered (it would need a change to Microsoft's HAL).
+ *    so a shutdown stays a power-off.
+ *
+ * 3. Text-mode restart. Text-mode Setup (setupdd.sys) restarts by calling
+ *    HalReturnToFirmware(HalRebootRoutine) directly, without shutdown
+ *    notifications, and the HAL then only pulses the 8042. When setupdd.sys
+ *    is loaded (text mode only), this driver points setupdd.sys's import
+ *    slot for HalReturnToFirmware, in memory, at its own routine: a reboot
+ *    or restart request runs the same reset sequence as above; anything
+ *    else (and a reset that did not happen) goes on to the HAL's routine.
+ *    No Microsoft file is changed: only the import address in the running
+ *    image is redirected, in the slot the loader itself filled in.
  */
 #include <ntddk.h>
 
 /* Exported by every NT kernel since 3.1; ntddk.h does not declare it. */
 __declspec(dllimport) extern ULONG KiBugCheckData[5];
 
-#define USOSRST_VERSION "usosrst 1.0-diag"
+/* Exported by every NT HAL (stdcall, one argument); the WDK 7.1 headers no
+   longer declare it. Routine values as in the NT 4.0-2003 DDKs
+   (FIRMWARE_REENTRY). */
+#define USOS_HAL_RESTART_ROUTINE  2
+#define USOS_HAL_REBOOT_ROUTINE   3
+__declspec(dllimport) VOID NTAPI HalReturnToFirmware(IN ULONG Routine);
+
+#define USOSRST_VERSION "usosrst 1.1"
 #define ROW_LOAD        2
 #define ROW_STOP        3
 
@@ -46,6 +61,9 @@ static ULONG g_ResetAddress;
 static UCHAR g_ResetValue;
 static PUCHAR g_ResetMapped;
 static ULONG g_AcpiRevision = 0xFF;    /* RSDP revision, FFh = no RSDP found */
+
+typedef VOID (NTAPI *USOS_RETURN_TO_FIRMWARE)(IN ULONG Routine);
+static USOS_RETURN_TO_FIRMWARE g_HalReturnToFirmware;  /* the HAL's routine */
 
 /* ------------------------------------------------------------------ */
 /* Text buffer                                                         */
@@ -267,15 +285,13 @@ StallMs(ULONG Ms)
     while (Ms--) KeStallExecutionProcessor(1000);
 }
 
-static NTSTATUS
-ShutdownDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
+/* FADT reset register, CF9h, 8042. Returns only if none of them reset the
+   machine. */
+static VOID
+ResetMachine(VOID)
 {
     ULONG i;
 
-    UNREFERENCED_PARAMETER(DeviceObject);
-
-    /* Every disk has been flushed (last-chance handlers run after the file
-       systems). */
     if (g_ResetSpace == 1) {
         WRITE_PORT_UCHAR((PUCHAR)g_ResetAddress, g_ResetValue);
         StallMs(500);
@@ -292,12 +308,148 @@ ShutdownDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
     for (i = 0; i < 100 && (READ_PORT_UCHAR((PUCHAR)0x64) & 0x02); i++) KeStallExecutionProcessor(1000);
     WRITE_PORT_UCHAR((PUCHAR)0x64, 0xFE);
     StallMs(500);
+}
+
+static NTSTATUS
+ShutdownDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
+{
+    UNREFERENCED_PARAMETER(DeviceObject);
+
+    /* Every disk has been flushed (last-chance handlers run after the file
+       systems). */
+    ResetMachine();
 
     /* Still here: let Windows try its own way. */
     Irp->IoStatus.Status = STATUS_SUCCESS;
     Irp->IoStatus.Information = 0;
     IoCompleteRequest(Irp, IO_NO_INCREMENT);
     return STATUS_SUCCESS;
+}
+
+/* ------------------------------------------------------------------ */
+/* Text-mode Setup restart                                             */
+/* ------------------------------------------------------------------ */
+
+/* setupdd.sys calls this instead of the HAL's HalReturnToFirmware (see
+   RedirectSetupRestart). */
+static VOID NTAPI
+SetupReturnToFirmware(IN ULONG Routine)
+{
+    static CHAR text[] = "usosrst: text-mode Setup restart (FADT reset register, CF9h, 8042)";
+
+    if (Routine == USOS_HAL_REBOOT_ROUTINE || Routine == USOS_HAL_RESTART_ROUTINE) {
+        ShowRow(ROW_STOP, text, sizeof(text) - 1, 0x1F00);
+        /* A pause before the reset, as the HAL has before its 8042 pulse,
+           for writes the disk is still completing. */
+        StallMs(1000);
+        ResetMachine();
+    }
+    g_HalReturnToFirmware(Routine);
+}
+
+/* Case-insensitive compare of a counted UTF-16 module name with ASCII. */
+static BOOLEAN
+NameIs(PWCHAR Name, USHORT Bytes, const char *Want)
+{
+    ULONG i, n = Bytes / 2;
+
+    for (i = 0; i < n; i++) {
+        WCHAR c = Name[i];
+        CHAR w = Want[i];
+        if (w == 0) return FALSE;
+        if (c >= 'A' && c <= 'Z') c = (WCHAR)(c + 32);
+        if (w >= 'A' && w <= 'Z') w = (CHAR)(w + 32);
+        if (c != (WCHAR)(UCHAR)w) return FALSE;
+    }
+    return (BOOLEAN)(Want[n] == 0);
+}
+
+/* The image base of a loaded module, walking the loaded-module list from our
+   own entry; NULL if it is not loaded. */
+static PUCHAR
+FindModule(const char *Name)
+{
+    PLIST_ENTRY entry;
+    ULONG n;
+
+    if (g_OwnEntry == NULL) return NULL;
+    entry = (PLIST_ENTRY)g_OwnEntry;
+    for (n = 0; n < 1024; n++) {
+        PUCHAR e = (PUCHAR)entry;
+        if (!MmIsAddressValid(e) || !MmIsAddressValid(e + LDR_BASENAME + 7)) return NULL;
+        {
+            ULONG base = *(PULONG)(e + LDR_DLLBASE);
+            USHORT len = *(PUSHORT)(e + LDR_BASENAME);
+            PWCHAR name = *(PWCHAR *)(e + LDR_BASENAME + 4);
+            if (base >= 0x80000000 && len != 0 && len < 128 && MmIsAddressValid(name) &&
+                MmIsAddressValid((PUCHAR)name + len - 1) && NameIs(name, len, Name)) {
+                return (PUCHAR)base;
+            }
+        }
+        entry = entry->Flink;
+        if (entry == (PLIST_ENTRY)g_OwnEntry) return NULL;
+    }
+    return NULL;
+}
+
+/* Writes one import slot through a second, writable mapping of its page
+   (the image section may be mapped read-only). */
+static BOOLEAN
+WriteSlot(PULONG Slot, ULONG Value)
+{
+    PMDL mdl;
+    PULONG writable;
+
+    mdl = IoAllocateMdl(Slot, sizeof(ULONG), FALSE, FALSE, NULL);
+    if (mdl == NULL) return FALSE;
+    MmBuildMdlForNonPagedPool(mdl);
+    writable = (PULONG)MmMapLockedPages(mdl, KernelMode);
+    if (writable == NULL) {
+        IoFreeMdl(mdl);
+        return FALSE;
+    }
+    InterlockedExchange((PLONG)writable, (LONG)Value);
+    MmUnmapLockedPages(writable, mdl);
+    IoFreeMdl(mdl);
+    return (BOOLEAN)(*Slot == Value);
+}
+
+/* 'o': redirected; '-': no setupdd.sys (not text mode); 'x': setupdd.sys
+   without a matching import slot, or the write failed. Every import address
+   table of setupdd.sys is searched for the HAL's HalReturnToFirmware
+   address (the value our own import of it holds), so no import names or
+   hint tables are needed. */
+static CHAR
+RedirectSetupRestart(VOID)
+{
+    PUCHAR base, nt;
+    ULONG target = (ULONG)HalReturnToFirmware;
+    ULONG size, rva, dir, dirSize, i, found = 0;
+
+    base = FindModule("setupdd.sys");
+    if (base == NULL) return '-';
+    if (!MmIsAddressValid(base + 0x3C)) return 'x';
+    nt = base + *(PULONG)(base + 0x3C);
+    if (!MmIsAddressValid(nt) || !MmIsAddressValid(nt + 0x87) || *(PULONG)nt != 0x00004550) return 'x';
+    size = *(PULONG)(nt + 0x50);                  /* SizeOfImage */
+    dir = *(PULONG)(nt + 0x80);                   /* import directory */
+    dirSize = *(PULONG)(nt + 0x84);
+    if (dir == 0 || dirSize < 20 || dir >= size || dirSize > size - dir) return 'x';
+    for (i = 0; i + 20 <= dirSize; i += 20) {
+        PUCHAR desc = base + dir + i;
+        PULONG slot;
+        if (!MmIsAddressValid(desc) || !MmIsAddressValid(desc + 19)) break;
+        rva = *(PULONG)(desc + 16);               /* FirstThunk */
+        if (rva == 0 && *(PULONG)(desc + 12) == 0) break;
+        if (rva == 0 || rva >= size) continue;
+        for (slot = (PULONG)(base + rva); (PUCHAR)slot + 4 <= base + size && MmIsAddressValid(slot) && *slot != 0; slot++) {
+            if (*slot != target) continue;
+            g_HalReturnToFirmware = (USOS_RETURN_TO_FIRMWARE)target;
+            if (!WriteSlot(slot, (ULONG)SetupReturnToFirmware)) return 'x';
+            found++;
+        }
+    }
+    return (CHAR)(found ? 'o' : 'x');
 }
 
 static BOOLEAN
@@ -333,6 +485,7 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     PHYSICAL_ADDRESS vga;
     PDEVICE_OBJECT device = NULL;
     BOOLEAN shutdownHandler = FALSE;
+    CHAR restart;
     CHAR line[80];
     PCHAR p, end = line + 80;
 
@@ -346,6 +499,7 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 
     g_InSetup = SetupInProgress();
     FindResetRegister();
+    restart = RedirectSetupRestart();
     if (g_InSetup && NT_SUCCESS(IoCreateDevice(DriverObject, 0, NULL, FILE_DEVICE_UNKNOWN, 0, FALSE, &device))) {
         DriverObject->MajorFunction[IRP_MJ_SHUTDOWN] = ShutdownDispatch;
         if (NT_SUCCESS(IoRegisterLastChanceShutdownNotification(device))) {
@@ -356,7 +510,7 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     }
 
     /* The load line: shows that the driver ran and what it found. */
-    p = PutStr(line, end, USOSRST_VERSION " rsdp-rev=");
+    p = PutStr(line, end, USOSRST_VERSION " rsdp=");
     p = PutHex(p, end, g_AcpiRevision, 2);
     p = PutStr(p, end, g_ResetSpace == 1 ? " reset=io:" : g_ResetSpace == 2 ? " reset=mem:" : " reset=cf9");
     if (g_ResetSpace) {
@@ -368,6 +522,7 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     p = PutStr(p, end, "+8042 setup=");
     p = PutStr(p, end, g_InSetup ? "1" : "0");
     p = PutStr(p, end, shutdownHandler ? " handler=on" : " handler=off");
+    p = PutStr(p, end, restart == 'o' ? " txt=on" : restart == '-' ? " txt=no" : " txt=err");
     ShowRow(ROW_LOAD, line, (ULONG)(p - line), 0x1F00);
 
     return STATUS_SUCCESS;

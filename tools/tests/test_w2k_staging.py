@@ -4,6 +4,8 @@ no Microsoft files:
 - tools/w2k_stage.sh: the AHCINT rows (TXTSETUP.SIF, INF source directory,
   DOSNET), [ACPIOptions] ACPIEnable = 0, apply on a stand-in target (ACPI
   off by default, on on request), refusals, the pinned package files;
+  the WINNT.SIF hardware answers ([KeyboardDrivers], ComputerType for the
+  MPS / Standard PC HAL) from the source's own TXTSETUP.SIF descriptions;
 - usosrst.sys (own helper): its TXTSETUP/registry/DOSNET rows, the pinned
   binary and its source;
 - tools/nt52_usb_stage.sh in the 2000 mode: usbhub20.sys forced as well, no
@@ -27,7 +29,17 @@ W2K_TXTSETUP = (b'[SetupData]\r\nMajorVersion = 5\r\nMinorVersion = 0\r\n[Source
                 b'[SCSI.Load]\r\natapi = atapi.sys,4\r\n[InputDevicesSupport.Load]\r\nopenhci  = openhci.sys\r\n'
                 b'[InputDevicesSupport]\r\nopenhci  = "Open HCI",files.openhci,openhci\r\n'
                 b'[HiveInfs.Fresh]\r\nAddReg = hivesys.inf,AddReg\r\n[ACPIOptions]\r\nACPIEnable = 2\r\nACPIBiosDate = 01,01,1999\r\n\r\n[NWACL]\r\n[SCSI]\r\natapi = "IDE"\r\n'
-                b'[BootBusExtenders.Load]\r\npci      = pci.sys\r\n[BootBusExtenders]\r\npci      = "PCI",files.pci,pci                \r\n')
+                b'[BootBusExtenders.Load]\r\npci      = pci.sys\r\n[BootBusExtenders]\r\npci      = "PCI",files.pci,pci                \r\n'
+                # The hardware lists text-mode Setup confirms (Polish media: ANSI, CP1250).
+                b'[Computer]\r\nacpiapic_mp = "ACPI Multiprocessor PC",files.none\r\nmps_mp      = "MPS Multiprocessor PC",files.none\r\n'
+                + 'e_isa_up    = "Standardowy komputer PC",files.none\r\n'.encode('cp1250')
+                + b'[Map.Keyboard]\r\nSTANDARD = PCAT_ENHANCED\r\n[Keyboard]\r\n'
+                + 'STANDARD    = "Klawiatura XT, AT lub rozszerzona (83-104 klawiszy)",files.i8042,i8042prt\r\n'.encode('cp1250')
+                + b'USB      = "Klawiatura USB",files.kbdhid,kbdhid\r\n')
+# The answer file text mode reads ($WIN_NT$.~BT\WINNT.SIF), as the w2k template writes it.
+W2K_WINNT = (b'[Data]\r\nmsdosinitiated="1"\r\nfloppyless="1"\r\n[Unattended]\r\nUnattendMode=ProvideDefault\r\n'
+             b'TargetPath=\\WINNT\r\n[SetupParams]\r\nUserExecute="C:\\USOS\\W2K\\usos-setup.cmd"\r\n')
+KBD = 'Klawiatura XT, AT lub rozszerzona (83-104 klawiszy)'.encode('cp1250')
 W2K_DOSNET = b'[Files]\r\nd1,atapi.sys\r\n[FloppyFiles.1]\r\nd1,atapi.sys\r\n[Files]\r\nd1,other.sys\r\n[FloppyFiles.1]\r\nd1,hal.dll\r\n'
 LIB = posix(ROOT / 'tools' / 'w2k_stage.sh')
 USB = posix(ROOT / 'tools' / 'nt52_usb_stage.sh')
@@ -145,7 +157,8 @@ class W2kStorage(unittest.TestCase):
         c = (rst / 'src/usosrst.c').read_bytes()
         self.assertIn(b'SPDX-License-Identifier: GPL-3.0-or-later', c)
         for want in (b'IoRegisterLastChanceShutdownNotification', b'KeRegisterBugCheckCallback', b'SystemSetupInProgress',
-                     b'0xCF9', b'(PUCHAR)0x64, 0xFE'):
+                     b'0xCF9', b'(PUCHAR)0x64, 0xFE', b'FindModule("setupdd.sys")', b'HalReturnToFirmware',
+                     b'MmBuildMdlForNonPagedPool'):
             self.assertIn(want, c)
         self.assertIn(b'MODIFIED version of AHCINT 1.3.0.0', files['MODIFIED.txt'])
         self.assertIn(b'usos2', files['MODIFIED.txt'])
@@ -190,6 +203,7 @@ class W2kStorage(unittest.TestCase):
             (folder / 'TXTSETUP.SIF').write_bytes(W2K_TXTSETUP)
             (folder / 'AHCINT.SY_').write_bytes(b'stale')
         (t / 'root/TXTSETUP.SIF').write_bytes(W2K_TXTSETUP)
+        (bt / 'WINNT.SIF').write_bytes(W2K_WINNT)
         (ls / 'DOSNET.INF').write_bytes(W2K_DOSNET)
         (ls / 'HIVESYS.INF').write_bytes('ď»ż[AddReg]\r\n'.encode('utf-16-le'))
         return bt, ls
@@ -227,10 +241,89 @@ class W2kStorage(unittest.TestCase):
                 self.assertIn(b'd1,ahcint.inf', (ls / 'DOSNET.INF').read_bytes())
                 self.assertIn(b'd1,usosrst.sys', (ls / 'DOSNET.INF').read_bytes())
                 self.assertIn(b'usosrst on', r.stdout)
+                # WINNT.SIF is written later (prepare_xp_windows_partition.sh); apply only checks.
+                self.assertEqual((bt / 'WINNT.SIF').read_bytes(), W2K_WINNT)
+                self.assertIn(b'HAL MPS Multiprocessor' if acpi == 'off' else b'HAL chosen by Setup', r.stdout)
+                # The answers: the standard keyboard always; the MPS HAL pinned with ACPI off.
+                computer = b'ComputerType = "MPS Multiprocessor PC","Retail"\r\n' if acpi == 'off' else b''
+                a = sh(f"{'USOS_W2K_ACPI=' + acpi if acpi else ':'}; export USOS_W2K_ACPI USOS_W2K_HAL; . '{LIB}'; usos_w2k_answer_sif '{posix(ls / 'TXTSETUP.SIF')}'", W2K_WINNT)
+                self.assertEqual(a.returncode, 0, a.stderr)
+                self.assertEqual(a.stdout, W2K_WINNT.replace(b'[Unattended]\r\n', b'[Unattended]\r\nOemPreinstall=Yes\r\n' + computer) +
+                                 b'[KeyboardDrivers]\r\n"' + KBD + b'" = "Retail"\r\n')
                 # HIVESYS.INF (UTF-16 on 2000) is left alone.
                 self.assertEqual((ls / 'HIVESYS.INF').read_bytes(), hivesys)
                 self.assertNotEqual(self.apply(t).returncode, 0)
                 self.assertEqual((ls / 'TXTSETUP.SIF').read_bytes(), sif)
+
+    def test_answer_rows(self):
+        # The descriptions exactly as the source spells them (localized, ANSI).
+        r = run_fn('usos_w2k_sif_desc keyboard standard', W2K_TXTSETUP)
+        self.assertEqual((r.returncode, r.stdout), (0, KBD))
+        self.assertEqual(run_fn('usos_w2k_sif_desc Computer E_ISA_UP', W2K_TXTSETUP).stdout, 'Standardowy komputer PC'.encode('cp1250'))
+        self.assertEqual(run_fn('usos_w2k_sif_desc computer mps_mp', W2K_TXTSETUP).stdout, b'MPS Multiprocessor PC')
+        self.assertEqual(run_fn('usos_w2k_sif_desc computer mps_up', W2K_TXTSETUP).returncode, 3)
+        self.assertEqual(run_fn('usos_w2k_sif_desc map.keyboard standard', W2K_TXTSETUP).returncode, 3)  # no quoted text
+        # ANSI (CP1250) bytes pass through unchanged, into WINNT.SIF as well.
+        mouse = 'Brak myszy lub innego urządzenia wskazującego'.encode('cp1250')
+        self.assertEqual(run_fn('usos_w2k_sif_desc mouse none', b'[Mouse]\r\nnone     = "' + mouse + b'",files.none,""\r\n').stdout, mouse)
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / 'desc').write_bytes(mouse)
+            r = run_fn(f'usos_w2k_hw_sif "$(cat \'{posix(Path(tmp) / "desc")}\')" "$(cat \'{posix(Path(tmp) / "desc")}\')"', W2K_WINNT)
+        self.assertIn(b'ComputerType = "' + mouse + b'","Retail"\r\n', r.stdout)
+        self.assertTrue(r.stdout.endswith(b'[KeyboardDrivers]\r\n"' + mouse + b'" = "Retail"\r\n'))
+        # WINNT.SIF: rows added once (preinstall mode: setupdd.sys reads the component
+        # answers only then), an older OemPreinstall / ComputerType / [KeyboardDrivers] replaced.
+        r = run_fn('usos_w2k_hw_sif "Standard PC" "Std kbd"', W2K_WINNT)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        want = W2K_WINNT.replace(b'[Unattended]\r\n', b'[Unattended]\r\nOemPreinstall=Yes\r\nComputerType = "Standard PC","Retail"\r\n') + \
+            b'[KeyboardDrivers]\r\n"Std kbd" = "Retail"\r\n'
+        self.assertEqual(r.stdout, want)
+        self.assertEqual(run_fn('usos_w2k_hw_sif "Standard PC" "Std kbd"', r.stdout).stdout, want)
+        old = W2K_WINNT.replace(b'[Unattended]\r\n', b'[Unattended]\r\nComputerType="Other",OEM\r\nOemPreinstall=No\r\n') + \
+            b'[KeyboardDrivers]\r\n"X" = "OEM"\r\n[Display]\r\nBitsPerPel=16\r\n'
+        self.assertEqual(run_fn('usos_w2k_hw_sif "" "Std kbd"', old).stdout,
+                         W2K_WINNT.replace(b'[Unattended]\r\n', b'[Unattended]\r\nOemPreinstall=Yes\r\n') +
+                         b'[Display]\r\nBitsPerPel=16\r\n[KeyboardDrivers]\r\n"Std kbd" = "Retail"\r\n')
+        self.assertEqual(run_fn('usos_w2k_hw_sif "" "k"', b'[Data]\r\nx=1\r\n').returncode, 3)
+
+    def test_apply_hal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            t = Path(tmp)
+            bt, ls = self.stand_in(t)
+            self.assertIn(b'USOS_W2K_HAL needs ACPI off', self.apply(t, 'USOS_W2K_HAL=standard').stdout)
+            self.assertIn(b'USOS_W2K_HAL must be', self.apply(t, 'USOS_W2K_ACPI=off USOS_W2K_HAL=acpi').stdout)
+            self.assertFalse((bt / 'ahcint.sys').exists())
+            r = self.apply(t, 'USOS_W2K_ACPI=off USOS_W2K_HAL=standard')
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn(b'HAL Standard PC (ComputerType)', r.stdout)
+            a = sh(f"USOS_W2K_ACPI=off USOS_W2K_HAL=standard; export USOS_W2K_ACPI USOS_W2K_HAL; . '{LIB}'; usos_w2k_answer_sif '{posix(ls / 'TXTSETUP.SIF')}'", W2K_WINNT)
+            self.assertIn(b'ComputerType = "Standardowy komputer PC","Retail"\r\n', a.stdout)
+            bad = sh(f"USOS_W2K_HAL=mps; export USOS_W2K_ACPI USOS_W2K_HAL; . '{LIB}'; usos_w2k_answer_sif '{posix(ls / 'TXTSETUP.SIF')}'", W2K_WINNT)
+            self.assertEqual((bad.returncode, bad.stdout), (1, b''))
+            self.assertIn(b'USOS_W2K_HAL needs ACPI off', bad.stderr)
+            bad = sh(f":; export USOS_W2K_ACPI USOS_W2K_HAL; . '{LIB}'; usos_w2k_answer_sif '{posix(ls / 'TXTSETUP.SIF')}'", b'[Data]\r\n')
+            self.assertIn(b'no [Unattended] section', bad.stderr)
+        # Without the keyboard row (or a pinned HAL's row) nothing is written.
+        for env, edit, msg in (('USOS_W2K_ACPI=off', (b'STANDARD    =', b'OTHER    ='), b'no [Keyboard] STANDARD row'),
+                               ('USOS_W2K_ACPI=off', (b'mps_mp      =', b'other_mp    ='), b'no [Computer] mps_mp row'),
+                               ('USOS_W2K_ACPI=off USOS_W2K_HAL=standard', (b'e_isa_up    =', b'other_up    ='), b'no [Computer] e_isa_up row')):
+            with tempfile.TemporaryDirectory() as tmp:
+                t = Path(tmp)
+                bt, ls = self.stand_in(t)
+                (ls / 'TXTSETUP.SIF').write_bytes(W2K_TXTSETUP.replace(*edit))
+                before = (ls / 'TXTSETUP.SIF').read_bytes()
+                r = self.apply(t, env)
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn(msg, r.stdout)
+                self.assertEqual((ls / 'TXTSETUP.SIF').read_bytes(), before)
+                self.assertFalse((bt / 'ahcint.sys').exists())
+        # The answer file is written where every NT5 UEFI answer is assembled.
+        part = (ROOT / 'tools/prepare_xp_windows_partition.sh').read_text()
+        self.assertIn('usos_w2k_answer_sif "${XP_TARGET_ROOT:?}/\\$WIN_NT\\$.~LS/I386/TXTSETUP.SIF"', part)
+        self.assertLess(part.index('usos_w2k_answer_sif'), part.index('put_verified "$work/winnt.sif" WINNT.SIF'))
+        stage = (ROOT / 'tools/legacy_xp_staging.sh').read_text()
+        self.assertIn('Unattended/hal-standard.txt" ]; then USOS_W2K_HAL=standard; else USOS_W2K_HAL=auto; fi', stage)
+        self.assertIn('export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL', stage)
 
     def test_gap_marker(self):
         r = run_fn('usos_w2k_gap_marker edc187d4', b'')
