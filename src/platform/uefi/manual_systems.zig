@@ -7,7 +7,6 @@ const system_icons = @import("system_icons.zig");
 const view = @import("manual_view.zig");
 const boot_timing = @import("boot_timing.zig");
 const secure_boot = @import("secure_boot.zig");
-const manual_utilities = @import("manual_utilities.zig");
 
 var list_timing_reported = false;
 
@@ -87,8 +86,8 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
             .activate => {
                 const entry = slots.at(selected) orelse continue;
                 const media = discovery.mediaStatus(entry.image_directory);
-                if (rows_model.viaBiosMode(entry, firmware) and media.hasImages()) {
-                    manual_utilities.biosMode(root, .available, entry);
+                if (rows_model.biosOnly(entry, firmware)) {
+                    if (media.hasImages()) showBackendDisabledNotice(entry, view.t(.notice_backend_line2)) else showMissingImageNotice(entry);
                     list.redrawFull(selected, shown_help);
                     continue;
                 }
@@ -131,11 +130,11 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
 
 const HelpLines = [2][]const u8;
 
-const Block = enum { none, requires_bios, requires_uefi, secure_boot_off, via_bios_mode };
+const Block = enum { none, requires_bios, requires_uefi, secure_boot_off };
 
 fn blockAt(slots: *const Slots, index: usize, firmware: usos.firmware.Firmware) Block {
     const entry = slots.at(index) orelse return .none;
-    if (rows_model.viaBiosMode(entry, firmware)) return .via_bios_mode;
+    if (rows_model.biosOnly(entry, firmware)) return .none;
     if (!entry.firmware.accepts(firmware)) return if (entry.firmware == .uefi) .requires_uefi else .requires_bios;
     if (secureBootBlocked(entry, firmware)) return .secure_boot_off;
     return .none;
@@ -155,10 +154,6 @@ fn blockedHelp(block: Block, lines: *HelpLines, entry: ?*const usos.catalog.Syst
             };
             // The row already carries the badge; its text heads the panel.
             return .{ .title = view.t(if (requires_uefi) .system_requires_uefi else .system_requires_bios), .lines = lines };
-        },
-        .via_bios_mode => {
-            lines.* = .{ view.t(.system_via_bios_mode_detail), view.t(.utilities_bios_mode_desc) };
-            return .{ .title = view.t(.system_via_bios_mode), .lines = lines };
         },
         .secure_boot_off => {
             const linux = if (entry) |e| e.family == .linux else false;

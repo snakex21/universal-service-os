@@ -350,8 +350,6 @@
   "boot.system.requires_bios.detail": "Ten system startuje tylko w trybie BIOS; USOS działa w trybie UEFI.",
   "boot.system.requires_uefi.hint": "Aby go użyć, uruchom pendrive w trybie UEFI: wybierz jego pozycję UEFI w menu rozruchu firmware.",
   "boot.system.requires_bios.hint": "Aby go użyć, uruchom pendrive w trybie Legacy BIOS (CSM): wybierz jego pozycję bez UEFI w menu rozruchu firmware.",
-  "boot.system.via_bios_mode": "Tryb Legacy BIOS",
-  "boot.system.via_bios_mode.detail": "Startuje przez menu BIOS USOS (CSMWrap) na tym komputerze",
   "boot.system.unavailable": "Niedostępny",
   "boot.system.unavailable.detail": "Żaden działający backend startowy nie obsługuje jeszcze tego systemu.",
   "boot.notice.no_image.title": "Nie znaleziono obrazów",
@@ -377,7 +375,6 @@
   "boot.bios_mode.note.restart": "Otwiera menu BIOS USOS (DOS, Windows 3.x, 95/98/Me). Restart wraca do UEFI.",
   "boot.bios_mode.note.cpu": "CSMWrap rezerwuje dla siebie jeden wątek procesora; DOS i Windows 3.x go nie potrzebują.",
   "boot.bios_mode.note.video": "Wymaga karty graficznej z klasycznym BIOS-em wideo; bez niego ekrany DOS pozostaną czarne.",
-  "boot.bios_mode.note.pick": "W menu BIOS wybierz go ponownie: Windows -> {0}",
   "boot.bios_mode.starting": "Uruchamianie trybu BIOS (CSMWrap)...",
   "boot.images.title": "Wybierz obraz",
   "boot.images.subtitle": "Pliki ISO, WIM, IMG, VHD, VHDX i EFI są wykrywane automatycznie",
@@ -1162,7 +1159,7 @@
   "boot.summary.vista_case_nocsm": "Windows Vista bez CSM: jeszcze nieobsługiwane (czarny ekran) - włącz CSM w ustawieniach płyty",
 
   "boot.summary.xp_csmwrap": "XP bez CSM (eksperymentalne): CSMWrap, karta z legacy VBIOS, 1 rdzeń zarezerwowany",
-  "boot.summary.w9x_csmwrap": "Bez CSM (eksperymentalne): USOS przygotowuje dysk FAT32 z instalatorem i CSMWrap; instalator startuje potem z niego",
+  "boot.summary.w9x_csmwrap": "Bez CSM (eksperymentalne): USOS przygotowuje dysk i CSMWrap; instalacja startuje potem z niego",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperymentalne): brak sterownika AHCI/NVMe/USB 3 dla NT 5.0 (SATA w trybie IDE), maks. 4 GB RAM i 2 procesory",
 

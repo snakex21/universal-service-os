@@ -298,8 +298,6 @@ pub const Key = enum(u16) {
     system_requires_uefi_hint,
     system_unavailable,
     system_unavailable_detail,
-    system_via_bios_mode,
-    system_via_bios_mode_detail,
     systems_subtitle,
     themes_builtin,
     themes_current,
@@ -345,7 +343,6 @@ pub const Key = enum(u16) {
     action_winpe,
     action_xp,
     bios_mode_note_cpu,
-    bios_mode_note_pick,
     bios_mode_note_restart,
     bios_mode_note_video,
     bios_mode_profile_detail,
@@ -980,8 +977,6 @@ pub const hashes = [_]u32{
     0xa4c837bf, // system.requires_uefi.hint
     0x31aec0c8, // system.unavailable
     0xa6ba9b83, // system.unavailable.detail
-    0x81fb528a, // system.via_bios_mode
-    0xf5d946bd, // system.via_bios_mode.detail
     0xab5ff4f5, // systems.subtitle
     0xf0db4556, // themes.builtin
     0xaef5a0d8, // themes.current
@@ -1027,7 +1022,6 @@ pub const hashes = [_]u32{
     0xb3fd0db4, // action.winpe
     0x45058703, // action.xp
     0xc6026856, // bios_mode.note.cpu
-    0xee018595, // bios_mode.note.pick
     0x33394f47, // bios_mode.note.restart
     0x643e4f67, // bios_mode.note.video
     0x9761d865, // bios_mode.profile_detail
@@ -1696,9 +1690,6 @@ pub const bios = [_]bool{
     true,
     true,
     true,
-    true,
-    true,
-    false,
     false,
     false,
     false,
@@ -2047,7 +2038,7 @@ pub const bios = [_]bool{
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
-pub const bios_count = 332;
+pub const bios_count = 330;
 
 pub const english = [_][]const u8{
     "Experimental",
@@ -2346,8 +2337,6 @@ pub const english = [_][]const u8{
     "To use it, start the USB stick in UEFI mode: pick its UEFI entry in the firmware boot menu.",
     "Unavailable",
     "No working boot backend supports this system yet.",
-    "Legacy BIOS mode",
-    "Starts through the USOS BIOS menu (CSMWrap) on this PC",
     "Select a system, distribution or utility group",
     "built-in",
     "in use",
@@ -2393,7 +2382,6 @@ pub const english = [_][]const u8{
     "Start WinPE",
     "Prepare the Windows XP installation",
     "CSMWrap reserves one CPU thread for itself; DOS and Windows 3.x do not need it.",
-    "In the BIOS menu choose it again: Windows -> {0}",
     "Opens the USOS BIOS menu (DOS, Windows 3.x, 95/98/Me). A restart returns to UEFI.",
     "Needs a graphics card with a legacy video BIOS; without one the DOS screens stay black.",
     "Also gives this answer profile to Windows 95/98/Me Setup",
@@ -2654,7 +2642,7 @@ pub const english = [_][]const u8{
     "KB2864202 + signed USB package + pre-Setup v11",
     "PE10 native USB; the target uses Vista USB v11",
     "Windows 2000 (experimental): no AHCI/NVMe/USB 3 driver for NT 5.0 (SATA in IDE mode), max. 4 GB RAM and 2 CPUs",
-    "Without CSM (experimental): USOS prepares a FAT32 Setup disk with CSMWrap; Setup then runs from it",
+    "Without CSM (experimental): USOS prepares the disk and CSMWrap; the installation then starts from it",
     "Selected and confirmed in the next graphical screen; the whole disk is erased",
     "XP without CSM (experimental): CSMWrap, card with a legacy VBIOS, 1 core reserved",
     "Selected and confirmed in the next graphical screen",

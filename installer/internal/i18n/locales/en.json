@@ -347,8 +347,6 @@
   "boot.system.requires_bios.detail": "This system starts only in BIOS mode; USOS is running in UEFI mode.",
   "boot.system.requires_uefi.hint": "To use it, start the USB stick in UEFI mode: pick its UEFI entry in the firmware boot menu.",
   "boot.system.requires_bios.hint": "To use it, start the USB stick in Legacy BIOS (CSM) mode: pick its non-UEFI entry in the firmware boot menu.",
-  "boot.system.via_bios_mode": "Legacy BIOS mode",
-  "boot.system.via_bios_mode.detail": "Starts through the USOS BIOS menu (CSMWrap) on this PC",
   "boot.system.unavailable": "Unavailable",
   "boot.system.unavailable.detail": "No working boot backend supports this system yet.",
   "boot.notice.no_image.title": "No images found",
@@ -374,7 +372,6 @@
   "boot.bios_mode.note.restart": "Opens the USOS BIOS menu (DOS, Windows 3.x, 95/98/Me). A restart returns to UEFI.",
   "boot.bios_mode.note.cpu": "CSMWrap reserves one CPU thread for itself; DOS and Windows 3.x do not need it.",
   "boot.bios_mode.note.video": "Needs a graphics card with a legacy video BIOS; without one the DOS screens stay black.",
-  "boot.bios_mode.note.pick": "In the BIOS menu choose it again: Windows -> {0}",
   "boot.bios_mode.starting": "Starting the BIOS mode (CSMWrap)...",
   "boot.images.title": "Select image",
   "boot.images.subtitle": "ISO, WIM, IMG, VHD, VHDX and EFI files are detected automatically",
@@ -1159,7 +1156,7 @@
   "boot.summary.vista_case_nocsm": "Windows Vista without CSM: not supported yet (black screen) - enable CSM in the board settings",
 
   "boot.summary.xp_csmwrap": "XP without CSM (experimental): CSMWrap, card with a legacy VBIOS, 1 core reserved",
-  "boot.summary.w9x_csmwrap": "Without CSM (experimental): USOS prepares a FAT32 Setup disk with CSMWrap; Setup then runs from it",
+  "boot.summary.w9x_csmwrap": "Without CSM (experimental): USOS prepares the disk and CSMWrap; the installation then starts from it",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimental): no AHCI/NVMe/USB 3 driver for NT 5.0 (SATA in IDE mode), max. 4 GB RAM and 2 CPUs",
 
