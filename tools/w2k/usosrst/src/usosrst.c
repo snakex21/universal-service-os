@@ -47,13 +47,36 @@
  *    counters = an I/O stall; a frozen row 1 = the timer/DPC path (or the
  *    whole machine) is stuck.
  *
+ * 5. Clock diagnostics (1.3, text-mode Setup only). Rows 9-10 show, once
+ *    at load, what drives the system clock: the TSC rate, the HPET (general
+ *    configuration with the LegacyReplacement bit, timer 0, whether its
+ *    counter runs), the 8254 PIT channel 0 status, the I/O APIC
+ *    redirection entries of pins 0, 2, 8 and 9, the local APIC timer and
+ *    LINT0/LINT1 entries, and the CMOS RTC registers A/B, century and year.
+ *    Row 1 also gets "w:", seconds since load from the TSC, next to the
+ *    clock-interrupt seconds "t:". If t: lags w:, clock interrupts are
+ *    being lost.
+ *
+ * 6. Experiment (off by default): with "USOSHPETLEGOFF" in the load
+ *    options (text mode, TXTSETUP [SetupData] OsLoadOptions) or the
+ *    Parameters value HpetLegacyOff = 1 (later boots), the driver clears
+ *    HPET LegacyReplacement (general configuration bit 1) when it is set.
+ *    The 8254 PIT and the RTC then drive IRQ 0 and IRQ 8 again, as the
+ *    pre-ACPI HALs expect. Row 9 shows "leg:1>0" when this was done.
+ *
  * Screen rows: 0 AHCINT, 1 heartbeat, 2 load line, 3-4 stall snapshot,
- * 5-7 STOP, 8 a second AHCINT HBA.
+ * 5-7 STOP, 8 a second AHCINT HBA, 9-10 clock.
  */
 #include <ntddk.h>
 
 /* Exported by every NT kernel since 3.1; ntddk.h does not declare it. */
 __declspec(dllimport) extern ULONG KiBugCheckData[5];
+
+/* Compiler intrinsics (WDK 7.1 x86 has no intrin.h; __rdtsc is in ntddk.h). */
+unsigned __int64 __readmsr(unsigned long Register);
+void __cdecl _disable(void);
+void __cdecl _enable(void);
+#pragma intrinsic(__readmsr, _disable, _enable)
 
 /* Exported by every NT HAL (stdcall, one argument); the WDK 7.1 headers no
    longer declare it. Routine values as in the NT 4.0-2003 DDKs
@@ -62,11 +85,12 @@ __declspec(dllimport) extern ULONG KiBugCheckData[5];
 #define USOS_HAL_REBOOT_ROUTINE   3
 __declspec(dllimport) VOID NTAPI HalReturnToFirmware(IN ULONG Routine);
 
-#define USOSRST_VERSION "usosrst 1.2"
+#define USOSRST_VERSION "usosrst 1.3"
 #define ROW_HB          1
 #define ROW_LOAD        2
 #define ROW_STALL       3
 #define ROW_STOP        5
+#define ROW_CLOCK       9
 
 static PUSHORT g_Vga;
 static KBUGCHECK_CALLBACK_RECORD g_BugCheckRecord;
@@ -78,6 +102,8 @@ static ULONG g_ResetAddress;
 static UCHAR g_ResetValue;
 static PUCHAR g_ResetMapped;
 static ULONG g_AcpiRevision = 0xFF;    /* RSDP revision, FFh = no RSDP found */
+static ULONG g_HpetTable;           /* physical address of the HPET table */
+static ULONG g_MadtTable;           /* physical address of the MADT ("APIC") */
 
 typedef VOID (NTAPI *USOS_RETURN_TO_FIRMWARE)(IN ULONG Routine);
 static USOS_RETURN_TO_FIRMWARE g_HalReturnToFirmware;  /* the HAL's routine */
@@ -267,9 +293,10 @@ FindResetRegister(VOID)
         if (entrySize == 8 && *(PULONG)(sdt + i + 4) != 0) continue;
         hdr = MapPhys(addr, 36);
         if (hdr == NULL) continue;
-        if (hdr[0] == 'F' && hdr[1] == 'A' && hdr[2] == 'C' && hdr[3] == 'P') fadtAddr = addr;
+        if (hdr[0] == 'F' && hdr[1] == 'A' && hdr[2] == 'C' && hdr[3] == 'P' && fadtAddr == 0) fadtAddr = addr;
+        if (hdr[0] == 'H' && hdr[1] == 'P' && hdr[2] == 'E' && hdr[3] == 'T' && g_HpetTable == 0) g_HpetTable = addr;
+        if (hdr[0] == 'A' && hdr[1] == 'P' && hdr[2] == 'I' && hdr[3] == 'C' && g_MadtTable == 0) g_MadtTable = addr;
         MmUnmapIoSpace(hdr, 36);
-        if (fadtAddr) break;
     }
     MmUnmapIoSpace(sdt, sdtLen);
     if (fadtAddr == 0) return;
@@ -493,6 +520,268 @@ SetupInProgress(VOID)
 }
 
 /* ------------------------------------------------------------------ */
+/* Clock diagnostics and the HPET LegacyReplacement experiment         */
+/* ------------------------------------------------------------------ */
+
+static PCHAR PutDec(PCHAR p, PCHAR end, ULONG v, ULONG digits);
+
+static ULONGLONG g_Tsc0;            /* TSC at load */
+static ULONG g_TscPer100ms;         /* TSC cycles in 100 ms (KeStallExecutionProcessor) */
+static ULONG g_HpetCfg = 0xFFFFFFFF, g_HpetT0 = 0xFFFFFFFF, g_HpetBase;
+static BOOLEAN g_HpetRuns, g_HpetLegCleared, g_HpetWanted;
+
+/* "USOSHPETLEGOFF" in the load options, or Parameters\HpetLegacyOff = 1. */
+static BOOLEAN
+HpetLegacyOffWanted(IN PUNICODE_STRING RegistryPath)
+{
+    static WCHAR want[] = L"USOSHPETLEGOFF";
+    UNICODE_STRING name;
+    OBJECT_ATTRIBUTES oa;
+    HANDLE key;
+    UCHAR buffer[sizeof(KEY_VALUE_PARTIAL_INFORMATION) + 512];
+    PKEY_VALUE_PARTIAL_INFORMATION info = (PKEY_VALUE_PARTIAL_INFORMATION)buffer;
+    ULONG length, i, j, n;
+    BOOLEAN result = FALSE;
+
+    RtlInitUnicodeString(&name, L"\\Registry\\Machine\\SYSTEM\\CurrentControlSet\\Control");
+    InitializeObjectAttributes(&oa, &name, OBJ_CASE_INSENSITIVE, NULL, NULL);
+    if (NT_SUCCESS(ZwOpenKey(&key, KEY_READ, &oa))) {
+        RtlInitUnicodeString(&name, L"SystemStartOptions");
+        if (NT_SUCCESS(ZwQueryValueKey(key, &name, KeyValuePartialInformation, info, sizeof(buffer) - 2, &length)) &&
+            info->Type == REG_SZ) {
+            PWCHAR text = (PWCHAR)info->Data;
+            n = info->DataLength / 2;
+            for (i = 0; i + 14 <= n && !result; i++) {
+                for (j = 0; j < 14; j++) {
+                    WCHAR c = text[i + j];
+                    if (c >= 'a' && c <= 'z') c = (WCHAR)(c - 32);
+                    if (c != want[j]) break;
+                }
+                if (j == 14) result = TRUE;
+            }
+        }
+        ZwClose(key);
+    }
+    if (result || RegistryPath == NULL) return result;
+    {
+        WCHAR path[256];
+        UNICODE_STRING full;
+        full.Buffer = path;
+        full.Length = 0;
+        full.MaximumLength = sizeof(path);
+        if (!NT_SUCCESS(RtlAppendUnicodeStringToString(&full, RegistryPath)) ||
+            !NT_SUCCESS(RtlAppendUnicodeToString(&full, L"\\Parameters"))) return FALSE;
+        InitializeObjectAttributes(&oa, &full, OBJ_CASE_INSENSITIVE, NULL, NULL);
+        if (!NT_SUCCESS(ZwOpenKey(&key, KEY_READ, &oa))) return FALSE;
+        RtlInitUnicodeString(&name, L"HpetLegacyOff");
+        if (NT_SUCCESS(ZwQueryValueKey(key, &name, KeyValuePartialInformation, info, sizeof(buffer), &length)) &&
+            info->Type == REG_DWORD && info->DataLength == sizeof(ULONG) && *(PULONG)info->Data == 1) result = TRUE;
+        ZwClose(key);
+    }
+    return result;
+}
+
+/* HPET: general configuration, timer 0, a running counter; clears
+   LegacyReplacement when asked. */
+static VOID
+ProbeHpet(BOOLEAN ClearLegacy)
+{
+    PUCHAR t, h;
+    PHYSICAL_ADDRESS pa;
+    ULONG c0, c1;
+
+    if (g_HpetTable == 0) return;
+    t = MapPhys(g_HpetTable, 56);
+    if (t == NULL) return;
+    if (*(PULONG)(t + 4) >= 56 && t[40] == 0 && *(PULONG)(t + 48) == 0) g_HpetBase = *(PULONG)(t + 44);
+    MmUnmapIoSpace(t, 56);
+    if (g_HpetBase == 0) return;
+    pa.QuadPart = g_HpetBase;
+    h = (PUCHAR)MmMapIoSpace(pa, 0x400, MmNonCached);
+    if (h == NULL) return;
+    g_HpetCfg = READ_REGISTER_ULONG((PULONG)(h + 0x10));
+    g_HpetT0 = READ_REGISTER_ULONG((PULONG)(h + 0x100));
+    c0 = READ_REGISTER_ULONG((PULONG)(h + 0xF0));
+    KeStallExecutionProcessor(100);
+    c1 = READ_REGISTER_ULONG((PULONG)(h + 0xF0));
+    g_HpetRuns = (BOOLEAN)(c0 != c1);
+    if (ClearLegacy && (g_HpetCfg & 2)) {
+        WRITE_REGISTER_ULONG((PULONG)(h + 0x10), g_HpetCfg & ~2UL);
+        g_HpetLegCleared = (BOOLEAN)((READ_REGISTER_ULONG((PULONG)(h + 0x10)) & 2) == 0);
+    }
+    MmUnmapIoSpace(h, 0x400);
+}
+
+/* I/O APIC redirection entry (low dword, bits 0-16) of Pin of the I/O APIC
+   with GSI base 0, from the MADT. FFFFFFFF: not found. */
+static ULONG g_IoApic;
+static VOID
+FindIoApic(VOID)
+{
+    PUCHAR m;
+    ULONG len, off;
+
+    if (g_MadtTable == 0) return;
+    m = MapPhys(g_MadtTable, 8);
+    if (m == NULL) return;
+    len = *(PULONG)(m + 4);
+    MmUnmapIoSpace(m, 8);
+    if (len < 44 || len > 0x4000) return;
+    m = MapPhys(g_MadtTable, len);
+    if (m == NULL) return;
+    for (off = 44; off + 2 <= len && m[off + 1] >= 2 && off + m[off + 1] <= len; off += m[off + 1]) {
+        if (m[off] == 1 && m[off + 1] >= 12 && *(PULONG)(m + off + 8) == 0) {
+            g_IoApic = *(PULONG)(m + off + 4);
+            break;
+        }
+    }
+    MmUnmapIoSpace(m, len);
+}
+
+static VOID
+ReadIoApic(PULONG Rte, const UCHAR *Pins, ULONG Count)
+{
+    PHYSICAL_ADDRESS pa;
+    volatile ULONG *io;
+    ULONG i;
+
+    for (i = 0; i < Count; i++) Rte[i] = 0xFFFFFFFF;
+    if (g_IoApic == 0) return;
+    pa.QuadPart = g_IoApic;
+    io = (volatile ULONG *)MmMapIoSpace(pa, 0x20, MmNonCached);
+    if (io == NULL) return;
+    _disable();
+    for (i = 0; i < Count; i++) {
+        io[0] = 0x10 + 2 * Pins[i];
+        Rte[i] = io[4] & 0x1FFFF;
+    }
+    _enable();
+    MmUnmapIoSpace((PVOID)io, 0x20);
+}
+
+static UCHAR
+CmosRead(UCHAR Index)
+{
+    WRITE_PORT_UCHAR((PUCHAR)0x70, Index);
+    return READ_PORT_UCHAR((PUCHAR)0x71);
+}
+
+/* Rows 9-10, once at load (text mode). */
+static VOID
+ShowClock(VOID)
+{
+    static const UCHAR pins[4] = { 0, 2, 8, 9 };
+    CHAR line[80];
+    PCHAR p, end = line + 80;
+    ULONG rte[4], i, lvtT = 0xFFFFFFFF, lint0 = 0xFFFFFFFF, lint1 = 0xFFFFFFFF, lapicInit = 0;
+    UCHAR pitStatus, rA, rB, cen, yr;
+    USHORT pit0, pit1;
+    PHYSICAL_ADDRESS pa;
+    ULONGLONG apicBase;
+    volatile ULONG *lapic;
+
+    /* PIT channel 0: read-back status, then the count twice */
+    _disable();
+    WRITE_PORT_UCHAR((PUCHAR)0x43, 0xE2);
+    pitStatus = READ_PORT_UCHAR((PUCHAR)0x40);
+    WRITE_PORT_UCHAR((PUCHAR)0x43, 0x00);
+    pit0 = READ_PORT_UCHAR((PUCHAR)0x40);
+    pit0 |= (USHORT)(READ_PORT_UCHAR((PUCHAR)0x40) << 8);
+    KeStallExecutionProcessor(50);
+    WRITE_PORT_UCHAR((PUCHAR)0x43, 0x00);
+    pit1 = READ_PORT_UCHAR((PUCHAR)0x40);
+    pit1 |= (USHORT)(READ_PORT_UCHAR((PUCHAR)0x40) << 8);
+    rA = CmosRead(0x0A);
+    rB = CmosRead(0x0B);
+    cen = CmosRead(0x32);
+    yr = CmosRead(0x09);
+    _enable();
+
+    FindIoApic();
+    ReadIoApic(rte, pins, 4);
+
+    apicBase = __readmsr(0x1B);
+    if (apicBase & 0x800) {
+        pa.QuadPart = (LONGLONG)(apicBase & 0xFFFFF000);
+        lapic = (volatile ULONG *)MmMapIoSpace(pa, 0x400, MmNonCached);
+        if (lapic != NULL) {
+            lvtT = lapic[0x320 / 4];
+            lint0 = lapic[0x350 / 4];
+            lint1 = lapic[0x360 / 4];
+            lapicInit = lapic[0x380 / 4];
+            MmUnmapIoSpace((PVOID)lapic, 0x400);
+        }
+    }
+
+    p = PutStr(line, end, "CLK tsc:");
+    p = PutDec(p, end, g_TscPer100ms / 100000, 4);
+    p = PutStr(p, end, "MHz hpet:");
+    if (g_HpetBase) {
+        p = PutHex(p, end, g_HpetBase, 8);
+        p = PutStr(p, end, " cfg:");
+        p = PutHex(p, end, g_HpetCfg, 8);
+        p = PutStr(p, end, " t0:");
+        p = PutHex(p, end, g_HpetT0, 8);
+        p = PutStr(p, end, g_HpetRuns ? " run" : " stop");
+        p = PutStr(p, end, " leg:");
+        p = PutHex(p, end, (g_HpetCfg >> 1) & 1, 1);
+        p = PutStr(p, end, g_HpetLegCleared ? ">0" : g_HpetWanted ? ">?" : "");
+    } else {
+        p = PutStr(p, end, g_HpetTable ? "nobase" : "none");
+    }
+    p = PutStr(p, end, " io:");
+    p = PutHex(p, end, g_IoApic, 8);
+    ShowRow(ROW_CLOCK, line, (ULONG)(p - line), 0x1F00);
+
+    p = PutStr(line, end, "CLK pit:");
+    p = PutHex(p, end, pitStatus, 2);
+    p = PutStr(p, end, pit0 != pit1 ? "+" : "=");          /* counting or not */
+    p = PutStr(p, end, " rte:");
+    for (i = 0; i < 4; i++) {
+        if (i) p = PutStr(p, end, " ");
+        p = PutHex(p, end, rte[i], 5);
+    }
+    p = PutStr(p, end, " lvt:");
+    p = PutHex(p, end, lvtT, 5);
+    p = PutStr(p, end, " ");
+    p = PutHex(p, end, lint0, 5);
+    p = PutStr(p, end, " ");
+    p = PutHex(p, end, lint1, 5);
+    p = PutStr(p, end, lapicInit ? " lt+" : " lt0");
+    p = PutStr(p, end, " rtc:");
+    p = PutHex(p, end, rA, 2);
+    p = PutStr(p, end, " ");
+    p = PutHex(p, end, rB, 2);
+    p = PutStr(p, end, " ");
+    p = PutHex(p, end, cen, 2);
+    p = PutHex(p, end, yr, 2);
+    ShowRow(ROW_CLOCK + 1, line, (ULONG)(p - line), 0x1F00);
+}
+
+/* TSC rate against KeStallExecutionProcessor (the HAL calibrates it with
+   the PIT counter, without interrupts). */
+static VOID
+CalibrateTsc(VOID)
+{
+    ULONGLONG t1;
+    ULONG i;
+
+    g_Tsc0 = __rdtsc();
+    for (i = 0; i < 2; i++) KeStallExecutionProcessor(50000);
+    t1 = __rdtsc();
+    g_TscPer100ms = (ULONG)(t1 - g_Tsc0);
+}
+
+/* Seconds since load from the TSC. */
+static ULONG
+WallSeconds(VOID)
+{
+    ULONG div = (ULONG)(((ULONGLONG)g_TscPer100ms * 10) >> 16);
+    if (div == 0) return 0;
+    return (ULONG)((__rdtsc() - g_Tsc0) >> 16) / div;
+}
+
+/* ------------------------------------------------------------------ */
 /* Heartbeat and AHCI stall watchdog (text-mode Setup only)            */
 /* ------------------------------------------------------------------ */
 
@@ -713,15 +1002,17 @@ HeartbeatDpc(IN PKDPC Dpc, IN PVOID Context, IN PVOID Arg1, IN PVOID Arg2)
 
     now = KeQueryInterruptTime();
     p = PutStr(line, end, "HB ");
-    p = PutHex(p, end, g_Tick, 8);
+    p = PutHex(p, end, g_Tick, 6);
     p = PutStr(p, end, " t:");
-    p = PutDec(p, end, (ULONG)(now >> 7) / 78125, 6);      /* 100 ns units -> s */
-    p = PutStr(p, end, "s S:");
+    p = PutDec(p, end, (ULONG)(now >> 7) / 78125, 5);      /* 100 ns units -> s */
+    p = PutStr(p, end, " w:");
+    p = PutDec(p, end, WallSeconds(), 5);
+    p = PutStr(p, end, " S:");
     p = PutHex(p, end, g_Stalls > 0xF ? 0xF : g_Stalls, 1);
     if (best != NULL) {
         p = PutStr(p, end, " ");
         p = PutName(p, end, best);
-        p = PutStr(p, end, " CI:");
+        p = PutStr(p, end, " C:");
         p = PutHex(p, end, bestCi, 8);
         p = PutStr(p, end, " L:");
         p = PutHex(p, end, best->Op, best->Op > 0xFF ? 4 : 2);
@@ -729,9 +1020,8 @@ HeartbeatDpc(IN PKDPC Dpc, IN PVOID Context, IN PVOID Arg1, IN PVOID Arg2)
         p = PutHex(p, end, best->Lba, 8);
         p = PutStr(p, end, "+");
         p = PutHex(p, end, best->Count, 4);
-        p = PutStr(p, end, " age:");
+        p = PutStr(p, end, " a:");
         p = PutDec(p, end, (g_Tick - best->Changed) * HB_PERIOD_MS / 1000, 4);
-        p = PutStr(p, end, "s");
     } else {
         p = PutStr(p, end, g_Watches ? " ahci:no-cmd" : " ahci:none");
     }
@@ -827,8 +1117,6 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     CHAR line[80];
     PCHAR p, end = line + 80;
 
-    UNREFERENCED_PARAMETER(RegistryPath);
-
     g_OwnEntry = DriverObject->DriverSection;
     vga.QuadPart = 0xB8000;
     g_Vga = (PUSHORT)MmMapIoSpace(vga, 80 * 50 * 2, MmNonCached);
@@ -838,9 +1126,16 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     g_InSetup = SetupInProgress();
     FindResetRegister();
     restart = RedirectSetupRestart();
-    /* Text-mode Setup only: the heartbeat writes the text buffer every
-       250 ms, which a graphics desktop must not get. */
-    if (restart != '-') StartHeartbeat();
+    /* The experiment applies to every boot that asks for it; the clock
+       rows and the heartbeat are text-mode Setup only (a graphics desktop
+       must not get text-buffer writes). */
+    g_HpetWanted = HpetLegacyOffWanted(RegistryPath);
+    if (restart != '-') CalibrateTsc();
+    ProbeHpet(g_HpetWanted);
+    if (restart != '-') {
+        ShowClock();
+        StartHeartbeat();
+    }
     if (g_InSetup && NT_SUCCESS(IoCreateDevice(DriverObject, 0, NULL, FILE_DEVICE_UNKNOWN, 0, FALSE, &device))) {
         DriverObject->MajorFunction[IRP_MJ_SHUTDOWN] = ShutdownDispatch;
         if (NT_SUCCESS(IoRegisterLastChanceShutdownNotification(device))) {

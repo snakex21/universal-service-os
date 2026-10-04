@@ -107,6 +107,12 @@ usos_w2k_apply() (
     case "$mode" in legacy|pnp) ;; *) echo "[W2K_STAGE] STOP: USOS_W2K_AHCINT_MODE must be legacy or pnp"; exit 1 ;; esac
     case "$acpi" in on|off) ;; *) echo "[W2K_STAGE] STOP: USOS_W2K_ACPI must be on or off"; exit 1 ;; esac
     hal=$(usos_w2k_hal) || { echo "$hal"; exit 1; }
+    # USOS_W2K_HPET: keep (default) or legacy-off (DATA hpet-legacy-off.txt,
+    # an X470 clock experiment; needs usosrst 1.3+).
+    hpet=${USOS_W2K_HPET:-keep}
+    case "$hpet" in keep|legacy-off) ;; *) echo '[W2K_STAGE] STOP: USOS_W2K_HPET must be keep or legacy-off'; exit 1 ;; esac
+    [ "$hpet" = keep ] || [ "$helper" = on ] || { echo '[W2K_STAGE] STOP: USOS_W2K_HPET=legacy-off needs usosrst'; exit 1; }
+    USOS_W2K_HPET=$hpet; export USOS_W2K_HPET
     bt="$XP_TARGET_ROOT/\$WIN_NT\$.~BT"
     ls="$XP_TARGET_ROOT/\$WIN_NT\$.~LS/I386"
     [ -f "$ls/TXTSETUP.SIF" ] || { echo "[W2K_STAGE] STOP: $ls/TXTSETUP.SIF missing"; exit 1; }
@@ -141,6 +147,10 @@ usos_w2k_apply() (
             usos_w2k_acpi_off_sif < "$sif.usos" > "$sif.acpi" || { rm -f "$sif.usos" "$sif.acpi"; echo "[W2K_STAGE] STOP: no [ACPIOptions] ACPIEnable row in $sif"; exit 1; }
             mv "$sif.acpi" "$sif.usos"
         fi
+        if [ "$hpet" = legacy-off ]; then
+            usos_w2k_hpet_sif < "$sif.usos" > "$sif.hpet" || { rm -f "$sif.usos" "$sif.hpet"; echo "[W2K_STAGE] STOP: no [SetupData] OsLoadOptions row in $sif"; exit 1; }
+            mv "$sif.hpet" "$sif.usos"
+        fi
         mv "$sif.usos" "$sif"
     done
     if [ -f "$ls/DOSNET.INF" ]; then
@@ -151,7 +161,7 @@ usos_w2k_apply() (
     printf '[W2K_STAGE] APPLIED PASS %s boot+local source, TXTSETUP.SIF PCI\\CC_010601, usosw2k.inf (CriticalDeviceDatabase), %s mode; ACPI %s; HAL %s; WINNT.SIF answers: standard keyboard; usosrst %s\n' \
         "$(usos_w2k_driver_title)" "$mode" "$([ "$acpi" = off ] && echo 'off (ACPIEnable = 0)' || echo 'kept (ACPIEnable unchanged)')" \
         "$(case "$hal" in mps) echo 'MPS Multiprocessor (ComputerType)' ;; standard) echo 'Standard PC (ComputerType)' ;; *) echo 'chosen by Setup' ;; esac)" \
-        "$([ "$helper" = on ] && echo 'on (STOP screen, Setup and text-mode restart via FADT/CF9/8042)' || echo off)"
+        "$([ "$helper" = on ] && echo 'on (STOP screen, Setup and text-mode restart via FADT/CF9/8042)' || echo off)$([ "$hpet" = legacy-off ] && echo '; HPET LegacyReplacement off (experiment)')"
 )
 
 # Every output line ends in CRLF, as the NT5 setup files do (BusyBox awk
@@ -204,7 +214,7 @@ usos_w2k_storage_sif() {
 # PnpInterface for AHCINT and the CriticalDeviceDatabase entries of
 # USOS_W2K_AHCI_IDS. Loaded through TXTSETUP.SIF [HiveInfs.Fresh].
 usos_w2k_hive_inf() {
-    awk -v ids="$USOS_W2K_AHCI_IDS" -v mode="${1:-legacy}" -v drv="${USOS_W2K_DRV:-ahcint}" -v helper="${USOS_W2K_USOSRST:-on}" -v acpi="${USOS_W2K_ACPI:-on}" '
+    awk -v ids="$USOS_W2K_AHCI_IDS" -v mode="${1:-legacy}" -v drv="${USOS_W2K_DRV:-ahcint}" -v helper="${USOS_W2K_USOSRST:-on}" -v acpi="${USOS_W2K_ACPI:-on}" -v hpet="${USOS_W2K_HPET:-keep}" '
         BEGIN {
             bs = sprintf("%c", 92); q = sprintf("%c", 34); n = split(ids, id, " ")
             base = "HKLM," q "SYSTEM" bs "CurrentControlSet" bs
@@ -241,6 +251,9 @@ usos_w2k_hive_inf() {
                 print svc q "ErrorControl" q ",0x00010001,0\r"
                 print svc q "Group" q ",0x00000000," q "Boot Bus Extender" q "\r"
                 print svc q "ImagePath" q ",0x00020000," q "System32" bs "DRIVERS" bs "usosrst.sys" q "\r"
+                # Experiment (DATA hpet-legacy-off.txt): usosrst clears HPET
+                # LegacyReplacement on every later boot too.
+                if (hpet == "legacy-off") print base "Services" bs "usosrst" bs "Parameters" q "," q "HpetLegacyOff" q ",0x00010001,1\r"
             }
             for (i = 1; i <= n; i++) {
                 key = tolower(id[i])
@@ -256,6 +269,25 @@ usos_w2k_hive_inf() {
 # a text-mode boot bus extender: without ACPI it enumerates the legacy
 # devices, and text mode stops with "no keyboard" without it; QEMU
 # 2026-10-04.)
+# stdin TXTSETUP.SIF -> stdout with " /USOSHPETLEGOFF" appended to
+# [SetupData] OsLoadOptions (the text-mode load options; usosrst 1.3 reads
+# them from SystemStartOptions and clears HPET LegacyReplacement). Status 3
+# when there is no single OsLoadOptions row.
+usos_w2k_hpet_sif() {
+    awk '
+        { line = $0; sub(/\r$/, "", line); low = tolower(line) }
+        low ~ /^[ \t]*\[/ { section = low; sub(/[ \t]+$/, "", section) }
+        section == "[setupdata]" && low ~ /^[ \t]*osloadoptions[ \t]*=/ {
+            if (low !~ /usoshpetlegoff/) {
+                if (line ~ /"[ \t]*$/) sub(/"[ \t]*$/, " /USOSHPETLEGOFF\"", line); else line = line " /USOSHPETLEGOFF"
+            }
+            done++
+        }
+        { print line "\r" }
+        END { if (done != 1) exit 3 }
+    '
+}
+
 usos_w2k_acpi_off_sif() {
     awk '
         { line = $0; sub(/\r$/, "", line); low = tolower(line) }

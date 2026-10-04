@@ -91,6 +91,27 @@ class W2kStorage(unittest.TestCase):
         # Only inside [ACPIOptions].
         self.assertEqual(run_fn('usos_w2k_acpi_off_sif', W2K_TXTSETUP.replace(b'[ACPIOptions]', b'[Other]')).returncode, 3)
 
+    def test_hpet_legacy_off(self):
+        # DATA hpet-legacy-off.txt: /USOSHPETLEGOFF in the text-mode load options and
+        # the usosrst Parameters value for later boots (usosrst 1.3 clears HPET
+        # LegacyReplacement); the default leaves both alone.
+        sif = W2K_TXTSETUP.replace(b'MinorVersion = 0\r\n', b'MinorVersion = 0\r\nOsLoadOptions = "/fastdetect /noguiboot /nodebug"\r\n')
+        r = run_fn('usos_w2k_hpet_sif', sif)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(rows(r.stdout), rows(sif.replace(b'/nodebug"', b'/nodebug /USOSHPETLEGOFF"')))
+        self.assertEqual(run_fn('usos_w2k_hpet_sif', r.stdout).stdout, r.stdout)          # idempotent
+        self.assertEqual(run_fn('usos_w2k_hpet_sif', W2K_TXTSETUP).returncode, 3)       # no OsLoadOptions row
+        row = 'HKLM,"SYSTEM\\CurrentControlSet\\Services\\usosrst\\Parameters","HpetLegacyOff",0x00010001,1'
+        self.assertIn(row, rows(run_fn('USOS_W2K_HPET=legacy-off usos_w2k_hive_inf', b'').stdout))
+        self.assertNotIn(row, rows(run_fn('usos_w2k_hive_inf', b'').stdout))
+        self.assertNotIn(b'HpetLegacyOff', run_fn('USOS_W2K_HPET=legacy-off USOS_W2K_USOSRST=off usos_w2k_hive_inf', b'').stdout)
+        stage = (ROOT / 'tools/legacy_xp_staging.sh').read_text()
+        self.assertIn('Unattended/hpet-legacy-off.txt" ]; then USOS_W2K_HPET=legacy-off; else USOS_W2K_HPET=keep; fi', stage)
+        self.assertIn('export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL USOS_W2K_HPET', stage)
+        c = (ROOT / 'tools/w2k/usosrst/src/usosrst.c').read_text()
+        for want in ('L"USOSHPETLEGOFF"', 'L"HpetLegacyOff"', 'SystemStartOptions', 'g_HpetCfg & ~2UL'):
+            self.assertIn(want, c)
+
     def test_hive_inf(self):
         r = run_fn('usos_w2k_hive_inf', b'')
         self.assertEqual(r.returncode, 0, r.stderr)

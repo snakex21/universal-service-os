@@ -528,6 +528,79 @@ digit. The file copy completed (W:00313C, TM and HB in step with `t`), and
 text mode reached its end screen. CSMWrap on OVMF did not start under WHPX.
 From now on, only the X470 tests these builds.
 
+## 7c. X470 run 7 (B261004-165547): text mode done, GUI Setup stuck at "Czekaj..."
+
+**Run 7 (usos4, usosrst 1.2, MPS HAL):**
+- Text mode completed and the restart worked.
+- GUI Setup started, then sat at "Instalator systemu Windows 2000 — Czekaj..."
+  for a long time.
+- USB input did not work, which is expected before device install.
+
+**BIOSTAR, read offline (read-only):** the disk was imaged and NTFS's log
+replayed on the copy only.
+- GUI Setup got only as far as lsass creating `SAM` and `SECURITY`.
+  - There is no `setuplog.txt`, no `setupapi.log`, no `*.evt` and no `edb*.log`.
+  - So the event log service never started: Setup was stuck early in
+    user-mode init, not in device install.
+- **The system clock is broken:**
+  - Every NT timestamp reads as about the year 14773, so the RTC time is
+    mis-read.
+  - The whole text-mode copy (minutes in reality) spans about 10 s of system
+    time.
+  - AHCINT's 250 ms timer ticked only 59 times over 23,352 requests.
+  - The GUI boot never wrote the `idle20s` trace record.
+- **Conclusion:** under the MPS HAL, clock interrupts almost never arrive.
+  - Text mode is mostly synchronous and survives.
+  - GUI Setup waits with timeouts and `Sleep`, so it does not progress.
+- **Suspect:** the firmware left the HPET in LegacyReplacement mode. Then the
+  HPET, not the PIT/RTC, drives IRQ 0/8, and a pre-ACPI HAL never programs
+  it.
+  - CSMWrap's MP table copies the MADT overrides correctly (`src/mptable.c`),
+    so the IRQ 0 routing in the MP table is the lesser suspect.
+
+**usosrst 1.3 (diagnostics):**
+
+Row 1 now also shows `w:`: seconds from the TSC since load, next to the
+clock-interrupt seconds `t:`. If `t` lags `w`, clock interrupts are lost.
+
+Rows 9-10, written once at load in text mode:
+
+    CLK tsc:3600MHz hpet:FED00000 cfg:00000003 t0:00008030 run leg:1 io:FEC00000
+    CLK pit:36+ rte:10000 0093D 0093E 0A0B1 lvt:100FD 00700 00400 lt0 rtc:26 02 2026
+
+**Row 9:**
+- The HPET general configuration (bit 0 enable, bit 1 LegacyReplacement =
+  `leg`), timer 0 configuration, and whether the HPET counter runs.
+
+**Row 10:**
+- `pit`: the 8254 channel 0 read-back status, then `+` if its count moves (`=` if it does not).
+- `rte`: the I/O APIC redirection entries of pins 0, 2, 8 and 9.
+  - Bits 0-7 are the vector, bit 16 the mask, bit 15 level trigger, bit 13
+    active low.
+- `lvt`: the local APIC timer, LINT0 and LINT1 entries; `lt+` means the APIC
+  timer is armed.
+- `rtc`: CMOS registers A and B (B bit 2 = binary, bit 1 = 24 h), then the
+  century and year bytes.
+
+**Opt-in experiment (off by default):** `hpet-legacy-off.txt` in DATA
+`Systems\Windows\Windows 2000\Unattended\`.
+- Staging appends `/USOSHPETLEGOFF` to the text-mode `OsLoadOptions` in all
+  three TXTSETUP.SIF copies.
+- It also adds `usosrst\Parameters\HpetLegacyOff = 1` to `usosw2k.inf` for
+  later boots.
+- usosrst then clears HPET LegacyReplacement at load if it is set. The PIT
+  and RTC drive IRQ 0/8 again; row 9 shows `leg:1>0`.
+- This is in usosrst instead of CSMWrap, so no CSMWrap rebuild is needed.
+
+**Reading the next photo:**
+- `leg:1` with `t` far below `w`: the HPET legacy routing is the cause.
+  - Retry with the flag file.
+  - If that run passes, make the fix default (in usosrst or CSMWrap).
+- `leg:0` and `t` ≈ `w`: the clock is healthy. Look elsewhere (rows 0-1
+  during "Czekaj...").
+- `leg:0` and `t` ≪ `w`: check `rte` pin 2 (masked, or the wrong vector or
+  trigger) and the `pit` status (mode 2/3, counting).
+
 ## 8. X470 test plan (first plan, 2026-10-03)
 
 

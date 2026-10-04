@@ -472,8 +472,11 @@ usos_legacy_xp_staging() {
     [ "$USOS_W2K_STORAGE" = ahcint ] || [ -f /usr/lib/usos/w2k-drivers/uniata/uniata.sys ] || stop 'Windows 2000 UniATA driver is missing from the package; no target write occurred'
     # usosrst.sys (own helper: STOP screen, Setup restart without an 8042).
     [ -f /usr/lib/usos/w2k-drivers/usosrst.sys ] || stop 'Windows 2000 helper driver (usosrst) is missing from the package; no target write occurred'
-    export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL
-    printf '[W2K_DRIVERS] storage %s, ACPI %s, HAL %s, usosrst, xhci98 x86; the XP bundle is NT 5.1 only\n' "$USOS_W2K_STORAGE" "$USOS_W2K_ACPI" "$USOS_W2K_HAL"
+    # hpet-legacy-off.txt: usosrst clears HPET LegacyReplacement (X470 clock
+    # experiment, docs/windows-2000-modern-2026-09-30.md 7c).
+    if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/hpet-legacy-off.txt" ]; then USOS_W2K_HPET=legacy-off; else USOS_W2K_HPET=keep; fi
+    export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL USOS_W2K_HPET
+    printf '[W2K_DRIVERS] storage %s, ACPI %s, HAL %s, HPET %s, usosrst, xhci98 x86; the XP bundle is NT 5.1 only\n' "$USOS_W2K_STORAGE" "$USOS_W2K_ACPI" "$USOS_W2K_HAL" "$USOS_W2K_HPET"
     else
     # XP x64 (NT 5.2 amd64): GenAHCI on the system's own StorPort
     # (nt5_storage_stage.sh, applied to the target after the source copy).
