@@ -254,15 +254,15 @@ tools\w2k\usosrst\build.cmd [workdir]
 Before pinning a new build, check that its imports (ntoskrnl, hal) resolve on
 the Windows 2000 SP4 kernel and every 2000 HAL.
 
-## Rebuilding xhci98 1.1.1.0-usos3 (optional)
+## Rebuilding xhci98 1.1.1.0-usos2 (optional)
 
 The XP package uses the vendored, hash-pinned binaries in
-`tools\vendor\xhci98\1.1.1.0-usos3\` (manifest.json); `build.bat` does not
+`tools\vendor\xhci98\1.1.1.0-usos2\` (manifest.json); `build.bat` does not
 rebuild them. To rebuild from source (upstream tag tarball in
 `tools\vendor\xhci98\1.1.1.0-src\` plus `patches\*.patch`):
 
 ```
-tools\vendor\xhci98\1.1.1.0-usos3\build.cmd [workdir]
+tools\vendor\xhci98\1.1.1.0-usos2\build.cmd [workdir]
 ```
 
 It needs **WDK 7.1** in `tools\WinDDK71` (git-ignored; `WDKROOT` overrides),
@@ -290,7 +290,7 @@ PDB GUID); compare with the pinned binaries by behaviour, not hash.
   (`tools\build_touchi2cdxe.ps1`, network); the release uses the vendored,
   MOK-signed binary.
 - **WDK 7.1** (`GRMWDK_EN_7600_1.ISO`, see above): user-downloaded, not
-  redistributable; only needed to rebuild xhci98 1.1.1.0-usos3 or GenAHCI.
+  redistributable; only needed to rebuild xhci98 1.1.1.0-usos2 or GenAHCI.
 - **GenAHCI** needs the Microsoft WDK 7600.16385.1 to rebuild
   (`tools/vendor/genahci/6.3.0.1-src/SOURCES.txt`); the release uses the
   upstream 6.3.0.1 binaries.

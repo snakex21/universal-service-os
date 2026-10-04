@@ -170,11 +170,15 @@ def nt5_storage_files(xp64_isos=()):
     files.update(xp64_acpi.files(xp64_isos))
     return files
 
-# NT 5.2 (Server 2003 x86, XP x64) USB 2.0 on xHCI: xhci98 1.1.1.0-usos3,
+# NT 5.2 (Server 2003 x86, XP x64) USB 2.0 on xHCI: xhci98 1.1.1.0-usos2,
 # the MODIFIED x86 and amd64 builds (AMD CPU xHCI start, xhci98.log; see
-# tools/vendor/xhci98/1.1.1.0-usos3/MODIFIED.txt; tools/nt52_usb_stage.sh).
+# tools/vendor/xhci98/1.1.1.0-usos2/MODIFIED.txt; tools/nt52_usb_stage.sh).
 # Every file pinned by its manifest.
-XHCI98_DIR=ROOT/'tools/vendor/xhci98/1.1.1.0-usos3'
+XHCI98_DIR=ROOT/'tools/vendor/xhci98/1.1.1.0-usos2'
+# Windows 2000 only: 1.1.1.0-usos3 (x86), which can poll (Parameters PollMode)
+# when the MPS HAL gives the xHCI functions no interrupt; NT 5.2 stays on the
+# hardware-proven usos2 until it is retested (decision 2026-10-05).
+XHCI98_W2K_DIR=ROOT/'tools/vendor/xhci98/1.1.1.0-usos3'
 
 def nt52_usb_files():
     pins=json.loads((XHCI98_DIR/'manifest.json').read_text())
@@ -186,13 +190,21 @@ def nt52_usb_files():
     files['LICENSE']=(XHCI98_DIR/'LICENSE').read_bytes()
     if hashlib.sha256(files['LICENSE']).hexdigest()!=pins['files']['LICENSE']:raise ValueError('xhci98 LICENSE hash mismatch')
     files['MODIFIED.txt']=(XHCI98_DIR/'MODIFIED.txt').read_bytes()
+    w2k=json.loads((XHCI98_W2K_DIR/'manifest.json').read_text())
+    for name in ('xhci98.sys','xhci98.inf','../MODIFIED.txt'):
+        rel=name if name.startswith('..') else 'release-x86/'+name
+        key=rel.replace('../','')
+        data=(XHCI98_W2K_DIR/key).read_bytes()
+        if hashlib.sha256(data).hexdigest()!=w2k['files'][key]:raise ValueError('xhci98 usos3 file hash mismatch: '+key)
+        files['x86-w2k/'+key.split('/')[-1]]=data
     if hashlib.sha256(files['MODIFIED.txt']).hexdigest()!=pins['files']['MODIFIED.txt']:raise ValueError('xhci98 MODIFIED.txt hash mismatch')
     files['SOURCE.txt']=('xhci98 %s (x86 and amd64, MODIFIED by USOS, see MODIFIED.txt), %s\n'
         'base: tag %s = commit %s (source tarball sha256 %s)\n'
         'plus %s, built with WDK 7.1 (7600.16385.1).\n'
         'Licence: GPL-2.0-only (LICENSE). Corresponding source: the USOS sources zip\n'
-        '(tools/vendor/xhci98/1.1.1.0-src and tools/vendor/xhci98/1.1.1.0-usos3).\n'
-        'USOS uses it only for Windows 2000, Server 2003 x86 and XP x64 Setup; staging\n'
+        '(tools/vendor/xhci98/1.1.1.0-src and tools/vendor/xhci98/1.1.1.0-usos2).\n'
+        'USOS uses it only for Server 2003 x86 and XP x64 Setup; Windows 2000 uses\n'
+        '1.1.1.0-usos3 (x86-w2k/, polling, tools/vendor/xhci98/1.1.1.0-usos3). Staging\n'
         'points the INF [SourceDisksNames] row 1 at the Setup source directory.\n'
         'Log: %%SystemRoot%%\\xhci98.log (every controller start, start refusal and stop).\n'
         %(pins['version'],pins['upstream'],pins['tag'],pins['commit'],pins['source_archive']['sha256'],', '.join(sorted(pins['patches'])))).encode()

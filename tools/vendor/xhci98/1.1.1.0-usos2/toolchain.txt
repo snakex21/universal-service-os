@@ -1,0 +1,12 @@
+Windows Driver Kit 7.1.0 (7600.16385.1), Microsoft
+  GRMWDK_EN_7600_1.ISO, 649,877,504 bytes
+  SHA-256 5edc723b50ea28a070cad361dd0927df402b7a861a036bbcf11d27ebba77657d
+  https://download.microsoft.com/download/4/A/2/4A25C7D5-EFBE-4182-B6A9-AE6850409A78/GRMWDK_EN_7600_1.ISO
+  (user-downloaded; the WDK licence does not allow USOS to redistribute it)
+Unpacked to tools\WinDDK71 with "msiexec /a <msi> /qn TARGETDIR=..." for every
+WDK\*.msi except samples, ia64, DSF, docs and debug files; no install, no
+registry. setenv.bat <root> fre x86 WNET no_oacr / fre x64 WNET no_oacr,
+BUILD_ALT_DIR=fre; build -cZ.
+  cl 15.00.30729.207 (x86 and x86->amd64 cross)
+Host: Windows 10 Pro 10.0.19045 x64. The build is not byte-reproducible (PE
+time stamp, PDB GUID); manifest.json pins the committed binaries.

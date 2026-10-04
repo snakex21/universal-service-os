@@ -592,7 +592,7 @@ class W2kUsb(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertIn(b'GUI-mode PnP only (no text-mode load)', r.stdout)
             self.assertEqual((ls / 'TXTSETUP.SIF').read_bytes(), run_fn(W2K_USB, W2K_TXTSETUP, USB).stdout)
-            self.assertEqual((ls / 'XHCI98/xhci98.sys').read_bytes(), pkg['x86/xhci98.sys'])
+            self.assertEqual((ls / 'XHCI98/xhci98.sys').read_bytes(), pkg['x86-w2k/xhci98.sys'])   # usos3 (polling), 2000 only
             self.assertIn(b'1=%DiskName%,,,\\i386\\xhci98\r\n', (ls / 'xhci98.inf').read_bytes())
 
 

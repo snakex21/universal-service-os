@@ -1,8 +1,8 @@
 #!/bin/sh
 # Windows Server 2003 x86 and XP x64 (NT 5.2, UEFI profiles, experimental):
-# USB 2.0 input and storage on xHCI-only boards through xhci98 1.1.1.0-usos3
+# USB 2.0 input and storage on xHCI-only boards through xhci98 1.1.1.0-usos2
 # (https://github.com/yeokm1/xhci98, GPL-2.0-only; a USBPORT miniport, no
-# KMDF, no kernel extender; tools/vendor/xhci98/1.1.1.0-usos3, MODIFIED). The x86 build
+# KMDF, no kernel extender; tools/vendor/xhci98/1.1.1.0-usos2, MODIFIED). The x86 build
 # (.NTx86 sections) for Server 2003 x86, the amd64 build for XP x64. Every
 # import resolves on the 5.2 SP2 kernel/HAL/usbport, and 5.2's usbport
 # reports the XP lineage (USBPORT_GetHciMn = 0x10000001) that xhci98
@@ -60,6 +60,9 @@ usos_nt52_usb_apply() (
         *) echo '[NT52_USB] STOP: unsupported source directory'; exit 1 ;;
     esac
     pkg=${USOS_NT52_USB_DIR:-/usr/lib/usos/nt52-usb}/$arch
+    # Windows 2000: xhci98 1.1.1.0-usos3 (x86-w2k), which polls when the MPS
+    # HAL gives the xHCI functions no interrupt; NT 5.2 keeps usos2.
+    [ "${NT5_SYSTEM:-}" != windows-2000 ] || pkg=${USOS_NT52_USB_DIR:-/usr/lib/usos/nt52-usb}/x86-w2k
     for name in xhci98.sys xhci98.inf; do
         [ -f "$pkg/$name" ] || { echo "[NT52_USB] STOP: $pkg/$name missing"; exit 1; }
     done
@@ -92,7 +95,7 @@ usos_nt52_usb_apply() (
     fi
     sync
     if [ "$textmode" = yes ]; then
-        printf '[NT52_USB] APPLIED PASS xhci98 1.1.1.0-usos3 (%s) boot+local source, TXTSETUP.SIF PCI\\CC_0C0330, USB/HID stack forced\n' "$arch"
+        printf '[NT52_USB] APPLIED PASS xhci98 1.1.1.0-usos2 (%s) boot+local source, TXTSETUP.SIF PCI\\CC_0C0330, USB/HID stack forced\n' "$arch"
     else
         printf '[NT52_USB] APPLIED PASS xhci98 1.1.1.0-usos3 (%s) local source, GUI-mode PnP only (no text-mode load), USB/HID stack forced incl. usbhub20\n' "$arch"
     fi

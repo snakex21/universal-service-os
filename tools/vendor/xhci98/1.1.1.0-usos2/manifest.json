@@ -1,0 +1,29 @@
+{
+  "name": "xhci98",
+  "version": "1.1.1.0-usos2",
+  "modified": "MODIFIED version of xhci98 1.1.1.0: PCI D0 + Memory Space/Bus Master Enable before the bus-master gate (AMD CPU xHCI 1022:149C), CNR wait, 10 s reset timeout, forced USBLEGSUP handoff, 16 Supported Protocol groups (was 4), xECP chain log, scratchpad cap 256, %SystemRoot%\\xhci98.log file sink (MODIFIED.txt)",
+  "upstream": "https://github.com/yeokm1/xhci98",
+  "tag": "v1.1.1.0",
+  "commit": "7d0dd9d440e9716a87e0882f905bf8e99fa443ac",
+  "licence": "GPL-2.0-only",
+  "source_archive": {
+    "file": "../1.1.1.0-src/xhci98-7d0dd9d440e9716a87e0882f905bf8e99fa443ac.tar.gz",
+    "sha256": "4f2653d00ee757c5edefcda6f7101526edf5b0778a07ebf5babbb59805088af3",
+    "note": "upstream tag tarball; the usos2 source is this archive plus patches/*.patch applied in order with git apply (build.cmd)"
+  },
+  "patches": {
+    "0001-usos1-amd-cpu-xhci-start-and-file-log.patch": "bbd1fe68948c247fc5eacecd4c207179f3d55219c4f9fc54e7d6f6665dc208c7",
+    "0002-usos2-sixteen-protocol-groups-and-cap-chain-log.patch": "9d35d70968832feb3ff493fa1eaebeeddaf18ab6fff92e45c25b6c52851f724a"
+  },
+  "toolchain": "WDK 7.1 7600.16385.1, GRMWDK_EN_7600_1.ISO sha256 5edc723b50ea28a070cad361dd0927df402b7a861a036bbcf11d27ebba77657d (toolchain.txt)",
+  "files": {
+    "LICENSE": "a5d0a99d4194fbb3dd913bba267dc71d4088691ea920f92fb6354d315f3f73be",
+    "MODIFIED.txt": "efb93014667e6e57654f4077d71f6f06bbfd73c5e378e72543626bcfbcf693cb",
+    "toolchain.txt": "c90d0b2b41e5cb2d957ee74ea78222da5eb9e272d596623ef2a0c3ea71747a7f",
+    "build.cmd": "0bc14a4005c521c55e8ce7cd3891a79cc883d367bc32592e6263ba1ad6ac47bf",
+    "release-x86/xhci98.sys": "01adf36d75eccebf9365a169fa47e5f1cd64cf40f43bcad4ba069210abd651ad",
+    "release-x86/xhci98.inf": "88ecbce637a81c361f8ae0c35df58fc03429aeb860e3ad62164185d1f9c6b5b8",
+    "release-x64/xhci98.sys": "aedc688ed29f8a6bbc3906fb9ba204e44c8010d8fe9bd0261fd63d0e6e8843e3",
+    "release-x64/xhci98.inf": "350a2dd077bb650876291f03963d496fb39c1554c8e11b315b89f4e0fa1a74b7"
+  }
+}

@@ -1,0 +1,64 @@
+xhci98 1.1.1.0-usos2 - MODIFIED version of xhci98 1.1.1.0 (GPL-2.0-only)
+
+This is NOT an upstream release. It was modified by the Universal Service OS
+(USOS) project on 2026-09-29 (GPL-2.0 section 2a notice). Upstream:
+https://github.com/yeokm1/xhci98 (Yeo Kheng Meng), tag v1.1.1.0 = commit
+7d0dd9d440e9716a87e0882f905bf8e99fa443ac. Report problems with this build to
+USOS, not upstream.
+
+Corresponding source: the upstream tag tarball
+(tools/vendor/xhci98/1.1.1.0-src/, pinned in ../1.1.1.0/SOURCES.txt) plus
+patches/0001-usos1-*.patch and patches/0002-usos2-*.patch, applied in order
+with "git apply" in the unpacked xhci98-1.1.1.0 directory; build.cmd does both and
+builds with WDK 7.1 (toolchain.txt). Every changed spot in the source carries
+a "MODIFIED (USOS 1.1.1.0-usos1)" or "(... usos2)" comment; src/xhci_usos.c is new.
+
+Why: on an ASRock X470 + Ryzen 7 5700X (Server 2003 x86 SP2 under CSMWrap)
+xhci98 1.1.1.0 started the Promontory chipset xHCI (1022:43D0) but never the
+CPU xHCI (1022:149C). The firmware leaves 149C with decoding and bus
+mastering off at ExitBootServices (no BootConfig in the registry); NT 5.x
+PCI.SYS assigns the BAR and enables decoding, and xhci98 refuses a controller
+whose Bus Master Enable it did not clear itself (init step 3).
+
+Changes:
+ 1. src/xhci_usos.c XhciUsosPciPrepare, called before the bus-master gate:
+    PCI power state D0 (restores the BARs if D3hot->D0 reset them), then
+    Memory Space Enable and Bus Master Enable if clear (Linux:
+    pci_enable_device + pci_set_master).
+ 2. src/xhci_init.c: wait for USBSTS.CNR = 0 (up to 10 s) before the first
+    USBCMD write; HCRST/CNR timeout 1 s -> 10 s (Linux XHCI_RESET_LONG_USEC);
+    USBLEGSUP: if the BIOS does not release within 1 s, clear BIOS_OWNED
+    and set OS_OWNED anyway (Linux quirk_usb_handoff_xhci); raw capability
+    words and PCI command/PMCSR recorded in the log ring.
+ 3. src/xhci.h: XHCI_MAX_SCRATCHPAD 64 -> 256 (AMD controllers were never
+    measured upstream; the common buffer grows by 768 KiB).
+ 4. Log file: every start refusal, successful start and stop is appended to
+    %SystemRoot%\xhci98.log (C:\WINDOWS\xhci98.log) by a system thread that
+    retries for up to 15 minutes until the boot volume is reachable
+    (src/xhci_usos.c, src/xhci_dispatch.c, src/xhci_log.c/.h). Switches in
+    the device's software key: XhciLogFile (1 on) and XhciLogVerbosity
+    (2 = note ring); both default to on when the value is ABSENT (text-mode
+    Setup), and the INF writes 1 and 2. Each flush starts with
+    "=== xhci98 1.1.1.0-usos2 flush reason=R pci=DDDDVVVV step=S status=X
+    tick=T dropped=D ===" (reason 0 stop, 1 start refused, 2 start OK;
+    step = XHCI_INIT_STEP_* of src/xhci.h, 22 = done).
+ 6. usos2 (after the X470 run of usos1, 2026-09-29): 149C was refused at
+    XHCI_INIT_STEP_PORT_MAP with XHCI_CAPS_TOO_MANY_PROTOCOLS (its PCI state
+    was already fine, command 0x0007, D0). XHCI_MAX_PROTOCOLS 4 -> 16
+    (src/xhci.h; the UCHAR index and its 0xFF sentinel, the port-map
+    layout assertion, XhciPortMapEqual, the post-reset re-parse and the
+    slot-type lookup all follow the constant). Companion pairing tries the
+    next USB 2.0 group when the first one took no pair (one capability per
+    port). The raw xECP chain (usos.xecp.*, usos.proto.dw2/dw3) and the
+    parsed groups (usos.map.group: major<<24|minor<<16|first<<8|count,
+    usos.map.group.psi.slot) are logged on the preflight pass, before any
+    refusal. 64-byte contexts (CSZ=1, 149C): reviewed, no change needed;
+    every context offset is index x ContextSize, the Input Context
+    (33 x 64 = 2112 bytes) and Device Context stride (2048) are reserved
+    for CSZ=1, builders write 8 DWORDs into a block zeroed at full size.
+ 5. Version string 1.1.1.0-usos2 (FileVersion/ProductVersion, Comments);
+    INF DriverVer 09/29/2026,1.1.1.0 and a MODIFIED header.
+
+Scope: built for NT 5.2 only (WDK 7.1 WNET target, x86 and amd64). Upstream's
+x86 build also serves Windows 98/ME/2000; this one does not and is not
+tested there.
