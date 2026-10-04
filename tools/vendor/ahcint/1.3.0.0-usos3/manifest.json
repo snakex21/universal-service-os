@@ -1,32 +1,34 @@
 {
   "name": "AHCINT",
-  "version": "1.3.0.0-usos2",
+  "version": "1.3.0.0-usos3",
   "modified": true,
   "base": "../1.3.0.0 (tag v1.3.0.0 = commit 7be9c9b81ef10979cf1e2c37d08a2e2e3e166066)",
   "licence": "GPL-3.0 (LICENSE)",
   "patches": [
     "patches/0001-usos1-flush-cache.patch",
-    "patches/0002-usos2-target-check-and-trace.patch"
+    "patches/0002-usos2-target-check-and-trace.patch",
+    "patches/0003-usos3-screen-stages-readback-fail-loudly.patch"
   ],
   "build": "build.cmd (WDK 7.1, x86 WXP)",
   "files": {
     "bin/2KXP/ahcint.inf": "c8dea5fd3839b8f9298a7925f6ba8c6451588638a42f24e10c4c8542915a6e21",
-    "bin/2KXP/i386/ahcint.sys": "0c807f42df13e1dfddad8f6a3f0399db7ba2a115b2975ee4609f138a5eb412c1",
-    "build.cmd": "c950c01f3d9d0fc0e3cf88ed9447a7b4554aee65b6fa4b74c73fbb16935c1ad3",
+    "bin/2KXP/i386/ahcint.sys": "f5bcab039c96a76672a7e94854b5eb8b90a972c4b66a6b9895a124161b2e4bdf",
+    "build.cmd": "0c92efcf47b8b8cea0713259a3aaa8aba4c644b6b12233ebedc8ab67a2af3940",
     "LICENSE": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
-    "MODIFIED.txt": "f374e23d40468f986c1b19a03888949df517fd9cfe39b99fc45edc357ab8a4ef",
+    "MODIFIED.txt": "d69de4d4aa40d1a47599ab224ca278d30e27152c17d41b5e6a4e444ee202e152",
     "patches/0001-usos1-flush-cache.patch": "a858d1023d995b7c7ee6ef32b1c2668fd615a4ed8cad1e964fb41104883311fd",
     "patches/0002-usos2-target-check-and-trace.patch": "ba70562a120bd080bbdbca8e11985eac4772c8a104577437f359066ec00abd3a",
+    "patches/0003-usos3-screen-stages-readback-fail-loudly.patch": "30a3f2b7c10d7895cec58b0878f5fb0d3e1487893cb962c43cbc9e622b37f7e6",
     "src/2KXP/ahcint.rc": "3407db078cdbebe3c6806206f13c9cd806efbeca66e9c354776378f73af13d2a",
     "src/2KXP/makefile": "272431810da48231039ac4fcfa245628b6b6c3dc39054b908c26c97d313ccf97",
     "src/2KXP/sources": "b7a975972be97486aaff3cb0e1c0407cbcb0f4c78b084e1ba9683a438099fe24",
     "src/9X/ahcint9x.lnk": "f6e9f66dfe8bfad3d23274c49304597a480a34ea19f129354e188735896ca6c1",
     "src/9X/build.bat": "ab8f19b5f282b3bc2a3d9dcc0c24e75e541a325f7caec528fd3893a4c8f875f5",
     "src/9X/makefile": "0dd9d6acd03ad012ccbd40562bf52ee0f929a67bb46062f7f62d8b511f635666",
-    "src/ahcimain.c": "d6d40cc02f37ee1e1070977d1b9a8caadd549e284583870b2bf783bbf09bc597",
-    "src/ahcint.h": "8a88dc0abc9b7d06d1da414b80f37757ab4148e4984664cdc57f9efdb908c703",
-    "src/ahcisatl.c": "0c3107d8798d715c56badc1a1dcad7d95704196dc292370b9fb6f6937fe297dd",
+    "src/ahcimain.c": "f36a08ac780ac7d06d03623ace50961a7acc4e4fb0b7e2380b300ea2eef23fc5",
+    "src/ahcint.h": "6b555b91ede1bf3b7d4a8c699141a65328a3cf7561be8f466ce036caad686d67",
+    "src/ahcisatl.c": "fc6dec12282a9441fbc429a604ec77d0d9e1b9a0333b9393316ad22688d04e97",
     "src/NT/build.bat": "592a19badaeaca36fc9c02dd9c520d9aa12f431ba0d3e07933abddbf4c70a560",
-    "toolchain.txt": "442dc1d59faf50b36ee8b47157950b5448832672484e24a8f230d5af04932c55"
+    "toolchain.txt": "d76edb2e19f45018a5852b95ac2ec1e023dee88cf0ab207600e3ffed47a58897"
   }
 }

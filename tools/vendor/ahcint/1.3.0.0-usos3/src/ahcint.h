@@ -376,6 +376,19 @@ typedef struct _AHCI_PORT_INFO {
     ULONG                   BouncePhysicalUpper;
 } AHCI_PORT_INFO, *PAHCI_PORT_INFO;
 
+/* MODIFIED (USOS 1.3.0.0-usos3): KBUGCHECK_CALLBACK_RECORD (x86 layout,
+   miniport.h has no ntddk.h types) */
+typedef struct _USOS_BUGCHECK_RECORD {
+    PVOID       EntryFlink;
+    PVOID       EntryBlink;
+    PVOID       CallbackRoutine;
+    PVOID       Buffer;
+    ULONG       Length;
+    PUCHAR      Component;
+    ULONG_PTR   Checksum;
+    ULONG       State;
+} USOS_BUGCHECK_RECORD;
+
 typedef struct _HW_DEVICE_EXTENSION {
     PUCHAR                  AbarMapped;
     ULONG                   PciBus;
@@ -397,6 +410,27 @@ typedef struct _HW_DEVICE_EXTENSION {
     ULONG                   UsosBoot;
     ULONG                   UsosVerify;         /* 0 none, 1 pass, 2 FAIL */
     ULONG                   UsosTracePortPlus1; /* 0: no USOS target found */
+
+    /* MODIFIED (USOS 1.3.0.0-usos3): the on-screen status line, stages,
+       sampled read-back and the bugcheck record (see ahcisatl.c) */
+    ULONG                   UsosInstance;       /* 0-based, = screen row */
+    PUSHORT                 UsosVga;            /* B8000h text buffer or NULL */
+    ULONG                   UsosPciId;          /* vendor | device << 16 */
+    ULONG                   UsosStage;          /* USOS_STAGE_* */
+    ULONG                   UsosMarker;         /* USOS_MARKER_* */
+    ULONG                   UsosMarkerHead;     /* first dword read at 2046 */
+    ULONG                   UsosProbePortPlus1; /* last probed port + 1 */
+    ULONG                   UsosLastWriteLba;
+    ULONG                   UsosFirstWrites[4];
+    ULONG                   UsosLastErrLba;
+    ULONG                   UsosLastErrTfd;
+    ULONG                   UsosLastErrCmd;
+    ULONG                   UsosRbChecks;
+    ULONG                   UsosRbBad;
+    ULONG                   UsosIos;
+    ULONG                   UsosInTrace;
+    ULONG                   UsosBugCheck[5];
+    USOS_BUGCHECK_RECORD    UsosBugCheckRecord;
 } HW_DEVICE_EXTENSION, *PHW_DEVICE_EXTENSION;
 
 /* One ATA/ATAPI command to put on the wire */
@@ -465,5 +499,30 @@ BOOLEAN AhciFlushPort(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port);
 #define USOS_GAP_TRACE_SLOTS            4
 VOID    AhciUsosProbe(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port);
 VOID    AhciUsosTrace(IN PHW_DEVICE_EXTENSION HwInit, IN PCHAR Why);
+/* MODIFIED (USOS 1.3.0.0-usos3): diagnostic build. AHCINT shows one status
+   line per HBA in the VGA text buffer (row = instance), records stages
+   (first write to LBA 0, first write over LBA 2048, first flush, shutdown,
+   bugcheck), reads back the first sector of sampled writes on the USOS disk
+   and stops with STOP 0x55534F53 ("USOS") instead of carrying on when the
+   disk does not keep what it is given:
+     P1 = 1 marker read failed (P4 = TFD), 2 write test failed (P4 = TFD),
+          3 read-back mismatch (P4 = LBA); P2 = PCI vendor | device << 16;
+     P3 = port. */
+#define USOS_BUGCHECK_CODE              0x55534F53
+#define USOS_STAGE_LBA0                 0x01
+#define USOS_STAGE_LBA2048              0x02
+#define USOS_STAGE_FLUSH                0x04
+#define USOS_STAGE_SHUTDOWN             0x08
+#define USOS_STAGE_RBFAIL               0x10
+#define USOS_STAGE_WRERR                0x20
+#define USOS_STAGE_RDERR                0x40
+#define USOS_STAGE_BUGCHECK             0x80
+#define USOS_MARKER_NONE                0   /* no ATA disk probed */
+#define USOS_MARKER_OK                  1
+#define USOS_MARKER_ABSENT              2   /* read, no USOS marker */
+#define USOS_MARKER_READ_ERROR          3
+VOID    AhciUsosAttach(IN PHW_DEVICE_EXTENSION HwInit);
+VOID    AhciUsosShow(IN PHW_DEVICE_EXTENSION HwInit);
+VOID    AhciUsosStage(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Stage, IN PCHAR Why);
 
 #endif /* _AHCINT_H_ */

@@ -4,6 +4,8 @@ no Microsoft files:
 - tools/w2k_stage.sh: the AHCINT rows (TXTSETUP.SIF, INF source directory,
   DOSNET), [ACPIOptions] ACPIEnable = 0, apply on a stand-in target (ACPI
   off by default, on on request), refusals, the pinned package files;
+- usosrst.sys (own helper): its TXTSETUP/registry/DOSNET rows, the pinned
+  binary and its source;
 - tools/nt52_usb_stage.sh in the 2000 mode: usbhub20.sys forced as well, no
   text-mode load rows; the NT 5.2 default unchanged.
 
@@ -24,7 +26,8 @@ W2K_TXTSETUP = (b'[SetupData]\r\nMajorVersion = 5\r\nMinorVersion = 0\r\n[Source
                 b'mouhid.sys   = 2,,,,,,,4,1,3   \r\n[HardwareIdsDatabase]\r\nPCI\\CC_0C0310 = "openhci"\r\n'
                 b'[SCSI.Load]\r\natapi = atapi.sys,4\r\n[InputDevicesSupport.Load]\r\nopenhci  = openhci.sys\r\n'
                 b'[InputDevicesSupport]\r\nopenhci  = "Open HCI",files.openhci,openhci\r\n'
-                b'[HiveInfs.Fresh]\r\nAddReg = hivesys.inf,AddReg\r\n[ACPIOptions]\r\nACPIEnable = 2\r\nACPIBiosDate = 01,01,1999\r\n\r\n[NWACL]\r\n[SCSI]\r\natapi = "IDE"\r\n')
+                b'[HiveInfs.Fresh]\r\nAddReg = hivesys.inf,AddReg\r\n[ACPIOptions]\r\nACPIEnable = 2\r\nACPIBiosDate = 01,01,1999\r\n\r\n[NWACL]\r\n[SCSI]\r\natapi = "IDE"\r\n'
+                b'[BootBusExtenders.Load]\r\npci      = pci.sys\r\n[BootBusExtenders]\r\npci      = "PCI",files.pci,pci                \r\n')
 W2K_DOSNET = b'[Files]\r\nd1,atapi.sys\r\n[FloppyFiles.1]\r\nd1,atapi.sys\r\n[Files]\r\nd1,other.sys\r\n[FloppyFiles.1]\r\nd1,hal.dll\r\n'
 LIB = posix(ROOT / 'tools' / 'w2k_stage.sh')
 USB = posix(ROOT / 'tools' / 'nt52_usb_stage.sh')
@@ -45,8 +48,8 @@ class W2kStorage(unittest.TestCase):
         first = out.index('[SourceDisksFiles]')
         # usosw2k.inf needs a row too (text mode refuses a hive INF without one;
         # QEMU 2026-09-30), boot-media only, never copied (as hivedef.inf).
-        self.assertEqual(out[first + 1:first + 4], ['ahcint.sys = 1,,,,,,4_,4,1,,,1,4', 'ahcint.inf = 1,,,,,,,20,0,0',
-                                                    'usosw2k.inf = 1,,,,,,_x,20,3,3'])
+        self.assertEqual(out[first + 1:first + 5], ['ahcint.sys = 1,,,,,,4_,4,1,,,1,4', 'ahcint.inf = 1,,,,,,,20,0,0',
+                                                    'usosw2k.inf = 1,,,,,,_x,20,3,3', 'usosrst.sys = 1,,,,,,4_,4,1,,,1,4'])
         self.assertEqual(sum(l.startswith('ahcint.sys =') for l in out), 1)
         hw = out.index('[HardwareIdsDatabase]')
         self.assertEqual(out[hw + 1:hw + 5], ['PCI\\CC_010601 = "ahcint"', 'PCI\\VEN_1022&DEV_7901 = "ahcint"',
@@ -55,6 +58,16 @@ class W2kStorage(unittest.TestCase):
         self.assertTrue(out[out.index('[SCSI]') + 1].startswith('ahcint = "AHCI SATA Controller (AHCINT'))
         self.assertEqual(out[out.index('[HiveInfs.Fresh]') + 1], 'AddReg = usosw2k.inf,AddReg')
         self.assertIn('ACPIEnable = 2', out)
+        # usosrst: loaded by SETUPLDR before the storage drivers, own files section at the end.
+        self.assertEqual(out[out.index('[BootBusExtenders.Load]') + 1], 'usosrst  = usosrst.sys')
+        self.assertEqual(out[out.index('[BootBusExtenders]') + 1], 'usosrst  = "USOS STOP screen and restart helper",files.usosrst,usosrst')
+        self.assertEqual(out[-4:], ['', '[files.usosrst]', 'usosrst.sys,4', ''])
+        self.assertEqual(len(out), len(rows(W2K_TXTSETUP)) + 4 + 4 + 1 + 1 + 1 + 1 + 1 + 3)
+        off = run_fn('USOS_W2K_USOSRST=off usos_w2k_storage_sif', W2K_TXTSETUP)
+        self.assertEqual(off.returncode, 0, off.stderr)
+        self.assertNotIn(b'usosrst', off.stdout)
+        self.assertEqual(rows(off.stdout), [l for l in out[:-4] if 'usosrst' not in l] + [''])
+        self.assertEqual(run_fn('usos_w2k_storage_sif', W2K_TXTSETUP.replace(b'[BootBusExtenders]', b'[Other]')).returncode, 3)
         self.assertEqual(run_fn('usos_w2k_storage_sif', r.stdout).returncode, 3)
         self.assertEqual(run_fn('usos_w2k_storage_sif', W2K_TXTSETUP.replace(b'[SCSI.Load]', b'[Other]')).returncode, 3)
 
@@ -84,6 +97,12 @@ class W2kStorage(unittest.TestCase):
         # The same PnpInterface value the INF sets (GUI-mode PnP then keeps one instance).
         inf = (ROOT / 'tools/vendor/ahcint/1.3.0.0/bin/2KXP/ahcint.inf').read_text()
         self.assertIn('HKR, "Parameters\\PnpInterface", "5", %REG_DWORD%, 0x00000001', inf)
+        # usosrst: a boot driver that never stops the boot.
+        svc = 'HKLM,"SYSTEM\\CurrentControlSet\\Services\\usosrst",'
+        self.assertEqual(out[5:10], [svc + '"Type",0x00010001,1', svc + '"Start",0x00010001,0', svc + '"ErrorControl",0x00010001,0',
+                                     svc + '"Group",0x00000000,"Boot Bus Extender"',
+                                     svc + '"ImagePath",0x00020000,"System32\\DRIVERS\\usosrst.sys"'])
+        self.assertNotIn(b'usosrst', run_fn('USOS_W2K_USOSRST=off usos_w2k_hive_inf', b'').stdout)
 
     def test_inf_source_directory(self):
         # Upstream ships the INF with LF line ends; the staged one is CRLF.
@@ -106,18 +125,32 @@ class W2kStorage(unittest.TestCase):
     def test_dosnet(self):
         r = run_fn('usos_w2k_dosnet', W2K_DOSNET)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual(r.stdout, b'[Files]\r\nd1,ahcint.sys\r\nd1,ahcint.inf\r\nd1,usosw2k.inf\r\nd1,atapi.sys\r\n[FloppyFiles.1]\r\n'
-                                   b'd1,ahcint.sys\r\nd1,ahcint.inf\r\nd1,usosw2k.inf\r\nd1,atapi.sys\r\n[Files]\r\nd1,other.sys\r\n[FloppyFiles.1]\r\nd1,hal.dll\r\n')
+        self.assertEqual(r.stdout, b'[Files]\r\nd1,ahcint.sys\r\nd1,ahcint.inf\r\nd1,usosw2k.inf\r\nd1,usosrst.sys\r\nd1,atapi.sys\r\n[FloppyFiles.1]\r\n'
+                                   b'd1,ahcint.sys\r\nd1,ahcint.inf\r\nd1,usosw2k.inf\r\nd1,usosrst.sys\r\nd1,atapi.sys\r\n[Files]\r\nd1,other.sys\r\n[FloppyFiles.1]\r\nd1,hal.dll\r\n')
         self.assertEqual(run_fn('usos_w2k_dosnet', r.stdout).returncode, 3)
+        self.assertEqual(run_fn('USOS_W2K_USOSRST=off usos_w2k_dosnet', W2K_DOSNET).stdout, r.stdout.replace(b'd1,usosrst.sys\r\n', b''))
 
     def test_package_files(self):
         import build_xp_uefi_csm_trial as builder
         files = builder.w2k_driver_files()
         self.assertEqual(sorted(files), ['LICENSE', 'MODIFIED.txt', 'SOURCE.txt', 'ahcint.inf', 'ahcint.sys',
-                                         'uniata/COPYING-GPL-2.0.txt', 'uniata/SOURCES.txt', 'uniata/uniata.sys'])
+                                         'uniata/COPYING-GPL-2.0.txt', 'uniata/SOURCES.txt', 'uniata/uniata.sys', 'usosrst.sys'])
+        self.assertEqual(struct.unpack_from('<H', files['usosrst.sys'], struct.unpack_from('<I', files['usosrst.sys'], 60)[0] + 4)[0], 0x14c)
+        self.assertIn(b'usosrst.sys: USOS', files['SOURCE.txt'])
+        # usosrst: own source next to the pinned binary, every file pinned.
+        rst = ROOT / 'tools/w2k/usosrst'
+        pins = json.loads((rst / 'manifest.json').read_text())
+        for rel, digest in pins['files'].items():
+            self.assertEqual(hashlib.sha256((rst / rel).read_bytes()).hexdigest(), digest, rel)
+        c = (rst / 'src/usosrst.c').read_bytes()
+        self.assertIn(b'SPDX-License-Identifier: GPL-3.0-or-later', c)
+        for want in (b'IoRegisterLastChanceShutdownNotification', b'KeRegisterBugCheckCallback', b'SystemSetupInProgress',
+                     b'0xCF9', b'(PUCHAR)0x64, 0xFE'):
+            self.assertIn(want, c)
         self.assertIn(b'MODIFIED version of AHCINT 1.3.0.0', files['MODIFIED.txt'])
         self.assertIn(b'usos2', files['MODIFIED.txt'])
-        self.assertIn(b'1.3.0.0-usos2', files['SOURCE.txt'])
+        self.assertIn(b'usos3', files['MODIFIED.txt'])
+        self.assertIn(b'1.3.0.0-usos3', files['SOURCE.txt'])
         self.assertEqual(struct.unpack_from('<H', files['uniata/uniata.sys'], struct.unpack_from('<I', files['uniata/uniata.sys'], 60)[0] + 4)[0], 0x14c)
         self.assertIn(b'Version 2, June 1991', files['uniata/COPYING-GPL-2.0.txt'])
         self.assertEqual(struct.unpack_from('<H', files['ahcint.sys'], struct.unpack_from('<I', files['ahcint.sys'], 60)[0] + 4)[0], 0x14c)
@@ -126,16 +159,22 @@ class W2kStorage(unittest.TestCase):
         self.assertIn(b'Version 3, 29 June 2007', files['LICENSE'])
         self.assertIn('usr/lib/usos/w2k-drivers/', builder.PACKAGE_PREFIXES)
         # The corresponding source is tracked next to the binary, every file pinned.
-        for folder in ('1.3.0.0', '1.3.0.0-usos2'):
+        for folder in ('1.3.0.0', '1.3.0.0-usos3'):
             pins = json.loads((ROOT / 'tools/vendor/ahcint' / folder / 'manifest.json').read_text())
             for rel, digest in pins['files'].items():
                 self.assertEqual(hashlib.sha256((ROOT / 'tools/vendor/ahcint' / folder / rel).read_bytes()).hexdigest(), digest, rel)
             self.assertIn('src/ahcimain.c', pins['files'])
         # The patched source carries the USOS markers.
-        src = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos2/src/ahcisatl.c').read_bytes()
+        src = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos3/src/ahcisatl.c').read_bytes()
         self.assertIn(b'MODIFIED (USOS 1.3.0.0-usos1)', src)
-        self.assertIn(b'MODIFIED (USOS 1.3.0.0-usos2)', src)
-        self.assertIn(b'USOSW2KTRACE'[:4], (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos2/src/ahcisatl.c').read_bytes())
+        self.assertIn(b'MODIFIED (USOS 1.3.0.0-usos3)', src)
+        self.assertIn(b'USOSW2KTRACE'[:4], (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos3/src/ahcisatl.c').read_bytes())
+        # usos3: the STOP code and the stages the X470 diagnosis relies on.
+        h = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos3/src/ahcint.h').read_bytes()
+        for want in (b'#define USOS_BUGCHECK_CODE              0x55534F53', b'USOS_STAGE_LBA0', b'USOS_STAGE_FLUSH', b'USOS_STAGE_BUGCHECK'):
+            self.assertIn(want, h)
+        for want in (b'AhciUsosBugCheckCallback', b'AhciUsosAfterWrite', b'"MARKER-READ-FAIL"', b'0xB8000'):
+            self.assertIn(want, src)
         pins = json.loads((ROOT / 'tools/vendor/uniata/0.47b/manifest.json').read_text())
         for rel, digest in pins['files'].items():
             self.assertEqual(hashlib.sha256((ROOT / 'tools/vendor/uniata/0.47b' / rel).read_bytes()).hexdigest(), digest, rel)
@@ -152,7 +191,7 @@ class W2kStorage(unittest.TestCase):
             (folder / 'AHCINT.SY_').write_bytes(b'stale')
         (t / 'root/TXTSETUP.SIF').write_bytes(W2K_TXTSETUP)
         (ls / 'DOSNET.INF').write_bytes(W2K_DOSNET)
-        (ls / 'HIVESYS.INF').write_bytes('﻿[AddReg]\r\n'.encode('utf-16-le'))
+        (ls / 'HIVESYS.INF').write_bytes('ď»ż[AddReg]\r\n'.encode('utf-16-le'))
         return bt, ls
 
     def apply(self, t: Path, env: str = '', source_dir: str = 'I386'):
@@ -168,7 +207,7 @@ class W2kStorage(unittest.TestCase):
                 hivesys = (ls / 'HIVESYS.INF').read_bytes()
                 r = self.apply(t, f'USOS_W2K_ACPI={acpi}' if acpi else '')
                 self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-                self.assertIn(b'[W2K_STAGE] APPLIED PASS AHCINT 1.3.0.0-usos2', r.stdout)
+                self.assertIn(b'[W2K_STAGE] APPLIED PASS AHCINT 1.3.0.0-usos3', r.stdout)
                 sif = run_fn('usos_w2k_storage_sif', W2K_TXTSETUP).stdout
                 if acpi == 'off':  # default (empty) keeps ACPI since 2026-10-03
                     sif = run_fn('usos_w2k_acpi_off_sif', sif).stdout
@@ -176,6 +215,7 @@ class W2kStorage(unittest.TestCase):
                 inf = run_fn('usos_w2k_ahcint_inf', pkg['ahcint.inf']).stdout
                 for folder in (bt, ls):
                     self.assertEqual((folder / 'ahcint.sys').read_bytes(), pkg['ahcint.sys'])
+                    self.assertEqual((folder / 'usosrst.sys').read_bytes(), pkg['usosrst.sys'])
                     self.assertEqual((folder / 'ahcint.inf').read_bytes(), inf)
                     self.assertFalse((folder / 'AHCINT.SY_').exists())
                     self.assertEqual((folder / 'usosw2k.inf').read_bytes(), run_fn('usos_w2k_hive_inf', b'').stdout)
@@ -185,6 +225,8 @@ class W2kStorage(unittest.TestCase):
                 # The GUI-mode source copy (text mode moves the one above).
                 self.assertEqual((ls / 'AHCINT/ahcint.sys').read_bytes(), pkg['ahcint.sys'])
                 self.assertIn(b'd1,ahcint.inf', (ls / 'DOSNET.INF').read_bytes())
+                self.assertIn(b'd1,usosrst.sys', (ls / 'DOSNET.INF').read_bytes())
+                self.assertIn(b'usosrst on', r.stdout)
                 # HIVESYS.INF (UTF-16 on 2000) is left alone.
                 self.assertEqual((ls / 'HIVESYS.INF').read_bytes(), hivesys)
                 self.assertNotEqual(self.apply(t).returncode, 0)
@@ -199,10 +241,10 @@ class W2kStorage(unittest.TestCase):
         self.assertEqual(r.stdout[32:40], b'edc187d4')
         self.assertEqual(r.stdout[40:], bytes(472))
         # The driver uses the same magic and LBAs.
-        h = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos2/src/ahcint.h').read_bytes()
+        h = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos3/src/ahcint.h').read_bytes()
         for want in (b'USOS_GAP_MARKER_LBA             2046', b'USOS_GAP_TEST_LBA               2045', b'USOS_GAP_TRACE_LBA              2040'):
             self.assertIn(want, h)
-        c = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos2/src/ahcisatl.c').read_bytes()
+        c = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos3/src/ahcisatl.c').read_bytes()
         self.assertIn(b"'U','S','O','S','W','2','K','T','R','A','C','E'", c)
 
     def test_uniata(self):
@@ -238,6 +280,10 @@ class W2kStorage(unittest.TestCase):
             t = Path(tmp)
             bt, ls = self.stand_in(t)
             self.assertIn(b'USOS_W2K_ACPI must be', self.apply(t, 'USOS_W2K_ACPI=maybe').stdout)
+            self.assertIn(b'USOS_W2K_USOSRST must be', self.apply(t, 'USOS_W2K_USOSRST=maybe').stdout)
+            (t / 'pkg/usosrst.sys').rename(t / 'pkg/usosrst.bak')
+            self.assertIn(b'usosrst.sys missing', self.apply(t).stdout)
+            (t / 'pkg/usosrst.bak').rename(t / 'pkg/usosrst.sys')
             self.assertIn(b'STOP', self.apply(t, source_dir='AMD64').stdout)
             (t / 'pkg/ahcint.inf').unlink()
             self.assertIn(b'ahcint.inf missing', self.apply(t).stdout)

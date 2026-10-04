@@ -66,7 +66,7 @@ sh "$SCRIPT_DIR/nt5_storage_stage.sh" apply || fail 'NT 5.2 AHCI driver integrat
 elif [ "${USOS_PLAN_PROFILE:-}" = w2k-x86-sp4-uefi-csm ]; then
 # Windows 2000: AHCINT (ScsiPort, polling) and ACPI off (w2k_stage.sh).
 sh "$SCRIPT_DIR/w2k_stage.sh" apply || fail 'Windows 2000 AHCI/ACPI integration failed'
-# The USOS gap marker at LBA 2046 (AHCINT usos2's target check and trace ring,
+# The USOS gap marker at LBA 2046 (AHCINT usos2+'s target check and trace ring,
 # LBA 2040-2045 cleared); the partition starts at 2048, the gap is USOS's.
 . "$SCRIPT_DIR/w2k_stage.sh"
 disk_sig=$(dd if="$TARGET_DEVICE" bs=1 skip=440 count=4 2>/dev/null | od -An -tx4 | tr -d ' \n')

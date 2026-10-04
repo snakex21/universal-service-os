@@ -198,20 +198,23 @@ def nt52_usb_files():
         %(pins['version'],pins['upstream'],pins['tag'],pins['commit'],pins['source_archive']['sha256'],', '.join(sorted(pins['patches'])))).encode()
     return files
 
-# Windows 2000 SP4 AHCI: AHCINT 1.3.0.0-usos2 (GPL-3.0, MODIFIED by USOS: real
+# Windows 2000 SP4 AHCI: AHCINT 1.3.0.0-usos3 (GPL-3.0, MODIFIED by USOS: real
 # FLUSH CACHE, FUA, caching mode page, engine/link checks, the USOS-gap
-# write test and trace; tools/vendor/ahcint/1.3.0.0-usos2/MODIFIED.txt), a
+# write test and trace; tools/vendor/ahcint/1.3.0.0-usos3/MODIFIED.txt), a
 # polling ScsiPort miniport built with WDK 7.1, and UniATA 0.47b (GPL-2.0,
 # unmodified, the alternative chosen with DATA's storage-uniata.txt).
 # tools/w2k_stage.sh adapts only the INFs when staging. Every file pinned.
-AHCINT_DIR=ROOT/'tools/vendor/ahcint/1.3.0.0-usos2'
+AHCINT_DIR=ROOT/'tools/vendor/ahcint/1.3.0.0-usos3'
 AHCINT_BASE=ROOT/'tools/vendor/ahcint/1.3.0.0'
 UNIATA_DIR=ROOT/'tools/vendor/uniata/0.47b'
+# usosrst.sys: USOS's own GPL helper (STOP screen, Setup restart without an 8042).
+USOSRST_DIR=ROOT/'tools/w2k/usosrst'
 
 def w2k_driver_files():
     pins=json.loads((AHCINT_DIR/'manifest.json').read_text())
     base=json.loads((AHCINT_BASE/'manifest.json').read_text())
     uni=json.loads((UNIATA_DIR/'manifest.json').read_text())
+    rst=json.loads((USOSRST_DIR/'manifest.json').read_text())
     files={}
     for name,member in (('ahcint.sys','bin/2KXP/i386/ahcint.sys'),('ahcint.inf','bin/2KXP/ahcint.inf'),('LICENSE','LICENSE'),('MODIFIED.txt','MODIFIED.txt')):
         files[name]=(AHCINT_DIR/member).read_bytes()
@@ -219,18 +222,22 @@ def w2k_driver_files():
     for name,member in (('uniata/uniata.sys','uniata.sys'),('uniata/COPYING-GPL-2.0.txt','COPYING-GPL-2.0.txt'),('uniata/SOURCES.txt','SOURCES.txt')):
         files[name]=(UNIATA_DIR/member).read_bytes()
         if hashlib.sha256(files[name]).hexdigest()!=uni['files'][member]:raise ValueError('UniATA file hash mismatch: '+member)
-    for name in ('ahcint.sys','uniata/uniata.sys'):
+    files['usosrst.sys']=(USOSRST_DIR/'bin/i386/usosrst.sys').read_bytes()
+    if hashlib.sha256(files['usosrst.sys']).hexdigest()!=rst['files']['bin/i386/usosrst.sys']:raise ValueError('usosrst file hash mismatch')
+    for name in ('ahcint.sys','uniata/uniata.sys','usosrst.sys'):
         if struct.unpack_from('<H',files[name],struct.unpack_from('<I',files[name],60)[0]+4)[0]!=0x14c:raise ValueError(name+' is not i386')
     files['SOURCE.txt']=('AHCINT %s (i386 ScsiPort miniport, MODIFIED by USOS, see MODIFIED.txt), %s\n'
         'base: tag %s = commit %s (release archive sha256 %s) plus %s,\n'
         'built with WDK 7.1 (7600.16385.1). Licence: GPL-3.0 (LICENSE).\n'
-        'Corresponding source: tools/vendor/ahcint/1.3.0.0-usos2/src (patched) and\n'
+        'Corresponding source: tools/vendor/ahcint/1.3.0.0-usos3/src (patched) and\n'
         'tools/vendor/ahcint/1.3.0.0/src (upstream) in the USOS sources zip.\n'
         'uniata/: UniATA 0.47b, unmodified (GPL-2.0, source in the USOS sources zip:\n'
         'tools/vendor/uniata/0.47b/BusMaster_v47b_src.rar).\n'
+        'usosrst.sys: USOS\'s own helper driver %s (GPL-3.0-or-later, source:\n'
+        'tools/w2k/usosrst/src in the USOS sources zip).\n'
         'USOS uses them only for Windows 2000 SP4 Setup; staging writes the INF\n'
         'source path (\\i386\\ahcint or \\i386\\uniata) and its own uniata.inf.\n'
-        %(pins['version'],base['upstream'],base['tag'],base['commit'],base['release_zip']['sha256'],', '.join(pins['patches']))).encode()
+        %(pins['version'],base['upstream'],base['tag'],base['commit'],base['release_zip']['sha256'],', '.join(pins['patches']),rst['version'])).encode()
     return files
 
 def is_package_entry(name):

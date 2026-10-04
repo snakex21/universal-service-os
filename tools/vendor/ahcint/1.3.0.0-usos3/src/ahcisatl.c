@@ -428,7 +428,20 @@ AhciRunCommand(
         else HwInit->UsosReads++;
         if (cmdHeader->PrdByteCount != Req->DataBufferLen) HwInit->UsosPrdbcBad++;
     }
-    if (result != AHCI_CMD_OK) HwInit->UsosErrors++;
+    if (result != AHCI_CMD_OK && !Req->IsAtapi) {
+        /* MODIFIED (USOS 1.3.0.0-usos3): disk (ATA) failures only, the last
+           one on the line (a DVD drive without a disc fails TEST UNIT READY
+           all the time) */
+        HwInit->UsosErrors++;
+        HwInit->UsosLastErrLba = Req->Lba.Low;
+        HwInit->UsosLastErrTfd = tfd;
+        HwInit->UsosLastErrCmd = (ULONG)Req->Command | (portIs & 0xFFFFFF00);
+        if (Req->DataBufferLen > 0)
+            HwInit->UsosStage |= Req->IsWrite ? USOS_STAGE_WRERR : USOS_STAGE_RDERR;
+        AhciUsosShow(HwInit);
+    } else if (result == AHCI_CMD_OK && (++HwInit->UsosIos & 0x3F) == 0) {
+        AhciUsosShow(HwInit);
+    }
 
     if (result != AHCI_CMD_OK) {
         AHCI_DBG((AHCI_PFX "Port %lu: cmd %02lX %s, TFD=%08lX IS=%08lX CI=%08lX\n",
@@ -776,6 +789,8 @@ AhciFlushPort(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port)
     /* MODIFIED (USOS 1.3.0.0-usos2): flushes are counted (the trace is
        written at start, every 2048 writes and at shutdown) */
     HwInit->UsosFlushes++;
+    /* MODIFIED (USOS 1.3.0.0-usos3): the first flush is a stage */
+    AhciUsosStage(HwInit, USOS_STAGE_FLUSH, "flush1");
     if (result == AHCI_CMD_DEVICE_ERROR && (pi->LastTfd & 0x0400)) {
         /* ERR with ABRT in the error register (TFD bits 15:8): not supported */
         return TRUE;
@@ -783,11 +798,23 @@ AhciFlushPort(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port)
     return (BOOLEAN)(result == AHCI_CMD_OK);
 }
 
-/* MODIFIED (USOS 1.3.0.0-usos2): the USOS gap, see ahcint.h */
+/* MODIFIED (USOS 1.3.0.0-usos2/usos3): the USOS gap, see ahcint.h */
 static const UCHAR UsosMagic[12] = { 'U','S','O','S','W','2','K','T','R','A','C','E' };
 
+/* MODIFIED (USOS 1.3.0.0-usos3): ntoskrnl services for the diagnostic build
+   (all exported by the Windows 2000 SP4 kernel; miniport.h declares none). */
+__declspec(dllimport) PVOID __stdcall MmMapIoSpace(IN PHYSICAL_ADDRESS PhysicalAddress, IN ULONG NumberOfBytes, IN ULONG CacheType);
+__declspec(dllimport) BOOLEAN __stdcall KeRegisterBugCheckCallback(IN PVOID CallbackRecord, IN PVOID CallbackRoutine,
+                                                                   IN PVOID Buffer, IN ULONG Length, IN PUCHAR Component);
+__declspec(dllimport) VOID __stdcall KeBugCheckEx(IN ULONG BugCheckCode, IN ULONG_PTR P1, IN ULONG_PTR P2,
+                                                  IN ULONG_PTR P3, IN ULONG_PTR P4);
+__declspec(dllimport) extern ULONG KiBugCheckData[5];
+
+static ULONG g_UsosInstances;
+static UCHAR g_UsosComponent[] = "AHCINT-USOS";
+
 static ULONG
-AhciUsosSector(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port, IN ULONG Lba, IN BOOLEAN IsWrite)
+AhciUsosSectorAt(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port, IN AHCI_LBA Lba, IN BOOLEAN IsWrite)
 {
     ATA_REQUEST req;
 
@@ -795,10 +822,25 @@ AhciUsosSector(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port, IN ULONG Lba, IN B
     req.UseBounce = TRUE;
     req.DataBufferLen = 512;
     req.IsWrite = IsWrite;
-    req.Command = IsWrite ? IDE_COMMAND_WRITE_DMA : IDE_COMMAND_READ_DMA;
-    req.Lba.Low = Lba;
+    req.Lba = Lba;
     req.SectorCount = 1;
+    if (AhciLbaFits28(Lba, 1)) {
+        req.Command = IsWrite ? IDE_COMMAND_WRITE_DMA : IDE_COMMAND_READ_DMA;
+    } else {
+        req.Is48Bit = TRUE;
+        req.Command = IsWrite ? IDE_COMMAND_WRITE_DMA_EXT : IDE_COMMAND_READ_DMA_EXT;
+    }
     return AhciRunCommand(HwInit, Port, NULL, &req);
+}
+
+static ULONG
+AhciUsosSector(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port, IN ULONG Lba, IN BOOLEAN IsWrite)
+{
+    AHCI_LBA lba;
+
+    lba.Low = Lba;
+    lba.High = 0;
+    return AhciUsosSectorAt(HwInit, Port, lba, IsWrite);
 }
 
 static PCHAR
@@ -809,12 +851,18 @@ UsosPutStr(PCHAR p, PCHAR end, const char *s)
 }
 
 static PCHAR
+UsosPutHexN(PCHAR p, PCHAR end, ULONG v, ULONG digits)
+{
+    static const char hex[] = "0123456789ABCDEF";
+    LONG shift;
+    for (shift = (LONG)(digits * 4) - 4; shift >= 0 && p < end; shift -= 4) *p++ = hex[(v >> shift) & 0xF];
+    return p;
+}
+
+static PCHAR
 UsosPutHex(PCHAR p, PCHAR end, ULONG v)
 {
-    static const char digits[] = "0123456789ABCDEF";
-    LONG shift;
-    for (shift = 28; shift >= 0 && p < end; shift -= 4) *p++ = digits[(v >> shift) & 0xF];
-    return p;
+    return UsosPutHexN(p, end, v, 8);
 }
 
 static PCHAR
@@ -826,6 +874,66 @@ UsosPutField(PCHAR p, PCHAR end, const char *name, ULONG v)
     return UsosPutHex(p, end, v);
 }
 
+/* The status line: one 80-column row of the VGA text buffer per HBA
+   (row = instance). Text-mode Setup draws in VGA text mode, and the screen
+   a STOP leaves on these boards is text mode too ("_"), so the line is
+   visible in both; in a graphics mode the writes land off-screen.
+
+   AHCINT3 1022:43C8 p2 MK:OK T:OK R:0001A2F3 W:00003F10 E:0000 LW:00A1B2C3 S:0F
+
+   p    port of the USOS disk (else the last ATA port probed, "-" none)
+   MK   marker at LBA 2046: OK, NO (read, not there), RE (read error), -- (no disk)
+   T    write/read-back test at 2045: OK, XX failed, -- not run
+   R/W  completed reads/writes (rising R during the file copy = AHCINT
+        serves the disk Setup copies from and to)
+   E    failed commands; LW last written LBA; S stages (USOS_STAGE_*) */
+VOID
+AhciUsosShow(IN PHW_DEVICE_EXTENSION HwInit)
+{
+    CHAR line[80];
+    PCHAR p, end;
+    PUSHORT row;
+    ULONG i, port;
+    USHORT attr;
+
+    if (HwInit->UsosVga == NULL || HwInit->UsosInstance > 1) return;
+    for (i = 0; i < 80; i++) line[i] = ' ';
+    p = line;
+    end = line + 80;
+    p = UsosPutStr(p, end, "AHCINT3 ");
+    p = UsosPutHexN(p, end, HwInit->UsosPciId & 0xFFFF, 4);
+    p = UsosPutStr(p, end, ":");
+    p = UsosPutHexN(p, end, HwInit->UsosPciId >> 16, 4);
+    p = UsosPutStr(p, end, " p");
+    port = HwInit->UsosTracePortPlus1 ? HwInit->UsosTracePortPlus1 : HwInit->UsosProbePortPlus1;
+    if (port) p = UsosPutHexN(p, end, port - 1, 1); else p = UsosPutStr(p, end, "-");
+    p = UsosPutStr(p, end, " MK:");
+    switch (HwInit->UsosMarker) {
+    case USOS_MARKER_OK: p = UsosPutStr(p, end, "OK"); break;
+    case USOS_MARKER_ABSENT: p = UsosPutStr(p, end, "NO"); break;
+    case USOS_MARKER_READ_ERROR: p = UsosPutStr(p, end, "RE"); break;
+    default: p = UsosPutStr(p, end, "--"); break;
+    }
+    p = UsosPutStr(p, end, " T:");
+    p = UsosPutStr(p, end, HwInit->UsosVerify == 1 ? "OK" : HwInit->UsosVerify == 2 ? "XX" : "--");
+    p = UsosPutStr(p, end, " R:");
+    p = UsosPutHex(p, end, HwInit->UsosReads);
+    p = UsosPutStr(p, end, " W:");
+    p = UsosPutHex(p, end, HwInit->UsosWrites);
+    p = UsosPutStr(p, end, " E:");
+    p = UsosPutHexN(p, end, HwInit->UsosErrors, 4);
+    p = UsosPutStr(p, end, " LW:");
+    p = UsosPutHex(p, end, HwInit->UsosLastWriteLba);
+    p = UsosPutStr(p, end, " S:");
+    p = UsosPutHexN(p, end, HwInit->UsosStage, 2);
+
+    attr = (USHORT)((HwInit->UsosErrors || HwInit->UsosVerify == 2 ||
+                     (HwInit->UsosStage & (USOS_STAGE_RBFAIL | USOS_STAGE_BUGCHECK)) ||
+                     HwInit->UsosMarker == USOS_MARKER_READ_ERROR) ? 0x4F00 : 0x1F00);
+    row = HwInit->UsosVga + HwInit->UsosInstance * 80;
+    for (i = 0; i < 80; i++) row[i] = (USHORT)(attr | (UCHAR)line[i]);
+}
+
 /* The trace record: one ASCII sector in the ring at USOS_GAP_TRACE_LBA. */
 VOID
 AhciUsosTrace(IN PHW_DEVICE_EXTENSION HwInit, IN PCHAR Why)
@@ -834,19 +942,21 @@ AhciUsosTrace(IN PHW_DEVICE_EXTENSION HwInit, IN PCHAR Why)
     PUCHAR buf;
     PCHAR p, end;
 
-    if (HwInit->UsosTracePortPlus1 == 0) return;
+    if (HwInit->UsosTracePortPlus1 == 0 || HwInit->UsosInTrace) return;
+    HwInit->UsosInTrace = 1;
     tp = HwInit->UsosTracePortPlus1 - 1;
     buf = HwInit->Ports[tp].BounceBuffer;
     ZeroMemoryBytes(buf, 512);
     p = (PCHAR)buf;
     end = (PCHAR)buf + 510;
-    p = UsosPutStr(p, end, "AHCINT 1.3.0.0-usos2 why=");
+    p = UsosPutStr(p, end, "AHCINT 1.3.0.0-usos3 why=");
     p = UsosPutStr(p, end, Why);
     p = UsosPutField(p, end, "boot", HwInit->UsosBoot);
+    p = UsosPutField(p, end, "id", HwInit->UsosPciId);
     p = UsosPutField(p, end, "port", tp);
     p = UsosPutField(p, end, "verify", HwInit->UsosVerify);
-    p = UsosPutField(p, end, "pi", HwInit->PortsImplemented);
-    p = UsosPutField(p, end, "cap", HwInit->HbaCapabilities);
+    p = UsosPutField(p, end, "stage", HwInit->UsosStage);
+    p = UsosPutStr(p, end, "\r\n");
     p = UsosPutField(p, end, "rd", HwInit->UsosReads);
     p = UsosPutField(p, end, "wr", HwInit->UsosWrites);
     p = UsosPutField(p, end, "wrsec", HwInit->UsosWriteSectors);
@@ -855,14 +965,36 @@ AhciUsosTrace(IN PHW_DEVICE_EXTENSION HwInit, IN PCHAR Why)
     p = UsosPutField(p, end, "eng", HwInit->UsosEngineDown);
     p = UsosPutField(p, end, "flush", HwInit->UsosFlushes);
     p = UsosPutStr(p, end, "\r\n");
+    p = UsosPutField(p, end, "lw", HwInit->UsosLastWriteLba);
+    p = UsosPutField(p, end, "w0", HwInit->UsosFirstWrites[0]);
+    p = UsosPutField(p, end, "w1", HwInit->UsosFirstWrites[1]);
+    p = UsosPutField(p, end, "w2", HwInit->UsosFirstWrites[2]);
+    p = UsosPutField(p, end, "w3", HwInit->UsosFirstWrites[3]);
+    p = UsosPutField(p, end, "rb", HwInit->UsosRbChecks);
+    p = UsosPutField(p, end, "rbbad", HwInit->UsosRbBad);
+    p = UsosPutStr(p, end, "\r\n");
+    p = UsosPutField(p, end, "elba", HwInit->UsosLastErrLba);
+    p = UsosPutField(p, end, "etfd", HwInit->UsosLastErrTfd);
+    p = UsosPutField(p, end, "ecmd", HwInit->UsosLastErrCmd);
+    p = UsosPutField(p, end, "pi", HwInit->PortsImplemented);
+    p = UsosPutField(p, end, "cap", HwInit->HbaCapabilities);
+    p = UsosPutStr(p, end, "\r\n");
+    if (HwInit->UsosStage & USOS_STAGE_BUGCHECK) {
+        p = UsosPutField(p, end, "stop", HwInit->UsosBugCheck[0]);
+        for (i = 1; i < 5; i++) p = UsosPutField(p, end, "p", HwInit->UsosBugCheck[i]);
+        p = UsosPutStr(p, end, "\r\n");
+    }
+    /* Ports with a device only (an 8-port HBA does not fit one sector) */
     for (port = 0; port < MAX_SUPPORTED_PORTS; port++) {
         PUCHAR pb;
+        ULONG ssts;
         if (!(HwInit->PortsImplemented & (1UL << port))) continue;
         pb = AHCI_PORT_BASE(HwInit->AbarMapped, port);
+        ssts = AHCI_READ_REG(pb, AHCI_PORT_SSTS);
+        if ((ssts & AHCI_SSTS_DET_MASK) == AHCI_SSTS_DET_NONE) continue;
         p = UsosPutField(p, end, "p", port);
-        p = UsosPutField(p, end, "ssts", AHCI_READ_REG(pb, AHCI_PORT_SSTS));
+        p = UsosPutField(p, end, "ssts", ssts);
         p = UsosPutField(p, end, "cmd", AHCI_READ_REG(pb, AHCI_PORT_CMD));
-        p = UsosPutField(p, end, "sig", AHCI_READ_REG(pb, AHCI_PORT_SIG));
         p = UsosPutField(p, end, "tfd", AHCI_READ_REG(pb, AHCI_PORT_TFD));
         p = UsosPutField(p, end, "use", (ULONG)HwInit->Ports[port].Present | ((ULONG)HwInit->Ports[port].IsAtapi << 4));
         if (HwInit->Ports[port].IdentifyValid) {
@@ -875,6 +1007,93 @@ AhciUsosTrace(IN PHW_DEVICE_EXTENSION HwInit, IN PCHAR Why)
         p = UsosPutStr(p, end, "\r\n");
     }
     AhciUsosSector(HwInit, tp, USOS_GAP_TRACE_LBA + (HwInit->UsosBoot % USOS_GAP_TRACE_SLOTS), TRUE);
+    HwInit->UsosInTrace = 0;
+}
+
+/* A stage seen for the first time: status line and trace. */
+VOID
+AhciUsosStage(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Stage, IN PCHAR Why)
+{
+    if (HwInit->UsosStage & Stage) return;
+    HwInit->UsosStage |= Stage;
+    AhciUsosShow(HwInit);
+    AhciUsosTrace(HwInit, Why);
+}
+
+/* Bugcheck callback (HIGH_LEVEL): the STOP data on the status line and in
+   the trace. Every other CPU is frozen; AHCINT polls, so the trace write
+   needs no interrupt. */
+static VOID __stdcall
+AhciUsosBugCheckCallback(IN PVOID Buffer, IN ULONG Length)
+{
+    PHW_DEVICE_EXTENSION HwInit = (PHW_DEVICE_EXTENSION)Buffer;
+    ULONG i;
+
+    (VOID)Length;
+    if (HwInit->UsosStage & USOS_STAGE_BUGCHECK) return;
+    for (i = 0; i < 5; i++) HwInit->UsosBugCheck[i] = KiBugCheckData[i];
+    HwInit->UsosStage |= USOS_STAGE_BUGCHECK;
+    AhciUsosShow(HwInit);
+    HwInit->UsosInTrace = 0;
+    AhciUsosTrace(HwInit, "BUGCHECK");
+}
+
+/* FindAdapter found an HBA: number it, map the text buffer, register the
+   bugcheck callback, show the line. */
+VOID
+AhciUsosAttach(IN PHW_DEVICE_EXTENSION HwInit)
+{
+    PHYSICAL_ADDRESS vga;
+
+    HwInit->UsosInstance = g_UsosInstances++;
+    vga.LowPart = 0xB8000;
+    vga.HighPart = 0;
+    if (HwInit->UsosVga == NULL) HwInit->UsosVga = (PUSHORT)MmMapIoSpace(vga, 80 * 50 * 2, 0 /* MmNonCached */);
+    if (HwInit->UsosBugCheckRecord.CallbackRoutine == NULL) {
+        KeRegisterBugCheckCallback(&HwInit->UsosBugCheckRecord, (PVOID)AhciUsosBugCheckCallback,
+                                   HwInit, sizeof(HW_DEVICE_EXTENSION), g_UsosComponent);
+    }
+    AhciUsosShow(HwInit);
+}
+
+/* Fail loudly: the line in red, the trace, then STOP 0x55534F53. */
+static VOID
+AhciUsosFail(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Reason, IN ULONG Port, IN ULONG Detail, IN PCHAR Why)
+{
+    AhciUsosShow(HwInit);
+    AhciUsosTrace(HwInit, Why);
+    KeBugCheckEx(USOS_BUGCHECK_CODE, Reason, HwInit->UsosPciId, Port, Detail);
+}
+
+/* After a completed write on the USOS disk: count it, record stages and,
+   for the first 256 writes and every 32nd after, read the first sector
+   back and compare it with what was written. */
+static VOID
+AhciUsosAfterWrite(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port, IN PSCSI_REQUEST_BLOCK Srb,
+                   IN AHCI_LBA Lba, IN ULONG Count)
+{
+    PUCHAR buf, data;
+    ULONG i, n;
+
+    n = HwInit->UsosWrites;
+    HwInit->UsosLastWriteLba = Lba.Low;
+    if (n >= 1 && n <= 4) HwInit->UsosFirstWrites[n - 1] = Lba.Low;
+    if (Lba.High == 0 && Lba.Low == 0) AhciUsosStage(HwInit, USOS_STAGE_LBA0, "write-lba0");
+    if (Lba.High == 0 && Lba.Low <= 2048 && Lba.Low + Count > 2048) AhciUsosStage(HwInit, USOS_STAGE_LBA2048, "write-lba2048");
+    if (HwInit->UsosTracePortPlus1 != Port + 1 || Srb == NULL || Srb->DataBuffer == NULL) return;
+    if (n > 256 && (n & 0x1F) != 0) return;
+    buf = HwInit->Ports[Port].BounceBuffer;
+    data = (PUCHAR)Srb->DataBuffer;
+    HwInit->UsosRbChecks++;
+    if (AhciUsosSectorAt(HwInit, Port, Lba, FALSE) != AHCI_CMD_OK) return;     /* counted as an error */
+    for (i = 0; i < 512; i++) {
+        if (buf[i] != data[i]) {
+            HwInit->UsosRbBad++;
+            HwInit->UsosStage |= USOS_STAGE_RBFAIL;
+            AhciUsosFail(HwInit, 3, Port, Lba.Low, "RB-FAIL");
+            return;
+        }
+    }
 }
 
 /* Called for every ATA port after IDENTIFY. Only the first disk with the
@@ -884,13 +1103,35 @@ AhciUsosProbe(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port)
 {
     PAHCI_PORT_INFO pi = &HwInit->Ports[Port];
     PUCHAR buf = pi->BounceBuffer;
-    ULONG i, boot;
+    ULONG i, boot, result, tries;
     UCHAR sig[8];
 
     if (!pi->Present || pi->IsAtapi || !pi->IdentifyValid || !pi->LbaSupported) return;
     if (HwInit->UsosTracePortPlus1 != 0) return;
-    if (AhciUsosSector(HwInit, Port, USOS_GAP_MARKER_LBA, FALSE) != AHCI_CMD_OK) return;
-    for (i = 0; i < 12; i++) if (buf[i] != UsosMagic[i]) return;
+    HwInit->UsosProbePortPlus1 = Port + 1;
+
+    /* MODIFIED (USOS 1.3.0.0-usos3): retries, then fail loudly; usos2
+       returned silently here and left nothing to see. */
+    result = AHCI_CMD_HBA_ERROR;
+    for (tries = 0; tries < 3; tries++) {
+        result = AhciUsosSector(HwInit, Port, USOS_GAP_MARKER_LBA, FALSE);
+        if (result == AHCI_CMD_OK) break;
+        for (i = 0; i < 20; i++) ScsiPortStallExecution(10000);
+    }
+    if (result != AHCI_CMD_OK) {
+        HwInit->UsosMarker = USOS_MARKER_READ_ERROR;
+        AhciUsosFail(HwInit, 1, Port, pi->LastTfd, "MARKER-READ-FAIL");
+        return;
+    }
+    HwInit->UsosMarkerHead = ((PULONG)buf)[0];
+    for (i = 0; i < 12; i++) {
+        if (buf[i] != UsosMagic[i]) {
+            if (HwInit->UsosMarker == USOS_MARKER_NONE) HwInit->UsosMarker = USOS_MARKER_ABSENT;
+            AhciUsosShow(HwInit);
+            return;
+        }
+    }
+    HwInit->UsosMarker = USOS_MARKER_OK;
     boot = ((PULONG)buf)[4] + 1;
     for (i = 0; i < 8; i++) sig[i] = buf[32 + i];
 
@@ -919,11 +1160,12 @@ AhciUsosProbe(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port)
 
     HwInit->UsosBoot = boot;
     HwInit->UsosTracePortPlus1 = Port + 1;
+    AhciUsosShow(HwInit);
     AhciUsosTrace(HwInit, (HwInit->UsosVerify == 1) ? "init" : "init-VERIFY-FAIL");
 
-    /* Fail loudly: a disk that does not keep what it is given is hidden,
-       so Setup stops with "no hard disk" instead of copying into nothing. */
-    if (HwInit->UsosVerify != 1) pi->Present = FALSE;
+    /* Fail loudly: a disk that does not keep what it is given stops the
+       machine with the numbers on screen (usos2 hid the port). */
+    if (HwInit->UsosVerify != 1) AhciUsosFail(HwInit, 2, Port, pi->LastTfd, "VERIFY-FAIL");
 }
 
 static VOID
@@ -989,6 +1231,9 @@ AhciAtaReadWrite(
         !AhciFlushPort(HwInit, Port)) {
         result = AHCI_CMD_DEVICE_ERROR;
     }
+
+    /* MODIFIED (USOS 1.3.0.0-usos3): stages and sampled read-back */
+    if (result == AHCI_CMD_OK && IsWrite) AhciUsosAfterWrite(HwInit, Port, Srb, Lba, Count);
 
     /* MODIFIED (USOS 1.3.0.0-usos2): a trace every 2048 writes (text-mode
        Setup sends neither flush nor shutdown before its restart) */

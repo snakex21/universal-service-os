@@ -1,4 +1,4 @@
-r"""Read the AHCINT 1.3.0.0-usos2 trace from the USOS gap of a Windows 2000 disk.
+r"""Read the AHCINT 1.3.0.0-usos3 trace from the USOS gap of a Windows 2000 disk.
 
     python tools/w2k_gap_trace.py \\.\PhysicalDrive10      (Windows, read-only)
     python tools/w2k_gap_trace.py /dev/sda                  (Linux, read-only)
@@ -8,7 +8,7 @@ r"""Read the AHCINT 1.3.0.0-usos2 trace from the USOS gap of a Windows 2000 disk
 Read-only: opens the disk/image for reading only. Prints the marker at LBA
 2046 (boot counter, last verify result, disk signature), the test sector at
 2045 and the four trace records at 2040-2043 (tools/vendor/ahcint/
-1.3.0.0-usos2/MODIFIED.txt; staged by tools/w2k_stage.sh).
+1.3.0.0-usos3/MODIFIED.txt; staged by tools/w2k_stage.sh).
 """
 from __future__ import annotations
 

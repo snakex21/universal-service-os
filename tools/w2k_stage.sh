@@ -4,9 +4,9 @@
 # Applied on the target after the local source copy, before xhci98
 # (nt52_usb_stage.sh):
 #
-# 1. AHCI: AHCINT 1.3.0.0-usos2 (https://github.com/ages2001/AHCINT, GPL-3.0,
+# 1. AHCI: AHCINT 1.3.0.0-usos3 (https://github.com/ages2001/AHCINT, GPL-3.0,
 #    MODIFIED by USOS: real FLUSH CACHE, FUA, caching mode page;
-#    tools/vendor/ahcint/1.3.0.0-usos2), a ScsiPort miniport with
+#    tools/vendor/ahcint/1.3.0.0-usos3), a ScsiPort miniport with
 #    polling I/O (no interrupt needed, so it also runs without ACPI). Every
 #    import (ntoskrnl, scsiport) resolves on the 2000 SP4 kernel. The
 #    GenAHCI/StorPort route of NT 5.2 does not exist on 2000 (no StorPort).
@@ -49,6 +49,15 @@
 #    (ERROR_NO_SYSTEM_RESOURCES, ESENT log flood) with AHCINT and hung with
 #    IDE, so it is the X470 fallback for a STOP 0xA5, not the default.
 #    Costs: no ACPI power-off, power button or sleep.
+# 3. usosrst.sys (USOS's own GPL driver, tools/w2k/usosrst; diagnostic
+#    build): loaded from [BootBusExtenders.Load] in text mode and as a boot
+#    driver (group Boot Bus Extender) afterwards. A bugcheck callback writes
+#    the STOP code, its parameters and the modules they point into to the
+#    VGA text buffer (the X470 without CSM shows only a black "_" for a
+#    STOP); while Setup runs (SystemSetupInProgress = 1) a last-chance
+#    shutdown handler restarts through the FADT reset register, CF9h and
+#    the 8042 (the 2000 HALs know only the 8042, which those boards lack).
+#    USOS_W2K_USOSRST=off leaves it out.
 # No Microsoft file is added or changed except the TXTSETUP.SIF and
 # DOSNET.INF copies on the target.
 #   sh w2k_stage.sh apply     (XP_TARGET_ROOT, NT5_SOURCE_DIR=I386)
@@ -65,6 +74,10 @@ usos_w2k_apply() (
         uniata) need='uniata/uniata.sys'; pkg="$pkg" ;;
         *) echo '[W2K_STAGE] STOP: USOS_W2K_STORAGE must be ahcint or uniata'; exit 1 ;;
     esac
+    helper=${USOS_W2K_USOSRST:-on}
+    case "$helper" in on|off) ;; *) echo '[W2K_STAGE] STOP: USOS_W2K_USOSRST must be on or off'; exit 1 ;; esac
+    USOS_W2K_USOSRST=$helper; export USOS_W2K_USOSRST
+    [ "$helper" = off ] || need="$need usosrst.sys"
     for name in $need; do
         [ -f "$pkg/$name" ] || { echo "[W2K_STAGE] STOP: $pkg/$name missing"; exit 1; }
     done
@@ -78,9 +91,13 @@ usos_w2k_apply() (
     ls="$XP_TARGET_ROOT/\$WIN_NT\$.~LS/I386"
     for folder in "$bt" "$ls"; do
         [ -f "$folder/TXTSETUP.SIF" ] || { echo "[W2K_STAGE] STOP: $folder/TXTSETUP.SIF missing"; exit 1; }
-        find "$folder" -maxdepth 1 -type f \( -iname "$drv.sys" -o -iname "$drv.sy_" -o -iname "$drv.inf" -o -iname "$drv.in_" -o -iname usosw2k.inf \) -exec rm -f '{}' \;
+        find "$folder" -maxdepth 1 -type f \( -iname "$drv.sys" -o -iname "$drv.sy_" -o -iname "$drv.inf" -o -iname "$drv.in_" -o -iname usosw2k.inf -o -iname usosrst.sys -o -iname usosrst.sy_ \) -exec rm -f '{}' \;
         cp "$sys" "$folder/$drv.sys"
         cmp -s "$sys" "$folder/$drv.sys"
+        if [ "$helper" = on ]; then
+            cp "$pkg/usosrst.sys" "$folder/usosrst.sys"
+            cmp -s "$pkg/usosrst.sys" "$folder/usosrst.sys"
+        fi
         if [ "$drv" = ahcint ]; then
             usos_w2k_ahcint_inf "$mode" < "$pkg/ahcint.inf" > "$folder/ahcint.inf" || { echo '[W2K_STAGE] STOP: cannot adapt ahcint.inf'; exit 1; }
         else
@@ -107,8 +124,9 @@ usos_w2k_apply() (
         mv "$ls/DOSNET.INF.usos" "$ls/DOSNET.INF"
     fi
     sync
-    printf '[W2K_STAGE] APPLIED PASS %s boot+local source, TXTSETUP.SIF PCI\\CC_010601, usosw2k.inf (CriticalDeviceDatabase), %s mode; ACPI %s\n' \
-        "$(usos_w2k_driver_title)" "$mode" "$([ "$acpi" = off ] && echo 'off (ACPIEnable = 0: MPS or Standard PC HAL)' || echo 'kept (ACPIEnable unchanged)')"
+    printf '[W2K_STAGE] APPLIED PASS %s boot+local source, TXTSETUP.SIF PCI\\CC_010601, usosw2k.inf (CriticalDeviceDatabase), %s mode; ACPI %s; usosrst %s\n' \
+        "$(usos_w2k_driver_title)" "$mode" "$([ "$acpi" = off ] && echo 'off (ACPIEnable = 0: MPS or Standard PC HAL)' || echo 'kept (ACPIEnable unchanged)')" \
+        "$([ "$helper" = on ] && echo 'on (STOP screen, Setup restart via FADT/CF9/8042)' || echo off)"
 )
 
 # Every output line ends in CRLF, as the NT5 setup files do (BusyBox awk
@@ -121,24 +139,39 @@ USOS_W2K_AHCI_IDS='CC_010601 VEN_1022&DEV_7901 VEN_1022&DEV_43C8 VEN_1022&DEV_43
 usos_w2k_driver_title() {
     case "${USOS_W2K_DRV:-ahcint}" in
         uniata) echo 'UniATA 0.47b' ;;
-        *) echo 'AHCINT 1.3.0.0-usos2' ;;
+        *) echo 'AHCINT 1.3.0.0-usos3 diagnostic' ;;
     esac
 }
 
 # stdin TXTSETUP.SIF -> stdout with the AHCINT rows (first block of each
-# section; the same rows twice are refused).
+# section; the same rows twice are refused) and, unless USOS_W2K_USOSRST=off,
+# usosrst.sys: [SourceDisksFiles] (System32\drivers), [BootBusExtenders.Load]
+# (SETUPLDR loads it from ~BT, the kernel starts it before the storage
+# drivers), [BootBusExtenders] and its own [files.usosrst] section.
 usos_w2k_storage_sif() {
-    awk -v ids="$USOS_W2K_AHCI_IDS" -v drv="${USOS_W2K_DRV:-ahcint}" -v title="$(usos_w2k_driver_title)" '
-        BEGIN { bs = sprintf("%c", 92); n = split(ids, id, " ") }
+    awk -v ids="$USOS_W2K_AHCI_IDS" -v drv="${USOS_W2K_DRV:-ahcint}" -v title="$(usos_w2k_driver_title)" -v helper="${USOS_W2K_USOSRST:-on}" '
+        BEGIN { bs = sprintf("%c", 92); q = sprintf("%c", 34); n = split(ids, id, " ") }
         { line = $0; sub(/\r$/, "", line); low = tolower(line) }
-        index(low, drv) == 1 || low ~ "^[ \t]+" drv || index(low, "pci" bs "cc_010601") || index(low, "usosw2k.inf") { dup = 1 }
+        index(low, drv) == 1 || low ~ "^[ \t]+" drv || index(low, "pci" bs "cc_010601") || index(low, "usosw2k.inf") || index(low, "usosrst") { dup = 1 }
         { print line "\r" }
-        low == "[sourcedisksfiles]" && !f { print drv ".sys = 1,,,,,,4_,4,1,,,1,4\r"; print drv ".inf = 1,,,,,,,20,0,0\r"; print "usosw2k.inf = 1,,,,,,_x,20,3,3\r"; f = 1 }
-        low == "[hardwareidsdatabase]" && !h { for (i = 1; i <= n; i++) print "PCI" bs id[i] " = \"" drv "\"\r"; h = 1 }
+        low == "[sourcedisksfiles]" && !f {
+            print drv ".sys = 1,,,,,,4_,4,1,,,1,4\r"; print drv ".inf = 1,,,,,,,20,0,0\r"; print "usosw2k.inf = 1,,,,,,_x,20,3,3\r"
+            if (helper == "on") print "usosrst.sys = 1,,,,,,4_,4,1,,,1,4\r"
+            f = 1
+        }
+        low == "[hardwareidsdatabase]" && !h { for (i = 1; i <= n; i++) print "PCI" bs id[i] " = " q drv q "\r"; h = 1 }
         low == "[scsi.load]" && !l { print drv " = " drv ".sys,4\r"; l = 1 }
-        low == "[scsi]" && !s { print drv " = \"AHCI SATA Controller (" title ", USOS)\"\r"; s = 1 }
+        low == "[scsi]" && !s { print drv " = " q "AHCI SATA Controller (" title ", USOS)" q "\r"; s = 1 }
         low == "[hiveinfs.fresh]" && !r { print "AddReg = usosw2k.inf,AddReg\r"; r = 1 }
-        END { if (dup || !(f && h && l && s && r)) exit 3 }
+        helper == "on" && low == "[bootbusextenders.load]" && !bl { print "usosrst  = usosrst.sys\r"; bl = 1 }
+        helper == "on" && low == "[bootbusextenders]" && !bb { print "usosrst  = " q "USOS STOP screen and restart helper" q ",files.usosrst,usosrst\r"; bb = 1 }
+        END {
+            if (dup || !(f && h && l && s && r)) exit 3
+            if (helper == "on") {
+                if (!(bl && bb)) exit 3
+                print "\r"; print "[files.usosrst]\r"; print "usosrst.sys,4\r"
+            }
+        }
     '
 }
 
@@ -146,7 +179,7 @@ usos_w2k_storage_sif() {
 # PnpInterface for AHCINT and the CriticalDeviceDatabase entries of
 # USOS_W2K_AHCI_IDS. Loaded through TXTSETUP.SIF [HiveInfs.Fresh].
 usos_w2k_hive_inf() {
-    awk -v ids="$USOS_W2K_AHCI_IDS" -v mode="${1:-legacy}" -v drv="${USOS_W2K_DRV:-ahcint}" '
+    awk -v ids="$USOS_W2K_AHCI_IDS" -v mode="${1:-legacy}" -v drv="${USOS_W2K_DRV:-ahcint}" -v helper="${USOS_W2K_USOSRST:-on}" '
         BEGIN {
             bs = sprintf("%c", 92); q = sprintf("%c", 34); n = split(ids, id, " ")
             base = "HKLM," q "SYSTEM" bs "CurrentControlSet" bs
@@ -162,6 +195,16 @@ usos_w2k_hive_inf() {
                 print base "Services" bs "atapi" q "," q "Start" q ",0x00010001,4\r"
             }
             if (mode == "pnp") print base "Services" bs drv bs "Parameters" bs "PnpInterface" q "," q "5" q ",0x00010001,1\r"
+            # usosrst: a boot driver of the first group, ErrorControl 0 (a
+            # failed start never stops the boot).
+            if (helper == "on") {
+                svc = base "Services" bs "usosrst" q ","
+                print svc q "Type" q ",0x00010001,1\r"
+                print svc q "Start" q ",0x00010001,0\r"
+                print svc q "ErrorControl" q ",0x00010001,0\r"
+                print svc q "Group" q ",0x00000000," q "Boot Bus Extender" q "\r"
+                print svc q "ImagePath" q ",0x00020000," q "System32" bs "DRIVERS" bs "usosrst.sys" q "\r"
+            }
             for (i = 1; i <= n; i++) {
                 key = tolower(id[i])
                 print cddb key q "," q "Service" q ",0x00000000," q drv q "\r"
@@ -203,15 +246,17 @@ usos_w2k_ahcint_inf() {
     '
 }
 
-# stdin DOSNET.INF -> stdout with d1,ahcint.sys, d1,ahcint.inf and d1,usosw2k.inf in the
-# first [Files] and [FloppyFiles.1] blocks.
+# stdin DOSNET.INF -> stdout with d1,ahcint.sys, d1,ahcint.inf, d1,usosw2k.inf
+# (and d1,usosrst.sys unless USOS_W2K_USOSRST=off) in the first [Files] and
+# [FloppyFiles.1] blocks.
 usos_w2k_dosnet() {
-    awk -v drv="${USOS_W2K_DRV:-ahcint}" '
+    awk -v drv="${USOS_W2K_DRV:-ahcint}" -v helper="${USOS_W2K_USOSRST:-on}" '
         { line = $0; sub(/\r$/, "", line); low = tolower(line) }
-        index(low, drv) || index(low, "usosw2k") { dup = 1 }
+        index(low, drv) || index(low, "usosw2k") || index(low, "usosrst") { dup = 1 }
         { print line "\r" }
-        low == "[files]" && !f { print "d1," drv ".sys\r"; print "d1," drv ".inf\r"; print "d1,usosw2k.inf\r"; f = 1 }
-        low == "[floppyfiles.1]" && !b { print "d1," drv ".sys\r"; print "d1," drv ".inf\r"; print "d1,usosw2k.inf\r"; b = 1 }
+        low == "[files]" && !f { rowsfor(); f = 1 }
+        low == "[floppyfiles.1]" && !b { rowsfor(); b = 1 }
+        function rowsfor() { print "d1," drv ".sys\r"; print "d1," drv ".inf\r"; print "d1,usosw2k.inf\r"; if (helper == "on") print "d1,usosrst.sys\r" }
         END { if (dup || !(f && b)) exit 3 }
     '
 }
@@ -252,7 +297,7 @@ usos_w2k_uniata_inf() {
 
 # stdout: the 512-byte marker sector USOS writes at LBA 2046 of the prepared
 # disk ("USOSW2KTRACE", boot counter 0 at offset 16, the MBR disk signature
-# $1 as hex at offset 32). AHCINT usos2 only touches a disk with this marker
+# $1 as hex at offset 32). AHCINT usos2+ only touches a disk with this marker
 # (write/read-back test at 2045, trace ring at 2040-2043; ahcint.h).
 usos_w2k_gap_marker() {
     printf 'USOSW2KTRACE'

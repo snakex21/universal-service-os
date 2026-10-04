@@ -718,6 +718,10 @@ AhciFindAdapter(
 
     if (!AhciAllocateDma(hwInit, ConfigInfo)) return SP_RETURN_ERROR;
 
+    /* MODIFIED (USOS 1.3.0.0-usos3): status line and bugcheck record */
+    hwInit->UsosPciId = (ULONG)pciConfig.VendorID | ((ULONG)pciConfig.DeviceID << 16);
+    AhciUsosAttach(hwInit);
+
     return SP_RETURN_FOUND;
 }
 
@@ -801,6 +805,9 @@ AhciHwInitialize(IN PVOID DeviceExtension)
     ghc = AHCI_READ_REG(hwInit->AbarMapped, AHCI_GEN_GHC);
     AHCI_WRITE_REG(hwInit->AbarMapped, AHCI_GEN_GHC, ghc & ~AHCI_GHC_IE);
 
+    /* MODIFIED (USOS 1.3.0.0-usos3): the line after every port is up */
+    AhciUsosShow(hwInit);
+
     AHCI_DBG((AHCI_PFX "HwInitialize: done\n"));
     return TRUE;
 }
@@ -841,7 +848,12 @@ AhciStartIo(IN PVOID DeviceExtension, IN PSCSI_REQUEST_BLOCK Srb)
            port instead of completing without telling the drive. */
         Srb->SrbStatus = AhciFlushPort(hwInit, Srb->TargetId) ? SRB_STATUS_SUCCESS : SRB_STATUS_ERROR;
         /* MODIFIED (USOS 1.3.0.0-usos2): the trace at shutdown */
-        if (Srb->Function == SRB_FUNCTION_SHUTDOWN) AhciUsosTrace(hwInit, "shutdown");
+        if (Srb->Function == SRB_FUNCTION_SHUTDOWN) {
+            /* MODIFIED (USOS 1.3.0.0-usos3): shutdown is a stage */
+            hwInit->UsosStage |= USOS_STAGE_SHUTDOWN;
+            AhciUsosShow(hwInit);
+            AhciUsosTrace(hwInit, "shutdown");
+        }
         break;
 
     default:

@@ -287,7 +287,104 @@ a blinking cursor; no visible restart, nothing for 15 minutes.
 4. Then the same with CSM on (the firmware's keyboard controller makes the
    2000 restart work).
 
-## 7. X470 test plan (first plan, 2026-10-03)
+## 7. X470 run 2 (2026-10-03, B261003-232921) and the usos3 diagnostic build
+
+**Run 2 (usos2, CSM off):** text mode showed "Instalator kopiuje pliki…" with
+its progress bar, then went **straight to a black screen with a blinking
+cursor**, with no "Saving configuration" step and no 15-second restart
+countdown. The user waited about 15 minutes before switching off. The
+BIOSTAR, read read-only on the dev PC, had no `WINNT`, no `BOOT.INI` and an
+unchanged VBR. The usos2 marker still had **boot counter 0**, and there was
+no test sector and no trace.
+
+Reading of the evidence:
+- **AHCINT is the only driver that can serve that disk in text mode.** It
+  is one instance: one `ScsiPortInitialize` call, and a global claimed-device
+  table, so the same function is never claimed twice. Legacy mode has no
+  `PnpInterface` row, so there is no legacy+PnP double. atapi/pciide only
+  drive IDE class 0101, not an AHCI controller with ABAR only. INT13 through
+  CSMWrap/SeaBIOS is used only by SETUPLDR, the loader screen before the
+  kernel; USB storage does not exist in 2000 text mode.
+- The usos2 probe **returned silently** when the marker read failed or did
+  not match, so it may never have run its write test. A boot counter of 0
+  does not show what happened.
+- Text mode **did not reach its end screens**, and a black text screen with
+  a cursor is what a 2000 STOP leaves on this board. The bootvid STOP screen
+  does not appear without CSM. So the most likely event is **a STOP during
+  or right after the copy, never shown**. A 15-minute wait also rules out
+  lost write-cache data.
+- Text-mode Setup restarts through `HalReturnToFirmware` directly (setupdd
+  imports it, not `NtShutdownSystem`), so shutdown notifications never run
+  there.
+
+**AHCINT 1.3.0.0-usos3** (diagnostic build, `MODIFIED.txt`, patch 0003):
+- A **status line in the VGA text buffer**, row 0 (a second HBA uses row 1):
+
+  `AHCINT3 1022:43C8 p2 MK:OK T:OK R:0001A2F3 W:00003F10 E:0000 LW:00A1B2C3 S:0F`
+
+  | Field | Meaning |
+  |---|---|
+  | `1022:43C8` | the HBA's PCI ID |
+  | `p2` | the USOS disk's port |
+  | `MK` | marker: `OK`; `NO` = read, but no marker; `RE` = read error; `--` = no disk |
+  | `T` | write/read-back test at 2045: `OK`, `XX`, or `--` (not run) |
+  | `R` / `W` | completed reads / writes |
+  | `E` | errors |
+  | `LW` | last written LBA |
+  | `S` | stages: `01` = LBA 0 written, `02` = LBA 2048 written, `04` = first flush, `08` = shutdown, `10` = read-back mismatch, `20` / `40` = write / read error, `80` = STOP |
+
+  Blue means normal; red means errors, a failed test or a STOP. **R rising
+  during the copy shows that AHCINT serves the disk.**
+- **Sampled read-back** on the USOS disk: the first sector of the first 256
+  writes, then of every 32nd, is read back and compared.
+- **Fail loudly** with STOP `0x55534F53` ("USOS") instead of carrying on:
+
+  | P1 | Cause | P4 |
+  |---|---|---|
+  | 1 | marker read failed after 3 tries | TFD |
+  | 2 | write test failed | TFD |
+  | 3 | read-back mismatch | LBA |
+
+  P2 is the PCI ID and P3 the port.
+- A **bugcheck callback** puts any STOP code on the line and writes it to
+  the trace.
+
+**usosrst.sys** (own driver, GPL-3.0-or-later, `tools/w2k/usosrst`):
+- It is loaded from `[BootBusExtenders.Load]` in text mode and as a boot
+  driver of the first group afterwards. The loader uses ErrorControl 0, so a
+  failed start never stops the boot.
+- **Load line, row 2.** Example:
+  `usosrst 1.0-diag rsdp-rev=02 reset=io:0CF9=06+cf9+8042 setup=0 handler=off` (rsdp-rev FF = no RSDP found).
+  It shows the FADT reset register found through the RSDP.
+- **STOP screen, rows 3-5.** It shows the STOP code, its parameters, and
+  the module plus offset each parameter points into, found by walking the
+  loaded-module list from its own entry.
+- **Restart.** When `SystemSetupInProgress` = 1 (GUI-mode Setup), a
+  last-chance shutdown handler resets through the FADT reset register, then
+  CF9h (02h, 06h, then 0Eh), then the 8042. After Setup the handler is not
+  registered, so a shutdown stays a power-off. The text-mode restart is not
+  covered (see above). Covering it would need a change to Microsoft's HAL,
+  which is not done without explicit approval. On the X470 without CSM, the
+  end of text mode still needs the reset button.
+- Imports: AHCINT 16 (ntoskrnl, scsiport) and usosrst 17 (ntoskrnl, hal).
+  All of them resolve on the 2000 SP4 ntoskrnl/ntkrnlmp and on every 2000
+  HAL.
+
+**Next X470 run (usos3 build, CSM off):** photograph the top rows during the
+copy, and again at the black screen.
+- No AHCINT line at all: AHCINT never started, or the screen is not in
+  text mode.
+- `MK:RE` / `MK:NO` / `T:XX`, or a STOP `0x55534F53`: the cause is on that
+  line.
+- A STOP line from usosrst: that names the failing driver.
+- Then press reset and bring the disk for the trace (`tools\w2k_gap_trace.py`).
+
+In parallel, the user runs the **UniATA experiment** with the existing
+build: `storage-uniata.txt` plus a re-prepare. It swaps the whole
+miniport, so a `WINNT` folder after that run puts the fault in AHCINT's
+write path.
+
+## 8. X470 test plan (first plan, 2026-10-03)
 
 
 Windows 2000 SP4 Professional, target on the chipset SATA (`1022:43C8`),
