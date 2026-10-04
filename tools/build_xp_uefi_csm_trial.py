@@ -198,13 +198,13 @@ def nt52_usb_files():
         %(pins['version'],pins['upstream'],pins['tag'],pins['commit'],pins['source_archive']['sha256'],', '.join(sorted(pins['patches'])))).encode()
     return files
 
-# Windows 2000 SP4 AHCI: AHCINT 1.3.0.0-usos3 (GPL-3.0, MODIFIED by USOS: real
+# Windows 2000 SP4 AHCI: AHCINT 1.3.0.0-usos4 (GPL-3.0, MODIFIED by USOS: real
 # FLUSH CACHE, FUA, caching mode page, engine/link checks, the USOS-gap
-# write test and trace; tools/vendor/ahcint/1.3.0.0-usos3/MODIFIED.txt), a
+# write test and trace; tools/vendor/ahcint/1.3.0.0-usos4/MODIFIED.txt), a
 # polling ScsiPort miniport built with WDK 7.1, and UniATA 0.47b (GPL-2.0,
 # unmodified, the alternative chosen with DATA's storage-uniata.txt).
 # tools/w2k_stage.sh adapts only the INFs when staging. Every file pinned.
-AHCINT_DIR=ROOT/'tools/vendor/ahcint/1.3.0.0-usos3'
+AHCINT_DIR=ROOT/'tools/vendor/ahcint/1.3.0.0-usos4'
 AHCINT_BASE=ROOT/'tools/vendor/ahcint/1.3.0.0'
 UNIATA_DIR=ROOT/'tools/vendor/uniata/0.47b'
 # usosrst.sys: USOS's own GPL helper (STOP screen, Setup restart without an 8042).
@@ -229,7 +229,7 @@ def w2k_driver_files():
     files['SOURCE.txt']=('AHCINT %s (i386 ScsiPort miniport, MODIFIED by USOS, see MODIFIED.txt), %s\n'
         'base: tag %s = commit %s (release archive sha256 %s) plus %s,\n'
         'built with WDK 7.1 (7600.16385.1). Licence: GPL-3.0 (LICENSE).\n'
-        'Corresponding source: tools/vendor/ahcint/1.3.0.0-usos3/src (patched) and\n'
+        'Corresponding source: tools/vendor/ahcint/1.3.0.0-usos4/src (patched) and\n'
         'tools/vendor/ahcint/1.3.0.0/src (upstream) in the USOS sources zip.\n'
         'uniata/: UniATA 0.47b, unmodified (GPL-2.0, source in the USOS sources zip:\n'
         'tools/vendor/uniata/0.47b/BusMaster_v47b_src.rar).\n'

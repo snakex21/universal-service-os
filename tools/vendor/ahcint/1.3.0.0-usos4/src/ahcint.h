@@ -389,6 +389,25 @@ typedef struct _USOS_BUGCHECK_RECORD {
     ULONG       State;
 } USOS_BUGCHECK_RECORD;
 
+/* MODIFIED (USOS 1.3.0.0-usos4): the stall snapshot (USOS_SNAP_* index) */
+#define USOS_SNAP_VALID                 0
+#define USOS_SNAP_PORT                  1
+#define USOS_SNAP_CI                    2
+#define USOS_SNAP_SACT                  3
+#define USOS_SNAP_IS                    4
+#define USOS_SNAP_SERR                  5
+#define USOS_SNAP_TFD                   6
+#define USOS_SNAP_CMD                   7
+#define USOS_SNAP_HIS                   8
+#define USOS_SNAP_GHC                   9
+#define USOS_SNAP_IE                    10
+#define USOS_SNAP_OP                    11
+#define USOS_SNAP_LBA                   12
+#define USOS_SNAP_COUNT                 13
+#define USOS_SNAP_ISR                   14
+#define USOS_SNAP_TIMER                 15
+#define USOS_SNAP_WORDS                 16
+
 typedef struct _HW_DEVICE_EXTENSION {
     PUCHAR                  AbarMapped;
     ULONG                   PciBus;
@@ -431,6 +450,18 @@ typedef struct _HW_DEVICE_EXTENSION {
     ULONG                   UsosInTrace;
     ULONG                   UsosBugCheck[5];
     USOS_BUGCHECK_RECORD    UsosBugCheckRecord;
+
+    /* MODIFIED (USOS 1.3.0.0-usos4): stall diagnostics (see ahcisatl.c) */
+    ULONG                   UsosIsrCalls;       /* HwInterrupt calls */
+    ULONG                   UsosIsrOwn;         /* ... with HBA IS set */
+    ULONG                   UsosTimerTicks;     /* miniport timer, 250 ms */
+    ULONG                   UsosSrbs;           /* HwStartIo calls */
+    ULONG                   UsosSrbsAtTick;
+    ULONG                   UsosIdleTicks;      /* timer ticks without a new SRB */
+    ULONG                   UsosIdleTraced;
+    ULONG                   UsosBusResets;      /* HwResetBus calls */
+    ULONG                   UsosStalls;         /* commands still busy after 2 s */
+    ULONG                   UsosSnap[USOS_SNAP_WORDS];
 } HW_DEVICE_EXTENSION, *PHW_DEVICE_EXTENSION;
 
 /* One ATA/ATAPI command to put on the wire */
@@ -524,5 +555,19 @@ VOID    AhciUsosTrace(IN PHW_DEVICE_EXTENSION HwInit, IN PCHAR Why);
 VOID    AhciUsosAttach(IN PHW_DEVICE_EXTENSION HwInit);
 VOID    AhciUsosShow(IN PHW_DEVICE_EXTENSION HwInit);
 VOID    AhciUsosStage(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Stage, IN PCHAR Why);
+/* MODIFIED (USOS 1.3.0.0-usos4): stall diagnostics. A 250 ms miniport timer
+   (TM on the line; it cannot run while HwStartIo polls, so a frozen TM with
+   a moving usosrst heartbeat = stuck inside AHCINT), HwInterrupt and
+   HwResetBus counts, seconds without a new SRB, and a snapshot of the port
+   (PxCI, PxSACT, PxIS, PxSERR, PxTFD, PxCMD, HBA IS, the command) when a
+   polled command is still busy after 2 s: screen rows 3-4 and the trace. */
+#define USOS_STALL_USEC                 2000000
+#define USOS_TIMER_USEC                 250000
+#define USOS_IDLE_TRACE_TICKS           80      /* 20 s without a new SRB */
+#define USOS_ROW_STALL                  3
+#define USOS_ROW_SECOND_HBA             8
+VOID    AhciUsosStallSnapshot(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port, IN PATA_REQUEST Req);
+VOID    AhciUsosTimer(IN PVOID DeviceExtension);
+VOID    AhciUsosArmTimer(IN PHW_DEVICE_EXTENSION HwInit);
 
 #endif /* _AHCINT_H_ */

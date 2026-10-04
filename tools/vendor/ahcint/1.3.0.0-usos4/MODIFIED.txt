@@ -1,8 +1,7 @@
-AHCINT 1.3.0.0-usos3 - MODIFIED version of AHCINT 1.3.0.0 (ages2001,
+AHCINT 1.3.0.0-usos4 - MODIFIED version of AHCINT 1.3.0.0 (ages2001,
 https://github.com/ages2001/AHCINT, tag v1.3.0.0 = commit 7be9c9b8), changed
 by the USOS project on 2026-09-30 (usos1), 2026-10-03 (usos2) and
-2026-10-04 (usos3). Not an
-upstream release. Licence: GPL-3.0, as the original (LICENSE).
+2026-10-04 (usos3, usos4). Not an upstream release. Licence: GPL-3.0, as the original (LICENSE).
 
 usos1 (patches/0001-usos1-flush-cache.patch):
 - SYNCHRONIZE CACHE (10)/(16), SRB_FUNCTION_FLUSH and SRB_FUNCTION_SHUTDOWN
@@ -51,6 +50,29 @@ disk, not even the usos2 marker update):
   trace (AHCINT polls, so this works with every other CPU stopped).
 Imports added: MmMapIoSpace, KeRegisterBugCheckCallback, KeBugCheckEx,
 KiBugCheckData (ntoskrnl, all on 2000 SP4).
+
+usos4 (patches/0004-usos4-stall-diagnostics.patch), a diagnostic build after
+the X470 run where text-mode Setup stopped at 4 % of the copy with the
+status line frozen and no STOP:
+- The status line is refreshed after every command (usos3: every 64th) and
+  by a 250 ms miniport timer, in a shorter format with new fields:
+  A4 43C8p2 OK/OK R:01A2F3 W:003F10 E:00 B:0 LW:00A1B2C3 S:0F I:000 TM:3A1 ID:00
+  B = HwResetBus calls (ScsiPort request timeouts), I = HwInterrupt calls
+  (AHCINT polls, so none are expected), TM = timer ticks (ScsiPort runs the
+  timer synchronized with HwStartIo, so TM stops while a command is polled),
+  ID = seconds without a new request. A second HBA now uses row 8 (rows
+  1-7 are usosrst's).
+- Stall watchdog: a polled command still busy after 2 s puts PxCI, PxSACT,
+  PxIS, PxSERR, PxTFD, PxCMD, the HBA IS, poll/irq (GHC.IE and PxIE), the
+  command (opcode, LBA, count), the interrupt count and the stall count on
+  rows 3-4; when the command ends or times out (3 s) the same snapshot is
+  written to the trace ("slow" or "stall").
+- The trace (usos4 format, fields in minimal hex so the snapshot fits):
+  interrupt, timer, request, idle, bus reset and stall counters, the
+  snapshot, GHC and HBA IS, PxCI/PxIS/PxSERR per port; also written on
+  every bus reset ("busreset") and once after 20 s without a new request
+  ("idle20s"). tools/w2k_gap_trace.py decodes it.
+No new imports (ScsiPortNotification RequestTimerCall).
 
 Every changed spot in src/ is marked "MODIFIED (USOS 1.3.0.0-usosN)".
 Built with WDK 7.1 (build.cmd, x86 WXP target); every import (16: ntoskrnl,

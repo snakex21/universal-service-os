@@ -292,6 +292,7 @@ AhciRunCommand(
     ULONG ci, portIs, tfd;
     ULONG result;
     ULONG i;
+    BOOLEAN stalled = FALSE;
 
     pi = &HwInit->Ports[Port];
     portBase = AHCI_PORT_BASE(HwInit->AbarMapped, Port);
@@ -410,6 +411,13 @@ AhciRunCommand(
             result = AHCI_CMD_HBA_ERROR;
             break;
         }
+        /* MODIFIED (USOS 1.3.0.0-usos4): still busy after 2 s: the port's
+           registers and the command on rows 3-4 (the trace follows once the
+           command ended or timed out) */
+        if (elapsed == USOS_STALL_USEC) {
+            stalled = TRUE;
+            AhciUsosStallSnapshot(HwInit, Port, Req);
+        }
         ScsiPortStallExecution(AHCI_POLL_INTERVAL_USEC);
         elapsed += AHCI_POLL_INTERVAL_USEC;
     }
@@ -439,7 +447,10 @@ AhciRunCommand(
         if (Req->DataBufferLen > 0)
             HwInit->UsosStage |= Req->IsWrite ? USOS_STAGE_WRERR : USOS_STAGE_RDERR;
         AhciUsosShow(HwInit);
-    } else if (result == AHCI_CMD_OK && (++HwInit->UsosIos & 0x3F) == 0) {
+    } else if (result == AHCI_CMD_OK) {
+        /* MODIFIED (USOS 1.3.0.0-usos4): the line after every command (usos3:
+           every 64th), so a frozen line means no command completed since */
+        HwInit->UsosIos++;
         AhciUsosShow(HwInit);
     }
 
@@ -451,6 +462,9 @@ AhciRunCommand(
                   tfd, portIs, ci));
         AhciRestartPort(HwInit, portBase);
     }
+    /* MODIFIED (USOS 1.3.0.0-usos4): a stalled command goes into the trace
+       (a no-op while the trace itself is written) */
+    if (stalled) AhciUsosTrace(HwInit, result == AHCI_CMD_OK ? "slow" : "stall");
     return result;
 }
 
@@ -865,34 +879,68 @@ UsosPutHex(PCHAR p, PCHAR end, ULONG v)
     return UsosPutHexN(p, end, v, 8);
 }
 
+/* MODIFIED (USOS 1.3.0.0-usos4): trace fields in as few hex digits as the
+   value needs (usos3: always 8), so the snapshot fits the sector */
 static PCHAR
 UsosPutField(PCHAR p, PCHAR end, const char *name, ULONG v)
 {
+    ULONG digits = 1;
+    while (digits < 8 && (v >> (digits * 4)) != 0) digits++;
     p = UsosPutStr(p, end, " ");
     p = UsosPutStr(p, end, name);
     p = UsosPutStr(p, end, "=");
-    return UsosPutHex(p, end, v);
+    return UsosPutHexN(p, end, v, digits);
+}
+
+/* MODIFIED (USOS 1.3.0.0-usos4): decimal, Digits wide, capped at 10^Digits-1 */
+static PCHAR
+UsosPutDec(PCHAR p, PCHAR end, ULONG v, ULONG digits)
+{
+    CHAR tmp[9];
+    ULONG i, max = 1;
+    if (digits > 9) digits = 9;
+    for (i = 0; i < digits; i++) max *= 10;
+    if (v >= max) v = max - 1;
+    for (i = 0; i < digits; i++) { tmp[i] = (CHAR)('0' + v % 10); v /= 10; }
+    while (i-- > 0 && p < end) *p++ = tmp[i];
+    return p;
+}
+
+static VOID
+UsosShowRow(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Row, IN PCHAR Line, IN USHORT Attr)
+{
+    PUSHORT row;
+    ULONG i;
+
+    if (HwInit->UsosVga == NULL) return;
+    row = HwInit->UsosVga + Row * 80;
+    for (i = 0; i < 80; i++) row[i] = (USHORT)(Attr | (UCHAR)Line[i]);
 }
 
 /* The status line: one 80-column row of the VGA text buffer per HBA
-   (row = instance). Text-mode Setup draws in VGA text mode, and the screen
-   a STOP leaves on these boards is text mode too ("_"), so the line is
-   visible in both; in a graphics mode the writes land off-screen.
+   (row 0; MODIFIED (USOS 1.3.0.0-usos4): a second HBA row 8, rows 1-7 are
+   usosrst's heartbeat, load line, stall snapshot and STOP lines). Text-mode
+   Setup draws in VGA text mode, and the screen a STOP leaves on these
+   boards is text mode too ("_"), so the line is visible in both; in a
+   graphics mode the writes land off-screen.
 
-   AHCINT3 1022:43C8 p2 MK:OK T:OK R:0001A2F3 W:00003F10 E:0000 LW:00A1B2C3 S:0F
+   A4 43C8p2 OK/OK R:01A2F3 W:003F10 E:00 B:0 LW:00A1B2C3 S:0F I:000 TM:3A1 ID:00
 
-   p    port of the USOS disk (else the last ATA port probed, "-" none)
-   MK   marker at LBA 2046: OK, NO (read, not there), RE (read error), -- (no disk)
-   T    write/read-back test at 2045: OK, XX failed, -- not run
-   R/W  completed reads/writes (rising R during the file copy = AHCINT
-        serves the disk Setup copies from and to)
-   E    failed commands; LW last written LBA; S stages (USOS_STAGE_*) */
+   43C8 PCI device ID; p  port of the USOS disk (else the last ATA port
+        probed, "-" none)
+   OK/OK  marker at LBA 2046 (OK, NO not there, RE read error, -- no disk)
+        / write test at 2045 (OK, XX failed, -- not run)
+   R/W  completed reads/writes (refreshed after every command)
+   E    failed commands; B ScsiPort bus resets (request timeouts)
+   LW   last written LBA; S stages (USOS_STAGE_*)
+   I    HwInterrupt calls (AHCINT polls: interrupts are not expected)
+   TM   miniport timer ticks (250 ms; frozen while a command is polled)
+   ID   seconds without a new request */
 VOID
 AhciUsosShow(IN PHW_DEVICE_EXTENSION HwInit)
 {
     CHAR line[80];
     PCHAR p, end;
-    PUSHORT row;
     ULONG i, port;
     USHORT attr;
 
@@ -900,38 +948,133 @@ AhciUsosShow(IN PHW_DEVICE_EXTENSION HwInit)
     for (i = 0; i < 80; i++) line[i] = ' ';
     p = line;
     end = line + 80;
-    p = UsosPutStr(p, end, "AHCINT3 ");
-    p = UsosPutHexN(p, end, HwInit->UsosPciId & 0xFFFF, 4);
-    p = UsosPutStr(p, end, ":");
+    p = UsosPutStr(p, end, "A4 ");
     p = UsosPutHexN(p, end, HwInit->UsosPciId >> 16, 4);
-    p = UsosPutStr(p, end, " p");
+    p = UsosPutStr(p, end, "p");
     port = HwInit->UsosTracePortPlus1 ? HwInit->UsosTracePortPlus1 : HwInit->UsosProbePortPlus1;
     if (port) p = UsosPutHexN(p, end, port - 1, 1); else p = UsosPutStr(p, end, "-");
-    p = UsosPutStr(p, end, " MK:");
+    p = UsosPutStr(p, end, " ");
     switch (HwInit->UsosMarker) {
     case USOS_MARKER_OK: p = UsosPutStr(p, end, "OK"); break;
     case USOS_MARKER_ABSENT: p = UsosPutStr(p, end, "NO"); break;
     case USOS_MARKER_READ_ERROR: p = UsosPutStr(p, end, "RE"); break;
     default: p = UsosPutStr(p, end, "--"); break;
     }
-    p = UsosPutStr(p, end, " T:");
+    p = UsosPutStr(p, end, "/");
     p = UsosPutStr(p, end, HwInit->UsosVerify == 1 ? "OK" : HwInit->UsosVerify == 2 ? "XX" : "--");
     p = UsosPutStr(p, end, " R:");
-    p = UsosPutHex(p, end, HwInit->UsosReads);
+    p = UsosPutHexN(p, end, HwInit->UsosReads, 6);
     p = UsosPutStr(p, end, " W:");
-    p = UsosPutHex(p, end, HwInit->UsosWrites);
+    p = UsosPutHexN(p, end, HwInit->UsosWrites, 6);
     p = UsosPutStr(p, end, " E:");
-    p = UsosPutHexN(p, end, HwInit->UsosErrors, 4);
+    p = UsosPutHexN(p, end, HwInit->UsosErrors > 0xFF ? 0xFF : HwInit->UsosErrors, 2);
+    p = UsosPutStr(p, end, " B:");
+    p = UsosPutHexN(p, end, HwInit->UsosBusResets > 0xF ? 0xF : HwInit->UsosBusResets, 1);
     p = UsosPutStr(p, end, " LW:");
     p = UsosPutHex(p, end, HwInit->UsosLastWriteLba);
     p = UsosPutStr(p, end, " S:");
     p = UsosPutHexN(p, end, HwInit->UsosStage, 2);
+    p = UsosPutStr(p, end, " I:");
+    p = UsosPutHexN(p, end, HwInit->UsosIsrCalls, 3);
+    p = UsosPutStr(p, end, " TM:");
+    p = UsosPutHexN(p, end, HwInit->UsosTimerTicks, 3);
+    p = UsosPutStr(p, end, " ID:");
+    p = UsosPutDec(p, end, HwInit->UsosIdleTicks / 4, 2);
 
-    attr = (USHORT)((HwInit->UsosErrors || HwInit->UsosVerify == 2 ||
+    attr = (USHORT)((HwInit->UsosErrors || HwInit->UsosVerify == 2 || HwInit->UsosBusResets ||
+                     HwInit->UsosStalls ||
                      (HwInit->UsosStage & (USOS_STAGE_RBFAIL | USOS_STAGE_BUGCHECK)) ||
                      HwInit->UsosMarker == USOS_MARKER_READ_ERROR) ? 0x4F00 : 0x1F00);
-    row = HwInit->UsosVga + HwInit->UsosInstance * 80;
-    for (i = 0; i < 80; i++) row[i] = (USHORT)(attr | (UCHAR)line[i]);
+    UsosShowRow(HwInit, HwInit->UsosInstance == 0 ? 0 : USOS_ROW_SECOND_HBA, line, attr);
+}
+
+/* MODIFIED (USOS 1.3.0.0-usos4): a polled command still busy after 2 s.
+   Rows 3-4 (red):
+
+   A4 STALL p2 CI:00000001 SACT:00000000 IS:00000000 SERR:00000000 TFD:000000D0
+   CMD:0000C017 HIS:00000000 poll op:35 lba:06FBA408 n:0080 slot:0 I:000 #01
+
+   poll/irq: how the HBA was set up to signal completion (GHC.IE and PxIE);
+   AHCINT polls, so "irq" here would be a driver fault. #: stalls so far. */
+VOID
+AhciUsosStallSnapshot(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port, IN PATA_REQUEST Req)
+{
+    PUCHAR pb = AHCI_PORT_BASE(HwInit->AbarMapped, Port);
+    PULONG snap = HwInit->UsosSnap;
+    CHAR line[80];
+    PCHAR p, end = line + 80;
+    ULONG i;
+
+    HwInit->UsosStalls++;
+    snap[USOS_SNAP_VALID] = 1;
+    snap[USOS_SNAP_PORT] = Port;
+    snap[USOS_SNAP_CI] = AHCI_READ_REG(pb, AHCI_PORT_CI);
+    snap[USOS_SNAP_SACT] = AHCI_READ_REG(pb, AHCI_PORT_SACT);
+    snap[USOS_SNAP_IS] = AHCI_READ_REG(pb, AHCI_PORT_IS);
+    snap[USOS_SNAP_SERR] = AHCI_READ_REG(pb, AHCI_PORT_SERR);
+    snap[USOS_SNAP_TFD] = AHCI_READ_REG(pb, AHCI_PORT_TFD);
+    snap[USOS_SNAP_CMD] = AHCI_READ_REG(pb, AHCI_PORT_CMD);
+    snap[USOS_SNAP_HIS] = AHCI_READ_REG(HwInit->AbarMapped, AHCI_GEN_IS);
+    snap[USOS_SNAP_GHC] = AHCI_READ_REG(HwInit->AbarMapped, AHCI_GEN_GHC);
+    snap[USOS_SNAP_IE] = AHCI_READ_REG(pb, AHCI_PORT_IE);
+    snap[USOS_SNAP_OP] = Req->IsAtapi ? (0xA000 | (Req->Cdb ? Req->Cdb[0] : 0)) : Req->Command;
+    snap[USOS_SNAP_LBA] = Req->Lba.Low;
+    snap[USOS_SNAP_COUNT] = Req->SectorCount;
+    snap[USOS_SNAP_ISR] = HwInit->UsosIsrCalls;
+    snap[USOS_SNAP_TIMER] = HwInit->UsosTimerTicks;
+
+    for (i = 0; i < 80; i++) line[i] = ' ';
+    p = UsosPutStr(line, end, "A4 STALL p");
+    p = UsosPutHexN(p, end, Port, 1);
+    p = UsosPutStr(p, end, " CI:");   p = UsosPutHex(p, end, snap[USOS_SNAP_CI]);
+    p = UsosPutStr(p, end, " SACT:"); p = UsosPutHex(p, end, snap[USOS_SNAP_SACT]);
+    p = UsosPutStr(p, end, " IS:");   p = UsosPutHex(p, end, snap[USOS_SNAP_IS]);
+    p = UsosPutStr(p, end, " SERR:"); p = UsosPutHex(p, end, snap[USOS_SNAP_SERR]);
+    p = UsosPutStr(p, end, " TFD:");  p = UsosPutHex(p, end, snap[USOS_SNAP_TFD]);
+    UsosShowRow(HwInit, USOS_ROW_STALL, line, 0x4F00);
+
+    for (i = 0; i < 80; i++) line[i] = ' ';
+    p = UsosPutStr(line, end, "CMD:"); p = UsosPutHex(p, end, snap[USOS_SNAP_CMD]);
+    p = UsosPutStr(p, end, " HIS:");  p = UsosPutHex(p, end, snap[USOS_SNAP_HIS]);
+    p = UsosPutStr(p, end, ((snap[USOS_SNAP_GHC] & AHCI_GHC_IE) && snap[USOS_SNAP_IE]) ? " irq " : " poll");
+    p = UsosPutStr(p, end, " op:");   p = UsosPutHexN(p, end, snap[USOS_SNAP_OP], snap[USOS_SNAP_OP] > 0xFF ? 4 : 2);
+    p = UsosPutStr(p, end, " lba:");  p = UsosPutHex(p, end, snap[USOS_SNAP_LBA]);
+    p = UsosPutStr(p, end, " n:");    p = UsosPutHexN(p, end, snap[USOS_SNAP_COUNT], 4);
+    p = UsosPutStr(p, end, " slot:0 I:"); p = UsosPutHexN(p, end, snap[USOS_SNAP_ISR], 3);
+    p = UsosPutStr(p, end, " #");     p = UsosPutDec(p, end, HwInit->UsosStalls, 2);
+    UsosShowRow(HwInit, USOS_ROW_STALL + 1, line, 0x4F00);
+    AhciUsosShow(HwInit);
+}
+
+/* MODIFIED (USOS 1.3.0.0-usos4): the 250 ms miniport timer. ScsiPort runs
+   it synchronized with HwStartIo, so TM stops while a command is polled.
+   It refreshes the line (TM, ID) and, once per idle period, writes the
+   trace after 20 s without a new request. */
+VOID
+AhciUsosArmTimer(IN PHW_DEVICE_EXTENSION HwInit)
+{
+    ScsiPortNotification(RequestTimerCall, HwInit, AhciUsosTimer, USOS_TIMER_USEC);
+}
+
+VOID
+AhciUsosTimer(IN PVOID DeviceExtension)
+{
+    PHW_DEVICE_EXTENSION HwInit = (PHW_DEVICE_EXTENSION)DeviceExtension;
+
+    HwInit->UsosTimerTicks++;
+    if (HwInit->UsosSrbs != HwInit->UsosSrbsAtTick) {
+        HwInit->UsosSrbsAtTick = HwInit->UsosSrbs;
+        HwInit->UsosIdleTicks = 0;
+        HwInit->UsosIdleTraced = 0;
+    } else if (HwInit->UsosIdleTicks < 0xFFFF) {
+        HwInit->UsosIdleTicks++;
+    }
+    if (HwInit->UsosIdleTicks >= USOS_IDLE_TRACE_TICKS && !HwInit->UsosIdleTraced && HwInit->UsosSrbs != 0) {
+        HwInit->UsosIdleTraced = 1;
+        AhciUsosTrace(HwInit, "idle20s");
+    }
+    AhciUsosShow(HwInit);
+    AhciUsosArmTimer(HwInit);
 }
 
 /* The trace record: one ASCII sector in the ring at USOS_GAP_TRACE_LBA. */
@@ -949,7 +1092,9 @@ AhciUsosTrace(IN PHW_DEVICE_EXTENSION HwInit, IN PCHAR Why)
     ZeroMemoryBytes(buf, 512);
     p = (PCHAR)buf;
     end = (PCHAR)buf + 510;
-    p = UsosPutStr(p, end, "AHCINT 1.3.0.0-usos3 why=");
+    /* MODIFIED (USOS 1.3.0.0-usos4): usos4 counters and the stall
+       snapshot; fields in minimal hex (tools/w2k_gap_trace.py decodes) */
+    p = UsosPutStr(p, end, "AHCINT 1.3.0.0-usos4 why=");
     p = UsosPutStr(p, end, Why);
     p = UsosPutField(p, end, "boot", HwInit->UsosBoot);
     p = UsosPutField(p, end, "id", HwInit->UsosPciId);
@@ -964,26 +1109,39 @@ AhciUsosTrace(IN PHW_DEVICE_EXTENSION HwInit, IN PCHAR Why)
     p = UsosPutField(p, end, "prdbc", HwInit->UsosPrdbcBad);
     p = UsosPutField(p, end, "eng", HwInit->UsosEngineDown);
     p = UsosPutField(p, end, "flush", HwInit->UsosFlushes);
-    p = UsosPutStr(p, end, "\r\n");
     p = UsosPutField(p, end, "lw", HwInit->UsosLastWriteLba);
-    p = UsosPutField(p, end, "w0", HwInit->UsosFirstWrites[0]);
-    p = UsosPutField(p, end, "w1", HwInit->UsosFirstWrites[1]);
-    p = UsosPutField(p, end, "w2", HwInit->UsosFirstWrites[2]);
-    p = UsosPutField(p, end, "w3", HwInit->UsosFirstWrites[3]);
     p = UsosPutField(p, end, "rb", HwInit->UsosRbChecks);
     p = UsosPutField(p, end, "rbbad", HwInit->UsosRbBad);
     p = UsosPutStr(p, end, "\r\n");
+    p = UsosPutField(p, end, "isr", HwInit->UsosIsrCalls);
+    p = UsosPutField(p, end, "own", HwInit->UsosIsrOwn);
+    p = UsosPutField(p, end, "tm", HwInit->UsosTimerTicks);
+    p = UsosPutField(p, end, "srb", HwInit->UsosSrbs);
+    p = UsosPutField(p, end, "idle", HwInit->UsosIdleTicks);
+    p = UsosPutField(p, end, "bres", HwInit->UsosBusResets);
+    p = UsosPutField(p, end, "stalls", HwInit->UsosStalls);
     p = UsosPutField(p, end, "elba", HwInit->UsosLastErrLba);
     p = UsosPutField(p, end, "etfd", HwInit->UsosLastErrTfd);
     p = UsosPutField(p, end, "ecmd", HwInit->UsosLastErrCmd);
-    p = UsosPutField(p, end, "pi", HwInit->PortsImplemented);
-    p = UsosPutField(p, end, "cap", HwInit->HbaCapabilities);
     p = UsosPutStr(p, end, "\r\n");
     if (HwInit->UsosStage & USOS_STAGE_BUGCHECK) {
         p = UsosPutField(p, end, "stop", HwInit->UsosBugCheck[0]);
         for (i = 1; i < 5; i++) p = UsosPutField(p, end, "p", HwInit->UsosBugCheck[i]);
         p = UsosPutStr(p, end, "\r\n");
     }
+    if (HwInit->UsosSnap[USOS_SNAP_VALID]) {
+        static const char *names[USOS_SNAP_WORDS] = { "snap", "p", "ci", "sact", "is", "serr", "tfd", "cmd",
+                                                      "his", "ghc", "ie", "op", "lba", "n", "isr", "tm" };
+        p = UsosPutStr(p, end, "snap");
+        for (i = 1; i < USOS_SNAP_WORDS; i++) p = UsosPutField(p, end, names[i], HwInit->UsosSnap[i]);
+        p = UsosPutStr(p, end, "\r\n");
+    }
+    p = UsosPutStr(p, end, "hba");
+    p = UsosPutField(p, end, "pi", HwInit->PortsImplemented);
+    p = UsosPutField(p, end, "cap", HwInit->HbaCapabilities);
+    p = UsosPutField(p, end, "ghc", AHCI_READ_REG(HwInit->AbarMapped, AHCI_GEN_GHC));
+    p = UsosPutField(p, end, "his", AHCI_READ_REG(HwInit->AbarMapped, AHCI_GEN_IS));
+    p = UsosPutStr(p, end, "\r\n");
     /* Ports with a device only (an 8-port HBA does not fit one sector) */
     for (port = 0; port < MAX_SUPPORTED_PORTS; port++) {
         PUCHAR pb;
@@ -992,14 +1150,18 @@ AhciUsosTrace(IN PHW_DEVICE_EXTENSION HwInit, IN PCHAR Why)
         pb = AHCI_PORT_BASE(HwInit->AbarMapped, port);
         ssts = AHCI_READ_REG(pb, AHCI_PORT_SSTS);
         if ((ssts & AHCI_SSTS_DET_MASK) == AHCI_SSTS_DET_NONE) continue;
+        p = UsosPutStr(p, end, "port");
         p = UsosPutField(p, end, "p", port);
         p = UsosPutField(p, end, "ssts", ssts);
         p = UsosPutField(p, end, "cmd", AHCI_READ_REG(pb, AHCI_PORT_CMD));
         p = UsosPutField(p, end, "tfd", AHCI_READ_REG(pb, AHCI_PORT_TFD));
+        p = UsosPutField(p, end, "ci", AHCI_READ_REG(pb, AHCI_PORT_CI));
+        p = UsosPutField(p, end, "is", AHCI_READ_REG(pb, AHCI_PORT_IS));
+        p = UsosPutField(p, end, "serr", AHCI_READ_REG(pb, AHCI_PORT_SERR));
         p = UsosPutField(p, end, "use", (ULONG)HwInit->Ports[port].Present | ((ULONG)HwInit->Ports[port].IsAtapi << 4));
         if (HwInit->Ports[port].IdentifyValid) {
             p = UsosPutStr(p, end, " ");
-            for (i = 0; i < 20 && p + 2 <= end; i++) {     /* model, byte-swapped words */
+            for (i = 0; i < 10 && p + 2 <= end; i++) {     /* model (first 20 characters), byte-swapped words */
                 *p++ = (CHAR)HwInit->Ports[port].IdentifyData[54 + 2 * i + 1];
                 *p++ = (CHAR)HwInit->Ports[port].IdentifyData[54 + 2 * i];
             }

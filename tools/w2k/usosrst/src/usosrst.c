@@ -13,8 +13,7 @@
  *    X470 without CSM (CSMWrap) only a black text screen with a blinking
  *    cursor is left. A bugcheck callback writes the STOP code, the four
  *    parameters and the modules the parameters point into straight into the
- *    VGA text buffer (B8000h), rows 3 to 6. AHCINT usos3 uses rows 0 and 1,
- *    this driver's load line is row 2.
+ *    VGA text buffer (B8000h), rows 5 to 7 (see the row list below).
  *
  * 2. Reset. The 2000 HALs restart through the 8042 keyboard controller,
  *    which these boards no longer have, so a restart hangs. While Setup
@@ -34,6 +33,22 @@
  *    else (and a reset that did not happen) goes on to the HAL's routine.
  *    No Microsoft file is changed: only the import address in the running
  *    image is redirected, in the slot the loader itself filled in.
+ *
+ * 4. Heartbeat and AHCI stall watchdog (1.2, text-mode Setup only). A
+ *    250 ms periodic kernel timer rewrites row 1: a tick counter, the
+ *    seconds since boot (interrupt time), one hex digit per CPU that only
+ *    moves when that CPU runs a DPC, and the live state of the most
+ *    recently active AHCI port (PxCI, the last command from its command
+ *    list, seconds since that command changed). The AHCI HBAs are found
+ *    in PCI config space and their registers are only read (no driver
+ *    state is touched), so this works whichever miniport serves the disk.
+ *    A command slot that stays set for 2 s with the same command puts the
+ *    port registers on rows 3-4. A moving row 1 with frozen AHCINT
+ *    counters = an I/O stall; a frozen row 1 = the timer/DPC path (or the
+ *    whole machine) is stuck.
+ *
+ * Screen rows: 0 AHCINT, 1 heartbeat, 2 load line, 3-4 stall snapshot,
+ * 5-7 STOP, 8 a second AHCINT HBA.
  */
 #include <ntddk.h>
 
@@ -47,9 +62,11 @@ __declspec(dllimport) extern ULONG KiBugCheckData[5];
 #define USOS_HAL_REBOOT_ROUTINE   3
 __declspec(dllimport) VOID NTAPI HalReturnToFirmware(IN ULONG Routine);
 
-#define USOSRST_VERSION "usosrst 1.1"
+#define USOSRST_VERSION "usosrst 1.2"
+#define ROW_HB          1
 #define ROW_LOAD        2
-#define ROW_STOP        3
+#define ROW_STALL       3
+#define ROW_STOP        5
 
 static PUSHORT g_Vga;
 static KBUGCHECK_CALLBACK_RECORD g_BugCheckRecord;
@@ -164,7 +181,7 @@ BugCheckCallback(IN PVOID Buffer, IN ULONG Length)
     for (i = 1; i <= 4; i++) p = PutModule(p, end, KiBugCheckData[i]);
     ShowRow(ROW_STOP + 1, line, (ULONG)(p - line), 0x4F00);
 
-    p = PutStr(line, end, "USOS: photograph this screen (rows 0-5) for the USOS issue report.");
+    p = PutStr(line, end, "USOS: photograph this screen (rows 0-8) for the USOS issue report.");
     ShowRow(ROW_STOP + 2, line, (ULONG)(p - line), 0x4F00);
 }
 
@@ -476,6 +493,327 @@ SetupInProgress(VOID)
 }
 
 /* ------------------------------------------------------------------ */
+/* Heartbeat and AHCI stall watchdog (text-mode Setup only)            */
+/* ------------------------------------------------------------------ */
+
+#define HB_PERIOD_MS        250
+#define HB_STALL_TICKS      8           /* 2 s */
+#define HB_MAX_HBAS         4
+#define HB_MAX_WATCH        16
+#define HB_MAX_CPUS         8
+#define HB_ABAR_MAP         0x1100      /* generic registers + 32 ports */
+#define HB_CLB_MAP          0x400       /* 32 command headers */
+#define HB_CT_MAP           0x50        /* command FIS + ATAPI command */
+
+#define AHCI_GHC            0x04
+#define AHCI_IS             0x08
+#define AHCI_PI             0x0C
+#define AHCI_GHC_IE         0x02
+#define PX_CLB              0x00
+#define PX_CLBU             0x04
+#define PX_IS               0x10
+#define PX_IE               0x14
+#define PX_CMD              0x18
+#define PX_TFD              0x20
+#define PX_SSTS             0x28
+#define PX_SERR             0x30
+#define PX_SACT             0x34
+#define PX_CI               0x38
+
+typedef struct _HB_WATCH {
+    PUCHAR  Abar;
+    PUCHAR  Regs;               /* port registers */
+    CHAR    Name[2];            /* HBA letter, port digit */
+    ULONG   ClbLow, ClbHigh;
+    PUCHAR  Clb;
+    ULONG   CtLow, CtHigh;
+    PUCHAR  Ct;
+    ULONG   Op, Lba, Count;     /* the command in the slot read last */
+    BOOLEAN Valid;
+    ULONG   Changed;            /* tick the command last changed */
+    ULONG   BusySince;          /* tick a busy slot was first seen, 0 idle */
+    ULONG   BusyOp, BusyLba, BusyCount;
+    BOOLEAN Reported;
+} HB_WATCH, *PHB_WATCH;
+
+static KTIMER g_HbTimer;
+static KDPC g_HbDpc;
+static KDPC g_CpuDpc[HB_MAX_CPUS];
+static volatile ULONG g_CpuTicks[HB_MAX_CPUS];
+static ULONG g_Cpus;
+static ULONG g_Tick;
+static ULONG g_Stalls;
+static ULONG g_Hbas;
+static ULONG g_Watches;
+static HB_WATCH g_Watch[HB_MAX_WATCH];
+
+#define RD(base, off) READ_REGISTER_ULONG((PULONG)((base) + (off)))
+
+static PCHAR
+PutDec(PCHAR p, PCHAR end, ULONG v, ULONG digits)
+{
+    CHAR tmp[9];
+    ULONG i, max = 1;
+
+    if (digits > 9) digits = 9;
+    for (i = 0; i < digits; i++) max *= 10;
+    if (v >= max) v = max - 1;
+    for (i = 0; i < digits; i++) { tmp[i] = (CHAR)('0' + v % 10); v /= 10; }
+    while (i-- > 0 && p < end) *p++ = tmp[i];
+    return p;
+}
+
+/* Keeps one mapping of a physical range, remapped only when the address
+   changes (the port's command list, the slot's command table). */
+static PUCHAR
+Remap(PUCHAR Old, ULONG OldLow, ULONG OldHigh, ULONG Low, ULONG High, ULONG Length)
+{
+    PHYSICAL_ADDRESS pa;
+
+    if (Old != NULL && OldLow == Low && OldHigh == High) return Old;
+    if (Old != NULL) MmUnmapIoSpace(Old, Length);
+    if (Low == 0 && High == 0) return NULL;
+    pa.LowPart = Low;
+    pa.HighPart = (LONG)High;
+    return (PUCHAR)MmMapIoSpace(pa, Length, MmNonCached);
+}
+
+/* The command in Slot of the port's command list (op: ATA command, or
+   A000h | SCSI opcode for ATAPI). */
+static VOID
+ReadCommand(PHB_WATCH w, ULONG Slot)
+{
+    ULONG low = RD(w->Regs, PX_CLB) & ~0x3FFUL, high = RD(w->Regs, PX_CLBU);
+    PUCHAR hdr, f;
+
+    w->Clb = Remap(w->Clb, w->ClbLow, w->ClbHigh, low, high, HB_CLB_MAP);
+    w->ClbLow = low;
+    w->ClbHigh = high;
+    w->Valid = FALSE;
+    if (w->Clb == NULL) return;
+    hdr = w->Clb + Slot * 32;
+    low = *(PULONG)(hdr + 8) & ~0x7FUL;
+    high = *(PULONG)(hdr + 12);
+    w->Ct = Remap(w->Ct, w->CtLow, w->CtHigh, low, high, HB_CT_MAP);
+    w->CtLow = low;
+    w->CtHigh = high;
+    if (w->Ct == NULL) return;
+    f = w->Ct;
+    if (f[0] != 0x27) return;                       /* not a host-to-device FIS */
+    w->Op = (hdr[0] & 0x20) ? (0xA000UL | f[0x40]) : f[2];
+    w->Lba = (ULONG)f[4] | ((ULONG)f[5] << 8) | ((ULONG)f[6] << 16) | ((ULONG)f[8] << 24);
+    w->Count = (ULONG)f[12] | ((ULONG)f[13] << 8);
+    w->Valid = TRUE;
+}
+
+static PCHAR
+PutName(PCHAR p, PCHAR end, PHB_WATCH w)
+{
+    if (p < end) *p++ = w->Name[0];
+    if (p < end) *p++ = w->Name[1];
+    return p;
+}
+
+/* Rows 3-4: the port registers of a command slot busy for 2 s.
+   RS STALL a2 CI:00000001 SACT:00000000 IS:00000000 SERR:00000000 TFD:000000D0
+   CMD:0000C017 HIS:00000000 poll op:35 lba:06FBA408 n:0080 slot:00 busy:02s #01 */
+static VOID
+ShowStall(PHB_WATCH w, ULONG Ci, ULONG Sact, ULONG Slot)
+{
+    CHAR line[80];
+    PCHAR p, end = line + 80;
+    ULONG ghc = RD(w->Abar, AHCI_GHC), ie = RD(w->Regs, PX_IE);
+
+    p = PutStr(line, end, "RS STALL ");
+    p = PutName(p, end, w);
+    p = PutStr(p, end, " CI:");   p = PutHex(p, end, Ci, 8);
+    p = PutStr(p, end, " SACT:"); p = PutHex(p, end, Sact, 8);
+    p = PutStr(p, end, " IS:");   p = PutHex(p, end, RD(w->Regs, PX_IS), 8);
+    p = PutStr(p, end, " SERR:"); p = PutHex(p, end, RD(w->Regs, PX_SERR), 8);
+    p = PutStr(p, end, " TFD:");  p = PutHex(p, end, RD(w->Regs, PX_TFD), 8);
+    ShowRow(ROW_STALL, line, (ULONG)(p - line), 0x4F00);
+
+    p = PutStr(line, end, "CMD:"); p = PutHex(p, end, RD(w->Regs, PX_CMD), 8);
+    p = PutStr(p, end, " HIS:");  p = PutHex(p, end, RD(w->Abar, AHCI_IS), 8);
+    p = PutStr(p, end, ((ghc & AHCI_GHC_IE) && ie) ? " irq " : " poll");
+    p = PutStr(p, end, " op:");   p = PutHex(p, end, w->Op, w->Op > 0xFF ? 4 : 2);
+    p = PutStr(p, end, " lba:");  p = PutHex(p, end, w->Lba, 8);
+    p = PutStr(p, end, " n:");    p = PutHex(p, end, w->Count, 4);
+    p = PutStr(p, end, " slot:"); p = PutDec(p, end, Slot, 2);
+    p = PutStr(p, end, " busy:"); p = PutDec(p, end, (g_Tick - w->BusySince) * HB_PERIOD_MS / 1000, 2);
+    p = PutStr(p, end, "s #");    p = PutDec(p, end, g_Stalls, 2);
+    ShowRow(ROW_STALL + 1, line, (ULONG)(p - line), 0x4F00);
+}
+
+static VOID
+CpuDpc(IN PKDPC Dpc, IN PVOID Context, IN PVOID Arg1, IN PVOID Arg2)
+{
+    UNREFERENCED_PARAMETER(Dpc);
+    UNREFERENCED_PARAMETER(Arg1);
+    UNREFERENCED_PARAMETER(Arg2);
+    g_CpuTicks[(ULONG)(ULONG_PTR)Context]++;
+}
+
+/* Row 1, every 250 ms:
+   HB 0000013A t:000123s S:0 a2 CI:00000000 L:25 06FBA408+0080 age:0037s cpu:3A */
+static VOID
+HeartbeatDpc(IN PKDPC Dpc, IN PVOID Context, IN PVOID Arg1, IN PVOID Arg2)
+{
+    CHAR line[80];
+    PCHAR p, end = line + 80;
+    PHB_WATCH best = NULL;
+    ULONG i, bestBusy = 0, bestCi = 0, busyAny = 0;
+    ULONGLONG now;
+
+    UNREFERENCED_PARAMETER(Dpc);
+    UNREFERENCED_PARAMETER(Context);
+    UNREFERENCED_PARAMETER(Arg1);
+    UNREFERENCED_PARAMETER(Arg2);
+
+    g_Tick++;
+    for (i = 0; i < g_Cpus; i++) KeInsertQueueDpc(&g_CpuDpc[i], NULL, NULL);
+
+    for (i = 0; i < g_Watches; i++) {
+        PHB_WATCH w = &g_Watch[i];
+        ULONG ci, sact, busy, slot = 0;
+        ULONG op = w->Op, lba = w->Lba, count = w->Count;
+        BOOLEAN valid = w->Valid;
+
+        if ((RD(w->Regs, PX_SSTS) & 0x0F) != 3) continue;
+        ci = RD(w->Regs, PX_CI);
+        sact = RD(w->Regs, PX_SACT);
+        busy = ci | sact;
+        if (busy) while (!(busy & (1UL << slot))) slot++;
+        ReadCommand(w, slot);
+        if (w->Valid && (!valid || op != w->Op || lba != w->Lba || count != w->Count)) w->Changed = g_Tick;
+        if (busy) {
+            busyAny = 1;
+            if (w->BusySince == 0 || w->BusyOp != w->Op || w->BusyLba != w->Lba || w->BusyCount != w->Count) {
+                w->BusySince = g_Tick;
+                w->BusyOp = w->Op;
+                w->BusyLba = w->Lba;
+                w->BusyCount = w->Count;
+                w->Reported = FALSE;
+            } else if (g_Tick - w->BusySince >= HB_STALL_TICKS && !w->Reported) {
+                w->Reported = TRUE;
+                g_Stalls++;
+                ShowStall(w, ci, sact, slot);
+            }
+        } else {
+            w->BusySince = 0;
+        }
+        /* Shown: a busy port first, else the one whose command changed last */
+        if (w->Valid && (best == NULL || (busy && !bestBusy) ||
+                         ((busy != 0) == (bestBusy != 0) && w->Changed > best->Changed))) {
+            best = w;
+            bestBusy = busy;
+            bestCi = ci;
+        }
+    }
+
+    now = KeQueryInterruptTime();
+    p = PutStr(line, end, "HB ");
+    p = PutHex(p, end, g_Tick, 8);
+    p = PutStr(p, end, " t:");
+    p = PutDec(p, end, (ULONG)(now >> 7) / 78125, 6);      /* 100 ns units -> s */
+    p = PutStr(p, end, "s S:");
+    p = PutHex(p, end, g_Stalls > 0xF ? 0xF : g_Stalls, 1);
+    if (best != NULL) {
+        p = PutStr(p, end, " ");
+        p = PutName(p, end, best);
+        p = PutStr(p, end, " CI:");
+        p = PutHex(p, end, bestCi, 8);
+        p = PutStr(p, end, " L:");
+        p = PutHex(p, end, best->Op, best->Op > 0xFF ? 4 : 2);
+        p = PutStr(p, end, " ");
+        p = PutHex(p, end, best->Lba, 8);
+        p = PutStr(p, end, "+");
+        p = PutHex(p, end, best->Count, 4);
+        p = PutStr(p, end, " age:");
+        p = PutDec(p, end, (g_Tick - best->Changed) * HB_PERIOD_MS / 1000, 4);
+        p = PutStr(p, end, "s");
+    } else {
+        p = PutStr(p, end, g_Watches ? " ahci:no-cmd" : " ahci:none");
+    }
+    p = PutStr(p, end, " cpu:");
+    for (i = 0; i < g_Cpus; i++) p = PutHex(p, end, g_CpuTicks[i], 1);
+    ShowRow(ROW_HB, line, (ULONG)(p - line), (USHORT)(busyAny && g_Stalls ? 0x4F00 : 0x1F00));
+}
+
+/* PCI: every AHCI HBA (class 01h/06h/01h, or the AMD/Intel IDs AHCINT also
+   takes), its BAR5 mapped, every implemented port watched. */
+static VOID
+FindAhci(VOID)
+{
+    PCI_COMMON_CONFIG cfg;
+    PCI_SLOT_NUMBER slot;
+    ULONG bus, dev, fn, got, abar, pi, port;
+    PHYSICAL_ADDRESS pa;
+    PUCHAR regs;
+
+    for (bus = 0; bus < 256; bus++) {
+        for (dev = 0; dev < 32; dev++) {
+            for (fn = 0; fn < 8; fn++) {
+                slot.u.AsULONG = 0;
+                slot.u.bits.DeviceNumber = dev;
+                slot.u.bits.FunctionNumber = fn;
+                got = HalGetBusData(PCIConfiguration, bus, slot.u.AsULONG, &cfg, PCI_COMMON_HDR_LENGTH);
+                if (got == 0 && dev == 0 && fn == 0) return;        /* no such bus */
+                if (got < PCI_COMMON_HDR_LENGTH || cfg.VendorID == 0xFFFF || cfg.VendorID == 0) {
+                    if (fn == 0) break;
+                    continue;
+                }
+                if (((cfg.BaseClass == 1 && cfg.SubClass == 6 && cfg.ProgIf == 1) ||
+                     (cfg.VendorID == 0x1022 && (cfg.DeviceID == 0x7901 || cfg.DeviceID == 0x43EB || cfg.DeviceID == 0x43C8)) ||
+                     (cfg.VendorID == 0x8086 && (cfg.DeviceID == 0x2829 || cfg.DeviceID == 0x2828 ||
+                                                 cfg.DeviceID == 0x2922 || cfg.DeviceID == 0x2681))) &&
+                    g_Hbas < HB_MAX_HBAS) {
+                    abar = cfg.u.type0.BaseAddresses[5];
+                    if (!(abar & 1) && (abar & ~0xFUL) != 0) {
+                        pa.QuadPart = abar & ~0xFUL;
+                        regs = (PUCHAR)MmMapIoSpace(pa, HB_ABAR_MAP, MmNonCached);
+                        if (regs != NULL) {
+                            pi = RD(regs, AHCI_PI);
+                            for (port = 0; port < 32 && g_Watches < HB_MAX_WATCH; port++) {
+                                PHB_WATCH w;
+                                if (!(pi & (1UL << port))) continue;
+                                w = &g_Watch[g_Watches++];
+                                w->Abar = regs;
+                                w->Regs = regs + 0x100 + port * 0x80;
+                                w->Name[0] = (CHAR)('a' + g_Hbas);
+                                w->Name[1] = (CHAR)(port < 10 ? '0' + port : 'A' + port - 10);
+                            }
+                            g_Hbas++;
+                        }
+                    }
+                }
+                if (fn == 0 && !(cfg.HeaderType & 0x80)) break;
+            }
+        }
+    }
+}
+
+static VOID
+StartHeartbeat(VOID)
+{
+    LARGE_INTEGER due;
+    KAFFINITY active = KeQueryActiveProcessors();
+    ULONG i;
+
+    FindAhci();
+    for (i = 0; i < HB_MAX_CPUS && (active & ((KAFFINITY)1 << i)); i++) {
+        KeInitializeDpc(&g_CpuDpc[i], CpuDpc, (PVOID)(ULONG_PTR)i);
+        KeSetTargetProcessorDpc(&g_CpuDpc[i], (CCHAR)i);
+        KeSetImportanceDpc(&g_CpuDpc[i], HighImportance);
+    }
+    g_Cpus = i;
+    KeInitializeDpc(&g_HbDpc, HeartbeatDpc, NULL);
+    KeInitializeTimer(&g_HbTimer);
+    due.QuadPart = -10000LL * HB_PERIOD_MS;
+    KeSetTimerEx(&g_HbTimer, due, HB_PERIOD_MS, &g_HbDpc);
+}
+
+/* ------------------------------------------------------------------ */
 /* DriverEntry                                                         */
 /* ------------------------------------------------------------------ */
 
@@ -500,6 +838,9 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     g_InSetup = SetupInProgress();
     FindResetRegister();
     restart = RedirectSetupRestart();
+    /* Text-mode Setup only: the heartbeat writes the text buffer every
+       250 ms, which a graphics desktop must not get. */
+    if (restart != '-') StartHeartbeat();
     if (g_InSetup && NT_SUCCESS(IoCreateDevice(DriverObject, 0, NULL, FILE_DEVICE_UNKNOWN, 0, FALSE, &device))) {
         DriverObject->MajorFunction[IRP_MJ_SHUTDOWN] = ShutdownDispatch;
         if (NT_SUCCESS(IoRegisterLastChanceShutdownNotification(device))) {
@@ -523,6 +864,10 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     p = PutStr(p, end, g_InSetup ? "1" : "0");
     p = PutStr(p, end, shutdownHandler ? " handler=on" : " handler=off");
     p = PutStr(p, end, restart == 'o' ? " txt=on" : restart == '-' ? " txt=no" : " txt=err");
+    p = PutStr(p, end, " hb");
+    p = PutHex(p, end, g_Hbas, 1);
+    p = PutStr(p, end, "/");
+    p = PutHex(p, end, g_Watches, 2);
     ShowRow(ROW_LOAD, line, (ULONG)(p - line), 0x1F00);
 
     return STATUS_SUCCESS;

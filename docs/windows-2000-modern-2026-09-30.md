@@ -448,6 +448,86 @@ X470. `isapnp` Start = 4 was also tried: text mode overwrites it (Start 0),
 and leaving isapnp out of text mode makes text mode stop with "no keyboard",
 so it is not used.
 
+## 7b. X470 run 6 (B261004-154947) and the stall diagnostics (usos4, usosrst 1.2)
+
+**Run 6 (CSM off, `acpi-off.txt`, MPS HAL, unattended answers):** text
+mode started and the real file copy ran, then stopped at 4 %
+("Kopiowanie: c_1252.nls") with no STOP screen. Row 0 stayed at
+`AHCINT3 1022:43C8 p2 MK:OK T:OK R:00000D5A W:000000F6 E:0000 LW:06FBA408 S:04`
+and did not change afterwards. usos3 refreshed that line only every 64
+commands, so the photo could not tell an I/O stall from a whole-machine
+hang.
+
+**Working mode from here on:** no speculative fixes; every hardware run
+must say what is wrong. This build only adds diagnostics.
+
+**AHCINT 1.3.0.0-usos4** (patch 0004, `MODIFIED.txt`):
+- Row 0 is rewritten after every command and by a 250 ms miniport timer.
+- A command still polled after 2 s puts the port registers on rows 3-4;
+  when it ends or times out (3 s) the same snapshot goes into the trace.
+- The trace also gets a record on every ScsiPort bus reset (`busreset`) and
+  once after 20 s without a new request (`idle20s`).
+
+**usosrst 1.2** (text-mode Setup only, so a graphics desktop never gets
+text-buffer writes):
+- A 250 ms kernel timer rewrites row 1 (heartbeat).
+- One DPC per CPU, sent with high importance; each CPU's digit moves only
+  when that CPU runs DPCs.
+- usosrst finds the AHCI HBAs itself through PCI config space and only
+  reads their registers and command list. So the watchdog does not depend
+  on AHCINT, and it works with UniATA too.
+- A slot that stays set with the same command for 2 s goes on rows 3-4.
+
+**Screen rows:**
+
+| Row | Writer | Example |
+|---|---|---|
+| 0 | AHCINT | `A4 43C8p2 OK/OK R:000D5A W:0000F6 E:00 B:0 LW:06FBA408 S:04 I:000 TM:3A1 ID:00` |
+| 1 | usosrst | `HB 0000013A t:000123s S:0 a2 CI:00000000 L:35 06FBA408+0080 age:0037s cpu:3A` |
+| 2 | usosrst | `usosrst 1.2 rsdp=02 reset=io:00B2=BE+cf9+8042 setup=0 handler=off txt=on hb1/06` |
+| 3-4 | AHCINT (`A4 STALL`) or usosrst (`RS STALL`) | PxCI, PxSACT, PxIS, PxSERR, PxTFD / PxCMD, HBA IS, poll or irq, op, LBA, count, slot |
+| 5-7 | usosrst | STOP code, parameters, modules |
+| 8 | AHCINT | a second HBA |
+
+**Row 0 fields:**
+- `OK/OK`: the marker / the write test.
+- `B`: ScsiPort bus resets.
+- `I`: HwInterrupt calls. AHCINT polls, so 0 is normal.
+- `TM`: miniport timer ticks. ScsiPort cannot run the timer while HwStartIo
+  polls.
+- `ID`: seconds without a new request.
+
+**Row 1 fields:**
+- `HB`: ticks, 4 per second.
+- `t`: seconds since boot, from the clock interrupt.
+- `S`: stalls seen.
+- `a2`: HBA letter and port.
+- `CI`: live PxCI.
+- `L`: the last command in the command list: opcode, LBA and count.
+- `age`: seconds since that command changed.
+- `cpu`: one digit per CPU.
+
+**How to read the next photo:**
+
+| Row 1 (HB) | Row 0 (TM / ID) | Rows 3-4 | Meaning |
+|---|---|---|---|
+| frozen | any | - | The machine (clock, timer DPC, or a CPU at high IRQL) is hung. Not a disk problem. |
+| moves, one `cpu` digit frozen | - | - | That CPU no longer runs DPCs: it is stuck at DISPATCH_LEVEL or above. |
+| moves, `CI` 0, `age` rising | TM moves, ID rising | empty | The disk is idle and nobody sends I/O: Setup or the I/O stack is waiting on something else. The trace gets `idle20s`. |
+| moves | TM frozen | `A4 STALL` | AHCINT is stuck polling a command. The registers show why: TFD BSY = the drive is busy, an IS/SERR error = a link or HBA fault. |
+| moves, `CI` non-zero | - | `RS STALL` | A command slot is set for over 2 s, seen from outside the driver. |
+| moves | `B` > 0 | - | ScsiPort timed out a request and reset the bus. The trace gets `busreset`. |
+
+`python tools\w2k_gap_trace.py \\.\PhysicalDriveN` decodes the usos4
+records: why, counters, the snapshot and the ports.
+
+**QEMU (one short run, before the user's decision of 2026-10-04 to run no
+more VMs for Windows 2000):** SeaBIOS, AHCI, 2 vCPUs, WHPX, ACPI off. Rows
+0 and 1 rendered and both moved; the text-mode Setup kernel showed one CPU
+digit. The file copy completed (W:00313C, TM and HB in step with `t`), and
+text mode reached its end screen. CSMWrap on OVMF did not start under WHPX.
+From now on, only the X470 tests these builds.
+
 ## 8. X470 test plan (first plan, 2026-10-03)
 
 

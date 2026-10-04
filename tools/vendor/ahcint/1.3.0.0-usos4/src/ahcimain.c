@@ -807,6 +807,8 @@ AhciHwInitialize(IN PVOID DeviceExtension)
 
     /* MODIFIED (USOS 1.3.0.0-usos3): the line after every port is up */
     AhciUsosShow(hwInit);
+    /* MODIFIED (USOS 1.3.0.0-usos4): the 250 ms diagnostic timer */
+    AhciUsosArmTimer(hwInit);
 
     AHCI_DBG((AHCI_PFX "HwInitialize: done\n"));
     return TRUE;
@@ -822,6 +824,11 @@ AhciStartIo(IN PVOID DeviceExtension, IN PSCSI_REQUEST_BLOCK Srb)
     PHW_DEVICE_EXTENSION hwInit;
 
     hwInit = (PHW_DEVICE_EXTENSION)DeviceExtension;
+
+    /* MODIFIED (USOS 1.3.0.0-usos4): SRBs are counted (idle time on the
+       line); the timer is armed again if it never ran */
+    hwInit->UsosSrbs++;
+    if (hwInit->UsosTimerTicks == 0 && (hwInit->UsosSrbs & 0xFF) == 1) AhciUsosArmTimer(hwInit);
 
     switch (Srb->Function) {
     case SRB_FUNCTION_EXECUTE_SCSI:
@@ -882,8 +889,11 @@ AhciInterrupt(IN PVOID DeviceExtension)
     hwInit = (PHW_DEVICE_EXTENSION)DeviceExtension;
     if (hwInit->AbarMapped == NULL) return FALSE;
 
+    /* MODIFIED (USOS 1.3.0.0-usos4): interrupts are counted (I on the line) */
+    hwInit->UsosIsrCalls++;
     hbaIs = AHCI_READ_REG(hwInit->AbarMapped, AHCI_GEN_IS);
     if (hbaIs == 0) return FALSE;
+    hwInit->UsosIsrOwn++;
 
     for (p = 0; p < MAX_SUPPORTED_PORTS; p++) {
         if (hbaIs & (1UL << p)) {
@@ -921,6 +931,12 @@ AhciResetBus(IN PVOID HwDeviceExtension, IN ULONG PathId)
         }
     }
     AHCI_WRITE_REG(hwInit->AbarMapped, AHCI_GEN_IS, 0xFFFFFFFF);
+
+    /* MODIFIED (USOS 1.3.0.0-usos4): ScsiPort resets the bus when a request
+       timed out: count it (B on the line) and write the trace */
+    hwInit->UsosBusResets++;
+    AhciUsosShow(hwInit);
+    AhciUsosTrace(hwInit, "busreset");
 
     return TRUE;
 }

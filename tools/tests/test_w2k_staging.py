@@ -158,12 +158,13 @@ class W2kStorage(unittest.TestCase):
         self.assertIn(b'SPDX-License-Identifier: GPL-3.0-or-later', c)
         for want in (b'IoRegisterLastChanceShutdownNotification', b'KeRegisterBugCheckCallback', b'SystemSetupInProgress',
                      b'0xCF9', b'(PUCHAR)0x64, 0xFE', b'FindModule("setupdd.sys")', b'HalReturnToFirmware',
-                     b'MmBuildMdlForNonPagedPool'):
+                     b'MmBuildMdlForNonPagedPool', b'KeSetTimerEx', b'KeSetTargetProcessorDpc', b'HalGetBusData',
+                     b'"RS STALL "', b'HB_STALL_TICKS'):
             self.assertIn(want, c)
         self.assertIn(b'MODIFIED version of AHCINT 1.3.0.0', files['MODIFIED.txt'])
         self.assertIn(b'usos2', files['MODIFIED.txt'])
         self.assertIn(b'usos3', files['MODIFIED.txt'])
-        self.assertIn(b'1.3.0.0-usos3', files['SOURCE.txt'])
+        self.assertIn(b'1.3.0.0-usos4', files['SOURCE.txt'])
         self.assertEqual(struct.unpack_from('<H', files['uniata/uniata.sys'], struct.unpack_from('<I', files['uniata/uniata.sys'], 60)[0] + 4)[0], 0x14c)
         self.assertIn(b'Version 2, June 1991', files['uniata/COPYING-GPL-2.0.txt'])
         self.assertEqual(struct.unpack_from('<H', files['ahcint.sys'], struct.unpack_from('<I', files['ahcint.sys'], 60)[0] + 4)[0], 0x14c)
@@ -172,18 +173,23 @@ class W2kStorage(unittest.TestCase):
         self.assertIn(b'Version 3, 29 June 2007', files['LICENSE'])
         self.assertIn('usr/lib/usos/w2k-drivers/', builder.PACKAGE_PREFIXES)
         # The corresponding source is tracked next to the binary, every file pinned.
-        for folder in ('1.3.0.0', '1.3.0.0-usos3'):
+        for folder in ('1.3.0.0', '1.3.0.0-usos4'):
             pins = json.loads((ROOT / 'tools/vendor/ahcint' / folder / 'manifest.json').read_text())
             for rel, digest in pins['files'].items():
                 self.assertEqual(hashlib.sha256((ROOT / 'tools/vendor/ahcint' / folder / rel).read_bytes()).hexdigest(), digest, rel)
             self.assertIn('src/ahcimain.c', pins['files'])
         # The patched source carries the USOS markers.
-        src = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos3/src/ahcisatl.c').read_bytes()
+        src = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos4/src/ahcisatl.c').read_bytes()
         self.assertIn(b'MODIFIED (USOS 1.3.0.0-usos1)', src)
         self.assertIn(b'MODIFIED (USOS 1.3.0.0-usos3)', src)
-        self.assertIn(b'USOSW2KTRACE'[:4], (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos3/src/ahcisatl.c').read_bytes())
+        self.assertIn(b'MODIFIED (USOS 1.3.0.0-usos4)', src)
+        # usos4: the stall watchdog, timer and counters (X470 4 % stop).
+        for want in (b'AhciUsosStallSnapshot', b'RequestTimerCall', b'"idle20s"', b'"busreset"', b'USOS_STALL_USEC'):
+            self.assertIn(want, src + (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos4/src/ahcint.h').read_bytes()
+                          + (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos4/src/ahcimain.c').read_bytes())
+        self.assertIn(b'USOSW2KTRACE'[:4], (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos4/src/ahcisatl.c').read_bytes())
         # usos3: the STOP code and the stages the X470 diagnosis relies on.
-        h = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos3/src/ahcint.h').read_bytes()
+        h = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos4/src/ahcint.h').read_bytes()
         for want in (b'#define USOS_BUGCHECK_CODE              0x55534F53', b'USOS_STAGE_LBA0', b'USOS_STAGE_FLUSH', b'USOS_STAGE_BUGCHECK'):
             self.assertIn(want, h)
         for want in (b'AhciUsosBugCheckCallback', b'AhciUsosAfterWrite', b'"MARKER-READ-FAIL"', b'0xB8000'):
@@ -221,7 +227,7 @@ class W2kStorage(unittest.TestCase):
                 hivesys = (ls / 'HIVESYS.INF').read_bytes()
                 r = self.apply(t, f'USOS_W2K_ACPI={acpi}' if acpi else '')
                 self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-                self.assertIn(b'[W2K_STAGE] APPLIED PASS AHCINT 1.3.0.0-usos3', r.stdout)
+                self.assertIn(b'[W2K_STAGE] APPLIED PASS AHCINT 1.3.0.0-usos4', r.stdout)
                 sif = run_fn('usos_w2k_storage_sif', W2K_TXTSETUP).stdout
                 if acpi == 'off':  # default (empty) keeps ACPI since 2026-10-03
                     sif = run_fn('usos_w2k_acpi_off_sif', sif).stdout
@@ -354,10 +360,10 @@ class W2kStorage(unittest.TestCase):
         self.assertEqual(r.stdout[32:40], b'edc187d4')
         self.assertEqual(r.stdout[40:], bytes(472))
         # The driver uses the same magic and LBAs.
-        h = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos3/src/ahcint.h').read_bytes()
+        h = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos4/src/ahcint.h').read_bytes()
         for want in (b'USOS_GAP_MARKER_LBA             2046', b'USOS_GAP_TEST_LBA               2045', b'USOS_GAP_TRACE_LBA              2040'):
             self.assertIn(want, h)
-        c = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos3/src/ahcisatl.c').read_bytes()
+        c = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos4/src/ahcisatl.c').read_bytes()
         self.assertIn(b"'U','S','O','S','W','2','K','T','R','A','C','E'", c)
 
     def test_uniata(self):

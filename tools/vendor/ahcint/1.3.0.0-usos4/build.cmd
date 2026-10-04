@@ -1,9 +1,9 @@
 @echo off
-rem build.cmd - build AHCINT 1.3.0.0-usos3 (i386, free) with WDK 7.1
+rem build.cmd - build AHCINT 1.3.0.0-usos4 (i386, free) with WDK 7.1
 rem (7600.16385.1) from src\ in this folder (upstream v1.3.0.0 plus
-rem patches\0001 to 0003, already applied).
+rem patches\0001 to 0004, already applied).
 rem
-rem   tools\vendor\ahcint\1.3.0.0-usos3\build.cmd [workdir]
+rem   tools\vendor\ahcint\1.3.0.0-usos4\build.cmd [workdir]
 rem
 rem Needs tools\WinDDK71 (or %WDKROOT%), see docs\BUILDING.md. Output:
 rem <workdir>\out\ahcint.sys. Nothing is copied into the repository.
@@ -23,7 +23,7 @@ if not exist "%WDKROOT%\bin\setenv.bat" (
   exit /b 2
 )
 set "WORK=%~1"
-if "%WORK%"=="" set "WORK=%TEMP%\ahcint-usos3-build"
+if "%WORK%"=="" set "WORK=%TEMP%\ahcint-usos4-build"
 if exist "%WORK%" rmdir /s /q "%WORK%"
 mkdir "%WORK%" || exit /b 2
 xcopy /e /i /q "%HERE%src" "%WORK%\src" >nul || exit /b 3

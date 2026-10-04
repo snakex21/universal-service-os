@@ -4,9 +4,9 @@
 # Applied on the target after the local source copy, before xhci98
 # (nt52_usb_stage.sh):
 #
-# 1. AHCI: AHCINT 1.3.0.0-usos3 (https://github.com/ages2001/AHCINT, GPL-3.0,
+# 1. AHCI: AHCINT 1.3.0.0-usos4 (https://github.com/ages2001/AHCINT, GPL-3.0,
 #    MODIFIED by USOS: real FLUSH CACHE, FUA, caching mode page;
-#    tools/vendor/ahcint/1.3.0.0-usos3), a ScsiPort miniport with
+#    tools/vendor/ahcint/1.3.0.0-usos4), a ScsiPort miniport with
 #    polling I/O (no interrupt needed, so it also runs without ACPI). Every
 #    import (ntoskrnl, scsiport) resolves on the 2000 SP4 kernel. The
 #    GenAHCI/StorPort route of NT 5.2 does not exist on 2000 (no StorPort).
@@ -164,7 +164,7 @@ USOS_W2K_AHCI_IDS='CC_010601 VEN_1022&DEV_7901 VEN_1022&DEV_43C8 VEN_1022&DEV_43
 usos_w2k_driver_title() {
     case "${USOS_W2K_DRV:-ahcint}" in
         uniata) echo 'UniATA 0.47b' ;;
-        *) echo 'AHCINT 1.3.0.0-usos3 diagnostic' ;;
+        *) echo 'AHCINT 1.3.0.0-usos4 diagnostic' ;;
     esac
 }
 
