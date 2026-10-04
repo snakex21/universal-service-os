@@ -94,6 +94,28 @@
 #        [a-z0-9_], at most 32 characters, not a USOS driver's name.
 #      A new .dll, two files with one name, or a folder without any .sys or
 #      .dll is refused before anything is written.
+# 6. The clock (default with usosrst; X470 2026-10-04/05): the firmware leaves
+#    the HPET in LegacyReplacement mode, so the pre-ACPI HALs got almost no
+#    clock interrupts, and the MPS HAL reads the CMOS year without its
+#    century (RtcDiag on the X470: HAL year 26), so GUI Setup ran with a
+#    negative system time and hung at "Czekaj..." in every wait with a
+#    deadline (rsabase, OleInitialize). usosrst 1.4 clears LegacyReplacement
+#    (/USOSHPETLEGOFF, Parameters\HpetLegacyOff) and serves ntoskrnl's RTC
+#    reads from its own decode, never writing the CMOS clock (/USOSRTCFIX,
+#    Parameters\RtcFix). Both options go into the text-mode OsLoadOptions
+#    and usosw2k.inf; USOS_W2K_HPET=keep / USOS_W2K_RTC=keep (DATA
+#    hpet-keep.txt / rtc-keep.txt) leave them out. With both, GUI Setup got
+#    past "Czekaj..." on the X470 (2026-10-05).
+# 7. USB keyboard preinstall (USOS_W2K_USB, on when the source has SP4's
+#    usbport): usosw2k.inf writes the services xhci98, usbhub20, HidUsb and
+#    kbdhid (demand start, as their INFs) and CriticalDeviceDatabase rows for
+#    PCI\CC_0C0330, USB\ROOT_HUB20, USB\HubClass, USB\Class_03 and
+#    HID_DEVICE_SYSTEM_KEYBOARD, so the first GUI-mode boot already starts a
+#    USB keyboard (no PS/2 on xHCI-only boards without CSM). The files come
+#    from nt52_usb_stage.sh's forced copy. The mouse (mouhid/mouclass) is only
+#    in DRIVER.CAB/SP4.CAB, so GUI-mode PnP installs it later. The answer
+#    file also gets [GuiUnattended] OemSkipWelcome=1 (the Welcome page waits
+#    for a click before "Installing devices") unless it already decides.
 # No Microsoft file is added or changed except the TXTSETUP.SIF and
 # DOSNET.INF copies on the target (and USOS's own WINNT.SIF); with a user
 # ACPI package, the user's own files replace the ones they name.
@@ -125,15 +147,22 @@ usos_w2k_apply() (
     case "$mode" in legacy|pnp) ;; *) echo "[W2K_STAGE] STOP: USOS_W2K_AHCINT_MODE must be legacy or pnp"; exit 1 ;; esac
     case "$acpi" in on|off) ;; *) echo "[W2K_STAGE] STOP: USOS_W2K_ACPI must be on or off"; exit 1 ;; esac
     hal=$(usos_w2k_hal) || { echo "$hal"; exit 1; }
-    # USOS_W2K_HPET: keep (default) or legacy-off (DATA hpet-legacy-off.txt,
-    # an X470 clock experiment; needs usosrst 1.3+).
-    hpet=${USOS_W2K_HPET:-keep}
+    # The clock (see 6.): USOS_W2K_HPET legacy-off (default with usosrst) or
+    # keep; USOS_W2K_RTC fix (default with usosrst) or keep. Both need usosrst.
+    if [ "$helper" = on ]; then hpet=${USOS_W2K_HPET:-legacy-off} rtc=${USOS_W2K_RTC:-fix}; else hpet=${USOS_W2K_HPET:-keep} rtc=${USOS_W2K_RTC:-keep}; fi
     case "$hpet" in keep|legacy-off) ;; *) echo '[W2K_STAGE] STOP: USOS_W2K_HPET must be keep or legacy-off'; exit 1 ;; esac
+    case "$rtc" in keep|fix) ;; *) echo '[W2K_STAGE] STOP: USOS_W2K_RTC must be keep or fix'; exit 1 ;; esac
     [ "$hpet" = keep ] || [ "$helper" = on ] || { echo '[W2K_STAGE] STOP: USOS_W2K_HPET=legacy-off needs usosrst'; exit 1; }
-    USOS_W2K_HPET=$hpet; export USOS_W2K_HPET
+    [ "$rtc" = keep ] || [ "$helper" = on ] || { echo '[W2K_STAGE] STOP: USOS_W2K_RTC=fix needs usosrst'; exit 1; }
+    USOS_W2K_HPET=$hpet USOS_W2K_RTC=$rtc; export USOS_W2K_HPET USOS_W2K_RTC
     bt="$XP_TARGET_ROOT/\$WIN_NT\$.~BT"
     ls="$XP_TARGET_ROOT/\$WIN_NT\$.~LS/I386"
     [ -f "$ls/TXTSETUP.SIF" ] || { echo "[W2K_STAGE] STOP: $ls/TXTSETUP.SIF missing"; exit 1; }
+    # USB keyboard preinstall (see 7.): only with SP4's usbport on the source
+    # (RTM has none, and nt52_usb_stage.sh then skips xhci98 too).
+    if [ -n "$(find "$ls" -maxdepth 1 -type f \( -iname usbport.sys -o -iname usbport.sy_ \) 2>/dev/null)" ]; then usb=${USOS_W2K_USB:-on}; else usb=off; fi
+    case "$usb" in on|off) ;; *) echo '[W2K_STAGE] STOP: USOS_W2K_USB must be on or off'; exit 1 ;; esac
+    USOS_W2K_USB=$usb; export USOS_W2K_USB
     # The user ACPI package (see 5.): resolved before anything is written.
     acpipkg=${USOS_W2K_ACPI_PKG:-}
     pkgplan=
@@ -184,8 +213,9 @@ usos_w2k_apply() (
             usos_w2k_acpi_off_sif < "$sif.usos" > "$sif.acpi" || { rm -f "$sif.usos" "$sif.acpi"; echo "[W2K_STAGE] STOP: no [ACPIOptions] ACPIEnable row in $sif"; exit 1; }
             mv "$sif.acpi" "$sif.usos"
         fi
-        if [ "$hpet" = legacy-off ]; then
-            usos_w2k_hpet_sif < "$sif.usos" > "$sif.hpet" || { rm -f "$sif.usos" "$sif.hpet"; echo "[W2K_STAGE] STOP: no [SetupData] OsLoadOptions row in $sif"; exit 1; }
+        loadopts=$(usos_w2k_load_options)
+        if [ -n "$loadopts" ]; then
+            usos_w2k_hpet_sif "$loadopts" < "$sif.usos" > "$sif.hpet" || { rm -f "$sif.usos" "$sif.hpet"; echo "[W2K_STAGE] STOP: no [SetupData] OsLoadOptions row in $sif"; exit 1; }
             mv "$sif.hpet" "$sif.usos"
         fi
         mv "$sif.usos" "$sif"
@@ -198,7 +228,7 @@ usos_w2k_apply() (
     printf '[W2K_STAGE] APPLIED PASS %s boot+local source, TXTSETUP.SIF PCI\\CC_010601, usosw2k.inf (CriticalDeviceDatabase), %s mode; ACPI %s; HAL %s; WINNT.SIF answers: standard keyboard; usosrst %s\n' \
         "$(usos_w2k_driver_title)" "$mode" "$([ "$acpi" = off ] && echo 'off (ACPIEnable = 0)' || echo 'kept (ACPIEnable unchanged)')" \
         "$(case "$hal" in mps) echo 'MPS Multiprocessor (ComputerType)' ;; standard) echo 'Standard PC (ComputerType)' ;; *) echo 'chosen by Setup' ;; esac)" \
-        "$([ "$helper" = on ] && echo 'on (STOP screen, Setup and text-mode restart via FADT/CF9/8042)' || echo off)$([ "$hpet" = legacy-off ] && echo '; HPET LegacyReplacement off (experiment)')$([ -n "$pkgplan" ] && printf '; user ACPI package: %s' "$(printf '%s\n' "$pkgplan" | awk -F '\t' '{ printf "%s%s %s", sep, ($1 == "extra" ? "boot driver" : "replaces"), $2; sep = ", " }')")"
+        "$([ "$helper" = on ] && echo 'on (STOP screen, Setup and text-mode restart via FADT/CF9/8042)' || echo off)$([ "$hpet" = legacy-off ] && echo '; HPET LegacyReplacement off')$([ "$rtc" = fix ] && echo '; RTC fix')$([ "$usb" = on ] && echo '; USB keyboard preinstall (CriticalDeviceDatabase)')$([ -n "$pkgplan" ] && printf '; user ACPI package: %s' "$(printf '%s\n' "$pkgplan" | awk -F '\t' '{ printf "%s%s %s", sep, ($1 == "extra" ? "boot driver" : "replaces"), $2; sep = ", " }')")"
 )
 
 # stdout: the plan for the user ACPI package folder $1 (see 5.) against the
@@ -301,7 +331,7 @@ usos_w2k_storage_sif() {
 # PnpInterface for AHCINT and the CriticalDeviceDatabase entries of
 # USOS_W2K_AHCI_IDS. Loaded through TXTSETUP.SIF [HiveInfs.Fresh].
 usos_w2k_hive_inf() {
-    awk -v ids="$USOS_W2K_AHCI_IDS" -v mode="${1:-legacy}" -v drv="${USOS_W2K_DRV:-ahcint}" -v helper="${USOS_W2K_USOSRST:-on}" -v acpi="${USOS_W2K_ACPI:-on}" -v hpet="${USOS_W2K_HPET:-keep}" -v extra="${USOS_W2K_ACPI_EXTRA:-}" '
+    awk -v ids="$USOS_W2K_AHCI_IDS" -v mode="${1:-legacy}" -v drv="${USOS_W2K_DRV:-ahcint}" -v helper="${USOS_W2K_USOSRST:-on}" -v acpi="${USOS_W2K_ACPI:-on}" -v hpet="${USOS_W2K_HPET:-keep}" -v rtc="${USOS_W2K_RTC:-keep}" -v usb="${USOS_W2K_USB:-off}" -v extra="${USOS_W2K_ACPI_EXTRA:-}" '
         BEGIN {
             bs = sprintf("%c", 92); q = sprintf("%c", 34); n = split(ids, id, " ")
             base = "HKLM," q "SYSTEM" bs "CurrentControlSet" bs
@@ -338,9 +368,32 @@ usos_w2k_hive_inf() {
                 print svc q "ErrorControl" q ",0x00010001,0\r"
                 print svc q "Group" q ",0x00000000," q "Boot Bus Extender" q "\r"
                 print svc q "ImagePath" q ",0x00020000," q "System32" bs "DRIVERS" bs "usosrst.sys" q "\r"
-                # Experiment (DATA hpet-legacy-off.txt): usosrst clears HPET
-                # LegacyReplacement on every later boot too.
+                # The clock (see 6.): the same on every later boot.
                 if (hpet == "legacy-off") print base "Services" bs "usosrst" bs "Parameters" q "," q "HpetLegacyOff" q ",0x00010001,1\r"
+                if (rtc == "fix") print base "Services" bs "usosrst" bs "Parameters" q "," q "RtcFix" q ",0x00010001,1\r"
+            }
+            # USB keyboard preinstall (see 7.): the services and their
+            # CriticalDeviceDatabase rows, as the INFs (xhci98, usb, input,
+            # keyboard) would write them.
+            if (usb == "on") {
+                ns = split("xhci98:Base:1:xhci98.sys usbhub20:Base:1:usbhub20.sys HidUsb:extended_base:0:hidusb.sys kbdhid:Keyboard_Port:0:kbdhid.sys", sv, " ")
+                for (i = 1; i <= ns; i++) {
+                    split(sv[i], fl, ":"); gsub(/_/, " ", fl[2])
+                    svc = base "Services" bs fl[1] q ","
+                    print svc q "Type" q ",0x00010001,1\r"
+                    print svc q "Start" q ",0x00010001,3\r"
+                    print svc q "ErrorControl" q ",0x00010001," fl[3] "\r"
+                    print svc q "Group" q ",0x00000000," q fl[2] q "\r"
+                    print svc q "ImagePath" q ",0x00020000," q "System32" bs "DRIVERS" bs fl[4] q "\r"
+                }
+                usbc = "{36FC9E60-C465-11CF-8056-444553540000}"
+                nc = split("pci#cc_0c0330:xhci98:" usbc " usb#root_hub20:usbhub20:" usbc " usb#hubclass:usbhub20:" usbc " usb#class_03:HidUsb:{745a17a0-74d3-11d0-b6fe-00a0c90f57da} hid_device_system_keyboard:kbdhid:{4D36E96B-E325-11CE-BFC1-08002BE10318}", cv, " ")
+                for (i = 1; i <= nc; i++) {
+                    split(cv[i], fl, ":")
+                    key = base "Control" bs "CriticalDeviceDatabase" bs fl[1] q ","
+                    print key q "Service" q ",0x00000000," q fl[2] q "\r"
+                    print key q "ClassGUID" q ",0x00000000," q fl[3] q "\r"
+                }
             }
             # The extra drivers of the user ACPI package (see 5.): the same boot service rows.
             ne = split(extra, ex, " ")
@@ -366,17 +419,29 @@ usos_w2k_hive_inf() {
 # a text-mode boot bus extender: without ACPI it enumerates the legacy
 # devices, and text mode stops with "no keyboard" without it; QEMU
 # 2026-10-04.)
-# stdin TXTSETUP.SIF -> stdout with " /USOSHPETLEGOFF" appended to
-# [SetupData] OsLoadOptions (the text-mode load options; usosrst 1.3 reads
-# them from SystemStartOptions and clears HPET LegacyReplacement). Status 3
-# when there is no single OsLoadOptions row.
+# stdout: the usosrst load options for text mode (see 6.), from
+# USOS_W2K_HPET and USOS_W2K_RTC; empty when neither is wanted.
+usos_w2k_load_options() {
+    o=
+    [ "${USOS_W2K_HPET:-keep}" = legacy-off ] && o="/USOSHPETLEGOFF"
+    [ "${USOS_W2K_RTC:-keep}" = fix ] && o="${o:+$o }/USOSRTCFIX"
+    printf '%s' "$o"
+}
+
+# stdin TXTSETUP.SIF -> stdout with the options $1 (default /USOSHPETLEGOFF;
+# each one only once) appended to [SetupData] OsLoadOptions (the text-mode
+# load options; usosrst reads them from SystemStartOptions). Status 3 when
+# there is no single OsLoadOptions row.
 usos_w2k_hpet_sif() {
-    awk '
+    awk -v opts="${1:-/USOSHPETLEGOFF}" '
+        BEGIN { no = split(opts, opt, " ") }
         { line = $0; sub(/\r$/, "", line); low = tolower(line) }
         low ~ /^[ \t]*\[/ { section = low; sub(/[ \t]+$/, "", section) }
         section == "[setupdata]" && low ~ /^[ \t]*osloadoptions[ \t]*=/ {
-            if (low !~ /usoshpetlegoff/) {
-                if (line ~ /"[ \t]*$/) sub(/"[ \t]*$/, " /USOSHPETLEGOFF\"", line); else line = line " /USOSHPETLEGOFF"
+            for (i = 1; i <= no; i++) {
+                if (index(low, tolower(opt[i]))) continue
+                if (line ~ /"[ \t]*$/) sub(/"[ \t]*$/, " " opt[i] "\"", line); else line = line " " opt[i]
+                low = tolower(line)
             }
             done++
         }
@@ -459,6 +524,7 @@ usos_w2k_hw_sif() {
         low ~ /^[ \t]*\[/ { section = low; sub(/^[ \t]+/, "", section); sub(/[ \t]+$/, "", section) }
         section == "[keyboarddrivers]" { next }
         section == "[unattended]" && low ~ /^[ \t]*(computertype|oempreinstall)[ \t]*=/ { next }
+        section == "[guiunattended]" && low ~ /^[ \t]*oemskipwelcome[ \t]*=/ { welcome = 1 }
         { print line "\r" }
         section == "[unattended]" && low ~ /^[ \t]*\[/ && !u {
             u = 1
@@ -467,6 +533,9 @@ usos_w2k_hw_sif() {
         }
         END {
             if (!u) exit 3
+            # The Welcome page comes before "Installing devices" and waits for
+            # a click; skipped unless the answer file already decides.
+            if (!welcome) { print "[GuiUnattended]\r"; print "OemSkipWelcome=1\r" }
             print "[KeyboardDrivers]\r"
             print q keyboard q " = " q "Retail" q "\r"
         }

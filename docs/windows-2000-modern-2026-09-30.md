@@ -645,6 +645,54 @@ files, a temporary bridge until USOS has its own implementation. Staging
   first), the same as usosrst. So if the stock `acpi.sys` hangs, these
   markers will not appear either.
 
+## 7e. X470 runs 8-11 (2026-10-04/05): the clock was the hang, then USB input
+
+**What the BIOSTAR showed (read offline, read-only):**
+
+| Run | Change | Result |
+|---|---|---|
+| 8 | `/USOSHPETLEGOFF` (usosrst 1.3) | System time now advances (+37 s instead of 0.28 s). GUI Setup reaches syssetup. The last setupact line is `loading dll...` for `rsabase.dll`. |
+| 9 | `rsabase` commented out in `[CryptoDlls]` | `dssbase.dll` loads, then hangs in `registering...`. |
+| 10 | all `[CryptoDlls]` commented out | Hangs after `Enter RegisterOleControls`, before `back from OleInitialize`. |
+| 11 | usosrst 1.4 `/USOSRTCFIX`, `[CryptoDlls]` restored | All crypto DLLs register in 0.15 s. Setup gets past "Czekaj..." to the optional-component init, and NTFS timestamps are sane (2026). |
+
+**Cause:**
+- `RtcDiag` from run 11 shows the CMOS clock reads `47 25 01 01 05 10 26`: BCD, 24-hour, register B = 42h, century byte 20h at 32h.
+  - The MPS HAL's `HalQueryRealTimeClock` returned Year = 26, without the century.
+  - So the kernel's system time was garbage: about the year 14773 in text mode, and negative (sign bit set) in GUI mode.
+- Every wait with an absolute deadline turned into an endless one: rsabase, dssbase and OleInitialize/RPC.
+- Relative timers kept working, which is why NTFS checkpoints went on.
+
+**usosrst 1.4 (`USOSRTCFIX`, Parameters `RtcFix`):**
+- Decodes the CMOS clock by register B and takes the century from the FADT CENTURY byte.
+- Redirects ntoskrnl's `HalQueryRealTimeClock` import to that decode, and `HalSetRealTimeClock` to a no-op, so the CMOS clock is never written.
+- Sets the system time with `ZwSetSystemTime`.
+- Writes `Parameters\RtcDiag`.
+
+**Defaults since run 11 (`w2k_stage.sh` 6., `legacy_xp_staging.sh`):**
+- `/USOSHPETLEGOFF /USOSRTCFIX` go into the text-mode OsLoadOptions.
+- `HpetLegacyOff` and `RtcFix` go into `usosw2k.inf`.
+- The opt-outs are DATA `hpet-keep.txt` and `rtc-keep.txt`. `hpet-legacy-off.txt` is no longer needed.
+
+**USB input (run 11):**
+- GUI Setup had not reached "Installing devices": `setupapi.log` holds class installs only, and no `xhci98.log` exists.
+- The Welcome page (UnattendMode ProvideDefault) waits for a click, and xHCI-only boards have no PS/2 port.
+
+**Changes in `w2k_stage.sh` 7.:**
+- `usosw2k.inf` now writes the xhci98, usbhub20, HidUsb and kbdhid services (demand start).
+- It also writes CriticalDeviceDatabase rows for `PCI\CC_0C0330`, `USB\ROOT_HUB20`, `USB\HubClass`, `USB\Class_03` and `HID_DEVICE_SYSTEM_KEYBOARD`.
+- The answer file gets `[GuiUnattended] OemSkipWelcome=1`.
+- `mouhid.sys` and `mouclass.sys` exist only in DRIVER.CAB/SP4.CAB, so the mouse comes later from GUI-mode PnP.
+
+**The BIOSTAR itself was patched offline:**
+- The same rows plus the mouse (`mouhid` and `mouclass` from SP4.CAB) went into `system` and `SYSTEM.ALT`.
+  - Win10 cannot load these hives (RegLoadAppKey fails with 1009 or 5), so a small regf 1.3 editor in the session scratchpad wrote them.
+- `$winnt$.inf` got `OemSkipWelcome = 1` and `OEMSkipRegional = 1`.
+
+**Side effect of the readback:**
+- Every Windows 10 mount of the BIOSTAR discards Windows 2000's NTFS log.
+- chkdsk then removes index entries that were never committed (SAM, SECURITY, `*.LOG`) or recovers orphans.
+
 ## 8. X470 test plan (first plan, 2026-10-03)
 
 

@@ -21,7 +21,7 @@ from test_nt52_staging import ROOT, SH, STACK, USB_DOSNET, USB_TXTSETUP, posix, 
 
 # Windows 2000 rows in the 5.0 spelling (2000's own TXTSETUP.SIF: disk 2 for
 # the SP4 cabinet, trailing blanks, [ACPIOptions] with the date rule).
-W2K_TXTSETUP = (b'[SetupData]\r\nMajorVersion = 5\r\nMinorVersion = 0\r\n[SourceDisksFiles]\r\natapi.sys    = 2,,,,,,3_,4,0,0\r\n'
+W2K_TXTSETUP = (b'[SetupData]\r\nMajorVersion = 5\r\nMinorVersion = 0\r\nOsLoadOptions = "/fastdetect /noguiboot /nodebug"\r\n[SourceDisksFiles]\r\natapi.sys    = 2,,,,,,3_,4,0,0\r\n'
                 b'[SourceDisksFiles]\r\nusbport.sys  = 2,,,,,,,4,1,3\r\nusbhub.sys   = 2,,,,,,2_,4,1,3     \r\n'
                 b'usbhub20.sys = 2,,,,,,,4,1,3\r\nusbd.sys     = 2,,,,,,2_,4,1,3     \r\nhidclass.sys = 2,,,,,,2_,4,1,3        \r\n'
                 b'hidparse.sys = 2,,,,,,2_,4,1,3        \r\nhidusb.sys   = 1,,,,,,2_,4,1,3        \r\nkbdhid.sys   = 1,,,,,,2_,4,1,3   \r\n'
@@ -95,22 +95,55 @@ class W2kStorage(unittest.TestCase):
         # DATA hpet-legacy-off.txt: /USOSHPETLEGOFF in the text-mode load options and
         # the usosrst Parameters value for later boots (usosrst 1.3 clears HPET
         # LegacyReplacement); the default leaves both alone.
-        sif = W2K_TXTSETUP.replace(b'MinorVersion = 0\r\n', b'MinorVersion = 0\r\nOsLoadOptions = "/fastdetect /noguiboot /nodebug"\r\n')
+        sif = W2K_TXTSETUP
         r = run_fn('usos_w2k_hpet_sif', sif)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(rows(r.stdout), rows(sif.replace(b'/nodebug"', b'/nodebug /USOSHPETLEGOFF"')))
         self.assertEqual(run_fn('usos_w2k_hpet_sif', r.stdout).stdout, r.stdout)          # idempotent
-        self.assertEqual(run_fn('usos_w2k_hpet_sif', W2K_TXTSETUP).returncode, 3)       # no OsLoadOptions row
+        noopt = W2K_TXTSETUP.replace(b'OsLoadOptions = "/fastdetect /noguiboot /nodebug"\r\n', b'')
+        self.assertEqual(run_fn('usos_w2k_hpet_sif', noopt).returncode, 3)              # no OsLoadOptions row
+        # Both clock options (the default with usosrst), each only once.
+        both = run_fn('usos_w2k_hpet_sif "$(USOS_W2K_HPET=legacy-off USOS_W2K_RTC=fix usos_w2k_load_options)"', r.stdout)
+        self.assertEqual(rows(both.stdout), rows(sif.replace(b'/nodebug"', b'/nodebug /USOSHPETLEGOFF /USOSRTCFIX"')))
+        self.assertEqual(run_fn('usos_w2k_load_options', b'').stdout, b'')
+        self.assertEqual(run_fn('USOS_W2K_RTC=fix usos_w2k_load_options', b'').stdout, b'/USOSRTCFIX')
+        rtc = 'HKLM,"SYSTEM\\CurrentControlSet\\Services\\usosrst\\Parameters","RtcFix",0x00010001,1'
+        self.assertIn(rtc, rows(run_fn('USOS_W2K_RTC=fix usos_w2k_hive_inf', b'').stdout))
+        self.assertNotIn(rtc, rows(run_fn('usos_w2k_hive_inf', b'').stdout))
         row = 'HKLM,"SYSTEM\\CurrentControlSet\\Services\\usosrst\\Parameters","HpetLegacyOff",0x00010001,1'
         self.assertIn(row, rows(run_fn('USOS_W2K_HPET=legacy-off usos_w2k_hive_inf', b'').stdout))
         self.assertNotIn(row, rows(run_fn('usos_w2k_hive_inf', b'').stdout))
         self.assertNotIn(b'HpetLegacyOff', run_fn('USOS_W2K_HPET=legacy-off USOS_W2K_USOSRST=off usos_w2k_hive_inf', b'').stdout)
         stage = (ROOT / 'tools/legacy_xp_staging.sh').read_text()
-        self.assertIn('Unattended/hpet-legacy-off.txt" ]; then USOS_W2K_HPET=legacy-off; else USOS_W2K_HPET=keep; fi', stage)
-        self.assertIn('export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL USOS_W2K_HPET', stage)
+        # The clock fixes are the default since the X470 run of 2026-10-05.
+        self.assertIn('Unattended/hpet-keep.txt" ]; then USOS_W2K_HPET=keep; else USOS_W2K_HPET=legacy-off; fi', stage)
+        self.assertIn('Unattended/rtc-keep.txt" ]; then USOS_W2K_RTC=keep; else USOS_W2K_RTC=fix; fi', stage)
+        self.assertIn('export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL USOS_W2K_HPET USOS_W2K_RTC', stage)
         c = (ROOT / 'tools/w2k/usosrst/src/usosrst.c').read_text()
-        for want in ('L"USOSHPETLEGOFF"', 'L"HpetLegacyOff"', 'SystemStartOptions', 'g_HpetCfg & ~2UL'):
+        for want in ('L"USOSHPETLEGOFF"', 'L"HpetLegacyOff"', 'SystemStartOptions', 'g_HpetCfg & ~2UL',
+                     'L"USOSRTCFIX"', 'L"RtcFix"', 'UsosSetRtc', 'ZwSetSystemTime'):
             self.assertIn(want, c)
+
+    def test_usb_preinstall(self):
+        # USOS_W2K_USB=on: the keyboard path starts from the CriticalDeviceDatabase
+        # on the first GUI-mode boot (no PS/2 on xHCI-only boards without CSM).
+        out = rows(run_fn('USOS_W2K_USB=on usos_w2k_hive_inf', b'').stdout)
+        base = 'HKLM,"SYSTEM\\CurrentControlSet\\'
+        for svc, group, err, image in (('xhci98', 'Base', 1, 'xhci98.sys'), ('usbhub20', 'Base', 1, 'usbhub20.sys'),
+                                       ('HidUsb', 'extended base', 0, 'hidusb.sys'), ('kbdhid', 'Keyboard Port', 0, 'kbdhid.sys')):
+            k = base + 'Services\\' + svc + '",'
+            for row in ('"Type",0x00010001,1', '"Start",0x00010001,3', '"ErrorControl",0x00010001,%d' % err,
+                        '"Group",0x00000000,"%s"' % group, '"ImagePath",0x00020000,"System32\\DRIVERS\\%s"' % image):
+                self.assertIn(k + row, out)
+        usb = '{36FC9E60-C465-11CF-8056-444553540000}'
+        for key, svc, cls in (('pci#cc_0c0330', 'xhci98', usb), ('usb#root_hub20', 'usbhub20', usb), ('usb#hubclass', 'usbhub20', usb),
+                              ('usb#class_03', 'HidUsb', '{745a17a0-74d3-11d0-b6fe-00a0c90f57da}'),
+                              ('hid_device_system_keyboard', 'kbdhid', '{4D36E96B-E325-11CE-BFC1-08002BE10318}')):
+            k = base + 'Control\\CriticalDeviceDatabase\\' + key + '",'
+            self.assertIn(k + '"Service",0x00000000,"' + svc + '"', out)
+            self.assertIn(k + '"ClassGUID",0x00000000,"' + cls + '"', out)
+        self.assertNotIn(b'cc_0c0330', run_fn('usos_w2k_hive_inf', b'').stdout)
+        self.assertNotIn(b'mouhid', run_fn('USOS_W2K_USB=on usos_w2k_hive_inf', b'').stdout)   # DRIVER.CAB only
 
     def test_hive_inf(self):
         r = run_fn('usos_w2k_hive_inf', b'')
@@ -250,6 +283,7 @@ class W2kStorage(unittest.TestCase):
                 self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
                 self.assertIn(b'[W2K_STAGE] APPLIED PASS AHCINT 1.3.0.0-usos4', r.stdout)
                 sif = run_fn('usos_w2k_storage_sif', W2K_TXTSETUP).stdout
+                sif = run_fn('usos_w2k_hpet_sif "/USOSHPETLEGOFF /USOSRTCFIX"', sif).stdout   # the clock default
                 if acpi == 'off':  # default (empty) keeps ACPI since 2026-10-03
                     sif = run_fn('usos_w2k_acpi_off_sif', sif).stdout
                     self.assertIn(b'ACPI off', r.stdout)
@@ -260,7 +294,7 @@ class W2kStorage(unittest.TestCase):
                     self.assertEqual((folder / 'ahcint.inf').read_bytes(), inf)
                     self.assertFalse((folder / 'AHCINT.SY_').exists())
                     self.assertEqual((folder / 'usosw2k.inf').read_bytes(),
-                                     run_fn(f'USOS_W2K_ACPI={acpi or "on"} usos_w2k_hive_inf', b'').stdout)
+                                     run_fn(f'USOS_W2K_HPET=legacy-off USOS_W2K_RTC=fix USOS_W2K_ACPI={acpi or "on"} usos_w2k_hive_inf', b'').stdout)
                     self.assertEqual(b'"PagedPoolSize",0x00010001,0xFFFFFFFF' in (folder / 'usosw2k.inf').read_bytes(), acpi == 'off')
                     self.assertEqual((folder / 'TXTSETUP.SIF').read_bytes(), sif)
                 self.assertEqual((t / 'root/TXTSETUP.SIF').read_bytes(), sif)
@@ -278,7 +312,7 @@ class W2kStorage(unittest.TestCase):
                 a = sh(f"{'USOS_W2K_ACPI=' + acpi if acpi else ':'}; export USOS_W2K_ACPI USOS_W2K_HAL; . '{LIB}'; usos_w2k_answer_sif '{posix(ls / 'TXTSETUP.SIF')}'", W2K_WINNT)
                 self.assertEqual(a.returncode, 0, a.stderr)
                 self.assertEqual(a.stdout, W2K_WINNT.replace(b'[Unattended]\r\n', b'[Unattended]\r\nOemPreinstall=Yes\r\n' + computer) +
-                                 b'[KeyboardDrivers]\r\n"' + KBD + b'" = "Retail"\r\n')
+                                 b'[GuiUnattended]\r\nOemSkipWelcome=1\r\n' + b'[KeyboardDrivers]\r\n"' + KBD + b'" = "Retail"\r\n')
                 # HIVESYS.INF (UTF-16 on 2000) is left alone.
                 self.assertEqual((ls / 'HIVESYS.INF').read_bytes(), hivesys)
                 self.assertNotEqual(self.apply(t).returncode, 0)
@@ -308,13 +342,14 @@ class W2kStorage(unittest.TestCase):
             self.assertIn(b'ACPI kept', r.stdout)
             extra = 'USOS_W2K_ACPI_EXTRA=acpi_w2k'
             sif = run_fn(f'{extra} usos_w2k_storage_sif', W2K_TXTSETUP).stdout
+            sif = run_fn('usos_w2k_hpet_sif "/USOSHPETLEGOFF /USOSRTCFIX"', sif).stdout
             for folder in (bt, ls):
                 self.assertEqual((folder / 'acpi_w2k.sys').read_bytes(), b'MZ user driver')
                 self.assertEqual((folder / 'acpi.sys').read_bytes(), b'MZ user acpi')
                 self.assertFalse((folder / 'ACPI.SY_').exists())
                 self.assertFalse((folder / 'README.txt').exists())
                 self.assertEqual((folder / 'TXTSETUP.SIF').read_bytes(), sif)
-                self.assertEqual((folder / 'usosw2k.inf').read_bytes(), run_fn(f'{extra} usos_w2k_hive_inf', b'').stdout)
+                self.assertEqual((folder / 'usosw2k.inf').read_bytes(), run_fn(f'USOS_W2K_HPET=legacy-off USOS_W2K_RTC=fix {extra} usos_w2k_hive_inf', b'').stdout)
             out = rows(sif)
             self.assertIn('acpi_w2k.sys = 1,,,,,,4_,4,1,,,1,4', out)
             load = out.index('[BootBusExtenders.Load]')
@@ -360,7 +395,7 @@ class W2kStorage(unittest.TestCase):
         stage = (ROOT / 'tools/legacy_xp_staging.sh').read_text()
         self.assertIn('USOS_W2K_ACPI_PKG="/mnt/data/Systems/Windows/$NT5_NAME/Unattended/acpi"', stage)
         self.assertIn("acpi-off.txt and the user ACPI package (Unattended\\acpi) exclude each other", stage)
-        self.assertIn('export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL USOS_W2K_HPET USOS_W2K_ACPI_PKG', stage)
+        self.assertIn('export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL USOS_W2K_HPET USOS_W2K_RTC USOS_W2K_ACPI_PKG', stage)
 
     def test_acpi_off_isapnp(self):
         # ACPI off: isapnp stays a text-mode boot bus extender (text mode needs it
@@ -395,20 +430,23 @@ class W2kStorage(unittest.TestCase):
             (Path(tmp) / 'desc').write_bytes(mouse)
             r = run_fn(f'usos_w2k_hw_sif "$(cat \'{posix(Path(tmp) / "desc")}\')" "$(cat \'{posix(Path(tmp) / "desc")}\')"', W2K_WINNT)
         self.assertIn(b'ComputerType = "' + mouse + b'","Retail"\r\n', r.stdout)
-        self.assertTrue(r.stdout.endswith(b'[KeyboardDrivers]\r\n"' + mouse + b'" = "Retail"\r\n'))
+        self.assertTrue(r.stdout.endswith(b'[GuiUnattended]\r\nOemSkipWelcome=1\r\n' + b'[KeyboardDrivers]\r\n"' + mouse + b'" = "Retail"\r\n'))
         # WINNT.SIF: rows added once (preinstall mode: setupdd.sys reads the component
         # answers only then), an older OemPreinstall / ComputerType / [KeyboardDrivers] replaced.
         r = run_fn('usos_w2k_hw_sif "Standard PC" "Std kbd"', W2K_WINNT)
         self.assertEqual(r.returncode, 0, r.stderr)
         want = W2K_WINNT.replace(b'[Unattended]\r\n', b'[Unattended]\r\nOemPreinstall=Yes\r\nComputerType = "Standard PC","Retail"\r\n') + \
-            b'[KeyboardDrivers]\r\n"Std kbd" = "Retail"\r\n'
+            b'[GuiUnattended]\r\nOemSkipWelcome=1\r\n' + b'[KeyboardDrivers]\r\n"Std kbd" = "Retail"\r\n'
         self.assertEqual(r.stdout, want)
         self.assertEqual(run_fn('usos_w2k_hw_sif "Standard PC" "Std kbd"', r.stdout).stdout, want)
         old = W2K_WINNT.replace(b'[Unattended]\r\n', b'[Unattended]\r\nComputerType="Other",OEM\r\nOemPreinstall=No\r\n') + \
             b'[KeyboardDrivers]\r\n"X" = "OEM"\r\n[Display]\r\nBitsPerPel=16\r\n'
         self.assertEqual(run_fn('usos_w2k_hw_sif "" "Std kbd"', old).stdout,
                          W2K_WINNT.replace(b'[Unattended]\r\n', b'[Unattended]\r\nOemPreinstall=Yes\r\n') +
-                         b'[Display]\r\nBitsPerPel=16\r\n[KeyboardDrivers]\r\n"Std kbd" = "Retail"\r\n')
+                         b'[Display]\r\nBitsPerPel=16\r\n' + b'[GuiUnattended]\r\nOemSkipWelcome=1\r\n' + b'[KeyboardDrivers]\r\n"Std kbd" = "Retail"\r\n')
+        # An answer file that already decides the Welcome page keeps its choice.
+        own = W2K_WINNT + b'[GuiUnattended]\r\nOemSkipWelcome=0\r\n'
+        self.assertEqual(run_fn('usos_w2k_hw_sif "" "k"', own).stdout.count(b'OemSkipWelcome'), 1)
         self.assertEqual(run_fn('usos_w2k_hw_sif "" "k"', b'[Data]\r\nx=1\r\n').returncode, 3)
 
     def test_apply_hal(self):
