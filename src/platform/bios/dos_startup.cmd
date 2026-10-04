@@ -86,6 +86,11 @@ ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\NUL GOTO USOSDRV>>C:\AUTOEXEC.BAT
 ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\USOSKEY.DRV COPY C:\USOS9X\*.DRV C:\WINDOWS\SYSTEM>>C:\AUTOEXEC.BAT
 ECHO :USOSDRV>>C:\AUTOEXEC.BAT
 ECHO @C:\USOS9X\USOSKEY.COM>>C:\AUTOEXEC.BAT
+REM The DOS KEYB TSR that Setup adds at the end of AUTOEXEC.BAT stops the
+REM installed Windows with a protection error next to the bridge (QEMU
+REM OVMF bisect): it is renamed to KEYB.USO before it would load. Windows
+REM keeps its own keyboard layout; only DOS prompts lose the national layout.
+ECHO @IF EXIST C:\WINDOWS\COMMAND\KEYB.COM REN C:\WINDOWS\COMMAND\KEYB.COM KEYB.USO>>C:\AUTOEXEC.BAT
 REM Me starts no real-mode program from AUTOEXEC.BAT and has no WINSTART.BAT:
 REM USOSKEY.DRV installs the bridge itself (in DOS memory of the system VM).
 REM The driver goes to SYSTEM before Setup; MSBATCH.INF [USOS.Csm] names it.

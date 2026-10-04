@@ -149,9 +149,15 @@ flow (FreeDOS, PC DOS, NT 4.0, betas) show "Unavailable".
   error at KERNEL init (bisected on the disk). The CSMWrap bridge is now
   keyboard-only (U9FIX /CSM adds only usoskey.drv). **A USB mouse in the
   installed Windows 9x under CSMWrap is open** (planned: a VxD-level mouse).
+* 98 SE end to end (QEMU OVMF, 2026-10-04): the user's key typed in the wizard, hardware setup, final
+  restart, **desktop with the USB keyboard** (`uefi-98se-desktop-usb-keyboard.png`). Second finding: the
+  DOS `KEYB` TSR that Setup appends to AUTOEXEC.BAT, loaded after USOSKEY.COM, also stops Windows with a
+  protection error at KERNEL init; under CSMWrap our AUTOEXEC block renames `KEYB.COM` to `KEYB.USO`
+  before that line runs (Windows keeps its own layout; DOS prompts show one "bad command" line).
+  Ctrl+Esc through the USB bridge did not open the Start menu in QEMU (single keys work): open.
 * Safe mode under CSMWrap hangs (Windows loads HIMEM without /M:2), so
-  MSDOS.SYS gets `BootMenuDefault=1`: after a failed start the menu offers
-  Normal.
+  MSDOS.SYS gets `BootMenuDefault=1`; after a failed start Windows 98 still
+  defaulted to Safe mode in QEMU (the setting does not override that default): open.
 * MS-DOS media: an ISO in `Systems\DOS\MS-DOS\Images` (Windows 3.x needs it
   as `MS-DOS 6.22.iso`); a .zip holding the ISO is a planned convenience.
 
