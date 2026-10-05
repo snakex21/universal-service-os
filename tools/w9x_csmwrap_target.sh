@@ -40,6 +40,11 @@ SIZE_GIB=${W9X_SIZE_GIB:-32}
 VM_PHASE1=${W9X_VM_PHASE1:-0}
 PCI_ROOT=${W9X_PCI_ROOT:-/sys/bus/pci/devices}
 ESP_DIR=${W9X_ESP_DIR:-/mnt/esp/EFI/USOS}
+# 98 SE native USB (xhci98 + the user's USB 2.0 stack) is opt-in: only with
+# this flag file. On the X470, xhci98 takes the xHCI controller from
+# SeaBIOS/CSMWrap, so the USOSKEY bridge (BIOS USB keyboard) dies, and native
+# USB HID does not work yet: no keyboard/mouse in Setup's final phase.
+XHCI98_FLAG=${W9X_XHCI98_FLAG:-$ESP_DIR/win9x/xhci98.flag}
 LIB=${USOS_LIB_DIR:-/usr/lib/usos}
 ESP_TAIL=133120
 MIN_SECTORS=4194304
@@ -213,8 +218,12 @@ cp "$ESP_DIR/dos-native/memdisk" "$work/c/USOS9X/MEMDISK" || fail 'cannot copy M
 # xhci98, native USB keyboard and mouse: the cabinet of its IExpress
 # installer EXE (NUSB 3.x) goes to USB\STACK.CAB, which INSTALL.BAT puts next
 # to Setup and XHCI98.INF reads usbport.sys/usbhub20.sys from (disk 2).
-# Microsoft files: never on the stick, only from the user.
-if [ "$SYSTEM_TAG" = 98SE ] && [ -n "$USB_DIR" ] && [ -d "$USB_DIR" ]; then
+# Microsoft files: never on the stick, only from the user. Only with
+# XHCI98_FLAG (default off: the USOSKEY bridge keeps the keyboard).
+USB_NATIVE=0
+if [ "$SYSTEM_TAG" = 98SE ] && [ ! -e "$XHCI98_FLAG" ]; then
+    log 'usb stack: xhci98 off (no win9x/xhci98.flag), USOSKEY bridge only'
+elif [ "$SYSTEM_TAG" = 98SE ] && [ -n "$USB_DIR" ] && [ -d "$USB_DIR" ]; then
     mkdir -p "$work/c/USOS9X/USB"
     for file in "$USB_DIR"/*; do
         [ -f "$file" ] || continue
@@ -229,9 +238,11 @@ if [ "$SYSTEM_TAG" = 98SE ] && [ -n "$USB_DIR" ] && [ -d "$USB_DIR" ]; then
         esac
     done
     log "usb stack: $(ls "$work/c/USOS9X/USB" | tr '\n' ' ')"
+    if [ -f "$work/c/USOS9X/USB/STACK.CAB" ]; then USB_NATIVE=1; fi
 fi
 printf 'SET U9SYS=%s\r\nSET U9SRC=%s\r\nSET U9ANS=%s\r\nSET U9CSM=1\r\nSET U9T=C:\\USOS9X\r\nSET U9DISK=1\r\n' \
     "$SYSTEM_TAG" "$SETUP_FOLDER" "$ANSWER_KIND" > "$work/c/USOS9X/U9ENV.BAT"
+if [ "$USB_NATIVE" = 1 ]; then printf 'SET U9USB=1\r\n' >> "$work/c/USOS9X/U9ENV.BAT"; fi
 if [ "$VM_PHASE1" = 1 ]; then
     printf 'SET U9VM=1\r\n' >> "$work/c/USOS9X/U9ENV.BAT"
     # In the VM, U9FIX /VGA sees QEMU's display card only: the real display

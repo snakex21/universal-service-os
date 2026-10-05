@@ -75,6 +75,10 @@ REM C:\USOS9X\USB\STACK.CAB). XHCI98.INF takes usbport.sys/usbhub20.sys from
 REM that cabinet (LZX: Setup unpacks it, DOS EXTRACT cannot) and binds the
 REM controller and the USB 2.0 root hub, so Setup's device detection installs
 REM them and the HID devices without a prompt. No stack: bridge only.
+REM Opt-in (U9USB=1, EFI\USOS\win9x\xhci98.flag): on the X470 xhci98 takes
+REM the controller from SeaBIOS, the bridge dies and native HID does not
+REM work yet. Default: bridge only, XHCI98.* never reaches the Setup folder.
+IF NOT "%U9USB%"=="1" GOTO USBDONE
 IF NOT "%U9CSM%"=="1" GOTO USBDONE
 IF NOT "%U9SYS%"=="98SE" GOTO USBDONE
 IF NOT EXIST C:\USOS9X\USB\STACK.CAB GOTO USBDONE

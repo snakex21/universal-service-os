@@ -214,6 +214,50 @@ class TargetVmParts(unittest.TestCase):
         self.assertIn("VM_PHASE1=${W9X_VM_PHASE1:-0}", text)
         self.assertIn("printf 'SET U9VM=1\\r\\n' >> \"$work/c/USOS9X/U9ENV.BAT\"", text)
 
+    def run_usb_block(self, tag, flag):
+        """The 98 SE USB stack block of the target writer + the U9ENV.BAT
+        lines, with a fake cabinet carver; returns (files in USB, U9ENV.BAT)."""
+        text = TARGET.read_text(encoding='utf-8')
+        block = text[text.index('# 98 SE: the user'):text.index("if [ \"$VM_PHASE1\" = 1 ]")]
+        tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-usb-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / 'usb').mkdir()
+        (tmp / 'usb/NUSB33E.EXE').write_bytes(b'MSCF usbport.sys usbhub20.sys')
+        (tmp / 'work/c/USOS9X').mkdir(parents=True)
+        (tmp / 'esp/win9x').mkdir(parents=True)
+        if flag:
+            (tmp / 'esp/win9x/xhci98.flag').write_bytes(b'')
+        script = (f'set -eu\nlog() {{ :; }}\nw9x_carve_cab() {{ cp "$1" "$2"; }}\n'
+                  f'work="{(tmp / "work").as_posix()}"\nUSB_DIR="{(tmp / "usb").as_posix()}"\n'
+                  f'SYSTEM_TAG={tag}\nSETUP_FOLDER=WIN98\nANSWER_KIND=USOS\n'
+                  f'XHCI98_FLAG="{(tmp / "esp/win9x/xhci98.flag").as_posix()}"\n' + block)
+        rc, _, err = sh(script)
+        self.assertEqual(rc, 0, err)
+        usb = tmp / 'work/c/USOS9X/USB'
+        files = sorted(p.name for p in usb.iterdir()) if usb.exists() else []
+        return files, (tmp / 'work/c/USOS9X/U9ENV.BAT').read_bytes()
+
+    def test_xhci98_is_opt_in_through_the_flag_file(self):
+        text = TARGET.read_text(encoding='utf-8')
+        self.assertIn('XHCI98_FLAG=${W9X_XHCI98_FLAG:-$ESP_DIR/win9x/xhci98.flag}', text)
+        files, env = self.run_usb_block('98SE', flag=False)
+        self.assertEqual(files, [])
+        self.assertNotIn(b'U9USB', env)
+        files, env = self.run_usb_block('98SE', flag=True)
+        self.assertEqual(files, ['STACK.CAB'])
+        self.assertIn(b'SET U9USB=1\r\n', env)
+        files, env = self.run_usb_block('98', flag=True)
+        self.assertEqual(files, [])
+        self.assertNotIn(b'U9USB', env)
+
+    def test_install_bat_copies_xhci98_only_with_u9usb(self):
+        lines = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='ascii').splitlines()
+        guard = lines.index('IF NOT "%U9USB%"=="1" GOTO USBDONE')
+        copy = next(i for i, l in enumerate(lines) if 'XHCI98.SYS XHCI98.INF USB\\STACK.CAB' in l)
+        self.assertLess(guard, copy)
+        self.assertLess(copy, lines.index(':USBDONE'))
+        self.assertFalse(any('XHCI98' in l and 'COPY' in l for l in lines[:guard]))
+
     def test_install_bat_adds_p_i_for_the_vm(self):
         lines = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='ascii').splitlines()
         vm = lines.index('IF "%U9VM%"=="1" SET U9SW=%U9SW% /P I')

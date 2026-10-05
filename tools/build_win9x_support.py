@@ -23,7 +23,9 @@
                 in 98 SE under CSMWrap. INSTALL.BAT puts them into the Setup
                 folder only next to STACK.CAB, the cabinet of the user's USB
                 2.0 stack installer (DATA Drivers/Windows 98 SE/USB,
-                tools/w9x_csmwrap_target.sh)
+                tools/w9x_csmwrap_target.sh), and only with the opt-in flag
+                EFI/USOS/win9x/xhci98.flag (default off: on the X470 xhci98
+                takes the controller from the USOSKEY bridge, HID not working)
 
   CREGFIX.SYS, CREGFIX.TXT
                 CREGFIX f0693437 (mintsuki, 0BSD, unmodified,
@@ -166,7 +168,8 @@ def stage_xhci98(out: Path) -> None:
               'Corresponding source: the USOS sources zip (tools/vendor/xhci98/1.1.1.0-src\n'
               'and tools/vendor/xhci98/1.1.1.0-usos3-w9x).\n'
               'USOS copies XHCI98.SYS/.INF into the 98 SE Setup folder only together with\n'
-              "STACK.CAB, the cabinet of the user's USB 2.0 stack installer (NUSB).\n\n" % (
+              "STACK.CAB, the cabinet of the user's USB 2.0 stack installer (NUSB), and only\n"
+              'with the opt-in flag file EFI/USOS/win9x/xhci98.flag (default off).\n\n' % (
                   manifest['version'], manifest['upstream'], manifest['tag'], manifest['commit'],
                   manifest['source_archive']['sha256'], ', '.join(sorted(manifest['patches']))))
     notice += (XHCI98 / 'MODIFIED.txt').read_text(encoding='ascii') + '\n' + '-' * 72 + '\n\n' + \

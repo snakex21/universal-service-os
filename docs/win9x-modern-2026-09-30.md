@@ -219,6 +219,9 @@ runs that stage in QEMU on the same machine and only the rest on the real hardwa
 * Own Windows 95 boot environment from the CD's CABs (bridge today).
 * Own 9x AHCI port driver. xhci98 for 98 SE: built with WDK 7.1 (section 4c); Me untested.
 * Windows 98 SE under CSMWrap enumerates no PCI bus although the PCI BIOS answers (section 4c).
+* Native USB HID on the X470 (2026-10-06): xhci98 loads and the PCI bus is visible with `/P I`, but HID
+  does not work, and once xhci98 owns the controller the USOSKEY bridge dies (no keyboard/mouse in Setup's
+  final phase). xhci98/NUSB staging is therefore opt-in: only with `EFI\USOS\win9x\xhci98.flag` (default off).
 * Windows 95: the COA page is not filled from MSBATCH.INF (`ProductID`), the key is typed.
 * The BIOS mode page renders the profile for all four systems at once; a
   per-system choice would need the system first (UEFI menu entry for 9x).
