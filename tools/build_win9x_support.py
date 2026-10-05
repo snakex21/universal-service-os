@@ -28,6 +28,8 @@
 Also built, not staged yet (hardware diagnostics, copied by hand):
   USOSDIAG.COM  timer tick / PIC / PIT, INT 15h memory, INT 13h, HPET report
   USOSHPET.COM  clears HPET LegacyReplacement (src/platform/bios/win9x/usosdiag.S)
+  USOSWHERE.COM TSR: interrupted CS:IP, ticks, PSP and last INT 13h/15h/21h/2Fh
+                AX in the top right corner (src/platform/bios/win9x/usoswhere.S)
 
 USOS code is GPL-3.0-or-later; no Microsoft files.
 
@@ -98,7 +100,7 @@ def build_u9fix(out: Path, work: Path) -> Path:
 
 
 def build_diag(out: Path, work: Path) -> None:
-    """USOSDIAG.COM and USOSHPET.COM from one source (-DUSOSHPET)."""
+    """USOSDIAG.COM and USOSHPET.COM from one source (-DUSOSHPET), USOSWHERE.COM."""
     env = dict(os.environ, ZIG_GLOBAL_CACHE_DIR=str(ROOT / 'tools/cache/zig-global'))
     zig = str(ROOT / 'tools/zig/zig.exe')
     for name, defines in (('USOSDIAG', []), ('USOSHPET', ['-DUSOSHPET'])):
@@ -112,6 +114,15 @@ def build_diag(out: Path, work: Path) -> None:
         # Scratch buffers start at 6F00h (E820/EDD) and 7000h (output).
         if not 0 < len(data) <= 0x6f00 - 0x100 or b'DIAG.LOG' not in data or name.encode() not in data:
             raise ValueError('unexpected %s.COM layout' % name)
+    obj, elf, com = work / 'USOSWHERE.o', work / 'USOSWHERE.elf', out / 'USOSWHERE.COM'
+    subprocess.run([zig, 'cc', '-target', 'x86-freestanding-none', '-mcpu=i386', '-c',
+                    str(SOURCE / 'usoswhere.S'), '-o', str(obj)], env=env, check=True)
+    subprocess.run([zig, 'ld.lld', '-m', 'elf_i386', '-T', str(ROOT / 'src/platform/bios/msdos/com.ld'),
+                    str(obj), '-o', str(elf)], env=env, check=True)
+    subprocess.run([zig, 'objcopy', '-O', 'binary', str(elf), str(com)], env=env, check=True)
+    data = com.read_bytes()
+    if not 0 < len(data) <= 2048 or data[0] != 0xE9 or b'USOSWHR1' not in data:
+        raise ValueError('unexpected USOSWHERE.COM layout')
 
 
 def stage_vmdisp9x(out: Path) -> None:
