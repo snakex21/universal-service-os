@@ -71,9 +71,9 @@ initramfs	usr/lib/usos/vista_disk_prepare.sh	100755	f41d1790480b90e0ca3e578dadc2
 initramfs	usr/lib/usos/w2k3_selected_partition_uefi_csm.sif	100755	d986de98a02dd6c9454db8e37d54999f9213b3d1fb5a8205ac996dc9f391f538
 initramfs	usr/lib/usos/w2k_selected_partition_uefi_csm.sif	100755	4081b007b280efb31c85ce519abbfcb18ac8f09482add26a7de1c8b3520de04e
 initramfs	usr/lib/usos/w2k_stage.sh	100755	cbfd2816c2eb9f70117bc17bac8f6b7d64661628c26e03c2ced393b06eb4c27d
-initramfs	usr/lib/usos/w9x_csmwrap_prepare.sh	100755	39b6a9ad46ef0f2840a73b8de5bdf72f0a8608cd1dd843c98c66c29ba7e89fe9
-initramfs	usr/lib/usos/w9x_csmwrap_target.sh	100755	6aa138c035445375ee934473e9a9bcfef9f5c612b6a1cb19139c2aa0caefd5f8
-initramfs	usr/lib/usos/w9x_phase1_qemu.sh	100755	322772ab940fdaeb56a6dedd8dee2c798d3f45aa60943f2aab1523255d65bf80
+initramfs	usr/lib/usos/w9x_csmwrap_prepare.sh	100755	961c68e6be4c4e9ff6365dea458dc4a1d8ae0574d713598af1bbab87ccefd1aa
+initramfs	usr/lib/usos/w9x_csmwrap_target.sh	100755	df152afcb2acff37b2e991627b0a36b062aad094e5a7aedb484f73e08557a61b
+initramfs	usr/lib/usos/w9x_phase1_qemu.sh	100755	03ce7ed10efb626b514e8d0f11b563f3bd6c673a66205c919d5cbc3b3ca0efff
 initramfs	usr/lib/usos/wimboot	100644	5f067ccdc4d084d5bf77b6c853bd0f8402dfc2b4cd1b103d358993ae97fae8e3
 initramfs	usr/lib/usos/wimboot-kexec	100644	f0c38d5b145b70d2156a37f62e3d97abdb5d75a3ab8703a718d43f777df0692a
 initramfs	usr/lib/usos/wimboot-kexec-ordered	100644	bf506f033e29ac09b338a1572d726e7d02a046f91ce3de59fc72905f1e1b89b5
@@ -264,7 +264,7 @@ initramfs	usr/lib/usos/xp-nt52-vbr-tail.bin	100644	ed455d345b4d02a2132f5ede10530
 initramfs	usr/lib/usos/xp-stage2.bin	100644	1f73f3a534edc6d5a1f365d3bb6de43aca7fe23c8511d8dfd7daf7f29872797a
 initramfs	usr/lib/usos/xp-vbr-code.bin	100644	6732885c24cc80d00f10093bb707fcfdd5e8755e8fc95734178f38b48ddb0059
 initramfs	usr/lib/usos/xp64_selected_partition_uefi_csm.sif	100755	d71bc6e824ebf15070445b4a17f6d5a0d18ff570e231a776d9af964f83922263
-initramfs	usr/lib/usos/xp_confirmation_ui.sh	100755	83d24331a4cec19452def8de121dcdc94dc67ce6b755d1d6025520a95f3a152d
+initramfs	usr/lib/usos/xp_confirmation_ui.sh	100755	c9b9bc2530e7112173baf970fdebae2ab07854c3fcc65470aa1152fe28430283
 initramfs	usr/lib/usos/xp_csmwrap_esp.sh	100755	e49c5b465189cc0d736ff791d3e8acff0f829d1ed5f086bf0ede2bf4d21004b3
 initramfs	usr/lib/usos/xp_detect_system.sh	100755	c80b0918d6794112474a18e57ef309ee4d32f09f37ecde4224c74680611ee046
 initramfs	usr/lib/usos/xp_disk_overview.sh	100755	6859dd93672462c90cfe38a5e46e678ca3cf3f664f7af3e694f07be5adba2a06
@@ -472,6 +472,8 @@ payload_zip	EFI/USOS/dos-native/ram-patch/REPAIR.BAT
 payload_zip	EFI/USOS/dos-native/ram-patch/manifest.json
 payload_zip	EFI/USOS/dos-native/ram-patch/source.zip
 payload_zip	EFI/USOS/dos-native/source.zip
+payload_zip	EFI/USOS/dos-native/win9x/CREGFIX.SYS
+payload_zip	EFI/USOS/dos-native/win9x/CREGFIX.TXT
 payload_zip	EFI/USOS/dos-native/win9x/MSBATCH.INF
 payload_zip	EFI/USOS/dos-native/win9x/U9FIX.COM
 payload_zip	EFI/USOS/dos-native/win9x/U9FIX.TXT
