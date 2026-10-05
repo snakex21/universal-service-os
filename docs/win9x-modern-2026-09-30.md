@@ -169,16 +169,25 @@ flow (FreeDOS, PC DOS, NT 4.0, betas) show "Unavailable".
   which DOS `EXTRACT` cannot unpack) and binds the USB 2.0 root hub. No stack: nothing changes.
   QEMU (one install run): Setup and the desktop are fine (a WHPX run stopped with a protection error at
   KERNEL init, the same disk under TCG reaches the desktop). **But 98 sees no PCI bus at all**:
-  `DETLOG.TXT` `int 1a,AX=b101` -> `PCIBUS=` empty, every devnode is `ROOT\...`. CSMWrap's SeaBIOS fork
-  never dispatches INT 1Ah AH=B1h (`handle_1a` in `seabios/src/clock.c` has no `case 0xb1`; the 32-bit
-  BIOS32 PCI entry is there), so the xHCI never appears and xhci98 cannot bind. Next: a CSMWrap patch
-  (`case 0xb1: handle_1ab1(regs);`) and a fresh install.
+  `DETLOG.TXT` `int 1a,AX=b101` -> `PCIBUS=` empty, every devnode is `ROOT\...`, so the xHCI never
+  appears and xhci98 cannot bind.
+* 2026-10-05 correction: **the PCI BIOS is not missing.** SeaBIOS (upstream and the CSMWrap fork) routes
+  AH=B1h before `handle_1a`: `entry_1a_official` in `romlayout.S` jumps to `entry_pcibios16`. On the
+  installed 98 SE under CSMWrap 3.1.2-usos3, DOS `DEBUG` gets AX=0001, BX=0210, EDX="PCI ", CF=0. A
+  `pci_bios` patch (usos4) was built and tested, made no difference, and was dropped (no CSMWrap change).
+  The same QEMU install (pci_bios on) still showed `PCIBUS=` empty and no `PCI\` devnode. Likely cause, to
+  check next: 98 finds a `$PnP` header (`*PNP0C00` detected), so the PCI bus has to come from the PnP BIOS
+  node list, which SeaBIOS does not provide (only function 60h). ACPI is refused ("ACPI BIOS ... not
+  compatible"). Options: force ACPI (`setup /p j`), or a SeaBIOS build without the `$PnP` header so
+  detection adds the PCI bus itself. Also seen: boots through the 98 boot menu (normal/logged) sometimes
+  stop after `SHELL` / at `Initializing KERNEL` and restart. This happens with or without the patch, while
+  `win` from the command-prompt entry reached the desktop.
 
 ## 5. Open points
 
 * Own Windows 95 boot environment from the CD's CABs (bridge today).
 * Own 9x AHCI port driver. xhci98 for 98 SE: built with WDK 7.1 (section 4c); Me untested.
-* CSMWrap: INT 1Ah PCI BIOS (AH=B1h) for Windows 9x (section 4c).
+* Windows 98 SE under CSMWrap enumerates no PCI bus although the PCI BIOS answers (section 4c).
 * Windows 95: the COA page is not filled from MSBATCH.INF (`ProductID`), the key is typed.
 * The BIOS mode page renders the profile for all four systems at once; a
   per-system choice would need the system first (UEFI menu entry for 9x).
