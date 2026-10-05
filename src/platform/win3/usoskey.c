@@ -19,7 +19,7 @@
  *     interrupt handler does; ToAscii stays the stock driver's.
  * Without the TSR (Windows Me starts no real-mode program from AUTOEXEC.BAT
  * and has no WINSTART.BAT) the driver installs the TSR's resident part
- * itself: a copy in DOS memory (GlobalDosAlloc) with INT 09h/15h/1Ch/2Fh
+ * itself: a copy in DOS memory (GlobalDosAlloc) with INT 08h/09h/15h/1Ch/2Fh
  * hooked in the system VM's real-mode vector table (DPMI 0200h/0201h); the
  * vectors are restored when the driver is freed.
  * No OpenWatcom runtime is linked (own entry point, -zl): the binary is only
@@ -35,6 +35,7 @@ typedef struct {
     WORD dropped, captured, passed;
     BYTE ring[64];
     WORD forced, refused;           /* diagnostics */
+    WORD polls;                     /* version 2: timer polls */
 } SHARED;
 
 typedef WORD (FAR PASCAL *CREATETIMER)(WORD, FARPROC);
@@ -179,6 +180,7 @@ void __far __loadds __saveregs poll(void)
      * mode): the Windows side may pause while a DOS box has the focus, and
      * a short timeout let keys overtake the queued ones. */
     shared->alive = 18;
+    if (shared->version >= 2) shared->polls++;
     while (shared->tail != shared->head) {
         BYTE b = shared->ring[shared->tail];
         /* VKD full: keep the byte for the next tick. */
@@ -191,9 +193,10 @@ void __far __loadds __saveregs poll(void)
     busy = 0;
 }
 
-static const BYTE tsr_ints[4] = { 0x09, 0x15, 0x1C, 0x2F };
-static const WORD tsr_handler[4] = { TSR_INT09, TSR_INT15, TSR_INT1C, TSR_INT2F };
-static const WORD tsr_old_slot[4] = { TSR_OLD09, TSR_OLD15, TSR_OLD1C, TSR_OLD2F };
+#define TSR_HOOKS 5
+static const BYTE tsr_ints[TSR_HOOKS] = { 0x08, 0x09, 0x15, 0x1C, 0x2F };
+static const WORD tsr_handler[TSR_HOOKS] = { TSR_INT08, TSR_INT09, TSR_INT15, TSR_INT1C, TSR_INT2F };
+static const WORD tsr_old_slot[TSR_HOOKS] = { TSR_OLD08, TSR_OLD09, TSR_OLD15, TSR_OLD1C, TSR_OLD2F };
 static DWORD tsr_mem;               /* GlobalDosAlloc: segment:selector */
 
 static DWORD get_rm_vector(BYTE n)
@@ -231,9 +234,9 @@ static void install_resident(void)
     seg = HIWORD(tsr_mem);
     p = (BYTE FAR *)MAKELP(LOWORD(tsr_mem), 0);
     for (i = 0; i < sizeof(tsr_image); i++) p[0x100 + i] = tsr_image[i];
-    for (i = 0; i < 4; i++) *(DWORD FAR *)(p + tsr_old_slot[i]) = get_rm_vector(tsr_ints[i]);
+    for (i = 0; i < TSR_HOOKS; i++) *(DWORD FAR *)(p + tsr_old_slot[i]) = get_rm_vector(tsr_ints[i]);
     _asm cli
-    for (i = 0; i < 4; i++) set_rm_vector(tsr_ints[i], ((DWORD)seg << 16) | tsr_handler[i]);
+    for (i = 0; i < TSR_HOOKS; i++) set_rm_vector(tsr_ints[i], ((DWORD)seg << 16) | tsr_handler[i]);
     _asm sti
 }
 
@@ -245,7 +248,7 @@ static void remove_resident(void)
     seg = HIWORD(tsr_mem);
     p = (BYTE FAR *)MAKELP(LOWORD(tsr_mem), 0);
     /* Only vectors that still point at the copy go back. */
-    for (i = 0; i < 4; i++)
+    for (i = 0; i < TSR_HOOKS; i++)
         if (get_rm_vector(tsr_ints[i]) == (((DWORD)seg << 16) | tsr_handler[i]))
             set_rm_vector(tsr_ints[i], *(DWORD FAR *)(p + tsr_old_slot[i]));
 }

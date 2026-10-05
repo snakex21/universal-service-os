@@ -38,6 +38,9 @@ Also built, not staged yet (hardware diagnostics, copied by hand):
   USOSHPET.COM  clears HPET LegacyReplacement (src/platform/bios/win9x/usosdiag.S)
   USOSWHERE.COM TSR: interrupted CS:IP, ticks, PSP and last INT 13h/15h/21h/2Fh
                 AX in the top right corner (src/platform/bios/win9x/usoswhere.S)
+  USOSDBG.EXE   Win16 program for the 9x desktop: USOSKEY bridge counters,
+                V86-vs-physical page map, xHCI and bridge PCI state, live
+                (src/platform/bios/win9x/usosdbg.c, OpenWatcom like USOSKEY.DRV)
 
 USOS code is GPL-3.0-or-later; no Microsoft files.
 
@@ -137,6 +140,29 @@ def build_diag(out: Path, work: Path) -> None:
         raise ValueError('unexpected USOSWHERE.COM layout')
 
 
+def build_usosdbg(out: Path, work: Path) -> Path:
+    """USOSDBG.EXE: Win16 (OpenWatcom wcc/wlink as USOSKEY.DRV, no runtime)."""
+    import sys
+    sys.path.insert(0, str(ROOT / 'tools'))
+    from build_win3_usb_keyboard import openwatcom
+    ow = openwatcom()
+    env = dict(os.environ, WATCOM=str(ow), INCLUDE=f'{ow / "h"};{ow / "h/win"}',
+               PATH=str(ow / 'binnt64') + os.pathsep + os.environ.get('PATH', ''))
+    obj = work / 'usosdbg.obj'
+    subprocess.run([str(ow / 'binnt64/wcc.exe'), '-q', '-bt=windows', '-ms', '-zl', '-s', '-3', '-osi',
+                    '-w3', '-we', '-fo=' + str(obj), str(SOURCE / 'usosdbg.c')], env=env, check=True, cwd=work)
+    exe = out / 'USOSDBG.EXE'
+    subprocess.run([str(ow / 'binnt64/wlink.exe'), '@' + str(SOURCE / 'usosdbg.lnk'), 'file', str(obj),
+                    'name', str(exe), 'option', 'map=' + str(work / 'usosdbg.map')], env=env, check=True, cwd=work)
+    data = exe.read_bytes()
+    ne = int.from_bytes(data[0x3c:0x3e], 'little')
+    if data[ne:ne + 2] != b'NE' or b'USOSDBG.LOG' not in data:
+        raise ValueError('USOSDBG.EXE is not the expected NE program')
+    if 'clib' in (work / 'usosdbg.map').read_text(errors='replace').lower():
+        raise ValueError('USOSDBG.EXE must not link the OpenWatcom C library')
+    return exe
+
+
 def stage_vmdisp9x(out: Path) -> None:
     manifest = json.loads((VMDISP / 'manifest.json').read_text())
     for name, expected in manifest['files'].items():
@@ -200,6 +226,7 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
     work.mkdir(parents=True, exist_ok=True)
     build_u9fix(out, work)
     build_diag(out, work)
+    build_usosdbg(out, work)
     (out / 'U9FIX.TXT').write_bytes(dos_text(NOTICE))
     answer = (SOURCE / 'msbatch.inf').read_text(encoding='ascii')
     if 'ProductKey' in answer:

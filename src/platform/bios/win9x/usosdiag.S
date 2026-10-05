@@ -33,6 +33,14 @@
  *         for drive 80h
  *   DRV   BDA 0040:0075 (hard disk count) and INT 13h 08h for 80h-8Fh,
  *         CF ("!" when set) and DL (count) per drive
+ *   PCI   every xHCI function (class 0C0330): bus:dev.fn, vendor:device,
+ *         command, status, BAR0/BAR1, interrupt line/pin register; in real
+ *         mode its capability/operational registers (CAPLENGTH+HCIVERSION,
+ *         HCSPARAMS1, USBCMD, USBSTS, MFINDEX twice: moving = running) and
+ *         PORTSC of connected ports; then every bridge above an xHCI bus:
+ *         command, status, bus numbers (18h), memory window, I/O and
+ *         prefetchable windows (1Ch, 24h, 28h, 2Ch), bridge control (3Ch).
+ *         USOSDBG.EXE shows the same values live under Windows 9x
  *   HPET  RSDP (EBDA, E0000-FFFFF) -> RSDT/XSDT -> HPET table -> base;
  *         capabilities, general configuration (bit 0 enable, bit 1
  *         LegacyReplacement = "leg"), timer 0 configuration, whether the
@@ -76,7 +84,7 @@ _start:
     .asciz "USOSHPET 1.0"
 #else
     call pr
-    .asciz "USOSDIAG 1.1"
+    .asciz "USOSDIAG 1.2"
 #endif
     call tag_and_rtc
     call flush
@@ -100,6 +108,8 @@ _start:
     call sec_disk
     call flush
     call sec_drv
+    call flush
+    call sec_pci
     call flush
     call sec_hpet
     call flush
@@ -1007,6 +1017,338 @@ unreal:
     ret
 
 /* ---------------------------------------------------------------- */
+/* PCI: xHCI controllers (class 0C0330) and the bridges above them,
+   through configuration mechanism 1 (ports CF8h/CFCh). Two scans of
+   bus 0 up to the highest subordinate bus seen: the first prints the
+   xHCI functions and remembers their buses, the second the bridges whose
+   secondary..subordinate range holds one of them. */
+sec_pci:
+    mov byte ptr [pci_nx], 0
+    mov byte ptr [pci_max], 0
+    mov byte ptr [pci_pass], 0
+    mov ebp, 0x80000000
+    xor bl, bl
+    call cfg
+    cmp ax, 0xffff
+    jne 1f
+    call pr
+    .asciz "PCI none (00:00.0 reads FFFF)"
+    jmp nl
+1:  call pci_scan
+    mov byte ptr [pci_pass], 1
+    call pci_scan
+    call pr
+    .asciz "PCI xhci:"
+    movzx edx, byte ptr [pci_nx]
+    call dec
+    call pr
+    .asciz " lastbus:"
+    movzx edx, byte ptr [pci_max]
+    call hex2
+    jmp nl
+
+pci_scan:
+    mov ebp, 0x80000000
+1:  xor bl, bl
+    call cfg
+    cmp ax, 0xffff
+    je 4f
+    call pci_one
+    test ebp, 0x700
+    jnz 2f
+    mov bl, 0x0c
+    call cfg
+    test eax, 0x00800000            /* multi-function */
+    jz 3f
+2:  add ebp, 0x100
+    test ebp, 0x700
+    jnz 1b
+    jmp 5f
+4:  test ebp, 0x700
+    jnz 2b
+3:  and ebp, 0xfffff800
+    add ebp, 0x800
+5:  mov eax, ebp
+    sub eax, 0x80000000
+    shr eax, 16
+    movzx edx, byte ptr [pci_max]
+    cmp eax, edx
+    jbe 1b
+    ret
+
+/* ebp = function address; bl = register -> eax */
+cfg:
+    push dx
+    mov eax, ebp
+    mov al, bl
+    mov dx, 0xcf8
+    out dx, eax
+    mov dl, 0xfc
+    in eax, dx
+    pop dx
+    ret
+
+pci_one:
+    mov bl, 0x08
+    call cfg
+    shr eax, 8
+    cmp eax, 0x0c0330
+    jne 1f
+    cmp byte ptr [pci_pass], 0
+    jne 9f
+    jmp pci_xhci
+1:  mov bl, 0x0c
+    call cfg
+    shr eax, 16
+    and al, 0x7f
+    cmp al, 1
+    jne 9f
+    mov bl, 0x18
+    call cfg
+    mov edx, eax
+    shr edx, 16                     /* dl = subordinate */
+    cmp dl, byte ptr [pci_max]
+    jbe 2f
+    mov byte ptr [pci_max], dl
+2:  cmp byte ptr [pci_pass], 1
+    jne 9f
+    movzx cx, byte ptr [pci_nx]
+    jcxz 9f
+    mov si, offset pci_bus
+3:  lodsb
+    cmp al, ah                      /* ah = secondary */
+    jb 4f
+    cmp al, dl
+    jbe pci_bridge
+4:  loop 3b
+9:  ret
+
+pci_bdf:
+    mov edx, ebp
+    shr edx, 16
+    call hex2
+    mov al, ':'
+    call putc
+    mov edx, ebp
+    shr edx, 11
+    and dl, 0x1f
+    call hex2
+    mov al, '.'
+    call putc
+    mov edx, ebp
+    shr edx, 8
+    and dl, 7
+    call hex1
+    mov al, ' '
+    call putc
+    xor bl, bl
+    call cfg
+    mov edx, eax
+    call hex4
+    mov al, ':'
+    call putc
+    shr edx, 16
+    call hex4
+    call pr
+    .asciz " cmd:"
+    mov bl, 0x04
+    call cfg
+    mov edx, eax
+    call hex4
+    call pr
+    .asciz " sts:"
+    shr edx, 16
+    jmp hex4
+
+/* one bus:dev.fn per line, then the reg dumps */
+pci_reg:                            /* bl = register, prints " XXXXXXXX" */
+    mov al, ' '
+    call putc
+    call cfg
+    mov edx, eax
+    jmp hex8
+
+pci_bridge:
+    call pr
+    .asciz "PCI  bridge "
+    call pci_bdf
+    call pr
+    .asciz " bus(18):"
+    mov bl, 0x18
+    call cfg
+    mov edx, eax
+    call hex8
+    call pr
+    .asciz " mem:"
+    mov bl, 0x20
+    call cfg
+    mov edx, eax
+    shl edx, 16
+    and edx, 0xfff00000
+    call hex8
+    mov al, '-'
+    call putc
+    mov edx, eax
+    and edx, 0xfff00000
+    or edx, 0x000fffff
+    call hex8
+    call pr
+    .asciz " io/pf(1C,24,28,2C):"
+    mov bl, 0x1c
+    call pci_reg
+    mov bl, 0x24
+    call pci_reg
+    mov bl, 0x28
+    call pci_reg
+    mov bl, 0x2c
+    call pci_reg
+    call pr
+    .asciz " ctl(3C):"
+    mov bl, 0x3c
+    call cfg
+    mov edx, eax
+    call hex8
+    jmp nl
+
+pci_xhci:
+    movzx bx, byte ptr [pci_nx]
+    cmp bx, 8
+    jae 1f
+    mov eax, ebp
+    shr eax, 16
+    mov byte ptr [pci_bus + bx], al
+    inc byte ptr [pci_nx]
+1:  call pr
+    .asciz "PCI xhci "
+    call pci_bdf
+    call pr
+    .asciz " bar0:"
+    mov bl, 0x10
+    call cfg
+    mov edx, eax
+    call hex8
+    call pr
+    .asciz " bar1:"
+    mov bl, 0x14
+    call cfg
+    mov edx, eax
+    call hex8
+    call pr
+    .asciz " int(3C):"
+    mov bl, 0x3c
+    call cfg
+    mov edx, eax
+    call hex8
+    call nl
+    /* operational registers: real mode, memory BAR below 4 GiB */
+    call pr
+    .asciz "PCI  mmio "
+    smsw ax
+    test al, 1
+    jz 2f
+    call pr
+    .asciz "skipped: not real mode"
+    jmp nl
+2:  mov bl, 0x10
+    call cfg
+    test al, 1
+    jnz 3f
+    mov ecx, eax
+    and al, 6
+    cmp al, 4
+    jne 4f
+    mov bl, 0x14
+    call cfg
+    test eax, eax
+    jz 4f
+3:  call pr
+    .asciz "skipped: BAR not reachable"
+    jmp nl
+4:  and ecx, 0xfffffff0
+    jz 3b
+    push ecx
+    call a20_on
+    pop ebx
+    call pr
+    .asciz "cap:"
+    call rd32
+    mov edx, eax
+    call hex8
+    cmp eax, 0xffffffff
+    je 8f
+    movzx esi, al                   /* CAPLENGTH */
+    add esi, ebx                    /* operational base */
+    call pr
+    .asciz " hcs1:"
+    push ebx
+    add ebx, 4
+    call rd32
+    pop ebx
+    mov edx, eax
+    call hex8
+    shr eax, 24
+    mov byte ptr [pci_ports], al
+    call pr
+    .asciz " usbcmd:"
+    push ebx
+    mov ebx, esi
+    call rd32
+    mov edx, eax
+    call hex8
+    call pr
+    .asciz " usbsts:"
+    add ebx, 4
+    call rd32
+    mov edx, eax
+    call hex8
+    pop ebx
+    call pr
+    .asciz " mfindex:"
+    push ebx
+    add ebx, 0x18
+    call rd32
+    pop ebx
+    and eax, 0xffffffe0
+    add ebx, eax                    /* runtime base: MFINDEX */
+    call rd32
+    mov edx, eax
+    and dx, 0x3fff
+    call hex4
+    mov cx, 0x4000                  /* a short wait: it counts 125 us */
+5:  in al, 0x80
+    loop 5b
+    mov al, '>'
+    call putc
+    call rd32
+    mov edx, eax
+    and dx, 0x3fff
+    call hex4
+    /* connected ports (PORTSC CCS) */
+    call pr
+    .asciz " ports:"
+    lea ebx, [esi + 0x400]
+    mov cl, 1
+6:  cmp cl, byte ptr [pci_ports]
+    ja 8f
+    call rd32
+    test al, 1
+    jz 7f
+    movzx edx, cl
+    call dec
+    mov al, '='
+    call putc
+    call rd32
+    mov edx, eax
+    call hex8
+    mov al, ' '
+    call putc
+7:  add ebx, 0x10
+    inc cl
+    jnz 6b
+8:  call a20_off
+    jmp nl
+
+/* ---------------------------------------------------------------- */
 /* output: buffer, flushed to the screen and appended to the log      */
 putc:
     push di
@@ -1162,6 +1504,11 @@ xms_ok:     .byte 0
 a20_how:    .byte 0
 port92:     .byte 0
 hpet_rc:    .byte 1
+pci_nx:     .byte 0
+pci_max:    .byte 0
+pci_pass:   .byte 0
+pci_ports:  .byte 0
+pci_bus:    .space 8
 drv:        .byte 0
 .balign 4
 t1:         .long 0
