@@ -46,6 +46,21 @@ def texts(path: Path):
 
 
 class Nt5MenuStrings(unittest.TestCase):
+    def test_confirmation_defaults_to_cancel(self):
+        """Shared XP/Vista/9x confirmation: the preselected item (selected=,
+        counted from 0 by fb_menu_model.zig) is Cancel, and only the menu's
+        first item (usos-fb-ui prints index + 1) confirms."""
+        src = (ROOT / 'tools/xp_confirmation_ui.sh').read_text(encoding='utf-8')
+        selected = int(re.search(r'\\nselected=(\d+)\\n', src).group(1))
+        items = [m.group(1) for m in re.finditer(r"item=([^|]+)\|", src)]
+        self.assertEqual(items, ['Confirm', 'Cancel'])
+        self.assertEqual(items[selected], 'Cancel')
+        self.assertIn('[ "$USOS_MENU_RESULT" = 1 ]', src)
+        model = (ROOT / 'src/platform/linux/fb_menu_model.zig').read_text(encoding='utf-8')
+        self.assertIn('state.selected >= state.count) return error.InvalidSelection', model)
+        menu = (ROOT / 'src/platform/linux/fb_menu.zig').read_text(encoding='utf-8')
+        self.assertIn('"{d}\\n", .{index + 1}', menu)
+
     def test_every_menu_text_has_a_key(self):
         exact, templates = catalog()
         missing = []

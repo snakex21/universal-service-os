@@ -246,13 +246,16 @@ if [ "$VM_PHASE1" = 1 ]; then
 fi
 
 # The boot floppy runs INSTALL.BAT from C: (A: stays the CD's DOS: SYS,
-# EXTRACT, ATTRIB). HIMEM with /M:2 under CSMWrap; the Me floppy has none.
+# EXTRACT, ATTRIB). CREGFIX.SYS from C: first (control registers after
+# CSMWrap, before Setup's mini-Windows), then HIMEM with /M:2 under CSMWrap;
+# the Me floppy has no HIMEM.
 printf '@ECHO OFF\r\nCALL C:\\USOS9X\\U9ENV.BAT\r\nC:\\USOS9X\\INSTALL.BAT\r\n' > "$work/AUTOEXEC.BAT"
+: > "$work/CONFIG.SYS"
+[ ! -f "$work/c/USOS9X/CREGFIX.SYS" ] || printf 'DEVICE=C:\\USOS9X\\CREGFIX.SYS\r\n' >> "$work/CONFIG.SYS"
 if mdir -i "$floppy" ::/HIMEM.SYS >/dev/null 2>&1; then
-    printf 'DEVICE=A:\\HIMEM.SYS /TESTMEM:OFF /M:2\r\nFILES=40\r\nBUFFERS=20\r\nLASTDRIVE=Z\r\n' > "$work/CONFIG.SYS"
-else
-    printf 'FILES=40\r\nBUFFERS=20\r\nLASTDRIVE=Z\r\n' > "$work/CONFIG.SYS"
+    printf 'DEVICE=A:\\HIMEM.SYS /TESTMEM:OFF /M:2\r\n' >> "$work/CONFIG.SYS"
 fi
+printf 'FILES=40\r\nBUFFERS=20\r\nLASTDRIVE=Z\r\n' >> "$work/CONFIG.SYS"
 for name in AUTOEXEC.BAT CONFIG.SYS; do
     mattrib -i "$floppy" -r -h -s "::/$name" >/dev/null 2>&1 || true
     mcopy -o -i "$floppy" "$work/$name" "::/$name" || fail "cannot write $name into the boot floppy"

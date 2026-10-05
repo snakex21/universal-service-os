@@ -93,7 +93,7 @@ class Phase1Vm(unittest.TestCase):
         self.assertEqual(args[args.index('-m') + 1], '512')
         self.assertEqual(args[args.index('-accel') + 1], 'tcg,tb-size=128')
         drives = [a for a in args if a.startswith('file=')]
-        self.assertEqual(drives, ['file=/dev/sdb,format=raw,if=ide,index=0,media=disk,cache=writeback,file.locking=off'])
+        self.assertEqual(drives, ['file=/dev/sdb,format=raw,if=ide,index=0,media=disk,cache=none,file.locking=off'])
         self.assertNotIn('-no-shutdown', args)
         self.assertNotIn('-netdev', joined)
         self.assertEqual(self.run_lib('w9x_vm_args /dev/sdb kvm')[1].splitlines()[8], 'kvm')
@@ -121,6 +121,63 @@ class Phase1Vm(unittest.TestCase):
         (c / 'WINDOWS/WIN.COM').unlink()
         rc, out, _ = self.run_lib(f'w9x_phase1_tree_ok "{c.as_posix()}"')
         self.assertIn('WIN.COM', out)
+
+    def test_patch_drops_the_vm_mouse_line_and_the_second_himem(self):
+        # The files of the BIOSTAR/X470 98 SE disk after phase 1 (shortened).
+        c = self.tmp / 'c'
+        (c / 'WINDOWS').mkdir(parents=True)
+        (self.tmp / 'run').mkdir()
+        ini = (b'[boot]\r\nmouse.drv=mouse.drv\r\n[386Enh]\r\nebios=*ebios\r\nmouse=*vmouse, msmouse.vxd\r\n'
+               b'woafont=dosapp.fon\r\n[mci]\r\nmouse=keep\r\n')
+        config = (b'DEVICE=C:\\WINDOWS\\HIMEM.SYS /TESTMEM:OFF /M:2\r\nDEVICE=C:\\WINDOWS\\HIMEM.SYS /TESTMEM:OFF /M:2\r\n'
+                  b'DEVICE=C:\\WINDOWS\\setver.exe\r\nCountry=048,852,C:\\WINDOWS\\COMMAND\\country.sys\r\n')
+        (c / 'WINDOWS/SYSTEM.INI').write_bytes(ini)
+        (c / 'CONFIG.SYS').write_bytes(config)
+        rc, out, err = self.run_lib(f'w9x_phase1_patch_c "{c.as_posix()}"')
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(out.splitlines(), ['SYSTEM.INI: removed mouse=*vmouse, msmouse.vxd',
+                                            'CONFIG.SYS: removed DEVICE=C:\\WINDOWS\\HIMEM.SYS /TESTMEM:OFF /M:2'])
+        self.assertEqual((c / 'WINDOWS/SYSTEM.INI').read_bytes(),
+                         b'[boot]\r\nmouse.drv=mouse.drv\r\n[386Enh]\r\nebios=*ebios\r\nwoafont=dosapp.fon\r\n[mci]\r\nmouse=keep\r\n')
+        self.assertEqual((c / 'CONFIG.SYS').read_bytes(),
+                         b'DEVICE=C:\\WINDOWS\\HIMEM.SYS /TESTMEM:OFF /M:2\r\nDEVICE=C:\\WINDOWS\\setver.exe\r\n'
+                         b'Country=048,852,C:\\WINDOWS\\COMMAND\\country.sys\r\n')
+        # Nothing left to change: no output, files and folder as they are.
+        rc, out, err = self.run_lib(f'w9x_phase1_patch_c "{c.as_posix()}"')
+        self.assertEqual((rc, out), (0, ''), err)
+        self.assertEqual(sorted(p.name for p in c.rglob('*')), ['CONFIG.SYS', 'SYSTEM.INI', 'WINDOWS'])
+
+    def test_fsck_is_read_only_and_its_errors_fail(self):
+        bin_dir = self.tmp / 'bin'
+        bin_dir.mkdir()
+        fake = bin_dir / 'fsck.fat'
+        fake.write_text('#!/bin/sh\necho "args: $*"\nexit "${W9X_FAKE_FSCK:-0}"\n', newline='\n')
+        fake.chmod(0o755)
+        log = (self.tmp / 'fsck.txt').as_posix()
+        # A POSIX PATH entry (Git sh on Windows: no drive colon).
+        bin_path = bin_dir.as_posix()
+        if bin_path[1:2] == ':':
+            bin_path = '/' + bin_path[0].lower() + bin_path[2:]
+        rc, _, err = sh(f'. "{LIB}"\nPATH="{bin_path}:$PATH"\nw9x_phase1_fsck /dev/loop7 "{log}" "C: test"', self.env())
+        self.assertEqual(rc, 0, err)
+        text = Path(log).read_text()
+        self.assertIn('== fsck.fat -n: C: test', text)
+        self.assertIn('args: -n /dev/loop7', text)
+        rc, _, _ = sh(f'. "{LIB}"\nPATH="{bin_path}:$PATH"\nw9x_phase1_fsck /dev/loop7 "{log}" again', self.env(W9X_FAKE_FSCK='1'))
+        self.assertEqual(rc, 1)
+        self.assertIn('== rc=1', Path(log).read_text())
+
+    def test_verify_checks_the_disk_before_and_after_and_flushes(self):
+        text = Path(LIB).read_text(encoding='utf-8')
+        body = text[text.index('w9x_phase1_verify() {'):]
+        first_fsck = body.index('w9x_phase1_fsck "$loop"')
+        self.assertLess(body.index('blockdev --flushbufs "$target"'), first_fsck)
+        self.assertLess(first_fsck, body.index('mount -t vfat'))
+        self.assertLess(body.index('w9x_phase1_patch_c'), body.index('PHASE1.OK'))
+        second_fsck = body.index('w9x_phase1_fsck "$loop"', first_fsck + 1)
+        self.assertLess(body.index('umount "$W9X_VM_RUN/c"'), second_fsck)
+        run = text[text.index('w9x_phase1_run() {'):text.index('w9x_phase1_tree_ok() {')]
+        self.assertLess(run.index('blockdev --flushbufs "$target"'), run.index('"$W9X_VM_QEMU" "$@"'))
 
 
 class TargetVmParts(unittest.TestCase):
@@ -162,6 +219,27 @@ class TargetVmParts(unittest.TestCase):
         vm = lines.index('IF "%U9VM%"=="1" SET U9SW=%U9SW% /P I')
         self.assertGreater(vm, lines.index('IF "%U9SYS%"=="95" SET U9SW=/IS'))
         self.assertLess(vm, next(i for i, l in enumerate(lines) if l.startswith('ECHO C:\\%U9SRC%\\SETUP.EXE')))
+
+    def test_install_bat_config_sys_under_csmwrap(self):
+        """CREGFIX first (it creates C:\\CONFIG.SYS), one HIMEM line in the VM
+        path, the C:\\USOS9X fallback only for the native Setup start."""
+        lines = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='ascii').splitlines()
+        cregfix = lines.index('ECHO DEVICE=C:\\USOS9X\\CREGFIX.SYS>C:\\CONFIG.SYS')
+        himem = lines.index('ECHO DEVICE=C:\\WINDOWS\\HIMEM.SYS /TESTMEM:OFF /M:2>>C:\\CONFIG.SYS')
+        skip = lines.index('IF "%U9VM%"=="1" GOTO NOCSM')
+        fallback = lines.index('ECHO DEVICE=C:\\USOS9X\\HIMEM.SYS /TESTMEM:OFF /M:2>>C:\\CONFIG.SYS')
+        self.assertLess(lines.index('IF NOT EXIST C:\\USOS9X\\CREGFIX.SYS GOTO FAILED'), cregfix)
+        self.assertLess(cregfix, himem)
+        self.assertLess(himem, skip)
+        self.assertLess(skip, fallback)
+        self.assertEqual(sum('>C:\\CONFIG.SYS' in l.replace('>>', '') for l in lines), 1)
+        self.assertTrue(any('CREGFIX.SYS) DO COPY /Y A:\\%%F C:\\USOS9X' in l for l in lines))
+
+    def test_boot_floppy_config_sys_loads_cregfix_first(self):
+        text = TARGET.read_text(encoding='utf-8')
+        block = text[text.index(': > "$work/CONFIG.SYS"'):text.index('for name in AUTOEXEC.BAT CONFIG.SYS')]
+        self.assertLess(block.index('CREGFIX.SYS'), block.index('HIMEM.SYS'))
+        self.assertLess(block.index('HIMEM.SYS'), block.index('FILES=40'))
 
 
 class PrepareWiring(unittest.TestCase):
