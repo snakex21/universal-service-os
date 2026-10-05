@@ -1217,6 +1217,30 @@
       "notice": "Unmodified PATCH9X.EXE by JHRobotics; source.zip includes libmspack (LGPL-2.1) and its licence."
     },
     {
+      "id": "cregfix",
+      "name": "CREGFIX",
+      "version": "f0693437",
+      "license": "0BSD",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/cregfix/f0693437/LICENSE"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/cregfix/f0693437/cregfix.asm",
+          "tools/vendor/cregfix/f0693437/README"
+        ],
+        "urls": [
+          "https://github.com/mintsuki/cregfix/tree/f0693437080d08bb3596101e1fc17bbffc4efba5"
+        ],
+        "offer": false
+      },
+      "notice": "By mintsuki and contributors; unmodified CREGFIX.SYS (control-register cleanup before Windows 9x Setup under CSMWrap), byte-identical to its source cregfix.asm."
+    },
+    {
       "id": "cwsdpmi",
       "name": "CWSDPMI",
       "version": "r7",

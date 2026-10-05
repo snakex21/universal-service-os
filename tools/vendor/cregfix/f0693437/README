@@ -1,0 +1,20 @@
+CREGFIX
+=======
+
+CREGFIX is a small DOS driver that works around an issue of many modern CSM
+BIOS implementations where certain control register bits are left "dirty", thus
+causing issues when trying to run legacy operating systems such as Microsoft
+Windows 9x (see "While initializing device VCACHE: Windows protection error"
+issue) or while trying to run EMM386.EXE.
+
+This program can be built using "nasm":
+
+  nasm cregfix.asm -fbin -o cregfix.sys
+
+but included in this repository is the prebuilt "cregfix.sys" file.
+
+CREGFIX is a DOS-compatible .SYS driver which can be added to the beginning of
+the CONFIG.SYS file and it will sanitise the control register bits every time
+DOS boots up. For example:
+
+  DEVICE=C:\CREGFIX.SYS
