@@ -57,6 +57,8 @@ IF ERRORLEVEL 1 GOTO FAILED
 COPY /Y A:\VMDISP9X.TXT C:\USOS9X >NUL
 FOR %%F IN (USOSKEY.COM USOSKEY.DRV VBMOUSE.EXE VBMOUSE.DRV VBADOS.TXT) DO COPY /Y A:\%%F C:\USOS9X >NUL
 :COPYDONE
+REM Step markers for a hang on real hardware: the last line shows the step.
+ECHO start %U9SYS% (U9CSM=%U9CSM% U9DISK=%U9DISK%)>>C:\USOS9X\INSTALL.LOG
 IF NOT EXIST C:\%U9SRC%\SETUP.EXE GOTO FAILED
 COPY /Y %U9T%\MSBATCH.INF C:\%U9SRC%\MSBATCH.INF >NUL
 IF ERRORLEVEL 1 GOTO FAILED
@@ -81,14 +83,22 @@ ECHO Natywne USB (xhci98 + stos USB 2.0)...
 FOR %%F IN (XHCI98.SYS XHCI98.INF USB\STACK.CAB) DO COPY /Y %U9T%\%%F C:\%U9SRC% >NUL
 :USBDONE
 REM Under CSMWrap HIMEM needs A20 through port 92h (/M:2), else DOS=HIGH hangs.
-REM Setup keeps the line; the file exists from its first restart on.
+REM Setup keeps the lines. C:\WINDOWS\HIMEM.SYS exists from Setup's first
+REM restart on; until then (a restart before Setup got that far) the copy of
+REM the boot floppy's HIMEM in C:\USOS9X loads instead, so RESUME.BAT can run
+REM Setup again (Setup needs XMS). Once the first one loaded, the second one
+REM only reports that an XMS driver is already there.
 REM (No IF with a redirection: COMMAND.COM opens the file even when false.)
 IF NOT "%U9CSM%"=="1" GOTO NOCSM
+IF EXIST A:\HIMEM.SYS COPY /Y A:\HIMEM.SYS C:\USOS9X >NUL
 ECHO DEVICE=C:\WINDOWS\HIMEM.SYS /TESTMEM:OFF /M:2>C:\CONFIG.SYS
+IF NOT EXIST C:\USOS9X\HIMEM.SYS GOTO NOCSM
+ECHO DEVICE=C:\USOS9X\HIMEM.SYS /TESTMEM:OFF /M:2>>C:\CONFIG.SYS
 :NOCSM
 REM Every Windows start: MaxPhysPage / MaxFileCache in SYSTEM.INI (U9FIX.TXT).
 IF "%U9CSM%"=="1" GOTO CSMAUTO
 ECHO @C:\USOS9X\U9FIX.COM C:\WINDOWS\SYSTEM.INI>C:\AUTOEXEC.BAT
+ECHO @IF NOT EXIST C:\WINDOWS\WIN.COM IF EXIST C:\USOS9X\RESUME.BAT CALL C:\USOS9X\RESUME.BAT>>C:\AUTOEXEC.BAT
 GOTO AUTODONE
 :CSMAUTO
 REM No firmware CSM: USB keyboard (USOSKEY bridge) in Windows through the
@@ -96,6 +106,9 @@ REM SeaBIOS services; U9FIX /CSM adds its driver. No VBADOS mouse: VBMOUSE.EXE
 REM next to the PS/2 mouse VxD of the installed system stops Windows.
 IF NOT EXIST C:\USOS9X\USOSKEY.DRV GOTO FAILED
 ECHO @C:\USOS9X\U9FIX.COM /CSM C:\WINDOWS\SYSTEM.INI>C:\AUTOEXEC.BAT
+REM A restart before Setup copied Windows (hang, power loss): RESUME.BAT,
+REM written once Patcher9x succeeded, starts Setup again.
+ECHO @IF NOT EXIST C:\WINDOWS\WIN.COM IF EXIST C:\USOS9X\RESUME.BAT CALL C:\USOS9X\RESUME.BAT>>C:\AUTOEXEC.BAT
 ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\NUL GOTO USOSDRV>>C:\AUTOEXEC.BAT
 ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\USOSKEY.DRV COPY C:\USOS9X\*.DRV C:\WINDOWS\SYSTEM>>C:\AUTOEXEC.BAT
 ECHO :USOSDRV>>C:\AUTOEXEC.BAT
@@ -117,19 +130,35 @@ IF "%U9ANS%"=="USER" GOTO AUTODONE
 ECHO system.ini,boot,drivers,,usoskey.drv>>C:\%U9SRC%\MSBATCH.INF
 :AUTODONE
 ECHO Poprawki zgodnosci (Patcher9x: TLB, CPU, RAM, rejestry CPU)...
-%U9T%\CWSDPMI.EXE -s-
+REM CWSDPMI stays resident (-p) for Patcher9x and is unloaded (-u) right
+REM after it: no DPMI host self-unload on program exit in the path (on the
+REM X470 the chain stopped after Patcher9x's last message). -s-: no swap file.
+ECHO CWSDPMI -p>>C:\USOS9X\INSTALL.LOG
+%U9T%\CWSDPMI.EXE -p -s-
+ECHO PATCH9X start>>C:\USOS9X\INSTALL.LOG
 %U9T%\PATCH9X.EXE -auto -select all C:\%U9SRC%
 IF ERRORLEVEL 1 GOTO FAILED
-C:
-CD \%U9SRC%
+ECHO PATCH9X ok>>C:\USOS9X\INSTALL.LOG
+ECHO Patcher9x zakonczony. Zwalnianie pamieci DPMI...
+%U9T%\CWSDPMI.EXE -u
+ECHO CWSDPMI -u>>C:\USOS9X\INSTALL.LOG
 REM /IS no ScanDisk, /IE no startup disk, /NM no RAM/CPU check (MEMDISK).
 REM Windows 95 Setup knows only /IS of these (and ignored the batch file
 REM with the 98 switches in QEMU): MSBATCH.INF first, then /IS.
-IF "%U9SYS%"=="95" GOTO SETUP95
-C:\%U9SRC%\SETUP.EXE C:\%U9SRC%\MSBATCH.INF /IS /IE /NM
-GOTO STOP
-:SETUP95
-C:\%U9SRC%\SETUP.EXE C:\%U9SRC%\MSBATCH.INF /IS
+SET U9SW=/IS /IE /NM
+IF "%U9SYS%"=="95" SET U9SW=/IS
+REM Resume hook: C:\AUTOEXEC.BAT calls it while C:\WINDOWS\WIN.COM is missing.
+ECHO @ECHO OFF>C:\USOS9X\RESUME.BAT
+ECHO ECHO Wznawianie Instalatora Windows %U9SYS%...>>C:\USOS9X\RESUME.BAT
+ECHO C:>>C:\USOS9X\RESUME.BAT
+ECHO CD \%U9SRC%>>C:\USOS9X\RESUME.BAT
+ECHO C:\%U9SRC%\SETUP.EXE C:\%U9SRC%\MSBATCH.INF %U9SW%>>C:\USOS9X\RESUME.BAT
+C:
+CD \%U9SRC%
+ECHO Uruchamianie Instalatora Windows %U9SYS%...
+ECHO SETUP start %U9SW%>>C:\USOS9X\INSTALL.LOG
+C:\%U9SRC%\SETUP.EXE C:\%U9SRC%\MSBATCH.INF %U9SW%
+ECHO SETUP returned>>C:\USOS9X\INSTALL.LOG
 GOTO STOP
 :FAILED
 ECHO Przygotowanie dysku nie powiodlo sie. Instalator nie zostanie uruchomiony.

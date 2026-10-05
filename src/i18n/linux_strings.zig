@@ -169,6 +169,14 @@ pub const hashes = [_]u32{
     0x53e526f6, // lx.vista_csmwrap_setup_hint
     0xda567045, // lx.vista_csmwrap_why
     0x59b2e029, // lx.vista_start_the_prepared_disk
+    0x4468e914, // lx.w9x_csmwrap_after_restart
+    0x6cf6ff01, // lx.w9x_csmwrap_copying
+    0xc337af94, // lx.w9x_csmwrap_layout
+    0xf1a71816, // lx.w9x_csmwrap_restart_notice
+    0xdfa2e92c, // lx.w9x_csmwrap_why
+    0xea679f67, // lx.w9x_no_target_disk
+    0xa4b7e3fb, // lx.w9x_preparation_failed
+    0x45c444d4, // lx.w9x_start_the_prepared_disk
     0xd2c4e12a, // lx.windows_c_x_gib_ntfs
     0xf4336aff, // lx.windows_xp
     0x1a650cd0, // lx.writing_autounattend_xml_to_the_prepared_work_pa
@@ -355,6 +363,14 @@ pub const english = [_][]const u8{
     "In {0} Setup select the unallocated space; do not delete the two small partitions.",
     "Without CSM, Vista starts through CSMWrap, so USOS must first prepare the target disk.",
     "Windows Vista: start the prepared disk",
+    "After the restart the disk starts by itself and {0} Setup continues on it.",
+    "Copying {0} Setup, the USOS helpers and CSMWrap to the selected disk.",
+    "New layout (MBR): {0} (drive C:) for {1}, then a 64 MiB CSMWrap partition at the end of the disk; the rest stays unallocated.",
+    "After the restart the firmware starts this disk's UEFI entry (CSMWrap; CSM stays off) and the {0} installation continues on it. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
+    "Without CSM, {0} starts through CSMWrap, so USOS prepares the target disk first.",
+    "No target disk found (only the USOS stick). No disk was changed.",
+    "The Windows 9x preparation failed; see EFI/USOS/win9x/prepare.log",
+    "{0}: start the prepared disk",
     "Windows C: {0} GiB NTFS.",
     "WINDOWS XP",
     "Writing Autounattend.xml to the prepared WORK partition.",
