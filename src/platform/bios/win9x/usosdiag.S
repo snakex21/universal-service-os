@@ -15,15 +15,24 @@
  * USOSDIAG sections:
  *   DOS   DOS version, CPU mode (SMSW PE), XMS driver (version, free KiB,
  *         A20 state from XMS), A20 by the 0000:0500 / FFFF:0510 wrap test,
- *         INT 08h and INT 1Ch vectors
+ *         INT 08h, 1Ch, 13h and 15h vectors (who owns the disk and memory
+ *         services: HIMEM hooks INT 15h and then answers 88h/E801h itself)
+ *   CPU   CR0, CR4 (when CPUID exists) and EFER (when CPUID 80000001h EDX
+ *         has LM, NX or SYSCALL) read directly in real mode; skipped under
+ *         a V86 memory manager. CR0 bits 30/29 (CD/NW) set = caches off,
+ *         which makes everything crawl; CREGFIX.SYS clears them
  *   TICK  PIC master mask (IRQ0 = bit 0), whether 8254 channel 0 counts,
  *         BIOS tick count (0040:006Ch) increments over one CMOS RTC second
  *         and the busy-loop count of that second. "NO-TICK" = IRQ0 never
  *         reaches the BIOS, so anything that waits for the tick count to
  *         move waits forever.
  *   MEM   INT 15h E801h, 88h and the E820h map
+ *   CMOS  memory-size registers 17/18h, 30/31h, 34/35h, 5B-5Dh and the
+ *         10h-2Dh checksum (stored 2E/2Fh vs computed)
  *   DISK  INT 13h 41h (extensions), 08h (geometry), 48h (sector count)
  *         for drive 80h
+ *   DRV   BDA 0040:0075 (hard disk count) and INT 13h 08h for 80h-8Fh,
+ *         CF ("!" when set) and DL (count) per drive
  *   HPET  RSDP (EBDA, E0000-FFFFF) -> RSDT/XSDT -> HPET table -> base;
  *         capabilities, general configuration (bit 0 enable, bit 1
  *         LegacyReplacement = "leg"), timer 0 configuration, whether the
@@ -67,7 +76,7 @@ _start:
     .asciz "USOSHPET 1.0"
 #else
     call pr
-    .asciz "USOSDIAG 1.0"
+    .asciz "USOSDIAG 1.1"
 #endif
     call tag_and_rtc
     call flush
@@ -80,11 +89,17 @@ _start:
 #else
     call sec_dos
     call flush
+    call sec_cpu
+    call flush
     call sec_tick
     call flush
     call sec_mem
     call flush
+    call sec_cmos
+    call flush
     call sec_disk
+    call flush
+    call sec_drv
     call flush
     call sec_hpet
     call flush
@@ -228,6 +243,76 @@ sec_dos:
     .asciz " int1C:"
     mov bx, 0x1c * 4
     call vec
+    call pr
+    .asciz " int13:"
+    mov bx, 0x13 * 4
+    call vec
+    call pr
+    .asciz " int15:"
+    mov bx, 0x15 * 4
+    call vec
+    jmp nl
+
+/* CR0 / CR4 / EFER, real mode only */
+sec_cpu:
+    call pr
+    .asciz "CPU msw:"
+    smsw ax
+    movzx edx, ax
+    call hex4
+    test al, 1
+    jz 1f
+    call pr
+    .asciz " cr:skipped (not real mode)"
+    jmp nl
+1:  call pr
+    .asciz " cr0:"
+    mov eax, cr0
+    mov edx, eax
+    call hex8
+    test eax, 0x60000000
+    jz 2f
+    call pr
+    .asciz "(CD/NW!)"
+2:  /* CPUID present when EFLAGS.ID (bit 21) can be toggled */
+    pushfd
+    pop eax
+    mov ecx, eax
+    xor eax, 0x200000
+    push eax
+    popfd
+    pushfd
+    pop eax
+    push ecx
+    popfd
+    xor eax, ecx
+    test eax, 0x200000
+    jnz 3f
+    call pr
+    .asciz " cpuid:none"
+    jmp nl
+3:  call pr
+    .asciz " cr4:"
+    .byte 0x0f, 0x20, 0xe0          /* mov eax, cr4 */
+    mov edx, eax
+    call hex8
+    mov eax, 0x80000000
+    .byte 0x0f, 0xa2                /* cpuid */
+    cmp eax, 0x80000001
+    jb 4f
+    mov eax, 0x80000001
+    .byte 0x0f, 0xa2
+    test edx, 0x20100800            /* LM | NX | SYSCALL */
+    jz 4f
+    call pr
+    .asciz " efer:"
+    mov ecx, 0xc0000080
+    .byte 0x0f, 0x32                /* rdmsr */
+    mov edx, eax
+    call hex8
+    jmp nl
+4:  call pr
+    .asciz " efer:none"
     jmp nl
 
 vec:
@@ -475,6 +560,92 @@ cf_mark:
     popf
     ret
 
+/* CMOS memory-size registers and checksum */
+sec_cmos:
+    call pr
+    .asciz "CMOS 17/18:"
+    mov ax, 0x1817
+    call cmos_word
+    call pr
+    .asciz " 30/31:"
+    mov ax, 0x3130
+    call cmos_word
+    call pr
+    .asciz " 34/35:"
+    mov ax, 0x3534
+    call cmos_word
+    call pr
+    .asciz " 5B-5D:"
+    mov al, 0x5d
+    call cmos_hex
+    mov al, 0x5c
+    call cmos_hex
+    mov al, 0x5b
+    call cmos_hex
+    call pr
+    .asciz " sum:"
+    mov ax, 0x2f2e
+    call cmos_word
+    mov al, '/'
+    call putc
+    xor edx, edx
+    mov cl, 0x10
+1:  mov al, cl
+    call cmos_read
+    movzx ax, al
+    add dx, ax
+    inc cl
+    cmp cl, 0x2e
+    jb 1b
+    call hex4
+    jmp nl
+
+/* al = low index, ah = high index -> four hex digits (high:low) */
+cmos_word:
+    push ax
+    mov al, ah
+    call cmos_read
+    mov dh, al
+    pop ax
+    call cmos_read
+    mov dl, al
+    movzx edx, dx
+    jmp hex4
+
+/* BDA hard disk count, then INT 13h 08h on 80h-8Fh: CF and DL */
+sec_drv:
+    call pr
+    .asciz "DRV bda75:"
+    push es
+    push 0x40
+    pop es
+    movzx edx, byte ptr es:[0x75]
+    pop es
+    call hex2
+    call flush_keep
+    mov byte ptr [drv], 0x80
+1:  mov al, ' '
+    call putc
+    movzx edx, byte ptr [drv]
+    call hex2
+    push es
+    mov ah, 0x08
+    mov dl, byte ptr [drv]
+    xor di, di
+    mov es, di
+    int 0x13
+    pop es
+    mov al, ':'
+    jnc 2f
+    mov al, '!'
+2:  call putc
+    movzx edx, dl
+    call hex2
+    inc byte ptr [drv]
+    cmp byte ptr [drv], 0x90
+    jb 1b
+    jmp nl
+
 sec_disk:
     call pr
     .asciz "DISK 41h:"
@@ -498,10 +669,12 @@ sec_disk:
     int 0x13
     pop es
     call cf_mark
+    push dx                         /* 1.0 printed CX twice here */
     movzx edx, cx
     call hex4
     mov al, ' '
     call putc
+    pop dx
     movzx edx, dx
     call hex4
     call pr
@@ -989,6 +1162,7 @@ xms_ok:     .byte 0
 a20_how:    .byte 0
 port92:     .byte 0
 hpet_rc:    .byte 1
+drv:        .byte 0
 .balign 4
 t1:         .long 0
 entsz:      .long 4
