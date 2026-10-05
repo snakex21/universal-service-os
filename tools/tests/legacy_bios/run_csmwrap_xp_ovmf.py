@@ -18,7 +18,7 @@ EFI/BOOT/BOOTX64.EFI = the pinned CSMWrap and EFI/BOOT/csmwrap.ini.
 Test tool only (not in the release). Disposable images only; no physical disk access.
 """
 from pathlib import Path
-import argparse, hashlib, json, shutil, struct, subprocess, sys, time
+import argparse, hashlib, json, os, shutil, struct, subprocess, sys, time
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -239,6 +239,8 @@ def boot(out, disk, tag, vga, accel, minutes, shots_every=3.0, run_through=False
              if ahci else ['-drive', f'if=ide,index=0,format=qcow2,file={disk}'])]
     cmd += ['-vga', 'std'] if vga == 'std' else ['-vga', 'none', '-device', vga]
     cmd += USB_ONLY if usb_only else []
+    # USOS_QEMU_EXTRA: more QEMU arguments (e.g. -m 32G: the E820 above 4 GB that CSMWrap passes on).
+    cmd += os.environ.get('USOS_QEMU_EXTRA', '').split()
     pending = sorted(type_at)
     proc = subprocess.Popen([str(c) for c in cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     events, last, result = [], None, 'timeout'

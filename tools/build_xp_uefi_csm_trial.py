@@ -123,7 +123,7 @@ def refresh_pae_flow(esp):
 # entry, scripts included, is the base's own, byte for byte: the UEFI-CSM
 # differences are profile branches in the scripts (USOS_PLAN_PROFILE).
 PACKAGE_ENTRIES=('usr/lib/usos/xp-pae.exe','usr/lib/usos/xp-pae-LICENSE.txt')
-PACKAGE_PREFIXES=('usr/lib/usos/xp-drivers/','usr/lib/usos/nt5-storage/','usr/lib/usos/nt52-usb/')
+PACKAGE_PREFIXES=('usr/lib/usos/xp-drivers/','usr/lib/usos/nt5-storage/','usr/lib/usos/nt52-usb/','usr/lib/usos/w2k-drivers/')
 
 # NT 5.2 (Server 2003 x86, XP x64) AHCI: GenAHCI 6.3.0.1 x86/x64 on the
 # system's own StorPort (tools/nt5_storage_stage.sh). Pinned archive.
@@ -175,6 +175,10 @@ def nt5_storage_files(xp64_isos=()):
 # tools/vendor/xhci98/1.1.1.0-usos2/MODIFIED.txt; tools/nt52_usb_stage.sh).
 # Every file pinned by its manifest.
 XHCI98_DIR=ROOT/'tools/vendor/xhci98/1.1.1.0-usos2'
+# Windows 2000 only: 1.1.1.0-usos3 (x86), which can poll (Parameters PollMode)
+# when the MPS HAL gives the xHCI functions no interrupt; NT 5.2 stays on the
+# hardware-proven usos2 until it is retested (decision 2026-10-05).
+XHCI98_W2K_DIR=ROOT/'tools/vendor/xhci98/1.1.1.0-usos3'
 
 def nt52_usb_files():
     pins=json.loads((XHCI98_DIR/'manifest.json').read_text())
@@ -186,16 +190,66 @@ def nt52_usb_files():
     files['LICENSE']=(XHCI98_DIR/'LICENSE').read_bytes()
     if hashlib.sha256(files['LICENSE']).hexdigest()!=pins['files']['LICENSE']:raise ValueError('xhci98 LICENSE hash mismatch')
     files['MODIFIED.txt']=(XHCI98_DIR/'MODIFIED.txt').read_bytes()
+    w2k=json.loads((XHCI98_W2K_DIR/'manifest.json').read_text())
+    for name in ('xhci98.sys','xhci98.inf','../MODIFIED.txt'):
+        rel=name if name.startswith('..') else 'release-x86/'+name
+        key=rel.replace('../','')
+        data=(XHCI98_W2K_DIR/key).read_bytes()
+        if hashlib.sha256(data).hexdigest()!=w2k['files'][key]:raise ValueError('xhci98 usos3 file hash mismatch: '+key)
+        files['x86-w2k/'+key.split('/')[-1]]=data
     if hashlib.sha256(files['MODIFIED.txt']).hexdigest()!=pins['files']['MODIFIED.txt']:raise ValueError('xhci98 MODIFIED.txt hash mismatch')
     files['SOURCE.txt']=('xhci98 %s (x86 and amd64, MODIFIED by USOS, see MODIFIED.txt), %s\n'
         'base: tag %s = commit %s (source tarball sha256 %s)\n'
         'plus %s, built with WDK 7.1 (7600.16385.1).\n'
         'Licence: GPL-2.0-only (LICENSE). Corresponding source: the USOS sources zip\n'
         '(tools/vendor/xhci98/1.1.1.0-src and tools/vendor/xhci98/1.1.1.0-usos2).\n'
-        'USOS uses it only for Windows Server 2003 x86 and XP x64 (NT 5.2) Setup; staging\n'
+        'USOS uses it only for Server 2003 x86 and XP x64 Setup; Windows 2000 uses\n'
+        '1.1.1.0-usos3 (x86-w2k/, polling, tools/vendor/xhci98/1.1.1.0-usos3). Staging\n'
         'points the INF [SourceDisksNames] row 1 at the Setup source directory.\n'
-        'Log: C:\\WINDOWS\\xhci98.log (every controller start, start refusal and stop).\n'
+        'Log: %%SystemRoot%%\\xhci98.log (every controller start, start refusal and stop).\n'
         %(pins['version'],pins['upstream'],pins['tag'],pins['commit'],pins['source_archive']['sha256'],', '.join(sorted(pins['patches'])))).encode()
+    return files
+
+# Windows 2000 SP4 AHCI: AHCINT 1.3.0.0-usos4 (GPL-3.0, MODIFIED by USOS: real
+# FLUSH CACHE, FUA, caching mode page, engine/link checks, the USOS-gap
+# write test and trace; tools/vendor/ahcint/1.3.0.0-usos4/MODIFIED.txt), a
+# polling ScsiPort miniport built with WDK 7.1, and UniATA 0.47b (GPL-2.0,
+# unmodified, the alternative chosen with DATA's storage-uniata.txt).
+# tools/w2k_stage.sh adapts only the INFs when staging. Every file pinned.
+AHCINT_DIR=ROOT/'tools/vendor/ahcint/1.3.0.0-usos4'
+AHCINT_BASE=ROOT/'tools/vendor/ahcint/1.3.0.0'
+UNIATA_DIR=ROOT/'tools/vendor/uniata/0.47b'
+# usosrst.sys: USOS's own GPL helper (STOP screen, Setup restart without an 8042).
+USOSRST_DIR=ROOT/'tools/w2k/usosrst'
+
+def w2k_driver_files():
+    pins=json.loads((AHCINT_DIR/'manifest.json').read_text())
+    base=json.loads((AHCINT_BASE/'manifest.json').read_text())
+    uni=json.loads((UNIATA_DIR/'manifest.json').read_text())
+    rst=json.loads((USOSRST_DIR/'manifest.json').read_text())
+    files={}
+    for name,member in (('ahcint.sys','bin/2KXP/i386/ahcint.sys'),('ahcint.inf','bin/2KXP/ahcint.inf'),('LICENSE','LICENSE'),('MODIFIED.txt','MODIFIED.txt')):
+        files[name]=(AHCINT_DIR/member).read_bytes()
+        if hashlib.sha256(files[name]).hexdigest()!=pins['files'][member]:raise ValueError('AHCINT file hash mismatch: '+member)
+    for name,member in (('uniata/uniata.sys','uniata.sys'),('uniata/COPYING-GPL-2.0.txt','COPYING-GPL-2.0.txt'),('uniata/SOURCES.txt','SOURCES.txt')):
+        files[name]=(UNIATA_DIR/member).read_bytes()
+        if hashlib.sha256(files[name]).hexdigest()!=uni['files'][member]:raise ValueError('UniATA file hash mismatch: '+member)
+    files['usosrst.sys']=(USOSRST_DIR/'bin/i386/usosrst.sys').read_bytes()
+    if hashlib.sha256(files['usosrst.sys']).hexdigest()!=rst['files']['bin/i386/usosrst.sys']:raise ValueError('usosrst file hash mismatch')
+    for name in ('ahcint.sys','uniata/uniata.sys','usosrst.sys'):
+        if struct.unpack_from('<H',files[name],struct.unpack_from('<I',files[name],60)[0]+4)[0]!=0x14c:raise ValueError(name+' is not i386')
+    files['SOURCE.txt']=('AHCINT %s (i386 ScsiPort miniport, MODIFIED by USOS, see MODIFIED.txt), %s\n'
+        'base: tag %s = commit %s (release archive sha256 %s) plus %s,\n'
+        'built with WDK 7.1 (7600.16385.1). Licence: GPL-3.0 (LICENSE).\n'
+        'Corresponding source: tools/vendor/ahcint/1.3.0.0-usos4/src (patched) and\n'
+        'tools/vendor/ahcint/1.3.0.0/src (upstream) in the USOS sources zip.\n'
+        'uniata/: UniATA 0.47b, unmodified (GPL-2.0, source in the USOS sources zip:\n'
+        'tools/vendor/uniata/0.47b/BusMaster_v47b_src.rar).\n'
+        'usosrst.sys: USOS\'s own helper driver %s (GPL-3.0-or-later, source:\n'
+        'tools/w2k/usosrst/src in the USOS sources zip).\n'
+        'USOS uses them only for Windows 2000 SP4 Setup; staging writes the INF\n'
+        'source path (\\i386\\ahcint or \\i386\\uniata) and its own uniata.inf.\n'
+        %(pins['version'],base['upstream'],base['tag'],base['commit'],base['release_zip']['sha256'],', '.join(pins['patches']),rst['version'])).encode()
     return files
 
 def is_package_entry(name):
@@ -222,6 +276,7 @@ def overlay(base, helper, driver_bundles, xp64_isos=(), xp64_extra=None):
     for name,data in (xp64_extra or {}).items():storage.setdefault(name,data)
     for name,data in storage.items():put(entries,Entry(prefix+'nt5-storage/'+name,stat.S_IFREG|0o644,data))
     for name,data in nt52_usb_files().items():put(entries,Entry(prefix+'nt52-usb/'+name,stat.S_IFREG|0o644,data))
+    for name,data in w2k_driver_files().items():put(entries,Entry(prefix+'w2k-drivers/'+name,stat.S_IFREG|0o644,data))
     changed=[n for n in before if not is_package_entry(n) and (entries[n].mode,entries[n].data)!=before[n]]
     if changed:raise ValueError('package would change base entries: '+', '.join(changed))
     return pad_initrd(gzip.compress(newc(entries),compresslevel=6,mtime=0))

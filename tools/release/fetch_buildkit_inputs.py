@@ -18,7 +18,10 @@ Pinned here:
     USOSKEY.DRV, the Windows 3.x USB keyboard driver);
   - a partial Alpine v3.24 x86_64 mirror for the CSMWrap build VM
     (tools/csmwrap_build): the signed APKINDEX.tar.gz of main and community
-    and every package of the dependency closure of lock.json apk_packages.
+    and every package of the dependency closure of lock.json apk_packages;
+  - REPO_INPUTS: git-ignored files fetched straight into their repository
+    path (the xhci98 1.1.1.0 GPL source tarball, which make_release ships in
+    the sources zip and make_buildkit.py requires).
 """
 from pathlib import Path
 import argparse, base64, gzip, hashlib, io, json, os, shutil, subprocess, sys, tarfile, urllib.request
@@ -42,6 +45,14 @@ FIXED = [
      'sha256': 'bac354f3c75ffa49ff8d70a44e475de7e7c1823fff04b80c14787bd0792c9bdf', 'license': 'Sybase Open Watcom Public License 1.0 (build tool only; nothing linked into USOS)', 'version': '2.0 2026-09-01-Build'},
 ]
 GO_MODULES = ['golang.org/x/sys@v0.47.0']
+# Fetched into the repository itself (git-ignored), not into CACHE. GitHub
+# tag tarballs are not guaranteed stable byte for byte: on a mismatch the
+# commit id in SOURCES.txt is the authoritative pin.
+REPO_INPUTS = [
+    {'path': 'tools/vendor/xhci98/1.1.1.0-src/xhci98-7d0dd9d440e9716a87e0882f905bf8e99fa443ac.tar.gz',
+     'url': 'https://github.com/yeokm1/xhci98/archive/refs/tags/v1.1.1.0.tar.gz',
+     'sha256': '4f2653d00ee757c5edefcda6f7101526edf5b0778a07ebf5babbb59805088af3', 'license': 'GPL-2.0-only'},
+]
 
 
 def sha256(path):
@@ -176,6 +187,8 @@ def main():
     a = p.parse_args()
     for item in FIXED:
         fetch(item['url'], CACHE / item['file'], item['sha256'])
+    for item in REPO_INPUTS:
+        fetch(item['url'], ROOT / item['path'], item['sha256'])
     if a.update_lock or not LOCK.exists():
         update_lock()
     verify_or_fetch(json.loads(LOCK.read_text(encoding='utf-8')))

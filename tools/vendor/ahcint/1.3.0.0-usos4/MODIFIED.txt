@@ -1,0 +1,79 @@
+AHCINT 1.3.0.0-usos4 - MODIFIED version of AHCINT 1.3.0.0 (ages2001,
+https://github.com/ages2001/AHCINT, tag v1.3.0.0 = commit 7be9c9b8), changed
+by the USOS project on 2026-09-30 (usos1), 2026-10-03 (usos2) and
+2026-10-04 (usos3, usos4). Not an upstream release. Licence: GPL-3.0, as the original (LICENSE).
+
+usos1 (patches/0001-usos1-flush-cache.patch):
+- SYNCHRONIZE CACHE (10)/(16), SRB_FUNCTION_FLUSH and SRB_FUNCTION_SHUTDOWN
+  send FLUSH CACHE (E7h) or FLUSH CACHE EXT (EAh) to the drive; FUA writes
+  are followed by a flush; MODE SENSE returns the caching page (WCE from
+  IDENTIFY word 85).
+
+usos2 (patches/0002-usos2-target-check-and-trace.patch), after the first X470
+run, where text-mode Setup copied files but nothing reached the disk:
+- Before every command the port must have a link (SSTS.DET = 3) and a
+  running command engine (PxCMD ST, FRE, CR, FR); otherwise the port is
+  restarted once and the command fails instead of being issued.
+- Counters (reads, writes, sectors written, errors, PRD byte count
+  mismatches, engine restarts, flushes); a PRD byte count that does not
+  match the request is counted.
+- The USOS gap: on the one disk whose LBA 2046 holds the USOS marker
+  ("USOSW2KTRACE", written by tools/w2k_stage.sh usos_w2k_gap_marker), the
+  driver writes and reads back a test pattern at LBA 2045 at every start; a
+  mismatch hides the port from Setup ("no hard disk" instead of copying
+  into nothing). It increments the boot counter in the marker and writes an
+  ASCII trace (counters, every port's SSTS/CMD/SIG/TFD and model) to LBA
+  2040 + boot % 4, again every 2048 writes and at shutdown. Other disks are only read at LBA
+  2046.
+
+usos3 (patches/0003-usos3-screen-stages-readback-fail-loudly.patch), a
+diagnostic build after the second X470 run (text mode copied with its
+progress bar, then a black screen with a blinking cursor; nothing on the
+disk, not even the usos2 marker update):
+- A status line per HBA in the VGA text buffer (row 0, a second HBA row 1):
+  PCI ID, port, marker result at LBA 2046 (OK / NO / RE read error), the
+  write test, completed reads and writes, errors, last written LBA and the
+  stages; refreshed every 64 commands, on every error and every stage.
+  Reads rising during the file copy show that AHCINT is the driver serving
+  the disk.
+- Stages (status line and trace): first write to LBA 0, first write over
+  LBA 2048, first flush, shutdown, read-back failure, write/read error,
+  bugcheck. The first four written LBAs, the last error (LBA, TFD, command)
+  and read-back counters are in the trace (now only ports with a device).
+- Sampled read-back on the USOS disk: the first sector of the first 256
+  writes and of every 32nd after is read back and compared.
+- Fail loudly: a marker read that fails 3 times, a failed write test or a
+  read-back mismatch stops with STOP 0x55534F53 (P1 1/2/3, P2 PCI ID,
+  P3 port, P4 TFD or LBA) after the line and the trace are written (usos2
+  returned silently or hid the port).
+- A bugcheck callback puts the STOP code on the line and writes it to the
+  trace (AHCINT polls, so this works with every other CPU stopped).
+Imports added: MmMapIoSpace, KeRegisterBugCheckCallback, KeBugCheckEx,
+KiBugCheckData (ntoskrnl, all on 2000 SP4).
+
+usos4 (patches/0004-usos4-stall-diagnostics.patch), a diagnostic build after
+the X470 run where text-mode Setup stopped at 4 % of the copy with the
+status line frozen and no STOP:
+- The status line is refreshed after every command (usos3: every 64th) and
+  by a 250 ms miniport timer, in a shorter format with new fields:
+  A4 43C8p2 OK/OK R:01A2F3 W:003F10 E:00 B:0 LW:00A1B2C3 S:0F I:000 TM:3A1 ID:00
+  B = HwResetBus calls (ScsiPort request timeouts), I = HwInterrupt calls
+  (AHCINT polls, so none are expected), TM = timer ticks (ScsiPort runs the
+  timer synchronized with HwStartIo, so TM stops while a command is polled),
+  ID = seconds without a new request. A second HBA now uses row 8 (rows
+  1-7 are usosrst's).
+- Stall watchdog: a polled command still busy after 2 s puts PxCI, PxSACT,
+  PxIS, PxSERR, PxTFD, PxCMD, the HBA IS, poll/irq (GHC.IE and PxIE), the
+  command (opcode, LBA, count), the interrupt count and the stall count on
+  rows 3-4; when the command ends or times out (3 s) the same snapshot is
+  written to the trace ("slow" or "stall").
+- The trace (usos4 format, fields in minimal hex so the snapshot fits):
+  interrupt, timer, request, idle, bus reset and stall counters, the
+  snapshot, GHC and HBA IS, PxCI/PxIS/PxSERR per port; also written on
+  every bus reset ("busreset") and once after 20 s without a new request
+  ("idle20s"). tools/w2k_gap_trace.py decodes it.
+No new imports (ScsiPortNotification RequestTimerCall).
+
+Every changed spot in src/ is marked "MODIFIED (USOS 1.3.0.0-usosN)".
+Built with WDK 7.1 (build.cmd, x86 WXP target); every import (16: ntoskrnl,
+scsiport) resolves on the Windows 2000 SP4 kernel and scsiport.

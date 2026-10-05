@@ -459,8 +459,33 @@ usos_legacy_xp_staging() {
     elif [ "$NT5_SYSTEM" = windows-2000 ]; then
     # The XP driver bundle (GenAHCI on StorPort, KMDF, USB3, community ACPI)
     # needs NT 5.1 exports that the Windows 2000 kernel/HAL lack; 2000 keeps
-    # its inbox drivers (docs/windows-2000-uefi-2026-09-27.md).
-    printf '[W2K_DRIVERS] none: the XP bundle is NT 5.1 only; inbox IDE/ACPI drivers\n'
+    # its own set instead (w2k_stage.sh, after the source copy): AHCINT and
+    # ACPI kept (or off with DATA's acpi-off.txt, the STOP 0xA5 fallback),
+    # plus xhci98 below (docs/windows-2000-modern-2026-09-30.md).
+    [ -f /usr/lib/usos/w2k-drivers/ahcint.sys ] && [ -f /usr/lib/usos/w2k-drivers/ahcint.inf ] || stop 'Windows 2000 AHCI driver (AHCINT) is missing from the package; no target write occurred'
+    if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/acpi-off.txt" ]; then USOS_W2K_ACPI=off; else USOS_W2K_ACPI=on; fi
+    # hal-standard.txt (with acpi-off.txt): the Standard PC HAL (hal.dll, PIC)
+    # instead of the MPS HAL, pinned through WINNT.SIF ComputerType.
+    if [ "$USOS_W2K_ACPI" = off ] && [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/hal-standard.txt" ]; then USOS_W2K_HAL=standard; else USOS_W2K_HAL=auto; fi
+    # storage-uniata.txt: UniATA 0.47b instead of AHCINT (the X470 A/B option).
+    if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/storage-uniata.txt" ]; then USOS_W2K_STORAGE=uniata; else USOS_W2K_STORAGE=ahcint; fi
+    [ "$USOS_W2K_STORAGE" = ahcint ] || [ -f /usr/lib/usos/w2k-drivers/uniata/uniata.sys ] || stop 'Windows 2000 UniATA driver is missing from the package; no target write occurred'
+    # usosrst.sys (own helper: STOP screen, Setup restart without an 8042).
+    [ -f /usr/lib/usos/w2k-drivers/usosrst.sys ] || stop 'Windows 2000 helper driver (usosrst) is missing from the package; no target write occurred'
+    # The clock fixes are the default (w2k_stage.sh 6., X470 2026-10-05):
+    # hpet-keep.txt keeps HPET LegacyReplacement, rtc-keep.txt keeps the HAL's
+    # RTC reads (docs/windows-2000-modern-2026-09-30.md 7c-7e).
+    if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/hpet-keep.txt" ]; then USOS_W2K_HPET=keep; else USOS_W2K_HPET=legacy-off; fi
+    if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/rtc-keep.txt" ]; then USOS_W2K_RTC=keep; else USOS_W2K_RTC=fix; fi
+    # Unattended\acpi\ (the user's own ACPI package, w2k_stage.sh 5.): ACPI
+    # stays on, so it never combines with acpi-off.txt.
+    USOS_W2K_ACPI_PKG=
+    if [ -d "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/acpi" ]; then
+        [ "$USOS_W2K_ACPI" = on ] || stop 'Windows 2000: acpi-off.txt and the user ACPI package (Unattended\acpi) exclude each other; remove one. No target write occurred'
+        USOS_W2K_ACPI_PKG="/mnt/data/Systems/Windows/$NT5_NAME/Unattended/acpi"
+    fi
+    export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL USOS_W2K_HPET USOS_W2K_RTC USOS_W2K_ACPI_PKG
+    printf '[W2K_DRIVERS] storage %s, ACPI %s, HAL %s, HPET %s, RTC %s, usosrst, xhci98 x86%s; the XP bundle is NT 5.1 only\n' "$USOS_W2K_STORAGE" "$USOS_W2K_ACPI" "$USOS_W2K_HAL" "$USOS_W2K_HPET" "$USOS_W2K_RTC" "$([ -n "$USOS_W2K_ACPI_PKG" ] && echo ', user ACPI package')"
     else
     # XP x64 (NT 5.2 amd64): GenAHCI on the system's own StorPort
     # (nt5_storage_stage.sh, applied to the target after the source copy).
@@ -468,8 +493,8 @@ usos_legacy_xp_staging() {
     [ -f "/usr/lib/usos/nt5-storage/$nt5_storage_arch/genahci.sys" ] || stop 'NT 5.2 AHCI driver (GenAHCI) is missing from the package; no target write occurred'
     printf '[NT5_STORAGE] PREFLIGHT PASS genahci %s on the system StorPort\n' "$nt5_storage_arch"
     fi
-    if [ "$NT5_SYSTEM" = windows-server-2003 ] || [ "$NT5_SYSTEM" = windows-xp-x64 ]; then
-    # NT 5.2: USB on xHCI through xhci98 (nt52_usb_stage.sh, after the source copy).
+    if [ "$NT5_SYSTEM" = windows-server-2003 ] || [ "$NT5_SYSTEM" = windows-xp-x64 ] || [ "$NT5_SYSTEM" = windows-2000 ]; then
+    # NT 5.2 and 2000: USB on xHCI through xhci98 (nt52_usb_stage.sh, after the source copy).
     case "$NT5_SOURCE_DIR" in AMD64) nt52_usb_arch=amd64 ;; *) nt52_usb_arch=x86 ;; esac
     [ -f "/usr/lib/usos/nt52-usb/$nt52_usb_arch/xhci98.sys" ] && [ -f "/usr/lib/usos/nt52-usb/$nt52_usb_arch/xhci98.inf" ] || stop 'NT 5.2 USB driver (xhci98) is missing from the package; no target write occurred'
     printf '[NT52_USB] PREFLIGHT PASS xhci98 %s\n' "$nt52_usb_arch"

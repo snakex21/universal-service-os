@@ -1,0 +1,29 @@
+AHCINT 1.3.0.0 - binary and source pin (USOS Windows 2000 work, 2026-09-30)
+
+Upstream repository: https://github.com/ages2001/AHCINT (ages2001)
+Tag v1.3.0.0 = commit 7be9c9b81ef10979cf1e2c37d08a2e2e3e166066
+  (release published 2026-09-29 16:03 UTC; DriverVer 09/29/2026,1.3.0.0).
+Release archive: AHCINT-v1.3.0.0.zip (git-ignored, *.zip)
+  https://github.com/ages2001/AHCINT/releases/download/v1.3.0.0/AHCINT-v1.3.0.0.zip
+  SHA-256 e0930ac2928e299548aa9a82749d42fc6c8cff10b4a590a7d312445ff1cf85ea
+Licence: GPL-3.0 (LICENSE = the full GPLv3 text of the repository).
+
+Tracked here, unmodified members of that archive:
+  bin/2KXP/i386/ahcint.sys  ScsiPort miniport, i386 (Windows 2000/XP/2003 x86)
+  bin/2KXP/ahcint.inf       GUI-mode / Device Manager INF (PCI\CC_010601)
+  bin/2KXP/txtsetup.oem     F6 file (reference only; USOS integrates through
+                            TXTSETUP.SIF instead)
+  src/                      the complete source of the tag (corresponding
+                            source of ahcint.sys, GPLv3 section 6); identical
+                            to src/ of the release archive
+Not used: the 9X, NT (3.5x/4.0) and amd64 builds.
+
+The driver matches class 01-06-01 (AHCI) plus AMD 1022:7901, 1022:43C8,
+1022:43EB and Intel 2828/2829/2922/2681 (src/ahcimain.c
+AhciPciConfigIsAhci). Polling I/O (no interrupts), no NCQ, 128 KB per
+request, 64-bit LBA since 1.3.0.0.
+
+USOS changes when staging (tools/w2k_stage.sh): the INF's [SourceDisksNames]
+and [SourceDisksNames.x86] row 1 get the path \i386\ahcint (a second
+ahcint.sys goes to that folder of the local source, as for xhci98). Nothing
+else in the INF and nothing in the .sys is changed.

@@ -40,8 +40,12 @@ trap 'rm -f "$manifest" "$winnt_sif"; rm -rf "$bt_stage"' EXIT HUP INT TERM
 # set. Preserve compressed source names from I386; only explicit third-column
 # destinations are renamed. NTLDR is deliberately excluded: WINNT32 leaves the
 # installed OS loader at the partition root and boots SETUPLDR separately.
+# Fields may be quoted ("system32\smss.exe" on nLite-processed media such as
+# the XP Media Center 2005 SP3 ISO; the quotes landed in the ~BT path and
+# text mode stopped with STOP 0x6B C000003A), as xp_dosnet_aliases.awk
+# already accepts.
 awk '
-function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
+function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); if (s ~ /^".*"$/) s = substr(s, 2, length(s) - 2); return s }
 {
     line=$0
     sub(/\r$/, "", line)
@@ -153,6 +157,27 @@ while IFS='|' read -r disk logical explicit_dest; do
     bt_rows=$((bt_rows + 1))
 done < "$manifest"
 [ "$bt_rows" -gt 0 ] || fail 'no BT files staged from DOSNET.INF'
+# Text-mode storage drivers that TXTSETUP.SIF [SCSI.Load] names but DOSNET.INF
+# does not list as a boot file: SETUPLDR loads them from ~BT and stops with
+# "The file <x> could not be found" (XP Media Center 2005 SP3, iaStor.sys,
+# QEMU 2026-09-30). Microsoft's own media list all of them, so nothing is
+# added there. Only files present in the source directory are copied.
+scsi_extra=0
+for driver in $(tr -d '\r' < "$SOURCE_ROOT/$SRC/TXTSETUP.SIF" | awk '
+    /^[ \t]*\[/ { s = tolower($0); gsub(/[ \t]/, "", s); next }
+    s == "[scsi.load]" && index($0, "=") { v = substr($0, index($0, "=") + 1); sub(/,.*/, "", v); gsub(/[ \t]/, "", v); if (v != "") print toupper(v) }
+' | sort -u); do
+    case "$driver" in *[!A-Z0-9_.-]*|'') continue ;; esac
+    [ -z "$(find "$bt_stage" -maxdepth 1 -type f \( -iname "$driver" -o -iname "${driver%?}_" \) | head -n 1)" ] || continue
+    for candidate in "$driver" "${driver%?}_"; do
+        found=$(find "$SOURCE_ROOT/$SRC" -maxdepth 1 -type f -iname "$candidate" | head -n 1)
+        [ -n "$found" ] || continue
+        cp "$found" "$bt_stage/$candidate" || fail "cannot stage text-mode storage driver: $candidate"
+        scsi_extra=$((scsi_extra + 1))
+        printf '[XP_LOCAL_SOURCE] BT text-mode storage driver added (not in DOSNET.INF): %s\n' "$candidate"
+        break
+    done
+done
 # One recursive mcopy avoids re-scanning a FAT32 tree with thousands of entries
 # for every one of the ~118 text-mode files under TCG.
 mcopy -s -o -i "$MTOOLS_IMAGE" "$bt_stage"/* "::/$BT_DIR/" || fail 'cannot copy staged BT tree'

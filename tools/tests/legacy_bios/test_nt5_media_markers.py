@@ -43,6 +43,19 @@ class Markers(unittest.TestCase):
             for name, expected in self.expected.items():
                 self.assertEqual((folder / name).read_bytes(), expected)
 
+    def test_server_rtm_markers(self):
+        # Windows 2000 Server: CDROM_IS.5, no SP4 marker needed; nothing else copied.
+        (self.source / 'cdrom_ip.5').unlink()
+        (self.source / 'cdromsp4.tst').unlink()
+        (self.source / ('CDROM_IS.5' if os.name == 'nt' else 'CDROM_IS.5')).write_bytes(b'W2KS\r\n')
+        result = self.run_copy()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('Server local media markers verified', result.stdout)
+        for folder in (self.target, self.target / '$WIN_NT$.~LS'):
+            self.assertEqual((folder / 'CDROM_IS.5').read_bytes(), b'W2KS\r\n')
+            self.assertFalse((folder / 'CDROMSP4.TST').exists())
+            self.assertFalse((folder / 'CDROM_IP.5').exists())
+
     def test_xp_is_unchanged(self):
         result = self.run_copy('windows-xp')
         self.assertEqual(result.returncode, 0, result.stderr)

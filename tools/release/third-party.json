@@ -1421,6 +1421,83 @@
       "notice": "Unmodified x86/x64 genahci.sys in the XP package. Source: upstream tag GenAHCI = commit b936a0d8 (in the sources zip); consistent with the 6.3.0.1 binaries but not byte-verified (needs WDK 7600), see SOURCES.txt."
     },
     {
+      "id": "ahcint",
+      "name": "AHCINT",
+      "version": "1.3.0.0-usos4",
+      "license": "GPL-3.0-only",
+      "modified": true,
+      "ships_in": [
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/vendor/ahcint/1.3.0.0-usos4/LICENSE",
+        "tools/vendor/ahcint/1.3.0.0-usos4/MODIFIED.txt",
+        "tools/vendor/ahcint/1.3.0.0/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "bundle_paths": [
+          "tools/vendor/ahcint/1.3.0.0/src/ahcimain.c",
+          "tools/vendor/ahcint/1.3.0.0/src/ahcisatl.c",
+          "tools/vendor/ahcint/1.3.0.0/src/ahcint.h",
+          "tools/vendor/ahcint/1.3.0.0/src/2KXP/ahcint.rc",
+          "tools/vendor/ahcint/1.3.0.0/src/2KXP/makefile",
+          "tools/vendor/ahcint/1.3.0.0/src/2KXP/sources",
+          "tools/vendor/ahcint/1.3.0.0/src/9X/ahcint9x.lnk",
+          "tools/vendor/ahcint/1.3.0.0/src/9X/build.bat",
+          "tools/vendor/ahcint/1.3.0.0/src/9X/makefile",
+          "tools/vendor/ahcint/1.3.0.0/src/NT/build.bat",
+          "tools/vendor/ahcint/1.3.0.0/SOURCES.txt",
+          "tools/vendor/ahcint/1.3.0.0/manifest.json",
+          "tools/vendor/ahcint/1.3.0.0-usos4/src/ahcimain.c",
+          "tools/vendor/ahcint/1.3.0.0-usos4/src/ahcisatl.c",
+          "tools/vendor/ahcint/1.3.0.0-usos4/src/ahcint.h",
+          "tools/vendor/ahcint/1.3.0.0-usos4/src/2KXP/ahcint.rc",
+          "tools/vendor/ahcint/1.3.0.0-usos4/src/2KXP/makefile",
+          "tools/vendor/ahcint/1.3.0.0-usos4/src/2KXP/sources",
+          "tools/vendor/ahcint/1.3.0.0-usos4/patches/0001-usos1-flush-cache.patch",
+          "tools/vendor/ahcint/1.3.0.0-usos4/build.cmd",
+          "tools/vendor/ahcint/1.3.0.0-usos4/toolchain.txt",
+          "tools/vendor/ahcint/1.3.0.0-usos4/MODIFIED.txt",
+          "tools/vendor/ahcint/1.3.0.0-usos4/manifest.json",
+          "tools/vendor/ahcint/1.3.0.0-usos4/patches/0002-usos2-target-check-and-trace.patch",
+          "tools/vendor/ahcint/1.3.0.0-usos4/patches/0003-usos3-screen-stages-readback-fail-loudly.patch",
+          "tools/vendor/ahcint/1.3.0.0-usos4/patches/0004-usos4-stall-diagnostics.patch"
+        ],
+        "urls": [
+          "https://github.com/ages2001/AHCINT/tree/7be9c9b81ef10979cf1e2c37d08a2e2e3e166066",
+          "https://github.com/ages2001/AHCINT/releases/download/v1.3.0.0/AHCINT-v1.3.0.0.zip"
+        ]
+      },
+      "notice": "MODIFIED i386 ahcint.sys 1.3.0.0-usos4 and the unmodified ahcint.inf (AHCINT, ScsiPort AHCI miniport with polling I/O) in the XP package, for Windows 2000 SP4 only: SYNCHRONIZE CACHE, SRB_FUNCTION_FLUSH and SHUTDOWN send FLUSH CACHE (EXT) to the drive, FUA writes are flushed, MODE SENSE reports the caching page; usos2 adds link/engine checks before every command, counters, and a write/read-back test plus an ASCII trace in the USOS gap (LBA 2040-2046) of the disk USOS prepared; usos3 (diagnostic) adds an on-screen status line, stages, sampled read-back and STOP 0x55534F53 instead of carrying on; usos4 (diagnostic) adds a stall watchdog (port registers on screen and in the trace when a command is busy for 2 s), a 250 ms miniport timer and interrupt, bus-reset and idle counters (tools/vendor/ahcint/1.3.0.0-usos4/MODIFIED.txt). Built with WDK 7.1 from the upstream tag v1.3.0.0 (commit 7be9c9b8) plus the USOS patches (all in the sources zip). The repository's LICENSE is the GPLv3 text; the files carry no per-file notices. Staging points the INF's [SourceDisksNames] row 1 at the Setup source directory on the target disk and, in the default legacy mode, comments out its PnpInterface row."
+    },
+    {
+      "id": "uniata",
+      "name": "UniATA",
+      "version": "0.47b",
+      "license": "GPL-2.0-only",
+      "modified": false,
+      "ships_in": [
+        "xp-package"
+      ],
+      "license_files": [
+        "tools/vendor/uniata/0.47b/COPYING-GPL-2.0.txt",
+        "tools/vendor/uniata/0.47b/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "bundle_paths": [
+          "tools/vendor/uniata/0.47b/BusMaster_v47b_src.rar",
+          "tools/vendor/uniata/0.47b/SOURCES.txt",
+          "tools/vendor/uniata/0.47b/manifest.json"
+        ],
+        "urls": [
+          "http://alter.org.ua/soft/win/uni_ata/BusMaster_v47b_src.rar"
+        ]
+      },
+      "notice": "Unmodified uniata.sys 0.47b (Alexander A. Telyatnikov) in the XP package, for Windows 2000 SP4 only, used instead of AHCINT when DATA has Systems\\Windows\\Windows 2000\\Unattended\\storage-uniata.txt. Licence GPLv2 per the source headers; the source archive is in the sources zip. USOS writes its own uniata.inf and TXTSETUP.SIF rows."
+    },
+    {
       "id": "xhci98",
       "name": "xhci98",
       "version": "1.1.1.0-usos2",
@@ -1441,6 +1518,10 @@
           "tools/vendor/xhci98/1.1.1.0/SOURCES.txt",
           "tools/vendor/xhci98/1.1.1.0-usos2/patches/0001-usos1-amd-cpu-xhci-start-and-file-log.patch",
           "tools/vendor/xhci98/1.1.1.0-usos2/patches/0002-usos2-sixteen-protocol-groups-and-cap-chain-log.patch",
+          "tools/vendor/xhci98/1.1.1.0-usos3/patches/0003-usos3-polling-engine.patch",
+          "tools/vendor/xhci98/1.1.1.0-usos3/build.cmd",
+          "tools/vendor/xhci98/1.1.1.0-usos3/MODIFIED.txt",
+          "tools/vendor/xhci98/1.1.1.0-usos3/manifest.json",
           "tools/vendor/xhci98/1.1.1.0-usos2/build.cmd",
           "tools/vendor/xhci98/1.1.1.0-usos2/toolchain.txt",
           "tools/vendor/xhci98/1.1.1.0-usos2/MODIFIED.txt",
@@ -1450,7 +1531,7 @@
           "https://github.com/yeokm1/xhci98/tree/7d0dd9d440e9716a87e0882f905bf8e99fa443ac"
         ]
       },
-      "notice": "MODIFIED x86/amd64 xhci98.sys and xhci98.inf 1.1.1.0-usos2 (tools/vendor/xhci98/1.1.1.0-usos2, MODIFIED.txt) in the XP package, for Server 2003 x86 and XP x64 only: PCI D0/Memory/Bus Master enable for firmware-disabled controllers (AMD CPU xHCI), CNR wait, forced USBLEGSUP handoff, 16 Supported Protocol groups, scratchpad cap 256, %SystemRoot%\\xhci98.log. Built with WDK 7.1 from the upstream tag v1.1.1.0 (commit 7d0dd9d4) plus the USOS patch (all in the sources zip). Staging points the INF's [SourceDisksNames] row 1 at the Setup source directory on the target disk."
+      "notice": "MODIFIED x86/amd64 xhci98.sys and xhci98.inf 1.1.1.0-usos2 (tools/vendor/xhci98/1.1.1.0-usos2, MODIFIED.txt) in the XP package, for Server 2003 x86 and XP x64 (Windows 2000 SP4: the x86 1.1.1.0-usos3 build in nt52-usb/x86-w2k, which adds a polling engine): PCI D0/Memory/Bus Master enable for firmware-disabled controllers (AMD CPU xHCI), CNR wait, forced USBLEGSUP handoff, 16 Supported Protocol groups, scratchpad cap 256, %SystemRoot%\\xhci98.log. Built with WDK 7.1 from the upstream tag v1.1.1.0 (commit 7d0dd9d4) plus the USOS patches (all in the sources zip). Staging points the INF's [SourceDisksNames] row 1 at the Setup source directory on the target disk."
     },
     {
       "id": "xhci98-w9x",

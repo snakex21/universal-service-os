@@ -1,0 +1,21 @@
+UniATA 0.47b - binary and source pin (USOS Windows 2000 work, 2026-10-03)
+
+Author: Alexander A. Telyatnikov (Alter), http://alter.org.ua/soft/win/uni_ata/
+Release: BusMaster_v47b.rar (binaries) and BusMaster_v47b_src.rar (source),
+both 2021-10-16, downloaded 2026-09-30 from the author's site:
+  http://alter.org.ua/soft/win/uni_ata/BusMaster_v47b.rar
+    SHA-256 a2766fa266c626aeec0bb5aa000ab12ecc343a0095bd541cd1e929e629eacf10
+  http://alter.org.ua/soft/win/uni_ata/BusMaster_v47b_src.rar  (tracked here)
+    SHA-256 2c792c86ed739ffc7f7cbc482bf2b414975d0617ff96759344aba7ed90d8af07
+Licence: GPLv2 ("Licence: GPLv2" in the source headers, e.g. driver/id_ata.cpp;
+parts from the FreeBSD ATA driver under its BSD licence, see the headers).
+The archives carry no licence text; COPYING-GPL-2.0.txt is the GPLv2 text.
+
+Tracked: uniata.sys (Release_Dist\uniata.sys of BusMaster_v47b.rar, unmodified),
+readme_w2k.txt (the author's 2000 notes), BusMaster_v47b_src.rar (the
+corresponding source).
+
+USOS use: Windows 2000 SP4 only, as the alternative to AHCINT selected with
+Systems\Windows\Windows 2000\Unattended\storage-uniata.txt on DATA
+(tools/w2k_stage.sh). USOS writes its own uniata.inf (the package's uata_2k.inf
+lists IDE controllers only) and the TXTSETUP.SIF rows; uniata.sys is unchanged.

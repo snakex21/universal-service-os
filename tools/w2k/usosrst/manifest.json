@@ -1,0 +1,15 @@
+{
+  "name": "usosrst",
+  "version": "1.4",
+  "licence": "GPL-3.0-or-later (repository LICENSE, NOTICE)",
+  "own_code": true,
+  "build": "build.cmd (WDK 7.1, x86 WXP environment); not byte-reproducible (PE time stamp, PDB GUID)",
+  "imports": "46: ntoskrnl, hal; all resolve on the Windows 2000 SP4 ntoskrnl/ntkrnlmp and every 2000 HAL",
+  "files": {
+    "bin/i386/usosrst.sys": "0c38413ad5c6e9f994ad4aa9f050a4ea7fe0aea188cb5abf28c381755ed76af5",
+    "build.cmd": "512844bf0ca29c015f8b62e3d54196f8f635c20981682646a940ec8db31f8681",
+    "src/usosrst.c": "3ad93db78d28a83e9b1dfb9f323882ec507ce1f8ccb16603604040777bdd60c5",
+    "src/sources": "03dfc1b07f4f26033b333ed7eaa000f48a12a9e5b77e4c1cab10435dd6b0b8fb",
+    "src/makefile": "7289517c7028ff031a48cc84f6308a437c3abe6e046c93f3132255221842d433"
+  }
+}

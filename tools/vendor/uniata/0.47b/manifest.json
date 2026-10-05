@@ -1,0 +1,18 @@
+{
+  "name": "UniATA",
+  "version": "0.47b",
+  "upstream": "http://alter.org.ua/soft/win/uni_ata/",
+  "licence": "GPL-2.0 (source headers; COPYING-GPL-2.0.txt)",
+  "binary_archive": {
+    "file": "BusMaster_v47b.rar",
+    "sha256": "a2766fa266c626aeec0bb5aa000ab12ecc343a0095bd541cd1e929e629eacf10",
+    "tracked": false
+  },
+  "files": {
+    "BusMaster_v47b_src.rar": "2c792c86ed739ffc7f7cbc482bf2b414975d0617ff96759344aba7ed90d8af07",
+    "COPYING-GPL-2.0.txt": "162eb961bb30cf48b46be205aae1def8450ebbd6d9cd88fcb405b6379ac13d26",
+    "readme_w2k.txt": "f36eebb97a46664e195657bec4613ff2aa67cc6f7ce59175cc74b282ebcc6d5c",
+    "SOURCES.txt": "78556e7139f4336045dd34e5f209e40d0dacf35d4dfcfd23b0f4d7161e39bdcc",
+    "uniata.sys": "f496db42afc5d44723be43d7731e2e220745d82af23ab30dcd3dc6d05f761679"
+  }
+}

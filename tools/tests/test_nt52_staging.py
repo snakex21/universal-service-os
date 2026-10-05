@@ -391,7 +391,7 @@ class Nt52Usb(unittest.TestCase):
     def test_package_files(self):
         import build_xp_uefi_csm_trial as builder
         files = builder.nt52_usb_files()
-        self.assertEqual(sorted(files), ['LICENSE', 'MODIFIED.txt', 'SOURCE.txt', 'amd64/xhci98.inf', 'amd64/xhci98.sys', 'x86/xhci98.inf', 'x86/xhci98.sys'])
+        self.assertEqual(sorted(files), ['LICENSE', 'MODIFIED.txt', 'SOURCE.txt', 'amd64/xhci98.inf', 'amd64/xhci98.sys', 'x86-w2k/MODIFIED.txt', 'x86-w2k/xhci98.inf', 'x86-w2k/xhci98.sys', 'x86/xhci98.inf', 'x86/xhci98.sys'])
         machine = lambda b: struct.unpack_from('<H', b, struct.unpack_from('<I', b, 60)[0] + 4)[0]
         self.assertEqual(machine(files['x86/xhci98.sys']), 0x14c)
         self.assertEqual(machine(files['amd64/xhci98.sys']), 0x8664)

@@ -61,6 +61,29 @@ class NT5Source(unittest.TestCase):
                 self.sif.write_text(text)
                 self.assertNotEqual(self.probe().returncode, 0)
 
+    def test_server_edition_any_service_pack(self):
+        # Windows 2000 Server (CDROM_IS.5, ProductType 1): RTM is accepted, and
+        # SP4.CAB is only required with the SP4 marker.
+        (self.source / 'CDROM_IP.5').unlink()
+        (self.source / 'cdromsp4.tst').unlink()
+        (self.source / 'I386/SP4.CAB').unlink()
+        (self.source / 'CDROM_IS.5').write_bytes(b'')
+        self.sif.write_text('[SetupData]\r\nMajorVersion = 5\r\nMinorVersion = 0\r\nProductType = 1\r\n')
+        result = self.probe()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('markers=CDROM_NT.5,CDROM_IS.5', result.stdout)
+        self.assertIn('service_pack_markers=none', result.stdout)
+        self.assertIn('edition=Windows 2000 Server', result.stdout)
+        # A Server marker with workstation SetupData, and two edition markers, are refused.
+        self.sif.write_text('[SetupData]\nMajorVersion = 5\nMinorVersion = 0\nProductType = 0\n')
+        self.assertNotEqual(self.probe().returncode, 0)
+        (self.source / 'CDROM_IP.5').write_bytes(b'')
+        self.assertIn('more than one', self.probe().stderr)
+
+    def test_professional_needs_its_marker(self):
+        (self.source / 'CDROM_IP.5').unlink()
+        self.assertIn('edition marker', self.probe().stderr)
+
     def test_unknown_profile_is_refused(self):
         self.assertNotEqual(self.probe('windows-nt-4').returncode, 0)
 
