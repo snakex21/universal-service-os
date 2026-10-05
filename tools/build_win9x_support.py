@@ -25,6 +25,10 @@
                 2.0 stack installer (DATA Drivers/Windows 98 SE/USB,
                 tools/w9x_csmwrap_target.sh)
 
+Also built, not staged yet (hardware diagnostics, copied by hand):
+  USOSDIAG.COM  timer tick / PIC / PIT, INT 15h memory, INT 13h, HPET report
+  USOSHPET.COM  clears HPET LegacyReplacement (src/platform/bios/win9x/usosdiag.S)
+
 USOS code is GPL-3.0-or-later; no Microsoft files.
 
   python tools/build_win9x_support.py [--out zig-out/dos-native/win9x]
@@ -93,6 +97,23 @@ def build_u9fix(out: Path, work: Path) -> Path:
     return com
 
 
+def build_diag(out: Path, work: Path) -> None:
+    """USOSDIAG.COM and USOSHPET.COM from one source (-DUSOSHPET)."""
+    env = dict(os.environ, ZIG_GLOBAL_CACHE_DIR=str(ROOT / 'tools/cache/zig-global'))
+    zig = str(ROOT / 'tools/zig/zig.exe')
+    for name, defines in (('USOSDIAG', []), ('USOSHPET', ['-DUSOSHPET'])):
+        obj, elf, com = work / (name + '.o'), work / (name + '.elf'), out / (name + '.COM')
+        subprocess.run([zig, 'cc', '-target', 'x86-freestanding-none', '-mcpu=i386', *defines, '-c',
+                        str(SOURCE / 'usosdiag.S'), '-o', str(obj)], env=env, check=True)
+        subprocess.run([zig, 'ld.lld', '-m', 'elf_i386', '-T', str(ROOT / 'src/platform/bios/msdos/com.ld'),
+                        str(obj), '-o', str(elf)], env=env, check=True)
+        subprocess.run([zig, 'objcopy', '-O', 'binary', str(elf), str(com)], env=env, check=True)
+        data = com.read_bytes()
+        # Scratch buffers start at 6F00h (E820/EDD) and 7000h (output).
+        if not 0 < len(data) <= 0x6f00 - 0x100 or b'DIAG.LOG' not in data or name.encode() not in data:
+            raise ValueError('unexpected %s.COM layout' % name)
+
+
 def stage_vmdisp9x(out: Path) -> None:
     manifest = json.loads((VMDISP / 'manifest.json').read_text())
     for name, expected in manifest['files'].items():
@@ -138,6 +159,7 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
     work = root / 'zig-out/win9x-support'
     work.mkdir(parents=True, exist_ok=True)
     build_u9fix(out, work)
+    build_diag(out, work)
     (out / 'U9FIX.TXT').write_bytes(dos_text(NOTICE))
     answer = (SOURCE / 'msbatch.inf').read_text(encoding='ascii')
     if 'ProductKey' in answer:
