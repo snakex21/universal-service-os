@@ -33,6 +33,7 @@ SYSTEM_TAG=${W9X_TAG:?W9X_TAG is required}
 ANSWER_INF=${W9X_ANSWER_INF:?W9X_ANSWER_INF is required}
 ANSWER_KIND=${W9X_ANSWER_KIND:-USOS}
 BOOT_FLOPPY=${W9X_BOOT_FLOPPY:-}
+USB_DIR=${W9X_USB_DIR:-}
 SIZE_GIB=${W9X_SIZE_GIB:-32}
 ESP_DIR=${W9X_ESP_DIR:-/mnt/esp/EFI/USOS}
 LIB=${USOS_LIB_DIR:-/usr/lib/usos}
@@ -43,6 +44,19 @@ MTOOLS_SKIP_CHECK=1
 export MTOOLS_SKIP_CHECK
 log() { printf '[W9X_CSMWRAP] %s\n' "$*"; }
 fail() { printf '[W9X_CSMWRAP] STOP: %s\n' "$1" >&2; exit 1; }
+# The first Microsoft cabinet ("MSCF", 4 reserved zero bytes, version 1.3)
+# inside an IExpress EXE: offset by scanning, length from the CFHEADER.
+w9x_carve_cab() {
+    off=$(od -An -v -tu1 "$1" | awk '
+        { for (i = 1; i <= NF; i++) { w = w " " $i; n++; if (n > 8) sub(/^ [0-9]+/, "", w)
+              if (w == " 77 83 67 70 0 0 0 0") { print pos - 7; exit } pos++ } }')
+    [ -n "$off" ] || return 1
+    size=$(od -An -tu4 -j $((off + 8)) -N4 "$1" | tr -d ' \n')
+    [ "$(od -An -tu1 -j $((off + 24)) -N2 "$1" | tr -s ' ' | sed 's/^ //')" = '3 1' ] || return 1
+    [ "$size" -gt 0 ] && [ $((off + size)) -le "$(wc -c < "$1")" ] || return 1
+    tail -c +$((off + 1)) "$1" | head -c "$size" > "$2" || return 1
+    [ "$(wc -c < "$2" | tr -d ' ')" = "$size" ]
+}
 
 for tool in dd od mkfs.fat mcopy mmd mdel mattrib mdir syslinux mount umount losetup blockdev awk sync wc; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
@@ -164,6 +178,27 @@ for name in INSTALL.BAT PATCH9X.EXE CWSDPMI.EXE; do
     cp "$PATCH/$name" "$work/c/USOS9X/$name" || fail "cannot copy $name"
 done
 cp "$ESP_DIR/dos-native/memdisk" "$work/c/USOS9X/MEMDISK" || fail 'cannot copy MEMDISK'
+# 98 SE: the user's USB 2.0 stack (DATA Drivers/Windows 98 SE/USB) for
+# xhci98, native USB keyboard and mouse: the cabinet of its IExpress
+# installer EXE (NUSB 3.x) goes to USB\STACK.CAB, which INSTALL.BAT puts next
+# to Setup and XHCI98.INF reads usbport.sys/usbhub20.sys from (disk 2).
+# Microsoft files: never on the stick, only from the user.
+if [ "$SYSTEM_TAG" = 98SE ] && [ -n "$USB_DIR" ] && [ -d "$USB_DIR" ]; then
+    mkdir -p "$work/c/USOS9X/USB"
+    for file in "$USB_DIR"/*; do
+        [ -f "$file" ] || continue
+        case "$(basename "$file" | tr '[:lower:]' '[:upper:]')" in
+            *.EXE)
+                # CFFILE names are stored uncompressed in the cabinet header.
+                w9x_carve_cab "$file" "$work/c/USOS9X/USB/STACK.CAB" &&
+                    grep -qi 'usbport\.sys' "$work/c/USOS9X/USB/STACK.CAB" &&
+                    grep -qi 'usbhub20\.sys' "$work/c/USOS9X/USB/STACK.CAB" && break
+                rm -f "$work/c/USOS9X/USB/STACK.CAB"
+                log "usb stack: no USB 2.0 stack cabinet in $(basename "$file")" ;;
+        esac
+    done
+    log "usb stack: $(ls "$work/c/USOS9X/USB" | tr '\n' ' ')"
+fi
 printf 'SET U9SYS=%s\r\nSET U9SRC=%s\r\nSET U9ANS=%s\r\nSET U9CSM=1\r\nSET U9T=C:\\USOS9X\r\nSET U9DISK=1\r\n' \
     "$SYSTEM_TAG" "$SETUP_FOLDER" "$ANSWER_KIND" > "$work/c/USOS9X/U9ENV.BAT"
 

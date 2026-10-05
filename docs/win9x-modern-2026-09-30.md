@@ -160,11 +160,25 @@ flow (FreeDOS, PC DOS, NT 4.0, betas) show "Unavailable".
   defaulted to Safe mode in QEMU (the setting does not override that default): open.
 * MS-DOS media: an ISO in `Systems\DOS\MS-DOS\Images` (Windows 3.x needs it
   as `MS-DOS 6.22.iso`); a .zip holding the ISO is a planned convenience.
+* Native USB keyboard and mouse in 98 SE (2026-10-05, wired, **blocked by CSMWrap**):
+  xhci98 `1.1.1.0-usos3-w9x` (`tools/vendor/xhci98/1.1.1.0-usos3-w9x`, GPL-2.0, usos3 polling built for
+  98 with WDK 7.1: no file sink, KeSetTimer, no /GS; all imports also used by NUSB's drivers on 98).
+  The user puts the NUSB installer EXE into `DATA\Drivers\Windows 98 SE\USB`; the 98 SE target writer
+  carves its cabinet to `C:\USOS9X\USB\STACK.CAB`, INSTALL.BAT copies `XHCI98.SYS/.INF` + `STACK.CAB`
+  into `C:\WIN98`; `XHCI98.INF` takes `usbport.sys`/`usbhub20.sys` from the cabinet (disk 2, LZX,
+  which DOS `EXTRACT` cannot unpack) and binds the USB 2.0 root hub. No stack: nothing changes.
+  QEMU (one install run): Setup and the desktop are fine (a WHPX run stopped with a protection error at
+  KERNEL init, the same disk under TCG reaches the desktop). **But 98 sees no PCI bus at all**:
+  `DETLOG.TXT` `int 1a,AX=b101` -> `PCIBUS=` empty, every devnode is `ROOT\...`. CSMWrap's SeaBIOS fork
+  never dispatches INT 1Ah AH=B1h (`handle_1a` in `seabios/src/clock.c` has no `case 0xb1`; the 32-bit
+  BIOS32 PCI entry is there), so the xHCI never appears and xhci98 cannot bind. Next: a CSMWrap patch
+  (`case 0xb1: handle_1ab1(regs);`) and a fresh install.
 
 ## 5. Open points
 
 * Own Windows 95 boot environment from the CD's CABs (bridge today).
-* Own 9x AHCI port driver; xhci98 for 98/Me needs a legitimate MSVC 6 / 2000 DDK toolchain.
+* Own 9x AHCI port driver. xhci98 for 98 SE: built with WDK 7.1 (section 4c); Me untested.
+* CSMWrap: INT 1Ah PCI BIOS (AH=B1h) for Windows 9x (section 4c).
 * Windows 95: the COA page is not filled from MSBATCH.INF (`ProductID`), the key is typed.
 * The BIOS mode page renders the profile for all four systems at once; a
   per-system choice would need the system first (UEFI menu entry for 9x).

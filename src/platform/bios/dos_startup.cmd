@@ -66,6 +66,20 @@ FOR %%F IN (VMHAL486.DLL VMDISP9X.DLL) DO COPY /Y %U9T%\%%F C:\%U9SRC% >NUL
 IF NOT EXIST C:\%U9SRC%\VMDISP9X.DLL GOTO FAILED
 REM Hardware IDs of this PC's display cards: they outrank Standard VGA.
 %U9T%\U9FIX.COM /VGA C:\%U9SRC%\USOSVESA.INF
+REM 98 SE under CSMWrap: native USB keyboard and mouse through xhci98 (USOS
+REM build, polling) on the user's USB 2.0 stack (DATA Drivers\Windows 98
+REM SE\USB: the NUSB installer, whose cabinet the UEFI preparation saved as
+REM C:\USOS9X\USB\STACK.CAB). XHCI98.INF takes usbport.sys/usbhub20.sys from
+REM that cabinet (LZX: Setup unpacks it, DOS EXTRACT cannot) and binds the
+REM controller and the USB 2.0 root hub, so Setup's device detection installs
+REM them and the HID devices without a prompt. No stack: bridge only.
+IF NOT "%U9CSM%"=="1" GOTO USBDONE
+IF NOT "%U9SYS%"=="98SE" GOTO USBDONE
+IF NOT EXIST C:\USOS9X\USB\STACK.CAB GOTO USBDONE
+IF NOT EXIST %U9T%\XHCI98.SYS GOTO USBDONE
+ECHO Natywne USB (xhci98 + stos USB 2.0)...
+FOR %%F IN (XHCI98.SYS XHCI98.INF USB\STACK.CAB) DO COPY /Y %U9T%\%%F C:\%U9SRC% >NUL
+:USBDONE
 REM Under CSMWrap HIMEM needs A20 through port 92h (/M:2), else DOS=HIGH hangs.
 REM Setup keeps the line; the file exists from its first restart on.
 REM (No IF with a redirection: COMMAND.COM opens the file even when false.)

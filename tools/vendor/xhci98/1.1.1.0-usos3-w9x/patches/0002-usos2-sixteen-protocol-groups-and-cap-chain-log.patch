@@ -1,0 +1,271 @@
+diff --git a/src/xhci.h b/src/xhci.h
+index 9714868..7dde8b3 100644
+--- a/src/xhci.h
++++ b/src/xhci.h
+@@ -1834,8 +1834,15 @@ ULONG XhciHcInfoEqual(const XHCI_HC_INFO *a, const XHCI_HC_INFO *b);
+ /* HCSPARAMS1.MaxPorts is eight bits, so 255 is the whole address space. */
+ #define XHCI_MAX_ROOT_PORTS     255
+ /* Two protocols is the shipping shape (one USB2 + one USB3); the slack is for
+- * controllers that split a revision across capabilities. */
+-#define XHCI_MAX_PROTOCOLS      4
++ * controllers that split a revision across capabilities.
++ * MODIFIED (USOS 1.1.1.0-usos2): 4 -> 16. The AMD Matisse/Vermeer CPU xHCI
++ * (1022:149C, X470 + Ryzen 5700X, 2026-09-29) has more than four Supported
++ * Protocol capabilities for its eight ports and was refused at
++ * XHCI_INIT_STEP_PORT_MAP with XHCI_CAPS_TOO_MANY_PROTOCOLS. Linux keeps no
++ * such limit. The index into Protocols[] is a UCHAR with 0xFF as "none"
++ * (XHCI_PORT_NO_PROTOCOL), so any value up to 254 would still fit; 16 costs
++ * 12 x 84 bytes in each of the two port maps of the extension. */
++#define XHCI_MAX_PROTOCOLS      16
+ /* PSIC is four bits: retain every entry a controller can advertise
+  * (docs/contributing/implementation-invariants.md, "Port Speed Decoding"). */
+ #define XHCI_MAX_PSI            15
+diff --git a/src/xhci98-amd64.inf b/src/xhci98-amd64.inf
+index 84b121c..3989ac1 100644
+--- a/src/xhci98-amd64.inf
++++ b/src/xhci98-amd64.inf
+@@ -1,7 +1,7 @@
+ ; xhci98-amd64.inf - xHCI USB host controller miniport, the 64-bit package
+ ;
+ ; MODIFIED by USOS (Universal Service OS) on 2026-09-29: package
+-; 1.1.1.0-usos1, see MODIFIED.txt beside this file. Not an upstream release.
++; 1.1.1.0-usos2, see MODIFIED.txt beside this file. Not an upstream release.
+ ;
+ ; A separate package from src\xhci98.inf, not a third path inside it, so
+ ; that file's [Manufacturer] line, which Windows 98's engine parses, never
+@@ -95,7 +95,7 @@ LoadOrderGroup=Base
+ ; the interrupt moderation interval in 250 ns units, 500 here, and 4000 when
+ ; absent or outside 10-4000; EnumPropPages32 and Controller give the
+ ; controller its Advanced tab.
+-; MODIFIED (USOS 1.1.1.0-usos1): the log ring on (2) and the file sink
++; MODIFIED (USOS 1.1.1.0-usos1/2): the log ring on (2) and the file sink
+ ; XhciLogFile on (1): every start refusal, successful start and stop is
+ ; appended to %SystemRoot%\xhci98.log. 0 turns either off.
+ [Xhci.AddReg.NT]
+diff --git a/src/xhci98.inf b/src/xhci98.inf
+index 2b826c0..7401ae5 100644
+--- a/src/xhci98.inf
++++ b/src/xhci98.inf
+@@ -1,7 +1,7 @@
+ ; xhci98.inf - xHCI USB host controller miniport, the 32-bit package
+ ;
+ ; MODIFIED by USOS (Universal Service OS) on 2026-09-29: package
+-; 1.1.1.0-usos1, see MODIFIED.txt beside this file. Not an upstream release.
++; 1.1.1.0-usos2, see MODIFIED.txt beside this file. Not an upstream release.
+ ;
+ ; One file, two setup engines, one xhci98.sys. Windows 98 SE and Windows ME
+ ; read only the undecorated sections and load the driver through
+@@ -108,7 +108,7 @@ HKR,,XhciImodInterval250ns,0x00010001,500
+ ; drawn by usbui.dll, as the NT references write them for EHCI. On Vista and
+ ; Windows 7 the value is only read when the devnode is built: to test it,
+ ; reinstall the package rather than adding it by hand.
+-; MODIFIED (USOS 1.1.1.0-usos1): the log ring on (2) and the file sink
++; MODIFIED (USOS 1.1.1.0-usos1/2): the log ring on (2) and the file sink
+ ; XhciLogFile on (1): every start refusal, successful start and stop is
+ ; appended to %SystemRoot%\xhci98.log. 0 turns either off.
+ [Xhci.AddReg.NT]
+diff --git a/src/xhci98.rc b/src/xhci98.rc
+index 9f4e7df..5ebaa24 100644
+--- a/src/xhci98.rc
++++ b/src/xhci98.rc
+@@ -88,7 +88,7 @@ BEGIN
+     BEGIN
+         BLOCK "040904B0"
+         BEGIN
+-            VALUE "Comments",         "Modified by USOS (1.1.1.0-usos1): AMD CPU xHCI start, file log. Not an upstream release.\0"
++            VALUE "Comments",         "Modified by USOS (1.1.1.0-usos2): AMD CPU xHCI start, 16 protocol groups, file log. Not an upstream release.\0"
+             VALUE "CompanyName",      "Yeo Kheng Meng\0"
+             VALUE "FileDescription",  "xHCI USB 2.0 Host Controller Miniport Driver (xhci98)\0"
+             VALUE "FileVersion",      XHCI_VER_STR "\0"
+diff --git a/src/xhci_caps.c b/src/xhci_caps.c
+index c19a4a8..42232c6 100644
+--- a/src/xhci_caps.c
++++ b/src/xhci_caps.c
+@@ -278,6 +278,7 @@ static VOID xhciPairCompanions(PXHCI_PORT_MAP map)
+     ULONG i;
+     ULONG j;
+     ULONG k;
++    ULONG paired;
+ 
+     for (i = 0; i < map->ProtocolCount; i++) {
+         if (map->Protocols[i].Major != 3) {
+@@ -290,6 +291,7 @@ static VOID xhciPairCompanions(PXHCI_PORT_MAP map)
+             if (map->Protocols[j].PortCount < map->Protocols[i].PortCount) {
+                 continue;
+             }
++            paired = 0;
+             for (k = 0; k < map->Protocols[i].PortCount; k++) {
+                 ULONG ss;
+                 ULONG hs;
+@@ -309,8 +311,20 @@ static VOID xhciPairCompanions(PXHCI_PORT_MAP map)
+                 map->Companion[hs - 1] = (UCHAR)ss;
+                 map->Class[ss - 1] = XHCI_PORT_CLASS_USB3_COMPANION;
+                 map->Class[hs - 1] = XHCI_PORT_CLASS_USB2_COMPANION;
++                paired++;
++            }
++            /*
++             * MODIFIED (USOS 1.1.1.0-usos2): stop at the first USB 2.0 group
++             * that took a pair, not at the first one that was large enough.
++             * With one capability per port (AMD 1022:149C) every USB 3.x
++             * group met the first USB 2.0 group, found its port already
++             * paired and stayed an orphan. The class only names the port:
++             * both USB 2.0 classes are managed and both USB 3.x ones are not,
++             * so this changes no port the driver powers or serves.
++             */
++            if (paired != 0) {
++                break;
+             }
+-            break;
+         }
+     }
+ }
+diff --git a/src/xhci_hw.h b/src/xhci_hw.h
+index b07de2d..3a8e6f8 100644
+--- a/src/xhci_hw.h
++++ b/src/xhci_hw.h
+@@ -1704,6 +1704,8 @@ ULONG XhciCommandNoOpSelfTest(PXHCI_EXTENSION ext);
+  * PASSIVE_LEVEL. XhciUsosFileAppend/Text/Header: <= DISPATCH_LEVEL.
+  */
+ ULONG XhciUsosPciPrepare(PXHCI_EXTENSION ext);
++/* usos2: the raw xECP chain into the log ring. IRQL: <= DISPATCH_LEVEL. */
++VOID XhciUsosLogCapChain(PXHCI_EXTENSION ext);
+ #ifndef XHCI_HOST_TEST
+ VOID XhciUsosInit(PDRIVER_OBJECT driverObject);
+ #endif
+diff --git a/src/xhci_init.c b/src/xhci_init.c
+index 6cf0e45..d4a2cfd 100644
+--- a/src/xhci_init.c
++++ b/src/xhci_init.c
+@@ -736,12 +736,39 @@ static ULONG xhciBuildPortMap(PXHCI_EXTENSION ext, ULONG afterReset)
+ 
+     map = afterReset ? &ext->PortMap : &ext->PreflightPortMap;
+ 
++    /* MODIFIED (USOS 1.1.1.0-usos2): the raw capability chain into the log
++     * before the parser can refuse it (preflight pass only). */
++    if (!afterReset) {
++        XhciUsosLogCapChain(ext);
++    }
++
+     status = XhciParseExtendedCaps(XhciBarReader, ext, ext->HcInfo.XecpDwords,
+                                    ext->IoSpaceLength, ext->HcInfo.MaxPorts,
+                                    map);
+     if (status != XHCI_CAPS_OK) {
++        XhciLogNote(ext, "usos.map.refused", status);
++        XhciLogNote(ext, "usos.map.groups", map->ProtocolCount);
+         return xhciPortMapRefused(ext, afterReset, status);
+     }
++    if (!afterReset) {
++        ULONG g;
++
++        /* MODIFIED (USOS 1.1.1.0-usos2): the parsed layout, per group:
++         * major << 24 | minor << 16 | first port << 8 | port count, then
++         * PSI count << 8 | slot type. */
++        XhciLogNote(ext, "usos.map.groups", map->ProtocolCount);
++        for (g = 0; g < map->ProtocolCount; g++) {
++            XhciLogNote(ext, "usos.map.group",
++                        (map->Protocols[g].Major << 24) |
++                            ((map->Protocols[g].Minor & 0xFFUL) << 16) |
++                            ((map->Protocols[g].PortOffset & 0xFFUL) << 8) |
++                            (map->Protocols[g].PortCount & 0xFFUL));
++            XhciLogNote(ext, "usos.map.group.psi.slot",
++                        ((map->Protocols[g].PsiCount & 0xFFUL) << 8) |
++                            (map->Protocols[g].SlotType & 0xFFUL));
++        }
++        XhciLogNote(ext, "usos.map.managed", map->ManagedPortCount);
++    }
+ 
+     /*
+      * A controller whose ports are all USB 3.x is one this driver cannot serve
+@@ -859,6 +886,10 @@ static ULONG xhciBuildPortMap(PXHCI_EXTENSION ext, ULONG afterReset)
+                     counts[XHCI_PORT_CLASS_USB2_COMPANION]);
+         XhciLogNote(ext, "map.usb3", counts[XHCI_PORT_CLASS_USB3_COMPANION] +
+                                          counts[XHCI_PORT_CLASS_USB3_ORPHAN]);
++        /* MODIFIED (USOS 1.1.1.0-usos2): the orphans on their own. */
++        XhciLogNote(ext, "usos.map.usb3orphan",
++                    counts[XHCI_PORT_CLASS_USB3_ORPHAN]);
++        XhciLogNote(ext, "usos.map.unclaimed", counts[XHCI_PORT_CLASS_NONE]);
+         for (i = 0; i < map->PortCount; i++) {
+             if (map->Class[i] == XHCI_PORT_CLASS_USB2_ONLY ||
+                 map->Class[i] == XHCI_PORT_CLASS_USB2_COMPANION) {
+diff --git a/src/xhci_usos.c b/src/xhci_usos.c
+index 390cbdf..86b13c5 100644
+--- a/src/xhci_usos.c
++++ b/src/xhci_usos.c
+@@ -168,6 +168,53 @@ ULONG XhciUsosPciPrepare(PXHCI_EXTENSION ext)
+     return (ULONG)command;
+ }
+ 
++/*
++ * usos2: every extended capability header, and for each Supported Protocol
++ * capability its DWORDs 0, 2 and 3 (revision, port range + PSI count, slot
++ * type), recorded before the parser can refuse the chain. Bounded like the
++ * parser: inside the mapping, all-ones ends the walk, at most 64 entries.
++ * IRQL: <= DISPATCH_LEVEL (BAR reads and log notes only).
++ */
++VOID XhciUsosLogCapChain(PXHCI_EXTENSION ext)
++{
++    ULONG offset;
++    ULONG header;
++    ULONG next;
++    ULONG seen;
++    ULONG protocols;
++
++    if (ext == NULL || ext->HcInfo.XecpDwords == 0) {
++        XhciLogNote(ext, "usos.xecp.none", 0);
++        return;
++    }
++    offset = ext->HcInfo.XecpDwords * 4UL;
++    protocols = 0;
++    for (seen = 0; seen < 64; seen++) {
++        if (offset > ext->IoSpaceLength || ext->IoSpaceLength - offset < 16) {
++            XhciLogNote(ext, "usos.xecp.outside", offset);
++            break;
++        }
++        header = XhciBarReader(ext, offset);
++        if (header == 0xFFFFFFFFUL) {
++            XhciLogNote(ext, "usos.xecp.allones", offset);
++            break;
++        }
++        XhciLogNote(ext, "usos.xecp.at", offset);
++        XhciLogNote(ext, "usos.xecp.dw0", header);
++        if ((header & 0xFFUL) == XHCI_XECP_ID_PROTOCOL) {
++            protocols++;
++            XhciLogNote(ext, "usos.proto.dw2", XhciBarReader(ext, offset + 8));
++            XhciLogNote(ext, "usos.proto.dw3", XhciBarReader(ext, offset + 12));
++        }
++        next = (header >> 8) & 0xFFUL;
++        if (next == 0) {
++            break;
++        }
++        offset += next * 4UL;
++    }
++    XhciLogNote(ext, "usos.xecp.protocols", protocols);
++}
++
+ /* ------------------------------------------------------------------ */
+ /* The file sink                                                       */
+ /* ------------------------------------------------------------------ */
+@@ -457,6 +504,7 @@ VOID XhciUsosFileKick(VOID)
+ 
+ /* The host suite has no PCI, no file system and no threads. */
+ ULONG XhciUsosPciPrepare(PXHCI_EXTENSION ext) { (void)ext; return 0; }
++VOID XhciUsosLogCapChain(PXHCI_EXTENSION ext) { (void)ext; }
+ VOID XhciUsosFileAppend(const UCHAR *bytes, ULONG count)
+ { (void)bytes; (void)count; }
+ VOID XhciUsosFileAppendText(const char *text) { (void)text; }
+diff --git a/src/xhci_version.h b/src/xhci_version.h
+index d9d5798..044e9ea 100644
+--- a/src/xhci_version.h
++++ b/src/xhci_version.h
+@@ -50,9 +50,9 @@
+ /* The same number as a string - the resource's two version strings, the DOS
+  * qualifier's banner, and the snapshot reader's report header. Must agree with
+  * XHCI_VER_CSV above; the INF gate refuses a build where it does not. */
+-/* MODIFIED (USOS, 2026-09-29): "-usos1" marks the USOS patch set; the four
++/* MODIFIED (USOS, 2026-09-29): "-usosN" marks the USOS patch set; the four
+  * integers stay upstream's so nothing that compares them moves. */
+-#define XHCI_VER_STR            "1.1.1.0-usos1"
++#define XHCI_VER_STR            "1.1.1.0-usos2"
+ 
+ /* The release date, in the MM/DD/YYYY form `DriverVer` takes, zero-padded -
+  * the INF gate refuses an unpadded one, because Windows 98's 16-bit parser is

@@ -16,6 +16,14 @@
   USOSKEY.COM, USOSKEY.DRV, VBMOUSE.EXE, VBMOUSE.DRV, VBADOS.TXT
                 the USB keyboard bridge (USOS) and VBADOS 0.67 (GPL-2.0+) of
                 the MS-DOS support, for installs under CSMWrap
+  XHCI98.SYS, XHCI98.INF, XHCI98.TXT
+                xhci98 1.1.1.0-usos3-w9x (GPL-2.0-only, MODIFIED: polling,
+                Windows 98 SE build; tools/vendor/xhci98/1.1.1.0-usos3-w9x,
+                checked against manifest.json): native USB keyboard and mouse
+                in 98 SE under CSMWrap. INSTALL.BAT puts them into the Setup
+                folder only next to STACK.CAB, the cabinet of the user's USB
+                2.0 stack installer (DATA Drivers/Windows 98 SE/USB,
+                tools/w9x_csmwrap_target.sh)
 
 USOS code is GPL-3.0-or-later; no Microsoft files.
 
@@ -27,6 +35,8 @@ import argparse, hashlib, json, os, shutil, subprocess
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'src/platform/bios/win9x'
 VMDISP = ROOT / 'tools/vendor/vmdisp9x/1.2025.0.119'
+XHCI98 = ROOT / 'tools/vendor/xhci98/1.1.1.0-usos3-w9x'
+XHCI98_FILES = {'release-x86/xhci98.sys': 'XHCI98.SYS', 'release-x86/xhci98.inf': 'XHCI98.INF'}
 VMDISP_FILES = {'vesamini.drv': 'VESAMINI.DRV', 'vesamini.vxd': 'VESAMINI.VXD', 'vmhal9x.dll': 'VMHAL9X.DLL',
                 'vmhal486.dll': 'VMHAL486.DLL', 'vmdisp9x.dll': 'VMDISP9X.DLL'}
 # What the Legacy Core copies to the RAM disk (dos_native_iso.zig win9x_helpers).
@@ -37,7 +47,7 @@ FILES = ('U9FIX.COM', 'U9FIX.TXT', 'USOSVESA.INF', 'VESAMINI.DRV', 'VESAMINI.VXD
     'USOSKEY.COM', 'USOSKEY.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT')
 BRIDGE = ('USOSKEY.COM', 'USOSKEY.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT')
 # Everything on the stick (the payload list and the release check use it).
-STAGED = FILES + ('MSBATCH.INF', 'VMDISP9X.TGZ')
+STAGED = FILES + ('MSBATCH.INF', 'VMDISP9X.TGZ', 'XHCI98.SYS', 'XHCI98.INF', 'XHCI98.TXT')
 
 NOTICE = """U9FIX.COM - USOS helper for Windows 95/98/Me
 Copyright (C) 2026 Maksymilian and the USOS Authors.
@@ -101,6 +111,27 @@ def stage_vmdisp9x(out: Path) -> None:
     (out / 'USOSVESA.INF').write_bytes(dos_text(inf))
 
 
+def stage_xhci98(out: Path) -> None:
+    manifest = json.loads((XHCI98 / 'manifest.json').read_text())
+    for name, expected in manifest['files'].items():
+        if hashlib.sha256((XHCI98 / name).read_bytes()).hexdigest() != expected:
+            raise ValueError('xhci98 checksum mismatch: ' + name)
+    for name, staged in XHCI98_FILES.items():
+        shutil.copyfile(XHCI98 / name, out / staged)
+    notice = ('xhci98 %s for Windows 98 SE (MODIFIED by USOS, GPL-2.0-only), %s\n'
+              'base: tag %s = commit %s (source tarball sha256 %s)\n'
+              'plus %s, built with WDK 7.1.\n'
+              'Corresponding source: the USOS sources zip (tools/vendor/xhci98/1.1.1.0-src\n'
+              'and tools/vendor/xhci98/1.1.1.0-usos3-w9x).\n'
+              'USOS copies XHCI98.SYS/.INF into the 98 SE Setup folder only together with\n'
+              "STACK.CAB, the cabinet of the user's USB 2.0 stack installer (NUSB).\n\n" % (
+                  manifest['version'], manifest['upstream'], manifest['tag'], manifest['commit'],
+                  manifest['source_archive']['sha256'], ', '.join(sorted(manifest['patches']))))
+    notice += (XHCI98 / 'MODIFIED.txt').read_text(encoding='ascii') + '\n' + '-' * 72 + '\n\n' + \
+        (XHCI98 / 'LICENSE').read_text(encoding='ascii')
+    (out / 'XHCI98.TXT').write_bytes(dos_text(notice))
+
+
 def build(root: Path = ROOT, out: Path | None = None) -> None:
     out = out or root / 'zig-out/dos-native/win9x'
     out.mkdir(parents=True, exist_ok=True)
@@ -113,6 +144,7 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
         raise ValueError('the default MSBATCH.INF must not carry a product key')
     (out / 'MSBATCH.INF').write_bytes(dos_text(answer))
     stage_vmdisp9x(out)
+    stage_xhci98(out)
     msdos = root / 'zig-out/dos-native/msdos'
     for name in BRIDGE:
         if not (msdos / name).is_file():

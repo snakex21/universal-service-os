@@ -177,7 +177,7 @@ usos_w9x_csmwrap_prepare() {
     else
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="/mnt/data/$iso" W9X_SETUP_FOLDER="$setup" W9X_TAG="$tag" \
             W9X_ANSWER_INF="$answer_inf" W9X_ANSWER_KIND="$answer_kind" W9X_BOOT_FLOPPY="$floppy" W9X_SIZE_GIB="$size_gib" \
-            sh /usr/lib/usos/w9x_csmwrap_target.sh
+            W9X_USB_DIR="/mnt/data/Drivers/$folder/USB" sh /usr/lib/usos/w9x_csmwrap_target.sh
     fi
     if ! "$@" >> "$W9X_DIR/prepare.log" 2>&1 < /dev/null; then
         rm -f "$answer_inf"

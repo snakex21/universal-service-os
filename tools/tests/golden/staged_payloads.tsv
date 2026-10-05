@@ -467,6 +467,9 @@ payload_zip	EFI/USOS/dos-native/win9x/VMDISP9X.TGZ
 payload_zip	EFI/USOS/dos-native/win9x/VMDISP9X.TXT
 payload_zip	EFI/USOS/dos-native/win9x/VMHAL486.DLL
 payload_zip	EFI/USOS/dos-native/win9x/VMHAL9X.DLL
+payload_zip	EFI/USOS/dos-native/win9x/XHCI98.INF
+payload_zip	EFI/USOS/dos-native/win9x/XHCI98.SYS
+payload_zip	EFI/USOS/dos-native/win9x/XHCI98.TXT
 payload_zip	EFI/USOS/licenses/fonts/LICENSE-Apache-2.0.txt
 payload_zip	EFI/USOS/licenses/fonts/LICENSE-OFL-1.1.txt
 payload_zip	EFI/USOS/licenses/fonts/README.md

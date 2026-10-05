@@ -1,0 +1,155 @@
+diff --git a/src/sources b/src/sources
+index d2284d4..c95f7d5 100644
+--- a/src/sources
++++ b/src/sources
+@@ -252,3 +252,16 @@ C_DEFINES=$(C_DEFINES) -DXHCI_FLAVOUR_RELEASE
+ # Matches the shipping NUSB/SP4 miniports: no separate .rdata section.
+ #
+ LINKER_FLAGS=-merge:.rdata=.text
++
++#
++# MODIFIED (USOS 1.1.1.0-usos3-w9x): XHCI_USOS_W9X=1 in the environment builds
++# the Windows 98 SE binary: no file sink, no registry read, KeSetTimer instead
++# of KeSetTimerEx (src/xhci_usos.c), no /GS cookie (its init imports
++# KeTickCount and KeBugCheckEx) and PE subsystem version 5.00.
++#
++!IF "$(XHCI_USOS_W9X)" == "1"
++C_DEFINES=$(C_DEFINES) -DXHCI_USOS_W9X
++BUFFER_OVERFLOW_CHECKS=0
++# Subsystem version as the upstream Windows 2000 DDK build that loads on 98.
++SUBSYSTEM_VERSION=5.00
++!ENDIF
+diff --git a/src/xhci98.rc b/src/xhci98.rc
+index 8158c3c..e792529 100644
+--- a/src/xhci98.rc
++++ b/src/xhci98.rc
+@@ -88,7 +88,7 @@ BEGIN
+     BEGIN
+         BLOCK "040904B0"
+         BEGIN
+-            VALUE "Comments",         "Modified by USOS (1.1.1.0-usos2): AMD CPU xHCI start, 16 protocol groups, file log. Not an upstream release.\0"
++            VALUE "Comments",         "Modified by USOS: AMD CPU xHCI start, 16 protocol groups, log, polling (MODIFIED.txt). Not an upstream release.\0"
+             VALUE "CompanyName",      "Yeo Kheng Meng\0"
+             VALUE "FileDescription",  "xHCI USB 2.0 Host Controller Miniport Driver (xhci98)\0"
+             VALUE "FileVersion",      XHCI_VER_STR "\0"
+diff --git a/src/xhci_usos.c b/src/xhci_usos.c
+index 63c5fff..b32800c 100644
+--- a/src/xhci_usos.c
++++ b/src/xhci_usos.c
+@@ -239,6 +239,15 @@ VOID XhciUsosLogCapChain(PXHCI_EXTENSION ext)
+ /* The file sink                                                       */
+ /* ------------------------------------------------------------------ */
+ 
++/*
++ * MODIFIED (USOS 1.1.1.0-usos3-w9x): the Windows 98 SE build has no file
++ * sink. Upstream measured that asking Windows 98's ntkern for write access
++ * to a file hangs the boot (design record 08, section 13.0.1), and the
++ * thread/handle services it needs are not all exported there. The stubs
++ * after this block keep every caller unchanged.
++ */
++#ifndef XHCI_USOS_W9X
++
+ #define USOS_PEND_BYTES     65536UL
+ #define USOS_WRITE_CHUNK    4096UL
+ #define USOS_RETRY_MS       2000L
+@@ -520,6 +529,18 @@ VOID XhciUsosFileKick(VOID)
+     ZwClose(thread);
+ }
+ 
++#else /* XHCI_USOS_W9X */
++
++VOID XhciUsosInit(PDRIVER_OBJECT driverObject) { UNREFERENCED_PARAMETER(driverObject); }
++VOID XhciUsosFileAppend(const UCHAR *bytes, ULONG count)
++{ UNREFERENCED_PARAMETER(bytes); UNREFERENCED_PARAMETER(count); }
++VOID XhciUsosFileAppendText(const char *text) { UNREFERENCED_PARAMETER(text); }
++VOID XhciUsosFileHeader(PXHCI_EXTENSION ext, ULONG reason)
++{ UNREFERENCED_PARAMETER(ext); UNREFERENCED_PARAMETER(reason); }
++VOID XhciUsosFileKick(VOID) { }
++
++#endif /* XHCI_USOS_W9X */
++
+ /* ------------------------------------------------------------------ */
+ /* The polling engine (usos3)                                          */
+ /* ------------------------------------------------------------------ */
+@@ -540,6 +561,15 @@ ULONG XhciUsosPollMode;
+  * the X470 lost USB input that way when "Installing devices" restarted both
+  * controllers (2026-10-05). PollMode = 0 (DWORD) turns interrupts back on.
+  */
++#ifdef XHCI_USOS_W9X
++/* MODIFIED (USOS 1.1.1.0-usos3-w9x): Windows 98 has no service key for an
++ * NTMPDriver miniport; polling is fixed on. */
++VOID XhciUsosReadPollMode(PUNICODE_STRING registryPath)
++{
++    UNREFERENCED_PARAMETER(registryPath);
++    XhciUsosPollMode = 1;
++}
++#else
+ VOID XhciUsosReadPollMode(PUNICODE_STRING registryPath)
+ {
+     WCHAR buffer[200];
+@@ -578,6 +608,7 @@ VOID XhciUsosReadPollMode(PUNICODE_STRING registryPath)
+     }
+     ZwClose(key);
+ }
++#endif /* XHCI_USOS_W9X */
+ 
+ /* IRQL: DISPATCH_LEVEL (timer DPC). */
+ static VOID NTAPI usosPollDpc(PKDPC dpc, PVOID context, PVOID arg1, PVOID arg2)
+@@ -595,6 +626,17 @@ static VOID NTAPI usosPollDpc(PKDPC dpc, PVOID context, PVOID arg1, PVOID arg2)
+         return;
+     }
+     InterlockedIncrement(&ext->UsosPollInDpc);
++#ifdef XHCI_USOS_W9X
++    /* MODIFIED (USOS 1.1.1.0-usos3-w9x): Windows 98 exports KeSetTimer but
++     * not KeSetTimerEx, so the one-shot timer is re-armed on every tick. */
++    if (ext->UsosPollState == 1) {
++        LARGE_INTEGER next;
++
++        next.LowPart = (ULONG)(USOS_POLL_PERIOD_MS * -10000L);
++        next.HighPart = -1;
++        (VOID)KeSetTimer(&ext->UsosPollTimer, next, &ext->UsosPollDpc);
++    }
++#endif
+     if (ext->UsosPollState != 1 || ext->ControllerFailed ||
+         (ext->Flags & XHCI_EXT_FLAG_STARTED) == 0 ||
+         (ext->Flags & XHCI_EXT_FLAG_INITIALIZED) == 0) {
+@@ -662,8 +704,12 @@ VOID XhciUsosPollStart(PXHCI_EXTENSION ext)
+     ext->UsosLastDpcCount = ext->DpcCount;
+     InterlockedExchange(&ext->UsosPollState, 1);
+     due.QuadPart = (LONGLONG)USOS_POLL_PERIOD_MS * (LONGLONG)(-10000);
++#ifdef XHCI_USOS_W9X
++    (VOID)KeSetTimer(&ext->UsosPollTimer, due, &ext->UsosPollDpc);
++#else
+     (VOID)KeSetTimerEx(&ext->UsosPollTimer, due, USOS_POLL_PERIOD_MS,
+                        &ext->UsosPollDpc);
++#endif
+ }
+ 
+ /* Before the controller is quiesced. IRQL: PASSIVE_LEVEL. */
+@@ -677,7 +723,9 @@ VOID XhciUsosPollStop(PXHCI_EXTENSION ext)
+     }
+     InterlockedExchange(&ext->UsosPollState, 2);
+     (VOID)KeCancelTimer(&ext->UsosPollTimer);
++#ifndef XHCI_USOS_W9X
+     (VOID)KeRemoveQueueDpc(&ext->UsosPollDpc);
++#endif
+     wait.QuadPart = -10000;     /* 1 ms */
+     for (guard = 0; guard < 1000 && ext->UsosPollInDpc != 0; guard++) {
+         if (KeGetCurrentIrql() == PASSIVE_LEVEL) {
+diff --git a/src/xhci_version.h b/src/xhci_version.h
+index d05cd7b..3a6227e 100644
+--- a/src/xhci_version.h
++++ b/src/xhci_version.h
+@@ -52,7 +52,12 @@
+  * XHCI_VER_CSV above; the INF gate refuses a build where it does not. */
+ /* MODIFIED (USOS, 2026-09-29): "-usosN" marks the USOS patch set; the four
+  * integers stay upstream's so nothing that compares them moves. */
++/* MODIFIED (USOS 1.1.1.0-usos3-w9x): the Windows 98 SE build. */
++#ifdef XHCI_USOS_W9X
++#define XHCI_VER_STR            "1.1.1.0-usos3-w9x"
++#else
+ #define XHCI_VER_STR            "1.1.1.0-usos3"
++#endif
+ 
+ /* The release date, in the MM/DD/YYYY form `DriverVer` takes, zero-padded -
+  * the INF gate refuses an unpadded one, because Windows 98's 16-bit parser is
