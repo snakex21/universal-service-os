@@ -34,7 +34,7 @@ const max_answer_bytes = 256 * 1024;
 const win9x_folder = [_][]const u16{ wide("EFI"), wide("USOS"), wide("dos-native"), wide("win9x") };
 /// Copied from EFI\USOS\dos-native\win9x to the RAM disk root; the list
 /// matches tools/build_win9x_support.py FILES.
-const win9x_helpers = [_][]const u8{ "U9FIX.COM", "U9FIX.TXT", "USOSVESA.INF", "VESAMINI.DRV", "VESAMINI.VXD", "VMHAL9X.DLL", "VMHAL486.DLL", "VMDISP9X.DLL", "VMDISP9X.TXT", "USOSKEY.COM", "USOSKEY.DRV", "VBMOUSE.EXE", "VBMOUSE.DRV", "VBADOS.TXT" };
+const win9x_helpers = [_][]const u8{ "U9FIX.COM", "U9FIX.TXT", "USOSVESA.INF", "VESAMINI.DRV", "VESAMINI.VXD", "VMHAL9X.DLL", "VMHAL486.DLL", "VMDISP9X.DLL", "VMDISP9X.TXT", "USOSKEY.COM", "USOSKEY.DRV", "VBMOUSE.EXE", "VBMOUSE.DRV", "VBADOS.TXT", "CREGFIX.SYS" };
 
 const Iso = struct {
     fs: ntfs.FileSystem,
@@ -138,7 +138,12 @@ pub noinline fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8
     // hangs; port 92h (/M:2) works (docs/design/bios-via-csmwrap.md 4.3).
     const himem_line = "DEVICE=A:\\HIMEM.SYS /TESTMEM:OFF\r\n";
     const himem_csmwrap = "DEVICE=A:\\HIMEM.SYS /TESTMEM:OFF /M:2\r\n";
-    try builder.add("CONFIG.SYS", if (!himem) config_tail else if (seabios.csmwrap) himem_csmwrap ++ config_tail else himem_line ++ config_tail);
+    // CREGFIX (mintsuki, 0BSD) first under CSMWrap: CR0/CR2/CR3/CR4/EFER as a
+    // legacy BIOS leaves them, before Setup's mini-Windows.
+    const cregfix = "DEVICE=A:\\CREGFIX.SYS\r\n";
+    try builder.add("CONFIG.SYS", if (seabios.csmwrap)
+        (if (himem) cregfix ++ himem_csmwrap ++ config_tail else cregfix ++ config_tail)
+    else if (himem) himem_line ++ config_tail else config_tail);
     try builder.makeNamedSetupDirectory(setup_folder);
     var position: u64 = 0;
     var copied: usize = 0;

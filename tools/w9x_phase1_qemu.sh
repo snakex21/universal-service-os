@@ -60,13 +60,16 @@ w9x_vm_accel() {
 
 # The QEMU argument list (one per line) for the target disk $1, accel $2.
 # Hard rules: ACPI off (Setup also gets /P I through U9VM=1), no network,
-# -no-reboot (Setup's first restart ends the VM), the whole disk, writeback.
+# -no-reboot (Setup's first restart ends the VM), the whole disk with
+# cache=none: O_DIRECT, so none of the guest's writes sit in this kernel's
+# page cache next to the later loop mount, and QEMU's flush on exit reaches
+# the disk.
 w9x_vm_args() {
     case "$2" in kvm) accel='kvm' ;; *) accel='tcg,tb-size=128' ;; esac
     printf '%s\n' -name usos-w9x-phase1 -nodefaults -L "$W9X_VM_DATADIR" \
         -machine pc,acpi=off -accel "$accel" -cpu pentium3 -smp 1 -m "$W9X_VM_GUEST_MB" \
         -rtc base=localtime -vga std -display none -nic none -no-reboot \
-        -drive "file=$1,format=raw,if=ide,index=0,media=disk,cache=writeback,file.locking=off" \
+        -drive "file=$1,format=raw,if=ide,index=0,media=disk,cache=none,file.locking=off" \
         -boot order=c \
         -serial "file:$W9X_VM_RUN/serial.log" \
         -chardev "file,id=seabios,path=$W9X_VM_RUN/seabios.log" -device isa-debugcon,iobase=0x402,chardev=seabios \
@@ -92,6 +95,9 @@ w9x_phase1_run() {
     accel=${2:-tcg}
     rm -rf "$W9X_VM_RUN"
     mkdir -p "$W9X_VM_RUN"
+    # The target writer's buffered writes on the disk, its cached pages dropped.
+    sync
+    blockdev --flushbufs "$target" 2>/dev/null || true
     mkfifo "$W9X_VM_RUN/mon.in" "$W9X_VM_RUN/mon.out" || return 2
     # Read-write open: never blocks, with or without QEMU on the other end.
     cat 0<> "$W9X_VM_RUN/mon.out" > "$W9X_VM_RUN/monitor.log" 2>/dev/null &
@@ -148,14 +154,75 @@ w9x_phase1_tree_ok() {
     echo 'phase 1 files present'
 }
 
+# What the real machine must not inherit from the VM, on the mounted C: at $1
+# (CR LF kept; a file is replaced through a temporary next to it, and only
+# when a line goes):
+#  - WINDOWS\SYSTEM.INI [386Enh] mouse=: Setup detected QEMU's i8042 mouse
+#    (mouse=*vmouse, msmouse.vxd); under CSMWrap SeaBIOS reports the USB
+#    mouse as a BIOS PS/2 mouse and VPICD_Phys_EOI stopped the X470 with a
+#    zero IRQ handle. U9FIX /CSM drops a *vmouse line at every start too.
+#  - CONFIG.SYS: a second HIMEM.SYS line (INSTALL.BAT's fallback line, which
+#    Setup turns into a copy of the first; the VM path no longer writes it).
+# One output line per removed line; 1 when a file cannot be replaced.
+w9x_phase1_patch_c() {
+    for patch_file in WINDOWS/SYSTEM.INI CONFIG.SYS; do
+        patch_path="$1/$patch_file"
+        [ -f "$patch_path" ] || continue
+        # BINMODE=3: gawk on Windows keeps the CRs too (busybox awk always does).
+        awk -v BINMODE=3 -v file="${patch_file##*/}" '
+            { line = $0; sub(/\r$/, "", line); low = tolower(line) }
+            file == "SYSTEM.INI" && low ~ /^[ \t]*\[/ { in386 = (low ~ /^[ \t]*\[386enh\]/) }
+            file == "SYSTEM.INI" && in386 && low ~ /^[ \t]*mouse[ \t]*=/ { print file ": removed " line > "/dev/stderr"; next }
+            file == "CONFIG.SYS" && low ~ /^[ \t]*device(high)?[ \t]*=.*himem\.sys/ {
+                if (seen) { print file ": removed " line > "/dev/stderr"; next }
+                seen = 1
+            }
+            { print }' "$patch_path" > "$patch_path.u9p" 2> "$W9X_VM_RUN/patch.txt" ||
+            { rm -f "$patch_path.u9p"; echo "cannot patch $patch_file"; return 1; }
+        if [ -s "$W9X_VM_RUN/patch.txt" ]; then
+            mv -f "$patch_path.u9p" "$patch_path" || { echo "cannot replace $patch_file"; return 1; }
+            cat "$W9X_VM_RUN/patch.txt"
+        else
+            rm -f "$patch_path.u9p"
+        fi
+    done
+    return 0
+}
+
+# Read-only FAT check (fsck.fat -n) of the partition $1, output appended to
+# $2 under the heading $3. 0 = no errors found.
+w9x_phase1_fsck() {
+    printf '== fsck.fat -n: %s\n' "$3" >> "$2"
+    if ! command -v fsck.fat >/dev/null 2>&1; then
+        echo 'fsck.fat missing' >> "$2"
+        return 1
+    fi
+    fsck.fat -n "$1" >> "$2" 2>&1
+    fsck_rc=$?
+    printf '== rc=%s\n' "$fsck_rc" >> "$2"
+    return "$fsck_rc"
+}
+
 # Checks C: on $1 (partition at LBA 2048, as w9x_csmwrap_target.sh writes it),
-# copies Setup's logs to $2 and marks C:\USOS9X\PHASE1.OK. 0 = phase 1 done.
+# copies Setup's logs to $2, removes what the VM left for the real machine
+# (w9x_phase1_patch_c, patch.txt) and marks C:\USOS9X\PHASE1.OK. fsck.fat -n
+# before the mount and after the USOS changes (fsck.txt): any error fails.
+# 0 = phase 1 done.
 w9x_phase1_verify() {
     target=$1
     logs=$2
     mkdir -p "$logs" "$W9X_VM_RUN/c"
+    rm -f "$logs/fsck.txt" "$logs/patch.txt"
+    # All writes on the disk and no stale cached block under the loop device.
+    sync
+    blockdev --flushbufs "$target" 2>/dev/null || true
     loop=$(losetup -f) || return 1
     losetup -o 1048576 "$loop" "$target" || return 1
+    if ! w9x_phase1_fsck "$loop" "$logs/fsck.txt" 'C: after Setup phase 1'; then
+        losetup -d "$loop" 2>/dev/null || true
+        echo 'fsck.fat found errors on C: after Setup phase 1 (fsck.txt)'
+        return 1
+    fi
     if ! mount -t vfat -o shortname=winnt,utf8=0 "$loop" "$W9X_VM_RUN/c"; then
         losetup -d "$loop" 2>/dev/null || true
         echo 'cannot mount C:'
@@ -167,10 +234,25 @@ w9x_phase1_verify() {
     status=0
     reason=$(w9x_phase1_tree_ok "$W9X_VM_RUN/c") || status=1
     if [ "$status" = 0 ]; then
+        if patched=$(w9x_phase1_patch_c "$W9X_VM_RUN/c"); then
+            printf '%s\n' "$patched" > "$logs/patch.txt"
+            [ -z "$patched" ] || reason="$reason; $(printf '%s' "$patched" | tr '\n' ';')"
+        else
+            reason="$reason; $patched"
+            status=1
+        fi
+    fi
+    if [ "$status" = 0 ]; then
         printf 'phase1=qemu elapsed=%s\r\n' "${W9X_VM_ELAPSED:-0}" > "$W9X_VM_RUN/c/USOS9X/PHASE1.OK" || status=1
     fi
     sync
     umount "$W9X_VM_RUN/c" || status=1
+    sync
+    blockdev --flushbufs "$target" 2>/dev/null || true
+    if ! w9x_phase1_fsck "$loop" "$logs/fsck.txt" 'C: after the USOS changes'; then
+        reason="$reason; fsck.fat found errors on C: after the USOS changes (fsck.txt)"
+        status=1
+    fi
     losetup -d "$loop" 2>/dev/null || true
     sync
     blockdev --flushbufs "$target" 2>/dev/null || true

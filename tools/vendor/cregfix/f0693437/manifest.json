@@ -12,5 +12,5 @@
   },
   "verified": "cregfix.sys (115 bytes, the upstream prebuilt) is byte-identical to cregfix.asm assembled with zig cc (GNU as, Intel syntax transliteration, retf emitted as 0xCB) at origin 0; NASM is not part of the USOS toolchain",
   "what": "DOS device driver for the first CONFIG.SYS line: sets CR0 = 10h (clears CD/NW cache-disable and other bits left set by modern CSM/CSMWrap firmware), CR2 = CR3 = CR4 = 0, EFER = 0, then unloads. Needed before Windows 9x SETUP.EXE, which starts its own mini-Windows without WIN.COM, so Patcher9x's WIN.COM register cleanup does not cover it.",
-  "status": "vendored 2026-10-05 for the 98 SE Setup hardware test under CSMWrap (X470); not staged into the payload yet"
+  "status": "vendored 2026-10-05; staged as EFI/USOS/dos-native/win9x/CREGFIX.SYS (+ CREGFIX.TXT), the first CONFIG.SYS line of Windows 9x under CSMWrap"
 }

@@ -188,6 +188,31 @@ class U9Fix(unittest.TestCase):
         self.assertEqual(files[INI], b'[boot]\r\ndrivers=usoskey.drv\r\nshell=Explorer.exe\r\n'
                          b'[boot.description]\r\nmouse.drv=Standard mouse\r\n[386Enh]\r\nMaxPhysPage=40000\r\n[vcache]\r\nMaxFileCache=262144\r\n')
 
+    def test_csm_mode_drops_the_vmouse_line_of_386enh(self):
+        # Setup's line from the BIOSTAR/X470 98 SE install (VPICD_Phys_EOI).
+        text = (b'[boot]\r\ndrivers=mmsystem.dll usoskey.drv\r\n[386Enh]\r\nebios=*ebios\r\n'
+                b'mouse=*vmouse, msmouse.vxd\r\nwoafont=dosapp.fon\r\nMOUSE = *VMOUSE\r\nMaxPhysPage=40000\r\n'
+                b'[mouse]\r\nmouse=*vmouse\r\n[vcache]\r\nMaxFileCache=1\r\n')
+        files = {INI: text}
+        st = self.run_fix(files, command=' /CSM ' + INI)
+        self.assertEqual(st['exit'], 0)
+        # "MOUSE = *VMOUSE" has blanks before '=': Setup never writes that; kept.
+        # Lines outside [386Enh] stay.
+        self.assertEqual(files[INI], b'[boot]\r\ndrivers=mmsystem.dll usoskey.drv\r\n[386Enh]\r\nebios=*ebios\r\n'
+                         b'woafont=dosapp.fon\r\nMOUSE = *VMOUSE\r\nMaxPhysPage=40000\r\n'
+                         b'[mouse]\r\nmouse=*vmouse\r\n[vcache]\r\nMaxFileCache=1\r\n')
+        again = dict(files)
+        st = self.run_fix(again, command=' /CSM ' + INI)
+        self.assertEqual((st['exit'], st['writes'], again), (0, 0, files))
+        # Two vmouse lines, another mouse= value kept, last line without CR LF.
+        files = {INI: b'[386Enh]\r\nmouse=*vmouse\r\nmouse=serial.vxd\r\nMaxPhysPage=40000\r\nMouse=*VMouse, msmouse.vxd'}
+        self.run_fix(files, command=' /CSM ' + INI)
+        self.assertEqual(files[INI], b'[386Enh]\r\nmouse=serial.vxd\r\nMaxPhysPage=40000\r\n[vcache]\r\nMaxFileCache=262144\r\n')
+        # Without /CSM the line stays.
+        files = {INI: text}
+        self.run_fix(files)
+        self.assertIn(b'mouse=*vmouse, msmouse.vxd\r\n', files[INI])
+
 
 if __name__ == '__main__':
     unittest.main()

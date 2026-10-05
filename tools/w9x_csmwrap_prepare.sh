@@ -224,6 +224,7 @@ usos_w9x_csmwrap_prepare() {
         IFS= read -r _w9x_ack || true
     fi
     sync
+    blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true
     reboot -f 2>/dev/null || true
     sleep 3
     echo 1 > /proc/sys/kernel/sysrq 2>/dev/null || true

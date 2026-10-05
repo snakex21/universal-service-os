@@ -36,7 +36,13 @@
  *   drivers=... usoskey.drv    USOSKEY.DRV feeds the USB keys that
  *                              USOSKEY.COM collected to VKD (Windows 3.x
  *                              bridge, docs/design/bios-via-csmwrap.md 8.5)
- * The token is appended to an existing drivers= line. No mouse line: VBADOS's
+ * The token is appended to an existing drivers= line. And in [386Enh] every
+ *   mouse=*vmouse...           is deleted: Setup's detection adds it for an
+ *                              i8042 mouse (QEMU in phase 1; SeaBIOS under
+ *                              CSMWrap reports the USB mouse as a BIOS PS/2
+ *                              mouse), and VPICD_Phys_EOI then stops the
+ *                              real machine with a zero IRQ handle (X470).
+ * Other mouse= values stay. No VBADOS mouse line either: VBADOS's
  * VBMOUSE.EXE next to Windows 98's own PS/2 mouse VxD stops the installed
  * system with a protection error at KERNEL init (docs/win9x-modern-2026-09-30.md);
  * a USB mouse in Windows 9x under CSMWrap is open.
@@ -410,7 +416,7 @@ csm_boot:
     mov si, offset sec_boot
     mov cx, 6
     call find_line
-    jc csm_ok                       /* no [boot]: nothing to adjust */
+    jc csm_mouse                    /* no [boot]: no driver to add */
     add di, cx
 csm_header_eol:
     cmp di, word ptr [limit]
@@ -461,6 +467,57 @@ csm_drivers_new:
     call insert
     jc csm_full
 csm_mouse:
+    /* [386Enh] mouse=*vmouse...: every such line goes */
+    mov si, offset sec_386
+    mov cx, 8
+    call find_line
+    jc csm_ok
+    add di, cx
+csm_mouse_eol:
+    cmp di, word ptr [limit]
+    jae csm_ok
+    mov al, byte ptr [di]
+    inc di
+    cmp al, 10
+    jne csm_mouse_eol
+    mov word ptr [sec_start], di
+csm_mouse_find:
+    mov si, offset key_mouse
+    mov cx, 6
+    call find_key_in_section
+    jc csm_ok
+    mov dx, di                      /* the line start */
+    mov bx, di
+csm_mouse_scan:
+    cmp bx, word ptr [limit]
+    jae csm_ok                      /* last line, no *vmouse */
+    cmp byte ptr [bx], 10
+    je csm_mouse_keep
+    mov di, bx
+    mov si, offset tok_vmouse
+    mov cx, 7
+    call match_at
+    je csm_mouse_cut
+    inc bx
+    jmp csm_mouse_scan
+csm_mouse_keep:
+    /* another mouse= value: kept, search on from the next line */
+    inc bx
+    mov word ptr [sec_start], bx
+    jmp csm_mouse_find
+csm_mouse_cut:
+    cmp bx, word ptr [limit]
+    jae csm_mouse_del
+    mov al, byte ptr [bx]
+    inc bx
+    cmp al, 10
+    jne csm_mouse_cut
+csm_mouse_del:
+    mov di, dx
+    mov cx, bx
+    sub cx, dx
+    call delete
+    jmp csm_mouse_find
 csm_ok:
     clc
     ret
@@ -697,6 +754,8 @@ sec_boot: .ascii "[boot]"
 key_drivers: .ascii "drivers="
 tok_usoskey: .ascii "usoskey.drv"
 add_usoskey: .ascii " usoskey.drv"
+key_mouse: .ascii "mouse="
+tok_vmouse: .ascii "*vmouse"
 line_drivers: .ascii "drivers=usoskey.drv\r\n"
 line_drivers_end:
 temp_name: .asciz "SYSTEM.U9$"

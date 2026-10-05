@@ -132,6 +132,8 @@ try {
         'EFI/USOS/dos-native/win9x/XHCI98.SYS',
         'EFI/USOS/dos-native/win9x/XHCI98.INF',
         'EFI/USOS/dos-native/win9x/XHCI98.TXT',
+        'EFI/USOS/dos-native/win9x/CREGFIX.SYS',
+        'EFI/USOS/dos-native/win9x/CREGFIX.TXT',
         'EFI/USOS/systemd-bootx64.efi',
         'EFI/USOS/touchi2c_x64.efi',
         'EFI/USOS/licenses/touchi2cdxe/LICENSE',

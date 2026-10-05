@@ -55,7 +55,7 @@ IF ERRORLEVEL 1 GOTO FAILED
 COPY /Y A:\U9FIX.TXT C:\USOS9X >NUL
 IF ERRORLEVEL 1 GOTO FAILED
 COPY /Y A:\VMDISP9X.TXT C:\USOS9X >NUL
-FOR %%F IN (USOSKEY.COM USOSKEY.DRV VBMOUSE.EXE VBMOUSE.DRV VBADOS.TXT) DO COPY /Y A:\%%F C:\USOS9X >NUL
+FOR %%F IN (USOSKEY.COM USOSKEY.DRV VBMOUSE.EXE VBMOUSE.DRV VBADOS.TXT CREGFIX.SYS) DO COPY /Y A:\%%F C:\USOS9X >NUL
 :COPYDONE
 REM Step markers for a hang on real hardware: the last line shows the step.
 ECHO start %U9SYS% (U9CSM=%U9CSM% U9DISK=%U9DISK% U9VM=%U9VM%)>>C:\USOS9X\INSTALL.LOG
@@ -88,10 +88,18 @@ REM restart on; until then (a restart before Setup got that far) the copy of
 REM the boot floppy's HIMEM in C:\USOS9X loads instead, so RESUME.BAT can run
 REM Setup again (Setup needs XMS). Once the first one loaded, the second one
 REM only reports that an XMS driver is already there.
+REM U9VM=1 (phase 1 in USOS's QEMU): C: first boots after that phase wrote
+REM C:\WINDOWS\HIMEM.SYS, and Setup turns the C:\USOS9X line into a second
+REM C:\WINDOWS\HIMEM.SYS line, so that path gets no fallback line.
+REM CREGFIX.SYS (mintsuki, 0BSD) comes first: it cleans CR0/CR2/CR3/CR4/EFER
+REM after CSMWrap at every start (Setup's mini-Windows, the installed system).
 REM (No IF with a redirection: COMMAND.COM opens the file even when false.)
 IF NOT "%U9CSM%"=="1" GOTO NOCSM
+IF NOT EXIST C:\USOS9X\CREGFIX.SYS GOTO FAILED
 IF EXIST A:\HIMEM.SYS COPY /Y A:\HIMEM.SYS C:\USOS9X >NUL
-ECHO DEVICE=C:\WINDOWS\HIMEM.SYS /TESTMEM:OFF /M:2>C:\CONFIG.SYS
+ECHO DEVICE=C:\USOS9X\CREGFIX.SYS>C:\CONFIG.SYS
+ECHO DEVICE=C:\WINDOWS\HIMEM.SYS /TESTMEM:OFF /M:2>>C:\CONFIG.SYS
+IF "%U9VM%"=="1" GOTO NOCSM
 IF NOT EXIST C:\USOS9X\HIMEM.SYS GOTO NOCSM
 ECHO DEVICE=C:\USOS9X\HIMEM.SYS /TESTMEM:OFF /M:2>>C:\CONFIG.SYS
 :NOCSM
