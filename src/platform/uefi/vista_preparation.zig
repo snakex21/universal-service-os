@@ -92,6 +92,9 @@ pub fn formatCommand(buffer: []u8, lang_initrd: []const u8, esp_partuuid: []cons
     return std.fmt.bufPrint(buffer, "initrd=\\EFI\\USOS\\micro-linux\\initramfs-usos{s} rdinit=/usos-init {s} usos.esp_partuuid={s} {s}{s}", .{ lang_initrd, console, esp_partuuid, mode.tokens(), theme_option });
 }
 
+/// The optional Windows 9x phase-1 VM initrd (build_micro_linux.py qemu9x.cpio).
+pub const win9x_vm_initrd = " initrd=\\EFI\\USOS\\micro-linux\\qemu9x.cpio";
+
 pub fn start(root: *uefi.protocol.File) !void {
     return startMode(root, .disk);
 }
@@ -112,10 +115,19 @@ fn startMode(root: *uefi.protocol.File, mode: Mode) !void {
         file.close() catch {};
         break :blk " initrd=\\EFI\\USOS\\lang.cpio";
     } else |_| "";
+    // Windows 98 Setup phase 1 in a VM (tools/w9x_phase1_qemu.sh): QEMU and
+    // KVM come as a second initrd, only on this command line and only when
+    // the installer wrote it (else step 620 keeps the native Setup start).
+    const qemu_initrd = if (mode == .win9x) if (root.open(wide("\\EFI\\USOS\\micro-linux\\qemu9x.cpio"), .read, .{})) |file| blk: {
+        file.close() catch {};
+        break :blk win9x_vm_initrd;
+    } else |_| "" else "";
+    var initrd_buffer: [win9x_vm_initrd.len + 32]u8 = undefined;
+    const initrds = try std.fmt.bufPrint(&initrd_buffer, "{s}{s}", .{ qemu_initrd, lang_initrd });
     var cmd: [1024]u8 = undefined;
     var theme_buffer: [@import("usos").gui.theme_cmdline.option_len]u8 = undefined;
     const theme_option = @import("usos").gui.theme_cmdline.option(&theme_buffer, @import("manual_view.zig").currentTheme());
-    const command = try formatCommand(&cmd, lang_initrd, &id, mode, mode != .disk and @import("diagnostic_boot.zig").requested(root), theme_option);
+    const command = try formatCommand(&cmd, initrds, &id, mode, mode != .disk and @import("diagnostic_boot.zig").requested(root), theme_option);
     const serial = @import("serial.zig");
     serial.writeAscii(switch (mode) {
         .csmwrap => "[VISTA_CSMWRAP_CMDLINE] ",
@@ -151,6 +163,13 @@ test "Vista disk preparation command line is unchanged; CSMWrap keeps its consol
     var c: [1024]u8 = undefined;
     const verbose = try formatCommand(&c, "", id, .csmwrap, true, "");
     try std.testing.expect(std.mem.indexOf(u8, verbose, " quiet ") == null);
+}
+
+test "Windows 9x: the phase-1 VM initrd follows the base initramfs, before the language" {
+    var a: [1024]u8 = undefined;
+    const command = try formatCommand(&a, win9x_vm_initrd ++ " initrd=\\EFI\\USOS\\lang.cpio", "0257E175-1685-4311-91AA-5A83D8EB41E5", .win9x, false, "");
+    try std.testing.expect(std.mem.startsWith(u8, command, "initrd=\\EFI\\USOS\\micro-linux\\initramfs-usos initrd=\\EFI\\USOS\\micro-linux\\qemu9x.cpio initrd=\\EFI\\USOS\\lang.cpio rdinit=/usos-init "));
+    try std.testing.expect(std.mem.endsWith(u8, command, " usos.legacy_action=w9x-csmwrap usos.plan_profile=w9x-uefi-csmwrap"));
 }
 
 test "the menu theme reaches the Vista micro-Linux command line" {

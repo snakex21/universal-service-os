@@ -183,6 +183,34 @@ flow (FreeDOS, PC DOS, NT 4.0, betas) show "Unavailable".
   stop after `SHELL` / at `Initializing KERNEL` and restart. This happens with or without the patch, while
   `win` from the command-prompt entry reached the desktop.
 
+## 4d. 98 / 98 SE Setup phase 1 in a VM on the target (2026-10-05, milestone 1)
+
+On the X470, SETUP.EXE's DOS stage hangs under CSMWrap. For Windows 98 and 98 SE, step 620 now
+runs that stage in QEMU on the same machine and only the rest on the real hardware:
+
+* `qemu9x.cpio` (`EFI\USOS\micro-linux`, built by `tools/build_micro_linux.py` from the `qemu9x`
+  section of `tools/micro_linux.lock.json`): Alpine v3.24 `qemu-system-i386` 11.0.3, SeaBIOS
+  `bios-256k.bin` and `vgabios-stdvga.bin` 1.17.0, the shared objects QEMU needs that initramfs-usos
+  lacks (DT_NEEDED closure), and the `kvm`, `kvm-amd`, `kvm-intel` modules. About 13 MB, loaded
+  as a second initrd only on the w9x command line (`vista_preparation.zig`), so other paths and
+  `initramfs-usos` are unchanged.
+* `tools/w9x_phase1_qemu.sh`: after `w9x_csmwrap_target.sh` wrote the disk (VM mode:
+  `U9VM=1` in U9ENV.BAT, so INSTALL.BAT adds `/P I` to Setup; the real PC's display IDs go into
+  USOSVESA.INF because U9FIX /VGA in the VM sees QEMU's card only), QEMU boots **the whole target
+  disk**: `-machine pc,acpi=off`, `-cpu pentium3`, 512 MiB, IDE, `cache=writeback`, no network,
+  `-no-reboot`. Setup's first restart ends the VM. The screen shows "{system} installation - stage 1 in
+  the background" with elapsed time and MB written. Then `C:\WINDOWS\WIN.COM`, `SYSTEM`,
+  `SYSTEM.INI` and `SETUPLOG.TXT` are checked, `C:\USOS9X\PHASE1.OK` is written, and the normal
+  "start the prepared disk" restart follows. If the VM fails or times out (90 min), a translated
+  stop screen appears and the PC does not restart. Logs go to `EFI\USOS\win9x\phase1\` (command,
+  QEMU, SeaBIOS debugcon, monitor, the last screendump, INSTALL.LOG, SETUPLOG/DETLOG).
+* The default is TCG. KVM is used only with `EFI\USOS\win9x\phase1-kvm.flag` and a working
+  `/dev/kvm`. `EFI\USOS\win9x\phase1-native.flag`, less than about 900 MB RAM, 95, Me or no
+  qemu9x.cpio keep the old path (DOS Setup on the real PC).
+* Licence gap before a release: Alpine's QEMU links `libsasl2` (BSD-4-Clause-Attribution), which
+  is not GPL-compatible. Milestone 2 replaces the Alpine binaries with our own minimal static
+  build (no VNC/SASL/Xen/slirp).
+
 ## 5. Open points
 
 * Own Windows 95 boot environment from the CD's CABs (bridge today).

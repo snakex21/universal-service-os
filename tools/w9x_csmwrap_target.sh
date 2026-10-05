@@ -35,6 +35,10 @@ ANSWER_KIND=${W9X_ANSWER_KIND:-USOS}
 BOOT_FLOPPY=${W9X_BOOT_FLOPPY:-}
 USB_DIR=${W9X_USB_DIR:-}
 SIZE_GIB=${W9X_SIZE_GIB:-32}
+# 1: Setup phase 1 runs in a VM on this machine (tools/w9x_phase1_qemu.sh):
+# U9ENV.BAT gets U9VM=1 (Setup /P I) and USOSVESA.INF this PC's display IDs.
+VM_PHASE1=${W9X_VM_PHASE1:-0}
+PCI_ROOT=${W9X_PCI_ROOT:-/sys/bus/pci/devices}
 ESP_DIR=${W9X_ESP_DIR:-/mnt/esp/EFI/USOS}
 LIB=${USOS_LIB_DIR:-/usr/lib/usos}
 ESP_TAIL=133120
@@ -56,6 +60,33 @@ w9x_carve_cab() {
     [ "$size" -gt 0 ] && [ $((off + size)) -le "$(wc -c < "$1")" ] || return 1
     tail -c +$((off + 1)) "$1" | head -c "$size" > "$2" || return 1
     [ "$(wc -c < "$2" | tr -d ' ')" = "$size" ]
+}
+
+# vendor:device (lower-case hex) of every display controller (class 03xxxx)
+# under the sysfs PCI folder $1, one per line.
+w9x_display_ids() {
+    for device in "$1"/*; do
+        case "$(cat "$device/class" 2>/dev/null)" in 0x03*) ;; *) continue ;; esac
+        printf '%s:%s\n' "$(sed 's/^0x//' "$device/vendor")" "$(sed 's/^0x//' "$device/device")"
+    done | tr 'ABCDEF' 'abcdef' | sort -u
+}
+# USOSVESA.INF (stdin -> stdout) with one U9FIX-style hardware ID line per
+# id of $1 right after [Mfg.VM]; ids already listed are skipped.
+w9x_add_display_ids() {
+    awk -v ids="$1" '
+        { sub(/\r$/, ""); lines[++count] = $0; text = text "\n" tolower($0) }
+        END {
+            n = split(ids, list, "\n"); bs = sprintf("%c", 92)
+            for (i = 1; i <= count; i++) {
+                printf "%s\r\n", lines[i]
+                if (lines[i] !~ /^\[Mfg\.VM\]/) continue
+                for (j = 1; j <= n; j++) {
+                    split(list[j], v, ":")
+                    if (index(text, "pci" bs "ven_" v[1] "&dev_" v[2])) continue
+                    printf "\"vesa (vmdisp9x) %s\"=VESA, PCI%sVEN_%s&DEV_%s\r\n", list[j], bs, v[1], v[2]
+                }
+            }
+        }'
 }
 
 for tool in dd od mkfs.fat mcopy mmd mdel mattrib mdir syslinux mount umount losetup blockdev awk sync wc; do
@@ -201,6 +232,18 @@ if [ "$SYSTEM_TAG" = 98SE ] && [ -n "$USB_DIR" ] && [ -d "$USB_DIR" ]; then
 fi
 printf 'SET U9SYS=%s\r\nSET U9SRC=%s\r\nSET U9ANS=%s\r\nSET U9CSM=1\r\nSET U9T=C:\\USOS9X\r\nSET U9DISK=1\r\n' \
     "$SYSTEM_TAG" "$SETUP_FOLDER" "$ANSWER_KIND" > "$work/c/USOS9X/U9ENV.BAT"
+if [ "$VM_PHASE1" = 1 ]; then
+    printf 'SET U9VM=1\r\n' >> "$work/c/USOS9X/U9ENV.BAT"
+    # In the VM, U9FIX /VGA sees QEMU's display card only: the real display
+    # controllers (PCI class 03h) get their USOSVESA.INF lines here, in
+    # U9FIX's form, so the VESA driver also binds them on the real machine.
+    ids=$(w9x_display_ids "$PCI_ROOT")
+    if [ -n "$ids" ] && [ -f "$work/c/USOS9X/USOSVESA.INF" ]; then
+        w9x_add_display_ids "$ids" < "$work/c/USOS9X/USOSVESA.INF" > "$work/USOSVESA.INF" &&
+            cp "$work/USOSVESA.INF" "$work/c/USOS9X/USOSVESA.INF" || fail 'cannot add the display IDs to USOSVESA.INF'
+    fi
+    log "vm phase 1: U9VM=1, display ids: $(printf '%s' "$ids" | tr '\n' ' ')"
+fi
 
 # The boot floppy runs INSTALL.BAT from C: (A: stays the CD's DOS: SYS,
 # EXTRACT, ATTRIB). HIMEM with /M:2 under CSMWrap; the Me floppy has none.

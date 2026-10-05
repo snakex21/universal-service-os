@@ -170,6 +170,15 @@ usos_w9x_csmwrap_prepare() {
     [ "$TARGET_DEVICE" != "$USOS_DISK_DEVICE" ] || stop 'refusing the USOS disk'
     w9x_csmwrap_log "TARGET $TARGET_DEVICE model=$model serial=$serial size=$size confirmed"
 
+    # Windows 98 / 98 SE: Setup phase 1 in a VM on this machine (qemu9x.cpio,
+    # tools/w9x_phase1_qemu.sh); 95, Me and machines without it keep the
+    # native DOS Setup start.
+    vm_phase1=no
+    if [ -z "$dos_iso" ] && [ -r /usr/lib/usos/w9x_phase1_qemu.sh ]; then
+        . /usr/lib/usos/w9x_phase1_qemu.sh
+        if vm_reason=$(w9x_vm_available "$tag"); then vm_phase1=yes; fi
+        w9x_csmwrap_log "PHASE1 vm=$vm_phase1 ($vm_reason)"
+    fi
     usos_ui_stage 4 5 'Preparing the disk' "Copying $folder Setup, the USOS helpers and CSMWrap to the selected disk." || true
     if [ -n "$dos_iso" ]; then
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="$dos_iso" DOS_WIN3_ISO="$win3_iso" \
@@ -177,7 +186,7 @@ usos_w9x_csmwrap_prepare() {
     else
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="/mnt/data/$iso" W9X_SETUP_FOLDER="$setup" W9X_TAG="$tag" \
             W9X_ANSWER_INF="$answer_inf" W9X_ANSWER_KIND="$answer_kind" W9X_BOOT_FLOPPY="$floppy" W9X_SIZE_GIB="$size_gib" \
-            W9X_USB_DIR="/mnt/data/Drivers/$folder/USB" sh /usr/lib/usos/w9x_csmwrap_target.sh
+            W9X_USB_DIR="/mnt/data/Drivers/$folder/USB" W9X_VM_PHASE1="$([ "$vm_phase1" = yes ] && echo 1 || echo 0)"             sh /usr/lib/usos/w9x_csmwrap_target.sh
     fi
     if ! "$@" >> "$W9X_DIR/prepare.log" 2>&1 < /dev/null; then
         rm -f "$answer_inf"
@@ -185,6 +194,25 @@ usos_w9x_csmwrap_prepare() {
         stop 'The Windows 9x preparation failed; see EFI/USOS/win9x/prepare.log'
     fi
     rm -f "$answer_inf"
+    if [ "$vm_phase1" = yes ]; then
+        w9x_phase1_progress() {
+            usos_ui_stage 5 5 "$folder installation - stage 1 in the background"                 "Do not turn off the computer. Elapsed: $(printf '%d:%02d' $(($1 / 60)) $(($1 % 60))), written to disk: $2 MB." || true
+        }
+        accel=$(w9x_vm_accel)
+        w9x_csmwrap_log "PHASE1 start target=$TARGET_DEVICE accel=$accel guest_mb=$W9X_VM_GUEST_MB timeout=$W9X_VM_TIMEOUT"
+        w9x_phase1_run "$TARGET_DEVICE" "$accel"
+        vm_rc=$?
+        w9x_csmwrap_log "PHASE1 vm rc=$vm_rc elapsed=${W9X_VM_ELAPSED:-?}s"
+        w9x_phase1_keep_logs "$W9X_DIR/phase1"
+        usos_ui_stage 5 5 'Checking the result of stage 1' '' || true
+        if [ "$vm_rc" != 0 ] || ! vm_check=$(w9x_phase1_verify "$TARGET_DEVICE" "$W9X_DIR/phase1"); then
+            w9x_csmwrap_log "PHASE1 FAILED rc=$vm_rc ${vm_check:-}"
+            umount /mnt/data 2>/dev/null || true
+            sync
+            stop 'Windows Setup stage 1 did not finish. The computer was not restarted; logs: EFI/USOS/win9x/phase1'
+        fi
+        w9x_csmwrap_log "PHASE1 PASS $vm_check"
+    fi
     mv "$request" "$W9X_DIR/request.done" 2>/dev/null || true
     umount /mnt/data 2>/dev/null || true
     sync

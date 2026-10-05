@@ -175,6 +175,10 @@ pub const hashes = [_]u32{
     0xf1a71816, // lx.w9x_csmwrap_restart_notice
     0xdfa2e92c, // lx.w9x_csmwrap_why
     0xea679f67, // lx.w9x_no_target_disk
+    0x52a87627, // lx.w9x_phase1_checking
+    0x004a1c42, // lx.w9x_phase1_failed
+    0xf12314c8, // lx.w9x_phase1_progress
+    0xd68d8fdf, // lx.w9x_phase1_title
     0xa4b7e3fb, // lx.w9x_preparation_failed
     0x45c444d4, // lx.w9x_start_the_prepared_disk
     0xd2c4e12a, // lx.windows_c_x_gib_ntfs
@@ -369,6 +373,10 @@ pub const english = [_][]const u8{
     "After the restart the firmware starts this disk's UEFI entry (CSMWrap; CSM stays off) and the {0} installation continues on it. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
     "Without CSM, {0} starts through CSMWrap, so USOS prepares the target disk first.",
     "No target disk found (only the USOS stick). No disk was changed.",
+    "Checking the result of stage 1",
+    "Windows Setup stage 1 did not finish. The computer was not restarted; logs: EFI/USOS/win9x/phase1",
+    "Do not turn off the computer. Elapsed: {0}, written to disk: {1} MB.",
+    "{0} installation - stage 1 in the background",
     "The Windows 9x preparation failed; see EFI/USOS/win9x/prepare.log",
     "{0}: start the prepared disk",
     "Windows C: {0} GiB NTFS.",

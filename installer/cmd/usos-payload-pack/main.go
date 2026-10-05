@@ -30,6 +30,9 @@ var payloadFiles = []payloadFile{
 	{`zig-out/micro-linux/systemd-bootx64.efi`, `EFI/USOS/systemd-bootx64.efi`},
 	{`zig-out/micro-linux/vmlinuz-virt`, `EFI/USOS/micro-linux/vmlinuz-virt`},
 	{`zig-out/micro-linux/initramfs-usos`, `EFI/USOS/micro-linux/initramfs-usos`},
+	// Windows 98 Setup phase 1 in a VM (QEMU, SeaBIOS, KVM modules): a second
+	// initrd only on the w9x-csmwrap command line.
+	{`zig-out/micro-linux/qemu9x.cpio`, `EFI/USOS/micro-linux/qemu9x.cpio`},
 	{`zig-out/windows-native/wimboot`, `EFI/USOS/windows-native/wimboot`},
 	{`zig-out/windows-native/support.cpio`, `EFI/USOS/windows-native/support.cpio`},
 	{`zig-out/windows-native/win7-support.cpio`, `EFI/USOS/windows-native/win7-support.cpio`},

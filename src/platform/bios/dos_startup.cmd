@@ -58,7 +58,7 @@ COPY /Y A:\VMDISP9X.TXT C:\USOS9X >NUL
 FOR %%F IN (USOSKEY.COM USOSKEY.DRV VBMOUSE.EXE VBMOUSE.DRV VBADOS.TXT) DO COPY /Y A:\%%F C:\USOS9X >NUL
 :COPYDONE
 REM Step markers for a hang on real hardware: the last line shows the step.
-ECHO start %U9SYS% (U9CSM=%U9CSM% U9DISK=%U9DISK%)>>C:\USOS9X\INSTALL.LOG
+ECHO start %U9SYS% (U9CSM=%U9CSM% U9DISK=%U9DISK% U9VM=%U9VM%)>>C:\USOS9X\INSTALL.LOG
 IF NOT EXIST C:\%U9SRC%\SETUP.EXE GOTO FAILED
 COPY /Y %U9T%\MSBATCH.INF C:\%U9SRC%\MSBATCH.INF >NUL
 IF ERRORLEVEL 1 GOTO FAILED
@@ -147,6 +147,9 @@ REM Windows 95 Setup knows only /IS of these (and ignored the batch file
 REM with the 98 switches in QEMU): MSBATCH.INF first, then /IS.
 SET U9SW=/IS /IE /NM
 IF "%U9SYS%"=="95" SET U9SW=/IS
+REM U9VM=1: this Setup runs in USOS's QEMU (ACPI off) for its phase 1, the
+REM rest on the real PC under CSMWrap: /P I keeps Windows off ACPI (APM/legacy).
+IF "%U9VM%"=="1" SET U9SW=%U9SW% /P I
 REM Resume hook: C:\AUTOEXEC.BAT calls it while C:\WINDOWS\WIN.COM is missing.
 ECHO @ECHO OFF>C:\USOS9X\RESUME.BAT
 ECHO ECHO Wznawianie Instalatora Windows %U9SYS%...>>C:\USOS9X\RESUME.BAT
