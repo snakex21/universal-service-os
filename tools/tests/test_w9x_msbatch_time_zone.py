@@ -44,6 +44,21 @@ class MsbatchTimeZone(unittest.TestCase):
         self.assertEqual(self.run_tz('a"b'), before)
         self.assertEqual(self.run_tz('x;rm'), before)
 
+    def release_zone(self, tag, zone):
+        script = f'. "{PREPARE}"\nw9x_release_time_zone "$TAG" "$TZ_VALUE"'
+        rc, out, err = sh(script, {'TAG': tag, 'TZ_VALUE': zone})
+        self.assertEqual(rc, 0, err)
+        return out
+
+    def test_windows_98_has_no_pacific_sa(self):
+        # The Windows 98 CD's TIMEZONE.INF lacks only "Pacific SA" (98 SE added it).
+        self.assertEqual(self.release_zone('98', 'Pacific SA'), '')
+        self.assertEqual(self.release_zone('98SE', 'Pacific SA'), 'Pacific SA')
+        self.assertEqual(self.release_zone('98', 'Central European'), 'Central European')
+        self.assertEqual(self.release_zone('98', ''), '')
+        none = Path(PREPARE).read_text(encoding='utf-8')
+        self.assertIn('time_zone=$(w9x_release_time_zone "$tag" "$time_zone")', none)
+
     def test_prepare_uses_it_only_for_the_default_answer(self):
         text = Path(PREPARE).read_text(encoding='utf-8')
         none = text[text.index('        none)'):text.index('        profile)')]

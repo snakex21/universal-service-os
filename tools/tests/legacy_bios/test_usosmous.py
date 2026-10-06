@@ -1,6 +1,6 @@
 """USB mouse for Windows 9x under CSMWrap: the INT 15h C207h callback of the
 real USOSKEY.COM (shared block version 4) in Unicorn, the USOSMOUS.DRV NE
-exports, and its wiring into the 98 SE install (INSTALL.BAT, payload)."""
+exports, and its wiring into the 98 SE / 98 install (INSTALL.BAT, payload)."""
 from pathlib import Path
 import struct
 import sys
@@ -116,6 +116,8 @@ class UsosMouse(unittest.TestCase):
         fix_line = next(i for i, l in enumerate(auto) if 'U9FIX.COM /CSM' in l)
         self.assertLess(copy_line, fix_line, 'the driver must be in SYSTEM before U9FIX names it')
         self.assertIn('IF "%U9SYS%"=="98SE" GOTO MOUSEOK', install)
+        # 98 (first edition) gets the mouse driver too; 95 / Me drop it.
+        self.assertIn('IF "%U9SYS%"=="98" GOTO MOUSEOK', install)
         sys.path.insert(0, str(ROOT / 'tools'))
         import build_win9x_support
         self.assertIn('USOSMOUS.DRV', build_win9x_support.FILES)
