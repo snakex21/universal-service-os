@@ -31,6 +31,17 @@
  *     0040:0018, 0040:0096) as SeaBIOS's INT 09h code would have (the stock
  *     KEYBOARD.DRV reads them) and logs the last 32 keybd_event calls in
  *     the TSR's shared block (version 3) for USOSDBG.EXE.
+ * Interrupt time: the timer callback (poll) interrupts whatever runs in the
+ * system VM, Win32 threads included (X470 98 SE, 2026-10-06: Win32
+ * processes died in KERNEL32's exit path, 0167:BFF8976B, while v3 called
+ * GetAsyncKeyState from it). It only touches the shared block, the BIOS
+ * data area, VKD_API_Force_Key and keybd_event (USER's interrupt-time entry,
+ * the one KEYBOARD.DRV's INT 9 handler uses); no other USER/KERNEL call.
+ * Everything else is computed outside it: MapVirtualKey into vk_of at load
+ * time, the DOS-box test in a WH_CBT hook (HCBT_ACTIVATE, the activating
+ * thread's context), which only sets a flag the callback reads. The
+ * callback also saves all 32-bit registers and FS/GS. Host test:
+ * tools/tests/legacy_bios/test_usoskey_timer_safe.py.
  * Without the TSR (Windows Me starts no real-mode program from AUTOEXEC.BAT
  * and has no WINSTART.BAT) the driver installs the TSR's resident part
  * itself: a copy in DOS memory (GlobalDosAlloc) with INT 08h/09h/15h/1Ch/2Fh
@@ -72,6 +83,8 @@ static CREATETIMER create_timer;
 static KILLTIMER kill_timer;
 static WORD timer;
 static BYTE busy;
+static HHOOK cbt_hook;
+static BYTE dos_focus;              /* WH_CBT: a DOS box (class "tty") is active */
 static BYTE FAR *bda;               /* selector for 0040:0000 */
 
 /* The stock KEYBOARD.DRV keeps the BIOS shift flags in step with every
@@ -80,13 +93,9 @@ static BYTE FAR *bda;               /* selector for 0040:0000 */
  * in usoskey_xlat.h). Only the bits it owns change; written when different. */
 static void sync_bios_flags(void);
 
-static BYTE key_state(int vk)
-{
-    int r = GetAsyncKeyState(vk);
-    return (BYTE)(((r & 0x8000) ? 0x80 : 0) | (r & 1));
-}
-
 static void keyboard_event_raw(WORD ax_value, WORD bx_value);
+static BYTE sent_ctrl(void);
+static BYTE sent_shift(void);
 
 static void keyboard_event(WORD ax_value, WORD bx_value)
 {
@@ -98,8 +107,10 @@ static void keyboard_event(WORD ax_value, WORD bx_value)
         e[1] = HIBYTE(ax_value);
         e[2] = LOBYTE(bx_value);
         e[3] = HIBYTE(bx_value);
-        e[4] = key_state(VK_CONTROL);
-        e[5] = key_state(VK_SHIFT);
+        /* Ctrl / Shift as this driver sent them (80h down): USER's key
+         * state cannot be read at interrupt time (USOSDBG shows its own). */
+        e[4] = sent_ctrl();
+        e[5] = sent_shift();
         e[6] = bda ? bda[0x17] : 0;
         e[7] = bda ? bda[0x18] : 0;
         shared->evseq++;
@@ -159,6 +170,9 @@ static void cad_via_vkd(void)
 #define xlat_cad() cad_via_vkd()
 #include "usoskey_xlat.h"
 
+static BYTE sent_ctrl(void) { return (BYTE)((lctrl || rctrl || altgr_ctrl) ? 0x80 : 0); }
+static BYTE sent_shift(void) { return (BYTE)((lshift || rshift) ? 0x80 : 0); }
+
 static void sync_bios_flags(void)
 {
     static BYTE f17, f18, f96;          /* DGROUP: SS is not DS here */
@@ -170,16 +184,25 @@ static void sync_bios_flags(void)
     if (bda[0x96] != f96) bda[0x96] = f96;
 }
 
-/* Windows 9x: is a DOS box (WinOldAp, class "tty") the active window? */
-static int dos_box_active(void)
+/* Windows 9x: WH_CBT hook, called in the context of the thread that
+ * activates a window (never at interrupt time): is the new active window a
+ * DOS box (WinOldAp, class "tty")? Only the flag reaches the timer. */
+LRESULT FAR PASCAL __export __loadds cbt_proc(int code, WPARAM wp, LPARAM lp)
 {
-    char name[8];
-    HWND w = GetActiveWindow();
-    if (!w || GetClassName(w, name, sizeof(name)) != 3) return 0;
-    return (name[0] | 0x20) == 't' && (name[1] | 0x20) == 't' && (name[2] | 0x20) == 'y';
+    if (code == HCBT_ACTIVATE) {
+        char name[8];
+        HWND w = (HWND)wp;
+        dos_focus = w && GetClassName(w, name, sizeof(name)) == 3 &&
+                    (name[0] | 0x20) == 't' && (name[1] | 0x20) == 't' && (name[2] | 0x20) == 'y';
+    }
+    return CallNextHookEx(cbt_hook, code, wp, lp);
 }
 
-void __far __loadds __saveregs poll(void)
+/* Interrupt time: poll_body and what it calls (translate, keyboard_event,
+ * force_key, cad_via_vkd, sync_bios_flags) run from the system timer.
+ * Allowed beyond the shared block and the BIOS data area: keybd_event_proc
+ * and vkd_entry, nothing else (test_usoskey_timer_safe.py). */
+static void __near __loadds poll_body(void)
 {
     BYTE use_vkd;
     if (busy || !shared) return;
@@ -189,7 +212,7 @@ void __far __loadds __saveregs poll(void)
      * a short timeout let keys overtake the queued ones. */
     shared->alive = 18;
     if (shared->version >= 2) shared->polls++;
-    use_vkd = vkd_entry && (!win9x || dos_box_active());
+    use_vkd = vkd_entry && (!win9x || dos_focus);
     while (shared->tail != shared->head) {
         BYTE b = shared->ring[shared->tail];
         /* VKD full: keep the byte for the next tick. */
@@ -203,6 +226,26 @@ void __far __loadds __saveregs poll(void)
         shared->tail = (shared->tail + 1) & 63;
     }
     busy = 0;
+}
+
+/* SYSTEM.DRV timer callback: whatever it interrupted gets all its registers
+ * back, the 32-bit halves and FS (a Win32 thread's TIB) included. */
+void __declspec(naked) __far poll(void)
+{
+    _asm {
+        pushad
+        push ds
+        push es
+        push fs
+        push gs
+        call poll_body
+        pop gs
+        pop fs
+        pop es
+        pop ds
+        popad
+        retf
+    }
 }
 
 #define TSR_HOOKS 6
@@ -369,11 +412,17 @@ static int init(void)
 static void start(void)
 {
     if (!timer && shared) timer = create_timer(20, (FARPROC)poll);
+    /* DOS-box routing (Windows 9x): without the hook every key takes the
+     * keybd_event path, as on the desktop. */
+    if (win9x && vkd_entry && !cbt_hook)
+        cbt_hook = SetWindowsHookEx(WH_CBT, (HOOKPROC)cbt_proc, GetModuleHandle("USOSKEY"), 0);
 }
 
 static void stop(void)
 {
     if (timer) { kill_timer(timer); timer = 0; }
+    if (cbt_hook) { UnhookWindowsHookEx(cbt_hook); cbt_hook = 0; }
+    dos_focus = 0;
     if (shared) shared->alive = 0;
 }
 

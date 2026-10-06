@@ -38,6 +38,9 @@ SIZE_GIB=${W9X_SIZE_GIB:-32}
 # 1: Setup phase 1 runs in a VM on this machine (tools/w9x_phase1_qemu.sh):
 # U9ENV.BAT gets U9VM=1 (Setup /P I) and USOSVESA.INF this PC's display IDs.
 VM_PHASE1=${W9X_VM_PHASE1:-0}
+# The 9x zone key of MSBATCH.INF [Setup] TimeZone (USOS default answer only):
+# 98 / 98 SE also get C:\USOS9X\TZFIX.BAT for the first-boot Date/Time step.
+TIME_ZONE=${W9X_TIME_ZONE:-}
 PCI_ROOT=${W9X_PCI_ROOT:-/sys/bus/pci/devices}
 ESP_DIR=${W9X_ESP_DIR:-/mnt/esp/EFI/USOS}
 # 98 SE native USB (xhci98 + the user's USB 2.0 stack) is opt-in: only with
@@ -259,6 +262,16 @@ if [ "$VM_PHASE1" = 1 ]; then
     fi
     log "vm phase 1: U9VM=1, display ids: $(printf '%s' "$ids" | tr '\n' ' ')"
 fi
+
+case "$SYSTEM_TAG:$TIME_ZONE" in
+    98SE:?*|98:?*)
+        if [ -r "$LIB/w9x_tzfix.sh" ] && . "$LIB/w9x_tzfix.sh" && w9x_tzfix_write "$TIME_ZONE" "$work/c/USOS9X"; then
+            log "time zone: TZFIX.BAT for '$TIME_ZONE' (first-boot Date/Time step)"
+        else
+            rm -f "$work/c/USOS9X/TZFIX.BAT" "$work/c/USOS9X/TZFIX.REG" "$work/c/USOS9X/TZRO1.REG" "$work/c/USOS9X/TZRO2.REG"
+            log "time zone: no TZFIX for '$TIME_ZONE' (MSBATCH TimeZone only)"
+        fi ;;
+esac
 
 # The boot floppy runs INSTALL.BAT from C: (A: stays the CD's DOS: SYS,
 # EXTRACT, ATTRIB). CREGFIX.SYS from C: first (control registers after
