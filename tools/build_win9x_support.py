@@ -34,7 +34,7 @@
                 clears the control registers CSMWrap leaves set
 
 Also built, not staged yet (hardware diagnostics, copied by hand):
-  USOSDIAG.COM  timer tick / PIC / PIT, INT 15h memory, INT 13h, HPET report
+  USOSDIAG.COM  timer tick / PIC / PIT, INT 15h memory, INT 13h, PCI, VBE, HPET report
   USOSHPET.COM  clears HPET LegacyReplacement (src/platform/bios/win9x/usosdiag.S)
   USOSWHERE.COM TSR: interrupted CS:IP, ticks, PSP and last INT 13h/15h/21h/2Fh
                 AX in the top right corner (src/platform/bios/win9x/usoswhere.S)
@@ -126,8 +126,8 @@ def build_diag(out: Path, work: Path) -> None:
                         str(obj), '-o', str(elf)], env=env, check=True)
         subprocess.run([zig, 'objcopy', '-O', 'binary', str(elf), str(com)], env=env, check=True)
         data = com.read_bytes()
-        # Scratch buffers start at 6F00h (E820/EDD) and 7000h (output).
-        if not 0 < len(data) <= 0x6f00 - 0x100 or b'DIAG.LOG' not in data or name.encode() not in data:
+        # Scratch buffers start at 6A00h (VBE), 6F00h (E820/EDD) and 7000h (output).
+        if not 0 < len(data) <= 0x6a00 - 0x100 or b'DIAG.LOG' not in data or name.encode() not in data:
             raise ValueError('unexpected %s.COM layout' % name)
     obj, elf, com = work / 'USOSWHERE.o', work / 'USOSWHERE.elf', out / 'USOSWHERE.COM'
     subprocess.run([zig, 'cc', '-target', 'x86-freestanding-none', '-mcpu=i386', '-c',

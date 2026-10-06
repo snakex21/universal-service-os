@@ -41,6 +41,17 @@
  *         command, status, bus numbers (18h), memory window, I/O and
  *         prefetchable windows (1Ch, 24h, 28h, 2Ch), bridge control (3Ch).
  *         USOSDBG.EXE shows the same values live under Windows 9x
+ *   VGA   every display-class PCI function (class 03): bus:dev.fn,
+ *         vendor:device, command, status, class, BAR0-BAR5, expansion ROM
+ *         (compare BAR0/BAR2 with the VBE PhysBasePtr below)
+ *   VBE   INT 10h 4F00 (signature, version, TotalMemory in KiB,
+ *         capabilities, mode list pointer, OEM/vendor/product strings),
+ *         4F03 current mode, then 4F01 for every listed graphics mode at
+ *         least 640 wide with a linear framebuffer: attributes, size and
+ *         depth, memory model, BytesPerScanLine (p) and VBE 3
+ *         LinBytesPerScanLine (lp), PhysBasePtr, image pages (banked /
+ *         linear) and BytesPerScanLine * height ("need", ">MEM" when it
+ *         exceeds TotalMemory)
  *   HPET  RSDP (EBDA, E0000-FFFFF) -> RSDT/XSDT -> HPET table -> base;
  *         capabilities, general configuration (bit 0 enable, bit 1
  *         LegacyReplacement = "leg"), timer 0 configuration, whether the
@@ -68,6 +79,8 @@
 .equ OUTEND, 0x7f00
 .equ E820BUF, 0x6f00
 .equ EDDBUF, 0x6f40
+.equ VBEINFO, 0x6a00
+.equ MODEINFO, 0x6c00
 .section .text
 .global _start
 _start:
@@ -84,7 +97,7 @@ _start:
     .asciz "USOSHPET 1.0"
 #else
     call pr
-    .asciz "USOSDIAG 1.2"
+    .asciz "USOSDIAG 1.3"
 #endif
     call tag_and_rtc
     call flush
@@ -110,6 +123,9 @@ _start:
     call sec_drv
     call flush
     call sec_pci
+    call flush
+    call sec_vga
+    call sec_vbe
     call flush
     call sec_hpet
     call flush
@@ -704,6 +720,278 @@ sec_disk:
     movzx edx, word ptr [EDDBUF + 0x18]
     call dec
     jmp nl
+
+/* ---------------------------------------------------------------- */
+/* VBE: 4F00 controller info, 4F03 current mode, then one line per    */
+/* listed graphics mode >= 640 wide with a linear framebuffer (4F01)  */
+sec_vbe:
+    mov di, VBEINFO
+    mov cx, 512
+    xor al, al
+    rep stosb
+    mov dword ptr [VBEINFO], 0x32454256      /* "VBE2": ask for VBE 2.0+ fields */
+    mov di, VBEINFO
+    mov ax, 0x4f00
+    push ds
+    int 0x10
+    pop ds
+    push ds
+    pop es
+    cmp ax, 0x004f
+    je 1f
+    call pr
+    .asciz "VBE 4F00 failed ax:"
+    movzx edx, ax
+    call hex4
+    jmp nl
+1:  call pr
+    .asciz "VBE sig:"
+    mov si, VBEINFO
+    mov cx, 4
+2:  lodsb
+    call putc_print
+    loop 2b
+    call pr
+    .asciz " ver:"
+    movzx edx, word ptr [VBEINFO + 4]
+    call hex4
+    call pr
+    .asciz " mem:"
+    movzx edx, word ptr [VBEINFO + 0x12]
+    shl edx, 6
+    call dec
+    call pr
+    .asciz "K cap:"
+    mov edx, dword ptr [VBEINFO + 0x0a]
+    call hex8
+    call pr
+    .asciz " list:"
+    movzx edx, word ptr [VBEINFO + 0x10]
+    call hex4
+    mov al, ':'
+    call putc
+    movzx edx, word ptr [VBEINFO + 0x0e]
+    call hex4
+    mov ax, 0x4f03
+    push ds
+    int 0x10
+    pop ds
+    push ds
+    pop es
+    call pr
+    .asciz " cur:"
+    movzx edx, bx
+    cmp ax, 0x004f
+    je 3f
+    mov dx, 0xffff
+3:  call hex4
+    call nl
+    call pr
+    .asciz "VBE oem:"
+    mov bx, 0x06
+    call vbe_str
+    cmp word ptr [VBEINFO + 4], 0x0200
+    jb 4f
+    call pr
+    .asciz " sw:"
+    movzx edx, word ptr [VBEINFO + 0x14]
+    call hex4
+    call pr
+    .asciz " vendor:"
+    mov bx, 0x16
+    call vbe_str
+    call pr
+    .asciz " prod:"
+    mov bx, 0x1a
+    call vbe_str
+    call pr
+    .asciz " rev:"
+    mov bx, 0x1e
+    call vbe_str
+4:  call nl
+    call flush
+    /* the mode list (may live inside VBEINFO; 4F01 writes MODEINFO) */
+    mov word ptr [vbe_n], 0
+    mov word ptr [vbe_shown], 0
+    mov si, word ptr [VBEINFO + 0x0e]
+5:  mov fs, word ptr [VBEINFO + 0x10]
+    mov cx, word ptr fs:[si]
+    cmp cx, 0xffff
+    je 9f
+    cmp word ptr [vbe_n], 400
+    jae 9f
+    inc word ptr [vbe_n]
+    add si, 2
+    push si
+    push cx
+    mov di, MODEINFO
+    mov cx, 256
+    xor al, al
+    rep stosb
+    pop cx
+    push cx
+    mov ax, 0x4f01
+    mov di, MODEINFO
+    push ds
+    int 0x10
+    pop ds
+    push ds
+    pop es
+    pop cx
+    cmp ax, 0x004f
+    jne 8f
+    mov dx, word ptr [MODEINFO]
+    and dx, 0x0090                  /* graphics + linear framebuffer */
+    cmp dx, 0x0090
+    jne 8f
+    cmp word ptr [MODEINFO + 0x12], 640
+    jb 8f
+    call vbe_mode
+    inc word ptr [vbe_shown]
+    call flush
+8:  pop si
+    jmp 5b
+9:  call pr
+    .asciz "VBE modes listed:"
+    movzx edx, word ptr [vbe_n]
+    call dec
+    call pr
+    .asciz " lfb>=640:"
+    movzx edx, word ptr [vbe_shown]
+    call dec
+    jmp nl
+
+/* cx = mode number, MODEINFO filled */
+vbe_mode:
+    call pr
+    .asciz "VBE m:"
+    movzx edx, cx
+    call hex4
+    call pr
+    .asciz " a:"
+    movzx edx, word ptr [MODEINFO]
+    call hex4
+    mov al, ' '
+    call putc
+    movzx edx, word ptr [MODEINFO + 0x12]
+    call dec
+    mov al, 'x'
+    call putc
+    movzx edx, word ptr [MODEINFO + 0x14]
+    call dec
+    mov al, 'x'
+    call putc
+    movzx edx, byte ptr [MODEINFO + 0x19]
+    call dec
+    call pr
+    .asciz " mm:"
+    movzx edx, byte ptr [MODEINFO + 0x1b]
+    call hex2
+    call pr
+    .asciz " p:"
+    movzx edx, word ptr [MODEINFO + 0x10]
+    call dec
+    call pr
+    .asciz " lp:"
+    movzx edx, word ptr [MODEINFO + 0x32]
+    call dec
+    call pr
+    .asciz " lfb:"
+    mov edx, dword ptr [MODEINFO + 0x28]
+    call hex8
+    call pr
+    .asciz " pg:"
+    movzx edx, byte ptr [MODEINFO + 0x1d]
+    call dec
+    mov al, '/'
+    call putc
+    movzx edx, byte ptr [MODEINFO + 0x36]
+    call dec
+    /* bytes needed by one page: BytesPerScanLine * YResolution */
+    call pr
+    .asciz " need:"
+    movzx eax, word ptr [MODEINFO + 0x10]
+    movzx edx, word ptr [MODEINFO + 0x14]
+    mul edx
+    mov edx, eax
+    call hex8
+    movzx edx, word ptr [VBEINFO + 0x12]
+    shl edx, 16
+    cmp eax, edx
+    jbe 1f
+    call pr
+    .asciz " >MEM"
+1:  jmp nl
+
+/* bx = offset of a far string pointer in VBEINFO; up to 40 printable chars */
+vbe_str:
+    push si
+    push fs
+    mov si, word ptr [VBEINFO + bx]
+    mov fs, word ptr [VBEINFO + bx + 2]
+    mov cx, 40
+1:  mov al, byte ptr fs:[si]
+    test al, al
+    jz 2f
+    call putc_print
+    inc si
+    loop 1b
+2:  pop fs
+    pop si
+    ret
+
+/* al -> putc, non-printable as '.' */
+putc_print:
+    cmp al, 0x20
+    jb 1f
+    cmp al, 0x7e
+    jbe 2f
+1:  mov al, '.'
+2:  jmp putc
+
+/* every display-class PCI function (class 03): BARs and expansion ROM */
+sec_vga:
+    mov ebp, 0x80000000
+1:  xor bl, bl
+    call cfg
+    cmp ax, 0xffff
+    je 2f
+    mov bl, 0x08
+    call cfg
+    shr eax, 24
+    cmp al, 0x03
+    jne 2f
+    call pr
+    .asciz "VGA "
+    call pci_bdf
+    call pr
+    .asciz " cls:"
+    mov bl, 0x08
+    call cfg
+    mov edx, eax
+    shr edx, 8
+    call hex8
+    call pr
+    .asciz " bar0-5:"
+    mov bl, 0x10
+3:  call pci_reg
+    add bl, 4
+    cmp bl, 0x28
+    jb 3b
+    call pr
+    .asciz " rom:"
+    mov bl, 0x30
+    call pci_reg
+    call nl
+    call flush
+2:  add ebp, 0x100
+    test ebp, 0x7f000000
+    jnz 4f
+    mov eax, ebp
+    shr eax, 16
+    cmp al, byte ptr [pci_max]
+    jbe 1b
+4:  ret
 #endif
 
 /* ---------------------------------------------------------------- */
@@ -1509,6 +1797,8 @@ pci_max:    .byte 0
 pci_pass:   .byte 0
 pci_ports:  .byte 0
 pci_bus:    .space 8
+vbe_n:      .word 0
+vbe_shown:  .word 0
 drv:        .byte 0
 .balign 4
 t1:         .long 0
