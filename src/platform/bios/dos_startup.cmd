@@ -149,6 +149,9 @@ ECHO @C:\USOS9X\U9FIX.COM /95 /CSM C:\WINDOWS\SYSTEM.INI>>C:\AUTOEXEC.BAT
 REM 95/98/98 SE with the USOS default answer: C:\USOS9X\TZFIX.BAT (tools/w9x_tzfix.sh)
 REM presets the time zone once and drops the first-boot Date/Time step.
 ECHO @IF EXIST C:\USOS9X\TZFIX.BAT CALL C:\USOS9X\TZFIX.BAT>>C:\AUTOEXEC.BAT
+REM Windows 95: C:\USOS9X\VESA95.BAT (tools/w9x_vesa95.sh) moves the display
+REM from Standard VGA to the VESA driver once (95 never enumerates PCI here).
+ECHO @IF EXIST C:\USOS9X\VESA95.BAT CALL C:\USOS9X\VESA95.BAT>>C:\AUTOEXEC.BAT
 REM A restart before Setup copied Windows (hang, power loss): RESUME.BAT,
 REM written once Patcher9x succeeded, starts Setup again.
 ECHO @IF NOT EXIST C:\WINDOWS\WIN.COM IF EXIST C:\USOS9X\RESUME.BAT CALL C:\USOS9X\RESUME.BAT>>C:\AUTOEXEC.BAT

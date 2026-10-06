@@ -445,6 +445,17 @@ and the 95 OSR2 startup disk as `Systems\Windows\Windows 95\Boot\BOOTDISK.IMG` (
   without one; not a DATA answer file) asks "Enter the Windows 95 product key" first
   (`win9x_key_prompt.zig`); the key goes only into the staged `95.INF` for this start, so phase 1 runs in
   the VM instead of the native start that freezes on the X470.
+* **VESA on 95 (2026-10-07, X470 report: 16-colour VGA with redraw smearing)**: 95 never enumerates PCI
+  under SeaBIOS: its detection skips the PCI bus when a PnP BIOS answers (DETLOG `SetVar: PNPBIOS=`, no
+  `*PNP0A03`; 98 detects `*PNP0A03` as a root device), and SeaBIOS's PnP BIOS lists no PCI node, so the
+  registry has no `Enum\PCI` at all. The display is the legacy-detected `Enum\Root\*PNP0900\0000`, bound
+  by detection to MSDISP.INF `[VGA]`; Setup never reads USOSVESA.INF (nothing in `INF\OTHER`), whatever
+  DevicePath says. Fix: for 95 `w9x_csmwrap_target.sh` writes `C:\USOS9X\VESA95.BAT` + `VESA95.REG`
+  (`tools/w9x_vesa95.sh`), AUTOEXEC.BAT calls it before Windows: once, only while `Display\0000` is still
+  `msdisp.inf`, it copies the vmdisp9x files to `SYSTEM`, USOSVESA.INF to `INF`, and imports USOSVESA.INF
+  `[VESA]`'s values (DEFAULT `vesamini.drv`/`.vxd`, MODES, `vmdisp9x\vesa` `NoMemTest`="1"), 16-bit
+  1024x768, with the TZFIX guards (`VESA95.RUN/.OK/.BAD`, backup `SYSTEM.V5`/`USER.V5`, export + FIND,
+  restore on failure). SYSTEM.INI already has `display.drv=pnpdrvr.drv` and `display=*vdd,*vflatd`.
 
 ## 5. Open points
 
