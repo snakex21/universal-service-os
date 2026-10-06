@@ -236,8 +236,8 @@ runs that stage in QEMU on the same machine and only the rest on the real hardwa
   stop screen appears and the PC does not restart. Logs go to `EFI\USOS\win9x\phase1\` (command,
   QEMU, SeaBIOS debugcon, monitor, the last screendump, INSTALL.LOG, SETUPLOG/DETLOG).
 * The default is TCG. KVM is used only with `EFI\USOS\win9x\phase1-kvm.flag` and a working
-  `/dev/kvm`. `EFI\USOS\win9x\phase1-native.flag`, less than about 900 MB RAM, 95, Me or no
-  qemu9x.cpio keep the old path (DOS Setup on the real PC).
+  `/dev/kvm`. `EFI\USOS\win9x\phase1-native.flag`, less than about 900 MB RAM, 95 or no
+  qemu9x.cpio keep the old path (DOS Setup on the real PC). Me uses the VM since 2026-10-06 (section 4g).
 * Licence gap before a release: Alpine's QEMU links `libsasl2` (BSD-4-Clause-Attribution), which
   is not GPL-compatible. Milestone 2 replaces the Alpine binaries with our own minimal static
   build (no VNC/SASL/Xen/slirp).
@@ -330,6 +330,61 @@ the menu tells 98 from 98 SE by the DATA folder (catalog `windows-98` / `windows
 * Unchanged: xhci98 stays 98 SE + opt-in only (98 FE has no USB 2.0 stack; NUSB does not apply).
 * Risks, not seen on hardware yet: the OEM first-run pages as on 98 SE (bridge keyboard/mouse);
   the phase-1 VM path was proven with 98 SE only (98 FE reached the desktop in QEMU, section 3); IE 4 desktop update.
+
+## 4g. Windows Me through the same UEFI flow (2026-10-06)
+
+Audit of the CSMWrap path for `windows-me` (tag `ME`, Setup folder `WIN9X`), media: the user's
+`Microsoft_Windows_ME_(4.90.3000)_[Polish]_(OEM).iso` (old tree root; DATA `Systems\Windows\Windows Me\Images`
+on the Kingston is still empty, copy it there before the X470 run).
+
+* **Phase 1 in the VM** (new): `w9x_vm_available` now takes `98SE|98|ME`; 95 alone keeps the native start.
+  Me's SETUP.EXE has the same DOS stage as 98 and accepts `/P I` (U9VM=1). Nothing else changed in
+  INSTALL.BAT: Me skips `SYS C:` (its Setup writes the MSWIN4.1 boot sector and IO.SYS/MSDOS.SYS in the VM)
+  and copies USOSKEY.DRV into `C:\WINDOWS\SYSTEM` before Setup, plus the `[USOS.Csm]` line
+  `system.ini,boot,drivers,,usoskey.drv` (profile and default answer; a user file is copied 1:1).
+* **Keyboard**: no TSR on Me, USOSKEY.DRV installs its own resident copy; that copy is the whole USOSKEY.COM
+  resident part (`tsr_image` up to `resident_end`), so it has the v4 mouse ring and callback (`mcb`) and the
+  INT 16h guard (TSR_HOOKS: 08h/09h/15h/16h/1Ch/2Fh).
+* **Mouse**: still off on Me (INSTALL.BAT deletes USOSMOUS.DRV for 95/Me, nothing names it). Two open
+  problems: the earlier Me callback test ended in a protection error at the first USB mouse report, and Me
+  runs nothing at every start that could set `mouse.drv=usosmous.drv` again after Setup's detection (U9FIX
+  /CSM only runs from AUTOEXEC.BAT on 95/98).
+* **TZFIX: not needed on Me.** The Me CD's SETUPC.INF (PRECOPY1.CAB) defines `SetTimeZone_Desc` but adds no
+  `RunOnce\Setup` TIMEDATE step (its `[NewWin.AddReg]` has only wallpaper, RunOnceEx 101 and VPOWERD); Me's
+  TIMEZONE.INF has every key of the menu's list (63; Me adds 12 more), so `TimeZone=` from the menu or a
+  profile goes into MSBATCH as on 98 SE and `w9x_release_time_zone` drops nothing for Me.
+* **Unchanged**: Patcher9x `-select all`, vmdisp9x VESA (`NoMemTest`), MSBATCH `UpdateInis` memory limits
+  (MaxPhysPage / MaxFileCache, Me has no U9FIX run), xhci98 stays 98 SE + opt-in.
+* **MSDOS.SYS on Me**: INSTALL.BAT cannot write it (Me's Setup writes its own in the VM), so
+  `w9x_phase1_patch_c` adds `Logo=0` under `[Options]` after phase 1 when the file has no `Logo=` line
+  (in place, the hidden/system/read-only bits stay; checked on the phase-1 disk under micro-Linux:
+  `rhs` before and after). Reason: the same text start as 95/98 (start messages visible for hardware
+  reports); it did **not** cure the QEMU hang below. `BootMenu=0` / `BootMenuDefault=1` are not written on Me (no DOS-mode menu entry
+  to fall into). CREGFIX.SYS stays in CONFIG.SYS, but Me's IO.SYS most likely ignores `DEVICE=` lines (not
+  checked on hardware; Patcher9x's CR patch covers VMM).
+* **QEMU smoke (one install, 2026-10-06)**: nested micro-Linux (initramfs-usos + qemu9x.cpio, this branch's
+  scripts) wrote a 3 GiB target and ran phase 1 in the inner QEMU (TCG, ACPI off, `/P I`): `RUN_RC=0` after
+  1031 s, verify PASS ("phase 1 files present"; `SYSTEM.INI: removed mouse=*vmouse, msmouse.vxd`),
+  `INSTALL.LOG`: `SETUP start /IS /IE /NM /P I`; SYSTEM.INI `[boot] drivers=mmsystem.dll usoskey.drv`,
+  `MaxPhysPage=40000`, `MaxFileCache=262144`; boot sector `MSWIN4.1`. Then OVMF -> the disk's CSMWrap ESP ->
+  Me hardware detection -> OEM wizard: user page (pre-filled USOS, typed on the **USB keyboard** through the
+  bridge), licence (Alt+A), **product key page empty although MSBATCH had `ProductKey`** (typed), finish ->
+  final setup steps (no time zone step in the list).
+  **Not reached: the Me desktop.** At Setup's last restart (after "Konfiguracja systemu") the QEMU guest
+  stays in VMM (ring 0, EIP c000afd5..c000b6e3, CR2=000B8000 constant) with a garbled text-mode screen,
+  with the logo on and again with `Logo=0` (second phase-2 run from the same phase-1 disk). Not analysed
+  (time box): QEMU-only (TCG, `-cpu max`, 2 vCPUs, 2 GiB, std VGA; CSMWrap panics "BIOS proxy
+  initialization failed" with 1 vCPU) or real is open. The 2026-09-30 Me desktop on CSMWrap came from the
+  native phase 1 without vmdisp9x/Patcher9x defaults of today, so suspects to bisect next: vmdisp9x VESA
+  on the first normal start, Patcher9x `-select all` on Me, `-cpu max`.
+* **Build / deploy**: test/x470-98se-qemu `B261006-202506-0B914CC3`, Kingston updated (usos-physical-update
+  with all four partition GUIDs: PASS 5/5, initramfs-usos SHA-256 1367BF96... read back; XP package
+  `--data M:/` + `-DriversOnly -Language pl`: HASH_READBACK=PASS, layout unchanged).
+* **X470 run** (manual): copy the Me ISO to DATA `Systems\Windows\Windows Me\Images`, UEFI menu -> Windows
+  Me -> target disk -> phase 1 in the VM (about 17 min under TCG in the nested test) -> restart into the
+  disk's CSMWrap entry -> detection -> OEM wizard on the USB keyboard (user page, licence Alt+A, product key
+  typed, finish) -> last restart: report whether the desktop appears or the start stops like in QEMU
+  (with `Logo=0` the last text line is visible). No USB mouse on Me yet.
 
 ## 5. Open points
 
