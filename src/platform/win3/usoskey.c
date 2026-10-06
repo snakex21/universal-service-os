@@ -12,6 +12,12 @@
  *     BX=000Dh) puts each byte into the focus VM as if typed on the 8042
  *     keyboard: the stock KEYBOARD.DRV (system VM, national layouts, dead
  *     keys) or the BIOS of a DOS box processes it natively.
+ *   Windows 9x, Windows desktop in front: keybd_event as in standard mode
+ *     (below). The 98 VKD only queues forced bytes for the system VM while
+ *     it traps the 8042 ports or the VM is in its message mode; with a real
+ *     8042 (X470 + PS/2 keyboard, 2026-10-06) the bytes were accepted and
+ *     never reached Windows. VKD stays in use when a DOS box (WinOldAp
+ *     "tty" window) is active.
  *   standard mode (no VKD): the driver translates to a virtual key (the
  *     stock driver's MapVirtualKey for the typing keys, so QWERTZ/AZERTY
  *     layouts keep their VKs; a fixed table for the rest) and calls USER's
@@ -46,6 +52,7 @@ static SHARED FAR *shared;
 static WORD shared_sel;
 static DWORD keybd_event_proc;      /* USER.289, register interface */
 static DWORD vkd_entry;             /* VKD PM API (enhanced mode) */
+static BYTE win9x;                  /* Windows 4.x: desktop keys via keybd_event */
 static CREATETIMER create_timer;
 static KILLTIMER kill_timer;
 static WORD timer;
@@ -122,7 +129,7 @@ static int force_key(BYTE scan)
         push es
         mov ch, scan
         mov cl, 1
-        mov ax, 1             ; VKD_API_Force_Key
+        mov eax, 1            ; VKD_API_Force_Key: VKD compares all of EAX
         xor ebx, ebx          ; focus VM
         mov edx, 0FFFFFFFFh   ; shift state unchanged
         call dword ptr vkd_entry
@@ -172,8 +179,18 @@ static void translate(BYTE b)
     keyboard_event((WORD)vk | (up ? 0x8000 : 0), (WORD)code | (ext ? 0x0100 : 0));
 }
 
+/* Windows 9x: is a DOS box (WinOldAp, class "tty") the active window? */
+static int dos_box_active(void)
+{
+    char name[8];
+    HWND w = GetActiveWindow();
+    if (!w || GetClassName(w, name, sizeof(name)) != 3) return 0;
+    return (name[0] | 0x20) == 't' && (name[1] | 0x20) == 't' && (name[2] | 0x20) == 'y';
+}
+
 void __far __loadds __saveregs poll(void)
 {
+    BYTE use_vkd;
     if (busy || !shared) return;
     busy = 1;
     /* About 1 s of INT 1Ch ticks (every VM counts them down in 386 enhanced
@@ -181,13 +198,17 @@ void __far __loadds __saveregs poll(void)
      * a short timeout let keys overtake the queued ones. */
     shared->alive = 18;
     if (shared->version >= 2) shared->polls++;
+    use_vkd = vkd_entry && (!win9x || dos_box_active());
     while (shared->tail != shared->head) {
         BYTE b = shared->ring[shared->tail];
         /* VKD full: keep the byte for the next tick. */
-        if (vkd_entry) {
+        if (use_vkd) {
             if (!force_key(b)) { shared->refused++; break; }
             shared->forced++;
-        } else translate(b);
+        } else {
+            translate(b);
+            shared->forced++;               /* delivered (keybd_event) */
+        }
         shared->tail = (shared->tail + 1) & 63;
     }
     busy = 0;
@@ -341,6 +362,8 @@ static int init(void)
         numlock = (flags & 0x20) != 0;
     }
     if (GetWinFlags() & WF_ENHANCED) find_vkd();
+    win9x = LOBYTE(LOWORD(GetVersion())) >= 4 ||
+            (LOBYTE(LOWORD(GetVersion())) == 3 && HIBYTE(LOWORD(GetVersion())) >= 95);
     return 1;
 }
 
