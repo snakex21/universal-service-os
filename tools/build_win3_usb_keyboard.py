@@ -1,7 +1,9 @@
 """USB keyboard for Windows 3.x under CSMWrap (docs/design/bios-via-csmwrap.md):
 USOSKEY.COM (DOS TSR, src/platform/bios/msdos/usoskey.S, zig cc + ld.lld at
 0100h) and USOSKEY.DRV (Win16 installable driver, src/platform/win3/usoskey.c,
-OpenWatcom 2.0 wcc/wlink, no OpenWatcom runtime linked).
+OpenWatcom 2.0 wcc/wlink, no OpenWatcom runtime linked). USB mouse:
+USOSMOUS.DRV (Win16 mouse driver, src/platform/win3/usosmous.c) on the
+mouse ring of the same TSR (shared block version 4).
 
 OpenWatcom is pinned (OW_SNAPSHOT below): the snapshot archive is taken from
 tools/cache/openwatcom or tools/cache/buildkit-downloads (build kit), or
@@ -133,6 +135,25 @@ def build_driver(out: Path, work: Path) -> Path:
     return drv
 
 
+def build_mouse_driver(out: Path, work: Path) -> Path:
+    ow = openwatcom()
+    env = dict(os.environ, WATCOM=str(ow), INCLUDE=f'{work};{ow / "h"};{ow / "h/win"}',
+               PATH=str(ow / 'binnt64') + os.pathsep + os.environ.get('PATH', ''))
+    obj = work / 'usosmous.obj'
+    subprocess.run([str(ow / 'binnt64/wcc.exe'), '-q', '-bt=windows', '-bd', '-ms', '-zu', '-zl', '-s', '-3', '-osi',
+                    '-w3', '-we', '-fo=' + str(obj), str(ROOT / 'src/platform/win3/usosmous.c')], env=env, check=True, cwd=work)
+    drv = out / 'USOSMOUS.DRV'
+    subprocess.run([str(ow / 'binnt64/wlink.exe'), '@' + str(ROOT / 'src/platform/win3/usosmous.lnk'),
+                    'file', str(obj), 'name', str(drv), 'option', 'map=' + str(work / 'usosmous.map')], env=env, check=True, cwd=work)
+    data = drv.read_bytes()
+    ne = int.from_bytes(data[0x3c:0x3e], 'little')
+    if data[ne:ne + 2] != b'NE' or b'MOUSEGETINTVECT' not in data or b'MOUSE' not in data:
+        raise ValueError('USOSMOUS.DRV is not the expected NE mouse driver (module MOUSE)')
+    if 'clib' in (work / 'usosmous.map').read_text(errors='replace').lower():
+        raise ValueError('USOSMOUS.DRV must not link the OpenWatcom C library')
+    return drv
+
+
 def build(root: Path = ROOT, out: Path | None = None):
     out = (out or root / 'zig-out/dos-native/msdos').resolve()
     work = root / 'zig-out/win3-usb-keyboard'
@@ -141,7 +162,9 @@ def build(root: Path = ROOT, out: Path | None = None):
     com = build_tsr(out, work)
     write_tsr_header(com, work / 'usoskey.elf', work)
     drv = build_driver(out, work)
-    print(f'[PASS] Windows 3.x USB keyboard: {com.name} {com.stat().st_size} bytes, {drv.name} {drv.stat().st_size} bytes '
+    mouse = build_mouse_driver(out, work)
+    print(f'[PASS] Windows 3.x USB keyboard and mouse: {com.name} {com.stat().st_size} bytes, {drv.name} {drv.stat().st_size} bytes, '
+          f'{mouse.name} {mouse.stat().st_size} bytes '
           f'(OpenWatcom snapshot {OW_SNAPSHOT["sha256"][:12]})')
 
 

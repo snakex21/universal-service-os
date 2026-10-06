@@ -79,6 +79,12 @@ class U9Fix(unittest.TestCase):
             elif ah == 0x56:
                 new = string(uc.reg_read(UC_X86_REG_DI))
                 files[new] = files.pop(string(dx)); carry(False)
+            elif ah == 0x43:
+                self.assertEqual(ax, 0x4300)
+                if string(dx) in files:
+                    uc.reg_write(UC_X86_REG_CX, 0x20); carry(False)
+                else:
+                    uc.reg_write(UC_X86_REG_AX, 2); carry(True)
             elif ah == 0x09:
                 pass
             elif ah == 0x4c:
@@ -212,6 +218,39 @@ class U9Fix(unittest.TestCase):
         files = {INI: text}
         self.run_fix(files)
         self.assertIn(b'mouse=*vmouse, msmouse.vxd\r\n', files[INI])
+
+    def test_csm_mode_names_the_usb_mouse_driver_when_it_is_in_system(self):
+        drv = 'C:\\WINDOWS\\SYSTEM\\USOSMOUS.DRV'
+        text = (b'[boot]\r\nshell=Explorer.exe\r\ndrivers=mmsystem.dll usoskey.drv\r\nmouse.drv=mouse.drv\r\n'
+                b'[boot.description]\r\nmouse.drv=Standard mouse\r\n[386Enh]\r\nMaxPhysPage=40000\r\n[vcache]\r\nMaxFileCache=1\r\n')
+        files = {INI: text, drv: b'MZ'}
+        st = self.run_fix(files, command=' /CSM ' + INI)
+        self.assertEqual(st['exit'], 0)
+        # Setup's mouse.drv line is replaced in place; [boot.description] stays.
+        self.assertEqual(files[INI], b'[boot]\r\nshell=Explorer.exe\r\ndrivers=mmsystem.dll usoskey.drv\r\nmouse.drv=usosmous.drv\r\n'
+                         b'[boot.description]\r\nmouse.drv=Standard mouse\r\n[386Enh]\r\nMaxPhysPage=40000\r\n[vcache]\r\nMaxFileCache=1\r\n')
+        again = dict(files)
+        st = self.run_fix(again, command=' /CSM ' + INI)
+        self.assertEqual((st['exit'], st['writes'], again), (0, 0, files))
+        # No mouse.drv and no drivers= line: both go right after [boot].
+        files = {INI: b'[boot]\r\nshell=Explorer.exe\r\n[386Enh]\r\nMaxPhysPage=40000\r\n[vcache]\r\nMaxFileCache=1\r\n', drv: b'MZ'}
+        self.run_fix(files, command=' /CSM ' + INI)
+        self.assertEqual(files[INI], b'[boot]\r\nmouse.drv=usosmous.drv\r\ndrivers=usoskey.drv\r\nshell=Explorer.exe\r\n'
+                         b'[386Enh]\r\nMaxPhysPage=40000\r\n[vcache]\r\nMaxFileCache=1\r\n')
+        # A look-alike value on the last line without CR LF.
+        files = {INI: b'[386Enh]\r\nMaxPhysPage=40000\r\n[vcache]\r\nMaxFileCache=1\r\n[boot]\r\ndrivers=usoskey.drv\r\n'
+                      b'Mouse.drv=usosmous.drv2', drv: b'MZ'}
+        self.run_fix(files, command=' /CSM ' + INI)
+        self.assertEqual(files[INI], b'[386Enh]\r\nMaxPhysPage=40000\r\n[vcache]\r\nMaxFileCache=1\r\n[boot]\r\n'
+                         b'drivers=usoskey.drv\r\nmouse.drv=usosmous.drv\r\n')
+        # The driver is not in SYSTEM (95, Me, before the AUTOEXEC copy): untouched.
+        files = {INI: text}
+        self.run_fix(files, command=' /CSM ' + INI)
+        self.assertIn(b'mouse.drv=mouse.drv\r\n', files[INI])
+        # Without /CSM the mouse driver line stays.
+        files = {INI: text, drv: b'MZ'}
+        self.run_fix(files)
+        self.assertEqual(files[INI], text)
 
 
 if __name__ == '__main__':

@@ -164,6 +164,19 @@ flow (FreeDOS, PC DOS, NT 4.0, betas) show "Unavailable".
   error at KERNEL init (bisected on the disk). The CSMWrap bridge is now
   keyboard-only (U9FIX /CSM adds only usoskey.drv). **A USB mouse in the
   installed Windows 9x under CSMWrap is open** (planned: a VxD-level mouse).
+* 98 SE USB mouse, 2026-10-06 (**untested on the X470**): `USOSMOUS.DRV`
+  (`[boot] mouse.drv=usosmous.drv`, clean-room Win16 mouse driver, module
+  MOUSE) registers USOSKEY.COM's resident callback with INT 15h C205h/C207h/
+  C200h through DPMI 0300h on Enable; SeaBIOS far-calls it per packet, the TSR
+  queues packets in the shared block (version 4, +396), the driver drains them
+  from a 20 ms system timer into USER's event procedure. `[386Enh]` stays
+  without `*vmouse`. U9FIX /CSM writes the `mouse.drv=` line only when
+  `SYSTEM\USOSMOUS.DRV` exists (98 SE only); USOSDBG 1.2 shows MOUSE lines.
+  QEMU, plain SeaBIOS, i8042 PS/2 mouse (same BIOS callback path, IRQ 12
+  instead of the USB poll): pointer moves and a click opens the Start menu.
+  The USB source itself is not covered in QEMU (plain SeaBIOS hangs in SMM,
+  without SMM it cannot poll xHCI from V86; CSMWrap from an extra ESP disk
+  returns Unsupported in the OVMF shell). Revert: `mouse.drv=mouse.drv`.
 * 98 SE end to end (QEMU OVMF, 2026-10-04): the user's key typed in the wizard, hardware setup, final
   restart, **desktop with the USB keyboard** (`uefi-98se-desktop-usb-keyboard.png`). Second finding: the
   DOS `KEYB` TSR that Setup appends to AUTOEXEC.BAT, loaded after USOSKEY.COM, also stops Windows with a

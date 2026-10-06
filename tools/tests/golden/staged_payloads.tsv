@@ -461,6 +461,7 @@ payload_zip	EFI/USOS/dos-native/win9x/U9FIX.COM
 payload_zip	EFI/USOS/dos-native/win9x/U9FIX.TXT
 payload_zip	EFI/USOS/dos-native/win9x/USOSKEY.COM
 payload_zip	EFI/USOS/dos-native/win9x/USOSKEY.DRV
+payload_zip	EFI/USOS/dos-native/win9x/USOSMOUS.DRV
 payload_zip	EFI/USOS/dos-native/win9x/USOSVESA.INF
 payload_zip	EFI/USOS/dos-native/win9x/VBADOS.TXT
 payload_zip	EFI/USOS/dos-native/win9x/VBMOUSE.DRV

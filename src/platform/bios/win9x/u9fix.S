@@ -36,7 +36,13 @@
  *   drivers=... usoskey.drv    USOSKEY.DRV feeds the USB keys that
  *                              USOSKEY.COM collected to VKD (Windows 3.x
  *                              bridge, docs/design/bios-via-csmwrap.md 8.5)
- * The token is appended to an existing drivers= line. And in [386Enh] every
+ * The token is appended to an existing drivers= line.
+ *   mouse.drv=usosmous.drv     only when SYSTEM\USOSMOUS.DRV exists next to
+ *                              the file (USB mouse through USOSKEY.COM's
+ *                              mouse ring, src/platform/win3/usosmous.c);
+ *                              another mouse.drv= value (Setup's detection
+ *                              writes mouse.drv) is replaced at every start.
+ * And in [386Enh] every
  *   mouse=*vmouse...           is deleted: Setup's detection adds it for an
  *                              i8042 mouse (QEMU in phase 1; SeaBIOS under
  *                              CSMWrap reports the USB mouse as a BIOS PS/2
@@ -44,8 +50,7 @@
  *                              real machine with a zero IRQ handle (X470).
  * Other mouse= values stay. No VBADOS mouse line either: VBADOS's
  * VBMOUSE.EXE next to Windows 98's own PS/2 mouse VxD stops the installed
- * system with a protection error at KERNEL init (docs/win9x-modern-2026-09-30.md);
- * a USB mouse in Windows 9x under CSMWrap is open.
+ * system with a protection error at KERNEL init (docs/win9x-modern-2026-09-30.md).
  *
  * No file, a file above 48 KiB or any DOS error: exit code 1, file unchanged.
  * Built with tools/build_win9x_support.py (zig cc, linked at 0100h).
@@ -417,20 +422,7 @@ csm_boot:
     mov cx, 6
     call find_line
     jc csm_mouse                    /* no [boot]: no driver to add */
-    add di, cx
-csm_header_eol:
-    cmp di, word ptr [limit]
-    jae csm_header_end
-    mov al, byte ptr [di]
-    inc di
-    cmp al, 10
-    jne csm_header_eol
-    jmp csm_section
-csm_header_end:
-    call ensure_newline
-    mov di, word ptr [limit]
-csm_section:
-    mov word ptr [sec_start], di
+    call boot_body
     /* drivers=: append " usoskey.drv" unless the line has it */
     mov si, offset key_drivers
     mov cx, 8
@@ -450,7 +442,7 @@ csm_token:
     mov si, offset tok_usoskey
     mov cx, 11
     call match_at
-    je csm_mouse
+    je csm_mousedrv
     inc bx
     jmp csm_token
 csm_token_end:
@@ -459,11 +451,61 @@ csm_token_end:
     mov cx, 12
     call insert
     jc csm_full
-    jmp csm_mouse
+    jmp csm_mousedrv
 csm_drivers_new:
     mov di, word ptr [sec_start]
     mov si, offset line_drivers
     mov cx, word ptr [line_drivers_len]
+    call insert
+    jc csm_full
+csm_mousedrv:
+    /* mouse.drv=usosmous.drv, only with SYSTEM\USOSMOUS.DRV next to the file */
+    call mouse_driver_present
+    jc csm_mouse
+    mov si, offset sec_boot
+    mov cx, 6
+    call find_line
+    jc csm_mouse
+    call boot_body
+    mov si, offset key_mousedrv
+    mov cx, 10
+    call find_key_in_section
+    jc csm_mousedrv_new
+    mov bx, di                      /* the line start */
+    add di, cx
+    mov si, offset tok_usosmous
+    mov cx, 12
+    call match_at
+    jne csm_mousedrv_cut
+    add di, cx                      /* exactly usosmous.drv? */
+    cmp di, word ptr [limit]
+    jae csm_mouse
+    mov al, byte ptr [di]
+    cmp al, 13
+    je csm_mouse
+    cmp al, 10
+    je csm_mouse
+csm_mousedrv_cut:
+    mov di, bx
+csm_mousedrv_eol:
+    cmp di, word ptr [limit]
+    jae csm_mousedrv_del
+    mov al, byte ptr [di]
+    inc di
+    cmp al, 10
+    jne csm_mousedrv_eol
+csm_mousedrv_del:
+    mov cx, di
+    sub cx, bx
+    mov di, bx
+    call delete
+    mov word ptr [sec_start], bx
+    /* the last line without CR LF: keep the file well-formed */
+    call ensure_newline
+csm_mousedrv_new:
+    mov di, word ptr [sec_start]
+    mov si, offset line_mousedrv
+    mov cx, word ptr [line_mousedrv_len]
     call insert
     jc csm_full
 csm_mouse:
@@ -523,6 +565,64 @@ csm_ok:
     ret
 csm_full:
     stc
+    ret
+
+/* boot_body: DI = the [boot] header line (from find_line, CX its length).
+ * sec_start = the line after it (a CR LF is added when the header ends the
+ * file). */
+boot_body:
+    add di, cx
+boot_body_eol:
+    cmp di, word ptr [limit]
+    jae boot_body_end
+    mov al, byte ptr [di]
+    inc di
+    cmp al, 10
+    jne boot_body_eol
+    jmp boot_body_done
+boot_body_end:
+    call ensure_newline
+    mov di, word ptr [limit]
+boot_body_done:
+    mov word ptr [sec_start], di
+    ret
+
+/* mouse_driver_present: CF clear when <folder of the file>\SYSTEM\USOSMOUS.DRV
+ * exists (INT 21h AX=4300h). Builds the name in temp. */
+mouse_driver_present:
+    push si
+    push di
+    push ds
+    pop es
+    mov si, word ptr [name]
+    mov di, offset temp
+    mov bx, di
+mdp_copy:
+    lodsb
+    stosb
+    cmp al, '\\'
+    je mdp_mark
+    cmp al, ':'
+    je mdp_mark
+    cmp al, 0
+    jne mdp_copy
+    jmp mdp_name
+mdp_mark:
+    mov bx, di
+    jmp mdp_copy
+mdp_name:
+    mov di, bx
+    mov si, offset mouse_driver_name
+mdp_name_loop:
+    lodsb
+    stosb
+    cmp al, 0
+    jne mdp_name_loop
+    mov dx, offset temp
+    mov ax, 0x4300
+    int 0x21
+    pop di
+    pop si
     ret
 
 /* find_key_in_section: SI = lower-case key (with '='), CX = length, lines
@@ -758,6 +858,11 @@ key_mouse: .ascii "mouse="
 tok_vmouse: .ascii "*vmouse"
 line_drivers: .ascii "drivers=usoskey.drv\r\n"
 line_drivers_end:
+key_mousedrv: .ascii "mouse.drv="
+tok_usosmous: .ascii "usosmous.drv"
+line_mousedrv: .ascii "mouse.drv=usosmous.drv\r\n"
+line_mousedrv_end:
+mouse_driver_name: .asciz "SYSTEM\\USOSMOUS.DRV"
 temp_name: .asciz "SYSTEM.U9$"
 msg_done: .ascii "USOS: settings added (U9FIX)\r\n$"
     .p2align 1
@@ -768,6 +873,7 @@ limit: .word 0
 changed: .byte 0
     .p2align 1
 line_drivers_len: .word line_drivers_end - line_drivers
+line_mousedrv_len: .word line_mousedrv_end - line_mousedrv
 sec_start: .word 0
 csm_mode: .byte 0
     .p2align 1

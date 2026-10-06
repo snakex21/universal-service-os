@@ -13,8 +13,9 @@
                 tools/vendor/vmdisp9x, checked against manifest.json)
   VMDISP9X.TXT  their SOURCES.txt + MIT licence
   VMDISP9X.TGZ  the vmdisp9x source archive
-  USOSKEY.COM, USOSKEY.DRV, VBMOUSE.EXE, VBMOUSE.DRV, VBADOS.TXT
-                the USB keyboard bridge (USOS) and VBADOS 0.67 (GPL-2.0+) of
+  USOSKEY.COM, USOSKEY.DRV, USOSMOUS.DRV, VBMOUSE.EXE, VBMOUSE.DRV, VBADOS.TXT
+                the USB keyboard and mouse bridge (USOS; USOSMOUS.DRV: 98 SE
+                mouse.drv) and VBADOS 0.67 (GPL-2.0+) of
                 the MS-DOS support, for installs under CSMWrap
   XHCI98.SYS, XHCI98.INF, XHCI98.TXT
                 xhci98 1.1.1.0-usos3-w9x (GPL-2.0-only, MODIFIED: polling,
@@ -62,10 +63,10 @@ FILES = ('U9FIX.COM', 'U9FIX.TXT', 'USOSVESA.INF', 'VESAMINI.DRV', 'VESAMINI.VXD
          'VMHAL486.DLL', 'VMDISP9X.DLL', 'VMDISP9X.TXT') + (
     # Under CSMWrap: the Windows 3.x USB keyboard bridge and VBADOS work in
     # Windows 9x too (copied from the MS-DOS support, built before this).
-    'USOSKEY.COM', 'USOSKEY.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT') + (
+    'USOSKEY.COM', 'USOSKEY.DRV', 'USOSMOUS.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT') + (
     # Under CSMWrap: CONFIG.SYS loads it first (dos_native_iso.zig, INSTALL.BAT).
     'CREGFIX.SYS',)
-BRIDGE = ('USOSKEY.COM', 'USOSKEY.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT')
+BRIDGE = ('USOSKEY.COM', 'USOSKEY.DRV', 'USOSMOUS.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT')
 # Everything on the stick (the payload list and the release check use it).
 STAGED = FILES + ('MSBATCH.INF', 'VMDISP9X.TGZ', 'XHCI98.SYS', 'XHCI98.INF', 'XHCI98.TXT',
                    'CREGFIX.TXT')

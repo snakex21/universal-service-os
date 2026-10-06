@@ -17,6 +17,10 @@
  *         oldest first: seq:VK d/u scan [x = extended], c = GetAsyncKeyState
  *         (VK_CONTROL) and s = (VK_SHIFT) right after (80 down, 01 pressed
  *         since), f = 0040:0017/0018 after the call
+ *   MOUSE from USOSKEY v4 on: USOSMOUS.DRV's BIOS registration (INT 15h
+ *         C205h/C207h/C200h result), packets the INT 15h C207h callback
+ *         saw / stored / dropped / ignored, the last packet, the driver's
+ *         polls and event procedure calls
  *   IVT   INT 08h/09h/15h/16h/1Ch/2Fh vectors of the system VM
  *   MAP   linear (system VM V86) against physical (DPMI 0800h) for a few
  *         pages: page 0 (control: the IVT page is per VM, expected to
@@ -38,7 +42,7 @@
  */
 #include <windows.h>
 
-#define LINES 64
+#define LINES 72
 #define WIDTH 256
 
 typedef struct {
@@ -58,6 +62,13 @@ typedef struct {
     WORD last16ax, last16ip, last16cs;
     WORD evseq;
     BYTE evlog[32][8];
+    /* version 4: USB mouse (USOSMOUS.DRV) */
+    BYTE mhead, mtail, malive, mstate;
+    WORD mcb;
+    WORD mdropped, mignored, mpolls;
+    DWORD mpackets;
+    BYTE mlast[4];
+    WORD mevents, merr;
 } SHARED;
 
 extern BOOL FAR PASCAL WaitEvent(HANDLE);
@@ -76,6 +87,8 @@ static HWND window;
 static WORD lin_sel, phys_sel, bda_sel;
 static DWORD prev_c08, prev_c1c, prev_c4f, prev_c4fusb, prev_tick;
 static WORD prev_polls, prev_captured;
+static DWORD prev_mpackets;
+static WORD prev_mpolls, prev_mevents;
 static WORD snapshots;
 static int char_h = 16;
 
@@ -238,6 +251,29 @@ static void show_key(void)
     }
     prev_tick = now;
     if (s->version >= 3) show_v3(s);
+}
+
+static void show_mouse(void)
+{
+    static const char *const states[5] = { "not registered", "registered", "no BIOS mouse (C205h failed)",
+                                           "BIOS refused (C207h/C200h)", "disabled" };
+    SHARED FAR *s = find_shared();
+    if (!s || s->version < 4) {
+        wsprintf(line(), "MOUSE USOSKEY.COM %s: no mouse ring (copy the new USOSKEY.COM)",
+                 (LPSTR)(s ? "older than v4" : "not found"));
+        return;
+    }
+    wsprintf(line(), "MOUSE USOSMOUS.DRV %s  state:%s  last BIOS error:%04X  callback %04X:%04X  alive:%u  head/tail:%u/%u",
+             (LPSTR)(GetModuleHandle("MOUSE") ? "MOUSE module loaded" : "no MOUSE module"),
+             (LPSTR)(s->mstate < 5 ? states[s->mstate] : "?"), s->merr, key_seg, s->mcb,
+             (WORD)s->malive, (WORD)s->mhead, (WORD)s->mtail);
+    wsprintf(line(), "MOUSE packets:%lu (+%lu)  dropped:%u  ignored:%u  last %02X %02X %02X  DRV polls:%u (+%u)  events:%u (+%u)",
+             s->mpackets, s->mpackets - prev_mpackets, s->mdropped, s->mignored,
+             (WORD)s->mlast[0], (WORD)s->mlast[1], (WORD)s->mlast[2],
+             s->mpolls, (WORD)(s->mpolls - prev_mpolls), s->mevents, (WORD)(s->mevents - prev_mevents));
+    prev_mpackets = s->mpackets;
+    prev_mpolls = s->mpolls;
+    prev_mevents = s->mevents;
 }
 
 static void show_ivt(void)
@@ -434,9 +470,10 @@ static void show_pci(void)
 static void refresh(void)
 {
     nlines = 0;
-    wsprintf(line(), "USOSDBG 1.1  tick:%lu  S = append to C:\\USOS9X\\USOSDBG.LOG (saved:%u)  Esc = quit",
+    wsprintf(line(), "USOSDBG 1.2  tick:%lu  S = append to C:\\USOS9X\\USOSDBG.LOG (saved:%u)  Esc = quit",
              GetTickCount(), snapshots);
     show_key();
+    show_mouse();
     show_ivt();
     show_map();
     show_pci();

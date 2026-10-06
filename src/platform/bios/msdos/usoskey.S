@@ -1,5 +1,5 @@
 /*
- * USOSKEY.COM - USB keyboard bridge for Windows 3.x under CSMWrap.
+ * USOSKEY.COM - USB keyboard (and mouse) bridge for Windows under CSMWrap.
  * Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
  *
  * Under CSMWrap (UEFI PC without a CSM) the keyboard is USB and SeaBIOS
@@ -42,6 +42,24 @@
  *        up), scan (BL), BH (1 = extended), GetAsyncKeyState(VK_CONTROL)
  *        and (VK_SHIFT) right after (80h down, 01h pressed since the last
  *        call), 0040:0017 and 0040:0018 after the call
+ *   version 4 (USB mouse for USOSMOUS.DRV, src/platform/win3/usosmous.c):
+ *   +396 mouse ring head (TSR)  +397 tail (consumer)  ring of 32 packets
+ *        of 4 bytes (status, X, Y, 0) at +420
+ *   +398 mouse alive: set by USOSMOUS.DRV on every poll, INT 1Ch counts it
+ *        down; packets are stored only while it is nonzero
+ *   +399 registration state (written by USOSMOUS.DRV)
+ *   +400 offset of the mouse callback in this segment (mcb)
+ *   +402 packets dropped (ring full)  +404 packets ignored (no consumer)
+ *   +406 USOSMOUS.DRV polls  +408 packets seen (dword)
+ *   +412 last packet (status, X, Y, 0)
+ *   +416 USOSMOUS.DRV event procedure calls  +418 its last BIOS error
+ * The mouse callback (mcb) is what USOSMOUS.DRV registers with INT 15h
+ * AX=C207h: SeaBIOS (CSMWrap) serves a USB boot-protocol mouse as the BIOS
+ * PS/2 pointing device and far-calls the handler from its USB poll (INT 08h)
+ * with status, X, Y and Z words on the stack (seabios/src/mouse.c). The
+ * handler only stores the packet; it is registered only while USOSMOUS.DRV
+ * is enabled and lives in this TSR (loaded before Windows: the same memory
+ * in every VM).
  * Built with tools/build_win3_usb_keyboard.py (zig cc, linked at 0100h).
  */
 .intel_syntax noprefix
@@ -54,7 +72,7 @@ _start:
     .p2align 1
 shared:
     .ascii "USKY"
-    .word 3
+    .word 4
 head:    .byte 0
 tail:    .byte 0
 alive:   .byte 0
@@ -82,6 +100,19 @@ last16ip: .word 0
 last16cs: .word 0
 evseq:   .word 0                  /* v3: written by USOSKEY.DRV */
 evlog:   .space 256
+mhead:   .byte 0                  /* v4: USB mouse */
+mtail:   .byte 0
+malive:  .byte 0
+mstate:  .byte 0                  /* written by USOSMOUS.DRV */
+mcbofs:  .word mcb
+mdropped: .word 0
+mignored: .word 0
+mpolls:  .word 0                  /* written by USOSMOUS.DRV */
+mpackets: .long 0
+mlast:   .space 4
+mevents: .word 0                  /* written by USOSMOUS.DRV */
+merr:    .word 0                  /* written by USOSMOUS.DRV */
+mring:   .space 128
 in9:     .byte 0
          .byte 0
 old08:   .long 0
@@ -192,13 +223,16 @@ gdone:
     pop bp
     iret
 
-/* INT 1Ch: the consumer's heartbeat runs down. */
+/* INT 1Ch: the consumers' heartbeats run down. */
 int1c:
     inc dword ptr cs:[c1c]
     cmp byte ptr cs:[alive], 0
     je 1f
     dec byte ptr cs:[alive]
-1:  .att_syntax prefix
+1:  cmp byte ptr cs:[malive], 0
+    je 2f
+    dec byte ptr cs:[malive]
+2:  .att_syntax prefix
     ljmpw *%cs:old1c
     .intel_syntax noprefix
 
@@ -265,6 +299,53 @@ chain15:
     .att_syntax prefix
     ljmpw *%cs:old15
     .intel_syntax noprefix
+
+/* Mouse callback (INT 15h C207h handler), far-called by the BIOS with
+ * [SP+4] Z, [SP+6] Y, [SP+8] X, [SP+10] status (the caller pops them).
+ * Stores the packet while USOSMOUS.DRV polls; no other side effects. */
+mcb:
+    push bp
+    mov bp, sp
+    push ax
+    push bx
+    push si
+    inc dword ptr cs:[mpackets]
+    mov al, byte ptr [bp + 12]
+    mov byte ptr cs:[mlast], al
+    mov al, byte ptr [bp + 10]
+    mov byte ptr cs:[mlast + 1], al
+    mov al, byte ptr [bp + 8]
+    mov byte ptr cs:[mlast + 2], al
+    cmp byte ptr cs:[malive], 0
+    je mcb_ignored
+    mov bl, byte ptr cs:[mhead]
+    mov bh, bl
+    inc bh
+    and bh, 31
+    cmp bh, byte ptr cs:[mtail]
+    je mcb_full
+    mov si, bx
+    and si, 0x00ff
+    shl si, 2
+    mov al, byte ptr [bp + 12]
+    mov byte ptr cs:[mring + si], al
+    mov al, byte ptr [bp + 10]
+    mov byte ptr cs:[mring + si + 1], al
+    mov al, byte ptr [bp + 8]
+    mov byte ptr cs:[mring + si + 2], al
+    mov byte ptr cs:[mhead], bh
+    jmp mcb_done
+mcb_full:
+    inc word ptr cs:[mdropped]
+    jmp mcb_done
+mcb_ignored:
+    inc word ptr cs:[mignored]
+mcb_done:
+    pop si
+    pop bx
+    pop ax
+    pop bp
+    .byte 0xcb                      /* retf (16-bit far return) */
 
 resident_end:
 
@@ -340,6 +421,6 @@ install:
     int 0x21
 
 msg_ok:
-    .ascii "USOSKEY: USB keyboard bridge for Windows 3.x installed (CSMWrap).\r\n$"
+    .ascii "USOSKEY: USB keyboard and mouse bridge for Windows installed (CSMWrap).\r\n$"
 msg_already:
     .ascii "USOSKEY: already installed.\r\n$"

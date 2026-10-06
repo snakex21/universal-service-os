@@ -69,6 +69,7 @@ var payloadFiles = []payloadFile{
 	{`zig-out/dos-native/win9x/VMDISP9X.TGZ`, `EFI/USOS/dos-native/win9x/VMDISP9X.TGZ`},
 	{`zig-out/dos-native/win9x/USOSKEY.COM`, `EFI/USOS/dos-native/win9x/USOSKEY.COM`},
 	{`zig-out/dos-native/win9x/USOSKEY.DRV`, `EFI/USOS/dos-native/win9x/USOSKEY.DRV`},
+	{`zig-out/dos-native/win9x/USOSMOUS.DRV`, `EFI/USOS/dos-native/win9x/USOSMOUS.DRV`},
 	{`zig-out/dos-native/win9x/VBMOUSE.EXE`, `EFI/USOS/dos-native/win9x/VBMOUSE.EXE`},
 	{`zig-out/dos-native/win9x/VBMOUSE.DRV`, `EFI/USOS/dos-native/win9x/VBMOUSE.DRV`},
 	{`zig-out/dos-native/win9x/VBADOS.TXT`, `EFI/USOS/dos-native/win9x/VBADOS.TXT`},
