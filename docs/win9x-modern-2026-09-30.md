@@ -324,6 +324,9 @@ the menu tells 98 from 98 SE by the DATA folder (catalog `windows-98` / `windows
   Central European and Eastern, `SETUPC.INF` adds the same `RunOnce\Setup` value "Strefa czasowa"
   (`TIMEDATE.CPL,,/f`). The 98 CD lacks one key of the menu's list, `Pacific SA` (added in 98 SE):
   `w9x_release_time_zone` drops it for 98 (Setup asks). A profile with that zone still writes it.
+* Startup menu (all 95/98/98 SE): INSTALL.BAT writes `BootMenu=0` next to `Logo=0` /
+  `BootMenuDefault=1` in `C:\MSDOS.SYS [Options]` (nothing in the chain sets `BootMenu=1`); Windows
+  still shows the menu by itself after an unclean shutdown or a failed start.
 * Unchanged: xhci98 stays 98 SE + opt-in only (98 FE has no USB 2.0 stack; NUSB does not apply).
 * Risks, not seen on hardware yet: the OEM first-run pages as on 98 SE (bridge keyboard/mouse);
   the phase-1 VM path was proven with 98 SE only (98 FE reached the desktop in QEMU, section 3); IE 4 desktop update.
