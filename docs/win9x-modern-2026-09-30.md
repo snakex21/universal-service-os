@@ -309,6 +309,25 @@ Still manual (needs a click or a key) in a fresh hands-off 98 SE run:
   the GOP handle, bytes 8-11), pass it in `request.ini` and add a USOS monitor INF with that hardware
   id next to Setup. `DDC`=0 is no option (Unknown Monitor caps at 640x480).
 
+## 4f. Windows 98 (first edition) through the same UEFI flow (2026-10-06)
+
+Audit of the CSMWrap path for `windows-98` (tag `98`, Setup folder `WIN98`), media: the user's
+`Windows_98_PL.iso` (4.10.1998 PL, files dated 1998-05-15) in DATA `Systems\Windows\Windows 98\Images`;
+the menu tells 98 from 98 SE by the DATA folder (catalog `windows-98` / `windows-98-se`), not by CD files.
+
+* Already shared with 98 SE: phase 1 in the VM + `/P I` (`w9x_vm_available` takes `98SE|98`), Patcher9x
+  `-select all` (includes the 95/98 FE CPU speed patch), CREGFIX, USOSKEY v4, vmdisp9x VESA with
+  `NoMemTest`, the default MSBATCH.INF (every key is a 98 FE key too), TZFIX (`98SE|98`).
+* New for 98: `USOSMOUS.DRV` is kept (INSTALL.BAT `MOUSEOK` for `98`), so U9FIX `/CSM` writes
+  `mouse.drv=usosmous.drv` as on 98 SE; 95 / Me still drop it.
+* TZFIX on 98 checked against the CD (PRECOPY1.CAB): `TIMEZONE.INF` has the same TZI for
+  Central European and Eastern, `SETUPC.INF` adds the same `RunOnce\Setup` value "Strefa czasowa"
+  (`TIMEDATE.CPL,,/f`). The 98 CD lacks one key of the menu's list, `Pacific SA` (added in 98 SE):
+  `w9x_release_time_zone` drops it for 98 (Setup asks). A profile with that zone still writes it.
+* Unchanged: xhci98 stays 98 SE + opt-in only (98 FE has no USB 2.0 stack; NUSB does not apply).
+* Risks, not seen on hardware yet: the OEM first-run pages as on 98 SE (bridge keyboard/mouse);
+  the phase-1 VM path was proven with 98 SE only (98 FE reached the desktop in QEMU, section 3); IE 4 desktop update.
+
 ## 5. Open points
 
 * Own Windows 95 boot environment from the CD's CABs (bridge today).

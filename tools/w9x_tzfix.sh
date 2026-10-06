@@ -17,7 +17,8 @@
 # Proven by hand on the X470 (98 SE PL OEM, 2026-10-06, TZFIX.OK ok-deleted).
 #
 # Zone data (TZI) from the Windows 98 SE CD's TIMEZONE.INF (Time Zones\<key>
-# in the installed registry). Only the zones of the menu's default languages
+# in the installed registry); the Windows 98 CD (4.10.1998, PL) has the same
+# TZI for both zones and the same RunOnce\Setup step names (SETUPC.INF). Only the zones of the menu's default languages
 # so far; any other zone returns 1 and MSBATCH TimeZone stays alone.
 
 w9x_tzfix_hex4() {

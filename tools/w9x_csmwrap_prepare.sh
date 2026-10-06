@@ -31,6 +31,16 @@ w9x_msbatch_time_zone() {
         mv "$2.tz" "$2"
 }
 
+# The menu's zone list is 98 SE's TIMEZONE.INF; the Windows 98 CD has every
+# key of it except "Pacific SA" (added in 98 SE). That key does not exist on
+# 98, so it gets no TimeZone / TZFIX for it (Setup asks on its Date/Time page).
+w9x_release_time_zone() {
+    case "$1:$2" in
+        98:'Pacific SA') return 0 ;;
+    esac
+    printf '%s' "$2"
+}
+
 usos_w9x_csmwrap_prepare() {
     W9X_DIR=/mnt/esp/EFI/USOS/win9x
     request=$W9X_DIR/request.ini
@@ -106,6 +116,7 @@ usos_w9x_csmwrap_prepare() {
         none)
             cp /mnt/esp/EFI/USOS/dos-native/win9x/MSBATCH.INF "$answer_inf" || stop 'the default MSBATCH.INF is missing'
             time_zone=$(w9x_csmwrap_value timezone "$request") || time_zone=
+            time_zone=$(w9x_release_time_zone "$tag" "$time_zone")
             w9x_csmwrap_log "TIMEZONE ${time_zone:-none (request.ini has no timezone=)}"
             w9x_msbatch_time_zone "$time_zone" "$answer_inf" || stop 'the time zone could not be added to MSBATCH.INF'
             # Guard: a zone from the menu must end up in [Setup], else the

@@ -117,10 +117,12 @@ REM No firmware CSM: USB keyboard (USOSKEY bridge) in Windows through the
 REM SeaBIOS services; U9FIX /CSM adds its driver. No VBADOS mouse: VBMOUSE.EXE
 REM next to the PS/2 mouse VxD of the installed system stops Windows.
 REM USB mouse: USOSMOUS.DRV (mouse.drv=) on USOSKEY.COM's mouse ring, 98 SE
-REM only so far. U9FIX /CSM names it once it is in C:\WINDOWS\SYSTEM, so the
-REM drivers are copied before U9FIX runs.
+REM and 98 (same 16-bit mouse.drv interface); 95 and Me not yet. U9FIX /CSM
+REM names it once it is in C:\WINDOWS\SYSTEM, so the drivers are copied
+REM before U9FIX runs.
 IF NOT EXIST C:\USOS9X\USOSKEY.DRV GOTO FAILED
 IF "%U9SYS%"=="98SE" GOTO MOUSEOK
+IF "%U9SYS%"=="98" GOTO MOUSEOK
 IF EXIST C:\USOS9X\USOSMOUS.DRV DEL C:\USOS9X\USOSMOUS.DRV
 :MOUSEOK
 ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\NUL GOTO USOSDRV>C:\AUTOEXEC.BAT

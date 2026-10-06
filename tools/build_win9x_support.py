@@ -15,7 +15,7 @@
   VMDISP9X.TGZ  the vmdisp9x source archive
   USOSKEY.COM, USOSKEY.DRV, USOSMOUS.DRV, VBMOUSE.EXE, VBMOUSE.DRV, VBADOS.TXT
                 the USB keyboard and mouse bridge (USOS; USOSMOUS.DRV: 98 SE
-                mouse.drv) and VBADOS 0.67 (GPL-2.0+) of
+                and 98 mouse.drv) and VBADOS 0.67 (GPL-2.0+) of
                 the MS-DOS support, for installs under CSMWrap
   XHCI98.SYS, XHCI98.INF, XHCI98.TXT
                 xhci98 1.1.1.0-usos3-w9x (GPL-2.0-only, MODIFIED: polling,
