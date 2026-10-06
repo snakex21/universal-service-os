@@ -13,14 +13,25 @@ HARNESS = r'''
 #include <stdlib.h>
 typedef unsigned char BYTE;
 typedef unsigned short WORD;
-static void xlat_event(WORD ax, WORD bx) { printf("%c%02X:%02X%s\n", ax & 0x8000 ? 'u' : 'd', ax & 0xFF, bx & 0xFF, bx & 0x100 ? "x" : ""); }
-static void xlat_cad(void) { printf("CAD\n"); }
+static int quiet;
+static void xlat_event(WORD ax, WORD bx) { if (!quiet) printf("%c%02X:%02X%s\n", ax & 0x8000 ? 'u' : 'd', ax & 0xFF, bx & 0xFF, bx & 0x100 ? "x" : ""); }
+static void xlat_cad(void) { if (!quiet) printf("CAD\n"); }
 #include "usoskey_xlat.h"
+/* argv[1]: "0"/"1" events (NumLock off/on); "f" BIOS flags after every byte
+ * (start 00/00/00); "F" the same with the kept bits set (80/8C/F3) and the
+ * lock toggles taken from 0040:0017 = 70h. */
 int main(int argc, char **argv)
 {
     int i;
-    translate_init(argc > 1 && argv[1][0] == '1');
-    for (i = 2; i < argc; i++) translate((BYTE)strtoul(argv[i], 0, 16));
+    char mode = argc > 1 ? argv[1][0] : '0';
+    BYTE f17 = 0, f18 = 0, f96 = 0;
+    translate_init(mode == '1');
+    if (mode == 'F') { f17 = 0xF0; f18 = 0x8C; f96 = 0xF3; translate_set_locks(f17); }
+    quiet = mode == 'f' || mode == 'F';
+    for (i = 2; i < argc; i++) {
+        translate((BYTE)strtoul(argv[i], 0, 16));
+        if (quiet) { bios_shift_flags(&f17, &f18, &f96); printf("%02X.%02X.%02X\n", f17, f18, f96); }
+    }
     return 0;
 }
 '''
@@ -51,6 +62,11 @@ class UsosKeyXlat(unittest.TestCase):
 
     def key(self, data, numlock=False):
         return self.run_bytes(data, numlock)
+
+    def flags(self, data, seeded=False):
+        out = subprocess.run([str(self.exe), 'F' if seeded else 'f'] + ['%02X' % b for b in data],
+                             check=True, capture_output=True, text=True).stdout
+        return out.split()
 
     def test_extended_keys(self):
         table = {0x1C: 0x0D, 0x1D: 0x11, 0x35: 0x6F, 0x47: 0x24, 0x48: 0x26, 0x49: 0x21, 0x4B: 0x25,
@@ -216,6 +232,41 @@ class UsosKeyXlat(unittest.TestCase):
                 if e.startswith(('d11', 'u11')):
                     state = 1 if e[0] == 'd' else 0
             self.assertEqual(state, 0, seq)
+
+    # --- BIOS shift flags 0040:0017 / 0040:0018 / 0040:0096 ---
+    def test_bios_flags_shift_ctrl_alt(self):
+        self.assertEqual(self.flags([0x2A, 0xAA]), ['02.00.00', '00.00.00'])
+        self.assertEqual(self.flags([0x36, 0xB6]), ['01.00.00', '00.00.00'])
+        self.assertEqual(self.flags([0x1D, 0x2E, 0xAE, 0x9D]), ['04.01.00'] * 3 + ['00.00.00'])
+        self.assertEqual(self.flags([0xE0, 0x1D, 0xE0, 0x9D]), ['00.00.00', '04.00.04', '04.00.04', '00.00.00'])
+        self.assertEqual(self.flags([0x38, 0xB8]), ['08.02.00', '00.00.00'])
+        self.assertEqual(self.flags([0xE0, 0x38, 0xE0, 0xB8])[1::2], ['0C.01.08', '00.00.00'])
+
+    def test_bios_flags_both_ctrls(self):
+        # Left down, right down, left up: Ctrl still active (right).
+        out = self.flags([0x1D, 0xE0, 0x1D, 0x9D, 0xE0, 0x9D])
+        self.assertEqual([out[0], out[2], out[3], out[5]], ['04.01.00', '04.01.04', '04.00.04', '00.00.00'])
+
+    def test_bios_flags_locks(self):
+        # Caps: toggled on press, "down" bit while held, repeats ignored.
+        self.assertEqual(self.flags([0x3A, 0x3A, 0xBA, 0x3A, 0xBA]),
+                         ['40.40.00', '40.40.00', '40.00.00', '00.40.00', '00.00.00'])
+        self.assertEqual(self.flags([0x45, 0xC5]), ['20.20.00', '20.00.00'])
+        self.assertEqual(self.flags([0x46, 0xC6]), ['10.10.00', '10.00.00'])
+        # Pause (E1 1D 45) is not NumLock, Ctrl+Break (E0 46) not ScrollLock.
+        self.assertEqual(self.flags([0xE1, 0x1D, 0x45, 0xE1, 0x9D, 0xC5])[-1], '00.00.00')
+        self.assertEqual(self.flags([0xE0, 0x46, 0xE0, 0xC6])[-1], '00.00.00')
+
+    def test_bios_flags_keep_foreign_bits_and_start_locks(self):
+        # Start: Insert on, Scroll/Num/Caps on (70h), SysReq/Pause/Insert-down,
+        # E0/E1/101-key bits: all kept; Caps press turns Caps off.
+        self.assertEqual(self.flags([0x1E], seeded=True), ['F0.8C.F3'])
+        self.assertEqual(self.flags([0x3A, 0xBA, 0x2A], seeded=True), ['B0.CC.F3', 'B0.8C.F3', 'B2.8C.F3'])
+        self.assertEqual(self.flags([0xE0, 0x1D], seeded=True)[-1], 'F4.8C.F7')
+
+    def test_bios_flags_numlock_drives_keypad(self):
+        # NumLock pressed: the keypad turns into digits like the flag says.
+        self.assertEqual(self.key([0x45, 0xC5, 0x47, 0xC7])[2:], [ev(0x67, False, 0x47), ev(0x67, True, 0x47)])
 
 
 if __name__ == '__main__':

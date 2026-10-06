@@ -27,6 +27,10 @@
  *     Print Screen / Pause) is in usoskey_xlat.h, host-tested by
  *     tools/tests/legacy_bios/test_usoskey_xlat.py. Ctrl+Alt+Del goes to
  *     VKD as forced bytes so its hot key (9x Close Program) still fires.
+ *     On this path the driver also keeps the BIOS shift flags (0040:0017,
+ *     0040:0018, 0040:0096) as SeaBIOS's INT 09h code would have (the stock
+ *     KEYBOARD.DRV reads them) and logs the last 32 keybd_event calls in
+ *     the TSR's shared block (version 3) for USOSDBG.EXE.
  * Without the TSR (Windows Me starts no real-mode program from AUTOEXEC.BAT
  * and has no WINSTART.BAT) the driver installs the TSR's resident part
  * itself: a copy in DOS memory (GlobalDosAlloc) with INT 08h/09h/15h/1Ch/2Fh
@@ -46,6 +50,13 @@ typedef struct {
     BYTE ring[64];
     WORD forced, refused;           /* diagnostics */
     WORD polls;                     /* version 2: timer polls */
+    BYTE last4f, last4f9;           /* version 2: TSR counters (not used here) */
+    DWORD c08, c1c, c4f, c4fusb;
+    WORD sp08, ss08, sp4f, ss4f;
+    WORD c16[10];                   /* version 3: TSR INT 16h guard */
+    WORD last16ax, last16ip, last16cs;
+    WORD evseq;                     /* version 3: keybd_event log, written here */
+    BYTE evlog[32][8];
 } SHARED;
 
 typedef WORD (FAR PASCAL *CREATETIMER)(WORD, FARPROC);
@@ -61,8 +72,41 @@ static CREATETIMER create_timer;
 static KILLTIMER kill_timer;
 static WORD timer;
 static BYTE busy;
+static BYTE FAR *bda;               /* selector for 0040:0000 */
+
+/* The stock KEYBOARD.DRV keeps the BIOS shift flags in step with every
+ * modifier and lock key and reads them back; under USOSKEY the bytes never
+ * reach SeaBIOS's INT 09h code, so this driver keeps them (bios_shift_flags
+ * in usoskey_xlat.h). Only the bits it owns change; written when different. */
+static void sync_bios_flags(void);
+
+static BYTE key_state(int vk)
+{
+    int r = GetAsyncKeyState(vk);
+    return (BYTE)(((r & 0x8000) ? 0x80 : 0) | (r & 1));
+}
+
+static void keyboard_event_raw(WORD ax_value, WORD bx_value);
 
 static void keyboard_event(WORD ax_value, WORD bx_value)
+{
+    sync_bios_flags();
+    keyboard_event_raw(ax_value, bx_value);
+    if (shared->version >= 3) {         /* log for USOSDBG.EXE (EVT lines) */
+        BYTE FAR *e = shared->evlog[shared->evseq & 31];
+        e[0] = LOBYTE(ax_value);
+        e[1] = HIBYTE(ax_value);
+        e[2] = LOBYTE(bx_value);
+        e[3] = HIBYTE(bx_value);
+        e[4] = key_state(VK_CONTROL);
+        e[5] = key_state(VK_SHIFT);
+        e[6] = bda ? bda[0x17] : 0;
+        e[7] = bda ? bda[0x18] : 0;
+        shared->evseq++;
+    }
+}
+
+static void keyboard_event_raw(WORD ax_value, WORD bx_value)
 {
     _asm {
         pusha
@@ -115,6 +159,17 @@ static void cad_via_vkd(void)
 #define xlat_cad() cad_via_vkd()
 #include "usoskey_xlat.h"
 
+static void sync_bios_flags(void)
+{
+    static BYTE f17, f18, f96;          /* DGROUP: SS is not DS here */
+    if (!bda) return;
+    f17 = bda[0x17]; f18 = bda[0x18]; f96 = bda[0x96];
+    bios_shift_flags(&f17, &f18, &f96);
+    if (bda[0x17] != f17) bda[0x17] = f17;
+    if (bda[0x18] != f18) bda[0x18] = f18;
+    if (bda[0x96] != f96) bda[0x96] = f96;
+}
+
 /* Windows 9x: is a DOS box (WinOldAp, class "tty") the active window? */
 static int dos_box_active(void)
 {
@@ -150,10 +205,10 @@ void __far __loadds __saveregs poll(void)
     busy = 0;
 }
 
-#define TSR_HOOKS 5
-static const BYTE tsr_ints[TSR_HOOKS] = { 0x08, 0x09, 0x15, 0x1C, 0x2F };
-static const WORD tsr_handler[TSR_HOOKS] = { TSR_INT08, TSR_INT09, TSR_INT15, TSR_INT1C, TSR_INT2F };
-static const WORD tsr_old_slot[TSR_HOOKS] = { TSR_OLD08, TSR_OLD09, TSR_OLD15, TSR_OLD1C, TSR_OLD2F };
+#define TSR_HOOKS 6
+static const BYTE tsr_ints[TSR_HOOKS] = { 0x08, 0x09, 0x15, 0x16, 0x1C, 0x2F };
+static const WORD tsr_handler[TSR_HOOKS] = { TSR_INT08, TSR_INT09, TSR_INT15, TSR_INT16, TSR_INT1C, TSR_INT2F };
+static const WORD tsr_old_slot[TSR_HOOKS] = { TSR_OLD08, TSR_OLD09, TSR_OLD15, TSR_OLD16, TSR_OLD1C, TSR_OLD2F };
 static DWORD tsr_mem;               /* GlobalDosAlloc: segment:selector */
 
 static DWORD get_rm_vector(BYTE n)
@@ -279,6 +334,14 @@ static int init(void)
     kill_timer = (KILLTIMER)GetProcAddress(system, MAKEINTRESOURCE(3));
     if (!keybd_event_proc || !create_timer || !kill_timer) return 0;
     translate_init(0);
+    {   /* BIOS data area: the shift flags (0040:0017/0018/0096). */
+        WORD sel = AllocSelector(HIWORD((DWORD)(void FAR *)&shared));
+        if (sel) {
+            SetSelectorBase(sel, 0x400);
+            SetSelectorLimit(sel, 0xFF);
+            bda = (BYTE FAR *)MAKELP(sel, 0);
+        }
+    }
     if (keyboard) {
         MAPVK map = (MAPVK)GetProcAddress(keyboard, MAKEINTRESOURCE(131));
         if (map) for (code = 1; code < sizeof(vk_of); code++) {
@@ -288,14 +351,14 @@ static int init(void)
             }
         }
     }
-    {   /* NumLock as the BIOS left it (INT 16h AH=02h, AL bit 5). */
+    {   /* Lock toggles as the BIOS left them (INT 16h AH=02h = 0040:0017). */
         BYTE flags = 0;
         _asm {
             mov ah, 2
             int 16h
             mov flags, al
         }
-        numlock = (flags & 0x20) != 0;
+        translate_set_locks(flags);
     }
     if (GetWinFlags() & WF_ENHANCED) find_vkd();
     win9x = LOBYTE(LOWORD(GetVersion())) >= 4 ||

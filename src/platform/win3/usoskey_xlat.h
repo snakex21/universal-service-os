@@ -33,6 +33,7 @@ static BYTE prefix;                 /* last byte was E0 */
 static BYTE e1_left;                /* bytes of an E1 (Pause) sequence still to come */
 static BYTE e1_up;
 static BYTE numlock;                /* NumLock toggle (keypad digits) */
+static BYTE capslock, scrolllock;   /* the other toggles, as USER counts them */
 static BYTE lshift, rshift, lctrl, rctrl, lalt, ralt;
 static BYTE altgr_ctrl;             /* Ctrl down sent for AltGr */
 static BYTE cad_held;               /* Del of a Ctrl+Alt+Del is down */
@@ -98,6 +99,49 @@ static void translate_init(BYTE numlock_on)
     lshift = rshift = lctrl = rctrl = lalt = ralt = 0;
     altgr_ctrl = cad_held = locks_down = 0;
     numlock = numlock_on;
+    capslock = scrolllock = 0;
+}
+
+/* Lock toggles from the BIOS shift flags (0040:0017) at start, the state
+ * KEYBOARD.DRV hands USER when Windows starts. */
+static void translate_set_locks(BYTE f17)
+{
+    scrolllock = (f17 & 0x10) != 0;
+    numlock = (f17 & 0x20) != 0;
+    capslock = (f17 & 0x40) != 0;
+}
+
+/* BIOS keyboard flags for the current state, as a BIOS INT 09h leaves them
+ * (IBM PC/AT BIOS data area; SeaBIOS kbd.c names them KF0/KF1):
+ *   0040:0017  0 RShift  1 LShift  2 Ctrl  3 Alt  4 Scroll on  5 Num on
+ *              6 Caps on  7 Insert on (kept)
+ *   0040:0018  0 LCtrl  1 LAlt  2 SysReq (kept)  3 Pause (kept)
+ *              4 Scroll down  5 Num down  6 Caps down  7 Insert down (kept)
+ *   0040:0096  2 RCtrl  3 RAlt; the rest kept (E0/E1 prefix, 101-key)
+ * AltGr's emulated Ctrl counts as the left Ctrl: Windows saw VK_CONTROL
+ * with the left Ctrl scan code, KEYBOARD.DRV keeps the flags the same way.
+ * Bits this translation does not own keep their value. */
+static void bios_shift_flags(BYTE *f17, BYTE *f18, BYTE *f96)
+{
+    BYTE lc = lctrl || altgr_ctrl;
+    BYTE a = (BYTE)(*f17 & 0x80), b = (BYTE)(*f18 & 0x8C), c = (BYTE)(*f96 & 0xF3);
+    if (rshift) a |= 0x01;
+    if (lshift) a |= 0x02;
+    if (lc || rctrl) a |= 0x04;
+    if (lalt || ralt) a |= 0x08;
+    if (scrolllock) a |= 0x10;
+    if (numlock) a |= 0x20;
+    if (capslock) a |= 0x40;
+    if (lc) b |= 0x01;
+    if (lalt) b |= 0x02;
+    if (locks_down & 4) b |= 0x10;
+    if (locks_down & 2) b |= 0x20;
+    if (locks_down & 1) b |= 0x40;
+    if (rctrl) c |= 0x04;
+    if (ralt) c |= 0x08;
+    *f17 = a;
+    *f18 = b;
+    *f96 = c;
 }
 
 /* One raw byte -> keybd_event, like KEYBOARD.DRV's INT 9 handler. */
@@ -135,7 +179,9 @@ static void translate(BYTE b)
             else if (locks_down & lock) return;
             else {
                 locks_down |= lock;
+                if (lock == 1) capslock = !capslock;
                 if (lock == 2) numlock = !numlock;
+                if (lock == 4) scrolllock = !scrolllock;
             }
         }
         if (code >= 0x47 && code <= 0x53 && numlock && !lshift && !rshift)

@@ -11,7 +11,13 @@
  *         INT 15h/4Fh calls and the ones not from INT 09h (USB), the SS:SP
  *         of the last INT 08h and of the last USB INT 15h/4Fh, and
  *         USOSKEY.DRV's polls / forced / refused counters
- *   IVT   INT 08h/09h/15h/1Ch/2Fh vectors of the system VM
+ *   INT16 from USOSKEY v3 on: the INT 16h guard counters (answered from
+ *         the BIOS data area / chained to SeaBIOS) and the last caller
+ *   EVT   from USOSKEY v3 on: the last 32 keybd_event calls of USOSKEY.DRV,
+ *         oldest first: seq:VK d/u scan [x = extended], c = GetAsyncKeyState
+ *         (VK_CONTROL) and s = (VK_SHIFT) right after (80 down, 01 pressed
+ *         since), f = 0040:0017/0018 after the call
+ *   IVT   INT 08h/09h/15h/16h/1Ch/2Fh vectors of the system VM
  *   MAP   linear (system VM V86) against physical (DPMI 0800h) for a few
  *         pages: page 0 (control: the IVT page is per VM, expected to
  *         differ), the USOSKEY page, the INT 08h and USB INT 15h/4Fh stack
@@ -47,6 +53,11 @@ typedef struct {
     BYTE last4f, last4f9;
     DWORD c08, c1c, c4f, c4fusb;
     WORD sp08, ss08, sp4f, ss4f;
+    /* version 3 */
+    WORD c16[10];
+    WORD last16ax, last16ip, last16cs;
+    WORD evseq;
+    BYTE evlog[32][8];
 } SHARED;
 
 extern BOOL FAR PASCAL WaitEvent(HANDLE);
@@ -62,7 +73,7 @@ static char text[LINES][WIDTH];
 static int nlines;
 static HINSTANCE instance;
 static HWND window;
-static WORD lin_sel, phys_sel;
+static WORD lin_sel, phys_sel, bda_sel;
 static DWORD prev_c08, prev_c1c, prev_c4f, prev_c4fusb, prev_tick;
 static WORD prev_polls, prev_captured;
 static WORD snapshots;
@@ -173,6 +184,27 @@ static SHARED FAR *find_shared(void)
     return s;
 }
 
+static void show_v3(SHARED FAR *s)
+{
+    WORD seq, first, n = 0;
+    LPSTR l = 0;
+    BYTE FAR *bda = (BYTE FAR *)MAKELP(bda_sel, 0);   /* own selector: s uses lin_sel */
+    wsprintf(line(), "INT16 guard (answered/chained): 00 -/%u  01 %u/%u  02 %u/-  10 -/%u  11 %u/%u  12 %u/-  other -/%u  not alive %u",
+             s->c16[0], s->c16[1], s->c16[2], s->c16[3], s->c16[4], s->c16[5], s->c16[6], s->c16[7], s->c16[8], s->c16[9]);
+    wsprintf(line(), "INT16 last while alive: AX=%04X from %04X:%04X   BDA now 17:%02X 18:%02X 96:%02X 97:%02X",
+             s->last16ax, s->last16cs, s->last16ip, (WORD)bda[0x17], (WORD)bda[0x18], (WORD)bda[0x96], (WORD)bda[0x97]);
+    seq = s->evseq;
+    first = seq > 32 ? seq - 32 : 0;
+    if (seq == first) wsprintf(line(), "EVT  no keybd_event logged yet (USOSKEY.DRV older than v3, or no key since start)");
+    for (; first != seq; first++) {
+        BYTE FAR *e = s->evlog[first & 31];
+        if (n++ % 4 == 0) { l = line(); wsprintf(l, "EVT "); }
+        wsprintf(l + lstrlen(l), "  %u:%02X%c%02X%s c%02X s%02X f%02X/%02X", first, (WORD)e[0],
+                 (e[1] & 0x80) ? 'u' : 'd', (WORD)e[2], (LPSTR)((e[3] & 1) ? "x" : " "),
+                 (WORD)e[4], (WORD)e[5], (WORD)e[6], (WORD)e[7]);
+    }
+}
+
 static void show_key(void)
 {
     SHARED FAR *s = find_shared();
@@ -205,17 +237,18 @@ static void show_key(void)
         stack4f_ss = s->ss4f; stack4f_sp = s->sp4f;
     }
     prev_tick = now;
+    if (s->version >= 3) show_v3(s);
 }
 
 static void show_ivt(void)
 {
-    static const BYTE ints[5] = { 0x08, 0x09, 0x15, 0x1C, 0x2F };
+    static const BYTE ints[6] = { 0x08, 0x09, 0x15, 0x16, 0x1C, 0x2F };
     WORD FAR *ivt = (WORD FAR *)linear(0, 0x3FF);
-    WORD v[10];
+    WORD v[12];
     int i;
-    for (i = 0; i < 5; i++) { v[2 * i] = ivt[ints[i] * 2 + 1]; v[2 * i + 1] = ivt[ints[i] * 2]; }
-    wsprintf(line(), "IVT  08:%04X:%04X  09:%04X:%04X  15:%04X:%04X  1C:%04X:%04X  2F:%04X:%04X",
-             v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9]);
+    for (i = 0; i < 6; i++) { v[2 * i] = ivt[ints[i] * 2 + 1]; v[2 * i + 1] = ivt[ints[i] * 2]; }
+    wsprintf(line(), "IVT  08:%04X:%04X  09:%04X:%04X  15:%04X:%04X  16:%04X:%04X  1C:%04X:%04X  2F:%04X:%04X",
+             v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11]);
 }
 
 /* ---------------------------------------------------------- MAP */
@@ -401,7 +434,7 @@ static void show_pci(void)
 static void refresh(void)
 {
     nlines = 0;
-    wsprintf(line(), "USOSDBG 1.0  tick:%lu  S = append to C:\\USOS9X\\USOSDBG.LOG (saved:%u)  Esc = quit",
+    wsprintf(line(), "USOSDBG 1.1  tick:%lu  S = append to C:\\USOS9X\\USOSDBG.LOG (saved:%u)  Esc = quit",
              GetTickCount(), snapshots);
     show_key();
     show_ivt();
@@ -472,7 +505,10 @@ static void run(HINSTANCE inst, HINSTANCE prev, int show)
     if (prev) return;
     lin_sel = AllocSelector(SELECTOROF((void FAR *)&text));
     phys_sel = AllocSelector(SELECTOROF((void FAR *)&text));
-    if (!lin_sel || !phys_sel) return;
+    bda_sel = AllocSelector(SELECTOROF((void FAR *)&text));
+    if (!lin_sel || !phys_sel || !bda_sel) return;
+    SetSelectorBase(bda_sel, 0x400);
+    SetSelectorLimit(bda_sel, 0xFF);
     wc.style = CS_HREDRAW | CS_VREDRAW;
     wc.lpfnWndProc = (WNDPROC)wndproc;
     wc.cbClsExtra = 0;
@@ -497,6 +533,7 @@ static void run(HINSTANCE inst, HINSTANCE prev, int show)
     }
     FreeSelector(lin_sel);
     FreeSelector(phys_sel);
+    FreeSelector(bda_sel);
 }
 
 /* Task entry (no C runtime): InitTask -> DI = hInstance, SI = hPrevInstance,
