@@ -1,4 +1,4 @@
-# Windows 98 / 98 SE Setup phase 1 in a VM on the target machine
+# Windows 98 / 98 SE / Me Setup phase 1 in a VM on the target machine
 # (docs/win9x-modern-2026-09-30.md section 4d; design option a1).
 # Sourced by tools/w9x_csmwrap_prepare.sh. Nothing here is copied from
 # Windows 9x QuickInstall.
@@ -13,7 +13,7 @@
 #
 # QEMU, SeaBIOS and the KVM modules come from the optional second initrd
 # EFI/USOS/micro-linux/qemu9x.cpio (only on the w9x command line). Without it,
-# with less than ~1 GiB RAM, for 95/Me, or with the flag file
+# with less than ~1 GiB RAM, for 95, or with the flag file
 # EFI/USOS/win9x/phase1-native.flag, the old path is kept (Setup's DOS stage
 # on the real machine). KVM only with EFI/USOS/win9x/phase1-kvm.flag and a
 # working /dev/kvm; the default is TCG.
@@ -35,7 +35,10 @@ W9X_VM_SCREEN_EVERY=${W9X_VM_SCREEN_EVERY:-60}
 
 # 0 when this system's Setup phase 1 runs in the VM (reason on stdout).
 w9x_vm_available() {
-    case "$1" in 98SE|98) ;; *) echo "release $1 keeps the native Setup start"; return 1 ;; esac
+    # Me (2026-10-06): the same DOS-stage SETUP.EXE as 98 (/P I valid), so the
+    # same VM path; 95 keeps the native start (its licence/COA pages need a
+    # keyboard in Setup phase 1).
+    case "$1" in 98SE|98|ME) ;; *) echo "release $1 keeps the native Setup start"; return 1 ;; esac
     if [ -e "$W9X_VM_FLAGS/phase1-native.flag" ]; then echo 'phase1-native.flag present'; return 1; fi
     if [ ! -x "$W9X_VM_QEMU" ]; then echo 'qemu9x.cpio not loaded (no QEMU)'; return 1; fi
     for firmware in bios-256k.bin vgabios-stdvga.bin; do

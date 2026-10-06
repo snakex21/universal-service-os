@@ -200,9 +200,9 @@ usos_w9x_csmwrap_prepare() {
     [ "$TARGET_DEVICE" != "$USOS_DISK_DEVICE" ] || stop 'refusing the USOS disk'
     w9x_csmwrap_log "TARGET $TARGET_DEVICE model=$model serial=$serial size=$size confirmed"
 
-    # Windows 98 / 98 SE: Setup phase 1 in a VM on this machine (qemu9x.cpio,
-    # tools/w9x_phase1_qemu.sh); 95, Me and machines without it keep the
-    # native DOS Setup start.
+    # Windows 98 / 98 SE / Me: Setup phase 1 in a VM on this machine
+    # (qemu9x.cpio, tools/w9x_phase1_qemu.sh); 95 and machines without it keep
+    # the native DOS Setup start.
     vm_phase1=no
     if [ -z "$dos_iso" ] && [ -r /usr/lib/usos/w9x_phase1_qemu.sh ]; then
         . /usr/lib/usos/w9x_phase1_qemu.sh
