@@ -98,6 +98,7 @@ var payloadFiles = []payloadFile{
 	{`zig-out/dos-native/msdos/W3CONFIG.CSM`, `EFI/USOS/dos-native/msdos/W3CONFIG.CSM`},
 	{`zig-out/dos-native/msdos/W3AUTO.CSM`, `EFI/USOS/dos-native/msdos/W3AUTO.CSM`},
 	{`zig-out/dos-native/msdos/W3INI.BAS`, `EFI/USOS/dos-native/msdos/W3INI.BAS`},
+	{`zig-out/dos-native/msdos/W3INF.BAS`, `EFI/USOS/dos-native/msdos/W3INF.BAS`},
 	{`zig-out/dos-native/msdos/VBMOUSE.EXE`, `EFI/USOS/dos-native/msdos/VBMOUSE.EXE`},
 	{`zig-out/dos-native/msdos/VBMOUSE.DRV`, `EFI/USOS/dos-native/msdos/VBMOUSE.DRV`},
 	{`zig-out/dos-native/msdos/VBADOS.TXT`, `EFI/USOS/dos-native/msdos/VBADOS.TXT`},

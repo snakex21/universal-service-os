@@ -441,6 +441,7 @@ payload_zip	EFI/USOS/dos-native/msdos/W3AUTO.BAT
 payload_zip	EFI/USOS/dos-native/msdos/W3AUTO.CSM
 payload_zip	EFI/USOS/dos-native/msdos/W3CONFIG.CSM
 payload_zip	EFI/USOS/dos-native/msdos/W3CONFIG.SYS
+payload_zip	EFI/USOS/dos-native/msdos/W3INF.BAS
 payload_zip	EFI/USOS/dos-native/msdos/W3INI.BAS
 payload_zip	EFI/USOS/dos-native/msdos/W3START.BAT
 payload_zip	EFI/USOS/dos-native/msdos/WINMENU.BAT

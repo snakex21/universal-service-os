@@ -1,4 +1,5 @@
 [menu]
+menucolor=15,1
 menuitem=WINSTD,Windows - tryb standardowy (domyslny)
 menuitem=WIN386,Windows - tryb rozszerzony 386 (alternatywny)
 menuitem=DOSONLY,MS-DOS - wiersz polecen

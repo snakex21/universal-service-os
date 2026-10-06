@@ -60,6 +60,17 @@ md C:\WINSETUP
 C:\DOS\XCOPY.EXE %USRC%\WINSETUP\*.* C:\WINSETUP /s /e /v >nul
 if errorlevel 1 goto failed
 if not exist C:\WINSETUP\SETUP.EXE goto failed
+rem Central European editions (Polish 3.1): Setup would put the code page 852
+rem helper (ADD852.EXE /A) into Autostart. It rewrites CONFIG.SYS and
+rem AUTOEXEC.BAT and so replaces the start menu. W3INF.BAS writes SETUP.NEW
+rem without that one entry; no SETUP.NEW = nothing to change.
+if exist C:\WINSETUP\SETUP.NEW del C:\WINSETUP\SETUP.NEW
+C:\DOS\QBASIC.EXE /RUN %USRC%\W3INF.BAS
+if not exist C:\WINSETUP\SETUP.NEW goto inf_done
+copy C:\WINSETUP\SETUP.NEW C:\WINSETUP\SETUP.INF /y >nul
+if errorlevel 1 goto failed
+del C:\WINSETUP\SETUP.NEW
+:inf_done
 md C:\USOSW3
 copy %USRC%\W3START.BAT C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
@@ -103,28 +114,43 @@ cls
 echo USOS - stage 1 completed.
 echo.
 echo DOS and Windows Setup files are ready on the target disk.
+if "%UDISK%"=="1" goto s1_disk
 echo Remove USOS USB, then press Enter to restart from the target disk.
+goto s1_text
+:s1_disk
+echo The computer restarts from the target disk automatically.
+:s1_text
 echo Original Windows Setup will start automatically.
 echo After Setup, USOS prepares a Windows and DOS start menu.
 echo A final restart will load that menu and its new settings.
-goto restart_ready
+goto reboot_prompt
 :dos_done
 cls
 echo USOS - installation completed.
 echo.
 echo MS-DOS installation completed.
+if "%UDISK%"=="1" goto done_disk
 echo Remove USOS USB, then press Enter to restart from the target disk.
-:restart_ready
+goto reboot_prompt
+:done_disk
+echo The computer restarts from the target disk automatically.
+rem MS-DOS compares only the first 8 characters of a label, so every label
+rem must differ within them (tools/tests/test_dos_batch_labels.py).
+:reboot_prompt
+prompt $p$g
+if "%UDISK%"=="1" goto auto_restart
 echo.
 echo REBOOT is prepared below. Press Enter when ready, or Esc to clear it.
 echo.
-prompt $p$g
-if "%UDISK%"=="1" goto restart_now
 D:
 cd \
 D:\REBOOT.COM /P
 goto end
-:restart_now
+:auto_restart
+echo.
+if not exist C:\DOS\CHOICE.COM goto restart_go
+C:\DOS\CHOICE.COM /C:R /T:R,8 Restarting in 8 seconds. Press R to restart now
+:restart_go
 echo Restarting from the target disk...
 %USRC%\REBOOT.COM
 goto end
