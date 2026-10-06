@@ -179,6 +179,8 @@ def stage_vmdisp9x(out: Path) -> None:
     for name in VMDISP_FILES:
         if f'\n{name}=1' not in inf:
             raise ValueError('usosvesa.inf does not list ' + name)
+    if '\nHKLM,Software\\vmdisp9x\\vesa,NoMemTest,,"1"' not in inf:
+        raise ValueError('usosvesa.inf must set NoMemTest="1" (real-hardware VRAM sizing)')
     (out / 'USOSVESA.INF').write_bytes(dos_text(inf))
 
 
