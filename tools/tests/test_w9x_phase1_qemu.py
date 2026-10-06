@@ -1,4 +1,4 @@
-"""Windows 98 Setup phase 1 in a VM (tools/w9x_phase1_qemu.sh, the VM parts
+"""Windows 98 / 98 SE / Me Setup phase 1 in a VM (tools/w9x_phase1_qemu.sh, the VM parts
 of tools/w9x_csmwrap_target.sh and INSTALL.BAT). Host only: Git sh, a fake
 qemu-system-i386 script, temp folders; no VM, no disk.
 """
@@ -57,11 +57,11 @@ class Phase1Vm(unittest.TestCase):
     def run_lib(self, body, **extra):
         return sh(f'. "{LIB}"\n{body}', self.env(**extra))
 
-    def test_only_98_and_98se_with_qemu_ram_and_no_opt_out(self):
-        for tag in ('98SE', '98'):
+    def test_only_98_98se_and_me_with_qemu_ram_and_no_opt_out(self):
+        for tag in ('98SE', '98', 'ME'):
             rc, out, _ = self.run_lib(f'w9x_vm_available {tag}')
             self.assertEqual(rc, 0, out)
-        for tag in ('95', 'ME', 'DOS'):
+        for tag in ('95', 'DOS', 'W3'):
             self.assertNotEqual(self.run_lib(f'w9x_vm_available {tag}')[0], 0, tag)
         self.assertNotEqual(self.run_lib('w9x_vm_available 98SE', W9X_VM_QEMU=(self.tmp / 'none').as_posix())[0], 0)
         self.meminfo.write_text('MemTotal:       786432 kB\n', newline='\n')
