@@ -407,7 +407,7 @@ and the 95 OSR2 startup disk as `Systems\Windows\Windows 95\Boot\BOOTDISK.IMG` (
     digits, retail `ddd-ddddddd`: 10 digits, untested); when the guest writes nothing for 60 s, shows a
     graphics screen (640x480; DOS text mode dumps as 720x400) and has written less than 64 MB, the digits
     and Enter go to a **second QEMU monitor** whose output is discarded (the fields move on at 5 / 7
-    digits, Enter = Next). At most 3 attempts; with a key, 30 min without a disk write ends the VM (rc 3).
+    digits, Enter = Next). At most 5 attempts (the smoke run used 3: the pages before, on and after the COA page); with a key, 30 min without a disk write ends the VM (rc 3).
     The key never reaches a log: `prepare.log` / `command.txt` show only its length and the attempt time,
     no screendump is taken while the typed page may still be on screen.
 * **Memory**: Patcher9x 0.9.91 covers 95 (TLB, CPU speed for NTKERN/IOS/ESDI_506/SCSIPORT/NDIS, the memory
