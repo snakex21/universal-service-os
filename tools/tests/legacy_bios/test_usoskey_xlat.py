@@ -143,6 +143,80 @@ class UsosKeyXlat(unittest.TestCase):
         for i, code in enumerate(list(range(0x3B, 0x45)) + [0x57, 0x58]):
             self.assertEqual(self.key([code, code | 0x80]), [ev(0x70 + i, False, code), ev(0x70 + i, True, code)])
 
+    # --- 2026-10-06 X470 report: Ctrl+letter, F-keys twice, editing keys ---
+    CTRLS = (([0x1D], [0x9D], 0x1D, False), ([0xE0, 0x1D], [0xE0, 0x9D], 0x1D, True))
+
+    def test_ctrl_letter_both_ctrls(self):
+        for down, up, scan, ext in self.CTRLS:
+            for letter, code in (('C', 0x2E), ('V', 0x2F), ('Z', 0x2C), ('X', 0x2D), ('S', 0x1F), ('O', 0x18)):
+                self.assertEqual(self.key(down + [code, code | 0x80] + up),
+                                 [ev(0x11, False, scan, ext), ev(ord(letter), False, code), ev(ord(letter), True, code),
+                                  ev(0x11, True, scan, ext)], (letter, ext))
+
+    def test_ctrl_held_tapping_c(self):
+        for down, up, scan, ext in self.CTRLS:
+            self.assertEqual(self.key(down + [0x2E, 0xAE] * 3 + up),
+                             [ev(0x11, False, scan, ext)] + [ev(ord('C'), False, 0x2E), ev(ord('C'), True, 0x2E)] * 3
+                             + [ev(0x11, True, scan, ext)])
+        # The next plain key carries no modifier (nothing stuck).
+        self.assertEqual(self.key([0x1D, 0x2E, 0xAE, 0x9D, 0x2E, 0xAE])[-2:],
+                         [ev(ord('C'), False, 0x2E), ev(ord('C'), True, 0x2E)])
+
+    def test_ctrl_shift_letter(self):
+        self.assertEqual(self.key([0x1D, 0x2A, 0x2C, 0xAC, 0xAA, 0x9D]),
+                         [ev(0x11, False, 0x1D), ev(0x10, False, 0x2A), ev(ord('Z'), False, 0x2C), ev(ord('Z'), True, 0x2C),
+                          ev(0x10, True, 0x2A), ev(0x11, True, 0x1D)])
+
+    def test_function_keys_twice(self):
+        for i, code in enumerate(list(range(0x3B, 0x45)) + [0x57, 0x58]):
+            pair = [ev(0x70 + i, False, code), ev(0x70 + i, True, code)]
+            self.assertEqual(self.key([code, code | 0x80, code, code | 0x80]), pair * 2, hex(code))
+        # F5 after a typed letter and after a Ctrl combo still arrives.
+        self.assertEqual(self.key([0x3F, 0xBF, 0x1E, 0x9E, 0x1D, 0x2E, 0xAE, 0x9D, 0x3F, 0xBF])[-2:],
+                         [ev(0x74, False, 0x3F), ev(0x74, True, 0x3F)])
+
+    def test_alt_tab(self):
+        self.assertEqual(self.key([0x38, 0x0F, 0x8F, 0x0F, 0x8F, 0xB8]),
+                         [ev(0x12, False, 0x38)] + [ev(0x09, False, 0x0F), ev(0x09, True, 0x0F)] * 2 + [ev(0x12, True, 0x38)])
+
+    def test_shift_and_ctrl_navigation(self):
+        nav = {0x48: 0x26, 0x50: 0x28, 0x4B: 0x25, 0x4D: 0x27, 0x47: 0x24, 0x4F: 0x23}
+        for numlock in (False, True):
+            for code, vk in nav.items():
+                for mdown, mup, mvk, mscan in (([0x2A], [0xAA], 0x10, 0x2A), ([0x1D], [0x9D], 0x11, 0x1D)):
+                    self.assertEqual(self.key(mdown + [0xE0, code, 0xE0, code | 0x80] + mup, numlock),
+                                     [ev(mvk, False, mscan), ev(vk, False, code, True), ev(vk, True, code, True),
+                                      ev(mvk, True, mscan)], (hex(code), numlock))
+
+    def test_esc_tab_backspace_enter(self):
+        for code, vk in ((0x01, 0x1B), (0x0F, 0x09), (0x0E, 0x08), (0x1C, 0x0D)):
+            self.assertEqual(self.key([code, code | 0x80, code, code | 0x80]),
+                             [ev(vk, False, code), ev(vk, True, code)] * 2)
+
+    def test_altgr_after_left_ctrl_tap(self):
+        out = self.key([0x1D, 0x9D, 0xE0, 0x38, 0x1E, 0x9E, 0xE0, 0xB8])
+        self.assertEqual(out, [ev(0x11, False, 0x1D), ev(0x11, True, 0x1D),
+                               ev(0x11, False, 0x1D), ev(0x12, False, 0x38, True), ev(ord('A'), False, 0x1E),
+                               ev(ord('A'), True, 0x1E), ev(0x12, True, 0x38, True), ev(0x11, True, 0x1D)])
+        # Ctrl+C after AltGr: Ctrl down and up exactly once each.
+        out = self.key([0xE0, 0x38, 0xE0, 0xB8, 0x1D, 0x2E, 0xAE, 0x9D])
+        self.assertEqual(out[4:], [ev(0x11, False, 0x1D), ev(ord('C'), False, 0x2E), ev(ord('C'), True, 0x2E),
+                                   ev(0x11, True, 0x1D)])
+
+    def test_ctrl_down_up_balanced_in_mixed_sequences(self):
+        seqs = [
+            [0xE0, 0x38, 0x1D, 0x9D, 0xE0, 0xB8],          # AltGr, left Ctrl tap inside
+            [0x1D, 0xE0, 0x38, 0x9D, 0xE0, 0xB8],          # left Ctrl released before AltGr
+            [0xE0, 0x1D, 0xE0, 0x38, 0xE0, 0xB8, 0xE0, 0x9D],
+            [0x1D, 0x38, 0xE0, 0x53, 0xE0, 0xD3, 0xB8, 0x9D],
+        ]
+        for seq in seqs:
+            state = 0
+            for e in self.key(seq):
+                if e.startswith(('d11', 'u11')):
+                    state = 1 if e[0] == 'd' else 0
+            self.assertEqual(state, 0, seq)
+
 
 if __name__ == '__main__':
     unittest.main()
