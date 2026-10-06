@@ -78,6 +78,8 @@ var payloadFiles = []payloadFile{
 	{`zig-out/dos-native/win9x/XHCI98.TXT`, `EFI/USOS/dos-native/win9x/XHCI98.TXT`},
 	{`zig-out/dos-native/win9x/CREGFIX.SYS`, `EFI/USOS/dos-native/win9x/CREGFIX.SYS`},
 	{`zig-out/dos-native/win9x/CREGFIX.TXT`, `EFI/USOS/dos-native/win9x/CREGFIX.TXT`},
+	{`zig-out/dos-native/win9x/USOSDIAG.COM`, `EFI/USOS/dos-native/win9x/USOSDIAG.COM`},
+	{`zig-out/dos-native/win9x/USOSDBG.EXE`, `EFI/USOS/dos-native/win9x/USOSDBG.EXE`},
 	{`zig-out/dos-native/msdos/HIMEMX.EXE`, `EFI/USOS/dos-native/msdos/HIMEMX.EXE`},
 	{`zig-out/dos-native/msdos/HIMEMX.TXT`, `EFI/USOS/dos-native/msdos/HIMEMX.TXT`},
 	{`zig-out/dos-native/msdos/HIMEMSRC.ZIP`, `EFI/USOS/dos-native/msdos/HIMEMSRC.ZIP`},

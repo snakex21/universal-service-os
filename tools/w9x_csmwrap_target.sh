@@ -45,6 +45,9 @@ ESP_DIR=${W9X_ESP_DIR:-/mnt/esp/EFI/USOS}
 # SeaBIOS/CSMWrap, so the USOSKEY bridge (BIOS USB keyboard) dies, and native
 # USB HID does not work yet: no keyboard/mouse in Setup's final phase.
 XHCI98_FLAG=${W9X_XHCI98_FLAG:-$ESP_DIR/win9x/xhci98.flag}
+# Real-hardware diagnostics (USOSDIAG BOOT before every Windows start) are
+# opt-in too; the files are in C:\USOS9X either way.
+DIAG_FLAG=${W9X_DIAG_FLAG:-$ESP_DIR/win9x/diag.flag}
 LIB=${USOS_LIB_DIR:-/usr/lib/usos}
 ESP_TAIL=133120
 MIN_SECTORS=4194304
@@ -243,6 +246,7 @@ fi
 printf 'SET U9SYS=%s\r\nSET U9SRC=%s\r\nSET U9ANS=%s\r\nSET U9CSM=1\r\nSET U9T=C:\\USOS9X\r\nSET U9DISK=1\r\n' \
     "$SYSTEM_TAG" "$SETUP_FOLDER" "$ANSWER_KIND" > "$work/c/USOS9X/U9ENV.BAT"
 if [ "$USB_NATIVE" = 1 ]; then printf 'SET U9USB=1\r\n' >> "$work/c/USOS9X/U9ENV.BAT"; fi
+if [ -e "$DIAG_FLAG" ]; then printf 'SET U9DIAG=1\r\n' >> "$work/c/USOS9X/U9ENV.BAT"; log 'diagnostics: USOSDIAG BOOT on (win9x/diag.flag)'; fi
 if [ "$VM_PHASE1" = 1 ]; then
     printf 'SET U9VM=1\r\n' >> "$work/c/USOS9X/U9ENV.BAT"
     # In the VM, U9FIX /VGA sees QEMU's display card only: the real display

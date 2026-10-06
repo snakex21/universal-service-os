@@ -70,8 +70,8 @@ initramfs	usr/lib/usos/vista_csmwrap_target.sh	100755	0690b03e56ee84a2a1422faf21
 initramfs	usr/lib/usos/vista_disk_prepare.sh	100755	f41d1790480b90e0ca3e578dadc2ed0c4aa20acc1a5b403f5b2b01e2013b464d
 initramfs	usr/lib/usos/w2k3_selected_partition_uefi_csm.sif	100755	d986de98a02dd6c9454db8e37d54999f9213b3d1fb5a8205ac996dc9f391f538
 initramfs	usr/lib/usos/w2k_selected_partition_uefi_csm.sif	100755	4081b007b280efb31c85ce519abbfcb18ac8f09482add26a7de1c8b3520de04e
-initramfs	usr/lib/usos/w9x_csmwrap_prepare.sh	100755	961c68e6be4c4e9ff6365dea458dc4a1d8ae0574d713598af1bbab87ccefd1aa
-initramfs	usr/lib/usos/w9x_csmwrap_target.sh	100755	713de563d1f1fc7030d2531f162050d57c000416c7cd8f2055a05c01e6b3f12f
+initramfs	usr/lib/usos/w9x_csmwrap_prepare.sh	100755	e1b026789d8b7a70a7bd2800fd86df108c9413d900da59f90d8eb683ed42a5fd
+initramfs	usr/lib/usos/w9x_csmwrap_target.sh	100755	862b8d7758b5cec863c1ed85436846d79aa099c8d30f1e10eea7df44cfbba817
 initramfs	usr/lib/usos/w9x_phase1_qemu.sh	100755	03ce7ed10efb626b514e8d0f11b563f3bd6c673a66205c919d5cbc3b3ca0efff
 initramfs	usr/lib/usos/wimboot	100644	5f067ccdc4d084d5bf77b6c853bd0f8402dfc2b4cd1b103d358993ae97fae8e3
 initramfs	usr/lib/usos/wimboot-kexec	100644	f0c38d5b145b70d2156a37f62e3d97abdb5d75a3ab8703a718d43f777df0692a
@@ -459,6 +459,8 @@ payload_zip	EFI/USOS/dos-native/source.zip
 payload_zip	EFI/USOS/dos-native/win9x/MSBATCH.INF
 payload_zip	EFI/USOS/dos-native/win9x/U9FIX.COM
 payload_zip	EFI/USOS/dos-native/win9x/U9FIX.TXT
+payload_zip	EFI/USOS/dos-native/win9x/USOSDBG.EXE
+payload_zip	EFI/USOS/dos-native/win9x/USOSDIAG.COM
 payload_zip	EFI/USOS/dos-native/win9x/USOSKEY.COM
 payload_zip	EFI/USOS/dos-native/win9x/USOSKEY.DRV
 payload_zip	EFI/USOS/dos-native/win9x/USOSMOUS.DRV

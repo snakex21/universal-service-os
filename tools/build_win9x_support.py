@@ -34,14 +34,17 @@
                 the first CONFIG.SYS line under CSMWrap (boot floppy and C:),
                 clears the control registers CSMWrap leaves set
 
-Also built, not staged yet (hardware diagnostics, copied by hand):
+Hardware diagnostics, staged (the UEFI path copies them to C:\\USOS9X;
+nothing runs them unless EFI/USOS/win9x/diag.flag exists):
   USOSDIAG.COM  timer tick / PIC / PIT, INT 15h memory, INT 13h, PCI, VBE, HPET report
-  USOSHPET.COM  clears HPET LegacyReplacement (src/platform/bios/win9x/usosdiag.S)
-  USOSWHERE.COM TSR: interrupted CS:IP, ticks, PSP and last INT 13h/15h/21h/2Fh
-                AX in the top right corner (src/platform/bios/win9x/usoswhere.S)
   USOSDBG.EXE   Win16 program for the 9x desktop: USOSKEY bridge counters,
                 V86-vs-physical page map, xHCI and bridge PCI state, live
                 (src/platform/bios/win9x/usosdbg.c, OpenWatcom like USOSKEY.DRV)
+
+Also built, not staged (copied by hand):
+  USOSHPET.COM  clears HPET LegacyReplacement (src/platform/bios/win9x/usosdiag.S)
+  USOSWHERE.COM TSR: interrupted CS:IP, ticks, PSP and last INT 13h/15h/21h/2Fh
+                AX in the top right corner (src/platform/bios/win9x/usoswhere.S)
 
 USOS code is GPL-3.0-or-later; no Microsoft files.
 
@@ -69,7 +72,11 @@ FILES = ('U9FIX.COM', 'U9FIX.TXT', 'USOSVESA.INF', 'VESAMINI.DRV', 'VESAMINI.VXD
 BRIDGE = ('USOSKEY.COM', 'USOSKEY.DRV', 'USOSMOUS.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT')
 # Everything on the stick (the payload list and the release check use it).
 STAGED = FILES + ('MSBATCH.INF', 'VMDISP9X.TGZ', 'XHCI98.SYS', 'XHCI98.INF', 'XHCI98.TXT',
-                   'CREGFIX.TXT')
+                   'CREGFIX.TXT') + (
+    # Hardware diagnostics: on the stick, so the UEFI path's target writer
+    # (tools/w9x_csmwrap_target.sh) puts them into C:\USOS9X; nothing runs
+    # them unless EFI/USOS/win9x/diag.flag exists (USOSDIAG BOOT, INSTALL.BAT).
+    'USOSDIAG.COM', 'USOSDBG.EXE')
 
 NOTICE = """U9FIX.COM - USOS helper for Windows 95/98/Me
 Copyright (C) 2026 Maksymilian and the USOS Authors.

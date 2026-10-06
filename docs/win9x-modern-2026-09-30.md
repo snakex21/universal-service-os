@@ -69,7 +69,7 @@ plain 4F07 test). 119 is the latest release. Upstream master (unreleased,
 2026-05 "new vram management", "VESA: real HW fixes") draws into a RAM shadow
 buffer instead. USOSDIAG 1.3 logs the VGA BARs and the VBE mode table ("need"
 = pitch*height, ">MEM" past TotalMemory) for the diagnosis. BIOSTAR test disk:
-one-time `C:\USOS9X\VESAFIX.BAT` sets `NoMemTest`="1" (backup `SYSTEM.VB`/`USER.VB`).
+one-time `C:\USOS9X\VESAFIX.BAT` sets `NoMemTest`="1" (backup `SYSTEM.VB`/`USER.VB`). Since 2026-10-06 USOSVESA.INF sets it by default (section 4e).
 
 ## 4. X470 test plan (CSM off, Secure Boot off, spare SATA disk; USB keyboard and mouse only, no PS/2)
 
@@ -241,6 +241,46 @@ runs that stage in QEMU on the same machine and only the rest on the real hardwa
 * Licence gap before a release: Alpine's QEMU links `libsasl2` (BSD-4-Clause-Attribution), which
   is not GPL-compatible. Milestone 2 replaces the Alpine binaries with our own minimal static
   build (no VNC/SASL/Xen/slirp).
+
+## 4e. 98 SE on the X470: hardware results folded in (2026-10-06)
+
+X470 (CSMWrap, 98 SE PL OEM, phase 1 in the VM): USB keyboard fully works (USOSKEY v3), USB mouse
+works (move, clicks, drag; USOSMOUS.DRV) but was far too fast with a Logitech G502, 1920x1080 16bpp
+works once `NoMemTest`="1" is set. Now the default for fresh installs:
+
+* **VESA**: `USOSVESA.INF` adds `HKLM\Software\vmdisp9x\vesa NoMemTest="1"` next to `VRAMLimit`
+  (no VESAFIX.BAT any more); `build_win9x_support.py` refuses an INF without it.
+* **Mouse speed**: USOSMOUS.DRV scales every movement by `SYSTEM.INI [usosmous] Multiplier=` /
+  `Divisor=` (default 1 / 2, limits 1..4 / 1..16) with the remainder carried per axis (dropped when
+  the direction turns), `src/platform/win3/usosmous_scale.h`, host-tested. USER then applies the
+  Control Panel speed and acceleration as before. Slower: `Divisor=3` or `4`; faster: `Divisor=1`.
+* **Date/Time page**: with no answer chosen (`answer=none`) the UEFI menu writes the menu language's
+  9x zone key into `request.ini` (`timezone=Central European` for Polish, `msbatch.timeZoneForUi`)
+  and `w9x_csmwrap_prepare.sh` puts `TimeZone="..."` into `[Setup]` of the default MSBATCH.INF
+  (MSBATCH TimeZone, Windows 98 Resource Kit appendix D; key names from the CD's TIMEZONE.INF).
+  Profiles already carry their zone; a user file is copied 1:1. The BIOS-mode path (no UEFI request)
+  still uses the default file without a zone.
+* **Diagnostics**: `USOSDIAG.COM` and `USOSDBG.EXE` are on the stick and in `C:\USOS9X`, but nothing
+  runs them; `EFI\USOS\win9x\diag.flag` (U9DIAG=1) adds `USOSDIAG BOOT` to AUTOEXEC.BAT.
+* Unchanged and checked: USOSKEY v4 (.COM + .DRV), `mouse.drv=usosmous.drv` (98 SE), no `*vmouse`,
+  xhci98 opt-in only, CREGFIX first in CONFIG.SYS, no second HIMEM line after the VM phase, APM left
+  on (APM off was only a keyboard debugging step).
+* **Known limit**: USB mouse hotplug does not work (SeaBIOS enumerates USB at boot); plug the mouse in
+  before the start.
+
+Still manual (needs a click or a key) in a fresh hands-off 98 SE run:
+
+* **OEM first-run pages** (user information, licence, product key, finish): on the OEM CD these are
+  SETUPX's first-run screens (`FirstRunScreens` in SETUPX.DLL, driven by `ProductType`=9 from
+  SETUPPP.INF; OPK audit files `C:\WINDOWS\OPTIONS\OEMAUDIT.INF` / `EndUser.INF` with
+  `[Dialog_Display]`), not MSBATCH pages: `Display=0`/`ShowEula=0` do not hide them, a profile key
+  only pre-fills the key page. No documented MSBATCH key removes them; changing `ProductType` was not
+  tried (it changes the key validation). The bridge keyboard/mouse answer them.
+* **Add New Hardware for the monitor**: vmdisp9x's `DDC`=1 lets 98 enumerate the EDID monitor
+  (`Monitor\<PnP id>`); MONITOR.INF matches it only through the compatible id `*PNP09FF`, so 98 asks
+  for a better driver. Planned: read the PnP id from the UEFI EDID protocol (EDID Active/Discovered on
+  the GOP handle, bytes 8-11), pass it in `request.ini` and add a USOS monitor INF with that hardware
+  id next to Setup. `DDC`=0 is no option (Unknown Monitor caps at 640x480).
 
 ## 5. Open points
 

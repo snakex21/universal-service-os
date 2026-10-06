@@ -132,6 +132,11 @@ REM A restart before Setup copied Windows (hang, power loss): RESUME.BAT,
 REM written once Patcher9x succeeded, starts Setup again.
 ECHO @IF NOT EXIST C:\WINDOWS\WIN.COM IF EXIST C:\USOS9X\RESUME.BAT CALL C:\USOS9X\RESUME.BAT>>C:\AUTOEXEC.BAT
 ECHO @C:\USOS9X\USOSKEY.COM>>C:\AUTOEXEC.BAT
+REM Real-hardware report before every Windows start (C:\USOS9X\DIAG.LOG):
+REM off by default, only with EFI\USOS\win9x\diag.flag (U9DIAG=1).
+IF NOT "%U9DIAG%"=="1" GOTO DIAGDONE
+ECHO @IF EXIST C:\USOS9X\USOSDIAG.COM C:\USOS9X\USOSDIAG.COM BOOT>>C:\AUTOEXEC.BAT
+:DIAGDONE
 REM The DOS KEYB TSR that Setup adds at the end of AUTOEXEC.BAT stops the
 REM installed Windows with a protection error next to the bridge (QEMU
 REM OVMF bisect): it is renamed to KEYB.USO before it would load. Windows
