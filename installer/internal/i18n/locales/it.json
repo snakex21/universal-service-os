@@ -1046,6 +1046,8 @@
   "boot.profile.value.edition_manual": "Inserisci manualmente…",
   "boot.profile.badge_incomplete": "Incompleto",
   "boot.profile.missing.key": "Nessun codice Product Key per {0}: l'installazione si ferma alla pagina del codice. Modifica il profilo (X) e inserisci il codice.",
+  "boot.win9x_key.title": "Immetti il codice Product Key di {0}",
+  "boot.win9x_key.subtitle": "Senza di esso il programma di installazione si ferma alla pagina del codice. Il codice viene usato solo per questa installazione e non viene salvato.",
   "boot.profile.missing.password": "{0} richiede una password di almeno 7 caratteri con tre tipi tra: maiuscole, minuscole, cifre, simboli. Senza, l'installazione si ferma alla pagina della password di Administrator.",
   "boot.profile.field.systems": "Usa per",
   "boot.profile.help.systems": "I sistemi la cui schermata delle risposte offre questo profilo. I profili salvati senza questa impostazione sono offerti per ogni Windows, mai per Linux.",

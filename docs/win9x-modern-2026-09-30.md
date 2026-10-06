@@ -438,6 +438,13 @@ and the 95 OSR2 startup disk as `Systems\Windows\Windows 95\Boot\BOOTDISK.IMG` (
 * **Still manual on a hands-off 95 run**: the Windows logon/password dialog (Enter twice; a 95 logon
   without network clients still shows it), the Add Printer wizard (Esc/Anuluj; an empty MSBATCH
   `[Printers]` section may skip it, untested), the Welcome window (USOS.NoWelcome is not honoured on 95).
+* **Menu fix (2026-10-07, X470 report)**: the UEFI menu never offered answer profiles for 95/98/Me
+  (`answer_screen.profileCapable` required an NT family), and `systems=` rejected 9x ids. Both fixed:
+  95/98/98 SE/Me list their profiles (`systems=windows-9x` or `windows-95`), a 95 profile without a
+  95-shaped key gets the "incomplete" badge, and Start of 95 without a 95 key (no profile, or a profile
+  without one; not a DATA answer file) asks "Enter the Windows 95 product key" first
+  (`win9x_key_prompt.zig`); the key goes only into the staged `95.INF` for this start, so phase 1 runs in
+  the VM instead of the native start that freezes on the X470.
 
 ## 5. Open points
 

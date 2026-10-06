@@ -332,6 +332,8 @@ pub const Key = enum(u16) {
     verify_vm,
     wait,
     wait_usb,
+    win9x_key_subtitle,
+    win9x_key_title,
     action_blocked,
     action_chainload,
     action_efi,
@@ -1011,6 +1013,8 @@ pub const hashes = [_]u32{
     0xd32c94ef, // verify.vm
     0x892e4ca0, // wait
     0x3e1f8ab9, // wait_usb
+    0x8382ff82, // win9x_key.subtitle
+    0xc186cf80, // win9x_key.title
     0xb9a53ded, // action.blocked
     0x67542164, // action.chainload
     0x4743492f, // action.efi
@@ -1690,6 +1694,8 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    true,
+    true,
     false,
     false,
     false,
@@ -2038,7 +2044,7 @@ pub const bios = [_]bool{
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
-pub const bios_count = 330;
+pub const bios_count = 332;
 
 pub const english = [_][]const u8{
     "Experimental",
@@ -2371,6 +2377,8 @@ pub const english = [_][]const u8{
     "Tested in a virtual machine",
     "Please wait",
     "Please wait - keep the USB drive connected",
+    "Without it Setup stops on the product key page. The key is used for this installation only and is not saved.",
+    "Enter the {0} product key",
     "Start is not possible with these settings",
     "Prepare and chainload",
     "Start the EFI application",

@@ -183,7 +183,8 @@ pub fn profileCapable(system: *const SystemEntry, image: ImageKind, method: Boot
         const linux_backend = preparation_capability.resolveForFirmware(system, image, method, firmware) orelse return false;
         return linux_backend == .linux_iso and firmware == .uefi;
     }
-    if (answer_target.familyFor(system.id) == null) return false;
+    // Windows 95/98/Me have no NT family: MSBATCH.INF (answer/msbatch.zig).
+    if (answer_target.familyFor(system.id) == null and @import("answer/msbatch.zig").releaseFor(system.id) == null) return false;
     if (image != .iso and image != .wim) return false;
     const backend = preparation_capability.resolveForFirmware(system, image, method, firmware) orelse return false;
     return switch (backend) {
@@ -202,6 +203,14 @@ pub fn linuxAnswerSystem(system_id: []const u8) bool {
         if (std.mem.eql(u8, id, system_id)) return true;
     }
     return false;
+}
+
+test "Windows 95/98/Me offer answer profiles on the UEFI path (MSBATCH.INF)" {
+    const systems = @import("../catalog/systems.zig");
+    for ([_][]const u8{ "windows-95", "windows-98", "windows-98-se", "windows-me" }) |id| {
+        try std.testing.expect(profileCapable(systems.findById(id).?, .iso, .automatic, .uefi));
+    }
+    try std.testing.expect(!profileCapable(systems.findById("windows-3-11").?, .iso, .automatic, .uefi));
 }
 
 test "Linux profiles only for Ubuntu, Debian and Fedora ISOs on UEFI" {

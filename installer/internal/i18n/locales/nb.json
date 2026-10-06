@@ -1046,6 +1046,8 @@
   "boot.profile.value.edition_manual": "Skriv inn manuelt…",
   "boot.profile.badge_incomplete": "Ufullstendig",
   "boot.profile.missing.key": "Ingen produktnøkkel for {0}: Setup stopper på siden for produktnøkkelen. Rediger profilen (X) og skriv inn nøkkelen.",
+  "boot.win9x_key.title": "Skriv inn produktnøkkelen for {0}",
+  "boot.win9x_key.subtitle": "Uten den stopper installasjonen på siden for produktnøkkel. Nøkkelen brukes bare til denne installasjonen og lagres ikke.",
   "boot.profile.missing.password": "{0} krever et passord på minst 7 tegn med tre av: store bokstaver, små bokstaver, sifre, symboler. Uten passord stopper Setup på siden for Administrator-passordet.",
   "boot.profile.field.systems": "Bruk for",
   "boot.profile.help.systems": "Systemene der svarskjermen tilbyr denne profilen. Profiler lagret uten denne innstillingen tilbys for alle Windows, aldri for Linux.",

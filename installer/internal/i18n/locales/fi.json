@@ -1046,6 +1046,8 @@
   "boot.profile.value.edition_manual": "Kirjoita käsin…",
   "boot.profile.badge_incomplete": "Keskeneräinen",
   "boot.profile.missing.key": "Ei tuoteavainta: {0}. Asennus pysähtyy tuoteavainsivulle. Muokkaa profiilia (X) ja anna avain.",
+  "boot.win9x_key.title": "Anna käyttöjärjestelmän {0} tuoteavain",
+  "boot.win9x_key.subtitle": "Ilman sitä asennus pysähtyy tuoteavaimen sivulle. Avainta käytetään vain tähän asennukseen, eikä sitä tallenneta.",
   "boot.profile.missing.password": "{0} vaatii vähintään 7 merkin salasanan, jossa on kolme näistä: isot kirjaimet, pienet kirjaimet, numerot, symbolit. Ilman sitä asennus pysähtyy Administrator-salasanan sivulle.",
   "boot.profile.field.systems": "Käytä kohteille",
   "boot.profile.help.systems": "Järjestelmät, joiden vastausnäyttö tarjoaa tämän profiilin. Ilman tätä asetusta tallennetut profiilit tarjotaan jokaiselle Windowsille, ei koskaan Linuxille.",

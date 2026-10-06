@@ -1046,6 +1046,8 @@
   "boot.profile.value.edition_manual": "Kézi megadás…",
   "boot.profile.badge_incomplete": "Hiányos",
   "boot.profile.missing.key": "Nincs termékkulcs ehhez: {0}; a telepítő megáll a termékkulcs oldalán. Szerkessze a profilt (X), és adja meg a kulcsot.",
+  "boot.win9x_key.title": "Adja meg a(z) {0} termékkulcsát",
+  "boot.win9x_key.subtitle": "Nélküle a telepítő megáll a termékkulcs oldalán. A kulcs csak ehhez a telepítéshez használatos, és nem kerül mentésre.",
   "boot.profile.missing.password": "{0}: legalább 7 karakteres jelszó kell, a következők közül hárommal: nagybetű, kisbetű, számjegy, szimbólum. Enélkül a telepítő megáll a rendszergazdai jelszó oldalán.",
   "boot.profile.field.systems": "Használat ehhez",
   "boot.profile.help.systems": "Azok a rendszerek, amelyek válaszképernyője felkínálja ezt a profilt. A beállítás nélkül mentett profilok minden Windowshoz megjelennek, Linuxhoz soha.",

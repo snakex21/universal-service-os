@@ -1049,6 +1049,8 @@
   "boot.profile.value.edition_manual": "Introdu manual…",
   "boot.profile.badge_incomplete": "Incomplet",
   "boot.profile.missing.key": "Lipsește cheia de produs pentru {0}: instalarea se oprește la pagina cheii de produs. Editați profilul (X) și introduceți cheia.",
+  "boot.win9x_key.title": "Introduceți cheia de produs pentru {0}",
+  "boot.win9x_key.subtitle": "Fără ea, instalarea se oprește la pagina cheii de produs. Cheia este folosită doar pentru această instalare și nu este salvată.",
   "boot.profile.missing.password": "{0} necesită o parolă de cel puțin 7 caractere cu trei dintre: majuscule, minuscule, cifre, simboluri. Fără ea, instalarea se oprește la pagina parolei de administrator.",
   "boot.profile.field.systems": "Folosire pentru",
   "boot.profile.help.systems": "Sistemele al căror ecran de răspuns oferă acest profil. Profilurile salvate fără această setare sunt oferite pentru orice Windows, niciodată pentru Linux.",

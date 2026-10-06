@@ -1046,6 +1046,8 @@
   "boot.profile.value.edition_manual": "Elle yaz…",
   "boot.profile.badge_incomplete": "Eksik",
   "boot.profile.missing.key": "{0} için ürün anahtarı yok: Kurulum ürün anahtarı sayfasında durur. Profili düzenleyin (X) ve anahtarı girin.",
+  "boot.win9x_key.title": "{0} ürün anahtarını girin",
+  "boot.win9x_key.subtitle": "Anahtar olmadan Kurulum ürün anahtarı sayfasında durur. Anahtar yalnızca bu kurulum için kullanılır ve kaydedilmez.",
   "boot.profile.missing.password": "{0} en az 7 karakterli ve şunlardan üçünü içeren bir parola ister: büyük harf, küçük harf, rakam, simge. Parola yoksa Kurulum Administrator parolası sayfasında durur.",
   "boot.profile.field.systems": "Kullanım",
   "boot.profile.help.systems": "Yanıt ekranında bu profili sunan sistemler. Bu ayar olmadan kaydedilen profiller her Windows için sunulur, Linux için asla.",

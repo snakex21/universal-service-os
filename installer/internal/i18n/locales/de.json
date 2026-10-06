@@ -1046,6 +1046,8 @@
   "boot.profile.value.edition_manual": "Manuell eingeben…",
   "boot.profile.badge_incomplete": "Unvollständig",
   "boot.profile.missing.key": "Kein Produktschlüssel für {0}: Setup hält auf der Seite für den Produktschlüssel an. Bearbeiten Sie das Profil (X) und geben Sie den Schlüssel ein.",
+  "boot.win9x_key.title": "Produktschlüssel für {0} eingeben",
+  "boot.win9x_key.subtitle": "Ohne ihn hält Setup auf der Seite für den Produktschlüssel an. Der Schlüssel gilt nur für diese Installation und wird nicht gespeichert.",
   "boot.profile.missing.password": "{0} braucht ein Kennwort mit mindestens 7 Zeichen und drei von: Großbuchstaben, Kleinbuchstaben, Ziffern, Sonderzeichen. Ohne Kennwort hält Setup auf der Seite für das Administratorkennwort an.",
   "boot.profile.field.systems": "Verwenden für",
   "boot.profile.help.systems": "Die Systeme, deren Antwortbildschirm dieses Profil anbietet. Profile ohne diese Einstellung werden für jedes Windows angeboten, nie für Linux.",

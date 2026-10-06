@@ -1046,6 +1046,8 @@
   "boot.profile.value.edition_manual": "Saisir manuellement…",
   "boot.profile.badge_incomplete": "Incomplet",
   "boot.profile.missing.key": "Aucune clé de produit pour {0} : le programme d'installation s'arrête à la page de la clé de produit. Modifiez le profil (X) et saisissez la clé.",
+  "boot.win9x_key.title": "Saisissez la clé de produit de {0}",
+  "boot.win9x_key.subtitle": "Sans elle, le programme d'installation s'arrête sur la page de la clé. La clé sert uniquement à cette installation et n'est pas enregistrée.",
   "boot.profile.missing.password": "{0} exige un mot de passe d'au moins 7 caractères avec trois types parmi : majuscules, minuscules, chiffres, symboles. Sans lui, le programme d'installation s'arrête à la page du mot de passe Administrateur.",
   "boot.profile.field.systems": "Utiliser pour",
   "boot.profile.help.systems": "Les systèmes dont l'écran de réponses propose ce profil. Les profils enregistrés sans ce paramètre sont proposés pour tout Windows, jamais pour Linux.",

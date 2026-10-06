@@ -1046,6 +1046,8 @@
   "boot.profile.value.edition_manual": "Sisesta käsitsi…",
   "boot.profile.badge_incomplete": "Puudulik",
   "boot.profile.missing.key": "{0} jaoks pole tootevõtit: install peatub tootevõtme lehel. Muutke profiili (X) ja sisestage võti.",
+  "boot.win9x_key.title": "Sisestage {0} tootevõti",
+  "boot.win9x_key.subtitle": "Ilma selleta peatub Setup tootevõtme lehel. Võtit kasutatakse ainult selle installi jaoks ja seda ei salvestata.",
   "boot.profile.missing.password": "{0} vajab vähemalt 7-märgilist parooli, milles on kolm neist: suurtähed, väiketähed, numbrid, sümbolid. Ilma selleta peatub install administraatori parooli lehel.",
   "boot.profile.field.systems": "Kasuta",
   "boot.profile.help.systems": "Süsteemid, mille vastuste ekraan seda profiili pakub. Ilma selle sätteta salvestatud profiile pakutakse igale Windowsile, mitte kunagi Linuxile.",

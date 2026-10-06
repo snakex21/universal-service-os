@@ -1046,6 +1046,8 @@
   "boot.profile.value.edition_manual": "Type manually…",
   "boot.profile.badge_incomplete": "Incomplete",
   "boot.profile.missing.key": "No product key for {0}: Setup stops on the product key page. Edit the profile (X) and enter the key.",
+  "boot.win9x_key.title": "Enter the {0} product key",
+  "boot.win9x_key.subtitle": "Without it Setup stops on the product key page. The key is used for this installation only and is not saved.",
   "boot.profile.missing.password": "{0} needs a password of at least 7 characters with three of: capitals, small letters, digits, symbols. Without one Setup stops on the Administrator password page.",
   "boot.profile.field.systems": "Use for",
   "boot.profile.help.systems": "The systems whose answer screen offers this profile. Profiles saved without this setting are offered for every Windows, never for Linux.",

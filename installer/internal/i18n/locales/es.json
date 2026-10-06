@@ -1046,6 +1046,8 @@
   "boot.profile.value.edition_manual": "Escribir manualmente…",
   "boot.profile.badge_incomplete": "Incompleto",
   "boot.profile.missing.key": "Sin clave de producto para {0}: el programa de instalación se detiene en la página de la clave. Edite el perfil (X) e introduzca la clave.",
+  "boot.win9x_key.title": "Introduzca la clave de producto de {0}",
+  "boot.win9x_key.subtitle": "Sin ella, el programa de instalación se detiene en la página de la clave. La clave solo se usa en esta instalación y no se guarda.",
   "boot.profile.missing.password": "{0} necesita una contraseña de al menos 7 caracteres con tres de: mayúsculas, minúsculas, dígitos, símbolos. Sin ella, el programa de instalación se detiene en la página de contraseña del Administrador.",
   "boot.profile.field.systems": "Usar para",
   "boot.profile.help.systems": "Los sistemas cuya pantalla de respuestas ofrece este perfil. Los perfiles guardados sin este ajuste se ofrecen para todo Windows, nunca para Linux.",

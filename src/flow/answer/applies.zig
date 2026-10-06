@@ -60,10 +60,20 @@ pub const Missing = enum {
 };
 
 pub fn missing(p: *const Profile, system_id: []const u8) ?Missing {
+    // Windows 95: phase 1 runs in the VM only with a 95 key (the OEM COA
+    // page); without one only the native Setup start is left.
+    if (std.ascii.eqlIgnoreCase(system_id, "windows-95")) return if (has95Key(p)) null else .product_key;
     const family = target.familyFor(system_id) orelse return null;
     if (family.nt5()) return if (p.keyFor(system_id).len == 0) .product_key else null;
     if (family.server() and !complexPassword(p.password.slice())) return .server_password;
     return null;
+}
+
+/// The profile holds a Windows 95 key (OEM or retail shape) for windows-95
+/// (key.windows-95, else `key=`).
+pub fn has95Key(p: *const Profile) bool {
+    const shape = profile_mod.keyShape(p.keyFor("windows-95")) orelse return false;
+    return shape != .five_by_five;
 }
 
 /// Windows Server's default "Password must meet complexity requirements":
@@ -111,6 +121,21 @@ test "systems: groups and ids" {
     try std.testing.expect(!appliesTo(&nine, "windows-xp") and !appliesTo(&nine, "windows-3-1"));
     const every = try profileFrom("name=A\nuser=Bob\n");
     try std.testing.expect(appliesTo(&every, "windows-98") and !appliesTo(&every, "windows-3-11"));
+}
+
+test "missing answers: Windows 95 needs a 95-shaped key" {
+    var p = try profileFrom("name=A\nuser=Bob\nsystems=windows-9x\n");
+    try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-95").?);
+    // 98/Me keep going without a key (phase 1 runs in the VM anyway).
+    try std.testing.expect(missing(&p, "windows-98-se") == null and missing(&p, "windows-me") == null);
+    // An XP-style key in key= is not a 95 key.
+    try p.key.set("AAAAA-BBBBB-CCCCC-DDDDD-EEEEE");
+    try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-95").?);
+    try p.setSystemKey("windows-95", "12345-OEM-1234567-12345");
+    try std.testing.expect(missing(&p, "windows-95") == null);
+    const retail = try profileFrom("name=A\nuser=Bob\nsystems=windows-95\nkey=123-1234567\n");
+    try std.testing.expect(missing(&retail, "windows-95") == null);
+    try std.testing.expect(appliesTo(&retail, "windows-95") and !appliesTo(&retail, "windows-98-se"));
 }
 
 test "missing answers: NT5 key, Server password" {

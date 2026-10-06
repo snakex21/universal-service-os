@@ -1049,6 +1049,8 @@
   "boot.profile.value.edition_manual": "Ievadīt manuāli…",
   "boot.profile.badge_incomplete": "Nepilnīgs",
   "boot.profile.missing.key": "Nav {0} produkta atslēgas: instalēšana apstāsies produkta atslēgas lapā. Rediģējiet profilu (X) un ievadiet atslēgu.",
+  "boot.win9x_key.title": "Ievadiet {0} produkta atslēgu",
+  "boot.win9x_key.subtitle": "Bez tās instalēšana apstājas produkta atslēgas lapā. Atslēga tiek izmantota tikai šai instalācijai un netiek saglabāta.",
   "boot.profile.missing.password": "{0} vajag vismaz 7 rakstzīmju paroli ar trim no: lielie burti, mazie burti, cipari, simboli. Bez tās instalēšana apstāsies administratora paroles lapā.",
   "boot.profile.field.systems": "Izmantot",
   "boot.profile.help.systems": "Sistēmas, kuru atbilžu ekrāns piedāvā šo profilu. Bez šī iestatījuma saglabāti profili tiek piedāvāti jebkurai Windows, nekad Linux.",

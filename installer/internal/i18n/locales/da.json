@@ -1046,6 +1046,8 @@
   "boot.profile.value.edition_manual": "Skriv manuelt…",
   "boot.profile.badge_incomplete": "Ufuldstændig",
   "boot.profile.missing.key": "Ingen produktnøgle til {0}: Setup stopper på siden med produktnøglen. Rediger profilen (X), og angiv nøglen.",
+  "boot.win9x_key.title": "Angiv produktnøglen til {0}",
+  "boot.win9x_key.subtitle": "Uden den stopper Setup på siden med produktnøglen. Nøglen bruges kun til denne installation og gemmes ikke.",
   "boot.profile.missing.password": "{0} kræver en adgangskode på mindst 7 tegn med tre af: store bogstaver, små bogstaver, cifre, symboler. Uden en stopper Setup på siden med Administrator-adgangskoden.",
   "boot.profile.field.systems": "Brug til",
   "boot.profile.help.systems": "De systemer, hvis svarskærm tilbyder denne profil. Profiler gemt uden denne indstilling tilbydes til alle Windows, aldrig til Linux.",
