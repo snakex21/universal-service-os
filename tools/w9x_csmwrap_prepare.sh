@@ -99,14 +99,20 @@ usos_w9x_csmwrap_prepare() {
 
     answer_inf=/run/w9x-msbatch.inf
     answer_kind=USOS
+    time_zone=
     [ -z "$dos_iso" ] || answer=dos
     case "$answer" in
         dos) : > "$answer_inf" ;;
         none)
             cp /mnt/esp/EFI/USOS/dos-native/win9x/MSBATCH.INF "$answer_inf" || stop 'the default MSBATCH.INF is missing'
             time_zone=$(w9x_csmwrap_value timezone "$request") || time_zone=
+            w9x_csmwrap_log "TIMEZONE ${time_zone:-none (request.ini has no timezone=)}"
             w9x_msbatch_time_zone "$time_zone" "$answer_inf" || stop 'the time zone could not be added to MSBATCH.INF'
-            [ -z "$time_zone" ] || w9x_csmwrap_log "TIMEZONE $time_zone" ;;
+            # Guard: a zone from the menu must end up in [Setup], else the
+            # Date/Time page would wait for a click again.
+            if [ -n "$time_zone" ] && ! grep -q 'TimeZone=' "$answer_inf"; then
+                stop "MSBATCH.INF has no TimeZone after inserting \"$time_zone\"; see EFI/USOS/win9x/prepare.log"
+            fi ;;
         profile)
             # Rendered by the UEFI menu (answer_profiles.stageWin9x); it may
             # hold a product key: copied to RAM, then every staged copy goes.
@@ -199,7 +205,7 @@ usos_w9x_csmwrap_prepare() {
     else
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="/mnt/data/$iso" W9X_SETUP_FOLDER="$setup" W9X_TAG="$tag" \
             W9X_ANSWER_INF="$answer_inf" W9X_ANSWER_KIND="$answer_kind" W9X_BOOT_FLOPPY="$floppy" W9X_SIZE_GIB="$size_gib" \
-            W9X_USB_DIR="/mnt/data/Drivers/$folder/USB" W9X_VM_PHASE1="$([ "$vm_phase1" = yes ] && echo 1 || echo 0)"             sh /usr/lib/usos/w9x_csmwrap_target.sh
+            W9X_USB_DIR="/mnt/data/Drivers/$folder/USB" W9X_TIME_ZONE="${time_zone:-}" W9X_VM_PHASE1="$([ "$vm_phase1" = yes ] && echo 1 || echo 0)"             sh /usr/lib/usos/w9x_csmwrap_target.sh
     fi
     if ! "$@" >> "$W9X_DIR/prepare.log" 2>&1 < /dev/null; then
         rm -f "$answer_inf"

@@ -260,11 +260,38 @@ works once `NoMemTest`="1" is set. Now the default for fresh installs:
   (MSBATCH TimeZone, Windows 98 Resource Kit appendix D; key names from the CD's TIMEZONE.INF).
   Profiles already carry their zone; a user file is copied 1:1. The BIOS-mode path (no UEFI request)
   still uses the default file without a zone.
+  Guard (2026-10-06): `prepare.log` always gets a `TIMEZONE <key>` line (`none` when request.ini has
+  no `timezone=`), and prepare stops with a clear message when a zone was given but `TimeZone=` is not
+  in the copy afterwards. The insert itself was checked under the micro-Linux BusyBox 1.37 (QEMU, the
+  stick build's vmlinuz-virt and busybox): it works. The fresh X470 run of B261006-133533 (16:02)
+  still had no `TimeZone` in `C:\USOS9X\MSBATCH.INF` although that build contained both halves; its
+  `request.done` / `prepare.log` were not read yet, so the cause (no `timezone=` in the request, or
+  the insert) stays open until the next run's `TIMEZONE` line.
+* **First-boot Date/Time step (TZFIX)**: SETUPC.INF `[NewWin.AddReg]` always adds the
+  `RunOnce\Setup` value "Strefa czasowa" / "Time Zone" = `TIMEDATE.CPL,,/f`; whether MSBATCH
+  `TimeZone` alone keeps that dialog away is not proven on hardware. So 98 / 98 SE with the default
+  answer and a zone known to `tools/w9x_tzfix.sh` (Central European, Eastern so far; TZI from the
+  98 SE CD's TIMEZONE.INF) also get `C:\USOS9X\TZFIX.BAT` + `TZFIX.REG` / `TZRO1.REG` / `TZRO2.REG`,
+  called from AUTOEXEC.BAT after U9FIX. Once, in real-mode DOS, and only while the TIMEDATE step is
+  pending: backup of SYSTEM.DAT / USER.DAT (`SYSTEM.TB` / `USER.TB`), `REGEDIT /L /R` import of
+  TimeZoneInformation, the step's value replaced by a harmless command, check by `REGEDIT /E` + FIND,
+  restore on failure. Result: `C:\USOS9X\TZFIX.OK` (`ok`, `ok-zone-only`, `not-pending`) or
+  `TZFIX.BAD`. The same registry change was proven by hand on the X470 (`ok-deleted`, 2026-10-06).
 * **Diagnostics**: `USOSDIAG.COM` and `USOSDBG.EXE` are on the stick and in `C:\USOS9X`, but nothing
   runs them; `EFI\USOS\win9x\diag.flag` (U9DIAG=1) adds `USOSDIAG BOOT` to AUTOEXEC.BAT.
 * Unchanged and checked: USOSKEY v4 (.COM + .DRV), `mouse.drv=usosmous.drv` (98 SE), no `*vmouse`,
   xhci98 opt-in only, CREGFIX first in CONFIG.SYS, no second HIMEM line after the VM phase, APM left
   on (APM off was only a keyboard debugging step).
+* **KERNEL32 crash on program exit (fixed, ae44717)**: in the final setup phase (RunOnce: TIMEDATE.CPL,
+  grpconv, winhlp32, PIFMGR, walign) Win32 processes faulted on exit with exception 0E at
+  `0167:BFF8976B` in KERNEL32 (current-thread pointer corrupt), also with USOSMOUS.DRV off. Root cause:
+  the 20 ms SYSTEM.DRV timer callback of USOSKEY.DRV runs at interrupt time and can interrupt a Win32
+  thread, yet it called USER (GetAsyncKeyState for the keybd_event log, GetActiveWindow / GetClassName
+  for the DOS-box test) and did not save all registers. Fix: `poll()` of USOSKEY.DRV and USOSMOUS.DRV
+  is a naked entry that saves all 32-bit registers and DS/ES/FS/GS; the DOS-box test is a WH_CBT hook
+  (HCBT_ACTIVATE) that only sets a flag; the callback calls nothing but keybd_event, the mouse event
+  procedure and VKD (`tools/tests/legacy_bios/test_usoskey_timer_safe.py` walks the call graph).
+  Hardware (BIOSTAR, installed 98 SE): opening and closing programs no longer crashes.
 * **Known limit**: USB mouse hotplug does not work (SeaBIOS enumerates USB at boot); plug the mouse in
   before the start.
 
