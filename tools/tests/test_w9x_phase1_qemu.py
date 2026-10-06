@@ -147,6 +147,26 @@ class Phase1Vm(unittest.TestCase):
         self.assertEqual((rc, out), (0, ''), err)
         self.assertEqual(sorted(p.name for p in c.rglob('*')), ['CONFIG.SYS', 'SYSTEM.INI', 'WINDOWS'])
 
+    def test_patch_adds_logo_off_to_the_me_msdos_sys_once(self):
+        # Me's Setup writes its own MSDOS.SYS in the VM (no Logo= line).
+        c = self.tmp / 'c'
+        c.mkdir()
+        (self.tmp / 'run').mkdir()
+        msdos = (b'[Paths]\r\nWinDir=C:\\WINDOWS\r\n\r\n[Options]\r\nBootMulti=1\r\nBootGUI=1\r\n'
+                 b'WinVer=4.90.3000\r\n;\r\n;xxxxxxxxxxa\r\n')
+        (c / 'MSDOS.SYS').write_bytes(msdos)
+        rc, out, err = self.run_lib(f'w9x_phase1_patch_c "{c.as_posix()}"')
+        self.assertEqual((rc, out.splitlines()), (0, ['MSDOS.SYS: added Logo=0']), err)
+        self.assertEqual((c / 'MSDOS.SYS').read_bytes(),
+                         msdos.replace(b'[Options]\r\n', b'[Options]\r\nLogo=0\r\n'))
+        rc, out, err = self.run_lib(f'w9x_phase1_patch_c "{c.as_posix()}"')
+        self.assertEqual((rc, out), (0, ''), err)
+        self.assertEqual(sorted(p.name for p in c.rglob('*')), ['MSDOS.SYS'])
+        # 98 / 98 SE: INSTALL.BAT already wrote Logo=0; a user's Logo=1 stays.
+        (c / 'MSDOS.SYS').write_bytes(b'[Options]\r\nlogo=1\r\n')
+        self.assertEqual(self.run_lib(f'w9x_phase1_patch_c "{c.as_posix()}"')[:2], (0, ''))
+        self.assertEqual((c / 'MSDOS.SYS').read_bytes(), b'[Options]\r\nlogo=1\r\n')
+
     def test_fsck_is_read_only_and_its_errors_fail(self):
         bin_dir = self.tmp / 'bin'
         bin_dir.mkdir()
