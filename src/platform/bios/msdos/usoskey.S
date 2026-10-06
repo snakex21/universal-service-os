@@ -39,9 +39,9 @@
  *   +132 AX, +134 IP, +136 CS of the last INT 16h while alive
  *   +138 keybd_event log sequence (USOSKEY.DRV): entry = seq & 31
  *   +140 32 entries of 8 bytes, written by USOSKEY.DRV: VK, AH (80h key
- *        up), scan (BL), BH (1 = extended), GetAsyncKeyState(VK_CONTROL)
- *        and (VK_SHIFT) right after (80h down, 01h pressed since the last
- *        call), 0040:0017 and 0040:0018 after the call
+ *        up), scan (BL), BH (1 = extended), Ctrl and Shift as the driver
+ *        had sent them (80h down; GetAsyncKeyState until 2026-10-06, not
+ *        safe at interrupt time), 0040:0017 and 0040:0018 after the call
  *   version 4 (USB mouse for USOSMOUS.DRV, src/platform/win3/usosmous.c):
  *   +396 mouse ring head (TSR)  +397 tail (consumer)  ring of 32 packets
  *        of 4 bytes (status, X, Y, 0) at +420

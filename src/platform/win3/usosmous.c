@@ -243,7 +243,10 @@ static WORD button_flags(BYTE old, BYTE now)
     return f;
 }
 
-void __far __loadds __saveregs poll(void)
+/* Interrupt time (SYSTEM.DRV timer, may interrupt a Win32 thread): only
+ * the shared block, scale_move and USER's event procedure; no other USER or
+ * KERNEL call (test_usoskey_timer_safe.py). */
+static void __near __loadds poll_body(void)
 {
     int sx = 0, sy = 0;
     if (busy || !shared || !event_proc) return;
@@ -268,6 +271,25 @@ void __far __loadds __saveregs poll(void)
     }
     if (sx || sy) call_event(SF_MOVEMENT, sx, sy);
     busy = 0;
+}
+
+/* Timer callback: all registers back, 32-bit halves and FS/GS included. */
+void __declspec(naked) __far poll(void)
+{
+    _asm {
+        pushad
+        push ds
+        push es
+        push fs
+        push gs
+        call poll_body
+        pop gs
+        pop fs
+        pop es
+        pop ds
+        popad
+        retf
+    }
 }
 
 static int init_timer_procs(void)

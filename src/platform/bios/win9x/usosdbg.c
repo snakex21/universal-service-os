@@ -14,9 +14,11 @@
  *   INT16 from USOSKEY v3 on: the INT 16h guard counters (answered from
  *         the BIOS data area / chained to SeaBIOS) and the last caller
  *   EVT   from USOSKEY v3 on: the last 32 keybd_event calls of USOSKEY.DRV,
- *         oldest first: seq:VK d/u scan [x = extended], c = GetAsyncKeyState
- *         (VK_CONTROL) and s = (VK_SHIFT) right after (80 down, 01 pressed
- *         since), f = 0040:0017/0018 after the call
+ *         oldest first: seq:VK d/u scan [x = extended], c / s = Ctrl /
+ *         Shift as the driver had sent them (80 down; from 2026-10-06 on,
+ *         before that GetAsyncKeyState, which is not safe at interrupt
+ *         time), f = 0040:0017/0018 after the call; the INT16 line shows
+ *         USER's own Ctrl/Shift state read here
  *   MOUSE from USOSKEY v4 on: USOSMOUS.DRV's BIOS registration (INT 15h
  *         C205h/C207h/C200h result), packets the INT 15h C207h callback
  *         saw / stored / dropped / ignored, the last packet, the driver's
@@ -204,8 +206,9 @@ static void show_v3(SHARED FAR *s)
     BYTE FAR *bda = (BYTE FAR *)MAKELP(bda_sel, 0);   /* own selector: s uses lin_sel */
     wsprintf(line(), "INT16 guard (answered/chained): 00 -/%u  01 %u/%u  02 %u/-  10 -/%u  11 %u/%u  12 %u/-  other -/%u  not alive %u",
              s->c16[0], s->c16[1], s->c16[2], s->c16[3], s->c16[4], s->c16[5], s->c16[6], s->c16[7], s->c16[8], s->c16[9]);
-    wsprintf(line(), "INT16 last while alive: AX=%04X from %04X:%04X   BDA now 17:%02X 18:%02X 96:%02X 97:%02X",
-             s->last16ax, s->last16cs, s->last16ip, (WORD)bda[0x17], (WORD)bda[0x18], (WORD)bda[0x96], (WORD)bda[0x97]);
+    wsprintf(line(), "INT16 last while alive: AX=%04X from %04X:%04X   BDA now 17:%02X 18:%02X 96:%02X 97:%02X   USER Ctrl %04X Shift %04X",
+             s->last16ax, s->last16cs, s->last16ip, (WORD)bda[0x17], (WORD)bda[0x18], (WORD)bda[0x96], (WORD)bda[0x97],
+             (WORD)GetAsyncKeyState(VK_CONTROL), (WORD)GetAsyncKeyState(VK_SHIFT));
     seq = s->evseq;
     first = seq > 32 ? seq - 32 : 0;
     if (seq == first) wsprintf(line(), "EVT  no keybd_event logged yet (USOSKEY.DRV older than v3, or no key since start)");
