@@ -111,29 +111,42 @@ IF NOT EXIST C:\USOS9X\HIMEM.SYS GOTO NOCSM
 ECHO DEVICE=C:\USOS9X\HIMEM.SYS /TESTMEM:OFF /M:2>>C:\CONFIG.SYS
 :NOCSM
 REM Every Windows start: MaxPhysPage / MaxFileCache in SYSTEM.INI (U9FIX.TXT).
+REM Windows 95: U9FIX /95 caps the RAM at 480 MiB (MaxPhysPage=1E000; 95 is
+REM unstable above ~480 MB) and replaces MSBATCH.INF's 40000.
 IF "%U9CSM%"=="1" GOTO CSMAUTO
+IF "%U9SYS%"=="95" GOTO FIX95
 ECHO @C:\USOS9X\U9FIX.COM C:\WINDOWS\SYSTEM.INI>C:\AUTOEXEC.BAT
+GOTO FIXDONE
+:FIX95
+ECHO @C:\USOS9X\U9FIX.COM /95 C:\WINDOWS\SYSTEM.INI>C:\AUTOEXEC.BAT
+:FIXDONE
 ECHO @IF NOT EXIST C:\WINDOWS\WIN.COM IF EXIST C:\USOS9X\RESUME.BAT CALL C:\USOS9X\RESUME.BAT>>C:\AUTOEXEC.BAT
 GOTO AUTODONE
 :CSMAUTO
 REM No firmware CSM: USB keyboard (USOSKEY bridge) in Windows through the
 REM SeaBIOS services; U9FIX /CSM adds its driver. No VBADOS mouse: VBMOUSE.EXE
 REM next to the PS/2 mouse VxD of the installed system stops Windows.
-REM USB mouse: USOSMOUS.DRV (mouse.drv=) on USOSKEY.COM's mouse ring, 98 SE
-REM and 98 (same 16-bit mouse.drv interface); 95 and Me not yet. U9FIX /CSM
-REM names it once it is in C:\WINDOWS\SYSTEM, so the drivers are copied
-REM before U9FIX runs.
+REM USB mouse: USOSMOUS.DRV (mouse.drv=) on USOSKEY.COM's mouse ring, 98 SE,
+REM 98 and 95 (same 16-bit Windows 4.x mouse.drv interface); Me not yet.
+REM U9FIX /CSM names it once it is in C:\WINDOWS\SYSTEM, so the drivers are
+REM copied before U9FIX runs.
 IF NOT EXIST C:\USOS9X\USOSKEY.DRV GOTO FAILED
 IF "%U9SYS%"=="98SE" GOTO MOUSEOK
 IF "%U9SYS%"=="98" GOTO MOUSEOK
+IF "%U9SYS%"=="95" GOTO MOUSEOK
 IF EXIST C:\USOS9X\USOSMOUS.DRV DEL C:\USOS9X\USOSMOUS.DRV
 :MOUSEOK
 ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\NUL GOTO USOSDRV>C:\AUTOEXEC.BAT
 ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\USOSKEY.DRV COPY C:\USOS9X\*.DRV C:\WINDOWS\SYSTEM>>C:\AUTOEXEC.BAT
 ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\USOSMOUS.DRV IF EXIST C:\USOS9X\USOSMOUS.DRV COPY C:\USOS9X\USOSMOUS.DRV C:\WINDOWS\SYSTEM>>C:\AUTOEXEC.BAT
 ECHO :USOSDRV>>C:\AUTOEXEC.BAT
+IF "%U9SYS%"=="95" GOTO CSMFIX95
 ECHO @C:\USOS9X\U9FIX.COM /CSM C:\WINDOWS\SYSTEM.INI>>C:\AUTOEXEC.BAT
-REM 98/98 SE with the USOS default answer: C:\USOS9X\TZFIX.BAT (tools/w9x_tzfix.sh)
+GOTO CSMFIXOK
+:CSMFIX95
+ECHO @C:\USOS9X\U9FIX.COM /95 /CSM C:\WINDOWS\SYSTEM.INI>>C:\AUTOEXEC.BAT
+:CSMFIXOK
+REM 95/98/98 SE with the USOS default answer: C:\USOS9X\TZFIX.BAT (tools/w9x_tzfix.sh)
 REM presets the time zone once and drops the first-boot Date/Time step.
 ECHO @IF EXIST C:\USOS9X\TZFIX.BAT CALL C:\USOS9X\TZFIX.BAT>>C:\AUTOEXEC.BAT
 REM A restart before Setup copied Windows (hang, power loss): RESUME.BAT,
@@ -176,12 +189,17 @@ ECHO Patcher9x zakonczony. Zwalnianie pamieci DPMI...
 ECHO CWSDPMI -u>>C:\USOS9X\INSTALL.LOG
 REM /IS no ScanDisk, /IE no startup disk, /NM no RAM/CPU check (MEMDISK).
 REM Windows 95 Setup knows only /IS of these (and ignored the batch file
-REM with the 98 switches in QEMU): MSBATCH.INF first, then /IS.
+REM with the 98 switches in QEMU): MSBATCH.INF first, then /IS, and /IW: no
+REM licence page (SUWIN.EXE looks for /IW on its command line; the licence
+REM runs in Setup's own mini-Windows, before any USB keyboard bridge, and in
+REM the phase-1 VM nobody can answer it). 95 has no ACPI: no /P I.
 SET U9SW=/IS /IE /NM
-IF "%U9SYS%"=="95" SET U9SW=/IS
+IF "%U9SYS%"=="95" SET U9SW=/IS /IW
 REM U9VM=1: this Setup runs in USOS's QEMU (ACPI off) for its phase 1, the
 REM rest on the real PC under CSMWrap: /P I keeps Windows off ACPI (APM/legacy).
+IF "%U9SYS%"=="95" GOTO VMSWOK
 IF "%U9VM%"=="1" SET U9SW=%U9SW% /P I
+:VMSWOK
 REM Resume hook: C:\AUTOEXEC.BAT calls it while C:\WINDOWS\WIN.COM is missing.
 ECHO @ECHO OFF>C:\USOS9X\RESUME.BAT
 ECHO ECHO Wznawianie Instalatora Windows %U9SYS%...>>C:\USOS9X\RESUME.BAT

@@ -18,7 +18,10 @@
 #
 # Zone data (TZI) from the Windows 98 SE CD's TIMEZONE.INF (Time Zones\<key>
 # in the installed registry); the Windows 98 CD (4.10.1998, PL) has the same
-# TZI for both zones and the same RunOnce\Setup step names (SETUPC.INF). Only the zones of the menu's default languages
+# TZI for both zones and the same RunOnce\Setup step names (SETUPC.INF). The
+# Windows 95 OSR2.1 PL CD (2026-10-06): the same "Strefa czasowa" step and the
+# same TZI under other key names ("Warsaw" for Central European; "Eastern" as
+# on 98). Only the zones of the menu's default languages
 # so far; any other zone returns 1 and MSBATCH TimeZone stays alone.
 
 w9x_tzfix_hex4() {
@@ -34,7 +37,7 @@ w9x_tzfix_write() {
     # DaylightStart (SYSTEMTIME: month, day-of-week, week 1-5, hour), names
     # (Windows-1250 bytes; cosmetic, Date/Time shows the zone list's text).
     case "$zone" in
-        'Central European')
+        'Central European'|Warsaw)
             bias=-60 dbias=-60
             std='00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00'
             dlt='00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00'

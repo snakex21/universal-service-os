@@ -13,10 +13,20 @@
 #
 # QEMU, SeaBIOS and the KVM modules come from the optional second initrd
 # EFI/USOS/micro-linux/qemu9x.cpio (only on the w9x command line). Without it,
-# with less than ~1 GiB RAM, for 95, or with the flag file
+# with less than ~1 GiB RAM, or with the flag file
 # EFI/USOS/win9x/phase1-native.flag, the old path is kept (Setup's DOS stage
 # on the real machine). KVM only with EFI/USOS/win9x/phase1-kvm.flag and a
 # working /dev/kvm; the default is TCG.
+#
+# Windows 95 (2026-10-06): its OEM Setup asks for the Certificate of
+# Authenticity number in phase 1 (SUWIN's COA page; for ProductType 9 it does
+# not take MSBATCH.INF ProductID) and nobody can type in the VM. The caller
+# passes the answer's key as digits (W9X_VM_KEY, never logged); when the guest
+# writes nothing for W9X_VM_IDLE seconds early in phase 1 (a page waits),
+# w9x_phase1_run types those digits and Enter through a second QEMU monitor
+# whose output is discarded (the edit fields move on by themselves at 5 / 7
+# digits; Enter is the wizard's Next). The licence page is skipped by Setup's
+# own /IW switch (INSTALL.BAT).
 
 W9X_VM_QEMU=${W9X_VM_QEMU:-/usr/bin/qemu-system-i386}
 W9X_VM_DATADIR=${W9X_VM_DATADIR:-/usr/share/qemu}
@@ -32,13 +42,22 @@ W9X_VM_MIN_KB=${W9X_VM_MIN_KB:-900000}
 # stopped on an error) never restarts, so the VM is stopped after this.
 W9X_VM_TIMEOUT=${W9X_VM_TIMEOUT:-5400}
 W9X_VM_SCREEN_EVERY=${W9X_VM_SCREEN_EVERY:-60}
+# Windows 95 key typing (see above): seconds without a disk write that count
+# as "a page waits", at most this many attempts, and only while the guest has
+# written less than this many MB (the COA page comes before the file copy).
+W9X_VM_IDLE=${W9X_VM_IDLE:-60}
+W9X_VM_KEY_TRIES=${W9X_VM_KEY_TRIES:-3}
+W9X_VM_KEY_MAX_MB=${W9X_VM_KEY_MAX_MB:-64}
+# With key typing: no disk write for this long ends the VM (rc 3), instead of
+# waiting for the full timeout on a page nobody can answer.
+W9X_VM_STALL=${W9X_VM_STALL:-1800}
 
 # 0 when this system's Setup phase 1 runs in the VM (reason on stdout).
 w9x_vm_available() {
     # Me (2026-10-06): the same DOS-stage SETUP.EXE as 98 (/P I valid), so the
-    # same VM path; 95 keeps the native start (its licence/COA pages need a
-    # keyboard in Setup phase 1).
-    case "$1" in 98SE|98|ME) ;; *) echo "release $1 keeps the native Setup start"; return 1 ;; esac
+    # same VM path. 95 (2026-10-06) too, but only with its key: the caller
+    # (w9x_csmwrap_prepare.sh) keeps the native start for 95 without one.
+    case "$1" in 98SE|98|ME|95) ;; *) echo "release $1 keeps the native Setup start"; return 1 ;; esac
     if [ -e "$W9X_VM_FLAGS/phase1-native.flag" ]; then echo 'phase1-native.flag present'; return 1; fi
     if [ ! -x "$W9X_VM_QEMU" ]; then echo 'qemu9x.cpio not loaded (no QEMU)'; return 1; fi
     for firmware in bios-256k.bin vgabios-stdvga.bin; do
@@ -76,12 +95,60 @@ w9x_vm_args() {
         -boot order=c \
         -serial "file:$W9X_VM_RUN/serial.log" \
         -chardev "file,id=seabios,path=$W9X_VM_RUN/seabios.log" -device isa-debugcon,iobase=0x402,chardev=seabios \
-        -monitor "pipe:$W9X_VM_RUN/mon"
+        -monitor "pipe:$W9X_VM_RUN/mon" \
+        -monitor "pipe:$W9X_VM_RUN/key"
 }
 
 w9x_vm_monitor() {
     # Read-write open: never blocks, also when QEMU is gone.
     printf '%s\n' "$1" 1<> "$W9X_VM_RUN/mon.in" 2>/dev/null || true
+}
+
+# The Windows 95 key of the MSBATCH.INF $1 ([Setup] ProductID, as
+# tools/../msbatch.zig renders it) as the digits typed into Setup's COA page:
+# OEM ddddd-OEM-ddddddd-ddddd -> 17 digits (the page has three fields and no
+# "OEM" field), retail ddd-ddddddd -> 10 digits. Nothing (rc 1) otherwise.
+w9x_vm_key_digits() {
+    awk '
+        { sub(/\r$/, "") }
+        /^[ \t]*\[/ { setup = (tolower($0) ~ /^[ \t]*\[setup\][ \t]*$/); next }
+        setup && tolower($0) ~ /^[ \t]*productid[ \t]*=/ {
+            v = $0; sub(/^[^=]*=[ \t]*/, "", v); gsub(/"/, "", v); sub(/[ \t]+$/, "", v); v = toupper(v)
+            if (v ~ /^[0-9][0-9][0-9][0-9][0-9]-OEM-[0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9]$/ ||
+                v ~ /^[0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9][0-9]$/) { gsub(/[^0-9]/, "", v); print v; found = 1 }
+            exit
+        }
+        END { exit(found ? 0 : 1) }' "$1" 2>/dev/null
+}
+
+# 0 when the guest shows a graphics screen (Setup's mini-Windows runs at
+# 640x480; QEMU dumps a text-mode screen as 720x400). The dump stays in
+# $W9X_VM_RUN only for its header and is deleted at once (it may show a page
+# with the digits after a rejected attempt).
+w9x_vm_graphics_screen() {
+    rm -f "$W9X_VM_RUN/mode.ppm"
+    w9x_vm_monitor "screendump $W9X_VM_RUN/mode.ppm"
+    for _ in 1 2 3 4 5; do
+        [ -s "$W9X_VM_RUN/mode.ppm" ] && break
+        sleep 1
+    done
+    size=$(head -c 20 "$W9X_VM_RUN/mode.ppm" 2>/dev/null | tr '\n' ' ' | awk '{ print $2 "x" $3 }')
+    rm -f "$W9X_VM_RUN/mode.ppm"
+    case "$size" in 720x400|x|'') return 1 ;; esac
+    return 0
+}
+
+# Types the digits $1 and Enter into the guest (second monitor; its output,
+# which echoes the commands, goes nowhere).
+w9x_vm_type_key() {
+    keys=$1
+    while [ -n "$keys" ]; do
+        digit=${keys%"${keys#?}"}
+        keys=${keys#?}
+        printf 'sendkey %s\n' "$digit" 1<> "$W9X_VM_RUN/key.in" 2>/dev/null || return 1
+        sleep 1
+    done
+    printf 'sendkey ret\n' 1<> "$W9X_VM_RUN/key.in" 2>/dev/null || return 1
 }
 
 # Sectors written to block device $1 so far (/sys/block/<name>/stat field 7).
@@ -101,10 +168,18 @@ w9x_phase1_run() {
     # The target writer's buffered writes on the disk, its cached pages dropped.
     sync
     blockdev --flushbufs "$target" 2>/dev/null || true
-    mkfifo "$W9X_VM_RUN/mon.in" "$W9X_VM_RUN/mon.out" || return 2
+    mkfifo "$W9X_VM_RUN/mon.in" "$W9X_VM_RUN/mon.out" "$W9X_VM_RUN/key.in" "$W9X_VM_RUN/key.out" || return 2
     # Read-write open: never blocks, with or without QEMU on the other end.
     cat 0<> "$W9X_VM_RUN/mon.out" > "$W9X_VM_RUN/monitor.log" 2>/dev/null &
     drain=$!
+    # The key monitor's echo would hold the key: discarded, never logged.
+    cat 0<> "$W9X_VM_RUN/key.out" > /dev/null 2>&1 &
+    drain_key=$!
+    key=${W9X_VM_KEY:-}
+    key_tries=0
+    key_on_screen=0
+    last_written=-1
+    idle_since=0
     set --
     while IFS= read -r arg; do set -- "$@" "$arg"; done <<EOF
 $(w9x_vm_args "$target" "$accel")
@@ -119,15 +194,46 @@ EOF
     while kill -0 "$vm" 2>/dev/null; do
         now=$(date +%s)
         elapsed=$((now - start))
-        written=$(( ($(w9x_vm_written "$target") - written0) / 2048 ))
+        sectors=$(w9x_vm_written "$target")
+        written=$(( (sectors - written0) / 2048 ))
         command -v w9x_phase1_progress >/dev/null 2>&1 && w9x_phase1_progress "$elapsed" "$written"
-        if [ $((now - last_shot)) -ge "$W9X_VM_SCREEN_EVERY" ]; then
+        if [ "$sectors" != "$last_written" ]; then
+            last_written=$sectors
+            idle_since=$now
+            key_on_screen=0
+        elif [ -n "$key" ]; then
+            idle=$((now - idle_since))
+            if [ "$idle" -ge "$W9X_VM_IDLE" ] && [ "$key_tries" -lt "$W9X_VM_KEY_TRIES" ] && [ "$written" -lt "$W9X_VM_KEY_MAX_MB" ] &&
+                ! w9x_vm_graphics_screen; then
+                # Text mode (DOS: INSTALL.BAT, Patcher9x, Setup's DOS stage):
+                # no page of Setup's mini-Windows waits; look again later.
+                idle_since=$(date +%s)
+            elif [ "$idle" -ge "$W9X_VM_IDLE" ] && [ "$key_tries" -lt "$W9X_VM_KEY_TRIES" ] && [ "$written" -lt "$W9X_VM_KEY_MAX_MB" ]; then
+                key_tries=$((key_tries + 1))
+                printf 'key typed: attempt %s at %ss, idle %ss, written %s MB\n' "$key_tries" "$elapsed" "$idle" "$written" >> "$W9X_VM_RUN/command.txt"
+                # Until the guest writes again the page may still show the
+                # digits: no screendump of it (the logs go to the USOS ESP).
+                key_on_screen=1
+                w9x_vm_type_key "$key"
+                idle_since=$(date +%s)
+            elif [ "$idle" -ge "$W9X_VM_STALL" ]; then
+                printf 'stalled: no disk write for %ss\n' "$idle" >> "$W9X_VM_RUN/command.txt"
+                result=3
+                [ "$key_on_screen" = 1 ] || w9x_vm_monitor "screendump $W9X_VM_RUN/screen.ppm"
+                sleep 3
+                w9x_vm_monitor quit
+                sleep 5
+                kill "$vm" 2>/dev/null || true
+                break
+            fi
+        fi
+        if [ $((now - last_shot)) -ge "$W9X_VM_SCREEN_EVERY" ] && [ "$key_on_screen" = 0 ]; then
             w9x_vm_monitor "screendump $W9X_VM_RUN/screen.ppm"
             last_shot=$now
         fi
         if [ "$elapsed" -ge "$W9X_VM_TIMEOUT" ]; then
             result=3
-            w9x_vm_monitor "screendump $W9X_VM_RUN/screen.ppm"
+            [ "$key_on_screen" = 1 ] || w9x_vm_monitor "screendump $W9X_VM_RUN/screen.ppm"
             sleep 3
             w9x_vm_monitor quit
             sleep 5
@@ -138,7 +244,7 @@ EOF
     done
     wait "$vm"
     rc=$?
-    kill "$drain" 2>/dev/null || true
+    kill "$drain" "$drain_key" 2>/dev/null || true
     W9X_VM_ELAPSED=$(( $(date +%s) - start ))
     printf 'rc=%s elapsed=%s accel=%s\n' "$rc" "$W9X_VM_ELAPSED" "$accel" >> "$W9X_VM_RUN/command.txt"
     sync

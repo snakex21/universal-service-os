@@ -39,7 +39,8 @@ SIZE_GIB=${W9X_SIZE_GIB:-32}
 # U9ENV.BAT gets U9VM=1 (Setup /P I) and USOSVESA.INF this PC's display IDs.
 VM_PHASE1=${W9X_VM_PHASE1:-0}
 # The 9x zone key of MSBATCH.INF [Setup] TimeZone (USOS default answer only):
-# 98 / 98 SE also get C:\USOS9X\TZFIX.BAT for the first-boot Date/Time step.
+# 95 / 98 / 98 SE also get C:\USOS9X\TZFIX.BAT for the first-boot Date/Time
+# step (95: the key as Windows 95 names it, e.g. Warsaw).
 TIME_ZONE=${W9X_TIME_ZONE:-}
 PCI_ROOT=${W9X_PCI_ROOT:-/sys/bus/pci/devices}
 ESP_DIR=${W9X_ESP_DIR:-/mnt/esp/EFI/USOS}
@@ -264,7 +265,7 @@ if [ "$VM_PHASE1" = 1 ]; then
 fi
 
 case "$SYSTEM_TAG:$TIME_ZONE" in
-    98SE:?*|98:?*)
+    98SE:?*|98:?*|95:?*)
         if [ -r "$LIB/w9x_tzfix.sh" ] && . "$LIB/w9x_tzfix.sh" && w9x_tzfix_write "$TIME_ZONE" "$work/c/USOS9X"; then
             log "time zone: TZFIX.BAT for '$TIME_ZONE' (first-boot Date/Time step)"
         else

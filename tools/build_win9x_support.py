@@ -91,6 +91,9 @@ When a key is missing it adds
   [vcache] MaxFileCache=262144   (disk cache at most 256 MiB)
 
 Keys already present are kept with their value, so a changed value stays.
+Windows 95 (U9FIX /95): MaxPhysPage=1E000 instead (at most 480 MiB; 95 is
+unstable above about 480 MB), and USOS's own MaxPhysPage=40000 from Setup
+is lowered to it; any other value stays.
 To stop it, delete the line from C:\\AUTOEXEC.BAT.
 
 This program is free software: you can redistribute it and/or modify it

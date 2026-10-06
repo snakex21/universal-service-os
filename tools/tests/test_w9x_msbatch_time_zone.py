@@ -59,6 +59,27 @@ class MsbatchTimeZone(unittest.TestCase):
         none = Path(PREPARE).read_text(encoding='utf-8')
         self.assertIn('time_zone=$(w9x_release_time_zone "$tag" "$time_zone")', none)
 
+    def test_windows_95_names_and_the_renderer_table_agree(self):
+        self.assertEqual(self.release_zone('95', 'Central European'), 'Warsaw')
+        self.assertEqual(self.release_zone('95', 'Central Europe'), 'Prague Bratislava')
+        self.assertEqual(self.release_zone('95', 'Eastern'), 'Eastern')
+        self.assertEqual(self.release_zone('95', 'GTB'), '')
+        self.assertEqual(self.release_zone('95', 'Pacific SA'), '')
+        # The same table as src/flow/answer/msbatch.zig timeZoneName95, for
+        # every key the menu can produce (windows98_zones).
+        import re
+        zig = (ROOT / 'src/flow/answer/msbatch.zig').read_text(encoding='utf-8')
+        fn = zig[zig.index('pub fn timeZoneName95'):zig.index('const windows95_zones')]
+        renamed = dict(re.findall(r'\.\{ "([^"]+)", "([^"]+)" \}', fn))
+        same = zig[zig.index('const windows95_zones'):]
+        same = re.findall(r'"([^"]+)"', same[:same.index('};')])
+        menu = zig[zig.index('const windows98_zones'):]
+        menu = re.findall(r'"([^"]+)"', menu[:menu.index('};')])
+        self.assertEqual(len(renamed), 5)
+        for name in menu:
+            expected = renamed.get(name, name if name in same else '')
+            self.assertEqual(self.release_zone('95', name), expected, name)
+
     def test_prepare_uses_it_only_for_the_default_answer(self):
         text = Path(PREPARE).read_text(encoding='utf-8')
         none = text[text.index('        none)'):text.index('        profile)')]
