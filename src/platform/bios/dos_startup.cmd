@@ -30,6 +30,9 @@ REM visible, and the logo hangs QEMU's SMM path. SYS wrote MSDOS.SYS.
 %U9X%\ATTRIB.EXE -H -S -R C:\MSDOS.SYS
 ECHO [Options]>>C:\MSDOS.SYS
 ECHO Logo=0>>C:\MSDOS.SYS
+REM No forced startup menu on normal boots (Windows still shows it by itself
+REM after an unclean shutdown or a failed start).
+ECHO BootMenu=0>>C:\MSDOS.SYS
 REM After a failed start the menu defaults to Normal, not Safe mode: safe
 REM mode loads HIMEM without /M:2 and hangs under CSMWrap.
 ECHO BootMenuDefault=1>>C:\MSDOS.SYS
