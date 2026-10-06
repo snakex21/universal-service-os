@@ -384,6 +384,45 @@ installed there. QEMU note: with the VMware backdoor (`vmport`) on, VBMOUSE
 uses it instead of the BIOS, so the tests run with `vmport=off` (the driver
 default now).
 
+#### 8.4.1 X470 Windows 3.1 PL run (2026-10-06) and its fixes
+
+* **Endless "REBOOT is prepared below" loop.** MS-DOS compares only the
+  first 8 characters of a batch label and jumps to the first match:
+  `:restart_ready` and `:restart_now` in `INSTALL.BAT` were one label, so in
+  disk mode `goto restart_now` looped back. The labels are now
+  `:reboot_prompt` / `:auto_restart` / `:restart_go`, and
+  `tools/tests/test_dos_batch_labels.py` scans every `.cmd`/`.bat` under
+  `src/platform/bios` and the batch heredocs of `tools/*.sh` for labels that
+  collide within 8 characters (and for `goto` targets that do not exist).
+* **Stage 1 in disk mode** says the computer restarts from the target disk
+  automatically (no "Remove USOS USB, then press Enter") and restarts after
+  `CHOICE /C:R /T:R,8` (8 s, R = now). The RAM-disk (BIOS Core) mode keeps
+  the prefilled `REBOOT` prompt.
+* **Final restart** (`WINMENU.BAT`): after `SMARTDRV /C`,
+  `CHOICE /C:RA /T:R,5`: R (default after 5 s) restarts through
+  `REBOOT.COM`, A stays in MS-DOS. Without `C:\DOS\CHOICE.COM` the old
+  prefilled `REBOOT /P` prompt; PREPDOS now requires `CHOICE.COM` (MS-DOS 6.x).
+* **REBOOT.COM** writes CMOS 0Fh = 0 (shutdown status: normal POST, port
+  70h = 8Fh keeps NMI masked) after CF9h 02h/06h and 8042 FEh, right before
+  the last-resort jump to FFFF:0000, so SeaBIOS under CSMWrap takes its
+  tryReboot path instead of a resume through a stale shutdown code.
+* **Code page 852 helper.** The Polish SETUP.INF puts
+  `"add852.exe /A"` into Autostart (`[group1]`). On the first Windows start
+  it asked for a restart and rewrites `C:\CONFIG.SYS` / `C:\AUTOEXEC.BAT`
+  (COUNTRY, DISPLAY.SYS, MODE CP PREP/SEL, NLSFUNC, KEYB), which replaces
+  the USOS start menu. Decision (simplest safe option): `INSTALL.BAT` runs
+  `QBASIC /RUN W3INF.BAS` on the `C:\WINSETUP` copy before Setup, which drops
+  only lines with `add852.exe /A`; the helper stays in the main group for a
+  manual run. USOS does not set code page 852 itself: DISPLAY.SYS font
+  loading through CSMWrap's video BIOS is untested and KEYB never sees USB
+  keys (SeaBIOS feeds INT 16h directly), so MS-DOS stays at code page 437
+  (Polish letters in DOS boxes show as 437 glyphs; Windows itself is fully
+  Polish). Running the helper manually later rewrites CONFIG.SYS /
+  AUTOEXEC.BAT; the menu copies stay in `C:\USOSW3` (`W3CONFIG.SYS`,
+  `W3AUTO.BAT`) for a restore.
+* **Startup menu colours.** `menucolor=15,1` (white on blue): CSMWrap's
+  video BIOS drew the default highlight white on white.
+
 ### 8.5 Windows 3.x USB keyboard (research and implementation)
 
 **Why the stock driver cannot see the keys.** Windows 3.x `KEYBOARD.DRV`
@@ -466,7 +505,18 @@ page tables, or load the stock driver under a patched module name. Instead:
   runs `SETUP.EXE /H:USOS.SHH`. The GUI part then needs no key at all. The
   DOS part still shows its (Polish) keyboard/language confirmation and the
   code-page note: two Enter presses, which the USB keyboard handles there
-  (BIOS INT 16h). The BIOS path has no answer profiles, so the user name is
+  (BIOS INT 16h). Looked at again after the X470 run (2026-10-06), where
+  they appeared despite `showsysinfo=no`: the first screen lists the Polish
+  keyboard switch (`[keyboard.switch]`: primary/secondary layout, switch
+  keys, language, "Bez zmian"); the camera cut off its top lines, so it is
+  open whether it is a Polish extension of the System Configuration screen
+  or a separate one. The Polish SETUP.EXE reads only `sysinfo.showsysinfo`
+  (compared with `yes`) and `configuration.*` from the .SHH, with no key for
+  the keyboard switch or the code page note (shown because MS-DOS runs code
+  page 437, SETUP.INF `defxlat = 852`). Setting `configuration.language` /
+  `kblayout` would tie USOS.SHH to one edition, and setting code page 852 in
+  MS-DOS is not done (8.4.1). So: a documented manual step, two Enter
+  presses. The BIOS path has no answer profiles, so the user name is
   the fixed `USOS`; real BIOS PCs keep the interactive Setup (hardware-proven
   on the MS-7100) until batch mode is tested there.
 * Keyboard LEDs do not follow Caps/Num Lock (SeaBIOS never sees the bytes

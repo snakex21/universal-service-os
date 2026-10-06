@@ -89,6 +89,13 @@ dos_reboot_start:
     out 0x64, al
     mov cx, 0
 2:  loop 2b
+    /* CMOS shutdown status 0Fh = 0 (normal POST; 80h keeps NMI masked): the
+     * reset vector then takes SeaBIOS's tryReboot path under CSMWrap instead
+     * of a resume through a stale shutdown code. */
+    mov al, 0x8f
+    out 0x70, al
+    xor al, al
+    out 0x71, al
     /* Re-enter BIOS POST, not INT 19h with MEMDISK hooks still installed. */
     .byte 0xea
     .word 0, 0xffff

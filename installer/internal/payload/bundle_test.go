@@ -46,6 +46,7 @@ func TestEmbeddedPayloadHasRequiredFiles(t *testing.T) {
 		"EFI/USOS/dos-native/msdos/W3CONFIG.SYS":  false,
 		"EFI/USOS/dos-native/msdos/W3AUTO.BAT":    false,
 		"EFI/USOS/dos-native/msdos/REBOOT.COM":    false,
+		"EFI/USOS/dos-native/msdos/W3INF.BAS":     false,
 	}
 	for _, file := range manifest {
 		if file.Size == 0 || file.SHA256 == "" {

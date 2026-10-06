@@ -64,6 +64,9 @@ def build(root: Path):
             if len(expanded) > 127:
                 raise ValueError('MS-DOS command line exceeds 127 bytes: ' + source)
         (dos_out / name).write_bytes(text.replace('\r\n', '\n').replace('\n', '\r\n').encode('ascii'))
+    # Before Windows 3.x Setup in both modes (INSTALL.BAT): no code page 852
+    # helper in Autostart (src/platform/bios/msdos/windows_inf.bas).
+    (dos_out / 'W3INF.BAS').write_bytes(dos_text((root / 'src/platform/bios/msdos/windows_inf.bas').read_text(encoding='ascii')))
     print('[PASS] MS-DOS support: verified HimemX 3.40, sources, license and DOS helpers')
     build_csmwrap_variants(root, dos_out)
     build_reboot(root)
