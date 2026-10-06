@@ -22,7 +22,11 @@
  *     stock driver's MapVirtualKey for the typing keys, so QWERTZ/AZERTY
  *     layouts keep their VKs; a fixed table for the rest) and calls USER's
  *     keyboard event procedure (keybd_event, USER.289) like KEYBOARD.DRV's
- *     interrupt handler does; ToAscii stays the stock driver's.
+ *     interrupt handler does; ToAscii stays the stock driver's. The
+ *     translation (E0/E1 keys, Windows keys, AltGr = Ctrl+Alt, lock keys,
+ *     Print Screen / Pause) is in usoskey_xlat.h, host-tested by
+ *     tools/tests/legacy_bios/test_usoskey_xlat.py. Ctrl+Alt+Del goes to
+ *     VKD as forced bytes so its hot key (9x Close Program) still fires.
  * Without the TSR (Windows Me starts no real-mode program from AUTOEXEC.BAT
  * and has no WINSTART.BAT) the driver installs the TSR's resident part
  * itself: a copy in DOS memory (GlobalDosAlloc) with INT 08h/09h/15h/1Ch/2Fh
@@ -57,53 +61,6 @@ static CREATETIMER create_timer;
 static KILLTIMER kill_timer;
 static WORD timer;
 static BYTE busy;
-static BYTE prefix;                 /* 0 or 0E0h */
-static BYTE e1_left;                /* bytes of an E1 (Pause) sequence to skip */
-static BYTE e1_make;
-static BYTE numlock, lshift, rshift, alt;
-static BYTE vk_of[0x59];            /* non-extended scan code -> VK */
-
-/* US enhanced (101/102) keyboard, set 1; the typing keys are replaced by the
- * stock driver's MapVirtualKey(scan, 1) when it knows them. */
-static const BYTE vk_us[0x59] = {
-    0,    0x1B, '1',  '2',  '3',  '4',  '5',  '6',  '7',  '8',  '9',  '0',  0xBD, 0xBB, 0x08, 0x09,
-    'Q',  'W',  'E',  'R',  'T',  'Y',  'U',  'I',  'O',  'P',  0xDB, 0xDD, 0x0D, 0x11, 'A',  'S',
-    'D',  'F',  'G',  'H',  'J',  'K',  'L',  0xBA, 0xDE, 0xC0, 0x10, 0xDC, 'Z',  'X',  'C',  'V',
-    'B',  'N',  'M',  0xBC, 0xBE, 0xBF, 0x10, 0x6A, 0x12, 0x20, 0x14, 0x70, 0x71, 0x72, 0x73, 0x74,
-    0x75, 0x76, 0x77, 0x78, 0x79, 0x90, 0x91, 0x24, 0x26, 0x21, 0x6D, 0x25, 0x0C, 0x27, 0x6B, 0x23,
-    0x28, 0x22, 0x2D, 0x2E, 0,    0,    0xE2, 0x7A, 0x7B
-};
-/* Numeric keypad with NumLock on (scan 47h..53h). */
-static const BYTE vk_numpad[13] = { 0x67, 0x68, 0x69, 0x6D, 0x64, 0x65, 0x66, 0x6B, 0x61, 0x62, 0x63, 0x60, 0x6E };
-
-static int is_typing_key(BYTE code)
-{
-    return (code >= 0x02 && code <= 0x0D) || (code >= 0x10 && code <= 0x1B) ||
-           (code >= 0x1E && code <= 0x29) || (code >= 0x2B && code <= 0x35) || code == 0x56;
-}
-
-static BYTE extended_vk(BYTE code)
-{
-    switch (code) {
-    case 0x1C: return 0x0D;   /* keypad Enter */
-    case 0x1D: return 0x11;   /* right Ctrl */
-    case 0x35: return 0x6F;   /* keypad / */
-    case 0x37: return 0x2C;   /* Print Screen */
-    case 0x38: return 0x12;   /* right Alt (AltGr) */
-    case 0x46: return 0x03;   /* Ctrl+Break */
-    case 0x47: return 0x24;
-    case 0x48: return 0x26;
-    case 0x49: return 0x21;
-    case 0x4B: return 0x25;
-    case 0x4D: return 0x27;
-    case 0x4F: return 0x23;
-    case 0x50: return 0x28;
-    case 0x51: return 0x22;
-    case 0x52: return 0x2D;
-    case 0x53: return 0x2E;
-    }
-    return 0;                 /* E0 2A/36 fake shifts, Windows keys: none */
-}
 
 static void keyboard_event(WORD ax_value, WORD bx_value)
 {
@@ -142,42 +99,21 @@ static int force_key(BYTE scan)
     return !failed;
 }
 
-/* Standard mode: one raw byte -> keybd_event, like KEYBOARD.DRV's INT 9. */
-static void translate(BYTE b)
+/* Ctrl+Alt+Del on the Windows desktop: USER does not act on it, VKD's hot
+ * key does (the 9x Close Program box, Windows 3.x's own handling). VKD's
+ * forced bytes share its hardware queue, which checks the hot keys. */
+static void cad_via_vkd(void)
 {
-    BYTE up, code, ext, vk;
-    if (e1_left) {
-        e1_left--;
-        if (e1_left == 0 && e1_make) {
-            keyboard_event(0x0013, 0x0045);           /* VK_PAUSE down */
-            keyboard_event(0x8013, 0x0045);           /* and up */
-        }
-        if ((b & 0x7F) == 0x1D) e1_make = (b & 0x80) == 0;
-        return;
-    }
-    if (b == 0xE0) { prefix = 0xE0; return; }
-    if (b == 0xE1) { e1_left = 2; e1_make = 0; prefix = 0; return; }
-    up = b & 0x80;
-    code = b & 0x7F;
-    ext = prefix == 0xE0;
-    prefix = 0;
-    if (ext) {
-        vk = extended_vk(code);
-    } else {
-        if (code >= sizeof(vk_of)) return;
-        vk = vk_of[code];
-        if (code == 0x2A) lshift = !up;
-        if (code == 0x36) rshift = !up;
-        if (code >= 0x47 && code <= 0x53 && numlock && !lshift && !rshift)
-            vk = vk_numpad[code - 0x47];
-        if (code == 0x45 && !up) numlock = !numlock;
-    }
-    if (code == 0x38) alt = !up;
-    if (!vk) return;
-    /* PrtSc: BL = 0 whole screen, 1 active window (Alt). */
-    if (vk == 0x2C) code = alt ? 1 : 0;
-    keyboard_event((WORD)vk | (up ? 0x8000 : 0), (WORD)code | (ext ? 0x0100 : 0));
+    static const BYTE seq[6] = { 0x1D, 0x38, 0x53, 0xD3, 0xB8, 0x9D };
+    BYTE i;
+    if (!vkd_entry) return;
+    for (i = 0; i < sizeof(seq); i++)
+        if (!force_key(seq[i])) { shared->refused++; break; }
 }
+
+#define xlat_event(ax, bx) keyboard_event((ax), (bx))
+#define xlat_cad() cad_via_vkd()
+#include "usoskey_xlat.h"
 
 /* Windows 9x: is a DOS box (WinOldAp, class "tty") the active window? */
 static int dos_box_active(void)
@@ -342,7 +278,7 @@ static int init(void)
     create_timer = (CREATETIMER)GetProcAddress(system, MAKEINTRESOURCE(2));
     kill_timer = (KILLTIMER)GetProcAddress(system, MAKEINTRESOURCE(3));
     if (!keybd_event_proc || !create_timer || !kill_timer) return 0;
-    for (code = 0; code < sizeof(vk_of); code++) vk_of[code] = vk_us[code];
+    translate_init(0);
     if (keyboard) {
         MAPVK map = (MAPVK)GetProcAddress(keyboard, MAKEINTRESOURCE(131));
         if (map) for (code = 1; code < sizeof(vk_of); code++) {
