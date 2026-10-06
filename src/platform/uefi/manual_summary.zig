@@ -269,6 +269,10 @@ pub fn show(
     };
 }
 
+/// Windows 95: the chosen profile (or the USOS default) with the key typed
+/// at start (win9x_key_prompt.zig); this start only.
+var keyed_95: ?answer_profiles.Profile = null;
+
 fn start(
     root: *std.os.uefi.protocol.File,
     system: *const usos.catalog.SystemEntry,
@@ -279,6 +283,18 @@ fn start(
 ) void {
     const unattended = answer.path;
     if (!system.firmware.accepts(firmware)) return showFirmwareUnavailable();
+    // Windows 95 without a 95 key (profile or none): ask for it now, while
+    // the gamepads still work (the on-screen keyboard). Phase 1 runs in the
+    // VM only with a key; the native start freezes on modern boards.
+    keyed_95 = null;
+    if (usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, firmware) == .win9x_uefi) {
+        const key_prompt = @import("win9x_key_prompt.zig");
+        const chosen: ?*const answer_profiles.Profile = if (answer.profile) |index| answer_profiles.get(index) else null;
+        if (key_prompt.needed(system.id, chosen, chosen == null and unattended != null)) {
+            const key = key_prompt.ask(system.name) orelse return;
+            keyed_95 = key_prompt.withKey(chosen, view.languageCode(), key) catch |err| return showError(view.t(.error_preparation), err);
+        }
+    }
     // No USB gamepad transfer may outlive the menu into another loader;
     // the pads are picked up again if the launch fails and the menu returns.
     input.stopGamepads();
@@ -316,7 +332,10 @@ fn start(
         view.vistaCsmwrapStatus(.validating, "Reading the selected ISO", vista_csmwrap_heading);
         const win9x = @import("win9x_preparation.zig");
         var request_answer: win9x.Answer = .none;
-        if (profile) |p| {
+        if (keyed_95) |*keyed| {
+            answer_profiles.stageWin9x(root, keyed) catch |err| return showError(view.t(.error_preparation), err);
+            request_answer = .profile;
+        } else if (profile) |p| {
             answer_profiles.stageWin9x(root, p) catch |err| return showError(view.t(.error_preparation), err);
             request_answer = .profile;
         } else if (unattended) |name| request_answer = .{ .file = name };

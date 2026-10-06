@@ -1049,6 +1049,8 @@
   "boot.profile.value.edition_manual": "Zadat ručně…",
   "boot.profile.badge_incomplete": "Neúplný",
   "boot.profile.missing.key": "Chybí kód Product Key pro {0}: instalace se zastaví na stránce kódu Product Key. Upravte profil (X) a zadejte kód.",
+  "boot.win9x_key.title": "Zadejte kód Product Key pro {0}",
+  "boot.win9x_key.subtitle": "Bez něj se instalace zastaví na stránce kódu Product Key. Kód se použije jen pro tuto instalaci a neuloží se.",
   "boot.profile.missing.password": "{0} vyžaduje heslo o délce aspoň 7 znaků se třemi z: velká písmena, malá písmena, číslice, symboly. Bez něj se instalace zastaví na stránce hesla správce.",
   "boot.profile.field.systems": "Použít pro",
   "boot.profile.help.systems": "Systémy, jejichž obrazovka odpovědí nabízí tento profil. Profily uložené bez tohoto nastavení se nabízejí pro každý Windows, nikdy pro Linux.",

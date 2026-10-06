@@ -1046,6 +1046,8 @@
   "boot.profile.value.edition_manual": "Skriv in manuellt…",
   "boot.profile.badge_incomplete": "Ofullständig",
   "boot.profile.missing.key": "Ingen produktnyckel för {0}: Setup stannar på sidan för produktnyckeln. Redigera profilen (X) och ange nyckeln.",
+  "boot.win9x_key.title": "Ange produktnyckeln för {0}",
+  "boot.win9x_key.subtitle": "Utan den stannar installationen på sidan för produktnyckeln. Nyckeln används bara för den här installationen och sparas inte.",
   "boot.profile.missing.password": "{0} kräver ett lösenord på minst 7 tecken med tre av: versaler, gemener, siffror, symboler. Utan lösenord stannar Setup på sidan för Administrator-lösenordet.",
   "boot.profile.field.systems": "Använd för",
   "boot.profile.help.systems": "De system vars svarsskärm erbjuder den här profilen. Profiler sparade utan den här inställningen erbjuds för alla Windows, aldrig för Linux.",

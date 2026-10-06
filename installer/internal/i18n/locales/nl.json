@@ -1046,6 +1046,8 @@
   "boot.profile.value.edition_manual": "Handmatig invoeren…",
   "boot.profile.badge_incomplete": "Onvolledig",
   "boot.profile.missing.key": "Geen productcode voor {0}: Setup stopt op de pagina voor de productcode. Bewerk het profiel (X) en voer de code in.",
+  "boot.win9x_key.title": "Voer de productcode voor {0} in",
+  "boot.win9x_key.subtitle": "Zonder code stopt Setup op de pagina voor de productcode. De code wordt alleen voor deze installatie gebruikt en niet opgeslagen.",
   "boot.profile.missing.password": "{0} vereist een wachtwoord van minstens 7 tekens met drie van: hoofdletters, kleine letters, cijfers, symbolen. Zonder wachtwoord stopt Setup op de pagina voor het Administrator-wachtwoord.",
   "boot.profile.field.systems": "Gebruiken voor",
   "boot.profile.help.systems": "De systemen waarvan het antwoordscherm dit profiel aanbiedt. Profielen opgeslagen zonder deze instelling worden aangeboden voor elke Windows, nooit voor Linux.",

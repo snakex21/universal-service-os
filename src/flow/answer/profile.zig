@@ -703,6 +703,8 @@ pub const linux_systems = [_][]const u8{ "ubuntu", "debian", "fedora" };
 
 pub fn knownSystemToken(token: []const u8) bool {
     if (@import("target.zig").familyFor(token) != null) return true;
+    // Windows 95/98/Me ids (MSBATCH.INF systems, no NT family).
+    if (@import("msbatch.zig").releaseFor(token) != null) return true;
     for (system_groups ++ linux_systems) |known| {
         if (std.mem.eql(u8, known, token)) return true;
     }
@@ -986,6 +988,7 @@ test "profile parse errors name the field and line, never the value" {
         .{ .text = "name=A\nuser=Bob\nnetwork_location=office\n", .field = .network_location, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\nedition=A<B\n", .field = .edition, .problem = .bad_characters, .line = 3 },
         .{ .text = "name=A\nuser=Bob\nsystems=windows-vista,amiga\n", .field = .systems, .problem = .bad_choice, .line = 3 },
+        .{ .text = "name=A\nuser=Bob\nsystems=windows-9x,windows-96\n", .field = .systems, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\ntheme=aero\n", .field = .theme, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\ndisplay=800x600\n", .field = .display, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\nskip_games=maybe\n", .field = .skip_games, .problem = .bad_boolean, .line = 3 },

@@ -1049,6 +1049,8 @@
   "boot.profile.value.edition_manual": "Įvesti rankiniu būdu…",
   "boot.profile.badge_incomplete": "Neišsamus",
   "boot.profile.missing.key": "Nėra {0} produkto rakto: sąranka sustos produkto rakto puslapyje. Redaguokite profilį (X) ir įveskite raktą.",
+  "boot.win9x_key.title": "Įveskite {0} produkto kodą",
+  "boot.win9x_key.subtitle": "Be jo sąranka sustoja produkto kodo puslapyje. Kodas naudojamas tik šiam diegimui ir neįrašomas.",
   "boot.profile.missing.password": "{0} reikia bent 7 simbolių slaptažodžio su trimis iš: didžiosios raidės, mažosios raidės, skaitmenys, simboliai. Be jo sąranka sustos administratoriaus slaptažodžio puslapyje.",
   "boot.profile.field.systems": "Naudoti",
   "boot.profile.help.systems": "Sistemos, kurių atsakymų ekranas siūlo šį profilį. Be šio parametro įrašyti profiliai siūlomi bet kuriai Windows, niekada Linux.",

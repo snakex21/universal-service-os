@@ -1049,6 +1049,8 @@
   "boot.profile.value.edition_manual": "Unesi ručno…",
   "boot.profile.badge_incomplete": "Nepotpun",
   "boot.profile.missing.key": "Nema ključa proizvoda za {0}: instalacija staje na stranici ključa proizvoda. Uredite profil (X) i unesite ključ.",
+  "boot.win9x_key.title": "Unesite ključ proizvoda za {0}",
+  "boot.win9x_key.subtitle": "Bez njega instalacija staje na stranici ključa proizvoda. Ključ se koristi samo za ovu instalaciju i ne čuva se.",
   "boot.profile.missing.password": "{0} traži lozinku od najmanje 7 znakova sa tri od: velika slova, mala slova, cifre, simboli. Bez nje instalacija staje na stranici lozinke administratora.",
   "boot.profile.field.systems": "Koristi za",
   "boot.profile.help.systems": "Sistemi čiji ekran odgovora nudi ovaj profil. Profili sačuvani bez ove postavke nude se za svaki Windows, nikad za Linux.",
