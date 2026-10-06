@@ -56,6 +56,21 @@ the key page. USB keyboard in the USOS BIOS menu and in DOS worked in
 all CSMWrap runs (SeaBIOS INT 16h). VESA driver: prepared (INF + IDs,
 unit-tested), not yet seen on a desktop (the desktop run predates it).
 
+VESA on the RX 560 (2026-10-06): 640x480x16 works; switching to 1024x768 gives
+exception 0D at 0377:3F2F (DIBENG fill). In vmdisp9x 1.2025.0.119 the VXD sizes
+VRAM once at boot as VBE TotalMemory*64K (capped by `VRAMLimit` MB) and then
+shrinks it to the first read-back mismatch of a full VRAM pattern test unless
+`NoMemTest`=1. The 16-bit selector given to DIBENG is built from that size once
+and never resized. A mode change does not check that the new surface fits:
+without a working 4F07 flip, GDI draws at offset `stride`, so 2*pitch*height
+must fit. `HKLM\Software\vmdisp9x\vesa` also reads `MTRR` (no effect in 119),
+`DosWindowSetMode` and `HWDoubleBuffer` (0/1/2; 1 and 2 both fall back to a
+plain 4F07 test). 119 is the latest release. Upstream master (unreleased,
+2026-05 "new vram management", "VESA: real HW fixes") draws into a RAM shadow
+buffer instead. USOSDIAG 1.3 logs the VGA BARs and the VBE mode table ("need"
+= pitch*height, ">MEM" past TotalMemory) for the diagnosis. BIOSTAR test disk:
+one-time `C:\USOS9X\VESAFIX.BAT` sets `NoMemTest`="1" (backup `SYSTEM.VB`/`USER.VB`).
+
 ## 4. X470 test plan (CSM off, Secure Boot off, spare SATA disk; USB keyboard and mouse only, no PS/2)
 
 0. Where to start (2026-10-03, after the X470 report "98 SE is locked"): in the UEFI menu
