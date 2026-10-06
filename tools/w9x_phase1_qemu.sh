@@ -46,7 +46,7 @@ W9X_VM_SCREEN_EVERY=${W9X_VM_SCREEN_EVERY:-60}
 # as "a page waits", at most this many attempts, and only while the guest has
 # written less than this many MB (the COA page comes before the file copy).
 W9X_VM_IDLE=${W9X_VM_IDLE:-60}
-W9X_VM_KEY_TRIES=${W9X_VM_KEY_TRIES:-3}
+W9X_VM_KEY_TRIES=${W9X_VM_KEY_TRIES:-5}
 W9X_VM_KEY_MAX_MB=${W9X_VM_KEY_MAX_MB:-64}
 # With key typing: no disk write for this long ends the VM (rc 3), instead of
 # waiting for the full timeout on a page nobody can answer.
