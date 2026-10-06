@@ -54,6 +54,14 @@ pub fn timeZoneName(zone: *const tables.TimeZone) ?[]const u8 {
     return null;
 }
 
+/// The 9x time zone key for a run without an answer profile: the default
+/// zone of the menu language (`ui_code`, e.g. "pl"), as a new profile gets
+/// it. Without it the Date/Time page stops Setup's hardware phase.
+pub fn timeZoneForUi(ui_code: []const u8) ?[]const u8 {
+    const zone = tables.timeZone(tables.timeZoneForLanguage(tables.languageForUi(ui_code))) orelse return null;
+    return timeZoneName(zone);
+}
+
 /// The time zone keys of Windows 98 SE (TIMEZONE.INF), zones added later
 /// are missing on purpose.
 const windows98_zones = [_][]const u8{
@@ -164,6 +172,12 @@ test "time zones map to the Windows 98 key names or to none" {
     try std.testing.expectEqualStrings("Greenwich", timeZoneName(tables.timeZone("Etc/UTC").?).?);
     // Zones Windows 98 does not know: Setup asks.
     try std.testing.expect(timeZoneName(tables.timeZone("Asia/Kathmandu") orelse tables.timeZone("Pacific/Tongatapu").?) == null);
+}
+
+test "the menu language gives the default 9x time zone" {
+    try std.testing.expectEqualStrings("Central European", timeZoneForUi("pl").?);
+    try std.testing.expectEqualStrings("W. Europe", timeZoneForUi("de").?);
+    try std.testing.expectEqualStrings("Eastern", timeZoneForUi("en").?);
 }
 
 test "MSBATCH.INF carries the profile, CRLF, the key only for 98 and Me" {

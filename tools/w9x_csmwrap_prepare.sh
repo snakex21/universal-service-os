@@ -22,6 +22,15 @@ w9x_csmwrap_value() {
     awk -F= -v key="$1" '{ sub(/\r$/, "") } $1 == key { sub(/^[^=]*=/, ""); print; found=1; exit } END { if (!found) exit 1 }' "$2"
 }
 
+# The USOS default MSBATCH.INF has no TimeZone: the UEFI menu passes the
+# menu language's 9x zone key (request.ini timezone=), inserted after
+# [Setup], so the Date/Time page of Setup's hardware phase does not wait.
+w9x_msbatch_time_zone() {
+    case "$1" in ''|*[!A-Za-z0-9.\ -]*) return 0 ;; esac
+    awk -v tz="$1" '{ print } !done && /^\[[Ss][Ee][Tt][Uu][Pp]\]/ { printf "TimeZone=\"%s\"\r\n", tz; done = 1 }' "$2" > "$2.tz" &&
+        mv "$2.tz" "$2"
+}
+
 usos_w9x_csmwrap_prepare() {
     W9X_DIR=/mnt/esp/EFI/USOS/win9x
     request=$W9X_DIR/request.ini
@@ -93,7 +102,11 @@ usos_w9x_csmwrap_prepare() {
     [ -z "$dos_iso" ] || answer=dos
     case "$answer" in
         dos) : > "$answer_inf" ;;
-        none) cp /mnt/esp/EFI/USOS/dos-native/win9x/MSBATCH.INF "$answer_inf" || stop 'the default MSBATCH.INF is missing' ;;
+        none)
+            cp /mnt/esp/EFI/USOS/dos-native/win9x/MSBATCH.INF "$answer_inf" || stop 'the default MSBATCH.INF is missing'
+            time_zone=$(w9x_csmwrap_value timezone "$request") || time_zone=
+            w9x_msbatch_time_zone "$time_zone" "$answer_inf" || stop 'the time zone could not be added to MSBATCH.INF'
+            [ -z "$time_zone" ] || w9x_csmwrap_log "TIMEZONE $time_zone" ;;
         profile)
             # Rendered by the UEFI menu (answer_profiles.stageWin9x); it may
             # hold a product key: copied to RAM, then every staged copy goes.
