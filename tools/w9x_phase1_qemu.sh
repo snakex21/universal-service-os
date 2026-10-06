@@ -166,6 +166,7 @@ w9x_phase1_tree_ok() {
 #    zero IRQ handle. U9FIX /CSM drops a *vmouse line at every start too.
 #  - CONFIG.SYS: a second HIMEM.SYS line (INSTALL.BAT's fallback line, which
 #    Setup turns into a copy of the first; the VM path no longer writes it).
+#  - MSDOS.SYS without a Logo= line (Me): Logo=0 is added (see below).
 # One output line per removed line; 1 when a file cannot be replaced.
 w9x_phase1_patch_c() {
     for patch_file in WINDOWS/SYSTEM.INI CONFIG.SYS; do
@@ -189,6 +190,18 @@ w9x_phase1_patch_c() {
             rm -f "$patch_path.u9p"
         fi
     done
+    # Me writes its own MSDOS.SYS in the VM (INSTALL.BAT's Logo=0 is 95/98
+    # only): Logo=0 under [Options] for the text start (start messages
+    # visible; the animated logo never got past itself under QEMU OVMF +
+    # CSMWrap, 2026-10-06). Rewritten in place (cat >), so the directory
+    # entry keeps its hidden/system/read-only bits.
+    msdos="$1/MSDOS.SYS"
+    if [ -f "$msdos" ] && grep -qi '^\[options\]' "$msdos" && ! grep -qi '^[ 	]*logo[ 	]*=' "$msdos"; then
+        awk -v BINMODE=3 '{ print } !done && tolower($0) ~ /^\[options\]/ { printf "Logo=0\r\n"; done = 1 }' "$msdos" > "$msdos.u9p" &&
+            cat "$msdos.u9p" > "$msdos" || { rm -f "$msdos.u9p"; echo 'cannot patch MSDOS.SYS'; return 1; }
+        rm -f "$msdos.u9p"
+        echo 'MSDOS.SYS: added Logo=0'
+    fi
     return 0
 }
 
