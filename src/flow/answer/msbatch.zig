@@ -62,6 +62,36 @@ pub fn timeZoneForUi(ui_code: []const u8) ?[]const u8 {
     return timeZoneName(zone);
 }
 
+/// The Windows 95 time zone key for a Windows 98 key: OSR2.1's TIMEZONE.INF
+/// (52 keys) names some zones differently (same TZI) and lacks others (null:
+/// Setup asks). tools/w9x_csmwrap_prepare.sh w9x_release_time_zone mirrors it.
+pub fn timeZoneName95(name98: []const u8) ?[]const u8 {
+    const renamed = [_][2][]const u8{
+        .{ "Central European", "Warsaw" }, .{ "Central Europe", "Prague Bratislava" },
+        .{ "China", "Beijing" },           .{ "SE Asia", "Bangkok" },
+        .{ "Arab", "Saudi Arabia" },
+    };
+    for (renamed) |pair| {
+        if (std.mem.eql(u8, pair[0], name98)) return pair[1];
+    }
+    for (windows95_zones) |known| {
+        if (std.mem.eql(u8, known, name98)) return known;
+    }
+    return null;
+}
+
+/// The Windows 98 keys that Windows 95 OSR2.1 has under the same name.
+const windows95_zones = [_][]const u8{
+    "GMT",          "Romance",        "W. Europe",     "E. Europe",       "E. South America", "Atlantic",
+    "Eastern",      "Central",        "Mountain",      "Pacific",         "Alaskan",          "Hawaiian",
+    "Samoa",        "New Zealand",    "AUS Eastern",   "Cen. Australia",  "Tokyo",            "Taipei",
+    "India",        "Arabian",        "Iran",          "Israel",          "Newfoundland",     "Azores",
+    "Mid-Atlantic", "Greenwich",      "SA Eastern",    "SA Western",      "US Eastern",       "SA Pacific",
+    "Canada Central", "Mexico",       "US Mountain",   "Dateline",        "Fiji",             "Central Pacific",
+    "Tasmania",     "West Pacific",   "AUS Central",   "Central Asia",    "West Asia",        "Afghanistan",
+    "Egypt",        "South Africa",   "Russian",       "E. Australia",
+};
+
 /// The time zone keys of Windows 98 SE (TIMEZONE.INF), zones added later
 /// are missing on purpose.
 const windows98_zones = [_][]const u8{
@@ -100,7 +130,10 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
         try w.writeAll("\"\r\n");
     }
     if (p.timeZone()) |zone| {
-        if (timeZoneName(zone)) |name| try w.print("TimeZone=\"{s}\"\r\n", .{name});
+        if (timeZoneName(zone)) |name98| {
+            const name = if (release == .windows_95) timeZoneName95(name98) else name98;
+            if (name) |n| try w.print("TimeZone=\"{s}\"\r\n", .{n});
+        }
     }
     // An empty field makes Setup show the user page (it needs a key press).
     const org = if (p.org.slice().len > 0) p.org.slice() else "USOS";
@@ -174,6 +207,21 @@ test "time zones map to the Windows 98 key names or to none" {
     try std.testing.expect(timeZoneName(tables.timeZone("Asia/Kathmandu") orelse tables.timeZone("Pacific/Tongatapu").?) == null);
 }
 
+test "Windows 95 time zone keys: renamed, same, or none" {
+    try std.testing.expectEqualStrings("Warsaw", timeZoneName95("Central European").?);
+    try std.testing.expectEqualStrings("Prague Bratislava", timeZoneName95("Central Europe").?);
+    try std.testing.expectEqualStrings("W. Europe", timeZoneName95("W. Europe").?);
+    try std.testing.expectEqualStrings("Eastern", timeZoneName95("Eastern").?);
+    try std.testing.expect(timeZoneName95("GTB") == null);
+    try std.testing.expect(timeZoneName95("Korea") == null);
+    // Every 95 key comes from a 98 key the menu can produce.
+    for (windows95_zones) |name| {
+        var found = false;
+        for (windows98_zones) |known| found = found or std.mem.eql(u8, known, name);
+        try std.testing.expect(found);
+    }
+}
+
 test "the menu language gives the default 9x time zone" {
     try std.testing.expectEqualStrings("Central European", timeZoneForUi("pl").?);
     try std.testing.expectEqualStrings("W. Europe", timeZoneForUi("de").?);
@@ -201,6 +249,7 @@ test "MSBATCH.INF carries the profile, CRLF, the key only for 98 and Me" {
     try std.testing.expect(std.mem.indexOf(u8, ninety_five, "ProductKey") == null and std.mem.indexOf(u8, ninety_five, "ProductID") == null);
     const oem = try render(&p, .windows_95, "12345-oem-0012345-12345", &buffer);
     try std.testing.expect(std.mem.indexOf(u8, oem, "\r\nProductID=\"12345-OEM-0012345-12345\"\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, oem, "\r\nTimeZone=\"Warsaw\"\r\n") != null);
     const retail = try render(&p, .windows_95, "123-4567890", &buffer);
     try std.testing.expect(std.mem.indexOf(u8, retail, "\r\nProductID=\"123-4567890\"\r\n") != null);
     const wrong = try render(&p, .windows_98, "123-4567890", &buffer);

@@ -252,6 +252,72 @@ class U9Fix(unittest.TestCase):
         self.run_fix(files)
         self.assertEqual(files[INI], text)
 
+    def test_95_mode_inserts_the_480_mib_cap_when_missing(self):
+        files = {INI: b'[386Enh]\r\nwoafont=dosapp.fon\r\n[vcache]\r\nMaxFileCache=1\r\n'}
+        st = self.run_fix(files, command=' /95 ' + INI)
+        self.assertEqual(st['exit'], 0)
+        self.assertEqual(files[INI], b'[386Enh]\r\nMaxPhysPage=1E000\r\nwoafont=dosapp.fon\r\n[vcache]\r\nMaxFileCache=1\r\n')
+        self.assertNotIn(TEMP, files)
+        # A second run finds 1E000 and does not write.
+        again = dict(files)
+        st = self.run_fix(again, command=' /95 ' + INI)
+        self.assertEqual((st['exit'], st['writes'], again), (0, 0, files))
+
+    def test_95_mode_replaces_usos_own_40000(self):
+        files = {INI: b'[386Enh]\r\nebios=*ebios\r\nmaxphyspage = 40000\r\nwoafont=dosapp.fon\r\n'
+                      b'[vcache]\r\nMaxFileCache=1\r\n'}
+        st = self.run_fix(files, command=' /95 ' + INI)
+        self.assertEqual(st['exit'], 0)
+        self.assertEqual(files[INI], b'[386Enh]\r\nebios=*ebios\r\nMaxPhysPage=1E000\r\nwoafont=dosapp.fon\r\n'
+                         b'[vcache]\r\nMaxFileCache=1\r\n')
+        again = dict(files)
+        st = self.run_fix(again, command=' /95 ' + INI)
+        self.assertEqual((st['exit'], st['writes'], again), (0, 0, files))
+        # The last line without CR LF.
+        files = {INI: b'[vcache]\r\nMaxFileCache=1\r\n[386Enh]\r\nMaxPhysPage=40000'}
+        self.run_fix(files, command=' /95 ' + INI)
+        self.assertEqual(files[INI], b'[vcache]\r\nMaxFileCache=1\r\n[386Enh]\r\nMaxPhysPage=1E000\r\n')
+
+    def test_95_mode_keeps_a_user_value(self):
+        for value in (b'20000', b'400000', b'40000 ;x'):
+            text = b'[386Enh]\r\nMaxPhysPage=' + value + b'\r\n[vcache]\r\nMaxFileCache=1\r\n'
+            files = {INI: text}
+            st = self.run_fix(files, command=' /95 ' + INI)
+            self.assertEqual((st['exit'], st['writes'], files), (0, 0, {INI: text}))
+        # Outside [386Enh] a 40000 line is not the memory setting.
+        text = b'[386Enh]\r\nMaxPhysPage=20000\r\n[other]\r\nMaxPhysPage=40000\r\n[vcache]\r\nMaxFileCache=1\r\n'
+        files = {INI: text}
+        st = self.run_fix(files, command=' /95 ' + INI)
+        self.assertEqual((st['exit'], st['writes'], files), (0, 0, {INI: text}))
+
+    def test_95_and_csm_together(self):
+        text = (b'[boot]\r\nshell=Explorer.exe\r\ndrivers=mmsystem.dll\r\n[386Enh]\r\n'
+                b'mouse=*vmouse, msmouse.vxd\r\nMaxPhysPage=40000\r\n[vcache]\r\nMaxFileCache=1\r\n')
+        expected = (b'[boot]\r\nshell=Explorer.exe\r\ndrivers=mmsystem.dll usoskey.drv\r\n[386Enh]\r\n'
+                    b'MaxPhysPage=1E000\r\n[vcache]\r\nMaxFileCache=1\r\n')
+        files = {INI: text}
+        st = self.run_fix(files, command=' /95 /CSM ' + INI)
+        self.assertEqual(st['exit'], 0)
+        self.assertEqual(files[INI], expected)
+        again = dict(files)
+        st = self.run_fix(again, command='  /95\t/csm  ' + INI)
+        self.assertEqual((st['exit'], st['writes'], again), (0, 0, files))
+        # No [386Enh] at all: the section comes with the 1E000 line.
+        files = {INI: b'[boot]\r\ndrivers=usoskey.drv\r\n'}
+        self.run_fix(files, command=' /95 /CSM ' + INI)
+        self.assertEqual(files[INI], b'[boot]\r\ndrivers=usoskey.drv\r\n[386Enh]\r\nMaxPhysPage=1E000\r\n'
+                         b'[vcache]\r\nMaxFileCache=262144\r\n')
+        # An option without a file name fails.
+        self.assertEqual(self.run_fix({INI: text}, command=' /95')['exit'], 1)
+        self.assertEqual(self.run_fix({INI: text}, command=' /95 /CSM ')['exit'], 1)
+
+    def test_without_95_the_40000_line_stays(self):
+        text = b'[386Enh]\r\nMaxPhysPage=40000\r\n[vcache]\r\nMaxFileCache=1\r\n'
+        for command in (' ' + INI, ' /CSM ' + INI):
+            files = {INI: text}
+            st = self.run_fix(files, command=command)
+            self.assertEqual((st['exit'], st['writes'], files), (0, 0, {INI: text}))
+
 
 if __name__ == '__main__':
     unittest.main()

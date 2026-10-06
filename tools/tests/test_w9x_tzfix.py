@@ -89,9 +89,9 @@ class Wiring(unittest.TestCase):
         self.assertIn("grep -q 'TimeZone=' \"$answer_inf\"", none)
         self.assertIn('W9X_TIME_ZONE="${time_zone:-}"', text)
 
-    def test_target_writes_tzfix_for_98_only(self):
+    def test_target_writes_tzfix_for_95_and_98_only(self):
         text = (ROOT / 'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')
-        self.assertIn('98SE:?*|98:?*)', text)
+        self.assertIn('98SE:?*|98:?*|95:?*)', text)
         self.assertIn('w9x_tzfix_write "$TIME_ZONE" "$work/c/USOS9X"', text)
         build = (ROOT / 'tools/build_micro_linux.py').read_text(encoding='utf-8')
         self.assertIn('("tools/w9x_tzfix.sh", "usr/lib/usos/w9x_tzfix.sh")', build)
@@ -100,6 +100,7 @@ class Wiring(unittest.TestCase):
         text = (ROOT / 'tools/w9x_csmwrap_target.sh').read_text(encoding='utf-8')
         block = text[text.index('case "$SYSTEM_TAG:$TIME_ZONE" in'):text.index('# The boot floppy runs INSTALL.BAT')]
         for tag, zone, expected in (('98SE', 'Central European', True), ('98', 'Eastern', True),
+                                    ('95', 'Warsaw', True), ('95', 'Eastern', True),
                                     ('ME', 'Central European', False), ('98SE', '', False), ('98SE', 'Pacific', False)):
             tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-tzblock-'))
             self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)

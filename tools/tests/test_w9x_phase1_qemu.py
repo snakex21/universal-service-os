@@ -57,11 +57,11 @@ class Phase1Vm(unittest.TestCase):
     def run_lib(self, body, **extra):
         return sh(f'. "{LIB}"\n{body}', self.env(**extra))
 
-    def test_only_98_98se_and_me_with_qemu_ram_and_no_opt_out(self):
-        for tag in ('98SE', '98', 'ME'):
+    def test_only_9x_with_qemu_ram_and_no_opt_out(self):
+        for tag in ('98SE', '98', 'ME', '95'):
             rc, out, _ = self.run_lib(f'w9x_vm_available {tag}')
             self.assertEqual(rc, 0, out)
-        for tag in ('95', 'DOS', 'W3'):
+        for tag in ('DOS', 'W3'):
             self.assertNotEqual(self.run_lib(f'w9x_vm_available {tag}')[0], 0, tag)
         self.assertNotEqual(self.run_lib('w9x_vm_available 98SE', W9X_VM_QEMU=(self.tmp / 'none').as_posix())[0], 0)
         self.meminfo.write_text('MemTotal:       786432 kB\n', newline='\n')
@@ -74,6 +74,62 @@ class Phase1Vm(unittest.TestCase):
         (self.tmp / 'flags/phase1-native.flag').unlink()
         (self.tmp / 'share/vgabios-stdvga.bin').unlink()
         self.assertNotEqual(self.run_lib('w9x_vm_available 98SE')[0], 0)
+
+    def test_windows_95_key_digits_from_the_answer(self):
+        inf = self.tmp / 'MSBATCH.INF'
+        cases = {
+            b'[Setup]\r\nExpress=1\r\nProductID="12345-oem-0012345-12345"\r\n[NameAndOrg]\r\n': '12345001234512345',
+            b'[Setup]\r\nProductID=123-4567890\r\n': '1234567890',
+            b'[Setup]\r\nProductKey="ABCDE-12345-FGHIJ-67890-KLMNO"\r\n': None,
+            b'[Setup]\r\nExpress=1\r\n[Other]\r\nProductID="12345-OEM-0012345-12345"\r\n': None,
+            b'[Setup]\r\nProductID="12345-OEM-001234-12345"\r\n': None,
+            b'[Setup]\r\nProductID="12345-OEM-0012345-12345;rm"\r\n': None,
+        }
+        for text, digits in cases.items():
+            inf.write_bytes(text)
+            rc, out, _ = self.run_lib(f'w9x_vm_key_digits "{inf.as_posix()}"')
+            if digits is None:
+                self.assertNotEqual(rc, 0, text)
+                self.assertEqual(out, '', text)
+            else:
+                self.assertEqual((rc, out.strip()), (0, digits), text)
+
+    def test_the_key_is_typed_once_idle_and_never_logged(self):
+        if self.run_lib('command -v mkfifo')[0] != 0:
+            self.skipTest('no mkfifo in this sh')
+        # No /sys/block here: the written counter stays 0, i.e. a waiting page;
+        # the fake QEMU draws nothing, so the screen test is replaced.
+        rc, out, err = self.run_lib('w9x_vm_graphics_screen() { return 0; }\nw9x_phase1_run /dev/fake tcg; echo "rc=$?"', W9X_FAKE_SLEEP='12',
+                                    W9X_VM_KEY='98765001234554321', W9X_VM_IDLE='1', W9X_VM_KEY_TRIES='1')
+        self.assertIn('rc=0', out, err)
+        command = (self.tmp / 'run/command.txt').read_text()
+        self.assertIn('key typed: attempt 1', command)
+        self.assertNotIn('key typed: attempt 2', command)
+        for name in ('command.txt', 'monitor.log', 'qemu.log'):
+            path = self.tmp / 'run' / name
+            if path.exists():
+                self.assertNotIn('98765', path.read_text(errors='replace'), name)
+                self.assertNotIn('sendkey', path.read_text(errors='replace'), name)
+        args = (self.tmp / 'args.txt').read_text().splitlines()
+        monitors = [args[i + 1] for i, a in enumerate(args) if a == '-monitor']
+        self.assertEqual([m.rsplit('/', 1)[1] for m in monitors], ['mon', 'key'])
+        # A text-mode screen (DOS) never gets the key.
+        rc, out, err = self.run_lib('w9x_phase1_run /dev/fake tcg; echo "rc=$?"', W9X_FAKE_SLEEP='8',
+                                    W9X_VM_KEY='98765001234554321', W9X_VM_IDLE='1')
+        self.assertIn('rc=0', out, err)
+        self.assertNotIn('key typed', (self.tmp / 'run/command.txt').read_text())
+        for header, graphics in ((b'P6\n720 400\n255\n', False), (b'P6\n640 480\n255\n', True)):
+            (self.tmp / 'hdr.bin').write_bytes(header + b'\0' * 32)
+            body = (f'mkdir -p "$W9X_VM_RUN"\nw9x_vm_monitor() {{ cp "{(self.tmp / "hdr.bin").as_posix()}" "${{1#screendump }}"; }}\n'
+                    'w9x_vm_graphics_screen; echo "g=$?"; ls "$W9X_VM_RUN"')
+            rc, out, err = self.run_lib(body)
+            self.assertIn('g=0' if graphics else 'g=1', out, err)
+            self.assertNotIn('mode.ppm', out)
+        # Without a key nothing is typed and the stall rule is off.
+        self.run_lib('w9x_phase1_run /dev/fake tcg', W9X_FAKE_SLEEP='3', W9X_VM_IDLE='1', W9X_VM_STALL='1')
+        command = (self.tmp / 'run/command.txt').read_text()
+        self.assertNotIn('key typed', command)
+        self.assertNotIn('stalled', command)
 
     def test_tcg_is_the_default_kvm_needs_flag_and_device(self):
         self.assertEqual(self.run_lib('w9x_vm_accel')[1].strip(), 'tcg')
@@ -302,8 +358,21 @@ class TargetVmParts(unittest.TestCase):
     def test_install_bat_adds_p_i_for_the_vm(self):
         lines = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='ascii').splitlines()
         vm = lines.index('IF "%U9VM%"=="1" SET U9SW=%U9SW% /P I')
-        self.assertGreater(vm, lines.index('IF "%U9SYS%"=="95" SET U9SW=/IS'))
+        self.assertGreater(vm, lines.index('IF "%U9SYS%"=="95" SET U9SW=/IS /IW'))
+        # 95 has no ACPI (and its Setup knows no /P I): skipped.
+        self.assertEqual(lines[vm - 1], 'IF "%U9SYS%"=="95" GOTO VMSWOK')
+        self.assertEqual(lines[vm + 1], ':VMSWOK')
         self.assertLess(vm, next(i for i, l in enumerate(lines) if l.startswith('ECHO C:\\%U9SRC%\\SETUP.EXE')))
+
+    def test_install_bat_caps_windows_95_memory_through_u9fix(self):
+        lines = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='ascii').splitlines()
+        fixes = [l for l in lines if 'U9FIX.COM' in l and 'AUTOEXEC.BAT' in l]
+        self.assertEqual(fixes, ['ECHO @C:\\USOS9X\\U9FIX.COM C:\\WINDOWS\\SYSTEM.INI>C:\\AUTOEXEC.BAT',
+                                 'ECHO @C:\\USOS9X\\U9FIX.COM /95 C:\\WINDOWS\\SYSTEM.INI>C:\\AUTOEXEC.BAT',
+                                 'ECHO @C:\\USOS9X\\U9FIX.COM /CSM C:\\WINDOWS\\SYSTEM.INI>>C:\\AUTOEXEC.BAT',
+                                 'ECHO @C:\\USOS9X\\U9FIX.COM /95 /CSM C:\\WINDOWS\\SYSTEM.INI>>C:\\AUTOEXEC.BAT'])
+        self.assertEqual(lines[lines.index(fixes[1]) - 1], ':FIX95')
+        self.assertEqual(lines[lines.index(fixes[3]) - 1], ':CSMFIX95')
 
     def test_install_bat_config_sys_under_csmwrap(self):
         """CREGFIX first (it creates C:\\CONFIG.SYS), one HIMEM line in the VM

@@ -236,7 +236,7 @@ runs that stage in QEMU on the same machine and only the rest on the real hardwa
   stop screen appears and the PC does not restart. Logs go to `EFI\USOS\win9x\phase1\` (command,
   QEMU, SeaBIOS debugcon, monitor, the last screendump, INSTALL.LOG, SETUPLOG/DETLOG).
 * The default is TCG. KVM is used only with `EFI\USOS\win9x\phase1-kvm.flag` and a working
-  `/dev/kvm`. `EFI\USOS\win9x\phase1-native.flag`, less than about 900 MB RAM, 95 or no
+  `/dev/kvm`. `EFI\USOS\win9x\phase1-native.flag`, less than about 900 MB RAM, 95 without a key (section 4h) or no
   qemu9x.cpio keep the old path (DOS Setup on the real PC). Me uses the VM since 2026-10-06 (section 4g).
 * Licence gap before a release: Alpine's QEMU links `libsasl2` (BSD-4-Clause-Attribution), which
   is not GPL-compatible. Milestone 2 replaces the Alpine binaries with our own minimal static
@@ -386,6 +386,48 @@ on the Kingston is still empty, copy it there before the X470 run).
   typed, finish) -> last restart: report whether the desktop appears or the start stops like in QEMU
   (with `Logo=0` the last text line is visible). No USB mouse on Me yet.
 
+## 4h. Windows 95 OSR2.1 through the same UEFI flow (2026-10-06)
+
+Audit of the CSMWrap path for `windows-95` (tag `95`, Setup folder `WIN95`), media: the user's
+`Windows_95_PL_OSR2.1.iso` (4.00.1111, OEM, `ProductType=9`) in DATA `Systems\Windows\Windows 95\Images`
+and the 95 OSR2 startup disk as `Systems\Windows\Windows 95\Boot\BOOTDISK.IMG` (bridge, section 2).
+
+* **Phase 1 in the VM** (new): `w9x_vm_available` takes `95`, but `w9x_csmwrap_prepare.sh` keeps the
+  native start when the answer has no 95 key (`ProductID`). Reason, from the CD's SUWIN.EXE / SETUPX.DLL:
+  * the **licence page** is skipped by Setup's own `/IW` switch (SUWIN looks for `/IW` on its command
+    line before it shows LICENSE.TXT; the DOS stage ignores unknown switches). INSTALL.BAT: `SETUP
+    MSBATCH.INF /IS /IW` for 95, native and VM (95 has no `ShowEula`, and no ACPI: no `/P I`);
+  * the **COA page** (three fields, 5 + 7 + 5 digits, the "-OEM-" part fixed) cannot be answered from
+    MSBATCH.INF on an OEM CD: SUWIN reads `[Setup] ProductID` into its PID block, but for ProductType 9
+    SETUPX's PID builder (export 600) only copies the CD's UPI, so the page always comes (the 2026-09-30
+    finding). The validator (export 601) wants `ddddd-OEM-ddddddd-ddddd` (day 001-366, year 95-99/00-02,
+    the 7-digit block starts with 0, its digit sum divisible by 7). Changing `ProductType` would skip the
+    page, but that bypasses the key check: not done.
+  * So `w9x_phase1_run` types the key: `w9x_vm_key_digits` takes `ProductID` from the answer (OEM: 17
+    digits, retail `ddd-ddddddd`: 10 digits, untested); when the guest writes nothing for 60 s, shows a
+    graphics screen (640x480; DOS text mode dumps as 720x400) and has written less than 64 MB, the digits
+    and Enter go to a **second QEMU monitor** whose output is discarded (the fields move on at 5 / 7
+    digits, Enter = Next). At most 3 attempts; with a key, 30 min without a disk write ends the VM (rc 3).
+    The key never reaches a log: `prepare.log` / `command.txt` show only its length and the attempt time,
+    no screendump is taken while the typed page may still be on screen.
+* **Memory**: Patcher9x 0.9.91 covers 95 (TLB, CPU speed for NTKERN/IOS/ESDI_506/SCSIPORT/NDIS, the memory
+  patch "fix missing parts ... for W95", CR registers, 4G resource); `-select all` on `WIN95` as for 98. No
+  extra CPU-speed fix needed (FIX95CPU would be patched Microsoft files anyway). U9FIX **`/95`** (AUTOEXEC.BAT
+  for 95, native and CSMWrap): `MaxPhysPage=1E000` (480 MiB) when missing and in place of USOS's own `40000`
+  (MSBATCH UpdateInis writes 40000 for every 9x); any other value stays. `MaxFileCache=262144` unchanged.
+* **USB input**: USOSKEY v4 (95 boots real-mode IO.SYS, so the TSR path applies, as on 98) and now
+  `USOSMOUS.DRV` for 95 too (INSTALL.BAT `MOUSEOK`; same Win 4.x 16-bit mouse.drv interface). Untested on 95.
+* **TZFIX / time zone**: 95's SETUPC.INF has the same `RunOnce\Setup` "Strefa czasowa" step
+  (`TIMEDATE.CPL,,/f`); TIMEZONE.INF has 52 keys, some renamed: `Central European` -> `Warsaw`, `Central
+  Europe` -> `Prague Bratislava`, `China` -> `Beijing`, `SE Asia` -> `Bangkok`, `Arab` -> `Saudi Arabia`
+  (same TZI); 12 keys of the menu list are missing (Caucasus, E. Africa, Ekaterinburg, FLE, GTB, Korea,
+  Pacific SA, Singapore, Sri Lanka, Vladivostok, W. Australia, Yakutsk: Setup asks). `w9x_release_time_zone` (menu default) and
+  `msbatch.timeZoneName95` (profiles) map them; TZFIX runs for 95 with `Warsaw` / `Eastern`.
+* **Unchanged / shared**: CREGFIX first in CONFIG.SYS, `Logo=0` / `BootMenu=0` / `BootMenuDefault=1` in
+  MSDOS.SYS (SYS from the OSR2 boot disk), FAT32 (OSR2 SYS writes the FAT32 boot sector), vmdisp9x VESA
+  (its readme lists 95; minimal build target), `w9x_phase1_patch_c` (mouse= line, second HIMEM).
+* **QEMU smoke**: see the run below.
+
 ## 5. Open points
 
 * Own Windows 95 boot environment from the CD's CABs (bridge today).
@@ -394,7 +436,8 @@ on the Kingston is still empty, copy it there before the X470 run).
 * Native USB HID on the X470 (2026-10-06): xhci98 loads and the PCI bus is visible with `/P I`, but HID
   does not work, and once xhci98 owns the controller the USOSKEY bridge dies (no keyboard/mouse in Setup's
   final phase). xhci98/NUSB staging is therefore opt-in: only with `EFI\USOS\win9x\xhci98.flag` (default off).
-* Windows 95: the COA page is not filled from MSBATCH.INF (`ProductID`), the key is typed.
+* Windows 95: the COA page is not filled from MSBATCH.INF (`ProductID`) on OEM CDs; the VM phase 1 types
+  the key from the answer (section 4h), a native start needs it typed.
 * The BIOS mode page renders the profile for all four systems at once; a
   per-system choice would need the system first (UEFI menu entry for 9x).
 

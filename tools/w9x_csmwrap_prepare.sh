@@ -34,9 +34,25 @@ w9x_msbatch_time_zone() {
 # The menu's zone list is 98 SE's TIMEZONE.INF; the Windows 98 CD has every
 # key of it except "Pacific SA" (added in 98 SE). That key does not exist on
 # 98, so it gets no TimeZone / TZFIX for it (Setup asks on its Date/Time page).
+# Windows 95 (OSR2.1 TIMEZONE.INF, 52 keys) names some zones differently and
+# lacks others: the 98 key is mapped to the 95 key with the same TZI, or
+# dropped (Setup asks). src/flow/answer/msbatch.zig timeZoneName95 is the same
+# table for answer profiles.
 w9x_release_time_zone() {
     case "$1:$2" in
         98:'Pacific SA') return 0 ;;
+        95:'Central European') printf 'Warsaw'; return 0 ;;
+        95:'Central Europe') printf 'Prague Bratislava'; return 0 ;;
+        95:China) printf 'Beijing'; return 0 ;;
+        95:'SE Asia') printf 'Bangkok'; return 0 ;;
+        95:Arab) printf 'Saudi Arabia'; return 0 ;;
+        95:GMT|95:Romance|95:'W. Europe'|95:'E. Europe'|95:'E. South America'|95:Atlantic|95:Eastern|95:Central|\
+        95:Mountain|95:Pacific|95:Alaskan|95:Hawaiian|95:Samoa|95:'New Zealand'|95:'AUS Eastern'|95:'Cen. Australia'|\
+        95:Tokyo|95:Taipei|95:India|95:Arabian|95:Iran|95:Israel|95:Newfoundland|95:Azores|95:Mid-Atlantic|\
+        95:Greenwich|95:'SA Eastern'|95:'SA Western'|95:'US Eastern'|95:'SA Pacific'|95:'Canada Central'|95:Mexico|\
+        95:'US Mountain'|95:Dateline|95:Fiji|95:'Central Pacific'|95:Tasmania|95:'West Pacific'|95:'AUS Central'|\
+        95:'Central Asia'|95:'West Asia'|95:Afghanistan|95:Egypt|95:'South Africa'|95:Russian|95:'E. Australia') ;;
+        95:*) return 0 ;;
     esac
     printf '%s' "$2"
 }
@@ -207,6 +223,18 @@ usos_w9x_csmwrap_prepare() {
     if [ -z "$dos_iso" ] && [ -r /usr/lib/usos/w9x_phase1_qemu.sh ]; then
         . /usr/lib/usos/w9x_phase1_qemu.sh
         if vm_reason=$(w9x_vm_available "$tag"); then vm_phase1=yes; fi
+        # Windows 95: the COA page of phase 1 needs the key, typed into the VM
+        # (w9x_phase1_run); never logged, only its length.
+        W9X_VM_KEY=''
+        if [ "$vm_phase1" = yes ] && [ "$tag" = 95 ]; then
+            if W9X_VM_KEY=$(w9x_vm_key_digits "$answer_inf"); then
+                vm_reason="$vm_reason; 95 key from the answer: ${#W9X_VM_KEY} digits for the COA page"
+            else
+                W9X_VM_KEY=''
+                vm_phase1=no
+                vm_reason='Windows 95 without a product key (ProductID) in the answer keeps the native Setup start'
+            fi
+        fi
         w9x_csmwrap_log "PHASE1 vm=$vm_phase1 ($vm_reason)"
     fi
     usos_ui_stage 4 5 'Preparing the disk' "Copying $folder Setup, the USOS helpers and CSMWrap to the selected disk." || true
@@ -232,6 +260,7 @@ usos_w9x_csmwrap_prepare() {
         w9x_csmwrap_log "PHASE1 start target=$TARGET_DEVICE accel=$accel guest_mb=$W9X_VM_GUEST_MB timeout=$W9X_VM_TIMEOUT"
         w9x_phase1_run "$TARGET_DEVICE" "$accel"
         vm_rc=$?
+        W9X_VM_KEY=''
         w9x_csmwrap_log "PHASE1 vm rc=$vm_rc elapsed=${W9X_VM_ELAPSED:-?}s"
         w9x_phase1_keep_logs "$W9X_DIR/phase1"
         usos_ui_stage 5 5 'Checking the result of stage 1' '' || true

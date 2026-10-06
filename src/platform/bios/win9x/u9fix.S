@@ -52,6 +52,15 @@
  * VBMOUSE.EXE next to Windows 98's own PS/2 mouse VxD stops the installed
  * system with a protection error at KERNEL init (docs/win9x-modern-2026-09-30.md).
  *
+ *   U9FIX /95 C:\WINDOWS\SYSTEM.INI
+ *   U9FIX /95 /CSM C:\WINDOWS\SYSTEM.INI
+ *
+ * Windows 95 (unstable above about 480 MiB of RAM): the missing-key line
+ * becomes MaxPhysPage=1E000 (480 MiB), and a [386Enh] MaxPhysPage line whose
+ * value is exactly USOS's own 40000 (MSBATCH.INF's UpdateInis writes it
+ * during Setup for every 9x) is replaced by MaxPhysPage=1E000. Any other
+ * value stays. /95 goes before the other option; options are blank-separated.
+ *
  * No file, a file above 48 KiB or any DOS error: exit code 1, file unchanged.
  * Built with tools/build_win9x_support.py (zig cc, linked at 0100h).
  */
@@ -78,27 +87,44 @@ skip_blank:
     dec si
     cmp byte ptr [si], 0
     je fail
-    /* "/VGA" or "/CSM" (any case) before the file name */
+    /* "/95", "/VGA" or "/CSM" (any case) before the file name */
     mov bp, offset rules
+option_loop:
     cmp byte ptr [si], '/'
     jne file_arg
     mov al, byte ptr [si + 1]
     or al, 0x20
     cmp al, 'c'
-    jne vga_option
+    jne not_csm
     mov byte ptr [csm_mode], 1
-    jmp option_done
+    jmp option_skip
+not_csm:
+    cmp al, '9'
+    jne vga_option
+    mov byte ptr [w95_mode], 1
+    mov word ptr [rules + 8], offset line_mpp95
+    jmp option_skip
 vga_option:
     call vga_rules
-option_done:
-    add si, 4
-vga_blank:
+option_skip:
+    /* the rest of the token, then the blanks after it */
+    lodsb
+    cmp al, 0
+    je fail
+    cmp al, ' '
+    je option_blank
+    cmp al, 9
+    jne option_skip
+option_blank:
     lodsb
     cmp al, ' '
-    je vga_blank
+    je option_blank
+    cmp al, 9
+    je option_blank
     dec si
     cmp byte ptr [si], 0
     je fail
+    jmp option_loop
 file_arg:
     mov word ptr [rule_table], bp
     mov word ptr [name], si
@@ -212,6 +238,11 @@ rule_next:
     jmp rule_loop
 
 rules_done:
+    cmp byte ptr [w95_mode], 0
+    je rules_csm
+    call cap95
+    jc fail
+rules_csm:
     cmp byte ptr [csm_mode], 0
     je rules_write
     call csm_boot
@@ -567,6 +598,103 @@ csm_full:
     stc
     ret
 
+/* cap95: /95 - every [386Enh] MaxPhysPage line whose value is exactly USOS's
+ * own 40000 (MSBATCH.INF's UpdateInis writes it for every 9x) becomes
+ * MaxPhysPage=1E000. Other values stay. CF set when the file would not fit. */
+cap95:
+    cmp word ptr [rule_table], offset rules
+    jne cap_ok                      /* /VGA: not a SYSTEM.INI */
+    mov si, offset sec_386
+    mov cx, 8
+    call find_line
+    jc cap_ok
+    add di, cx
+cap_header:
+    cmp di, word ptr [limit]
+    jae cap_ok
+    mov al, byte ptr [di]
+    inc di
+    cmp al, 10
+    jne cap_header
+    mov word ptr [sec_start], di
+cap_find:
+    mov si, offset key_mpp
+    mov cx, 11
+    call find_key_in_section
+    jc cap_ok
+    mov bx, di                      /* the line start */
+    add di, cx
+    call skip_blanks
+    cmp di, word ptr [limit]
+    jae cap_ok
+    cmp byte ptr [di], '='
+    jne cap_next
+    inc di
+    call skip_blanks
+    mov si, offset val_40000
+    mov cx, 5
+    call match_at
+    jne cap_next
+    add di, cx
+    cmp di, word ptr [limit]
+    jae cap_replace
+    mov al, byte ptr [di]
+    cmp al, 13
+    je cap_replace
+    cmp al, 10
+    je cap_replace
+cap_next:
+    mov di, bx
+cap_next_eol:
+    cmp di, word ptr [limit]
+    jae cap_ok
+    mov al, byte ptr [di]
+    inc di
+    cmp al, 10
+    jne cap_next_eol
+    mov word ptr [sec_start], di
+    jmp cap_find
+cap_replace:
+    mov di, bx
+cap_replace_eol:
+    cmp di, word ptr [limit]
+    jae cap_replace_del
+    mov al, byte ptr [di]
+    inc di
+    cmp al, 10
+    jne cap_replace_eol
+cap_replace_del:
+    mov cx, di
+    sub cx, bx
+    mov di, bx
+    call delete
+    mov si, offset line_mpp95
+    mov cx, 19                      /* "MaxPhysPage=1E000\r\n" */
+    call insert
+    jc cap_full
+    mov word ptr [sec_start], di    /* after the new line */
+    jmp cap_find
+cap_ok:
+    clc
+    ret
+cap_full:
+    stc
+    ret
+
+/* skip_blanks: DI over spaces and tabs, not past limit */
+skip_blanks:
+    cmp di, word ptr [limit]
+    jae skip_done
+    cmp byte ptr [di], ' '
+    je skip_one
+    cmp byte ptr [di], 9
+    jne skip_done
+skip_one:
+    inc di
+    jmp skip_blanks
+skip_done:
+    ret
+
 /* boot_body: DI = the [boot] header line (from find_line, CX its length).
  * sec_start = the line after it (a CR LF is added when the header ends the
  * file). */
@@ -832,6 +960,8 @@ sec_386: .ascii "[386enh]"
 key_mpp: .ascii "maxphyspage"
 line_mpp: .ascii "MaxPhysPage=40000\r\n"
 line_mpp_end:
+line_mpp95: .ascii "MaxPhysPage=1E000\r\n"
+val_40000: .ascii "40000"
 head_386: .ascii "[386Enh]\r\n"
 head_386_end:
 sec_vc: .ascii "[vcache]"
@@ -876,6 +1006,7 @@ line_drivers_len: .word line_drivers_end - line_drivers
 line_mousedrv_len: .word line_mousedrv_end - line_mousedrv
 sec_start: .word 0
 csm_mode: .byte 0
+w95_mode: .byte 0
     .p2align 1
 vga_prefix_len: .word vga_prefix_end - vga_prefix
 vga_model_len: .word vga_model_end - vga_model
