@@ -18,7 +18,10 @@
  *   - drains the ring from a SYSTEM.DRV system timer (20 ms) and calls the
  *     event procedure USER passed to Enable (mouse_event register
  *     interface: AX flags, BX/CX relative mickeys, DX buttons), merging
- *     packets with the same buttons; USER applies speed and acceleration.
+ *     packets with the same buttons, after scaling the movement by
+ *     SYSTEM.INI [usosmous] Multiplier= / Divisor= (default 1/2, with the
+ *     remainder carried, usosmous_scale.h); USER then applies the Control
+ *     Panel speed and acceleration on top.
  * Windows' own PS/2 mouse VxD (*vmouse / VMOUSE) must stay out: next to
  * SeaBIOS's BIOS mouse it stopped the X470 in VPICD (U9FIX /CSM removes
  * the line). Only the Windows desktop gets the mouse; DOS programs and DOS
@@ -29,6 +32,7 @@
  * Built with tools/build_win3_usb_keyboard.py; docs/win9x-modern-2026-09-30.md.
  */
 #include <windows.h>
+#include "usosmous_scale.h"
 
 typedef struct {
     BYTE msExists;
@@ -102,6 +106,8 @@ static KILLTIMER kill_timer;
 static WORD timer;
 static BYTE busy, buttons;
 static RMREGS rm;
+static SCALE scale;
+static int move_x, move_y;          /* DGROUP: -zu, SS is not DS */
 
 static int query_bridge(void)
 {
@@ -196,7 +202,19 @@ static void probe(void)
 
 static void call_event(WORD flags, int dx, int dy)
 {
-    WORD fx = flags, mx = (WORD)dx, my = (WORD)dy;
+    WORD fx, mx, my;
+    move_x = dx;
+    move_y = dy;
+    scale_move(&scale, &move_x, &move_y);
+    dx = move_x;
+    dy = move_y;
+    if (!dx && !dy) {
+        flags &= ~SF_MOVEMENT;
+        if (!flags) return;         /* below one pixel: carried to the next one */
+    }
+    fx = flags;
+    mx = (WORD)dx;
+    my = (WORD)dy;
     _asm {
         pusha
         push ds
@@ -301,6 +319,8 @@ void FAR PASCAL __loadds Enable(FARPROC proc)
     if (!present || !init_timer_procs()) return;
     shared->mtail = shared->mhead;  /* nothing stale */
     buttons = 0;
+    scale_init(&scale, (int)GetPrivateProfileInt("usosmous", "Multiplier", SCALE_MUL_DEFAULT, "SYSTEM.INI"),
+               (int)GetPrivateProfileInt("usosmous", "Divisor", SCALE_DIV_DEFAULT, "SYSTEM.INI"));
     r = bios15(0xC205, 0x0300, 0);
     if (r) { note_error(0x05, r); shared->mstate = MS_NO_MOUSE; return; }
     r = bios15(0xC207, shared->mcb, shared_seg);
