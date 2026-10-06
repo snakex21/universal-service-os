@@ -13,8 +13,9 @@
                 tools/vendor/vmdisp9x, checked against manifest.json)
   VMDISP9X.TXT  their SOURCES.txt + MIT licence
   VMDISP9X.TGZ  the vmdisp9x source archive
-  USOSKEY.COM, USOSKEY.DRV, VBMOUSE.EXE, VBMOUSE.DRV, VBADOS.TXT
-                the USB keyboard bridge (USOS) and VBADOS 0.67 (GPL-2.0+) of
+  USOSKEY.COM, USOSKEY.DRV, USOSMOUS.DRV, VBMOUSE.EXE, VBMOUSE.DRV, VBADOS.TXT
+                the USB keyboard and mouse bridge (USOS; USOSMOUS.DRV: 98 SE
+                mouse.drv) and VBADOS 0.67 (GPL-2.0+) of
                 the MS-DOS support, for installs under CSMWrap
   XHCI98.SYS, XHCI98.INF, XHCI98.TXT
                 xhci98 1.1.1.0-usos3-w9x (GPL-2.0-only, MODIFIED: polling,
@@ -23,7 +24,9 @@
                 in 98 SE under CSMWrap. INSTALL.BAT puts them into the Setup
                 folder only next to STACK.CAB, the cabinet of the user's USB
                 2.0 stack installer (DATA Drivers/Windows 98 SE/USB,
-                tools/w9x_csmwrap_target.sh)
+                tools/w9x_csmwrap_target.sh), and only with the opt-in flag
+                EFI/USOS/win9x/xhci98.flag (default off: on the X470 xhci98
+                takes the controller from the USOSKEY bridge, HID not working)
 
   CREGFIX.SYS, CREGFIX.TXT
                 CREGFIX f0693437 (mintsuki, 0BSD, unmodified,
@@ -31,8 +34,14 @@
                 the first CONFIG.SYS line under CSMWrap (boot floppy and C:),
                 clears the control registers CSMWrap leaves set
 
-Also built, not staged yet (hardware diagnostics, copied by hand):
-  USOSDIAG.COM  timer tick / PIC / PIT, INT 15h memory, INT 13h, HPET report
+Hardware diagnostics, staged (the UEFI path copies them to C:\\USOS9X;
+nothing runs them unless EFI/USOS/win9x/diag.flag exists):
+  USOSDIAG.COM  timer tick / PIC / PIT, INT 15h memory, INT 13h, PCI, VBE, HPET report
+  USOSDBG.EXE   Win16 program for the 9x desktop: USOSKEY bridge counters,
+                V86-vs-physical page map, xHCI and bridge PCI state, live
+                (src/platform/bios/win9x/usosdbg.c, OpenWatcom like USOSKEY.DRV)
+
+Also built, not staged (copied by hand):
   USOSHPET.COM  clears HPET LegacyReplacement (src/platform/bios/win9x/usosdiag.S)
   USOSWHERE.COM TSR: interrupted CS:IP, ticks, PSP and last INT 13h/15h/21h/2Fh
                 AX in the top right corner (src/platform/bios/win9x/usoswhere.S)
@@ -57,13 +66,17 @@ FILES = ('U9FIX.COM', 'U9FIX.TXT', 'USOSVESA.INF', 'VESAMINI.DRV', 'VESAMINI.VXD
          'VMHAL486.DLL', 'VMDISP9X.DLL', 'VMDISP9X.TXT') + (
     # Under CSMWrap: the Windows 3.x USB keyboard bridge and VBADOS work in
     # Windows 9x too (copied from the MS-DOS support, built before this).
-    'USOSKEY.COM', 'USOSKEY.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT') + (
+    'USOSKEY.COM', 'USOSKEY.DRV', 'USOSMOUS.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT') + (
     # Under CSMWrap: CONFIG.SYS loads it first (dos_native_iso.zig, INSTALL.BAT).
     'CREGFIX.SYS',)
-BRIDGE = ('USOSKEY.COM', 'USOSKEY.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT')
+BRIDGE = ('USOSKEY.COM', 'USOSKEY.DRV', 'USOSMOUS.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT')
 # Everything on the stick (the payload list and the release check use it).
 STAGED = FILES + ('MSBATCH.INF', 'VMDISP9X.TGZ', 'XHCI98.SYS', 'XHCI98.INF', 'XHCI98.TXT',
-                   'CREGFIX.TXT')
+                   'CREGFIX.TXT') + (
+    # Hardware diagnostics: on the stick, so the UEFI path's target writer
+    # (tools/w9x_csmwrap_target.sh) puts them into C:\USOS9X; nothing runs
+    # them unless EFI/USOS/win9x/diag.flag exists (USOSDIAG BOOT, INSTALL.BAT).
+    'USOSDIAG.COM', 'USOSDBG.EXE')
 
 NOTICE = """U9FIX.COM - USOS helper for Windows 95/98/Me
 Copyright (C) 2026 Maksymilian and the USOS Authors.
@@ -121,8 +134,8 @@ def build_diag(out: Path, work: Path) -> None:
                         str(obj), '-o', str(elf)], env=env, check=True)
         subprocess.run([zig, 'objcopy', '-O', 'binary', str(elf), str(com)], env=env, check=True)
         data = com.read_bytes()
-        # Scratch buffers start at 6F00h (E820/EDD) and 7000h (output).
-        if not 0 < len(data) <= 0x6f00 - 0x100 or b'DIAG.LOG' not in data or name.encode() not in data:
+        # Scratch buffers start at 6A00h (VBE), 6F00h (E820/EDD) and 7000h (output).
+        if not 0 < len(data) <= 0x6a00 - 0x100 or b'DIAG.LOG' not in data or name.encode() not in data:
             raise ValueError('unexpected %s.COM layout' % name)
     obj, elf, com = work / 'USOSWHERE.o', work / 'USOSWHERE.elf', out / 'USOSWHERE.COM'
     subprocess.run([zig, 'cc', '-target', 'x86-freestanding-none', '-mcpu=i386', '-c',
@@ -133,6 +146,29 @@ def build_diag(out: Path, work: Path) -> None:
     data = com.read_bytes()
     if not 0 < len(data) <= 2048 or data[0] != 0xE9 or b'USOSWHR1' not in data:
         raise ValueError('unexpected USOSWHERE.COM layout')
+
+
+def build_usosdbg(out: Path, work: Path) -> Path:
+    """USOSDBG.EXE: Win16 (OpenWatcom wcc/wlink as USOSKEY.DRV, no runtime)."""
+    import sys
+    sys.path.insert(0, str(ROOT / 'tools'))
+    from build_win3_usb_keyboard import openwatcom
+    ow = openwatcom()
+    env = dict(os.environ, WATCOM=str(ow), INCLUDE=f'{ow / "h"};{ow / "h/win"}',
+               PATH=str(ow / 'binnt64') + os.pathsep + os.environ.get('PATH', ''))
+    obj = work / 'usosdbg.obj'
+    subprocess.run([str(ow / 'binnt64/wcc.exe'), '-q', '-bt=windows', '-ms', '-zl', '-s', '-3', '-osi',
+                    '-w3', '-we', '-fo=' + str(obj), str(SOURCE / 'usosdbg.c')], env=env, check=True, cwd=work)
+    exe = out / 'USOSDBG.EXE'
+    subprocess.run([str(ow / 'binnt64/wlink.exe'), '@' + str(SOURCE / 'usosdbg.lnk'), 'file', str(obj),
+                    'name', str(exe), 'option', 'map=' + str(work / 'usosdbg.map')], env=env, check=True, cwd=work)
+    data = exe.read_bytes()
+    ne = int.from_bytes(data[0x3c:0x3e], 'little')
+    if data[ne:ne + 2] != b'NE' or b'USOSDBG.LOG' not in data:
+        raise ValueError('USOSDBG.EXE is not the expected NE program')
+    if 'clib' in (work / 'usosdbg.map').read_text(errors='replace').lower():
+        raise ValueError('USOSDBG.EXE must not link the OpenWatcom C library')
+    return exe
 
 
 def stage_vmdisp9x(out: Path) -> None:
@@ -150,6 +186,8 @@ def stage_vmdisp9x(out: Path) -> None:
     for name in VMDISP_FILES:
         if f'\n{name}=1' not in inf:
             raise ValueError('usosvesa.inf does not list ' + name)
+    if '\nHKLM,Software\\vmdisp9x\\vesa,NoMemTest,,"1"' not in inf:
+        raise ValueError('usosvesa.inf must set NoMemTest="1" (real-hardware VRAM sizing)')
     (out / 'USOSVESA.INF').write_bytes(dos_text(inf))
 
 
@@ -166,7 +204,8 @@ def stage_xhci98(out: Path) -> None:
               'Corresponding source: the USOS sources zip (tools/vendor/xhci98/1.1.1.0-src\n'
               'and tools/vendor/xhci98/1.1.1.0-usos3-w9x).\n'
               'USOS copies XHCI98.SYS/.INF into the 98 SE Setup folder only together with\n'
-              "STACK.CAB, the cabinet of the user's USB 2.0 stack installer (NUSB).\n\n" % (
+              "STACK.CAB, the cabinet of the user's USB 2.0 stack installer (NUSB), and only\n"
+              'with the opt-in flag file EFI/USOS/win9x/xhci98.flag (default off).\n\n' % (
                   manifest['version'], manifest['upstream'], manifest['tag'], manifest['commit'],
                   manifest['source_archive']['sha256'], ', '.join(sorted(manifest['patches']))))
     notice += (XHCI98 / 'MODIFIED.txt').read_text(encoding='ascii') + '\n' + '-' * 72 + '\n\n' + \
@@ -197,6 +236,7 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
     work.mkdir(parents=True, exist_ok=True)
     build_u9fix(out, work)
     build_diag(out, work)
+    build_usosdbg(out, work)
     (out / 'U9FIX.TXT').write_bytes(dos_text(NOTICE))
     answer = (SOURCE / 'msbatch.inf').read_text(encoding='ascii')
     if 'ProductKey' in answer:

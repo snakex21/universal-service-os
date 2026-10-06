@@ -1,0 +1,57 @@
+"""The USOS default MSBATCH.INF gets the menu language's 9x time zone
+(request.ini timezone=, tools/w9x_csmwrap_prepare.sh w9x_msbatch_time_zone),
+so Setup's Date/Time page does not wait for a click. Host only (Git sh)."""
+from pathlib import Path
+import shutil
+import sys
+import tempfile
+import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_w9x_phase1_qemu import sh
+
+ROOT = Path(__file__).resolve().parents[2]
+PREPARE = (ROOT / 'tools/w9x_csmwrap_prepare.sh').as_posix()
+DEFAULT = ROOT / 'src/platform/bios/win9x/msbatch.inf'
+
+
+class MsbatchTimeZone(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-tz-'))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.inf = self.tmp / 'MSBATCH.INF'
+        self.inf.write_bytes(DEFAULT.read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
+
+    def run_tz(self, zone):
+        script = f'. "{PREPARE}"\nw9x_msbatch_time_zone "$TZ_VALUE" "{self.inf.as_posix()}"'
+        rc, out, err = sh(script, {'TZ_VALUE': zone})
+        self.assertEqual(rc, 0, err)
+        return self.inf.read_bytes()
+
+    def test_zone_goes_right_after_setup(self):
+        # Git's awk on Windows drops the CRs of the input lines; busybox awk
+        # in the micro-Linux keeps them. The inserted line is always CRLF.
+        text = self.run_tz('Central European')
+        self.assertIn(b'TimeZone="Central European"\r\n', text)
+        lines = text.replace(b'\r\n', b'\n').split(b'\n')
+        at = lines.index(b'[Setup]')
+        self.assertEqual(lines[at + 1:at + 3], [b'TimeZone="Central European"', b'Express=1'])
+        self.assertEqual(text.count(b'TimeZone='), 1)
+
+    def test_no_or_unsafe_zone_leaves_the_file(self):
+        before = self.inf.read_bytes()
+        self.assertEqual(self.run_tz(''), before)
+        self.assertEqual(self.run_tz('a"b'), before)
+        self.assertEqual(self.run_tz('x;rm'), before)
+
+    def test_prepare_uses_it_only_for_the_default_answer(self):
+        text = Path(PREPARE).read_text(encoding='utf-8')
+        none = text[text.index('        none)'):text.index('        profile)')]
+        self.assertIn('w9x_csmwrap_value timezone "$request"', none)
+        self.assertIn('w9x_msbatch_time_zone "$time_zone" "$answer_inf"', none)
+        # The default file itself stays without a zone (BIOS mode, other languages).
+        self.assertNotIn(b'TimeZone', DEFAULT.read_bytes())
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -55,7 +55,7 @@ IF ERRORLEVEL 1 GOTO FAILED
 COPY /Y A:\U9FIX.TXT C:\USOS9X >NUL
 IF ERRORLEVEL 1 GOTO FAILED
 COPY /Y A:\VMDISP9X.TXT C:\USOS9X >NUL
-FOR %%F IN (USOSKEY.COM USOSKEY.DRV VBMOUSE.EXE VBMOUSE.DRV VBADOS.TXT CREGFIX.SYS) DO COPY /Y A:\%%F C:\USOS9X >NUL
+FOR %%F IN (USOSKEY.COM USOSKEY.DRV USOSMOUS.DRV VBMOUSE.EXE VBMOUSE.DRV VBADOS.TXT CREGFIX.SYS) DO COPY /Y A:\%%F C:\USOS9X >NUL
 :COPYDONE
 REM Step markers for a hang on real hardware: the last line shows the step.
 ECHO start %U9SYS% (U9CSM=%U9CSM% U9DISK=%U9DISK% U9VM=%U9VM%)>>C:\USOS9X\INSTALL.LOG
@@ -75,6 +75,10 @@ REM C:\USOS9X\USB\STACK.CAB). XHCI98.INF takes usbport.sys/usbhub20.sys from
 REM that cabinet (LZX: Setup unpacks it, DOS EXTRACT cannot) and binds the
 REM controller and the USB 2.0 root hub, so Setup's device detection installs
 REM them and the HID devices without a prompt. No stack: bridge only.
+REM Opt-in (U9USB=1, EFI\USOS\win9x\xhci98.flag): on the X470 xhci98 takes
+REM the controller from SeaBIOS, the bridge dies and native HID does not
+REM work yet. Default: bridge only, XHCI98.* never reaches the Setup folder.
+IF NOT "%U9USB%"=="1" GOTO USBDONE
 IF NOT "%U9CSM%"=="1" GOTO USBDONE
 IF NOT "%U9SYS%"=="98SE" GOTO USBDONE
 IF NOT EXIST C:\USOS9X\USB\STACK.CAB GOTO USBDONE
@@ -112,15 +116,27 @@ GOTO AUTODONE
 REM No firmware CSM: USB keyboard (USOSKEY bridge) in Windows through the
 REM SeaBIOS services; U9FIX /CSM adds its driver. No VBADOS mouse: VBMOUSE.EXE
 REM next to the PS/2 mouse VxD of the installed system stops Windows.
+REM USB mouse: USOSMOUS.DRV (mouse.drv=) on USOSKEY.COM's mouse ring, 98 SE
+REM only so far. U9FIX /CSM names it once it is in C:\WINDOWS\SYSTEM, so the
+REM drivers are copied before U9FIX runs.
 IF NOT EXIST C:\USOS9X\USOSKEY.DRV GOTO FAILED
-ECHO @C:\USOS9X\U9FIX.COM /CSM C:\WINDOWS\SYSTEM.INI>C:\AUTOEXEC.BAT
+IF "%U9SYS%"=="98SE" GOTO MOUSEOK
+IF EXIST C:\USOS9X\USOSMOUS.DRV DEL C:\USOS9X\USOSMOUS.DRV
+:MOUSEOK
+ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\NUL GOTO USOSDRV>C:\AUTOEXEC.BAT
+ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\USOSKEY.DRV COPY C:\USOS9X\*.DRV C:\WINDOWS\SYSTEM>>C:\AUTOEXEC.BAT
+ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\USOSMOUS.DRV IF EXIST C:\USOS9X\USOSMOUS.DRV COPY C:\USOS9X\USOSMOUS.DRV C:\WINDOWS\SYSTEM>>C:\AUTOEXEC.BAT
+ECHO :USOSDRV>>C:\AUTOEXEC.BAT
+ECHO @C:\USOS9X\U9FIX.COM /CSM C:\WINDOWS\SYSTEM.INI>>C:\AUTOEXEC.BAT
 REM A restart before Setup copied Windows (hang, power loss): RESUME.BAT,
 REM written once Patcher9x succeeded, starts Setup again.
 ECHO @IF NOT EXIST C:\WINDOWS\WIN.COM IF EXIST C:\USOS9X\RESUME.BAT CALL C:\USOS9X\RESUME.BAT>>C:\AUTOEXEC.BAT
-ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\NUL GOTO USOSDRV>>C:\AUTOEXEC.BAT
-ECHO @IF NOT EXIST C:\WINDOWS\SYSTEM\USOSKEY.DRV COPY C:\USOS9X\*.DRV C:\WINDOWS\SYSTEM>>C:\AUTOEXEC.BAT
-ECHO :USOSDRV>>C:\AUTOEXEC.BAT
 ECHO @C:\USOS9X\USOSKEY.COM>>C:\AUTOEXEC.BAT
+REM Real-hardware report before every Windows start (C:\USOS9X\DIAG.LOG):
+REM off by default, only with EFI\USOS\win9x\diag.flag (U9DIAG=1).
+IF NOT "%U9DIAG%"=="1" GOTO DIAGDONE
+ECHO @IF EXIST C:\USOS9X\USOSDIAG.COM C:\USOS9X\USOSDIAG.COM BOOT>>C:\AUTOEXEC.BAT
+:DIAGDONE
 REM The DOS KEYB TSR that Setup adds at the end of AUTOEXEC.BAT stops the
 REM installed Windows with a protection error next to the bridge (QEMU
 REM OVMF bisect): it is renamed to KEYB.USO before it would load. Windows

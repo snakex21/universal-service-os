@@ -2,7 +2,8 @@
 ; MODIFIED by the USOS Authors on 2026-09-30 from vmdisp9x.inf of vmdisp9x 1.2025.0.119
 ; (https://github.com/JHRobotics/vmdisp9x, MIT licence, VMDISP9X.TXT): only the VESA
 ; model is kept (any PCI display class device), the virtual-machine adapters,
-; OpenGL and 3D entries are removed. Files are unmodified upstream binaries.
+; OpenGL and 3D entries are removed; NoMemTest="1" is added (2026-10-06, real
+; hardware). Files are unmodified upstream binaries.
 ; Copyright 2012-2022, The OS/2 Museum; 2023-2025, Jaroslav Hensl.
 
 [version]
@@ -129,6 +130,10 @@ HKR,"MODES\32\1680,1050"
 HKR,"MODES\32\1920,1080"
 HKR,"MODES\32\1920,1200"
 HKLM,Software\vmdisp9x\vesa,VRAMLimit,,128
+; No VRAM read-back test at boot: on a real card (RX 560 under CSMWrap) it
+; shrank the VRAM size below what 1024x768 and up need, and DIBENG faulted
+; (exception 0D) after a mode change (docs/win9x-modern-2026-09-30.md).
+HKLM,Software\vmdisp9x\vesa,NoMemTest,,"1"
 
 [Strings]
 Mfg="JHRobotics (vmdisp9x, via USOS)"

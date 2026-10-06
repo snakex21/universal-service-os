@@ -320,7 +320,10 @@ fn start(
             answer_profiles.stageWin9x(root, p) catch |err| return showError(view.t(.error_preparation), err);
             request_answer = .profile;
         } else if (unattended) |name| request_answer = .{ .file = name };
-        win9x.writeRequest(root, system.id, system.name, system.image_directory, image.name.slice(), request_answer) catch |err| return showError(view.t(.error_preparation), err);
+        // No answer chosen: the USOS default MSBATCH.INF gets the menu
+        // language's time zone (else the Date/Time page waits for a click).
+        const time_zone = usos.flow.answer.msbatch.timeZoneForUi(view.languageCode());
+        win9x.writeRequest(root, system.id, system.name, system.image_directory, image.name.slice(), request_answer, time_zone) catch |err| return showError(view.t(.error_preparation), err);
         view.vistaCsmwrapStatus(.loading, usos.flow.preparation_boot_progress.VistaCsmwrapStage.loading_detail, vista_csmwrap_heading);
         @import("vista_preparation.zig").startWin9x(root) catch |err| {
             view.refreshFramebuffer();

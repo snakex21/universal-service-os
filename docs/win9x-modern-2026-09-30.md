@@ -56,6 +56,21 @@ the key page. USB keyboard in the USOS BIOS menu and in DOS worked in
 all CSMWrap runs (SeaBIOS INT 16h). VESA driver: prepared (INF + IDs,
 unit-tested), not yet seen on a desktop (the desktop run predates it).
 
+VESA on the RX 560 (2026-10-06): 640x480x16 works; switching to 1024x768 gives
+exception 0D at 0377:3F2F (DIBENG fill). In vmdisp9x 1.2025.0.119 the VXD sizes
+VRAM once at boot as VBE TotalMemory*64K (capped by `VRAMLimit` MB) and then
+shrinks it to the first read-back mismatch of a full VRAM pattern test unless
+`NoMemTest`=1. The 16-bit selector given to DIBENG is built from that size once
+and never resized. A mode change does not check that the new surface fits:
+without a working 4F07 flip, GDI draws at offset `stride`, so 2*pitch*height
+must fit. `HKLM\Software\vmdisp9x\vesa` also reads `MTRR` (no effect in 119),
+`DosWindowSetMode` and `HWDoubleBuffer` (0/1/2; 1 and 2 both fall back to a
+plain 4F07 test). 119 is the latest release. Upstream master (unreleased,
+2026-05 "new vram management", "VESA: real HW fixes") draws into a RAM shadow
+buffer instead. USOSDIAG 1.3 logs the VGA BARs and the VBE mode table ("need"
+= pitch*height, ">MEM" past TotalMemory) for the diagnosis. BIOSTAR test disk:
+one-time `C:\USOS9X\VESAFIX.BAT` sets `NoMemTest`="1" (backup `SYSTEM.VB`/`USER.VB`). Since 2026-10-06 USOSVESA.INF sets it by default (section 4e).
+
 ## 4. X470 test plan (CSM off, Secure Boot off, spare SATA disk; USB keyboard and mouse only, no PS/2)
 
 0. Where to start (2026-10-03, after the X470 report "98 SE is locked"): in the UEFI menu
@@ -149,6 +164,19 @@ flow (FreeDOS, PC DOS, NT 4.0, betas) show "Unavailable".
   error at KERNEL init (bisected on the disk). The CSMWrap bridge is now
   keyboard-only (U9FIX /CSM adds only usoskey.drv). **A USB mouse in the
   installed Windows 9x under CSMWrap is open** (planned: a VxD-level mouse).
+* 98 SE USB mouse, 2026-10-06 (**untested on the X470**): `USOSMOUS.DRV`
+  (`[boot] mouse.drv=usosmous.drv`, clean-room Win16 mouse driver, module
+  MOUSE) registers USOSKEY.COM's resident callback with INT 15h C205h/C207h/
+  C200h through DPMI 0300h on Enable; SeaBIOS far-calls it per packet, the TSR
+  queues packets in the shared block (version 4, +396), the driver drains them
+  from a 20 ms system timer into USER's event procedure. `[386Enh]` stays
+  without `*vmouse`. U9FIX /CSM writes the `mouse.drv=` line only when
+  `SYSTEM\USOSMOUS.DRV` exists (98 SE only); USOSDBG 1.2 shows MOUSE lines.
+  QEMU, plain SeaBIOS, i8042 PS/2 mouse (same BIOS callback path, IRQ 12
+  instead of the USB poll): pointer moves and a click opens the Start menu.
+  The USB source itself is not covered in QEMU (plain SeaBIOS hangs in SMM,
+  without SMM it cannot poll xHCI from V86; CSMWrap from an extra ESP disk
+  returns Unsupported in the OVMF shell). Revert: `mouse.drv=mouse.drv`.
 * 98 SE end to end (QEMU OVMF, 2026-10-04): the user's key typed in the wizard, hardware setup, final
   restart, **desktop with the USB keyboard** (`uefi-98se-desktop-usb-keyboard.png`). Second finding: the
   DOS `KEYB` TSR that Setup appends to AUTOEXEC.BAT, loaded after USOSKEY.COM, also stops Windows with a
@@ -214,11 +242,54 @@ runs that stage in QEMU on the same machine and only the rest on the real hardwa
   is not GPL-compatible. Milestone 2 replaces the Alpine binaries with our own minimal static
   build (no VNC/SASL/Xen/slirp).
 
+## 4e. 98 SE on the X470: hardware results folded in (2026-10-06)
+
+X470 (CSMWrap, 98 SE PL OEM, phase 1 in the VM): USB keyboard fully works (USOSKEY v3), USB mouse
+works (move, clicks, drag; USOSMOUS.DRV) but was far too fast with a Logitech G502, 1920x1080 16bpp
+works once `NoMemTest`="1" is set. Now the default for fresh installs:
+
+* **VESA**: `USOSVESA.INF` adds `HKLM\Software\vmdisp9x\vesa NoMemTest="1"` next to `VRAMLimit`
+  (no VESAFIX.BAT any more); `build_win9x_support.py` refuses an INF without it.
+* **Mouse speed**: USOSMOUS.DRV scales every movement by `SYSTEM.INI [usosmous] Multiplier=` /
+  `Divisor=` (default 1 / 2, limits 1..4 / 1..16) with the remainder carried per axis (dropped when
+  the direction turns), `src/platform/win3/usosmous_scale.h`, host-tested. USER then applies the
+  Control Panel speed and acceleration as before. Slower: `Divisor=3` or `4`; faster: `Divisor=1`.
+* **Date/Time page**: with no answer chosen (`answer=none`) the UEFI menu writes the menu language's
+  9x zone key into `request.ini` (`timezone=Central European` for Polish, `msbatch.timeZoneForUi`)
+  and `w9x_csmwrap_prepare.sh` puts `TimeZone="..."` into `[Setup]` of the default MSBATCH.INF
+  (MSBATCH TimeZone, Windows 98 Resource Kit appendix D; key names from the CD's TIMEZONE.INF).
+  Profiles already carry their zone; a user file is copied 1:1. The BIOS-mode path (no UEFI request)
+  still uses the default file without a zone.
+* **Diagnostics**: `USOSDIAG.COM` and `USOSDBG.EXE` are on the stick and in `C:\USOS9X`, but nothing
+  runs them; `EFI\USOS\win9x\diag.flag` (U9DIAG=1) adds `USOSDIAG BOOT` to AUTOEXEC.BAT.
+* Unchanged and checked: USOSKEY v4 (.COM + .DRV), `mouse.drv=usosmous.drv` (98 SE), no `*vmouse`,
+  xhci98 opt-in only, CREGFIX first in CONFIG.SYS, no second HIMEM line after the VM phase, APM left
+  on (APM off was only a keyboard debugging step).
+* **Known limit**: USB mouse hotplug does not work (SeaBIOS enumerates USB at boot); plug the mouse in
+  before the start.
+
+Still manual (needs a click or a key) in a fresh hands-off 98 SE run:
+
+* **OEM first-run pages** (user information, licence, product key, finish): on the OEM CD these are
+  SETUPX's first-run screens (`FirstRunScreens` in SETUPX.DLL, driven by `ProductType`=9 from
+  SETUPPP.INF; OPK audit files `C:\WINDOWS\OPTIONS\OEMAUDIT.INF` / `EndUser.INF` with
+  `[Dialog_Display]`), not MSBATCH pages: `Display=0`/`ShowEula=0` do not hide them, a profile key
+  only pre-fills the key page. No documented MSBATCH key removes them; changing `ProductType` was not
+  tried (it changes the key validation). The bridge keyboard/mouse answer them.
+* **Add New Hardware for the monitor**: vmdisp9x's `DDC`=1 lets 98 enumerate the EDID monitor
+  (`Monitor\<PnP id>`); MONITOR.INF matches it only through the compatible id `*PNP09FF`, so 98 asks
+  for a better driver. Planned: read the PnP id from the UEFI EDID protocol (EDID Active/Discovered on
+  the GOP handle, bytes 8-11), pass it in `request.ini` and add a USOS monitor INF with that hardware
+  id next to Setup. `DDC`=0 is no option (Unknown Monitor caps at 640x480).
+
 ## 5. Open points
 
 * Own Windows 95 boot environment from the CD's CABs (bridge today).
 * Own 9x AHCI port driver. xhci98 for 98 SE: built with WDK 7.1 (section 4c); Me untested.
 * Windows 98 SE under CSMWrap enumerates no PCI bus although the PCI BIOS answers (section 4c).
+* Native USB HID on the X470 (2026-10-06): xhci98 loads and the PCI bus is visible with `/P I`, but HID
+  does not work, and once xhci98 owns the controller the USOSKEY bridge dies (no keyboard/mouse in Setup's
+  final phase). xhci98/NUSB staging is therefore opt-in: only with `EFI\USOS\win9x\xhci98.flag` (default off).
 * Windows 95: the COA page is not filled from MSBATCH.INF (`ProductID`), the key is typed.
 * The BIOS mode page renders the profile for all four systems at once; a
   per-system choice would need the system first (UEFI menu entry for 9x).
