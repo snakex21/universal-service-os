@@ -426,7 +426,18 @@ and the 95 OSR2 startup disk as `Systems\Windows\Windows 95\Boot\BOOTDISK.IMG` (
 * **Unchanged / shared**: CREGFIX first in CONFIG.SYS, `Logo=0` / `BootMenu=0` / `BootMenuDefault=1` in
   MSDOS.SYS (SYS from the OSR2 boot disk), FAT32 (OSR2 SYS writes the FAT32 boot sector), vmdisp9x VESA
   (its readme lists 95; minimal build target), `w9x_phase1_patch_c` (mouse= line, second HIMEM).
-* **QEMU smoke**: see the run below.
+* **QEMU smoke (one install, 2026-10-06)**: nested micro-Linux (initramfs-usos + qemu9x.cpio, this branch's
+  scripts; 95 OSR2.1 PL + the OSR2 boot disk, 2 GiB target, profile-style MSBATCH with the user's OEM key,
+  `TimeZone="Warsaw"`): `KEY digits=17`; INSTALL.LOG `SETUP start /IS /IW`; the key was typed at 160 s,
+  238 s and 341 s (three idle graphics pages: before, on and after the COA page); `RUN_RC=0` after 544 s,
+  verify PASS (`SYSTEM.INI: removed mouse=*vmouse, msmouse.vxd`); AUTOEXEC.BAT `U9FIX.COM /95 /CSM`, TZFIX
+  hook, USOSKEY.COM; MSDOS.SYS `Logo=0`, `BootMenu=0`, `BootMenuDefault=1`. Then OVMF -> the disk's
+  CSMWrap ESP -> "getting ready for the first time" -> **Windows logon dialog** (typed on the **USB keyboard**
+  through the bridge, empty password confirmed) -> no Date/Time step -> **Add Printer wizard** (Esc) ->
+  **Windows 95 desktop** with the Welcome window (clock in local time). No key or key-bearing disk kept.
+* **Still manual on a hands-off 95 run**: the Windows logon/password dialog (Enter twice; a 95 logon
+  without network clients still shows it), the Add Printer wizard (Esc/Anuluj; an empty MSBATCH
+  `[Printers]` section may skip it, untested), the Welcome window (USOS.NoWelcome is not honoured on 95).
 
 ## 5. Open points
 
