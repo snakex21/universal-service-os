@@ -700,7 +700,18 @@ AhciFindAdapter(
     ConfigInfo->SystemIoBusNumber = targetBus;
     ConfigInfo->SlotNumber = targetSlot;
 
-#ifdef AHCI_NT4
+#if defined(AHCI_NT4) && !defined(AHCI_W9X)
+    /* MODIFIED (USOS 1.3.0.0-usos4, NT 4.0 build, 0006): no interrupt.
+       Every command completes inside HwStartIo (Fast Polling, GHC.IE and
+       PxIE stay off), so ScsiPort needs no interrupt object. NT 4.0
+       ScsiPort runs an adapter without one when level and vector are 0.
+       Upstream took INTx from config space; under UEFI + CSMWrap (likely
+       no MP-table PCI interrupt entry for the HBA) ScsiPort
+       dropped the adapter after HwFindAdapter (QEMU OVMF +
+       CSMWrap 2026-10-07: STOP 0x7B, HwInitialize never called). */
+    ConfigInfo->BusInterruptLevel = 0;
+    ConfigInfo->BusInterruptVector = 0;
+#elif defined(AHCI_NT4)
     /* When the miniport picks the slot itself, NT4 ScsiPort does not look
        up the interrupt for it -- take INTx from config space. */
     ConfigInfo->BusInterruptLevel = pciConfig.u.type0.InterruptLine;

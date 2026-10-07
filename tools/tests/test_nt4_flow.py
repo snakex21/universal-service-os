@@ -46,7 +46,8 @@ class Nt4Vm(unittest.TestCase):
     def test_boot_ini_options(self):
         ini = '[boot loader]\r\ntimeout=30\r\ndefault=multi(0)disk(0)rdisk(0)partition(1)\\WINNT\r\n[operating systems]\r\n' \
               'multi(0)disk(0)rdisk(0)partition(1)\\WINNT="Windows NT Workstation 4.0"\r\n' \
-              'multi(0)disk(0)rdisk(0)partition(1)\\WINNT="Windows NT Workstation 4.0 [VGA]" /basevideo /sos\r\n'
+              'multi(0)disk(0)rdisk(0)partition(1)\\WINNT="Windows NT Workstation 4.0 [VGA]" /basevideo /sos\r\n' \
+              'C:\\ = "Nierozpoznany system operacyjny na dysku C"\r\n'
         (self.tmp / 'boot.ini').write_bytes(ini.encode('ascii'))
         rc, out, err = sh(f'. "{VM}"; . "{NT4}"; nt4_boot_ini < "{(self.tmp / "boot.ini").as_posix()}" > "{(self.tmp / "out.ini").as_posix()}"')
         self.assertEqual(rc, 0, err)
@@ -57,6 +58,19 @@ class Nt4Vm(unittest.TestCase):
         # default= is not an ARC line with options.
         self.assertIn('default=multi(0)disk(0)rdisk(0)partition(1)\\WINNT\r\n', text)
         self.assertEqual(text.count('/NUMPROC'), 2)
+        # The C:\ entry (BOOTSECT.DOS = the syslinux boot sector) is dropped.
+        self.assertNotIn('C:\\', text)
+
+    def test_ci_path_finds_lower_case_nt_names(self):
+        root = self.tmp / 'c'
+        (root / 'winnt' / 'system32').mkdir(parents=True)
+        (root / 'winnt' / 'system32' / 'ntoskrnl.exe').write_bytes(b'')
+        (root / 'boot.ini').write_bytes(b'')
+        r = root.as_posix()
+        rc, out, err = sh(f'. "{VM}"; . "{NT4}"; nt4_ci_path "{r}" WINNT/SYSTEM32/NTOSKRNL.EXE; nt4_ci_path "{r}" BOOT.INI; '
+                          f'nt4_ci_path "{r}" NTLDR || echo none')
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(out.split(), [f'{r}/winnt/system32/ntoskrnl.exe', f'{r}/boot.ini', 'none'])
 
     def install(self, done_after):
         logs = (self.tmp / 'logs').as_posix()
@@ -142,6 +156,9 @@ class Nt4Target(unittest.TestCase):
         self.assertIn('start /wait C:\\USOS\\NT4\\SP6I386.EXE -u -z', text)
         self.assertIn('C:\\USOS\\NT4\\USOSOFF.EXE /r', text)
         self.assertIn('"AutoAdminLogon"="0"', text)
+        # NT 4.0 COPY has no /Y (syntax error, the drivers were not copied).
+        self.assertNotIn('copy /y', text.lower())
+        self.assertIn(r'CSD.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Windows', text)
         # Never the CSMWrap ESP before the VM: it is written after the install.
         self.assertNotIn('xp_csmwrap_esp.sh', text)
 

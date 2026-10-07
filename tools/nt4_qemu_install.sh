@@ -69,13 +69,34 @@ nt4_vm_install() {
 }
 
 # BOOT.INI (stdin -> stdout, CR LF): NT4_BOOT_OPTIONS on every ARC line
-# that lacks /NUMPROC, timeout=5.
+# that lacks /NUMPROC, timeout=5, no C:\ entry (Setup saved the syslinux
+# boot sector as BOOTSECT.DOS; LDLINUX.SYS is removed below).
 nt4_boot_ini() {
     awk -v BINMODE=3 -v opts="$NT4_BOOT_OPTIONS" '
         { line = $0; sub(/\r$/, "", line); low = tolower(line) }
         low ~ /^[ \t]*timeout[ \t]*=/ { line = "timeout=5" }
+        low ~ /^[ \t]*c:\\[ \t]*=/ { next }
         low ~ /^[ \t]*multi\(/ && low !~ /\/numproc/ { line = line " " opts }
         { printf "%s\r\n", line }'
+}
+
+# The real path of C:-relative $2 under the mount point $1, any letter case
+# (NT 4.0 stores lower-case 8.3 names, e.g. boot.ini, ntoskrnl.exe, with the
+# NT case flags; shortname=winnt shows them lower case and the micro-Linux
+# vfat lookup is case-sensitive: QEMU e2e 2026-10-07 found "missing NTLDR").
+# 1 when a component does not exist.
+nt4_ci_path() {
+    found=$1
+    rest=$2
+    while [ -n "$rest" ]; do
+        part=${rest%%/*}
+        case "$rest" in */*) rest=${rest#*/} ;; *) rest='' ;; esac
+        [ -n "$part" ] || continue
+        match=$(ls -a "$found" 2>/dev/null | awk -v p="$part" 'tolower($0) == tolower(p) { print; exit }')
+        [ -n "$match" ] || return 1
+        found=$found/$match
+    done
+    printf '%s\n' "$found"
 }
 
 # After the VM: checks C: on $1 (fsck.fat -n before and after), copies the
@@ -102,30 +123,37 @@ nt4_vm_finish() {
         return 1
     fi
     c=$W9X_VM_RUN/c
-    for file in POST.LOG VERSION.REG USOSRST.REG DONE.TXT; do
-        [ -f "$c/USOS/NT4/$file" ] && cp "$c/USOS/NT4/$file" "$logs/$file" 2>/dev/null
+    for file in POST.LOG VERSION.REG CSD.REG USOSRST.REG DONE.TXT; do
+        src=$(nt4_ci_path "$c" "USOS/NT4/$file") && cp "$src" "$logs/$file" 2>/dev/null
     done
     status=0
     reason=''
     for path in WINNT/SYSTEM32/NTOSKRNL.EXE WINNT/SYSTEM32/DRIVERS/AHCINT.SYS WINNT/SYSTEM32/DRIVERS/USOSRST.SYS BOOT.INI NTLDR USOS/NT4/DONE.TXT; do
-        [ -e "$c/$path" ] || { reason="$reason missing $path;"; status=1; }
+        nt4_ci_path "$c" "$path" >/dev/null || { reason="$reason missing $path;"; status=1; }
     done
-    if [ -f "$c/USOS/NT4/SP6I386.EXE" ]; then
-        if grep -aq 'Service Pack 6' "$c/USOS/NT4/VERSION.REG" 2>/dev/null; then reason="$reason SP6a installed;"
+    if nt4_ci_path "$c" USOS/NT4/SP6I386.EXE >/dev/null; then
+        # SP6a: Control\Windows CSDVersion = 0x600 right after update.exe (the
+        # CurrentVersion string keeps the CD's service pack until a restart).
+        if grep -aiq 'CSDVersion"=dword:0000060' "$logs/CSD.REG" 2>/dev/null ||
+            grep -aq 'Service Pack 6' "$logs/VERSION.REG" 2>/dev/null; then reason="$reason SP6a installed;"
         else reason="$reason no Service Pack 6 in CSDVersion;"; status=1; fi
     fi
     if [ "$status" = 0 ]; then
-        nt4_boot_ini < "$c/BOOT.INI" > "$W9X_VM_RUN/boot.ini" && cat "$W9X_VM_RUN/boot.ini" > "$c/BOOT.INI" ||
+        ini=$(nt4_ci_path "$c" BOOT.INI) || ini=$c/BOOT.INI
+        chmod u+w "$ini" 2>/dev/null || true
+        nt4_boot_ini < "$ini" > "$W9X_VM_RUN/boot.ini" && cat "$W9X_VM_RUN/boot.ini" > "$ini" ||
             { reason="$reason cannot write BOOT.INI;"; status=1; }
-        cp "$c/BOOT.INI" "$logs/BOOT.INI" 2>/dev/null
+        cp "$ini" "$logs/BOOT.INI" 2>/dev/null
         # chmod clears the read-only bit (vfat), so rm can remove LDLINUX.SYS.
-        for leftover in LDLINUX.SYS LDLINUX.C32 SYSLINUX.CFG CHAIN.C32 LIBCOM32.C32 LIBUTIL.C32 '$LDR$' TXTSETUP.SIF WINNT.SIF \
+        for leftover in LDLINUX.SYS LDLINUX.C32 SYSLINUX.CFG CHAIN.C32 LIBCOM32.C32 LIBUTIL.C32 BOOTSECT.DOS '$LDR$' TXTSETUP.SIF WINNT.SIF \
             USOS/NT4/SP6I386.EXE; do
-            [ -e "$c/$leftover" ] || continue
-            chmod u+w "$c/$leftover" 2>/dev/null || true
-            rm -f "$c/$leftover"
+            file=$(nt4_ci_path "$c" "$leftover") || continue
+            chmod u+w "$file" 2>/dev/null || true
+            rm -f "$file"
         done
-        rm -rf "$c/\$WIN_NT\$.~BT" "$c/\$WIN_NT\$.~LS"
+        for leftover in '$WIN_NT$.~BT' '$WIN_NT$.~LS'; do
+            file=$(nt4_ci_path "$c" "$leftover") && rm -rf "$file"
+        done
         reason="$reason BOOT.INI: $NT4_BOOT_OPTIONS;"
     fi
     sync
