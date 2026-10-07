@@ -1159,6 +1159,8 @@
 
   "boot.summary.xp_csmwrap": "CSM olmadan XP (deneysel): CSMWrap, legacy VBIOS'lu kart, 1 çekirdek ayrılmış",
   "boot.summary.w9x_csmwrap": "CSM olmadan (deneysel): USOS kurulumlu bir FAT32 disk ve CSMWrap hazırlar; kurulum daha sonra bu diskten başlar",
+  "boot.summary.nt4_csmwrap": "CSM olmadan (deneysel): kurulumun tamamı bu bilgisayardaki bir sanal makinede çalışır; tamamlanan sistem daha sonra CSMWrap üzerinden başlar",
+  "boot.summary.nt4_limits": "Windows NT 4.0: PS/2 klavye kullanın (henüz USB girişi yok); ekran 640x480; DATA üzerinde Systems\\Windows\\Windows NT 4.0\\ServicePack içinde SP6I386.EXE (Service Pack 6a) gerekir.",
 
   "boot.summary.w2k_limits": "Windows 2000 (deneysel): NT 5.0 için AHCI/NVMe/USB 3 sürücüsü yok (SATA IDE modunda), en fazla 4 GB RAM ve 2 işlemci",
 
@@ -1185,6 +1187,13 @@
   "boot.lx.w9x_phase1_progress": "Bilgisayarı kapatmayın. Geçen süre: {0}, diske yazılan: {1} MB.",
   "boot.lx.w9x_phase1_checking": "1. aşamanın sonucu denetleniyor",
   "boot.lx.w9x_phase1_failed": "Windows Kurulumu 1. aşaması tamamlanmadı. Bilgisayar yeniden başlatılmadı; günlükler: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "{0} kurulumu arka planda (başlangıç {1})",
+  "boot.lx.nt4_checking": "Kurulu sistem denetleniyor",
+  "boot.lx.nt4_after_restart": "Yeniden başlatmadan sonra disk kendiliğinden kurulu {0} sistemine başlar.",
+  "boot.lx.nt4_needs_sp6a": "Windows NT 4.0 için Service Pack 6a gerekir: SP6I386.EXE dosyasını USOS_DATA üzerinde Systems\\Windows\\Windows NT 4.0\\ServicePack içine koyun",
+  "boot.lx.nt4_needs_key": "Windows NT 4.0 için ürün anahtarı gerekir: anahtarı içeren bir yanıt profili seçin veya menü sorduğunda yazın",
+  "boot.lx.nt4_needs_vm": "Windows NT 4.0 yalnızca bu bilgisayardaki sanal makinede kurulur ve bu sanal makine kullanılamıyor: {0}",
+  "boot.lx.nt4_failed": "Windows NT 4.0 kurulumu tamamlanmadı. Bilgisayar yeniden başlatılmadı; günlükler: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Yeniden başlat",
   "winpe.vista_csmwrap_title": "USOS - CSM olmadan Vista",
   "winpe.vista_csmwrap_done": "Vista kurulumunun ilk bölümü tamamlandı. Şimdi USOS belleğini çıkarın ve Tamam'ı seçin: bilgisayar yeniden başlar ve Vista, CSMWrap üzerinden diskten devam eder. Bellek takılı kalırsa bu diskin UEFI girişini ürün yazılımı önyükleme menüsünden başlatın.",

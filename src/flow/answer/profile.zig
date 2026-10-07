@@ -705,6 +705,8 @@ pub fn knownSystemToken(token: []const u8) bool {
     if (@import("target.zig").familyFor(token) != null) return true;
     // Windows 95/98/Me ids (MSBATCH.INF systems, no NT family).
     if (@import("msbatch.zig").releaseFor(token) != null) return true;
+    // Windows NT 4.0 Workstation / Server (nt4.zig).
+    if (@import("nt4.zig").isNt4(token)) return true;
     for (system_groups ++ linux_systems) |known| {
         if (std.mem.eql(u8, known, token)) return true;
     }

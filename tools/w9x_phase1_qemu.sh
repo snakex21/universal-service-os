@@ -57,7 +57,8 @@ w9x_vm_available() {
     # Me (2026-10-06): the same DOS-stage SETUP.EXE as 98 (/P I valid), so the
     # same VM path. 95 (2026-10-06) too, but only with its key: the caller
     # (w9x_csmwrap_prepare.sh) keeps the native start for 95 without one.
-    case "$1" in 98SE|98|ME|95) ;; *) echo "release $1 keeps the native Setup start"; return 1 ;; esac
+    # NT4 / NT4S (2026-10-07): the whole install runs in the VM (tools/nt4_qemu_install.sh).
+    case "$1" in 98SE|98|ME|95|NT4|NT4S) ;; *) echo "release $1 keeps the native Setup start"; return 1 ;; esac
     if [ -e "$W9X_VM_FLAGS/phase1-native.flag" ]; then echo 'phase1-native.flag present'; return 1; fi
     if [ ! -x "$W9X_VM_QEMU" ]; then echo 'qemu9x.cpio not loaded (no QEMU)'; return 1; fi
     for firmware in bios-256k.bin vgabios-stdvga.bin; do
@@ -156,7 +157,8 @@ w9x_vm_written() {
     awk '{ print $7; exit }' "/sys/block/${1##*/}/stat" 2>/dev/null || echo 0
 }
 
-# Runs the VM on $1 (the confirmed target, nothing else is passed). Calls
+# Runs the VM on $1 (the confirmed target, nothing else is passed; the
+# argument list comes from W9X_VM_ARGS_FN, default w9x_vm_args). Calls
 # w9x_phase1_progress ELAPSED_SECONDS WRITTEN_MB every few seconds when the
 # caller defines it. 0 = the guest restarted (Setup phase 1 ended), 2 = QEMU
 # failed, 3 = timeout. Logs in $W9X_VM_RUN.
@@ -182,7 +184,7 @@ w9x_phase1_run() {
     idle_since=0
     set --
     while IFS= read -r arg; do set -- "$@" "$arg"; done <<EOF
-$(w9x_vm_args "$target" "$accel")
+$("${W9X_VM_ARGS_FN:-w9x_vm_args}" "$target" "$accel")
 EOF
     printf '%s\n' "$W9X_VM_QEMU $*" > "$W9X_VM_RUN/command.txt"
     start=$(date +%s)

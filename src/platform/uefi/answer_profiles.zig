@@ -282,6 +282,9 @@ pub fn clearWin9x(root: *uefi.protocol.File) void {
     for (answer.msbatch.staged) |entry| {
         deleteFile(root, std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }) catch continue);
     }
+    for (answer.nt4.staged) |entry| {
+        deleteFile(root, std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }) catch continue);
+    }
 }
 
 /// Windows 95/98/Me through the BIOS mode (docs/win9x-modern-2026-09-30.md):
@@ -294,6 +297,11 @@ pub fn stageWin9x(root: *uefi.protocol.File, profile: *const Profile) !void {
     try ensureDirectory(root, plan_file.directory);
     var path: [96]u8 = undefined;
     for (answer.msbatch.staged) |entry| {
+        const result = (try answer.render(profile, entry.system_id, .x86, null, null, &rendered)) orelse return error.NoGeneratedAnswer;
+        try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }), result.bytes);
+    }
+    // Windows NT 4.0 (same micro-Linux step 620): NT4.SIF / NT4S.SIF.
+    for (answer.nt4.staged) |entry| {
         const result = (try answer.render(profile, entry.system_id, .x86, null, null, &rendered)) orelse return error.NoGeneratedAnswer;
         try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }), result.bytes);
     }

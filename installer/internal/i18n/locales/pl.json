@@ -1162,6 +1162,8 @@
 
   "boot.summary.xp_csmwrap": "XP bez CSM (eksperymentalne): CSMWrap, karta z legacy VBIOS, 1 rdzeń zarezerwowany",
   "boot.summary.w9x_csmwrap": "Bez CSM (eksperymentalne): USOS przygotowuje dysk i CSMWrap; instalacja startuje potem z niego",
+  "boot.summary.nt4_csmwrap": "Bez CSM (eksperymentalne): cała instalacja przebiega w maszynie wirtualnej na tym komputerze; gotowy system uruchamia się potem przez CSMWrap",
+  "boot.summary.nt4_limits": "Windows NT 4.0: użyj klawiatury PS/2 (klawiatura i mysz USB jeszcze nie działają); obraz 640x480; wymaga pliku SP6I386.EXE (Service Pack 6a) w folderze Systems\\Windows\\Windows NT 4.0\\ServicePack na partycji DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperymentalne): brak sterownika AHCI/NVMe/USB 3 dla NT 5.0 (SATA w trybie IDE), maks. 4 GB RAM i 2 procesory",
 
@@ -1188,6 +1190,13 @@
   "boot.lx.w9x_phase1_progress": "Nie wyłączaj komputera. Upłynęło: {0}, zapisano na dysk: {1} MB.",
   "boot.lx.w9x_phase1_checking": "Sprawdzanie wyniku etapu 1",
   "boot.lx.w9x_phase1_failed": "Etap 1 Instalatora Windows nie został ukończony. Komputer nie został uruchomiony ponownie; logi: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "Instalacja {0} w tle (uruchomienie {1})",
+  "boot.lx.nt4_checking": "Sprawdzanie zainstalowanego systemu",
+  "boot.lx.nt4_after_restart": "Po restarcie dysk sam uruchomi zainstalowany system {0}.",
+  "boot.lx.nt4_needs_sp6a": "Windows NT 4.0 wymaga Service Pack 6a: umieść plik SP6I386.EXE w folderze Systems\\Windows\\Windows NT 4.0\\ServicePack na partycji USOS_DATA",
+  "boot.lx.nt4_needs_key": "Windows NT 4.0 wymaga klucza produktu: wybierz profil odpowiedzi z kluczem albo wpisz go, gdy menu o niego poprosi",
+  "boot.lx.nt4_needs_vm": "Windows NT 4.0 instaluje się tylko w maszynie wirtualnej na tym komputerze, a ta jest niedostępna: {0}",
+  "boot.lx.nt4_failed": "Instalacja Windows NT 4.0 nie została ukończona. Komputer nie został uruchomiony ponownie; logi: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Uruchom ponownie",
   "winpe.vista_csmwrap_title": "USOS - Vista bez CSM",
   "winpe.vista_csmwrap_done": "Pierwsza część instalacji Visty jest zakończona. Odłącz teraz pendrive USOS i wybierz OK: komputer uruchomi się ponownie, a Vista będzie kontynuowana z dysku przez CSMWrap. Jeśli pendrive zostanie podłączony, uruchom wpis UEFI tego dysku z menu rozruchu płyty.",

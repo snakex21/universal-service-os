@@ -1,0 +1,167 @@
+"""Windows NT 4.0 through the UEFI flow (tools/nt4_csmwrap_target.sh,
+tools/nt4_qemu_install.sh, the NT4 branch of tools/w9x_csmwrap_prepare.sh).
+Host only: Git sh, stubs, temp folders; no VM, no disk.
+"""
+from pathlib import Path
+import re
+import shutil
+import tempfile
+import unittest
+
+from test_w9x_phase1_qemu import sh
+
+ROOT = Path(__file__).resolve().parents[2]
+VM = (ROOT / 'tools/w9x_phase1_qemu.sh').as_posix()
+NT4 = (ROOT / 'tools/nt4_qemu_install.sh').as_posix()
+TARGET = ROOT / 'tools/nt4_csmwrap_target.sh'
+PREPARE = ROOT / 'tools/w9x_csmwrap_prepare.sh'
+
+
+def function_text(path: Path, name: str) -> str:
+    """The shell function `name` of `path` (from its line to the first '}' at column 0)."""
+    lines = path.read_text(encoding='utf-8').splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith(f'{name}() {{'))
+    end = next(i for i in range(start, len(lines)) if lines[i] == '}')
+    return '\n'.join(lines[start:end + 1])
+
+
+class Nt4Vm(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix='usos-nt4-'))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def test_vm_args(self):
+        rc, out, err = sh(f'. "{VM}"; . "{NT4}"; W9X_VM_RUN=/r; nt4_vm_args /dev/sdz tcg')
+        self.assertEqual(rc, 0, err)
+        args = out.split('\n')
+        self.assertIn('pentium3', args)
+        self.assertIn('-no-reboot', args)
+        self.assertIn('none', args)  # -nic none / -display none
+        drive = next(a for a in args if a.startswith('file=/dev/sdz'))
+        self.assertIn('size=4294967296', drive)
+        self.assertIn('cache=none', drive)
+        self.assertIn('if=ide', drive)
+        self.assertNotIn('acpi=off', ' '.join(args))
+
+    def test_boot_ini_options(self):
+        ini = '[boot loader]\r\ntimeout=30\r\ndefault=multi(0)disk(0)rdisk(0)partition(1)\\WINNT\r\n[operating systems]\r\n' \
+              'multi(0)disk(0)rdisk(0)partition(1)\\WINNT="Windows NT Workstation 4.0"\r\n' \
+              'multi(0)disk(0)rdisk(0)partition(1)\\WINNT="Windows NT Workstation 4.0 [VGA]" /basevideo /sos\r\n'
+        (self.tmp / 'boot.ini').write_bytes(ini.encode('ascii'))
+        rc, out, err = sh(f'. "{VM}"; . "{NT4}"; nt4_boot_ini < "{(self.tmp / "boot.ini").as_posix()}" > "{(self.tmp / "out.ini").as_posix()}"')
+        self.assertEqual(rc, 0, err)
+        text = (self.tmp / 'out.ini').read_bytes().decode('ascii')
+        self.assertIn('timeout=5\r\n', text)
+        self.assertIn('"Windows NT Workstation 4.0" /NUMPROC=2 /MAXMEM=1024\r\n', text)
+        self.assertIn('/basevideo /sos /NUMPROC=2 /MAXMEM=1024\r\n', text)
+        # default= is not an ARC line with options.
+        self.assertIn('default=multi(0)disk(0)rdisk(0)partition(1)\\WINNT\r\n', text)
+        self.assertEqual(text.count('/NUMPROC'), 2)
+
+    def install(self, done_after):
+        logs = (self.tmp / 'logs').as_posix()
+        script = f'''. "{VM}"; . "{NT4}"
+runs=0
+w9x_phase1_run() {{ runs=$((runs + 1)); W9X_VM_ELAPSED=10; return 0; }}
+w9x_phase1_keep_logs() {{ mkdir -p "$1"; }}
+nt4_vm_marker() {{ [ "$runs" -ge {done_after} ]; }}
+nt4_vm_install /dev/sdz "{logs}" tcg; rc=$?
+echo "rc=$rc runs=$runs elapsed=$NT4_VM_ELAPSED fn=$W9X_VM_ARGS_FN"
+'''
+        return sh(script)
+
+    def test_install_runs_until_done(self):
+        rc, out, err = self.install(3)
+        self.assertEqual(rc, 0, err)
+        self.assertIn('rc=0 runs=3 elapsed=30 fn=nt4_vm_args', out)
+        self.assertEqual(len((self.tmp / 'logs/runs.txt').read_text().splitlines()), 3)
+
+    def test_install_gives_up(self):
+        rc, out, err = self.install(99)
+        self.assertIn('rc=4 runs=6', out)
+
+    def test_install_stops_on_vm_failure(self):
+        script = f'''. "{VM}"; . "{NT4}"
+w9x_phase1_run() {{ return 3; }}
+w9x_phase1_keep_logs() {{ :; }}
+nt4_vm_install /dev/sdz "{(self.tmp / 'l').as_posix()}" tcg; echo "rc=$?"
+'''
+        rc, out, err = sh(script)
+        self.assertIn('rc=3', out)
+
+    def test_vm_available_for_nt4(self):
+        share = self.tmp / 'share'
+        share.mkdir()
+        for name in ('bios-256k.bin', 'vgabios-stdvga.bin'):
+            (share / name).write_bytes(b'x')
+        (self.tmp / 'qemu').write_text('#!/bin/sh\n')
+        (self.tmp / 'qemu').chmod(0o755)
+        (self.tmp / 'meminfo').write_text('MemTotal:       16000000 kB\n')
+        env = {'W9X_VM_QEMU': (self.tmp / 'qemu').as_posix(), 'W9X_VM_DATADIR': share.as_posix(),
+               'W9X_VM_MEMINFO': (self.tmp / 'meminfo').as_posix(), 'W9X_VM_FLAGS': (self.tmp / 'flags').as_posix()}
+        for tag in ('NT4', 'NT4S'):
+            rc, out, err = sh(f'. "{VM}"; w9x_vm_available {tag}', env)
+            self.assertEqual(rc, 0, out + err)
+
+
+class Nt4Target(unittest.TestCase):
+    def resolve(self, lang, text):
+        tmp = Path(tempfile.mkdtemp(prefix='usos-nt4-tz-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / 'in.sif').write_bytes(text.encode('ascii'))
+        fn = function_text(TARGET, 'nt4_resolve_time_zone')
+        rc, out, err = sh(f'{fn}\nnt4_resolve_time_zone "{lang}" < "{(tmp / "in.sif").as_posix()}" > "{(tmp / "out.sif").as_posix()}"')
+        self.assertEqual(rc, 0, err)
+        return (tmp / 'out.sif').read_bytes().decode('ascii')
+
+    def test_polish_cd_time_zone(self):
+        out = self.resolve('0415', '[GuiUnattended]\r\nOemSkipWelcome = 1\r\n;USOS-TZ=Central European\r\n\r\n[Display]\r\n')
+        self.assertIn('TimeZone = "(GMT+01:00) Warszawa, Praga, Budapeszt"\r\n', out)
+        self.assertNotIn('USOS-TZ', out)
+        self.assertTrue(out.endswith('[Display]\r\n'))
+
+    def test_english_cd_time_zone(self):
+        out = self.resolve('0409', ';USOS-TZ=Central European\r\n')
+        self.assertEqual(out, 'TimeZone = "(GMT+01:00) Prague, Warsaw, Budapest"\r\n')
+
+    def test_unknown_language_or_zone_drops_the_marker(self):
+        for lang, zone in (('0407', 'Central European'), ('0415', 'Pacific SA')):
+            out = self.resolve(lang, f'[GuiUnattended]\n;USOS-TZ={zone}\n')
+            self.assertNotIn('TimeZone', out)
+            self.assertNotIn('USOS-TZ', out)
+
+    def test_target_layout_and_post_script(self):
+        text = TARGET.read_text(encoding='utf-8')
+        # FAT16 C: as in the 2026-10-07 QEMU lab: LBA 63, 2000 MiB, 32 KiB clusters, type 06, active.
+        self.assertIn('PART_START=63', text)
+        self.assertIn('PART_SECTORS=4096000', text)
+        self.assertIn('mkfs.fat -F 16 -s 64', text)
+        self.assertIn(r"printf '\200\001\001\000\006\366\067\376'", text)
+        self.assertIn('APPEND boot ntldr=/$LDR$', text)
+        self.assertIn('CMDLINES.TXT', text)
+        self.assertIn('start /wait C:\\USOS\\NT4\\SP6I386.EXE -u -z', text)
+        self.assertIn('C:\\USOS\\NT4\\USOSOFF.EXE /r', text)
+        self.assertIn('"AutoAdminLogon"="0"', text)
+        # Never the CSMWrap ESP before the VM: it is written after the install.
+        self.assertNotIn('xp_csmwrap_esp.sh', text)
+
+    def test_chs_end_matches_the_partition(self):
+        # 255 heads, 63 sectors: LBA 63 + 4096000 - 1.
+        lba = 63 + 4096000 - 1
+        c, h, s = lba // (255 * 63), (lba // 63) % 255, lba % 63 + 1
+        self.assertEqual((h, s | ((c >> 2) & 0xC0), c & 0xFF), (0o366, 0o067, 0o376))
+
+
+class Nt4Prepare(unittest.TestCase):
+    def test_prepare_routes_nt4(self):
+        text = PREPARE.read_text(encoding='utf-8')
+        self.assertIn('windows-nt-4) tag=NT4', text)
+        self.assertIn('windows-nt-4-server) tag=NT4S', text)
+        self.assertIn('nt4_vm_install "$TARGET_DEVICE"', text)
+        self.assertIn('nt4_vm_finish "$TARGET_DEVICE"', text)
+        self.assertRegex(text, re.compile(r'nt4_vm_finish.*\n(.*\n){0,12}.*xp_csmwrap_esp\.sh', re.M))
+        self.assertIn('-iname \'sp6i386.exe\'', text)
+
+
+if __name__ == '__main__':
+    unittest.main()

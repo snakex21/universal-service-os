@@ -117,6 +117,9 @@ pub const traits_table = [_]SystemTraits{
     .{ .system_id = "windows-server-2012", .route_as = "windows-8", .no_inbox_nvme = true },
     .{ .system_id = "windows-server-2008-r2", .route_as = "windows-7" },
     .{ .system_id = "windows-server-2008", .route_as = "windows-vista" },
+    // Windows NT 4.0 (answer/nt4.zig WINNT.SIF; CSMWrap is unsigned).
+    .{ .system_id = "windows-nt-4", .answer = .winnt_sif, .secure_boot_off = true },
+    .{ .system_id = "windows-nt-4-server", .answer = .winnt_sif, .secure_boot_off = true, .icon_as = "windows-nt-4" },
     // Linux ISO from DATA: SystemRescue ships no Microsoft-signed shim.
     .{ .system_id = "systemrescue", .secure_boot_off = true },
 };
@@ -270,6 +273,8 @@ const auto_iso_memdisk = &[_]BootMethod{ .automatic, .direct_iso, .memdisk };
 /// The DOS-family CSMWrap preparation from UEFI (micro-Linux step 620).
 const dos_family_ids = &[_][]const u8{ "windows-98-se", "windows-98", "windows-me", "windows-95", "ms-dos", "windows-3-1", "windows-3-11" };
 
+const nt4_ids = &[_][]const u8{ "windows-nt-4", "windows-nt-4-server" };
+
 const uefi_profiles = [_]Profile{
     // ---- UEFI only
     // Linux ISO from DATA (docs/design/linux-iso-boot.md): kernel + initrd from
@@ -294,6 +299,12 @@ const uefi_profiles = [_]Profile{
     // that disk in BIOS mode (docs/win9x-modern-2026-09-30.md 4c).
     .{ .id = "w9x-uefi-csmwrap", .systems = .{ .ids = dos_family_ids }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .win9x_uefi, .progress = .direct_iso },
     .{ .id = "w9x-uefi-other", .systems = .{ .ids = dos_family_ids }, .firmware = .uefi, .backend = null, .progress = .none },
+    // Windows NT 4.0 Workstation / Server from UEFI: the same step 620; the
+    // whole install runs in QEMU on the target disk (-cpu pentium3, the RTM
+    // text-mode kernel cannot start on Zen), then SP6a starts through CSMWrap
+    // (docs/nt4-2026-10-07.md).
+    .{ .id = "nt4-x86-qemu-csmwrap", .systems = .{ .ids = nt4_ids }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .win9x_uefi, .progress = .direct_iso },
+    .{ .id = "nt4-uefi-other", .systems = .{ .ids = nt4_ids }, .firmware = .uefi, .backend = null, .progress = .none },
 };
 
 /// Ordered: firmware-specific rules first, then the firmware-independent
@@ -409,6 +420,18 @@ test "XP on UEFI selects the UEFI-CSM profile and refuses everything else" {
     try std.testing.expect(backend(xp, .iso, .chainload, .uefi) == null);
     try std.testing.expectEqualStrings("nt5-staging", select(xp, .iso, .automatic, .bios).?.id);
     try std.testing.expectEqualStrings("nt5-staging", select(xp, .iso, .automatic, null).?.id);
+}
+
+test "Windows NT 4.0 Workstation and Server on UEFI: the VM install, nothing else" {
+    const systems = @import("systems.zig");
+    for ([_][]const u8{ "windows-nt-4", "windows-nt-4-server" }) |id| {
+        const nt4 = systems.findById(id).?;
+        try std.testing.expectEqualStrings("nt4-x86-qemu-csmwrap", select(nt4, .iso, .automatic, .uefi).?.id);
+        try std.testing.expectEqual(Backend.win9x_uefi, backend(nt4, .iso, .automatic, .uefi).?);
+        try std.testing.expect(backend(nt4, .iso, .chainload, .uefi) == null);
+        try std.testing.expectEqual(AnswerFormat.winnt_sif, traits(id).answer);
+    }
+    try std.testing.expectEqualStrings("windows-nt-4", iconId("windows-nt-4-server"));
 }
 
 test "Windows 10/11 and 7/Vista native UEFI profiles" {

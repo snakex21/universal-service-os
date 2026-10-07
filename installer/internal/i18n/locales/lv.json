@@ -1162,6 +1162,8 @@
 
   "boot.summary.xp_csmwrap": "XP bez CSM (eksperimentāli): CSMWrap, karte ar legacy VBIOS, 1 kodols rezervēts",
   "boot.summary.w9x_csmwrap": "Bez CSM (eksperimentāli): USOS sagatavo FAT32 instalēšanas disku ar CSMWrap; instalēšana tad sākas no tā",
+  "boot.summary.nt4_csmwrap": "Bez CSM (eksperimentāli): visa instalēšana notiek virtuālajā mašīnā šajā datorā; gatavā sistēma pēc tam startē caur CSMWrap",
+  "boot.summary.nt4_limits": "Windows NT 4.0: izmantojiet PS/2 tastatūru (USB ievade vēl nedarbojas); displejs 640x480; vajadzīgs SP6I386.EXE (Service Pack 6a) mapē Systems\\Windows\\Windows NT 4.0\\ServicePack nodalījumā DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentāls): nav AHCI/NVMe/USB 3 draivera NT 5.0 (SATA IDE režīmā), maks. 4 GB RAM un 2 procesori",
 
@@ -1188,6 +1190,13 @@
   "boot.lx.w9x_phase1_progress": "Neizslēdziet datoru. Pagājis: {0}, ierakstīts diskā: {1} MB.",
   "boot.lx.w9x_phase1_checking": "Pārbauda 1. posma rezultātu",
   "boot.lx.w9x_phase1_failed": "Windows iestatīšanas 1. posms netika pabeigts. Dators netika restartēts; žurnāli: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "{0} instalēšana fonā (sākums {1})",
+  "boot.lx.nt4_checking": "Pārbauda instalēto sistēmu",
+  "boot.lx.nt4_after_restart": "Pēc restartēšanas disks pats startēs instalētajā {0}.",
+  "boot.lx.nt4_needs_sp6a": "Windows NT 4.0 vajadzīga Service Pack 6a: ievietojiet SP6I386.EXE mapē Systems\\Windows\\Windows NT 4.0\\ServicePack nodalījumā USOS_DATA",
+  "boot.lx.nt4_needs_key": "Windows NT 4.0 vajadzīga produkta atslēga: izvēlieties atbilžu profilu ar atslēgu vai ievadiet to, kad izvēlne to prasa",
+  "boot.lx.nt4_needs_vm": "Windows NT 4.0 instalējas tikai šī datora virtuālajā mašīnā, kas nav pieejama: {0}",
+  "boot.lx.nt4_failed": "Windows NT 4.0 instalēšana netika pabeigta. Dators netika restartēts; žurnāli: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Restartēt",
   "winpe.vista_csmwrap_title": "USOS - Vista bez CSM",
   "winpe.vista_csmwrap_done": "Vista instalēšanas pirmā daļa ir pabeigta. Tagad atvienojiet USOS zibatmiņu un izvēlieties Labi: dators tiks restartēts, un Vista turpināsies no diska ar CSMWrap. Ja zibatmiņa paliek pievienota, startējiet šī diska UEFI ierakstu no aparātprogrammatūras sāknēšanas izvēlnes.",

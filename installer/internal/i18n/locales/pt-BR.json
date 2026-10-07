@@ -1159,6 +1159,8 @@
 
   "boot.summary.xp_csmwrap": "XP sem CSM (experimental): CSMWrap, placa com VBIOS legado, 1 núcleo reservado",
   "boot.summary.w9x_csmwrap": "Sem CSM (experimental): o USOS prepara um disco FAT32 com a instalação e o CSMWrap; a instalação inicia depois a partir dele",
+  "boot.summary.nt4_csmwrap": "Sem CSM (experimental): toda a instalação é executada em uma máquina virtual neste PC; depois o sistema pronto inicia pelo CSMWrap",
+  "boot.summary.nt4_limits": "Windows NT 4.0: use um teclado PS/2 (ainda sem entrada USB); tela 640x480; requer SP6I386.EXE (Service Pack 6a) em Systems\\Windows\\Windows NT 4.0\\ServicePack no DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimental): sem driver AHCI/NVMe/USB 3 para NT 5.0 (SATA no modo IDE), máx. 4 GB de RAM e 2 CPUs",
 
@@ -1185,6 +1187,13 @@
   "boot.lx.w9x_phase1_progress": "Não desligue o computador. Decorrido: {0}, gravado no disco: {1} MB.",
   "boot.lx.w9x_phase1_checking": "Verificando o resultado da etapa 1",
   "boot.lx.w9x_phase1_failed": "A etapa 1 da instalação do Windows não terminou. O computador não foi reiniciado; logs: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "Instalação do {0} em segundo plano (início {1})",
+  "boot.lx.nt4_checking": "Verificando o sistema instalado",
+  "boot.lx.nt4_after_restart": "Após a reinicialização o disco inicia sozinho no {0} instalado.",
+  "boot.lx.nt4_needs_sp6a": "O Windows NT 4.0 requer o Service Pack 6a: coloque SP6I386.EXE em Systems\\Windows\\Windows NT 4.0\\ServicePack no USOS_DATA",
+  "boot.lx.nt4_needs_key": "O Windows NT 4.0 requer uma chave do produto: escolha um perfil de respostas com a chave ou digite-a quando o menu pedir",
+  "boot.lx.nt4_needs_vm": "O Windows NT 4.0 só é instalado na máquina virtual deste PC, que não está disponível: {0}",
+  "boot.lx.nt4_failed": "A instalação do Windows NT 4.0 não terminou. O computador não foi reiniciado; logs: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Reiniciar",
   "winpe.vista_csmwrap_title": "USOS - Vista sem CSM",
   "winpe.vista_csmwrap_done": "A primeira parte da instalação do Vista foi concluída. Remova agora o pendrive USOS e escolha OK: o computador reinicia e o Vista continua a partir do disco via CSMWrap. Se o pendrive continuar conectado, inicie a entrada UEFI deste disco pelo menu de inicialização do firmware.",

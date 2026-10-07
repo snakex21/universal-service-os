@@ -1159,6 +1159,8 @@
 
   "boot.summary.xp_csmwrap": "XP zonder CSM (experimenteel): CSMWrap, kaart met legacy-VBIOS, 1 kern gereserveerd",
   "boot.summary.w9x_csmwrap": "Zonder CSM (experimenteel): USOS bereidt een FAT32-installatieschijf met CSMWrap voor; de installatie start daarna daarvan",
+  "boot.summary.nt4_csmwrap": "Zonder CSM (experimenteel): de hele installatie draait in een virtuele machine op deze pc; het voltooide systeem start daarna via CSMWrap",
+  "boot.summary.nt4_limits": "Windows NT 4.0: gebruik een PS/2-toetsenbord (nog geen USB-invoer); beeld 640x480; vereist SP6I386.EXE (Service Pack 6a) in Systems\\Windows\\Windows NT 4.0\\ServicePack op DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimenteel): geen AHCI/NVMe/USB 3-stuurprogramma voor NT 5.0 (SATA in IDE-modus), max. 4 GB RAM en 2 CPU's",
 
@@ -1185,6 +1187,13 @@
   "boot.lx.w9x_phase1_progress": "Zet de computer niet uit. Verstreken: {0}, naar schijf geschreven: {1} MB.",
   "boot.lx.w9x_phase1_checking": "Resultaat van fase 1 controleren",
   "boot.lx.w9x_phase1_failed": "Fase 1 van Windows Setup is niet voltooid. De computer is niet opnieuw opgestart; logboeken: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "Installatie van {0} op de achtergrond (start {1})",
+  "boot.lx.nt4_checking": "Geïnstalleerd systeem controleren",
+  "boot.lx.nt4_after_restart": "Na de herstart start de schijf vanzelf in het geïnstalleerde {0}.",
+  "boot.lx.nt4_needs_sp6a": "Windows NT 4.0 vereist Service Pack 6a: zet SP6I386.EXE in Systems\\Windows\\Windows NT 4.0\\ServicePack op USOS_DATA",
+  "boot.lx.nt4_needs_key": "Windows NT 4.0 vereist een productcode: kies een antwoordprofiel met de code of typ deze in wanneer het menu erom vraagt",
+  "boot.lx.nt4_needs_vm": "Windows NT 4.0 wordt alleen geïnstalleerd in de virtuele machine op deze pc, die niet beschikbaar is: {0}",
+  "boot.lx.nt4_failed": "De installatie van Windows NT 4.0 is niet voltooid. De computer is niet opnieuw opgestart; logboeken: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Opnieuw opstarten",
   "winpe.vista_csmwrap_title": "USOS - Vista zonder CSM",
   "winpe.vista_csmwrap_done": "Het eerste deel van de Vista-installatie is voltooid. Verwijder nu de USOS-stick en kies OK: de computer start opnieuw op en Vista gaat via CSMWrap verder vanaf de schijf. Blijft de stick aangesloten, start dan het UEFI-item van deze schijf vanuit het opstartmenu van de firmware.",

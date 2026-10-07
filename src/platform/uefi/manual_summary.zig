@@ -151,9 +151,15 @@ pub fn show(
     }
     var can_start = true;
     if (backend == .win9x_uefi) {
-        // Windows 95/98/Me from UEFI (w9x-uefi-csmwrap, experimental).
-        fields.add(view.t(.summary_preparation), view.t(.summary_w9x_csmwrap));
+        // Windows 95/98/Me from UEFI (w9x-uefi-csmwrap, experimental);
+        // Windows NT 4.0 (nt4-x86-qemu-csmwrap): the whole install in the VM.
+        const nt4 = usos.flow.answer.nt4.isNt4(system.id);
+        fields.add(view.t(.summary_preparation), if (nt4) view.t(.summary_nt4_csmwrap) else view.t(.summary_w9x_csmwrap));
         fields.add(view.t(.summary_disk), view.t(.summary_w9x_disk));
+        if (nt4) {
+            notes[note_count] = view.t(.summary_nt4_limits);
+            note_count += 1;
+        }
     }
     if (backend == .xp_uefi_staging) {
         // No CSM: the experimental xp-x86-sp3-uefi-csmwrap preparation (CSMWrap on
@@ -292,7 +298,7 @@ fn start(
         const chosen: ?*const answer_profiles.Profile = if (answer.profile) |index| answer_profiles.get(index) else null;
         if (key_prompt.needed(system.id, chosen, chosen == null and unattended != null)) {
             const key = key_prompt.ask(system.name) orelse return;
-            keyed_95 = key_prompt.withKey(chosen, view.languageCode(), key) catch |err| return showError(view.t(.error_preparation), err);
+            keyed_95 = key_prompt.withKey(chosen, view.languageCode(), system.id, key) catch |err| return showError(view.t(.error_preparation), err);
         }
     }
     // No USB gamepad transfer may outlive the menu into another loader;

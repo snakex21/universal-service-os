@@ -8,7 +8,8 @@
     "patches/0001-usos1-flush-cache.patch",
     "patches/0002-usos2-target-check-and-trace.patch",
     "patches/0003-usos3-screen-stages-readback-fail-loudly.patch",
-    "patches/0004-usos4-stall-diagnostics.patch"
+    "patches/0004-usos4-stall-diagnostics.patch",
+    "patches/0005-nt4-wdk-build.patch"
   ],
   "build": "build.cmd (WDK 7.1, x86 WXP)",
   "files": {
@@ -16,7 +17,7 @@
     "bin/2KXP/i386/ahcint.sys": "4e2d454357e0bfa468be48dc24ea428b5e1adbeb81bcc52dac6e15a4a302289f",
     "build.cmd": "cb6c3f7f2289ee7f1b3ede66fe1824b474eb7dc425112a4a9947e95ef295111e",
     "LICENSE": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
-    "MODIFIED.txt": "6669bb85acbc49eb99f90d9d654c985086d2aff5eddcf3a9b82d326e1b671ed4",
+    "MODIFIED.txt": "6920bcf75ecc5ce1568a678d2890a539a249290bdb64eb85fa1be9ac0f0899c7",
     "patches/0001-usos1-flush-cache.patch": "a858d1023d995b7c7ee6ef32b1c2668fd615a4ed8cad1e964fb41104883311fd",
     "patches/0002-usos2-target-check-and-trace.patch": "ba70562a120bd080bbdbca8e11985eac4772c8a104577437f359066ec00abd3a",
     "patches/0003-usos3-screen-stages-readback-fail-loudly.patch": "30a3f2b7c10d7895cec58b0878f5fb0d3e1487893cb962c43cbc9e622b37f7e6",
@@ -26,11 +27,17 @@
     "src/9X/ahcint9x.lnk": "f6e9f66dfe8bfad3d23274c49304597a480a34ea19f129354e188735896ca6c1",
     "src/9X/build.bat": "ab8f19b5f282b3bc2a3d9dcc0c24e75e541a325f7caec528fd3893a4c8f875f5",
     "src/9X/makefile": "0dd9d6acd03ad012ccbd40562bf52ee0f929a67bb46062f7f62d8b511f635666",
-    "src/ahcimain.c": "7072acb54354d32b2a99bfeb8071d00eaa4c13ef518a8beffac30612cd0a56c0",
+    "src/ahcimain.c": "eee1295e33cd2e84fce73900ccea6743b4ced2cf9c48cfc643c70dd74c78c709",
     "src/ahcint.h": "9458a65d4d2fb5de364bd4e34a466f0f81a6dddb64be67cb0c03bb6c591b7e35",
     "src/ahcisatl.c": "fba86391f7c7bce18f08348067b8bc3406c50bfd0d488cc30ed60b795a5412e8",
     "src/NT/build.bat": "592a19badaeaca36fc9c02dd9c520d9aa12f431ba0d3e07933abddbf4c70a560",
     "toolchain.txt": "d76edb2e19f45018a5852b95ac2ec1e023dee88cf0ab207600e3ffed47a58897",
-    "patches/0004-usos4-stall-diagnostics.patch": "27f3b3b460b6cd02980d55b445eeef29a6aea31eed9ead9b8ccf08f3050c6170"
-  }
+    "patches/0004-usos4-stall-diagnostics.patch": "27f3b3b460b6cd02980d55b445eeef29a6aea31eed9ead9b8ccf08f3050c6170",
+    "build-nt4.cmd": "20676c98fbfa0bbd5b8fad46c25d94509d83e0dc0163749aeb0c043a29abbc33",
+    "src/NT4WDK/sources": "1c9fe90769e943ca2ad4b3404a1e7e97cbc97c3da4a5e0b4281fee8cd7df3b68",
+    "src/NT4WDK/makefile": "272431810da48231039ac4fcfa245628b6b6c3dc39054b908c26c97d313ccf97",
+    "bin/NT4/i386/ahcint.sys": "c8fda75b81964de3109ed39954ba2b3220d0f7d4f1dee5ab4bc1e5a0c7b1046f",
+    "patches/0005-nt4-wdk-build.patch": "3346fc0f9401abd2139ecf2ac7ed86ee693558459427d4eb703fd5b78d403d97"
+  },
+  "build_nt4": "build-nt4.cmd (WDK 7.1, x86 WXP, -DAHCI_NT4 -DAHCI_NT4_WDK, PE version 4.00 via tools/nt4/pe_nt4_version.py) -> bin/NT4/i386/ahcint.sys"
 }

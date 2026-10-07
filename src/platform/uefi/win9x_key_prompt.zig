@@ -6,6 +6,10 @@
 //! product key"). The key is used for this start only: it goes into the
 //! staged 95.INF (removed by micro-Linux after it is copied to RAM) and is
 //! never written to a profile or traced.
+//!
+//! Windows NT 4.0 (Workstation / Server, 2026-10-07): the same prompt and
+//! key shapes; its install runs fully in the VM and GUI Setup would wait on
+//! the key page, so the key is asked the same way (staged in NT4.SIF).
 const std = @import("std");
 const usos = @import("usos");
 const form = @import("manual_form.zig");
@@ -27,9 +31,11 @@ const cancel_id: u8 = 2;
 /// (or none) that lacks a 95-shaped key. A DATA answer file is the user's
 /// own (its ProductID is checked by micro-Linux).
 pub fn needed(system_id: []const u8, profile: ?*const Profile, answer_file: bool) bool {
-    if (!std.ascii.eqlIgnoreCase(system_id, "windows-95")) return false;
+    const nt4 = answer.nt4.isNt4(system_id);
+    if (!std.ascii.eqlIgnoreCase(system_id, "windows-95") and !nt4) return false;
     if (answer_file) return false;
     const p = profile orelse return true;
+    if (nt4) return !answer.nt4.validKey(p.keyFor(system_id));
     return !answer.applies.has95Key(p);
 }
 
@@ -41,8 +47,8 @@ pub fn valid95(value: []const u8) bool {
 
 /// The profile staged for this start: `base` (the chosen profile, or the
 /// USOS default owner "USOS" in the menu language's zone when null) with
-/// key.windows-95 set to `key`.
-pub fn withKey(base: ?*const Profile, ui_language: []const u8, key: []const u8) !Profile {
+/// key.<system_id> set to `key`.
+pub fn withKey(base: ?*const Profile, ui_language: []const u8, system_id: []const u8, key: []const u8) !Profile {
     var p: Profile = if (base) |b| b.* else blk: {
         var d = @import("profile_editor.zig").defaults(ui_language);
         // The USOS default MSBATCH.INF owner (an empty Name shows the page).
@@ -52,7 +58,7 @@ pub fn withKey(base: ?*const Profile, ui_language: []const u8, key: []const u8) 
         break :blk d;
     };
     p.remember_key = false;
-    try p.setSystemKey("windows-95", key);
+    try p.setSystemKey(system_id, key);
     return p;
 }
 
@@ -95,5 +101,8 @@ test "a 95 key is asked only for Windows 95 without one" {
     try std.testing.expect(!needed("windows-98-se", null, false));
     try p.setSystemKey("windows-95", "12345-OEM-1234567-12345");
     try std.testing.expect(!needed("windows-95", &p, false));
+    try std.testing.expect(needed("windows-nt-4", &p, false) and needed("windows-nt-4-server", null, false));
+    try p.setSystemKey("windows-nt-4", "123-4567890");
+    try std.testing.expect(!needed("windows-nt-4", &p, false) and !needed("windows-nt-4", null, true));
     try std.testing.expect(valid95("123-1234567") and !valid95("AAAAA-BBBBB-CCCCC-DDDDD-EEEEE") and !valid95("12345-OEM"));
 }

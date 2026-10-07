@@ -1159,6 +1159,8 @@
 
   "boot.summary.xp_csmwrap": "XP uten CSM (eksperimentelt): CSMWrap, kort med legacy-VBIOS, 1 kjerne reservert",
   "boot.summary.w9x_csmwrap": "Uten CSM (eksperimentelt): USOS forbereder en FAT32-installasjonsdisk med CSMWrap; installasjonen starter så fra den",
+  "boot.summary.nt4_csmwrap": "Uten CSM (eksperimentelt): hele installasjonen kjører i en virtuell maskin på denne PC-en; det ferdige systemet starter deretter via CSMWrap",
+  "boot.summary.nt4_limits": "Windows NT 4.0: bruk et PS/2-tastatur (ingen USB-inndata ennå); skjerm 640x480; krever SP6I386.EXE (Service Pack 6a) i Systems\\Windows\\Windows NT 4.0\\ServicePack på DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentelt): ingen AHCI/NVMe/USB 3-driver for NT 5.0 (SATA i IDE-modus), maks. 4 GB RAM og 2 prosessorer",
 
@@ -1185,6 +1187,13 @@
   "boot.lx.w9x_phase1_progress": "Ikke slå av datamaskinen. Gått: {0}, skrevet til disken: {1} MB.",
   "boot.lx.w9x_phase1_checking": "Kontrollerer resultatet av fase 1",
   "boot.lx.w9x_phase1_failed": "Fase 1 av Windows Setup ble ikke fullført. Datamaskinen ble ikke startet på nytt; logger: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "Installasjon av {0} i bakgrunnen (start {1})",
+  "boot.lx.nt4_checking": "Kontrollerer det installerte systemet",
+  "boot.lx.nt4_after_restart": "Etter omstarten starter disken av seg selv i det installerte {0}.",
+  "boot.lx.nt4_needs_sp6a": "Windows NT 4.0 krever Service Pack 6a: legg SP6I386.EXE i Systems\\Windows\\Windows NT 4.0\\ServicePack på USOS_DATA",
+  "boot.lx.nt4_needs_key": "Windows NT 4.0 krever en produktnøkkel: velg en svarprofil med nøkkelen, eller skriv den inn når menyen ber om den",
+  "boot.lx.nt4_needs_vm": "Windows NT 4.0 installeres bare i den virtuelle maskinen på denne PC-en, som ikke er tilgjengelig: {0}",
+  "boot.lx.nt4_failed": "Installasjonen av Windows NT 4.0 ble ikke fullført. Datamaskinen ble ikke startet på nytt; logger: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Start på nytt",
   "winpe.vista_csmwrap_title": "USOS - Vista uten CSM",
   "winpe.vista_csmwrap_done": "Den første delen av Vista-installasjonen er ferdig. Ta ut USOS-pinnen nå, og velg OK: datamaskinen starter på nytt, og Vista fortsetter fra disken via CSMWrap. Hvis pinnen forblir tilkoblet, start denne diskens UEFI-oppføring fra fastvarens oppstartsmeny.",

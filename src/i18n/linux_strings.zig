@@ -82,6 +82,13 @@ pub const hashes = [_]u32{
     0x399e2996, // lx.no_disks_detected
     0x2be3334f, // lx.no_separate_xpsetup_partition_will_remain
     0x76d8d357, // lx.no_unattended_file_selected_skipped
+    0x0f924b74, // lx.nt4_after_restart
+    0x26b7fa06, // lx.nt4_checking
+    0x30c7d55b, // lx.nt4_failed
+    0x9dcb2084, // lx.nt4_install_title
+    0x69cefafb, // lx.nt4_needs_key
+    0xcfdf9246, // lx.nt4_needs_sp6a
+    0xff201299, // lx.nt4_needs_vm
     0xe5d5307c, // lx.one_partition_for_windows_and_automatic_setup
     0x02b9eb81, // lx.opening_data_partition
     0x03527491, // lx.opening_the_hardware_panel
@@ -280,6 +287,13 @@ pub const english = [_][]const u8{
     "No disks detected.",
     "No separate XPSETUP partition will remain.",
     "No unattended file selected - skipped.",
+    "After the restart the disk starts by itself into the installed {0}.",
+    "Checking the installed system",
+    "The Windows NT 4.0 installation did not finish. The computer was not restarted; logs: EFI/USOS/win9x/nt4",
+    "{0} installation in the background (start {1})",
+    "Windows NT 4.0 needs a product key: choose an answer profile with the key or type it when the menu asks",
+    "Windows NT 4.0 needs Service Pack 6a: put SP6I386.EXE into Systems\\Windows\\Windows NT 4.0\\ServicePack on USOS_DATA",
+    "Windows NT 4.0 installs only in the VM on this PC, which is not available: {0}",
     "One partition for Windows and automatic setup.",
     "Opening DATA partition",
     "Opening the hardware panel.",

@@ -1162,6 +1162,8 @@
 
   "boot.summary.xp_csmwrap": "XP bez CSM (experimentálne): CSMWrap, karta s legacy VBIOS, 1 jadro rezervované",
   "boot.summary.w9x_csmwrap": "Bez CSM (experimentálne): USOS pripraví disk FAT32 s inštaláciou a CSMWrap; inštalácia sa potom spustí z neho",
+  "boot.summary.nt4_csmwrap": "Bez CSM (experimentálne): celá inštalácia prebehne vo virtuálnom počítači na tomto PC; hotový systém sa potom spúšťa cez CSMWrap",
+  "boot.summary.nt4_limits": "Windows NT 4.0: použite klávesnicu PS/2 (vstup cez USB zatiaľ nefunguje); zobrazenie 640x480; vyžaduje SP6I386.EXE (Service Pack 6a) v priečinku Systems\\Windows\\Windows NT 4.0\\ServicePack na DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimentálne): chýba ovládač AHCI/NVMe/USB 3 pre NT 5.0 (SATA v režime IDE), max. 4 GB RAM a 2 procesory",
 
@@ -1188,6 +1190,13 @@
   "boot.lx.w9x_phase1_progress": "Nevypínajte počítač. Uplynulo: {0}, zapísané na disk: {1} MB.",
   "boot.lx.w9x_phase1_checking": "Kontrola výsledku fázy 1",
   "boot.lx.w9x_phase1_failed": "Fáza 1 Inštalácie Windows sa nedokončila. Počítač sa nereštartoval; protokoly: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "Inštalácia {0} na pozadí (začiatok {1})",
+  "boot.lx.nt4_checking": "Kontrola nainštalovaného systému",
+  "boot.lx.nt4_after_restart": "Po reštarte sa disk sám spustí do nainštalovaného systému {0}.",
+  "boot.lx.nt4_needs_sp6a": "Windows NT 4.0 vyžaduje Service Pack 6a: vložte SP6I386.EXE do priečinka Systems\\Windows\\Windows NT 4.0\\ServicePack na USOS_DATA",
+  "boot.lx.nt4_needs_key": "Windows NT 4.0 vyžaduje kód Product Key: zvoľte profil odpovedí s kľúčom alebo ho zadajte, keď oň ponuka požiada",
+  "boot.lx.nt4_needs_vm": "Windows NT 4.0 sa inštaluje iba vo virtuálnom počítači na tomto PC, ktorý nie je k dispozícii: {0}",
+  "boot.lx.nt4_failed": "Inštalácia Windows NT 4.0 sa nedokončila. Počítač sa nereštartoval; protokoly: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Reštartovať",
   "winpe.vista_csmwrap_title": "USOS - Vista bez CSM",
   "winpe.vista_csmwrap_done": "Prvá časť inštalácie Visty je dokončená. Teraz odpojte USB kľúč USOS a zvoľte OK: počítač sa reštartuje a Vista pokračuje z disku cez CSMWrap. Ak kľúč zostane pripojený, spustite položku UEFI tohto disku z ponuky zavádzania firmvéru.",

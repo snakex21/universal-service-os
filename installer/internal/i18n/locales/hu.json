@@ -1159,6 +1159,8 @@
 
   "boot.summary.xp_csmwrap": "XP CSM nélkül (kísérleti): CSMWrap, legacy VBIOS-os kártya, 1 mag fenntartva",
   "boot.summary.w9x_csmwrap": "CSM nélkül (kísérleti): az USOS FAT32 telepítőlemezt készít CSMWrappel; a telepítő ezután erről indul",
+  "boot.summary.nt4_csmwrap": "CSM nélkül (kísérleti): a teljes telepítés ezen a számítógépen egy virtuális gépben fut; a kész rendszer ezután CSMWrapen keresztül indul",
+  "boot.summary.nt4_limits": "Windows NT 4.0: használjon PS/2 billentyűzetet (USB-bevitel még nincs); kijelző 640x480; szükséges az SP6I386.EXE (Service Pack 6a) a DATA Systems\\Windows\\Windows NT 4.0\\ServicePack mappájában.",
 
   "boot.summary.w2k_limits": "Windows 2000 (kísérleti): nincs AHCI/NVMe/USB 3 illesztőprogram NT 5.0-hoz (SATA IDE módban), legfeljebb 4 GB RAM és 2 processzor",
 
@@ -1185,6 +1187,13 @@
   "boot.lx.w9x_phase1_progress": "Ne kapcsolja ki a számítógépet. Eltelt: {0}, lemezre írva: {1} MB.",
   "boot.lx.w9x_phase1_checking": "Az 1. szakasz eredményének ellenőrzése",
   "boot.lx.w9x_phase1_failed": "A Windows telepítő 1. szakasza nem fejeződött be. A számítógép nem indult újra; naplók: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "{0} telepítése a háttérben (kezdés: {1})",
+  "boot.lx.nt4_checking": "A telepített rendszer ellenőrzése",
+  "boot.lx.nt4_after_restart": "Az újraindítás után a lemez magától a telepített {0} rendszerbe indul.",
+  "boot.lx.nt4_needs_sp6a": "A Windows NT 4.0-hoz Service Pack 6a kell: tegye az SP6I386.EXE fájlt az USOS_DATA Systems\\Windows\\Windows NT 4.0\\ServicePack mappájába",
+  "boot.lx.nt4_needs_key": "A Windows NT 4.0-hoz termékkulcs kell: válasszon kulcsot tartalmazó válaszprofilt, vagy írja be, amikor a menü kéri",
+  "boot.lx.nt4_needs_vm": "A Windows NT 4.0 csak ezen a számítógépen, virtuális gépben telepíthető, ez azonban nem érhető el: {0}",
+  "boot.lx.nt4_failed": "A Windows NT 4.0 telepítése nem fejeződött be. A számítógép nem indult újra; naplók: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Újraindítás",
   "winpe.vista_csmwrap_title": "USOS - Vista CSM nélkül",
   "winpe.vista_csmwrap_done": "A Vista telepítésének első része befejeződött. Most húzza ki az USOS pendrive-ot, majd válassza az OK gombot: a számítógép újraindul, és a Vista a lemezről folytatódik a CSMWrap segítségével. Ha a pendrive csatlakoztatva marad, indítsa el ennek a lemeznek az UEFI bejegyzését a firmware rendszerindító menüjéből.",

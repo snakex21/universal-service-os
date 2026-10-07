@@ -1162,6 +1162,8 @@
 
   "boot.summary.xp_csmwrap": "XP без CSM (экспериментально): CSMWrap, видеокарта с legacy VBIOS, 1 ядро зарезервировано",
   "boot.summary.w9x_csmwrap": "Без CSM (экспериментально): USOS готовит диск FAT32 с установкой и CSMWrap; затем установка запускается с него",
+  "boot.summary.nt4_csmwrap": "Без CSM (экспериментально): вся установка выполняется в виртуальной машине на этом ПК; затем готовая система запускается через CSMWrap",
+  "boot.summary.nt4_limits": "Windows NT 4.0: используйте клавиатуру PS/2 (ввод через USB пока не работает); экран 640x480; нужен SP6I386.EXE (Service Pack 6a) в Systems\\Windows\\Windows NT 4.0\\ServicePack на DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (экспериментально): нет драйвера AHCI/NVMe/USB 3 для NT 5.0 (SATA в режиме IDE), не более 4 ГБ ОЗУ и 2 процессоров",
 
@@ -1188,6 +1190,13 @@
   "boot.lx.w9x_phase1_progress": "Не выключайте компьютер. Прошло: {0}, записано на диск: {1} МБ.",
   "boot.lx.w9x_phase1_checking": "Проверка результата этапа 1",
   "boot.lx.w9x_phase1_failed": "Этап 1 программы установки Windows не завершён. Компьютер не перезапускался; журналы: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "Установка {0} в фоновом режиме (начало {1})",
+  "boot.lx.nt4_checking": "Проверка установленной системы",
+  "boot.lx.nt4_after_restart": "После перезагрузки диск сам запустит установленную {0}.",
+  "boot.lx.nt4_needs_sp6a": "Для Windows NT 4.0 нужен Service Pack 6a: поместите SP6I386.EXE в Systems\\Windows\\Windows NT 4.0\\ServicePack на USOS_DATA",
+  "boot.lx.nt4_needs_key": "Для Windows NT 4.0 нужен ключ продукта: выберите профиль ответов с ключом или введите его, когда меню попросит",
+  "boot.lx.nt4_needs_vm": "Windows NT 4.0 устанавливается только в виртуальной машине на этом ПК, а она недоступна: {0}",
+  "boot.lx.nt4_failed": "Установка Windows NT 4.0 не завершена. Компьютер не перезапускался; журналы: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Перезагрузить",
   "winpe.vista_csmwrap_title": "USOS - Vista без CSM",
   "winpe.vista_csmwrap_done": "Первая часть установки Vista завершена. Отключите сейчас флешку USOS и нажмите OK: компьютер перезагрузится, и Vista продолжит установку с диска через CSMWrap. Если флешка останется подключённой, запустите UEFI-запись этого диска из загрузочного меню прошивки.",

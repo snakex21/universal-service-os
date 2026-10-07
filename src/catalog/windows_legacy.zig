@@ -38,7 +38,10 @@ pub const entries = [_]SystemEntry{
         .firmware = .any,
         .boot_methods = &methods,
     },
-    legacy("windows-nt-4", "Windows NT 4.0", "Windows NT 4.0", true),
+    // Windows NT 4.0 Workstation: from UEFI the whole install runs in QEMU
+    // on the target (profile nt4-x86-qemu-csmwrap, experimental;
+    // docs/nt4-2026-10-07.md), then the SP6a system starts through CSMWrap.
+    anyFirmware(legacy("windows-nt-4", "Windows NT 4.0", "Windows NT 4.0", true)),
     // Windows 95/98/Me: the BIOS Core's DOS Setup, and from UEFI the
     // micro-Linux disk preparation with a CSMWrap ESP (profile
     // w9x-uefi-csmwrap, experimental; docs/win9x-modern-2026-09-30.md 4c).

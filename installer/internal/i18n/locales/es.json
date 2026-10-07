@@ -1159,6 +1159,8 @@
 
   "boot.summary.xp_csmwrap": "XP sin CSM (experimental): CSMWrap, tarjeta con VBIOS legacy, 1 núcleo reservado",
   "boot.summary.w9x_csmwrap": "Sin CSM (experimental): USOS prepara un disco FAT32 con el instalador y CSMWrap; luego el instalador arranca desde él",
+  "boot.summary.nt4_csmwrap": "Sin CSM (experimental): toda la instalación se ejecuta en una máquina virtual en este equipo; después el sistema terminado arranca mediante CSMWrap",
+  "boot.summary.nt4_limits": "Windows NT 4.0: use un teclado PS/2 (aún sin entrada USB); pantalla 640x480; necesita SP6I386.EXE (Service Pack 6a) en Systems\\Windows\\Windows NT 4.0\\ServicePack en DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimental): sin controlador AHCI/NVMe/USB 3 para NT 5.0 (SATA en modo IDE), máx. 4 GB de RAM y 2 CPU",
 
@@ -1185,6 +1187,13 @@
   "boot.lx.w9x_phase1_progress": "No apague el equipo. Transcurrido: {0}, escrito en el disco: {1} MB.",
   "boot.lx.w9x_phase1_checking": "Comprobando el resultado de la etapa 1",
   "boot.lx.w9x_phase1_failed": "La etapa 1 del programa de instalación de Windows no terminó. El equipo no se reinició; registros: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "Instalación de {0} en segundo plano (inicio {1})",
+  "boot.lx.nt4_checking": "Comprobando el sistema instalado",
+  "boot.lx.nt4_after_restart": "Tras el reinicio el disco arranca solo en el {0} instalado.",
+  "boot.lx.nt4_needs_sp6a": "Windows NT 4.0 necesita el Service Pack 6a: coloque SP6I386.EXE en Systems\\Windows\\Windows NT 4.0\\ServicePack en USOS_DATA",
+  "boot.lx.nt4_needs_key": "Windows NT 4.0 necesita una clave de producto: elija un perfil de respuestas con la clave o escríbala cuando el menú la pida",
+  "boot.lx.nt4_needs_vm": "Windows NT 4.0 solo se instala en la máquina virtual de este equipo, que no está disponible: {0}",
+  "boot.lx.nt4_failed": "La instalación de Windows NT 4.0 no terminó. El equipo no se reinició; registros: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Reiniciar",
   "winpe.vista_csmwrap_title": "USOS - Vista sin CSM",
   "winpe.vista_csmwrap_done": "La primera parte de la instalación de Vista ha terminado. Retire ahora la memoria USOS y elija Aceptar: el equipo se reinicia y Vista continúa desde el disco mediante CSMWrap. Si la memoria sigue conectada, inicie la entrada UEFI de este disco desde el menú de arranque del firmware.",

@@ -98,7 +98,41 @@ void __cdecl _enable(void);
 #define USOS_HAL_REBOOT_ROUTINE   3
 __declspec(dllimport) VOID NTAPI HalReturnToFirmware(IN ULONG Routine);
 
+#ifdef USOSRST_NT4
+/* NT 4.0 build (build-nt4.cmd): three kernel routines this driver uses
+   came with Windows 2000, so the NT 4.0 build replaces them.
+   KeQueryInterruptTime: the interrupt time the kernel keeps in the shared
+   user data page (KSYSTEM_TIME, read until both high parts agree).
+   KeQueryActiveProcessors: NT 4.0 numbers its processors 0..n-1, so the
+   mask follows from KeNumberProcessors. IoRegisterLastChanceShutdownNotification
+   does not exist; see RedirectKernelRestart instead. */
+static ULONGLONG
+UsosInterruptTime(VOID)
+{
+    LARGE_INTEGER t;
+
+    do {
+        t.HighPart = SharedUserData->InterruptTime.High1Time;
+        t.LowPart = SharedUserData->InterruptTime.LowPart;
+    } while (t.HighPart != SharedUserData->InterruptTime.High2Time);
+    return (ULONGLONG)t.QuadPart;
+}
+#define KeQueryInterruptTime() UsosInterruptTime()
+
+static KAFFINITY
+UsosActiveProcessors(VOID)
+{
+    CCHAR n = KeNumberProcessors;
+
+    if (n <= 0) return 1;
+    if (n >= (CCHAR)(sizeof(KAFFINITY) * 8)) return (KAFFINITY)-1;
+    return ((KAFFINITY)1 << n) - 1;
+}
+#define KeQueryActiveProcessors() UsosActiveProcessors()
+#define USOSRST_VERSION "usosrst 1.4-nt4"
+#else
 #define USOSRST_VERSION "usosrst 1.4"
+#endif
 #define ROW_HB          1
 #define ROW_LOAD        2
 #define ROW_STALL       3
@@ -370,6 +404,7 @@ ResetMachine(VOID)
     StallMs(500);
 }
 
+#ifndef USOSRST_NT4
 static NTSTATUS
 ShutdownDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 {
@@ -385,6 +420,7 @@ ShutdownDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
     IoCompleteRequest(Irp, IO_NO_INCREMENT);
     return STATUS_SUCCESS;
 }
+#endif
 
 /* ------------------------------------------------------------------ */
 /* Text-mode Setup restart                                             */
@@ -524,6 +560,29 @@ RedirectSetupRestart(VOID)
     n = PatchImports(base, (ULONG)HalReturnToFirmware, (ULONG)SetupReturnToFirmware);
     return (CHAR)(n > 0 ? 'o' : 'x');
 }
+
+#ifdef USOSRST_NT4
+/* NT 4.0 has no last-chance shutdown notification. Its kernel restarts by
+   calling HalReturnToFirmware(HalRebootRoutine) after the file systems and
+   disks are flushed, so the kernel's import slot for it is pointed at the
+   same routine as setupdd.sys's: reboot/restart run the reset sequence,
+   every other routine (and a reset that did not happen) goes on to the
+   HAL. Unlike the 2000 handler this stays on after Setup: only restarts
+   are taken over, and the NT 4.0 HALs restart through the 8042 alone.
+   TRUE when at least one slot was redirected. */
+static BOOLEAN
+RedirectKernelRestart(VOID)
+{
+    static const char *kernels[2] = { "ntoskrnl.exe", "ntkrnlmp.exe" };
+    PUCHAR kernel = NULL;
+    ULONG i;
+
+    for (i = 0; i < 2 && kernel == NULL; i++) kernel = FindModule(kernels[i]);
+    if (kernel == NULL) return FALSE;
+    g_HalReturnToFirmware = (USOS_RETURN_TO_FIRMWARE)(ULONG)HalReturnToFirmware;
+    return (BOOLEAN)(PatchImports(kernel, (ULONG)HalReturnToFirmware, (ULONG)SetupReturnToFirmware) > 0);
+}
+#endif
 
 static BOOLEAN
 SetupInProgress(VOID)
@@ -1313,7 +1372,9 @@ NTSTATUS
 DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 {
     PHYSICAL_ADDRESS vga;
+#ifndef USOSRST_NT4
     PDEVICE_OBJECT device = NULL;
+#endif
     BOOLEAN shutdownHandler = FALSE;
     CHAR restart;
     CHAR line[80];
@@ -1339,6 +1400,9 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
         ShowClock();
         StartHeartbeat();
     }
+#ifdef USOSRST_NT4
+    shutdownHandler = RedirectKernelRestart();
+#else
     if (g_InSetup && NT_SUCCESS(IoCreateDevice(DriverObject, 0, NULL, FILE_DEVICE_UNKNOWN, 0, FALSE, &device))) {
         DriverObject->MajorFunction[IRP_MJ_SHUTDOWN] = ShutdownDispatch;
         if (NT_SUCCESS(IoRegisterLastChanceShutdownNotification(device))) {
@@ -1347,6 +1411,7 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
             IoDeleteDevice(device);
         }
     }
+#endif
 
     /* The load line: shows that the driver ran and what it found. */
     p = PutStr(line, end, USOSRST_VERSION " rsdp=");

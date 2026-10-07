@@ -1162,6 +1162,8 @@
 
   "boot.summary.xp_csmwrap": "XP be CSM (eksperimentinis): CSMWrap, plokštė su legacy VBIOS, 1 branduolys rezervuotas",
   "boot.summary.w9x_csmwrap": "Be CSM (eksperimentinis): USOS paruošia FAT32 diegimo diską su CSMWrap; diegimas paleidžiamas iš jo",
+  "boot.summary.nt4_csmwrap": "Be CSM (eksperimentinis): visas diegimas vyksta virtualioje mašinoje šiame kompiuteryje; paruošta sistema po to paleidžiama per CSMWrap",
+  "boot.summary.nt4_limits": "Windows NT 4.0: naudokite PS/2 klaviatūrą (USB įvestis dar neveikia); ekranas 640x480; reikia SP6I386.EXE (Service Pack 6a) aplanke Systems\\Windows\\Windows NT 4.0\\ServicePack skaidinyje DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentinė): nėra NT 5.0 AHCI/NVMe/USB 3 tvarkyklės (SATA IDE režimu), daugiausia 4 GB RAM ir 2 procesoriai",
 
@@ -1188,6 +1190,13 @@
   "boot.lx.w9x_phase1_progress": "Neišjunkite kompiuterio. Praėjo: {0}, įrašyta į diską: {1} MB.",
   "boot.lx.w9x_phase1_checking": "Tikrinamas 1 etapo rezultatas",
   "boot.lx.w9x_phase1_failed": "Windows sąrankos 1 etapas nebaigtas. Kompiuteris nebuvo paleistas iš naujo; žurnalai: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "{0} diegimas fone (pradžia {1})",
+  "boot.lx.nt4_checking": "Tikrinama įdiegta sistema",
+  "boot.lx.nt4_after_restart": "Po paleidimo iš naujo diskas pats paleis įdiegtą {0}.",
+  "boot.lx.nt4_needs_sp6a": "Windows NT 4.0 reikia Service Pack 6a: įdėkite SP6I386.EXE į aplanką Systems\\Windows\\Windows NT 4.0\\ServicePack skaidinyje USOS_DATA",
+  "boot.lx.nt4_needs_key": "Windows NT 4.0 reikia produkto rakto: pasirinkite atsakymų profilį su raktu arba įveskite jį, kai meniu paprašys",
+  "boot.lx.nt4_needs_vm": "Windows NT 4.0 diegiama tik šio kompiuterio virtualioje mašinoje, kuri nepasiekiama: {0}",
+  "boot.lx.nt4_failed": "Windows NT 4.0 diegimas nebaigtas. Kompiuteris nebuvo paleistas iš naujo; žurnalai: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Paleisti iš naujo",
   "winpe.vista_csmwrap_title": "USOS - Vista be CSM",
   "winpe.vista_csmwrap_done": "Pirmoji Vista diegimo dalis baigta. Dabar ištraukite USOS atmintuką ir pasirinkite Gerai: kompiuteris bus paleistas iš naujo, o Vista tęs diegimą iš disko per CSMWrap. Jei atmintukas liks prijungtas, paleiskite šio disko UEFI įrašą iš programinės aparatinės įrangos paleidimo meniu.",

@@ -538,7 +538,17 @@ DriverEntry(IN PVOID DriverObject, IN PVOID Argument2)
 
     ZeroMemoryBytes(&initData, sizeof(HW_INITIALIZATION_DATA));
 
+#ifdef AHCI_NT4_WDK
+    /* MODIFIED (USOS 1.3.0.0-usos4, NT4 build with WDK 7.1 headers,
+       src/NT4WDK): NT 4.0 ScsiPort rejects a HwInitializationDataSize
+       above its own structure (0x4C on i386, everything before
+       HwAdapterControl). The NT4 DDK headers give that size; the WDK 7.1
+       headers add HwAdapterControl, so report the NT4 size explicitly.
+       HwAdapterControl stays NULL. */
+    initData.HwInitializationDataSize = FIELD_OFFSET(HW_INITIALIZATION_DATA, HwAdapterControl);
+#else
     initData.HwInitializationDataSize = sizeof(HW_INITIALIZATION_DATA);
+#endif
     initData.HwInitialize = AhciHwInitialize;
     initData.HwStartIo = AhciStartIo;
     initData.HwInterrupt = AhciInterrupt;
