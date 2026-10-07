@@ -2,10 +2,10 @@
 # Microsoft Mouse, EGA (more than 64K), no printer, C:\WINDOWS.
 wait "Setup prepares Microsoft Windows to run"
 key c
-# The "To setup ... you need" page: in QEMU it did not stay on the screen
-# once C was typed on the first page, so the script does not wait for it.
 wait "full pathname of the directory"
 key enter
+wait "To setup Microsoft Windows on a hard disk you need"
+key c
 wait "Type the number for your keyboard"
 key enter
 wait "Type the number for your pointing device"
