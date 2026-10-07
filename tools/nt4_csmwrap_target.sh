@@ -118,6 +118,32 @@ nt4_resolve_time_zone() {
         { printf "%s\r\n", line }'
 }
 
+# The Server pages of GUI-mode Setup (stdin -> stdout, CR LF) when the CD's
+# TXTSETUP.SIF [SetupData] ProductType ($1) is not 0 (Workstation): NT 4.0
+# Server and Enterprise Server Setup wait on "Server Type" (syssetup.dll,
+# [GuiUnattended] AdvServerType = SERVERNT | LANSECNT | LANMANNT) and on
+# "Choose Licensing Mode" (liccpa.cpl, [LicenseFilePrintData] AutoMode /
+# AutoUsers) when the answer lacks them (X470 2026-10-07: the install VM sat
+# on a page at 15 MB written). Stand-alone server (no network is installed,
+# so no domain role), Per Server for 5 connections; keys already in the
+# answer are kept.
+nt4_server_answer() {
+    awk -v BINMODE=3 -v product="$1" '
+        { line = $0; sub(/\r$/, "", line); lines[++n] = line; low = tolower(line); gsub(/[ \t]/, "", low)
+          if (low ~ /^advservertype=/) has_type = 1
+          if (low == "[licensefileprintdata]") has_lic = 1 }
+        END {
+            server = (product != "" && product != "0")
+            for (i = 1; i <= n; i++) {
+                printf "%s\r\n", lines[i]
+                low = tolower(lines[i]); gsub(/[ \t]/, "", low)
+                if (server && !has_type && low == "[guiunattended]") { printf "AdvServerType = SERVERNT\r\n"; has_type = 1 }
+            }
+            if (server && !has_type) printf "\r\n[GuiUnattended]\r\nAdvServerType = SERVERNT\r\n"
+            if (server && !has_lic) printf "\r\n[LicenseFilePrintData]\r\nAutoMode = PerServer\r\nAutoUsers = 5\r\n"
+        }'
+}
+
 for tool in dd od mkfs.fat mdir syslinux mount umount losetup blockdev awk sync wc tr; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
@@ -163,7 +189,8 @@ major=$(awk '{ sub(/\r$/, "") } /^\[/ { s = (tolower($0) == "[setupdata]") } s &
 lang=$(awk '{ sub(/\r$/, "") } tolower($1) == "unicodecasetable" { n = split($0, a, ","); v = a[n]; gsub(/[ \t]/, "", v); print v; exit }' "$txtsetup")
 product=$(awk '{ sub(/\r$/, "") } /^\[/ { s = (tolower($0) == "[setupdata]") } s && tolower($1) == "producttype" { v = $0; sub(/^[^=]*=[ \t]*/, "", v); print v; exit }' "$txtsetup")
 log "source: NT 4.0 ProductType=${product:-?} language=${lang:-?}"
-nt4_resolve_time_zone "${lang:-}" < "$ANSWER_SIF" > "$work/WINNT.SIF" || fail 'cannot prepare WINNT.SIF'
+nt4_resolve_time_zone "${lang:-}" < "$ANSWER_SIF" | nt4_server_answer "${product:-0}" > "$work/WINNT.SIF" || fail 'cannot prepare WINNT.SIF'
+[ "${product:-0}" = 0 ] || log 'server CD: stand-alone server (AdvServerType = SERVERNT), licensing Per Server 5 (LicenseFilePrintData)'
 if grep -qi '^TimeZone' "$work/WINNT.SIF"; then log 'time zone: set for this CD language'; else log 'time zone: none (Setup asks)'; fi
 
 # ---------------------------------------------------------------- the disk

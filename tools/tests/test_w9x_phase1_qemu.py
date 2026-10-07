@@ -131,6 +131,34 @@ class Phase1Vm(unittest.TestCase):
         self.assertNotIn('key typed', command)
         self.assertNotIn('stalled', command)
 
+    def test_stall_rule_without_a_key_when_asked(self):
+        # NT 4.0 (W9X_VM_STALL_ANY=1): no key, but a run without disk writes
+        # still ends (rc 3) and reports the idle seconds.
+        if self.run_lib('command -v mkfifo')[0] != 0:
+            self.skipTest('no mkfifo in this sh')
+        rc, out, err = self.run_lib('w9x_phase1_run /dev/fake tcg; echo "rc=$? stalled=$W9X_VM_STALLED"', W9X_FAKE_SLEEP='30',
+                                    W9X_VM_STALL_ANY='1', W9X_VM_IDLE='1', W9X_VM_STALL='4')
+        self.assertIn('rc=3 stalled=', out, err)
+        self.assertGreaterEqual(int(out.split('stalled=')[1].split()[0]), 4)
+        command = (self.tmp / 'run/command.txt').read_text()
+        self.assertIn('stalled: no disk write', command)
+        self.assertNotIn('key typed', command)
+        self.assertNotIn('answer typed', command)
+
+    def test_answer_key_for_a_waiting_message_box(self):
+        if self.run_lib('command -v mkfifo')[0] != 0:
+            self.skipTest('no mkfifo in this sh')
+        rc, out, err = self.run_lib('w9x_vm_graphics_screen() { return 0; }\nw9x_phase1_run /dev/fake tcg; echo "rc=$?"', W9X_FAKE_SLEEP='14',
+                                    W9X_VM_STALL_ANY='1', W9X_VM_ANSWER='alt-n', W9X_VM_ANSWER_IDLE='1', W9X_VM_ANSWER_TRIES='1')
+        self.assertIn('rc=0', out, err)
+        command = (self.tmp / 'run/command.txt').read_text()
+        self.assertIn('answer typed: alt-n attempt 1', command)
+        self.assertNotIn('attempt 2', command)
+        # Text mode (no graphics screen): never typed.
+        rc, out, err = self.run_lib('w9x_vm_graphics_screen() { return 1; }\nw9x_phase1_run /dev/fake tcg; echo "rc=$?"', W9X_FAKE_SLEEP='8',
+                                    W9X_VM_STALL_ANY='1', W9X_VM_ANSWER='alt-n', W9X_VM_ANSWER_IDLE='1')
+        self.assertNotIn('answer typed', (self.tmp / 'run/command.txt').read_text())
+
     def test_tcg_is_the_default_kvm_needs_flag_and_device(self):
         self.assertEqual(self.run_lib('w9x_vm_accel')[1].strip(), 'tcg')
         (self.tmp / 'flags/phase1-kvm.flag').write_bytes(b'')

@@ -48,9 +48,17 @@ W9X_VM_SCREEN_EVERY=${W9X_VM_SCREEN_EVERY:-60}
 W9X_VM_IDLE=${W9X_VM_IDLE:-60}
 W9X_VM_KEY_TRIES=${W9X_VM_KEY_TRIES:-5}
 W9X_VM_KEY_MAX_MB=${W9X_VM_KEY_MAX_MB:-64}
-# With key typing: no disk write for this long ends the VM (rc 3), instead of
-# waiting for the full timeout on a page nobody can answer.
+# With key typing, or with W9X_VM_STALL_ANY=1 (NT 4.0: no key to type), no
+# disk write for this long ends the VM (rc 3, W9X_VM_STALLED = the idle
+# seconds) instead of waiting for the full timeout on a page nobody answers.
 W9X_VM_STALL=${W9X_VM_STALL:-1800}
+# A message box that needs one known key (W9X_VM_ANSWER, a QEMU sendkey name;
+# NT 4.0: alt-n): typed when a graphics screen got no disk write for
+# W9X_VM_ANSWER_IDLE seconds, at most W9X_VM_ANSWER_TRIES times per run, the
+# screen before it kept as answer-N.ppm. Off when empty.
+W9X_VM_ANSWER=${W9X_VM_ANSWER:-}
+W9X_VM_ANSWER_IDLE=${W9X_VM_ANSWER_IDLE:-180}
+W9X_VM_ANSWER_TRIES=${W9X_VM_ANSWER_TRIES:-3}
 
 # 0 when this system's Setup phase 1 runs in the VM (reason on stdout).
 w9x_vm_available() {
@@ -182,6 +190,8 @@ w9x_phase1_run() {
     key_on_screen=0
     last_written=-1
     idle_since=0
+    W9X_VM_STALLED=0
+    answer_tries=0
     set --
     while IFS= read -r arg; do set -- "$@" "$arg"; done <<EOF
 $("${W9X_VM_ARGS_FN:-w9x_vm_args}" "$target" "$accel")
@@ -203,14 +213,14 @@ EOF
             last_written=$sectors
             idle_since=$now
             key_on_screen=0
-        elif [ -n "$key" ]; then
+        elif [ -n "$key" ] || [ "${W9X_VM_STALL_ANY:-0}" = 1 ]; then
             idle=$((now - idle_since))
-            if [ "$idle" -ge "$W9X_VM_IDLE" ] && [ "$key_tries" -lt "$W9X_VM_KEY_TRIES" ] && [ "$written" -lt "$W9X_VM_KEY_MAX_MB" ] &&
+            if [ -n "$key" ] && [ "$idle" -ge "$W9X_VM_IDLE" ] && [ "$key_tries" -lt "$W9X_VM_KEY_TRIES" ] && [ "$written" -lt "$W9X_VM_KEY_MAX_MB" ] &&
                 ! w9x_vm_graphics_screen; then
                 # Text mode (DOS: INSTALL.BAT, Patcher9x, Setup's DOS stage):
                 # no page of Setup's mini-Windows waits; look again later.
                 idle_since=$(date +%s)
-            elif [ "$idle" -ge "$W9X_VM_IDLE" ] && [ "$key_tries" -lt "$W9X_VM_KEY_TRIES" ] && [ "$written" -lt "$W9X_VM_KEY_MAX_MB" ]; then
+            elif [ -n "$key" ] && [ "$idle" -ge "$W9X_VM_IDLE" ] && [ "$key_tries" -lt "$W9X_VM_KEY_TRIES" ] && [ "$written" -lt "$W9X_VM_KEY_MAX_MB" ]; then
                 key_tries=$((key_tries + 1))
                 printf 'key typed: attempt %s at %ss, idle %ss, written %s MB\n' "$key_tries" "$elapsed" "$idle" "$written" >> "$W9X_VM_RUN/command.txt"
                 # Until the guest writes again the page may still show the
@@ -218,8 +228,17 @@ EOF
                 key_on_screen=1
                 w9x_vm_type_key "$key"
                 idle_since=$(date +%s)
+            elif [ -n "$W9X_VM_ANSWER" ] && [ "$idle" -ge "$W9X_VM_ANSWER_IDLE" ] && [ "$answer_tries" -lt "$W9X_VM_ANSWER_TRIES" ] &&
+                w9x_vm_graphics_screen; then
+                answer_tries=$((answer_tries + 1))
+                w9x_vm_monitor "screendump $W9X_VM_RUN/answer-$answer_tries.ppm"
+                sleep 3
+                printf 'answer typed: %s attempt %s at %ss, idle %ss, written %s MB\n' "$W9X_VM_ANSWER" "$answer_tries" "$elapsed" "$idle" "$written" >> "$W9X_VM_RUN/command.txt"
+                w9x_vm_monitor "sendkey $W9X_VM_ANSWER"
+                idle_since=$(date +%s)
             elif [ "$idle" -ge "$W9X_VM_STALL" ]; then
                 printf 'stalled: no disk write for %ss\n' "$idle" >> "$W9X_VM_RUN/command.txt"
+                W9X_VM_STALLED=$idle
                 result=3
                 [ "$key_on_screen" = 1 ] || w9x_vm_monitor "screendump $W9X_VM_RUN/screen.ppm"
                 sleep 3
@@ -387,7 +406,7 @@ w9x_phase1_verify() {
 # The VM's logs (and the last screen) next to prepare.log on the USOS ESP.
 w9x_phase1_keep_logs() {
     mkdir -p "$1"
-    for file in command.txt qemu.log serial.log seabios.log monitor.log screen.ppm; do
+    for file in command.txt qemu.log serial.log seabios.log monitor.log screen.ppm answer-1.ppm answer-2.ppm answer-3.ppm; do
         [ -f "$W9X_VM_RUN/$file" ] && cp "$W9X_VM_RUN/$file" "$1/$file" 2>/dev/null
     done
     sync

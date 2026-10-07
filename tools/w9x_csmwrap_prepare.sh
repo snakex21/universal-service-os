@@ -311,9 +311,18 @@ usos_w9x_csmwrap_prepare() {
         w9x_csmwrap_log "NT4 vm rc=$vm_rc elapsed=${NT4_VM_ELAPSED:-?}s"
         usos_ui_stage 5 5 'Checking the installed system' '' || true
         if [ "$vm_rc" != 0 ] || ! vm_check=$(nt4_vm_finish "$TARGET_DEVICE" "$W9X_DIR/nt4"); then
-            w9x_csmwrap_log "NT4 FAILED rc=$vm_rc ${vm_check:-}"
+            w9x_csmwrap_log "NT4 FAILED rc=$vm_rc stalled=${NT4_VM_STALLED:-0}s ${vm_check:-}"
             umount /mnt/data 2>/dev/null || true
             sync
+            if [ "$vm_rc" = 3 ] && [ "${NT4_VM_STALLED:-0}" -gt 0 ]; then
+                stop "Windows NT 4.0 Setup stopped writing to the disk for $((NT4_VM_STALLED / 60)) minutes (start ${NT4_VM_BOOT:-?}): a Setup page is waiting for input. The computer was not restarted; the last screen and logs: EFI/USOS/win9x/nt4"
+            fi
+            case "${vm_check:-}" in *'no Service Pack 6'*)
+                # SP6a's update.exe refuses a CD of another language ("This
+                # Service Pack is for a different language", QEMU 2026-10-07:
+                # the Polish SP6a on the English Enterprise Server CD).
+                stop "Service Pack 6a did not install. It must be the same language as the CD: put SP6I386.EXE of that language into Systems\\Windows\\$folder\\ServicePack on USOS_DATA (that folder is used before the Workstation one). Logs: EFI/USOS/win9x/nt4" ;;
+            esac
             stop 'The Windows NT 4.0 installation did not finish. The computer was not restarted; logs: EFI/USOS/win9x/nt4'
         fi
         w9x_csmwrap_log "NT4 PASS $vm_check"

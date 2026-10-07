@@ -61,6 +61,15 @@ class Nt4Vm(unittest.TestCase):
         # The C:\ entry (BOOTSECT.DOS = the syslinux boot sector) is dropped.
         self.assertNotIn('C:\\', text)
 
+    def test_boot_ini_drops_the_enterprise_maxmem(self):
+        ini = '[operating systems]\r\nmulti(0)disk(0)rdisk(0)partition(1)\\WINNT="Windows NT Server Version 4.00" /maxmem=256\r\n'
+        (self.tmp / 'boot.ini').write_bytes(ini.encode('ascii'))
+        rc, out, err = sh(f'. "{VM}"; . "{NT4}"; nt4_boot_ini < "{(self.tmp / "boot.ini").as_posix()}" > "{(self.tmp / "out.ini").as_posix()}"')
+        self.assertEqual(rc, 0, err)
+        text = (self.tmp / 'out.ini').read_bytes().decode('ascii')
+        self.assertIn('"Windows NT Server Version 4.00" /NUMPROC=2 /MAXMEM=1024\r\n', text)
+        self.assertNotIn('maxmem=256', text)
+
     def test_ci_path_finds_lower_case_nt_names(self):
         root = self.tmp / 'c'
         (root / 'winnt' / 'system32').mkdir(parents=True)
@@ -103,6 +112,19 @@ nt4_vm_install /dev/sdz "{(self.tmp / 'l').as_posix()}" tcg; echo "rc=$?"
         rc, out, err = sh(script)
         self.assertIn('rc=3', out)
 
+    def test_install_turns_on_the_stall_rule(self):
+        # NT 4.0 has no key to type; a Setup page that waits must still end the
+        # run (X470 2026-10-07: Server sat 40 minutes at 15 MB).
+        script = f'''. "{VM}"; . "{NT4}"
+w9x_phase1_run() {{ echo "any=$W9X_VM_STALL_ANY stall=$W9X_VM_STALL answer=$W9X_VM_ANSWER"; W9X_VM_STALLED=905; return 3; }}
+w9x_phase1_keep_logs() {{ mkdir -p "$1"; }}
+nt4_vm_install /dev/sdz "{(self.tmp / 'l').as_posix()}" tcg; echo "rc=$? nt4_stalled=$NT4_VM_STALLED"
+'''
+        rc, out, err = sh(script)
+        self.assertIn('any=1 stall=900 answer=alt-n', out, err)
+        self.assertIn('rc=3 nt4_stalled=905', out)
+        self.assertIn('stalled=905', (self.tmp / 'l/runs.txt').read_text())
+
     def test_vm_available_for_nt4(self):
         share = self.tmp / 'share'
         share.mkdir()
@@ -116,6 +138,45 @@ nt4_vm_install /dev/sdz "{(self.tmp / 'l').as_posix()}" tcg; echo "rc=$?"
         for tag in ('NT4', 'NT4S'):
             rc, out, err = sh(f'. "{VM}"; w9x_vm_available {tag}', env)
             self.assertEqual(rc, 0, out + err)
+
+
+class Nt4ServerAnswer(unittest.TestCase):
+    """NT 4.0 Server / Enterprise Server GUI pages (nt4_server_answer)."""
+
+    def run_fn(self, product, text):
+        tmp = Path(tempfile.mkdtemp(prefix='usos-nt4-srv-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / 'in.sif').write_bytes(text.encode('ascii'))
+        fn = function_text(TARGET, 'nt4_server_answer')
+        rc, out, err = sh(f'{fn}\nnt4_server_answer "{product}" < "{(tmp / "in.sif").as_posix()}" > "{(tmp / "out.sif").as_posix()}"')
+        self.assertEqual(rc, 0, err)
+        return (tmp / 'out.sif').read_bytes().decode('ascii')
+
+    SIF = '[UserData]\r\nFullName = "USOS"\r\n\r\n[GuiUnattended]\r\nOemSkipWelcome = 1\r\nOEMBlankAdminPassword = 1\r\n\r\n[Display]\r\nXResolution = 640\r\n'
+
+    def test_workstation_cd_unchanged(self):
+        self.assertEqual(self.run_fn('0', self.SIF), self.SIF)
+        self.assertEqual(self.run_fn('', self.SIF), self.SIF)
+
+    def test_server_cd_gets_role_and_licensing(self):
+        out = self.run_fn('1', self.SIF)
+        self.assertIn('[GuiUnattended]\r\nAdvServerType = SERVERNT\r\nOemSkipWelcome = 1\r\n', out)
+        self.assertTrue(out.endswith('[Display]\r\nXResolution = 640\r\n\r\n[LicenseFilePrintData]\r\nAutoMode = PerServer\r\nAutoUsers = 5\r\n'))
+        self.assertEqual(out.count('AdvServerType'), 1)
+        self.assertNotIn('\r\r', out)
+
+    def test_server_keys_already_present_are_kept(self):
+        text = '[GuiUnattended]\r\nAdvServerType = LANMANNT\r\n[LicenseFilePrintData]\r\nAutoMode = PerSeat\r\n'
+        self.assertEqual(self.run_fn('1', text), text)
+
+    def test_server_without_gui_section(self):
+        out = self.run_fn('1', '[UserData]\nFullName = "A"\n')
+        self.assertIn('[GuiUnattended]\r\nAdvServerType = SERVERNT\r\n', out)
+        self.assertIn('[LicenseFilePrintData]\r\nAutoMode = PerServer\r\nAutoUsers = 5\r\n', out)
+
+    def test_target_pipes_the_answer_through_it(self):
+        text = TARGET.read_text(encoding='utf-8')
+        self.assertIn('| nt4_server_answer "${product:-0}" > "$work/WINNT.SIF"', text)
 
 
 class Nt4Target(unittest.TestCase):
@@ -173,10 +234,12 @@ class Nt4Prepare(unittest.TestCase):
     def test_prepare_routes_nt4(self):
         text = PREPARE.read_text(encoding='utf-8')
         self.assertIn('windows-nt-4) tag=NT4', text)
+        # A run that stopped writing gets its own message, not the generic one.
+        self.assertIn('stopped writing to the disk for $((NT4_VM_STALLED / 60)) minutes', text)
         self.assertIn('windows-nt-4-server) tag=NT4S', text)
         self.assertIn('nt4_vm_install "$TARGET_DEVICE"', text)
         self.assertIn('nt4_vm_finish "$TARGET_DEVICE"', text)
-        self.assertRegex(text, re.compile(r'nt4_vm_finish.*\n(.*\n){0,12}.*xp_csmwrap_esp\.sh', re.M))
+        self.assertRegex(text, re.compile(r'nt4_vm_finish.*\n(.*\n){0,25}.*xp_csmwrap_esp\.sh', re.M))
         self.assertIn('-iname \'sp6i386.exe\'', text)
 
 
