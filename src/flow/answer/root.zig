@@ -13,6 +13,7 @@ pub const editions = @import("editions.zig");
 pub const sha512crypt = @import("sha512crypt.zig");
 pub const linux = @import("linux.zig");
 pub const applies = @import("applies.zig");
+pub const msbatch = @import("msbatch.zig");
 
 pub const Profile = profile.Profile;
 pub const Arch = target.Arch;
@@ -47,14 +48,17 @@ pub fn matchEdition(p: *const Profile, system_id: []const u8, images: ?*const ed
 /// at start); null uses the profile's. `images`: the install images of the
 /// chosen media, for the profile's edition (null: no edition written).
 pub fn render(p: *const Profile, system_id: []const u8, arch: Arch, key: ?[]const u8, images: ?*const editions.List, buffer: []u8) !?Rendered {
-    const family = target.familyFor(system_id) orelse return null;
     const use_key = key orelse p.keyFor(system_id);
-    if (family.nt5()) return .{ .format = .nt5_settings, .bytes = try nt5.render(p, family, use_key, buffer) };
+    if (msbatch.releaseFor(system_id)) |release| return .{ .format = .msbatch_inf, .bytes = try msbatch.render(p, release, use_key, buffer) };
+    const family = target.familyFor(system_id) orelse return null;
+    // NT keys are 5x5 only (a Windows 95 key in the profile's `key=` is not theirs).
+    const nt_key = if (profile.keyShape(use_key) == .five_by_five) use_key else "";
+    if (family.nt5()) return .{ .format = .nt5_settings, .bytes = try nt5.render(p, family, nt_key, buffer) };
     const image_index: ?u16 = switch (matchEdition(p, system_id, images)) {
         .found => |image| image.index,
         else => null,
     };
-    const xml = try autounattend.render(.{ .profile = p, .family = family, .arch = arch, .key = use_key, .image_index = image_index }, buffer);
+    const xml = try autounattend.render(.{ .profile = p, .family = family, .arch = arch, .key = nt_key, .image_index = image_index }, buffer);
     try xml_check.wellFormed(xml);
     try schema.check(xml, family, null);
     return .{ .format = .autounattend_xml, .bytes = xml };
@@ -73,6 +77,7 @@ test {
     _ = sha512crypt;
     _ = linux;
     _ = applies;
+    _ = msbatch;
 }
 
 test "render dispatch per system" {
@@ -87,7 +92,10 @@ test "render dispatch per system" {
     const ten = (try render(&p, "windows-10", .amd64, null, null, &buffer)).?;
     try std.testing.expectEqual(plan_file.Format.autounattend_xml, ten.format);
     try std.testing.expect(std.mem.indexOf(u8, ten.bytes, "AAAAA") == null);
-    try std.testing.expect((try render(&p, "windows-98-se", .x86, null, null, &buffer)) == null);
+    const ninety_eight = (try render(&p, "windows-98-se", .x86, null, null, &buffer)).?;
+    try std.testing.expectEqual(plan_file.Format.msbatch_inf, ninety_eight.format);
+    try std.testing.expect(std.mem.indexOf(u8, ninety_eight.bytes, "Name=\"Tester\"") != null);
+    try std.testing.expect((try render(&p, "windows-3-1", .x86, null, null, &buffer)) == null);
 }
 
 test "a key typed without dashes renders dashed in WINNT.SIF settings and autounattend.xml" {

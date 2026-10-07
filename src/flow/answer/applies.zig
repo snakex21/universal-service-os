@@ -39,7 +39,10 @@ pub fn appliesTo(p: *const Profile, system_id: []const u8) bool {
 fn tokenMatches(token: []const u8, system_id: []const u8) bool {
     if (std.ascii.eqlIgnoreCase(token, system_id)) return true;
     const family = target.familyFor(system_id);
-    if (std.mem.eql(u8, token, "windows")) return family != null;
+    // Windows 95/98/Me render MSBATCH.INF (msbatch.zig) without an NT family.
+    const win9x = @import("msbatch.zig").releaseFor(system_id) != null;
+    if (std.mem.eql(u8, token, "windows")) return family != null or win9x;
+    if (std.mem.eql(u8, token, "windows-9x")) return win9x;
     if (std.mem.eql(u8, token, "windows-nt5")) return if (family) |f| f.nt5() else false;
     if (std.mem.eql(u8, token, "windows-nt6")) return if (family) |f| !f.nt5() else false;
     if (std.mem.eql(u8, token, "linux")) return isLinux(system_id);
@@ -57,10 +60,20 @@ pub const Missing = enum {
 };
 
 pub fn missing(p: *const Profile, system_id: []const u8) ?Missing {
+    // Windows 95: phase 1 runs in the VM only with a 95 key (the OEM COA
+    // page); without one only the native Setup start is left.
+    if (std.ascii.eqlIgnoreCase(system_id, "windows-95")) return if (has95Key(p)) null else .product_key;
     const family = target.familyFor(system_id) orelse return null;
     if (family.nt5()) return if (p.keyFor(system_id).len == 0) .product_key else null;
     if (family.server() and !complexPassword(p.password.slice())) return .server_password;
     return null;
+}
+
+/// The profile holds a Windows 95 key (OEM or retail shape) for windows-95
+/// (key.windows-95, else `key=`).
+pub fn has95Key(p: *const Profile) bool {
+    const shape = profile_mod.keyShape(p.keyFor("windows-95")) orelse return false;
+    return shape != .five_by_five;
 }
 
 /// Windows Server's default "Password must meet complexity requirements":
@@ -102,6 +115,27 @@ test "systems: groups and ids" {
     try std.testing.expect(!appliesTo(&p, "windows-vista") and !appliesTo(&p, "ubuntu"));
     const nt6 = try profileFrom("name=A\nuser=Bob\nsystems=windows-nt6,linux\nedition.windows-vista=Ultimate\n");
     try std.testing.expect(appliesTo(&nt6, "windows-11") and appliesTo(&nt6, "debian") and !appliesTo(&nt6, "windows-2000"));
+    try std.testing.expect(!appliesTo(&nt6, "windows-98-se"));
+    const nine = try profileFrom("name=A\nuser=Bob\nsystems=windows-9x\n");
+    try std.testing.expect(appliesTo(&nine, "windows-98-se") and appliesTo(&nine, "windows-95") and appliesTo(&nine, "windows-me"));
+    try std.testing.expect(!appliesTo(&nine, "windows-xp") and !appliesTo(&nine, "windows-3-1"));
+    const every = try profileFrom("name=A\nuser=Bob\n");
+    try std.testing.expect(appliesTo(&every, "windows-98") and !appliesTo(&every, "windows-3-11"));
+}
+
+test "missing answers: Windows 95 needs a 95-shaped key" {
+    var p = try profileFrom("name=A\nuser=Bob\nsystems=windows-9x\n");
+    try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-95").?);
+    // 98/Me keep going without a key (phase 1 runs in the VM anyway).
+    try std.testing.expect(missing(&p, "windows-98-se") == null and missing(&p, "windows-me") == null);
+    // An XP-style key in key= is not a 95 key.
+    try p.key.set("AAAAA-BBBBB-CCCCC-DDDDD-EEEEE");
+    try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-95").?);
+    try p.setSystemKey("windows-95", "12345-OEM-1234567-12345");
+    try std.testing.expect(missing(&p, "windows-95") == null);
+    const retail = try profileFrom("name=A\nuser=Bob\nsystems=windows-95\nkey=123-1234567\n");
+    try std.testing.expect(missing(&retail, "windows-95") == null);
+    try std.testing.expect(appliesTo(&retail, "windows-95") and !appliesTo(&retail, "windows-98-se"));
 }
 
 test "missing answers: NT5 key, Server password" {

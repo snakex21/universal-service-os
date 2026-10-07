@@ -616,7 +616,7 @@ fn executeMethodChoice(
     graphics: *?vbe_probe.Session,
 ) bool {
     const backend = item.backend orelse return false;
-    const unattended_name = if ((backend == .xp_staging or backend == .windows_bios_iso) and system.unattended_directory != null) blk: {
+    const unattended_name = if ((backend == .xp_staging or backend == .windows_bios_iso or backend == .win9x_dos) and system.unattended_directory != null) blk: {
         const choice = showUnattended(discovery, diag, system, graphics);
         if (choice.back) return false;
         break :blk choice.path;

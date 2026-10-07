@@ -68,6 +68,8 @@ def start(out, a):
     # vmport=off: no VMware backdoor, so VBMOUSE uses the BIOS (SeaBIOS
     # INT 15h C2 = the USB mouse) as on real hardware.
     machine = 'pc' + (',i8042=off' if a.i8042 == 'off' else '') + (',vmport=off' if a.vmport == 'off' else '')
+    # smm=off: Windows 9x's boot logo hangs QEMU's i440FX SMM path (docs/win9x-modern-2026-09-30.md).
+    machine += ',smm=off' if a.smm == 'off' else ''
     cmd = [QEMU, '-machine', machine, '-accel', a.accel, '-cpu', a.cpu, '-m', str(a.mem), '-smp', str(a.smp),
            '-display', 'none', '-nic', 'none', '-rtc', 'base=localtime', '-serial', f'file:{serial}',
            '-monitor', f'tcp:127.0.0.1:{port},server=on,wait=off', '-vga', 'std']
@@ -81,13 +83,17 @@ def start(out, a):
     cmd += ['-device', 'qemu-xhci,id=xhci']
     if a.kbd == 'usb':
         # With usb-kbd present QEMU routes sendkey to it, not to the i8042.
-        cmd += ['-device', 'usb-kbd,bus=xhci.0']
+        cmd += ['-device', 'usb-kbd,bus=xhci.0,id=ukbd']
     if a.tablet:
         cmd += ['-device', 'usb-tablet,bus=xhci.0']
     if a.mouse == 'usb':
         # Relative USB mouse (SeaBIOS: INT 15h C2 / PS/2-BIOS events).
         cmd += ['-device', 'usb-mouse,bus=xhci.0']
-    if a.target:
+    if a.target and a.target_bus == 'ide':
+        # Legacy IDE (PIIX) instead of AHCI: for comparing Windows 9x disk drivers.
+        cmd += ['-drive', f'if=none,id=target,format={a.target_format},file={a.target}',
+                '-device', f'ide-hd,drive=target,bus=ide.0,bootindex={2 if a.stick else 0}']
+    elif a.target:
         cmd += ['-device', 'ahci,id=ahci', '-drive', f'if=none,id=target,format={a.target_format},file={a.target}',
                 '-device', f'ide-hd,drive=target,bus=ahci.0,bootindex={2 if a.stick else 0}']
     if a.extra_disk:
@@ -145,6 +151,7 @@ def main():
     s.add_argument('--stick-ro', action='store_true')
     s.add_argument('--target', type=Path)
     s.add_argument('--target-format', default='qcow2')
+    s.add_argument('--target-bus', choices=('ahci', 'ide'), default='ahci')
     s.add_argument('--target-first', action='store_true')
     s.add_argument('--extra-disk', type=Path, help='raw image as a second AHCI disk')
     s.add_argument('--tablet', action='store_true')
@@ -152,6 +159,7 @@ def main():
     s.add_argument('--kbd', choices=('usb', 'ps2'), default='usb')
     s.add_argument('--i8042', choices=('on', 'off'), default='on')
     s.add_argument('--vmport', choices=('on', 'off'), default='off')
+    s.add_argument('--smm', choices=('on', 'off'), default='on')
     s.add_argument('--accel', default='tcg,thread=multi')
     s.add_argument('--cpu', default='max')
     s.add_argument('--mem', type=int, default=1024)

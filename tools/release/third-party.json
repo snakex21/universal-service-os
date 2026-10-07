@@ -798,6 +798,29 @@
       "notice": "Unmodified Alpine binaries inside initramfs-usos / initramfs-xp."
     },
     {
+      "id": "alpine-syslinux",
+      "name": "syslinux installer (Alpine v3.24 package)",
+      "version": "syslinux 6.04_pre1-r19",
+      "license": "GPL-2.0-or-later",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/release/licenses/spdx/GPL-2.0.txt",
+        "tools/release/licenses/alpine/SOURCES.txt"
+      ],
+      "source": {
+        "offer": true,
+        "urls": [
+          "https://gitlab.alpinelinux.org/alpine/aports/-/tree/d5dfca89b19916b8369b7322bfda4bf396742332/main/syslinux",
+          "https://www.zytor.com/pub/syslinux/Testing/6.04/syslinux-6.04-pre1.tar.xz"
+        ],
+        "bundle_paths": []
+      },
+      "notice": "Unmodified Alpine /usr/bin/syslinux (mtools installer with LDLINUX built in) inside initramfs-usos: makes the Windows 9x Setup disk start once (docs/win9x-modern-2026-09-30.md 4c)."
+    },
+    {
       "id": "alpine-dmidecode",
       "name": "dmidecode (Alpine v3.24 package)",
       "version": "dmidecode 3.7-r0",
@@ -1194,6 +1217,30 @@
       "notice": "Unmodified PATCH9X.EXE by JHRobotics; source.zip includes libmspack (LGPL-2.1) and its licence."
     },
     {
+      "id": "cregfix",
+      "name": "CREGFIX",
+      "version": "f0693437",
+      "license": "0BSD",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/cregfix/f0693437/LICENSE"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/cregfix/f0693437/cregfix.asm",
+          "tools/vendor/cregfix/f0693437/README"
+        ],
+        "urls": [
+          "https://github.com/mintsuki/cregfix/tree/f0693437080d08bb3596101e1fc17bbffc4efba5"
+        ],
+        "offer": false
+      },
+      "notice": "By mintsuki and contributors; unmodified CREGFIX.SYS (control-register cleanup before Windows 9x Setup under CSMWrap), byte-identical to its source cregfix.asm."
+    },
+    {
       "id": "cwsdpmi",
       "name": "CWSDPMI",
       "version": "r7",
@@ -1262,6 +1309,32 @@
         "offer": false
       },
       "notice": "By Javier S. Pedro; unmodified release binaries, source on the ESP (VBADOS.TGZ) and VBADOS.TXT (SOURCES + GPL text) next to them on MS-DOS / Windows 3.x disks installed under CSMWrap."
+    },
+    {
+      "id": "vmdisp9x",
+      "name": "vmdisp9x VESA display driver and VMHal9x (Windows 95/98/Me)",
+      "version": "1.2025.0.119",
+      "license": "MIT",
+      "modified": false,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/vmdisp9x/1.2025.0.119/license.txt",
+        "tools/vendor/vmdisp9x/1.2025.0.119/SOURCES.txt"
+      ],
+      "source": {
+        "bundle_paths": [
+          "tools/vendor/vmdisp9x/1.2025.0.119/vmdisp9x-1.2025.0.119.tar.gz",
+          "tools/vendor/vmdisp9x/1.2025.0.119/manifest.json"
+        ],
+        "urls": [
+          "https://github.com/JHRobotics/vmdisp9x/releases/tag/v1.2025.0.119",
+          "https://github.com/JHRobotics/vmhal9x"
+        ],
+        "offer": false
+      },
+      "notice": "By Jaroslav Hensl (JHRobotics), parts The OS/2 Museum; unmodified release binaries (vesamini.drv/.vxd, vmhal9x.dll, vmhal486.dll, vmdisp9x.dll) with USOS's own INF (src/platform/bios/win9x/usosvesa.inf, MODIFIED from vmdisp9x.inf) in EFI/USOS/dos-native/win9x; VMDISP9X.TXT (SOURCES + MIT text) and VMDISP9X.TGZ (source) next to them; Windows 95/98/Me disks get the driver files and VMDISP9X.TXT."
     },
     {
       "id": "freedos",
@@ -1459,6 +1532,40 @@
         ]
       },
       "notice": "MODIFIED x86/amd64 xhci98.sys and xhci98.inf 1.1.1.0-usos2 (tools/vendor/xhci98/1.1.1.0-usos2, MODIFIED.txt) in the XP package, for Server 2003 x86 and XP x64 (Windows 2000 SP4: the x86 1.1.1.0-usos3 build in nt52-usb/x86-w2k, which adds a polling engine): PCI D0/Memory/Bus Master enable for firmware-disabled controllers (AMD CPU xHCI), CNR wait, forced USBLEGSUP handoff, 16 Supported Protocol groups, scratchpad cap 256, %SystemRoot%\\xhci98.log. Built with WDK 7.1 from the upstream tag v1.1.1.0 (commit 7d0dd9d4) plus the USOS patches (all in the sources zip). Staging points the INF's [SourceDisksNames] row 1 at the Setup source directory on the target disk."
+    },
+    {
+      "id": "xhci98-w9x",
+      "name": "xhci98 (Windows 98 SE build)",
+      "version": "1.1.1.0-usos3-w9x",
+      "license": "GPL-2.0-only",
+      "modified": true,
+      "ships_in": [
+        "stick-esp"
+      ],
+      "license_files": [
+        "tools/vendor/xhci98/1.1.1.0-usos3-w9x/LICENSE",
+        "tools/vendor/xhci98/1.1.1.0-usos3-w9x/MODIFIED.txt",
+        "tools/vendor/xhci98/1.1.1.0/SOURCES.txt"
+      ],
+      "source": {
+        "offer": false,
+        "bundle_paths": [
+          "tools/vendor/xhci98/1.1.1.0-src/xhci98-7d0dd9d440e9716a87e0882f905bf8e99fa443ac.tar.gz",
+          "tools/vendor/xhci98/1.1.1.0/SOURCES.txt",
+          "tools/vendor/xhci98/1.1.1.0-usos3-w9x/patches/0001-usos1-amd-cpu-xhci-start-and-file-log.patch",
+          "tools/vendor/xhci98/1.1.1.0-usos3-w9x/patches/0002-usos2-sixteen-protocol-groups-and-cap-chain-log.patch",
+          "tools/vendor/xhci98/1.1.1.0-usos3-w9x/patches/0003-usos3-polling-engine.patch",
+          "tools/vendor/xhci98/1.1.1.0-usos3-w9x/patches/0004-usos3-w9x-windows98-build.patch",
+          "tools/vendor/xhci98/1.1.1.0-usos3-w9x/build.cmd",
+          "tools/vendor/xhci98/1.1.1.0-usos3-w9x/toolchain.txt",
+          "tools/vendor/xhci98/1.1.1.0-usos3-w9x/MODIFIED.txt",
+          "tools/vendor/xhci98/1.1.1.0-usos3-w9x/manifest.json"
+        ],
+        "urls": [
+          "https://github.com/yeokm1/xhci98/tree/7d0dd9d440e9716a87e0882f905bf8e99fa443ac"
+        ]
+      },
+      "notice": "MODIFIED x86 xhci98.sys and xhci98.inf 1.1.1.0-usos3-w9x (tools/vendor/xhci98/1.1.1.0-usos3-w9x, MODIFIED.txt) as XHCI98.SYS/.INF/.TXT in EFI/USOS/dos-native/win9x, for Windows 98 SE under CSMWrap only: the usos3 changes (AMD xHCI start, 16 protocol groups, polling) built for 98 (no file sink, KeSetTimer, no /GS); the INF also copies usbport.sys. INSTALL.BAT puts them into the Setup folder only next to the user-supplied USB 2.0 stack (Microsoft files, never shipped). Built with WDK 7.1 from upstream tag v1.1.1.0 plus the USOS patches (all in the sources zip)."
     },
     {
       "id": "go-runtime",

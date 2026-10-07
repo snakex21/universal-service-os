@@ -191,6 +191,7 @@ pub const Key = enum(u16) {
     method_auto_msdos,
     method_auto_slitaz,
     method_auto_vhdboot,
+    method_auto_w9x_uefi,
     method_auto_wimboot,
     method_auto_win2000,
     method_auto_windows_setup,
@@ -331,6 +332,8 @@ pub const Key = enum(u16) {
     verify_vm,
     wait,
     wait_usb,
+    win9x_key_subtitle,
+    win9x_key_title,
     action_blocked,
     action_chainload,
     action_efi,
@@ -344,6 +347,7 @@ pub const Key = enum(u16) {
     bios_mode_note_cpu,
     bios_mode_note_restart,
     bios_mode_note_video,
+    bios_mode_profile_detail,
     bios_mode_question,
     bios_mode_secure_boot_line1,
     bios_mode_secure_boot_line2,
@@ -601,6 +605,8 @@ pub const Key = enum(u16) {
     summary_vista_support,
     summary_vista_usb,
     summary_w2k_limits,
+    summary_w9x_csmwrap,
+    summary_w9x_disk,
     summary_xp_csmwrap,
     summary_xp_disk,
     summary_xp_preparation,
@@ -866,6 +872,7 @@ pub const hashes = [_]u32{
     0xdf251230, // method.auto_msdos
     0xdc54235f, // method.auto_slitaz
     0xd0d5afbc, // method.auto_vhdboot
+    0x66f6edd4, // method.auto_w9x_uefi
     0xaaec70e9, // method.auto_wimboot
     0x1fcc2a9a, // method.auto_win2000
     0xabbaa3a1, // method.auto_windows_setup
@@ -1006,6 +1013,8 @@ pub const hashes = [_]u32{
     0xd32c94ef, // verify.vm
     0x892e4ca0, // wait
     0x3e1f8ab9, // wait_usb
+    0x8382ff82, // win9x_key.subtitle
+    0xc186cf80, // win9x_key.title
     0xb9a53ded, // action.blocked
     0x67542164, // action.chainload
     0x4743492f, // action.efi
@@ -1019,6 +1028,7 @@ pub const hashes = [_]u32{
     0xc6026856, // bios_mode.note.cpu
     0x33394f47, // bios_mode.note.restart
     0x643e4f67, // bios_mode.note.video
+    0x9761d865, // bios_mode.profile_detail
     0xfd68991e, // bios_mode.question
     0xc1a2d4cf, // bios_mode.secure_boot.line1
     0xc2a2d662, // bios_mode.secure_boot.line2
@@ -1276,6 +1286,8 @@ pub const hashes = [_]u32{
     0xa0987638, // summary.vista_support
     0x1e3154b1, // summary.vista_usb
     0xf657c7a8, // summary.w2k_limits
+    0xb1cdcd1f, // summary.w9x_csmwrap
+    0xdb6f9367, // summary.w9x_disk
     0xac5a69f9, // summary.xp_csmwrap
     0xe262ce65, // summary.xp_disk
     0xedd282b9, // summary.xp_preparation
@@ -1681,6 +1693,12 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
     false,
     false,
     false,
@@ -2026,7 +2044,7 @@ pub const bios = [_]bool{
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
-pub const bios_count = 329;
+pub const bios_count = 332;
 
 pub const english = [_][]const u8{
     "Experimental",
@@ -2093,13 +2111,13 @@ pub const english = [_][]const u8{
     "Patcher9x / RAM fix",
     "The system and partitions stay. Changed files are backed up first.",
     "Repairs the installation in C:\\WINDOWS, also after the first restart.",
-    "Windows 98 RAM repair",
+    "Windows 95/98/Me RAM repair",
     "The remaining space stays unallocated.",
     "Existing partitions on this disk will be deleted.",
     "Size of the new partition",
-    "New Windows 98 SE installation",
-    "Repair RAM support in an installed Windows 98",
-    "Install Windows 98 or repair its support for more RAM",
+    "New Windows 95/98/Me installation",
+    "Repair RAM support in an installed Windows 95/98/Me",
+    "Install Windows 95/98/Me or repair its support for more RAM",
     "Blocked",
     "Switch it on to try again.",
     "built-in",
@@ -2218,6 +2236,7 @@ pub const english = [_][]const u8{
     "Automatic (MS-DOS / Windows 3.x)",
     "Automatic (SliTaz Live)",
     "Automatic (VHDBoot)",
+    "Automatic (UEFI preparation / DOS Setup via CSMWrap)",
     "Automatic (WIMBoot)",
     "Automatic (Windows 2000 Setup)",
     "Automatic (Windows Setup)",
@@ -2358,6 +2377,8 @@ pub const english = [_][]const u8{
     "Tested in a virtual machine",
     "Please wait",
     "Please wait - keep the USB drive connected",
+    "Without it Setup stops on the product key page. The key is used for this installation only and is not saved.",
+    "Enter the {0} product key",
     "Start is not possible with these settings",
     "Prepare and chainload",
     "Start the EFI application",
@@ -2369,8 +2390,9 @@ pub const english = [_][]const u8{
     "Start WinPE",
     "Prepare the Windows XP installation",
     "CSMWrap reserves one CPU thread for itself; DOS and Windows 3.x do not need it.",
-    "Opens the USOS BIOS menu (FreeDOS, MS-DOS, Windows 3.x). A restart returns to UEFI.",
+    "Opens the USOS BIOS menu (DOS, Windows 3.x, 95/98/Me). A restart returns to UEFI.",
     "Needs a graphics card with a legacy video BIOS; without one the DOS screens stay black.",
+    "Also gives this answer profile to Windows 95/98/Me Setup",
     "Switch this PC to BIOS mode until the next restart?",
     "CSMWrap is not signed, so Secure Boot blocks it.",
     "Turn Secure Boot off in the firmware settings to use the BIOS mode.",
@@ -2628,6 +2650,8 @@ pub const english = [_][]const u8{
     "KB2864202 + signed USB package + pre-Setup v11",
     "PE10 native USB; the target uses Vista USB v11",
     "Windows 2000 (experimental): no AHCI/NVMe/USB 3 driver for NT 5.0 (SATA in IDE mode), max. 4 GB RAM and 2 CPUs",
+    "Without CSM (experimental): USOS prepares the disk and CSMWrap; the installation then starts from it",
+    "Selected and confirmed in the next graphical screen; the whole disk is erased",
     "XP without CSM (experimental): CSMWrap, card with a legacy VBIOS, 1 core reserved",
     "Selected and confirmed in the next graphical screen",
     "UEFI; installed XP requires firmware CSM and MBR",
@@ -2688,7 +2712,7 @@ pub const english = [_][]const u8{
     "Theme {0} saved on the stick and in use.",
     "Base theme, element, colour: the preview and the contrast check follow every change",
     "Theme editor",
-    "USOS BIOS menu on this UEFI PC: FreeDOS, MS-DOS, Windows 3.x",
+    "USOS BIOS menu on this UEFI PC: DOS, Windows 3.x, 95/98/Me",
     "Unavailable: Secure Boot is on",
     "Legacy BIOS mode (CSMWrap)",
     "Command line for EFI tools (flashers, testers) from DATA",

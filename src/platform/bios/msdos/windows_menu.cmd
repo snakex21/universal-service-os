@@ -50,12 +50,24 @@ echo Windows standard mode will start automatically after 8 seconds.
 echo Previous configuration: C:\USOSW3\*.OLD
 echo.
 if not exist C:\DOS\REBOOT.COM goto manual_restart
-echo REBOOT is prepared below. Press Enter when ready, or Esc to clear it.
-echo.
 path C:\DOS;C:\WINDOWS;C:\PROGRAMS
 prompt $p$g
 C:
 cd \
+if not exist C:\DOS\CHOICE.COM goto prefill_reboot
+echo R - restart now (automatic after 5 seconds)
+echo A - stay in MS-DOS (type REBOOT later to restart)
+echo.
+C:\DOS\CHOICE.COM /C:RA /T:R,5 Restart now
+if errorlevel 2 goto stay_dos
+C:\DOS\REBOOT.COM
+goto end
+:stay_dos
+echo Type REBOOT and press Enter to restart. Do not run WIN in this session.
+goto end
+:prefill_reboot
+echo REBOOT is prepared below. Press Enter when ready, or Esc to clear it.
+echo.
 C:\DOS\REBOOT.COM /P
 goto end
 :manual_restart

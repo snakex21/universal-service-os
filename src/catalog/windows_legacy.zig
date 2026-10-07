@@ -39,12 +39,15 @@ pub const entries = [_]SystemEntry{
         .boot_methods = &methods,
     },
     legacy("windows-nt-4", "Windows NT 4.0", "Windows NT 4.0", true),
-    legacy("windows-me", "Windows Me", "Windows Me", true),
-    legacy("windows-98-se", "Windows 98 SE", "Windows 98 SE", true),
-    legacy("windows-98", "Windows 98", "Windows 98", true),
-    legacy("windows-95", "Windows 95", "Windows 95", true),
-    legacy("windows-3-11", "Windows 3.11", "Windows 3.11", false),
-    legacy("windows-3-1", "Windows 3.1", "Windows 3.1", false),
+    // Windows 95/98/Me: the BIOS Core's DOS Setup, and from UEFI the
+    // micro-Linux disk preparation with a CSMWrap ESP (profile
+    // w9x-uefi-csmwrap, experimental; docs/win9x-modern-2026-09-30.md 4c).
+    win9x("windows-me", "Windows Me"),
+    win9x("windows-98-se", "Windows 98 SE"),
+    win9x("windows-98", "Windows 98"),
+    win9x("windows-95", "Windows 95"),
+    anyFirmware(legacy("windows-3-11", "Windows 3.11", "Windows 3.11", false)),
+    anyFirmware(legacy("windows-3-1", "Windows 3.1", "Windows 3.1", false)),
 };
 
 fn legacy(
@@ -63,4 +66,16 @@ fn legacy(
         .firmware = .bios,
         .boot_methods = &methods,
     };
+}
+
+fn win9x(comptime id: []const u8, comptime name: []const u8) SystemEntry {
+    return anyFirmware(legacy(id, name, name, true));
+}
+
+/// BIOS-only installers that UEFI starts through the DOS-family CSMWrap
+/// preparation (profile w9x-uefi-csmwrap).
+fn anyFirmware(entry: SystemEntry) SystemEntry {
+    var result = entry;
+    result.firmware = .any;
+    return result;
 }

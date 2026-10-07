@@ -150,6 +150,11 @@ pub fn show(
         }
     }
     var can_start = true;
+    if (backend == .win9x_uefi) {
+        // Windows 95/98/Me from UEFI (w9x-uefi-csmwrap, experimental).
+        fields.add(view.t(.summary_preparation), view.t(.summary_w9x_csmwrap));
+        fields.add(view.t(.summary_disk), view.t(.summary_w9x_disk));
+    }
     if (backend == .xp_uefi_staging) {
         // No CSM: the experimental xp-x86-sp3-uefi-csmwrap preparation (CSMWrap on
         // a small ESP of the target disk; docs/design/csmwrap-integration.md).
@@ -264,6 +269,10 @@ pub fn show(
     };
 }
 
+/// Windows 95: the chosen profile (or the USOS default) with the key typed
+/// at start (win9x_key_prompt.zig); this start only.
+var keyed_95: ?answer_profiles.Profile = null;
+
 fn start(
     root: *std.os.uefi.protocol.File,
     system: *const usos.catalog.SystemEntry,
@@ -274,6 +283,18 @@ fn start(
 ) void {
     const unattended = answer.path;
     if (!system.firmware.accepts(firmware)) return showFirmwareUnavailable();
+    // Windows 95 without a 95 key (profile or none): ask for it now, while
+    // the gamepads still work (the on-screen keyboard). Phase 1 runs in the
+    // VM only with a key; the native start freezes on modern boards.
+    keyed_95 = null;
+    if (usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, firmware) == .win9x_uefi) {
+        const key_prompt = @import("win9x_key_prompt.zig");
+        const chosen: ?*const answer_profiles.Profile = if (answer.profile) |index| answer_profiles.get(index) else null;
+        if (key_prompt.needed(system.id, chosen, chosen == null and unattended != null)) {
+            const key = key_prompt.ask(system.name) orelse return;
+            keyed_95 = key_prompt.withKey(chosen, view.languageCode(), key) catch |err| return showError(view.t(.error_preparation), err);
+        }
+    }
     // No USB gamepad transfer may outlive the menu into another loader;
     // the pads are picked up again if the launch fails and the menu returns.
     input.stopGamepads();
@@ -301,6 +322,31 @@ fn start(
         @import("xp_preparation.zig").start(root, system.id, image.name.slice(), answer, showXpProgress) catch |err| {
             view.refreshFramebuffer();
             showError(view.t(.error_xp), err);
+        };
+        return;
+    }
+    if (backend == .win9x_uefi) {
+        // Windows 95/98/Me from UEFI (w9x-uefi-csmwrap): request + profile on
+        // the ESP, then micro-Linux step 620 writes the Setup disk.
+        vista_csmwrap_heading = system.name;
+        view.vistaCsmwrapStatus(.validating, "Reading the selected ISO", vista_csmwrap_heading);
+        const win9x = @import("win9x_preparation.zig");
+        var request_answer: win9x.Answer = .none;
+        if (keyed_95) |*keyed| {
+            answer_profiles.stageWin9x(root, keyed) catch |err| return showError(view.t(.error_preparation), err);
+            request_answer = .profile;
+        } else if (profile) |p| {
+            answer_profiles.stageWin9x(root, p) catch |err| return showError(view.t(.error_preparation), err);
+            request_answer = .profile;
+        } else if (unattended) |name| request_answer = .{ .file = name };
+        // No answer chosen: the USOS default MSBATCH.INF gets the menu
+        // language's time zone (else the Date/Time page waits for a click).
+        const time_zone = usos.flow.answer.msbatch.timeZoneForUi(view.languageCode());
+        win9x.writeRequest(root, system.id, system.name, system.image_directory, image.name.slice(), request_answer, time_zone) catch |err| return showError(view.t(.error_preparation), err);
+        view.vistaCsmwrapStatus(.loading, usos.flow.preparation_boot_progress.VistaCsmwrapStage.loading_detail, vista_csmwrap_heading);
+        @import("vista_preparation.zig").startWin9x(root) catch |err| {
+            view.refreshFramebuffer();
+            showError(view.t(.error_preparation), err);
         };
         return;
     }

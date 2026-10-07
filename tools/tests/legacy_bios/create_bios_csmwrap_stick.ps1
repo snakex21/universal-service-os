@@ -23,6 +23,8 @@ param(
     [string]$CsmwrapIni = '',                        # file copied to EFI\USOS\csmwrap\csmwrap.ini
     [string]$CsmwrapEfi = '',                        # prototype binary replacing EFI\USOS\csmwrap\csmwrapx64.efi
     [string]$CoreSlot = '',                          # prototype core-slot.bin instead of the committed Core
+    [string[]]$DataFile = @(),                       # extra DATA files, 'DATA folder=source file'
+    [string]$EspOverlay = '',                        # folder copied over the payload ESP files (prototype helpers)
     [int]$SizeMiB = 1536,
     [int]$EspMiB = 512
 )
@@ -67,8 +69,13 @@ try {
     $data | Add-PartitionAccessPath -AccessPath $dataPath
     try {
         Copy-Item -Path (Join-Path $payloadDir '*') -Destination $espPath -Recurse -Force
+        if ($EspOverlay) { Copy-Item -Path (Join-Path $EspOverlay '*') -Destination $espPath -Recurse -Force }
         if ($CsmwrapEfi) { Copy-Item -LiteralPath $CsmwrapEfi -Destination (Join-Path $espPath 'EFI\USOS\csmwrap\csmwrapx64.efi') -Force }
         if ($CsmwrapIni) { Copy-Item -LiteralPath $CsmwrapIni -Destination (Join-Path $espPath 'EFI\USOS\csmwrap\csmwrap.ini') -Force }
+        # The installer's identity record: the UEFI menu's micro-Linux starts (XP, Vista,
+        # Windows 9x CSMWrap preparation) find the ESP and DATA by these partition GUIDs.
+        $device = @('[device]', "esp_partuuid=$($esp.Guid.Trim('{}'))", "data_partuuid=$($data.Guid.Trim('{}'))", 'data_label=USOS_DATA') -join "`r`n"
+        [IO.File]::WriteAllText((Join-Path $espPath 'EFI\USOS\usos-device.ini'), $device + "`r`n")
         foreach ($folder in @('Programs', 'Systems', 'Utilities', 'Utilities\FreeDOS\Programs', 'Systems\DOS\MS-DOS\Programs')) {
             New-Item -ItemType Directory -Force -Path (Join-Path $dataPath $folder) | Out-Null
         }
@@ -76,7 +83,13 @@ try {
             Copy-Item -LiteralPath $DemoDir -Destination (Join-Path $dataPath 'Utilities\FreeDOS\Programs\DEMO') -Recurse
             Copy-Item -LiteralPath $DemoDir -Destination (Join-Path $dataPath 'Systems\DOS\MS-DOS\Programs\DEMO') -Recurse
         }
-        foreach ($item in @(@{ Src = $MsDosIso; Dir = 'Systems\DOS\MS-DOS\Images' }, @{ Src = $Win31Iso; Dir = 'Systems\Windows\Windows 3.1\Images' })) {
+        $items = @(@{ Src = $MsDosIso; Dir = 'Systems\DOS\MS-DOS\Images' }, @{ Src = $Win31Iso; Dir = 'Systems\Windows\Windows 3.1\Images' })
+        foreach ($spec in $DataFile) {
+            $pair = $spec.Split('=', 2)
+            if ($pair.Count -ne 2) { throw "DataFile must be 'DATA folder=source file': $spec" }
+            $items += @{ Src = $pair[1]; Dir = $pair[0] }
+        }
+        foreach ($item in $items) {
             if (-not $item.Src) { continue }
             $dir = Join-Path $dataPath $item.Dir
             New-Item -ItemType Directory -Force -Path $dir | Out-Null

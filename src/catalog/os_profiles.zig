@@ -29,11 +29,14 @@ pub const native_windows7_enabled = builtin.os.tag != .freestanding;
 pub const AnswerFormat = enum {
     winnt_sif,
     autounattend_xml,
+    /// Windows 95/98/Me DOS Setup (docs/win9x-modern-2026-09-30.md).
+    msbatch_inf,
 
     pub fn extension(self: AnswerFormat) []const u8 {
         return switch (self) {
             .winnt_sif => ".sif",
             .autounattend_xml => ".xml",
+            .msbatch_inf => ".inf",
         };
     }
 
@@ -41,6 +44,7 @@ pub const AnswerFormat = enum {
         return switch (self) {
             .winnt_sif => "WINNT.SIF",
             .autounattend_xml => "unattend.xml",
+            .msbatch_inf => "MSBATCH.INF",
         };
     }
 };
@@ -121,7 +125,10 @@ fn ownTraits(system_id: []const u8) SystemTraits {
     for (traits_table) |entry| {
         if (std.mem.eql(u8, entry.system_id, system_id)) return entry;
     }
-    return .{ .system_id = system_id };
+    // Windows 95/98/98 SE/Me (no table rows: the Legacy Core has no room).
+    const win9x = std.mem.eql(u8, system_id, "windows-98-se") or std.mem.eql(u8, system_id, "windows-98") or
+        std.mem.eql(u8, system_id, "windows-me") or std.mem.eql(u8, system_id, "windows-95");
+    return .{ .system_id = system_id, .answer = if (win9x) .msbatch_inf else .autounattend_xml };
 }
 
 pub fn traits(system_id: []const u8) SystemTraits {
@@ -257,9 +264,13 @@ const linux_ids = &[_][]const u8{ "ubuntu", "debian", "fedora", "linux-mint", "a
 const auto_iso = &[_]BootMethod{ .automatic, .direct_iso };
 const auto_iso_memdisk = &[_]BootMethod{ .automatic, .direct_iso, .memdisk };
 
-/// Ordered: firmware-specific rules first, then the firmware-independent
-/// ones (the former resolveBackend). First match wins.
-pub const profiles = [_]Profile{
+/// UEFI-only rules. The freestanding BIOS Core never runs with UEFI firmware,
+/// so it leaves them out of its image (Core size budget); the order of
+/// `profiles` is unchanged on every other target.
+/// The DOS-family CSMWrap preparation from UEFI (micro-Linux step 620).
+const dos_family_ids = &[_][]const u8{ "windows-98-se", "windows-98", "windows-me", "windows-95", "ms-dos", "windows-3-1", "windows-3-11" };
+
+const uefi_profiles = [_]Profile{
     // ---- UEFI only
     // Linux ISO from DATA (docs/design/linux-iso-boot.md): kernel + initrd from
     // the ISO, /usos/init maps the ISO file as a block device. Replaces the WORK
@@ -278,13 +289,25 @@ pub const profiles = [_]Profile{
     .{ .id = "w2k3-uefi-other", .systems = .{ .ids = &.{"windows-server-2003"} }, .firmware = .uefi, .backend = null, .progress = .none },
     .{ .id = "xp-x64-sp2-uefi-csm", .systems = .{ .ids = &.{"windows-xp-x64"} }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .xp_uefi_staging, .progress = .xp_uefi },
     .{ .id = "xp-x64-uefi-other", .systems = .{ .ids = &.{"windows-xp-x64"} }, .firmware = .uefi, .backend = null, .progress = .none },
+    // Windows 95/98/Me from UEFI: micro-Linux step 620 writes a FAT32 Setup
+    // disk with a one-time DOS start and a CSMWrap ESP; Setup then runs from
+    // that disk in BIOS mode (docs/win9x-modern-2026-09-30.md 4c).
+    .{ .id = "w9x-uefi-csmwrap", .systems = .{ .ids = dos_family_ids }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .win9x_uefi, .progress = .direct_iso },
+    .{ .id = "w9x-uefi-other", .systems = .{ .ids = dos_family_ids }, .firmware = .uefi, .backend = null, .progress = .none },
+};
+
+/// Ordered: firmware-specific rules first, then the firmware-independent
+/// ones (the former resolveBackend). First match wins.
+pub const profiles = (if (native_windows7_enabled) uefi_profiles else [_]Profile{}) ++ [_]Profile{
     // ---- BIOS only
     .{ .id = "linux-live-bios", .systems = .{ .ids = &.{"other-linux"} }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .linux_live_iso, .progress = .core },
     // Linux ISO from DATA in the BIOS Core (other-linux keeps the SliTaz row;
     // its backend falls back to this path for non-SliTaz ISOs).
     .{ .id = "linux-iso-bios", .systems = .{ .ids = linux_ids }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .linux_iso, .progress = .core },
     .{ .id = "dos-fat16-bios", .systems = .{ .ids = &.{ "ms-dos", "windows-3-1", "windows-3-11" } }, .images = iso, .methods = auto_iso_memdisk, .firmware = .bios, .backend = .dos_bios_iso, .progress = .core },
-    .{ .id = "win98se-dos-bios", .systems = .{ .ids = &.{"windows-98-se"} }, .images = iso, .methods = auto_iso_memdisk, .firmware = .bios, .backend = .win9x_dos, .progress = .core },
+    // Windows 95/98/Me: the ISO's own DOS boot floppy + DOS Setup from a RAM
+    // disk (docs/win9x-modern-2026-09-30.md); also under CSMWrap.
+    .{ .id = "win9x-dos-bios", .systems = .{ .ids = &.{ "windows-98-se", "windows-98", "windows-me", "windows-95" } }, .images = iso, .methods = auto_iso_memdisk, .firmware = .bios, .backend = .win9x_dos, .progress = .core },
     .{ .id = "windows-pe-bios-iso", .systems = .{ .ids = &.{ "windows-7", "windows-vista", "windows-10" } }, .images = iso, .methods = auto_iso, .firmware = .bios, .backend = .windows_bios_iso, .progress = .core },
     // ---- any firmware
     .{ .id = "win7-no-chainload", .systems = .{ .ids = &.{"windows-7"} }, .methods = &.{.chainload}, .backend = null, .progress = .none },

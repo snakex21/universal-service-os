@@ -84,7 +84,17 @@ pub const grub_paths = [_][]const u8{
 /// caller's: not on the stack (UEFI stacks are small and USOS runs below
 /// shim's frames under Secure Boot) and not static (the BIOS Core has no BSS).
 pub fn plan(source: anytype, out: *Recipe, text_buf: []u8) Error!void {
-    out.* = .{};
+    // Field by field: `out.* = .{}` is a 3 KiB constant (the undefined
+    // buffers included) in the size-limited Legacy BIOS Core.
+    out.family = .unknown;
+    out.answer = .none;
+    out.shim_layout = false;
+    out.entry.kernel_len = 0;
+    out.entry.initrd_lens = @splat(0);
+    out.entry.initrd_count = 0;
+    out.entry.args_len = 0;
+    out.label_len = 0;
+    out.cmdline_len = 0;
     const volume = source.volumeLabel();
     out.label_len = @min(volume.len, out.label_buf.len);
     @memcpy(out.label_buf[0..out.label_len], volume[0..out.label_len]);

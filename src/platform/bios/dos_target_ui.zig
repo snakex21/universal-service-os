@@ -43,7 +43,7 @@ fn hints(ui: *const graphics.ui.Ui, buffer: *[3]graphics.ui.Hint, enter: graphic
     return buffer;
 }
 
-pub fn action(session: vbe.Session) ?Action {
+pub fn action(session: vbe.Session, title: []const u8) ?Action {
     var selected: usize = 0;
     while (true) {
         const ui = menu.strings(&session);
@@ -52,7 +52,7 @@ pub fn action(session: vbe.Session) ?Action {
             .{ .title = ui.t(.dos_w98_install), .icon = .{ .vector = .windows } },
         };
         var buffer: [3]graphics.ui.Hint = undefined;
-        menu.choice(&session, "Windows 98 SE", ui.t(.dos_w98_subtitle), &rows, selected, &.{}, hints(&ui, &buffer, .key_next));
+        menu.choice(&session, title, ui.t(.dos_w98_subtitle), &rows, selected, &.{}, hints(&ui, &buffer, .key_next));
         const key = console.readKey();
         if (key.ascii == 27) return null;
         if (key.scan == 0x48) selected = 0;
@@ -80,9 +80,10 @@ pub fn dosAction(session: vbe.Session) ?bool {
     }
 }
 
-pub fn choose(source: u8, session: vbe.Session, selected_action: Action) !?Selection {
+/// `win9x_title`: the Windows 95/98/Me system name (FAT32 paths).
+pub fn choose(source: u8, session: vbe.Session, selected_action: Action, win9x_title: []const u8) !?Selection {
     const fat16 = selected_action == .dos_install;
-    const title = if (fat16) "MS-DOS / Windows 3.x" else "Windows 98 SE";
+    const title = if (fat16) "MS-DOS / Windows 3.x" else win9x_title;
     var disks: [16]Disk = undefined;
     var source_gpt: [512]u8 = undefined;
     if (bios_read_sector_drive(source, 1, &source_gpt) != 0) return error.DosSourceIdentityUnavailable;
@@ -161,9 +162,9 @@ pub fn choose(source: u8, session: vbe.Session, selected_action: Action) !?Selec
             continue;
         }
         var size_index: usize = 0;
-        const sizes = if (fat16) [_]u32{ 256, 512, 128 } else [_]u32{ 8, 4, 2 };
+        const sizes = if (fat16) [_]u32{ 256, 512, 128 } else [_]u32{ 32, 8, 2 };
         while (size_index < 2 and !sizeAvailable(disk, source, sizes[size_index], fat16)) size_index += 1;
-        const labels = if (fat16) [_][]const u8{ "256 MiB", "512 MiB", "128 MiB" } else [_][]const u8{ "8 GiB", "4 GiB", "2 GiB" };
+        const labels = if (fat16) [_][]const u8{ "256 MiB", "512 MiB", "128 MiB" } else [_][]const u8{ "32 GiB", "8 GiB", "2 GiB" };
         while (true) {
             const size_ui = menu.strings(&session);
             var size_rows: [3]graphics.ui.Row = undefined;
@@ -193,7 +194,7 @@ pub fn choose(source: u8, session: vbe.Session, selected_action: Action) !?Selec
                     .{ .title = confirm_ui.t(.dos_confirm_go), .icon = .{ .vector = .warning } },
                 };
                 const confirm_notes = [_][]const u8{ detail, confirm_ui.t(.dos_confirm_note1), confirm_ui.t(.dos_confirm_note2), confirm_ui.t(.dos_confirm_csmwrap) };
-                const shown_notes: usize = if (fat16 and seabios.csmwrap) 4 else 3;
+                const shown_notes: usize = if (seabios.csmwrap) 4 else 3;
                 var confirm_hints: [3]graphics.ui.Hint = undefined;
                 menu.choice(&session, confirm_ui.t(.dos_confirm_title), disk.label[0..disk.len], &choices, confirm, confirm_notes[0..shown_notes], hints(&confirm_ui, &confirm_hints, .key_confirm));
                 const confirm_key = console.readKey();
@@ -218,7 +219,7 @@ fn sizeAvailable(disk: *const Disk, source: u8, size: u32, fat16: bool) bool {
         _ = partition.planFat16(disk.drive, source, planSectors(disk.sectors), size, disk.cylinders, disk.heads, disk.spt, disk.before) catch return false;
         return true;
     }
-    return disk.sectors >= size * 2 * 1024 * 1024 + 2082;
+    return planSectors(disk.sectors) >= size * 2 * 1024 * 1024 + 2082;
 }
 pub fn commit(plan: partition.Plan) !void {
     var current = Raw{};

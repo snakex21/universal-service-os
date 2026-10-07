@@ -1,0 +1,21 @@
+{
+  "name": "vmdisp9x (VESA BIOS display driver for Windows 9x, 2D part) and VMHal9x DirectDraw HAL",
+  "version": "1.2025.0.119",
+  "license": "MIT",
+  "upstream": "https://github.com/JHRobotics/vmdisp9x (tag v1.2025.0.119); HAL: https://github.com/JHRobotics/vmhal9x",
+  "binaries": "https://github.com/JHRobotics/vmdisp9x/releases/download/v1.2025.0.119/vmdisp9x-1.2025.0.119b-driver-2d.zip (sha256 e0d698a6089347a6a619ed439c092f247392fbafac6b342f4651c1380911fb23)",
+  "used_by": "the Windows 95/98/Me installer (src/platform/bios/win9x/usosvesa.inf, docs/win9x-modern-2026-09-30.md)",
+  "files": {
+    "SOURCES.txt": "1a7ff95a8b145ecc3fc479ce6dff1c2035496db968925e946400a09246e34038",
+    "license.txt": "41e6fab05ff91d39589428630494817c9258af48d17b021378436a8cbd75b180",
+    "readme.txt": "e91833efec4eb1145dd5bfea42c4cd8ff6b951fdc8faea698c1e4fc4aed36421",
+    "version.txt": "e5d2d392a43948bed63e4d80b6f8004c30da6f76f4e792342628a0cc99ca4634",
+    "vesamini.drv": "2e661f2c17b5e7d6bcaa2c93cf3f79d38e70ab901850d7e5e3d26658aa697ddc",
+    "vesamini.vxd": "3a8fec2ad24e2c9b6c0a44e3d616a227d6b974d407d4ee16d33d88c3ca9d803a",
+    "vmdisp9x-1.2025.0.119.tar.gz": "29f52124467f5f4978e2b312c1ea8b74fb5d150aabc5d1b48d2cd7c30c0c74e9",
+    "vmdisp9x.dll": "227d849b42815bd6b2f644ebfda54df1b43dfdd86a56aeda7dc7d1cbe3b07123",
+    "vmdisp9x.inf": "e38bb224f346ee10f52953a9a40a5a67718ad8aec45720c700e9a6a4e3ef4ab7",
+    "vmhal486.dll": "e2d35b6646a895638947a06fdfb0ad6fe5ca7d5fc0a5331d44fda65201d9e132",
+    "vmhal9x.dll": "974c5e17aa63ea6ee43c3ecfee68bef1518d62294b4ece67718988bb916d190b"
+  }
+}

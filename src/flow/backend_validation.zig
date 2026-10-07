@@ -27,7 +27,7 @@ pub const Status = enum {
 pub fn statusBackend(backend: Backend) Status {
     return switch (backend) {
         // Linux ISO from DATA: QEMU only (docs/design/linux-iso-boot.md).
-        .xp_uefi_staging, .win9x_dos, .linux_iso => .experimental,
+        .xp_uefi_staging, .win9x_uefi, .win9x_dos, .linux_iso => .experimental,
         // Green production-path QEMU validation plus physical-media validation.
         .windows_iso,
         .chainload,

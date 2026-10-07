@@ -39,7 +39,7 @@ pub fn execute(
         },
         .linux_iso => try linuxIso(context, system_id, image_name, graphics),
         .dos_bios_iso => try dos6_native_iso.run(context.esp_fs, context.reader, context.bulk_reader, context.bios_boot_drive, graphics, system_id, image_name),
-        .win9x_dos => try dos_native_iso.run(context.esp_fs, context.reader, context.bulk_reader, context.bios_boot_drive, graphics, image_name),
+        .win9x_dos => try dos_native_iso.run(context.esp_fs, context.reader, context.bulk_reader, context.bios_boot_drive, graphics, system_id, image_name, unattended_name),
         .windows_bios_iso => {
             // Windows Server follows its client release (os_profiles
             // route_as) with its own DATA folder.

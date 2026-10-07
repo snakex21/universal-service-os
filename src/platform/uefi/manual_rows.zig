@@ -3,6 +3,12 @@ const std = @import("std");
 const usos = @import("usos");
 const view = @import("manual_view.zig");
 const secure_boot = @import("secure_boot.zig");
+/// A BIOS-only system with no UEFI install flow yet (FreeDOS, PC DOS, NT 4.0,
+/// betas). Shown like any system without a working backend; the Legacy BIOS
+/// mode stays an advanced tool under Utilities and is not offered here.
+pub fn biosOnly(entry: *const usos.catalog.SystemEntry, firmware: usos.firmware.Firmware) bool {
+    return firmware == .uefi and entry.firmware == .bios;
+}
 
 pub const DetailBuffer = [48]u8;
 
@@ -14,6 +20,10 @@ pub fn system(
     detail_buffer: *DetailBuffer,
 ) usos.gui.ui.Row {
     const row_icon: usos.gui.ui.RowIcon = if (icon) |image| .{ .image = image } else .{ .vector = fallbackIcon(entry) };
+    if (biosOnly(entry, firmware)) {
+        if (!media.hasImages()) return .{ .title = entry.name, .detail = view.t(.system_no_image), .icon = row_icon, .enabled = false };
+        return .{ .title = entry.name, .detail = view.t(.system_unavailable_detail), .icon = row_icon, .badge = .{ .text = view.t(.system_unavailable) }, .enabled = false };
+    }
     if (!entry.firmware.accepts(firmware)) {
         const requires_uefi = entry.firmware == .uefi;
         return .{

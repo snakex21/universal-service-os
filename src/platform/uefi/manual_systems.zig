@@ -86,6 +86,11 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
             .activate => {
                 const entry = slots.at(selected) orelse continue;
                 const media = discovery.mediaStatus(entry.image_directory);
+                if (rows_model.biosOnly(entry, firmware)) {
+                    if (media.hasImages()) showBackendDisabledNotice(entry, view.t(.notice_backend_line2)) else showMissingImageNotice(entry);
+                    list.redrawFull(selected, shown_help);
+                    continue;
+                }
                 switch (access(entry, media, firmware).activation()) {
                     .firmware_mismatch, .secure_boot_off_required => {
                         // Selectable so the reason can be read; never launched.
@@ -129,6 +134,7 @@ const Block = enum { none, requires_bios, requires_uefi, secure_boot_off };
 
 fn blockAt(slots: *const Slots, index: usize, firmware: usos.firmware.Firmware) Block {
     const entry = slots.at(index) orelse return .none;
+    if (rows_model.biosOnly(entry, firmware)) return .none;
     if (!entry.firmware.accepts(firmware)) return if (entry.firmware == .uefi) .requires_uefi else .requires_bios;
     if (secureBootBlocked(entry, firmware)) return .secure_boot_off;
     return .none;

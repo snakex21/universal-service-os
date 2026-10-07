@@ -28,6 +28,7 @@ if not exist %2\MEM.EXE goto failed
 if not exist %2\XCOPY.EXE goto failed
 if not exist %2\EDIT.COM goto failed
 if not exist %2\QBASIC.EXE goto failed
+if not exist %2\CHOICE.COM goto failed
 echo READY>%2\READY.TAG
 goto end
 :failed

@@ -73,7 +73,7 @@ test "category lookup stays isolated" {
 
 test "legacy catalog exposes firmware requirements to the view model" {
     try std.testing.expectEqual(@import("firmware_requirement.zig").FirmwareRequirement.any, findById("windows-xp").?.firmware);
-    try std.testing.expectEqual(@import("firmware_requirement.zig").FirmwareRequirement.bios, findById("ms-dos").?.firmware);
+    try std.testing.expectEqual(@import("firmware_requirement.zig").FirmwareRequirement.bios, findById("freedos").?.firmware);
     try std.testing.expectEqual(@import("firmware_requirement.zig").FirmwareRequirement.any, findById("windows-11").?.firmware);
 }
 
