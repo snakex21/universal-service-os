@@ -71,7 +71,7 @@ class Binaries(unittest.TestCase):
             self.assertEqual(struct.unpack_from('<H', b, p + 24 + 68)[0], 1)       # native
             self.assertEqual(struct.unpack_from('<I', b, p + 24 + 64)[0], pe_checksum(b, p + 24 + 64))
             self.assertEqual(set_nt4(b), b)                                         # idempotent
-        self.assertIn(b'usosrst 1.4-nt4', NT4_BINARIES[1].read_bytes())
+        self.assertIn(b'usosrst 1.5-nt4', NT4_BINARIES[1].read_bytes())
 
     def test_pins_and_sources(self):
         for folder, add in ((AHCINT, ['build-nt4.cmd', 'src/NT4WDK/sources', 'src/NT4WDK/makefile', 'bin/NT4/i386/ahcint.sys',
@@ -90,7 +90,8 @@ class Binaries(unittest.TestCase):
         self.assertIn('#ifdef AHCI_NT4_WDK', main)
         self.assertIn('FIELD_OFFSET(HW_INITIALIZATION_DATA, HwAdapterControl)', main)
         rst = (USOSRST / 'src/usosrst.c').read_text()
-        for want in ('#ifdef USOSRST_NT4', 'RedirectKernelRestart', 'SharedUserData->InterruptTime', 'KeNumberProcessors'):
+        for want in ('#ifdef USOSRST_NT4', 'RedirectKernelRestart', 'SharedUserData->InterruptTime', 'KeNumberProcessors',
+                     'FreeVgaWindow', 'System Resources\\Reserved'):
             self.assertIn(want, rst)
         for cmd in (AHCINT / 'build-nt4.cmd', USOSRST / 'build-nt4.cmd'):
             self.assertIn('pe_nt4_version.py', cmd.read_text())

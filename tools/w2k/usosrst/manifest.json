@@ -8,12 +8,13 @@
   "files": {
     "bin/i386/usosrst.sys": "0c38413ad5c6e9f994ad4aa9f050a4ea7fe0aea188cb5abf28c381755ed76af5",
     "build.cmd": "512844bf0ca29c015f8b62e3d54196f8f635c20981682646a940ec8db31f8681",
-    "src/usosrst.c": "de84de9412ffd73bcb554e164bde7aa0d39a0cd10ecc3e571ee6d904e1429398",
+    "src/usosrst.c": "7086d043879da1754719deb716253831284c12f1b950da61a61a92035cf2de78",
     "src/sources": "03dfc1b07f4f26033b333ed7eaa000f48a12a9e5b77e4c1cab10435dd6b0b8fb",
     "src/makefile": "7289517c7028ff031a48cc84f6308a437c3abe6e046c93f3132255221842d433",
     "build-nt4.cmd": "25c3bdf38fc39982f5bc0e98cf64e37e3d8819242f18b80432613ae42ee9b804",
-    "bin/nt4/i386/usosrst.sys": "a0d357aa948cf673db28bb75ed25e3dac67ec82a4c8c37ccbc6b40f3ff63d046"
+    "bin/nt4/i386/usosrst.sys": "d028580b4040662605d2c88b90094fd4125b2526cfda1083dc9011d6efafb23b"
   },
-  "build_nt4": "build-nt4.cmd (same source, -DUSOSRST_NT4, PE version 4.00 via tools/nt4/pe_nt4_version.py) -> bin/nt4/i386/usosrst.sys, version string usosrst 1.4-nt4",
-  "imports_nt4": "40: ntoskrnl, hal; all resolve on the NT 4.0 RTM (1381.1) and SP6a (1381.335) ntoskrnl/ntkrnlmp and hal/halmps/halapic"
+  "build_nt4": "build-nt4.cmd (same source, -DUSOSRST_NT4, PE version 4.00 via tools/nt4/pe_nt4_version.py) -> bin/nt4/i386/usosrst.sys, version string usosrst 1.5-nt4",
+  "imports_nt4": "40: ntoskrnl, hal; all resolve on the NT 4.0 RTM (1381.1) and SP6a (1381.335) ntoskrnl/ntkrnlmp and hal/halmps/halapic",
+  "nt4_1_5": "1.5-nt4 (2026-10-07): cuts the VGA window A0000h-BFFFFh out of HARDWARE\\RESOURCEMAP\\System Resources\\Reserved (CSMWrap reports A0000h-FFFFFh as E820 reserved; NT 4.0 videoprt then refuses vga.sys -> STOP C0000143 DISPLAY DRIVER.DLL); load line \"vga\" + o/-/x. The Windows 2000 binary bin/i386 is unchanged (NT4-only code)."
 }
