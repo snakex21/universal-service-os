@@ -11,6 +11,11 @@ rem it does not accept, so this file names none of them.
 if exist C:\USOSW3\W1SETUP.BAT goto early_setup
 rem Prepared under CSMWrap: batch Setup, no keyboard needed (USB keyboard).
 if not exist USOS.SHH goto interactive_setup
+rem Text pages batch Setup still shows (Polish edition: keyboard layout and
+rem code page 852): answered by USOSKBC from SETUP.KEY when they appear.
+if not exist C:\USOSW3\SETUP.KEY goto batch_setup
+if exist C:\DOS\USOSKBC.COM C:\DOS\USOSKBC.COM C:\USOSW3\SETUP.KEY
+:batch_setup
 SETUP.EXE /H:USOS.SHH
 goto setup_done
 :interactive_setup

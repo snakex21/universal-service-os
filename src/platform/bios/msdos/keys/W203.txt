@@ -1,0 +1,22 @@
+# Windows 2.03 Setup (USOSKBC, tools/usos_keyscript.py). IBM PC/XT/AT, VGA,
+# US keyboard, Microsoft Mouse on the PS/2 port, no printer, United States.
+wait "SETUP PROGRAM for Microsoft Windows Version 2"
+key enter
+wait "will now be set up on your hard disk"
+key enter
+wait "list of computers on which you may set up Windows"
+key down down enter
+wait "select your display adapter"
+key down down down down down down enter
+wait "select your keyboard"
+key enter
+wait "select your pointing device"
+key down down enter
+wait "list of the items you've selected"
+key enter
+wait "allow you to install a printer"
+key c
+wait "create appropriate country settings"
+key enter
+wait "view the README files"
+key f

@@ -1,0 +1,614 @@
+/*
+ * USOSKBC.COM - USB keyboard through the 8042 and scripted Setup answers
+ * for Windows 1.0x, 2.x and 3.0 (and the text pages of WfW 3.11 Setup).
+ * Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
+ *
+ *   USOSKBC [/R] [script.key]
+ *
+ * /R (relay): under CSMWrap SeaBIOS serves the USB keyboard from its timer
+ * interrupt and hands every raw set-1 byte to INT 15h AH=4Fh before its own
+ * processing. KEYBOARD.DRV of Windows 1.0x-3.0 reads port 60h in its own
+ * INT 09h handler, so it never sees those bytes. With an 8042 present (port
+ * 64h does not read FFh; the X470 has one) this TSR takes the bytes that did
+ * NOT come through INT 09h, tells SeaBIOS to drop them (CF clear) and writes
+ * them back through the controller with command D2h ("write keyboard output
+ * buffer"): the 8042 raises IRQ 1 and whoever owns INT 09h (SeaBIOS in DOS,
+ * KEYBOARD.DRV in Windows) reads the byte from port 60h as if a PS/2
+ * keyboard had sent it. One byte per timer tick, only when the controller's
+ * input and output buffers are empty. At install /R also sets the keyboard
+ * interrupt bit of the controller command byte (SeaBIOS leaves it off when
+ * no PS/2 keyboard answered its reset).
+ *
+ * Script (built by tools/usos_keyscript.py; header "UKS1"): steps run from
+ * the timer interrupt, so Setup programs get their answers without a person
+ * at the keyboard. Ops: 0 end, 1 wait for text on the text screen, 2 delay
+ * (ticks), 3 key (set-1 bytes + BIOS word), 4 wait for a graphics mode,
+ * 5 wait until a text is gone. Keys go through the 8042 when there is one
+ * (also into Windows), otherwise into the BIOS keyboard buffer (text Setup
+ * pages only). A missing text simply stops the script: the keyboard keeps
+ * working, a person can answer.
+ *
+ * Shared block (INT 2Fh AX=D710h -> AL=FFh, BX=segment, CX=offset,
+ * DX='KB'): "UKBC", version, flags (1 relay, 2 8042 present, 4 script
+ * running), queue head/tail, counters; docs/windows-early-2026-10-07.md.
+ * Built with tools/build_win3_usb_keyboard.py (zig cc, linked at 0100h).
+ */
+.intel_syntax noprefix
+.code16
+.section .text
+.global _start
+_start:
+    jmp install
+
+    .p2align 1
+shared:
+    .ascii "UKBC"
+    .word 1
+kflags:  .byte 0                  /* 1 relay, 2 8042, 4 script running */
+busy:    .byte 0
+qhead:   .byte 0
+qtail:   .byte 0
+in9:     .byte 0
+tick:    .byte 0
+spos:    .word 0                  /* script position (offset) */
+swait:   .word 0                  /* ticks left in a delay */
+relayed: .long 0
+captured: .long 0
+qfull:   .word 0
+fed:     .word 0                  /* script keys */
+step:    .word 0                  /* script steps done */
+queue:   .space 64
+old08:   .long 0
+old09:   .long 0
+old15:   .long 0
+old2f:   .long 0
+
+/* INT 08h: the BIOS first (SeaBIOS polls USB there and sends the EOI),
+ * then one queued byte to the 8042 and one script step. */
+int08:
+    pushf
+    .att_syntax prefix
+    lcallw *%cs:old08
+    .intel_syntax noprefix
+    cli
+    cmp byte ptr cs:[busy], 0
+    jne 9f
+    inc byte ptr cs:[busy]
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push ds
+    push es
+    push cs
+    pop ds
+    call drain
+    test byte ptr [kflags], 4
+    jz 1f
+    call script
+1:  pop es
+    pop ds
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    dec byte ptr cs:[busy]
+9:  iret
+
+/* One byte from the queue to the 8042 (DS = CS). */
+drain:
+    test byte ptr [kflags], 2
+    jz 9f
+    mov bl, byte ptr [qtail]
+    cmp bl, byte ptr [qhead]
+    je 9f
+    in al, 0x64
+    test al, 3                      /* input or output buffer full: later */
+    jnz 9f
+    mov al, 0xd2
+    out 0x64, al
+    mov cx, 0x4000
+1:  in al, 0x64
+    test al, 2
+    loopnz 1b
+    xor bh, bh
+    mov al, byte ptr [queue + bx]
+    out 0x60, al
+    inc bl
+    and bl, 63
+    mov byte ptr [qtail], bl
+    inc dword ptr [relayed]
+9:  ret
+
+/* Append AL to the queue (DS = CS); CF set when full. */
+enqueue:
+    push bx
+    mov bl, byte ptr [qhead]
+    mov bh, bl
+    inc bh
+    and bh, 63
+    cmp bh, byte ptr [qtail]
+    je 1f
+    push si
+    mov si, bx
+    and si, 0x00ff
+    mov byte ptr [queue + si], al
+    pop si
+    mov byte ptr [qhead], bh
+    pop bx
+    clc
+    ret
+1:  inc word ptr [qfull]
+    pop bx
+    stc
+    ret
+
+/* One script step (DS = CS). */
+script:
+    inc byte ptr [tick]
+    cmp word ptr [swait], 0
+    je 1f
+    dec word ptr [swait]
+    ret
+1:  mov si, word ptr [spos]
+    mov al, byte ptr [si]
+    cmp al, 1
+    je op_wait
+    cmp al, 2
+    je op_delay
+    cmp al, 3
+    je op_key
+    cmp al, 4
+    je op_gfx
+    cmp al, 5
+    je op_gone
+    and byte ptr [kflags], 0xfb      /* 0 (or unknown): script done */
+    ret
+op_wait:
+    test byte ptr [tick], 3
+    jnz 9f
+    call findtext
+    jnc 9f
+    jmp skiptext
+op_gone:
+    test byte ptr [tick], 3
+    jnz 9f
+    call findtext
+    jc 9f
+skiptext:
+    mov al, byte ptr [si + 1]
+    xor ah, ah
+    add si, ax
+    add si, 2
+    jmp next
+op_delay:
+    mov ax, word ptr [si + 1]
+    mov word ptr [swait], ax
+    add si, 3
+    jmp next
+op_gfx:
+    mov ax, 0x40
+    mov es, ax
+    mov al, byte ptr es:[0x49]
+    cmp al, 7
+    je 9f
+    cmp al, 3
+    jbe 9f
+    inc si
+    jmp next
+op_key:
+    /* [si+1] n, n set-1 bytes, then the BIOS word (scan:ascii). */
+    mov al, byte ptr [qtail]
+    cmp al, byte ptr [qhead]
+    jne 9f                          /* previous key still going out */
+    mov cl, byte ptr [si + 1]
+    xor ch, ch
+    lea di, [si + 2]
+    test byte ptr [kflags], 2
+    jz key_bios
+    jcxz key_done
+2:  mov al, byte ptr [di]
+    call enqueue
+    inc di
+    loop 2b
+    jmp key_done
+key_bios:
+    add di, cx
+    mov dx, word ptr [di]
+    sub di, cx
+    or dx, dx
+    jz key_done
+    mov ax, 0x40
+    mov es, ax
+    mov bx, word ptr es:[0x1c]
+    mov ax, bx
+    add ax, 2
+    cmp ax, word ptr es:[0x82]
+    jb 3f
+    mov ax, word ptr es:[0x80]
+3:  cmp ax, word ptr es:[0x1a]
+    je 9f                           /* BIOS buffer full: retry */
+    mov word ptr es:[bx], dx
+    mov word ptr es:[0x1c], ax
+key_done:
+    inc word ptr [fed]
+    mov cl, byte ptr [si + 1]
+    xor ch, ch
+    add si, cx
+    add si, 4
+next:
+    mov word ptr [spos], si
+    inc word ptr [step]
+9:  ret
+
+/* Is the counted string at [si+1] on the text screen? CF set = yes.
+ * Keeps SI; DS = CS. */
+findtext:
+    push si
+    mov ax, 0x40
+    mov es, ax
+    mov al, byte ptr es:[0x49]
+    mov dx, 0xb800
+    cmp al, 7
+    jne 1f
+    mov dx, 0xb000
+    jmp 2f
+1:  cmp al, 3
+    ja nf
+2:  mov al, byte ptr es:[0x84]      /* rows - 1 (0 on old BIOSes) */
+    or al, al
+    jnz 3f
+    mov al, 24
+3:  inc al
+    mov bl, byte ptr es:[0x4a]      /* columns */
+    mul bl                          /* AX = cells */
+    /* Page start from the CRT controller (start address registers 0Ch/0Dh,
+     * in characters): Windows 1.0x Setup flips pages without telling the
+     * BIOS, so the BDA word 0040:004Eh can name the hidden page. */
+    push ax
+    push dx
+    mov dx, 0x3d4
+    cmp byte ptr es:[0x49], 7
+    jne 7f
+    mov dx, 0x3b4
+7:  in al, dx
+    mov cl, al                      /* the program's index register value */
+    mov al, 0x0c
+    out dx, al
+    inc dx
+    in al, dx
+    mov ah, al
+    dec dx
+    mov al, 0x0d
+    out dx, al
+    inc dx
+    in al, dx
+    dec dx
+    xchg ax, cx
+    out dx, al                      /* index register back */
+    mov di, cx
+    shl di, 1                       /* byte offset in the text buffer */
+    pop dx
+    pop ax
+    mov bx, word ptr es:[0x4e]      /* the BIOS's idea of the page start */
+    mov es, dx
+    mov cl, byte ptr [si + 1]
+    xor ch, ch
+    jcxz found
+    sub ax, cx
+    jb nf
+    inc ax
+    inc si
+    inc si                          /* SI = first character */
+    push ax
+    call scan
+    pop ax
+    jc found
+    cmp bx, di
+    je nf
+    mov di, bx                      /* CRTC page did not have it: BDA page */
+    call scan
+    jc found
+    jmp nf
+
+/* Search ES:DI (text cells) at AX start positions for the CX characters
+ * at DS:SI. CF set = found. Keeps CX, SI, DI. */
+scan:
+    push di
+    mov dx, ax
+4:  push di
+    push si
+    push cx
+5:  mov al, byte ptr es:[di]
+    cmp al, byte ptr [si]
+    jne 6f
+    inc si
+    add di, 2
+    loop 5b
+    pop cx
+    pop si
+    pop di
+    pop di
+    stc
+    ret
+6:  pop cx
+    pop si
+    pop di
+    add di, 2
+    dec dx
+    jnz 4b
+    pop di
+    clc
+    ret
+nf: pop si
+    clc
+    ret
+found:
+    pop si
+    stc
+    ret
+
+/* INT 09h: mark keyboard-IRQ context, so INT 15h/4Fh from it passes. */
+int09:
+    inc byte ptr cs:[in9]
+    pushf
+    .att_syntax prefix
+    lcallw *%cs:old09
+    .intel_syntax noprefix
+    dec byte ptr cs:[in9]
+    iret
+
+/* INT 15h AH=4Fh: USB bytes (not from INT 09h) go to the 8042 queue. */
+int15:
+    cmp ah, 0x4f
+    jne chain15
+    test byte ptr cs:[kflags], 1
+    jz chain15
+    cmp byte ptr cs:[in9], 0
+    jne chain15
+    push ds
+    push cs
+    pop ds
+    call enqueue
+    pop ds
+    jc chain15                      /* queue full: SeaBIOS keeps it */
+    inc dword ptr cs:[captured]
+    push bp
+    mov bp, sp
+    and byte ptr [bp + 6], 0xfe     /* CF clear in the caller's FLAGS: drop */
+    pop bp
+    iret
+chain15:
+    .att_syntax prefix
+    ljmpw *%cs:old15
+    .intel_syntax noprefix
+
+/* INT 2Fh AX=D710h: installation check and shared block address. */
+int2f:
+    cmp ax, 0xd710
+    jne 1f
+    mov al, 0xff
+    mov bx, cs
+    mov cx, offset shared
+    mov dx, 0x4b42
+    iret
+1:  .att_syntax prefix
+    ljmpw *%cs:old2f
+    .intel_syntax noprefix
+
+/* ---------------------------------------------------------------- install */
+    .set SCRIPT_MAX, 3072
+install:
+    mov ax, 0xd710
+    int 0x2f
+    cmp al, 0xff
+    jne 1f
+    cmp dx, 0x4b42
+    jne 1f
+    mov dx, offset msg_already
+    jmp say_exit
+1:  /* Command tail: /R and an optional script file name. */
+    mov si, 0x81
+    mov word ptr [resend], offset scriptbuf
+parse:
+    lodsb
+    cmp al, 0x0d
+    je parsed
+    cmp al, ' '
+    je parse
+    cmp al, 9
+    je parse
+    cmp al, '/'
+    jne fname
+    lodsb
+    or al, 0x20
+    cmp al, 'r'
+    jne bad_args
+    or byte ptr [kflags], 1
+    jmp parse
+fname:
+    dec si
+    mov dx, si                      /* DS:DX = name */
+2:  lodsb
+    cmp al, ' '
+    je 3f
+    cmp al, 9
+    je 3f
+    cmp al, 0x0d
+    jne 2b
+3:  mov byte ptr [si - 1], 0
+    mov byte ptr [term], al
+    push si
+    mov ax, 0x3d00
+    int 0x21
+    jc no_file
+    mov bx, ax
+    mov dx, offset scriptbuf
+    mov cx, SCRIPT_MAX
+    mov ah, 0x3f
+    int 0x21
+    pushf
+    push ax
+    mov ah, 0x3e
+    int 0x21
+    pop ax
+    popf
+    jc no_file
+    cmp ax, 6
+    jb bad_file
+    cmp ax, SCRIPT_MAX
+    jae bad_file
+    cmp word ptr [scriptbuf], 0x4b55       /* "UK" */
+    jne bad_file
+    cmp word ptr [scriptbuf + 2], 0x3153   /* "S1" */
+    jne bad_file
+    mov bx, offset scriptbuf
+    add bx, ax
+    mov byte ptr [bx], 0            /* end op after the last step */
+    inc bx
+    mov word ptr [resend], bx
+    mov word ptr [spos], offset scriptbuf + 4
+    or byte ptr [kflags], 4
+    pop si
+    cmp byte ptr [term], 0x0d
+    je parsed
+    jmp parse
+no_file:
+    pop si
+    mov dx, offset msg_nofile
+    jmp say_exit
+bad_file:
+    pop si
+    mov dx, offset msg_badfile
+    jmp say_exit
+bad_args:
+    mov dx, offset msg_usage
+    jmp say_exit
+parsed:
+    /* 8042 present? Port 64h reads FFh without a controller. */
+    in al, 0x64
+    cmp al, 0xff
+    je no_kbc
+    or byte ptr [kflags], 2
+    test byte ptr [kflags], 1
+    jz kbc_done
+    /* /R: keyboard interrupt on in the command byte (bit 0). */
+    cli
+    call kbc_wait_in
+    mov al, 0x20
+    out 0x64, al
+    mov cx, 0xffff
+4:  in al, 0x64
+    test al, 1
+    loopz 4b
+    jcxz 5f
+    in al, 0x60
+    or al, 1
+    mov ah, al
+    call kbc_wait_in
+    mov al, 0x60
+    out 0x64, al
+    call kbc_wait_in
+    mov al, ah
+    out 0x60, al
+5:  sti
+    jmp kbc_done
+no_kbc:
+    and byte ptr [kflags], 0xfe      /* no relay without a controller */
+kbc_done:
+    mov ax, 0x3508
+    int 0x21
+    mov word ptr [old08], bx
+    mov word ptr [old08 + 2], es
+    mov ax, 0x3509
+    int 0x21
+    mov word ptr [old09], bx
+    mov word ptr [old09 + 2], es
+    mov ax, 0x3515
+    int 0x21
+    mov word ptr [old15], bx
+    mov word ptr [old15 + 2], es
+    mov ax, 0x352f
+    int 0x21
+    mov word ptr [old2f], bx
+    mov word ptr [old2f + 2], es
+    mov dx, offset int09
+    mov ax, 0x2509
+    int 0x21
+    mov dx, offset int15
+    mov ax, 0x2515
+    int 0x21
+    mov dx, offset int2f
+    mov ax, 0x252f
+    int 0x21
+    mov dx, offset int08
+    mov ax, 0x2508
+    int 0x21
+    mov es, word ptr [0x2c]
+    mov ah, 0x49
+    int 0x21
+    mov dx, offset msg_ok
+    mov ah, 9
+    int 0x21
+    test byte ptr [kflags], 1
+    jz 6f
+    mov dx, offset msg_relay
+    mov ah, 9
+    int 0x21
+6:  test byte ptr [kflags], 4
+    jz 7f
+    mov dx, offset msg_script
+    mov ah, 9
+    int 0x21
+7:  mov dx, offset msg_nl
+    mov ah, 9
+    int 0x21
+    mov dx, word ptr [resend]
+    add dx, 15
+    shr dx, 4
+    mov ax, 0x3100
+    int 0x21
+
+kbc_wait_in:
+    push cx
+    mov cx, 0xffff
+1:  in al, 0x64
+    test al, 2
+    loopnz 1b
+    pop cx
+    ret
+
+say_exit:
+    mov ah, 9
+    int 0x21
+    mov ax, 0x4c01
+    int 0x21
+
+resend: .word 0
+term:   .byte 0
+msg_ok:
+    .ascii "USOSKBC: installed$"
+msg_relay:
+    .ascii ", USB keyboard through the 8042$"
+msg_script:
+    .ascii ", Setup answers$"
+msg_nl:
+    .ascii ".\r\n$"
+msg_already:
+    .ascii "USOSKBC: already installed.\r\n$"
+msg_nofile:
+    .ascii "USOSKBC: cannot read the script file.\r\n$"
+msg_badfile:
+    .ascii "USOSKBC: not a USOS key script.\r\n$"
+msg_usage:
+    .ascii "USOSKBC [/R] [script.key]\r\n$"
+
+    /* The script is read to here and stays resident with the code above
+     * (the install part is small; reading over it would overwrite the
+     * running code). */
+    .p2align 1
+scriptbuf:

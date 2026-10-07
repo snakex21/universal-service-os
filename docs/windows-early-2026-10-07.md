@@ -66,8 +66,55 @@ Answers used in QEMU (SeaBIOS, PS/2 keyboard):
 | 3.0a | yes | VGA | real mode (WIN /R) OK with mouse; standard mode restarted the VM |
 | WfW 3.11 PL | yes (batch Setup) | VGA | 386 enhanced; VBMOUSE + USOSKEY |
 
-Open: no unattended answers for 1.0x-3.0 (a BIOS keystroke feeder would do it);
-inside Windows 1.0x-3.0 the keyboard is KEYBOARD.DRV on the 8042 (PS/2
-keyboard on the X470; USOSKEY.DRV needs Windows 3.1); USB mouse in 2.x / 3.0
-through their PS/2 driver under CSMWrap is untested; 1.04, 2.11 (286/386)
-start from the menu and 3.0 standard mode not yet verified.
+(First round; superseded by the section below.)
+
+## Unattended Setup and USB keyboard: USOSKBC (second round, 2026-10-07)
+
+`USOSKBC.COM` (src/platform/bios/msdos/usoskbc.S, own GPL code, built by
+tools/build_win3_usb_keyboard.py) does two things:
+
+* `/R` relay: SeaBIOS (CSMWrap) serves the USB keyboard from its timer
+  interrupt and hands each set-1 byte to INT 15h AH=4Fh. KEYBOARD.DRV of
+  Windows 1.0x-3.0 reads port 60h in its own INT 09h handler and never sees
+  those bytes. USOSKBC takes the bytes that did not come through INT 09h,
+  drops them for SeaBIOS and writes them back through the 8042 with command
+  D2h, so IRQ 1 fires and whoever owns INT 09h reads them as PS/2 bytes. It
+  needs an 8042 (port 64h not FFh; the X470 has one); /R also sets the
+  keyboard interrupt bit in the controller command byte. One byte per tick.
+* Key script: `USOSKBC /R C:\USOSW3\SETUP.KEY` (W1SETUP.BAT) or
+  `USOSKBC C:\USOSW3\SETUP.KEY` (W3START.BAT, 3.1 / WfW batch Setup). Scripts:
+  src/platform/bios/msdos/keys/*.txt, compiled by tools/usos_keyscript.py to
+  W101/W104/W203/W211/W386/W30/W3PL.KEY; dos_csmwrap_target.sh copies the
+  matching one to SETUP.KEY (W3PL for 3.1 / WfW: the Polish keyboard-layout
+  and code page 852 pages). A step waits for a text on the text screen (page
+  start from the CRT controller: Windows 1.0x Setup flips pages without the
+  BIOS) and then types its keys; Windows 3.0's graphical part gets timed keys
+  through the 8042. A text that never shows stops the script; the keyboard
+  stays usable for a person.
+
+Start menu (W1AUTO.CSM): VBMOUSE and `USOSKBC /R` instead of USOSKEY.
+Windows 3.0 starts in real mode (WIN /R) by default; the second menu entry is
+WIN /S.
+
+QEMU (SeaBIOS = CSMWrap's BIOS, `-machine pc,smm=off`, usb-kbd and usb-mouse
+on qemu-xhci, i8042 present; the harness sent no keys):
+
+| System | Unattended Setup | USB keyboard in Windows | Mouse | Display |
+| --- | --- | --- | --- | --- |
+| 1.01 | yes, to the desktop | yes (relay) | no (no pointer) | EGA 640x350 |
+| 1.04 | yes (after the CRT-controller page fix) | yes (relay) | no | EGA |
+| 2.03 | yes, to the desktop | yes (relay) | no (PS/2 port driver, pointer stays) | VGA |
+| 2.11 (286) | yes, to the desktop | yes (relay) | no (MS Mouse Bus/Serial) | VGA |
+| 2.11 (386) | yes, to the desktop | no: WIN386 virtualises the 8042 | no | VGA |
+| 3.0a | yes, DOS and Windows part; Program Manager with groups | yes, real mode | no | VGA |
+| WfW 3.11 PL | yes, both Polish pages answered | USOSKEY.DRV (3.1 path) | VBMOUSE.DRV | VGA |
+
+Windows 3.0: 386 enhanced mode hangs in the BIOS (V86, F000) and also wants
+WINA20.386 in C:\ (not copied); standard mode stopped at the logo in QEMU.
+QEMU's SMM must be off: with SMM on, Windows 1.0x-3.0 hang in SeaBIOS's SMM
+handler (QEMU only; CSMWrap has no SeaBIOS SMM).
+
+Open (parked): USB mouse in 1.0x-3.0 (their drivers probe the hardware or the
+PS/2 aux port; a D3h "write aux output buffer" relay of the SeaBIOS mouse
+packets is the analogous next step); keyboard in Windows/386 2.11 and 3.0
+enhanced mode (WIN386 / VKD virtualise the 8042).

@@ -1,7 +1,7 @@
 [menu]
 menucolor=15,1
 menuitem=WINSTD,Windows (domyslny)
-menuitem=WINREAL,Windows 3.0 - tryb rzeczywisty (WIN /R)
+menuitem=WINREAL,Windows 3.0 - tryb standardowy (WIN /S, test)
 menuitem=DOSONLY,MS-DOS - wiersz polecen
 menudefault=WINSTD,8
 

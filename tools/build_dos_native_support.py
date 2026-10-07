@@ -109,7 +109,9 @@ def build_csmwrap_variants(root: Path, dos_out: Path):
     early_auto = (msdos / 'windows_early_auto.cmd').read_text(encoding='ascii')
     if early_auto.count(temp) != 1:
         raise ValueError('windows_early_auto.cmd: TEMP line not found once')
-    (dos_out / 'W1AUTO.CSM').write_bytes(dos_text(early_auto.replace(temp, temp + 'C:\\DOS\\VBMOUSE.EXE\nC:\\DOS\\USOSKEY.COM\n')))
+    # Windows 1.0x-3.0 read the 8042 themselves: USOSKBC /R relays the USB
+    # keyboard through it (USOSKEY.DRV needs Windows 3.1).
+    (dos_out / 'W1AUTO.CSM').write_bytes(dos_text(early_auto.replace(temp, temp + 'C:\\DOS\\VBMOUSE.EXE\nC:\\DOS\\USOSKBC.COM /R\n')))
     (dos_out / 'W3INI.BAS').write_bytes(dos_text((msdos / 'windows_ini.bas').read_text(encoding='ascii')))
     (dos_out / 'USOS.SHH').write_bytes(dos_text((msdos / 'windows_setup.shh').read_text(encoding='ascii')))
     vendor = root / 'tools/vendor/vbados/0.67'

@@ -173,6 +173,12 @@ if [ -n "$WIN3_ISO" ]; then
         '') ;;
         windows-1-01|windows-1-04|windows-2-03|windows-2-11-286|windows-2-11-386|windows-3-0)
             printf '%s\r\n' "$WIN_EARLY" > "$U/EARLY.TAG"
+            # Setup answers for USOSKBC (src/platform/bios/msdos/keys).
+            case "$WIN_EARLY" in
+                windows-1-01) key=W101 ;; windows-1-04) key=W104 ;; windows-2-03) key=W203 ;;
+                windows-2-11-286) key=W211 ;; windows-2-11-386) key=W386 ;; *) key=W30 ;;
+            esac
+            [ ! -f "$U/$key.KEY" ] || cp "$U/$key.KEY" "$U/SETUP.KEY" || fail "cannot copy $key.KEY"
             log "early Windows: $WIN_EARLY (Setup from A: = C:\WINSETUP)" ;;
         *) fail "unexpected DOS_WIN_EARLY: $WIN_EARLY" ;;
     esac

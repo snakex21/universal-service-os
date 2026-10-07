@@ -1,0 +1,19 @@
+# Windows 3.0 Setup (USOSKBC, tools/usos_keyscript.py). DOS part: C:\WINDOWS,
+# detected hardware. Windows part (graphics, no text to wait for; the keys
+# reach Windows through the 8042): no printers, no application search, no
+# documents, then Continue / OK until Setup returns to MS-DOS or restarts.
+wait "Welcome to Setup."
+key enter
+wait "Setup is ready to install Windows into"
+key enter
+wait "Setup has determined that your system includes"
+key enter
+gfx
+delay 25
+key alt+p alt+a alt+d enter
+delay 90
+key enter
+delay 20
+key enter
+delay 20
+key enter

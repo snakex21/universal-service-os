@@ -9,11 +9,18 @@ if exist C:\WIN386\WIN386.EXE goto w386dir
 if exist C:\WINDOWS\WIN386.EXE goto w386win
 if not exist C:\WINDOWS\WIN.COM goto missing
 cd \WINDOWS
-if "%CONFIG%"=="WINREAL" goto real
-WIN.COM
-goto end
-:real
+rem Windows 3.0 (SYSTEM\DOSX.EXE = standard mode present): real mode by
+rem default. Under CSMWrap 386 enhanced mode hangs in the BIOS USB code (V86)
+rem and standard mode stopped at the logo in QEMU; the menu offers WIN /S.
+if not exist C:\WINDOWS\SYSTEM\DOSX.EXE goto plain
+if "%CONFIG%"=="WINREAL" goto standard
 WIN.COM /R
+goto end
+:standard
+WIN.COM /S
+goto end
+:plain
+WIN.COM
 goto end
 :w386dir
 cd \WIN386

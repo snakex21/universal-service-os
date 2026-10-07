@@ -47,6 +47,10 @@ copy %USRC%\VBADOS.TXT C:\DOS /y >nul
 if errorlevel 1 goto failed
 copy %USRC%\USOSKEY.COM C:\DOS /y >nul
 if errorlevel 1 goto failed
+if not exist %USRC%\USOSKBC.COM goto kbc_done
+copy %USRC%\USOSKBC.COM C:\DOS /y >nul
+if errorlevel 1 goto failed
+:kbc_done
 echo C:\DOS\VBMOUSE.EXE>>C:\AUTOEXEC.BAT
 echo C:\DOS\USOSKEY.COM>>C:\AUTOEXEC.BAT
 :csm_dos_done
@@ -72,6 +76,11 @@ if errorlevel 1 goto failed
 del C:\WINSETUP\SETUP.NEW
 :inf_done
 md C:\USOSW3
+rem Setup answers for USOSKBC (dos_csmwrap_target.sh picks the script).
+if not exist %USRC%\SETUP.KEY goto setup_key_done
+copy %USRC%\SETUP.KEY C:\USOSW3 /y >nul
+if errorlevel 1 goto failed
+:setup_key_done
 copy %USRC%\W3START.BAT C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
 copy %USRC%\WINMENU.BAT C:\USOSW3 /y >nul

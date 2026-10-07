@@ -1,0 +1,26 @@
+# Windows 1.04 Setup (USOSKBC, tools/usos_keyscript.py). US keyboard,
+# Microsoft Mouse, EGA (more than 64K), no printer, C:\WINDOWS.
+wait "Setup prepares Microsoft Windows to run"
+key c
+# The "To setup ... you need" page: in QEMU it did not stay on the screen
+# once C was typed on the first page, so the script does not wait for it.
+wait "full pathname of the directory"
+key enter
+wait "Type the number for your keyboard"
+key enter
+wait "Type the number for your pointing device"
+key 2 enter
+wait "Type the number for your graphics adapter"
+key 6 enter
+wait "Put the Build disk"
+key c
+wait "Put the Utilities disk"
+key c
+wait "Would you like to set up a printer"
+key n
+wait "Put the Font disk"
+key c
+wait "Put the Desktop Applications disk"
+key c
+wait "Put the Microsoft Write Program"
+key c
