@@ -284,14 +284,19 @@ EOF
 # The only logon in the VM (automatic, RunOnce from CMDLINES.TXT): drivers,
 # SP6a (-u unattended, -z no restart), the version and usosrst keys for the
 # check, no more automatic logon, DONE.TXT, then USOSOFF restarts the guest,
-# which ends QEMU (-no-reboot). Files SP6a could not replace while in use
+# which ends QEMU (-no-reboot). NT 4.0 COPY has no /Y (it overwrites; with /Y
+# it stops with a syntax error, QEMU e2e 2026-10-07). SP6a sets
+# Control\Windows CSDVersion (0x600) at once; the CurrentVersion string
+# follows after a restart. Files SP6a could not replace while in use
 # are renamed by SMSS at the first start on the real machine (SP6a kernel).
 crlf > "$usos/POST.CMD" <<'EOF'
 @echo off
 if exist C:\USOS\NT4\POST.OK goto end
 echo USOS NT4 post > C:\USOS\NT4\POST.LOG
-copy /y C:\USOS\NT4\AHCINT.SYS %SystemRoot%\system32\drivers\ahcint.sys >> C:\USOS\NT4\POST.LOG
-copy /y C:\USOS\NT4\USOSRST.SYS %SystemRoot%\system32\drivers\usosrst.sys >> C:\USOS\NT4\POST.LOG
+copy C:\USOS\NT4\AHCINT.SYS %SystemRoot%\system32\drivers\ahcint.sys >> C:\USOS\NT4\POST.LOG
+copy C:\USOS\NT4\USOSRST.SYS %SystemRoot%\system32\drivers\usosrst.sys >> C:\USOS\NT4\POST.LOG
+if not exist %SystemRoot%\system32\drivers\ahcint.sys echo AHCINT.SYS copy FAILED >> C:\USOS\NT4\POST.LOG
+if not exist %SystemRoot%\system32\drivers\usosrst.sys echo USOSRST.SYS copy FAILED >> C:\USOS\NT4\POST.LOG
 %SystemRoot%\regedit.exe /s C:\USOS\NT4\DRIVERS.REG
 echo drivers registered >> C:\USOS\NT4\POST.LOG
 if not exist C:\USOS\NT4\SP6I386.EXE goto nosp
@@ -301,6 +306,7 @@ echo sp end %errorlevel% >> C:\USOS\NT4\POST.LOG
 :nosp
 echo ok > C:\USOS\NT4\POST.OK
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\VERSION.REG "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+%SystemRoot%\regedit.exe /e C:\USOS\NT4\CSD.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Windows
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\USOSRST.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usosrst
 %SystemRoot%\regedit.exe /s C:\USOS\NT4\DONE.REG
 echo done > C:\USOS\NT4\DONE.TXT
