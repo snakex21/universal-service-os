@@ -287,6 +287,47 @@ class Nt4Target(unittest.TestCase):
         self.assertLess(post.index('del "%NHI%"'), post.index('SP6I386.EXE -u -z'))
         self.assertLess(post.index('del "%NHI%"'), post.index('USOSOFF.EXE /r'))
 
+    def test_post_script_switches_a_128_bit_cd_for_the_export_sp6a(self):
+        # The export SP6a on the 128-bit English Enterprise CD: update.exe
+        # refuses silently. POST.CMD extracts the SP (sfxcab -x:dir -q), runs
+        # update.exe, and only with CRYPTOHI.TXT and no CSDVersion 0x600 puts
+        # the SP's own schannel.dll in place, renames rsaenh.dll and retries.
+        text = TARGET.read_text(encoding='utf-8')
+        post = text[text.index('crlf > "$usos/POST.CMD"'):]
+        post = post[:post.index('\nEOF\n')]
+        order = [
+            r'SP6I386.EXE -x:C:\USOS\NT4\SP6X -q',
+            r'start /wait C:\USOS\NT4\SP6X\update\update.exe -u -z',
+            r'if not exist C:\USOS\NT4\CRYPTOHI.TXT goto nosp',
+            r'CSD1.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Windows',
+            'findstr /i /c:"dword:00000600"',
+            'if not errorlevel 1 goto nosp',
+            'echo crypto: high to standard for SP6a',
+            r'copy %SystemRoot%\system32\schannel.dll C:\USOS\NT4\SCHAN128.DLL',
+            r'ren %SystemRoot%\system32\schannel.dll schannel.128',
+            r'copy C:\USOS\NT4\SP6X\schannel.dll %SystemRoot%\system32\schannel.dll',
+            r'ren %SystemRoot%\system32\rsaenh.dll rsaenh.128',
+            'echo sp start (standard)',
+            ':spsfx',
+            r'start /wait C:\USOS\NT4\SP6I386.EXE -u -z',
+            ':nosp',
+        ]
+        positions = [post.index(item) for item in order]
+        self.assertEqual(positions, sorted(positions))
+        self.assertEqual(post.count(r'SP6X\update\update.exe -u -z'), 2)
+        # cmd: '>' in an echo text is a redirection (QEMU 2026-10-07: "->"
+        # wrote a file named "standard" and cut the log line).
+        for line in post.splitlines():
+            if line.startswith('echo '):
+                text_part = line.split('>>')[0] if '>>' in line else line.split('>')[0]
+                self.assertNotIn('>', text_part[5:], line)
+        # The flag is written only for a 128-bit CD.
+        self.assertIn('if [ "$crypto" = high ]; then printf \'high\\r\\n\' > "$usos/CRYPTOHI.TXT"; fi', text)
+
+    def test_finish_removes_the_extracted_service_pack(self):
+        nt4 = Path(NT4).read_text(encoding='utf-8')
+        self.assertIn("for leftover in '$WIN_NT$.~BT' '$WIN_NT$.~LS' USOS/NT4/SP6X; do", nt4)
+
     def test_chs_end_matches_the_partition(self):
         # 255 heads, 63 sectors: LBA 63 + 4096000 - 1.
         lba = 63 + 4096000 - 1

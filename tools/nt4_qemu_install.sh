@@ -181,7 +181,8 @@ nt4_vm_finish() {
             grep -aq 'Service Pack 6' "$logs/VERSION.REG" 2>/dev/null; then reason="$reason SP6a installed;"
         elif grep -aq 'crypto=high' "$logs/SOURCE.TXT" 2>/dev/null; then
             # update.exe -u exits without a word when a Standard Encryption
-            # SP6a meets the 128-bit files of a US/Canada CD.
+            # SP6a meets the 128-bit files of a US/Canada CD, and POST.CMD's
+            # switch to standard encryption did not help either.
             reason="$reason no Service Pack 6 in CSDVersion (high-encryption CD);"; status=1
         else reason="$reason no Service Pack 6 in CSDVersion;"; status=1; fi
     fi
@@ -198,7 +199,7 @@ nt4_vm_finish() {
             chmod u+w "$file" 2>/dev/null || true
             rm -f "$file"
         done
-        for leftover in '$WIN_NT$.~BT' '$WIN_NT$.~LS'; do
+        for leftover in '$WIN_NT$.~BT' '$WIN_NT$.~LS' USOS/NT4/SP6X; do
             file=$(nt4_ci_path "$c" "$leftover") && rm -rf "$file"
         done
         reason="$reason BOOT.INI: $NT4_BOOT_OPTIONS;"

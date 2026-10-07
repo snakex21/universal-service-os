@@ -320,8 +320,10 @@ usos_w9x_csmwrap_prepare() {
             case "${vm_check:-}" in *'high-encryption CD'*)
                 # update.exe refuses the Standard Encryption SP6a on a CD with
                 # 128-bit security files (QEMU 2026-10-07, English Enterprise
-                # Server CD with the export SP6a).
-                stop "Service Pack 6a did not install: this CD has 128-bit (High Encryption) security files and the Standard Encryption SP6a refuses them. Put the 128-bit (High Encryption) SP6I386.EXE of the CD's language into Systems\\Windows\\$folder\\ServicePack on USOS_DATA. Logs: EFI/USOS/win9x/nt4" ;;
+                # Server CD with the export SP6a). POST.CMD then switches the
+                # system to standard encryption and retries; this stop means
+                # that failed too (POST.LOG "crypto:" lines).
+                stop "Service Pack 6a did not install on this 128-bit (High Encryption) CD, also not after switching it to standard encryption (POST.LOG). Check that SP6I386.EXE is SP6a in the CD's language, or use the 128-bit (High Encryption) SP6I386.EXE, in Systems\\Windows\\$folder\\ServicePack on USOS_DATA. Logs: EFI/USOS/win9x/nt4" ;;
             esac
             case "${vm_check:-}" in *'no Service Pack 6'*)
                 # SP6a's update.exe refuses a CD of another language ("This

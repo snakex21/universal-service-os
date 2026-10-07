@@ -199,12 +199,16 @@ if grep -qi '^TimeZone' "$work/WINNT.SIF"; then log 'time zone: set for this CD 
 # chosen to install a version of the Service Pack with Standard Encryption
 # onto a system with High Encryption", QEMU 2026-10-07, English Enterprise
 # Server CD). The finish step names the High Encryption SP6a for this case.
+# The version string is UTF-16: match its bytes as hex. BusyBox tr cannot
+# delete NUL bytes (tr -d '\000' kept all 105232 bytes of the Enterprise
+# CD's SCHANNEL.DLL in micro-Linux, QEMU 2026-10-07), GNU tr can.
 crypto=standard
+not_for_export='4e006f007400200066006f00720020004500780070006f0072007400'
 for name in SCHANNEL.DLL schannel.dll; do
-    if [ -f "$i386/$name" ] && tr -d '\000' < "$i386/$name" | grep -q 'Not for Export'; then crypto=high; fi
+    if [ -f "$i386/$name" ] && od -An -v -tx1 "$i386/$name" | tr -d ' \n' | grep -q "$not_for_export"; then crypto=high; fi
 done
 if [ "$crypto" = high ]; then
-    log 'CD encryption: high (128-bit, US/Canada): SP6a must be the High Encryption (128-bit) build'
+    log 'CD encryption: high (128-bit, US/Canada): a Standard Encryption SP6a switches it to standard (POST.CMD)'
 else
     log 'CD encryption: standard'
 fi
@@ -403,6 +407,18 @@ EOF
 # Enterprise components. Without the CD its "Install Service Pack 3" window
 # hangs (QEMU 2026-10-07, 18 min), and SP3 must never go over SP6a: POST.CMD
 # removes it (RunOnce runs before the Startup group).
+# SP6a runs from its own extracted copy (sfxcab -x:dir -q: silent, exit 0;
+# the package itself only runs update\update.exe). A US/Canada 128-bit CD
+# (CRYPTOHI.TXT) with a Standard Encryption (export) SP6a: update.exe refuses
+# silently ("Standard Encryption onto a system with High Encryption"; it reads
+# the version strings of schannel.dll/rsaenh.dll), CSDVersion stays below
+# 0x600. POST.CMD then renames the CD's 128-bit schannel.dll to schannel.128
+# (it is loaded, so COPY over it fails: "0 file(s) copied", QEMU 2026-10-07;
+# a copy stays in C:\USOS\NT4\SCHAN128.DLL), puts the SP6a's own export
+# schannel.dll in its place, renames rsaenh.dll (if any)
+# to rsaenh.128 and runs update.exe again: the system drops to standard
+# encryption (SP6a installs that schannel.dll anyway). A real 128-bit SP6a
+# installs at the first try and nothing is switched.
 crlf > "$usos/POST.CMD" <<'EOF'
 @echo off
 if exist C:\USOS\NT4\POST.OK goto end
@@ -436,7 +452,32 @@ goto vesadone
 echo vesa off: no framebuf.dll, VGA stays >> C:\USOS\NT4\POST.LOG
 :vesadone
 if not exist C:\USOS\NT4\SP6I386.EXE goto nosp
+start /wait C:\USOS\NT4\SP6I386.EXE -x:C:\USOS\NT4\SP6X -q
+if not exist C:\USOS\NT4\SP6X\update\update.exe goto spsfx
 echo sp start >> C:\USOS\NT4\POST.LOG
+start /wait C:\USOS\NT4\SP6X\update\update.exe -u -z
+echo sp end %errorlevel% >> C:\USOS\NT4\POST.LOG
+if not exist C:\USOS\NT4\CRYPTOHI.TXT goto nosp
+%SystemRoot%\regedit.exe /e C:\USOS\NT4\CSD1.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Windows
+findstr /i /c:"dword:00000600" C:\USOS\NT4\CSD1.REG > nul
+if not errorlevel 1 goto nosp
+if not exist C:\USOS\NT4\SP6X\schannel.dll goto nosp
+echo crypto: high to standard for SP6a (Standard Encryption SP6a on a 128-bit CD) >> C:\USOS\NT4\POST.LOG
+copy %SystemRoot%\system32\schannel.dll C:\USOS\NT4\SCHAN128.DLL >> C:\USOS\NT4\POST.LOG
+if exist %SystemRoot%\system32\schannel.128 del %SystemRoot%\system32\schannel.128
+ren %SystemRoot%\system32\schannel.dll schannel.128
+copy C:\USOS\NT4\SP6X\schannel.dll %SystemRoot%\system32\schannel.dll >> C:\USOS\NT4\POST.LOG
+if exist %SystemRoot%\system32\schannel.128 echo crypto: 128-bit schannel.dll renamed to schannel.128 >> C:\USOS\NT4\POST.LOG
+if not exist %SystemRoot%\system32\schannel.dll echo crypto: schannel.dll swap FAILED >> C:\USOS\NT4\POST.LOG
+if not exist %SystemRoot%\system32\schannel.dll copy C:\USOS\NT4\SCHAN128.DLL %SystemRoot%\system32\schannel.dll >> C:\USOS\NT4\POST.LOG
+if exist %SystemRoot%\system32\rsaenh.dll ren %SystemRoot%\system32\rsaenh.dll rsaenh.128
+if exist %SystemRoot%\system32\rsaenh.128 echo crypto: rsaenh.dll renamed to rsaenh.128 >> C:\USOS\NT4\POST.LOG
+echo sp start (standard) >> C:\USOS\NT4\POST.LOG
+start /wait C:\USOS\NT4\SP6X\update\update.exe -u -z
+echo sp end %errorlevel% >> C:\USOS\NT4\POST.LOG
+goto nosp
+:spsfx
+echo sp extract failed, running the package >> C:\USOS\NT4\POST.LOG
 start /wait C:\USOS\NT4\SP6I386.EXE -u -z
 echo sp end %errorlevel% >> C:\USOS\NT4\POST.LOG
 :nosp
@@ -451,6 +492,10 @@ C:\USOS\NT4\USOSOFF.EXE /r
 :end
 EOF
 printf 'answer=%s\r\ncrypto=%s\r\n' "$ANSWER_KIND" "$crypto" > "$usos/SOURCE.TXT"
+# POST.CMD reads the strength from this flag (cmd cannot parse SOURCE.TXT
+# easily): a 128-bit CD with a Standard Encryption SP6a switches to the
+# SP6a's own schannel.dll and runs update.exe again.
+if [ "$crypto" = high ]; then printf 'high\r\n' > "$usos/CRYPTOHI.TXT"; fi
 
 for file in "$SYSLINUX_DIR/chain.c32" "$SYSLINUX_DIR/libcom32.c32" "$SYSLINUX_DIR/libutil.c32"; do
     cp "$file" "$work/c/$(basename "$file" | tr '[:lower:]' '[:upper:]')" || fail "cannot copy $(basename "$file")"
