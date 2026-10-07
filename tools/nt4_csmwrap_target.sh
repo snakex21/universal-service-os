@@ -197,6 +197,14 @@ ls_dir="$work/c/\$WIN_NT\$.~LS"
 bt_dir="$work/c/\$WIN_NT\$.~BT"
 nt4_copy_upper "$i386" "$ls_dir/I386" || fail 'cannot copy the I386 folder (local source)'
 nt4_copy_upper "$i386" "$bt_dir" files || fail 'cannot copy the Setup boot files'
+# Text mode runs \SystemRoot\SYSTEM32\SMSS.EXE of the boot folder (QEMU
+# 2026-10-07: STOP 0x6B, C000003A without I386\SYSTEM32 in ~BT).
+for name in SYSTEM32 system32; do
+    [ -d "$i386/$name" ] || continue
+    nt4_copy_upper "$i386/$name" "$bt_dir/SYSTEM32" || fail 'cannot copy I386\SYSTEM32'
+    break
+done
+[ -d "$bt_dir/SYSTEM32" ] || fail 'the ISO has no I386\SYSTEM32 (text-mode Setup)'
 log "local source: $(find "$ls_dir/I386" -type f | wc -l | tr -d ' ') files"
 cp "$work/WINNT.SIF" "$bt_dir/WINNT.SIF" || fail 'cannot copy WINNT.SIF'
 cp "$work/WINNT.SIF" "$work/c/WINNT.SIF" || fail 'cannot copy WINNT.SIF'
