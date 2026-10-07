@@ -1,0 +1,26 @@
+# USOS addition: NT 4.0 build of the same source with WDK 7.1 (the
+# upstream NT4 build is src\NT\build.bat with Visual C++ 4.0 + NT4 DDK).
+# AHCI_NT4 selects the upstream non-PnP ScsiPort path; AHCI_NT4_WDK sets
+# the NT4 HwInitializationDataSize (ahcimain.c). WDK 7.1 has no NT4
+# target, so the oldest one (WXP) is used with the PE subsystem version
+# forced to 4.00.
+TARGETNAME=ahcint
+TARGETPATH=obj
+TARGETTYPE=MINIPORT
+
+INCLUDES=..
+C_DEFINES=$(C_DEFINES) -DAHCI_NT4 -DAHCI_NT4_WDK
+
+TARGETLIBS=$(DDK_LIB_PATH)\scsiport.lib \
+           $(DDK_LIB_PATH)\ntoskrnl.lib
+
+MSC_WARNING_LEVEL=/W3
+_NT_TARGET_VERSION=$(_NT_TARGET_VERSION_WINXP)
+SUBSYSTEM_VERSION=4.00
+
+MUI=0
+MUI_COMMENT=0
+BUFFER_OVERFLOW_CHECKS=0
+
+SOURCES=..\ahcimain.c \
+        ..\ahcisatl.c
