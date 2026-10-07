@@ -223,6 +223,51 @@ class Nt4Target(unittest.TestCase):
         # Never the CSMWrap ESP before the VM: it is written after the install.
         self.assertNotIn('xp_csmwrap_esp.sh', text)
 
+    def _crypto(self, schannel: bytes | None) -> str:
+        text = TARGET.read_text(encoding='utf-8')
+        start = text.index('crypto=standard\n')
+        end = text.index('\ndone\n', start) + len('\ndone\n')
+        tmp = Path(tempfile.mkdtemp(prefix='usos-nt4-crypto-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / 'I386').mkdir()
+        if schannel is not None:
+            (tmp / 'I386/SCHANNEL.DLL').write_bytes(b'MZ\0\0' + schannel + b'\0\0')
+        script = f'set -eu\ni386={tmp.as_posix()}/I386\n' + text[start:end] + 'echo "$crypto"\n'
+        rc, out, err = sh(script)
+        self.assertEqual(rc, 0, err)
+        return out.strip()
+
+    def test_cd_encryption_strength(self):
+        # English Enterprise Server CD: "PCT / SSL Security Provider (US/Canada
+        # Only, Not for Export)" in UTF-16; SP6a export: "(Export Version)".
+        self.assertEqual(self._crypto('PCT / SSL Security Provider (US/Canada Only, Not for Export)'.encode('utf-16le')), 'high')
+        self.assertEqual(self._crypto('TLS / SSL Security Provider (Export Version)'.encode('utf-16le')), 'standard')
+        self.assertEqual(self._crypto(None), 'standard')
+        text = TARGET.read_text(encoding='utf-8')
+        self.assertIn('"$ANSWER_KIND" "$crypto" > "$usos/SOURCE.TXT"', text)
+
+    def test_finish_names_the_high_encryption_service_pack(self):
+        nt4 = Path(NT4).read_text(encoding='utf-8')
+        self.assertIn('USOSRST.REG DONE.TXT SOURCE.TXT; do', nt4)
+        self.assertIn("grep -aq 'crypto=high' \"$logs/SOURCE.TXT\"", nt4)
+        self.assertIn('(high-encryption CD);', nt4)
+        prepare = PREPARE.read_text(encoding='utf-8')
+        # The encryption message comes before the generic language one.
+        self.assertLess(prepare.index("*'high-encryption CD'*)"), prepare.index("*'no Service Pack 6'*)"))
+        self.assertIn('128-bit (High Encryption) SP6I386.EXE', prepare)
+
+    def test_post_script_removes_the_enterprise_installer_before_sp6a(self):
+        # Enterprise Server CD: NHSETUP.CMD puts NHLOADER (SP3 from the CD's
+        # \SP3) in the All Users Startup group; it hung without the CD and
+        # must never put SP3 over SP6a.
+        text = TARGET.read_text(encoding='utf-8')
+        post = text[text.index('crlf > "$usos/POST.CMD"'):]
+        name = r'Startup\Windows NT Server, Enterprise Edition Installer.cmd'
+        self.assertIn(r'set NHI=%SystemRoot%\Profiles\All Users\Start Menu\Programs' + '\\' + name, post)
+        self.assertIn('del "%NHI%"', post)
+        self.assertLess(post.index('del "%NHI%"'), post.index('SP6I386.EXE -u -z'))
+        self.assertLess(post.index('del "%NHI%"'), post.index('USOSOFF.EXE /r'))
+
     def test_chs_end_matches_the_partition(self):
         # 255 heads, 63 sectors: LBA 63 + 4096000 - 1.
         lba = 63 + 4096000 - 1

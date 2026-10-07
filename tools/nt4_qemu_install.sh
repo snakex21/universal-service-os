@@ -143,7 +143,7 @@ nt4_vm_finish() {
         return 1
     fi
     c=$W9X_VM_RUN/c
-    for file in POST.LOG VERSION.REG CSD.REG USOSRST.REG DONE.TXT; do
+    for file in POST.LOG VERSION.REG CSD.REG USOSRST.REG DONE.TXT SOURCE.TXT; do
         src=$(nt4_ci_path "$c" "USOS/NT4/$file") && cp "$src" "$logs/$file" 2>/dev/null
     done
     status=0
@@ -156,6 +156,10 @@ nt4_vm_finish() {
         # CurrentVersion string keeps the CD's service pack until a restart).
         if grep -aiq 'CSDVersion"=dword:0000060' "$logs/CSD.REG" 2>/dev/null ||
             grep -aq 'Service Pack 6' "$logs/VERSION.REG" 2>/dev/null; then reason="$reason SP6a installed;"
+        elif grep -aq 'crypto=high' "$logs/SOURCE.TXT" 2>/dev/null; then
+            # update.exe -u exits without a word when a Standard Encryption
+            # SP6a meets the 128-bit files of a US/Canada CD.
+            reason="$reason no Service Pack 6 in CSDVersion (high-encryption CD);"; status=1
         else reason="$reason no Service Pack 6 in CSDVersion;"; status=1; fi
     fi
     if [ "$status" = 0 ]; then

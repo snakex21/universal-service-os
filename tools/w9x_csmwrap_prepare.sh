@@ -317,6 +317,12 @@ usos_w9x_csmwrap_prepare() {
             if [ "$vm_rc" = 3 ] && [ "${NT4_VM_STALLED:-0}" -gt 0 ]; then
                 stop "Windows NT 4.0 Setup stopped writing to the disk for $((NT4_VM_STALLED / 60)) minutes (start ${NT4_VM_BOOT:-?}): a Setup page is waiting for input. The computer was not restarted; the last screen and logs: EFI/USOS/win9x/nt4"
             fi
+            case "${vm_check:-}" in *'high-encryption CD'*)
+                # update.exe refuses the Standard Encryption SP6a on a CD with
+                # 128-bit security files (QEMU 2026-10-07, English Enterprise
+                # Server CD with the export SP6a).
+                stop "Service Pack 6a did not install: this CD has 128-bit (High Encryption) security files and the Standard Encryption SP6a refuses them. Put the 128-bit (High Encryption) SP6I386.EXE of the CD's language into Systems\\Windows\\$folder\\ServicePack on USOS_DATA. Logs: EFI/USOS/win9x/nt4" ;;
+            esac
             case "${vm_check:-}" in *'no Service Pack 6'*)
                 # SP6a's update.exe refuses a CD of another language ("This
                 # Service Pack is for a different language", QEMU 2026-10-07:

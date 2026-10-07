@@ -192,6 +192,21 @@ log "source: NT 4.0 ProductType=${product:-?} language=${lang:-?}"
 nt4_resolve_time_zone "${lang:-}" < "$ANSWER_SIF" | nt4_server_answer "${product:-0}" > "$work/WINNT.SIF" || fail 'cannot prepare WINNT.SIF'
 [ "${product:-0}" = 0 ] || log 'server CD: stand-alone server (AdvServerType = SERVERNT), licensing Per Server 5 (LicenseFilePrintData)'
 if grep -qi '^TimeZone' "$work/WINNT.SIF"; then log 'time zone: set for this CD language'; else log 'time zone: none (Setup asks)'; fi
+# Encryption strength of the CD: a US/Canada CD has 128-bit security files
+# (SCHANNEL.DLL "US/Canada Only, Not for Export"). SP6a's update.exe then
+# refuses the Standard Encryption (export) SP6a, silently with -u ("You have
+# chosen to install a version of the Service Pack with Standard Encryption
+# onto a system with High Encryption", QEMU 2026-10-07, English Enterprise
+# Server CD). The finish step names the High Encryption SP6a for this case.
+crypto=standard
+for name in SCHANNEL.DLL schannel.dll; do
+    if [ -f "$i386/$name" ] && tr -d '\000' < "$i386/$name" | grep -q 'Not for Export'; then crypto=high; fi
+done
+if [ "$crypto" = high ]; then
+    log 'CD encryption: high (128-bit, US/Canada): SP6a must be the High Encryption (128-bit) build'
+else
+    log 'CD encryption: standard'
+fi
 
 # ---------------------------------------------------------------- the disk
 size=$(blockdev --getsize64 "$TARGET_DEVICE") || fail 'cannot read the target size'
@@ -336,10 +351,23 @@ EOF
 # Control\Windows CSDVersion (0x600) at once; the CurrentVersion string
 # follows after a restart. Files SP6a could not replace while in use
 # are renamed by SMSS at the first start on the real machine (SP6a kernel).
+# The Enterprise Server CD's GUI Setup (NHSETUP.CMD) puts "Windows NT Server,
+# Enterprise Edition Installer.cmd" in the All Users Startup group: at every
+# logon NHLOADER.EXE offers Service Pack 3 from the CD's \SP3 and the
+# Enterprise components. Without the CD its "Install Service Pack 3" window
+# hangs (QEMU 2026-10-07, 18 min), and SP3 must never go over SP6a: POST.CMD
+# removes it (RunOnce runs before the Startup group).
 crlf > "$usos/POST.CMD" <<'EOF'
 @echo off
 if exist C:\USOS\NT4\POST.OK goto end
 echo USOS NT4 post > C:\USOS\NT4\POST.LOG
+set NHI=%SystemRoot%\Profiles\All Users\Start Menu\Programs\Startup\Windows NT Server, Enterprise Edition Installer.cmd
+if not exist "%NHI%" goto nonhi
+del "%NHI%"
+if exist "%NHI%" echo Enterprise Edition Installer removal FAILED >> C:\USOS\NT4\POST.LOG
+if not exist "%NHI%" echo Enterprise Edition Installer removed >> C:\USOS\NT4\POST.LOG
+:nonhi
+set NHI=
 copy C:\USOS\NT4\AHCINT.SYS %SystemRoot%\system32\drivers\ahcint.sys >> C:\USOS\NT4\POST.LOG
 copy C:\USOS\NT4\USOSRST.SYS %SystemRoot%\system32\drivers\usosrst.sys >> C:\USOS\NT4\POST.LOG
 copy C:\USOS\NT4\USOSUSB.SYS %SystemRoot%\system32\drivers\usosusb.sys >> C:\USOS\NT4\POST.LOG
@@ -362,7 +390,7 @@ echo done > C:\USOS\NT4\DONE.TXT
 C:\USOS\NT4\USOSOFF.EXE /r
 :end
 EOF
-printf 'answer=%s\r\n' "$ANSWER_KIND" > "$usos/SOURCE.TXT"
+printf 'answer=%s\r\ncrypto=%s\r\n' "$ANSWER_KIND" "$crypto" > "$usos/SOURCE.TXT"
 
 for file in "$SYSLINUX_DIR/chain.c32" "$SYSLINUX_DIR/libcom32.c32" "$SYSLINUX_DIR/libutil.c32"; do
     cp "$file" "$work/c/$(basename "$file" | tr '[:lower:]' '[:upper:]')" || fail "cannot copy $(basename "$file")"
