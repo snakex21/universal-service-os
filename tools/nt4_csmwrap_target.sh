@@ -60,7 +60,7 @@ nt4_copy_upper() {
 
 # The answer file with the USOS time zone marker resolved (stdin -> stdout):
 # ";USOS-TZ=<9x zone key>" becomes [GuiUnattended] TimeZone = "<the CD's
-# display string>" when the CD's language is known ($1: 0415 = Polish),
+# display string>" when the CD's language is known ($1: 0415 Polish, 0409 English),
 # otherwise it is dropped (Setup shows the time zone page).
 nt4_resolve_time_zone() {
     awk -v BINMODE=3 -v lang="$1" '
@@ -84,9 +84,33 @@ nt4_resolve_time_zone() {
             if (k == "Arabian") return "(GMT+04:00) Abu Zabi, Maskat, Tbilisi"
             return ""
         }
+        function en(k) {
+            if (k == "Central European" || k == "Central Europe") return "(GMT+01:00) Prague, Warsaw, Budapest"
+            if (k == "W. Europe") return "(GMT+01:00) Berlin, Stockholm, Rome, Bern, Brussels, Vienna"
+            if (k == "Romance") return "(GMT+01:00) Paris, Madrid, Amsterdam"
+            if (k == "GMT") return "(GMT) Greenwich Mean Time; Dublin, Edinburgh, London, Lisbon"
+            if (k == "E. Europe") return "(GMT+02:00) Eastern Europe"
+            if (k == "GTB" || k == "FLE") return "(GMT+02:00) Athens, Helsinki, Istanbul"
+            if (k == "Russian") return "(GMT+03:00) Moscow, St. Petersburg, Kazan, Volgograd"
+            if (k == "Eastern") return "(GMT-05:00) Eastern Time (US & Canada)"
+            if (k == "Central") return "(GMT-06:00) Central Time (US & Canada)"
+            if (k == "Mountain") return "(GMT-07:00) Mountain Time (US & Canada)"
+            if (k == "Pacific") return "(GMT-08:00) Pacific Time (US & Canada); Tijuana"
+            if (k == "Atlantic") return "(GMT-04:00) Atlantic Time (Canada)"
+            if (k == "Alaskan") return "(GMT-09:00) Alaska"
+            if (k == "Hawaiian") return "(GMT-10:00) Hawaii"
+            if (k == "Tokyo") return "(GMT+09:00) Tokyo, Osaka, Sapporo, Seoul, Yakutsk"
+            if (k == "Israel") return "(GMT+02:00) Israel"
+            if (k == "Egypt") return "(GMT+02:00) Cairo"
+            if (k == "India") return "(GMT+05:30) Bombay, Calcutta, Madras, New Delhi, Colombo"
+            if (k == "New Zealand") return "(GMT+12:00) Wellington, Auckland"
+            if (k == "AUS Eastern") return "(GMT+10:00) Brisbane, Melbourne, Sydney"
+            if (k == "China") return "(GMT+08:00) Beijing, Chongqing, Urumqi"
+            return ""
+        }
         { line = $0; sub(/\r$/, "", line) }
         line ~ /^;USOS-TZ=/ {
-            k = substr(line, 10); v = (lang == "0415") ? pl(k) : ""
+            k = substr(line, 10); v = (lang == "0415") ? pl(k) : (lang == "0409") ? en(k) : ""
             if (v != "") printf "TimeZone = \"%s\"\r\n", v
             next
         }

@@ -120,8 +120,12 @@ class Nt4Target(unittest.TestCase):
         self.assertNotIn('USOS-TZ', out)
         self.assertTrue(out.endswith('[Display]\r\n'))
 
+    def test_english_cd_time_zone(self):
+        out = self.resolve('0409', ';USOS-TZ=Central European\r\n')
+        self.assertEqual(out, 'TimeZone = "(GMT+01:00) Prague, Warsaw, Budapest"\r\n')
+
     def test_unknown_language_or_zone_drops_the_marker(self):
-        for lang, zone in (('0409', 'Central European'), ('0415', 'Pacific SA')):
+        for lang, zone in (('0407', 'Central European'), ('0415', 'Pacific SA')):
             out = self.resolve(lang, f'[GuiUnattended]\n;USOS-TZ={zone}\n')
             self.assertNotIn('TimeZone', out)
             self.assertNotIn('USOS-TZ', out)
