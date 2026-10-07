@@ -71,13 +71,33 @@ nt4_vm_install() {
 # BOOT.INI (stdin -> stdout, CR LF): NT4_BOOT_OPTIONS on every ARC line
 # that lacks /NUMPROC, timeout=5, no C:\ entry (Setup saved the syslinux
 # boot sector as BOOTSECT.DOS; LDLINUX.SYS is removed below).
+# Diagnostics: after the first normal entry (the default stays first) an
+# "[USOS /SOS]" entry (driver list on screen, photographable on a crash) and,
+# when Setup wrote none, a "[VGA mode]" /basevideo /sos entry.
 nt4_boot_ini() {
     awk -v BINMODE=3 -v opts="$NT4_BOOT_OPTIONS" '
+        function entry(arc, desc, sw) { return arc "=\"" desc "\" " sw (opts == "" ? "" : " " opts) }
         { line = $0; sub(/\r$/, "", line); low = tolower(line) }
         low ~ /^[ \t]*timeout[ \t]*=/ { line = "timeout=5" }
         low ~ /^[ \t]*c:\\[ \t]*=/ { next }
-        low ~ /^[ \t]*multi\(/ && low !~ /\/numproc/ { line = line " " opts }
-        { printf "%s\r\n", line }'
+        low ~ /^[ \t]*multi\(/ {
+            if (low ~ /\/basevideo/) vga = 1
+            else if (low ~ /\/sos/) sos = 1
+            else if (first == "" && (p = index(line, "=\"")) > 0) {
+                rest = substr(line, p + 2); q = index(rest, "\"")
+                if (q > 0) { first = n + 1; arc = substr(line, 1, p - 1); desc = substr(rest, 1, q - 1) }
+            }
+            if (low !~ /\/numproc/) line = line (opts == "" ? "" : " " opts)
+        }
+        { out[++n] = line }
+        END {
+            for (i = 1; i <= n; i++) {
+                printf "%s\r\n", out[i]
+                if (i != first) continue
+                if (!sos) printf "%s\r\n", entry(arc, desc " [USOS /SOS]", "/SOS")
+                if (!vga) printf "%s\r\n", entry(arc, desc " [VGA mode]", "/basevideo /sos")
+            }
+        }'
 }
 
 # The real path of C:-relative $2 under the mount point $1, any letter case

@@ -57,9 +57,28 @@ class Nt4Vm(unittest.TestCase):
         self.assertIn('/basevideo /sos /NUMPROC=2 /MAXMEM=1024\r\n', text)
         # default= is not an ARC line with options.
         self.assertIn('default=multi(0)disk(0)rdisk(0)partition(1)\\WINNT\r\n', text)
-        self.assertEqual(text.count('/NUMPROC'), 2)
+        # Diagnostic /SOS entry right after the default one; Setup's VGA entry kept, not doubled.
+        lines = text.split('\r\n')
+        first = lines.index('multi(0)disk(0)rdisk(0)partition(1)\\WINNT="Windows NT Workstation 4.0" /NUMPROC=2 /MAXMEM=1024')
+        self.assertEqual(lines[first + 1],
+                         'multi(0)disk(0)rdisk(0)partition(1)\\WINNT="Windows NT Workstation 4.0 [USOS /SOS]" /SOS /NUMPROC=2 /MAXMEM=1024')
+        self.assertEqual(text.count('/basevideo'), 1)
+        self.assertEqual(text.count('/NUMPROC'), 3)
         # The C:\ entry (BOOTSECT.DOS = the syslinux boot sector) is dropped.
         self.assertNotIn('C:\\', text)
+
+    def test_boot_ini_adds_vga_entry_when_missing(self):
+        ini = '[boot loader]\r\ntimeout=30\r\ndefault=multi(0)disk(0)rdisk(0)partition(1)\\WINNT\r\n[operating systems]\r\n' \
+              'multi(0)disk(0)rdisk(0)partition(1)\\WINNT="NT Server"\r\n'
+        (self.tmp / 'boot.ini').write_bytes(ini.encode('ascii'))
+        rc, out, err = sh(f'. "{VM}"; . "{NT4}"; nt4_boot_ini < "{(self.tmp / "boot.ini").as_posix()}" > "{(self.tmp / "out.ini").as_posix()}"')
+        self.assertEqual(rc, 0, err)
+        lines = (self.tmp / 'out.ini').read_bytes().decode('ascii').split('\r\n')
+        self.assertEqual(lines[-4:], [
+            'multi(0)disk(0)rdisk(0)partition(1)\\WINNT="NT Server" /NUMPROC=2 /MAXMEM=1024',
+            'multi(0)disk(0)rdisk(0)partition(1)\\WINNT="NT Server [USOS /SOS]" /SOS /NUMPROC=2 /MAXMEM=1024',
+            'multi(0)disk(0)rdisk(0)partition(1)\\WINNT="NT Server [VGA mode]" /basevideo /sos /NUMPROC=2 /MAXMEM=1024',
+            ''])
 
     def test_ci_path_finds_lower_case_nt_names(self):
         root = self.tmp / 'c'
