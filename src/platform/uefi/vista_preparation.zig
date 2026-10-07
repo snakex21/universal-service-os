@@ -96,19 +96,41 @@ pub fn formatCommand(buffer: []u8, lang_initrd: []const u8, esp_partuuid: []cons
 pub const win9x_vm_initrd = " initrd=\\EFI\\USOS\\micro-linux\\qemu9x.cpio";
 
 pub fn start(root: *uefi.protocol.File) !void {
-    return startMode(root, .disk);
+    return startMode(root, .disk, "");
 }
 
 pub fn startCsmwrap(root: *uefi.protocol.File) !void {
-    return startMode(root, .csmwrap);
+    return startMode(root, .csmwrap, "");
 }
 
-/// Windows 95/98/Me (step 620): the same base micro-Linux start.
-pub fn startWin9x(root: *uefi.protocol.File) !void {
-    return startMode(root, .win9x);
+/// Windows 95/98/Me and the DOS family (step 620): the same base micro-Linux
+/// start. `heading`: the system's name for the micro-Linux progress page.
+pub fn startWin9x(root: *uefi.protocol.File, heading: []const u8) !void {
+    return startMode(root, .win9x, heading);
 }
 
-fn startMode(root: *uefi.protocol.File, mode: Mode) !void {
+/// The longest heading token; a longer name is left out (the page then
+/// keeps its generic heading until the request is read).
+const heading_max = 64;
+pub const heading_option_len = " usos.heading=".len + heading_max;
+
+/// " usos.heading=<name>" for the micro-Linux progress page
+/// (tools/micro_linux_ui.sh turns '_' back into spaces), so its first frame
+/// already names the chosen system (Windows 3.0, not "Windows 9x"). Empty
+/// when the name is empty, too long or has a byte a kernel command line
+/// cannot carry.
+pub fn headingOption(buffer: []u8, name: []const u8) []const u8 {
+    const prefix = " usos.heading=";
+    if (name.len == 0 or name.len > heading_max or buffer.len < prefix.len + name.len) return "";
+    @memcpy(buffer[0..prefix.len], prefix);
+    for (name, 0..) |c, i| {
+        if (c == '_' or c == '"' or c == '\\' or c < ' ' or c > '~') return "";
+        buffer[prefix.len + i] = if (c == ' ') '_' else c;
+    }
+    return buffer[0 .. prefix.len + name.len];
+}
+
+fn startMode(root: *uefi.protocol.File, mode: Mode, heading: []const u8) !void {
     var id: [36]u8 = undefined;
     try espPartuuid(root, &id);
     const lang_initrd = if (root.open(wide("\\EFI\\USOS\\lang.cpio"), .read, .{})) |file| blk: {
@@ -127,7 +149,10 @@ fn startMode(root: *uefi.protocol.File, mode: Mode) !void {
     var cmd: [1024]u8 = undefined;
     var theme_buffer: [@import("usos").gui.theme_cmdline.option_len]u8 = undefined;
     const theme_option = @import("usos").gui.theme_cmdline.option(&theme_buffer, @import("manual_view.zig").currentTheme());
-    const command = try formatCommand(&cmd, initrds, &id, mode, mode != .disk and @import("diagnostic_boot.zig").requested(root), theme_option);
+    var heading_buffer: [heading_option_len]u8 = undefined;
+    var tail_buffer: [theme_buffer.len + heading_option_len]u8 = undefined;
+    const tail = try std.fmt.bufPrint(&tail_buffer, "{s}{s}", .{ theme_option, headingOption(&heading_buffer, heading) });
+    const command = try formatCommand(&cmd, initrds, &id, mode, mode != .disk and @import("diagnostic_boot.zig").requested(root), tail);
     const serial = @import("serial.zig");
     serial.writeAscii(switch (mode) {
         .csmwrap => "[VISTA_CSMWRAP_CMDLINE] ",
@@ -182,4 +207,14 @@ test "the menu theme reaches the Vista micro-Linux command line" {
         const command = try formatCommand(&buffer, "", "0257E175-1685-4311-91AA-5A83D8EB41E5", mode, false, theme_cmdline.option(&theme_buffer, retro));
         try std.testing.expectEqualDeep(retro, theme_cmdline.fromCmdline(command));
     }
+}
+
+test "Windows 9x / DOS family heading token: spaces become '_', unsafe names are left out" {
+    var buffer: [heading_option_len]u8 = undefined;
+    try std.testing.expectEqualStrings(" usos.heading=Windows_for_Workgroups_3.11", headingOption(&buffer, "Windows for Workgroups 3.11"));
+    try std.testing.expectEqualStrings(" usos.heading=Windows_2.11_(386)", headingOption(&buffer, "Windows 2.11 (386)"));
+    try std.testing.expectEqualStrings("", headingOption(&buffer, ""));
+    try std.testing.expectEqualStrings("", headingOption(&buffer, "a_b"));
+    try std.testing.expectEqualStrings("", headingOption(&buffer, "Windows \"3\""));
+    try std.testing.expectEqualStrings("", headingOption(&buffer, "x" ** (heading_max + 1)));
 }

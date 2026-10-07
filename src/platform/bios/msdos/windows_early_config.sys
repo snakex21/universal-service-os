@@ -6,7 +6,8 @@ menuitem=DOSONLY,MS-DOS - wiersz polecen
 menudefault=WINSTD,8
 
 ; Windows 1.0x-3.0: no DOS=HIGH (Windows 2.x needs the HMA), SETVER
-; (WIN.COM of 2.x: "Incorrect DOS version" on MS-DOS 6.22 without it).
+; (the 1.0x and 2.x kernels: "Incorrect DOS version" on MS-DOS 6.22; WIN200.BIN
+; is in its table, INSTALL.BAT adds WIN100.BIN).
 [common]
 DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF
 DEVICE=C:\DOS\SETVER.EXE
