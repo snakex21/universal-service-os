@@ -143,7 +143,7 @@ nt4_vm_finish() {
         return 1
     fi
     c=$W9X_VM_RUN/c
-    for file in POST.LOG VERSION.REG CSD.REG USOSRST.REG DONE.TXT; do
+    for file in POST.LOG VERSION.REG CSD.REG USOSRST.REG USOSVBE.REG DONE.TXT; do
         src=$(nt4_ci_path "$c" "USOS/NT4/$file") && cp "$src" "$logs/$file" 2>/dev/null
     done
     status=0

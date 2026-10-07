@@ -28,7 +28,7 @@ class Fixtures(unittest.TestCase):
     def test_export_lists(self):
         for f in FIXTURES:
             t = tables(f)
-            self.assertEqual(sorted(t), sorted(nt4.FILES), f.name)
+            self.assertEqual(sorted(t), sorted({**nt4.FILES, **nt4.DISPLAY}), f.name)
             # Names only: no binary bytes, every line printable ASCII.
             self.assertTrue(f.read_bytes().isascii())
             for want in ('ScsiPortInitialize', 'ScsiPortGetDeviceBase'):
