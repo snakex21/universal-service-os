@@ -20,7 +20,8 @@
 #   \$LDR$, \TXTSETUP.SIF  Setup loader for the hard-disk start
 #   \USOS\NT4            POST.CMD (first logon), the .REG files,
 #                        AHCINT.SYS + USOSRST.SYS + USOSUSB.SYS (NT4 builds),
-#                        USOSOFF.EXE,
+#                        USOSVBE.SYS (own VESA miniport), USOSOFF.EXE,
+#                        FRAMEBUF.DL_ (copied from the user's CD, if present),
 #                        SP6I386.EXE (the user's SP6a from DATA)
 #   syslinux (GPL-2.0-or-later) in the boot sector, SYSLINUX.CFG starts
 #   chain.c32 ntldr=/$LDR$; text-mode Setup replaces the boot sector with
@@ -121,7 +122,7 @@ nt4_resolve_time_zone() {
 for tool in dd od mkfs.fat mdir syslinux mount umount losetup blockdev awk sync wc tr; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
-for file in "$LIB/xp-geometry-fix-mbr-440.bin" "$LIB/nt4/AHCINT.SYS" "$LIB/nt4/USOSRST.SYS" "$LIB/nt4/USOSUSB.SYS" "$LIB/nt4/USOSOFF.EXE" \
+for file in "$LIB/xp-geometry-fix-mbr-440.bin" "$LIB/nt4/AHCINT.SYS" "$LIB/nt4/USOSRST.SYS" "$LIB/nt4/USOSUSB.SYS" "$LIB/nt4/USOSVBE.SYS" "$LIB/nt4/USOSOFF.EXE" \
     "$SYSLINUX_DIR/chain.c32" "$SYSLINUX_DIR/libcom32.c32" "$SYSLINUX_DIR/libutil.c32" "$ANSWER_SIF" "$SOURCE_ISO"; do
     [ -r "$file" ] || fail "missing: $file"
 done
@@ -230,7 +231,22 @@ mkdir -p "$usos"
 cp "$LIB/nt4/AHCINT.SYS" "$usos/AHCINT.SYS" || fail 'cannot copy AHCINT.SYS'
 cp "$LIB/nt4/USOSRST.SYS" "$usos/USOSRST.SYS" || fail 'cannot copy USOSRST.SYS'
 cp "$LIB/nt4/USOSUSB.SYS" "$usos/USOSUSB.SYS" || fail 'cannot copy USOSUSB.SYS'
+cp "$LIB/nt4/USOSVBE.SYS" "$usos/USOSVBE.SYS" || fail 'cannot copy USOSVBE.SYS'
 cp "$LIB/nt4/USOSOFF.EXE" "$usos/USOSOFF.EXE" || fail 'cannot copy USOSOFF.EXE'
+# VESA display = our miniport (usosvbe.sys) + NT 4.0's own frame buffer
+# display driver framebuf.dll. USOS never ships framebuf.dll: text-mode Setup
+# installs it from the user's CD ([files.vga] of TXTSETUP.SIF, Workstation and
+# Server CDs alike). The CD's compressed copy goes along as a second source
+# for POST.CMD (expanded there with NT 4.0's own expand.exe). Without either,
+# POST.CMD leaves the VGA driver alone (640x480x16).
+framebuf=''
+for name in FRAMEBUF.DL_ framebuf.dl_; do [ -f "$i386/$name" ] && framebuf="$i386/$name" && break; done
+if [ -n "$framebuf" ]; then
+    cp "$framebuf" "$usos/FRAMEBUF.DL_" || fail 'cannot copy FRAMEBUF.DL_'
+    log 'display: VESA (usosvbe + framebuf.dll from the CD)'
+else
+    log 'display: the CD has no I386\FRAMEBUF.DL_ (VESA only if Setup installs framebuf.dll)'
+fi
 if [ -n "$SP_EXE" ]; then
     cp "$SP_EXE" "$usos/SP6I386.EXE" || fail 'cannot copy the service pack'
     log "service pack: $(basename "$SP_EXE") ($(wc -c < "$SP_EXE" | tr -d ' ') bytes)"
@@ -258,6 +274,7 @@ EOF
 # (ConnectMultiplePorts), so PS/2 and USB work side by side. Its pointer
 # port always exists, so mouclass no longer fails without a PS/2 mouse
 # (Service Control Manager event 7026 "Mouclass" at every start).
+# usosvbe is registered by VESA.REG, and only when framebuf.dll is there.
 crlf > "$usos/DRIVERS.REG" <<'EOF'
 REGEDIT4
 
@@ -288,6 +305,35 @@ REGEDIT4
 
 [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Mouclass\Parameters]
 "ConnectMultiplePorts"=dword:00000001
+EOF
+# usosvbe (own GPL miniport, tools/nt4/usosvbe) + framebuf.dll (NT 4.0's own,
+# from the user's CD): 1024x768x16 by default; the Display applet lists every
+# VBE mode. VgaStart (Video Init, ForceVga) would load first and win, so it is
+# off; VgaSave stays for full-screen consoles and /basevideo ([VGA mode]).
+# InstalledDisplayDrivers is REG_MULTI_SZ "framebuf": NT 4.0 regedit
+# (REGEDIT4) takes hex(7) as ANSI bytes and widens each one.
+crlf > "$usos/VESA.REG" <<'EOF'
+REGEDIT4
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usosvbe]
+"Type"=dword:00000001
+"Start"=dword:00000001
+"ErrorControl"=dword:00000000
+"Group"="Video"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usosvbe\Device0]
+"InstalledDisplayDrivers"=hex(7):66,72,61,6d,65,62,75,66,00,00
+"VgaCompatible"=dword:00000000
+"DefaultSettings.BitsPerPel"=dword:00000010
+"DefaultSettings.XResolution"=dword:00000400
+"DefaultSettings.YResolution"=dword:00000300
+"DefaultSettings.VRefresh"=dword:0000003c
+"DefaultSettings.Flags"=dword:00000000
+"DefaultSettings.XPanning"=dword:00000000
+"DefaultSettings.YPanning"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\VgaStart]
+"Start"=dword:00000004
 EOF
 # End of the VM part: no more automatic logon; atapi off (the real machine has no
 # legacy IDE ports: it would only report "a service failed" at every start).
@@ -321,6 +367,19 @@ if not exist %SystemRoot%\system32\drivers\usosrst.sys echo USOSRST.SYS copy FAI
 if not exist %SystemRoot%\system32\drivers\usosusb.sys echo USOSUSB.SYS copy FAILED >> C:\USOS\NT4\POST.LOG
 %SystemRoot%\regedit.exe /s C:\USOS\NT4\DRIVERS.REG
 echo drivers registered >> C:\USOS\NT4\POST.LOG
+if exist %SystemRoot%\system32\framebuf.dll goto vesa
+if not exist C:\USOS\NT4\FRAMEBUF.DL_ goto novesa
+%SystemRoot%\system32\expand.exe C:\USOS\NT4\FRAMEBUF.DL_ %SystemRoot%\system32\framebuf.dll >> C:\USOS\NT4\POST.LOG
+if not exist %SystemRoot%\system32\framebuf.dll goto novesa
+:vesa
+copy C:\USOS\NT4\USOSVBE.SYS %SystemRoot%\system32\drivers\usosvbe.sys >> C:\USOS\NT4\POST.LOG
+if not exist %SystemRoot%\system32\drivers\usosvbe.sys goto novesa
+%SystemRoot%\regedit.exe /s C:\USOS\NT4\VESA.REG
+echo vesa on >> C:\USOS\NT4\POST.LOG
+goto vesadone
+:novesa
+echo vesa off: no framebuf.dll, VGA stays >> C:\USOS\NT4\POST.LOG
+:vesadone
 if not exist C:\USOS\NT4\SP6I386.EXE goto nosp
 echo sp start >> C:\USOS\NT4\POST.LOG
 start /wait C:\USOS\NT4\SP6I386.EXE -u -z
@@ -330,6 +389,7 @@ echo ok > C:\USOS\NT4\POST.OK
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\VERSION.REG "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\CSD.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Windows
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\USOSRST.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usosrst
+%SystemRoot%\regedit.exe /e C:\USOS\NT4\USOSVBE.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usosvbe
 %SystemRoot%\regedit.exe /s C:\USOS\NT4\DONE.REG
 echo done > C:\USOS\NT4\DONE.TXT
 C:\USOS\NT4\USOSOFF.EXE /r

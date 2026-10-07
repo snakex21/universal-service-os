@@ -8,6 +8,14 @@ direct-color modes, by default 1024x768 with 16 bpp. The X470 run without CSM
 through CSMWrap works because the card's legacy video BIOS is still loaded
 there.
 
+**In the NT4 flow: the miniport only, with NT 4.0's own `framebuf.dll`**
+(2026-10-07). Text-mode Setup installs framebuf.dll from the user's CD
+(`[files.vga]`); POST.CMD falls back to expanding the CD's
+`I386\FRAMEBUF.DL_`, and without it skips VESA (VGA stays). USOS never ships
+framebuf.dll. `usosvbe.dll` is WIP and not shipped (see the blocker below).
+Wiring: `tools/nt4_csmwrap_target.sh` (VESA.REG, POST.CMD),
+`docs/nt4-2026-10-07.md`.
+
 ## How it works
 
 * `usosvbe.sys` claims no hardware. Everything goes through NT 4.0's
@@ -38,7 +46,7 @@ The DLL imports only the 8 `Eng*` routines that NT 4.0's own `framebuf.dll`
 uses. The miniport imports 6 `VideoPort*` routines, `MmIsAddressValid` and
 `PsGetCurrentProcessId` (trace).
 
-## Status (2026-10-07): not in the NT4 flow yet
+## Status of usosvbe.dll (2026-10-07): WIP, not in the NT4 flow
 
 QEMU (OVMF + CSMWrap, std VGA, EPYC-Milan, NT 4.0 WS PL SP6a): the miniport
 works. `UsosVbeDiag` = `usosvbe 1.0-nt4 try=2 es=0000 vbe=0300 mem=16384k
@@ -62,18 +70,10 @@ SET_CURRENT_MODE, MAP and three declined SetPointerShape calls, then nothing.
 Next: compare the PE image layout (WDK GDI_DRIVER build: image base 0x10000,
 sections, writable data) with framebuf.dll, then a kernel debugger on the hang.
 
-The flow wiring is ready but not applied, because it would hang the logon.
-`POST.CMD` copies `usosvbe.sys` to `system32\drivers` and `usosvbe.dll` to
-`system32`. `DRIVERS.REG` adds:
-
-    Services\usosvbe          Type=1, Start=1, ErrorControl=0, Group="Video"
-    Services\usosvbe\Device0  InstalledDisplayDrivers=hex(7):75,73,6f,73,76,62,65,00,00
-                              (NT 4.0 regedit widens each hex(7) byte to UTF-16),
-                              DefaultSettings.BitsPerPel=16, .XResolution=1024,
-                              .YResolution=768, .VRefresh=60, .Flags=0
-    Services\VgaStart         Start=4 (Video Init + ForceVga would win otherwise)
-
-`VgaSave` stays for full-screen consoles and `/basevideo`.
+The flow uses the same registry with `InstalledDisplayDrivers` = `framebuf`
+(VESA.REG). To try usosvbe.dll instead: copy it to `system32` and set
+`hex(7):75,73,6f,73,76,62,65,00,00` ("usosvbe"; NT 4.0 regedit widens each
+hex(7) byte to UTF-16).
 
 ## Build
 

@@ -624,6 +624,7 @@ def main() -> int:
             ("tools/vendor/ahcint/1.3.0.0-usos4/bin/NT4/i386/ahcint.sys", "usr/lib/usos/nt4/AHCINT.SYS"),
             ("tools/w2k/usosrst/bin/nt4/i386/usosrst.sys", "usr/lib/usos/nt4/USOSRST.SYS"),
             ("tools/nt4/usosusb/bin/i386/usosusb.sys", "usr/lib/usos/nt4/USOSUSB.SYS"),
+            ("tools/nt4/usosvbe/bin/i386/usosvbe.sys", "usr/lib/usos/nt4/USOSVBE.SYS"),
             ("tools/nt4/usosoff/bin/i386/usosoff.exe", "usr/lib/usos/nt4/USOSOFF.EXE"),
         ):
             put(entries, Entry(target_name, stat.S_IFREG | 0o644, (root / source_name).read_bytes()))
