@@ -91,3 +91,10 @@ NT 4.0 build (2026-10-07, same source, no change to the 2000/XP binary):
   (the WDK 7.1 linker writes 5.00) and the PE checksum.
 Every import (16: ntoskrnl, scsiport) resolves on the NT 4.0 RTM (1381.1)
 and SP6a (1381.335) kernels and scsiport (tools/tests/check_nt4_driver_imports.py).
+- ahcimain.c AhciFindAdapter (AHCI_NT4 without AHCI_W9X, patch 0006,
+  2026-10-07): BusInterruptLevel and BusInterruptVector are 0, so NT 4.0
+  ScsiPort connects no interrupt (every command completes in HwStartIo,
+  GHC.IE and PxIE stay off). With INTx from config space, QEMU OVMF +
+  CSMWrap stopped with 0x7B: ScsiPort dropped the adapter after HwFindAdapter, HwInitialize was
+  never called (likely cause: no MP-table PCI interrupt entry for the HBA
+  under CSMWrap). The 9x build keeps INTx (SCSIPORT.PDR), 2000/XP unchanged.
