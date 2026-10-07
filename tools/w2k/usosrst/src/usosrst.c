@@ -129,7 +129,7 @@ UsosActiveProcessors(VOID)
     return ((KAFFINITY)1 << n) - 1;
 }
 #define KeQueryActiveProcessors() UsosActiveProcessors()
-#define USOSRST_VERSION "usosrst 1.4-nt4"
+#define USOSRST_VERSION "usosrst 1.5-nt4"
 #else
 #define USOSRST_VERSION "usosrst 1.4"
 #endif
@@ -581,6 +581,109 @@ RedirectKernelRestart(VOID)
     if (kernel == NULL) return FALSE;
     g_HalReturnToFirmware = (USOS_RETURN_TO_FIRMWARE)(ULONG)HalReturnToFirmware;
     return (BOOLEAN)(PatchImports(kernel, (ULONG)HalReturnToFirmware, (ULONG)SetupReturnToFirmware) > 0);
+}
+
+/* VGA window (1.5). CSMWrap's E820 map marks A0000h-FFFFFh as reserved;
+   the NT 4.0 loader passes that on and the kernel puts it under
+   HARDWARE\RESOURCEMAP\System Resources\Reserved as device-exclusive
+   memory. videoprt then gets a conflict for the VGA window (A0000h,
+   128 KB) that vga.sys claims, VgaStart/VgaSave fail to start and Win32k
+   stops with C0000143 "DISPLAY DRIVER.DLL". On SeaBIOS proper the window
+   is not in the map at all. A0000h-BFFFFh is never RAM or firmware, so
+   it is cut out of every memory range in the .Translated and .Raw lists
+   of that key, before the video drivers load (this driver is a boot
+   driver). Returns 'o' when a range was cut, '-' when none overlapped,
+   'x' on an error. */
+#define USOS_VGA_LOW   0xA0000
+#define USOS_VGA_HIGH  0xC0000
+static UCHAR g_ResIn[1024], g_ResOut[1024 + 64 * sizeof(CM_PARTIAL_RESOURCE_DESCRIPTOR)];
+
+static CHAR
+CutVgaFromList(HANDLE Key, PCWSTR ValueName)
+{
+    UNICODE_STRING name;
+    PKEY_VALUE_PARTIAL_INFORMATION info = (PKEY_VALUE_PARTIAL_INFORMATION)g_ResIn;
+    PUCHAR in, inEnd, out, outEnd;
+    ULONG length, full, fullCount, part, partCount, cuts = 0;
+    PCM_FULL_RESOURCE_DESCRIPTOR fin, fout;
+    PCM_PARTIAL_RESOURCE_DESCRIPTOR pin, pout;
+
+    RtlInitUnicodeString(&name, ValueName);
+    if (!NT_SUCCESS(ZwQueryValueKey(Key, &name, KeyValuePartialInformation, info, sizeof(g_ResIn), &length)))
+        return '-';
+    if (info->Type != REG_RESOURCE_LIST || info->DataLength < sizeof(ULONG)) return 'x';
+    in = info->Data;
+    inEnd = in + info->DataLength;
+    out = g_ResOut;
+    outEnd = g_ResOut + sizeof(g_ResOut);
+    fullCount = ((PCM_RESOURCE_LIST)in)->Count;
+    *(PULONG)out = fullCount;
+    in += sizeof(ULONG);
+    out += sizeof(ULONG);
+    for (full = 0; full < fullCount; full++) {
+        ULONG header = FIELD_OFFSET(CM_FULL_RESOURCE_DESCRIPTOR, PartialResourceList.PartialDescriptors);
+        if (in + header > inEnd || out + header > outEnd) return 'x';
+        fin = (PCM_FULL_RESOURCE_DESCRIPTOR)in;
+        fout = (PCM_FULL_RESOURCE_DESCRIPTOR)out;
+        RtlCopyMemory(fout, fin, header);
+        partCount = fin->PartialResourceList.Count;
+        in += header;
+        out += header;
+        fout->PartialResourceList.Count = 0;
+        for (part = 0; part < partCount; part++) {
+            ULONG start, end;
+            pin = (PCM_PARTIAL_RESOURCE_DESCRIPTOR)in;
+            if (in + sizeof(*pin) > inEnd || out + 2 * sizeof(*pin) > outEnd) return 'x';
+            in += sizeof(*pin);
+            start = pin->u.Memory.Start.LowPart;
+            end = start + pin->u.Memory.Length;
+            if (pin->Type != CmResourceTypeMemory || pin->u.Memory.Start.HighPart != 0 ||
+                end <= USOS_VGA_LOW || start >= USOS_VGA_HIGH) {
+                RtlCopyMemory(out, pin, sizeof(*pin));
+                out += sizeof(*pin);
+                fout->PartialResourceList.Count++;
+                continue;
+            }
+            cuts++;
+            if (start < USOS_VGA_LOW) {          /* the part below A0000h */
+                pout = (PCM_PARTIAL_RESOURCE_DESCRIPTOR)out;
+                RtlCopyMemory(pout, pin, sizeof(*pin));
+                pout->u.Memory.Length = USOS_VGA_LOW - start;
+                out += sizeof(*pin);
+                fout->PartialResourceList.Count++;
+            }
+            if (end > USOS_VGA_HIGH) {           /* the part from C0000h up */
+                pout = (PCM_PARTIAL_RESOURCE_DESCRIPTOR)out;
+                RtlCopyMemory(pout, pin, sizeof(*pin));
+                pout->u.Memory.Start.LowPart = USOS_VGA_HIGH;
+                pout->u.Memory.Length = end - USOS_VGA_HIGH;
+                out += sizeof(*pin);
+                fout->PartialResourceList.Count++;
+            }
+        }
+    }
+    if (cuts == 0) return '-';
+    if (!NT_SUCCESS(ZwSetValueKey(Key, &name, 0, REG_RESOURCE_LIST, g_ResOut, (ULONG)(out - g_ResOut))))
+        return 'x';
+    return 'o';
+}
+
+static CHAR
+FreeVgaWindow(VOID)
+{
+    UNICODE_STRING keyName;
+    OBJECT_ATTRIBUTES oa;
+    HANDLE key;
+    CHAR t, r;
+
+    RtlInitUnicodeString(&keyName, L"\\Registry\\Machine\\HARDWARE\\RESOURCEMAP\\System Resources\\Reserved");
+    InitializeObjectAttributes(&oa, &keyName, OBJ_CASE_INSENSITIVE, NULL, NULL);
+    if (!NT_SUCCESS(ZwOpenKey(&key, KEY_QUERY_VALUE | KEY_SET_VALUE, &oa))) return '-';
+    t = CutVgaFromList(key, L".Translated");
+    r = CutVgaFromList(key, L".Raw");
+    ZwClose(key);
+    if (t == 'x' || r == 'x') return 'x';
+    return (CHAR)(t == 'o' || r == 'o' ? 'o' : '-');
 }
 #endif
 
@@ -1377,6 +1480,9 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 #endif
     BOOLEAN shutdownHandler = FALSE;
     CHAR restart;
+#ifdef USOSRST_NT4
+    CHAR vgaWindow;
+#endif
     CHAR line[80];
     PCHAR p, end = line + 80;
 
@@ -1402,6 +1508,7 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     }
 #ifdef USOSRST_NT4
     shutdownHandler = RedirectKernelRestart();
+    vgaWindow = FreeVgaWindow();
 #else
     if (g_InSetup && NT_SUCCESS(IoCreateDevice(DriverObject, 0, NULL, FILE_DEVICE_UNKNOWN, 0, FALSE, &device))) {
         DriverObject->MajorFunction[IRP_MJ_SHUTDOWN] = ShutdownDispatch;
@@ -1414,7 +1521,13 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 #endif
 
     /* The load line: shows that the driver ran and what it found. */
+#ifdef USOSRST_NT4
+    p = PutStr(line, end, USOSRST_VERSION " vga");
+    *p++ = vgaWindow;
+    p = PutStr(p, end, " rsdp=");
+#else
     p = PutStr(line, end, USOSRST_VERSION " rsdp=");
+#endif
     p = PutHex(p, end, g_AcpiRevision, 2);
     p = PutStr(p, end, g_ResetSpace == 1 ? " reset=io:" : g_ResetSpace == 2 ? " reset=mem:" : " reset=cf9");
     if (g_ResetSpace) {
