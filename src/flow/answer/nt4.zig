@@ -15,6 +15,12 @@
 //!   [GuiUnattended] blank Administrator password, time zone marker
 //!   [Display]       640x480 (vga.sys)
 //!
+//! Server / Enterprise Server: micro-Linux adds [GuiUnattended]
+//! AdvServerType = SERVERNT and [LicenseFilePrintData] AutoMode = PerServer,
+//! AutoUsers = 5 when the CD's TXTSETUP.SIF ProductType is not 0
+//! (nt4_server_answer); without them GUI Setup waits on its Server Type and
+//! Licensing Mode pages (X470 2026-10-07). The CD decides, not the menu entry.
+//!
 //! NT 4.0 takes the time zone as the CD's own display string (localised,
 //! "(GMT+01:00) Warszawa, Praga, Budapeszt" on the Polish CD), so the
 //! renderer writes ";USOS-TZ=<9x zone key>" and micro-Linux replaces it for

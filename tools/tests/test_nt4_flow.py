@@ -80,6 +80,15 @@ class Nt4Vm(unittest.TestCase):
             'multi(0)disk(0)rdisk(0)partition(1)\\WINNT="NT Server [VGA mode]" /basevideo /sos /NUMPROC=2 /MAXMEM=1024',
             ''])
 
+    def test_boot_ini_drops_the_enterprise_maxmem(self):
+        ini = '[operating systems]\r\nmulti(0)disk(0)rdisk(0)partition(1)\\WINNT="Windows NT Server Version 4.00" /maxmem=256\r\n'
+        (self.tmp / 'boot.ini').write_bytes(ini.encode('ascii'))
+        rc, out, err = sh(f'. "{VM}"; . "{NT4}"; nt4_boot_ini < "{(self.tmp / "boot.ini").as_posix()}" > "{(self.tmp / "out.ini").as_posix()}"')
+        self.assertEqual(rc, 0, err)
+        text = (self.tmp / 'out.ini').read_bytes().decode('ascii')
+        self.assertIn('"Windows NT Server Version 4.00" /NUMPROC=2 /MAXMEM=1024\r\n', text)
+        self.assertNotIn('maxmem=256', text)
+
     def test_ci_path_finds_lower_case_nt_names(self):
         root = self.tmp / 'c'
         (root / 'winnt' / 'system32').mkdir(parents=True)
@@ -122,6 +131,19 @@ nt4_vm_install /dev/sdz "{(self.tmp / 'l').as_posix()}" tcg; echo "rc=$?"
         rc, out, err = sh(script)
         self.assertIn('rc=3', out)
 
+    def test_install_turns_on_the_stall_rule(self):
+        # NT 4.0 has no key to type; a Setup page that waits must still end the
+        # run (X470 2026-10-07: Server sat 40 minutes at 15 MB).
+        script = f'''. "{VM}"; . "{NT4}"
+w9x_phase1_run() {{ echo "any=$W9X_VM_STALL_ANY stall=$W9X_VM_STALL answer=$W9X_VM_ANSWER"; W9X_VM_STALLED=905; return 3; }}
+w9x_phase1_keep_logs() {{ mkdir -p "$1"; }}
+nt4_vm_install /dev/sdz "{(self.tmp / 'l').as_posix()}" tcg; echo "rc=$? nt4_stalled=$NT4_VM_STALLED"
+'''
+        rc, out, err = sh(script)
+        self.assertIn('any=1 stall=900 answer=alt-n', out, err)
+        self.assertIn('rc=3 nt4_stalled=905', out)
+        self.assertIn('stalled=905', (self.tmp / 'l/runs.txt').read_text())
+
     def test_vm_available_for_nt4(self):
         share = self.tmp / 'share'
         share.mkdir()
@@ -135,6 +157,45 @@ nt4_vm_install /dev/sdz "{(self.tmp / 'l').as_posix()}" tcg; echo "rc=$?"
         for tag in ('NT4', 'NT4S'):
             rc, out, err = sh(f'. "{VM}"; w9x_vm_available {tag}', env)
             self.assertEqual(rc, 0, out + err)
+
+
+class Nt4ServerAnswer(unittest.TestCase):
+    """NT 4.0 Server / Enterprise Server GUI pages (nt4_server_answer)."""
+
+    def run_fn(self, product, text):
+        tmp = Path(tempfile.mkdtemp(prefix='usos-nt4-srv-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / 'in.sif').write_bytes(text.encode('ascii'))
+        fn = function_text(TARGET, 'nt4_server_answer')
+        rc, out, err = sh(f'{fn}\nnt4_server_answer "{product}" < "{(tmp / "in.sif").as_posix()}" > "{(tmp / "out.sif").as_posix()}"')
+        self.assertEqual(rc, 0, err)
+        return (tmp / 'out.sif').read_bytes().decode('ascii')
+
+    SIF = '[UserData]\r\nFullName = "USOS"\r\n\r\n[GuiUnattended]\r\nOemSkipWelcome = 1\r\nOEMBlankAdminPassword = 1\r\n\r\n[Display]\r\nXResolution = 640\r\n'
+
+    def test_workstation_cd_unchanged(self):
+        self.assertEqual(self.run_fn('0', self.SIF), self.SIF)
+        self.assertEqual(self.run_fn('', self.SIF), self.SIF)
+
+    def test_server_cd_gets_role_and_licensing(self):
+        out = self.run_fn('1', self.SIF)
+        self.assertIn('[GuiUnattended]\r\nAdvServerType = SERVERNT\r\nOemSkipWelcome = 1\r\n', out)
+        self.assertTrue(out.endswith('[Display]\r\nXResolution = 640\r\n\r\n[LicenseFilePrintData]\r\nAutoMode = PerServer\r\nAutoUsers = 5\r\n'))
+        self.assertEqual(out.count('AdvServerType'), 1)
+        self.assertNotIn('\r\r', out)
+
+    def test_server_keys_already_present_are_kept(self):
+        text = '[GuiUnattended]\r\nAdvServerType = LANMANNT\r\n[LicenseFilePrintData]\r\nAutoMode = PerSeat\r\n'
+        self.assertEqual(self.run_fn('1', text), text)
+
+    def test_server_without_gui_section(self):
+        out = self.run_fn('1', '[UserData]\nFullName = "A"\n')
+        self.assertIn('[GuiUnattended]\r\nAdvServerType = SERVERNT\r\n', out)
+        self.assertIn('[LicenseFilePrintData]\r\nAutoMode = PerServer\r\nAutoUsers = 5\r\n', out)
+
+    def test_target_pipes_the_answer_through_it(self):
+        text = TARGET.read_text(encoding='utf-8')
+        self.assertIn('| nt4_server_answer "${product:-0}" > "$work/WINNT.SIF"', text)
 
 
 class Nt4Target(unittest.TestCase):
@@ -181,6 +242,51 @@ class Nt4Target(unittest.TestCase):
         # Never the CSMWrap ESP before the VM: it is written after the install.
         self.assertNotIn('xp_csmwrap_esp.sh', text)
 
+    def _crypto(self, schannel: bytes | None) -> str:
+        text = TARGET.read_text(encoding='utf-8')
+        start = text.index('crypto=standard\n')
+        end = text.index('\ndone\n', start) + len('\ndone\n')
+        tmp = Path(tempfile.mkdtemp(prefix='usos-nt4-crypto-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / 'I386').mkdir()
+        if schannel is not None:
+            (tmp / 'I386/SCHANNEL.DLL').write_bytes(b'MZ\0\0' + schannel + b'\0\0')
+        script = f'set -eu\ni386={tmp.as_posix()}/I386\n' + text[start:end] + 'echo "$crypto"\n'
+        rc, out, err = sh(script)
+        self.assertEqual(rc, 0, err)
+        return out.strip()
+
+    def test_cd_encryption_strength(self):
+        # English Enterprise Server CD: "PCT / SSL Security Provider (US/Canada
+        # Only, Not for Export)" in UTF-16; SP6a export: "(Export Version)".
+        self.assertEqual(self._crypto('PCT / SSL Security Provider (US/Canada Only, Not for Export)'.encode('utf-16le')), 'high')
+        self.assertEqual(self._crypto('TLS / SSL Security Provider (Export Version)'.encode('utf-16le')), 'standard')
+        self.assertEqual(self._crypto(None), 'standard')
+        text = TARGET.read_text(encoding='utf-8')
+        self.assertIn('"$ANSWER_KIND" "$crypto" > "$usos/SOURCE.TXT"', text)
+
+    def test_finish_names_the_high_encryption_service_pack(self):
+        nt4 = Path(NT4).read_text(encoding='utf-8')
+        self.assertIn('USOSRST.REG USOSVBE.REG DONE.TXT SOURCE.TXT; do', nt4)
+        self.assertIn("grep -aq 'crypto=high' \"$logs/SOURCE.TXT\"", nt4)
+        self.assertIn('(high-encryption CD);', nt4)
+        prepare = PREPARE.read_text(encoding='utf-8')
+        # The encryption message comes before the generic language one.
+        self.assertLess(prepare.index("*'high-encryption CD'*)"), prepare.index("*'no Service Pack 6'*)"))
+        self.assertIn('128-bit (High Encryption) SP6I386.EXE', prepare)
+
+    def test_post_script_removes_the_enterprise_installer_before_sp6a(self):
+        # Enterprise Server CD: NHSETUP.CMD puts NHLOADER (SP3 from the CD's
+        # \SP3) in the All Users Startup group; it hung without the CD and
+        # must never put SP3 over SP6a.
+        text = TARGET.read_text(encoding='utf-8')
+        post = text[text.index('crlf > "$usos/POST.CMD"'):]
+        name = r'Startup\Windows NT Server, Enterprise Edition Installer.cmd'
+        self.assertIn(r'set NHI=%SystemRoot%\Profiles\All Users\Start Menu\Programs' + '\\' + name, post)
+        self.assertIn('del "%NHI%"', post)
+        self.assertLess(post.index('del "%NHI%"'), post.index('SP6I386.EXE -u -z'))
+        self.assertLess(post.index('del "%NHI%"'), post.index('USOSOFF.EXE /r'))
+
     def test_chs_end_matches_the_partition(self):
         # 255 heads, 63 sectors: LBA 63 + 4096000 - 1.
         lba = 63 + 4096000 - 1
@@ -192,10 +298,12 @@ class Nt4Prepare(unittest.TestCase):
     def test_prepare_routes_nt4(self):
         text = PREPARE.read_text(encoding='utf-8')
         self.assertIn('windows-nt-4) tag=NT4', text)
+        # A run that stopped writing gets its own message, not the generic one.
+        self.assertIn('stopped writing to the disk for $((NT4_VM_STALLED / 60)) minutes', text)
         self.assertIn('windows-nt-4-server) tag=NT4S', text)
         self.assertIn('nt4_vm_install "$TARGET_DEVICE"', text)
         self.assertIn('nt4_vm_finish "$TARGET_DEVICE"', text)
-        self.assertRegex(text, re.compile(r'nt4_vm_finish.*\n(.*\n){0,12}.*xp_csmwrap_esp\.sh', re.M))
+        self.assertRegex(text, re.compile(r'nt4_vm_finish.*\n(.*\n){0,25}.*xp_csmwrap_esp\.sh', re.M))
         self.assertIn('-iname \'sp6i386.exe\'', text)
 
 

@@ -15,6 +15,17 @@
 NT4_VM_BOOTS=${NT4_VM_BOOTS:-6}
 NT4_VM_DISK_BYTES=${NT4_VM_DISK_BYTES:-4294967296}
 NT4_PART_OFFSET=32256
+# No disk write for this long ends the run (rc 3): a Setup page waits for
+# input that never comes (X470 2026-10-07: NT 4.0 Server sat on its Server
+# Type / Licensing pages for 40 minutes at 15 MB). Under TCG the longest
+# quiet stretch of a good install is a few minutes.
+NT4_VM_STALL=${NT4_VM_STALL:-900}
+# NT 4.0 Server GUI-mode Setup ends with "One or more minor errors occurred
+# ... Would you like to view the log file now? Yes/No" (QEMU 2026-10-07,
+# Enterprise Server CD: setuplog.txt only had the Information lines about the
+# pagefile and "Crashdump was enabled"; no answer-file key turns it off).
+# Alt+N answers No and Setup restarts; on a wizard page it is Next.
+NT4_VM_ANSWER=${NT4_VM_ANSWER:-alt-n}
 # Workstation: 2 processors (its licence; SP6a halmps on the X470's MP table
 # from SeaBIOS); 1 GiB (NT 4.0 trouble reports with more memory).
 NT4_BOOT_OPTIONS=${NT4_BOOT_OPTIONS:-/NUMPROC=2 /MAXMEM=1024}
@@ -43,8 +54,10 @@ nt4_vm_marker() {
 
 # Runs the VM until the install is done. Calls nt4_vm_progress BOOT ELAPSED
 # WRITTEN_MB when the caller defines it. 0 = DONE.TXT written, 2 = QEMU
-# failed, 3 = timeout, 4 = no DONE.TXT after NT4_VM_BOOTS runs. Logs of every
-# run in $1/run-N.
+# failed, 3 = timeout or no disk write for NT4_VM_STALL seconds
+# (NT4_VM_STALLED = those seconds, 0 for the overall timeout), 4 = no
+# DONE.TXT after NT4_VM_BOOTS runs. Logs of every run in $1/run-N (the last
+# screen as screen.ppm).
 nt4_vm_install() {
     target=$1
     logs=$2
@@ -52,6 +65,10 @@ nt4_vm_install() {
     NT4_VM_ELAPSED=0
     W9X_VM_ARGS_FN=nt4_vm_args
     W9X_VM_KEY=''
+    W9X_VM_STALL_ANY=1
+    W9X_VM_STALL=$NT4_VM_STALL
+    W9X_VM_ANSWER=$NT4_VM_ANSWER
+    NT4_VM_STALLED=0
     boot=0
     while [ "$boot" -lt "$NT4_VM_BOOTS" ]; do
         boot=$((boot + 1))
@@ -61,7 +78,8 @@ nt4_vm_install() {
         rc=$?
         NT4_VM_ELAPSED=$((NT4_VM_ELAPSED + ${W9X_VM_ELAPSED:-0}))
         w9x_phase1_keep_logs "$logs/run-$boot"
-        printf 'run %s rc=%s elapsed=%s\n' "$boot" "$rc" "${W9X_VM_ELAPSED:-0}" >> "$logs/runs.txt"
+        NT4_VM_STALLED=${W9X_VM_STALLED:-0}
+        printf 'run %s rc=%s elapsed=%s stalled=%s\n' "$boot" "$rc" "${W9X_VM_ELAPSED:-0}" "$NT4_VM_STALLED" >> "$logs/runs.txt"
         [ "$rc" = 0 ] || return "$rc"
         if nt4_vm_marker "$target" DONE.TXT; then return 0; fi
     done
@@ -70,7 +88,9 @@ nt4_vm_install() {
 
 # BOOT.INI (stdin -> stdout, CR LF): NT4_BOOT_OPTIONS on every ARC line
 # that lacks /NUMPROC, timeout=5, no C:\ entry (Setup saved the syslinux
-# boot sector as BOOTSECT.DOS; LDLINUX.SYS is removed below).
+# boot sector as BOOTSECT.DOS; LDLINUX.SYS is removed below). A /MAXMEM
+# Setup wrote is dropped first (the Enterprise Server CD's TXTSETUP.SIF has
+# OsLoadOptions "/maxmem=256", QEMU 2026-10-07).
 # Diagnostics: after the first normal entry (the default stays first) an
 # "[USOS /SOS]" entry (driver list on screen, photographable on a crash) and,
 # when Setup wrote none, a "[VGA mode]" /basevideo /sos entry.
@@ -87,7 +107,10 @@ nt4_boot_ini() {
                 rest = substr(line, p + 2); q = index(rest, "\"")
                 if (q > 0) { first = n + 1; arc = substr(line, 1, p - 1); desc = substr(rest, 1, q - 1) }
             }
-            if (low !~ /\/numproc/) line = line (opts == "" ? "" : " " opts)
+            if (low !~ /\/numproc/) {
+                gsub(/[ \t]+\/[Mm][Aa][Xx][Mm][Ee][Mm]=[0-9]+/, "", line)
+                line = line (opts == "" ? "" : " " opts)
+            }
         }
         { out[++n] = line }
         END {
@@ -143,7 +166,7 @@ nt4_vm_finish() {
         return 1
     fi
     c=$W9X_VM_RUN/c
-    for file in POST.LOG VERSION.REG CSD.REG USOSRST.REG USOSVBE.REG DONE.TXT; do
+    for file in POST.LOG VERSION.REG CSD.REG USOSRST.REG USOSVBE.REG DONE.TXT SOURCE.TXT; do
         src=$(nt4_ci_path "$c" "USOS/NT4/$file") && cp "$src" "$logs/$file" 2>/dev/null
     done
     status=0
@@ -156,6 +179,10 @@ nt4_vm_finish() {
         # CurrentVersion string keeps the CD's service pack until a restart).
         if grep -aiq 'CSDVersion"=dword:0000060' "$logs/CSD.REG" 2>/dev/null ||
             grep -aq 'Service Pack 6' "$logs/VERSION.REG" 2>/dev/null; then reason="$reason SP6a installed;"
+        elif grep -aq 'crypto=high' "$logs/SOURCE.TXT" 2>/dev/null; then
+            # update.exe -u exits without a word when a Standard Encryption
+            # SP6a meets the 128-bit files of a US/Canada CD.
+            reason="$reason no Service Pack 6 in CSDVersion (high-encryption CD);"; status=1
         else reason="$reason no Service Pack 6 in CSDVersion;"; status=1; fi
     fi
     if [ "$status" = 0 ]; then
