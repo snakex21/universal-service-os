@@ -79,6 +79,16 @@ class Vesa95(unittest.TestCase):
         self.assertIn('COPY /Y C:\\USOS9X\\SYSTEM.V5 SYSTEM.DAT', bad)
         self.assertIn('COPY /Y C:\\USOS9X\\USER.V5 USER.DAT', bad)
 
+    def test_registry_files_lose_the_system_attribute_before_the_backup(self):
+        # SYSTEM.DAT / USER.DAT are +S +H +R: ATTRIB -R -H alone is refused
+        # ("Not resetting system file"), COPY then misses the hidden file and
+        # no backup is made (X470, 95 OSR2.1 PL, 2026-10-07: only VESA95.RUN).
+        text = self.write()[1]['VESA95.BAT'].decode('ascii')
+        for name in ('SYSTEM.DAT', 'USER.DAT'):
+            self.assertLess(text.index('ATTRIB.EXE -S -R -H ' + name), text.index('COPY /Y ' + name))
+            self.assertIn('ATTRIB.EXE +S +R +H ' + name, text[text.index(':ATTR'):])
+        self.assertNotIn('ATTRIB.EXE -R -H', text)
+
 
 class Wiring(unittest.TestCase):
     def test_target_writes_vesa95_for_95_only(self):

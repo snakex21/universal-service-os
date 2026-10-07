@@ -79,6 +79,11 @@ class Tzfix(unittest.TestCase):
             self.assertIn(marker, text)
         bad = text[text.index(':BAD'):]
         self.assertIn('COPY /Y C:\\USOS9X\\SYSTEM.TB SYSTEM.DAT', bad)
+        # +S +H +R registry files: without -S, ATTRIB refuses and COPY misses them.
+        for name in ('SYSTEM.DAT', 'USER.DAT'):
+            self.assertLess(text.index('ATTRIB.EXE -S -R -H ' + name), text.index('COPY /Y ' + name))
+            self.assertIn('ATTRIB.EXE +S +R +H ' + name, text[text.index(':ATTR'):])
+        self.assertNotIn('ATTRIB.EXE -R -H', text)
 
 
 class Wiring(unittest.TestCase):
