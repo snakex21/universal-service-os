@@ -117,9 +117,6 @@ pub const traits_table = [_]SystemTraits{
     .{ .system_id = "windows-server-2012", .route_as = "windows-8", .no_inbox_nvme = true },
     .{ .system_id = "windows-server-2008-r2", .route_as = "windows-7" },
     .{ .system_id = "windows-server-2008", .route_as = "windows-vista" },
-    // Windows NT 4.0 (answer/nt4.zig WINNT.SIF; CSMWrap is unsigned).
-    .{ .system_id = "windows-nt-4", .answer = .winnt_sif, .secure_boot_off = true },
-    .{ .system_id = "windows-nt-4-server", .answer = .winnt_sif, .secure_boot_off = true, .icon_as = "windows-nt-4" },
     // Linux ISO from DATA: SystemRescue ships no Microsoft-signed shim.
     .{ .system_id = "systemrescue", .secure_boot_off = true },
 };
@@ -131,7 +128,9 @@ fn ownTraits(system_id: []const u8) SystemTraits {
     // Windows 95/98/98 SE/Me (no table rows: the Legacy Core has no room).
     const win9x = std.mem.eql(u8, system_id, "windows-98-se") or std.mem.eql(u8, system_id, "windows-98") or
         std.mem.eql(u8, system_id, "windows-me") or std.mem.eql(u8, system_id, "windows-95");
-    return .{ .system_id = system_id, .answer = if (win9x) .msbatch_inf else .autounattend_xml };
+    // Windows NT 4.0 (answer/nt4.zig WINNT.SIF), no rows for the same reason.
+    const nt4 = std.mem.startsWith(u8, system_id, "windows-nt-4");
+    return .{ .system_id = system_id, .answer = if (win9x) .msbatch_inf else if (nt4) .winnt_sif else .autounattend_xml };
 }
 
 pub fn traits(system_id: []const u8) SystemTraits {
@@ -431,7 +430,6 @@ test "Windows NT 4.0 Workstation and Server on UEFI: the VM install, nothing els
         try std.testing.expect(backend(nt4, .iso, .chainload, .uefi) == null);
         try std.testing.expectEqual(AnswerFormat.winnt_sif, traits(id).answer);
     }
-    try std.testing.expectEqualStrings("windows-nt-4", iconId("windows-nt-4-server"));
 }
 
 test "Windows 10/11 and 7/Vista native UEFI profiles" {

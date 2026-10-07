@@ -202,6 +202,12 @@ cp "$work/WINNT.SIF" "$bt_dir/WINNT.SIF" || fail 'cannot copy WINNT.SIF'
 cp "$work/WINNT.SIF" "$work/c/WINNT.SIF" || fail 'cannot copy WINNT.SIF'
 cp "$setupldr" "$work/c/\$LDR\$" || fail 'cannot copy the Setup loader'
 cp "$txtsetup" "$work/c/TXTSETUP.SIF" || fail 'cannot copy TXTSETUP.SIF'
+# setupldr started from the hard disk runs \NTDETECT.COM of the boot
+# partition (QEMU 2026-10-07: "NTDETECT failed" without it).
+ntdetect=''
+for name in NTDETECT.COM ntdetect.com; do [ -f "$i386/$name" ] && ntdetect="$i386/$name" && break; done
+[ -n "$ntdetect" ] || fail 'the ISO has no I386\NTDETECT.COM'
+cp "$ntdetect" "$work/c/NTDETECT.COM" || fail 'cannot copy NTDETECT.COM'
 
 # $OEM$ (OemPreinstall = Yes): CMDLINES.TXT runs at the end of GUI-mode Setup
 # and turns on one automatic Administrator logon with POST.CMD in RunOnce.
