@@ -19,7 +19,8 @@
 #   \$WIN_NT$.~BT        the top-level I386 files + WINNT.SIF (the answer)
 #   \$LDR$, \TXTSETUP.SIF  Setup loader for the hard-disk start
 #   \USOS\NT4            POST.CMD (first logon), the .REG files,
-#                        AHCINT.SYS + USOSRST.SYS (NT4 builds), USOSOFF.EXE,
+#                        AHCINT.SYS + USOSRST.SYS + USOSUSB.SYS (NT4 builds),
+#                        USOSOFF.EXE,
 #                        SP6I386.EXE (the user's SP6a from DATA)
 #   syslinux (GPL-2.0-or-later) in the boot sector, SYSLINUX.CFG starts
 #   chain.c32 ntldr=/$LDR$; text-mode Setup replaces the boot sector with
@@ -120,7 +121,7 @@ nt4_resolve_time_zone() {
 for tool in dd od mkfs.fat mdir syslinux mount umount losetup blockdev awk sync wc tr; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
-for file in "$LIB/xp-geometry-fix-mbr-440.bin" "$LIB/nt4/AHCINT.SYS" "$LIB/nt4/USOSRST.SYS" "$LIB/nt4/USOSOFF.EXE" \
+for file in "$LIB/xp-geometry-fix-mbr-440.bin" "$LIB/nt4/AHCINT.SYS" "$LIB/nt4/USOSRST.SYS" "$LIB/nt4/USOSUSB.SYS" "$LIB/nt4/USOSOFF.EXE" \
     "$SYSLINUX_DIR/chain.c32" "$SYSLINUX_DIR/libcom32.c32" "$SYSLINUX_DIR/libutil.c32" "$ANSWER_SIF" "$SOURCE_ISO"; do
     [ -r "$file" ] || fail "missing: $file"
 done
@@ -228,6 +229,7 @@ usos="$work/c/USOS/NT4"
 mkdir -p "$usos"
 cp "$LIB/nt4/AHCINT.SYS" "$usos/AHCINT.SYS" || fail 'cannot copy AHCINT.SYS'
 cp "$LIB/nt4/USOSRST.SYS" "$usos/USOSRST.SYS" || fail 'cannot copy USOSRST.SYS'
+cp "$LIB/nt4/USOSUSB.SYS" "$usos/USOSUSB.SYS" || fail 'cannot copy USOSUSB.SYS'
 cp "$LIB/nt4/USOSOFF.EXE" "$usos/USOSOFF.EXE" || fail 'cannot copy USOSOFF.EXE'
 if [ -n "$SP_EXE" ]; then
     cp "$SP_EXE" "$usos/SP6I386.EXE" || fail 'cannot copy the service pack'
@@ -250,6 +252,12 @@ EOF
 # NT 4.0 is not PnP: a SCSI miniport needs only its file and Services key and
 # scans PCI itself; usosrst (HPET legacy replacement off, CMOS century,
 # restart through CF9/8042) loads before the HAL's timer is trusted.
+# usosusb (own GPL driver, tools/nt4/usosusb): keyboard and pointer port for
+# USB keyboards and mice on xHCI (NT 4.0 has no USB stack). It loads after
+# i8042prt and before the class drivers, which connect to every port
+# (ConnectMultiplePorts), so PS/2 and USB work side by side. Its pointer
+# port always exists, so mouclass no longer fails without a PS/2 mouse
+# (Service Control Manager event 7026 "Mouclass" at every start).
 crlf > "$usos/DRIVERS.REG" <<'EOF'
 REGEDIT4
 
@@ -268,6 +276,18 @@ REGEDIT4
 [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usosrst\Parameters]
 "HpetLegacyOff"=dword:00000001
 "RtcFix"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usosusb]
+"Type"=dword:00000001
+"Start"=dword:00000001
+"ErrorControl"=dword:00000000
+"Group"="Keyboard Port"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Kbdclass\Parameters]
+"ConnectMultiplePorts"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Mouclass\Parameters]
+"ConnectMultiplePorts"=dword:00000001
 EOF
 # End of the VM part: no more automatic logon; atapi off (the real machine has no
 # legacy IDE ports: it would only report "a service failed" at every start).
@@ -295,8 +315,10 @@ if exist C:\USOS\NT4\POST.OK goto end
 echo USOS NT4 post > C:\USOS\NT4\POST.LOG
 copy C:\USOS\NT4\AHCINT.SYS %SystemRoot%\system32\drivers\ahcint.sys >> C:\USOS\NT4\POST.LOG
 copy C:\USOS\NT4\USOSRST.SYS %SystemRoot%\system32\drivers\usosrst.sys >> C:\USOS\NT4\POST.LOG
+copy C:\USOS\NT4\USOSUSB.SYS %SystemRoot%\system32\drivers\usosusb.sys >> C:\USOS\NT4\POST.LOG
 if not exist %SystemRoot%\system32\drivers\ahcint.sys echo AHCINT.SYS copy FAILED >> C:\USOS\NT4\POST.LOG
 if not exist %SystemRoot%\system32\drivers\usosrst.sys echo USOSRST.SYS copy FAILED >> C:\USOS\NT4\POST.LOG
+if not exist %SystemRoot%\system32\drivers\usosusb.sys echo USOSUSB.SYS copy FAILED >> C:\USOS\NT4\POST.LOG
 %SystemRoot%\regedit.exe /s C:\USOS\NT4\DRIVERS.REG
 echo drivers registered >> C:\USOS\NT4\POST.LOG
 if not exist C:\USOS\NT4\SP6I386.EXE goto nosp
