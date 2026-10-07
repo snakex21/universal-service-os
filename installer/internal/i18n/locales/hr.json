@@ -1162,6 +1162,8 @@
 
   "boot.summary.xp_csmwrap": "XP bez CSM-a (eksperimentalno): CSMWrap, kartica s legacy VBIOS-om, 1 jezgra rezervirana",
   "boot.summary.w9x_csmwrap": "Bez CSM-a (eksperimentalno): USOS priprema FAT32 disk s instalacijom i CSMWrapom; instalacija se zatim pokreće s njega",
+  "boot.summary.nt4_csmwrap": "Bez CSM-a (eksperimentalno): cijela instalacija odvija se u virtualnom stroju na ovom računalu; gotov sustav zatim se pokreće putem CSMWrapa",
+  "boot.summary.nt4_limits": "Windows NT 4.0: koristite PS/2 tipkovnicu (USB unos još ne radi); prikaz 640x480; potreban je SP6I386.EXE (Service Pack 6a) u Systems\\Windows\\Windows NT 4.0\\ServicePack na DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentalno): nema upravljačkog programa AHCI/NVMe/USB 3 za NT 5.0 (SATA u IDE načinu), najviše 4 GB RAM-a i 2 procesora",
 
@@ -1188,6 +1190,13 @@
   "boot.lx.w9x_phase1_progress": "Ne isključujte računalo. Proteklo: {0}, zapisano na disk: {1} MB.",
   "boot.lx.w9x_phase1_checking": "Provjera rezultata faze 1",
   "boot.lx.w9x_phase1_failed": "Faza 1 instalacije sustava Windows nije završena. Računalo nije ponovno pokrenuto; zapisnici: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "Instalacija {0} u pozadini (početak {1})",
+  "boot.lx.nt4_checking": "Provjera instaliranog sustava",
+  "boot.lx.nt4_after_restart": "Nakon ponovnog pokretanja disk se sam pokreće u instalirani sustav {0}.",
+  "boot.lx.nt4_needs_sp6a": "Windows NT 4.0 treba Service Pack 6a: stavite SP6I386.EXE u Systems\\Windows\\Windows NT 4.0\\ServicePack na USOS_DATA",
+  "boot.lx.nt4_needs_key": "Windows NT 4.0 treba ključ proizvoda: odaberite profil odgovora s ključem ili ga upišite kada ga izbornik zatraži",
+  "boot.lx.nt4_needs_vm": "Windows NT 4.0 instalira se samo u virtualnom stroju na ovom računalu, koji nije dostupan: {0}",
+  "boot.lx.nt4_failed": "Instalacija sustava Windows NT 4.0 nije završena. Računalo nije ponovno pokrenuto; zapisnici: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Ponovno pokreni",
   "winpe.vista_csmwrap_title": "USOS - Vista bez CSM-a",
   "winpe.vista_csmwrap_done": "Prvi dio instalacije Viste je dovršen. Sada izvadite USOS stick i odaberite U redu: računalo se ponovno pokreće i Vista nastavlja s diska putem CSMWrapa. Ako stick ostane priključen, pokrenite UEFI unos ovog diska iz izbornika pokretanja firmvera.",

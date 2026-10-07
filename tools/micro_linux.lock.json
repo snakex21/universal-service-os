@@ -208,7 +208,10 @@
       "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/syslinux-6.04_pre1-r19.apk",
       "sha256": "8d48ed312febfca789740fab80cc07c7f380ce2cb629a0005ea92b049b81aad1",
       "files": [
-        "usr/bin/syslinux"
+        "usr/bin/syslinux",
+        "usr/share/syslinux/chain.c32",
+        "usr/share/syslinux/libcom32.c32",
+        "usr/share/syslinux/libutil.c32"
       ]
     }
   ],

@@ -1159,6 +1159,8 @@
 
   "boot.summary.xp_csmwrap": "XP ilman CSM:ää (kokeellinen): CSMWrap, näytönohjain legacy-VBIOSilla, 1 ydin varattu",
   "boot.summary.w9x_csmwrap": "Ilman CSM:ää (kokeellinen): USOS valmistelee FAT32-asennuslevyn ja CSMWrapin; asennus käynnistyy siltä",
+  "boot.summary.nt4_csmwrap": "Ilman CSM:ää (kokeellinen): koko asennus tehdään virtuaalikoneessa tällä tietokoneella; valmis järjestelmä käynnistyy sitten CSMWrapin kautta",
+  "boot.summary.nt4_limits": "Windows NT 4.0: käytä PS/2-näppäimistöä (USB-syöte ei vielä toimi); näyttö 640x480; tarvitsee tiedoston SP6I386.EXE (Service Pack 6a) kansioon Systems\\Windows\\Windows NT 4.0\\ServicePack DATA-osiolle.",
 
   "boot.summary.w2k_limits": "Windows 2000 (kokeellinen): ei AHCI/NVMe/USB 3 -ajuria NT 5.0:lle (SATA IDE-tilassa), enintään 4 Gt RAM ja 2 suoritinta",
 
@@ -1185,6 +1187,13 @@
   "boot.lx.w9x_phase1_progress": "Älä sammuta tietokonetta. Kulunut: {0}, kirjoitettu levylle: {1} Mt.",
   "boot.lx.w9x_phase1_checking": "Tarkistetaan vaiheen 1 tulos",
   "boot.lx.w9x_phase1_failed": "Windowsin asennuksen vaihe 1 ei päättynyt. Tietokonetta ei käynnistetty uudelleen; lokit: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "{0}-asennus taustalla (aloitettu {1})",
+  "boot.lx.nt4_checking": "Tarkistetaan asennettu järjestelmä",
+  "boot.lx.nt4_after_restart": "Uudelleenkäynnistyksen jälkeen levy käynnistyy itsestään asennettuun järjestelmään {0}.",
+  "boot.lx.nt4_needs_sp6a": "Windows NT 4.0 tarvitsee Service Pack 6a:n: kopioi SP6I386.EXE kansioon Systems\\Windows\\Windows NT 4.0\\ServicePack USOS_DATA-osiolle",
+  "boot.lx.nt4_needs_key": "Windows NT 4.0 tarvitsee tuoteavaimen: valitse vastausprofiili, jossa on avain, tai kirjoita se, kun valikko kysyy",
+  "boot.lx.nt4_needs_vm": "Windows NT 4.0 asennetaan vain tämän tietokoneen virtuaalikoneeseen, joka ei ole käytettävissä: {0}",
+  "boot.lx.nt4_failed": "Windows NT 4.0:n asennus ei päättynyt. Tietokonetta ei käynnistetty uudelleen; lokit: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Käynnistä uudelleen",
   "winpe.vista_csmwrap_title": "USOS - Vista ilman CSM:ää",
   "winpe.vista_csmwrap_done": "Vistan asennuksen ensimmäinen osa on valmis. Irrota nyt USOS-tikku ja valitse OK: tietokone käynnistyy uudelleen ja Vista jatkuu levyltä CSMWrapin kautta. Jos tikku jää kytketyksi, käynnistä tämän levyn UEFI-merkintä laiteohjelmiston käynnistysvalikosta.",

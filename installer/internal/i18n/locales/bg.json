@@ -1159,6 +1159,8 @@
 
   "boot.summary.xp_csmwrap": "XP без CSM (експериментално): CSMWrap, карта с legacy VBIOS, 1 ядро резервирано",
   "boot.summary.w9x_csmwrap": "Без CSM (експериментално): USOS подготвя FAT32 диск с инсталатора и CSMWrap; инсталаторът стартира от него",
+  "boot.summary.nt4_csmwrap": "Без CSM (експериментално): цялото инсталиране протича във виртуална машина на този компютър; готовата система след това стартира чрез CSMWrap",
+  "boot.summary.nt4_limits": "Windows NT 4.0: използвайте PS/2 клавиатура (все още няма USB вход); екран 640x480; нужен е SP6I386.EXE (Service Pack 6a) в Systems\\Windows\\Windows NT 4.0\\ServicePack на DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (експериментално): няма драйвер AHCI/NVMe/USB 3 за NT 5.0 (SATA в режим IDE), макс. 4 GB RAM и 2 процесора",
 
@@ -1185,6 +1187,13 @@
   "boot.lx.w9x_phase1_progress": "Не изключвайте компютъра. Изминало: {0}, записано на диска: {1} MB.",
   "boot.lx.w9x_phase1_checking": "Проверка на резултата от етап 1",
   "boot.lx.w9x_phase1_failed": "Етап 1 от инсталирането на Windows не завърши. Компютърът не беше рестартиран; журнали: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "Инсталиране на {0} във фонов режим (начало {1})",
+  "boot.lx.nt4_checking": "Проверка на инсталираната система",
+  "boot.lx.nt4_after_restart": "След рестартирането дискът стартира сам в инсталираната {0}.",
+  "boot.lx.nt4_needs_sp6a": "Windows NT 4.0 изисква Service Pack 6a: поставете SP6I386.EXE в Systems\\Windows\\Windows NT 4.0\\ServicePack на USOS_DATA",
+  "boot.lx.nt4_needs_key": "Windows NT 4.0 изисква продуктов ключ: изберете профил с отговори с ключа или го въведете, когато менюто поиска",
+  "boot.lx.nt4_needs_vm": "Windows NT 4.0 се инсталира само във виртуалната машина на този компютър, която не е налична: {0}",
+  "boot.lx.nt4_failed": "Инсталирането на Windows NT 4.0 не завърши. Компютърът не беше рестартиран; журнали: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Рестартиране",
   "winpe.vista_csmwrap_title": "USOS - Vista без CSM",
   "winpe.vista_csmwrap_done": "Първата част от инсталацията на Vista приключи. Извадете сега флашката USOS и изберете OK: компютърът се рестартира и Vista продължава от диска чрез CSMWrap. Ако флашката остане свързана, стартирайте UEFI записа на този диск от менюто за зареждане на фърмуера.",

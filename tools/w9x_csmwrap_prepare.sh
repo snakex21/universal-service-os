@@ -87,6 +87,10 @@ usos_w9x_csmwrap_prepare() {
         # 3.x on top of the MS-DOS 6.22 ISO from Systems\DOS\MS-DOS\Images.
         ms-dos) tag=DOS setup='' ;;
         windows-3-1|windows-3-11) tag=W3 setup='' ;;
+        # Windows NT 4.0 (tools/nt4_csmwrap_target.sh + nt4_qemu_install.sh):
+        # the whole install in the VM, then the finished SP6a system starts.
+        windows-nt-4) tag=NT4 setup='' ;;
+        windows-nt-4-server) tag=NT4S setup='' ;;
         *) stop "request.ini names an unsupported system: $system" ;;
     esac
     w9x_csmwrap_log "REQUEST system=$system iso=$iso folder=$folder answer=${answer%%:*} size=$size_gib"
@@ -108,6 +112,23 @@ usos_w9x_csmwrap_prepare() {
     [ -f "/mnt/data/$iso" ] || stop "the Windows ISO is not on DATA: $iso"
     floppy=''
     dos_iso=''
+    nt4=''
+    sp_exe=''
+    case "$tag" in NT4|NT4S) nt4=yes ;; esac
+    if [ -n "$nt4" ]; then
+        for helper in nt4_csmwrap_target.sh nt4_qemu_install.sh w9x_phase1_qemu.sh; do
+            [ -r "/usr/lib/usos/$helper" ] || stop "$helper is missing"
+        done
+        # SP6a (the user's SP6I386.EXE, a Microsoft file: never on the stick):
+        # the X470 cannot start the RTM kernel, only an SP6a system.
+        for sp_dir in "/mnt/data/Systems/Windows/$folder/ServicePack" '/mnt/data/Systems/Windows/Windows NT 4.0/ServicePack'; do
+            [ -d "$sp_dir" ] || continue
+            sp_exe=$(find "$sp_dir" -maxdepth 1 -type f -iname 'sp6i386.exe' 2>/dev/null | head -n 1)
+            [ -z "$sp_exe" ] || break
+        done
+        [ -n "$sp_exe" ] || stop 'Windows NT 4.0 needs Service Pack 6a: put SP6I386.EXE into Systems\Windows\Windows NT 4.0\ServicePack on USOS_DATA'
+        w9x_csmwrap_log "NT4 service pack: ${sp_exe#/mnt/data/}"
+    fi
     win3_iso=''
     case "$tag" in
         DOS) dos_iso="/mnt/data/$iso" ;;
@@ -127,7 +148,21 @@ usos_w9x_csmwrap_prepare() {
     answer_kind=USOS
     time_zone=
     [ -z "$dos_iso" ] || answer=dos
+    [ -z "$nt4" ] || answer_inf=/run/nt4-winnt.sif
+    case "$nt4:$answer" in
+        yes:none) stop 'Windows NT 4.0 needs a product key: choose an answer profile with the key or type it when the menu asks' ;;
+        yes:profile)
+            # Rendered by the UEFI menu (answer_profiles.stageWin9x: NT4.SIF /
+            # NT4S.SIF, WINNT.SIF with the key): copied to RAM, staged copies go.
+            cp "/mnt/esp/EFI/USOS/answer/$tag.SIF" "$answer_inf" || stop 'the answer profile could not be taken'
+            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF
+            for staged in 98SE 98 ME 95; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
+            sync
+            answer=nt4
+            answer_kind=PROFILE ;;
+    esac
     case "$answer" in
+        nt4) ;;
         dos) : > "$answer_inf" ;;
         none)
             cp /mnt/esp/EFI/USOS/dos-native/win9x/MSBATCH.INF "$answer_inf" || stop 'the default MSBATCH.INF is missing'
@@ -145,6 +180,7 @@ usos_w9x_csmwrap_prepare() {
             # hold a product key: copied to RAM, then every staged copy goes.
             cp "/mnt/esp/EFI/USOS/answer/$tag.INF" "$answer_inf" || stop 'the answer profile could not be taken'
             for staged in 98SE 98 ME 95; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
+            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF
             sync
             answer_kind=PROFILE ;;
         file:*)
@@ -201,13 +237,18 @@ usos_w9x_csmwrap_prepare() {
         [ $((2048 + part_gib * 2097152)) -le "$esp_start" ] || part_gib=$(( (esp_start - 2048) / 2097152 ))
         layout="one FAT32 partition of $part_gib GiB"
         [ -z "$dos_iso" ] || layout='one FAT16 partition of 256 MiB'
+        [ -z "$nt4" ] || layout='one FAT16 partition of 2000 MiB at the disk start'
         {
             printf 'ERASE ALL DATA ON THIS DISK\n\n'
             cat "$overview"
             printf '\n'
             printf 'All partitions, systems and files on this disk will be erased.\n'
             printf 'New layout (MBR): %s (drive C:) for %s, then a 64 MiB CSMWrap partition at the end of the disk; the rest stays unallocated.\n' "$layout" "$folder"
-            printf 'After the restart the disk starts by itself and %s Setup continues on it.\n' "$folder"
+            if [ -n "$nt4" ]; then
+                printf 'After the restart the disk starts by itself into the installed %s.\n' "$folder"
+            else
+                printf 'After the restart the disk starts by itself and %s Setup continues on it.\n' "$folder"
+            fi
         } > "$screen"
         w9x_csmwrap_log "CONFIRM $TARGET_DEVICE model=$model serial=$serial size=$size part_gib=$part_gib"
         usos_xp_confirm "$screen" 'FORMAT THE ENTIRE DISK?' 'Erase ALL partitions and data on the selected disk' && break
@@ -220,7 +261,12 @@ usos_w9x_csmwrap_prepare() {
     # (qemu9x.cpio, tools/w9x_phase1_qemu.sh); 95 and machines without it keep
     # the native DOS Setup start.
     vm_phase1=no
-    if [ -z "$dos_iso" ] && [ -r /usr/lib/usos/w9x_phase1_qemu.sh ]; then
+    if [ -n "$nt4" ]; then
+        . /usr/lib/usos/w9x_phase1_qemu.sh
+        . /usr/lib/usos/nt4_qemu_install.sh
+        vm_reason=$(w9x_vm_available "$tag") || stop "Windows NT 4.0 installs only in the VM on this PC, which is not available: $vm_reason"
+        w9x_csmwrap_log "NT4 vm ($vm_reason)"
+    elif [ -z "$dos_iso" ] && [ -r /usr/lib/usos/w9x_phase1_qemu.sh ]; then
         . /usr/lib/usos/w9x_phase1_qemu.sh
         if vm_reason=$(w9x_vm_available "$tag"); then vm_phase1=yes; fi
         # Windows 95: the COA page of phase 1 needs the key, typed into the VM
@@ -238,7 +284,9 @@ usos_w9x_csmwrap_prepare() {
         w9x_csmwrap_log "PHASE1 vm=$vm_phase1 ($vm_reason)"
     fi
     usos_ui_stage 4 5 'Preparing the disk' "Copying $folder Setup, the USOS helpers and CSMWrap to the selected disk." || true
-    if [ -n "$dos_iso" ]; then
+    if [ -n "$nt4" ]; then
+        set -- env TARGET_DEVICE="$TARGET_DEVICE" NT4_SOURCE_ISO="/mnt/data/$iso" NT4_ANSWER_SIF="$answer_inf"             NT4_ANSWER_KIND="$answer_kind" NT4_SP_EXE="$sp_exe" sh /usr/lib/usos/nt4_csmwrap_target.sh
+    elif [ -n "$dos_iso" ]; then
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="$dos_iso" DOS_WIN3_ISO="$win3_iso" \
             DOS_PROGRAMS_DIR=/mnt/data/Systems/DOS/MS-DOS/Programs sh /usr/lib/usos/dos_csmwrap_target.sh
     else
@@ -252,6 +300,27 @@ usos_w9x_csmwrap_prepare() {
         stop 'The Windows 9x preparation failed; see EFI/USOS/win9x/prepare.log'
     fi
     rm -f "$answer_inf"
+    if [ -n "$nt4" ]; then
+        nt4_vm_progress() {
+            usos_ui_stage 5 5 "$folder installation in the background (start $1)"                 "Do not turn off the computer. Elapsed: $(printf '%d:%02d' $(($2 / 60)) $(($2 % 60))), written to disk: $3 MB." || true
+        }
+        accel=$(w9x_vm_accel)
+        w9x_csmwrap_log "NT4 install start target=$TARGET_DEVICE accel=$accel guest_mb=$W9X_VM_GUEST_MB timeout=$W9X_VM_TIMEOUT boots=$NT4_VM_BOOTS"
+        nt4_vm_install "$TARGET_DEVICE" "$W9X_DIR/nt4" "$accel"
+        vm_rc=$?
+        w9x_csmwrap_log "NT4 vm rc=$vm_rc elapsed=${NT4_VM_ELAPSED:-?}s"
+        usos_ui_stage 5 5 'Checking the installed system' '' || true
+        if [ "$vm_rc" != 0 ] || ! vm_check=$(nt4_vm_finish "$TARGET_DEVICE" "$W9X_DIR/nt4"); then
+            w9x_csmwrap_log "NT4 FAILED rc=$vm_rc ${vm_check:-}"
+            umount /mnt/data 2>/dev/null || true
+            sync
+            stop 'The Windows NT 4.0 installation did not finish. The computer was not restarted; logs: EFI/USOS/win9x/nt4'
+        fi
+        w9x_csmwrap_log "NT4 PASS $vm_check"
+        if ! TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=133120 sh /usr/lib/usos/xp_csmwrap_esp.sh >> "$W9X_DIR/prepare.log" 2>&1; then
+            stop 'The CSMWrap partition could not be written; see EFI/USOS/win9x/prepare.log'
+        fi
+    fi
     if [ "$vm_phase1" = yes ]; then
         w9x_phase1_progress() {
             usos_ui_stage 5 5 "$folder installation - stage 1 in the background"                 "Do not turn off the computer. Elapsed: $(printf '%d:%02d' $(($1 / 60)) $(($1 % 60))), written to disk: $2 MB." || true

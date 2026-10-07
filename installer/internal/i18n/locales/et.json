@@ -1159,6 +1159,8 @@
 
   "boot.summary.xp_csmwrap": "XP ilma CSM-ita (katseline): CSMWrap, legacy VBIOS-iga kaart, 1 tuum reserveeritud",
   "boot.summary.w9x_csmwrap": "Ilma CSM-ita (katseline): USOS valmistab ette FAT32 paigaldusketta CSMWrapiga; paigaldus käivitub sealt",
+  "boot.summary.nt4_csmwrap": "Ilma CSM-ita (katseline): kogu paigaldus toimub selle arvuti virtuaalmasinas; valmis süsteem käivitub seejärel CSMWrapi kaudu",
+  "boot.summary.nt4_limits": "Windows NT 4.0: kasuta PS/2 klaviatuuri (USB-sisend veel puudub); ekraan 640x480; vajab faili SP6I386.EXE (Service Pack 6a) kaustas Systems\\Windows\\Windows NT 4.0\\ServicePack kettal DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (katseline): NT 5.0 jaoks puudub AHCI/NVMe/USB 3 draiver (SATA IDE-režiimis), kuni 4 GB RAM-i ja 2 protsessorit",
 
@@ -1185,6 +1187,13 @@
   "boot.lx.w9x_phase1_progress": "Ärge lülitage arvutit välja. Möödunud: {0}, kettale kirjutatud: {1} MB.",
   "boot.lx.w9x_phase1_checking": "1. etapi tulemuse kontrollimine",
   "boot.lx.w9x_phase1_failed": "Windowsi installi 1. etapp ei lõppenud. Arvutit ei taaskäivitatud; logid: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "{0} paigaldus taustal (algus {1})",
+  "boot.lx.nt4_checking": "Paigaldatud süsteemi kontrollimine",
+  "boot.lx.nt4_after_restart": "Pärast taaskäivitust käivitub ketas ise paigaldatud süsteemi {0}.",
+  "boot.lx.nt4_needs_sp6a": "Windows NT 4.0 vajab Service Pack 6a-d: pane SP6I386.EXE kausta Systems\\Windows\\Windows NT 4.0\\ServicePack kettal USOS_DATA",
+  "boot.lx.nt4_needs_key": "Windows NT 4.0 vajab tootevõtit: vali võtmega vastuseprofiil või sisesta see, kui menüü seda küsib",
+  "boot.lx.nt4_needs_vm": "Windows NT 4.0 paigaldub ainult selle arvuti virtuaalmasinasse, mis pole saadaval: {0}",
+  "boot.lx.nt4_failed": "Windows NT 4.0 paigaldus ei lõppenud. Arvutit ei taaskäivitatud; logid: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Taaskäivita",
   "winpe.vista_csmwrap_title": "USOS - Vista ilma CSM-ita",
   "winpe.vista_csmwrap_done": "Vista paigalduse esimene osa on valmis. Eemaldage nüüd USOS-i mälupulk ja valige OK: arvuti taaskäivitub ja Vista jätkab kettalt CSMWrapi kaudu. Kui pulk jääb ühendatuks, käivitage selle ketta UEFI-kirje püsivara alglaadimismenüüst.",

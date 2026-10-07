@@ -1159,6 +1159,8 @@
 
   "boot.summary.xp_csmwrap": "XP ohne CSM (experimentell): CSMWrap, Grafikkarte mit Legacy-VBIOS, 1 Kern reserviert",
   "boot.summary.w9x_csmwrap": "Ohne CSM (experimentell): USOS bereitet eine FAT32-Setup-Festplatte mit CSMWrap vor; Setup läuft dann von ihr",
+  "boot.summary.nt4_csmwrap": "Ohne CSM (experimentell): die gesamte Installation läuft in einer virtuellen Maschine auf diesem PC; das fertige System startet danach über CSMWrap",
+  "boot.summary.nt4_limits": "Windows NT 4.0: PS/2-Tastatur verwenden (noch keine USB-Eingabe); Anzeige 640x480; benötigt SP6I386.EXE (Service Pack 6a) in Systems\\Windows\\Windows NT 4.0\\ServicePack auf DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimentell): kein AHCI/NVMe/USB-3-Treiber für NT 5.0 (SATA im IDE-Modus), max. 4 GB RAM und 2 CPUs",
 
@@ -1185,6 +1187,13 @@
   "boot.lx.w9x_phase1_progress": "Computer nicht ausschalten. Vergangen: {0}, auf den Datenträger geschrieben: {1} MB.",
   "boot.lx.w9x_phase1_checking": "Ergebnis von Phase 1 wird geprüft",
   "boot.lx.w9x_phase1_failed": "Phase 1 des Windows-Setups wurde nicht abgeschlossen. Der Computer wurde nicht neu gestartet; Protokolle: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "{0}-Installation im Hintergrund (Start {1})",
+  "boot.lx.nt4_checking": "Installiertes System wird geprüft",
+  "boot.lx.nt4_after_restart": "Nach dem Neustart startet der Datenträger von selbst in das installierte {0}.",
+  "boot.lx.nt4_needs_sp6a": "Windows NT 4.0 benötigt Service Pack 6a: SP6I386.EXE nach Systems\\Windows\\Windows NT 4.0\\ServicePack auf USOS_DATA kopieren",
+  "boot.lx.nt4_needs_key": "Windows NT 4.0 benötigt einen Produktschlüssel: ein Antwortprofil mit dem Schlüssel wählen oder ihn eingeben, wenn das Menü danach fragt",
+  "boot.lx.nt4_needs_vm": "Windows NT 4.0 wird nur in der virtuellen Maschine auf diesem PC installiert, die nicht verfügbar ist: {0}",
+  "boot.lx.nt4_failed": "Die Installation von Windows NT 4.0 wurde nicht abgeschlossen. Der Computer wurde nicht neu gestartet; Protokolle: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Neu starten",
   "winpe.vista_csmwrap_title": "USOS - Vista ohne CSM",
   "winpe.vista_csmwrap_done": "Der erste Teil der Vista-Installation ist abgeschlossen. Entfernen Sie jetzt den USOS-Stick und wählen Sie OK: Der Computer startet neu und Vista wird über CSMWrap vom Datenträger fortgesetzt. Bleibt der Stick angeschlossen, starten Sie den UEFI-Eintrag dieses Datenträgers aus dem Bootmenü der Firmware.",

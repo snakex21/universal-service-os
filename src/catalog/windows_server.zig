@@ -23,6 +23,18 @@ pub const entries = [_]SystemEntry{
     server("windows-server-2008-r2", "2008 R2", &windows7_methods),
     server("windows-server-2008", "2008", &methods),
     server("windows-server-2003", "2003", &nt5_methods),
+    // Windows NT 4.0 Server: the Workstation flow (os_profiles.zig
+    // nt4-x86-qemu-csmwrap) with the Server CD.
+    .{
+        .id = "windows-nt-4-server",
+        .name = "Windows NT 4.0 Server",
+        .category = .windows,
+        .family = .windows_legacy,
+        .image_directory = "\\Systems\\Windows\\Windows NT 4.0 Server\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Windows NT 4.0 Server\\Unattended",
+        .boot_methods = &nt5_methods,
+        .server = true,
+    },
 };
 
 fn server(comptime id: []const u8, comptime version: []const u8, comptime boot_methods: []const BootMethod) SystemEntry {

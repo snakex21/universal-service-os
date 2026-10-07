@@ -14,6 +14,7 @@ pub const sha512crypt = @import("sha512crypt.zig");
 pub const linux = @import("linux.zig");
 pub const applies = @import("applies.zig");
 pub const msbatch = @import("msbatch.zig");
+pub const nt4 = @import("nt4.zig");
 
 pub const Profile = profile.Profile;
 pub const Arch = target.Arch;
@@ -49,6 +50,7 @@ pub fn matchEdition(p: *const Profile, system_id: []const u8, images: ?*const ed
 /// chosen media, for the profile's edition (null: no edition written).
 pub fn render(p: *const Profile, system_id: []const u8, arch: Arch, key: ?[]const u8, images: ?*const editions.List, buffer: []u8) !?Rendered {
     const use_key = key orelse p.keyFor(system_id);
+    if (nt4.isNt4(system_id)) return .{ .format = .nt4_sif, .bytes = try nt4.render(p, use_key, buffer) };
     if (msbatch.releaseFor(system_id)) |release| return .{ .format = .msbatch_inf, .bytes = try msbatch.render(p, release, use_key, buffer) };
     const family = target.familyFor(system_id) orelse return null;
     // NT keys are 5x5 only (a Windows 95 key in the profile's `key=` is not theirs).
@@ -78,6 +80,7 @@ test {
     _ = linux;
     _ = applies;
     _ = msbatch;
+    _ = nt4;
 }
 
 test "render dispatch per system" {

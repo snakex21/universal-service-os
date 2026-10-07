@@ -570,6 +570,8 @@ def main() -> int:
             ("tools/w9x_vesa95.sh", "usr/lib/usos/w9x_vesa95.sh"),
             ("tools/w9x_phase1_qemu.sh", "usr/lib/usos/w9x_phase1_qemu.sh"),
             ("tools/dos_csmwrap_target.sh", "usr/lib/usos/dos_csmwrap_target.sh"),
+            ("tools/nt4_csmwrap_target.sh", "usr/lib/usos/nt4_csmwrap_target.sh"),
+            ("tools/nt4_qemu_install.sh", "usr/lib/usos/nt4_qemu_install.sh"),
             ("tools/legacy_xp_resume.sh", "usr/lib/usos/legacy_xp_resume.sh"),
             ("tools/xp_unattended_policy.sh", "usr/lib/usos/xp_unattended_policy.sh"),
             ("tools/xp_user_settings.sh", "usr/lib/usos/xp_user_settings.sh"),
@@ -617,6 +619,13 @@ def main() -> int:
             payload = (root / source_name).read_bytes().replace(b"\r\n", b"\n")
             put(entries, Entry(target_name, stat.S_IFREG | 0o755, payload))
         put(entries, Entry("usr/bin/usos-fb-ui", stat.S_IFREG | 0o755, framebuffer_ui.read_bytes()))
+        # Windows NT 4.0 (tools/nt4_csmwrap_target.sh): own GPL builds for NT 4.0.
+        for source_name, target_name in (
+            ("tools/vendor/ahcint/1.3.0.0-usos4/bin/NT4/i386/ahcint.sys", "usr/lib/usos/nt4/AHCINT.SYS"),
+            ("tools/w2k/usosrst/bin/nt4/i386/usosrst.sys", "usr/lib/usos/nt4/USOSRST.SYS"),
+            ("tools/nt4/usosoff/bin/i386/usosoff.exe", "usr/lib/usos/nt4/USOSOFF.EXE"),
+        ):
+            put(entries, Entry(target_name, stat.S_IFREG | 0o644, (root / source_name).read_bytes()))
         xp_vbr = root / "zig-out/xp-bios/xp-vbr-code.bin"
         xp_stage2 = root / "zig-out/xp-bios/xp-stage2.bin"
         xp_nt52_vbr = root / "zig-out/xp-bios/xp-nt52-vbr-tail.bin"

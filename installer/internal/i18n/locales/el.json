@@ -1159,6 +1159,8 @@
 
   "boot.summary.xp_csmwrap": "XP χωρίς CSM (πειραματικό): CSMWrap, κάρτα με legacy VBIOS, 1 πυρήνας δεσμευμένος",
   "boot.summary.w9x_csmwrap": "Χωρίς CSM (πειραματικό): το USOS προετοιμάζει δίσκο FAT32 με την εγκατάσταση και CSMWrap· η εγκατάσταση εκτελείται από αυτόν",
+  "boot.summary.nt4_csmwrap": "Χωρίς CSM (πειραματικό): όλη η εγκατάσταση εκτελείται σε εικονική μηχανή σε αυτόν τον υπολογιστή· το έτοιμο σύστημα ξεκινά μετά μέσω CSMWrap",
+  "boot.summary.nt4_limits": "Windows NT 4.0: χρησιμοποιήστε πληκτρολόγιο PS/2 (δεν υπάρχει ακόμη είσοδος USB)· οθόνη 640x480· απαιτείται το SP6I386.EXE (Service Pack 6a) στο Systems\\Windows\\Windows NT 4.0\\ServicePack στο DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (πειραματικό): χωρίς πρόγραμμα οδήγησης AHCI/NVMe/USB 3 για NT 5.0 (SATA σε λειτουργία IDE), έως 4 GB RAM και 2 CPU",
 
@@ -1185,6 +1187,13 @@
   "boot.lx.w9x_phase1_progress": "Μην απενεργοποιείτε τον υπολογιστή. Πέρασαν: {0}, γράφτηκαν στον δίσκο: {1} MB.",
   "boot.lx.w9x_phase1_checking": "Έλεγχος του αποτελέσματος του σταδίου 1",
   "boot.lx.w9x_phase1_failed": "Το στάδιο 1 της Εγκατάστασης των Windows δεν ολοκληρώθηκε. Ο υπολογιστής δεν επανεκκινήθηκε; αρχεία καταγραφής: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "Εγκατάσταση {0} στο παρασκήνιο (έναρξη {1})",
+  "boot.lx.nt4_checking": "Έλεγχος του εγκατεστημένου συστήματος",
+  "boot.lx.nt4_after_restart": "Μετά την επανεκκίνηση ο δίσκος ξεκινά μόνος του στο εγκατεστημένο {0}.",
+  "boot.lx.nt4_needs_sp6a": "Τα Windows NT 4.0 απαιτούν Service Pack 6a: τοποθετήστε το SP6I386.EXE στο Systems\\Windows\\Windows NT 4.0\\ServicePack στο USOS_DATA",
+  "boot.lx.nt4_needs_key": "Τα Windows NT 4.0 απαιτούν Product Key: επιλέξτε προφίλ απαντήσεων με το κλειδί ή πληκτρολογήστε το όταν το ζητήσει το μενού",
+  "boot.lx.nt4_needs_vm": "Τα Windows NT 4.0 εγκαθίστανται μόνο στην εικονική μηχανή αυτού του υπολογιστή, η οποία δεν είναι διαθέσιμη: {0}",
+  "boot.lx.nt4_failed": "Η εγκατάσταση των Windows NT 4.0 δεν ολοκληρώθηκε. Ο υπολογιστής δεν επανεκκινήθηκε· αρχεία καταγραφής: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Επανεκκίνηση",
   "winpe.vista_csmwrap_title": "USOS - Vista χωρίς CSM",
   "winpe.vista_csmwrap_done": "Το πρώτο μέρος της εγκατάστασης των Vista ολοκληρώθηκε. Αφαιρέστε τώρα το USB USOS και επιλέξτε OK: ο υπολογιστής επανεκκινείται και τα Vista συνεχίζουν από τον δίσκο μέσω CSMWrap. Αν το USB μείνει συνδεδεμένο, ξεκινήστε την καταχώριση UEFI αυτού του δίσκου από το μενού εκκίνησης του υλικολογισμικού.",

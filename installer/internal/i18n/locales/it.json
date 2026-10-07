@@ -1159,6 +1159,8 @@
 
   "boot.summary.xp_csmwrap": "XP senza CSM (sperimentale): CSMWrap, scheda con VBIOS legacy, 1 core riservato",
   "boot.summary.w9x_csmwrap": "Senza CSM (sperimentale): USOS prepara un disco FAT32 con l’installazione e CSMWrap; l’installazione parte poi da esso",
+  "boot.summary.nt4_csmwrap": "Senza CSM (sperimentale): l’intera installazione avviene in una macchina virtuale su questo PC; il sistema finito si avvia poi tramite CSMWrap",
+  "boot.summary.nt4_limits": "Windows NT 4.0: usare una tastiera PS/2 (ingresso USB non ancora supportato); schermo 640x480; richiede SP6I386.EXE (Service Pack 6a) in Systems\\Windows\\Windows NT 4.0\\ServicePack su DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (sperimentale): nessun driver AHCI/NVMe/USB 3 per NT 5.0 (SATA in modalità IDE), max 4 GB di RAM e 2 CPU",
 
@@ -1185,6 +1187,13 @@
   "boot.lx.w9x_phase1_progress": "Non spegnere il computer. Trascorso: {0}, scritti su disco: {1} MB.",
   "boot.lx.w9x_phase1_checking": "Verifica del risultato della fase 1",
   "boot.lx.w9x_phase1_failed": "La fase 1 dell'installazione di Windows non è terminata. Il computer non è stato riavviato; log: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "Installazione di {0} in background (avvio {1})",
+  "boot.lx.nt4_checking": "Verifica del sistema installato",
+  "boot.lx.nt4_after_restart": "Dopo il riavvio il disco si avvia da solo nel {0} installato.",
+  "boot.lx.nt4_needs_sp6a": "Windows NT 4.0 richiede il Service Pack 6a: copiare SP6I386.EXE in Systems\\Windows\\Windows NT 4.0\\ServicePack su USOS_DATA",
+  "boot.lx.nt4_needs_key": "Windows NT 4.0 richiede un codice Product Key: scegliere un profilo di risposte con il codice o digitarlo quando il menu lo chiede",
+  "boot.lx.nt4_needs_vm": "Windows NT 4.0 si installa solo nella macchina virtuale di questo PC, che non è disponibile: {0}",
+  "boot.lx.nt4_failed": "L'installazione di Windows NT 4.0 non è terminata. Il computer non è stato riavviato; log: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Riavvia",
   "winpe.vista_csmwrap_title": "USOS - Vista senza CSM",
   "winpe.vista_csmwrap_done": "La prima parte dell'installazione di Vista è completata. Rimuovi ora la chiavetta USOS, poi scegli OK: il computer si riavvia e Vista prosegue dal disco tramite CSMWrap. Se la chiavetta resta collegata, avvia la voce UEFI di questo disco dal menu di avvio del firmware.",

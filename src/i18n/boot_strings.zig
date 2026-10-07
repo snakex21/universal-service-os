@@ -580,6 +580,8 @@ pub const Key = enum(u16) {
     summary_native_case,
     summary_no_answer_files,
     summary_no_drivers,
+    summary_nt4_csmwrap,
+    summary_nt4_limits,
     summary_nt52_limits,
     summary_preparation,
     summary_secure_boot_badge,
@@ -1261,6 +1263,8 @@ pub const hashes = [_]u32{
     0x25344415, // summary.native_case
     0x34dc4dbb, // summary.no_answer_files
     0xe8143028, // summary.no_drivers
+    0x298a1e85, // summary.nt4_csmwrap
+    0xd78afc14, // summary.nt4_limits
     0xeefafc17, // summary.nt52_limits
     0x92637c78, // summary.preparation
     0xb2783d3b, // summary.secure_boot_badge
@@ -1696,6 +1700,8 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
+    false,
     false,
     false,
     false,
@@ -2625,6 +2631,8 @@ pub const english = [_][]const u8{
     "Windows Setup straight from the ISO (no copy to WORK)",
     "None found in {0}",
     "None in Drivers/x64; target USB 3 may be unavailable",
+    "Without CSM (experimental): the whole installation runs in a virtual machine on this PC; the finished system then starts through CSMWrap",
+    "Windows NT 4.0: use a PS/2 keyboard (no USB input yet); display 640x480; needs SP6I386.EXE (Service Pack 6a) in Systems\\Windows\\Windows NT 4.0\\ServicePack on DATA.",
     "NT 5.2 (experimental): AHCI through GenAHCI on the system's StorPort; no NVMe/USB 3 driver in Setup",
     "Preparation",
     "Requires Secure Boot off",

@@ -1159,6 +1159,8 @@
 
   "boot.summary.xp_csmwrap": "XP without CSM (experimental): CSMWrap, card with a legacy VBIOS, 1 core reserved",
   "boot.summary.w9x_csmwrap": "Without CSM (experimental): USOS prepares the disk and CSMWrap; the installation then starts from it",
+  "boot.summary.nt4_csmwrap": "Without CSM (experimental): the whole installation runs in a virtual machine on this PC; the finished system then starts through CSMWrap",
+  "boot.summary.nt4_limits": "Windows NT 4.0: use a PS/2 keyboard (no USB input yet); display 640x480; needs SP6I386.EXE (Service Pack 6a) in Systems\\Windows\\Windows NT 4.0\\ServicePack on DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimental): no AHCI/NVMe/USB 3 driver for NT 5.0 (SATA in IDE mode), max. 4 GB RAM and 2 CPUs",
 
@@ -1185,6 +1187,13 @@
   "boot.lx.w9x_phase1_progress": "Do not turn off the computer. Elapsed: {0}, written to disk: {1} MB.",
   "boot.lx.w9x_phase1_checking": "Checking the result of stage 1",
   "boot.lx.w9x_phase1_failed": "Windows Setup stage 1 did not finish. The computer was not restarted; logs: EFI/USOS/win9x/phase1",
+  "boot.lx.nt4_install_title": "{0} installation in the background (start {1})",
+  "boot.lx.nt4_checking": "Checking the installed system",
+  "boot.lx.nt4_after_restart": "After the restart the disk starts by itself into the installed {0}.",
+  "boot.lx.nt4_needs_sp6a": "Windows NT 4.0 needs Service Pack 6a: put SP6I386.EXE into Systems\\Windows\\Windows NT 4.0\\ServicePack on USOS_DATA",
+  "boot.lx.nt4_needs_key": "Windows NT 4.0 needs a product key: choose an answer profile with the key or type it when the menu asks",
+  "boot.lx.nt4_needs_vm": "Windows NT 4.0 installs only in the VM on this PC, which is not available: {0}",
+  "boot.lx.nt4_failed": "The Windows NT 4.0 installation did not finish. The computer was not restarted; logs: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Restart",
   "winpe.vista_csmwrap_title": "USOS - Vista without CSM",
   "winpe.vista_csmwrap_done": "The first part of the Vista installation is complete. Remove the USOS stick now, then choose OK: the computer restarts and Vista continues from the disk through CSMWrap. If the stick stays connected, start this disk's UEFI entry from the firmware boot menu.",
