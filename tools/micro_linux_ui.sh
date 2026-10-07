@@ -36,8 +36,21 @@ fi
 USOS_UI_VISTA=${USOS_UI_VISTA:-no}
 case " $(cat /proc/cmdline 2>/dev/null) " in
     *' usos.legacy_action=vista-csmwrap '*) USOS_UI_VISTA=yes; [ -n "$USOS_UI_HEADING" ] || USOS_UI_HEADING='Windows Vista' ;;
-    # Windows 95/98/Me without CSM (step 620): the same five-stage page.
-    *' usos.legacy_action=w9x-csmwrap '*) USOS_UI_VISTA=yes; [ -n "$USOS_UI_HEADING" ] || USOS_UI_HEADING='Windows 9x' ;;
+    # Windows 95/98/Me and the DOS family without CSM (step 620): the same
+    # five-stage page. The UEFI menu passes the chosen system's name as
+    # usos.heading= ('_' for spaces; vista_preparation.headingOption), so the
+    # first frame does not say "Windows 9x" for Windows 3.0 or MS-DOS.
+    *' usos.legacy_action=w9x-csmwrap '*)
+        USOS_UI_VISTA=yes
+        if [ -z "$USOS_UI_HEADING" ]; then
+            for usos_ui_word in $(cat /proc/cmdline 2>/dev/null); do
+                case "$usos_ui_word" in
+                    usos.heading=?*) USOS_UI_HEADING=$(printf '%s' "${usos_ui_word#usos.heading=}" | tr '_' ' ') ;;
+                esac
+            done
+            unset usos_ui_word
+        fi
+        [ -n "$USOS_UI_HEADING" ] || USOS_UI_HEADING='Windows' ;;
 esac
 if [ "$USOS_UI_VISTA" = yes ] && [ -z "$USOS_UI_LABELS" ]; then
     USOS_UI_LABELS='Validating installation ISO|Loading the preparation environment|Choosing the target disk|Preparing the disk|Starting Windows Setup'

@@ -115,12 +115,17 @@ copy %USRC%\W1CONFIG.SYS C:\USOSW3\W3CONFIG.SYS /y >nul
 if errorlevel 1 goto failed
 copy %USRC%\W1AUTO.BAT C:\USOSW3\W3AUTO.BAT /y >nul
 if errorlevel 1 goto failed
-if not exist %USRC%\CSMWRAP.TAG goto early_done
+if not exist %USRC%\CSMWRAP.TAG goto early_setver
 copy %USRC%\W1CONFIG.CSM C:\USOSW3\W3CONFIG.SYS /y >nul
 if errorlevel 1 goto failed
 copy %USRC%\W1AUTO.CSM C:\USOSW3\W3AUTO.BAT /y >nul
 if errorlevel 1 goto failed
 if exist C:\USOSW3\W3INI.BAS del C:\USOSW3\W3INI.BAS
+:early_setver
+rem The SETVER table of MS-DOS 6.22 lists WIN200.BIN (Windows 2.x) but not
+rem WIN100.BIN: the Windows 1.0x kernel then fails its DOS check and prints
+rem "Incorrect DOS version" plus memory garbage at every start.
+if exist C:\DOS\SETVER.EXE C:\DOS\SETVER.EXE C:\DOS WIN100.BIN 3.40 >nul
 :early_done
 rem Windows Setup needs the original DOS XMS manager after a cold restart.
 rem Under CSMWrap HIMEM picks A20 handler 3, which leaves A20 off: /M:2.

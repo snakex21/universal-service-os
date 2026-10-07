@@ -1,7 +1,9 @@
 # Windows 3.0 Setup (USOSKBC, tools/usos_keyscript.py). DOS part: C:\WINDOWS,
 # detected hardware. Windows part (graphics, no text to wait for; the keys
 # reach Windows through the 8042): no printers, no application search, no
-# documents, then Continue / OK until Setup returns to MS-DOS or restarts.
+# documents, then Continue / OK, and "Return to DOS" in the exit dialog: its
+# default button reboots, and USOS restarts once more anyway after it writes
+# the start menu (WINMENU.BAT), so a Setup reboot would be one restart too many.
 wait "Welcome to Setup."
 key enter
 wait "Setup is ready to install Windows into"
@@ -16,4 +18,4 @@ key enter
 delay 20
 key enter
 delay 20
-key enter
+key alt+d

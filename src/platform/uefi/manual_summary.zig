@@ -358,7 +358,7 @@ fn start(
         const time_zone = usos.flow.answer.msbatch.timeZoneForUi(view.languageCode());
         win9x.writeRequest(root, system.id, system.name, system.image_directory, image.name.slice(), request_answer, time_zone) catch |err| return showError(view.t(.error_preparation), err);
         view.vistaCsmwrapStatus(.loading, usos.flow.preparation_boot_progress.VistaCsmwrapStage.loading_detail, vista_csmwrap_heading);
-        @import("vista_preparation.zig").startWin9x(root) catch |err| {
+        @import("vista_preparation.zig").startWin9x(root, vista_csmwrap_heading) catch |err| {
             view.refreshFramebuffer();
             showError(view.t(.error_preparation), err);
         };

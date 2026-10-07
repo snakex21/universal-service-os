@@ -118,3 +118,50 @@ Open (parked): USB mouse in 1.0x-3.0 (their drivers probe the hardware or the
 PS/2 aux port; a D3h "write aux output buffer" relay of the SeaBIOS mouse
 packets is the analogous next step); keyboard in Windows/386 2.11 and 3.0
 enhanced mode (WIN386 / VKD virtualise the 8042).
+
+## X470 results and fixes (2026-10-08)
+
+Hardware run of build B261007-213309-DCFD9C2F (X470, no CSM):
+
+| System | Result |
+| --- | --- |
+| WfW 3.11 PL | installs and works; VGA only (no VESA yet) |
+| 3.0a | works, USB keyboard OK, no mouse (expected); one restart too many |
+| 2.03 | install completes, then hangs at the blue logo on every start |
+| 1.0x (photo: 1.04) | works, but "Incorrect DOS version" and screens of garbage after the logo |
+
+Fixes (branch feature/win-early-2):
+
+* **"Incorrect DOS version" + garbage (1.0x).** The message comes from the
+  Windows 1.0x kernel (bound into WIN100.BIN), not from WIN.COM. Its DOS check
+  walks DOS internals with version-specific offsets; on 6.22 it fails, prints
+  the message and then prints memory from a stale pointer up to the next `$`
+  (the garbage). MS-DOS 6.22's SETVER table lists WIN200.BIN 3.40 but not
+  WIN100.BIN. INSTALL.BAT now runs `SETVER C:\DOS WIN100.BIN 3.40` for the
+  early systems (the start menu already loads SETVER.EXE). QEMU: console output
+  traced through INT 29h (gdbstub): before, "Incorrect DOS version" plus about
+  3 KB of code bytes; after, nothing between USOSKBC and the MS-DOS Executive.
+* **2.03 hang at the logo (X470 only).** Not reproducible in QEMU (64 MiB and
+  2 GiB, without serial port, without i8042: 2.03 reaches the MS-DOS
+  Executive). The logo is drawn by WIN.COM; the hang is in KERNEL/USER start,
+  before the display driver. Suspect: MOUSE.DRV (Setup's "Microsoft Mouse on
+  the PS/2 port"), which on the X470 (no PS/2 mouse) takes its PS/2 path:
+  INT 15h C205/C201/... with up to 20 retries per call on error 04h, and
+  SeaBIOS (CSMWrap) answers each failed PS/2 command with 04h after its
+  timeout. The mouse cannot work under CSMWrap anyway, so W203.KEY now picks
+  "No mouse or other pointing device". Needs an X470 retest.
+* **"Windows 9x" on the preparation page.** micro_linux_ui.sh fell back to
+  "Windows 9x" until request.ini was read. The UEFI menu now adds
+  `usos.heading=<name>` (spaces as `_`) to the micro-Linux command line
+  (vista_preparation.headingOption) and the first frame shows the chosen
+  system (Windows 3.0, Windows for Workgroups 3.11, MS-DOS, ...); without the
+  token the fallback is "Windows".
+* **Windows 3.0 restarts.** The last key of W30.KEY pressed Enter in Setup's
+  exit dialog, whose default button is Reboot; after that reboot USOS writes
+  the start menu and restarts again. W30.KEY now answers Alt+D ("Return to
+  DOS"): W3START.BAT continues with WINMENU.BAT in the same session, so the
+  flow has two restarts (after MS-DOS, after the start menu) instead of three.
+
+Parked polish items: VESA for 3.x (WfW 3.11 / 3.0 / 3.1), USB mouse for
+1.0x-3.0 (D3h aux relay), keyboard in Windows/386 2.11 and 3.0 386 enhanced
+mode, PS/2 mouse driver back for 2.03 once the aux relay exists.
