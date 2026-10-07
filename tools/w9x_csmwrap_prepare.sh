@@ -86,7 +86,11 @@ usos_w9x_csmwrap_prepare() {
         # DOS family (tools/dos_csmwrap_target.sh): MS-DOS 6.22, and Windows
         # 3.x on top of the MS-DOS 6.22 ISO from Systems\DOS\MS-DOS\Images.
         ms-dos) tag=DOS setup='' ;;
-        windows-3-1|windows-3-11) tag=W3 setup='' ;;
+        windows-3-1|windows-3-11|windows-wfw-3-11) tag=W3 setup='' ;;
+        # Windows 1.0x-3.0: the same DOS path; their Setup reads drive A: only
+        # (W3START.BAT: SUBST A: C:\WINSETUP) and has no batch mode.
+        windows-1-01|windows-1-04|windows-2-03|windows-2-11-286|windows-2-11-386|windows-3-0)
+            tag=W3 setup='' win_early=$system ;;
         # Windows NT 4.0 (tools/nt4_csmwrap_target.sh + nt4_qemu_install.sh):
         # the whole install in the VM, then the finished SP6a system starts.
         windows-nt-4) tag=NT4 setup='' ;;
@@ -287,7 +291,7 @@ usos_w9x_csmwrap_prepare() {
     if [ -n "$nt4" ]; then
         set -- env TARGET_DEVICE="$TARGET_DEVICE" NT4_SOURCE_ISO="/mnt/data/$iso" NT4_ANSWER_SIF="$answer_inf"             NT4_ANSWER_KIND="$answer_kind" NT4_SP_EXE="$sp_exe" sh /usr/lib/usos/nt4_csmwrap_target.sh
     elif [ -n "$dos_iso" ]; then
-        set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="$dos_iso" DOS_WIN3_ISO="$win3_iso" \
+        set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="$dos_iso" DOS_WIN3_ISO="$win3_iso" DOS_WIN_EARLY="${win_early:-}" \
             DOS_PROGRAMS_DIR=/mnt/data/Systems/DOS/MS-DOS/Programs sh /usr/lib/usos/dos_csmwrap_target.sh
     else
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="/mnt/data/$iso" W9X_SETUP_FOLDER="$setup" W9X_TAG="$tag" \

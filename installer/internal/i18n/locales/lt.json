@@ -1164,6 +1164,7 @@
   "boot.summary.w9x_csmwrap": "Be CSM (eksperimentinis): USOS paruošia FAT32 diegimo diską su CSMWrap; diegimas paleidžiamas iš jo",
   "boot.summary.nt4_csmwrap": "Be CSM (eksperimentinis): visas diegimas vyksta virtualioje mašinoje šiame kompiuteryje; paruošta sistema po to paleidžiama per CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: naudokite PS/2 klaviatūrą (USB įvestis dar neveikia); ekranas 640x480; reikia SP6I386.EXE (Service Pack 6a) aplanke Systems\\Windows\\Windows NT 4.0\\ServicePack skaidinyje DATA.",
+  "boot.summary.win_early_limits": "Windows 1.0x-3.0: į originalios Setup programos klausimus atsakykite klaviatūra (ten veikia ir USB klaviatūra); Setup pasirinkite VGA (1.0x – EGA) ir IBM PS/2 pelę. Pačiose šiose Windows versijose naudokite PS/2 klaviatūrą (USB klaviatūros tilto dar nėra). Reikia MS-DOS 6.22.iso aplanke Systems\\DOS\\MS-DOS\\Images skaidinyje DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentinė): nėra NT 5.0 AHCI/NVMe/USB 3 tvarkyklės (SATA IDE režimu), daugiausia 4 GB RAM ir 2 procesoriai",
 

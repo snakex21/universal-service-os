@@ -609,6 +609,7 @@ pub const Key = enum(u16) {
     summary_w2k_limits,
     summary_w9x_csmwrap,
     summary_w9x_disk,
+    summary_win_early_limits,
     summary_xp_csmwrap,
     summary_xp_disk,
     summary_xp_preparation,
@@ -1292,6 +1293,7 @@ pub const hashes = [_]u32{
     0xf657c7a8, // summary.w2k_limits
     0xb1cdcd1f, // summary.w9x_csmwrap
     0xdb6f9367, // summary.w9x_disk
+    0x7dcf30c0, // summary.win_early_limits
     0xac5a69f9, // summary.xp_csmwrap
     0xe262ce65, // summary.xp_disk
     0xedd282b9, // summary.xp_preparation
@@ -1700,6 +1702,7 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
     false,
     false,
     false,
@@ -2660,6 +2663,7 @@ pub const english = [_][]const u8{
     "Windows 2000 (experimental): no AHCI/NVMe/USB 3 driver for NT 5.0 (SATA in IDE mode), max. 4 GB RAM and 2 CPUs",
     "Without CSM (experimental): USOS prepares the disk and CSMWrap; the installation then starts from it",
     "Selected and confirmed in the next graphical screen; the whole disk is erased",
+    "Windows 1.0x-3.0: answer the questions of the original Setup with the keyboard (a USB keyboard works there); in Setup pick VGA (EGA for 1.0x) and the IBM PS/2 mouse. Inside these Windows versions use a PS/2 keyboard (no USB keyboard bridge yet). Needs MS-DOS 6.22.iso in Systems\\DOS\\MS-DOS\\Images on DATA.",
     "XP without CSM (experimental): CSMWrap, card with a legacy VBIOS, 1 core reserved",
     "Selected and confirmed in the next graphical screen",
     "UEFI; installed XP requires firmware CSM and MBR",

@@ -1161,6 +1161,7 @@
   "boot.summary.w9x_csmwrap": "Sin CSM (experimental): USOS prepara un disco FAT32 con el instalador y CSMWrap; luego el instalador arranca desde él",
   "boot.summary.nt4_csmwrap": "Sin CSM (experimental): toda la instalación se ejecuta en una máquina virtual en este equipo; después el sistema terminado arranca mediante CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: use un teclado PS/2 (aún sin entrada USB); pantalla 640x480; necesita SP6I386.EXE (Service Pack 6a) en Systems\\Windows\\Windows NT 4.0\\ServicePack en DATA.",
+  "boot.summary.win_early_limits": "Windows 1.0x-3.0: responda a las preguntas del Setup original con el teclado (allí funciona también un teclado USB); en el Setup elija VGA (EGA para 1.0x) y el ratón IBM PS/2. Dentro de estas versiones de Windows use un teclado PS/2 (aún no hay puente para teclado USB). Requiere MS-DOS 6.22.iso en Systems\\DOS\\MS-DOS\\Images en DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimental): sin controlador AHCI/NVMe/USB 3 para NT 5.0 (SATA en modo IDE), máx. 4 GB de RAM y 2 CPU",
 

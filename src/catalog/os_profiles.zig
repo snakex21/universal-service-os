@@ -270,7 +270,10 @@ const auto_iso_memdisk = &[_]BootMethod{ .automatic, .direct_iso, .memdisk };
 /// so it leaves them out of its image (Core size budget); the order of
 /// `profiles` is unchanged on every other target.
 /// The DOS-family CSMWrap preparation from UEFI (micro-Linux step 620).
-const dos_family_ids = &[_][]const u8{ "windows-98-se", "windows-98", "windows-me", "windows-95", "ms-dos", "windows-3-1", "windows-3-11" };
+const dos_family_ids = &[_][]const u8{ "windows-98-se", "windows-98", "windows-me", "windows-95", "ms-dos", "windows-3-1", "windows-3-11" } ++ windows_early_ids;
+/// Windows for Workgroups 3.11 and Windows 1.0x-3.0: UEFI only (the BIOS
+/// Core does not carry them; src/catalog/windows_legacy.zig).
+pub const windows_early_ids = &[_][]const u8{ "windows-wfw-3-11", "windows-3-0", "windows-2-11-386", "windows-2-11-286", "windows-2-03", "windows-1-04", "windows-1-01" };
 
 const nt4_ids = &[_][]const u8{ "windows-nt-4", "windows-nt-4-server" };
 

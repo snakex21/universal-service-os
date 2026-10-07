@@ -160,6 +160,14 @@ pub fn show(
             notes[note_count] = view.t(.summary_nt4_limits);
             note_count += 1;
         }
+        // Windows 1.0x-3.0 (not WfW 3.11, which has the 3.1 batch Setup).
+        for (usos.catalog.os_profiles.windows_early_ids[1..]) |id| {
+            if (std.mem.eql(u8, system.id, id)) {
+                notes[note_count] = view.t(.summary_win_early_limits);
+                note_count += 1;
+                break;
+            }
+        }
     }
     if (backend == .xp_uefi_staging) {
         // No CSM: the experimental xp-x86-sp3-uefi-csmwrap preparation (CSMWrap on

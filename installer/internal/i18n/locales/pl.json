@@ -1164,6 +1164,7 @@
   "boot.summary.w9x_csmwrap": "Bez CSM (eksperymentalne): USOS przygotowuje dysk i CSMWrap; instalacja startuje potem z niego",
   "boot.summary.nt4_csmwrap": "Bez CSM (eksperymentalne): cała instalacja przebiega w maszynie wirtualnej na tym komputerze; gotowy system uruchamia się potem przez CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: użyj klawiatury PS/2 (klawiatura i mysz USB jeszcze nie działają); obraz 640x480; wymaga pliku SP6I386.EXE (Service Pack 6a) w folderze Systems\\Windows\\Windows NT 4.0\\ServicePack na partycji DATA.",
+  "boot.summary.win_early_limits": "Windows 1.0x-3.0: na pytania oryginalnego Setupu odpowiedz klawiaturą (działa tam także klawiatura USB); w Setupie wybierz VGA (EGA dla 1.0x) i mysz IBM PS/2. W samych tych Windows użyj klawiatury PS/2 (mostek klawiatury USB jeszcze nie działa). Wymaga MS-DOS 6.22.iso w Systems\\DOS\\MS-DOS\\Images na partycji DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperymentalne): brak sterownika AHCI/NVMe/USB 3 dla NT 5.0 (SATA w trybie IDE), maks. 4 GB RAM i 2 procesory",
 

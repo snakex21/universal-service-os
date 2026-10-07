@@ -1,3 +1,4 @@
+const builtin = @import("builtin");
 const BootMethod = @import("boot_method.zig").BootMethod;
 const SystemEntry = @import("system_entry.zig").SystemEntry;
 
@@ -49,9 +50,41 @@ pub const entries = [_]SystemEntry{
     win9x("windows-98-se", "Windows 98 SE"),
     win9x("windows-98", "Windows 98"),
     win9x("windows-95", "Windows 95"),
+} ++ uefiOnly(.{
+    // Windows for Workgroups 3.11: the Windows 3.1 flow (SETUP /H:USOS.SHH).
+    early("windows-wfw-3-11", "Windows for Workgroups 3.11", "Windows for Workgroups 3.11"),
+}) ++ [_]SystemEntry{
     anyFirmware(legacy("windows-3-11", "Windows 3.11", "Windows 3.11", false)),
     anyFirmware(legacy("windows-3-1", "Windows 3.1", "Windows 3.1", false)),
-};
+} ++ uefiOnly(.{
+    // Windows 1.0x-3.0 (docs/windows-early-2026-10-07.md): MS-DOS 6.22, then
+    // their original Setup from A: (SUBST to C:\WINSETUP), own start menu.
+    early("windows-3-0", "Windows 3.0", "Windows 3.0"),
+    early("windows-2-11-386", "Windows 2.11 (386)", "Windows 2.11 (386)"),
+    early("windows-2-11-286", "Windows 2.11 (286)", "Windows 2.11 (286)"),
+    early("windows-2-03", "Windows 2.03", "Windows 2.03"),
+    early("windows-1-04", "Windows 1.04", "Windows 1.04"),
+    early("windows-1-01", "Windows 1.01", "Windows 1.01"),
+});
+
+/// Only the UEFI menu's DOS-family preparation (w9x-uefi-csmwrap) stages
+/// these; the BIOS Core (freestanding, size budget) leaves them out.
+const freestanding = builtin.os.tag == .freestanding;
+
+fn uefiOnly(comptime list: anytype) [if (freestanding) 0 else list.len]SystemEntry {
+    var result: [if (freestanding) 0 else list.len]SystemEntry = undefined;
+    if (!freestanding) {
+        inline for (list, 0..) |entry, i| result[i] = entry;
+    }
+    return result;
+}
+
+/// `folder`: the DATA folder (Systems\Windows\<folder>\Images); no "/".
+fn early(comptime id: []const u8, comptime name: []const u8, comptime folder: []const u8) SystemEntry {
+    var result = legacy(id, name, folder, false);
+    result.firmware = .uefi;
+    return result;
+}
 
 fn legacy(
     comptime id: []const u8,

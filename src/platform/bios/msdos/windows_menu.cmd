@@ -1,5 +1,9 @@
 @echo off
-if not exist C:\WINDOWS\WIN.COM goto missing
+if exist C:\WINDOWS\WIN.COM goto have_win
+if exist C:\WIN386\WIN386.EXE goto have_win
+if exist C:\WINDOWS\WIN386.EXE goto have_win
+goto missing
+:have_win
 if not exist C:\USOSW3\W3CONFIG.SYS goto missing
 if not exist C:\USOSW3\W3AUTO.BAT goto missing
 if exist C:\USOSW3\MENU.TAG goto ready

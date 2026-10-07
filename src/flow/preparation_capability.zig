@@ -216,6 +216,15 @@ test "MS-DOS and Windows 3.x use the FAT16 BIOS ISO backend only" {
     try std.testing.expect(resolveForFirmware(systems.findById("freedos").?, .iso, .automatic, .bios).? != .dos_bios_iso);
 }
 
+test "Windows 1.0x-3.0 and WfW 3.11: the UEFI DOS-family preparation only" {
+    for (os_profiles.windows_early_ids) |id| {
+        const entry = systems.findById(id).?;
+        try std.testing.expectEqual(Backend.win9x_uefi, resolveForFirmware(entry, .iso, .automatic, .uefi).?);
+        try std.testing.expect(resolveForFirmware(entry, .iso, .memdisk, .uefi) == null);
+        try std.testing.expect(!entry.firmware.accepts(.bios));
+    }
+}
+
 test "standalone WIM and VHD images resolve to their native Windows boot backends" {
     try std.testing.expectEqual(BootMethod.wimboot, resolve("windows-11", .wim, .automatic).?);
     try std.testing.expectEqual(BootMethod.wimboot, resolve("windows-11", .wim, .wimboot).?);

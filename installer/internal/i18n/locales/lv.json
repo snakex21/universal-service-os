@@ -1164,6 +1164,7 @@
   "boot.summary.w9x_csmwrap": "Bez CSM (eksperimentāli): USOS sagatavo FAT32 instalēšanas disku ar CSMWrap; instalēšana tad sākas no tā",
   "boot.summary.nt4_csmwrap": "Bez CSM (eksperimentāli): visa instalēšana notiek virtuālajā mašīnā šajā datorā; gatavā sistēma pēc tam startē caur CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: izmantojiet PS/2 tastatūru (USB ievade vēl nedarbojas); displejs 640x480; vajadzīgs SP6I386.EXE (Service Pack 6a) mapē Systems\\Windows\\Windows NT 4.0\\ServicePack nodalījumā DATA.",
+  "boot.summary.win_early_limits": "Windows 1.0x-3.0: atbildiet uz oriģinālā Setup jautājumiem ar tastatūru (tur darbojas arī USB tastatūra); Setup izvēlieties VGA (1.0x — EGA) un IBM PS/2 peli. Pašās šajās Windows versijās izmantojiet PS/2 tastatūru (USB tastatūras tilta vēl nav). Nepieciešams MS-DOS 6.22.iso mapē Systems\\DOS\\MS-DOS\\Images nodalījumā DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentāls): nav AHCI/NVMe/USB 3 draivera NT 5.0 (SATA IDE režīmā), maks. 4 GB RAM un 2 procesori",
 

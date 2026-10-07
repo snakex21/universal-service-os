@@ -1161,6 +1161,7 @@
   "boot.summary.w9x_csmwrap": "Ilman CSM:ää (kokeellinen): USOS valmistelee FAT32-asennuslevyn ja CSMWrapin; asennus käynnistyy siltä",
   "boot.summary.nt4_csmwrap": "Ilman CSM:ää (kokeellinen): koko asennus tehdään virtuaalikoneessa tällä tietokoneella; valmis järjestelmä käynnistyy sitten CSMWrapin kautta",
   "boot.summary.nt4_limits": "Windows NT 4.0: käytä PS/2-näppäimistöä (USB-syöte ei vielä toimi); näyttö 640x480; tarvitsee tiedoston SP6I386.EXE (Service Pack 6a) kansioon Systems\\Windows\\Windows NT 4.0\\ServicePack DATA-osiolle.",
+  "boot.summary.win_early_limits": "Windows 1.0x-3.0: vastaa alkuperäisen Setupin kysymyksiin näppäimistöllä (siellä toimii myös USB-näppäimistö); valitse Setupissa VGA (1.0x:lle EGA) ja IBM PS/2 -hiiri. Käytä näissä Windows-versioissa PS/2-näppäimistöä (USB-näppäimistösiltaa ei vielä ole). Vaatii MS-DOS 6.22.iso -tiedoston DATA-osion kansioon Systems\\DOS\\MS-DOS\\Images.",
 
   "boot.summary.w2k_limits": "Windows 2000 (kokeellinen): ei AHCI/NVMe/USB 3 -ajuria NT 5.0:lle (SATA IDE-tilassa), enintään 4 Gt RAM ja 2 suoritinta",
 

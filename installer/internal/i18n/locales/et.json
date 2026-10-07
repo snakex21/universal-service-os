@@ -1161,6 +1161,7 @@
   "boot.summary.w9x_csmwrap": "Ilma CSM-ita (katseline): USOS valmistab ette FAT32 paigaldusketta CSMWrapiga; paigaldus käivitub sealt",
   "boot.summary.nt4_csmwrap": "Ilma CSM-ita (katseline): kogu paigaldus toimub selle arvuti virtuaalmasinas; valmis süsteem käivitub seejärel CSMWrapi kaudu",
   "boot.summary.nt4_limits": "Windows NT 4.0: kasuta PS/2 klaviatuuri (USB-sisend veel puudub); ekraan 640x480; vajab faili SP6I386.EXE (Service Pack 6a) kaustas Systems\\Windows\\Windows NT 4.0\\ServicePack kettal DATA.",
+  "boot.summary.win_early_limits": "Windows 1.0x-3.0: vasta algse Setupi küsimustele klaviatuuriga (seal töötab ka USB-klaviatuur); vali Setupis VGA (1.0x puhul EGA) ja IBM PS/2 hiir. Nendes Windowsi versioonides endis kasuta PS/2 klaviatuuri (USB-klaviatuuri silda veel pole). Vajab faili MS-DOS 6.22.iso kaustas Systems\\DOS\\MS-DOS\\Images partitsioonil DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (katseline): NT 5.0 jaoks puudub AHCI/NVMe/USB 3 draiver (SATA IDE-režiimis), kuni 4 GB RAM-i ja 2 protsessorit",
 
