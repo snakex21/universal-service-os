@@ -8,7 +8,7 @@ system	windows-vista	windows	windows	any	\Systems\Windows\Windows Vista\Images	\
 system	windows-xp	windows_legacy	windows	any	\Systems\Windows\Windows XP\Images	\Systems\Windows\Windows XP\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-xp-x64	windows_legacy	windows	any	\Systems\Windows\Windows XP x64\Images	\Systems\Windows\Windows XP x64\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-2000	windows_legacy	windows	any	\Systems\Windows\Windows 2000\Images	\Systems\Windows\Windows 2000\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
-system	windows-nt-4	windows_legacy	windows	any	\Systems\Windows\Windows NT 4.0\Images	\Systems\Windows\Windows NT 4.0\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
+system	windows-nt-4	windows_legacy	windows	any	\Systems\Windows\Windows NT 4.0\Images	\Systems\Windows\Windows NT 4.0\Unattended	.sif	WINNT.SIF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-me	windows_legacy	windows	any	\Systems\Windows\Windows Me\Images	\Systems\Windows\Windows Me\Unattended	.inf	MSBATCH.INF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-98-se	windows_legacy	windows	any	\Systems\Windows\Windows 98 SE\Images	\Systems\Windows\Windows 98 SE\Unattended	.inf	MSBATCH.INF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-98	windows_legacy	windows	any	\Systems\Windows\Windows 98\Images	\Systems\Windows\Windows 98\Unattended	.inf	MSBATCH.INF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
@@ -24,7 +24,7 @@ system	windows-server-2012	windows	windows	any	\Systems\Windows\Windows Server 2
 system	windows-server-2008-r2	windows	windows	any	\Systems\Windows\Windows Server 2008 R2\Images	\Systems\Windows\Windows Server 2008 R2\Unattended	.xml	unattend.xml	1	automatic,direct_iso,wimboot,vhdboot,direct_efi
 system	windows-server-2008	windows	windows	any	\Systems\Windows\Windows Server 2008\Images	\Systems\Windows\Windows Server 2008\Unattended	.xml	unattend.xml	1	automatic,direct_iso,wimboot,vhdboot,direct_efi,chainload
 system	windows-server-2003	windows	windows	any	\Systems\Windows\Windows Server 2003\Images	\Systems\Windows\Windows Server 2003\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
-system	windows-nt-4-server	windows_legacy	windows	any	\Systems\Windows\Windows NT 4.0 Server\Images	\Systems\Windows\Windows NT 4.0 Server\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
+system	windows-nt-4-server	windows_legacy	windows	any	\Systems\Windows\Windows NT 4.0 Server\Images	\Systems\Windows\Windows NT 4.0 Server\Unattended	.sif	WINNT.SIF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	ubuntu	linux	linux	any	\Systems\Linux\Ubuntu\Images	\Systems\Linux\Ubuntu\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,direct_efi,disk_image
 system	debian	linux	linux	any	\Systems\Linux\Debian\Images	\Systems\Linux\Debian\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,direct_efi,disk_image
 system	fedora	linux	linux	any	\Systems\Linux\Fedora\Images	\Systems\Linux\Fedora\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,direct_efi,disk_image
