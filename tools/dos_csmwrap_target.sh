@@ -170,7 +170,10 @@ if [ -n "$WIN3_ISO" ]; then
     # EARLY.TAG to C:\USOSW3; W3START.BAT runs their Setup from A: (SUBST)
     # and the start menu uses the early variants (no DOS=HIGH, SETVER).
     case "$WIN_EARLY" in
-        '') ;;
+        '')
+            # Windows 3.1 / WfW 3.11 batch Setup: the text pages of the Central
+            # European editions (W3PL; other editions never show its texts).
+            [ ! -f "$U/W3PL.KEY" ] || cp "$U/W3PL.KEY" "$U/SETUP.KEY" || fail 'cannot copy W3PL.KEY' ;;
         windows-1-01|windows-1-04|windows-2-03|windows-2-11-286|windows-2-11-386|windows-3-0)
             printf '%s\r\n' "$WIN_EARLY" > "$U/EARLY.TAG"
             # Setup answers for USOSKBC (src/platform/bios/msdos/keys).
