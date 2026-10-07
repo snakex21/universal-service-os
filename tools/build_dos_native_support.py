@@ -48,7 +48,9 @@ def build(root: Path):
                          ('prepare_files.cmd', 'PREPDOS.BAT'), ('copy_group.cmd', 'COPYDOS.BAT'),
                          ('unpack_file.cmd', 'UNPACK.BAT'),
                          ('windows_start.cmd', 'W3START.BAT'), ('windows_menu.cmd', 'WINMENU.BAT'),
-                         ('windows_config.sys', 'W3CONFIG.SYS'), ('windows_auto.cmd', 'W3AUTO.BAT')]:
+                         ('windows_config.sys', 'W3CONFIG.SYS'), ('windows_auto.cmd', 'W3AUTO.BAT'),
+                         ('windows_early_config.sys', 'W1CONFIG.SYS'), ('windows_early_auto.cmd', 'W1AUTO.BAT'),
+                         ('windows_early_setup.cmd', 'W1SETUP.BAT')]:
         text = (root / 'src/platform/bios/msdos' / source).read_text(encoding='ascii')
         # COMMAND.COM expands arguments before applying its 127-byte line
         # limit. Long FOR lists can silently lose the final loop variable.
@@ -99,6 +101,17 @@ def build_csmwrap_variants(root: Path, dos_out: Path):
     if auto.count(temp) != 1:
         raise ValueError('windows_auto.cmd: TEMP line not found once')
     (dos_out / 'W3AUTO.CSM').write_bytes(dos_text(auto.replace(temp, temp + 'C:\\DOS\\VBMOUSE.EXE\nC:\\DOS\\USOSKEY.COM\n')))
+    # Windows 1.0x-3.0 start menu (INSTALL.BAT, EARLY.TAG): the same two changes.
+    early_config = (msdos / 'windows_early_config.sys').read_text(encoding='ascii')
+    if early_config.count(himem) != 1:
+        raise ValueError('windows_early_config.sys: HIMEM line not found once')
+    (dos_out / 'W1CONFIG.CSM').write_bytes(dos_text(early_config.replace(himem, 'DEVICE=C:\\DOS\\HIMEM.SYS /TESTMEM:OFF /M:2\n')))
+    early_auto = (msdos / 'windows_early_auto.cmd').read_text(encoding='ascii')
+    if early_auto.count(temp) != 1:
+        raise ValueError('windows_early_auto.cmd: TEMP line not found once')
+    # Windows 1.0x-3.0 read the 8042 themselves: USOSKBC /R relays the USB
+    # keyboard through it (USOSKEY.DRV needs Windows 3.1).
+    (dos_out / 'W1AUTO.CSM').write_bytes(dos_text(early_auto.replace(temp, temp + 'C:\\DOS\\VBMOUSE.EXE\nC:\\DOS\\USOSKBC.COM /R\n')))
     (dos_out / 'W3INI.BAS').write_bytes(dos_text((msdos / 'windows_ini.bas').read_text(encoding='ascii')))
     (dos_out / 'USOS.SHH').write_bytes(dos_text((msdos / 'windows_setup.shh').read_text(encoding='ascii')))
     vendor = root / 'tools/vendor/vbados/0.67'
@@ -111,7 +124,7 @@ def build_csmwrap_variants(root: Path, dos_out: Path):
     shutil.copyfile(vendor / 'vbados-0.67.tar.gz', dos_out / 'VBADOS.TGZ')
     notice = (vendor / 'SOURCES.txt').read_text(encoding='ascii') + '\n' + '-' * 72 + '\n\n' + (vendor / 'COPYING').read_text(encoding='ascii')
     (dos_out / 'VBADOS.TXT').write_bytes(dos_text(notice))
-    print('[PASS] MS-DOS CSMWrap variants: W3CONFIG.CSM (HIMEM /M:2), W3AUTO.CSM, W3INI.BAS, VBADOS 0.67')
+    print('[PASS] MS-DOS CSMWrap variants: W3CONFIG.CSM / W1CONFIG.CSM (HIMEM /M:2), W3AUTO.CSM / W1AUTO.CSM, W3INI.BAS, VBADOS 0.67')
     from build_win3_usb_keyboard import build as build_usb_keyboard
     build_usb_keyboard(root, dos_out)
 

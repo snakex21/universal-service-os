@@ -30,8 +30,15 @@ var windowsProfiles = []dataProfile{
 	{"windows-98-se", "Windows 98 SE", true, false},
 	{"windows-98", "Windows 98", true, false},
 	{"windows-95", "Windows 95", true, false},
+	{"windows-wfw-3-11", "Windows for Workgroups 3.11", false, false},
 	{"windows-3-11", "Windows 3.11", false, false},
 	{"windows-3-1", "Windows 3.1", false, false},
+	{"windows-3-0", "Windows 3.0", false, false},
+	{"windows-2-11-386", "Windows 2.11 (386)", false, false},
+	{"windows-2-11-286", "Windows 2.11 (286)", false, false},
+	{"windows-2-03", "Windows 2.03", false, false},
+	{"windows-1-04", "Windows 1.04", false, false},
+	{"windows-1-01", "Windows 1.01", false, false},
 	// Windows Server (src/catalog/windows_server.zig); 2003 x86 uses the NT5
 	// staging.
 	{"windows-server-2025", "Windows Server 2025", true, true},

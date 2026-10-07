@@ -1,0 +1,22 @@
+# Windows 1.01 Setup (USOSKBC, tools/usos_keyscript.py). EGA (more than
+# 64K) display, Microsoft Mouse, no printer, C:\WINDOWS.
+wait "Setup prepares Microsoft Windows to run"
+key c
+wait "full pathname of the directory"
+key enter
+wait "To setup Microsoft Windows on a hard disk you need"
+key c
+wait "Type the number for your pointing device"
+key 2 enter
+wait "Type the number for your graphics adapter"
+key 6 enter
+wait "Put the Build disk"
+key c
+wait "Put the Utilities disk"
+key c
+wait "Would you like to set up a printer"
+key n
+wait "Put the Desktop Applications disk"
+key c
+wait "Put the Microsoft Write Program"
+key c

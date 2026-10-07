@@ -1164,6 +1164,7 @@
   "boot.summary.w9x_csmwrap": "Fără CSM (experimental): USOS pregătește un disc FAT32 cu instalarea și CSMWrap; instalarea pornește apoi de pe el",
   "boot.summary.nt4_csmwrap": "Fără CSM (experimental): întreaga instalare rulează într-o mașină virtuală pe acest PC; sistemul finalizat pornește apoi prin CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: folosiți o tastatură PS/2 (încă fără intrare USB); afișaj 640x480; necesită SP6I386.EXE (Service Pack 6a) în Systems\\Windows\\Windows NT 4.0\\ServicePack pe DATA.",
+  "boot.summary.win_early_limits": "Windows 1.0x-3.0: răspundeți la întrebările Setup-ului original cu tastatura (acolo funcționează și o tastatură USB); în Setup alegeți VGA (EGA pentru 1.0x) și mouse-ul IBM PS/2. În aceste versiuni de Windows folosiți o tastatură PS/2 (încă fără punte pentru tastatura USB). Necesită MS-DOS 6.22.iso în Systems\\DOS\\MS-DOS\\Images pe DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimental): fără driver AHCI/NVMe/USB 3 pentru NT 5.0 (SATA în mod IDE), max. 4 GB RAM și 2 procesoare",
 

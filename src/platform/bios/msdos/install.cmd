@@ -47,6 +47,10 @@ copy %USRC%\VBADOS.TXT C:\DOS /y >nul
 if errorlevel 1 goto failed
 copy %USRC%\USOSKEY.COM C:\DOS /y >nul
 if errorlevel 1 goto failed
+if not exist %USRC%\USOSKBC.COM goto kbc_done
+copy %USRC%\USOSKBC.COM C:\DOS /y >nul
+if errorlevel 1 goto failed
+:kbc_done
 echo C:\DOS\VBMOUSE.EXE>>C:\AUTOEXEC.BAT
 echo C:\DOS\USOSKEY.COM>>C:\AUTOEXEC.BAT
 :csm_dos_done
@@ -72,6 +76,11 @@ if errorlevel 1 goto failed
 del C:\WINSETUP\SETUP.NEW
 :inf_done
 md C:\USOSW3
+rem Setup answers for USOSKBC (dos_csmwrap_target.sh picks the script).
+if not exist %USRC%\SETUP.KEY goto setup_key_done
+copy %USRC%\SETUP.KEY C:\USOSW3 /y >nul
+if errorlevel 1 goto failed
+:setup_key_done
 copy %USRC%\W3START.BAT C:\USOSW3 /y >nul
 if errorlevel 1 goto failed
 copy %USRC%\WINMENU.BAT C:\USOSW3 /y >nul
@@ -95,6 +104,24 @@ if errorlevel 1 goto failed
 copy %USRC%\USOS.SHH C:\WINSETUP /y >nul
 if errorlevel 1 goto failed
 :csm_w3_done
+rem Windows 1.0x-3.0 (EARLY.TAG): Setup from A: (W3START.BAT), own start
+rem menu (no DOS=HIGH, SETVER, WIN386), no SYSTEM.INI changes.
+if not exist %USRC%\EARLY.TAG goto early_done
+copy %USRC%\EARLY.TAG C:\USOSW3 /y >nul
+if errorlevel 1 goto failed
+copy %USRC%\W1SETUP.BAT C:\USOSW3 /y >nul
+if errorlevel 1 goto failed
+copy %USRC%\W1CONFIG.SYS C:\USOSW3\W3CONFIG.SYS /y >nul
+if errorlevel 1 goto failed
+copy %USRC%\W1AUTO.BAT C:\USOSW3\W3AUTO.BAT /y >nul
+if errorlevel 1 goto failed
+if not exist %USRC%\CSMWRAP.TAG goto early_done
+copy %USRC%\W1CONFIG.CSM C:\USOSW3\W3CONFIG.SYS /y >nul
+if errorlevel 1 goto failed
+copy %USRC%\W1AUTO.CSM C:\USOSW3\W3AUTO.BAT /y >nul
+if errorlevel 1 goto failed
+if exist C:\USOSW3\W3INI.BAS del C:\USOSW3\W3INI.BAS
+:early_done
 rem Windows Setup needs the original DOS XMS manager after a cold restart.
 rem Under CSMWrap HIMEM picks A20 handler 3, which leaves A20 off: /M:2.
 rem (No IF with a redirection: COMMAND.COM opens the file even when false.)
@@ -104,7 +131,14 @@ goto himem_done
 :himem_csmwrap
 echo DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF /M:2>C:\CONFIG.SYS
 :himem_done
+rem Windows 2.x needs the HMA free and SETVER (WIN.COM: "Incorrect DOS
+rem version" on MS-DOS 6.22).
+if exist %USRC%\EARLY.TAG goto conf_early
 echo DOS=HIGH>>C:\CONFIG.SYS
+goto conf_common
+:conf_early
+echo DEVICE=C:\DOS\SETVER.EXE>>C:\CONFIG.SYS
+:conf_common
 echo FILES=40>>C:\CONFIG.SYS
 echo BUFFERS=20>>C:\CONFIG.SYS
 echo LASTDRIVE=Z>>C:\CONFIG.SYS

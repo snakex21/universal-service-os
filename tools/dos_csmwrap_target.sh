@@ -14,7 +14,9 @@
 #                      floppy first, so MS-DOS SYS can put its files there)
 #   \USOSDOS           INSTALL.BAT and the other EFI\USOS\dos-native\msdos
 #                      helpers, CSMWRAP.TAG, DOSFILES = the MS-DOS ISO root,
-#                      WINSETUP = the Windows 3.x ISO root, PROGRAMS (DATA),
+#                      WINSETUP = the Windows 3.x ISO root (one directory
+#                      level kept), EARLY.TAG for Windows 1.0x-3.0,
+#                      PROGRAMS (DATA),
 #                      MEMDISK and BOOT.IMG = the MS-DOS 6.22 El Torito
 #                      floppy with our AUTOEXEC.BAT / CONFIG.SYS
 #   syslinux (boot sector, LDLINUX.SYS/.C32, SYSLINUX.CFG): MEMDISK + BOOT.IMG
@@ -27,6 +29,7 @@ set -eu
 TARGET_DEVICE=${TARGET_DEVICE:?TARGET_DEVICE is required}
 DOS_ISO=${W9X_SOURCE_ISO:?W9X_SOURCE_ISO is required}
 WIN3_ISO=${DOS_WIN3_ISO:-}
+WIN_EARLY=${DOS_WIN_EARLY:-}
 PROGRAMS_DIR=${DOS_PROGRAMS_DIR:-}
 SIZE_MIB=${DOS_SIZE_MIB:-256}
 ESP_DIR=${W9X_ESP_DIR:-/mnt/esp/EFI/USOS}
@@ -149,10 +152,39 @@ log "MS-DOS files copied: $copied"
 if [ -n "$WIN3_ISO" ]; then
     mkdir -p "$U/WINSETUP"
     for file in "$work/win"/*; do
+        name=$(basename "$file" | tr '[:lower:]' '[:upper:]')
+        if [ -d "$file" ]; then
+            # One directory level (Windows 1.0x: PIF), as on its diskette.
+            mkdir -p "$U/WINSETUP/$name"
+            for sub in "$file"/*; do
+                [ -f "$sub" ] || continue
+                cp "$sub" "$U/WINSETUP/$name/$(basename "$sub" | tr '[:lower:]' '[:upper:]')" || fail "cannot copy $name/$(basename "$sub")"
+            done
+            continue
+        fi
         [ -f "$file" ] || continue
-        cp "$file" "$U/WINSETUP/$(basename "$file" | tr '[:lower:]' '[:upper:]')" || fail "cannot copy $(basename "$file")"
+        cp "$file" "$U/WINSETUP/$name" || fail "cannot copy $name"
     done
     log 'Windows 3.x Setup files copied'
+    # Windows 1.0x-3.0 (tools/w9x_csmwrap_prepare.sh): INSTALL.BAT copies
+    # EARLY.TAG to C:\USOSW3; W3START.BAT runs their Setup from A: (SUBST)
+    # and the start menu uses the early variants (no DOS=HIGH, SETVER).
+    case "$WIN_EARLY" in
+        '')
+            # Windows 3.1 / WfW 3.11 batch Setup: the text pages of the Central
+            # European editions (W3PL; other editions never show its texts).
+            [ ! -f "$U/W3PL.KEY" ] || cp "$U/W3PL.KEY" "$U/SETUP.KEY" || fail 'cannot copy W3PL.KEY' ;;
+        windows-1-01|windows-1-04|windows-2-03|windows-2-11-286|windows-2-11-386|windows-3-0)
+            printf '%s\r\n' "$WIN_EARLY" > "$U/EARLY.TAG"
+            # Setup answers for USOSKBC (src/platform/bios/msdos/keys).
+            case "$WIN_EARLY" in
+                windows-1-01) key=W101 ;; windows-1-04) key=W104 ;; windows-2-03) key=W203 ;;
+                windows-2-11-286) key=W211 ;; windows-2-11-386) key=W386 ;; *) key=W30 ;;
+            esac
+            [ ! -f "$U/$key.KEY" ] || cp "$U/$key.KEY" "$U/SETUP.KEY" || fail "cannot copy $key.KEY"
+            log "early Windows: $WIN_EARLY (Setup from A: = C:\WINSETUP)" ;;
+        *) fail "unexpected DOS_WIN_EARLY: $WIN_EARLY" ;;
+    esac
 fi
 if [ -n "$PROGRAMS_DIR" ] && [ -d "$PROGRAMS_DIR" ]; then
     cp -r "$PROGRAMS_DIR" "$U/PROGRAMS" || fail 'cannot copy the DOS programs from DATA'

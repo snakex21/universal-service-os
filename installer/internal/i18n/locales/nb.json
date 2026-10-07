@@ -1161,6 +1161,7 @@
   "boot.summary.w9x_csmwrap": "Uten CSM (eksperimentelt): USOS forbereder en FAT32-installasjonsdisk med CSMWrap; installasjonen starter så fra den",
   "boot.summary.nt4_csmwrap": "Uten CSM (eksperimentelt): hele installasjonen kjører i en virtuell maskin på denne PC-en; det ferdige systemet starter deretter via CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: bruk et PS/2-tastatur (ingen USB-inndata ennå); skjerm 640x480; krever SP6I386.EXE (Service Pack 6a) i Systems\\Windows\\Windows NT 4.0\\ServicePack på DATA.",
+  "boot.summary.win_early_limits": "Windows 1.0x-3.0: svar på spørsmålene i det opprinnelige Setup med tastaturet (der fungerer også et USB-tastatur); velg VGA (EGA for 1.0x) og IBM PS/2-musen i Setup. Bruk et PS/2-tastatur i selve disse Windows-versjonene (ingen USB-tastaturbro ennå). Krever MS-DOS 6.22.iso i Systems\\DOS\\MS-DOS\\Images på DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentelt): ingen AHCI/NVMe/USB 3-driver for NT 5.0 (SATA i IDE-modus), maks. 4 GB RAM og 2 prosessorer",
 

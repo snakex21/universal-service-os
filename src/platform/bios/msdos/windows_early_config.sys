@@ -1,0 +1,23 @@
+[menu]
+menucolor=15,1
+menuitem=WINSTD,Windows (domyslny)
+menuitem=WINREAL,Windows 3.0 - tryb standardowy (WIN /S, test)
+menuitem=DOSONLY,MS-DOS - wiersz polecen
+menudefault=WINSTD,8
+
+; Windows 1.0x-3.0: no DOS=HIGH (Windows 2.x needs the HMA), SETVER
+; (WIN.COM of 2.x: "Incorrect DOS version" on MS-DOS 6.22 without it).
+[common]
+DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF
+DEVICE=C:\DOS\SETVER.EXE
+FILES=40
+BUFFERS=20
+LASTDRIVE=Z
+SHELL=C:\COMMAND.COM C:\ /E:2048 /P
+STACKS=9,256
+
+[WINSTD]
+
+[WINREAL]
+
+[DOSONLY]

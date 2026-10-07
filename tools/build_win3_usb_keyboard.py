@@ -78,6 +78,26 @@ def build_tsr(out: Path, work: Path) -> Path:
     return com
 
 
+def build_kbc(out: Path, work: Path) -> Path:
+    """USOSKBC.COM (src/platform/bios/msdos/usoskbc.S): USB keyboard through
+    the 8042 and scripted Setup answers for Windows 1.0x-3.0."""
+    env = dict(os.environ, ZIG_GLOBAL_CACHE_DIR=str(ROOT / 'tools/cache/zig-global'))
+    zig = str(ROOT / 'tools/zig/zig.exe')
+    obj, elf, com = work / 'usoskbc.o', work / 'usoskbc.elf', out / 'USOSKBC.COM'
+    subprocess.run([zig, 'cc', '-target', 'x86-freestanding-none', '-mcpu=i386', '-c',
+                    str(ROOT / 'src/platform/bios/msdos/usoskbc.S'), '-o', str(obj)], env=env, check=True)
+    subprocess.run([zig, 'ld.lld', '-m', 'elf_i386', '-T', str(ROOT / 'src/platform/bios/msdos/com.ld'),
+                    str(obj), '-o', str(elf)], env=env, check=True)
+    subprocess.run([zig, 'objcopy', '-O', 'binary', str(elf), str(com)], env=env, check=True)
+    data = com.read_bytes()
+    if not 0 < len(data) <= 4096 or data[4:8] != b'UKBC':
+        raise ValueError('unexpected USOSKBC.COM layout')
+    sym = elf_symbols(elf)
+    if sym['scriptbuf'] - 0x100 != len(data) + (len(data) & 1) and sym['scriptbuf'] - 0x100 != len(data):
+        raise ValueError('USOSKBC.COM: the script buffer must follow the image')
+    return com
+
+
 def elf_symbols(elf: Path) -> dict:
     """Symbol name -> value from an ELF32 file (the TSR's labels)."""
     import struct
@@ -163,8 +183,11 @@ def build(root: Path = ROOT, out: Path | None = None):
     write_tsr_header(com, work / 'usoskey.elf', work)
     drv = build_driver(out, work)
     mouse = build_mouse_driver(out, work)
+    kbc = build_kbc(out, work)
+    from usos_keyscript import build_all as build_keyscripts
+    scripts = build_keyscripts(out)
     print(f'[PASS] Windows 3.x USB keyboard and mouse: {com.name} {com.stat().st_size} bytes, {drv.name} {drv.stat().st_size} bytes, '
-          f'{mouse.name} {mouse.stat().st_size} bytes '
+          f'{mouse.name} {mouse.stat().st_size} bytes, {kbc.name} {kbc.stat().st_size} bytes, {len(scripts)} key scripts '
           f'(OpenWatcom snapshot {OW_SNAPSHOT["sha256"][:12]})')
 
 

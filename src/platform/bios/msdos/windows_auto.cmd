@@ -8,6 +8,8 @@ if not exist C:\WINDOWS\WIN.COM goto missing
 C:
 cd \WINDOWS
 if "%CONFIG%"=="WIN386" goto enhanced
+rem Windows for Workgroups 3.11 runs in 386 enhanced mode only.
+if exist C:\WINSETUP\WFWSETUP.DL_ goto enhanced
 echo Windows 3.x - tryb standardowy, bez cache dysku.
 WIN.COM /S /B
 goto end

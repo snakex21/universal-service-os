@@ -1161,6 +1161,7 @@
   "boot.summary.w9x_csmwrap": "Без CSM (експериментално): USOS подготвя FAT32 диск с инсталатора и CSMWrap; инсталаторът стартира от него",
   "boot.summary.nt4_csmwrap": "Без CSM (експериментално): цялото инсталиране протича във виртуална машина на този компютър; готовата система след това стартира чрез CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: използвайте PS/2 клавиатура (все още няма USB вход); екран 640x480; нужен е SP6I386.EXE (Service Pack 6a) в Systems\\Windows\\Windows NT 4.0\\ServicePack на DATA.",
+  "boot.summary.win_early_limits": "Windows 1.0x-3.0: отговорете на въпросите на оригиналния Setup с клавиатурата (там работи и USB клавиатура); в Setup изберете VGA (EGA за 1.0x) и мишка IBM PS/2. В самите тези версии на Windows използвайте PS/2 клавиатура (все още няма мост за USB клавиатура). Изисква MS-DOS 6.22.iso в Systems\\DOS\\MS-DOS\\Images на DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (експериментално): няма драйвер AHCI/NVMe/USB 3 за NT 5.0 (SATA в режим IDE), макс. 4 GB RAM и 2 процесора",
 

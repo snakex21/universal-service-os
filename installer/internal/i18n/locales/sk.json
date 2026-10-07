@@ -1164,6 +1164,7 @@
   "boot.summary.w9x_csmwrap": "Bez CSM (experimentálne): USOS pripraví disk FAT32 s inštaláciou a CSMWrap; inštalácia sa potom spustí z neho",
   "boot.summary.nt4_csmwrap": "Bez CSM (experimentálne): celá inštalácia prebehne vo virtuálnom počítači na tomto PC; hotový systém sa potom spúšťa cez CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: použite klávesnicu PS/2 (vstup cez USB zatiaľ nefunguje); zobrazenie 640x480; vyžaduje SP6I386.EXE (Service Pack 6a) v priečinku Systems\\Windows\\Windows NT 4.0\\ServicePack na DATA.",
+  "boot.summary.win_early_limits": "Windows 1.0x-3.0: na otázky pôvodného Setupu odpovedzte klávesnicou (funguje tam aj klávesnica USB); v Setupe zvoľte VGA (EGA pre 1.0x) a myš IBM PS/2. V samotných týchto Windows použite klávesnicu PS/2 (most pre klávesnicu USB zatiaľ nie je). Vyžaduje MS-DOS 6.22.iso v Systems\\DOS\\MS-DOS\\Images na oddiele DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimentálne): chýba ovládač AHCI/NVMe/USB 3 pre NT 5.0 (SATA v režime IDE), max. 4 GB RAM a 2 procesory",
 

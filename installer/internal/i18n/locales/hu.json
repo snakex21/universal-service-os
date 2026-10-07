@@ -1161,6 +1161,7 @@
   "boot.summary.w9x_csmwrap": "CSM nélkül (kísérleti): az USOS FAT32 telepítőlemezt készít CSMWrappel; a telepítő ezután erről indul",
   "boot.summary.nt4_csmwrap": "CSM nélkül (kísérleti): a teljes telepítés ezen a számítógépen egy virtuális gépben fut; a kész rendszer ezután CSMWrapen keresztül indul",
   "boot.summary.nt4_limits": "Windows NT 4.0: használjon PS/2 billentyűzetet (USB-bevitel még nincs); kijelző 640x480; szükséges az SP6I386.EXE (Service Pack 6a) a DATA Systems\\Windows\\Windows NT 4.0\\ServicePack mappájában.",
+  "boot.summary.win_early_limits": "Windows 1.0x-3.0: az eredeti Setup kérdéseire a billentyűzettel válaszoljon (ott USB-billentyűzet is működik); a Setupban válassza a VGA-t (1.0x-nél EGA-t) és az IBM PS/2 egeret. Ezekben a Windows-verziókban PS/2 billentyűzetet használjon (USB-billentyűzethíd még nincs). Szükséges: MS-DOS 6.22.iso a DATA Systems\\DOS\\MS-DOS\\Images mappájában.",
 
   "boot.summary.w2k_limits": "Windows 2000 (kísérleti): nincs AHCI/NVMe/USB 3 illesztőprogram NT 5.0-hoz (SATA IDE módban), legfeljebb 4 GB RAM és 2 processzor",
 

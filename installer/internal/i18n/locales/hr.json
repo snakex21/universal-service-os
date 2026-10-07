@@ -1164,6 +1164,7 @@
   "boot.summary.w9x_csmwrap": "Bez CSM-a (eksperimentalno): USOS priprema FAT32 disk s instalacijom i CSMWrapom; instalacija se zatim pokreće s njega",
   "boot.summary.nt4_csmwrap": "Bez CSM-a (eksperimentalno): cijela instalacija odvija se u virtualnom stroju na ovom računalu; gotov sustav zatim se pokreće putem CSMWrapa",
   "boot.summary.nt4_limits": "Windows NT 4.0: koristite PS/2 tipkovnicu (USB unos još ne radi); prikaz 640x480; potreban je SP6I386.EXE (Service Pack 6a) u Systems\\Windows\\Windows NT 4.0\\ServicePack na DATA.",
+  "boot.summary.win_early_limits": "Windows 1.0x-3.0: na pitanja izvornog Setupa odgovorite tipkovnicom (ondje radi i USB tipkovnica); u Setupu odaberite VGA (EGA za 1.0x) i miš IBM PS/2. U samim tim verzijama Windowsa koristite PS/2 tipkovnicu (most za USB tipkovnicu još ne postoji). Potreban je MS-DOS 6.22.iso u Systems\\DOS\\MS-DOS\\Images na particiji DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentalno): nema upravljačkog programa AHCI/NVMe/USB 3 za NT 5.0 (SATA u IDE načinu), najviše 4 GB RAM-a i 2 procesora",
 

@@ -1161,6 +1161,7 @@
   "boot.summary.w9x_csmwrap": "Χωρίς CSM (πειραματικό): το USOS προετοιμάζει δίσκο FAT32 με την εγκατάσταση και CSMWrap· η εγκατάσταση εκτελείται από αυτόν",
   "boot.summary.nt4_csmwrap": "Χωρίς CSM (πειραματικό): όλη η εγκατάσταση εκτελείται σε εικονική μηχανή σε αυτόν τον υπολογιστή· το έτοιμο σύστημα ξεκινά μετά μέσω CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: χρησιμοποιήστε πληκτρολόγιο PS/2 (δεν υπάρχει ακόμη είσοδος USB)· οθόνη 640x480· απαιτείται το SP6I386.EXE (Service Pack 6a) στο Systems\\Windows\\Windows NT 4.0\\ServicePack στο DATA.",
+  "boot.summary.win_early_limits": "Windows 1.0x-3.0: απαντήστε στις ερωτήσεις του αρχικού Setup με το πληκτρολόγιο (εκεί λειτουργεί και πληκτρολόγιο USB)· στο Setup επιλέξτε VGA (EGA για 1.0x) και ποντίκι IBM PS/2. Μέσα σε αυτές τις εκδόσεις Windows χρησιμοποιήστε πληκτρολόγιο PS/2 (δεν υπάρχει ακόμη γέφυρα πληκτρολογίου USB). Απαιτεί MS-DOS 6.22.iso στο Systems\\DOS\\MS-DOS\\Images στο DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (πειραματικό): χωρίς πρόγραμμα οδήγησης AHCI/NVMe/USB 3 για NT 5.0 (SATA σε λειτουργία IDE), έως 4 GB RAM και 2 CPU",
 
