@@ -60,7 +60,15 @@ are unchanged (WORK copy).
   installed.
 * **Server 2008 R2 SP1 VL x64**: summary "Edition: SERVERSTANDARD (image
   1)", PE10 donor; Setup went straight to the disk page (no key, edition
-  or license page) and installed; see the status below for the first boot.
+  or license page) and installed; the first boot (TCG, no CSM, through the
+  Int10 dispatcher) ran "Completing installation" without stops and reached
+  the "Windows Server 2008 R2 Standard" Ctrl+Alt+Del logon screen. Logon
+  was not possible in QEMU: the harness keyboard is on xHCI and 2008 R2
+  has no xHCI driver (the summary warned: none in Drivers/x64).
+
+Kingston: build B261008-215501-31AC67DF deployed 2026-10-09 with the 2008
+R2 ISO in DATA; DATA had 6.1 GB free, so the 2012 R2 and Embedded 8.1
+ISOs (5.2 / 3.7 / 2.7 GB) were not copied.
 
 Open: the 8.1 express-settings page; the summary calls the 2008 R2 full
 installation "Desktop Experience" and the Foundation image "Other";
