@@ -55,7 +55,7 @@ After installation the stick has three partitions:
 |---|---|---|
 | USOS_ESP | FAT32, 1 GiB | USOS boot files, Secure Boot key, settings, logs, profiles, themes |
 | USOS_DATA | NTFS, the rest | your ISO images, drivers, tools |
-| USOS_WORK | NTFS, 1/4 of the stick (12 to 24 GiB) | working space for some Windows installers |
+| USOS_WORK | NTFS, 1/4 of the stick (12 to 16 GiB) | working space for some Windows installers |
 
 ---
 

@@ -17,19 +17,12 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// TestVHDXPartitionsStayUnmountedUntilFormatted runs the real GPT write,
-// format and expose steps against a temporary VHDX (never a physical disk):
-// the new DATA/WORK volumes must not get a drive letter until they are
-// formatted; afterwards only DATA has one. It needs administrator rights.
-//
-//	set USOS_VHD_INTEGRATION=1 && go test ./internal/winhost -run VHDX -v
-func TestVHDXPartitionsStayUnmountedUntilFormatted(t *testing.T) {
-	if os.Getenv("USOS_VHD_INTEGRATION") != "1" {
-		t.Skip("set USOS_VHD_INTEGRATION=1 (elevated) to run the VHDX integration test")
-	}
+// newTestVHDX creates, attaches and opens a temporary expandable VHDX and
+// refuses to continue unless the disk really is that file-backed image.
+func newTestVHDX(t *testing.T, sizeMiB int) (uint32, windows.Handle) {
+	t.Helper()
 	dir := t.TempDir()
-	image := filepath.Join(dir, "usos-hidden-mount.vhdx")
-	const sizeMiB = 40 * 1024
+	image := filepath.Join(dir, "usos-vhd-test.vhdx")
 	script := filepath.Join(dir, "create.txt")
 	if err := os.WriteFile(script, []byte(fmt.Sprintf("create vdisk file=\"%s\" maximum=%d type=expandable\r\n", image, sizeMiB)), 0o600); err != nil {
 		t.Fatal(err)
@@ -68,7 +61,51 @@ func TestVHDXPartitionsStayUnmountedUntilFormatted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer windows.CloseHandle(handle)
+	t.Cleanup(func() { windows.CloseHandle(handle) })
+
+	return diskNumber, handle
+}
+
+// driveLetters lists drive-letter mount paths of the disk's volumes, keyed
+// by the name of the partition whose start offset matches.
+func driveLetters(t *testing.T, diskNumber uint32, names map[uint64]string) map[string][]string {
+	t.Helper()
+	volumes, err := enumerateVolumes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := map[string][]string{}
+	for _, v := range volumes {
+		for _, e := range v.Extents {
+			if e.DiskNumber != diskNumber {
+				continue
+			}
+			name, ok := names[e.StartingOffset]
+			if !ok {
+				name = "?"
+			}
+			for _, p := range v.Info.MountPaths {
+				if len(p) >= 2 && p[1] == ':' {
+					found[name] = append(found[name], p)
+				}
+			}
+		}
+	}
+	return found
+}
+
+// TestVHDXPartitionsStayUnmountedUntilFormatted runs the real GPT write,
+// format and expose steps against a temporary VHDX (never a physical disk):
+// the new DATA/WORK volumes must not get a drive letter until they are
+// formatted; afterwards only DATA has one. It needs administrator rights.
+//
+//	set USOS_VHD_INTEGRATION=1 && go test ./internal/winhost -run VHDX -v
+func TestVHDXPartitionsStayUnmountedUntilFormatted(t *testing.T) {
+	if os.Getenv("USOS_VHD_INTEGRATION") != "1" {
+		t.Skip("set USOS_VHD_INTEGRATION=1 (elevated) to run the VHDX integration test")
+	}
+	const sizeMiB = 40 * 1024
+	diskNumber, handle := newTestVHDX(t, sizeMiB)
 
 	plan, err := layout.Build(uint64(sizeMiB) * 1024 * 1024)
 	if err != nil {
@@ -98,34 +135,7 @@ func TestVHDXPartitionsStayUnmountedUntilFormatted(t *testing.T) {
 	media.DiskNumber = diskNumber
 
 	letters := func() map[string][]string {
-		t.Helper()
-		volumes, err := enumerateVolumes()
-		if err != nil {
-			t.Fatal(err)
-		}
-		found := map[string][]string{}
-		for _, v := range volumes {
-			for _, e := range v.Extents {
-				if e.DiskNumber != diskNumber {
-					continue
-				}
-				name := "?"
-				switch e.StartingOffset {
-				case media.ESP.StartBytes:
-					name = "ESP"
-				case media.DATA.StartBytes:
-					name = "DATA"
-				case media.WORK.StartBytes:
-					name = "WORK"
-				}
-				for _, p := range v.Info.MountPaths {
-					if len(p) >= 2 && p[1] == ':' {
-						found[name] = append(found[name], p)
-					}
-				}
-			}
-		}
-		return found
+		return driveLetters(t, diskNumber, map[uint64]string{media.ESP.StartBytes: "ESP", media.DATA.StartBytes: "DATA", media.WORK.StartBytes: "WORK"})
 	}
 	time.Sleep(3 * time.Second) // let the mount manager see the new volumes
 	if got := letters(); len(got) != 0 {
@@ -160,4 +170,60 @@ func TestVHDXPartitionsStayUnmountedUntilFormatted(t *testing.T) {
 		t.Fatalf("final layout: %v", err)
 	}
 	t.Logf("PhysicalDrive%d: DATA=%v, WORK and ESP without letters", diskNumber, got["DATA"])
+}
+
+// TestVHDXUninstallVolumeStaysUnmountedUntilFormatted runs the real uninstall
+// GPT write, exFAT format and expose steps against a temporary VHDX: the
+// single partition must not get a drive letter until it is formatted, and
+// must have one afterwards. It needs administrator rights.
+func TestVHDXUninstallVolumeStaysUnmountedUntilFormatted(t *testing.T) {
+	if os.Getenv("USOS_VHD_INTEGRATION") != "1" {
+		t.Skip("set USOS_VHD_INTEGRATION=1 (elevated) to run the VHDX integration test")
+	}
+	diskNumber, handle := newTestVHDX(t, 34*1024)
+	restoreAutoPlay, err := autoplay.Suppress(autoplay.CurrentUser{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := restoreAutoPlay(); err != nil {
+			t.Errorf("restore AutoPlay: %v", err)
+		}
+	}()
+	media, err := createSingleDataLayout(handle, diskNumber, 512)
+	if err != nil {
+		t.Fatal(err)
+	}
+	letters := func() map[string][]string {
+		return driveLetters(t, diskNumber, map[uint64]string{media.Data.StartBytes: "DATA"})
+	}
+	time.Sleep(3 * time.Second) // let the mount manager see the new volume
+	if got := letters(); len(got) != 0 {
+		t.Fatalf("unformatted uninstall volume got a drive letter: %v", got)
+	}
+	if err := (Backend{}).FormatExFAT(media); err != nil {
+		t.Fatal(err)
+	}
+	if got := letters(); len(got) != 0 {
+		t.Fatalf("drive letter appeared during format: %v", got)
+	}
+	if err := (Backend{}).ExposeFormattedVolume(media); err != nil {
+		t.Fatal(err)
+	}
+	got := letters()
+	if len(got["DATA"]) == 0 {
+		t.Fatalf("after expose: letters=%v, want one for the exFAT volume", got)
+	}
+	after, err := readDriveLayout(handle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := verifySingleDataLayout(media, after, 0); err != nil {
+		t.Fatalf("final layout: %v", err)
+	}
+	report, err := (Backend{}).VerifyUninstall(media)
+	if err != nil {
+		t.Fatalf("VerifyUninstall: %v %+v", err, report.Items)
+	}
+	t.Logf("PhysicalDrive%d: exFAT volume at %v", diskNumber, got["DATA"])
 }

@@ -8,7 +8,13 @@ const (
 	MinimumDiskBytes = 32 * GiB
 	ESPBytes         = 1 * GiB
 	WorkMinBytes     = 12 * GiB
-	WorkMaxBytes     = 24 * GiB
+	// WORK holds one guarded copy of the selected Windows Setup ISO (BIOS
+	// Windows PE path for 7/Vista/10, 8.1/2012 R2 on BIOS, and the generic
+	// ISO chainload fallback) plus WinPE drivers; the BIOS path requires
+	// source + 256 MiB. XP/2000/NT/9x stage on the target disk, Vista/7 PE10
+	// and native Win10/11/8.1 UEFI do not use WORK. The largest supported
+	// ISO (Windows 11 25H2, 7.8 GiB via Chainload) leaves ~8 GiB headroom.
+	WorkMaxBytes     = 16 * GiB
 	AlignmentBytes   = 1 * MiB
 	HeadReserveBytes = 1 * MiB
 	TailReserveBytes = 1 * MiB
