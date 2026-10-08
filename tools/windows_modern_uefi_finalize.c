@@ -73,6 +73,28 @@ static int later(const FILETIME *t, const FILETIME *start) {
 static int attributes(const WCHAR *path, WIN32_FILE_ATTRIBUTE_DATA *d) { return GetFileAttributesExW(path, GetFileExInfoStandard, d); }
 
 /* ------------------------------------------------------------------ volumes */
+/* GPT identity of a partition of PhysicalDrive`disk` from the drive layout,
+ * by its number (`*part` != 0) or its starting offset (`*part` == 0, then
+ * set). WinPE 5.0 (8.1 / Server 2012 R2) did not report the ESP Setup had
+ * just created on the target disk through its volume (QEMU e2e
+ * 2026-10-08), so the guard found no target ESP; the layout still names it. */
+static BYTE layout_buffer[65536];
+static int layout_gpt(DWORD disk, DWORD *part, LONGLONG offset, GUID *type, GUID *id) {
+    WCHAR path[40]; copy(path, L"\\\\.\\PhysicalDrive"); append_number(path, disk);
+    HANDLE h = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+    if (h == INVALID_HANDLE_VALUE) return 0;
+    DWORD got = 0; int ok = DeviceIoControl(h, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, 0, 0, layout_buffer, sizeof(layout_buffer), &got, 0); CloseHandle(h);
+    if (!ok || got < offsetof(DRIVE_LAYOUT_INFORMATION_EX, PartitionEntry)) return 0;
+    DRIVE_LAYOUT_INFORMATION_EX *layout = (void *)layout_buffer;
+    if (layout->PartitionStyle != PARTITION_STYLE_GPT) return 0;
+    for (DWORD i = 0; i < layout->PartitionCount; i++) {
+        PARTITION_INFORMATION_EX *p = &layout->PartitionEntry[i];
+        if (p->PartitionStyle != PARTITION_STYLE_GPT || !p->PartitionNumber) continue;
+        if (*part ? p->PartitionNumber != *part : p->StartingOffset.QuadPart != offset) continue;
+        *part = p->PartitionNumber; *type = p->Gpt.PartitionType; *id = p->Gpt.PartitionId; return 1;
+    }
+    return 0;
+}
 static int volumes(void) {
     nvols = 0;
     WCHAR name[64];
@@ -87,11 +109,21 @@ static int volumes(void) {
         STORAGE_DEVICE_NUMBER number; PARTITION_INFORMATION_EX part; DWORD got = 0;
         int ok = DeviceIoControl(h, IOCTL_STORAGE_GET_DEVICE_NUMBER, 0, 0, &number, sizeof(number), &got, 0) && number.DeviceType == FILE_DEVICE_DISK;
         int gpt = ok && DeviceIoControl(h, IOCTL_DISK_GET_PARTITION_INFO_EX, 0, 0, &part, sizeof(part), &got, 0) && part.PartitionStyle == PARTITION_STYLE_GPT;
+        DWORD disk = ok ? number.DeviceNumber : 0, partition = ok ? number.PartitionNumber : 0; LONGLONG offset = 0;
+        if (!gpt) {
+            /* The volume's single extent: its disk and starting offset. */
+            VOLUME_DISK_EXTENTS extents;
+            if (DeviceIoControl(h, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, 0, 0, &extents, sizeof(extents), &got, 0) && extents.NumberOfDiskExtents == 1) {
+                if (!ok) { disk = extents.Extents[0].DiskNumber; partition = 0; ok = 1; }
+                if (disk == extents.Extents[0].DiskNumber) offset = extents.Extents[0].StartingOffset.QuadPart;
+            }
+        }
         CloseHandle(h);
         if (!ok) continue;
         Volume *v = &vols[nvols++]; zero(v, sizeof(*v));
-        copy(v->name, name); v->disk = number.DeviceNumber; v->part = number.PartitionNumber; v->gpt = gpt;
+        copy(v->name, name); v->disk = disk; v->part = partition; v->gpt = gpt;
         if (gpt) { v->type = part.Gpt.PartitionType; v->id = part.Gpt.PartitionId; }
+        else if ((partition || offset) && layout_gpt(disk, &v->part, offset, &v->type, &v->id)) v->gpt = 1;
     } while (FindNextVolumeW(find, name, 64));
     FindVolumeClose(find);
     return 1;
