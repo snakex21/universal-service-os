@@ -204,5 +204,21 @@ class Nt3MicroLinux(unittest.TestCase):
         self.assertIn('"usr/lib/usos/nt3-e820-mbr-440.bin"', text)
 
 
+class Nt3Mbr(unittest.TestCase):
+    """The NT 3.x MBR clears HPET LegacyReplacement before NTLDR (X470: no
+    clock interrupt for the 3.51 kernel otherwise, hang after the banner)."""
+
+    def test_hpet_legacy_off(self):
+        text = (ROOT / 'src/platform/bios/nt3/nt3_e820_mbr.S').read_text(encoding='utf-8')
+        for want in ('mov ebx, 0xFED00000', 'btr dword ptr fs:[ebx + 0x10], 1',
+                     '.byte 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x92, 0xCF, 0x00',
+                     '#ifdef NT3_HPET_SET_LEGACY'):
+            self.assertIn(want, text)
+        # The HPET write sits inside the cli window of the INT 15h hook install.
+        cli = text.index('    cli\n    /* FS: flat')
+        self.assertLess(cli, text.index('btr dword ptr'))
+        self.assertLess(text.index('btr dword ptr'), text.index('    mov word ptr [0x15 * 4], 4'))
+
+
 if __name__ == '__main__':
     unittest.main()

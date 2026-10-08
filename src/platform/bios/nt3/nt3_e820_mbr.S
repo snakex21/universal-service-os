@@ -18,6 +18,18 @@
  *   - the RAM entry at address 0 ends below the hook (INT 12h size).
  * Everything else is the XP geometry-fix MBR: boot the active partition and
  * correct the BPB head count from INT 13h AH=08.
+ *
+ * HPET: the X470 firmware (AMI, booted through CSMWrap) hands over with the
+ * HPET enabled in LegacyReplacement mode and timer 0 interrupts off
+ * (usosrst 1.3, Win2000: cfg 00000003, t0 00008030).  Then neither the PIT
+ * nor the HPET raises IRQ 0 (and the RTC not IRQ 8), so a pre-ACPI HAL gets
+ * no clock interrupt.  NT 4.0 and 2000 survive until usosrst clears the bit;
+ * NT 3.51 waits on the clock before the first boot driver (hang after
+ * "1 System Processor", APIC and Standard PC HAL alike).  This MBR clears
+ * LegacyReplacement (general configuration bit 1) itself, through a 4 GiB
+ * FS limit (unreal mode), when the HPET at FED00000h (the fixed AMD/Intel
+ * address) answers.  -DNT3_HPET_SET_LEGACY builds the opposite (enable +
+ * LegacyReplacement) to reproduce the X470 state in QEMU.
  */
 .intel_syntax noprefix
 .code16
@@ -26,8 +38,6 @@
 
 .equ RELOC_BASE,      0x0600
 .equ BOOT_DRIVE_SLOT, 0x04F0
-.equ HEADS_SLOT,      0x04F2
-.equ DAP_BASE,        0x0500
 .equ PART_TABLE_OFF,  446
 .equ VBR_LOAD,        0x7C00
 .equ HOOK_LEN,        (hook_end - hook_start)
@@ -66,6 +76,26 @@ relocated:
     mov eax, dword ptr [0x15 * 4]
     mov dword ptr es:[0], eax
     cli
+    /* FS: flat 4 GiB limit (unreal mode), then the HPET general config. */
+    .byte 0x0F, 0x01, 0x16                 /* lgdt [gdtr] (relocated) */
+    .word RELOC_BASE + (gdtr - nt3_e820_mbr_start)
+    mov eax, cr0
+    inc ax
+    mov cr0, eax
+    mov bx, 8
+    mov fs, bx
+    dec ax
+    mov cr0, eax
+    mov ebx, 0xFED00000
+    mov eax, dword ptr fs:[ebx]
+    inc eax
+    jz 1f
+#ifdef NT3_HPET_SET_LEGACY
+    or dword ptr fs:[ebx + 0x10], 3
+#else
+    btr dword ptr fs:[ebx + 0x10], 1
+#endif
+1:
     mov word ptr [0x15 * 4], 4
     mov word ptr [0x15 * 4 + 2], es
     sti
@@ -82,17 +112,17 @@ find_active:
     jmp boot_error
 
 active_found:
-    mov byte ptr [DAP_BASE + 0], 0x10
-    mov byte ptr [DAP_BASE + 1], 0x00
-    mov word ptr [DAP_BASE + 2], 1
-    mov word ptr [DAP_BASE + 4], VBR_LOAD
-    mov word ptr [DAP_BASE + 6], 0x0000
-    mov eax, dword ptr [si + 8]
-    mov dword ptr [DAP_BASE + 8], eax
-    mov dword ptr [DAP_BASE + 12], 0
+    /* INT 13h AH=42 packet on the stack: 1 sector of LBA [si+8] to 0:7C00. */
+    .byte 0x66, 0x6A, 0x00                 /* push dword 0 (LBA high) */
+    push dword ptr [si + 8]
+    .byte 0x6A, 0x00                       /* push word 0 (segment) */
+    .byte 0x68
+    .word VBR_LOAD                         /* push word 7C00h (offset) */
+    .byte 0x6A, 0x01                       /* push word 1 (sectors) */
+    .byte 0x6A, 0x10                       /* push word 10h (size) */
+    mov si, sp
 
     mov dl, byte ptr [BOOT_DRIVE_SLOT]
-    mov si, DAP_BASE
     mov ah, 0x42
     int 0x13
     jc boot_error
@@ -115,7 +145,6 @@ active_found:
     ja geometry_fallback
     movzx ax, dh
     inc ax
-    mov word ptr [HEADS_SLOT], ax
     mov word ptr [VBR_LOAD + 0x1A], ax
 
 geometry_fallback:
@@ -129,6 +158,14 @@ boot_error:
 1:
     hlt
     jmp 1b
+
+/* GDT for the unreal-mode FS: the base points 8 bytes before the flat data
+   descriptor, so the (never loaded) null descriptor is the code above. */
+gdtr:
+    .word 15
+    .long RELOC_BASE + (gdt_flat - nt3_e820_mbr_start) - 8
+gdt_flat:
+    .byte 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x92, 0xCF, 0x00
 
 /* Resident part, copied to (INT 12h top):0000; the old vector is at offset 0,
    the handler (new INT 15h vector) at offset 4. */
