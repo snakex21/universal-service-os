@@ -334,7 +334,12 @@ mount -t vfat -o shortname=winnt,utf8=0 "$part_loop" "$work/c" || fail 'cannot m
 
 ls_dir="$work/c/\$WIN_NT\$.~LS"
 bt_dir="$work/c/\$WIN_NT\$.~BT"
-nt4_copy_upper "$i386" "$ls_dir/I386" || fail 'cannot copy the I386 folder (local source)'
+# NT 4.0 Setup reads \$WIN_NT$.~LS\I386; NT 3.51 reads the files straight
+# from \$WIN_NT$.~LS (its DOSNET.INF d1 = \; QEMU 2026-10-08: "Setup was
+# unable to copy the file kbdclass.sys" with an I386 subfolder).
+ls_src=$ls_dir/I386
+[ -z "$nt3" ] || ls_src=$ls_dir
+nt4_copy_upper "$i386" "$ls_src" || fail 'cannot copy the I386 folder (local source)'
 nt4_copy_upper "$i386" "$bt_dir" files || fail 'cannot copy the Setup boot files'
 # Text mode runs \SystemRoot\SYSTEM32\SMSS.EXE of the boot folder (QEMU
 # 2026-10-07: STOP 0x6B, C000003A without I386\SYSTEM32 in ~BT).
@@ -353,7 +358,7 @@ if [ -n "$nt3" ] && [ ! -d "$bt_dir/SYSTEM32" ]; then
     cp "$bt_dir/USETUP.EXE" "$bt_dir/SYSTEM32/SMSS.EXE" || fail 'cannot copy USETUP.EXE as SMSS.EXE'
 fi
 [ -d "$bt_dir/SYSTEM32" ] || fail 'the ISO has no I386\SYSTEM32 (text-mode Setup)'
-log "local source: $(find "$ls_dir/I386" -type f | wc -l | tr -d ' ') files"
+log "local source: $(find "$ls_src" -type f | wc -l | tr -d ' ') files"
 cp "$work/WINNT.SIF" "$bt_dir/WINNT.SIF" || fail 'cannot copy WINNT.SIF'
 cp "$work/WINNT.SIF" "$work/c/WINNT.SIF" || fail 'cannot copy WINNT.SIF'
 cp "$setupldr" "$work/c/\$LDR\$" || fail 'cannot copy the Setup loader'
