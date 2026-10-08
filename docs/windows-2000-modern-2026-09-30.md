@@ -741,6 +741,83 @@ Windows 2000 Server: the probe now accepts Server/Advanced Server
 required for Professional. RTM media have no `usbport.sys`, so xhci98 is
 skipped there (no USB input on xHCI-only boards).
 
+## 9. Windows 2000 Server menu entry (2026-10-08)
+
+The servers section of the UEFI menu has **Windows 2000 Server**
+(`windows-2000-server`, UEFI only; the BIOS Core leaves it out). It is the
+Windows 2000 path above, unchanged: `route_as = windows-2000` (traits,
+profile `w2k-x86-sp4-uefi-csm`, icon), the same micro-Linux action
+(`windows2000-staging`) and driver set (AHCINT usos4, usosrst 1.4 with the
+RTC/HPET fixes, xhci98 usos3 polling when the CD has `usbport.sys`).
+
+| Piece | Where |
+|---|---|
+| Catalog entry, DATA folders `Systems\Windows\Windows 2000 Server\Images` / `Unattended` | `src/catalog/windows_server.zig`, installer `winhost/data_layout.go` |
+| Routing as Windows 2000 | `src/catalog/os_profiles.zig` (traits row, gated out of the BIOS Core) |
+| Answer family 2000, own key field `key.windows-2000-server` (2000 `ProductID`) | `src/flow/answer/target.zig` |
+| Kernel argument `usos.w2k_edition=server` | `src/platform/uefi/xp_preparation.zig` (`Nt5System.windows_2000_server`) |
+| DATA folder / title from that argument | `tools/nt5_profile.sh` (`USOS_W2K_EDITION=server`) |
+| Server entry refuses a Professional CD | `tools/probe_nt5_source.sh` |
+| Server answers | `tools/w2k_stage.sh` `usos_w2k_server_sif`, called by `prepare_xp_windows_partition.sh` when the copied `TXTSETUP.SIF` has ProductType 1 |
+| `C:\USOS\W2K\srvwiz.reg` | `tools/prepare_xp_ntfs_target.sh` |
+| Summary note | `boot.summary.w2k_server_limits` (all 27 languages) |
+
+Server answers (keys the answer file already sets are kept, so a `.sif`
+chosen in the menu wins):
+- `[LicenseFilePrintData] AutoMode=PerServer`, `AutoUsers=5`: the licensing
+  page.
+- `[Components]`: IIS (`iis_common`, `iis_inetmgr`, `iis_www`, `iis_ftp`,
+  `iis_smtp`, `iis_nntp`, `iis_doc`, `iis_htmla`, `iis_pwmgr`, the two
+  virtual directories) and `fp_extensions` off. 2000 Server installs IIS by
+  default; the other Server components are off by default anyway.
+- `[GuiUnattended] AutoLogon=Yes`, `AutoLogonCount=1` when the answer sets
+  the Administrator password (usos-xp.ini / profile), as on Server 2003.
+- `[GuiRunOnce] "regedit /s C:\USOS\W2K\srvwiz.reg"`: HKCU
+  `...\Setup\Welcome` `srvwiz = 0`, so "Configure Your Server" stays closed
+  for that first logon's user. 2000 has no `reg.exe`, so the Default User
+  hive is not edited; later new users still see the wizard once.
+- Workgroup and the default network components come from the usual
+  usos-xp.ini merge (`JoinWorkgroup=WORKGROUP`,
+  `InstallDefaultComponents=Yes`); no domain controller promotion.
+
+The decision follows the CD (ProductType), not the menu entry: a Server CD
+in the Professional folder gets the same answers. The Server folder needs
+its own DATA flags (`acpi-off.txt` for the X470 MPS HAL path, as in
+section 7a).
+
+**The user's media:** `Windows 2000 Server PL.iso` (434 096 128 bytes,
+SHA-256 `4F0BA26C...E5A8ED`): `CDROM_IS.5` (Server Standard),
+`TXTSETUP.SIF` ProductType 1, 5.00.2195 RTM (no service pack),
+`SETUPP.INI` Pid `52820000` (retail channel 000: **a product key is
+needed**). RTM has no `usbport.sys`, so xhci98 is skipped and **an
+xHCI-only board has no USB keyboard/mouse in Setup or afterwards**; on the
+X470 that means a PS/2 keyboard, or a Server CD with SP4 integrated
+(SP4 slipstream support is not part of this entry).
+
+**QEMU e2e (2026-10-08, OVMF without CSM -> CSMWrap, AHCI, `qemu-xhci` +
+USB keyboard/tablet only, ACPI kept, usos-xp.ini without a key; harness
+`run_csmwrap_xp_prepared.py --profile w2k-x86-sp4-uefi-csm` with
+`USOS_TEST_PROBE_EXPORTS=USOS_W2K_EDITION=server`): PASS to the desktop.**
+- Preparation: `[XP_WINDOWS] Windows 2000 Server answers: ...` and
+  `srvwiz.reg staged`; the probe took the Server CD (xhci98 skipped: RTM).
+- Text mode (AHCINT, usosrst 1.4) copied and restarted through CSMWrap;
+  GUI Setup titled "Instalator systemu Windows 2000 Server".
+- The first VM process ended by itself about 2 minutes into "Installing
+  devices" (no STOP on screen, cause not found); booting the same disk again
+  resumed GUI Setup, which then ran through: the licensing page came up
+  already set to "Na serwer", 5 connections, and went on by itself; no
+  product key page appeared with this CD; final tasks, restart, automatic
+  Administrator logon to the desktop, no "Configure Your Server" window.
+- Not shown by QEMU: USB input (the VM keeps an 8042; RTM has no xhci98),
+  hardware display modes. On the X470 this CD has no USB keyboard/mouse.
+
+## 10. Open (Windows 2000 Server)
+
+- SP4 for the Server CD (USB on xHCI-only boards): a ServicePack drop on
+  DATA with slipstream in the micro-Linux, as NT4 has for SP6a.
+- The "VM ended by itself" event of the first e2e boot.
+- X470 hardware test with `acpi-off.txt` in the Server Unattended folder.
+
 ## Sources
 
 - AHCINT: <https://github.com/ages2001/AHCINT> (tag `v1.3.0.0`, README
