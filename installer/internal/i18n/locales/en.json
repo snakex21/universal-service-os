@@ -1044,6 +1044,7 @@
   "boot.profile.value.same_locale": "Same as the formats",
   "boot.profile.value.setup_asks": "(Setup asks)",
   "boot.profile.value.edition_manual": "Type manually…",
+  "boot.profile.value.edition_server_default": "(Standard - default)",
   "boot.profile.badge_incomplete": "Incomplete",
   "boot.profile.missing.key": "No product key for {0}: Setup stops on the product key page. Edit the profile (X) and enter the key.",
   "boot.win9x_key.title": "Enter the {0} product key",

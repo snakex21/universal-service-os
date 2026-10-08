@@ -1047,6 +1047,7 @@
   "boot.profile.value.same_locale": "Jako formáty",
   "boot.profile.value.setup_asks": "(zeptá se instalace)",
   "boot.profile.value.edition_manual": "Zadat ručně…",
+  "boot.profile.value.edition_server_default": "(Standard - výchozí)",
   "boot.profile.badge_incomplete": "Neúplný",
   "boot.profile.missing.key": "Chybí kód Product Key pro {0}: instalace se zastaví na stránce kódu Product Key. Upravte profil (X) a zadejte kód.",
   "boot.win9x_key.title": "Zadejte kód Product Key pro {0}",

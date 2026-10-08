@@ -1047,6 +1047,7 @@
   "boot.profile.value.same_locale": "Ca formatele",
   "boot.profile.value.setup_asks": "(întreabă instalarea)",
   "boot.profile.value.edition_manual": "Introdu manual…",
+  "boot.profile.value.edition_server_default": "(Standard - implicit)",
   "boot.profile.badge_incomplete": "Incomplet",
   "boot.profile.missing.key": "Lipsește cheia de produs pentru {0}: instalarea se oprește la pagina cheii de produs. Editați profilul (X) și introduceți cheia.",
   "boot.win9x_key.title": "Introduceți cheia de produs pentru {0}",

@@ -1044,6 +1044,7 @@
   "boot.profile.value.same_locale": "Wie die Formate",
   "boot.profile.value.setup_asks": "(Setup fragt)",
   "boot.profile.value.edition_manual": "Manuell eingeben…",
+  "boot.profile.value.edition_server_default": "(Standard - Vorgabe)",
   "boot.profile.badge_incomplete": "Unvollständig",
   "boot.profile.missing.key": "Kein Produktschlüssel für {0}: Setup hält auf der Seite für den Produktschlüssel an. Bearbeiten Sie das Profil (X) und geben Sie den Schlüssel ein.",
   "boot.win9x_key.title": "Produktschlüssel für {0} eingeben",

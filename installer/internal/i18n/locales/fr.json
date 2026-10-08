@@ -1044,6 +1044,7 @@
   "boot.profile.value.same_locale": "Comme les formats",
   "boot.profile.value.setup_asks": "(demandé à l'installation)",
   "boot.profile.value.edition_manual": "Saisir manuellement…",
+  "boot.profile.value.edition_server_default": "(Standard - par défaut)",
   "boot.profile.badge_incomplete": "Incomplet",
   "boot.profile.missing.key": "Aucune clé de produit pour {0} : le programme d'installation s'arrête à la page de la clé de produit. Modifiez le profil (X) et saisissez la clé.",
   "boot.win9x_key.title": "Saisissez la clé de produit de {0}",

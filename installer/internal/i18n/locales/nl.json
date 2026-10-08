@@ -1044,6 +1044,7 @@
   "boot.profile.value.same_locale": "Zelfde als de notaties",
   "boot.profile.value.setup_asks": "(Setup vraagt)",
   "boot.profile.value.edition_manual": "Handmatig invoeren…",
+  "boot.profile.value.edition_server_default": "(Standard - standaard)",
   "boot.profile.badge_incomplete": "Onvolledig",
   "boot.profile.missing.key": "Geen productcode voor {0}: Setup stopt op de pagina voor de productcode. Bewerk het profiel (X) en voer de code in.",
   "boot.win9x_key.title": "Voer de productcode voor {0} in",

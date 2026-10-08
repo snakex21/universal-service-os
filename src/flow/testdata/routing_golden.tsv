@@ -2,6 +2,7 @@
 system	windows-11	windows	windows	any	\Systems\Windows\Windows 11\Images	\Systems\Windows\Windows 11\Unattended	.xml	unattend.xml	0	automatic,direct_iso,wimboot,vhdboot,direct_efi,chainload
 system	windows-10	windows	windows	any	\Systems\Windows\Windows 10\Images	\Systems\Windows\Windows 10\Unattended	.xml	unattend.xml	0	automatic,direct_iso,wimboot,vhdboot,direct_efi,chainload
 system	windows-8-1	windows	windows	any	\Systems\Windows\Windows 8.1\Images	\Systems\Windows\Windows 8.1\Unattended	.xml	unattend.xml	0	automatic,direct_iso,wimboot,vhdboot,direct_efi,chainload
+system	windows-embedded-8-1-industry	windows	windows	uefi	\Systems\Windows\Windows Embedded 8.1 Industry\Images	\Systems\Windows\Windows Embedded 8.1 Industry\Unattended	.xml	unattend.xml	0	automatic,direct_iso,wimboot,vhdboot,direct_efi,chainload
 system	windows-8	windows	windows	any	\Systems\Windows\Windows 8\Images	\Systems\Windows\Windows 8\Unattended	.xml	unattend.xml	0	automatic,direct_iso,wimboot,vhdboot,direct_efi,chainload
 system	windows-7	windows	windows	any	\Systems\Windows\Windows 7\Images	\Systems\Windows\Windows 7\Unattended	.xml	unattend.xml	1	automatic,direct_iso,wimboot,vhdboot,direct_efi
 system	windows-vista	windows	windows	any	\Systems\Windows\Windows Vista\Images	\Systems\Windows\Windows Vista\Unattended	.xml	unattend.xml	1	automatic,direct_iso,wimboot,vhdboot,direct_efi,chainload
@@ -278,9 +279,9 @@ route	windows-10	efi	disk_image	uefi	-
 route	windows-10	efi	floppy_image	bios	-
 route	windows-10	efi	floppy_image	uefi	-
 route	windows-8-1	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
-route	windows-8-1	iso	automatic	uefi	chainload	chainload	uefi	validated_hardware	0
+route	windows-8-1	iso	automatic	uefi	windows_iso	direct_iso	uefi	tested_in_vm	0
 route	windows-8-1	iso	direct_iso	bios	-
-route	windows-8-1	iso	direct_iso	uefi	-
+route	windows-8-1	iso	direct_iso	uefi	windows_iso	direct_iso	uefi	tested_in_vm	0
 route	windows-8-1	iso	wimboot	bios	-
 route	windows-8-1	iso	wimboot	uefi	-
 route	windows-8-1	iso	vhdboot	bios	-
@@ -385,6 +386,114 @@ route	windows-8-1	efi	disk_image	bios	-
 route	windows-8-1	efi	disk_image	uefi	-
 route	windows-8-1	efi	floppy_image	bios	-
 route	windows-8-1	efi	floppy_image	uefi	-
+route	windows-embedded-8-1-industry	iso	automatic	bios	chainload	chainload	uefi	experimental	0
+route	windows-embedded-8-1-industry	iso	automatic	uefi	windows_iso	direct_iso	uefi	experimental	0
+route	windows-embedded-8-1-industry	iso	direct_iso	bios	-
+route	windows-embedded-8-1-industry	iso	direct_iso	uefi	windows_iso	direct_iso	uefi	experimental	0
+route	windows-embedded-8-1-industry	iso	wimboot	bios	-
+route	windows-embedded-8-1-industry	iso	wimboot	uefi	-
+route	windows-embedded-8-1-industry	iso	vhdboot	bios	-
+route	windows-embedded-8-1-industry	iso	vhdboot	uefi	-
+route	windows-embedded-8-1-industry	iso	direct_efi	bios	-
+route	windows-embedded-8-1-industry	iso	direct_efi	uefi	-
+route	windows-embedded-8-1-industry	iso	chainload	bios	chainload	chainload	uefi	experimental	0
+route	windows-embedded-8-1-industry	iso	chainload	uefi	chainload	chainload	uefi	experimental	0
+route	windows-embedded-8-1-industry	iso	memdisk	bios	-
+route	windows-embedded-8-1-industry	iso	memdisk	uefi	-
+route	windows-embedded-8-1-industry	iso	disk_image	bios	-
+route	windows-embedded-8-1-industry	iso	disk_image	uefi	-
+route	windows-embedded-8-1-industry	iso	floppy_image	bios	-
+route	windows-embedded-8-1-industry	iso	floppy_image	uefi	-
+route	windows-embedded-8-1-industry	wim	automatic	bios	wimboot	wimboot	uefi	experimental	0
+route	windows-embedded-8-1-industry	wim	automatic	uefi	wimboot	wimboot	uefi	experimental	0
+route	windows-embedded-8-1-industry	wim	direct_iso	bios	-
+route	windows-embedded-8-1-industry	wim	direct_iso	uefi	-
+route	windows-embedded-8-1-industry	wim	wimboot	bios	wimboot	wimboot	uefi	experimental	0
+route	windows-embedded-8-1-industry	wim	wimboot	uefi	wimboot	wimboot	uefi	experimental	0
+route	windows-embedded-8-1-industry	wim	vhdboot	bios	-
+route	windows-embedded-8-1-industry	wim	vhdboot	uefi	-
+route	windows-embedded-8-1-industry	wim	direct_efi	bios	-
+route	windows-embedded-8-1-industry	wim	direct_efi	uefi	-
+route	windows-embedded-8-1-industry	wim	chainload	bios	-
+route	windows-embedded-8-1-industry	wim	chainload	uefi	-
+route	windows-embedded-8-1-industry	wim	memdisk	bios	-
+route	windows-embedded-8-1-industry	wim	memdisk	uefi	-
+route	windows-embedded-8-1-industry	wim	disk_image	bios	-
+route	windows-embedded-8-1-industry	wim	disk_image	uefi	-
+route	windows-embedded-8-1-industry	wim	floppy_image	bios	-
+route	windows-embedded-8-1-industry	wim	floppy_image	uefi	-
+route	windows-embedded-8-1-industry	img	automatic	bios	-
+route	windows-embedded-8-1-industry	img	automatic	uefi	-
+route	windows-embedded-8-1-industry	img	direct_iso	bios	-
+route	windows-embedded-8-1-industry	img	direct_iso	uefi	-
+route	windows-embedded-8-1-industry	img	wimboot	bios	-
+route	windows-embedded-8-1-industry	img	wimboot	uefi	-
+route	windows-embedded-8-1-industry	img	vhdboot	bios	-
+route	windows-embedded-8-1-industry	img	vhdboot	uefi	-
+route	windows-embedded-8-1-industry	img	direct_efi	bios	-
+route	windows-embedded-8-1-industry	img	direct_efi	uefi	-
+route	windows-embedded-8-1-industry	img	chainload	bios	-
+route	windows-embedded-8-1-industry	img	chainload	uefi	-
+route	windows-embedded-8-1-industry	img	memdisk	bios	-
+route	windows-embedded-8-1-industry	img	memdisk	uefi	-
+route	windows-embedded-8-1-industry	img	disk_image	bios	-
+route	windows-embedded-8-1-industry	img	disk_image	uefi	-
+route	windows-embedded-8-1-industry	img	floppy_image	bios	-
+route	windows-embedded-8-1-industry	img	floppy_image	uefi	-
+route	windows-embedded-8-1-industry	vhd	automatic	bios	vhdboot	vhdboot	uefi	experimental	0
+route	windows-embedded-8-1-industry	vhd	automatic	uefi	vhdboot	vhdboot	uefi	experimental	0
+route	windows-embedded-8-1-industry	vhd	direct_iso	bios	-
+route	windows-embedded-8-1-industry	vhd	direct_iso	uefi	-
+route	windows-embedded-8-1-industry	vhd	wimboot	bios	-
+route	windows-embedded-8-1-industry	vhd	wimboot	uefi	-
+route	windows-embedded-8-1-industry	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	experimental	0
+route	windows-embedded-8-1-industry	vhd	vhdboot	uefi	vhdboot	vhdboot	uefi	experimental	0
+route	windows-embedded-8-1-industry	vhd	direct_efi	bios	-
+route	windows-embedded-8-1-industry	vhd	direct_efi	uefi	-
+route	windows-embedded-8-1-industry	vhd	chainload	bios	-
+route	windows-embedded-8-1-industry	vhd	chainload	uefi	-
+route	windows-embedded-8-1-industry	vhd	memdisk	bios	-
+route	windows-embedded-8-1-industry	vhd	memdisk	uefi	-
+route	windows-embedded-8-1-industry	vhd	disk_image	bios	-
+route	windows-embedded-8-1-industry	vhd	disk_image	uefi	-
+route	windows-embedded-8-1-industry	vhd	floppy_image	bios	-
+route	windows-embedded-8-1-industry	vhd	floppy_image	uefi	-
+route	windows-embedded-8-1-industry	vhdx	automatic	bios	vhdboot	vhdboot	uefi	experimental	0
+route	windows-embedded-8-1-industry	vhdx	automatic	uefi	vhdboot	vhdboot	uefi	experimental	0
+route	windows-embedded-8-1-industry	vhdx	direct_iso	bios	-
+route	windows-embedded-8-1-industry	vhdx	direct_iso	uefi	-
+route	windows-embedded-8-1-industry	vhdx	wimboot	bios	-
+route	windows-embedded-8-1-industry	vhdx	wimboot	uefi	-
+route	windows-embedded-8-1-industry	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	experimental	0
+route	windows-embedded-8-1-industry	vhdx	vhdboot	uefi	vhdboot	vhdboot	uefi	experimental	0
+route	windows-embedded-8-1-industry	vhdx	direct_efi	bios	-
+route	windows-embedded-8-1-industry	vhdx	direct_efi	uefi	-
+route	windows-embedded-8-1-industry	vhdx	chainload	bios	-
+route	windows-embedded-8-1-industry	vhdx	chainload	uefi	-
+route	windows-embedded-8-1-industry	vhdx	memdisk	bios	-
+route	windows-embedded-8-1-industry	vhdx	memdisk	uefi	-
+route	windows-embedded-8-1-industry	vhdx	disk_image	bios	-
+route	windows-embedded-8-1-industry	vhdx	disk_image	uefi	-
+route	windows-embedded-8-1-industry	vhdx	floppy_image	bios	-
+route	windows-embedded-8-1-industry	vhdx	floppy_image	uefi	-
+route	windows-embedded-8-1-industry	efi	automatic	bios	direct_efi	direct_efi	uefi	experimental	0
+route	windows-embedded-8-1-industry	efi	automatic	uefi	direct_efi	direct_efi	uefi	experimental	0
+route	windows-embedded-8-1-industry	efi	direct_iso	bios	-
+route	windows-embedded-8-1-industry	efi	direct_iso	uefi	-
+route	windows-embedded-8-1-industry	efi	wimboot	bios	-
+route	windows-embedded-8-1-industry	efi	wimboot	uefi	-
+route	windows-embedded-8-1-industry	efi	vhdboot	bios	-
+route	windows-embedded-8-1-industry	efi	vhdboot	uefi	-
+route	windows-embedded-8-1-industry	efi	direct_efi	bios	direct_efi	direct_efi	uefi	experimental	0
+route	windows-embedded-8-1-industry	efi	direct_efi	uefi	direct_efi	direct_efi	uefi	experimental	0
+route	windows-embedded-8-1-industry	efi	chainload	bios	chainload	chainload	uefi	experimental	0
+route	windows-embedded-8-1-industry	efi	chainload	uefi	chainload	chainload	uefi	experimental	0
+route	windows-embedded-8-1-industry	efi	memdisk	bios	-
+route	windows-embedded-8-1-industry	efi	memdisk	uefi	-
+route	windows-embedded-8-1-industry	efi	disk_image	bios	-
+route	windows-embedded-8-1-industry	efi	disk_image	uefi	-
+route	windows-embedded-8-1-industry	efi	floppy_image	bios	-
+route	windows-embedded-8-1-industry	efi	floppy_image	uefi	-
 route	windows-8	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
 route	windows-8	iso	automatic	uefi	chainload	chainload	uefi	validated_hardware	0
 route	windows-8	iso	direct_iso	bios	-
@@ -3194,9 +3303,9 @@ route	windows-server-2016	efi	disk_image	uefi	-
 route	windows-server-2016	efi	floppy_image	bios	-
 route	windows-server-2016	efi	floppy_image	uefi	-
 route	windows-server-2012-r2	iso	automatic	bios	chainload	chainload	uefi	experimental	0
-route	windows-server-2012-r2	iso	automatic	uefi	chainload	chainload	uefi	experimental	0
+route	windows-server-2012-r2	iso	automatic	uefi	windows_iso	direct_iso	uefi	experimental	0
 route	windows-server-2012-r2	iso	direct_iso	bios	-
-route	windows-server-2012-r2	iso	direct_iso	uefi	-
+route	windows-server-2012-r2	iso	direct_iso	uefi	windows_iso	direct_iso	uefi	experimental	0
 route	windows-server-2012-r2	iso	wimboot	bios	-
 route	windows-server-2012-r2	iso	wimboot	uefi	-
 route	windows-server-2012-r2	iso	vhdboot	bios	-
@@ -6722,9 +6831,12 @@ profile	windows-10	efi	direct_efi	-	efi-direct
 profile	windows-10	efi	chainload	bios	efi-chainload
 profile	windows-10	efi	chainload	uefi	efi-chainload
 profile	windows-10	efi	chainload	-	efi-chainload
-profile	windows-8-1	iso	automatic	bios	iso-work-chainload
-profile	windows-8-1	iso	automatic	uefi	iso-work-chainload
-profile	windows-8-1	iso	automatic	-	iso-work-chainload
+profile	windows-8-1	iso	automatic	bios	win81-bios-chainload
+profile	windows-8-1	iso	automatic	uefi	win10-11-uefi-native
+profile	windows-8-1	iso	automatic	-	win10-11-uefi-native
+profile	windows-8-1	iso	direct_iso	bios	win81-bios-other-iso
+profile	windows-8-1	iso	direct_iso	uefi	win10-11-uefi-native
+profile	windows-8-1	iso	direct_iso	-	win10-11-uefi-native
 profile	windows-8-1	iso	chainload	bios	iso-work-chainload
 profile	windows-8-1	iso	chainload	uefi	iso-work-chainload
 profile	windows-8-1	iso	chainload	-	iso-work-chainload
@@ -6755,6 +6867,42 @@ profile	windows-8-1	efi	direct_efi	-	efi-direct
 profile	windows-8-1	efi	chainload	bios	efi-chainload
 profile	windows-8-1	efi	chainload	uefi	efi-chainload
 profile	windows-8-1	efi	chainload	-	efi-chainload
+profile	windows-embedded-8-1-industry	iso	automatic	bios	win81-bios-chainload
+profile	windows-embedded-8-1-industry	iso	automatic	uefi	win10-11-uefi-native
+profile	windows-embedded-8-1-industry	iso	automatic	-	win10-11-uefi-native
+profile	windows-embedded-8-1-industry	iso	direct_iso	bios	win81-bios-other-iso
+profile	windows-embedded-8-1-industry	iso	direct_iso	uefi	win10-11-uefi-native
+profile	windows-embedded-8-1-industry	iso	direct_iso	-	win10-11-uefi-native
+profile	windows-embedded-8-1-industry	iso	chainload	bios	iso-work-chainload
+profile	windows-embedded-8-1-industry	iso	chainload	uefi	iso-work-chainload
+profile	windows-embedded-8-1-industry	iso	chainload	-	iso-work-chainload
+profile	windows-embedded-8-1-industry	wim	automatic	bios	wim-wimboot
+profile	windows-embedded-8-1-industry	wim	automatic	uefi	wim-wimboot
+profile	windows-embedded-8-1-industry	wim	automatic	-	wim-wimboot
+profile	windows-embedded-8-1-industry	wim	wimboot	bios	wim-wimboot
+profile	windows-embedded-8-1-industry	wim	wimboot	uefi	wim-wimboot
+profile	windows-embedded-8-1-industry	wim	wimboot	-	wim-wimboot
+profile	windows-embedded-8-1-industry	vhd	automatic	bios	vhd-vhdboot
+profile	windows-embedded-8-1-industry	vhd	automatic	uefi	vhd-vhdboot
+profile	windows-embedded-8-1-industry	vhd	automatic	-	vhd-vhdboot
+profile	windows-embedded-8-1-industry	vhd	vhdboot	bios	vhd-vhdboot
+profile	windows-embedded-8-1-industry	vhd	vhdboot	uefi	vhd-vhdboot
+profile	windows-embedded-8-1-industry	vhd	vhdboot	-	vhd-vhdboot
+profile	windows-embedded-8-1-industry	vhdx	automatic	bios	vhd-vhdboot
+profile	windows-embedded-8-1-industry	vhdx	automatic	uefi	vhd-vhdboot
+profile	windows-embedded-8-1-industry	vhdx	automatic	-	vhd-vhdboot
+profile	windows-embedded-8-1-industry	vhdx	vhdboot	bios	vhd-vhdboot
+profile	windows-embedded-8-1-industry	vhdx	vhdboot	uefi	vhd-vhdboot
+profile	windows-embedded-8-1-industry	vhdx	vhdboot	-	vhd-vhdboot
+profile	windows-embedded-8-1-industry	efi	automatic	bios	efi-direct
+profile	windows-embedded-8-1-industry	efi	automatic	uefi	efi-direct
+profile	windows-embedded-8-1-industry	efi	automatic	-	efi-direct
+profile	windows-embedded-8-1-industry	efi	direct_efi	bios	efi-direct
+profile	windows-embedded-8-1-industry	efi	direct_efi	uefi	efi-direct
+profile	windows-embedded-8-1-industry	efi	direct_efi	-	efi-direct
+profile	windows-embedded-8-1-industry	efi	chainload	bios	efi-chainload
+profile	windows-embedded-8-1-industry	efi	chainload	uefi	efi-chainload
+profile	windows-embedded-8-1-industry	efi	chainload	-	efi-chainload
 profile	windows-8	iso	automatic	bios	iso-work-chainload
 profile	windows-8	iso	automatic	uefi	iso-work-chainload
 profile	windows-8	iso	automatic	-	iso-work-chainload
@@ -8472,9 +8620,12 @@ profile	windows-server-2016	efi	direct_efi	-	efi-direct
 profile	windows-server-2016	efi	chainload	bios	efi-chainload
 profile	windows-server-2016	efi	chainload	uefi	efi-chainload
 profile	windows-server-2016	efi	chainload	-	efi-chainload
-profile	windows-server-2012-r2	iso	automatic	bios	iso-work-chainload
-profile	windows-server-2012-r2	iso	automatic	uefi	iso-work-chainload
-profile	windows-server-2012-r2	iso	automatic	-	iso-work-chainload
+profile	windows-server-2012-r2	iso	automatic	bios	win81-bios-chainload
+profile	windows-server-2012-r2	iso	automatic	uefi	win10-11-uefi-native
+profile	windows-server-2012-r2	iso	automatic	-	win10-11-uefi-native
+profile	windows-server-2012-r2	iso	direct_iso	bios	win81-bios-other-iso
+profile	windows-server-2012-r2	iso	direct_iso	uefi	win10-11-uefi-native
+profile	windows-server-2012-r2	iso	direct_iso	-	win10-11-uefi-native
 profile	windows-server-2012-r2	iso	chainload	bios	iso-work-chainload
 profile	windows-server-2012-r2	iso	chainload	uefi	iso-work-chainload
 profile	windows-server-2012-r2	iso	chainload	-	iso-work-chainload
@@ -9896,8 +10047,8 @@ resolve	windows-10	efi	chainload	chainload	1	ok
 resolve	windows-10	efi	memdisk	-	0	UnsupportedImage
 resolve	windows-10	efi	disk_image	-	0	UnsupportedImage
 resolve	windows-10	efi	floppy_image	-	0	UnsupportedImage
-resolve	windows-8-1	iso	automatic	chainload	1	ok
-resolve	windows-8-1	iso	direct_iso	-	0	UnsupportedMethod
+resolve	windows-8-1	iso	automatic	direct_iso	1	ok
+resolve	windows-8-1	iso	direct_iso	direct_iso	1	ok
 resolve	windows-8-1	iso	wimboot	-	0	UnsupportedMethod
 resolve	windows-8-1	iso	vhdboot	-	0	UnsupportedImage
 resolve	windows-8-1	iso	direct_efi	-	0	UnsupportedImage
@@ -9950,6 +10101,60 @@ resolve	windows-8-1	efi	chainload	chainload	1	ok
 resolve	windows-8-1	efi	memdisk	-	0	UnsupportedImage
 resolve	windows-8-1	efi	disk_image	-	0	UnsupportedImage
 resolve	windows-8-1	efi	floppy_image	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	iso	automatic	direct_iso	1	ok
+resolve	windows-embedded-8-1-industry	iso	direct_iso	direct_iso	1	ok
+resolve	windows-embedded-8-1-industry	iso	wimboot	-	0	UnsupportedMethod
+resolve	windows-embedded-8-1-industry	iso	vhdboot	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	iso	direct_efi	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	iso	chainload	chainload	1	ok
+resolve	windows-embedded-8-1-industry	iso	memdisk	-	0	UnsupportedMethod
+resolve	windows-embedded-8-1-industry	iso	disk_image	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	iso	floppy_image	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	wim	automatic	wimboot	1	ok
+resolve	windows-embedded-8-1-industry	wim	direct_iso	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	wim	wimboot	wimboot	1	ok
+resolve	windows-embedded-8-1-industry	wim	vhdboot	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	wim	direct_efi	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	wim	chainload	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	wim	memdisk	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	wim	disk_image	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	wim	floppy_image	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	img	automatic	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	img	direct_iso	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	img	wimboot	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	img	vhdboot	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	img	direct_efi	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	img	chainload	-	0	UnsupportedMethod
+resolve	windows-embedded-8-1-industry	img	memdisk	-	0	UnsupportedMethod
+resolve	windows-embedded-8-1-industry	img	disk_image	-	0	UnsupportedMethod
+resolve	windows-embedded-8-1-industry	img	floppy_image	-	0	UnsupportedMethod
+resolve	windows-embedded-8-1-industry	vhd	automatic	vhdboot	1	ok
+resolve	windows-embedded-8-1-industry	vhd	direct_iso	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	vhd	wimboot	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	vhd	vhdboot	vhdboot	1	ok
+resolve	windows-embedded-8-1-industry	vhd	direct_efi	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	vhd	chainload	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	vhd	memdisk	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	vhd	disk_image	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	vhd	floppy_image	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	vhdx	automatic	vhdboot	1	ok
+resolve	windows-embedded-8-1-industry	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	vhdx	wimboot	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	vhdx	vhdboot	vhdboot	1	ok
+resolve	windows-embedded-8-1-industry	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	vhdx	chainload	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	vhdx	memdisk	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	vhdx	disk_image	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	efi	automatic	direct_efi	1	ok
+resolve	windows-embedded-8-1-industry	efi	direct_iso	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	efi	wimboot	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	efi	vhdboot	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	efi	direct_efi	direct_efi	1	ok
+resolve	windows-embedded-8-1-industry	efi	chainload	chainload	1	ok
+resolve	windows-embedded-8-1-industry	efi	memdisk	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	efi	disk_image	-	0	UnsupportedImage
+resolve	windows-embedded-8-1-industry	efi	floppy_image	-	0	UnsupportedImage
 resolve	windows-8	iso	automatic	chainload	1	ok
 resolve	windows-8	iso	direct_iso	-	0	UnsupportedMethod
 resolve	windows-8	iso	wimboot	-	0	UnsupportedMethod
@@ -11354,8 +11559,8 @@ resolve	windows-server-2016	efi	chainload	chainload	1	ok
 resolve	windows-server-2016	efi	memdisk	-	0	UnsupportedImage
 resolve	windows-server-2016	efi	disk_image	-	0	UnsupportedImage
 resolve	windows-server-2016	efi	floppy_image	-	0	UnsupportedImage
-resolve	windows-server-2012-r2	iso	automatic	chainload	1	ok
-resolve	windows-server-2012-r2	iso	direct_iso	-	0	UnsupportedMethod
+resolve	windows-server-2012-r2	iso	automatic	direct_iso	1	ok
+resolve	windows-server-2012-r2	iso	direct_iso	direct_iso	1	ok
 resolve	windows-server-2012-r2	iso	wimboot	-	0	UnsupportedMethod
 resolve	windows-server-2012-r2	iso	vhdboot	-	0	UnsupportedImage
 resolve	windows-server-2012-r2	iso	direct_efi	-	0	UnsupportedImage
@@ -13233,8 +13438,8 @@ menu	windows-8-1	iso	bios	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM
 menu	windows-8-1	iso	bios	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
 menu	windows-8-1	iso	bios	4	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	windows-8-1	iso	bios	5	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
-menu	windows-8-1	iso	uefi	0	automatic	chainload	1	1	validated_hardware	Automatic (Chainload)		READY	-
-menu	windows-8-1	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-8-1	iso	uefi	0	automatic	windows_iso	1	1	tested_in_vm	Automatic (ISO) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	windows-8-1	iso	uefi	1	direct_iso	windows_iso	1	1	tested_in_vm	ISO [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	windows-8-1	iso	uefi	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
 menu	windows-8-1	iso	uefi	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
 menu	windows-8-1	iso	uefi	4	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
@@ -13299,6 +13504,78 @@ menu	windows-8-1	efi	uefi	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM
 menu	windows-8-1	efi	uefi	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
 menu	windows-8-1	efi	uefi	4	direct_efi	direct_efi	1	1	tested_in_vm	EFI [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	windows-8-1	efi	uefi	5	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	windows-embedded-8-1-industry	iso	bios	0	automatic	chainload	0	0	experimental	Automatic (Chainload) [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-8-1-industry	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-embedded-8-1-industry	iso	bios	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-embedded-8-1-industry	iso	bios	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
+menu	windows-embedded-8-1-industry	iso	bios	4	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-8-1-industry	iso	bios	5	chainload	chainload	0	0	experimental	Chainload [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-8-1-industry	iso	uefi	0	automatic	windows_iso	1	1	experimental	Automatic (ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-embedded-8-1-industry	iso	uefi	1	direct_iso	windows_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-embedded-8-1-industry	iso	uefi	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-embedded-8-1-industry	iso	uefi	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
+menu	windows-embedded-8-1-industry	iso	uefi	4	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	windows-embedded-8-1-industry	iso	uefi	5	chainload	chainload	1	1	experimental	Chainload [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-embedded-8-1-industry	wim	bios	0	automatic	wimboot	0	0	experimental	Automatic (WIMBoot) [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-8-1-industry	wim	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-8-1-industry	wim	bios	2	wimboot	wimboot	0	0	experimental	WIMBoot [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-8-1-industry	wim	bios	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
+menu	windows-embedded-8-1-industry	wim	bios	4	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-8-1-industry	wim	bios	5	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-embedded-8-1-industry	wim	uefi	0	automatic	wimboot	1	1	experimental	Automatic (WIMBoot) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-embedded-8-1-industry	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-8-1-industry	wim	uefi	2	wimboot	wimboot	1	1	experimental	WIMBoot [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-embedded-8-1-industry	wim	uefi	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
+menu	windows-embedded-8-1-industry	wim	uefi	4	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	windows-embedded-8-1-industry	wim	uefi	5	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-embedded-8-1-industry	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-embedded-8-1-industry	img	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-8-1-industry	img	bios	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-embedded-8-1-industry	img	bios	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
+menu	windows-embedded-8-1-industry	img	bios	4	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-8-1-industry	img	bios	5	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-embedded-8-1-industry	img	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-embedded-8-1-industry	img	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-8-1-industry	img	uefi	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-embedded-8-1-industry	img	uefi	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
+menu	windows-embedded-8-1-industry	img	uefi	4	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	windows-embedded-8-1-industry	img	uefi	5	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-embedded-8-1-industry	vhd	bios	0	automatic	vhdboot	0	0	experimental	Automatic (VHDBoot) [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-8-1-industry	vhd	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-8-1-industry	vhd	bios	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-embedded-8-1-industry	vhd	bios	3	vhdboot	vhdboot	0	0	experimental	VHDBoot [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-8-1-industry	vhd	bios	4	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-8-1-industry	vhd	bios	5	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-embedded-8-1-industry	vhd	uefi	0	automatic	vhdboot	1	1	experimental	Automatic (VHDBoot) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-embedded-8-1-industry	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-8-1-industry	vhd	uefi	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-embedded-8-1-industry	vhd	uefi	3	vhdboot	vhdboot	1	1	experimental	VHDBoot [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-embedded-8-1-industry	vhd	uefi	4	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	windows-embedded-8-1-industry	vhd	uefi	5	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-embedded-8-1-industry	vhdx	bios	0	automatic	vhdboot	0	0	experimental	Automatic (VHDBoot) [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-8-1-industry	vhdx	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-8-1-industry	vhdx	bios	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-embedded-8-1-industry	vhdx	bios	3	vhdboot	vhdboot	0	0	experimental	VHDBoot [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-8-1-industry	vhdx	bios	4	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-8-1-industry	vhdx	bios	5	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-embedded-8-1-industry	vhdx	uefi	0	automatic	vhdboot	1	1	experimental	Automatic (VHDBoot) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-embedded-8-1-industry	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-8-1-industry	vhdx	uefi	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-embedded-8-1-industry	vhdx	uefi	3	vhdboot	vhdboot	1	1	experimental	VHDBoot [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-embedded-8-1-industry	vhdx	uefi	4	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	windows-embedded-8-1-industry	vhdx	uefi	5	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-embedded-8-1-industry	efi	bios	0	automatic	direct_efi	0	0	experimental	Automatic (EFI) [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-8-1-industry	efi	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-8-1-industry	efi	bios	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-embedded-8-1-industry	efi	bios	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
+menu	windows-embedded-8-1-industry	efi	bios	4	direct_efi	direct_efi	0	0	experimental	EFI [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-8-1-industry	efi	bios	5	chainload	chainload	0	0	experimental	Chainload [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-8-1-industry	efi	uefi	0	automatic	direct_efi	1	1	experimental	Automatic (EFI) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-embedded-8-1-industry	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-8-1-industry	efi	uefi	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-embedded-8-1-industry	efi	uefi	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
+menu	windows-embedded-8-1-industry	efi	uefi	4	direct_efi	direct_efi	1	1	experimental	EFI [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-embedded-8-1-industry	efi	uefi	5	chainload	chainload	1	1	experimental	Chainload [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	windows-8	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	windows-8	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-8	iso	bios	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
@@ -15165,8 +15442,8 @@ menu	windows-server-2012-r2	iso	bios	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[r
 menu	windows-server-2012-r2	iso	bios	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
 menu	windows-server-2012-r2	iso	bios	4	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	windows-server-2012-r2	iso	bios	5	chainload	chainload	0	0	experimental	Chainload [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
-menu	windows-server-2012-r2	iso	uefi	0	automatic	chainload	1	1	experimental	Automatic (Chainload) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
-menu	windows-server-2012-r2	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-server-2012-r2	iso	uefi	0	automatic	windows_iso	1	1	experimental	Automatic (ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-server-2012-r2	iso	uefi	1	direct_iso	windows_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	windows-server-2012-r2	iso	uefi	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
 menu	windows-server-2012-r2	iso	uefi	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
 menu	windows-server-2012-r2	iso	uefi	4	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
@@ -17488,8 +17765,8 @@ help	windows-10	efi	chainload	Chainload	Transfers control to another bootloader 
 help	windows-10	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
 help	windows-10	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
 help	windows-10	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
-help	windows-8-1	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
-help	windows-8-1	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-8-1	iso	automatic	Windows ISO - WIMBoot UEFI	Starts Windows Setup directly from the ISO on DATA; nothing is copied to WORK.	Boot files go to the target disk; the USOS stick's ESP is checked and restored.
+help	windows-8-1	iso	direct_iso	Windows ISO - WIMBoot UEFI	Starts Windows Setup directly from the ISO on DATA; nothing is copied to WORK.	Boot files go to the target disk; the USOS stick's ESP is checked and restored.
 help	windows-8-1	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
 help	windows-8-1	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
 help	windows-8-1	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
@@ -17542,6 +17819,60 @@ help	windows-8-1	efi	chainload	Chainload	Transfers control to another bootloader
 help	windows-8-1	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
 help	windows-8-1	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
 help	windows-8-1	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-embedded-8-1-industry	iso	automatic	Windows ISO - WIMBoot UEFI	Starts Windows Setup directly from the ISO on DATA; nothing is copied to WORK.	Boot files go to the target disk; the USOS stick's ESP is checked and restored.
+help	windows-embedded-8-1-industry	iso	direct_iso	Windows ISO - WIMBoot UEFI	Starts Windows Setup directly from the ISO on DATA; nothing is copied to WORK.	Boot files go to the target disk; the USOS stick's ESP is checked and restored.
+help	windows-embedded-8-1-industry	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-embedded-8-1-industry	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-embedded-8-1-industry	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-embedded-8-1-industry	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-embedded-8-1-industry	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-embedded-8-1-industry	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-embedded-8-1-industry	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-embedded-8-1-industry	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-embedded-8-1-industry	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-embedded-8-1-industry	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-embedded-8-1-industry	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-embedded-8-1-industry	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-embedded-8-1-industry	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-embedded-8-1-industry	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-embedded-8-1-industry	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-embedded-8-1-industry	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-embedded-8-1-industry	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-embedded-8-1-industry	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-embedded-8-1-industry	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-embedded-8-1-industry	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-embedded-8-1-industry	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-embedded-8-1-industry	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-embedded-8-1-industry	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-embedded-8-1-industry	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-embedded-8-1-industry	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-embedded-8-1-industry	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-embedded-8-1-industry	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-embedded-8-1-industry	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-embedded-8-1-industry	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-embedded-8-1-industry	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-embedded-8-1-industry	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-embedded-8-1-industry	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-embedded-8-1-industry	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-embedded-8-1-industry	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-embedded-8-1-industry	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-embedded-8-1-industry	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-embedded-8-1-industry	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-embedded-8-1-industry	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-embedded-8-1-industry	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-embedded-8-1-industry	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-embedded-8-1-industry	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-embedded-8-1-industry	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-embedded-8-1-industry	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-embedded-8-1-industry	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-embedded-8-1-industry	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-embedded-8-1-industry	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-embedded-8-1-industry	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-embedded-8-1-industry	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-embedded-8-1-industry	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-embedded-8-1-industry	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-embedded-8-1-industry	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-embedded-8-1-industry	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
 help	windows-8	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
 help	windows-8	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
 help	windows-8	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
@@ -18946,8 +19277,8 @@ help	windows-server-2016	efi	chainload	Chainload	Transfers control to another bo
 help	windows-server-2016	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
 help	windows-server-2016	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
 help	windows-server-2016	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
-help	windows-server-2012-r2	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
-help	windows-server-2012-r2	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-server-2012-r2	iso	automatic	Windows ISO - WIMBoot UEFI	Starts Windows Setup directly from the ISO on DATA; nothing is copied to WORK.	Boot files go to the target disk; the USOS stick's ESP is checked and restored.
+help	windows-server-2012-r2	iso	direct_iso	Windows ISO - WIMBoot UEFI	Starts Windows Setup directly from the ISO on DATA; nothing is copied to WORK.	Boot files go to the target disk; the USOS stick's ESP is checked and restored.
 help	windows-server-2012-r2	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
 help	windows-server-2012-r2	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
 help	windows-server-2012-r2	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
@@ -20694,6 +21025,8 @@ profile_def	linux-live-bios	linux_live_iso	core
 profile_def	linux-iso-bios	linux_iso	core	
 profile_def	dos-fat16-bios	dos_bios_iso	core	
 profile_def	win9x-dos-bios	win9x_dos	core	
+profile_def	win81-bios-chainload	chainload	micro_linux	Starting environment|Verifying target device|Preparing workspace|Copying files|Verification and finalization
+profile_def	win81-bios-other-iso	-	none	
 profile_def	windows-pe-bios-iso	windows_bios_iso	core	
 profile_def	win7-no-chainload	-	none	
 profile_def	nt5-staging	xp_staging	core	
@@ -20881,6 +21214,13 @@ wimboot_server	windows-server-2016	modern_setup	3	drivers usos-drivers.bin user 
 wimboot_server	windows-server-2016	modern_setup	4	file usos-source.ini folder=Windows Server 2016
 wimboot_server	windows-server-2016	modern_setup	5	file usos-unattend.xml from Systems\Windows\Windows Server 2016\Unattended
 wimboot_server	windows-server-2016	modern_setup	6	boot BCD boot.sdi boot.wim
+wimboot_server	windows-server-2012-r2	modern_setup	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot_server	windows-server-2012-r2	modern_setup	1	support \EFI\USOS\windows-native\modern-support.cpio limit=8MiB
+wimboot_server	windows-server-2012-r2	modern_setup	2	flag usos-modern-uefi.flag
+wimboot_server	windows-server-2012-r2	modern_setup	3	drivers usos-drivers.bin user Drivers\Windows Server 2012 R2 (if any)
+wimboot_server	windows-server-2012-r2	modern_setup	4	file usos-source.ini folder=Windows Server 2012 R2
+wimboot_server	windows-server-2012-r2	modern_setup	5	file usos-unattend.xml from Systems\Windows\Windows Server 2012 R2\Unattended
+wimboot_server	windows-server-2012-r2	modern_setup	6	boot BCD boot.sdi boot.wim
 wimboot_server	windows-server-2008-r2	win7	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
 wimboot_server	windows-server-2008-r2	win7	1	support \EFI\USOS\windows-native\win7-support.cpio limit=64MiB
 wimboot_server	windows-server-2008-r2	win7	2	flag usos-modern-win7.flag

@@ -1044,6 +1044,7 @@
   "boot.profile.value.same_locale": "Mint a formátumok",
   "boot.profile.value.setup_asks": "(a telepítő kérdezi)",
   "boot.profile.value.edition_manual": "Kézi megadás…",
+  "boot.profile.value.edition_server_default": "(Standard - alapértelmezett)",
   "boot.profile.badge_incomplete": "Hiányos",
   "boot.profile.missing.key": "Nincs termékkulcs ehhez: {0}; a telepítő megáll a termékkulcs oldalán. Szerkessze a profilt (X), és adja meg a kulcsot.",
   "boot.win9x_key.title": "Adja meg a(z) {0} termékkulcsát",

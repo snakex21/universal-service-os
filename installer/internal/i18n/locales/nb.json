@@ -1044,6 +1044,7 @@
   "boot.profile.value.same_locale": "Samme som formatene",
   "boot.profile.value.setup_asks": "(Setup spør)",
   "boot.profile.value.edition_manual": "Skriv inn manuelt…",
+  "boot.profile.value.edition_server_default": "(Standard - standardvalg)",
   "boot.profile.badge_incomplete": "Ufullstendig",
   "boot.profile.missing.key": "Ingen produktnøkkel for {0}: Setup stopper på siden for produktnøkkelen. Rediger profilen (X) og skriv inn nøkkelen.",
   "boot.win9x_key.title": "Skriv inn produktnøkkelen for {0}",

@@ -1047,6 +1047,7 @@
   "boot.profile.value.same_locale": "Tāpat kā formāti",
   "boot.profile.value.setup_asks": "(jautās instalēšanas programma)",
   "boot.profile.value.edition_manual": "Ievadīt manuāli…",
+  "boot.profile.value.edition_server_default": "(Standard - noklusējums)",
   "boot.profile.badge_incomplete": "Nepilnīgs",
   "boot.profile.missing.key": "Nav {0} produkta atslēgas: instalēšana apstāsies produkta atslēgas lapā. Rediģējiet profilu (X) un ievadiet atslēgu.",
   "boot.win9x_key.title": "Ievadiet {0} produkta atslēgu",

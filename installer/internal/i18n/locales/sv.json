@@ -1044,6 +1044,7 @@
   "boot.profile.value.same_locale": "Samma som formaten",
   "boot.profile.value.setup_asks": "(Setup frågar)",
   "boot.profile.value.edition_manual": "Skriv in manuellt…",
+  "boot.profile.value.edition_server_default": "(Standard - standardval)",
   "boot.profile.badge_incomplete": "Ofullständig",
   "boot.profile.missing.key": "Ingen produktnyckel för {0}: Setup stannar på sidan för produktnyckeln. Redigera profilen (X) och ange nyckeln.",
   "boot.win9x_key.title": "Ange produktnyckeln för {0}",
