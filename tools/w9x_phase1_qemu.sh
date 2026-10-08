@@ -138,7 +138,8 @@ w9x_vm_key_digits() {
 }
 
 # 0 when the guest shows a graphics screen (Setup's mini-Windows runs at
-# 640x480; QEMU dumps a text-mode screen as 720x400). The dump stays in
+# 640x480; QEMU dumps a text-mode screen 720 pixels wide: 720x400, NT 3.51
+# text-mode Setup 720x396, QEMU 2026-10-08). The dump stays in
 # $W9X_VM_RUN only for its header and is deleted at once (it may show a page
 # with the digits after a rejected attempt).
 w9x_vm_graphics_screen() {
@@ -150,7 +151,7 @@ w9x_vm_graphics_screen() {
     done
     size=$(head -c 20 "$W9X_VM_RUN/mode.ppm" 2>/dev/null | tr '\n' ' ' | awk '{ print $2 "x" $3 }')
     rm -f "$W9X_VM_RUN/mode.ppm"
-    case "$size" in 720x400|x|'') return 1 ;; esac
+    case "$size" in 720x*|x|'') return 1 ;; esac
     return 0
 }
 
