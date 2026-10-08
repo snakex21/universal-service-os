@@ -198,6 +198,14 @@ nt4_vm_finish() {
             reason="$reason no Service Pack 6 in CSDVersion (high-encryption CD);"; status=1
         else reason="$reason no Service Pack 6 in CSDVersion;"; status=1; fi
     fi
+    if [ "$status" = 0 ] && [ "$sub" = NT3 ]; then
+        # nt4_csmwrap_target.sh kept AUTOCHK.EXE out of text-mode Setup.
+        if ! nt4_ci_path "$c" WINNT/SYSTEM32/AUTOCHK.EXE >/dev/null; then
+            src=$(nt4_ci_path "$c" USOS/NT3/AUTOCHK.EXE) && sys32=$(nt4_ci_path "$c" WINNT/SYSTEM32) &&
+                cp "$src" "$sys32/autochk.exe" && reason="$reason autochk.exe restored;" ||
+                { reason="$reason cannot restore autochk.exe;"; status=1; }
+        fi
+    fi
     if [ "$status" = 0 ]; then
         ini=$(nt4_ci_path "$c" BOOT.INI) || ini=$c/BOOT.INI
         chmod u+w "$ini" 2>/dev/null || true

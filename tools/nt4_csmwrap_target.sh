@@ -357,6 +357,23 @@ if [ -n "$nt3" ] && [ ! -d "$bt_dir/SYSTEM32" ]; then
     cp "$bt_dir/NTDLL.DLL" "$bt_dir/SYSTEM32/NTDLL.DLL" || fail 'cannot copy NTDLL.DLL'
     cp "$bt_dir/USETUP.EXE" "$bt_dir/SYSTEM32/SMSS.EXE" || fail 'cannot copy USETUP.EXE as SMSS.EXE'
 fi
+if [ -n "$nt3" ]; then
+    # The other renamed [FloppyFiles.x] entries: the boot-disk tag files
+    # (d1,disk1,disk101 .. disk103) Setup looks for in the boot folder.
+    dosnet=''
+    for name in DOSNET.INF dosnet.inf; do [ -f "$i386/$name" ] && dosnet="$i386/$name" && break; done
+    [ -n "$dosnet" ] || fail 'the ISO has no I386\DOSNET.INF'
+    awk '{ sub(/\r$/, "") } /^\[/ { s = (tolower($0) ~ /^\[floppyfiles\./) ; next }
+        s && $0 !~ /^[ \t]*#/ { n = split($0, a, ","); if (n >= 3) { gsub(/[ \t]/, "", a[2]); gsub(/[ \t]/, "", a[3]); print toupper(a[2]) " " toupper(a[3]) } }' "$dosnet" |
+    while read -r src dst; do
+        dst=$(printf %s "$dst" | tr '\\' /)
+        [ -f "$bt_dir/$dst" ] && continue
+        [ -f "$bt_dir/$src" ] || fail "the ISO has no I386\\$src (DOSNET.INF [FloppyFiles])"
+        mkdir -p "$(dirname "$bt_dir/$dst")" && cp "$bt_dir/$src" "$bt_dir/$dst" || fail "cannot copy $src as $dst"
+    done || exit 1
+    # winnt.exe writes \$WIN_NT$.~LS\SIZE.SIF ([Data] Size = bytes of the local source).
+    printf '[Data]\r\nSize = %s\r\n' "$(du -sk "$ls_src" | awk '{ print $1 * 1024 }')" > "$ls_src/SIZE.SIF" || fail 'cannot write SIZE.SIF'
+fi
 [ -d "$bt_dir/SYSTEM32" ] || fail 'the ISO has no I386\SYSTEM32 (text-mode Setup)'
 log "local source: $(find "$ls_src" -type f | wc -l | tr -d ' ') files"
 cp "$work/WINNT.SIF" "$bt_dir/WINNT.SIF" || fail 'cannot copy WINNT.SIF'
@@ -382,6 +399,26 @@ mkdir -p "$usos"
 for file in AHCINT.SYS USOSRST.SYS USOSUSB.SYS USOSNT3.EXE; do
     cp "$drv/$file" "$usos/$file" || fail "cannot copy $file"
 done
+# Text-mode Setup runs AUTOCHK.EXE from the local source on C: ("Checking
+# drive C:"); in the QEMU install VM that run overflows a kernel stack and
+# the VM triple-faults (2026-10-08, double fault -> STOP 0x7F 8 with the
+# HAL's display reset in V86 mode). Without AUTOCHK.EXE in the local source
+# Setup only says "Setup was unable to verify your C: drive" (ENTER, typed by
+# nt4_vm_install), and the copy of autochk.exe is taken out of TXTSETUP.SIF
+# [Files]; nt4_vm_finish puts it into SYSTEM32 from \USOS\NT3\AUTOCHK.EXE.
+ac=''
+for name in AUTOCHK.EXE; do [ -f "$ls_src/$name" ] && ac="$ls_src/$name"; done
+[ -n "$ac" ] || fail 'the ISO has no I386\AUTOCHK.EXE'
+mv "$ac" "$usos/AUTOCHK.EXE" || fail 'cannot move AUTOCHK.EXE'
+rm -f "$bt_dir/AUTOCHK.EXE"
+for sif in "$work/c/TXTSETUP.SIF" "$bt_dir/TXTSETUP.SIF" "$ls_src/TXTSETUP.SIF"; do
+    [ -f "$sif" ] || continue
+    awk -v BINMODE=3 '{ line = $0; sub(/\r$/, "", line); low = tolower(line) }
+        /^\[/ { files = (low ~ /^\[files\][ \t]*$/) }
+        files && low ~ /^autochk\.exe[ \t]*=/ { next }
+        { printf "%s\r\n", line }' "$sif" > "$work/txtsetup.sif" && cat "$work/txtsetup.sif" > "$sif" || fail 'cannot edit TXTSETUP.SIF'
+done
+grep -qi '^autochk\.exe[ 	]*=' "$work/c/TXTSETUP.SIF" && fail 'autochk.exe is still in TXTSETUP.SIF [Files]'
 [ -z "$SP_EXE" ] || log "service pack: $(basename "$SP_EXE") ignored (NT 3.51 service packs are not installed yet)"
 log 'display: VGA (640x480x16; no VESA for NT 3.51 yet)'
 printf 'answer=%s\r\nversion=%s.%s\r\n' "$ANSWER_KIND" "$major" "$minor" > "$usos/SOURCE.TXT"
