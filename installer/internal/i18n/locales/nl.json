@@ -1166,6 +1166,7 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (experimenteel): geen AHCI/NVMe/USB 3-stuurprogramma voor NT 5.0 (SATA in IDE-modus), max. 4 GB RAM en 2 CPU's",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (experimenteel): het Windows 2000-pad; beantwoordt licentie Per server (5), werkgroep, IIS uit; productcode uit het antwoordprofiel; een cd zonder SP4 heeft geen USB 2.0-stack (geen USB-toetsenbord/-muis)",
+  "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (experimenteel): het Windows XP-pad; vereist het medium op één schijf met CMPNENTS (Media Center-onderdelen); productcode uit het antwoordprofiel, anders uit de eigen WINNT.SIF van de schijf",
 
   "boot.summary.nt52_limits": "NT 5.2 (experimenteel): AHCI via GenAHCI op de StorPort van het systeem; geen NVMe/USB 3-stuurprogramma in Setup",
   "boot.summary.vista_csmwrap": "Vista zonder CSM (experimenteel): legacy-installatie (MBR) via CSMWrap, kaart met legacy-VBIOS",

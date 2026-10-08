@@ -24,6 +24,8 @@ var windowsProfiles = []dataProfile{
 	{"windows-vista", "Windows Vista", true, true},
 	{"windows-xp", "Windows XP", true, true},
 	{"windows-xp-x64", "Windows XP x64", true, true},
+	// Windows XP Media Center Edition 2005: the XP flow from UEFI.
+	{"windows-xp-mce", "Windows XP Media Center Edition 2005", true, true},
 	{"windows-2000", "Windows 2000", true, true},
 	{"windows-nt-4", "Windows NT 4.0", true, false},
 	{"windows-nt-3-51", "Windows NT 3.51", true, false},

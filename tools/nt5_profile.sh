@@ -13,6 +13,20 @@ usos_nt5_profile() {
         windows-xp)
             NT5_NAME='Windows XP'
             NT5_TITLE='WINDOWS XP'
+            # XP Media Center Edition 2005 (menu entry windows-xp-mce): the
+            # same flow from its own DATA folder; the UEFI menu adds
+            # usos.xp_edition=mce (src/platform/uefi/xp_preparation.zig).
+            if [ "${USOS_XP_EDITION:-}" != mce ]; then
+                case " $(cat /proc/cmdline 2>/dev/null) " in
+                    *' usos.xp_edition=mce '*) USOS_XP_EDITION=mce ;;
+                    *) USOS_XP_EDITION= ;;
+                esac
+            fi
+            if [ "$USOS_XP_EDITION" = mce ]; then
+                NT5_NAME='Windows XP Media Center Edition 2005'
+                NT5_TITLE='WINDOWS XP MEDIA CENTER EDITION 2005'
+            fi
+            export USOS_XP_EDITION
             NT5_INSTALL_DIR=WINDOWS
             ;;
         windows-2000)

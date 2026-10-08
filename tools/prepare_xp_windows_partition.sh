@@ -94,6 +94,19 @@ if [ "${USOS_PLAN_PROFILE:-}" = w2k-x86-sp4-uefi-csm ]; then
         printf '[XP_WINDOWS] Windows 2000 Server answers: licensing Per Server 5, IIS off, Configure Your Server off\n'
     fi
 fi
+# No key answered: the disc's own I386\WINNT.SIF key, if it has one (OEM /
+# Media Center media; tools/nt5_media_key.sh). The key is not logged.
+. "$SCRIPT_DIR/nt5_media_key.sh"
+key_field=ProductKey
+[ "$NT5_SYSTEM" != windows-2000 ] || key_field=ProductID
+if [ -n "${SOURCE_ROOT:-}" ] && ! usos_nt5_answer_has_key "$key_field" < "$work/winnt.sif" &&
+    media_sif=$(usos_nt5_media_sif_path "$SOURCE_ROOT") && media_key=$(usos_nt5_media_key "$media_sif"); then
+    mv "$work/winnt.sif" "$work/winnt.base"
+    usos_nt5_put_key "$key_field" "$media_key" < "$work/winnt.base" > "$work/winnt.sif" || fail 'cannot add the disc key to WINNT.SIF'
+    rm -f "$work/winnt.base"
+    media_key=
+    printf '[XP_WINDOWS] product key: none answered, taken from the disc'"'"'s own I386\\WINNT.SIF (not logged)\n'
+fi
 put_verified "$work/winnt.sif" WINNT.SIF
 put_verified "$work/migrate.inf" MIGRATE.INF
 sync

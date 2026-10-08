@@ -170,3 +170,14 @@ test "Windows 2000 Server: its own key field, the NT5 group, no Server password 
     try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-2000").?);
     try std.testing.expect(@import("profile.zig").knownSystemToken("windows-2000-server"));
 }
+
+test "XP Media Center Edition: its own key field in the NT5 group" {
+    var p = try profileFrom("name=A\nuser=Bob\nsystems=windows-nt5\n");
+    try std.testing.expect(appliesTo(&p, "windows-xp-mce"));
+    try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-xp-mce").?);
+    try p.setSystemKey("windows-xp-mce", "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE");
+    try std.testing.expect(missing(&p, "windows-xp-mce") == null);
+    // The Media Center key is not the Professional one.
+    try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-xp").?);
+    try std.testing.expect(@import("profile.zig").knownSystemToken("windows-xp-mce"));
+}

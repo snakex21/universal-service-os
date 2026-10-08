@@ -6,6 +6,7 @@ system	windows-8	windows	windows	any	\Systems\Windows\Windows 8\Images	\Systems\
 system	windows-7	windows	windows	any	\Systems\Windows\Windows 7\Images	\Systems\Windows\Windows 7\Unattended	.xml	unattend.xml	1	automatic,direct_iso,wimboot,vhdboot,direct_efi
 system	windows-vista	windows	windows	any	\Systems\Windows\Windows Vista\Images	\Systems\Windows\Windows Vista\Unattended	.xml	unattend.xml	1	automatic,direct_iso,wimboot,vhdboot,direct_efi,chainload
 system	windows-xp	windows_legacy	windows	any	\Systems\Windows\Windows XP\Images	\Systems\Windows\Windows XP\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
+system	windows-xp-mce	windows_legacy	windows	uefi	\Systems\Windows\Windows XP Media Center Edition 2005\Images	\Systems\Windows\Windows XP Media Center Edition 2005\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-xp-x64	windows_legacy	windows	any	\Systems\Windows\Windows XP x64\Images	\Systems\Windows\Windows XP x64\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-2000	windows_legacy	windows	any	\Systems\Windows\Windows 2000\Images	\Systems\Windows\Windows 2000\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-nt-4	windows_legacy	windows	any	\Systems\Windows\Windows NT 4.0\Images	\Systems\Windows\Windows NT 4.0\Unattended	.sif	WINNT.SIF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
@@ -816,6 +817,114 @@ route	windows-xp	efi	disk_image	bios	-
 route	windows-xp	efi	disk_image	uefi	-
 route	windows-xp	efi	floppy_image	bios	-
 route	windows-xp	efi	floppy_image	uefi	-
+route	windows-xp-mce	iso	automatic	bios	xp_staging	direct_iso	bios	experimental	0
+route	windows-xp-mce	iso	automatic	uefi	xp_uefi_staging	direct_iso	uefi	experimental	1
+route	windows-xp-mce	iso	direct_iso	bios	-
+route	windows-xp-mce	iso	direct_iso	uefi	-
+route	windows-xp-mce	iso	wimboot	bios	-
+route	windows-xp-mce	iso	wimboot	uefi	-
+route	windows-xp-mce	iso	vhdboot	bios	-
+route	windows-xp-mce	iso	vhdboot	uefi	-
+route	windows-xp-mce	iso	direct_efi	bios	-
+route	windows-xp-mce	iso	direct_efi	uefi	-
+route	windows-xp-mce	iso	chainload	bios	chainload	chainload	uefi	experimental	0
+route	windows-xp-mce	iso	chainload	uefi	-
+route	windows-xp-mce	iso	memdisk	bios	-
+route	windows-xp-mce	iso	memdisk	uefi	-
+route	windows-xp-mce	iso	disk_image	bios	-
+route	windows-xp-mce	iso	disk_image	uefi	-
+route	windows-xp-mce	iso	floppy_image	bios	-
+route	windows-xp-mce	iso	floppy_image	uefi	-
+route	windows-xp-mce	wim	automatic	bios	wimboot	wimboot	uefi	experimental	0
+route	windows-xp-mce	wim	automatic	uefi	-
+route	windows-xp-mce	wim	direct_iso	bios	-
+route	windows-xp-mce	wim	direct_iso	uefi	-
+route	windows-xp-mce	wim	wimboot	bios	wimboot	wimboot	uefi	experimental	0
+route	windows-xp-mce	wim	wimboot	uefi	-
+route	windows-xp-mce	wim	vhdboot	bios	-
+route	windows-xp-mce	wim	vhdboot	uefi	-
+route	windows-xp-mce	wim	direct_efi	bios	-
+route	windows-xp-mce	wim	direct_efi	uefi	-
+route	windows-xp-mce	wim	chainload	bios	-
+route	windows-xp-mce	wim	chainload	uefi	-
+route	windows-xp-mce	wim	memdisk	bios	-
+route	windows-xp-mce	wim	memdisk	uefi	-
+route	windows-xp-mce	wim	disk_image	bios	-
+route	windows-xp-mce	wim	disk_image	uefi	-
+route	windows-xp-mce	wim	floppy_image	bios	-
+route	windows-xp-mce	wim	floppy_image	uefi	-
+route	windows-xp-mce	img	automatic	bios	-
+route	windows-xp-mce	img	automatic	uefi	-
+route	windows-xp-mce	img	direct_iso	bios	-
+route	windows-xp-mce	img	direct_iso	uefi	-
+route	windows-xp-mce	img	wimboot	bios	-
+route	windows-xp-mce	img	wimboot	uefi	-
+route	windows-xp-mce	img	vhdboot	bios	-
+route	windows-xp-mce	img	vhdboot	uefi	-
+route	windows-xp-mce	img	direct_efi	bios	-
+route	windows-xp-mce	img	direct_efi	uefi	-
+route	windows-xp-mce	img	chainload	bios	-
+route	windows-xp-mce	img	chainload	uefi	-
+route	windows-xp-mce	img	memdisk	bios	-
+route	windows-xp-mce	img	memdisk	uefi	-
+route	windows-xp-mce	img	disk_image	bios	-
+route	windows-xp-mce	img	disk_image	uefi	-
+route	windows-xp-mce	img	floppy_image	bios	-
+route	windows-xp-mce	img	floppy_image	uefi	-
+route	windows-xp-mce	vhd	automatic	bios	vhdboot	vhdboot	uefi	experimental	0
+route	windows-xp-mce	vhd	automatic	uefi	-
+route	windows-xp-mce	vhd	direct_iso	bios	-
+route	windows-xp-mce	vhd	direct_iso	uefi	-
+route	windows-xp-mce	vhd	wimboot	bios	-
+route	windows-xp-mce	vhd	wimboot	uefi	-
+route	windows-xp-mce	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	experimental	0
+route	windows-xp-mce	vhd	vhdboot	uefi	-
+route	windows-xp-mce	vhd	direct_efi	bios	-
+route	windows-xp-mce	vhd	direct_efi	uefi	-
+route	windows-xp-mce	vhd	chainload	bios	-
+route	windows-xp-mce	vhd	chainload	uefi	-
+route	windows-xp-mce	vhd	memdisk	bios	-
+route	windows-xp-mce	vhd	memdisk	uefi	-
+route	windows-xp-mce	vhd	disk_image	bios	-
+route	windows-xp-mce	vhd	disk_image	uefi	-
+route	windows-xp-mce	vhd	floppy_image	bios	-
+route	windows-xp-mce	vhd	floppy_image	uefi	-
+route	windows-xp-mce	vhdx	automatic	bios	vhdboot	vhdboot	uefi	experimental	0
+route	windows-xp-mce	vhdx	automatic	uefi	-
+route	windows-xp-mce	vhdx	direct_iso	bios	-
+route	windows-xp-mce	vhdx	direct_iso	uefi	-
+route	windows-xp-mce	vhdx	wimboot	bios	-
+route	windows-xp-mce	vhdx	wimboot	uefi	-
+route	windows-xp-mce	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	experimental	0
+route	windows-xp-mce	vhdx	vhdboot	uefi	-
+route	windows-xp-mce	vhdx	direct_efi	bios	-
+route	windows-xp-mce	vhdx	direct_efi	uefi	-
+route	windows-xp-mce	vhdx	chainload	bios	-
+route	windows-xp-mce	vhdx	chainload	uefi	-
+route	windows-xp-mce	vhdx	memdisk	bios	-
+route	windows-xp-mce	vhdx	memdisk	uefi	-
+route	windows-xp-mce	vhdx	disk_image	bios	-
+route	windows-xp-mce	vhdx	disk_image	uefi	-
+route	windows-xp-mce	vhdx	floppy_image	bios	-
+route	windows-xp-mce	vhdx	floppy_image	uefi	-
+route	windows-xp-mce	efi	automatic	bios	direct_efi	direct_efi	uefi	experimental	0
+route	windows-xp-mce	efi	automatic	uefi	-
+route	windows-xp-mce	efi	direct_iso	bios	-
+route	windows-xp-mce	efi	direct_iso	uefi	-
+route	windows-xp-mce	efi	wimboot	bios	-
+route	windows-xp-mce	efi	wimboot	uefi	-
+route	windows-xp-mce	efi	vhdboot	bios	-
+route	windows-xp-mce	efi	vhdboot	uefi	-
+route	windows-xp-mce	efi	direct_efi	bios	direct_efi	direct_efi	uefi	experimental	0
+route	windows-xp-mce	efi	direct_efi	uefi	-
+route	windows-xp-mce	efi	chainload	bios	chainload	chainload	uefi	experimental	0
+route	windows-xp-mce	efi	chainload	uefi	-
+route	windows-xp-mce	efi	memdisk	bios	-
+route	windows-xp-mce	efi	memdisk	uefi	-
+route	windows-xp-mce	efi	disk_image	bios	-
+route	windows-xp-mce	efi	disk_image	uefi	-
+route	windows-xp-mce	efi	floppy_image	bios	-
+route	windows-xp-mce	efi	floppy_image	uefi	-
 route	windows-xp-x64	iso	automatic	bios	xp_staging	direct_iso	bios	tested_in_vm	0
 route	windows-xp-x64	iso	automatic	uefi	xp_uefi_staging	direct_iso	uefi	experimental	1
 route	windows-xp-x64	iso	direct_iso	bios	-
@@ -6839,6 +6948,82 @@ profile	windows-xp	efi	chainload	-	efi-chainload
 profile	windows-xp	efi	memdisk	uefi	xp-uefi-other
 profile	windows-xp	efi	disk_image	uefi	xp-uefi-other
 profile	windows-xp	efi	floppy_image	uefi	xp-uefi-other
+profile	windows-xp-mce	iso	automatic	bios	nt5-staging
+profile	windows-xp-mce	iso	automatic	uefi	xp-x86-sp3-uefi-csm
+profile	windows-xp-mce	iso	automatic	-	nt5-staging
+profile	windows-xp-mce	iso	direct_iso	uefi	xp-uefi-other
+profile	windows-xp-mce	iso	wimboot	uefi	xp-uefi-other
+profile	windows-xp-mce	iso	vhdboot	uefi	xp-uefi-other
+profile	windows-xp-mce	iso	direct_efi	uefi	xp-uefi-other
+profile	windows-xp-mce	iso	chainload	bios	iso-work-chainload
+profile	windows-xp-mce	iso	chainload	uefi	xp-uefi-other
+profile	windows-xp-mce	iso	chainload	-	iso-work-chainload
+profile	windows-xp-mce	iso	memdisk	uefi	xp-uefi-other
+profile	windows-xp-mce	iso	disk_image	uefi	xp-uefi-other
+profile	windows-xp-mce	iso	floppy_image	uefi	xp-uefi-other
+profile	windows-xp-mce	wim	automatic	bios	wim-wimboot
+profile	windows-xp-mce	wim	automatic	uefi	xp-uefi-other
+profile	windows-xp-mce	wim	automatic	-	wim-wimboot
+profile	windows-xp-mce	wim	direct_iso	uefi	xp-uefi-other
+profile	windows-xp-mce	wim	wimboot	bios	wim-wimboot
+profile	windows-xp-mce	wim	wimboot	uefi	xp-uefi-other
+profile	windows-xp-mce	wim	wimboot	-	wim-wimboot
+profile	windows-xp-mce	wim	vhdboot	uefi	xp-uefi-other
+profile	windows-xp-mce	wim	direct_efi	uefi	xp-uefi-other
+profile	windows-xp-mce	wim	chainload	uefi	xp-uefi-other
+profile	windows-xp-mce	wim	memdisk	uefi	xp-uefi-other
+profile	windows-xp-mce	wim	disk_image	uefi	xp-uefi-other
+profile	windows-xp-mce	wim	floppy_image	uefi	xp-uefi-other
+profile	windows-xp-mce	img	automatic	uefi	xp-uefi-other
+profile	windows-xp-mce	img	direct_iso	uefi	xp-uefi-other
+profile	windows-xp-mce	img	wimboot	uefi	xp-uefi-other
+profile	windows-xp-mce	img	vhdboot	uefi	xp-uefi-other
+profile	windows-xp-mce	img	direct_efi	uefi	xp-uefi-other
+profile	windows-xp-mce	img	chainload	uefi	xp-uefi-other
+profile	windows-xp-mce	img	memdisk	uefi	xp-uefi-other
+profile	windows-xp-mce	img	disk_image	uefi	xp-uefi-other
+profile	windows-xp-mce	img	floppy_image	uefi	xp-uefi-other
+profile	windows-xp-mce	vhd	automatic	bios	vhd-vhdboot
+profile	windows-xp-mce	vhd	automatic	uefi	xp-uefi-other
+profile	windows-xp-mce	vhd	automatic	-	vhd-vhdboot
+profile	windows-xp-mce	vhd	direct_iso	uefi	xp-uefi-other
+profile	windows-xp-mce	vhd	wimboot	uefi	xp-uefi-other
+profile	windows-xp-mce	vhd	vhdboot	bios	vhd-vhdboot
+profile	windows-xp-mce	vhd	vhdboot	uefi	xp-uefi-other
+profile	windows-xp-mce	vhd	vhdboot	-	vhd-vhdboot
+profile	windows-xp-mce	vhd	direct_efi	uefi	xp-uefi-other
+profile	windows-xp-mce	vhd	chainload	uefi	xp-uefi-other
+profile	windows-xp-mce	vhd	memdisk	uefi	xp-uefi-other
+profile	windows-xp-mce	vhd	disk_image	uefi	xp-uefi-other
+profile	windows-xp-mce	vhd	floppy_image	uefi	xp-uefi-other
+profile	windows-xp-mce	vhdx	automatic	bios	vhd-vhdboot
+profile	windows-xp-mce	vhdx	automatic	uefi	xp-uefi-other
+profile	windows-xp-mce	vhdx	automatic	-	vhd-vhdboot
+profile	windows-xp-mce	vhdx	direct_iso	uefi	xp-uefi-other
+profile	windows-xp-mce	vhdx	wimboot	uefi	xp-uefi-other
+profile	windows-xp-mce	vhdx	vhdboot	bios	vhd-vhdboot
+profile	windows-xp-mce	vhdx	vhdboot	uefi	xp-uefi-other
+profile	windows-xp-mce	vhdx	vhdboot	-	vhd-vhdboot
+profile	windows-xp-mce	vhdx	direct_efi	uefi	xp-uefi-other
+profile	windows-xp-mce	vhdx	chainload	uefi	xp-uefi-other
+profile	windows-xp-mce	vhdx	memdisk	uefi	xp-uefi-other
+profile	windows-xp-mce	vhdx	disk_image	uefi	xp-uefi-other
+profile	windows-xp-mce	vhdx	floppy_image	uefi	xp-uefi-other
+profile	windows-xp-mce	efi	automatic	bios	efi-direct
+profile	windows-xp-mce	efi	automatic	uefi	xp-uefi-other
+profile	windows-xp-mce	efi	automatic	-	efi-direct
+profile	windows-xp-mce	efi	direct_iso	uefi	xp-uefi-other
+profile	windows-xp-mce	efi	wimboot	uefi	xp-uefi-other
+profile	windows-xp-mce	efi	vhdboot	uefi	xp-uefi-other
+profile	windows-xp-mce	efi	direct_efi	bios	efi-direct
+profile	windows-xp-mce	efi	direct_efi	uefi	xp-uefi-other
+profile	windows-xp-mce	efi	direct_efi	-	efi-direct
+profile	windows-xp-mce	efi	chainload	bios	efi-chainload
+profile	windows-xp-mce	efi	chainload	uefi	xp-uefi-other
+profile	windows-xp-mce	efi	chainload	-	efi-chainload
+profile	windows-xp-mce	efi	memdisk	uefi	xp-uefi-other
+profile	windows-xp-mce	efi	disk_image	uefi	xp-uefi-other
+profile	windows-xp-mce	efi	floppy_image	uefi	xp-uefi-other
 profile	windows-xp-x64	iso	automatic	bios	nt5-staging
 profile	windows-xp-x64	iso	automatic	uefi	xp-x64-sp2-uefi-csm
 profile	windows-xp-x64	iso	automatic	-	nt5-staging
@@ -9981,6 +10166,60 @@ resolve	windows-xp	efi	chainload	chainload	1	ok
 resolve	windows-xp	efi	memdisk	-	0	UnsupportedImage
 resolve	windows-xp	efi	disk_image	-	0	UnsupportedImage
 resolve	windows-xp	efi	floppy_image	-	0	UnsupportedImage
+resolve	windows-xp-mce	iso	automatic	direct_iso	1	ok
+resolve	windows-xp-mce	iso	direct_iso	-	0	UnsupportedMethod
+resolve	windows-xp-mce	iso	wimboot	-	0	UnsupportedMethod
+resolve	windows-xp-mce	iso	vhdboot	-	0	UnsupportedImage
+resolve	windows-xp-mce	iso	direct_efi	-	0	UnsupportedImage
+resolve	windows-xp-mce	iso	chainload	chainload	1	ok
+resolve	windows-xp-mce	iso	memdisk	-	0	UnsupportedMethod
+resolve	windows-xp-mce	iso	disk_image	-	0	UnsupportedImage
+resolve	windows-xp-mce	iso	floppy_image	-	0	UnsupportedImage
+resolve	windows-xp-mce	wim	automatic	wimboot	1	ok
+resolve	windows-xp-mce	wim	direct_iso	-	0	UnsupportedImage
+resolve	windows-xp-mce	wim	wimboot	wimboot	1	ok
+resolve	windows-xp-mce	wim	vhdboot	-	0	UnsupportedImage
+resolve	windows-xp-mce	wim	direct_efi	-	0	UnsupportedImage
+resolve	windows-xp-mce	wim	chainload	-	0	UnsupportedImage
+resolve	windows-xp-mce	wim	memdisk	-	0	UnsupportedImage
+resolve	windows-xp-mce	wim	disk_image	-	0	UnsupportedImage
+resolve	windows-xp-mce	wim	floppy_image	-	0	UnsupportedImage
+resolve	windows-xp-mce	img	automatic	-	0	UnsupportedImage
+resolve	windows-xp-mce	img	direct_iso	-	0	UnsupportedImage
+resolve	windows-xp-mce	img	wimboot	-	0	UnsupportedImage
+resolve	windows-xp-mce	img	vhdboot	-	0	UnsupportedImage
+resolve	windows-xp-mce	img	direct_efi	-	0	UnsupportedImage
+resolve	windows-xp-mce	img	chainload	-	0	UnsupportedMethod
+resolve	windows-xp-mce	img	memdisk	-	0	UnsupportedMethod
+resolve	windows-xp-mce	img	disk_image	-	0	UnsupportedMethod
+resolve	windows-xp-mce	img	floppy_image	-	0	UnsupportedMethod
+resolve	windows-xp-mce	vhd	automatic	vhdboot	1	ok
+resolve	windows-xp-mce	vhd	direct_iso	-	0	UnsupportedImage
+resolve	windows-xp-mce	vhd	wimboot	-	0	UnsupportedImage
+resolve	windows-xp-mce	vhd	vhdboot	vhdboot	1	ok
+resolve	windows-xp-mce	vhd	direct_efi	-	0	UnsupportedImage
+resolve	windows-xp-mce	vhd	chainload	-	0	UnsupportedImage
+resolve	windows-xp-mce	vhd	memdisk	-	0	UnsupportedImage
+resolve	windows-xp-mce	vhd	disk_image	-	0	UnsupportedImage
+resolve	windows-xp-mce	vhd	floppy_image	-	0	UnsupportedImage
+resolve	windows-xp-mce	vhdx	automatic	vhdboot	1	ok
+resolve	windows-xp-mce	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	windows-xp-mce	vhdx	wimboot	-	0	UnsupportedImage
+resolve	windows-xp-mce	vhdx	vhdboot	vhdboot	1	ok
+resolve	windows-xp-mce	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	windows-xp-mce	vhdx	chainload	-	0	UnsupportedImage
+resolve	windows-xp-mce	vhdx	memdisk	-	0	UnsupportedImage
+resolve	windows-xp-mce	vhdx	disk_image	-	0	UnsupportedImage
+resolve	windows-xp-mce	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	windows-xp-mce	efi	automatic	direct_efi	1	ok
+resolve	windows-xp-mce	efi	direct_iso	-	0	UnsupportedImage
+resolve	windows-xp-mce	efi	wimboot	-	0	UnsupportedImage
+resolve	windows-xp-mce	efi	vhdboot	-	0	UnsupportedImage
+resolve	windows-xp-mce	efi	direct_efi	direct_efi	1	ok
+resolve	windows-xp-mce	efi	chainload	chainload	1	ok
+resolve	windows-xp-mce	efi	memdisk	-	0	UnsupportedImage
+resolve	windows-xp-mce	efi	disk_image	-	0	UnsupportedImage
+resolve	windows-xp-mce	efi	floppy_image	-	0	UnsupportedImage
 resolve	windows-xp-x64	iso	automatic	direct_iso	1	ok
 resolve	windows-xp-x64	iso	direct_iso	-	0	UnsupportedMethod
 resolve	windows-xp-x64	iso	wimboot	-	0	UnsupportedMethod
@@ -13336,6 +13575,78 @@ menu	windows-xp	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend
 menu	windows-xp	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-xp	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-xp	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	iso	bios	0	automatic	xp_staging	1	1	experimental	Automatic (XP staging) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-xp-mce	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-mce	iso	bios	2	chainload	chainload	0	0	experimental	Chainload [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-xp-mce	iso	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-mce	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	iso	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	iso	uefi	0	automatic	xp_uefi_staging	1	1	experimental	Automatic (UEFI preparation / XP via CSM) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-xp-mce	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-mce	iso	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-mce	iso	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-mce	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	iso	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	wim	bios	0	automatic	wimboot	0	0	experimental	Automatic (WIMBoot) [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-xp-mce	wim	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-mce	wim	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-xp-mce	wim	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-xp-mce	wim	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	wim	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-xp-mce	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-mce	wim	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-xp-mce	wim	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-xp-mce	wim	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	wim	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-xp-mce	img	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-mce	img	bios	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-mce	img	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-mce	img	bios	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-mce	img	bios	5	floppy_image	-	0	1	experimental	Floppy image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-mce	img	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-xp-mce	img	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-mce	img	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-mce	img	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-mce	img	uefi	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-mce	img	uefi	5	floppy_image	-	0	1	experimental	Floppy image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-mce	vhd	bios	0	automatic	vhdboot	0	0	experimental	Automatic (VHDBoot) [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-xp-mce	vhd	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-mce	vhd	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-xp-mce	vhd	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-xp-mce	vhd	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	vhd	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-xp-mce	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-mce	vhd	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-xp-mce	vhd	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-xp-mce	vhd	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	vhd	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	vhdx	bios	0	automatic	vhdboot	0	0	experimental	Automatic (VHDBoot) [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-xp-mce	vhdx	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-mce	vhdx	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-xp-mce	vhdx	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-xp-mce	vhdx	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	vhdx	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-xp-mce	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-mce	vhdx	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-xp-mce	vhdx	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-xp-mce	vhdx	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	vhdx	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	efi	bios	0	automatic	direct_efi	0	0	experimental	Automatic (EFI) [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-xp-mce	efi	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-mce	efi	bios	2	chainload	chainload	0	0	experimental	Chainload [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-xp-mce	efi	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-xp-mce	efi	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	efi	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-xp-mce	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-xp-mce	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-xp-mce	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-xp-mce	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-xp-mce	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-xp-x64	iso	bios	0	automatic	xp_staging	1	1	tested_in_vm	Automatic (XP staging) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	windows-xp-x64	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-xp-x64	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
@@ -17447,6 +17758,60 @@ help	windows-xp	efi	chainload	Chainload	Transfers control to another bootloader 
 help	windows-xp	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
 help	windows-xp	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
 help	windows-xp	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-xp-mce	iso	automatic	Automatic - Windows Setup	Copies installation files to the selected Windows partition.	After preparation, remove the USB drive and start the computer from that disk.
+help	windows-xp-mce	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-xp-mce	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-xp-mce	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-xp-mce	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-xp-mce	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-xp-mce	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-xp-mce	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-xp-mce	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-xp-mce	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-xp-mce	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-xp-mce	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-xp-mce	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-xp-mce	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-xp-mce	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-xp-mce	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-xp-mce	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-xp-mce	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-xp-mce	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-xp-mce	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-xp-mce	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-xp-mce	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-xp-mce	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-xp-mce	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-xp-mce	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-xp-mce	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-xp-mce	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-xp-mce	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-xp-mce	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-xp-mce	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-xp-mce	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-xp-mce	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-xp-mce	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-xp-mce	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-xp-mce	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-xp-mce	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-xp-mce	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-xp-mce	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-xp-mce	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-xp-mce	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-xp-mce	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-xp-mce	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-xp-mce	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-xp-mce	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-xp-mce	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-xp-mce	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-xp-mce	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-xp-mce	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-xp-mce	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-xp-mce	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-xp-mce	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-xp-mce	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-xp-mce	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-xp-mce	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
 help	windows-xp-x64	iso	automatic	Automatic - Windows Setup	Copies installation files to the selected Windows partition.	After preparation, remove the USB drive and start the computer from that disk.
 help	windows-xp-x64	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
 help	windows-xp-x64	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.

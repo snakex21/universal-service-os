@@ -1169,6 +1169,7 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentinė): nėra NT 5.0 AHCI/NVMe/USB 3 tvarkyklės (SATA IDE režimu), daugiausia 4 GB RAM ir 2 procesoriai",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (eksperimentinis): Windows 2000 kelias; atsako licencijavimas Pagal serverį (5), darbo grupė, IIS išjungta; produkto raktas iš atsakymų profilio; CD be SP4 neturi USB 2.0 steko (nėra USB klaviatūros/pelės)",
+  "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (eksperimentinė): Windows XP kelias; reikia vieno disko laikmenos su CMPNENTS (Media Center komponentai); produkto raktas iš atsakymų profilio, kitaip iš paties disko WINNT.SIF",
 
   "boot.summary.nt52_limits": "NT 5.2 (eksperimentinė): AHCI per GenAHCI sistemos StorPort; diegime nėra NVMe/USB 3 tvarkyklės",
   "boot.summary.vista_csmwrap": "Vista be CSM (eksperimentinė): legacy (MBR) diegimas per CSMWrap, plokštė su legacy VBIOS",

@@ -1169,6 +1169,7 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (experimentální): chybí ovladač AHCI/NVMe/USB 3 pro NT 5.0 (SATA v režimu IDE), max. 4 GB RAM a 2 procesory",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (experimentální): cesta Windows 2000; odpovídá licencování Na server (5), pracovní skupina, IIS vypnuto; kód Product Key z profilu odpovědí; CD bez SP4 nemá zásobník USB 2.0 (bez USB klávesnice/myši)",
+  "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (experimentální): cesta Windows XP; vyžaduje jednodiskové médium se složkou CMPNENTS (součásti Media Center); kód Product Key z profilu odpovědí, jinak z vlastního WINNT.SIF disku",
 
   "boot.summary.nt52_limits": "NT 5.2 (experimentální): AHCI přes GenAHCI na StorPortu systému; bez ovladače NVMe/USB 3 v instalaci",
   "boot.summary.vista_csmwrap": "Vista bez CSM (experimentální): legacy instalace (MBR) přes CSMWrap, karta s legacy VBIOS",

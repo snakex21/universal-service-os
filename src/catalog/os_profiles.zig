@@ -124,6 +124,10 @@ pub const traits_table = [_]SystemTraits{
     // Windows 2000 NT5 staging with the same driver set; the micro-Linux
     // reads its own DATA folder and adds the Server answers.
     .{ .system_id = "windows-2000-server", .route_as = "windows-2000" },
+    // Windows XP Media Center Edition 2005 (UEFI only, windows_legacy.zig):
+    // the XP x86 staging (pae.exe, driver bundle, usos-xp.ini) from its own
+    // DATA folder; the micro-Linux copies CMPNENTS into the local source.
+    .{ .system_id = "windows-xp-mce", .route_as = "windows-xp" },
 } else [_]SystemTraits{});
 
 fn ownTraits(system_id: []const u8) SystemTraits {
@@ -176,6 +180,11 @@ test "NT 5.2 entries and the routed Servers fall back to a client icon" {
     try std.testing.expectEqualStrings("windows-2000", iconId("windows-2000-server"));
     try std.testing.expect(traits("windows-2000-server").nt5_staging);
     try std.testing.expectEqual(AnswerFormat.winnt_sif, traits("windows-2000-server").answer);
+    // XP Media Center Edition takes the XP routing, traits and icon.
+    try std.testing.expectEqualStrings("windows-xp", routeId("windows-xp-mce"));
+    try std.testing.expectEqualStrings("windows-xp", iconId("windows-xp-mce"));
+    try std.testing.expect(traits("windows-xp-mce").nt5_staging);
+    try std.testing.expectEqualStrings("usos-xp.ini", traits("windows-xp-mce").settings_file.?);
 }
 
 /// The start gate of a probed Windows ISO of this system (image list, boot
