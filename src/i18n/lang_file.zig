@@ -28,8 +28,10 @@ pub const header_size: usize = 28;
 /// first (strings.bios_count), so its tables end there. The UEFI menu and
 /// usos-fb-ui keep every key.
 pub const key_count = if (with_linux_strings) strings.english.len else strings.bios_count;
-/// Name hashes of the kept keys.
-const kept_hashes = strings.hashes[0..key_count];
+/// Name hashes of the kept keys: a copy of exactly those entries, so the
+/// BIOS Core does not carry the hashes of the UEFI-only strings (a slice of
+/// strings.hashes kept the whole table: 4 bytes per UEFI string).
+const kept_hashes: [key_count]u32 = strings.hashes[0..key_count].*;
 pub const linux_key_count = linux_strings.english.len;
 pub const max_blob_bytes: usize = 256 * 1024;
 
@@ -109,7 +111,7 @@ pub const Table = struct {
             // Unknown keys (newer installer) are ignored; undrawable values stay English.
             if (!cover.covers(value)) continue;
             const hash = nameHash(name);
-            if (indexOfHash(kept_hashes, hash)) |slot| {
+            if (indexOfHash(&kept_hashes, hash)) |slot| {
                 table.values[slot] = value_offset;
             } else if (with_linux_strings) {
                 if (indexOfHash(&linux_strings.hashes, hash)) |slot| table.linux_values[slot] = value_offset;
