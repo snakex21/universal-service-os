@@ -32,7 +32,7 @@ The golden table (`src/flow/testdata/routing_golden.tsv`) pins the result.
 | Server | Routed as | UEFI | BIOS |
 |---|---|---|---|
 | 2016, 2019, 2022, 2025 | Windows 10 | native wimboot start from the ISO (the ISO's own WinPE, ESP guard and finalizer) | Core native wimboot start (Windows 10 path) |
-| 2012 R2 | Windows 8.1 | WORK copy + chainload | WORK copy + chainload |
+| 2012 R2 | Windows 8.1 | native wimboot start from the ISO (PE 5.0, same helpers as Windows 10/11; 2026-10-08) | WORK copy + chainload |
 | 2012 | Windows 8 | WORK copy + chainload | WORK copy + chainload |
 | 2008 R2 | Windows 7 | native start: PE7 hybrid or the PE10 donor; Secure Boot off | micro-Linux Windows 7 request with `usos.legacy_folder_hex` |
 | 2008 | Vista | native start through the PE10 donor (SP2 x64 only); Secure Boot off | Core native wimboot start (Vista path) |
@@ -97,6 +97,18 @@ the file is copied next to Setup). Server-specific points:
   media is 1 Standard Core, 2 Standard Desktop, 3 Datacenter Core,
   4 Datacenter Desktop, but check the ISO: evaluation and multi-edition media
   differ.
+* **Server Manager / Initial Configuration Tasks** (2026-10-08): a USOS
+  profile answer for a Server adds `Microsoft-Windows-ServerManager-SvrMgrNc`
+  / `DoNotOpenServerManagerAtLogon` (2008 R2 and later) and
+  `Microsoft-Windows-OutOfBoxExperience` /
+  `DoNotOpenInitialConfigurationTasksAtLogon` (2008, 2008 R2) in specialize,
+  so the first logon lands on a plain desktop.
+* **Default edition** (2026-10-08): a USOS profile with no edition and no
+  key for the Server installs **Standard with the full GUI** (Full
+  Installation / Desktop Experience, id `ServerStandard`) when the ISO has
+  it; the editor shows "(Standard - default)" as the first choice. Media
+  without Standard (2012 R2 Foundation / Storage Server) keep Setup's own
+  choice, which the product key decides there.
 * **Product key.** Retail and volume media ask for a key unless
   `Microsoft-Windows-Setup` / `UserData` / `ProductKey` / `Key` is set
   (the generic KMS client setup key of the edition works for installation);

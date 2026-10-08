@@ -83,6 +83,9 @@ note. The start is not blocked.
 - Server 2008 and newer: the password does not meet the default Server
   policy (7+ characters, three of upper case, lower case, digits,
   symbols): Setup stops on the Administrator password page.
+- Windows 8 / 8.1, Server 2012 / 2012 R2 and Embedded 8.1 Industry: no
+  product key (`key.<id>` or `key`): their Setup has no "I don't have a
+  key" and stops on the product key page.
 
 ### Tweaks
 
@@ -176,6 +179,15 @@ stays. Not found (or the image list unreadable): nothing is written, Setup
 shows its edition list as before, and the summary shows a note ("Edition
 ... is not on this ISO: Setup asks for the edition"); found, the summary
 shows "Edition: <name> (image <n>)".
+
+Server default (2026-10-08, `root.matchEdition`): a Windows Server
+(2008 and later) with no `edition` and no key in the profile installs
+`ServerStandard` (Standard with the full GUI: Full Installation on
+2008 / 2008 R2, Desktop Experience on 2016+) when the ISO has it, so an
+unattended Server install does not stop on the edition list. Media
+without Standard (2012 R2 Foundation / Storage Server) keep Setup's choice,
+which their product key decides. The editor shows the empty value as
+"(Standard - default)" for Server systems.
 
 Matching, in this order:
 
