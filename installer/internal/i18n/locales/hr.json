@@ -1047,6 +1047,7 @@
   "boot.profile.value.same_locale": "Kao formati",
   "boot.profile.value.setup_asks": "(pita instalacija)",
   "boot.profile.value.edition_manual": "Upiši ručno…",
+  "boot.profile.value.edition_server_default": "(Standard - zadano)",
   "boot.profile.badge_incomplete": "Nepotpun",
   "boot.profile.missing.key": "Nema ključa proizvoda za {0}: instalacija staje na stranici ključa proizvoda. Uredite profil (X) i unesite ključ.",
   "boot.win9x_key.title": "Unesite ključ proizvoda za {0}",

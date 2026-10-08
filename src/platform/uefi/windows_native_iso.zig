@@ -344,16 +344,29 @@ test "Vista CSMWrap request names DATA-relative paths and the answer source" {
 
 pub const systemFolder = scanner.systemFolder;
 
+/// The Setup WinPE versions the native modern start runs: 6.3 and 10.0.
+pub fn modernSetupVersion(setup: wim.Setup) bool {
+    return setup.major == 10 or (setup.major == 6 and setup.minor == 3);
+}
+
+test "native modern start accepts PE 5.0 (6.3) and PE 10, not PE 7/4" {
+    try std.testing.expect(modernSetupVersion(.{ .index = 2, .major = 6, .minor = 3, .build = 9600 }));
+    try std.testing.expect(modernSetupVersion(.{ .index = 2, .major = 10, .minor = 0, .build = 26100 }));
+    try std.testing.expect(!modernSetupVersion(.{ .index = 2, .major = 6, .minor = 2, .build = 9200 }));
+    try std.testing.expect(!modernSetupVersion(.{ .index = 2, .major = 6, .minor = 1, .build = 7601 }));
+}
+
 pub const ModernInspection = struct {
     setup: wim.Setup,
     install: []const u8,
 };
 
-/// Windows 10/11 Setup media: x64 boot.wim (its declared boot index) of
-/// version 10, BCD and boot.sdi, sources/setup.exe and an install image.
+/// Windows 8.1/10/11 Setup media: x64 boot.wim (its declared boot index) of
+/// version 6.3 (PE 5.0: 8.1, Server 2012 R2, Embedded 8.1) or 10, BCD and
+/// boot.sdi, sources/setup.exe and an install image.
 fn inspectModernIso(iso: anytype) !ModernInspection {
     const setup = try scanner.setupInfo(uefi.pool_allocator, iso);
-    if (setup.major != 10) return error.UnsupportedWindowsSetupVersion;
+    if (!modernSetupVersion(setup)) return error.UnsupportedWindowsSetupVersion;
     try scanner.validateBootFiles(iso);
     var node: udf.Node = undefined;
     if (!try udf.openPath(iso, "sources/setup.exe", &node) or node.is_directory or node.size == 0) return error.WindowsSetupMissing;

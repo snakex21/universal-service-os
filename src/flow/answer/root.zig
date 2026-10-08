@@ -37,9 +37,21 @@ pub const EditionMatch = union(enum) {
     missing: []const u8,
 };
 
+/// Windows Server without an edition in the profile (and no key, which
+/// would name one): Standard with the full GUI (Desktop Experience / Full
+/// Installation) when the media has it, so an unattended Server install
+/// does not stop on the edition list. Media without it: Setup asks.
+pub const server_default_edition = "ServerStandard";
+
 pub fn matchEdition(p: *const Profile, system_id: []const u8, images: ?*const editions.List) EditionMatch {
     const wanted = p.editionFor(system_id);
-    if (wanted.len == 0) return .none;
+    if (wanted.len == 0) {
+        const family = target.familyFor(system_id) orelse return .none;
+        if (!family.server() or family.nt5() or p.keyFor(system_id).len > 0) return .none;
+        const list = images orelse return .none;
+        const image = editions.match(server_default_edition, list) orelse return .none;
+        return .{ .found = image };
+    }
     const list = images orelse return .{ .missing = wanted };
     const image = editions.match(wanted, list) orelse return .{ .missing = wanted };
     return .{ .found = image };
@@ -146,4 +158,41 @@ test "edition from the media: found, missing, per system" {
     try std.testing.expect(matchEdition(&p, "windows-10", &list) == .found);
     p.edition = .{};
     try std.testing.expect(matchEdition(&p, "windows-10", &list) == .none);
+}
+
+test "Server without an edition: Standard full installation by default" {
+    var p = Profile{};
+    try p.name.set("A");
+    try p.user.set("Tester");
+    // Server 2008 R2 SP1 VL pl (install.wim order of the X470 library ISO).
+    var list = editions.List{};
+    const images = [_]struct { []const u8, bool }{
+        .{ "ServerStandard", false }, .{ "ServerStandard", true }, .{ "ServerEnterprise", false }, .{ "ServerEnterprise", true },
+        .{ "ServerDatacenter", false }, .{ "ServerDatacenter", true }, .{ "ServerWeb", false }, .{ "ServerWeb", true },
+    };
+    for (images, 0..) |entry, i| {
+        var image = editions.Image{ .index = @intCast(i + 1), .server = true, .core = entry[1] };
+        image.edition_id.set(entry[0]);
+        list.items[i] = image;
+    }
+    list.len = images.len;
+    try std.testing.expectEqual(@as(u16, 1), matchEdition(&p, "windows-server-2008-r2", &list).found.index);
+    var buffer: [autounattend.max_size]u8 = undefined;
+    const r2 = (try render(&p, "windows-server-2008-r2", .amd64, null, &list, &buffer)).?;
+    try std.testing.expect(std.mem.indexOf(u8, r2.bytes, "<Value>1</Value>") != null);
+    // A chosen edition wins; Core on request.
+    try p.setSystemEdition("windows-server-2008-r2", "Datacenter Core");
+    try std.testing.expectEqual(@as(u16, 6), matchEdition(&p, "windows-server-2008-r2", &list).found.index);
+    try p.setSystemEdition("windows-server-2008-r2", "");
+    // Clients and keyed profiles: no default (the key names the edition).
+    try std.testing.expect(matchEdition(&p, "windows-7", &list) == .none);
+    try p.setSystemKey("windows-server-2008-r2", "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE");
+    try std.testing.expect(matchEdition(&p, "windows-server-2008-r2", &list) == .none);
+    // Media without Standard (2012 R2 Foundation / Storage Server): Setup asks.
+    var foundation = editions.List{};
+    var image = editions.Image{ .index = 1, .server = true };
+    image.edition_id.set("ServerWinFoundation");
+    foundation.items[0] = image;
+    foundation.len = 1;
+    try std.testing.expect(matchEdition(&p, "windows-server-2012-r2", &foundation) == .none);
 }

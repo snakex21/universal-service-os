@@ -117,7 +117,7 @@ test "Windows 8.1 ISO automatic help explains the resolved backend" {
 }
 
 test "Windows 10/11 ISO help explains the native start without a WORK copy" {
-    for ([_][]const u8{ "windows-10", "windows-11" }) |id| {
+    for ([_][]const u8{ "windows-10", "windows-11", "windows-8-1", "windows-server-2012-r2" }) |id| {
         for ([_]BootMethod{ .automatic, .direct_iso }) |method| {
             const help = describe(id, .iso, method);
             try std.testing.expect(std.mem.indexOf(u8, help.line1, "nothing is copied to WORK") != null);
@@ -126,6 +126,6 @@ test "Windows 10/11 ISO help explains the native start without a WORK copy" {
 }
 
 test "explicit ISO help explains WORK preparation" {
-    const help = describe("windows-8-1", .iso, .direct_iso);
+    const help = describe("windows-8", .iso, .direct_iso);
     try std.testing.expect(std.mem.indexOf(u8, help.line1, "WORK partition") != null);
 }

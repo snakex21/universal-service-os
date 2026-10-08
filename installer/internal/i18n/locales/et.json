@@ -1044,6 +1044,7 @@
   "boot.profile.value.same_locale": "Sama mis vormingud",
   "boot.profile.value.setup_asks": "(install küsib)",
   "boot.profile.value.edition_manual": "Sisesta käsitsi…",
+  "boot.profile.value.edition_server_default": "(Standard - vaikimisi)",
   "boot.profile.badge_incomplete": "Puudulik",
   "boot.profile.missing.key": "{0} jaoks pole tootevõtit: install peatub tootevõtme lehel. Muutke profiili (X) ja sisestage võti.",
   "boot.win9x_key.title": "Sisestage {0} tootevõti",

@@ -1044,6 +1044,7 @@
   "boot.profile.value.same_locale": "Както форматите",
   "boot.profile.value.setup_asks": "(инсталацията пита)",
   "boot.profile.value.edition_manual": "Въведете ръчно…",
+  "boot.profile.value.edition_server_default": "(Standard - по подразбиране)",
   "boot.profile.badge_incomplete": "Непълен",
   "boot.profile.missing.key": "Няма продуктов ключ за {0}: инсталацията спира на страницата за ключа. Редактирайте профила (X) и въведете ключа.",
   "boot.win9x_key.title": "Въведете продуктовия ключ за {0}",

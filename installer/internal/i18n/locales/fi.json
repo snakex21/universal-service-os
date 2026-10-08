@@ -1044,6 +1044,7 @@
   "boot.profile.value.same_locale": "Sama kuin muodot",
   "boot.profile.value.setup_asks": "(asennus kysyy)",
   "boot.profile.value.edition_manual": "Kirjoita käsin…",
+  "boot.profile.value.edition_server_default": "(Standard - oletus)",
   "boot.profile.badge_incomplete": "Keskeneräinen",
   "boot.profile.missing.key": "Ei tuoteavainta: {0}. Asennus pysähtyy tuoteavainsivulle. Muokkaa profiilia (X) ja anna avain.",
   "boot.win9x_key.title": "Anna käyttöjärjestelmän {0} tuoteavain",

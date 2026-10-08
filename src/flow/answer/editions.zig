@@ -240,6 +240,7 @@ const server_2008_editions = [_]Known{
     .{ .id = "ServerStandardCore", .label = "Standard (Server Core)" },
     .{ .id = "ServerEnterpriseCore", .label = "Enterprise (Server Core)" },
     .{ .id = "ServerDatacenterCore", .label = "Datacenter (Server Core)" },
+    .{ .id = "ServerWebCore", .label = "Web Server (Server Core)" },
 };
 const server_editions = [_]Known{
     .{ .id = "ServerStandard", .label = "Standard (Desktop Experience)" },

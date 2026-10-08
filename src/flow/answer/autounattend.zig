@@ -249,6 +249,21 @@ fn specialize(w: *W, input: Input) !void {
         try element(w, 3, "EnableLUA", "false");
         try endComponent(w);
     }
+    // Server: no Initial Configuration Tasks (2008 / 2008 R2) and no Server
+    // Manager (2008 R2 and later) at the first logon.
+    if (input.family.server()) {
+        const level = @intFromEnum(schema.Level.of(input.family));
+        if (level <= @intFromEnum(schema.Level.windows_7)) {
+            try component(w, "Microsoft-Windows-OutOfBoxExperience", input.arch);
+            try element(w, 3, "DoNotOpenInitialConfigurationTasksAtLogon", "true");
+            try endComponent(w);
+        }
+        if (level >= @intFromEnum(schema.Level.windows_7)) {
+            try component(w, "Microsoft-Windows-ServerManager-SvrMgrNc", input.arch);
+            try element(w, 3, "DoNotOpenServerManagerAtLogon", "true");
+            try endComponent(w);
+        }
+    }
     var commands: Commands = .{};
     try specializeCommands(p, input.family, &commands);
     if (commands.len > 0) {
@@ -436,4 +451,26 @@ test "autounattend: Vista and 7 OOBE answers per version" {
     const ten = try render(.{ .profile = &p, .family = .windows_10, .arch = .amd64 }, &buffer);
     try std.testing.expect(std.mem.indexOf(u8, ten, "NetworkLocation") == null);
     try std.testing.expect(std.mem.indexOf(u8, ten, "<HideOEMRegistrationScreen>") != null);
+}
+
+test "autounattend: Server Manager and Initial Configuration Tasks stay closed at logon" {
+    var p = Profile{};
+    try p.name.set("A");
+    try p.user.set("Tester");
+    try p.password.set("Usos-2026!");
+    var buffer: [max_size]u8 = undefined;
+    const r2 = try render(.{ .profile = &p, .family = .server_2008_r2, .arch = .amd64 }, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, r2, "<DoNotOpenInitialConfigurationTasksAtLogon>true</DoNotOpenInitialConfigurationTasksAtLogon>") != null);
+    try std.testing.expect(std.mem.indexOf(u8, r2, "<DoNotOpenServerManagerAtLogon>true</DoNotOpenServerManagerAtLogon>") != null);
+    try std.testing.expect(std.mem.indexOf(u8, r2, "<AdministratorPassword>") != null);
+    try schema.check(r2, .server_2008_r2, null);
+    const r12 = try render(.{ .profile = &p, .family = .server_2012_r2, .arch = .amd64 }, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, r12, "InitialConfigurationTasks") == null);
+    try std.testing.expect(std.mem.indexOf(u8, r12, "<DoNotOpenServerManagerAtLogon>true</DoNotOpenServerManagerAtLogon>") != null);
+    try schema.check(r12, .server_2012_r2, null);
+    const s2008 = try render(.{ .profile = &p, .family = .server_2008, .arch = .amd64 }, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, s2008, "DoNotOpenServerManagerAtLogon") == null);
+    try std.testing.expect(std.mem.indexOf(u8, s2008, "DoNotOpenInitialConfigurationTasksAtLogon") != null);
+    const eight = try render(.{ .profile = &p, .family = .windows_8_1, .arch = .amd64 }, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, eight, "ServerManager") == null and std.mem.indexOf(u8, eight, "OutOfBoxExperience") == null);
 }

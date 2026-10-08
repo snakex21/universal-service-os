@@ -258,7 +258,10 @@ fn editionManual() bool {
 /// stored value (a value in no list: "Type manually" with that text).
 fn loadEdition(stored: []const u8) void {
     edition_option_count = 0;
-    addEdition(t(.profile_value_setup_asks), "");
+    // Server without an edition: Standard (full installation) when the ISO
+    // has it (answer.root matchEdition), else Setup asks.
+    const server = if (familyOfEditor()) |family| family.server() and !family.nt5() else false;
+    addEdition(t(if (server) .profile_value_edition_server_default else .profile_value_setup_asks), "");
     const image_count: usize = if (edition_images) |list| list.len else 0;
     if (edition_images) |list| {
         for (list.slice(), 0..) |*image, i| addEdition(image.label(), image.id(&edition_id_storage[i]));

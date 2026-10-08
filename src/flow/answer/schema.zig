@@ -48,6 +48,9 @@ pub const Setting = struct {
     until: Level = .windows_11,
     /// Only on client editions (not in the Server shell of that level).
     client_only: bool = false,
+    /// Only on Server editions (the Server Manager / Initial Configuration
+    /// Tasks components).
+    server_only: bool = false,
 };
 
 const winpe_intl = "Microsoft-Windows-International-Core-WinPE";
@@ -57,6 +60,8 @@ const shell = "Microsoft-Windows-Shell-Setup";
 const deployment = "Microsoft-Windows-Deployment";
 const wer = "Microsoft-Windows-ErrorReportingCore";
 const lua = "Microsoft-Windows-LUA-Settings";
+const server_manager = "Microsoft-Windows-ServerManager-SvrMgrNc";
+const ict = "Microsoft-Windows-OutOfBoxExperience";
 
 pub const settings = [_]Setting{
     // windowsPE
@@ -86,6 +91,10 @@ pub const settings = [_]Setting{
     // Tweak disable_uac on 7 / 2008 R2 (8+ Store apps need UAC; Vista SP2
     // Setup refused the value, Vista gets the registry value as a command).
     .{ .pass = .specialize, .component = lua, .path = "EnableLUA", .since = .windows_7, .until = .windows_7 },
+    // Server: Server Manager (2008 R2+) and Initial Configuration Tasks
+    // (2008 / 2008 R2) do not open at the first logon.
+    .{ .pass = .specialize, .component = server_manager, .path = "DoNotOpenServerManagerAtLogon", .since = .windows_7, .server_only = true },
+    .{ .pass = .specialize, .component = ict, .path = "DoNotOpenInitialConfigurationTasksAtLogon", .until = .windows_7, .server_only = true },
     // oobeSystem
     .{ .pass = .oobeSystem, .component = intl, .path = "InputLocale" },
     .{ .pass = .oobeSystem, .component = intl, .path = "SystemLocale" },
@@ -214,6 +223,7 @@ fn allowed(pass: Pass, component: []const u8, path: []const u8, family: Family) 
         known = true;
         if (@intFromEnum(level) < @intFromEnum(s.since) or @intFromEnum(level) > @intFromEnum(s.until)) continue;
         if (s.client_only and family.server()) continue;
+        if (s.server_only and !family.server()) continue;
         return;
     }
     return if (known) error.NotForThisVersion else error.UnknownSetting;
@@ -378,6 +388,22 @@ test "schema: Vista and 7 reject later OOBE settings" {
     try check(lua_setting, .windows_7, null);
     try std.testing.expectError(error.NotForThisVersion, check(lua_setting, .vista, null));
     try std.testing.expectError(error.NotForThisVersion, check(live, .server_2008_r2, null));
+    const server_manager_setting =
+        \\<unattend><settings pass="specialize"><component name="Microsoft-Windows-ServerManager-SvrMgrNc">
+        \\<DoNotOpenServerManagerAtLogon>true</DoNotOpenServerManagerAtLogon></component></settings></unattend>
+    ;
+    try check(server_manager_setting, .server_2008_r2, null);
+    try check(server_manager_setting, .server_2012_r2, null);
+    try std.testing.expectError(error.NotForThisVersion, check(server_manager_setting, .windows_8_1, null));
+    try std.testing.expectError(error.NotForThisVersion, check(server_manager_setting, .server_2008, null));
+    const ict_setting =
+        \\<unattend><settings pass="specialize"><component name="Microsoft-Windows-OutOfBoxExperience">
+        \\<DoNotOpenInitialConfigurationTasksAtLogon>true</DoNotOpenInitialConfigurationTasksAtLogon></component></settings></unattend>
+    ;
+    try check(ict_setting, .server_2008_r2, null);
+    try check(ict_setting, .server_2008, null);
+    try std.testing.expectError(error.NotForThisVersion, check(ict_setting, .server_2012_r2, null));
+    try std.testing.expectError(error.NotForThisVersion, check(ict_setting, .windows_7, null));
     try std.testing.expectError(error.NotForThisVersion, check(live, .vista, null));
     const misplaced =
         \\<unattend><settings pass="windowsPE"><component name="Microsoft-Windows-Shell-Setup">

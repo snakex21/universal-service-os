@@ -1047,6 +1047,7 @@
   "boot.profile.value.same_locale": "Jak formaty",
   "boot.profile.value.setup_asks": "(Instalator zapyta)",
   "boot.profile.value.edition_manual": "Wpisz ręcznie…",
+  "boot.profile.value.edition_server_default": "(Standard - domyślnie)",
   "boot.profile.badge_incomplete": "Niekompletny",
   "boot.profile.missing.key": "Brak klucza produktu dla {0}: Instalator zatrzyma się na stronie klucza produktu. Edytuj profil (X) i wpisz klucz.",
   "boot.win9x_key.title": "Podaj klucz {0}",

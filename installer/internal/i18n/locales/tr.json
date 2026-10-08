@@ -1044,6 +1044,7 @@
   "boot.profile.value.same_locale": "Biçimlerle aynı",
   "boot.profile.value.setup_asks": "(Kurulum sorar)",
   "boot.profile.value.edition_manual": "Elle yaz…",
+  "boot.profile.value.edition_server_default": "(Standard - varsayılan)",
   "boot.profile.badge_incomplete": "Eksik",
   "boot.profile.missing.key": "{0} için ürün anahtarı yok: Kurulum ürün anahtarı sayfasında durur. Profili düzenleyin (X) ve anahtarı girin.",
   "boot.win9x_key.title": "{0} ürün anahtarını girin",

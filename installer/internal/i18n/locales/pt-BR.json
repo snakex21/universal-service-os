@@ -1044,6 +1044,7 @@
   "boot.profile.value.same_locale": "Igual aos formatos",
   "boot.profile.value.setup_asks": "(a instalação pergunta)",
   "boot.profile.value.edition_manual": "Digitar manualmente…",
+  "boot.profile.value.edition_server_default": "(Standard - padrão)",
   "boot.profile.badge_incomplete": "Incompleto",
   "boot.profile.missing.key": "Sem chave do produto para {0}: a instalação para na página da chave do produto. Edite o perfil (X) e digite a chave.",
   "boot.win9x_key.title": "Digite a chave do produto do {0}",

@@ -73,7 +73,22 @@ pub fn missing(p: *const Profile, system_id: []const u8) ?Missing {
     const family = target.familyFor(system_id) orelse return null;
     if (family.nt5()) return if (p.keyFor(system_id).len == 0) .product_key else null;
     if (family.server() and !complexPassword(p.password.slice())) return .server_password;
+    // Windows 8 / 8.1 Setup (also Server 2012 / 2012 R2, Embedded 8.1) has no
+    // "I don't have a product key": without one it stops on the key page.
+    const client = family.client();
+    if ((client == .windows_8 or client == .windows_8_1) and p.keyFor(system_id).len == 0) return .product_key;
     return null;
+}
+
+test "missing: Windows 8.1 family needs a key, Server 2008 R2 does not" {
+    var p = try profileFrom("name=A\nuser=Bob\npassword=Usos-2026!\n");
+    try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-8-1").?);
+    try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-server-2012-r2").?);
+    try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-embedded-8-1-industry").?);
+    try std.testing.expect(missing(&p, "windows-server-2008-r2") == null);
+    try std.testing.expect(missing(&p, "windows-10") == null);
+    try p.setSystemKey("windows-embedded-8-1-industry", "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE");
+    try std.testing.expect(missing(&p, "windows-embedded-8-1-industry") == null);
 }
 
 /// The profile holds a Windows 95 key (OEM or retail shape) for windows-95

@@ -19,6 +19,8 @@ var windowsProfiles = []dataProfile{
 	{"windows-11", "Windows 11", true, true},
 	{"windows-10", "Windows 10", true, true},
 	{"windows-8-1", "Windows 8.1", true, true},
+	// Windows Embedded 8.1 Industry: the Windows 8.1 flow (UEFI only).
+	{"windows-embedded-8-1-industry", "Windows Embedded 8.1 Industry", true, true},
 	{"windows-8", "Windows 8", true, true},
 	{"windows-7", "Windows 7", true, true},
 	{"windows-vista", "Windows Vista", true, true},

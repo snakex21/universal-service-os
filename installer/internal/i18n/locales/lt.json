@@ -1047,6 +1047,7 @@
   "boot.profile.value.same_locale": "Kaip ir formatai",
   "boot.profile.value.setup_asks": "(paklaus diegimo programa)",
   "boot.profile.value.edition_manual": "Įvesti rankiniu būdu…",
+  "boot.profile.value.edition_server_default": "(Standard - numatytoji)",
   "boot.profile.badge_incomplete": "Neišsamus",
   "boot.profile.missing.key": "Nėra {0} produkto rakto: sąranka sustos produkto rakto puslapyje. Redaguokite profilį (X) ir įveskite raktą.",
   "boot.win9x_key.title": "Įveskite {0} produkto kodą",
