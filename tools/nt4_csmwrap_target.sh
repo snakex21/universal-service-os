@@ -216,6 +216,27 @@ nt3_detached_answer() {
         }'
 }
 
+# NT 3.51 TXTSETUP.SIF (stdin -> stdout, CR LF): the [hal] rows of the MPS
+# machine types (mps_up = halapic.dll, mps_mp = halmps.dll) install the
+# "Standard PC" hal.dll (8259 PIC) instead. The install VM has an APIC and an
+# MP table, so Setup picks mps_up; on the X470 under CSMWrap the firmware
+# leaves the HPET in LegacyReplacement mode, the I/O APIC pin 2 clock never
+# ticks and the 3.51 kernel hung right after "1 System Processor [.. KB
+# Memory]" (2026-10-08, before any boot driver ran, so usosrst cannot clear
+# it). The PIT -> 8259 IRQ 0 path works there (DOS, 9x, Win2000 Standard PC).
+# NT 3.51 text-mode Setup has no [Unattended] ComputerType, hence the table.
+# [Hal.Load] (the text-mode HAL inside the VM) stays as it is.
+nt3_standard_hal() {
+    awk -v BINMODE=3 '
+        { line = $0; sub(/\r$/, "", line); low = tolower(line); gsub(/[ \t]/, "", low)
+          if (low ~ /^\[/) sec = low
+          else if (sec == "[hal]" && low ~ /^mps_(up|mp)=/) {
+              key = line; sub(/[ \t]*=.*/, "", key); rest = line; sub(/^[^,]*/, "", rest)
+              line = key " = hal.dll    " rest
+          }
+          printf "%s\r\n", line }'
+}
+
 for tool in dd od mkfs.fat mdir syslinux mount umount losetup blockdev awk sync wc tr; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
@@ -387,6 +408,16 @@ cp "$work/WINNT.SIF" "$bt_dir/WINNT.SIF" || fail 'cannot copy WINNT.SIF'
 cp "$work/WINNT.SIF" "$work/c/WINNT.SIF" || fail 'cannot copy WINNT.SIF'
 cp "$setupldr" "$work/c/\$LDR\$" || fail 'cannot copy the Setup loader'
 cp "$txtsetup" "$work/c/TXTSETUP.SIF" || fail 'cannot copy TXTSETUP.SIF'
+if [ -n "$nt3" ]; then
+    # Standard PC HAL on the finished system (nt3_standard_hal); every copy
+    # Setup may read: \TXTSETUP.SIF, ~BT and the local source.
+    for sif in "$work/c/TXTSETUP.SIF" "$bt_dir/TXTSETUP.SIF" "$ls_src/TXTSETUP.SIF"; do
+        [ -f "$sif" ] || continue
+        nt3_standard_hal < "$sif" > "$work/txtsetup.hal" && cat "$work/txtsetup.hal" > "$sif" || fail 'cannot write TXTSETUP.SIF'
+    done
+    grep -aiq '^mps_up *= *hal\.dll' "$work/c/TXTSETUP.SIF" || fail 'TXTSETUP.SIF has no [hal] mps_up row (not an NT 3.51 CD?)'
+    log 'HAL: Standard PC (hal.dll) for the MPS machine types'
+fi
 # setupldr started from the hard disk runs \NTDETECT.COM of the boot
 # partition (QEMU 2026-10-07: "NTDETECT failed" without it).
 ntdetect=''

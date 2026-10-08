@@ -105,6 +105,30 @@ class Nt3Target(unittest.TestCase):
                       '!SetupNetwork = NO\r\n', out)
         self.assertEqual(out.count('DetachedProgram'), 1)
 
+    def test_standard_pc_hal_for_the_mps_machine_types(self):
+        # X470 2026-10-08: halapic.dll (mps_up, picked in the install VM)
+        # hung after the banner; the finished system gets the 8259 hal.dll.
+        tmp = Path(tempfile.mkdtemp(prefix='usos-nt3-hal-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        sif = tmp / 'TXTSETUP.SIF'
+        sif.write_bytes(b'[Map.Computer]\r\nmps_up = "MPS Uniprocessor PC"\r\n'
+                        b'[hal]\r\ne_isa_up    = hal.dll     ,2,hal.dll\r\n'
+                        b'mps_up      = halapic.dll ,2,hal.dll\r\nmps_mp      = halmps.dll  ,2,hal.dll\r\n'
+                        b'[Hal.Load]\r\nmps_up      = halapic.dll\r\n')
+        script = tmp / 'run.sh'
+        script.write_bytes((function_text(TARGET, 'nt3_standard_hal') +
+                            f'\nnt3_standard_hal < "{sif.as_posix()}" > "{(tmp / "out.sif").as_posix()}"\n').encode('utf-8'))
+        rc, _, err = sh(f'. "{script.as_posix()}"')
+        self.assertEqual(rc, 0, err)
+        out = (tmp / 'out.sif').read_bytes()
+        self.assertEqual(out, b'[Map.Computer]\r\nmps_up = "MPS Uniprocessor PC"\r\n'
+                              b'[hal]\r\ne_isa_up    = hal.dll     ,2,hal.dll\r\n'
+                              b'mps_up = hal.dll    ,2,hal.dll\r\nmps_mp = hal.dll    ,2,hal.dll\r\n'
+                              b'[Hal.Load]\r\nmps_up      = halapic.dll\r\n')
+        text = TARGET.read_text(encoding='utf-8')
+        self.assertIn('nt3_standard_hal < "$sif" > "$work/txtsetup.hal"', text)
+        self.assertIn('for sif in "$work/c/TXTSETUP.SIF" "$bt_dir/TXTSETUP.SIF" "$ls_src/TXTSETUP.SIF"; do', text)
+
     def test_server_cd_gets_licensing_in_the_empty_section(self):
         tmp = Path(tempfile.mkdtemp(prefix='usos-nt3-srv-'))
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
