@@ -172,13 +172,15 @@ nt4_server_answer() {
     awk -v BINMODE=3 -v product="$1" -v bang="$([ "${2:-}" = yes ] && echo '!')" '
         { line = $0; sub(/\r$/, "", line); lines[++n] = line; low = tolower(line); gsub(/[ \t]/, "", low)
           if (low ~ /^!?advservertype=/) has_type = 1
-          if (low == "[licensefileprintdata]") has_lic = 1 }
+          if (low ~ /^!?automode=/) has_lic = 1 }
         END {
             server = (product != "" && product != "0")
             for (i = 1; i <= n; i++) {
                 printf "%s\r\n", lines[i]
                 low = tolower(lines[i]); gsub(/[ \t]/, "", low)
                 if (server && !has_type && low == "[guiunattended]") { printf "%sAdvServerType = SERVERNT\r\n", bang; has_type = 1 }
+                # An empty [LicenseFilePrintData] (the NT 3.51 answer has one) gets the keys.
+                if (server && !has_lic && low == "[licensefileprintdata]") { printf "%sAutoMode = PerServer\r\n%sAutoUsers = 5\r\n", bang, bang; has_lic = 1 }
             }
             if (server && !has_type) printf "\r\n[GuiUnattended]\r\n%sAdvServerType = SERVERNT\r\n", bang
             if (server && !has_lic) printf "\r\n[LicenseFilePrintData]\r\n%sAutoMode = PerServer\r\n%sAutoUsers = 5\r\n", bang, bang
