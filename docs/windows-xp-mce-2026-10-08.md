@@ -88,3 +88,31 @@ SHA-256 `0e8d7abd...251074e`), created 2008-08-14:
   token differs from XP), and the routing golden (additions only).
   `test_w2k_staging.py` and the pipeline tables are unchanged.
 - QEMU e2e: see section 5.
+
+## 5. QEMU e2e (2026-10-08): PASS to the desktop, Media Center installed
+
+The run booted OVMF without CSM, then CSMWrap, on AHCI with TCG.
+`run_csmwrap_xp_prepared.py --profile xp-x86-sp3-uefi-csm --ahci --run-through`
+ran with `USOS_TEST_PROBE_EXPORTS=USOS_XP_EDITION=mce` and a `usos-xp.ini`
+that has a user, computer name and time zone but **no key**. The package was
+the current one plus the MCE bundle (`--add-source`, bundle `9319296c...`).
+
+- Preparation: the probe reported `media_center=yes` and the driver
+  preflight passed (MCE bundle). The log showed
+  `CMPNENTS copy PASS`, `IASTOR.SYS` staged to `~BT`, and
+  `product key: none answered, taken from the disc's own I386\WINNT.SIF
+  (not logged)`. The CSMWrap ESP was created.
+- Text mode copied the files through CSMWrap and restarted.
+- GUI Setup ran hands-free: no product key page and no CD2 prompt.
+  `setupapi.log` shows the Media Center files extracted from
+  `C:\$WIN_NT$.~LS\cmpnents\mediactr\i386\mediactr.cab`.
+- The second CSMWrap boot reached the XP logo, then the desktop with
+  automatic logon as `Tester` and the MCE "Energy" wallpaper.
+- Offline check of the target: `WINDOWS\ehome\ehshell.exe` (2006-10-09,
+  Rollup 2 from `SVCPACK`), `ehrecvr.exe`, `ehtray.exe`, and the Start menu
+  entries `All Users\Start Menu\Programs\Media Center.lnk` and
+  `...\Accessories\Media Center\Media Center.lnk`. `setuperr.log` holds one
+  entry: the unsigned `acpi.sys` of the XP driver bundle, as expected.
+
+Not covered by QEMU: starting Media Center itself (it needs DirectX 9 video
+with hardware overlay), TV tuners, and the X470 hardware.
