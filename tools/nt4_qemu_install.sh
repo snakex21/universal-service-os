@@ -95,7 +95,11 @@ nt4_vm_install() {
     fi
     NT4_VM_STALLED=0
     boot=0
-    while [ "$boot" -lt "$NT4_VM_BOOTS" ]; do
+    boots=$NT4_VM_BOOTS
+    # NT 3.51 restarts a few times after GUI Setup before the usosnt3 service
+    # runs (QEMU 2026-10-08: DONE.TXT at the 5th and at the 7th VM start).
+    [ -z "$NT4_VM_HBA" ] || boots=${NT3_VM_BOOTS:-12}
+    while [ "$boot" -lt "$boots" ]; do
         boot=$((boot + 1))
         NT4_VM_BOOT=$boot
         w9x_phase1_progress() { command -v nt4_vm_progress >/dev/null 2>&1 && nt4_vm_progress "$NT4_VM_BOOT" "$1" "$2"; return 0; }

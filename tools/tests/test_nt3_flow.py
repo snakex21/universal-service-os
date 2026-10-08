@@ -79,6 +79,16 @@ class Nt3Target(unittest.TestCase):
         self.assertIn('mv "$ls_src/AUTOCHK.EXE" "$usos/AUTOCHK.EXE"', text)
         self.assertIn('cp "$drv/USOSACHK.EXE" "$ls_src/AUTOCHK.EXE"', text)
         self.assertIn('autochk.exe restored', QEMU_INSTALL.read_text(encoding='utf-8'))
+        # INITIAL.INF reads $(!SetupNetWork) (capital W).
+        self.assertIn('printf "!SetupNetWork = %s', text)
+
+    def test_install_vm_uses_a_scsi_disk_for_nt3(self):
+        text = QEMU_INSTALL.read_text(encoding='utf-8')
+        self.assertIn('NT4_VM_HBA=${NT3_VM_HBA:-am53c974}', text)
+        self.assertIn('-device "$NT4_VM_HBA,id=hba" -device scsi-hd,drive=target,bus=hba.0,bootindex=0', text)
+        self.assertIn('$(nt4_vm_disk_args "$1")', text)
+        self.assertIn('nt4_vm_dirty_only "$loop" "$logs/fsck.txt"', text)
+        self.assertIn('set_dword("amsint", NULL, "Start", 4);', (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='utf-8'))
 
     def test_detached_program_keeps_backslashes(self):
         tmp = Path(tempfile.mkdtemp(prefix='usos-nt3-det-'))
