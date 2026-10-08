@@ -53,7 +53,7 @@ func createSingleDataLayout(handle windows.Handle, diskNumber uint32, sectorByte
 		return uninstall.MediaLayout{}, fmt.Errorf("read back uninstall GPT layout: %w", err)
 	}
 	media := uninstall.MediaLayout{DiskNumber: diskNumber, DiskPTUUID: guidString(diskID), Data: part}
-	return verifySingleDataLayout(media, actual)
+	return verifySingleDataLayout(media, actual, gptBasicDataAttributeNoDriveLetter)
 }
 
 func buildSingleDataLayoutBuffer(header gptHeader, diskID, partID windows.GUID, part install.PartitionRef) ([]byte, error) {
@@ -70,13 +70,18 @@ func buildSingleDataLayoutBuffer(header gptHeader, diskID, partID windows.GUID, 
 	binary.LittleEndian.PutUint64(buffer[32:40], header.UsableLength)
 	binary.LittleEndian.PutUint32(buffer[40:44], header.MaxPartitionCount)
 	planned := layout.Partition{StartBytes: part.StartBytes, SizeBytes: part.SizeBytes}
-	if err := putPartitionEntry(buffer[driveLayoutHeaderSize:], 1, 1, planned, basicDataPartitionType, partID, 0, ""); err != nil {
+	// Created with NoDriveLetter so Windows does not mount the raw volume
+	// under a letter (and offer to format it) before Format-Volume runs;
+	// ExposeFormattedVolume clears the bit and assigns the letter afterwards.
+	if err := putPartitionEntry(buffer[driveLayoutHeaderSize:], 1, 1, planned, basicDataPartitionType, partID, gptBasicDataAttributeNoDriveLetter, ""); err != nil {
 		return nil, err
 	}
 	return buffer, nil
 }
 
-func verifySingleDataLayout(expected uninstall.MediaLayout, actual parsedLayout) (uninstall.MediaLayout, error) {
+// verifySingleDataLayout checks the single uninstall partition. wantAttributes
+// is NoDriveLetter right after creation and 0 once the volume is exposed.
+func verifySingleDataLayout(expected uninstall.MediaLayout, actual parsedLayout, wantAttributes uint64) (uninstall.MediaLayout, error) {
 	if !equalGUIDText(guidString(actual.Header.DiskID), expected.DiskPTUUID) {
 		return uninstall.MediaLayout{}, fmt.Errorf("uninstall disk GUID mismatch: got %s want %s", guidString(actual.Header.DiskID), expected.DiskPTUUID)
 	}
@@ -93,8 +98,8 @@ func verifySingleDataLayout(expected uninstall.MediaLayout, actual parsedLayout)
 	if got.StartBytes != expected.Data.StartBytes || got.SizeBytes != expected.Data.SizeBytes {
 		return uninstall.MediaLayout{}, fmt.Errorf("uninstall partition extent mismatch: got offset=%d size=%d want offset=%d size=%d", got.StartBytes, got.SizeBytes, expected.Data.StartBytes, expected.Data.SizeBytes)
 	}
-	if got.Attributes != 0 {
-		return uninstall.MediaLayout{}, fmt.Errorf("uninstall partition GPT attributes=0x%016X, want 0", got.Attributes)
+	if got.Attributes != wantAttributes {
+		return uninstall.MediaLayout{}, fmt.Errorf("uninstall partition GPT attributes=0x%016X, want 0x%016X", got.Attributes, wantAttributes)
 	}
 	result := expected
 	result.Data.Number = got.Number

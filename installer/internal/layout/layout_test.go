@@ -10,8 +10,10 @@ func TestWorkBytesForDisk(t *testing.T) {
 	}{
 		{"32 GiB clamps to minimum", 32 * GiB, 12 * GiB},
 		{"64 GiB is proportional", 64 * GiB, 16 * GiB},
-		{"96 GiB reaches maximum", 96 * GiB, 24 * GiB},
-		{"128 GiB stays at maximum", 128 * GiB, 24 * GiB},
+		{"48 GiB clamps to minimum", 48 * GiB, 12 * GiB},
+		{"56 GiB is proportional", 56 * GiB, 14 * GiB},
+		{"96 GiB stays at maximum", 96 * GiB, 16 * GiB},
+		{"128 GiB stays at maximum", 128 * GiB, 16 * GiB},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

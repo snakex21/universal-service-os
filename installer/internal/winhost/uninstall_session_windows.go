@@ -153,7 +153,8 @@ func (s *destructiveSession) VerifyUninstallLayoutUnchanged(expected uninstall.M
 	if err != nil {
 		return uninstall.MediaLayout{}, fmt.Errorf("IOCTL_DISK_GET_DRIVE_LAYOUT_EX uninstall: %w", err)
 	}
-	verified, err := verifySingleDataLayout(expected, actual)
+	// Called after ExposeFormattedVolume, so NoDriveLetter must be clear.
+	verified, err := verifySingleDataLayout(expected, actual, 0)
 	if err != nil {
 		return uninstall.MediaLayout{}, err
 	}

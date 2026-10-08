@@ -55,7 +55,7 @@ Po instalacji pendrive ma trzy partycje:
 |---|---|---|
 | USOS_ESP | FAT32, 1 GiB | pliki startowe USOS, klucz Secure Boot, ustawienia, logi, profile, motywy |
 | USOS_DATA | NTFS, reszta miejsca | Twoje obrazy ISO, sterowniki, narzędzia |
-| USOS_WORK | NTFS, 1/4 pendrive'a (12 do 24 GiB) | miejsce robocze dla niektórych instalatorów Windows |
+| USOS_WORK | NTFS, 1/4 pendrive'a (12 do 16 GiB) | miejsce robocze dla niektórych instalatorów Windows |
 
 ---
 
