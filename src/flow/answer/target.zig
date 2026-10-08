@@ -84,8 +84,6 @@ const entries = [_]Entry{
     .{ .id = "windows-2000-server", .family = .windows_2000 },
     .{ .id = "windows-xp", .family = .windows_xp },
     .{ .id = "windows-xp-x64", .family = .windows_xp },
-    // XP Media Center Edition 2005: the XP answer (own key field).
-    .{ .id = "windows-xp-mce", .family = .windows_xp },
     .{ .id = "windows-server-2003", .family = .windows_2003 },
     .{ .id = "windows-vista", .family = .vista },
     .{ .id = "windows-7", .family = .windows_7 },
@@ -101,7 +99,11 @@ const entries = [_]Entry{
     .{ .id = "windows-server-2019", .family = .server_2019 },
     .{ .id = "windows-server-2022", .family = .server_2022 },
     .{ .id = "windows-server-2025", .family = .server_2025 },
-};
+} ++ (if (@import("builtin").os.tag != .freestanding) [_]Entry{
+    // XP Media Center Edition 2005 (UEFI only; the BIOS Core has no such
+    // entry and no room): the XP answer with its own key field.
+    .{ .id = "windows-xp-mce", .family = .windows_xp },
+} else [_]Entry{});
 
 /// The answer family of a catalog system id; null: no generated answer.
 pub fn familyFor(system_id: []const u8) ?Family {
