@@ -269,7 +269,7 @@ mbr_code=$LIB/xp-geometry-fix-mbr-440.bin
 drv=$LIB/$(printf %s "$sub" | tr '[:upper:]' '[:lower:]')
 for file in AHCINT.SYS USOSRST.SYS USOSUSB.SYS; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
 if [ -n "$nt3" ]; then
-    [ -r "$drv/USOSNT3.EXE" ] || fail "missing: $drv/USOSNT3.EXE"
+    for file in USOSNT3.EXE USOSACHK.EXE; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
 else
     for file in USOSVBE.SYS USOSOFF.EXE; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
 fi
@@ -401,24 +401,15 @@ for file in AHCINT.SYS USOSRST.SYS USOSUSB.SYS USOSNT3.EXE; do
 done
 # Text-mode Setup runs AUTOCHK.EXE from the local source on C: ("Checking
 # drive C:"); in the QEMU install VM that run overflows a kernel stack and
-# the VM triple-faults (2026-10-08, double fault -> STOP 0x7F 8 with the
-# HAL's display reset in V86 mode). Without AUTOCHK.EXE in the local source
-# Setup only says "Setup was unable to verify your C: drive" (ENTER, typed by
-# nt4_vm_install), and the copy of autochk.exe is taken out of TXTSETUP.SIF
-# [Files]; nt4_vm_finish puts it into SYSTEM32 from \USOS\NT3\AUTOCHK.EXE.
-ac=''
-for name in AUTOCHK.EXE; do [ -f "$ls_src/$name" ] && ac="$ls_src/$name"; done
-[ -n "$ac" ] || fail 'the ISO has no I386\AUTOCHK.EXE'
-mv "$ac" "$usos/AUTOCHK.EXE" || fail 'cannot move AUTOCHK.EXE'
+# the VM triple-faults (2026-10-08: double fault -> STOP 0x7F 8 while the
+# HAL resets the display in V86 mode). The local source gets USOSACHK.EXE
+# (tools/nt3/usosachk, own native program that ends with success) under that
+# name; Setup copies it as system32\autochk.exe and nt4_vm_finish puts the
+# CD's AUTOCHK.EXE, kept as \USOS\NT3\AUTOCHK.EXE, back in place.
+[ -f "$ls_src/AUTOCHK.EXE" ] || fail 'the ISO has no I386\AUTOCHK.EXE'
+mv "$ls_src/AUTOCHK.EXE" "$usos/AUTOCHK.EXE" || fail 'cannot move AUTOCHK.EXE'
+cp "$drv/USOSACHK.EXE" "$ls_src/AUTOCHK.EXE" || fail 'cannot copy USOSACHK.EXE'
 rm -f "$bt_dir/AUTOCHK.EXE"
-for sif in "$work/c/TXTSETUP.SIF" "$bt_dir/TXTSETUP.SIF" "$ls_src/TXTSETUP.SIF"; do
-    [ -f "$sif" ] || continue
-    awk -v BINMODE=3 '{ line = $0; sub(/\r$/, "", line); low = tolower(line) }
-        /^\[/ { files = (low ~ /^\[files\][ \t]*$/) }
-        files && low ~ /^autochk\.exe[ \t]*=/ { next }
-        { printf "%s\r\n", line }' "$sif" > "$work/txtsetup.sif" && cat "$work/txtsetup.sif" > "$sif" || fail 'cannot edit TXTSETUP.SIF'
-done
-grep -qi '^autochk\.exe[ 	]*=' "$work/c/TXTSETUP.SIF" && fail 'autochk.exe is still in TXTSETUP.SIF [Files]'
 [ -z "$SP_EXE" ] || log "service pack: $(basename "$SP_EXE") ignored (NT 3.51 service packs are not installed yet)"
 log 'display: VGA (640x480x16; no VESA for NT 3.51 yet)'
 printf 'answer=%s\r\nversion=%s.%s\r\n' "$ANSWER_KIND" "$major" "$minor" > "$usos/SOURCE.TXT"

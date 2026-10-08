@@ -71,6 +71,14 @@ class Nt3Target(unittest.TestCase):
         self.assertIn('cp "$bt_dir/NTDLL.DLL" "$bt_dir/SYSTEM32/NTDLL.DLL"', text)
         self.assertIn('for file in AHCINT.SYS USOSRST.SYS USOSUSB.SYS USOSNT3.EXE; do', text)
         self.assertIn('| nt4_server_answer "${product:-0}" yes | nt3_detached_answer', text)
+        # Flat local source (DOSNET d1 = \), renamed [FloppyFiles] entries, SIZE.SIF.
+        self.assertIn('[ -z "$nt3" ] || ls_src=$ls_dir', text)
+        self.assertIn(r'/^\[floppyfiles\./', text)
+        self.assertIn('> "$ls_src/SIZE.SIF"', text)
+        # The autochk stand-in in the local source, the CD's AUTOCHK.EXE kept.
+        self.assertIn('mv "$ls_src/AUTOCHK.EXE" "$usos/AUTOCHK.EXE"', text)
+        self.assertIn('cp "$drv/USOSACHK.EXE" "$ls_src/AUTOCHK.EXE"', text)
+        self.assertIn('autochk.exe restored', QEMU_INSTALL.read_text(encoding='utf-8'))
 
     def test_detached_program_keeps_backslashes(self):
         tmp = Path(tempfile.mkdtemp(prefix='usos-nt3-det-'))
@@ -129,6 +137,22 @@ class Nt3Prepare(unittest.TestCase):
         self.assertIn('"The $nt_name installation did not finish. The computer was not restarted; logs: EFI/USOS/win9x/nt4"', text)
 
 
+class Nt3AutochkStandIn(unittest.TestCase):
+    """tools/nt3/usosachk: native, PE 3.10, only ntdll!NtTerminateProcess."""
+
+    def test_image(self):
+        import struct
+        data = (ROOT / 'tools/nt3/usosachk/bin/i386/usosachk.exe').read_bytes()
+        pe = struct.unpack_from('<I', data, 0x3C)[0]
+        self.assertEqual(data[pe:pe + 4], b'PE\0\0')
+        opt = pe + 24
+        self.assertEqual(struct.unpack_from('<H', data, opt + 68)[0], 1)  # IMAGE_SUBSYSTEM_NATIVE
+        self.assertEqual(struct.unpack_from('<HH', data, opt + 40), (3, 10))
+        self.assertEqual(struct.unpack_from('<HH', data, opt + 48), (3, 10))
+        self.assertIn(b'NtTerminateProcess', data)
+        self.assertIn(b'ntdll.dll', data.lower())
+
+
 class Nt3MicroLinux(unittest.TestCase):
     def test_file_list(self):
         text = BUILD.read_text(encoding='utf-8')
@@ -137,6 +161,7 @@ class Nt3MicroLinux(unittest.TestCase):
             ('tools/w2k/usosrst/bin/nt351/i386/usosrst.sys', 'usr/lib/usos/nt3/USOSRST.SYS'),
             ('tools/nt4/usosusb/bin/i386/usosusb.sys', 'usr/lib/usos/nt3/USOSUSB.SYS'),
             ('tools/nt3/usosnt3/bin/i386/usosnt3.exe', 'usr/lib/usos/nt3/USOSNT3.EXE'),
+            ('tools/nt3/usosachk/bin/i386/usosachk.exe', 'usr/lib/usos/nt3/USOSACHK.EXE'),
         ):
             self.assertIn(f'("{pair[0]}", "{pair[1]}")', text)
             self.assertTrue((ROOT / pair[0]).is_file(), pair[0])

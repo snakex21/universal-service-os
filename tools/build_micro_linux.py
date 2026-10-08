@@ -632,6 +632,7 @@ def main() -> int:
             ("tools/w2k/usosrst/bin/nt351/i386/usosrst.sys", "usr/lib/usos/nt3/USOSRST.SYS"),
             ("tools/nt4/usosusb/bin/i386/usosusb.sys", "usr/lib/usos/nt3/USOSUSB.SYS"),
             ("tools/nt3/usosnt3/bin/i386/usosnt3.exe", "usr/lib/usos/nt3/USOSNT3.EXE"),
+            ("tools/nt3/usosachk/bin/i386/usosachk.exe", "usr/lib/usos/nt3/USOSACHK.EXE"),
         ):
             put(entries, Entry(target_name, stat.S_IFREG | 0o644, (root / source_name).read_bytes()))
         xp_vbr = root / "zig-out/xp-bios/xp-vbr-code.bin"
