@@ -88,9 +88,10 @@ Na górze okna możesz wybrać język. Wybrany język trafia też na pendrive
    wymagane 32 GB”).
 4. Kliknij **Dalej**. Pojawi się ekran „**UWAGA - OPERACJA NISZCZĄCA**”
    z listą partycji i plików, które zostaną usunięte. Przeczytaj ją.
-5. Wpisz dokładnie, znak w znak, tekst potwierdzenia pokazany po lewej
-   (nazwę modelu pendrive'a).
-6. Kliknij **ROZPOCZNIJ KASOWANIE I INSTALACJĘ**.
+5. Zaznacz **Rozumiem, że wszystko na tym dysku zostanie usunięte**.
+6. Kliknij **ROZPOCZNIJ KASOWANIE I INSTALACJĘ**. Przycisk staje się
+   aktywny po zaznaczeniu pola i 3 sekundach od wyświetlenia ekranu
+   (odliczanie widać na przycisku).
 7. Czekaj. Instalacja ma 9 kroków. Od kroku 1 nie da się już przerwać.
    **Nie odłączaj pendrive'a i nie wyłączaj komputera.**
 8. Na końcu instalator sam czyta pendrive i sprawdza wynik. Ekran końcowy
@@ -131,8 +132,9 @@ DATA i WORK nie są formatowane ani czyszczone.
 1. Wybierz kartę **Deinstalacja** i swój pendrive.
 2. Przeczytaj ekran „**UWAGA - DEINSTALACJA USOS**”. Zniknie wszystko:
    ESP, DATA (z obrazami) i WORK.
-3. Wpisz pełny model urządzenia dokładnie tak, jak jest pokazany.
-4. Kliknij **ROZPOCZNIJ DEINSTALACJĘ**.
+3. Zaznacz **Rozumiem, że wszystko na tym dysku zostanie usunięte**.
+4. Kliknij **ROZPOCZNIJ DEINSTALACJĘ** (aktywny po zaznaczeniu pola
+   i 3-sekundowym odliczaniu).
 
 Wynik: jedna zwykła partycja exFAT.
 

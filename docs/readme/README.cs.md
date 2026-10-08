@@ -165,8 +165,8 @@ v PowerShellu) proti `SHA256SUMS`.
    disk prodávaný jako „32 GB“ bývá obvykle příliš malý). **Vše, co je na
    něm, bude smazáno.**
 2. Na počítači s Windows spusťte `USOS-Installer-1.0.0.exe` (vyžádá si práva
-   správce), zvolte **Instalace**, vyberte flash disk, napište potvrzovací
-   text a klikněte na **SMAZAT A INSTALOVAT**.
+   správce), zvolte **Instalace**, vyberte flash disk, zaškrtněte
+   potvrzovací políčko a klikněte na **SMAZAT A INSTALOVAT**.
 3. Zkopírujte své obrazy ISO na oddíl DATA do složky `Images` příslušného
    systému, např. `Systems\Windows\Windows 11\Images\`.
 4. Volitelně: pro Vistu nebo originální Windows 7 v UEFI zkopírujte složku

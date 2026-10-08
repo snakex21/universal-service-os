@@ -167,8 +167,8 @@ Controleer een download met `certutil -hashfile USOS-Installer-1.0.0.exe SHA256`
    stick die als “32 GB” wordt verkocht, is meestal te klein). **Alles wat
    erop staat, wordt gewist.**
 2. Start op een Windows-pc `USOS-Installer-1.0.0.exe` (het vraagt om
-   beheerdersrechten), kies **Installatie**, selecteer de stick, typ de
-   bevestigingstekst en klik op **WISSEN EN INSTALLEREN**.
+   beheerdersrechten), kies **Installatie**, selecteer de stick, vink het
+   bevestigingsvakje aan en klik op **WISSEN EN INSTALLEREN**.
 3. Kopieer je ISO-images naar de DATA-partitie, in de map `Images` van het
    betreffende systeem, bijv. `Systems\Windows\Windows 11\Images\`.
 4. Optioneel: voor Vista of de originele Windows 7 op UEFI kopieer je de map

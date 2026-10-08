@@ -4,6 +4,7 @@ package ui
 
 import (
 	"strings"
+	"time"
 
 	"github.com/snakex21/universal-service-os/installer/internal/domain"
 	"github.com/snakex21/universal-service-os/installer/internal/i18n"
@@ -62,40 +63,49 @@ func itoa(n uint32) string {
 	return string(b[i:])
 }
 
-// ---- typed confirmation (install and uninstall) ---------------------------
+// ---- erase confirmation (install and uninstall) ---------------------------
 
-type typedConfirmScreen struct {
+// eraseConfirmScreen guards the destructive operations. The start button is
+// enabled only after the "everything on this drive will be erased" box is
+// ticked and the screen has been shown for domain.DestructiveConfirmDelay.
+type eraseConfirmScreen struct {
 	f         *Flow
 	op        operation
 	disk      domain.Disk
 	target    installed.Target
 	model     domain.Confirmation
-	input     string
+	gate      domain.DestructiveGate
 	submitted bool
 	onCancel  func()
 	onConfirm func()
 }
 
-func newInstallConfirmation(f *Flow, disk domain.Disk) *typedConfirmScreen {
-	s := &typedConfirmScreen{f: f, op: opInstall, disk: disk, model: domain.BuildConfirmation(disk), onCancel: f.showInstallDevices}
+func newInstallConfirmation(f *Flow, disk domain.Disk) *eraseConfirmScreen {
+	s := &eraseConfirmScreen{f: f, op: opInstall, disk: disk, model: domain.BuildConfirmation(disk), gate: domain.NewDestructiveGate(time.Now()), onCancel: f.showInstallDevices}
 	s.onConfirm = func() { f.showInstallProgress(disk) }
 	return s
 }
 
-func newUninstallConfirmation(f *Flow, target installed.Target) *typedConfirmScreen {
-	s := &typedConfirmScreen{f: f, op: opUninstall, disk: target.Disk, target: target, model: domain.BuildConfirmation(target.Disk)}
+func newUninstallConfirmation(f *Flow, target installed.Target) *eraseConfirmScreen {
+	s := &eraseConfirmScreen{f: f, op: opUninstall, disk: target.Disk, target: target, model: domain.BuildConfirmation(target.Disk), gate: domain.NewDestructiveGate(time.Now())}
 	s.onCancel = func() { f.showInstalledDevices(opUninstall) }
 	s.onConfirm = func() { f.showUninstallProgress(target) }
 	return s
 }
 
-func (s *typedConfirmScreen) relocalize() {
+func (s *eraseConfirmScreen) relocalize() {
 	s.model = domain.BuildConfirmation(s.disk)
 }
 
-func (s *typedConfirmScreen) accepted() bool { return s.model.Accepts(s.input) }
+func (s *eraseConfirmScreen) accepted() bool { return s.gate.Ready(time.Now()) }
 
-func (s *typedConfirmScreen) confirm() {
+func (s *eraseConfirmScreen) toggle() {
+	if !s.submitted {
+		s.gate.Toggle()
+	}
+}
+
+func (s *eraseConfirmScreen) confirm() {
 	if s.submitted || !s.accepted() || s.onConfirm == nil {
 		return
 	}
@@ -103,64 +113,51 @@ func (s *typedConfirmScreen) confirm() {
 	s.onConfirm()
 }
 
-func (s *typedConfirmScreen) cancel() {
+func (s *eraseConfirmScreen) cancel() {
 	if !s.submitted && s.onCancel != nil {
 		s.onCancel()
 	}
 }
 
-func (s *typedConfirmScreen) draw(f *Flow, w *win, area rect) {
+func (s *eraseConfirmScreen) draw(f *Flow, w *win, area rect) {
 	c := w.canvas
 	bar, body := w.actionBar(area)
 	title, warning := i18n.T("installer.confirm.title"), i18n.T("installer.confirm.warning")
 	button := i18n.T("installer.confirm.button")
-	prompt := i18n.T("installer.confirm.prompt")
 	if s.op == opUninstall {
 		title, warning = i18n.T("installer.uninstall.confirm_title"), i18n.T("installer.uninstall.confirm_warning")
 		button = i18n.T("installer.uninstall.button")
-		prompt = i18n.T("installer.uninstall.prompt")
 	}
 	body = w.pageTitle(body, title, "", theme.Danger, glyphWarning)
 	body.Top -= w.px(4)
 	body.Top += w.banner(body.Left, body.Top, body.w(), warning, toneDanger) + w.px(16)
 
-	// Bottom block: prompt, expected text, input. Measured first so the
+	// Bottom block: the acknowledgement checkbox. Measured first so the
 	// middle area gets whatever height is left.
-	promptH := c.measure(w.bodyFont(), prompt, body.w())
-	inputH := w.px(40)
-	bottomH := promptH + w.px(10) + inputH
-	middle := rect{body.Left, body.Top, body.Right, body.Bottom - bottomH - w.px(18)}
+	ack := i18n.T("installer.confirm.acknowledge")
+	box := w.px(20)
+	ackH := max(box, c.measure(w.bodyFont(), ack, body.w()-box-w.px(12)))
+	middle := rect{body.Left, body.Top, body.Right, body.Bottom - ackH - w.px(18)}
 	leftW := middle.w() * 44 / 100
 	leftR, rightR := middle.cutLeft(leftW)
 	rightR.Left += w.px(16)
 	drawTarget(w, leftR.Left, leftR.Top, leftR.w(), s.disk, nil)
 	s.drawLosses(w, rightR)
 
-	y := body.Bottom - bottomH
-	y += w.wrapped(w.bodyFont(), prompt, body.Left, y, body.w(), theme.Text) + w.px(10)
-	// The text to type, shown next to the input.
-	expected := s.model.ExpectedText
-	expW := min(c.textWidth(w.mono(15), expected)+w.px(28), body.w()*45/100)
-	expR := rect{body.Left, y, body.Left + expW, y + inputH}
-	c.roundRect(expR, w.px(radiusButton), theme.DangerSoft)
-	c.text(w.fontFace("Consolas", 15, fwBold, clearTypeQuality), expected, expR.inset(w.px(14), 0), theme.Danger.mix(theme.Text, 0.35), dtLeft|dtSingleLine|dtVCenter|dtEndEllipsis)
-	inR := rect{expR.Right + w.px(12), y, body.Right, y + inputH}
-	w.textField("confirm.input", inR, editOptions{mono: true, fontSize: 15, disabled: s.submitted, cue: i18n.T("installer.confirm.input_cue"), onChange: func(text string) { s.input = text }})
-	if s.input != "" {
-		mark, col := glyphCancel, theme.Danger
-		if s.accepted() {
-			mark, col = glyphCheck, theme.Success
-		}
-		w.glyph(mark, rect{inR.Right - w.px(34), inR.Top, inR.Right - w.px(10), inR.Bottom}, 14, col)
-	}
+	w.checkbox("confirm.ack", body.Left+w.px(4), body.Bottom-ackH, body.w()-w.px(8), ack, s.gate.Acknowledged(), s.toggle)
 
+	now := time.Now()
+	if left := s.gate.RemainingSeconds(now); left > 0 && !s.submitted {
+		button += " (" + itoa(uint32(left)) + ")"
+		w.animate = true // repaint until the delay has passed
+	}
 	w.actions(bar,
 		[]action{{"action.back", buttonSpec{label: i18n.T("installer.common.cancel"), disabled: s.submitted, onClick: s.cancel}}},
-		[]action{{"confirm.go", buttonSpec{label: button, glyph: glyphWarning, style: buttonDanger, disabled: s.submitted || !s.accepted(), onClick: s.confirm, commits: true}}},
+		[]action{{"confirm.go", buttonSpec{label: button, glyph: glyphWarning, style: buttonDanger, disabled: s.submitted || !s.gate.Ready(now), onClick: s.confirm, commits: true}}},
 	)
 }
 
-func (s *typedConfirmScreen) drawLosses(w *win, r rect) {
+func (s *eraseConfirmScreen) drawLosses(w *win, r rect) {
 	c := w.canvas
 	w.panel(r)
 	inner := r.inset(w.px(20), w.px(16))
@@ -194,7 +191,7 @@ func (s *typedConfirmScreen) drawLosses(w *win, r rect) {
 	w.endScroll("losses", view, y+offset-view.Top)
 }
 
-func (s *typedConfirmScreen) key(f *Flow, w *win, vk uintptr) bool {
+func (s *eraseConfirmScreen) key(f *Flow, w *win, vk uintptr) bool {
 	if vk == vkEscape {
 		s.cancel()
 		return true

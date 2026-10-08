@@ -170,7 +170,7 @@ w PowerShell), porównując wynik z wierszem w `SHA256SUMS`.
    **Wszystko, co na nim jest, zostanie skasowane.**
 2. Na komputerze z Windows uruchom `USOS-Installer-1.0.0.exe` (poprosi
    o uprawnienia administratora), wybierz **Instalacja**, wskaż pendrive,
-   przepisz tekst potwierdzenia i kliknij **ROZPOCZNIJ KASOWANIE
+   zaznacz pole potwierdzenia i kliknij **ROZPOCZNIJ KASOWANIE
    I INSTALACJĘ**.
 3. Skopiuj swoje obrazy ISO na partycję DATA, do folderu `Images`
    odpowiedniego systemu, np. `Systems\Windows\Windows 11\Images\`.

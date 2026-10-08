@@ -168,7 +168,7 @@ doğrulayın.
    silinecektir.**
 2. Bir Windows bilgisayarda `USOS-Installer-1.0.0.exe` dosyasını çalıştırın
    (yönetici hakları ister), **Kurulum**'u seçin, belleği seçin, onay
-   metnini yazın ve **SİL VE KUR**'a tıklayın.
+   kutusunu işaretleyin ve **SİL VE KUR**'a tıklayın.
 3. ISO kalıplarınızı DATA bölümüne, her sistemin `Images` klasörüne
    kopyalayın, ör. `Systems\Windows\Windows 11\Images\`.
 4. İsteğe bağlı: UEFI'de Vista veya orijinal Windows 7 için PE10 donör

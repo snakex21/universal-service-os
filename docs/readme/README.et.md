@@ -167,8 +167,8 @@ Kontrolli allalaaditud faili käsuga
    pulgana müüdud pulk on tavaliselt liiga väike). **Kõik sellel olev
    kustutatakse.**
 2. Käivita Windowsi arvutis `USOS-Installer-1.0.0.exe` (see küsib
-   administraatoriõigusi), vali **Installimine**, vali pulk, sisesta
-   kinnitustekst ja klõpsa **KUSTUTA JA INSTALLI**.
+   administraatoriõigusi), vali **Installimine**, vali pulk, märgi
+   kinnituskast ja klõpsa **KUSTUTA JA INSTALLI**.
 3. Kopeeri oma ISO-tõmmised DATA partitsioonile vastava süsteemi kausta
    `Images`, nt `Systems\Windows\Windows 11\Images\`.
 4. Valikuline: Vista või Windows 7 originaali jaoks UEFI-l kopeeri PE10

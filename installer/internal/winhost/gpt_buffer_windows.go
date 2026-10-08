@@ -112,9 +112,13 @@ func buildDriveLayoutBuffer(plan layout.Plan, header gptHeader, ids gptIDs) ([]b
 		attributes uint64
 		name       string
 	}{
+		// DATA and WORK are created with NoDriveLetter so Windows does not
+		// mount the still-unformatted volumes under a letter (Explorer
+		// windows and the "format the disk in drive X:" prompt). Bit 63 is
+		// cleared after formatting (ExposeFormattedVolumes).
 		{1, 1, plan.ESP, efiSystemPartitionType, ids.ESP, 0, "USOS_ESP"},
-		{2, 2, plan.DATA, basicDataPartitionType, ids.DATA, 0, "USOS_DATA"},
-		{3, 3, plan.WORK, basicDataPartitionType, ids.WORK, 0, "USOS_WORK"},
+		{2, 2, plan.DATA, basicDataPartitionType, ids.DATA, gptBasicDataAttributeNoDriveLetter, "USOS_DATA"},
+		{3, 3, plan.WORK, basicDataPartitionType, ids.WORK, gptBasicDataAttributeNoDriveLetter, "USOS_WORK"},
 	}
 	for index, partition := range partitions {
 		offset := driveLayoutHeaderSize + index*partitionEntrySize

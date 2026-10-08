@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
+
+	"github.com/snakex21/universal-service-os/installer/internal/hiddenexec"
 )
 
 const wimBootTemplateDirectory = "WimBootTemplate"
@@ -195,8 +196,7 @@ func createWimBootBCD(bcdeditPath, storePath string) error {
 }
 
 func runBCD(executable string, args ...string) (string, error) {
-	command := exec.Command(executable, args...)
-	output, err := command.CombinedOutput()
+	output, err := hiddenexec.CombinedOutput(fmt.Sprint(filepath.Base(executable), " ", args), hiddenexec.Command(executable, args...))
 	if err != nil {
 		return string(output), fmt.Errorf("%s %v failed: %w: %s", executable, args, err, strings.TrimSpace(string(output)))
 	}

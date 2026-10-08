@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/snakex21/universal-service-os/installer/internal/hiddenexec"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/uninstall"
 )
@@ -45,7 +46,7 @@ func (Backend) FormatExFAT(media uninstall.MediaLayout) error {
 	if err != nil {
 		return fmt.Errorf("Windows PowerShell is required for Format-Volume: %w", err)
 	}
-	cmd := exec.Command(powershell, "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", formatUninstallExFATScript)
+	cmd := hiddenexec.Command(powershell, "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", formatUninstallExFATScript)
 	cmd.Env = append(os.Environ(),
 		"USOS_UNINSTALL_DISK="+strconv.FormatUint(uint64(media.DiskNumber), 10),
 		"USOS_UNINSTALL_OFFSET="+strconv.FormatUint(media.Data.StartBytes, 10),
@@ -53,7 +54,7 @@ func (Backend) FormatExFAT(media uninstall.MediaLayout) error {
 		"USOS_UNINSTALL_PARTUUID="+media.Data.PartUUID,
 		"USOS_UNINSTALL_GPTTYPE="+guidString(basicDataPartitionType),
 	)
-	output, err := cmd.CombinedOutput()
+	output, err := hiddenexec.CombinedOutput("Format-Volume exFAT PARTUUID="+media.Data.PartUUID, cmd)
 	if err != nil {
 		return fmt.Errorf("Format-Volume exFAT PARTUUID=%s: %w: %s", media.Data.PartUUID, err, strings.TrimSpace(string(output)))
 	}

@@ -164,8 +164,8 @@ Kontrollér en download med `certutil -hashfile USOS-Installer-1.0.0.exe SHA256`
    sælges som »32 GB«, er som regel for lille). **Alt på det bliver
    slettet.**
 2. Kør `USOS-Installer-1.0.0.exe` på en Windows-pc (den beder om
-   administratorrettigheder), vælg **Installation**, vælg stikket, skriv
-   bekræftelsesteksten og klik på **SLET OG INSTALLER**.
+   administratorrettigheder), vælg **Installation**, vælg stikket, sæt
+   flueben i bekræftelsesfeltet og klik på **SLET OG INSTALLER**.
 3. Kopiér dine ISO-aftryk til DATA-partitionen, i mappen `Images` for det
    pågældende system, f.eks. `Systems\Windows\Windows 11\Images\`.
 4. Valgfrit: til Vista eller original Windows 7 på UEFI kopierer du mappen

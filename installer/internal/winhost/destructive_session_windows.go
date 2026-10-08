@@ -3,12 +3,14 @@
 package winhost
 
 import (
-	"github.com/snakex21/universal-service-os/installer/internal/volumelock"
 	"fmt"
+	"time"
 
+	"github.com/snakex21/universal-service-os/installer/internal/autoplay"
 	"github.com/snakex21/universal-service-os/installer/internal/domain"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/layout"
+	"github.com/snakex21/universal-service-os/installer/internal/volumelock"
 	"golang.org/x/sys/windows"
 )
 
@@ -24,20 +26,49 @@ type Backend struct {
 	VolumeInUse volumelock.Prompt
 	// VolumeLockLog receives the retry log lines; nil discards them.
 	VolumeLockLog func(string)
+	// Log receives other diagnostic lines (AutoPlay); nil discards them.
+	Log func(string)
+}
+
+// autoPlayRestoreDelay keeps AutoPlay off for a moment after the session,
+// because the shell handles the arrival of the new DATA drive letter
+// asynchronously.
+const autoPlayRestoreDelay = 3 * time.Second
+
+func (b Backend) log(line string) {
+	if b.Log != nil {
+		b.Log(line)
+	}
+}
+
+// suppressAutoPlay turns AutoPlay off for the rest of the session so no
+// Explorer window or AutoPlay prompt opens for the volumes being created.
+// A failure only costs that comfort, so it is logged, not fatal.
+func (s *destructiveSession) suppressAutoPlay(b Backend) {
+	restore, err := autoplay.Suppress(autoplay.CurrentUser{})
+	if err != nil {
+		b.log("WARN AutoPlay nie został wyłączony na czas operacji: " + err.Error())
+		return
+	}
+	b.log("AutoPlay wyłączony na czas operacji (przywracany po jej zakończeniu)")
+	s.restoreAutoPlay = restore
+	s.log = b.log
 }
 
 type destructiveSession struct {
-	diskNumber  uint32
-	sectorBytes uint32
-	diskBytes   uint64
-	disk        windows.Handle
-	volumes     []lockedVolume
+	diskNumber       uint32
+	sectorBytes      uint32
+	diskBytes        uint64
+	disk             windows.Handle
+	volumes          []lockedVolume
 	cleaned          bool
 	created          bool
 	closed           bool
 	legacyCleared    bool
 	legacyCoreStart  uint64
 	legacyCoreLength uint64
+	restoreAutoPlay  func() error
+	log              func(string)
 }
 
 func (b Backend) BeginDestructive(expected domain.Disk) (install.DestructiveSession, domain.Disk, error) {
@@ -98,6 +129,7 @@ func (b Backend) BeginDestructive(expected domain.Disk) (install.DestructiveSess
 	}
 	session.sectorBytes = current.SectorBytes
 	session.diskBytes = current.SizeBytes
+	session.suppressAutoPlay(b)
 	return session, current, nil
 }
 
@@ -201,6 +233,17 @@ func (s *destructiveSession) Close() error {
 	s.closed = true
 	volumeErr := closeLockedVolumes(s.volumes)
 	diskErr := windows.CloseHandle(s.disk)
+	if s.restoreAutoPlay != nil {
+		if s.created {
+			time.Sleep(autoPlayRestoreDelay)
+		}
+		if err := s.restoreAutoPlay(); err != nil && s.log != nil {
+			s.log("WARN przywrócenie ustawienia AutoPlay: " + err.Error())
+		} else if s.log != nil {
+			s.log("AutoPlay przywrócony do ustawienia użytkownika")
+		}
+		s.restoreAutoPlay = nil
+	}
 	if volumeErr != nil {
 		return volumeErr
 	}

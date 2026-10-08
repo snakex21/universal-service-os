@@ -19,9 +19,10 @@ package winhost
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"strings"
 
+	"github.com/snakex21/universal-service-os/installer/internal/hiddenexec"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 )
 
@@ -84,7 +85,7 @@ func StageWin7UEFIModernOnDisk(p Win7StagingParams) error {
 	}
 	// bcdboot dopiero po verify apply-image: wywolujacy ma to zagwarantowac.
 	bcdboot := install.BcdbootUEFICommand(p.WindowsDir, p.ESPVolume)
-	if out, err := exec.Command(bcdboot[0], bcdboot[1:]...).CombinedOutput(); err != nil {
+	if out, err := hiddenexec.CombinedOutput(strings.Join(bcdboot, " "), hiddenexec.Command(bcdboot[0], bcdboot[1:]...)); err != nil {
 		return fmt.Errorf("win7 staging: %v: %w: %s", bcdboot, err, string(out))
 	}
 	entry := p.StagedEntryID
@@ -97,7 +98,7 @@ func StageWin7UEFIModernOnDisk(p Win7StagingParams) error {
 	}
 	winCmds, _ := install.OneShotBootNextCommands(entry, timeout)
 	for _, c := range winCmds {
-		if out, err := exec.Command(c[0], c[1:]...).CombinedOutput(); err != nil {
+		if out, err := hiddenexec.CombinedOutput(strings.Join(c, " "), hiddenexec.Command(c[0], c[1:]...)); err != nil {
 			return fmt.Errorf("win7 staging one-shot: %v: %w: %s", c, err, string(out))
 		}
 	}
@@ -137,7 +138,7 @@ func BackupESPBootFiles(espRoot, backupDir string) error {
 // (odczyt, bez modyfikacji BootOrder).
 func DumpFirmwareNVRAM(backupDir string) error {
 	win, _ := install.FirmwareDumpCommands()
-	out, err := exec.Command(win[0], win[1:]...).CombinedOutput()
+	out, err := hiddenexec.CombinedOutput(strings.Join(win, " "), hiddenexec.Command(win[0], win[1:]...))
 	if err != nil {
 		return fmt.Errorf("win7 staging: dump NVRAM: %w: %s", err, string(out))
 	}
@@ -180,7 +181,7 @@ func RestoreWin7StagingBackup(espRoot, backupDir, defaultEntryID string) error {
 	if entry == "" {
 		entry = "{default}"
 	}
-	if out, err := exec.Command("bcdedit", "/set", "{fwbootmgr}", "displayorder", entry, "/addfirst").CombinedOutput(); err != nil {
+	if out, err := hiddenexec.CombinedOutput("bcdedit /set {fwbootmgr} displayorder "+entry+" /addfirst", hiddenexec.Command("bcdedit", "/set", "{fwbootmgr}", "displayorder", entry, "/addfirst")); err != nil {
 		return fmt.Errorf("win7 rollback: domyslny wpis: %w: %s", err, string(out))
 	}
 	return nil

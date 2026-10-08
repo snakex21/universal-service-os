@@ -168,7 +168,7 @@ Confira um download com `certutil -hashfile USOS-Installer-1.0.0.exe SHA256`
    que houver nele será apagado.**
 2. Em um PC com Windows, execute `USOS-Installer-1.0.0.exe` (ele pede
    direitos de administrador), escolha **Instalação**, selecione o
-   pendrive, digite o texto de confirmação e clique em **APAGAR E
+   pendrive, marque a caixa de confirmação e clique em **APAGAR E
    INSTALAR**.
 3. Copie suas imagens ISO para a partição DATA, na pasta `Images` de cada
    sistema, por exemplo `Systems\Windows\Windows 11\Images\`.

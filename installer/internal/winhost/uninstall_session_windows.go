@@ -76,6 +76,7 @@ func (b Backend) BeginUSOSDestructive(expected uninstall.Target) (uninstall.Dest
 	}
 	session.sectorBytes = current.SectorBytes
 	session.diskBytes = current.SizeBytes
+	session.suppressAutoPlay(b)
 	return session, current, nil
 }
 

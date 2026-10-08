@@ -170,7 +170,7 @@ Vérifiez un téléchargement avec `certutil -hashfile USOS-Installer-1.0.0.exe 
    contenu sera effacé.**
 2. Sur un PC Windows, lancez `USOS-Installer-1.0.0.exe` (il demande les
    droits d'administrateur), choisissez **Installation**, sélectionnez la
-   clé, saisissez le texte de confirmation et cliquez sur **EFFACER ET
+   clé, cochez la case de confirmation et cliquez sur **EFFACER ET
    INSTALLER**.
 3. Copiez vos images ISO sur la partition DATA, dans le dossier `Images` de
    chaque système, par exemple `Systems\Windows\Windows 11\Images\`.

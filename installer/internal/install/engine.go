@@ -22,7 +22,9 @@ type Backend interface {
 	FormatESP(media MediaLayout) error
 	FormatDATA(media MediaLayout) error
 	FormatWORK(media MediaLayout) error
-	EnsureWORKVisible(media MediaLayout) error
+	// ExposeFormattedVolumes clears the NoDriveLetter bit DATA and WORK are
+	// created with and gives DATA (only) a drive letter.
+	ExposeFormattedVolumes(media MediaLayout) error
 	CopyInstallPayload(media MediaLayout, progress func(done, total uint64)) error
 	WriteIdentity(media MediaLayout, workBytes uint64) (DeviceINI, error)
 	Verify(media MediaLayout, expected DeviceINI) (VerificationReport, error)
@@ -115,15 +117,15 @@ func (e *Engine) run(expected domain.Disk, events chan<- Event) {
 		if err := e.backend.FormatWORK(media); err != nil {
 			return err
 		}
-		if err := e.backend.EnsureWORKVisible(media); err != nil {
-			return fmt.Errorf("expose WORK after format: %w", err)
+		if err := e.backend.ExposeFormattedVolumes(media); err != nil {
+			return fmt.Errorf("expose DATA/WORK after format: %w", err)
 		}
 		readBack, err := session.VerifyLayoutUnchanged(media)
 		if err != nil {
 			return fmt.Errorf("post-format GPT read-back mismatch: %w", err)
 		}
 		media = readBack
-		e.log(events, "POST-FORMAT READ-BACK PASS: PARTUUID-y, typy i atrybuty GPT (WORK NoDriveLetter=0), offsety oraz rozmiary nie zmieniły się po formatowaniu")
+		e.log(events, "POST-FORMAT READ-BACK PASS: PARTUUID-y, typy i atrybuty GPT (DATA/WORK NoDriveLetter=0, DATA ma literę, WORK bez litery), offsety oraz rozmiary nie zmieniły się po formatowaniu")
 		return nil
 	}); err != nil {
 		return

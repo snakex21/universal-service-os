@@ -18,7 +18,7 @@ import (
 // bar and the header, Start presses the screen's main button and the right
 // stick scrolls. Start never commits an operation: on a confirmation screen
 // it only moves the focus to the confirm button, which then needs A (and,
-// for installs and uninstalls, the typed model name as always).
+// for installs and uninstalls, the ticked "everything will be erased" box).
 
 const (
 	padTimerID       = 2

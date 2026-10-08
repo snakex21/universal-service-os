@@ -12,7 +12,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/snakex21/universal-service-os/installer/internal/autoplay"
 	"github.com/snakex21/universal-service-os/installer/internal/buildinfo"
+	"github.com/snakex21/universal-service-os/installer/internal/hiddenexec"
 	"github.com/snakex21/universal-service-os/installer/internal/i18n"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/localupdate"
@@ -53,10 +55,20 @@ func run(prefsPath string) error {
 	defer logger.Close()
 	linkedBuild := buildinfo.Current()
 	_ = logger.WriteLine(fmt.Sprintf("INSTALLER BUILD id=%s epoch=%d source_sha256=%s", linkedBuild.Display(), linkedBuild.Epoch, linkedBuild.SourceSHA256))
+	// Helper programs (PowerShell, bcdedit, dism) run without a console
+	// window; their output goes to this log.
+	hiddenexec.SetLog(func(line string) { _ = logger.WriteLine(line) })
+	defer hiddenexec.SetLog(nil)
+	// AutoPlay is switched off while a target is partitioned; a run that
+	// crashed in that window left a journal, so put the user's setting back.
+	if err := autoplay.RestorePending(autoplay.CurrentUser{}); err != nil {
+		_ = logger.WriteLine("WARN przywrócenie AutoPlay po poprzednim uruchomieniu: " + err.Error())
+	}
+	defer func() { _ = autoplay.RestoreAtExit(autoplay.CurrentUser{}) }()
 
 	// The progress screen answers "drive in use" with Retry/Cancel.
 	volumeInUse := &volumelock.Relay{}
-	backend := winhost.Backend{VolumeInUse: volumeInUse.Ask}
+	backend := winhost.Backend{VolumeInUse: volumeInUse.Ask, Log: func(line string) { _ = logger.WriteLine(line) }}
 	installEngine, err := install.NewEngine(backend, logger)
 	if err != nil {
 		return startupError(i18n.T("installer.startup.install_engine_failed", err.Error()))

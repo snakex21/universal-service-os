@@ -168,7 +168,7 @@ Tarkista lataus komennolla `certutil -hashfile USOS-Installer-1.0.0.exe SHA256`
    oleva poistetaan.**
 2. Aja Windows-tietokoneella `USOS-Installer-1.0.0.exe` (se pyytää
    järjestelmänvalvojan oikeuksia), valitse **Asennus**, valitse tikku,
-   kirjoita vahvistusteksti ja napsauta **TYHJENNÄ JA ASENNA**.
+   rastita vahvistusruutu ja napsauta **TYHJENNÄ JA ASENNA**.
 3. Kopioi ISO-levykuvasi DATA-osiolle kunkin järjestelmän kansioon
    `Images`, esim. `Systems\Windows\Windows 11\Images\`.
 4. Valinnainen: Vistaa tai alkuperäistä Windows 7:ää varten UEFI-tilassa
