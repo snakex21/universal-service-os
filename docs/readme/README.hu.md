@@ -171,8 +171,8 @@ a `SHA256SUMS` alapján.
    **Minden adat törlődik róla.**
 2. Egy windowsos gépen futtasd a `USOS-Installer-1.0.0.exe` programot
    (rendszergazdai jogokat kér), válaszd a **Telepítés** módot, jelöld ki a
-   pendrive-ot, írd be a megerősítő szöveget, és kattints a **TÖRLÉS ÉS
-   TELEPÍTÉS** gombra.
+   pendrive-ot, jelöld be a megerősítő jelölőnégyzetet, és kattints a
+   **TÖRLÉS ÉS TELEPÍTÉS** gombra.
 3. Másold az ISO-képfájljaidat a DATA partícióra, az adott rendszer
    `Images` mappájába, pl. `Systems\Windows\Windows 11\Images\`.
 4. Opcionális: a Vistához vagy az eredeti Windows 7-hez UEFI-n másold a

@@ -89,9 +89,10 @@ built in.
    than the required 32 GB").
 4. Click **Next**. The "**WARNING - DESTRUCTIVE OPERATION**" screen lists
    the partitions and files that will be deleted. Read it.
-5. Type the confirmation text shown on the left (the stick's model name)
-   exactly, character for character.
-6. Click **ERASE AND INSTALL**.
+5. Tick **I understand that everything on this drive will be erased**.
+6. Click **ERASE AND INSTALL**. The button becomes active once the box is
+   ticked and the screen has been shown for 3 seconds (the countdown is on
+   the button).
 7. Wait. Installation has 9 steps. From step 1 on, it cannot be cancelled.
    **Do not unplug the stick and do not turn off the computer.**
 8. At the end the installer reads the stick back and checks the result. The
@@ -132,8 +133,9 @@ and WORK are not formatted or cleared.
 1. Choose the **Uninstall** card and your stick.
 2. Read the "**WARNING - USOS UNINSTALL**" screen. Everything goes: ESP,
    DATA (with your images) and WORK.
-3. Type the full device model exactly as shown.
-4. Click **START UNINSTALL**.
+3. Tick **I understand that everything on this drive will be erased**.
+4. Click **START UNINSTALL** (active after the tick and a 3-second
+   countdown).
 
 Result: one plain exFAT partition.
 

@@ -168,8 +168,8 @@ Compruebe una descarga con `certutil -hashfile USOS-Installer-1.0.0.exe SHA256`
    una memoria vendida como «32 GB» suele ser demasiado pequeña). **Se
    borrará todo su contenido.**
 2. En un PC con Windows ejecute `USOS-Installer-1.0.0.exe` (pide derechos
-   de administrador), elija **Instalación**, seleccione la memoria, escriba
-   el texto de confirmación y haga clic en **BORRAR E INSTALAR**.
+   de administrador), elija **Instalación**, seleccione la memoria, marque
+   la casilla de confirmación y haga clic en **BORRAR E INSTALAR**.
 3. Copie sus imágenes ISO a la partición DATA, en la carpeta `Images` de
    cada sistema, p. ej. `Systems\Windows\Windows 11\Images\`.
 4. Opcional: para Vista o Windows 7 original en UEFI, copie la carpeta

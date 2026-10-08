@@ -168,7 +168,7 @@ u PowerShellu) u odnosu na `SHA256SUMS`.
    obrisano.**
 2. Na računaru sa Windowsom pokrenite `USOS-Installer-1.0.0.exe` (traži
    administratorska prava), izaberite **Instalacija**, izaberite fleš,
-   upišite tekst potvrde i kliknite na **IZBRIŠI I INSTALIRAJ**.
+   označite polje za potvrdu i kliknite na **IZBRIŠI I INSTALIRAJ**.
 3. Kopirajte svoje ISO slike na particiju DATA, u fasciklu `Images`
    odgovarajućeg sistema, npr. `Systems\Windows\Windows 11\Images\`.
 4. Opciono: za Vistu ili originalni Windows 7 u UEFI-ju kopirajte fasciklu

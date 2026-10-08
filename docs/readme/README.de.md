@@ -170,7 +170,7 @@ Prüfen Sie einen Download mit `certutil -hashfile USOS-Installer-1.0.0.exe SHA2
    darauf wird gelöscht.**
 2. Starten Sie auf einem Windows-PC `USOS-Installer-1.0.0.exe` (er fragt
    nach Administratorrechten), wählen Sie **Installation**, wählen Sie den
-   Stick, tippen Sie den Bestätigungstext ein und klicken Sie auf **LÖSCHEN
+   Stick, setzen Sie das Bestätigungshäkchen und klicken Sie auf **LÖSCHEN
    UND INSTALLIEREN**.
 3. Kopieren Sie Ihre ISO-Abbilder auf die Partition DATA, in den Ordner
    `Images` des jeweiligen Systems, z. B. `Systems\Windows\Windows 11\Images\`.

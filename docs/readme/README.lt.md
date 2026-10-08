@@ -170,7 +170,7 @@ PowerShell aplinkoje) ir palyginkite su `SHA256SUMS`.
    maža). **Visi joje esantys duomenys bus ištrinti.**
 2. Windows kompiuteryje paleiskite `USOS-Installer-1.0.0.exe` (ji prašo
    administratoriaus teisių), pasirinkite **Diegimas**, pažymėkite
-   atmintinę, įveskite patvirtinimo tekstą ir spustelėkite **IŠTRINTI IR
+   atmintinę, pažymėkite patvirtinimo langelį ir spustelėkite **IŠTRINTI IR
    ĮDIEGTI**.
 3. Nukopijuokite savo ISO atvaizdus į DATA skaidinį, į kiekvienos sistemos
    aplanką `Images`, pvz., `Systems\Windows\Windows 11\Images\`.

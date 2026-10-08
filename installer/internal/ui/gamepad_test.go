@@ -191,7 +191,7 @@ func TestSectionTarget(t *testing.T) {
 	if got := sectionTarget([]string{"log.toggle"}, "log.toggle", 1); got != "" {
 		t.Fatalf("single section = %q", got)
 	}
-	if padSection("confirm.go") != sectionActions || padSection("confirm.input") != sectionBody {
+	if padSection("confirm.go") != sectionActions || padSection("confirm.ack") != sectionBody {
 		t.Fatal("confirm widgets misclassified")
 	}
 }

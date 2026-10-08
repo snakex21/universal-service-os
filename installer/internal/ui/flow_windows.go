@@ -527,7 +527,7 @@ func (f *Flow) showInstallDevices() {
 }
 
 func (f *Flow) showInstallConfirmation(disk domain.Disk) {
-	f.show(newInstallConfirmation(f, disk), "confirm.input")
+	f.show(newInstallConfirmation(f, disk), "confirm.ack")
 }
 
 func (f *Flow) showInstallProgress(disk domain.Disk) {
@@ -572,7 +572,7 @@ func (f *Flow) showRepairProgress(target installed.Target) {
 }
 
 func (f *Flow) showUninstallConfirmation(target installed.Target) {
-	f.show(newUninstallConfirmation(f, target), "confirm.input")
+	f.show(newUninstallConfirmation(f, target), "confirm.ack")
 }
 
 func (f *Flow) showUninstallProgress(target installed.Target) {

@@ -167,8 +167,8 @@ komandu `Get-FileHash`), salīdzinot ar `SHA256SUMS`.
    ir, tiks izdzēsts.**
 2. Windows datorā palaidiet `USOS-Installer-1.0.0.exe` (tas prasa
    administratora tiesības), izvēlieties **Instalēšana**, atlasiet
-   zibatmiņu, ierakstiet apstiprinājuma tekstu un noklikšķiniet uz **DZĒST
-   UN INSTALĒT**.
+   zibatmiņu, atzīmējiet apstiprinājuma izvēles rūtiņu un noklikšķiniet uz
+   **DZĒST UN INSTALĒT**.
 3. Nokopējiet savus ISO attēlus DATA nodalījumā, katras sistēmas mapē
    `Images`, piem., `Systems\Windows\Windows 11\Images\`.
 4. Pēc izvēles: Vista vai oriģinālajai Windows 7 UEFI režīmā nokopējiet mapi

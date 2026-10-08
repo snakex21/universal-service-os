@@ -101,10 +101,6 @@ func cleanDisplayToken(s string) string {
 	return strings.Join(strings.Fields(filtered), " ")
 }
 
-func (d Disk) ConfirmationValue() string {
-	return d.DisplayName()
-}
-
 // Storage bus types reported by IOCTL_STORAGE_QUERY_PROPERTY.
 const (
 	BusUSB  = 7

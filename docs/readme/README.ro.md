@@ -167,7 +167,7 @@ Verificați un fișier descărcat cu
    stick vândut ca „32 GB” este de obicei prea mic). **Tot conținutul lui
    va fi șters.**
 2. Pe un PC cu Windows rulați `USOS-Installer-1.0.0.exe` (cere drepturi de
-   administrator), alegeți **Instalare**, selectați stickul, tastați textul
+   administrator), alegeți **Instalare**, selectați stickul, bifați caseta
    de confirmare și faceți clic pe **ȘTERGE ȘI INSTALEAZĂ**.
 3. Copiați imaginile ISO pe partiția DATA, în folderul `Images` al fiecărui
    sistem, de ex. `Systems\Windows\Windows 11\Images\`.

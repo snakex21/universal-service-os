@@ -169,7 +169,7 @@ Verificate un download con `certutil -hashfile USOS-Installer-1.0.0.exe SHA256`
    suo contenuto verrà cancellato.**
 2. Su un PC Windows avviate `USOS-Installer-1.0.0.exe` (chiede i diritti di
    amministratore), scegliete **Installazione**, selezionate la chiavetta,
-   digitate il testo di conferma e fate clic su **CANCELLA E INSTALLA**.
+   spuntate la casella di conferma e fate clic su **CANCELLA E INSTALLA**.
 3. Copiate le vostre immagini ISO sulla partizione DATA, nella cartella
    `Images` di ciascun sistema, ad es. `Systems\Windows\Windows 11\Images\`.
 4. Facoltativo: per Vista o Windows 7 originale su UEFI, copiate la cartella

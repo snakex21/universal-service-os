@@ -160,8 +160,8 @@ Check a download with `certutil -hashfile USOS-Installer-1.0.0.exe SHA256`
 1. Get a USB stick of **at least 32 GiB** (in practice 64 GB; a stick sold
    as "32 GB" is usually too small). **Everything on it will be erased.**
 2. On a Windows PC run `USOS-Installer-1.0.0.exe` (it asks for
-   administrator rights), choose **Installation**, pick the stick, type the
-   confirmation text and click **ERASE AND INSTALL**.
+   administrator rights), choose **Installation**, pick the stick, tick the
+   confirmation box and click **ERASE AND INSTALL**.
 3. Copy your ISO images to the DATA partition, into the `Images` folder of
    each system, e.g. `Systems\Windows\Windows 11\Images\`.
 4. After the install, the installer's **Components** step puts the WinPE

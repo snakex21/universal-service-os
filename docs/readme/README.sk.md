@@ -166,8 +166,8 @@ v PowerShelli) oproti `SHA256SUMS`.
    kľúč predávaný ako „32 GB“ je zvyčajne príliš malý). **Všetko, čo je na
    ňom, bude vymazané.**
 2. Na počítači s Windows spustite `USOS-Installer-1.0.0.exe` (vyžiada si
-   práva správcu), zvoľte **Inštalácia**, vyberte USB kľúč, napíšte
-   potvrdzovací text a kliknite na **VYMAZAŤ A INŠTALOVAŤ**.
+   práva správcu), zvoľte **Inštalácia**, vyberte USB kľúč, začiarknite
+   potvrdzovacie políčko a kliknite na **VYMAZAŤ A INŠTALOVAŤ**.
 3. Skopírujte svoje obrazy ISO na oddiel DATA do priečinka `Images`
    príslušného systému, napr. `Systems\Windows\Windows 11\Images\`.
 4. Voliteľne: pre Vistu alebo originálne Windows 7 v UEFI skopírujte
