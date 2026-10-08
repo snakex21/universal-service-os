@@ -200,10 +200,10 @@ nt3_detached_answer() {
                 printf "%s\r\n", lines[i]
                 low = tolower(lines[i]); gsub(/[ \t]/, "", low)
                 if (!has && low == "[guiunattended]") {
-                    printf "!DetachedProgram = \"C:\USOS\NT3\USOSNT3.EXE\"\r\n!Arguments = \"/setup\"\r\n"; has = 1
+                    printf "!DetachedProgram = \"C:\\USOS\\NT3\\USOSNT3.EXE\"\r\n!Arguments = \"/setup\"\r\n"; has = 1
                 }
             }
-            if (!has) printf "\r\n[GuiUnattended]\r\n!DetachedProgram = \"C:\USOS\NT3\USOSNT3.EXE\"\r\n!Arguments = \"/setup\"\r\n"
+            if (!has) printf "\r\n[GuiUnattended]\r\n!DetachedProgram = \"C:\\USOS\\NT3\\USOSNT3.EXE\"\r\n!Arguments = \"/setup\"\r\n"
         }'
 }
 
