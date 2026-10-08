@@ -1167,6 +1167,7 @@
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: atbildiet uz oriģinālā Setup jautājumiem ar tastatūru (tur darbojas arī USB tastatūra); Setup izvēlieties VGA (1.0x — EGA) un IBM PS/2 peli. Pašās šajās Windows versijās izmantojiet PS/2 tastatūru (USB tastatūras tilta vēl nav). Nepieciešams MS-DOS 6.22.iso mapē Systems\\DOS\\MS-DOS\\Images nodalījumā DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentāls): nav AHCI/NVMe/USB 3 draivera NT 5.0 (SATA IDE režīmā), maks. 4 GB RAM un 2 procesori",
+  "boot.summary.w2k_server_limits": "Windows 2000 Server (eksperimentāls): Windows 2000 ceļš; atbild licencēšana Uz serveri (5), darba grupa, IIS izslēgts; produkta atslēga no atbilžu profila; CD bez SP4 nav USB 2.0 steka (nav USB tastatūras/peles)",
 
   "boot.summary.nt52_limits": "NT 5.2 (eksperimentāls): AHCI ar GenAHCI uz sistēmas StorPort; instalācijā nav NVMe/USB 3 draivera",
   "boot.summary.vista_csmwrap": "Vista bez CSM (eksperimentāli): legacy (MBR) instalēšana ar CSMWrap, karte ar legacy VBIOS",

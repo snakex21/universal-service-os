@@ -1167,6 +1167,7 @@
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: na pitanja originalnog Setupa odgovorite tastaturom (tamo radi i USB tastatura); u Setupu izaberite VGA (EGA za 1.0x) i miš IBM PS/2. U samim tim verzijama Windowsa koristite PS/2 tastaturu (most za USB tastaturu još ne postoji). Potreban je MS-DOS 6.22.iso u Systems\\DOS\\MS-DOS\\Images na particiji DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentalno): nema drajvera AHCI/NVMe/USB 3 za NT 5.0 (SATA u IDE režimu), najviše 4 GB RAM-a i 2 procesora",
+  "boot.summary.w2k_server_limits": "Windows 2000 Server (eksperimentalno): putanja Windows 2000; odgovara licenciranje Po serveru (5), radna grupa, IIS isključen; ključ proizvoda iz profila odgovora; CD bez SP4 nema USB 2.0 stek (bez USB tastature/miša)",
 
   "boot.summary.nt52_limits": "NT 5.2 (eksperimentalno): AHCI preko GenAHCI na StorPortu sistema; nema drajvera NVMe/USB 3 u instalaciji",
   "boot.summary.vista_csmwrap": "Vista bez CSM-a (eksperimentalno): legacy instalacija (MBR) preko CSMWrap-a, kartica sa legacy VBIOS-om",

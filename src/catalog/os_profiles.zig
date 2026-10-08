@@ -119,7 +119,12 @@ pub const traits_table = [_]SystemTraits{
     .{ .system_id = "windows-server-2008", .route_as = "windows-vista" },
     // Linux ISO from DATA: SystemRescue ships no Microsoft-signed shim.
     .{ .system_id = "systemrescue", .secure_boot_off = true },
-};
+} ++ (if (native_windows7_enabled) [_]SystemTraits{
+    // Windows 2000 Server (UEFI only, src/catalog/windows_server.zig): the
+    // Windows 2000 NT5 staging with the same driver set; the micro-Linux
+    // reads its own DATA folder and adds the Server answers.
+    .{ .system_id = "windows-2000-server", .route_as = "windows-2000" },
+} else [_]SystemTraits{});
 
 fn ownTraits(system_id: []const u8) SystemTraits {
     for (traits_table) |entry| {
@@ -165,6 +170,11 @@ test "NT 5.2 entries and the routed Servers fall back to a client icon" {
     // The icon alias never changes the routing.
     try std.testing.expectEqualStrings("windows-server-2003", routeId("windows-server-2003"));
     try std.testing.expectEqualStrings("windows-xp-x64", routeId("windows-xp-x64"));
+    // Windows 2000 Server takes the Windows 2000 routing, traits and icon.
+    try std.testing.expectEqualStrings("windows-2000", routeId("windows-2000-server"));
+    try std.testing.expectEqualStrings("windows-2000", iconId("windows-2000-server"));
+    try std.testing.expect(traits("windows-2000-server").nt5_staging);
+    try std.testing.expectEqual(AnswerFormat.winnt_sif, traits("windows-2000-server").answer);
 }
 
 /// The start gate of a probed Windows ISO of this system (image list, boot

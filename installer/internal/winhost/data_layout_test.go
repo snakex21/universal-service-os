@@ -55,10 +55,10 @@ func TestWindows311DoesNotCreateUnattendedDirectory(t *testing.T) {
 }
 
 func TestDataProfileCountsStayInSyncWithCatalog(t *testing.T) {
-	// 16 client versions (with XP x64), Windows Server 2003 to 2025, and the
-	// early systems (WfW 3.11, 3.0, 2.11 386/286, 2.03, 1.04, 1.01).
-	if len(windowsProfiles) != 32 {
-		t.Fatalf("windows profile count=%d, want 32", len(windowsProfiles))
+	// 16 client versions (with XP x64), Windows Server 2003 to 2025, Windows
+	// 2000 Server, and the early systems (WfW 3.11, 3.0, 2.11 386/286, 2.03, 1.04, 1.01).
+	if len(windowsProfiles) != 33 {
+		t.Fatalf("windows profile count=%d, want 33", len(windowsProfiles))
 	}
 	// Nine distributions plus the SystemRescue, GParted Live and Clonezilla rescue ISOs.
 	if len(linuxProfiles) != 12 {
@@ -112,7 +112,7 @@ func TestRequiredDataDirectoriesContainDriversTree(t *testing.T) {
 	for _, name := range []string{"Windows 11", "Windows 10", "Windows 8.1", "Windows 8", "Windows 7", "Windows Vista", "Windows XP", "Windows 2000",
 		"Windows Server 2025", "Windows Server 2022", "Windows Server 2019", "Windows Server 2016",
 		"Windows Server 2012 R2", "Windows Server 2012", "Windows Server 2008 R2", "Windows Server 2008",
-		"Windows XP x64", "Windows Server 2003"} {
+		"Windows XP x64", "Windows Server 2003", "Windows 2000 Server"} {
 		nt[name] = true
 	}
 	for _, profile := range windowsProfiles {

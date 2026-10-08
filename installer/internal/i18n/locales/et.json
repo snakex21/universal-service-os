@@ -1164,6 +1164,7 @@
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: vasta algse Setupi küsimustele klaviatuuriga (seal töötab ka USB-klaviatuur); vali Setupis VGA (1.0x puhul EGA) ja IBM PS/2 hiir. Nendes Windowsi versioonides endis kasuta PS/2 klaviatuuri (USB-klaviatuuri silda veel pole). Vajab faili MS-DOS 6.22.iso kaustas Systems\\DOS\\MS-DOS\\Images partitsioonil DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (katseline): NT 5.0 jaoks puudub AHCI/NVMe/USB 3 draiver (SATA IDE-režiimis), kuni 4 GB RAM-i ja 2 protsessorit",
+  "boot.summary.w2k_server_limits": "Windows 2000 Server (katseline): Windows 2000 tee; vastab litsentsimine Serveri kohta (5), töörühm, IIS väljas; tootevõti vastuseprofiilist; ilma SP4-ta CD-l pole USB 2.0 pinu (USB-klaviatuur/hiir puudub)",
 
   "boot.summary.nt52_limits": "NT 5.2 (katseline): AHCI GenAHCI kaudu süsteemi StorPortil; paigalduses puudub NVMe/USB 3 draiver",
   "boot.summary.vista_csmwrap": "Vista ilma CSM-ita (katseline): legacy-paigaldus (MBR) CSMWrapi kaudu, legacy-VBIOS-iga kaart",

@@ -30,12 +30,16 @@ pub const lang_initrd_option = " initrd=\\EFI\\USOS\\lang.cpio";
 pub const Nt5System = enum {
     windows_xp,
     windows_2000,
+    /// Windows 2000 Server: the Windows 2000 action and profile; the
+    /// micro-Linux takes the Server DATA folder (usos.w2k_edition=server).
+    windows_2000_server,
     windows_server_2003,
     windows_xp_x64,
 
     pub fn fromId(system_id: []const u8) ?Nt5System {
         if (std.mem.eql(u8, system_id, "windows-xp")) return .windows_xp;
         if (std.mem.eql(u8, system_id, "windows-2000")) return .windows_2000;
+        if (std.mem.eql(u8, system_id, "windows-2000-server")) return .windows_2000_server;
         if (std.mem.eql(u8, system_id, "windows-server-2003")) return .windows_server_2003;
         if (std.mem.eql(u8, system_id, "windows-xp-x64")) return .windows_xp_x64;
         return null;
@@ -44,7 +48,7 @@ pub const Nt5System = enum {
     pub fn action(self: Nt5System) []const u8 {
         return switch (self) {
             .windows_xp => "xp-staging",
-            .windows_2000 => "windows2000-staging",
+            .windows_2000, .windows_2000_server => "windows2000-staging",
             .windows_server_2003 => "windows2003-staging",
             .windows_xp_x64 => "xp64-staging",
         };
@@ -53,10 +57,15 @@ pub const Nt5System = enum {
     pub fn planProfile(self: Nt5System) []const u8 {
         return switch (self) {
             .windows_xp => "xp-x86-sp3-uefi-csm",
-            .windows_2000 => "w2k-x86-sp4-uefi-csm",
+            .windows_2000, .windows_2000_server => "w2k-x86-sp4-uefi-csm",
             .windows_server_2003 => "w2k3-x86-sp2-uefi-csm",
             .windows_xp_x64 => "xp-x64-sp2-uefi-csm",
         };
+    }
+
+    /// Extra micro-Linux argument: the edition whose DATA folder is used.
+    pub fn editionOption(self: Nt5System) []const u8 {
+        return if (self == .windows_2000_server) " usos.w2k_edition=server" else "";
     }
 
     /// Answer-profile architecture of the staged system.
@@ -83,7 +92,7 @@ pub const CommandParts = struct {
 /// usos.xp_boot=csmwrap: the language (lang.cpio) and everything else are
 /// the default path's.
 pub fn formatCommand(buffer: []u8, parts: CommandParts) ![]const u8 {
-    return std.fmt.bufPrint(buffer, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action={s} usos.legacy_image_hex={s}{s}{s} usos.plan_profile={s}{s}{s} {s}", .{ parts.lang_initrd, parts.esp_partuuid, parts.system.action(), parts.image_hex, parts.answer_option, parts.settings_option, parts.system.planProfile(), if (parts.csmwrap) " usos.xp_boot=csmwrap" else "", parts.theme_option, parts.console_options });
+    return std.fmt.bufPrint(buffer, "initrd=\\EFI\\USOS-XP\\initramfs-xp{s} rdinit=/usos-init usos.esp_partuuid={s} usos.legacy_action={s} usos.legacy_image_hex={s}{s}{s} usos.plan_profile={s}{s}{s}{s} {s}", .{ parts.lang_initrd, parts.esp_partuuid, parts.system.action(), parts.image_hex, parts.answer_option, parts.settings_option, parts.system.planProfile(), parts.system.editionOption(), if (parts.csmwrap) " usos.xp_boot=csmwrap" else "", parts.theme_option, parts.console_options });
 }
 
 /// `answer`: the answer-file screen's choice (src/flow/answer_screen.zig):
@@ -209,6 +218,29 @@ test "Windows 2000 from UEFI keeps the XP command line except its action and pro
     try std.testing.expectEqual(@as(?Nt5System, .windows_2000), Nt5System.fromId("windows-2000"));
     try std.testing.expect(Nt5System.fromId("windows-7") == null);
     try std.testing.expect(std.mem.indexOf(u8, xp, " usos.legacy_action=xp-staging ") != null);
+    try std.testing.expect(std.mem.indexOf(u8, w2k, "usos.w2k_edition") == null);
+}
+
+test "Windows 2000 Server: the 2000 action and profile plus the Server DATA folder" {
+    var w2k_buffer: [2048]u8 = undefined;
+    var server_buffer: [2048]u8 = undefined;
+    const common = CommandParts{ .lang_initrd = lang_initrd_option, .esp_partuuid = "0257E175-1685-4311-91AA-5A83D8EB41E5", .image_hex = "77326b2e69736f", .csmwrap = true };
+    var w2k_parts = common;
+    w2k_parts.system = .windows_2000;
+    var server_parts = common;
+    server_parts.system = Nt5System.fromId("windows-2000-server").?;
+    const w2k = try formatCommand(&w2k_buffer, w2k_parts);
+    const server = try formatCommand(&server_buffer, server_parts);
+    try std.testing.expect(std.mem.indexOf(u8, server, " usos.legacy_action=windows2000-staging ") != null);
+    try std.testing.expect(std.mem.indexOf(u8, server, " usos.plan_profile=w2k-x86-sp4-uefi-csm usos.w2k_edition=server usos.xp_boot=csmwrap ") != null);
+    // Only the edition token differs.
+    const token = " usos.w2k_edition=server";
+    const at = std.mem.indexOf(u8, server, token).?;
+    var joined: [2048]u8 = undefined;
+    @memcpy(joined[0..at], server[0..at]);
+    const rest = server[at + token.len ..];
+    @memcpy(joined[at .. at + rest.len], rest);
+    try std.testing.expectEqualStrings(w2k, joined[0 .. at + rest.len]);
 }
 
 test "the menu theme reaches the NT5 micro-Linux command line" {
@@ -217,7 +249,7 @@ test "the menu theme reaches the NT5 micro-Linux command line" {
     try std.testing.expect(outcome.ok());
     const sunset = outcome.theme;
     var theme_buffer: [theme_cmdline.option_len]u8 = undefined;
-    for ([_]Nt5System{ .windows_xp, .windows_2000, .windows_server_2003, .windows_xp_x64 }) |system| {
+    for ([_]Nt5System{ .windows_xp, .windows_2000, .windows_2000_server, .windows_server_2003, .windows_xp_x64 }) |system| {
         for ([_]bool{ false, true }) |csmwrap| {
             var buffer: [2048]u8 = undefined;
             const command = try formatCommand(&buffer, .{ .system = system, .lang_initrd = lang_initrd_option, .esp_partuuid = "0257E175-1685-4311-91AA-5A83D8EB41E5", .image_hex = "77326b2e69736f", .csmwrap = csmwrap, .theme_option = theme_cmdline.option(&theme_buffer, sunset), .console_options = "quiet" });

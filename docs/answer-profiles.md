@@ -59,7 +59,7 @@ read, so a new name never overwrites another system's profile.
 - `systems=` set: the listed ids and groups (`windows` = every Windows with
   a generated answer, 95/98/Me included, `windows-9x` = 95, 98, 98 SE, Me
   (MSBATCH.INF, [win9x-modern-2026-09-30.md](win9x-modern-2026-09-30.md)),
-  `windows-nt5` = 2000/XP/2003/XP x64,
+  `windows-nt5` = 2000 (Professional and Server)/XP/2003/XP x64,
   `windows-nt6` = Vista and newer, `linux` = Ubuntu, Debian, Fedora).
 - Absent (a profile saved before the field existed): every Windows, never
   Linux. One exception, a read-time default: when the profile's only
@@ -250,7 +250,12 @@ give byte-identical `WINNT.SIF` and accounts script.
   (`usos_xp_settings_sif`): 2000 gets `ProductID`, 2003
   `[LicenseFilePrintData] AutoMode=PerServer`, a chosen language
   `[RegionalSettings]`. Partition, PAE and driver keys stay the automatic
-  ones.
+  ones. Windows 2000 Server (`windows-2000-server`, its own key
+  `key.windows-2000-server`) renders the 2000 settings; the staging adds the
+  Server pages when the CD's ProductType is 1 (`w2k_stage.sh`
+  `usos_w2k_server_sif`: licensing Per Server 5, IIS off, one automatic
+  logon, Configure Your Server off;
+  [windows-2000-modern-2026-09-30.md](windows-2000-modern-2026-09-30.md) 9).
 - **6.x+** (`autounattend.zig`): one renderer, per version (Vista/7 schema:
   `NetworkLocation`, no online-account screens; 8+: `HideOnlineAccountScreens`;
   Server: `AdministratorPassword`) and per architecture

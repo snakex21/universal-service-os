@@ -1167,6 +1167,7 @@
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: răspundeți la întrebările Setup-ului original cu tastatura (acolo funcționează și o tastatură USB); în Setup alegeți VGA (EGA pentru 1.0x) și mouse-ul IBM PS/2. În aceste versiuni de Windows folosiți o tastatură PS/2 (încă fără punte pentru tastatura USB). Necesită MS-DOS 6.22.iso în Systems\\DOS\\MS-DOS\\Images pe DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimental): fără driver AHCI/NVMe/USB 3 pentru NT 5.0 (SATA în mod IDE), max. 4 GB RAM și 2 procesoare",
+  "boot.summary.w2k_server_limits": "Windows 2000 Server (experimental): calea Windows 2000; răspunde licențiere Per server (5), grup de lucru, IIS oprit; cheia de produs din profilul de răspunsuri; un CD fără SP4 nu are stiva USB 2.0 (fără tastatură/mouse USB)",
 
   "boot.summary.nt52_limits": "NT 5.2 (experimental): AHCI prin GenAHCI pe StorPort-ul sistemului; fără driver NVMe/USB 3 în instalare",
   "boot.summary.vista_csmwrap": "Vista fără CSM (experimental): instalare legacy (MBR) prin CSMWrap, placă cu VBIOS legacy",

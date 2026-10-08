@@ -18,6 +18,20 @@ usos_nt5_profile() {
         windows-2000)
             NT5_NAME='Windows 2000'
             NT5_TITLE='WINDOWS 2000'
+            # Windows 2000 Server (menu entry windows-2000-server): the same
+            # flow from its own DATA folder; the UEFI menu adds
+            # usos.w2k_edition=server (src/platform/uefi/xp_preparation.zig).
+            if [ "${USOS_W2K_EDITION:-}" != server ]; then
+                case " $(cat /proc/cmdline 2>/dev/null) " in
+                    *' usos.w2k_edition=server '*) USOS_W2K_EDITION=server ;;
+                    *) USOS_W2K_EDITION= ;;
+                esac
+            fi
+            if [ "$USOS_W2K_EDITION" = server ]; then
+                NT5_NAME='Windows 2000 Server'
+                NT5_TITLE='WINDOWS 2000 SERVER'
+            fi
+            export USOS_W2K_EDITION
             NT5_INSTALL_DIR=WINNT
             NT5_SETUP_DIR=W2K
             ;;

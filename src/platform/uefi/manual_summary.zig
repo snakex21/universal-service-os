@@ -180,6 +180,9 @@ pub fn show(
         if (std.mem.eql(u8, system.id, "windows-2000")) {
             notes[note_count] = view.t(.summary_w2k_limits);
             note_count += 1;
+        } else if (std.mem.eql(u8, system.id, "windows-2000-server")) {
+            notes[note_count] = view.t(.summary_w2k_server_limits);
+            note_count += 1;
         } else if (std.mem.eql(u8, system.id, "windows-server-2003") or std.mem.eql(u8, system.id, "windows-xp-x64")) {
             notes[note_count] = view.t(.summary_nt52_limits);
             note_count += 1;

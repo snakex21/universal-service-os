@@ -31,6 +31,7 @@ system	windows-server-2012	windows	windows	any	\Systems\Windows\Windows Server 2
 system	windows-server-2008-r2	windows	windows	any	\Systems\Windows\Windows Server 2008 R2\Images	\Systems\Windows\Windows Server 2008 R2\Unattended	.xml	unattend.xml	1	automatic,direct_iso,wimboot,vhdboot,direct_efi
 system	windows-server-2008	windows	windows	any	\Systems\Windows\Windows Server 2008\Images	\Systems\Windows\Windows Server 2008\Unattended	.xml	unattend.xml	1	automatic,direct_iso,wimboot,vhdboot,direct_efi,chainload
 system	windows-server-2003	windows	windows	any	\Systems\Windows\Windows Server 2003\Images	\Systems\Windows\Windows Server 2003\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
+system	windows-2000-server	windows_legacy	windows	uefi	\Systems\Windows\Windows 2000 Server\Images	\Systems\Windows\Windows 2000 Server\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-nt-4-server	windows_legacy	windows	any	\Systems\Windows\Windows NT 4.0 Server\Images	\Systems\Windows\Windows NT 4.0 Server\Unattended	.sif	WINNT.SIF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	ubuntu	linux	linux	any	\Systems\Linux\Ubuntu\Images	\Systems\Linux\Ubuntu\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,direct_efi,disk_image
 system	debian	linux	linux	any	\Systems\Linux\Debian\Images	\Systems\Linux\Debian\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,direct_efi,disk_image
@@ -3513,6 +3514,114 @@ route	windows-server-2003	efi	disk_image	bios	-
 route	windows-server-2003	efi	disk_image	uefi	-
 route	windows-server-2003	efi	floppy_image	bios	-
 route	windows-server-2003	efi	floppy_image	uefi	-
+route	windows-2000-server	iso	automatic	bios	xp_staging	direct_iso	bios	experimental	0
+route	windows-2000-server	iso	automatic	uefi	xp_uefi_staging	direct_iso	uefi	experimental	1
+route	windows-2000-server	iso	direct_iso	bios	-
+route	windows-2000-server	iso	direct_iso	uefi	-
+route	windows-2000-server	iso	wimboot	bios	-
+route	windows-2000-server	iso	wimboot	uefi	-
+route	windows-2000-server	iso	vhdboot	bios	-
+route	windows-2000-server	iso	vhdboot	uefi	-
+route	windows-2000-server	iso	direct_efi	bios	-
+route	windows-2000-server	iso	direct_efi	uefi	-
+route	windows-2000-server	iso	chainload	bios	chainload	chainload	uefi	experimental	0
+route	windows-2000-server	iso	chainload	uefi	-
+route	windows-2000-server	iso	memdisk	bios	-
+route	windows-2000-server	iso	memdisk	uefi	-
+route	windows-2000-server	iso	disk_image	bios	-
+route	windows-2000-server	iso	disk_image	uefi	-
+route	windows-2000-server	iso	floppy_image	bios	-
+route	windows-2000-server	iso	floppy_image	uefi	-
+route	windows-2000-server	wim	automatic	bios	wimboot	wimboot	uefi	experimental	0
+route	windows-2000-server	wim	automatic	uefi	-
+route	windows-2000-server	wim	direct_iso	bios	-
+route	windows-2000-server	wim	direct_iso	uefi	-
+route	windows-2000-server	wim	wimboot	bios	wimboot	wimboot	uefi	experimental	0
+route	windows-2000-server	wim	wimboot	uefi	-
+route	windows-2000-server	wim	vhdboot	bios	-
+route	windows-2000-server	wim	vhdboot	uefi	-
+route	windows-2000-server	wim	direct_efi	bios	-
+route	windows-2000-server	wim	direct_efi	uefi	-
+route	windows-2000-server	wim	chainload	bios	-
+route	windows-2000-server	wim	chainload	uefi	-
+route	windows-2000-server	wim	memdisk	bios	-
+route	windows-2000-server	wim	memdisk	uefi	-
+route	windows-2000-server	wim	disk_image	bios	-
+route	windows-2000-server	wim	disk_image	uefi	-
+route	windows-2000-server	wim	floppy_image	bios	-
+route	windows-2000-server	wim	floppy_image	uefi	-
+route	windows-2000-server	img	automatic	bios	-
+route	windows-2000-server	img	automatic	uefi	-
+route	windows-2000-server	img	direct_iso	bios	-
+route	windows-2000-server	img	direct_iso	uefi	-
+route	windows-2000-server	img	wimboot	bios	-
+route	windows-2000-server	img	wimboot	uefi	-
+route	windows-2000-server	img	vhdboot	bios	-
+route	windows-2000-server	img	vhdboot	uefi	-
+route	windows-2000-server	img	direct_efi	bios	-
+route	windows-2000-server	img	direct_efi	uefi	-
+route	windows-2000-server	img	chainload	bios	-
+route	windows-2000-server	img	chainload	uefi	-
+route	windows-2000-server	img	memdisk	bios	-
+route	windows-2000-server	img	memdisk	uefi	-
+route	windows-2000-server	img	disk_image	bios	-
+route	windows-2000-server	img	disk_image	uefi	-
+route	windows-2000-server	img	floppy_image	bios	-
+route	windows-2000-server	img	floppy_image	uefi	-
+route	windows-2000-server	vhd	automatic	bios	vhdboot	vhdboot	uefi	experimental	0
+route	windows-2000-server	vhd	automatic	uefi	-
+route	windows-2000-server	vhd	direct_iso	bios	-
+route	windows-2000-server	vhd	direct_iso	uefi	-
+route	windows-2000-server	vhd	wimboot	bios	-
+route	windows-2000-server	vhd	wimboot	uefi	-
+route	windows-2000-server	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	experimental	0
+route	windows-2000-server	vhd	vhdboot	uefi	-
+route	windows-2000-server	vhd	direct_efi	bios	-
+route	windows-2000-server	vhd	direct_efi	uefi	-
+route	windows-2000-server	vhd	chainload	bios	-
+route	windows-2000-server	vhd	chainload	uefi	-
+route	windows-2000-server	vhd	memdisk	bios	-
+route	windows-2000-server	vhd	memdisk	uefi	-
+route	windows-2000-server	vhd	disk_image	bios	-
+route	windows-2000-server	vhd	disk_image	uefi	-
+route	windows-2000-server	vhd	floppy_image	bios	-
+route	windows-2000-server	vhd	floppy_image	uefi	-
+route	windows-2000-server	vhdx	automatic	bios	vhdboot	vhdboot	uefi	experimental	0
+route	windows-2000-server	vhdx	automatic	uefi	-
+route	windows-2000-server	vhdx	direct_iso	bios	-
+route	windows-2000-server	vhdx	direct_iso	uefi	-
+route	windows-2000-server	vhdx	wimboot	bios	-
+route	windows-2000-server	vhdx	wimboot	uefi	-
+route	windows-2000-server	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	experimental	0
+route	windows-2000-server	vhdx	vhdboot	uefi	-
+route	windows-2000-server	vhdx	direct_efi	bios	-
+route	windows-2000-server	vhdx	direct_efi	uefi	-
+route	windows-2000-server	vhdx	chainload	bios	-
+route	windows-2000-server	vhdx	chainload	uefi	-
+route	windows-2000-server	vhdx	memdisk	bios	-
+route	windows-2000-server	vhdx	memdisk	uefi	-
+route	windows-2000-server	vhdx	disk_image	bios	-
+route	windows-2000-server	vhdx	disk_image	uefi	-
+route	windows-2000-server	vhdx	floppy_image	bios	-
+route	windows-2000-server	vhdx	floppy_image	uefi	-
+route	windows-2000-server	efi	automatic	bios	direct_efi	direct_efi	uefi	experimental	0
+route	windows-2000-server	efi	automatic	uefi	-
+route	windows-2000-server	efi	direct_iso	bios	-
+route	windows-2000-server	efi	direct_iso	uefi	-
+route	windows-2000-server	efi	wimboot	bios	-
+route	windows-2000-server	efi	wimboot	uefi	-
+route	windows-2000-server	efi	vhdboot	bios	-
+route	windows-2000-server	efi	vhdboot	uefi	-
+route	windows-2000-server	efi	direct_efi	bios	direct_efi	direct_efi	uefi	experimental	0
+route	windows-2000-server	efi	direct_efi	uefi	-
+route	windows-2000-server	efi	chainload	bios	chainload	chainload	uefi	experimental	0
+route	windows-2000-server	efi	chainload	uefi	-
+route	windows-2000-server	efi	memdisk	bios	-
+route	windows-2000-server	efi	memdisk	uefi	-
+route	windows-2000-server	efi	disk_image	bios	-
+route	windows-2000-server	efi	disk_image	uefi	-
+route	windows-2000-server	efi	floppy_image	bios	-
+route	windows-2000-server	efi	floppy_image	uefi	-
 route	windows-nt-4-server	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
 route	windows-nt-4-server	iso	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
 route	windows-nt-4-server	iso	direct_iso	bios	-
@@ -8110,6 +8219,82 @@ profile	windows-server-2003	efi	chainload	-	efi-chainload
 profile	windows-server-2003	efi	memdisk	uefi	w2k3-uefi-other
 profile	windows-server-2003	efi	disk_image	uefi	w2k3-uefi-other
 profile	windows-server-2003	efi	floppy_image	uefi	w2k3-uefi-other
+profile	windows-2000-server	iso	automatic	bios	nt5-staging
+profile	windows-2000-server	iso	automatic	uefi	w2k-x86-sp4-uefi-csm
+profile	windows-2000-server	iso	automatic	-	nt5-staging
+profile	windows-2000-server	iso	direct_iso	uefi	w2k-uefi-other
+profile	windows-2000-server	iso	wimboot	uefi	w2k-uefi-other
+profile	windows-2000-server	iso	vhdboot	uefi	w2k-uefi-other
+profile	windows-2000-server	iso	direct_efi	uefi	w2k-uefi-other
+profile	windows-2000-server	iso	chainload	bios	iso-work-chainload
+profile	windows-2000-server	iso	chainload	uefi	w2k-uefi-other
+profile	windows-2000-server	iso	chainload	-	iso-work-chainload
+profile	windows-2000-server	iso	memdisk	uefi	w2k-uefi-other
+profile	windows-2000-server	iso	disk_image	uefi	w2k-uefi-other
+profile	windows-2000-server	iso	floppy_image	uefi	w2k-uefi-other
+profile	windows-2000-server	wim	automatic	bios	wim-wimboot
+profile	windows-2000-server	wim	automatic	uefi	w2k-uefi-other
+profile	windows-2000-server	wim	automatic	-	wim-wimboot
+profile	windows-2000-server	wim	direct_iso	uefi	w2k-uefi-other
+profile	windows-2000-server	wim	wimboot	bios	wim-wimboot
+profile	windows-2000-server	wim	wimboot	uefi	w2k-uefi-other
+profile	windows-2000-server	wim	wimboot	-	wim-wimboot
+profile	windows-2000-server	wim	vhdboot	uefi	w2k-uefi-other
+profile	windows-2000-server	wim	direct_efi	uefi	w2k-uefi-other
+profile	windows-2000-server	wim	chainload	uefi	w2k-uefi-other
+profile	windows-2000-server	wim	memdisk	uefi	w2k-uefi-other
+profile	windows-2000-server	wim	disk_image	uefi	w2k-uefi-other
+profile	windows-2000-server	wim	floppy_image	uefi	w2k-uefi-other
+profile	windows-2000-server	img	automatic	uefi	w2k-uefi-other
+profile	windows-2000-server	img	direct_iso	uefi	w2k-uefi-other
+profile	windows-2000-server	img	wimboot	uefi	w2k-uefi-other
+profile	windows-2000-server	img	vhdboot	uefi	w2k-uefi-other
+profile	windows-2000-server	img	direct_efi	uefi	w2k-uefi-other
+profile	windows-2000-server	img	chainload	uefi	w2k-uefi-other
+profile	windows-2000-server	img	memdisk	uefi	w2k-uefi-other
+profile	windows-2000-server	img	disk_image	uefi	w2k-uefi-other
+profile	windows-2000-server	img	floppy_image	uefi	w2k-uefi-other
+profile	windows-2000-server	vhd	automatic	bios	vhd-vhdboot
+profile	windows-2000-server	vhd	automatic	uefi	w2k-uefi-other
+profile	windows-2000-server	vhd	automatic	-	vhd-vhdboot
+profile	windows-2000-server	vhd	direct_iso	uefi	w2k-uefi-other
+profile	windows-2000-server	vhd	wimboot	uefi	w2k-uefi-other
+profile	windows-2000-server	vhd	vhdboot	bios	vhd-vhdboot
+profile	windows-2000-server	vhd	vhdboot	uefi	w2k-uefi-other
+profile	windows-2000-server	vhd	vhdboot	-	vhd-vhdboot
+profile	windows-2000-server	vhd	direct_efi	uefi	w2k-uefi-other
+profile	windows-2000-server	vhd	chainload	uefi	w2k-uefi-other
+profile	windows-2000-server	vhd	memdisk	uefi	w2k-uefi-other
+profile	windows-2000-server	vhd	disk_image	uefi	w2k-uefi-other
+profile	windows-2000-server	vhd	floppy_image	uefi	w2k-uefi-other
+profile	windows-2000-server	vhdx	automatic	bios	vhd-vhdboot
+profile	windows-2000-server	vhdx	automatic	uefi	w2k-uefi-other
+profile	windows-2000-server	vhdx	automatic	-	vhd-vhdboot
+profile	windows-2000-server	vhdx	direct_iso	uefi	w2k-uefi-other
+profile	windows-2000-server	vhdx	wimboot	uefi	w2k-uefi-other
+profile	windows-2000-server	vhdx	vhdboot	bios	vhd-vhdboot
+profile	windows-2000-server	vhdx	vhdboot	uefi	w2k-uefi-other
+profile	windows-2000-server	vhdx	vhdboot	-	vhd-vhdboot
+profile	windows-2000-server	vhdx	direct_efi	uefi	w2k-uefi-other
+profile	windows-2000-server	vhdx	chainload	uefi	w2k-uefi-other
+profile	windows-2000-server	vhdx	memdisk	uefi	w2k-uefi-other
+profile	windows-2000-server	vhdx	disk_image	uefi	w2k-uefi-other
+profile	windows-2000-server	vhdx	floppy_image	uefi	w2k-uefi-other
+profile	windows-2000-server	efi	automatic	bios	efi-direct
+profile	windows-2000-server	efi	automatic	uefi	w2k-uefi-other
+profile	windows-2000-server	efi	automatic	-	efi-direct
+profile	windows-2000-server	efi	direct_iso	uefi	w2k-uefi-other
+profile	windows-2000-server	efi	wimboot	uefi	w2k-uefi-other
+profile	windows-2000-server	efi	vhdboot	uefi	w2k-uefi-other
+profile	windows-2000-server	efi	direct_efi	bios	efi-direct
+profile	windows-2000-server	efi	direct_efi	uefi	w2k-uefi-other
+profile	windows-2000-server	efi	direct_efi	-	efi-direct
+profile	windows-2000-server	efi	chainload	bios	efi-chainload
+profile	windows-2000-server	efi	chainload	uefi	w2k-uefi-other
+profile	windows-2000-server	efi	chainload	-	efi-chainload
+profile	windows-2000-server	efi	memdisk	uefi	w2k-uefi-other
+profile	windows-2000-server	efi	disk_image	uefi	w2k-uefi-other
+profile	windows-2000-server	efi	floppy_image	uefi	w2k-uefi-other
 profile	windows-nt-4-server	iso	automatic	bios	iso-work-chainload
 profile	windows-nt-4-server	iso	automatic	uefi	nt4-x86-qemu-csmwrap
 profile	windows-nt-4-server	iso	automatic	-	iso-work-chainload
@@ -10776,6 +10961,60 @@ resolve	windows-server-2003	efi	chainload	chainload	1	ok
 resolve	windows-server-2003	efi	memdisk	-	0	UnsupportedImage
 resolve	windows-server-2003	efi	disk_image	-	0	UnsupportedImage
 resolve	windows-server-2003	efi	floppy_image	-	0	UnsupportedImage
+resolve	windows-2000-server	iso	automatic	direct_iso	1	ok
+resolve	windows-2000-server	iso	direct_iso	-	0	UnsupportedMethod
+resolve	windows-2000-server	iso	wimboot	-	0	UnsupportedMethod
+resolve	windows-2000-server	iso	vhdboot	-	0	UnsupportedImage
+resolve	windows-2000-server	iso	direct_efi	-	0	UnsupportedImage
+resolve	windows-2000-server	iso	chainload	chainload	1	ok
+resolve	windows-2000-server	iso	memdisk	-	0	UnsupportedMethod
+resolve	windows-2000-server	iso	disk_image	-	0	UnsupportedImage
+resolve	windows-2000-server	iso	floppy_image	-	0	UnsupportedImage
+resolve	windows-2000-server	wim	automatic	wimboot	1	ok
+resolve	windows-2000-server	wim	direct_iso	-	0	UnsupportedImage
+resolve	windows-2000-server	wim	wimboot	wimboot	1	ok
+resolve	windows-2000-server	wim	vhdboot	-	0	UnsupportedImage
+resolve	windows-2000-server	wim	direct_efi	-	0	UnsupportedImage
+resolve	windows-2000-server	wim	chainload	-	0	UnsupportedImage
+resolve	windows-2000-server	wim	memdisk	-	0	UnsupportedImage
+resolve	windows-2000-server	wim	disk_image	-	0	UnsupportedImage
+resolve	windows-2000-server	wim	floppy_image	-	0	UnsupportedImage
+resolve	windows-2000-server	img	automatic	-	0	UnsupportedImage
+resolve	windows-2000-server	img	direct_iso	-	0	UnsupportedImage
+resolve	windows-2000-server	img	wimboot	-	0	UnsupportedImage
+resolve	windows-2000-server	img	vhdboot	-	0	UnsupportedImage
+resolve	windows-2000-server	img	direct_efi	-	0	UnsupportedImage
+resolve	windows-2000-server	img	chainload	-	0	UnsupportedMethod
+resolve	windows-2000-server	img	memdisk	-	0	UnsupportedMethod
+resolve	windows-2000-server	img	disk_image	-	0	UnsupportedMethod
+resolve	windows-2000-server	img	floppy_image	-	0	UnsupportedMethod
+resolve	windows-2000-server	vhd	automatic	vhdboot	1	ok
+resolve	windows-2000-server	vhd	direct_iso	-	0	UnsupportedImage
+resolve	windows-2000-server	vhd	wimboot	-	0	UnsupportedImage
+resolve	windows-2000-server	vhd	vhdboot	vhdboot	1	ok
+resolve	windows-2000-server	vhd	direct_efi	-	0	UnsupportedImage
+resolve	windows-2000-server	vhd	chainload	-	0	UnsupportedImage
+resolve	windows-2000-server	vhd	memdisk	-	0	UnsupportedImage
+resolve	windows-2000-server	vhd	disk_image	-	0	UnsupportedImage
+resolve	windows-2000-server	vhd	floppy_image	-	0	UnsupportedImage
+resolve	windows-2000-server	vhdx	automatic	vhdboot	1	ok
+resolve	windows-2000-server	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	windows-2000-server	vhdx	wimboot	-	0	UnsupportedImage
+resolve	windows-2000-server	vhdx	vhdboot	vhdboot	1	ok
+resolve	windows-2000-server	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	windows-2000-server	vhdx	chainload	-	0	UnsupportedImage
+resolve	windows-2000-server	vhdx	memdisk	-	0	UnsupportedImage
+resolve	windows-2000-server	vhdx	disk_image	-	0	UnsupportedImage
+resolve	windows-2000-server	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	windows-2000-server	efi	automatic	direct_efi	1	ok
+resolve	windows-2000-server	efi	direct_iso	-	0	UnsupportedImage
+resolve	windows-2000-server	efi	wimboot	-	0	UnsupportedImage
+resolve	windows-2000-server	efi	vhdboot	-	0	UnsupportedImage
+resolve	windows-2000-server	efi	direct_efi	direct_efi	1	ok
+resolve	windows-2000-server	efi	chainload	chainload	1	ok
+resolve	windows-2000-server	efi	memdisk	-	0	UnsupportedImage
+resolve	windows-2000-server	efi	disk_image	-	0	UnsupportedImage
+resolve	windows-2000-server	efi	floppy_image	-	0	UnsupportedImage
 resolve	windows-nt-4-server	iso	automatic	chainload	1	ok
 resolve	windows-nt-4-server	iso	direct_iso	-	0	UnsupportedMethod
 resolve	windows-nt-4-server	iso	wimboot	-	0	UnsupportedMethod
@@ -14407,6 +14646,78 @@ menu	windows-server-2003	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload
 menu	windows-server-2003	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-server-2003	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-server-2003	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	iso	bios	0	automatic	xp_staging	1	1	experimental	Automatic (Windows 2000 Setup) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-2000-server	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-2000-server	iso	bios	2	chainload	chainload	0	0	experimental	Chainload [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-2000-server	iso	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-2000-server	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	iso	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	iso	uefi	0	automatic	xp_uefi_staging	1	1	experimental	Automatic (UEFI preparation / XP via CSM) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-2000-server	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-2000-server	iso	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-2000-server	iso	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-2000-server	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	iso	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	wim	bios	0	automatic	wimboot	0	0	experimental	Automatic (WIMBoot) [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-2000-server	wim	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-2000-server	wim	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-2000-server	wim	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-2000-server	wim	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	wim	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-2000-server	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-2000-server	wim	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-2000-server	wim	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-2000-server	wim	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	wim	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-2000-server	img	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-2000-server	img	bios	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-2000-server	img	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-2000-server	img	bios	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-2000-server	img	bios	5	floppy_image	-	0	1	experimental	Floppy image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-2000-server	img	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-2000-server	img	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-2000-server	img	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-2000-server	img	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-2000-server	img	uefi	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-2000-server	img	uefi	5	floppy_image	-	0	1	experimental	Floppy image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-2000-server	vhd	bios	0	automatic	vhdboot	0	0	experimental	Automatic (VHDBoot) [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-2000-server	vhd	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-2000-server	vhd	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-2000-server	vhd	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-2000-server	vhd	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	vhd	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-2000-server	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-2000-server	vhd	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-2000-server	vhd	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-2000-server	vhd	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	vhd	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	vhdx	bios	0	automatic	vhdboot	0	0	experimental	Automatic (VHDBoot) [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-2000-server	vhdx	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-2000-server	vhdx	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-2000-server	vhdx	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-2000-server	vhdx	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	vhdx	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-2000-server	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-2000-server	vhdx	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-2000-server	vhdx	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-2000-server	vhdx	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	vhdx	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	efi	bios	0	automatic	direct_efi	0	0	experimental	Automatic (EFI) [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-2000-server	efi	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-2000-server	efi	bios	2	chainload	chainload	0	0	experimental	Chainload [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-2000-server	efi	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-2000-server	efi	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	efi	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-2000-server	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-2000-server	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-2000-server	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-2000-server	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-2000-server	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-nt-4-server	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	windows-nt-4-server	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-nt-4-server	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
@@ -17864,6 +18175,60 @@ help	windows-server-2003	efi	chainload	Chainload	Transfers control to another bo
 help	windows-server-2003	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
 help	windows-server-2003	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
 help	windows-server-2003	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-2000-server	iso	automatic	Automatic - Windows Setup	Copies installation files to the selected Windows partition.	After preparation, remove the USB drive and start the computer from that disk.
+help	windows-2000-server	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-2000-server	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-2000-server	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-2000-server	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-2000-server	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-2000-server	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-2000-server	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-2000-server	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-2000-server	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-2000-server	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-2000-server	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-2000-server	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-2000-server	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-2000-server	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-2000-server	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-2000-server	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-2000-server	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-2000-server	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-2000-server	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-2000-server	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-2000-server	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-2000-server	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-2000-server	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-2000-server	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-2000-server	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-2000-server	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-2000-server	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-2000-server	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-2000-server	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-2000-server	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-2000-server	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-2000-server	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-2000-server	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-2000-server	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-2000-server	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-2000-server	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-2000-server	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-2000-server	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-2000-server	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-2000-server	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-2000-server	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-2000-server	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-2000-server	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-2000-server	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-2000-server	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-2000-server	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-2000-server	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-2000-server	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-2000-server	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-2000-server	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-2000-server	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-2000-server	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-2000-server	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
 help	windows-nt-4-server	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
 help	windows-nt-4-server	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
 help	windows-nt-4-server	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.

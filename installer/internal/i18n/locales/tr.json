@@ -1164,6 +1164,7 @@
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: orijinal Setup'ın sorularını klavyeyle yanıtlayın (orada USB klavye de çalışır); Setup'ta VGA (1.0x için EGA) ve IBM PS/2 fareyi seçin. Bu Windows sürümlerinin içinde PS/2 klavye kullanın (USB klavye köprüsü henüz yok). DATA üzerinde Systems\\DOS\\MS-DOS\\Images içinde MS-DOS 6.22.iso gerekir.",
 
   "boot.summary.w2k_limits": "Windows 2000 (deneysel): NT 5.0 için AHCI/NVMe/USB 3 sürücüsü yok (SATA IDE modunda), en fazla 4 GB RAM ve 2 işlemci",
+  "boot.summary.w2k_server_limits": "Windows 2000 Server (deneysel): Windows 2000 yolu; Sunucu başına lisans (5), çalışma grubu, IIS kapalı yanıtlanır; ürün anahtarı yanıt profilinden; SP4 içermeyen CD'de USB 2.0 yığını yok (USB klavye/fare yok)",
 
   "boot.summary.nt52_limits": "NT 5.2 (deneysel): sistemin StorPort'u üzerinde GenAHCI ile AHCI; kurulumda NVMe/USB 3 sürücüsü yok",
   "boot.summary.vista_csmwrap": "CSM olmadan Vista (deneysel): CSMWrap ile legacy (MBR) kurulum, legacy VBIOS'lu kart",

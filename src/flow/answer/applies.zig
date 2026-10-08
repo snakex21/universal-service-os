@@ -156,3 +156,14 @@ test "missing answers: NT5 key, Server password" {
     try p.password.set("test1234");
     try std.testing.expectEqual(Missing.server_password, missing(&p, "windows-server-2008").?);
 }
+
+test "Windows 2000 Server: its own key field, the NT5 group, no Server password rule" {
+    var p = try profileFrom("name=A\nuser=Bob\nsystems=windows-nt5\n");
+    try std.testing.expect(appliesTo(&p, "windows-2000-server") and appliesTo(&p, "windows-2000"));
+    try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-2000-server").?);
+    try p.setSystemKey("windows-2000-server", "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE");
+    try std.testing.expect(missing(&p, "windows-2000-server") == null);
+    // The Server key is not the Professional one.
+    try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-2000").?);
+    try std.testing.expect(@import("profile.zig").knownSystemToken("windows-2000-server"));
+}

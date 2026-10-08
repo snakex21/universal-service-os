@@ -1164,6 +1164,7 @@
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: vastaa alkuperäisen Setupin kysymyksiin näppäimistöllä (siellä toimii myös USB-näppäimistö); valitse Setupissa VGA (1.0x:lle EGA) ja IBM PS/2 -hiiri. Käytä näissä Windows-versioissa PS/2-näppäimistöä (USB-näppäimistösiltaa ei vielä ole). Vaatii MS-DOS 6.22.iso -tiedoston DATA-osion kansioon Systems\\DOS\\MS-DOS\\Images.",
 
   "boot.summary.w2k_limits": "Windows 2000 (kokeellinen): ei AHCI/NVMe/USB 3 -ajuria NT 5.0:lle (SATA IDE-tilassa), enintään 4 Gt RAM ja 2 suoritinta",
+  "boot.summary.w2k_server_limits": "Windows 2000 Server (kokeellinen): Windows 2000 -polku; vastaa käyttöoikeus Palvelinta kohden (5), työryhmä, IIS pois; tuoteavain vastausprofiilista; CD:llä ilman SP4:ää ei ole USB 2.0 -pinoa (ei USB-näppäimistöä/-hiirtä)",
 
   "boot.summary.nt52_limits": "NT 5.2 (kokeellinen): AHCI GenAHCI:n kautta järjestelmän StorPortilla; asennuksessa ei NVMe/USB 3 -ajuria",
   "boot.summary.vista_csmwrap": "Vista ilman CSM:ää (kokeellinen): legacy-asennus (MBR) CSMWrapin kautta, näytönohjaimessa legacy-VBIOS",

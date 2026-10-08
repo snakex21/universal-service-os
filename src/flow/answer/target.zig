@@ -80,6 +80,8 @@ const Entry = struct { id: []const u8, family: Family };
 
 const entries = [_]Entry{
     .{ .id = "windows-2000", .family = .windows_2000 },
+    // Windows 2000 Server: the 2000 answer (the Server keys come from the CD).
+    .{ .id = "windows-2000-server", .family = .windows_2000 },
     .{ .id = "windows-xp", .family = .windows_xp },
     .{ .id = "windows-xp-x64", .family = .windows_xp },
     .{ .id = "windows-server-2003", .family = .windows_2003 },
@@ -123,10 +125,12 @@ test "families of the catalog systems" {
     try std.testing.expect(familyFor("windows-10").?.atLeast8());
     try std.testing.expect(familyFor("windows-server-2022").?.server());
     try std.testing.expectEqual(Arch.amd64, Arch.fromText("x64").?);
-    // XP x64 renders the XP answer (the family's system id stays windows-xp).
+    // XP x64 renders the XP answer (the family's system id stays windows-xp),
+    // 2000 Server the 2000 answer.
     for (entries) |entry| {
-        if (std.mem.eql(u8, entry.id, "windows-xp-x64")) continue;
+        if (std.mem.eql(u8, entry.id, "windows-xp-x64") or std.mem.eql(u8, entry.id, "windows-2000-server")) continue;
         try std.testing.expectEqualStrings(entry.id, systemId(entry.family));
     }
     try std.testing.expectEqual(Family.windows_xp, familyFor("windows-xp-x64").?);
+    try std.testing.expectEqual(Family.windows_2000, familyFor("windows-2000-server").?);
 }

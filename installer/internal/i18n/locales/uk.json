@@ -1167,6 +1167,7 @@
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: відповідайте на запитання оригінального Setup з клавіатури (там працює й USB-клавіатура); у Setup виберіть VGA (EGA для 1.0x) і мишу IBM PS/2. У самих цих версіях Windows використовуйте клавіатуру PS/2 (мосту для USB-клавіатури поки немає). Потрібен MS-DOS 6.22.iso у Systems\\DOS\\MS-DOS\\Images на DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (експериментально): немає драйвера AHCI/NVMe/USB 3 для NT 5.0 (SATA в режимі IDE), не більше 4 ГБ ОЗП і 2 процесорів",
+  "boot.summary.w2k_server_limits": "Windows 2000 Server (експериментально): шлях Windows 2000; відповідає ліцензування На сервер (5), робоча група, IIS вимкнено; ключ продукту з профілю відповідей; на диску без SP4 немає стека USB 2.0 (немає USB-клавіатури/миші)",
 
   "boot.summary.nt52_limits": "NT 5.2 (експериментально): AHCI через GenAHCI на StorPort системи; немає драйвера NVMe/USB 3 під час встановлення",
   "boot.summary.vista_csmwrap": "Vista без CSM (експериментально): legacy-встановлення (MBR) через CSMWrap, відеокарта з legacy VBIOS",

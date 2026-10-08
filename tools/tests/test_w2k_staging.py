@@ -551,6 +551,88 @@ class W2kStorage(unittest.TestCase):
 
 
 @unittest.skipIf(SH is None, 'sh not found')
+class W2kServer(unittest.TestCase):
+    """Windows 2000 Server (catalog windows-2000-server): the Server answers
+    follow the CD's ProductType, the srvwiz.reg of the first logon, the
+    edition switch in nt5_profile.sh and the probe's Professional refusal."""
+
+    def source(self, text: bytes):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        path = Path(tmp.name) / 'TXTSETUP.SIF'
+        path.write_bytes(text)
+        return run_fn(f"usos_w2k_server_source '{posix(path)}'", b'').returncode
+
+    def test_server_source(self):
+        self.assertEqual(self.source(b'[SetupData]\r\nMajorVersion = 5\r\nProductType = 1\r\n'), 0)
+        self.assertEqual(self.source(b'[SetupData]\r\nProductType=0\r\n'), 1)
+        self.assertEqual(self.source(W2K_TXTSETUP), 1)  # no ProductType row
+        # A ProductType in another section or a comment does not count.
+        self.assertEqual(self.source(b'[Other]\r\nProductType = 1\r\n[SetupData]\r\n;ProductType = 1\r\n'), 1)
+
+    def test_server_answers(self):
+        # The unattended answer (usos-xp.ini / profile merged): every page answered.
+        sif = W2K_WINNT + b'[GuiUnattended]\r\nAdminPassword=*\r\nOemSkipWelcome=1\r\n[UserData]\r\nComputerName=USOS\r\n'
+        r = run_fn('usos_w2k_server_sif', sif)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.count(b'\r\n'), r.stdout.count(b'\n'))
+        out = rows(r.stdout)
+        self.assertEqual(out[out.index('[GuiUnattended]'):out.index('[UserData]')],
+                         ['[GuiUnattended]', 'AdminPassword=*', 'OemSkipWelcome=1', 'AutoLogon=Yes', 'AutoLogonCount=1'])
+        self.assertEqual(out[out.index('[LicenseFilePrintData]'):out.index('[LicenseFilePrintData]') + 3],
+                         ['[LicenseFilePrintData]', 'AutoMode=PerServer', 'AutoUsers=5'])
+        for key in ('iis_common', 'iis_www', 'iis_ftp', 'iis_smtp', 'iis_inetmgr', 'fp_extensions'):
+            self.assertIn(f'{key}=Off', out)
+        self.assertIn('[GuiRunOnce]', out)
+        self.assertEqual(out[out.index('[GuiRunOnce]') + 1], 'Command0="regedit /s C:\\USOS\\W2K\\srvwiz.reg"')
+        self.assertNotIn('dcpromo', r.stdout.decode().lower())
+        # The answer file's own choices win; GuiRunOnce appends after its commands.
+        own = sif + b'[LicenseFilePrintData]\r\nAutoMode=PerSeat\r\n[Components]\r\niis_www=On\r\n[GuiRunOnce]\r\nCommand0="notepad"\r\n'
+        out = rows(run_fn('usos_w2k_server_sif', own).stdout)
+        self.assertIn('AutoMode=PerSeat', out)
+        self.assertNotIn('AutoMode=PerServer', out)
+        self.assertIn('AutoUsers=5', out)
+        self.assertIn('iis_www=On', out)
+        self.assertNotIn('iis_www=Off', out)
+        self.assertEqual(out.count('[LicenseFilePrintData]'), 1)
+        self.assertEqual(out[out.index('[GuiRunOnce]'):out.index('[GuiRunOnce]') + 3],
+                         ['[GuiRunOnce]', 'Command0="notepad"', 'Command1="regedit /s C:\\USOS\\W2K\\srvwiz.reg"'])
+        # The interactive answer (no password answered): no automatic logon.
+        out = rows(run_fn('usos_w2k_server_sif', W2K_WINNT).stdout)
+        self.assertNotIn('AutoLogon=Yes', out)
+        self.assertIn('AutoMode=PerServer', out)
+
+    def test_server_reg(self):
+        r = run_fn('usos_w2k_server_reg', b'')
+        self.assertEqual(r.stdout, b'REGEDIT4\r\n\r\n[HKEY_CURRENT_USER\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Setup\\Welcome]\r\n'
+                                   b'"srvwiz"=dword:00000000\r\n\r\n')
+
+    def test_profile_edition(self):
+        prof = posix(ROOT / 'tools' / 'nt5_profile.sh')
+        show = 'usos_nt5_profile; printf "%s|%s|%s|%s" "$NT5_NAME" "$NT5_TITLE" "$NT5_SETUP_DIR" "$USOS_W2K_EDITION"'
+        r = sh(f"NT5_SYSTEM=windows-2000 USOS_W2K_EDITION=server; . '{prof}'; {show}")
+        self.assertEqual(r.stdout.decode(), 'Windows 2000 Server|WINDOWS 2000 SERVER|W2K|server')
+        r = sh(f"NT5_SYSTEM=windows-2000 USOS_W2K_EDITION=; . '{prof}'; {show}")
+        self.assertEqual(r.stdout.decode(), 'Windows 2000|WINDOWS 2000|W2K|')
+
+    def test_probe_refuses_professional_in_server_entry(self):
+        probe = posix(ROOT / 'tools' / 'probe_nt5_source.sh')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'I386').mkdir()
+            for marker in ('CDROM_NT.5', 'CDROM_IP.5', 'CDROMSP4.TST'):
+                (root / marker).write_bytes(b'')
+            for name in ('DOSNET.INF', 'SETUPLDR.BIN', 'NTLDR', 'NTDETECT.COM', 'USETUP.EXE', 'SETUPDD.SY_', 'NTOSKRNL.EX_', 'NTKRNLMP.EX_', 'BOOTVID.DL_', 'SP4.CAB'):
+                (root / 'I386' / name).write_bytes(b'x')
+            (root / 'I386' / 'TXTSETUP.SIF').write_bytes(b'[SetupData]\r\nMajorVersion = 5\r\nMinorVersion = 0\r\nProductType = 0\r\n')
+            base = f"SOURCE_ROOT='{posix(root)}' NT5_SYSTEM=windows-2000"
+            self.assertEqual(sh(f"{base} sh '{probe}'").returncode, 0)
+            r = sh(f"{base} USOS_W2K_EDITION=server sh '{probe}'")
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn(b'Professional CD', r.stdout + r.stderr)
+
+
+@unittest.skipIf(SH is None, 'sh not found')
 class W2kUsb(unittest.TestCase):
     def test_rows(self):
         r = run_fn(W2K_USB, W2K_TXTSETUP, USB)
