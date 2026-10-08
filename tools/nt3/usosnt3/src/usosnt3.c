@@ -32,8 +32,8 @@
  *   1. copies C:\USOS\NT3\{AHCINT,USOSRST,USOSUSB}.SYS to system32\drivers;
  *   2. writes their Services keys (the values of the NT 4.0 DRIVERS.REG) and
  *      Kbdclass/Mouclass ConnectMultiplePorts = 1;
- *   3. turns atdisk and atapi off (the real machine has no legacy IDE ports;
- *      the VM's IDE disk is not needed any more);
+ *   3. turns atdisk, atapi and (when installed) amsint off (the real machine
+ *      has no legacy IDE ports; the VM's IDE/SCSI disk is not needed any more);
  *   4. writes VERSION.TXT and DRIVERS.TXT (values read back), turns itself
  *      off (Start = 4) and writes DONE.TXT;
  *   5. restarts the system (InitiateSystemShutdown, then NtShutdownSystem),
@@ -233,7 +233,7 @@ static void post(void)
 {
     static const char *const drivers[] = { "AHCINT", "USOSRST", "USOSUSB" };
     static const char *const keys[] = { "ahcint", "usosrst", "usosusb", "atdisk", "atapi", "i8042prt",
-                                        "Kbdclass", "Mouclass", "vga", "VgaSave" };
+                                        "Kbdclass", "Mouclass", "vga", "VgaSave", "amsint" };
     static const char ver[] = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion";
     char sys[MAX_PATH], src[MAX_PATH], dst[MAX_PATH], key[128];
     int i, j;
@@ -277,6 +277,15 @@ static void post(void)
     /* IDE: the VM's disk only; the real machine boots through AHCINT. */
     set_dword("atdisk", NULL, "Start", 4);
     set_dword("atapi", NULL, "Start", 4);
+    /* The install VM's SCSI adapter (QEMU am53c974 -> amsint.sys, used
+       because atdisk overflows a kernel stack in QEMU): off when installed. */
+    {
+        HKEY h;
+        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "amsint", 0, KEY_READ, &h) == ERROR_SUCCESS) {
+            RegCloseKey(h);
+            set_dword("amsint", NULL, "Start", 4);
+        }
+    }
 
     g_text[0] = 0;
     dump_value(g_text, ver, "CurrentVersion");

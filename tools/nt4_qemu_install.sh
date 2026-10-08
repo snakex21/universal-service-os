@@ -34,12 +34,26 @@ NT4_BOOT_OPTIONS=${NT4_BOOT_OPTIONS:-/NUMPROC=2 /MAXMEM=1024}
 # (no network, -no-reboot, cache=none) with the disk view limited to the
 # first NT4_VM_DISK_BYTES (FAT16 C: is in the first 2 GiB; NT 4.0 atapi has
 # no 48-bit LBA) and the hard disk as the only boot device.
+# The target disk: IDE for NT 4.0; NT 3.51 on an AMD Am53c974 SCSI adapter
+# (NT4_VM_HBA, in-box miniport amsint.sys; SeaBIOS boots from it): NT 3.51's
+# IDE driver atdisk.sys overflows a kernel stack in QEMU (nested per-sector
+# IRQ 14, STOP 0x7F 8, 2026-10-08). The real disk keeps its own controller
+# after the install (AHCINT). One argument per line.
+nt4_vm_disk_args() {
+    if [ -n "${NT4_VM_HBA:-}" ]; then
+        printf '%s\n' -drive "file=$1,format=raw,size=$NT4_VM_DISK_BYTES,if=none,id=target,cache=none,file.locking=off" \
+            -device "$NT4_VM_HBA,id=hba" -device scsi-hd,drive=target,bus=hba.0,bootindex=0
+    else
+        printf '%s\n' -drive "file=$1,format=raw,size=$NT4_VM_DISK_BYTES,if=ide,index=0,media=disk,cache=none,file.locking=off"
+    fi
+}
+
 nt4_vm_args() {
     case "$2" in kvm) accel='kvm' ;; *) accel='tcg,tb-size=128' ;; esac
     printf '%s\n' -name usos-nt4-install -nodefaults -L "$W9X_VM_DATADIR" \
         -machine pc -accel "$accel" -cpu pentium3 -smp 1 -m "$W9X_VM_GUEST_MB" \
         -rtc base=localtime -vga std -display none -nic none -no-reboot \
-        -drive "file=$1,format=raw,size=$NT4_VM_DISK_BYTES,if=ide,index=0,media=disk,cache=none,file.locking=off" \
+        $(nt4_vm_disk_args "$1") \
         -boot order=c \
         -serial "file:$W9X_VM_RUN/serial.log" \
         -chardev "file,id=seabios,path=$W9X_VM_RUN/seabios.log" -device isa-debugcon,iobase=0x402,chardev=seabios \
@@ -74,7 +88,11 @@ nt4_vm_install() {
     # drive ... Press ENTER to continue" (its autochk on the USOS FAT16 C:,
     # QEMU 2026-10-08); ENTER goes on and the install completes.
     W9X_VM_TEXT_ANSWER=''
-    MTOOLS_SKIP_CHECK=1 mdir -i "$target@@$NT4_PART_OFFSET" ::/USOS/NT3 >/dev/null 2>&1 && W9X_VM_TEXT_ANSWER=${NT3_VM_TEXT_ANSWER:-ret}
+    NT4_VM_HBA=''
+    if MTOOLS_SKIP_CHECK=1 mdir -i "$target@@$NT4_PART_OFFSET" ::/USOS/NT3 >/dev/null 2>&1; then
+        W9X_VM_TEXT_ANSWER=${NT3_VM_TEXT_ANSWER:-ret}
+        NT4_VM_HBA=${NT3_VM_HBA:-am53c974}
+    fi
     NT4_VM_STALLED=0
     boot=0
     while [ "$boot" -lt "$NT4_VM_BOOTS" ]; do
@@ -149,6 +167,19 @@ nt4_ci_path() {
     printf '%s\n' "$found"
 }
 
+# 0 when the last fsck.fat -n run in the log $2 only found the dirty bit
+# (NT 3.51 leaves it set when the USOS service restarts the VM, QEMU
+# 2026-10-08); then fsck.fat -a clears it and a new -n run must be clean.
+nt4_vm_dirty_only() {
+    last=$(awk '/^== fsck.fat -n:/ { s = "" } { s = s $0 "\n" } END { printf "%s", s }' "$2")
+    printf '%s' "$last" | grep -q 'Dirty bit is set' || return 1
+    printf '%s' "$last" | grep -v -e '^== ' -e '^fsck.fat ' -e 'Dirty bit is set' -e 'Automatically removing dirty bit' \
+        -e '^Leaving filesystem unchanged' -e ': [0-9]* files, [0-9]*/[0-9]* clusters$' -e '^ *$' | grep -q . && return 1
+    printf '== fsck.fat -a: dirty bit only\n' >> "$2"
+    fsck.fat -a "$1" >> "$2" 2>&1
+    w9x_phase1_fsck "$1" "$2" 'C: after clearing the dirty bit'
+}
+
 # After the VM: checks C: on $1 (fsck.fat -n before and after), copies the
 # USOS logs to $2, writes BOOT.INI's options, removes the Setup leftovers
 # (syslinux, $LDR$, the local source, the answer copies, the service pack).
@@ -162,7 +193,7 @@ nt4_vm_finish() {
     blockdev --flushbufs "$target" 2>/dev/null || true
     loop=$(losetup -f) || return 1
     losetup -o "$NT4_PART_OFFSET" "$loop" "$target" || return 1
-    if ! w9x_phase1_fsck "$loop" "$logs/fsck.txt" 'C: after the NT 4.0 install'; then
+    if ! w9x_phase1_fsck "$loop" "$logs/fsck.txt" 'C: after the NT 4.0 install' && ! nt4_vm_dirty_only "$loop" "$logs/fsck.txt"; then
         losetup -d "$loop" 2>/dev/null || true
         echo 'fsck.fat found errors on C: after the install (fsck.txt)'
         return 1
@@ -200,9 +231,11 @@ nt4_vm_finish() {
     fi
     if [ "$status" = 0 ] && [ "$sub" = NT3 ]; then
         # nt4_csmwrap_target.sh kept AUTOCHK.EXE out of text-mode Setup.
-        if ! nt4_ci_path "$c" WINNT/SYSTEM32/AUTOCHK.EXE >/dev/null; then
-            src=$(nt4_ci_path "$c" USOS/NT3/AUTOCHK.EXE) && sys32=$(nt4_ci_path "$c" WINNT/SYSTEM32) &&
-                cp "$src" "$sys32/autochk.exe" && reason="$reason autochk.exe restored;" ||
+        # Setup copied the stand-in (usosachk) as system32\autochk.exe.
+        if src=$(nt4_ci_path "$c" USOS/NT3/AUTOCHK.EXE); then
+            sys32=$(nt4_ci_path "$c" WINNT/SYSTEM32) &&
+                { old=$(nt4_ci_path "$c" WINNT/SYSTEM32/AUTOCHK.EXE) || old=$sys32/autochk.exe; } &&
+                cp "$src" "$old" && reason="$reason autochk.exe restored;" ||
                 { reason="$reason cannot restore autochk.exe;"; status=1; }
         fi
     fi

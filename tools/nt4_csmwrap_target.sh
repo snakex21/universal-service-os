@@ -201,6 +201,13 @@ nt3_detached_answer() {
             for (i = 1; i <= n; i++) {
                 printf "%s\r\n", lines[i]
                 low = tolower(lines[i]); gsub(/[ \t]/, "", low)
+                # INITIAL.INF tests $(!SetupNetWork) (capital W; INF variable
+                # names are case-sensitive), UNATTEND.TXT documents
+                # !SetupNetwork: write both (QEMU 2026-10-08, the network
+                # adapter page stopped GUI Setup).
+                if (low ~ /^!setupnetwork=/ && lines[i] !~ /^[ \t]*!SetupNetWork[ \t]*=/) {
+                    v = lines[i]; sub(/^[^=]*=[ \t]*/, "", v); printf "!SetupNetWork = %s\r\n", v
+                }
                 if (!has && low == "[guiunattended]") {
                     printf "!DetachedProgram = \"C:\\USOS\\NT3\\USOSNT3.EXE\"\r\n!Arguments = \"/setup\"\r\n"; has = 1
                 }
