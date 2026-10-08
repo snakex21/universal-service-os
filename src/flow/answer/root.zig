@@ -47,8 +47,12 @@ pub fn matchEdition(p: *const Profile, system_id: []const u8, images: ?*const ed
     const wanted = p.editionFor(system_id);
     if (wanted.len == 0) {
         const family = target.familyFor(system_id) orelse return .none;
-        if (!family.server() or family.nt5() or p.keyFor(system_id).len > 0) return .none;
+        if (family.nt5()) return .none;
         const list = images orelse return .none;
+        // One image (Embedded 8.1 Industry Pro): 8.1 Setup still showed its
+        // one-line edition list (QEMU e2e 2026-10-08); name it.
+        if (list.len == 1) return .{ .found = &list.items[0] };
+        if (!family.server() or p.keyFor(system_id).len > 0) return .none;
         const image = editions.match(server_default_edition, list) orelse return .none;
         return .{ .found = image };
     }
@@ -157,7 +161,9 @@ test "edition from the media: found, missing, per system" {
     try std.testing.expect(matchEdition(&p, "windows-7", &list) == .missing);
     try std.testing.expect(matchEdition(&p, "windows-10", &list) == .found);
     p.edition = .{};
-    try std.testing.expect(matchEdition(&p, "windows-10", &list) == .none);
+    // No edition named: a one-image ISO still gets its image.
+    try std.testing.expect(matchEdition(&p, "windows-10", &list) == .found);
+    try std.testing.expect(matchEdition(&p, "windows-10", null) == .none);
 }
 
 test "Server without an edition: Standard full installation by default" {
@@ -194,5 +200,12 @@ test "Server without an edition: Standard full installation by default" {
     image.edition_id.set("ServerWinFoundation");
     foundation.items[0] = image;
     foundation.len = 1;
+    // A single image is always named (the 8.1 Setup listed it otherwise).
+    try std.testing.expectEqual(@as(u16, 1), matchEdition(&p, "windows-server-2012-r2", &foundation).found.index);
+    try std.testing.expectEqual(@as(u16, 1), matchEdition(&p, "windows-embedded-8-1-industry", &foundation).found.index);
+    image.index = 2;
+    image.edition_id.set("ServerStorageStandard");
+    foundation.items[1] = image;
+    foundation.len = 2;
     try std.testing.expect(matchEdition(&p, "windows-server-2012-r2", &foundation) == .none);
 }
