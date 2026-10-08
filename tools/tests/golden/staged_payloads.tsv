@@ -4,7 +4,7 @@ initramfs	usos-init	100755	f77dbe8ae76df70561ab9b633a77327be0bec44aaca893f3631e4
 initramfs	usr/lib/usos/UefiSeven.efi	100644	0a44a256cda725c22f1daadcf093fc4660b7214e6437968a4c8e119aed02a947
 initramfs	usr/lib/usos/answer_plan.sh	100755	07d2dc07a197f98689ea8add0bc4c5271a457486324bef357b769ad3b39eaaa1
 initramfs	usr/lib/usos/device_guard.sh	100755	ec013aee287b67e8fde7d02a827b39eea1a2af8638884f135a5a51de8d59ebac
-initramfs	usr/lib/usos/dos_csmwrap_target.sh	100755	dab340cc8259b59e5ed8690a2f4a16a5123312dbd2e075a2d72a09b108cb6837
+initramfs	usr/lib/usos/dos_csmwrap_target.sh	100755	37d51f6b94ea10eb5bbcd9b35799b6686e6baef405527ac10e48d663a30572f8
 initramfs	usr/lib/usos/extract.sh	100755	a13f57d3ebbf0b2882a9306f0574a917a8686fb449189dfc26f85054c5f14371
 initramfs	usr/lib/usos/hardware_inventory.sh	100755	a6a69c8507fd4a087ebae896059f085bd81d6546aeb81a74071f2fa1ab0235d2
 initramfs	usr/lib/usos/hardware_smart.sh	100755	d405e510555321811f02b417d5445496173114c005c1381df5d8ec2eb7262241
@@ -19,15 +19,25 @@ initramfs	usr/lib/usos/imdisk-x86_64.sys	100644	72873d35ee3a9d9ef1311bbb6fdefd2d
 initramfs	usr/lib/usos/legacy_windows_request.sh	100755	86946245c2fcd93c7fc9ffef76cebe2f8a73f197a92958cd543d7644c97c657f
 initramfs	usr/lib/usos/legacy_xp_resume.sh	100755	50abdb4e5c844391889f4800f63a377b49f25ccf98aa8a62fd769caaaa107cb7
 initramfs	usr/lib/usos/legacy_xp_staging.sh	100755	b6cf4d583b9bff8e8f396214025652e60b3ba1216768faf936f808ab8b05ecf1
-initramfs	usr/lib/usos/micro_linux_ui.sh	100755	29b80c7ffebc5a7792797e7c421348f7d70b9f3d16da0da22c686bbc0ec93a50
+initramfs	usr/lib/usos/micro_linux_ui.sh	100755	aa2706759236e7e804cbcaf522b05f8da07e4504f493fde02833d106618e3a8e
+initramfs	usr/lib/usos/nt3	40755	dir
+initramfs	usr/lib/usos/nt3-e820-mbr-440.bin	100644	dbfae0e04ec20c1b3f8b74b110c96fbc2bfb68759aa3ac47a5d495b27500c4e6
+initramfs	usr/lib/usos/nt3/AHCINT.SYS	100644	260771715885af8167c6e50f1a8a2e7b5730d15bbf93e43e0d3ca4cd3479733c
+initramfs	usr/lib/usos/nt3/USOSACHK.EXE	100644	748725aefcfeba1a6ef5af5feeb6d110c6ba90142c4a76bb0dee73adb924a4ac
+initramfs	usr/lib/usos/nt3/USOSNT3.EXE	100644	8eb12ede577be750d574b88f26b1870e5eb406f7474c1ab59f76c54afbb1c76f
+initramfs	usr/lib/usos/nt3/USOSRST.SYS	100644	f3ee44afc8081d748fe928acccdbab9c6efeb45e3790e789e588a1d8e180ba7c
+initramfs	usr/lib/usos/nt3/USOSUSB.SYS	100644	68944efb7f3d26c7fc19bf99cab2bd7944e0d32955da97f933a8019b226d2046
 initramfs	usr/lib/usos/nt4	40755	dir
-initramfs	usr/lib/usos/nt4/AHCINT.SYS	100644	c8fda75b81964de3109ed39954ba2b3220d0f7d4f1dee5ab4bc1e5a0c7b1046f
+initramfs	usr/lib/usos/nt4/AHCINT.SYS	100644	243b759cf53cbb0bad3d1e50c3618b0487b368c1e28e9738c2fbea612c8b0821
 initramfs	usr/lib/usos/nt4/USOSOFF.EXE	100644	11ac72c6d5b73d6931e957df1e4b86348dcca79b08412d9a75b432968c303ffa
-initramfs	usr/lib/usos/nt4/USOSRST.SYS	100644	a0d357aa948cf673db28bb75ed25e3dac67ec82a4c8c37ccbc6b40f3ff63d046
-initramfs	usr/lib/usos/nt4_csmwrap_target.sh	100755	5ffc5307660af3b16454bd7da8e45ca6aad48a26dde679f7b9a528ad2d5c455c
-initramfs	usr/lib/usos/nt4_qemu_install.sh	100755	e359eb00a81166b2e39ed1d237ebc67b69bbc279c22df57ed37cb50bde719513
+initramfs	usr/lib/usos/nt4/USOSRST.SYS	100644	d028580b4040662605d2c88b90094fd4125b2526cfda1083dc9011d6efafb23b
+initramfs	usr/lib/usos/nt4/USOSUSB.SYS	100644	68944efb7f3d26c7fc19bf99cab2bd7944e0d32955da97f933a8019b226d2046
+initramfs	usr/lib/usos/nt4/USOSVBE.SYS	100644	35bcafe45c8cb8629a3b66923ffedf66ff75ab2ea1df8b42cb0bbfb192eb90bb
+initramfs	usr/lib/usos/nt4_csmwrap_target.sh	100755	14430c5fdd6329ee2ca8f1667368362c7d07b6e1c2a70cc3a3d89fea3bbdef62
+initramfs	usr/lib/usos/nt4_qemu_install.sh	100755	fe57e02344c0e137312c9a6d3738a72ac9643ddfa62d02415fd194e3000466fd
 initramfs	usr/lib/usos/nt52_usb_stage.sh	100755	32280cd7d12e0db9fbabfaf311ade7695311c3c9af3f8c884c5f112009ba9e93
-initramfs	usr/lib/usos/nt5_profile.sh	100755	7d13f35fe285de2e73a0bc70708e0ce744328bba7ac5bbbdca56892e5dfaf38a
+initramfs	usr/lib/usos/nt5_media_key.sh	100755	9f62ee0e64af21ec8a641b1bde227f8d1c2ae8e63938ec69c20c9d1d13d5db41
+initramfs	usr/lib/usos/nt5_profile.sh	100755	a38d71b232a7e315388d23a7f36b667ee3756a756118c081223d6c83bf3b0697
 initramfs	usr/lib/usos/nt5_storage_stage.sh	100755	2b656da845fb69abf6ba304ab97a3d3f32d8c19611e7a254120f8b133ee26f8d
 initramfs	usr/lib/usos/nt5_user_drivers.sh	100755	f119d30029bf0e34aa65a791509df186d00ce41d31c445efc1a89eefa5110ab0
 initramfs	usr/lib/usos/partuuid.sh	100755	717393ba57556d5e9b11bcc545f36738c07cf4a084967ce807f55b03193f995e
@@ -49,13 +59,13 @@ initramfs	usr/lib/usos/prepare_windows7_nvme.sh	100755	e15bdc718ed699289deffaa7d
 initramfs	usr/lib/usos/prepare_windows7_uefi.sh	100755	900eae05959e90e0293806cd5e5737fc3e04a43fcdb0bcc808b71f467bfd7c23
 initramfs	usr/lib/usos/prepare_windows_bios_boot.sh	100755	4729c126c3f855176760534e4032807cfbc6f18469a7dc9422bd6f34cc21f1b2
 initramfs	usr/lib/usos/prepare_work.sh	100755	700bb7d9bc9e23ef61243275dc08ce155478e31d4a0868da68f26102739541bb
-initramfs	usr/lib/usos/prepare_xp_local_source.sh	100755	fc75f88647435a5007e288c308e128226c493128b603b2acd2bd9e6e9492bfda
-initramfs	usr/lib/usos/prepare_xp_ntfs_target.sh	100755	b91cb7610cc325da8858f62b538d69e21caf4781e3551902794577954bb95ce6
+initramfs	usr/lib/usos/prepare_xp_local_source.sh	100755	bda1217f08bb31dcac24e8fa5bbd682bbaa4b5eff816c5238a7df53027e93e47
+initramfs	usr/lib/usos/prepare_xp_ntfs_target.sh	100755	4b72a0d33139a06282a7ee1cf1a9c952a1305cc30cda1cb7b5b9e00c588f0dc4
 initramfs	usr/lib/usos/prepare_xp_source_aliases.sh	100755	71e9f08a8b877a11f67016aeea617dd4a7d690cb70c6c61f1b7711d3c2424ff2
 initramfs	usr/lib/usos/prepare_xp_target.sh	100755	022ce9ac03c0b5ac4cf4eb8d5527978f0620e0eb3aaf02f98999f012ef799465
-initramfs	usr/lib/usos/prepare_xp_windows_partition.sh	100755	3dd4c5133b5257f82640fd8cd2e7abff18cf78b6066a9e15569896658ab1f153
-initramfs	usr/lib/usos/probe_nt5_source.sh	100755	4b76b6fd97624ebc0be99a1400457e987f32c2fc36531ba148a7766c563f412f
-initramfs	usr/lib/usos/probe_xp_source.sh	100755	1da872de696426935f1c7f899bedb0921bed0ce9f8a0a1c085d30ec674b799ce
+initramfs	usr/lib/usos/prepare_xp_windows_partition.sh	100755	93dc273130a09b9a49ad70ef379ef97d8f818703044a7b7112b41b0dbf8f2ed3
+initramfs	usr/lib/usos/probe_nt5_source.sh	100755	4932efde2e08d5b415aa139ee240e844a6a8a6717171b68f562c71beb9ec7140
+initramfs	usr/lib/usos/probe_xp_source.sh	100755	1643a24cd44e5a588ed697afca1f70db52b534c21583fa3a7a2aa4b247865c4e
 initramfs	usr/lib/usos/simpledrm.modules	100644	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 initramfs	usr/lib/usos/target_disk_guard.sh	100755	a42173f94fba4392bed9803557573cd9af4041f006d8ddca1c28e1d8da55fff8
 initramfs	usr/lib/usos/target_disk_identity.sh	100755	ed2a3efffbbe15fcc77c79024c694a596afd955e019436fc0162ccbf826fe584
@@ -76,10 +86,10 @@ initramfs	usr/lib/usos/vista_csmwrap_target.sh	100755	0690b03e56ee84a2a1422faf21
 initramfs	usr/lib/usos/vista_disk_prepare.sh	100755	f41d1790480b90e0ca3e578dadc2ed0c4aa20acc1a5b403f5b2b01e2013b464d
 initramfs	usr/lib/usos/w2k3_selected_partition_uefi_csm.sif	100755	d986de98a02dd6c9454db8e37d54999f9213b3d1fb5a8205ac996dc9f391f538
 initramfs	usr/lib/usos/w2k_selected_partition_uefi_csm.sif	100755	4081b007b280efb31c85ce519abbfcb18ac8f09482add26a7de1c8b3520de04e
-initramfs	usr/lib/usos/w2k_stage.sh	100755	cbfd2816c2eb9f70117bc17bac8f6b7d64661628c26e03c2ced393b06eb4c27d
-initramfs	usr/lib/usos/w9x_csmwrap_prepare.sh	100755	abbde46ee514b317bf5315e2e508bc5f92477e2ef08aede4ffd7970ae25e8783
+initramfs	usr/lib/usos/w2k_stage.sh	100755	e04c3009e784a75aec80a3c4c9390ddea80505468a34cb4d12383fc515186b7d
+initramfs	usr/lib/usos/w9x_csmwrap_prepare.sh	100755	8278352c8b0227fdf2feb418e5d6b3166214955b502d9ae20d3711533c172c97
 initramfs	usr/lib/usos/w9x_csmwrap_target.sh	100755	0bfe04f8fdd1addc4c1f984a0a2de3766de727d6c66d070c0478176adf27a3ea
-initramfs	usr/lib/usos/w9x_phase1_qemu.sh	100755	596ad02ff2c4ae82ab88f0122d9b8d40905e72fa19b6ce10160baf7ebf3be59f
+initramfs	usr/lib/usos/w9x_phase1_qemu.sh	100755	991ac15291a238b2a677fe39fe2ee2bb0d18ca60a8b49d46d11928dff417081f
 initramfs	usr/lib/usos/w9x_tzfix.sh	100755	c36eb1162d0f0fdf3d71717f8e18a0e88c29b74e71acfce0def5a1c9f8c0fd0c
 initramfs	usr/lib/usos/w9x_vesa95.sh	100755	05a18da41edc1342fe3a68b14d96f9d2a1820c573ac1f640668703b586e22c12
 initramfs	usr/lib/usos/wimboot	100644	5f067ccdc4d084d5bf77b6c853bd0f8402dfc2b4cd1b103d358993ae97fae8e3
@@ -320,8 +330,8 @@ xp_csm	usr/lib/usos/nt52-usb/x86/xhci98.inf	100644	88ecbce637a81c361f8ae0c35df58
 xp_csm	usr/lib/usos/nt52-usb/x86/xhci98.sys	100644	01adf36d75eccebf9365a169fa47e5f1cd64cf40f43bcad4ba069210abd651ad
 xp_csm	usr/lib/usos/w2k-drivers	40755	dir
 xp_csm	usr/lib/usos/w2k-drivers/LICENSE	100644	230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809
-xp_csm	usr/lib/usos/w2k-drivers/MODIFIED.txt	100644	6920bcf75ecc5ce1568a678d2890a539a249290bdb64eb85fa1be9ac0f0899c7
-xp_csm	usr/lib/usos/w2k-drivers/SOURCE.txt	100644	b8821fd4235e18f2ee005eba63df0a5b292f8714eaf59e79f5937db7dab27b9a
+xp_csm	usr/lib/usos/w2k-drivers/MODIFIED.txt	100644	b10d8d048e9fe4a6fe22424da19f1b98c1069580e730993f0a9ae690a591c02b
+xp_csm	usr/lib/usos/w2k-drivers/SOURCE.txt	100644	a5f2cb1c90a2b908972a88bf74c7e0de59af3f3e8e6ead3289d7bdfc8c8d0649
 xp_csm	usr/lib/usos/w2k-drivers/ahcint.inf	100644	c8dea5fd3839b8f9298a7925f6ba8c6451588638a42f24e10c4c8542915a6e21
 xp_csm	usr/lib/usos/w2k-drivers/ahcint.sys	100644	4e2d454357e0bfa468be48dc24ea428b5e1adbeb81bcc52dac6e15a4a302289f
 xp_csm	usr/lib/usos/w2k-drivers/uniata	40755	dir
@@ -455,18 +465,31 @@ payload_zip	EFI/USOS/dos-native/msdos/PREPDOS.BAT
 payload_zip	EFI/USOS/dos-native/msdos/REBOOT.COM
 payload_zip	EFI/USOS/dos-native/msdos/UNPACK.BAT
 payload_zip	EFI/USOS/dos-native/msdos/USOS.SHH
+payload_zip	EFI/USOS/dos-native/msdos/USOSKBC.COM
 payload_zip	EFI/USOS/dos-native/msdos/USOSKEY.COM
 payload_zip	EFI/USOS/dos-native/msdos/USOSKEY.DRV
 payload_zip	EFI/USOS/dos-native/msdos/VBADOS.TGZ
 payload_zip	EFI/USOS/dos-native/msdos/VBADOS.TXT
 payload_zip	EFI/USOS/dos-native/msdos/VBMOUSE.DRV
 payload_zip	EFI/USOS/dos-native/msdos/VBMOUSE.EXE
+payload_zip	EFI/USOS/dos-native/msdos/W101.KEY
+payload_zip	EFI/USOS/dos-native/msdos/W104.KEY
+payload_zip	EFI/USOS/dos-native/msdos/W1AUTO.BAT
+payload_zip	EFI/USOS/dos-native/msdos/W1AUTO.CSM
+payload_zip	EFI/USOS/dos-native/msdos/W1CONFIG.CSM
+payload_zip	EFI/USOS/dos-native/msdos/W1CONFIG.SYS
+payload_zip	EFI/USOS/dos-native/msdos/W1SETUP.BAT
+payload_zip	EFI/USOS/dos-native/msdos/W203.KEY
+payload_zip	EFI/USOS/dos-native/msdos/W211.KEY
+payload_zip	EFI/USOS/dos-native/msdos/W30.KEY
+payload_zip	EFI/USOS/dos-native/msdos/W386.KEY
 payload_zip	EFI/USOS/dos-native/msdos/W3AUTO.BAT
 payload_zip	EFI/USOS/dos-native/msdos/W3AUTO.CSM
 payload_zip	EFI/USOS/dos-native/msdos/W3CONFIG.CSM
 payload_zip	EFI/USOS/dos-native/msdos/W3CONFIG.SYS
 payload_zip	EFI/USOS/dos-native/msdos/W3INF.BAS
 payload_zip	EFI/USOS/dos-native/msdos/W3INI.BAS
+payload_zip	EFI/USOS/dos-native/msdos/W3PL.KEY
 payload_zip	EFI/USOS/dos-native/msdos/W3START.BAT
 payload_zip	EFI/USOS/dos-native/msdos/WINMENU.BAT
 payload_zip	EFI/USOS/dos-native/msdos/manifest.json
