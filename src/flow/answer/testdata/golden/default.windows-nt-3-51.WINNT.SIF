@@ -1,0 +1,29 @@
+; WINNT.SIF rendered by USOS for Windows NT 3.51 (docs/nt351-2026-10-08.md)
+[Data]
+MsDosInitiated = 1
+Floppyless = 1
+
+[Unattended]
+Method = express
+ConfirmHardware = no
+NtUpgrade = no
+Win31Upgrade = no
+TargetPath = \WINNT
+OverwriteOemFilesOnUpgrade = no
+
+[GuiUnattended]
+!SetupNetwork = NO
+!SetupApplications = NO
+
+[UserData]
+!FullName = "USOS"
+!OrgName = "USOS"
+!ComputerName = USOS-NT351
+
+[LicenseFilePrintData]
+
+[NetworkAdapterData]
+
+[TransportData]
+
+[DomainData]

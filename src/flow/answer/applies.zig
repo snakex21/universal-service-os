@@ -42,7 +42,8 @@ fn tokenMatches(token: []const u8, system_id: []const u8) bool {
     // Windows 95/98/Me render MSBATCH.INF (msbatch.zig) without an NT family.
     const win9x = @import("msbatch.zig").releaseFor(system_id) != null;
     // Windows NT 4.0 renders WINNT.SIF (nt4.zig) without an NT5/NT6 family.
-    const nt4 = @import("nt4.zig").isNt4(system_id);
+    // Windows NT 3.51 too (nt3.zig).
+    const nt4 = @import("nt4.zig").isNt4(system_id) or @import("nt3.zig").isNt3(system_id);
     if (std.mem.eql(u8, token, "windows")) return family != null or win9x or nt4;
     if (std.mem.eql(u8, token, "windows-9x")) return win9x;
     if (std.mem.eql(u8, token, "windows-nt5")) return if (family) |f| f.nt5() else false;
@@ -67,6 +68,8 @@ pub fn missing(p: *const Profile, system_id: []const u8) ?Missing {
     if (std.ascii.eqlIgnoreCase(system_id, "windows-95")) return if (has95Key(p)) null else .product_key;
     // Windows NT 4.0: ProductId (the 95 key shapes); without it GUI Setup waits.
     if (@import("nt4.zig").isNt4(system_id)) return if (@import("nt4.zig").validKey(p.keyFor(system_id))) null else .product_key;
+    // Windows NT 3.51: no key (INITIAL.INF DisplayPidDlg = NO), nothing missing.
+    if (@import("nt3.zig").isNt3(system_id)) return null;
     const family = target.familyFor(system_id) orelse return null;
     if (family.nt5()) return if (p.keyFor(system_id).len == 0) .product_key else null;
     if (family.server() and !complexPassword(p.password.slice())) return .server_password;

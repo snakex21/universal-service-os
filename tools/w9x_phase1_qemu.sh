@@ -59,14 +59,21 @@ W9X_VM_STALL=${W9X_VM_STALL:-1800}
 W9X_VM_ANSWER=${W9X_VM_ANSWER:-}
 W9X_VM_ANSWER_IDLE=${W9X_VM_ANSWER_IDLE:-180}
 W9X_VM_ANSWER_TRIES=${W9X_VM_ANSWER_TRIES:-3}
+# The same for a text-mode screen (W9X_VM_TEXT_ANSWER; NT 3.51: ret for
+# text-mode Setup's "Setup was unable to verify your C: drive ... Press ENTER
+# to continue", QEMU 2026-10-08), after W9X_VM_TEXT_ANSWER_IDLE seconds
+# without a disk write, at most W9X_VM_ANSWER_TRIES times per run. Off when
+# empty.
+W9X_VM_TEXT_ANSWER=${W9X_VM_TEXT_ANSWER:-}
+W9X_VM_TEXT_ANSWER_IDLE=${W9X_VM_TEXT_ANSWER_IDLE:-90}
 
 # 0 when this system's Setup phase 1 runs in the VM (reason on stdout).
 w9x_vm_available() {
     # Me (2026-10-06): the same DOS-stage SETUP.EXE as 98 (/P I valid), so the
     # same VM path. 95 (2026-10-06) too, but only with its key: the caller
     # (w9x_csmwrap_prepare.sh) keeps the native start for 95 without one.
-    # NT4 / NT4S (2026-10-07): the whole install runs in the VM (tools/nt4_qemu_install.sh).
-    case "$1" in 98SE|98|ME|95|NT4|NT4S) ;; *) echo "release $1 keeps the native Setup start"; return 1 ;; esac
+    # NT4 / NT4S (2026-10-07), NT351 / NT351S (2026-10-08): the whole install runs in the VM (tools/nt4_qemu_install.sh).
+    case "$1" in 98SE|98|ME|95|NT4|NT4S|NT351|NT351S) ;; *) echo "release $1 keeps the native Setup start"; return 1 ;; esac
     if [ -e "$W9X_VM_FLAGS/phase1-native.flag" ]; then echo 'phase1-native.flag present'; return 1; fi
     if [ ! -x "$W9X_VM_QEMU" ]; then echo 'qemu9x.cpio not loaded (no QEMU)'; return 1; fi
     for firmware in bios-256k.bin vgabios-stdvga.bin; do
@@ -131,7 +138,8 @@ w9x_vm_key_digits() {
 }
 
 # 0 when the guest shows a graphics screen (Setup's mini-Windows runs at
-# 640x480; QEMU dumps a text-mode screen as 720x400). The dump stays in
+# 640x480; QEMU dumps a text-mode screen 720 pixels wide: 720x400, NT 3.51
+# text-mode Setup 720x396, QEMU 2026-10-08). The dump stays in
 # $W9X_VM_RUN only for its header and is deleted at once (it may show a page
 # with the digits after a rejected attempt).
 w9x_vm_graphics_screen() {
@@ -143,7 +151,7 @@ w9x_vm_graphics_screen() {
     done
     size=$(head -c 20 "$W9X_VM_RUN/mode.ppm" 2>/dev/null | tr '\n' ' ' | awk '{ print $2 "x" $3 }')
     rm -f "$W9X_VM_RUN/mode.ppm"
-    case "$size" in 720x400|x|'') return 1 ;; esac
+    case "$size" in 720x*|x|'') return 1 ;; esac
     return 0
 }
 
@@ -192,6 +200,7 @@ w9x_phase1_run() {
     idle_since=0
     W9X_VM_STALLED=0
     answer_tries=0
+    text_tries=0
     set --
     while IFS= read -r arg; do set -- "$@" "$arg"; done <<EOF
 $("${W9X_VM_ARGS_FN:-w9x_vm_args}" "$target" "$accel")
@@ -235,6 +244,15 @@ EOF
                 sleep 3
                 printf 'answer typed: %s attempt %s at %ss, idle %ss, written %s MB\n' "$W9X_VM_ANSWER" "$answer_tries" "$elapsed" "$idle" "$written" >> "$W9X_VM_RUN/command.txt"
                 w9x_vm_monitor "sendkey $W9X_VM_ANSWER"
+                idle_since=$(date +%s)
+            elif [ -n "$W9X_VM_TEXT_ANSWER" ] && [ "$idle" -ge "$W9X_VM_TEXT_ANSWER_IDLE" ] && [ "$text_tries" -lt "$W9X_VM_ANSWER_TRIES" ] &&
+                ! w9x_vm_graphics_screen; then
+                text_tries=$((text_tries + 1))
+                w9x_vm_monitor "screendump $W9X_VM_RUN/text-answer-$text_tries.ppm"
+                sleep 3
+                printf 'text answer typed: %s attempt %s at %ss, idle %ss, written %s MB
+' "$W9X_VM_TEXT_ANSWER" "$text_tries" "$elapsed" "$idle" "$written" >> "$W9X_VM_RUN/command.txt"
+                w9x_vm_monitor "sendkey $W9X_VM_TEXT_ANSWER"
                 idle_since=$(date +%s)
             elif [ "$idle" -ge "$W9X_VM_STALL" ]; then
                 printf 'stalled: no disk write for %ss\n' "$idle" >> "$W9X_VM_RUN/command.txt"

@@ -82,6 +82,8 @@ pub const hashes = [_]u32{
     0x399e2996, // lx.no_disks_detected
     0x2be3334f, // lx.no_separate_xpsetup_partition_will_remain
     0x76d8d357, // lx.no_unattended_file_selected_skipped
+    0xf76a47e0, // lx.nt3_failed
+    0xdc0d7b06, // lx.nt3_needs_vm
     0x0f924b74, // lx.nt4_after_restart
     0x26b7fa06, // lx.nt4_checking
     0x30c7d55b, // lx.nt4_failed
@@ -287,6 +289,8 @@ pub const english = [_][]const u8{
     "No disks detected.",
     "No separate XPSETUP partition will remain.",
     "No unattended file selected - skipped.",
+    "The Windows NT 3.51 installation did not finish. The computer was not restarted; logs: EFI/USOS/win9x/nt4",
+    "Windows NT 3.51 installs only in the VM on this PC, which is not available: {0}",
     "After the restart the disk starts by itself into the installed {0}.",
     "Checking the installed system",
     "The Windows NT 4.0 installation did not finish. The computer was not restarted; logs: EFI/USOS/win9x/nt4",

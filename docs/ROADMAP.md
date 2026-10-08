@@ -419,6 +419,12 @@ startu 7,8 GB / 1024 cylindry bez nowszego `atapi.sys`), `unattend.txt`
 zamiast `winnt.sif`, brak ACPI, USB i AHCI. Tylko BIOS i retro sprzęt
 (MS-7100 w trybie IDE). Najniższy priorytet.
 
+Stan 2026-10-08: NT 4.0 Workstation/Server instaluje się z UEFI bez CSM
+(cała instalacja w QEMU na docelowym PC, potem CSMWrap;
+docs/nt4-2026-10-07.md, X470 PASS). NT 3.51 Workstation/Server idzie tą
+samą ścieżką (profil `nt3-x86-qemu-csmwrap`, MBR z filtrem E820, bez klucza
+i bez SP; docs/nt351-2026-10-08.md), test na X470 czeka.
+
 ### L9. shim-review: **Later**, długoterminowo
 
 Własny shim z wbudowanym certyfikatem USOS, podpisany przez Microsoft,

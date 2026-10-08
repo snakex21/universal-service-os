@@ -1164,6 +1164,7 @@
   "boot.summary.w9x_csmwrap": "Bez CSM-a (eksperimentalno): USOS priprema FAT32 disk sa instalacijom i CSMWrap-om; instalacija se zatim pokreće sa njega",
   "boot.summary.nt4_csmwrap": "Bez CSM-a (eksperimentalno): cela instalacija se odvija u virtuelnoj mašini na ovom računaru; gotov sistem se zatim pokreće preko CSMWrap-a",
   "boot.summary.nt4_limits": "Windows NT 4.0: koristite PS/2 tastaturu (USB unos još ne radi); prikaz 640x480; potreban je SP6I386.EXE (Service Pack 6a) u Systems\\Windows\\Windows NT 4.0\\ServicePack na DATA.",
+  "boot.summary.nt3_limits": "Windows NT 3.51: koristite PS/2 tastaturu (USB unos još ne radi); prikaz 640x480.",
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: na pitanja originalnog Setupa odgovorite tastaturom (tamo radi i USB tastatura); u Setupu izaberite VGA (EGA za 1.0x) i miš IBM PS/2. U samim tim verzijama Windowsa koristite PS/2 tastaturu (most za USB tastaturu još ne postoji). Potreban je MS-DOS 6.22.iso u Systems\\DOS\\MS-DOS\\Images na particiji DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentalno): nema drajvera AHCI/NVMe/USB 3 za NT 5.0 (SATA u IDE režimu), najviše 4 GB RAM-a i 2 procesora",
@@ -1198,6 +1199,8 @@
   "boot.lx.nt4_needs_key": "Windows NT 4.0 zahteva ključ proizvoda: izaberite profil odgovora sa ključem ili ga unesite kada meni to zatraži",
   "boot.lx.nt4_needs_vm": "Windows NT 4.0 se instalira samo u virtuelnoj mašini na ovom računaru, koja nije dostupna: {0}",
   "boot.lx.nt4_failed": "Instalacija sistema Windows NT 4.0 nije završena. Računar nije ponovo pokrenut; dnevnici: EFI/USOS/win9x/nt4",
+  "boot.lx.nt3_needs_vm": "Windows NT 3.51 se instalira samo u virtuelnoj mašini na ovom računaru, koja nije dostupna: {0}",
+  "boot.lx.nt3_failed": "Instalacija sistema Windows NT 3.51 nije završena. Računar nije ponovo pokrenut; dnevnici: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Ponovo pokreni",
   "winpe.vista_csmwrap_title": "USOS - Vista bez CSM-a",
   "winpe.vista_csmwrap_done": "Prvi deo instalacije Viste je završen. Sada izvadite USOS fleš i izaberite U redu: računar se ponovo pokreće i Vista nastavlja sa diska preko CSMWrap-a. Ako fleš ostane priključen, pokrenite UEFI stavku ovog diska iz menija za pokretanje firmvera.",

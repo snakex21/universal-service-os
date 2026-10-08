@@ -822,7 +822,11 @@ __declspec(dllimport) BOOLEAN __stdcall KeRegisterBugCheckCallback(IN PVOID Call
                                                                    IN PVOID Buffer, IN ULONG Length, IN PUCHAR Component);
 __declspec(dllimport) VOID __stdcall KeBugCheckEx(IN ULONG BugCheckCode, IN ULONG_PTR P1, IN ULONG_PTR P2,
                                                   IN ULONG_PTR P3, IN ULONG_PTR P4);
+#ifndef AHCI_NT351
 __declspec(dllimport) extern ULONG KiBugCheckData[5];
+#endif
+/* MODIFIED (USOS 1.3.0.0-usos4, NT 3.51 build, 0007): NT 3.51 ntoskrnl
+   does not export KiBugCheckData; that build keeps the STOP code at 0. */
 
 static ULONG g_UsosInstances;
 static UCHAR g_UsosComponent[] = "AHCINT-USOS";
@@ -1193,7 +1197,11 @@ AhciUsosBugCheckCallback(IN PVOID Buffer, IN ULONG Length)
 
     (VOID)Length;
     if (HwInit->UsosStage & USOS_STAGE_BUGCHECK) return;
+#ifndef AHCI_NT351
     for (i = 0; i < 5; i++) HwInit->UsosBugCheck[i] = KiBugCheckData[i];
+#else
+    for (i = 0; i < 5; i++) HwInit->UsosBugCheck[i] = 0;
+#endif
     HwInit->UsosStage |= USOS_STAGE_BUGCHECK;
     AhciUsosShow(HwInit);
     HwInit->UsosInTrace = 0;

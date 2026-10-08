@@ -1161,6 +1161,7 @@
   "boot.summary.w9x_csmwrap": "Sans CSM (expérimental) : USOS prépare un disque FAT32 avec l’installation et CSMWrap ; l’installation démarre ensuite depuis celui-ci",
   "boot.summary.nt4_csmwrap": "Sans CSM (expérimental) : toute l’installation s’exécute dans une machine virtuelle sur ce PC ; le système terminé démarre ensuite via CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0 : utilisez un clavier PS/2 (pas encore d’entrée USB) ; affichage 640x480 ; nécessite SP6I386.EXE (Service Pack 6a) dans Systems\\Windows\\Windows NT 4.0\\ServicePack sur DATA.",
+  "boot.summary.nt3_limits": "Windows NT 3.51 : utilisez un clavier PS/2 (pas encore d’entrée USB) ; affichage 640x480.",
   "boot.summary.win_early_limits": "Windows 1.0x-3.0 : répondez aux questions du Setup d'origine au clavier (un clavier USB y fonctionne) ; dans le Setup, choisissez VGA (EGA pour 1.0x) et la souris IBM PS/2. Dans ces versions de Windows, utilisez un clavier PS/2 (pas encore de pont clavier USB). Nécessite MS-DOS 6.22.iso dans Systems\\DOS\\MS-DOS\\Images sur DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (expérimental) : pas de pilote AHCI/NVMe/USB 3 pour NT 5.0 (SATA en mode IDE), 4 Go de RAM et 2 processeurs max.",
@@ -1195,6 +1196,8 @@
   "boot.lx.nt4_needs_key": "Windows NT 4.0 nécessite une clé de produit : choisissez un profil de réponses contenant la clé ou saisissez-la lorsque le menu la demande",
   "boot.lx.nt4_needs_vm": "Windows NT 4.0 ne s’installe que dans la machine virtuelle de ce PC, qui n’est pas disponible : {0}",
   "boot.lx.nt4_failed": "L'installation de Windows NT 4.0 n'est pas terminée. L'ordinateur n'a pas été redémarré ; journaux : EFI/USOS/win9x/nt4",
+  "boot.lx.nt3_needs_vm": "Windows NT 3.51 ne s’installe que dans la machine virtuelle de ce PC, qui n’est pas disponible : {0}",
+  "boot.lx.nt3_failed": "L'installation de Windows NT 3.51 n'est pas terminée. L'ordinateur n'a pas été redémarré ; journaux : EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Redémarrer",
   "winpe.vista_csmwrap_title": "USOS - Vista sans CSM",
   "winpe.vista_csmwrap_done": "La première partie de l'installation de Vista est terminée. Retirez maintenant la clé USOS, puis choisissez OK : l'ordinateur redémarre et Vista continue depuis le disque via CSMWrap. Si la clé reste branchée, lancez l'entrée UEFI de ce disque depuis le menu de démarrage du micrologiciel.",

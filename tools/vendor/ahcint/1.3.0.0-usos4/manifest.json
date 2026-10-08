@@ -10,7 +10,8 @@
     "patches/0003-usos3-screen-stages-readback-fail-loudly.patch",
     "patches/0004-usos4-stall-diagnostics.patch",
     "patches/0005-nt4-wdk-build.patch",
-    "patches/0006-nt4-no-interrupt.patch"
+    "patches/0006-nt4-no-interrupt.patch",
+    "patches/0007-nt351-no-kibugcheckdata.patch"
   ],
   "build": "build.cmd (WDK 7.1, x86 WXP)",
   "files": {
@@ -18,7 +19,7 @@
     "bin/2KXP/i386/ahcint.sys": "4e2d454357e0bfa468be48dc24ea428b5e1adbeb81bcc52dac6e15a4a302289f",
     "build.cmd": "cb6c3f7f2289ee7f1b3ede66fe1824b474eb7dc425112a4a9947e95ef295111e",
     "LICENSE": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
-    "MODIFIED.txt": "46ef5544f18f7f43f47f7ce7bbbbf08099f6d184ebb23c4af6d3155b04fa95a1",
+    "MODIFIED.txt": "b10d8d048e9fe4a6fe22424da19f1b98c1069580e730993f0a9ae690a591c02b",
     "patches/0001-usos1-flush-cache.patch": "a858d1023d995b7c7ee6ef32b1c2668fd615a4ed8cad1e964fb41104883311fd",
     "patches/0002-usos2-target-check-and-trace.patch": "ba70562a120bd080bbdbca8e11985eac4772c8a104577437f359066ec00abd3a",
     "patches/0003-usos3-screen-stages-readback-fail-loudly.patch": "30a3f2b7c10d7895cec58b0878f5fb0d3e1487893cb962c43cbc9e622b37f7e6",
@@ -30,7 +31,7 @@
     "src/9X/makefile": "0dd9d6acd03ad012ccbd40562bf52ee0f929a67bb46062f7f62d8b511f635666",
     "src/ahcimain.c": "dda22bb6b1a54ce149d78e48adddb8137851dbbfa89954b92403ee2d7b4b78db",
     "src/ahcint.h": "9458a65d4d2fb5de364bd4e34a466f0f81a6dddb64be67cb0c03bb6c591b7e35",
-    "src/ahcisatl.c": "fba86391f7c7bce18f08348067b8bc3406c50bfd0d488cc30ed60b795a5412e8",
+    "src/ahcisatl.c": "12623fa9c2c847b41e1b312f78b29a45d207332fcebfdd77dd232541a853cd8d",
     "src/NT/build.bat": "592a19badaeaca36fc9c02dd9c520d9aa12f431ba0d3e07933abddbf4c70a560",
     "toolchain.txt": "d76edb2e19f45018a5852b95ac2ec1e023dee88cf0ab207600e3ffed47a58897",
     "patches/0004-usos4-stall-diagnostics.patch": "27f3b3b460b6cd02980d55b445eeef29a6aea31eed9ead9b8ccf08f3050c6170",
@@ -39,7 +40,11 @@
     "src/NT4WDK/makefile": "272431810da48231039ac4fcfa245628b6b6c3dc39054b908c26c97d313ccf97",
     "bin/NT4/i386/ahcint.sys": "243b759cf53cbb0bad3d1e50c3618b0487b368c1e28e9738c2fbea612c8b0821",
     "patches/0005-nt4-wdk-build.patch": "3346fc0f9401abd2139ecf2ac7ed86ee693558459427d4eb703fd5b78d403d97",
-    "patches/0006-nt4-no-interrupt.patch": "ff509680abb6cde7fe4f8d81de3fbc0155fcf061777084bfd67bca0f19a49923"
+    "patches/0006-nt4-no-interrupt.patch": "ff509680abb6cde7fe4f8d81de3fbc0155fcf061777084bfd67bca0f19a49923",
+    "build-nt351.cmd": "0c082564c77dfaf0ecd063f44a89eb39da1c532e9ea6ecc4ba7e3efe5923d736",
+    "bin/NT351/i386/ahcint.sys": "260771715885af8167c6e50f1a8a2e7b5730d15bbf93e43e0d3ca4cd3479733c",
+    "patches/0007-nt351-no-kibugcheckdata.patch": "b956ee5742ad5196b043088df07a2a6cff58f2624d5b851152bd40eed19c115d"
   },
-  "build_nt4": "build-nt4.cmd (WDK 7.1, x86 WXP, -DAHCI_NT4 -DAHCI_NT4_WDK, PE version 4.00 via tools/nt4/pe_nt4_version.py) -> bin/NT4/i386/ahcint.sys"
+  "build_nt4": "build-nt4.cmd (WDK 7.1, x86 WXP, -DAHCI_NT4 -DAHCI_NT4_WDK, PE version 4.00 via tools/nt4/pe_nt4_version.py) -> bin/NT4/i386/ahcint.sys",
+  "build_nt351": "build-nt351.cmd (WDK 7.1, x86 WXP, the NT 4.0 defines plus patch 0007: no KiBugCheckData, PE version 3.51 via tools/nt4/pe_nt4_version.py --version 3.51) -> bin/NT351/i386/ahcint.sys; every import resolves on NT 3.51 (tools/tests/data/nt351_exports.txt)"
 }

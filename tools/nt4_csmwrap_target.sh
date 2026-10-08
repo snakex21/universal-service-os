@@ -1,6 +1,14 @@
 #!/bin/sh
-# Windows NT 4.0 Workstation / Server from the UEFI menu without firmware CSM
-# (profile nt4-x86-qemu-csmwrap, experimental; docs/nt4-2026-10-07.md).
+# Windows NT 4.0 and NT 3.51 Workstation / Server from the UEFI menu without
+# firmware CSM (profiles nt4-x86-qemu-csmwrap, nt3-x86-qemu-csmwrap,
+# experimental; docs/nt4-2026-10-07.md, docs/nt351-2026-10-08.md).
+# NT 3.51 (TXTSETUP.SIF MajorVersion = 3) takes the same layout and differs
+# in: no I386\SYSTEM32, no $OEM$ (NT 3.51 has no CMDLINES.TXT, no RunOnce and
+# no REGEDIT4 import), \USOS\NT3 instead of \USOS\NT4 with USOSNT3.EXE (own
+# GPL tool, tools/nt3/usosnt3: GUI Setup starts it as [GuiUnattended]
+# !DetachedProgram; it registers itself as a service that does the
+# post-install work at the first start of the installed system) and the NT
+# 3.51 driver builds, and the "!"-prefixed GUI keys of the answer file.
 # Called by tools/w9x_csmwrap_prepare.sh after the user picked and confirmed
 # the disk. The whole NT4 install then runs in QEMU on this disk
 # (tools/nt4_qemu_install.sh: -cpu pentium3, IDE); the RTM text-mode kernel
@@ -8,7 +16,11 @@
 # the real machine only ever boots the finished SP6a system through CSMWrap.
 #
 # Writes ONLY $TARGET_DEVICE:
-#   MBR     USOS MBR code (boots the active partition), new disk signature
+#   MBR     USOS MBR code (boots the active partition), new disk signature;
+#           NT 3.51: nt3-e820-mbr-440.bin, which also hides E820 entries
+#           above 4 GiB / non-RAM entries above 1 MiB from the 3.51 loaders
+#           (their kernel otherwise sizes MmHighestPhysicalPage from a
+#           firmware range at FFFC0000 and stops with 0x50 in MmInit)
 #   slot 1  FAT16 (type 06), active, LBA 63, 2000 MiB, 32 KiB clusters,
 #           255 heads / 63 sectors (the layout of the 2026-10-07 QEMU lab)
 #   (slot 2, the CSMWrap ESP, is written after the install: the VM sees only
@@ -63,9 +75,35 @@ nt4_copy_upper() {
 # The answer file with the USOS time zone marker resolved (stdin -> stdout):
 # ";USOS-TZ=<9x zone key>" becomes [GuiUnattended] TimeZone = "<the CD's
 # display string>" when the CD's language is known ($1: 0415 Polish, 0409 English),
-# otherwise it is dropped (Setup shows the time zone page).
+# otherwise it is dropped (Setup shows the time zone page). $2 = yes: NT 3.51,
+# whose GUI Setup reads "!TimeZone" and runs main.cpl /INSTALL=<string> with
+# its own, older list (UNATTEND.TXT of the 3.51 CD; Warsaw is "Lisbon, Warsaw").
 nt4_resolve_time_zone() {
-    awk -v BINMODE=3 -v lang="$1" '
+    awk -v BINMODE=3 -v lang="$1" -v nt3="${2:-}" '
+        function en351(k) {
+            if (k == "Central European" || k == "Central Europe") return "(GMT+01:00) Lisbon, Warsaw"
+            if (k == "W. Europe") return "(GMT+01:00) Berlin, Stockholm, Rome, Bern, Brussels, Vienna"
+            if (k == "Romance") return "(GMT+01:00) Paris, Madrid"
+            if (k == "GMT") return "(GMT) Greenwich Mean Time; Dublin, Edinburgh, London"
+            if (k == "E. Europe") return "(GMT+02:00) Eastern Europe"
+            if (k == "GTB" || k == "FLE") return "(GMT+02:00) Athens, Helsinki, Istanbul"
+            if (k == "Russian") return "(GMT+03:00) Moscow, St. Petersburg"
+            if (k == "Eastern") return "(GMT-05:00) Eastern Time (US & Canada)"
+            if (k == "Central") return "(GMT-06:00) Central Time (US & Canada)"
+            if (k == "Mountain") return "(GMT-07:00) Mountain Time (US & Canada)"
+            if (k == "Pacific") return "(GMT-08:00) Pacific Time (US & Canada); Tijuana"
+            if (k == "Atlantic") return "(GMT-04:00) Atlantic Time (Canada)"
+            if (k == "Alaskan") return "(GMT-09:00) Alaska"
+            if (k == "Hawaiian") return "(GMT-10:00) Hawaii"
+            if (k == "Tokyo") return "(GMT+09:00) Tokyo, Osaka, Sapporo, Seoul, Yakutsk"
+            if (k == "Israel") return "(GMT+02:00) Israel"
+            if (k == "Egypt") return "(GMT+02:00) Cairo"
+            if (k == "India") return "(GMT+05:30) Bombay, Calcutta, Madras, New Delhi, Colombo"
+            if (k == "New Zealand") return "(GMT+12:00) Wellington"
+            if (k == "AUS Eastern") return "(GMT+10:00) Brisbane, Melbourne, Sydney"
+            if (k == "China") return "(GMT+08:00) Beijing, Chongqing, Urumqi"
+            return ""
+        }
         function pl(k) {
             if (k == "Central European" || k == "Central Europe") return "(GMT+01:00) Warszawa, Praga, Budapeszt"
             if (k == "GMT") return "(GMT) Czas Greenwich; Dublin, Edynburg, Londyn, Lizbona"
@@ -112,8 +150,10 @@ nt4_resolve_time_zone() {
         }
         { line = $0; sub(/\r$/, "", line) }
         line ~ /^;USOS-TZ=/ {
-            k = substr(line, 10); v = (lang == "0415") ? pl(k) : (lang == "0409") ? en(k) : ""
-            if (v != "") printf "TimeZone = \"%s\"\r\n", v
+            k = substr(line, 10)
+            if (nt3 == "yes") v = (lang == "0409") ? en351(k) : ""
+            else v = (lang == "0415") ? pl(k) : (lang == "0409") ? en(k) : ""
+            if (v != "") printf "%sTimeZone = \"%s\"\r\n", (nt3 == "yes" ? "!" : ""), v
             next
         }
         { printf "%s\r\n", line }'
@@ -127,29 +167,59 @@ nt4_resolve_time_zone() {
 # AutoUsers) when the answer lacks them (X470 2026-10-07: the install VM sat
 # on a page at 15 MB written). Stand-alone server (no network is installed,
 # so no domain role), Per Server for 5 connections; keys already in the
-# answer are kept.
+# answer are kept. $2 = yes: NT 3.51 ("!"-prefixed keys, same values).
 nt4_server_answer() {
-    awk -v BINMODE=3 -v product="$1" '
+    awk -v BINMODE=3 -v product="$1" -v bang="$([ "${2:-}" = yes ] && echo '!')" '
         { line = $0; sub(/\r$/, "", line); lines[++n] = line; low = tolower(line); gsub(/[ \t]/, "", low)
-          if (low ~ /^advservertype=/) has_type = 1
-          if (low == "[licensefileprintdata]") has_lic = 1 }
+          if (low ~ /^!?advservertype=/) has_type = 1
+          if (low ~ /^!?automode=/) has_lic = 1 }
         END {
             server = (product != "" && product != "0")
             for (i = 1; i <= n; i++) {
                 printf "%s\r\n", lines[i]
                 low = tolower(lines[i]); gsub(/[ \t]/, "", low)
-                if (server && !has_type && low == "[guiunattended]") { printf "AdvServerType = SERVERNT\r\n"; has_type = 1 }
+                if (server && !has_type && low == "[guiunattended]") { printf "%sAdvServerType = SERVERNT\r\n", bang; has_type = 1 }
+                # An empty [LicenseFilePrintData] (the NT 3.51 answer has one) gets the keys.
+                if (server && !has_lic && low == "[licensefileprintdata]") { printf "%sAutoMode = PerServer\r\n%sAutoUsers = 5\r\n", bang, bang; has_lic = 1 }
             }
-            if (server && !has_type) printf "\r\n[GuiUnattended]\r\nAdvServerType = SERVERNT\r\n"
-            if (server && !has_lic) printf "\r\n[LicenseFilePrintData]\r\nAutoMode = PerServer\r\nAutoUsers = 5\r\n"
+            if (server && !has_type) printf "\r\n[GuiUnattended]\r\n%sAdvServerType = SERVERNT\r\n", bang
+            if (server && !has_lic) printf "\r\n[LicenseFilePrintData]\r\n%sAutoMode = PerServer\r\n%sAutoUsers = 5\r\n", bang, bang
+        }'
+}
+
+# NT 3.51 (stdin -> stdout, CR LF): GUI Setup (INITIAL.INF) starts
+# [GuiUnattended] !DetachedProgram with !Arguments early, next to its own
+# work. USOSNT3.EXE /setup only registers the USOS service (usosnt3) that
+# does the post-install work at the first start of the installed system
+# (NT 3.51 has no RunOnce, no CMDLINES.TXT and no .REG import). An answer
+# that names its own detached program keeps it, and the service is missing.
+nt3_detached_answer() {
+    awk -v BINMODE=3 '
+        { line = $0; sub(/\r$/, "", line); lines[++n] = line; low = tolower(line); gsub(/[ \t]/, "", low)
+          if (low ~ /^!detachedprogram=/) has = 1 }
+        END {
+            for (i = 1; i <= n; i++) {
+                printf "%s\r\n", lines[i]
+                low = tolower(lines[i]); gsub(/[ \t]/, "", low)
+                # INITIAL.INF tests $(!SetupNetWork) (capital W; INF variable
+                # names are case-sensitive), UNATTEND.TXT documents
+                # !SetupNetwork: write both (QEMU 2026-10-08, the network
+                # adapter page stopped GUI Setup).
+                if (low ~ /^!setupnetwork=/ && lines[i] !~ /^[ \t]*!SetupNetWork[ \t]*=/) {
+                    v = lines[i]; sub(/^[^=]*=[ \t]*/, "", v); printf "!SetupNetWork = %s\r\n", v
+                }
+                if (!has && low == "[guiunattended]") {
+                    printf "!DetachedProgram = \"C:\\USOS\\NT3\\USOSNT3.EXE\"\r\n!Arguments = \"/setup\"\r\n"; has = 1
+                }
+            }
+            if (!has) printf "\r\n[GuiUnattended]\r\n!DetachedProgram = \"C:\\USOS\\NT3\\USOSNT3.EXE\"\r\n!Arguments = \"/setup\"\r\n"
         }'
 }
 
 for tool in dd od mkfs.fat mdir syslinux mount umount losetup blockdev awk sync wc tr; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
-for file in "$LIB/xp-geometry-fix-mbr-440.bin" "$LIB/nt4/AHCINT.SYS" "$LIB/nt4/USOSRST.SYS" "$LIB/nt4/USOSUSB.SYS" "$LIB/nt4/USOSVBE.SYS" "$LIB/nt4/USOSOFF.EXE" \
-    "$SYSLINUX_DIR/chain.c32" "$SYSLINUX_DIR/libcom32.c32" "$SYSLINUX_DIR/libutil.c32" "$ANSWER_SIF" "$SOURCE_ISO"; do
+for file in "$LIB/xp-geometry-fix-mbr-440.bin" "$SYSLINUX_DIR/chain.c32" "$SYSLINUX_DIR/libcom32.c32" "$SYSLINUX_DIR/libutil.c32" "$ANSWER_SIF" "$SOURCE_ISO"; do
     [ -r "$file" ] || fail "missing: $file"
 done
 [ "$(wc -c < "$LIB/xp-geometry-fix-mbr-440.bin" | tr -d ' ')" = 440 ] || fail 'USOS MBR code must be 440 bytes'
@@ -183,16 +253,44 @@ txtsetup=''
 for name in TXTSETUP.SIF txtsetup.sif; do [ -f "$i386/$name" ] && txtsetup="$i386/$name" && break; done
 setupldr=''
 for name in SETUPLDR.BIN setupldr.bin; do [ -f "$i386/$name" ] && setupldr="$i386/$name" && break; done
-[ -n "$txtsetup" ] && [ -n "$setupldr" ] || fail 'the ISO has no I386\TXTSETUP.SIF / SETUPLDR.BIN (not an NT 4.0 Setup CD)'
-# NT 4.0: [SetupData] MajorVersion = 4 (2000/XP: 5).
-major=$(awk '{ sub(/\r$/, "") } /^\[/ { s = (tolower($0) == "[setupdata]") } s && tolower($1) == "majorversion" { v = $0; sub(/^[^=]*=[ \t]*/, "", v); print v; exit }' "$txtsetup")
-[ "$major" = 4 ] || fail "the ISO is not Windows NT 4.0 Setup (MajorVersion=${major:-none})"
+[ -n "$txtsetup" ] && [ -n "$setupldr" ] || fail 'the ISO has no I386\TXTSETUP.SIF / SETUPLDR.BIN (not an NT 3.51 / 4.0 Setup CD)'
+# [SetupData] MajorVersion: 4 = NT 4.0, 3 = NT 3.51 (2000/XP: 5). NT_MAJOR
+# (the system chosen in the menu, when set) must match the CD.
+setup_value() {
+    awk -v key="$1" '{ sub(/\r$/, "") } /^\[/ { s = (tolower($0) == "[setupdata]") } s && tolower($1) == key { v = $0; sub(/^[^=]*=[ \t]*/, "", v); print v; exit }' "$txtsetup"
+}
+major=$(setup_value majorversion)
+minor=$(setup_value minorversion)
+case "$major" in
+    4) nt3='' sub=NT4 ;;
+    3) nt3=yes sub=NT3 ;;
+    *) fail "the ISO is not Windows NT 3.51 / 4.0 Setup (MajorVersion=${major:-none})" ;;
+esac
+[ -z "${NT_MAJOR:-}" ] || [ "$NT_MAJOR" = "$major" ] || fail "the ISO is Windows NT $major.$minor Setup, not the chosen NT $NT_MAJOR system"
+# NT 3.5 and 3.1 come later; their Setup differs (docs/nt351-2026-10-08.md).
+[ -z "$nt3" ] || [ "$minor" = 51 ] || fail "of the NT 3.x family only NT 3.51 is supported so far (MinorVersion=${minor:-none})"
+mbr_code=$LIB/xp-geometry-fix-mbr-440.bin
+[ -z "$nt3" ] || mbr_code=$LIB/nt3-e820-mbr-440.bin
+[ -r "$mbr_code" ] || fail "missing: $mbr_code"
+[ "$(wc -c < "$mbr_code" | tr -d ' ')" = 440 ] || fail 'USOS MBR code must be 440 bytes'
+drv=$LIB/$(printf %s "$sub" | tr '[:upper:]' '[:lower:]')
+for file in AHCINT.SYS USOSRST.SYS USOSUSB.SYS; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
+if [ -n "$nt3" ]; then
+    for file in USOSNT3.EXE USOSACHK.EXE; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
+else
+    for file in USOSVBE.SYS USOSOFF.EXE; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
+fi
 lang=$(awk '{ sub(/\r$/, "") } tolower($1) == "unicodecasetable" { n = split($0, a, ","); v = a[n]; gsub(/[ \t]/, "", v); print v; exit }' "$txtsetup")
 product=$(awk '{ sub(/\r$/, "") } /^\[/ { s = (tolower($0) == "[setupdata]") } s && tolower($1) == "producttype" { v = $0; sub(/^[^=]*=[ \t]*/, "", v); print v; exit }' "$txtsetup")
-log "source: NT 4.0 ProductType=${product:-?} language=${lang:-?}"
-nt4_resolve_time_zone "${lang:-}" < "$ANSWER_SIF" | nt4_server_answer "${product:-0}" > "$work/WINNT.SIF" || fail 'cannot prepare WINNT.SIF'
+log "source: NT $major.$minor ProductType=${product:-?} language=${lang:-?}"
+if [ -n "$nt3" ]; then
+    nt4_resolve_time_zone "${lang:-}" yes < "$ANSWER_SIF" | nt4_server_answer "${product:-0}" yes | nt3_detached_answer > "$work/WINNT.SIF" ||
+        fail 'cannot prepare WINNT.SIF'
+else
+    nt4_resolve_time_zone "${lang:-}" < "$ANSWER_SIF" | nt4_server_answer "${product:-0}" > "$work/WINNT.SIF" || fail 'cannot prepare WINNT.SIF'
+fi
 [ "${product:-0}" = 0 ] || log 'server CD: stand-alone server (AdvServerType = SERVERNT), licensing Per Server 5 (LicenseFilePrintData)'
-if grep -qi '^TimeZone' "$work/WINNT.SIF"; then log 'time zone: set for this CD language'; else log 'time zone: none (Setup asks)'; fi
+if grep -qi '^!\{0,1\}TimeZone' "$work/WINNT.SIF"; then log 'time zone: set for this CD language'; else log 'time zone: none (Setup asks)'; fi
 # Encryption strength of the CD: a US/Canada CD has 128-bit security files
 # (SCHANNEL.DLL "US/Canada Only, Not for Export"). SP6a's update.exe then
 # refuses the Standard Encryption (export) SP6a, silently with -u ("You have
@@ -224,7 +322,7 @@ dd if=/dev/zero of="$TARGET_DEVICE" bs=512 count=2048 conv=notrunc,fsync 2>/dev/
 dd if=/dev/zero of="$TARGET_DEVICE" bs=512 seek=$((total - 2048)) count=2048 conv=notrunc,fsync 2>/dev/null || fail 'cannot clear the disk end'
 mbr="$work/mbr.bin"
 dd if=/dev/zero of="$mbr" bs=512 count=1 2>/dev/null
-dd if="$LIB/xp-geometry-fix-mbr-440.bin" of="$mbr" bs=440 count=1 conv=notrunc 2>/dev/null
+dd if="$mbr_code" of="$mbr" bs=440 count=1 conv=notrunc 2>/dev/null
 dd if=/dev/urandom of="$mbr" bs=1 seek=440 count=4 conv=notrunc 2>/dev/null
 le32() {
     v=$1
@@ -243,7 +341,12 @@ mount -t vfat -o shortname=winnt,utf8=0 "$part_loop" "$work/c" || fail 'cannot m
 
 ls_dir="$work/c/\$WIN_NT\$.~LS"
 bt_dir="$work/c/\$WIN_NT\$.~BT"
-nt4_copy_upper "$i386" "$ls_dir/I386" || fail 'cannot copy the I386 folder (local source)'
+# NT 4.0 Setup reads \$WIN_NT$.~LS\I386; NT 3.51 reads the files straight
+# from \$WIN_NT$.~LS (its DOSNET.INF d1 = \; QEMU 2026-10-08: "Setup was
+# unable to copy the file kbdclass.sys" with an I386 subfolder).
+ls_src=$ls_dir/I386
+[ -z "$nt3" ] || ls_src=$ls_dir
+nt4_copy_upper "$i386" "$ls_src" || fail 'cannot copy the I386 folder (local source)'
 nt4_copy_upper "$i386" "$bt_dir" files || fail 'cannot copy the Setup boot files'
 # Text mode runs \SystemRoot\SYSTEM32\SMSS.EXE of the boot folder (QEMU
 # 2026-10-07: STOP 0x6B, C000003A without I386\SYSTEM32 in ~BT).
@@ -252,8 +355,34 @@ for name in SYSTEM32 system32; do
     nt4_copy_upper "$i386/$name" "$bt_dir/SYSTEM32" || fail 'cannot copy I386\SYSTEM32'
     break
 done
+# NT 3.51 has no I386\SYSTEM32: winnt.exe builds it from DOSNET.INF
+# [FloppyFiles.1] (ntdll.dll -> system32\ntdll.dll, usetup.exe ->
+# system32\smss.exe); without it text mode stops with 0x6B C000003A.
+if [ -n "$nt3" ] && [ ! -d "$bt_dir/SYSTEM32" ]; then
+    [ -f "$bt_dir/NTDLL.DLL" ] && [ -f "$bt_dir/USETUP.EXE" ] || fail 'the ISO has no I386\NTDLL.DLL or I386\USETUP.EXE (NT 3.51 text-mode Setup)'
+    mkdir -p "$bt_dir/SYSTEM32" || fail 'cannot create the Setup SYSTEM32 folder'
+    cp "$bt_dir/NTDLL.DLL" "$bt_dir/SYSTEM32/NTDLL.DLL" || fail 'cannot copy NTDLL.DLL'
+    cp "$bt_dir/USETUP.EXE" "$bt_dir/SYSTEM32/SMSS.EXE" || fail 'cannot copy USETUP.EXE as SMSS.EXE'
+fi
+if [ -n "$nt3" ]; then
+    # The other renamed [FloppyFiles.x] entries: the boot-disk tag files
+    # (d1,disk1,disk101 .. disk103) Setup looks for in the boot folder.
+    dosnet=''
+    for name in DOSNET.INF dosnet.inf; do [ -f "$i386/$name" ] && dosnet="$i386/$name" && break; done
+    [ -n "$dosnet" ] || fail 'the ISO has no I386\DOSNET.INF'
+    awk '{ sub(/\r$/, "") } /^\[/ { s = (tolower($0) ~ /^\[floppyfiles\./) ; next }
+        s && $0 !~ /^[ \t]*#/ { n = split($0, a, ","); if (n >= 3) { gsub(/[ \t]/, "", a[2]); gsub(/[ \t]/, "", a[3]); print toupper(a[2]) " " toupper(a[3]) } }' "$dosnet" |
+    while read -r src dst; do
+        dst=$(printf %s "$dst" | tr '\\' /)
+        [ -f "$bt_dir/$dst" ] && continue
+        [ -f "$bt_dir/$src" ] || fail "the ISO has no I386\\$src (DOSNET.INF [FloppyFiles])"
+        mkdir -p "$(dirname "$bt_dir/$dst")" && cp "$bt_dir/$src" "$bt_dir/$dst" || fail "cannot copy $src as $dst"
+    done || exit 1
+    # winnt.exe writes \$WIN_NT$.~LS\SIZE.SIF ([Data] Size = bytes of the local source).
+    printf '[Data]\r\nSize = %s\r\n' "$(du -sk "$ls_src" | awk '{ print $1 * 1024 }')" > "$ls_src/SIZE.SIF" || fail 'cannot write SIZE.SIF'
+fi
 [ -d "$bt_dir/SYSTEM32" ] || fail 'the ISO has no I386\SYSTEM32 (text-mode Setup)'
-log "local source: $(find "$ls_dir/I386" -type f | wc -l | tr -d ' ') files"
+log "local source: $(find "$ls_src" -type f | wc -l | tr -d ' ') files"
 cp "$work/WINNT.SIF" "$bt_dir/WINNT.SIF" || fail 'cannot copy WINNT.SIF'
 cp "$work/WINNT.SIF" "$work/c/WINNT.SIF" || fail 'cannot copy WINNT.SIF'
 cp "$setupldr" "$work/c/\$LDR\$" || fail 'cannot copy the Setup loader'
@@ -265,6 +394,33 @@ for name in NTDETECT.COM ntdetect.com; do [ -f "$i386/$name" ] && ntdetect="$i38
 [ -n "$ntdetect" ] || fail 'the ISO has no I386\NTDETECT.COM'
 cp "$ntdetect" "$work/c/NTDETECT.COM" || fail 'cannot copy NTDETECT.COM'
 
+crlf() { awk -v BINMODE=3 '{ sub(/\r$/, ""); printf "%s\r\n", $0 }'; }
+# NT 3.51: \USOS\NT3 with the NT 3.51 driver builds and USOSNT3.EXE, which
+# does what POST.CMD and the .REG files do for NT 4.0 (tools/nt3/usosnt3:
+# copies the drivers, writes their Services keys, atdisk/atapi off, the
+# version and driver keys as text, DONE.TXT, restart). No service pack yet:
+# the NT 3.51 RTM kernel starts on Zen 3 (QEMU EPYC-Milan 2026-10-08).
+if [ -n "$nt3" ]; then
+usos="$work/c/USOS/NT3"
+mkdir -p "$usos"
+for file in AHCINT.SYS USOSRST.SYS USOSUSB.SYS USOSNT3.EXE; do
+    cp "$drv/$file" "$usos/$file" || fail "cannot copy $file"
+done
+# Text-mode Setup runs AUTOCHK.EXE from the local source on C: ("Checking
+# drive C:"); in the QEMU install VM that run overflows a kernel stack and
+# the VM triple-faults (2026-10-08: double fault -> STOP 0x7F 8 while the
+# HAL resets the display in V86 mode). The local source gets USOSACHK.EXE
+# (tools/nt3/usosachk, own native program that ends with success) under that
+# name; Setup copies it as system32\autochk.exe and nt4_vm_finish puts the
+# CD's AUTOCHK.EXE, kept as \USOS\NT3\AUTOCHK.EXE, back in place.
+[ -f "$ls_src/AUTOCHK.EXE" ] || fail 'the ISO has no I386\AUTOCHK.EXE'
+mv "$ls_src/AUTOCHK.EXE" "$usos/AUTOCHK.EXE" || fail 'cannot move AUTOCHK.EXE'
+cp "$drv/USOSACHK.EXE" "$ls_src/AUTOCHK.EXE" || fail 'cannot copy USOSACHK.EXE'
+rm -f "$bt_dir/AUTOCHK.EXE"
+[ -z "$SP_EXE" ] || log "service pack: $(basename "$SP_EXE") ignored (NT 3.51 service packs are not installed yet)"
+log 'display: VGA (640x480x16; no VESA for NT 3.51 yet)'
+printf 'answer=%s\r\nversion=%s.%s\r\n' "$ANSWER_KIND" "$major" "$minor" > "$usos/SOURCE.TXT"
+else
 # $OEM$ (OemPreinstall = Yes): CMDLINES.TXT runs at the end of GUI-mode Setup
 # and turns on one automatic Administrator logon with POST.CMD in RunOnce.
 for oem in "$ls_dir/\$OEM\$" "$ls_dir/I386/\$OEM\$"; do
@@ -299,7 +455,6 @@ if [ -n "$SP_EXE" ]; then
 else
     log 'service pack: none (the X470 needs SP6a: the RTM kernel stops on Zen CPUs)'
 fi
-crlf() { awk -v BINMODE=3 '{ sub(/\r$/, ""); printf "%s\r\n", $0 }'; }
 crlf > "$usos/SETUP.REG" <<'EOF'
 REGEDIT4
 
@@ -496,6 +651,7 @@ printf 'answer=%s\r\ncrypto=%s\r\n' "$ANSWER_KIND" "$crypto" > "$usos/SOURCE.TXT
 # easily): a 128-bit CD with a Standard Encryption SP6a switches to the
 # SP6a's own schannel.dll and runs update.exe again.
 if [ "$crypto" = high ]; then printf 'high\r\n' > "$usos/CRYPTOHI.TXT"; fi
+fi
 
 for file in "$SYSLINUX_DIR/chain.c32" "$SYSLINUX_DIR/libcom32.c32" "$SYSLINUX_DIR/libutil.c32"; do
     cp "$file" "$work/c/$(basename "$file" | tr '[:lower:]' '[:upper:]')" || fail "cannot copy $(basename "$file")"

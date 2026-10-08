@@ -128,8 +128,9 @@ fn ownTraits(system_id: []const u8) SystemTraits {
     // Windows 95/98/98 SE/Me (no table rows: the Legacy Core has no room).
     const win9x = std.mem.eql(u8, system_id, "windows-98-se") or std.mem.eql(u8, system_id, "windows-98") or
         std.mem.eql(u8, system_id, "windows-me") or std.mem.eql(u8, system_id, "windows-95");
-    // Windows NT 4.0 (answer/nt4.zig WINNT.SIF), no rows for the same reason.
-    const nt4 = std.mem.startsWith(u8, system_id, "windows-nt-4");
+    // Windows NT 4.0 / 3.51 (answer/nt4.zig, nt3.zig WINNT.SIF), no rows for
+    // the same reason.
+    const nt4 = std.mem.startsWith(u8, system_id, "windows-nt-");
     return .{ .system_id = system_id, .answer = if (win9x) .msbatch_inf else if (nt4) .winnt_sif else .autounattend_xml };
 }
 
@@ -276,6 +277,7 @@ const dos_family_ids = &[_][]const u8{ "windows-98-se", "windows-98", "windows-m
 pub const windows_early_ids = &[_][]const u8{ "windows-wfw-3-11", "windows-3-0", "windows-2-11-386", "windows-2-11-286", "windows-2-03", "windows-1-04", "windows-1-01" };
 
 const nt4_ids = &[_][]const u8{ "windows-nt-4", "windows-nt-4-server" };
+const nt3_ids = &[_][]const u8{ "windows-nt-3-51", "windows-nt-3-51-server" };
 
 const uefi_profiles = [_]Profile{
     // ---- UEFI only
@@ -307,6 +309,11 @@ const uefi_profiles = [_]Profile{
     // (docs/nt4-2026-10-07.md).
     .{ .id = "nt4-x86-qemu-csmwrap", .systems = .{ .ids = nt4_ids }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .win9x_uefi, .progress = .direct_iso },
     .{ .id = "nt4-uefi-other", .systems = .{ .ids = nt4_ids }, .firmware = .uefi, .backend = null, .progress = .none },
+    // Windows NT 3.51 Workstation / Server from UEFI: the NT 4.0 VM flow
+    // (nt4_csmwrap_target.sh with NT_MAJOR=3: E820 filter MBR, \USOS\NT3 with
+    // USOSNT3.EXE as !DetachedProgram); no service pack (docs/nt351-2026-10-08.md).
+    .{ .id = "nt3-x86-qemu-csmwrap", .systems = .{ .ids = nt3_ids }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .win9x_uefi, .progress = .direct_iso },
+    .{ .id = "nt3-uefi-other", .systems = .{ .ids = nt3_ids }, .firmware = .uefi, .backend = null, .progress = .none },
 };
 
 /// Ordered: firmware-specific rules first, then the firmware-independent
@@ -431,6 +438,17 @@ test "Windows NT 4.0 Workstation and Server on UEFI: the VM install, nothing els
         try std.testing.expectEqualStrings("nt4-x86-qemu-csmwrap", select(nt4, .iso, .automatic, .uefi).?.id);
         try std.testing.expectEqual(Backend.win9x_uefi, backend(nt4, .iso, .automatic, .uefi).?);
         try std.testing.expect(backend(nt4, .iso, .chainload, .uefi) == null);
+        try std.testing.expectEqual(AnswerFormat.winnt_sif, traits(id).answer);
+    }
+}
+
+test "Windows NT 3.51 Workstation and Server on UEFI: the VM install, nothing else" {
+    const systems = @import("systems.zig");
+    for ([_][]const u8{ "windows-nt-3-51", "windows-nt-3-51-server" }) |id| {
+        const nt3 = systems.findById(id).?;
+        try std.testing.expectEqualStrings("nt3-x86-qemu-csmwrap", select(nt3, .iso, .automatic, .uefi).?.id);
+        try std.testing.expectEqual(Backend.win9x_uefi, backend(nt3, .iso, .automatic, .uefi).?);
+        try std.testing.expect(backend(nt3, .iso, .chainload, .uefi) == null);
         try std.testing.expectEqual(AnswerFormat.winnt_sif, traits(id).answer);
     }
 }

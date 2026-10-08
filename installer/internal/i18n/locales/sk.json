@@ -1164,6 +1164,7 @@
   "boot.summary.w9x_csmwrap": "Bez CSM (experimentálne): USOS pripraví disk FAT32 s inštaláciou a CSMWrap; inštalácia sa potom spustí z neho",
   "boot.summary.nt4_csmwrap": "Bez CSM (experimentálne): celá inštalácia prebehne vo virtuálnom počítači na tomto PC; hotový systém sa potom spúšťa cez CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: použite klávesnicu PS/2 (vstup cez USB zatiaľ nefunguje); zobrazenie 640x480; vyžaduje SP6I386.EXE (Service Pack 6a) v priečinku Systems\\Windows\\Windows NT 4.0\\ServicePack na DATA.",
+  "boot.summary.nt3_limits": "Windows NT 3.51: použite klávesnicu PS/2 (vstup cez USB zatiaľ nefunguje); zobrazenie 640x480.",
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: na otázky pôvodného Setupu odpovedzte klávesnicou (funguje tam aj klávesnica USB); v Setupe zvoľte VGA (EGA pre 1.0x) a myš IBM PS/2. V samotných týchto Windows použite klávesnicu PS/2 (most pre klávesnicu USB zatiaľ nie je). Vyžaduje MS-DOS 6.22.iso v Systems\\DOS\\MS-DOS\\Images na oddiele DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimentálne): chýba ovládač AHCI/NVMe/USB 3 pre NT 5.0 (SATA v režime IDE), max. 4 GB RAM a 2 procesory",
@@ -1198,6 +1199,8 @@
   "boot.lx.nt4_needs_key": "Windows NT 4.0 vyžaduje kód Product Key: zvoľte profil odpovedí s kľúčom alebo ho zadajte, keď oň ponuka požiada",
   "boot.lx.nt4_needs_vm": "Windows NT 4.0 sa inštaluje iba vo virtuálnom počítači na tomto PC, ktorý nie je k dispozícii: {0}",
   "boot.lx.nt4_failed": "Inštalácia Windows NT 4.0 sa nedokončila. Počítač sa nereštartoval; protokoly: EFI/USOS/win9x/nt4",
+  "boot.lx.nt3_needs_vm": "Windows NT 3.51 sa inštaluje iba vo virtuálnom počítači na tomto PC, ktorý nie je k dispozícii: {0}",
+  "boot.lx.nt3_failed": "Inštalácia Windows NT 3.51 sa nedokončila. Počítač sa nereštartoval; protokoly: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Reštartovať",
   "winpe.vista_csmwrap_title": "USOS - Vista bez CSM",
   "winpe.vista_csmwrap_done": "Prvá časť inštalácie Visty je dokončená. Teraz odpojte USB kľúč USOS a zvoľte OK: počítač sa reštartuje a Vista pokračuje z disku cez CSMWrap. Ak kľúč zostane pripojený, spustite položku UEFI tohto disku z ponuky zavádzania firmvéru.",

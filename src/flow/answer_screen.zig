@@ -184,9 +184,9 @@ pub fn profileCapable(system: *const SystemEntry, image: ImageKind, method: Boot
         return linux_backend == .linux_iso and firmware == .uefi;
     }
     // Windows 95/98/Me have no NT family: MSBATCH.INF (answer/msbatch.zig).
-    // Windows NT 4.0: WINNT.SIF (answer/nt4.zig).
+    // Windows NT 4.0 / 3.51: WINNT.SIF (answer/nt4.zig, answer/nt3.zig).
     if (answer_target.familyFor(system.id) == null and @import("answer/msbatch.zig").releaseFor(system.id) == null and
-        !@import("answer/nt4.zig").isNt4(system.id)) return false;
+        !@import("answer/nt4.zig").isNt4(system.id) and !@import("answer/nt3.zig").isNt3(system.id)) return false;
     if (image != .iso and image != .wim) return false;
     const backend = preparation_capability.resolveForFirmware(system, image, method, firmware) orelse return false;
     return switch (backend) {
@@ -215,6 +215,8 @@ test "Windows 95/98/Me offer answer profiles on the UEFI path (MSBATCH.INF)" {
     try std.testing.expect(!profileCapable(systems.findById("windows-3-11").?, .iso, .automatic, .uefi));
     try std.testing.expect(profileCapable(systems.findById("windows-nt-4").?, .iso, .automatic, .uefi));
     try std.testing.expect(profileCapable(systems.findById("windows-nt-4-server").?, .iso, .automatic, .uefi));
+    try std.testing.expect(profileCapable(systems.findById("windows-nt-3-51").?, .iso, .automatic, .uefi));
+    try std.testing.expect(profileCapable(systems.findById("windows-nt-3-51-server").?, .iso, .automatic, .uefi));
 }
 
 test "Linux profiles only for Ubuntu, Debian and Fedora ISOs on UEFI" {

@@ -29,7 +29,8 @@ pub const Format = enum {
     autounattend_xml,
     /// Windows 95/98/Me: read by the BIOS Core's DOS Setup path.
     msbatch_inf,
-    /// Windows NT 4.0: WINNT.SIF for the micro-Linux VM install (nt4.zig).
+    /// Windows NT 4.0 / 3.51: WINNT.SIF for the micro-Linux VM install
+    /// (nt4.zig, nt3.zig).
     nt4_sif,
 
     pub fn fileName(self: Format) []const u8 {

@@ -56,9 +56,10 @@ func TestWindows311DoesNotCreateUnattendedDirectory(t *testing.T) {
 
 func TestDataProfileCountsStayInSyncWithCatalog(t *testing.T) {
 	// 16 client versions (with XP x64), Windows Server 2003 to 2025, and the
-	// early systems (WfW 3.11, 3.0, 2.11 386/286, 2.03, 1.04, 1.01).
-	if len(windowsProfiles) != 32 {
-		t.Fatalf("windows profile count=%d, want 32", len(windowsProfiles))
+	// early systems (WfW 3.11, 3.0, 2.11 386/286, 2.03, 1.04, 1.01), and
+	// Windows NT 3.51 Workstation / Server.
+	if len(windowsProfiles) != 34 {
+		t.Fatalf("windows profile count=%d, want 34", len(windowsProfiles))
 	}
 	// Nine distributions plus the SystemRescue, GParted Live and Clonezilla rescue ISOs.
 	if len(linuxProfiles) != 12 {

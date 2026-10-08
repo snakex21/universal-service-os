@@ -1164,6 +1164,7 @@
   "boot.summary.w9x_csmwrap": "Be CSM (eksperimentinis): USOS paruošia FAT32 diegimo diską su CSMWrap; diegimas paleidžiamas iš jo",
   "boot.summary.nt4_csmwrap": "Be CSM (eksperimentinis): visas diegimas vyksta virtualioje mašinoje šiame kompiuteryje; paruošta sistema po to paleidžiama per CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: naudokite PS/2 klaviatūrą (USB įvestis dar neveikia); ekranas 640x480; reikia SP6I386.EXE (Service Pack 6a) aplanke Systems\\Windows\\Windows NT 4.0\\ServicePack skaidinyje DATA.",
+  "boot.summary.nt3_limits": "Windows NT 3.51: naudokite PS/2 klaviatūrą (USB įvestis dar neveikia); ekranas 640x480.",
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: į originalios Setup programos klausimus atsakykite klaviatūra (ten veikia ir USB klaviatūra); Setup pasirinkite VGA (1.0x – EGA) ir IBM PS/2 pelę. Pačiose šiose Windows versijose naudokite PS/2 klaviatūrą (USB klaviatūros tilto dar nėra). Reikia MS-DOS 6.22.iso aplanke Systems\\DOS\\MS-DOS\\Images skaidinyje DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentinė): nėra NT 5.0 AHCI/NVMe/USB 3 tvarkyklės (SATA IDE režimu), daugiausia 4 GB RAM ir 2 procesoriai",
@@ -1198,6 +1199,8 @@
   "boot.lx.nt4_needs_key": "Windows NT 4.0 reikia produkto rakto: pasirinkite atsakymų profilį su raktu arba įveskite jį, kai meniu paprašys",
   "boot.lx.nt4_needs_vm": "Windows NT 4.0 diegiama tik šio kompiuterio virtualioje mašinoje, kuri nepasiekiama: {0}",
   "boot.lx.nt4_failed": "Windows NT 4.0 diegimas nebaigtas. Kompiuteris nebuvo paleistas iš naujo; žurnalai: EFI/USOS/win9x/nt4",
+  "boot.lx.nt3_needs_vm": "Windows NT 3.51 diegiama tik šio kompiuterio virtualioje mašinoje, kuri nepasiekiama: {0}",
+  "boot.lx.nt3_failed": "Windows NT 3.51 diegimas nebaigtas. Kompiuteris nebuvo paleistas iš naujo; žurnalai: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Paleisti iš naujo",
   "winpe.vista_csmwrap_title": "USOS - Vista be CSM",
   "winpe.vista_csmwrap_done": "Pirmoji Vista diegimo dalis baigta. Dabar ištraukite USOS atmintuką ir pasirinkite Gerai: kompiuteris bus paleistas iš naujo, o Vista tęs diegimą iš disko per CSMWrap. Jei atmintukas liks prijungtas, paleiskite šio disko UEFI įrašą iš programinės aparatinės įrangos paleidimo meniu.",

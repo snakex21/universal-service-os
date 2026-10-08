@@ -98,3 +98,9 @@ and SP6a (1381.335) kernels and scsiport (tools/tests/check_nt4_driver_imports.p
   CSMWrap stopped with 0x7B: ScsiPort dropped the adapter after HwFindAdapter, HwInitialize was
   never called (likely cause: no MP-table PCI interrupt entry for the HBA
   under CSMWrap). The 9x build keeps INTx (SCSIPORT.PDR), 2000/XP unchanged.
+- ahcisatl.c (patch 0007, NT 3.51 build only, 2026-10-08): with AHCI_NT351
+  the bugcheck trace does not import KiBugCheckData (NT 3.51 ntoskrnl does
+  not export it) and records the STOP code as 0. build-nt351.cmd builds
+  bin/NT351/i386/ahcint.sys with the NT 4.0 defines plus -DAHCI_NT351 and
+  PE version 3.51; every import resolves on NT 3.51
+  (tools/tests/data/nt351_exports.txt). The other builds are unchanged.

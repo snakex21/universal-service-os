@@ -15,6 +15,7 @@ pub const linux = @import("linux.zig");
 pub const applies = @import("applies.zig");
 pub const msbatch = @import("msbatch.zig");
 pub const nt4 = @import("nt4.zig");
+pub const nt3 = @import("nt3.zig");
 
 pub const Profile = profile.Profile;
 pub const Arch = target.Arch;
@@ -51,6 +52,7 @@ pub fn matchEdition(p: *const Profile, system_id: []const u8, images: ?*const ed
 pub fn render(p: *const Profile, system_id: []const u8, arch: Arch, key: ?[]const u8, images: ?*const editions.List, buffer: []u8) !?Rendered {
     const use_key = key orelse p.keyFor(system_id);
     if (nt4.isNt4(system_id)) return .{ .format = .nt4_sif, .bytes = try nt4.render(p, use_key, buffer) };
+    if (nt3.isNt3(system_id)) return .{ .format = .nt4_sif, .bytes = try nt3.render(p, buffer) };
     if (msbatch.releaseFor(system_id)) |release| return .{ .format = .msbatch_inf, .bytes = try msbatch.render(p, release, use_key, buffer) };
     const family = target.familyFor(system_id) orelse return null;
     // NT keys are 5x5 only (a Windows 95 key in the profile's `key=` is not theirs).
@@ -81,6 +83,7 @@ test {
     _ = applies;
     _ = msbatch;
     _ = nt4;
+    _ = nt3;
 }
 
 test "render dispatch per system" {
@@ -99,6 +102,11 @@ test "render dispatch per system" {
     try std.testing.expectEqual(plan_file.Format.msbatch_inf, ninety_eight.format);
     try std.testing.expect(std.mem.indexOf(u8, ninety_eight.bytes, "Name=\"Tester\"") != null);
     try std.testing.expect((try render(&p, "windows-3-1", .x86, null, null, &buffer)) == null);
+    // NT 3.51: WINNT.SIF without a key, even when the profile holds one.
+    const nt351 = (try render(&p, "windows-nt-3-51-server", .x86, "123-4567890", null, &buffer)).?;
+    try std.testing.expectEqual(plan_file.Format.nt4_sif, nt351.format);
+    try std.testing.expect(std.mem.indexOf(u8, nt351.bytes, "for Windows NT 3.51") != null);
+    try std.testing.expect(std.mem.indexOf(u8, nt351.bytes, "123-4567890") == null);
 }
 
 test "a key typed without dashes renders dashed in WINNT.SIF settings and autounattend.xml" {

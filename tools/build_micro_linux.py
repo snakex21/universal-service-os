@@ -626,6 +626,13 @@ def main() -> int:
             ("tools/nt4/usosusb/bin/i386/usosusb.sys", "usr/lib/usos/nt4/USOSUSB.SYS"),
             ("tools/nt4/usosvbe/bin/i386/usosvbe.sys", "usr/lib/usos/nt4/USOSVBE.SYS"),
             ("tools/nt4/usosoff/bin/i386/usosoff.exe", "usr/lib/usos/nt4/USOSOFF.EXE"),
+            # Windows NT 3.51 (the same target script, \USOS\NT3): own GPL
+            # builds for NT 3.51 (docs/nt351-2026-10-08.md).
+            ("tools/vendor/ahcint/1.3.0.0-usos4/bin/NT351/i386/ahcint.sys", "usr/lib/usos/nt3/AHCINT.SYS"),
+            ("tools/w2k/usosrst/bin/nt351/i386/usosrst.sys", "usr/lib/usos/nt3/USOSRST.SYS"),
+            ("tools/nt4/usosusb/bin/i386/usosusb.sys", "usr/lib/usos/nt3/USOSUSB.SYS"),
+            ("tools/nt3/usosnt3/bin/i386/usosnt3.exe", "usr/lib/usos/nt3/USOSNT3.EXE"),
+            ("tools/nt3/usosachk/bin/i386/usosachk.exe", "usr/lib/usos/nt3/USOSACHK.EXE"),
         ):
             put(entries, Entry(target_name, stat.S_IFREG | 0o644, (root / source_name).read_bytes()))
         xp_vbr = root / "zig-out/xp-bios/xp-vbr-code.bin"
@@ -633,7 +640,9 @@ def main() -> int:
         xp_nt52_vbr = root / "zig-out/xp-bios/xp-nt52-vbr-tail.bin"
         xp_nt52_stage2 = root / "zig-out/xp-bios/xp-nt52-stage2.bin"
         xp_geometry_fix_mbr = root / "zig-out/xp-geometry-fix-mbr/xp-geometry-fix-mbr-440.bin"
-        for required in (xp_vbr, xp_stage2, xp_nt52_vbr, xp_nt52_stage2, xp_geometry_fix_mbr):
+        # NT 3.51: the geometry-fix MBR with the E820 filter (nt3_e820_mbr.S).
+        nt3_e820_mbr = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-mbr-440.bin"
+        for required in (xp_vbr, xp_stage2, xp_nt52_vbr, xp_nt52_stage2, xp_geometry_fix_mbr, nt3_e820_mbr):
             if not required.is_file():
                 raise FileNotFoundError(f"XP BIOS bootstrap artifact missing: {required}")
         geometry_mbr = xp_geometry_fix_mbr.read_bytes()
@@ -707,6 +716,10 @@ def main() -> int:
                 filename = prefix + arch + ".exe"
                 put(entries, Entry("usr/lib/usos/" + filename, stat.S_IFREG | 0o644, (reader_out / filename).read_bytes()))
         put(entries, Entry("usr/lib/usos/xp-geometry-fix-mbr-440.bin", stat.S_IFREG | 0o644, geometry_mbr))
+        nt3_mbr = nt3_e820_mbr.read_bytes()
+        if len(nt3_mbr) != 440:
+            raise RuntimeError(f"NT 3.51 E820 MBR code must be 440 bytes: {nt3_e820_mbr}")
+        put(entries, Entry("usr/lib/usos/nt3-e820-mbr-440.bin", stat.S_IFREG | 0o644, nt3_mbr))
 
         module_root = modloop_out / "modules" / kernel_release
         qemu9x_module_set = set(qemu9x_modules)
