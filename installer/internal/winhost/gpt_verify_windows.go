@@ -28,8 +28,8 @@ func verifyReadBack(plan layout.Plan, ids gptIDs, actual parsedLayout) (install.
 
 	expected := []expectedPartition{
 		{name: "ESP", plan: plan.ESP, typeID: efiSystemPartitionType, partID: ids.ESP, attributes: 0},
-		{name: "DATA", plan: plan.DATA, typeID: basicDataPartitionType, partID: ids.DATA, attributes: 0},
-		{name: "WORK", plan: plan.WORK, typeID: basicDataPartitionType, partID: ids.WORK, attributes: 0},
+		{name: "DATA", plan: plan.DATA, typeID: basicDataPartitionType, partID: ids.DATA, attributes: gptBasicDataAttributeNoDriveLetter},
+		{name: "WORK", plan: plan.WORK, typeID: basicDataPartitionType, partID: ids.WORK, attributes: gptBasicDataAttributeNoDriveLetter},
 	}
 
 	refs := make(map[string]install.PartitionRef, len(expected))

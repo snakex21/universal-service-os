@@ -44,8 +44,8 @@ func (*engineTestBackend) FormatESP(MediaLayout) error { return nil }
 func (b *engineTestBackend) FormatDATA(MediaLayout) error {
 	return b.failFormat
 }
-func (*engineTestBackend) FormatWORK(MediaLayout) error        { return nil }
-func (*engineTestBackend) EnsureWORKVisible(MediaLayout) error { return nil }
+func (*engineTestBackend) FormatWORK(MediaLayout) error             { return nil }
+func (*engineTestBackend) ExposeFormattedVolumes(MediaLayout) error { return nil }
 func (*engineTestBackend) CopyInstallPayload(MediaLayout, func(uint64, uint64)) error {
 	return nil
 }
