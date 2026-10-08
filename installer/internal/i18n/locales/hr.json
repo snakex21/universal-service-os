@@ -1164,6 +1164,7 @@
   "boot.summary.w9x_csmwrap": "Bez CSM-a (eksperimentalno): USOS priprema FAT32 disk s instalacijom i CSMWrapom; instalacija se zatim pokreće s njega",
   "boot.summary.nt4_csmwrap": "Bez CSM-a (eksperimentalno): cijela instalacija odvija se u virtualnom stroju na ovom računalu; gotov sustav zatim se pokreće putem CSMWrapa",
   "boot.summary.nt4_limits": "Windows NT 4.0: koristite PS/2 tipkovnicu (USB unos još ne radi); prikaz 640x480; potreban je SP6I386.EXE (Service Pack 6a) u Systems\\Windows\\Windows NT 4.0\\ServicePack na DATA.",
+  "boot.summary.nt3_limits": "Windows NT 3.51: koristite PS/2 tipkovnicu (USB unos još ne radi); prikaz 640x480.",
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: na pitanja izvornog Setupa odgovorite tipkovnicom (ondje radi i USB tipkovnica); u Setupu odaberite VGA (EGA za 1.0x) i miš IBM PS/2. U samim tim verzijama Windowsa koristite PS/2 tipkovnicu (most za USB tipkovnicu još ne postoji). Potreban je MS-DOS 6.22.iso u Systems\\DOS\\MS-DOS\\Images na particiji DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentalno): nema upravljačkog programa AHCI/NVMe/USB 3 za NT 5.0 (SATA u IDE načinu), najviše 4 GB RAM-a i 2 procesora",
@@ -1198,6 +1199,8 @@
   "boot.lx.nt4_needs_key": "Windows NT 4.0 treba ključ proizvoda: odaberite profil odgovora s ključem ili ga upišite kada ga izbornik zatraži",
   "boot.lx.nt4_needs_vm": "Windows NT 4.0 instalira se samo u virtualnom stroju na ovom računalu, koji nije dostupan: {0}",
   "boot.lx.nt4_failed": "Instalacija sustava Windows NT 4.0 nije završena. Računalo nije ponovno pokrenuto; zapisnici: EFI/USOS/win9x/nt4",
+  "boot.lx.nt3_needs_vm": "Windows NT 3.51 instalira se samo u virtualnom stroju na ovom računalu, koji nije dostupan: {0}",
+  "boot.lx.nt3_failed": "Instalacija sustava Windows NT 3.51 nije završena. Računalo nije ponovno pokrenuto; zapisnici: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Ponovno pokreni",
   "winpe.vista_csmwrap_title": "USOS - Vista bez CSM-a",
   "winpe.vista_csmwrap_done": "Prvi dio instalacije Viste je dovršen. Sada izvadite USOS stick i odaberite U redu: računalo se ponovno pokreće i Vista nastavlja s diska putem CSMWrapa. Ako stick ostane priključen, pokrenite UEFI unos ovog diska iz izbornika pokretanja firmvera.",

@@ -152,12 +152,14 @@ pub fn show(
     var can_start = true;
     if (backend == .win9x_uefi) {
         // Windows 95/98/Me from UEFI (w9x-uefi-csmwrap, experimental);
-        // Windows NT 4.0 (nt4-x86-qemu-csmwrap): the whole install in the VM.
+        // Windows NT 4.0 (nt4-x86-qemu-csmwrap) and NT 3.51
+        // (nt3-x86-qemu-csmwrap): the whole install in the VM.
         const nt4 = usos.flow.answer.nt4.isNt4(system.id);
-        fields.add(view.t(.summary_preparation), if (nt4) view.t(.summary_nt4_csmwrap) else view.t(.summary_w9x_csmwrap));
+        const nt3 = usos.flow.answer.nt3.isNt3(system.id);
+        fields.add(view.t(.summary_preparation), if (nt4 or nt3) view.t(.summary_nt4_csmwrap) else view.t(.summary_w9x_csmwrap));
         fields.add(view.t(.summary_disk), view.t(.summary_w9x_disk));
-        if (nt4) {
-            notes[note_count] = view.t(.summary_nt4_limits);
+        if (nt4 or nt3) {
+            notes[note_count] = view.t(if (nt3) .summary_nt3_limits else .summary_nt4_limits);
             note_count += 1;
         }
         // Windows 1.0x-3.0 (not WfW 3.11, which has the 3.1 batch Setup).

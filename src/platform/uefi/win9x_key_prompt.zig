@@ -104,5 +104,7 @@ test "a 95 key is asked only for Windows 95 without one" {
     try std.testing.expect(needed("windows-nt-4", &p, false) and needed("windows-nt-4-server", null, false));
     try p.setSystemKey("windows-nt-4", "123-4567890");
     try std.testing.expect(!needed("windows-nt-4", &p, false) and !needed("windows-nt-4", null, true));
+    // NT 3.51 takes no key (INITIAL.INF DisplayPidDlg = NO): never asked.
+    try std.testing.expect(!needed("windows-nt-3-51", null, false) and !needed("windows-nt-3-51-server", null, false));
     try std.testing.expect(valid95("123-1234567") and !valid95("AAAAA-BBBBB-CCCCC-DDDDD-EEEEE") and !valid95("12345-OEM"));
 }

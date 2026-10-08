@@ -1161,6 +1161,7 @@
   "boot.summary.w9x_csmwrap": "Uden CSM (eksperimentelt): USOS forbereder en FAT32-installationsdisk med CSMWrap; installationen kører derefter fra den",
   "boot.summary.nt4_csmwrap": "Uden CSM (eksperimentelt): hele installationen kører i en virtuel maskine på denne pc; det færdige system starter derefter via CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: brug et PS/2-tastatur (endnu ingen USB-input); skærm 640x480; kræver SP6I386.EXE (Service Pack 6a) i Systems\\Windows\\Windows NT 4.0\\ServicePack på DATA.",
+  "boot.summary.nt3_limits": "Windows NT 3.51: brug et PS/2-tastatur (endnu ingen USB-input); skærm 640x480.",
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: besvar spørgsmålene i det oprindelige Setup med tastaturet (der virker også et USB-tastatur); vælg VGA (EGA for 1.0x) og IBM PS/2-musen i Setup. Brug et PS/2-tastatur i selve disse Windows-versioner (ingen USB-tastaturbro endnu). Kræver MS-DOS 6.22.iso i Systems\\DOS\\MS-DOS\\Images på DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentelt): ingen AHCI/NVMe/USB 3-driver til NT 5.0 (SATA i IDE-tilstand), maks. 4 GB RAM og 2 CPU'er",
@@ -1195,6 +1196,8 @@
   "boot.lx.nt4_needs_key": "Windows NT 4.0 kræver en produktnøgle: vælg en svarprofil med nøglen, eller indtast den, når menuen beder om den",
   "boot.lx.nt4_needs_vm": "Windows NT 4.0 installeres kun i den virtuelle maskine på denne pc, som ikke er tilgængelig: {0}",
   "boot.lx.nt4_failed": "Installationen af Windows NT 4.0 blev ikke fuldført. Computeren blev ikke genstartet; logfiler: EFI/USOS/win9x/nt4",
+  "boot.lx.nt3_needs_vm": "Windows NT 3.51 installeres kun i den virtuelle maskine på denne pc, som ikke er tilgængelig: {0}",
+  "boot.lx.nt3_failed": "Installationen af Windows NT 3.51 blev ikke fuldført. Computeren blev ikke genstartet; logfiler: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Genstart",
   "winpe.vista_csmwrap_title": "USOS - Vista uden CSM",
   "winpe.vista_csmwrap_done": "Den første del af Vista-installationen er færdig. Fjern nu USOS-nøglen, og vælg OK: computeren genstarter, og Vista fortsætter fra disken via CSMWrap. Hvis nøglen forbliver tilsluttet, skal du starte denne disks UEFI-post fra firmwarens startmenu.",

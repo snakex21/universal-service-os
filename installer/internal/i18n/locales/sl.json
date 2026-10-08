@@ -1167,6 +1167,7 @@
   "boot.summary.w9x_csmwrap": "Brez CSM (preizkusno): USOS pripravi disk FAT32 z namestitvijo in CSMWrap; namestitev se nato zažene z njega",
   "boot.summary.nt4_csmwrap": "Brez CSM (preizkusno): celotna namestitev poteka v navideznem računalniku na tem računalniku; dokončan sistem se nato zažene prek CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: uporabite tipkovnico PS/2 (vnos prek USB še ne deluje); zaslon 640x480; potreben je SP6I386.EXE (Service Pack 6a) v Systems\\Windows\\Windows NT 4.0\\ServicePack na DATA.",
+  "boot.summary.nt3_limits": "Windows NT 3.51: uporabite tipkovnico PS/2 (vnos prek USB še ne deluje); zaslon 640x480.",
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: na vprašanja izvirnega Setupa odgovorite s tipkovnico (tam deluje tudi tipkovnica USB); v Setupu izberite VGA (EGA za 1.0x) in miško IBM PS/2. V samih teh različicah Windows uporabite tipkovnico PS/2 (mostu za tipkovnico USB še ni). Potrebuje MS-DOS 6.22.iso v Systems\\DOS\\MS-DOS\\Images na razdelku DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (poskusno): ni gonilnika AHCI/NVMe/USB 3 za NT 5.0 (SATA v načinu IDE), največ 4 GB RAM in 2 procesorja",
@@ -1201,6 +1202,8 @@
   "boot.lx.nt4_needs_key": "Windows NT 4.0 potrebuje ključ izdelka: izberite profil odgovorov s ključem ali ga vnesite, ko ga meni zahteva",
   "boot.lx.nt4_needs_vm": "Windows NT 4.0 se namesti samo v navideznem računalniku na tem računalniku, ki ni na voljo: {0}",
   "boot.lx.nt4_failed": "Namestitev sistema Windows NT 4.0 se ni končala. Računalnik ni bil znova zagnan; dnevniki: EFI/USOS/win9x/nt4",
+  "boot.lx.nt3_needs_vm": "Windows NT 3.51 se namesti samo v navideznem računalniku na tem računalniku, ki ni na voljo: {0}",
+  "boot.lx.nt3_failed": "Namestitev sistema Windows NT 3.51 se ni končala. Računalnik ni bil znova zagnan; dnevniki: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Znova zaženi",
   "winpe.vista_csmwrap_title": "USOS - Vista brez CSM",
   "winpe.vista_csmwrap_done": "Prvi del namestitve Viste je končan. Zdaj odstranite ključ USOS in izberite V redu: računalnik se znova zažene in Vista nadaljuje z diska prek CSMWrap. Če ključ ostane priključen, zaženite vnos UEFI tega diska iz zagonskega menija vdelane programske opreme.",

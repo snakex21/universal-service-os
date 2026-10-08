@@ -1161,6 +1161,7 @@
   "boot.summary.w9x_csmwrap": "Without CSM (experimental): USOS prepares the disk and CSMWrap; the installation then starts from it",
   "boot.summary.nt4_csmwrap": "Without CSM (experimental): the whole installation runs in a virtual machine on this PC; the finished system then starts through CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: use a PS/2 keyboard (no USB input yet); display 640x480; needs SP6I386.EXE (Service Pack 6a) in Systems\\Windows\\Windows NT 4.0\\ServicePack on DATA.",
+  "boot.summary.nt3_limits": "Windows NT 3.51: use a PS/2 keyboard (no USB input yet); display 640x480.",
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: answer the questions of the original Setup with the keyboard (a USB keyboard works there); in Setup pick VGA (EGA for 1.0x) and the IBM PS/2 mouse. Inside these Windows versions use a PS/2 keyboard (no USB keyboard bridge yet). Needs MS-DOS 6.22.iso in Systems\\DOS\\MS-DOS\\Images on DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimental): no AHCI/NVMe/USB 3 driver for NT 5.0 (SATA in IDE mode), max. 4 GB RAM and 2 CPUs",
@@ -1195,6 +1196,8 @@
   "boot.lx.nt4_needs_key": "Windows NT 4.0 needs a product key: choose an answer profile with the key or type it when the menu asks",
   "boot.lx.nt4_needs_vm": "Windows NT 4.0 installs only in the VM on this PC, which is not available: {0}",
   "boot.lx.nt4_failed": "The Windows NT 4.0 installation did not finish. The computer was not restarted; logs: EFI/USOS/win9x/nt4",
+  "boot.lx.nt3_needs_vm": "Windows NT 3.51 installs only in the VM on this PC, which is not available: {0}",
+  "boot.lx.nt3_failed": "The Windows NT 3.51 installation did not finish. The computer was not restarted; logs: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Restart",
   "winpe.vista_csmwrap_title": "USOS - Vista without CSM",
   "winpe.vista_csmwrap_done": "The first part of the Vista installation is complete. Remove the USOS stick now, then choose OK: the computer restarts and Vista continues from the disk through CSMWrap. If the stick stays connected, start this disk's UEFI entry from the firmware boot menu.",

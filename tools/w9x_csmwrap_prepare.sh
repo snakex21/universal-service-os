@@ -57,6 +57,23 @@ w9x_release_time_zone() {
     printf '%s' "$2"
 }
 
+# Windows NT 3.51 without an answer profile (stdout, CR LF): the WINNT.SIF
+# the UEFI menu renders for the default profile (src/flow/answer/nt3.zig,
+# owner/organisation "USOS", computer USOS-NT351; tools/tests/test_nt3_flow.py
+# keeps both equal). $1: the 9x time zone key of request.ini (may be empty);
+# nt4_csmwrap_target.sh turns the marker into !TimeZone for the CD language.
+# NT 3.51 takes no product key (INITIAL.INF DisplayPidDlg = NO).
+w9x_nt3_default_sif() {
+    printf '%s\r\n' "; WINNT.SIF rendered by USOS for Windows NT 3.51 (docs/nt351-2026-10-08.md)"
+    printf '[Data]\r\nMsDosInitiated = 1\r\nFloppyless = 1\r\n\r\n'
+    printf '[Unattended]\r\nMethod = express\r\nConfirmHardware = no\r\nNtUpgrade = no\r\nWin31Upgrade = no\r\n'
+    printf 'TargetPath = \\WINNT\r\nOverwriteOemFilesOnUpgrade = no\r\n\r\n'
+    printf '[GuiUnattended]\r\n!SetupNetwork = NO\r\n!SetupApplications = NO\r\n'
+    [ -z "${1:-}" ] || printf ';USOS-TZ=%s\r\n' "$1"
+    printf '\r\n[UserData]\r\n!FullName = "USOS"\r\n!OrgName = "USOS"\r\n!ComputerName = USOS-NT351\r\n'
+    printf '\r\n[LicenseFilePrintData]\r\n\r\n[NetworkAdapterData]\r\n\r\n[TransportData]\r\n\r\n[DomainData]\r\n'
+}
+
 usos_w9x_csmwrap_prepare() {
     W9X_DIR=/mnt/esp/EFI/USOS/win9x
     request=$W9X_DIR/request.ini
@@ -95,6 +112,10 @@ usos_w9x_csmwrap_prepare() {
         # the whole install in the VM, then the finished SP6a system starts.
         windows-nt-4) tag=NT4 setup='' ;;
         windows-nt-4-server) tag=NT4S setup='' ;;
+        # Windows NT 3.51 (2026-10-08): the same VM flow; nt4_csmwrap_target.sh
+        # checks the CD with NT_MAJOR=3 (E820 filter MBR, \USOS\NT3, no SP).
+        windows-nt-3-51) tag=NT351 setup='' ;;
+        windows-nt-3-51-server) tag=NT351S setup='' ;;
         *) stop "request.ini names an unsupported system: $system" ;;
     esac
     w9x_csmwrap_log "REQUEST system=$system iso=$iso folder=$folder answer=${answer%%:*} size=$size_gib"
@@ -118,11 +139,19 @@ usos_w9x_csmwrap_prepare() {
     dos_iso=''
     nt4=''
     sp_exe=''
-    case "$tag" in NT4|NT4S) nt4=yes ;; esac
+    nt_major=''
+    nt_name=''
+    case "$tag" in
+        NT4|NT4S) nt4=yes nt_major=4 nt_name='Windows NT 4.0' ;;
+        # NT 3.51: the NT 4.0 path ($nt4) without the service pack and key.
+        NT351|NT351S) nt4=yes nt_major=3 nt_name='Windows NT 3.51' ;;
+    esac
     if [ -n "$nt4" ]; then
         for helper in nt4_csmwrap_target.sh nt4_qemu_install.sh w9x_phase1_qemu.sh; do
             [ -r "/usr/lib/usos/$helper" ] || stop "$helper is missing"
         done
+    fi
+    if [ "$nt_major" = 4 ]; then
         # SP6a (the user's SP6I386.EXE, a Microsoft file: never on the stick):
         # the X470 cannot start the RTM kernel, only an SP6a system.
         for sp_dir in "/mnt/data/Systems/Windows/$folder/ServicePack" '/mnt/data/Systems/Windows/Windows NT 4.0/ServicePack'; do
@@ -153,13 +182,20 @@ usos_w9x_csmwrap_prepare() {
     time_zone=
     [ -z "$dos_iso" ] || answer=dos
     [ -z "$nt4" ] || answer_inf=/run/nt4-winnt.sif
-    case "$nt4:$answer" in
-        yes:none) stop 'Windows NT 4.0 needs a product key: choose an answer profile with the key or type it when the menu asks' ;;
-        yes:profile)
+    case "$nt_major:$answer" in
+        4:none) stop 'Windows NT 4.0 needs a product key: choose an answer profile with the key or type it when the menu asks' ;;
+        3:none)
+            # NT 3.51 needs no key: without a profile the default answer.
+            time_zone=$(w9x_csmwrap_value timezone "$request") || time_zone=
+            w9x_nt3_default_sif "$time_zone" > "$answer_inf" || stop 'the default WINNT.SIF could not be written'
+            w9x_csmwrap_log "NT3 default answer, timezone=${time_zone:-none}"
+            answer=nt4 ;;
+        [34]:profile)
             # Rendered by the UEFI menu (answer_profiles.stageWin9x: NT4.SIF /
-            # NT4S.SIF, WINNT.SIF with the key): copied to RAM, staged copies go.
+            # NT4S.SIF with the key, NT351.SIF / NT351S.SIF): copied to RAM,
+            # staged copies go.
             cp "/mnt/esp/EFI/USOS/answer/$tag.SIF" "$answer_inf" || stop 'the answer profile could not be taken'
-            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF
+            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF
             for staged in 98SE 98 ME 95; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
             sync
             answer=nt4
@@ -184,7 +220,7 @@ usos_w9x_csmwrap_prepare() {
             # hold a product key: copied to RAM, then every staged copy goes.
             cp "/mnt/esp/EFI/USOS/answer/$tag.INF" "$answer_inf" || stop 'the answer profile could not be taken'
             for staged in 98SE 98 ME 95; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
-            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF
+            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF
             sync
             answer_kind=PROFILE ;;
         file:*)
@@ -268,7 +304,7 @@ usos_w9x_csmwrap_prepare() {
     if [ -n "$nt4" ]; then
         . /usr/lib/usos/w9x_phase1_qemu.sh
         . /usr/lib/usos/nt4_qemu_install.sh
-        vm_reason=$(w9x_vm_available "$tag") || stop "Windows NT 4.0 installs only in the VM on this PC, which is not available: $vm_reason"
+        vm_reason=$(w9x_vm_available "$tag") || stop "$nt_name installs only in the VM on this PC, which is not available: $vm_reason"
         w9x_csmwrap_log "NT4 vm ($vm_reason)"
     elif [ -z "$dos_iso" ] && [ -r /usr/lib/usos/w9x_phase1_qemu.sh ]; then
         . /usr/lib/usos/w9x_phase1_qemu.sh
@@ -289,7 +325,7 @@ usos_w9x_csmwrap_prepare() {
     fi
     usos_ui_stage 4 5 'Preparing the disk' "Copying $folder Setup, the USOS helpers and CSMWrap to the selected disk." || true
     if [ -n "$nt4" ]; then
-        set -- env TARGET_DEVICE="$TARGET_DEVICE" NT4_SOURCE_ISO="/mnt/data/$iso" NT4_ANSWER_SIF="$answer_inf"             NT4_ANSWER_KIND="$answer_kind" NT4_SP_EXE="$sp_exe" sh /usr/lib/usos/nt4_csmwrap_target.sh
+        set -- env TARGET_DEVICE="$TARGET_DEVICE" NT4_SOURCE_ISO="/mnt/data/$iso" NT4_ANSWER_SIF="$answer_inf"             NT4_ANSWER_KIND="$answer_kind" NT4_SP_EXE="$sp_exe" NT_MAJOR="$nt_major" sh /usr/lib/usos/nt4_csmwrap_target.sh
     elif [ -n "$dos_iso" ]; then
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="$dos_iso" DOS_WIN3_ISO="$win3_iso" DOS_WIN_EARLY="${win_early:-}" \
             DOS_PROGRAMS_DIR=/mnt/data/Systems/DOS/MS-DOS/Programs sh /usr/lib/usos/dos_csmwrap_target.sh
@@ -319,7 +355,7 @@ usos_w9x_csmwrap_prepare() {
             umount /mnt/data 2>/dev/null || true
             sync
             if [ "$vm_rc" = 3 ] && [ "${NT4_VM_STALLED:-0}" -gt 0 ]; then
-                stop "Windows NT 4.0 Setup stopped writing to the disk for $((NT4_VM_STALLED / 60)) minutes (start ${NT4_VM_BOOT:-?}): a Setup page is waiting for input. The computer was not restarted; the last screen and logs: EFI/USOS/win9x/nt4"
+                stop "$nt_name Setup stopped writing to the disk for $((NT4_VM_STALLED / 60)) minutes (start ${NT4_VM_BOOT:-?}): a Setup page is waiting for input. The computer was not restarted; the last screen and logs: EFI/USOS/win9x/nt4"
             fi
             case "${vm_check:-}" in *'high-encryption CD'*)
                 # update.exe refuses the Standard Encryption SP6a on a CD with
@@ -335,7 +371,7 @@ usos_w9x_csmwrap_prepare() {
                 # the Polish SP6a on the English Enterprise Server CD).
                 stop "Service Pack 6a did not install. It must be the same language as the CD: put SP6I386.EXE of that language into Systems\\Windows\\$folder\\ServicePack on USOS_DATA (that folder is used before the Workstation one). Logs: EFI/USOS/win9x/nt4" ;;
             esac
-            stop 'The Windows NT 4.0 installation did not finish. The computer was not restarted; logs: EFI/USOS/win9x/nt4'
+            stop "The $nt_name installation did not finish. The computer was not restarted; logs: EFI/USOS/win9x/nt4"
         fi
         w9x_csmwrap_log "NT4 PASS $vm_check"
         if ! TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=133120 sh /usr/lib/usos/xp_csmwrap_esp.sh >> "$W9X_DIR/prepare.log" 2>&1; then

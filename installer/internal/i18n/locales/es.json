@@ -1161,6 +1161,7 @@
   "boot.summary.w9x_csmwrap": "Sin CSM (experimental): USOS prepara un disco FAT32 con el instalador y CSMWrap; luego el instalador arranca desde él",
   "boot.summary.nt4_csmwrap": "Sin CSM (experimental): toda la instalación se ejecuta en una máquina virtual en este equipo; después el sistema terminado arranca mediante CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: use un teclado PS/2 (aún sin entrada USB); pantalla 640x480; necesita SP6I386.EXE (Service Pack 6a) en Systems\\Windows\\Windows NT 4.0\\ServicePack en DATA.",
+  "boot.summary.nt3_limits": "Windows NT 3.51: use un teclado PS/2 (aún sin entrada USB); pantalla 640x480.",
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: responda a las preguntas del Setup original con el teclado (allí funciona también un teclado USB); en el Setup elija VGA (EGA para 1.0x) y el ratón IBM PS/2. Dentro de estas versiones de Windows use un teclado PS/2 (aún no hay puente para teclado USB). Requiere MS-DOS 6.22.iso en Systems\\DOS\\MS-DOS\\Images en DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimental): sin controlador AHCI/NVMe/USB 3 para NT 5.0 (SATA en modo IDE), máx. 4 GB de RAM y 2 CPU",
@@ -1195,6 +1196,8 @@
   "boot.lx.nt4_needs_key": "Windows NT 4.0 necesita una clave de producto: elija un perfil de respuestas con la clave o escríbala cuando el menú la pida",
   "boot.lx.nt4_needs_vm": "Windows NT 4.0 solo se instala en la máquina virtual de este equipo, que no está disponible: {0}",
   "boot.lx.nt4_failed": "La instalación de Windows NT 4.0 no terminó. El equipo no se reinició; registros: EFI/USOS/win9x/nt4",
+  "boot.lx.nt3_needs_vm": "Windows NT 3.51 solo se instala en la máquina virtual de este equipo, que no está disponible: {0}",
+  "boot.lx.nt3_failed": "La instalación de Windows NT 3.51 no terminó. El equipo no se reinició; registros: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Reiniciar",
   "winpe.vista_csmwrap_title": "USOS - Vista sin CSM",
   "winpe.vista_csmwrap_done": "La primera parte de la instalación de Vista ha terminado. Retire ahora la memoria USOS y elija Aceptar: el equipo se reinicia y Vista continúa desde el disco mediante CSMWrap. Si la memoria sigue conectada, inicie la entrada UEFI de este disco desde el menú de arranque del firmware.",

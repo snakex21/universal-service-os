@@ -1164,6 +1164,7 @@
   "boot.summary.w9x_csmwrap": "Fără CSM (experimental): USOS pregătește un disc FAT32 cu instalarea și CSMWrap; instalarea pornește apoi de pe el",
   "boot.summary.nt4_csmwrap": "Fără CSM (experimental): întreaga instalare rulează într-o mașină virtuală pe acest PC; sistemul finalizat pornește apoi prin CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: folosiți o tastatură PS/2 (încă fără intrare USB); afișaj 640x480; necesită SP6I386.EXE (Service Pack 6a) în Systems\\Windows\\Windows NT 4.0\\ServicePack pe DATA.",
+  "boot.summary.nt3_limits": "Windows NT 3.51: folosiți o tastatură PS/2 (încă fără intrare USB); afișaj 640x480.",
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: răspundeți la întrebările Setup-ului original cu tastatura (acolo funcționează și o tastatură USB); în Setup alegeți VGA (EGA pentru 1.0x) și mouse-ul IBM PS/2. În aceste versiuni de Windows folosiți o tastatură PS/2 (încă fără punte pentru tastatura USB). Necesită MS-DOS 6.22.iso în Systems\\DOS\\MS-DOS\\Images pe DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimental): fără driver AHCI/NVMe/USB 3 pentru NT 5.0 (SATA în mod IDE), max. 4 GB RAM și 2 procesoare",
@@ -1198,6 +1199,8 @@
   "boot.lx.nt4_needs_key": "Windows NT 4.0 necesită o cheie de produs: alegeți un profil de răspunsuri cu cheia sau tastați-o când meniul o cere",
   "boot.lx.nt4_needs_vm": "Windows NT 4.0 se instalează doar în mașina virtuală de pe acest PC, care nu este disponibilă: {0}",
   "boot.lx.nt4_failed": "Instalarea Windows NT 4.0 nu s-a terminat. Computerul nu a fost repornit; jurnale: EFI/USOS/win9x/nt4",
+  "boot.lx.nt3_needs_vm": "Windows NT 3.51 se instalează doar în mașina virtuală de pe acest PC, care nu este disponibilă: {0}",
+  "boot.lx.nt3_failed": "Instalarea Windows NT 3.51 nu s-a terminat. Computerul nu a fost repornit; jurnale: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Repornire",
   "winpe.vista_csmwrap_title": "USOS - Vista fără CSM",
   "winpe.vista_csmwrap_done": "Prima parte a instalării Vista s-a încheiat. Scoateți acum stickul USOS, apoi alegeți OK: computerul repornește și Vista continuă de pe disc prin CSMWrap. Dacă stickul rămâne conectat, porniți intrarea UEFI a acestui disc din meniul de pornire al firmware-ului.",

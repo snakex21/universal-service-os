@@ -267,7 +267,7 @@ class Nt4Target(unittest.TestCase):
 
     def test_finish_names_the_high_encryption_service_pack(self):
         nt4 = Path(NT4).read_text(encoding='utf-8')
-        self.assertIn('USOSRST.REG USOSVBE.REG DONE.TXT SOURCE.TXT; do', nt4)
+        self.assertIn('USOSRST.REG USOSVBE.REG VERSION.TXT DRIVERS.TXT SETUP.LOG DONE.TXT SOURCE.TXT; do', nt4)
         self.assertIn("grep -aq 'crypto=high' \"$logs/SOURCE.TXT\"", nt4)
         self.assertIn('(high-encryption CD);', nt4)
         prepare = PREPARE.read_text(encoding='utf-8')

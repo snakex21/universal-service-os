@@ -26,6 +26,7 @@ var windowsProfiles = []dataProfile{
 	{"windows-xp-x64", "Windows XP x64", true, true},
 	{"windows-2000", "Windows 2000", true, true},
 	{"windows-nt-4", "Windows NT 4.0", true, false},
+	{"windows-nt-3-51", "Windows NT 3.51", true, false},
 	{"windows-me", "Windows Me", true, false},
 	{"windows-98-se", "Windows 98 SE", true, false},
 	{"windows-98", "Windows 98", true, false},
@@ -50,6 +51,8 @@ var windowsProfiles = []dataProfile{
 	{"windows-server-2008-r2", "Windows Server 2008 R2", true, true},
 	{"windows-server-2008", "Windows Server 2008", true, true},
 	{"windows-server-2003", "Windows Server 2003", true, true},
+	// Windows NT 3.51 Server: the NT 3.51 VM flow with the Server CD.
+	{"windows-nt-3-51-server", "Windows NT 3.51 Server", true, false},
 }
 
 var linuxProfiles = []dataProfile{

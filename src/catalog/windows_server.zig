@@ -35,7 +35,21 @@ pub const entries = [_]SystemEntry{
         .boot_methods = &nt5_methods,
         .server = true,
     },
-};
+} ++ @import("windows_legacy.zig").uefiOnly(.{
+    // Windows NT 3.51 Server: the NT 3.51 Workstation flow (os_profiles.zig
+    // nt3-x86-qemu-csmwrap) with the Server CD; UEFI only.
+    SystemEntry{
+        .id = "windows-nt-3-51-server",
+        .name = "Windows NT 3.51 Server",
+        .category = .windows,
+        .family = .windows_legacy,
+        .image_directory = "\\Systems\\Windows\\Windows NT 3.51 Server\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Windows NT 3.51 Server\\Unattended",
+        .firmware = .uefi,
+        .boot_methods = &nt5_methods,
+        .server = true,
+    },
+});
 
 fn server(comptime id: []const u8, comptime version: []const u8, comptime boot_methods: []const BootMethod) SystemEntry {
     const name = "Windows Server " ++ version;

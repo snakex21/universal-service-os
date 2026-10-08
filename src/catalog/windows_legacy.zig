@@ -43,6 +43,12 @@ pub const entries = [_]SystemEntry{
     // on the target (profile nt4-x86-qemu-csmwrap, experimental;
     // docs/nt4-2026-10-07.md), then the SP6a system starts through CSMWrap.
     anyFirmware(legacy("windows-nt-4", "Windows NT 4.0", "Windows NT 4.0", true)),
+} ++ uefiOnly(.{
+    // Windows NT 3.51 Workstation: the NT 4.0 VM flow (profile
+    // nt3-x86-qemu-csmwrap, experimental; docs/nt351-2026-10-08.md). UEFI
+    // only: the BIOS Core has no NT 3.51 path (and no room).
+    uefiLegacy("windows-nt-3-51", "Windows NT 3.51", "Windows NT 3.51"),
+}) ++ [_]SystemEntry{
     // Windows 95/98/Me: the BIOS Core's DOS Setup, and from UEFI the
     // micro-Linux disk preparation with a CSMWrap ESP (profile
     // w9x-uefi-csmwrap, experimental; docs/win9x-modern-2026-09-30.md 4c).
@@ -71,11 +77,18 @@ pub const entries = [_]SystemEntry{
 /// these; the BIOS Core (freestanding, size budget) leaves them out.
 const freestanding = builtin.os.tag == .freestanding;
 
-fn uefiOnly(comptime list: anytype) [if (freestanding) 0 else list.len]SystemEntry {
+pub fn uefiOnly(comptime list: anytype) [if (freestanding) 0 else list.len]SystemEntry {
     var result: [if (freestanding) 0 else list.len]SystemEntry = undefined;
     if (!freestanding) {
         inline for (list, 0..) |entry, i| result[i] = entry;
     }
+    return result;
+}
+
+/// A UEFI-only entry with an Unattended folder (Windows NT 3.51).
+fn uefiLegacy(comptime id: []const u8, comptime name: []const u8, comptime folder: []const u8) SystemEntry {
+    var result = legacy(id, name, folder, true);
+    result.firmware = .uefi;
     return result;
 }
 

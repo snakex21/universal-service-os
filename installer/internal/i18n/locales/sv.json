@@ -1161,6 +1161,7 @@
   "boot.summary.w9x_csmwrap": "Utan CSM (experimentellt): USOS förbereder en FAT32-installationsdisk med CSMWrap; installationen startar sedan från den",
   "boot.summary.nt4_csmwrap": "Utan CSM (experimentellt): hela installationen körs i en virtuell maskin på den här datorn; det färdiga systemet startar sedan via CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: använd ett PS/2-tangentbord (ingen USB-inmatning ännu); skärm 640x480; kräver SP6I386.EXE (Service Pack 6a) i Systems\\Windows\\Windows NT 4.0\\ServicePack på DATA.",
+  "boot.summary.nt3_limits": "Windows NT 3.51: använd ett PS/2-tangentbord (ingen USB-inmatning ännu); skärm 640x480.",
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: besvara frågorna i det ursprungliga Setup med tangentbordet (där fungerar även ett USB-tangentbord); välj VGA (EGA för 1.0x) och IBM PS/2-musen i Setup. Använd ett PS/2-tangentbord i själva dessa Windows-versioner (ingen USB-tangentbordsbrygga ännu). Kräver MS-DOS 6.22.iso i Systems\\DOS\\MS-DOS\\Images på DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimentellt): ingen AHCI/NVMe/USB 3-drivrutin för NT 5.0 (SATA i IDE-läge), max 4 GB RAM och 2 processorer",
@@ -1195,6 +1196,8 @@
   "boot.lx.nt4_needs_key": "Windows NT 4.0 kräver en produktnyckel: välj en svarsprofil med nyckeln eller skriv den när menyn ber om den",
   "boot.lx.nt4_needs_vm": "Windows NT 4.0 installeras bara i den virtuella maskinen på den här datorn, som inte är tillgänglig: {0}",
   "boot.lx.nt4_failed": "Installationen av Windows NT 4.0 slutfördes inte. Datorn startades inte om; loggar: EFI/USOS/win9x/nt4",
+  "boot.lx.nt3_needs_vm": "Windows NT 3.51 installeras bara i den virtuella maskinen på den här datorn, som inte är tillgänglig: {0}",
+  "boot.lx.nt3_failed": "Installationen av Windows NT 3.51 slutfördes inte. Datorn startades inte om; loggar: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Starta om",
   "winpe.vista_csmwrap_title": "USOS - Vista utan CSM",
   "winpe.vista_csmwrap_done": "Den första delen av Vista-installationen är klar. Ta ut USOS-stickan nu och välj OK: datorn startas om och Vista fortsätter från disken via CSMWrap. Om stickan är kvar, starta den här diskens UEFI-post från firmwarens startmeny.",

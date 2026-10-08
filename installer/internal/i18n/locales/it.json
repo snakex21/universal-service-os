@@ -1161,6 +1161,7 @@
   "boot.summary.w9x_csmwrap": "Senza CSM (sperimentale): USOS prepara un disco FAT32 con l’installazione e CSMWrap; l’installazione parte poi da esso",
   "boot.summary.nt4_csmwrap": "Senza CSM (sperimentale): l’intera installazione avviene in una macchina virtuale su questo PC; il sistema finito si avvia poi tramite CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: usare una tastiera PS/2 (ingresso USB non ancora supportato); schermo 640x480; richiede SP6I386.EXE (Service Pack 6a) in Systems\\Windows\\Windows NT 4.0\\ServicePack su DATA.",
+  "boot.summary.nt3_limits": "Windows NT 3.51: usare una tastiera PS/2 (ingresso USB non ancora supportato); schermo 640x480.",
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: rispondi alle domande del Setup originale con la tastiera (lì funziona anche una tastiera USB); nel Setup scegli VGA (EGA per 1.0x) e il mouse IBM PS/2. All'interno di queste versioni di Windows usa una tastiera PS/2 (nessun ponte per tastiera USB per ora). Richiede MS-DOS 6.22.iso in Systems\\DOS\\MS-DOS\\Images su DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (sperimentale): nessun driver AHCI/NVMe/USB 3 per NT 5.0 (SATA in modalità IDE), max 4 GB di RAM e 2 CPU",
@@ -1195,6 +1196,8 @@
   "boot.lx.nt4_needs_key": "Windows NT 4.0 richiede un codice Product Key: scegliere un profilo di risposte con il codice o digitarlo quando il menu lo chiede",
   "boot.lx.nt4_needs_vm": "Windows NT 4.0 si installa solo nella macchina virtuale di questo PC, che non è disponibile: {0}",
   "boot.lx.nt4_failed": "L'installazione di Windows NT 4.0 non è terminata. Il computer non è stato riavviato; log: EFI/USOS/win9x/nt4",
+  "boot.lx.nt3_needs_vm": "Windows NT 3.51 si installa solo nella macchina virtuale di questo PC, che non è disponibile: {0}",
+  "boot.lx.nt3_failed": "L'installazione di Windows NT 3.51 non è terminata. Il computer non è stato riavviato; log: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Riavvia",
   "winpe.vista_csmwrap_title": "USOS - Vista senza CSM",
   "winpe.vista_csmwrap_done": "La prima parte dell'installazione di Vista è completata. Rimuovi ora la chiavetta USOS, poi scegli OK: il computer si riavvia e Vista prosegue dal disco tramite CSMWrap. Se la chiavetta resta collegata, avvia la voce UEFI di questo disco dal menu di avvio del firmware.",

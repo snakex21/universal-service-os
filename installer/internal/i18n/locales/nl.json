@@ -1161,6 +1161,7 @@
   "boot.summary.w9x_csmwrap": "Zonder CSM (experimenteel): USOS bereidt een FAT32-installatieschijf met CSMWrap voor; de installatie start daarna daarvan",
   "boot.summary.nt4_csmwrap": "Zonder CSM (experimenteel): de hele installatie draait in een virtuele machine op deze pc; het voltooide systeem start daarna via CSMWrap",
   "boot.summary.nt4_limits": "Windows NT 4.0: gebruik een PS/2-toetsenbord (nog geen USB-invoer); beeld 640x480; vereist SP6I386.EXE (Service Pack 6a) in Systems\\Windows\\Windows NT 4.0\\ServicePack op DATA.",
+  "boot.summary.nt3_limits": "Windows NT 3.51: gebruik een PS/2-toetsenbord (nog geen USB-invoer); beeld 640x480.",
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: beantwoord de vragen van de originele Setup met het toetsenbord (een USB-toetsenbord werkt daar); kies in Setup VGA (EGA voor 1.0x) en de IBM PS/2-muis. Gebruik in deze Windows-versies zelf een PS/2-toetsenbord (nog geen USB-toetsenbordbrug). Vereist MS-DOS 6.22.iso in Systems\\DOS\\MS-DOS\\Images op DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimenteel): geen AHCI/NVMe/USB 3-stuurprogramma voor NT 5.0 (SATA in IDE-modus), max. 4 GB RAM en 2 CPU's",
@@ -1195,6 +1196,8 @@
   "boot.lx.nt4_needs_key": "Windows NT 4.0 vereist een productcode: kies een antwoordprofiel met de code of typ deze in wanneer het menu erom vraagt",
   "boot.lx.nt4_needs_vm": "Windows NT 4.0 wordt alleen geïnstalleerd in de virtuele machine op deze pc, die niet beschikbaar is: {0}",
   "boot.lx.nt4_failed": "De installatie van Windows NT 4.0 is niet voltooid. De computer is niet opnieuw opgestart; logboeken: EFI/USOS/win9x/nt4",
+  "boot.lx.nt3_needs_vm": "Windows NT 3.51 wordt alleen geïnstalleerd in de virtuele machine op deze pc, die niet beschikbaar is: {0}",
+  "boot.lx.nt3_failed": "De installatie van Windows NT 3.51 is niet voltooid. De computer is niet opnieuw opgestart; logboeken: EFI/USOS/win9x/nt4",
   "boot.lx.restart": "Opnieuw opstarten",
   "winpe.vista_csmwrap_title": "USOS - Vista zonder CSM",
   "winpe.vista_csmwrap_done": "Het eerste deel van de Vista-installatie is voltooid. Verwijder nu de USOS-stick en kies OK: de computer start opnieuw op en Vista gaat via CSMWrap verder vanaf de schijf. Blijft de stick aangesloten, start dan het UEFI-item van deze schijf vanuit het opstartmenu van de firmware.",
