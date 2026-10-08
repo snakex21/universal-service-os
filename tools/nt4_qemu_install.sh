@@ -47,9 +47,11 @@ nt4_vm_args() {
         -monitor "pipe:$W9X_VM_RUN/key"
 }
 
-# 0 when C: of the target $1 holds \USOS\NT4\$2 (mtools, read only).
+# 0 when C: of the target $1 holds \USOS\NT4\$2 or (NT 3.51) \USOS\NT3\$2
+# (mtools, read only).
 nt4_vm_marker() {
-    MTOOLS_SKIP_CHECK=1 mdir -i "$1@@$NT4_PART_OFFSET" "::/USOS/NT4/$2" >/dev/null 2>&1
+    MTOOLS_SKIP_CHECK=1 mdir -i "$1@@$NT4_PART_OFFSET" "::/USOS/NT4/$2" >/dev/null 2>&1 ||
+        MTOOLS_SKIP_CHECK=1 mdir -i "$1@@$NT4_PART_OFFSET" "::/USOS/NT3/$2" >/dev/null 2>&1
 }
 
 # Runs the VM until the install is done. Calls nt4_vm_progress BOOT ELAPSED
@@ -166,12 +168,17 @@ nt4_vm_finish() {
         return 1
     fi
     c=$W9X_VM_RUN/c
-    for file in POST.LOG VERSION.REG CSD.REG USOSRST.REG USOSVBE.REG DONE.TXT SOURCE.TXT; do
-        src=$(nt4_ci_path "$c" "USOS/NT4/$file") && cp "$src" "$logs/$file" 2>/dev/null
+    # NT 3.51 keeps its USOS files in \USOS\NT3 (USOSNT3.EXE writes POST.LOG
+    # and the key dumps as .TXT; nt4_csmwrap_target.sh).
+    sub=NT4
+    nt4_ci_path "$c" USOS/NT3 >/dev/null && sub=NT3
+    for file in POST.LOG VERSION.REG CSD.REG USOSRST.REG USOSVBE.REG VERSION.TXT DRIVERS.TXT SETUP.LOG DONE.TXT SOURCE.TXT; do
+        src=$(nt4_ci_path "$c" "USOS/$sub/$file") && cp "$src" "$logs/$file" 2>/dev/null
     done
     status=0
     reason=''
-    for path in WINNT/SYSTEM32/NTOSKRNL.EXE WINNT/SYSTEM32/DRIVERS/AHCINT.SYS WINNT/SYSTEM32/DRIVERS/USOSRST.SYS BOOT.INI NTLDR USOS/NT4/DONE.TXT; do
+    [ "$sub" = NT4 ] || reason='NT 3.51;'
+    for path in WINNT/SYSTEM32/NTOSKRNL.EXE WINNT/SYSTEM32/DRIVERS/AHCINT.SYS WINNT/SYSTEM32/DRIVERS/USOSRST.SYS BOOT.INI NTLDR USOS/$sub/DONE.TXT; do
         nt4_ci_path "$c" "$path" >/dev/null || { reason="$reason missing $path;"; status=1; }
     done
     if nt4_ci_path "$c" USOS/NT4/SP6I386.EXE >/dev/null; then

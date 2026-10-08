@@ -82,8 +82,19 @@
  */
 #include <ntddk.h>
 
-/* Exported by every NT kernel since 3.1; ntddk.h does not declare it. */
+#ifdef USOSRST_NT351
+/* NT 3.51 build (build-nt351.cmd, also USOSRST_NT4): the NT 3.51 kernel
+   exports no KiBugCheckData, no KeSetTimerEx and no ZwSetSystemTime. The
+   STOP rows show zeros, the heartbeat timer is re-armed by its DPC, and
+   the clock fix only redirects the HAL RTC routines (the system time keeps
+   the value the kernel read at boot). */
+static ULONG g_NoBugCheckData[5];
+#define USOS_BUGCHECK_DATA g_NoBugCheckData
+#else
+/* Exported by every NT kernel since 4.0; ntddk.h does not declare it. */
 __declspec(dllimport) extern ULONG KiBugCheckData[5];
+#define USOS_BUGCHECK_DATA KiBugCheckData
+#endif
 
 /* Compiler intrinsics (WDK 7.1 x86 has no intrin.h; __rdtsc is in ntddk.h). */
 unsigned __int64 __readmsr(unsigned long Register);
@@ -129,7 +140,11 @@ UsosActiveProcessors(VOID)
     return ((KAFFINITY)1 << n) - 1;
 }
 #define KeQueryActiveProcessors() UsosActiveProcessors()
+#ifdef USOSRST_NT351
+#define USOSRST_VERSION "usosrst 1.5-nt351"
+#else
 #define USOSRST_VERSION "usosrst 1.5-nt4"
+#endif
 #else
 #define USOSRST_VERSION "usosrst 1.4"
 #endif
@@ -242,17 +257,17 @@ BugCheckCallback(IN PVOID Buffer, IN ULONG Length)
     UNREFERENCED_PARAMETER(Length);
 
     p = PutStr(line, end, "USOS: STOP 0x");
-    p = PutHex(p, end, KiBugCheckData[0], 8);
+    p = PutHex(p, end, USOS_BUGCHECK_DATA[0], 8);
     p = PutStr(p, end, " (");
     for (i = 1; i <= 4; i++) {
         p = PutStr(p, end, "0x");
-        p = PutHex(p, end, KiBugCheckData[i], 8);
+        p = PutHex(p, end, USOS_BUGCHECK_DATA[i], 8);
         p = PutStr(p, end, i < 4 ? "," : ")");
     }
     ShowRow(ROW_STOP, line, (ULONG)(p - line), 0x4F00);
 
     p = PutStr(line, end, "USOS: in");
-    for (i = 1; i <= 4; i++) p = PutModule(p, end, KiBugCheckData[i]);
+    for (i = 1; i <= 4; i++) p = PutModule(p, end, USOS_BUGCHECK_DATA[i]);
     ShowRow(ROW_STOP + 1, line, (ULONG)(p - line), 0x4F00);
 
     p = PutStr(line, end, "USOS: photograph this screen (rows 0-8) for the USOS issue report.");
@@ -982,7 +997,9 @@ WallSeconds(VOID)
    them for drivers. */
 __declspec(dllimport) BOOLEAN NTAPI HalQueryRealTimeClock(OUT PTIME_FIELDS TimeFields);
 __declspec(dllimport) BOOLEAN NTAPI HalSetRealTimeClock(IN PTIME_FIELDS TimeFields);
+#ifndef USOSRST_NT351
 NTSYSAPI NTSTATUS NTAPI ZwSetSystemTime(IN PLARGE_INTEGER SystemTime, OUT PLARGE_INTEGER PreviousTime OPTIONAL);
+#endif
 
 typedef BOOLEAN (NTAPI *USOS_RTC_ROUTINE)(IN OUT PTIME_FIELDS TimeFields);
 static USOS_RTC_ROUTINE g_HalQueryRtc;  /* the HAL's routine (fallback) */
@@ -1117,7 +1134,11 @@ FixRtc(IN PUNICODE_STRING RegistryPath)
                writes the RTC through HalSetRealTimeClock. */
             if (RtlTimeFieldsToTime(&d.Own, &local)) {
                 ExLocalTimeToSystemTime(&local, &utc);
+#ifdef USOSRST_NT351
+                d.SetStatus = STATUS_NOT_IMPLEMENTED;
+#else
                 d.SetStatus = ZwSetSystemTime(&utc, NULL);
+#endif
             }
         }
     }
@@ -1447,6 +1468,19 @@ FindAhci(VOID)
     }
 }
 
+#ifdef USOSRST_NT351
+/* NT 3.51 has no periodic timers (KeSetTimerEx): the DPC re-arms. */
+static VOID
+HeartbeatDpc351(IN PKDPC Dpc, IN PVOID Context, IN PVOID Arg1, IN PVOID Arg2)
+{
+    LARGE_INTEGER due;
+
+    HeartbeatDpc(Dpc, Context, Arg1, Arg2);
+    due.QuadPart = -10000LL * HB_PERIOD_MS;
+    KeSetTimer(&g_HbTimer, due, &g_HbDpc);
+}
+#endif
+
 static VOID
 StartHeartbeat(VOID)
 {
@@ -1461,10 +1495,15 @@ StartHeartbeat(VOID)
         KeSetImportanceDpc(&g_CpuDpc[i], HighImportance);
     }
     g_Cpus = i;
-    KeInitializeDpc(&g_HbDpc, HeartbeatDpc, NULL);
     KeInitializeTimer(&g_HbTimer);
     due.QuadPart = -10000LL * HB_PERIOD_MS;
+#ifdef USOSRST_NT351
+    KeInitializeDpc(&g_HbDpc, HeartbeatDpc351, NULL);
+    KeSetTimer(&g_HbTimer, due, &g_HbDpc);
+#else
+    KeInitializeDpc(&g_HbDpc, HeartbeatDpc, NULL);
     KeSetTimerEx(&g_HbTimer, due, HB_PERIOD_MS, &g_HbDpc);
+#endif
 }
 
 /* ------------------------------------------------------------------ */
