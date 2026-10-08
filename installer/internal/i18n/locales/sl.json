@@ -1171,6 +1171,7 @@
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: na vprašanja izvirnega Setupa odgovorite s tipkovnico (tam deluje tudi tipkovnica USB); v Setupu izberite VGA (EGA za 1.0x) in miško IBM PS/2. V samih teh različicah Windows uporabite tipkovnico PS/2 (mostu za tipkovnico USB še ni). Potrebuje MS-DOS 6.22.iso v Systems\\DOS\\MS-DOS\\Images na razdelku DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (poskusno): ni gonilnika AHCI/NVMe/USB 3 za NT 5.0 (SATA v načinu IDE), največ 4 GB RAM in 2 procesorja",
+  "boot.summary.w2k_server_limits": "Windows 2000 Server (preskusno): pot Windows 2000; odgovori licenciranje Na strežnik (5), delovna skupina, IIS izklopljen; ključ izdelka iz profila odgovorov; CD brez SP4 nima sklada USB 2.0 (brez tipkovnice/miške USB)",
 
   "boot.summary.nt52_limits": "NT 5.2 (poskusno): AHCI prek GenAHCI na StorPortu sistema; brez gonilnika NVMe/USB 3 v namestitvi",
   "boot.summary.vista_csmwrap": "Vista brez CSM (preizkusno): namestitev legacy (MBR) prek CSMWrap, kartica z legacy VBIOS",

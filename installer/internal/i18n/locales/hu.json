@@ -1165,6 +1165,7 @@
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: az eredeti Setup kérdéseire a billentyűzettel válaszoljon (ott USB-billentyűzet is működik); a Setupban válassza a VGA-t (1.0x-nél EGA-t) és az IBM PS/2 egeret. Ezekben a Windows-verziókban PS/2 billentyűzetet használjon (USB-billentyűzethíd még nincs). Szükséges: MS-DOS 6.22.iso a DATA Systems\\DOS\\MS-DOS\\Images mappájában.",
 
   "boot.summary.w2k_limits": "Windows 2000 (kísérleti): nincs AHCI/NVMe/USB 3 illesztőprogram NT 5.0-hoz (SATA IDE módban), legfeljebb 4 GB RAM és 2 processzor",
+  "boot.summary.w2k_server_limits": "Windows 2000 Server (kísérleti): a Windows 2000 útvonal; válaszol: Kiszolgálónkénti licenc (5), munkacsoport, IIS ki; termékkulcs a válaszprofilból; SP4 nélküli CD-n nincs USB 2.0 verem (nincs USB billentyűzet/egér)",
 
   "boot.summary.nt52_limits": "NT 5.2 (kísérleti): AHCI a GenAHCI-val a rendszer StorPortján; a telepítőben nincs NVMe/USB 3 illesztőprogram",
   "boot.summary.vista_csmwrap": "Vista CSM nélkül (kísérleti): legacy (MBR) telepítés CSMWrap segítségével, legacy VBIOS-os kártya",

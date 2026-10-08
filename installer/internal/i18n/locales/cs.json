@@ -1168,6 +1168,7 @@
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: na otázky původního Setupu odpovězte klávesnicí (funguje tam i klávesnice USB); v Setupu zvolte VGA (EGA pro 1.0x) a myš IBM PS/2. V samotných těchto Windows použijte klávesnici PS/2 (most pro klávesnici USB zatím není). Vyžaduje MS-DOS 6.22.iso v Systems\\DOS\\MS-DOS\\Images na oddílu DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimentální): chybí ovladač AHCI/NVMe/USB 3 pro NT 5.0 (SATA v režimu IDE), max. 4 GB RAM a 2 procesory",
+  "boot.summary.w2k_server_limits": "Windows 2000 Server (experimentální): cesta Windows 2000; odpovídá licencování Na server (5), pracovní skupina, IIS vypnuto; kód Product Key z profilu odpovědí; CD bez SP4 nemá zásobník USB 2.0 (bez USB klávesnice/myši)",
 
   "boot.summary.nt52_limits": "NT 5.2 (experimentální): AHCI přes GenAHCI na StorPortu systému; bez ovladače NVMe/USB 3 v instalaci",
   "boot.summary.vista_csmwrap": "Vista bez CSM (experimentální): legacy instalace (MBR) přes CSMWrap, karta s legacy VBIOS",

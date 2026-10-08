@@ -1165,6 +1165,7 @@
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: responda a las preguntas del Setup original con el teclado (allí funciona también un teclado USB); en el Setup elija VGA (EGA para 1.0x) y el ratón IBM PS/2. Dentro de estas versiones de Windows use un teclado PS/2 (aún no hay puente para teclado USB). Requiere MS-DOS 6.22.iso en Systems\\DOS\\MS-DOS\\Images en DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimental): sin controlador AHCI/NVMe/USB 3 para NT 5.0 (SATA en modo IDE), máx. 4 GB de RAM y 2 CPU",
+  "boot.summary.w2k_server_limits": "Windows 2000 Server (experimental): la ruta de Windows 2000; responde licencia Por servidor (5), grupo de trabajo, IIS desactivado; clave de producto del perfil de respuestas; un CD sin SP4 no tiene pila USB 2.0 (sin teclado/ratón USB)",
 
   "boot.summary.nt52_limits": "NT 5.2 (experimental): AHCI mediante GenAHCI sobre el StorPort del sistema; sin controlador NVMe/USB 3 en la instalación",
   "boot.summary.vista_csmwrap": "Vista sin CSM (experimental): instalación legacy (MBR) mediante CSMWrap, tarjeta con VBIOS legacy",

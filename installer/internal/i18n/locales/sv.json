@@ -1165,6 +1165,7 @@
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: besvara frågorna i det ursprungliga Setup med tangentbordet (där fungerar även ett USB-tangentbord); välj VGA (EGA för 1.0x) och IBM PS/2-musen i Setup. Använd ett PS/2-tangentbord i själva dessa Windows-versioner (ingen USB-tangentbordsbrygga ännu). Kräver MS-DOS 6.22.iso i Systems\\DOS\\MS-DOS\\Images på DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimentellt): ingen AHCI/NVMe/USB 3-drivrutin för NT 5.0 (SATA i IDE-läge), max 4 GB RAM och 2 processorer",
+  "boot.summary.w2k_server_limits": "Windows 2000 Server (experimentell): Windows 2000-vägen; besvarar licensiering Per server (5), arbetsgrupp, IIS av; produktnyckel från svarsprofilen; en cd utan SP4 saknar USB 2.0-stacken (inget USB-tangentbord/-mus)",
 
   "boot.summary.nt52_limits": "NT 5.2 (experimentellt): AHCI via GenAHCI på systemets StorPort; ingen NVMe/USB 3-drivrutin i installationen",
   "boot.summary.vista_csmwrap": "Vista utan CSM (experimentellt): legacy-installation (MBR) via CSMWrap, grafikkort med legacy-VBIOS",

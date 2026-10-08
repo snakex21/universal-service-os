@@ -1168,6 +1168,7 @@
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: na pytania oryginalnego Setupu odpowiedz klawiaturą (działa tam także klawiatura USB); w Setupie wybierz VGA (EGA dla 1.0x) i mysz IBM PS/2. W samych tych Windows użyj klawiatury PS/2 (mostek klawiatury USB jeszcze nie działa). Wymaga MS-DOS 6.22.iso w Systems\\DOS\\MS-DOS\\Images na partycji DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperymentalne): brak sterownika AHCI/NVMe/USB 3 dla NT 5.0 (SATA w trybie IDE), maks. 4 GB RAM i 2 procesory",
+  "boot.summary.w2k_server_limits": "Windows 2000 Server (eksperymentalne): ścieżka Windows 2000; odpowiada licencjonowanie Na serwer (5), grupa robocza, IIS wyłączony; klucz produktu z profilu odpowiedzi; płyta bez SP4 nie ma stosu USB 2.0 (brak klawiatury/myszy USB)",
 
   "boot.summary.nt52_limits": "NT 5.2 (eksperymentalne): AHCI przez GenAHCI na StorPort systemu; brak sterownika NVMe/USB 3 w instalatorze",
   "boot.summary.vista_csmwrap": "Vista bez CSM (eksperymentalne): instalacja legacy (MBR) przez CSMWrap, karta z legacy VBIOS",

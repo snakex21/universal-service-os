@@ -66,6 +66,9 @@ case "$edition" in
     CDROM_IS.5|CDROM_IA.5) want_product=1; name='Windows 2000 Server' ;;
     *) fail 'Windows 2000 edition marker (CDROM_IP.5, CDROM_IS.5 or CDROM_IA.5) is missing' ;;
 esac
+# The Windows 2000 Server menu entry (nt5_profile.sh USOS_W2K_EDITION=server)
+# takes only Server / Advanced Server CDs.
+[ "${USOS_W2K_EDITION:-}" != server ] || [ "$want_product" = 1 ] || fail 'Windows 2000 Server entry: this is a Professional CD (CDROM_IP.5); put it into Systems\Windows\Windows 2000\Images'
 sp=''
 [ ! -f "$SOURCE_ROOT/CDROMSP4.TST" ] && [ ! -f "$SOURCE_ROOT/cdromsp4.tst" ] || sp=CDROMSP4.TST
 [ -n "$sp" ] || [ "$want_product" = 1 ] || fail 'Windows 2000 SP4 source is required'

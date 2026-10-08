@@ -608,6 +608,7 @@ pub const Key = enum(u16) {
     summary_vista_support,
     summary_vista_usb,
     summary_w2k_limits,
+    summary_w2k_server_limits,
     summary_w9x_csmwrap,
     summary_w9x_disk,
     summary_win_early_limits,
@@ -1293,6 +1294,7 @@ pub const hashes = [_]u32{
     0xa0987638, // summary.vista_support
     0x1e3154b1, // summary.vista_usb
     0xf657c7a8, // summary.w2k_limits
+    0xde1ce3fc, // summary.w2k_server_limits
     0xb1cdcd1f, // summary.w9x_csmwrap
     0xdb6f9367, // summary.w9x_disk
     0x7dcf30c0, // summary.win_early_limits
@@ -1704,6 +1706,7 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
     false,
     false,
     false,
@@ -2665,6 +2668,7 @@ pub const english = [_][]const u8{
     "KB2864202 + signed USB package + pre-Setup v11",
     "PE10 native USB; the target uses Vista USB v11",
     "Windows 2000 (experimental): no AHCI/NVMe/USB 3 driver for NT 5.0 (SATA in IDE mode), max. 4 GB RAM and 2 CPUs",
+    "Windows 2000 Server (experimental): the Windows 2000 path; answers Per Server licensing (5), workgroup, IIS off; product key from the answer profile; a CD without SP4 has no USB 2.0 stack (no USB keyboard/mouse)",
     "Without CSM (experimental): USOS prepares the disk and CSMWrap; the installation then starts from it",
     "Selected and confirmed in the next graphical screen; the whole disk is erased",
     "Windows 1.0x-3.0: answer the questions of the original Setup with the keyboard (a USB keyboard works there); in Setup pick VGA (EGA for 1.0x) and the IBM PS/2 mouse. Inside these Windows versions use a PS/2 keyboard (no USB keyboard bridge yet). Needs MS-DOS 6.22.iso in Systems\\DOS\\MS-DOS\\Images on DATA.",

@@ -1165,6 +1165,7 @@
   "boot.summary.win_early_limits": "Windows 1.0x-3.0: beantwoord de vragen van de originele Setup met het toetsenbord (een USB-toetsenbord werkt daar); kies in Setup VGA (EGA voor 1.0x) en de IBM PS/2-muis. Gebruik in deze Windows-versies zelf een PS/2-toetsenbord (nog geen USB-toetsenbordbrug). Vereist MS-DOS 6.22.iso in Systems\\DOS\\MS-DOS\\Images op DATA.",
 
   "boot.summary.w2k_limits": "Windows 2000 (experimenteel): geen AHCI/NVMe/USB 3-stuurprogramma voor NT 5.0 (SATA in IDE-modus), max. 4 GB RAM en 2 CPU's",
+  "boot.summary.w2k_server_limits": "Windows 2000 Server (experimenteel): het Windows 2000-pad; beantwoordt licentie Per server (5), werkgroep, IIS uit; productcode uit het antwoordprofiel; een cd zonder SP4 heeft geen USB 2.0-stack (geen USB-toetsenbord/-muis)",
 
   "boot.summary.nt52_limits": "NT 5.2 (experimenteel): AHCI via GenAHCI op de StorPort van het systeem; geen NVMe/USB 3-stuurprogramma in Setup",
   "boot.summary.vista_csmwrap": "Vista zonder CSM (experimenteel): legacy-installatie (MBR) via CSMWrap, kaart met legacy-VBIOS",

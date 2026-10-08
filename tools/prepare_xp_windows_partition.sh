@@ -85,6 +85,14 @@ if [ "${USOS_PLAN_PROFILE:-}" = w2k-x86-sp4-uefi-csm ]; then
     usos_w2k_answer_sif "${XP_TARGET_ROOT:?}/\$WIN_NT\$.~LS/I386/TXTSETUP.SIF" < "$work/winnt.base" > "$work/winnt.sif" || fail 'cannot add the Windows 2000 hardware answers to WINNT.SIF'
     rm -f "$work/winnt.base"
     printf '[XP_WINDOWS] Windows 2000 answers: [KeyboardDrivers] standard keyboard, HAL %s\n' "$(usos_w2k_hal)"
+    # Windows 2000 Server CD (ProductType 1): licensing, IIS off, one
+    # automatic logon, "Configure Your Server" off (w2k_stage.sh).
+    if usos_w2k_server_source "${XP_TARGET_ROOT:?}/\$WIN_NT\$.~LS/I386/TXTSETUP.SIF"; then
+        mv "$work/winnt.sif" "$work/winnt.base"
+        usos_w2k_server_sif < "$work/winnt.base" > "$work/winnt.sif" || fail 'cannot add the Windows 2000 Server answers to WINNT.SIF'
+        rm -f "$work/winnt.base"
+        printf '[XP_WINDOWS] Windows 2000 Server answers: licensing Per Server 5, IIS off, Configure Your Server off\n'
+    fi
 fi
 put_verified "$work/winnt.sif" WINNT.SIF
 put_verified "$work/migrate.inf" MIGRATE.INF

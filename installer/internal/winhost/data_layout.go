@@ -51,6 +51,8 @@ var windowsProfiles = []dataProfile{
 	{"windows-server-2008-r2", "Windows Server 2008 R2", true, true},
 	{"windows-server-2008", "Windows Server 2008", true, true},
 	{"windows-server-2003", "Windows Server 2003", true, true},
+	// Windows 2000 Server: the Windows 2000 flow from UEFI.
+	{"windows-2000-server", "Windows 2000 Server", true, true},
 	// Windows NT 3.51 Server: the NT 3.51 VM flow with the Server CD.
 	{"windows-nt-3-51-server", "Windows NT 3.51 Server", true, false},
 }

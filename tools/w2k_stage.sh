@@ -621,6 +621,73 @@ usos_w2k_uniata_inf() {
     '
 }
 
+# Windows 2000 Server (catalog windows-2000-server, the same flow): status 0
+# when TXTSETUP.SIF $1 has [SetupData] ProductType = 1 (Server / Advanced
+# Server; Professional is 0). The answers below follow the CD, so a Server
+# CD in the Professional folder gets them as well.
+usos_w2k_server_source() {
+    LC_ALL=C awk '
+        { line = $0; sub(/;.*/, "", line); sub(/\r$/, "", line); gsub(/^[ \t]+|[ \t]+$/, "", line); low = tolower(line) }
+        low ~ /^\[/ { active = (low == "[setupdata]"); next }
+        active && low ~ /^producttype[ \t]*=/ { v = substr(low, index(low, "=") + 1); gsub(/[ \t"]/, "", v); product = v }
+        END { exit !(product == "1") }
+    ' "$1"
+}
+
+# The Server CD's GUI Setup pages USOS answers (only keys the answer file
+# does not set yet, so a .sif chosen in the menu wins):
+#   [LicenseFilePrintData] AutoMode=PerServer, AutoUsers=5 (the licensing page);
+#   [Components] IIS and the FrontPage extensions off (2000 Server installs
+#   IIS by default; nothing else is on by default);
+#   [GuiUnattended] AutoLogon=Yes, AutoLogonCount=1 when the answer sets the
+#   Administrator password (usos-xp.ini / profile: one automatic logon, as on
+#   Server 2003);
+#   [GuiRunOnce] regedit /s C:\USOS\W2K\srvwiz.reg (usos_w2k_server_reg) at
+#   that first logon: "Configure Your Server" stays closed.
+# The workgroup and the default network components come from the merged
+# usos-xp.ini answer ([Identification] JoinWorkgroup, [Networking]); no
+# domain controller promotion (dcpromo is never run).
+# stdin WINNT.SIF -> stdout (CRLF).
+usos_w2k_server_sif() {
+    LC_ALL=C awk '
+        function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
+        function want(sec, key, value) { n++; wsec[n] = sec; wkey[n] = tolower(key); wline[n] = key "=" value }
+        BEGIN {
+            want("licensefileprintdata", "AutoMode", "PerServer")
+            want("licensefileprintdata", "AutoUsers", "5")
+            split("iis_common iis_inetmgr iis_www iis_ftp iis_smtp iis_nntp iis_doc iis_htmla iis_pwmgr iis_www_vdir_scripts iis_www_vdir_printers fp_extensions", iis, " ")
+            for (i = 1; i in iis; i++) want("components", iis[i], "Off")
+            names["licensefileprintdata"] = "LicenseFilePrintData"; names["components"] = "Components"; names["guiunattended"] = "GuiUnattended"; names["guirunonce"] = "GuiRunOnce"
+            run = "regedit /s C:" sprintf("%c", 92) "USOS" sprintf("%c", 92) "W2K" sprintf("%c", 92) "srvwiz.reg"
+        }
+        { sub(/\r$/, ""); lines[++count] = $0; t = trim($0); low = tolower(t) }
+        substr(t, 1, 1) == "[" { s = substr(low, 2); e = index(s, "]"); sec = trim(e ? substr(s, 1, e - 1) : s); last[sec] = count; next }
+        sec != "" && index(t, "=") > 0 && substr(t, 1, 1) != ";" {
+            key = tolower(trim(substr(t, 1, index(t, "=") - 1)))
+            have[sec, key] = 1; last[sec] = count
+            if (sec == "guirunonce") runs++
+            if (sec == "guiunattended" && key == "adminpassword") admin = 1
+        }
+        END {
+            for (i = 1; i <= n; i++) if (!((wsec[i], wkey[i]) in have)) add[wsec[i]] = add[wsec[i]] wline[i] "\r\n"
+            if (admin && !(("guiunattended", "autologon") in have)) add["guiunattended"] = add["guiunattended"] "AutoLogon=Yes\r\nAutoLogonCount=1\r\n"
+            add["guirunonce"] = "Command" (runs + 0) "=" sprintf("%c", 34) run sprintf("%c", 34) "\r\n"
+            for (i = 1; i <= count; i++) {
+                printf "%s\r\n", lines[i]
+                for (s in add) if ((s in last) && last[s] == i && !(s in done)) { printf "%s", add[s]; done[s] = 1 }
+            }
+            split("licensefileprintdata components guiunattended guirunonce", order, " ")
+            for (i = 1; i in order; i++) if ((order[i] in add) && !(order[i] in done)) printf "[%s]\r\n%s", names[order[i]], add[order[i]]
+        }
+    '
+}
+
+# stdout (CRLF): C:\USOS\W2K\srvwiz.reg, the first logon's "Configure Your
+# Server" off for that user (HKCU ...\Setup\Welcome srvwiz = 0).
+usos_w2k_server_reg() {
+    printf 'REGEDIT4\r\n\r\n[HKEY_CURRENT_USER\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Setup\\Welcome]\r\n"srvwiz"=dword:00000000\r\n\r\n'
+}
+
 # stdout: the 512-byte marker sector USOS writes at LBA 2046 of the prepared
 # disk ("USOSW2KTRACE", boot counter 0 at offset 16, the MBR disk signature
 # $1 as hex at offset 32). AHCINT usos2+ only touches a disk with this marker

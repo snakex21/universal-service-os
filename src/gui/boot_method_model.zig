@@ -73,7 +73,9 @@ pub fn collect(system: *const SystemEntry, image: ImageKind, firmware: Firmware)
     result.len = raw_len;
     for (raw[0..raw_len], 0..) |option, index| {
         var label = FixedText{};
-        const win2k = @import("std").mem.eql(u8, system.id, "windows-2000");
+        // Windows 2000 Server is UEFI only (the BIOS Core has no such entry).
+        const win2k = @import("std").mem.eql(u8, system.id, "windows-2000") or
+            (@import("builtin").os.tag != .freestanding and @import("std").mem.eql(u8, system.id, "windows-2000-server"));
         setLabel(&label, if (win2k and option.method == .automatic and option.backend == .xp_staging)
             "Automatic (Windows 2000 Setup)"
         else baseLabel(option.method, option.backend));

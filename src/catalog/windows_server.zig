@@ -23,6 +23,23 @@ pub const entries = [_]SystemEntry{
     server("windows-server-2008-r2", "2008 R2", &windows7_methods),
     server("windows-server-2008", "2008", &methods),
     server("windows-server-2003", "2003", &nt5_methods),
+} ++ (if (freestanding) [_]SystemEntry{} else [_]SystemEntry{
+    // Windows 2000 Server: the Windows 2000 flow from UEFI (os_profiles.zig
+    // route_as windows-2000, profile w2k-x86-sp4-uefi-csm) with the Server
+    // CD; the micro-Linux adds the Server answers. The BIOS Core leaves it
+    // out (size budget, no BIOS staging action for it).
+    .{
+        .id = "windows-2000-server",
+        .name = "Windows 2000 Server",
+        .category = .windows,
+        .family = .windows_legacy,
+        .image_directory = "\\Systems\\Windows\\Windows 2000 Server\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Windows 2000 Server\\Unattended",
+        .firmware = .uefi,
+        .boot_methods = &nt5_methods,
+        .server = true,
+    },
+}) ++ [_]SystemEntry{
     // Windows NT 4.0 Server: the Workstation flow (os_profiles.zig
     // nt4-x86-qemu-csmwrap) with the Server CD.
     .{
@@ -50,6 +67,8 @@ pub const entries = [_]SystemEntry{
         .server = true,
     },
 });
+
+const freestanding = @import("builtin").os.tag == .freestanding;
 
 fn server(comptime id: []const u8, comptime version: []const u8, comptime boot_methods: []const BootMethod) SystemEntry {
     const name = "Windows Server " ++ version;

@@ -141,6 +141,15 @@ mkdir -p "$setup_dir"
     fi
     printf 'exit /b 0\r\n'
 } > "$setup_dir/usos-setup.cmd"
+# Windows 2000 Server: the first logon's [GuiRunOnce] imports srvwiz.reg
+# ("Configure Your Server" off; w2k_stage.sh usos_w2k_server_sif).
+if [ "$NT5_SYSTEM" = windows-2000 ]; then
+. "$SCRIPT_DIR/w2k_stage.sh"
+if usos_w2k_server_source "$work/volume/\$WIN_NT\$.~LS/I386/TXTSETUP.SIF"; then
+usos_w2k_server_reg > "$setup_dir/srvwiz.reg"
+printf '[NT5] srvwiz.reg staged in USOS/%s (Windows 2000 Server: Configure Your Server off at the first logon)\n' "$NT5_SETUP_DIR"
+fi
+fi
 if [ -n "${XP_USER_SETTINGS:-}" ] && [ -z "${XP_CUSTOM_SIF:-}" ]; then
 . "$SCRIPT_DIR/xp_user_settings.sh"
 usos_xp_settings_accounts "$XP_USER_SETTINGS" "$work/accounts.cmd" || fail 'cannot render usos-xp.ini accounts'
