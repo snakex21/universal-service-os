@@ -169,7 +169,8 @@ user's file); screens and logs are in `artifacts/win10-esp-test/qemu-native-2026
 
 ### Limitations
 
-* **WORK / chainload** (and Windows 8/8.1 on UEFI): the ISO's own boot manager
+* **WORK / chainload** (and Windows 8 / Server 2012 on UEFI; 8.1, Server
+  2012 R2 and Embedded 8.1 Industry start natively since 2026-10-08): the ISO's own boot manager
   starts Setup from WORK on the stick, so the stick is the firmware boot disk.
   USOS has no hook inside Setup's WinPE phase there, and Setup may choose the
   stick's ESP for its boot files. Prefer Automatic for Windows 10/11. After a
