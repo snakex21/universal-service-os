@@ -53,6 +53,10 @@ try {
     $disk = Get-DiskImage -ImagePath $VhdPath | Get-Disk
     if ($disk.PartitionStyle -ne 'RAW') { throw "new VHD is not RAW: $($disk.PartitionStyle)" }
     Initialize-Disk -Number $disk.Number -PartitionStyle GPT | Out-Null
+    # Like the installer's layout (gpt_buffer_windows.go): no MSR, the ESP is
+    # the first partition. WinPE before Windows 10 1703 (Windows 7, 8.1,
+    # Server 2012 R2) mounts only the first partition of a removable disk.
+    Get-Partition -DiskNumber $disk.Number -ErrorAction SilentlyContinue | Where-Object { $_.GptType -eq '{e3c9e316-0b5c-4db8-817d-f92df00215ae}' } | Remove-Partition -Confirm:$false
     $disk = Get-Disk -Number $disk.Number
     $esp = New-Partition -DiskNumber $disk.Number -Size 1GB -GptType $EspType
     $data = New-Partition -DiskNumber $disk.Number -Size (([uint64]$SizeGB - 3) * 1GB) -GptType $BasicDataType
