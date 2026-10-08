@@ -10,10 +10,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/snakex21/universal-service-os/installer/internal/components"
+	"github.com/snakex21/universal-service-os/installer/internal/hiddenexec"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 )
 
@@ -143,10 +143,9 @@ func installXPComponent(espRoot, zipPath string, log func(string)) error {
 		espRoot += `\`
 	}
 	// The wrapper turns a thrown error into one unwrapped "ERROR: " line.
-	cmd := exec.Command(powershell, "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", xpInstallWrapper)
+	cmd := hiddenexec.Command(powershell, "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", xpInstallWrapper)
 	cmd.Dir = work
 	cmd.Env = append(os.Environ(), "USOS_XP_SCRIPT="+script, "USOS_XP_ESP="+espRoot)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW
 	output, runErr := cmd.CombinedOutput()
 	for _, line := range strings.Split(strings.ReplaceAll(string(output), "\r", ""), "\n") {
 		if line = strings.TrimSpace(line); line != "" {

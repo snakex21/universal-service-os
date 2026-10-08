@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/snakex21/universal-service-os/installer/internal/hiddenexec"
 )
 
 // DismExtractor wypakowuje plik z WIM przez DISM. Wybrano DISM, bo jest
@@ -92,7 +94,7 @@ func (d DismExtractor) run(name string, args ...string) ([]byte, error) {
 	if d.Run != nil {
 		return d.Run(name, args...)
 	}
-	return exec.Command(name, args...).CombinedOutput()
+	return hiddenexec.CombinedOutput(fmt.Sprint(filepath.Base(name), " ", args), hiddenexec.Command(name, args...))
 }
 
 // copyFile kopiuje plik zachowujac zwykle uprawnienia; katalog docelowy
