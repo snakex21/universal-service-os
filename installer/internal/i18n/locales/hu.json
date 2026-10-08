@@ -1166,6 +1166,7 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (kísérleti): nincs AHCI/NVMe/USB 3 illesztőprogram NT 5.0-hoz (SATA IDE módban), legfeljebb 4 GB RAM és 2 processzor",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (kísérleti): a Windows 2000 útvonal; válaszol: Kiszolgálónkénti licenc (5), munkacsoport, IIS ki; termékkulcs a válaszprofilból; SP4 nélküli CD-n nincs USB 2.0 verem (nincs USB billentyűzet/egér)",
+  "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (kísérleti): a Windows XP útvonala; egylemezes, CMPNENTS mappát (Media Center összetevők) tartalmazó adathordozó kell; a termékkulcs a válaszprofilból, ennek hiányában a lemez saját WINNT.SIF fájljából",
 
   "boot.summary.nt52_limits": "NT 5.2 (kísérleti): AHCI a GenAHCI-val a rendszer StorPortján; a telepítőben nincs NVMe/USB 3 illesztőprogram",
   "boot.summary.vista_csmwrap": "Vista CSM nélkül (kísérleti): legacy (MBR) telepítés CSMWrap segítségével, legacy VBIOS-os kártya",

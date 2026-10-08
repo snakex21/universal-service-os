@@ -1166,6 +1166,7 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (πειραματικό): χωρίς πρόγραμμα οδήγησης AHCI/NVMe/USB 3 για NT 5.0 (SATA σε λειτουργία IDE), έως 4 GB RAM και 2 CPU",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (πειραματικό): η διαδρομή των Windows 2000· απαντά αδειοδότηση Ανά διακομιστή (5), ομάδα εργασίας, IIS ανενεργό· κλειδί από το προφίλ απαντήσεων· CD χωρίς SP4 δεν έχει στοίβα USB 2.0 (χωρίς πληκτρολόγιο/ποντίκι USB)",
+  "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (πειραματικό): η διαδρομή των Windows XP· απαιτεί μέσο ενός δίσκου με CMPNENTS (στοιχεία Media Center)· κλειδί άδειας χρήσης από το προφίλ απαντήσεων, αλλιώς από το WINNT.SIF του ίδιου του δίσκου",
 
   "boot.summary.nt52_limits": "NT 5.2 (πειραματικό): AHCI μέσω GenAHCI στο StorPort του συστήματος· χωρίς πρόγραμμα οδήγησης NVMe/USB 3 στην εγκατάσταση",
   "boot.summary.vista_csmwrap": "Vista χωρίς CSM (πειραματικό): εγκατάσταση legacy (MBR) μέσω CSMWrap, κάρτα με legacy VBIOS",

@@ -281,6 +281,13 @@ def overlay(base, helper, driver_bundles, xp64_isos=(), xp64_extra=None):
     if changed:raise ValueError('package would change base entries: '+', '.join(changed))
     return pad_initrd(gzip.compress(newc(entries),compresslevel=6,mtime=0))
 
+# XP x86 DATA folders whose SP3 ISOs get a source-bound driver bundle: XP and
+# XP Media Center Edition 2005 (menu entry windows-xp-mce, the same XP flow).
+XP_IMAGE_FOLDERS=('Windows XP','Windows XP Media Center Edition 2005')
+
+def xp_images(data):
+    return sorted(p for folder in XP_IMAGE_FOLDERS for p in (data/'Systems/Windows'/folder/'Images').glob('*.iso'))
+
 def is_sp3(iso):
     # Microsoft names it "..._with_service_pack_3_...", others "SP3".
     name=iso.name.lower()
@@ -371,7 +378,7 @@ def build_from_old(micro, data, old):
     env=dict(os.environ,TEMP=str(OUT/'tmp'),TMP=str(OUT/'tmp'),ZIG_GLOBAL_CACHE_DIR=str(ROOT/'tools/cache/zig-global'),ZIG_LOCAL_CACHE_DIR=str(OUT/'zig-cache'))
     helper=compile_helper(env)
     base=micro/'initramfs-usos';kernel=micro/'vmlinuz-virt'
-    local={p.name:p for p in (data/'Systems/Windows/Windows XP/Images').glob('*.iso')} if data.exists() else {}
+    local={p.name:p for p in xp_images(data)} if data.exists() else {}
     driver_bundles=[];sources=[]
     for source in old_meta['driver_sources']:
         old_bundle=old/'drivers'/source['sha256']/'bundle'
@@ -415,7 +422,7 @@ def build(micro, data, release=False, release_lang=None):
     env=dict(os.environ,TEMP=str(OUT/'tmp'),TMP=str(OUT/'tmp'),ZIG_GLOBAL_CACHE_DIR=str(ROOT/'tools/cache/zig-global'),ZIG_LOCAL_CACHE_DIR=str(OUT/'zig-cache'))
     helper=compile_helper(env)
     base=micro/'initramfs-usos';kernel=micro/'vmlinuz-virt'
-    images=sorted((data/'Systems/Windows/Windows XP/Images').glob('*.iso'))
+    images=xp_images(data)
     if not images:raise ValueError('No XP ISO on DATA')
     # SP2 remains visible for historical compatibility but is refused before
     # any target write by the new runtime preflight. First hardware trial: SP3.
@@ -446,7 +453,7 @@ def build(micro, data, release=False, release_lang=None):
 if __name__=='__main__':
     p=argparse.ArgumentParser()
     p.add_argument('--micro-linux',type=Path,default=ROOT/'zig-out/micro-linux',help='micro-Linux build the package is derived from')
-    p.add_argument('--data',type=Path,default=Path('L:/'),help='DATA folder with Systems/Windows/Windows XP/Images (read only)')
+    p.add_argument('--data',type=Path,default=Path('L:/'),help='DATA folder with Systems/Windows/Windows XP/Images and .../Windows XP Media Center Edition 2005/Images (read only)')
     p.add_argument('--out',type=Path,default=OUT,help='package folder (default zig-out/xp-uefi-csm)')
     p.add_argument('--esp',type=Path,default=Path('J:/'),help='--refresh-pae-flow only: ESP whose base the package was built from')
     p.add_argument('--release',action='store_true',help='release package: only the RELEASE_SOURCES SHA-256 allowlist (original PL x14-80476 and EN x14-80428)')

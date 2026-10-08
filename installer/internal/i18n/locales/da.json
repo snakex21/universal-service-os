@@ -1166,6 +1166,7 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentelt): ingen AHCI/NVMe/USB 3-driver til NT 5.0 (SATA i IDE-tilstand), maks. 4 GB RAM og 2 CPU'er",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (eksperimentel): Windows 2000-stien; besvarer licens Pr. server (5), arbejdsgruppe, IIS fra; produktnøgle fra svarprofilen; en cd uden SP4 har ingen USB 2.0-stak (intet USB-tastatur/-mus)",
+  "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (eksperimentelt): Windows XP-stien; kræver medie på én disk med CMPNENTS (Media Center-komponenter); produktnøgle fra svarprofilen, ellers fra diskens egen WINNT.SIF",
 
   "boot.summary.nt52_limits": "NT 5.2 (eksperimentelt): AHCI via GenAHCI på systemets StorPort; ingen NVMe/USB 3-driver i installationen",
   "boot.summary.vista_csmwrap": "Vista uden CSM (eksperimentelt): legacy-installation (MBR) via CSMWrap, grafikkort med legacy-VBIOS",

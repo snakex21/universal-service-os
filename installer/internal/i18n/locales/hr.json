@@ -1169,6 +1169,7 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (eksperimentalno): nema upravljačkog programa AHCI/NVMe/USB 3 za NT 5.0 (SATA u IDE načinu), najviše 4 GB RAM-a i 2 procesora",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (eksperimentalno): put Windows 2000; odgovara licenciranje Po poslužitelju (5), radna grupa, IIS isključen; ključ proizvoda iz profila odgovora; CD bez SP4 nema USB 2.0 stog (bez USB tipkovnice/miša)",
+  "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (eksperimentalno): put sustava Windows XP; potreban je medij na jednom disku s mapom CMPNENTS (komponente Media Center); ključ proizvoda iz profila odgovora, inače iz vlastitog WINNT.SIF diska",
 
   "boot.summary.nt52_limits": "NT 5.2 (eksperimentalno): AHCI putem GenAHCI na StorPortu sustava; nema upravljačkog programa NVMe/USB 3 u instalaciji",
   "boot.summary.vista_csmwrap": "Vista bez CSM-a (eksperimentalno): legacy instalacija (MBR) putem CSMWrapa, kartica s legacy VBIOS-om",

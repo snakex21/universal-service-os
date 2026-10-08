@@ -87,6 +87,16 @@ case "$XP_LOCAL_SOURCE_TEST_MODE" in
             mcopy -s -o -i "$MTOOLS_IMAGE" "$SOURCE_ROOT/$SRC" "::/$LS_DIR/" || fail "cannot copy complete $SRC into local source"
             printf '[XP_LOCAL_SOURCE] complete %s copy PASS\n' "$SRC"
         fi
+        # CD2 components merged into one disc (XP Media Center Edition 2005:
+        # CMPNENTS\MEDIACTR, CMPNENTS\NETFX; Tablet PC: CMPNENTS\TABLETPC).
+        # DOSNET.INF [Directories] names them relative to the source root,
+        # so GUI Setup reads them from ~LS\CMPNENTS instead of asking for CD2.
+        cmpnents=$(find "$SOURCE_ROOT" -maxdepth 1 -type d -iname cmpnents | head -n 1)
+        if [ -n "$cmpnents" ]; then
+            printf '[XP_LOCAL_SOURCE] copying %s (CD2 components) to %s\n' "${cmpnents##*/}" "$LS_DIR"
+            mcopy -s -o -i "$MTOOLS_IMAGE" "$cmpnents" "::/$LS_DIR/" || fail 'cannot copy CMPNENTS into local source'
+            printf '[XP_LOCAL_SOURCE] CMPNENTS copy PASS\n'
+        fi
         sh "$(dirname -- "$0")/prepare_xp_source_aliases.sh" || fail 'cannot prepare DOSNET local-source aliases'
         sh "$(dirname -- "$0")/prepare_nt5_media_markers.sh" || fail 'cannot prepare NT5 media markers'
         LS_MODE=complete

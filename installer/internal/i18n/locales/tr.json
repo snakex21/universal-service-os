@@ -1166,6 +1166,7 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (deneysel): NT 5.0 için AHCI/NVMe/USB 3 sürücüsü yok (SATA IDE modunda), en fazla 4 GB RAM ve 2 işlemci",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (deneysel): Windows 2000 yolu; Sunucu başına lisans (5), çalışma grubu, IIS kapalı yanıtlanır; ürün anahtarı yanıt profilinden; SP4 içermeyen CD'de USB 2.0 yığını yok (USB klavye/fare yok)",
+  "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (deneysel): Windows XP yolu; CMPNENTS (Media Center bileşenleri) içeren tek diskli ortam gerekir; ürün anahtarı yanıt profilinden, yoksa diskin kendi WINNT.SIF dosyasından",
 
   "boot.summary.nt52_limits": "NT 5.2 (deneysel): sistemin StorPort'u üzerinde GenAHCI ile AHCI; kurulumda NVMe/USB 3 sürücüsü yok",
   "boot.summary.vista_csmwrap": "CSM olmadan Vista (deneysel): CSMWrap ile legacy (MBR) kurulum, legacy VBIOS'lu kart",

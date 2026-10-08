@@ -614,6 +614,7 @@ pub const Key = enum(u16) {
     summary_win_early_limits,
     summary_xp_csmwrap,
     summary_xp_disk,
+    summary_xp_mce_limits,
     summary_xp_preparation,
     summary_xp_sif_merged,
     summary_xp_source,
@@ -1300,6 +1301,7 @@ pub const hashes = [_]u32{
     0x7dcf30c0, // summary.win_early_limits
     0xac5a69f9, // summary.xp_csmwrap
     0xe262ce65, // summary.xp_disk
+    0xf5c65f1c, // summary.xp_mce_limits
     0xedd282b9, // summary.xp_preparation
     0xa87889c3, // summary.xp_sif_merged
     0x6dfb98bd, // summary.xp_source
@@ -1706,6 +1708,7 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
     false,
     false,
     false,
@@ -2674,6 +2677,7 @@ pub const english = [_][]const u8{
     "Windows 1.0x-3.0: answer the questions of the original Setup with the keyboard (a USB keyboard works there); in Setup pick VGA (EGA for 1.0x) and the IBM PS/2 mouse. Inside these Windows versions use a PS/2 keyboard (no USB keyboard bridge yet). Needs MS-DOS 6.22.iso in Systems\\DOS\\MS-DOS\\Images on DATA.",
     "XP without CSM (experimental): CSMWrap, card with a legacy VBIOS, 1 core reserved",
     "Selected and confirmed in the next graphical screen",
+    "Windows XP Media Center Edition 2005 (experimental): the Windows XP path; needs the one-disc media with CMPNENTS (Media Center components); product key from the answer profile, else from the disc's own WINNT.SIF",
     "UEFI; installed XP requires firmware CSM and MBR",
     "{0} (merged into the automatic answer)",
     "XP SP3 x86; ACPI / SATA / USB drivers; optional PAE boot entry",

@@ -586,6 +586,7 @@ def main() -> int:
             ("tools/nt52_usb_stage.sh", "usr/lib/usos/nt52_usb_stage.sh"),
             ("tools/w2k_stage.sh", "usr/lib/usos/w2k_stage.sh"),
             ("tools/nt5_user_drivers.sh", "usr/lib/usos/nt5_user_drivers.sh"),
+            ("tools/nt5_media_key.sh", "usr/lib/usos/nt5_media_key.sh"),
             ("tools/xp_driver_stage.sh", "usr/lib/usos/xp_driver_stage.sh"),
             ("tools/xp_verify_target.sh", "usr/lib/usos/xp_verify_target.sh"),
             ("tools/xp_drive_letters.awk", "usr/lib/usos/xp_drive_letters.awk"),

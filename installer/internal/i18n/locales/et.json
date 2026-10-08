@@ -1166,6 +1166,7 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (katseline): NT 5.0 jaoks puudub AHCI/NVMe/USB 3 draiver (SATA IDE-režiimis), kuni 4 GB RAM-i ja 2 protsessorit",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (katseline): Windows 2000 tee; vastab litsentsimine Serveri kohta (5), töörühm, IIS väljas; tootevõti vastuseprofiilist; ilma SP4-ta CD-l pole USB 2.0 pinu (USB-klaviatuur/hiir puudub)",
+  "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (katseline): Windows XP tee; vajab üheplaadilist andmekandjat koos CMPNENTS-iga (Media Centeri komponendid); tootevõti vastuseprofiilist, muidu plaadi enda WINNT.SIF-ist",
 
   "boot.summary.nt52_limits": "NT 5.2 (katseline): AHCI GenAHCI kaudu süsteemi StorPortil; paigalduses puudub NVMe/USB 3 draiver",
   "boot.summary.vista_csmwrap": "Vista ilma CSM-ita (katseline): legacy-paigaldus (MBR) CSMWrapi kaudu, legacy-VBIOS-iga kaart",

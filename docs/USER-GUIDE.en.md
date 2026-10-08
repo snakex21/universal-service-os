@@ -269,6 +269,7 @@ USOS_DATA\
 │  │  │   └─ Drivers\x64\   (USB 3 / NVMe drivers for Windows 7)
 │  │  ├─ Windows Vista\     Images\   Unattended\
 │  │  ├─ Windows XP\        Images\   Unattended\  (usos-xp.ini, usos-xp.example.ini)
+│  │  ├─ Windows XP Media Center Edition 2005\
 │  │  ├─ Windows XP x64\  Windows 2000\  Windows NT 4.0\  Windows NT 3.51\
 │  │  ├─ Windows Me\  Windows 98 SE\  Windows 98\  Windows 95\
 │  │  ├─ Windows 3.11\  Windows 3.1\          (Images only)

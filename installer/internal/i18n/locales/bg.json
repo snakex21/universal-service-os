@@ -1166,6 +1166,7 @@
 
   "boot.summary.w2k_limits": "Windows 2000 (експериментално): няма драйвер AHCI/NVMe/USB 3 за NT 5.0 (SATA в режим IDE), макс. 4 GB RAM и 2 процесора",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (експериментално): пътят на Windows 2000; отговаря лицензиране На сървър (5), работна група, IIS изключен; продуктов ключ от профила с отговори; диск без SP4 няма USB 2.0 стек (без USB клавиатура/мишка)",
+  "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (експериментално): пътят на Windows XP; изисква носител на един диск с CMPNENTS (компоненти на Media Center); продуктов ключ от профила с отговори, иначе от собствения WINNT.SIF на диска",
 
   "boot.summary.nt52_limits": "NT 5.2 (експериментално): AHCI чрез GenAHCI върху StorPort на системата; няма драйвер NVMe/USB 3 в инсталацията",
   "boot.summary.vista_csmwrap": "Vista без CSM (експериментално): legacy инсталация (MBR) чрез CSMWrap, карта с legacy VBIOS",
