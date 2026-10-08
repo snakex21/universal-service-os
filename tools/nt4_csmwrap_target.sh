@@ -16,7 +16,11 @@
 # the real machine only ever boots the finished SP6a system through CSMWrap.
 #
 # Writes ONLY $TARGET_DEVICE:
-#   MBR     USOS MBR code (boots the active partition), new disk signature
+#   MBR     USOS MBR code (boots the active partition), new disk signature;
+#           NT 3.51: nt3-e820-mbr-440.bin, which also hides E820 entries
+#           above 4 GiB / non-RAM entries above 1 MiB from the 3.51 loaders
+#           (their kernel otherwise sizes MmHighestPhysicalPage from a
+#           firmware range at FFFC0000 and stops with 0x50 in MmInit)
 #   slot 1  FAT16 (type 06), active, LBA 63, 2000 MiB, 32 KiB clusters,
 #           255 heads / 63 sectors (the layout of the 2026-10-07 QEMU lab)
 #   (slot 2, the CSMWrap ESP, is written after the install: the VM sees only
@@ -256,6 +260,10 @@ esac
 [ -z "${NT_MAJOR:-}" ] || [ "$NT_MAJOR" = "$major" ] || fail "the ISO is Windows NT $major.$minor Setup, not the chosen NT $NT_MAJOR system"
 # NT 3.5 and 3.1 come later; their Setup differs (docs/nt351-2026-10-08.md).
 [ -z "$nt3" ] || [ "$minor" = 51 ] || fail "of the NT 3.x family only NT 3.51 is supported so far (MinorVersion=${minor:-none})"
+mbr_code=$LIB/xp-geometry-fix-mbr-440.bin
+[ -z "$nt3" ] || mbr_code=$LIB/nt3-e820-mbr-440.bin
+[ -r "$mbr_code" ] || fail "missing: $mbr_code"
+[ "$(wc -c < "$mbr_code" | tr -d ' ')" = 440 ] || fail 'USOS MBR code must be 440 bytes'
 drv=$LIB/$(printf %s "$sub" | tr '[:upper:]' '[:lower:]')
 for file in AHCINT.SYS USOSRST.SYS USOSUSB.SYS; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
 if [ -n "$nt3" ]; then
@@ -305,7 +313,7 @@ dd if=/dev/zero of="$TARGET_DEVICE" bs=512 count=2048 conv=notrunc,fsync 2>/dev/
 dd if=/dev/zero of="$TARGET_DEVICE" bs=512 seek=$((total - 2048)) count=2048 conv=notrunc,fsync 2>/dev/null || fail 'cannot clear the disk end'
 mbr="$work/mbr.bin"
 dd if=/dev/zero of="$mbr" bs=512 count=1 2>/dev/null
-dd if="$LIB/xp-geometry-fix-mbr-440.bin" of="$mbr" bs=440 count=1 conv=notrunc 2>/dev/null
+dd if="$mbr_code" of="$mbr" bs=440 count=1 conv=notrunc 2>/dev/null
 dd if=/dev/urandom of="$mbr" bs=1 seek=440 count=4 conv=notrunc 2>/dev/null
 le32() {
     v=$1
@@ -333,8 +341,16 @@ for name in SYSTEM32 system32; do
     nt4_copy_upper "$i386/$name" "$bt_dir/SYSTEM32" || fail 'cannot copy I386\SYSTEM32'
     break
 done
-# NT 3.51 text mode has no SYSTEM32 subfolder in I386.
-[ -n "$nt3" ] || [ -d "$bt_dir/SYSTEM32" ] || fail 'the ISO has no I386\SYSTEM32 (text-mode Setup)'
+# NT 3.51 has no I386\SYSTEM32: winnt.exe builds it from DOSNET.INF
+# [FloppyFiles.1] (ntdll.dll -> system32\ntdll.dll, usetup.exe ->
+# system32\smss.exe); without it text mode stops with 0x6B C000003A.
+if [ -n "$nt3" ] && [ ! -d "$bt_dir/SYSTEM32" ]; then
+    [ -f "$bt_dir/NTDLL.DLL" ] && [ -f "$bt_dir/USETUP.EXE" ] || fail 'the ISO has no I386\NTDLL.DLL or I386\USETUP.EXE (NT 3.51 text-mode Setup)'
+    mkdir -p "$bt_dir/SYSTEM32" || fail 'cannot create the Setup SYSTEM32 folder'
+    cp "$bt_dir/NTDLL.DLL" "$bt_dir/SYSTEM32/NTDLL.DLL" || fail 'cannot copy NTDLL.DLL'
+    cp "$bt_dir/USETUP.EXE" "$bt_dir/SYSTEM32/SMSS.EXE" || fail 'cannot copy USETUP.EXE as SMSS.EXE'
+fi
+[ -d "$bt_dir/SYSTEM32" ] || fail 'the ISO has no I386\SYSTEM32 (text-mode Setup)'
 log "local source: $(find "$ls_dir/I386" -type f | wc -l | tr -d ' ') files"
 cp "$work/WINNT.SIF" "$bt_dir/WINNT.SIF" || fail 'cannot copy WINNT.SIF'
 cp "$work/WINNT.SIF" "$work/c/WINNT.SIF" || fail 'cannot copy WINNT.SIF'

@@ -70,6 +70,11 @@ nt4_vm_install() {
     W9X_VM_STALL_ANY=1
     W9X_VM_STALL=$NT4_VM_STALL
     W9X_VM_ANSWER=$NT4_VM_ANSWER
+    # NT 3.51 text-mode Setup stops at "Setup was unable to verify your C:
+    # drive ... Press ENTER to continue" (its autochk on the USOS FAT16 C:,
+    # QEMU 2026-10-08); ENTER goes on and the install completes.
+    W9X_VM_TEXT_ANSWER=''
+    MTOOLS_SKIP_CHECK=1 mdir -i "$target@@$NT4_PART_OFFSET" ::/USOS/NT3 >/dev/null 2>&1 && W9X_VM_TEXT_ANSWER=${NT3_VM_TEXT_ANSWER:-ret}
     NT4_VM_STALLED=0
     boot=0
     while [ "$boot" -lt "$NT4_VM_BOOTS" ]; do

@@ -59,6 +59,13 @@ W9X_VM_STALL=${W9X_VM_STALL:-1800}
 W9X_VM_ANSWER=${W9X_VM_ANSWER:-}
 W9X_VM_ANSWER_IDLE=${W9X_VM_ANSWER_IDLE:-180}
 W9X_VM_ANSWER_TRIES=${W9X_VM_ANSWER_TRIES:-3}
+# The same for a text-mode screen (W9X_VM_TEXT_ANSWER; NT 3.51: ret for
+# text-mode Setup's "Setup was unable to verify your C: drive ... Press ENTER
+# to continue", QEMU 2026-10-08), after W9X_VM_TEXT_ANSWER_IDLE seconds
+# without a disk write, at most W9X_VM_ANSWER_TRIES times per run. Off when
+# empty.
+W9X_VM_TEXT_ANSWER=${W9X_VM_TEXT_ANSWER:-}
+W9X_VM_TEXT_ANSWER_IDLE=${W9X_VM_TEXT_ANSWER_IDLE:-90}
 
 # 0 when this system's Setup phase 1 runs in the VM (reason on stdout).
 w9x_vm_available() {
@@ -192,6 +199,7 @@ w9x_phase1_run() {
     idle_since=0
     W9X_VM_STALLED=0
     answer_tries=0
+    text_tries=0
     set --
     while IFS= read -r arg; do set -- "$@" "$arg"; done <<EOF
 $("${W9X_VM_ARGS_FN:-w9x_vm_args}" "$target" "$accel")
@@ -235,6 +243,15 @@ EOF
                 sleep 3
                 printf 'answer typed: %s attempt %s at %ss, idle %ss, written %s MB\n' "$W9X_VM_ANSWER" "$answer_tries" "$elapsed" "$idle" "$written" >> "$W9X_VM_RUN/command.txt"
                 w9x_vm_monitor "sendkey $W9X_VM_ANSWER"
+                idle_since=$(date +%s)
+            elif [ -n "$W9X_VM_TEXT_ANSWER" ] && [ "$idle" -ge "$W9X_VM_TEXT_ANSWER_IDLE" ] && [ "$text_tries" -lt "$W9X_VM_ANSWER_TRIES" ] &&
+                ! w9x_vm_graphics_screen; then
+                text_tries=$((text_tries + 1))
+                w9x_vm_monitor "screendump $W9X_VM_RUN/text-answer-$text_tries.ppm"
+                sleep 3
+                printf 'text answer typed: %s attempt %s at %ss, idle %ss, written %s MB
+' "$W9X_VM_TEXT_ANSWER" "$text_tries" "$elapsed" "$idle" "$written" >> "$W9X_VM_RUN/command.txt"
+                w9x_vm_monitor "sendkey $W9X_VM_TEXT_ANSWER"
                 idle_since=$(date +%s)
             elif [ "$idle" -ge "$W9X_VM_STALL" ]; then
                 printf 'stalled: no disk write for %ss\n' "$idle" >> "$W9X_VM_RUN/command.txt"
