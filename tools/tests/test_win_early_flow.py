@@ -169,6 +169,17 @@ class DiagnosticMenu(unittest.TestCase):
             if 'USOSWHER.COM' in programs:
                 self.assertIn(r'C:\DOS\USOSWHER.COM /G', ran)
 
+    def test_default_items(self):
+        # X470 PASS 2026-10-09 (Windows 2.03 via D6): every default item loads
+        # USOSV10 first and USOSKBC /R; the USOSWHER overlay only in diagnostics
+        for config in ('WINSTD', 'WINREAL', 'DOSONLY'):
+            ran, names = self.loaded(config)
+            self.assertEqual(names[0], 'USOSV10.COM', config)
+            self.assertIn(r'C:\DOS\USOSKBC.COM /R', ran)
+            self.assertNotIn('USOSWHER.COM', names, config)
+        self.assertIn('menudefault=WINSTD,8', self.config)
+        self.assertIn('submenu=DIAG,Diagnostyka (D1-D6, tylko do testow)', self.config)
+
     def test_diag_log(self):
         for config, tag in (('D1WHERE', 'D1'), ('D2NOKBC', 'D2'), ('D4CLEAN', 'D4'), ('D5MIN', 'D5'),
                             ('D6V10', 'D6')):
@@ -225,6 +236,10 @@ class DiagnosticMenu(unittest.TestCase):
         # tools/tests/legacy_bios/test_usosv10.py)
         self.assertIn("dos_out / 'USOSV10.COM'", build)
         self.assertIn(r'copy %USRC%\USOSV10.COM C:\DOS /y >nul', batch_lines(MSDOS / 'install.cmd'))
+        # copied with or without CSMWrap (the video BIOS stack depth does not depend on it)
+        lines = batch_lines(MSDOS / 'install.cmd')
+        self.assertLess(lines.index(r'copy %USRC%\USOSV10.COM C:\DOS /y >nul'),
+                        lines.index(r'if not exist %USRC%\CSMWRAP.TAG goto csm_dos_done'))
         self.assertIn('USOSV10.COM', (ROOT / 'installer/cmd/usos-payload-pack/main.go').read_text(encoding='utf-8'))
         v10 = (ROOT / 'src/platform/bios/win9x/usosv10.S').read_text(encoding='ascii')
         self.assertIn('mov sp, offset stktop', v10)

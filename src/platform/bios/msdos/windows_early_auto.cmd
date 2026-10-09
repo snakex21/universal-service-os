@@ -3,10 +3,12 @@ prompt $p$g
 path C:\DOS;C:\WINDOWS;C:\PROGRAMS
 set TEMP=C:\TEMP
 rem Windows 1.0x, 2.x, Windows/386 2.x and 3.0 (W1CONFIG.SYS start menu).
-rem Diagnostic items (W1CONFIG.SYS submenu DIAG; Windows 2.03 hangs at its
-rem logo on the X470): D1 default + USOSWHER, D2 without USOSKBC, D4 without
-rem HIMEM and VBMOUSE, D5 only SETVER + USOSWHER (without USOSV10), D6 = D5 +
-rem USOSV10. Log: C:\USOS\DIAG\Dn.TXT.
+rem Default items: USOSV10, VBMOUSE, USOSKBC /R, then WIN; no USOSWHER.
+rem Diagnostic items only (W1CONFIG.SYS submenu DIAG, from the Windows 2.03
+rem logo hang on the X470, fixed by USOSV10 - D6 PASS 2026-10-09): D1
+rem default + USOSWHER, D2 without USOSKBC, D4 without HIMEM and VBMOUSE, D5
+rem only SETVER + USOSWHER (without USOSV10), D6 = D5 + USOSV10.
+rem Log: C:\USOS\DIAG\Dn.TXT.
 set UDIAG=
 if "%CONFIG%"=="D1WHERE" set UDIAG=D1
 if "%CONFIG%"=="D2NOKBC" set UDIAG=D2
@@ -15,8 +17,8 @@ if "%CONFIG%"=="D5MIN" set UDIAG=D5
 if "%CONFIG%"=="D6V10" set UDIAG=D6
 rem USOSV10 first: INT 10h on its own 2 KiB stack. WIN.COM 2.x calls the video
 rem BIOS for its logo with about 200 bytes of stack left above its own code;
-rem a modern video BIOS needs more and overwrites that code (hang at the
-rem logo). D5 leaves it out as the control item.
+rem a modern video BIOS (RX 560) needs more and overwrites that code (hang at
+rem the logo). D5 leaves it out as the control item.
 if "%UDIAG%"=="D5" goto v10_done
 if exist C:\DOS\USOSV10.COM C:\DOS\USOSV10.COM
 :v10_done

@@ -395,3 +395,15 @@ returned". New menu item D6V10 = D5 + USOSV10. Build: build_win9x_support
 list. Tests: tools/tests/legacy_bios/test_usosv10.py (tiny stack below code
 breaks without, runs with; registers/flags; outputs pass through; nesting;
 install + report), test_win_early_flow.py.
+
+### X470 PASS (2026-10-09): Windows 2.03 via D6; USOSV10 in the default start
+
+D6 (D5 + USOSV10, no USOSKBC) reached the MS-DOS Executive on the X470 /
+RX 560 (PS/2 keyboard only, as expected without USOSKBC): the cause above is
+confirmed. The default items (Windows, WIN /S, MS-DOS) load USOSV10 first,
+then VBMOUSE and USOSKBC /R (USB keyboard); USOSWHER stays in the diagnostic
+submenu (now "Diagnostyka (D1-D6, tylko do testow)"). INSTALL.BAT copies
+USOSV10 also without CSMWrap (the video BIOS stack depth does not depend on
+it). Windows 2.11, /286 and /386 use the same WIN.COM logo path and likely
+benefit too. Windows 3.1/WfW and 9x DOS phases do not load USOSV10 (no
+known need; their own stacks are larger).

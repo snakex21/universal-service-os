@@ -39,6 +39,12 @@ echo prompt $p$g>>C:\AUTOEXEC.BAT
 echo path C:\DOS;C:\WINDOWS;C:\PROGRAMS>>C:\AUTOEXEC.BAT
 echo set TEMP=C:\TEMP>>C:\AUTOEXEC.BAT
 echo ver>>C:\AUTOEXEC.BAT
+rem INT 10h on a private stack for WIN.COM of Windows 1.x/2.x (W1AUTO.BAT),
+rem also with CSM: the video BIOS stack depth does not depend on CSMWrap.
+if not exist %USRC%\USOSV10.COM goto v10_done
+copy %USRC%\USOSV10.COM C:\DOS /y >nul
+if errorlevel 1 goto failed
+:v10_done
 rem Prepared under CSMWrap (UEFI PC without CSM): USB mouse through VBADOS.
 if not exist %USRC%\CSMWRAP.TAG goto csm_dos_done
 copy %USRC%\VBMOUSE.EXE C:\DOS /y >nul
@@ -56,11 +62,6 @@ if not exist %USRC%\USOSWHER.COM goto where_done
 copy %USRC%\USOSWHER.COM C:\DOS /y >nul
 if errorlevel 1 goto failed
 :where_done
-rem INT 10h on a private stack for WIN.COM of Windows 1.x/2.x (W1AUTO.BAT).
-if not exist %USRC%\USOSV10.COM goto v10_done
-copy %USRC%\USOSV10.COM C:\DOS /y >nul
-if errorlevel 1 goto failed
-:v10_done
 echo C:\DOS\VBMOUSE.EXE>>C:\AUTOEXEC.BAT
 echo C:\DOS\USOSKEY.COM>>C:\AUTOEXEC.BAT
 :csm_dos_done

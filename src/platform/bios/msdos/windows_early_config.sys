@@ -3,10 +3,11 @@ menucolor=15,1
 menuitem=WINSTD,Windows (domyslny)
 menuitem=WINREAL,Windows 3.0 - tryb standardowy (WIN /S, test)
 menuitem=DOSONLY,MS-DOS - wiersz polecen
-submenu=DIAG,Diagnostyka zawieszenia Windows (D1-D6)
+submenu=DIAG,Diagnostyka (D1-D6, tylko do testow)
 menudefault=WINSTD,8
 
-; Diagnostic start variants (Windows 2.03 hangs at its logo on the X470):
+; Diagnostic start variants only (Windows 2.03 logo hang on the X470, fixed
+; by USOSV10 in every default item; D6 PASS 2026-10-09):
 ; each isolates one suspect; W1AUTO.BAT logs to C:\USOS\DIAG\<variant>.TXT.
 ; D3 (EGA instead of VGA) needs a second Windows 2.x Setup: the display
 ; driver is bound into WIN200.BIN. Not offered.
