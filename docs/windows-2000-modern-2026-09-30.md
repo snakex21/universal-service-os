@@ -833,7 +833,7 @@ mismatch is counted (`rbbad`), the first LBA kept (`rblba`), one trace
 record `rb-mismatch` written; no STOP and no red line. The two start-up
 STOPs (marker read, write test) stay. Retest with a fresh install from a
 build with usos5. (Copying the usos5 ahcint.sys over
-WINNT\system32\drivershcint.sys on the half-installed disk would likely
+`WINNT\system32\drivers\ahcint.sys` on the half-installed disk would likely
 let GUI Setup restart on the next boot, but a GUI Setup interrupted during
 component registration is not a reliable base.)
 
