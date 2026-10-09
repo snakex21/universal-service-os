@@ -8,17 +8,17 @@
   "files": {
     "bin/i386/usosrst.sys": "0c38413ad5c6e9f994ad4aa9f050a4ea7fe0aea188cb5abf28c381755ed76af5",
     "build.cmd": "512844bf0ca29c015f8b62e3d54196f8f635c20981682646a940ec8db31f8681",
-    "src/usosrst.c": "71d9b2997459e96a59ddefc6afed1831c8cf87abd0444d148806d61947a084c8",
+    "src/usosrst.c": "4a864249034ae0e5bd2be08d0167b2740bb863e3474bde5f67919bc8e210d8f7",
     "src/sources": "03dfc1b07f4f26033b333ed7eaa000f48a12a9e5b77e4c1cab10435dd6b0b8fb",
     "src/makefile": "7289517c7028ff031a48cc84f6308a437c3abe6e046c93f3132255221842d433",
     "build-nt4.cmd": "25c3bdf38fc39982f5bc0e98cf64e37e3d8819242f18b80432613ae42ee9b804",
     "bin/nt4/i386/usosrst.sys": "d028580b4040662605d2c88b90094fd4125b2526cfda1083dc9011d6efafb23b",
     "build-nt351.cmd": "c2b77247cf6cdcefae51a08b4e794ccff0a9e47ebd4183fba6ff68e9d6411e8f",
-    "bin/nt351/i386/usosrst.sys": "f3ee44afc8081d748fe928acccdbab9c6efeb45e3790e789e588a1d8e180ba7c"
+    "bin/nt351/i386/usosrst.sys": "2b948d8817a291540e48da03e2aeb5553cd82580d0814ff3511f737eebd1397c"
   },
   "build_nt4": "build-nt4.cmd (same source, -DUSOSRST_NT4, PE version 4.00 via tools/nt4/pe_nt4_version.py) -> bin/nt4/i386/usosrst.sys, version string usosrst 1.5-nt4",
   "imports_nt4": "40: ntoskrnl, hal; all resolve on the NT 4.0 RTM (1381.1) and SP6a (1381.335) ntoskrnl/ntkrnlmp and hal/halmps/halapic",
   "nt4_1_5": "1.5-nt4 (2026-10-07): cuts the VGA window A0000h-BFFFFh out of HARDWARE\\RESOURCEMAP\\System Resources\\Reserved (CSMWrap reports A0000h-FFFFFh as E820 reserved; NT 4.0 videoprt then refuses vga.sys -> STOP C0000143 DISPLAY DRIVER.DLL); load line \"vga\" + o/-/x. The Windows 2000 binary bin/i386 is unchanged (NT4-only code).",
-  "build_nt351": "build-nt351.cmd (same source, -DUSOSRST_NT4 -DUSOSRST_NT351, PE version 3.51 via tools/nt4/pe_nt4_version.py --version 3.51) -> bin/nt351/i386/usosrst.sys, version string usosrst 1.5-nt351",
+  "build_nt351": "build-nt351.cmd (same source, -DUSOSRST_NT4 -DUSOSRST_NT351, PE version 3.51 via tools/nt4/pe_nt4_version.py --version 3.51) -> bin/nt351/i386/usosrst.sys, version string usosrst 1.6-nt351 (1.6: the AHCI heartbeat reads PCI configuration space through CF8h/CFCh, so it also works with the PCI BIOS hidden by the NT 3.x MBR)",
   "imports_nt351": "no KiBugCheckData, KeSetTimer re-armed by the DPC instead of KeSetTimerEx, no ZwSetSystemTime; every import resolves on the NT 3.51 ntoskrnl/hal (tools/tests/data/nt351_exports.txt)"
 }

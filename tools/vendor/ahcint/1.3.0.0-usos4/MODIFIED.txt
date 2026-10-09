@@ -104,3 +104,19 @@ and SP6a (1381.335) kernels and scsiport (tools/tests/check_nt4_driver_imports.p
   bin/NT351/i386/ahcint.sys with the NT 4.0 defines plus -DAHCI_NT351 and
   PE version 3.51; every import resolves on NT 3.51
   (tools/tests/data/nt351_exports.txt). The other builds are unchanged.
+- ahcimain.c (patch 0008, NT 3.51 build only, "usos5", 2026-10-09): on
+  boards whose PCI BIOS reports a last bus >= 8 the USOS NT 3.x MBR hides
+  the PCI BIOS from NTDETECT (the NT 3.51 HAL bridge scan loops forever
+  otherwise, X470), so the HAL has no PCI bus handler. With AHCI_NT351 the
+  driver registers for the Isa bus, reads and writes PCI configuration
+  space itself through ports CF8h/CFCh (every bus 0-255), maps the ABAR
+  through the Isa bus (system bus as a fallback), reports the adapter as
+  PCIBus for the DMA adapter (no map registers; as an Isa master
+  ScsiPortGetPhysicalAddress gave no address for data buffers), leaves the
+  ABAR range out of the resource report when the HAL has no PCI bus
+  handler (a PCIBus report fails there) and asks ScsiPort to call again for
+  a second HBA (*Again = TRUE). New imports: ScsiPortReadPortUlong,
+  ScsiPortWritePortUlong, ScsiPortWritePortUshort (all on NT 3.51). QEMU
+  2026-10-09: logon with OVMF + CSMWrap and SeaBIOS, q35 with and without
+  12 pcie-root-ports (PCI BIOS hidden and present). The other builds are
+  unchanged.

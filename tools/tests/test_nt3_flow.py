@@ -4,6 +4,7 @@ of tools/w9x_csmwrap_prepare.sh, tools/build_micro_linux.py;
 docs/nt351-2026-10-08.md). Host only: Git sh, temp folders; no VM, no disk.
 """
 from pathlib import Path
+import json
 import shutil
 import tempfile
 import unittest
@@ -210,14 +211,49 @@ class Nt3Mbr(unittest.TestCase):
 
     def test_hpet_legacy_off(self):
         text = (ROOT / 'src/platform/bios/nt3/nt3_e820_mbr.S').read_text(encoding='utf-8')
-        for want in ('mov ebx, 0xFED00000', 'btr dword ptr fs:[ebx + 0x10], 1',
+        for want in ('mov ebx, 0xFED00000', 'and dword ptr fs:[ebx + 0x10], 0xFFFFFFFD',
                      '.byte 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x92, 0xCF, 0x00',
                      '#ifdef NT3_HPET_SET_LEGACY'):
             self.assertIn(want, text)
         # The HPET write sits inside the cli window of the INT 15h hook install.
         cli = text.index('    cli\n    /* FS: flat')
-        self.assertLess(cli, text.index('btr dword ptr'))
-        self.assertLess(text.index('btr dword ptr'), text.index('    mov word ptr [0x15 * 4], 4'))
+        self.assertLess(cli, text.index('and dword ptr fs:'))
+        self.assertLess(text.index('and dword ptr fs:'), text.index('    and word ptr [0x15 * 4], 0'))
+
+    def test_pci_bios_hidden_only_past_bus_7(self):
+        # NTDETECT caps the PCI bus count at 8 and the 3.51 HAL bridge scan
+        # loops when a bridge leads past it (X470): with a last bus >= 8 the
+        # MBR turns INT 1Ah B101h into B1FFh (unsupported).
+        text = (ROOT / 'src/platform/bios/nt3/nt3_e820_mbr.S').read_text(encoding='utf-8')
+        check = text.index('    mov ax, 0xB101\n    int 0x1A\n    jc 1f\n    cmp cl, 8\n    jb 1f\n')
+        install = text.index('    mov word ptr [0x1A * 4], offset H1A')
+        self.assertLess(check, install)
+        hook = text[text.index('hook_1a:'):text.index('hook_end:')]
+        for want in ('cmp ax, 0xB101', 'mov al, 0xFF', '.word OLD1A'):
+            self.assertIn(want, hook)
+        # The boot drive survives the PCI BIOS call (EDX = "PCI ") in BP.
+        self.assertIn('    mov bp, dx\n', text)
+        self.assertEqual(text.count('    mov dx, bp\n'), 3)
+
+
+class Nt3DriversWithoutPciBios(unittest.TestCase):
+    """With the PCI BIOS hidden the 3.51 HAL has no PCI bus handler: the NT 3.51
+    builds of AHCINT and usosrst read PCI configuration space via CF8h/CFCh."""
+
+    def test_ahcint_nt351_direct_config(self):
+        src = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos4/src/ahcimain.c').read_text(encoding='latin-1')
+        for want in ('static PUCHAR AhciCfgPorts;', 'ScsiPortWritePortUlong((PULONG)AhciCfgPorts,',
+                     'initData.AdapterInterfaceType = Isa;', 'ConfigInfo->AdapterInterfaceType = PCIBus;',
+                     'AhciCfgWrite16(targetBus, targetSlot, 0x04, pciCmd);', '*Again = TRUE;'):
+            self.assertIn(want, src)
+        manifest = json.loads((ROOT / 'tools/vendor/ahcint/1.3.0.0-usos4/manifest.json').read_text(encoding='utf-8'))
+        self.assertIn('patches/0008-nt351-direct-pci-config.patch', manifest['patches'])
+
+    def test_usosrst_nt351_direct_config(self):
+        src = (ROOT / 'tools/w2k/usosrst/src/usosrst.c').read_text(encoding='latin-1')
+        self.assertIn('#define USOSRST_VERSION "usosrst 1.6-nt351"', src)
+        self.assertIn('got = PciCfgHeader351(bus, slot.u.AsULONG, &cfg);', src)
+        self.assertIn('WRITE_PORT_ULONG((PULONG)0xCF8, base | (i * 4));', src)
 
 
 if __name__ == '__main__':

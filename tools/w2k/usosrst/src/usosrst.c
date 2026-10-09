@@ -141,7 +141,7 @@ UsosActiveProcessors(VOID)
 }
 #define KeQueryActiveProcessors() UsosActiveProcessors()
 #ifdef USOSRST_NT351
-#define USOSRST_VERSION "usosrst 1.5-nt351"
+#define USOSRST_VERSION "usosrst 1.6-nt351"
 #else
 #define USOSRST_VERSION "usosrst 1.5-nt4"
 #endif
@@ -1415,6 +1415,29 @@ HeartbeatDpc(IN PKDPC Dpc, IN PVOID Context, IN PVOID Arg1, IN PVOID Arg2)
     ShowRow(ROW_HB, line, (ULONG)(p - line), (USHORT)(busyAny && g_Stalls ? 0x4F00 : 0x1F00));
 }
 
+#ifdef USOSRST_NT351
+/* NT 3.51: PCI configuration space through ports CF8h/CFCh. On boards whose
+   PCI BIOS reports a last bus >= 8 the USOS NT 3.x MBR hides the PCI BIOS
+   from NTDETECT (the 3.51 HAL bridge scan loops forever otherwise), so the
+   HAL has no PCI bus handler and HalGetBusData finds nothing. */
+static ULONG
+PciCfgHeader351(ULONG Bus, ULONG Slot, PPCI_COMMON_CONFIG Cfg)
+{
+    PCI_SLOT_NUMBER slot;
+    ULONG i, base;
+
+    slot.u.AsULONG = Slot;
+    base = 0x80000000UL | ((Bus & 0xFF) << 16) | ((ULONG)slot.u.bits.DeviceNumber << 11) |
+           ((ULONG)slot.u.bits.FunctionNumber << 8);
+    for (i = 0; i < PCI_COMMON_HDR_LENGTH / 4; i++) {
+        WRITE_PORT_ULONG((PULONG)0xCF8, base | (i * 4));
+        ((PULONG)Cfg)[i] = READ_PORT_ULONG((PULONG)0xCFC);
+        if (i == 0 && (Cfg->VendorID == 0xFFFF || Cfg->VendorID == 0)) break;
+    }
+    return PCI_COMMON_HDR_LENGTH;     /* buses may be sparse: never "no such bus" */
+}
+#endif
+
 /* PCI: every AHCI HBA (class 01h/06h/01h, or the AMD/Intel IDs AHCINT also
    takes), its BAR5 mapped, every implemented port watched. */
 static VOID
@@ -1432,7 +1455,11 @@ FindAhci(VOID)
                 slot.u.AsULONG = 0;
                 slot.u.bits.DeviceNumber = dev;
                 slot.u.bits.FunctionNumber = fn;
+#ifdef USOSRST_NT351
+                got = PciCfgHeader351(bus, slot.u.AsULONG, &cfg);
+#else
                 got = HalGetBusData(PCIConfiguration, bus, slot.u.AsULONG, &cfg, PCI_COMMON_HDR_LENGTH);
+#endif
                 if (got == 0 && dev == 0 && fn == 0) return;        /* no such bus */
                 if (got < PCI_COMMON_HDR_LENGTH || cfg.VendorID == 0xFFFF || cfg.VendorID == 0) {
                     if (fn == 0) break;
