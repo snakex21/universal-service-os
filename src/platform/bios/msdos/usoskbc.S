@@ -3,7 +3,7 @@
  * for Windows 1.0x, 2.x and 3.0 (and the text pages of WfW 3.11 Setup).
  * Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
  *
- *   USOSKBC [/R] [script.key]
+ *   USOSKBC [/R] [/M] [script.key]
  *
  * /R (relay): under CSMWrap SeaBIOS serves the USB keyboard from its timer
  * interrupt and hands every raw set-1 byte to INT 15h AH=4Fh before its own
@@ -19,6 +19,20 @@
  * interrupt bit of the controller command byte (SeaBIOS leaves it off when
  * no PS/2 keyboard answered its reset).
  *
+ * /M (mouse): the PS/2 path of MOUSE.DRV in Windows 2.x and 3.0 starts the
+ * BIOS pointing device (INT 15h C205h/C201h/C203h/C207h/C200h), but its
+ * C207h callback only stores the packet; the driver hands it to Windows
+ * from its own INT 74h (IRQ 12) handler, after chaining the previous one.
+ * Under CSMWrap SeaBIOS serves the USB mouse from its timer interrupt and
+ * calls the callback there; IRQ 12 never comes, so the pointer never moves.
+ * With /M this TSR registers its own trampoline for every C207h call (the
+ * caller's handler is called from it with the same stack words) and, after
+ * the BIOS timer interrupt delivered a packet, issues INT 74h itself when
+ * someone hooked INT 74h above this TSR's own stub. That stub sits under
+ * the driver's handler (MOUSE.DRV chains to it): for this software INT 74h
+ * it returns at once (no BIOS IRQ 12 code, no EOI); a real IRQ 12 goes on
+ * to the BIOS. No 8042 needed. Windows 1.0x has no PS/2 mouse driver.
+ *
  * Script (built by tools/usos_keyscript.py; header "UKS1"): steps run from
  * the timer interrupt, so Setup programs get their answers without a person
  * at the keyboard. Ops: 0 end, 1 wait for text on the text screen, 2 delay
@@ -30,7 +44,8 @@
  *
  * Shared block (INT 2Fh AX=D710h -> AL=FFh, BX=segment, CX=offset,
  * DX='KB'): "UKBC", version, flags (1 relay, 2 8042 present, 4 script
- * running), queue head/tail, counters; docs/windows-early-2026-10-07.md.
+ * running, 8 mouse), queue head/tail, counters, version 2: the C207h
+ * handler, packets, INT 74h kicks; docs/windows-early-2026-10-07.md.
  * Built with tools/build_win3_usb_keyboard.py (zig cc, linked at 0100h).
  */
 .intel_syntax noprefix
@@ -43,8 +58,8 @@ _start:
     .p2align 1
 shared:
     .ascii "UKBC"
-    .word 1
-kflags:  .byte 0                  /* 1 relay, 2 8042, 4 script running */
+    .word 2
+kflags:  .byte 0                  /* 1 relay, 2 8042, 4 script, 8 mouse */
 busy:    .byte 0
 qhead:   .byte 0
 qtail:   .byte 0
@@ -62,6 +77,13 @@ old08:   .long 0
 old09:   .long 0
 old15:   .long 0
 old2f:   .long 0
+/* version 2: /M */
+mcb:     .long 0                  /* caller's INT 15h C207h handler */
+mpackets: .long 0                 /* packets passed to it */
+mkicks:  .long 0                  /* software INT 74h issued */
+old74:   .long 0
+mpend:   .byte 0                  /* packet delivered, INT 74h due */
+msoft:   .byte 0                  /* inside the software INT 74h */
 
 /* INT 08h: the BIOS first (SeaBIOS polls USB there and sends the EOI),
  * then one queued byte to the 8042 and one script step. */
@@ -88,7 +110,10 @@ int08:
     test byte ptr [kflags], 4
     jz 1f
     call script
-1:  pop es
+1:  test byte ptr [kflags], 8
+    jz 2f
+    call kick
+2:  pop es
     pop ds
     pop di
     pop si
@@ -123,6 +148,55 @@ drain:
     mov byte ptr [qtail], bl
     inc dword ptr [relayed]
 9:  ret
+
+/* /M: after a packet went to the C207h handler, INT 74h for the driver
+ * that hooked it (DS = CS). Nothing above our own stub: nobody to wake. */
+kick:
+    cmp byte ptr [mpend], 0
+    je 9f
+    mov byte ptr [mpend], 0
+    xor ax, ax
+    mov es, ax
+    cmp word ptr es:[0x74 * 4], offset int74
+    jne 1f
+    mov ax, cs
+    cmp word ptr es:[0x74 * 4 + 2], ax
+    je 9f
+1:  mov byte ptr [msoft], 1
+    int 0x74
+    mov byte ptr cs:[msoft], 0
+    inc dword ptr cs:[mkicks]
+9:  ret
+
+/* INT 74h: the software one from kick returns at once; IRQ 12 to the BIOS. */
+int74:
+    cmp byte ptr cs:[msoft], 0
+    jne 1f
+    .att_syntax prefix
+    ljmpw *%cs:old74
+    .intel_syntax noprefix
+1:  iret
+
+/* The BIOS far-calls this with status, X, Y, Z words on the stack (as for
+ * any C207h handler): the same words to the caller's handler, then mark
+ * the INT 74h as due. */
+mtramp:
+    push bp
+    mov bp, sp
+    cmp word ptr cs:[mcb + 2], 0
+    je 1f
+    push word ptr [bp + 12]
+    push word ptr [bp + 10]
+    push word ptr [bp + 8]
+    push word ptr [bp + 6]
+    .att_syntax prefix
+    lcallw *%cs:mcb
+    .intel_syntax noprefix
+    add sp, 8
+    mov byte ptr cs:[mpend], 1
+    inc dword ptr cs:[mpackets]
+1:  pop bp
+    .byte 0xcb                      /* retf (16-bit far return) */
 
 /* Append AL to the queue (DS = CS); CF set when full. */
 enqueue:
@@ -362,9 +436,42 @@ int09:
     dec byte ptr cs:[in9]
     iret
 
-/* INT 15h AH=4Fh: USB bytes (not from INT 09h) go to the 8042 queue. */
+/* INT 15h AH=4Fh: USB bytes (not from INT 09h) go to the 8042 queue.
+ * AX=C207h with /M: the BIOS gets the trampoline, the caller keeps ES:BX
+ * and gets the BIOS's AH and CF. 0:0 (remove) goes straight through. */
 int15:
-    cmp ah, 0x4f
+    cmp ax, 0xc207
+    jne 3f
+    test byte ptr cs:[kflags], 8
+    jz chain15
+    mov word ptr cs:[mcb], bx
+    mov word ptr cs:[mcb + 2], es
+    push bx
+    mov bx, es
+    or bx, word ptr cs:[mcb]
+    pop bx
+    jz chain15
+    push es
+    push bx
+    push cs
+    pop es
+    mov bx, offset mtramp
+    pushf
+    .att_syntax prefix
+    lcallw *%cs:old15
+    .intel_syntax noprefix
+    pop bx
+    pop es
+    push bp
+    mov bp, sp
+    jc 2f
+    and byte ptr [bp + 6], 0xfe
+    pop bp
+    iret
+2:  or byte ptr [bp + 6], 1
+    pop bp
+    iret
+3:  cmp ah, 0x4f
     jne chain15
     test byte ptr cs:[kflags], 1
     jz chain15
@@ -426,7 +533,11 @@ parse:
     jne fname
     lodsb
     or al, 0x20
-    cmp al, 'r'
+    cmp al, 'm'
+    jne 1f
+    or byte ptr [kflags], 8
+    jmp parse
+1:  cmp al, 'r'
     jne bad_args
     or byte ptr [kflags], 1
     jmp parse
@@ -536,7 +647,16 @@ kbc_done:
     int 0x21
     mov word ptr [old2f], bx
     mov word ptr [old2f + 2], es
-    mov dx, offset int09
+    test byte ptr [kflags], 8
+    jz 8f
+    mov ax, 0x3574
+    int 0x21
+    mov word ptr [old74], bx
+    mov word ptr [old74 + 2], es
+    mov dx, offset int74
+    mov ax, 0x2574
+    int 0x21
+8:  mov dx, offset int09
     mov ax, 0x2509
     int 0x21
     mov dx, offset int15
@@ -559,7 +679,12 @@ kbc_done:
     mov dx, offset msg_relay
     mov ah, 9
     int 0x21
-6:  test byte ptr [kflags], 4
+6:  test byte ptr [kflags], 8
+    jz 5f
+    mov dx, offset msg_mouse
+    mov ah, 9
+    int 0x21
+5:  test byte ptr [kflags], 4
     jz 7f
     mov dx, offset msg_script
     mov ah, 9
@@ -594,6 +719,8 @@ msg_ok:
     .ascii "USOSKBC: installed$"
 msg_relay:
     .ascii ", USB keyboard through the 8042$"
+msg_mouse:
+    .ascii ", USB mouse for MOUSE.DRV (INT 74h)$"
 msg_script:
     .ascii ", Setup answers$"
 msg_nl:
@@ -605,7 +732,7 @@ msg_nofile:
 msg_badfile:
     .ascii "USOSKBC: not a USOS key script.\r\n$"
 msg_usage:
-    .ascii "USOSKBC [/R] [script.key]\r\n$"
+    .ascii "USOSKBC [/R] [/M] [script.key]\r\n$"
 
     /* The script is read to here and stays resident with the code above
      * (the install part is small; reading over it would overwrite the

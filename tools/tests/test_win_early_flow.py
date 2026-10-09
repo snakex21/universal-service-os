@@ -5,7 +5,7 @@
   version" plus memory garbage at every start), on the CSMWrap and the
   plain path, and only for the early systems.
 * Key scripts: Windows 3.0 leaves Setup with "Return to DOS" (no extra
-  restart), Windows 2.03 installs without a mouse driver.
+  restart), Windows 2.03 installs MOUSE.DRV (USB mouse via USOSKBC /M).
 * micro_linux_ui.sh takes the progress-page heading from usos.heading=
   instead of the old "Windows 9x" default.
 """
@@ -53,11 +53,22 @@ class KeyScripts(unittest.TestCase):
     def test_w30_returns_to_dos(self):
         self.assertEqual(self.ops('W30.txt')[-1], 'key alt+d')
 
-    def test_w203_no_mouse(self):
+    def test_w203_microsoft_mouse(self):
         ops = self.ops('W203.txt')
         i = ops.index('wait "select your pointing device"')
-        # The list starts with the Microsoft Mouse; "No mouse" is second.
-        self.assertEqual(ops[i + 1], 'key down enter')
+        # The list starts with "Microsoft Mouse (Bus or Serial)" = MOUSE.DRV
+        # (its PS/2 path through the BIOS; USOSKBC /M wakes it under CSMWrap).
+        self.assertEqual(ops[i + 1], 'key enter')
+
+    def test_setup_and_start_load_mouse_kick(self):
+        setup = batch_lines(MSDOS / 'windows_early_setup.cmd')
+        self.assertIn(r'if exist C:\DOS\USOSKBC.COM C:\DOS\USOSKBC.COM /R /M C:\USOSW3\SETUP.KEY', setup)
+        auto = batch_lines(MSDOS / 'windows_early_auto.cmd')
+        self.assertIn(r'if exist C:\DOS\USOSKBC.COM C:\DOS\USOSKBC.COM /R /M', auto)
+        kbc = (MSDOS / 'usoskbc.S').read_text(encoding='ascii')
+        # unit run of /M: tools/tests/legacy_bios/test_usoskbc_mouse.py
+        for needle in ('cmp ax, 0xc207', 'mtramp:', 'int74:', 'int 0x74', 'mov ax, 0x2574', "cmp al, 'm'"):
+            self.assertIn(needle, kbc)
 
 
 class Heading(unittest.TestCase):
@@ -165,7 +176,7 @@ class DiagnosticMenu(unittest.TestCase):
             ran, names = self.loaded(config)
             self.assertEqual(names, programs, config)
             if 'USOSKBC.COM' in programs:
-                self.assertIn(r'C:\DOS\USOSKBC.COM /R', ran)
+                self.assertIn(r'C:\DOS\USOSKBC.COM /R /M', ran)
             if 'USOSWHER.COM' in programs:
                 self.assertIn(r'C:\DOS\USOSWHER.COM /G', ran)
 
@@ -175,7 +186,7 @@ class DiagnosticMenu(unittest.TestCase):
         for config in ('WINSTD', 'WINREAL', 'DOSONLY'):
             ran, names = self.loaded(config)
             self.assertEqual(names[0], 'USOSV10.COM', config)
-            self.assertIn(r'C:\DOS\USOSKBC.COM /R', ran)
+            self.assertIn(r'C:\DOS\USOSKBC.COM /R /M', ran)
             self.assertNotIn('USOSWHER.COM', names, config)
         self.assertIn('menudefault=WINSTD,8', self.config)
         self.assertIn('submenu=DIAG,Diagnostyka (D1-D6, tylko do testow)', self.config)
