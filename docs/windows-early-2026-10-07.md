@@ -224,3 +224,29 @@ install line prints the font pointer, and row 1 starts with `10:` = AX of the
 last INT 10h AH=00h (mode set). Next X470 run: D5 only. Rows over the logo =
 read CS:IP and whether t counts; still no rows = the timer interrupt is dead
 after the logo (then: disassemble WIN.COM's loader after the logo).
+
+### D5 with USOSWHERE 1.1 (2026-10-09) and USOSWHERE 1.2
+
+Video VID_20261009_163727: the text-mode corner is visible for one frame
+after the install lines (`USOSWHERE /G font C000:5C98`; corner
+`94C6:3A9E t:0001 p:1029 COMMAND.`, `10:0000 13:0201 15:0000 21:4E00
+2F:1123`), then one black frame (mode set), then the 2.03 logo for the rest
+of the video with no corner rows. Ctrl+Alt+Del during the hang resets the PC
+(keyboard IRQ and BIOS INT 09h still run, interrupts are on).
+
+Static analysis (installed WIN.COM = WIN.CNF + CGA.LGO + MSLOGO.LGD, 3952 +
+468 + 2570 = 6990 bytes, the size on the target): the logo code CGA.LGO sets
+**mode 06h** (CGA 640x200 two colours; INT 10h AX=0006h, then AX=1000h/1001h
+make colour 0 blue). USOSWHERE 1.1 only drew in modes 0Eh/10h-12h, so the
+missing corner says nothing about the timer. WIN200.BIN has no port-61h
+refresh-bit or CMOS update-in-progress loops: port 61h is only the keyboard
+ACK toggle (KEYBOARD) and the beep (PIT channel 2 with fixed LOOP delays);
+no `in al,40h` timing loops.
+
+USOSWHERE 1.2 (feature/win203-diag3): `/G` also draws in mode 06h (B800h,
+interlaced banks, 1 bit per pixel); a fourth row `k:cccc:iiii n:nnnn` holds
+the CS:IP interrupted by the last keyboard IRQ and the number of keyboard
+IRQs, and INT 09h (chained unchanged) also redraws the corner. During a hang:
+t counting = timer alive, CS:IP row 0 is the loop; t frozen + k changing on
+each Shift press = IRQ0 masked or INT 08h taken over, k is the loop. Handler
+paths unit-run with unicorn (text mode and mode 6 layout), no VM.

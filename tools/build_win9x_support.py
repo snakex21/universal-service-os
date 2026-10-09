@@ -147,7 +147,7 @@ def build_diag(out: Path, work: Path) -> None:
                     str(obj), '-o', str(elf)], env=env, check=True)
     subprocess.run([zig, 'objcopy', '-O', 'binary', str(elf), str(com)], env=env, check=True)
     data = com.read_bytes()
-    if not 0 < len(data) <= 2048 or data[0] != 0xE9 or b'USOSWHR1' not in data:
+    if not 0 < len(data) <= 4096 or data[0] != 0xE9 or b'USOSWHR1' not in data:
         raise ValueError('unexpected USOSWHERE.COM layout')
 
 

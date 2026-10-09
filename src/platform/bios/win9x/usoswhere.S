@@ -16,6 +16,14 @@
  *          INT 13h, 15h, 21h and 2Fh call (INT 15h without AH=4Fh/90h/91h,
  *          which the keyboard and disk BIOS issue all the time)
  *   row 2  the last 8 distinct interrupted CS values, most recent first
+ *   row 3  k:cccc:iiii n:nnnn  (1.2) CS:IP interrupted by the last keyboard
+ *          IRQ (INT 09h) and the number of keyboard IRQs seen
+ *
+ * Since 1.2 the corner is also redrawn from INT 09h, so pressing a key
+ * (Shift, Ctrl) during a hang shows where the CPU is even when the timer
+ * no longer reaches us (IRQ0 masked or INT 08h taken over without
+ * chaining): k: changes with every key press, t: shows whether the timer
+ * still runs. INT 09h is chained unchanged (Ctrl+Alt+Del still works).
  *
  * After a hang a photo of the corner shows where it is:
  *   t still counting  -> interrupts on; CS:IP is the loop (mostly the same
@@ -40,6 +48,10 @@
  * AX=1130h the BIOS 8x8 font at F000:FA6Eh is used; the install message
  * prints the pointer in use.
  *
+ * Since 1.2 /G also draws in the CGA 640x200 two-colour mode 06h (B800h,
+ * interlaced), which the Windows 2.x logo code CGA.LGO uses (it sets mode
+ * 6 and makes colour 0 blue); 1.1 drew nothing over that logo.
+ *
  * The hooks change no register and no flag before chaining. Running it a
  * second time only prints a message. It cannot be unloaded (reboot).
  *
@@ -51,6 +63,7 @@
 .equ ROW0, 8
 .equ ROW1, 41 - 40
 .equ ROW2, 41 - 40
+.equ ROW3, 41 - 40
 .section .text
 .global _start
 _start:
@@ -58,6 +71,7 @@ _start:
 
 sig:    .ascii "USOSWHR1"
 old08:  .long 0
+old09:  .long 0
 old10:  .long 0
 old13:  .long 0
 old15:  .long 0
@@ -74,8 +88,14 @@ ring:   .space 16
 gflag:  .byte 0
 vmode:  .byte 0
 font:   .long 0
-/* three rows of 40 characters (screen columns 40-79), filled per tick */
-scr:    .space 120, ' '
+lcs:    .word 0
+lip:    .word 0
+kcs:    .word 0
+kip:    .word 0
+kcnt:   .word 0
+busy:   .byte 0
+/* four rows of 40 characters (screen columns 40-79), filled per tick */
+scr:    .space 160, ' '
 
 /* far jump through a dword at cs:[x] (FF /5 with a CS override) */
 .macro JMPFAR x
@@ -128,6 +148,8 @@ int08:
     push cs
     pop ds
     inc word ptr [ticks]
+    mov ax, word ptr [bp + 20]
+    mov word ptr [lip], ax
     /* most recently used list: move or insert CS at the front */
     push ds
     pop es
@@ -145,14 +167,65 @@ int08:
     sub di, 2
     jmp 2b
 3:  mov word ptr [ring], ax
+    mov word ptr [lcs], ax
+    call draw
+    jmp regout
+
+/* keyboard IRQ: remember the interrupted CS:IP, redraw, chain */
+int09:
+    pushf
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push bp
+    push ds
+    push es
+    mov bp, sp
+    cld
+    push cs
+    pop ds
+    inc word ptr [kcnt]
+    mov ax, word ptr [bp + 20]
+    mov word ptr [kip], ax
+    mov ax, word ptr [bp + 22]
+    mov word ptr [kcs], ax
+    call draw
+    pop es
+    pop ds
+    pop bp
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    popf
+    JMPFAR old09
+
+/* build the four rows from the saved values and put them on the screen
+ * (ds = cs, direction flag clear); not re-entered */
+draw:
+    cmp byte ptr [busy], 0
+    jne 14f
+    mov byte ptr [busy], 1
     push 0x40
     pop es
     mov al, byte ptr es:[0x49]
     mov byte ptr [vmode], al
     cmp al, 3
     jbe 13f
+    cmp al, 6
+    je 15f
     call gmode
     jc 9f
+    jmp 11f
+15: cmp byte ptr [gflag], 0
+    je 9f
+    cmp word ptr [font + 2], 0
+    je 9f
     jmp 11f
     /* text mode by the BDA: planar graphics set through the ports? */
 13: call gport
@@ -162,11 +235,11 @@ int08:
     pop es
     /* row 0 */
     mov di, offset scr + ROW0
-    mov ax, word ptr [bp + 22]
+    mov ax, word ptr [lcs]
     call hex4
     mov al, ':'
     call pch
-    mov ax, word ptr [bp + 20]
+    mov ax, word ptr [lip]
     call hex4
     mov si, offset s_t
     call pstr
@@ -239,12 +312,34 @@ int08:
     je 10f
     call pch
 10: loop 8b
+    /* row 3 */
+    mov di, offset scr + 120 + ROW3
+    mov si, offset s_k
+    call pstr
+    mov ax, word ptr [kcs]
+    call hex4
+    mov al, ':'
+    call pch
+    mov ax, word ptr [kip]
+    call hex4
+    mov si, offset s_n
+    call pstr
+    mov ax, word ptr [kcnt]
+    call hex4
     cmp byte ptr [vmode], 3
     ja 12f
     call textout
     jmp 9f
-12: call gfxout
-9:  pop es
+12: cmp byte ptr [vmode], 6
+    jne 16f
+    call cgaout
+    jmp 9f
+16: call gfxout
+9:  mov byte ptr [busy], 0
+14: ret
+
+regout:
+    pop es
     pop ds
     pop bp
     pop di
@@ -337,6 +432,10 @@ textout:
     mov si, offset scr + 80 + ROW2
     mov di, (2 * 80 + 40 + ROW2) * 2
     mov cx, 40 - ROW2
+    call 1f
+    mov si, offset scr + 120 + ROW3
+    mov di, (3 * 80 + 40 + ROW3) * 2
+    mov cx, 40 - ROW3
 1:  lodsb
     mov ah, ATTR
     stosw
@@ -383,7 +482,7 @@ gfxout:
     pop es
     mov si, offset scr
     mov di, 40
-    mov bp, 3
+    mov bp, 4
 1:  mov dx, 40
 2:  lodsb
     cmp al, 0x80
@@ -438,6 +537,45 @@ gfxout:
     out dx, al
     ret
 
+/* the buffer to B800h in CGA mode 06h (640x200, one bit per pixel, even
+ * scan lines at 0000h, odd ones at 2000h, 80 bytes per line): 4 rows of
+ * 8 scan lines = 320 bytes per text row in each bank */
+cgaout:
+    push 0xb800
+    pop es
+    mov si, offset scr
+    mov di, 40
+    mov bp, 4
+1:  mov dx, 40
+2:  lodsb
+    cmp al, 0x80
+    jb 3f
+    mov al, '.'
+3:  xor ah, ah
+    shl ax, 3
+    push ds
+    push si
+    push di
+    lds si, dword ptr cs:[font]
+    add si, ax
+    mov cx, 4
+4:  lodsb
+    mov byte ptr es:[di], al
+    lodsb
+    mov byte ptr es:[di + 0x2000], al
+    add di, 80
+    loop 4b
+    pop di
+    pop si
+    pop ds
+    inc di
+    dec dx
+    jnz 2b
+    add di, 320 - 40
+    dec bp
+    jnz 1b
+    ret
+
 /* al -> es:di (the row buffer) */
 pch:
     stosb
@@ -472,6 +610,8 @@ s_13: .asciz " 13:"
 s_15: .asciz " 15:"
 s_21: .asciz " 21:"
 s_2f: .asciz " 2F:"
+s_k:  .asciz "k:"
+s_n:  .asciz " n:"
 
 resend:
 
@@ -531,6 +671,10 @@ install:
     int 0x21
 3:  mov word ptr [old08], bx
     mov word ptr [old08 + 2], es
+    mov ax, 0x3509
+    int 0x21
+    mov word ptr [old09], bx
+    mov word ptr [old09 + 2], es
     mov ax, 0x3510
     int 0x21
     mov word ptr [old10], bx
@@ -574,6 +718,9 @@ install:
     mov dx, offset int2f
     mov ax, 0x252f
     int 0x21
+    mov dx, offset int09
+    mov ax, 0x2509
+    int 0x21
     mov dx, offset int08
     mov ax, 0x2508
     int 0x21
@@ -591,9 +738,10 @@ install:
     int 0x21
 
 m_ok:
-    .ascii "USOSWHERE 1.1 resident: top right = CS:IP, ticks, PSP+name,\r\n"
-    .ascii "last INT 10h mode set + 13h/15h/21h/2Fh AX, last 8 CS values.\r\n"
-    .ascii "GPL-3.0-or-later. /G: also in EGA/VGA 16-colour graphics modes.\r\n$"
+    .ascii "USOSWHERE 1.2 resident: top right = CS:IP, ticks, PSP+name,\r\n"
+    .ascii "last INT 10h mode set + 13h/15h/21h/2Fh AX, last 8 CS values,\r\n"
+    .ascii "k: CS:IP at the last key press (press Shift during a hang).\r\n"
+    .ascii "GPL-3.0-or-later. /G: also CGA mode 6 + EGA/VGA 16 colours.\r\n$"
 m_font:
     .ascii "USOSWHERE /G font "
 m_fseg:

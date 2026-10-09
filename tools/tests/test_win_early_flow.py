@@ -194,6 +194,11 @@ class DiagnosticMenu(unittest.TestCase):
         self.assertIn('gport:', where)
         self.assertIn('0xfa6e', where)
         self.assertIn('mov word ptr cs:[ax10], ax', where)
+        # 1.2: CGA mode 6 (the 2.x logo, CGA.LGO) and the INT 09h snapshot row
+        self.assertIn('cgaout:', where)
+        self.assertIn('cmp al, 6', where)
+        self.assertIn('mov ax, 0x2509', where)
+        self.assertIn('JMPFAR old09', where)
 
 
 if __name__ == '__main__':
