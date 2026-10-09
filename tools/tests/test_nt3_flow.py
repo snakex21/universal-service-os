@@ -105,6 +105,30 @@ class Nt3Target(unittest.TestCase):
                       '!SetupNetwork = NO\r\n', out)
         self.assertEqual(out.count('DetachedProgram'), 1)
 
+    def test_standard_pc_hal_for_the_mps_machine_types(self):
+        # X470 2026-10-08: halapic.dll (mps_up, picked in the install VM)
+        # hung after the banner; the finished system gets the 8259 hal.dll.
+        tmp = Path(tempfile.mkdtemp(prefix='usos-nt3-hal-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        sif = tmp / 'TXTSETUP.SIF'
+        sif.write_bytes(b'[Map.Computer]\r\nmps_up = "MPS Uniprocessor PC"\r\n'
+                        b'[hal]\r\ne_isa_up    = hal.dll     ,2,hal.dll\r\n'
+                        b'mps_up      = halapic.dll ,2,hal.dll\r\nmps_mp      = halmps.dll  ,2,hal.dll\r\n'
+                        b'[Hal.Load]\r\nmps_up      = halapic.dll\r\n')
+        script = tmp / 'run.sh'
+        script.write_bytes((function_text(TARGET, 'nt3_standard_hal') +
+                            f'\nnt3_standard_hal < "{sif.as_posix()}" > "{(tmp / "out.sif").as_posix()}"\n').encode('utf-8'))
+        rc, _, err = sh(f'. "{script.as_posix()}"')
+        self.assertEqual(rc, 0, err)
+        out = (tmp / 'out.sif').read_bytes()
+        self.assertEqual(out, b'[Map.Computer]\r\nmps_up = "MPS Uniprocessor PC"\r\n'
+                              b'[hal]\r\ne_isa_up    = hal.dll     ,2,hal.dll\r\n'
+                              b'mps_up = hal.dll    ,2,hal.dll\r\nmps_mp = hal.dll    ,2,hal.dll\r\n'
+                              b'[Hal.Load]\r\nmps_up      = halapic.dll\r\n')
+        text = TARGET.read_text(encoding='utf-8')
+        self.assertIn('nt3_standard_hal < "$sif" > "$work/txtsetup.hal"', text)
+        self.assertIn('for sif in "$work/c/TXTSETUP.SIF" "$bt_dir/TXTSETUP.SIF" "$ls_src/TXTSETUP.SIF"; do', text)
+
     def test_server_cd_gets_licensing_in_the_empty_section(self):
         tmp = Path(tempfile.mkdtemp(prefix='usos-nt3-srv-'))
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
@@ -178,6 +202,22 @@ class Nt3MicroLinux(unittest.TestCase):
         self.assertIn('nt3_e820_mbr = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-mbr-440.bin"', text)
         self.assertIn('xp_geometry_fix_mbr, nt3_e820_mbr):', text)
         self.assertIn('"usr/lib/usos/nt3-e820-mbr-440.bin"', text)
+
+
+class Nt3Mbr(unittest.TestCase):
+    """The NT 3.x MBR clears HPET LegacyReplacement before NTLDR (X470: no
+    clock interrupt for the 3.51 kernel otherwise, hang after the banner)."""
+
+    def test_hpet_legacy_off(self):
+        text = (ROOT / 'src/platform/bios/nt3/nt3_e820_mbr.S').read_text(encoding='utf-8')
+        for want in ('mov ebx, 0xFED00000', 'btr dword ptr fs:[ebx + 0x10], 1',
+                     '.byte 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x92, 0xCF, 0x00',
+                     '#ifdef NT3_HPET_SET_LEGACY'):
+            self.assertIn(want, text)
+        # The HPET write sits inside the cli window of the INT 15h hook install.
+        cli = text.index('    cli\n    /* FS: flat')
+        self.assertLess(cli, text.index('btr dword ptr'))
+        self.assertLess(text.index('btr dword ptr'), text.index('    mov word ptr [0x15 * 4], 4'))
 
 
 if __name__ == '__main__':
