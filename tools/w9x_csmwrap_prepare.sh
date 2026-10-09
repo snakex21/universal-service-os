@@ -120,6 +120,11 @@ usos_w9x_csmwrap_prepare() {
         # flow; the CD must say MinorVersion 50.
         windows-nt-3-5) tag=NT35 setup='' ;;
         windows-nt-3-5-server) tag=NT35S setup='' ;;
+        # Windows NT 3.1 / 3.1 Advanced Server (2026-10-09,
+        # docs/nt31-2026-10-09.md): TXTSETUP.INF Setup, text mode answered
+        # page by page, GUI Setup from a patched INITIAL.INF.
+        windows-nt-3-1) tag=NT31 setup='' ;;
+        windows-nt-3-1-server) tag=NT31S setup='' ;;
         *) stop "request.ini names an unsupported system: $system" ;;
     esac
     w9x_csmwrap_log "REQUEST system=$system iso=$iso folder=$folder answer=${answer%%:*} size=$size_gib"
@@ -151,6 +156,7 @@ usos_w9x_csmwrap_prepare() {
         # NT 3.51: the NT 4.0 path ($nt4) without the service pack and key.
         NT351|NT351S) nt4=yes nt_major=3 nt_minor=51 nt_name='Windows NT 3.51' ;;
         NT35|NT35S) nt4=yes nt_major=3 nt_minor=50 nt_name='Windows NT 3.5' ;;
+        NT31|NT31S) nt4=yes nt_major=3 nt_minor=10 nt_name='Windows NT 3.1' ;;
     esac
     if [ -n "$nt4" ]; then
         for helper in nt4_csmwrap_target.sh nt4_qemu_install.sh w9x_phase1_qemu.sh; do
@@ -199,10 +205,10 @@ usos_w9x_csmwrap_prepare() {
         [34]:profile)
             # Rendered by the UEFI menu (answer_profiles.stageWin9x: NT4.SIF /
             # NT4S.SIF with the key, NT351.SIF / NT351S.SIF, NT35.SIF /
-            # NT35S.SIF): copied to RAM,
+            # NT35S.SIF, NT31.SIF / NT31S.SIF): copied to RAM,
             # staged copies go.
             cp "/mnt/esp/EFI/USOS/answer/$tag.SIF" "$answer_inf" || stop 'the answer profile could not be taken'
-            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF
+            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF /mnt/esp/EFI/USOS/answer/NT31.SIF /mnt/esp/EFI/USOS/answer/NT31S.SIF
             for staged in 98SE 98 ME 95; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
             sync
             answer=nt4
@@ -227,7 +233,7 @@ usos_w9x_csmwrap_prepare() {
             # hold a product key: copied to RAM, then every staged copy goes.
             cp "/mnt/esp/EFI/USOS/answer/$tag.INF" "$answer_inf" || stop 'the answer profile could not be taken'
             for staged in 98SE 98 ME 95; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
-            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF
+            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF /mnt/esp/EFI/USOS/answer/NT31.SIF /mnt/esp/EFI/USOS/answer/NT31S.SIF
             sync
             answer_kind=PROFILE ;;
         file:*)

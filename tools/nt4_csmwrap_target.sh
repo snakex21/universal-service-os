@@ -237,6 +237,67 @@ nt3_standard_hal() {
           printf "%s\r\n", line }'
 }
 
+crlf() { awk -v BINMODE=3 '{ sub(/\r$/, ""); printf "%s\r\n", $0 }'; }
+
+# NT 3.1 (docs/nt31-2026-10-09.md). winnt.exe of NT 3.1 copies the I386
+# folder flat to \$WIN_NT$.~LS (DOSNET.INF d1 = \) and writes a Setup boot
+# floppy: the DOSNET.INF [FloppyFiles] (SETUPLDR, NTDETECT.COM, TXTSETUP.INF,
+# the DISK1 tag file and the ISA/EISA SCSI miniports) with a [MsDosInitiated]
+# section appended to TXTSETUP.INF; SETUPAPP.EXE (text mode) then takes every
+# file from the local source. USOS puts the floppy files on the root of C:
+# instead and starts SETUPLDR there (syslinux chain.c32 ntldr=, as $LDR$).
+nt31_layout() {
+    nt4_copy_upper "$i386" "$ls_dir" files || fail 'cannot copy the I386 folder (local source)'
+    dosnet=''
+    for name in DOSNET.INF dosnet.inf; do [ -f "$i386/$name" ] && dosnet="$i386/$name" && break; done
+    [ -n "$dosnet" ] || fail 'the ISO has no I386\DOSNET.INF'
+    awk '{ sub(/\r$/, "") } /^\[/ { s = (tolower($0) == "[floppyfiles]"); next }
+        s && $0 !~ /^[ \t]*#/ { n = split($0, a, ","); if (n >= 2) { gsub(/[ \t]/, "", a[2]); if (a[2] != "") print toupper(a[2]) } }' "$dosnet" |
+    while read -r file; do
+        [ -f "$ls_dir/$file" ] || fail "the ISO has no I386\\$file (DOSNET.INF [FloppyFiles])"
+        cp "$ls_dir/$file" "$work/c/$file" || fail "cannot copy $file"
+    done || exit 1
+    rm -f "$work/c/SETUPLDR"
+    # Removed again after the install (nt4_vm_finish); NTDETECT.COM stays.
+    mkdir -p "$work/c/USOS/NT3"
+    ls "$work/c" | grep -v -x -e NTDETECT.COM -e USOS -e '$WIN_NT$.~LS' -e TXTSETUP.INF > "$work/c/USOS/NT3/ROOTLIST.TXT"
+    cp "$setupldr" "$work/c/\$LDR\$" || fail 'cannot copy the Setup loader'
+    { crlf < "$txtsetup"; printf '\r\n[MsDosInitiated]\r\n'; } > "$work/c/TXTSETUP.INF" || fail 'cannot write TXTSETUP.INF'
+    [ -f "$work/c/NTDETECT.COM" ] || fail 'the ISO has no I386\NTDETECT.COM'
+    log "local source: $(find "$ls_dir" -type f | wc -l | tr -d ' ') files (NT 3.1 layout)"
+}
+
+# NT 3.1: \USOS\NT3 with the NT 3.1 driver builds; GUI Setup (the patched
+# INITIAL.INF, nt31_initial_inf) copies and registers them itself.
+nt31_usos() {
+    usos="$work/c/USOS/NT3"
+    mkdir -p "$usos"
+    cp "$drv/$ahci" "$usos/AHCINT.SYS" || fail "cannot copy $ahci"
+    cp "$drv/$rst" "$usos/USOSRST.SYS" || fail "cannot copy $rst"
+    cp "$drv/$usb" "$usos/USOSUSB.SYS" || fail "cannot copy $usb"
+    log 'display: VGA (640x480x16)'
+    printf 'answer=%s\r\nversion=%s.%s\r\n' "$ANSWER_KIND" "$major" "$minor" > "$usos/SOURCE.TXT"
+    # The names GUI Setup would ask for (WINNT.SIF [UserData]; NT 3.1 has no
+    # answer file: nt31_vm_patch_initial writes them into INITIAL.INF).
+    awk -v BINMODE=3 '{ sub(/\r$/, "") } /^\[/ { s = (tolower($0) == "[userdata]"); next }
+        s && /=/ { k = $0; sub(/[ \t]*=.*/, "", k); sub(/^[ \t]*!?/, "", k); k = tolower(k)
+            v = $0; sub(/^[^=]*=[ \t]*/, "", v); gsub(/"/, "", v); sub(/[ \t]+$/, "", v)
+            if (k == "fullname") f = v; else if (k == "orgname") o = v; else if (k == "computername") c = v }
+        END { if (f == "") f = "USOS"; if (c == "" || c == "USOS-NT351") c = "USOS-NT31"
+            printf "fullname=%s\r\norg=%s\r\ncomputer=%s\r\n", f, o, c }' "$work/WINNT.SIF" > "$usos/NAMES.TXT" || fail 'cannot write NAMES.TXT'
+    # Run by GUI Setup at its end (INITIAL.INF [UsosNt31Post], after the
+    # Services keys): the drivers into place, then DONE.TXT for the VM loop.
+    crlf <<'EOF' > "$usos/POST.CMD"
+@echo off
+echo USOS NT 3.1 post > C:\USOS\NT3\POST.LOG
+copy C:\USOS\NT3\AHCINT.SYS C:\WINNT\SYSTEM32\DRIVERS\AHCINT.SYS >> C:\USOS\NT3\POST.LOG
+copy C:\USOS\NT3\USOSRST.SYS C:\WINNT\SYSTEM32\DRIVERS\USOSRST.SYS >> C:\USOS\NT3\POST.LOG
+copy C:\USOS\NT3\USOSUSB.SYS C:\WINNT\SYSTEM32\DRIVERS\USOSUSB.SYS >> C:\USOS\NT3\POST.LOG
+if not exist C:\WINNT\SYSTEM32\DRIVERS\AHCINT.SYS echo AHCINT.SYS copy FAILED >> C:\USOS\NT3\POST.LOG
+echo done > C:\USOS\NT3\DONE.TXT
+EOF
+}
+
 for tool in dd od mkfs.fat mdir syslinux mount umount losetup blockdev awk sync wc tr; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
@@ -274,7 +335,17 @@ txtsetup=''
 for name in TXTSETUP.SIF txtsetup.sif; do [ -f "$i386/$name" ] && txtsetup="$i386/$name" && break; done
 setupldr=''
 for name in SETUPLDR.BIN setupldr.bin; do [ -f "$i386/$name" ] && setupldr="$i386/$name" && break; done
-[ -n "$txtsetup" ] && [ -n "$setupldr" ] || fail 'the ISO has no I386\TXTSETUP.SIF / SETUPLDR.BIN (not an NT 3.51 / 4.0 Setup CD)'
+# NT 3.1 (docs/nt31-2026-10-09.md): the older Setup generation, I386\TXTSETUP.INF
+# and I386\SETUPLDR (no .BIN), no MajorVersion. Its text-mode Setup is
+# SETUPAPP.EXE inside the loader (BIOS disk calls, no CD driver needed when
+# the files come from the local source on C:).
+nt31=''
+if [ -z "$txtsetup" ] && [ -z "$setupldr" ]; then
+    for name in TXTSETUP.INF txtsetup.inf; do [ -f "$i386/$name" ] && txtsetup="$i386/$name" && break; done
+    for name in SETUPLDR setupldr; do [ -f "$i386/$name" ] && setupldr="$i386/$name" && break; done
+    [ -n "$txtsetup" ] && [ -n "$setupldr" ] && nt31=yes
+fi
+[ -n "$txtsetup" ] && [ -n "$setupldr" ] || fail 'the ISO has no I386\TXTSETUP.SIF / SETUPLDR.BIN (not an NT 3.x / 4.0 Setup CD)'
 # [SetupData] MajorVersion: 4 = NT 4.0, 3 = NT 3.51 (2000/XP: 5). NT_MAJOR
 # (the system chosen in the menu, when set) must match the CD.
 setup_value() {
@@ -282,6 +353,7 @@ setup_value() {
 }
 major=$(setup_value majorversion)
 minor=$(setup_value minorversion)
+[ -z "$nt31" ] || { major=3; minor=10; }
 case "$major" in
     4) nt3='' sub=NT4 ;;
     3) nt3=yes sub=NT3 ;;
@@ -292,8 +364,8 @@ esac
 # Setup refuses a CPU newer than a Pentium, so its install VM runs -cpu
 # pentium, nt4_qemu_install.sh). NT 3.1 has no TXTSETUP.SIF (docs/nt35-2026-10-09.md).
 case "$nt3:$minor" in
-    yes:51|yes:50|:*) ;;
-    *) fail "of the NT 3.x family only NT 3.51 and NT 3.5 are supported so far (MinorVersion=${minor:-none})" ;;
+    yes:51|yes:50|yes:10|:*) ;;
+    *) fail "of the NT 3.x family only NT 3.51, 3.5 and 3.1 are supported so far (MinorVersion=${minor:-none})" ;;
 esac
 [ -z "${NT_MINOR:-}" ] || [ "$NT_MINOR" = "$minor" ] || fail "the ISO is Windows NT $major.$minor Setup, not the chosen NT $major.$NT_MINOR system"
 mbr_code=$LIB/xp-geometry-fix-mbr-440.bin
@@ -306,7 +378,13 @@ for file in AHCINT.SYS USOSRST.SYS USOSUSB.SYS; do [ -r "$drv/$file" ] || fail "
 # KeSetTargetProcessorDpc / KeSetImportanceDpc.
 rst=USOSRST.SYS
 [ "$nt3:$minor" != yes:50 ] || rst=USOSRST35.SYS
-if [ -n "$nt3" ]; then
+# NT 3.1 builds (no KeRegisterBugCheckCallback, memset, IofCompleteRequest,
+# Kf*Irql in the 3.1 kernel / HAL): AHCINT31.SYS, USOSRST31.SYS, USOSUSB31.SYS.
+ahci=AHCINT.SYS usb=USOSUSB.SYS
+[ -z "$nt31" ] || { rst=USOSRST31.SYS ahci=AHCINT31.SYS usb=USOSUSB31.SYS; }
+if [ -n "$nt31" ]; then
+    for file in $ahci $rst $usb; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
+elif [ -n "$nt3" ]; then
     for file in USOSNT3.EXE USOSACHK.EXE $rst; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
 else
     for file in USOSVBE.SYS USOSOFF.EXE; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
@@ -347,6 +425,12 @@ size=$(blockdev --getsize64 "$TARGET_DEVICE") || fail 'cannot read the target si
 total=$((size / 512))
 [ "$total" -ge "$MIN_SECTORS" ] || fail 'the selected disk is smaller than 4 GiB; no disk was changed'
 [ "$total" -le 4294967295 ] || fail 'the selected disk is larger than 2 TiB (MBR); no disk was changed'
+CLUSTER_SECTORS=64
+if [ -n "$nt31" ]; then
+    PART_SECTORS=${NT31_PART_SECTORS:-1024000}
+    CLUSTER_SECTORS=${NT31_CLUSTER_SECTORS:-16}
+    MKFS_NOALIGN=-a
+fi
 log "disk_sectors=$total part_start=$PART_START part_sectors=$PART_SECTORS"
 
 dd if=/dev/zero of="$TARGET_DEVICE" bs=512 count=2048 conv=notrunc,fsync 2>/dev/null || fail 'cannot clear the disk start'
@@ -366,7 +450,7 @@ dd if="$mbr" of="$TARGET_DEVICE" bs=512 count=1 conv=notrunc,fsync 2>/dev/null |
 
 part_loop=$(losetup -f) || fail 'no free loop device for the new partition'
 losetup -o $((PART_START * 512)) "$part_loop" "$TARGET_DEVICE" || fail 'cannot attach the new partition'
-mkfs.fat -F 16 -s 64 -R 1 -f 2 -r 512 -h "$PART_START" -g 255/63 -D 0x80 -M 0xF8 -n USOS-NT4 "$part_loop" $((PART_SECTORS / 2)) >/dev/null ||
+mkfs.fat -F 16 -s "$CLUSTER_SECTORS" ${MKFS_NOALIGN:-} -R 1 -f 2 -r 512 -h "$PART_START" -g 255/63 -D 0x80 -M 0xF8 -n USOS-NT4 "$part_loop" $((PART_SECTORS / 2)) >/dev/null ||
     fail 'cannot format the FAT16 partition'
 mount -t vfat -o shortname=winnt,utf8=0 "$part_loop" "$work/c" || fail 'cannot mount the new FAT16 partition'
 
@@ -375,6 +459,9 @@ bt_dir="$work/c/\$WIN_NT\$.~BT"
 # NT 4.0 Setup reads \$WIN_NT$.~LS\I386; NT 3.51 reads the files straight
 # from \$WIN_NT$.~LS (its DOSNET.INF d1 = \; QEMU 2026-10-08: "Setup was
 # unable to copy the file kbdclass.sys" with an I386 subfolder).
+if [ -n "$nt31" ]; then
+    nt31_layout
+else
 ls_src=$ls_dir/I386
 [ -z "$nt3" ] || ls_src=$ls_dir
 nt4_copy_upper "$i386" "$ls_src" || fail 'cannot copy the I386 folder (local source)'
@@ -434,14 +521,16 @@ ntdetect=''
 for name in NTDETECT.COM ntdetect.com; do [ -f "$i386/$name" ] && ntdetect="$i386/$name" && break; done
 [ -n "$ntdetect" ] || fail 'the ISO has no I386\NTDETECT.COM'
 cp "$ntdetect" "$work/c/NTDETECT.COM" || fail 'cannot copy NTDETECT.COM'
+fi
 
-crlf() { awk -v BINMODE=3 '{ sub(/\r$/, ""); printf "%s\r\n", $0 }'; }
 # NT 3.51: \USOS\NT3 with the NT 3.51 driver builds and USOSNT3.EXE, which
 # does what POST.CMD and the .REG files do for NT 4.0 (tools/nt3/usosnt3:
 # copies the drivers, writes their Services keys, atdisk/atapi off, the
 # version and driver keys as text, DONE.TXT, restart). No service pack yet:
 # the NT 3.51 RTM kernel starts on Zen 3 (QEMU EPYC-Milan 2026-10-08).
-if [ -n "$nt3" ]; then
+if [ -n "$nt31" ]; then
+nt31_usos
+elif [ -n "$nt3" ]; then
 usos="$work/c/USOS/NT3"
 mkdir -p "$usos"
 for file in AHCINT.SYS USOSUSB.SYS USOSNT3.EXE; do

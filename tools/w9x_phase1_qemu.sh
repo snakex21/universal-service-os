@@ -72,8 +72,8 @@ w9x_vm_available() {
     # Me (2026-10-06): the same DOS-stage SETUP.EXE as 98 (/P I valid), so the
     # same VM path. 95 (2026-10-06) too, but only with its key: the caller
     # (w9x_csmwrap_prepare.sh) keeps the native start for 95 without one.
-    # NT4 / NT4S (2026-10-07), NT351 / NT351S (2026-10-08), NT35 / NT35S (2026-10-09): the whole install runs in the VM (tools/nt4_qemu_install.sh).
-    case "$1" in 98SE|98|ME|95|NT4|NT4S|NT351|NT351S|NT35|NT35S) ;; *) echo "release $1 keeps the native Setup start"; return 1 ;; esac
+    # NT4 / NT4S (2026-10-07), NT351 / NT351S (2026-10-08), NT35 / NT35S, NT31 / NT31S (2026-10-09): the whole install runs in the VM (tools/nt4_qemu_install.sh).
+    case "$1" in 98SE|98|ME|95|NT4|NT4S|NT351|NT351S|NT35|NT35S|NT31|NT31S) ;; *) echo "release $1 keeps the native Setup start"; return 1 ;; esac
     if [ -e "$W9X_VM_FLAGS/phase1-native.flag" ]; then echo 'phase1-native.flag present'; return 1; fi
     if [ ! -x "$W9X_VM_QEMU" ]; then echo 'qemu9x.cpio not loaded (no QEMU)'; return 1; fi
     for firmware in bios-256k.bin vgabios-stdvga.bin; do
@@ -218,6 +218,9 @@ EOF
         sectors=$(w9x_vm_written "$target")
         written=$(( (sectors - written0) / 2048 ))
         command -v w9x_phase1_progress >/dev/null 2>&1 && w9x_phase1_progress "$elapsed" "$written"
+        # A caller-defined step on every round (NT 3.1: its text-mode Setup
+        # pages answered by their text, nt4_qemu_install.sh).
+        [ -z "${W9X_VM_TICK_FN:-}" ] || "$W9X_VM_TICK_FN" "$elapsed" || true
         if [ "$sectors" != "$last_written" ]; then
             last_written=$sectors
             idle_since=$now

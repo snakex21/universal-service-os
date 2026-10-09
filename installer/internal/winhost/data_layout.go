@@ -34,6 +34,7 @@ var windowsProfiles = []dataProfile{
 	{"windows-nt-4", "Windows NT 4.0", true, false},
 	{"windows-nt-3-51", "Windows NT 3.51", true, false},
 	{"windows-nt-3-5", "Windows NT 3.5", true, false},
+	{"windows-nt-3-1", "Windows NT 3.1", true, false},
 	{"windows-me", "Windows Me", true, false},
 	{"windows-98-se", "Windows 98 SE", true, false},
 	{"windows-98", "Windows 98", true, false},
@@ -64,6 +65,8 @@ var windowsProfiles = []dataProfile{
 	{"windows-nt-3-51-server", "Windows NT 3.51 Server", true, false},
 	// Windows NT 3.5 Server: the NT 3.5 VM flow with the Server CD.
 	{"windows-nt-3-5-server", "Windows NT 3.5 Server", true, false},
+	// Windows NT 3.1 Advanced Server: the NT 3.1 VM flow with the AS CD.
+	{"windows-nt-3-1-server", "Windows NT 3.1 Advanced Server", true, false},
 }
 
 var linuxProfiles = []dataProfile{

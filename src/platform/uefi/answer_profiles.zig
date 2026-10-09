@@ -308,7 +308,7 @@ pub fn stageWin9x(root: *uefi.protocol.File, profile: *const Profile) !void {
         const result = (try answer.render(profile, entry.system_id, .x86, null, null, &rendered)) orelse return error.NoGeneratedAnswer;
         try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }), result.bytes);
     }
-    // Windows NT 3.51 / 3.5 (same step 620): NT351.SIF / NT351S.SIF, NT35.SIF / NT35S.SIF.
+    // Windows NT 3.51 / 3.5 / 3.1 (same step 620): NT351.SIF / NT351S.SIF, NT35.SIF / NT35S.SIF, NT31.SIF / NT31S.SIF.
     for (answer.nt3.staged) |entry| {
         const result = (try answer.render(profile, entry.system_id, .x86, null, null, &rendered)) orelse return error.NoGeneratedAnswer;
         try settings_store.replaceFile(root, try std.fmt.bufPrint(&path, "{s}\\{s}", .{ plan_file.directory, entry.file }), result.bytes);

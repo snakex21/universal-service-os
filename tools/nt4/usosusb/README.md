@@ -71,3 +71,11 @@ the scan code table and the flow wiring.
 
 Licence: GPL-3.0-or-later. Copyright (C) 2026 Maksymilian and the USOS Authors.
 Own code, written from the public xHCI 1.2, USB 2.0 and HID 1.11 specifications.
+
+## NT 3.1 build
+
+`build-nt31.cmd` (`-DUSOSUSB_NT31`, PE version 3.10) -> `bin/nt31/i386/usosusb.sys`:
+`IoCompleteRequest`, `KeRaiseIrql` and `KeLowerIrql` as the NT 3.1 kernel and HAL
+export them, plus a Diag line written at once in `DriverEntry`. NT 3.1 needs it as
+a boot driver (Start 0): as a system driver its DriverEntry never ran. QEMU
+2026-10-10: USB keyboard logon on NT 3.1 (docs/nt31-2026-10-09.md).

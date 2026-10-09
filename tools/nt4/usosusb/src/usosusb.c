@@ -42,7 +42,20 @@
 #include <ntddmou.h>
 #include <kbdmou.h>
 
+#ifdef USOSUSB_NT31
+/* NT 3.1 (build-nt31.cmd): its kernel exports IoCompleteRequest, its HAL
+   KeRaiseIrql / KeLowerIrql (stdcall), not the fastcall Iof / Kf forms
+   the WDK macros name. */
+#undef IoCompleteRequest
+#undef KeRaiseIrql
+#undef KeLowerIrql
+__declspec(dllimport) VOID __stdcall IoCompleteRequest(PIRP Irp, CCHAR PriorityBoost);
+__declspec(dllimport) VOID __stdcall KeRaiseIrql(KIRQL NewIrql, PKIRQL OldIrql);
+__declspec(dllimport) VOID __stdcall KeLowerIrql(KIRQL NewIrql);
+#define USOSUSB_VERSION L"usosusb 1.0-nt31"
+#else
 #define USOSUSB_VERSION L"usosusb 1.0-nt4"
+#endif
 
 #define MAXHC 4
 #define MAXDEV 16
@@ -1082,6 +1095,9 @@ static VOID worker(PVOID ctx)
                     hc->vid = (USHORT)id;
                     hc->did = (USHORT)(id >> 16);
                     diag_add(L" hc%u=%02x:%02x.%u", g_nhc, bus, dv, fn);
+#ifdef USOSUSB_NT31
+                    diag_write();
+#endif
                     if (hc_start(hc, a)) {
                         diag_add(L"(%u ports)", hc->maxports, 0, 0, 0);
                         g_nhc++;
@@ -1306,8 +1322,19 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT drv, PUNICODE_STRING reg)
     drv->MajorFunction[IRP_MJ_DEVICE_CONTROL] = dispatch;
     drv->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL] = dispatch;
 
+#ifdef USOSUSB_NT31
+    /* NT 3.1 bring-up: a Diag line at once, so a stop before the worker
+       still shows how far DriverEntry came. */
+    g_diag[0] = 0;
+    diag_add(L"%s: entry", (ULONG_PTR)USOSUSB_VERSION, 0, 0, 0);
+    diag_write();
+#endif
     g_kbd = make_port(drv, L"KeyboardPort", L"KeyboardPort", 1);
     g_mou = make_port(drv, L"PointerPort", L"PointerPort", 0);
+#ifdef USOSUSB_NT31
+    diag_add(L" kbd=%u mou=%u", (ULONG_PTR)(g_kbd != NULL), (ULONG_PTR)(g_mou != NULL), 0, 0);
+    diag_write();
+#endif
     if (!g_kbd && !g_mou)
         return STATUS_NO_SUCH_DEVICE;
     st = PsCreateSystemThread(&th, THREAD_ALL_ACCESS, NULL, NULL, NULL, worker, NULL);

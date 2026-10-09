@@ -141,7 +141,9 @@ UsosActiveProcessors(VOID)
 }
 #define KeQueryActiveProcessors() UsosActiveProcessors()
 #ifdef USOSRST_NT351
-#ifdef USOSRST_NT35
+#if defined(USOSRST_NT31)
+#define USOSRST_VERSION "usosrst 1.6-nt31"
+#elif defined(USOSRST_NT35)
 #define USOSRST_VERSION "usosrst 1.6-nt35"
 #else
 #define USOSRST_VERSION "usosrst 1.6-nt351"
@@ -1569,7 +1571,10 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     vga.QuadPart = 0xB8000;
     g_Vga = (PUSHORT)MmMapIoSpace(vga, 80 * 50 * 2, MmNonCached);
     KeInitializeCallbackRecord(&g_BugCheckRecord);
+#ifndef USOSRST_NT31
+    /* NT 3.1 (build-nt31.cmd) exports no KeRegisterBugCheckCallback. */
     KeRegisterBugCheckCallback(&g_BugCheckRecord, BugCheckCallback, NULL, 0, g_Component);
+#endif
 
     g_InSetup = SetupInProgress();
     FindResetRegister();

@@ -13,7 +13,8 @@
     "patches/0006-nt4-no-interrupt.patch",
     "patches/0007-nt351-no-kibugcheckdata.patch",
     "patches/0008-usos5-readback-mismatch-not-fatal.patch",
-    "patches/0009-usos6-nt351-direct-pci-config.patch"
+    "patches/0009-usos6-nt351-direct-pci-config.patch",
+    "patches/0010-usos7-nt31-build.patch"
   ],
   "build": "build.cmd (WDK 7.1, x86 WXP)",
   "files": {
@@ -21,7 +22,7 @@
     "bin/2KXP/i386/ahcint.sys": "f5f0a8112f941f3833ac43c8104b4d169d2b6831d4ec224f9560ea10e3234f07",
     "build.cmd": "cb6c3f7f2289ee7f1b3ede66fe1824b474eb7dc425112a4a9947e95ef295111e",
     "LICENSE": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
-    "MODIFIED.txt": "c0167a0cddda994e0e36e94cec0c6ed44c1a1391514c8f555c78fc7b2c813f09",
+    "MODIFIED.txt": "88d9241a952cceac00921562087c1c13f175bf531ccccf1af4a44be4666834e8",
     "patches/0001-usos1-flush-cache.patch": "a858d1023d995b7c7ee6ef32b1c2668fd615a4ed8cad1e964fb41104883311fd",
     "patches/0002-usos2-target-check-and-trace.patch": "ba70562a120bd080bbdbca8e11985eac4772c8a104577437f359066ec00abd3a",
     "patches/0003-usos3-screen-stages-readback-fail-loudly.patch": "30a3f2b7c10d7895cec58b0878f5fb0d3e1487893cb962c43cbc9e622b37f7e6",
@@ -31,9 +32,9 @@
     "src/9X/ahcint9x.lnk": "f6e9f66dfe8bfad3d23274c49304597a480a34ea19f129354e188735896ca6c1",
     "src/9X/build.bat": "ab8f19b5f282b3bc2a3d9dcc0c24e75e541a325f7caec528fd3893a4c8f875f5",
     "src/9X/makefile": "0dd9d6acd03ad012ccbd40562bf52ee0f929a67bb46062f7f62d8b511f635666",
-    "src/ahcimain.c": "97de8cab7cc2dd8d36a731ff91cab041a0a1357dda085c2d85d849d84b009217",
+    "src/ahcimain.c": "57bd0302272dc094658fc9786f8e7c7f1ecfea7601451156e635553dc75c336b",
     "src/ahcint.h": "6e31d0ef7fa5b8f5e3a288a4b4e223c08e3b46fc7282ea0e5b0567e787651968",
-    "src/ahcisatl.c": "05c3d5aff7fdd70c1d6fa6e7f6cf5cc85b96b2d4350d9aefc511c163da7e1bb9",
+    "src/ahcisatl.c": "3fb5ea0e6f1672d88fc4290f1760d7967c9ae622046f94e516351e7a968c52f2",
     "src/NT/build.bat": "592a19badaeaca36fc9c02dd9c520d9aa12f431ba0d3e07933abddbf4c70a560",
     "toolchain.txt": "d76edb2e19f45018a5852b95ac2ec1e023dee88cf0ab207600e3ffed47a58897",
     "patches/0004-usos4-stall-diagnostics.patch": "27f3b3b460b6cd02980d55b445eeef29a6aea31eed9ead9b8ccf08f3050c6170",
@@ -47,8 +48,12 @@
     "bin/NT351/i386/ahcint.sys": "40ba39c123e98ae5129751e7691a8ca5c41b9e88c269daabf3f288b90fdb6ed9",
     "patches/0007-nt351-no-kibugcheckdata.patch": "b956ee5742ad5196b043088df07a2a6cff58f2624d5b851152bd40eed19c115d",
     "patches/0008-usos5-readback-mismatch-not-fatal.patch": "26cf9a66b5aa637e46b6ab038b7d118bd851e8fc948dd23f673e26da4e9c3220",
-    "patches/0009-usos6-nt351-direct-pci-config.patch": "d9d861d99ff8d0cfb2494e97b991cfd1ea07819b11c3c5c79418cbf01fc97416"
+    "patches/0009-usos6-nt351-direct-pci-config.patch": "d9d861d99ff8d0cfb2494e97b991cfd1ea07819b11c3c5c79418cbf01fc97416",
+    "build-nt31.cmd": "313419fd117b184cd8db1caa9646a4435cbaf9ef85b1a62b4e55a66799a9c17a",
+    "bin/NT31/i386/ahcint.sys": "962db3d8b1d4882fbe6d287fc30abca3335c59fcad1d55fcffd2c47af803b53c",
+    "patches/0010-usos7-nt31-build.patch": "1c94cdb7678325166b5cd49f438198e2e65062bb9d9864d652daadeee6d5d3eb"
   },
   "build_nt4": "build-nt4.cmd (WDK 7.1, x86 WXP, -DAHCI_NT4 -DAHCI_NT4_WDK, PE version 4.00 via tools/nt4/pe_nt4_version.py) -> bin/NT4/i386/ahcint.sys",
-  "build_nt351": "build-nt351.cmd (WDK 7.1, x86 WXP, the NT 4.0 defines plus patches 0007 (no KiBugCheckData), 0008 (usos5, all builds) and 0009 (usos6: Isa registration, PCI configuration space through CF8h/CFCh, PCIBus DMA adapter; works with the PCI BIOS hidden by the NT 3.x MBR), PE version 3.51 via tools/nt4/pe_nt4_version.py --version 3.51) -> bin/NT351/i386/ahcint.sys; every import resolves on NT 3.51 (tools/tests/data/nt351_exports.txt)"
+  "build_nt351": "build-nt351.cmd (WDK 7.1, x86 WXP, the NT 4.0 defines plus patches 0007 (no KiBugCheckData), 0008 (usos5, all builds) and 0009 (usos6: Isa registration, PCI configuration space through CF8h/CFCh, PCIBus DMA adapter; works with the PCI BIOS hidden by the NT 3.x MBR), PE version 3.51 via tools/nt4/pe_nt4_version.py --version 3.51) -> bin/NT351/i386/ahcint.sys; every import resolves on NT 3.51 (tools/tests/data/nt351_exports.txt)",
+  "build_nt31": "build-nt31.cmd (WDK 7.1, x86 WXP, the NT 3.51 defines plus -DAHCI_NT31, patch 0010 (usos7): HwInitializationDataSize 0x40, no SlotNumber / MaximumNumberOfTargets (the NT 3.1 ScsiPort structures end earlier), an EISA bus-master adapter (NT 3.1 has no PCIBus interface type), no KeRegisterBugCheckCallback, own memset; PE version 3.10) -> bin/NT31/i386/ahcint.sys; every import resolves on NT 3.1 (tools/tests/data/nt31_exports.txt)"
 }
