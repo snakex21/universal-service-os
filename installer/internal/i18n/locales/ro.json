@@ -1169,6 +1169,7 @@
   "boot.summary.w2k_limits": "Windows 2000 (experimental): fără driver AHCI/NVMe/USB 3 pentru NT 5.0 (SATA în mod IDE), max. 4 GB RAM și 2 procesoare",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (experimental): calea Windows 2000; răspunde licențiere Per server (5), grup de lucru, IIS oprit; cheia de produs din profilul de răspunsuri; un CD fără SP4 nu are stiva USB 2.0 (fără tastatură/mouse USB)",
   "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (experimental): calea Windows XP; necesită suportul pe un singur disc cu CMPNENTS (componente Media Center); cheia de produs din profilul de răspunsuri, altfel din WINNT.SIF al discului",
+  "boot.summary.xp_tablet_limits": "Windows XP Tablet PC Edition 2005 (experimental): calea Windows XP; necesită suportul pe un singur disc cu CMPNENTS (componente Tablet PC); cheia de produs Tablet PC din profilul de răspunsuri",
 
   "boot.summary.nt52_limits": "NT 5.2 (experimental): AHCI prin GenAHCI pe StorPort-ul sistemului; fără driver NVMe/USB 3 în instalare",
   "boot.summary.vista_csmwrap": "Vista fără CSM (experimental): instalare legacy (MBR) prin CSMWrap, placă cu VBIOS legacy",

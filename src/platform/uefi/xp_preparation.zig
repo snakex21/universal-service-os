@@ -38,6 +38,9 @@ pub const Nt5System = enum {
     /// XP Media Center Edition 2005: the XP action and profile; the
     /// micro-Linux takes the Media Center DATA folder (usos.xp_edition=mce).
     windows_xp_mce,
+    /// XP Tablet PC Edition 2005: the XP action and profile; the micro-Linux
+    /// takes the Tablet PC DATA folder (usos.xp_edition=tablet).
+    windows_xp_tablet,
 
     pub fn fromId(system_id: []const u8) ?Nt5System {
         if (std.mem.eql(u8, system_id, "windows-xp")) return .windows_xp;
@@ -46,12 +49,13 @@ pub const Nt5System = enum {
         if (std.mem.eql(u8, system_id, "windows-server-2003")) return .windows_server_2003;
         if (std.mem.eql(u8, system_id, "windows-xp-x64")) return .windows_xp_x64;
         if (std.mem.eql(u8, system_id, "windows-xp-mce")) return .windows_xp_mce;
+        if (std.mem.eql(u8, system_id, "windows-xp-tablet")) return .windows_xp_tablet;
         return null;
     }
 
     pub fn action(self: Nt5System) []const u8 {
         return switch (self) {
-            .windows_xp, .windows_xp_mce => "xp-staging",
+            .windows_xp, .windows_xp_mce, .windows_xp_tablet => "xp-staging",
             .windows_2000, .windows_2000_server => "windows2000-staging",
             .windows_server_2003 => "windows2003-staging",
             .windows_xp_x64 => "xp64-staging",
@@ -60,7 +64,7 @@ pub const Nt5System = enum {
 
     pub fn planProfile(self: Nt5System) []const u8 {
         return switch (self) {
-            .windows_xp, .windows_xp_mce => "xp-x86-sp3-uefi-csm",
+            .windows_xp, .windows_xp_mce, .windows_xp_tablet => "xp-x86-sp3-uefi-csm",
             .windows_2000, .windows_2000_server => "w2k-x86-sp4-uefi-csm",
             .windows_server_2003 => "w2k3-x86-sp2-uefi-csm",
             .windows_xp_x64 => "xp-x64-sp2-uefi-csm",
@@ -72,6 +76,7 @@ pub const Nt5System = enum {
         return switch (self) {
             .windows_2000_server => " usos.w2k_edition=server",
             .windows_xp_mce => " usos.xp_edition=mce",
+            .windows_xp_tablet => " usos.xp_edition=tablet",
             else => "",
         };
     }
@@ -275,13 +280,36 @@ test "XP Media Center Edition: the XP action and profile plus its DATA folder" {
     try std.testing.expectEqualStrings(xp, joined[0 .. at + rest.len]);
 }
 
+test "XP Tablet PC Edition: the XP action and profile plus its DATA folder" {
+    var xp_buffer: [2048]u8 = undefined;
+    var tablet_buffer: [2048]u8 = undefined;
+    const common = CommandParts{ .lang_initrd = lang_initrd_option, .esp_partuuid = "0257E175-1685-4311-91AA-5A83D8EB41E5", .image_hex = "7470632e69736f", .csmwrap = true };
+    var xp_parts = common;
+    xp_parts.system = .windows_xp;
+    var tablet_parts = common;
+    tablet_parts.system = Nt5System.fromId("windows-xp-tablet").?;
+    const xp = try formatCommand(&xp_buffer, xp_parts);
+    const tablet = try formatCommand(&tablet_buffer, tablet_parts);
+    try std.testing.expect(std.mem.indexOf(u8, tablet, " usos.legacy_action=xp-staging ") != null);
+    try std.testing.expect(std.mem.indexOf(u8, tablet, " usos.plan_profile=xp-x86-sp3-uefi-csm usos.xp_edition=tablet usos.xp_boot=csmwrap ") != null);
+    try std.testing.expectEqual(usos.flow.answer.target.Arch.x86, tablet_parts.system.arch());
+    // Only the edition token differs.
+    const token = " usos.xp_edition=tablet";
+    const at = std.mem.indexOf(u8, tablet, token).?;
+    var joined: [2048]u8 = undefined;
+    @memcpy(joined[0..at], tablet[0..at]);
+    const rest = tablet[at + token.len ..];
+    @memcpy(joined[at .. at + rest.len], rest);
+    try std.testing.expectEqualStrings(xp, joined[0 .. at + rest.len]);
+}
+
 test "the menu theme reaches the NT5 micro-Linux command line" {
     const theme_cmdline = usos.gui.theme_cmdline;
     const outcome = usos.gui.theme_file.resolve("base=dark\nbackground=#15100d\nheader=#1d1612\naccent=#ff9e40\n");
     try std.testing.expect(outcome.ok());
     const sunset = outcome.theme;
     var theme_buffer: [theme_cmdline.option_len]u8 = undefined;
-    for ([_]Nt5System{ .windows_xp, .windows_2000, .windows_2000_server, .windows_server_2003, .windows_xp_x64, .windows_xp_mce }) |system| {
+    for ([_]Nt5System{ .windows_xp, .windows_2000, .windows_2000_server, .windows_server_2003, .windows_xp_x64, .windows_xp_mce, .windows_xp_tablet }) |system| {
         for ([_]bool{ false, true }) |csmwrap| {
             var buffer: [2048]u8 = undefined;
             const command = try formatCommand(&buffer, .{ .system = system, .lang_initrd = lang_initrd_option, .esp_partuuid = "0257E175-1685-4311-91AA-5A83D8EB41E5", .image_hex = "77326b2e69736f", .csmwrap = csmwrap, .theme_option = theme_cmdline.option(&theme_buffer, sunset), .console_options = "quiet" });

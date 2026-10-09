@@ -86,6 +86,8 @@ const entries = [_]Entry{
     .{ .id = "windows-xp-x64", .family = .windows_xp },
     // XP Media Center Edition 2005: the XP answer (own key field).
     .{ .id = "windows-xp-mce", .family = .windows_xp },
+    // XP Tablet PC Edition 2005: the XP answer (own key field).
+    .{ .id = "windows-xp-tablet", .family = .windows_xp },
     .{ .id = "windows-server-2003", .family = .windows_2003 },
     .{ .id = "windows-vista", .family = .vista },
     .{ .id = "windows-7", .family = .windows_7 },
@@ -132,12 +134,13 @@ test "families of the catalog systems" {
     // XP x64 renders the XP answer (the family's system id stays windows-xp),
     // 2000 Server the 2000 answer.
     for (entries) |entry| {
-        if (std.mem.eql(u8, entry.id, "windows-xp-x64") or std.mem.eql(u8, entry.id, "windows-2000-server") or std.mem.eql(u8, entry.id, "windows-xp-mce") or std.mem.eql(u8, entry.id, "windows-embedded-8-1-industry")) continue;
+        if (std.mem.eql(u8, entry.id, "windows-xp-x64") or std.mem.eql(u8, entry.id, "windows-2000-server") or std.mem.eql(u8, entry.id, "windows-xp-mce") or std.mem.eql(u8, entry.id, "windows-xp-tablet") or std.mem.eql(u8, entry.id, "windows-embedded-8-1-industry")) continue;
         try std.testing.expectEqualStrings(entry.id, systemId(entry.family));
     }
     try std.testing.expectEqual(Family.windows_xp, familyFor("windows-xp-x64").?);
     try std.testing.expectEqual(Family.windows_2000, familyFor("windows-2000-server").?);
     try std.testing.expectEqual(Family.windows_xp, familyFor("windows-xp-mce").?);
+    try std.testing.expectEqual(Family.windows_xp, familyFor("windows-xp-tablet").?);
     try std.testing.expectEqual(Family.windows_8_1, familyFor("windows-embedded-8-1-industry").?);
     try std.testing.expectEqualStrings("windows-8-1", systemId(.windows_8_1));
 }

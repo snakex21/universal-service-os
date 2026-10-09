@@ -619,6 +619,7 @@ pub const Key = enum(u16) {
     summary_xp_preparation,
     summary_xp_sif_merged,
     summary_xp_source,
+    summary_xp_tablet_limits,
     theme_edit_blocked,
     theme_edit_cancel,
     theme_edit_contrast_bad,
@@ -1307,6 +1308,7 @@ pub const hashes = [_]u32{
     0xedd282b9, // summary.xp_preparation
     0xa87889c3, // summary.xp_sif_merged
     0x6dfb98bd, // summary.xp_source
+    0x011e67b5, // summary.xp_tablet_limits
     0x1a62b0c1, // theme_edit.blocked
     0xbe71b5e9, // theme_edit.cancel
     0xf3bd28a8, // theme_edit.contrast.bad
@@ -1710,6 +1712,7 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    false,
     false,
     false,
     false,
@@ -2685,6 +2688,7 @@ pub const english = [_][]const u8{
     "UEFI; installed XP requires firmware CSM and MBR",
     "{0} (merged into the automatic answer)",
     "XP SP3 x86; ACPI / SATA / USB drivers; optional PAE boot entry",
+    "Windows XP Tablet PC Edition 2005 (experimental): the Windows XP path; needs the one-disc media with CMPNENTS (Tablet PC components); Tablet PC product key from the answer profile",
     "Fix the contrast first: {0}",
     "Cancel",
     "Too little contrast: {0}",

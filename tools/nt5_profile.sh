@@ -13,19 +13,30 @@ usos_nt5_profile() {
         windows-xp)
             NT5_NAME='Windows XP'
             NT5_TITLE='WINDOWS XP'
-            # XP Media Center Edition 2005 (menu entry windows-xp-mce): the
-            # same flow from its own DATA folder; the UEFI menu adds
-            # usos.xp_edition=mce (src/platform/uefi/xp_preparation.zig).
-            if [ "${USOS_XP_EDITION:-}" != mce ]; then
-                case " $(cat /proc/cmdline 2>/dev/null) " in
-                    *' usos.xp_edition=mce '*) USOS_XP_EDITION=mce ;;
-                    *) USOS_XP_EDITION= ;;
-                esac
-            fi
-            if [ "$USOS_XP_EDITION" = mce ]; then
-                NT5_NAME='Windows XP Media Center Edition 2005'
-                NT5_TITLE='WINDOWS XP MEDIA CENTER EDITION 2005'
-            fi
+            # XP Media Center Edition 2005 (menu entry windows-xp-mce) and
+            # XP Tablet PC Edition 2005 (windows-xp-tablet): the same flow
+            # from their own DATA folders; the UEFI menu adds
+            # usos.xp_edition=mce|tablet (src/platform/uefi/xp_preparation.zig).
+            case "${USOS_XP_EDITION:-}" in
+                mce | tablet) ;;
+                *)
+                    case " $(cat /proc/cmdline 2>/dev/null) " in
+                        *' usos.xp_edition=mce '*) USOS_XP_EDITION=mce ;;
+                        *' usos.xp_edition=tablet '*) USOS_XP_EDITION=tablet ;;
+                        *) USOS_XP_EDITION= ;;
+                    esac
+                    ;;
+            esac
+            case "$USOS_XP_EDITION" in
+                mce)
+                    NT5_NAME='Windows XP Media Center Edition 2005'
+                    NT5_TITLE='WINDOWS XP MEDIA CENTER EDITION 2005'
+                    ;;
+                tablet)
+                    NT5_NAME='Windows XP Tablet PC Edition 2005'
+                    NT5_TITLE='WINDOWS XP TABLET PC EDITION 2005'
+                    ;;
+            esac
             export USOS_XP_EDITION
             NT5_INSTALL_DIR=WINDOWS
             ;;

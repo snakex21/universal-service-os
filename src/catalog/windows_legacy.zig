@@ -21,6 +21,10 @@ pub const entries = [_]SystemEntry{
     // route_as windows-xp, profile xp-x86-sp3-uefi-csm) with its own DATA
     // folder (usos.xp_edition=mce). The BIOS Core leaves it out (size budget).
     uefiLegacy("windows-xp-mce", "Windows XP Media Center Edition 2005", "Windows XP Media Center Edition 2005"),
+    // Windows XP Tablet PC Edition 2005 (XP x86 SP3 Setup with the Tablet PC
+    // components in CMPNENTS\TABLETPC): the same XP flow from UEFI with its
+    // own DATA folder (usos.xp_edition=tablet). Not in the BIOS Core.
+    uefiLegacy("windows-xp-tablet", "Windows XP Tablet PC Edition 2005", "Windows XP Tablet PC Edition 2005"),
 }) ++ [_]SystemEntry{
     // XP Professional x64 (NT 5.2 amd64): the NT5 staging with an AMD64
     // source (profile xp-x64-sp2-uefi-csm from UEFI, experimental).

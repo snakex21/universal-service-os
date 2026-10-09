@@ -20,6 +20,7 @@ USOS_UI_HEADING=${USOS_UI_HEADING:-}
 USOS_UI_NT5=${USOS_UI_NT5:-no}
 case " $(cat /proc/cmdline 2>/dev/null) " in
     *' usos.legacy_action=xp-staging '*' usos.xp_edition=mce '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows XP Media Center Edition 2005' ;;
+    *' usos.legacy_action=xp-staging '*' usos.xp_edition=tablet '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows XP Tablet PC Edition 2005' ;;
     *' usos.legacy_action=xp-staging '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows XP' ;;
     *' usos.legacy_action=windows2000-staging '*' usos.w2k_edition=server '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows 2000 Server' ;;
     *' usos.legacy_action=windows2000-staging '*) USOS_UI_NT5=yes; USOS_UI_HEADING='Windows 2000' ;;

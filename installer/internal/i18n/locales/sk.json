@@ -1169,6 +1169,7 @@
   "boot.summary.w2k_limits": "Windows 2000 (experimentálne): chýba ovládač AHCI/NVMe/USB 3 pre NT 5.0 (SATA v režime IDE), max. 4 GB RAM a 2 procesory",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (experimentálne): cesta Windows 2000; odpovedá licencovanie Na server (5), pracovná skupina, IIS vypnuté; kód Product Key z profilu odpovedí; CD bez SP4 nemá zásobník USB 2.0 (bez USB klávesnice/myši)",
   "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (experimentálne): cesta Windows XP; vyžaduje jednodiskové médium s priečinkom CMPNENTS (súčasti Media Center); kód Product Key z profilu odpovedí, inak z vlastného WINNT.SIF disku",
+  "boot.summary.xp_tablet_limits": "Windows XP Tablet PC Edition 2005 (experimentálne): cesta Windows XP; vyžaduje jednodiskové médium s priečinkom CMPNENTS (súčasti Tablet PC); kód Product Key pre Tablet PC z profilu odpovedí",
 
   "boot.summary.nt52_limits": "NT 5.2 (experimentálne): AHCI cez GenAHCI na StorPorte systému; bez ovládača NVMe/USB 3 v inštalácii",
   "boot.summary.vista_csmwrap": "Vista bez CSM (experimentálne): legacy inštalácia (MBR) cez CSMWrap, karta s legacy VBIOS",

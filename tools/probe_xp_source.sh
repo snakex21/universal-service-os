@@ -59,8 +59,18 @@ mce_cab=$(find "$SOURCE_ROOT" -maxdepth 4 -type f -ipath '*/cmpnents/mediactr/i3
 if [ "${USOS_XP_EDITION:-}" = mce ] && [ "$media_center" != yes ]; then
     fail 'XP Media Center Edition entry: CMPNENTS\MEDIACTR\I386\MEDIACTR.CAB is missing (only disc 1 of the two-CD set?); use a disc with CD2'"'"'s CMPNENTS folder merged in'
 fi
+# XP Tablet PC Edition 2005 (menu entry windows-xp-tablet, USOS_XP_EDITION=
+# tablet): GUI Setup installs the Tablet PC components from CD2's
+# CMPNENTS\TABLETPC\I386\TABLETPC.CAB (DOSNET.INF d2 = \cmpnents\tabletpc\I386).
+tablet_pc=no
+tablet_cab=$(find "$SOURCE_ROOT" -maxdepth 4 -type f -ipath '*/cmpnents/tabletpc/i386/tabletpc.cab' 2>/dev/null | head -n 1)
+[ -z "$tablet_cab" ] || tablet_pc=yes
+if [ "${USOS_XP_EDITION:-}" = tablet ] && [ "$tablet_pc" != yes ]; then
+    fail 'XP Tablet PC Edition entry: CMPNENTS\TABLETPC\I386\TABLETPC.CAB is missing (only disc 1 of the two-CD set?); use a disc with CD2'"'"'s CMPNENTS folder merged in'
+fi
 [ -n "$service_pack_markers" ] || service_pack_markers=RTM
 
 printf 'markers=%s\n' "$markers"
 printf 'service_pack_markers=%s\n' "$service_pack_markers"
 printf 'media_center=%s\n' "$media_center"
+printf 'tablet_pc=%s\n' "$tablet_pc"

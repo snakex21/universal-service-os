@@ -1169,6 +1169,7 @@
   "boot.summary.w2k_limits": "Windows 2000 (експериментально): немає драйвера AHCI/NVMe/USB 3 для NT 5.0 (SATA в режимі IDE), не більше 4 ГБ ОЗП і 2 процесорів",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (експериментально): шлях Windows 2000; відповідає ліцензування На сервер (5), робоча група, IIS вимкнено; ключ продукту з профілю відповідей; на диску без SP4 немає стека USB 2.0 (немає USB-клавіатури/миші)",
   "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (експериментально): шлях Windows XP; потрібен однодисковий носій із текою CMPNENTS (компоненти Media Center); ключ продукту з профілю відповідей, інакше з власного WINNT.SIF диска",
+  "boot.summary.xp_tablet_limits": "Windows XP Tablet PC Edition 2005 (експериментально): шлях Windows XP; потрібен однодисковий носій із текою CMPNENTS (компоненти Tablet PC); ключ продукту Tablet PC з профілю відповідей",
 
   "boot.summary.nt52_limits": "NT 5.2 (експериментально): AHCI через GenAHCI на StorPort системи; немає драйвера NVMe/USB 3 під час встановлення",
   "boot.summary.vista_csmwrap": "Vista без CSM (експериментально): legacy-встановлення (MBR) через CSMWrap, відеокарта з legacy VBIOS",
