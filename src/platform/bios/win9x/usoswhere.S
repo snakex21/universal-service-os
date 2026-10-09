@@ -18,6 +18,14 @@
  *   row 2  the last 8 distinct interrupted CS values, most recent first
  *   row 3  k:cccc:iiii n:nnnn  (1.2) CS:IP interrupted by the last keyboard
  *          IRQ (INT 09h) and the number of keyboard IRQs seen
+ *   row 4  c:bbbbbbbbbbbbbbbb s:ssss:pppp d:eeii  (1.3) the 8 code bytes at
+ *          the CS:IP of the last tick, the interrupted SS:SP and the DOS
+ *          critical-error and InDOS flags (SDA+0/+1; InDOS 01 = inside a
+ *          DOS call such as EXEC)
+ *   row 5  w:aaaa bbbb cccc b:eeee:bbbb i:nnnn  (1.3) the top three words
+ *          on the interrupted stack, ES:BX (buffer) of the last INT 13h
+ *          call and the number of INT 13h calls (still growing = disk I/O
+ *          goes on)
  *
  * Since 1.2 the corner is also redrawn from INT 09h, so pressing a key
  * (Shift, Ctrl) during a hang shows where the CPU is even when the timer
@@ -52,6 +60,10 @@
  * interlaced), which the Windows 2.x logo code CGA.LGO uses (it sets mode
  * 6 and makes colour 0 blue); 1.1 drew nothing over that logo.
  *
+ * 1.3 (Windows 2.03 on the X470: the loop was at 124A:0FAD, inside the
+ * 256-byte stack of WIN.COM): rows 4 and 5 tell code from data at the
+ * loop address and show whether DOS (EXEC) is still busy.
+ *
  * The hooks change no register and no flag before chaining. Running it a
  * second time only prints a message. It cannot be unloaded (reboot).
  *
@@ -64,6 +76,9 @@
 .equ ROW1, 41 - 40
 .equ ROW2, 41 - 40
 .equ ROW3, 41 - 40
+.equ ROW4, 41 - 40
+.equ ROW5, 41 - 40
+.equ NROWS, 6
 .section .text
 .global _start
 _start:
@@ -94,8 +109,15 @@ kcs:    .word 0
 kip:    .word 0
 kcnt:   .word 0
 busy:   .byte 0
-/* four rows of 40 characters (screen columns 40-79), filled per tick */
-scr:    .space 160, ' '
+cbytes: .space 8
+lss:    .word 0
+lsp:    .word 0
+stkw:   .space 6
+es13:   .word 0
+bx13:   .word 0
+n13:    .word 0
+/* six rows of 40 characters (screen columns 40-79), filled per tick */
+scr:    .space 40 * NROWS, ' '
 
 /* far jump through a dword at cs:[x] (FF /5 with a CS override) */
 .macro JMPFAR x
@@ -112,6 +134,11 @@ int10:
     JMPFAR old10
 int13:
     mov word ptr cs:[ax13], ax
+    mov word ptr cs:[es13], es
+    mov word ptr cs:[bx13], bx
+    pushf
+    inc word ptr cs:[n13]
+    popf
     JMPFAR old13
 int21:
     mov word ptr cs:[ax21], ax
@@ -168,6 +195,27 @@ int08:
     jmp 2b
 3:  mov word ptr [ring], ax
     mov word ptr [lcs], ax
+    /* 1.3: code bytes at CS:IP, interrupted SS:SP, top 3 stack words
+     * (frame: FLAGS at bp+24, the interrupted stack starts at bp+26) */
+    push ds
+    lds si, dword ptr [bp + 20]
+    mov di, offset cbytes
+    movsw
+    movsw
+    movsw
+    movsw
+    pop ds
+    mov word ptr [lss], ss
+    lea si, [bp + 26]
+    mov word ptr [lsp], si
+    push ds
+    push ss
+    pop ds
+    mov di, offset stkw
+    movsw
+    movsw
+    movsw
+    pop ds
     call draw
     jmp regout
 
@@ -326,6 +374,59 @@ draw:
     call pstr
     mov ax, word ptr [kcnt]
     call hex4
+    /* row 4 */
+    mov di, offset scr + 160 + ROW4
+    mov si, offset s_c
+    call pstr
+    mov si, offset cbytes
+    mov bx, 8
+17: lodsb
+    call hex2
+    dec bx
+    jnz 17b
+    mov si, offset s_s
+    call pstr
+    mov ax, word ptr [lss]
+    call hex4
+    mov al, ':'
+    call pch
+    mov ax, word ptr [lsp]
+    call hex4
+    mov si, offset s_d
+    call pstr
+    mov ax, 0xffff
+    cmp word ptr [sda + 2], 0
+    je 18f
+    push es
+    les bx, dword ptr [sda]
+    mov ax, word ptr es:[bx]
+    pop es
+    xchg ah, al
+18: call hex4
+    /* row 5 */
+    mov di, offset scr + 200 + ROW5
+    mov si, offset s_w
+    call pstr
+    mov si, offset stkw
+    mov bx, 3
+19: lodsw
+    call hex4
+    mov al, ' '
+    call pch
+    dec bx
+    jnz 19b
+    mov si, offset s_b
+    call pstr
+    mov ax, word ptr [es13]
+    call hex4
+    mov al, ':'
+    call pch
+    mov ax, word ptr [bx13]
+    call hex4
+    mov si, offset s_i
+    call pstr
+    mov ax, word ptr [n13]
+    call hex4
     cmp byte ptr [vmode], 3
     ja 12f
     call textout
@@ -436,6 +537,14 @@ textout:
     mov si, offset scr + 120 + ROW3
     mov di, (3 * 80 + 40 + ROW3) * 2
     mov cx, 40 - ROW3
+    call 1f
+    mov si, offset scr + 160 + ROW4
+    mov di, (4 * 80 + 40 + ROW4) * 2
+    mov cx, 40 - ROW4
+    call 1f
+    mov si, offset scr + 200 + ROW5
+    mov di, (5 * 80 + 40 + ROW5) * 2
+    mov cx, 40 - ROW5
 1:  lodsb
     mov ah, ATTR
     stosw
@@ -482,7 +591,7 @@ gfxout:
     pop es
     mov si, offset scr
     mov di, 40
-    mov bp, 4
+    mov bp, NROWS
 1:  mov dx, 40
 2:  lodsb
     cmp al, 0x80
@@ -545,7 +654,7 @@ cgaout:
     pop es
     mov si, offset scr
     mov di, 40
-    mov bp, 4
+    mov bp, NROWS
 1:  mov dx, 40
 2:  lodsb
     cmp al, 0x80
@@ -588,6 +697,12 @@ pstr:
     call pch
     jmp pstr
 1:  ret
+/* al -> two hex digits at es:di */
+hex2:
+    mov ah, al
+    mov cx, 2
+    mov dx, ax
+    jmp 1f
 /* ax -> four hex digits at es:di */
 hex4:
     mov cx, 4
@@ -612,6 +727,12 @@ s_21: .asciz " 21:"
 s_2f: .asciz " 2F:"
 s_k:  .asciz "k:"
 s_n:  .asciz " n:"
+s_c:  .asciz "c:"
+s_s:  .asciz " s:"
+s_d:  .asciz " d:"
+s_w:  .asciz "w:"
+s_b:  .asciz "b:"
+s_i:  .asciz " i:"
 
 resend:
 
@@ -738,9 +859,10 @@ install:
     int 0x21
 
 m_ok:
-    .ascii "USOSWHERE 1.2 resident: top right = CS:IP, ticks, PSP+name,\r\n"
+    .ascii "USOSWHERE 1.3 resident: top right = CS:IP, ticks, PSP+name,\r\n"
     .ascii "last INT 10h mode set + 13h/15h/21h/2Fh AX, last 8 CS values,\r\n"
-    .ascii "k: CS:IP at the last key press (press Shift during a hang).\r\n"
+    .ascii "k: CS:IP at the last key press (press Shift during a hang),\r\n"
+    .ascii "c: code bytes at CS:IP, SS:SP, d: InDOS, w: stack, INT 13h.\r\n"
     .ascii "GPL-3.0-or-later. /G: also CGA mode 6 + EGA/VGA 16 colours.\r\n$"
 m_font:
     .ascii "USOSWHERE /G font "

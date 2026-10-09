@@ -250,3 +250,53 @@ IRQs, and INT 09h (chained unchanged) also redraws the corner. During a hang:
 t counting = timer alive, CS:IP row 0 is the loop; t frozen + k changing on
 each Shift press = IRQ0 masked or INT 08h taken over, k is the loop. Handler
 paths unit-run with unicorn (text mode and mode 6 layout), no VM.
+
+### D5 with USOSWHERE 1.2 (2026-10-09): where the CPU is, and USOSWHERE 1.3
+
+Two photos about 10 s apart over the logo: `124A:0FAD t:00D9 p:124A WIN..u.`
+then `t:014E` (timer alive, every tick at 124A:0FAD, current PSP = WIN.COM);
+`10:0006 13:0201 15:8800 21:4B00 2F:1123`; CS history `124A 1351`;
+`k:1351:00B1 n:0001`.
+
+Reading (static, installed WIN.COM read raw from the target = WIN.CNF +
+CGA.LGO + MSLOGO.LGD byte for byte):
+
+- WIN.CNF is loaded at CS:0100-106F, the logo CGA.LGO at CS:1070 = segment
+  CS+107h = **1351h** (the second CS in the history). At 0361h WIN.COM sets
+  `mov sp,1070h`: its stack is the 256 zero bytes at CS:0F70-106F at the end
+  of WIN.CNF. **IP 0FADh lies inside that stack** (0C3h below its top);
+  there is no code there in the file. The CPU executes stack residue: a far
+  return/IRET went to a stale address. It is not a polling loop of WIN.COM.
+- k: 1351:00B1 is CGA.LGO right after INT 10h AX=1000h (palette): one IRQ1
+  that was pending through the mode set. n stays 1 because D5 has no
+  USOSKBC /R: SeaBIOS (CSMWrap) polls the USB keyboard from IRQ0 and puts
+  keys into the BDA buffer without raising IRQ1; Ctrl+Alt+Del is handled in
+  that poll. The keyboard is not dead.
+- `15:8800` comes from MEM.EXE ("Memory accessible using Int 15h", run just
+  before WIN in D5). WIN.COM, CGA.LGO and WIN200.BIN contain no INT 15h at
+  all, so an oversized INT 15h AH=88h result is **not** the cause.
+- Order in WIN.COM: logo (CGA.LGO entry 4), INT 21h 4Ah shrink to 107h+
+  logo paragraphs, 48h FFFFh check against 49C0h paragraphs, then EXEC
+  `4B00h` of WIN200.BIN at 06FAh-070Eh (SS:SP saved in CS:0107h/0109h,
+  124A:1004h). WIN200.BIN is an MZ (KERNSTUB, entry 0000:0000, SS:SP
+  000B:0080) with min = max alloc = 0, i.e. **loaded high** (219 KB at the
+  top of conventional memory, about 6915h-9FC0h with 639 KB).
+- After the EXEC: no further INT 21h (the kernel would call DOS at once), the
+  current PSP is still WIN.COM (DOS switches it only when it enters the
+  child), and no INT 10h AX=0003h (WIN.COM restores the text mode through
+  CGA.LGO entry 7 when the EXEC fails). So the hang starts inside the EXEC
+  (loading the image) or in the first instructions of KERNSTUB, and ends with
+  the CPU in WIN.COM's stack.
+
+Windows 1.04 (works on the X470) is also loaded high but its image is
+smaller; a candidate cause is something in the lower part of that range
+(conventional memory used by firmware/CSM code without being reserved);
+not proven.
+
+USOSWHERE 1.3 adds two rows to decide it from one photo:
+`c:<8 code bytes at CS:IP> s:<interrupted SS:SP> d:<crit-error, InDOS>` and
+`w:<top 3 stack words> b:<ES:BX of the last INT 13h> i:<INT 13h count>`.
+d: ...01 = still inside DOS (EXEC); i: growing = disk reads go on, frozen =
+stopped; b: = the load address reached; c: shows what really runs at 0FADh.
+Handler paths unit-run with unicorn (text mode, mode 6, INT 13h keeps
+registers and flags), no VM.
