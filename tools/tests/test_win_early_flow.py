@@ -199,6 +199,15 @@ class DiagnosticMenu(unittest.TestCase):
         self.assertIn('cmp al, 6', where)
         self.assertIn('mov ax, 0x2509', where)
         self.assertIn('JMPFAR old09', where)
+        # 1.4: #UD (INT 06h) dump screen and the EXEC trace (INT 01h ring) armed by WIN's 4B00h
+        self.assertIn('mov ax, 0x2506', where)
+        self.assertIn('mov ax, 0x2501', where)
+        self.assertIn('cmp ax, 0x4b00', where)
+        self.assertIn('cmp word ptr ds:[8], 0x4957', where)
+        self.assertIn('cmp ax, 0xc000', where)
+        self.assertIn('CALLFAR old08', where)
+        self.assertNotIn('    call dword ptr', where)
+        self.assertIn('USOSWHERE 1.4', where)
 
 
 if __name__ == '__main__':

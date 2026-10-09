@@ -300,3 +300,52 @@ d: ...01 = still inside DOS (EXEC); i: growing = disk reads go on, frozen =
 stopped; b: = the load address reached; c: shows what really runs at 0FADh.
 Handler paths unit-run with unicorn (text mode, mode 6, INT 13h keeps
 registers and flags), no VM.
+
+### D5 with USOSWHERE 1.3 (2026-10-09): an invalid-opcode loop, and USOSWHERE 1.4
+
+Two photos, same values except t (00A1, 013B: timer alive):
+`1263:0FAD p:1263 WIN`, `10:0006 13:0201 15:8800 21:4B00 2F:1123`,
+CS history `1263 136A 94C6`, `k:136A:00AA n:0001`,
+`c:0F00000000000000 s:1263:106F d:0000`,
+`w:4C03 474F E94F b:0C3F:257C i:0053`.
+
+- `0F 00 00` at 0FADh is SLDT [BX+SI]: invalid in real mode (#UD, INT 06h on
+  286 and later). The INT 06h vector of SeaBIOS/CSMWrap is a bare IRET, so
+  the CPU faults on the same instruction forever; IF is restored by that
+  IRET, every timer tick lands on 0FADh, and no other CS shows up (the INT
+  06h handler runs with IF=0). Bytes 0F70h-0FACh are zeros (`00 00` = ADD
+  [BX+SI],AL): the CPU entered the stack area of WIN.COM somewhere below
+  0FADh and slid up to the first non-zero byte.
+- The "stack words" are not saved registers: SS:SP 1263:106F is one byte
+  below the top of the empty stack. 106Fh = 03 (high byte of the return
+  address 03CAh of WIN.COM's `call 052Fh`, the EXEC routine), 1070h-1073h
+  = `LOGO` (the CGA.LGO signature), 1074h = `E9` (its JMP).
+- d:0000 (not in DOS), current PSP still WIN.COM, last INT 21h = 4B00h, and
+  no INT 10h AH=00h after it (WIN.COM restores the text mode through
+  CGA.LGO entry 0007h right after any EXEC return, also a failed one).
+- WIN200.BIN: KERNSTUB checks `NE` at image 200h and far-returns into the
+  KERNEL entry (segment 1, IP 7E3Ah); KERNEL reads WIN.COM's handshake data
+  through PSP:16h, checks EMMXXXX0 and calls INT 21h AH=30h within about 50
+  instructions. KERNEL segment 1 contains no 0Fh opcode at all (no LOADALL,
+  SMSW, SLDT). With p: still WIN.COM and no INT 21h after 4B00h, the child
+  most likely never ran: the CPU left the DOS EXEC call by a path that is
+  neither the child entry nor the normal return to 0710h.
+- b:0C3F:257C lies in the DOS buffers (IO system data 0B8Ah-1025h): the last
+  disk read went through a DOS buffer (FAT/directory/header or the last
+  partial sector), not straight into the image; i: frozen at 53h.
+
+Not provable from the binaries alone, so USOSWHERE 1.4 records the path:
+an INT 06h handler that dumps one text screen on the first #UD (CS:IP,
+FLAGS, registers, 8 code bytes, 8 stack words and the last 176 traced
+instruction addresses, then halts with interrupts on), and an instruction
+trace (INT 01h, trap flag) armed when a program named WIN* calls INT 21h
+AX=4B00h; TF is set for DOS and in the caller's saved FLAGS, BIOS/ROM code
+(CS >= C000h) runs untraced (the caller's IRET restores TF), consecutive
+repeats are stored once, and the first INT 21h afterwards ends the trace
+(f: = its AX and caller CS:IP). No DOS call and no #UD within 10 s: the
+timer dumps the same screen (reason T). Corner row 3 adds x: (steps) and
+f:. Unicorn unit run (emulated real-mode INT/trap/#UD delivery): fake DOS
+with a ROM far call and a LOOP, failed EXEC, zero slide to `0F 00 00` -> the
+ring ends `... 1263:0F99 ... 1263:0FAD`, ROM not recorded; the trace end
+by INT 21h and the 10 s dump path covered. 1.3's `call dword ptr` would
+assemble with a 66h prefix; 1.4 uses an explicit FF /3 far call (CALLFAR).

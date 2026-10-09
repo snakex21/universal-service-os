@@ -16,8 +16,10 @@
  *          INT 13h, 15h, 21h and 2Fh call (INT 15h without AH=4Fh/90h/91h,
  *          which the keyboard and disk BIOS issue all the time)
  *   row 2  the last 8 distinct interrupted CS values, most recent first
- *   row 3  k:cccc:iiii n:nnnn  (1.2) CS:IP interrupted by the last keyboard
- *          IRQ (INT 09h) and the number of keyboard IRQs seen
+ *   row 3  k:cccc:iiii n:nnnn x:xxxx f:ffff  (1.2) CS:IP interrupted by the
+ *          last keyboard IRQ (INT 09h) and the number of keyboard IRQs seen;
+ *          (1.4) traced instructions and AX of the INT 21h that ended the
+ *          trace (see below)
  *   row 4  c:bbbbbbbbbbbbbbbb s:ssss:pppp d:eeii  (1.3) the 8 code bytes at
  *          the CS:IP of the last tick, the interrupted SS:SP and the DOS
  *          critical-error and InDOS flags (SDA+0/+1; InDOS 01 = inside a
@@ -64,6 +66,27 @@
  * 256-byte stack of WIN.COM): rows 4 and 5 tell code from data at the
  * loop address and show whether DOS (EXEC) is still busy.
  *
+ * 1.4 (D5 with 1.3: 1263:0FAD, code bytes 0F 00 00 .. = SLDT, #UD in real
+ * mode; the default INT 06h handler of SeaBIOS/CSMWrap is a bare IRET, so the
+ * CPU faults on the same instruction forever while the timer ticks; the
+ * stack was empty, SS:SP 1263:106F, InDOS 0, PSP still WIN.COM, no INT 21h
+ * after the EXEC 4B00h):
+ *   - INT 06h (#UD) handler: on the first invalid opcode it switches to text
+ *     mode 3 and dumps one screen: the faulting CS:IP and FLAGS, all
+ *     registers, 8 code bytes, 8 stack words, and the last 176 instruction
+ *     addresses (oldest first, 8 per row) before the fault; then it halts
+ *     with interrupts on (Ctrl+Alt+Del works).
+ *   - instruction trace: when the DOS EXEC (INT 21h AX=4B00h) is called by a
+ *     program whose MCB name starts with WIN (WIN.COM starting WIN200.BIN),
+ *     the trap flag is set for DOS and for the caller; INT 01h records every
+ *     CS:IP (consecutive repeats once) in a ring of 176 entries. BIOS and
+ *     option ROM code (CS >= C000h) runs untraced (TF cleared, the caller's
+ *     IRET restores it), our own code is not recorded. The first INT 21h
+ *     after that (the child's first DOS call, or the caller after a failed
+ *     EXEC) stops the trace: f: = its AX and caller CS:IP. Without an INT 21h
+ *     or a #UD within 10 s the timer dumps the same screen (reason T).
+ *   - row 3 of the corner adds x: (traced steps) and f: (that INT 21h AX).
+ *
  * The hooks change no register and no flag before chaining. Running it a
  * second time only prints a message. It cannot be unloaded (reboot).
  *
@@ -79,6 +102,8 @@
 .equ ROW4, 41 - 40
 .equ ROW5, 41 - 40
 .equ NROWS, 6
+/* 1.4: trace ring entries (22 rows of 8 on the dump screen) */
+.equ RINGN, 176
 .section .text
 .global _start
 _start:
@@ -116,12 +141,49 @@ stkw:   .space 6
 es13:   .word 0
 bx13:   .word 0
 n13:    .word 0
+/* 1.4: #UD dump and EXEC trace */
+trarm:  .byte 0         /* 0 idle, 1 tracing, 2 trace ended, 3 dumped */
+dreason: .byte 0
+armt:   .word 0
+tcnt:   .word 0
+rhead:  .word 0
+rnum:   .word 0
+udcnt:  .word 0
+f21ax:  .word 0
+f21ip:  .word 0
+f21cs:  .word 0
+u_ip:   .word 0
+u_cs:   .word 0
+u_fl:   .word 0
+/* r_ax..r_es in the order of s_regs; r_sp, r_ss adjacent (lds) */
+r_ax:   .word 0
+r_bx:   .word 0
+r_cx:   .word 0
+r_dx:   .word 0
+r_si:   .word 0
+r_di:   .word 0
+r_bp:   .word 0
+r_ds:   .word 0
+r_es:   .word 0
+r_sp:   .word 0
+r_ss:   .word 0
+ucode:  .space 8
+ustk:   .space 16
+dpos:   .word 0
+dleft:  .word 0
+dcol:   .byte 0
 /* six rows of 40 characters (screen columns 40-79), filled per tick */
 scr:    .space 40 * NROWS, ' '
 
 /* far jump through a dword at cs:[x] (FF /5 with a CS override) */
 .macro JMPFAR x
     .byte 0x2e, 0xff, 0x2e
+    .word \x
+.endm
+/* far call through a dword at cs:[x] (FF /3 with a CS override; the
+ * assembler would add a 66h prefix to "call dword ptr") */
+.macro CALLFAR x
+    .byte 0x2e, 0xff, 0x1e
     .word \x
 .endm
 
@@ -142,7 +204,156 @@ int13:
     JMPFAR old13
 int21:
     mov word ptr cs:[ax21], ax
+    cmp byte ptr cs:[trarm], 1
+    je 5f
+    ja 9f
+    cmp ax, 0x4b00
+    jne 9f
+    call iswin
+    jne 9f
+    /* WIN* starts its child: trace DOS (TF now) and the caller after the
+     * IRET of DOS (TF in its saved FLAGS) */
+    mov byte ptr cs:[trarm], 1
+    mov word ptr cs:[armt], 0
+    push bp
+    mov bp, sp
+    or word ptr [bp + 6], 0x100
+    pop bp
+    push ax
+    pushf
+    pop ax
+    or ah, 1
+    push ax
+    popf
+    pop ax
     JMPFAR old21
+    /* tracing and a new DOS call: the trace ends here */
+5:  mov word ptr cs:[f21ax], ax
+    push bp
+    mov bp, sp
+    push ax
+    mov ax, word ptr [bp + 2]
+    mov word ptr cs:[f21ip], ax
+    mov ax, word ptr [bp + 4]
+    mov word ptr cs:[f21cs], ax
+    and word ptr [bp + 6], 0xfeff
+    mov byte ptr cs:[trarm], 2
+    pushf
+    pop ax
+    and ah, 0xfe
+    push ax
+    popf
+    pop ax
+    pop bp
+9:  JMPFAR old21
+
+/* ZF set when the current PSP belongs to a program named WIN* */
+iswin:
+    cmp word ptr cs:[sda + 2], 0
+    jne 1f
+    cmp sp, 0
+    ret
+1:  push ds
+    push bx
+    lds bx, dword ptr cs:[sda]
+    mov bx, word ptr [bx + 0x10]
+    dec bx
+    mov ds, bx
+    cmp word ptr ds:[8], 0x4957
+    jne 2f
+    cmp byte ptr ds:[10], 'N'
+2:  pop bx
+    pop ds
+    ret
+
+/* single step: record CS:IP of the next instruction */
+int01:
+    push bp
+    mov bp, sp
+    push ax
+    push bx
+    push si
+    push ds
+    push cs
+    pop ds
+    cmp byte ptr [trarm], 1
+    jne 8f
+    mov ax, word ptr [bp + 4]
+    cmp ax, 0xc000
+    jae 8f
+    mov bx, cs
+    cmp ax, bx
+    je 9f
+    inc word ptr [tcnt]
+    mov bx, word ptr [rhead]
+    cmp word ptr [rnum], 0
+    je 3f
+    mov si, bx
+    sub si, 4
+    jnc 1f
+    add si, RINGN * 4
+1:  mov ax, word ptr [bp + 2]
+    cmp word ptr [si + ring2], ax
+    jne 3f
+    mov ax, word ptr [bp + 4]
+    cmp word ptr [si + ring2 + 2], ax
+    je 9f
+3:  mov ax, word ptr [bp + 2]
+    mov word ptr [bx + ring2], ax
+    mov ax, word ptr [bp + 4]
+    mov word ptr [bx + ring2 + 2], ax
+    add bx, 4
+    cmp bx, RINGN * 4
+    jb 4f
+    xor bx, bx
+4:  mov word ptr [rhead], bx
+    cmp word ptr [rnum], RINGN
+    jae 9f
+    inc word ptr [rnum]
+    jmp 9f
+    /* not tracing, or BIOS/ROM code: TF off (an IRET restores the caller's) */
+8:  and word ptr [bp + 6], 0xfeff
+9:  pop ds
+    pop si
+    pop bx
+    pop ax
+    pop bp
+    iret
+
+/* invalid opcode: dump once, then halt with interrupts on */
+int06:
+    mov word ptr cs:[r_ax], ax
+    mov word ptr cs:[r_bx], bx
+    mov word ptr cs:[r_cx], cx
+    mov word ptr cs:[r_dx], dx
+    mov word ptr cs:[r_si], si
+    mov word ptr cs:[r_di], di
+    mov word ptr cs:[r_bp], bp
+    mov word ptr cs:[r_ds], ds
+    mov word ptr cs:[r_es], es
+    mov word ptr cs:[r_ss], ss
+    mov bp, sp
+    lea ax, [bp + 6]
+    mov word ptr cs:[r_sp], ax
+    mov ax, word ptr [bp]
+    mov word ptr cs:[u_ip], ax
+    mov ax, word ptr [bp + 2]
+    mov word ptr cs:[u_cs], ax
+    mov ax, word ptr [bp + 4]
+    mov word ptr cs:[u_fl], ax
+    inc word ptr cs:[udcnt]
+    cmp byte ptr cs:[trarm], 3
+    je 1f
+    push cs
+    pop ds
+    push cs
+    pop es
+    cld
+    mov byte ptr [dreason], 'U'
+    call dump
+1:  sti
+2:  hlt
+    jmp 2b
 int2f:
     mov word ptr cs:[ax2f], ax
     JMPFAR old2f
@@ -217,7 +428,42 @@ int08:
     movsw
     pop ds
     call draw
-    jmp regout
+    /* 1.4: trace running for 10 s without a DOS call or #UD: dump */
+    cmp byte ptr [trarm], 1
+    jne regout
+    inc word ptr [armt]
+    cmp word ptr [armt], 182
+    jb regout
+    mov ax, word ptr [bp + 20]
+    mov word ptr [u_ip], ax
+    mov ax, word ptr [bp + 22]
+    mov word ptr [u_cs], ax
+    mov ax, word ptr [bp + 24]
+    mov word ptr [u_fl], ax
+    /* saved ax at bp+16 ... es at bp+0 = r_ax ... r_es */
+    mov si, offset r_ax
+    mov di, 16
+21: mov ax, word ptr [bp + di]
+    mov word ptr [si], ax
+    add si, 2
+    sub di, 2
+    jns 21b
+    mov word ptr [r_ss], ss
+    lea ax, [bp + 26]
+    mov word ptr [r_sp], ax
+    /* chain first (EOI), then dump and halt */
+    pushf
+    CALLFAR old08
+    push cs
+    pop ds
+    push cs
+    pop es
+    cld
+    mov byte ptr [dreason], 'T'
+    call dump
+    sti
+22: hlt
+    jmp 22b
 
 /* keyboard IRQ: remember the interrupted CS:IP, redraw, chain */
 int09:
@@ -373,6 +619,14 @@ draw:
     mov si, offset s_n
     call pstr
     mov ax, word ptr [kcnt]
+    call hex4
+    mov si, offset s_x
+    call pstr
+    mov ax, word ptr [tcnt]
+    call hex4
+    mov si, offset s_f
+    call pstr
+    mov ax, word ptr [f21ax]
     call hex4
     /* row 4 */
     mov di, offset scr + 160 + ROW4
@@ -685,6 +939,203 @@ cgaout:
     jnz 1b
     ret
 
+/* 1.4: one text screen with the fault, registers and the trace ring
+ * (ds = es = cs, direction flag clear); the corner is no longer drawn */
+dump:
+    mov byte ptr [busy], 1
+    mov byte ptr [trarm], 3
+    push ds
+    lds si, dword ptr cs:[u_ip]
+    mov di, offset ucode
+    mov cx, 8
+    rep movsb
+    pop ds
+    push ds
+    lds si, dword ptr cs:[r_sp]
+    mov di, offset ustk
+    mov cx, 16
+    rep movsb
+    pop ds
+    mov ax, 3
+    int 0x10
+    /* row 0 */
+    call lclr
+    mov si, offset s_h
+    call pstr
+    mov al, byte ptr [dreason]
+    call pch
+    mov si, offset s_at
+    call pstr
+    mov ax, word ptr [u_cs]
+    call hex4
+    mov al, ':'
+    call pch
+    mov ax, word ptr [u_ip]
+    call hex4
+    mov si, offset s_fl
+    call pstr
+    mov ax, word ptr [u_fl]
+    call hex4
+    mov si, offset s_x
+    call pstr
+    mov ax, word ptr [tcnt]
+    call hex4
+    mov si, offset s_u
+    call pstr
+    mov ax, word ptr [udcnt]
+    call hex4
+    mov si, offset s_f
+    call pstr
+    mov ax, word ptr [f21ax]
+    call hex4
+    mov al, '@'
+    call pch
+    mov ax, word ptr [f21cs]
+    call hex4
+    mov al, ':'
+    call pch
+    mov ax, word ptr [f21ip]
+    call hex4
+    mov si, offset s_p
+    call pstr
+    xor ax, ax
+    cmp word ptr [sda + 2], 0
+    je 1f
+    push es
+    les bx, dword ptr [sda]
+    mov ax, word ptr es:[bx + 0x10]
+    pop es
+1:  call hex4
+    xor bx, bx
+    call rowout
+    /* row 1: registers */
+    call lclr
+    mov si, offset r_ax
+    mov bx, offset s_regs
+2:  mov al, byte ptr [bx]
+    call pch
+    mov al, byte ptr [bx + 1]
+    call pch
+    mov al, ':'
+    call pch
+    lodsw
+    call hex4
+    mov al, ' '
+    call pch
+    add bx, 2
+    cmp si, offset r_sp
+    jb 2b
+    mov bx, 1
+    call rowout
+    /* row 2: code bytes, SS:SP, stack words */
+    call lclr
+    mov si, offset s_c
+    call pstr
+    mov si, offset ucode
+    mov bx, 8
+3:  lodsb
+    call hex2
+    dec bx
+    jnz 3b
+    mov si, offset s_s
+    call pstr
+    mov ax, word ptr [r_ss]
+    call hex4
+    mov al, ':'
+    call pch
+    mov ax, word ptr [r_sp]
+    call hex4
+    mov si, offset s_ww
+    call pstr
+    mov si, offset ustk
+    mov bx, 8
+4:  lodsw
+    call hex4
+    mov al, ' '
+    call pch
+    dec bx
+    jnz 4b
+    mov bx, 2
+    call rowout
+    /* rows 3-24: the trace ring, oldest first */
+    mov ax, word ptr [rnum]
+    mov word ptr [dleft], ax
+    shl ax, 2
+    mov si, word ptr [rhead]
+    sub si, ax
+    jnc 5f
+    add si, RINGN * 4
+5:  mov word ptr [dpos], si
+    mov bx, 3
+6:  cmp word ptr [dleft], 0
+    je 9f
+    call lclr
+    mov byte ptr [dcol], 8
+7:  cmp word ptr [dleft], 0
+    je 8f
+    mov si, word ptr [dpos]
+    mov ax, word ptr [si + ring2 + 2]
+    call hex4
+    mov al, ':'
+    call pch
+    mov si, word ptr [dpos]
+    mov ax, word ptr [si + ring2]
+    call hex4
+    mov al, ' '
+    call pch
+    add word ptr [dpos], 4
+    cmp word ptr [dpos], RINGN * 4
+    jb 10f
+    mov word ptr [dpos], 0
+10: dec word ptr [dleft]
+    dec byte ptr [dcol]
+    jnz 7b
+8:  call rowout
+    inc bx
+    cmp bx, 25
+    jb 6b
+9:  ret
+
+/* lbuf = 80 spaces, di = lbuf */
+lclr:
+    push ax
+    push cx
+    mov di, offset lbuf
+    mov cx, 80
+    mov al, ' '
+    rep stosb
+    mov di, offset lbuf
+    pop cx
+    pop ax
+    ret
+
+/* lbuf -> text row bx (B800h, grey on black) */
+rowout:
+    push es
+    push ax
+    push cx
+    push dx
+    push si
+    push di
+    mov ax, 160
+    mul bx
+    mov di, ax
+    push 0xb800
+    pop es
+    mov si, offset lbuf
+    mov cx, 80
+    mov ah, 0x07
+1:  lodsb
+    stosw
+    loop 1b
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop ax
+    pop es
+    ret
+
 /* al -> es:di (the row buffer) */
 pch:
     stosb
@@ -733,8 +1184,21 @@ s_d:  .asciz " d:"
 s_w:  .asciz "w:"
 s_b:  .asciz "b:"
 s_i:  .asciz " i:"
+s_x:  .asciz " x:"
+s_f:  .asciz " f:"
+s_h:  .asciz "USOSWHERE 1.4 "
+s_at: .asciz " at "
+s_fl: .asciz " fl:"
+s_u:  .asciz " u:"
+s_ww: .asciz " w:"
+s_regs: .ascii "axbxcxdxsidibpdses"
 
 resend:
+/* 1.4: trace ring and dump line buffer, resident but not in the file (they
+ * overlay the transient part below once it has run) */
+.set ring2, resend
+.set lbuf, resend + RINGN * 4
+.set resall, lbuf + 80
 
 /* ---------------- transient part ---------------- */
 install:
@@ -842,6 +1306,12 @@ install:
     mov dx, offset int09
     mov ax, 0x2509
     int 0x21
+    mov dx, offset int01
+    mov ax, 0x2501
+    int 0x21
+    mov dx, offset int06
+    mov ax, 0x2506
+    int 0x21
     mov dx, offset int08
     mov ax, 0x2508
     int 0x21
@@ -853,16 +1323,17 @@ install:
     mov ah, 0x49
     int 0x21
     mov word ptr [0x2c], 0
-    mov dx, offset resend + 15
+    mov dx, offset resall + 15
     shr dx, 4
     mov ax, 0x3100
     int 0x21
 
 m_ok:
-    .ascii "USOSWHERE 1.3 resident: top right = CS:IP, ticks, PSP+name,\r\n"
+    .ascii "USOSWHERE 1.4 resident: top right = CS:IP, ticks, PSP+name,\r\n"
     .ascii "last INT 10h mode set + 13h/15h/21h/2Fh AX, last 8 CS values,\r\n"
     .ascii "k: CS:IP at the last key press (press Shift during a hang),\r\n"
     .ascii "c: code bytes at CS:IP, SS:SP, d: InDOS, w: stack, INT 13h.\r\n"
+    .ascii "#UD (INT 06h) or 10 s trace after the EXEC of WIN: dump screen.\r\n"
     .ascii "GPL-3.0-or-later. /G: also CGA mode 6 + EGA/VGA 16 colours.\r\n$"
 m_font:
     .ascii "USOSWHERE /G font "
