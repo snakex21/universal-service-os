@@ -425,9 +425,12 @@ docs/nt4-2026-10-07.md, X470 PASS). NT 3.51 Workstation/Server idzie tą
 samą ścieżką (profil `nt3-x86-qemu-csmwrap`, MBR z filtrem E820, bez klucza
 i bez SP; docs/nt351-2026-10-08.md), NT 3.51 Server X470 PASS 2026-10-09.
 NT 3.5 Workstation/Server (2026-10-09, docs/nt35-2026-10-09.md): ta sama
-ścieżka, QEMU e2e, X470 czeka. NT 3.1 / 3.1 Advanced Server: odłożone
-(inny tekstowy Setup bez unattend, brak DetachedProgram, sterowniki bez
-buildów NT 3.1).
+ścieżka, NT 3.5 Workstation X470 PASS 2026-10-09. NT 3.1 / 3.1 Advanced
+Server (2026-10-09, docs/nt31-2026-10-09.md): instalacja w VM bez
+interakcji (tekstowy Setup odpowiadany po tekście ekranu, GUI Setup z
+poprawionego INITIAL.INF), buildy NT 3.1 sterowników; QEMU OVMF + CSMWrap:
+Workstation do pulpitu z klawiaturą USB; otwarte: logowanie na Advanced
+Server (netlogon bez sieci), X470 czeka.
 
 ### L9. shim-review: **Later**, długoterminowo
 

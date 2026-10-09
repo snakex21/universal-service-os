@@ -57,6 +57,9 @@ pub const entries = [_]SystemEntry{
     uefiLegacy("windows-nt-3-51", "Windows NT 3.51", "Windows NT 3.51"),
     // Windows NT 3.5 Workstation: the NT 3.51 flow (docs/nt35-2026-10-09.md).
     uefiLegacy("windows-nt-3-5", "Windows NT 3.5", "Windows NT 3.5"),
+    // Windows NT 3.1 Workstation: the NT 3.x VM flow with the 3.1 Setup
+    // (docs/nt31-2026-10-09.md).
+    uefiLegacy("windows-nt-3-1", "Windows NT 3.1", "Windows NT 3.1"),
 }) ++ [_]SystemEntry{
     // Windows 95/98/Me: the BIOS Core's DOS Setup, and from UEFI the
     // micro-Linux disk preparation with a CSMWrap ESP (profile

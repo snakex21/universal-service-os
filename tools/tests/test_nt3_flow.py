@@ -1,7 +1,7 @@
-"""Windows NT 3.51 and 3.5 through the UEFI flow: the NT 4.0 VM flow with
+"""Windows NT 3.51, 3.5 and 3.1 through the UEFI flow: the NT 4.0 VM flow with
 NT_MAJOR=3 (tools/nt4_csmwrap_target.sh, tools/nt4_qemu_install.sh, the NT 3.x
 branch of tools/w9x_csmwrap_prepare.sh, tools/build_micro_linux.py;
-docs/nt351-2026-10-08.md, docs/nt35-2026-10-09.md). Host only: Git sh, temp
+docs/nt351-2026-10-08.md, docs/nt35-2026-10-09.md, docs/nt31-2026-10-09.md). Host only: Git sh, temp
 folders; no VM, no disk.
 """
 from pathlib import Path
@@ -149,9 +149,9 @@ class Nt3Target(unittest.TestCase):
 
     def test_nt35_cd_accepted(self):
         # NT 3.5 (MinorVersion 50): the NT 3.51 layout, its own usosrst build;
-        # NT 3.1 (no TXTSETUP.SIF) and other minors are refused.
+        # NT 3.1 (TXTSETUP.INF, its own branch) and other minors are refused.
         text = TARGET.read_text(encoding='utf-8')
-        self.assertIn('    yes:51|yes:50|:*) ;;\n', text)
+        self.assertIn('    yes:51|yes:50|yes:10|:*) ;;\n', text)
         self.assertIn('[ -z "${NT_MINOR:-}" ] || [ "$NT_MINOR" = "$minor" ]', text)
         self.assertIn('[ "$nt3:$minor" != yes:50 ] || rst=USOSRST35.SYS', text)
         self.assertIn('for file in USOSNT3.EXE USOSACHK.EXE $rst; do', text)
@@ -203,10 +203,14 @@ class Nt3Prepare(unittest.TestCase):
         self.assertIn('windows-nt-3-5) tag=NT35', text)
         self.assertIn('windows-nt-3-5-server) tag=NT35S', text)
         self.assertIn("NT35|NT35S) nt4=yes nt_major=3 nt_minor=50 nt_name='Windows NT 3.5'", text)
+        self.assertIn('windows-nt-3-1) tag=NT31', text)
+        self.assertIn('windows-nt-3-1-server) tag=NT31S', text)
+        self.assertIn("NT31|NT31S) nt4=yes nt_major=3 nt_minor=10 nt_name='Windows NT 3.1'", text)
         # The staged profile files and the SP6a lookup only for NT 4.0.
         self.assertEqual(text.count('/mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF'
-                                    ' /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF'), 2)
-        self.assertIn('NT351|NT351S|NT35|NT35S) ;;', (ROOT / 'tools/w9x_phase1_qemu.sh').read_text(encoding='utf-8'))
+                                    ' /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF'
+                                    ' /mnt/esp/EFI/USOS/answer/NT31.SIF /mnt/esp/EFI/USOS/answer/NT31S.SIF'), 2)
+        self.assertIn('NT351|NT351S|NT35|NT35S|NT31|NT31S) ;;', (ROOT / 'tools/w9x_phase1_qemu.sh').read_text(encoding='utf-8'))
         self.assertIn('if [ "$nt_major" = 4 ]; then', text)
         self.assertIn('3:none)', text)
         self.assertIn('w9x_nt3_default_sif "$time_zone" > "$answer_inf"', text)
@@ -322,6 +326,114 @@ class Nt3DriversWithoutPciBios(unittest.TestCase):
         self.assertIn('#define USOSRST_VERSION "usosrst 1.6-nt351"', src)
         self.assertIn('got = PciCfgHeader351(bus, slot.u.AsULONG, &cfg);', src)
         self.assertIn('WRITE_PORT_ULONG((PULONG)0xCF8, base | (i * 4));', src)
+
+
+class Nt31(unittest.TestCase):
+    """NT 3.1 (docs/nt31-2026-10-09.md): TXTSETUP.INF Setup from the local
+    source on C:, text mode answered by its page text, GUI Setup from a
+    patched INITIAL.INF / HARDWARE.INF, the NT 3.1 driver builds."""
+
+    # Synthetic stand-ins with the anchors the patch needs (no Microsoft text).
+    INITIAL = ('[UiVars]\r\n    DoPartial   = $(Chosen)\r\n    DoNetwork   = $(Chosen)\r\n'
+               '    DoPrinter   = $(Chosen)\r\n    DoAppSetup  = $(Chosen)\r\n'
+               '[Shell Commands]\r\n'
+               '    RunProgram STATUS "" "" $(!STF_WINDOWSSYSPATH)"\\control.exe" main.cpl $(Applet) setup\r\n'
+               '    shell "repair.inf" "CreateRepairDiskette"\r\n'
+               'setupdone =+\r\n    EndWait\r\n'
+               '[DoLicense]\r\n    set Status = STATUS_FAILED\r\n'
+               '[DoComputerName]\r\n    set Status = STATUS_FAILED\r\n'
+               '[DoAccountSetup]\r\n    set Status = STATUS_FAILED\r\n'
+               '[DoAdminAccountSetup]\r\n    set Status = STATUS_SUCCESSFUL\r\n')
+    HARDWARE = ('[InitialHardwareInstall]\r\n    StartWait\r\nsystem = +\r\n    ui start "System"\r\n'
+                'install_system = +\r\n    Return\r\n')
+
+    def run_fn(self, script, name, args, data):
+        tmp = Path(tempfile.mkdtemp(prefix='usos-nt31-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / 'in.inf').write_bytes(data.encode('ascii'))
+        # Sourced, not passed as text: the awk program's backslashes next to
+        # quotes would not survive the Windows command line.
+        rc, _, err = sh(f'. "{script.as_posix()}"\n{name} {args} < "{(tmp / "in.inf").as_posix()}" > "{(tmp / "out.inf").as_posix()}"')
+        return rc, err, (tmp / 'out.inf').read_bytes().decode('ascii')
+
+    def test_initial_inf_patch(self):
+        rc, err, out = self.run_fn(QEMU_INSTALL, 'nt31_initial_inf', '"Jan Kowalski" "USOS" USOS-NT31', self.INITIAL)
+        self.assertEqual(rc, 0, err)
+        self.assertNotIn('\n', out.replace('\r\n', ''))
+        for want in ('    DoNetwork   = $(NotChosen)\r\n', '    DoPrinter   = $(NotChosen)\r\n',
+                     '    DoAppSetup  = $(NotChosen)\r\n', '    DoPartial   = $(Chosen)\r\n',
+                     '; USOS: no Emergency Repair Disk\r\n',
+                     'setupdone =+\r\n    shell "" UsosNt31Post\r\n    set Exit_Code = $(!SETUP_ERROR_SUCCESS)\r\n    goto rebootend\r\n',
+                     '[DoLicense]\r\n    set !FullName = "Jan Kowalski"\r\n    set !OrgName = "USOS"\r\n    Return STATUS_SUCCESSFUL\r\n',
+                     '[DoComputerName]\r\n    Return STATUS_SUCCESSFUL "USOS-NT31"\r\n',
+                     '[DoAdminAccountSetup]\r\n    Return STATUS_SUCCESSFUL ""\r\n',
+                     '[DoAccountSetup]\r\n    Return STATUS_USERCANCEL "" ""\r\n',
+                     '[UsosNt31Post]\r\n',
+                     '    OpenRegKey $(!REG_H_LOCAL) "" "system\\CurrentControlSet\\services" 33554432 UsosSvc\r\n',
+                     '{{ahcint,0,33554432}} {{Type,0,$(!REG_VT_DWORD),1},{Start,0,$(!REG_VT_DWORD),0}',
+                     '{{usosrst,0,33554432},{Parameters,0,33554432}} {{HpetLegacyOff,0,$(!REG_VT_DWORD),1},{RtcFix,0,$(!REG_VT_DWORD),1}}',
+                     '{{Scsidisk,0,33554432}} {{Start,0,$(!REG_VT_DWORD),0}}',
+                     '{{Atdisk,0,33554432}} {{Start,0,$(!REG_VT_DWORD),4}}',
+                     '{{Winlogon,0,33554432}}',
+                     '$(!STF_WINDOWSSYSPATH)"\\cmd.exe" /c C:\\USOS\\NT3\\POST.CMD\r\n'):
+            self.assertIn(want, out)
+        self.assertIn('main.cpl', out)
+        # Another INITIAL.INF (an anchor missing): refused.
+        rc, _, _ = self.run_fn(QEMU_INSTALL, 'nt31_initial_inf', 'a b c', self.INITIAL.replace('[DoLicense]', '[DoLicence]'))
+        self.assertNotEqual(rc, 0)
+
+    def test_hardware_inf_patch(self):
+        rc, err, out = self.run_fn(QEMU_INSTALL, 'nt31_hardware_inf', '', self.HARDWARE)
+        self.assertEqual(rc, 0, err)
+        self.assertIn('system = +\r\n; USOS: the default language (locale), no page\r\n    goto install_system\r\n', out)
+        rc, _, _ = self.run_fn(QEMU_INSTALL, 'nt31_hardware_inf', '', self.HARDWARE.replace('install_system', 'x'))
+        self.assertNotEqual(rc, 0)
+
+    def test_text_mode_pages(self):
+        fn = function_text(QEMU_INSTALL, 'nt31_vm_tick')
+        for page, key in (("'Welcome to Setup.'", 'key=ret'), ("'Express Setup (recommended)'", 'key=ret'),
+                          ("'select the partition where you would like to install'", 'key=ret'),
+                          ("'select a file system option'", 'key=ret'), ("'Choose the location'", 'key=ret'),
+                          ("'Press CTRL+ALT+DELETE to restart'", 'key=ctrl-alt-delete')):
+            self.assertIn(page, fn)
+            self.assertIn(key, fn[fn.index(page):fn.index(page) + 120])
+        self.assertIn('pmemsave 0xb8000 4000', fn)
+        install = QEMU_INSTALL.read_text(encoding='utf-8')
+        self.assertIn("grep -q '^version=3\\.10'", install)
+        self.assertIn('W9X_VM_TICK_FN=nt31_vm_tick', install)
+        self.assertIn('W9X_VM_ANSWER=${NT31_VM_ANSWER:-ret}', install)
+        self.assertIn('NT4_BOOT_OPTIONS=$NT31_BOOT_OPTIONS', install)
+        self.assertIn('[ -z "${W9X_VM_TICK_FN:-}" ] || "$W9X_VM_TICK_FN" "$elapsed" || true',
+                      (ROOT / 'tools/w9x_phase1_qemu.sh').read_text(encoding='utf-8'))
+
+    def test_target_layout(self):
+        text = TARGET.read_text(encoding='utf-8')
+        for want in ('for name in TXTSETUP.INF txtsetup.inf; do', 'for name in SETUPLDR setupldr; do',
+                     '[ -z "$nt31" ] || { major=3; minor=10; }',
+                     "printf '\\r\\n[MsDosInitiated]\\r\\n'",
+                     '[ -z "$nt31" ] || { rst=USOSRST31.SYS ahci=AHCINT31.SYS usb=USOSUSB31.SYS; }',
+                     'PART_SECTORS=${NT31_PART_SECTORS:-1024000}', 'ROOTLIST.TXT', 'NAMES.TXT'):
+            self.assertIn(want, text)
+
+    def test_nt31_drivers(self):
+        from check_nt52_driver_imports import pe
+        from check_nt4_driver_imports import parse
+        tables = parse((ROOT / 'tools/tests/data/nt31_exports.txt').read_text(encoding='utf-8'))
+        for rel in ('tools/vendor/ahcint/1.3.0.0-usos4/bin/NT31/i386/ahcint.sys',
+                    'tools/w2k/usosrst/bin/nt31/i386/usosrst.sys', 'tools/nt4/usosusb/bin/nt31/i386/usosusb.sys'):
+            _, imports = pe(ROOT / rel)
+            for kernel in ('ntoskrnl.exe', 'ntkrnlmp.exe'):
+                view = {'ntoskrnl.exe': tables[kernel], 'hal.dll': tables['hal.dll'], 'scsiport.sys': tables['scsiport.sys']}
+                missing = [f'{m}!{n}' for m, n in imports if n not in view[m.lower()]]
+                self.assertEqual(missing, [], f'{rel} on {kernel}')
+        src = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos4/src/ahcimain.c').read_text(encoding='latin-1')
+        self.assertIn('initData.HwInitializationDataSize = 0x40;', src)
+        self.assertIn('ConfigInfo->AdapterInterfaceType = Eisa;', src)
+        build = BUILD.read_text(encoding='utf-8')
+        for pair in (('tools/vendor/ahcint/1.3.0.0-usos4/bin/NT31/i386/ahcint.sys', 'usr/lib/usos/nt3/AHCINT31.SYS'),
+                     ('tools/w2k/usosrst/bin/nt31/i386/usosrst.sys', 'usr/lib/usos/nt3/USOSRST31.SYS'),
+                     ('tools/nt4/usosusb/bin/nt31/i386/usosusb.sys', 'usr/lib/usos/nt3/USOSUSB31.SYS')):
+            self.assertIn(f'("{pair[0]}", "{pair[1]}")', build)
 
 
 if __name__ == '__main__':

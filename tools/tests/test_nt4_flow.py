@@ -229,7 +229,8 @@ class Nt4Target(unittest.TestCase):
         # FAT16 C: as in the 2026-10-07 QEMU lab: LBA 63, 2000 MiB, 32 KiB clusters, type 06, active.
         self.assertIn('PART_START=63', text)
         self.assertIn('PART_SECTORS=4096000', text)
-        self.assertIn('mkfs.fat -F 16 -s 64', text)
+        self.assertIn('CLUSTER_SECTORS=64\n', text)
+        self.assertIn('mkfs.fat -F 16 -s "$CLUSTER_SECTORS"', text)
         self.assertIn(r"printf '\200\001\001\000\006\366\067\376'", text)
         self.assertIn('APPEND boot ntldr=/$LDR$', text)
         self.assertIn('CMDLINES.TXT', text)

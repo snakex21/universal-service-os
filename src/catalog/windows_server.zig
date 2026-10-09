@@ -79,6 +79,19 @@ pub const entries = [_]SystemEntry{
         .boot_methods = &nt5_methods,
         .server = true,
     },
+    // Windows NT 3.1 Advanced Server: the NT 3.1 Workstation flow with the
+    // Advanced Server CD (docs/nt31-2026-10-09.md); UEFI only.
+    SystemEntry{
+        .id = "windows-nt-3-1-server",
+        .name = "Windows NT 3.1 Advanced Server",
+        .category = .windows,
+        .family = .windows_legacy,
+        .image_directory = "\\Systems\\Windows\\Windows NT 3.1 Advanced Server\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Windows NT 3.1 Advanced Server\\Unattended",
+        .firmware = .uefi,
+        .boot_methods = &nt5_methods,
+        .server = true,
+    },
 });
 
 const freestanding = @import("builtin").os.tag == .freestanding;

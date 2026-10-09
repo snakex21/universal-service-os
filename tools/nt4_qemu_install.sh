@@ -35,6 +35,137 @@ NT4_BOOT_OPTIONS=${NT4_BOOT_OPTIONS:-/NUMPROC=2 /MAXMEM=1024}
 # /MAXMEM=128 boots).
 NT35_BOOT_OPTIONS=${NT35_BOOT_OPTIONS:-/NUMPROC=2 /MAXMEM=128}
 
+# NT 3.1 (docs/nt31-2026-10-09.md): /NODEBUG (without it the 3.1 kernel
+# runs its debugger on COM1, "Kernel Debugger Using: COM1" on a STOP), no
+# RAM beyond 64 MiB until a larger size is proven; the 3.1 loader knows no
+# /NUMPROC.
+NT31_BOOT_OPTIONS=${NT31_BOOT_OPTIONS:-/NODEBUG /MAXMEM=64}
+
+# NT 3.1 text-mode Setup (SETUPAPP.EXE, no answer file): the VGA text page
+# (QEMU pmemsave of B8000h) decides the key. Every page of the express path
+# takes ENTER (Welcome, Express Setup, the partition C:, keep the FAT file
+# system, \winnt), the last one CTRL+ALT+DELETE (that restart ends the VM).
+# A page still on screen 30 s after its key gets the key again.
+nt31_vm_tick() {
+    [ $(( $1 - ${NT31_TICK_AT:--10} )) -ge 4 ] || return 0
+    NT31_TICK_AT=$1
+    rm -f "$W9X_VM_RUN/vga.bin"
+    w9x_vm_monitor "pmemsave 0xb8000 4000 $W9X_VM_RUN/vga.bin"
+    sleep 1
+    [ -s "$W9X_VM_RUN/vga.bin" ] || return 0
+    screen=$(od -An -v -tu1 "$W9X_VM_RUN/vga.bin" | awk '{ for (i = 1; i <= NF; i++) if (++n % 2) printf "%s", ($i >= 32 && $i < 127) ? sprintf("%c", $i + 0) : " " }')
+    case "$screen" in
+        *'Press CTRL+ALT+DELETE to restart'*) page=restart key=ctrl-alt-delete ;;
+        *'Welcome to Setup.'*) page=welcome key=ret ;;
+        *'Express Setup (recommended)'*) page=express key=ret ;;
+        *'select the partition where you would like to install'*) page=partition key=ret ;;
+        *'select a file system option'*) page=filesystem key=ret ;;
+        *'Choose the location'*) page=location key=ret ;;
+        *) return 0 ;;
+    esac
+    [ "$page" != "${NT31_PAGE:-}" ] || [ $(( $1 - NT31_PAGE_AT )) -ge 30 ] || return 0
+    NT31_PAGE=$page
+    NT31_PAGE_AT=$1
+    printf 'nt31 text page %s at %ss: %s\n' "$page" "$1" "$key" >> "$W9X_VM_RUN/command.txt"
+    w9x_vm_monitor "sendkey $key"
+}
+
+# NT 3.1 GUI-mode Setup (INITIAL.INF, stdin -> stdout, CR LF) without its
+# pages: no network, printer or application search; owner $1, organisation
+# $2, computer name $3; blank Administrator password, no extra user account;
+# no Emergency Repair Disk (the Date/Time applet stays: nt4_vm_install
+# answers it with ENTER); at the end the USOS
+# section (drivers and their Services keys) and the restart without the
+# "Setup is done" page. 1 when an anchor is missing (another INITIAL.INF).
+nt31_initial_inf() {
+    awk -v BINMODE=3 -v full="$1" -v org="$2" -v comp="$3" '
+        function out(t) { printf "%s\r\n", t }
+        { line = $0; sub(/\r$/, "", line); low = tolower(line); gsub(/[ \t]/, "", low) }
+        low ~ /^\[/ { sec = low }
+        sec == "[uivars]" && low ~ /^(donetwork|doprinter|doappsetup)=\$\(chosen\)$/ { sub(/\$\([Cc]hosen\)/, "$(NotChosen)", line); hit["vars"]++ }
+        low ~ /^shell"repair\.inf""createrepairdiskette"$/ { out("; USOS: no Emergency Repair Disk"); hit["erd"]++; next }
+        { out(line) }
+        low == "[dolicense]" { out("    set !FullName = \"" full "\""); out("    set !OrgName = \"" org "\""); out("    Return STATUS_SUCCESSFUL"); hit["lic"]++ }
+        low == "[docomputername]" { out("    Return STATUS_SUCCESSFUL \"" comp "\""); hit["comp"]++ }
+        low == "[doadminaccountsetup]" { out("    Return STATUS_SUCCESSFUL \"\""); hit["admin"]++ }
+        low == "[doaccountsetup]" { out("    Return STATUS_USERCANCEL \"\" \"\""); hit["acct"]++ }
+        sec == "[shellcommands]" && low == "setupdone=+" { out("    shell \"\" UsosNt31Post"); out("    set Exit_Code = $(!SETUP_ERROR_SUCCESS)"); out("    goto rebootend"); hit["done"]++ }
+        END {
+            out("")
+            out("; USOS NT 3.1 (docs/nt31-2026-10-09.md): the USOS drivers and their Services keys")
+            out("[UsosNt31Post]")
+            out("    OpenRegKey $(!REG_H_LOCAL) \"\" \"system\\CurrentControlSet\\services\" 33554432 UsosSvc")
+            svc("ahcint", 1, 0, 1, "SCSI miniport")
+            svc("usosrst", 1, 0, 0, "SCSI miniport")
+            par("usosrst", "{HpetLegacyOff,0,$(!REG_VT_DWORD),1},{RtcFix,0,$(!REG_VT_DWORD),1}")
+            # usosusb as a boot driver: as a system driver (Start 1) NT 3.1
+            # never ran its DriverEntry (no Diag value, QEMU 2026-10-10).
+            svc("usosusb", 1, 0, 0, "Keyboard Port")
+            set("Scsidisk", "{Start,0,$(!REG_VT_DWORD),0}")
+            par("Kbdclass", "{ConnectMultiplePorts,0,$(!REG_VT_DWORD),1}")
+            par("Mouclass", "{ConnectMultiplePorts,0,$(!REG_VT_DWORD),1}")
+            set("Atdisk", "{Start,0,$(!REG_VT_DWORD),4}")
+            out("    CloseRegKey $(UsosSvc)")
+            # No automatic logon in NT 3.1; the logon box offers Administrator.
+            out("    OpenRegKey $(!REG_H_LOCAL) \"\" \"software\\Microsoft\\Windows NT\\CurrentVersion\" 33554432 UsosSvc")
+            set("Winlogon", "{DefaultUserName,0,$(!REG_VT_SZ),\"Administrator\"}")
+            out("    CloseRegKey $(UsosSvc)")
+            out("    RunProgram STATUS \"\" \"\" $(!STF_WINDOWSSYSPATH)\"\\cmd.exe\" /c C:\\USOS\\NT3\\POST.CMD")
+            out("    Return STATUS_SUCCESSFUL")
+            n = split("vars erd lic comp admin acct done", need, " ")
+            for (i = 1; i <= n; i++) if (!hit[need[i]]) { print "INITIAL.INF: no anchor " need[i] > "/dev/stderr"; bad = 1 }
+            if (hit["vars"] != 3) { print "INITIAL.INF: UiVars " hit["vars"] "/3" > "/dev/stderr"; bad = 1 }
+            exit bad
+        }
+        function key(name, values) {
+            out("    shell \"registry.inf\" CreateKey $(UsosSvc) " name " " values)
+            out("    ifstr(i) $($R0) == STATUS_SUCCESSFUL")
+            out("        CloseRegKey $($R1)")
+            out("    endif")
+        }
+        function set(name, values) { key("{{" name ",0,33554432}}", "{" values "}") }
+        function par(name, values) { key("{{" name ",0,33554432},{Parameters,0,33554432}}", "{" values "}") }
+        function svc(name, type, start, err, group) {
+            set(name, "{Type,0,$(!REG_VT_DWORD)," type "},{Start,0,$(!REG_VT_DWORD)," start "},{ErrorControl,0,$(!REG_VT_DWORD)," err "},{Group,0,$(!REG_VT_SZ),\"" group "\"}")
+        }'
+}
+
+# After a VM run of an NT 3.1 install: once text mode has written
+# \WINNT\SYSTEM32\INITIAL.INF (plain text there), it gets nt31_initial_inf
+# with the names of \USOS\NT3\NAMES.TXT (nt4_csmwrap_target.sh). 1 = the
+# file is there but cannot be patched.
+nt31_vm_patch_initial() {
+    img="$1@@$NT4_PART_OFFSET"
+    inf=$W9X_VM_RUN/../nt31-initial.inf
+    MTOOLS_SKIP_CHECK=1 mtype -i "$img" ::/WINNT/SYSTEM32/INITIAL.INF > "$inf" 2>/dev/null && [ -s "$inf" ] || { rm -f "$inf"; return 0; }
+    if ! grep -q '^\[UsosNt31Post\]' "$inf"; then
+        names=$(MTOOLS_SKIP_CHECK=1 mtype -i "$img" ::/USOS/NT3/NAMES.TXT 2>/dev/null | tr -d '\r')
+        value() { printf '%s\n' "$names" | awk -v k="$1" -F= '$1 == k { sub(/^[^=]*=/, ""); print; exit }'; }
+        nt31_initial_inf "$(value fullname)" "$(value org)" "$(value computer)" < "$inf" > "$inf.new" || { rm -f "$inf" "$inf.new"; return 1; }
+        MTOOLS_SKIP_CHECK=1 mcopy -o -i "$img" "$inf.new" ::/WINNT/SYSTEM32/INITIAL.INF || { rm -f "$inf" "$inf.new"; return 1; }
+    fi
+    # HARDWARE.INF: the Language (Locale) page keeps the CD's default.
+    MTOOLS_SKIP_CHECK=1 mtype -i "$img" ::/WINNT/SYSTEM32/HARDWARE.INF > "$inf" 2>/dev/null && [ -s "$inf" ] || { rm -f "$inf" "$inf.new"; return 1; }
+    if ! grep -q '^; USOS' "$inf"; then
+        nt31_hardware_inf < "$inf" > "$inf.new" || { rm -f "$inf" "$inf.new"; return 1; }
+        MTOOLS_SKIP_CHECK=1 mcopy -o -i "$img" "$inf.new" ::/WINNT/SYSTEM32/HARDWARE.INF || { rm -f "$inf" "$inf.new"; return 1; }
+    fi
+    rm -f "$inf" "$inf.new"
+    return 0
+}
+
+# NT 3.1 HARDWARE.INF (stdin -> stdout, CR LF): [InitialHardwareInstall]
+# installs the detected default language (locale) without its page.
+nt31_hardware_inf() {
+    awk -v BINMODE=3 '
+        { line = $0; sub(/\r$/, "", line); low = tolower(line); gsub(/[ \t]/, "", low) }
+        low ~ /^\[/ { sec = low }
+        { printf "%s\r\n", line }
+        sec == "[initialhardwareinstall]" && low == "system=+" { printf "; USOS: the default language (locale), no page\r\n    goto install_system\r\n"; hit++ }
+        sec == "[initialhardwareinstall]" && low == "install_system=+" { lab++ }
+        END { if (hit != 1 || lab != 1) { print "HARDWARE.INF: no [InitialHardwareInstall] system / install_system label" > "/dev/stderr"; exit 1 } }'
+}
+
 # The QEMU argument list (W9X_VM_ARGS_FN for w9x_phase1_run): the w9x rules
 # (no network, -no-reboot, cache=none) with the disk view limited to the
 # first NT4_VM_DISK_BYTES (FAT16 C: is in the first 2 GiB; NT 4.0 atapi has
@@ -56,7 +187,7 @@ nt4_vm_disk_args() {
 nt4_vm_args() {
     case "$2" in kvm) accel='kvm' ;; *) accel='tcg,tb-size=128' ;; esac
     printf '%s\n' -name usos-nt4-install -nodefaults -L "$W9X_VM_DATADIR" \
-        -machine pc -accel "$accel" -cpu "${NT4_VM_CPU:-pentium3}" -smp 1 -m "$W9X_VM_GUEST_MB" \
+        -machine pc -accel "$accel" -cpu "${NT4_VM_CPU:-pentium3}" -smp 1 -m "${NT4_VM_MB:-$W9X_VM_GUEST_MB}" \
         -rtc base=localtime -vga std -display none -nic none -no-reboot \
         $(nt4_vm_disk_args "$1") \
         -boot order=c \
@@ -95,7 +226,10 @@ nt4_vm_install() {
     W9X_VM_TEXT_ANSWER=''
     NT4_VM_HBA=''
     NT4_VM_CPU=''
+    NT4_VM_MB=''
+    W9X_VM_TICK_FN=''
     nt3=''
+    nt31=''
     if MTOOLS_SKIP_CHECK=1 mdir -i "$target@@$NT4_PART_OFFSET" ::/USOS/NT3 >/dev/null 2>&1; then
         nt3=yes
         W9X_VM_TEXT_ANSWER=${NT3_VM_TEXT_ANSWER:-ret}
@@ -107,6 +241,23 @@ nt4_vm_install() {
         if MTOOLS_SKIP_CHECK=1 mtype -i "$target@@$NT4_PART_OFFSET" ::/USOS/NT3/SOURCE.TXT 2>/dev/null | grep -q '^version=3\.50'; then
             NT4_VM_CPU=${NT35_VM_CPU:-pentium}
             NT4_VM_HBA=${NT35_VM_HBA:-}
+        fi
+        # NT 3.1 (version=3.10): text mode answered page by page
+        # (nt31_vm_tick), GUI Setup runs from the patched INITIAL.INF
+        # (nt31_vm_patch_initial after each run); Pentium, IDE, 64 MiB.
+        if MTOOLS_SKIP_CHECK=1 mtype -i "$target@@$NT4_PART_OFFSET" ::/USOS/NT3/SOURCE.TXT 2>/dev/null | grep -q '^version=3\.10'; then
+            nt31=yes
+            NT4_VM_CPU=${NT31_VM_CPU:-pentium}
+            NT4_VM_HBA=''
+            NT4_VM_MB=${NT31_VM_MB:-64}
+            W9X_VM_TEXT_ANSWER=''
+            # The Date/Time applet GUI Setup opens (it writes the time zone;
+            # without it WinLogon refused Administrator: "time restrictions",
+            # QEMU 2026-10-10) is accepted with ENTER after the idle time.
+            W9X_VM_ANSWER=${NT31_VM_ANSWER:-ret}
+            W9X_VM_TICK_FN=nt31_vm_tick
+            NT31_PAGE=''
+            NT31_TICK_AT=-10
         fi
     fi
     NT4_VM_STALLED=0
@@ -125,9 +276,15 @@ nt4_vm_install() {
         w9x_phase1_keep_logs "$logs/run-$boot"
         NT4_VM_STALLED=${W9X_VM_STALLED:-0}
         printf 'run %s rc=%s elapsed=%s stalled=%s\n' "$boot" "$rc" "${W9X_VM_ELAPSED:-0}" "$NT4_VM_STALLED" >> "$logs/runs.txt"
-        [ "$rc" = 0 ] || return "$rc"
-        if nt4_vm_marker "$target" DONE.TXT; then return 0; fi
+        [ "$rc" = 0 ] || { W9X_VM_TICK_FN=''; return "$rc"; }
+        if [ -n "$nt31" ] && ! nt31_vm_patch_initial "$target"; then
+            printf 'run %s: cannot patch INITIAL.INF\n' "$boot" >> "$logs/runs.txt"
+            W9X_VM_TICK_FN=''
+            return 2
+        fi
+        if nt4_vm_marker "$target" DONE.TXT; then W9X_VM_TICK_FN=''; return 0; fi
     done
+    W9X_VM_TICK_FN=''
     return 4
 }
 
@@ -262,6 +419,19 @@ nt4_vm_finish() {
     if [ "$status" = 0 ] && [ "$sub" = NT3 ] && src=$(nt4_ci_path "$c" USOS/NT3/SOURCE.TXT) &&
         grep -aq '^version=3\.50' "$src"; then
         NT4_BOOT_OPTIONS=$NT35_BOOT_OPTIONS
+    fi
+    if [ "$status" = 0 ] && [ "$sub" = NT3 ] && src=$(nt4_ci_path "$c" USOS/NT3/SOURCE.TXT) &&
+        grep -aq '^version=3\.10' "$src"; then
+        NT4_BOOT_OPTIONS=$NT31_BOOT_OPTIONS
+        # NT 3.1: the Setup boot floppy files on the root of C:
+        # (nt4_csmwrap_target.sh nt31_layout, ROOTLIST.TXT).
+        if list=$(nt4_ci_path "$c" USOS/NT3/ROOTLIST.TXT); then
+            for leftover in $(tr -d '\r' < "$list") TXTSETUP.INF; do
+                file=$(nt4_ci_path "$c" "$leftover") || continue
+                chmod u+w "$file" 2>/dev/null || true
+                rm -f "$file"
+            done
+        fi
     fi
     if [ "$status" = 0 ]; then
         ini=$(nt4_ci_path "$c" BOOT.INI) || ini=$c/BOOT.INI

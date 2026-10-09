@@ -827,6 +827,17 @@ __declspec(dllimport) extern ULONG KiBugCheckData[5];
 #endif
 /* MODIFIED (USOS 1.3.0.0-usos4, NT 3.51 build, 0007): NT 3.51 ntoskrnl
    does not export KiBugCheckData; that build keeps the STOP code at 0. */
+#ifdef AHCI_NT31
+/* MODIFIED (USOS 1.3.0.0-usos7, NT 3.1 build, 0010): the NT 3.1 kernel
+   exports no memset; the compiler's calls for structure zeroing land here. */
+#pragma function(memset)
+void * __cdecl memset(void *dst, int val, unsigned int count)
+{
+    unsigned char *p = (unsigned char *)dst;
+    while (count--) *p++ = (unsigned char)val;
+    return dst;
+}
+#endif
 
 static ULONG g_UsosInstances;
 static UCHAR g_UsosComponent[] = "AHCINT-USOS";
@@ -1220,10 +1231,14 @@ AhciUsosAttach(IN PHW_DEVICE_EXTENSION HwInit)
     vga.LowPart = 0xB8000;
     vga.HighPart = 0;
     if (HwInit->UsosVga == NULL) HwInit->UsosVga = (PUSHORT)MmMapIoSpace(vga, 80 * 50 * 2, 0 /* MmNonCached */);
+#ifndef AHCI_NT31
+    /* MODIFIED (usos7, 0010): NT 3.1 exports no KeRegisterBugCheckCallback;
+       that build has no STOP-time trace callback. */
     if (HwInit->UsosBugCheckRecord.CallbackRoutine == NULL) {
         KeRegisterBugCheckCallback(&HwInit->UsosBugCheckRecord, (PVOID)AhciUsosBugCheckCallback,
                                    HwInit, sizeof(HW_DEVICE_EXTENSION), g_UsosComponent);
     }
+#endif
     AhciUsosShow(HwInit);
 }
 

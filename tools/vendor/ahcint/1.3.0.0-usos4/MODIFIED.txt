@@ -138,3 +138,16 @@ ScsiPortWritePortUlong, ScsiPortWritePortUshort (all on NT 3.51). QEMU
 2026-10-09: logon with OVMF + CSMWrap and SeaBIOS, q35 with and without
 12 pcie-root-ports (PCI BIOS hidden and present). The other builds are
 unchanged.
+
+usos7 (patches/0010-usos7-nt31-build.patch, 2026-10-09; ahcimain.c,
+ahcisatl.c, NT 3.1 build only, new bin/NT31 via build-nt31.cmd): the NT
+3.51 build plus AHCI_NT31. NT 3.1 ScsiPort takes a
+HwInitializationDataSize of exactly 0x40 (the offset of VendorIdLength,
+0x3E, is rejected), its PORT_CONFIGURATION_INFORMATION ends after
+ReceiveEvent (SlotNumber and MaximumNumberOfTargets are neither read nor
+written), it knows no PCIBus interface type (the adapter is reported as an
+EISA bus master with 32-bit addresses: no map registers) and its kernel
+exports neither KeRegisterBugCheckCallback (no STOP-time trace callback in
+that build) nor memset (own copy). QEMU 2026-10-09: NT 3.1 Workstation and
+Advanced Server reach the logon screen through AHCINT with OVMF + CSMWrap
+(ich9-ahci, 12 pcie-root-ports). The other builds are unchanged.

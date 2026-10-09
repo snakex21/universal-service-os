@@ -636,6 +636,11 @@ def main() -> int:
             ("tools/nt4/usosusb/bin/i386/usosusb.sys", "usr/lib/usos/nt3/USOSUSB.SYS"),
             ("tools/nt3/usosnt3/bin/i386/usosnt3.exe", "usr/lib/usos/nt3/USOSNT3.EXE"),
             ("tools/nt3/usosachk/bin/i386/usosachk.exe", "usr/lib/usos/nt3/USOSACHK.EXE"),
+            # NT 3.1 (docs/nt31-2026-10-09.md): builds for the NT 3.1 kernel,
+            # HAL and ScsiPort (build-nt31.cmd of each driver).
+            ("tools/vendor/ahcint/1.3.0.0-usos4/bin/NT31/i386/ahcint.sys", "usr/lib/usos/nt3/AHCINT31.SYS"),
+            ("tools/w2k/usosrst/bin/nt31/i386/usosrst.sys", "usr/lib/usos/nt3/USOSRST31.SYS"),
+            ("tools/nt4/usosusb/bin/nt31/i386/usosusb.sys", "usr/lib/usos/nt3/USOSUSB31.SYS"),
         ):
             put(entries, Entry(target_name, stat.S_IFREG | 0o644, (root / source_name).read_bytes()))
         xp_vbr = root / "zig-out/xp-bios/xp-vbr-code.bin"

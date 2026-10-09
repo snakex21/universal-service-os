@@ -34,6 +34,10 @@ pub const staged = [_]struct { system_id: []const u8, file: []const u8 }{
     // same WINNT.SIF; micro-Linux checks MinorVersion 50 on the CD.
     .{ .system_id = "windows-nt-3-5", .file = "NT35.SIF" },
     .{ .system_id = "windows-nt-3-5-server", .file = "NT35S.SIF" },
+    // NT 3.1 (docs/nt31-2026-10-09.md): no answer file in its Setup;
+    // micro-Linux takes the [UserData] names into the patched INITIAL.INF.
+    .{ .system_id = "windows-nt-3-1", .file = "NT31.SIF" },
+    .{ .system_id = "windows-nt-3-1-server", .file = "NT31S.SIF" },
 };
 
 pub fn isNt3(system_id: []const u8) bool {
@@ -91,7 +95,8 @@ pub fn render(p: *const Profile, buffer: []u8) ![]const u8 {
 test "NT 3.51 / 3.5 ids" {
     try std.testing.expect(isNt3("windows-nt-3-51") and isNt3("Windows-NT-3-51-Server"));
     try std.testing.expect(isNt3("windows-nt-3-5") and isNt3("windows-nt-3-5-server"));
-    try std.testing.expect(!isNt3("windows-nt-4") and !isNt3("windows-nt-3-1"));
+    try std.testing.expect(isNt3("windows-nt-3-1") and isNt3("windows-nt-3-1-server"));
+    try std.testing.expect(!isNt3("windows-nt-4") and !isNt3("windows-nt-3-11"));
 }
 
 test "NT 3.51 WINNT.SIF: the default profile" {
