@@ -30,9 +30,12 @@ NT52_SELECTED_USB3=[n for n in SELECTED if n!='Dependencies/storport.sys']
 NT52_SELECTED=['ACPI/acpi.sys','SATA/genahci.sys','SATA/genahci.inf']
 NT52_MARKERS=('WIN51IS.SP2','WIN51IA.SP2','WIN51IB.SP2','WIN51ID.SP2','WIN51IC.SP2')
 
+def iso_listing(iso):
+    return subprocess.run([SEVEN,'l','-ba',str(iso)],check=True,capture_output=True,text=True,errors='replace').stdout.upper().split()
+
 def source_kind(iso):
     """'xp-sp3' or 'w2k3-sp2' from the media's tag files."""
-    listing=subprocess.run([SEVEN,'l','-ba',str(iso)],check=True,capture_output=True,text=True,errors='replace').stdout.upper().split()
+    listing=iso_listing(iso)
     if 'WIN51IP.SP3' in listing:return 'xp-sp3'
     if any(m in listing for m in NT52_MARKERS):return 'w2k3-sp2'
     raise ValueError('Driver experiment requires XP Professional SP3 or Windows Server 2003 SP2 (x86)')
@@ -144,11 +147,18 @@ def build_driver_overlay(iso,out):
     sp_cab,selected,marker=('SP3.CAB',SELECTED,'WIN51IP.SP3') if kind=='xp-sp3' else ('SP2.CAB',NT52_SELECTED_USB3 if NT52_USB3 else NT52_SELECTED,'WIN51')
     usb3=kind=='xp-sp3' or NT52_USB3
     builtin_usb=BUILTIN_USB if usb3 else ()
-    subprocess.run([SEVEN,'e',str(iso),*['I386\\'+n for n in META],'I386\\'+sp_cab,marker,'-o'+str(original),'-y'],check=True,stdout=subprocess.DEVNULL)
+    # Integrated SP3 media (nLite-style: the SP3 files merged into DRIVER.CAB
+    # and I386, no I386\SP3.CAB, DriverCabName=driver.cab; e.g. the XP Tablet
+    # PC Edition 2005 SP3 "updated" disc): the bundle adds its own SP3.CAB
+    # holding only the community ACPI and registers it as a driver cabinet,
+    # so the installed system's driver cache serves that ACPI, as on
+    # Microsoft-slipstreamed media.
+    integrated=kind=='xp-sp3' and 'I386\\'+sp_cab not in iso_listing(iso)
+    subprocess.run([SEVEN,'e',str(iso),*['I386\\'+n for n in META],*([] if integrated else ['I386\\'+sp_cab]),marker,'-o'+str(original),'-y'],check=True,stdout=subprocess.DEVNULL)
     if not (original/marker).exists():raise ValueError('Driver experiment currently requires XP Professional SP3')
     for n in META:assert (original/n).is_file(),n
     cabdir=out/'sp3-files';cabdir.mkdir(exist_ok=True)
-    subprocess.run([SEVEN,'e',str(original/sp_cab),'-o'+str(cabdir),'-y'],check=True,stdout=subprocess.DEVNULL)
+    if not integrated:subprocess.run([SEVEN,'e',str(original/sp_cab),'-o'+str(cabdir),'-y'],check=True,stdout=subprocess.DEVNULL)
     bundle=out/'bundle';bundle.mkdir(exist_ok=True)
     hashes=''.join(sha(original/n)+'  I386/'+n+'\n' for n in META)
     bundle_id=hashlib.sha256(hashes.encode()).hexdigest()
@@ -169,7 +179,7 @@ def build_driver_overlay(iso,out):
         pack_file(p,i386/(p.name[:-1]+'_'))
     native=out/'native-usb';native.mkdir(exist_ok=True)
     fallback=out/'source-driver-cache';fallback.mkdir(exist_ok=True)
-    sp3_stamps=xp_cab.stamps((original/sp_cab).read_bytes())
+    sp3_stamps={} if integrated else xp_cab.stamps((original/sp_cab).read_bytes())
     driver_stamps={}
     if any(not (cabdir/n).is_file() for n in builtin_usb):
         # SP3.CAB contains updated files; unchanged XP files remain in DRIVER.CAB.
@@ -194,6 +204,7 @@ def build_driver_overlay(iso,out):
     text=edit_section(text,'HardwareIdsDatabase',[r'PCI\CC_010601 = "genahci"',r'PCI\CC_0C0330 = "usbxhci"',r'USB\ROOT_HUB30 = "usbhub3"',r'USB\USB30_HUB = "usbhub3"',r'USB\USB20_HUB = "usbhub3"'] if usb3 else [r'PCI\CC_010601 = "genahci"'])
     text=edit_section(text,'SCSI.Load',['genahci = genahci.sys,4'])
     text=edit_section(text,'SCSI',['genahci = "USOS Generic SATA AHCI"'])
+    if integrated:text=register_integrated_cab(text,sp_cab)
     for group,svc,label,files in [
       ('BootBusExtenders','wdf01000','Kernel-Mode Driver Framework 1.11',['wdf01000.sys','wdfldr.sys','ntoskrn8.sys']),
       ('BusExtenders','ucx01000','USB Controller Extension',['ucx01000.sys','wdfldr.sys','wpprecor.sys']),
@@ -207,6 +218,7 @@ def build_driver_overlay(iso,out):
     for sec,items in [('Files',names),('FloppyFiles.1',sysnames)]:
         # DOSNET rows share d1, so their identity is the whole row, not its first field.
         text=edit_section(text,sec,['d1,'+n for n in items],replace=False)
+    if integrated:text=edit_section(text,'Files',['d1,'+sp_cab.lower()],replace=False)
     (i386/'DOSNET.INF').write_bytes(text.encode(encoding))
     text,encoding=decode((original/'HIVESYS.INF').read_bytes())
     reglines=[]
@@ -224,6 +236,7 @@ def build_driver_overlay(iso,out):
     # The registry engine stamps the build time into touched keys and header.
     hive=i386/'SETUPREG.HIV';hive.write_bytes(xp_hive.pin_hive(hive.read_bytes(),(original/'SETUPREG.HIV').read_bytes()))
     # PnP can extract ACPI from SP3.CAB later, so replace its copy too.
+    if integrated:shutil.copyfile(DRIVERS/'ACPI/acpi.sys',cabdir/'acpi.sys')
     acpi=[p for p in cabdir.iterdir() if p.name.lower()=='acpi.sys']
     if len(acpi)!=1:raise ValueError(sp_cab+' lacks unique ACPI; refusing incomplete integration')
     shutil.copyfile(DRIVERS/'ACPI/acpi.sys',acpi[0])
@@ -235,6 +248,18 @@ def build_driver_overlay(iso,out):
     # Unchanged files keep Microsoft's date/time; the replaced ACPI gets the pinned one.
     xp_cab.pin(i386/sp_cab,{n:t for n,t in sp3_stamps.items() if n!=acpi[0].name.lower()})
     return finish_bundle(out,bundle,i386,native,names,selected,bundle_id,iso)
+
+def register_integrated_cab(text,cab):
+    """TXTSETUP.SIF of integrated SP3 media: the bundle's own driver cabinet
+    next to DRIVER.CAB (copied to the driver cache, directory 39, like
+    Microsoft-slipstreamed media's sp3.cab)."""
+    name=cab.lower()
+    m=re.search(r'(?im)^[ \t]*DriverCabName[ \t]*=[ \t]*(.*?)[ \t]*$',text)
+    cabs=[c.strip() for c in m.group(1).split(',') if c.strip()] if m else ['driver.cab']
+    if name not in [c.lower() for c in cabs]:cabs.append(name)
+    text=edit_section(text,'SetupData',['DriverCabName = '+','.join(cabs)])
+    text=edit_section(text,'SourceDisksFiles',[name+' = 1,,,,,,_x,39,0,0'])
+    return edit_section(text,'FileFlags',[name+' = 16'])
 
 def finish_bundle(out,bundle,i386,native,names,selected,bundle_id,iso):
     (bundle/'payload.sha256').write_text(''.join(sha(p)+'  I386/'+p.name+'\n' for p in sorted(i386.iterdir()) if p.is_file()),encoding='ascii',newline='\n')
