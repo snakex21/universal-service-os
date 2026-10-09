@@ -21,11 +21,11 @@ initramfs	usr/lib/usos/legacy_xp_resume.sh	100755	50abdb4e5c844391889f4800f63a37
 initramfs	usr/lib/usos/legacy_xp_staging.sh	100755	b6cf4d583b9bff8e8f396214025652e60b3ba1216768faf936f808ab8b05ecf1
 initramfs	usr/lib/usos/micro_linux_ui.sh	100755	aa2706759236e7e804cbcaf522b05f8da07e4504f493fde02833d106618e3a8e
 initramfs	usr/lib/usos/nt3	40755	dir
-initramfs	usr/lib/usos/nt3-e820-mbr-440.bin	100644	dbfae0e04ec20c1b3f8b74b110c96fbc2bfb68759aa3ac47a5d495b27500c4e6
-initramfs	usr/lib/usos/nt3/AHCINT.SYS	100644	f685ab4cbd2d541889c950a2ced8c9c2088badd91f6103c7fde1bacf25bd3150
+initramfs	usr/lib/usos/nt3-e820-mbr-440.bin	100644	52888d8cf93bf7a805335c2faececd88f5290ad088d83265530415e0d1f670c6
+initramfs	usr/lib/usos/nt3/AHCINT.SYS	100644	40ba39c123e98ae5129751e7691a8ca5c41b9e88c269daabf3f288b90fdb6ed9
 initramfs	usr/lib/usos/nt3/USOSACHK.EXE	100644	748725aefcfeba1a6ef5af5feeb6d110c6ba90142c4a76bb0dee73adb924a4ac
 initramfs	usr/lib/usos/nt3/USOSNT3.EXE	100644	8eb12ede577be750d574b88f26b1870e5eb406f7474c1ab59f76c54afbb1c76f
-initramfs	usr/lib/usos/nt3/USOSRST.SYS	100644	f3ee44afc8081d748fe928acccdbab9c6efeb45e3790e789e588a1d8e180ba7c
+initramfs	usr/lib/usos/nt3/USOSRST.SYS	100644	2b948d8817a291540e48da03e2aeb5553cd82580d0814ff3511f737eebd1397c
 initramfs	usr/lib/usos/nt3/USOSUSB.SYS	100644	68944efb7f3d26c7fc19bf99cab2bd7944e0d32955da97f933a8019b226d2046
 initramfs	usr/lib/usos/nt4	40755	dir
 initramfs	usr/lib/usos/nt4/AHCINT.SYS	100644	f2b90a21b4889229b758dec8478254c1fa5880c30c04831a9244a6c94ea71208
@@ -33,7 +33,7 @@ initramfs	usr/lib/usos/nt4/USOSOFF.EXE	100644	11ac72c6d5b73d6931e957df1e4b86348d
 initramfs	usr/lib/usos/nt4/USOSRST.SYS	100644	d028580b4040662605d2c88b90094fd4125b2526cfda1083dc9011d6efafb23b
 initramfs	usr/lib/usos/nt4/USOSUSB.SYS	100644	68944efb7f3d26c7fc19bf99cab2bd7944e0d32955da97f933a8019b226d2046
 initramfs	usr/lib/usos/nt4/USOSVBE.SYS	100644	35bcafe45c8cb8629a3b66923ffedf66ff75ab2ea1df8b42cb0bbfb192eb90bb
-initramfs	usr/lib/usos/nt4_csmwrap_target.sh	100755	14430c5fdd6329ee2ca8f1667368362c7d07b6e1c2a70cc3a3d89fea3bbdef62
+initramfs	usr/lib/usos/nt4_csmwrap_target.sh	100755	d3ccbccc0d96c70bbf1e0f9cad96c85d253c95b1a6dd3814ed55dc31980fb5c4
 initramfs	usr/lib/usos/nt4_qemu_install.sh	100755	fe57e02344c0e137312c9a6d3738a72ac9643ddfa62d02415fd194e3000466fd
 initramfs	usr/lib/usos/nt52_usb_stage.sh	100755	32280cd7d12e0db9fbabfaf311ade7695311c3c9af3f8c884c5f112009ba9e93
 initramfs	usr/lib/usos/nt5_media_key.sh	100755	9f62ee0e64af21ec8a641b1bde227f8d1c2ae8e63938ec69c20c9d1d13d5db41
@@ -330,8 +330,8 @@ xp_csm	usr/lib/usos/nt52-usb/x86/xhci98.inf	100644	88ecbce637a81c361f8ae0c35df58
 xp_csm	usr/lib/usos/nt52-usb/x86/xhci98.sys	100644	01adf36d75eccebf9365a169fa47e5f1cd64cf40f43bcad4ba069210abd651ad
 xp_csm	usr/lib/usos/w2k-drivers	40755	dir
 xp_csm	usr/lib/usos/w2k-drivers/LICENSE	100644	230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809
-xp_csm	usr/lib/usos/w2k-drivers/MODIFIED.txt	100644	b10d8d048e9fe4a6fe22424da19f1b98c1069580e730993f0a9ae690a591c02b
-xp_csm	usr/lib/usos/w2k-drivers/SOURCE.txt	100644	a5f2cb1c90a2b908972a88bf74c7e0de59af3f3e8e6ead3289d7bdfc8c8d0649
+xp_csm	usr/lib/usos/w2k-drivers/MODIFIED.txt	100644	c0167a0cddda994e0e36e94cec0c6ed44c1a1391514c8f555c78fc7b2c813f09
+xp_csm	usr/lib/usos/w2k-drivers/SOURCE.txt	100644	2cda4f3576b9f08dda561abdb37c8ba8610c656e098988281d4c111249080d28
 xp_csm	usr/lib/usos/w2k-drivers/ahcint.inf	100644	c8dea5fd3839b8f9298a7925f6ba8c6451588638a42f24e10c4c8542915a6e21
 xp_csm	usr/lib/usos/w2k-drivers/ahcint.sys	100644	f5f0a8112f941f3833ac43c8104b4d169d2b6831d4ec224f9560ea10e3234f07
 xp_csm	usr/lib/usos/w2k-drivers/uniata	40755	dir
