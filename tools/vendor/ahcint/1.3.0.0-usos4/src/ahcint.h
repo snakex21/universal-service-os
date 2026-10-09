@@ -446,6 +446,7 @@ typedef struct _HW_DEVICE_EXTENSION {
     ULONG                   UsosLastErrCmd;
     ULONG                   UsosRbChecks;
     ULONG                   UsosRbBad;
+    ULONG                   UsosRbBadLba;       /* MODIFIED (USOS 1.3.0.0-usos5): first mismatch */
     ULONG                   UsosIos;
     ULONG                   UsosInTrace;
     ULONG                   UsosBugCheck[5];
