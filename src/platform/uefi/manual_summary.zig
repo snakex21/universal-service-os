@@ -188,6 +188,9 @@ pub fn show(
         } else if (std.mem.eql(u8, system.id, "windows-xp-mce")) {
             notes[note_count] = view.t(.summary_xp_mce_limits);
             note_count += 1;
+        } else if (std.mem.eql(u8, system.id, "windows-xp-tablet")) {
+            notes[note_count] = view.t(.summary_xp_tablet_limits);
+            note_count += 1;
         } else if (std.mem.eql(u8, system.id, "windows-server-2003") or std.mem.eql(u8, system.id, "windows-xp-x64")) {
             notes[note_count] = view.t(.summary_nt52_limits);
             note_count += 1;

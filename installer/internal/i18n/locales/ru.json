@@ -1169,6 +1169,7 @@
   "boot.summary.w2k_limits": "Windows 2000 (экспериментально): нет драйвера AHCI/NVMe/USB 3 для NT 5.0 (SATA в режиме IDE), не более 4 ГБ ОЗУ и 2 процессоров",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (экспериментально): путь Windows 2000; отвечает лицензирование На сервер (5), рабочая группа, IIS выключен; ключ продукта из профиля ответов; на диске без SP4 нет стека USB 2.0 (нет USB-клавиатуры/мыши)",
   "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (экспериментально): путь Windows XP; нужен однодисковый носитель с папкой CMPNENTS (компоненты Media Center); ключ продукта из профиля ответов, иначе из собственного WINNT.SIF диска",
+  "boot.summary.xp_tablet_limits": "Windows XP Tablet PC Edition 2005 (экспериментально): путь Windows XP; нужен однодисковый носитель с папкой CMPNENTS (компоненты Tablet PC); ключ продукта Tablet PC из профиля ответов",
 
   "boot.summary.nt52_limits": "NT 5.2 (экспериментально): AHCI через GenAHCI на StorPort системы; нет драйвера NVMe/USB 3 в установке",
   "boot.summary.vista_csmwrap": "Vista без CSM (экспериментально): legacy-установка (MBR) через CSMWrap, видеокарта с legacy VBIOS",

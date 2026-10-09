@@ -1172,6 +1172,7 @@
   "boot.summary.w2k_limits": "Windows 2000 (poskusno): ni gonilnika AHCI/NVMe/USB 3 za NT 5.0 (SATA v načinu IDE), največ 4 GB RAM in 2 procesorja",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (preskusno): pot Windows 2000; odgovori licenciranje Na strežnik (5), delovna skupina, IIS izklopljen; ključ izdelka iz profila odgovorov; CD brez SP4 nima sklada USB 2.0 (brez tipkovnice/miške USB)",
   "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (poskusno): pot sistema Windows XP; potreben je medij na enem disku z mapo CMPNENTS (komponente Media Center); ključ izdelka iz profila odgovorov, sicer iz lastnega WINNT.SIF diska",
+  "boot.summary.xp_tablet_limits": "Windows XP Tablet PC Edition 2005 (poskusno): pot sistema Windows XP; potreben je medij na enem disku z mapo CMPNENTS (komponente Tablet PC); ključ izdelka za Tablet PC iz profila odgovorov",
 
   "boot.summary.nt52_limits": "NT 5.2 (poskusno): AHCI prek GenAHCI na StorPortu sistema; brez gonilnika NVMe/USB 3 v namestitvi",
   "boot.summary.vista_csmwrap": "Vista brez CSM (preizkusno): namestitev legacy (MBR) prek CSMWrap, kartica z legacy VBIOS",

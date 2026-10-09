@@ -133,6 +133,9 @@ pub const traits_table = [_]SystemTraits{
     // the XP x86 staging (pae.exe, driver bundle, usos-xp.ini) from its own
     // DATA folder; the micro-Linux copies CMPNENTS into the local source.
     .{ .system_id = "windows-xp-mce", .route_as = "windows-xp" },
+    // Windows XP Tablet PC Edition 2005 (UEFI only, windows_legacy.zig): the
+    // same XP x86 staging from its own DATA folder (CMPNENTS\TABLETPC).
+    .{ .system_id = "windows-xp-tablet", .route_as = "windows-xp" },
     // Windows Embedded 8.1 Industry (UEFI only, windows_modern.zig): the
     // Windows 8.1 native start from its own DATA folder.
     .{ .system_id = "windows-embedded-8-1-industry", .route_as = "windows-8-1" },
@@ -193,6 +196,11 @@ test "NT 5.2 entries and the routed Servers fall back to a client icon" {
     try std.testing.expectEqualStrings("windows-xp", iconId("windows-xp-mce"));
     try std.testing.expect(traits("windows-xp-mce").nt5_staging);
     try std.testing.expectEqualStrings("usos-xp.ini", traits("windows-xp-mce").settings_file.?);
+    // So does XP Tablet PC Edition.
+    try std.testing.expectEqualStrings("windows-xp", routeId("windows-xp-tablet"));
+    try std.testing.expectEqualStrings("windows-xp", iconId("windows-xp-tablet"));
+    try std.testing.expect(traits("windows-xp-tablet").nt5_staging);
+    try std.testing.expectEqualStrings("usos-xp.ini", traits("windows-xp-tablet").settings_file.?);
 }
 
 /// The start gate of a probed Windows ISO of this system (image list, boot

@@ -196,3 +196,15 @@ test "XP Media Center Edition: its own key field in the NT5 group" {
     try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-xp").?);
     try std.testing.expect(@import("profile.zig").knownSystemToken("windows-xp-mce"));
 }
+
+test "XP Tablet PC Edition: its own key field in the NT5 group" {
+    var p = try profileFrom("name=A\nuser=Bob\nsystems=windows-nt5\n");
+    try std.testing.expect(appliesTo(&p, "windows-xp-tablet"));
+    try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-xp-tablet").?);
+    try p.setSystemKey("windows-xp-tablet", "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE");
+    try std.testing.expect(missing(&p, "windows-xp-tablet") == null);
+    // The Tablet PC key is neither the Professional nor the Media Center one.
+    try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-xp").?);
+    try std.testing.expectEqual(Missing.product_key, missing(&p, "windows-xp-mce").?);
+    try std.testing.expect(@import("profile.zig").knownSystemToken("windows-xp-tablet"));
+}

@@ -276,6 +276,7 @@ USOS_DATA\
 │  │  ├─ Windows Vista\     Images\   Unattended\
 │  │  ├─ Windows XP\        Images\   Unattended\  (usos-xp.ini, usos-xp.example.ini)
 │  │  ├─ Windows XP Media Center Edition 2005\
+│  │  ├─ Windows XP Tablet PC Edition 2005\
 │  │  ├─ Windows XP x64\  Windows 2000\  Windows NT 4.0\  Windows NT 3.51\  Windows NT 3.5\
 │  │  ├─ Windows Me\  Windows 98 SE\  Windows 98\  Windows 95\
 │  │  ├─ Windows 3.11\  Windows 3.1\          (tylko Images)

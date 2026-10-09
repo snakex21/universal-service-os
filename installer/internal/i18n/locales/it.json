@@ -1166,6 +1166,7 @@
   "boot.summary.w2k_limits": "Windows 2000 (sperimentale): nessun driver AHCI/NVMe/USB 3 per NT 5.0 (SATA in modalità IDE), max 4 GB di RAM e 2 CPU",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (sperimentale): il percorso di Windows 2000; risponde licenza Per server (5), gruppo di lavoro, IIS disattivato; codice Product Key dal profilo di risposte; un CD senza SP4 non ha lo stack USB 2.0 (niente tastiera/mouse USB)",
   "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (sperimentale): il percorso di Windows XP; richiede il supporto a disco singolo con CMPNENTS (componenti Media Center); codice Product Key dal profilo di risposte, altrimenti dal WINNT.SIF del disco stesso",
+  "boot.summary.xp_tablet_limits": "Windows XP Tablet PC Edition 2005 (sperimentale): il percorso di Windows XP; richiede il supporto a disco singolo con CMPNENTS (componenti Tablet PC); codice Product Key di Tablet PC dal profilo di risposte",
 
   "boot.summary.nt52_limits": "NT 5.2 (sperimentale): AHCI tramite GenAHCI sullo StorPort del sistema; nessun driver NVMe/USB 3 nell'installazione",
   "boot.summary.vista_csmwrap": "Vista senza CSM (sperimentale): installazione legacy (MBR) tramite CSMWrap, scheda con VBIOS legacy",

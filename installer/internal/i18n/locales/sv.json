@@ -1166,6 +1166,7 @@
   "boot.summary.w2k_limits": "Windows 2000 (experimentellt): ingen AHCI/NVMe/USB 3-drivrutin för NT 5.0 (SATA i IDE-läge), max 4 GB RAM och 2 processorer",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (experimentell): Windows 2000-vägen; besvarar licensiering Per server (5), arbetsgrupp, IIS av; produktnyckel från svarsprofilen; en cd utan SP4 saknar USB 2.0-stacken (inget USB-tangentbord/-mus)",
   "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (experimentellt): Windows XP-vägen; kräver media på en skiva med CMPNENTS (Media Center-komponenter); produktnyckel från svarsprofilen, annars från skivans egen WINNT.SIF",
+  "boot.summary.xp_tablet_limits": "Windows XP Tablet PC Edition 2005 (experimentellt): Windows XP-vägen; kräver media på en skiva med CMPNENTS (Tablet PC-komponenter); produktnyckel för Tablet PC från svarsprofilen",
 
   "boot.summary.nt52_limits": "NT 5.2 (experimentellt): AHCI via GenAHCI på systemets StorPort; ingen NVMe/USB 3-drivrutin i installationen",
   "boot.summary.vista_csmwrap": "Vista utan CSM (experimentellt): legacy-installation (MBR) via CSMWrap, grafikkort med legacy-VBIOS",

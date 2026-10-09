@@ -1166,6 +1166,7 @@
   "boot.summary.w2k_limits": "Windows 2000 (kokeellinen): ei AHCI/NVMe/USB 3 -ajuria NT 5.0:lle (SATA IDE-tilassa), enintään 4 Gt RAM ja 2 suoritinta",
   "boot.summary.w2k_server_limits": "Windows 2000 Server (kokeellinen): Windows 2000 -polku; vastaa käyttöoikeus Palvelinta kohden (5), työryhmä, IIS pois; tuoteavain vastausprofiilista; CD:llä ilman SP4:ää ei ole USB 2.0 -pinoa (ei USB-näppäimistöä/-hiirtä)",
   "boot.summary.xp_mce_limits": "Windows XP Media Center Edition 2005 (kokeellinen): Windows XP -polku; vaatii yhden levyn median, jossa on CMPNENTS (Media Center -osat); tuoteavain vastausprofiilista, muuten levyn omasta WINNT.SIF-tiedostosta",
+  "boot.summary.xp_tablet_limits": "Windows XP Tablet PC Edition 2005 (kokeellinen): Windows XP -polku; vaatii yhden levyn median, jossa on CMPNENTS (Tablet PC -osat); Tablet PC -tuoteavain vastausprofiilista",
 
   "boot.summary.nt52_limits": "NT 5.2 (kokeellinen): AHCI GenAHCI:n kautta järjestelmän StorPortilla; asennuksessa ei NVMe/USB 3 -ajuria",
   "boot.summary.vista_csmwrap": "Vista ilman CSM:ää (kokeellinen): legacy-asennus (MBR) CSMWrapin kautta, näytönohjaimessa legacy-VBIOS",
