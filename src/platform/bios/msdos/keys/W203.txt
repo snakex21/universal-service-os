@@ -1,9 +1,9 @@
 # Windows 2.03 Setup (USOSKBC, tools/usos_keyscript.py). IBM PC/XT/AT, VGA,
-# US keyboard, no mouse, no printer, United States. No mouse: under CSMWrap
-# MOUSE.DRV cannot reach the USB mouse anyway, and its PS/2 start (INT 15h
-# C2xx, up to 20 retries per call) is the suspect of the X470 hang at the
-# logo (no PS/2 mouse there; not reproducible in QEMU). The list starts
-# with "Microsoft Mouse (Bus or Serial)"; "No mouse" is the second entry.
+# US keyboard, Microsoft Mouse, no printer, United States. The mouse list
+# starts with "Microsoft Mouse (Bus or Serial)" (MOUSE.DRV; it finds the
+# PS/2 port itself through the BIOS, INT 15h C0h/C2xx): under CSMWrap the
+# USB mouse reaches it through USOSKBC /M (start menu). The X470 hang at the
+# logo was the video BIOS stack depth (USOSV10), not the mouse driver.
 wait "SETUP PROGRAM for Microsoft Windows Version 2"
 key enter
 wait "will now be set up on your hard disk"
@@ -15,7 +15,7 @@ key down down down down down down enter
 wait "select your keyboard"
 key enter
 wait "select your pointing device"
-key down enter
+key enter
 wait "list of the items you've selected"
 key enter
 wait "allow you to install a printer"

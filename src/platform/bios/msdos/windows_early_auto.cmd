@@ -3,7 +3,7 @@ prompt $p$g
 path C:\DOS;C:\WINDOWS;C:\PROGRAMS
 set TEMP=C:\TEMP
 rem Windows 1.0x, 2.x, Windows/386 2.x and 3.0 (W1CONFIG.SYS start menu).
-rem Default items: USOSV10, VBMOUSE, USOSKBC /R, then WIN; no USOSWHER.
+rem Default items: USOSV10, VBMOUSE, USOSKBC /R /M, then WIN; no USOSWHER.
 rem Diagnostic items only (W1CONFIG.SYS submenu DIAG, from the Windows 2.03
 rem logo hang on the X470, fixed by USOSV10 - D6 PASS 2026-10-09): D1
 rem default + USOSWHER, D2 without USOSKBC, D4 without HIMEM and VBMOUSE, D5
@@ -22,16 +22,18 @@ rem the logo). D5 leaves it out as the control item.
 if "%UDIAG%"=="D5" goto v10_done
 if exist C:\DOS\USOSV10.COM C:\DOS\USOSV10.COM
 :v10_done
-rem Under CSMWrap (files present): VBMOUSE (DOS programs) and USOSKBC /R,
-rem the USB keyboard relayed through the 8042 for KEYBOARD.DRV of Windows
-rem 1.0x-3.0 (USOSKEY.DRV needs Windows 3.1).
+rem Under CSMWrap (files present): VBMOUSE (DOS programs) and USOSKBC /R /M:
+rem /R the USB keyboard relayed through the 8042 for KEYBOARD.DRV of Windows
+rem 1.0x-3.0 (USOSKEY.DRV needs Windows 3.1); /M the USB mouse for MOUSE.DRV
+rem of Windows 2.x/3.0 (PS/2 path: BIOS INT 15h C2xx, INT 74h after each
+rem packet, which SeaBIOS delivers from its timer and not as IRQ 12).
 if "%UDIAG%"=="D4" goto kbc_load
 if "%UDIAG%"=="D5" goto tsr_done
 if "%UDIAG%"=="D6" goto tsr_done
 if exist C:\DOS\VBMOUSE.EXE C:\DOS\VBMOUSE.EXE
 if "%UDIAG%"=="D2" goto tsr_done
 :kbc_load
-if exist C:\DOS\USOSKBC.COM C:\DOS\USOSKBC.COM /R
+if exist C:\DOS\USOSKBC.COM C:\DOS\USOSKBC.COM /R /M
 :tsr_done
 if "%CONFIG%"=="DOSONLY" goto dos
 if "%UDIAG%"=="" goto win_go

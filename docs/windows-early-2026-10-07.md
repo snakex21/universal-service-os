@@ -407,3 +407,57 @@ USOSV10 also without CSMWrap (the video BIOS stack depth does not depend on
 it). Windows 2.11, /286 and /386 use the same WIN.COM logo path and likely
 benefit too. Windows 3.1/WfW and 9x DOS phases do not load USOSV10 (no
 known need; their own stacks are larger).
+
+## USB mouse for Windows 2.x and 3.0: USOSKBC /M (2026-10-09)
+
+Static reading of the shipped MOUSE.DRV (2.03 = 2.11/286 = 2.11/386 byte
+for byte; 3.0a after EXPAND): one driver for bus, serial and PS/2 mice that
+finds the port itself. The PS/2 path asks the BIOS: INT 15h C0h (model byte
+FAh/FCh/F8h; SeaBIOS: FCh -> IRQ 12, vector 74h), INT 11h bit 2 (SeaBIOS
+sets it), then C205h/C201h/C203h/C207h/C200h/C206h/C202h (all served by
+SeaBIOS's USB mouse emulation). Its C207h callback only stores the 3 bytes
+and sets a flag; the event goes to Windows from the driver's own INT 74h
+handler, which first chains the previous INT 74h (the BIOS IRQ 12 code,
+which calls the callback on a real PS/2 mouse). Under CSMWrap SeaBIOS polls
+the USB mouse from INT 08h and calls the callback there; IRQ 12 never
+fires, so the flag is set and nothing reaches Windows - the pointer stands.
+
+`USOSKBC /M` (src/platform/bios/msdos/usoskbc.S, own GPL code):
+* hooks INT 74h at install with a stub that, during its own software
+  INT 74h, returns at once (no BIOS IRQ 12 code, no EOI); otherwise chains
+  to the BIOS. MOUSE.DRV hooks INT 74h later and chains to this stub.
+* INT 15h AX=C207h: remembers the caller's handler and registers a
+  trampoline with the BIOS (caller keeps ES:BX, gets the BIOS's CF/AH; 0:0
+  goes straight through). The trampoline calls the caller's handler with
+  the same status/X/Y/Z words and marks an INT 74h as due.
+* INT 08h (after the BIOS, i.e. after the USB poll): when due and someone
+  hooked INT 74h above the stub, issues INT 74h -> the driver dispatches
+  the packet exactly as after a hardware IRQ 12.
+* No 8042 needed (the D3h aux-buffer idea is not needed: the drivers never
+  read port 60h on their PS/2 path). Shared block version 2: mcb, mpackets,
+  mkicks, old74, mpend, msoft after old2f.
+
+Start menu (W1AUTO): `USOSKBC /R /M`; Setup (W1SETUP.BAT): `/R /M` too
+(Windows part of 3.0 Setup). W203.KEY picks "Microsoft Mouse (Bus or
+Serial)" again (= MOUSE.DRV, first list entry; the 2.03 logo hang was the
+video BIOS stack, USOSV10). 2.11 (/286, /386) and 3.0 Setup keep their
+detected mouse: the 2.11 machine default is the Microsoft Mouse; 3.0 Setup
+asks INT 33h AX=24h (VBMOUSE is loaded by the install AUTOEXEC) -> PS/2 ->
+MOUSE.DRV.
+
+Per version:
+* 2.03, 2.11/286, 3.0 real mode (WIN /R, default): expected to work.
+* 2.11/386 (V86, WIN386) and 3.0 standard mode (WIN /S, DOSX): untested;
+  the software INT 74h is issued in real/V86 mode from the timer hook.
+* 1.01/1.04: no PS/2 mouse driver exists (MOUSE.DRV bus/serial only,
+  MSMOUSE1/2 serial, LMOUSE Logitech serial/bus) and no driver uses the BIOS
+  or INT 33h; a USB mouse would need either our own 1.x mouse driver
+  (bound into WIN100.BIN by Setup) or a serial/bus mouse hardware emulation
+  (not possible in real mode without I/O trapping). Not done.
+
+The mouse driver is bound into WIN200.BIN / chosen in SYSTEM.INI by Setup:
+an existing 2.03 install with "No mouse" needs a fresh install (or a second
+Setup) to get MOUSE.DRV. Unit test: tools/tests/legacy_bios/test_usoskbc_mouse.py
+(Unicorn: install, C207h trampoline incl. error and remove, packet from the
+timer -> driver's INT 74h -> event, no kick without a hook, real IRQ 12 to
+the BIOS). Hardware test pending (no QEMU proof: QEMU has a real PS/2 mouse).
