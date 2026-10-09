@@ -165,3 +165,39 @@ Fixes (branch feature/win-early-2):
 Parked polish items: VESA for 3.x (WfW 3.11 / 3.0 / 3.1), USB mouse for
 1.0x-3.0 (D3h aux relay), keyboard in Windows/386 2.11 and 3.0 386 enhanced
 mode, PS/2 mouse driver back for 2.03 once the aux relay exists.
+
+## X470 diagnostic start items (2026-10-09)
+
+Windows 2.03 still hangs at its logo on the X470 after the no-mouse fix
+(SanDisk, B261008-233752). The early-Windows start menu (W1CONFIG.SYS, all of
+1.0x-3.0) has a submenu "Diagnostyka zawieszenia Windows (D1-D5)"; each item
+changes one thing against the default (HIMEM /M:2 + SETVER, VBMOUSE,
+USOSKBC /R):
+
+| Item | Block | Change |
+| --- | --- | --- |
+| D1 | D1WHERE | default + USOSWHER /G (CS:IP corner display) |
+| D2 | D2NOKBC | default without USOSKBC (PS/2 keyboard only) |
+| D4 | D4CLEAN | no HIMEM, no VBMOUSE; SETVER + USOSKBC only |
+| D5 | D5MIN | SETVER + USOSWHER /G only (no HIMEM, VBMOUSE, USOSKBC) |
+
+D3 (EGA instead of VGA) is not offered: Windows 2.x Setup binds the display
+driver into WIN200.BIN, so another display needs a second Setup run.
+
+Each item appends to `C:\USOS\DIAG\Dn.TXT` before WIN starts: a start line,
+VER, `MEM /D` (WIN.COM loads at the first free block listed) and `MEM /C`,
+then "WIN started"; "WIN returned" follows only when Windows exits. A log
+without "WIN returned" = hang (or reset).
+
+USOSWHER.COM (src/platform/bios/win9x/usoswhere.S, 8.3 name of
+USOSWHERE.COM, now staged in dos-native/msdos and copied to C:\DOS) has a new
+`/G` switch: it also draws its three rows in the planar EGA/VGA modes 0Eh,
+10h, 11h and 12h (8x8 BIOS font, white on black, top right), so the corner
+stays visible over the graphical 2.x logo. It saves and restores the VGA
+sequencer map mask, graphics controller registers 1/3/5/8 and both index
+registers around each draw. Row 0: interrupted CS:IP, tick counter, current
+PSP and its MCB name; row 1: AX of the last INT 13h/15h/21h/2Fh; row 2: last
+8 distinct CS values. Ticks still counting = interrupts on (CS:IP is the
+loop); ticks frozen = interrupts off or dead.
+
+Hardware only (no VM run for this round, by decision).

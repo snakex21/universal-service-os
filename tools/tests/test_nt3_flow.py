@@ -247,7 +247,7 @@ class Nt3DriversWithoutPciBios(unittest.TestCase):
                      'AhciCfgWrite16(targetBus, targetSlot, 0x04, pciCmd);', '*Again = TRUE;'):
             self.assertIn(want, src)
         manifest = json.loads((ROOT / 'tools/vendor/ahcint/1.3.0.0-usos4/manifest.json').read_text(encoding='utf-8'))
-        self.assertIn('patches/0008-nt351-direct-pci-config.patch', manifest['patches'])
+        self.assertIn('patches/0009-usos6-nt351-direct-pci-config.patch', manifest['patches'])
 
     def test_usosrst_nt351_direct_config(self):
         src = (ROOT / 'tools/w2k/usosrst/src/usosrst.c').read_text(encoding='latin-1')

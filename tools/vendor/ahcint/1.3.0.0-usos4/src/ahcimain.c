@@ -142,7 +142,7 @@ AhciPciConfigIsAhci(IN PPCI_COMMON_CONFIG PciConfig)
 }
 
 #ifdef AHCI_NT351
-/* MODIFIED (USOS 1.3.0.0-usos5, NT 3.51 build, 0008): PCI configuration
+/* MODIFIED (USOS 1.3.0.0-usos6, NT 3.51 build, 0009): PCI configuration
    space through ports CF8h/CFCh (mechanism 1), not ScsiPortGetBusData.
    On boards whose PCI BIOS reports a last bus >= 8 the USOS NT 3.x MBR
    hides the PCI BIOS from NTDETECT (the 3.51 HAL loops forever in its
@@ -623,7 +623,7 @@ DriverEntry(IN PVOID DriverObject, IN PVOID Argument2)
 #endif
     initData.DeviceExtensionSize = sizeof(HW_DEVICE_EXTENSION);
 #ifdef AHCI_NT351
-    /* MODIFIED (USOS 1.3.0.0-usos5, 0008): Isa, see AhciCfgMap. */
+    /* MODIFIED (USOS 1.3.0.0-usos6, 0009): Isa, see AhciCfgMap. */
     initData.AdapterInterfaceType = Isa;
 #else
     initData.AdapterInterfaceType = PCIBus;
@@ -757,7 +757,7 @@ AhciFindAdapter(
         hwInit->AbarMapped = NULL;
     }
 #elif defined(AHCI_NT351)
-    /* MODIFIED (USOS 1.3.0.0-usos5, 0008): the ABAR through the Isa bus
+    /* MODIFIED (USOS 1.3.0.0-usos6, 0009): the ABAR through the Isa bus
        (the system bus as a fallback); there may be no PCI bus handler. */
     hwInit->AbarMapped = (PUCHAR)ScsiPortGetDeviceBase(hwInit, Isa, 0, basePhys,
                                                        AHCI_ABAR_MAP_SIZE, FALSE);
@@ -780,7 +780,7 @@ AhciFindAdapter(
     }
 
 #ifdef AHCI_NT351
-    /* MODIFIED (USOS 1.3.0.0-usos5, 0008): ScsiPort builds the DMA adapter
+    /* MODIFIED (USOS 1.3.0.0-usos6, 0009): ScsiPort builds the DMA adapter
        and the resource report from ConfigInfo after (or, for the uncached
        extension, during) HwFindAdapter. As an Isa bus master the 3.51 HAL
        wants map registers and ScsiPortGetPhysicalAddress then returns no
