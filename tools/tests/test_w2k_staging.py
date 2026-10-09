@@ -252,6 +252,17 @@ class W2kStorage(unittest.TestCase):
             self.assertIn(want, h)
         for want in (b'AhciUsosBugCheckCallback', b'AhciUsosAfterWrite', b'"MARKER-READ-FAIL"', b'0xB8000'):
             self.assertIn(want, src)
+        # usos5: a read-back mismatch is traced, never a STOP (the compared
+        # buffer is the caller's live pages; X470 2000 Server SP4 STOP
+        # 0x55534F53 (3, 43C81022, 2, 01E69238) at component registration).
+        self.assertIn(b'MODIFIED (USOS 1.3.0.0-usos5)', src)
+        self.assertIn(b'"rb-mismatch"', src)
+        self.assertNotIn(b'"RB-FAIL"', src)
+        self.assertNotIn(b'AhciUsosFail(HwInit, 3,', src)
+        for sysfile in ('bin/2KXP/i386/ahcint.sys', 'bin/NT4/i386/ahcint.sys', 'bin/NT351/i386/ahcint.sys'):
+            binary = (ROOT / 'tools/vendor/ahcint/1.3.0.0-usos4' / sysfile).read_bytes()
+            self.assertIn(b'rb-mismatch', binary, sysfile)
+            self.assertNotIn(b'RB-FAIL', binary, sysfile)
         pins = json.loads((ROOT / 'tools/vendor/uniata/0.47b/manifest.json').read_text())
         for rel, digest in pins['files'].items():
             self.assertEqual(hashlib.sha256((ROOT / 'tools/vendor/uniata/0.47b' / rel).read_bytes()).hexdigest(), digest, rel)

@@ -22,13 +22,13 @@ initramfs	usr/lib/usos/legacy_xp_staging.sh	100755	b6cf4d583b9bff8e8f39621402565
 initramfs	usr/lib/usos/micro_linux_ui.sh	100755	aa2706759236e7e804cbcaf522b05f8da07e4504f493fde02833d106618e3a8e
 initramfs	usr/lib/usos/nt3	40755	dir
 initramfs	usr/lib/usos/nt3-e820-mbr-440.bin	100644	dbfae0e04ec20c1b3f8b74b110c96fbc2bfb68759aa3ac47a5d495b27500c4e6
-initramfs	usr/lib/usos/nt3/AHCINT.SYS	100644	260771715885af8167c6e50f1a8a2e7b5730d15bbf93e43e0d3ca4cd3479733c
+initramfs	usr/lib/usos/nt3/AHCINT.SYS	100644	f685ab4cbd2d541889c950a2ced8c9c2088badd91f6103c7fde1bacf25bd3150
 initramfs	usr/lib/usos/nt3/USOSACHK.EXE	100644	748725aefcfeba1a6ef5af5feeb6d110c6ba90142c4a76bb0dee73adb924a4ac
 initramfs	usr/lib/usos/nt3/USOSNT3.EXE	100644	8eb12ede577be750d574b88f26b1870e5eb406f7474c1ab59f76c54afbb1c76f
 initramfs	usr/lib/usos/nt3/USOSRST.SYS	100644	f3ee44afc8081d748fe928acccdbab9c6efeb45e3790e789e588a1d8e180ba7c
 initramfs	usr/lib/usos/nt3/USOSUSB.SYS	100644	68944efb7f3d26c7fc19bf99cab2bd7944e0d32955da97f933a8019b226d2046
 initramfs	usr/lib/usos/nt4	40755	dir
-initramfs	usr/lib/usos/nt4/AHCINT.SYS	100644	243b759cf53cbb0bad3d1e50c3618b0487b368c1e28e9738c2fbea612c8b0821
+initramfs	usr/lib/usos/nt4/AHCINT.SYS	100644	f2b90a21b4889229b758dec8478254c1fa5880c30c04831a9244a6c94ea71208
 initramfs	usr/lib/usos/nt4/USOSOFF.EXE	100644	11ac72c6d5b73d6931e957df1e4b86348dcca79b08412d9a75b432968c303ffa
 initramfs	usr/lib/usos/nt4/USOSRST.SYS	100644	d028580b4040662605d2c88b90094fd4125b2526cfda1083dc9011d6efafb23b
 initramfs	usr/lib/usos/nt4/USOSUSB.SYS	100644	68944efb7f3d26c7fc19bf99cab2bd7944e0d32955da97f933a8019b226d2046
@@ -333,7 +333,7 @@ xp_csm	usr/lib/usos/w2k-drivers/LICENSE	100644	230184f60bae2feaf244f10a8bac053c8
 xp_csm	usr/lib/usos/w2k-drivers/MODIFIED.txt	100644	b10d8d048e9fe4a6fe22424da19f1b98c1069580e730993f0a9ae690a591c02b
 xp_csm	usr/lib/usos/w2k-drivers/SOURCE.txt	100644	a5f2cb1c90a2b908972a88bf74c7e0de59af3f3e8e6ead3289d7bdfc8c8d0649
 xp_csm	usr/lib/usos/w2k-drivers/ahcint.inf	100644	c8dea5fd3839b8f9298a7925f6ba8c6451588638a42f24e10c4c8542915a6e21
-xp_csm	usr/lib/usos/w2k-drivers/ahcint.sys	100644	4e2d454357e0bfa468be48dc24ea428b5e1adbeb81bcc52dac6e15a4a302289f
+xp_csm	usr/lib/usos/w2k-drivers/ahcint.sys	100644	f5f0a8112f941f3833ac43c8104b4d169d2b6831d4ec224f9560ea10e3234f07
 xp_csm	usr/lib/usos/w2k-drivers/uniata	40755	dir
 xp_csm	usr/lib/usos/w2k-drivers/uniata/COPYING-GPL-2.0.txt	100644	162eb961bb30cf48b46be205aae1def8450ebbd6d9cd88fcb405b6379ac13d26
 xp_csm	usr/lib/usos/w2k-drivers/uniata/SOURCES.txt	100644	78556e7139f4336045dd34e5f209e40d0dacf35d4dfcfd23b0f4d7161e39bdcc

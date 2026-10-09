@@ -1,0 +1,61 @@
+usos5 (2026-10-09): a sampled read-back mismatch is counted and traced, never
+a STOP (2000 Server SP4 on the X470 stopped with STOP 0x55534F53
+(3, 43C81022, 2, 01E69238) at "Registering components": the compared buffer
+is the caller's live pages, which may change while their write is in
+flight). Applies to src/ in this folder.
+
+--- 1.3.0.0-usos4/src/ahcint.h
++++ new/ahcint.h
+@@ -446,6 +446,7 @@ typedef struct _HW_DEVICE_EXTENSION {
+     ULONG                   UsosLastErrCmd;
+     ULONG                   UsosRbChecks;
+     ULONG                   UsosRbBad;
++    ULONG                   UsosRbBadLba;       /* MODIFIED (USOS 1.3.0.0-usos5): first mismatch */
+     ULONG                   UsosIos;
+     ULONG                   UsosInTrace;
+     ULONG                   UsosBugCheck[5];
+--- 1.3.0.0-usos4/src/ahcisatl.c
++++ new/ahcisatl.c
+@@ -987,7 +987,7 @@ AhciUsosShow(IN PHW_DEVICE_EXTENSION HwInit)
+ 
+     attr = (USHORT)((HwInit->UsosErrors || HwInit->UsosVerify == 2 || HwInit->UsosBusResets ||
+                      HwInit->UsosStalls ||
+-                     (HwInit->UsosStage & (USOS_STAGE_RBFAIL | USOS_STAGE_BUGCHECK)) ||
++                     (HwInit->UsosStage & USOS_STAGE_BUGCHECK) ||
+                      HwInit->UsosMarker == USOS_MARKER_READ_ERROR) ? 0x4F00 : 0x1F00);
+     UsosShowRow(HwInit, HwInit->UsosInstance == 0 ? 0 : USOS_ROW_SECOND_HBA, line, attr);
+ }
+@@ -1116,6 +1116,7 @@ AhciUsosTrace(IN PHW_DEVICE_EXTENSION HwInit, IN PCHAR Why)
+     p = UsosPutField(p, end, "lw", HwInit->UsosLastWriteLba);
+     p = UsosPutField(p, end, "rb", HwInit->UsosRbChecks);
+     p = UsosPutField(p, end, "rbbad", HwInit->UsosRbBad);
++    if (HwInit->UsosRbBad) p = UsosPutField(p, end, "rblba", HwInit->UsosRbBadLba);
+     p = UsosPutStr(p, end, "\r\n");
+     p = UsosPutField(p, end, "isr", HwInit->UsosIsrCalls);
+     p = UsosPutField(p, end, "own", HwInit->UsosIsrOwn);
+@@ -1256,11 +1257,24 @@ AhciUsosAfterWrite(IN PHW_DEVICE_EXTENSION HwInit, IN ULONG Port, IN PSCSI_REQUE
+     data = (PUCHAR)Srb->DataBuffer;
+     HwInit->UsosRbChecks++;
+     if (AhciUsosSectorAt(HwInit, Port, Lba, FALSE) != AHCI_CMD_OK) return;     /* counted as an error */
++    /* MODIFIED (USOS 1.3.0.0-usos5): a mismatch is counted and traced,
++       never a STOP. The write was DMAed straight from the caller's pages
++       (no bounce copy) and the comparison reads those pages again after
++       the command: the memory manager lets a mapped or paged-out page be
++       changed while its write is in flight (the page is just dirtied
++       again and written later), so on a busy SMP system the buffer can
++       legitimately differ from what reached the disk. usos3 stopped with
++       STOP 0x55534F53 (3, PCI ID, port, LBA) on that: 2000 Server SP4 on
++       the X470 (16 threads) at "Registering components", 2026-10-09. */
+     for (i = 0; i < 512; i++) {
+         if (buf[i] != data[i]) {
+             HwInit->UsosRbBad++;
+             HwInit->UsosStage |= USOS_STAGE_RBFAIL;
+-            AhciUsosFail(HwInit, 3, Port, Lba.Low, "RB-FAIL");
++            if (HwInit->UsosRbBad == 1) {
++                HwInit->UsosRbBadLba = Lba.Low;
++                AhciUsosShow(HwInit);
++                AhciUsosTrace(HwInit, "rb-mismatch");
++            }
+             return;
+         }
+     }

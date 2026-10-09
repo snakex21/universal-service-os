@@ -343,7 +343,7 @@ Reading of the evidence:
   |---|---|---|
   | 1 | marker read failed after 3 tries | TFD |
   | 2 | write test failed | TFD |
-  | 3 | read-back mismatch | LBA |
+  | 3 | read-back mismatch (usos3/usos4 only; usos5 traces it instead, see section 9a) | LBA |
 
   P2 is the PCI ID and P3 the port.
 - A **bugcheck callback** puts any STOP code on the line and writes it to
@@ -810,6 +810,32 @@ USB keyboard/tablet only, ACPI kept, usos-xp.ini without a key; harness
   Administrator logon to the desktop, no "Configure Your Server" window.
 - Not shown by QEMU: USB input (the VM keeps an 8042; RTM has no xhci98),
   hardware display modes. On the X470 this CD has no USB keyboard/mouse.
+
+## 9a. X470 2000 Server SP4 PL (2026-10-09, B261008-233752) and AHCINT usos5
+
+USB keyboard and mouse worked through Setup. GUI Setup stopped at
+"Rejestrowanie składników" (Registering components) with
+STOP 0x55534F53 (0x00000003, 0x43C81022, 0x00000002, 0x01E69238): AHCINT's
+own fail-loudly STOP, P1 3 = sampled read-back mismatch, P2 = PCI ID
+1022:43C8 (AMD 400-series chipset SATA), P3 = port 2, P4 = LBA 0x01E69238.
+
+Cause: the check, not the disk. AHCINT DMAs a write straight from the
+caller's pages and compared the read-back with those same pages after the
+command. Windows lets a mapped or paged-out page change while its write is
+in flight (the page is dirtied again and written later), so on an SMP
+system under mapped-file and hive load (component registration) the
+buffer can differ from what reached the disk. 2000 Pro SP4 passed with the
+same driver: fewer CPUs used (2 vs 4) and far fewer components, so the
+sampled check (first 256 writes, then every 32nd) never caught a change.
+
+Fix (AHCINT usos5, patch 0008, same folder, all three binaries rebuilt): a
+mismatch is counted (`rbbad`), the first LBA kept (`rblba`), one trace
+record `rb-mismatch` written; no STOP and no red line. The two start-up
+STOPs (marker read, write test) stay. Retest with a fresh install from a
+build with usos5. (Copying the usos5 ahcint.sys over
+WINNT\system32\drivershcint.sys on the half-installed disk would likely
+let GUI Setup restart on the next boot, but a GUI Setup interrupted during
+component registration is not a reliable base.)
 
 ## 10. Open (Windows 2000 Server)
 
