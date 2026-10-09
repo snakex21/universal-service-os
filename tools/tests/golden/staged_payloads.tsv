@@ -24,8 +24,9 @@ initramfs	usr/lib/usos/nt3	40755	dir
 initramfs	usr/lib/usos/nt3-e820-mbr-440.bin	100644	52888d8cf93bf7a805335c2faececd88f5290ad088d83265530415e0d1f670c6
 initramfs	usr/lib/usos/nt3/AHCINT.SYS	100644	40ba39c123e98ae5129751e7691a8ca5c41b9e88c269daabf3f288b90fdb6ed9
 initramfs	usr/lib/usos/nt3/USOSACHK.EXE	100644	748725aefcfeba1a6ef5af5feeb6d110c6ba90142c4a76bb0dee73adb924a4ac
-initramfs	usr/lib/usos/nt3/USOSNT3.EXE	100644	8eb12ede577be750d574b88f26b1870e5eb406f7474c1ab59f76c54afbb1c76f
+initramfs	usr/lib/usos/nt3/USOSNT3.EXE	100644	431499675756c8ad9a46e2b9367965721787456e572bbe911b3b320adcd5d5cf
 initramfs	usr/lib/usos/nt3/USOSRST.SYS	100644	2b948d8817a291540e48da03e2aeb5553cd82580d0814ff3511f737eebd1397c
+initramfs	usr/lib/usos/nt3/USOSRST35.SYS	100644	f52d33255efa90172769b37a0828baaf0bd9dc896213ddd688855bdbc5b61938
 initramfs	usr/lib/usos/nt3/USOSUSB.SYS	100644	68944efb7f3d26c7fc19bf99cab2bd7944e0d32955da97f933a8019b226d2046
 initramfs	usr/lib/usos/nt4	40755	dir
 initramfs	usr/lib/usos/nt4/AHCINT.SYS	100644	f2b90a21b4889229b758dec8478254c1fa5880c30c04831a9244a6c94ea71208

@@ -423,7 +423,11 @@ Stan 2026-10-08: NT 4.0 Workstation/Server instaluje się z UEFI bez CSM
 (cała instalacja w QEMU na docelowym PC, potem CSMWrap;
 docs/nt4-2026-10-07.md, X470 PASS). NT 3.51 Workstation/Server idzie tą
 samą ścieżką (profil `nt3-x86-qemu-csmwrap`, MBR z filtrem E820, bez klucza
-i bez SP; docs/nt351-2026-10-08.md), test na X470 czeka.
+i bez SP; docs/nt351-2026-10-08.md), NT 3.51 Server X470 PASS 2026-10-09.
+NT 3.5 Workstation/Server (2026-10-09, docs/nt35-2026-10-09.md): ta sama
+ścieżka, QEMU e2e, X470 czeka. NT 3.1 / 3.1 Advanced Server: odłożone
+(inny tekstowy Setup bez unattend, brak DetachedProgram, sterowniki bez
+buildów NT 3.1).
 
 ### L9. shim-review: **Later**, długoterminowo
 

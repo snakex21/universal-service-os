@@ -141,7 +141,11 @@ UsosActiveProcessors(VOID)
 }
 #define KeQueryActiveProcessors() UsosActiveProcessors()
 #ifdef USOSRST_NT351
+#ifdef USOSRST_NT35
+#define USOSRST_VERSION "usosrst 1.6-nt35"
+#else
 #define USOSRST_VERSION "usosrst 1.6-nt351"
+#endif
 #else
 #define USOSRST_VERSION "usosrst 1.5-nt4"
 #endif
@@ -1516,11 +1520,20 @@ StartHeartbeat(VOID)
     ULONG i;
 
     FindAhci();
+#ifdef USOSRST_NT35
+    /* NT 3.5 exports neither KeSetTargetProcessorDpc nor KeSetImportanceDpc:
+       one DPC on the processor that queues it (the NT 3.x path installs
+       the uniprocessor kernel and the Standard PC HAL). */
+    UNREFERENCED_PARAMETER(active);
+    KeInitializeDpc(&g_CpuDpc[0], CpuDpc, (PVOID)(ULONG_PTR)0);
+    i = 1;
+#else
     for (i = 0; i < HB_MAX_CPUS && (active & ((KAFFINITY)1 << i)); i++) {
         KeInitializeDpc(&g_CpuDpc[i], CpuDpc, (PVOID)(ULONG_PTR)i);
         KeSetTargetProcessorDpc(&g_CpuDpc[i], (CCHAR)i);
         KeSetImportanceDpc(&g_CpuDpc[i], HighImportance);
     }
+#endif
     g_Cpus = i;
     KeInitializeTimer(&g_HbTimer);
     due.QuadPart = -10000LL * HB_PERIOD_MS;
