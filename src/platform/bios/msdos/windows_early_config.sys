@@ -3,22 +3,47 @@ menucolor=15,1
 menuitem=WINSTD,Windows (domyslny)
 menuitem=WINREAL,Windows 3.0 - tryb standardowy (WIN /S, test)
 menuitem=DOSONLY,MS-DOS - wiersz polecen
+submenu=DIAG,Diagnostyka zawieszenia Windows (D1-D5)
 menudefault=WINSTD,8
+
+; Diagnostic start variants (Windows 2.03 hangs at its logo on the X470):
+; each isolates one suspect; W1AUTO.BAT logs to C:\USOS\DIAG\<variant>.TXT.
+; D3 (EGA instead of VGA) needs a second Windows 2.x Setup: the display
+; driver is bound into WIN200.BIN. Not offered.
+[DIAG]
+menuitem=D1WHERE,D1 - jak domyslny + USOSWHER (CS:IP w rogu ekranu)
+menuitem=D2NOKBC,D2 - bez USOSKBC (tylko klawiatura PS/2)
+menuitem=D4CLEAN,D4 - bez HIMEM i VBMOUSE (tylko SETVER + USOSKBC)
+menuitem=D5MIN,D5 - minimum: tylko SETVER + USOSWHER
+menuitem=DOSONLY,MS-DOS - wiersz polecen
+
+; HIMEM per item (D4/D5 without it), before SETVER as before.
+[WINSTD]
+DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF
+
+[WINREAL]
+DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF
+
+[DOSONLY]
+DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF
+
+[D1WHERE]
+DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF
+
+[D2NOKBC]
+DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF
+
+[D4CLEAN]
+
+[D5MIN]
 
 ; Windows 1.0x-3.0: no DOS=HIGH (Windows 2.x needs the HMA), SETVER
 ; (the 1.0x and 2.x kernels: "Incorrect DOS version" on MS-DOS 6.22; WIN200.BIN
 ; is in its table, INSTALL.BAT adds WIN100.BIN).
 [common]
-DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF
 DEVICE=C:\DOS\SETVER.EXE
 FILES=40
 BUFFERS=20
 LASTDRIVE=Z
 SHELL=C:\COMMAND.COM C:\ /E:2048 /P
 STACKS=9,256
-
-[WINSTD]
-
-[WINREAL]
-
-[DOSONLY]

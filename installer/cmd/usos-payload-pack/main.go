@@ -111,6 +111,7 @@ var payloadFiles = []payloadFile{
 	{`zig-out/dos-native/msdos/CSMESP.IMG`, `EFI/USOS/dos-native/msdos/CSMESP.IMG`},
 	{`zig-out/dos-native/msdos/USOSKEY.COM`, `EFI/USOS/dos-native/msdos/USOSKEY.COM`},
 	{`zig-out/dos-native/msdos/USOSKBC.COM`, `EFI/USOS/dos-native/msdos/USOSKBC.COM`},
+	{`zig-out/dos-native/msdos/USOSWHER.COM`, `EFI/USOS/dos-native/msdos/USOSWHER.COM`},
 	{`zig-out/dos-native/msdos/W101.KEY`, `EFI/USOS/dos-native/msdos/W101.KEY`},
 	{`zig-out/dos-native/msdos/W104.KEY`, `EFI/USOS/dos-native/msdos/W104.KEY`},
 	{`zig-out/dos-native/msdos/W203.KEY`, `EFI/USOS/dos-native/msdos/W203.KEY`},

@@ -468,6 +468,7 @@ payload_zip	EFI/USOS/dos-native/msdos/USOS.SHH
 payload_zip	EFI/USOS/dos-native/msdos/USOSKBC.COM
 payload_zip	EFI/USOS/dos-native/msdos/USOSKEY.COM
 payload_zip	EFI/USOS/dos-native/msdos/USOSKEY.DRV
+payload_zip	EFI/USOS/dos-native/msdos/USOSWHER.COM
 payload_zip	EFI/USOS/dos-native/msdos/VBADOS.TGZ
 payload_zip	EFI/USOS/dos-native/msdos/VBADOS.TXT
 payload_zip	EFI/USOS/dos-native/msdos/VBMOUSE.DRV
