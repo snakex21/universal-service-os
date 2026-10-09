@@ -11,10 +11,10 @@
  *          interrupted CS:IP (from the interrupt frame), own tick counter,
  *          current DOS PSP (from the DOS swappable data area, INT 21h
  *          AX=5D06h at install time) and the owner name in its MCB
- *   row 1  13:aaaa 15:aaaa 21:aaaa 2F:aaaa
- *          AX of the last INT 13h, 15h, 21h and 2Fh call (INT 15h without
- *          AH=4Fh/90h/91h, which the keyboard and disk BIOS issue all the
- *          time)
+ *   row 1  10:aaaa 13:aaaa 15:aaaa 21:aaaa 2F:aaaa
+ *          AX of the last INT 10h mode set (AH=00h only), and of the last
+ *          INT 13h, 15h, 21h and 2Fh call (INT 15h without AH=4Fh/90h/91h,
+ *          which the keyboard and disk BIOS issue all the time)
  *   row 2  the last 8 distinct interrupted CS values, most recent first
  *
  * After a hang a photo of the corner shows where it is:
@@ -33,6 +33,12 @@
  * the Windows 2.x logo. It saves and restores the VGA sequencer map mask
  * and the graphics controller registers 1, 3, 5 and 8 and both index
  * registers around the drawing (VGA: readable; not for a real EGA).
+ * Graphics is detected from the BDA mode byte and, since 1.1, also from the
+ * VGA graphics controller (register 6 bit 0 set, 256-colour shift and
+ * chain-4 off), so a program that switches to planar graphics through the
+ * ports without INT 10h is covered too. Without a font pointer from INT 10h
+ * AX=1130h the BIOS 8x8 font at F000:FA6Eh is used; the install message
+ * prints the pointer in use.
  *
  * The hooks change no register and no flag before chaining. Running it a
  * second time only prints a message. It cannot be unloaded (reboot).
@@ -43,7 +49,7 @@
 .code16
 .equ ATTR, 0x1f
 .equ ROW0, 8
-.equ ROW1, 49 - 40
+.equ ROW1, 41 - 40
 .equ ROW2, 41 - 40
 .section .text
 .global _start
@@ -52,12 +58,14 @@ _start:
 
 sig:    .ascii "USOSWHR1"
 old08:  .long 0
+old10:  .long 0
 old13:  .long 0
 old15:  .long 0
 old21:  .long 0
 old2f:  .long 0
 sda:    .long 0
 ticks:  .word 0
+ax10:   .word 0
 ax13:   .word 0
 ax15:   .word 0
 ax21:   .word 0
@@ -75,6 +83,13 @@ scr:    .space 120, ' '
     .word \x
 .endm
 
+int10:
+    pushf
+    or ah, ah
+    jnz 1f
+    mov word ptr cs:[ax10], ax
+1:  popf
+    JMPFAR old10
 int13:
     mov word ptr cs:[ax13], ax
     JMPFAR old13
@@ -135,9 +150,14 @@ int08:
     mov al, byte ptr es:[0x49]
     mov byte ptr [vmode], al
     cmp al, 3
-    jbe 11f
+    jbe 13f
     call gmode
     jc 9f
+    jmp 11f
+    /* text mode by the BDA: planar graphics set through the ports? */
+13: call gport
+    jc 11f
+    mov byte ptr [vmode], 0x12
 11: push cs
     pop es
     /* row 0 */
@@ -186,6 +206,10 @@ int08:
     loop 5b
 7:  /* row 1 */
     mov di, offset scr + 40 + ROW1
+    mov si, offset s_10
+    call pstr
+    mov ax, word ptr [ax10]
+    call hex4
     mov si, offset s_13
     call pstr
     mov ax, word ptr [ax13]
@@ -247,6 +271,53 @@ gmode:
     cmp al, 0x12
     ja 1f
 2:  clc
+    ret
+1:  stc
+    ret
+
+/* CF clear when /G was given, a font is known and the VGA graphics
+ * controller is in planar graphics (GC 6 bit 0 set, GC 5 bit 6 clear,
+ * sequencer 4 bit 3 clear); the index registers are restored */
+gport:
+    cmp byte ptr [gflag], 0
+    je 1f
+    cmp word ptr [font + 2], 0
+    je 1f
+    mov dx, 0x3ce
+    in al, dx
+    mov ah, al
+    mov al, 6
+    out dx, al
+    inc dx
+    in al, dx
+    mov bl, al
+    dec dx
+    mov al, 5
+    out dx, al
+    inc dx
+    in al, dx
+    mov bh, al
+    dec dx
+    mov al, ah
+    out dx, al
+    mov dx, 0x3c4
+    in al, dx
+    mov ah, al
+    mov al, 4
+    out dx, al
+    inc dx
+    in al, dx
+    mov cl, al
+    dec dx
+    mov al, ah
+    out dx, al
+    test bl, 1
+    jz 1f
+    test bh, 0x40
+    jnz 1f
+    test cl, 8
+    jnz 1f
+    clc
     ret
 1:  stc
     ret
@@ -396,7 +467,8 @@ hex4:
 
 s_t:  .asciz " t:"
 s_p:  .asciz " p:"
-s_13: .asciz "13:"
+s_10: .asciz "10:"
+s_13: .asciz " 13:"
 s_15: .asciz " 15:"
 s_21: .asciz " 21:"
 s_2f: .asciz " 2F:"
@@ -440,8 +512,29 @@ install:
     pop bp
     pop bx
     pop es
+    cmp word ptr [font + 2], 0
+    jne 5f
+    mov word ptr [font], 0xfa6e
+    mov word ptr [font + 2], 0xf000
+5:  push es
+    push cs
+    pop es
+    mov di, offset m_fseg
+    mov ax, word ptr [font + 2]
+    call hex4
+    inc di
+    mov ax, word ptr [font]
+    call hex4
+    pop es
+    mov dx, offset m_font
+    mov ah, 9
+    int 0x21
 3:  mov word ptr [old08], bx
     mov word ptr [old08 + 2], es
+    mov ax, 0x3510
+    int 0x21
+    mov word ptr [old10], bx
+    mov word ptr [old10 + 2], es
     mov ax, 0x3513
     int 0x21
     mov word ptr [old13], bx
@@ -466,6 +559,9 @@ install:
     mov word ptr cs:[sda], si
     mov word ptr cs:[sda + 2], ds
 2:  pop ds
+    mov dx, offset int10
+    mov ax, 0x2510
+    int 0x21
     mov dx, offset int13
     mov ax, 0x2513
     int 0x21
@@ -495,8 +591,12 @@ install:
     int 0x21
 
 m_ok:
-    .ascii "USOSWHERE 1.0 resident: top right = CS:IP, ticks, PSP+name,\r\n"
-    .ascii "last INT 13h/15h/21h/2Fh AX, last 8 CS values. GPL-3.0-or-later.\r\n"
-    .ascii "/G: also in EGA/VGA 16-colour graphics modes.\r\n$"
+    .ascii "USOSWHERE 1.1 resident: top right = CS:IP, ticks, PSP+name,\r\n"
+    .ascii "last INT 10h mode set + 13h/15h/21h/2Fh AX, last 8 CS values.\r\n"
+    .ascii "GPL-3.0-or-later. /G: also in EGA/VGA 16-colour graphics modes.\r\n$"
+m_font:
+    .ascii "USOSWHERE /G font "
+m_fseg:
+    .ascii "SSSS:OOOO\r\n$"
 m_again:
     .ascii "USOSWHERE is already resident.\r\n$"

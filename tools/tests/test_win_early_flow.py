@@ -190,6 +190,10 @@ class DiagnosticMenu(unittest.TestCase):
         where = (ROOT / 'src/platform/bios/win9x/usoswhere.S').read_text(encoding='ascii')
         self.assertIn('mov ax, 0x1130', where)
         self.assertIn('gfxout:', where)
+        # 1.1: planar graphics detected from the VGA GC too, INT 10h mode-set AX, font fallback
+        self.assertIn('gport:', where)
+        self.assertIn('0xfa6e', where)
+        self.assertIn('mov word ptr cs:[ax10], ax', where)
 
 
 if __name__ == '__main__':

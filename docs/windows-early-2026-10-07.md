@@ -201,3 +201,26 @@ PSP and its MCB name; row 1: AX of the last INT 13h/15h/21h/2Fh; row 2: last
 loop); ticks frozen = interrupts off or dead.
 
 Hardware only (no VM run for this round, by decision).
+
+### X470 result of the diagnostic items (2026-10-09, SanDisk B261009-120423)
+
+Video of four fresh starts after a fresh 2.03 install: D1, D2, D4 and D5 all
+stop at the blue 2.03 logo (WIN.COM's logo screen) and never return
+(C:\USOS\DIAG\D1/D2/D4/D5.TXT end with "WIN started", no "WIN returned").
+The short flash before the logo is only the TSR banners (VBMouse 0.67
+"Cannot find VirtualBox PCI device ... Driver installed", USOSKBC, USOSWHERE),
+the text-mode corner rows were visible for one frame
+(`13:0201 15:8801 21:3FC6 2F:1123`, COMMAND transient at 94C6h). Result:
+HIMEM, VBMOUSE and USOSKBC are not the cause (D5 = SETVER + USOSWHER only).
+USOSWHER /G drew nothing over the logo in D1 and D5: either the timer
+interrupt stops after the logo (CLI loop / IRQ0 masked) or the 1.0 mode
+check missed the graphics mode (it trusted the BDA mode byte and the INT 10h
+1130h font pointer).
+
+USOSWHERE 1.1 (feature/win203-diag2) removes the second possibility: planar
+graphics is also detected from the VGA graphics controller (GC 6 bit 0,
+GC 5 bit 6 and SEQ 4 bit 3 clear), the font falls back to F000:FA6Eh and the
+install line prints the font pointer, and row 1 starts with `10:` = AX of the
+last INT 10h AH=00h (mode set). Next X470 run: D5 only. Rows over the logo =
+read CS:IP and whether t counts; still no rows = the timer interrupt is dead
+after the logo (then: disassemble WIN.COM's loader after the logo).
