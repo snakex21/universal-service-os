@@ -1,5 +1,5 @@
 /*
- * USOS NT 3.x MBR: E820 filter + XP geometry fix.
+ * USOS NT 3.x MBR: E820 filter, HPET legacy off, PCI BIOS hiding, XP geometry fix.
  * Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-2.0-or-later.
  *
  * The NT 3.51 loaders (SETUPLDR.BIN, NTLDR) turn every INT 15h E820 entry
@@ -18,6 +18,30 @@
  *   - the RAM entry at address 0 ends below the hook (INT 12h size).
  * Everything else is the XP geometry-fix MBR: boot the active partition and
  * correct the BPB head count from INT 13h AH=08.
+ *
+ * HPET: the X470 firmware (AMI, booted through CSMWrap) hands over with the
+ * HPET enabled in LegacyReplacement mode and timer 0 interrupts off
+ * (usosrst 1.3, Win2000: cfg 00000003, t0 00008030).  Then neither the PIT
+ * nor the HPET raises IRQ 0 (and the RTC not IRQ 8), so a pre-ACPI HAL gets
+ * no clock interrupt until usosrst clears the bit.  This MBR clears
+ * LegacyReplacement (general configuration bit 1) already, through a 4 GiB
+ * FS limit (unreal mode), when the HPET at FED00000h (the fixed AMD/Intel
+ * address) answers.  -DNT3_HPET_SET_LEGACY builds the opposite (enable +
+ * LegacyReplacement) to reproduce the X470 state in QEMU.
+ *
+ * PCI: NTDETECT 3.51 takes the PCI bus count from INT 1Ah B101h (last bus +
+ * 1) but caps it at 8.  The 3.51 HAL (HalReportResourceUsage) then scans the
+ * PCI-to-PCI bridges on those buses and, for a bus-master bridge whose
+ * secondary bus has no bus handler, raises the count to that secondary bus
+ * number -- not past it -- and scans again, forever: the hang after
+ * "1 System Processor" on the X470, whose GPP bridges lead to buses >= 8
+ * (QEMU q35 + 12 pcie-root-ports under OVMF + CSMWrap hangs the same way).
+ * When the PCI BIOS reports a last bus >= 8, this MBR hooks INT 1Ah and turns
+ * B101h into the unsupported B1FFh (AH = 81h, CF = 1): NTDETECT then records
+ * no PCI bus and the HAL sets up none.  The USOS NT 3.51 drivers (AHCINT,
+ * usosrst, usosusb) reach PCI configuration space through ports CF8h/CFCh
+ * themselves.  With a last bus <= 7 every bridge lies below the count
+ * NTDETECT reports and nothing is hooked (Setup VM, small QEMU machines).
  */
 .intel_syntax noprefix
 .code16
@@ -25,13 +49,15 @@
 .global nt3_e820_mbr_start
 
 .equ RELOC_BASE,      0x0600
-.equ BOOT_DRIVE_SLOT, 0x04F0
-.equ HEADS_SLOT,      0x04F2
-.equ DAP_BASE,        0x0500
 .equ PART_TABLE_OFF,  446
 .equ VBR_LOAD,        0x7C00
 .equ HOOK_LEN,        (hook_end - hook_start)
 .equ HOOK_SRC,        RELOC_BASE + (hook_start - nt3_e820_mbr_start)
+/* Resident layout (1 KiB at the INT 12h top, segment = CS of the hooks):
+   0 = INT 15h handler, H1A = INT 1Ah handler, then the two old vectors. */
+.equ H1A,             (hook_1a - hook_start)
+.equ OLD15,           HOOK_LEN
+.equ OLD1A,           HOOK_LEN + 4
 
 nt3_e820_mbr_start:
     cli
@@ -43,9 +69,10 @@ nt3_e820_mbr_start:
     sti
     cld
 
-    mov byte ptr [BOOT_DRIVE_SLOT], dl
+    /* BP keeps the boot drive (INT 1Ah B101h returns EDX = "PCI "). */
+    mov bp, dx
 
-    mov si, 0x7C00
+    mov si, sp
     mov di, RELOC_BASE
     mov cx, 256
     rep movsw
@@ -54,7 +81,7 @@ nt3_e820_mbr_start:
     .word 0x0000
 
 relocated:
-    /* Take 1 KiB from the top of conventional memory for the INT 15h hook. */
+    /* Take 1 KiB from the top of conventional memory for the hooks. */
     dec word ptr [0x0413]
     mov ax, word ptr [0x0413]
     shl ax, 6
@@ -64,11 +91,43 @@ relocated:
     mov cx, offset HOOK_LEN
     rep movsb
     mov eax, dword ptr [0x15 * 4]
-    mov dword ptr es:[0], eax
+    mov dword ptr es:[OLD15], eax
     cli
-    mov word ptr [0x15 * 4], 4
+    /* FS: flat 4 GiB limit (unreal mode), then the HPET general config. */
+    .byte 0x0F, 0x01, 0x16                 /* lgdt [gdtr] (relocated) */
+    .word RELOC_BASE + (gdtr - nt3_e820_mbr_start)
+    mov eax, cr0
+    inc ax
+    mov cr0, eax
+    push 8
+    pop fs
+    dec ax
+    mov cr0, eax
+    mov ebx, 0xFED00000
+    mov eax, dword ptr fs:[ebx]
+    inc eax
+    jz 1f
+#ifdef NT3_HPET_SET_LEGACY
+    or dword ptr fs:[ebx + 0x10], 3
+#else
+    and dword ptr fs:[ebx + 0x10], 0xFFFFFFFD
+#endif
+1:
+    and word ptr [0x15 * 4], 0
     mov word ptr [0x15 * 4 + 2], es
     sti
+
+    /* PCI BIOS last bus >= 8: hide B101h from NTDETECT (see above). */
+    mov ax, 0xB101
+    int 0x1A
+    jc 1f
+    cmp cl, 8
+    jb 1f
+    mov eax, dword ptr [0x1A * 4]
+    mov dword ptr es:[OLD1A], eax
+    mov word ptr [0x1A * 4], offset H1A
+    mov word ptr [0x1A * 4 + 2], es
+1:
     push ds
     pop es
 
@@ -82,23 +141,23 @@ find_active:
     jmp boot_error
 
 active_found:
-    mov byte ptr [DAP_BASE + 0], 0x10
-    mov byte ptr [DAP_BASE + 1], 0x00
-    mov word ptr [DAP_BASE + 2], 1
-    mov word ptr [DAP_BASE + 4], VBR_LOAD
-    mov word ptr [DAP_BASE + 6], 0x0000
-    mov eax, dword ptr [si + 8]
-    mov dword ptr [DAP_BASE + 8], eax
-    mov dword ptr [DAP_BASE + 12], 0
+    /* INT 13h AH=42 packet on the stack: 1 sector of LBA [si+8] to 0:7C00. */
+    .byte 0x66, 0x6A, 0x00                 /* push dword 0 (LBA high) */
+    push dword ptr [si + 8]
+    .byte 0x6A, 0x00                       /* push word 0 (segment) */
+    .byte 0x68
+    .word VBR_LOAD                         /* push word 7C00h (offset) */
+    .byte 0x6A, 0x01                       /* push word 1 (sectors) */
+    .byte 0x6A, 0x10                       /* push word 10h (size) */
+    mov si, sp
 
-    mov dl, byte ptr [BOOT_DRIVE_SLOT]
-    mov si, DAP_BASE
+    mov dx, bp
     mov ah, 0x42
     int 0x13
     jc boot_error
 
     /* Same fail-safe heads correction as xp_geometry_fix_mbr.S. */
-    mov dl, byte ptr [BOOT_DRIVE_SLOT]
+    mov dx, bp
     mov ah, 0x08
     int 0x13
     jc geometry_fallback
@@ -109,17 +168,17 @@ active_found:
     jne geometry_fallback
     cmp al, byte ptr [VBR_LOAD + 0x18]
     jne geometry_fallback
-    cmp dh, 1
-    jb geometry_fallback
+    test dh, dh
+    jz geometry_fallback
     cmp dh, 254
     ja geometry_fallback
-    movzx ax, dh
+    /* AH = 0 after a successful AH=08h. */
+    mov al, dh
     inc ax
-    mov word ptr [HEADS_SLOT], ax
     mov word ptr [VBR_LOAD + 0x1A], ax
 
 geometry_fallback:
-    mov dl, byte ptr [BOOT_DRIVE_SLOT]
+    mov dx, bp
     .byte 0xEA
     .word VBR_LOAD
     .word 0x0000
@@ -130,19 +189,31 @@ boot_error:
     hlt
     jmp 1b
 
-/* Resident part, copied to (INT 12h top):0000; the old vector is at offset 0,
-   the handler (new INT 15h vector) at offset 4. */
+/* GDT for the unreal-mode FS: the base points 8 bytes before the flat data
+   descriptor, so the (never loaded) null descriptor is the code above. */
+gdtr:
+    .word 15
+    .long RELOC_BASE + (gdt_flat - nt3_e820_mbr_start) - 8
+gdt_flat:
+    .byte 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x92, 0xCF, 0x00
+
+/* Resident part, copied to (INT 12h top):0000; INT 15h handler at 0. */
 hook_start:
-    .long 0
-    cmp eax, 0xE820
+    cmp ax, 0xE820
     je 2f
-    .byte 0x2E, 0xFF, 0x2E, 0x00, 0x00    /* jmp far cs:[0] (m16:16) */
+    .byte 0x2E, 0xFF, 0x2E                 /* jmp far cs:[OLD15] (m16:16) */
+    .word OLD15
+8:
+    or byte ptr [bp + 6], 0x01
+    pop bp
+    iret
 2:
     pushf
-    .byte 0x2E, 0xFF, 0x1E, 0x00, 0x00    /* call far cs:[0] (m16:16) */
+    .byte 0x2E, 0xFF, 0x1E                 /* call far cs:[OLD15] (m16:16) */
+    .word OLD15
     push bp
     mov bp, sp
-    jc 8f
+    jc 8b
     push eax
     cmp dword ptr es:[di + 4], 0
     jne 6f
@@ -162,33 +233,41 @@ hook_start:
     mov eax, dword ptr es:[di]
     neg eax
     mov dword ptr es:[di + 8], eax
-    mov dword ptr es:[di + 12], 0
+    and dword ptr es:[di + 12], 0
 3:
     cmp dword ptr es:[di], 0
     jne 7f
-    push ds
-    xor ax, ax
-    mov ds, ax
-    movzx eax, word ptr [0x0413]
-    pop ds
-    shl eax, 10
+    /* The hook segment (CS) starts at the INT 12h top. */
+    xor eax, eax
+    mov ax, cs
+    shl eax, 4
     cmp dword ptr es:[di + 8], eax
     jbe 7f
     mov dword ptr es:[di + 8], eax
     jmp 7f
 6:
-    mov dword ptr es:[di], 0xF0000
-    mov dword ptr es:[di + 4], 0
-    mov dword ptr es:[di + 8], 0x10000
-    mov dword ptr es:[di + 12], 0
-    mov dword ptr es:[di + 16], 2
+    /* A copy of the BIOS ROM range: F0000h, length 10000h, type 2. */
+    xor eax, eax
+    mov dword ptr es:[di + 4], eax
+    mov dword ptr es:[di + 12], eax
+    mov al, 2
+    mov dword ptr es:[di + 16], eax
+    shl eax, 15
+    mov dword ptr es:[di + 8], eax
+    imul eax, eax, 15
+    mov dword ptr es:[di], eax
 7:
     pop eax
     and byte ptr [bp + 6], 0xFE
     pop bp
     iret
-8:
-    or byte ptr [bp + 6], 0x01
-    pop bp
-    iret
+
+/* INT 1Ah: B101h becomes the unsupported B1FFh (AH = 81h, CF = 1). */
+hook_1a:
+    cmp ax, 0xB101
+    jne 1f
+    mov al, 0xFF
+1:
+    .byte 0x2E, 0xFF, 0x2E                 /* jmp far cs:[OLD1A] (m16:16) */
+    .word OLD1A
 hook_end:

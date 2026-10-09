@@ -141,6 +141,56 @@ AhciPciConfigIsAhci(IN PPCI_COMMON_CONFIG PciConfig)
     return FALSE;
 }
 
+#ifdef AHCI_NT351
+/* MODIFIED (USOS 1.3.0.0-usos6, NT 3.51 build, 0009): PCI configuration
+   space through ports CF8h/CFCh (mechanism 1), not ScsiPortGetBusData.
+   On boards whose PCI BIOS reports a last bus >= 8 the USOS NT 3.x MBR
+   hides the PCI BIOS from NTDETECT (the 3.51 HAL loops forever in its
+   bridge scan otherwise), so the HAL has no PCI bus handler at all; the
+   NT 3.51 build therefore registers for the Isa bus and finds the HBA
+   itself, on every bus (0-255). */
+static PUCHAR AhciCfgPorts;
+
+static BOOLEAN
+AhciCfgMap(IN PHW_DEVICE_EXTENSION HwInit)
+{
+    SCSI_PHYSICAL_ADDRESS ports;
+
+    if (AhciCfgPorts == NULL) {
+        ports.LowPart = 0xCF8;
+        ports.HighPart = 0;
+        AhciCfgPorts = (PUCHAR)ScsiPortGetDeviceBase(HwInit, Isa, 0, ports, 8, TRUE);
+    }
+    return (BOOLEAN)(AhciCfgPorts != NULL);
+}
+
+static VOID
+AhciCfgSelect(IN ULONG Bus, IN ULONG Slot, IN ULONG Offset)
+{
+    PCI_SLOT_NUMBER slot;
+
+    slot.u.AsULONG = Slot;
+    ScsiPortWritePortUlong((PULONG)AhciCfgPorts,
+                           0x80000000UL | ((Bus & 0xFF) << 16) |
+                           ((ULONG)slot.u.bits.DeviceNumber << 11) |
+                           ((ULONG)slot.u.bits.FunctionNumber << 8) | (Offset & 0xFC));
+}
+
+static ULONG
+AhciCfgRead32(IN ULONG Bus, IN ULONG Slot, IN ULONG Offset)
+{
+    AhciCfgSelect(Bus, Slot, Offset);
+    return ScsiPortReadPortUlong((PULONG)(AhciCfgPorts + 4));
+}
+
+static VOID
+AhciCfgWrite16(IN ULONG Bus, IN ULONG Slot, IN ULONG Offset, IN USHORT Value)
+{
+    AhciCfgSelect(Bus, Slot, Offset);
+    ScsiPortWritePortUshort((PUSHORT)(AhciCfgPorts + 4 + (Offset & 2)), Value);
+}
+#endif
+
 /* FALSE for an empty slot; *BusMissing when the bus does not exist */
 static BOOLEAN
 AhciReadPciHeader(
@@ -153,6 +203,19 @@ AhciReadPciHeader(
 {
     ULONG bytesRead;
 
+#ifdef AHCI_NT351
+    ULONG i;
+
+    if (BusMissing != NULL) *BusMissing = FALSE;     /* buses may be sparse */
+    if (Bus > 0xFF || !AhciCfgMap(HwInit)) return FALSE;
+    ((PULONG)PciConfig)[0] = AhciCfgRead32(Bus, Slot, 0);
+    if (PciConfig->VendorID == 0xFFFF || PciConfig->VendorID == 0x0000) return FALSE;
+    for (i = 1; i < AHCI_PCI_HEADER_LENGTH / 4; i++) {
+        ((PULONG)PciConfig)[i] = AhciCfgRead32(Bus, Slot, i * 4);
+    }
+    (VOID)bytesRead;
+    return TRUE;
+#else
     bytesRead = ScsiPortGetBusData(HwInit, PCIConfiguration, Bus, Slot,
                                    PciConfig, AHCI_PCI_HEADER_LENGTH);
     if (BusMissing != NULL) {
@@ -161,6 +224,7 @@ AhciReadPciHeader(
     if (bytesRead < AHCI_PCI_HEADER_LENGTH) return FALSE;
     if (PciConfig->VendorID == 0xFFFF || PciConfig->VendorID == 0x0000) return FALSE;
     return TRUE;
+#endif
 }
 
 /* Fallback when the bus:slot we were called for is not an unclaimed AHCI
@@ -558,7 +622,12 @@ DriverEntry(IN PVOID DriverObject, IN PVOID Argument2)
     initData.HwAdapterState = AhciAdapterState;
 #endif
     initData.DeviceExtensionSize = sizeof(HW_DEVICE_EXTENSION);
+#ifdef AHCI_NT351
+    /* MODIFIED (USOS 1.3.0.0-usos6, 0009): Isa, see AhciCfgMap. */
+    initData.AdapterInterfaceType = Isa;
+#else
     initData.AdapterInterfaceType = PCIBus;
+#endif
     initData.NumberOfAccessRanges = 1;
     initData.MapBuffers = TRUE;
     initData.NeedPhysicalAddresses = TRUE;
@@ -666,8 +735,12 @@ AhciFindAdapter(
 
     /* Memory space + bus master on, INTx disable off */
     pciCmd = (USHORT)((pciConfig.Command | 0x0006) & ~(1 << 10));
+#ifdef AHCI_NT351
+    AhciCfgWrite16(targetBus, targetSlot, 0x04, pciCmd);
+#else
     ScsiPortSetBusDataByOffset(hwInit, PCIConfiguration, targetBus, targetSlot,
                                &pciCmd, 0x04, sizeof(USHORT));
+#endif
 
 #ifdef AHCI_NT4
     /* Non-PnP ScsiPort: report the range we use so it gets claimed */
@@ -683,6 +756,15 @@ AhciFindAdapter(
     if (hwInit->AbarMapped == (PUCHAR)0xFFFFFFFF) {
         hwInit->AbarMapped = NULL;
     }
+#elif defined(AHCI_NT351)
+    /* MODIFIED (USOS 1.3.0.0-usos6, 0009): the ABAR through the Isa bus
+       (the system bus as a fallback); there may be no PCI bus handler. */
+    hwInit->AbarMapped = (PUCHAR)ScsiPortGetDeviceBase(hwInit, Isa, 0, basePhys,
+                                                       AHCI_ABAR_MAP_SIZE, FALSE);
+    if (hwInit->AbarMapped == NULL) {
+        hwInit->AbarMapped = (PUCHAR)ScsiPortGetDeviceBase(hwInit, Internal, 0, basePhys,
+                                                           AHCI_ABAR_MAP_SIZE, FALSE);
+    }
 #else
     hwInit->AbarMapped = (PUCHAR)ScsiPortGetDeviceBase(hwInit, ConfigInfo->AdapterInterfaceType,
                                                        targetBus, basePhys, AHCI_ABAR_MAP_SIZE, FALSE);
@@ -697,6 +779,29 @@ AhciFindAdapter(
         return SP_RETURN_ERROR;
     }
 
+#ifdef AHCI_NT351
+    /* MODIFIED (USOS 1.3.0.0-usos6, 0009): ScsiPort builds the DMA adapter
+       and the resource report from ConfigInfo after (or, for the uncached
+       extension, during) HwFindAdapter. As an Isa bus master the 3.51 HAL
+       wants map registers and ScsiPortGetPhysicalAddress then returns no
+       address for the data buffers (QEMU: READ(10) fails, STOP 0x7B), so
+       the adapter is reported as PCIBus (a PCI bus-master adapter, no map
+       registers). Without a PCI bus handler (PCI BIOS hidden) a PCIBus
+       resource report fails (ScsiPortInitialize C0040003), so the ABAR
+       range is then not reported. No interrupt is connected (level and
+       vector 0 below). ScsiPort calls again for the next HBA. */
+    {
+        USHORT vendor = 0;
+        if (ScsiPortGetBusData(hwInit, PCIConfiguration, 0, 0, &vendor, sizeof(vendor)) == 0 &&
+            accessRanges != NULL && ConfigInfo->NumberOfAccessRanges > 0) {
+            accessRanges[0].RangeStart.LowPart = 0;
+            accessRanges[0].RangeStart.HighPart = 0;
+            accessRanges[0].RangeLength = 0;
+        }
+        ConfigInfo->AdapterInterfaceType = PCIBus;
+    }
+    *Again = TRUE;
+#endif
     ConfigInfo->SystemIoBusNumber = targetBus;
     ConfigInfo->SlotNumber = targetSlot;
 
