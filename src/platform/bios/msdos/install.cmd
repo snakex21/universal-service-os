@@ -51,6 +51,11 @@ if not exist %USRC%\USOSKBC.COM goto kbc_done
 copy %USRC%\USOSKBC.COM C:\DOS /y >nul
 if errorlevel 1 goto failed
 :kbc_done
+rem CS:IP locator for the early-Windows diagnostic start items (W1AUTO.BAT).
+if not exist %USRC%\USOSWHER.COM goto where_done
+copy %USRC%\USOSWHER.COM C:\DOS /y >nul
+if errorlevel 1 goto failed
+:where_done
 echo C:\DOS\VBMOUSE.EXE>>C:\AUTOEXEC.BAT
 echo C:\DOS\USOSKEY.COM>>C:\AUTOEXEC.BAT
 :csm_dos_done

@@ -78,6 +78,10 @@ def build(root: Path):
     # After the MS-DOS support: it reuses USOSKEY and VBADOS from there.
     from build_win9x_support import build as build_win9x
     build_win9x(root, out / 'win9x')
+    # CS:IP locator for the early-Windows diagnostic start items (W1AUTO.BAT,
+    # USOSWHER /G); the 8.3 name of USOSWHERE.COM.
+    shutil.copyfile(out / 'win9x/USOSWHERE.COM', dos_out / 'USOSWHER.COM')
+    print('[PASS] MS-DOS support: USOSWHER.COM (early-Windows diagnostics)')
 
 
 def dos_text(text: str) -> bytes:
@@ -101,17 +105,18 @@ def build_csmwrap_variants(root: Path, dos_out: Path):
     if auto.count(temp) != 1:
         raise ValueError('windows_auto.cmd: TEMP line not found once')
     (dos_out / 'W3AUTO.CSM').write_bytes(dos_text(auto.replace(temp, temp + 'C:\\DOS\\VBMOUSE.EXE\nC:\\DOS\\USOSKEY.COM\n')))
-    # Windows 1.0x-3.0 start menu (INSTALL.BAT, EARLY.TAG): the same two changes.
+    # Windows 1.0x-3.0 start menu (INSTALL.BAT, EARLY.TAG): HIMEM /M:2 in every
+    # menu block that loads HIMEM (the diagnostic items D4/D5 load none).
     early_config = (msdos / 'windows_early_config.sys').read_text(encoding='ascii')
-    if early_config.count(himem) != 1:
-        raise ValueError('windows_early_config.sys: HIMEM line not found once')
+    if early_config.count(himem) < 1:
+        raise ValueError('windows_early_config.sys: HIMEM line not found')
     (dos_out / 'W1CONFIG.CSM').write_bytes(dos_text(early_config.replace(himem, 'DEVICE=C:\\DOS\\HIMEM.SYS /TESTMEM:OFF /M:2\n')))
+    # W1AUTO.BAT loads VBMOUSE and USOSKBC /R itself when present (the
+    # diagnostic items leave some out); the CSMWrap copy is the same text.
     early_auto = (msdos / 'windows_early_auto.cmd').read_text(encoding='ascii')
-    if early_auto.count(temp) != 1:
-        raise ValueError('windows_early_auto.cmd: TEMP line not found once')
-    # Windows 1.0x-3.0 read the 8042 themselves: USOSKBC /R relays the USB
-    # keyboard through it (USOSKEY.DRV needs Windows 3.1).
-    (dos_out / 'W1AUTO.CSM').write_bytes(dos_text(early_auto.replace(temp, temp + 'C:\\DOS\\VBMOUSE.EXE\nC:\\DOS\\USOSKBC.COM /R\n')))
+    if 'C:\\DOS\\USOSKBC.COM /R' not in early_auto:
+        raise ValueError('windows_early_auto.cmd: USOSKBC /R not found')
+    (dos_out / 'W1AUTO.CSM').write_bytes(dos_text(early_auto))
     (dos_out / 'W3INI.BAS').write_bytes(dos_text((msdos / 'windows_ini.bas').read_text(encoding='ascii')))
     (dos_out / 'USOS.SHH').write_bytes(dos_text((msdos / 'windows_setup.shh').read_text(encoding='ascii')))
     vendor = root / 'tools/vendor/vbados/0.67'
