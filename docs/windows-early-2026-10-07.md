@@ -349,3 +349,49 @@ with a ROM far call and a LOOP, failed EXEC, zero slide to `0F 00 00` -> the
 ring ends `... 1263:0F99 ... 1263:0FAD`, ROM not recorded; the trace end
 by INT 21h and the 10 s dump path covered. 1.3's `call dword ptr` would
 assemble with a 66h prefix; 1.4 uses an explicit FF /3 far call (CALLFAR).
+
+### D5 with USOSWHERE 1.4 (2026-10-09): the video BIOS overruns WIN.COM's stack; USOSV10
+
+Dump screen: `U at 12E4:0FAD x:0000 u:0001`, `ax:0FA2 bx:0007 cx:0023
+dx:18BF si:0002 di:007E bp:091C ds:13EB es:B800`, `s:12E4:106F`. x:0000:
+the trace never armed, so WIN.COM never issued its EXEC (the 21:4B00 seen
+before was COMMAND.COM starting WIN.COM). DS = 13EBh = CS+107h is the
+segment of CGA.LGO, ES = B800h its drawing target, BX = 0007h is only set
+by its text routine (CGA.LGO 001Ah: AH=02h/0Eh), BP = 091Ch is WIN.COM's
+own BP (DOS start value) restored by the logo's `pop bp`: the hang starts
+in or right after the logo, not in the EXEC.
+
+Cause (static + Unicorn with the real WIN.COM, local copy only): WIN.COM
+sets SP = 1070h; its stack is the 256 bytes behind its own code
+(CS:0F70-106F), and the logo is entered from CS:0F39-0F6C, returning to
+0F6Dh (`pop ds; ret`). Every INT 10h of CGA.LGO (AH=0Fh, AX=0006h,
+AX=1000h/1001h, then AH=02h/0Eh per character) runs with SP = 103Ch-1040h,
+i.e. about 200 bytes above that code. A 1987 BIOS used a few dozen bytes; a
+video BIOS that needs more than ~190 bytes of the caller's stack overwrites
+WIN.COM's code at 0F39-0F6E, and the logo's final RETF to 0F6Dh executes
+stack residue and slides into the empty stack area. QEMU's SeaVGABIOS
+switches to its own stack (extra stack), so QEMU never showed it; the RX 560
+option ROM on the X470 runs on the caller's stack.
+
+Unicorn run (scratch w203/repro203.py, WIN.COM from the BIOSTAR, video BIOS
+stub that uses N bytes of stack): N <= 128 reaches WIN.COM's first INT 21h
+(AH=4Ah at 0904h) with code intact; N = 192/200 ends in the stack area of
+12E4 with DS=13EB ES=B800 BX=0007 CX=0023 BP=091C (the X470 dump registers),
+N >= 208 runs away. With USOSV10 resident every N up to 400 reaches 0904h
+with 0F39-0F6E intact. Register clobbering by the BIOS (BX..ES) cannot
+over-pop: the logo unwinds by SP and restores BP itself.
+
+Fix: **USOSV10.COM** (src/platform/bios/win9x/usosv10.S, GPL): TSR, INT 10h
+on a private 2 KiB stack (outermost call only; nested calls chain on that
+stack), and for the functions that return nothing but AX (AH=00h-0Eh except
+03h/04h, AX=1000h-1003h/1010h/1012h) BX, CX, DX, SI, DI, BP, DS, ES restored
+as a CGA/EGA BIOS kept them; arithmetic flags from the BIOS, IF/TF from the
+caller. The stack is pre-filled with 5Ah; `USOSV10` run again prints the
+deepest use and the call count (at install it measures a no-clear mode set
+of the current text mode). W1AUTO.BAT loads it first in every item except
+D5 (control) and writes the report into Dn.TXT before WIN and after "WIN
+returned". New menu item D6V10 = D5 + USOSV10. Build: build_win9x_support
+(build_usosv10), staged msdos/USOSV10.COM -> C:\DOS by INSTALL.BAT, payload
+list. Tests: tools/tests/legacy_bios/test_usosv10.py (tiny stack below code
+breaks without, runs with; registers/flags; outputs pass through; nesting;
+install + report), test_win_early_flow.py.

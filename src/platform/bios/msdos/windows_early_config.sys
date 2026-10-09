@@ -3,7 +3,7 @@ menucolor=15,1
 menuitem=WINSTD,Windows (domyslny)
 menuitem=WINREAL,Windows 3.0 - tryb standardowy (WIN /S, test)
 menuitem=DOSONLY,MS-DOS - wiersz polecen
-submenu=DIAG,Diagnostyka zawieszenia Windows (D1-D5)
+submenu=DIAG,Diagnostyka zawieszenia Windows (D1-D6)
 menudefault=WINSTD,8
 
 ; Diagnostic start variants (Windows 2.03 hangs at its logo on the X470):
@@ -14,10 +14,11 @@ menudefault=WINSTD,8
 menuitem=D1WHERE,D1 - jak domyslny + USOSWHER (CS:IP w rogu ekranu)
 menuitem=D2NOKBC,D2 - bez USOSKBC (tylko klawiatura PS/2)
 menuitem=D4CLEAN,D4 - bez HIMEM i VBMOUSE (tylko SETVER + USOSKBC)
-menuitem=D5MIN,D5 - minimum: tylko SETVER + USOSWHER
+menuitem=D5MIN,D5 - minimum: tylko SETVER + USOSWHER (bez USOSV10)
+menuitem=D6V10,D6 - jak D5 + USOSV10 (INT 10h na wlasnym stosie)
 menuitem=DOSONLY,MS-DOS - wiersz polecen
 
-; HIMEM per item (D4/D5 without it), before SETVER as before.
+; HIMEM per item (D4/D5/D6 without it), before SETVER as before.
 [WINSTD]
 DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF
 
@@ -36,6 +37,8 @@ DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF
 [D4CLEAN]
 
 [D5MIN]
+
+[D6V10]
 
 ; Windows 1.0x-3.0: no DOS=HIGH (Windows 2.x needs the HMA), SETVER
 ; (the 1.0x and 2.x kernels: "Incorrect DOS version" on MS-DOS 6.22; WIN200.BIN
