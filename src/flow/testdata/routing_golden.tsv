@@ -12,6 +12,7 @@ system	windows-xp-x64	windows_legacy	windows	any	\Systems\Windows\Windows XP x64
 system	windows-2000	windows_legacy	windows	any	\Systems\Windows\Windows 2000\Images	\Systems\Windows\Windows 2000\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-nt-4	windows_legacy	windows	any	\Systems\Windows\Windows NT 4.0\Images	\Systems\Windows\Windows NT 4.0\Unattended	.sif	WINNT.SIF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-nt-3-51	windows_legacy	windows	uefi	\Systems\Windows\Windows NT 3.51\Images	\Systems\Windows\Windows NT 3.51\Unattended	.sif	WINNT.SIF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
+system	windows-nt-3-5	windows_legacy	windows	uefi	\Systems\Windows\Windows NT 3.5\Images	\Systems\Windows\Windows NT 3.5\Unattended	.sif	WINNT.SIF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-me	windows_legacy	windows	any	\Systems\Windows\Windows Me\Images	\Systems\Windows\Windows Me\Unattended	.inf	MSBATCH.INF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-98-se	windows_legacy	windows	any	\Systems\Windows\Windows 98 SE\Images	\Systems\Windows\Windows 98 SE\Unattended	.inf	MSBATCH.INF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-98	windows_legacy	windows	any	\Systems\Windows\Windows 98\Images	\Systems\Windows\Windows 98\Unattended	.inf	MSBATCH.INF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
@@ -37,6 +38,7 @@ system	windows-server-2003	windows	windows	any	\Systems\Windows\Windows Server 2
 system	windows-2000-server	windows_legacy	windows	uefi	\Systems\Windows\Windows 2000 Server\Images	\Systems\Windows\Windows 2000 Server\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-nt-4-server	windows_legacy	windows	any	\Systems\Windows\Windows NT 4.0 Server\Images	\Systems\Windows\Windows NT 4.0 Server\Unattended	.sif	WINNT.SIF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-nt-3-51-server	windows_legacy	windows	uefi	\Systems\Windows\Windows NT 3.51 Server\Images	\Systems\Windows\Windows NT 3.51 Server\Unattended	.sif	WINNT.SIF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
+system	windows-nt-3-5-server	windows_legacy	windows	uefi	\Systems\Windows\Windows NT 3.5 Server\Images	\Systems\Windows\Windows NT 3.5 Server\Unattended	.sif	WINNT.SIF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	ubuntu	linux	linux	any	\Systems\Linux\Ubuntu\Images	\Systems\Linux\Ubuntu\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,direct_efi,disk_image
 system	debian	linux	linux	any	\Systems\Linux\Debian\Images	\Systems\Linux\Debian\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,direct_efi,disk_image
 system	fedora	linux	linux	any	\Systems\Linux\Fedora\Images	\Systems\Linux\Fedora\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,direct_efi,disk_image
@@ -1466,6 +1468,114 @@ route	windows-nt-3-51	efi	disk_image	bios	-
 route	windows-nt-3-51	efi	disk_image	uefi	-
 route	windows-nt-3-51	efi	floppy_image	bios	-
 route	windows-nt-3-51	efi	floppy_image	uefi	-
+route	windows-nt-3-5	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	windows-nt-3-5	iso	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
+route	windows-nt-3-5	iso	direct_iso	bios	-
+route	windows-nt-3-5	iso	direct_iso	uefi	-
+route	windows-nt-3-5	iso	wimboot	bios	-
+route	windows-nt-3-5	iso	wimboot	uefi	-
+route	windows-nt-3-5	iso	vhdboot	bios	-
+route	windows-nt-3-5	iso	vhdboot	uefi	-
+route	windows-nt-3-5	iso	direct_efi	bios	-
+route	windows-nt-3-5	iso	direct_efi	uefi	-
+route	windows-nt-3-5	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	windows-nt-3-5	iso	chainload	uefi	-
+route	windows-nt-3-5	iso	memdisk	bios	-
+route	windows-nt-3-5	iso	memdisk	uefi	-
+route	windows-nt-3-5	iso	disk_image	bios	-
+route	windows-nt-3-5	iso	disk_image	uefi	-
+route	windows-nt-3-5	iso	floppy_image	bios	-
+route	windows-nt-3-5	iso	floppy_image	uefi	-
+route	windows-nt-3-5	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-nt-3-5	wim	automatic	uefi	-
+route	windows-nt-3-5	wim	direct_iso	bios	-
+route	windows-nt-3-5	wim	direct_iso	uefi	-
+route	windows-nt-3-5	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-nt-3-5	wim	wimboot	uefi	-
+route	windows-nt-3-5	wim	vhdboot	bios	-
+route	windows-nt-3-5	wim	vhdboot	uefi	-
+route	windows-nt-3-5	wim	direct_efi	bios	-
+route	windows-nt-3-5	wim	direct_efi	uefi	-
+route	windows-nt-3-5	wim	chainload	bios	-
+route	windows-nt-3-5	wim	chainload	uefi	-
+route	windows-nt-3-5	wim	memdisk	bios	-
+route	windows-nt-3-5	wim	memdisk	uefi	-
+route	windows-nt-3-5	wim	disk_image	bios	-
+route	windows-nt-3-5	wim	disk_image	uefi	-
+route	windows-nt-3-5	wim	floppy_image	bios	-
+route	windows-nt-3-5	wim	floppy_image	uefi	-
+route	windows-nt-3-5	img	automatic	bios	-
+route	windows-nt-3-5	img	automatic	uefi	-
+route	windows-nt-3-5	img	direct_iso	bios	-
+route	windows-nt-3-5	img	direct_iso	uefi	-
+route	windows-nt-3-5	img	wimboot	bios	-
+route	windows-nt-3-5	img	wimboot	uefi	-
+route	windows-nt-3-5	img	vhdboot	bios	-
+route	windows-nt-3-5	img	vhdboot	uefi	-
+route	windows-nt-3-5	img	direct_efi	bios	-
+route	windows-nt-3-5	img	direct_efi	uefi	-
+route	windows-nt-3-5	img	chainload	bios	-
+route	windows-nt-3-5	img	chainload	uefi	-
+route	windows-nt-3-5	img	memdisk	bios	-
+route	windows-nt-3-5	img	memdisk	uefi	-
+route	windows-nt-3-5	img	disk_image	bios	-
+route	windows-nt-3-5	img	disk_image	uefi	-
+route	windows-nt-3-5	img	floppy_image	bios	-
+route	windows-nt-3-5	img	floppy_image	uefi	-
+route	windows-nt-3-5	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-nt-3-5	vhd	automatic	uefi	-
+route	windows-nt-3-5	vhd	direct_iso	bios	-
+route	windows-nt-3-5	vhd	direct_iso	uefi	-
+route	windows-nt-3-5	vhd	wimboot	bios	-
+route	windows-nt-3-5	vhd	wimboot	uefi	-
+route	windows-nt-3-5	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-nt-3-5	vhd	vhdboot	uefi	-
+route	windows-nt-3-5	vhd	direct_efi	bios	-
+route	windows-nt-3-5	vhd	direct_efi	uefi	-
+route	windows-nt-3-5	vhd	chainload	bios	-
+route	windows-nt-3-5	vhd	chainload	uefi	-
+route	windows-nt-3-5	vhd	memdisk	bios	-
+route	windows-nt-3-5	vhd	memdisk	uefi	-
+route	windows-nt-3-5	vhd	disk_image	bios	-
+route	windows-nt-3-5	vhd	disk_image	uefi	-
+route	windows-nt-3-5	vhd	floppy_image	bios	-
+route	windows-nt-3-5	vhd	floppy_image	uefi	-
+route	windows-nt-3-5	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-nt-3-5	vhdx	automatic	uefi	-
+route	windows-nt-3-5	vhdx	direct_iso	bios	-
+route	windows-nt-3-5	vhdx	direct_iso	uefi	-
+route	windows-nt-3-5	vhdx	wimboot	bios	-
+route	windows-nt-3-5	vhdx	wimboot	uefi	-
+route	windows-nt-3-5	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-nt-3-5	vhdx	vhdboot	uefi	-
+route	windows-nt-3-5	vhdx	direct_efi	bios	-
+route	windows-nt-3-5	vhdx	direct_efi	uefi	-
+route	windows-nt-3-5	vhdx	chainload	bios	-
+route	windows-nt-3-5	vhdx	chainload	uefi	-
+route	windows-nt-3-5	vhdx	memdisk	bios	-
+route	windows-nt-3-5	vhdx	memdisk	uefi	-
+route	windows-nt-3-5	vhdx	disk_image	bios	-
+route	windows-nt-3-5	vhdx	disk_image	uefi	-
+route	windows-nt-3-5	vhdx	floppy_image	bios	-
+route	windows-nt-3-5	vhdx	floppy_image	uefi	-
+route	windows-nt-3-5	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-nt-3-5	efi	automatic	uefi	-
+route	windows-nt-3-5	efi	direct_iso	bios	-
+route	windows-nt-3-5	efi	direct_iso	uefi	-
+route	windows-nt-3-5	efi	wimboot	bios	-
+route	windows-nt-3-5	efi	wimboot	uefi	-
+route	windows-nt-3-5	efi	vhdboot	bios	-
+route	windows-nt-3-5	efi	vhdboot	uefi	-
+route	windows-nt-3-5	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-nt-3-5	efi	direct_efi	uefi	-
+route	windows-nt-3-5	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	windows-nt-3-5	efi	chainload	uefi	-
+route	windows-nt-3-5	efi	memdisk	bios	-
+route	windows-nt-3-5	efi	memdisk	uefi	-
+route	windows-nt-3-5	efi	disk_image	bios	-
+route	windows-nt-3-5	efi	disk_image	uefi	-
+route	windows-nt-3-5	efi	floppy_image	bios	-
+route	windows-nt-3-5	efi	floppy_image	uefi	-
 route	windows-me	iso	automatic	bios	win9x_dos	direct_iso	bios	experimental	0
 route	windows-me	iso	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
 route	windows-me	iso	direct_iso	bios	win9x_dos	direct_iso	bios	experimental	0
@@ -4166,6 +4276,114 @@ route	windows-nt-3-51-server	efi	disk_image	bios	-
 route	windows-nt-3-51-server	efi	disk_image	uefi	-
 route	windows-nt-3-51-server	efi	floppy_image	bios	-
 route	windows-nt-3-51-server	efi	floppy_image	uefi	-
+route	windows-nt-3-5-server	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	windows-nt-3-5-server	iso	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
+route	windows-nt-3-5-server	iso	direct_iso	bios	-
+route	windows-nt-3-5-server	iso	direct_iso	uefi	-
+route	windows-nt-3-5-server	iso	wimboot	bios	-
+route	windows-nt-3-5-server	iso	wimboot	uefi	-
+route	windows-nt-3-5-server	iso	vhdboot	bios	-
+route	windows-nt-3-5-server	iso	vhdboot	uefi	-
+route	windows-nt-3-5-server	iso	direct_efi	bios	-
+route	windows-nt-3-5-server	iso	direct_efi	uefi	-
+route	windows-nt-3-5-server	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	windows-nt-3-5-server	iso	chainload	uefi	-
+route	windows-nt-3-5-server	iso	memdisk	bios	-
+route	windows-nt-3-5-server	iso	memdisk	uefi	-
+route	windows-nt-3-5-server	iso	disk_image	bios	-
+route	windows-nt-3-5-server	iso	disk_image	uefi	-
+route	windows-nt-3-5-server	iso	floppy_image	bios	-
+route	windows-nt-3-5-server	iso	floppy_image	uefi	-
+route	windows-nt-3-5-server	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-nt-3-5-server	wim	automatic	uefi	-
+route	windows-nt-3-5-server	wim	direct_iso	bios	-
+route	windows-nt-3-5-server	wim	direct_iso	uefi	-
+route	windows-nt-3-5-server	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-nt-3-5-server	wim	wimboot	uefi	-
+route	windows-nt-3-5-server	wim	vhdboot	bios	-
+route	windows-nt-3-5-server	wim	vhdboot	uefi	-
+route	windows-nt-3-5-server	wim	direct_efi	bios	-
+route	windows-nt-3-5-server	wim	direct_efi	uefi	-
+route	windows-nt-3-5-server	wim	chainload	bios	-
+route	windows-nt-3-5-server	wim	chainload	uefi	-
+route	windows-nt-3-5-server	wim	memdisk	bios	-
+route	windows-nt-3-5-server	wim	memdisk	uefi	-
+route	windows-nt-3-5-server	wim	disk_image	bios	-
+route	windows-nt-3-5-server	wim	disk_image	uefi	-
+route	windows-nt-3-5-server	wim	floppy_image	bios	-
+route	windows-nt-3-5-server	wim	floppy_image	uefi	-
+route	windows-nt-3-5-server	img	automatic	bios	-
+route	windows-nt-3-5-server	img	automatic	uefi	-
+route	windows-nt-3-5-server	img	direct_iso	bios	-
+route	windows-nt-3-5-server	img	direct_iso	uefi	-
+route	windows-nt-3-5-server	img	wimboot	bios	-
+route	windows-nt-3-5-server	img	wimboot	uefi	-
+route	windows-nt-3-5-server	img	vhdboot	bios	-
+route	windows-nt-3-5-server	img	vhdboot	uefi	-
+route	windows-nt-3-5-server	img	direct_efi	bios	-
+route	windows-nt-3-5-server	img	direct_efi	uefi	-
+route	windows-nt-3-5-server	img	chainload	bios	-
+route	windows-nt-3-5-server	img	chainload	uefi	-
+route	windows-nt-3-5-server	img	memdisk	bios	-
+route	windows-nt-3-5-server	img	memdisk	uefi	-
+route	windows-nt-3-5-server	img	disk_image	bios	-
+route	windows-nt-3-5-server	img	disk_image	uefi	-
+route	windows-nt-3-5-server	img	floppy_image	bios	-
+route	windows-nt-3-5-server	img	floppy_image	uefi	-
+route	windows-nt-3-5-server	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-nt-3-5-server	vhd	automatic	uefi	-
+route	windows-nt-3-5-server	vhd	direct_iso	bios	-
+route	windows-nt-3-5-server	vhd	direct_iso	uefi	-
+route	windows-nt-3-5-server	vhd	wimboot	bios	-
+route	windows-nt-3-5-server	vhd	wimboot	uefi	-
+route	windows-nt-3-5-server	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-nt-3-5-server	vhd	vhdboot	uefi	-
+route	windows-nt-3-5-server	vhd	direct_efi	bios	-
+route	windows-nt-3-5-server	vhd	direct_efi	uefi	-
+route	windows-nt-3-5-server	vhd	chainload	bios	-
+route	windows-nt-3-5-server	vhd	chainload	uefi	-
+route	windows-nt-3-5-server	vhd	memdisk	bios	-
+route	windows-nt-3-5-server	vhd	memdisk	uefi	-
+route	windows-nt-3-5-server	vhd	disk_image	bios	-
+route	windows-nt-3-5-server	vhd	disk_image	uefi	-
+route	windows-nt-3-5-server	vhd	floppy_image	bios	-
+route	windows-nt-3-5-server	vhd	floppy_image	uefi	-
+route	windows-nt-3-5-server	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-nt-3-5-server	vhdx	automatic	uefi	-
+route	windows-nt-3-5-server	vhdx	direct_iso	bios	-
+route	windows-nt-3-5-server	vhdx	direct_iso	uefi	-
+route	windows-nt-3-5-server	vhdx	wimboot	bios	-
+route	windows-nt-3-5-server	vhdx	wimboot	uefi	-
+route	windows-nt-3-5-server	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-nt-3-5-server	vhdx	vhdboot	uefi	-
+route	windows-nt-3-5-server	vhdx	direct_efi	bios	-
+route	windows-nt-3-5-server	vhdx	direct_efi	uefi	-
+route	windows-nt-3-5-server	vhdx	chainload	bios	-
+route	windows-nt-3-5-server	vhdx	chainload	uefi	-
+route	windows-nt-3-5-server	vhdx	memdisk	bios	-
+route	windows-nt-3-5-server	vhdx	memdisk	uefi	-
+route	windows-nt-3-5-server	vhdx	disk_image	bios	-
+route	windows-nt-3-5-server	vhdx	disk_image	uefi	-
+route	windows-nt-3-5-server	vhdx	floppy_image	bios	-
+route	windows-nt-3-5-server	vhdx	floppy_image	uefi	-
+route	windows-nt-3-5-server	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-nt-3-5-server	efi	automatic	uefi	-
+route	windows-nt-3-5-server	efi	direct_iso	bios	-
+route	windows-nt-3-5-server	efi	direct_iso	uefi	-
+route	windows-nt-3-5-server	efi	wimboot	bios	-
+route	windows-nt-3-5-server	efi	wimboot	uefi	-
+route	windows-nt-3-5-server	efi	vhdboot	bios	-
+route	windows-nt-3-5-server	efi	vhdboot	uefi	-
+route	windows-nt-3-5-server	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-nt-3-5-server	efi	direct_efi	uefi	-
+route	windows-nt-3-5-server	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	windows-nt-3-5-server	efi	chainload	uefi	-
+route	windows-nt-3-5-server	efi	memdisk	bios	-
+route	windows-nt-3-5-server	efi	memdisk	uefi	-
+route	windows-nt-3-5-server	efi	disk_image	bios	-
+route	windows-nt-3-5-server	efi	disk_image	uefi	-
+route	windows-nt-3-5-server	efi	floppy_image	bios	-
+route	windows-nt-3-5-server	efi	floppy_image	uefi	-
 route	ubuntu	iso	automatic	bios	linux_iso	direct_iso	any	experimental	0
 route	ubuntu	iso	automatic	uefi	linux_iso	direct_iso	any	experimental	0
 route	ubuntu	iso	direct_iso	bios	linux_iso	direct_iso	any	experimental	0
@@ -7476,6 +7694,82 @@ profile	windows-nt-3-51	efi	chainload	-	efi-chainload
 profile	windows-nt-3-51	efi	memdisk	uefi	nt3-uefi-other
 profile	windows-nt-3-51	efi	disk_image	uefi	nt3-uefi-other
 profile	windows-nt-3-51	efi	floppy_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5	iso	automatic	bios	iso-work-chainload
+profile	windows-nt-3-5	iso	automatic	uefi	nt3-x86-qemu-csmwrap
+profile	windows-nt-3-5	iso	automatic	-	iso-work-chainload
+profile	windows-nt-3-5	iso	direct_iso	uefi	nt3-uefi-other
+profile	windows-nt-3-5	iso	wimboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5	iso	vhdboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5	iso	direct_efi	uefi	nt3-uefi-other
+profile	windows-nt-3-5	iso	chainload	bios	iso-work-chainload
+profile	windows-nt-3-5	iso	chainload	uefi	nt3-uefi-other
+profile	windows-nt-3-5	iso	chainload	-	iso-work-chainload
+profile	windows-nt-3-5	iso	memdisk	uefi	nt3-uefi-other
+profile	windows-nt-3-5	iso	disk_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5	iso	floppy_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5	wim	automatic	bios	wim-wimboot
+profile	windows-nt-3-5	wim	automatic	uefi	nt3-uefi-other
+profile	windows-nt-3-5	wim	automatic	-	wim-wimboot
+profile	windows-nt-3-5	wim	direct_iso	uefi	nt3-uefi-other
+profile	windows-nt-3-5	wim	wimboot	bios	wim-wimboot
+profile	windows-nt-3-5	wim	wimboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5	wim	wimboot	-	wim-wimboot
+profile	windows-nt-3-5	wim	vhdboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5	wim	direct_efi	uefi	nt3-uefi-other
+profile	windows-nt-3-5	wim	chainload	uefi	nt3-uefi-other
+profile	windows-nt-3-5	wim	memdisk	uefi	nt3-uefi-other
+profile	windows-nt-3-5	wim	disk_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5	wim	floppy_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5	img	automatic	uefi	nt3-uefi-other
+profile	windows-nt-3-5	img	direct_iso	uefi	nt3-uefi-other
+profile	windows-nt-3-5	img	wimboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5	img	vhdboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5	img	direct_efi	uefi	nt3-uefi-other
+profile	windows-nt-3-5	img	chainload	uefi	nt3-uefi-other
+profile	windows-nt-3-5	img	memdisk	uefi	nt3-uefi-other
+profile	windows-nt-3-5	img	disk_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5	img	floppy_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhd	automatic	bios	vhd-vhdboot
+profile	windows-nt-3-5	vhd	automatic	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhd	automatic	-	vhd-vhdboot
+profile	windows-nt-3-5	vhd	direct_iso	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhd	wimboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhd	vhdboot	bios	vhd-vhdboot
+profile	windows-nt-3-5	vhd	vhdboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhd	vhdboot	-	vhd-vhdboot
+profile	windows-nt-3-5	vhd	direct_efi	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhd	chainload	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhd	memdisk	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhd	disk_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhd	floppy_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhdx	automatic	bios	vhd-vhdboot
+profile	windows-nt-3-5	vhdx	automatic	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhdx	automatic	-	vhd-vhdboot
+profile	windows-nt-3-5	vhdx	direct_iso	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhdx	wimboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhdx	vhdboot	bios	vhd-vhdboot
+profile	windows-nt-3-5	vhdx	vhdboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhdx	vhdboot	-	vhd-vhdboot
+profile	windows-nt-3-5	vhdx	direct_efi	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhdx	chainload	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhdx	memdisk	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhdx	disk_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5	vhdx	floppy_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5	efi	automatic	bios	efi-direct
+profile	windows-nt-3-5	efi	automatic	uefi	nt3-uefi-other
+profile	windows-nt-3-5	efi	automatic	-	efi-direct
+profile	windows-nt-3-5	efi	direct_iso	uefi	nt3-uefi-other
+profile	windows-nt-3-5	efi	wimboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5	efi	vhdboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5	efi	direct_efi	bios	efi-direct
+profile	windows-nt-3-5	efi	direct_efi	uefi	nt3-uefi-other
+profile	windows-nt-3-5	efi	direct_efi	-	efi-direct
+profile	windows-nt-3-5	efi	chainload	bios	efi-chainload
+profile	windows-nt-3-5	efi	chainload	uefi	nt3-uefi-other
+profile	windows-nt-3-5	efi	chainload	-	efi-chainload
+profile	windows-nt-3-5	efi	memdisk	uefi	nt3-uefi-other
+profile	windows-nt-3-5	efi	disk_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5	efi	floppy_image	uefi	nt3-uefi-other
 profile	windows-me	iso	automatic	bios	win9x-dos-bios
 profile	windows-me	iso	automatic	uefi	w9x-uefi-csmwrap
 profile	windows-me	iso	automatic	-	iso-work-chainload
@@ -9077,6 +9371,82 @@ profile	windows-nt-3-51-server	efi	chainload	-	efi-chainload
 profile	windows-nt-3-51-server	efi	memdisk	uefi	nt3-uefi-other
 profile	windows-nt-3-51-server	efi	disk_image	uefi	nt3-uefi-other
 profile	windows-nt-3-51-server	efi	floppy_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	iso	automatic	bios	iso-work-chainload
+profile	windows-nt-3-5-server	iso	automatic	uefi	nt3-x86-qemu-csmwrap
+profile	windows-nt-3-5-server	iso	automatic	-	iso-work-chainload
+profile	windows-nt-3-5-server	iso	direct_iso	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	iso	wimboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	iso	vhdboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	iso	direct_efi	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	iso	chainload	bios	iso-work-chainload
+profile	windows-nt-3-5-server	iso	chainload	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	iso	chainload	-	iso-work-chainload
+profile	windows-nt-3-5-server	iso	memdisk	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	iso	disk_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	iso	floppy_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	wim	automatic	bios	wim-wimboot
+profile	windows-nt-3-5-server	wim	automatic	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	wim	automatic	-	wim-wimboot
+profile	windows-nt-3-5-server	wim	direct_iso	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	wim	wimboot	bios	wim-wimboot
+profile	windows-nt-3-5-server	wim	wimboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	wim	wimboot	-	wim-wimboot
+profile	windows-nt-3-5-server	wim	vhdboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	wim	direct_efi	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	wim	chainload	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	wim	memdisk	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	wim	disk_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	wim	floppy_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	img	automatic	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	img	direct_iso	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	img	wimboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	img	vhdboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	img	direct_efi	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	img	chainload	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	img	memdisk	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	img	disk_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	img	floppy_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhd	automatic	bios	vhd-vhdboot
+profile	windows-nt-3-5-server	vhd	automatic	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhd	automatic	-	vhd-vhdboot
+profile	windows-nt-3-5-server	vhd	direct_iso	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhd	wimboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhd	vhdboot	bios	vhd-vhdboot
+profile	windows-nt-3-5-server	vhd	vhdboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhd	vhdboot	-	vhd-vhdboot
+profile	windows-nt-3-5-server	vhd	direct_efi	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhd	chainload	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhd	memdisk	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhd	disk_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhd	floppy_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhdx	automatic	bios	vhd-vhdboot
+profile	windows-nt-3-5-server	vhdx	automatic	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhdx	automatic	-	vhd-vhdboot
+profile	windows-nt-3-5-server	vhdx	direct_iso	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhdx	wimboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhdx	vhdboot	bios	vhd-vhdboot
+profile	windows-nt-3-5-server	vhdx	vhdboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhdx	vhdboot	-	vhd-vhdboot
+profile	windows-nt-3-5-server	vhdx	direct_efi	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhdx	chainload	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhdx	memdisk	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhdx	disk_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	vhdx	floppy_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	efi	automatic	bios	efi-direct
+profile	windows-nt-3-5-server	efi	automatic	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	efi	automatic	-	efi-direct
+profile	windows-nt-3-5-server	efi	direct_iso	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	efi	wimboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	efi	vhdboot	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	efi	direct_efi	bios	efi-direct
+profile	windows-nt-3-5-server	efi	direct_efi	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	efi	direct_efi	-	efi-direct
+profile	windows-nt-3-5-server	efi	chainload	bios	efi-chainload
+profile	windows-nt-3-5-server	efi	chainload	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	efi	chainload	-	efi-chainload
+profile	windows-nt-3-5-server	efi	memdisk	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	efi	disk_image	uefi	nt3-uefi-other
+profile	windows-nt-3-5-server	efi	floppy_image	uefi	nt3-uefi-other
 profile	ubuntu	iso	automatic	bios	linux-iso-bios
 profile	ubuntu	iso	automatic	uefi	linux-iso-uefi
 profile	ubuntu	iso	automatic	-	iso-work-chainload
@@ -10641,6 +11011,60 @@ resolve	windows-nt-3-51	efi	chainload	chainload	1	ok
 resolve	windows-nt-3-51	efi	memdisk	-	0	UnsupportedImage
 resolve	windows-nt-3-51	efi	disk_image	-	0	UnsupportedImage
 resolve	windows-nt-3-51	efi	floppy_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5	iso	automatic	chainload	1	ok
+resolve	windows-nt-3-5	iso	direct_iso	-	0	UnsupportedMethod
+resolve	windows-nt-3-5	iso	wimboot	-	0	UnsupportedMethod
+resolve	windows-nt-3-5	iso	vhdboot	-	0	UnsupportedImage
+resolve	windows-nt-3-5	iso	direct_efi	-	0	UnsupportedImage
+resolve	windows-nt-3-5	iso	chainload	chainload	1	ok
+resolve	windows-nt-3-5	iso	memdisk	-	0	UnsupportedMethod
+resolve	windows-nt-3-5	iso	disk_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5	iso	floppy_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5	wim	automatic	wimboot	1	ok
+resolve	windows-nt-3-5	wim	direct_iso	-	0	UnsupportedImage
+resolve	windows-nt-3-5	wim	wimboot	wimboot	1	ok
+resolve	windows-nt-3-5	wim	vhdboot	-	0	UnsupportedImage
+resolve	windows-nt-3-5	wim	direct_efi	-	0	UnsupportedImage
+resolve	windows-nt-3-5	wim	chainload	-	0	UnsupportedImage
+resolve	windows-nt-3-5	wim	memdisk	-	0	UnsupportedImage
+resolve	windows-nt-3-5	wim	disk_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5	wim	floppy_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5	img	automatic	-	0	UnsupportedImage
+resolve	windows-nt-3-5	img	direct_iso	-	0	UnsupportedImage
+resolve	windows-nt-3-5	img	wimboot	-	0	UnsupportedImage
+resolve	windows-nt-3-5	img	vhdboot	-	0	UnsupportedImage
+resolve	windows-nt-3-5	img	direct_efi	-	0	UnsupportedImage
+resolve	windows-nt-3-5	img	chainload	-	0	UnsupportedMethod
+resolve	windows-nt-3-5	img	memdisk	-	0	UnsupportedMethod
+resolve	windows-nt-3-5	img	disk_image	-	0	UnsupportedMethod
+resolve	windows-nt-3-5	img	floppy_image	-	0	UnsupportedMethod
+resolve	windows-nt-3-5	vhd	automatic	vhdboot	1	ok
+resolve	windows-nt-3-5	vhd	direct_iso	-	0	UnsupportedImage
+resolve	windows-nt-3-5	vhd	wimboot	-	0	UnsupportedImage
+resolve	windows-nt-3-5	vhd	vhdboot	vhdboot	1	ok
+resolve	windows-nt-3-5	vhd	direct_efi	-	0	UnsupportedImage
+resolve	windows-nt-3-5	vhd	chainload	-	0	UnsupportedImage
+resolve	windows-nt-3-5	vhd	memdisk	-	0	UnsupportedImage
+resolve	windows-nt-3-5	vhd	disk_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5	vhd	floppy_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5	vhdx	automatic	vhdboot	1	ok
+resolve	windows-nt-3-5	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	windows-nt-3-5	vhdx	wimboot	-	0	UnsupportedImage
+resolve	windows-nt-3-5	vhdx	vhdboot	vhdboot	1	ok
+resolve	windows-nt-3-5	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	windows-nt-3-5	vhdx	chainload	-	0	UnsupportedImage
+resolve	windows-nt-3-5	vhdx	memdisk	-	0	UnsupportedImage
+resolve	windows-nt-3-5	vhdx	disk_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5	efi	automatic	direct_efi	1	ok
+resolve	windows-nt-3-5	efi	direct_iso	-	0	UnsupportedImage
+resolve	windows-nt-3-5	efi	wimboot	-	0	UnsupportedImage
+resolve	windows-nt-3-5	efi	vhdboot	-	0	UnsupportedImage
+resolve	windows-nt-3-5	efi	direct_efi	direct_efi	1	ok
+resolve	windows-nt-3-5	efi	chainload	chainload	1	ok
+resolve	windows-nt-3-5	efi	memdisk	-	0	UnsupportedImage
+resolve	windows-nt-3-5	efi	disk_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5	efi	floppy_image	-	0	UnsupportedImage
 resolve	windows-me	iso	automatic	chainload	1	ok
 resolve	windows-me	iso	direct_iso	-	0	UnsupportedMethod
 resolve	windows-me	iso	wimboot	-	0	UnsupportedMethod
@@ -11991,6 +12415,60 @@ resolve	windows-nt-3-51-server	efi	chainload	chainload	1	ok
 resolve	windows-nt-3-51-server	efi	memdisk	-	0	UnsupportedImage
 resolve	windows-nt-3-51-server	efi	disk_image	-	0	UnsupportedImage
 resolve	windows-nt-3-51-server	efi	floppy_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	iso	automatic	chainload	1	ok
+resolve	windows-nt-3-5-server	iso	direct_iso	-	0	UnsupportedMethod
+resolve	windows-nt-3-5-server	iso	wimboot	-	0	UnsupportedMethod
+resolve	windows-nt-3-5-server	iso	vhdboot	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	iso	direct_efi	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	iso	chainload	chainload	1	ok
+resolve	windows-nt-3-5-server	iso	memdisk	-	0	UnsupportedMethod
+resolve	windows-nt-3-5-server	iso	disk_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	iso	floppy_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	wim	automatic	wimboot	1	ok
+resolve	windows-nt-3-5-server	wim	direct_iso	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	wim	wimboot	wimboot	1	ok
+resolve	windows-nt-3-5-server	wim	vhdboot	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	wim	direct_efi	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	wim	chainload	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	wim	memdisk	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	wim	disk_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	wim	floppy_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	img	automatic	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	img	direct_iso	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	img	wimboot	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	img	vhdboot	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	img	direct_efi	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	img	chainload	-	0	UnsupportedMethod
+resolve	windows-nt-3-5-server	img	memdisk	-	0	UnsupportedMethod
+resolve	windows-nt-3-5-server	img	disk_image	-	0	UnsupportedMethod
+resolve	windows-nt-3-5-server	img	floppy_image	-	0	UnsupportedMethod
+resolve	windows-nt-3-5-server	vhd	automatic	vhdboot	1	ok
+resolve	windows-nt-3-5-server	vhd	direct_iso	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	vhd	wimboot	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	vhd	vhdboot	vhdboot	1	ok
+resolve	windows-nt-3-5-server	vhd	direct_efi	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	vhd	chainload	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	vhd	memdisk	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	vhd	disk_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	vhd	floppy_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	vhdx	automatic	vhdboot	1	ok
+resolve	windows-nt-3-5-server	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	vhdx	wimboot	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	vhdx	vhdboot	vhdboot	1	ok
+resolve	windows-nt-3-5-server	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	vhdx	chainload	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	vhdx	memdisk	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	vhdx	disk_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	efi	automatic	direct_efi	1	ok
+resolve	windows-nt-3-5-server	efi	direct_iso	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	efi	wimboot	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	efi	vhdboot	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	efi	direct_efi	direct_efi	1	ok
+resolve	windows-nt-3-5-server	efi	chainload	chainload	1	ok
+resolve	windows-nt-3-5-server	efi	memdisk	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	efi	disk_image	-	0	UnsupportedImage
+resolve	windows-nt-3-5-server	efi	floppy_image	-	0	UnsupportedImage
 resolve	ubuntu	iso	automatic	chainload	1	ok
 resolve	ubuntu	iso	direct_iso	-	0	UnsupportedMethod
 resolve	ubuntu	iso	wimboot	-	0	UnsupportedMethod
@@ -14212,6 +14690,78 @@ menu	windows-nt-3-51	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[ba
 menu	windows-nt-3-51	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-nt-3-51	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-nt-3-51	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-3-5	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-3-5	iso	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	iso	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	iso	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-nt-3-5	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5	iso	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5	iso	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	iso	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	wim	bios	0	automatic	wimboot	0	0	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-3-5	wim	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5	wim	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-3-5	wim	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-3-5	wim	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	wim	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-3-5	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5	wim	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-3-5	wim	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-3-5	wim	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	wim	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-3-5	img	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5	img	bios	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5	img	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5	img	bios	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5	img	bios	5	floppy_image	-	0	1	experimental	Floppy image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5	img	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-3-5	img	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5	img	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5	img	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5	img	uefi	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5	img	uefi	5	floppy_image	-	0	1	experimental	Floppy image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5	vhd	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-3-5	vhd	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5	vhd	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-3-5	vhd	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-3-5	vhd	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	vhd	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-3-5	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5	vhd	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-3-5	vhd	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-3-5	vhd	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	vhd	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	vhdx	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-3-5	vhdx	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5	vhdx	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-3-5	vhdx	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-3-5	vhdx	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	vhdx	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-3-5	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5	vhdx	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-3-5	vhdx	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-3-5	vhdx	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	vhdx	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	efi	bios	0	automatic	direct_efi	0	0	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-3-5	efi	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5	efi	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-3-5	efi	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-3-5	efi	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	efi	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-3-5	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-3-5	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-me	iso	bios	0	automatic	win9x_dos	1	1	experimental	Automatic (DOS Setup) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	windows-me	iso	bios	1	direct_iso	win9x_dos	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	windows-me	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
@@ -16000,6 +16550,78 @@ menu	windows-nt-3-51-server	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainl
 menu	windows-nt-3-51-server	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-nt-3-51-server	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-nt-3-51-server	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-3-5-server	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5-server	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-3-5-server	iso	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5-server	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	iso	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	iso	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-nt-3-5-server	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5-server	iso	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5-server	iso	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5-server	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	iso	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	wim	bios	0	automatic	wimboot	0	0	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-3-5-server	wim	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5-server	wim	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-3-5-server	wim	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-3-5-server	wim	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	wim	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-3-5-server	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5-server	wim	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-3-5-server	wim	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-3-5-server	wim	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	wim	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-3-5-server	img	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5-server	img	bios	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5-server	img	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5-server	img	bios	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5-server	img	bios	5	floppy_image	-	0	1	experimental	Floppy image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5-server	img	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-3-5-server	img	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5-server	img	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5-server	img	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5-server	img	uefi	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5-server	img	uefi	5	floppy_image	-	0	1	experimental	Floppy image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5-server	vhd	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-3-5-server	vhd	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5-server	vhd	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-3-5-server	vhd	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-3-5-server	vhd	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	vhd	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-3-5-server	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5-server	vhd	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-3-5-server	vhd	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-3-5-server	vhd	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	vhd	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	vhdx	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-3-5-server	vhdx	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5-server	vhdx	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-3-5-server	vhdx	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-3-5-server	vhdx	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	vhdx	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-3-5-server	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5-server	vhdx	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-3-5-server	vhdx	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-3-5-server	vhdx	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	vhdx	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	efi	bios	0	automatic	direct_efi	0	0	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-3-5-server	efi	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5-server	efi	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-3-5-server	efi	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-3-5-server	efi	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	efi	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-3-5-server	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-3-5-server	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-3-5-server	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-3-5-server	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-3-5-server	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	ubuntu	iso	bios	0	automatic	linux_iso	1	1	experimental	Automatic (Linux ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	ubuntu	iso	bios	1	direct_iso	linux_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	ubuntu	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
@@ -18359,6 +18981,60 @@ help	windows-nt-3-51	efi	chainload	Chainload	Transfers control to another bootlo
 help	windows-nt-3-51	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
 help	windows-nt-3-51	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
 help	windows-nt-3-51	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-3-5	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-3-5	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-3-5	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-3-5	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-3-5	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-3-5	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-3-5	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-3-5	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-3-5	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-3-5	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-3-5	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-3-5	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-3-5	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-3-5	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-3-5	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-3-5	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-3-5	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-3-5	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-3-5	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-3-5	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-3-5	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-3-5	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-3-5	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-3-5	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-3-5	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-3-5	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-3-5	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-3-5	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-3-5	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-3-5	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-3-5	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-3-5	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-3-5	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-3-5	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-3-5	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-3-5	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-3-5	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-3-5	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-3-5	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-3-5	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-3-5	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-3-5	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-3-5	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-3-5	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-3-5	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-3-5	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-3-5	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-3-5	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-3-5	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-3-5	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-3-5	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-3-5	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-3-5	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-3-5	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
 help	windows-me	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
 help	windows-me	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
 help	windows-me	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
@@ -19709,6 +20385,60 @@ help	windows-nt-3-51-server	efi	chainload	Chainload	Transfers control to another
 help	windows-nt-3-51-server	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
 help	windows-nt-3-51-server	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
 help	windows-nt-3-51-server	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-3-5-server	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-3-5-server	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-3-5-server	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-3-5-server	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-3-5-server	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-3-5-server	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-3-5-server	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-3-5-server	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-3-5-server	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-3-5-server	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-3-5-server	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-3-5-server	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-3-5-server	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-3-5-server	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-3-5-server	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-3-5-server	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-3-5-server	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-3-5-server	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-3-5-server	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-3-5-server	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-3-5-server	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-3-5-server	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-3-5-server	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-3-5-server	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-3-5-server	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-3-5-server	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-3-5-server	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-3-5-server	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-3-5-server	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-3-5-server	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-3-5-server	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-3-5-server	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-3-5-server	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-3-5-server	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-3-5-server	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-3-5-server	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-3-5-server	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-3-5-server	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-3-5-server	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-3-5-server	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-3-5-server	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-3-5-server	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-3-5-server	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-3-5-server	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-3-5-server	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-3-5-server	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-3-5-server	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-3-5-server	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-3-5-server	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-3-5-server	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-3-5-server	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-3-5-server	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-3-5-server	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-3-5-server	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
 help	ubuntu	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
 help	ubuntu	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
 help	ubuntu	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.

@@ -233,7 +233,7 @@ static void post(void)
 {
     static const char *const drivers[] = { "AHCINT", "USOSRST", "USOSUSB" };
     static const char *const keys[] = { "ahcint", "usosrst", "usosusb", "atdisk", "atapi", "i8042prt",
-                                        "Kbdclass", "Mouclass", "vga", "VgaSave", "amsint" };
+                                        "Kbdclass", "Mouclass", "vga", "VgaSave", "amsint", "Scsidisk" };
     static const char ver[] = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion";
     char sys[MAX_PATH], src[MAX_PATH], dst[MAX_PATH], key[128];
     int i, j;
@@ -277,6 +277,10 @@ static void post(void)
     /* IDE: the VM's disk only; the real machine boots through AHCINT. */
     set_dword("atdisk", NULL, "Start", 4);
     set_dword("atapi", NULL, "Start", 4);
+    /* The disk class driver must start with AHCINT (boot): NT 3.5 Setup on
+       the VM's IDE disk (atdisk) leaves Scsidisk at Start 1, and the system
+       stops with 0x7B (QEMU 2026-10-09). NT 3.51 (SCSI VM disk) has 0 already. */
+    set_dword("Scsidisk", NULL, "Start", 0);
     /* The install VM's SCSI adapter (QEMU am53c974 -> amsint.sys, used
        because atdisk overflows a kernel stack in QEMU): off when installed. */
     {

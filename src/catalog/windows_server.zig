@@ -66,6 +66,19 @@ pub const entries = [_]SystemEntry{
         .boot_methods = &nt5_methods,
         .server = true,
     },
+    // Windows NT 3.5 Server: the NT 3.5 Workstation flow with the Server CD
+    // (docs/nt35-2026-10-09.md); UEFI only.
+    SystemEntry{
+        .id = "windows-nt-3-5-server",
+        .name = "Windows NT 3.5 Server",
+        .category = .windows,
+        .family = .windows_legacy,
+        .image_directory = "\\Systems\\Windows\\Windows NT 3.5 Server\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Windows NT 3.5 Server\\Unattended",
+        .firmware = .uefi,
+        .boot_methods = &nt5_methods,
+        .server = true,
+    },
 });
 
 const freestanding = @import("builtin").os.tag == .freestanding;

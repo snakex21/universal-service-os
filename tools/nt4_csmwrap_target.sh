@@ -230,7 +230,7 @@ nt3_standard_hal() {
     awk -v BINMODE=3 '
         { line = $0; sub(/\r$/, "", line); low = tolower(line); gsub(/[ \t]/, "", low)
           if (low ~ /^\[/) sec = low
-          else if (sec == "[hal]" && low ~ /^mps_(up|mp)=/) {
+          else if (sec == "[hal]" && low ~ /^mps[0-9]*_(up|mp)=/) {
               key = line; sub(/[ \t]*=.*/, "", key); rest = line; sub(/^[^,]*/, "", rest)
               line = key " = hal.dll    " rest
           }
@@ -288,16 +288,26 @@ case "$major" in
     *) fail "the ISO is not Windows NT 3.51 / 4.0 Setup (MajorVersion=${major:-none})" ;;
 esac
 [ -z "${NT_MAJOR:-}" ] || [ "$NT_MAJOR" = "$major" ] || fail "the ISO is Windows NT $major.$minor Setup, not the chosen NT $NT_MAJOR system"
-# NT 3.5 and 3.1 come later; their Setup differs (docs/nt351-2026-10-08.md).
-[ -z "$nt3" ] || [ "$minor" = 51 ] || fail "of the NT 3.x family only NT 3.51 is supported so far (MinorVersion=${minor:-none})"
+# NT 3.51 and NT 3.5 (MinorVersion 50: the same winnt /b layout; its GUI
+# Setup refuses a CPU newer than a Pentium, so its install VM runs -cpu
+# pentium, nt4_qemu_install.sh). NT 3.1 has no TXTSETUP.SIF (docs/nt35-2026-10-09.md).
+case "$nt3:$minor" in
+    yes:51|yes:50|:*) ;;
+    *) fail "of the NT 3.x family only NT 3.51 and NT 3.5 are supported so far (MinorVersion=${minor:-none})" ;;
+esac
+[ -z "${NT_MINOR:-}" ] || [ "$NT_MINOR" = "$minor" ] || fail "the ISO is Windows NT $major.$minor Setup, not the chosen NT $major.$NT_MINOR system"
 mbr_code=$LIB/xp-geometry-fix-mbr-440.bin
 [ -z "$nt3" ] || mbr_code=$LIB/nt3-e820-mbr-440.bin
 [ -r "$mbr_code" ] || fail "missing: $mbr_code"
 [ "$(wc -c < "$mbr_code" | tr -d ' ')" = 440 ] || fail 'USOS MBR code must be 440 bytes'
 drv=$LIB/$(printf %s "$sub" | tr '[:upper:]' '[:lower:]')
 for file in AHCINT.SYS USOSRST.SYS USOSUSB.SYS; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
+# usosrst for NT 3.5 (USOSRST35.SYS, build-nt35.cmd): the 3.5 kernel lacks
+# KeSetTargetProcessorDpc / KeSetImportanceDpc.
+rst=USOSRST.SYS
+[ "$nt3:$minor" != yes:50 ] || rst=USOSRST35.SYS
 if [ -n "$nt3" ]; then
-    for file in USOSNT3.EXE USOSACHK.EXE; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
+    for file in USOSNT3.EXE USOSACHK.EXE $rst; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
 else
     for file in USOSVBE.SYS USOSOFF.EXE; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
 fi
@@ -415,7 +425,7 @@ if [ -n "$nt3" ]; then
         [ -f "$sif" ] || continue
         nt3_standard_hal < "$sif" > "$work/txtsetup.hal" && cat "$work/txtsetup.hal" > "$sif" || fail 'cannot write TXTSETUP.SIF'
     done
-    grep -aiq '^mps_up *= *hal\.dll' "$work/c/TXTSETUP.SIF" || fail 'TXTSETUP.SIF has no [hal] mps_up row (not an NT 3.51 CD?)'
+    grep -aiEq '^mps[0-9]*_(up|mp) *= *hal\.dll' "$work/c/TXTSETUP.SIF" || fail 'TXTSETUP.SIF has no [hal] MPS row (not an NT 3.5 / 3.51 CD?)'
     log 'HAL: Standard PC (hal.dll) for the MPS machine types'
 fi
 # setupldr started from the hard disk runs \NTDETECT.COM of the boot
@@ -434,9 +444,10 @@ crlf() { awk -v BINMODE=3 '{ sub(/\r$/, ""); printf "%s\r\n", $0 }'; }
 if [ -n "$nt3" ]; then
 usos="$work/c/USOS/NT3"
 mkdir -p "$usos"
-for file in AHCINT.SYS USOSRST.SYS USOSUSB.SYS USOSNT3.EXE; do
+for file in AHCINT.SYS USOSUSB.SYS USOSNT3.EXE; do
     cp "$drv/$file" "$usos/$file" || fail "cannot copy $file"
 done
+cp "$drv/$rst" "$usos/USOSRST.SYS" || fail "cannot copy $rst"
 # Text-mode Setup runs AUTOCHK.EXE from the local source on C: ("Checking
 # drive C:"); in the QEMU install VM that run overflows a kernel stack and
 # the VM triple-faults (2026-10-08: double fault -> STOP 0x7F 8 while the

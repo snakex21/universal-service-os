@@ -13,7 +13,7 @@ Drivers\
   Windows Vista\  Windows XP\  Windows 2000\          <- NT setup systems:
   Windows Server 2025\ ... Windows Server 2008\          (Server: docs/windows-server.md)
       Storage\  USB\  Other\                             boot-critical / USB 3 / everything else
-  Windows NT 4.0\  Windows NT 3.51\  Windows Me\  Windows 98 SE\  Windows 98\  Windows 95\
+  Windows NT 4.0\  Windows NT 3.51\  Windows NT 3.5\  Windows Me\  Windows 98 SE\  Windows 98\  Windows 95\
   Windows 3.11\  Windows 3.1\                          <- folder only (manual use)
 ```
 

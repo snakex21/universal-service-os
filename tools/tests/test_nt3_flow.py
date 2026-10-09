@@ -1,7 +1,8 @@
-"""Windows NT 3.51 through the UEFI flow: the NT 4.0 VM flow with NT_MAJOR=3
-(tools/nt4_csmwrap_target.sh, tools/nt4_qemu_install.sh, the NT 3.51 branch
-of tools/w9x_csmwrap_prepare.sh, tools/build_micro_linux.py;
-docs/nt351-2026-10-08.md). Host only: Git sh, temp folders; no VM, no disk.
+"""Windows NT 3.51 and 3.5 through the UEFI flow: the NT 4.0 VM flow with
+NT_MAJOR=3 (tools/nt4_csmwrap_target.sh, tools/nt4_qemu_install.sh, the NT 3.x
+branch of tools/w9x_csmwrap_prepare.sh, tools/build_micro_linux.py;
+docs/nt351-2026-10-08.md, docs/nt35-2026-10-09.md). Host only: Git sh, temp
+folders; no VM, no disk.
 """
 from pathlib import Path
 import json
@@ -60,6 +61,8 @@ class Nt3DefaultAnswer(unittest.TestCase):
         self.assertIn('@embedFile("testdata/golden/default.windows-nt-3-51.WINNT.SIF")', zig)
         self.assertIn('.{ .system_id = "windows-nt-3-51", .file = "NT351.SIF" }', zig)
         self.assertIn('.{ .system_id = "windows-nt-3-51-server", .file = "NT351S.SIF" }', zig)
+        self.assertIn('.{ .system_id = "windows-nt-3-5", .file = "NT35.SIF" }', zig)
+        self.assertIn('.{ .system_id = "windows-nt-3-5-server", .file = "NT35S.SIF" }', zig)
 
 
 class Nt3Target(unittest.TestCase):
@@ -70,7 +73,8 @@ class Nt3Target(unittest.TestCase):
         # winnt.exe's ~BT\SYSTEM32 (0x6B C000003A without it).
         self.assertIn('cp "$bt_dir/USETUP.EXE" "$bt_dir/SYSTEM32/SMSS.EXE"', text)
         self.assertIn('cp "$bt_dir/NTDLL.DLL" "$bt_dir/SYSTEM32/NTDLL.DLL"', text)
-        self.assertIn('for file in AHCINT.SYS USOSRST.SYS USOSUSB.SYS USOSNT3.EXE; do', text)
+        self.assertIn('for file in AHCINT.SYS USOSUSB.SYS USOSNT3.EXE; do', text)
+        self.assertIn('cp "$drv/$rst" "$usos/USOSRST.SYS"', text)
         self.assertIn('| nt4_server_answer "${product:-0}" yes | nt3_detached_answer', text)
         # Flat local source (DOSNET d1 = \), renamed [FloppyFiles] entries, SIZE.SIF.
         self.assertIn('[ -z "$nt3" ] || ls_src=$ls_dir', text)
@@ -90,6 +94,8 @@ class Nt3Target(unittest.TestCase):
         self.assertIn('$(nt4_vm_disk_args "$1")', text)
         self.assertIn('nt4_vm_dirty_only "$loop" "$logs/fsck.txt"', text)
         self.assertIn('set_dword("amsint", NULL, "Start", 4);', (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='utf-8'))
+        # NT 3.5 Setup on IDE leaves the disk class driver at Start 1 (0x7B with AHCINT).
+        self.assertIn('set_dword("Scsidisk", NULL, "Start", 0);', (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='utf-8'))
 
     def test_detached_program_keeps_backslashes(self):
         tmp = Path(tempfile.mkdtemp(prefix='usos-nt3-det-'))
@@ -141,6 +147,45 @@ class Nt3Target(unittest.TestCase):
         self.assertIn('!AutoMode = PerServer\r\n', out)
         self.assertIn('!AutoUsers = 5\r\n', out)
 
+    def test_nt35_cd_accepted(self):
+        # NT 3.5 (MinorVersion 50): the NT 3.51 layout, its own usosrst build;
+        # NT 3.1 (no TXTSETUP.SIF) and other minors are refused.
+        text = TARGET.read_text(encoding='utf-8')
+        self.assertIn('    yes:51|yes:50|:*) ;;\n', text)
+        self.assertIn('[ -z "${NT_MINOR:-}" ] || [ "$NT_MINOR" = "$minor" ]', text)
+        self.assertIn('[ "$nt3:$minor" != yes:50 ] || rst=USOSRST35.SYS', text)
+        self.assertIn('for file in USOSNT3.EXE USOSACHK.EXE $rst; do', text)
+
+    def test_standard_pc_hal_for_the_nt35_mps_row(self):
+        # NT 3.5 names its MPS HAL row mps11_mp (halmps.dll).
+        tmp = Path(tempfile.mkdtemp(prefix='usos-nt35-hal-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        sif = tmp / 'TXTSETUP.SIF'
+        sif.write_bytes(b'[hal]\r\ne_isa_up    = hal.dll     ,2,hal.dll\r\nmps11_mp    = halmps.dll  ,2,hal.dll\r\n'
+                        b'ncr3x_mp    = halncr.dll  ,2,hal.dll\r\n')
+        script = tmp / 'run.sh'
+        script.write_bytes((function_text(TARGET, 'nt3_standard_hal') +
+                            f'\nnt3_standard_hal < "{sif.as_posix()}" > "{(tmp / "out.sif").as_posix()}"\n').encode('utf-8'))
+        rc, _, err = sh(f'. "{script.as_posix()}"')
+        self.assertEqual(rc, 0, err)
+        self.assertEqual((tmp / 'out.sif').read_bytes(),
+                         b'[hal]\r\ne_isa_up    = hal.dll     ,2,hal.dll\r\nmps11_mp = hal.dll    ,2,hal.dll\r\n'
+                         b'ncr3x_mp    = halncr.dll  ,2,hal.dll\r\n')
+        self.assertIn("grep -aiEq '^mps[0-9]*_(up|mp) *= *hal\\.dll'", TARGET.read_text(encoding='utf-8'))
+
+    def test_install_vm_for_nt35(self):
+        # NT 3.5 GUI Setup knows no CPU newer than a Pentium; its CD has no
+        # amsint.sys, and its atdisk.sys works on QEMU IDE.
+        text = QEMU_INSTALL.read_text(encoding='utf-8')
+        self.assertIn('-cpu "${NT4_VM_CPU:-pentium3}"', text)
+        self.assertIn("mtype -i \"$target@@$NT4_PART_OFFSET\" ::/USOS/NT3/SOURCE.TXT 2>/dev/null | grep -q '^version=3\\.50'", text)
+        self.assertIn('NT4_VM_CPU=${NT35_VM_CPU:-pentium}', text)
+        self.assertIn('NT4_VM_HBA=${NT35_VM_HBA:-}', text)
+        self.assertIn('[ -z "$nt3" ] || boots=${NT3_VM_BOOTS:-12}', text)
+        # More than 128 MiB: STOP 0x7B on NT 3.5 (QEMU 2026-10-09).
+        self.assertIn('NT35_BOOT_OPTIONS=${NT35_BOOT_OPTIONS:-/NUMPROC=2 /MAXMEM=128}', text)
+        self.assertIn("grep -aq '^version=3\\.50' \"$src\"; then\n        NT4_BOOT_OPTIONS=$NT35_BOOT_OPTIONS", text)
+
     def test_qemu_install_answers_the_autochk_prompt(self):
         text = QEMU_INSTALL.read_text(encoding='utf-8')
         self.assertIn('W9X_VM_TEXT_ANSWER=${NT3_VM_TEXT_ANSWER:-ret}', text)
@@ -152,11 +197,16 @@ class Nt3Prepare(unittest.TestCase):
         text = PREPARE.read_text(encoding='utf-8')
         self.assertIn('windows-nt-3-51) tag=NT351', text)
         self.assertIn('windows-nt-3-51-server) tag=NT351S', text)
-        self.assertIn("NT351|NT351S) nt4=yes nt_major=3 nt_name='Windows NT 3.51'", text)
+        self.assertIn("NT351|NT351S) nt4=yes nt_major=3 nt_minor=51 nt_name='Windows NT 3.51'", text)
         self.assertIn("NT4|NT4S) nt4=yes nt_major=4 nt_name='Windows NT 4.0'", text)
-        self.assertIn('NT_MAJOR="$nt_major" sh /usr/lib/usos/nt4_csmwrap_target.sh', text)
+        self.assertIn('NT_MAJOR="$nt_major" NT_MINOR="$nt_minor" sh /usr/lib/usos/nt4_csmwrap_target.sh', text)
+        self.assertIn('windows-nt-3-5) tag=NT35', text)
+        self.assertIn('windows-nt-3-5-server) tag=NT35S', text)
+        self.assertIn("NT35|NT35S) nt4=yes nt_major=3 nt_minor=50 nt_name='Windows NT 3.5'", text)
         # The staged profile files and the SP6a lookup only for NT 4.0.
-        self.assertIn('/mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF', text)
+        self.assertEqual(text.count('/mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF'
+                                    ' /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF'), 2)
+        self.assertIn('NT351|NT351S|NT35|NT35S) ;;', (ROOT / 'tools/w9x_phase1_qemu.sh').read_text(encoding='utf-8'))
         self.assertIn('if [ "$nt_major" = 4 ]; then', text)
         self.assertIn('3:none)', text)
         self.assertIn('w9x_nt3_default_sif "$time_zone" > "$answer_inf"', text)
@@ -194,6 +244,7 @@ class Nt3MicroLinux(unittest.TestCase):
         for pair in (
             ('tools/vendor/ahcint/1.3.0.0-usos4/bin/NT351/i386/ahcint.sys', 'usr/lib/usos/nt3/AHCINT.SYS'),
             ('tools/w2k/usosrst/bin/nt351/i386/usosrst.sys', 'usr/lib/usos/nt3/USOSRST.SYS'),
+            ('tools/w2k/usosrst/bin/nt35/i386/usosrst.sys', 'usr/lib/usos/nt3/USOSRST35.SYS'),
             ('tools/nt4/usosusb/bin/i386/usosusb.sys', 'usr/lib/usos/nt3/USOSUSB.SYS'),
             ('tools/nt3/usosnt3/bin/i386/usosnt3.exe', 'usr/lib/usos/nt3/USOSNT3.EXE'),
             ('tools/nt3/usosachk/bin/i386/usosachk.exe', 'usr/lib/usos/nt3/USOSACHK.EXE'),
@@ -248,6 +299,23 @@ class Nt3DriversWithoutPciBios(unittest.TestCase):
             self.assertIn(want, src)
         manifest = json.loads((ROOT / 'tools/vendor/ahcint/1.3.0.0-usos4/manifest.json').read_text(encoding='utf-8'))
         self.assertIn('patches/0009-usos6-nt351-direct-pci-config.patch', manifest['patches'])
+
+    def test_nt35_imports(self):
+        # Our NT 3.x binaries against the NT 3.5 exports (names only,
+        # tools/tests/data/nt35_exports.txt): usosrst has its own NT 3.5 build.
+        from check_nt52_driver_imports import pe
+        from check_nt4_driver_imports import parse
+        tables = parse((ROOT / 'tools/tests/data/nt35_exports.txt').read_text(encoding='utf-8'))
+        for rel in ('tools/vendor/ahcint/1.3.0.0-usos4/bin/NT351/i386/ahcint.sys',
+                    'tools/w2k/usosrst/bin/nt35/i386/usosrst.sys', 'tools/nt4/usosusb/bin/i386/usosusb.sys'):
+            _, imports = pe(ROOT / rel)
+            for kernel, hal in (('ntoskrnl.exe', 'hal.dll'), ('ntkrnlmp.exe', 'halmps.dll')):
+                view = {'ntoskrnl.exe': tables[kernel], 'hal.dll': tables[hal], 'scsiport.sys': tables['scsiport.sys']}
+                missing = [f'{m}!{n}' for m, n in imports if n not in view[m.lower()]]
+                self.assertEqual(missing, [], f'{rel} on {kernel}+{hal}')
+        src = (ROOT / 'tools/w2k/usosrst/src/usosrst.c').read_text(encoding='latin-1')
+        self.assertIn('#define USOSRST_VERSION "usosrst 1.6-nt35"', src)
+        self.assertIn('-DUSOSRST_NT35', (ROOT / 'tools/w2k/usosrst/build-nt35.cmd').read_text(encoding='utf-8'))
 
     def test_usosrst_nt351_direct_config(self):
         src = (ROOT / 'tools/w2k/usosrst/src/usosrst.c').read_text(encoding='latin-1')

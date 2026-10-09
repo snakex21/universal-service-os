@@ -631,6 +631,8 @@ def main() -> int:
             # builds for NT 3.51 (docs/nt351-2026-10-08.md).
             ("tools/vendor/ahcint/1.3.0.0-usos4/bin/NT351/i386/ahcint.sys", "usr/lib/usos/nt3/AHCINT.SYS"),
             ("tools/w2k/usosrst/bin/nt351/i386/usosrst.sys", "usr/lib/usos/nt3/USOSRST.SYS"),
+            # NT 3.5 (docs/nt35-2026-10-09.md): usosrst without the per-CPU DPC calls.
+            ("tools/w2k/usosrst/bin/nt35/i386/usosrst.sys", "usr/lib/usos/nt3/USOSRST35.SYS"),
             ("tools/nt4/usosusb/bin/i386/usosusb.sys", "usr/lib/usos/nt3/USOSUSB.SYS"),
             ("tools/nt3/usosnt3/bin/i386/usosnt3.exe", "usr/lib/usos/nt3/USOSNT3.EXE"),
             ("tools/nt3/usosachk/bin/i386/usosachk.exe", "usr/lib/usos/nt3/USOSACHK.EXE"),

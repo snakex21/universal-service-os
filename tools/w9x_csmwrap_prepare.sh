@@ -116,6 +116,10 @@ usos_w9x_csmwrap_prepare() {
         # checks the CD with NT_MAJOR=3 (E820 filter MBR, \USOS\NT3, no SP).
         windows-nt-3-51) tag=NT351 setup='' ;;
         windows-nt-3-51-server) tag=NT351S setup='' ;;
+        # Windows NT 3.5 (2026-10-09, docs/nt35-2026-10-09.md): the NT 3.51
+        # flow; the CD must say MinorVersion 50.
+        windows-nt-3-5) tag=NT35 setup='' ;;
+        windows-nt-3-5-server) tag=NT35S setup='' ;;
         *) stop "request.ini names an unsupported system: $system" ;;
     esac
     w9x_csmwrap_log "REQUEST system=$system iso=$iso folder=$folder answer=${answer%%:*} size=$size_gib"
@@ -140,11 +144,13 @@ usos_w9x_csmwrap_prepare() {
     nt4=''
     sp_exe=''
     nt_major=''
+    nt_minor=''
     nt_name=''
     case "$tag" in
         NT4|NT4S) nt4=yes nt_major=4 nt_name='Windows NT 4.0' ;;
         # NT 3.51: the NT 4.0 path ($nt4) without the service pack and key.
-        NT351|NT351S) nt4=yes nt_major=3 nt_name='Windows NT 3.51' ;;
+        NT351|NT351S) nt4=yes nt_major=3 nt_minor=51 nt_name='Windows NT 3.51' ;;
+        NT35|NT35S) nt4=yes nt_major=3 nt_minor=50 nt_name='Windows NT 3.5' ;;
     esac
     if [ -n "$nt4" ]; then
         for helper in nt4_csmwrap_target.sh nt4_qemu_install.sh w9x_phase1_qemu.sh; do
@@ -192,10 +198,11 @@ usos_w9x_csmwrap_prepare() {
             answer=nt4 ;;
         [34]:profile)
             # Rendered by the UEFI menu (answer_profiles.stageWin9x: NT4.SIF /
-            # NT4S.SIF with the key, NT351.SIF / NT351S.SIF): copied to RAM,
+            # NT4S.SIF with the key, NT351.SIF / NT351S.SIF, NT35.SIF /
+            # NT35S.SIF): copied to RAM,
             # staged copies go.
             cp "/mnt/esp/EFI/USOS/answer/$tag.SIF" "$answer_inf" || stop 'the answer profile could not be taken'
-            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF
+            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF
             for staged in 98SE 98 ME 95; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
             sync
             answer=nt4
@@ -220,7 +227,7 @@ usos_w9x_csmwrap_prepare() {
             # hold a product key: copied to RAM, then every staged copy goes.
             cp "/mnt/esp/EFI/USOS/answer/$tag.INF" "$answer_inf" || stop 'the answer profile could not be taken'
             for staged in 98SE 98 ME 95; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
-            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF
+            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF
             sync
             answer_kind=PROFILE ;;
         file:*)
@@ -325,7 +332,7 @@ usos_w9x_csmwrap_prepare() {
     fi
     usos_ui_stage 4 5 'Preparing the disk' "Copying $folder Setup, the USOS helpers and CSMWrap to the selected disk." || true
     if [ -n "$nt4" ]; then
-        set -- env TARGET_DEVICE="$TARGET_DEVICE" NT4_SOURCE_ISO="/mnt/data/$iso" NT4_ANSWER_SIF="$answer_inf"             NT4_ANSWER_KIND="$answer_kind" NT4_SP_EXE="$sp_exe" NT_MAJOR="$nt_major" sh /usr/lib/usos/nt4_csmwrap_target.sh
+        set -- env TARGET_DEVICE="$TARGET_DEVICE" NT4_SOURCE_ISO="/mnt/data/$iso" NT4_ANSWER_SIF="$answer_inf"             NT4_ANSWER_KIND="$answer_kind" NT4_SP_EXE="$sp_exe" NT_MAJOR="$nt_major" NT_MINOR="$nt_minor" sh /usr/lib/usos/nt4_csmwrap_target.sh
     elif [ -n "$dos_iso" ]; then
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="$dos_iso" DOS_WIN3_ISO="$win3_iso" DOS_WIN_EARLY="${win_early:-}" \
             DOS_PROGRAMS_DIR=/mnt/data/Systems/DOS/MS-DOS/Programs sh /usr/lib/usos/dos_csmwrap_target.sh

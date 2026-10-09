@@ -29,6 +29,11 @@ NT4_VM_ANSWER=${NT4_VM_ANSWER:-alt-n}
 # Workstation: 2 processors (its licence; SP6a halmps on the X470's MP table
 # from SeaBIOS); 1 GiB (NT 4.0 trouble reports with more memory).
 NT4_BOOT_OPTIONS=${NT4_BOOT_OPTIONS:-/NUMPROC=2 /MAXMEM=1024}
+# NT 3.5: with more than 128 MiB the kernel finds no boot disk through AHCINT
+# (STOP 0x7B, C0000034 for the ARC name after one disk read; QEMU OVMF +
+# CSMWrap 2026-10-09: 64 and 128 MiB boot, 256 MiB and more stop, 2 GiB with
+# /MAXMEM=128 boots).
+NT35_BOOT_OPTIONS=${NT35_BOOT_OPTIONS:-/NUMPROC=2 /MAXMEM=128}
 
 # The QEMU argument list (W9X_VM_ARGS_FN for w9x_phase1_run): the w9x rules
 # (no network, -no-reboot, cache=none) with the disk view limited to the
@@ -51,7 +56,7 @@ nt4_vm_disk_args() {
 nt4_vm_args() {
     case "$2" in kvm) accel='kvm' ;; *) accel='tcg,tb-size=128' ;; esac
     printf '%s\n' -name usos-nt4-install -nodefaults -L "$W9X_VM_DATADIR" \
-        -machine pc -accel "$accel" -cpu pentium3 -smp 1 -m "$W9X_VM_GUEST_MB" \
+        -machine pc -accel "$accel" -cpu "${NT4_VM_CPU:-pentium3}" -smp 1 -m "$W9X_VM_GUEST_MB" \
         -rtc base=localtime -vga std -display none -nic none -no-reboot \
         $(nt4_vm_disk_args "$1") \
         -boot order=c \
@@ -89,16 +94,27 @@ nt4_vm_install() {
     # QEMU 2026-10-08); ENTER goes on and the install completes.
     W9X_VM_TEXT_ANSWER=''
     NT4_VM_HBA=''
+    NT4_VM_CPU=''
+    nt3=''
     if MTOOLS_SKIP_CHECK=1 mdir -i "$target@@$NT4_PART_OFFSET" ::/USOS/NT3 >/dev/null 2>&1; then
+        nt3=yes
         W9X_VM_TEXT_ANSWER=${NT3_VM_TEXT_ANSWER:-ret}
         NT4_VM_HBA=${NT3_VM_HBA:-am53c974}
+        # NT 3.5 (SOURCE.TXT version=3.50, nt4_csmwrap_target.sh): its GUI
+        # Setup (INITIAL.INF GetProcessor) knows no CPU newer than a Pentium
+        # and its CD has no amsint.sys; its atdisk.sys runs text mode on QEMU
+        # IDE without the NT 3.51 interrupt nesting (QEMU 2026-10-09).
+        if MTOOLS_SKIP_CHECK=1 mtype -i "$target@@$NT4_PART_OFFSET" ::/USOS/NT3/SOURCE.TXT 2>/dev/null | grep -q '^version=3\.50'; then
+            NT4_VM_CPU=${NT35_VM_CPU:-pentium}
+            NT4_VM_HBA=${NT35_VM_HBA:-}
+        fi
     fi
     NT4_VM_STALLED=0
     boot=0
     boots=$NT4_VM_BOOTS
     # NT 3.51 restarts a few times after GUI Setup before the usosnt3 service
     # runs (QEMU 2026-10-08: DONE.TXT at the 5th and at the 7th VM start).
-    [ -z "$NT4_VM_HBA" ] || boots=${NT3_VM_BOOTS:-12}
+    [ -z "$nt3" ] || boots=${NT3_VM_BOOTS:-12}
     while [ "$boot" -lt "$boots" ]; do
         boot=$((boot + 1))
         NT4_VM_BOOT=$boot
@@ -217,7 +233,7 @@ nt4_vm_finish() {
     done
     status=0
     reason=''
-    [ "$sub" = NT4 ] || reason='NT 3.51;'
+    [ "$sub" = NT4 ] || reason='NT 3.x;'
     for path in WINNT/SYSTEM32/NTOSKRNL.EXE WINNT/SYSTEM32/DRIVERS/AHCINT.SYS WINNT/SYSTEM32/DRIVERS/USOSRST.SYS BOOT.INI NTLDR USOS/$sub/DONE.TXT; do
         nt4_ci_path "$c" "$path" >/dev/null || { reason="$reason missing $path;"; status=1; }
     done
@@ -242,6 +258,10 @@ nt4_vm_finish() {
                 cp "$src" "$old" && reason="$reason autochk.exe restored;" ||
                 { reason="$reason cannot restore autochk.exe;"; status=1; }
         fi
+    fi
+    if [ "$status" = 0 ] && [ "$sub" = NT3 ] && src=$(nt4_ci_path "$c" USOS/NT3/SOURCE.TXT) &&
+        grep -aq '^version=3\.50' "$src"; then
+        NT4_BOOT_OPTIONS=$NT35_BOOT_OPTIONS
     fi
     if [ "$status" = 0 ]; then
         ini=$(nt4_ci_path "$c" BOOT.INI) || ini=$c/BOOT.INI
