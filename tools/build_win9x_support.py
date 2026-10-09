@@ -45,6 +45,7 @@ Also built, not staged (copied by hand):
   USOSHPET.COM  clears HPET LegacyReplacement (src/platform/bios/win9x/usosdiag.S)
   USOSWHERE.COM TSR: interrupted CS:IP, ticks, PSP and last INT 13h/15h/21h/2Fh
                 AX in the top right corner (src/platform/bios/win9x/usoswhere.S)
+  USOSV10.COM   TSR: INT 10h on a private 2 KiB stack (src/platform/bios/win9x/usosv10.S)
 
 USOS code is GPL-3.0-or-later; no Microsoft files.
 
@@ -147,8 +148,25 @@ def build_diag(out: Path, work: Path) -> None:
                     str(obj), '-o', str(elf)], env=env, check=True)
     subprocess.run([zig, 'objcopy', '-O', 'binary', str(elf), str(com)], env=env, check=True)
     data = com.read_bytes()
-    if not 0 < len(data) <= 2048 or data[0] != 0xE9 or b'USOSWHR1' not in data:
+    if not 0 < len(data) <= 4096 or data[0] != 0xE9 or b'USOSWHR1' not in data:
         raise ValueError('unexpected USOSWHERE.COM layout')
+    build_usosv10(out, work)
+
+
+def build_usosv10(out: Path, work: Path) -> Path:
+    """USOSV10.COM: INT 10h on a private stack (Windows 1.x/2.x WIN.COM logo)."""
+    env = dict(os.environ, ZIG_GLOBAL_CACHE_DIR=str(ROOT / 'tools/cache/zig-global'))
+    zig = str(ROOT / 'tools/zig/zig.exe')
+    obj, elf, com = work / 'USOSV10.o', work / 'USOSV10.elf', out / 'USOSV10.COM'
+    subprocess.run([zig, 'cc', '-target', 'x86-freestanding-none', '-mcpu=i386', '-c',
+                    str(SOURCE / 'usosv10.S'), '-o', str(obj)], env=env, check=True)
+    subprocess.run([zig, 'ld.lld', '-m', 'elf_i386', '-T', str(ROOT / 'src/platform/bios/msdos/com.ld'),
+                    str(obj), '-o', str(elf)], env=env, check=True)
+    subprocess.run([zig, 'objcopy', '-O', 'binary', str(elf), str(com)], env=env, check=True)
+    data = com.read_bytes()
+    if not 2048 < len(data) <= 4096 or data[0] != 0xE9 or b'USOSV10A' not in data:
+        raise ValueError('unexpected USOSV10.COM layout')
+    return com
 
 
 def build_usosdbg(out: Path, work: Path) -> Path:

@@ -78,7 +78,8 @@ def run_early_auto(config):
     2.x installed): the commands that run, in order, without the comments."""
     lines = [l.strip() for l in (MSDOS / 'windows_early_auto.cmd').read_text(encoding='ascii').splitlines()]
     env = {'CONFIG': config}
-    exists = {r'C:\DOS\VBMOUSE.EXE', r'C:\DOS\USOSKBC.COM', r'C:\DOS\USOSWHER.COM', r'C:\WINDOWS\WIN.COM'}
+    exists = {r'C:\DOS\VBMOUSE.EXE', r'C:\DOS\USOSKBC.COM', r'C:\DOS\USOSWHER.COM', r'C:\DOS\USOSV10.COM',
+              r'C:\WINDOWS\WIN.COM'}
     labels = {l[1:].lower()[:8]: i for i, l in reversed(list(enumerate(lines))) if l.startswith(':')}
     ran, i = [], 0
     expand = lambda s: re.sub(r'%(\w+)%', lambda m: env.get(m.group(1), ''), s)
@@ -126,7 +127,7 @@ class DiagnosticMenu(unittest.TestCase):
     def test_menu(self):
         self.assertIn('submenu=DIAG,', '\n'.join(self.blocks['menu']))
         items = [l.split('=', 1)[1].split(',')[0] for l in self.blocks['DIAG'] if l.startswith('menuitem=')]
-        self.assertEqual(items, ['D1WHERE', 'D2NOKBC', 'D4CLEAN', 'D5MIN', 'DOSONLY'])
+        self.assertEqual(items, ['D1WHERE', 'D2NOKBC', 'D4CLEAN', 'D5MIN', 'D6V10', 'DOSONLY'])
         self.assertLessEqual(len(items), 9)
         for item in items:
             self.assertIn(item, self.blocks)
@@ -135,7 +136,7 @@ class DiagnosticMenu(unittest.TestCase):
         himem = r'DEVICE=C:\DOS\HIMEM.SYS /TESTMEM:OFF'
         for name in ('WINSTD', 'WINREAL', 'DOSONLY', 'D1WHERE', 'D2NOKBC'):
             self.assertIn(himem, self.blocks[name])
-        for name in ('D4CLEAN', 'D5MIN'):
+        for name in ('D4CLEAN', 'D5MIN', 'D6V10'):
             self.assertEqual(self.blocks[name], [])
         self.assertNotIn(himem, self.blocks['common'])
         self.assertIn(r'DEVICE=C:\DOS\SETVER.EXE', self.blocks['common'])
@@ -145,16 +146,20 @@ class DiagnosticMenu(unittest.TestCase):
     def loaded(self, config):
         ran = run_early_auto(config)
         names = [r.split()[0].split('\\')[-1] for r in ran]
-        return ran, [n for n in names if n in ('VBMOUSE.EXE', 'USOSKBC.COM', 'USOSWHER.COM', 'WIN.COM')]
+        return ran, [n for n in names if n in ('USOSV10.COM', 'VBMOUSE.EXE', 'USOSKBC.COM', 'USOSWHER.COM', 'WIN.COM')]
 
     def test_variants(self):
         expected = {
-            'WINSTD': ['VBMOUSE.EXE', 'USOSKBC.COM', 'WIN.COM'],
-            'D1WHERE': ['VBMOUSE.EXE', 'USOSKBC.COM', 'USOSWHER.COM', 'WIN.COM'],
-            'D2NOKBC': ['VBMOUSE.EXE', 'WIN.COM'],
-            'D4CLEAN': ['USOSKBC.COM', 'WIN.COM'],
+            # USOSV10 (INT 10h on its own stack) first everywhere but in D5,
+            # the control item for the 2.03 logo hang
+            'WINSTD': ['USOSV10.COM', 'VBMOUSE.EXE', 'USOSKBC.COM', 'WIN.COM'],
+            'WINREAL': ['USOSV10.COM', 'VBMOUSE.EXE', 'USOSKBC.COM', 'WIN.COM'],
+            'D1WHERE': ['USOSV10.COM', 'VBMOUSE.EXE', 'USOSKBC.COM', 'USOSWHER.COM', 'WIN.COM'],
+            'D2NOKBC': ['USOSV10.COM', 'VBMOUSE.EXE', 'WIN.COM'],
+            'D4CLEAN': ['USOSV10.COM', 'USOSKBC.COM', 'WIN.COM'],
             'D5MIN': ['USOSWHER.COM', 'WIN.COM'],
-            'DOSONLY': ['VBMOUSE.EXE', 'USOSKBC.COM'],
+            'D6V10': ['USOSV10.COM', 'USOSWHER.COM', 'WIN.COM'],
+            'DOSONLY': ['USOSV10.COM', 'VBMOUSE.EXE', 'USOSKBC.COM'],
         }
         for config, programs in expected.items():
             ran, names = self.loaded(config)
@@ -164,8 +169,20 @@ class DiagnosticMenu(unittest.TestCase):
             if 'USOSWHER.COM' in programs:
                 self.assertIn(r'C:\DOS\USOSWHER.COM /G', ran)
 
+    def test_default_items(self):
+        # X470 PASS 2026-10-09 (Windows 2.03 via D6): every default item loads
+        # USOSV10 first and USOSKBC /R; the USOSWHER overlay only in diagnostics
+        for config in ('WINSTD', 'WINREAL', 'DOSONLY'):
+            ran, names = self.loaded(config)
+            self.assertEqual(names[0], 'USOSV10.COM', config)
+            self.assertIn(r'C:\DOS\USOSKBC.COM /R', ran)
+            self.assertNotIn('USOSWHER.COM', names, config)
+        self.assertIn('menudefault=WINSTD,8', self.config)
+        self.assertIn('submenu=DIAG,Diagnostyka (D1-D6, tylko do testow)', self.config)
+
     def test_diag_log(self):
-        for config, tag in (('D1WHERE', 'D1'), ('D2NOKBC', 'D2'), ('D4CLEAN', 'D4'), ('D5MIN', 'D5')):
+        for config, tag in (('D1WHERE', 'D1'), ('D2NOKBC', 'D2'), ('D4CLEAN', 'D4'), ('D5MIN', 'D5'),
+                            ('D6V10', 'D6')):
             ran = run_early_auto(config)
             log = r'>>C:\USOS\DIAG\%s.TXT' % tag
             writes = [r for r in ran if r.endswith(log)]
@@ -175,6 +192,13 @@ class DiagnosticMenu(unittest.TestCase):
             self.assertIn('echo ==== WIN returned' + log, ran)
             self.assertLess(win, ran.index('echo ==== WIN returned' + log))
         self.assertFalse(any('DIAG' in r for r in run_early_auto('WINSTD')))
+        # USOSV10 reports its deepest stack use into the log (not in D5)
+        for config, tag in (('D1WHERE', 'D1'), ('D6V10', 'D6')):
+            ran = run_early_auto(config)
+            report = r'C:\DOS\USOSV10.COM>>C:\USOS\DIAG\%s.TXT' % tag
+            self.assertEqual(ran.count(report), 2, config)
+            self.assertLess(ran.index(report), ran.index('WIN.COM'))
+        self.assertFalse(any(r.startswith(r'C:\DOS\USOSV10.COM') for r in run_early_auto('D5MIN')))
 
     def test_no_redirection_inside_if(self):
         # COMMAND.COM opens a redirection target even when the IF is false.
@@ -194,6 +218,31 @@ class DiagnosticMenu(unittest.TestCase):
         self.assertIn('gport:', where)
         self.assertIn('0xfa6e', where)
         self.assertIn('mov word ptr cs:[ax10], ax', where)
+        # 1.2: CGA mode 6 (the 2.x logo, CGA.LGO) and the INT 09h snapshot row
+        self.assertIn('cgaout:', where)
+        self.assertIn('cmp al, 6', where)
+        self.assertIn('mov ax, 0x2509', where)
+        self.assertIn('JMPFAR old09', where)
+        # 1.4: #UD (INT 06h) dump screen and the EXEC trace (INT 01h ring) armed by WIN's 4B00h
+        self.assertIn('mov ax, 0x2506', where)
+        self.assertIn('mov ax, 0x2501', where)
+        self.assertIn('cmp ax, 0x4b00', where)
+        self.assertIn('cmp word ptr ds:[8], 0x4957', where)
+        self.assertIn('cmp ax, 0xc000', where)
+        self.assertIn('CALLFAR old08', where)
+        self.assertNotIn('    call dword ptr', where)
+        self.assertIn('USOSWHERE 1.4', where)
+        # USOSV10: built, staged by INSTALL.BAT and in the payload (unit run:
+        # tools/tests/legacy_bios/test_usosv10.py)
+        self.assertIn("dos_out / 'USOSV10.COM'", build)
+        self.assertIn(r'copy %USRC%\USOSV10.COM C:\DOS /y >nul', batch_lines(MSDOS / 'install.cmd'))
+        # copied with or without CSMWrap (the video BIOS stack depth does not depend on it)
+        lines = batch_lines(MSDOS / 'install.cmd')
+        self.assertLess(lines.index(r'copy %USRC%\USOSV10.COM C:\DOS /y >nul'),
+                        lines.index(r'if not exist %USRC%\CSMWRAP.TAG goto csm_dos_done'))
+        self.assertIn('USOSV10.COM', (ROOT / 'installer/cmd/usos-payload-pack/main.go').read_text(encoding='utf-8'))
+        v10 = (ROOT / 'src/platform/bios/win9x/usosv10.S').read_text(encoding='ascii')
+        self.assertIn('mov sp, offset stktop', v10)
 
 
 if __name__ == '__main__':

@@ -224,3 +224,186 @@ install line prints the font pointer, and row 1 starts with `10:` = AX of the
 last INT 10h AH=00h (mode set). Next X470 run: D5 only. Rows over the logo =
 read CS:IP and whether t counts; still no rows = the timer interrupt is dead
 after the logo (then: disassemble WIN.COM's loader after the logo).
+
+### D5 with USOSWHERE 1.1 (2026-10-09) and USOSWHERE 1.2
+
+Video VID_20261009_163727: the text-mode corner is visible for one frame
+after the install lines (`USOSWHERE /G font C000:5C98`; corner
+`94C6:3A9E t:0001 p:1029 COMMAND.`, `10:0000 13:0201 15:0000 21:4E00
+2F:1123`), then one black frame (mode set), then the 2.03 logo for the rest
+of the video with no corner rows. Ctrl+Alt+Del during the hang resets the PC
+(keyboard IRQ and BIOS INT 09h still run, interrupts are on).
+
+Static analysis (installed WIN.COM = WIN.CNF + CGA.LGO + MSLOGO.LGD, 3952 +
+468 + 2570 = 6990 bytes, the size on the target): the logo code CGA.LGO sets
+**mode 06h** (CGA 640x200 two colours; INT 10h AX=0006h, then AX=1000h/1001h
+make colour 0 blue). USOSWHERE 1.1 only drew in modes 0Eh/10h-12h, so the
+missing corner says nothing about the timer. WIN200.BIN has no port-61h
+refresh-bit or CMOS update-in-progress loops: port 61h is only the keyboard
+ACK toggle (KEYBOARD) and the beep (PIT channel 2 with fixed LOOP delays);
+no `in al,40h` timing loops.
+
+USOSWHERE 1.2 (feature/win203-diag3): `/G` also draws in mode 06h (B800h,
+interlaced banks, 1 bit per pixel); a fourth row `k:cccc:iiii n:nnnn` holds
+the CS:IP interrupted by the last keyboard IRQ and the number of keyboard
+IRQs, and INT 09h (chained unchanged) also redraws the corner. During a hang:
+t counting = timer alive, CS:IP row 0 is the loop; t frozen + k changing on
+each Shift press = IRQ0 masked or INT 08h taken over, k is the loop. Handler
+paths unit-run with unicorn (text mode and mode 6 layout), no VM.
+
+### D5 with USOSWHERE 1.2 (2026-10-09): where the CPU is, and USOSWHERE 1.3
+
+Two photos about 10 s apart over the logo: `124A:0FAD t:00D9 p:124A WIN..u.`
+then `t:014E` (timer alive, every tick at 124A:0FAD, current PSP = WIN.COM);
+`10:0006 13:0201 15:8800 21:4B00 2F:1123`; CS history `124A 1351`;
+`k:1351:00B1 n:0001`.
+
+Reading (static, installed WIN.COM read raw from the target = WIN.CNF +
+CGA.LGO + MSLOGO.LGD byte for byte):
+
+- WIN.CNF is loaded at CS:0100-106F, the logo CGA.LGO at CS:1070 = segment
+  CS+107h = **1351h** (the second CS in the history). At 0361h WIN.COM sets
+  `mov sp,1070h`: its stack is the 256 zero bytes at CS:0F70-106F at the end
+  of WIN.CNF. **IP 0FADh lies inside that stack** (0C3h below its top);
+  there is no code there in the file. The CPU executes stack residue: a far
+  return/IRET went to a stale address. It is not a polling loop of WIN.COM.
+- k: 1351:00B1 is CGA.LGO right after INT 10h AX=1000h (palette): one IRQ1
+  that was pending through the mode set. n stays 1 because D5 has no
+  USOSKBC /R: SeaBIOS (CSMWrap) polls the USB keyboard from IRQ0 and puts
+  keys into the BDA buffer without raising IRQ1; Ctrl+Alt+Del is handled in
+  that poll. The keyboard is not dead.
+- `15:8800` comes from MEM.EXE ("Memory accessible using Int 15h", run just
+  before WIN in D5). WIN.COM, CGA.LGO and WIN200.BIN contain no INT 15h at
+  all, so an oversized INT 15h AH=88h result is **not** the cause.
+- Order in WIN.COM: logo (CGA.LGO entry 4), INT 21h 4Ah shrink to 107h+
+  logo paragraphs, 48h FFFFh check against 49C0h paragraphs, then EXEC
+  `4B00h` of WIN200.BIN at 06FAh-070Eh (SS:SP saved in CS:0107h/0109h,
+  124A:1004h). WIN200.BIN is an MZ (KERNSTUB, entry 0000:0000, SS:SP
+  000B:0080) with min = max alloc = 0, i.e. **loaded high** (219 KB at the
+  top of conventional memory, about 6915h-9FC0h with 639 KB).
+- After the EXEC: no further INT 21h (the kernel would call DOS at once), the
+  current PSP is still WIN.COM (DOS switches it only when it enters the
+  child), and no INT 10h AX=0003h (WIN.COM restores the text mode through
+  CGA.LGO entry 7 when the EXEC fails). So the hang starts inside the EXEC
+  (loading the image) or in the first instructions of KERNSTUB, and ends with
+  the CPU in WIN.COM's stack.
+
+Windows 1.04 (works on the X470) is also loaded high but its image is
+smaller; a candidate cause is something in the lower part of that range
+(conventional memory used by firmware/CSM code without being reserved);
+not proven.
+
+USOSWHERE 1.3 adds two rows to decide it from one photo:
+`c:<8 code bytes at CS:IP> s:<interrupted SS:SP> d:<crit-error, InDOS>` and
+`w:<top 3 stack words> b:<ES:BX of the last INT 13h> i:<INT 13h count>`.
+d: ...01 = still inside DOS (EXEC); i: growing = disk reads go on, frozen =
+stopped; b: = the load address reached; c: shows what really runs at 0FADh.
+Handler paths unit-run with unicorn (text mode, mode 6, INT 13h keeps
+registers and flags), no VM.
+
+### D5 with USOSWHERE 1.3 (2026-10-09): an invalid-opcode loop, and USOSWHERE 1.4
+
+Two photos, same values except t (00A1, 013B: timer alive):
+`1263:0FAD p:1263 WIN`, `10:0006 13:0201 15:8800 21:4B00 2F:1123`,
+CS history `1263 136A 94C6`, `k:136A:00AA n:0001`,
+`c:0F00000000000000 s:1263:106F d:0000`,
+`w:4C03 474F E94F b:0C3F:257C i:0053`.
+
+- `0F 00 00` at 0FADh is SLDT [BX+SI]: invalid in real mode (#UD, INT 06h on
+  286 and later). The INT 06h vector of SeaBIOS/CSMWrap is a bare IRET, so
+  the CPU faults on the same instruction forever; IF is restored by that
+  IRET, every timer tick lands on 0FADh, and no other CS shows up (the INT
+  06h handler runs with IF=0). Bytes 0F70h-0FACh are zeros (`00 00` = ADD
+  [BX+SI],AL): the CPU entered the stack area of WIN.COM somewhere below
+  0FADh and slid up to the first non-zero byte.
+- The "stack words" are not saved registers: SS:SP 1263:106F is one byte
+  below the top of the empty stack. 106Fh = 03 (high byte of the return
+  address 03CAh of WIN.COM's `call 052Fh`, the EXEC routine), 1070h-1073h
+  = `LOGO` (the CGA.LGO signature), 1074h = `E9` (its JMP).
+- d:0000 (not in DOS), current PSP still WIN.COM, last INT 21h = 4B00h, and
+  no INT 10h AH=00h after it (WIN.COM restores the text mode through
+  CGA.LGO entry 0007h right after any EXEC return, also a failed one).
+- WIN200.BIN: KERNSTUB checks `NE` at image 200h and far-returns into the
+  KERNEL entry (segment 1, IP 7E3Ah); KERNEL reads WIN.COM's handshake data
+  through PSP:16h, checks EMMXXXX0 and calls INT 21h AH=30h within about 50
+  instructions. KERNEL segment 1 contains no 0Fh opcode at all (no LOADALL,
+  SMSW, SLDT). With p: still WIN.COM and no INT 21h after 4B00h, the child
+  most likely never ran: the CPU left the DOS EXEC call by a path that is
+  neither the child entry nor the normal return to 0710h.
+- b:0C3F:257C lies in the DOS buffers (IO system data 0B8Ah-1025h): the last
+  disk read went through a DOS buffer (FAT/directory/header or the last
+  partial sector), not straight into the image; i: frozen at 53h.
+
+Not provable from the binaries alone, so USOSWHERE 1.4 records the path:
+an INT 06h handler that dumps one text screen on the first #UD (CS:IP,
+FLAGS, registers, 8 code bytes, 8 stack words and the last 176 traced
+instruction addresses, then halts with interrupts on), and an instruction
+trace (INT 01h, trap flag) armed when a program named WIN* calls INT 21h
+AX=4B00h; TF is set for DOS and in the caller's saved FLAGS, BIOS/ROM code
+(CS >= C000h) runs untraced (the caller's IRET restores TF), consecutive
+repeats are stored once, and the first INT 21h afterwards ends the trace
+(f: = its AX and caller CS:IP). No DOS call and no #UD within 10 s: the
+timer dumps the same screen (reason T). Corner row 3 adds x: (steps) and
+f:. Unicorn unit run (emulated real-mode INT/trap/#UD delivery): fake DOS
+with a ROM far call and a LOOP, failed EXEC, zero slide to `0F 00 00` -> the
+ring ends `... 1263:0F99 ... 1263:0FAD`, ROM not recorded; the trace end
+by INT 21h and the 10 s dump path covered. 1.3's `call dword ptr` would
+assemble with a 66h prefix; 1.4 uses an explicit FF /3 far call (CALLFAR).
+
+### D5 with USOSWHERE 1.4 (2026-10-09): the video BIOS overruns WIN.COM's stack; USOSV10
+
+Dump screen: `U at 12E4:0FAD x:0000 u:0001`, `ax:0FA2 bx:0007 cx:0023
+dx:18BF si:0002 di:007E bp:091C ds:13EB es:B800`, `s:12E4:106F`. x:0000:
+the trace never armed, so WIN.COM never issued its EXEC (the 21:4B00 seen
+before was COMMAND.COM starting WIN.COM). DS = 13EBh = CS+107h is the
+segment of CGA.LGO, ES = B800h its drawing target, BX = 0007h is only set
+by its text routine (CGA.LGO 001Ah: AH=02h/0Eh), BP = 091Ch is WIN.COM's
+own BP (DOS start value) restored by the logo's `pop bp`: the hang starts
+in or right after the logo, not in the EXEC.
+
+Cause (static + Unicorn with the real WIN.COM, local copy only): WIN.COM
+sets SP = 1070h; its stack is the 256 bytes behind its own code
+(CS:0F70-106F), and the logo is entered from CS:0F39-0F6C, returning to
+0F6Dh (`pop ds; ret`). Every INT 10h of CGA.LGO (AH=0Fh, AX=0006h,
+AX=1000h/1001h, then AH=02h/0Eh per character) runs with SP = 103Ch-1040h,
+i.e. about 200 bytes above that code. A 1987 BIOS used a few dozen bytes; a
+video BIOS that needs more than ~190 bytes of the caller's stack overwrites
+WIN.COM's code at 0F39-0F6E, and the logo's final RETF to 0F6Dh executes
+stack residue and slides into the empty stack area. QEMU's SeaVGABIOS
+switches to its own stack (extra stack), so QEMU never showed it; the RX 560
+option ROM on the X470 runs on the caller's stack.
+
+Unicorn run (scratch w203/repro203.py, WIN.COM from the BIOSTAR, video BIOS
+stub that uses N bytes of stack): N <= 128 reaches WIN.COM's first INT 21h
+(AH=4Ah at 0904h) with code intact; N = 192/200 ends in the stack area of
+12E4 with DS=13EB ES=B800 BX=0007 CX=0023 BP=091C (the X470 dump registers),
+N >= 208 runs away. With USOSV10 resident every N up to 400 reaches 0904h
+with 0F39-0F6E intact. Register clobbering by the BIOS (BX..ES) cannot
+over-pop: the logo unwinds by SP and restores BP itself.
+
+Fix: **USOSV10.COM** (src/platform/bios/win9x/usosv10.S, GPL): TSR, INT 10h
+on a private 2 KiB stack (outermost call only; nested calls chain on that
+stack), and for the functions that return nothing but AX (AH=00h-0Eh except
+03h/04h, AX=1000h-1003h/1010h/1012h) BX, CX, DX, SI, DI, BP, DS, ES restored
+as a CGA/EGA BIOS kept them; arithmetic flags from the BIOS, IF/TF from the
+caller. The stack is pre-filled with 5Ah; `USOSV10` run again prints the
+deepest use and the call count (at install it measures a no-clear mode set
+of the current text mode). W1AUTO.BAT loads it first in every item except
+D5 (control) and writes the report into Dn.TXT before WIN and after "WIN
+returned". New menu item D6V10 = D5 + USOSV10. Build: build_win9x_support
+(build_usosv10), staged msdos/USOSV10.COM -> C:\DOS by INSTALL.BAT, payload
+list. Tests: tools/tests/legacy_bios/test_usosv10.py (tiny stack below code
+breaks without, runs with; registers/flags; outputs pass through; nesting;
+install + report), test_win_early_flow.py.
+
+### X470 PASS (2026-10-09): Windows 2.03 via D6; USOSV10 in the default start
+
+D6 (D5 + USOSV10, no USOSKBC) reached the MS-DOS Executive on the X470 /
+RX 560 (PS/2 keyboard only, as expected without USOSKBC): the cause above is
+confirmed. The default items (Windows, WIN /S, MS-DOS) load USOSV10 first,
+then VBMOUSE and USOSKBC /R (USB keyboard); USOSWHER stays in the diagnostic
+submenu (now "Diagnostyka (D1-D6, tylko do testow)"). INSTALL.BAT copies
+USOSV10 also without CSMWrap (the video BIOS stack depth does not depend on
+it). Windows 2.11, /286 and /386 use the same WIN.COM logo path and likely
+benefit too. Windows 3.1/WfW and 9x DOS phases do not load USOSV10 (no
+known need; their own stacks are larger).

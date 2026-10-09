@@ -82,6 +82,9 @@ def build(root: Path):
     # USOSWHER /G); the 8.3 name of USOSWHERE.COM.
     shutil.copyfile(out / 'win9x/USOSWHERE.COM', dos_out / 'USOSWHER.COM')
     print('[PASS] MS-DOS support: USOSWHER.COM (early-Windows diagnostics)')
+    # INT 10h on a private stack before WIN.COM of Windows 1.x/2.x (W1AUTO.BAT).
+    shutil.copyfile(out / 'win9x/USOSV10.COM', dos_out / 'USOSV10.COM')
+    print('[PASS] MS-DOS support: USOSV10.COM (INT 10h stack for Windows 1.x/2.x)')
 
 
 def dos_text(text: str) -> bytes:
