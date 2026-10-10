@@ -76,6 +76,22 @@ Server 2008 R2 drivers (Intel I210 / 82574L PCIe card, Realtek RTL8111 card
 or a USB 3 adapter with 2008 R2 drivers, once USB 3 works). The user should
 check Device Manager (or the board label) for the exact NIC ID.
 
+Checked 2026-10-10 with Intel's "Network Adapter Driver for Windows 7
+Final Release" 25.0 (`prowinx64legacy.exe`, SHA-256 `de96ed1e...2fbe28`,
+`PRO1000\Winx64\NDIS62`, e1r62x64 12.13.27.0): the INF lists `DEV_1539`
+only in `[Intel.NTamd64.6.1.1]` (ProductType 1 = client), so Server 2008 R2
+/ WHS 2011 do not match it. The test stick (not the repo: Intel binaries
+are never committed) has `Drivers\Windows Home Server 2011\Other\Intel I211
+e1r62x64 12.13.27.0 (server INF patch)\`: Intel's original .sys/.cat/.din/
+co-installer DLLs plus an INF with one added line in `[Intel.NTamd64.6.1]`
+(`DEV_1539` -> Intel's own `E1539.6.1.1` section). The catalog no longer
+covers the INF, so Windows installs the package as unsigned (publisher
+warning, "Install anyway" in Device Manager -> Update driver -> Browse);
+`e1r62x64.sys` keeps Intel's embedded signature, so the x64 kernel loads it.
+Offline injection (unattend DriverPaths / DISM) may refuse the unsigned
+package; then install it by hand or with the WHS wizard's "Install network
+drivers". Not yet tried on the X470.
+
 Open for WHS: USB 3 (as 2008 R2), Administrator password from the profile
 (as 2008 R2), NIC driver on the X470, the data partition (the wizard's
 storage step was not reached).
