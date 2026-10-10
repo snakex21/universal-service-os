@@ -50,9 +50,9 @@
 <JoinWorkgroup Value="WORKGROUP" />
 </Security>
 </SystemData>
-<!-- USOS: POSReady runs RunOnce inside the First Boot Agent: \USOS\POSR\FIRST.CMD from the FAT16 Setup partition installs the X470 drivers and a RunOnce for LOGON.CMD (first logon: ACPI check, DONE.TXT, shutdown). Batch files need cmd.exe in FilePath and /c in Attributes; FBA mangles every % (%11% gave "Invalid Path: [%\cmd.exe]", QEMU 2026-10-10), so the Setup partition's letter is tried without variables. -->
+<!-- USOS: POSReady runs RunOnce inside the First Boot Agent, where the FAT16 Setup partition has no drive letter (QEMU 2026-10-10: D:, E:, F: all missing). posready_after_setup copies \USOS\POSR onto the Windows partition (C:) before the first start, so the command uses that fixed path. Batch files need cmd.exe in FilePath and /c in Attributes; FBA mangles every percent sign (%11% gave "Invalid Path: [%\cmd.exe]"), so the command has none. FIRST.CMD installs the X470 drivers and a RunOnce for LOGON.CMD (first logon: ACPI check, DONE.TXT, shutdown). -->
 <RunOnce>
-<RunOnceCommand FilePath="C:\WINDOWS\system32\cmd.exe" Attributes="/c (if exist D:\USOS\POSR\FIRST.CMD call D:\USOS\POSR\FIRST.CMD) &amp; (if exist E:\USOS\POSR\FIRST.CMD call E:\USOS\POSR\FIRST.CMD) &amp; (if exist F:\USOS\POSR\FIRST.CMD call F:\USOS\POSR\FIRST.CMD) &amp; (if exist C:\USOS\POSR\FIRST.CMD call C:\USOS\POSR\FIRST.CMD)" Flags="0" ErrorControl="0" Reboot="False" Timeout="600">
+<RunOnceCommand FilePath="C:\WINDOWS\system32\cmd.exe" Attributes="/c C:\USOS\POSR\FIRST.CMD" Flags="0" ErrorControl="0" Reboot="False" Timeout="600">
 <DisplayName Value="USOS X470 drivers" />
 <Description Value="USOS: community ACPI, GenAHCI, USB3 for the X470" />
 </RunOnceCommand>

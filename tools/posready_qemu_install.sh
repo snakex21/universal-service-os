@@ -12,9 +12,10 @@
 #   run 1   PE -> SetupLauncher -> Setup /unattended; then
 #           posready_after_setup (boot files, BOOT.INI /execute, USOS MBR);
 #   run 2-4 the installed system: First Boot Agent (it restarts 3 times);
+#           FBA runs the answer's RunOnce C:\USOS\POSR\FIRST.CMD (drivers;
+#           posready_after_setup copied \USOS\POSR onto partition 2);
 #   run 5   the logon dialog: Administrator typed (blank password); the
-#           RunOnce starts \USOS\POSR\FIRST.CMD from partition 1: drivers,
-#           DONE.TXT, shutdown.
+#           RunOnce LOGON.CMD: ACPI check, DONE.TXT, shutdown.
 # Partition 1 stays: the system partition (NTLDR, BOOT.INI) and the source.
 
 POSR_VM_BOOTS=${POSR_VM_BOOTS:-8}
@@ -54,7 +55,7 @@ posready_set_active() {
     sync
 }
 
-# Runs the VM until FIRST.CMD wrote \USOS\POSR\DONE.TXT on partition 1.
+# Runs the VM until LOGON.CMD wrote \USOS\POSR\DONE.TXT on partition 2 (C:).
 # Calls posready_vm_progress RUN ELAPSED WRITTEN_MB when the caller defines
 # it. 0 = done, 2 = QEMU or the after-setup step failed, 3 = timeout or no
 # disk write for POSR_VM_STALL seconds, 4 = no DONE.TXT after POSR_VM_BOOTS
@@ -92,10 +93,24 @@ posready_vm_install() {
     return 4
 }
 
-# 0 when \USOS\POSR\$2 exists on partition 1 (FAT16, mtools, read only).
+# Mounts partition 2 (NTFS, the Windows C:) of $1 read only on $2; prints
+# the loop device. rc 1 when it cannot.
+posready_mount_windows() {
+    p2=$(od -An -tu4 -j 470 -N4 "$1" | tr -d ' \n')
+    mkdir -p "$2"
+    lw=$(losetup -f) && losetup -r -o $((p2 * 512)) "$lw" "$1" || return 1
+    mount -t ntfs3 -o ro "$lw" "$2" 2>/dev/null || { losetup -d "$lw"; return 1; }
+    echo "$lw"
+}
+
+# 0 when C:\USOS\POSR\$2 exists on partition 2 (read only).
 posready_vm_marker() {
-    off=$(( $(od -An -tu4 -j 454 -N4 "$1" | tr -d ' \n') * 512 ))
-    MTOOLS_SKIP_CHECK=1 mdir -i "$1@@$off" "::/USOS/POSR/$2" >/dev/null 2>&1
+    m=/run/posready-marker
+    lm=$(posready_mount_windows "$1" "$m") || return 1
+    found=1
+    [ ! -f "$m/USOS/POSR/$2" ] || found=0
+    umount "$m"; losetup -d "$lm"
+    return "$found"
 }
 
 # After the VM: FIRST.LOG of the first logon (the community ACPI check) and
@@ -105,25 +120,24 @@ posready_vm_finish() {
     t=$1
     l=$2
     off=$(( $(od -An -tu4 -j 454 -N4 "$t" | tr -d ' \n') * 512 ))
-    MTOOLS_SKIP_CHECK=1 mtype -i "$t@@$off" ::/USOS/POSR/FIRST.LOG > "$l/FIRST.LOG" 2>/dev/null || { echo 'no FIRST.LOG'; return 1; }
     MTOOLS_SKIP_CHECK=1 mtype -i "$t@@$off" ::/BOOT.INI > "$l/BOOT.INI" 2>/dev/null || { echo 'no BOOT.INI on partition 1'; return 1; }
     w=/run/posready-finish
-    mkdir -p "$w"
-    p2=$(od -An -tu4 -j 470 -N4 "$t" | tr -d ' \n')
-    lp=$(losetup -f) && losetup -r -o $((p2 * 512)) "$lp" "$t" || { echo 'no loop device'; return 1; }
     rc=0
-    if mount -t ntfs3 -o ro "$lp" "$w"; then
+    if lp=$(posready_mount_windows "$t" "$w"); then
+        # FIRST.CMD / LOGON.CMD logs (C:\USOS\POSR, written in the VM).
+        cp "$w/USOS/POSR/FIRST.LOG" "$l/FIRST.LOG" 2>/dev/null || { echo 'no FIRST.LOG'; rc=1; }
         win=$w/Windows; [ -d "$win" ] || win=$w/WINDOWS
+        cp "$win/FBA/FBALOG.TXT" "$l/FBALOG.TXT" 2>/dev/null || true
         acpi=$(sha256sum "$win/system32/drivers/acpi.sys" 2>/dev/null | cut -c1-64)
         want=$(sha256sum /usr/lib/usos/posready/DRV/acpi.sys 2>/dev/null | cut -c1-64)
         [ -n "$acpi" ] && [ "$acpi" = "$want" ] || { echo 'acpi.sys on the system is not the community ACPI'; rc=1; }
         [ -f "$win/system32/drivers/genahci.sys" ] || { echo 'genahci.sys missing'; rc=1; }
         [ -f "$win/system32/drivers/usbxhci.sys" ] || { echo 'usbxhci.sys missing'; rc=1; }
         umount "$w"
+        losetup -d "$lp"
     else
         echo 'cannot mount the Windows partition'; rc=1
     fi
-    losetup -d "$lp"
     [ "$rc" = 0 ] && echo "POSReady installed; community ACPI, GenAHCI, USB3 in place"
     return "$rc"
 }
@@ -137,7 +151,8 @@ posready_vm_finish() {
 # system partition: its NTLDR / NTDETECT.COM become the disc's Setup\NTLdr /
 # Setup\NTDetect.com (SYSLINUX keeps chaining /NTLDR), BOOT.INI gets a short
 # timeout, and the USOS MBR code goes back (it boots the active partition by
-# LBA). Partition 2 is only checked (ro). Logs to $2.
+# LBA). Partition 2 gets only the new folder \USOS\POSR (ntfs3; the FBA
+# RunOnce reads it as C:\USOS\POSR). Logs to $2.
 posready_after_setup() {
     t=$1
     l=$2
@@ -147,9 +162,9 @@ posready_after_setup() {
     p1=$(od -An -tu4 -j 454 -N4 "$t" | tr -d ' \n')
     p2=$(od -An -tu4 -j 470 -N4 "$t" | tr -d ' \n')
     l1=$(losetup -f) && losetup -o $((p1 * 512)) "$l1" "$t" || return 1
-    l2=$(losetup -f) && losetup -r -o $((p2 * 512)) "$l2" "$t" || { losetup -d "$l1"; return 1; }
+    l2=$(losetup -f) && losetup -o $((p2 * 512)) "$l2" "$t" || { losetup -d "$l1"; return 1; }
     rc=0
-    if mount -t vfat -o utf8=0,shortname=mixed "$l1" "$w/pe" && mount -t ntfs3 -o ro "$l2" "$w/win"; then
+    if mount -t vfat -o utf8=0,shortname=mixed "$l1" "$w/pe" && mount -t ntfs3 "$l2" "$w/win"; then
         if [ ! -f "$w/win/WINDOWS/system32/ntoskrnl.exe" ] && [ ! -f "$w/win/Windows/system32/ntoskrnl.exe" ]; then
             echo 'after-setup: no Windows\system32\ntoskrnl.exe on partition 2' >> "$l/runs.txt"; rc=1
         elif [ ! -f "$w/pe/BOOT.INI" ] && [ ! -f "$w/pe/boot.ini" ]; then
@@ -165,6 +180,16 @@ posready_after_setup() {
             awk '{ sub(/\r$/, "") } /^timeout=/ { $0 = "timeout=3" }
                 /^multi\(/ && /=/ && !/\/execute/ { $0 = $0 " /execute" } { printf "%s\r\n", $0 }' "$ini" > "$w/boot.ini" &&
                 cat "$w/boot.ini" > "$ini" || rc=1
+            # \USOS\POSR onto the Windows partition (C:): POSReady runs the
+            # answer's RunOnce inside the First Boot Agent, where the FAT16
+            # Setup partition has no drive letter (QEMU 2026-10-10: D:, E:,
+            # F: all missing), so FIRST.CMD / LOGON.CMD run from
+            # C:\USOS\POSR and write their logs and DONE.TXT there. Only new
+            # files in a new folder; NTLDR stays on partition 1.
+            mkdir -p "$w/win/USOS" && rm -rf "$w/win/USOS/POSR" && cp -r "$w/pe/USOS/POSR" "$w/win/USOS/POSR" &&
+                cmp -s "$w/pe/USOS/POSR/DRV/acpi.sys" "$w/win/USOS/POSR/DRV/acpi.sys" &&
+                cmp -s "$w/pe/USOS/POSR/FIRST.CMD" "$w/win/USOS/POSR/FIRST.CMD" || {
+                echo 'after-setup: cannot copy \USOS\POSR onto the Windows partition' >> "$l/runs.txt"; rc=1; }
         fi
     else
         echo 'after-setup: cannot mount partition 1 (FAT) or 2 (NTFS)' >> "$l/runs.txt"; rc=1
@@ -175,7 +200,7 @@ posready_after_setup() {
     [ "$rc" = 0 ] || return 1
     dd if="$lib/xp-geometry-fix-mbr-440.bin" of="$t" bs=440 count=1 conv=notrunc 2>/dev/null || return 1
     posready_set_active "$t" 1 || return 1
-    echo 'after-setup: partition 1 NTLDR = Setup\NTLdr, BOOT.INI from Setup, USOS MBR' >> "$l/runs.txt"
+    echo 'after-setup: partition 1 NTLDR = Setup\NTLdr, BOOT.INI from Setup, USOS MBR; C:\USOS\POSR copied' >> "$l/runs.txt"
 }
 
 # unattended.xml (stdout) from the template $1 and the menu's POSR.SIF $2

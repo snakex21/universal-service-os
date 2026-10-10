@@ -40,7 +40,9 @@ class AnswerTemplate(unittest.TestCase):
         # Batch files need cmd.exe with /c in Attributes (POSReady docs).
         self.assertEqual(cmd.get("FilePath"), r"C:\WINDOWS\system32\cmd.exe")
         self.assertNotIn("%", cmd.get("Attributes"))  # FBA mangles every %
-        self.assertIn(r"\USOS\POSR\FIRST.CMD", cmd.get("Attributes"))
+        # Inside FBA the FAT16 Setup partition has no drive letter (QEMU
+        # 2026-10-10): the fixed path on C:, where posready_after_setup put it.
+        self.assertEqual(cmd.get("Attributes"), r"/c C:\USOS\POSR\FIRST.CMD")
 
     @unittest.skipUnless(SH, "no sh")
     def test_answer_xml_from_sif(self) -> None:
@@ -82,7 +84,25 @@ class Payload(unittest.TestCase):
         self.assertIn(b"fc /b", logon)
         self.assertIn(b"DONE.TXT", logon)
         self.assertIn(b"shutdown -s", logon)
-        self.assertIn(b"LOGON.CMD", (ROOT / "tools" / "posready_logon.reg").read_bytes())
+        self.assertIn(b'"cmd.exe /c C:\\\\USOS\\\\POSR\\\\LOGON.CMD"', (ROOT / "tools" / "posready_logon.reg").read_bytes())
+
+    def test_posr_folder_on_the_windows_partition(self) -> None:
+        # posready_after_setup copies \USOS\POSR from partition 1 onto
+        # partition 2 (ntfs3 rw) and checks the copy; the marker and the
+        # finish step read C:\USOS\POSR on partition 2 (MBR entry 2, byte 470).
+        text = (ROOT / "tools" / "posready_qemu_install.sh").read_text(encoding="utf-8")
+        after = text[text.index("posready_after_setup() {"):text.index("posready_answer_xml() {")]
+        self.assertIn('cp -r "$w/pe/USOS/POSR" "$w/win/USOS/POSR"', after)
+        self.assertIn('mount -t ntfs3 "$l2" "$w/win"', after)
+        self.assertNotIn("losetup -r -o $((p2", after)
+        mount = text[text.index("posready_mount_windows() {"):text.index("posready_vm_marker() {")]
+        self.assertIn("-j 470", mount)
+        self.assertIn("-o ro", mount)
+        for fn in ("posready_vm_marker() {", "posready_vm_finish() {"):
+            body = text[text.index(fn):]
+            body = body[:body.index("\n}\n")]
+            self.assertIn("posready_mount_windows", body, fn)
+            self.assertNotIn("::/USOS/POSR", body, fn)
 
     def test_driver_set_is_the_xp_selection(self) -> None:
         from build_micro_linux import POSREADY_DRIVERS
