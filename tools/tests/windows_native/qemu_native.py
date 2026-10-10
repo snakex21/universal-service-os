@@ -37,6 +37,11 @@ RUN = ROOT / "tools" / "tests" / "artifacts" / os.environ.get("USOS_NATIVE_RUN",
 # USOS_NATIVE_TARGET_BUS=ahci: a SATA target (Vista has no inbox NVMe driver).
 TARGET_BUS = os.environ.get("USOS_NATIVE_TARGET_BUS", "nvme")
 STATE = RUN / "qemu-state.json"
+# USOS_NATIVE_TARGET_FIRST=1: the target disk boots before the stick (as if the
+# user picked the disk's UEFI entry in the firmware boot menu). A blank target
+# falls through to the stick; once a CSMWrap path (Vista, 32-bit 8.1/10)
+# prepared it, the disk starts while the stick stays connected for the ISO.
+TARGET_FIRST = os.environ.get("USOS_NATIVE_TARGET_FIRST") == "1"
 # USOS_NATIVE_MACHINE=pc: i440FX. The CSMWrap paths (Vista / Server 2008
 # without CSM) need it: on q35 PE10 in BIOS mode under CSMWrap gets no USB
 # keyboard (Setup's first page never reacts); the CSMWrap Vista harness
@@ -100,10 +105,10 @@ def disk_args(stick: Path | None, target: Path) -> list[str]:
     if stick is not None:
         fmt = "vpc" if stick.suffix.lower() == ".vhd" else "qcow2"
         args += ["-drive", f"if=none,id=stick,file={stick.as_posix()},format={fmt}",
-                 "-device", "usb-storage,bus=xhci.0,drive=stick,removable=on,serial=USOSSTICK"]
+                 "-device", "usb-storage,bus=xhci.0,drive=stick,removable=on,serial=USOSSTICK" + (",bootindex=1" if TARGET_FIRST else "")]
     target_fmt = "vpc" if target.suffix.lower() == ".vhd" else "qcow2"
     if TARGET_BUS == "ahci":
-        args += ["-drive", f"if=none,id=target,file={target.as_posix()},format={target_fmt}", "-device", "ahci,id=sata", "-device", "ide-hd,bus=sata.0,drive=target,serial=USOSTARGET"]
+        args += ["-drive", f"if=none,id=target,file={target.as_posix()},format={target_fmt}", "-device", "ahci,id=sata", "-device", "ide-hd,bus=sata.0,drive=target,serial=USOSTARGET" + (",bootindex=0" if TARGET_FIRST else "")]
     else:
         args += ["-drive", f"if=none,id=target,file={target.as_posix()},format=qcow2", "-device", "nvme,drive=target,serial=USOSTARGET"]
     return args

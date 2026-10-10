@@ -123,13 +123,7 @@ def build_modern_support(root: Path, out: Path):
     try:
         writer.add_bytes('usos-modern-uefi.cmd', (root / 'tools/windows_modern_uefi_startup.cmd').read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
         writer.add_file('usos-modern-finalize.exe', helpers / 'usos-modern-finalize.exe')
-        writer.add_bytes('usos-x86-csmwrap.cmd', (root / 'tools/windows_x86_csmwrap.cmd').read_bytes().replace(b'
-
-', b'
-').replace(b'
-', b'
-
-'))
+        writer.add_bytes('usos-x86-csmwrap.cmd', (root / 'tools/windows_x86_csmwrap.cmd').read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
         writer.add_file('usos-x86-csmwrap.exe', helpers / 'usos-x86-csmwrap.exe')
         for name in ('usos-drivers.exe', 'usos-unattend-drivers.exe'):
             writer.add_file(name, win7 / name)
