@@ -475,3 +475,59 @@ plain "OK" confirmation.
 * XP: unchanged behaviour (the picker's extra `info=` line appears only with
   `USOS_XP_DISK_NOTE`, set only by step 610; `USOS_UI_VISTA` only with
   `usos.legacy_action=vista-csmwrap`).
+
+## 11. 32-bit Windows 8.1 / 10 without firmware CSM (profile `win-x86-uefi-csmwrap`, 2026-10-10)
+
+Status: **experimental, QEMU end-to-end** (section 11.3); X470 untested.
+
+The X470 firmware is 64-bit UEFI only, so x86 Windows 8.1 / 10 media were
+blocked (`needs_32bit_uefi_or_bios`). Their own Setup WinPE already has
+xHCI, AHCI and NVMe drivers, so unlike Vista (section 10) no PE10 donor is
+needed: the ISO's own x86 `boot.wim` is staged on the target and started in
+BIOS mode through CSMWrap.
+
+```
+UEFI menu (no CSM, x86 media of windows-10 / windows-8-1 / Embedded 8.1)
+  -> windows_native_iso.prepareX86Csmwrap: x86 Setup PE 6.3 or 10, BCD,
+     boot.sdi, root bootmgr, setup.exe, install image; usos-source.ini and
+     request.ini (profile=win-x86-uefi-csmwrap, donor = the ISO itself) in
+     \EFI\USOS\vista-csmwrap; the answer profile is staged as x86
+  -> micro-Linux step 610 (same picker + "FORMAT THE ENTIRE DISK?"), target
+     script with X86_SELF=1, MBR:
+       slot 1  NTFS "Windows", inactive, 1 MiB .. staging
+       slot 2  NTFS "USOS-SETUP", active, 1 GiB: the ISO's bootmgr, boot\bcd,
+               boot\boot.sdi, sources\boot.wim (Setup image) + support.cpio
+               + modern-support.cpio + usos-x86-csmwrap.flag +
+               usos-csmwrap-target.ini (+ usos-unattend.xml)
+       slot 3  CSMWrap ESP (xp_csmwrap_esp.sh)
+restart -> disk UEFI entry -> CSMWrap -> SeaBIOS -> MBR -> bootmgr -> x86 WinPE
+  -> usos-start.cmd mounts the ISO from DATA (usos-source x86, ImDisk x86)
+  -> usos-x86-csmwrap.cmd: usos-x86-csmwrap before (disk by MBR signature,
+     WinPE letters of its volumes dropped, Windows partition active, staging
+     inactive + hidden 0x17, InstallTo DiskID/PartitionID added to the answer)
+  -> setup.exe /noreboot /installfrom /unattend (no disk page)
+  -> usos-x86-csmwrap after (bootmgr + winload.exe on the Windows partition,
+     one active partition; staging entry removed; 2-minute "remove the stick"
+     notice) -> restart -> disk -> CSMWrap -> Windows phase 2 / OOBE
+```
+
+Failure of Setup: `usos-x86-csmwrap failed` makes the staging partition
+active again (the next boot of the disk retries).
+
+### 11.1 Limits / open
+
+* Answer commands are not wrapped by `usos-run-hidden` (x64 only) and user
+  INF drivers (DATA\Drivers) are not loaded on this path.
+* The WinPE notice text is English only (no `winpe.*` key yet).
+* The image list row and the boot-method help still describe the x64 path.
+* After the staging entry is removed its 1 GiB stays unallocated.
+* Same CSMWrap limits as section 3 (legacy VBIOS, one core reserved, Secure
+  Boot off; the menu refuses with Secure Boot on).
+
+### 11.2 Tests
+
+`tools/tests/test_windows_x86_csmwrap.py` (InstallTo edit), Zig tests
+(`formatX86CsmwrapRequest`, variant selection, golden `csmwrap` row).
+QEMU: `tools/tests/windows_native/qemu_native.py` with
+`USOS_NATIVE_MACHINE=pc USOS_NATIVE_TARGET_BUS=ahci USOS_NATIVE_TARGET_FIRST=1`
+(the target boots first once prepared; the stick stays connected for the ISO).
