@@ -11,6 +11,7 @@ ROOT=Path(__file__).resolve().parents[1]
 DRIVERS=ROOT/'media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86'
 SEVEN=os.environ.get('USOS_7Z','C:/Program Files/7-Zip/7z.exe')  # USOS_7Z: build kit copy
 META=('TXTSETUP.SIF','DOSNET.INF','HIVESYS.INF','SETUPREG.HIV')
+DRVINDEX='DRVINDEX.INF'  # integrated SP3 media only
 SELECTED=['ACPI/acpi.sys','Dependencies/ntoskrn8.sys','Dependencies/storport.sys',
  'KMDF/wdf01000.sys','KMDF/wdfldr.sys','SATA/genahci.sys','SATA/genahci.inf',
  *['USB3/'+n for n in ('ksecd8.sys','ucx01000.sys','usbd8.sys','usbhub3.sys','usbhub3.inf','usbxhci.sys','usbxhci.inf','wpprecor.sys')]]
@@ -153,14 +154,21 @@ def build_driver_overlay(iso,out):
     # holding only the community ACPI and registers it as a driver cabinet,
     # so the installed system's driver cache serves that ACPI, as on
     # Microsoft-slipstreamed media.
+    # GUI-mode PnP (setupapi) does not read TXTSETUP.SIF: it finds a driver
+    # file's cabinet through INF\DRVINDEX.INF. With only DRIVER.CAB listed
+    # there, the ACPI device install re-extracted the stock SP3 ACPI.SYS
+    # (5.1.2600.5512) over the community one and the X470 stopped at the
+    # next boot (BIOSTAR evidence 2026-10-10, setupapi.log W025). So the
+    # bundle's DRVINDEX.INF lists its SP3.CAB first, as Microsoft media do.
     integrated=kind=='xp-sp3' and 'I386\\'+sp_cab not in iso_listing(iso)
-    subprocess.run([SEVEN,'e',str(iso),*['I386\\'+n for n in META],*([] if integrated else ['I386\\'+sp_cab]),marker,'-o'+str(original),'-y'],check=True,stdout=subprocess.DEVNULL)
+    meta=META+(DRVINDEX,) if integrated else META
+    subprocess.run([SEVEN,'e',str(iso),*['I386\\'+n for n in meta],*([] if integrated else ['I386\\'+sp_cab]),marker,'-o'+str(original),'-y'],check=True,stdout=subprocess.DEVNULL)
     if not (original/marker).exists():raise ValueError('Driver experiment currently requires XP Professional SP3')
-    for n in META:assert (original/n).is_file(),n
+    for n in meta:assert (original/n).is_file(),n
     cabdir=out/'sp3-files';cabdir.mkdir(exist_ok=True)
     if not integrated:subprocess.run([SEVEN,'e',str(original/sp_cab),'-o'+str(cabdir),'-y'],check=True,stdout=subprocess.DEVNULL)
     bundle=out/'bundle';bundle.mkdir(exist_ok=True)
-    hashes=''.join(sha(original/n)+'  I386/'+n+'\n' for n in META)
+    hashes=''.join(sha(original/n)+'  I386/'+n+'\n' for n in meta)
     bundle_id=hashlib.sha256(hashes.encode()).hexdigest()
     (bundle/'source.sha256').write_text(hashes,encoding='ascii',newline='\n')
     i386=bundle/'I386';i386.mkdir(exist_ok=True)
@@ -220,6 +228,9 @@ def build_driver_overlay(iso,out):
         text=edit_section(text,sec,['d1,'+n for n in items],replace=False)
     if integrated:text=edit_section(text,'Files',['d1,'+sp_cab.lower()],replace=False)
     (i386/'DOSNET.INF').write_bytes(text.encode(encoding))
+    if integrated:
+        text,encoding=decode((original/DRVINDEX).read_bytes())
+        (i386/DRVINDEX).write_bytes(register_integrated_drvindex(text,sp_cab,['acpi.sys']).encode(encoding))
     text,encoding=decode((original/'HIVESYS.INF').read_bytes())
     reglines=[]
     for p,n,t,v in registry_values(usb3):
@@ -260,6 +271,21 @@ def register_integrated_cab(text,cab):
     text=edit_section(text,'SetupData',['DriverCabName = '+','.join(cabs)])
     text=edit_section(text,'SourceDisksFiles',[name+' = 1,,,,,,_x,39,0,0'])
     return edit_section(text,'FileFlags',[name+' = 16'])
+
+def register_integrated_drvindex(text,cab,files):
+    """DRVINDEX.INF of integrated SP3 media: the bundle's cabinet becomes the
+    first entry of CabFiles with its own file section (as on Microsoft SP3
+    media: CabFiles=SP3,driver, [SP3], [Cabs] SP3=SP3.cab) and the files
+    leave the other cabinets' sections, so setupapi extracts them only from it."""
+    section=cab.rsplit('.',1)[0]
+    names=sorted(f.lower() for f in files)
+    m=re.search(r'(?im)^[ \t]*CabFiles[ \t]*=[ \t]*(.*?)[ \t]*$',text)
+    cabs=[c.strip() for c in m.group(1).split(',') if c.strip()] if m else ['driver']
+    cabs=[section]+[c for c in cabs if c.lower()!=section.lower()]
+    text=edit_section(text,'Version',['CabFiles='+','.join(cabs)])
+    for other in cabs[1:]:text=drop_keys(text,other,set(names))
+    text=edit_section(text,section,names)
+    return edit_section(text,'Cabs',[section+'='+cab])
 
 def finish_bundle(out,bundle,i386,native,names,selected,bundle_id,iso):
     (bundle/'payload.sha256').write_text(''.join(sha(p)+'  I386/'+p.name+'\n' for p in sorted(i386.iterdir()) if p.is_file()),encoding='ascii',newline='\n')

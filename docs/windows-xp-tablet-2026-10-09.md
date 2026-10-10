@@ -100,3 +100,38 @@ in no log). The package got the Tablet bundle via `--add-source`.
   `setuperr.log` is empty, `tabletoc.log` has no errors.
 
 Not covered: the X470, pen/touch hardware, activation.
+
+## 6. X470 (2026-10-10): stop after the 3rd restart, fixed (DRVINDEX.INF)
+
+Build `B261010-115635-C836468A` on the SanDisk: Setup completed, then the
+first boot after GUI Setup stopped with a bluescreen at the XP loading
+screen. Offline reading of the installed system (BIOSTAR SSD):
+
+- `WINDOWS\system32\drivers\acpi.sys` was the **stock SP3** ACPI
+  (5.1.2600.5512, 187 776 bytes), not the community ACPI (5.1.2600.7777).
+  The stock one is the known X470 stop (0xA5).
+- `setupapi.log`: during GUI Setup the PnP install of
+  `ACPI_HAL\PNP0C08` (`acpi.inf [ACPI_Inst.NT]`) extracted `acpi.sys`
+  from `Driver Cache\i386\driver.cab` and logged W025 "A newer file ... was
+  overwritten by an older (signed) file", 5512 over 7777. No other bundle
+  file was overwritten; `dllcache` holds no `acpi.sys`.
+- `WINDOWS\inf\drvindex.inf` (copied from the disc unchanged) said
+  `CabFiles=driver` with `acpi.sys` under `[driver]`. GUI-mode PnP finds a
+  file's cabinet through DRVINDEX.INF, not TXTSETUP.SIF, so the bundle's
+  `sp3.cab` (in the driver cache) was never asked. Microsoft SP3 media have
+  `CabFiles=SP3,driver` with `acpi.sys` only under `[SP3]`, which is why XP
+  Pro and MCE keep the community ACPI. QEMU passed because the stock ACPI
+  works on QEMU's tables.
+
+**Fix:** for integrated media `tools/xp_driver_overlay.py` also ships a
+patched `I386\DRVINDEX.INF` (`register_integrated_drvindex`):
+`CabFiles=SP3,driver`, a `[SP3]` section with `acpi.sys`, `acpi.sys`
+removed from `[driver]`, `[Cabs] SP3=SP3.CAB`. The source's DRVINDEX.INF
+joins the bundle's `source.sha256` (integrated media only, so the XP Pro /
+MCE bundle ids are unchanged; the Tablet bundle id changes). Test:
+`tools/tests/test_xp_overlay_integrated.py` (`IntegratedDrvindex`).
+
+**BIOSTAR patched in place:** community `acpi.sys` written to
+`system32\drivers`, `inf\drvindex.inf` patched the same way and
+`drvindex.PNF` deleted (rebuilt by Windows); originals backed up in
+`USOS\XP\backup-20261010-acpi\` on that disk.
