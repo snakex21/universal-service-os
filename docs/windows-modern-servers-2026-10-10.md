@@ -68,8 +68,8 @@ network adapter: on the X470 the onboard NIC driver (2008 R2 / Win7 x64
 package) must be in `Drivers\Windows Home Server 2011` (or loaded through
 the wizard's "Install network drivers" button). Not re-run with a NIC.
 
-X470 network: the test board (ASRock X470 Taichi / Master SLI/ac; both have
-an **Intel I211-AT**, PCI `VEN_8086&DEV_1539`) needs Intel's Windows 7 /
+X470 network: the test board (ASRock X470 Master SLI/ac; it has
+an **Intel I211-AT** LAN, PCI `VEN_8086&DEV_1539`, and Intel 802.11ac Wi-Fi) needs Intel's Windows 7 /
 2008 R2 x64 driver (PROWinx64, `e1r62x64.inf`). Intel limits the I211
 (a client NIC) on Server systems; if the INF refuses on WHS, use a NIC with
 Server 2008 R2 drivers (Intel I210 / 82574L PCIe card, Realtek RTL8111 card

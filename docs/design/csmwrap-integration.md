@@ -256,7 +256,7 @@ byte-for-byte), same package goldens.
 
 ## 9. Hardware results
 
-**2026-09-27, X470 Taichi / Ryzen 7 5700X, CSM OFF, Secure Boot OFF, build
+**2026-09-27, X470 Master SLI/ac / Ryzen 7 5700X, CSM OFF, Secure Boot OFF, build
 B260927-153019: PASS.** USOS (UEFI) prepared the Intel SSD in CSMWrap mode
 (`legacy-xp-csmwrap.log`: NTFS in MBR slot 1 at LBA 2048, CSMWrap ESP in slot
 2 at LBA 234309632, 131072 sectors, BOOTX64.EFI read back); the firmware then

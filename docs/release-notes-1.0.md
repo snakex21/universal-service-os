@@ -131,7 +131,7 @@ modes. Windows XP, Vista and 7 always need Secure Boot off.
 
 ## Hardware-tested configurations
 
-**ASRock X470 (Taichi), Ryzen 7 5700X, Radeon RX 560, AMI Aptio.** Test
+**ASRock X470 Master SLI/ac, Ryzen 7 5700X, Radeon RX 560, AMI Aptio.** Test
 disks: Intel SSD 120 GB and Biostar S100 120 GB (SATA). Monitor: BenQ over
 HDMI. This is the main UEFI test target.
 
