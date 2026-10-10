@@ -75,12 +75,17 @@ def monitor(commands: list[str]) -> str:
 def launch(args: list[str], label: str, no_reboot: bool) -> None:
     port = free_port()
     full = [str(QEMU), "-name", f"USOS-native-{label}", "-machine", MACHINE, *ACCEL,
-            "-m", "6144", "-smp", "4", "-nic", "none", "-display", "none", "-device", "VGA,xres=1280,yres=800",
+            *(["-m", "4096", "-smp", "2", "-vga", "std"] if MACHINE == "pc" else ["-m", "6144", "-smp", "4", "-device", "VGA,xres=1280,yres=800"]),
+            "-nic", "none", "-display", "none",
             "-monitor", f"tcp:127.0.0.1:{port},server=on,wait=off",
             "-serial", f"file:{(RUN / f'serial-{label}.log').as_posix()}",
             "-drive", f"if=pflash,format=raw,readonly=on,file={OVMF_CODE.as_posix()}",
             "-drive", f"if=pflash,format=raw,file={(RUN / 'vars.fd').as_posix()}",
-            "-device", "qemu-xhci,id=xhci", "-device", "usb-kbd,bus=xhci.0", "-device", "usb-tablet,bus=xhci.0",
+            "-device", "qemu-xhci,id=xhci",
+            # USOS_NATIVE_PS2_INPUT=1: no USB keyboard/tablet, sendkey goes to
+            # the PS/2 keyboard (installed systems without an xHCI driver:
+            # Server 2008 R2 / Home Server 2011 first logon).
+            *([] if os.environ.get("USOS_NATIVE_PS2_INPUT") == "1" else ["-device", "usb-kbd,bus=xhci.0", "-device", "usb-tablet,bus=xhci.0"]),
             *args]
     if no_reboot:
         full.append("-no-reboot")

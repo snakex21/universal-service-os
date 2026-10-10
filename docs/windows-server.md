@@ -35,7 +35,8 @@ The golden table (`src/flow/testdata/routing_golden.tsv`) pins the result.
 | 2012 R2 | Windows 8.1 | native wimboot start from the ISO (PE 5.0, same helpers as Windows 10/11; 2026-10-08) | WORK copy + chainload |
 | 2012 | Windows 8 | WORK copy + chainload | WORK copy + chainload |
 | 2008 R2 | Windows 7 | native start: PE7 hybrid or the PE10 donor; Secure Boot off | micro-Linux Windows 7 request with `usos.legacy_folder_hex` |
-| 2008 | Vista | native start through the PE10 donor (SP2 x64 only); Secure Boot off | Core native wimboot start (Vista path) |
+| 2008 | Vista | native start through the PE10 donor (SP2 x64 only); without CSM the Vista CSMWrap variant (legacy MBR install); Secure Boot off | Core native wimboot start (Vista path) |
+| Home Server 2011 (own entry, UEFI only) | Windows 7 | native start through the PE10 donor, the ISO's `setup.exe` without the WHS WinPE shell (no 160 GB check; docs/windows-modern-servers-2026-10-10.md) | - |
 
 Notes:
 
