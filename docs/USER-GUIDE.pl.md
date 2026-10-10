@@ -280,8 +280,8 @@ USOS_DATA\
 │  │  ├─ Windows XP x64\  Windows 2000\  Windows NT 4.0\  Windows NT 3.51\  Windows NT 3.5\  Windows NT 3.1\
 │  │  ├─ Windows Me\  Windows 98 SE\  Windows 98\  Windows 95\
 │  │  ├─ Windows 3.11\  Windows 3.1\          (tylko Images)
-│  │  └─ Windows Server 2025 ... 2008, Windows Server 2003, Windows NT 3.51 Server,
-│  │                         Windows NT 3.5 Server, Windows NT 3.1 Advanced Server
+│  │  └─ Windows Server 2025 ... 2008, Windows Server 2003, Windows NT 4.0 Terminal Server,
+│  │                         Windows NT 3.51 Server, Windows NT 3.5 Server, Windows NT 3.1 Advanced Server
 │  ├─ Linux\
 │  │  ├─ Ubuntu\  Debian\  Fedora\  Linux Mint\  Arch Linux\  openSUSE\
 │  │  ├─ Manjaro\  Kali Linux\  SystemRescue\  GParted Live\  Clonezilla\

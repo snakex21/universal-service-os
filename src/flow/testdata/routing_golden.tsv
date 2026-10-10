@@ -39,6 +39,7 @@ system	windows-server-2008	windows	windows	any	\Systems\Windows\Windows Server 2
 system	windows-server-2003	windows	windows	any	\Systems\Windows\Windows Server 2003\Images	\Systems\Windows\Windows Server 2003\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-2000-server	windows_legacy	windows	uefi	\Systems\Windows\Windows 2000 Server\Images	\Systems\Windows\Windows 2000 Server\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-nt-4-server	windows_legacy	windows	any	\Systems\Windows\Windows NT 4.0 Server\Images	\Systems\Windows\Windows NT 4.0 Server\Unattended	.sif	WINNT.SIF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
+system	windows-nt-4-tse	windows_legacy	windows	uefi	\Systems\Windows\Windows NT 4.0 Terminal Server\Images	\Systems\Windows\Windows NT 4.0 Terminal Server\Unattended	.sif	WINNT.SIF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-nt-3-51-server	windows_legacy	windows	uefi	\Systems\Windows\Windows NT 3.51 Server\Images	\Systems\Windows\Windows NT 3.51 Server\Unattended	.sif	WINNT.SIF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-nt-3-5-server	windows_legacy	windows	uefi	\Systems\Windows\Windows NT 3.5 Server\Images	\Systems\Windows\Windows NT 3.5 Server\Unattended	.sif	WINNT.SIF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-nt-3-1-server	windows_legacy	windows	uefi	\Systems\Windows\Windows NT 3.1 Advanced Server\Images	\Systems\Windows\Windows NT 3.1 Advanced Server\Unattended	.sif	WINNT.SIF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
@@ -4387,6 +4388,114 @@ route	windows-nt-4-server	efi	disk_image	bios	-
 route	windows-nt-4-server	efi	disk_image	uefi	-
 route	windows-nt-4-server	efi	floppy_image	bios	-
 route	windows-nt-4-server	efi	floppy_image	uefi	-
+route	windows-nt-4-tse	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	windows-nt-4-tse	iso	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
+route	windows-nt-4-tse	iso	direct_iso	bios	-
+route	windows-nt-4-tse	iso	direct_iso	uefi	-
+route	windows-nt-4-tse	iso	wimboot	bios	-
+route	windows-nt-4-tse	iso	wimboot	uefi	-
+route	windows-nt-4-tse	iso	vhdboot	bios	-
+route	windows-nt-4-tse	iso	vhdboot	uefi	-
+route	windows-nt-4-tse	iso	direct_efi	bios	-
+route	windows-nt-4-tse	iso	direct_efi	uefi	-
+route	windows-nt-4-tse	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	windows-nt-4-tse	iso	chainload	uefi	-
+route	windows-nt-4-tse	iso	memdisk	bios	-
+route	windows-nt-4-tse	iso	memdisk	uefi	-
+route	windows-nt-4-tse	iso	disk_image	bios	-
+route	windows-nt-4-tse	iso	disk_image	uefi	-
+route	windows-nt-4-tse	iso	floppy_image	bios	-
+route	windows-nt-4-tse	iso	floppy_image	uefi	-
+route	windows-nt-4-tse	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-nt-4-tse	wim	automatic	uefi	-
+route	windows-nt-4-tse	wim	direct_iso	bios	-
+route	windows-nt-4-tse	wim	direct_iso	uefi	-
+route	windows-nt-4-tse	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-nt-4-tse	wim	wimboot	uefi	-
+route	windows-nt-4-tse	wim	vhdboot	bios	-
+route	windows-nt-4-tse	wim	vhdboot	uefi	-
+route	windows-nt-4-tse	wim	direct_efi	bios	-
+route	windows-nt-4-tse	wim	direct_efi	uefi	-
+route	windows-nt-4-tse	wim	chainload	bios	-
+route	windows-nt-4-tse	wim	chainload	uefi	-
+route	windows-nt-4-tse	wim	memdisk	bios	-
+route	windows-nt-4-tse	wim	memdisk	uefi	-
+route	windows-nt-4-tse	wim	disk_image	bios	-
+route	windows-nt-4-tse	wim	disk_image	uefi	-
+route	windows-nt-4-tse	wim	floppy_image	bios	-
+route	windows-nt-4-tse	wim	floppy_image	uefi	-
+route	windows-nt-4-tse	img	automatic	bios	-
+route	windows-nt-4-tse	img	automatic	uefi	-
+route	windows-nt-4-tse	img	direct_iso	bios	-
+route	windows-nt-4-tse	img	direct_iso	uefi	-
+route	windows-nt-4-tse	img	wimboot	bios	-
+route	windows-nt-4-tse	img	wimboot	uefi	-
+route	windows-nt-4-tse	img	vhdboot	bios	-
+route	windows-nt-4-tse	img	vhdboot	uefi	-
+route	windows-nt-4-tse	img	direct_efi	bios	-
+route	windows-nt-4-tse	img	direct_efi	uefi	-
+route	windows-nt-4-tse	img	chainload	bios	-
+route	windows-nt-4-tse	img	chainload	uefi	-
+route	windows-nt-4-tse	img	memdisk	bios	-
+route	windows-nt-4-tse	img	memdisk	uefi	-
+route	windows-nt-4-tse	img	disk_image	bios	-
+route	windows-nt-4-tse	img	disk_image	uefi	-
+route	windows-nt-4-tse	img	floppy_image	bios	-
+route	windows-nt-4-tse	img	floppy_image	uefi	-
+route	windows-nt-4-tse	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-nt-4-tse	vhd	automatic	uefi	-
+route	windows-nt-4-tse	vhd	direct_iso	bios	-
+route	windows-nt-4-tse	vhd	direct_iso	uefi	-
+route	windows-nt-4-tse	vhd	wimboot	bios	-
+route	windows-nt-4-tse	vhd	wimboot	uefi	-
+route	windows-nt-4-tse	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-nt-4-tse	vhd	vhdboot	uefi	-
+route	windows-nt-4-tse	vhd	direct_efi	bios	-
+route	windows-nt-4-tse	vhd	direct_efi	uefi	-
+route	windows-nt-4-tse	vhd	chainload	bios	-
+route	windows-nt-4-tse	vhd	chainload	uefi	-
+route	windows-nt-4-tse	vhd	memdisk	bios	-
+route	windows-nt-4-tse	vhd	memdisk	uefi	-
+route	windows-nt-4-tse	vhd	disk_image	bios	-
+route	windows-nt-4-tse	vhd	disk_image	uefi	-
+route	windows-nt-4-tse	vhd	floppy_image	bios	-
+route	windows-nt-4-tse	vhd	floppy_image	uefi	-
+route	windows-nt-4-tse	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-nt-4-tse	vhdx	automatic	uefi	-
+route	windows-nt-4-tse	vhdx	direct_iso	bios	-
+route	windows-nt-4-tse	vhdx	direct_iso	uefi	-
+route	windows-nt-4-tse	vhdx	wimboot	bios	-
+route	windows-nt-4-tse	vhdx	wimboot	uefi	-
+route	windows-nt-4-tse	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-nt-4-tse	vhdx	vhdboot	uefi	-
+route	windows-nt-4-tse	vhdx	direct_efi	bios	-
+route	windows-nt-4-tse	vhdx	direct_efi	uefi	-
+route	windows-nt-4-tse	vhdx	chainload	bios	-
+route	windows-nt-4-tse	vhdx	chainload	uefi	-
+route	windows-nt-4-tse	vhdx	memdisk	bios	-
+route	windows-nt-4-tse	vhdx	memdisk	uefi	-
+route	windows-nt-4-tse	vhdx	disk_image	bios	-
+route	windows-nt-4-tse	vhdx	disk_image	uefi	-
+route	windows-nt-4-tse	vhdx	floppy_image	bios	-
+route	windows-nt-4-tse	vhdx	floppy_image	uefi	-
+route	windows-nt-4-tse	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-nt-4-tse	efi	automatic	uefi	-
+route	windows-nt-4-tse	efi	direct_iso	bios	-
+route	windows-nt-4-tse	efi	direct_iso	uefi	-
+route	windows-nt-4-tse	efi	wimboot	bios	-
+route	windows-nt-4-tse	efi	wimboot	uefi	-
+route	windows-nt-4-tse	efi	vhdboot	bios	-
+route	windows-nt-4-tse	efi	vhdboot	uefi	-
+route	windows-nt-4-tse	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-nt-4-tse	efi	direct_efi	uefi	-
+route	windows-nt-4-tse	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	windows-nt-4-tse	efi	chainload	uefi	-
+route	windows-nt-4-tse	efi	memdisk	bios	-
+route	windows-nt-4-tse	efi	memdisk	uefi	-
+route	windows-nt-4-tse	efi	disk_image	bios	-
+route	windows-nt-4-tse	efi	disk_image	uefi	-
+route	windows-nt-4-tse	efi	floppy_image	bios	-
+route	windows-nt-4-tse	efi	floppy_image	uefi	-
 route	windows-nt-3-51-server	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
 route	windows-nt-3-51-server	iso	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
 route	windows-nt-3-51-server	iso	direct_iso	bios	-
@@ -9774,6 +9883,82 @@ profile	windows-nt-4-server	efi	chainload	-	efi-chainload
 profile	windows-nt-4-server	efi	memdisk	uefi	nt4-uefi-other
 profile	windows-nt-4-server	efi	disk_image	uefi	nt4-uefi-other
 profile	windows-nt-4-server	efi	floppy_image	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	iso	automatic	bios	iso-work-chainload
+profile	windows-nt-4-tse	iso	automatic	uefi	nt4-x86-qemu-csmwrap
+profile	windows-nt-4-tse	iso	automatic	-	iso-work-chainload
+profile	windows-nt-4-tse	iso	direct_iso	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	iso	wimboot	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	iso	vhdboot	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	iso	direct_efi	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	iso	chainload	bios	iso-work-chainload
+profile	windows-nt-4-tse	iso	chainload	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	iso	chainload	-	iso-work-chainload
+profile	windows-nt-4-tse	iso	memdisk	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	iso	disk_image	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	iso	floppy_image	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	wim	automatic	bios	wim-wimboot
+profile	windows-nt-4-tse	wim	automatic	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	wim	automatic	-	wim-wimboot
+profile	windows-nt-4-tse	wim	direct_iso	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	wim	wimboot	bios	wim-wimboot
+profile	windows-nt-4-tse	wim	wimboot	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	wim	wimboot	-	wim-wimboot
+profile	windows-nt-4-tse	wim	vhdboot	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	wim	direct_efi	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	wim	chainload	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	wim	memdisk	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	wim	disk_image	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	wim	floppy_image	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	img	automatic	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	img	direct_iso	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	img	wimboot	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	img	vhdboot	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	img	direct_efi	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	img	chainload	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	img	memdisk	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	img	disk_image	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	img	floppy_image	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhd	automatic	bios	vhd-vhdboot
+profile	windows-nt-4-tse	vhd	automatic	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhd	automatic	-	vhd-vhdboot
+profile	windows-nt-4-tse	vhd	direct_iso	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhd	wimboot	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhd	vhdboot	bios	vhd-vhdboot
+profile	windows-nt-4-tse	vhd	vhdboot	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhd	vhdboot	-	vhd-vhdboot
+profile	windows-nt-4-tse	vhd	direct_efi	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhd	chainload	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhd	memdisk	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhd	disk_image	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhd	floppy_image	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhdx	automatic	bios	vhd-vhdboot
+profile	windows-nt-4-tse	vhdx	automatic	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhdx	automatic	-	vhd-vhdboot
+profile	windows-nt-4-tse	vhdx	direct_iso	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhdx	wimboot	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhdx	vhdboot	bios	vhd-vhdboot
+profile	windows-nt-4-tse	vhdx	vhdboot	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhdx	vhdboot	-	vhd-vhdboot
+profile	windows-nt-4-tse	vhdx	direct_efi	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhdx	chainload	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhdx	memdisk	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhdx	disk_image	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	vhdx	floppy_image	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	efi	automatic	bios	efi-direct
+profile	windows-nt-4-tse	efi	automatic	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	efi	automatic	-	efi-direct
+profile	windows-nt-4-tse	efi	direct_iso	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	efi	wimboot	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	efi	vhdboot	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	efi	direct_efi	bios	efi-direct
+profile	windows-nt-4-tse	efi	direct_efi	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	efi	direct_efi	-	efi-direct
+profile	windows-nt-4-tse	efi	chainload	bios	efi-chainload
+profile	windows-nt-4-tse	efi	chainload	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	efi	chainload	-	efi-chainload
+profile	windows-nt-4-tse	efi	memdisk	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	efi	disk_image	uefi	nt4-uefi-other
+profile	windows-nt-4-tse	efi	floppy_image	uefi	nt4-uefi-other
 profile	windows-nt-3-51-server	iso	automatic	bios	iso-work-chainload
 profile	windows-nt-3-51-server	iso	automatic	uefi	nt3-x86-qemu-csmwrap
 profile	windows-nt-3-51-server	iso	automatic	-	iso-work-chainload
@@ -13024,6 +13209,60 @@ resolve	windows-nt-4-server	efi	chainload	chainload	1	ok
 resolve	windows-nt-4-server	efi	memdisk	-	0	UnsupportedImage
 resolve	windows-nt-4-server	efi	disk_image	-	0	UnsupportedImage
 resolve	windows-nt-4-server	efi	floppy_image	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	iso	automatic	chainload	1	ok
+resolve	windows-nt-4-tse	iso	direct_iso	-	0	UnsupportedMethod
+resolve	windows-nt-4-tse	iso	wimboot	-	0	UnsupportedMethod
+resolve	windows-nt-4-tse	iso	vhdboot	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	iso	direct_efi	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	iso	chainload	chainload	1	ok
+resolve	windows-nt-4-tse	iso	memdisk	-	0	UnsupportedMethod
+resolve	windows-nt-4-tse	iso	disk_image	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	iso	floppy_image	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	wim	automatic	wimboot	1	ok
+resolve	windows-nt-4-tse	wim	direct_iso	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	wim	wimboot	wimboot	1	ok
+resolve	windows-nt-4-tse	wim	vhdboot	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	wim	direct_efi	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	wim	chainload	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	wim	memdisk	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	wim	disk_image	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	wim	floppy_image	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	img	automatic	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	img	direct_iso	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	img	wimboot	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	img	vhdboot	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	img	direct_efi	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	img	chainload	-	0	UnsupportedMethod
+resolve	windows-nt-4-tse	img	memdisk	-	0	UnsupportedMethod
+resolve	windows-nt-4-tse	img	disk_image	-	0	UnsupportedMethod
+resolve	windows-nt-4-tse	img	floppy_image	-	0	UnsupportedMethod
+resolve	windows-nt-4-tse	vhd	automatic	vhdboot	1	ok
+resolve	windows-nt-4-tse	vhd	direct_iso	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	vhd	wimboot	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	vhd	vhdboot	vhdboot	1	ok
+resolve	windows-nt-4-tse	vhd	direct_efi	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	vhd	chainload	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	vhd	memdisk	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	vhd	disk_image	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	vhd	floppy_image	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	vhdx	automatic	vhdboot	1	ok
+resolve	windows-nt-4-tse	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	vhdx	wimboot	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	vhdx	vhdboot	vhdboot	1	ok
+resolve	windows-nt-4-tse	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	vhdx	chainload	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	vhdx	memdisk	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	vhdx	disk_image	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	efi	automatic	direct_efi	1	ok
+resolve	windows-nt-4-tse	efi	direct_iso	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	efi	wimboot	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	efi	vhdboot	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	efi	direct_efi	direct_efi	1	ok
+resolve	windows-nt-4-tse	efi	chainload	chainload	1	ok
+resolve	windows-nt-4-tse	efi	memdisk	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	efi	disk_image	-	0	UnsupportedImage
+resolve	windows-nt-4-tse	efi	floppy_image	-	0	UnsupportedImage
 resolve	windows-nt-3-51-server	iso	automatic	chainload	1	ok
 resolve	windows-nt-3-51-server	iso	direct_iso	-	0	UnsupportedMethod
 resolve	windows-nt-3-51-server	iso	wimboot	-	0	UnsupportedMethod
@@ -17339,6 +17578,78 @@ menu	windows-nt-4-server	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload
 menu	windows-nt-4-server	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-nt-4-server	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-nt-4-server	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-4-tse	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-4-tse	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-4-tse	iso	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-4-tse	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	iso	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	iso	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-nt-4-tse	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-4-tse	iso	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-4-tse	iso	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-4-tse	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	iso	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	wim	bios	0	automatic	wimboot	0	0	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-4-tse	wim	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-4-tse	wim	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-4-tse	wim	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-4-tse	wim	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	wim	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-4-tse	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-4-tse	wim	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-4-tse	wim	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-4-tse	wim	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	wim	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-4-tse	img	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-4-tse	img	bios	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-4-tse	img	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-4-tse	img	bios	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-4-tse	img	bios	5	floppy_image	-	0	1	experimental	Floppy image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-4-tse	img	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-4-tse	img	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-4-tse	img	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-4-tse	img	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-4-tse	img	uefi	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-4-tse	img	uefi	5	floppy_image	-	0	1	experimental	Floppy image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-4-tse	vhd	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-4-tse	vhd	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-4-tse	vhd	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-4-tse	vhd	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-4-tse	vhd	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	vhd	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-4-tse	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-4-tse	vhd	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-4-tse	vhd	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-4-tse	vhd	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	vhd	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	vhdx	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-4-tse	vhdx	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-4-tse	vhdx	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-4-tse	vhdx	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-4-tse	vhdx	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	vhdx	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-4-tse	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-4-tse	vhdx	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-nt-4-tse	vhdx	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-4-tse	vhdx	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	vhdx	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	efi	bios	0	automatic	direct_efi	0	0	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-4-tse	efi	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-4-tse	efi	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-nt-4-tse	efi	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-4-tse	efi	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	efi	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-nt-4-tse	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-nt-4-tse	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-nt-4-tse	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-nt-4-tse	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-nt-4-tse	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-nt-3-51-server	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	windows-nt-3-51-server	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-nt-3-51-server	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
@@ -21372,6 +21683,60 @@ help	windows-nt-4-server	efi	chainload	Chainload	Transfers control to another bo
 help	windows-nt-4-server	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
 help	windows-nt-4-server	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
 help	windows-nt-4-server	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-4-tse	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-4-tse	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-4-tse	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-4-tse	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-4-tse	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-4-tse	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-4-tse	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-4-tse	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-4-tse	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-4-tse	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-4-tse	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-4-tse	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-4-tse	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-4-tse	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-4-tse	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-4-tse	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-4-tse	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-4-tse	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-4-tse	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-4-tse	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-4-tse	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-4-tse	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-4-tse	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-4-tse	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-4-tse	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-4-tse	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-4-tse	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-4-tse	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-4-tse	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-4-tse	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-4-tse	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-4-tse	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-4-tse	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-4-tse	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-4-tse	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-4-tse	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-4-tse	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-4-tse	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-4-tse	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-4-tse	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-4-tse	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-4-tse	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-4-tse	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-4-tse	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-4-tse	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-nt-4-tse	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-nt-4-tse	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-nt-4-tse	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-nt-4-tse	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-nt-4-tse	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-nt-4-tse	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-nt-4-tse	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-nt-4-tse	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-nt-4-tse	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
 help	windows-nt-3-51-server	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
 help	windows-nt-3-51-server	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
 help	windows-nt-3-51-server	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.

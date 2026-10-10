@@ -61,6 +61,9 @@ var windowsProfiles = []dataProfile{
 	{"windows-server-2003", "Windows Server 2003", true, true},
 	// Windows 2000 Server: the Windows 2000 flow from UEFI.
 	{"windows-2000-server", "Windows 2000 Server", true, true},
+	// Windows NT 4.0 Terminal Server Edition: the NT 4.0 VM flow with the
+	// TSE CD (its own service pack: ServicePack next to Images).
+	{"windows-nt-4-tse", "Windows NT 4.0 Terminal Server", true, false},
 	// Windows NT 3.51 Server: the NT 3.51 VM flow with the Server CD.
 	{"windows-nt-3-51-server", "Windows NT 3.51 Server", true, false},
 	// Windows NT 3.5 Server: the NT 3.5 VM flow with the Server CD.
