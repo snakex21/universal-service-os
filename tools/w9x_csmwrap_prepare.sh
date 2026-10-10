@@ -129,6 +129,10 @@ usos_w9x_csmwrap_prepare() {
         # page by page, GUI Setup from a patched INITIAL.INF.
         windows-nt-3-1) tag=NT31 setup='' ;;
         windows-nt-3-1-server) tag=NT31S setup='' ;;
+        # Windows Embedded POSReady 2009 (2026-10-10, docs/posready-2009-2026-10-10.md):
+        # Windows PE + POSReady Setup in the VM (posready_csmwrap_target.sh,
+        # posready_qemu_install.sh), then the system starts through CSMWrap.
+        windows-embedded-posready-2009) tag=POSR setup='' ;;
         *) stop "request.ini names an unsupported system: $system" ;;
     esac
     w9x_csmwrap_log "REQUEST system=$system iso=$iso folder=$folder answer=${answer%%:*} size=$size_gib"
@@ -163,6 +167,13 @@ usos_w9x_csmwrap_prepare() {
         NT35|NT35S) nt4=yes nt_major=3 nt_minor=50 nt_name='Windows NT 3.5' ;;
         NT31|NT31S) nt4=yes nt_major=3 nt_minor=10 nt_name='Windows NT 3.1' ;;
     esac
+    posr=''
+    if [ "$tag" = POSR ]; then
+        posr=yes nt_name='Windows Embedded POSReady 2009'
+        for helper in posready_csmwrap_target.sh posready_qemu_install.sh posready_unattended.xml w9x_phase1_qemu.sh; do
+            [ -r "/usr/lib/usos/$helper" ] || stop "$helper is missing"
+        done
+    fi
     if [ -n "$nt4" ]; then
         for helper in nt4_csmwrap_target.sh nt4_qemu_install.sh w9x_phase1_qemu.sh; do
             [ -r "/usr/lib/usos/$helper" ] || stop "$helper is missing"
@@ -212,6 +223,33 @@ usos_w9x_csmwrap_prepare() {
     time_zone=
     [ -z "$dos_iso" ] || answer=dos
     [ -z "$nt4" ] || answer_inf=/run/nt4-winnt.sif
+    if [ -n "$posr" ]; then
+        # POSReady Setup reads unattended.xml: rendered from the template and
+        # the menu's POSR.SIF (key required), or the user's XML from DATA.
+        . /usr/lib/usos/posready_qemu_install.sh
+        answer_inf=/run/posready-unattended.xml
+        case "$answer" in
+            none) stop 'Windows Embedded POSReady 2009 needs a product key: choose an answer profile with the key or type it when the menu asks' ;;
+            profile)
+                cp /mnt/esp/EFI/USOS/answer/POSR.SIF /run/posready.sif || stop 'the answer profile could not be taken'
+                rm -f /mnt/esp/EFI/USOS/answer/POSR.SIF /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT4T.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF /mnt/esp/EFI/USOS/answer/NT31.SIF /mnt/esp/EFI/USOS/answer/NT31S.SIF
+                for staged in 98SE 98 ME 95; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
+                sync
+                posready_answer_xml /usr/lib/usos/posready_unattended.xml /run/posready.sif > "$answer_inf" || {
+                    rm -f /run/posready.sif "$answer_inf"
+                    stop 'Windows Embedded POSReady 2009 needs a product key: the answer profile has no POSReady key (key.windows-embedded-posready-2009)'; }
+                rm -f /run/posready.sif
+                answer_kind=PROFILE ;;
+            file:*)
+                name=${answer#file:}
+                case "$name" in */*|'') stop 'request.ini has an unsafe answer file name' ;; esac
+                cp "/mnt/data/Systems/Windows/$folder/Unattended/$name" "$answer_inf" || stop "the answer file is not on DATA: $name"
+                answer_kind=USER ;;
+            *) stop 'request.ini has an unknown answer kind' ;;
+        esac
+        answer=posr
+        w9x_csmwrap_log "POSR answer=$answer_kind"
+    fi
     case "$nt_major:$answer" in
         4:none) stop 'Windows NT 4.0 needs a product key: choose an answer profile with the key or type it when the menu asks' ;;
         3:none)
@@ -233,7 +271,7 @@ usos_w9x_csmwrap_prepare() {
             answer_kind=PROFILE ;;
     esac
     case "$answer" in
-        nt4) ;;
+        nt4|posr) ;;
         dos) : > "$answer_inf" ;;
         none)
             cp /mnt/esp/EFI/USOS/dos-native/win9x/MSBATCH.INF "$answer_inf" || stop 'the default MSBATCH.INF is missing'
@@ -309,13 +347,14 @@ usos_w9x_csmwrap_prepare() {
         layout="one FAT32 partition of $part_gib GiB"
         [ -z "$dos_iso" ] || layout='one FAT16 partition of 256 MiB'
         [ -z "$nt4" ] || layout='one FAT16 partition of 2000 MiB at the disk start'
+        [ -z "$posr" ] || layout='a 2 GiB FAT16 Setup and boot partition, then one NTFS partition for Windows (up to 32 GiB)'
         {
             printf 'ERASE ALL DATA ON THIS DISK\n\n'
             cat "$overview"
             printf '\n'
             printf 'All partitions, systems and files on this disk will be erased.\n'
             printf 'New layout (MBR): %s (drive C:) for %s, then a 64 MiB CSMWrap partition at the end of the disk; the rest stays unallocated.\n' "$layout" "$folder"
-            if [ -n "$nt4" ]; then
+            if [ -n "$nt4" ] || [ -n "$posr" ]; then
                 printf 'After the restart the disk starts by itself into the installed %s.\n' "$folder"
             else
                 printf 'After the restart the disk starts by itself and %s Setup continues on it.\n' "$folder"
@@ -332,7 +371,11 @@ usos_w9x_csmwrap_prepare() {
     # (qemu9x.cpio, tools/w9x_phase1_qemu.sh); 95 and machines without it keep
     # the native DOS Setup start.
     vm_phase1=no
-    if [ -n "$nt4" ]; then
+    if [ -n "$posr" ]; then
+        . /usr/lib/usos/w9x_phase1_qemu.sh
+        vm_reason=$(w9x_vm_available "$tag") || stop "$nt_name installs only in the VM on this PC, which is not available: $vm_reason"
+        w9x_csmwrap_log "POSR vm ($vm_reason)"
+    elif [ -n "$nt4" ]; then
         . /usr/lib/usos/w9x_phase1_qemu.sh
         . /usr/lib/usos/nt4_qemu_install.sh
         vm_reason=$(w9x_vm_available "$tag") || stop "$nt_name installs only in the VM on this PC, which is not available: $vm_reason"
@@ -355,7 +398,9 @@ usos_w9x_csmwrap_prepare() {
         w9x_csmwrap_log "PHASE1 vm=$vm_phase1 ($vm_reason)"
     fi
     usos_ui_stage 4 5 'Preparing the disk' "Copying $folder Setup, the USOS helpers and CSMWrap to the selected disk." || true
-    if [ -n "$nt4" ]; then
+    if [ -n "$posr" ]; then
+        set -- env TARGET_DEVICE="$TARGET_DEVICE" POSR_SOURCE_ISO="/mnt/data/$iso" POSR_UNATTENDED="$answer_inf" sh /usr/lib/usos/posready_csmwrap_target.sh
+    elif [ -n "$nt4" ]; then
         set -- env TARGET_DEVICE="$TARGET_DEVICE" NT4_SOURCE_ISO="/mnt/data/$iso" NT4_ANSWER_SIF="$answer_inf"             NT4_ANSWER_KIND="$answer_kind" NT4_SP_EXE="$sp_exe" NT4_EDITION="$([ "$tag" = NT4T ] && echo tse)" NT_MAJOR="$nt_major" NT_MINOR="$nt_minor" sh /usr/lib/usos/nt4_csmwrap_target.sh
     elif [ -n "$dos_iso" ]; then
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="$dos_iso" DOS_WIN3_ISO="$win3_iso" DOS_WIN_EARLY="${win_early:-}" \
@@ -371,6 +416,27 @@ usos_w9x_csmwrap_prepare() {
         stop 'The Windows 9x preparation failed; see EFI/USOS/win9x/prepare.log'
     fi
     rm -f "$answer_inf"
+    if [ -n "$posr" ]; then
+        posready_vm_progress() {
+            usos_ui_stage 5 5 "$folder installation in the background (start $1)"                 "Do not turn off the computer. Elapsed: $(printf '%d:%02d' $(($2 / 60)) $(($2 % 60))), written to disk: $3 MB." || true
+        }
+        accel=$(w9x_vm_accel)
+        w9x_csmwrap_log "POSR install start target=$TARGET_DEVICE accel=$accel"
+        posready_vm_install "$TARGET_DEVICE" "$W9X_DIR/posready" "$accel"
+        vm_rc=$?
+        w9x_csmwrap_log "POSR vm rc=$vm_rc"
+        usos_ui_stage 5 5 'Checking the installed system' '' || true
+        if [ "$vm_rc" != 0 ] || ! vm_check=$(posready_vm_finish "$TARGET_DEVICE" "$W9X_DIR/posready"); then
+            w9x_csmwrap_log "POSR FAILED rc=$vm_rc stalled=${W9X_VM_STALLED:-0}s ${vm_check:-}"
+            umount /mnt/data 2>/dev/null || true
+            sync
+            stop "The $nt_name installation did not finish. The computer was not restarted; logs: EFI/USOS/win9x/posready"
+        fi
+        w9x_csmwrap_log "POSR PASS $vm_check"
+        if ! TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=133120 sh /usr/lib/usos/xp_csmwrap_esp.sh >> "$W9X_DIR/prepare.log" 2>&1; then
+            stop 'The CSMWrap partition could not be written; see EFI/USOS/win9x/prepare.log'
+        fi
+    fi
     if [ -n "$nt4" ]; then
         nt4_vm_progress() {
             usos_ui_stage 5 5 "$folder installation in the background (start $1)"                 "Do not turn off the computer. Elapsed: $(printf '%d:%02d' $(($2 / 60)) $(($2 % 60))), written to disk: $3 MB." || true

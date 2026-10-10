@@ -42,6 +42,28 @@ for m in ahci sd_mod virtio_pci virtio_blk loop isofs vfat fat nls_cp437 nls_iso
 sleep 2; mdev -s 2>/dev/null
 [ -b "$TARGET" ] && [ -b "$SRC" ] || { log "no $TARGET or $SRC"; echo E2E-RESULT=FAIL; exit 1; }
 mkdir -p /mnt/data /run
+if [ "${POSR_STAGE:-}" = after ]; then
+    modprobe ntfs3 2>/dev/null
+    . /usr/lib/usos/posready_qemu_install.sh
+    mkdir -p /tmp/posr
+    posready_after_setup "$TARGET" /tmp/posr; rc=$?
+    cat /tmp/posr/runs.txt 2>/dev/null; cat /tmp/posr/setup-boot.ini 2>/dev/null
+    sync
+    [ "$rc" = 0 ] && echo E2E-RESULT=PASS || echo E2E-RESULT=FAIL
+    exit 0
+fi
+if [ "${POSR_STAGE:-}" = finish ]; then
+    modprobe ntfs3 2>/dev/null
+    . /usr/lib/usos/posready_qemu_install.sh
+    mkdir -p /tmp/posr
+    if check=$(posready_vm_finish "$TARGET" /tmp/posr); then log "finish PASS $check"; else log "finish FAIL $check"; echo E2E-RESULT=FAIL; exit 0; fi
+    cat /tmp/posr/FIRST.LOG; cat /tmp/posr/BOOT.INI
+    TARGET_DEVICE="$TARGET" USOS_XP_ESP_TAIL_SECTORS=133120 USOS_CSMWRAP_DIR=/usos-e2e/csmwrap sh /usr/lib/usos/xp_csmwrap_esp.sh > /tmp/esp.log 2>&1 || { cat /tmp/esp.log; echo E2E-RESULT=FAIL; exit 0; }
+    tail -n 2 /tmp/esp.log
+    sync
+    echo E2E-RESULT=PASS
+    exit 0
+fi
 dd if="$SRC" of=/mnt/data/source.iso bs=1M 2>/dev/null || { echo E2E-RESULT=FAIL; exit 1; }
 log "iso $(wc -c < /mnt/data/source.iso) bytes"
 if ! env TARGET_DEVICE="$TARGET" POSR_SOURCE_ISO=/mnt/data/source.iso POSR_UNATTENDED=/usos-e2e/unattended.xml \
@@ -73,13 +95,30 @@ SCRIPTS = ("posready_csmwrap_target.sh", "posready_qemu_install.sh", "w9x_phase1
 
 
 def overlay(unattended: bytes, extra: dict[str, bytes]) -> bytes:
-    entries = [("usos-e2e", 0o040755, b""), *[("usos-e2e/" + k, 0o100644, v) for k, v in extra.items()], ("usos-e2e/posr.sh", 0o100755, GUEST.encode()),
+    entries = [("usos-e2e", 0o040755, b""), ("usos-e2e/csmwrap", 0o040755, b""), *[("usos-e2e/" + k, 0o100644, v) for k, v in extra.items()], ("usos-e2e/posr.sh", 0o100755, GUEST.encode()),
                ("usos-e2e/unattended.xml", 0o100644, unattended),
                ("usr", 0o040755, b""), ("usr/lib", 0o040755, b""), ("usr/lib/usos", 0o040755, b"")]
     for name in SCRIPTS:
         f = ROOT / "tools" / name
         if f.exists():
-            entries.append(("usr/lib/usos/" + name, 0o100755, f.read_bytes()))
+            entries.append(("usr/lib/usos/" + name, 0o100755, f.read_bytes().replace(b"\r\n", b"\n")))
+    # The payload build_micro_linux.py puts into initramfs-usos (this
+    # checkout's copies, so a build before the test is not needed).
+    entries += [("usr/lib/usos/posready", 0o040755, b""), ("usr/lib/usos/posready/DRV", 0o040755, b""),
+                ("usr/lib/usos/posready_unattended.xml", 0o100644, (ROOT / "tools/posready_unattended.xml").read_bytes()),
+                ("usr/lib/usos/posready/X470.REG", 0o100644, (ROOT / "tools/posready_x470.reg").read_bytes()),
+                ("usr/lib/usos/posready/FIRST.CMD", 0o100644, (ROOT / "tools/posready_first.cmd").read_bytes())]
+    for f in sorted(nt3.CSMWRAP.rglob("*")):
+        rel = "usos-e2e/csmwrap/" + f.relative_to(nt3.CSMWRAP).as_posix()
+        if f.is_dir():
+            entries.append((rel, 0o040755, b""))
+        else:
+            entries.append((rel, 0o100644, f.read_bytes()))
+    sys.path.insert(0, str(ROOT / "tools"))
+    from build_micro_linux import POSREADY_DRIVERS  # noqa: E402
+    drivers = ROOT / "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86"
+    for name in POSREADY_DRIVERS:
+        entries.append(("usr/lib/usos/posready/DRV/" + name.split("/")[1], 0o100644, (drivers / name).read_bytes()))
     return nt3.cpio_newc(entries)
 
 
@@ -140,11 +179,19 @@ def prepare(args, out: Path, target: Path) -> bool:
 def host_vm(args, out: Path, target: Path) -> int:
     """POSReady Setup on this PC's QEMU: one run per guest restart (-no-reboot)."""
     rc = 0
-    for run in range(1, args.vm_runs + 1):
+    if args.start_run > 1 and args.after_first:
+        saved = list(args.env)
+        args.env = saved + ["POSR_STAGE=after"]
+        ok = prepare(args, out, target)
+        args.env = saved
+        print(f"after-setup step {'PASS' if ok else 'FAIL'}", flush=True)
+        if not ok:
+            return 1
+    for run in range(args.start_run, args.vm_runs + 1):
         port = nt3.free_port()
         accel = ["-accel", "whpx", "-accel", "tcg"] if args.accel == "whpx" else ["-accel", "tcg"]
         cmd = [str(nt3.QEMU), "-machine", "pc", *accel, "-cpu", "qemu32" if args.accel != "whpx" else "max",
-               "-smp", "2", "-m", "1024", "-no-reboot", "-nic", "none", "-display", "none", "-vga", "std",
+               "-smp", str(args.smp), "-m", "1024", "-no-reboot", "-nic", "none", "-display", "none", "-vga", "std",
                "-drive", f"file={target.as_posix()},format=qcow2,if=ide,index=0,media=disk,cache=writeback",
                "-rtc", "base=localtime", "-monitor", f"tcp:127.0.0.1:{port},server=on,wait=off"]
         q = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=(out / f"vm-{run}-qemu.log").open("wb"))
@@ -159,7 +206,10 @@ def host_vm(args, out: Path, target: Path) -> int:
         mon.settimeout(0.5)
 
         def hmp(text: str, wait: float = 0.5) -> None:
-            mon.sendall(text.encode() + b"\n")
+            try:  # the guest may end QEMU at any moment (-no-reboot)
+                mon.sendall(text.encode() + b"\n")
+            except OSError:
+                return
             time.sleep(wait)
             try:
                 while mon.recv(65536):
@@ -183,7 +233,7 @@ def host_vm(args, out: Path, target: Path) -> int:
                 except Exception:  # noqa: BLE001
                     pass
                 print(f"vm run {run} shot {n} at {int(time.time() - t0)} s", flush=True)
-                if args.type and not typed and time.time() - t0 >= args.type_after:
+                if args.type and not typed and run >= args.type_from_run and time.time() - t0 >= args.type_after:
                     typed = True
                     for k in keys_for(args.type):
                         hmp(f"sendkey {k}", 0.15)
@@ -192,6 +242,14 @@ def host_vm(args, out: Path, target: Path) -> int:
             q.kill()
             q.wait()
         print(f"vm run {run} {'ended by the guest' if ended else 'timed out'} after {int(time.time() - t0)} s", flush=True)
+        if run == 1 and ended:
+            saved = list(args.env)
+            args.env = saved + ["POSR_STAGE=after"]
+            ok = prepare(args, out, target)
+            args.env = saved
+            print(f"after-setup step {'PASS' if ok else 'FAIL'}", flush=True)
+            if not ok:
+                return 1
         if not ended:
             rc = 1
             break
@@ -223,6 +281,7 @@ def main() -> int:
     p.add_argument("--presetup")
     p.add_argument("--type", help="text typed into the VM once (\n = Enter)")
     p.add_argument("--type-after", type=int, default=120)
+    p.add_argument("--type-from-run", type=int, default=1, help="type only in this run and later (each run once)")
     p.add_argument("--postsetup")
     p.add_argument("--accel", default="whpx", choices=["whpx", "tcg"])
     p.add_argument("--timeout", type=int, default=7200)
@@ -231,9 +290,16 @@ def main() -> int:
     p.add_argument("--vm", choices=["none", "host", "nested"], default="none")
     p.add_argument("--vm-only", action="store_true", help="skip stage 1 (reuse OUT/target.qcow2)")
     p.add_argument("--vm-runs", type=int, default=3)
+    p.add_argument("--smp", type=int, default=1, help="install VM CPUs (1 like posready_qemu_install.sh)")
+    p.add_argument("--start-run", type=int, default=1, help="with --vm-only: continue at this run")
+    p.add_argument("--after-first", action="store_true", help="with --start-run > 1: run the after-setup step first")
     p.add_argument("--vm-seconds", type=int, default=3600)
     p.add_argument("--shot", type=int, default=30)
     p.add_argument("--size", default="16G")
+    p.add_argument("--finish", action="store_true", help="after the VM runs: posready_vm_finish + xp_csmwrap_esp.sh in micro-Linux")
+    p.add_argument("--finish-only", action="store_true")
+    p.add_argument("--boot", action="store_true", help="then boot the disk like the X470 (OVMF + CSMWrap, run_nt3 boot())")
+    p.add_argument("--boot-seconds", type=int, default=420)
     args = p.parse_args()
     nt3.set_root(args.root)
     args.out.mkdir(parents=True, exist_ok=True)
@@ -242,11 +308,23 @@ def main() -> int:
         target.unlink(missing_ok=True)
         subprocess.run([str(nt3.QEMU_IMG), "create", "-q", "-f", "qcow2", str(target), args.size], check=True)
         ok = prepare(args, args.out, target)
-        print("[PASS] POSReady target through micro-Linux" if ok else "[FAIL] POSReady target (console.log)")
+        print("[PASS] POSReady target through micro-Linux" if ok else "[FAIL] POSReady target (console.log)", flush=True)
         if not ok:
             return 1
-    if args.vm == "host":
-        return host_vm(args, args.out, target)
+    if args.vm == "host" and not args.finish_only:
+        rc = host_vm(args, args.out, target)
+        if rc:
+            return rc
+    if args.finish or args.finish_only:
+        saved = list(args.env)
+        args.env = saved + ["POSR_STAGE=finish"]
+        ok = prepare(args, args.out, target)
+        args.env = saved
+        print(f"finish + CSMWrap ESP {'PASS' if ok else 'FAIL'}", flush=True)
+        if not ok:
+            return 1
+    if args.boot:
+        nt3.boot(args.out, target, args.boot_seconds)
     return 0
 
 

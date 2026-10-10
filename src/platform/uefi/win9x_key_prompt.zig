@@ -32,10 +32,12 @@ const cancel_id: u8 = 2;
 /// own (its ProductID is checked by micro-Linux).
 pub fn needed(system_id: []const u8, profile: ?*const Profile, answer_file: bool) bool {
     const nt4 = answer.nt4.isNt4(system_id);
-    if (!std.ascii.eqlIgnoreCase(system_id, "windows-95") and !nt4) return false;
+    const posready = answer.posready.isPosReady(system_id);
+    if (!std.ascii.eqlIgnoreCase(system_id, "windows-95") and !nt4 and !posready) return false;
     if (answer_file) return false;
     const p = profile orelse return true;
     if (nt4) return !answer.nt4.validKey(p.keyFor(system_id));
+    if (posready) return !answer.posready.validKey(p.keyFor(system_id));
     return !answer.applies.has95Key(p);
 }
 
@@ -62,13 +64,21 @@ pub fn withKey(base: ?*const Profile, ui_language: []const u8, system_id: []cons
     return p;
 }
 
+/// POSReady 2009 takes a 5x5 key; Windows 95 / NT 4.0 the 95 shapes.
+var want_five_by_five = false;
+
+fn validInput(value: []const u8) bool {
+    return if (want_five_by_five) answer.posready.validKey(value) else valid95(value);
+}
+
 fn hookInvalid(_: *anyopaque, index: usize) bool {
-    return index == 0 and show_invalid and !valid95(key_text.slice());
+    return index == 0 and show_invalid and !validInput(key_text.slice());
 }
 
 /// Asks for the key; null on Back/Cancel. The returned slice lives until
 /// the next call.
-pub fn ask(system_name: []const u8) ?[]const u8 {
+pub fn ask(system_name: []const u8, system_id: []const u8) ?[]const u8 {
+    want_five_by_five = answer.posready.isPosReady(system_id);
     key_text = .{ .max = 29 };
     show_invalid = false;
     var label: [96]u8 = undefined;
@@ -85,7 +95,7 @@ pub fn ask(system_name: []const u8) ?[]const u8 {
             .x_on, .y_on => {},
             .action => |id| {
                 if (id == cancel_id) return null;
-                if (valid95(key_text.slice())) return key_text.slice();
+                if (validInput(key_text.slice())) return key_text.slice();
                 show_invalid = true;
                 selected = 0;
             },
@@ -106,5 +116,9 @@ test "a 95 key is asked only for Windows 95 without one" {
     try std.testing.expect(!needed("windows-nt-4", &p, false) and !needed("windows-nt-4", null, true));
     // NT 3.51 takes no key (INITIAL.INF DisplayPidDlg = NO): never asked.
     try std.testing.expect(!needed("windows-nt-3-51", null, false) and !needed("windows-nt-3-51-server", null, false));
+    // POSReady 2009: a 5x5 key.
+    try std.testing.expect(needed("windows-embedded-posready-2009", null, false));
+    try p.setSystemKey("windows-embedded-posready-2009", "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE");
+    try std.testing.expect(!needed("windows-embedded-posready-2009", &p, false));
     try std.testing.expect(valid95("123-1234567") and !valid95("AAAAA-BBBBB-CCCCC-DDDDD-EEEEE") and !valid95("12345-OEM"));
 }

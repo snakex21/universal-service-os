@@ -61,8 +61,8 @@ func TestDataProfileCountsStayInSyncWithCatalog(t *testing.T) {
 	// Center Edition 2005, XP Tablet PC Edition 2005, Windows Embedded 8.1
 	// Industry, Windows NT 4.0 Terminal Server Edition and Windows Home Server
 	// 2011.
-	if len(windowsProfiles) != 44 {
-		t.Fatalf("windows profile count=%d, want 44", len(windowsProfiles))
+	if len(windowsProfiles) != 45 {
+		t.Fatalf("windows profile count=%d, want 45", len(windowsProfiles))
 	}
 	// Nine distributions plus the SystemRescue, GParted Live and Clonezilla rescue ISOs.
 	if len(linuxProfiles) != 12 {

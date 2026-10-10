@@ -30,6 +30,9 @@ var windowsProfiles = []dataProfile{
 	{"windows-xp-mce", "Windows XP Media Center Edition 2005", true, true},
 	// Windows XP Tablet PC Edition 2005: the XP flow from UEFI.
 	{"windows-xp-tablet", "Windows XP Tablet PC Edition 2005", true, true},
+	// Windows Embedded POSReady 2009: its own VM flow from UEFI (Windows PE +
+	// POSReady Setup in QEMU on the target, then CSMWrap).
+	{"windows-embedded-posready-2009", "Windows Embedded POSReady 2009", true, false},
 	{"windows-2000", "Windows 2000", true, true},
 	{"windows-nt-4", "Windows NT 4.0", true, false},
 	{"windows-nt-3-51", "Windows NT 3.51", true, false},

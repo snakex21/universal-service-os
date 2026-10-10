@@ -25,6 +25,11 @@ pub const entries = [_]SystemEntry{
     // components in CMPNENTS\TABLETPC): the same XP flow from UEFI with its
     // own DATA folder (usos.xp_edition=tablet). Not in the BIOS Core.
     uefiLegacy("windows-xp-tablet", "Windows XP Tablet PC Edition 2005", "Windows XP Tablet PC Edition 2005"),
+    // Windows Embedded POSReady 2009 (XP SP3 Embedded; Windows PE + .NET
+    // Setup + setup.wim, not XP text mode): the whole install in the VM on
+    // the target like NT 4.0 (profile posready-x86-qemu-csmwrap,
+    // docs/posready-2009-2026-10-10.md), then CSMWrap. Not in the BIOS Core.
+    uefiLegacy("windows-embedded-posready-2009", "Windows Embedded POSReady 2009", "Windows Embedded POSReady 2009"),
 }) ++ [_]SystemEntry{
     // XP Professional x64 (NT 5.2 amd64): the NT5 staging with an AMD64
     // source (profile xp-x64-sp2-uefi-csm from UEFI, experimental).

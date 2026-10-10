@@ -39,6 +39,7 @@ SOURCE_ISO=${POSR_SOURCE_ISO:?POSR_SOURCE_ISO is required}
 UNATTENDED=${POSR_UNATTENDED:?POSR_UNATTENDED is required}
 POSTSETUP=${POSR_POSTSETUP:-}
 PRESETUP=${POSR_PRESETUP:-}
+PAYLOAD=${POSR_PAYLOAD_DIR:-/usr/lib/usos/posready}
 SYSLINUX_DIR=${POSR_SYSLINUX_DIR:-/usr/share/syslinux}
 LIB=${USOS_LIB_DIR:-/usr/lib/usos}
 PART_START=63
@@ -54,7 +55,7 @@ fail() { printf '[POSREADY] STOP: %s\n' "$1" >&2; exit 1; }
 for tool in dd od mkfs.fat mdir syslinux mount umount losetup blockdev awk sync wc tr cp; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
-for file in "$LIB/xp-geometry-fix-mbr-440.bin" "$SYSLINUX_DIR/chain.c32" "$SYSLINUX_DIR/libcom32.c32" "$SYSLINUX_DIR/libutil.c32" "$UNATTENDED" "$SOURCE_ISO"; do
+for file in "$LIB/xp-geometry-fix-mbr-440.bin" "$SYSLINUX_DIR/chain.c32" "$SYSLINUX_DIR/libcom32.c32" "$SYSLINUX_DIR/libutil.c32" "$UNATTENDED" "$SOURCE_ISO" "$PAYLOAD/FIRST.CMD" "$PAYLOAD/X470.REG" "$PAYLOAD/DRV/acpi.sys" "$PAYLOAD/DRV/genahci.sys"; do
     [ -r "$file" ] || fail "missing: $file"
 done
 if awk -v d="$TARGET_DEVICE" 'index($1, d) == 1 { found=1 } END { exit(found ? 0 : 1) }' /proc/mounts; then
@@ -97,7 +98,8 @@ size=$(blockdev --getsize64 "$TARGET_DEVICE") || fail 'cannot read the target si
 total=$((size / 512))
 [ "$total" -ge "$MIN_SECTORS" ] || fail 'the selected disk is smaller than 4 GiB; no disk was changed'
 [ "$total" -le 4294967295 ] || fail 'the selected disk is larger than 2 TiB (MBR); no disk was changed'
-visible=$total
+# The last 133120 sectors stay free for the CSMWrap ESP (xp_csmwrap_esp.sh).
+visible=$((total - 133120 - 2048))
 [ "$visible" -le "$VISIBLE_SECTORS" ] || visible=$VISIBLE_SECTORS
 # Partition 1 = PE (FAT16, from sector 63; QEMU 2026-10-10: at the disk end
 # SYSLINUX 6.04 loaded LDLINUX.SYS but read no SYSLINUX.CFG), partition 2 =
@@ -166,6 +168,11 @@ cp "$UNATTENDED" "$work/pe/Setup/unattended.xml" || fail 'cannot copy unattended
 # Debug (POSR_DEBUG_SHELL=1): no winpeshl.ini, so PE opens startnet.cmd's
 # command prompt in \Setup instead of SetupLauncher.
 [ "${POSR_DEBUG_SHELL:-0}" != 1 ] || rm -f "$work/pe/MININT/system32/winpeshl.ini" "$work/pe/MININT/SYSTEM32/WINPESHL.INI"
+# \USOS\POSR: FIRST.CMD (the RunOnce of the first logon in the VM), the X470
+# registry values and the XP path's community driver set.
+mkdir -p "$work/pe/USOS/POSR/DRV" || fail 'cannot create \USOS\POSR'
+cp "$PAYLOAD/FIRST.CMD" "$PAYLOAD/X470.REG" "$work/pe/USOS/POSR/" || fail 'cannot copy FIRST.CMD / X470.REG'
+cp "$PAYLOAD"/DRV/* "$work/pe/USOS/POSR/DRV/" || fail 'cannot copy the X470 drivers'
 
 sync
 umount "$work/pe" || fail 'cannot unmount the PE partition'

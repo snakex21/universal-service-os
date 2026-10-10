@@ -156,7 +156,9 @@ pub fn show(
         // (nt3-x86-qemu-csmwrap): the whole install in the VM.
         const nt4 = usos.flow.answer.nt4.isNt4(system.id);
         const nt3 = usos.flow.answer.nt3.isNt3(system.id);
-        fields.add(view.t(.summary_preparation), if (nt4 or nt3) view.t(.summary_nt4_csmwrap) else view.t(.summary_w9x_csmwrap));
+        // POSReady 2009: also the whole install in the VM (no NT limits note).
+        const posready = usos.flow.answer.posready.isPosReady(system.id);
+        fields.add(view.t(.summary_preparation), if (nt4 or nt3 or posready) view.t(.summary_nt4_csmwrap) else view.t(.summary_w9x_csmwrap));
         fields.add(view.t(.summary_disk), view.t(.summary_w9x_disk));
         if (nt4 or nt3) {
             notes[note_count] = view.t(if (nt3) .summary_nt3_limits else .summary_nt4_limits);
@@ -329,7 +331,7 @@ fn start(
         const key_prompt = @import("win9x_key_prompt.zig");
         const chosen: ?*const answer_profiles.Profile = if (answer.profile) |index| answer_profiles.get(index) else null;
         if (key_prompt.needed(system.id, chosen, chosen == null and unattended != null)) {
-            const key = key_prompt.ask(system.name) orelse return;
+            const key = key_prompt.ask(system.name, system.id) orelse return;
             keyed_95 = key_prompt.withKey(chosen, view.languageCode(), system.id, key) catch |err| return showError(view.t(.error_preparation), err);
         }
     }

@@ -136,6 +136,10 @@ pub const traits_table = [_]SystemTraits{
     // Windows XP Tablet PC Edition 2005 (UEFI only, windows_legacy.zig): the
     // same XP x86 staging from its own DATA folder (CMPNENTS\TABLETPC).
     .{ .system_id = "windows-xp-tablet", .route_as = "windows-xp" },
+    // Windows Embedded POSReady 2009 (UEFI only, windows_legacy.zig): its
+    // own VM flow (posready-x86-qemu-csmwrap); POSReady Setup reads an XML
+    // answer (a DATA Unattended\*.xml is offered), the XP icon.
+    .{ .system_id = "windows-embedded-posready-2009", .icon_as = "windows-xp", .answer = .autounattend_xml },
     // Windows Embedded 8.1 Industry (UEFI only, windows_modern.zig): the
     // Windows 8.1 native start from its own DATA folder.
     .{ .system_id = "windows-embedded-8-1-industry", .route_as = "windows-8-1" },
@@ -315,6 +319,7 @@ const dos_family_ids = &[_][]const u8{ "windows-98-se", "windows-98", "windows-m
 pub const windows_early_ids = &[_][]const u8{ "windows-wfw-3-11", "windows-3-0", "windows-2-11-386", "windows-2-11-286", "windows-2-03", "windows-1-04", "windows-1-01" };
 
 const nt4_ids = &[_][]const u8{ "windows-nt-4", "windows-nt-4-server", "windows-nt-4-tse" };
+const posready_ids = &[_][]const u8{"windows-embedded-posready-2009"};
 const nt3_ids = &[_][]const u8{ "windows-nt-3-51", "windows-nt-3-51-server", "windows-nt-3-5", "windows-nt-3-5-server", "windows-nt-3-1", "windows-nt-3-1-server" };
 
 const uefi_profiles = [_]Profile{
@@ -352,6 +357,12 @@ const uefi_profiles = [_]Profile{
     // USOSNT3.EXE as !DetachedProgram); no service pack (docs/nt351-2026-10-08.md).
     .{ .id = "nt3-x86-qemu-csmwrap", .systems = .{ .ids = nt3_ids }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .win9x_uefi, .progress = .direct_iso },
     .{ .id = "nt3-uefi-other", .systems = .{ .ids = nt3_ids }, .firmware = .uefi, .backend = null, .progress = .none },
+    // Windows Embedded POSReady 2009 from UEFI: the same step 620; Windows PE
+    // + POSReady Setup run in QEMU on the target disk (posready_csmwrap_target.sh,
+    // posready_qemu_install.sh), then the system starts through CSMWrap
+    // (docs/posready-2009-2026-10-10.md).
+    .{ .id = "posready-x86-qemu-csmwrap", .systems = .{ .ids = posready_ids }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .win9x_uefi, .progress = .direct_iso },
+    .{ .id = "posready-uefi-other", .systems = .{ .ids = posready_ids }, .firmware = .uefi, .backend = null, .progress = .none },
 };
 
 /// Ordered: firmware-specific rules first, then the firmware-independent
