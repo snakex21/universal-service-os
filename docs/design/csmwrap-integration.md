@@ -568,12 +568,10 @@ Where the ISOs go on DATA: the system ISO in its usual folder
 
 ### 12.1 Limits / open
 
-* No USB 3 driver is put into the installed system yet: on the X470 (xHCI
-  only) phase 2 / the desktop have no USB keyboard or mouse. Windows 7 x86:
-  the user's Win8 generic USB backport (`driwer\x86`, `NTx86.6.1`) plus
-  KMDF 1.11 x86 (KB2685811 / KB2864202) would have to be serviced offline
-  (as the x64 Windows 7 path does with DATA drivers); Vista / 2008 x86: no
-  x86 NT 6.0 xHCI package exists locally (the x64 v11 package is x64 only).
+* USB 3 in the installed system: Windows 7 x86 see 12.3 (user files on
+  DATA); Vista / Server 2008 x86 still none (no 32-bit NT 6.0 xHCI driver,
+  12.3), so on the X470 (xHCI only) their phase 2 / desktop have no USB
+  keyboard or mouse.
 * DATA\Drivers and answer-command wrapping: as section 11.1.
 * A USOS profile renders x86 components; with no key and no edition Vista /
   2008 Setup asks for them (a DATA answer with `/IMAGE/INDEX` avoids that).
@@ -600,3 +598,50 @@ USOS_NATIVE_TARGET_FIRST=1`:
   ESP. The disk alone (stick removed, same NVRAM) boots to the desktop.
 * Input on the desktop: none (qemu-xhci, Server 2008 has no xHCI driver;
   see 12.1). Setup in PE10 had USB.
+
+### 12.3 USB 3 for the installed 32-bit Windows 7 (2026-10-10)
+
+After Setup returned 0 (`/noreboot`) and before the staging entry is
+removed, `usos-x86-csmwrap.cmd` runs a `usb3` step (never fatal):
+
+* `usos-x86-csmwrap.exe target <file>`: the volume at the prepared Windows
+  partition keeps its letter or gets a free one; the file gets
+  `<letter>: <major.minor>` from `Windows\System32\ntoskrnl.exe`.
+* NT 6.1 only. From DATA (the read-only ImDisk mapping the ISO came from):
+  `Systems\Windows\Windows 7\Updates\*kb2864202-x86*.msu` (or
+  `*kb2685811-x86*`; expanded with `expand.exe`) and
+  `Systems\Windows\Windows 7\Drivers\x86\` (one folder per package). The x86
+  PE10's DISM adds the KMDF 1.11 CAB (`/Add-Package`), then the packages
+  (`/Add-Driver /Recurse /ForceUnsigned`; 32-bit Windows 7 does not enforce
+  kernel-mode signatures, so a community-signed package loads). Logs:
+  `<Windows>\USOS-usb3\dism-*.log`. Missing files or a DISM error only skip
+  the step. Windows 8.1 / 10 x86 (same script) are left alone.
+* The 32-bit package used for the tests is the user's Win8 generic USB
+  backport (`driwer\x86`: usbxhci / ucx01000 / usbhub3 / usbd8
+  6.2.9200.22453, `NTx86.6.1`, PCI\CC_0C0330 plus AMD/ASMedia/Intel/...
+  HWIDs, catalog signed by Riolin); it needs KMDF 1.11. KMDF x86 for
+  Windows 7: Microsoft Update Catalog
+  `windows6.1-kb2864202-x86_9e556e48e72ae30ec89c5f1c713acde26da2556a.msu`
+  (the user has it in `driwer\`). Both are user files on DATA, never in the
+  repo or the release (temporary bridge, ROADMAP L6 rule).
+* NT 6.0 x86 (Vista / Server 2008): skipped. Checked 2026-10-10:
+  - DISM 10 refuses NT 6.0 images ("DISM does not support servicing a
+    Windows Vista RTM or earlier operating system"), and Vista's own
+    `pkgmgr /o:` fails offline under a Windows 10 kernel (0x80070057), so
+    KMDF for Vista/2008 x86 (Microsoft Update Catalog
+    `windows6.0-kb2864202-x86_ede193c9c47705284407043eac9daee1ce489389.msu`,
+    one file for both) would have to be installed online (pkgmgr before
+    windeploy, as the Vista x64 v11 flow does);
+  - the user's x86 package cannot load on NT 6.0 even with KMDF 1.11:
+    usbxhci / ucx01000 / usbhub3 import Windows 7 kernel exports that Server
+    2008 SP2 x86 lacks (`KeQueryActiveProcessorCountEx`,
+    `KeGetProcessorIndexFromNumber`, `KeQueryHighestNodeNumber`,
+    `KeGetCurrentProcessorNumberEx`, `RtlUnicodeToUTF8N`, `wcsncpy_s`,
+    `ObfReferenceObjectWithTag`, `ObfDereferenceObjectWithTag`);
+  - the Vista-capable community build used for Vista x64 (marie-systems
+    win7-sp2 `patches/drivers/USB3/XHCI`) has no x86 folder; AMD has no
+    32-bit or Vista USB 3 driver for Ryzen / Promontory; Renesas / ASMedia
+    packages do not bind the AMD controllers.
+  A Vista / 2008 x86 USB 3 path needs a 32-bit xHCI package whose imports
+  resolve against Vista SP2 + KB2864202 (user-supplied), plus the online
+  KMDF step.

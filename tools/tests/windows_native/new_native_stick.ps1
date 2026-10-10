@@ -23,7 +23,10 @@ param(
     [int]$SizeGB = 20,
     # USOS answer profile (.ini) copied to the ESP as \EFI\USOS\profiles\<name>,
     # as the menu's profile editor saves it.
-    [string]$ProfilePath = ''
+    [string]$ProfilePath = '',
+    # A folder copied as it is into the DATA root (e.g. Systems\Windows\Windows 7\Updates
+    # and ...\Drivers\x86 for the 32-bit Windows 7 USB 3 step).
+    [string]$DataExtraPath = ''
 )
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
@@ -128,6 +131,10 @@ try {
     if ($DataDriversPath) {
         & robocopy.exe $DataDriversPath (Join-Path $dataRoot 'Drivers') /E /R:0 /W:0 /NP /NJH /NJS | Out-Null
         if ($LASTEXITCODE -ge 8) { throw "robocopy of DATA drivers failed: $LASTEXITCODE" }
+    }
+    if ($DataExtraPath) {
+        & robocopy.exe $DataExtraPath $dataRoot /E /R:0 /W:0 /NP /NJH /NJS | Out-Null
+        if ($LASTEXITCODE -ge 8) { throw "robocopy of DATA extra files failed: $LASTEXITCODE" }
     }
     Write-Host "[PASS] native stick disk=$diskGuid esp=$espGuid data=$dataGuid work=$workGuid iso=$isoTarget"
 } finally {

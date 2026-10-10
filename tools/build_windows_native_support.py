@@ -117,7 +117,7 @@ def build_modern_support(root: Path, out: Path):
     # x86 WinPE in BIOS mode; micro-Linux step 610 injects this archive too.
     subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.win10-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
                     '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_x86_csmwrap.c'),
-                    '-Wl,--entry,entry', '-lkernel32', '-luser32', '-lshell32', '-o', str(helpers / 'usos-x86-csmwrap.exe')], env=env, check=True)
+                    '-Wl,--entry,entry', '-lkernel32', '-luser32', '-lshell32', '-lversion', '-o', str(helpers / 'usos-x86-csmwrap.exe')], env=env, check=True)
     win7 = root / 'zig-out/windows7-uefi'
     writer = NewcWriter(out / 'modern-support.cpio.tmp')
     try:

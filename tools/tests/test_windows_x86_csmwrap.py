@@ -42,7 +42,14 @@ def main() -> int:
     no_setup = '<?xml version="1.0"?><unattend xmlns="urn:schemas-microsoft-com:unattend"><settings pass="oobeSystem"/></unattend>'
     edited = run(no_setup)
     assert edited.index('<settings pass="windowsPE">') < edited.index('<settings pass="oobeSystem"/>') and WANT in edited
-    print("PASS windows_x86_csmwrap answer edit")
+    script = (ROOT / "tools" / "windows_x86_csmwrap.cmd").read_text(encoding="utf-8")
+    # USB 3 step: after a good Setup, before the staging entry is removed;
+    # KMDF before the driver packages; NT 6.1 only.
+    usb3 = script.index("call :usb3")
+    assert script.index("setup-returned") < usb3 < script.index('usos-x86-csmwrap.exe" after')
+    assert script.index("/Add-Package") < script.index("/Add-Driver")
+    assert 'if not "%USOS_NT%"=="6.1" exit /b 0' in script and "/ForceUnsigned" in script
+    print("PASS windows_x86_csmwrap answer edit + usb3 step")
     return 0
 
 
