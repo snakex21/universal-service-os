@@ -531,3 +531,72 @@ active again (the next boot of the disk retries).
 QEMU: `tools/tests/windows_native/qemu_native.py` with
 `USOS_NATIVE_MACHINE=pc USOS_NATIVE_TARGET_BUS=ahci USOS_NATIVE_TARGET_FIRST=1`
 (the target boots first once prepared; the stick stays connected for the ISO).
+
+## 12. 32-bit Windows 7 / Vista / Server 2008 without firmware CSM (profile `win-nt6-x86-uefi-csmwrap`, 2026-10-10)
+
+Status: **experimental, QEMU end-to-end for Server 2008 x86** (section 12.2); Windows 7 x86 and Vista x86 untested (no retail 32-bit media in the library); X470 untested.
+
+The 32-bit NT 6.0 / 6.1 media were blocked on the X470 (64-bit UEFI only,
+`needs_32bit_uefi_or_bios`). Their own Setup WinPE has no xHCI driver (no
+keyboard or mouse on the X470), so, as for Vista x64 (section 10), a PE10
+donor runs their Setup: here an **x86** PE10, i.e. the Setup image of a
+Windows 10 x86 ISO. The disk layout and the WinPE helper are the ones of
+section 11 (`X86_SELF=1`), only the staged WinPE comes from the donor.
+
+```
+UEFI menu (no CSM, x86 media of windows-7 / windows-vista / Server 2008)
+  -> windows_native_iso.prepareNt6X86Csmwrap: the ISO has sources/setup.exe
+     and an all-x86 install.wim of NT 6.1 (Windows 7) or 6.0 (Vista / 2008);
+     the x86 PE10 donor = the first valid Windows 10 x86 Setup ISO (PE 10.0
+     build 10240..21999, BCD, SDI, setup.exe, root bootmgr) in
+     Programs/USOS/WinPE, else in Systems/Windows/Windows 10/Images (where a
+     Windows 10 x86 ISO for its own install already lives);
+     usos-source.ini (binds the 32-bit ISO) + request.ini
+     (profile=win-nt6-x86-uefi-csmwrap, donor=<the x86 PE10 ISO>)
+  -> micro-Linux step 610: exactly the section 11 layout, with the donor's
+     bootmgr / BCD / boot.sdi / boot.wim (+ support.cpio, modern-support.cpio)
+  -> CSMWrap -> x86 PE10 in BIOS mode -> usos-start.cmd mounts the 32-bit
+     ISO -> usos-x86-csmwrap.cmd: InstallTo added, the ISO's setup.exe
+     /noreboot /installfrom /unattend -> staging entry removed -> restart ->
+     disk -> CSMWrap -> Windows phase 2 / OOBE
+```
+
+Where the ISOs go on DATA: the system ISO in its usual folder
+(`Systems\Windows\Windows 7\Images`, `...\Windows Vista\Images`,
+`...\Windows Server 2008\Images`), the Windows 10 x86 ISO in
+`Systems\Windows\Windows 10\Images` (or `Programs\USOS\WinPE`).
+
+### 12.1 Limits / open
+
+* No USB 3 driver is put into the installed system yet: on the X470 (xHCI
+  only) phase 2 / the desktop have no USB keyboard or mouse. Windows 7 x86:
+  the user's Win8 generic USB backport (`driwer\x86`, `NTx86.6.1`) plus
+  KMDF 1.11 x86 (KB2685811 / KB2864202) would have to be serviced offline
+  (as the x64 Windows 7 path does with DATA drivers); Vista / 2008 x86: no
+  x86 NT 6.0 xHCI package exists locally (the x64 v11 package is x64 only).
+* DATA\Drivers and answer-command wrapping: as section 11.1.
+* A USOS profile renders x86 components; with no key and no edition Vista /
+  2008 Setup asks for them (a DATA answer with `/IMAGE/INDEX` avoids that).
+
+### 12.2 QEMU results (2026-10-10, build B261010-204513-7DF3AAC3)
+
+OVMF **without CSM** (`pc`, TCG, std VGA), target 40 GiB on AHCI, the test
+stick (`new_native_stick.ps1`: Web Server 2008 SP2 PL x86 ISO, Windows 10
+22H2 x86 ISO as `-DonorPath`, a DATA `Unattended` answer with
+`/IMAGE/INDEX` 1, empty key, Administrator password + autologon) on xHCI,
+`qemu_native.py` with `USOS_NATIVE_MACHINE=pc USOS_NATIVE_TARGET_BUS=ahci
+USOS_NATIVE_TARGET_FIRST=1`:
+
+* Menu: the x86 image is listed (no 32-bit block); summary "Boot source ISO
+  = the Windows 10 x86 ISO, Boot PE 10.0.19041 x86 / WIM index 2".
+* Step 610: picker, "FORMAT THE ENTIRE DISK?", PREPARED (X86_SELF layout).
+* Restart -> disk -> CSMWrap -> x86 PE10 -> Server 2008 Setup started from
+  the mounted ISO: **no language, key, edition or disk page** (InstallTo),
+  install ran to the end, usos-x86-csmwrap removed the staging entry, the
+  PE restarted by itself.
+* Phase 2 through CSMWrap, Setup finished, autologon: **Server 2008 Web x86
+  desktop** (Server Manager, computer name from the answer, PL).
+* Final MBR: slot 1 Windows NTFS active, staging entry gone, slot 3 CSMWrap
+  ESP. The disk alone (stick removed, same NVRAM) boots to the desktop.
+* Input on the desktop: none (qemu-xhci, Server 2008 has no xHCI driver;
+  see 12.1). Setup in PE10 had USB.
