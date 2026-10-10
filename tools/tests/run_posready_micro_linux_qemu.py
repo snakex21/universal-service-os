@@ -53,12 +53,32 @@ if [ "${POSR_STAGE:-}" = after ]; then
     [ "$rc" = 0 ] && echo E2E-RESULT=PASS || echo E2E-RESULT=FAIL
     exit 0
 fi
+if [ "${POSR_STAGE:-}" = marker ]; then
+    modprobe ntfs3 2>/dev/null
+    . /usr/lib/usos/posready_qemu_install.sh
+    if posready_vm_marker "$TARGET" DONE.TXT; then echo E2E-RESULT=PASS; else echo E2E-RESULT=FAIL; fi
+    exit 0
+fi
+if [ "${POSR_STAGE:-}" = inspect ]; then
+    # Debug: the Windows partition read only (C:\\USOS\\POSR, FBA log tail).
+    modprobe ntfs3 2>/dev/null
+    . /usr/lib/usos/posready_qemu_install.sh
+    if lw=$(posready_mount_windows "$TARGET" /tmp/win); then
+        ls -la /tmp/win/USOS/POSR; cat /tmp/win/USOS/POSR/*.LOG
+        w=/tmp/win/WINDOWS; [ -d "$w" ] || w=/tmp/win/Windows
+        tail -n 40 "$w/FBA/FBALOG.TXT" | grep -v '^$'
+        ls -la "$w/system32/drivers/acpi.sys" "$w/system32/drivers/genahci.sys" 2>&1
+        umount /tmp/win; losetup -d "$lw"; echo E2E-RESULT=PASS
+    else echo E2E-RESULT=FAIL; fi
+    exit 0
+fi
 if [ "${POSR_STAGE:-}" = finish ]; then
     modprobe ntfs3 2>/dev/null
     . /usr/lib/usos/posready_qemu_install.sh
     mkdir -p /tmp/posr
-    if check=$(posready_vm_finish "$TARGET" /tmp/posr); then log "finish PASS $check"; else log "finish FAIL $check"; echo E2E-RESULT=FAIL; exit 0; fi
-    cat /tmp/posr/FIRST.LOG; cat /tmp/posr/BOOT.INI
+    if check=$(posready_vm_finish "$TARGET" /tmp/posr); then fin=PASS; else fin=FAIL; fi
+    cat /tmp/posr/FIRST.LOG; cat /tmp/posr/BOOT.INI; grep -i 'usos\|hidden' /tmp/posr/FBALOG.TXT 2>/dev/null | tail -n 5
+    log "finish $fin $check"; [ "$fin" = PASS ] || { echo E2E-RESULT=FAIL; exit 0; }
     TARGET_DEVICE="$TARGET" USOS_XP_ESP_TAIL_SECTORS=133120 USOS_CSMWRAP_DIR=/usos-e2e/csmwrap sh /usr/lib/usos/xp_csmwrap_esp.sh > /tmp/esp.log 2>&1 || { cat /tmp/esp.log; echo E2E-RESULT=FAIL; exit 0; }
     tail -n 2 /tmp/esp.log
     sync
@@ -175,7 +195,18 @@ def prepare(args, out: Path, target: Path) -> bool:
     finally:
         if console is not None:
             (out / "console.log").write_text(console.text, encoding="utf-8")
-        q.kill()
+            # A guest `sync` sends no FLUSH for loop/raw writes, and q.kill()
+            # then lost QEMU's unwritten qcow2 metadata: files ntfs3 wrote in
+            # posready_after_setup read back as zeros in the VM (2026-10-10;
+            # most likely also the earlier "TRAP 6" with NTLDR on the NTFS
+            # root). The guest powers off so QEMU closes the qcow2 itself.
+            try:
+                console.sock.sendall(b"sync; poweroff -f\n")
+                q.wait(timeout=60)
+            except Exception:  # noqa: BLE001 - kill below
+                pass
+        if q.poll() is None:
+            q.kill()
         q.wait()
 
 
@@ -256,31 +287,26 @@ def host_vm(args, out: Path, target: Path) -> int:
         if not ended:
             rc = 1
             break
-        if run >= 3 and done_marker(out, target):
+        if run >= 3 and done_marker(args, out, target):
             print(f"DONE.TXT after run {run} (LOGON.CMD shut the VM down)", flush=True)
             return 0
     return rc
 
 
-def done_marker(out: Path, target: Path) -> bool:
-    """\\USOS\\POSR\\DONE.TXT on partition 1 (7-Zip reads the qcow2's FAT, read only)."""
-    seven = Path("C:/Program Files/7-Zip/7z.exe")
-    tmp = out / "fatcheck"
-    shutil.rmtree(tmp, ignore_errors=True)
-    subprocess.run([str(seven), "e", "-y", f"-o{tmp}", str(target), "0.fat"], capture_output=True)
-    fat = tmp / "0.fat"
-    found = False
-    if fat.exists():
-        listing = subprocess.run([str(seven), "l", str(fat), "USOS/POSR/DONE.TXT"], capture_output=True, text=True, errors="replace").stdout
-        found = "DONE.TXT" in listing
-    shutil.rmtree(tmp, ignore_errors=True)
-    return found
+def done_marker(args, out: Path, target: Path) -> bool:
+    """C:\\USOS\\POSR\\DONE.TXT on partition 2 (NTFS): posready_vm_marker in micro-Linux, read only."""
+    saved = list(args.env)
+    args.env = saved + ["POSR_STAGE=marker"]
+    try:
+        return prepare(args, out, target)
+    finally:
+        args.env = saved
 
 
 def keys_for(text: str) -> list[str]:
     """QEMU sendkey names for TEXT (US layout); a newline is ret."""
     special = {" ": "spc", "\n": "ret", ".": "dot", "\\": "backslash", ":": "shift-semicolon", "/": "slash",
-               "-": "minus", ">": "shift-dot", "_": "shift-minus", "*": "shift-8", "=": "equal", "%": "shift-5", "|": "shift-backslash"}
+               "-": "minus", ">": "shift-dot", "_": "shift-minus", "*": "shift-8", "=": "equal", "%": "shift-5", "|": "shift-backslash", "&": "shift-7"}
     if text.startswith("keys:"):  # raw sendkey names, e.g. keys:alt-d
         return text[5:].split()
     out = []
@@ -321,10 +347,19 @@ def main() -> int:
     p.add_argument("--finish-only", action="store_true")
     p.add_argument("--boot", action="store_true", help="then boot the disk like the X470 (OVMF + CSMWrap, run_nt3 boot())")
     p.add_argument("--boot-seconds", type=int, default=420)
+    p.add_argument("--stage", choices=["marker", "inspect"], help="only this micro-Linux stage on OUT/target.qcow2 (read only)")
+    p.add_argument("--qemu", type=Path, help="host qemu-system-x86_64 to use, e.g. a renamed copy (default: ROOT/tools/qemu)")
     args = p.parse_args()
     nt3.set_root(args.root)
+    if args.qemu:
+        nt3.QEMU = args.qemu
     args.out.mkdir(parents=True, exist_ok=True)
     target = args.out / "target.qcow2"
+    if args.stage:
+        args.env = args.env + ["POSR_STAGE=" + args.stage]
+        ok = prepare(args, args.out, target)
+        print(f"stage {args.stage} {'PASS' if ok else 'FAIL'} (OUT/console.log)", flush=True)
+        return 0 if ok else 1
     if not args.vm_only:
         target.unlink(missing_ok=True)
         subprocess.run([str(nt3.QEMU_IMG), "create", "-q", "-f", "qcow2", str(target), args.size], check=True)

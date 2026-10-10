@@ -154,9 +154,25 @@ nt4_vm_install /dev/sdz "{(self.tmp / 'l').as_posix()}" tcg; echo "rc=$? nt4_sta
         (self.tmp / 'meminfo').write_text('MemTotal:       16000000 kB\n')
         env = {'W9X_VM_QEMU': (self.tmp / 'qemu').as_posix(), 'W9X_VM_DATADIR': share.as_posix(),
                'W9X_VM_MEMINFO': (self.tmp / 'meminfo').as_posix(), 'W9X_VM_FLAGS': (self.tmp / 'flags').as_posix()}
-        for tag in ('NT4', 'NT4S'):
+        for tag in ('NT4', 'NT4S', 'NT4T'):
             rc, out, err = sh(f'. "{VM}"; w9x_vm_available {tag}', env)
             self.assertEqual(rc, 0, out + err)
+
+    def test_every_vm_only_tag_is_vm_available(self):
+        # Every tag that w9x_csmwrap_prepare.sh routes to the VM-only path
+        # ($nt4 or $posr: "installs only in the VM") must pass the
+        # w9x_vm_available release list (NT4T was missing, 2026-10-10).
+        prep = (ROOT / 'tools/w9x_csmwrap_prepare.sh').read_text(encoding='utf-8')
+        tags = set()
+        for line in prep.splitlines():
+            m = re.match(r'\s*([A-Z0-9|]+)\)\s*nt4=yes', line)
+            if m:
+                tags.update(m.group(1).split('|'))
+        tags.update(re.findall(r'\[ "\$tag" = (\w+) \]; then\s*\n\s*posr=yes', prep))
+        self.assertTrue({'NT4', 'NT4S', 'NT4T', 'NT351', 'NT31S', 'POSR'} <= tags, tags)
+        lib = (ROOT / 'tools/w9x_phase1_qemu.sh').read_text(encoding='utf-8')
+        listed = set(re.search(r'w9x_vm_available\(\) \{.*?case "\$1" in ([A-Z0-9|]+)\)', lib, re.S).group(1).split('|'))
+        self.assertEqual(tags - listed, set())
 
 
 class Nt4ServerAnswer(unittest.TestCase):
@@ -423,7 +439,8 @@ class Nt4TerminalServer(unittest.TestCase):
         self.assertNotIn('Windows NT 4.0/ServicePack', block)
         self.assertIn('Terminal Server Edition Service Pack 6', block)
         self.assertIn('NT4_EDITION="$([ "$tag" = NT4T ] && echo tse)"', text)
-        self.assertEqual(text.count('/mnt/esp/EFI/USOS/answer/NT4T.SIF'), 2)
+        # Cleared in every answer branch (NT4, 9x, POSReady since 2026-10-10).
+        self.assertGreaterEqual(text.count('/mnt/esp/EFI/USOS/answer/NT4T.SIF'), 2)
         # The TSE message comes before the generic language one.
         self.assertLess(text.index("NT4T:*'no Service Pack 6'*)"), text.index("case \"${vm_check:-}\" in *'no Service Pack 6'*)"))
         self.assertIn('Systems\\\\Windows\\\\$folder\\\\ServicePack', block)

@@ -75,8 +75,8 @@ w9x_vm_available() {
     # Me (2026-10-06): the same DOS-stage SETUP.EXE as 98 (/P I valid), so the
     # same VM path. 95 (2026-10-06) too, but only with its key: the caller
     # (w9x_csmwrap_prepare.sh) keeps the native start for 95 without one.
-    # NT4 / NT4S (2026-10-07), NT351 / NT351S (2026-10-08), NT35 / NT35S, NT31 / NT31S (2026-10-09): the whole install runs in the VM (tools/nt4_qemu_install.sh).
-    case "$1" in 98SE|98|ME|95|NT4|NT4S|NT351|NT351S|NT35|NT35S|NT31|NT31S|POSR) ;; *) echo "release $1 keeps the native Setup start"; return 1 ;; esac
+    # NT4 / NT4S (2026-10-07), NT4T (Terminal Server, 2026-10-10), NT351 / NT351S (2026-10-08), NT35 / NT35S, NT31 / NT31S (2026-10-09): the whole install runs in the VM (tools/nt4_qemu_install.sh).
+    case "$1" in 98SE|98|ME|95|NT4|NT4S|NT4T|NT351|NT351S|NT35|NT35S|NT31|NT31S|POSR) ;; *) echo "release $1 keeps the native Setup start"; return 1 ;; esac
     if [ -e "$W9X_VM_FLAGS/phase1-native.flag" ]; then echo 'phase1-native.flag present'; return 1; fi
     if [ ! -x "$W9X_VM_QEMU" ]; then echo 'qemu9x.cpio not loaded (no QEMU)'; return 1; fi
     for firmware in bios-256k.bin vgabios-stdvga.bin; do

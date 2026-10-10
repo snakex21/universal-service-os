@@ -110,7 +110,9 @@ fi
 cat /tmp/prepare.log
 . /usr/lib/usos/w9x_phase1_qemu.sh
 . /usr/lib/usos/nt4_qemu_install.sh
-log "$(w9x_vm_available "$TAG")"
+# The same gate as step 620 (w9x_csmwrap_prepare.sh stops when it fails).
+vm_reason=$(w9x_vm_available "$TAG") || { log "VM not available: $vm_reason"; echo E2E-RESULT=FAIL; exit 1; }
+log "$vm_reason"
 accel=$(w9x_vm_accel)
 NT4_PROGRESS_AT=0
 nt4_vm_progress() {
