@@ -20,7 +20,10 @@ param(
     # PE10 donor for Vista / Windows 7 originals: copied to DATA\Programs\USOS\WinPE
     # and recorded in EFI\USOS\winpe-donor.ini, as the installer does.
     [string]$DonorPath = '',
-    [int]$SizeGB = 20
+    [int]$SizeGB = 20,
+    # USOS answer profile (.ini) copied to the ESP as \EFI\USOS\profiles\<name>,
+    # as the menu's profile editor saves it.
+    [string]$ProfilePath = ''
 )
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
@@ -116,6 +119,11 @@ try {
         $donorHash = (Get-FileHash -LiteralPath $donorTarget -Algorithm SHA256).Hash.ToLowerInvariant()
         $donorSize = (Get-Item -LiteralPath $donorTarget).Length
         [IO.File]::WriteAllText((Join-Path $espRoot 'EFI\USOS\winpe-donor.ini'), "; USOS-managed PE10 donor (test stick)`r`nname=$donorName`r`nsize=$donorSize`r`nsha256=$donorHash`r`n")
+    }
+    if ($ProfilePath) {
+        $profiles = Join-Path $espRoot 'EFI\USOS\profiles'
+        New-Item -ItemType Directory -Force -Path $profiles | Out-Null
+        Copy-Item -LiteralPath $ProfilePath -Destination (Join-Path $profiles (Split-Path -Leaf $ProfilePath)) -Force
     }
     if ($DataDriversPath) {
         & robocopy.exe $DataDriversPath (Join-Path $dataRoot 'Drivers') /E /R:0 /W:0 /NP /NJH /NJS | Out-Null

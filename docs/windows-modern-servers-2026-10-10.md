@@ -68,18 +68,41 @@ network adapter: on the X470 the onboard NIC driver (2008 R2 / Win7 x64
 package) must be in `Drivers\Windows Home Server 2011` (or loaded through
 the wizard's "Install network drivers" button). Not re-run with a NIC.
 
+X470 network: the test board (ASRock X470 Taichi / Master SLI/ac; both have
+an **Intel I211-AT**, PCI `VEN_8086&DEV_1539`) needs Intel's Windows 7 /
+2008 R2 x64 driver (PROWinx64, `e1r62x64.inf`). Intel limits the I211
+(a client NIC) on Server systems; if the INF refuses on WHS, use a NIC with
+Server 2008 R2 drivers (Intel I210 / 82574L PCIe card, Realtek RTL8111 card
+or a USB 3 adapter with 2008 R2 drivers, once USB 3 works). The user should
+check Device Manager (or the board label) for the exact NIC ID.
+
 Open for WHS: USB 3 (as 2008 R2), Administrator password from the profile
 (as 2008 R2), NIC driver on the X470, the data partition (the wizard's
 storage step was not reached).
 
 ## Server 2012 R2 (Foundation / Storage Server)
 
-No `ei.cfg`, no `PID.txt` in the ISO, nothing in the OS library README and
-no key file in `%LOCALAPPDATA%\USOS\test-assets\private-keys`. Setup stops
-on the product key page without one; these editions have no public setup
-(KMS client) key. Needed from the user: a Foundation or Storage Server 2012
-R2 key (OEM), for the profile's key field (hardware) or the private-keys
-folder (QEMU test).
+The ISO has no `ei.cfg` / `PID.txt`; Setup needs a key. The user provided
+one (kept only in `%LOCALAPPDATA%\USOS\test-assets\private-keys`). It is a
+**Storage Server 2012 R2 Standard** key: with it Setup filters the
+edition list to that one image (WIM index 2, `ServerStorageStandard`).
+
+QEMU e2e (OVMF without CSM, q35, TCG, 60 GB AHCI target, stick on xHCI,
+build B261010-183828 payload): USOS profile on the stick without a key
+("Incomplete" on the answer screen) -> F2 editor -> key typed into
+"Product key (Windows Server 2012 R2)", Remember off -> profile complete ->
+summary (PE 6.3, index 2 boot) -> Setup: no key or license page, edition
+page with the one matching edition, disk page (manual by design) ->
+install -> finalizer -> first boot -> OOBE "Finalizing settings" -> Ctrl+
+Alt+Del -> Administrator and Tester (profile) accounts, profile password ->
+**Windows Storage Server 2012 R2 Standard desktop**, USB keyboard working
+(inbox xHCI), Server Manager not opened.
+
+Fix: the summary showed the Foundation image as "Other"; its EDITIONID is
+`ServerWinFoundation`, now read as Foundation.
+
+Possible polish: with a key and no edition, USOS could pass the matching
+image (the edition page then disappears); now Setup asks once.
 
 ## 32-bit Windows without CSM (Vista / 2008 x86, 8.x x86, 10 x86)
 

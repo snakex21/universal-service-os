@@ -308,6 +308,8 @@ pub fn serverEdition(edition_id: []const u8) ?ServerEdition {
         .{ .prefix = "Solution", .edition = .essentials },
         .{ .prefix = "Essentials", .edition = .essentials },
         .{ .prefix = "Foundation", .edition = .foundation },
+        // Server 2012 / 2012 R2 Foundation: ServerWinFoundation.
+        .{ .prefix = "WinFoundation", .edition = .foundation },
         .{ .prefix = "Storage", .edition = .storage },
         .{ .prefix = "Home", .edition = .home },
     };
@@ -632,6 +634,7 @@ test "edition ids and version folders" {
     try std.testing.expectEqual(ServerEdition.storage, serverEdition("ServerStorageStandard").?);
     try std.testing.expectEqual(ServerEdition.other, serverEdition("ServerAzureStackHCICor").?);
     try std.testing.expectEqual(ServerEdition.home, serverEdition("ServerHomePremium").?);
+    try std.testing.expectEqual(ServerEdition.foundation, serverEdition("ServerWinFoundation").?);
     // Windows Home Server 2011 (6.1, ServerHomePremium only): its own folder.
     const whs = Install{ .known = true, .server = true, .major = 6, .minor = 1, .build = 7601, .images = 1, .desktop = ServerEdition.home.bit() };
     try std.testing.expectEqualStrings("Windows Home Server 2011", suggestedFolder(whs).?);
