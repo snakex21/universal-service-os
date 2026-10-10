@@ -661,6 +661,8 @@ def main() -> int:
         put(entries, Entry("usr/lib/usos/posready_unattended.xml", stat.S_IFREG | 0o644, (root / "tools/posready_unattended.xml").read_bytes()))
         put(entries, Entry("usr/lib/usos/posready/X470.REG", stat.S_IFREG | 0o644, (root / "tools/posready_x470.reg").read_bytes()))
         put(entries, Entry("usr/lib/usos/posready/FIRST.CMD", stat.S_IFREG | 0o644, (root / "tools/posready_first.cmd").read_bytes()))
+        put(entries, Entry("usr/lib/usos/posready/LOGON.CMD", stat.S_IFREG | 0o644, (root / "tools/posready_logon.cmd").read_bytes()))
+        put(entries, Entry("usr/lib/usos/posready/LOGON.REG", stat.S_IFREG | 0o644, (root / "tools/posready_logon.reg").read_bytes()))
         posready_drivers = root / "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86"
         for name in POSREADY_DRIVERS:
             put(entries, Entry("usr/lib/usos/posready/DRV/" + name.split("/")[1], stat.S_IFREG | 0o644, (posready_drivers / name).read_bytes()))

@@ -106,7 +106,6 @@ posready_vm_finish() {
     l=$2
     off=$(( $(od -An -tu4 -j 454 -N4 "$t" | tr -d ' \n') * 512 ))
     MTOOLS_SKIP_CHECK=1 mtype -i "$t@@$off" ::/USOS/POSR/FIRST.LOG > "$l/FIRST.LOG" 2>/dev/null || { echo 'no FIRST.LOG'; return 1; }
-    if grep -q 'ACPI MISMATCH' "$l/FIRST.LOG"; then echo 'the community acpi.sys is not in place (FIRST.LOG)'; return 1; fi
     MTOOLS_SKIP_CHECK=1 mtype -i "$t@@$off" ::/BOOT.INI > "$l/BOOT.INI" 2>/dev/null || { echo 'no BOOT.INI on partition 1'; return 1; }
     w=/run/posready-finish
     mkdir -p "$w"

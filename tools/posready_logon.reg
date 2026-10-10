@@ -1,0 +1,7 @@
+REGEDIT4
+
+; USOS: Windows Embedded POSReady 2009, imported by FIRST.CMD inside the First
+; Boot Agent: the first logon runs \USOS\POSR\LOGON.CMD from the FAT16 Setup
+; partition (whatever its drive letter is).
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce]
+"USOSPOSReady"="cmd.exe /c (if exist D:\\USOS\\POSR\\LOGON.CMD call D:\\USOS\\POSR\\LOGON.CMD) & (if exist E:\\USOS\\POSR\\LOGON.CMD call E:\\USOS\\POSR\\LOGON.CMD) & (if exist F:\\USOS\\POSR\\LOGON.CMD call F:\\USOS\\POSR\\LOGON.CMD) & (if exist C:\\USOS\\POSR\\LOGON.CMD call C:\\USOS\\POSR\\LOGON.CMD)"
