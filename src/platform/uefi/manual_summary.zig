@@ -205,7 +205,20 @@ pub fn show(
     const modern_native = image.kind == .iso and backend == .windows_iso and usos.flow.preparation_capability.nativeModernNt(system.id);
     var modern_pe_text: [96]u8 = undefined;
     var modern_driver_text: [120]u8 = undefined;
-    if (modern_native) {
+    if (modern_native and manual_images.x86Csmwrap(system, image)) {
+        // 32-bit media without CSM: win-x86-uefi-csmwrap (CSMWrap, MBR disk).
+        if (windows_native_iso.inspectModernX86(system.image_directory, image.name.slice())) |inspection| {
+            fields.add(view.t(.summary_iso_case), view.t(.summary_w9x_csmwrap));
+            fields.add(view.t(.summary_disk), view.t(.summary_vista_csmwrap_disk));
+            const setup = inspection.setup;
+            fields.add(view.t(.summary_boot_pe), std.fmt.bufPrint(&modern_pe_text, "{d}.{d}.{d} x86 / WIM index {d}", .{ setup.major, setup.minor, setup.build, setup.index }) catch view.t(.summary_unavailable));
+        } else |err| {
+            can_start = false;
+            fields.add(view.t(.summary_iso_inspection), @errorName(err));
+            notes[note_count] = view.tr(usos.windows7_iso.errorDetail(err));
+            note_count += 1;
+        }
+    } else if (modern_native) {
         if (windows_native_iso.inspectModern(system.image_directory, image.name.slice())) |inspection| {
             fields.add(view.t(.summary_iso_case), view.t(.summary_native_case));
             const setup = inspection.setup;
@@ -385,6 +398,31 @@ fn start(
     }
 
     if (manual_images.blockReason(system, image)) |reason| return showMediaBlocked(image.name.slice(), reason);
+    if (image.kind == .iso and backend == .windows_iso and manual_images.x86Csmwrap(system, image)) {
+        // 32-bit Windows 8.1 / 10 without CSM (win-x86-uefi-csmwrap): the ISO
+        // is checked here, then micro-Linux step 610 writes the Windows
+        // partition, the ISO's own WinPE (staging) and the CSMWrap ESP to the
+        // chosen MBR disk; Setup then runs in BIOS mode from that disk.
+        if (secure_boot.enforced()) return showSecureBootRequired(system);
+        vista_csmwrap_heading = windows_native_iso.systemFolder(system.image_directory) catch system.name;
+        view.vistaCsmwrapStatus(.validating, "Reading the selected Windows ISO", vista_csmwrap_heading);
+        var x86_answer: windows_native_iso.CsmwrapAnswer = .none;
+        if (profile) |p| {
+            _ = answer_profiles.stage(root, p, system.id, .x86, windows_native_iso.x86_csmwrap_profile) catch |err| return showError(view.t(.error_iso), err);
+            x86_answer = .profile;
+        } else if (unattended) |name| x86_answer = .{ .file = name };
+        windows_native_iso.prepareX86Csmwrap(root, system.image_directory, image.name.slice(), x86_answer, showVistaCsmwrapIso) catch |err| {
+            view.refreshFramebuffer();
+            showError(view.t(.error_iso), err);
+            return;
+        };
+        view.vistaCsmwrapStatus(.loading, usos.flow.preparation_boot_progress.VistaCsmwrapStage.loading_detail, vista_csmwrap_heading);
+        @import("vista_preparation.zig").startCsmwrapHeading(root, vista_csmwrap_heading) catch |err| {
+            view.refreshFramebuffer();
+            showError(view.t(.error_preparation), err);
+        };
+        return;
+    }
     if (image.kind == .iso and backend == .windows_iso and usos.flow.preparation_capability.nativeModernNt(system.id)) {
         view.windowsIsoStatus(.validating, "Reading the selected Windows ISO");
         const rendered = renderForWimboot(profile, system, os_profile_id) catch |err| return showError(view.t(.error_iso), err);

@@ -213,7 +213,7 @@ def install(args, out: Path, target: Path) -> bool:
            "-kernel", str(ML / "vmlinuz-virt"), "-initrd", str(initrd),
            "-append", "console=ttyS0,115200 rdinit=/bin/sh loglevel=3",
            "-chardev", f"socket,id=s0,host=127.0.0.1,port={port},server=on,wait=off", "-serial", "chardev:s0",
-           "-drive", f"file={target.as_posix()},format=qcow2,if=none,id=t,cache=unsafe", "-device", "ide-hd,drive=t,bus=ide.0",
+           "-drive", f"file={target.as_posix()},format=qcow2,if=none,id=t,cache=writeback", "-device", "ide-hd,drive=t,bus=ide.0",
            "-drive", f"file={Path(args.iso).as_posix()},format=raw,if=none,id=cd,readonly=on", "-device", "virtio-blk-pci,drive=cd"]
     stderr = (out / "outer-qemu.log").open("wb")
     q = subprocess.Popen(cmd, stderr=stderr)
@@ -255,7 +255,17 @@ def install(args, out: Path, target: Path) -> bool:
     finally:
         if console is not None:
             (out / "console.log").write_text(console.text, encoding="utf-8")
-        q.kill()
+            # cache=unsafe ignored the guest's flushes and q.kill() then lost
+            # the last target writes (POSReady run, 2026-10-10): writeback
+            # honours sync, and the guest powers off so QEMU closes the qcow2
+            # itself; kill only as a fallback.
+            try:
+                console.sock.sendall(b"sync; poweroff -f\n")
+                q.wait(timeout=60)
+            except Exception:
+                pass
+        if q.poll() is None:
+            q.kill()
         q.wait()
         stderr.close()
 

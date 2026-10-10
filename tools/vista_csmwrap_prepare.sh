@@ -13,6 +13,10 @@
 # Screens: the UEFI menu's progress page continues here (stages 3-5 of
 # VistaCsmwrapStage, tools/micro_linux_ui.sh); /dev/console is the serial
 # port (vista_preparation.formatCommand), every tool writes to prepare.log.
+#
+# profile=win-x86-uefi-csmwrap in request.ini (32-bit Windows 8.1 / 10,
+# design doc section 11): no donor (donor= is the Windows ISO itself), the
+# target script runs with X86_SELF=1 and prepares the Windows partition too.
 
 vista_csmwrap_log() {
     printf '[VISTA_CSMWRAP] %s\n' "$*"
@@ -41,12 +45,21 @@ usos_vista_csmwrap_prepare() {
     donor=$(vista_csmwrap_value donor "$request") || stop 'request.ini has no donor'
     folder=$(vista_csmwrap_value folder "$request") || folder='Windows Vista'
     answer=$(vista_csmwrap_value answer "$request") || answer=none
+    profile=$(vista_csmwrap_value profile "$request") || profile=vista-x64-sp2-uefi-csmwrap
+    case "$profile" in
+        vista-x64-sp2-uefi-csmwrap) x86_self=0 ;;
+        win-x86-uefi-csmwrap) x86_self=1; [ "$donor" = "$iso" ] || stop 'request.ini: the x86 path boots the Windows ISO itself' ;;
+        *) stop 'request.ini has an unknown profile' ;;
+    esac
     for value in "$iso" "$donor" "$folder" "$answer"; do
         case "$value" in *..*|/*) stop 'request.ini has an unsafe path' ;; esac
     done
-    vista_csmwrap_log "REQUEST iso=$iso donor=$donor folder=$folder answer=${answer%%:*}"
+    vista_csmwrap_log "REQUEST profile=$profile iso=$iso donor=$donor folder=$folder answer=${answer%%:*}"
     # "Windows Vista" or "Windows Server 2008": the heading of the UEFI page too.
-    case "$folder" in 'Windows Server 2008') NT5_NAME=$folder ;; *) NT5_NAME='Windows Vista' ;; esac
+    # x86: the DATA folder ("Windows 10", "Windows 8.1", ...).
+    if [ "$x86_self" = 1 ]; then NT5_NAME=$folder
+    else case "$folder" in 'Windows Server 2008') NT5_NAME=$folder ;; *) NT5_NAME='Windows Vista' ;; esac
+    fi
     NT5_TITLE=$(printf '%s' "$NT5_NAME" | tr '[:lower:]' '[:upper:]')
     USOS_UI_HEADING=$NT5_NAME
     export NT5_TITLE NT5_NAME USOS_UI_HEADING
@@ -58,7 +71,7 @@ usos_vista_csmwrap_prepare() {
     modprobe ntfs3 2>/dev/null || true
     mkdir -p /mnt/data
     mount -t ntfs3 -o ro,noatime "$DATA_PATH" /mnt/data || stop 'cannot mount USOS_DATA read-only'
-    [ -f "/mnt/data/$iso" ] || stop "the Vista ISO is not on DATA: $iso"
+    [ -f "/mnt/data/$iso" ] || stop "the Windows ISO is not on DATA: $iso"
     [ -f "/mnt/data/$donor" ] || stop "the PE10 donor is not on DATA: $donor"
 
     answer_xml=''
@@ -104,7 +117,11 @@ usos_vista_csmwrap_prepare() {
 
     # Why the disk is chosen now (on the picker itself), then the XP erase
     # confirmation with the disk's model, size and partitions.
-    USOS_XP_DISK_NOTE='Without CSM, Vista starts through CSMWrap, so USOS must first prepare the target disk.'
+    if [ "$x86_self" = 1 ]; then
+        USOS_XP_DISK_NOTE="Without CSM, $NT5_NAME starts through CSMWrap, so USOS prepares the target disk first."
+    else
+        USOS_XP_DISK_NOTE='Without CSM, Vista starts through CSMWrap, so USOS must first prepare the target disk.'
+    fi
     export USOS_XP_DISK_NOTE
     while :; do
         TARGET_DEVICE=''
@@ -133,8 +150,13 @@ usos_vista_csmwrap_prepare() {
             cat "$overview"
             printf '\n'
             printf 'All partitions, systems and files on this disk will be erased.\n'
-            printf 'New layout (MBR): approx. %s GiB unallocated for %s, then a 1 GiB USOS-VISTA helper partition and a 64 MiB CSMWrap partition at the end of the disk.\n' "$free_gib" "$NT5_NAME"
-            printf 'In %s Setup select the unallocated space; do not delete the two small partitions.\n' "$NT5_NAME"
+            if [ "$x86_self" = 1 ]; then
+                # The 1 GiB helper partition before the ESP is removed after Setup.
+                printf 'New layout (MBR): %s (drive C:) for %s, then a 64 MiB CSMWrap partition at the end of the disk; the rest stays unallocated.\n' "$free_gib GiB NTFS" "$NT5_NAME"
+            else
+                printf 'New layout (MBR): approx. %s GiB unallocated for %s, then a 1 GiB USOS-VISTA helper partition and a 64 MiB CSMWrap partition at the end of the disk.\n' "$free_gib" "$NT5_NAME"
+                printf 'In %s Setup select the unallocated space; do not delete the two small partitions.\n' "$NT5_NAME"
+            fi
         } > "$screen"
         vista_csmwrap_log "CONFIRM $TARGET_DEVICE model=$model serial=$serial size=$size free_gib=$free_gib"
         usos_xp_confirm "$screen" 'FORMAT THE ENTIRE DISK?' 'Erase ALL partitions and data on the selected disk' && break
@@ -146,11 +168,11 @@ usos_vista_csmwrap_prepare() {
     # Every tool's output goes to prepare.log (none reaches the screen); the
     # stage-4 page stays up until the script ends.
     usos_ui_stage 4 5 'Preparing the disk' 'Copying the Windows PE helper and CSMWrap to the selected disk.' || true
-    if ! TARGET_DEVICE=$TARGET_DEVICE VISTA_DONOR_ISO="/mnt/data/$donor" VISTA_REQUEST_DIR=$VISTA_CSMWRAP_DIR VISTA_ANSWER_XML=$answer_xml \
+    if ! TARGET_DEVICE=$TARGET_DEVICE VISTA_DONOR_ISO="/mnt/data/$donor" VISTA_REQUEST_DIR=$VISTA_CSMWRAP_DIR VISTA_ANSWER_XML=$answer_xml X86_SELF=$x86_self \
         sh /usr/lib/usos/vista_csmwrap_target.sh >> "$VISTA_CSMWRAP_DIR/prepare.log" 2>&1 < /dev/null; then
         rm -f /run/vista-answer.xml
         tail -n 5 "$VISTA_CSMWRAP_DIR/prepare.log" 2>/dev/null || true
-        stop 'The Vista CSMWrap preparation failed; see EFI/USOS/vista-csmwrap/prepare.log'
+        stop "The $NT5_NAME CSMWrap preparation failed; see EFI/USOS/vista-csmwrap/prepare.log"
     fi
     rm -f /run/vista-answer.xml
     mv "$request" "$VISTA_CSMWRAP_DIR/request.done" 2>/dev/null || true
@@ -158,7 +180,11 @@ usos_vista_csmwrap_prepare() {
     sync
     vista_csmwrap_log 'DONE; waiting for the restart'
     # Stage 5 (restart into Windows Setup): the notice page, every stage done.
-    usos_ui_notice_continue 'Windows Vista: start the prepared disk' "Keep the USOS stick connected. After the restart open the firmware boot menu and start this disk's UEFI entry (not Legacy); CSM stays off. Vista Setup then starts from it through CSMWrap." 'Restart' || true
+    if [ "$x86_self" = 1 ]; then
+        usos_ui_notice_continue "$NT5_NAME: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry (CSMWrap; CSM stays off) and the $NT5_NAME installation continues on it. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true
+    else
+        usos_ui_notice_continue 'Windows Vista: start the prepared disk' "Keep the USOS stick connected. After the restart open the firmware boot menu and start this disk's UEFI entry (not Legacy); CSM stays off. Vista Setup then starts from it through CSMWrap." 'Restart' || true
+    fi
     if [ -r "${USOS_UI_TTY:-}" ]; then
         IFS= read -r _vista_ack < "$USOS_UI_TTY" || true
     else

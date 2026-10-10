@@ -57,7 +57,20 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, system: *const
 /// their media need no own UEFI loader (os_profiles.mediaBlock).
 pub fn blockReason(system: *const usos.catalog.SystemEntry, image: usos.catalog.ImageItem) ?media.Block {
     const info = image.media orelse return null;
-    return usos.catalog.os_profiles.mediaBlock(system.id, info, probe.firmware());
+    const reason = usos.catalog.os_profiles.mediaBlock(system.id, info, probe.firmware());
+    // 32-bit Windows 8.1 / 10 without firmware CSM: win-x86-uefi-csmwrap
+    // (the ISO's own WinPE through CSMWrap). With a CSM the block stays.
+    if (reason == .needs_32bit_uefi_or_bios and x86Csmwrap(system, image)) return null;
+    return reason;
+}
+
+/// 32-bit media of Windows 8.1 / 10 (native modern systems) on 64-bit UEFI
+/// without a firmware CSM: started through CSMWrap (micro-Linux step 610).
+pub fn x86Csmwrap(system: *const usos.catalog.SystemEntry, image: usos.catalog.ImageItem) bool {
+    const info = image.media orelse return false;
+    if (info.arch != .x86 or image.kind != .iso or probe.firmware() != .uefi_x64) return false;
+    if (!usos.flow.preparation_capability.nativeModernNt(system.id)) return false;
+    return !@import("secure_boot.zig").csm().likelyOn();
 }
 
 pub fn blockText(reason: media.Block) []const u8 {

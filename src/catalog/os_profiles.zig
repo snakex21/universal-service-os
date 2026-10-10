@@ -393,15 +393,24 @@ pub const CsmwrapVariant = struct {
     id: []const u8,
     /// How the start differs from the base profile's (golden text).
     start: []const u8,
+    /// Only for 32-bit media (the base profile's x64 start is unchanged).
+    x86_media_only: bool = false,
 };
 
 pub const csmwrap_variants = [_]CsmwrapVariant{
     .{ .base = "xp-x86-sp3-uefi-csm", .id = "xp-x86-sp3-uefi-csmwrap", .start = "same micro-Linux staging + usos.xp_boot=csmwrap (CSMWrap ESP at the disk end)" },
     .{ .base = "vista-uefi-pe10", .id = "vista-x64-sp2-uefi-csmwrap", .start = "micro-Linux step 610: MBR disk, PE10 staging partition + CSMWrap ESP; Vista Setup in BIOS mode" },
+    .{ .base = "win10-11-uefi-native", .id = "win-x86-uefi-csmwrap", .start = "x86 media only: micro-Linux step 610: MBR disk, Windows partition + the ISO's own WinPE staging + CSMWrap ESP; Setup in BIOS mode (InstallTo)", .x86_media_only = true },
 };
 
 pub fn csmwrapVariant(base_id: []const u8) ?*const CsmwrapVariant {
+    return csmwrapVariantFor(base_id, false);
+}
+
+/// `x86_media`: the selected image is 32-bit (win-x86-uefi-csmwrap).
+pub fn csmwrapVariantFor(base_id: []const u8, x86_media: bool) ?*const CsmwrapVariant {
     for (&csmwrap_variants) |*variant| {
+        if (variant.x86_media_only and !x86_media) continue;
         if (std.mem.eql(u8, variant.base, base_id)) return variant;
     }
     return null;
@@ -419,6 +428,13 @@ test "CSMWrap variants replace existing UEFI profiles and have their own ids" {
     const server = select(systems.findById("windows-server-2008").?, .iso, .automatic, .uefi).?;
     try std.testing.expectEqualStrings("vista-x64-sp2-uefi-csmwrap", csmwrapVariant(server.id).?.id);
     try std.testing.expect(csmwrapVariant("win7-uefi-native") == null);
+    // Windows 8.1 / 10: x64 media keep the native UEFI start, x86 media go
+    // through CSMWrap.
+    for ([_][]const u8{ "windows-10", "windows-8-1", "windows-embedded-8-1-industry" }) |id| {
+        const modern = select(systems.findById(id).?, .iso, .automatic, .uefi).?;
+        try std.testing.expect(csmwrapVariant(modern.id) == null);
+        try std.testing.expectEqualStrings("win-x86-uefi-csmwrap", csmwrapVariantFor(modern.id, true).?.id);
+    }
 }
 
 /// The profile that decides this selection, or null when no rule applies.

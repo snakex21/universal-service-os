@@ -103,6 +103,12 @@ pub fn startCsmwrap(root: *uefi.protocol.File) !void {
     return startMode(root, .csmwrap, "");
 }
 
+/// The same step 610 for 32-bit Windows 8.1 / 10 (request.ini names
+/// win-x86-uefi-csmwrap); `heading`: the DATA folder for the progress page.
+pub fn startCsmwrapHeading(root: *uefi.protocol.File, heading: []const u8) !void {
+    return startMode(root, .csmwrap, heading);
+}
+
 /// Windows 95/98/Me and the DOS family (step 620): the same base micro-Linux
 /// start. `heading`: the system's name for the micro-Linux progress page.
 pub fn startWin9x(root: *uefi.protocol.File, heading: []const u8) !void {
