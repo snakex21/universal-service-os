@@ -49,6 +49,9 @@ usos_vista_csmwrap_prepare() {
     case "$profile" in
         vista-x64-sp2-uefi-csmwrap) x86_self=0 ;;
         win-x86-uefi-csmwrap) x86_self=1; [ "$donor" = "$iso" ] || stop 'request.ini: the x86 path boots the Windows ISO itself' ;;
+        # 32-bit Windows 7 / Vista / Server 2008 (design doc section 12): the
+        # same layout, the x86 PE10 donor is the staged WinPE.
+        win-nt6-x86-uefi-csmwrap) x86_self=1; [ "$donor" != "$iso" ] || stop 'request.ini: the 32-bit Windows 7 / Vista path needs an x86 PE10 donor' ;;
         *) stop 'request.ini has an unknown profile' ;;
     esac
     for value in "$iso" "$donor" "$folder" "$answer"; do

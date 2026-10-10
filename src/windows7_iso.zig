@@ -167,6 +167,80 @@ fn resolveDonorIn(selected: Inspection, source: directory.Source, context: anyty
     return if (found) result else null;
 }
 
+// ------------------------------------- 32-bit Windows 7 / Vista / 2008
+// Without firmware CSM (win-nt6-x86-uefi-csmwrap, design doc
+// csmwrap-integration.md section 12): the selected 32-bit NT 6.0 / 6.1 ISO
+// keeps Setup and install.wim; an x86 PE10 donor (a Windows 10 x86 Setup
+// ISO: it has xHCI, AHCI and NVMe) is staged on the target and started in
+// BIOS mode through CSMWrap.
+
+/// The selected 32-bit media: sources/setup.exe and an all-x86 install.wim
+/// of NT 6.`minor` (1: Windows 7, 0: Vista / Server 2008). Returns the
+/// install version (index 0) for the summary.
+pub fn inspectNt6X86(allocator: std.mem.Allocator, iso: anytype, minor: u32) !wim.Setup {
+    try validateSetup(iso);
+    var node: udf.Node = undefined;
+    if (!try udf.openPath(iso, "sources/install.wim", &node) or node.is_directory or node.size == 0)
+        return error.WindowsInstallImageMissing;
+    var header: [124]u8 = undefined;
+    const bytes = try metadata(allocator, iso, &node, &header);
+    defer allocator.free(bytes);
+    const target = try wim.inspectNt6X86Install(bytes, minor);
+    if (target.count != std.mem.readInt(u32, header[44..48], .little)) return error.InvalidWimXml;
+    return .{ .index = 0, .major = 6, .minor = minor, .build = if (minor == 1) 7601 else 6002 };
+}
+
+/// An x86 PE10 donor: x86 Setup PE 10.0 (build 10240..21999), BCD, SDI,
+/// boot.wim, sources/setup.exe and the BIOS bootmgr in the root.
+pub fn inspectX86Donor(allocator: std.mem.Allocator, iso: anytype) !wim.Setup {
+    const setup = try setupInfoX86(allocator, iso);
+    if (!setup.isWindows10Donor()) return error.Windows10PeDonorWrongVersion;
+    try validateBootFiles(iso);
+    try validateSetup(iso);
+    var node: udf.Node = undefined;
+    if (!try udf.openPath(iso, "bootmgr", &node) or node.is_directory or node.size == 0) return error.InvalidWindowsBootFile;
+    return setup;
+}
+
+/// The x86 PE10 donor: the first valid one (by name) in Programs/USOS/WinPE,
+/// else in Systems/Windows/Windows 10/Images (where a Windows 10 x86 ISO for
+/// its own install already lives). x64 donors and other ISOs are skipped.
+/// `context.probeX86Donor(directory, name)` reads the ISO's metadata.
+pub fn resolveX86Donor(selected: Inspection, source: directory.Source, context: anytype) !Inspection {
+    var iso_count: usize = 0;
+    for (donor_directories) |folder| {
+        var entries: [8]directory.Entry = undefined;
+        var skip: usize = 0;
+        while (true) {
+            const page = source.listPage(folder, skip, &entries) catch |err| switch (err) {
+                error.NotFound, error.FileNotFound, error.PathNotFound => break,
+                else => return err,
+            };
+            if (page.count > entries.len or page.count > max_donor_entries - skip or
+                (page.has_more and (page.count == 0 or skip + page.count == max_donor_entries))) return error.Windows10PeDonorScanLimit;
+            for (entries[0..page.count]) |entry| {
+                const name = entry.name.slice();
+                if (entry.directory or !std.ascii.endsWithIgnoreCase(name, ".iso")) continue;
+                iso_count += 1;
+                const setup = context.probeX86Donor(folder, name) catch |err| switch (err) {
+                    error.OutOfMemory => return err,
+                    else => continue,
+                };
+                if (!setup.isWindows10Donor()) continue;
+                var result = selected;
+                result.mode = .original;
+                result.donor_name = entry.name;
+                result.donor_directory = folder;
+                result.boot_setup = setup;
+                return result;
+            }
+            skip += page.count;
+            if (!page.has_more) break;
+        }
+    }
+    return error.X86PeDonorMissing;
+}
+
 /// Written by the installer (install/update/repair) next to the other ESP
 /// state: the PE10 donor it placed in Programs\USOS\WinPE.
 pub const donor_record_path = "\\EFI\\USOS\\winpe-donor.ini";
@@ -225,6 +299,8 @@ pub fn errorDetail(err: anyerror) []const u8 {
         error.Windows10PeDonorScanLimit => "Donor scan exceeds 256 directory entries; reduce the donor folder contents.",
         error.UnsupportedWindows7InstallTarget => "Every install image must be Windows 7 (6.1) x64; mixed targets are rejected.",
         error.Windows7OriginalRequiresInstallWim => "Native-PE7 media requires sources/install.wim for external PE10 Setup.",
+        error.X86PeDonorMissing => "Add a Windows 10 x86 Setup ISO to Systems/Windows/Windows 10/Images (or Programs/USOS/WinPE) on DATA.",
+        error.UnsupportedNt6X86InstallTarget => "Every install image must be 32-bit Windows 7 (6.1) or Vista / Server 2008 (6.0).",
         else => "ISO validation failed; no PE7 fallback and no installer was launched.",
     };
 }
@@ -269,6 +345,9 @@ const Fake = struct {
             if (std.mem.eql(u8, item.name, name)) return item.setup orelse error.InvalidWindowsBootFile;
         }
         return error.FileNotFound;
+    }
+    pub fn probeX86Donor(self: *Fake, folder: []const u8, name: []const u8) anyerror!wim.Setup {
+        return self.probeDonor(folder, name);
     }
 };
 const pe7 = wim.Setup{ .index = 2, .major = 6, .minor = 1, .build = 7601 };
@@ -354,4 +433,16 @@ test "donor record needs name, size and a 64-digit SHA-256" {
     try std.testing.expectEqual(@as(u8, 0xab), record.sha256[31]);
     try std.testing.expect(parseDonorRecord("name=a.iso\nsize=1\n") == null);
     try std.testing.expect(parseDonorRecord("name=a.iso\nsize=x\nsha256=" ++ "00" ** 32) == null);
+}
+
+test "x86 PE10 donor: first valid by name, managed folder first, then Windows 10/Images" {
+    const pe10_x86 = wim.Setup{ .index = 1, .major = 10, .minor = 0, .build = 19041 };
+    var fake = Fake{ .missing = true, .legacy_entries = &.{ .{ .name = "a-bad.iso", .setup = null }, .{ .name = "w10x86.iso", .setup = pe10_x86 }, .{ .name = "z.iso", .setup = pe10_x86 } } };
+    const resolved = try resolveX86Donor(original, fake.source(), &fake);
+    try std.testing.expectEqualStrings("w10x86.iso", resolved.donor_name.slice());
+    try std.testing.expectEqualStrings(legacy_donor_directory, resolved.donor_directory);
+    fake = .{ .entries = &.{.{ .name = "pe.iso", .setup = pe10_x86 }}, .legacy_entries = &.{.{ .name = "w10x86.iso", .setup = pe10_x86 }} };
+    try std.testing.expectEqualStrings(donor_directory, (try resolveX86Donor(original, fake.source(), &fake)).donor_directory);
+    fake = .{ .missing = true, .legacy_entries = &.{.{ .name = "pe7.iso", .setup = pe7 }} };
+    try std.testing.expectError(error.X86PeDonorMissing, resolveX86Donor(original, fake.source(), &fake));
 }

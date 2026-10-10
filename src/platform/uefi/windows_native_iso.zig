@@ -267,6 +267,11 @@ pub const CsmwrapAnswer = union(enum) {
 /// request.ini: DATA-relative paths of the Vista ISO and the PE10 donor, the
 /// DATA system folder and the answer source. No key or password in it.
 pub fn formatCsmwrapRequest(buffer: []u8, folder: []const u8, name: []const u8, donor_directory: []const u8, donor_name: []const u8, answer: CsmwrapAnswer) ![]const u8 {
+    return formatCsmwrapRequestFor(buffer, "vista-x64-sp2-uefi-csmwrap", folder, name, donor_directory, donor_name, answer);
+}
+
+/// The same request with another step-610 profile (win-nt6-x86-uefi-csmwrap).
+pub fn formatCsmwrapRequestFor(buffer: []u8, comptime profile: []const u8, folder: []const u8, name: []const u8, donor_directory: []const u8, donor_name: []const u8, answer: CsmwrapAnswer) ![]const u8 {
     try source_config.validateName(folder);
     try source_config.validateName(name);
     try source_config.validateName(donor_name);
@@ -284,7 +289,7 @@ pub fn formatCsmwrapRequest(buffer: []u8, folder: []const u8, name: []const u8, 
             break :blk try std.fmt.bufPrint(&answer_text, "file:{s}", .{file});
         },
     };
-    return std.fmt.bufPrint(buffer, "version=1\r\nprofile=vista-x64-sp2-uefi-csmwrap\r\niso=Systems/Windows/{s}/Images/{s}\r\ndonor={s}/{s}\r\nfolder={s}\r\nanswer={s}\r\n", .{ folder, name, dir, donor_name, folder, answer_value });
+    return std.fmt.bufPrint(buffer, "version=1\r\nprofile=" ++ profile ++ "\r\niso=Systems/Windows/{s}/Images/{s}\r\ndonor={s}/{s}\r\nfolder={s}\r\nanswer={s}\r\n", .{ folder, name, dir, donor_name, folder, answer_value });
 }
 
 fn ensureEspDirectory(root: *uefi.protocol.File, path_text: []const u8) !void {
@@ -338,6 +343,82 @@ test "Vista CSMWrap request names DATA-relative paths and the answer source" {
     try std.testing.expect(std.mem.endsWith(u8, try formatCsmwrapRequest(&buffer, "Windows Vista", "v.iso", "Programs/USOS/WinPE", "PE10.iso", .profile), "answer=profile\r\n"));
     try std.testing.expectError(error.InvalidImageName, formatCsmwrapRequest(&buffer, "Windows Vista", "v.iso", "../x", "PE10.iso", .none));
     try std.testing.expectError(error.InvalidImageName, formatCsmwrapRequest(&buffer, "Windows Vista", "a/b.iso", "Programs/USOS/WinPE", "PE10.iso", .none));
+}
+
+// ------------------------------------ 32-bit Windows 7 / Vista / 2008
+// No firmware CSM (win-nt6-x86-uefi-csmwrap, design doc
+// csmwrap-integration.md section 12): the selected 32-bit ISO keeps Setup
+// and install.wim, an x86 PE10 donor (a Windows 10 x86 Setup ISO) is staged
+// on the target by micro-Linux step 610 (the X86_SELF layout of section 11)
+// and runs that Setup in BIOS mode through CSMWrap.
+
+pub const nt6_x86_csmwrap_profile = "win-nt6-x86-uefi-csmwrap";
+
+const X86DonorContext = struct {
+    state: *BootState,
+    pub fn probeX86Donor(self: *X86DonorContext, directory: []const u8, name: []const u8) !usos.wim_setup.Setup {
+        try openIn(&self.state.catalog, directory, name, &self.state.donor);
+        var iso = Iso{ .catalog = &self.state.catalog, .file = &self.state.donor };
+        return scanner.inspectX86Donor(uefi.pool_allocator, &iso);
+    }
+};
+
+/// NT minor version of a Windows 7 / Vista route (1: 7 / 2008 R2, 0: Vista / 2008).
+pub fn nt6Minor(system: *const usos.catalog.SystemEntry) u32 {
+    return if (usos.catalog.os_profiles.traits(system.id).native_uefi == .vista) 0 else 1;
+}
+
+fn inspectNt6X86State(state: *BootState, folder: []const u8, name: []const u8, minor: u32) !scanner.Inspection {
+    try openIso(&state.catalog, folder, name, &state.source);
+    var iso = Iso{ .catalog = &state.catalog, .file = &state.source };
+    const install = try scanner.inspectNt6X86(uefi.pool_allocator, &iso, minor);
+    const selected = scanner.Inspection{ .mode = .original, .selected_setup = install, .boot_setup = install, .nvme_packages = false };
+    var adapter = directory_source.Adapter.init(state.catalog.fs, state.catalog.reader());
+    var context = X86DonorContext{ .state = state };
+    return scanner.resolveX86Donor(selected, adapter.source(), &context);
+}
+
+/// The summary's check: the 32-bit ISO and the x86 PE10 donor.
+pub noinline fn inspectNt6X86(folder: []const u8, name: []const u8, minor: u32) !scanner.Inspection {
+    if (uefi.system_table.boot_services == null) return error.NoBootServices;
+    const state = try uefi.pool_allocator.create(BootState);
+    defer uefi.pool_allocator.destroy(state);
+    try initBootState(state);
+    return inspectNt6X86State(state, folder, name, minor);
+}
+
+/// The ISO and donor checks, then usos-source.ini (the 32-bit ISO: WinPE
+/// mounts it) and request.ini (profile win-nt6-x86-uefi-csmwrap, donor =
+/// the x86 PE10 ISO) in \EFI\USOS\vista-csmwrap for micro-Linux step 610.
+pub noinline fn prepareNt6X86Csmwrap(root: *uefi.protocol.File, folder: []const u8, name: []const u8, minor: u32, answer: CsmwrapAnswer, progress: *const fn (IsoStage, []const u8) void) !void {
+    if (@import("builtin").cpu.arch != .x86_64) return error.WindowsSetupRequiresX64;
+    try source_config.validateName(name);
+    if (uefi.system_table.boot_services == null) return error.NoBootServices;
+    const state = try uefi.pool_allocator.create(BootState);
+    defer uefi.pool_allocator.destroy(state);
+    try initBootState(state);
+    progress(.validating, "Validating the installation ISO and the x86 PE10 donor");
+    const inspection = try inspectNt6X86State(state, folder, name, minor);
+    var message: [320]u8 = undefined;
+    serial.writeAscii(std.fmt.bufPrint(&message, "[NT6_X86_CSMWRAP] {s}/{s}; NT 6.{d} x86; donor {s}/{s} PE={d}.{d}.{d} x86\r\n", .{ folder, name, minor, inspection.donor_directory, inspection.donor_name.slice(), inspection.boot_setup.major, inspection.boot_setup.minor, inspection.boot_setup.build }) catch "[NT6_X86_CSMWRAP] inspected\r\n");
+    // Reopen the selected ISO (its size goes into the binding).
+    try openIso(&state.catalog, folder, name, &state.source);
+    var config: [544]u8 = undefined;
+    const binding = try source_config.sourceConfigForFolder(&config, state.catalog.partition.part_guid, state.source.size(), folder, name);
+    var request: [1024]u8 = undefined;
+    const text = try formatCsmwrapRequestFor(&request, nt6_x86_csmwrap_profile, folder, name, inspection.donor_directory, inspection.donor_name.slice(), answer);
+    const settings_store = @import("settings_store.zig");
+    try ensureEspDirectory(root, csmwrap_directory);
+    try settings_store.replaceFile(root, csmwrap_directory ++ "\\usos-source.ini", binding);
+    try settings_store.replaceFile(root, csmwrap_directory ++ "\\request.ini", text);
+    serial.writeAscii("[NT6_X86_CSMWRAP] request written: ");
+    serial.writeAscii(text);
+}
+
+test "32-bit Windows 7 / Vista request names the x86 PE10 donor" {
+    var buffer: [1024]u8 = undefined;
+    const text = try formatCsmwrapRequestFor(&buffer, nt6_x86_csmwrap_profile, "Windows 7", "w7x86.iso", "Systems/Windows/Windows 10/Images", "w10x86.iso", .profile);
+    try std.testing.expectEqualStrings("version=1\r\nprofile=win-nt6-x86-uefi-csmwrap\r\niso=Systems/Windows/Windows 7/Images/w7x86.iso\r\ndonor=Systems/Windows/Windows 10/Images/w10x86.iso\r\nfolder=Windows 7\r\nanswer=profile\r\n", text);
 }
 
 // ------------------------------------------------- Windows 10/11 and WinPE

@@ -412,6 +412,10 @@ pub const csmwrap_variants = [_]CsmwrapVariant{
     .{ .base = "xp-x86-sp3-uefi-csm", .id = "xp-x86-sp3-uefi-csmwrap", .start = "same micro-Linux staging + usos.xp_boot=csmwrap (CSMWrap ESP at the disk end)" },
     .{ .base = "vista-uefi-pe10", .id = "vista-x64-sp2-uefi-csmwrap", .start = "micro-Linux step 610: MBR disk, PE10 staging partition + CSMWrap ESP; Vista Setup in BIOS mode" },
     .{ .base = "win10-11-uefi-native", .id = "win-x86-uefi-csmwrap", .start = "x86 media only: micro-Linux step 610: MBR disk, Windows partition + the ISO's own WinPE staging + CSMWrap ESP; Setup in BIOS mode (InstallTo)", .x86_media_only = true },
+    // 32-bit Windows 7 / Vista / Server 2008: the same layout, but an x86 PE10
+    // donor (Windows 10 x86 Setup ISO) is staged instead of the ISO's own PE.
+    .{ .base = "win7-uefi-native", .id = "win-nt6-x86-uefi-csmwrap", .start = "x86 media only: micro-Linux step 610: MBR disk, Windows partition + x86 PE10 donor staging + CSMWrap ESP; the ISO's Setup in BIOS mode (InstallTo)", .x86_media_only = true },
+    .{ .base = "vista-uefi-pe10", .id = "win-nt6-x86-uefi-csmwrap", .start = "x86 media only: micro-Linux step 610: MBR disk, Windows partition + x86 PE10 donor staging + CSMWrap ESP; the ISO's Setup in BIOS mode (InstallTo)", .x86_media_only = true },
 };
 
 pub fn csmwrapVariant(base_id: []const u8) ?*const CsmwrapVariant {
@@ -420,8 +424,13 @@ pub fn csmwrapVariant(base_id: []const u8) ?*const CsmwrapVariant {
 
 /// `x86_media`: the selected image is 32-bit (win-x86-uefi-csmwrap).
 pub fn csmwrapVariantFor(base_id: []const u8, x86_media: bool) ?*const CsmwrapVariant {
+    // 32-bit media: an x86-only variant of the base wins (Vista x86 is not
+    // the Vista x64 PE10 path).
+    if (x86_media) for (&csmwrap_variants) |*variant| {
+        if (variant.x86_media_only and std.mem.eql(u8, variant.base, base_id)) return variant;
+    };
     for (&csmwrap_variants) |*variant| {
-        if (variant.x86_media_only and !x86_media) continue;
+        if (variant.x86_media_only) continue;
         if (std.mem.eql(u8, variant.base, base_id)) return variant;
     }
     return null;
@@ -446,6 +455,12 @@ test "CSMWrap variants replace existing UEFI profiles and have their own ids" {
         try std.testing.expect(csmwrapVariant(modern.id) == null);
         try std.testing.expectEqualStrings("win-x86-uefi-csmwrap", csmwrapVariantFor(modern.id, true).?.id);
     }
+    // Windows 7 / Vista / Server 2008: x86 media through the x86 PE10 donor.
+    for ([_][]const u8{ "windows-7", "windows-vista", "windows-server-2008" }) |id| {
+        const legacy = select(systems.findById(id).?, .iso, .automatic, .uefi).?;
+        try std.testing.expectEqualStrings("win-nt6-x86-uefi-csmwrap", csmwrapVariantFor(legacy.id, true).?.id);
+    }
+    try std.testing.expectEqualStrings("vista-x64-sp2-uefi-csmwrap", csmwrapVariantFor("vista-uefi-pe10", false).?.id);
 }
 
 /// The profile that decides this selection, or null when no rule applies.
