@@ -57,6 +57,8 @@ var windowsProfiles = []dataProfile{
 	{"windows-server-2012-r2", "Windows Server 2012 R2", true, true},
 	{"windows-server-2012", "Windows Server 2012", true, true},
 	{"windows-server-2008-r2", "Windows Server 2008 R2", true, true},
+	// Windows Home Server 2011: the Windows 7 / 2008 R2 flow (UEFI only).
+	{"windows-home-server-2011", "Windows Home Server 2011", true, true},
 	{"windows-server-2008", "Windows Server 2008", true, true},
 	{"windows-server-2003", "Windows Server 2003", true, true},
 	// Windows 2000 Server: the Windows 2000 flow from UEFI.

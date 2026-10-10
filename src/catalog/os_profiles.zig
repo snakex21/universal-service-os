@@ -139,6 +139,9 @@ pub const traits_table = [_]SystemTraits{
     // Windows Embedded 8.1 Industry (UEFI only, windows_modern.zig): the
     // Windows 8.1 native start from its own DATA folder.
     .{ .system_id = "windows-embedded-8-1-industry", .route_as = "windows-8-1" },
+    // Windows Home Server 2011 (UEFI only, windows_server.zig): the Windows 7
+    // native start (PE10 donor, Setup from the ISO) from its own DATA folder.
+    .{ .system_id = "windows-home-server-2011", .route_as = "windows-7" },
 } else [_]SystemTraits{});
 
 fn ownTraits(system_id: []const u8) SystemTraits {

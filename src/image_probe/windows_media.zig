@@ -61,6 +61,8 @@ pub const ServerEdition = enum(u4) {
     foundation,
     storage,
     hyperv,
+    /// Windows Home Server 2011 (ServerHomePremium / ServerHomeStandard).
+    home,
     other,
 
     pub fn label(self: ServerEdition) []const u8 {
@@ -73,6 +75,7 @@ pub const ServerEdition = enum(u4) {
             .foundation => "Foundation",
             .storage => "Storage",
             .hyperv => "Hyper-V Server",
+            .home => "Home Server",
             .other => "Other",
         };
     }
@@ -256,6 +259,26 @@ fn tagText(entry: []const u8, comptime tag: []const u8) ?[]const u8 {
     return std.mem.trim(u8, entry[start..stop], " \t\r\n");
 }
 
+fn nonEmpty(text: ?[]const u8) ?[]const u8 {
+    const value = text orelse return null;
+    return if (value.len == 0) null else value;
+}
+
+/// INSTALLATIONTYPE for media written before the tag existed (Server 2008,
+/// whose Core image keeps the plain FLAGS id, e.g. SERVERWEB): "Server Core"
+/// when a PRODUCTTYPE ServerNT image says so in its display name ("...
+/// (Server Core Installation)", "(instalacja Server Core)"); otherwise null
+/// and the EDITIONID / FLAGS rules decide.
+fn legacyInstallationType(entry: []const u8) ?[]const u8 {
+    const product_type = tagText(entry, "PRODUCTTYPE") orelse return null;
+    if (!std.ascii.eqlIgnoreCase(product_type, "ServerNT")) return null;
+    const tail = if (std.mem.indexOf(u8, entry, "</WINDOWS>")) |w| entry[w..] else entry;
+    for ([_]?[]const u8{ tagText(tail, "DISPLAYNAME"), tagText(tail, "NAME") }) |name| {
+        if (name) |text| if (std.ascii.indexOfIgnoreCase(text, "Server Core") != null) return "Server Core";
+    }
+    return null;
+}
+
 fn tagNumber(entry: []const u8, comptime tag: []const u8) ?u32 {
     return std.fmt.parseInt(u32, tagText(entry, tag) orelse return null, 10) catch null;
 }
@@ -286,6 +309,7 @@ pub fn serverEdition(edition_id: []const u8) ?ServerEdition {
         .{ .prefix = "Essentials", .edition = .essentials },
         .{ .prefix = "Foundation", .edition = .foundation },
         .{ .prefix = "Storage", .edition = .storage },
+        .{ .prefix = "Home", .edition = .home },
     };
     for (known) |item| if (startsWithIgnoreCase(name, item.prefix)) return item.edition;
     return .other;
@@ -319,8 +343,11 @@ pub fn parseInstall(xml: []u8) !Install {
         }
         info.images +|= 1;
         if (tagNumber(entry, "ARCH") == 6) info.ia64 = true;
-        const edition_id = tagText(entry, "EDITIONID") orelse "";
-        const installation_type = tagText(entry, "INSTALLATIONTYPE");
+        // Vista / Server 2008 media have no <EDITIONID> and no
+        // <INSTALLATIONTYPE>: <FLAGS> holds the id (SERVERWEB) and
+        // <PRODUCTTYPE> ServerNT says Server (as flow/answer/editions.zig).
+        const edition_id = nonEmpty(tagText(entry, "EDITIONID")) orelse nonEmpty(tagText(entry, "FLAGS")) orelse "";
+        const installation_type = tagText(entry, "INSTALLATIONTYPE") orelse legacyInstallationType(entry);
         const server_type = if (installation_type) |kind| startsWithIgnoreCase(kind, "Server") else false;
         // INSTALLATIONTYPE Client wins: Windows 10 Enterprise multi-session
         // is EDITIONID ServerRdsh on a client Setup.
@@ -366,7 +393,7 @@ pub fn suggestedFolder(install: Install) ?[]const u8 {
     return switch (install.major) {
         6 => switch (install.minor) {
             0 => if (server) "Windows Server 2008" else "Windows Vista",
-            1 => if (server) "Windows Server 2008 R2" else "Windows 7",
+            1 => if (!server) "Windows 7" else if (install.core | install.desktop == ServerEdition.home.bit()) "Windows Home Server 2011" else "Windows Server 2008 R2",
             2 => if (server) "Windows Server 2012" else "Windows 8",
             3 => if (server) "Windows Server 2012 R2" else "Windows 8.1",
             else => null,
@@ -546,6 +573,18 @@ test "Server 2008 R2: Core comes from the EDITIONID suffix too" {
     try std.testing.expectEqualStrings("Standard (Core), Standard (Desktop Experience)", formatEditions(install, &buffer, "Core", "Desktop Experience"));
 }
 
+test "Server 2008 (no EDITIONID): FLAGS and PRODUCTTYPE make it Server media" {
+    // Windows Web Server 2008 SP2: FLAGS SERVERWEB on both images, the Core
+    // image only says "Server Core" in its name.
+    const install = try fixtureInstall("install-server-2008-web.xml");
+    try std.testing.expect(install.serverOnly());
+    try std.testing.expectEqual(ServerEdition.web.bit(), install.desktop);
+    try std.testing.expectEqual(ServerEdition.web.bit(), install.core);
+    try std.testing.expectEqualStrings("Windows Server 2008", suggestedFolder(install).?);
+    try std.testing.expectEqual(FolderHint.none, folderHint(install, true));
+    try std.testing.expectEqual(FolderHint.server_in_client_folder, folderHint(install, false));
+}
+
 test "IA64 Server 2008 R2 media is blocked on every firmware" {
     const install = try fixtureInstall("install-server-2008-r2-ia64.xml");
     try std.testing.expect(install.ia64 and install.server);
@@ -592,6 +631,11 @@ test "edition ids and version folders" {
     try std.testing.expectEqual(ServerEdition.foundation, serverEdition("ServerFoundation").?);
     try std.testing.expectEqual(ServerEdition.storage, serverEdition("ServerStorageStandard").?);
     try std.testing.expectEqual(ServerEdition.other, serverEdition("ServerAzureStackHCICor").?);
+    try std.testing.expectEqual(ServerEdition.home, serverEdition("ServerHomePremium").?);
+    // Windows Home Server 2011 (6.1, ServerHomePremium only): its own folder.
+    const whs = Install{ .known = true, .server = true, .major = 6, .minor = 1, .build = 7601, .images = 1, .desktop = ServerEdition.home.bit() };
+    try std.testing.expectEqualStrings("Windows Home Server 2011", suggestedFolder(whs).?);
+    try std.testing.expectEqual(FolderHint.none, folderHint(whs, true));
     try std.testing.expect(serverEdition("Professional") == null);
     try std.testing.expect(serverEdition("Enterprise") == null);
     const Case = struct { server: bool, major: u16, minor: u16, build: u32, folder: ?[]const u8 };
