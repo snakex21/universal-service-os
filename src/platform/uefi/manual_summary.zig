@@ -241,7 +241,25 @@ pub fn show(
             note_count += 1;
         }
     }
-    if (image.kind == .iso and native.legacyPe()) {
+    const nt6_x86 = image.kind == .iso and backend == .windows_iso and native.legacyPe() and manual_images.x86Csmwrap(system, image);
+    if (nt6_x86) {
+        // 32-bit Windows 7 / Vista / Server 2008 without CSM
+        // (win-nt6-x86-uefi-csmwrap): the x86 PE10 donor runs the ISO's Setup
+        // in BIOS mode through CSMWrap (MBR disk prepared in micro-Linux).
+        if (windows_native_iso.inspectNt6X86(windows_native_iso.legacyFolder(system), image.name.slice(), windows_native_iso.nt6Minor(system))) |inspection| {
+            fields.add(view.t(.summary_iso_case), view.t(.summary_w9x_csmwrap));
+            fields.add(view.t(.summary_disk), view.t(.summary_vista_csmwrap_disk));
+            fields.add(view.t(.summary_boot_source), inspection.donor_name.slice());
+            const setup = inspection.boot_setup;
+            fields.add(view.t(.summary_boot_pe), std.fmt.bufPrint(&version_text, "{d}.{d}.{d} x86 / WIM index {d}", .{ setup.major, setup.minor, setup.build, setup.index }) catch view.t(.summary_unavailable));
+        } else |err| {
+            can_start = false;
+            fields.add(view.t(.summary_iso_inspection), @errorName(err));
+            notes[note_count] = view.tr(usos.windows7_iso.errorDetail(err));
+            note_count += 1;
+        }
+    }
+    if (image.kind == .iso and native.legacyPe() and !nt6_x86) {
         if (windows_native_iso.inspect(windows_native_iso.legacyFolder(system), image.name.slice(), vista)) |inspection| {
             // Vista without CSM (the UEFI path gave a black screen on the X470,
             // 2026-09-27): vista-x64-sp2-uefi-csmwrap (legacy MBR install
@@ -405,15 +423,21 @@ fn start(
         // is checked here, then micro-Linux step 610 writes the Windows
         // partition, the ISO's own WinPE (staging) and the CSMWrap ESP to the
         // chosen MBR disk; Setup then runs in BIOS mode from that disk.
+        // Windows 7 / Vista / Server 2008 (win-nt6-x86-uefi-csmwrap): the same
+        // step 610, but an x86 PE10 donor boots instead of the ISO's own PE.
         if (secure_boot.enforced()) return showSecureBootRequired(system);
-        vista_csmwrap_heading = windows_native_iso.systemFolder(system.image_directory) catch system.name;
+        const nt6 = manual_images.nt6Legacy(system);
+        vista_csmwrap_heading = if (nt6) windows_native_iso.legacyFolder(system) else windows_native_iso.systemFolder(system.image_directory) catch system.name;
         view.vistaCsmwrapStatus(.validating, "Reading the selected Windows ISO", vista_csmwrap_heading);
         var x86_answer: windows_native_iso.CsmwrapAnswer = .none;
         if (profile) |p| {
-            _ = answer_profiles.stage(root, p, system.id, .x86, windows_native_iso.x86_csmwrap_profile) catch |err| return showError(view.t(.error_iso), err);
+            _ = answer_profiles.stage(root, p, system.id, .x86, if (nt6) windows_native_iso.nt6_x86_csmwrap_profile else windows_native_iso.x86_csmwrap_profile) catch |err| return showError(view.t(.error_iso), err);
             x86_answer = .profile;
         } else if (unattended) |name| x86_answer = .{ .file = name };
-        windows_native_iso.prepareX86Csmwrap(root, system.image_directory, image.name.slice(), x86_answer, showVistaCsmwrapIso) catch |err| {
+        (if (nt6)
+            windows_native_iso.prepareNt6X86Csmwrap(root, windows_native_iso.legacyFolder(system), image.name.slice(), windows_native_iso.nt6Minor(system), x86_answer, showVistaCsmwrapIso)
+        else
+            windows_native_iso.prepareX86Csmwrap(root, system.image_directory, image.name.slice(), x86_answer, showVistaCsmwrapIso)) catch |err| {
             view.refreshFramebuffer();
             showError(view.t(.error_iso), err);
             return;

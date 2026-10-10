@@ -69,8 +69,15 @@ pub fn blockReason(system: *const usos.catalog.SystemEntry, image: usos.catalog.
 pub fn x86Csmwrap(system: *const usos.catalog.SystemEntry, image: usos.catalog.ImageItem) bool {
     const info = image.media orelse return false;
     if (info.arch != .x86 or image.kind != .iso or probe.firmware() != .uefi_x64) return false;
-    if (!usos.flow.preparation_capability.nativeModernNt(system.id)) return false;
+    // Windows 7 / Vista and Server 2008 (route_as) as well: their 32-bit media
+    // go through an x86 PE10 donor (win-nt6-x86-uefi-csmwrap).
+    if (!usos.flow.preparation_capability.nativeModernNt(system.id) and !nt6Legacy(system)) return false;
     return !@import("secure_boot.zig").csm().likelyOn();
+}
+
+/// Windows 7 / Vista routes (Server 2008 / 2008 R2 via route_as).
+pub fn nt6Legacy(system: *const usos.catalog.SystemEntry) bool {
+    return usos.catalog.os_profiles.traits(system.id).native_uefi.legacyPe();
 }
 
 pub fn blockText(reason: media.Block) []const u8 {
