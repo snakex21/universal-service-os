@@ -59,9 +59,10 @@ func TestDataProfileCountsStayInSyncWithCatalog(t *testing.T) {
 	// 2000 Server, the early systems (WfW 3.11, 3.0, 2.11 386/286, 2.03, 1.04,
 	// 1.01), Windows NT 3.51, 3.5 and 3.1 Workstation / Server, XP Media
 	// Center Edition 2005, XP Tablet PC Edition 2005, Windows Embedded 8.1
-	// Industry and Windows NT 4.0 Terminal Server Edition.
-	if len(windowsProfiles) != 43 {
-		t.Fatalf("windows profile count=%d, want 43", len(windowsProfiles))
+	// Industry, Windows NT 4.0 Terminal Server Edition and Windows Home Server
+	// 2011.
+	if len(windowsProfiles) != 44 {
+		t.Fatalf("windows profile count=%d, want 44", len(windowsProfiles))
 	}
 	// Nine distributions plus the SystemRescue, GParted Live and Clonezilla rescue ISOs.
 	if len(linuxProfiles) != 12 {
@@ -115,7 +116,7 @@ func TestRequiredDataDirectoriesContainDriversTree(t *testing.T) {
 	for _, name := range []string{"Windows 11", "Windows 10", "Windows 8.1", "Windows 8", "Windows 7", "Windows Vista", "Windows XP", "Windows 2000",
 		"Windows Server 2025", "Windows Server 2022", "Windows Server 2019", "Windows Server 2016",
 		"Windows Server 2012 R2", "Windows Server 2012", "Windows Server 2008 R2", "Windows Server 2008",
-		"Windows XP x64", "Windows Server 2003", "Windows 2000 Server", "Windows XP Media Center Edition 2005", "Windows XP Tablet PC Edition 2005", "Windows Embedded 8.1 Industry"} {
+		"Windows XP x64", "Windows Server 2003", "Windows 2000 Server", "Windows XP Media Center Edition 2005", "Windows XP Tablet PC Edition 2005", "Windows Embedded 8.1 Industry", "Windows Home Server 2011"} {
 		nt[name] = true
 	}
 	for _, profile := range windowsProfiles {

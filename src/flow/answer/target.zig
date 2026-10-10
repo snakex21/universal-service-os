@@ -99,6 +99,8 @@ const entries = [_]Entry{
     .{ .id = "windows-11", .family = .windows_11 },
     .{ .id = "windows-server-2008", .family = .server_2008 },
     .{ .id = "windows-server-2008-r2", .family = .server_2008_r2 },
+    // Windows Home Server 2011: the Server 2008 R2 answer (the same Setup).
+    .{ .id = "windows-home-server-2011", .family = .server_2008_r2 },
     .{ .id = "windows-server-2012", .family = .server_2012 },
     .{ .id = "windows-server-2012-r2", .family = .server_2012_r2 },
     .{ .id = "windows-server-2016", .family = .server_2016 },
@@ -134,7 +136,7 @@ test "families of the catalog systems" {
     // XP x64 renders the XP answer (the family's system id stays windows-xp),
     // 2000 Server the 2000 answer.
     for (entries) |entry| {
-        if (std.mem.eql(u8, entry.id, "windows-xp-x64") or std.mem.eql(u8, entry.id, "windows-2000-server") or std.mem.eql(u8, entry.id, "windows-xp-mce") or std.mem.eql(u8, entry.id, "windows-xp-tablet") or std.mem.eql(u8, entry.id, "windows-embedded-8-1-industry")) continue;
+        if (std.mem.eql(u8, entry.id, "windows-xp-x64") or std.mem.eql(u8, entry.id, "windows-2000-server") or std.mem.eql(u8, entry.id, "windows-xp-mce") or std.mem.eql(u8, entry.id, "windows-xp-tablet") or std.mem.eql(u8, entry.id, "windows-embedded-8-1-industry") or std.mem.eql(u8, entry.id, "windows-home-server-2011")) continue;
         try std.testing.expectEqualStrings(entry.id, systemId(entry.family));
     }
     try std.testing.expectEqual(Family.windows_xp, familyFor("windows-xp-x64").?);
@@ -142,5 +144,7 @@ test "families of the catalog systems" {
     try std.testing.expectEqual(Family.windows_xp, familyFor("windows-xp-mce").?);
     try std.testing.expectEqual(Family.windows_xp, familyFor("windows-xp-tablet").?);
     try std.testing.expectEqual(Family.windows_8_1, familyFor("windows-embedded-8-1-industry").?);
+    try std.testing.expectEqual(Family.server_2008_r2, familyFor("windows-home-server-2011").?);
+    try std.testing.expectEqualStrings("windows-server-2008-r2", systemId(.server_2008_r2));
     try std.testing.expectEqualStrings("windows-8-1", systemId(.windows_8_1));
 }

@@ -35,6 +35,7 @@ system	windows-server-2016	windows	windows	any	\Systems\Windows\Windows Server 2
 system	windows-server-2012-r2	windows	windows	any	\Systems\Windows\Windows Server 2012 R2\Images	\Systems\Windows\Windows Server 2012 R2\Unattended	.xml	unattend.xml	0	automatic,direct_iso,wimboot,vhdboot,direct_efi,chainload
 system	windows-server-2012	windows	windows	any	\Systems\Windows\Windows Server 2012\Images	\Systems\Windows\Windows Server 2012\Unattended	.xml	unattend.xml	0	automatic,direct_iso,wimboot,vhdboot,direct_efi,chainload
 system	windows-server-2008-r2	windows	windows	any	\Systems\Windows\Windows Server 2008 R2\Images	\Systems\Windows\Windows Server 2008 R2\Unattended	.xml	unattend.xml	1	automatic,direct_iso,wimboot,vhdboot,direct_efi
+system	windows-home-server-2011	windows	windows	uefi	\Systems\Windows\Windows Home Server 2011\Images	\Systems\Windows\Windows Home Server 2011\Unattended	.xml	unattend.xml	1	automatic,direct_iso,wimboot,vhdboot,direct_efi
 system	windows-server-2008	windows	windows	any	\Systems\Windows\Windows Server 2008\Images	\Systems\Windows\Windows Server 2008\Unattended	.xml	unattend.xml	1	automatic,direct_iso,wimboot,vhdboot,direct_efi,chainload
 system	windows-server-2003	windows	windows	any	\Systems\Windows\Windows Server 2003\Images	\Systems\Windows\Windows Server 2003\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-2000-server	windows_legacy	windows	uefi	\Systems\Windows\Windows 2000 Server\Images	\Systems\Windows\Windows 2000 Server\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
@@ -3956,6 +3957,114 @@ route	windows-server-2008-r2	efi	disk_image	bios	-
 route	windows-server-2008-r2	efi	disk_image	uefi	-
 route	windows-server-2008-r2	efi	floppy_image	bios	-
 route	windows-server-2008-r2	efi	floppy_image	uefi	-
+route	windows-home-server-2011	iso	automatic	bios	windows_bios_iso	direct_iso	bios	experimental	0
+route	windows-home-server-2011	iso	automatic	uefi	windows_iso	direct_iso	uefi	experimental	1
+route	windows-home-server-2011	iso	direct_iso	bios	windows_bios_iso	direct_iso	bios	experimental	0
+route	windows-home-server-2011	iso	direct_iso	uefi	windows_iso	direct_iso	uefi	experimental	1
+route	windows-home-server-2011	iso	wimboot	bios	-
+route	windows-home-server-2011	iso	wimboot	uefi	-
+route	windows-home-server-2011	iso	vhdboot	bios	-
+route	windows-home-server-2011	iso	vhdboot	uefi	-
+route	windows-home-server-2011	iso	direct_efi	bios	-
+route	windows-home-server-2011	iso	direct_efi	uefi	-
+route	windows-home-server-2011	iso	chainload	bios	-
+route	windows-home-server-2011	iso	chainload	uefi	-
+route	windows-home-server-2011	iso	memdisk	bios	-
+route	windows-home-server-2011	iso	memdisk	uefi	-
+route	windows-home-server-2011	iso	disk_image	bios	-
+route	windows-home-server-2011	iso	disk_image	uefi	-
+route	windows-home-server-2011	iso	floppy_image	bios	-
+route	windows-home-server-2011	iso	floppy_image	uefi	-
+route	windows-home-server-2011	wim	automatic	bios	wimboot	wimboot	uefi	experimental	0
+route	windows-home-server-2011	wim	automatic	uefi	wimboot	wimboot	uefi	experimental	0
+route	windows-home-server-2011	wim	direct_iso	bios	-
+route	windows-home-server-2011	wim	direct_iso	uefi	-
+route	windows-home-server-2011	wim	wimboot	bios	wimboot	wimboot	uefi	experimental	0
+route	windows-home-server-2011	wim	wimboot	uefi	wimboot	wimboot	uefi	experimental	0
+route	windows-home-server-2011	wim	vhdboot	bios	-
+route	windows-home-server-2011	wim	vhdboot	uefi	-
+route	windows-home-server-2011	wim	direct_efi	bios	-
+route	windows-home-server-2011	wim	direct_efi	uefi	-
+route	windows-home-server-2011	wim	chainload	bios	-
+route	windows-home-server-2011	wim	chainload	uefi	-
+route	windows-home-server-2011	wim	memdisk	bios	-
+route	windows-home-server-2011	wim	memdisk	uefi	-
+route	windows-home-server-2011	wim	disk_image	bios	-
+route	windows-home-server-2011	wim	disk_image	uefi	-
+route	windows-home-server-2011	wim	floppy_image	bios	-
+route	windows-home-server-2011	wim	floppy_image	uefi	-
+route	windows-home-server-2011	img	automatic	bios	-
+route	windows-home-server-2011	img	automatic	uefi	-
+route	windows-home-server-2011	img	direct_iso	bios	-
+route	windows-home-server-2011	img	direct_iso	uefi	-
+route	windows-home-server-2011	img	wimboot	bios	-
+route	windows-home-server-2011	img	wimboot	uefi	-
+route	windows-home-server-2011	img	vhdboot	bios	-
+route	windows-home-server-2011	img	vhdboot	uefi	-
+route	windows-home-server-2011	img	direct_efi	bios	-
+route	windows-home-server-2011	img	direct_efi	uefi	-
+route	windows-home-server-2011	img	chainload	bios	-
+route	windows-home-server-2011	img	chainload	uefi	-
+route	windows-home-server-2011	img	memdisk	bios	-
+route	windows-home-server-2011	img	memdisk	uefi	-
+route	windows-home-server-2011	img	disk_image	bios	-
+route	windows-home-server-2011	img	disk_image	uefi	-
+route	windows-home-server-2011	img	floppy_image	bios	-
+route	windows-home-server-2011	img	floppy_image	uefi	-
+route	windows-home-server-2011	vhd	automatic	bios	vhdboot	vhdboot	uefi	experimental	0
+route	windows-home-server-2011	vhd	automatic	uefi	vhdboot	vhdboot	uefi	experimental	0
+route	windows-home-server-2011	vhd	direct_iso	bios	-
+route	windows-home-server-2011	vhd	direct_iso	uefi	-
+route	windows-home-server-2011	vhd	wimboot	bios	-
+route	windows-home-server-2011	vhd	wimboot	uefi	-
+route	windows-home-server-2011	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	experimental	0
+route	windows-home-server-2011	vhd	vhdboot	uefi	vhdboot	vhdboot	uefi	experimental	0
+route	windows-home-server-2011	vhd	direct_efi	bios	-
+route	windows-home-server-2011	vhd	direct_efi	uefi	-
+route	windows-home-server-2011	vhd	chainload	bios	-
+route	windows-home-server-2011	vhd	chainload	uefi	-
+route	windows-home-server-2011	vhd	memdisk	bios	-
+route	windows-home-server-2011	vhd	memdisk	uefi	-
+route	windows-home-server-2011	vhd	disk_image	bios	-
+route	windows-home-server-2011	vhd	disk_image	uefi	-
+route	windows-home-server-2011	vhd	floppy_image	bios	-
+route	windows-home-server-2011	vhd	floppy_image	uefi	-
+route	windows-home-server-2011	vhdx	automatic	bios	vhdboot	vhdboot	uefi	experimental	0
+route	windows-home-server-2011	vhdx	automatic	uefi	vhdboot	vhdboot	uefi	experimental	0
+route	windows-home-server-2011	vhdx	direct_iso	bios	-
+route	windows-home-server-2011	vhdx	direct_iso	uefi	-
+route	windows-home-server-2011	vhdx	wimboot	bios	-
+route	windows-home-server-2011	vhdx	wimboot	uefi	-
+route	windows-home-server-2011	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	experimental	0
+route	windows-home-server-2011	vhdx	vhdboot	uefi	vhdboot	vhdboot	uefi	experimental	0
+route	windows-home-server-2011	vhdx	direct_efi	bios	-
+route	windows-home-server-2011	vhdx	direct_efi	uefi	-
+route	windows-home-server-2011	vhdx	chainload	bios	-
+route	windows-home-server-2011	vhdx	chainload	uefi	-
+route	windows-home-server-2011	vhdx	memdisk	bios	-
+route	windows-home-server-2011	vhdx	memdisk	uefi	-
+route	windows-home-server-2011	vhdx	disk_image	bios	-
+route	windows-home-server-2011	vhdx	disk_image	uefi	-
+route	windows-home-server-2011	vhdx	floppy_image	bios	-
+route	windows-home-server-2011	vhdx	floppy_image	uefi	-
+route	windows-home-server-2011	efi	automatic	bios	direct_efi	direct_efi	uefi	experimental	0
+route	windows-home-server-2011	efi	automatic	uefi	direct_efi	direct_efi	uefi	experimental	0
+route	windows-home-server-2011	efi	direct_iso	bios	-
+route	windows-home-server-2011	efi	direct_iso	uefi	-
+route	windows-home-server-2011	efi	wimboot	bios	-
+route	windows-home-server-2011	efi	wimboot	uefi	-
+route	windows-home-server-2011	efi	vhdboot	bios	-
+route	windows-home-server-2011	efi	vhdboot	uefi	-
+route	windows-home-server-2011	efi	direct_efi	bios	direct_efi	direct_efi	uefi	experimental	0
+route	windows-home-server-2011	efi	direct_efi	uefi	direct_efi	direct_efi	uefi	experimental	0
+route	windows-home-server-2011	efi	chainload	bios	-
+route	windows-home-server-2011	efi	chainload	uefi	-
+route	windows-home-server-2011	efi	memdisk	bios	-
+route	windows-home-server-2011	efi	memdisk	uefi	-
+route	windows-home-server-2011	efi	disk_image	bios	-
+route	windows-home-server-2011	efi	disk_image	uefi	-
+route	windows-home-server-2011	efi	floppy_image	bios	-
+route	windows-home-server-2011	efi	floppy_image	uefi	-
 route	windows-server-2008	iso	automatic	bios	windows_bios_iso	direct_iso	bios	experimental	0
 route	windows-server-2008	iso	automatic	uefi	windows_iso	direct_iso	uefi	experimental	1
 route	windows-server-2008	iso	direct_iso	bios	windows_bios_iso	direct_iso	bios	experimental	0
@@ -9619,6 +9728,54 @@ profile	windows-server-2008-r2	efi	direct_efi	-	efi-direct
 profile	windows-server-2008-r2	efi	chainload	bios	win7-no-chainload
 profile	windows-server-2008-r2	efi	chainload	uefi	win7-no-chainload
 profile	windows-server-2008-r2	efi	chainload	-	win7-no-chainload
+profile	windows-home-server-2011	iso	automatic	bios	windows-pe-bios-iso
+profile	windows-home-server-2011	iso	automatic	uefi	win7-uefi-native
+profile	windows-home-server-2011	iso	automatic	-	win7-uefi-native
+profile	windows-home-server-2011	iso	direct_iso	bios	windows-pe-bios-iso
+profile	windows-home-server-2011	iso	direct_iso	uefi	win7-uefi-native
+profile	windows-home-server-2011	iso	direct_iso	-	win7-uefi-native
+profile	windows-home-server-2011	iso	chainload	bios	win7-no-chainload
+profile	windows-home-server-2011	iso	chainload	uefi	win7-no-chainload
+profile	windows-home-server-2011	iso	chainload	-	win7-no-chainload
+profile	windows-home-server-2011	wim	automatic	bios	wim-wimboot
+profile	windows-home-server-2011	wim	automatic	uefi	wim-wimboot
+profile	windows-home-server-2011	wim	automatic	-	wim-wimboot
+profile	windows-home-server-2011	wim	wimboot	bios	wim-wimboot
+profile	windows-home-server-2011	wim	wimboot	uefi	wim-wimboot
+profile	windows-home-server-2011	wim	wimboot	-	wim-wimboot
+profile	windows-home-server-2011	wim	chainload	bios	win7-no-chainload
+profile	windows-home-server-2011	wim	chainload	uefi	win7-no-chainload
+profile	windows-home-server-2011	wim	chainload	-	win7-no-chainload
+profile	windows-home-server-2011	img	chainload	bios	win7-no-chainload
+profile	windows-home-server-2011	img	chainload	uefi	win7-no-chainload
+profile	windows-home-server-2011	img	chainload	-	win7-no-chainload
+profile	windows-home-server-2011	vhd	automatic	bios	vhd-vhdboot
+profile	windows-home-server-2011	vhd	automatic	uefi	vhd-vhdboot
+profile	windows-home-server-2011	vhd	automatic	-	vhd-vhdboot
+profile	windows-home-server-2011	vhd	vhdboot	bios	vhd-vhdboot
+profile	windows-home-server-2011	vhd	vhdboot	uefi	vhd-vhdboot
+profile	windows-home-server-2011	vhd	vhdboot	-	vhd-vhdboot
+profile	windows-home-server-2011	vhd	chainload	bios	win7-no-chainload
+profile	windows-home-server-2011	vhd	chainload	uefi	win7-no-chainload
+profile	windows-home-server-2011	vhd	chainload	-	win7-no-chainload
+profile	windows-home-server-2011	vhdx	automatic	bios	vhd-vhdboot
+profile	windows-home-server-2011	vhdx	automatic	uefi	vhd-vhdboot
+profile	windows-home-server-2011	vhdx	automatic	-	vhd-vhdboot
+profile	windows-home-server-2011	vhdx	vhdboot	bios	vhd-vhdboot
+profile	windows-home-server-2011	vhdx	vhdboot	uefi	vhd-vhdboot
+profile	windows-home-server-2011	vhdx	vhdboot	-	vhd-vhdboot
+profile	windows-home-server-2011	vhdx	chainload	bios	win7-no-chainload
+profile	windows-home-server-2011	vhdx	chainload	uefi	win7-no-chainload
+profile	windows-home-server-2011	vhdx	chainload	-	win7-no-chainload
+profile	windows-home-server-2011	efi	automatic	bios	efi-direct
+profile	windows-home-server-2011	efi	automatic	uefi	efi-direct
+profile	windows-home-server-2011	efi	automatic	-	efi-direct
+profile	windows-home-server-2011	efi	direct_efi	bios	efi-direct
+profile	windows-home-server-2011	efi	direct_efi	uefi	efi-direct
+profile	windows-home-server-2011	efi	direct_efi	-	efi-direct
+profile	windows-home-server-2011	efi	chainload	bios	win7-no-chainload
+profile	windows-home-server-2011	efi	chainload	uefi	win7-no-chainload
+profile	windows-home-server-2011	efi	chainload	-	win7-no-chainload
 profile	windows-server-2008	iso	automatic	bios	windows-pe-bios-iso
 profile	windows-server-2008	iso	automatic	uefi	vista-uefi-pe10
 profile	windows-server-2008	iso	automatic	-	vista-uefi-pe10
@@ -12993,6 +13150,60 @@ resolve	windows-server-2008-r2	efi	chainload	-	0	UnsupportedMethod
 resolve	windows-server-2008-r2	efi	memdisk	-	0	UnsupportedImage
 resolve	windows-server-2008-r2	efi	disk_image	-	0	UnsupportedImage
 resolve	windows-server-2008-r2	efi	floppy_image	-	0	UnsupportedImage
+resolve	windows-home-server-2011	iso	automatic	direct_iso	1	ok
+resolve	windows-home-server-2011	iso	direct_iso	direct_iso	1	ok
+resolve	windows-home-server-2011	iso	wimboot	-	0	UnsupportedMethod
+resolve	windows-home-server-2011	iso	vhdboot	-	0	UnsupportedImage
+resolve	windows-home-server-2011	iso	direct_efi	-	0	UnsupportedImage
+resolve	windows-home-server-2011	iso	chainload	-	0	UnsupportedMethod
+resolve	windows-home-server-2011	iso	memdisk	-	0	UnsupportedMethod
+resolve	windows-home-server-2011	iso	disk_image	-	0	UnsupportedImage
+resolve	windows-home-server-2011	iso	floppy_image	-	0	UnsupportedImage
+resolve	windows-home-server-2011	wim	automatic	wimboot	1	ok
+resolve	windows-home-server-2011	wim	direct_iso	-	0	UnsupportedImage
+resolve	windows-home-server-2011	wim	wimboot	wimboot	1	ok
+resolve	windows-home-server-2011	wim	vhdboot	-	0	UnsupportedImage
+resolve	windows-home-server-2011	wim	direct_efi	-	0	UnsupportedImage
+resolve	windows-home-server-2011	wim	chainload	-	0	UnsupportedImage
+resolve	windows-home-server-2011	wim	memdisk	-	0	UnsupportedImage
+resolve	windows-home-server-2011	wim	disk_image	-	0	UnsupportedImage
+resolve	windows-home-server-2011	wim	floppy_image	-	0	UnsupportedImage
+resolve	windows-home-server-2011	img	automatic	-	0	UnsupportedImage
+resolve	windows-home-server-2011	img	direct_iso	-	0	UnsupportedImage
+resolve	windows-home-server-2011	img	wimboot	-	0	UnsupportedImage
+resolve	windows-home-server-2011	img	vhdboot	-	0	UnsupportedImage
+resolve	windows-home-server-2011	img	direct_efi	-	0	UnsupportedImage
+resolve	windows-home-server-2011	img	chainload	-	0	UnsupportedMethod
+resolve	windows-home-server-2011	img	memdisk	-	0	UnsupportedMethod
+resolve	windows-home-server-2011	img	disk_image	-	0	UnsupportedMethod
+resolve	windows-home-server-2011	img	floppy_image	-	0	UnsupportedMethod
+resolve	windows-home-server-2011	vhd	automatic	vhdboot	1	ok
+resolve	windows-home-server-2011	vhd	direct_iso	-	0	UnsupportedImage
+resolve	windows-home-server-2011	vhd	wimboot	-	0	UnsupportedImage
+resolve	windows-home-server-2011	vhd	vhdboot	vhdboot	1	ok
+resolve	windows-home-server-2011	vhd	direct_efi	-	0	UnsupportedImage
+resolve	windows-home-server-2011	vhd	chainload	-	0	UnsupportedImage
+resolve	windows-home-server-2011	vhd	memdisk	-	0	UnsupportedImage
+resolve	windows-home-server-2011	vhd	disk_image	-	0	UnsupportedImage
+resolve	windows-home-server-2011	vhd	floppy_image	-	0	UnsupportedImage
+resolve	windows-home-server-2011	vhdx	automatic	vhdboot	1	ok
+resolve	windows-home-server-2011	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	windows-home-server-2011	vhdx	wimboot	-	0	UnsupportedImage
+resolve	windows-home-server-2011	vhdx	vhdboot	vhdboot	1	ok
+resolve	windows-home-server-2011	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	windows-home-server-2011	vhdx	chainload	-	0	UnsupportedImage
+resolve	windows-home-server-2011	vhdx	memdisk	-	0	UnsupportedImage
+resolve	windows-home-server-2011	vhdx	disk_image	-	0	UnsupportedImage
+resolve	windows-home-server-2011	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	windows-home-server-2011	efi	automatic	direct_efi	1	ok
+resolve	windows-home-server-2011	efi	direct_iso	-	0	UnsupportedImage
+resolve	windows-home-server-2011	efi	wimboot	-	0	UnsupportedImage
+resolve	windows-home-server-2011	efi	vhdboot	-	0	UnsupportedImage
+resolve	windows-home-server-2011	efi	direct_efi	direct_efi	1	ok
+resolve	windows-home-server-2011	efi	chainload	-	0	UnsupportedMethod
+resolve	windows-home-server-2011	efi	memdisk	-	0	UnsupportedImage
+resolve	windows-home-server-2011	efi	disk_image	-	0	UnsupportedImage
+resolve	windows-home-server-2011	efi	floppy_image	-	0	UnsupportedImage
 resolve	windows-server-2008	iso	automatic	direct_iso	1	ok
 resolve	windows-server-2008	iso	direct_iso	direct_iso	1	ok
 resolve	windows-server-2008	iso	wimboot	-	0	UnsupportedMethod
@@ -17290,6 +17501,66 @@ menu	windows-server-2008-r2	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[re
 menu	windows-server-2008-r2	efi	uefi	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
 menu	windows-server-2008-r2	efi	uefi	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
 menu	windows-server-2008-r2	efi	uefi	4	direct_efi	direct_efi	1	1	experimental	EFI [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-home-server-2011	iso	bios	0	automatic	windows_bios_iso	1	1	experimental	Automatic (Windows Setup) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-home-server-2011	iso	bios	1	direct_iso	windows_bios_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-home-server-2011	iso	bios	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-home-server-2011	iso	bios	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
+menu	windows-home-server-2011	iso	bios	4	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-home-server-2011	iso	uefi	0	automatic	windows_iso	1	1	experimental	Automatic (ISO) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-home-server-2011	iso	uefi	1	direct_iso	windows_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-home-server-2011	iso	uefi	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-home-server-2011	iso	uefi	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
+menu	windows-home-server-2011	iso	uefi	4	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	windows-home-server-2011	wim	bios	0	automatic	wimboot	0	0	experimental	Automatic (WIMBoot) [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-home-server-2011	wim	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-home-server-2011	wim	bios	2	wimboot	wimboot	0	0	experimental	WIMBoot [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-home-server-2011	wim	bios	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
+menu	windows-home-server-2011	wim	bios	4	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-home-server-2011	wim	uefi	0	automatic	wimboot	1	1	experimental	Automatic (WIMBoot) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-home-server-2011	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-home-server-2011	wim	uefi	2	wimboot	wimboot	1	1	experimental	WIMBoot [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-home-server-2011	wim	uefi	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
+menu	windows-home-server-2011	wim	uefi	4	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	windows-home-server-2011	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-home-server-2011	img	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-home-server-2011	img	bios	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-home-server-2011	img	bios	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
+menu	windows-home-server-2011	img	bios	4	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-home-server-2011	img	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-home-server-2011	img	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-home-server-2011	img	uefi	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-home-server-2011	img	uefi	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
+menu	windows-home-server-2011	img	uefi	4	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	windows-home-server-2011	vhd	bios	0	automatic	vhdboot	0	0	experimental	Automatic (VHDBoot) [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-home-server-2011	vhd	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-home-server-2011	vhd	bios	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-home-server-2011	vhd	bios	3	vhdboot	vhdboot	0	0	experimental	VHDBoot [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-home-server-2011	vhd	bios	4	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-home-server-2011	vhd	uefi	0	automatic	vhdboot	1	1	experimental	Automatic (VHDBoot) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-home-server-2011	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-home-server-2011	vhd	uefi	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-home-server-2011	vhd	uefi	3	vhdboot	vhdboot	1	1	experimental	VHDBoot [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-home-server-2011	vhd	uefi	4	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	windows-home-server-2011	vhdx	bios	0	automatic	vhdboot	0	0	experimental	Automatic (VHDBoot) [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-home-server-2011	vhdx	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-home-server-2011	vhdx	bios	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-home-server-2011	vhdx	bios	3	vhdboot	vhdboot	0	0	experimental	VHDBoot [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-home-server-2011	vhdx	bios	4	direct_efi	-	0	0	-	EFI	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-home-server-2011	vhdx	uefi	0	automatic	vhdboot	1	1	experimental	Automatic (VHDBoot) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-home-server-2011	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-home-server-2011	vhdx	uefi	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-home-server-2011	vhdx	uefi	3	vhdboot	vhdboot	1	1	experimental	VHDBoot [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-home-server-2011	vhdx	uefi	4	direct_efi	-	0	1	-	EFI	[requires EFI]	[requires EFI]	[requires EFI]
+menu	windows-home-server-2011	efi	bios	0	automatic	direct_efi	0	0	experimental	Automatic (EFI) [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-home-server-2011	efi	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-home-server-2011	efi	bios	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-home-server-2011	efi	bios	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
+menu	windows-home-server-2011	efi	bios	4	direct_efi	direct_efi	0	0	experimental	EFI [EXPERIMENTAL]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-home-server-2011	efi	uefi	0	automatic	direct_efi	1	1	experimental	Automatic (EFI) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-home-server-2011	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-home-server-2011	efi	uefi	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
+menu	windows-home-server-2011	efi	uefi	3	vhdboot	-	0	1	-	VHDBoot	[requires VHD or VHDX]	[requires VHD or VHDX]	[requires VHD or VHDX]
+menu	windows-home-server-2011	efi	uefi	4	direct_efi	direct_efi	1	1	experimental	EFI [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	windows-server-2008	iso	bios	0	automatic	windows_bios_iso	1	1	experimental	Automatic (Windows Setup) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	windows-server-2008	iso	bios	1	direct_iso	windows_bios_iso	1	1	experimental	ISO [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	windows-server-2008	iso	bios	2	wimboot	-	0	1	-	WIMBoot	[requires WIM]	[requires WIM]	[requires WIM]
@@ -21467,6 +21738,60 @@ help	windows-server-2008-r2	efi	chainload	Chainload	Transfers control to another
 help	windows-server-2008-r2	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
 help	windows-server-2008-r2	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
 help	windows-server-2008-r2	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-home-server-2011	iso	automatic	Windows ISO - WIMBoot UEFI	Detects the installer version and starts it directly from ISO in UEFI.	WinPE 7 receives UEFI compatibility and optional Drivers/x64 packages in RAM.
+help	windows-home-server-2011	iso	direct_iso	Windows ISO - WIMBoot UEFI	Detects the installer version and starts it directly from ISO in UEFI.	WinPE 7 receives UEFI compatibility and optional Drivers/x64 packages in RAM.
+help	windows-home-server-2011	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-home-server-2011	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-home-server-2011	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-home-server-2011	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-home-server-2011	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-home-server-2011	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-home-server-2011	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-home-server-2011	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-home-server-2011	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-home-server-2011	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-home-server-2011	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-home-server-2011	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-home-server-2011	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-home-server-2011	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-home-server-2011	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-home-server-2011	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-home-server-2011	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-home-server-2011	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-home-server-2011	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-home-server-2011	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-home-server-2011	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-home-server-2011	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-home-server-2011	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-home-server-2011	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-home-server-2011	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-home-server-2011	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-home-server-2011	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-home-server-2011	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-home-server-2011	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-home-server-2011	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-home-server-2011	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-home-server-2011	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-home-server-2011	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-home-server-2011	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-home-server-2011	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-home-server-2011	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-home-server-2011	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-home-server-2011	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-home-server-2011	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-home-server-2011	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-home-server-2011	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-home-server-2011	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-home-server-2011	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-home-server-2011	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-home-server-2011	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-home-server-2011	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-home-server-2011	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-home-server-2011	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-home-server-2011	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-home-server-2011	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-home-server-2011	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-home-server-2011	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
 help	windows-server-2008	iso	automatic	Automatic - recommended	USOS selects the supported boot path for this image automatically.	For this Windows ISO it currently resolves to the ISO method below.
 help	windows-server-2008	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
 help	windows-server-2008	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
@@ -23420,6 +23745,15 @@ wimboot_server	windows-server-2008-r2	win7	5	drivers usos-drivers.bin bundled+us
 wimboot_server	windows-server-2008-r2	win7	6	boot BCD boot.sdi boot.wim
 wimboot_server	windows-server-2008-r2	win7	7	file usos-source.ini folder=Windows Server 2008 R2
 wimboot_server	windows-server-2008-r2	win7	8	file usos-unattend.xml from Systems\Windows\Windows Server 2008 R2\Unattended
+wimboot_server	windows-home-server-2011	win7	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
+wimboot_server	windows-home-server-2011	win7	1	support \EFI\USOS\windows-native\win7-support.cpio limit=64MiB
+wimboot_server	windows-home-server-2011	win7	2	flag usos-modern-win7.flag
+wimboot_server	windows-home-server-2011	win7	3	flag usos-external-pe10.flag
+wimboot_server	windows-home-server-2011	win7	4	flag usos-nvme-packages.flag
+wimboot_server	windows-home-server-2011	win7	5	drivers usos-drivers.bin bundled+user Drivers\Windows Home Server 2011
+wimboot_server	windows-home-server-2011	win7	6	boot BCD boot.sdi boot.wim
+wimboot_server	windows-home-server-2011	win7	7	file usos-source.ini folder=Windows Home Server 2011
+wimboot_server	windows-home-server-2011	win7	8	file usos-unattend.xml from Systems\Windows\Windows Home Server 2011\Unattended
 wimboot_server	windows-server-2008	vista	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
 wimboot_server	windows-server-2008	vista	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
 wimboot_server	windows-server-2008	vista	2	flag usos-modern-vista.flag
@@ -23430,6 +23764,7 @@ wimboot_server	windows-server-2008	vista	5	file usos-source.ini folder=Windows S
 int10_dispatcher	windows-7
 int10_dispatcher	windows-vista
 int10_dispatcher	windows-server-2008-r2
+int10_dispatcher	windows-home-server-2011
 int10_dispatcher	windows-server-2008
 # wimboot_int10: Vista plans with the dispatcher flag: external_pe10 answer index injection
 wimboot_int10	vista	0	0	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB

@@ -25,7 +25,10 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-QEMU = ROOT / "tools" / "qemu" / "qemu-system-x86_64.exe"
+# USOS_QEMU_EXE: another executable name in tools/qemu (a copy of
+# qemu-system-x86_64.exe), so parallel runs that stop QEMU by image name
+# leave this run alone.
+QEMU = ROOT / "tools" / "qemu" / os.environ.get("USOS_QEMU_EXE", "qemu-system-x86_64.exe")
 QEMU_IMG = ROOT / "tools" / "qemu" / "qemu-img.exe"
 OVMF_CODE = ROOT / "tools" / "qemu" / "share" / "edk2-x86_64-code.fd"
 OVMF_VARS = ROOT / "tools" / "qemu" / "share" / "edk2-i386-vars.fd"
@@ -34,6 +37,11 @@ RUN = ROOT / "tools" / "tests" / "artifacts" / os.environ.get("USOS_NATIVE_RUN",
 # USOS_NATIVE_TARGET_BUS=ahci: a SATA target (Vista has no inbox NVMe driver).
 TARGET_BUS = os.environ.get("USOS_NATIVE_TARGET_BUS", "nvme")
 STATE = RUN / "qemu-state.json"
+# USOS_NATIVE_MACHINE=pc: i440FX. The CSMWrap paths (Vista / Server 2008
+# without CSM) need it: on q35 PE10 in BIOS mode under CSMWrap gets no USB
+# keyboard (Setup's first page never reacts); the CSMWrap Vista harness
+# (tools/tests/legacy_bios/run_csmwrap_vista_prepared.py) uses pc as well.
+MACHINE = os.environ.get("USOS_NATIVE_MACHINE", "q35")
 # USOS_NATIVE_ACCEL=whpx: Windows Hypervisor Platform (much faster than TCG).
 ACCEL = (["-accel", "whpx,kernel-irqchip=off", "-cpu", "qemu64,+ssse3,+sse4.1,+sse4.2,+popcnt"]
          if os.environ.get("USOS_NATIVE_ACCEL") == "whpx" else ["-accel", "tcg,thread=multi", "-cpu", "max"])
@@ -66,13 +74,18 @@ def monitor(commands: list[str]) -> str:
 
 def launch(args: list[str], label: str, no_reboot: bool) -> None:
     port = free_port()
-    full = [str(QEMU), "-name", f"USOS-native-{label}", "-machine", "q35", *ACCEL,
-            "-m", "6144", "-smp", "4", "-nic", "none", "-display", "none", "-device", "VGA,xres=1280,yres=800",
+    full = [str(QEMU), "-name", f"USOS-native-{label}", "-machine", MACHINE, *ACCEL,
+            *(["-m", "4096", "-smp", "2", "-vga", "std"] if MACHINE == "pc" else ["-m", "6144", "-smp", "4", "-device", "VGA,xres=1280,yres=800"]),
+            "-nic", "none", "-display", "none",
             "-monitor", f"tcp:127.0.0.1:{port},server=on,wait=off",
             "-serial", f"file:{(RUN / f'serial-{label}.log').as_posix()}",
             "-drive", f"if=pflash,format=raw,readonly=on,file={OVMF_CODE.as_posix()}",
             "-drive", f"if=pflash,format=raw,file={(RUN / 'vars.fd').as_posix()}",
-            "-device", "qemu-xhci,id=xhci", "-device", "usb-kbd,bus=xhci.0", "-device", "usb-tablet,bus=xhci.0",
+            "-device", "qemu-xhci,id=xhci",
+            # USOS_NATIVE_PS2_INPUT=1: no USB keyboard/tablet, sendkey goes to
+            # the PS/2 keyboard (installed systems without an xHCI driver:
+            # Server 2008 R2 / Home Server 2011 first logon).
+            *([] if os.environ.get("USOS_NATIVE_PS2_INPUT") == "1" else ["-device", "usb-kbd,bus=xhci.0", "-device", "usb-tablet,bus=xhci.0"]),
             *args]
     if no_reboot:
         full.append("-no-reboot")

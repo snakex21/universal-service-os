@@ -21,6 +21,24 @@ pub const entries = [_]SystemEntry{
     server("windows-server-2012-r2", "2012 R2", &methods),
     server("windows-server-2012", "2012", &methods),
     server("windows-server-2008-r2", "2008 R2", &windows7_methods),
+} ++ @import("windows_legacy.zig").uefiOnly(.{
+    // Windows Home Server 2011 (Server 2008 R2 SP1 based, x64): the
+    // Windows 7 native start (os_profiles.zig route_as windows-7). The PE10
+    // donor runs the ISO's sources\setup.exe directly, so the media's own
+    // WinPE shell (wpshell.exe: 160 GB disk minimum, disk wipe) never runs.
+    // UEFI only: the BIOS Core would start that shell.
+    SystemEntry{
+        .id = "windows-home-server-2011",
+        .name = "Windows Home Server 2011",
+        .category = .windows,
+        .family = .windows,
+        .image_directory = "\\Systems\\Windows\\Windows Home Server 2011\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Windows Home Server 2011\\Unattended",
+        .firmware = .uefi,
+        .boot_methods = &windows7_methods,
+        .server = true,
+    },
+}) ++ [_]SystemEntry{
     server("windows-server-2008", "2008", &methods),
     server("windows-server-2003", "2003", &nt5_methods),
 } ++ (if (freestanding) [_]SystemEntry{} else [_]SystemEntry{
