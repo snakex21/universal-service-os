@@ -1,6 +1,7 @@
 """NT 4.0 driver builds (AHCINT AHCI_NT4, usosrst NT4), host-only, no
 Microsoft files: the pinned binaries are checked against the export-name
-lists of the NT 4.0 RTM (1381.1) and SP6a (1381.335) kernels, HALs and
+lists of the NT 4.0 RTM (1381.1), SP6a (1381.335) and Terminal Server
+Edition (1381.32772) kernels, HALs and
 ScsiPort in tools/tests/data (check_nt4_driver_imports.py --dump-exports).
 """
 from __future__ import annotations
@@ -17,7 +18,8 @@ from pe_nt4_version import pe_checksum, set_nt4  # noqa: E402
 AHCINT = ROOT / 'tools/vendor/ahcint/1.3.0.0-usos4'
 USOSRST = ROOT / 'tools/w2k/usosrst'
 NT4_BINARIES = [AHCINT / 'bin/NT4/i386/ahcint.sys', USOSRST / 'bin/nt4/i386/usosrst.sys']
-FIXTURES = [HERE / 'data/nt4rtm_exports.txt', HERE / 'data/nt4sp6a_exports.txt']
+# RTM 1381.1, SP6a 1381.335, Terminal Server Edition 1381.32772 (RTM TSE CD).
+FIXTURES = [HERE / 'data/nt4rtm_exports.txt', HERE / 'data/nt4sp6a_exports.txt', HERE / 'data/nt4tse_exports.txt']
 
 
 def tables(path: Path) -> dict:

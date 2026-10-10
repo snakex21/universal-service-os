@@ -18,7 +18,8 @@ SYS = DRV / 'bin/i386/usosusb.sys'
 SRC = DRV / 'src/usosusb.c'
 TARGET = ROOT / 'tools/nt4_csmwrap_target.sh'
 MICRO = ROOT / 'tools/build_micro_linux.py'
-FIXTURES = [HERE / 'data/nt4rtm_exports.txt', HERE / 'data/nt4sp6a_exports.txt']
+# RTM 1381.1, SP6a 1381.335, Terminal Server Edition 1381.32772 (RTM TSE CD).
+FIXTURES = [HERE / 'data/nt4rtm_exports.txt', HERE / 'data/nt4sp6a_exports.txt', HERE / 'data/nt4tse_exports.txt']
 
 
 def set1_table() -> list[int]:

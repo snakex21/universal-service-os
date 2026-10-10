@@ -45,6 +45,9 @@ SOURCE_ISO=${NT4_SOURCE_ISO:?NT4_SOURCE_ISO is required}
 ANSWER_SIF=${NT4_ANSWER_SIF:?NT4_ANSWER_SIF is required}
 ANSWER_KIND=${NT4_ANSWER_KIND:-PROFILE}
 SP_EXE=${NT4_SP_EXE:-}
+# tse: the menu entry is Windows NT 4.0 Terminal Server Edition (the CD must
+# be the TSE CD and the other entries must not take it).
+EDITION=${NT4_EDITION:-}
 LIB=${USOS_LIB_DIR:-/usr/lib/usos}
 SYSLINUX_DIR=${NT4_SYSLINUX_DIR:-/usr/share/syslinux}
 PART_START=63
@@ -184,6 +187,34 @@ nt4_server_answer() {
             }
             if (server && !has_type) printf "\r\n[GuiUnattended]\r\n%sAdvServerType = SERVERNT\r\n", bang
             if (server && !has_lic) printf "\r\n[LicenseFilePrintData]\r\n%sAutoMode = PerServer\r\n%sAutoUsers = 5\r\n", bang, bang
+        }'
+}
+
+# Terminal Server Edition (stdin -> stdout, CR LF): GUI Setup waits on its
+# "Terminal Server Desktops" page (number of client licenses) unless the
+# answer has [TerminalServerDesktops] Quantity (the CD's I386\UNATTEND.TXT);
+# QEMU 2026-10-10: the install VM sat on that page with a "licenses set to
+# zero" warning box. 5, like the Per Server licensing. [InternetExplorer]
+# InstallIE4 = No: the CD's IE 4.0 setup at the end of GUI Setup is left
+# out (its own pages; it can be run from the CD later). Keys already in the
+# answer are kept.
+nt4_tse_answer() {
+    awk -v BINMODE=3 '
+        { line = $0; sub(/\r$/, "", line); lines[++n] = line; low = tolower(line); gsub(/[ \t]/, "", low)
+          if (low ~ /^\[/) sec = low
+          if (sec == "[terminalserverdesktops]" && low ~ /^quantity=/) has_qty = 1
+          if (sec == "[internetexplorer]" && low ~ /^installie4=/) has_ie = 1
+          if (low == "[terminalserverdesktops]") has_qsec = 1
+          if (low == "[internetexplorer]") has_isec = 1 }
+        END {
+            for (i = 1; i <= n; i++) {
+                printf "%s\r\n", lines[i]
+                low = tolower(lines[i]); gsub(/[ \t]/, "", low)
+                if (!has_qty && low == "[terminalserverdesktops]") { printf "Quantity = 5\r\n"; has_qty = 1 }
+                if (!has_ie && low == "[internetexplorer]") { printf "InstallIE4 = No\r\n"; has_ie = 1 }
+            }
+            if (!has_qty) printf "\r\n[TerminalServerDesktops]\r\nQuantity = 5\r\n"
+            if (!has_ie) printf "\r\n[InternetExplorer]\r\nInstallIE4 = No\r\n"
         }'
 }
 
@@ -397,11 +428,28 @@ fi
 lang=$(awk '{ sub(/\r$/, "") } tolower($1) == "unicodecasetable" { n = split($0, a, ","); v = a[n]; gsub(/[ \t]/, "", v); print v; exit }' "$txtsetup")
 product=$(awk '{ sub(/\r$/, "") } /^\[/ { s = (tolower($0) == "[setupdata]") } s && tolower($1) == "producttype" { v = $0; sub(/^[^=]*=[ \t]*/, "", v); print v; exit }' "$txtsetup")
 log "source: NT $major.$minor ProductType=${product:-?} language=${lang:-?}"
+# Windows NT 4.0 Terminal Server Edition: tag file CDROM_TS.40 on the CD root
+# (the Workstation / Server CDs have CDROM_W.40 / CDROM_S.40), kernel 1381
+# multi-user (QFE number 32772). Same Setup, same layout and answers (it is a
+# Server CD: ProductType 1); only its own service pack applies.
+tse=''
+for name in CDROM_TS.40 cdrom_ts.40; do [ -f "$work/iso/$name" ] && tse=yes; done
+if [ "$EDITION" = tse ] && [ -z "$tse" ]; then
+    fail 'the ISO is not the Windows NT 4.0 Terminal Server Edition CD (no CDROM_TS.40): choose Windows NT 4.0 or Windows NT 4.0 Server for it'
+fi
+if [ -n "$tse" ] && [ "$EDITION" != tse ] && [ "${NT_MAJOR:-}" = 4 ]; then
+    fail 'the ISO is the Windows NT 4.0 Terminal Server Edition CD: choose Windows NT 4.0 Terminal Server Edition for it (it needs its own service pack)'
+fi
+[ -z "$tse" ] || log 'edition: Terminal Server Edition (CDROM_TS.40)'
 if [ -n "$nt3" ]; then
     nt4_resolve_time_zone "${lang:-}" yes < "$ANSWER_SIF" | nt4_server_answer "${product:-0}" yes | nt3_detached_answer > "$work/WINNT.SIF" ||
         fail 'cannot prepare WINNT.SIF'
 else
     nt4_resolve_time_zone "${lang:-}" < "$ANSWER_SIF" | nt4_server_answer "${product:-0}" > "$work/WINNT.SIF" || fail 'cannot prepare WINNT.SIF'
+    if [ -n "$tse" ]; then
+        nt4_tse_answer < "$work/WINNT.SIF" > "$work/WINNT.TSE" && mv "$work/WINNT.TSE" "$work/WINNT.SIF" || fail 'cannot prepare WINNT.SIF'
+        log 'Terminal Server: 5 client licenses (TerminalServerDesktops), no IE 4.0 during Setup'
+    fi
 fi
 [ "${product:-0}" = 0 ] || log 'server CD: stand-alone server (AdvServerType = SERVERNT), licensing Per Server 5 (LicenseFilePrintData)'
 if grep -qi '^!\{0,1\}TimeZone' "$work/WINNT.SIF"; then log 'time zone: set for this CD language'; else log 'time zone: none (Setup asks)'; fi
@@ -590,6 +638,8 @@ fi
 if [ -n "$SP_EXE" ]; then
     cp "$SP_EXE" "$usos/SP6I386.EXE" || fail 'cannot copy the service pack'
     log "service pack: $(basename "$SP_EXE") ($(wc -c < "$SP_EXE" | tr -d ' ') bytes)"
+elif [ -n "$tse" ]; then
+    log 'service pack: none (the X470 needs the Terminal Server Edition SP6: the RTM TSE kernel stops on CPUs with more than 3 CPUID leaves)'
 else
     log 'service pack: none (the X470 needs SP6a: the RTM kernel stops on Zen CPUs)'
 fi
@@ -784,7 +834,7 @@ echo done > C:\USOS\NT4\DONE.TXT
 C:\USOS\NT4\USOSOFF.EXE /r
 :end
 EOF
-printf 'answer=%s\r\ncrypto=%s\r\n' "$ANSWER_KIND" "$crypto" > "$usos/SOURCE.TXT"
+printf 'answer=%s\r\ncrypto=%s\r\nedition=%s\r\n' "$ANSWER_KIND" "$crypto" "${tse:+tse}" > "$usos/SOURCE.TXT"
 # POST.CMD reads the strength from this flag (cmd cannot parse SOURCE.TXT
 # easily): a 128-bit CD with a Standard Encryption SP6a switches to the
 # SP6a's own schannel.dll and runs update.exe again.

@@ -15,7 +15,7 @@
 //!   [GuiUnattended] blank Administrator password, time zone marker
 //!   [Display]       640x480 (vga.sys)
 //!
-//! Server / Enterprise Server: micro-Linux adds [GuiUnattended]
+//! Server / Enterprise Server / Terminal Server Edition: micro-Linux adds [GuiUnattended]
 //! AdvServerType = SERVERNT and [LicenseFilePrintData] AutoMode = PerServer,
 //! AutoUsers = 5 when the CD's TXTSETUP.SIF ProductType is not 0
 //! (nt4_server_answer); without them GUI Setup waits on its Server Type and
@@ -36,6 +36,9 @@ pub const file_name = "WINNT.SIF";
 pub const staged = [_]struct { system_id: []const u8, file: []const u8 }{
     .{ .system_id = "windows-nt-4", .file = "NT4.SIF" },
     .{ .system_id = "windows-nt-4-server", .file = "NT4S.SIF" },
+    // Terminal Server Edition: the Server answer (micro-Linux adds the
+    // Server pages for the CD's ProductType 1).
+    .{ .system_id = "windows-nt-4-tse", .file = "NT4T.SIF" },
 };
 
 pub fn isNt4(system_id: []const u8) bool {
@@ -104,7 +107,7 @@ pub fn render(p: *const Profile, key: []const u8, buffer: []u8) ![]const u8 {
 }
 
 test "NT 4.0 ids and key shapes" {
-    try std.testing.expect(isNt4("windows-nt-4") and isNt4("Windows-NT-4-Server") and !isNt4("windows-2000"));
+    try std.testing.expect(isNt4("windows-nt-4") and isNt4("Windows-NT-4-Server") and isNt4("windows-nt-4-tse") and !isNt4("windows-2000"));
     try std.testing.expect(validKey("12345-OEM-0012345-12345") and validKey("123-4567890"));
     try std.testing.expect(!validKey("AAAAA-BBBBB-CCCCC-DDDDD-EEEEE") and !validKey(""));
 }

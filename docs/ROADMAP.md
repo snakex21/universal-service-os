@@ -431,6 +431,10 @@ interakcji (tekstowy Setup odpowiadany po tekście ekranu, GUI Setup z
 poprawionego INITIAL.INF), buildy NT 3.1 sterowników; QEMU OVMF + CSMWrap:
 Workstation do pulpitu z klawiaturą USB; otwarte: logowanie na Advanced
 Server (netlogon bez sieci), X470 czeka.
+NT 4.0 Terminal Server Edition (2026-10-10): wpis `windows-nt-4-tse`, ta sama
+ścieżka; instalacja w QEMU przez micro-Linux PASS, ale jądro RTM TSE resetuje
+się na CPU z więcej niż 3 liśćmi CPUID (Zen 3), więc X470 wymaga SP6 dla TSE
+(zwykły SP6a odmawia na TSE); brak tego pliku u użytkownika.
 
 ### L9. shim-review: **Later**, długoterminowo
 

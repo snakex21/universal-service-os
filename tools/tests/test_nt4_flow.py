@@ -264,7 +264,7 @@ class Nt4Target(unittest.TestCase):
         self.assertEqual(self._crypto('TLS / SSL Security Provider (Export Version)'.encode('utf-16le')), 'standard')
         self.assertEqual(self._crypto(None), 'standard')
         text = TARGET.read_text(encoding='utf-8')
-        self.assertIn('"$ANSWER_KIND" "$crypto" > "$usos/SOURCE.TXT"', text)
+        self.assertIn('"$ANSWER_KIND" "$crypto" "${tse:+tse}" > "$usos/SOURCE.TXT"', text)
 
     def test_finish_names_the_high_encryption_service_pack(self):
         nt4 = Path(NT4).read_text(encoding='utf-8')
@@ -345,8 +345,88 @@ class Nt4Prepare(unittest.TestCase):
         self.assertIn('windows-nt-4-server) tag=NT4S', text)
         self.assertIn('nt4_vm_install "$TARGET_DEVICE"', text)
         self.assertIn('nt4_vm_finish "$TARGET_DEVICE"', text)
-        self.assertRegex(text, re.compile(r'nt4_vm_finish.*\n(.*\n){0,25}.*xp_csmwrap_esp\.sh', re.M))
+        self.assertRegex(text, re.compile(r'nt4_vm_finish.*\n(.*\n){0,35}.*xp_csmwrap_esp\.sh', re.M))
         self.assertIn('-iname \'sp6i386.exe\'', text)
+
+
+
+class Nt4TerminalServer(unittest.TestCase):
+    """Windows NT 4.0 Terminal Server Edition (2026-10-10): the NT 4.0 VM flow
+    with the TSE CD (tag file CDROM_TS.40) and only its own service pack."""
+
+    def _edition(self, tag_file, edition, major='4'):
+        text = TARGET.read_text(encoding='utf-8')
+        start = text.index("tse=''\n")
+        end = text.index("[ -z \"$tse\" ] || log 'edition: Terminal Server Edition (CDROM_TS.40)'")
+        tmp = Path(tempfile.mkdtemp(prefix='usos-tse-'))
+        self.addCleanup(shutil.rmtree, tmp, True)
+        (tmp / 'iso').mkdir()
+        if tag_file:
+            (tmp / 'iso' / tag_file).write_bytes(b'SMURF')
+        script = '\n'.join(['set -eu', 'fail() { echo "STOP: $1"; exit 1; }', f'work={tmp.as_posix()}',
+                             f'EDITION={edition}', f'NT_MAJOR={major}', text[start:end] + 'echo "tse=$tse"', ''])
+        rc, out, err = sh(script)
+        return rc, out.strip()
+
+    def test_tse_cd_with_the_tse_entry(self):
+        self.assertEqual(self._edition('CDROM_TS.40', 'tse'), (0, 'tse=yes'))
+
+    def test_tse_entry_refuses_another_cd(self):
+        rc, out = self._edition('CDROM_S.40', 'tse')
+        self.assertEqual(rc, 1)
+        self.assertIn('not the Windows NT 4.0 Terminal Server Edition CD', out)
+
+    def test_server_entry_refuses_the_tse_cd(self):
+        rc, out = self._edition('CDROM_TS.40', '')
+        self.assertEqual(rc, 1)
+        self.assertIn('choose Windows NT 4.0 Terminal Server Edition', out)
+
+    def test_server_cd_with_the_server_entry(self):
+        self.assertEqual(self._edition('CDROM_S.40', ''), (0, 'tse='))
+
+    def test_source_records_the_edition(self):
+        text = TARGET.read_text(encoding='utf-8')
+        self.assertIn('EDITION=${NT4_EDITION:-}', text)
+        self.assertIn("edition=%s\\r\\n' \"$ANSWER_KIND\" \"$crypto\" \"${tse:+tse}\"", text)
+
+    def _tse_answer(self, answer: str) -> str:
+        script = function_text(TARGET, 'nt4_tse_answer') + f"\nprintf '%s' '{answer}' | nt4_tse_answer\n"
+        rc, out, err = sh(script)
+        self.assertEqual(rc, 0, err)
+        return out
+
+    def test_tse_answer_adds_licenses_and_skips_ie4(self):
+        # GUI Setup stops on "Terminal Server Desktops" without Quantity
+        # (QEMU 2026-10-10); the CD's IE 4.0 setup is left out.
+        out = self._tse_answer('[GuiUnattended]\r\nOemSkipWelcome = 1\r\n')
+        # (sh() returns text with the CR LF folded to LF.)
+        self.assertIn('[TerminalServerDesktops]\nQuantity = 5\n', out)
+        self.assertIn('[InternetExplorer]\nInstallIE4 = No\n', out)
+        self.assertIn('OemSkipWelcome = 1\n', out)
+
+    def test_tse_answer_keeps_given_values(self):
+        out = self._tse_answer('[TerminalServerDesktops]\r\nQuantity = 9\r\n[InternetExplorer]\r\n')
+        self.assertIn('Quantity = 9', out)
+        self.assertNotIn('Quantity = 5', out)
+        self.assertEqual(out.count('[InternetExplorer]'), 1)
+        self.assertIn('[InternetExplorer]\nInstallIE4 = No\n', out)
+        self.assertIn('nt4_tse_answer < "$work/WINNT.SIF"', TARGET.read_text(encoding='utf-8'))
+
+    def test_prepare_takes_only_the_tse_service_pack(self):
+        text = PREPARE.read_text(encoding='utf-8')
+        self.assertIn("windows-nt-4-tse) tag=NT4T setup='' ;;", text)
+        self.assertIn("NT4T) nt4=yes nt_major=4 nt_name='Windows NT 4.0 Terminal Server' ;;", text)
+        block = text[text.index('if [ "$tag" = NT4T ]; then'):text.index('elif [ "$nt_major" = 4 ]; then')]
+        # Its own folder only: the Workstation folder holds the regular SP6a,
+        # which refuses Terminal Server.
+        self.assertIn('sp_dir="/mnt/data/Systems/Windows/$folder/ServicePack"', block)
+        self.assertNotIn('Windows NT 4.0/ServicePack', block)
+        self.assertIn('Terminal Server Edition Service Pack 6', block)
+        self.assertIn('NT4_EDITION="$([ "$tag" = NT4T ] && echo tse)"', text)
+        self.assertEqual(text.count('/mnt/esp/EFI/USOS/answer/NT4T.SIF'), 2)
+        # The TSE message comes before the generic language one.
+        self.assertLess(text.index("NT4T:*'no Service Pack 6'*)"), text.index("case \"${vm_check:-}\" in *'no Service Pack 6'*)"))
+        self.assertIn('Systems\\\\Windows\\\\$folder\\\\ServicePack', block)
 
 
 if __name__ == '__main__':

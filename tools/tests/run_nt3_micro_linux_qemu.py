@@ -32,6 +32,14 @@ keyboard + mouse, 12 pcie-root-ports, no NIC; screenshots in OUT/boot-*.png
 
     python tools/tests/run_nt3_micro_linux_qemu.py --iso NT31.iso --out DIR [--scripts] [--boot]
 
+NT 4.0 (--tag NT4 / NT4S / NT4T, Terminal Server Edition: NT4T) runs the same
+way with NT_MAJOR=4: --answer is the WINNT.SIF the UEFI menu would stage
+(NT4.SIF / NT4S.SIF / NT4T.SIF, rendered by src/flow/answer/nt4.zig; it holds
+the product key, so keep it in OUT or outside the checkout), --sp the user's
+SP6I386.EXE (optional: without it the finish step skips the service pack
+check, the finished disk then has the RTM kernel). --boot-cpu picks the CPU
+model of the --boot run (an RTM NT 4.0 kernel needs ",level=3").
+
 Scratch images only (OUT); no physical disk is opened. Delete OUT afterwards.
 """
 from __future__ import annotations
@@ -81,11 +89,22 @@ sleep 2; mdev -s 2>/dev/null
 mkdir -p /mnt/data "$LOGS" /run
 dd if="$SRC" of=/mnt/data/source.iso bs=1M 2>/dev/null || { echo E2E-RESULT=FAIL; exit 1; }
 log "iso $(wc -c < /mnt/data/source.iso) bytes; scripts $(md5sum /usr/lib/usos/nt4_qemu_install.sh | cut -c1-12)"
+if [ "$NT_MAJOR" = 4 ]; then
+    # NT 4.0: the menu-rendered answer from the overlay; the key stays in RAM.
+    cp /usos-e2e/winnt.sif /run/nt4-winnt.sif
+    SP=''
+    [ ! -f /usos-e2e/SP6I386.EXE ] || SP=/usos-e2e/SP6I386.EXE
+    KIND=PROFILE
+else
 sed -n '/^w9x_nt3_default_sif()/,/^}/p' /usr/lib/usos/w9x_csmwrap_prepare.sh > /tmp/sif.sh
 . /tmp/sif.sh
 w9x_nt3_default_sif 'Central European' > /run/nt4-winnt.sif
+SP=''
+KIND=USOS
+fi
 if ! env TARGET_DEVICE="$TARGET" NT4_SOURCE_ISO=/mnt/data/source.iso NT4_ANSWER_SIF=/run/nt4-winnt.sif \
-    NT4_ANSWER_KIND=USOS NT4_SP_EXE= NT_MAJOR=3 NT_MINOR="$NT_MINOR" sh /usr/lib/usos/nt4_csmwrap_target.sh > /tmp/prepare.log 2>&1 < /dev/null; then
+    NT4_ANSWER_KIND="$KIND" NT4_SP_EXE="$SP" NT_MAJOR="$NT_MAJOR" NT_MINOR="$NT_MINOR" NT4_EDITION="${NT4_EDITION:-}" \
+    sh /usr/lib/usos/nt4_csmwrap_target.sh > /tmp/prepare.log 2>&1 < /dev/null; then
     cat /tmp/prepare.log; echo E2E-RESULT=FAIL; exit 1
 fi
 cat /tmp/prepare.log
@@ -143,7 +162,7 @@ def cpio_newc(entries: list[tuple[str, int, bytes]]) -> bytes:
     return blob + b"\0" * (-len(blob) % 512)
 
 
-def overlay(scripts: bool) -> bytes:
+def overlay(scripts: bool, answer: Path | None = None, sp: Path | None = None) -> bytes:
     entries: list[tuple[str, int, bytes]] = []
     dirs = set()
 
@@ -163,6 +182,10 @@ def overlay(scripts: bool) -> bytes:
     for f in sorted(CSMWRAP.rglob("*")):
         if f.is_file():
             add("usos-e2e/csmwrap/" + f.relative_to(CSMWRAP).as_posix(), f.read_bytes())
+    if answer is not None:
+        add("usos-e2e/winnt.sif", answer.read_bytes())
+    if sp is not None:
+        add("usos-e2e/SP6I386.EXE", sp.read_bytes())
     if scripts:
         for name in SCRIPTS:
             add("usr/lib/usos/" + name, (ROOT / "tools" / name).read_bytes(), 0o100755)
@@ -180,7 +203,8 @@ def free_port() -> int:
 def install(args, out: Path, target: Path) -> bool:
     initrd = out / "initrd.cpio"
     with initrd.open("wb") as f:
-        for part in ((ML / "initramfs-usos").read_bytes(), (ML / "qemu9x.cpio").read_bytes(), overlay(args.scripts)):
+        for part in ((ML / "initramfs-usos").read_bytes(), (ML / "qemu9x.cpio").read_bytes(),
+                     overlay(args.scripts, args.answer, args.sp)):
             f.write(part)
             f.write(b"\0" * (-f.tell() % 4))
     port = free_port()
@@ -200,10 +224,14 @@ def install(args, out: Path, target: Path) -> bool:
         console.run("export PATH=/usr/sbin:/usr/bin:/sbin:/bin; /bin/busybox --install -s 2>/dev/null; "
                     "mount -t proc proc /proc; mount -t sysfs sys /sys; mount -t devtmpfs dev /dev 2>/dev/null; "
                     "mkdir -p /tmp /run; mount -t tmpfs tmp /tmp; mount -t tmpfs run /run", "SETUP-DONE", 120)
-        minor = {"NT31": "10", "NT31S": "10", "NT35": "50", "NT35S": "50", "NT351": "51", "NT351S": "51"}[args.tag]
+        minor = {"NT31": "10", "NT31S": "10", "NT35": "50", "NT35S": "50", "NT351": "51", "NT351S": "51",
+                 "NT4": "", "NT4S": "", "NT4T": ""}[args.tag]
+        major = "4" if args.tag.startswith("NT4") else "3"
+        edition = "tse" if args.tag == "NT4T" else ""
         start = len(console.text)
         env = " ".join(args.env)
-        console.sock.sendall(f"{env} TAG={args.tag} NT_MINOR={minor} sh /usos-e2e/nt3.sh 2>&1; echo E2E-EXIT\n".encode())
+        console.sock.sendall(f"{env} TAG={args.tag} NT_MAJOR={major} NT_MINOR={minor} NT4_EDITION={edition} "
+                             f"sh /usos-e2e/nt3.sh 2>&1; echo E2E-EXIT\n".encode())
         deadline = time.time() + args.timeout
         shown = start
         while "E2E-RESULT=" not in console.text[start:] or "\nE2E-EXIT" not in console.text[start:]:
@@ -232,12 +260,12 @@ def install(args, out: Path, target: Path) -> bool:
         stderr.close()
 
 
-def boot(out: Path, target: Path, seconds: int) -> None:
+def boot(out: Path, target: Path, seconds: int, cpu: str = "EPYC-Rome") -> None:
     """X470-like boot of the finished disk; screenshots only (the user logs on by hand there)."""
     vars_ = out / "vars.fd"
     shutil.copyfile(OVMF_VARS, vars_)
     port = free_port()
-    cmd = [str(QEMU), "-machine", "q35", "-accel", "tcg", "-cpu", "EPYC-Rome", "-smp", "2", "-m", "2048",
+    cmd = [str(QEMU), "-machine", "q35", "-accel", "tcg", "-cpu", cpu, "-smp", "2", "-m", "2048",
            "-drive", f"if=pflash,unit=0,format=raw,readonly=on,file={OVMF_CODE.as_posix()}",
            "-drive", f"if=pflash,unit=1,format=raw,file={vars_.as_posix()}",
            "-drive", f"file={target.as_posix()},format=qcow2,if=none,id=t,snapshot=on", "-device", "ide-hd,drive=t,bus=ide.0",
@@ -294,7 +322,10 @@ def boot(out: Path, target: Path, seconds: int) -> None:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--iso", required=True)
-    p.add_argument("--tag", default="NT31", choices=["NT31", "NT31S", "NT35", "NT35S", "NT351", "NT351S"])
+    p.add_argument("--tag", default="NT31", choices=["NT31", "NT31S", "NT35", "NT35S", "NT351", "NT351S", "NT4", "NT4S", "NT4T"])
+    p.add_argument("--answer", type=Path, help="NT 4.0: the WINNT.SIF the menu would stage (holds the key)")
+    p.add_argument("--sp", type=Path, help="NT 4.0: the service pack SP6I386.EXE (optional)")
+    p.add_argument("--boot-cpu", default="EPYC-Rome", help="CPU model of the --boot run")
     p.add_argument("--out", required=True, type=Path)
     p.add_argument("--scripts", action="store_true", help="overlay this checkout's NT path scripts")
     p.add_argument("--accel", default="whpx", choices=["whpx", "tcg"])
@@ -304,22 +335,29 @@ def main() -> int:
     p.add_argument("--boot", action="store_true", help="boot the finished disk under OVMF + CSMWrap")
     p.add_argument("--boot-only", action="store_true")
     p.add_argument("--boot-seconds", type=int, default=420)
+    p.add_argument("--qemu", type=Path, help="host qemu-system-x86_64 to use (default: ROOT/tools/qemu)")
     args = p.parse_args()
     set_root(args.root)
+    if args.qemu is not None:
+        global QEMU
+        QEMU = args.qemu
     for required in (QEMU, QEMU_IMG, ML / "vmlinuz-virt", ML / "initramfs-usos", ML / "qemu9x.cpio", CSMWRAP / "csmwrapx64.efi"):
         if not required.exists():
             raise SystemExit(f"missing {required}")
+    if args.tag.startswith("NT4") and args.answer is None and not args.boot_only:
+        raise SystemExit("NT 4.0 needs --answer (the WINNT.SIF with the key)")
     args.out.mkdir(parents=True, exist_ok=True)
     target = args.out / "target.qcow2"
     if not args.boot_only:
         target.unlink(missing_ok=True)
         subprocess.run([str(QEMU_IMG), "create", "-q", "-f", "qcow2", str(target), "8G"], check=True)
         ok = install(args, args.out, target)
-        print("[PASS] NT 3.x install through micro-Linux" if ok else "[FAIL] NT 3.x install through micro-Linux (console.log)")
+        what = "NT 4.0" if args.tag.startswith("NT4") else "NT 3.x"
+        print(f"[PASS] {what} install through micro-Linux" if ok else f"[FAIL] {what} install through micro-Linux (console.log)")
         if not ok:
             return 1
     if args.boot or args.boot_only:
-        boot(args.out, target, args.boot_seconds)
+        boot(args.out, target, args.boot_seconds, args.boot_cpu)
     return 0
 
 

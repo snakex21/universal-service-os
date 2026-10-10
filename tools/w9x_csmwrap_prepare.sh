@@ -112,6 +112,10 @@ usos_w9x_csmwrap_prepare() {
         # the whole install in the VM, then the finished SP6a system starts.
         windows-nt-4) tag=NT4 setup='' ;;
         windows-nt-4-server) tag=NT4S setup='' ;;
+        # Windows NT 4.0 Terminal Server Edition (2026-10-10): the same VM
+        # flow; its own kernel (1381 multi-user) takes only the Terminal
+        # Server Edition service pack (docs/nt4-2026-10-07.md).
+        windows-nt-4-tse) tag=NT4T setup='' ;;
         # Windows NT 3.51 (2026-10-08): the same VM flow; nt4_csmwrap_target.sh
         # checks the CD with NT_MAJOR=3 (E820 filter MBR, \USOS\NT3, no SP).
         windows-nt-3-51) tag=NT351 setup='' ;;
@@ -153,6 +157,7 @@ usos_w9x_csmwrap_prepare() {
     nt_name=''
     case "$tag" in
         NT4|NT4S) nt4=yes nt_major=4 nt_name='Windows NT 4.0' ;;
+        NT4T) nt4=yes nt_major=4 nt_name='Windows NT 4.0 Terminal Server' ;;
         # NT 3.51: the NT 4.0 path ($nt4) without the service pack and key.
         NT351|NT351S) nt4=yes nt_major=3 nt_minor=51 nt_name='Windows NT 3.51' ;;
         NT35|NT35S) nt4=yes nt_major=3 nt_minor=50 nt_name='Windows NT 3.5' ;;
@@ -163,7 +168,20 @@ usos_w9x_csmwrap_prepare() {
             [ -r "/usr/lib/usos/$helper" ] || stop "$helper is missing"
         done
     fi
-    if [ "$nt_major" = 4 ]; then
+    if [ "$tag" = NT4T ]; then
+        # Terminal Server Edition: the RTM TSE kernel (1381.32772) triple-
+        # faults on a CPU whose CPUID reports more than 3 standard leaves (the
+        # NT 4.0 "Limit CPUID MaxVal" bug; QEMU 2026-10-10: EPYC-Milan,
+        # qemu32, Opteron_G1 and pentium3,level=4 reset, level=3 starts), so
+        # the X470 needs a service-packed TSE kernel. The regular NT 4.0
+        # SP6a refuses Terminal Server ("Cannot install this Service Pack on
+        # Windows NT Terminal Server", update.exe): only the Terminal Server
+        # Edition SP6 from the TSE folder, under the same file name.
+        sp_dir="/mnt/data/Systems/Windows/$folder/ServicePack"
+        [ ! -d "$sp_dir" ] || sp_exe=$(find "$sp_dir" -maxdepth 1 -type f -iname 'sp6i386.exe' 2>/dev/null | head -n 1)
+        [ -n "$sp_exe" ] || stop "Windows NT 4.0 Terminal Server needs the Terminal Server Edition Service Pack 6 (not the regular NT 4.0 SP6a, which refuses Terminal Server): put its SP6I386.EXE into Systems\\Windows\\$folder\\ServicePack on USOS_DATA"
+        w9x_csmwrap_log "NT4 TSE service pack: ${sp_exe#/mnt/data/}"
+    elif [ "$nt_major" = 4 ]; then
         # SP6a (the user's SP6I386.EXE, a Microsoft file: never on the stick):
         # the X470 cannot start the RTM kernel, only an SP6a system.
         for sp_dir in "/mnt/data/Systems/Windows/$folder/ServicePack" '/mnt/data/Systems/Windows/Windows NT 4.0/ServicePack'; do
@@ -204,11 +222,11 @@ usos_w9x_csmwrap_prepare() {
             answer=nt4 ;;
         [34]:profile)
             # Rendered by the UEFI menu (answer_profiles.stageWin9x: NT4.SIF /
-            # NT4S.SIF with the key, NT351.SIF / NT351S.SIF, NT35.SIF /
+            # NT4S.SIF / NT4T.SIF with the key, NT351.SIF / NT351S.SIF, NT35.SIF /
             # NT35S.SIF, NT31.SIF / NT31S.SIF): copied to RAM,
             # staged copies go.
             cp "/mnt/esp/EFI/USOS/answer/$tag.SIF" "$answer_inf" || stop 'the answer profile could not be taken'
-            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF /mnt/esp/EFI/USOS/answer/NT31.SIF /mnt/esp/EFI/USOS/answer/NT31S.SIF
+            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT4T.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF /mnt/esp/EFI/USOS/answer/NT31.SIF /mnt/esp/EFI/USOS/answer/NT31S.SIF
             for staged in 98SE 98 ME 95; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
             sync
             answer=nt4
@@ -233,7 +251,7 @@ usos_w9x_csmwrap_prepare() {
             # hold a product key: copied to RAM, then every staged copy goes.
             cp "/mnt/esp/EFI/USOS/answer/$tag.INF" "$answer_inf" || stop 'the answer profile could not be taken'
             for staged in 98SE 98 ME 95; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
-            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF /mnt/esp/EFI/USOS/answer/NT31.SIF /mnt/esp/EFI/USOS/answer/NT31S.SIF
+            rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT4T.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF /mnt/esp/EFI/USOS/answer/NT31.SIF /mnt/esp/EFI/USOS/answer/NT31S.SIF
             sync
             answer_kind=PROFILE ;;
         file:*)
@@ -338,7 +356,7 @@ usos_w9x_csmwrap_prepare() {
     fi
     usos_ui_stage 4 5 'Preparing the disk' "Copying $folder Setup, the USOS helpers and CSMWrap to the selected disk." || true
     if [ -n "$nt4" ]; then
-        set -- env TARGET_DEVICE="$TARGET_DEVICE" NT4_SOURCE_ISO="/mnt/data/$iso" NT4_ANSWER_SIF="$answer_inf"             NT4_ANSWER_KIND="$answer_kind" NT4_SP_EXE="$sp_exe" NT_MAJOR="$nt_major" NT_MINOR="$nt_minor" sh /usr/lib/usos/nt4_csmwrap_target.sh
+        set -- env TARGET_DEVICE="$TARGET_DEVICE" NT4_SOURCE_ISO="/mnt/data/$iso" NT4_ANSWER_SIF="$answer_inf"             NT4_ANSWER_KIND="$answer_kind" NT4_SP_EXE="$sp_exe" NT4_EDITION="$([ "$tag" = NT4T ] && echo tse)" NT_MAJOR="$nt_major" NT_MINOR="$nt_minor" sh /usr/lib/usos/nt4_csmwrap_target.sh
     elif [ -n "$dos_iso" ]; then
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="$dos_iso" DOS_WIN3_ISO="$win3_iso" DOS_WIN_EARLY="${win_early:-}" \
             DOS_PROGRAMS_DIR=/mnt/data/Systems/DOS/MS-DOS/Programs sh /usr/lib/usos/dos_csmwrap_target.sh
@@ -377,6 +395,12 @@ usos_w9x_csmwrap_prepare() {
                 # system to standard encryption and retries; this stop means
                 # that failed too (POST.LOG "crypto:" lines).
                 stop "Service Pack 6a did not install on this 128-bit (High Encryption) CD, also not after switching it to standard encryption (POST.LOG). Check that SP6I386.EXE is SP6a in the CD's language, or use the 128-bit (High Encryption) SP6I386.EXE, in Systems\\Windows\\$folder\\ServicePack on USOS_DATA. Logs: EFI/USOS/win9x/nt4" ;;
+            esac
+            case "$tag:${vm_check:-}" in NT4T:*'no Service Pack 6'*)
+                # The regular SP6a refuses Terminal Server (update.exe:
+                # "Cannot install this Service Pack on Windows NT Terminal
+                # Server"); the TSE SP6 must also match the CD's language.
+                stop "The Terminal Server Edition Service Pack 6 did not install. The regular NT 4.0 SP6a does not install on Terminal Server: put the Terminal Server Edition SP6 (SP6I386.EXE, the CD's language) into Systems\\Windows\\$folder\\ServicePack on USOS_DATA. Logs: EFI/USOS/win9x/nt4" ;;
             esac
             case "${vm_check:-}" in *'no Service Pack 6'*)
                 # SP6a's update.exe refuses a CD of another language ("This

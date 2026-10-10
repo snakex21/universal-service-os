@@ -311,7 +311,7 @@ const dos_family_ids = &[_][]const u8{ "windows-98-se", "windows-98", "windows-m
 /// Core does not carry them; src/catalog/windows_legacy.zig).
 pub const windows_early_ids = &[_][]const u8{ "windows-wfw-3-11", "windows-3-0", "windows-2-11-386", "windows-2-11-286", "windows-2-03", "windows-1-04", "windows-1-01" };
 
-const nt4_ids = &[_][]const u8{ "windows-nt-4", "windows-nt-4-server" };
+const nt4_ids = &[_][]const u8{ "windows-nt-4", "windows-nt-4-server", "windows-nt-4-tse" };
 const nt3_ids = &[_][]const u8{ "windows-nt-3-51", "windows-nt-3-51-server", "windows-nt-3-5", "windows-nt-3-5-server", "windows-nt-3-1", "windows-nt-3-1-server" };
 
 const uefi_profiles = [_]Profile{
@@ -470,9 +470,9 @@ test "XP on UEFI selects the UEFI-CSM profile and refuses everything else" {
     try std.testing.expectEqualStrings("nt5-staging", select(xp, .iso, .automatic, null).?.id);
 }
 
-test "Windows NT 4.0 Workstation and Server on UEFI: the VM install, nothing else" {
+test "Windows NT 4.0 Workstation, Server and Terminal Server on UEFI: the VM install, nothing else" {
     const systems = @import("systems.zig");
-    for ([_][]const u8{ "windows-nt-4", "windows-nt-4-server" }) |id| {
+    for ([_][]const u8{ "windows-nt-4", "windows-nt-4-server", "windows-nt-4-tse" }) |id| {
         const nt4 = systems.findById(id).?;
         try std.testing.expectEqualStrings("nt4-x86-qemu-csmwrap", select(nt4, .iso, .automatic, .uefi).?.id);
         try std.testing.expectEqual(Backend.win9x_uefi, backend(nt4, .iso, .automatic, .uefi).?);

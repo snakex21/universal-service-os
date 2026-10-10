@@ -19,7 +19,8 @@ import check_nt4_driver_imports as nt4  # noqa: E402
 DRV = ROOT / 'tools/nt4/usosvbe'
 SYS = DRV / 'bin/i386/usosvbe.sys'
 DLL = DRV / 'bin/i386/usosvbe.dll'
-FIXTURES = [HERE / 'data/nt4rtm_exports.txt', HERE / 'data/nt4sp6a_exports.txt']
+# RTM 1381.1, SP6a 1381.335, Terminal Server Edition 1381.32772 (RTM TSE CD).
+FIXTURES = [HERE / 'data/nt4rtm_exports.txt', HERE / 'data/nt4sp6a_exports.txt', HERE / 'data/nt4tse_exports.txt']
 # The routines NT 4.0 RTM's framebuf.dll imports from win32k.sys.
 FRAMEBUF_SET = {'EngAllocMem', 'EngAssociateSurface', 'EngCreateBitmap', 'EngCreatePalette',
                 'EngDeletePalette', 'EngDeleteSurface', 'EngDeviceIoControl', 'EngFreeMem'}

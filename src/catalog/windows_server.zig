@@ -53,6 +53,20 @@ pub const entries = [_]SystemEntry{
         .server = true,
     },
 } ++ @import("windows_legacy.zig").uefiOnly(.{
+    // Windows NT 4.0 Terminal Server Edition: the NT 4.0 Server flow
+    // (nt4-x86-qemu-csmwrap) with the TSE CD and its own service pack
+    // (docs/nt4-2026-10-07.md); UEFI only.
+    SystemEntry{
+        .id = "windows-nt-4-tse",
+        .name = "Windows NT 4.0 Terminal Server Edition",
+        .category = .windows,
+        .family = .windows_legacy,
+        .image_directory = "\\Systems\\Windows\\Windows NT 4.0 Terminal Server\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Windows NT 4.0 Terminal Server\\Unattended",
+        .firmware = .uefi,
+        .boot_methods = &nt5_methods,
+        .server = true,
+    },
     // Windows NT 3.51 Server: the NT 3.51 Workstation flow (os_profiles.zig
     // nt3-x86-qemu-csmwrap) with the Server CD; UEFI only.
     SystemEntry{
