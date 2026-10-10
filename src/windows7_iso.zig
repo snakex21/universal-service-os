@@ -49,6 +49,16 @@ pub fn setupInfo(allocator: std.mem.Allocator, iso: anytype) !wim.Setup {
     return wim.detectX64Setup(bytes, try wim.bootIndex(&header));
 }
 
+/// The same for 32-bit Setup media (win-x86-uefi-csmwrap).
+pub fn setupInfoX86(allocator: std.mem.Allocator, iso: anytype) !wim.Setup {
+    var node: udf.Node = undefined;
+    if (!try udf.openPath(iso, "sources/boot.wim", &node) or node.is_directory or node.size > max_boot_file_size) return error.InvalidWindowsBootFile;
+    var header: [124]u8 = undefined;
+    const bytes = try metadata(allocator, iso, &node, &header);
+    defer allocator.free(bytes);
+    return wim.detectX86Setup(bytes, try wim.bootIndex(&header));
+}
+
 pub fn validateBootFiles(iso: anytype) !void {
     for (boot_paths) |path| {
         var node: udf.Node = undefined;

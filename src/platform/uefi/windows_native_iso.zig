@@ -386,6 +386,90 @@ pub noinline fn inspectModern(image_directory: []const u8, name: []const u8) !Mo
     return inspectModernIso(&iso);
 }
 
+// ------------------------------- 32-bit Windows 8.1 / 10 without CSM
+
+/// 32-bit Windows 8.1 / 10 Setup media (win-x86-uefi-csmwrap): x86 boot.wim of
+/// PE 5.0 or 10, BCD, boot.sdi, the BIOS bootmgr, sources/setup.exe and an
+/// install image. The x64 firmware cannot start it: micro-Linux step 610
+/// stages the ISO's own WinPE on the target, which then runs in BIOS mode
+/// through CSMWrap (docs/design/csmwrap-integration.md section 11).
+fn inspectModernX86Iso(iso: anytype) !ModernInspection {
+    const setup = try usos.windows7_iso.setupInfoX86(uefi.pool_allocator, iso);
+    if (!modernSetupVersion(setup)) return error.UnsupportedWindowsSetupVersion;
+    try scanner.validateBootFiles(iso);
+    var node: udf.Node = undefined;
+    if (!try udf.openPath(iso, "sources/setup.exe", &node) or node.is_directory or node.size == 0) return error.WindowsSetupMissing;
+    if (!try udf.openPath(iso, "bootmgr", &node) or node.is_directory or node.size == 0) return error.InvalidWindowsBootFile;
+    for (usos.image_probe.windows_detect.modern_install_images) |path| {
+        if (try udf.openPath(iso, path, &node) and !node.is_directory and node.size > 0) return .{ .setup = setup, .install = path };
+    }
+    return error.WindowsInstallImageMissing;
+}
+
+pub noinline fn inspectModernX86(image_directory: []const u8, name: []const u8) !ModernInspection {
+    if (uefi.system_table.boot_services == null) return error.NoBootServices;
+    const state = try uefi.pool_allocator.create(BootState);
+    defer uefi.pool_allocator.destroy(state);
+    try initBootState(state);
+    try openIn(&state.catalog, image_directory, name, &state.source);
+    var iso = Iso{ .catalog = &state.catalog, .file = &state.source };
+    return inspectModernX86Iso(&iso);
+}
+
+pub const x86_csmwrap_profile = "win-x86-uefi-csmwrap";
+
+/// request.ini of the x86 path: the ISO is its own boot source (donor = iso).
+pub fn formatX86CsmwrapRequest(buffer: []u8, folder: []const u8, name: []const u8, answer: CsmwrapAnswer) ![]const u8 {
+    try source_config.validateName(folder);
+    try source_config.validateName(name);
+    var answer_text: [300]u8 = undefined;
+    const answer_value = switch (answer) {
+        .none => "none",
+        .profile => "profile",
+        .file => |file| blk: {
+            try source_config.validateName(file);
+            break :blk try std.fmt.bufPrint(&answer_text, "file:{s}", .{file});
+        },
+    };
+    return std.fmt.bufPrint(buffer, "version=1\r\nprofile=" ++ x86_csmwrap_profile ++ "\r\niso=Systems/Windows/{s}/Images/{s}\r\ndonor=Systems/Windows/{s}/Images/{s}\r\nfolder={s}\r\nanswer={s}\r\n", .{ folder, name, folder, name, folder, answer_value });
+}
+
+test "x86 CSMWrap request boots the ISO itself" {
+    var buffer: [512]u8 = undefined;
+    const text = try formatX86CsmwrapRequest(&buffer, "Windows 10", "w10x86.iso", .profile);
+    try std.testing.expectEqualStrings("version=1\r\nprofile=win-x86-uefi-csmwrap\r\niso=Systems/Windows/Windows 10/Images/w10x86.iso\r\ndonor=Systems/Windows/Windows 10/Images/w10x86.iso\r\nfolder=Windows 10\r\nanswer=profile\r\n", text);
+    try std.testing.expectError(error.InvalidImageName, formatX86CsmwrapRequest(&buffer, "Windows 10", "a/b.iso", .none));
+}
+
+/// The ISO checks of the x86 path, then usos-source.ini (the DATA binding
+/// usos-start.cmd mounts the ISO with) and request.ini in
+/// \EFI\USOS\vista-csmwrap for micro-Linux step 610. Nothing is booted here.
+pub noinline fn prepareX86Csmwrap(root: *uefi.protocol.File, image_directory: []const u8, name: []const u8, answer: CsmwrapAnswer, progress: *const fn (IsoStage, []const u8) void) !void {
+    if (@import("builtin").cpu.arch != .x86_64) return error.WindowsSetupRequiresX64;
+    try source_config.validateName(name);
+    if (uefi.system_table.boot_services == null) return error.NoBootServices;
+    const folder = try systemFolder(image_directory);
+    const state = try uefi.pool_allocator.create(BootState);
+    defer uefi.pool_allocator.destroy(state);
+    try initBootState(state);
+    progress(.validating, "Reading the selected Windows ISO");
+    try openIn(&state.catalog, image_directory, name, &state.source);
+    var iso = Iso{ .catalog = &state.catalog, .file = &state.source };
+    const inspection = try inspectModernX86Iso(&iso);
+    var message: [256]u8 = undefined;
+    serial.writeAscii(try std.fmt.bufPrint(&message, "[X86_CSMWRAP] {s}\\{s}; PE={d}.{d}.{d} x86 index={d}\r\n", .{ folder, name, inspection.setup.major, inspection.setup.minor, inspection.setup.build, inspection.setup.index }));
+    var config: [544]u8 = undefined;
+    const binding = try source_config.sourceConfigForFolder(&config, state.catalog.partition.part_guid, state.source.size(), folder, name);
+    var request: [1024]u8 = undefined;
+    const text = try formatX86CsmwrapRequest(&request, folder, name, answer);
+    const settings_store = @import("settings_store.zig");
+    try ensureEspDirectory(root, csmwrap_directory);
+    try settings_store.replaceFile(root, csmwrap_directory ++ "\\usos-source.ini", binding);
+    try settings_store.replaceFile(root, csmwrap_directory ++ "\\request.ini", text);
+    serial.writeAscii("[X86_CSMWRAP] request written: ");
+    serial.writeAscii(text);
+}
+
 /// Starts Windows 10/11 Setup from the selected ISO (`winpe == false`) or a
 /// WinPE/rescue ISO as it is (`winpe == true`, no USOS helpers, no Setup).
 pub noinline fn startModern(root: *uefi.protocol.File, image_directory: []const u8, name: []const u8, answer_name: ?[]const u8, rendered: ?Rendered, winpe: bool, progress: *const fn (IsoStage, []const u8) void) !void {

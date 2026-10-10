@@ -17,6 +17,16 @@
 # -> USOS Vista installer -> Vista Setup in BIOS mode. The installer clears the
 # staging partition's active flag before Setup (so Vista puts its boot files on
 # its own partition) and removes the staging partition after a good install.
+#
+# X86_SELF=1 (profile win-x86-uefi-csmwrap: 32-bit Windows 8.1 / 10, section
+# 11 of the design doc): VISTA_DONOR_ISO is the selected Windows ISO itself
+# (its own x86 WinPE has USB 3, AHCI and NVMe); bootmgr comes from the ISO
+# root; the layout is
+#   slot 1  NTFS "Windows", inactive, from 1 MiB up to the staging partition
+#           (Setup installs there: InstallTo, the disk was confirmed already)
+#   slot 2  NTFS "USOS-SETUP", active, 1 GiB: the ISO's boot files + boot.wim
+#           with support.cpio and modern-support.cpio (usos-x86-csmwrap)
+#   slot 3  CSMWrap ESP, 64 MiB at the end
 set -eu
 
 TARGET_DEVICE=${TARGET_DEVICE:?TARGET_DEVICE is required}
@@ -24,6 +34,7 @@ DONOR_ISO=${VISTA_DONOR_ISO:?VISTA_DONOR_ISO is required}
 REQUEST_DIR=${VISTA_REQUEST_DIR:?VISTA_REQUEST_DIR is required}
 SUPPORT_DIR=${VISTA_SUPPORT_DIR:-/mnt/esp/EFI/USOS/windows-native}
 ANSWER_XML=${VISTA_ANSWER_XML:-}
+X86_SELF=${X86_SELF:-0}
 LIB=${USOS_LIB_DIR:-/usr/lib/usos}
 ESP_TAIL=133120
 STAGING_SECTORS=2097152
@@ -35,7 +46,8 @@ fail() { printf '[VISTA_CSMWRAP] STOP: %s\n' "$1" >&2; exit 1; }
 for tool in dd od cmp sfdisk mkntfs mount umount losetup wimlib-imagex cpio sha256sum blockdev awk mdev; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
-for file in "$LIB/xp-geometry-fix-mbr-440.bin" "$LIB/vista-nt60-ntfs.bin" "$LIB/xp_csmwrap_esp.sh" "$REQUEST_DIR/usos-source.ini" "$SUPPORT_DIR/support.cpio" "$SUPPORT_DIR/vista-support.cpio" "$DONOR_ISO"; do
+if [ "$X86_SELF" = 1 ]; then helpers_cpio="$SUPPORT_DIR/modern-support.cpio"; else helpers_cpio="$SUPPORT_DIR/vista-support.cpio"; fi
+for file in "$LIB/xp-geometry-fix-mbr-440.bin" "$LIB/vista-nt60-ntfs.bin" "$LIB/xp_csmwrap_esp.sh" "$REQUEST_DIR/usos-source.ini" "$SUPPORT_DIR/support.cpio" "$helpers_cpio" "$DONOR_ISO"; do
     [ -r "$file" ] || fail "missing: $file"
 done
 [ "$(wc -c < "$LIB/xp-geometry-fix-mbr-440.bin" | tr -d ' ')" = 440 ] || fail 'USOS MBR code must be 440 bytes'
@@ -53,7 +65,9 @@ total=$((size / 512))
 esp_start=$(( (total - ESP_TAIL + 2047) / 2048 * 2048 ))
 staging_start=$(( (esp_start - STAGING_SECTORS) / 2048 * 2048 ))
 staging_sectors=$((esp_start - staging_start))
-log "disk_sectors=$total staging_start=$staging_start staging_sectors=$staging_sectors esp_start=$esp_start"
+windows_start=2048
+windows_sectors=$((staging_start - windows_start))
+log "disk_sectors=$total staging_start=$staging_start staging_sectors=$staging_sectors esp_start=$esp_start x86_self=$X86_SELF"
 
 work=/run/vista-csmwrap
 rm -rf "$work"
@@ -81,8 +95,11 @@ mbr=$work/mbr.bin
     cat "$LIB/xp-geometry-fix-mbr-440.bin"
     le32 "$signature"
     printf '\000\000'
+    if [ "$X86_SELF" = 1 ]; then
+        printf '\000\376\377\377\007\376\377\377'; le32 "$windows_start"; le32 "$windows_sectors"
+    fi
     printf '\200\376\377\377\007\376\377\377'; le32 "$staging_start"; le32 "$staging_sectors"
-    dd if=/dev/zero bs=48 count=1 2>/dev/null
+    if [ "$X86_SELF" = 1 ]; then dd if=/dev/zero bs=32 count=1 2>/dev/null; else dd if=/dev/zero bs=48 count=1 2>/dev/null; fi
     printf '\125\252'
 } > "$mbr"
 [ "$(wc -c < "$mbr" | tr -d ' ')" = 512 ] || fail 'internal error: MBR size'
@@ -94,14 +111,24 @@ log "MBR PASS signature=$signature_hex"
 blockdev --rereadpt "$TARGET_DEVICE" 2>/dev/null || true
 mdev -s 2>/dev/null || true
 sleep 1
-case "$TARGET_DEVICE" in *[0-9]) node="${TARGET_DEVICE}p1" ;; *) node="${TARGET_DEVICE}1" ;; esac
+case "$TARGET_DEVICE" in *[0-9]) part_prefix="${TARGET_DEVICE}p" ;; *) part_prefix=$TARGET_DEVICE ;; esac
+if [ "$X86_SELF" = 1 ]; then node="${part_prefix}2"; windows_node="${part_prefix}1"; else node="${part_prefix}1"; fi
 [ -b "$node" ] || fail 'the staging partition node did not appear'
 name=${node##*/}
 [ "$(cat "/sys/class/block/$name/start")" = "$staging_start" ] || fail 'staging partition start mismatch'
 [ "$(cat "/sys/class/block/$name/size")" = "$staging_sectors" ] || fail 'staging partition size mismatch'
 
 # 2. NTFS with the NT60 boot code (loads BOOTMGR); mkntfs's BPB is kept.
-mkntfs -Q -F -s 512 -c 4096 -H 255 -S 63 -p "$staging_start" -L USOS-VISTA "$node" >/dev/null || fail 'cannot format the staging partition'
+if [ "$X86_SELF" = 1 ]; then
+    [ -b "$windows_node" ] || fail 'the Windows partition node did not appear'
+    [ "$(cat "/sys/class/block/${windows_node##*/}/start")" = "$windows_start" ] || fail 'Windows partition start mismatch'
+    mkntfs -Q -F -s 512 -c 4096 -H 255 -S 63 -p "$windows_start" -L Windows "$windows_node" >/dev/null || fail 'cannot format the Windows partition'
+    log "Windows partition PASS start=$windows_start sectors=$windows_sectors"
+    staging_label=USOS-SETUP
+else
+    staging_label=USOS-VISTA
+fi
+mkntfs -Q -F -s 512 -c 4096 -H 255 -S 63 -p "$staging_start" -L "$staging_label" "$node" >/dev/null || fail 'cannot format the staging partition'
 dd if="$node" of="$work/boot" bs=512 count=16 2>/dev/null
 dd if="$LIB/vista-nt60-ntfs.bin" of="$work/boot" bs=1 skip=84 seek=84 count=8108 conv=notrunc 2>/dev/null
 dd if="$work/boot" of="$node" bs=512 count=16 conv=notrunc 2>/dev/null
@@ -125,7 +152,14 @@ bcd=$(pick /boot/bcd); sdi=$(pick /boot/boot.sdi); wim=$(pick /sources/boot.wim)
 boot_index=$(wimlib-imagex info "$wim" --header 2>/dev/null | awk -F'[: ]+' 'tolower($0) ~ /^boot index/ { print $NF; exit }')
 case "$boot_index" in ''|0|*[!0-9]*) fail 'the PE10 donor boot.wim has no boot image' ;; esac
 mkdir -p "$work/staging/boot" "$work/staging/sources" "$work/pcat"
-wimlib-imagex extract "$wim" "$boot_index" /Windows/Boot/PCAT/bootmgr --dest-dir="$work/pcat" --no-acls >/dev/null || fail 'cannot take bootmgr from the PE10 donor'
+if [ "$X86_SELF" = 1 ]; then
+    # The x86 ISO's own BIOS boot manager (its BCD names [boot]\sources\boot.wim).
+    root_bootmgr=$(pick /bootmgr)
+    [ -n "$root_bootmgr" ] || fail 'the Windows ISO has no bootmgr in its root'
+    cp "$root_bootmgr" "$work/pcat/bootmgr" || fail 'cannot take bootmgr from the Windows ISO'
+else
+    wimlib-imagex extract "$wim" "$boot_index" /Windows/Boot/PCAT/bootmgr --dest-dir="$work/pcat" --no-acls >/dev/null || fail 'cannot take bootmgr from the PE10 donor'
+fi
 cp "$work/pcat/bootmgr" "$work/staging/bootmgr" && cmp -s "$work/pcat/bootmgr" "$work/staging/bootmgr" || fail 'bootmgr copy failed'
 cp "$bcd" "$work/staging/boot/bcd" && cmp -s "$bcd" "$work/staging/boot/bcd" || fail 'BCD copy failed'
 cp "$sdi" "$work/staging/boot/boot.sdi" && cmp -s "$sdi" "$work/staging/boot/boot.sdi" || fail 'boot.sdi copy failed'
@@ -135,13 +169,22 @@ wimlib-imagex export "$wim" "$boot_index" "$work/staging/sources/boot.wim" --boo
 # 4. What the UEFI path's wimboot puts into \Windows\System32 (src/flow/plan.zig
 # wimbootPlan .vista): support.cpio, vista-support.cpio, the flags, the source
 # binding; plus the CSMWrap flag, the target record and the answer file.
-( cd "$work/inject" && cpio -idm < "$SUPPORT_DIR/support.cpio" 2>/dev/null && cpio -idm < "$SUPPORT_DIR/vista-support.cpio" 2>/dev/null ) || fail 'cannot unpack the USOS WinPE helpers'
-[ -r "$work/inject/usos-vista-install.exe" ] && [ -r "$work/inject/winpeshl.ini" ] || fail 'the USOS WinPE helpers are incomplete'
-printf '1\r\n' > "$work/inject/usos-modern-vista.flag"
-printf '1\r\n' > "$work/inject/usos-external-pe10.flag"
-printf '1\r\n' > "$work/inject/usos-vista-csmwrap.flag"
+( cd "$work/inject" && cpio -idm < "$SUPPORT_DIR/support.cpio" 2>/dev/null && cpio -idm < "$helpers_cpio" 2>/dev/null ) || fail 'cannot unpack the USOS WinPE helpers'
+if [ "$X86_SELF" = 1 ]; then
+    [ -r "$work/inject/usos-x86-csmwrap.exe" ] && [ -r "$work/inject/usos-x86-csmwrap.cmd" ] && [ -r "$work/inject/winpeshl.ini" ] || fail 'the USOS WinPE helpers are incomplete'
+    printf '1\r\n' > "$work/inject/usos-x86-csmwrap.flag"
+    target_ini=usos-csmwrap-target.ini
+    helper_check=usos-x86-csmwrap.exe
+else
+    [ -r "$work/inject/usos-vista-install.exe" ] && [ -r "$work/inject/winpeshl.ini" ] || fail 'the USOS WinPE helpers are incomplete'
+    printf '1\r\n' > "$work/inject/usos-modern-vista.flag"
+    printf '1\r\n' > "$work/inject/usos-external-pe10.flag"
+    printf '1\r\n' > "$work/inject/usos-vista-csmwrap.flag"
+    target_ini=usos-vista-target.ini
+    helper_check=usos-vista-install.exe
+fi
 cp "$REQUEST_DIR/usos-source.ini" "$work/inject/usos-source.ini"
-printf 'disk_signature=%s\r\nstaging_start=%s\r\nstaging_sectors=%s\r\nesp_start=%s\r\ndisk_sectors=%s\r\n' "$signature_hex" "$staging_start" "$staging_sectors" "$esp_start" "$total" > "$work/inject/usos-vista-target.ini"
+printf 'disk_signature=%s\r\nstaging_start=%s\r\nstaging_sectors=%s\r\nesp_start=%s\r\ndisk_sectors=%s\r\nwindows_start=%s\r\nwindows_sectors=%s\r\n' "$signature_hex" "$staging_start" "$staging_sectors" "$esp_start" "$total" "$windows_start" "$windows_sectors" > "$work/inject/$target_ini"
 if [ -n "$ANSWER_XML" ]; then
     [ -r "$ANSWER_XML" ] || fail 'the answer file is missing'
     cp "$ANSWER_XML" "$work/inject/usos-unattend.xml"
@@ -155,8 +198,8 @@ for file in "$work/inject"/*; do
 done
 wimlib-imagex update "$work/staging/sources/boot.wim" 1 < "$commands" >/dev/null || fail 'cannot add the USOS helpers to the PE10 image'
 rm -rf "$work/check"; mkdir -p "$work/check"
-wimlib-imagex extract "$work/staging/sources/boot.wim" 1 /Windows/System32/winpeshl.ini /Windows/System32/usos-vista-csmwrap.flag /Windows/System32/usos-vista-target.ini /Windows/System32/usos-vista-install.exe --dest-dir="$work/check" --no-acls >/dev/null || fail 'read-back: the helpers are not in the PE10 image'
-for file in winpeshl.ini usos-vista-target.ini usos-vista-install.exe; do
+wimlib-imagex extract "$work/staging/sources/boot.wim" 1 /Windows/System32/winpeshl.ini "/Windows/System32/$target_ini" "/Windows/System32/$helper_check" --dest-dir="$work/check" --no-acls >/dev/null || fail 'read-back: the helpers are not in the PE10 image'
+for file in winpeshl.ini "$target_ini" "$helper_check"; do
     cmp -s "$work/inject/$file" "$work/check/$file" || fail "read-back: $file differs in the PE10 image"
 done
 rm -f "$work/inject/usos-unattend.xml"
@@ -169,12 +212,18 @@ blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true
 # 5. The CSMWrap ESP at the end (the XP script, unchanged: slot 2, 64 MiB).
 TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=$ESP_TAIL sh "$LIB/xp_csmwrap_esp.sh" || fail 'the CSMWrap ESP could not be created'
 
-# 6. Read back the final table: slot 1 active NTFS staging, slot 2 ESP.
+# 6. Read back the final table: the active NTFS staging, then the ESP
+# (Vista: slots 1 and 2; X86_SELF: Windows slot 1, staging 2, ESP 3).
 dd if="$TARGET_DEVICE" of="$work/mbr.final" bs=512 count=1 2>/dev/null
-[ "$(od -An -tx1 -j446 -N1 "$work/mbr.final" | tr -d ' \n')" = 80 ] || fail 'read-back: staging partition is not active'
-[ "$(od -An -tu1 -j450 -N1 "$work/mbr.final" | tr -d ' \n')" = 7 ] || fail 'read-back: staging partition type'
-[ "$(od -An -tu1 -j466 -N1 "$work/mbr.final" | tr -d ' \n')" = 239 ] || fail 'read-back: CSMWrap ESP is not in slot 2'
-[ "$(od -An -tu4 -j470 -N4 "$work/mbr.final" | tr -d ' \n')" = "$esp_start" ] || fail 'read-back: CSMWrap ESP start'
+if [ "$X86_SELF" = 1 ]; then s_off=462; e_off=478; else s_off=446; e_off=462; fi
+[ "$(od -An -tx1 -j$s_off -N1 "$work/mbr.final" | tr -d ' \n')" = 80 ] || fail 'read-back: staging partition is not active'
+[ "$(od -An -tu1 -j$((s_off + 4)) -N1 "$work/mbr.final" | tr -d ' \n')" = 7 ] || fail 'read-back: staging partition type'
+[ "$(od -An -tu1 -j$((e_off + 4)) -N1 "$work/mbr.final" | tr -d ' \n')" = 239 ] || fail 'read-back: CSMWrap ESP slot'
+[ "$(od -An -tu4 -j$((e_off + 8)) -N4 "$work/mbr.final" | tr -d ' \n')" = "$esp_start" ] || fail 'read-back: CSMWrap ESP start'
+if [ "$X86_SELF" = 1 ]; then
+    [ "$(od -An -tx1 -j446 -N1 "$work/mbr.final" | tr -d ' \n')" = 00 ] || fail 'read-back: Windows partition must be inactive'
+    [ "$(od -An -tu4 -j454 -N4 "$work/mbr.final" | tr -d ' \n')" = "$windows_start" ] || fail 'read-back: Windows partition start'
+fi
 sync
 blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true
-log "PREPARED PASS signature=$signature_hex free_for_vista_sectors=$((staging_start - 2048))"
+log "PREPARED PASS signature=$signature_hex free_for_vista_sectors=$((staging_start - 2048)) x86_self=$X86_SELF"

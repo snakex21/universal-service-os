@@ -62,6 +62,16 @@ pub fn hasModernX64Setup(xml: []u8) !bool {
 }
 
 pub fn detectX64Setup(xml: []u8, index: u32) !Setup {
+    return detectSetupArch(xml, index, 9);
+}
+
+/// 32-bit Setup WinPE (WIM ARCH 0): Windows 8.1 / 10 x86 without CSM
+/// (win-x86-uefi-csmwrap), started in BIOS mode through CSMWrap.
+pub fn detectX86Setup(xml: []u8, index: u32) !Setup {
+    return detectSetupArch(xml, index, 0);
+}
+
+fn detectSetupArch(xml: []u8, index: u32, want_arch: u32) !Setup {
     if (xml.len % 2 != 0 or xml.len < 4 or xml[0] != 0xff or xml[1] != 0xfe) return error.InvalidWimXml;
     const length = xml.len / 2 - 1;
     for (0..length) |i| xml[i] = if (xml[3 + 2 * i] == 0) xml[2 + 2 * i] else '?';
@@ -75,7 +85,7 @@ pub fn detectX64Setup(xml: []u8, index: u32) !Setup {
     if (std.mem.indexOf(u8, entry[1..], "<IMAGE") != null or
         std.mem.indexOf(u8, rest[end + 8 ..], tag) != null) return error.InvalidWimXml;
     const arch = try number(entry, "ARCH");
-    if (arch != 9) return error.WindowsSetupRequiresX64;
+    if (arch != want_arch) return if (want_arch == 9) error.WindowsSetupRequiresX64 else error.WindowsSetupRequiresX86;
     const major = try number(entry, "MAJOR");
     const minor = try number(entry, "MINOR");
     if (major < 6 or (major == 6 and minor == 0)) return error.UnsupportedWindowsSetupVersion;

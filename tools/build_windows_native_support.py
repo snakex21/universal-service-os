@@ -113,11 +113,24 @@ def build_modern_support(root: Path, out: Path):
     subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86_64-windows.win10-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
                     '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_modern_uefi_finalize.c'),
                     '-Wl,--entry,entry', '-lkernel32', '-ladvapi32', '-o', str(helpers / 'usos-modern-finalize.exe')], env=env, check=True)
+    # 32-bit Windows 8.1 / 10 without CSM (win-x86-uefi-csmwrap): the ISO's own
+    # x86 WinPE in BIOS mode; micro-Linux step 610 injects this archive too.
+    subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.win10-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
+                    '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_x86_csmwrap.c'),
+                    '-Wl,--entry,entry', '-lkernel32', '-luser32', '-lshell32', '-o', str(helpers / 'usos-x86-csmwrap.exe')], env=env, check=True)
     win7 = root / 'zig-out/windows7-uefi'
     writer = NewcWriter(out / 'modern-support.cpio.tmp')
     try:
         writer.add_bytes('usos-modern-uefi.cmd', (root / 'tools/windows_modern_uefi_startup.cmd').read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
         writer.add_file('usos-modern-finalize.exe', helpers / 'usos-modern-finalize.exe')
+        writer.add_bytes('usos-x86-csmwrap.cmd', (root / 'tools/windows_x86_csmwrap.cmd').read_bytes().replace(b'
+
+', b'
+').replace(b'
+', b'
+
+'))
+        writer.add_file('usos-x86-csmwrap.exe', helpers / 'usos-x86-csmwrap.exe')
         for name in ('usos-drivers.exe', 'usos-unattend-drivers.exe'):
             writer.add_file(name, win7 / name)
     finally:

@@ -42,6 +42,7 @@ if not exist "%USOS_INSTALL%" set "USOS_INSTALL=%USOS_SOURCE%\sources\install.sw
 if not exist "%USOS_INSTALL%" goto missing
 echo Selected Windows installation ISO mounted at %USOS_SOURCE%
 echo [USOS] phase=source-ready install=%USOS_INSTALL%
+if exist "%~dp0usos-x86-csmwrap.flag" goto x86_csmwrap
 if exist "%~dp0usos-modern-vista.flag" goto modern_vista
 if exist "%~dp0usos-modern-win7.flag" goto modern_win7
 if exist "%~dp0usos-modern-uefi.flag" goto modern_uefi
@@ -53,6 +54,9 @@ if exist "%~dp0usos-unattend.xml" (
 exit /b %errorlevel%
 :modern_vista
 call "%~dp0usos-modern-vista.cmd"
+exit /b %errorlevel%
+:x86_csmwrap
+call "%~dp0usos-x86-csmwrap.cmd"
 exit /b %errorlevel%
 :modern_uefi
 call "%~dp0usos-modern-uefi.cmd"
