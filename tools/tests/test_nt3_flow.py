@@ -463,7 +463,9 @@ class Nt31(unittest.TestCase):
                           ("'Press CTRL+ALT+DELETE to restart'", 'key=ctrl-alt-delete')):
             self.assertIn(page, fn)
             self.assertIn(key, fn[fn.index(page):fn.index(page) + 120])
-        self.assertIn('pmemsave 0xb8000 4000', fn)
+        # HMP parses the size as an expression: an unquoted "4000 /run/..." is
+        # a division (X470 2026-10-10: no dump, Welcome page never answered).
+        self.assertIn('pmemsave 0xb8000 4000 \\"$W9X_VM_RUN/vga.bin\\"', fn)
         install = QEMU_INSTALL.read_text(encoding='utf-8')
         self.assertIn("grep -q '^version=3\\.10'", install)
         self.assertIn('W9X_VM_TICK_FN=nt31_vm_tick', install)

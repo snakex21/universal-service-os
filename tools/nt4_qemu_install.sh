@@ -50,7 +50,11 @@ nt31_vm_tick() {
     [ $(( $1 - ${NT31_TICK_AT:--10} )) -ge 4 ] || return 0
     NT31_TICK_AT=$1
     rm -f "$W9X_VM_RUN/vga.bin"
-    w9x_vm_monitor "pmemsave 0xb8000 4000 $W9X_VM_RUN/vga.bin"
+    # The file name in double quotes: HMP reads the size as an expression,
+    # and an unquoted "4000 /run/..." is "4000 divided by run" ("invalid char
+    # 'r' in expression", no dump; X470 2026-10-10: the Welcome page never
+    # got its ENTER and the VM stalled at 0 MB).
+    w9x_vm_monitor "pmemsave 0xb8000 4000 \"$W9X_VM_RUN/vga.bin\""
     sleep 1
     [ -s "$W9X_VM_RUN/vga.bin" ] || return 0
     screen=$(od -An -v -tu1 "$W9X_VM_RUN/vga.bin" | awk '{ for (i = 1; i <= NF; i++) if (++n % 2) printf "%s", ($i >= 32 && $i < 127) ? sprintf("%c", $i + 0) : " " }')
