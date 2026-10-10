@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- USOS POSReady 2009 answer template (docs/posready-2009-2026-10-10.md). @PRODUCT_KEY@ is filled at run time from the answer profile; never commit a key. Validated by POSReady Setup in QEMU 2026-10-10 up to the key check. -->
+<Unattend>
+<LoggingData>
+<LogFile Path="%TARGETDRIVE%\Windows\Setup.log" />
+<UnattendedFile Path="%TARGETDRIVE%\Windows\Unattended.xml" Copy="Yes" />
+</LoggingData>
+<UserData>
+<ProductKey Value="@PRODUCT_KEY@" />
+<FullName Value="USOS" />
+<Organization Value="" />
+<ComputerName Value="USOS-POSREADY" />
+<AdminPassword Value="" StrongPassword="No" EncryptedPassword="No" />
+</UserData>
+<DiskConfig>
+<Disk ID="0" WipeDisk="No">
+<ModifyPartition ID="2" Label="POSReady" Letter="C" FileSystem="NTFS" AllocationUnit="4096" QuickFormat="Yes" FileCompression="No" />
+</Disk>
+</DiskConfig>
+<SystemData>
+<OSConfiguration>
+<PageFile Path="*" InitialSize="*" MaximumSize="*" />
+</OSConfiguration>
+<LanguageSettings>
+<DefaultInputLanguage Value="1033" />
+<NonUnicodeLanguage Value="1033" />
+<UseComplexScriptLanguages Value="No" />
+<UseEastAsianLanguages Value="No" />
+</LanguageSettings>
+<RegionalSettings>
+<StandardsAndFormats Value="1033" />
+<GeographicalLocation Value="244" />
+<TimeZone Value="85" />
+</RegionalSettings>
+<Components>
+<Component Name=".Net Framework 2.0" Install="Yes" />
+<Component Name="Calculator" Install="Yes" />
+<Component Name="Notepad" Install="Yes" />
+<Component Name="Paint" Install="Yes" />
+<Component Name="WordPad" Install="Yes" />
+<Component Name="Command Line Utilities" Install="Yes" />
+<Component Name="Disk Management" Install="Yes" />
+</Components>
+<Networking>
+<IPAddress DynamicIPAddress="Yes" />
+<DNSServer DNSAuto="Yes" />
+<WINSServer WINSAuto="Yes" />
+</Networking>
+<Security>
+<JoinWorkgroup Value="WORKGROUP" />
+</Security>
+</SystemData>
+<SetupData>
+<Preinstall AcceptEula="Yes" />
+</SetupData>
+</Unattend>
