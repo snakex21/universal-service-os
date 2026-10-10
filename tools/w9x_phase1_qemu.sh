@@ -55,7 +55,10 @@ W9X_VM_STALL=${W9X_VM_STALL:-1800}
 # A message box that needs one known key (W9X_VM_ANSWER, a QEMU sendkey name;
 # NT 4.0: alt-n): typed when a graphics screen got no disk write for
 # W9X_VM_ANSWER_IDLE seconds, at most W9X_VM_ANSWER_TRIES times per run, the
-# screen before it kept as answer-N.ppm. Off when empty.
+# screen before it kept as answer-N.ppm. Off when empty. Several answers:
+# "keys;keys;..." (attempt N types list N, later attempts the last list),
+# each list one or more sendkey names separated by spaces (NT 3.1 Advanced
+# Server: its Domain Settings page first, then the Date/Time applet).
 W9X_VM_ANSWER=${W9X_VM_ANSWER:-}
 W9X_VM_ANSWER_IDLE=${W9X_VM_ANSWER_IDLE:-180}
 W9X_VM_ANSWER_TRIES=${W9X_VM_ANSWER_TRIES:-3}
@@ -245,8 +248,9 @@ EOF
                 answer_tries=$((answer_tries + 1))
                 w9x_vm_monitor "screendump $W9X_VM_RUN/answer-$answer_tries.ppm"
                 sleep 3
-                printf 'answer typed: %s attempt %s at %ss, idle %ss, written %s MB\n' "$W9X_VM_ANSWER" "$answer_tries" "$elapsed" "$idle" "$written" >> "$W9X_VM_RUN/command.txt"
-                w9x_vm_monitor "sendkey $W9X_VM_ANSWER"
+                keys=$(printf '%s\n' "$W9X_VM_ANSWER" | awk -F';' -v n="$answer_tries" '{ print (n <= NF) ? $n : $NF }')
+                printf 'answer typed: %s attempt %s at %ss, idle %ss, written %s MB\n' "$keys" "$answer_tries" "$elapsed" "$idle" "$written" >> "$W9X_VM_RUN/command.txt"
+                for k in $keys; do w9x_vm_monitor "sendkey $k"; sleep 1; done
                 idle_since=$(date +%s)
             elif [ -n "$W9X_VM_TEXT_ANSWER" ] && [ "$idle" -ge "$W9X_VM_TEXT_ANSWER_IDLE" ] && [ "$text_tries" -lt "$W9X_VM_ANSWER_TRIES" ] &&
                 ! w9x_vm_graphics_screen; then

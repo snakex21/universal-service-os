@@ -159,6 +159,19 @@ class Phase1Vm(unittest.TestCase):
                                     W9X_VM_STALL_ANY='1', W9X_VM_ANSWER='alt-n', W9X_VM_ANSWER_IDLE='1')
         self.assertNotIn('answer typed', (self.tmp / 'run/command.txt').read_text())
 
+    def test_answer_lists_per_attempt(self):
+        # "keys;keys": attempt N types list N (NT 3.1 Advanced Server: Domain
+        # Settings, then the Date/Time applet), later attempts the last list.
+        if self.run_lib('command -v mkfifo')[0] != 0:
+            self.skipTest('no mkfifo in this sh')
+        rc, out, err = self.run_lib('w9x_vm_graphics_screen() { return 0; }\nw9x_phase1_run /dev/fake tcg; echo "rc=$?"', W9X_FAKE_SLEEP='20',
+                                    W9X_VM_STALL_ANY='1', W9X_VM_ANSWER='alt-c tab shift-u ret;ret', W9X_VM_ANSWER_IDLE='1',
+                                    W9X_VM_ANSWER_TRIES='3')
+        self.assertIn('rc=0', out, err)
+        command = (self.tmp / 'run/command.txt').read_text()
+        self.assertIn('answer typed: alt-c tab shift-u ret attempt 1', command)
+        self.assertIn('answer typed: ret attempt 2', command)
+
     def test_tcg_is_the_default_kvm_needs_flag_and_device(self):
         self.assertEqual(self.run_lib('w9x_vm_accel')[1].strip(), 'tcg')
         (self.tmp / 'flags/phase1-kvm.flag').write_bytes(b'')

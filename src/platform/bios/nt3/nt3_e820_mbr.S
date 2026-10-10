@@ -19,6 +19,22 @@
  * Everything else is the XP geometry-fix MBR: boot the active partition and
  * correct the BPB head count from INT 13h AH=08.
  *
+ * The resident hooks do not fit next to the boot code: they are their own
+ * section (.hook, nt3-e820-hook-512.bin, "U3" in its last two bytes) that
+ * nt4_csmwrap_target.sh writes to sector 1 (unused: the partition starts at
+ * sector 63).  This MBR reads it into the reserved 1 KiB; without the sector
+ * it boots without any hook.
+ *
+ * Old memory sizes: the NT 3.1 NTLDR / SETUPLDR know no E820.  They size the
+ * memory above 1 MiB with INT 15h AH=88h and take AX=E801h only when its AX
+ * equals the AH=88h value (then BX 64 KiB blocks from 16 MiB on).  SeaBIOS
+ * (CSMWrap) answers both from the end of the first contiguous RAM above
+ * 1 MiB: OVMF's reserved range at 8 MiB left NT 3.1 with 8128 KB (QEMU
+ * 2026-10-10), and above 64 MiB AH=88h (63 MiB) and E801h AX (15 MiB)
+ * disagree.  The hook answers AH=88h and AX=E801h alike: AX (CX) = the BIOS
+ * E801h AX (contiguous RAM 1-16 MiB), BX (DX) = the E820 RAM entry that
+ * covers 16 MiB, up to its end (at most 4 GiB).
+ *
  * HPET: the X470 firmware (AMI, booted through CSMWrap) hands over with the
  * HPET enabled in LegacyReplacement mode and timer 0 interrupts off
  * (usosrst 1.3, Win2000: cfg 00000003, t0 00008030).  Then neither the PIT
@@ -51,13 +67,11 @@
 .equ RELOC_BASE,      0x0600
 .equ PART_TABLE_OFF,  446
 .equ VBR_LOAD,        0x7C00
-.equ HOOK_LEN,        (hook_end - hook_start)
-.equ HOOK_SRC,        RELOC_BASE + (hook_start - nt3_e820_mbr_start)
-/* Resident layout (1 KiB at the INT 12h top, segment = CS of the hooks):
+/* Resident layout (sector 1 at the INT 12h top, segment = CS of the hooks):
    0 = INT 15h handler, H1A = INT 1Ah handler, then the two old vectors. */
 .equ H1A,             (hook_1a - hook_start)
-.equ OLD15,           HOOK_LEN
-.equ OLD1A,           HOOK_LEN + 4
+.equ OLD15,           (hook_end - hook_start)
+.equ OLD1A,           (hook_end - hook_start) + 4
 
 nt3_e820_mbr_start:
     cli
@@ -81,15 +95,22 @@ nt3_e820_mbr_start:
     .word 0x0000
 
 relocated:
-    /* Take 1 KiB from the top of conventional memory for the hooks. */
+    /* Take 1 KiB from the top of conventional memory for the hooks and read
+       them there (sector 1, "U3" at its end; without it no hooks). */
     dec word ptr [0x0413]
     mov ax, word ptr [0x0413]
     shl ax, 6
     mov es, ax
-    xor di, di
-    mov si, offset HOOK_SRC
-    mov cx, offset HOOK_LEN
-    rep movsb
+    xor bx, bx
+    mov eax, 1
+    call read_sector
+    jc 2f
+    cmp word ptr es:[510], 0x3355
+    je 3f
+2:
+    inc word ptr [0x0413]
+    jmp boot_partition
+3:
     mov eax, dword ptr [0x15 * 4]
     mov dword ptr es:[OLD15], eax
     cli
@@ -120,14 +141,15 @@ relocated:
     /* PCI BIOS last bus >= 8: hide B101h from NTDETECT (see above). */
     mov ax, 0xB101
     int 0x1A
-    jc 1f
+    jc boot_partition
     cmp cl, 8
-    jb 1f
+    jb boot_partition
     mov eax, dword ptr [0x1A * 4]
     mov dword ptr es:[OLD1A], eax
     mov word ptr [0x1A * 4], offset H1A
     mov word ptr [0x1A * 4 + 2], es
-1:
+
+boot_partition:
     push ds
     pop es
 
@@ -141,19 +163,9 @@ find_active:
     jmp boot_error
 
 active_found:
-    /* INT 13h AH=42 packet on the stack: 1 sector of LBA [si+8] to 0:7C00. */
-    .byte 0x66, 0x6A, 0x00                 /* push dword 0 (LBA high) */
-    push dword ptr [si + 8]
-    .byte 0x6A, 0x00                       /* push word 0 (segment) */
-    .byte 0x68
-    .word VBR_LOAD                         /* push word 7C00h (offset) */
-    .byte 0x6A, 0x01                       /* push word 1 (sectors) */
-    .byte 0x6A, 0x10                       /* push word 10h (size) */
-    mov si, sp
-
-    mov dx, bp
-    mov ah, 0x42
-    int 0x13
+    mov eax, dword ptr [si + 8]
+    mov bx, VBR_LOAD
+    call read_sector
     jc boot_error
 
     /* Same fail-safe heads correction as xp_geometry_fix_mbr.S. */
@@ -189,6 +201,22 @@ boot_error:
     hlt
     jmp 1b
 
+/* One sector of LBA EAX to ES:BX (INT 13h AH=42h, packet on the stack,
+   drive in BP). CF = error. */
+read_sector:
+    .byte 0x66, 0x6A, 0x00                 /* push dword 0 (LBA high) */
+    push eax
+    push es
+    push bx
+    .byte 0x6A, 0x01                       /* push word 1 (sectors) */
+    .byte 0x6A, 0x10                       /* push word 10h (size) */
+    mov si, sp
+    mov dx, bp
+    mov ah, 0x42
+    int 0x13
+    lea sp, [si + 16]
+    ret
+
 /* GDT for the unreal-mode FS: the base points 8 bytes before the flat data
    descriptor, so the (never loaded) null descriptor is the code above. */
 gdtr:
@@ -197,10 +225,17 @@ gdtr:
 gdt_flat:
     .byte 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x92, 0xCF, 0x00
 
-/* Resident part, copied to (INT 12h top):0000; INT 15h handler at 0. */
+/* Resident part: sector 1, read to (INT 12h top):0000; INT 15h handler at 0. */
+.section .hook, "ax"
+.global hook_start
 hook_start:
     cmp ax, 0xE820
     je 2f
+    cmp ah, 0x88
+    je mem_sizes
+    cmp ax, 0xE801
+    je mem_sizes
+9:
     .byte 0x2E, 0xFF, 0x2E                 /* jmp far cs:[OLD15] (m16:16) */
     .word OLD15
 8:
@@ -261,6 +296,90 @@ hook_start:
     and byte ptr [bp + 6], 0xFE
     pop bp
     iret
+
+/* AH=88h / AX=E801h (see the header): low = the BIOS E801h AX (KiB 1-16
+   MiB), high = 64 KiB blocks of the E820 RAM entry that covers 16 MiB.
+   Without a BIOS E801h the call goes to the BIOS unchanged. */
+mem_sizes:
+    push bp
+    mov bp, sp
+    push ax                                /* [bp - 2]: the function */
+    push 0                                 /* [bp - 4]: high blocks */
+    push 0                                 /* [bp - 6]: low KiB */
+    push si
+    push di
+    push es
+    push ebx
+    push ecx
+    push edx                               /* [bp - 24] */
+    sub sp, 20                             /* E820 entry */
+    mov di, sp
+    push ss
+    pop es
+    mov ax, 0xE801
+    pushf
+    .byte 0x2E, 0xFF, 0x1E                 /* call far cs:[OLD15] (m16:16) */
+    .word OLD15
+    jc 5f
+    mov word ptr [bp - 6], ax
+    xor ebx, ebx
+1:
+    mov eax, 0xE820
+    mov ecx, 20
+    mov edx, 0x534D4150
+    pushf
+    .byte 0x2E, 0xFF, 0x1E                 /* call far cs:[OLD15] (m16:16) */
+    .word OLD15
+    jc 4f
+    cmp dword ptr es:[di + 16], 1
+    jne 3f
+    cmp dword ptr es:[di + 4], 0
+    jne 3f
+    mov eax, dword ptr es:[di]
+    cmp eax, 0x1000000
+    ja 3f
+    mov edx, dword ptr es:[di + 12]
+    add eax, dword ptr es:[di + 8]
+    adc edx, 0
+    jnz 2f
+    sub eax, 0x1000000
+    jbe 3f
+    shr eax, 16
+    jmp 6f
+2:
+    mov ax, 0xFF00                         /* up to 4 GiB */
+6:
+    mov word ptr [bp - 4], ax
+3:
+    test ebx, ebx
+    jnz 1b
+4:
+    clc
+5:
+    lea sp, [bp - 24]
+    pop edx
+    pop ecx
+    pop ebx
+    pop es
+    pop di
+    pop si
+    jc 7f
+    mov ax, word ptr [bp - 6]
+    cmp byte ptr [bp - 1], 0x88
+    je 6f
+    mov cx, ax
+    mov bx, word ptr [bp - 4]
+    mov dx, bx
+6:
+    mov sp, bp
+    and byte ptr [bp + 6], 0xFE
+    pop bp
+    iret
+7:
+    mov ax, word ptr [bp - 2]
+    mov sp, bp
+    pop bp
+    jmp 9b
 
 /* INT 1Ah: B101h becomes the unsupported B1FFh (AH = 81h, CF = 1). */
 hook_1a:

@@ -256,7 +256,7 @@ class Nt3MicroLinux(unittest.TestCase):
             self.assertIn(f'("{pair[0]}", "{pair[1]}")', text)
             self.assertTrue((ROOT / pair[0]).is_file(), pair[0])
         self.assertIn('nt3_e820_mbr = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-mbr-440.bin"', text)
-        self.assertIn('xp_geometry_fix_mbr, nt3_e820_mbr):', text)
+        self.assertIn('xp_geometry_fix_mbr, nt3_e820_mbr, nt3_e820_hook):', text)
         self.assertIn('"usr/lib/usos/nt3-e820-mbr-440.bin"', text)
 
 
@@ -280,7 +280,7 @@ class Nt3Mbr(unittest.TestCase):
         # loops when a bridge leads past it (X470): with a last bus >= 8 the
         # MBR turns INT 1Ah B101h into B1FFh (unsupported).
         text = (ROOT / 'src/platform/bios/nt3/nt3_e820_mbr.S').read_text(encoding='utf-8')
-        check = text.index('    mov ax, 0xB101\n    int 0x1A\n    jc 1f\n    cmp cl, 8\n    jb 1f\n')
+        check = text.index('    mov ax, 0xB101\n    int 0x1A\n    jc boot_partition\n    cmp cl, 8\n    jb boot_partition\n')
         install = text.index('    mov word ptr [0x1A * 4], offset H1A')
         self.assertLess(check, install)
         hook = text[text.index('hook_1a:'):text.index('hook_end:')]
@@ -289,6 +289,41 @@ class Nt3Mbr(unittest.TestCase):
         # The boot drive survives the PCI BIOS call (EDX = "PCI ") in BP.
         self.assertIn('    mov bp, dx\n', text)
         self.assertEqual(text.count('    mov dx, bp\n'), 3)
+
+
+    def test_hook_sector(self):
+        # The resident hooks are sector 1 (.hook section, "U3" signature);
+        # without the signature the MBR boots without hooks.
+        text = (ROOT / 'src/platform/bios/nt3/nt3_e820_mbr.S').read_text(encoding='utf-8')
+        self.assertIn('.section .hook, "ax"', text)
+        self.assertIn('    mov eax, 1\n    call read_sector\n    jc 2f\n    cmp word ptr es:[510], 0x3355\n    je 3f\n2:\n    inc word ptr [0x0413]\n', text)
+        ld = (ROOT / 'src/platform/bios/nt3/nt3_e820_mbr.ld').read_text(encoding='utf-8')
+        self.assertIn('.hook 0 : AT(0x10000)', ld)
+        ps1 = (ROOT / 'tools/build_xp_geometry_fix_mbr.ps1').read_text(encoding='utf-8')
+        for want in ("$hookbin = Join-Path $out 'nt3-e820-hook-512.bin'", '-j .hook $nt3elf $hookraw',
+                     '$padded[510] = 0x55', '$padded[511] = 0x33'):
+            self.assertIn(want, ps1)
+        target = TARGET.read_text(encoding='utf-8')
+        self.assertIn('[ -z "$nt3" ] || mbr_hook=$LIB/nt3-e820-hook-512.bin', target)
+        self.assertIn('dd if="$mbr_hook" of="$TARGET_DEVICE" bs=512 seek=1 count=1 conv=notrunc,fsync', target)
+        self.assertLess(target.index('cannot write the MBR\''), target.index('cannot write the MBR hook sector'))
+        build = BUILD.read_text(encoding='utf-8')
+        self.assertIn('nt3_e820_hook = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-hook-512.bin"', build)
+        self.assertIn('"usr/lib/usos/nt3-e820-hook-512.bin"', build)
+
+    def test_old_memory_size_calls(self):
+        # NT 3.1 sizes memory with AH=88h / AX=E801h only (no E820): both get
+        # the same low size (BIOS E801h AX) and E801h BX/DX = the E820 RAM
+        # entry over 16 MiB (OVMF + CSMWrap: 8128 KB -> 57152 KB, QEMU 2026-10-10).
+        text = (ROOT / 'src/platform/bios/nt3/nt3_e820_mbr.S').read_text(encoding='utf-8')
+        hook = text[text.index('hook_start:'):text.index('hook_1a:')]
+        for want in ('    cmp ah, 0x88\n    je mem_sizes\n    cmp ax, 0xE801\n    je mem_sizes\n',
+                     '    mov ax, 0xE801\n', '    mov word ptr [bp - 6], ax\n', '    mov edx, 0x534D4150\n',
+                     '    cmp eax, 0x1000000\n    ja 3f\n', '    mov ax, 0xFF00', '    mov ax, word ptr [bp - 6]\n',
+                     '    cmp byte ptr [bp - 1], 0x88\n', '    mov cx, ax\n    mov bx, word ptr [bp - 4]\n    mov dx, bx\n'):
+            self.assertIn(want, hook)
+        # The saved registers are popped before the results are loaded.
+        self.assertLess(hook.index('    pop si\n    jc 7f\n'), hook.index('    mov ax, word ptr [bp - 6]\n'))
 
 
 class Nt3DriversWithoutPciBios(unittest.TestCase):
@@ -381,6 +416,37 @@ class Nt31(unittest.TestCase):
         # Another INITIAL.INF (an anchor missing): refused.
         rc, _, _ = self.run_fn(QEMU_INSTALL, 'nt31_initial_inf', 'a b c', self.INITIAL.replace('[DoLicense]', '[DoLicence]'))
         self.assertNotEqual(rc, 0)
+
+    def test_advanced_server_keeps_the_network(self):
+        # 3.1 AS is always a domain controller: without the network no logon
+        # (netlogon), so its Setup keeps DoNetwork and installs the Loopback.
+        rc, err, out = self.run_fn(QEMU_INSTALL, 'nt31_initial_inf', 'a b c net', self.INITIAL)
+        self.assertEqual(rc, 0, err)
+        self.assertIn('    DoNetwork   = $(Chosen)\r\n', out)
+        self.assertIn('    DoPrinter   = $(NotChosen)\r\n', out)
+        self.assertIn('    DoAppSetup  = $(NotChosen)\r\n', out)
+        lanman = ('[InitialAdapterInstall]\r\n    Set DtAnyFound = NO\r\n    Set !STF_NCDETINFO = {}\r\n'
+                  '    Shell $(NcParamInf) Param_ControlDetection DTSTART\r\ndetectbypass = +\r\n    Return\r\n')
+        rc, err, out = self.run_fn(QEMU_INSTALL, 'nt31_ntlanman_inf', '', lanman)
+        self.assertEqual(rc, 0, err)
+        self.assertIn('    Set !STF_NCDETINFO = {}\r\n; USOS: the MS Loopback Adapter during Setup (docs/nt31-2026-10-09.md)\r\n'
+                      '    Ifstr(i) $(!NTN_Origination) == "install"\r\n        Set !STF_NCOPTION = LOOP\r\n'
+                      '        Goto detectbypass\r\n    Endif\r\n    Shell $(NcParamInf)', out)
+        rc, _, _ = self.run_fn(QEMU_INSTALL, 'nt31_ntlanman_inf', '', lanman.replace('NCDETINFO', 'NCDETINF'))
+        self.assertNotEqual(rc, 0)
+        loop = '[InstallOption]\r\nadapteroptions = +\r\n    ui start "InputDlg"\r\nskipoptions = +\r\n'
+        rc, err, out = self.run_fn(QEMU_INSTALL, 'nt31_oemnadlb_inf', '', loop)
+        self.assertEqual(rc, 0, err)
+        self.assertIn('adapteroptions = +\r\n; USOS: no media type page during Setup (docs/nt31-2026-10-09.md)\r\n'
+                      '    Ifstr(i) $(!NTN_Origination) == "install"\r\n        goto skipoptions\r\n    Endif\r\n'
+                      '    ui start "InputDlg"\r\n', out)
+        install = QEMU_INSTALL.read_text(encoding='utf-8')
+        self.assertIn("! grep -qi '^[[:space:]]*STF_PRODUCT[[:space:]]*=[[:space:]]*LanmanNT' \"$inf\" || NT31_NET=net", install)
+        self.assertIn('nt31_vm_patch_file "$img" NTLANMAN.INF nt31_ntlanman_inf &&', install)
+        self.assertIn('nt31_vm_patch_file "$img" OEMNADLB.INF nt31_oemnadlb_inf', install)
+        # Domain Settings first (controller of the new domain USOSDOMAIN), then Date/Time.
+        self.assertIn('W9X_VM_ANSWER=${NT31_AS_VM_ANSWER:-alt-c tab ${NT31_DOMAIN_KEYS:-shift-u shift-s shift-o shift-s '
+                      'shift-d shift-o shift-m shift-a shift-i shift-n} ret;ret}', install)
 
     def test_hardware_inf_patch(self):
         rc, err, out = self.run_fn(QEMU_INSTALL, 'nt31_hardware_inf', '', self.HARDWARE)

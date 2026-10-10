@@ -650,7 +650,9 @@ def main() -> int:
         xp_geometry_fix_mbr = root / "zig-out/xp-geometry-fix-mbr/xp-geometry-fix-mbr-440.bin"
         # NT 3.51: the geometry-fix MBR with the E820 filter (nt3_e820_mbr.S).
         nt3_e820_mbr = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-mbr-440.bin"
-        for required in (xp_vbr, xp_stage2, xp_nt52_vbr, xp_nt52_stage2, xp_geometry_fix_mbr, nt3_e820_mbr):
+        # Its resident hooks (sector 1 of the NT 3.x disk).
+        nt3_e820_hook = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-hook-512.bin"
+        for required in (xp_vbr, xp_stage2, xp_nt52_vbr, xp_nt52_stage2, xp_geometry_fix_mbr, nt3_e820_mbr, nt3_e820_hook):
             if not required.is_file():
                 raise FileNotFoundError(f"XP BIOS bootstrap artifact missing: {required}")
         geometry_mbr = xp_geometry_fix_mbr.read_bytes()
@@ -728,6 +730,10 @@ def main() -> int:
         if len(nt3_mbr) != 440:
             raise RuntimeError(f"NT 3.51 E820 MBR code must be 440 bytes: {nt3_e820_mbr}")
         put(entries, Entry("usr/lib/usos/nt3-e820-mbr-440.bin", stat.S_IFREG | 0o644, nt3_mbr))
+        nt3_hook = nt3_e820_hook.read_bytes()
+        if len(nt3_hook) != 512 or nt3_hook[510:] != b"U3":
+            raise RuntimeError(f"NT 3.x MBR hook sector must be 512 bytes ending in U3: {nt3_e820_hook}")
+        put(entries, Entry("usr/lib/usos/nt3-e820-hook-512.bin", stat.S_IFREG | 0o644, nt3_hook))
 
         module_root = modloop_out / "modules" / kernel_release
         qemu9x_module_set = set(qemu9x_modules)

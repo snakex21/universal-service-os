@@ -77,11 +77,17 @@ nt31_vm_tick() {
 # answers it with ENTER); at the end the USOS
 # section (drivers and their Services keys) and the restart without the
 # "Setup is done" page. 1 when an anchor is missing (another INITIAL.INF).
+# $4 = net (Advanced Server, STF_PRODUCT LanmanNT): the network stays on.
+# 3.1 AS is always a domain controller; without the network WinLogon refuses
+# every logon ("Unable to log you on because the netlogon service is not
+# running", QEMU 2026-10-10), so its Setup installs the MS Loopback Adapter
+# (nt31_ntlanman_inf) and creates the domain.
 nt31_initial_inf() {
-    awk -v BINMODE=3 -v full="$1" -v org="$2" -v comp="$3" '
+    awk -v BINMODE=3 -v full="$1" -v org="$2" -v comp="$3" -v net="${4:-}" '
         function out(t) { printf "%s\r\n", t }
         { line = $0; sub(/\r$/, "", line); low = tolower(line); gsub(/[ \t]/, "", low) }
         low ~ /^\[/ { sec = low }
+        sec == "[uivars]" && net == "net" && low ~ /^donetwork=\$\(chosen\)$/ { hit["vars"]++; low = "" }
         sec == "[uivars]" && low ~ /^(donetwork|doprinter|doappsetup)=\$\(chosen\)$/ { sub(/\$\([Cc]hosen\)/, "$(NotChosen)", line); hit["vars"]++ }
         low ~ /^shell"repair\.inf""createrepairdiskette"$/ { out("; USOS: no Emergency Repair Disk"); hit["erd"]++; next }
         { out(line) }
@@ -132,26 +138,77 @@ nt31_initial_inf() {
 
 # After a VM run of an NT 3.1 install: once text mode has written
 # \WINNT\SYSTEM32\INITIAL.INF (plain text there), it gets nt31_initial_inf
-# with the names of \USOS\NT3\NAMES.TXT (nt4_csmwrap_target.sh). 1 = the
-# file is there but cannot be patched.
+# with the names of \USOS\NT3\NAMES.TXT (nt4_csmwrap_target.sh); Advanced
+# Server (NT31_NET = net) also its network INFs. 1 = the file is there but
+# cannot be patched.
 nt31_vm_patch_initial() {
     img="$1@@$NT4_PART_OFFSET"
     inf=$W9X_VM_RUN/../nt31-initial.inf
     MTOOLS_SKIP_CHECK=1 mtype -i "$img" ::/WINNT/SYSTEM32/INITIAL.INF > "$inf" 2>/dev/null && [ -s "$inf" ] || { rm -f "$inf"; return 0; }
+    NT31_NET=''
+    ! grep -qi '^[[:space:]]*STF_PRODUCT[[:space:]]*=[[:space:]]*LanmanNT' "$inf" || NT31_NET=net
     if ! grep -q '^\[UsosNt31Post\]' "$inf"; then
         names=$(MTOOLS_SKIP_CHECK=1 mtype -i "$img" ::/USOS/NT3/NAMES.TXT 2>/dev/null | tr -d '\r')
         value() { printf '%s\n' "$names" | awk -v k="$1" -F= '$1 == k { sub(/^[^=]*=/, ""); print; exit }'; }
-        nt31_initial_inf "$(value fullname)" "$(value org)" "$(value computer)" < "$inf" > "$inf.new" || { rm -f "$inf" "$inf.new"; return 1; }
+        if [ -n "$NT31_NET" ]; then
+            nt31_vm_patch_file "$img" NTLANMAN.INF nt31_ntlanman_inf &&
+                nt31_vm_patch_file "$img" OEMNADLB.INF nt31_oemnadlb_inf || { rm -f "$inf"; return 1; }
+        fi
+        nt31_initial_inf "$(value fullname)" "$(value org)" "$(value computer)" "$NT31_NET" < "$inf" > "$inf.new" || { rm -f "$inf" "$inf.new"; return 1; }
         MTOOLS_SKIP_CHECK=1 mcopy -o -i "$img" "$inf.new" ::/WINNT/SYSTEM32/INITIAL.INF || { rm -f "$inf" "$inf.new"; return 1; }
     fi
-    # HARDWARE.INF: the Language (Locale) page keeps the CD's default.
-    MTOOLS_SKIP_CHECK=1 mtype -i "$img" ::/WINNT/SYSTEM32/HARDWARE.INF > "$inf" 2>/dev/null && [ -s "$inf" ] || { rm -f "$inf" "$inf.new"; return 1; }
-    if ! grep -q '^; USOS' "$inf"; then
-        nt31_hardware_inf < "$inf" > "$inf.new" || { rm -f "$inf" "$inf.new"; return 1; }
-        MTOOLS_SKIP_CHECK=1 mcopy -o -i "$img" "$inf.new" ::/WINNT/SYSTEM32/HARDWARE.INF || { rm -f "$inf" "$inf.new"; return 1; }
-    fi
     rm -f "$inf" "$inf.new"
+    # HARDWARE.INF: the Language (Locale) page keeps the CD's default.
+    nt31_vm_patch_file "$img" HARDWARE.INF nt31_hardware_inf
+}
+
+# Filters \WINNT\SYSTEM32\$2 of the C: image $1 (mtools "image@@offset")
+# through $3 (stdin -> stdout) unless it already has a "; USOS" line.
+# 1 = the file is missing or cannot be patched.
+nt31_vm_patch_file() {
+    pf=$W9X_VM_RUN/../nt31-patch.inf
+    MTOOLS_SKIP_CHECK=1 mtype -i "$1" "::/WINNT/SYSTEM32/$2" > "$pf" 2>/dev/null && [ -s "$pf" ] || { rm -f "$pf"; return 1; }
+    if ! grep -q '^; USOS' "$pf"; then
+        "$3" < "$pf" > "$pf.new" && MTOOLS_SKIP_CHECK=1 mcopy -o -i "$1" "$pf.new" "::/WINNT/SYSTEM32/$2" || { rm -f "$pf" "$pf.new"; return 1; }
+    fi
+    rm -f "$pf" "$pf.new"
     return 0
+}
+
+# NT 3.1 Advanced Server network pages (NTLANMAN.INF, stdin -> stdout, CR
+# LF): during Setup (NTN_Origination install) the adapter is the MS Loopback
+# Adapter (LOOP, the CD's OEMNADLB.INF and LOOP.SYS; no hardware, so the
+# installed system runs the same on the X470 without the VM network card),
+# without the detection and the adapter list. Control Panel runs
+# (NTN_Origination ncpa) keep the CD behaviour.
+nt31_ntlanman_inf() {
+    awk -v BINMODE=3 '
+        { line = $0; sub(/\r$/, "", line); low = tolower(line); gsub(/[ \t]/, "", low) }
+        low ~ /^\[/ { sec = low }
+        { printf "%s\r\n", line }
+        sec == "[initialadapterinstall]" && low == "set!stf_ncdetinfo={}" && !hit++ {
+            printf "; USOS: the MS Loopback Adapter during Setup (docs/nt31-2026-10-09.md)\r\n"
+            printf "    Ifstr(i) $(!NTN_Origination) == \"install\"\r\n"
+            printf "        Set !STF_NCOPTION = LOOP\r\n"
+            printf "        Goto detectbypass\r\n"
+            printf "    Endif\r\n"
+        }
+        END { if (hit != 1) { print "NTLANMAN.INF: no [InitialAdapterInstall] STF_NCDETINFO line" > "/dev/stderr"; exit 1 } }'
+}
+
+# OEMNADLB.INF (MS Loopback Adapter, stdin -> stdout, CR LF): during Setup
+# no media type page (the INF default 802.3 stays).
+nt31_oemnadlb_inf() {
+    awk -v BINMODE=3 '
+        { line = $0; sub(/\r$/, "", line); low = tolower(line); gsub(/[ \t]/, "", low) }
+        { printf "%s\r\n", line }
+        low == "adapteroptions=+" && !hit++ {
+            printf "; USOS: no media type page during Setup (docs/nt31-2026-10-09.md)\r\n"
+            printf "    Ifstr(i) $(!NTN_Origination) == \"install\"\r\n"
+            printf "        goto skipoptions\r\n"
+            printf "    Endif\r\n"
+        }
+        END { if (hit != 1) { print "OEMNADLB.INF: no adapteroptions label" > "/dev/stderr"; exit 1 } }'
 }
 
 # NT 3.1 HARDWARE.INF (stdin -> stdout, CR LF): [InitialHardwareInstall]
@@ -230,6 +287,7 @@ nt4_vm_install() {
     W9X_VM_TICK_FN=''
     nt3=''
     nt31=''
+    NT31_NET=''
     if MTOOLS_SKIP_CHECK=1 mdir -i "$target@@$NT4_PART_OFFSET" ::/USOS/NT3 >/dev/null 2>&1; then
         nt3=yes
         W9X_VM_TEXT_ANSWER=${NT3_VM_TEXT_ANSWER:-ret}
@@ -282,6 +340,12 @@ nt4_vm_install() {
             W9X_VM_TICK_FN=''
             return 2
         fi
+        # NT 3.1 Advanced Server: GUI Setup stops first at Domain Settings
+        # (3.1 has no unattended form of it, QEMU 2026-10-10): controller of
+        # the new domain USOSDOMAIN (NT31_DOMAIN_KEYS), then the Date/Time
+        # applet takes ENTER.
+        [ -z "$nt31" ] || [ "$NT31_NET" != net ] ||
+            W9X_VM_ANSWER=${NT31_AS_VM_ANSWER:-alt-c tab ${NT31_DOMAIN_KEYS:-shift-u shift-s shift-o shift-s shift-d shift-o shift-m shift-a shift-i shift-n} ret;ret}
         if nt4_vm_marker "$target" DONE.TXT; then W9X_VM_TICK_FN=''; return 0; fi
     done
     W9X_VM_TICK_FN=''

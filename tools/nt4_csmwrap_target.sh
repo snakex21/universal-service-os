@@ -372,6 +372,11 @@ mbr_code=$LIB/xp-geometry-fix-mbr-440.bin
 [ -z "$nt3" ] || mbr_code=$LIB/nt3-e820-mbr-440.bin
 [ -r "$mbr_code" ] || fail "missing: $mbr_code"
 [ "$(wc -c < "$mbr_code" | tr -d ' ')" = 440 ] || fail 'USOS MBR code must be 440 bytes'
+# NT 3.x: the MBR's resident INT 15h / INT 1Ah hooks are sector 1
+# (nt3_e820_mbr.S; it boots without hooks when the sector is missing).
+mbr_hook=''
+[ -z "$nt3" ] || mbr_hook=$LIB/nt3-e820-hook-512.bin
+[ -z "$mbr_hook" ] || [ "$(wc -c < "$mbr_hook" 2>/dev/null | tr -d ' ')" = 512 ] || fail "missing or not 512 bytes: $mbr_hook"
 drv=$LIB/$(printf %s "$sub" | tr '[:upper:]' '[:lower:]')
 for file in AHCINT.SYS USOSRST.SYS USOSUSB.SYS; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
 # usosrst for NT 3.5 (USOSRST35.SYS, build-nt35.cmd): the 3.5 kernel lacks
@@ -447,6 +452,8 @@ le32() {
 { printf '\200\001\001\000\006\366\067\376'; le32 "$PART_START"; le32 "$PART_SECTORS"; } | dd of="$mbr" bs=1 seek=446 count=16 conv=notrunc 2>/dev/null
 printf '\125\252' | dd of="$mbr" bs=1 seek=510 count=2 conv=notrunc 2>/dev/null
 dd if="$mbr" of="$TARGET_DEVICE" bs=512 count=1 conv=notrunc,fsync 2>/dev/null || fail 'cannot write the MBR'
+[ -z "$mbr_hook" ] || dd if="$mbr_hook" of="$TARGET_DEVICE" bs=512 seek=1 count=1 conv=notrunc,fsync 2>/dev/null ||
+    fail 'cannot write the MBR hook sector'
 
 part_loop=$(losetup -f) || fail 'no free loop device for the new partition'
 losetup -o $((PART_START * 512)) "$part_loop" "$TARGET_DEVICE" || fail 'cannot attach the new partition'
