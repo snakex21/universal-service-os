@@ -645,3 +645,30 @@ removed, `usos-x86-csmwrap.cmd` runs a `usb3` step (never fatal):
   A Vista / 2008 x86 USB 3 path needs a 32-bit xHCI package whose imports
   resolve against Vista SP2 + KB2864202 (user-supplied), plus the online
   KMDF step.
+
+### 12.4 QEMU results with retail 32-bit media (2026-10-11, build B261010-215407-A5A3B2C3)
+
+Same harness as 12.2 (OVMF without CSM, `pc`, TCG, AHCI target, stick on
+xHCI, DATA answer file), sticks built with `new_native_stick.ps1
+-DataExtraPath` for the Windows 7 USB 3 files.
+
+* **Windows 7 Ultimate SP1 PL x86** (`pl_windows_7_ultimate_with_sp1_x86_dvd_u_677455.iso`,
+  5 editions Starter..Ultimate, build 7601.17514; answer `/IMAGE/INDEX` 5,
+  local account + autologon): menu lists it (x86, summary "Without CSM",
+  boot PE 10.0.19041 x86); step 610; PE10 Setup hands-free; the `usb3` step
+  logged `installed Windows: C: 6.1`, KMDF DISM exit 0, both packages
+  (usbxhci, uaspstor) "successfully installed", driver DISM exit 0; phase 2
+  through CSMWrap to the **desktop**. The disk alone, then booted with
+  `pc,i8042=off` (no PS/2 controller at all) and only qemu-xhci +
+  usb-kbd + usb-tablet: the USB keyboard types in Notepad / Run; `sc query`
+  shows usbxhci, usbhub3, kbdhid, mouhid RUNNING, i8042prt STOPPED. Windows
+  asks once for a restart (new devices).
+* **Windows Vista SP2 PL x86** (`pl_windows_vista_with_sp2_x86_dvd_x15-36306.iso`,
+  7 editions, build 6002.18005; answer index 4 = Ultimate): accepted by the
+  menu and step 610. Client Vista Setup shows the product key page even
+  with `/IMAGE/INDEX` and no `ProductKey` (an empty `<Key>` is rejected as
+  "invalid product key"); Next + No continues (USB input in PE10). The
+  `usb3` step logs the NT 6.0 skip; phase 2 through CSMWrap, OOBE skipped,
+  autologon: **Vista Ultimate x86 desktop**. No USB input there (12.3).
+* **Server 2008 Web SP2 PL x86**: as 12.2; the `usb3` step logs the NT 6.0
+  skip. An empty `<Key>` is rejected there too; leave `ProductKey` out.
