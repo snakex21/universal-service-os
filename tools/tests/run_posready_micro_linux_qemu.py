@@ -22,6 +22,7 @@ The answer file may hold a product key: it is never printed or logged here.
 from __future__ import annotations
 
 import argparse
+import shutil
 import socket
 import subprocess
 import sys
@@ -107,7 +108,9 @@ def overlay(unattended: bytes, extra: dict[str, bytes]) -> bytes:
     entries += [("usr/lib/usos/posready", 0o040755, b""), ("usr/lib/usos/posready/DRV", 0o040755, b""),
                 ("usr/lib/usos/posready_unattended.xml", 0o100644, (ROOT / "tools/posready_unattended.xml").read_bytes()),
                 ("usr/lib/usos/posready/X470.REG", 0o100644, (ROOT / "tools/posready_x470.reg").read_bytes()),
-                ("usr/lib/usos/posready/FIRST.CMD", 0o100644, (ROOT / "tools/posready_first.cmd").read_bytes())]
+                ("usr/lib/usos/posready/FIRST.CMD", 0o100644, (ROOT / "tools/posready_first.cmd").read_bytes()),
+                ("usr/lib/usos/posready/LOGON.CMD", 0o100644, (ROOT / "tools/posready_logon.cmd").read_bytes()),
+                ("usr/lib/usos/posready/LOGON.REG", 0o100644, (ROOT / "tools/posready_logon.reg").read_bytes())]
     for f in sorted(nt3.CSMWRAP.rglob("*")):
         rel = "usos-e2e/csmwrap/" + f.relative_to(nt3.CSMWRAP).as_posix()
         if f.is_dir():
@@ -253,7 +256,25 @@ def host_vm(args, out: Path, target: Path) -> int:
         if not ended:
             rc = 1
             break
+        if run >= 3 and done_marker(out, target):
+            print(f"DONE.TXT after run {run} (LOGON.CMD shut the VM down)", flush=True)
+            return 0
     return rc
+
+
+def done_marker(out: Path, target: Path) -> bool:
+    """\\USOS\\POSR\\DONE.TXT on partition 1 (7-Zip reads the qcow2's FAT, read only)."""
+    seven = Path("C:/Program Files/7-Zip/7z.exe")
+    tmp = out / "fatcheck"
+    shutil.rmtree(tmp, ignore_errors=True)
+    subprocess.run([str(seven), "e", "-y", f"-o{tmp}", str(target), "0.fat"], capture_output=True)
+    fat = tmp / "0.fat"
+    found = False
+    if fat.exists():
+        listing = subprocess.run([str(seven), "l", str(fat), "USOS/POSR/DONE.TXT"], capture_output=True, text=True, errors="replace").stdout
+        found = "DONE.TXT" in listing
+    shutil.rmtree(tmp, ignore_errors=True)
+    return found
 
 
 def keys_for(text: str) -> list[str]:

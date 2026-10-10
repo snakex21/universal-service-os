@@ -36,8 +36,11 @@ class AnswerTemplate(unittest.TestCase):
         self.assertEqual(self.root.find("SetupData/Preinstall").get("AcceptEula"), "Yes")
 
     def test_first_logon_runs_first_cmd(self) -> None:
-        cmd = self.root.find("RunOnce/RunOnceCommand").get("FilePath")
-        self.assertIn(r"\USOS\POSR\FIRST.CMD", cmd)
+        cmd = self.root.find("RunOnce/RunOnceCommand")
+        # Batch files need cmd.exe with /c in Attributes (POSReady docs).
+        self.assertEqual(cmd.get("FilePath"), r"C:\WINDOWS\system32\cmd.exe")
+        self.assertNotIn("%", cmd.get("Attributes"))  # FBA mangles every %
+        self.assertIn(r"\USOS\POSR\FIRST.CMD", cmd.get("Attributes"))
 
     @unittest.skipUnless(SH, "no sh")
     def test_answer_xml_from_sif(self) -> None:
@@ -63,12 +66,23 @@ class Payload(unittest.TestCase):
         import posready_reg
         self.assertEqual((ROOT / "tools" / "posready_x470.reg").read_bytes(), posready_reg.render())
 
-    def test_first_cmd_is_crlf_and_checks_acpi(self) -> None:
-        data = (ROOT / "tools" / "posready_first.cmd").read_bytes()
-        self.assertNotIn(b"\n", data.replace(b"\r\n", b""))
-        self.assertIn(b"dllcache", data)
-        self.assertIn(b"ACPI MISMATCH", data)
-        self.assertIn(b"shutdown -s", data)
+    def test_scripts_are_crlf(self) -> None:
+        for name in ("posready_first.cmd", "posready_logon.cmd", "posready_logon.reg", "posready_x470.reg"):
+            data = (ROOT / "tools" / name).read_bytes()
+            self.assertNotIn(b"\n", data.replace(b"\r\n", b""), name)
+
+    def test_fba_runonce_then_logon_check(self) -> None:
+        first = (ROOT / "tools" / "posready_first.cmd").read_bytes()
+        logon = (ROOT / "tools" / "posready_logon.cmd").read_bytes()
+        # Inside FBA: drivers (dllcache first) and the RunOnce for the logon; no shutdown.
+        self.assertIn(b"dllcache", first)
+        self.assertIn(b"LOGON.REG", first)
+        self.assertNotIn(b"shutdown -s", first)
+        # First logon: the ACPI check after FBA's PnP, DONE.TXT, shutdown.
+        self.assertIn(b"fc /b", logon)
+        self.assertIn(b"DONE.TXT", logon)
+        self.assertIn(b"shutdown -s", logon)
+        self.assertIn(b"LOGON.CMD", (ROOT / "tools" / "posready_logon.reg").read_bytes())
 
     def test_driver_set_is_the_xp_selection(self) -> None:
         from build_micro_linux import POSREADY_DRIVERS
@@ -101,7 +115,7 @@ class Scripts(unittest.TestCase):
         vm = (ROOT / "tools" / "w9x_phase1_qemu.sh").read_text(encoding="utf-8")
         self.assertRegex(vm, r"NT31\|NT31S\|POSR\)")
         build = (ROOT / "tools" / "build_micro_linux.py").read_text(encoding="utf-8")
-        for name in ("posready_csmwrap_target.sh", "posready_qemu_install.sh", "posready_unattended.xml", "posready/FIRST.CMD"):
+        for name in ("posready_csmwrap_target.sh", "posready_qemu_install.sh", "posready_unattended.xml", "posready/FIRST.CMD", "posready/LOGON.CMD", "posready/LOGON.REG"):
             self.assertIn(name, build)
 
     def test_install_vm_is_uniprocessor(self) -> None:
