@@ -9,7 +9,10 @@ rem   1. usos-x86-csmwrap before: Windows partition active, staging hidden,
 rem      WinPE letters of the prepared disk dropped, InstallTo added to the
 rem      answer (the disk was confirmed in micro-Linux);
 rem   2. Setup with /noreboot;
-rem   3. usos-x86-csmwrap after: boot files on the Windows partition checked,
+rem   3. Windows 7 x86 only: USB 3 for the installed system (offline DISM,
+rem      the user's KMDF 1.11 update and 32-bit xHCI package from DATA,
+rem      design doc section 12.3); never fatal;
+rem   4. usos-x86-csmwrap after: boot files on the Windows partition checked,
 rem      staging entry removed, "remove the stick" notice, restart.
 set "USOS_SETUP=%USOS_SOURCE%\sources\setup.exe"
 if not exist "%USOS_SETUP%" exit /b 1
@@ -31,6 +34,7 @@ if not "%USOS_SETUP_RESULT%"=="0" (
     "%~dp0usos-x86-csmwrap.exe" failed
     exit /b %USOS_SETUP_RESULT%
 )
+call :usb3
 echo [USOS] phase=finalize-target-boot
 "%~dp0usos-x86-csmwrap.exe" after
 set "USOS_FINALIZE_RESULT=%errorlevel%"
@@ -38,4 +42,56 @@ set "USOS_FINALIZE_RESULT=%errorlevel%"
 if not "%USOS_FINALIZE_RESULT%"=="0" exit /b %USOS_FINALIZE_RESULT%
 echo [USOS] phase=reboot-after-success
 wpeutil reboot
+exit /b 0
+
+rem ---- USB 3 for the installed 32-bit Windows 7 (section 12.3) ------------
+rem Windows 7 has no xHCI driver; the X470 has only xHCI ports. From DATA:
+rem   Systems\Windows\Windows 7\Updates\windows6.1-kb2864202-x86*.msu (or
+rem   kb2685811-x86): KMDF 1.11, which the generic USB 3 package needs;
+rem   Systems\Windows\Windows 7\Drivers\x86\: the 32-bit USB 3 package(s).
+rem Both go into the installed image with this WinPE's DISM before its first
+rem boot. Vista / Server 2008 (NT 6.0): this DISM cannot service them and no
+rem 32-bit NT 6.0 xHCI package is known; skipped with a note.
+:usb3
+echo [USOS] phase=usb3-offline
+set "USOS_T="
+set "USOS_NT="
+set "USOS_WORKDIR="
+"%~dp0usos-x86-csmwrap.exe" target "%TEMP%\usos-target.txt"
+if errorlevel 1 (echo [USOS] USB3: installed Windows not found; skipped. & exit /b 0)
+for /f "usebackq tokens=1,2" %%A in ("%TEMP%\usos-target.txt") do (set "USOS_T=%%A" & set "USOS_NT=%%B")
+if not defined USOS_NT (echo [USOS] USB3: no target record; skipped. & exit /b 0)
+if "%USOS_NT%"=="6.0" (echo [USOS] USB3: Vista / Server 2008 x86 - no USB 3 driver for this Windows yet; skipped. & exit /b 0)
+rem Windows 8.1 / 10 x86 (profile win-x86-uefi-csmwrap) have their own xHCI driver.
+if not "%USOS_NT%"=="6.1" exit /b 0
+set "USOS_DATA="
+for %%D in (C D E F G H I J K L M N O P Q R S T U V W Y Z) do if not defined USOS_DATA if /i not "%%D:"=="%USOS_T%" if exist "%%D:\Systems\Windows\Windows 7\" set "USOS_DATA=%%D:\Systems\Windows\Windows 7"
+if not defined USOS_DATA (echo [USOS] USB3: DATA\Systems\Windows\Windows 7 not visible; skipped. & exit /b 0)
+set "USOS_DRV=%USOS_DATA%\Drivers\x86"
+set "USOS_KMDF_MSU="
+for %%M in ("%USOS_DATA%\Updates\*kb2685811-x86*.msu" "%USOS_DATA%\Updates\*kb2864202-x86*.msu") do set "USOS_KMDF_MSU=%%~fM"
+set "USOS_HAVE_INF="
+if exist "%USOS_DRV%\" for /r "%USOS_DRV%" %%I in (*.inf) do set "USOS_HAVE_INF=1"
+if not defined USOS_HAVE_INF (echo [USOS] USB3: no 32-bit package in %USOS_DRV%; skipped. & exit /b 0)
+if not defined USOS_KMDF_MSU (echo [USOS] USB3: KMDF 1.11 x86 missing - put windows6.1-kb2864202-x86*.msu into %USOS_DATA%\Updates; skipped. & exit /b 0)
+set "USOS_WORKDIR=%USOS_T%\USOS-usb3"
+if exist "%USOS_WORKDIR%" rd /s /q "%USOS_WORKDIR%"
+md "%USOS_WORKDIR%\cab"
+md "%USOS_WORKDIR%\scratch"
+expand.exe -F:Windows6.1-KB*-x86.cab "%USOS_KMDF_MSU%" "%USOS_WORKDIR%\cab" >nul
+set "USOS_KMDF_CAB="
+for %%C in ("%USOS_WORKDIR%\cab\Windows6.1-KB*-x86.cab") do set "USOS_KMDF_CAB=%%~fC"
+if not defined USOS_KMDF_CAB (echo [USOS] USB3: no KMDF package inside %USOS_KMDF_MSU%; skipped. & goto usb3_done)
+echo [USOS] USB3: KMDF %USOS_KMDF_CAB% into %USOS_T%
+dism.exe /English /Image:%USOS_T%\ /ScratchDir:"%USOS_WORKDIR%\scratch" /LogPath:"%USOS_WORKDIR%\dism-kmdf.log" /Add-Package /PackagePath:"%USOS_KMDF_CAB%"
+set "USOS_DISM=%errorlevel%"
+echo [USOS] USB3: KMDF DISM exit=%USOS_DISM%
+if not "%USOS_DISM%"=="0" if not "%USOS_DISM%"=="3010" (echo [USOS] USB3: KMDF not installed, so the USB 3 package would not start; skipped. & goto usb3_done)
+echo [USOS] USB3: drivers %USOS_DRV%
+dism.exe /English /Image:%USOS_T%\ /ScratchDir:"%USOS_WORKDIR%\scratch" /LogPath:"%USOS_WORKDIR%\dism-drivers.log" /Add-Driver /Driver:"%USOS_DRV%" /Recurse /ForceUnsigned
+echo [USOS] USB3: driver DISM exit=%errorlevel%
+:usb3_done
+"%~dp0usos-log-x86.exe"
+if exist "%USOS_WORKDIR%\scratch" rd /s /q "%USOS_WORKDIR%\scratch"
+if exist "%USOS_WORKDIR%\cab" rd /s /q "%USOS_WORKDIR%\cab"
 exit /b 0

@@ -104,6 +104,8 @@ Systems/Windows/Windows 7/Drivers/x64/NVMe/*.inf|*.sys|*.cat
 Systems/Windows/Windows 7/Updates/*kb4474419*.msu
 Systems/Windows/Windows 7/Updates/*kb2990941*.msu
 Systems/Windows/Windows 7/Updates/*kb3087873*.msu
+Systems/Windows/Windows 7/Drivers/x86/<pakiet>/*.inf|*.sys|*.cat   (Windows 7 x86 bez CSM: USB 3)
+Systems/Windows/Windows 7/Updates/*kb2864202-x86*.msu       (KMDF 1.11 x86; albo *kb2685811-x86*)
 ```
 
 Dopasowanie MSU ignoruje wielkość liter i wersję w nazwie

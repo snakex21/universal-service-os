@@ -16,6 +16,10 @@
  *                            micro-Linux, so Setup does not ask again).
  *   failed                   Setup failed: the staging partition becomes active
  *                            again (the next boot of the disk retries).
+ *   target <out>             after Setup: <out> = "<letter>: <NT major.minor>"
+ *                            of the installed Windows (a letter is given to
+ *                            its volume when it has none), for the offline
+ *                            USB 3 step of usos-x86-csmwrap.cmd.
  *   after                    the Windows partition holds bootmgr and
  *                            Windows\System32\winload.exe and is the only active
  *                            one; the staging entry is removed; a notice says to
@@ -26,6 +30,7 @@
 #include <windows.h>
 #include <winioctl.h>
 #include <shellapi.h>
+#include <winver.h>
 #include <stddef.h>
 
 static WCHAR base[MAX_PATH], scratch[MAX_PATH];
@@ -216,6 +221,73 @@ static BOOL exists_on_partition(const WCHAR *tail) {
     DWORD a = GetFileAttributesW(name);
     return a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY);
 }
+/* ---- target <out>: letter + NT version of the installed Windows ---------
+ * For the USB 3 step of usos-x86-csmwrap.cmd (offline DISM needs a drive
+ * letter): the volume that starts at the prepared Windows partition of the
+ * prepared disk keeps its letter, or gets the first free one. <out> receives
+ * "<L>: <major>.<minor>" from the version of Windows\System32\ntoskrnl.exe. */
+static WCHAR target_root[4];
+static BOOL target_letter(void) {
+    WCHAR volume[64], names[256]; DWORD got = 0;
+    HANDLE f = FindFirstVolumeW(volume, 64);
+    if (f == INVALID_HANDLE_VALUE) return FALSE;
+    BOOL found = FALSE;
+    do {
+        int len = lstrlenW(volume);
+        if (len < 2 || volume[len - 1] != L'\\') continue;
+        volume[len - 1] = 0;
+        HANDLE h = CreateFileW(volume, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+        volume[len - 1] = L'\\';
+        if (h == INVALID_HANDLE_VALUE) continue;
+        VOLUME_DISK_EXTENTS e;
+        BOOL match = DeviceIoControl(h, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, 0, 0, &e, sizeof(e), &got, 0) && e.NumberOfDiskExtents == 1 &&
+                     e.Extents[0].DiskNumber == disk && (ULONGLONG)e.Extents[0].StartingOffset.QuadPart == windows_start * 512;
+        CloseHandle(h);
+        if (!match) continue;
+        found = TRUE;
+        if (GetVolumePathNamesForVolumeNameW(volume, names, 256, &got)) {
+            for (WCHAR *p = names; *p; p += lstrlenW(p) + 1)
+                if (p[1] == L':' && p[2] == L'\\' && !p[3]) { target_root[0] = p[0]; target_root[1] = L':'; target_root[2] = L'\\'; target_root[3] = 0; break; }
+        }
+        if (!target_root[0]) {
+            DWORD used = GetLogicalDrives();
+            for (DWORD i = 2; i < 26 && !target_root[0]; i++) if (!(used & (1u << i))) {
+                WCHAR root[4] = {(WCHAR)(L'A' + i), L':', L'\\', 0};
+                if (SetVolumeMountPointW(root, volume)) { lstrcpyW(target_root, root); logn("letter given to the Windows partition (ASCII)=", (DWORD)root[0]); }
+            }
+        }
+        break;
+    } while (FindNextVolumeW(f, volume, 64));
+    FindVolumeClose(f);
+    return found && target_root[0];
+}
+static BOOL target_version(DWORD *major, DWORD *minor) {
+    WCHAR file[MAX_PATH]; lstrcpyW(file, target_root); lstrcatW(file, L"Windows\\System32\\ntoskrnl.exe");
+    DWORD unused = 0, n = GetFileVersionInfoSizeW(file, &unused);
+    if (!n || n > sizeof(buffer)) return FALSE;
+    VS_FIXEDFILEINFO *v = 0; UINT size = 0;
+    if (!GetFileVersionInfoW(file, 0, n, buffer) || !VerQueryValueW(buffer, L"\\", (void **)&v, &size) || size < sizeof(*v)) return FALSE;
+    *major = HIWORD(v->dwFileVersionMS); *minor = LOWORD(v->dwFileVersionMS);
+    return TRUE;
+}
+static BOOL write_target(const WCHAR *output) {
+    DWORD major = 0, minor = 0;
+    if (!target_letter()) { say("[X86_CSMWRAP] the installed Windows volume has no drive letter\r\n"); return FALSE; }
+    if (!target_version(&major, &minor)) { say("[X86_CSMWRAP] the installed Windows has no readable ntoskrnl.exe version\r\n"); return FALSE; }
+    char line[32], d[24]; int at = 0;
+    line[at++] = (char)target_root[0]; line[at++] = ':'; line[at++] = ' ';
+    decimal(d, major); for (int i = 0; d[i]; i++) line[at++] = d[i];
+    line[at++] = '.';
+    decimal(d, minor); for (int i = 0; d[i]; i++) line[at++] = d[i];
+    line[at++] = '\r'; line[at++] = '\n'; line[at] = 0;
+    say("[X86_CSMWRAP] installed Windows: "); say(line);
+    HANDLE h = CreateFileW(output, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+    if (h == INVALID_HANDLE_VALUE) return FALSE;
+    DWORD wrote = 0; BOOL ok = WriteFile(h, line, (DWORD)at, &wrote, 0) && wrote == (DWORD)at;
+    CloseHandle(h);
+    return ok;
+}
+
 static DWORD WINAPI notice(LPVOID unused) {
     (void)unused;
     MessageBoxW(0, L"The first part of the Windows installation is complete.\n\nRemove the USOS stick now, then choose OK: the computer restarts and Windows continues from the disk through CSMWrap. If the stick stays connected, start this disk's UEFI entry from the firmware boot menu.\n\nThe computer restarts by itself in 2 minutes.",
@@ -258,6 +330,7 @@ void entry(void) {
         se[0] = 0x80; se[4] = 0x07;
         ExitProcess(write_mbr(s, "staging partition active again for a retry") ? 0 : 6);
     }
+    if (lstrcmpiW(args[1], L"target") == 0 && arg_count == 3) ExitProcess(write_target(args[2]) ? 0 : 9);
     if (lstrcmpiW(args[1], L"after") == 0) {
         BOOL bootmgr = exists_on_partition(L"\\bootmgr"), winload = exists_on_partition(L"\\Windows\\System32\\winload.exe");
         logn("bootmgr on the Windows partition=", bootmgr);
