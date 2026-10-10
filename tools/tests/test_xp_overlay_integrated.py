@@ -44,5 +44,27 @@ class IntegratedCab(unittest.TestCase):
         self.assertEqual(rows(text, 'SetupData')[-1], 'DriverCabName = driver.cab,sp3.cab')
 
 
+DRVINDEX = ('\r\n[Version]\r\nSignature="$Windows NT$"\r\nCabFiles=driver\r\n\r\n'
+            '[driver]\r\n1394bus.sys\r\nacpi.sys\r\nacpiec.sys\r\n\r\n'
+            '[Cabs]\r\ndriver=driver.cab\r\n')
+
+
+class IntegratedDrvindex(unittest.TestCase):
+    """GUI-mode PnP finds driver files through DRVINDEX.INF, not TXTSETUP.SIF.
+    X470 2026-10-10: with only driver.cab listed, the ACPI device install put
+    the stock SP3 acpi.sys back over the community one (stop at next boot)."""
+
+    def test_bundle_cabinet_serves_acpi(self):
+        text = overlay.register_integrated_drvindex(DRVINDEX, 'SP3.CAB', ['acpi.sys'])
+        self.assertIn('CabFiles=SP3,driver', rows(text, 'Version'))
+        self.assertEqual(rows(text, 'SP3'), ['acpi.sys'])
+        self.assertEqual(rows(text, 'driver'), ['1394bus.sys', 'acpiec.sys'])
+        self.assertEqual(rows(text, 'Cabs'), ['driver=driver.cab', 'SP3=SP3.CAB'])
+
+    def test_idempotent(self):
+        once = overlay.register_integrated_drvindex(DRVINDEX, 'SP3.CAB', ['acpi.sys'])
+        self.assertEqual(overlay.register_integrated_drvindex(once, 'SP3.CAB', ['acpi.sys']), once)
+
+
 if __name__ == '__main__':
     unittest.main()
