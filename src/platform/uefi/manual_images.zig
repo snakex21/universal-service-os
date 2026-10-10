@@ -114,7 +114,7 @@ fn row(system: *const usos.catalog.SystemEntry, image: *const usos.catalog.Image
         return result;
     }
     const arch: ?[]const u8 = if (info.arch == .unknown) null else info.arch.label();
-    if (usos.catalog.os_profiles.mediaBlock(system.id, info, probe.firmware())) |reason| {
+    if (blockReason(system, image.*)) |reason| {
         result.detail = blockText(reason);
         result.badge = .{ .text = arch orelse view.t(.badge_unavailable), .tone = .warning };
         return result;
