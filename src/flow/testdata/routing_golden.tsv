@@ -9,6 +9,7 @@ system	windows-vista	windows	windows	any	\Systems\Windows\Windows Vista\Images	\
 system	windows-xp	windows_legacy	windows	any	\Systems\Windows\Windows XP\Images	\Systems\Windows\Windows XP\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-xp-mce	windows_legacy	windows	uefi	\Systems\Windows\Windows XP Media Center Edition 2005\Images	\Systems\Windows\Windows XP Media Center Edition 2005\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-xp-tablet	windows_legacy	windows	uefi	\Systems\Windows\Windows XP Tablet PC Edition 2005\Images	\Systems\Windows\Windows XP Tablet PC Edition 2005\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
+system	windows-embedded-posready-2009	windows_legacy	windows	uefi	\Systems\Windows\Windows Embedded POSReady 2009\Images	\Systems\Windows\Windows Embedded POSReady 2009\Unattended	.xml	unattend.xml	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-xp-x64	windows_legacy	windows	any	\Systems\Windows\Windows XP x64\Images	\Systems\Windows\Windows XP x64\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-2000	windows_legacy	windows	any	\Systems\Windows\Windows 2000\Images	\Systems\Windows\Windows 2000\Unattended	.sif	WINNT.SIF	1	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	windows-nt-4	windows_legacy	windows	any	\Systems\Windows\Windows NT 4.0\Images	\Systems\Windows\Windows NT 4.0\Unattended	.sif	WINNT.SIF	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
@@ -1149,6 +1150,114 @@ route	windows-xp-tablet	efi	disk_image	bios	-
 route	windows-xp-tablet	efi	disk_image	uefi	-
 route	windows-xp-tablet	efi	floppy_image	bios	-
 route	windows-xp-tablet	efi	floppy_image	uefi	-
+route	windows-embedded-posready-2009	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	windows-embedded-posready-2009	iso	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
+route	windows-embedded-posready-2009	iso	direct_iso	bios	-
+route	windows-embedded-posready-2009	iso	direct_iso	uefi	-
+route	windows-embedded-posready-2009	iso	wimboot	bios	-
+route	windows-embedded-posready-2009	iso	wimboot	uefi	-
+route	windows-embedded-posready-2009	iso	vhdboot	bios	-
+route	windows-embedded-posready-2009	iso	vhdboot	uefi	-
+route	windows-embedded-posready-2009	iso	direct_efi	bios	-
+route	windows-embedded-posready-2009	iso	direct_efi	uefi	-
+route	windows-embedded-posready-2009	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	windows-embedded-posready-2009	iso	chainload	uefi	-
+route	windows-embedded-posready-2009	iso	memdisk	bios	-
+route	windows-embedded-posready-2009	iso	memdisk	uefi	-
+route	windows-embedded-posready-2009	iso	disk_image	bios	-
+route	windows-embedded-posready-2009	iso	disk_image	uefi	-
+route	windows-embedded-posready-2009	iso	floppy_image	bios	-
+route	windows-embedded-posready-2009	iso	floppy_image	uefi	-
+route	windows-embedded-posready-2009	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-embedded-posready-2009	wim	automatic	uefi	-
+route	windows-embedded-posready-2009	wim	direct_iso	bios	-
+route	windows-embedded-posready-2009	wim	direct_iso	uefi	-
+route	windows-embedded-posready-2009	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	windows-embedded-posready-2009	wim	wimboot	uefi	-
+route	windows-embedded-posready-2009	wim	vhdboot	bios	-
+route	windows-embedded-posready-2009	wim	vhdboot	uefi	-
+route	windows-embedded-posready-2009	wim	direct_efi	bios	-
+route	windows-embedded-posready-2009	wim	direct_efi	uefi	-
+route	windows-embedded-posready-2009	wim	chainload	bios	-
+route	windows-embedded-posready-2009	wim	chainload	uefi	-
+route	windows-embedded-posready-2009	wim	memdisk	bios	-
+route	windows-embedded-posready-2009	wim	memdisk	uefi	-
+route	windows-embedded-posready-2009	wim	disk_image	bios	-
+route	windows-embedded-posready-2009	wim	disk_image	uefi	-
+route	windows-embedded-posready-2009	wim	floppy_image	bios	-
+route	windows-embedded-posready-2009	wim	floppy_image	uefi	-
+route	windows-embedded-posready-2009	img	automatic	bios	-
+route	windows-embedded-posready-2009	img	automatic	uefi	-
+route	windows-embedded-posready-2009	img	direct_iso	bios	-
+route	windows-embedded-posready-2009	img	direct_iso	uefi	-
+route	windows-embedded-posready-2009	img	wimboot	bios	-
+route	windows-embedded-posready-2009	img	wimboot	uefi	-
+route	windows-embedded-posready-2009	img	vhdboot	bios	-
+route	windows-embedded-posready-2009	img	vhdboot	uefi	-
+route	windows-embedded-posready-2009	img	direct_efi	bios	-
+route	windows-embedded-posready-2009	img	direct_efi	uefi	-
+route	windows-embedded-posready-2009	img	chainload	bios	-
+route	windows-embedded-posready-2009	img	chainload	uefi	-
+route	windows-embedded-posready-2009	img	memdisk	bios	-
+route	windows-embedded-posready-2009	img	memdisk	uefi	-
+route	windows-embedded-posready-2009	img	disk_image	bios	-
+route	windows-embedded-posready-2009	img	disk_image	uefi	-
+route	windows-embedded-posready-2009	img	floppy_image	bios	-
+route	windows-embedded-posready-2009	img	floppy_image	uefi	-
+route	windows-embedded-posready-2009	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-embedded-posready-2009	vhd	automatic	uefi	-
+route	windows-embedded-posready-2009	vhd	direct_iso	bios	-
+route	windows-embedded-posready-2009	vhd	direct_iso	uefi	-
+route	windows-embedded-posready-2009	vhd	wimboot	bios	-
+route	windows-embedded-posready-2009	vhd	wimboot	uefi	-
+route	windows-embedded-posready-2009	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-embedded-posready-2009	vhd	vhdboot	uefi	-
+route	windows-embedded-posready-2009	vhd	direct_efi	bios	-
+route	windows-embedded-posready-2009	vhd	direct_efi	uefi	-
+route	windows-embedded-posready-2009	vhd	chainload	bios	-
+route	windows-embedded-posready-2009	vhd	chainload	uefi	-
+route	windows-embedded-posready-2009	vhd	memdisk	bios	-
+route	windows-embedded-posready-2009	vhd	memdisk	uefi	-
+route	windows-embedded-posready-2009	vhd	disk_image	bios	-
+route	windows-embedded-posready-2009	vhd	disk_image	uefi	-
+route	windows-embedded-posready-2009	vhd	floppy_image	bios	-
+route	windows-embedded-posready-2009	vhd	floppy_image	uefi	-
+route	windows-embedded-posready-2009	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-embedded-posready-2009	vhdx	automatic	uefi	-
+route	windows-embedded-posready-2009	vhdx	direct_iso	bios	-
+route	windows-embedded-posready-2009	vhdx	direct_iso	uefi	-
+route	windows-embedded-posready-2009	vhdx	wimboot	bios	-
+route	windows-embedded-posready-2009	vhdx	wimboot	uefi	-
+route	windows-embedded-posready-2009	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	windows-embedded-posready-2009	vhdx	vhdboot	uefi	-
+route	windows-embedded-posready-2009	vhdx	direct_efi	bios	-
+route	windows-embedded-posready-2009	vhdx	direct_efi	uefi	-
+route	windows-embedded-posready-2009	vhdx	chainload	bios	-
+route	windows-embedded-posready-2009	vhdx	chainload	uefi	-
+route	windows-embedded-posready-2009	vhdx	memdisk	bios	-
+route	windows-embedded-posready-2009	vhdx	memdisk	uefi	-
+route	windows-embedded-posready-2009	vhdx	disk_image	bios	-
+route	windows-embedded-posready-2009	vhdx	disk_image	uefi	-
+route	windows-embedded-posready-2009	vhdx	floppy_image	bios	-
+route	windows-embedded-posready-2009	vhdx	floppy_image	uefi	-
+route	windows-embedded-posready-2009	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-embedded-posready-2009	efi	automatic	uefi	-
+route	windows-embedded-posready-2009	efi	direct_iso	bios	-
+route	windows-embedded-posready-2009	efi	direct_iso	uefi	-
+route	windows-embedded-posready-2009	efi	wimboot	bios	-
+route	windows-embedded-posready-2009	efi	wimboot	uefi	-
+route	windows-embedded-posready-2009	efi	vhdboot	bios	-
+route	windows-embedded-posready-2009	efi	vhdboot	uefi	-
+route	windows-embedded-posready-2009	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	windows-embedded-posready-2009	efi	direct_efi	uefi	-
+route	windows-embedded-posready-2009	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	windows-embedded-posready-2009	efi	chainload	uefi	-
+route	windows-embedded-posready-2009	efi	memdisk	bios	-
+route	windows-embedded-posready-2009	efi	memdisk	uefi	-
+route	windows-embedded-posready-2009	efi	disk_image	bios	-
+route	windows-embedded-posready-2009	efi	disk_image	uefi	-
+route	windows-embedded-posready-2009	efi	floppy_image	bios	-
+route	windows-embedded-posready-2009	efi	floppy_image	uefi	-
 route	windows-xp-x64	iso	automatic	bios	xp_staging	direct_iso	bios	tested_in_vm	0
 route	windows-xp-x64	iso	automatic	uefi	xp_uefi_staging	direct_iso	uefi	experimental	1
 route	windows-xp-x64	iso	direct_iso	bios	-
@@ -8011,6 +8120,82 @@ profile	windows-xp-tablet	efi	chainload	-	efi-chainload
 profile	windows-xp-tablet	efi	memdisk	uefi	xp-uefi-other
 profile	windows-xp-tablet	efi	disk_image	uefi	xp-uefi-other
 profile	windows-xp-tablet	efi	floppy_image	uefi	xp-uefi-other
+profile	windows-embedded-posready-2009	iso	automatic	bios	iso-work-chainload
+profile	windows-embedded-posready-2009	iso	automatic	uefi	posready-x86-qemu-csmwrap
+profile	windows-embedded-posready-2009	iso	automatic	-	iso-work-chainload
+profile	windows-embedded-posready-2009	iso	direct_iso	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	iso	wimboot	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	iso	vhdboot	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	iso	direct_efi	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	iso	chainload	bios	iso-work-chainload
+profile	windows-embedded-posready-2009	iso	chainload	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	iso	chainload	-	iso-work-chainload
+profile	windows-embedded-posready-2009	iso	memdisk	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	iso	disk_image	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	iso	floppy_image	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	wim	automatic	bios	wim-wimboot
+profile	windows-embedded-posready-2009	wim	automatic	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	wim	automatic	-	wim-wimboot
+profile	windows-embedded-posready-2009	wim	direct_iso	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	wim	wimboot	bios	wim-wimboot
+profile	windows-embedded-posready-2009	wim	wimboot	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	wim	wimboot	-	wim-wimboot
+profile	windows-embedded-posready-2009	wim	vhdboot	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	wim	direct_efi	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	wim	chainload	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	wim	memdisk	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	wim	disk_image	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	wim	floppy_image	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	img	automatic	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	img	direct_iso	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	img	wimboot	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	img	vhdboot	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	img	direct_efi	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	img	chainload	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	img	memdisk	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	img	disk_image	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	img	floppy_image	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhd	automatic	bios	vhd-vhdboot
+profile	windows-embedded-posready-2009	vhd	automatic	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhd	automatic	-	vhd-vhdboot
+profile	windows-embedded-posready-2009	vhd	direct_iso	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhd	wimboot	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhd	vhdboot	bios	vhd-vhdboot
+profile	windows-embedded-posready-2009	vhd	vhdboot	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhd	vhdboot	-	vhd-vhdboot
+profile	windows-embedded-posready-2009	vhd	direct_efi	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhd	chainload	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhd	memdisk	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhd	disk_image	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhd	floppy_image	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhdx	automatic	bios	vhd-vhdboot
+profile	windows-embedded-posready-2009	vhdx	automatic	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhdx	automatic	-	vhd-vhdboot
+profile	windows-embedded-posready-2009	vhdx	direct_iso	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhdx	wimboot	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhdx	vhdboot	bios	vhd-vhdboot
+profile	windows-embedded-posready-2009	vhdx	vhdboot	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhdx	vhdboot	-	vhd-vhdboot
+profile	windows-embedded-posready-2009	vhdx	direct_efi	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhdx	chainload	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhdx	memdisk	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhdx	disk_image	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	vhdx	floppy_image	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	efi	automatic	bios	efi-direct
+profile	windows-embedded-posready-2009	efi	automatic	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	efi	automatic	-	efi-direct
+profile	windows-embedded-posready-2009	efi	direct_iso	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	efi	wimboot	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	efi	vhdboot	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	efi	direct_efi	bios	efi-direct
+profile	windows-embedded-posready-2009	efi	direct_efi	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	efi	direct_efi	-	efi-direct
+profile	windows-embedded-posready-2009	efi	chainload	bios	efi-chainload
+profile	windows-embedded-posready-2009	efi	chainload	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	efi	chainload	-	efi-chainload
+profile	windows-embedded-posready-2009	efi	memdisk	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	efi	disk_image	uefi	posready-uefi-other
+profile	windows-embedded-posready-2009	efi	floppy_image	uefi	posready-uefi-other
 profile	windows-xp-x64	iso	automatic	bios	nt5-staging
 profile	windows-xp-x64	iso	automatic	uefi	xp-x64-sp2-uefi-csm
 profile	windows-xp-x64	iso	automatic	-	nt5-staging
@@ -11746,6 +11931,60 @@ resolve	windows-xp-tablet	efi	chainload	chainload	1	ok
 resolve	windows-xp-tablet	efi	memdisk	-	0	UnsupportedImage
 resolve	windows-xp-tablet	efi	disk_image	-	0	UnsupportedImage
 resolve	windows-xp-tablet	efi	floppy_image	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	iso	automatic	chainload	1	ok
+resolve	windows-embedded-posready-2009	iso	direct_iso	-	0	UnsupportedMethod
+resolve	windows-embedded-posready-2009	iso	wimboot	-	0	UnsupportedMethod
+resolve	windows-embedded-posready-2009	iso	vhdboot	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	iso	direct_efi	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	iso	chainload	chainload	1	ok
+resolve	windows-embedded-posready-2009	iso	memdisk	-	0	UnsupportedMethod
+resolve	windows-embedded-posready-2009	iso	disk_image	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	iso	floppy_image	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	wim	automatic	wimboot	1	ok
+resolve	windows-embedded-posready-2009	wim	direct_iso	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	wim	wimboot	wimboot	1	ok
+resolve	windows-embedded-posready-2009	wim	vhdboot	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	wim	direct_efi	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	wim	chainload	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	wim	memdisk	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	wim	disk_image	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	wim	floppy_image	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	img	automatic	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	img	direct_iso	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	img	wimboot	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	img	vhdboot	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	img	direct_efi	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	img	chainload	-	0	UnsupportedMethod
+resolve	windows-embedded-posready-2009	img	memdisk	-	0	UnsupportedMethod
+resolve	windows-embedded-posready-2009	img	disk_image	-	0	UnsupportedMethod
+resolve	windows-embedded-posready-2009	img	floppy_image	-	0	UnsupportedMethod
+resolve	windows-embedded-posready-2009	vhd	automatic	vhdboot	1	ok
+resolve	windows-embedded-posready-2009	vhd	direct_iso	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	vhd	wimboot	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	vhd	vhdboot	vhdboot	1	ok
+resolve	windows-embedded-posready-2009	vhd	direct_efi	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	vhd	chainload	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	vhd	memdisk	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	vhd	disk_image	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	vhd	floppy_image	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	vhdx	automatic	vhdboot	1	ok
+resolve	windows-embedded-posready-2009	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	vhdx	wimboot	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	vhdx	vhdboot	vhdboot	1	ok
+resolve	windows-embedded-posready-2009	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	vhdx	chainload	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	vhdx	memdisk	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	vhdx	disk_image	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	efi	automatic	direct_efi	1	ok
+resolve	windows-embedded-posready-2009	efi	direct_iso	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	efi	wimboot	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	efi	vhdboot	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	efi	direct_efi	direct_efi	1	ok
+resolve	windows-embedded-posready-2009	efi	chainload	chainload	1	ok
+resolve	windows-embedded-posready-2009	efi	memdisk	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	efi	disk_image	-	0	UnsupportedImage
+resolve	windows-embedded-posready-2009	efi	floppy_image	-	0	UnsupportedImage
 resolve	windows-xp-x64	iso	automatic	direct_iso	1	ok
 resolve	windows-xp-x64	iso	direct_iso	-	0	UnsupportedMethod
 resolve	windows-xp-x64	iso	wimboot	-	0	UnsupportedMethod
@@ -15641,6 +15880,78 @@ menu	windows-xp-tablet	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[
 menu	windows-xp-tablet	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	windows-xp-tablet	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-xp-tablet	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-posready-2009	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-embedded-posready-2009	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-posready-2009	iso	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-embedded-posready-2009	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	iso	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	iso	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	windows-embedded-posready-2009	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-embedded-posready-2009	iso	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-embedded-posready-2009	iso	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-embedded-posready-2009	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	iso	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	wim	bios	0	automatic	wimboot	0	0	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-posready-2009	wim	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-posready-2009	wim	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-embedded-posready-2009	wim	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-embedded-posready-2009	wim	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	wim	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-embedded-posready-2009	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-posready-2009	wim	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-embedded-posready-2009	wim	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-embedded-posready-2009	wim	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	wim	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-embedded-posready-2009	img	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-posready-2009	img	bios	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-embedded-posready-2009	img	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-embedded-posready-2009	img	bios	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-embedded-posready-2009	img	bios	5	floppy_image	-	0	1	experimental	Floppy image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-embedded-posready-2009	img	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-embedded-posready-2009	img	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-posready-2009	img	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-embedded-posready-2009	img	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-embedded-posready-2009	img	uefi	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-embedded-posready-2009	img	uefi	5	floppy_image	-	0	1	experimental	Floppy image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-embedded-posready-2009	vhd	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-posready-2009	vhd	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-posready-2009	vhd	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-embedded-posready-2009	vhd	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-embedded-posready-2009	vhd	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	vhd	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-embedded-posready-2009	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-posready-2009	vhd	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-embedded-posready-2009	vhd	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-embedded-posready-2009	vhd	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	vhd	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	vhdx	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-posready-2009	vhdx	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-posready-2009	vhdx	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-embedded-posready-2009	vhdx	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-embedded-posready-2009	vhdx	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	vhdx	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-embedded-posready-2009	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-posready-2009	vhdx	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
+menu	windows-embedded-posready-2009	vhdx	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-embedded-posready-2009	vhdx	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	vhdx	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	efi	bios	0	automatic	direct_efi	0	0	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-posready-2009	efi	bios	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-posready-2009	efi	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	windows-embedded-posready-2009	efi	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-embedded-posready-2009	efi	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	efi	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	windows-embedded-posready-2009	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
+menu	windows-embedded-posready-2009	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
+menu	windows-embedded-posready-2009	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
+menu	windows-embedded-posready-2009	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	windows-embedded-posready-2009	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	windows-xp-x64	iso	bios	0	automatic	xp_staging	1	1	tested_in_vm	Automatic (XP staging) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
 menu	windows-xp-x64	iso	bios	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	windows-xp-x64	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
@@ -20334,6 +20645,60 @@ help	windows-xp-tablet	efi	chainload	Chainload	Transfers control to another boot
 help	windows-xp-tablet	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
 help	windows-xp-tablet	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
 help	windows-xp-tablet	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-embedded-posready-2009	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-embedded-posready-2009	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-embedded-posready-2009	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-embedded-posready-2009	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-embedded-posready-2009	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-embedded-posready-2009	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-embedded-posready-2009	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-embedded-posready-2009	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-embedded-posready-2009	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-embedded-posready-2009	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-embedded-posready-2009	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-embedded-posready-2009	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-embedded-posready-2009	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-embedded-posready-2009	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-embedded-posready-2009	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-embedded-posready-2009	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-embedded-posready-2009	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-embedded-posready-2009	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-embedded-posready-2009	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-embedded-posready-2009	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-embedded-posready-2009	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-embedded-posready-2009	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-embedded-posready-2009	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-embedded-posready-2009	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-embedded-posready-2009	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-embedded-posready-2009	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-embedded-posready-2009	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-embedded-posready-2009	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-embedded-posready-2009	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-embedded-posready-2009	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-embedded-posready-2009	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-embedded-posready-2009	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-embedded-posready-2009	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-embedded-posready-2009	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-embedded-posready-2009	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-embedded-posready-2009	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-embedded-posready-2009	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-embedded-posready-2009	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-embedded-posready-2009	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-embedded-posready-2009	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-embedded-posready-2009	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-embedded-posready-2009	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-embedded-posready-2009	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-embedded-posready-2009	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-embedded-posready-2009	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	windows-embedded-posready-2009	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	windows-embedded-posready-2009	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	windows-embedded-posready-2009	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	windows-embedded-posready-2009	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	windows-embedded-posready-2009	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	windows-embedded-posready-2009	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	windows-embedded-posready-2009	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	windows-embedded-posready-2009	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	windows-embedded-posready-2009	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
 help	windows-xp-x64	iso	automatic	Automatic - Windows Setup	Copies installation files to the selected Windows partition.	After preparation, remove the USB drive and start the computer from that disk.
 help	windows-xp-x64	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
 help	windows-xp-x64	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
@@ -23536,6 +23901,8 @@ profile_def	nt4-x86-qemu-csmwrap	win9x_uefi	direct_iso	Validating installation I
 profile_def	nt4-uefi-other	-	none	
 profile_def	nt3-x86-qemu-csmwrap	win9x_uefi	direct_iso	Validating installation ISO|Loading Windows boot files|Starting Windows Setup
 profile_def	nt3-uefi-other	-	none	
+profile_def	posready-x86-qemu-csmwrap	win9x_uefi	direct_iso	Validating installation ISO|Loading Windows boot files|Starting Windows Setup
+profile_def	posready-uefi-other	-	none	
 profile_def	linux-live-bios	linux_live_iso	core	
 profile_def	linux-iso-bios	linux_iso	core	
 profile_def	dos-fat16-bios	dos_bios_iso	core	

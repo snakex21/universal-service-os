@@ -186,7 +186,8 @@ pub fn profileCapable(system: *const SystemEntry, image: ImageKind, method: Boot
     // Windows 95/98/Me have no NT family: MSBATCH.INF (answer/msbatch.zig).
     // Windows NT 4.0 / 3.51: WINNT.SIF (answer/nt4.zig, answer/nt3.zig).
     if (answer_target.familyFor(system.id) == null and @import("answer/msbatch.zig").releaseFor(system.id) == null and
-        !@import("answer/nt4.zig").isNt4(system.id) and !@import("answer/nt3.zig").isNt3(system.id)) return false;
+        !@import("answer/nt4.zig").isNt4(system.id) and !@import("answer/nt3.zig").isNt3(system.id) and
+        !@import("answer/posready.zig").isPosReady(system.id)) return false;
     if (image != .iso and image != .wim) return false;
     const backend = preparation_capability.resolveForFirmware(system, image, method, firmware) orelse return false;
     return switch (backend) {

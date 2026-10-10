@@ -709,6 +709,8 @@ pub fn knownSystemToken(token: []const u8) bool {
     if (@import("nt4.zig").isNt4(token)) return true;
     // Windows NT 3.51 Workstation / Server (nt3.zig).
     if (@import("nt3.zig").isNt3(token)) return true;
+    // Windows Embedded POSReady 2009 (posready.zig).
+    if (@import("posready.zig").isPosReady(token)) return true;
     for (system_groups ++ linux_systems) |known| {
         if (std.mem.eql(u8, known, token)) return true;
     }

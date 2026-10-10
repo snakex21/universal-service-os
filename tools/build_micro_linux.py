@@ -17,6 +17,15 @@ import tarfile
 import tempfile
 import urllib.request
 
+# Windows Embedded POSReady 2009: the XP x86 X470 driver set (under
+# media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86), as
+# tools/xp_driver_overlay.py SELECTED.
+POSREADY_DRIVERS = (
+    "ACPI/acpi.sys", "Dependencies/ntoskrn8.sys", "Dependencies/storport.sys", "KMDF/wdf01000.sys", "KMDF/wdfldr.sys",
+    "SATA/genahci.sys", "SATA/genahci.inf", "USB3/ksecd8.sys", "USB3/ucx01000.sys", "USB3/usbd8.sys", "USB3/usbhub3.sys",
+    "USB3/usbhub3.inf", "USB3/usbxhci.sys", "USB3/usbxhci.inf", "USB3/wpprecor.sys",
+)
+
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -572,6 +581,8 @@ def main() -> int:
             ("tools/dos_csmwrap_target.sh", "usr/lib/usos/dos_csmwrap_target.sh"),
             ("tools/nt4_csmwrap_target.sh", "usr/lib/usos/nt4_csmwrap_target.sh"),
             ("tools/nt4_qemu_install.sh", "usr/lib/usos/nt4_qemu_install.sh"),
+            ("tools/posready_csmwrap_target.sh", "usr/lib/usos/posready_csmwrap_target.sh"),
+            ("tools/posready_qemu_install.sh", "usr/lib/usos/posready_qemu_install.sh"),
             ("tools/legacy_xp_resume.sh", "usr/lib/usos/legacy_xp_resume.sh"),
             ("tools/xp_unattended_policy.sh", "usr/lib/usos/xp_unattended_policy.sh"),
             ("tools/xp_user_settings.sh", "usr/lib/usos/xp_user_settings.sh"),
@@ -643,6 +654,16 @@ def main() -> int:
             ("tools/nt4/usosusb/bin/nt31/i386/usosusb.sys", "usr/lib/usos/nt3/USOSUSB31.SYS"),
         ):
             put(entries, Entry(target_name, stat.S_IFREG | 0o644, (root / source_name).read_bytes()))
+        # Windows Embedded POSReady 2009 (docs/posready-2009-2026-10-10.md):
+        # the answer template, the X470 registry values and the XP path's
+        # community driver set (the files of tools/xp_driver_overlay.py
+        # SELECTED); FIRST.CMD installs them at the first logon in the VM.
+        put(entries, Entry("usr/lib/usos/posready_unattended.xml", stat.S_IFREG | 0o644, (root / "tools/posready_unattended.xml").read_bytes()))
+        put(entries, Entry("usr/lib/usos/posready/X470.REG", stat.S_IFREG | 0o644, (root / "tools/posready_x470.reg").read_bytes()))
+        put(entries, Entry("usr/lib/usos/posready/FIRST.CMD", stat.S_IFREG | 0o644, (root / "tools/posready_first.cmd").read_bytes()))
+        posready_drivers = root / "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86"
+        for name in POSREADY_DRIVERS:
+            put(entries, Entry("usr/lib/usos/posready/DRV/" + name.split("/")[1], stat.S_IFREG | 0o644, (posready_drivers / name).read_bytes()))
         xp_vbr = root / "zig-out/xp-bios/xp-vbr-code.bin"
         xp_stage2 = root / "zig-out/xp-bios/xp-stage2.bin"
         xp_nt52_vbr = root / "zig-out/xp-bios/xp-nt52-vbr-tail.bin"

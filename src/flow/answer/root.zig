@@ -16,6 +16,7 @@ pub const applies = @import("applies.zig");
 pub const msbatch = @import("msbatch.zig");
 pub const nt4 = @import("nt4.zig");
 pub const nt3 = @import("nt3.zig");
+pub const posready = @import("posready.zig");
 
 pub const Profile = profile.Profile;
 pub const Arch = target.Arch;
@@ -69,6 +70,8 @@ pub fn render(p: *const Profile, system_id: []const u8, arch: Arch, key: ?[]cons
     const use_key = key orelse p.keyFor(system_id);
     if (nt4.isNt4(system_id)) return .{ .format = .nt4_sif, .bytes = try nt4.render(p, use_key, buffer) };
     if (nt3.isNt3(system_id)) return .{ .format = .nt4_sif, .bytes = try nt3.render(p, buffer) };
+    // POSReady 2009: POSR.SIF (staged like WINNT.SIF; posready.zig).
+    if (posready.isPosReady(system_id)) return .{ .format = .nt4_sif, .bytes = try posready.render(p, use_key, buffer) };
     if (msbatch.releaseFor(system_id)) |release| return .{ .format = .msbatch_inf, .bytes = try msbatch.render(p, release, use_key, buffer) };
     const family = target.familyFor(system_id) orelse return null;
     // NT keys are 5x5 only (a Windows 95 key in the profile's `key=` is not theirs).
@@ -100,6 +103,7 @@ test {
     _ = msbatch;
     _ = nt4;
     _ = nt3;
+    _ = posready;
 }
 
 test "render dispatch per system" {

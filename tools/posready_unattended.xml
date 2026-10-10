@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- USOS POSReady 2009 answer template (docs/posready-2009-2026-10-10.md). @PRODUCT_KEY@ is filled at run time from the answer profile; never commit a key. Validated by POSReady Setup in QEMU 2026-10-10 up to the key check. -->
+<!-- USOS POSReady 2009 answer template (docs/posready-2009-2026-10-10.md). The @...@ fields are filled by tools/posready_qemu_install.sh posready_answer_xml from the menu answer (POSR.SIF); never commit a key. Validated by POSReady Setup in QEMU 2026-10-10 up to the key check. -->
 <Unattend>
 <LoggingData>
 <LogFile Path="%TARGETDRIVE%\Windows\Setup.log" />
-<UnattendedFile Path="%TARGETDRIVE%\Windows\Unattended.xml" Copy="Yes" />
+<UnattendedFile Path="%TARGETDRIVE%\Windows\Unattended.xml" Copy="No" />
 </LoggingData>
 <UserData>
 <ProductKey Value="@PRODUCT_KEY@" />
-<FullName Value="USOS" />
-<Organization Value="" />
-<ComputerName Value="USOS-POSREADY" />
-<AdminPassword Value="" StrongPassword="No" EncryptedPassword="No" />
+<FullName Value="@FULL_NAME@" />
+<Organization Value="@ORGANIZATION@" />
+<ComputerName Value="@COMPUTER_NAME@" />
+<AdminPassword Value="@ADMIN_PASSWORD@" StrongPassword="No" EncryptedPassword="No" />
 </UserData>
 <DiskConfig>
 <Disk ID="0" WipeDisk="No">
@@ -50,6 +50,13 @@
 <JoinWorkgroup Value="WORKGROUP" />
 </Security>
 </SystemData>
+<!-- USOS: the first logon runs \USOS\POSR\FIRST.CMD from the FAT16 Setup partition (X470 drivers, then shutdown). -->
+<RunOnce>
+<RunOnceCommand FilePath="cmd.exe /c for %d in (C D E F G H I J K) do if exist %d:\USOS\POSR\FIRST.CMD call %d:\USOS\POSR\FIRST.CMD" Attributes="" Flags="0" ErrorControl="0" Reboot="False" Timeout="0">
+<DisplayName Value="USOS X470 drivers" />
+<Description Value="USOS: community ACPI, GenAHCI, USB3 for the X470" />
+</RunOnceCommand>
+</RunOnce>
 <SetupData>
 <Preinstall AcceptEula="Yes" />
 </SetupData>
