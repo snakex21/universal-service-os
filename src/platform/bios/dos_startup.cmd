@@ -169,13 +169,26 @@ ECHO @IF EXIST C:\WINDOWS\COMMAND\KEYB.COM REN C:\WINDOWS\COMMAND\KEYB.COM KEYB.
 REM Me starts no real-mode program from AUTOEXEC.BAT and has no WINSTART.BAT:
 REM USOSKEY.DRV installs the bridge itself (in DOS memory of the system VM).
 REM The driver goes to SYSTEM before Setup; MSBATCH.INF [USOS.Csm] names it.
-IF NOT "%U9SYS%"=="ME" GOTO AUTODONE
+IF NOT "%U9SYS%"=="ME" GOTO CSMREG
 MD C:\WINDOWS
 MD C:\WINDOWS\SYSTEM
 COPY /Y C:\USOS9X\USOSKEY.DRV C:\WINDOWS\SYSTEM >NUL
 REM A user's own answer file is copied 1:1 (it ends with its own section).
 IF "%U9ANS%"=="USER" GOTO AUTODONE
 ECHO system.ini,boot,drivers,,usoskey.drv>>C:\%U9SRC%\MSBATCH.INF
+GOTO AUTODONE
+:CSMREG
+REM 98/98 SE: no PCI bus without this. SeaBIOS has a $PnP header but gives no
+REM PnP BIOS device nodes, and Setup's detection (SYSDETMG DetectBus) adds the
+REM PCI bus (*PNP0A03) only when it finds neither ACPI (refused: BIOS date
+REM before ACPICheckDate) nor a PnP BIOS. IgnorePnPBIOS makes it skip $PnP
+REM (docs/win9x-modern-2026-09-30.md 4c). [Install] names USOS.CsmReg.
+IF "%U9SYS%"=="98SE" GOTO CSMREG2
+IF NOT "%U9SYS%"=="98" GOTO AUTODONE
+:CSMREG2
+IF "%U9ANS%"=="USER" GOTO AUTODONE
+ECHO [USOS.CsmReg]>>C:\%U9SRC%\MSBATCH.INF
+ECHO HKLM,"Software\Microsoft\Windows\CurrentVersion\Detect",IgnorePnPBIOS,,"1">>C:\%U9SRC%\MSBATCH.INF
 :AUTODONE
 ECHO Poprawki zgodnosci (Patcher9x: TLB, CPU, RAM, rejestry CPU)...
 REM CWSDPMI stays resident (-p) for Patcher9x and is unloaded (-u) right

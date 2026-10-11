@@ -320,6 +320,9 @@ pub const windows_early_ids = &[_][]const u8{ "windows-wfw-3-11", "windows-3-0",
 
 const nt4_ids = &[_][]const u8{ "windows-nt-4", "windows-nt-4-server", "windows-nt-4-tse" };
 const posready_ids = &[_][]const u8{"windows-embedded-posready-2009"};
+/// Custom OS (src/catalog/other_systems.zig) and FreeDOS from UEFI: the image
+/// written to the target disk (docs/custom-os-2026-10-11.md).
+pub const custom_image_ids = &[_][]const u8{ "haiku", "freebsd", "reactos", "kolibrios", "other-os", "freedos" };
 const nt3_ids = &[_][]const u8{ "windows-nt-3-51", "windows-nt-3-51-server", "windows-nt-3-5", "windows-nt-3-5-server", "windows-nt-3-1", "windows-nt-3-1-server" };
 
 const uefi_profiles = [_]Profile{
@@ -363,6 +366,11 @@ const uefi_profiles = [_]Profile{
     // (docs/posready-2009-2026-10-10.md).
     .{ .id = "posready-x86-qemu-csmwrap", .systems = .{ .ids = posready_ids }, .images = iso, .methods = &.{.automatic}, .firmware = .uefi, .backend = .win9x_uefi, .progress = .direct_iso },
     .{ .id = "posready-uefi-other", .systems = .{ .ids = posready_ids }, .firmware = .uefi, .backend = null, .progress = .none },
+    // Custom OS from UEFI: the same step 620; tools/image_disk_target.sh writes
+    // the official hybrid image (ISO or disk image) to the confirmed disk and
+    // adds the CSMWrap ESP when the image has no UEFI loader.
+    .{ .id = "custom-image-uefi", .systems = .{ .ids = custom_image_ids }, .images = &.{ .iso, .img }, .methods = &.{.automatic}, .firmware = .uefi, .backend = .win9x_uefi, .progress = .direct_iso },
+    .{ .id = "custom-image-uefi-other", .systems = .{ .ids = custom_image_ids }, .firmware = .uefi, .backend = null, .progress = .none },
 };
 
 /// Ordered: firmware-specific rules first, then the firmware-independent
@@ -535,6 +543,21 @@ test "Windows NT 3.51 / 3.5 / 3.1 Workstation and Server on UEFI: the VM install
         try std.testing.expect(backend(nt3, .iso, .chainload, .uefi) == null);
         try std.testing.expectEqual(AnswerFormat.winnt_sif, traits(id).answer);
     }
+}
+
+test "Custom OS and FreeDOS on UEFI: the image written to the target disk, nothing else" {
+    const systems = @import("systems.zig");
+    for (custom_image_ids) |id| {
+        const entry = systems.findById(id).?;
+        for ([_]ImageKind{ .iso, .img }) |image| {
+            try std.testing.expectEqualStrings("custom-image-uefi", select(entry, image, .automatic, .uefi).?.id);
+            try std.testing.expectEqual(Backend.win9x_uefi, backend(entry, image, .automatic, .uefi).?);
+        }
+        try std.testing.expect(backend(entry, .efi, .automatic, .uefi) == null);
+        try std.testing.expect(backend(entry, .iso, .chainload, .uefi) == null);
+    }
+    // FreeDOS keeps its BIOS Core routes.
+    try std.testing.expect(!std.mem.eql(u8, "custom-image-uefi", select(systems.findById("freedos").?, .iso, .automatic, .bios).?.id));
 }
 
 test "Windows 10/11 and 7/Vista native UEFI profiles" {

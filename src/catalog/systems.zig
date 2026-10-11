@@ -7,13 +7,16 @@ const windows_server = @import("windows_server.zig");
 const linux_systems = @import("linux_systems.zig");
 const windows_betas = @import("windows_betas.zig");
 const dos_systems = @import("dos_systems.zig");
+const other_systems = @import("other_systems.zig");
 
 pub const all = windows_modern.entries ++
     windows_legacy.entries ++
     windows_server.entries ++
     linux_systems.entries ++
     windows_betas.entries ++
-    dos_systems.entries;
+    dos_systems.entries ++
+    // UEFI menu only (the BIOS Core has no "Other systems" card).
+    (if (@import("builtin").os.tag == .freestanding) [_]SystemEntry{} else other_systems.entries);
 
 pub fn findById(id: []const u8) ?*const SystemEntry {
     for (&all) |*entry| {
@@ -73,7 +76,7 @@ test "category lookup stays isolated" {
 
 test "legacy catalog exposes firmware requirements to the view model" {
     try std.testing.expectEqual(@import("firmware_requirement.zig").FirmwareRequirement.any, findById("windows-xp").?.firmware);
-    try std.testing.expectEqual(@import("firmware_requirement.zig").FirmwareRequirement.bios, findById("freedos").?.firmware);
+    try std.testing.expectEqual(@import("firmware_requirement.zig").FirmwareRequirement.any, findById("freedos").?.firmware);
     try std.testing.expectEqual(@import("firmware_requirement.zig").FirmwareRequirement.any, findById("windows-11").?.firmware);
 }
 

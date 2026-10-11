@@ -579,6 +579,7 @@ def main() -> int:
             ("tools/w9x_vesa95.sh", "usr/lib/usos/w9x_vesa95.sh"),
             ("tools/w9x_phase1_qemu.sh", "usr/lib/usos/w9x_phase1_qemu.sh"),
             ("tools/dos_csmwrap_target.sh", "usr/lib/usos/dos_csmwrap_target.sh"),
+            ("tools/image_disk_target.sh", "usr/lib/usos/image_disk_target.sh"),
             ("tools/nt4_csmwrap_target.sh", "usr/lib/usos/nt4_csmwrap_target.sh"),
             ("tools/nt4_qemu_install.sh", "usr/lib/usos/nt4_qemu_install.sh"),
             ("tools/posready_csmwrap_target.sh", "usr/lib/usos/posready_csmwrap_target.sh"),

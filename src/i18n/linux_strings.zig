@@ -64,6 +64,10 @@ pub const hashes = [_]u32{
     0x75d932c4, // lx.hardware_information
     0x0d14da67, // lx.hardware_smart
     0x3fc155ac, // lx.identity_attributes_and_error_history_no_additio
+    0x58230247, // lx.image_disk_after_restart
+    0x27467e49, // lx.image_disk_layout
+    0x627a6d87, // lx.image_disk_restart_notice
+    0x6e68bf21, // lx.image_disk_writing
     0x6cc43056, // lx.initializing_keyboard_and_mouse
     0x34d9903d, // lx.initializing_only_the_storage_stack_needed_for_p
     0xa600211f, // lx.inspecting_disk
@@ -271,6 +275,10 @@ pub const english = [_][]const u8{
     "HARDWARE INFORMATION",
     "HARDWARE & SMART",
     "Identity, attributes and error history; no additional disk query",
+    "After the restart the disk starts by itself into {0}.",
+    "New layout: the {0} image unchanged at the start of the disk ({1} MB); a 64 MiB CSMWrap partition at the end only when the image has no UEFI loader; the rest stays unallocated.",
+    "After the restart the firmware starts this disk's UEFI entry and {0} starts from it. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
+    "Writing the {0} image to the selected disk.",
     "Initializing keyboard and mouse.",
     "Initializing only the storage stack needed for preparation.",
     "Inspecting disk",

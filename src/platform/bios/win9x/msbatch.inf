@@ -44,7 +44,9 @@ Protocols=
 Services=
 
 [Install]
-AddReg=USOS.RunOnce
+; USOS.CsmReg exists only under CSMWrap (98, 98 SE: INSTALL.BAT appends it);
+; a missing AddReg section is skipped (machine.inf does the same).
+AddReg=USOS.RunOnce,USOS.CsmReg
 UpdateInis=USOS.Memory
 UpdateIniFields=USOS.Csm
 

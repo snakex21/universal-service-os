@@ -80,7 +80,7 @@ usos_w9x_csmwrap_prepare() {
     [ -f "$request" ] || stop 'the Windows 9x request is missing on the USOS ESP'
     : > "$W9X_DIR/prepare.log" 2>/dev/null || true
     [ -d /sys/firmware/efi ] || stop 'the Windows 9x preparation requires UEFI'
-    for helper in target_disk_identity.sh xp_confirmation_ui.sh xp_menu_ui.sh xp_disk_overview.sh xp_detect_system.sh w9x_csmwrap_target.sh dos_csmwrap_target.sh xp_csmwrap_esp.sh; do
+    for helper in target_disk_identity.sh xp_confirmation_ui.sh xp_menu_ui.sh xp_disk_overview.sh xp_detect_system.sh w9x_csmwrap_target.sh dos_csmwrap_target.sh image_disk_target.sh xp_csmwrap_esp.sh; do
         [ -r "/usr/lib/usos/$helper" ] || stop "$helper is missing"
     done
     . /usr/lib/usos/target_disk_identity.sh
@@ -133,6 +133,9 @@ usos_w9x_csmwrap_prepare() {
         # Windows PE + POSReady Setup in the VM (posready_csmwrap_target.sh,
         # posready_qemu_install.sh), then the system starts through CSMWrap.
         windows-embedded-posready-2009) tag=POSR setup='' ;;
+        # Custom OS (2026-10-11, docs/custom-os-2026-10-11.md): the official
+        # hybrid image written to the disk (tools/image_disk_target.sh).
+        haiku|freebsd|reactos|kolibrios|other-os|freedos) tag=IMG setup='' ;;
         *) stop "request.ini names an unsupported system: $system" ;;
     esac
     w9x_csmwrap_log "REQUEST system=$system iso=$iso folder=$folder answer=${answer%%:*} size=$size_gib"
@@ -203,6 +206,8 @@ usos_w9x_csmwrap_prepare() {
         [ -n "$sp_exe" ] || stop 'Windows NT 4.0 needs Service Pack 6a: put SP6I386.EXE into Systems\Windows\Windows NT 4.0\ServicePack on USOS_DATA'
         w9x_csmwrap_log "NT4 service pack: ${sp_exe#/mnt/data/}"
     fi
+    img=''
+    [ "$tag" != IMG ] || img=yes
     win3_iso=''
     case "$tag" in
         DOS) dos_iso="/mnt/data/$iso" ;;
@@ -223,6 +228,7 @@ usos_w9x_csmwrap_prepare() {
     time_zone=
     [ -z "$dos_iso" ] || answer=dos
     [ -z "$nt4" ] || answer_inf=/run/nt4-winnt.sif
+    [ -z "$img" ] || answer=dos
     if [ -n "$posr" ]; then
         # POSReady Setup reads unattended.xml: rendered from the template and
         # the menu's POSR.SIF (key required), or the user's XML from DATA.
@@ -348,6 +354,26 @@ usos_w9x_csmwrap_prepare() {
         [ -z "$dos_iso" ] || layout='one FAT16 partition of 256 MiB'
         [ -z "$nt4" ] || layout='one FAT16 partition of 2000 MiB at the disk start'
         [ -z "$posr" ] || layout='a 2 GiB FAT16 Setup and boot partition, then one NTFS partition for Windows (up to 32 GiB)'
+        if [ -n "$img" ]; then
+            {
+                printf 'ERASE ALL DATA ON THIS DISK
+
+'
+                cat "$overview"
+                printf '
+'
+                printf 'All partitions, systems and files on this disk will be erased.
+'
+                printf 'New layout: the %s image unchanged at the start of the disk (%s MB); a 64 MiB CSMWrap partition at the end only when the image has no UEFI loader; the rest stays unallocated.
+' "$folder" "$(( ($(wc -c < "/mnt/data/$iso") + 1048575) / 1048576 ))"
+                printf 'After the restart the disk starts by itself into %s.
+' "$folder"
+            } > "$screen"
+            w9x_csmwrap_log "CONFIRM $TARGET_DEVICE model=$model serial=$serial size=$size image"
+            usos_xp_confirm "$screen" 'FORMAT THE ENTIRE DISK?' 'Erase ALL partitions and data on the selected disk' && break
+            w9x_csmwrap_log "CONFIRM $TARGET_DEVICE cancelled; no disk was changed"
+            continue
+        fi
         {
             printf 'ERASE ALL DATA ON THIS DISK\n\n'
             cat "$overview"
@@ -398,7 +424,10 @@ usos_w9x_csmwrap_prepare() {
         w9x_csmwrap_log "PHASE1 vm=$vm_phase1 ($vm_reason)"
     fi
     usos_ui_stage 4 5 'Preparing the disk' "Copying $folder Setup, the USOS helpers and CSMWrap to the selected disk." || true
-    if [ -n "$posr" ]; then
+    if [ -n "$img" ]; then
+        usos_ui_stage 4 5 'Preparing the disk' "Writing the $folder image to the selected disk." || true
+        set -- env TARGET_DEVICE="$TARGET_DEVICE" IMAGE_SOURCE="/mnt/data/$iso" IMAGE_SYSTEM="$system" sh /usr/lib/usos/image_disk_target.sh
+    elif [ -n "$posr" ]; then
         set -- env TARGET_DEVICE="$TARGET_DEVICE" POSR_SOURCE_ISO="/mnt/data/$iso" POSR_UNATTENDED="$answer_inf" sh /usr/lib/usos/posready_csmwrap_target.sh
     elif [ -n "$nt4" ]; then
         set -- env TARGET_DEVICE="$TARGET_DEVICE" NT4_SOURCE_ISO="/mnt/data/$iso" NT4_ANSWER_SIF="$answer_inf"             NT4_ANSWER_KIND="$answer_kind" NT4_SP_EXE="$sp_exe" NT4_EDITION="$([ "$tag" = NT4T ] && echo tse)" NT_MAJOR="$nt_major" NT_MINOR="$nt_minor" sh /usr/lib/usos/nt4_csmwrap_target.sh
@@ -413,6 +442,10 @@ usos_w9x_csmwrap_prepare() {
     if ! "$@" >> "$W9X_DIR/prepare.log" 2>&1 < /dev/null; then
         rm -f "$answer_inf"
         tail -n 5 "$W9X_DIR/prepare.log" 2>/dev/null || true
+        if [ -n "$img" ]; then
+            reason=$(awk -F= '$1 == "stop" { sub(/^[^=]*=/, ""); print; exit }' /run/image-disk.result 2>/dev/null || true)
+            stop "${reason:-The image could not be written}. See EFI/USOS/win9x/prepare.log"
+        fi
         stop 'The Windows 9x preparation failed; see EFI/USOS/win9x/prepare.log'
     fi
     rm -f "$answer_inf"
@@ -505,7 +538,11 @@ usos_w9x_csmwrap_prepare() {
     umount /mnt/data 2>/dev/null || true
     sync
     w9x_csmwrap_log 'DONE; waiting for the restart'
+    if [ -n "$img" ]; then
+        usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry and $folder starts from it. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true
+    else
     usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry (CSMWrap; CSM stays off) and the $folder installation continues on it. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true
+    fi
     if [ -r "${USOS_UI_TTY:-}" ]; then
         IFS= read -r _w9x_ack < "$USOS_UI_TTY" || true
     else

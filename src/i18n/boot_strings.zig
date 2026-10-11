@@ -31,6 +31,8 @@ pub const Key = enum(u16) {
     category_beta_desc,
     category_dos_desc,
     category_linux_desc,
+    category_others,
+    category_others_desc,
     category_power,
     category_power_desc,
     category_utilities,
@@ -574,6 +576,7 @@ pub const Key = enum(u16) {
     summary_esp_guard,
     summary_esp_guard_label,
     summary_image,
+    summary_image_disk,
     summary_inf_count,
     summary_iso_case,
     summary_iso_inspection,
@@ -720,6 +723,8 @@ pub const hashes = [_]u32{
     0x50adb2ee, // category.beta.desc
     0xc4dcd124, // category.dos.desc
     0xf91b310c, // category.linux.desc
+    0xfffaabfa, // category.others
+    0x387e901d, // category.others.desc
     0x47a1786e, // category.power
     0x3595e4b1, // category.power.desc
     0x0443aa4f, // category.utilities
@@ -1263,6 +1268,7 @@ pub const hashes = [_]u32{
     0xf810572f, // summary.esp_guard
     0x4e8be16e, // summary.esp_guard_label
     0xc7a77b9c, // summary.image
+    0xea3000f0, // summary.image_disk
     0xfbb93592, // summary.inf_count
     0xa67ee0dd, // summary.iso_case
     0x23a9357f, // summary.iso_inspection
@@ -1712,6 +1718,9 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    true,
+    true,
+    false,
     false,
     false,
     false,
@@ -2068,7 +2077,7 @@ pub const bios = [_]bool{
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
-pub const bios_count = 332;
+pub const bios_count = 334;
 
 pub const english = [_][]const u8{
     "Experimental",
@@ -2100,6 +2109,8 @@ pub const english = [_][]const u8{
     "Whistler, Longhorn and other builds",
     "DOS systems and legacy boot images",
     "Linux installers and live systems",
+    "Other systems",
+    "Haiku, FreeBSD, ReactOS, KolibriOS and your own images",
     "Power",
     "Restart, shut down or enter firmware setup",
     "Utilities",
@@ -2643,6 +2654,7 @@ pub const english = [_][]const u8{
     "Written to the target disk; the USOS stick's ESP is checked",
     "Boot files",
     "Image",
+    "Experimental: USOS writes this image to the target disk; the disk then starts by itself (CSMWrap is added when the image has no UEFI loader)",
     "INF files: {0}; Windows checks the hardware match",
     "ISO case",
     "ISO inspection",
