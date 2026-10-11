@@ -94,6 +94,11 @@ posready_vm_install() {
                 cp "$W9X_VM_RUN/screen.ppm" "$logs/live/screen.ppm" 2>/dev/null || true
                 { cat "$W9X_VM_RUN/command.txt"; echo "run $POSR_VM_BOOT at ${1}s, written ${2} MB"; } > "$logs/live/command.txt" 2>/dev/null || true
                 sync
+                # $logs is the tmpfs copy; the stick ESP stays read-only
+                # between these short writes (tools/stick_write.sh).
+                if command -v usos_stick_flush >/dev/null 2>&1; then
+                    usos_stick_flush || true
+                fi
             fi
             return 0
         }

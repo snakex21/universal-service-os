@@ -186,6 +186,9 @@ usos_vista_csmwrap_prepare() {
     else
         usos_ui_notice_continue 'Windows Vista: start the prepared disk' "Keep the USOS stick connected. After the restart open the firmware boot menu and start this disk's UEFI entry (not Legacy); CSM stays off. Vista Setup then starts from it through CSMWrap." 'Restart' || true
     fi
+    # The notice waits for the user: the stick volumes read-only meanwhile
+    # (a power-off here leaves the ESP clean).
+    sh /usr/lib/usos/stick_release.sh ro
     if [ -r "${USOS_UI_TTY:-}" ]; then
         IFS= read -r _vista_ack < "$USOS_UI_TTY" || true
     else

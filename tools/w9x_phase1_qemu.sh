@@ -465,4 +465,9 @@ w9x_phase1_keep_logs() {
         [ -f "$W9X_VM_RUN/$file" ] && cp "$W9X_VM_RUN/$file" "$1/$file" 2>/dev/null
     done
     sync
+    # $1 is a tmpfs copy while the stick ESP is read-only
+    # (w9x_csmwrap_prepare.sh): onto the ESP in one short read-write window.
+    if command -v usos_stick_flush >/dev/null 2>&1; then
+        usos_stick_flush || true
+    fi
 }
