@@ -14,8 +14,10 @@
 #   run 2-4 the installed system: First Boot Agent (it restarts 3 times);
 #           FBA runs the answer's RunOnce C:\USOS\POSR\FIRST.CMD (drivers;
 #           posready_after_setup copied \USOS\POSR onto partition 2);
-#   run 5   the logon dialog: Administrator typed (blank password); the
-#           RunOnce LOGON.CMD: ACPI check, DONE.TXT, shutdown.
+#   run 5   the first logon: automatic (LOGON.REG, once; Administrator with
+#           the blank password typed only as a fallback); the RunOnce
+#           LOGON.CMD: ACPI check, automatic logon off, DONE.TXT, shutdown.
+# On the X470 (2026-10-11, TCG) runs 1-4 took 150 + 963 + 45 + 241 s.
 # Partition 1 stays: the system partition (NTLDR, BOOT.INI) and the source.
 
 POSR_VM_BOOTS=${POSR_VM_BOOTS:-8}
@@ -24,6 +26,9 @@ POSR_VM_MB=${POSR_VM_MB:-1024}
 # The disk the VM sees: the whole target up to 33 GiB (the target script
 # ends the Windows partition at 32 GiB; the CSMWrap ESP comes after the VM).
 POSR_VM_DISK_MAX=${POSR_VM_DISK_MAX:-35433480192}
+# The screen and command.txt of the running VM go to LOGS/live every this
+# many seconds (a run cut by a power-off leaves no run-N folder).
+POSR_VM_LIVE_EVERY=${POSR_VM_LIVE_EVERY:-300}
 
 posready_vm_args() {
     case "$2" in kvm) accel='kvm' ;; *) accel='tcg,tb-size=256' ;; esac
@@ -69,6 +74,10 @@ posready_vm_install() {
     W9X_VM_STALL_ANY=1
     W9X_VM_STALL=$POSR_VM_STALL
     W9X_VM_ANSWER=''
+    # The logon fallback: XP keeps writing behind the logon dialog, so the
+    # answer also comes after this long with less than this many MB written.
+    W9X_VM_ANSWER_IDLE=${POSR_VM_ANSWER_IDLE:-600}
+    W9X_VM_ANSWER_QUIET_MB=${POSR_VM_ANSWER_QUIET_MB:-16}
     W9X_VM_TEXT_ANSWER=''
     W9X_VM_TICK_FN=''
     mkdir -p "$logs"
@@ -76,7 +85,19 @@ posready_vm_install() {
     while [ "$boot" -lt "$POSR_VM_BOOTS" ]; do
         boot=$((boot + 1))
         POSR_VM_BOOT=$boot
-        w9x_phase1_progress() { command -v posready_vm_progress >/dev/null 2>&1 && posready_vm_progress "$POSR_VM_BOOT" "$1" "$2"; return 0; }
+        POSR_VM_LIVE=0
+        w9x_phase1_progress() {
+            command -v posready_vm_progress >/dev/null 2>&1 && posready_vm_progress "$POSR_VM_BOOT" "$1" "$2"
+            if [ $(($1 - POSR_VM_LIVE)) -ge "$POSR_VM_LIVE_EVERY" ]; then
+                POSR_VM_LIVE=$1
+                mkdir -p "$logs/live"
+                cp "$W9X_VM_RUN/screen.ppm" "$logs/live/screen.ppm" 2>/dev/null || true
+                { cat "$W9X_VM_RUN/command.txt"; echo "run $POSR_VM_BOOT at ${1}s, written ${2} MB"; } > "$logs/live/command.txt" 2>/dev/null || true
+                sync
+            fi
+            return 0
+        }
+        printf 'run %s start\n' "$boot" >> "$logs/runs.txt"
         w9x_phase1_run "$target" "$accel"
         rc=$?
         w9x_phase1_keep_logs "$logs/run-$boot"
@@ -84,9 +105,10 @@ posready_vm_install() {
             "$(posready_mbr_byte "$target" 1 0)" >> "$logs/runs.txt"
         [ "$rc" = 0 ] || return "$rc"
         [ "$boot" != 1 ] || posready_after_setup "$target" "$logs" || return 2
-        # After the First Boot Agent the classic logon dialog waits (POSReady
-        # has no autologon answer; QEMU 2026-10-10): Administrator, blank
-        # password, typed when the screen sat idle (W9X_VM_ANSWER_IDLE).
+        # After the First Boot Agent: LOGON.REG's automatic logon. Only if the
+        # classic logon dialog still waits (POSReady has no autologon answer):
+        # Administrator, blank password, typed when the screen sat idle or
+        # quiet (W9X_VM_ANSWER_IDLE / W9X_VM_ANSWER_QUIET_MB).
         W9X_VM_ANSWER=${POSR_VM_LOGON_KEYS:-shift-a d m i n i s t r a t o r ret}
         if posready_vm_marker "$target" DONE.TXT; then return 0; fi
     done

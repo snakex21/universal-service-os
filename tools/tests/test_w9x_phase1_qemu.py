@@ -159,6 +159,27 @@ class Phase1Vm(unittest.TestCase):
                                     W9X_VM_STALL_ANY='1', W9X_VM_ANSWER='alt-n', W9X_VM_ANSWER_IDLE='1')
         self.assertNotIn('answer typed', (self.tmp / 'run/command.txt').read_text())
 
+    def test_answer_while_the_guest_keeps_writing_a_little(self):
+        # XP's logon dialog (POSReady, X470 2026-10-11): a few sectors written
+        # all the time, so the disk is never idle. W9X_VM_ANSWER_QUIET_MB
+        # types the answer anyway; without it nothing is typed.
+        if self.run_lib('command -v mkfifo')[0] != 0:
+            self.skipTest('no mkfifo in this sh')
+        counter = (self.tmp / 'sectors').as_posix()
+        busy = (f'w9x_vm_written() {{ n=$(cat "{counter}" 2>/dev/null || echo 0); n=$((n + 8)); echo "$n" > "{counter}"; echo "$n"; }}\n'
+                'w9x_vm_graphics_screen() { return 0; }\nw9x_phase1_run /dev/fake tcg; echo "rc=$?"')
+        rc, out, err = self.run_lib(busy, W9X_FAKE_SLEEP='14', W9X_VM_STALL_ANY='1', W9X_VM_ANSWER='shift-a ret',
+                                    W9X_VM_ANSWER_IDLE='1', W9X_VM_ANSWER_TRIES='1', W9X_VM_ANSWER_QUIET_MB='1')
+        self.assertIn('rc=0', out, err)
+        command = (self.tmp / 'run/command.txt').read_text()
+        self.assertIn('answer typed: shift-a ret attempt 1', command)
+        self.assertNotIn('attempt 2', command)
+        (self.tmp / 'sectors').unlink()
+        rc, out, err = self.run_lib(busy, W9X_FAKE_SLEEP='10', W9X_VM_STALL_ANY='1', W9X_VM_ANSWER='shift-a ret',
+                                    W9X_VM_ANSWER_IDLE='1', W9X_VM_ANSWER_TRIES='1')
+        self.assertIn('rc=0', out, err)
+        self.assertNotIn('answer typed', (self.tmp / 'run/command.txt').read_text())
+
     def test_answer_lists_per_attempt(self):
         # "keys;keys": attempt N types list N (NT 3.1 Advanced Server: Domain
         # Settings, then the Date/Time applet), later attempts the last list.

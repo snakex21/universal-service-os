@@ -84,7 +84,22 @@ class Payload(unittest.TestCase):
         self.assertIn(b"fc /b", logon)
         self.assertIn(b"DONE.TXT", logon)
         self.assertIn(b"shutdown -s", logon)
-        self.assertIn(b'"cmd.exe /c C:\\\\USOS\\\\POSR\\\\LOGON.CMD"', (ROOT / "tools" / "posready_logon.reg").read_bytes())
+        reg = (ROOT / "tools" / "posready_logon.reg").read_bytes()
+        self.assertIn(b'"cmd.exe /c C:\\\\USOS\\\\POSR\\\\LOGON.CMD"', reg)
+        # One automatic logon (X470 2026-10-11: the typed logon never came,
+        # XP keeps the disk busy behind the dialog); LOGON.CMD switches it off
+        # before DONE.TXT.
+        self.assertIn(b"CurrentVersion\\Winlogon]", reg)
+        for value in (b'"AutoAdminLogon"="1"', b'"DefaultUserName"="Administrator"', b'"DefaultPassword"=""',
+                      b'"AutoLogonCount"=dword:00000001'):
+            self.assertIn(value, reg)
+        self.assertLess(logon.index(b"/v AutoAdminLogon /t REG_SZ /d 0"), logon.index(b"DONE.TXT\"\r\n"))
+        self.assertIn(b"/v DefaultPassword /f", logon)
+        vm = (ROOT / "tools" / "posready_qemu_install.sh").read_text(encoding="utf-8")
+        # Typed logon only as a fallback, also while the guest writes a little;
+        # the running VM's screen reaches the ESP (logs/live).
+        self.assertIn("W9X_VM_ANSWER_QUIET_MB=${POSR_VM_ANSWER_QUIET_MB:-16}", vm)
+        self.assertIn('"$logs/live/screen.ppm"', vm)
 
     def test_posr_folder_on_the_windows_partition(self) -> None:
         # posready_after_setup copies \USOS\POSR from partition 1 onto

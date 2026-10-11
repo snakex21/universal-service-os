@@ -5,3 +5,13 @@ REGEDIT4
 ; copies \USOS\POSR onto the Windows partition; the Setup partition has no letter).
 [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce]
 "USOSPOSReady"="cmd.exe /c C:\\USOS\\POSR\\LOGON.CMD"
+
+; One automatic logon (X470 2026-10-11: the logon dialog waited over an hour,
+; because the install VM types Administrator only after the disk was idle and
+; XP keeps writing behind the logon dialog). Administrator has a blank
+; password; LOGON.CMD switches the automatic logon off again.
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon]
+"AutoAdminLogon"="1"
+"DefaultUserName"="Administrator"
+"DefaultPassword"=""
+"AutoLogonCount"=dword:00000001

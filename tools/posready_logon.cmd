@@ -8,6 +8,11 @@ echo USOS POSReady first logon >> "%S%FIRST.LOG"
 fc /b "%S%DRV\acpi.sys" %SystemRoot%\system32\drivers\acpi.sys > nul
 if errorlevel 1 echo ACPI RESTORED: stock acpi.sys after FBA, community copied again >> "%S%FIRST.LOG"
 if errorlevel 1 copy /y "%S%DRV\acpi.sys" %SystemRoot%\system32\drivers\acpi.sys >> "%S%FIRST.LOG"
+rem The automatic logon of LOGON.REG is for this first logon only.
+reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoAdminLogon /t REG_SZ /d 0 /f > nul
+echo autologon off %ERRORLEVEL% >> "%S%FIRST.LOG"
+reg delete "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultPassword /f > nul 2>&1
+reg delete "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoLogonCount /f > nul 2>&1
 fc /b "%S%DRV\acpi.sys" %SystemRoot%\system32\drivers\acpi.sys > nul
 if not errorlevel 1 echo done> "%S%DONE.TXT"
 shutdown -s -f -t 0
