@@ -677,7 +677,9 @@ def main() -> int:
         nt3_e820_mbr = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-mbr-440.bin"
         # Its resident hooks (sector 1 of the NT 3.x disk).
         nt3_e820_hook = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-hook-512.bin"
-        for required in (xp_vbr, xp_stage2, xp_nt52_vbr, xp_nt52_stage2, xp_geometry_fix_mbr, nt3_e820_mbr, nt3_e820_hook):
+        # ReactOS / own BIOS images behind CSMWrap: ELCR MBR (elcr_mbr.S).
+        elcr_mbr = root / "zig-out/xp-geometry-fix-mbr/elcr-mbr-440.bin"
+        for required in (xp_vbr, xp_stage2, xp_nt52_vbr, xp_nt52_stage2, xp_geometry_fix_mbr, nt3_e820_mbr, nt3_e820_hook, elcr_mbr):
             if not required.is_file():
                 raise FileNotFoundError(f"XP BIOS bootstrap artifact missing: {required}")
         geometry_mbr = xp_geometry_fix_mbr.read_bytes()
@@ -755,6 +757,10 @@ def main() -> int:
         if len(nt3_mbr) != 440:
             raise RuntimeError(f"NT 3.51 E820 MBR code must be 440 bytes: {nt3_e820_mbr}")
         put(entries, Entry("usr/lib/usos/nt3-e820-mbr-440.bin", stat.S_IFREG | 0o644, nt3_mbr))
+        elcr = elcr_mbr.read_bytes()
+        if len(elcr) != 440:
+            raise RuntimeError(f"ELCR MBR code must be 440 bytes: {elcr_mbr}")
+        put(entries, Entry("usr/lib/usos/elcr-mbr-440.bin", stat.S_IFREG | 0o644, elcr))
         nt3_hook = nt3_e820_hook.read_bytes()
         if len(nt3_hook) != 512 or nt3_hook[510:] != b"U3":
             raise RuntimeError(f"NT 3.x MBR hook sector must be 512 bytes ending in U3: {nt3_e820_hook}")

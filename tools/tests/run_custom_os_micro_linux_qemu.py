@@ -82,7 +82,10 @@ def cpio_newc(entries):
     return blob + b"\0" * (-len(blob) % 512)
 
 
-def overlay(csmwrap: Path) -> bytes:
+BLOBS = ("elcr-mbr-440.bin",)
+
+
+def overlay(csmwrap: Path, root: Path) -> bytes:
     entries = []
     dirs = set()
 
@@ -101,6 +104,13 @@ def overlay(csmwrap: Path) -> bytes:
             add("usos-e2e/csmwrap/" + f.relative_to(csmwrap).as_posix(), f.read_bytes())
     for name in SCRIPTS:
         add("usr/lib/usos/" + name, (ROOT / "tools" / name).read_bytes().replace(b"\r\n", b"\n"), 0o100755)
+    # MBR blobs (build_xp_geometry_fix_mbr.ps1): this checkout's zig-out first.
+    for name in BLOBS:
+        for base in (ROOT, root):
+            blob = base / "zig-out" / "xp-geometry-fix-mbr" / name
+            if blob.is_file():
+                add("usr/lib/usos/" + name, blob.read_bytes())
+                break
     return cpio_newc(entries)
 
 
@@ -129,7 +139,7 @@ def prepare(args, root: Path, out: Path, disk: Path) -> bool:
     ml = root / "zig-out" / "micro-linux"
     initrd = out / "initrd.cpio"
     with initrd.open("wb") as f:
-        for part in ((ml / "initramfs-usos").read_bytes(), overlay(root / "zig-out" / "usb" / "EFI" / "USOS" / "csmwrap")):
+        for part in ((ml / "initramfs-usos").read_bytes(), overlay(root / "zig-out" / "usb" / "EFI" / "USOS" / "csmwrap", root)):
             f.write(part)
             f.write(b"\0" * (-f.tell() % 4))
     port = free_port()
