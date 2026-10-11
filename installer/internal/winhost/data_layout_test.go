@@ -21,6 +21,12 @@ func TestRequiredDataDirectoriesCoverEveryVisibleProfile(t *testing.T) {
 		filepath.Join("Systems", "Betas", "Windows Longhorn", "Unattended"),
 		filepath.Join("Systems", "DOS", "MS-DOS", "Images"),
 		filepath.Join("Systems", "DOS", "MS-DOS", "Programs"),
+		filepath.Join("Systems", "DOS", "FreeDOS", "Images"),
+		filepath.Join("Systems", "Other", "Haiku", "Images"),
+		filepath.Join("Systems", "Other", "FreeBSD", "Images"),
+		filepath.Join("Systems", "Other", "ReactOS", "Images"),
+		filepath.Join("Systems", "Other", "KolibriOS", "Images"),
+		filepath.Join("Systems", "Other", "Other", "Images"),
 		"Utilities",
 		filepath.Join("Programs", "USOS"),
 	}
@@ -73,6 +79,10 @@ func TestDataProfileCountsStayInSyncWithCatalog(t *testing.T) {
 	}
 	if len(dosProfiles) != 6 {
 		t.Fatalf("DOS profile count=%d, want 6", len(dosProfiles))
+	}
+	// Haiku, FreeBSD, ReactOS, KolibriOS and the own-image entry.
+	if len(otherProfiles) != 5 {
+		t.Fatalf("other profile count=%d, want 5", len(otherProfiles))
 	}
 }
 

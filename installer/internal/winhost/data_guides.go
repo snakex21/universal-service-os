@@ -18,7 +18,7 @@ var dataGuides = []dataGuide{
 	},
 	{
 		relativePath: filepath.Join("Systems", "README.txt"),
-		contents:     []byte("Universal Service OS - Systems\r\n\r\nKażdy system ma gotowy katalog profilu.\r\nObrazy ISO/WIM/IMG/VHD/VHDX/EFI kopiuj do folderu Images odpowiedniego profilu.\r\nPliki automatycznej instalacji, jeżeli profil je obsługuje, kopiuj do folderu Unattended.\r\n\r\nStabilne Windows: Systems\\Windows\r\nLinux: Systems\\Linux\r\nPrototypy i bety Windows (Whistler, Longhorn, Neptune itd.): Systems\\Betas\r\nDOS: Systems\\DOS\r\n\r\nOpcjonalna ikona profilu: icon.png w katalogu profilu, obok Images.\r\nPo dodaniu lub zmianie icon.png uruchom Aktualizuj USOS, aby odświeżyć metadane menu na ESP.\r\n"),
+		contents:     []byte("Universal Service OS - Systems\r\n\r\nKażdy system ma gotowy katalog profilu.\r\nObrazy ISO/WIM/IMG/VHD/VHDX/EFI kopiuj do folderu Images odpowiedniego profilu.\r\nPliki automatycznej instalacji, jeżeli profil je obsługuje, kopiuj do folderu Unattended.\r\n\r\nStabilne Windows: Systems\\Windows\r\nLinux: Systems\\Linux\r\nPrototypy i bety Windows (Whistler, Longhorn, Neptune itd.): Systems\\Betas\r\nDOS: Systems\\DOS\r\nInne systemy (Haiku, FreeBSD, ReactOS, KolibriOS, własny obraz): Systems\\Other\r\n\r\nOpcjonalna ikona profilu: icon.png w katalogu profilu, obok Images.\r\nPo dodaniu lub zmianie icon.png uruchom Aktualizuj USOS, aby odświeżyć metadane menu na ESP.\r\n"),
 	},
 	{
 		relativePath: filepath.Join("Utilities", "README.txt"),
