@@ -108,6 +108,7 @@ foreach ($relative in @(
     'tools\hardware_smart.sh',
     'tools\hardware_smart_table.awk',
     'tools\hardware_ui.sh',
+    'tools\stick_release.sh',
     'tools\micro_linux_ui.sh',
     'tools\partuuid.sh',
     'tools\partuuid_diagnostics.sh',

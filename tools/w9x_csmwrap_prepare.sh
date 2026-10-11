@@ -550,9 +550,6 @@ usos_w9x_csmwrap_prepare() {
     fi
     sync
     blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true
-    reboot -f 2>/dev/null || true
-    sleep 3
-    echo 1 > /proc/sys/kernel/sysrq 2>/dev/null || true
-    echo b > /proc/sysrq-trigger 2>/dev/null || true
+    sh /usr/lib/usos/stick_release.sh reboot
     while :; do sleep 3600; done
 }

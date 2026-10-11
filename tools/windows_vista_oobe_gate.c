@@ -153,7 +153,13 @@ void entry(void){
   lstrcpyW(file,windows);lstrcatW(file,L"\\System32\\oobe\\windeploy.exe");
  }else{
   if(!start_watch())ExitProcess(ERROR_NOT_READY);
+#ifdef USOS_GATE_NATIVE_DEPLOY
+  /* 32-bit Vista / Server 2008 SP2 (usos-x86-csmwrap.cmd, no USB payload):
+   * straight to native windeploy, as on the recovery branch above. */
+  lstrcpyW(file,windows);lstrcatW(file,L"\\System32\\oobe\\windeploy.exe");
+#else
   lstrcpyW(file,L"C:\\USOS\\usb.exe");file[0]=windows[0];
+#endif
  }
  RegCloseKey(setup);DWORD result=run(file);report("Native bootstrap/deploy exit=",result);CloseHandle(log_file);ExitProcess(result);
 }

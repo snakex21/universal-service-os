@@ -705,6 +705,65 @@ xHCI, DATA answer file), sticks built with `new_native_stick.ps1
 * **Server 2008 Web SP2 PL x86**: as 12.2; the `usb3` step logs the NT 6.0
   skip. An empty `<Key>` is rejected there too; leave `ProductKey` out.
 
+### 12.5 X470: Vista x86 OOBE hang (WinSAT) and stick autochk (2026-10-11)
+
+X470 / 5700X / RX 560, CSM off, build B261011-123142-843DD3F6, no answer
+profile (the helper's InstallTo-only answer), Biostar S100 target.
+
+**WinSAT.** Evidence on the target (read-only): `Windows\Performance\WinSAT\winsat.log`
+of the first OOBE (15:08) ends with `Running Assessment: mem ''` after the
+features / graphics / media / cpu assessments, i.e. `winsat moobe` (OOBE's
+"Sprawdzanie wydajnosci komputera") never returned (user: 100 % CPU, no
+bugcheck); same spot as the Vista x64 stall of 2026-09-21
+(`docs/windows-vista-winsat-recovery-2026-09-21.md`). UnattendGC shows
+`create user [test]` + `Exiting mandatory tasks [0x0]` at 15:08 and, after
+the hard reset, a complete second OOBE (15:16: computer name, time zone,
+`create user [test1]`): OOBE had not finished, so Windows ran all of it
+again, and with no answer profile the pages were interactive. WinSAT then
+logged `Already ran during MOOBE key value = 1` and windeploy finished
+(`IMAGE_STATE_COMPLETE`).
+
+Fix: the x64 Vista path has had the OOBE gate since 2026-09-21
+(`tools/windows_vista_oobe_gate.c`: `WinSAT\MOOBE=2` before OOBE, so `winsat
+moobe` exits before any assessment, no score is invented; an interrupted
+late OOBE with exactly one completed account resumes via the native
+`SkipMachineOOBE` instead of asking for a second account; boot autochk
+limited to the system volume). The x86 path now uses the same gate:
+`usos-vista-oobe-x86.exe` (x86 build with `USOS_GATE_NATIVE_DEPLOY`: hands
+over to native `windeploy.exe`, there is no USB payload), armed by the
+`nt60_gate` step of `usos-x86-csmwrap.cmd` for installed NT 6.0.6002 only:
+offline `MOOBE=2` (SOFTWARE), the gate copied to `<Windows>\USOS\oobe.exe`,
+`Setup\CmdLine` `oobe\windeploy.exe` -> that path, `SetupType=2` (SYSTEM,
+with WinPE's `reg load`). Never fatal: any check failing leaves Setup's own
+entry. WinSAT itself is untouched; the assessment stays available later
+(Control Panel / `winsat formal`). An answer profile with
+user and time zone still fills those pages; without one they stay Setup's own.
+
+**USB input in OOBE.** The keyboard / mouse worked up to the clock page and
+not on the desktop. Vista x86 has no xHCI driver, so that input can only be
+the firmware's legacy USB emulation behind the i8042 (`ACPI\PNP0303` =
+i8042prt is installed); setupapi / System logs show no USB or xHCI device
+install around that point. What ends the emulation is not identified;
+not pursued (no 32-bit NT 6.0 xHCI driver, 12.3).
+
+**Stick autochk ("Skanowanie i naprawianie dysku").** Windows 10 x86 phase 2
+on the X470 scanned the USOS stick. micro-Linux mounts the stick ESP
+read-write (`micro_linux_init.sh`) and step 610 (and the w9x, Vista-prepare,
+hardware, XP-menu paths) ended with `reboot -f` / `poweroff -f` while it was
+still mounted. Linux vfat sets the FAT32 dirty flag (boot sector 0x41
+bit 0) on a read-write mount and clears it only on unmount / remount
+read-only, so the stick ESP came back dirty and Windows' boot autochk
+repaired it. Fix: every micro-Linux restart / power-off goes through
+`tools/stick_release.sh` (remounts every rw FAT / exFAT / NTFS mount
+read-only, unmounts it, each bounded to 10 s, then restarts); `stop()`
+remounts them read-only before the emergency shell
+(`tools/tests/test_stick_release.py` fails on any direct `reboot -f`).
+Diagnostics: `usos-x86-csmwrap.exe stick` logs `FSCTL_IS_VOLUME_DIRTY` of
+every USB / removable volume before Setup and before the restart
+(read-only). A drive-letter based autochk exclusion (`/k:`) cannot cover
+the stick on the installed system (letters unknown offline); the Vista gate
+keeps its fixed-volume exclusion.
+
 ## 13. One disk question per flow (2026-10-11)
 
 Rule (user, 2026-10-11): every flow asks for the target disk **exactly once**.

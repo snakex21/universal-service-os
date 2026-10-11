@@ -125,9 +125,6 @@ usos_vista_disk_prepare() {
     # already renamed into place and synced. Restart through the kernel.
     sync
     sleep 3
-    reboot -f 2>/dev/null || true
-    sleep 3
-    echo 1 > /proc/sys/kernel/sysrq 2>/dev/null || true
-    echo b > /proc/sysrq-trigger 2>/dev/null || true
+    sh /usr/lib/usos/stick_release.sh reboot
     while :; do sleep 3600; done
 }
