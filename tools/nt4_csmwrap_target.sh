@@ -695,6 +695,24 @@ REGEDIT4
 [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Mouclass\Parameters]
 "ConnectMultiplePorts"=dword:00000001
 EOF
+# NVMe target (docs/nvme-nt-2026-10-11.md): USOS's own usosnvme miniport
+# (tools/nt/usosnvme, NT4 build: non-PnP, scans PCI for class 01-08-02,
+# polled) next to AHCINT. Only for an NVMe target, so a SATA install never
+# loads it (on a board without NVMe it would fail to start at every boot).
+case "$TARGET_DEVICE" in /dev/nvme*)
+    nvme_lbs=$(cat "/sys/class/block/${TARGET_DEVICE##*/}/queue/logical_block_size" 2>/dev/null || echo unknown)
+    [ "$nvme_lbs" = 512 ] || fail "the NVMe target uses $nvme_lbs-byte sectors; NT 4.0 needs 512-byte sectors"
+    cp "$LIB/nt4/USOSNVME.SYS" "$usos/USOSNVME.SYS" || fail 'cannot copy USOSNVME.SYS'
+    crlf >> "$usos/DRIVERS.REG" <<'EOF'
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usosnvme]
+"Type"=dword:00000001
+"Start"=dword:00000000
+"ErrorControl"=dword:00000001
+"Group"="SCSI miniport"
+EOF
+    log "storage: NVMe target $TARGET_DEVICE, usosnvme staged next to AHCINT" ;;
+esac
 # usosvbe (own GPL miniport, tools/nt4/usosvbe) + framebuf.dll (NT 4.0's own,
 # from the user's CD): 1024x768x16 by default; the Display applet lists every
 # VBE mode. VgaStart (Video Init, ForceVga) would load first and win, so it is
@@ -777,6 +795,8 @@ copy C:\USOS\NT4\AHCINT.SYS %SystemRoot%\system32\drivers\ahcint.sys >> C:\USOS\
 copy C:\USOS\NT4\USOSRST.SYS %SystemRoot%\system32\drivers\usosrst.sys >> C:\USOS\NT4\POST.LOG
 copy C:\USOS\NT4\USOSUSB.SYS %SystemRoot%\system32\drivers\usosusb.sys >> C:\USOS\NT4\POST.LOG
 if not exist %SystemRoot%\system32\drivers\ahcint.sys echo AHCINT.SYS copy FAILED >> C:\USOS\NT4\POST.LOG
+if exist C:\USOS\NT4\USOSNVME.SYS copy C:\USOS\NT4\USOSNVME.SYS %SystemRoot%\system32\drivers\usosnvme.sys >> C:\USOS\NT4\POST.LOG
+if exist C:\USOS\NT4\USOSNVME.SYS if not exist %SystemRoot%\system32\drivers\usosnvme.sys echo USOSNVME.SYS copy FAILED >> C:\USOS\NT4\POST.LOG
 if not exist %SystemRoot%\system32\drivers\usosrst.sys echo USOSRST.SYS copy FAILED >> C:\USOS\NT4\POST.LOG
 if not exist %SystemRoot%\system32\drivers\usosusb.sys echo USOSUSB.SYS copy FAILED >> C:\USOS\NT4\POST.LOG
 %SystemRoot%\regedit.exe /s C:\USOS\NT4\DRIVERS.REG

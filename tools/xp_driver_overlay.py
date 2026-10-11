@@ -30,6 +30,15 @@ NT52_USB3=False
 NT52_SELECTED_USB3=[n for n in SELECTED if n!='Dependencies/storport.sys']
 NT52_SELECTED=['ACPI/acpi.sys','SATA/genahci.sys','SATA/genahci.inf']
 NT52_MARKERS=('WIN51IS.SP2','WIN51IA.SP2','WIN51IB.SP2','WIN51ID.SP2','WIN51IC.SP2')
+# NVMe target (docs/nvme-nt-2026-10-11.md): USOS's own usosnvme ScsiPort
+# miniport (GPL, tools/nt/usosnvme, 2KXP build) on the system's ScsiPort.
+# The bundle always carries USOSNVME.SY_ / USOSNVME.IN_ in I386; the setup
+# metadata that loads it (TXTSETUP.SIF, DOSNET.INF, HIVESYS.INF,
+# SETUPREG.HIV) is a second set in NVME/, applied by xp_driver_stage.sh only
+# when the target is an NVMe disk, so a SATA install never loads it.
+NVME_DIR=ROOT/'tools/nt/usosnvme'
+NVME_NAMES=('usosnvme.sys','usosnvme.inf')
+NVME_CLASS_GUID='{4D36E97B-E325-11CE-BFC1-08002BE10318}'
 
 def iso_listing(iso):
     return subprocess.run([SEVEN,'l','-ba',str(iso)],check=True,capture_output=True,text=True,errors='replace').stdout.upper().split()
@@ -67,6 +76,42 @@ def drop_keys(text,section,names):
         if not inside or key(l) not in names:out.append(l)
     return '\r\n'.join(out)+'\r\n'
 
+def nvme_registry_rows():
+    svc='Services\\usosnvme'
+    rows=[(svc,'Type',4,1),(svc,'Start',4,0),(svc,'ErrorControl',4,1),(svc,'Group',1,'SCSI miniport'),
+          (svc,'ImagePath',2,'system32\\drivers\\usosnvme.sys'),(svc+'\\Parameters\\PnpInterface','5',4,1)]
+    cdb='Control\\CriticalDeviceDatabase\\pci#cc_010802'
+    return rows+[(cdb,'Service',1,'usosnvme'),(cdb,'ClassGUID',1,NVME_CLASS_GUID)]
+
+def nvme_txtsetup(text):
+    for sec in ('SourceDisksFiles','SourceDisksFiles.x86'):text=drop_keys(text,sec,set(NVME_NAMES))
+    text=edit_section(text,'SourceDisksFiles.x86',['usosnvme.sys = 1,,,,,,4_,4,0,0,,1,4','usosnvme.inf = 1,,,,,,,20,0,0'])
+    text=edit_section(text,'FileFlags',['usosnvme.sys = 16'])
+    text=edit_section(text,'HardwareIdsDatabase',['PCI\\CC_010802 = "usosnvme"'])
+    text=edit_section(text,'SCSI.Load',['usosnvme = usosnvme.sys,4'])
+    return edit_section(text,'SCSI',['usosnvme = "USOS NVMe Controller"'])
+
+def nvme_dosnet(text):
+    text=edit_section(text,'Files',['d1,'+n for n in NVME_NAMES],replace=False)
+    return edit_section(text,'FloppyFiles.1',['d1,usosnvme.sys'],replace=False)
+
+def hivesys_rows(rows):
+    out=[]
+    for p,n,t,v in rows:
+        flags={1:'0x00000000',2:'0x00020000',4:'0x00010001'}[t]
+        encoded=hex(v) if t==4 else v
+        out.append(f'HKLM,"SYSTEM\\CurrentControlSet\\{p}","{n}",{flags},"{encoded}"')
+    return out
+
+def nvme_payload(out,i386):
+    """USOSNVME.SY_ and USOSNVME.IN_ (the INF's source path is \\I386, as for GenAHCI)."""
+    raw=out/'raw-nvme';shutil.rmtree(raw,ignore_errors=True);raw.mkdir()
+    shutil.copyfile(NVME_DIR/'bin/2KXP/i386/usosnvme.sys',raw/'USOSNVME.SYS')
+    inf=(NVME_DIR/'usosnvme.inf').read_text(encoding='latin1').replace('\r\n','\n')
+    inf=re.sub(r'(?im)^1\s*=.*$',lambda m:'1="USOS XP drivers",,,"\\I386"',inf)
+    (raw/'USOSNVME.INF').write_bytes(inf.replace('\n','\r\n').encode('latin1'))
+    for n in ('USOSNVME.SYS','USOSNVME.INF'):pack_file(raw/n,i386/(n[:-1]+'_'))
+
 def registry_values(usb3=True):
     rows=registry_rows()
     if usb3:return rows
@@ -99,7 +144,7 @@ def registry_rows():
         add('Control\\CriticalDeviceDatabase\\'+hw,'ClassGUID','{'+guid+'}')
     return rows
 
-def patch_hive(path,usb3=True):
+def patch_hive(path,usb3=True,extra=()):
     # Private app hive, not HKLM/HKU. Only the disposable build copy is modified.
     adv=c.WinDLL('advapi32',use_last_error=True)
     adv.RegLoadAppKeyW.argtypes=[c.c_wchar_p,c.POINTER(c.c_void_p),c.c_uint,c.c_uint,c.c_uint]
@@ -109,7 +154,7 @@ def patch_hive(path,usb3=True):
     if rc:raise OSError(rc,'RegLoadAppKeyW build copy')
     hive=handle.value
     try:
-        for p,n,t,v in registry_values(usb3):
+        for p,n,t,v in [*registry_values(usb3),*extra]:
             with winreg.CreateKeyEx(hive,'ControlSet001\\'+p,0,winreg.KEY_ALL_ACCESS) as k:
                 winreg.SetValueEx(k,n,0,t,v)
                 assert winreg.QueryValueEx(k,n)==(v,t)
@@ -222,30 +267,34 @@ def build_driver_overlay(iso,out):
         text=edit_section(text,group,[f'{svc} = "{label}",files.{svc},{svc}'])
         text=edit_section(text,'files.'+svc,[n+',4' for n in files])
     (i386/'TXTSETUP.SIF').write_bytes(text.encode(encoding))
+    nvme=bundle/'NVME';nvme.mkdir(exist_ok=True)
+    (nvme/'TXTSETUP.SIF').write_bytes(nvme_txtsetup(text).encode(encoding))
+    nvme_payload(out,i386)
     text,encoding=decode((original/'DOSNET.INF').read_bytes())
     for sec,items in [('Files',names),('FloppyFiles.1',sysnames)]:
         # DOSNET rows share d1, so their identity is the whole row, not its first field.
         text=edit_section(text,sec,['d1,'+n for n in items],replace=False)
     if integrated:text=edit_section(text,'Files',['d1,'+sp_cab.lower()],replace=False)
     (i386/'DOSNET.INF').write_bytes(text.encode(encoding))
+    (nvme/'DOSNET.INF').write_bytes(nvme_dosnet(text).encode(encoding))
     if integrated:
         text,encoding=decode((original/DRVINDEX).read_bytes())
         (i386/DRVINDEX).write_bytes(register_integrated_drvindex(text,sp_cab,['acpi.sys']).encode(encoding))
     text,encoding=decode((original/'HIVESYS.INF').read_bytes())
-    reglines=[]
-    for p,n,t,v in registry_values(usb3):
-        flags={1:'0x00000000',2:'0x00020000',4:'0x00010001'}[t]
-        encoded=hex(v) if t==4 else v
-        reglines.append(f'HKLM,"SYSTEM\\CurrentControlSet\\{p}","{n}",{flags},"{encoded}"')
-    text=edit_section(text,'AddReg',reglines,replace=False)
+    text=edit_section(text,'AddReg',hivesys_rows(registry_values(usb3)),replace=False)
     text=disable_crash_dump(text)
     (i386/'HIVESYS.INF').write_bytes(text.encode(encoding))
+    (nvme/'HIVESYS.INF').write_bytes(edit_section(text,'AddReg',hivesys_rows(nvme_registry_rows()),replace=False).encode(encoding))
     # Only disposable build files; never reuse transaction logs from an earlier hive.
     for suffix in ('.LOG','.LOG1','.LOG2'):(i386/('SETUPREG.HIV'+suffix)).unlink(missing_ok=True)
     shutil.copyfile(original/'SETUPREG.HIV',i386/'SETUPREG.HIV');patch_hive(i386/'SETUPREG.HIV',usb3)
     for suffix in ('.LOG','.LOG1','.LOG2'):(i386/('SETUPREG.HIV'+suffix)).unlink(missing_ok=True)
     # The registry engine stamps the build time into touched keys and header.
     hive=i386/'SETUPREG.HIV';hive.write_bytes(xp_hive.pin_hive(hive.read_bytes(),(original/'SETUPREG.HIV').read_bytes()))
+    # The NVMe set: the same hive plus usosnvme's service and its CriticalDeviceDatabase row.
+    shutil.copyfile(original/'SETUPREG.HIV',nvme/'SETUPREG.HIV');patch_hive(nvme/'SETUPREG.HIV',usb3,nvme_registry_rows())
+    for suffix in ('.LOG','.LOG1','.LOG2'):(nvme/('SETUPREG.HIV'+suffix)).unlink(missing_ok=True)
+    hive=nvme/'SETUPREG.HIV';hive.write_bytes(xp_hive.pin_hive(hive.read_bytes(),(original/'SETUPREG.HIV').read_bytes()))
     # PnP can extract ACPI from SP3.CAB later, so replace its copy too.
     if integrated:shutil.copyfile(DRIVERS/'ACPI/acpi.sys',cabdir/'acpi.sys')
     acpi=[p for p in cabdir.iterdir() if p.name.lower()=='acpi.sys']
@@ -288,6 +337,7 @@ def register_integrated_drvindex(text,cab,files):
     return edit_section(text,'Cabs',[section+'='+cab])
 
 def finish_bundle(out,bundle,i386,native,names,selected,bundle_id,iso):
+    (bundle/'nvme.sha256').write_text(''.join(sha(p)+'  NVME/'+p.name+'\n' for p in sorted((bundle/'NVME').iterdir()) if p.is_file()),encoding='ascii',newline='\n')
     (bundle/'payload.sha256').write_text(''.join(sha(p)+'  I386/'+p.name+'\n' for p in sorted(i386.iterdir()) if p.is_file()),encoding='ascii',newline='\n')
     (bundle/'replace-names.txt').write_text('\n'.join(n.upper() for n in names)+'\n',encoding='ascii',newline='\n')
     report={'id':bundle_id,'source':iso.name,'source_size':iso.stat().st_size,'drivers':selected,'native_usb_dependencies':{n:sha(native/n) for n in BUILTIN_USB if (native/n).is_file()},'sha256':{p.relative_to(bundle).as_posix():sha(p) for p in bundle.rglob('*') if p.is_file() and p.name!='manifest.json'},'runtime_verified':False}

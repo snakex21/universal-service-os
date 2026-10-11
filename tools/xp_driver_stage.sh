@@ -49,8 +49,32 @@ usos_xp_driver_apply() (
             cmp -s "$src" "$folder/$name"
         done
     done
-    cp "$XP_DRIVER_BUNDLE/I386/TXTSETUP.SIF" "$XP_TARGET_ROOT/TXTSETUP.SIF"
-    cmp -s "$XP_DRIVER_BUNDLE/I386/TXTSETUP.SIF" "$XP_TARGET_ROOT/TXTSETUP.SIF"
+    sif="$XP_DRIVER_BUNDLE/I386/TXTSETUP.SIF"
+    # NVMe target (docs/nvme-nt-2026-10-11.md): the bundle's NVME/ set
+    # (TXTSETUP.SIF, DOSNET.INF, HIVESYS.INF, SETUPREG.HIV with USOS's own
+    # usosnvme ScsiPort miniport) replaces the base set; USOSNVME.SY_/.IN_
+    # are already in both folders. A SATA/AHCI target keeps the base set.
+    case "${TARGET_DEVICE:-}" in
+    /dev/nvme*)
+        [ -f "$XP_DRIVER_BUNDLE/nvme.sha256" ] || { echo '[XP_DRIVERS] STOP: the target is NVMe but this driver package has no NVMe driver (usosnvme); rebuild the package'; exit 1; }
+        (cd "$XP_DRIVER_BUNDLE" && sha256sum -c nvme.sha256 >/dev/null)
+        for src in "$XP_DRIVER_BUNDLE"/NVME/*; do
+            name=${src##*/}
+            for folder in "$ls" "$bt"; do
+                find "$folder" -maxdepth 1 -type f -iname "$name" -exec rm -f '{}' \;
+                cp "$src" "$folder/$name"
+                cmp -s "$src" "$folder/$name"
+            done
+        done
+        for name in USOSNVME.SY_ USOSNVME.IN_; do
+            [ -f "$ls/$name" ] && [ -f "$bt/$name" ] || { echo "[XP_DRIVERS] STOP: $name missing from the boot/local source"; exit 1; }
+        done
+        sif="$XP_DRIVER_BUNDLE/NVME/TXTSETUP.SIF"
+        printf '[XP_DRIVERS] NVME PASS target=%s usosnvme (TXTSETUP/DOSNET/HIVESYS/SETUPREG NVMe set)\n' "$TARGET_DEVICE"
+        ;;
+    esac
+    cp "$sif" "$XP_TARGET_ROOT/TXTSETUP.SIF"
+    cmp -s "$sif" "$XP_TARGET_ROOT/TXTSETUP.SIF"
     mkdir -p "$XP_TARGET_ROOT/USOS/XP"
     cp "$XP_DRIVER_BUNDLE/manifest.json" "$XP_TARGET_ROOT/USOS/XP/drivers-manifest.json"
     sync

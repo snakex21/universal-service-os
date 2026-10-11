@@ -641,6 +641,11 @@ def main() -> int:
             ("tools/nt4/usosusb/bin/i386/usosusb.sys", "usr/lib/usos/nt4/USOSUSB.SYS"),
             ("tools/nt4/usosvbe/bin/i386/usosvbe.sys", "usr/lib/usos/nt4/USOSVBE.SYS"),
             ("tools/nt4/usosoff/bin/i386/usosoff.exe", "usr/lib/usos/nt4/USOSOFF.EXE"),
+            # usosnvme (own GPL NVMe miniport, tools/nt/usosnvme): staged only
+            # for an NVMe target (docs/nvme-nt-2026-10-11.md).
+            ("tools/nt/usosnvme/bin/NT4/i386/usosnvme.sys", "usr/lib/usos/nt4/USOSNVME.SYS"),
+            ("tools/nt/usosnvme/bin/NT351/i386/usosnvme.sys", "usr/lib/usos/nt3/USOSNVME.SYS"),
+            ("tools/nt/usosnvme/bin/NT31/i386/usosnvme.sys", "usr/lib/usos/nt3/USOSNVME31.SYS"),
             # Windows NT 3.51 (the same target script, \USOS\NT3): own GPL
             # builds for NT 3.51 (docs/nt351-2026-10-08.md).
             ("tools/vendor/ahcint/1.3.0.0-usos4/bin/NT351/i386/ahcint.sys", "usr/lib/usos/nt3/AHCINT.SYS"),

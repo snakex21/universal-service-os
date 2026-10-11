@@ -17,6 +17,9 @@ Layouts (all with the decoy's MBR bootable):
   same-port1   target port 0, decoy port 1 of one AHCI controller
   other-ctrl   decoy on its own AHCI controller at a lower PCI slot
   usb-target   target on qemu-xhci usb-storage (the stick path), decoy on AHCI
+  nvme-target  target on an NVMe controller, decoy on AHCI (INT 13h on NVMe,
+               docs/nvme-nt-2026-10-11.md: DOS / 9x / NTLDR read through it)
+  nvme-decoy   target on AHCI, decoy on NVMe (0x81 read from NVMe)
 
   python tools/tests/legacy_bios/run_csmwrap_boot_disk_qemu.py --output zig-out/csmwrap-bootdisk \
       [--csmwrap-efi <efi>] [--layout same-port0 ...] [--expect-fail]
@@ -38,7 +41,7 @@ OVMF_VARS = ROOT / 'tools/qemu/share/edk2-i386-vars.fd'
 CSMWRAP = ROOT / 'tools/vendor/csmwrap/3.1.2-usos4/csmwrapx64.efi'
 SECTOR = 512
 DISK_SECTORS = 2048 + ESP_SECTORS + 2048
-LAYOUTS = ('same-port0', 'same-port1', 'other-ctrl', 'usb-target')
+LAYOUTS = ('same-port0', 'same-port1', 'other-ctrl', 'usb-target', 'nvme-target', 'nvme-decoy')
 
 
 def boot_code(name: bytes) -> bytes:
@@ -104,6 +107,12 @@ def qemu_args(layout: str, target: Path, decoy: Path, out: Path, vars_fd: Path) 
     elif layout == 'usb-target':
         a += ['-device', 'ahci,id=sata', '-device', 'ide-hd,bus=sata.0,drive=decoy',
               '-device', 'usb-storage,bus=xhci.0,drive=target,removable=on']
+    elif layout == 'nvme-target':
+        a += ['-device', 'ahci,id=sata', '-device', 'ide-hd,bus=sata.0,drive=decoy',
+              '-device', 'nvme,drive=target,serial=USOS-NVME-T']
+    elif layout == 'nvme-decoy':
+        a += ['-device', 'nvme,drive=decoy,serial=USOS-NVME-D',
+              '-device', 'ahci,id=sata', '-device', 'ide-hd,bus=sata.0,drive=target']
     return a
 
 

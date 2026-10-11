@@ -79,11 +79,11 @@ GUEST = r'''#!/bin/sh
 # run_nt3_micro_linux_qemu.py guest part: step 620's NT calls, no screens.
 set -u
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
-TARGET=/dev/sda
+TARGET=${E2E_TARGET:-/dev/sda}
 SRC=/dev/vda
 LOGS=/tmp/w9x/nt4
 log() { echo "E2E: $*"; }
-for m in ahci sd_mod virtio_pci virtio_blk loop isofs vfat fat nls_cp437 nls_iso8859_1 nls_utf8; do modprobe "$m" 2>/dev/null; done
+for m in ahci sd_mod nvme virtio_pci virtio_blk loop isofs vfat fat nls_cp437 nls_iso8859_1 nls_utf8; do modprobe "$m" 2>/dev/null; done
 sleep 2; mdev -s 2>/dev/null
 [ -b "$TARGET" ] && [ -b "$SRC" ] || { log "no $TARGET or $SRC"; lsblk; echo E2E-RESULT=FAIL; exit 1; }
 mkdir -p /mnt/data "$LOGS" /run
@@ -164,7 +164,7 @@ def cpio_newc(entries: list[tuple[str, int, bytes]]) -> bytes:
     return blob + b"\0" * (-len(blob) % 512)
 
 
-def overlay(scripts: bool, answer: Path | None = None, sp: Path | None = None) -> bytes:
+def overlay(scripts: bool, answer: Path | None = None, sp: Path | None = None, nvme: bool = False) -> bytes:
     entries: list[tuple[str, int, bytes]] = []
     dirs = set()
 
@@ -188,6 +188,10 @@ def overlay(scripts: bool, answer: Path | None = None, sp: Path | None = None) -
         add("usos-e2e/winnt.sif", answer.read_bytes())
     if sp is not None:
         add("usos-e2e/SP6I386.EXE", sp.read_bytes())
+    if nvme:
+        # --nvme: this checkout's usosnvme builds (a package built before them has none).
+        for variant, name in (("NT4", "nt4/USOSNVME.SYS"), ("NT351", "nt3/USOSNVME.SYS"), ("NT31", "nt3/USOSNVME31.SYS")):
+            add("usr/lib/usos/" + name, (ROOT / "tools/nt/usosnvme/bin" / variant / "i386/usosnvme.sys").read_bytes())
     if scripts:
         for name in SCRIPTS:
             add("usr/lib/usos/" + name, (ROOT / "tools" / name).read_bytes(), 0o100755)
@@ -206,7 +210,7 @@ def install(args, out: Path, target: Path) -> bool:
     initrd = out / "initrd.cpio"
     with initrd.open("wb") as f:
         for part in ((ML / "initramfs-usos").read_bytes(), (ML / "qemu9x.cpio").read_bytes(),
-                     overlay(args.scripts, args.answer, args.sp)):
+                     overlay(args.scripts, args.answer, args.sp, args.nvme)):
             f.write(part)
             f.write(b"\0" * (-f.tell() % 4))
     port = free_port()
@@ -215,7 +219,7 @@ def install(args, out: Path, target: Path) -> bool:
            "-kernel", str(ML / "vmlinuz-virt"), "-initrd", str(initrd),
            "-append", "console=ttyS0,115200 rdinit=/bin/sh loglevel=3",
            "-chardev", f"socket,id=s0,host=127.0.0.1,port={port},server=on,wait=off", "-serial", "chardev:s0",
-           "-drive", f"file={target.as_posix()},format=qcow2,if=none,id=t,cache=writeback", "-device", "ide-hd,drive=t,bus=ide.0",
+           "-drive", f"file={target.as_posix()},format=qcow2,if=none,id=t,cache=writeback", *(["-device", "nvme,drive=t,serial=NT-NVME-TARGET"] if args.nvme else ["-device", "ide-hd,drive=t,bus=ide.0"]),
            "-drive", f"file={Path(args.iso).as_posix()},format=raw,if=none,id=cd,readonly=on", "-device", "virtio-blk-pci,drive=cd"]
     stderr = (out / "outer-qemu.log").open("wb")
     q = subprocess.Popen(cmd, stderr=stderr)
@@ -231,7 +235,7 @@ def install(args, out: Path, target: Path) -> bool:
         major = "4" if args.tag.startswith("NT4") else "3"
         edition = "tse" if args.tag == "NT4T" else ""
         start = len(console.text)
-        env = " ".join(args.env)
+        env = " ".join(args.env + (["E2E_TARGET=/dev/nvme0n1"] if args.nvme else []))
         console.sock.sendall(f"{env} TAG={args.tag} NT_MAJOR={major} NT_MINOR={minor} NT4_EDITION={edition} "
                              f"sh /usos-e2e/nt3.sh 2>&1; echo E2E-EXIT\n".encode())
         deadline = time.time() + args.timeout
@@ -272,7 +276,7 @@ def install(args, out: Path, target: Path) -> bool:
         stderr.close()
 
 
-def boot(out: Path, target: Path, seconds: int, cpu: str = "EPYC-Rome") -> None:
+def boot(out: Path, target: Path, seconds: int, cpu: str = "EPYC-Rome", nvme: bool = False) -> None:
     """X470-like boot of the finished disk; screenshots only (the user logs on by hand there)."""
     vars_ = out / "vars.fd"
     shutil.copyfile(OVMF_VARS, vars_)
@@ -280,7 +284,9 @@ def boot(out: Path, target: Path, seconds: int, cpu: str = "EPYC-Rome") -> None:
     cmd = [str(QEMU), "-machine", "q35", "-accel", "tcg", "-cpu", cpu, "-smp", "2", "-m", "2048",
            "-drive", f"if=pflash,unit=0,format=raw,readonly=on,file={OVMF_CODE.as_posix()}",
            "-drive", f"if=pflash,unit=1,format=raw,file={vars_.as_posix()}",
-           "-drive", f"file={target.as_posix()},format=qcow2,if=none,id=t,snapshot=on", "-device", "ide-hd,drive=t,bus=ide.0",
+           "-drive", f"file={target.as_posix()},format=qcow2,if=none,id=t,snapshot=on",
+           # --nvme: the NVMe controller behind a PCIe root port (bus 1+), as on the X470's M.2.
+           *(["-device", "pcie-root-port,id=rpn,chassis=20,slot=20", "-device", "nvme,drive=t,serial=NT-NVME-TARGET,bus=rpn"] if nvme else ["-device", "ide-hd,drive=t,bus=ide.0"]),
            "-display", "none", "-nic", "none", "-vga", "std",
            "-device", "qemu-xhci,id=xhci", "-device", "usb-kbd,bus=xhci.0", "-device", "usb-mouse,bus=xhci.0",
            "-monitor", f"tcp:127.0.0.1:{port},server=on,wait=off"]
@@ -347,6 +353,7 @@ def main() -> int:
     p.add_argument("--boot", action="store_true", help="boot the finished disk under OVMF + CSMWrap")
     p.add_argument("--boot-only", action="store_true")
     p.add_argument("--boot-seconds", type=int, default=420)
+    p.add_argument("--nvme", action="store_true", help="target on an NVMe controller (install and boot; usosnvme)")
     p.add_argument("--qemu", type=Path, help="host qemu-system-x86_64 to use (default: ROOT/tools/qemu)")
     args = p.parse_args()
     set_root(args.root)
@@ -369,7 +376,7 @@ def main() -> int:
         if not ok:
             return 1
     if args.boot or args.boot_only:
-        boot(args.out, target, args.boot_seconds, args.boot_cpu)
+        boot(args.out, target, args.boot_seconds, args.boot_cpu, args.nvme)
     return 0
 
 

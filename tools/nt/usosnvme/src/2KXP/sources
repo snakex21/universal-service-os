@@ -1,0 +1,14 @@
+# usosnvme for Windows 2000 / XP / Server 2003 x86 (PnP ScsiPort miniport).
+TARGETNAME=usosnvme
+TARGETPATH=obj
+TARGETTYPE=MINIPORT
+INCLUDES=..
+TARGETLIBS=$(DDK_LIB_PATH)\scsiport.lib \
+           $(DDK_LIB_PATH)\ntoskrnl.lib
+MSC_WARNING_LEVEL=/W3
+_NT_TARGET_VERSION=$(_NT_TARGET_VERSION_WS03)
+MUI=0
+MUI_COMMENT=0
+BUFFER_OVERFLOW_CHECKS=0
+SOURCES=..\usosnvme.c \
+        ..\usosnvme.rc

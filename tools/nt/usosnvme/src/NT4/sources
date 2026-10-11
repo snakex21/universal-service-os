@@ -1,0 +1,19 @@
+# usosnvme for Windows NT 4.0 (and, with C_DEFINES from build.cmd, NT 3.5x /
+# 3.1): non-PnP ScsiPort, the miniport scans PCI itself. WDK 7.1 has no NT4
+# target; the WXP environment is used and tools\nt4\pe_nt4_version.py sets
+# the PE version afterwards.
+TARGETNAME=usosnvme
+TARGETPATH=obj
+TARGETTYPE=MINIPORT
+INCLUDES=..
+C_DEFINES=$(C_DEFINES) -DUSOSNVME_NT4
+TARGETLIBS=$(DDK_LIB_PATH)\scsiport.lib \
+           $(DDK_LIB_PATH)\ntoskrnl.lib
+MSC_WARNING_LEVEL=/W3
+_NT_TARGET_VERSION=$(_NT_TARGET_VERSION_WINXP)
+SUBSYSTEM_VERSION=4.00
+MUI=0
+MUI_COMMENT=0
+BUFFER_OVERFLOW_CHECKS=0
+SOURCES=..\usosnvme.c \
+        ..\usosnvme.rc
