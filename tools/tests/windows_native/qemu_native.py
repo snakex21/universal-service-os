@@ -113,9 +113,9 @@ def disk_args(stick: Path | None, target: Path) -> list[str]:
         # pick the target and prove the decoy is never written (compare its
         # contents before and after). Default: the decoy has its own AHCI
         # controller at a lower PCI slot. USOS_NATIVE_DECOY_SAME_CONTROLLER=1
-        # puts it on port 0 of the target's controller instead: CSMWrap's
-        # SeaBIOS (patch 0004) ranks controllers, not ports, so it then boots
-        # the decoy's MBR instead of the prepared target (found 2026-10-11).
+        # puts it on port 0 of the target's controller instead: before
+        # CSMWrap 3.1.2-usos4 (patch 0005) SeaBIOS ranked controllers, not
+        # ports, and booted the decoy's MBR instead of the prepared target.
         decoy = os.environ.get("USOS_NATIVE_DECOY")
         same = decoy and os.environ.get("USOS_NATIVE_DECOY_SAME_CONTROLLER") == "1"
         port = 1 if same else 0

@@ -40,16 +40,17 @@ const (
 	// NTFS driver. USOS starts it only on matching SMBIOS (touch_driver.zig).
 	touchVendorDir    = "tools/vendor/touchi2cdxe/v1.3.1-usos1"
 	touchDriverTarget = "EFI/USOS/touchi2c_x64.efi"
-	// CSMWrap 3.1.2-usos3 (a MODIFIED CSMWrap 3.1.2: quiet boot unless
+	// CSMWrap 3.1.2-usos4 (a MODIFIED CSMWrap 3.1.2: quiet boot unless
 	// csmwrap.ini sets verbose = true, and SeaBIOS boot priorities from
-	// CSMWrap's BBS table, USB included; docs/research/csmwrap.md sections 6
+	// CSMWrap's BBS table, USB included, the exact disk CSMWrap was loaded
+	// from as 0x80; docs/research/csmwrap.md sections 6
 	// and 7, docs/design/bios-via-csmwrap.md) for XP / Vista without firmware
 	// CSM and for the UEFI menu's "Legacy BIOS mode (CSMWrap)": copied
 	// hash-checked, never signed; the preparers put it on the target's own
 	// ESP (tools/xp_csmwrap_esp.sh, the BIOS Core DOS installer). The LGPL
 	// source (the unpatched archive plus the patches) and every licence
 	// notice travel with it.
-	csmwrapVendorDir  = "tools/vendor/csmwrap/3.1.2-usos3"
+	csmwrapVendorDir  = "tools/vendor/csmwrap/3.1.2-usos4"
 	csmwrapLicenseDir = "tools/vendor/csmwrap/3.1.2"
 	csmwrapSourceDir  = "tools/vendor/csmwrap/3.1.2-src"
 	csmwrapTargetDir  = "EFI/USOS/csmwrap"
@@ -414,8 +415,10 @@ func stageCSMWrap(vendorDir, licenseDir, sourceDir, gplv3, usb string) error {
 		"banner or UUID line, no 'Booting from ...' lines, no boot-menu prompt or wait),\r\n" +
 		"and on 2026-09-29 (patch 0004): SeaBIOS takes the boot priorities from\r\n" +
 		"CSMWrap's BBS table by PCI address, USB mass storage included, so the drive\r\n" +
-		"CSMWrap was loaded from boots first. Version strings: CSMWrap Version\r\n" +
-		"3.1.2-usos3, SeaBIOS 578d260b-CSMWrap-3.1.2-usos3.\r\n" +
+		"CSMWrap was loaded from boots first, and on 2026-10-11 (patch 0005): CSMWrap\r\n" +
+		"tags the exact disk it was loaded from (hash of its sector 0) and SeaBIOS\r\n" +
+		"makes that disk 0x80 also when other disks share its controller. Version\r\n" +
+		"strings: CSMWrap Version 3.1.2-usos4, SeaBIOS 578d260b-CSMWrap-3.1.2-usos4.\r\n" +
 		"\r\n" +
 		"Complete corresponding source, next to this file:\r\n" +
 		"  " + source.Archive.File + " (unpatched CSMWrap 3.1.2, commit 808ac8e, with all\r\n" +
