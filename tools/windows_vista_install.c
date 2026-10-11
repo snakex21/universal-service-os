@@ -42,7 +42,11 @@ static BOOL have_selected_esp;
  * the MBR signature of usos-vista-target.ini. */
 static BOOL csmwrap;
 static DWORD csm_signature,csm_disk=0xffffffff;
-static ULONGLONG csm_staging_start,csm_staging_sectors;
+static ULONGLONG csm_staging_start,csm_staging_sectors,csm_windows_start,csm_windows_sectors;
+/* The prepared Windows partition (slot 1, NTFS, before the staging partition)
+ * as Windows numbers it: Setup gets InstallTo = this disk and partition, so it
+ * shows no disk page (the disk was chosen once, in micro-Linux step 610). */
+static DWORD csm_windows_number;
 void *memcpy(void *d,const void *s,size_t n){volatile BYTE *p=d;const BYTE *q=s;while(n--)*p++=*q++;return d;}
 void *memset(void *d,int v,size_t n){volatile BYTE *p=d;while(n--)*p++=(BYTE)v;return d;}
 static BOOL same(const void *a,const void *b,DWORD n){const BYTE *x=a,*y=b;while(n--)if(*x++!=*y++)return FALSE;return TRUE;}
@@ -262,11 +266,13 @@ static BOOL load_csmwrap_target(void){
  path(file,base,L"usos-vista-target.ini");HANDLE h=CreateFileW(file,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
  if(h==INVALID_HANDLE_VALUE){logcode("CSMWrap: usos-vista-target.ini missing=",GetLastError());return FALSE;}
  BOOL ok=ReadFile(h,text,sizeof(text)-1,&got,0);CloseHandle(h);if(!ok)return FALSE;text[got]=0;
- const char *sig=ini_value(text,"disk_signature"),*start=ini_value(text,"staging_start"),*count=ini_value(text,"staging_sectors");
- if(!sig||!start||!count)return FALSE;
+ const char *sig=ini_value(text,"disk_signature"),*start=ini_value(text,"staging_start"),*count=ini_value(text,"staging_sectors"),
+  *wstart=ini_value(text,"windows_start"),*wcount=ini_value(text,"windows_sectors");
+ if(!sig||!start||!count||!wstart||!wcount)return FALSE;
  DWORD v=0;for(int i=0;i<8;i++){char c=sig[i];if(c>='0'&&c<='9')v=v*16+(DWORD)(c-'0');else if((c|32)>='a'&&(c|32)<='f')v=v*16+(DWORD)((c|32)-'a'+10);else return FALSE;}
  csm_signature=v;csm_staging_start=parse_decimal(start);csm_staging_sectors=parse_decimal(count);
- if(!csm_signature||!csm_staging_start||!csm_staging_sectors)return FALSE;
+ csm_windows_start=parse_decimal(wstart);csm_windows_sectors=parse_decimal(wcount);
+ if(!csm_signature||!csm_staging_start||!csm_staging_sectors||!csm_windows_start||!csm_windows_sectors)return FALSE;
  logcode("CSMWrap: target disk signature=",csm_signature);logcode("CSMWrap: staging partition start LBA (low)=",(DWORD)csm_staging_start);
  return TRUE;
 }
@@ -277,10 +283,15 @@ static BOOL find_csmwrap_disk(void){
   HANDLE h=disk_handle(disk);if(h==INVALID_HANDLE_VALUE)continue;
   DWORD got=0;BOOL ok=internal(h)&&DeviceIoControl(h,IOCTL_DISK_GET_DRIVE_LAYOUT_EX,0,0,buffer,sizeof(buffer),&got,0)&&got>=offsetof(DRIVE_LAYOUT_INFORMATION_EX,PartitionEntry);CloseHandle(h);
   if(!ok)continue;DRIVE_LAYOUT_INFORMATION_EX *layout=(void*)buffer;
-  if(layout->PartitionStyle==PARTITION_STYLE_MBR&&layout->Mbr.Signature==csm_signature){csm_disk=disk;found++;}
+  if(layout->PartitionStyle==PARTITION_STYLE_MBR&&layout->Mbr.Signature==csm_signature){
+   csm_disk=disk;found++;csm_windows_number=0;
+   for(DWORD i=0;i<layout->PartitionCount&&i<64;i++){PARTITION_INFORMATION_EX *p=&layout->PartitionEntry[i];
+    if(p->PartitionNumber&&(ULONGLONG)p->StartingOffset.QuadPart==csm_windows_start*512&&(ULONGLONG)p->PartitionLength.QuadPart==csm_windows_sectors*512)csm_windows_number=p->PartitionNumber;}
+  }
  }
  logcode("CSMWrap: disks with the prepared MBR signature=",found);
- if(found!=1){csm_disk=0xffffffff;return FALSE;}
+ if(found!=1||!csm_windows_number){logcode("CSMWrap: prepared Windows partition number=",csm_windows_number);csm_disk=0xffffffff;return FALSE;}
+ logcode("CSMWrap: prepared Windows partition number=",csm_windows_number);
  logcode("CSMWrap: target physical disk=",csm_disk);return TRUE;
 }
 static BOOL mbr_io(BYTE sector[512],BOOL write){
@@ -362,6 +373,28 @@ static BOOL merge_user_answer(WCHAR *answer){
  if(o!=INVALID_HANDLE_VALUE)CloseHandle(o);LocalFree(text);
  logcode("Answer merge: user answer + KMDF servicing written (bytes)=",ok?w1+w2+w3:0);
  if(ok)lstrcpyW(answer,merged);return ok;
+}
+/* CSMWrap: the final answer (merged, or the servicing-only UTF-16 one) with
+ * every disk setting replaced by InstallTo = the prepared disk and Windows
+ * partition (tools/windows_installto.h); written as UTF-8. */
+#include "windows_installto.h"
+static char csm_in[1<<20],csm_utf8[(1<<20)+64],csm_scratch[(1<<20)+64],csm_out[(1<<20)+8192];
+static BOOL csmwrap_install_to(WCHAR *answer){
+ HANDLE f=CreateFileW(answer,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);if(f==INVALID_HANDLE_VALUE)return FALSE;
+ DWORD got=0;BOOL ok=ReadFile(f,csm_in,sizeof(csm_in),&got,0)&&got>16&&got<sizeof(csm_in);CloseHandle(f);if(!ok)return FALSE;
+ const char *text=csm_in,*note="";DWORD len=got;
+ if((BYTE)csm_in[0]==0xFF&&(BYTE)csm_in[1]==0xFE){len=usos_it_utf16_to_utf8((const BYTE*)csm_in,got,csm_utf8,sizeof(csm_utf8));if(!len)return FALSE;text=csm_utf8;}
+ else if(got>=3&&(BYTE)csm_in[0]==0xEF&&(BYTE)csm_in[1]==0xBB&&(BYTE)csm_in[2]==0xBF){text+=3;len-=3;}
+ DWORD n=usos_installto_answer(text,len,csm_scratch,sizeof(csm_scratch),csm_out,sizeof(csm_out),csm_disk,csm_windows_number,"amd64",&note);
+ if(!n)return FALSE;
+ WCHAR target[MAX_PATH];path(target,base,L"vista-csmwrap-answer.xml");
+ HANDLE o=CreateFileW(target,GENERIC_WRITE,FILE_SHARE_READ,0,CREATE_ALWAYS,FILE_FLAG_WRITE_THROUGH,0);DWORD w=0;
+ ok=o!=INVALID_HANDLE_VALUE&&WriteFile(o,csm_out,n,&w,0)&&w==n&&FlushFileBuffers(o);if(o!=INVALID_HANDLE_VALUE)CloseHandle(o);
+ if(!ok)return FALSE;
+ {DWORD k;WriteFile(GetStdHandle(STD_OUTPUT_HANDLE),"CSMWrap answer: ",16,&k,0);WriteFile(GetStdHandle(STD_OUTPUT_HANDLE),note,lstrlenA(note),&k,0);
+  if(log_file!=INVALID_HANDLE_VALUE){WriteFile(log_file,"CSMWrap answer: ",16,&k,0);WriteFile(log_file,note,lstrlenA(note),&k,0);WriteFile(log_file,"\r\n",2,&k,0);}}
+ logcode("CSMWrap: Setup installs to the disk chosen in USOS (InstallTo, physical disk)=",csm_disk);
+ lstrcpyW(answer,target);return TRUE;
 }
 /* A USOS profile answer: its RunSynchronous commands run through
  * usos-run-hidden.exe (tools/windows_hidden_commands.h), so specialize shows
@@ -907,7 +940,7 @@ void entry(void){
  path(scratch,base,L"usos-vista-csmwrap.flag");csmwrap=GetFileAttributesW(scratch)!=INVALID_FILE_ATTRIBUTES;
  if(firmware!=(csmwrap?FirmwareTypeBios:FirmwareTypeUefi))ExitProcess(2);
  path(scratch,base,L"usos-vista-install.log");log_file=CreateFileW(scratch,GENERIC_WRITE,FILE_SHARE_READ,0,CREATE_ALWAYS,FILE_FLAG_WRITE_THROUGH,0);
- logcode("Vista USB installer v12 / USB armed before the optional dispatcher / disk preparation opt-in / no pre-Setup ESP gate / formatted ESP preferred / Vista bcdedit from the ISO boot.wim / ESP hints without volume access / known firstboot v11 / CSMWrap legacy MBR mode v1=",0);
+ logcode("Vista USB installer v12 / USB armed before the optional dispatcher / disk preparation opt-in / no pre-Setup ESP gate / formatted ESP preferred / Vista bcdedit from the ISO boot.wim / ESP hints without volume access / known firstboot v11 / CSMWrap legacy MBR mode v2 (InstallTo)=",0);
  logcode("Firmware type (1 = BIOS, 2 = UEFI)=",firmware);
  if(csmwrap)logcode("CSMWrap mode: PE10 booted in BIOS mode from the prepared disk; Vista installs as a legacy MBR system=",0);
  WCHAR source[MAX_PATH];n=GetEnvironmentVariableW(L"USOS_SOURCE",source,MAX_PATH);
@@ -917,7 +950,12 @@ void entry(void){
  BYTE hash[32];for(unsigned i=0;i<sizeof(vista_files)/sizeof(vista_files[0]);i++){
   path(scratch,base,vista_files[i].source);if(!hash_file(scratch,hash)||!same(hash,vista_files[i].sha256,32)){logcode("Preflight payload hash failed at file=",i);ExitProcess(3);}
  }
- if(csmwrap&&(!load_csmwrap_target()||!find_csmwrap_disk())){logcode("Setup not started: the prepared CSMWrap disk was not found exactly once=",ERROR_NOT_FOUND);ExitProcess(4);}
+ if(csmwrap&&(!load_csmwrap_target()||!find_csmwrap_disk())){
+  logcode("Setup not started: the prepared CSMWrap disk was not found exactly once=",ERROR_NOT_FOUND);
+  MessageBoxW(0,L"USOS could not identify the disk you chose in the USOS menu (it was not found exactly once, or its Windows partition is missing).\n\nNothing was installed and no disk was changed. Windows Setup is not started, so it cannot write to another disk.\n\nRestart, then choose the system again in the USOS menu to prepare the disk once more.",
+   L"USOS - target disk not found",MB_OK|MB_ICONERROR|MB_SETFOREGROUND|MB_TOPMOST|MB_SYSTEMMODAL);
+  ExitProcess(4);
+ }
  if(!privilege(L"SeBackupPrivilege")||!privilege(L"SeRestorePrivilege")||(!csmwrap&&!load_boot_profile())||!inventory(before,&before_count))ExitProcess(4);
  if(!pinned_esp&&!csmwrap)load_prepared_disk();
  /* Vista's own bcdedit serves the UEFI system-store hints only. */
@@ -928,9 +966,11 @@ void entry(void){
  }
  static WCHAR servicing_answer[MAX_PATH];if(!prepare_servicing_answer(servicing_answer))ExitProcess(10);
  /* A user answer (profile or DATA file) on both paths: UEFI with CSM and
-  * CSMWrap (legacy MBR). The disk stays manual (no DiskConfiguration). */
+  * CSMWrap (legacy MBR). UEFI: the disk stays manual (no DiskConfiguration);
+  * CSMWrap: InstallTo = the disk chosen in micro-Linux (csmwrap_install_to). */
  if(!hide_answer_commands()){logcode("Setup not started: the answer commands could not be prepared=",ERROR_INVALID_DATA);ExitProcess(11);}
  if(!merge_user_answer(servicing_answer)){logcode("Setup not started: the answer file could not be merged with the servicing answer=",ERROR_INVALID_DATA);ExitProcess(11);}
+ if(csmwrap&&!csmwrap_install_to(servicing_answer)){logcode("Setup not started: the target disk could not be written into the answer (InstallTo)=",ERROR_INVALID_DATA);staging_entry(STAGING_ACTIVE_IF_ALONE);ExitProcess(11);}
  if(csmwrap&&!staging_entry(STAGING_INACTIVE)){logcode("Setup not started: the staging partition could not be marked inactive=",ERROR_WRITE_FAULT);ExitProcess(12);}
  lstrcpyW(command,L"\"");lstrcatW(command,setup_path);lstrcatW(command,L"\" /noreboot /installfrom:\"");lstrcatW(command,source);lstrcatW(command,L"\\sources\\install.wim\"");
  lstrcatW(command,L" /unattend:\"");lstrcatW(command,servicing_answer);lstrcatW(command,L"\"");

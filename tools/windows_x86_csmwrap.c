@@ -13,7 +13,9 @@
  *                            <out>: the answer file (or a new one) with
  *                            ImageInstall/OSImage/InstallTo = that disk and
  *                            partition (the user confirmed this disk in
- *                            micro-Linux, so Setup does not ask again).
+ *                            micro-Linux, so Setup does not ask again; any
+ *                            disk setting of the answer is replaced, a UTF-16
+ *                            answer is converted: tools/windows_installto.h).
  *   failed                   Setup failed: the staging partition becomes active
  *                            again (the next boot of the disk retries).
  *   target <out>             after Setup: <out> = "<letter>: <NT major.minor>"
@@ -153,64 +155,30 @@ static void drop_letters(void) {
     }
 }
 
-/* ---- answer file: InstallTo ------------------------------------------- */
-static char xml_in[1 << 20], xml_out[(1 << 20) + 4096];
-static DWORD out_len;
-static void put(const char *p, DWORD n) { if (out_len + n < sizeof(xml_out)) { memcpy(xml_out + out_len, p, n); out_len += n; } else out_len = sizeof(xml_out); }
-static void puts_(const char *p) { DWORD n = 0; while (p[n]) n++; put(p, n); }
-static const char *find(const char *hay, DWORD hay_len, const char *needle) {
-    DWORD n = 0; while (needle[n]) n++;
-    for (DWORD i = 0; i + n <= hay_len; i++) if (same(hay + i, needle, n)) return hay + i;
-    return 0;
-}
-static void install_to(void) {
-    char d[24];
-    puts_("<InstallTo><DiskID>"); decimal(d, disk); puts_(d); puts_("</DiskID><PartitionID>"); decimal(d, windows_number); puts_(d); puts_("</PartitionID></InstallTo>");
-}
-static void image_install(void) { puts_("<ImageInstall><OSImage>"); install_to(); puts_("<WillShowUI>OnError</WillShowUI></OSImage></ImageInstall>"); }
-static const char setup_component[] = "<component name=\"Microsoft-Windows-Setup\" processorArchitecture=\"x86\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\">";
+/* ---- answer file: InstallTo (tools/windows_installto.h) ---------------- */
+#include "windows_installto.h"
+static char xml_in[1 << 20], xml_utf8[(1 << 20) + 64], xml_scratch[(1 << 20) + 64], xml_out[(1 << 20) + 8192];
 static BOOL write_answer(const WCHAR *input, const WCHAR *output) {
-    DWORD got = 0; out_len = 0;
-    BOOL have = lstrcmpW(input, L"-") != 0;
-    if (have) {
+    DWORD got = 0, len = 0; const char *text = 0, *note = "";
+    if (lstrcmpW(input, L"-") != 0) {
         HANDLE h = CreateFileW(input, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
         if (h == INVALID_HANDLE_VALUE) return FALSE;
         BOOL ok = ReadFile(h, xml_in, sizeof(xml_in), &got, 0); CloseHandle(h);
         if (!ok || got == 0 || got == sizeof(xml_in)) return FALSE;
+        text = xml_in; len = got;
+        if (got >= 2 && (BYTE)xml_in[0] == 0xff && (BYTE)xml_in[1] == 0xfe) {
+            len = usos_it_utf16_to_utf8((const BYTE *)xml_in, got, xml_utf8, sizeof(xml_utf8));
+            if (!len) return FALSE;
+            text = xml_utf8;
+            say("[X86_CSMWRAP] answer: UTF-16 file converted to UTF-8\r\n");
+        } else if (got >= 3 && (BYTE)xml_in[0] == 0xef && (BYTE)xml_in[1] == 0xbb && (BYTE)xml_in[2] == 0xbf) { text += 3; len -= 3; }
     }
-    const char *at;
-    if (!have) {
-        puts_("<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<unattend xmlns=\"urn:schemas-microsoft-com:unattend\"><settings pass=\"windowsPE\">");
-        puts_(setup_component); image_install(); puts_("</component></settings></unattend>\r\n");
-        say("[X86_CSMWRAP] answer: none supplied; InstallTo only (Setup asks the rest)\r\n");
-    } else if (got >= 2 && (BYTE)xml_in[0] == 0xff && (BYTE)xml_in[1] == 0xfe) {
-        put(xml_in, got);
-        say("[X86_CSMWRAP] answer: UTF-16 file kept as it is; the disk page stays manual\r\n");
-    } else if (find(xml_in, got, "<InstallTo")) {
-        put(xml_in, got);
-        say("[X86_CSMWRAP] answer: the file names its own InstallTo; kept as it is\r\n");
-    } else if ((at = find(xml_in, got, "<component name=\"Microsoft-Windows-Setup\"")) != 0) {
-        const char *end = find(at, got - (DWORD)(at - xml_in), ">");
-        if (!end) return FALSE;
-        const char *os = find(end, got - (DWORD)(end - xml_in), "<OSImage>");
-        const char *close = find(end, got - (DWORD)(end - xml_in), "</component>");
-        if (os && close && os < close) {
-            os += 9; put(xml_in, (DWORD)(os - xml_in)); install_to(); put(os, got - (DWORD)(os - xml_in));
-        } else {
-            end += 1; put(xml_in, (DWORD)(end - xml_in)); image_install(); put(end, got - (DWORD)(end - xml_in));
-        }
-        say("[X86_CSMWRAP] answer: InstallTo added to Microsoft-Windows-Setup\r\n");
-    } else if ((at = find(xml_in, got, "<settings pass=\"windowsPE\">")) != 0) {
-        at += 27; put(xml_in, (DWORD)(at - xml_in)); puts_(setup_component); image_install(); puts_("</component>"); put(at, got - (DWORD)(at - xml_in));
-        say("[X86_CSMWRAP] answer: Microsoft-Windows-Setup with InstallTo added to windowsPE\r\n");
-    } else if ((at = find(xml_in, got, "<unattend")) != 0 && (at = find(at, got - (DWORD)(at - xml_in), ">")) != 0) {
-        at += 1; put(xml_in, (DWORD)(at - xml_in)); puts_("<settings pass=\"windowsPE\">"); puts_(setup_component); image_install(); puts_("</component></settings>"); put(at, got - (DWORD)(at - xml_in));
-        say("[X86_CSMWRAP] answer: windowsPE settings with InstallTo added\r\n");
-    } else return FALSE;
-    if (out_len >= sizeof(xml_out)) return FALSE;
+    DWORD n = usos_installto_answer(text, len, xml_scratch, sizeof(xml_scratch), xml_out, sizeof(xml_out), disk, windows_number, "x86", &note);
+    if (!n) return FALSE;
+    say("[X86_CSMWRAP] answer: "); say(note); say("\r\n");
     HANDLE h = CreateFileW(output, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
     if (h == INVALID_HANDLE_VALUE) return FALSE;
-    DWORD wrote = 0; BOOL ok = WriteFile(h, xml_out, out_len, &wrote, 0) && wrote == out_len && FlushFileBuffers(h);
+    DWORD wrote = 0; BOOL ok = WriteFile(h, xml_out, n, &wrote, 0) && wrote == n && FlushFileBuffers(h);
     CloseHandle(h);
     return ok;
 }

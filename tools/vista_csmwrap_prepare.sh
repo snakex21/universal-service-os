@@ -153,13 +153,11 @@ usos_vista_csmwrap_prepare() {
             cat "$overview"
             printf '\n'
             printf 'All partitions, systems and files on this disk will be erased.\n'
-            if [ "$x86_self" = 1 ]; then
-                # The 1 GiB helper partition before the ESP is removed after Setup.
-                printf 'New layout (MBR): %s (drive C:) for %s, then a 64 MiB CSMWrap partition at the end of the disk; the rest stays unallocated.\n' "$free_gib GiB NTFS" "$NT5_NAME"
-            else
-                printf 'New layout (MBR): approx. %s GiB unallocated for %s, then a 1 GiB USOS-VISTA helper partition and a 64 MiB CSMWrap partition at the end of the disk.\n' "$free_gib" "$NT5_NAME"
-                printf 'In %s Setup select the unallocated space; do not delete the two small partitions.\n' "$NT5_NAME"
-            fi
+            # Every path (Vista x64 too since 2026-10-11): the Windows
+            # partition is made here and Setup installs to it (InstallTo), so
+            # this is the only disk question. The 1 GiB helper partition
+            # before the ESP is removed after Setup.
+            printf 'New layout (MBR): %s (drive C:) for %s, then a 64 MiB CSMWrap partition at the end of the disk; the rest stays unallocated.\n' "$free_gib GiB NTFS" "$NT5_NAME"
         } > "$screen"
         vista_csmwrap_log "CONFIRM $TARGET_DEVICE model=$model serial=$serial size=$size free_gib=$free_gib"
         usos_xp_confirm "$screen" 'FORMAT THE ENTIRE DISK?' 'Erase ALL partitions and data on the selected disk' && break
