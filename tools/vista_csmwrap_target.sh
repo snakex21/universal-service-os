@@ -5,13 +5,15 @@
 #
 # Writes ONLY $TARGET_DEVICE:
 #   MBR     USOS MBR code (boots the active partition), new disk signature
-#   slot 1  NTFS "USOS-VISTA", active, 1 GiB before the CSMWrap ESP: the PE10
+#   slot 1  NTFS "Windows", inactive, from 1 MiB up to the staging partition:
+#           Vista Setup installs there (InstallTo; the disk was chosen and
+#           confirmed in the USOS menu, so Setup shows no disk page)
+#   slot 2  NTFS "USOS-VISTA", active, 1 GiB before the CSMWrap ESP: the PE10
 #           donor's BIOS boot files (bootmgr from Windows\Boot\PCAT, boot\bcd,
 #           boot\boot.sdi) and its Setup image (sources\boot.wim) with the
 #           USOS Vista helpers added to \Windows\System32 (what wimboot
 #           injects on the UEFI path)
-#   slot 2  CSMWrap ESP, 64 MiB at the end (tools/xp_csmwrap_esp.sh, unchanged)
-#   the space before slot 1 stays unallocated: Vista Setup installs there.
+#   slot 3  CSMWrap ESP, 64 MiB at the end (tools/xp_csmwrap_esp.sh, unchanged)
 # Boot chain: firmware -> the disk's \EFI\BOOT\BOOTX64.EFI (CSMWrap) -> SeaBIOS
 # (card VBIOS POSTed) -> MBR -> NT60 NTFS boot code -> bootmgr -> PE10 in RAM
 # -> USOS Vista installer -> Vista Setup in BIOS mode. The installer clears the
@@ -21,12 +23,8 @@
 # X86_SELF=1 (profile win-x86-uefi-csmwrap: 32-bit Windows 8.1 / 10, section
 # 11 of the design doc): VISTA_DONOR_ISO is the selected Windows ISO itself
 # (its own x86 WinPE has USB 3, AHCI and NVMe); bootmgr comes from the ISO
-# root; the layout is
-#   slot 1  NTFS "Windows", inactive, from 1 MiB up to the staging partition
-#           (Setup installs there: InstallTo, the disk was confirmed already)
-#   slot 2  NTFS "USOS-SETUP", active, 1 GiB: the ISO's boot files + boot.wim
-#           with support.cpio and modern-support.cpio (usos-x86-csmwrap)
-#   slot 3  CSMWrap ESP, 64 MiB at the end
+# root; the same layout, the staging partition is "USOS-SETUP" with
+# support.cpio and modern-support.cpio (usos-x86-csmwrap).
 set -eu
 
 TARGET_DEVICE=${TARGET_DEVICE:?TARGET_DEVICE is required}
@@ -95,11 +93,9 @@ mbr=$work/mbr.bin
     cat "$LIB/xp-geometry-fix-mbr-440.bin"
     le32 "$signature"
     printf '\000\000'
-    if [ "$X86_SELF" = 1 ]; then
-        printf '\000\376\377\377\007\376\377\377'; le32 "$windows_start"; le32 "$windows_sectors"
-    fi
+    printf '\000\376\377\377\007\376\377\377'; le32 "$windows_start"; le32 "$windows_sectors"
     printf '\200\376\377\377\007\376\377\377'; le32 "$staging_start"; le32 "$staging_sectors"
-    if [ "$X86_SELF" = 1 ]; then dd if=/dev/zero bs=32 count=1 2>/dev/null; else dd if=/dev/zero bs=48 count=1 2>/dev/null; fi
+    dd if=/dev/zero bs=32 count=1 2>/dev/null
     printf '\125\252'
 } > "$mbr"
 [ "$(wc -c < "$mbr" | tr -d ' ')" = 512 ] || fail 'internal error: MBR size'
@@ -112,22 +108,18 @@ blockdev --rereadpt "$TARGET_DEVICE" 2>/dev/null || true
 mdev -s 2>/dev/null || true
 sleep 1
 case "$TARGET_DEVICE" in *[0-9]) part_prefix="${TARGET_DEVICE}p" ;; *) part_prefix=$TARGET_DEVICE ;; esac
-if [ "$X86_SELF" = 1 ]; then node="${part_prefix}2"; windows_node="${part_prefix}1"; else node="${part_prefix}1"; fi
+node="${part_prefix}2"; windows_node="${part_prefix}1"
 [ -b "$node" ] || fail 'the staging partition node did not appear'
 name=${node##*/}
 [ "$(cat "/sys/class/block/$name/start")" = "$staging_start" ] || fail 'staging partition start mismatch'
 [ "$(cat "/sys/class/block/$name/size")" = "$staging_sectors" ] || fail 'staging partition size mismatch'
 
 # 2. NTFS with the NT60 boot code (loads BOOTMGR); mkntfs's BPB is kept.
-if [ "$X86_SELF" = 1 ]; then
-    [ -b "$windows_node" ] || fail 'the Windows partition node did not appear'
-    [ "$(cat "/sys/class/block/${windows_node##*/}/start")" = "$windows_start" ] || fail 'Windows partition start mismatch'
-    mkntfs -Q -F -s 512 -c 4096 -H 255 -S 63 -p "$windows_start" -L Windows "$windows_node" >/dev/null || fail 'cannot format the Windows partition'
-    log "Windows partition PASS start=$windows_start sectors=$windows_sectors"
-    staging_label=USOS-SETUP
-else
-    staging_label=USOS-VISTA
-fi
+[ -b "$windows_node" ] || fail 'the Windows partition node did not appear'
+[ "$(cat "/sys/class/block/${windows_node##*/}/start")" = "$windows_start" ] || fail 'Windows partition start mismatch'
+mkntfs -Q -F -s 512 -c 4096 -H 255 -S 63 -p "$windows_start" -L Windows "$windows_node" >/dev/null || fail 'cannot format the Windows partition'
+log "Windows partition PASS start=$windows_start sectors=$windows_sectors"
+if [ "$X86_SELF" = 1 ]; then staging_label=USOS-SETUP; else staging_label=USOS-VISTA; fi
 mkntfs -Q -F -s 512 -c 4096 -H 255 -S 63 -p "$staging_start" -L "$staging_label" "$node" >/dev/null || fail 'cannot format the staging partition'
 dd if="$node" of="$work/boot" bs=512 count=16 2>/dev/null
 dd if="$LIB/vista-nt60-ntfs.bin" of="$work/boot" bs=1 skip=84 seek=84 count=8108 conv=notrunc 2>/dev/null
@@ -212,18 +204,17 @@ blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true
 # 5. The CSMWrap ESP at the end (the XP script, unchanged: slot 2, 64 MiB).
 TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=$ESP_TAIL sh "$LIB/xp_csmwrap_esp.sh" || fail 'the CSMWrap ESP could not be created'
 
-# 6. Read back the final table: the active NTFS staging, then the ESP
-# (Vista: slots 1 and 2; X86_SELF: Windows slot 1, staging 2, ESP 3).
+# 6. Read back the final table: Windows slot 1 (inactive), the active NTFS
+# staging slot 2, the CSMWrap ESP slot 3.
 dd if="$TARGET_DEVICE" of="$work/mbr.final" bs=512 count=1 2>/dev/null
-if [ "$X86_SELF" = 1 ]; then s_off=462; e_off=478; else s_off=446; e_off=462; fi
+s_off=462; e_off=478
 [ "$(od -An -tx1 -j$s_off -N1 "$work/mbr.final" | tr -d ' \n')" = 80 ] || fail 'read-back: staging partition is not active'
 [ "$(od -An -tu1 -j$((s_off + 4)) -N1 "$work/mbr.final" | tr -d ' \n')" = 7 ] || fail 'read-back: staging partition type'
 [ "$(od -An -tu1 -j$((e_off + 4)) -N1 "$work/mbr.final" | tr -d ' \n')" = 239 ] || fail 'read-back: CSMWrap ESP slot'
 [ "$(od -An -tu4 -j$((e_off + 8)) -N4 "$work/mbr.final" | tr -d ' \n')" = "$esp_start" ] || fail 'read-back: CSMWrap ESP start'
-if [ "$X86_SELF" = 1 ]; then
-    [ "$(od -An -tx1 -j446 -N1 "$work/mbr.final" | tr -d ' \n')" = 00 ] || fail 'read-back: Windows partition must be inactive'
-    [ "$(od -An -tu4 -j454 -N4 "$work/mbr.final" | tr -d ' \n')" = "$windows_start" ] || fail 'read-back: Windows partition start'
-fi
+[ "$(od -An -tx1 -j446 -N1 "$work/mbr.final" | tr -d ' \n')" = 00 ] || fail 'read-back: Windows partition must be inactive'
+[ "$(od -An -tu1 -j450 -N1 "$work/mbr.final" | tr -d ' \n')" = 7 ] || fail 'read-back: Windows partition type'
+[ "$(od -An -tu4 -j454 -N4 "$work/mbr.final" | tr -d ' \n')" = "$windows_start" ] || fail 'read-back: Windows partition start' 
 sync
 blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true
-log "PREPARED PASS signature=$signature_hex free_for_vista_sectors=$((staging_start - 2048)) x86_self=$X86_SELF"
+log "PREPARED PASS signature=$signature_hex windows_sectors=$windows_sectors x86_self=$X86_SELF"

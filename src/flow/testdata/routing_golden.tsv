@@ -23922,7 +23922,7 @@ profile_def	vhd-vhdboot	vhdboot	micro_linux	Starting environment|Verifying targe
 profile_def	efi-direct	direct_efi	efi_image	
 # csmwrap: UEFI without firmware CSM, base profile -> variant id, start
 csmwrap	xp-x86-sp3-uefi-csm	xp-x86-sp3-uefi-csmwrap	same micro-Linux staging + usos.xp_boot=csmwrap (CSMWrap ESP at the disk end)
-csmwrap	vista-uefi-pe10	vista-x64-sp2-uefi-csmwrap	micro-Linux step 610: MBR disk, PE10 staging partition + CSMWrap ESP; Vista Setup in BIOS mode
+csmwrap	vista-uefi-pe10	vista-x64-sp2-uefi-csmwrap	micro-Linux step 610: MBR disk, Windows partition + PE10 staging partition + CSMWrap ESP; Vista Setup in BIOS mode (InstallTo)
 csmwrap	win10-11-uefi-native	win-x86-uefi-csmwrap	x86 media only: micro-Linux step 610: MBR disk, Windows partition + the ISO's own WinPE staging + CSMWrap ESP; Setup in BIOS mode (InstallTo)
 csmwrap	win7-uefi-native	win-nt6-x86-uefi-csmwrap	x86 media only: micro-Linux step 610: MBR disk, Windows partition + x86 PE10 donor staging + CSMWrap ESP; the ISO's Setup in BIOS mode (InstallTo)
 csmwrap	vista-uefi-pe10	win-nt6-x86-uefi-csmwrap	x86 media only: micro-Linux step 610: MBR disk, Windows partition + x86 PE10 donor staging + CSMWrap ESP; the ISO's Setup in BIOS mode (InstallTo)

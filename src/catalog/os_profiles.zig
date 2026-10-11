@@ -410,7 +410,7 @@ pub const CsmwrapVariant = struct {
 
 pub const csmwrap_variants = [_]CsmwrapVariant{
     .{ .base = "xp-x86-sp3-uefi-csm", .id = "xp-x86-sp3-uefi-csmwrap", .start = "same micro-Linux staging + usos.xp_boot=csmwrap (CSMWrap ESP at the disk end)" },
-    .{ .base = "vista-uefi-pe10", .id = "vista-x64-sp2-uefi-csmwrap", .start = "micro-Linux step 610: MBR disk, PE10 staging partition + CSMWrap ESP; Vista Setup in BIOS mode" },
+    .{ .base = "vista-uefi-pe10", .id = "vista-x64-sp2-uefi-csmwrap", .start = "micro-Linux step 610: MBR disk, Windows partition + PE10 staging partition + CSMWrap ESP; Vista Setup in BIOS mode (InstallTo)" },
     .{ .base = "win10-11-uefi-native", .id = "win-x86-uefi-csmwrap", .start = "x86 media only: micro-Linux step 610: MBR disk, Windows partition + the ISO's own WinPE staging + CSMWrap ESP; Setup in BIOS mode (InstallTo)", .x86_media_only = true },
     // 32-bit Windows 7 / Vista / Server 2008: the same layout, but an x86 PE10
     // donor (Windows 10 x86 Setup ISO) is staged instead of the ISO's own PE.
