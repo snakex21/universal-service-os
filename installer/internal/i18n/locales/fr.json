@@ -349,6 +349,7 @@
   "boot.system.requires_bios.hint": "Pour l'utiliser, démarrez la clé USB en mode Legacy BIOS (CSM) : choisissez son entrée sans UEFI dans le menu de démarrage du firmware.",
   "boot.system.unavailable": "Indisponible",
   "boot.system.unavailable.detail": "Aucun backend de démarrage fonctionnel ne prend encore en charge ce système.",
+  "boot.system.other_os": "Autre système (image personnelle)",
   "boot.notice.no_image.title": "Aucune image trouvée",
   "boot.notice.no_image.line1": "Aucun fichier image pris en charge n'a été trouvé. Copiez un fichier dans :",
   "boot.notice.backend.line1": "Aucun backend de démarrage implémenté ne prend en charge cette sélection.",

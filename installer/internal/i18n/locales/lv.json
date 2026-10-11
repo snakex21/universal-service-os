@@ -352,6 +352,7 @@
   "boot.system.requires_bios.hint": "Lai to izmantotu, palaidiet USB zibatmiņu Legacy BIOS (CSM) režīmā: aparātprogrammatūras sāknēšanas izvēlnē izvēlieties tās ierakstu bez UEFI.",
   "boot.system.unavailable": "Nav pieejams",
   "boot.system.unavailable.detail": "Neviena strādājoša sāknēšanas aizmugursistēma vēl neatbalsta šo sistēmu.",
+  "boot.system.other_os": "Cita sistēma (savs attēls)",
   "boot.notice.no_image.title": "Attēli nav atrasti",
   "boot.notice.no_image.line1": "Netika atrasti atbalstīti attēlu faili. Kopējiet failu uz:",
   "boot.notice.backend.line1": "Neviena ieviesta sāknēšanas aizmugursistēma neatbalsta šo izvēli.",

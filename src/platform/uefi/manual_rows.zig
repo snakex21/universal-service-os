@@ -21,13 +21,13 @@ pub fn system(
 ) usos.gui.ui.Row {
     const row_icon: usos.gui.ui.RowIcon = if (icon) |image| .{ .image = image } else .{ .vector = fallbackIcon(entry) };
     if (biosOnly(entry, firmware)) {
-        if (!media.hasImages()) return .{ .title = entry.name, .detail = view.t(.system_no_image), .icon = row_icon, .enabled = false };
-        return .{ .title = entry.name, .detail = view.t(.system_unavailable_detail), .icon = row_icon, .badge = .{ .text = view.t(.system_unavailable) }, .enabled = false };
+        if (!media.hasImages()) return .{ .title = view.tr(entry.name), .detail = view.t(.system_no_image), .icon = row_icon, .enabled = false };
+        return .{ .title = view.tr(entry.name), .detail = view.t(.system_unavailable_detail), .icon = row_icon, .badge = .{ .text = view.t(.system_unavailable) }, .enabled = false };
     }
     if (!entry.firmware.accepts(firmware)) {
         const requires_uefi = entry.firmware == .uefi;
         return .{
-            .title = entry.name,
+            .title = view.tr(entry.name),
             .detail = view.t(if (requires_uefi) .system_requires_uefi_detail else .system_requires_bios_detail),
             .icon = row_icon,
             .badge = .{ .text = view.t(if (requires_uefi) .system_requires_uefi else .system_requires_bios), .tone = .warning },
@@ -37,7 +37,7 @@ pub fn system(
     if (firmware == .uefi and usos.flow.secure_boot_policy.blocked(secure_boot.state(), entry.id)) {
         // CSM/UefiSeven/pre-Secure-Boot Windows: say why instead of failing later.
         return .{
-            .title = entry.name,
+            .title = view.tr(entry.name),
             .detail = view.t(.summary_secure_boot_detail),
             .icon = row_icon,
             .badge = .{ .text = view.t(.summary_secure_boot_badge), .tone = .warning },
@@ -45,15 +45,15 @@ pub fn system(
         };
     }
     if (!media.hasImages()) {
-        return .{ .title = entry.name, .detail = view.t(.system_no_image), .icon = row_icon, .enabled = false };
+        return .{ .title = view.tr(entry.name), .detail = view.t(.system_no_image), .icon = row_icon, .enabled = false };
     }
     var count_buffer: [12]u8 = undefined;
     const count = std.fmt.bufPrint(&count_buffer, "{d}", .{media.imageCount()}) catch "?";
     const detail = view.format(detail_buffer, .system_image_count, &.{count});
     if (!usos.flow.preparation_capability.supportsSystem(entry.id)) {
-        return .{ .title = entry.name, .detail = view.t(.system_unavailable_detail), .icon = row_icon, .badge = .{ .text = view.t(.system_unavailable) }, .enabled = false };
+        return .{ .title = view.tr(entry.name), .detail = view.t(.system_unavailable_detail), .icon = row_icon, .badge = .{ .text = view.t(.system_unavailable) }, .enabled = false };
     }
-    return .{ .title = entry.name, .detail = detail, .icon = row_icon, .badge = .{ .text = view.t(.system_ready), .tone = .success } };
+    return .{ .title = view.tr(entry.name), .detail = detail, .icon = row_icon, .badge = .{ .text = view.t(.system_ready), .tone = .success } };
 }
 
 fn fallbackIcon(entry: *const usos.catalog.SystemEntry) usos.gui.icons.Kind {

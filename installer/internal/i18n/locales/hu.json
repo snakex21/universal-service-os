@@ -349,6 +349,7 @@
   "boot.system.requires_bios.hint": "A használatához indítsa a pendrive-ot Legacy BIOS (CSM) módban: a firmware rendszerindító menüjében válassza a nem UEFI bejegyzését.",
   "boot.system.unavailable": "Nem elérhető",
   "boot.system.unavailable.detail": "Ezt a rendszert még egyetlen működő indítási háttérmodul sem támogatja.",
+  "boot.system.other_os": "Egyéb rendszer (saját lemezkép)",
   "boot.notice.no_image.title": "Nem található kép",
   "boot.notice.no_image.line1": "Nem található támogatott képfájl. Másoljon egy fájlt ide:",
   "boot.notice.backend.line1": "Ezt a választást egyetlen megvalósított indítási háttérmodul sem támogatja.",

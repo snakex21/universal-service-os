@@ -352,6 +352,7 @@
   "boot.system.requires_bios.hint": "Ak ho chcete použiť, spustite USB kľúč v režime Legacy BIOS (CSM): v zavádzacej ponuke firmvéru vyberte jeho položku bez UEFI.",
   "boot.system.unavailable": "Nedostupné",
   "boot.system.unavailable.detail": "Tento systém zatiaľ nepodporuje žiadny funkčný zavádzací backend.",
+  "boot.system.other_os": "Iný systém (vlastný obraz)",
   "boot.notice.no_image.title": "Nenašli sa žiadne obrazy",
   "boot.notice.no_image.line1": "Nenašli sa žiadne podporované súbory obrazov. Skopírujte súbor do:",
   "boot.notice.backend.line1": "Tento výber nepodporuje žiadny implementovaný zavádzací backend.",

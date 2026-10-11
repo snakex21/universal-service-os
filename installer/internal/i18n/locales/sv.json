@@ -349,6 +349,7 @@
   "boot.system.requires_bios.hint": "Starta USB-minnet i Legacy BIOS-läge (CSM) för att använda det: välj posten utan UEFI i firmwarens startmeny.",
   "boot.system.unavailable": "Ej tillgänglig",
   "boot.system.unavailable.detail": "Ingen fungerande startbackend stöder det här systemet ännu.",
+  "boot.system.other_os": "Annat system (egen avbildning)",
   "boot.notice.no_image.title": "Inga avbildningar hittades",
   "boot.notice.no_image.line1": "Inga avbildningsfiler som stöds hittades. Kopiera en fil till:",
   "boot.notice.backend.line1": "Ingen implementerad startbackend stöder det här valet.",

@@ -349,6 +349,7 @@
   "boot.system.requires_bios.hint": "Kullanmak için USB belleği Legacy BIOS (CSM) modunda başlatın: ürün yazılımı önyükleme menüsünde UEFI olmayan girişini seçin.",
   "boot.system.unavailable": "Kullanılamaz",
   "boot.system.unavailable.detail": "Çalışan hiçbir önyükleme arka ucu bu sistemi henüz desteklemiyor.",
+  "boot.system.other_os": "Diğer sistem (kendi kalıbınız)",
   "boot.notice.no_image.title": "Görüntü bulunamadı",
   "boot.notice.no_image.line1": "Desteklenen görüntü dosyası bulunamadı. Bir dosyayı şuraya kopyalayın:",
   "boot.notice.backend.line1": "Uygulanmış hiçbir önyükleme arka ucu bu seçimi desteklemiyor.",

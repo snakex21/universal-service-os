@@ -349,6 +349,7 @@
   "boot.system.requires_bios.hint": "Per usarlo, avvia la chiavetta USB in modalità Legacy BIOS (CSM): scegli la sua voce senza UEFI nel menu di avvio del firmware.",
   "boot.system.unavailable": "Non disponibile",
   "boot.system.unavailable.detail": "Nessun backend di avvio funzionante supporta ancora questo sistema.",
+  "boot.system.other_os": "Altro sistema (immagine propria)",
   "boot.notice.no_image.title": "Nessuna immagine trovata",
   "boot.notice.no_image.line1": "Non sono stati trovati file immagine supportati. Copia un file in:",
   "boot.notice.backend.line1": "Nessun backend di avvio implementato supporta questa selezione.",

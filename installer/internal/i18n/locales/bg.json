@@ -349,6 +349,7 @@
   "boot.system.requires_bios.hint": "За да го използвате, стартирайте USB паметта в режим Legacy BIOS (CSM): изберете записа ѝ без UEFI в менюто за зареждане на фърмуера.",
   "boot.system.unavailable": "Недостъпно",
   "boot.system.unavailable.detail": "Засега нито един работещ механизъм за зареждане не поддържа тази система.",
+  "boot.system.other_os": "Друга система (собствен образ)",
   "boot.notice.no_image.title": "Не са намерени образи",
   "boot.notice.no_image.line1": "Не са намерени поддържани файлове с образи. Копирайте файл в:",
   "boot.notice.backend.line1": "Нито един реализиран механизъм за зареждане не поддържа този избор.",

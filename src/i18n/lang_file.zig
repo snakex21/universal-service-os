@@ -354,6 +354,10 @@ test "reverse lookup translates catalog and script English, including templates"
     try std.testing.expectEqualStrings("WINDOWS XP - wybierz dysk", table.translate(&buffer, "WINDOWS XP - SELECT DISK"));
     try std.testing.expectEqualStrings("Automatycznie (ISO)", table.translate(&buffer, "Automatic (ISO)"));
     try std.testing.expectEqualStrings("not a catalog string", table.translate(&buffer, "not a catalog string"));
+    // System entry names go through view.tr: the own-image entry translates,
+    // product names stay as they are (src/catalog/other_systems.zig).
+    try std.testing.expectEqualStrings("Inny system (własny obraz)", table.lookup("Other system (own image)"));
+    try std.testing.expectEqualStrings("Haiku", table.lookup("Haiku"));
     const english = Table.english_only;
     try std.testing.expectEqualStrings("12 of 40 files", english.translate(&buffer, "12 of 40 files"));
 }

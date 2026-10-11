@@ -42,7 +42,7 @@ func syncDataCatalog(media install.MediaLayout) error {
 }
 
 func catalogProfiles() []catalogProfile {
-	profiles := make([]catalogProfile, 0, len(windowsProfiles)+len(linuxProfiles)+len(betaProfiles)+len(dosProfiles))
+	profiles := make([]catalogProfile, 0, len(windowsProfiles)+len(linuxProfiles)+len(betaProfiles)+len(dosProfiles)+len(otherProfiles))
 	appendProfiles := func(root string, source []dataProfile) {
 		for _, profile := range source {
 			profiles = append(profiles, catalogProfile{root: root, profile: profile})
@@ -52,6 +52,7 @@ func catalogProfiles() []catalogProfile {
 	appendProfiles(filepath.Join("Systems", "Linux"), linuxProfiles)
 	appendProfiles(filepath.Join("Systems", "Betas"), betaProfiles)
 	appendProfiles(filepath.Join("Systems", "DOS"), dosProfiles)
+	appendProfiles(filepath.Join("Systems", "Other"), otherProfiles)
 	return profiles
 }
 

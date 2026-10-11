@@ -349,6 +349,7 @@
   "boot.system.requires_bios.hint": "Kasutamiseks käivitage USB-mälupulk Legacy BIOS (CSM) režiimis: valige püsivara alglaadimismenüüst selle UEFI-ta kirje.",
   "boot.system.unavailable": "Pole saadaval",
   "boot.system.unavailable.detail": "Ükski töötav käivitustaustsüsteem seda süsteemi veel ei toeta.",
+  "boot.system.other_os": "Muu süsteem (oma tõmmis)",
   "boot.notice.no_image.title": "Tõmmiseid ei leitud",
   "boot.notice.no_image.line1": "Toetatud tõmmisefaile ei leitud. Kopeerige fail asukohta:",
   "boot.notice.backend.line1": "Ükski realiseeritud käivitustaustsüsteem seda valikut ei toeta.",

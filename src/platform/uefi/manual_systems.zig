@@ -96,7 +96,7 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
                         // Selectable so the reason can be read; never launched.
                         var notice_lines: HelpLines = undefined;
                         if (blockedHelp(blockAt(&slots, selected, firmware), &notice_lines, entry)) |help| {
-                            view.notice(entry.name, .warning, .warning, help.title, help.lines);
+                            view.notice(view.tr(entry.name), .warning, .warning, help.title, help.lines);
                             view.waitForAnyKey();
                         }
                         list.redrawFull(selected, shown_help);
@@ -178,12 +178,12 @@ pub fn access(entry: *const usos.catalog.SystemEntry, media: usos.catalog.System
 
 pub fn showMissingImageNotice(entry: *const usos.catalog.SystemEntry) void {
     const lines = [_][]const u8{ view.t(.notice_no_image_line1), usos.gui.menu_policy.displayImagePath(entry.image_directory) };
-    view.notice(entry.name, .warning, .warning, view.t(.notice_no_image_title), &lines);
+    view.notice(view.tr(entry.name), .warning, .warning, view.t(.notice_no_image_title), &lines);
     view.waitForDismiss();
 }
 
 pub fn showBackendDisabledNotice(entry: *const usos.catalog.SystemEntry, reason: []const u8) void {
     const lines = [_][]const u8{ view.t(.notice_backend_line1), reason };
-    view.notice(entry.name, .info, .neutral, view.t(.system_unavailable), &lines);
+    view.notice(view.tr(entry.name), .info, .neutral, view.t(.system_unavailable), &lines);
     view.waitForDismiss();
 }

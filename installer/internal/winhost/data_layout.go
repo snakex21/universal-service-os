@@ -110,6 +110,16 @@ var dosProfiles = []dataProfile{
 	{"other-dos", "Other DOS", false, false},
 }
 
+// otherProfiles are the "Other systems" (Custom OS, src/catalog/other_systems.zig):
+// the official hybrid image goes to Images, no answer files.
+var otherProfiles = []dataProfile{
+	{"haiku", "Haiku", false, false},
+	{"freebsd", "FreeBSD", false, false},
+	{"reactos", "ReactOS", false, false},
+	{"kolibrios", "KolibriOS", false, false},
+	{"other-os", "Other", false, false},
+}
+
 var requiredDataDirectories = buildRequiredDataDirectories()
 
 func buildRequiredDataDirectories() []string {
@@ -127,6 +137,7 @@ func buildRequiredDataDirectories() []string {
 	appendProfiles(filepath.Join("Systems", "Linux"), linuxProfiles)
 	appendProfiles(filepath.Join("Systems", "Betas"), betaProfiles)
 	appendProfiles(filepath.Join("Systems", "DOS"), dosProfiles)
+	appendProfiles(filepath.Join("Systems", "Other"), otherProfiles)
 	directories = append(directories, "Utilities", "Programs", filepath.Join("Programs", "USOS"))
 	directories = append(directories, filepath.Join("Systems", "DOS", "MS-DOS", "Programs"))
 	directories = append(directories, filepath.Join("Utilities", "FreeDOS", "Programs"))

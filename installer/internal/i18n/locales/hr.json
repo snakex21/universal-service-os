@@ -352,6 +352,7 @@
   "boot.system.requires_bios.hint": "Za korištenje pokrenite USB stick u načinu Legacy BIOS (CSM): u izborniku pokretanja firmvera odaberite njegov unos bez UEFI.",
   "boot.system.unavailable": "Nedostupno",
   "boot.system.unavailable.detail": "Nijedan funkcionalni pozadinski modul za pokretanje još ne podržava ovaj sustav.",
+  "boot.system.other_os": "Drugi sustav (vlastita slika)",
   "boot.notice.no_image.title": "Nisu pronađene slike",
   "boot.notice.no_image.line1": "Nisu pronađene podržane datoteke slika. Kopirajte datoteku u:",
   "boot.notice.backend.line1": "Nijedan implementirani pozadinski modul za pokretanje ne podržava ovaj odabir.",

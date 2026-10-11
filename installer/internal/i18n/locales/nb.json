@@ -349,6 +349,7 @@
   "boot.system.requires_bios.hint": "Start USB-pinnen i Legacy BIOS-modus (CSM) for å bruke det: velg oppføringen uten UEFI i fastvarens oppstartsmeny.",
   "boot.system.unavailable": "Utilgjengelig",
   "boot.system.unavailable.detail": "Ingen fungerende oppstartsbackend støtter dette systemet ennå.",
+  "boot.system.other_os": "Annet system (eget bilde)",
   "boot.notice.no_image.title": "Fant ingen avbildninger",
   "boot.notice.no_image.line1": "Fant ingen støttede avbildningsfiler. Kopier en fil til:",
   "boot.notice.backend.line1": "Ingen implementert oppstartsbackend støtter dette valget.",
