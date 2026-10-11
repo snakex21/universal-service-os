@@ -62,6 +62,7 @@ fn fallbackIcon(entry: *const usos.catalog.SystemEntry) usos.gui.icons.Kind {
         .linux => .terminal,
         .beta => .flask,
         .dos => .floppy,
+        .other => .disc,
         .utilities => .gear,
     };
 }

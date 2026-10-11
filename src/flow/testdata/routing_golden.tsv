@@ -63,12 +63,17 @@ system	windows-neptune	windows_beta	beta	any	\Systems\Betas\Windows Neptune\Imag
 system	windows-chicago	windows_beta	beta	any	\Systems\Betas\Windows Chicago\Images	\Systems\Betas\Windows Chicago\Unattended	.xml	unattend.xml	0	automatic,direct_iso,wimboot,chainload,memdisk,disk_image,floppy_image
 system	windows-memphis	windows_beta	beta	any	\Systems\Betas\Windows Memphis\Images	\Systems\Betas\Windows Memphis\Unattended	.xml	unattend.xml	0	automatic,direct_iso,wimboot,chainload,memdisk,disk_image,floppy_image
 system	windows-nashville	windows_beta	beta	any	\Systems\Betas\Windows Nashville\Images	\Systems\Betas\Windows Nashville\Unattended	.xml	unattend.xml	0	automatic,direct_iso,wimboot,chainload,memdisk,disk_image,floppy_image
-system	freedos	dos	dos	bios	\Systems\DOS\FreeDOS\Images	-	.xml	unattend.xml	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
+system	freedos	dos	dos	any	\Systems\DOS\FreeDOS\Images	-	.xml	unattend.xml	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	ms-dos	dos	dos	any	\Systems\DOS\MS-DOS\Images	-	.xml	unattend.xml	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	pc-dos	dos	dos	bios	\Systems\DOS\PC DOS\Images	-	.xml	unattend.xml	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	dr-dos	dos	dos	bios	\Systems\DOS\DR-DOS\Images	-	.xml	unattend.xml	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	opendos	dos	dos	bios	\Systems\DOS\OpenDOS\Images	-	.xml	unattend.xml	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
 system	other-dos	dos	dos	bios	\Systems\DOS\Other DOS\Images	-	.xml	unattend.xml	0	automatic,direct_iso,chainload,memdisk,disk_image,floppy_image
+system	haiku	other	other	any	\Systems\Other\Haiku\Images	-	.xml	unattend.xml	0	automatic
+system	freebsd	other	other	any	\Systems\Other\FreeBSD\Images	-	.xml	unattend.xml	0	automatic
+system	reactos	other	other	any	\Systems\Other\ReactOS\Images	-	.xml	unattend.xml	0	automatic
+system	kolibrios	other	other	any	\Systems\Other\KolibriOS\Images	-	.xml	unattend.xml	0	automatic
+system	other-os	other	other	any	\Systems\Other\Other\Images	-	.xml	unattend.xml	0	automatic
 # route: system image method firmware backend backend_method backend_firmware validation backend_secure_boot_off
 route	windows-11	iso	automatic	bios	windows_iso	direct_iso	uefi	tested_in_vm	0
 route	windows-11	iso	automatic	uefi	windows_iso	direct_iso	uefi	tested_in_vm	0
@@ -6983,7 +6988,7 @@ route	windows-nashville	efi	disk_image	uefi	-
 route	windows-nashville	efi	floppy_image	bios	-
 route	windows-nashville	efi	floppy_image	uefi	-
 route	freedos	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
-route	freedos	iso	automatic	uefi	chainload	chainload	uefi	validated_hardware	0
+route	freedos	iso	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
 route	freedos	iso	direct_iso	bios	-
 route	freedos	iso	direct_iso	uefi	-
 route	freedos	iso	wimboot	bios	-
@@ -6993,7 +6998,7 @@ route	freedos	iso	vhdboot	uefi	-
 route	freedos	iso	direct_efi	bios	-
 route	freedos	iso	direct_efi	uefi	-
 route	freedos	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
-route	freedos	iso	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	freedos	iso	chainload	uefi	-
 route	freedos	iso	memdisk	bios	-
 route	freedos	iso	memdisk	uefi	-
 route	freedos	iso	disk_image	bios	-
@@ -7001,11 +7006,11 @@ route	freedos	iso	disk_image	uefi	-
 route	freedos	iso	floppy_image	bios	-
 route	freedos	iso	floppy_image	uefi	-
 route	freedos	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
-route	freedos	wim	automatic	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	freedos	wim	automatic	uefi	-
 route	freedos	wim	direct_iso	bios	-
 route	freedos	wim	direct_iso	uefi	-
 route	freedos	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
-route	freedos	wim	wimboot	uefi	wimboot	wimboot	uefi	tested_in_vm	0
+route	freedos	wim	wimboot	uefi	-
 route	freedos	wim	vhdboot	bios	-
 route	freedos	wim	vhdboot	uefi	-
 route	freedos	wim	direct_efi	bios	-
@@ -7019,7 +7024,7 @@ route	freedos	wim	disk_image	uefi	-
 route	freedos	wim	floppy_image	bios	-
 route	freedos	wim	floppy_image	uefi	-
 route	freedos	img	automatic	bios	-
-route	freedos	img	automatic	uefi	-
+route	freedos	img	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
 route	freedos	img	direct_iso	bios	-
 route	freedos	img	direct_iso	uefi	-
 route	freedos	img	wimboot	bios	-
@@ -7037,13 +7042,13 @@ route	freedos	img	disk_image	uefi	-
 route	freedos	img	floppy_image	bios	-
 route	freedos	img	floppy_image	uefi	-
 route	freedos	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	freedos	vhd	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	freedos	vhd	automatic	uefi	-
 route	freedos	vhd	direct_iso	bios	-
 route	freedos	vhd	direct_iso	uefi	-
 route	freedos	vhd	wimboot	bios	-
 route	freedos	vhd	wimboot	uefi	-
 route	freedos	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	freedos	vhd	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	freedos	vhd	vhdboot	uefi	-
 route	freedos	vhd	direct_efi	bios	-
 route	freedos	vhd	direct_efi	uefi	-
 route	freedos	vhd	chainload	bios	-
@@ -7055,13 +7060,13 @@ route	freedos	vhd	disk_image	uefi	-
 route	freedos	vhd	floppy_image	bios	-
 route	freedos	vhd	floppy_image	uefi	-
 route	freedos	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	freedos	vhdx	automatic	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	freedos	vhdx	automatic	uefi	-
 route	freedos	vhdx	direct_iso	bios	-
 route	freedos	vhdx	direct_iso	uefi	-
 route	freedos	vhdx	wimboot	bios	-
 route	freedos	vhdx	wimboot	uefi	-
 route	freedos	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
-route	freedos	vhdx	vhdboot	uefi	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	freedos	vhdx	vhdboot	uefi	-
 route	freedos	vhdx	direct_efi	bios	-
 route	freedos	vhdx	direct_efi	uefi	-
 route	freedos	vhdx	chainload	bios	-
@@ -7073,7 +7078,7 @@ route	freedos	vhdx	disk_image	uefi	-
 route	freedos	vhdx	floppy_image	bios	-
 route	freedos	vhdx	floppy_image	uefi	-
 route	freedos	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
-route	freedos	efi	automatic	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	freedos	efi	automatic	uefi	-
 route	freedos	efi	direct_iso	bios	-
 route	freedos	efi	direct_iso	uefi	-
 route	freedos	efi	wimboot	bios	-
@@ -7081,9 +7086,9 @@ route	freedos	efi	wimboot	uefi	-
 route	freedos	efi	vhdboot	bios	-
 route	freedos	efi	vhdboot	uefi	-
 route	freedos	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
-route	freedos	efi	direct_efi	uefi	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	freedos	efi	direct_efi	uefi	-
 route	freedos	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
-route	freedos	efi	chainload	uefi	chainload	chainload	uefi	validated_hardware	0
+route	freedos	efi	chainload	uefi	-
 route	freedos	efi	memdisk	bios	-
 route	freedos	efi	memdisk	uefi	-
 route	freedos	efi	disk_image	bios	-
@@ -7630,6 +7635,546 @@ route	other-dos	efi	disk_image	bios	-
 route	other-dos	efi	disk_image	uefi	-
 route	other-dos	efi	floppy_image	bios	-
 route	other-dos	efi	floppy_image	uefi	-
+route	haiku	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	haiku	iso	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
+route	haiku	iso	direct_iso	bios	-
+route	haiku	iso	direct_iso	uefi	-
+route	haiku	iso	wimboot	bios	-
+route	haiku	iso	wimboot	uefi	-
+route	haiku	iso	vhdboot	bios	-
+route	haiku	iso	vhdboot	uefi	-
+route	haiku	iso	direct_efi	bios	-
+route	haiku	iso	direct_efi	uefi	-
+route	haiku	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	haiku	iso	chainload	uefi	-
+route	haiku	iso	memdisk	bios	-
+route	haiku	iso	memdisk	uefi	-
+route	haiku	iso	disk_image	bios	-
+route	haiku	iso	disk_image	uefi	-
+route	haiku	iso	floppy_image	bios	-
+route	haiku	iso	floppy_image	uefi	-
+route	haiku	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	haiku	wim	automatic	uefi	-
+route	haiku	wim	direct_iso	bios	-
+route	haiku	wim	direct_iso	uefi	-
+route	haiku	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	haiku	wim	wimboot	uefi	-
+route	haiku	wim	vhdboot	bios	-
+route	haiku	wim	vhdboot	uefi	-
+route	haiku	wim	direct_efi	bios	-
+route	haiku	wim	direct_efi	uefi	-
+route	haiku	wim	chainload	bios	-
+route	haiku	wim	chainload	uefi	-
+route	haiku	wim	memdisk	bios	-
+route	haiku	wim	memdisk	uefi	-
+route	haiku	wim	disk_image	bios	-
+route	haiku	wim	disk_image	uefi	-
+route	haiku	wim	floppy_image	bios	-
+route	haiku	wim	floppy_image	uefi	-
+route	haiku	img	automatic	bios	-
+route	haiku	img	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
+route	haiku	img	direct_iso	bios	-
+route	haiku	img	direct_iso	uefi	-
+route	haiku	img	wimboot	bios	-
+route	haiku	img	wimboot	uefi	-
+route	haiku	img	vhdboot	bios	-
+route	haiku	img	vhdboot	uefi	-
+route	haiku	img	direct_efi	bios	-
+route	haiku	img	direct_efi	uefi	-
+route	haiku	img	chainload	bios	-
+route	haiku	img	chainload	uefi	-
+route	haiku	img	memdisk	bios	-
+route	haiku	img	memdisk	uefi	-
+route	haiku	img	disk_image	bios	-
+route	haiku	img	disk_image	uefi	-
+route	haiku	img	floppy_image	bios	-
+route	haiku	img	floppy_image	uefi	-
+route	haiku	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	haiku	vhd	automatic	uefi	-
+route	haiku	vhd	direct_iso	bios	-
+route	haiku	vhd	direct_iso	uefi	-
+route	haiku	vhd	wimboot	bios	-
+route	haiku	vhd	wimboot	uefi	-
+route	haiku	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	haiku	vhd	vhdboot	uefi	-
+route	haiku	vhd	direct_efi	bios	-
+route	haiku	vhd	direct_efi	uefi	-
+route	haiku	vhd	chainload	bios	-
+route	haiku	vhd	chainload	uefi	-
+route	haiku	vhd	memdisk	bios	-
+route	haiku	vhd	memdisk	uefi	-
+route	haiku	vhd	disk_image	bios	-
+route	haiku	vhd	disk_image	uefi	-
+route	haiku	vhd	floppy_image	bios	-
+route	haiku	vhd	floppy_image	uefi	-
+route	haiku	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	haiku	vhdx	automatic	uefi	-
+route	haiku	vhdx	direct_iso	bios	-
+route	haiku	vhdx	direct_iso	uefi	-
+route	haiku	vhdx	wimboot	bios	-
+route	haiku	vhdx	wimboot	uefi	-
+route	haiku	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	haiku	vhdx	vhdboot	uefi	-
+route	haiku	vhdx	direct_efi	bios	-
+route	haiku	vhdx	direct_efi	uefi	-
+route	haiku	vhdx	chainload	bios	-
+route	haiku	vhdx	chainload	uefi	-
+route	haiku	vhdx	memdisk	bios	-
+route	haiku	vhdx	memdisk	uefi	-
+route	haiku	vhdx	disk_image	bios	-
+route	haiku	vhdx	disk_image	uefi	-
+route	haiku	vhdx	floppy_image	bios	-
+route	haiku	vhdx	floppy_image	uefi	-
+route	haiku	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	haiku	efi	automatic	uefi	-
+route	haiku	efi	direct_iso	bios	-
+route	haiku	efi	direct_iso	uefi	-
+route	haiku	efi	wimboot	bios	-
+route	haiku	efi	wimboot	uefi	-
+route	haiku	efi	vhdboot	bios	-
+route	haiku	efi	vhdboot	uefi	-
+route	haiku	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	haiku	efi	direct_efi	uefi	-
+route	haiku	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	haiku	efi	chainload	uefi	-
+route	haiku	efi	memdisk	bios	-
+route	haiku	efi	memdisk	uefi	-
+route	haiku	efi	disk_image	bios	-
+route	haiku	efi	disk_image	uefi	-
+route	haiku	efi	floppy_image	bios	-
+route	haiku	efi	floppy_image	uefi	-
+route	freebsd	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	freebsd	iso	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
+route	freebsd	iso	direct_iso	bios	-
+route	freebsd	iso	direct_iso	uefi	-
+route	freebsd	iso	wimboot	bios	-
+route	freebsd	iso	wimboot	uefi	-
+route	freebsd	iso	vhdboot	bios	-
+route	freebsd	iso	vhdboot	uefi	-
+route	freebsd	iso	direct_efi	bios	-
+route	freebsd	iso	direct_efi	uefi	-
+route	freebsd	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	freebsd	iso	chainload	uefi	-
+route	freebsd	iso	memdisk	bios	-
+route	freebsd	iso	memdisk	uefi	-
+route	freebsd	iso	disk_image	bios	-
+route	freebsd	iso	disk_image	uefi	-
+route	freebsd	iso	floppy_image	bios	-
+route	freebsd	iso	floppy_image	uefi	-
+route	freebsd	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	freebsd	wim	automatic	uefi	-
+route	freebsd	wim	direct_iso	bios	-
+route	freebsd	wim	direct_iso	uefi	-
+route	freebsd	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	freebsd	wim	wimboot	uefi	-
+route	freebsd	wim	vhdboot	bios	-
+route	freebsd	wim	vhdboot	uefi	-
+route	freebsd	wim	direct_efi	bios	-
+route	freebsd	wim	direct_efi	uefi	-
+route	freebsd	wim	chainload	bios	-
+route	freebsd	wim	chainload	uefi	-
+route	freebsd	wim	memdisk	bios	-
+route	freebsd	wim	memdisk	uefi	-
+route	freebsd	wim	disk_image	bios	-
+route	freebsd	wim	disk_image	uefi	-
+route	freebsd	wim	floppy_image	bios	-
+route	freebsd	wim	floppy_image	uefi	-
+route	freebsd	img	automatic	bios	-
+route	freebsd	img	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
+route	freebsd	img	direct_iso	bios	-
+route	freebsd	img	direct_iso	uefi	-
+route	freebsd	img	wimboot	bios	-
+route	freebsd	img	wimboot	uefi	-
+route	freebsd	img	vhdboot	bios	-
+route	freebsd	img	vhdboot	uefi	-
+route	freebsd	img	direct_efi	bios	-
+route	freebsd	img	direct_efi	uefi	-
+route	freebsd	img	chainload	bios	-
+route	freebsd	img	chainload	uefi	-
+route	freebsd	img	memdisk	bios	-
+route	freebsd	img	memdisk	uefi	-
+route	freebsd	img	disk_image	bios	-
+route	freebsd	img	disk_image	uefi	-
+route	freebsd	img	floppy_image	bios	-
+route	freebsd	img	floppy_image	uefi	-
+route	freebsd	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	freebsd	vhd	automatic	uefi	-
+route	freebsd	vhd	direct_iso	bios	-
+route	freebsd	vhd	direct_iso	uefi	-
+route	freebsd	vhd	wimboot	bios	-
+route	freebsd	vhd	wimboot	uefi	-
+route	freebsd	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	freebsd	vhd	vhdboot	uefi	-
+route	freebsd	vhd	direct_efi	bios	-
+route	freebsd	vhd	direct_efi	uefi	-
+route	freebsd	vhd	chainload	bios	-
+route	freebsd	vhd	chainload	uefi	-
+route	freebsd	vhd	memdisk	bios	-
+route	freebsd	vhd	memdisk	uefi	-
+route	freebsd	vhd	disk_image	bios	-
+route	freebsd	vhd	disk_image	uefi	-
+route	freebsd	vhd	floppy_image	bios	-
+route	freebsd	vhd	floppy_image	uefi	-
+route	freebsd	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	freebsd	vhdx	automatic	uefi	-
+route	freebsd	vhdx	direct_iso	bios	-
+route	freebsd	vhdx	direct_iso	uefi	-
+route	freebsd	vhdx	wimboot	bios	-
+route	freebsd	vhdx	wimboot	uefi	-
+route	freebsd	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	freebsd	vhdx	vhdboot	uefi	-
+route	freebsd	vhdx	direct_efi	bios	-
+route	freebsd	vhdx	direct_efi	uefi	-
+route	freebsd	vhdx	chainload	bios	-
+route	freebsd	vhdx	chainload	uefi	-
+route	freebsd	vhdx	memdisk	bios	-
+route	freebsd	vhdx	memdisk	uefi	-
+route	freebsd	vhdx	disk_image	bios	-
+route	freebsd	vhdx	disk_image	uefi	-
+route	freebsd	vhdx	floppy_image	bios	-
+route	freebsd	vhdx	floppy_image	uefi	-
+route	freebsd	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	freebsd	efi	automatic	uefi	-
+route	freebsd	efi	direct_iso	bios	-
+route	freebsd	efi	direct_iso	uefi	-
+route	freebsd	efi	wimboot	bios	-
+route	freebsd	efi	wimboot	uefi	-
+route	freebsd	efi	vhdboot	bios	-
+route	freebsd	efi	vhdboot	uefi	-
+route	freebsd	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	freebsd	efi	direct_efi	uefi	-
+route	freebsd	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	freebsd	efi	chainload	uefi	-
+route	freebsd	efi	memdisk	bios	-
+route	freebsd	efi	memdisk	uefi	-
+route	freebsd	efi	disk_image	bios	-
+route	freebsd	efi	disk_image	uefi	-
+route	freebsd	efi	floppy_image	bios	-
+route	freebsd	efi	floppy_image	uefi	-
+route	reactos	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	reactos	iso	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
+route	reactos	iso	direct_iso	bios	-
+route	reactos	iso	direct_iso	uefi	-
+route	reactos	iso	wimboot	bios	-
+route	reactos	iso	wimboot	uefi	-
+route	reactos	iso	vhdboot	bios	-
+route	reactos	iso	vhdboot	uefi	-
+route	reactos	iso	direct_efi	bios	-
+route	reactos	iso	direct_efi	uefi	-
+route	reactos	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	reactos	iso	chainload	uefi	-
+route	reactos	iso	memdisk	bios	-
+route	reactos	iso	memdisk	uefi	-
+route	reactos	iso	disk_image	bios	-
+route	reactos	iso	disk_image	uefi	-
+route	reactos	iso	floppy_image	bios	-
+route	reactos	iso	floppy_image	uefi	-
+route	reactos	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	reactos	wim	automatic	uefi	-
+route	reactos	wim	direct_iso	bios	-
+route	reactos	wim	direct_iso	uefi	-
+route	reactos	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	reactos	wim	wimboot	uefi	-
+route	reactos	wim	vhdboot	bios	-
+route	reactos	wim	vhdboot	uefi	-
+route	reactos	wim	direct_efi	bios	-
+route	reactos	wim	direct_efi	uefi	-
+route	reactos	wim	chainload	bios	-
+route	reactos	wim	chainload	uefi	-
+route	reactos	wim	memdisk	bios	-
+route	reactos	wim	memdisk	uefi	-
+route	reactos	wim	disk_image	bios	-
+route	reactos	wim	disk_image	uefi	-
+route	reactos	wim	floppy_image	bios	-
+route	reactos	wim	floppy_image	uefi	-
+route	reactos	img	automatic	bios	-
+route	reactos	img	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
+route	reactos	img	direct_iso	bios	-
+route	reactos	img	direct_iso	uefi	-
+route	reactos	img	wimboot	bios	-
+route	reactos	img	wimboot	uefi	-
+route	reactos	img	vhdboot	bios	-
+route	reactos	img	vhdboot	uefi	-
+route	reactos	img	direct_efi	bios	-
+route	reactos	img	direct_efi	uefi	-
+route	reactos	img	chainload	bios	-
+route	reactos	img	chainload	uefi	-
+route	reactos	img	memdisk	bios	-
+route	reactos	img	memdisk	uefi	-
+route	reactos	img	disk_image	bios	-
+route	reactos	img	disk_image	uefi	-
+route	reactos	img	floppy_image	bios	-
+route	reactos	img	floppy_image	uefi	-
+route	reactos	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	reactos	vhd	automatic	uefi	-
+route	reactos	vhd	direct_iso	bios	-
+route	reactos	vhd	direct_iso	uefi	-
+route	reactos	vhd	wimboot	bios	-
+route	reactos	vhd	wimboot	uefi	-
+route	reactos	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	reactos	vhd	vhdboot	uefi	-
+route	reactos	vhd	direct_efi	bios	-
+route	reactos	vhd	direct_efi	uefi	-
+route	reactos	vhd	chainload	bios	-
+route	reactos	vhd	chainload	uefi	-
+route	reactos	vhd	memdisk	bios	-
+route	reactos	vhd	memdisk	uefi	-
+route	reactos	vhd	disk_image	bios	-
+route	reactos	vhd	disk_image	uefi	-
+route	reactos	vhd	floppy_image	bios	-
+route	reactos	vhd	floppy_image	uefi	-
+route	reactos	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	reactos	vhdx	automatic	uefi	-
+route	reactos	vhdx	direct_iso	bios	-
+route	reactos	vhdx	direct_iso	uefi	-
+route	reactos	vhdx	wimboot	bios	-
+route	reactos	vhdx	wimboot	uefi	-
+route	reactos	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	reactos	vhdx	vhdboot	uefi	-
+route	reactos	vhdx	direct_efi	bios	-
+route	reactos	vhdx	direct_efi	uefi	-
+route	reactos	vhdx	chainload	bios	-
+route	reactos	vhdx	chainload	uefi	-
+route	reactos	vhdx	memdisk	bios	-
+route	reactos	vhdx	memdisk	uefi	-
+route	reactos	vhdx	disk_image	bios	-
+route	reactos	vhdx	disk_image	uefi	-
+route	reactos	vhdx	floppy_image	bios	-
+route	reactos	vhdx	floppy_image	uefi	-
+route	reactos	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	reactos	efi	automatic	uefi	-
+route	reactos	efi	direct_iso	bios	-
+route	reactos	efi	direct_iso	uefi	-
+route	reactos	efi	wimboot	bios	-
+route	reactos	efi	wimboot	uefi	-
+route	reactos	efi	vhdboot	bios	-
+route	reactos	efi	vhdboot	uefi	-
+route	reactos	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	reactos	efi	direct_efi	uefi	-
+route	reactos	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	reactos	efi	chainload	uefi	-
+route	reactos	efi	memdisk	bios	-
+route	reactos	efi	memdisk	uefi	-
+route	reactos	efi	disk_image	bios	-
+route	reactos	efi	disk_image	uefi	-
+route	reactos	efi	floppy_image	bios	-
+route	reactos	efi	floppy_image	uefi	-
+route	kolibrios	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	kolibrios	iso	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
+route	kolibrios	iso	direct_iso	bios	-
+route	kolibrios	iso	direct_iso	uefi	-
+route	kolibrios	iso	wimboot	bios	-
+route	kolibrios	iso	wimboot	uefi	-
+route	kolibrios	iso	vhdboot	bios	-
+route	kolibrios	iso	vhdboot	uefi	-
+route	kolibrios	iso	direct_efi	bios	-
+route	kolibrios	iso	direct_efi	uefi	-
+route	kolibrios	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	kolibrios	iso	chainload	uefi	-
+route	kolibrios	iso	memdisk	bios	-
+route	kolibrios	iso	memdisk	uefi	-
+route	kolibrios	iso	disk_image	bios	-
+route	kolibrios	iso	disk_image	uefi	-
+route	kolibrios	iso	floppy_image	bios	-
+route	kolibrios	iso	floppy_image	uefi	-
+route	kolibrios	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	kolibrios	wim	automatic	uefi	-
+route	kolibrios	wim	direct_iso	bios	-
+route	kolibrios	wim	direct_iso	uefi	-
+route	kolibrios	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	kolibrios	wim	wimboot	uefi	-
+route	kolibrios	wim	vhdboot	bios	-
+route	kolibrios	wim	vhdboot	uefi	-
+route	kolibrios	wim	direct_efi	bios	-
+route	kolibrios	wim	direct_efi	uefi	-
+route	kolibrios	wim	chainload	bios	-
+route	kolibrios	wim	chainload	uefi	-
+route	kolibrios	wim	memdisk	bios	-
+route	kolibrios	wim	memdisk	uefi	-
+route	kolibrios	wim	disk_image	bios	-
+route	kolibrios	wim	disk_image	uefi	-
+route	kolibrios	wim	floppy_image	bios	-
+route	kolibrios	wim	floppy_image	uefi	-
+route	kolibrios	img	automatic	bios	-
+route	kolibrios	img	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
+route	kolibrios	img	direct_iso	bios	-
+route	kolibrios	img	direct_iso	uefi	-
+route	kolibrios	img	wimboot	bios	-
+route	kolibrios	img	wimboot	uefi	-
+route	kolibrios	img	vhdboot	bios	-
+route	kolibrios	img	vhdboot	uefi	-
+route	kolibrios	img	direct_efi	bios	-
+route	kolibrios	img	direct_efi	uefi	-
+route	kolibrios	img	chainload	bios	-
+route	kolibrios	img	chainload	uefi	-
+route	kolibrios	img	memdisk	bios	-
+route	kolibrios	img	memdisk	uefi	-
+route	kolibrios	img	disk_image	bios	-
+route	kolibrios	img	disk_image	uefi	-
+route	kolibrios	img	floppy_image	bios	-
+route	kolibrios	img	floppy_image	uefi	-
+route	kolibrios	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	kolibrios	vhd	automatic	uefi	-
+route	kolibrios	vhd	direct_iso	bios	-
+route	kolibrios	vhd	direct_iso	uefi	-
+route	kolibrios	vhd	wimboot	bios	-
+route	kolibrios	vhd	wimboot	uefi	-
+route	kolibrios	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	kolibrios	vhd	vhdboot	uefi	-
+route	kolibrios	vhd	direct_efi	bios	-
+route	kolibrios	vhd	direct_efi	uefi	-
+route	kolibrios	vhd	chainload	bios	-
+route	kolibrios	vhd	chainload	uefi	-
+route	kolibrios	vhd	memdisk	bios	-
+route	kolibrios	vhd	memdisk	uefi	-
+route	kolibrios	vhd	disk_image	bios	-
+route	kolibrios	vhd	disk_image	uefi	-
+route	kolibrios	vhd	floppy_image	bios	-
+route	kolibrios	vhd	floppy_image	uefi	-
+route	kolibrios	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	kolibrios	vhdx	automatic	uefi	-
+route	kolibrios	vhdx	direct_iso	bios	-
+route	kolibrios	vhdx	direct_iso	uefi	-
+route	kolibrios	vhdx	wimboot	bios	-
+route	kolibrios	vhdx	wimboot	uefi	-
+route	kolibrios	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	kolibrios	vhdx	vhdboot	uefi	-
+route	kolibrios	vhdx	direct_efi	bios	-
+route	kolibrios	vhdx	direct_efi	uefi	-
+route	kolibrios	vhdx	chainload	bios	-
+route	kolibrios	vhdx	chainload	uefi	-
+route	kolibrios	vhdx	memdisk	bios	-
+route	kolibrios	vhdx	memdisk	uefi	-
+route	kolibrios	vhdx	disk_image	bios	-
+route	kolibrios	vhdx	disk_image	uefi	-
+route	kolibrios	vhdx	floppy_image	bios	-
+route	kolibrios	vhdx	floppy_image	uefi	-
+route	kolibrios	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	kolibrios	efi	automatic	uefi	-
+route	kolibrios	efi	direct_iso	bios	-
+route	kolibrios	efi	direct_iso	uefi	-
+route	kolibrios	efi	wimboot	bios	-
+route	kolibrios	efi	wimboot	uefi	-
+route	kolibrios	efi	vhdboot	bios	-
+route	kolibrios	efi	vhdboot	uefi	-
+route	kolibrios	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	kolibrios	efi	direct_efi	uefi	-
+route	kolibrios	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	kolibrios	efi	chainload	uefi	-
+route	kolibrios	efi	memdisk	bios	-
+route	kolibrios	efi	memdisk	uefi	-
+route	kolibrios	efi	disk_image	bios	-
+route	kolibrios	efi	disk_image	uefi	-
+route	kolibrios	efi	floppy_image	bios	-
+route	kolibrios	efi	floppy_image	uefi	-
+route	other-os	iso	automatic	bios	chainload	chainload	uefi	validated_hardware	0
+route	other-os	iso	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
+route	other-os	iso	direct_iso	bios	-
+route	other-os	iso	direct_iso	uefi	-
+route	other-os	iso	wimboot	bios	-
+route	other-os	iso	wimboot	uefi	-
+route	other-os	iso	vhdboot	bios	-
+route	other-os	iso	vhdboot	uefi	-
+route	other-os	iso	direct_efi	bios	-
+route	other-os	iso	direct_efi	uefi	-
+route	other-os	iso	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	other-os	iso	chainload	uefi	-
+route	other-os	iso	memdisk	bios	-
+route	other-os	iso	memdisk	uefi	-
+route	other-os	iso	disk_image	bios	-
+route	other-os	iso	disk_image	uefi	-
+route	other-os	iso	floppy_image	bios	-
+route	other-os	iso	floppy_image	uefi	-
+route	other-os	wim	automatic	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	other-os	wim	automatic	uefi	-
+route	other-os	wim	direct_iso	bios	-
+route	other-os	wim	direct_iso	uefi	-
+route	other-os	wim	wimboot	bios	wimboot	wimboot	uefi	tested_in_vm	0
+route	other-os	wim	wimboot	uefi	-
+route	other-os	wim	vhdboot	bios	-
+route	other-os	wim	vhdboot	uefi	-
+route	other-os	wim	direct_efi	bios	-
+route	other-os	wim	direct_efi	uefi	-
+route	other-os	wim	chainload	bios	-
+route	other-os	wim	chainload	uefi	-
+route	other-os	wim	memdisk	bios	-
+route	other-os	wim	memdisk	uefi	-
+route	other-os	wim	disk_image	bios	-
+route	other-os	wim	disk_image	uefi	-
+route	other-os	wim	floppy_image	bios	-
+route	other-os	wim	floppy_image	uefi	-
+route	other-os	img	automatic	bios	-
+route	other-os	img	automatic	uefi	win9x_uefi	direct_iso	uefi	experimental	1
+route	other-os	img	direct_iso	bios	-
+route	other-os	img	direct_iso	uefi	-
+route	other-os	img	wimboot	bios	-
+route	other-os	img	wimboot	uefi	-
+route	other-os	img	vhdboot	bios	-
+route	other-os	img	vhdboot	uefi	-
+route	other-os	img	direct_efi	bios	-
+route	other-os	img	direct_efi	uefi	-
+route	other-os	img	chainload	bios	-
+route	other-os	img	chainload	uefi	-
+route	other-os	img	memdisk	bios	-
+route	other-os	img	memdisk	uefi	-
+route	other-os	img	disk_image	bios	-
+route	other-os	img	disk_image	uefi	-
+route	other-os	img	floppy_image	bios	-
+route	other-os	img	floppy_image	uefi	-
+route	other-os	vhd	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	other-os	vhd	automatic	uefi	-
+route	other-os	vhd	direct_iso	bios	-
+route	other-os	vhd	direct_iso	uefi	-
+route	other-os	vhd	wimboot	bios	-
+route	other-os	vhd	wimboot	uefi	-
+route	other-os	vhd	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	other-os	vhd	vhdboot	uefi	-
+route	other-os	vhd	direct_efi	bios	-
+route	other-os	vhd	direct_efi	uefi	-
+route	other-os	vhd	chainload	bios	-
+route	other-os	vhd	chainload	uefi	-
+route	other-os	vhd	memdisk	bios	-
+route	other-os	vhd	memdisk	uefi	-
+route	other-os	vhd	disk_image	bios	-
+route	other-os	vhd	disk_image	uefi	-
+route	other-os	vhd	floppy_image	bios	-
+route	other-os	vhd	floppy_image	uefi	-
+route	other-os	vhdx	automatic	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	other-os	vhdx	automatic	uefi	-
+route	other-os	vhdx	direct_iso	bios	-
+route	other-os	vhdx	direct_iso	uefi	-
+route	other-os	vhdx	wimboot	bios	-
+route	other-os	vhdx	wimboot	uefi	-
+route	other-os	vhdx	vhdboot	bios	vhdboot	vhdboot	uefi	tested_in_vm	0
+route	other-os	vhdx	vhdboot	uefi	-
+route	other-os	vhdx	direct_efi	bios	-
+route	other-os	vhdx	direct_efi	uefi	-
+route	other-os	vhdx	chainload	bios	-
+route	other-os	vhdx	chainload	uefi	-
+route	other-os	vhdx	memdisk	bios	-
+route	other-os	vhdx	memdisk	uefi	-
+route	other-os	vhdx	disk_image	bios	-
+route	other-os	vhdx	disk_image	uefi	-
+route	other-os	vhdx	floppy_image	bios	-
+route	other-os	vhdx	floppy_image	uefi	-
+route	other-os	efi	automatic	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	other-os	efi	automatic	uefi	-
+route	other-os	efi	direct_iso	bios	-
+route	other-os	efi	direct_iso	uefi	-
+route	other-os	efi	wimboot	bios	-
+route	other-os	efi	wimboot	uefi	-
+route	other-os	efi	vhdboot	bios	-
+route	other-os	efi	vhdboot	uefi	-
+route	other-os	efi	direct_efi	bios	direct_efi	direct_efi	uefi	tested_in_vm	0
+route	other-os	efi	direct_efi	uefi	-
+route	other-os	efi	chainload	bios	chainload	chainload	uefi	validated_hardware	0
+route	other-os	efi	chainload	uefi	-
+route	other-os	efi	memdisk	bios	-
+route	other-os	efi	memdisk	uefi	-
+route	other-os	efi	disk_image	bios	-
+route	other-os	efi	disk_image	uefi	-
+route	other-os	efi	floppy_image	bios	-
+route	other-os	efi	floppy_image	uefi	-
 # profile (M1): system image method firmware(-: firmware-less) selected profile id
 profile	windows-11	iso	automatic	bios	win10-11-uefi-native
 profile	windows-11	iso	automatic	uefi	win10-11-uefi-native
@@ -11148,38 +11693,81 @@ profile	windows-nashville	efi	chainload	bios	efi-chainload
 profile	windows-nashville	efi	chainload	uefi	efi-chainload
 profile	windows-nashville	efi	chainload	-	efi-chainload
 profile	freedos	iso	automatic	bios	iso-work-chainload
-profile	freedos	iso	automatic	uefi	iso-work-chainload
+profile	freedos	iso	automatic	uefi	custom-image-uefi
 profile	freedos	iso	automatic	-	iso-work-chainload
+profile	freedos	iso	direct_iso	uefi	custom-image-uefi-other
+profile	freedos	iso	wimboot	uefi	custom-image-uefi-other
+profile	freedos	iso	vhdboot	uefi	custom-image-uefi-other
+profile	freedos	iso	direct_efi	uefi	custom-image-uefi-other
 profile	freedos	iso	chainload	bios	iso-work-chainload
-profile	freedos	iso	chainload	uefi	iso-work-chainload
+profile	freedos	iso	chainload	uefi	custom-image-uefi-other
 profile	freedos	iso	chainload	-	iso-work-chainload
+profile	freedos	iso	memdisk	uefi	custom-image-uefi-other
+profile	freedos	iso	disk_image	uefi	custom-image-uefi-other
+profile	freedos	iso	floppy_image	uefi	custom-image-uefi-other
 profile	freedos	wim	automatic	bios	wim-wimboot
-profile	freedos	wim	automatic	uefi	wim-wimboot
+profile	freedos	wim	automatic	uefi	custom-image-uefi-other
 profile	freedos	wim	automatic	-	wim-wimboot
+profile	freedos	wim	direct_iso	uefi	custom-image-uefi-other
 profile	freedos	wim	wimboot	bios	wim-wimboot
-profile	freedos	wim	wimboot	uefi	wim-wimboot
+profile	freedos	wim	wimboot	uefi	custom-image-uefi-other
 profile	freedos	wim	wimboot	-	wim-wimboot
+profile	freedos	wim	vhdboot	uefi	custom-image-uefi-other
+profile	freedos	wim	direct_efi	uefi	custom-image-uefi-other
+profile	freedos	wim	chainload	uefi	custom-image-uefi-other
+profile	freedos	wim	memdisk	uefi	custom-image-uefi-other
+profile	freedos	wim	disk_image	uefi	custom-image-uefi-other
+profile	freedos	wim	floppy_image	uefi	custom-image-uefi-other
+profile	freedos	img	automatic	uefi	custom-image-uefi
+profile	freedos	img	direct_iso	uefi	custom-image-uefi-other
+profile	freedos	img	wimboot	uefi	custom-image-uefi-other
+profile	freedos	img	vhdboot	uefi	custom-image-uefi-other
+profile	freedos	img	direct_efi	uefi	custom-image-uefi-other
+profile	freedos	img	chainload	uefi	custom-image-uefi-other
+profile	freedos	img	memdisk	uefi	custom-image-uefi-other
+profile	freedos	img	disk_image	uefi	custom-image-uefi-other
+profile	freedos	img	floppy_image	uefi	custom-image-uefi-other
 profile	freedos	vhd	automatic	bios	vhd-vhdboot
-profile	freedos	vhd	automatic	uefi	vhd-vhdboot
+profile	freedos	vhd	automatic	uefi	custom-image-uefi-other
 profile	freedos	vhd	automatic	-	vhd-vhdboot
+profile	freedos	vhd	direct_iso	uefi	custom-image-uefi-other
+profile	freedos	vhd	wimboot	uefi	custom-image-uefi-other
 profile	freedos	vhd	vhdboot	bios	vhd-vhdboot
-profile	freedos	vhd	vhdboot	uefi	vhd-vhdboot
+profile	freedos	vhd	vhdboot	uefi	custom-image-uefi-other
 profile	freedos	vhd	vhdboot	-	vhd-vhdboot
+profile	freedos	vhd	direct_efi	uefi	custom-image-uefi-other
+profile	freedos	vhd	chainload	uefi	custom-image-uefi-other
+profile	freedos	vhd	memdisk	uefi	custom-image-uefi-other
+profile	freedos	vhd	disk_image	uefi	custom-image-uefi-other
+profile	freedos	vhd	floppy_image	uefi	custom-image-uefi-other
 profile	freedos	vhdx	automatic	bios	vhd-vhdboot
-profile	freedos	vhdx	automatic	uefi	vhd-vhdboot
+profile	freedos	vhdx	automatic	uefi	custom-image-uefi-other
 profile	freedos	vhdx	automatic	-	vhd-vhdboot
+profile	freedos	vhdx	direct_iso	uefi	custom-image-uefi-other
+profile	freedos	vhdx	wimboot	uefi	custom-image-uefi-other
 profile	freedos	vhdx	vhdboot	bios	vhd-vhdboot
-profile	freedos	vhdx	vhdboot	uefi	vhd-vhdboot
+profile	freedos	vhdx	vhdboot	uefi	custom-image-uefi-other
 profile	freedos	vhdx	vhdboot	-	vhd-vhdboot
+profile	freedos	vhdx	direct_efi	uefi	custom-image-uefi-other
+profile	freedos	vhdx	chainload	uefi	custom-image-uefi-other
+profile	freedos	vhdx	memdisk	uefi	custom-image-uefi-other
+profile	freedos	vhdx	disk_image	uefi	custom-image-uefi-other
+profile	freedos	vhdx	floppy_image	uefi	custom-image-uefi-other
 profile	freedos	efi	automatic	bios	efi-direct
-profile	freedos	efi	automatic	uefi	efi-direct
+profile	freedos	efi	automatic	uefi	custom-image-uefi-other
 profile	freedos	efi	automatic	-	efi-direct
+profile	freedos	efi	direct_iso	uefi	custom-image-uefi-other
+profile	freedos	efi	wimboot	uefi	custom-image-uefi-other
+profile	freedos	efi	vhdboot	uefi	custom-image-uefi-other
 profile	freedos	efi	direct_efi	bios	efi-direct
-profile	freedos	efi	direct_efi	uefi	efi-direct
+profile	freedos	efi	direct_efi	uefi	custom-image-uefi-other
 profile	freedos	efi	direct_efi	-	efi-direct
 profile	freedos	efi	chainload	bios	efi-chainload
-profile	freedos	efi	chainload	uefi	efi-chainload
+profile	freedos	efi	chainload	uefi	custom-image-uefi-other
 profile	freedos	efi	chainload	-	efi-chainload
+profile	freedos	efi	memdisk	uefi	custom-image-uefi-other
+profile	freedos	efi	disk_image	uefi	custom-image-uefi-other
+profile	freedos	efi	floppy_image	uefi	custom-image-uefi-other
 profile	ms-dos	iso	automatic	bios	dos-fat16-bios
 profile	ms-dos	iso	automatic	uefi	w9x-uefi-csmwrap
 profile	ms-dos	iso	automatic	-	iso-work-chainload
@@ -11390,6 +11978,386 @@ profile	other-dos	efi	direct_efi	-	efi-direct
 profile	other-dos	efi	chainload	bios	efi-chainload
 profile	other-dos	efi	chainload	uefi	efi-chainload
 profile	other-dos	efi	chainload	-	efi-chainload
+profile	haiku	iso	automatic	bios	iso-work-chainload
+profile	haiku	iso	automatic	uefi	custom-image-uefi
+profile	haiku	iso	automatic	-	iso-work-chainload
+profile	haiku	iso	direct_iso	uefi	custom-image-uefi-other
+profile	haiku	iso	wimboot	uefi	custom-image-uefi-other
+profile	haiku	iso	vhdboot	uefi	custom-image-uefi-other
+profile	haiku	iso	direct_efi	uefi	custom-image-uefi-other
+profile	haiku	iso	chainload	bios	iso-work-chainload
+profile	haiku	iso	chainload	uefi	custom-image-uefi-other
+profile	haiku	iso	chainload	-	iso-work-chainload
+profile	haiku	iso	memdisk	uefi	custom-image-uefi-other
+profile	haiku	iso	disk_image	uefi	custom-image-uefi-other
+profile	haiku	iso	floppy_image	uefi	custom-image-uefi-other
+profile	haiku	wim	automatic	bios	wim-wimboot
+profile	haiku	wim	automatic	uefi	custom-image-uefi-other
+profile	haiku	wim	automatic	-	wim-wimboot
+profile	haiku	wim	direct_iso	uefi	custom-image-uefi-other
+profile	haiku	wim	wimboot	bios	wim-wimboot
+profile	haiku	wim	wimboot	uefi	custom-image-uefi-other
+profile	haiku	wim	wimboot	-	wim-wimboot
+profile	haiku	wim	vhdboot	uefi	custom-image-uefi-other
+profile	haiku	wim	direct_efi	uefi	custom-image-uefi-other
+profile	haiku	wim	chainload	uefi	custom-image-uefi-other
+profile	haiku	wim	memdisk	uefi	custom-image-uefi-other
+profile	haiku	wim	disk_image	uefi	custom-image-uefi-other
+profile	haiku	wim	floppy_image	uefi	custom-image-uefi-other
+profile	haiku	img	automatic	uefi	custom-image-uefi
+profile	haiku	img	direct_iso	uefi	custom-image-uefi-other
+profile	haiku	img	wimboot	uefi	custom-image-uefi-other
+profile	haiku	img	vhdboot	uefi	custom-image-uefi-other
+profile	haiku	img	direct_efi	uefi	custom-image-uefi-other
+profile	haiku	img	chainload	uefi	custom-image-uefi-other
+profile	haiku	img	memdisk	uefi	custom-image-uefi-other
+profile	haiku	img	disk_image	uefi	custom-image-uefi-other
+profile	haiku	img	floppy_image	uefi	custom-image-uefi-other
+profile	haiku	vhd	automatic	bios	vhd-vhdboot
+profile	haiku	vhd	automatic	uefi	custom-image-uefi-other
+profile	haiku	vhd	automatic	-	vhd-vhdboot
+profile	haiku	vhd	direct_iso	uefi	custom-image-uefi-other
+profile	haiku	vhd	wimboot	uefi	custom-image-uefi-other
+profile	haiku	vhd	vhdboot	bios	vhd-vhdboot
+profile	haiku	vhd	vhdboot	uefi	custom-image-uefi-other
+profile	haiku	vhd	vhdboot	-	vhd-vhdboot
+profile	haiku	vhd	direct_efi	uefi	custom-image-uefi-other
+profile	haiku	vhd	chainload	uefi	custom-image-uefi-other
+profile	haiku	vhd	memdisk	uefi	custom-image-uefi-other
+profile	haiku	vhd	disk_image	uefi	custom-image-uefi-other
+profile	haiku	vhd	floppy_image	uefi	custom-image-uefi-other
+profile	haiku	vhdx	automatic	bios	vhd-vhdboot
+profile	haiku	vhdx	automatic	uefi	custom-image-uefi-other
+profile	haiku	vhdx	automatic	-	vhd-vhdboot
+profile	haiku	vhdx	direct_iso	uefi	custom-image-uefi-other
+profile	haiku	vhdx	wimboot	uefi	custom-image-uefi-other
+profile	haiku	vhdx	vhdboot	bios	vhd-vhdboot
+profile	haiku	vhdx	vhdboot	uefi	custom-image-uefi-other
+profile	haiku	vhdx	vhdboot	-	vhd-vhdboot
+profile	haiku	vhdx	direct_efi	uefi	custom-image-uefi-other
+profile	haiku	vhdx	chainload	uefi	custom-image-uefi-other
+profile	haiku	vhdx	memdisk	uefi	custom-image-uefi-other
+profile	haiku	vhdx	disk_image	uefi	custom-image-uefi-other
+profile	haiku	vhdx	floppy_image	uefi	custom-image-uefi-other
+profile	haiku	efi	automatic	bios	efi-direct
+profile	haiku	efi	automatic	uefi	custom-image-uefi-other
+profile	haiku	efi	automatic	-	efi-direct
+profile	haiku	efi	direct_iso	uefi	custom-image-uefi-other
+profile	haiku	efi	wimboot	uefi	custom-image-uefi-other
+profile	haiku	efi	vhdboot	uefi	custom-image-uefi-other
+profile	haiku	efi	direct_efi	bios	efi-direct
+profile	haiku	efi	direct_efi	uefi	custom-image-uefi-other
+profile	haiku	efi	direct_efi	-	efi-direct
+profile	haiku	efi	chainload	bios	efi-chainload
+profile	haiku	efi	chainload	uefi	custom-image-uefi-other
+profile	haiku	efi	chainload	-	efi-chainload
+profile	haiku	efi	memdisk	uefi	custom-image-uefi-other
+profile	haiku	efi	disk_image	uefi	custom-image-uefi-other
+profile	haiku	efi	floppy_image	uefi	custom-image-uefi-other
+profile	freebsd	iso	automatic	bios	iso-work-chainload
+profile	freebsd	iso	automatic	uefi	custom-image-uefi
+profile	freebsd	iso	automatic	-	iso-work-chainload
+profile	freebsd	iso	direct_iso	uefi	custom-image-uefi-other
+profile	freebsd	iso	wimboot	uefi	custom-image-uefi-other
+profile	freebsd	iso	vhdboot	uefi	custom-image-uefi-other
+profile	freebsd	iso	direct_efi	uefi	custom-image-uefi-other
+profile	freebsd	iso	chainload	bios	iso-work-chainload
+profile	freebsd	iso	chainload	uefi	custom-image-uefi-other
+profile	freebsd	iso	chainload	-	iso-work-chainload
+profile	freebsd	iso	memdisk	uefi	custom-image-uefi-other
+profile	freebsd	iso	disk_image	uefi	custom-image-uefi-other
+profile	freebsd	iso	floppy_image	uefi	custom-image-uefi-other
+profile	freebsd	wim	automatic	bios	wim-wimboot
+profile	freebsd	wim	automatic	uefi	custom-image-uefi-other
+profile	freebsd	wim	automatic	-	wim-wimboot
+profile	freebsd	wim	direct_iso	uefi	custom-image-uefi-other
+profile	freebsd	wim	wimboot	bios	wim-wimboot
+profile	freebsd	wim	wimboot	uefi	custom-image-uefi-other
+profile	freebsd	wim	wimboot	-	wim-wimboot
+profile	freebsd	wim	vhdboot	uefi	custom-image-uefi-other
+profile	freebsd	wim	direct_efi	uefi	custom-image-uefi-other
+profile	freebsd	wim	chainload	uefi	custom-image-uefi-other
+profile	freebsd	wim	memdisk	uefi	custom-image-uefi-other
+profile	freebsd	wim	disk_image	uefi	custom-image-uefi-other
+profile	freebsd	wim	floppy_image	uefi	custom-image-uefi-other
+profile	freebsd	img	automatic	uefi	custom-image-uefi
+profile	freebsd	img	direct_iso	uefi	custom-image-uefi-other
+profile	freebsd	img	wimboot	uefi	custom-image-uefi-other
+profile	freebsd	img	vhdboot	uefi	custom-image-uefi-other
+profile	freebsd	img	direct_efi	uefi	custom-image-uefi-other
+profile	freebsd	img	chainload	uefi	custom-image-uefi-other
+profile	freebsd	img	memdisk	uefi	custom-image-uefi-other
+profile	freebsd	img	disk_image	uefi	custom-image-uefi-other
+profile	freebsd	img	floppy_image	uefi	custom-image-uefi-other
+profile	freebsd	vhd	automatic	bios	vhd-vhdboot
+profile	freebsd	vhd	automatic	uefi	custom-image-uefi-other
+profile	freebsd	vhd	automatic	-	vhd-vhdboot
+profile	freebsd	vhd	direct_iso	uefi	custom-image-uefi-other
+profile	freebsd	vhd	wimboot	uefi	custom-image-uefi-other
+profile	freebsd	vhd	vhdboot	bios	vhd-vhdboot
+profile	freebsd	vhd	vhdboot	uefi	custom-image-uefi-other
+profile	freebsd	vhd	vhdboot	-	vhd-vhdboot
+profile	freebsd	vhd	direct_efi	uefi	custom-image-uefi-other
+profile	freebsd	vhd	chainload	uefi	custom-image-uefi-other
+profile	freebsd	vhd	memdisk	uefi	custom-image-uefi-other
+profile	freebsd	vhd	disk_image	uefi	custom-image-uefi-other
+profile	freebsd	vhd	floppy_image	uefi	custom-image-uefi-other
+profile	freebsd	vhdx	automatic	bios	vhd-vhdboot
+profile	freebsd	vhdx	automatic	uefi	custom-image-uefi-other
+profile	freebsd	vhdx	automatic	-	vhd-vhdboot
+profile	freebsd	vhdx	direct_iso	uefi	custom-image-uefi-other
+profile	freebsd	vhdx	wimboot	uefi	custom-image-uefi-other
+profile	freebsd	vhdx	vhdboot	bios	vhd-vhdboot
+profile	freebsd	vhdx	vhdboot	uefi	custom-image-uefi-other
+profile	freebsd	vhdx	vhdboot	-	vhd-vhdboot
+profile	freebsd	vhdx	direct_efi	uefi	custom-image-uefi-other
+profile	freebsd	vhdx	chainload	uefi	custom-image-uefi-other
+profile	freebsd	vhdx	memdisk	uefi	custom-image-uefi-other
+profile	freebsd	vhdx	disk_image	uefi	custom-image-uefi-other
+profile	freebsd	vhdx	floppy_image	uefi	custom-image-uefi-other
+profile	freebsd	efi	automatic	bios	efi-direct
+profile	freebsd	efi	automatic	uefi	custom-image-uefi-other
+profile	freebsd	efi	automatic	-	efi-direct
+profile	freebsd	efi	direct_iso	uefi	custom-image-uefi-other
+profile	freebsd	efi	wimboot	uefi	custom-image-uefi-other
+profile	freebsd	efi	vhdboot	uefi	custom-image-uefi-other
+profile	freebsd	efi	direct_efi	bios	efi-direct
+profile	freebsd	efi	direct_efi	uefi	custom-image-uefi-other
+profile	freebsd	efi	direct_efi	-	efi-direct
+profile	freebsd	efi	chainload	bios	efi-chainload
+profile	freebsd	efi	chainload	uefi	custom-image-uefi-other
+profile	freebsd	efi	chainload	-	efi-chainload
+profile	freebsd	efi	memdisk	uefi	custom-image-uefi-other
+profile	freebsd	efi	disk_image	uefi	custom-image-uefi-other
+profile	freebsd	efi	floppy_image	uefi	custom-image-uefi-other
+profile	reactos	iso	automatic	bios	iso-work-chainload
+profile	reactos	iso	automatic	uefi	custom-image-uefi
+profile	reactos	iso	automatic	-	iso-work-chainload
+profile	reactos	iso	direct_iso	uefi	custom-image-uefi-other
+profile	reactos	iso	wimboot	uefi	custom-image-uefi-other
+profile	reactos	iso	vhdboot	uefi	custom-image-uefi-other
+profile	reactos	iso	direct_efi	uefi	custom-image-uefi-other
+profile	reactos	iso	chainload	bios	iso-work-chainload
+profile	reactos	iso	chainload	uefi	custom-image-uefi-other
+profile	reactos	iso	chainload	-	iso-work-chainload
+profile	reactos	iso	memdisk	uefi	custom-image-uefi-other
+profile	reactos	iso	disk_image	uefi	custom-image-uefi-other
+profile	reactos	iso	floppy_image	uefi	custom-image-uefi-other
+profile	reactos	wim	automatic	bios	wim-wimboot
+profile	reactos	wim	automatic	uefi	custom-image-uefi-other
+profile	reactos	wim	automatic	-	wim-wimboot
+profile	reactos	wim	direct_iso	uefi	custom-image-uefi-other
+profile	reactos	wim	wimboot	bios	wim-wimboot
+profile	reactos	wim	wimboot	uefi	custom-image-uefi-other
+profile	reactos	wim	wimboot	-	wim-wimboot
+profile	reactos	wim	vhdboot	uefi	custom-image-uefi-other
+profile	reactos	wim	direct_efi	uefi	custom-image-uefi-other
+profile	reactos	wim	chainload	uefi	custom-image-uefi-other
+profile	reactos	wim	memdisk	uefi	custom-image-uefi-other
+profile	reactos	wim	disk_image	uefi	custom-image-uefi-other
+profile	reactos	wim	floppy_image	uefi	custom-image-uefi-other
+profile	reactos	img	automatic	uefi	custom-image-uefi
+profile	reactos	img	direct_iso	uefi	custom-image-uefi-other
+profile	reactos	img	wimboot	uefi	custom-image-uefi-other
+profile	reactos	img	vhdboot	uefi	custom-image-uefi-other
+profile	reactos	img	direct_efi	uefi	custom-image-uefi-other
+profile	reactos	img	chainload	uefi	custom-image-uefi-other
+profile	reactos	img	memdisk	uefi	custom-image-uefi-other
+profile	reactos	img	disk_image	uefi	custom-image-uefi-other
+profile	reactos	img	floppy_image	uefi	custom-image-uefi-other
+profile	reactos	vhd	automatic	bios	vhd-vhdboot
+profile	reactos	vhd	automatic	uefi	custom-image-uefi-other
+profile	reactos	vhd	automatic	-	vhd-vhdboot
+profile	reactos	vhd	direct_iso	uefi	custom-image-uefi-other
+profile	reactos	vhd	wimboot	uefi	custom-image-uefi-other
+profile	reactos	vhd	vhdboot	bios	vhd-vhdboot
+profile	reactos	vhd	vhdboot	uefi	custom-image-uefi-other
+profile	reactos	vhd	vhdboot	-	vhd-vhdboot
+profile	reactos	vhd	direct_efi	uefi	custom-image-uefi-other
+profile	reactos	vhd	chainload	uefi	custom-image-uefi-other
+profile	reactos	vhd	memdisk	uefi	custom-image-uefi-other
+profile	reactos	vhd	disk_image	uefi	custom-image-uefi-other
+profile	reactos	vhd	floppy_image	uefi	custom-image-uefi-other
+profile	reactos	vhdx	automatic	bios	vhd-vhdboot
+profile	reactos	vhdx	automatic	uefi	custom-image-uefi-other
+profile	reactos	vhdx	automatic	-	vhd-vhdboot
+profile	reactos	vhdx	direct_iso	uefi	custom-image-uefi-other
+profile	reactos	vhdx	wimboot	uefi	custom-image-uefi-other
+profile	reactos	vhdx	vhdboot	bios	vhd-vhdboot
+profile	reactos	vhdx	vhdboot	uefi	custom-image-uefi-other
+profile	reactos	vhdx	vhdboot	-	vhd-vhdboot
+profile	reactos	vhdx	direct_efi	uefi	custom-image-uefi-other
+profile	reactos	vhdx	chainload	uefi	custom-image-uefi-other
+profile	reactos	vhdx	memdisk	uefi	custom-image-uefi-other
+profile	reactos	vhdx	disk_image	uefi	custom-image-uefi-other
+profile	reactos	vhdx	floppy_image	uefi	custom-image-uefi-other
+profile	reactos	efi	automatic	bios	efi-direct
+profile	reactos	efi	automatic	uefi	custom-image-uefi-other
+profile	reactos	efi	automatic	-	efi-direct
+profile	reactos	efi	direct_iso	uefi	custom-image-uefi-other
+profile	reactos	efi	wimboot	uefi	custom-image-uefi-other
+profile	reactos	efi	vhdboot	uefi	custom-image-uefi-other
+profile	reactos	efi	direct_efi	bios	efi-direct
+profile	reactos	efi	direct_efi	uefi	custom-image-uefi-other
+profile	reactos	efi	direct_efi	-	efi-direct
+profile	reactos	efi	chainload	bios	efi-chainload
+profile	reactos	efi	chainload	uefi	custom-image-uefi-other
+profile	reactos	efi	chainload	-	efi-chainload
+profile	reactos	efi	memdisk	uefi	custom-image-uefi-other
+profile	reactos	efi	disk_image	uefi	custom-image-uefi-other
+profile	reactos	efi	floppy_image	uefi	custom-image-uefi-other
+profile	kolibrios	iso	automatic	bios	iso-work-chainload
+profile	kolibrios	iso	automatic	uefi	custom-image-uefi
+profile	kolibrios	iso	automatic	-	iso-work-chainload
+profile	kolibrios	iso	direct_iso	uefi	custom-image-uefi-other
+profile	kolibrios	iso	wimboot	uefi	custom-image-uefi-other
+profile	kolibrios	iso	vhdboot	uefi	custom-image-uefi-other
+profile	kolibrios	iso	direct_efi	uefi	custom-image-uefi-other
+profile	kolibrios	iso	chainload	bios	iso-work-chainload
+profile	kolibrios	iso	chainload	uefi	custom-image-uefi-other
+profile	kolibrios	iso	chainload	-	iso-work-chainload
+profile	kolibrios	iso	memdisk	uefi	custom-image-uefi-other
+profile	kolibrios	iso	disk_image	uefi	custom-image-uefi-other
+profile	kolibrios	iso	floppy_image	uefi	custom-image-uefi-other
+profile	kolibrios	wim	automatic	bios	wim-wimboot
+profile	kolibrios	wim	automatic	uefi	custom-image-uefi-other
+profile	kolibrios	wim	automatic	-	wim-wimboot
+profile	kolibrios	wim	direct_iso	uefi	custom-image-uefi-other
+profile	kolibrios	wim	wimboot	bios	wim-wimboot
+profile	kolibrios	wim	wimboot	uefi	custom-image-uefi-other
+profile	kolibrios	wim	wimboot	-	wim-wimboot
+profile	kolibrios	wim	vhdboot	uefi	custom-image-uefi-other
+profile	kolibrios	wim	direct_efi	uefi	custom-image-uefi-other
+profile	kolibrios	wim	chainload	uefi	custom-image-uefi-other
+profile	kolibrios	wim	memdisk	uefi	custom-image-uefi-other
+profile	kolibrios	wim	disk_image	uefi	custom-image-uefi-other
+profile	kolibrios	wim	floppy_image	uefi	custom-image-uefi-other
+profile	kolibrios	img	automatic	uefi	custom-image-uefi
+profile	kolibrios	img	direct_iso	uefi	custom-image-uefi-other
+profile	kolibrios	img	wimboot	uefi	custom-image-uefi-other
+profile	kolibrios	img	vhdboot	uefi	custom-image-uefi-other
+profile	kolibrios	img	direct_efi	uefi	custom-image-uefi-other
+profile	kolibrios	img	chainload	uefi	custom-image-uefi-other
+profile	kolibrios	img	memdisk	uefi	custom-image-uefi-other
+profile	kolibrios	img	disk_image	uefi	custom-image-uefi-other
+profile	kolibrios	img	floppy_image	uefi	custom-image-uefi-other
+profile	kolibrios	vhd	automatic	bios	vhd-vhdboot
+profile	kolibrios	vhd	automatic	uefi	custom-image-uefi-other
+profile	kolibrios	vhd	automatic	-	vhd-vhdboot
+profile	kolibrios	vhd	direct_iso	uefi	custom-image-uefi-other
+profile	kolibrios	vhd	wimboot	uefi	custom-image-uefi-other
+profile	kolibrios	vhd	vhdboot	bios	vhd-vhdboot
+profile	kolibrios	vhd	vhdboot	uefi	custom-image-uefi-other
+profile	kolibrios	vhd	vhdboot	-	vhd-vhdboot
+profile	kolibrios	vhd	direct_efi	uefi	custom-image-uefi-other
+profile	kolibrios	vhd	chainload	uefi	custom-image-uefi-other
+profile	kolibrios	vhd	memdisk	uefi	custom-image-uefi-other
+profile	kolibrios	vhd	disk_image	uefi	custom-image-uefi-other
+profile	kolibrios	vhd	floppy_image	uefi	custom-image-uefi-other
+profile	kolibrios	vhdx	automatic	bios	vhd-vhdboot
+profile	kolibrios	vhdx	automatic	uefi	custom-image-uefi-other
+profile	kolibrios	vhdx	automatic	-	vhd-vhdboot
+profile	kolibrios	vhdx	direct_iso	uefi	custom-image-uefi-other
+profile	kolibrios	vhdx	wimboot	uefi	custom-image-uefi-other
+profile	kolibrios	vhdx	vhdboot	bios	vhd-vhdboot
+profile	kolibrios	vhdx	vhdboot	uefi	custom-image-uefi-other
+profile	kolibrios	vhdx	vhdboot	-	vhd-vhdboot
+profile	kolibrios	vhdx	direct_efi	uefi	custom-image-uefi-other
+profile	kolibrios	vhdx	chainload	uefi	custom-image-uefi-other
+profile	kolibrios	vhdx	memdisk	uefi	custom-image-uefi-other
+profile	kolibrios	vhdx	disk_image	uefi	custom-image-uefi-other
+profile	kolibrios	vhdx	floppy_image	uefi	custom-image-uefi-other
+profile	kolibrios	efi	automatic	bios	efi-direct
+profile	kolibrios	efi	automatic	uefi	custom-image-uefi-other
+profile	kolibrios	efi	automatic	-	efi-direct
+profile	kolibrios	efi	direct_iso	uefi	custom-image-uefi-other
+profile	kolibrios	efi	wimboot	uefi	custom-image-uefi-other
+profile	kolibrios	efi	vhdboot	uefi	custom-image-uefi-other
+profile	kolibrios	efi	direct_efi	bios	efi-direct
+profile	kolibrios	efi	direct_efi	uefi	custom-image-uefi-other
+profile	kolibrios	efi	direct_efi	-	efi-direct
+profile	kolibrios	efi	chainload	bios	efi-chainload
+profile	kolibrios	efi	chainload	uefi	custom-image-uefi-other
+profile	kolibrios	efi	chainload	-	efi-chainload
+profile	kolibrios	efi	memdisk	uefi	custom-image-uefi-other
+profile	kolibrios	efi	disk_image	uefi	custom-image-uefi-other
+profile	kolibrios	efi	floppy_image	uefi	custom-image-uefi-other
+profile	other-os	iso	automatic	bios	iso-work-chainload
+profile	other-os	iso	automatic	uefi	custom-image-uefi
+profile	other-os	iso	automatic	-	iso-work-chainload
+profile	other-os	iso	direct_iso	uefi	custom-image-uefi-other
+profile	other-os	iso	wimboot	uefi	custom-image-uefi-other
+profile	other-os	iso	vhdboot	uefi	custom-image-uefi-other
+profile	other-os	iso	direct_efi	uefi	custom-image-uefi-other
+profile	other-os	iso	chainload	bios	iso-work-chainload
+profile	other-os	iso	chainload	uefi	custom-image-uefi-other
+profile	other-os	iso	chainload	-	iso-work-chainload
+profile	other-os	iso	memdisk	uefi	custom-image-uefi-other
+profile	other-os	iso	disk_image	uefi	custom-image-uefi-other
+profile	other-os	iso	floppy_image	uefi	custom-image-uefi-other
+profile	other-os	wim	automatic	bios	wim-wimboot
+profile	other-os	wim	automatic	uefi	custom-image-uefi-other
+profile	other-os	wim	automatic	-	wim-wimboot
+profile	other-os	wim	direct_iso	uefi	custom-image-uefi-other
+profile	other-os	wim	wimboot	bios	wim-wimboot
+profile	other-os	wim	wimboot	uefi	custom-image-uefi-other
+profile	other-os	wim	wimboot	-	wim-wimboot
+profile	other-os	wim	vhdboot	uefi	custom-image-uefi-other
+profile	other-os	wim	direct_efi	uefi	custom-image-uefi-other
+profile	other-os	wim	chainload	uefi	custom-image-uefi-other
+profile	other-os	wim	memdisk	uefi	custom-image-uefi-other
+profile	other-os	wim	disk_image	uefi	custom-image-uefi-other
+profile	other-os	wim	floppy_image	uefi	custom-image-uefi-other
+profile	other-os	img	automatic	uefi	custom-image-uefi
+profile	other-os	img	direct_iso	uefi	custom-image-uefi-other
+profile	other-os	img	wimboot	uefi	custom-image-uefi-other
+profile	other-os	img	vhdboot	uefi	custom-image-uefi-other
+profile	other-os	img	direct_efi	uefi	custom-image-uefi-other
+profile	other-os	img	chainload	uefi	custom-image-uefi-other
+profile	other-os	img	memdisk	uefi	custom-image-uefi-other
+profile	other-os	img	disk_image	uefi	custom-image-uefi-other
+profile	other-os	img	floppy_image	uefi	custom-image-uefi-other
+profile	other-os	vhd	automatic	bios	vhd-vhdboot
+profile	other-os	vhd	automatic	uefi	custom-image-uefi-other
+profile	other-os	vhd	automatic	-	vhd-vhdboot
+profile	other-os	vhd	direct_iso	uefi	custom-image-uefi-other
+profile	other-os	vhd	wimboot	uefi	custom-image-uefi-other
+profile	other-os	vhd	vhdboot	bios	vhd-vhdboot
+profile	other-os	vhd	vhdboot	uefi	custom-image-uefi-other
+profile	other-os	vhd	vhdboot	-	vhd-vhdboot
+profile	other-os	vhd	direct_efi	uefi	custom-image-uefi-other
+profile	other-os	vhd	chainload	uefi	custom-image-uefi-other
+profile	other-os	vhd	memdisk	uefi	custom-image-uefi-other
+profile	other-os	vhd	disk_image	uefi	custom-image-uefi-other
+profile	other-os	vhd	floppy_image	uefi	custom-image-uefi-other
+profile	other-os	vhdx	automatic	bios	vhd-vhdboot
+profile	other-os	vhdx	automatic	uefi	custom-image-uefi-other
+profile	other-os	vhdx	automatic	-	vhd-vhdboot
+profile	other-os	vhdx	direct_iso	uefi	custom-image-uefi-other
+profile	other-os	vhdx	wimboot	uefi	custom-image-uefi-other
+profile	other-os	vhdx	vhdboot	bios	vhd-vhdboot
+profile	other-os	vhdx	vhdboot	uefi	custom-image-uefi-other
+profile	other-os	vhdx	vhdboot	-	vhd-vhdboot
+profile	other-os	vhdx	direct_efi	uefi	custom-image-uefi-other
+profile	other-os	vhdx	chainload	uefi	custom-image-uefi-other
+profile	other-os	vhdx	memdisk	uefi	custom-image-uefi-other
+profile	other-os	vhdx	disk_image	uefi	custom-image-uefi-other
+profile	other-os	vhdx	floppy_image	uefi	custom-image-uefi-other
+profile	other-os	efi	automatic	bios	efi-direct
+profile	other-os	efi	automatic	uefi	custom-image-uefi-other
+profile	other-os	efi	automatic	-	efi-direct
+profile	other-os	efi	direct_iso	uefi	custom-image-uefi-other
+profile	other-os	efi	wimboot	uefi	custom-image-uefi-other
+profile	other-os	efi	vhdboot	uefi	custom-image-uefi-other
+profile	other-os	efi	direct_efi	bios	efi-direct
+profile	other-os	efi	direct_efi	uefi	custom-image-uefi-other
+profile	other-os	efi	direct_efi	-	efi-direct
+profile	other-os	efi	chainload	bios	efi-chainload
+profile	other-os	efi	chainload	uefi	custom-image-uefi-other
+profile	other-os	efi	chainload	-	efi-chainload
+profile	other-os	efi	memdisk	uefi	custom-image-uefi-other
+profile	other-os	efi	disk_image	uefi	custom-image-uefi-other
+profile	other-os	efi	floppy_image	uefi	custom-image-uefi-other
 # resolve (no firmware, e2e_flow): system image method resolve supports validate
 resolve	windows-11	iso	automatic	direct_iso	1	ok
 resolve	windows-11	iso	direct_iso	direct_iso	1	ok
@@ -15171,6 +16139,276 @@ resolve	other-dos	efi	chainload	chainload	1	ok
 resolve	other-dos	efi	memdisk	-	0	UnsupportedImage
 resolve	other-dos	efi	disk_image	-	0	UnsupportedImage
 resolve	other-dos	efi	floppy_image	-	0	UnsupportedImage
+resolve	haiku	iso	automatic	chainload	1	ok
+resolve	haiku	iso	direct_iso	-	0	UnsupportedMethod
+resolve	haiku	iso	wimboot	-	0	UnsupportedMethod
+resolve	haiku	iso	vhdboot	-	0	UnsupportedImage
+resolve	haiku	iso	direct_efi	-	0	UnsupportedImage
+resolve	haiku	iso	chainload	chainload	1	ok
+resolve	haiku	iso	memdisk	-	0	UnsupportedMethod
+resolve	haiku	iso	disk_image	-	0	UnsupportedImage
+resolve	haiku	iso	floppy_image	-	0	UnsupportedImage
+resolve	haiku	wim	automatic	wimboot	1	ok
+resolve	haiku	wim	direct_iso	-	0	UnsupportedImage
+resolve	haiku	wim	wimboot	wimboot	1	ok
+resolve	haiku	wim	vhdboot	-	0	UnsupportedImage
+resolve	haiku	wim	direct_efi	-	0	UnsupportedImage
+resolve	haiku	wim	chainload	-	0	UnsupportedImage
+resolve	haiku	wim	memdisk	-	0	UnsupportedImage
+resolve	haiku	wim	disk_image	-	0	UnsupportedImage
+resolve	haiku	wim	floppy_image	-	0	UnsupportedImage
+resolve	haiku	img	automatic	-	0	UnsupportedImage
+resolve	haiku	img	direct_iso	-	0	UnsupportedImage
+resolve	haiku	img	wimboot	-	0	UnsupportedImage
+resolve	haiku	img	vhdboot	-	0	UnsupportedImage
+resolve	haiku	img	direct_efi	-	0	UnsupportedImage
+resolve	haiku	img	chainload	-	0	UnsupportedMethod
+resolve	haiku	img	memdisk	-	0	UnsupportedMethod
+resolve	haiku	img	disk_image	-	0	UnsupportedMethod
+resolve	haiku	img	floppy_image	-	0	UnsupportedMethod
+resolve	haiku	vhd	automatic	vhdboot	1	ok
+resolve	haiku	vhd	direct_iso	-	0	UnsupportedImage
+resolve	haiku	vhd	wimboot	-	0	UnsupportedImage
+resolve	haiku	vhd	vhdboot	vhdboot	1	ok
+resolve	haiku	vhd	direct_efi	-	0	UnsupportedImage
+resolve	haiku	vhd	chainload	-	0	UnsupportedImage
+resolve	haiku	vhd	memdisk	-	0	UnsupportedImage
+resolve	haiku	vhd	disk_image	-	0	UnsupportedImage
+resolve	haiku	vhd	floppy_image	-	0	UnsupportedImage
+resolve	haiku	vhdx	automatic	vhdboot	1	ok
+resolve	haiku	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	haiku	vhdx	wimboot	-	0	UnsupportedImage
+resolve	haiku	vhdx	vhdboot	vhdboot	1	ok
+resolve	haiku	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	haiku	vhdx	chainload	-	0	UnsupportedImage
+resolve	haiku	vhdx	memdisk	-	0	UnsupportedImage
+resolve	haiku	vhdx	disk_image	-	0	UnsupportedImage
+resolve	haiku	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	haiku	efi	automatic	direct_efi	1	ok
+resolve	haiku	efi	direct_iso	-	0	UnsupportedImage
+resolve	haiku	efi	wimboot	-	0	UnsupportedImage
+resolve	haiku	efi	vhdboot	-	0	UnsupportedImage
+resolve	haiku	efi	direct_efi	direct_efi	1	ok
+resolve	haiku	efi	chainload	chainload	1	ok
+resolve	haiku	efi	memdisk	-	0	UnsupportedImage
+resolve	haiku	efi	disk_image	-	0	UnsupportedImage
+resolve	haiku	efi	floppy_image	-	0	UnsupportedImage
+resolve	freebsd	iso	automatic	chainload	1	ok
+resolve	freebsd	iso	direct_iso	-	0	UnsupportedMethod
+resolve	freebsd	iso	wimboot	-	0	UnsupportedMethod
+resolve	freebsd	iso	vhdboot	-	0	UnsupportedImage
+resolve	freebsd	iso	direct_efi	-	0	UnsupportedImage
+resolve	freebsd	iso	chainload	chainload	1	ok
+resolve	freebsd	iso	memdisk	-	0	UnsupportedMethod
+resolve	freebsd	iso	disk_image	-	0	UnsupportedImage
+resolve	freebsd	iso	floppy_image	-	0	UnsupportedImage
+resolve	freebsd	wim	automatic	wimboot	1	ok
+resolve	freebsd	wim	direct_iso	-	0	UnsupportedImage
+resolve	freebsd	wim	wimboot	wimboot	1	ok
+resolve	freebsd	wim	vhdboot	-	0	UnsupportedImage
+resolve	freebsd	wim	direct_efi	-	0	UnsupportedImage
+resolve	freebsd	wim	chainload	-	0	UnsupportedImage
+resolve	freebsd	wim	memdisk	-	0	UnsupportedImage
+resolve	freebsd	wim	disk_image	-	0	UnsupportedImage
+resolve	freebsd	wim	floppy_image	-	0	UnsupportedImage
+resolve	freebsd	img	automatic	-	0	UnsupportedImage
+resolve	freebsd	img	direct_iso	-	0	UnsupportedImage
+resolve	freebsd	img	wimboot	-	0	UnsupportedImage
+resolve	freebsd	img	vhdboot	-	0	UnsupportedImage
+resolve	freebsd	img	direct_efi	-	0	UnsupportedImage
+resolve	freebsd	img	chainload	-	0	UnsupportedMethod
+resolve	freebsd	img	memdisk	-	0	UnsupportedMethod
+resolve	freebsd	img	disk_image	-	0	UnsupportedMethod
+resolve	freebsd	img	floppy_image	-	0	UnsupportedMethod
+resolve	freebsd	vhd	automatic	vhdboot	1	ok
+resolve	freebsd	vhd	direct_iso	-	0	UnsupportedImage
+resolve	freebsd	vhd	wimboot	-	0	UnsupportedImage
+resolve	freebsd	vhd	vhdboot	vhdboot	1	ok
+resolve	freebsd	vhd	direct_efi	-	0	UnsupportedImage
+resolve	freebsd	vhd	chainload	-	0	UnsupportedImage
+resolve	freebsd	vhd	memdisk	-	0	UnsupportedImage
+resolve	freebsd	vhd	disk_image	-	0	UnsupportedImage
+resolve	freebsd	vhd	floppy_image	-	0	UnsupportedImage
+resolve	freebsd	vhdx	automatic	vhdboot	1	ok
+resolve	freebsd	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	freebsd	vhdx	wimboot	-	0	UnsupportedImage
+resolve	freebsd	vhdx	vhdboot	vhdboot	1	ok
+resolve	freebsd	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	freebsd	vhdx	chainload	-	0	UnsupportedImage
+resolve	freebsd	vhdx	memdisk	-	0	UnsupportedImage
+resolve	freebsd	vhdx	disk_image	-	0	UnsupportedImage
+resolve	freebsd	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	freebsd	efi	automatic	direct_efi	1	ok
+resolve	freebsd	efi	direct_iso	-	0	UnsupportedImage
+resolve	freebsd	efi	wimboot	-	0	UnsupportedImage
+resolve	freebsd	efi	vhdboot	-	0	UnsupportedImage
+resolve	freebsd	efi	direct_efi	direct_efi	1	ok
+resolve	freebsd	efi	chainload	chainload	1	ok
+resolve	freebsd	efi	memdisk	-	0	UnsupportedImage
+resolve	freebsd	efi	disk_image	-	0	UnsupportedImage
+resolve	freebsd	efi	floppy_image	-	0	UnsupportedImage
+resolve	reactos	iso	automatic	chainload	1	ok
+resolve	reactos	iso	direct_iso	-	0	UnsupportedMethod
+resolve	reactos	iso	wimboot	-	0	UnsupportedMethod
+resolve	reactos	iso	vhdboot	-	0	UnsupportedImage
+resolve	reactos	iso	direct_efi	-	0	UnsupportedImage
+resolve	reactos	iso	chainload	chainload	1	ok
+resolve	reactos	iso	memdisk	-	0	UnsupportedMethod
+resolve	reactos	iso	disk_image	-	0	UnsupportedImage
+resolve	reactos	iso	floppy_image	-	0	UnsupportedImage
+resolve	reactos	wim	automatic	wimboot	1	ok
+resolve	reactos	wim	direct_iso	-	0	UnsupportedImage
+resolve	reactos	wim	wimboot	wimboot	1	ok
+resolve	reactos	wim	vhdboot	-	0	UnsupportedImage
+resolve	reactos	wim	direct_efi	-	0	UnsupportedImage
+resolve	reactos	wim	chainload	-	0	UnsupportedImage
+resolve	reactos	wim	memdisk	-	0	UnsupportedImage
+resolve	reactos	wim	disk_image	-	0	UnsupportedImage
+resolve	reactos	wim	floppy_image	-	0	UnsupportedImage
+resolve	reactos	img	automatic	-	0	UnsupportedImage
+resolve	reactos	img	direct_iso	-	0	UnsupportedImage
+resolve	reactos	img	wimboot	-	0	UnsupportedImage
+resolve	reactos	img	vhdboot	-	0	UnsupportedImage
+resolve	reactos	img	direct_efi	-	0	UnsupportedImage
+resolve	reactos	img	chainload	-	0	UnsupportedMethod
+resolve	reactos	img	memdisk	-	0	UnsupportedMethod
+resolve	reactos	img	disk_image	-	0	UnsupportedMethod
+resolve	reactos	img	floppy_image	-	0	UnsupportedMethod
+resolve	reactos	vhd	automatic	vhdboot	1	ok
+resolve	reactos	vhd	direct_iso	-	0	UnsupportedImage
+resolve	reactos	vhd	wimboot	-	0	UnsupportedImage
+resolve	reactos	vhd	vhdboot	vhdboot	1	ok
+resolve	reactos	vhd	direct_efi	-	0	UnsupportedImage
+resolve	reactos	vhd	chainload	-	0	UnsupportedImage
+resolve	reactos	vhd	memdisk	-	0	UnsupportedImage
+resolve	reactos	vhd	disk_image	-	0	UnsupportedImage
+resolve	reactos	vhd	floppy_image	-	0	UnsupportedImage
+resolve	reactos	vhdx	automatic	vhdboot	1	ok
+resolve	reactos	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	reactos	vhdx	wimboot	-	0	UnsupportedImage
+resolve	reactos	vhdx	vhdboot	vhdboot	1	ok
+resolve	reactos	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	reactos	vhdx	chainload	-	0	UnsupportedImage
+resolve	reactos	vhdx	memdisk	-	0	UnsupportedImage
+resolve	reactos	vhdx	disk_image	-	0	UnsupportedImage
+resolve	reactos	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	reactos	efi	automatic	direct_efi	1	ok
+resolve	reactos	efi	direct_iso	-	0	UnsupportedImage
+resolve	reactos	efi	wimboot	-	0	UnsupportedImage
+resolve	reactos	efi	vhdboot	-	0	UnsupportedImage
+resolve	reactos	efi	direct_efi	direct_efi	1	ok
+resolve	reactos	efi	chainload	chainload	1	ok
+resolve	reactos	efi	memdisk	-	0	UnsupportedImage
+resolve	reactos	efi	disk_image	-	0	UnsupportedImage
+resolve	reactos	efi	floppy_image	-	0	UnsupportedImage
+resolve	kolibrios	iso	automatic	chainload	1	ok
+resolve	kolibrios	iso	direct_iso	-	0	UnsupportedMethod
+resolve	kolibrios	iso	wimboot	-	0	UnsupportedMethod
+resolve	kolibrios	iso	vhdboot	-	0	UnsupportedImage
+resolve	kolibrios	iso	direct_efi	-	0	UnsupportedImage
+resolve	kolibrios	iso	chainload	chainload	1	ok
+resolve	kolibrios	iso	memdisk	-	0	UnsupportedMethod
+resolve	kolibrios	iso	disk_image	-	0	UnsupportedImage
+resolve	kolibrios	iso	floppy_image	-	0	UnsupportedImage
+resolve	kolibrios	wim	automatic	wimboot	1	ok
+resolve	kolibrios	wim	direct_iso	-	0	UnsupportedImage
+resolve	kolibrios	wim	wimboot	wimboot	1	ok
+resolve	kolibrios	wim	vhdboot	-	0	UnsupportedImage
+resolve	kolibrios	wim	direct_efi	-	0	UnsupportedImage
+resolve	kolibrios	wim	chainload	-	0	UnsupportedImage
+resolve	kolibrios	wim	memdisk	-	0	UnsupportedImage
+resolve	kolibrios	wim	disk_image	-	0	UnsupportedImage
+resolve	kolibrios	wim	floppy_image	-	0	UnsupportedImage
+resolve	kolibrios	img	automatic	-	0	UnsupportedImage
+resolve	kolibrios	img	direct_iso	-	0	UnsupportedImage
+resolve	kolibrios	img	wimboot	-	0	UnsupportedImage
+resolve	kolibrios	img	vhdboot	-	0	UnsupportedImage
+resolve	kolibrios	img	direct_efi	-	0	UnsupportedImage
+resolve	kolibrios	img	chainload	-	0	UnsupportedMethod
+resolve	kolibrios	img	memdisk	-	0	UnsupportedMethod
+resolve	kolibrios	img	disk_image	-	0	UnsupportedMethod
+resolve	kolibrios	img	floppy_image	-	0	UnsupportedMethod
+resolve	kolibrios	vhd	automatic	vhdboot	1	ok
+resolve	kolibrios	vhd	direct_iso	-	0	UnsupportedImage
+resolve	kolibrios	vhd	wimboot	-	0	UnsupportedImage
+resolve	kolibrios	vhd	vhdboot	vhdboot	1	ok
+resolve	kolibrios	vhd	direct_efi	-	0	UnsupportedImage
+resolve	kolibrios	vhd	chainload	-	0	UnsupportedImage
+resolve	kolibrios	vhd	memdisk	-	0	UnsupportedImage
+resolve	kolibrios	vhd	disk_image	-	0	UnsupportedImage
+resolve	kolibrios	vhd	floppy_image	-	0	UnsupportedImage
+resolve	kolibrios	vhdx	automatic	vhdboot	1	ok
+resolve	kolibrios	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	kolibrios	vhdx	wimboot	-	0	UnsupportedImage
+resolve	kolibrios	vhdx	vhdboot	vhdboot	1	ok
+resolve	kolibrios	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	kolibrios	vhdx	chainload	-	0	UnsupportedImage
+resolve	kolibrios	vhdx	memdisk	-	0	UnsupportedImage
+resolve	kolibrios	vhdx	disk_image	-	0	UnsupportedImage
+resolve	kolibrios	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	kolibrios	efi	automatic	direct_efi	1	ok
+resolve	kolibrios	efi	direct_iso	-	0	UnsupportedImage
+resolve	kolibrios	efi	wimboot	-	0	UnsupportedImage
+resolve	kolibrios	efi	vhdboot	-	0	UnsupportedImage
+resolve	kolibrios	efi	direct_efi	direct_efi	1	ok
+resolve	kolibrios	efi	chainload	chainload	1	ok
+resolve	kolibrios	efi	memdisk	-	0	UnsupportedImage
+resolve	kolibrios	efi	disk_image	-	0	UnsupportedImage
+resolve	kolibrios	efi	floppy_image	-	0	UnsupportedImage
+resolve	other-os	iso	automatic	chainload	1	ok
+resolve	other-os	iso	direct_iso	-	0	UnsupportedMethod
+resolve	other-os	iso	wimboot	-	0	UnsupportedMethod
+resolve	other-os	iso	vhdboot	-	0	UnsupportedImage
+resolve	other-os	iso	direct_efi	-	0	UnsupportedImage
+resolve	other-os	iso	chainload	chainload	1	ok
+resolve	other-os	iso	memdisk	-	0	UnsupportedMethod
+resolve	other-os	iso	disk_image	-	0	UnsupportedImage
+resolve	other-os	iso	floppy_image	-	0	UnsupportedImage
+resolve	other-os	wim	automatic	wimboot	1	ok
+resolve	other-os	wim	direct_iso	-	0	UnsupportedImage
+resolve	other-os	wim	wimboot	wimboot	1	ok
+resolve	other-os	wim	vhdboot	-	0	UnsupportedImage
+resolve	other-os	wim	direct_efi	-	0	UnsupportedImage
+resolve	other-os	wim	chainload	-	0	UnsupportedImage
+resolve	other-os	wim	memdisk	-	0	UnsupportedImage
+resolve	other-os	wim	disk_image	-	0	UnsupportedImage
+resolve	other-os	wim	floppy_image	-	0	UnsupportedImage
+resolve	other-os	img	automatic	-	0	UnsupportedImage
+resolve	other-os	img	direct_iso	-	0	UnsupportedImage
+resolve	other-os	img	wimboot	-	0	UnsupportedImage
+resolve	other-os	img	vhdboot	-	0	UnsupportedImage
+resolve	other-os	img	direct_efi	-	0	UnsupportedImage
+resolve	other-os	img	chainload	-	0	UnsupportedMethod
+resolve	other-os	img	memdisk	-	0	UnsupportedMethod
+resolve	other-os	img	disk_image	-	0	UnsupportedMethod
+resolve	other-os	img	floppy_image	-	0	UnsupportedMethod
+resolve	other-os	vhd	automatic	vhdboot	1	ok
+resolve	other-os	vhd	direct_iso	-	0	UnsupportedImage
+resolve	other-os	vhd	wimboot	-	0	UnsupportedImage
+resolve	other-os	vhd	vhdboot	vhdboot	1	ok
+resolve	other-os	vhd	direct_efi	-	0	UnsupportedImage
+resolve	other-os	vhd	chainload	-	0	UnsupportedImage
+resolve	other-os	vhd	memdisk	-	0	UnsupportedImage
+resolve	other-os	vhd	disk_image	-	0	UnsupportedImage
+resolve	other-os	vhd	floppy_image	-	0	UnsupportedImage
+resolve	other-os	vhdx	automatic	vhdboot	1	ok
+resolve	other-os	vhdx	direct_iso	-	0	UnsupportedImage
+resolve	other-os	vhdx	wimboot	-	0	UnsupportedImage
+resolve	other-os	vhdx	vhdboot	vhdboot	1	ok
+resolve	other-os	vhdx	direct_efi	-	0	UnsupportedImage
+resolve	other-os	vhdx	chainload	-	0	UnsupportedImage
+resolve	other-os	vhdx	memdisk	-	0	UnsupportedImage
+resolve	other-os	vhdx	disk_image	-	0	UnsupportedImage
+resolve	other-os	vhdx	floppy_image	-	0	UnsupportedImage
+resolve	other-os	efi	automatic	direct_efi	1	ok
+resolve	other-os	efi	direct_iso	-	0	UnsupportedImage
+resolve	other-os	efi	wimboot	-	0	UnsupportedImage
+resolve	other-os	efi	vhdboot	-	0	UnsupportedImage
+resolve	other-os	efi	direct_efi	direct_efi	1	ok
+resolve	other-os	efi	chainload	chainload	1	ok
+resolve	other-os	efi	memdisk	-	0	UnsupportedImage
+resolve	other-os	efi	disk_image	-	0	UnsupportedImage
+resolve	other-os	efi	floppy_image	-	0	UnsupportedImage
 # menu: system image firmware index method backend enabled selectable validation label detail status reason
 menu	windows-11	iso	bios	0	automatic	windows_iso	0	0	tested_in_vm	Automatic (ISO) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
 menu	windows-11	iso	bios	1	direct_iso	windows_iso	0	0	tested_in_vm	ISO [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
@@ -19678,9 +20916,9 @@ menu	freedos	iso	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[re
 menu	freedos	iso	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	freedos	iso	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	freedos	iso	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	freedos	iso	uefi	0	automatic	chainload	1	1	validated_hardware	Automatic (Chainload)		READY	-
+menu	freedos	iso	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	freedos	iso	uefi	1	direct_iso	-	0	1	validated_hardware	ISO	[backend not implemented]	[backend not implemented]	[backend not implemented]
-menu	freedos	iso	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	freedos	iso	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	freedos	iso	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	freedos	iso	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	freedos	iso	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -19690,7 +20928,7 @@ menu	freedos	wim	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[
 menu	freedos	wim	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	freedos	wim	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	freedos	wim	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	freedos	wim	uefi	0	automatic	wimboot	1	1	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	freedos	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	freedos	wim	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	freedos	wim	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	freedos	wim	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -19702,7 +20940,7 @@ menu	freedos	img	bios	2	chainload	-	0	1	validated_hardware	Chainload	[backend no
 menu	freedos	img	bios	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	freedos	img	bios	4	disk_image	-	0	1	experimental	Disk image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	freedos	img	bios	5	floppy_image	-	0	1	experimental	Floppy image [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
-menu	freedos	img	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	freedos	img	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
 menu	freedos	img	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	freedos	img	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	freedos	img	uefi	3	memdisk	-	0	1	experimental	Memdisk [EXPERIMENTAL]	[backend not implemented]	[backend not implemented]	[backend not implemented]
@@ -19714,7 +20952,7 @@ menu	freedos	vhd	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[
 menu	freedos	vhd	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	freedos	vhd	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	freedos	vhd	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	freedos	vhd	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	freedos	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	freedos	vhd	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	freedos	vhd	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	freedos	vhd	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -19726,7 +20964,7 @@ menu	freedos	vhdx	bios	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	
 menu	freedos	vhdx	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	freedos	vhdx	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	freedos	vhdx	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	freedos	vhdx	uefi	0	automatic	vhdboot	1	1	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	freedos	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	freedos	vhdx	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
 menu	freedos	vhdx	uefi	2	chainload	-	0	1	-	Chainload	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]	[requires ISO, IMG or EFI]
 menu	freedos	vhdx	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
@@ -19738,9 +20976,9 @@ menu	freedos	efi	bios	2	chainload	chainload	0	0	validated_hardware	Chainload	[re
 menu	freedos	efi	bios	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	freedos	efi	bios	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	freedos	efi	bios	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
-menu	freedos	efi	uefi	0	automatic	direct_efi	1	1	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[TESTED IN VM]	TESTED IN VM	-
+menu	freedos	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 menu	freedos	efi	uefi	1	direct_iso	-	0	1	-	ISO	[requires ISO]	[requires ISO]	[requires ISO]
-menu	freedos	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		READY	-
+menu	freedos	efi	uefi	2	chainload	-	0	1	validated_hardware	Chainload	[backend not implemented]	[backend not implemented]	[backend not implemented]
 menu	freedos	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	freedos	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	freedos	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
@@ -20104,6 +21342,66 @@ menu	other-dos	efi	uefi	2	chainload	chainload	1	1	validated_hardware	Chainload		
 menu	other-dos	efi	uefi	3	memdisk	-	0	1	-	Memdisk	[requires ISO or IMG]	[requires ISO or IMG]	[requires ISO or IMG]
 menu	other-dos	efi	uefi	4	disk_image	-	0	1	-	Disk image	[requires IMG]	[requires IMG]	[requires IMG]
 menu	other-dos	efi	uefi	5	floppy_image	-	0	1	-	Floppy image	[requires IMG]	[requires IMG]	[requires IMG]
+menu	haiku	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	haiku	iso	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	haiku	wim	bios	0	automatic	wimboot	0	0	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	haiku	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	haiku	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	haiku	img	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	haiku	vhd	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	haiku	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	haiku	vhdx	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	haiku	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	haiku	efi	bios	0	automatic	direct_efi	0	0	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	haiku	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	freebsd	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	freebsd	iso	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	freebsd	wim	bios	0	automatic	wimboot	0	0	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	freebsd	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	freebsd	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	freebsd	img	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	freebsd	vhd	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	freebsd	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	freebsd	vhdx	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	freebsd	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	freebsd	efi	bios	0	automatic	direct_efi	0	0	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	freebsd	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	reactos	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	reactos	iso	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	reactos	wim	bios	0	automatic	wimboot	0	0	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	reactos	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	reactos	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	reactos	img	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	reactos	vhd	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	reactos	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	reactos	vhdx	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	reactos	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	reactos	efi	bios	0	automatic	direct_efi	0	0	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	reactos	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	kolibrios	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	kolibrios	iso	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	kolibrios	wim	bios	0	automatic	wimboot	0	0	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	kolibrios	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	kolibrios	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	kolibrios	img	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	kolibrios	vhd	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	kolibrios	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	kolibrios	vhdx	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	kolibrios	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	kolibrios	efi	bios	0	automatic	direct_efi	0	0	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	kolibrios	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	other-os	iso	bios	0	automatic	chainload	0	0	validated_hardware	Automatic (Chainload)	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	other-os	iso	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	other-os	wim	bios	0	automatic	wimboot	0	0	tested_in_vm	Automatic (WIMBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	other-os	wim	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	other-os	img	bios	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	other-os	img	uefi	0	automatic	win9x_uefi	1	1	experimental	Automatic (UEFI preparation / DOS Setup via CSMWrap) [EXPERIMENTAL]	[EXPERIMENTAL]	EXPERIMENTAL	-
+menu	other-os	vhd	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	other-os	vhd	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	other-os	vhdx	bios	0	automatic	vhdboot	0	0	tested_in_vm	Automatic (VHDBoot) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	other-os	vhdx	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
+menu	other-os	efi	bios	0	automatic	direct_efi	0	0	tested_in_vm	Automatic (EFI) [TESTED IN VM]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]	[requires UEFI; running BIOS]
+menu	other-os	efi	uefi	0	automatic	-	0	1	experimental	Automatic [EXPERIMENTAL]	[no implemented backend]	[no implemented backend]	[no implemented backend]
 # help: system image method title | line1 | line2
 help	windows-11	iso	automatic	Windows ISO - WIMBoot UEFI	Starts Windows Setup directly from the ISO on DATA; nothing is copied to WORK.	Boot files go to the target disk; the USOS stick's ESP is checked and restored.
 help	windows-11	iso	direct_iso	Windows ISO - WIMBoot UEFI	Starts Windows Setup directly from the ISO on DATA; nothing is copied to WORK.	Boot files go to the target disk; the USOS stick's ESP is checked and restored.
@@ -23885,6 +25183,276 @@ help	other-dos	efi	chainload	Chainload	Transfers control to another bootloader i
 help	other-dos	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
 help	other-dos	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
 help	other-dos	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	haiku	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	haiku	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	haiku	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	haiku	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	haiku	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	haiku	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	haiku	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	haiku	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	haiku	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	haiku	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	haiku	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	haiku	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	haiku	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	haiku	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	haiku	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	haiku	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	haiku	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	haiku	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	haiku	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	haiku	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	haiku	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	haiku	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	haiku	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	haiku	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	haiku	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	haiku	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	haiku	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	haiku	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	haiku	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	haiku	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	haiku	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	haiku	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	haiku	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	haiku	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	haiku	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	haiku	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	haiku	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	haiku	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	haiku	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	haiku	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	haiku	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	haiku	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	haiku	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	haiku	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	haiku	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	haiku	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	haiku	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	haiku	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	haiku	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	haiku	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	haiku	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	haiku	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	haiku	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	haiku	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	freebsd	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	freebsd	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	freebsd	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	freebsd	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	freebsd	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	freebsd	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	freebsd	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	freebsd	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	freebsd	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	freebsd	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	freebsd	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	freebsd	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	freebsd	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	freebsd	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	freebsd	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	freebsd	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	freebsd	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	freebsd	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	freebsd	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	freebsd	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	freebsd	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	freebsd	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	freebsd	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	freebsd	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	freebsd	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	freebsd	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	freebsd	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	freebsd	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	freebsd	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	freebsd	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	freebsd	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	freebsd	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	freebsd	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	freebsd	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	freebsd	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	freebsd	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	freebsd	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	freebsd	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	freebsd	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	freebsd	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	freebsd	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	freebsd	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	freebsd	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	freebsd	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	freebsd	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	freebsd	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	freebsd	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	freebsd	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	freebsd	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	freebsd	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	freebsd	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	freebsd	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	freebsd	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	freebsd	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	reactos	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	reactos	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	reactos	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	reactos	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	reactos	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	reactos	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	reactos	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	reactos	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	reactos	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	reactos	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	reactos	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	reactos	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	reactos	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	reactos	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	reactos	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	reactos	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	reactos	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	reactos	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	reactos	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	reactos	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	reactos	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	reactos	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	reactos	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	reactos	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	reactos	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	reactos	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	reactos	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	reactos	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	reactos	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	reactos	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	reactos	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	reactos	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	reactos	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	reactos	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	reactos	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	reactos	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	reactos	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	reactos	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	reactos	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	reactos	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	reactos	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	reactos	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	reactos	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	reactos	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	reactos	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	reactos	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	reactos	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	reactos	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	reactos	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	reactos	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	reactos	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	reactos	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	reactos	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	reactos	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	kolibrios	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	kolibrios	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	kolibrios	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	kolibrios	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	kolibrios	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	kolibrios	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	kolibrios	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	kolibrios	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	kolibrios	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	kolibrios	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	kolibrios	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	kolibrios	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	kolibrios	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	kolibrios	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	kolibrios	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	kolibrios	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	kolibrios	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	kolibrios	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	kolibrios	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	kolibrios	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	kolibrios	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	kolibrios	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	kolibrios	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	kolibrios	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	kolibrios	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	kolibrios	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	kolibrios	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	kolibrios	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	kolibrios	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	kolibrios	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	kolibrios	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	kolibrios	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	kolibrios	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	kolibrios	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	kolibrios	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	kolibrios	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	kolibrios	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	kolibrios	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	kolibrios	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	kolibrios	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	kolibrios	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	kolibrios	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	kolibrios	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	kolibrios	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	kolibrios	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	kolibrios	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	kolibrios	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	kolibrios	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	kolibrios	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	kolibrios	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	kolibrios	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	kolibrios	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	kolibrios	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	kolibrios	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	other-os	iso	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	other-os	iso	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	other-os	iso	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	other-os	iso	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	other-os	iso	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	other-os	iso	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	other-os	iso	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	other-os	iso	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	other-os	iso	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	other-os	wim	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	other-os	wim	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	other-os	wim	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	other-os	wim	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	other-os	wim	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	other-os	wim	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	other-os	wim	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	other-os	wim	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	other-os	wim	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	other-os	img	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	other-os	img	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	other-os	img	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	other-os	img	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	other-os	img	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	other-os	img	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	other-os	img	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	other-os	img	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	other-os	img	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	other-os	vhd	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	other-os	vhd	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	other-os	vhd	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	other-os	vhd	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	other-os	vhd	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	other-os	vhd	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	other-os	vhd	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	other-os	vhd	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	other-os	vhd	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	other-os	vhdx	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	other-os	vhdx	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	other-os	vhdx	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	other-os	vhdx	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	other-os	vhdx	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	other-os	vhdx	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	other-os	vhdx	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	other-os	vhdx	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	other-os	vhdx	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
+help	other-os	efi	automatic	Automatic - recommended	USOS chooses the best implemented boot method for the selected image.	Choose an explicit method only when you intentionally want to force that path.
+help	other-os	efi	direct_iso	ISO - force ISO preparation	Extracts Windows Setup from the ISO to the WORK partition.	After preparation USOS restarts once and boots Windows Setup from WORK.
+help	other-os	efi	wimboot	WIMBoot	Starts a Windows PE/WIM image using a WIM-oriented boot path.	Useful when the source is a WIM instead of a complete installation ISO.
+help	other-os	efi	vhdboot	VHDBoot	Boots a prepared Windows installation stored in a VHD or VHDX image.	It is for virtual-disk images, not normal Windows installation ISO files.
+help	other-os	efi	direct_efi	EFI - direct UEFI start	Loads the selected EFI application directly through UEFI LoadImage/StartImage.	Use it for standalone .efi boot programs that do not need another loader.
+help	other-os	efi	chainload	Chainload	Transfers control to another bootloader instead of preparing the image itself.	Useful when the selected media already contains its own compatible bootloader.
+help	other-os	efi	memdisk	Memdisk	Presents a small image as memory-backed boot media for legacy software.	Primarily intended for DOS and older utilities, not modern Windows installers.
+help	other-os	efi	disk_image	Disk image	Treats an IMG file as a complete disk image rather than an optical image.	Use it for utilities or systems distributed as raw disk images.
+help	other-os	efi	floppy_image	Floppy image	Treats an IMG file as a legacy floppy image.	Intended for DOS-era boot disks and small legacy diagnostic tools.
 # profile_def (M2): id backend progress stage labels
 profile_def	linux-iso-uefi	linux_iso	linux_iso	
 profile_def	xp-x86-sp3-uefi-csm	xp_uefi_staging	xp_uefi	Loading the preparation environment|Detecting disks|Choosing the target disk|Preparing workspace|Copying and verifying files
@@ -23903,6 +25471,8 @@ profile_def	nt3-x86-qemu-csmwrap	win9x_uefi	direct_iso	Validating installation I
 profile_def	nt3-uefi-other	-	none	
 profile_def	posready-x86-qemu-csmwrap	win9x_uefi	direct_iso	Validating installation ISO|Loading Windows boot files|Starting Windows Setup
 profile_def	posready-uefi-other	-	none	
+profile_def	custom-image-uefi	win9x_uefi	direct_iso	Validating installation ISO|Loading Windows boot files|Starting Windows Setup
+profile_def	custom-image-uefi-other	-	none	
 profile_def	linux-live-bios	linux_live_iso	core	
 profile_def	linux-iso-bios	linux_iso	core	
 profile_def	dos-fat16-bios	dos_bios_iso	core	

@@ -158,7 +158,9 @@ pub fn show(
         const nt3 = usos.flow.answer.nt3.isNt3(system.id);
         // POSReady 2009: also the whole install in the VM (no NT limits note).
         const posready = usos.flow.answer.posready.isPosReady(system.id);
-        fields.add(view.t(.summary_preparation), if (nt4 or nt3 or posready) view.t(.summary_nt4_csmwrap) else view.t(.summary_w9x_csmwrap));
+        // Custom OS (custom-image-uefi): the image is written to the disk.
+        const custom = customImage(system.id);
+        fields.add(view.t(.summary_preparation), if (custom) view.t(.summary_image_disk) else if (nt4 or nt3 or posready) view.t(.summary_nt4_csmwrap) else view.t(.summary_w9x_csmwrap));
         fields.add(view.t(.summary_disk), view.t(.summary_w9x_disk));
         if (nt4 or nt3) {
             notes[note_count] = view.t(if (nt3) .summary_nt3_limits else .summary_nt4_limits);
@@ -679,4 +681,12 @@ fn showPreparationProgress(stage: usos.flow.preparation_boot_progress.Stage) voi
 fn nt5Arch(system_id: []const u8) usos.flow.answer.target.Arch {
     const nt5 = @import("xp_preparation.zig").Nt5System.fromId(system_id) orelse return .x86;
     return nt5.arch();
+}
+
+/// Custom OS and FreeDOS from UEFI (profile custom-image-uefi).
+fn customImage(system_id: []const u8) bool {
+    for (usos.catalog.os_profiles.custom_image_ids) |id| {
+        if (std.mem.eql(u8, id, system_id)) return true;
+    }
+    return false;
 }

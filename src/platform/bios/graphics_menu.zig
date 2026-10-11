@@ -73,6 +73,7 @@ fn homeItems(ui: *const Ui, items: *[catalog.categories.all.len + 1]screens.Home
                 .linux => .terminal,
                 .beta => .flask,
                 .dos => .floppy,
+                .other => .disc,
                 .utilities => .gear,
             },
             .title = ui.strings.lookup(category.label()),
@@ -81,6 +82,7 @@ fn homeItems(ui: *const Ui, items: *[catalog.categories.all.len + 1]screens.Home
                 .linux => .category_linux_desc,
                 .beta => .category_beta_desc,
                 .dos => .category_dos_desc,
+                .other => .category_other_desc,
                 .utilities => .category_utilities_desc,
             }),
         };
