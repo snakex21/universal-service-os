@@ -1104,7 +1104,7 @@
     {
       "id": "csmwrap",
       "name": "CSMWrap with its SeaBIOS fork",
-      "version": "3.1.2-usos3",
+      "version": "3.1.2-usos4",
       "license": "LGPL-2.1-only AND LGPL-3.0-only",
       "modified": true,
       "ships_in": [
@@ -1127,7 +1127,7 @@
       "source": {
         "bundle_paths": [
           "tools/vendor/csmwrap/3.1.2-src",
-          "tools/vendor/csmwrap/3.1.2-usos3",
+          "tools/vendor/csmwrap/3.1.2-usos4",
           "tools/csmwrap_build",
           "tools/build_csmwrap.ps1",
           "docs/research/csmwrap.md"
@@ -1138,7 +1138,7 @@
         ],
         "offer": false
       },
-      "notice": "MODIFIED by USOS on 2026-09-27 (quiet boot unless csmwrap.ini sets verbose = true; patches 0001-0003) and 2026-09-29 (SeaBIOS boot priorities from the CSMWrap BBS table by PCI address, USB included; patch 0004); four patches in 3.1.2-usos3/patches. Submodules: cc-runtime (Apache-2.0 WITH LLVM-exception), flanterm (BSD-2-Clause), freestnd-c-hdrs (0BSD), nanoprintf (Unlicense OR 0BSD), PicoEFI, uACPI (MIT)."
+      "notice": "MODIFIED by USOS on 2026-09-27 (quiet boot unless csmwrap.ini sets verbose = true; patches 0001-0003) and 2026-09-29 (SeaBIOS boot priorities from the CSMWrap BBS table by PCI address, USB included; patch 0004) and 2026-10-11 (the exact disk CSMWrap was loaded from becomes BIOS drive 0x80, by a hash of its sector 0; patch 0005); five patches in 3.1.2-usos4/patches. Submodules: cc-runtime (Apache-2.0 WITH LLVM-exception), flanterm (BSD-2-Clause), freestnd-c-hdrs (0BSD), nanoprintf (Unlicense OR 0BSD), PicoEFI, uACPI (MIT)."
     },
     {
       "id": "touchi2cdxe",
