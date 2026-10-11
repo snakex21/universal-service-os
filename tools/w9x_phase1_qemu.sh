@@ -62,6 +62,11 @@ W9X_VM_STALL=${W9X_VM_STALL:-1800}
 W9X_VM_ANSWER=${W9X_VM_ANSWER:-}
 W9X_VM_ANSWER_IDLE=${W9X_VM_ANSWER_IDLE:-180}
 W9X_VM_ANSWER_TRIES=${W9X_VM_ANSWER_TRIES:-3}
+# With W9X_VM_ANSWER_QUIET_MB set, W9X_VM_ANSWER is also typed after
+# W9X_VM_ANSWER_IDLE seconds in which the guest wrote less than that many MB:
+# XP's logon dialog never leaves the disk idle (services, event logs, post-FBA
+# installs; POSReady on the X470 2026-10-11 waited over an hour).
+W9X_VM_ANSWER_QUIET_MB=${W9X_VM_ANSWER_QUIET_MB:-}
 # The same for a text-mode screen (W9X_VM_TEXT_ANSWER; NT 3.51: ret for
 # text-mode Setup's "Setup was unable to verify your C: drive ... Press ENTER
 # to continue", QEMU 2026-10-08), after W9X_VM_TEXT_ANSWER_IDLE seconds
@@ -176,6 +181,17 @@ w9x_vm_written() {
     awk '{ print $7; exit }' "/sys/block/${1##*/}/stat" 2>/dev/null || echo 0
 }
 
+# Types W9X_VM_ANSWER (list number answer_tries + 1, see above) into the
+# running VM; ELAPSED IDLE_SECONDS WRITTEN_MB go to command.txt.
+w9x_vm_answer() {
+    answer_tries=$((answer_tries + 1))
+    w9x_vm_monitor "screendump $W9X_VM_RUN/answer-$answer_tries.ppm"
+    sleep 3
+    keys=$(printf '%s\n' "$W9X_VM_ANSWER" | awk -F';' -v n="$answer_tries" '{ print (n <= NF) ? $n : $NF }')
+    printf 'answer typed: %s attempt %s at %ss, idle %ss, written %s MB\n' "$keys" "$answer_tries" "$1" "$2" "$3" >> "$W9X_VM_RUN/command.txt"
+    for k in $keys; do w9x_vm_monitor "sendkey $k"; sleep 1; done
+}
+
 # Runs the VM on $1 (the confirmed target, nothing else is passed; the
 # argument list comes from W9X_VM_ARGS_FN, default w9x_vm_args). Calls
 # w9x_phase1_progress ELAPSED_SECONDS WRITTEN_MB every few seconds when the
@@ -204,6 +220,8 @@ w9x_phase1_run() {
     W9X_VM_STALLED=0
     answer_tries=0
     text_tries=0
+    quiet_base=-1
+    quiet_since=0
     set --
     while IFS= read -r arg; do set -- "$@" "$arg"; done <<EOF
 $("${W9X_VM_ARGS_FN:-w9x_vm_args}" "$target" "$accel")
@@ -224,7 +242,23 @@ EOF
         # A caller-defined step on every round (NT 3.1: its text-mode Setup
         # pages answered by their text, nt4_qemu_install.sh).
         [ -z "${W9X_VM_TICK_FN:-}" ] || "$W9X_VM_TICK_FN" "$elapsed" || true
-        if [ "$sectors" != "$last_written" ]; then
+        # Quiet window for W9X_VM_ANSWER_QUIET_MB: starts again whenever the
+        # guest wrote that much since its start.
+        if [ -n "$W9X_VM_ANSWER_QUIET_MB" ] && { [ "$quiet_base" -lt 0 ] ||
+            [ $((sectors - quiet_base)) -ge $((W9X_VM_ANSWER_QUIET_MB * 2048)) ]; }; then
+            quiet_base=$sectors
+            quiet_since=$now
+        fi
+        quiet=0
+        [ -z "$W9X_VM_ANSWER_QUIET_MB" ] || [ $((now - quiet_since)) -lt "$W9X_VM_ANSWER_IDLE" ] || quiet=1
+        if [ -n "$W9X_VM_ANSWER" ] && [ "$quiet" = 1 ] && [ "$answer_tries" -lt "$W9X_VM_ANSWER_TRIES" ] &&
+            [ "$sectors" != "$last_written" ] && w9x_vm_graphics_screen; then
+            # Writes go on, but only a few MB: the same answer as below.
+            last_written=$sectors
+            w9x_vm_answer "$elapsed" "$((now - quiet_since))" "$written"
+            idle_since=$(date +%s)
+            quiet_since=$idle_since
+        elif [ "$sectors" != "$last_written" ]; then
             last_written=$sectors
             idle_since=$now
             key_on_screen=0
@@ -243,15 +277,11 @@ EOF
                 key_on_screen=1
                 w9x_vm_type_key "$key"
                 idle_since=$(date +%s)
-            elif [ -n "$W9X_VM_ANSWER" ] && [ "$idle" -ge "$W9X_VM_ANSWER_IDLE" ] && [ "$answer_tries" -lt "$W9X_VM_ANSWER_TRIES" ] &&
-                w9x_vm_graphics_screen; then
-                answer_tries=$((answer_tries + 1))
-                w9x_vm_monitor "screendump $W9X_VM_RUN/answer-$answer_tries.ppm"
-                sleep 3
-                keys=$(printf '%s\n' "$W9X_VM_ANSWER" | awk -F';' -v n="$answer_tries" '{ print (n <= NF) ? $n : $NF }')
-                printf 'answer typed: %s attempt %s at %ss, idle %ss, written %s MB\n' "$keys" "$answer_tries" "$elapsed" "$idle" "$written" >> "$W9X_VM_RUN/command.txt"
-                for k in $keys; do w9x_vm_monitor "sendkey $k"; sleep 1; done
+            elif [ -n "$W9X_VM_ANSWER" ] && { [ "$idle" -ge "$W9X_VM_ANSWER_IDLE" ] || [ "$quiet" = 1 ]; } &&
+                [ "$answer_tries" -lt "$W9X_VM_ANSWER_TRIES" ] && w9x_vm_graphics_screen; then
+                w9x_vm_answer "$elapsed" "$idle" "$written"
                 idle_since=$(date +%s)
+                quiet_since=$idle_since
             elif [ -n "$W9X_VM_TEXT_ANSWER" ] && [ "$idle" -ge "$W9X_VM_TEXT_ANSWER_IDLE" ] && [ "$text_tries" -lt "$W9X_VM_ANSWER_TRIES" ] &&
                 ! w9x_vm_graphics_screen; then
                 text_tries=$((text_tries + 1))
