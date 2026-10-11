@@ -17,7 +17,7 @@ ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(ROOT/'tools'))
 import build_micro_linux as cpio
 
-QEMU=ROOT/'tools/qemu/qemu-system-x86_64.exe'
+QEMU=ROOT/'tools/qemu'/__import__('os').environ.get('USOS_QEMU_EXE','qemu-system-x86_64.exe')
 QEMU_IMG=ROOT/'tools/qemu/qemu-img.exe'
 SEABIOS=ROOT/'tools/qemu/share/bios-256k.bin'
 # USOS_XP_PACKAGE_DIR: a package derived for tests (derive_xp_uefi_csm_package.py).

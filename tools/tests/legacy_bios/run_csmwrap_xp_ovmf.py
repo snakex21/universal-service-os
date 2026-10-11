@@ -25,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(ROOT / 'tools'))
 from run_seabios_xp_uefi_csm_textmode import Monitor, free_port, vga_text  # noqa: E402
 
-QEMU = ROOT / 'tools/qemu/qemu-system-x86_64.exe'
+QEMU = ROOT / 'tools/qemu' / os.environ.get('USOS_QEMU_EXE', 'qemu-system-x86_64.exe')  # renamed copy: parallel runs
 QEMU_IMG = ROOT / 'tools/qemu/qemu-img.exe'
 OVMF_CODE = ROOT / 'tools/qemu/share/edk2-x86_64-code.fd'
 OVMF_VARS = ROOT / 'tools/qemu/share/edk2-i386-vars.fd'
@@ -222,7 +222,7 @@ def usb_input(mon, shots, tag):
     mon.cmd(f'screendump "{(shots / (tag + "-pointer.ppm")).as_posix()}"')
 
 
-def boot(out, disk, tag, vga, accel, minutes, shots_every=3.0, run_through=False, usb_only=False, ahci=False, type_at=()):
+def boot(out, disk, tag, vga, accel, minutes, shots_every=3.0, run_through=False, usb_only=False, ahci=False, type_at=(), decoy=None):
     shots = out / tag
     shutil.rmtree(shots, ignore_errors=True)
     shots.mkdir(parents=True)
@@ -236,7 +236,12 @@ def boot(out, disk, tag, vga, accel, minutes, shots_every=3.0, run_through=False
            '-display', 'none', '-nic', 'none', '-serial', f'file:{serial}',
            '-monitor', f'tcp:127.0.0.1:{port},server=on,wait=off',
            *(['-device', 'ahci,id=ahci', '-drive', f'if=none,id=target,format=qcow2,file={disk}', '-device', 'ide-hd,drive=target,bus=ahci.0']
-             if ahci else ['-drive', f'if=ide,index=0,format=qcow2,file={disk}'])]
+             if ahci and not decoy else ['-drive', f'if=ide,index=0,format=qcow2,file={disk}'] if not decoy else
+             # --decoy: a bootable disk on port 0 of the target's own AHCI
+             # controller, the target on port 1 (csmwrap-integration 13.4).
+             ['-device', 'ahci,id=ahci', '-drive', f'if=none,id=decoy,format=raw,cache=writeback,file={decoy}',
+              '-device', 'ide-hd,drive=decoy,bus=ahci.0', '-drive', f'if=none,id=target,format=qcow2,cache=writeback,file={disk}',
+              '-device', 'ide-hd,drive=target,bus=ahci.1'])]
     cmd += ['-vga', 'std'] if vga == 'std' else ['-vga', 'none', '-device', vga]
     cmd += USB_ONLY if usb_only else []
     # USOS_QEMU_EXTRA: more QEMU arguments (e.g. -m 32G: the E820 above 4 GB that CSMWrap passes on).
@@ -320,6 +325,7 @@ def main():
     p.add_argument('--csmwrap-efi', type=Path, help='CSMWrap binary to test instead of the pinned 3.1.2-usos4 (e.g. tools/vendor/csmwrap/3.1.2/csmwrapx64.efi, upstream)')
     p.add_argument('--verbose', choices=('true', 'false'), default='true', help='csmwrap.ini verbose value')
     p.add_argument('--tag', default='', help='suffix of the after-* screenshot folder')
+    p.add_argument('--decoy', action='store_true', help='a bootable decoy disk on port 0 of the same AHCI controller (target on port 1); it must stay byte-identical')
     p.add_argument('--shots-every', type=float, default=0, help='seconds between frame-*.png (default 3, 20 with --run-through; 0.2 catches the CSMWrap screen)')
     a = p.parse_args()
     out = a.output.resolve()
@@ -332,8 +338,24 @@ def main():
         results['before'] = boot(out, before, 'before', a.vga, a.accel, a.before_minutes)
     after = out / 'after.qcow2'
     make_overlay(a.prepared, after, esp=True, ini=ini, efi_path=a.csmwrap_efi)
-    results['after'] = boot(out, after, 'after-' + a.vga.split(',')[0] + ('-norom' if 'romfile=' in a.vga else '') + a.tag, a.vga, a.accel, a.minutes,
-                             shots_every=a.shots_every or (20.0 if a.run_through else 3.0), run_through=a.run_through)
+    decoy = None
+    if a.decoy:
+        from run_csmwrap_boot_disk_qemu import make_disk
+        decoy = out / 'decoy.img'
+        make_disk(decoy, b'USOS-DECOY', False, b'')
+        decoy_before = hashlib.sha256(decoy.read_bytes()).hexdigest()
+    try:
+        results['after'] = boot(out, after, 'after-' + a.vga.split(',')[0] + ('-norom' if 'romfile=' in a.vga else '') + a.tag, a.vga, a.accel, a.minutes,
+                                 shots_every=a.shots_every or (20.0 if a.run_through else 3.0), run_through=a.run_through, decoy=decoy)
+    except OSError as e:  # QEMU stopped from outside (its monitor is gone)
+        results['after'] = f'qemu-gone ({e.__class__.__name__})'
+    if decoy:
+        same = hashlib.sha256(decoy.read_bytes()).hexdigest() == decoy_before
+        results['decoy_unchanged'] = same
+        print('[DECOY] byte-identical after the run:', same, flush=True)
+        decoy.unlink()
+        if not same:
+            results['after'] = 'decoy-written'
     print(json.dumps(results))
     return 0 if results['after'] == 'copying' else 1
 
