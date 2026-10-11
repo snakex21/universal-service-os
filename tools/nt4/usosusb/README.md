@@ -72,6 +72,31 @@ the scan code table and the flow wiring.
 Licence: GPL-3.0-or-later. Copyright (C) 2026 Maksymilian and the USOS Authors.
 Own code, written from the public xHCI 1.2, USB 2.0 and HID 1.11 specifications.
 
+## Vista / Server 2008 SP2 x86 build (NT 6.0)
+
+`build-nt6.cmd` (`-DUSOSUSB_NT6`, WXP environment, PE 5.01) ->
+`bin/nt6/i386/usosusb.sys`, for the installed 32-bit Vista / Server 2008 SP2
+on xHCI-only machines (no 32-bit NT 6.0 xHCI driver exists). Same port devices
+and xHCI code; differences:
+
+* PCI configuration space through `HalGetBusDataByOffset` /
+  `HalSetBusDataByOffset` (the HAL's lock; NT 6.0 runs every CPU).
+* NT 6.0 `kbdclass` / `mouclass` connect the ports as legacy ports
+  (`\Device\KeyboardClassLegacyN`, `\Device\PointerClassLegacyN`, which
+  win32k opens); input is passed on once a class driver connected, also
+  before its first ENABLE.
+* `Parameters\Conn` (REG_SZ), e.g. `kbd c1 e1/1 n42 mou c1 e1/1 n7`:
+  connected, ENABLE seen / count, input records passed to the class driver.
+
+Installed offline by the `nt60_usb` step of `tools/windows_x86_csmwrap.cmd`
+(x86 CSMWrap WinPE, NT 6.0.6002 only): `system32\drivers\usosusb.sys`, service
+Type 1, Start 1, ErrorControl 0, Group "Keyboard Port" (before "Keyboard
+Class" / "Pointer Class", where `kbdclass` and `mouclass` are system-start
+services). 32-bit NT 6.0 does not enforce kernel-mode signatures, so the
+unsigned driver loads. `tools/tests/test_nt60_usosusb.py` checks the imports
+against the Server 2008 SP2 x86 kernels and HALs (export-name fixture) and
+the flow wiring.
+
 ## NT 3.1 build
 
 `build-nt31.cmd` (`-DUSOSUSB_NT31`, PE version 3.10) -> `bin/nt31/i386/usosusb.sys`:
