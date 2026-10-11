@@ -20,6 +20,10 @@ rem      becomes Setup's first-boot command: WinSAT's OOBE assessment is
 rem      skipped (MOOBE=2; it hung on the X470 in "mem"), an interrupted
 rem      OOBE resumes without a second account, autochk stays on the system
 rem      volume; never fatal (design doc section 12.5);
+rem   3c. Vista / Server 2008 SP2 x86 (NT 6.0.6002) only: usosusb.sys (own
+rem      xHCI keyboard / mouse port driver, tools/nt4/usosusb build-nt6)
+rem      copied to system32\drivers and registered offline as a system-start
+rem      "Keyboard Port" service; never fatal (design doc section 12.6);
 rem   4. usos-x86-csmwrap after: boot files on the Windows partition checked,
 rem      staging entry removed, "remove the stick" notice, restart.
 set "USOS_SETUP=%USOS_SOURCE%\sources\setup.exe"
@@ -45,6 +49,7 @@ if not "%USOS_SETUP_RESULT%"=="0" (
 )
 call :usb3
 call :nt60_gate
+call :nt60_usb
 echo [USOS] phase=finalize-target-boot
 "%~dp0usos-x86-csmwrap.exe" stick
 "%~dp0usos-x86-csmwrap.exe" after
@@ -72,7 +77,7 @@ set "USOS_WORKDIR="
 if errorlevel 1 (echo [USOS] USB3: installed Windows not found; skipped. & exit /b 0)
 for /f "usebackq tokens=1,2" %%A in ("%TEMP%\usos-target.txt") do (set "USOS_T=%%A" & set "USOS_NT=%%B")
 if not defined USOS_NT (echo [USOS] USB3: no target record; skipped. & exit /b 0)
-if "%USOS_NT%"=="6.0" (echo [USOS] USB3: Vista / Server 2008 x86 - no USB 3 driver for this Windows yet; skipped. & exit /b 0)
+if "%USOS_NT%"=="6.0" (echo [USOS] USB3: Vista / Server 2008 x86 - no Microsoft-stack USB 3 driver; see the nt60-usb step. & exit /b 0)
 rem Windows 8.1 / 10 x86 (profile win-x86-uefi-csmwrap) have their own xHCI driver.
 if not "%USOS_NT%"=="6.1" exit /b 0
 set "USOS_DATA="
@@ -150,6 +155,47 @@ if /i "%USOS_CMDLINE%"=="oobe\windeploy.exe" (
 ) else (
     echo [USOS] OOBE gate: unexpected Setup CmdLine "%USOS_CMDLINE%"; left unchanged.
 )
+reg unload HKLM\USOS_SYS >nul
+"%~dp0usos-log-x86.exe"
+exit /b 0
+
+rem ---- Vista / Server 2008 SP2 x86: USB keyboard and mouse (section 12.6) --
+rem NT 6.0 x86 has no xHCI driver and no Vista-capable 32-bit package exists;
+rem the X470 has only xHCI ports (firmware legacy emulation through i8042
+rem ended during OOBE). usosusb.sys (own GPL driver, tools/nt4/usosusb,
+rem build-nt6.cmd) takes the xHCI controllers from the firmware (USBLEGSUP),
+rem polls root-port HID boot keyboards / mice and feeds kbdclass / mouclass
+rem as a legacy keyboard / pointer port. Offline, with this WinPE's reg.exe:
+rem the driver into system32\drivers and a system-start "Keyboard Port"
+rem service (loads before kbdclass / mouclass). 6.0.6002 only: Windows 7 and
+rem later have a Microsoft xHCI stack (usbxhci) that must not meet it.
+rem 32-bit Vista does not enforce kernel-mode signatures (x64 only).
+:nt60_usb
+set "USOS_T="
+set "USOS_NT="
+set "USOS_BUILD="
+"%~dp0usos-x86-csmwrap.exe" target "%TEMP%\usos-target.txt" >nul
+if errorlevel 1 exit /b 0
+for /f "usebackq tokens=1,2,3" %%A in ("%TEMP%\usos-target.txt") do (set "USOS_T=%%A" & set "USOS_NT=%%B" & set "USOS_BUILD=%%C")
+if not "%USOS_NT%"=="6.0" exit /b 0
+echo [USOS] phase=nt60-usb build=%USOS_BUILD%
+if not "%USOS_BUILD%"=="6002" (echo [USOS] usosusb: only for SP2 builds 6002; skipped. & exit /b 0)
+if not exist "%~dp0usosusb-nt6.sys" (echo [USOS] usosusb: driver missing; skipped. & exit /b 0)
+copy /y "%~dp0usosusb-nt6.sys" "%USOS_T%\Windows\System32\drivers\usosusb.sys" >nul
+if errorlevel 1 (echo [USOS] usosusb: copy failed; skipped. & exit /b 0)
+reg load HKLM\USOS_SYS "%USOS_T%\Windows\System32\config\SYSTEM" >nul
+if errorlevel 1 (echo [USOS] usosusb: SYSTEM hive not loaded; skipped. & exit /b 0)
+set "USOS_CS="
+for /f "tokens=3" %%A in ('reg query "HKLM\USOS_SYS\Select" /v Current ^| find /i "Current"') do set /a "USOS_CS=%%A"
+if not defined USOS_CS set "USOS_CS=1"
+set "USOS_SVC=HKLM\USOS_SYS\ControlSet00%USOS_CS%\Services\usosusb"
+reg add "%USOS_SVC%" /v Type /t REG_DWORD /d 1 /f >nul
+reg add "%USOS_SVC%" /v Start /t REG_DWORD /d 1 /f >nul
+reg add "%USOS_SVC%" /v ErrorControl /t REG_DWORD /d 0 /f >nul
+reg add "%USOS_SVC%" /v Group /t REG_SZ /d "Keyboard Port" /f >nul
+reg add "%USOS_SVC%" /v ImagePath /t REG_EXPAND_SZ /d "system32\drivers\usosusb.sys" /f >nul
+reg add "%USOS_SVC%" /v DisplayName /t REG_SZ /d "USOS USB keyboard and mouse (xHCI)" /f >nul
+echo [USOS] usosusb: registered in ControlSet00%USOS_CS% exit=%errorlevel%
 reg unload HKLM\USOS_SYS >nul
 "%~dp0usos-log-x86.exe"
 exit /b 0
