@@ -312,7 +312,8 @@ restart -> firmware boots the disk's UEFI entry -> CSMWrap -> SeaBIOS (card
   VBIOS POSTed) -> MBR -> NT60 -> bootmgr -> PE10 in RAM (BIOS mode, own USB 3,
   AHCI, NVMe) -> USOS Vista installer (usos-vista-csmwrap.flag):
      staging partition marked inactive, Vista setup.exe from the ISO on the
-     stick (ImDisk, as on UEFI), the user picks the unallocated space
+     stick (ImDisk, as on UEFI), InstallTo = the prepared Windows partition
+     (since 2026-10-11, section 13; before: the user picked unallocated space)
   -> Setup in BIOS mode: MBR partition, bootmgr + \Boot\BCD on its own
      partition (active), NT60 MBR
   -> finalizer: test signing in that BCD, USB v11 first boot armed (MBR
@@ -358,7 +359,8 @@ Why this one:
   taken by `usos_answer_plan_take`) and DATA `Unattended` files; since
   2026-09-28 also on the UEFI path with CSM (the same installer merge). The installer inserts its KMDF `<servicing>` block right
   after `<unattend ...>` (`merge_user_answer`, UTF-8 only; a file with its own
-  `servicing` section is refused). Disk selection stays manual (the renderer
+  `servicing` section is refused). Since 2026-10-11 the installer adds InstallTo for
+  the prepared Windows partition (section 13); before, disk selection stayed manual (the renderer
   writes no DiskConfiguration/InstallTo).
 * **Installer** (`tools/windows_vista_install.c`, CSMWrap mode v1): BIOS
   firmware is accepted only with `usos-vista-csmwrap.flag`; before Setup the
@@ -471,7 +473,7 @@ plain "OK" confirmation.
   (the first and the last MiB are zeroed: MBR and both GPT copies, then a new
   MBR); the sectors in between are not overwritten, but no partition refers
   to them any more and Setup formats its new partition. In Vista Setup the
-  user picks the unallocated space.
+  user picked the unallocated space (until 2026-10-11; now InstallTo, section 13).
 * XP: unchanged behaviour (the picker's extra `info=` line appears only with
   `USOS_XP_DISK_NOTE`, set only by step 610; `USOS_UI_VISTA` only with
   `usos.legacy_action=vista-csmwrap`).
@@ -672,3 +674,116 @@ xHCI, DATA answer file), sticks built with `new_native_stick.ps1
   autologon: **Vista Ultimate x86 desktop**. No USB input there (12.3).
 * **Server 2008 Web SP2 PL x86**: as 12.2; the `usb3` step logs the NT 6.0
   skip. An empty `<Key>` is rejected there too; leave `ProductKey` out.
+
+## 13. One disk question per flow (2026-10-11)
+
+Rule (user, 2026-10-11): every flow asks for the target disk **exactly once**.
+Where Windows Setup can boot straight from the stick, that is Setup's own
+disk page and USOS asks nothing. Where something must be staged on the target
+before Setup can boot (the CSMWrap paths), the USOS picker of step 610 is that
+one question and Setup must not ask again.
+
+### 13.1 Inventory
+
+| Path | Before | After | USOS picker required? |
+|---|---|---|---|
+| Windows 8.1 / 10 / 11 x64 native UEFI (also Embedded 8.1 x64, Server 2012 R2 Storage/Foundation) | Setup page only | unchanged | no: wimboot from the stick, Setup chooses |
+| Windows 7 x64 / Server 2008 R2 / Home Server 2011 (UEFI, Int10 dispatcher, PE10 donor) | Setup page only | unchanged | no |
+| Vista x64 UEFI with firmware CSM | Setup page only (USOS disk prep off unless `vista-disk-prep.flag`) | unchanged | no |
+| Vista x64 / Web Server 2008 x64 without CSM (`vista-x64-sp2-uefi-csmwrap`) | **both**: USOS picker + Setup page (pick the unallocated space) | USOS picker only (InstallTo) | yes: the PE10 staging partition and the CSMWrap ESP must be on the disk before Setup can boot in BIOS mode |
+| 8.1 / 10 x86 without CSM (`win-x86-uefi-csmwrap`) | USOS picker only (InstallTo); a UTF-16 answer kept the Setup page | USOS picker only, UTF-16 answers converted | yes (same reason) |
+| 7 / Vista / 2008 x86 without CSM (`win-nt6-x86-uefi-csmwrap`) | as above | as above | yes |
+
+### 13.2 Implementation
+
+* `tools/vista_csmwrap_target.sh`: the Vista x64 layout is now the x86 one
+  (slot 1 NTFS "Windows", inactive; slot 2 the active staging partition;
+  slot 3 the CSMWrap ESP), read back; `usos-vista-target.ini` already carried
+  `windows_start` / `windows_sectors`.
+* `tools/windows_installto.h` (shared by `usos-x86-csmwrap.exe` and
+  `usos-vista-install.exe` CSMWrap mode v2): the answer's own disk settings
+  (`DiskConfiguration`, `InstallTo`, `InstallToAvailablePartition`) are
+  removed, then `ImageInstall/OSImage/InstallTo` = the prepared disk and
+  partition goes into **every** `Microsoft-Windows-Setup` component (answer
+  files often carry one per architecture), or a windowsPE component is added
+  before `</unattend>`. UTF-16 answers are converted to UTF-8. Only the disk
+  confirmed in step 610 can be written by Setup.
+* The disk is the one internal MBR disk with the recorded signature whose
+  partition table holds the prepared Windows partition (offset + length).
+  Not found exactly once: a message box says so, Setup is never started (no
+  fallback to any other disk, no Setup disk page).
+* Host test `tools/tests/test_windows_x86_csmwrap.py` (hostile answer with
+  `WillWipeDisk` on disk 0, two Setup components, UTF-16, the Vista
+  servicing-only answer).
+
+### 13.3 Two-disk QEMU check
+
+`qemu_native.py` with `USOS_NATIVE_DECOY=<qcow2>`: a second internal disk
+(20 GiB, MBR with an active partition, marker data) enumerated before the
+target (Linux `sda`, Windows disk 0); the DATA answer file is hostile on
+purpose (`DiskConfiguration` with `WillWipeDisk` on disk 0 and `InstallTo`
+disk 0). OVMF without CSM, `pc`, TCG, target 40 GiB on its own AHCI
+controller, build B261011-082326-3D3F4F21:
+
+| Run | Result |
+|---|---|
+| Server 2008 Web SP2 PL x86 (`win-nt6-x86-uefi-csmwrap`, x86 PE10 donor) | picker lists both disks, the target is confirmed; PE10: `target physical disk=1`, `the answer's own disk settings removed; InstallTo added`; Setup ran with no page at all, the helper removed the staging entry, phase 2 through CSMWrap, Server 2008 desktop. Target MBR: Windows active at 2048, CSMWrap ESP; decoy: `qemu-img compare` identical to its pristine copy. PASS |
+| Vista SP2 PL x64 (`vista-x64-sp2-uefi-csmwrap`, PE10 x64 donor) | picker + "FORMAT THE ENTIRE DISK?" with the new layout text; PE10 Setup with `vista-csmwrap-answer.xml`: only the (known) client key page, then straight to "Installing Windows" (no edition or disk page); finalizer PASS; phase 2 from the target through CSMWrap in test mode up to the USB v11 gate (stops in QEMU as in 10.4). Target MBR as above; decoy identical. PASS |
+
+
+### 13.4 Finding: SeaBIOS boot priority is per controller, not per port
+
+With the decoy on **port 0 of the target's own AHCI controller**
+(`USOS_NATIVE_DECOY_SAME_CONTROLLER=1`), the firmware started the target's
+CSMWrap ESP correctly, but SeaBIOS then booted the **decoy's** MBR (black
+screen, nothing read from the prepared staging partition). Cause: patch 0004
+(`csm_bootprio_ata`) ranks by the controller's PCI address only; every disk on
+that controller gets the same priority and SeaBIOS breaks the tie by port
+order. This affects every CSMWrap target path (XP, 2000, NT, 9x, Vista, x86)
+on a PC with another disk on a lower port of the same SATA controller (common
+on the X470 chipset ports). It needs a SeaBIOS patch that also matches the
+port (CSMWrap's device path names the SATA port it was loaded from) and a
+CSMWrap rebuild; not done here.
+
+### 13.5 Booting Setup from the stick instead (evaluated, not implemented)
+
+Asked for 2026-10-11: no USOS picker on the CSMWrap paths either; Setup's own
+disk page, with the WinPE boot set loaded into RAM by the UEFI side and
+exposed to SeaBIOS as an INT 13h RAM disk; the CSMWrap ESP added afterwards
+on the disk Setup used.
+
+* Why the design staged on the target (section 2, 10.1): CSMWrap 3.1.2 has
+  no boot-device option (BBS: the drive it was loaded from first); the
+  installed system needs the target ESP on every boot anyway; Vista's own PE
+  has no xHCI, so PE10 had to be bootable without the stick.
+* RAM disk: SeaBIOS in CSM mode has no RAM hard-disk driver (its `ramdisk.c`
+  is a CBFS floppy for coreboot) and CSMWrap always ends in `Legacy16Boot`
+  (BBS). The memdisk part itself exists in USOS: the BIOS `wimboot` gives
+  bootmgr an INT 13h virtual disk built from files in RAM (the BIOS Core's
+  Windows ISO path uses it). Missing: a way to start a preloaded real-mode
+  image after CSMWrap's ExitBootServices without SeaBIOS reading the stick,
+  i.e. a CSMWrap/SeaBIOS patch (for example `boot_image=` in `csmwrap.ini`,
+  loaded below 1 MiB / reserved in E820 and entered instead of the BBS boot)
+  plus a rebuild with the pinned toolchain, new hashes and the release steps
+  of research/csmwrap.md 6.5.
+* USB INT 13h fallback: exists today (Utilities -> BIOS mode: CSMWrap from
+  the stick -> USOS Stage 1 -> Core -> BIOS wimboot from the DATA ISO); never
+  run on the X470; the Core reads the whole boot.wim through SeaBIOS's xHCI
+  driver. QEMU check 2026-10-11 (OVMF without CSM, stick on qemu-xhci, build
+  B261011-082326): the BIOS menu comes up through CSMWrap from the stick, but
+  Windows 10 x86 -> Automatic stops with `RuntimeWindowNotUsable` right after
+  `WIMBOOT FILE LOOKUP PASS`: `windows_wimboot.allocate` reserves 1-17 MiB for
+  wimboot's runtime, and the E820 that CSMWrap builds from the OVMF memory map
+  has a non-RAM range at 8 MiB (section 7: OVMF NVS at 8 MiB). The X470 map is
+  unknown; the fix would be a smaller or relocated window in the Core.
+* Open risks for any "Setup chooses" variant in BIOS mode: Setup puts
+  bootmgr on the active partition of what the BIOS reports as the boot disk;
+  booted from the stick (80h) it may pick another internal disk (the classic
+  multi-disk case), which writes to a disk the user did not choose and leaves
+  the chosen disk unbootable through its own CSMWrap ESP; and 13.4 applies to
+  phase 2 as well. The ESP itself can be carved after phase 1 (PE10
+  `diskpart shrink` by 65 MiB, a free MBR slot: Vista uses one partition,
+  7+ two).
+* Verdict: blocked within this task by the CSMWrap/SeaBIOS rebuild (both the
+  RAM-disk hook and the 13.4 fix need it) and by the unverified system
+  partition placement. The step-610 picker stays, with no second question.

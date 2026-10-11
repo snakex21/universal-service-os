@@ -108,16 +108,26 @@ def disk_args(stick: Path | None, target: Path) -> list[str]:
                  "-device", "usb-storage,bus=xhci.0,drive=stick,removable=on,serial=USOSSTICK" + (",bootindex=1" if TARGET_FIRST else "")]
     target_fmt = "vpc" if target.suffix.lower() == ".vhd" else "qcow2"
     if TARGET_BUS == "ahci":
-        # USOS_NATIVE_DECOY=<qcow2>: a second internal disk on the first SATA
-        # port (the guest's disk 0 / sda; the target moves to port 1). The
-        # one-disk-question checks pick the target and prove the decoy is
-        # never written (compare its contents before and after).
+        # USOS_NATIVE_DECOY=<qcow2>: a second internal disk, enumerated before
+        # the target (the guest's disk 0 / sda). The one-disk-question checks
+        # pick the target and prove the decoy is never written (compare its
+        # contents before and after). Default: the decoy has its own AHCI
+        # controller at a lower PCI slot. USOS_NATIVE_DECOY_SAME_CONTROLLER=1
+        # puts it on port 0 of the target's controller instead: CSMWrap's
+        # SeaBIOS (patch 0004) ranks controllers, not ports, so it then boots
+        # the decoy's MBR instead of the prepared target (found 2026-10-11).
         decoy = os.environ.get("USOS_NATIVE_DECOY")
-        port = 1 if decoy else 0
-        args += ["-device", "ahci,id=sata"]
+        same = decoy and os.environ.get("USOS_NATIVE_DECOY_SAME_CONTROLLER") == "1"
+        port = 1 if same else 0
         if decoy:
-            args += ["-drive", f"if=none,id=decoy,file={Path(decoy).resolve().as_posix()},format=qcow2,cache=writeback",
-                     "-device", "ide-hd,bus=sata.0,drive=decoy,serial=USOSDECOY"]
+            bus = "sata.0" if same else "sata_decoy.0"
+            if not same:
+                args += ["-device", "ahci,id=sata_decoy,addr=0x5"]
+            args += ["-drive", f"if=none,id=decoy,file={Path(decoy).resolve().as_posix()},format=qcow2,cache=writeback"]
+            decoy_device = ["-device", f"ide-hd,bus={bus},drive=decoy,serial=USOSDECOY"]
+        args += ["-device", "ahci,id=sata" + (",addr=0x6" if decoy else "")]
+        if decoy:
+            args += decoy_device
         args += ["-drive", f"if=none,id=target,file={target.as_posix()},format={target_fmt},cache=writeback",
                  "-device", f"ide-hd,bus=sata.{port},drive=target,serial=USOSTARGET" + (",bootindex=0" if TARGET_FIRST else "")]
     else:
