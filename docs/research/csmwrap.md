@@ -376,3 +376,32 @@ over three VM runs; staged by `release.go`, pinned in `xp_csmwrap_esp.sh`
 and in the DOS target ESP image. XP and Vista target-ESP boots with and
 without the stick: PASS in QEMU. The blinking-cursor patch mentioned in
 section 7 is still not done (it would be a later build).
+
+## 9. 3.1.2-usos4: the disk CSMWrap was loaded from is 0x80 (2026-10-11, branch `feature/csmwrap-boot-disk`)
+
+usos3 plus patch 0005. CSMWrap's BBS table names controllers only, so every
+disk on the controller CSMWrap was loaded from got priority 0 and SeaBIOS
+broke the tie by port: a bootable disk on a lower port of the same SATA
+controller became 0x80 (design doc csmwrap-integration 13.4). Now CSMWrap
+finds the raw disk whose device path prefixes the loaded image's path and
+tags its BBS entry (IBV1 = "USOS", IBV2 = FNV-1a of its first 512 bytes);
+SeaBIOS reads sector 0 of each hard disk before mapping drives and moves the
+single match in front of the first hard disk, the other disks keep their
+order (0x81, ...). No tag, no match or several matches (cloned disks): the
+order stays as in usos3. Legacy IDE (16-bit-only `DTYPE_ATA`) drives cannot
+be read at that point and keep the usos3 order.
+
+`csmwrapx64.efi` SHA-256
+`e566e5a91c7b880105afbb435e3d8fbecfca748cbf28101ff14d686a47f8e807`, built
+twice in one VM run (identical). Alpine v3.24 dropped python3 3.14.7-r1, the
+pin is now 3.14.8-r0; the unpatched rebuild still gives the
+`upstream_rebuild` hash, so the toolchain output did not change.
+
+Tests: `tools/tests/legacy_bios/run_csmwrap_boot_disk_qemu.py` (OVMF without
+CSM, two raw disks whose MBR code reports which disk is 0x80 and which 0x81
+on the debug console): decoy on port 0 / target on port 1 of one AHCI
+controller, the reverse, decoy on its own controller, target on qemu-xhci
+usb-storage: all `USOS-TARGET USOS-DECOY` with usos4; the usos3 control
+boots the decoy. XP SP3 PL (`run_csmwrap_xp_ovmf.py --decoy`) and 32-bit
+Windows 10 (`qemu_native.py`, `USOS_NATIVE_DECOY_SAME_CONTROLLER=1`) in
+csmwrap-integration 13.4.
