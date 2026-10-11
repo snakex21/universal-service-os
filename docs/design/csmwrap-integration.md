@@ -743,7 +743,24 @@ order. This affects every CSMWrap target path (XP, 2000, NT, 9x, Vista, x86)
 on a PC with another disk on a lower port of the same SATA controller (common
 on the X470 chipset ports). It needs a SeaBIOS patch that also matches the
 port (CSMWrap's device path names the SATA port it was loaded from) and a
-CSMWrap rebuild; not done here.
+CSMWrap rebuild.
+
+**Fixed in CSMWrap 3.1.2-usos4 (patch 0005, 2026-10-11,
+research/csmwrap.md section 9):** CSMWrap tags the BBS entry of the exact
+disk it was loaded from (device-path prefix of the loaded image) with an
+FNV-1a hash of that disk's sector 0; SeaBIOS reads sector 0 of every hard
+disk before mapping drives and moves the one match in front of the first
+hard disk. The target is 0x80, the other disks follow in their usual order
+(0x81, ...), so `rdisk(0)` in boot.ini / WINNT.SIF, the 9x `C:` and NT6's
+system disk (the first BIOS disk) keep meaning the prepared target; nothing
+in the flows had to change. QEMU, OVMF without CSM, build
+B261011-094317-A0DAC3F4:
+
+| Run | Result |
+|---|---|
+| `run_csmwrap_boot_disk_qemu.py`: decoy port 0 / target port 1 of one AHCI controller; target port 0 / decoy port 1; decoy on its own controller; target on qemu-xhci usb-storage | all four: target is 0x80, decoy 0x81 (read through INT 13h), decoy byte-identical. Control with usos3: the decoy boots. PASS |
+| XP Professional SP3 PL, prepared target on port 1, bootable decoy on port 0 of the same controller (`run_csmwrap_xp_ovmf.py --decoy --run-through`) | CSMWrap -> target MBR -> text-mode Setup copies, restarts, second CSMWrap boot -> GUI Setup; decoy byte-identical. PASS |
+| Windows 10 22H2 PL x86 (`win-x86-uefi-csmwrap`), `qemu_native.py` with `USOS_NATIVE_DECOY_SAME_CONTROLLER=1` (decoy port 0, target port 1), stick on qemu-xhci | USOS picker lists both, target confirmed, restart -> CSMWrap from the target ESP -> staging WinPE -> Setup without a disk page -> restart -> second CSMWrap boot from the target -> Windows phase 2 ("Przygotowywanie urządzeń"; run stopped there with the QEMU monitor `quit`). Target MBR: Windows active at 2048, CSMWrap ESP in slot 3; decoy `qemu-img compare` identical to its pristine copy. PASS |
 
 ### 13.5 Booting Setup from the stick instead (evaluated, not implemented)
 
@@ -784,6 +801,51 @@ on the disk Setup used.
   phase 2 as well. The ESP itself can be carved after phase 1 (PE10
   `diskpart shrink` by 65 MiB, a free MBR slot: Vista uses one partition,
   7+ two).
-* Verdict: blocked within this task by the CSMWrap/SeaBIOS rebuild (both the
-  RAM-disk hook and the 13.4 fix need it) and by the unverified system
-  partition placement. The step-610 picker stays, with no second question.
+* Verdict (first evaluation): blocked by the CSMWrap/SeaBIOS rebuild and by
+  the unverified system partition placement.
+
+### 13.6 RAM-disk boot: system partition placement measured (2026-10-11)
+
+The rebuild is no longer the blocker (13.4 landed as usos4). The deciding
+question was what NT6 Setup does when BIOS drive 0x80 is a RAM disk that
+Windows cannot see. `tools/tests/legacy_bios/run_setup_system_disk_probe.py`
+reproduces exactly that BIOS view without building the RAM disk: QEMU legacy
+SeaBIOS, the ISO booted from CD, 0x80 = a virtio-blk disk with an MBR (Setup
+has no virtio driver, so like the RAM disk it is a BIOS disk with no Windows
+disk behind it), the AHCI disks after it, an answer file with language and
+EULA only, so Setup shows its own disk page; the target (40 GiB) is picked.
+
+| Setup | Disks Windows sees | Disk page / Next |
+|---|---|---|
+| Windows 7 Ultimate SP1 PL x86 | disk 0 = decoy (0x81, active NTFS-type partition), disk 1 = target (0x82) | the decoy's partition is listed as type **System**; Next on disk 1: "Instalator nie mógł utworzyć nowej partycji systemowej ani zlokalizować istniejącej partycji systemowej" |
+| Windows 7 Ultimate SP1 PL x86 | disk 0 = blank decoy (0x81), disk 1 = target | same error on disk 1 |
+| Windows 7 Ultimate SP1 PL x86 | disk 0 = target only (0x81) | same error |
+| Windows 10 22H2 PL x86 | disk 0 = target only (0x81) | "Nie mogliśmy utworzyć nowej partycji ani zlokalizować istniejącej" |
+
+Nothing was written in any run (decoy and the 0x80 stand-in byte-identical,
+target still empty). Result: in BIOS mode Setup takes the system disk from
+BIOS drive 0x80. A RAM disk at 0x80 that Windows cannot see makes Setup
+refuse **every** disk, even on a single-disk PC. Numbering the RAM disk after
+the real disks does not help either: then 0x80 is whatever internal disk the
+BIOS lists first, Setup puts the system partition (bootmgr, BCD) there when
+it is not the disk the user picked (the "System" row above) - a write to a
+disk the user did not choose, which the design must never do. Only the disk
+the user picks being 0x80 is safe, and that needs the choice before the BIOS
+boot, i.e. the step-610 USOS picker.
+
+Not built because of this: the UEFI-side boot-set loader, the SeaBIOS RAM
+disk, the E820 reservation for it, and the WinPE helper that would carve the
+CSMWrap ESP after phase 1. The `RuntimeWindowNotUsable` item of 13.5 belongs
+to the BIOS Core's own wimboot path and is unrelated to this result.
+
+Possible route, not attempted: make the RAM disk visible to Windows as a
+fixed disk (a memdisk-style table, mBFT, plus a WinPE disk driver that reads
+it, e.g. the GPL WinVBlock). Setup would then put the system partition on
+the RAM disk (written only in memory), install to the disk the user picked,
+and the helper would run `bcdboot` on that disk and add the CSMWrap ESP. It
+needs a Windows kernel driver for x86 PE 6.x/10 and its own tests; the
+`attributes disk set readonly` trick does not help because the disk the user
+will pick is unknown before Setup runs.
+
+Decision: the USOS picker (step 610, one question, Setup without a disk
+page) stays the default for all CSMWrap paths.
