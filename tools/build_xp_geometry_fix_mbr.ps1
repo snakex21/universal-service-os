@@ -71,3 +71,26 @@ $padded[511] = 0x33
 $sha = (Get-FileHash -LiteralPath $hookbin -Algorithm SHA256).Hash
 Write-Host "[PASS] NT3 MBR hook sector: $($code.Length)/502 bytes SHA256=$sha"
 Write-Host "OUTPUT=$hookbin"
+
+# ReactOS (and own BIOS images) behind CSMWrap: the ELCR MBR marks the PCI
+# IRQs level-triggered, then chains to the image's MBR kept at LBA 1
+# (src/platform/bios/reactos/elcr_mbr.S, docs/custom-os-2026-10-11.md).
+$elcrsrc = Full 'src/platform/bios/reactos'
+$elcrelf = Join-Path $out 'elcr-mbr.elf'
+$elcrraw = Join-Path $out 'elcr-mbr.raw.bin'
+$elcrbin = Join-Path $out 'elcr-mbr-440.bin'
+& $zig cc -target x86-freestanding-none -mcpu=i386 -nostdlib -nodefaultlibs `
+    "-Wl,-T,$((Join-Path $elcrsrc 'elcr_mbr.ld'))" `
+    '-Wl,--entry=elcr_mbr_start' `
+    (Join-Path $elcrsrc 'elcr_mbr.S') -o $elcrelf
+if ($LASTEXITCODE -ne 0) { throw "ELCR MBR assembly/link failed: $LASTEXITCODE" }
+& $zig objcopy -O binary -j .text $elcrelf $elcrraw
+if ($LASTEXITCODE -ne 0) { throw "ELCR MBR objcopy failed: $LASTEXITCODE" }
+$code = [IO.File]::ReadAllBytes($elcrraw)
+if ($code.Length -gt 440) { throw "ELCR MBR code is $($code.Length) bytes; max is 440" }
+$padded = New-Object byte[] 440
+[Array]::Copy($code,$padded,$code.Length)
+[IO.File]::WriteAllBytes($elcrbin,$padded)
+$sha = (Get-FileHash -LiteralPath $elcrbin -Algorithm SHA256).Hash
+Write-Host "[PASS] ELCR MBR: $($code.Length)/440 bytes SHA256=$sha"
+Write-Host "OUTPUT=$elcrbin"

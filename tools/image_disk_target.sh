@@ -14,6 +14,9 @@
 #   - MBR image without one (BIOS only): adds the CSMWrap ESP in a free MBR
 #     slot at the disk end (tools/xp_csmwrap_esp.sh), CSMWrap's SeaBIOS boots
 #     the disk as 0x80;
+#   - ReactOS / own BIOS image: the ELCR MBR in front of the image's MBR
+#     (kept at LBA 1), so PCI interrupts are level-triggered as on a real
+#     BIOS (ReactOS stops with 0x7B behind CSMWrap otherwise);
 #   - FreeDOS FullUSB: SETUP.BAT -> SETUP.OFF so the disk starts into the
 #     FreeDOS prompt instead of the installer (which aborts on its own disk);
 #     the package repository stays on the disk (FDIMPLES).
@@ -172,6 +175,34 @@ if [ "$mode" = csmwrap ] && [ "$(dd if="$TARGET_DEVICE" bs=1 skip=$((17 * 2048 +
 fi
 if [ "$mode" = csmwrap ]; then
     TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=$ESP_TAIL sh "$LIB/xp_csmwrap_esp.sh" || fail 'the CSMWrap ESP could not be written'
+fi
+
+# ReactOS / own BIOS image behind CSMWrap: CSMWrap's SeaBIOS (CSM mode) leaves
+# the 8259 ELCR at 00/00, so PCI interrupts look edge-triggered and ReactOS's
+# disk driver never sees its (level) AHCI interrupt: STOP 0x7B (QEMU
+# 2026-10-11). The ELCR MBR (src/platform/bios/reactos/elcr_mbr.S) marks the
+# PCI IRQs level-triggered and chains to the image's own MBR, kept unchanged
+# at LBA 1. Only when LBA 1 is empty (ISO system area); FreeDOS does not need it.
+elcr_fix() {
+    stub="$LIB/elcr-mbr-440.bin"
+    [ -r "$stub" ] || { log 'elcr-mbr-440.bin missing: the image MBR stays (0x7B risk behind CSMWrap)'; return 0; }
+    [ "$(wc -c < "$stub" | tr -d ' ')" = 440 ] || fail 'internal error: ELCR MBR size'
+    if [ -n "$(dd if="$TARGET_DEVICE" bs=512 skip=1 count=1 2>/dev/null | od -An -v -tx1 | tr -d ' \n0')" ]; then
+        log 'LBA 1 is in use by the image: no ELCR MBR'
+        return 0
+    fi
+    orig="$work/mbr-image.bin"
+    dd if="$TARGET_DEVICE" of="$orig" bs=512 count=1 2>/dev/null || fail 'cannot read the MBR'
+    dd if="$orig" of="$TARGET_DEVICE" bs=512 seek=1 count=1 conv=notrunc,fsync 2>/dev/null || fail 'cannot keep the image MBR at LBA 1'
+    dd if="$stub" of="$TARGET_DEVICE" bs=440 count=1 conv=notrunc,fsync 2>/dev/null || fail 'cannot write the ELCR MBR'
+    sync
+    a=$( { cat "$stub"; dd if="$orig" bs=1 skip=440 count=72 2>/dev/null; cat "$orig"; } | sha256sum | awk '{print $1}')
+    b=$(dd if="$TARGET_DEVICE" bs=512 count=2 2>/dev/null | sha256sum | awk '{print $1}')
+    [ "$a" = "$b" ] || fail 'read-back: the ELCR MBR or the kept image MBR differs'
+    log 'ELCR MBR written (PCI IRQs level-triggered); the image MBR kept at LBA 1, read-back PASS'
+}
+if [ "$mode" = csmwrap ]; then
+    case "$SYSTEM" in reactos|other-os) elcr_fix ;; esac
 fi
 sync
 blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true
