@@ -552,6 +552,7 @@ def main() -> int:
             ("tools/hardware_smart.sh", "usr/lib/usos/hardware_smart.sh"),
             ("tools/hardware_smart_table.awk", "usr/lib/usos/hardware_smart_table.awk"),
             ("tools/hardware_ui.sh", "usr/lib/usos/hardware_ui.sh"),
+            ("tools/stick_release.sh", "usr/lib/usos/stick_release.sh"),
             ("tools/partuuid.sh", "usr/lib/usos/partuuid.sh"),
             ("tools/partuuid_diagnostics.sh", "usr/lib/usos/partuuid_diagnostics.sh"),
             ("tools/device_guard.sh", "usr/lib/usos/device_guard.sh"),

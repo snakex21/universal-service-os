@@ -127,6 +127,6 @@ usos_hardware_main() {
             *) break ;;
         esac
     done
-    reboot -f
+    sh /usr/lib/usos/stick_release.sh reboot
     while :; do sleep 3600; done
 }

@@ -22,6 +22,8 @@
  *                            of the installed Windows (a letter is given to
  *                            its volume when it has none), for the offline
  *                            USB 3 step of usos-x86-csmwrap.cmd.
+ *   stick                    read-only: logs the dirty bit of every volume on
+ *                            a USB / removable disk (the USOS stick).
  *   after                    the Windows partition holds bootmgr and
  *                            Windows\System32\winload.exe and is the only active
  *                            one; the staging entry is removed; a notice says to
@@ -230,12 +232,13 @@ static BOOL target_letter(void) {
     FindVolumeClose(f);
     return found && target_root[0];
 }
+static DWORD file_build; /* build of the last file_version() */
 static BOOL file_version(const WCHAR *file, DWORD *major, DWORD *minor) {
     DWORD unused = 0, n = GetFileVersionInfoSizeW(file, &unused);
     if (!n || n > sizeof(buffer)) return FALSE;
     VS_FIXEDFILEINFO *v = 0; UINT size = 0;
     if (!GetFileVersionInfoW(file, 0, n, buffer) || !VerQueryValueW(buffer, L"\\", (void **)&v, &size) || size < sizeof(*v)) return FALSE;
-    *major = HIWORD(v->dwFileVersionMS); *minor = LOWORD(v->dwFileVersionMS);
+    *major = HIWORD(v->dwFileVersionMS); *minor = LOWORD(v->dwFileVersionMS); file_build = HIWORD(v->dwFileVersionLS);
     return TRUE;
 }
 static BOOL target_version(DWORD *major, DWORD *minor) {
@@ -251,6 +254,8 @@ static BOOL write_target(const WCHAR *output) {
     decimal(d, major); for (int i = 0; d[i]; i++) line[at++] = d[i];
     line[at++] = '.';
     decimal(d, minor); for (int i = 0; d[i]; i++) line[at++] = d[i];
+    line[at++] = ' '; /* third token: the build (6002 = Vista / 2008 SP2: OOBE gate) */
+    decimal(d, file_build); for (int i = 0; d[i]; i++) line[at++] = d[i];
     line[at++] = '\r'; line[at++] = '\n'; line[at] = 0;
     say("[X86_CSMWRAP] installed Windows: "); say(line);
     HANDLE h = CreateFileW(output, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
@@ -258,6 +263,51 @@ static BOOL write_target(const WCHAR *output) {
     DWORD wrote = 0; BOOL ok = WriteFile(h, line, (DWORD)at, &wrote, 0) && wrote == (DWORD)at;
     CloseHandle(h);
     return ok;
+}
+
+/* ---- stick: read-only dirty check of USB / removable volumes -------------
+ * X470 2026-10-11: Windows 10 x86 phase 2 ran "Scanning and repairing drive"
+ * on the USOS stick (a micro-Linux session restarted with the ESP still
+ * mounted rw, tools/stick_release.sh). Only logs FSCTL_IS_VOLUME_DIRTY of
+ * every volume on a USB or removable disk; nothing is written to them. */
+static void stick_report(void) {
+    WCHAR volume[64]; DWORD got = 0, checked = 0;
+    HANDLE f = FindFirstVolumeW(volume, 64);
+    if (f == INVALID_HANDLE_VALUE) return;
+    do {
+        int len = lstrlenW(volume);
+        if (len < 2 || volume[len - 1] != L'\\') continue;
+        WCHAR fs[16] = {0}; DWORD serial = 0;
+        GetVolumeInformationW(volume, 0, 0, &serial, 0, 0, fs, 16);
+        volume[len - 1] = 0;
+        HANDLE h = CreateFileW(volume, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+        volume[len - 1] = L'\\';
+        if (h == INVALID_HANDLE_VALUE) continue;
+        VOLUME_DISK_EXTENTS e; BOOL usb = FALSE; DWORD number = 0xffffffff;
+        if (DeviceIoControl(h, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, 0, 0, &e, sizeof(e), &got, 0) && e.NumberOfDiskExtents == 1) {
+            number = e.Extents[0].DiskNumber;
+            HANDLE d = disk_handle(number, 0);
+            if (d != INVALID_HANDLE_VALUE) { usb = !internal(d); CloseHandle(d); }
+        }
+        if (usb) {
+            ULONG dirty = 0; checked++;
+            /* FSCTL_IS_VOLUME_DIRTY needs a read handle (no lock, no write). */
+            volume[len - 1] = 0;
+            HANDLE r = CreateFileW(volume, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+            volume[len - 1] = L'\\';
+            BOOL ok = r != INVALID_HANDLE_VALUE && DeviceIoControl(r, FSCTL_IS_VOLUME_DIRTY, 0, 0, &dirty, sizeof(dirty), &got, 0);
+            DWORD error = ok ? 0 : GetLastError();
+            if (r != INVALID_HANDLE_VALUE) CloseHandle(r);
+            char name[16]; int i = 0; for (; fs[i] && i < 15; i++) name[i] = (char)fs[i]; name[i] = 0;
+            say("[X86_CSMWRAP] stick volume fs="); say(i ? name : "?"); say("\r\n");
+            logn("  on disk=", number);
+            logn("  volume serial (decimal)=", serial);
+            logn(ok ? "  dirty bit (1 = Windows would run autochk on it)=" : "  dirty bit query failed, error=", ok ? (dirty & VOLUME_IS_DIRTY) : error);
+        }
+        CloseHandle(h);
+    } while (FindNextVolumeW(f, volume, 64));
+    FindVolumeClose(f);
+    logn("USB / removable volumes checked=", checked);
 }
 
 static DWORD WINAPI notice(LPVOID unused) {
@@ -281,6 +331,7 @@ void entry(void) {
         modern_setup = arg_count == 7 && lstrcmpiW(args[6], L"modern") == 0;
         ExitProcess(write_answer(args[2], args[3]) ? 0 : 7);
     }
+    if (lstrcmpiW(args[1], L"stick") == 0) { stick_report(); ExitProcess(0); }
     FIRMWARE_TYPE firmware;
     if (!GetFirmwareType(&firmware) || firmware != FirmwareTypeBios) { say("[X86_CSMWRAP] STOP: not booted in BIOS mode\r\n"); ExitProcess(2); }
     if (!load_target()) { say("[X86_CSMWRAP] STOP: usos-csmwrap-target.ini is invalid\r\n"); ExitProcess(3); }

@@ -192,9 +192,6 @@ usos_vista_csmwrap_prepare() {
         IFS= read -r _vista_ack || true
     fi
     sync
-    reboot -f 2>/dev/null || true
-    sleep 3
-    echo 1 > /proc/sys/kernel/sysrq 2>/dev/null || true
-    echo b > /proc/sysrq-trigger 2>/dev/null || true
+    sh /usr/lib/usos/stick_release.sh reboot
     while :; do sleep 3600; done
 }

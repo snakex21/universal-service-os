@@ -74,6 +74,6 @@ usos_xp_choose_disk() {
     fi
     if [ -n "${USOS_XP_TRACE_DIR:-}" ]; then xp_stage_set user-return-to-usos; fi
     sync
-    reboot -f
+    sh /usr/lib/usos/stick_release.sh reboot
     while :; do sleep 3600; done
 }

@@ -118,6 +118,13 @@ def build_modern_support(root: Path, out: Path):
     subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.win10-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
                     '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_x86_csmwrap.c'),
                     '-Wl,--entry,entry', '-lkernel32', '-luser32', '-lshell32', '-lversion', '-o', str(helpers / 'usos-x86-csmwrap.exe')], env=env, check=True)
+    # 32-bit Vista / Server 2008 SP2 on that path: the Vista OOBE gate (WinSAT
+    # guard, interrupted-OOBE recovery, autochk limit) as an x86 build that
+    # hands over to native windeploy (no USB payload); usos-x86-csmwrap.cmd
+    # installs it as C:/USOS/oobe.exe (csmwrap-integration 12.5).
+    subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.vista-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
+                    '-DUSOS_GATE_NATIVE_DEPLOY', '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_vista_oobe_gate.c'),
+                    '-Wl,--entry,entry', '-lkernel32', '-ladvapi32', '-lnetapi32', '-luser32', '-o', str(helpers / 'usos-vista-oobe-x86.exe')], env=env, check=True)
     win7 = root / 'zig-out/windows7-uefi'
     writer = NewcWriter(out / 'modern-support.cpio.tmp')
     try:
@@ -125,6 +132,7 @@ def build_modern_support(root: Path, out: Path):
         writer.add_file('usos-modern-finalize.exe', helpers / 'usos-modern-finalize.exe')
         writer.add_bytes('usos-x86-csmwrap.cmd', (root / 'tools/windows_x86_csmwrap.cmd').read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
         writer.add_file('usos-x86-csmwrap.exe', helpers / 'usos-x86-csmwrap.exe')
+        writer.add_file('usos-vista-oobe-x86.exe', helpers / 'usos-vista-oobe-x86.exe')
         for name in ('usos-drivers.exe', 'usos-unattend-drivers.exe'):
             writer.add_file(name, win7 / name)
     finally:

@@ -14,6 +14,12 @@ rem   2. Setup with /noreboot;
 rem   3. Windows 7 x86 only: USB 3 for the installed system (offline DISM,
 rem      the user's KMDF 1.11 update and 32-bit xHCI package from DATA,
 rem      design doc section 12.3); never fatal;
+rem   3b. Vista / Server 2008 SP2 x86 (NT 6.0.6002) only: the Vista OOBE gate
+rem      (C:\USOS\oobe.exe, x86 build of tools/windows_vista_oobe_gate.c)
+rem      becomes Setup's first-boot command: WinSAT's OOBE assessment is
+rem      skipped (MOOBE=2; it hung on the X470 in "mem"), an interrupted
+rem      OOBE resumes without a second account, autochk stays on the system
+rem      volume; never fatal (design doc section 12.5);
 rem   4. usos-x86-csmwrap after: boot files on the Windows partition checked,
 rem      staging entry removed, "remove the stick" notice, restart.
 set "USOS_SETUP=%USOS_SOURCE%\sources\setup.exe"
@@ -22,6 +28,7 @@ set "USOS_ANSWER=-"
 if exist "%~dp0usos-unattend.xml" set "USOS_ANSWER=%~dp0usos-unattend.xml"
 if exist "%~dp0usos-unattend.xml" (echo [USOS] User answer file supplied.) else (echo [USOS] No user answer file.)
 echo [USOS] phase=x86-csmwrap-before
+"%~dp0usos-x86-csmwrap.exe" stick
 "%~dp0usos-x86-csmwrap.exe" before "%USOS_ANSWER%" "%~dp0usos-csmwrap-unattend.xml" "%USOS_SETUP%"
 if errorlevel 1 exit /b 1
 echo [USOS] phase=launch-setup answer=%~dp0usos-csmwrap-unattend.xml
@@ -37,7 +44,9 @@ if not "%USOS_SETUP_RESULT%"=="0" (
     exit /b %USOS_SETUP_RESULT%
 )
 call :usb3
+call :nt60_gate
 echo [USOS] phase=finalize-target-boot
+"%~dp0usos-x86-csmwrap.exe" stick
 "%~dp0usos-x86-csmwrap.exe" after
 set "USOS_FINALIZE_RESULT=%errorlevel%"
 "%~dp0usos-log-x86.exe"
@@ -96,4 +105,51 @@ echo [USOS] USB3: driver DISM exit=%errorlevel%
 "%~dp0usos-log-x86.exe"
 if exist "%USOS_WORKDIR%\scratch" rd /s /q "%USOS_WORKDIR%\scratch"
 if exist "%USOS_WORKDIR%\cab" rd /s /q "%USOS_WORKDIR%\cab"
+exit /b 0
+
+rem ---- Vista / Server 2008 SP2 x86: OOBE gate (section 12.5) ---------------
+rem X470 2026-10-11 (Vista SP2 PL x86, RX 560 / 5700X): the OOBE step
+rem "Sprawdzanie wydajnosci komputera" = WinSAT's automatic assessment hung in
+rem "mem" at 100 % CPU; after a hard reset OOBE ran again and created a second
+rem account. The x64 Vista path (USB v11) has run this gate since 2026-09-21.
+rem Offline, with this WinPE's reg.exe: WinSAT\MOOBE=2 (winsat moobe exits
+rem before any assessment; no score is invented), the gate copied to
+rem <Windows>\USOS\oobe.exe and Setup\CmdLine oobe\windeploy.exe replaced by
+rem it (the gate itself hands over to windeploy).
+:nt60_gate
+set "USOS_T="
+set "USOS_NT="
+set "USOS_BUILD="
+"%~dp0usos-x86-csmwrap.exe" target "%TEMP%\usos-target.txt" >nul
+if errorlevel 1 exit /b 0
+for /f "usebackq tokens=1,2,3" %%A in ("%TEMP%\usos-target.txt") do (set "USOS_T=%%A" & set "USOS_NT=%%B" & set "USOS_BUILD=%%C")
+if not "%USOS_NT%"=="6.0" exit /b 0
+echo [USOS] phase=nt60-oobe-gate build=%USOS_BUILD%
+if not "%USOS_BUILD%"=="6002" (echo [USOS] OOBE gate: only for SP2 builds 6002; WinSAT left as is. & exit /b 0)
+if not exist "%~dp0usos-vista-oobe-x86.exe" (echo [USOS] OOBE gate: helper missing; skipped. & exit /b 0)
+set "USOS_SYSDRIVE="
+reg load HKLM\USOS_SW "%USOS_T%\Windows\System32\config\SOFTWARE" >nul
+if errorlevel 1 (echo [USOS] OOBE gate: SOFTWARE hive not loaded; skipped. & exit /b 0)
+reg add "HKLM\USOS_SW\Microsoft\Windows NT\CurrentVersion\WinSAT" /v MOOBE /t REG_DWORD /d 2 /f >nul
+echo [USOS] OOBE gate: offline WinSAT MOOBE=2 exit=%errorlevel%
+for /f "tokens=2,*" %%A in ('reg query "HKLM\USOS_SW\Microsoft\Windows NT\CurrentVersion" /v SystemRoot ^| find /i "SystemRoot"') do set "USOS_SYSDRIVE=%%B"
+reg unload HKLM\USOS_SW >nul
+if not defined USOS_SYSDRIVE (echo [USOS] OOBE gate: SystemRoot unknown; gate not armed. & exit /b 0)
+set "USOS_SYSDRIVE=%USOS_SYSDRIVE:~0,2%"
+md "%USOS_T%\USOS" 2>nul
+copy /y "%~dp0usos-vista-oobe-x86.exe" "%USOS_T%\USOS\oobe.exe" >nul
+if errorlevel 1 (echo [USOS] OOBE gate: copy failed; gate not armed. & exit /b 0)
+reg load HKLM\USOS_SYS "%USOS_T%\Windows\System32\config\SYSTEM" >nul
+if errorlevel 1 (echo [USOS] OOBE gate: SYSTEM hive not loaded; gate not armed. & exit /b 0)
+set "USOS_CMDLINE="
+for /f "tokens=2,*" %%A in ('reg query "HKLM\USOS_SYS\Setup" /v CmdLine ^| find /i "CmdLine"') do set "USOS_CMDLINE=%%B"
+if /i "%USOS_CMDLINE%"=="oobe\windeploy.exe" (
+    reg add "HKLM\USOS_SYS\Setup" /v CmdLine /t REG_SZ /d "%USOS_SYSDRIVE%\USOS\oobe.exe" /f >nul
+    reg add "HKLM\USOS_SYS\Setup" /v SetupType /t REG_DWORD /d 2 /f >nul
+    echo [USOS] OOBE gate armed: Setup CmdLine = %USOS_SYSDRIVE%\USOS\oobe.exe
+) else (
+    echo [USOS] OOBE gate: unexpected Setup CmdLine "%USOS_CMDLINE%"; left unchanged.
+)
+reg unload HKLM\USOS_SYS >nul
+"%~dp0usos-log-x86.exe"
 exit /b 0

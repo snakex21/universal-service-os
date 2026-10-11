@@ -111,6 +111,9 @@ stop() {
         usos_ui_restore_cursor
     fi
     printf '[MICRO-LINUX] STOP: %s\n' "$1"
+    # A stopped session usually ends with the power button: leave the stick
+    # volumes clean (read-only) so Windows does not scan the stick later.
+    sh /usr/lib/usos/stick_release.sh ro 2>/dev/null || true
     printf '[MICRO-LINUX] loading emergency keyboard support...\n'
     enable_emergency_input || true
     printf '[MICRO-LINUX] emergency shell available on console\n'
@@ -457,7 +460,7 @@ if [ -f "$XP_TARGET_TEST_INI" ]; then
     umount /mnt/esp || stop 'cannot unmount ESP after XP target preparation'
     sync
     printf '[XP_TARGET_TEST] PREPARED SYNC PASS; rebooting for Legacy chainload\n'
-    reboot -f
+    sh /usr/lib/usos/stick_release.sh reboot
 fi
 
 DEVICE_INI=/mnt/esp/EFI/USOS/usos-device.ini
@@ -646,4 +649,4 @@ fi
 printf '[MICRO-LINUX] full preparation PASS; rebooting to USOS\n'
 umount /mnt/esp || stop 'cannot unmount ESP'
 sync
-reboot -f
+sh /usr/lib/usos/stick_release.sh reboot

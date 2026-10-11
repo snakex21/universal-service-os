@@ -76,6 +76,10 @@ function Run-Unit {
     if ($LASTEXITCODE -ne 0) { throw 'Vista Int10 dispatcher step tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/test_vista_autochk.py')
     if ($LASTEXITCODE -ne 0) { throw 'Vista autochk exclusion tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/test_x86_vista_oobe_gate.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Vista / 2008 x86 OOBE gate tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/test_stick_release.py')
+    if ($LASTEXITCODE -ne 0) { throw 'micro-Linux stick release tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/test_initrd_alignment.py')
     if ($LASTEXITCODE -ne 0) { throw 'Initramfs alignment (lang.cpio) tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/test_nt52_staging.py')

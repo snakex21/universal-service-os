@@ -665,8 +665,6 @@ usos_legacy_xp_staging() {
         IFS= read -r _poweroff_request || true
     fi
     printf '[LEGACY_XP] POWER OFF REQUESTED input=%s\n' "$USOS_UI_TTY"
-    poweroff -f 2>/dev/null || true
-    sleep 2
-    halt -f 2>/dev/null || true
+    sh /usr/lib/usos/stick_release.sh poweroff
     while true; do sleep 3600; done
 }
