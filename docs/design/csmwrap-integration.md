@@ -764,6 +764,25 @@ every USB / removable volume before Setup and before the restart
 the stick on the installed system (letters unknown offline); the Vista gate
 keeps its fixed-volume exclusion.
 
+QEMU (build B261011-133114-553C6A86; OVMF no CSM, `pc`, AHCI target with
+cache=writeback, stick on xHCI):
+
+* Vista SP2 PL x86, USOS profile "Vista Ultimate" (user Retro, Europe/Warsaw):
+  stick ESP byte 0x41 = 0x00 before boot, **0x01 while micro-Linux had the
+  ESP mounted**, 0x00 right after the step-610 restart
+  (`[STICK_RELEASE] /mnt/esp remounted read-only` / `unmounted`) and through
+  phase 2; WinPE: `installed Windows: C: 6.0 6002`, `OOBE gate armed`;
+  OOBE with no page (profile filled user, computer name, time zone), WinSAT
+  `Already ran during MOOBE key value = 2`, `oobe-prep.log` recovery
+  decision 0, watcher left after OOBE, Setup keys cleared; Retro desktop.
+  `fsutil dirty query` (read-only mount): ESP, DATA, WORK not dirty. PASS.
+* Windows 10 22H2 PL x86, no answer: ESP flag 0 after step 610 and at every
+  later checkpoint, WinPE `dirty bit ... =0` for all three stick volumes, no
+  autochk screen on the two target boots with the stick attached (run stopped
+  at OOBE); ESP, DATA, WORK not dirty. PASS.
+* Side finding: the profile's `skip_games` (`pkgmgr /uu:InboxGames`) shows a
+  console window during specialize for minutes (UX "no console windows").
+
 ## 13. One disk question per flow (2026-10-11)
 
 Rule (user, 2026-10-11): every flow asks for the target disk **exactly once**.
