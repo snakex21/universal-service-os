@@ -135,7 +135,9 @@ pub fn show(
         if (unattended) |path| {
             fields.add(view.t(.summary_answer_file), path);
             // An answer file for another architecture does nothing in Setup.
-            if (image.media) |info| if (info.arch == .x86 or info.arch == .x64 or info.arch == .arm64) {
+            // Not on the 32-bit CSMWrap paths: usos-x86-csmwrap retargets an
+            // amd64-only answer to x86 (tools/windows_installto.h).
+            if (image.media) |info| if ((info.arch == .x86 or info.arch == .x64 or info.arch == .arm64) and !manual_images.x86Csmwrap(system, image)) {
                 const media_arch = answer_profiles.archOf(info);
                 if (system.unattended_directory) |directory| if (xp_settings.answerArchMismatch(directory, path, media_arch)) {
                     notes[note_count] = view.format(&arch_note, .profile_arch_warning, &.{@tagName(media_arch)});
