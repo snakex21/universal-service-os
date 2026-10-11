@@ -7,7 +7,9 @@ rem micro-Linux step 610 wrote to the target disk.
 rem
 rem   1. usos-x86-csmwrap before: Windows partition active, staging hidden,
 rem      WinPE letters of the prepared disk dropped, InstallTo added to the
-rem      answer (the disk was confirmed in micro-Linux);
+rem      answer (the disk was confirmed in micro-Linux); the Setup version
+rem      decides the product key handling (8.x / 10: Setup's own key page
+rem      when the answer has none, tools/windows_installto.h);
 rem   2. Setup with /noreboot;
 rem   3. Windows 7 x86 only: USB 3 for the installed system (offline DISM,
 rem      the user's KMDF 1.11 update and 32-bit xHCI package from DATA,
@@ -20,7 +22,7 @@ set "USOS_ANSWER=-"
 if exist "%~dp0usos-unattend.xml" set "USOS_ANSWER=%~dp0usos-unattend.xml"
 if exist "%~dp0usos-unattend.xml" (echo [USOS] User answer file supplied.) else (echo [USOS] No user answer file.)
 echo [USOS] phase=x86-csmwrap-before
-"%~dp0usos-x86-csmwrap.exe" before "%USOS_ANSWER%" "%~dp0usos-csmwrap-unattend.xml"
+"%~dp0usos-x86-csmwrap.exe" before "%USOS_ANSWER%" "%~dp0usos-csmwrap-unattend.xml" "%USOS_SETUP%"
 if errorlevel 1 exit /b 1
 echo [USOS] phase=launch-setup answer=%~dp0usos-csmwrap-unattend.xml
 "%~dp0usos-log-x86.exe"

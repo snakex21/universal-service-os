@@ -158,6 +158,7 @@ static void drop_letters(void) {
 /* ---- answer file: InstallTo (tools/windows_installto.h) ---------------- */
 #include "windows_installto.h"
 static char xml_in[1 << 20], xml_utf8[(1 << 20) + 64], xml_scratch[(1 << 20) + 64], xml_out[(1 << 20) + 8192];
+static int modern_setup; /* Setup 6.2+ (8.x / 10): windows_installto.h usos_it_key */
 static BOOL write_answer(const WCHAR *input, const WCHAR *output) {
     DWORD got = 0, len = 0; const char *text = 0, *note = "";
     if (lstrcmpW(input, L"-") != 0) {
@@ -173,7 +174,7 @@ static BOOL write_answer(const WCHAR *input, const WCHAR *output) {
             say("[X86_CSMWRAP] answer: UTF-16 file converted to UTF-8\r\n");
         } else if (got >= 3 && (BYTE)xml_in[0] == 0xef && (BYTE)xml_in[1] == 0xbb && (BYTE)xml_in[2] == 0xbf) { text += 3; len -= 3; }
     }
-    DWORD n = usos_installto_answer(text, len, xml_scratch, sizeof(xml_scratch), xml_out, sizeof(xml_out), disk, windows_number, "x86", &note);
+    DWORD n = usos_installto_answer(text, len, xml_scratch, sizeof(xml_scratch), xml_out, sizeof(xml_out), disk, windows_number, "x86", modern_setup, &note);
     if (!n) return FALSE;
     say("[X86_CSMWRAP] answer: "); say(note); say("\r\n");
     HANDLE h = CreateFileW(output, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
@@ -229,14 +230,17 @@ static BOOL target_letter(void) {
     FindVolumeClose(f);
     return found && target_root[0];
 }
-static BOOL target_version(DWORD *major, DWORD *minor) {
-    WCHAR file[MAX_PATH]; lstrcpyW(file, target_root); lstrcatW(file, L"Windows\\System32\\ntoskrnl.exe");
+static BOOL file_version(const WCHAR *file, DWORD *major, DWORD *minor) {
     DWORD unused = 0, n = GetFileVersionInfoSizeW(file, &unused);
     if (!n || n > sizeof(buffer)) return FALSE;
     VS_FIXEDFILEINFO *v = 0; UINT size = 0;
     if (!GetFileVersionInfoW(file, 0, n, buffer) || !VerQueryValueW(buffer, L"\\", (void **)&v, &size) || size < sizeof(*v)) return FALSE;
     *major = HIWORD(v->dwFileVersionMS); *minor = LOWORD(v->dwFileVersionMS);
     return TRUE;
+}
+static BOOL target_version(DWORD *major, DWORD *minor) {
+    WCHAR file[MAX_PATH]; lstrcpyW(file, target_root); lstrcatW(file, L"Windows\\System32\\ntoskrnl.exe");
+    return file_version(file, major, minor);
 }
 static BOOL write_target(const WCHAR *output) {
     DWORD major = 0, minor = 0;
@@ -272,8 +276,9 @@ void entry(void) {
     while (n && base[n - 1] != L'\\') n--;
     base[n] = 0;
     /* Host test of the answer edit only (tools/tests/test_windows_x86_csmwrap.py). */
-    if (lstrcmpiW(args[1], L"answer-test") == 0 && arg_count == 6) {
+    if (lstrcmpiW(args[1], L"answer-test") == 0 && (arg_count == 6 || arg_count == 7)) {
         disk = (DWORD)args[4][0] - L'0'; windows_number = (DWORD)args[5][0] - L'0';
+        modern_setup = arg_count == 7 && lstrcmpiW(args[6], L"modern") == 0;
         ExitProcess(write_answer(args[2], args[3]) ? 0 : 7);
     }
     FIRMWARE_TYPE firmware;
@@ -285,7 +290,12 @@ void entry(void) {
     int staging = slot_of(s, staging_start, staging_sectors, TRUE), windows = slot_of(s, windows_start, windows_sectors, FALSE);
     if (staging < 0 || windows < 0) { logn("MBR entries not found (staging slot+1, windows slot+1)=", (DWORD)((staging + 1) * 10 + windows + 1)); ExitProcess(5); }
     BYTE *se = s + 446 + 16 * staging, *we = s + 446 + 16 * windows;
-    if (lstrcmpiW(args[1], L"before") == 0 && arg_count == 4) {
+    if (lstrcmpiW(args[1], L"before") == 0 && (arg_count == 4 || arg_count == 5)) {
+        DWORD major = 0, minor = 0;
+        if (arg_count == 5 && file_version(args[4], &major, &minor)) {
+            modern_setup = major > 6 || (major == 6 && minor >= 2);
+            logn("Setup version major=", major); logn("Setup version minor=", minor);
+        } else say("[X86_CSMWRAP] Setup version unknown; product key left as in the answer\r\n");
         drop_letters();
         for (int i = 0; i < 4; i++) s[446 + 16 * i] = 0;
         we[0] = 0x80; se[4] = 0x17;

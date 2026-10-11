@@ -385,7 +385,7 @@ static BOOL csmwrap_install_to(WCHAR *answer){
  const char *text=csm_in,*note="";DWORD len=got;
  if((BYTE)csm_in[0]==0xFF&&(BYTE)csm_in[1]==0xFE){len=usos_it_utf16_to_utf8((const BYTE*)csm_in,got,csm_utf8,sizeof(csm_utf8));if(!len)return FALSE;text=csm_utf8;}
  else if(got>=3&&(BYTE)csm_in[0]==0xEF&&(BYTE)csm_in[1]==0xBB&&(BYTE)csm_in[2]==0xBF){text+=3;len-=3;}
- DWORD n=usos_installto_answer(text,len,csm_scratch,sizeof(csm_scratch),csm_out,sizeof(csm_out),csm_disk,csm_windows_number,"amd64",&note);
+ DWORD n=usos_installto_answer(text,len,csm_scratch,sizeof(csm_scratch),csm_out,sizeof(csm_out),csm_disk,csm_windows_number,"amd64",0,&note);
  if(!n)return FALSE;
  WCHAR target[MAX_PATH];path(target,base,L"vista-csmwrap-answer.xml");
  HANDLE o=CreateFileW(target,GENERIC_WRITE,FILE_SHARE_READ,0,CREATE_ALWAYS,FILE_FLAG_WRITE_THROUGH,0);DWORD w=0;
