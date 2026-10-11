@@ -104,6 +104,11 @@ persist_legacy_xp_stop() {
 
 stop() {
     persist_legacy_xp_stop "$1" || true
+    # A flow that keeps the stick ESP read-only (tools/stick_write.sh) copies
+    # its tmpfs logs onto it now, in one short read-write window.
+    if command -v usos_stick_flush >/dev/null 2>&1; then
+        usos_stick_flush || true
+    fi
     if command -v usos_ui_fail >/dev/null 2>&1; then
         usos_ui_fail 'Preparation stopped' "$1"
     fi

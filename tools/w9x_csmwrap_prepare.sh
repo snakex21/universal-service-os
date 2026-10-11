@@ -12,10 +12,25 @@
 #
 # Screens: the Vista CSMWrap page layout (USOS_UI_VISTA, 5 stages); every
 # tool writes to EFI/USOS/win9x/prepare.log, nothing reaches the screen.
+#
+# The stick ESP is read-only from the disk picker on (tools/stick_write.sh;
+# X470 2026-10-11: a POSReady VM loop ended by a power-off after 1 h left the
+# ESP dirty): every log goes to the tmpfs copy W9X_LOG and usos_stick_flush
+# copies it to EFI/USOS/win9x in one short read-write window (after the disk
+# write, after every VM run, the POSReady live screen, stop() and the end).
 
 w9x_csmwrap_log() {
     printf '[W9X_CSMWRAP] %s\n' "$*"
-    printf '%s\n' "$*" >> "$W9X_DIR/prepare.log" 2>/dev/null || true
+    printf '%s\n' "$*" >> "$W9X_LOG/prepare.log" 2>/dev/null || true
+}
+
+# The tmpfs logs onto the ESP (EFI/USOS/win9x), in one read-write window.
+w9x_logs_to_esp() {
+    mkdir -p "$W9X_DIR" && cp -rf "$W9X_LOG/." "$W9X_DIR/"
+}
+usos_stick_flush() {
+    [ -n "${W9X_LOG:-}" ] && [ -d "$W9X_LOG" ] || return 0
+    usos_stick_write w9x_logs_to_esp
 }
 
 w9x_csmwrap_value() {
@@ -76,6 +91,11 @@ w9x_nt3_default_sif() {
 
 usos_w9x_csmwrap_prepare() {
     W9X_DIR=/mnt/esp/EFI/USOS/win9x
+    W9X_LOG=/run/usos-stick-log/win9x
+    rm -rf "$W9X_LOG"; mkdir -p "$W9X_LOG"
+    : > "$W9X_LOG/prepare.log"
+    [ -r /usr/lib/usos/stick_write.sh ] || stop 'stick_write.sh is missing'
+    . /usr/lib/usos/stick_write.sh
     request=$W9X_DIR/request.ini
     [ -f "$request" ] || stop 'the Windows 9x request is missing on the USOS ESP'
     : > "$W9X_DIR/prepare.log" 2>/dev/null || true
@@ -305,6 +325,11 @@ usos_w9x_csmwrap_prepare() {
             answer_kind=USER ;;
         *) stop 'request.ini has an unknown answer kind' ;;
     esac
+    # From here on the stick ESP stays read-only (disk picker, the target
+    # write, the VM loops, the final notice); logs reach it through
+    # usos_stick_flush only.
+    usos_stick_ro || w9x_csmwrap_log 'STICK ESP could not be remounted read-only'
+    w9x_csmwrap_log "STICK ESP mode=$(usos_stick_mode)"
 
     ESP_PARENT=$(lsblk -dnro PKNAME "$ESP_PATH" 2>/dev/null | head -n 1)
     [ -n "$ESP_PARENT" ] || stop 'cannot resolve the USOS disk'
@@ -342,7 +367,7 @@ usos_w9x_csmwrap_prepare() {
         overview=/run/w9x-disk-overview.txt
         screen=/run/w9x-disk-confirm.txt
         usos_ui_stage 3 5 'Inspecting disk' 'Reading partitions, free space and system files.' || true
-        if ! TARGET_DEVICE=$TARGET_DEVICE sh /usr/lib/usos/xp_disk_overview.sh > "$overview" 2>> "$W9X_DIR/prepare.log"; then
+        if ! TARGET_DEVICE=$TARGET_DEVICE sh /usr/lib/usos/xp_disk_overview.sh > "$overview" 2>> "$W9X_LOG/prepare.log"; then
             printf 'Disk: %s\nS/N: %s\nSize: %s GiB\n' "$model" "$serial" "$((size / 1073741824))" > "$overview"
         fi
         # The layout w9x_csmwrap_target.sh writes (same arithmetic).
@@ -439,9 +464,12 @@ usos_w9x_csmwrap_prepare() {
             W9X_ANSWER_INF="$answer_inf" W9X_ANSWER_KIND="$answer_kind" W9X_BOOT_FLOPPY="$floppy" W9X_SIZE_GIB="$size_gib" \
             W9X_USB_DIR="/mnt/data/Drivers/$folder/USB" W9X_TIME_ZONE="${time_zone:-}" W9X_VM_PHASE1="$([ "$vm_phase1" = yes ] && echo 1 || echo 0)"             sh /usr/lib/usos/w9x_csmwrap_target.sh
     fi
-    if ! "$@" >> "$W9X_DIR/prepare.log" 2>&1 < /dev/null; then
+    "$@" >> "$W9X_LOG/prepare.log" 2>&1 < /dev/null
+    target_rc=$?
+    usos_stick_flush || true
+    if [ "$target_rc" != 0 ]; then
         rm -f "$answer_inf"
-        tail -n 5 "$W9X_DIR/prepare.log" 2>/dev/null || true
+        tail -n 5 "$W9X_LOG/prepare.log" 2>/dev/null || true
         if [ -n "$img" ]; then
             reason=$(awk -F= '$1 == "stop" { sub(/^[^=]*=/, ""); print; exit }' /run/image-disk.result 2>/dev/null || true)
             stop "${reason:-The image could not be written}. See EFI/USOS/win9x/prepare.log"
@@ -455,18 +483,18 @@ usos_w9x_csmwrap_prepare() {
         }
         accel=$(w9x_vm_accel)
         w9x_csmwrap_log "POSR install start target=$TARGET_DEVICE accel=$accel"
-        posready_vm_install "$TARGET_DEVICE" "$W9X_DIR/posready" "$accel"
+        posready_vm_install "$TARGET_DEVICE" "$W9X_LOG/posready" "$accel"
         vm_rc=$?
         w9x_csmwrap_log "POSR vm rc=$vm_rc"
         usos_ui_stage 5 5 'Checking the installed system' '' || true
-        if [ "$vm_rc" != 0 ] || ! vm_check=$(posready_vm_finish "$TARGET_DEVICE" "$W9X_DIR/posready"); then
+        if [ "$vm_rc" != 0 ] || ! vm_check=$(posready_vm_finish "$TARGET_DEVICE" "$W9X_LOG/posready"); then
             w9x_csmwrap_log "POSR FAILED rc=$vm_rc stalled=${W9X_VM_STALLED:-0}s ${vm_check:-}"
             umount /mnt/data 2>/dev/null || true
             sync
             stop "The $nt_name installation did not finish. The computer was not restarted; logs: EFI/USOS/win9x/posready"
         fi
         w9x_csmwrap_log "POSR PASS $vm_check"
-        if ! TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=133120 sh /usr/lib/usos/xp_csmwrap_esp.sh >> "$W9X_DIR/prepare.log" 2>&1; then
+        if ! TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=133120 sh /usr/lib/usos/xp_csmwrap_esp.sh >> "$W9X_LOG/prepare.log" 2>&1; then
             stop 'The CSMWrap partition could not be written; see EFI/USOS/win9x/prepare.log'
         fi
     fi
@@ -476,11 +504,11 @@ usos_w9x_csmwrap_prepare() {
         }
         accel=$(w9x_vm_accel)
         w9x_csmwrap_log "NT4 install start target=$TARGET_DEVICE accel=$accel guest_mb=$W9X_VM_GUEST_MB timeout=$W9X_VM_TIMEOUT boots=$NT4_VM_BOOTS"
-        nt4_vm_install "$TARGET_DEVICE" "$W9X_DIR/nt4" "$accel"
+        nt4_vm_install "$TARGET_DEVICE" "$W9X_LOG/nt4" "$accel"
         vm_rc=$?
         w9x_csmwrap_log "NT4 vm rc=$vm_rc elapsed=${NT4_VM_ELAPSED:-?}s"
         usos_ui_stage 5 5 'Checking the installed system' '' || true
-        if [ "$vm_rc" != 0 ] || ! vm_check=$(nt4_vm_finish "$TARGET_DEVICE" "$W9X_DIR/nt4"); then
+        if [ "$vm_rc" != 0 ] || ! vm_check=$(nt4_vm_finish "$TARGET_DEVICE" "$W9X_LOG/nt4"); then
             w9x_csmwrap_log "NT4 FAILED rc=$vm_rc stalled=${NT4_VM_STALLED:-0}s ${vm_check:-}"
             umount /mnt/data 2>/dev/null || true
             sync
@@ -510,7 +538,7 @@ usos_w9x_csmwrap_prepare() {
             stop "The $nt_name installation did not finish. The computer was not restarted; logs: EFI/USOS/win9x/nt4"
         fi
         w9x_csmwrap_log "NT4 PASS $vm_check"
-        if ! TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=133120 sh /usr/lib/usos/xp_csmwrap_esp.sh >> "$W9X_DIR/prepare.log" 2>&1; then
+        if ! TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=133120 sh /usr/lib/usos/xp_csmwrap_esp.sh >> "$W9X_LOG/prepare.log" 2>&1; then
             stop 'The CSMWrap partition could not be written; see EFI/USOS/win9x/prepare.log'
         fi
     fi
@@ -524,9 +552,9 @@ usos_w9x_csmwrap_prepare() {
         vm_rc=$?
         W9X_VM_KEY=''
         w9x_csmwrap_log "PHASE1 vm rc=$vm_rc elapsed=${W9X_VM_ELAPSED:-?}s"
-        w9x_phase1_keep_logs "$W9X_DIR/phase1"
+        w9x_phase1_keep_logs "$W9X_LOG/phase1"
         usos_ui_stage 5 5 'Checking the result of stage 1' '' || true
-        if [ "$vm_rc" != 0 ] || ! vm_check=$(w9x_phase1_verify "$TARGET_DEVICE" "$W9X_DIR/phase1"); then
+        if [ "$vm_rc" != 0 ] || ! vm_check=$(w9x_phase1_verify "$TARGET_DEVICE" "$W9X_LOG/phase1"); then
             w9x_csmwrap_log "PHASE1 FAILED rc=$vm_rc ${vm_check:-}"
             umount /mnt/data 2>/dev/null || true
             sync
@@ -534,10 +562,11 @@ usos_w9x_csmwrap_prepare() {
         fi
         w9x_csmwrap_log "PHASE1 PASS $vm_check"
     fi
-    mv "$request" "$W9X_DIR/request.done" 2>/dev/null || true
     umount /mnt/data 2>/dev/null || true
     sync
     w9x_csmwrap_log 'DONE; waiting for the restart'
+    usos_stick_write mv "$request" "$W9X_DIR/request.done" 2>/dev/null || true
+    usos_stick_flush || true
     if [ -n "$img" ]; then
         usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry and $folder starts from it. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true
     else

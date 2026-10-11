@@ -9,6 +9,14 @@ usos_xp_menu() {
     fi
     enable_emergency_input || true
     USOS_XP_MENU_SHOWN=yes
+    # The menu waits for the user without a time limit: the stick ESP is
+    # read-only meanwhile (a power-off here leaves it clean,
+    # tools/stick_write.sh) and read-write again afterwards when it was.
+    xp_menu_stick=''
+    if [ -r "${USOS_LIB_DIR:-/usr/lib/usos}/stick_write.sh" ]; then
+        . "${USOS_LIB_DIR:-/usr/lib/usos}/stick_write.sh"
+        if [ "$(usos_stick_mode)" = rw ] && usos_stick_ro; then xp_menu_stick=rw; fi
+    fi
     xp_menu_log=/dev/console
     if [ -n "${USOS_XP_TRACE_DIR:-}" ]; then
         xp_stage_set menu-launch
@@ -25,7 +33,12 @@ usos_xp_menu() {
         } > "$USOS_XP_TRACE_DIR/menu-hardware.txt" 2>&1
         sync
     fi
-    if xp_menu_result=$("$USOS_FB_UI" --menu "$xp_menu_file" 2>> "$xp_menu_log"); then
+    xp_menu_result=$("$USOS_FB_UI" --menu "$xp_menu_file" 2>> "$xp_menu_log")
+    xp_menu_status=$?
+    if [ -n "$xp_menu_stick" ]; then
+        usos_stick_rw || stop 'cannot remount the USOS ESP read-write after the menu'
+    fi
+    if [ "$xp_menu_status" = 0 ]; then
         if [ -n "${USOS_XP_TRACE_DIR:-}" ]; then
             printf 'menu-return=0 selected=%s\n' "$xp_menu_result" >> "$xp_menu_log"
             xp_stage_set menu-selected
@@ -40,7 +53,6 @@ usos_xp_menu() {
         fi
         return 0
     else
-        xp_menu_status=$?
         if [ -n "${USOS_XP_TRACE_DIR:-}" ]; then
             printf 'menu-return=%s\n' "$xp_menu_status" >> "$xp_menu_log"
             xp_stage_set menu-returned
