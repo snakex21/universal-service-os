@@ -54,6 +54,7 @@ pub const storage = struct {
 pub const image_probe = struct {
     pub const probe = @import("image_probe/probe.zig");
     pub const random_access = @import("image_probe/random_access.zig");
+    pub const read_cache = @import("image_probe/read_cache.zig");
     pub const udf = @import("image_probe/udf.zig");
     pub const iso9660 = @import("image_probe/iso9660.zig");
     pub const optical_fs = @import("image_probe/optical_fs.zig");
@@ -169,6 +170,7 @@ test {
     _ = storage.fat32;
     _ = storage.ntfs;
     _ = image_probe.random_access;
+    _ = image_probe.read_cache;
     _ = image_probe.udf;
     _ = image_probe.iso9660;
     _ = image_probe.optical_fs;

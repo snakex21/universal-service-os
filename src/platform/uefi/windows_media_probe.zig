@@ -3,7 +3,9 @@
 //! the start gates (image_probe/windows_media.zig). A few UDF/ISO9660
 //! directory lookups per ISO; the boot.wim metadata is read only for media
 //! without an EFI loader. Results are cached per name and size for the menu
-//! session, so returning to a list does not read the ISOs again.
+//! session, so returning to a list does not read the ISOs again. Reads go
+//! through a 32 KiB chunk cache (image_probe/read_cache.zig): the UDF
+//! directory scans read every entry in small pieces, one USB command each.
 const std = @import("std");
 const uefi = std.os.uefi;
 const usos = @import("usos");
@@ -45,7 +47,16 @@ pub fn applies(system: *const usos.catalog.SystemEntry) bool {
 const State = struct {
     catalog: data_volume.Catalog,
     file: ntfs.File,
+    cache: Cached,
+
+    /// The cache for the ISO just opened into `file`.
+    fn iso(self: *State) *Cached {
+        self.cache.reset(.{ .state = self });
+        return &self.cache;
+    }
 };
+
+const Cached = usos.image_probe.read_cache.CachedReader(Iso);
 
 const Iso = struct {
     state: *State,
@@ -87,7 +98,7 @@ fn probeOne(state: *State, directory: []const u8, directory_hash: u64, name: uso
     for (&cache) |*entry| {
         if (entry.used and entry.directory_hash == directory_hash and entry.size == size and std.mem.eql(u8, entry.name.slice(), name.slice())) return entry.info;
     }
-    const info = inspect(state) catch |err| blk: {
+    const info = inspect(state.iso()) catch |err| blk: {
         var message: [160]u8 = undefined;
         serial.writeAscii(std.fmt.bufPrint(&message, "[MEDIA] {s}: unreadable ({s})\r\n", .{ name.slice(), @errorName(err) }) catch "[MEDIA] unreadable\r\n");
         break :blk media.Info{ .unreadable = true };
@@ -103,7 +114,7 @@ fn probeOne(state: *State, directory: []const u8, directory_hash: u64, name: uso
     return info;
 }
 
-fn exists(iso: *const Iso, path: []const u8) !bool {
+fn exists(iso: *Cached, path: []const u8) !bool {
     const found = optical_fs.findPath(iso, path) catch |err| switch (err) {
         error.NotIso9660 => return error.NotOpticalMedia,
         else => return err,
@@ -111,20 +122,19 @@ fn exists(iso: *const Iso, path: []const u8) !bool {
     return if (found) |info| !info.is_directory and info.size > 0 else false;
 }
 
-fn inspect(state: *State) !media.Info {
-    const iso = Iso{ .state = state };
+fn inspect(iso: *Cached) !media.Info {
     var presence = media.Presence{
-        .efi_x64 = try exists(&iso, media.efi_x64),
-        .efi_ia32 = try exists(&iso, media.efi_ia32),
-        .efi_aa64 = try exists(&iso, media.efi_aa64),
-        .efi_ia64 = try exists(&iso, media.efi_ia64),
-        .bootmgr = try exists(&iso, media.bios_bootmgr),
-        .boot_wim = try exists(&iso, media.boot_wim),
-        .setup_exe = try exists(&iso, media.setup_exe),
+        .efi_x64 = try exists(iso, media.efi_x64),
+        .efi_ia32 = try exists(iso, media.efi_ia32),
+        .efi_aa64 = try exists(iso, media.efi_aa64),
+        .efi_ia64 = try exists(iso, media.efi_ia64),
+        .bootmgr = try exists(iso, media.bios_bootmgr),
+        .boot_wim = try exists(iso, media.boot_wim),
+        .setup_exe = try exists(iso, media.setup_exe),
     };
     var install_path: ?[]const u8 = null;
     for (usos.image_probe.windows_detect.modern_install_images) |path| {
-        if (try exists(&iso, path)) {
+        if (try exists(iso, path)) {
             presence.install_image = true;
             install_path = path;
             break;
@@ -132,15 +142,15 @@ fn inspect(state: *State) !media.Info {
     }
     // Only media without any EFI loader need the boot.wim metadata.
     if (presence.boot_wim and !presence.efi_x64 and !presence.efi_ia32 and !presence.efi_aa64)
-        presence.wim_arch = bootWimArch(&iso) catch null;
+        presence.wim_arch = bootWimArch(iso) catch null;
     var info = media.classify(presence);
     // What the install image installs (client/Server, editions, IA64).
-    if (install_path) |path| info.install = installInfo(&iso, path) catch .{};
+    if (install_path) |path| info.install = installInfo(iso, path) catch .{};
     return info;
 }
 
 /// install.wim/esd/swm XML metadata (uncompressed in every WIM version).
-fn installInfo(iso: *const Iso, path: []const u8) !media.Install {
+fn installInfo(iso: *Cached, path: []const u8) !media.Install {
     var node: udf.Node = undefined;
     if (!try udf.openPath(iso, path, &node) or node.is_directory) return error.WindowsInstallImageMissing;
     var header: [124]u8 = undefined;
@@ -152,7 +162,7 @@ fn installInfo(iso: *const Iso, path: []const u8) !media.Install {
     return media.parseInstall(bytes);
 }
 
-fn bootWimArch(iso: *const Iso) !u32 {
+fn bootWimArch(iso: *Cached) !u32 {
     var node: udf.Node = undefined;
     if (!try udf.openPath(iso, media.boot_wim, &node) or node.is_directory) return error.InvalidWindowsBootFile;
     var header: [124]u8 = undefined;
@@ -175,17 +185,17 @@ pub fn readEditions(system: *const usos.catalog.SystemEntry, image_name: []const
     var path: native.PathBuffer = .{};
     const components = try path.build(system.image_directory, image_name);
     try ntfs.openFile(state.catalog.fs, state.catalog.reader(), components, &state.file);
-    const iso = Iso{ .state = state };
+    const iso = state.iso();
     for (usos.image_probe.windows_detect.modern_install_images) |install| {
-        if (!try exists(&iso, install)) continue;
+        if (!try exists(iso, install)) continue;
         var node: udf.Node = undefined;
-        if (!try udf.openPath(&iso, install, &node) or node.is_directory) return error.WindowsInstallImageMissing;
+        if (!try udf.openPath(iso, install, &node) or node.is_directory) return error.WindowsInstallImageMissing;
         var header: [124]u8 = undefined;
-        try udf.readNodeAt(&iso, &node, 0, &header);
+        try udf.readNodeAt(iso, &node, 0, &header);
         const resource = try wim.xmlResource(&header, node.size);
         const bytes = try uefi.pool_allocator.alloc(u8, resource.size);
         defer uefi.pool_allocator.free(bytes);
-        try udf.readNodeAt(&iso, &node, resource.offset, bytes);
+        try udf.readNodeAt(iso, &node, resource.offset, bytes);
         usos.flow.answer.editions.parse(try media.installXmlAscii(bytes), out);
         var message: [120]u8 = undefined;
         serial.writeAscii(std.fmt.bufPrint(&message, "[MEDIA] {s}: {d} install images\r\n", .{ image_name, out.len }) catch "[MEDIA] install images\r\n");
