@@ -108,7 +108,18 @@ def disk_args(stick: Path | None, target: Path) -> list[str]:
                  "-device", "usb-storage,bus=xhci.0,drive=stick,removable=on,serial=USOSSTICK" + (",bootindex=1" if TARGET_FIRST else "")]
     target_fmt = "vpc" if target.suffix.lower() == ".vhd" else "qcow2"
     if TARGET_BUS == "ahci":
-        args += ["-drive", f"if=none,id=target,file={target.as_posix()},format={target_fmt}", "-device", "ahci,id=sata", "-device", "ide-hd,bus=sata.0,drive=target,serial=USOSTARGET" + (",bootindex=0" if TARGET_FIRST else "")]
+        # USOS_NATIVE_DECOY=<qcow2>: a second internal disk on the first SATA
+        # port (the guest's disk 0 / sda; the target moves to port 1). The
+        # one-disk-question checks pick the target and prove the decoy is
+        # never written (compare its contents before and after).
+        decoy = os.environ.get("USOS_NATIVE_DECOY")
+        port = 1 if decoy else 0
+        args += ["-device", "ahci,id=sata"]
+        if decoy:
+            args += ["-drive", f"if=none,id=decoy,file={Path(decoy).resolve().as_posix()},format=qcow2,cache=writeback",
+                     "-device", "ide-hd,bus=sata.0,drive=decoy,serial=USOSDECOY"]
+        args += ["-drive", f"if=none,id=target,file={target.as_posix()},format={target_fmt},cache=writeback",
+                 "-device", f"ide-hd,bus=sata.{port},drive=target,serial=USOSTARGET" + (",bootindex=0" if TARGET_FIRST else "")]
     else:
         args += ["-drive", f"if=none,id=target,file={target.as_posix()},format=qcow2", "-device", "nvme,drive=target,serial=USOSTARGET"]
     return args
