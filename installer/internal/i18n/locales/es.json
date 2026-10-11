@@ -349,6 +349,7 @@
   "boot.system.requires_bios.hint": "Para usarlo, inicia la memoria USB en modo Legacy BIOS (CSM): elige su entrada sin UEFI en el menú de arranque del firmware.",
   "boot.system.unavailable": "No disponible",
   "boot.system.unavailable.detail": "Todavía ningún backend de arranque funcional admite este sistema.",
+  "boot.system.other_os": "Otro sistema (imagen propia)",
   "boot.notice.no_image.title": "No se encontraron imágenes",
   "boot.notice.no_image.line1": "No se encontraron archivos de imagen compatibles. Copie un archivo en:",
   "boot.notice.backend.line1": "Ningún backend de arranque implementado admite esta selección.",

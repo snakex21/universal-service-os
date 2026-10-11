@@ -349,6 +349,7 @@
   "boot.system.requires_bios.hint": "Zum Verwenden den USB-Stick im Legacy-BIOS-Modus (CSM) starten: im Bootmenü der Firmware den Eintrag ohne UEFI wählen.",
   "boot.system.unavailable": "Nicht verfügbar",
   "boot.system.unavailable.detail": "Noch kein funktionierendes Boot-Backend unterstützt dieses System.",
+  "boot.system.other_os": "Anderes System (eigenes Image)",
   "boot.notice.no_image.title": "Keine Images gefunden",
   "boot.notice.no_image.line1": "Es wurden keine unterstützten Image-Dateien gefunden. Kopieren Sie eine Datei nach:",
   "boot.notice.backend.line1": "Kein implementiertes Boot-Backend unterstützt diese Auswahl.",

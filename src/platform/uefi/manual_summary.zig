@@ -51,7 +51,7 @@ pub fn show(
     var fields = Fields{};
     var notes: [8][]const u8 = undefined;
     var note_count: usize = 0;
-    fields.add(view.t(.summary_system), system.name);
+    fields.add(view.t(.summary_system), view.tr(system.name));
     fields.add(view.t(.summary_image), image.name.slice());
     // Windows Server media: its editions as Setup will list them.
     var editions_text: [256]u8 = undefined;
@@ -413,7 +413,7 @@ fn start(
         return;
     }
     if (image.kind == .efi and (resolved == .direct_efi or resolved == .chainload)) {
-        const lines = [_][]const u8{ system.name, image.name.slice(), view.t(.efi_line1) };
+        const lines = [_][]const u8{ view.tr(system.name), image.name.slice(), view.t(.efi_line1) };
         view.status(view.t(.efi_title), view.tr(resolved.label()), &lines);
         esp_image_start.start(root, system.image_directory, image.name.slice()) catch |err| {
             showError(view.t(.error_efi), err);
@@ -555,7 +555,7 @@ pub fn showWinPe(
     if (!system.firmware.accepts(firmware) or firmware != .uefi) return showFirmwareUnavailable();
     if (manual_images.blockReason(system, image)) |reason| return showMediaBlocked(image.name.slice(), reason);
     var fields = Fields{};
-    fields.add(view.t(.summary_system), system.name);
+    fields.add(view.t(.summary_system), view.tr(system.name));
     fields.add(view.t(.summary_image), image.name.slice());
     fields.add(view.t(.summary_iso_case), view.t(.media_winpe));
     if (image.media) |info| {

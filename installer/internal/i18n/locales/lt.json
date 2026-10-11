@@ -352,6 +352,7 @@
   "boot.system.requires_bios.hint": "Norėdami naudoti, paleiskite USB atmintinę Legacy BIOS (CSM) režimu: programinės įrangos įkrovos meniu pasirinkite jos įrašą be UEFI.",
   "boot.system.unavailable": "Neprieinama",
   "boot.system.unavailable.detail": "Šios sistemos dar nepalaiko jokia veikianti įkrovos posistemė.",
+  "boot.system.other_os": "Kita sistema (savas atvaizdas)",
   "boot.notice.no_image.title": "Atvaizdų nerasta",
   "boot.notice.no_image.line1": "Nerasta palaikomų atvaizdų failų. Nukopijuokite failą į:",
   "boot.notice.backend.line1": "Šio pasirinkimo nepalaiko jokia įdiegta įkrovos posistemė.",

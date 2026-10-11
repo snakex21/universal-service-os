@@ -14,7 +14,7 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, system: *const
     const images = &list_storage;
     if (images.len == 0) {
         const lines = [_][]const u8{ view.t(.images_none_line1), view.t(.images_none_line2) };
-        view.notice(system.name, .warning, .warning, view.t(.notice_no_image_title), &lines);
+        view.notice(view.tr(system.name), .warning, .warning, view.t(.notice_no_image_title), &lines);
         view.waitForDismiss();
         return null;
     }
@@ -30,7 +30,7 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, system: *const
 
     var selected: usize = 0;
     var list: view.ListScreen = undefined;
-    list.open(system.name, view.t(.images_subtitle), rows[0..images.len], selected, two_line, null);
+    list.open(view.tr(system.name), view.t(.images_subtitle), rows[0..images.len], selected, two_line, null);
 
     while (true) {
         switch (navigation.handle(input.readBlocking(), &selected, images.len, &list)) {
@@ -39,7 +39,7 @@ pub fn select(discovery: *usos.catalog.media_discovery.Discovery, system: *const
                 // Selectable but blocked: explain why and stay in the list.
                 if (blockReason(system, image)) |reason| {
                     showBlocked(image.name.slice(), reason);
-                    list.open(system.name, view.t(.images_subtitle), rows[0..images.len], selected, two_line, null);
+                    list.open(view.tr(system.name), view.t(.images_subtitle), rows[0..images.len], selected, two_line, null);
                     continue;
                 }
                 return image;

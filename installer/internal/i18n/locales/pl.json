@@ -352,6 +352,7 @@
   "boot.system.requires_bios.hint": "Aby go użyć, uruchom pendrive w trybie Legacy BIOS (CSM): wybierz jego pozycję bez UEFI w menu rozruchu firmware.",
   "boot.system.unavailable": "Niedostępny",
   "boot.system.unavailable.detail": "Żaden działający backend startowy nie obsługuje jeszcze tego systemu.",
+  "boot.system.other_os": "Inny system (własny obraz)",
   "boot.notice.no_image.title": "Nie znaleziono obrazów",
   "boot.notice.no_image.line1": "Nie znaleziono obsługiwanych plików obrazów. Skopiuj plik do:",
   "boot.notice.backend.line1": "Żaden zaimplementowany backend startowy nie obsługuje tego wyboru.",

@@ -352,6 +352,7 @@
   "boot.system.requires_bios.hint": "Щоб використати його, завантажте флешку в режимі Legacy BIOS (CSM): виберіть її пункт без UEFI в меню завантаження прошивки.",
   "boot.system.unavailable": "Недоступно",
   "boot.system.unavailable.detail": "Поки що жоден робочий механізм завантаження не підтримує цю систему.",
+  "boot.system.other_os": "Інша система (власний образ)",
   "boot.notice.no_image.title": "Образи не знайдено",
   "boot.notice.no_image.line1": "Підтримуваних файлів образів не знайдено. Скопіюйте файл до:",
   "boot.notice.backend.line1": "Жоден реалізований механізм завантаження не підтримує цей вибір.",

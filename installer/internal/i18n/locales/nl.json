@@ -349,6 +349,7 @@
   "boot.system.requires_bios.hint": "Start de USB-stick in Legacy BIOS-modus (CSM) om het te gebruiken: kies de vermelding zonder UEFI in het opstartmenu van de firmware.",
   "boot.system.unavailable": "Niet beschikbaar",
   "boot.system.unavailable.detail": "Nog geen werkende opstartbackend ondersteunt dit systeem.",
+  "boot.system.other_os": "Ander systeem (eigen image)",
   "boot.notice.no_image.title": "Geen images gevonden",
   "boot.notice.no_image.line1": "Er zijn geen ondersteunde imagebestanden gevonden. Kopieer een bestand naar:",
   "boot.notice.backend.line1": "Geen geïmplementeerde opstartbackend ondersteunt deze keuze.",

@@ -355,6 +355,7 @@
   "boot.system.requires_bios.hint": "Za uporabo zaženite ključek USB v načinu Legacy BIOS (CSM): v zagonskem meniju vdelane programske opreme izberite njegov vnos brez UEFI.",
   "boot.system.unavailable": "Ni na voljo",
   "boot.system.unavailable.detail": "Tega sistema še ne podpira noben delujoč zagonski zaledni sistem.",
+  "boot.system.other_os": "Drug sistem (lastna slika)",
   "boot.notice.no_image.title": "Ni najdenih slik",
   "boot.notice.no_image.line1": "Ni bilo najdenih podprtih datotek slik. Kopirajte datoteko v:",
   "boot.notice.backend.line1": "Te izbire ne podpira noben izveden zagonski zaledni sistem.",

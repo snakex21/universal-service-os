@@ -349,6 +349,7 @@
   "boot.system.requires_bios.hint": "Para usá-lo, inicie o pendrive no modo Legacy BIOS (CSM): escolha a entrada sem UEFI no menu de inicialização do firmware.",
   "boot.system.unavailable": "Indisponível",
   "boot.system.unavailable.detail": "Nenhum backend de inicialização funcional oferece suporte a este sistema ainda.",
+  "boot.system.other_os": "Outro sistema (imagem própria)",
   "boot.notice.no_image.title": "Nenhuma imagem encontrada",
   "boot.notice.no_image.line1": "Nenhum arquivo de imagem compatível foi encontrado. Copie um arquivo para:",
   "boot.notice.backend.line1": "Nenhum backend de inicialização implementado oferece suporte a esta seleção.",

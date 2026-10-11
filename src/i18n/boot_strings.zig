@@ -291,6 +291,7 @@ pub const Key = enum(u16) {
     system_copy_to,
     system_image_count,
     system_no_image,
+    system_other_os,
     system_ready,
     system_requires_bios,
     system_requires_bios_detail,
@@ -983,6 +984,7 @@ pub const hashes = [_]u32{
     0x6fd0eb35, // system.copy_to
     0x4961b793, // system.image_count
     0x2a578ca3, // system.no_image
+    0xf0809b5b, // system.other_os
     0xd3048155, // system.ready
     0xab6c36c8, // system.requires_bios
     0x47e54d83, // system.requires_bios.detail
@@ -1720,6 +1722,7 @@ pub const bios = [_]bool{
     true,
     true,
     true,
+    true,
     false,
     false,
     false,
@@ -2077,7 +2080,7 @@ pub const bios = [_]bool{
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
-pub const bios_count = 334;
+pub const bios_count = 335;
 
 pub const english = [_][]const u8{
     "Experimental",
@@ -2369,6 +2372,7 @@ pub const english = [_][]const u8{
     "Copy images to {0}",
     "Images: {0}",
     "No image",
+    "Other system (own image)",
     "Ready",
     "Requires BIOS",
     "This system starts only in BIOS mode; USOS is running in UEFI mode.",

@@ -352,6 +352,7 @@
   "boot.system.requires_bios.hint": "Pentru a-l folosi, porniți stick-ul USB în modul Legacy BIOS (CSM): alegeți intrarea fără UEFI din meniul de pornire al firmware-ului.",
   "boot.system.unavailable": "Indisponibil",
   "boot.system.unavailable.detail": "Niciun backend de pornire funcțional nu acceptă încă acest sistem.",
+  "boot.system.other_os": "Alt sistem (imagine proprie)",
   "boot.notice.no_image.title": "Nu s-au găsit imagini",
   "boot.notice.no_image.line1": "Nu s-au găsit fișiere imagine acceptate. Copiați un fișier în:",
   "boot.notice.backend.line1": "Niciun backend de pornire implementat nu acceptă această selecție.",
