@@ -534,6 +534,36 @@ QEMU: `tools/tests/windows_native/qemu_native.py` with
 `USOS_NATIVE_MACHINE=pc USOS_NATIVE_TARGET_BUS=ahci USOS_NATIVE_TARGET_FIRST=1`
 (the target boots first once prepared; the stick stays connected for the ISO).
 
+### 11.3 Product key and answer architecture (X470 2026-10-11)
+
+X470, build B261011-094317: Windows 10 22H2 x86 Setup stopped right after
+"Instalator rozpoczyna pracę" with "cannot read the `<ProductKey>` setting"
+(setupact: `Callback_Productkey_Validate_Unattend ... hr = 0x80070002`), in
+two runs:
+
+* DATA answer made for amd64 only (generator file, every component
+  `processorArchitecture="amd64"`): 32-bit Setup ignores all of it
+  ("No `<ImageInstall>` section"), so neither the InstallTo the helper added
+  nor the answer's key reached Setup;
+* no answer: the helper's InstallTo-only answer has no key; 8.x / 10 Setup
+  with `/unattend` on multi-edition media without ei.cfg requires one.
+
+Not an encoding or nesting fault of `windows_installto.h`. Fix
+(`usos_it_arch`, `usos_it_key`): an answer without components for Setup's
+architecture is retargeted (x86 <-> amd64); an empty `<Key>` never reaches
+Setup (removed for Vista / 7 / 2008, whose Setup rejects it); for Setup 6.2+
+(version of the ISO's `sources\setup.exe`, 5th argument of
+`usos-x86-csmwrap before`) a missing or empty key becomes
+`00000-00000-00000-00000-00000` with `WillShowUI=Always`, i.e. Setup's own
+key / edition page, as without an answer file. The menu no longer warns
+about an answer for another architecture on these paths.
+
+QEMU recheck (OVMF no CSM, `pc`, AHCI target, real stick path, Windows 10
+22H2 PL x86): the user's amd64-only generator answer (generic Pro key) ->
+helper "components retargeted ... InstallTo added" -> Setup installs with
+no page at all; no answer -> language page, then Setup's own "Aktywuj system
+Windows" key page (with "Nie mam klucza produktu") instead of the stop.
+
 ## 12. 32-bit Windows 7 / Vista / Server 2008 without firmware CSM (profile `win-nt6-x86-uefi-csmwrap`, 2026-10-10)
 
 Status: **experimental, QEMU end-to-end for Server 2008 x86** (section 12.2); Windows 7 x86 and Vista x86 untested (no retail 32-bit media in the library); X470 untested.
