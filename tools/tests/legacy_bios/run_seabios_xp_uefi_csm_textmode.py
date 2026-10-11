@@ -24,6 +24,9 @@ SEABIOS=ROOT/'tools/qemu/share/bios-256k.bin'
 PACKAGE=Path(__import__('os').environ.get('USOS_XP_PACKAGE_DIR',ROOT/'zig-out/xp-uefi-csm'))
 DEFAULT_ISO=Path('L:/Systems/Windows/Windows XP/Images/pl_windows_xp_professional_with_service_pack_3_x86_cd_x14-80476.iso')
 TARGET_BYTES=12*1024**3
+# TARGET_NVME (run_csmwrap_xp_prepared.py --nvme): the target is an NVMe disk
+# (-device nvme), so the package sees /dev/nvme0n1 (docs/nvme-nt-2026-10-11.md).
+TARGET_NVME=False
 
 PROBE_INIT=r'''#!/bin/sh
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
@@ -38,7 +41,8 @@ sleep 3; mdev -s; cat /proc/partitions
 # The kernel may enumerate the three IDE disks in any order: pick them by size
 # (USOS stand-in 256 MiB, target 12 GiB, the rest is the ISO).
 USOS_DEV= TARGET_DEV= ISO_DEV=
-for b in /sys/block/sd?; do
+for b in /sys/block/sd? /sys/block/nvme?n?; do
+  [ -e "$b/size" ] || continue
   case "$(cat "$b/size")" in 524288) USOS_DEV=/dev/${b##*/} ;; 25165824) TARGET_DEV=/dev/${b##*/} ;; *) ISO_DEV=/dev/${b##*/} ;; esac
 done
 log "disks usos=$USOS_DEV target=$TARGET_DEV iso=$ISO_DEV"
@@ -152,7 +156,7 @@ def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),
          '-serial','file:'+str(serial),'-kernel',str(PACKAGE/'vmlinuz.efi'),'-initrd',str(initrd),
          '-append','console=ttyS0,115200 rdinit=/probe-init quiet',
          '-drive','if=none,id=usos,format=qcow2,file='+str(usos),'-device','ide-hd,bus=ide.0,unit=0,drive=usos,serial=USOS-PROBE-STICK',
-         '-drive','if=none,id=target,format=qcow2,file='+str(target),'-device','ide-hd,bus=ide.0,unit=1,drive=target,serial=XP-TEXTMODE-TARGET',
+         '-drive','if=none,id=target,format=qcow2,cache=writeback,file='+str(target),*(['-device','nvme,drive=target,serial=XP-NVME-TARGET'] if TARGET_NVME else ['-device','ide-hd,bus=ide.0,unit=1,drive=target,serial=XP-TEXTMODE-TARGET']),
          '-drive','if=none,id=iso,format=raw,snapshot=on,file='+str(iso),'-device','ide-hd,bus=ide.1,unit=0,drive=iso,serial=XP-SOURCE-ISO']
     subprocess.run(cmd,timeout=1800,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     log=serial.read_text(errors='replace')

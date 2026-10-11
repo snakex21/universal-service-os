@@ -71,5 +71,36 @@ class Source(unittest.TestCase):
         self.assertIn('PCI\CC_010802', (DRV / 'usosnvme.inf').read_text(encoding='latin-1'))
 
 
+class Flow(unittest.TestCase):
+    """Wiring: only an NVMe target loads usosnvme (XP / 2003 bundle NVME/ set,
+    NT 4.0 DRIVERS.REG); 4Kn targets stop before any write."""
+
+    def test_xp_bundle(self):
+        sys.path.insert(0, str(ROOT / 'tools'))
+        import xp_driver_overlay as o
+        base = '[SourceDisksFiles.x86]\r\na.sys = 1\r\n[HardwareIdsDatabase]\r\n[SCSI.Load]\r\n[SCSI]\r\n[FileFlags]\r\n'
+        t = o.nvme_txtsetup(base)
+        for want in ('usosnvme.sys = 1,,,,,,4_,4,0,0,,1,4', 'PCI\\CC_010802 = "usosnvme"',
+                     'usosnvme = usosnvme.sys,4', 'usosnvme.sys = 16'):
+            self.assertIn(want, t)
+        rows = {(p, n): v for p, n, _, v in o.nvme_registry_rows()}
+        self.assertEqual(rows[('Control\\CriticalDeviceDatabase\\pci#cc_010802', 'Service')], 'usosnvme')
+        self.assertEqual(rows[('Services\\usosnvme\\Parameters\\PnpInterface', '5')], 1)
+        self.assertEqual(rows[('Services\\usosnvme', 'Start')], 0)
+
+    def test_scripts(self):
+        stage = (ROOT / 'tools/xp_driver_stage.sh').read_text(encoding='utf-8')
+        self.assertIn('/dev/nvme*)', stage)
+        self.assertIn('sha256sum -c nvme.sha256', stage)
+        legacy = (ROOT / 'tools/legacy_xp_staging.sh').read_text(encoding='utf-8')
+        self.assertIn('queue/logical_block_size', legacy)
+        nt4 = (ROOT / 'tools/nt4_csmwrap_target.sh').read_text(encoding='utf-8')
+        self.assertIn('case "$TARGET_DEVICE" in /dev/nvme*)', nt4)
+        self.assertIn('Services\\usosnvme]', nt4)
+        self.assertIn('if exist C:\\USOS\\NT4\\USOSNVME.SYS copy', nt4)
+        build = (ROOT / 'tools/build_micro_linux.py').read_text(encoding='utf-8')
+        self.assertIn('("tools/nt/usosnvme/bin/NT4/i386/usosnvme.sys", "usr/lib/usos/nt4/USOSNVME.SYS")', build)
+
+
 if __name__ == '__main__':
     unittest.main()

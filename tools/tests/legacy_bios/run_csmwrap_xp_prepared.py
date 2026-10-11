@@ -45,6 +45,9 @@ def main():
     p.add_argument('--tree-scripts', default='', help='more tools/* names taken from the working tree')
     p.add_argument('--usb-only', action='store_true', help='qemu-xhci + usb-kbd + usb-tablet, pointer routed to the USB tablet')
     p.add_argument('--ahci', action='store_true', help='target on an AHCI controller')
+    p.add_argument('--nvme', action='store_true', help='target on an NVMe controller (prepare and boot; usosnvme)')
+    p.add_argument('--reboots', type=int, default=0, help='after the run, boot the disk again N times (minutes each: --reboot-minutes)')
+    p.add_argument('--reboot-minutes', type=float, default=8)
     p.add_argument('--usb-storage', type=Path, help='with --usb-only and --type-at: raw image hot-plugged as usb-storage at the first input step')
     p.add_argument('--type-at', default='', help='seconds after the CSMWrap boot start at which to type and move the pointer (space-separated)')
     a = p.parse_args()
@@ -65,6 +68,7 @@ def main():
             textmode.cpio.put(entries, textmode.cpio.Entry('csmwrap-src/' + name, stat.S_IFREG | 0o644, blob))
         return entries
     textmode.cpio.parse_newc = parse_with_csmwrap
+    textmode.TARGET_NVME = a.nvme
     target = textmode.prepare(out, a.iso, a.profile, a.settings, ('xp_csmwrap_esp.sh', 'xp_windows_partition_plan.awk', *a.tree_scripts.split()))
     log = (out / 'prepare-serial.log').read_text(errors='replace')
     ok = 'CSMWrap ESP PASS' in log
@@ -73,7 +77,9 @@ def main():
         raise SystemExit(log[-4000:])
     csm.USB_STICK['path'] = a.usb_storage
     result = csm.boot(out, target, 'csmwrap-boot', 'std', 'tcg,thread=multi', a.minutes, run_through=a.run_through,
-                      usb_only=a.usb_only, ahci=a.ahci, type_at=[float(t) for t in a.type_at.split()])
+                      usb_only=a.usb_only, ahci=a.ahci, type_at=[float(t) for t in a.type_at.split()], nvme=a.nvme)
+    for i in range(a.reboots):
+        csm.boot(out, target, 'reboot-%d' % (i + 1), 'std', 'tcg,thread=multi', a.reboot_minutes, run_through=True, ahci=a.ahci, nvme=a.nvme)
     serial = (out / 'csmwrap-boot/serial.log').read_text(errors='replace') if (out / 'csmwrap-boot/serial.log').exists() else ''
     summary = {'result': result, 'csmwrap_boots': serial.count('Unlock!'), 'seabios_banners': serial.count('SeaBIOS (version')}
     (out / 'summary.json').write_text(json.dumps(summary, indent=1), encoding='utf-8')

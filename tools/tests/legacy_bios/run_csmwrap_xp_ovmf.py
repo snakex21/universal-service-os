@@ -222,7 +222,7 @@ def usb_input(mon, shots, tag):
     mon.cmd(f'screendump "{(shots / (tag + "-pointer.ppm")).as_posix()}"')
 
 
-def boot(out, disk, tag, vga, accel, minutes, shots_every=3.0, run_through=False, usb_only=False, ahci=False, type_at=(), decoy=None):
+def boot(out, disk, tag, vga, accel, minutes, shots_every=3.0, run_through=False, usb_only=False, ahci=False, type_at=(), decoy=None, nvme=False):
     shots = out / tag
     shutil.rmtree(shots, ignore_errors=True)
     shots.mkdir(parents=True)
@@ -235,7 +235,10 @@ def boot(out, disk, tag, vga, accel, minutes, shots_every=3.0, run_through=False
            '-drive', f'if=pflash,unit=1,format=raw,file={vars_copy}',
            '-display', 'none', '-nic', 'none', '-serial', f'file:{serial}',
            '-monitor', f'tcp:127.0.0.1:{port},server=on,wait=off',
-           *(['-device', 'ahci,id=ahci', '-drive', f'if=none,id=target,format=qcow2,file={disk}', '-device', 'ide-hd,drive=target,bus=ahci.0']
+           # nvme: the target on an NVMe controller (usosnvme, docs/nvme-nt-2026-10-11.md).
+           *(['-drive', f'if=none,id=target,format=qcow2,cache=writeback,file={disk}', '-device', 'nvme,drive=target,serial=XP-NVME-TARGET']
+             if nvme else
+             ['-device', 'ahci,id=ahci', '-drive', f'if=none,id=target,format=qcow2,file={disk}', '-device', 'ide-hd,drive=target,bus=ahci.0']
              if ahci and not decoy else ['-drive', f'if=ide,index=0,format=qcow2,file={disk}'] if not decoy else
              # --decoy: a bootable disk on port 0 of the target's own AHCI
              # controller, the target on port 1 (csmwrap-integration 13.4).
