@@ -47,6 +47,11 @@ TARGET_FIRST = os.environ.get("USOS_NATIVE_TARGET_FIRST") == "1"
 # keyboard (Setup's first page never reacts); the CSMWrap Vista harness
 # (tools/tests/legacy_bios/run_csmwrap_vista_prepared.py) uses pc as well.
 MACHINE = os.environ.get("USOS_NATIVE_MACHINE", "q35")
+# USOS_NATIVE_NO_PS2=1: no i8042 at all (machine i8042=off), as on boards whose
+# only keyboard is USB (Vista / 2008 x86 usosusb check, X470 without CSM).
+MACHINE_ARG = MACHINE + (",i8042=off" if os.environ.get("USOS_NATIVE_NO_PS2") == "1" else "")
+# USOS_NATIVE_USB_MOUSE=1: usb-mouse (HID boot mouse) instead of usb-tablet.
+USB_POINTER = "usb-mouse" if os.environ.get("USOS_NATIVE_USB_MOUSE") == "1" else "usb-tablet"
 # USOS_NATIVE_ACCEL=whpx: Windows Hypervisor Platform (much faster than TCG).
 ACCEL = (["-accel", "whpx,kernel-irqchip=off", "-cpu", "qemu64,+ssse3,+sse4.1,+sse4.2,+popcnt"]
          if os.environ.get("USOS_NATIVE_ACCEL") == "whpx" else ["-accel", "tcg,thread=multi", "-cpu", "max"])
@@ -79,7 +84,7 @@ def monitor(commands: list[str]) -> str:
 
 def launch(args: list[str], label: str, no_reboot: bool) -> None:
     port = free_port()
-    full = [str(QEMU), "-name", f"USOS-native-{label}", "-machine", MACHINE, *ACCEL,
+    full = [str(QEMU), "-name", f"USOS-native-{label}", "-machine", MACHINE_ARG, *ACCEL,
             *(["-m", "4096", "-smp", "2", "-vga", "std"] if MACHINE == "pc" else ["-m", "6144", "-smp", "4", "-device", "VGA,xres=1280,yres=800"]),
             "-nic", "none", "-display", "none",
             "-monitor", f"tcp:127.0.0.1:{port},server=on,wait=off",
@@ -90,7 +95,7 @@ def launch(args: list[str], label: str, no_reboot: bool) -> None:
             # USOS_NATIVE_PS2_INPUT=1: no USB keyboard/tablet, sendkey goes to
             # the PS/2 keyboard (installed systems without an xHCI driver:
             # Server 2008 R2 / Home Server 2011 first logon).
-            *([] if os.environ.get("USOS_NATIVE_PS2_INPUT") == "1" else ["-device", "usb-kbd,bus=xhci.0", "-device", "usb-tablet,bus=xhci.0"]),
+            *([] if os.environ.get("USOS_NATIVE_PS2_INPUT") == "1" else ["-device", "usb-kbd,bus=xhci.0", "-device", USB_POINTER + ",bus=xhci.0"]),
             *args]
     if no_reboot:
         full.append("-no-reboot")

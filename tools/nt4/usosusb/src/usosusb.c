@@ -53,6 +53,15 @@ __declspec(dllimport) VOID __stdcall IoCompleteRequest(PIRP Irp, CCHAR PriorityB
 __declspec(dllimport) VOID __stdcall KeRaiseIrql(KIRQL NewIrql, PKIRQL OldIrql);
 __declspec(dllimport) VOID __stdcall KeLowerIrql(KIRQL NewIrql);
 #define USOSUSB_VERSION L"usosusb 1.0-nt31"
+#elif defined(USOSUSB_NT6)
+/* Vista / Server 2008 SP2 x86 (build-nt6.cmd): same legacy port devices;
+   kbdclass / mouclass connect them as legacy ports (\Device\KeyboardClassLegacyN,
+   \Device\PointerClassLegacyN, which win32k opens). PCI configuration goes
+   through the HAL (its lock; other CPUs run), input is sent once a class
+   driver connected even before its ENABLE, and a Conn value shows the
+   connect / enable state. */
+#pragma warning(disable:4996)   /* HalGetBusDataByOffset is marked obsolete */
+#define USOSUSB_VERSION L"usosusb 1.0-nt6"
 #else
 #define USOSUSB_VERSION L"usosusb 1.0-nt4"
 #endif
@@ -141,6 +150,7 @@ typedef struct _PORTEXT {
     int keyboard;
     int connected;
     LONG enabled;
+    LONG enable_seen;
     CONNECT_DATA conn;
     KEYBOARD_TYPEMATIC_PARAMETERS typematic;
     KEYBOARD_INDICATOR_PARAMETERS leds;
@@ -153,6 +163,10 @@ static UNICODE_STRING g_regpath;
 static WCHAR g_regbuf[256];
 static WCHAR g_diag[512];
 static volatile LONG g_ledseq;
+#ifdef USOSUSB_NT6
+static volatile LONG g_connseq;  /* bumped on connect / enable / disable */
+static ULONG g_kbd_sent, g_mou_sent;   /* input records passed to the class drivers */
+#endif
 
 /* typematic state (worker thread only) */
 static UCHAR g_rep_usage;
@@ -257,6 +271,53 @@ static void diag_write(void)
                           (ULONG)(wcslen(g_diag) + 1) * sizeof(WCHAR));
 }
 
+#ifdef USOSUSB_NT6
+/* Parameters\Conn (REG_SZ): class connection per port, e.g.
+   "kbd c1 e1/1 n42 mou c1 e1/1 n7" (connected, ENABLE seen / count,
+   input records sent). */
+static void conn_write(void)
+{
+    WCHAR path[300], line[96];
+    ULONG_PTR a[8];
+    PORTEXT *k = g_kbd ? (PORTEXT *)g_kbd->DeviceExtension : NULL;
+    PORTEXT *m = g_mou ? (PORTEXT *)g_mou->DeviceExtension : NULL;
+    if (g_regpath.Length / sizeof(WCHAR) + 12 >= sizeof(path) / sizeof(WCHAR))
+        return;
+    a[0] = k ? k->connected : 9; a[1] = k ? k->enable_seen : 9; a[2] = k ? (ULONG)k->enabled : 0; a[3] = g_kbd_sent;
+    a[4] = m ? m->connected : 9; a[5] = m ? m->enable_seen : 9; a[6] = m ? (ULONG)m->enabled : 0; a[7] = g_mou_sent;
+    wfmt(line, 96, L"kbd c%u e%u/%d n%u ", a);
+    wfmt(line + wcslen(line), 96 - wcslen(line), L"mou c%u e%u/%d n%u", a + 4);
+    RtlCopyMemory(path, g_regpath.Buffer, g_regpath.Length);
+    RtlCopyMemory(path + g_regpath.Length / sizeof(WCHAR), L"\\Parameters", 12 * sizeof(WCHAR));
+    RtlCreateRegistryKey(RTL_REGISTRY_ABSOLUTE, path);
+    RtlWriteRegistryValue(RTL_REGISTRY_ABSOLUTE, path, L"Conn", REG_SZ, line,
+                          (ULONG)(wcslen(line) + 1) * sizeof(WCHAR));
+}
+#endif
+#ifdef USOSUSB_NT6
+/* addr = mechanism 1 form (bus 23:16, device 15:11, function 10:8). */
+static ULONG pci_slot(ULONG addr)
+{
+    PCI_SLOT_NUMBER s;
+    s.u.AsULONG = 0;
+    s.u.bits.DeviceNumber = (addr >> 11) & 0x1F;
+    s.u.bits.FunctionNumber = (addr >> 8) & 7;
+    return s.u.AsULONG;
+}
+
+static ULONG pci_read(ULONG addr, ULONG off)
+{
+    ULONG v = 0xFFFFFFFFu;
+    if (HalGetBusDataByOffset(PCIConfiguration, (addr >> 16) & 0xFF, pci_slot(addr), &v, off & 0xFC, 4) != 4)
+        return 0xFFFFFFFFu;
+    return v;
+}
+
+static void pci_write(ULONG addr, ULONG off, ULONG v)
+{
+    HalSetBusDataByOffset(PCIConfiguration, (addr >> 16) & 0xFF, pci_slot(addr), &v, off & 0xFC, 4);
+}
+#else
 /* PCI configuration mechanism 1 (CF8h/CFCh), interrupts off on this CPU. */
 static ULONG pci_read(ULONG addr, ULONG off)
 {
@@ -275,6 +336,7 @@ static void pci_write(ULONG addr, ULONG off, ULONG v)
     WRITE_PORT_ULONG((PULONG)0xCFC, v);
     __asm sti
 }
+#endif
 
 /* ------------------------------------------------------------------ */
 /* rings                                                               */
@@ -344,6 +406,18 @@ static void write64(volatile ULONG *reg, ULONG lo)
 /* ------------------------------------------------------------------ */
 /* input to the class drivers                                          */
 
+static int port_live(PORTEXT *x)
+{
+    if (!x->connected || !x->conn.ClassService)
+        return 0;
+#ifdef USOSUSB_NT6
+    /* until the first ENABLE / DISABLE: the class driver connected */
+    if (!x->enable_seen)
+        return 1;
+#endif
+    return x->enabled > 0;
+}
+
 static void send_kbd(KEYBOARD_INPUT_DATA *a, ULONG n)
 {
     PORTEXT *x;
@@ -352,11 +426,14 @@ static void send_kbd(KEYBOARD_INPUT_DATA *a, ULONG n)
     if (!g_kbd || !n)
         return;
     x = (PORTEXT *)g_kbd->DeviceExtension;
-    if (!x->connected || x->enabled <= 0 || !x->conn.ClassService)
+    if (!port_live(x))
         return;
     KeRaiseIrql(DISPATCH_LEVEL, &old);
     (*(PSERVICE_CALLBACK_ROUTINE)(ULONG_PTR)x->conn.ClassService)(x->conn.ClassDeviceObject, a, a + n, &used);
     KeLowerIrql(old);
+#ifdef USOSUSB_NT6
+    g_kbd_sent += n;
+#endif
 }
 
 static void send_mou(MOUSE_INPUT_DATA *a)
@@ -367,11 +444,14 @@ static void send_mou(MOUSE_INPUT_DATA *a)
     if (!g_mou)
         return;
     x = (PORTEXT *)g_mou->DeviceExtension;
-    if (!x->connected || x->enabled <= 0 || !x->conn.ClassService)
+    if (!port_live(x))
         return;
     KeRaiseIrql(DISPATCH_LEVEL, &old);
     (*(PSERVICE_CALLBACK_ROUTINE)(ULONG_PTR)x->conn.ClassService)(x->conn.ClassDeviceObject, a, a + 1, &used);
     KeLowerIrql(old);
+#ifdef USOSUSB_NT6
+    g_mou_sent++;
+#endif
 }
 
 /*
@@ -1074,6 +1154,9 @@ static VOID worker(PVOID ctx)
 {
     ULONG bus, dv, fn, i;
     LONG seq = 0;
+#ifdef USOSUSB_NT6
+    ULONG tick = 0, conn_last = 0xFFFFFFFFu;
+#endif
     UNREFERENCED_PARAMETER(ctx);
     KeSetPriorityThread(KeGetCurrentThread(), LOW_REALTIME_PRIORITY);
 
@@ -1137,6 +1220,16 @@ static VOID worker(PVOID ctx)
             }
         }
         kbd_repeat();
+#ifdef USOSUSB_NT6
+        if (++tick >= 250) {
+            ULONG sum = (ULONG)g_connseq + g_kbd_sent + g_mou_sent;
+            tick = 0;
+            if (sum != conn_last) {
+                conn_last = sum;
+                conn_write();
+            }
+        }
+#endif
         delay_ms(8);
     }
 }
@@ -1166,6 +1259,9 @@ static NTSTATUS dispatch(PDEVICE_OBJECT dobj, PIRP irp)
             else {
                 x->conn = *(PCONNECT_DATA)s->Parameters.DeviceIoControl.Type3InputBuffer;
                 x->connected = 1;
+#ifdef USOSUSB_NT6
+                InterlockedIncrement((PLONG)&g_connseq);
+#endif
             }
             break;
         case IOCTL_INTERNAL_KEYBOARD_DISCONNECT:
@@ -1175,11 +1271,19 @@ static NTSTATUS dispatch(PDEVICE_OBJECT dobj, PIRP irp)
         case IOCTL_INTERNAL_KEYBOARD_ENABLE:
         case IOCTL_INTERNAL_MOUSE_ENABLE:
             InterlockedIncrement(&x->enabled);
+            x->enable_seen = 1;
+#ifdef USOSUSB_NT6
+            InterlockedIncrement((PLONG)&g_connseq);
+#endif
             break;
         case IOCTL_INTERNAL_KEYBOARD_DISABLE:
         case IOCTL_INTERNAL_MOUSE_DISABLE:
             if (x->enabled > 0)
                 InterlockedDecrement(&x->enabled);
+            x->enable_seen = 1;
+#ifdef USOSUSB_NT6
+            InterlockedIncrement((PLONG)&g_connseq);
+#endif
             break;
         case IOCTL_KEYBOARD_QUERY_ATTRIBUTES:
             if (outl < sizeof(KEYBOARD_ATTRIBUTES))

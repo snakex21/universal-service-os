@@ -133,6 +133,10 @@ def build_modern_support(root: Path, out: Path):
         writer.add_bytes('usos-x86-csmwrap.cmd', (root / 'tools/windows_x86_csmwrap.cmd').read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
         writer.add_file('usos-x86-csmwrap.exe', helpers / 'usos-x86-csmwrap.exe')
         writer.add_file('usos-vista-oobe-x86.exe', helpers / 'usos-vista-oobe-x86.exe')
+        # Vista / Server 2008 SP2 x86: own xHCI keyboard / mouse port driver
+        # (committed build of tools/nt4/usosusb/build-nt6.cmd), registered
+        # offline by the nt60_usb step of usos-x86-csmwrap.cmd (12.6).
+        writer.add_file('usosusb-nt6.sys', root / 'tools/nt4/usosusb/bin/nt6/i386/usosusb.sys')
         for name in ('usos-drivers.exe', 'usos-unattend-drivers.exe'):
             writer.add_file(name, win7 / name)
     finally:
