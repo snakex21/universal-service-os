@@ -144,7 +144,7 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
     try w.writeAll(
         \\
         \\[Install]
-        \\AddReg=USOS.RunOnce
+        \\AddReg=USOS.RunOnce,USOS.CsmReg
         \\UpdateInis=USOS.Memory
         \\UpdateIniFields=USOS.Csm
         \\
@@ -166,7 +166,8 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
         \\HKLM,"Software\Microsoft\Windows\CurrentVersion\Welcome\Regwiz",,1,01,00,00,00
         \\HKLM,"Software\Microsoft\Windows\CurrentVersion",RegDone,1,01,00,00,00
         \\
-        \\; Last section: under CSMWrap INSTALL.BAT appends the Me USB input lines.
+        \\; Last section: under CSMWrap INSTALL.BAT appends the Me USB input lines
+        \\; (Me) or the USOS.CsmReg section (98, 98 SE); missing, it is skipped.
         \\[USOS.Csm]
         \\
     );
@@ -241,7 +242,7 @@ test "MSBATCH.INF carries the profile, CRLF, the key only for 98 and Me" {
     try std.testing.expect(std.mem.indexOf(u8, text, "\r\nName=\"Jan Kowalski\"\r\nOrg=\"USOS Lab\"\r\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, text, "\r\nTimeZone=\"Central European\"\r\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, text, "\r\nComputerName=\"USOS-9X\"\r\n") != null);
-    try std.testing.expect(std.mem.indexOf(u8, text, "\r\nAddReg=USOS.RunOnce\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "\r\nAddReg=USOS.RunOnce,USOS.CsmReg\r\n") != null);
     for (text, 0..) |c, i| {
         if (c == '\n') try std.testing.expectEqual(@as(u8, '\r'), text[i - 1]);
     }

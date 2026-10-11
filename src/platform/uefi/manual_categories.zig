@@ -91,7 +91,7 @@ fn description(index: usize) []const u8 {
         .linux => view.t(.category_linux_desc),
         .beta => view.t(.category_beta_desc),
         .dos => view.t(.category_dos_desc),
-        .other => view.t(.category_other_desc),
+        .other => view.t(.category_others_desc),
         .utilities => view.t(.category_utilities_desc),
     };
 }

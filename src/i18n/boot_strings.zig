@@ -31,8 +31,8 @@ pub const Key = enum(u16) {
     category_beta_desc,
     category_dos_desc,
     category_linux_desc,
-    category_other,
-    category_other_desc,
+    category_others,
+    category_others_desc,
     category_power,
     category_power_desc,
     category_utilities,
@@ -723,8 +723,8 @@ pub const hashes = [_]u32{
     0x50adb2ee, // category.beta.desc
     0xc4dcd124, // category.dos.desc
     0xf91b310c, // category.linux.desc
-    0x20cc882d, // category.other
-    0x8e21d344, // category.other.desc
+    0xfffaabfa, // category.others
+    0x387e901d, // category.others.desc
     0x47a1786e, // category.power
     0x3595e4b1, // category.power.desc
     0x0443aa4f, // category.utilities
