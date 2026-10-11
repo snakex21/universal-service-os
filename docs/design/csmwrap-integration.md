@@ -601,9 +601,8 @@ Where the ISOs go on DATA: the system ISO in its usual folder
 ### 12.1 Limits / open
 
 * USB 3 in the installed system: Windows 7 x86 see 12.3 (user files on
-  DATA); Vista / Server 2008 x86 still none (no 32-bit NT 6.0 xHCI driver,
-  12.3), so on the X470 (xHCI only) their phase 2 / desktop have no USB
-  keyboard or mouse.
+  DATA); Vista / Server 2008 SP2 x86: USB keyboard and mouse through our own
+  usosusb driver (12.6), no USB storage (no 32-bit NT 6.0 xHCI stack).
 * DATA\Drivers and answer-command wrapping: as section 11.1.
 * A USOS profile renders x86 components; with no key and no edition Vista /
   2008 Setup asks for them (a DATA answer with `/IMAGE/INDEX` avoids that).
@@ -782,6 +781,75 @@ cache=writeback, stick on xHCI):
   at OOBE); ESP, DATA, WORK not dirty. PASS.
 * Side finding: the profile's `skip_games` (`pkgmgr /uu:InboxGames`) shows a
   console window during specialize for minutes (UX "no console windows").
+
+### 12.6 Vista / Server 2008 SP2 x86: USB keyboard and mouse (usosusb, 2026-10-11)
+
+No 32-bit NT 6.0 xHCI driver exists (12.3), and the X470 has only xHCI
+ports: the Vista x86 OOBE keyboard / mouse ended at the clock page (12.5,
+firmware legacy emulation behind i8042). Our NT 4.0 / 3.x driver
+`tools/nt4/usosusb` (own xHCI polling, root-port HID boot keyboard / mouse,
+legacy keyboard / pointer port for kbdclass / mouclass) gets an NT 6.0 build:
+
+* `build-nt6.cmd` (`-DUSOSUSB_NT6`) -> `tools/nt4/usosusb/bin/nt6/i386/usosusb.sys`:
+  PCI configuration through `HalGet/SetBusDataByOffset` (HAL lock; the
+  CF8h/CFCh `cli` pair of the NT4 build only protects one CPU); input passed
+  on once the class driver connected (also before its first ENABLE);
+  `Parameters\Conn` diagnostics next to `Diag`. Every import resolves on the
+  Server 2008 SP2 x86 kernels (ntoskrnl, ntkrnlpa) and HALs (halmacpi,
+  halacpi): `tools/tests/test_nt60_usosusb.py`, fixture
+  `tools/tests/data/nt60sp2_x86_exports.txt`.
+* How NT 6.0 takes a legacy port: kbdclass / mouclass are system-start
+  services (group "Keyboard Class" / "Pointer Class") and keep the legacy
+  path: a `\Device\KeyboardPortN` listed in `HARDWARE\DEVICEMAP` becomes
+  `\Device\KeyboardClassLegacyN`, and win32k opens
+  `\Device\KeyboardClassLegacy0` / `\Device\PointerClassLegacy0` next to the
+  PnP keyboard interfaces (strings in the 6002 win32k.sys / kbdclass.sys).
+  No PnP device, INF or class filter is needed; i8042prt (PnP, ACPI PNP0303)
+  keeps working beside it.
+* Signing: 32-bit NT 6.0 does not enforce kernel-mode code signing (only
+  x64 does); the unsigned driver loads as a system-start service.
+* Firmware handoff: the driver takes each xHCI controller with the USBLEGSUP
+  handshake (forced after 1 s) and clears the SMI enables, so the firmware's
+  i8042 emulation stops when usosusb starts (boot, before kbdclass), and
+  input comes only from usosusb from then on.
+* Install: `nt60_usb` step of `usos-x86-csmwrap.cmd` after `nt60_gate`, for
+  installed NT 6.0 build 6002 only (Windows 7 and later have usbxhci and are
+  left alone): `usosusb-nt6.sys` (modern-support.cpio) -> `<Windows>\System32\drivers\usosusb.sys`,
+  `reg load` of the target SYSTEM hive in the PE10, service in
+  `ControlSet00<Select\Current>`: Type 1, Start 1, ErrorControl 0, Group
+  "Keyboard Port", ImagePath `system32\drivers\usosusb.sys`. Never fatal.
+* Limits (as NT4): root-port devices only (no hubs, so no keyboards with a
+  built-in hub), HID boot protocol only (no absolute tablets), no USB
+  storage, no power management (sleep / hibernate would leave the controller
+  unprogrammed; the Vista profile turns hibernation off). Stage 2 (USB mass
+  storage) would need a SCSI miniport (or storport-less ScsiPort) on the same
+  xHCI rings: bulk-only transport, SCSI READ/WRITE(10) passthrough, a PnP or
+  legacy disk class binding, plus sharing the controller with the HID code
+  (one driver owning the xHCI, two device stacks).
+
+QEMU (build B261011-151241-B661FA01; OVMF without CSM, `pc`, TCG, AHCI target
+cache=writeback, stick on qemu-xhci, PE10 x86 donor):
+
+* Web Server 2008 SP2 PL x86 (DATA answer, index 1, Administrator autologon):
+  hands-free to the desktop. With PS/2 present: `Diag` `usosusb 1.0-nt6:
+  hc0=00:03.0(8 ports) p5:s1K-`, `Conn` `kbd c1 e1/1 n262` (the typed
+  command came through usosusb), i8042prt RUNNING beside it. Then the disk
+  alone with `pc,i8042=off`, qemu-xhci + usb-kbd + usb-mouse only: Notepad
+  typing, mouse to the Start button + click opens the Start menu; `Diag`
+  `p5:s1K- p6:s2-M`, `Conn` `kbd c1 e1/1 n400 mou c1 e1/1 n12`, i8042prt
+  STOPPED. PASS.
+* Vista SP2 PL x86 (USOS profile "Vista Ultimate"; client Setup still shows
+  its key page, Next + No): hands-free afterwards to the Retro desktop. The
+  disk alone with `pc,i8042=off`, usb-kbd + usb-mouse only: Notepad typing,
+  Start menu by USB mouse click; `Diag` `p5:s1K- p6:s2-M`, `Conn` `kbd c1
+  e1/1 n408 mou c1 e1/1 n9`, i8042prt STOPPED, `ver` 6.0.6002. PASS.
+* WinPE log (both): `phase=nt60-usb build=6002`, `usosusb: registered in
+  ControlSet001 exit=0` after `OOBE gate armed`.
+
+X470 to check: USB keyboard / mouse on root ports (not behind a hub) from
+the first phase-2 boot through OOBE to the desktop; `Diag` / `Conn` values
+(controllers 2, keyboard `K`, mouse `M`); keyboards with a built-in hub
+will not work (as on NT4).
 
 ## 13. One disk question per flow (2026-10-11)
 
