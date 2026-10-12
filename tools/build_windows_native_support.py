@@ -117,7 +117,7 @@ def build_modern_support(root: Path, out: Path):
     # x86 WinPE in BIOS mode; micro-Linux step 610 injects this archive too.
     subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.win10-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
                     '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_x86_csmwrap.c'),
-                    '-Wl,--entry,entry', '-lkernel32', '-luser32', '-lshell32', '-lversion', '-o', str(helpers / 'usos-x86-csmwrap.exe')], env=env, check=True)
+                    '-Wl,--entry,entry', '-lkernel32', '-luser32', '-lshell32', '-lversion', '-ladvapi32', '-o', str(helpers / 'usos-x86-csmwrap.exe')], env=env, check=True)
     # 32-bit Vista / Server 2008 SP2 on that path: the Vista OOBE gate (WinSAT
     # guard, interrupted-OOBE recovery, autochk limit) as an x86 build that
     # hands over to native windeploy (no USB payload); usos-x86-csmwrap.cmd
@@ -137,6 +137,19 @@ def build_modern_support(root: Path, out: Path):
         # (committed build of tools/nt4/usosusb/build-nt6.cmd), registered
         # offline by the nt60_usb step of usos-x86-csmwrap.cmd (12.6).
         writer.add_file('usosusb-nt6.sys', root / 'tools/nt4/usosusb/bin/nt6/i386/usosusb.sys')
+        # NVMe target, Windows 7 / Vista / Server 2008 x86: own SCSIPORT
+        # miniport (2KXP build of tools/nt/usosnvme; imports checked against
+        # NT 6.0 SP2 in tools/tests/test_usosnvme.py), registered offline by
+        # the nvme step of usos-x86-csmwrap.cmd (docs/nvme-nt6-2026-10-12.md).
+        writer.add_file('usosnvme-nt6.sys', root / 'tools/nt/usosnvme/bin/2KXP/i386/usosnvme.sys')
+        # DriverVer older than every inbox stornvme.inf: Setup only has to
+        # find a driver for the controller in the list it migrates; in the
+        # PE10 donor stornvme must keep the running disk (QEMU 2026-10-12: a
+        # newer date let usosnvme take the controller and the PE restarted).
+        inf = (root / 'tools/nt/usosnvme/usosnvme.inf').read_bytes()
+        if b'DriverVer=10/11/2026,1.0.0.0' not in inf:
+            raise ValueError('usosnvme.inf DriverVer changed; update the NT6 copy')
+        writer.add_bytes('usosnvme.inf', inf.replace(b'DriverVer=10/11/2026,1.0.0.0', b'DriverVer=01/01/2001,1.0.0.0'))
         for name in ('usos-drivers.exe', 'usos-unattend-drivers.exe'):
             writer.add_file(name, win7 / name)
     finally:

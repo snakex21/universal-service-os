@@ -161,6 +161,30 @@ static void drop_letters(void) {
 #include "windows_installto.h"
 static char xml_in[1 << 20], xml_utf8[(1 << 20) + 64], xml_scratch[(1 << 20) + 64], xml_out[(1 << 20) + 8192];
 static int modern_setup; /* Setup 6.2+ (8.x / 10): windows_installto.h usos_it_key */
+/* NVMe target, Setup 6.0 / 6.1 (Vista / 2008 / 7 x86 under the PE10 donor):
+ * the folder with usosnvme.inf / .sys (USOS_NVME_DRIVERS, set by
+ * usos-x86-csmwrap.cmd). Setup refuses a disk whose controller driver (the
+ * donor's stornvme) the new system lacks ("Windows needs the driver for
+ * [Standard NVM Express controller]", QEMU 2026-10-12) unless a driver for
+ * it was loaded: Microsoft-Windows-PnpCustomizationsWinPE DriverPaths
+ * (docs/nvme-nt6-2026-10-12.md). */
+static char nvme_drivers[MAX_PATH];
+static DWORD nvme_component(const char *in, DWORD n, char *out, DWORD cap) {
+    static const char pe[] = "<settings pass=\"windowsPE\">";
+    static const char head[] = "<component name=\"Microsoft-Windows-PnpCustomizationsWinPE\" processorArchitecture=\"x86\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\" xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\"><DriverPaths><PathAndCredentials wcm:action=\"add\" wcm:keyValue=\"1\"><Path>";
+    static const char tail[] = "</Path></PathAndCredentials></DriverPaths></component>";
+    long at = usos_it_find(in, n, 0, pe);
+    if (at < 0 || usos_it_find(in, n, 0, "Microsoft-Windows-PnpCustomizationsWinPE") >= 0) return 0;
+    DWORD split = (DWORD)at + sizeof(pe) - 1, path = usos_it_len(nvme_drivers);
+    if (n + sizeof(head) + path + sizeof(tail) > cap) return 0;
+    DWORD o = 0;
+    memcpy(out, in, split); o = split;
+    memcpy(out + o, head, sizeof(head) - 1); o += sizeof(head) - 1;
+    memcpy(out + o, nvme_drivers, path); o += path;
+    memcpy(out + o, tail, sizeof(tail) - 1); o += sizeof(tail) - 1;
+    memcpy(out + o, in + split, n - split); o += n - split;
+    return o;
+}
 static BOOL write_answer(const WCHAR *input, const WCHAR *output) {
     DWORD got = 0, len = 0; const char *text = 0, *note = "";
     if (lstrcmpW(input, L"-") != 0) {
@@ -179,6 +203,11 @@ static BOOL write_answer(const WCHAR *input, const WCHAR *output) {
     DWORD n = usos_installto_answer(text, len, xml_scratch, sizeof(xml_scratch), xml_out, sizeof(xml_out), disk, windows_number, "x86", modern_setup, &note);
     if (!n) return FALSE;
     say("[X86_CSMWRAP] answer: "); say(note); say("\r\n");
+    if (nvme_drivers[0]) {
+        DWORD m = nvme_component(xml_out, n, xml_scratch, sizeof(xml_scratch));
+        if (m) { memcpy(xml_out, xml_scratch, m); n = m; say("[X86_CSMWRAP] answer: NVMe driver path added (PnpCustomizationsWinPE): "); say(nvme_drivers); say("\r\n"); }
+        else say("[X86_CSMWRAP] answer: NVMe driver path NOT added (no windowsPE settings or already present)\r\n");
+    }
     HANDLE h = CreateFileW(output, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
     if (h == INVALID_HANDLE_VALUE) return FALSE;
     DWORD wrote = 0; BOOL ok = WriteFile(h, xml_out, n, &wrote, 0) && wrote == n && FlushFileBuffers(h);
@@ -310,6 +339,36 @@ static void stick_report(void) {
     logn("USB / removable volumes checked=", checked);
 }
 
+/* ---- nodump: crash-dump stack off in this WinPE (NVMe target) ------------
+ * The donor PE booted from the NVMe staging partition, so its crash-dump
+ * stack (dump_stornvme) is armed for that controller. When Setup installs
+ * usosnvme for the controller (PnpCustomizationsWinPE, the only way Vista /
+ * 7 Setup accepts a disk without an inbox driver), the swap bugchecked in
+ * dump_stornvme.sys (KMODE_EXCEPTION_NOT_HANDLED, QEMU 2026-10-12). Turn the
+ * dump off and let the kernel re-read CrashControl, as the System applet
+ * does (SystemCrashDumpStateInformation). */
+static DWORD no_dump_stack(void) {
+    HKEY k; DWORD zero = 0, result = 0;
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\CrashControl", 0, KEY_SET_VALUE, &k) == ERROR_SUCCESS) {
+        RegSetValueExW(k, L"CrashDumpEnabled", 0, REG_DWORD, (const BYTE *)&zero, 4);
+        RegSetValueExW(k, L"AutoReboot", 0, REG_DWORD, (const BYTE *)&zero, 4);
+        RegCloseKey(k);
+    } else result |= 1;
+    HANDLE token;
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &token)) {
+        TOKEN_PRIVILEGES tp = {1}; tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+        if (LookupPrivilegeValueW(0, L"SeCreatePagefilePrivilege", &tp.Privileges[0].Luid)) AdjustTokenPrivileges(token, FALSE, &tp, 0, 0, 0);
+        CloseHandle(token);
+    }
+    typedef LONG (WINAPI *set_info_t)(ULONG, PVOID, ULONG);
+    set_info_t set_info = (set_info_t)(void *)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtSetSystemInformation");
+    LONG status = -1; ULONG state = 0;
+    if (set_info) status = set_info(34 /* SystemCrashDumpStateInformation */, &state, sizeof(state));
+    logn("crash dump off: registry=", (result & 1) ? 0 : 1);
+    logn("crash dump state re-read NTSTATUS=", (DWORD)status);
+    return 0;
+}
+
 static DWORD WINAPI notice(LPVOID unused) {
     (void)unused;
     MessageBoxW(0, L"The first part of the Windows installation is complete.\n\nRemove the USOS stick now, then choose OK: the computer restarts and Windows continues from the disk through CSMWrap. If the stick stays connected, start this disk's UEFI entry from the firmware boot menu.\n\nThe computer restarts by itself in 2 minutes.",
@@ -329,9 +388,11 @@ void entry(void) {
     if (lstrcmpiW(args[1], L"answer-test") == 0 && (arg_count == 6 || arg_count == 7)) {
         disk = (DWORD)args[4][0] - L'0'; windows_number = (DWORD)args[5][0] - L'0';
         modern_setup = arg_count == 7 && lstrcmpiW(args[6], L"modern") == 0;
+        { char d[MAX_PATH]; DWORD dn = GetEnvironmentVariableA("USOS_NVME_DRIVERS", d, MAX_PATH); if (dn && dn < MAX_PATH) lstrcpyA(nvme_drivers, d); }
         ExitProcess(write_answer(args[2], args[3]) ? 0 : 7);
     }
     if (lstrcmpiW(args[1], L"stick") == 0) { stick_report(); ExitProcess(0); }
+    if (lstrcmpiW(args[1], L"nodump") == 0) ExitProcess(no_dump_stack());
     FIRMWARE_TYPE firmware;
     if (!GetFirmwareType(&firmware) || firmware != FirmwareTypeBios) { say("[X86_CSMWRAP] STOP: not booted in BIOS mode\r\n"); ExitProcess(2); }
     if (!load_target()) { say("[X86_CSMWRAP] STOP: usos-csmwrap-target.ini is invalid\r\n"); ExitProcess(3); }
@@ -345,6 +406,11 @@ void entry(void) {
         DWORD major = 0, minor = 0;
         if (arg_count == 5 && file_version(args[4], &major, &minor)) {
             modern_setup = major > 6 || (major == 6 && minor >= 2);
+            WCHAR drv[MAX_PATH]; DWORD dn = GetEnvironmentVariableW(L"USOS_NVME_DRIVERS", drv, MAX_PATH);
+            if (major == 6 && minor <= 1 && dn && dn < MAX_PATH) {
+                int i = 0; for (; drv[i] && i < MAX_PATH - 1; i++) nvme_drivers[i] = drv[i] < 128 ? (char)drv[i] : '_';
+                nvme_drivers[i] = 0;
+            }
             logn("Setup version major=", major); logn("Setup version minor=", minor);
         } else say("[X86_CSMWRAP] Setup version unknown; product key left as in the answer\r\n");
         drop_letters();

@@ -398,6 +398,13 @@ case "$nt3:$minor" in
     yes:51|yes:50|yes:10|:*) ;;
     *) fail "of the NT 3.x family only NT 3.51, 3.5 and 3.1 are supported so far (MinorVersion=${minor:-none})" ;;
 esac
+# NVMe target gate, before any write (docs/nvme-nt6-2026-10-12.md): NT 4.0
+# gets usosnvme below; the NT 3.x builds exist but are not wired yet.
+case "$TARGET_DEVICE" in /dev/nvme*)
+    nvme_lbs=$(cat "/sys/class/block/${TARGET_DEVICE##*/}/queue/logical_block_size" 2>/dev/null || echo unknown)
+    [ "$nvme_lbs" = 512 ] || fail "the NVMe target uses $nvme_lbs-byte sectors; Windows NT needs 512-byte sectors. No disk was changed"
+    [ -z "$nt3" ] || fail "no NVMe driver for Windows NT 3.x in this flow yet; pick a SATA disk. No disk was changed" ;;
+esac
 [ -z "${NT_MINOR:-}" ] || [ "$NT_MINOR" = "$minor" ] || fail "the ISO is Windows NT $major.$minor Setup, not the chosen NT $major.$NT_MINOR system"
 mbr_code=$LIB/xp-geometry-fix-mbr-440.bin
 [ -z "$nt3" ] || mbr_code=$LIB/nt3-e820-mbr-440.bin
@@ -700,8 +707,6 @@ EOF
 # polled) next to AHCINT. Only for an NVMe target, so a SATA install never
 # loads it (on a board without NVMe it would fail to start at every boot).
 case "$TARGET_DEVICE" in /dev/nvme*)
-    nvme_lbs=$(cat "/sys/class/block/${TARGET_DEVICE##*/}/queue/logical_block_size" 2>/dev/null || echo unknown)
-    [ "$nvme_lbs" = 512 ] || fail "the NVMe target uses $nvme_lbs-byte sectors; NT 4.0 needs 512-byte sectors"
     cp "$LIB/nt4/USOSNVME.SYS" "$usos/USOSNVME.SYS" || fail 'cannot copy USOSNVME.SYS'
     crlf >> "$usos/DRIVERS.REG" <<'EOF'
 
