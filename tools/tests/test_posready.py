@@ -82,6 +82,35 @@ class Payload(unittest.TestCase):
         import xp_driver_overlay
         self.assertNotIn("pci#cc_0604", repr(xp_driver_overlay.registry_rows()))
 
+    def test_reg_maps_the_input_chain_for_the_first_real_boot(self) -> None:
+        # X470 2026-10-12: no PS/2 and no USB input at the first boot. With
+        # the driver signing policy at "Warn" the server-side installs were
+        # blocked, so only CriticalDeviceDatabase devices got drivers. The
+        # rows are txtsetup.sif's [HardwareIdsDatabase] lines for these IDs.
+        reg = (ROOT / "tools" / "posready_x470.reg").read_bytes().decode("latin1")
+        cdd = "[HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\CriticalDeviceDatabase\\"
+        keyboard, mouse = "{4D36E96B-E325-11CE-BFC1-08002BE10318}", "{4D36E96F-E325-11CE-BFC1-08002BE10318}"
+        hid, usb, system = "{745A17A0-74D3-11D0-B6FE-00A0C90F57DA}", "{36FC9E60-C465-11CF-8056-444553540000}", \
+            "{4D36E97D-E325-11CE-BFC1-08002BE10318}"
+        expected = {
+            # PS/2: the ACPI PS/2 devices are children of the LPC bridge.
+            "pci#cc_0601": ("isapnp", system),
+            "*pnp0303": ("i8042prt", keyboard),
+            "*pnp030b": ("i8042prt", keyboard),
+            "*pnp0f13": ("i8042prt", mouse),
+            # USB: xHCI + root hub were already mapped; the HID chain was not.
+            "usb#composite": ("usbccgp", usb),
+            "usb#class_03&subclass_01&prot_01": ("hidusb", hid),
+            "usb#class_03&subclass_01&prot_02": ("hidusb", hid),
+            "usb#class_03": ("hidusb", hid),
+            "hid_device_system_keyboard": ("kbdhid", keyboard),
+            "hid_device_system_mouse": ("mouhid", mouse),
+            "pci#cc_0c0330": ("USBXHCI", usb),
+            "usb#root_hub30": ("USBHUB3", usb),
+        }
+        for hw, (svc, guid) in expected.items():
+            self.assertIn(f'{cdd}{hw}]\r\n"Service"="{svc}"\r\n"ClassGUID"="{guid}"\r\n', reg, hw)
+
     def test_scripts_are_crlf(self) -> None:
         for name in ("posready_first.cmd", "posready_logon.cmd", "posready_logon.reg", "posready_x470.reg"):
             data = (ROOT / "tools" / name).read_bytes()
