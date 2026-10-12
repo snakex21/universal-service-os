@@ -100,7 +100,7 @@ usos_w9x_csmwrap_prepare() {
     [ -f "$request" ] || stop 'the Windows 9x request is missing on the USOS ESP'
     : > "$W9X_DIR/prepare.log" 2>/dev/null || true
     [ -d /sys/firmware/efi ] || stop 'the Windows 9x preparation requires UEFI'
-    for helper in target_disk_identity.sh xp_confirmation_ui.sh xp_menu_ui.sh xp_disk_overview.sh xp_detect_system.sh w9x_csmwrap_target.sh dos_csmwrap_target.sh image_disk_target.sh xp_csmwrap_esp.sh; do
+    for helper in target_disk_identity.sh xp_confirmation_ui.sh xp_menu_ui.sh xp_disk_overview.sh xp_detect_system.sh w9x_csmwrap_target.sh dos_csmwrap_target.sh image_disk_target.sh uefi_boot_entry.sh xp_csmwrap_esp.sh; do
         [ -r "/usr/lib/usos/$helper" ] || stop "$helper is missing"
     done
     . /usr/lib/usos/target_disk_identity.sh
@@ -451,7 +451,7 @@ usos_w9x_csmwrap_prepare() {
     usos_ui_stage 4 5 'Preparing the disk' "Copying $folder Setup, the USOS helpers and CSMWrap to the selected disk." || true
     if [ -n "$img" ]; then
         usos_ui_stage 4 5 'Preparing the disk' "Writing the $folder image to the selected disk." || true
-        set -- env TARGET_DEVICE="$TARGET_DEVICE" IMAGE_SOURCE="/mnt/data/$iso" IMAGE_SYSTEM="$system" sh /usr/lib/usos/image_disk_target.sh
+        set -- env TARGET_DEVICE="$TARGET_DEVICE" IMAGE_SOURCE="/mnt/data/$iso" IMAGE_SYSTEM="$system" IMAGE_TITLE="$folder" sh /usr/lib/usos/image_disk_target.sh
     elif [ -n "$posr" ]; then
         set -- env TARGET_DEVICE="$TARGET_DEVICE" POSR_SOURCE_ISO="/mnt/data/$iso" POSR_UNATTENDED="$answer_inf" sh /usr/lib/usos/posready_csmwrap_target.sh
     elif [ -n "$nt4" ]; then

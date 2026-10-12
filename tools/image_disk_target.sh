@@ -9,14 +9,16 @@
 # its first bytes are a partition table. USOS writes it unchanged to the
 # start of $TARGET_DEVICE, then
 #   - GPT image: moves the backup GPT to the real disk end (sfdisk);
-#   - image with an EFI system partition: nothing else, the firmware boots
-#     the disk's own UEFI loader;
+#   - image with an EFI system partition: the firmware boots the disk's own
+#     UEFI loader;
 #   - MBR image without one (BIOS only): adds the CSMWrap ESP in a free MBR
 #     slot at the disk end (tools/xp_csmwrap_esp.sh), CSMWrap's SeaBIOS boots
 #     the disk as 0x80;
 #   - ReactOS / own BIOS image: the ELCR MBR in front of the image's MBR
 #     (kept at LBA 1), so PCI interrupts are level-triggered as on a real
 #     BIOS (ReactOS stops with 0x7B behind CSMWrap otherwise);
+#   - every image: a firmware boot entry named after the system, appended to
+#     BootOrder and set as BootNext (tools/uefi_boot_entry.sh, efivarfs);
 #   - FreeDOS FullUSB: SETUP.BAT -> SETUP.OFF so the disk starts into the
 #     FreeDOS prompt instead of the installer (which aborts on its own disk);
 #     the package repository stays on the disk (FDIMPLES).
@@ -163,15 +165,17 @@ case "$SYSTEM" in freedos) freedos_fix ;; esac
 sync
 blockdev --rereadpt "$TARGET_DEVICE" 2>/dev/null || true
 
-if [ "$mode" = csmwrap ] && [ "$(dd if="$TARGET_DEVICE" bs=1 skip=$((17 * 2048 + 7)) count=23 2>/dev/null)" = 'EL TORITO SPECIFICATION' ]; then
-    # Hybrid ISO (ReactOS): the UEFI partition driver (EDK2 OVMF, QEMU
-    # 2026-10-11) sees the El Torito boot record first, makes the whole disk
-    # a CD-ROM and never reads the MBR, so the CSMWrap ESP stays invisible.
+if [ "$gpt" = no ] && [ "$(dd if="$TARGET_DEVICE" bs=1 skip=$((17 * 2048 + 7)) count=23 2>/dev/null)" = 'EL TORITO SPECIFICATION' ]; then
+    # Hybrid ISO with an MBR (ReactOS, Haiku anyboot): the UEFI partition
+    # driver (EDK2 OVMF, QEMU 2026-10-11) sees the El Torito boot record
+    # first, makes the whole disk a CD-ROM and never reads the MBR, so the
+    # CSMWrap ESP stays invisible and the image's own ESP is no HD()
+    # partition the firmware boot entry (uefi_boot_entry.sh) could name.
     # On a hard disk the record has no use (CD boot only; the OS reads the
     # primary volume descriptor at sector 16): one byte of its identifier
     # changes, 'EL TORITO' -> 'XL TORITO'.
     printf 'X' | dd of="$TARGET_DEVICE" bs=1 seek=$((17 * 2048 + 7)) count=1 conv=notrunc,fsync 2>/dev/null || fail 'cannot hide the El Torito record'
-    log 'hybrid ISO: El Torito boot record hidden (UEFI sees the MBR and the CSMWrap ESP)'
+    log 'hybrid ISO: El Torito boot record hidden (UEFI sees the MBR and its EFI system partition)'
 fi
 if [ "$mode" = csmwrap ]; then
     TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=$ESP_TAIL sh "$LIB/xp_csmwrap_esp.sh" || fail 'the CSMWrap ESP could not be written'
@@ -206,4 +210,22 @@ if [ "$mode" = csmwrap ]; then
 fi
 sync
 blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true
+
+# Firmware boot entry named after the system (BootOrder + BootNext): the
+# restart after the flow starts this disk, and the entry stays in the
+# firmware boot menu (Haiku had none on the X470, 2026-10-12). Not fatal:
+# without it the firmware still finds \EFI\BOOT\BOOTX64.EFI by its
+# removable-media scan.
+if [ -r "$LIB/uefi_boot_entry.sh" ]; then
+    entry_log="$work/boot-entry.log"
+    if TARGET_DEVICE=$TARGET_DEVICE ENTRY_NAME="${IMAGE_TITLE:-$SYSTEM}" sh "$LIB/uefi_boot_entry.sh" add > "$entry_log" 2>&1; then
+        cat "$entry_log"
+        grep '^boot_entry=' "$entry_log" >> "$RESULT" || true
+    else
+        cat "$entry_log"
+        log 'no firmware boot entry written; the disk still starts through the firmware removable-media path'
+    fi
+else
+    log 'uefi_boot_entry.sh missing: no firmware boot entry'
+fi
 log "PASS target=$TARGET_DEVICE mode=$mode; next boot: $([ "$mode" = uefi ] && echo "the disk's own UEFI loader" || echo 'CSMWrap -> SeaBIOS -> the image MBR')"

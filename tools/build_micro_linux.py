@@ -488,6 +488,8 @@ def main() -> int:
             "kernel/fs/fat/fat.ko",
             "kernel/fs/fat/vfat.ko",
             "kernel/drivers/cdrom/cdrom.ko",
+            # efivarfs: firmware boot entries (tools/uefi_boot_entry.sh).
+            "kernel/fs/efivarfs/efivarfs.ko",
         ]
         selected_modules = module_dependency_closure(
             dependencies, runtime_roots + legacy_ata_roots
@@ -582,6 +584,7 @@ def main() -> int:
             ("tools/w9x_phase1_qemu.sh", "usr/lib/usos/w9x_phase1_qemu.sh"),
             ("tools/dos_csmwrap_target.sh", "usr/lib/usos/dos_csmwrap_target.sh"),
             ("tools/image_disk_target.sh", "usr/lib/usos/image_disk_target.sh"),
+            ("tools/uefi_boot_entry.sh", "usr/lib/usos/uefi_boot_entry.sh"),
             ("tools/nt4_csmwrap_target.sh", "usr/lib/usos/nt4_csmwrap_target.sh"),
             ("tools/nt4_qemu_install.sh", "usr/lib/usos/nt4_qemu_install.sh"),
             ("tools/posready_csmwrap_target.sh", "usr/lib/usos/posready_csmwrap_target.sh"),
