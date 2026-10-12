@@ -1177,7 +1177,7 @@ static int bulk_xfer(DEV *d, int in, ULONG pa, ULONG len, ULONG *got, ULONG ms)
         hc_poll(hc);
         if (d->blk_done)
             break;
-        if (++spins < 4000) {           /* about 20 ms busy, then 1 ms sleeps */
+        if (++spins < 400) {            /* about 2 ms busy, then 1 ms sleeps */
             KeStallExecutionProcessor(5);
             continue;
         }
@@ -1391,12 +1391,16 @@ static void vol_create(DEV *d, ULONG start, ULONG count, UCHAR ptype, UCHAR boot
     mount_queue(v, 1);
 }
 
-/* GPT stick (protective MBR): one volume per partition, Microsoft reserved
-   skipped; at most 4 (the USOS stick: ESP, DATA, WORK). 32-bit LBAs. */
+/* GPT stick (protective MBR): one volume per partition; Microsoft reserved,
+   EFI system partitions (Windows gives them no letter either; keeps the
+   USOS stick's ESP away from the file system) and "no drive letter" /
+   hidden entries skipped; at most 4 (the USOS stick: DATA, WORK). 32-bit LBAs. */
 static void gpt_volumes(DEV *d)
 {
     static const UCHAR msr[16] = { 0x16, 0xE3, 0xC9, 0xE3, 0x5C, 0x0B, 0xB8, 0x4D,
                                    0x81, 0x7D, 0xF9, 0x2D, 0xF0, 0x02, 0x15, 0xAE };
+    static const UCHAR esp[16] = { 0x28, 0x73, 0x2A, 0xC1, 0x1F, 0xF8, 0xD2, 0x11,
+                                   0xBA, 0x4B, 0x00, 0xA0, 0xC9, 0x3E, 0xC9, 0x3B };
     UCHAR *h = g_bva, *e;
     ULONG elba, n, esz, sig, i, secs;
     if (!NT_SUCCESS(scsi_rw(d, 0, 1, 1)) || RtlCompareMemory(h, "EFI PART", 8) != 8)
@@ -1418,7 +1422,8 @@ static void gpt_volumes(DEV *d)
         for (k = 0; k < 16; k++)
             if (e[k])
                 zero = 0;
-        if (zero || RtlCompareMemory(e, msr, 16) == 16)
+        if (zero || RtlCompareMemory(e, msr, 16) == 16 || RtlCompareMemory(e, esp, 16) == 16 ||
+            (e[55] & 0xC0))                 /* attribute bits 63 (no drive letter), 62 (hidden) */
             continue;
         first = le32(e + 32);
         last = le32(e + 40);
@@ -1450,8 +1455,11 @@ static void msc_attach(DEV *d)
     RtlZeroMemory(cdb, sizeof(cdb));
     cdb[0] = 0x12;                                  /* INQUIRY */
     cdb[4] = 36;
-    for (i = 0; i < 3 && r != 0; i++)
+    for (i = 0; i < 3 && r != 0; i++) {
+        if (i)
+            delay_ms(100);
         r = bot_cmd(d, cdb, 6, 1, d->bufpa + SNS_OFF, 36, &got);
+    }
     if (r != 0 || (b[0] & 0x1F) != 0) {
         diag_add(L"(inq%d/%x)", (ULONG)r, b[0], 0, 0);
         return;
@@ -1517,7 +1525,7 @@ static void msc_attach(DEV *d)
             const UCHAR *e = s + 446 + i * 16;
             ULONG st = le32(e + 8), n = le32(e + 12);
             UCHAR t = e[4];
-            if (!t || t == 0x05 || t == 0x0F || t == 0x85 || t == 0xEE || !st || !n || st >= d->blocks)
+            if (!t || t == 0x05 || t == 0x0F || t == 0x85 || t == 0xEE || t == 0xEF || !st || !n || st >= d->blocks)
                 continue;
             if (n > d->blocks - st)
                 n = d->blocks - st;
@@ -1529,6 +1537,19 @@ static void msc_attach(DEV *d)
     diag_add(L"(%uM wp%u %uv)", d->blocks >> 11, d->wp, d->nvol, 0);
 }
 
+/* A stick that went away behaves like removed media: the file system gets
+   STATUS_VERIFY_REQUIRED (DO_VERIFY_VOLUME), its verify read fails and it
+   dismounts the volume, instead of retrying its write-behind for ever. */
+static NTSTATUS vol_gone_status(VOL *v, PIO_STACK_LOCATION s, PIRP irp)
+{
+    if ((v->dobj->Flags & DO_VERIFY_VOLUME) && !(s->Flags & SL_OVERRIDE_VERIFY_VOLUME)) {
+        if (irp->Tail.Overlay.Thread)
+            IoSetHardErrorOrVerifyDevice(irp, v->dobj);
+        return STATUS_VERIFY_REQUIRED;
+    }
+    return STATUS_NO_MEDIA_IN_DEVICE;
+}
+
 /* worker: the stick went away (unplug, enumeration failure) */
 static void msc_detach(DEV *d)
 {
@@ -1538,6 +1559,7 @@ static void msc_detach(DEV *d)
         if (!v)
             continue;
         InterlockedExchange((PLONG)&v->gone, 1);
+        v->dobj->Flags |= DO_VERIFY_VOLUME;
         v->d = NULL;
         d->vol[i] = NULL;
         mount_queue(v, 0);
@@ -1559,7 +1581,7 @@ static void msc_irp(PIRP irp)
     DEV *d = v->d;
     irp->IoStatus.Information = 0;
     if (v->gone || !d || !d->used)
-        st = STATUS_NO_MEDIA_IN_DEVICE;
+        st = vol_gone_status(v, s, irp);
     else if ((((ULONG)off | len) & 511) || (off >> 9) + (len >> 9) > v->count)
         st = STATUS_INVALID_PARAMETER;
     else if (wr && d->wp)
@@ -1575,14 +1597,29 @@ static void msc_irp(PIRP irp)
     IoCompleteRequest(irp, IO_DISK_INCREMENT);
 }
 
+/* The worker keeps LOW_REALTIME_PRIORITY (HID input must not wait behind a
+   busy desktop), so a long copy rests one timer tick every 30 ms: the busy
+   waits of a fast stick must not starve the other threads of that CPU. */
 static void msc_service(void)
 {
+    static LONGLONG rest;
     PLIST_ENTRY e;
-    while ((e = ExInterlockedRemoveHeadList(&g_q, &g_qlock)) != NULL)
+    while ((e = ExInterlockedRemoveHeadList(&g_q, &g_qlock)) != NULL) {
+        LONGLONG t = now_ms();
+        if (t - rest > 30) {
+            if (rest && t - rest < 1000) {
+                ULONG i;
+                delay_ms(1);
+                for (i = 0; i < (ULONG)g_nhc; i++)
+                    hc_poll(&g_hc[i]);
+            }
+            rest = now_ms();
+        }
         msc_irp(CONTAINING_RECORD(e, IRP, Tail.Overlay.ListEntry));
+    }
 }
 
-static NTSTATUS vol_ioctl(VOL *v, PIO_STACK_LOCATION s, PVOID sb, ULONG_PTR *info)
+static NTSTATUS vol_ioctl(VOL *v, PIO_STACK_LOCATION s, PIRP irp, PVOID sb, ULONG_PTR *info)
 {
     ULONG outl = s->Parameters.DeviceIoControl.OutputBufferLength;
     LONGLONG bytes = (LONGLONG)v->count << 9;
@@ -1685,7 +1722,7 @@ static NTSTATUS vol_ioctl(VOL *v, PIO_STACK_LOCATION s, PVOID sb, ULONG_PTR *inf
     case IOCTL_STORAGE_CHECK_VERIFY:
     case IOCTL_STORAGE_CHECK_VERIFY2:
         if (v->gone)
-            return STATUS_NO_MEDIA_IN_DEVICE;
+            return vol_gone_status(v, s, irp);
         if (outl >= sizeof(ULONG)) {
             *(PULONG)sb = 0;                        /* media change count */
             *info = sizeof(ULONG);
@@ -1720,7 +1757,7 @@ static NTSTATUS vol_dispatch(PDEVICE_OBJECT dobj, PIRP irp)
     case IRP_MJ_READ:
     case IRP_MJ_WRITE:
         if (v->gone) {
-            st = STATUS_NO_MEDIA_IN_DEVICE;
+            st = vol_gone_status(v, s, irp);
             break;
         }
         if (!s->Parameters.Read.Length)
@@ -1730,7 +1767,7 @@ static NTSTATUS vol_dispatch(PDEVICE_OBJECT dobj, PIRP irp)
         KeSetEvent(&g_wake, 0, FALSE);
         return STATUS_PENDING;
     case IRP_MJ_DEVICE_CONTROL:
-        st = vol_ioctl(v, s, irp->AssociatedIrp.SystemBuffer, &info);
+        st = vol_ioctl(v, s, irp, irp->AssociatedIrp.SystemBuffer, &info);
         break;
     default:                    /* create, close, cleanup, flush, shutdown */
         break;
@@ -1893,9 +1930,29 @@ static void mnt_arrive(VOL *v)
     msc_note(set ? L"%s:%x+%c " : L"%s:%x=%c ", (ULONG_PTR)(v->name + 8), (ULONG)st, c ? c : L'-');
 }
 
+/* Make the file system notice the removal now: a volume open runs its
+   verify (DO_VERIFY_VOLUME is set), which fails, so it dismounts. */
+static void vol_kick(VOL *v)
+{
+    UNICODE_STRING us;
+    OBJECT_ATTRIBUTES oa;
+    IO_STATUS_BLOCK io;
+    HANDLE h;
+    us.Buffer = v->name;
+    us.Length = v->namelen;
+    us.MaximumLength = sizeof(v->name);
+    InitializeObjectAttributes(&oa, &us, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, NULL);
+    if (NT_SUCCESS(ZwCreateFile(&h, FILE_READ_DATA | SYNCHRONIZE, &oa, &io, NULL, 0,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, FILE_OPEN,
+                                FILE_SYNCHRONOUS_IO_NONALERT, NULL, 0)))
+        ZwClose(h);
+}
+
 static void mnt_remove(VOL *v)
 {
-    NTSTATUS st = mm_ioctl(IOCTL_MOUNTMGR_DELETE_POINTS, g_mmbuf, mm_point(v), g_mmout, sizeof(g_mmout));
+    NTSTATUS st;
+    vol_kick(v);
+    st = mm_ioctl(IOCTL_MOUNTMGR_DELETE_POINTS, g_mmbuf, mm_point(v), g_mmout, sizeof(g_mmout));
     msc_note(L"%s:gone%x ", (ULONG_PTR)(v->name + 8), (ULONG)st, 0);
     v->letter = 0;
 }
@@ -1903,6 +1960,7 @@ static void mnt_remove(VOL *v)
 static VOID mount_thread(PVOID ctx)
 {
     UNREFERENCED_PARAMETER(ctx);
+    IoSetThreadHardErrorMode(FALSE);    /* no "insert a disk" pop-ups for a stick that is gone */
     for (;;) {
         VOL *v;
         UCHAR op = 0;

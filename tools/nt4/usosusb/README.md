@@ -112,9 +112,11 @@ descriptions.
   REQUEST SENSE (up to about 10 s), READ CAPACITY(10) (512-byte sectors only,
   up to 2 TiB), MODE SENSE(6) for the write-protect bit. Then LBA 0: a
   superfloppy (boot sector at LBA 0) is one volume; an MBR gives one volume per
-  primary partition; a protective MBR leads to the GPT entries (Microsoft
-  reserved skipped). At most 4 volumes per stick, so the USOS stick shows ESP,
-  DATA and WORK.
+  primary partition; a protective MBR leads to the GPT entries. EFI system
+  partitions (GPT type or MBR EFh), Microsoft reserved and GPT entries marked
+  "no drive letter" / hidden get no volume, as in Windows itself (so the USOS
+  stick shows DATA and WORK, its ESP stays untouched). At most 4 volumes per
+  stick.
 * Transfers: CBW / data / CSW as single-TRB TDs through a 64 KiB bounce
   buffer (READ(10) / WRITE(10) of up to 128 sectors), reset recovery
   (class reset + CLEAR_FEATURE(HALT)) after a transport error, up to 4
