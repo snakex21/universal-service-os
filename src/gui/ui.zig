@@ -1158,14 +1158,31 @@ test "pad hint keys draw as controller glyphs, other keys as key caps" {
     }
 }
 
-/// See Ui.textOn.
+/// See Ui.textOn. Contrast with linear light approximated as the squared
+/// channel (no 1 KiB sRGB table: this toolkit is also in the size-capped
+/// Legacy BIOS Core) and a margin (5.0 instead of 4.5); the real WCAG ratio
+/// for the bus colours in every built-in theme is checked by the tests
+/// (src/platform/linux/fb_disk_badge.zig).
 pub fn readableOn(theme: Theme, fill: Color) Color {
-    const contrast = @import("theme_contrast.zig");
-    const a = contrast.ratio10(theme.text, fill);
-    const b = contrast.ratio10(theme.background, fill);
-    const best = if (a >= b) theme.text else theme.background;
-    if (@max(a, b) >= 45) return best;
     const white = Color{ .r = 0xff, .g = 0xff, .b = 0xff };
     const black = Color{ .r = 0, .g = 0, .b = 0 };
-    return if (contrast.ratio10(white, fill) >= contrast.ratio10(black, fill)) white else black;
+    const a = roughRatio10(theme.text, fill);
+    const b = roughRatio10(theme.background, fill);
+    if (@max(a, b) >= 50) return if (a >= b) theme.text else theme.background;
+    return if (roughRatio10(white, fill) >= roughRatio10(black, fill)) white else black;
+}
+
+fn roughRatio10(x: Color, y: Color) u64 {
+    const lum = struct {
+        fn of(c: Color) u64 {
+            const r: u64 = c.r;
+            const g: u64 = c.g;
+            const b: u64 = c.b;
+            return 2126 * r * r + 7152 * g * g + 722 * b * b;
+        }
+    }.of;
+    const flare: u64 = 10000 * 65025 / 20;
+    const p = lum(x) + flare;
+    const q = lum(y) + flare;
+    return @max(p, q) * 10 / @min(p, q);
 }
