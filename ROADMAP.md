@@ -148,6 +148,8 @@ Status: profile katalogu istnieją; instalacje wymagają osobnej pracy.
   (Haiku, FreeBSD, KolibriOS, FreeDOS, własny obraz; QEMU PASS). Odłożone:
   ReactOS za CSMWrap (0x7B w QEMU), TempleOS (tylko IDE), instalacja FreeBSD
   bez drugiego dysku (bsdinstall w VM), wejście USB w KolibriOS/ReactOS (brak xHCI).
+  Partia 2 (2026-10-12): OpenBSD, NetBSD, 9front, Redox (QEMU, USB-only
+  wejście); ZealOS/MINIX/AROS/OpenIndiana nie (szczegóły w sekcji 6).
 
 ## Proponowana kolejność
 

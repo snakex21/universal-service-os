@@ -117,6 +117,10 @@ var otherProfiles = []dataProfile{
 	{"freebsd", "FreeBSD", false, false},
 	{"reactos", "ReactOS", false, false},
 	{"kolibrios", "KolibriOS", false, false},
+	{"openbsd", "OpenBSD", false, false},
+	{"netbsd", "NetBSD", false, false},
+	{"9front", "9front", false, false},
+	{"redox", "Redox", false, false},
 	{"other-os", "Other", false, false},
 }
 

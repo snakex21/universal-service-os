@@ -337,7 +337,7 @@
   "boot.category.dos.desc": "Systémy DOS a staršie zavádzacie obrazy",
   "boot.category.utilities.desc": "Nástroje na diagnostiku, obnovu a firmvér",
   "boot.category.others": "Iné systémy",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS a vlastné obrazy",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS a vlastné obrazy",
   "boot.category.power.desc": "Reštart, vypnutie alebo nastavenie firmvéru",
   "boot.systems.subtitle": "Vyberte systém, distribúciu alebo skupinu nástrojov",
   "boot.system.ready": "Pripravené",

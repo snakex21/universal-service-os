@@ -337,7 +337,7 @@
   "boot.category.dos.desc": "DOS sistēmas un mantotie sāknēšanas attēli",
   "boot.category.utilities.desc": "Diagnostikas, atkopšanas un aparātprogrammatūras rīki",
   "boot.category.others": "Citas sistēmas",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS un savi attēli",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS un savi attēli",
   "boot.category.power.desc": "Restartēt, izslēgt vai atvērt aparātprogrammatūras iestatījumus",
   "boot.systems.subtitle": "Izvēlieties sistēmu, distribūciju vai rīku grupu",
   "boot.system.ready": "Gatavs",

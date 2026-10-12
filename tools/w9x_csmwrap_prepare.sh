@@ -155,7 +155,7 @@ usos_w9x_csmwrap_prepare() {
         windows-embedded-posready-2009) tag=POSR setup='' ;;
         # Custom OS (2026-10-11, docs/custom-os-2026-10-11.md): the official
         # hybrid image written to the disk (tools/image_disk_target.sh).
-        haiku|freebsd|reactos|kolibrios|other-os|freedos) tag=IMG setup='' ;;
+        haiku|freebsd|reactos|kolibrios|openbsd|netbsd|9front|redox|other-os|freedos) tag=IMG setup='' ;;
         *) stop "request.ini names an unsupported system: $system" ;;
     esac
     w9x_csmwrap_log "REQUEST system=$system iso=$iso folder=$folder answer=${answer%%:*} size=$size_gib"
