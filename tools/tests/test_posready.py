@@ -68,6 +68,20 @@ class Payload(unittest.TestCase):
         import posready_reg
         self.assertEqual((ROOT / "tools" / "posready_x470.reg").read_bytes(), posready_reg.render())
 
+    def test_reg_maps_pci_bridges_for_the_first_real_boot(self) -> None:
+        # The FBA CriticalDeviceDatabase only knows the i440FX VM. Without
+        # PCI\CC_0604 -> pci the X470 SATA controllers (behind PCI-to-PCI
+        # bridges) never reach GenAHCI: 0x7B on the first X470 boot (2026-10-12).
+        reg = (ROOT / "tools" / "posready_x470.reg").read_bytes().decode("latin1")
+        cdd = "[HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\CriticalDeviceDatabase\\"
+        self.assertIn(cdd + 'pci#cc_0604]\r\n"Service"="pci"\r\n'
+                      '"ClassGUID"="{4D36E97D-E325-11CE-BFC1-08002BE10318}"\r\n', reg)
+        self.assertIn(cdd + 'pci#cc_010601]\r\n"Service"="genahci"\r\n', reg)
+        self.assertIn('"Start"=dword:00000000', reg.split("Services\\genahci]", 1)[1].split("[", 1)[0])
+        # The XP overlay rows stay untouched (XP bundle ids must not move).
+        import xp_driver_overlay
+        self.assertNotIn("pci#cc_0604", repr(xp_driver_overlay.registry_rows()))
+
     def test_scripts_are_crlf(self) -> None:
         for name in ("posready_first.cmd", "posready_logon.cmd", "posready_logon.reg", "posready_x470.reg"):
             data = (ROOT / "tools" / name).read_bytes()

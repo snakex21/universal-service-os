@@ -85,3 +85,7 @@ REGEDIT4
 [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CriticalDeviceDatabase\usb#usb20_hub]
 "Service"="USBHUB3"
 "ClassGUID"="{36FC9E60-C465-11CF-8056-444553540000}"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CriticalDeviceDatabase\pci#cc_0604]
+"Service"="pci"
+"ClassGUID"="{4D36E97D-E325-11CE-BFC1-08002BE10318}"
