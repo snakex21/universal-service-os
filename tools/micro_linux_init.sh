@@ -76,13 +76,31 @@ enable_emergency_input() {
     mdev -s 2>/dev/null || true
 }
 
+# Every write onto the stick ESP goes through usos_stick_write: the ESP is
+# read-only during waits and VM loops (tools/stick_write.sh,
+# tools/tests/test_esp_writes_helper.py).
+if [ -r /usr/lib/usos/stick_write.sh ]; then
+    . /usr/lib/usos/stick_write.sh
+else
+    usos_stick_write() { "$@"; }
+fi
+
 persist_legacy_xp_stop() {
     reason=$1
     case "${LEGACY_ACTION:-}" in xp-staging|windows2000-staging|windows2003-staging|xp64-staging) ;; *) return 0 ;; esac
     [ -r /proc/mounts ] || return 0
     awk '$2 == "/mnt/esp" { found=1 } END { exit(found ? 0 : 1) }' /proc/mounts || return 0
     [ -d /mnt/esp/EFI/USOS ] || return 0
+    # stop() also runs while the ESP is read-only (a menu wait, X470
+    # 2026-10-12): the record goes through usos_stick_write.
     error_file=${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/legacy-xp-staging-last-error.txt
+    usos_stick_write persist_legacy_xp_stop_write "$error_file" "$reason" || return 0
+    printf '[MICRO-LINUX] persisted Legacy XP failure to %s\n' "${error_file#/mnt/esp/}"
+}
+
+persist_legacy_xp_stop_write() {
+    error_file=$1
+    reason=$2
     tmp_file="$error_file.tmp"
     {
         printf '[LEGACY_XP_FAILURE]\n'
@@ -96,10 +114,8 @@ persist_legacy_xp_stop() {
         fi
         printf '%s\n' '--- block inventory ---'
         lsblk -bdnpo NAME,TYPE,MODEL,SERIAL,SIZE,PTTYPE,RM,RO 2>/dev/null || true
-    } > "$tmp_file" 2>/dev/null || return 0
-    mv "$tmp_file" "$error_file" 2>/dev/null || return 0
-    sync
-    printf '[MICRO-LINUX] persisted Legacy XP failure to %s\n' "${error_file#/mnt/esp/}"
+    } > "$tmp_file" 2>/dev/null || return 1
+    mv "$tmp_file" "$error_file" 2>/dev/null
 }
 
 stop() {
