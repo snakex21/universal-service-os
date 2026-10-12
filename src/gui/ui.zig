@@ -765,7 +765,7 @@ pub const Ui = struct {
                 right = self.badgeRight(right, center_y, badge, fill) -| self.px(12);
             }
         }
-        var chip_index = if (solid_chips) item.chips.len else 0;
+        var chip_index: usize = if (solid_chips) item.chips.len else 0;
         while (chip_index > 0) {
             chip_index -= 1;
             const chip = item.chips[chip_index];
