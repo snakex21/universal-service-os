@@ -37,7 +37,7 @@ class Binary(unittest.TestCase):
 
     def test_nt6_variant(self):
         data = SYS.read_bytes()
-        self.assertIn('usosusb 1.0-nt6'.encode('utf-16-le'), data)
+        self.assertIn('usosusb 1.1-nt6'.encode('utf-16-le'), data)
         self.assertIn(b'HalGetBusDataByOffset', data)      # PCI through the HAL lock
         for name in (b'_snwprintf', b'__security_check_cookie', b'IoRegisterPlugPlayNotification', b'usbd.sys'):
             self.assertNotIn(name, data)
@@ -52,6 +52,41 @@ class Binary(unittest.TestCase):
         # NT 4.0 / 3.1 builds keep the CF8h/CFCh access and the ENABLE gate.
         self.assertRegex(text, r'#else\n/\* PCI configuration mechanism 1')
         self.assertIn('return x->enabled > 0;', text)
+
+
+class MassStorage(unittest.TestCase):
+    """USB sticks (bulk-only transport) as removable volumes, NT6 build only."""
+
+    def test_binary_has_volume_path(self):
+        data = SYS.read_bytes()
+        for s in ('\\Device\\UsosUsbDisk%u', '\\Device\\MountPointManager', 'Msc',
+                  '\\Registry\\Machine\\SYSTEM\\MountedDevices'):
+            self.assertIn(s.encode('utf-16-le'), data, s)
+        _, imports = pe(SYS)
+        names = {fn for _, fn in imports}
+        for fn in ('IoBuildDeviceIoControlRequest', 'IoGetDeviceObjectPointer', 'MmMapLockedPagesSpecifyCache',
+                   'ExfInterlockedInsertTailList', 'ExfInterlockedRemoveHeadList', 'ZwOpenSymbolicLinkObject'):
+            self.assertIn(fn, names)
+
+    def test_source_bot_and_scsi(self):
+        text = SRC.read_text(encoding='utf-8')
+        self.assertIn('#define USOSUSB_MSC 1', text)
+        # only the NT6 block defines it
+        self.assertLess(text.index('defined(USOSUSB_NT6)'), text.index('#define USOSUSB_MSC 1'))
+        self.assertLess(text.index('#define USOSUSB_MSC 1'), text.index('#define USOSUSB_VERSION L"usosusb 1.0-nt4"'))
+        for needle in ('0x43425355', '0x53425355',            # CBW / CSW signatures
+                       'b[off + 5] == 8 && b[off + 6] == 6 && b[off + 7] == 0x50',   # class 08/06/50
+                       "cdb[0] = (UCHAR)(wr ? 0x2A : 0x28);",  # WRITE(10) / READ(10)
+                       'cdb[0] = 0x25;', 'cdb[0] = 0x12;', 'cdb[0] = 0x1A;', 'cdb[0] = 0x03;',
+                       'FILE_REMOVABLE_MEDIA', 'IOCTL_MOUNTMGR_VOLUME_ARRIVAL_NOTIFICATION',
+                       'IOCTL_MOUNTMGR_CREATE_POINT', 'IOCTL_MOUNTMGR_DELETE_POINTS'):
+            self.assertIn(needle, text)
+
+    def test_nt4_builds_keep_the_old_path(self):
+        # the committed NT 4.0 / 3.1 binaries carry no storage code
+        for rel in ('bin/i386/usosusb.sys', 'bin/nt31/i386/usosusb.sys'):
+            data = (DRV / rel).read_bytes()
+            self.assertNotIn('UsosUsbDisk'.encode('utf-16-le'), data)
 
 
 class Flow(unittest.TestCase):
