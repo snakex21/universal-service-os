@@ -140,6 +140,13 @@ class UsosReg(unittest.TestCase):
         self.assertEqual(self.hdr['subsys_ver'], (4, 0))
         self.assertNotEqual(self.hdr['checksum'], 0)
 
+    def test_no_sse_instructions(self):
+        # NT 4.0 never enables SSE: a movaps (0f 28 / 0f 29) faulted with
+        # c000001d in QEMU (2026-10-12); the build targets i586.
+        data = self.exe.read_bytes()
+        self.assertNotIn(b'\x0f\x28', data)
+        self.assertNotIn(b'\x0f\x29', data)
+
     def test_imports_only_nt4_functions(self):
         self.assertEqual(set(self.imports), set(NT4_ALLOWED))
         for dll, funcs in self.imports.items():

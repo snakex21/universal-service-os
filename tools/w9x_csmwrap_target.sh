@@ -212,11 +212,13 @@ for file in "$setup_dir"/*; do
 done
 [ -f "$work/c/$SETUP_FOLDER/SETUP.EXE" ] || fail 'SETUP.EXE was not copied'
 log "setup folder copied: $copied files"
-cp "$ANSWER_INF" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot copy MSBATCH.INF'
 for file in "$HELPERS"/*; do
     [ -f "$file" ] || continue
     cp "$file" "$work/c/USOS9X/$(basename "$file" | tr '[:lower:]' '[:upper:]')" || fail "cannot copy $(basename "$file")"
 done
+# After the helpers: they include the USOS default MSBATCH.INF, which must
+# not replace the chosen answer (a rendered profile or the user's file).
+cp "$ANSWER_INF" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot copy MSBATCH.INF'
 for name in INSTALL.BAT PATCH9X.EXE CWSDPMI.EXE; do
     cp "$PATCH/$name" "$work/c/USOS9X/$name" || fail "cannot copy $name"
 done

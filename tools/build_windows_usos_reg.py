@@ -41,7 +41,7 @@ def build(root: Path, output: Path) -> Path:
     env['ZIG_LOCAL_CACHE_DIR'] = str(output / 'zig-cache')
     include = zig.parent / 'lib/libc/include/any-windows-any'
     exe = output / NAME
-    subprocess.run([str(zig), 'cc', '-target', 'x86-windows-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
+    subprocess.run([str(zig), 'cc', '-target', 'x86-windows-gnu', '-mcpu=i586', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
                     '-I' + str(include), str(root / 'tools/windows_usos_reg.c'),
                     '-Wl,--entry,entry', '-Wl,--subsystem,console', '-lkernel32', '-ladvapi32', '-o', str(exe)],
                    env=env, check=True)
