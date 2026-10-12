@@ -23,8 +23,41 @@ OUT = ROOT / "tools" / "posready_x470.reg"
 # without it the X470 bridges in front of the SATA controllers get no boot
 # driver, GenAHCI never sees its controller and the first real boot stops with
 # 0x7B INACCESSIBLE_BOOT_DEVICE (X470, 2026-10-12).
+SYSTEM = "4D36E97D-E325-11CE-BFC1-08002BE10318"
+KEYBOARD = "4D36E96B-E325-11CE-BFC1-08002BE10318"
+MOUSE = "4D36E96F-E325-11CE-BFC1-08002BE10318"
+USB = "36FC9E60-C465-11CF-8056-444553540000"
+HIDCLASS = "745A17A0-74D3-11D0-B6FE-00A0C90F57DA"
+#
+# The input chain needs the same: on the first X470 boot (2026-10-12) no
+# keyboard or mouse worked. The driver signing policy is "Warn", so every
+# server-side PnP install that needs the System/Keyboard/Mouse class installer
+# (syssetup.dll, 0x800b0100) or an INF without a catalog (usbxhci.inf) was
+# blocked and left for a Found New Hardware wizard nobody can answer without
+# input. Only devices with a CriticalDeviceDatabase entry got a driver:
+#   PS/2: the ACPI PS/2 devices are children of the LPC bridge (PCI\CC_0601);
+#         with no service for it they are never enumerated.
+#   USB:  xHCI and the root hub came up (pci#cc_0c0330, usb#root_hub30), but
+#         the keyboard and mouse stayed without a driver (no usb#class_03 /
+#         usb#composite entry).
+# These rows are txtsetup.sif's [HardwareIdsDatabase] lines for the same IDs.
 POSREADY_CDD = [
-    (r"pci#cc_0604", "pci", "4D36E97D-E325-11CE-BFC1-08002BE10318"),
+    (r"pci#cc_0604", "pci", SYSTEM),
+    (r"pci#cc_0601", "isapnp", SYSTEM),
+    (r"pci#cc_0602", "isapnp", SYSTEM),
+    (r"*pnp0303", "i8042prt", KEYBOARD),
+    (r"*pnp030b", "i8042prt", KEYBOARD),
+    (r"ps2_keyboard", "i8042prt", KEYBOARD),
+    (r"*pnp0f13", "i8042prt", MOUSE),
+    (r"ps2_mouse", "i8042prt", MOUSE),
+    (r"usb#composite", "usbccgp", USB),
+    (r"usb#class_09", "usbhub", USB),
+    (r"usb#class_03&subclass_01&prot_01", "hidusb", HIDCLASS),
+    (r"usb#class_03&subclass_01&prot_02", "hidusb", HIDCLASS),
+    (r"usb#class_03&subclass_01", "hidusb", HIDCLASS),
+    (r"usb#class_03", "hidusb", HIDCLASS),
+    (r"hid_device_system_keyboard", "kbdhid", KEYBOARD),
+    (r"hid_device_system_mouse", "mouhid", MOUSE),
 ]
 
 
