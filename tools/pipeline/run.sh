@@ -62,7 +62,7 @@ usos_pipeline_steps() {
         vista-x64-sp2-uefi-csmwrap) printf '610' ;;
         w9x-uefi-csmwrap) printf '620' ;;
         windows-pe-bios-iso) printf '500 200' ;;
-        iso-work-chainload|wim-wimboot|vhd-vhdboot) printf '200' ;;
+        iso-work-chainload|win81-bios-chainload|wim-wimboot|vhd-vhdboot) printf '200' ;;
         *) return 1 ;;
     esac
 }
@@ -83,7 +83,7 @@ usos_pipeline_step_name() {
 # The selected_method the menu persists for a WORK profile (Backend.method()).
 usos_pipeline_work_method() {
     case "$1" in
-        iso-work-chainload) printf 'chainload' ;;
+        iso-work-chainload|win81-bios-chainload) printf 'chainload' ;;
         wim-wimboot) printf 'wimboot' ;;
         vhd-vhdboot) printf 'vhdboot' ;;
         *) return 1 ;;
