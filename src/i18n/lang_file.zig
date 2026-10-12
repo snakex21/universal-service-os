@@ -353,6 +353,8 @@ test "reverse lookup translates catalog and script English, including templates"
     try std.testing.expectEqualStrings("12 z 40 plików", table.translate(&buffer, "12 of 40 files"));
     try std.testing.expectEqualStrings("WINDOWS XP - wybierz dysk", table.translate(&buffer, "WINDOWS XP - SELECT DISK"));
     try std.testing.expectEqualStrings("Automatycznie (ISO)", table.translate(&buffer, "Automatic (ISO)"));
+    // Disk type line of the confirmation screens (tools/target_disk_identity.sh).
+    try std.testing.expectEqualStrings("Typ: SATA SSD", table.translate(&buffer, "Type: SATA SSD"));
     try std.testing.expectEqualStrings("not a catalog string", table.translate(&buffer, "not a catalog string"));
     // System entry names go through view.tr: the own-image entry translates,
     // product names stay as they are (src/catalog/other_systems.zig).

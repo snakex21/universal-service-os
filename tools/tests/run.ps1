@@ -59,10 +59,12 @@ function Run-Unit {
     Invoke-Step 'zig test memtest_image.zig' { Run-Zig @('test', 'src/platform/bios/memtest_image.zig', '--cache-dir', $zigCache) }
     Invoke-Step 'zig test dos_fat.zig' { Run-Zig @('test', 'src/platform/bios/dos_fat.zig', '--cache-dir', $zigCache) }
     Invoke-Step 'zig test linux_boot_params.zig' { Run-Zig @('test', '--dep', 'graphics', '-Mroot=src/platform/bios/linux_boot_params.zig', '-Mgraphics=src/legacy_graphics_module.zig', '--cache-dir', $zigCache) }
+    Invoke-Step 'zig test edd_interface.zig' { Run-Zig @('test', 'src/platform/bios/edd_interface.zig', '--cache-dir', $zigCache) }
     # M0 golden fingerprints (docs/design/refactor-os-pipeline.md): staged
     # micro-Linux/XP/WinPE payloads and WINNT.SIF of the last build.
     Invoke-PythonStep 'tools/tests/golden/staged_payloads.py' 'Staged payload goldens differ (see tools/tests/artifacts/golden).'
     Invoke-PythonStep 'tools/tests/legacy_bios/test_hardware_smart.py' 'Hardware SMART tests failed.'
+    Invoke-PythonStep 'tools/tests/test_disk_type_labels.py' 'Disk type label tests failed.'
     Invoke-PythonStep 'tools/tests/legacy_bios/test_legacy_rgba_rle.py' 'Legacy icon compression tests failed.'
     Invoke-PythonStep 'tools/tests/legacy_bios/test_windows3_media.py' 'Windows 3.x media conversion tests failed.'
     Invoke-PythonStep 'tools/tests/test_dos_batch_labels.py' 'MS-DOS batch label / Windows 3.x flow tests failed.'

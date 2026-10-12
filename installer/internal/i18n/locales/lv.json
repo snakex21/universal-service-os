@@ -870,6 +870,7 @@
   "boot.lx.a_new_x_layout_will_be_created": "Tiks izveidots jauns {0} izkārtojums.",
   "boot.lx.x_confirm_installation": "{0} - apstipriniet instalēšanu",
   "boot.lx.disk_x": "Disks: {0}",
+  "boot.lx.type_x": "Tips: {0}",
   "boot.lx.s_n_x": "S/N: {0}",
   "boot.lx.size_x_gib": "Izmērs: {0} GiB",
   "boot.lx.status_in_use_formatting_is_blocked": "Statuss: tiek lietots - formatēšana ir bloķēta.",

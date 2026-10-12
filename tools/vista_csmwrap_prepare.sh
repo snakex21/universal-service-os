@@ -155,7 +155,7 @@ usos_vista_csmwrap_prepare() {
         usos_ui_stage 3 5 'Inspecting disk' 'Reading partitions, free space and system files.' || true
         # Read-only (loop devices, ro mounts); failure only means "unknown".
         if ! TARGET_DEVICE=$TARGET_DEVICE sh /usr/lib/usos/xp_disk_overview.sh > "$overview" 2>> "$VISTA_CSMWRAP_DIR/prepare.log"; then
-            printf 'Disk: %s\nS/N: %s\nSize: %s GiB\n' "$model" "$serial" "$((size / 1073741824))" > "$overview"
+            { printf 'Disk: %s\n' "$model"; usos_disk_type_line "$TARGET_DEVICE"; printf 'S/N: %s\nSize: %s GiB\n' "$serial" "$((size / 1073741824))"; } > "$overview"
         fi
         # The layout vista_csmwrap_target.sh writes (same arithmetic): the
         # whole partition table is replaced (both GPT copies and the MBR are

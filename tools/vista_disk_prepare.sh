@@ -70,7 +70,9 @@ usos_vista_disk_prepare() {
         size=$(usos_disk_size "$TARGET_DEVICE")
         screen=/run/vista-disk-confirm.txt
         {
-            printf 'Disk: %s\nS/N: %s\nSize: %s GiB\n\n' "$model" "$serial" "$((size / 1073741824))"
+            printf 'Disk: %s\n' "$model"
+            usos_disk_type_line "$TARGET_DEVICE"
+            printf 'S/N: %s\nSize: %s GiB\n\n' "$serial" "$((size / 1073741824))"
             printf 'All partitions, systems and files on this disk will be erased.\n'
             printf 'USOS creates an EFI partition and leaves the rest free. In Vista Setup select the unallocated space.\n'
         } > "$screen"
