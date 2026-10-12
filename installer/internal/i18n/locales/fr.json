@@ -1246,6 +1246,7 @@
   "boot.lx.image_disk_after_restart": "Après le redémarrage, le disque démarre tout seul sur {0}.",
   "boot.lx.image_disk_writing": "Écriture de l'image de {0} sur le disque choisi.",
   "boot.lx.image_disk_restart_notice": "Après le redémarrage, le firmware lance l'entrée UEFI de ce disque et {0} démarre depuis celui-ci. Si la clé USOS démarre à la place, choisissez le disque dans le menu de démarrage du firmware.",
+  "boot.lx.image_disk_restart_notice_haiku": "Après le redémarrage, le firmware lance l'entrée UEFI de ce disque et Haiku démarre depuis celui-ci. Pour installer Haiku durablement : Installer > Set up partitions > créez une partition BFS dans l'espace libre. Si la clé USOS démarre à la place, choisissez le disque dans le menu de démarrage du firmware.",
   "boot.lx.w9x_csmwrap_copying": "Copie de l'installation de {0}, des outils USOS et de CSMWrap sur le disque choisi.",
   "boot.lx.w9x_preparation_failed": "La préparation de Windows 9x a échoué ; voir EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0} : démarrer le disque préparé",

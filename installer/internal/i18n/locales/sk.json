@@ -1249,6 +1249,7 @@
   "boot.lx.image_disk_after_restart": "Po reštarte sa disk sám spustí do {0}.",
   "boot.lx.image_disk_writing": "Zapisuje sa obraz {0} na vybraný disk.",
   "boot.lx.image_disk_restart_notice": "Po reštarte firmvér spustí položku UEFI tohto disku a z nej sa spustí {0}. Ak sa namiesto toho spustí USB kľúč USOS, vyberte disk v zavádzacej ponuke firmvéru.",
+  "boot.lx.image_disk_restart_notice_haiku": "Po reštarte firmvér spustí položku UEFI tohto disku a Haiku sa z neho spustí. Trvalá inštalácia Haiku: Installer > Set up partitions > vytvorte oddiel BFS vo voľnom mieste. Ak sa namiesto toho spustí USB kľúč USOS, vyberte disk v zavádzacej ponuke firmvéru.",
   "boot.lx.w9x_csmwrap_copying": "Kopírovanie inštalácie {0}, nástrojov USOS a CSMWrap na vybraný disk.",
   "boot.lx.w9x_preparation_failed": "Príprava Windows 9x zlyhala; pozri EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0}: spustite pripravený disk",

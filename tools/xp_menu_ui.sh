@@ -102,7 +102,10 @@ usos_xp_choose_disk() {
     {
         printf 'title=%s - SELECT DISK\nsubtitle=Select the disk for %s.\n' "${NT5_TITLE:-WINDOWS XP}" "${NT5_NAME:-Windows XP}"
         while IFS='|' read -r index candidate; do
-            printf 'item=%s (%s GiB)|S/N: %s\n' "$(usos_disk_type_model "$candidate")" "$(( $(usos_disk_size "$candidate") / 1073741824 ))" "$(usos_disk_serial "$candidate")"
+            # Model, size and S/N as text; bus and media as coloured chips
+            # (badge= lines, src/platform/linux/fb_disk_badge.zig).
+            printf 'item=%s (%s GiB)|S/N: %s\n' "$(usos_disk_picker_name "$candidate")" "$(( $(usos_disk_size "$candidate") / 1073741824 ))" "$(usos_disk_serial "$candidate")"
+            usos_disk_badges "$candidate"
         done < "$CANDIDATES"
         printf 'item=Return to USOS|Restart the computer\n'
         # A path that must say why the disk is chosen here (Vista without CSM).

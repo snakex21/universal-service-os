@@ -1246,6 +1246,7 @@
   "boot.lx.image_disk_after_restart": "Pärast taaskäivitust käivitub ketas ise süsteemi {0}.",
   "boot.lx.image_disk_writing": "{0} tõmmise kirjutamine valitud kettale.",
   "boot.lx.image_disk_restart_notice": "Pärast taaskäivitust käivitab püsivara selle ketta UEFI kirje ja sellelt käivitub {0}. Kui selle asemel käivitub USOS-i mälupulk, vali ketas püsivara alglaadimismenüüst.",
+  "boot.lx.image_disk_restart_notice_haiku": "Pärast taaskäivitust käivitab püsivara selle ketta UEFI-kirje ja Haiku käivitub sellelt. Haiku püsivaks paigaldamiseks: Installer > Set up partitions > loo vabasse ruumi BFS-partitsioon. Kui selle asemel käivitub USOS-i mälupulk, vali ketas püsivara alglaadimismenüüst.",
   "boot.lx.w9x_csmwrap_copying": "{0} paigaldusfailide, USOS-i abivahendite ja CSMWrapi kopeerimine valitud kettale.",
   "boot.lx.w9x_preparation_failed": "Windows 9x ettevalmistus ebaõnnestus; vaata EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0}: käivita ettevalmistatud ketas",

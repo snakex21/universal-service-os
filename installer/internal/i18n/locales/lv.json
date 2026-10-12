@@ -1249,6 +1249,7 @@
   "boot.lx.image_disk_after_restart": "Pēc restartēšanas disks pats palaidīs {0}.",
   "boot.lx.image_disk_writing": "{0} attēls tiek ierakstīts izvēlētajā diskā.",
   "boot.lx.image_disk_restart_notice": "Pēc restartēšanas aparātprogrammatūra palaiž šī diska UEFI ierakstu, un no tā palaižas {0}. Ja tā vietā palaižas USOS zibatmiņa, izvēlieties disku aparātprogrammatūras sāknēšanas izvēlnē.",
+  "boot.lx.image_disk_restart_notice_haiku": "Pēc restartēšanas programmaparatūra palaiž šī diska UEFI ierakstu, un no tā startē Haiku. Lai Haiku instalētu pastāvīgi: Installer > Set up partitions > izveidojiet BFS nodalījumu brīvajā vietā. Ja tā vietā startē USOS zibatmiņa, izvēlieties disku programmaparatūras sāknēšanas izvēlnē.",
   "boot.lx.w9x_csmwrap_copying": "Kopē {0} instalēšanas failus, USOS palīgrīkus un CSMWrap uz izvēlēto disku.",
   "boot.lx.w9x_preparation_failed": "Windows 9x sagatavošana neizdevās; skatiet EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0}: startējiet sagatavoto disku",

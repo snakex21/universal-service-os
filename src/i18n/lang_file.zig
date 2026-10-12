@@ -360,6 +360,10 @@ test "reverse lookup translates catalog and script English, including templates"
     // product names stay as they are (src/catalog/other_systems.zig).
     try std.testing.expectEqualStrings("Inny system (własny obraz)", table.lookup("Other system (own image)"));
     try std.testing.expectEqualStrings("Haiku", table.lookup("Haiku"));
+    // The Haiku done screen hint (tools/w9x_csmwrap_prepare.sh).
+    var long: [512]u8 = undefined;
+    const haiku = table.translate(&long, "After the restart the firmware starts this disk's UEFI entry and Haiku starts from it. To install Haiku permanently: Installer > Set up partitions > create a BFS partition in the free space. If the USOS stick starts instead, pick the disk in the firmware boot menu.");
+    try std.testing.expect(std.mem.indexOf(u8, haiku, "utwórz partycję BFS w wolnym miejscu") != null);
     const english = Table.english_only;
     try std.testing.expectEqualStrings("12 of 40 files", english.translate(&buffer, "12 of 40 files"));
 }

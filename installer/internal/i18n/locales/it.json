@@ -1246,6 +1246,7 @@
   "boot.lx.image_disk_after_restart": "Dopo il riavvio il disco si avvia da solo in {0}.",
   "boot.lx.image_disk_writing": "Scrittura dell'immagine di {0} sul disco selezionato.",
   "boot.lx.image_disk_restart_notice": "Dopo il riavvio il firmware avvia la voce UEFI di questo disco e {0} parte da esso. Se invece parte la chiavetta USOS, scegli il disco nel menu di avvio del firmware.",
+  "boot.lx.image_disk_restart_notice_haiku": "Dopo il riavvio il firmware avvia la voce UEFI di questo disco e Haiku parte da esso. Per installare Haiku in modo permanente: Installer > Set up partitions > crea una partizione BFS nello spazio libero. Se invece si avvia la chiavetta USOS, scegli il disco nel menu di avvio del firmware.",
   "boot.lx.w9x_csmwrap_copying": "Copia dell'installazione di {0}, degli strumenti USOS e di CSMWrap sul disco scelto.",
   "boot.lx.w9x_preparation_failed": "La preparazione di Windows 9x non è riuscita; vedere EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0}: avvia il disco preparato",

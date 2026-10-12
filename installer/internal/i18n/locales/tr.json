@@ -1246,6 +1246,7 @@
   "boot.lx.image_disk_after_restart": "Yeniden başlatmadan sonra disk kendiliğinden {0} ile başlar.",
   "boot.lx.image_disk_writing": "{0} kalıbı seçilen diske yazılıyor.",
   "boot.lx.image_disk_restart_notice": "Yeniden başlatmadan sonra ürün yazılımı bu diskin UEFI girdisini başlatır ve {0} ondan açılır. Bunun yerine USOS belleği açılırsa, diski ürün yazılımının önyükleme menüsünden seçin.",
+  "boot.lx.image_disk_restart_notice_haiku": "Yeniden başlatmadan sonra ürün yazılımı bu diskin UEFI girdisini başlatır ve Haiku bu diskten açılır. Haiku'yu kalıcı olarak kurmak için: Installer > Set up partitions > boş alanda bir BFS bölümü oluşturun. Bunun yerine USOS belleği açılırsa, diski ürün yazılımının önyükleme menüsünden seçin.",
   "boot.lx.w9x_csmwrap_copying": "{0} kurulumu, USOS yardımcıları ve CSMWrap seçilen diske kopyalanıyor.",
   "boot.lx.w9x_preparation_failed": "Windows 9x hazırlığı başarısız oldu; bkz. EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0}: hazırlanan diski başlatın",

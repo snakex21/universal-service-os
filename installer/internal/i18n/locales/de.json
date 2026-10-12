@@ -1246,6 +1246,7 @@
   "boot.lx.image_disk_after_restart": "Nach dem Neustart startet der Datenträger selbst in {0}.",
   "boot.lx.image_disk_writing": "Das Abbild von {0} wird auf den gewählten Datenträger geschrieben.",
   "boot.lx.image_disk_restart_notice": "Nach dem Neustart startet die Firmware den UEFI-Eintrag dieses Datenträgers und {0} startet davon. Startet stattdessen der USOS-Stick, wähle den Datenträger im Bootmenü der Firmware.",
+  "boot.lx.image_disk_restart_notice_haiku": "Nach dem Neustart startet die Firmware den UEFI-Eintrag dieses Datenträgers, und Haiku startet davon. Haiku dauerhaft installieren: Installer > Set up partitions > im freien Speicher eine BFS-Partition anlegen. Startet stattdessen der USOS-Stick, wählen Sie den Datenträger im Bootmenü der Firmware.",
   "boot.lx.w9x_csmwrap_copying": "{0}-Setup, die USOS-Hilfsprogramme und CSMWrap werden auf den gewählten Datenträger kopiert.",
   "boot.lx.w9x_preparation_failed": "Die Windows-9x-Vorbereitung ist fehlgeschlagen; siehe EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0}: vorbereiteten Datenträger starten",

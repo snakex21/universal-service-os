@@ -1249,6 +1249,7 @@
   "boot.lx.image_disk_after_restart": "После перезагрузки диск сам запустит {0}.",
   "boot.lx.image_disk_writing": "Запись образа {0} на выбранный диск.",
   "boot.lx.image_disk_restart_notice": "После перезагрузки прошивка запустит UEFI-запись этого диска, и с него загрузится {0}. Если вместо этого запустится флешка USOS, выберите диск в загрузочном меню прошивки.",
+  "boot.lx.image_disk_restart_notice_haiku": "После перезагрузки прошивка запустит запись UEFI этого диска, и с него загрузится Haiku. Чтобы установить Haiku насовсем: Installer > Set up partitions > создайте раздел BFS в свободном месте. Если вместо этого загрузится флешка USOS, выберите диск в загрузочном меню прошивки.",
   "boot.lx.w9x_csmwrap_copying": "Копирование установки {0}, утилит USOS и CSMWrap на выбранный диск.",
   "boot.lx.w9x_preparation_failed": "Подготовка Windows 9x не удалась; см. EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0}: запустите подготовленный диск",

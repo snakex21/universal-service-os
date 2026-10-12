@@ -7,10 +7,11 @@
 #   uefi_boot_entry.sh add       TARGET_DEVICE, ENTRY_NAME: finds the EFI
 #                                system partition of TARGET_DEVICE, writes a
 #                                Boot#### "ENTRY_NAME" = HD(ESP)/\EFI\BOOT\BOOTX64.EFI,
-#                                appends it to BootOrder (the current default
-#                                stays first) and sets BootNext to it, so the
-#                                restart after the flow starts the new disk once
-#                                and the entry stays in the firmware boot menu.
+#                                puts it first in BootOrder (ENTRY_ORDER=last:
+#                                appended; every other entry, the USOS stick
+#                                too, stays in its order) and sets BootNext to
+#                                it, so the restart starts the new disk and it
+#                                stays the default and in the boot menu.
 #   uefi_boot_entry.sh option    print the load option (hex) for the ESP of
 #                                TARGET_DEVICE (tests)
 #   uefi_boot_entry.sh esp       print "number start size mbrtype sigtype signature" (tests)
@@ -28,6 +29,10 @@ set -eu
 TARGET_DEVICE=${TARGET_DEVICE:?TARGET_DEVICE is required}
 EFIVARS=${EFIVARS_DIR:-/sys/firmware/efi/efivars}
 LOADER=${ENTRY_LOADER:-'\EFI\BOOT\BOOTX64.EFI'}
+# Where the entry goes in BootOrder: "first" (default; the written system
+# stays the default after BootNext is used up, X470 2026-10-12) or "last".
+ORDER=${ENTRY_ORDER:-first}
+case "$ORDER" in first|last) ;; *) printf '[BOOT_ENTRY] FAIL: ENTRY_ORDER must be first or last\n' >&2; exit 1 ;; esac
 GLOBAL=8be4df61-93ca-11d2-aa0d-00e098032b8c
 # EFI_VARIABLE_NON_VOLATILE | BOOTSERVICE_ACCESS | RUNTIME_ACCESS
 ATTR=07000000
@@ -183,15 +188,23 @@ fi
 le_number=$(le16 $((0x$number)))
 
 order=$(var_hex BootOrder | cut -c9- || true)
-present=no
+# Every other entry (the USOS stick, other systems) stays, in its order.
+others=''
 rest=$order
 while [ -n "$rest" ]; do
-    [ "$(printf '%s' "$rest" | cut -c1-4)" != "$le_number" ] || present=yes
+    item=$(printf '%s' "$rest" | cut -c1-4)
+    [ "$item" = "$le_number" ] || others="$others$item"
     rest=$(printf '%s' "$rest" | cut -c5-)
 done
-if [ "$present" = no ]; then
-    var_write BootOrder "$order$le_number"
-    log "BootOrder: Boot$number appended"
+case "$ORDER" in
+    first) new_order="$le_number$others" ;;
+    *) if [ "$others" = "$order" ]; then new_order="$order$le_number"; else new_order=$order; fi ;;
+esac
+if [ "$new_order" != "$order" ]; then
+    var_write BootOrder "$new_order"
+    log "BootOrder: Boot$number $([ "$ORDER" = first ] && echo 'first (the default from now on; the other entries keep their order)' || echo appended)"
+else
+    log "BootOrder: Boot$number already $([ "$ORDER" = first ] && echo first || echo present)"
 fi
 var_write BootNext "$le_number"
 log "BootNext=Boot$number: the restart starts \"$NAME\""

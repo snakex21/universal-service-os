@@ -1246,6 +1246,7 @@
   "boot.lx.image_disk_after_restart": "Na de herstart start de schijf vanzelf in {0}.",
   "boot.lx.image_disk_writing": "De image van {0} wordt naar de gekozen schijf geschreven.",
   "boot.lx.image_disk_restart_notice": "Na de herstart start de firmware de UEFI-vermelding van deze schijf en start {0} daarvan. Start in plaats daarvan de USOS-stick, kies dan de schijf in het opstartmenu van de firmware.",
+  "boot.lx.image_disk_restart_notice_haiku": "Na de herstart start de firmware de UEFI-vermelding van deze schijf en start Haiku ervan. Haiku permanent installeren: Installer > Set up partitions > maak een BFS-partitie in de vrije ruimte. Start in plaats daarvan de USOS-stick, kies dan de schijf in het opstartmenu van de firmware.",
   "boot.lx.w9x_csmwrap_copying": "Installatie van {0}, de USOS-hulpmiddelen en CSMWrap worden naar de gekozen schijf gekopieerd.",
   "boot.lx.w9x_preparation_failed": "De voorbereiding van Windows 9x is mislukt; zie EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0}: start de voorbereide schijf",

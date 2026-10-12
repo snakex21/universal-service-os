@@ -1246,6 +1246,7 @@
   "boot.lx.image_disk_after_restart": "Efter genstarten starter disken af sig selv i {0}.",
   "boot.lx.image_disk_writing": "Skriver aftrykket af {0} til den valgte disk.",
   "boot.lx.image_disk_restart_notice": "Efter genstarten starter firmwaren diskens UEFI-post, og {0} starter fra den. Hvis USOS-nøglen starter i stedet, så vælg disken i firmwarens startmenu.",
+  "boot.lx.image_disk_restart_notice_haiku": "Efter genstarten starter firmwaren denne disks UEFI-post, og Haiku starter fra den. Installer Haiku permanent: Installer > Set up partitions > opret en BFS-partition i den ledige plads. Starter USOS-nøglen i stedet, så vælg disken i firmwarens bootmenu.",
   "boot.lx.w9x_csmwrap_copying": "Kopierer {0}-installationen, USOS-hjælpeværktøjerne og CSMWrap til den valgte disk.",
   "boot.lx.w9x_preparation_failed": "Forberedelsen af Windows 9x mislykkedes; se EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0}: start den forberedte disk",

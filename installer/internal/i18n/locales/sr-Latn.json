@@ -1249,6 +1249,7 @@
   "boot.lx.image_disk_after_restart": "Posle ponovnog pokretanja disk se sam pokreće u {0}.",
   "boot.lx.image_disk_writing": "Upisivanje slike {0} na izabrani disk.",
   "boot.lx.image_disk_restart_notice": "Posle ponovnog pokretanja firmver pokreće UEFI unos ovog diska i sa njega se pokreće {0}. Ako se umesto toga pokrene USOS fleš, izaberite disk u meniju za pokretanje firmvera.",
+  "boot.lx.image_disk_restart_notice_haiku": "Posle ponovnog pokretanja firmver pokreće UEFI unos ovog diska i sa njega se pokreće Haiku. Za trajnu instalaciju Haikua: Installer > Set up partitions > napravite BFS particiju u slobodnom prostoru. Ako se umesto toga pokrene USOS fleš, izaberite disk u meniju za pokretanje firmvera.",
   "boot.lx.w9x_csmwrap_copying": "Kopiranje instalacije sistema {0}, USOS alata i CSMWrap-a na izabrani disk.",
   "boot.lx.w9x_preparation_failed": "Priprema sistema Windows 9x nije uspela; pogledajte EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0}: pokrenite pripremljeni disk",

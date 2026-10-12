@@ -1,7 +1,7 @@
 #!/bin/sh
 # A self-contained, read-only service session using the common USOS GUI.
 
-# usos_disk_type (disk bus: "SATA SSD", "M.2 NVMe", "USB", ...), read-only.
+# usos_disk_type ("SATA SSD", "NVMe SSD", "USB", ...) and usos_disk_badges, read-only.
 if ! command -v usos_disk_type >/dev/null 2>&1 && [ -r /usr/lib/usos/target_disk_identity.sh ]; then
     . /usr/lib/usos/target_disk_identity.sh
 fi
@@ -90,6 +90,8 @@ usos_hw_disk_screen() {
                 label="Disk $number - ${model:-Unknown model} - $(usos_hw_size "$bytes")"
                 printf '%s\n' "$label" >> "$USOS_HW_DIR/disk-labels.txt"
                 printf 'item=%s|%s | S/N: %s\n' "$label" "${transport:-Unknown interface}" "${serial:-Unavailable}"
+                # Bus and media chips as in the disk pickers (fb_disk_badge.zig).
+                if command -v usos_disk_badges >/dev/null 2>&1; then usos_disk_badges "$disk"; fi
             done < "$USOS_HW_DIR/disks.txt"
             printf 'item=Refresh disk list|Detect newly connected devices\nitem=Back|Return to Hardware & SMART\n'
             [ "$count" -gt 0 ] || printf 'info=No disks detected.\n'

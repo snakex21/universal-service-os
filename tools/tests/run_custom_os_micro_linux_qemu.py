@@ -44,12 +44,13 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "tests" / "uefi_drivers"))
 from run_stage_drivers_qemu import Console  # noqa: E402
 
-SCRIPTS = ("image_disk_target.sh", "xp_csmwrap_esp.sh", "uefi_boot_entry.sh")
+SCRIPTS = ("image_disk_target.sh", "xp_csmwrap_esp.sh", "uefi_boot_entry.sh",
+           "xp_disk_overview.sh", "target_disk_identity.sh", "xp_detect_system.sh")
 
 GUEST = r'''#!/bin/sh
 set -u
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
-for m in ahci sd_mod virtio_pci virtio_blk loop vfat fat nls_cp437 nls_iso8859_1; do modprobe "$m" 2>/dev/null; done
+for m in ahci sd_mod virtio_pci virtio_blk loop vfat fat nls_cp437 nls_iso8859_1 nls_utf8; do modprobe "$m" 2>/dev/null; done
 sleep 2; mdev -s 2>/dev/null
 [ -b /dev/sda ] && [ -b /dev/vda ] || { echo "E2E: no sda/vda"; lsblk; echo E2E-RESULT=FAIL; exit 1; }
 # UEFI prepare (OVMF): efivarfs for uefi_boot_entry.sh; a micro-Linux built
@@ -58,8 +59,29 @@ if [ -d /sys/firmware/efi ]; then
     modprobe efivarfs 2>/dev/null || { [ -f /usos-e2e/efivarfs.ko ] && insmod /usos-e2e/efivarfs.ko; }
     echo "E2E: UEFI prepare, efivarfs registered: $(grep -c efivarfs /proc/filesystems)"
 fi
-if env TARGET_DEVICE=/dev/sda IMAGE_SOURCE=/dev/vda IMAGE_SYSTEM="$SYSTEM" IMAGE_TITLE="$TITLE" USOS_CSMWRAP_DIR=/usos-e2e/csmwrap \
+up() { cut -d' ' -f1 /proc/uptime; }
+IMG=/dev/vda
+# --image-file: the image as a file (copied to tmpfs; on the X470 it is a
+# file on the stick's DATA partition), so the write takes a file path as in
+# step 620; times BusyBox wc -c (reads the file) against stat.
+if [ "${IMGFILE:-0}" = 1 ]; then
+    mkdir -p /mnt/img
+    mount -t tmpfs -o size=3g img /mnt/img
+    dd if=/dev/vda of=/mnt/img/image.bin bs=4M 2>/dev/null || { echo "E2E: cannot copy the image"; echo E2E-RESULT=FAIL; exit 1; }
+    IMG=/mnt/img/image.bin
+    a=$(up); n=$(wc -c < "$IMG"); b=$(up); echo "E2E-TIME wc-c bytes=$n $a -> $b"
+    a=$(up); n=$(stat -L -c %s "$IMG"); b=$(up); echo "E2E-TIME stat bytes=$n $a -> $b"
+fi
+# --overview: the step-620 "Reading partitions, free space and system files"
+# screen (xp_disk_overview.sh) on what the disk holds now (--keep-disk).
+if [ "${OVERVIEW:-0}" = 1 ]; then
+    a=$(up); TARGET_DEVICE=/dev/sda sh /usr/lib/usos/xp_disk_overview.sh > /tmp/overview.txt 2>&1; b=$(up)
+    sed 's/^/E2E-OV /' /tmp/overview.txt; echo "E2E-TIME overview $a -> $b"
+fi
+a=$(up)
+if env TARGET_DEVICE=/dev/sda IMAGE_SOURCE="$IMG" IMAGE_SYSTEM="$SYSTEM" IMAGE_TITLE="$TITLE" USOS_CSMWRAP_DIR=/usos-e2e/csmwrap \
     sh /usr/lib/usos/image_disk_target.sh > /tmp/prepare.log 2>&1 < /dev/null; then
+    echo "E2E-TIME write $a -> $(up)"
     cat /tmp/prepare.log; cat /run/image-disk.result
     sfdisk -l /dev/sda 2>&1 | tail -n 6
     sync; echo E2E-RESULT=PASS
@@ -176,7 +198,7 @@ def prepare(args, root: Path, out: Path, disk: Path) -> bool:
         vars_copy.write_bytes(Path(args.vars_from).read_bytes() if args.vars_from else (share / "edk2-i386-vars.fd").read_bytes())
         firmware = ["-drive", f"if=pflash,format=raw,readonly=on,file={share / 'edk2-x86_64-code.fd'}",
                     "-drive", f"if=pflash,format=raw,file={vars_copy}"]
-    cmd = [str(qemu_copy(root)), "-machine", "q35", "-accel", "whpx", "-accel", "tcg", "-m", "2048", "-smp", "2", *qemu_data(root), *firmware,
+    cmd = [str(qemu_copy(root)), "-machine", "q35", "-accel", "whpx", "-accel", "tcg", "-m", "4096" if args.image_file else "2048", "-smp", "2", *qemu_data(root), *firmware,
            "-display", "none", "-nic", "none", "-kernel", str(ml / "vmlinuz-virt"), "-initrd", str(initrd),
            "-append", "console=ttyS0,115200 rdinit=/bin/sh loglevel=3",
            "-chardev", f"socket,id=s0,host=127.0.0.1,port={port},server=on,wait=off", "-serial", "chardev:s0",
@@ -192,7 +214,8 @@ def prepare(args, root: Path, out: Path, disk: Path) -> bool:
                     "mount -t proc proc /proc; mount -t sysfs sys /sys; mount -t devtmpfs dev /dev 2>/dev/null; "
                     "mkdir -p /tmp /run; mount -t tmpfs tmp /tmp; mount -t tmpfs run /run", "SETUP-DONE", 120)
         start = len(console.text)
-        console.sock.sendall(f"SYSTEM={args.system} TITLE='{args.title or args.system}' sh /usos-e2e/guest.sh 2>&1; echo E2E-EXIT\n".encode())
+        flags = f"IMGFILE={1 if args.image_file else 0} OVERVIEW={1 if args.overview else 0}"
+        console.sock.sendall(f"{flags} SYSTEM={args.system} TITLE='{args.title or args.system}' sh /usos-e2e/guest.sh 2>&1; echo E2E-EXIT\n".encode())
         deadline = time.time() + args.timeout
         while "\nE2E-EXIT" not in console.text[start:] and time.time() < deadline and q.poll() is None:
             try:
@@ -346,6 +369,9 @@ def main() -> int:
     p.add_argument("--efivarfs-ko", default="", help="prepare: efivarfs.ko for a micro-Linux built without it")
     p.add_argument("--vars-from", default="", help="prepare: start from this OVMF VARS file instead of a blank one")
     p.add_argument("--decoy", action="store_true", help="boot: a UEFI Shell disk first in the boot order (checks BootNext)")
+    p.add_argument("--keep-disk", action="store_true", help="prepare: write over OUT/target.raw of an earlier run (e.g. Haiku over KolibriOS)")
+    p.add_argument("--image-file", action="store_true", help="prepare: the image as a file (tmpfs copy) as on DATA, not the virtio disk; times wc -c vs stat")
+    p.add_argument("--overview", action="store_true", help="prepare: run and time xp_disk_overview.sh first (the step-620 disk inspection)")
     args = p.parse_args()
     root = Path(args.root)
     out = Path(args.out)
@@ -354,8 +380,9 @@ def main() -> int:
     if args.boot_only:
         ok = disk.exists()
     else:
-        with disk.open("wb") as f:
-            f.truncate(args.disk_gib << 30)
+        if not (args.keep_disk and disk.exists()):
+            with disk.open("wb") as f:
+                f.truncate(args.disk_gib << 30)
         ok = prepare(args, root, out, disk)
     print("PREPARE", "PASS" if ok else "FAIL", flush=True)
     show_vars("after prepare", out)

@@ -51,12 +51,25 @@ fi
 u8() { od -An -tu1 -j"$2" -N1 "$1" | tr -d ' \n'; }
 u32() { od -An -tu4 -j"$2" -N4 "$1" | tr -d ' \n'; }
 
+# Size in bytes without reading the file: BusyBox `wc -c` reads all of it
+# (the 1.4 GB Haiku ISO from the stick took long on the X470, 2026-10-12).
+# A block device (tests: the image on a virtio disk) through blockdev.
+usos_file_bytes() {
+    if [ -b "$1" ]; then
+        blockdev --getsize64 "$1"
+    elif stat -L -c %s "$1" 2>/dev/null; then
+        :
+    else
+        wc -c < "$1" | tr -d ' '
+    fi
+}
+
 work=/run/image-disk
 rm -rf "$work"
 mkdir -p "$work"
 head="$work/head.bin"
 dd if="$IMAGE" of="$head" bs=512 count=64 2>/dev/null || fail 'cannot read the image'
-image_bytes=$(wc -c < "$IMAGE" | tr -d ' ')
+image_bytes=$(usos_file_bytes "$IMAGE") || fail 'cannot read the image size'
 [ "$image_bytes" -ge 32768 ] || fail 'the image is too small to be a disk image'
 
 # ---------------------------------------------------------------- classify
@@ -147,6 +160,38 @@ if [ "$gpt" = yes ]; then
         sfdisk --relocate gpt-bak-std "$TARGET_DEVICE" >/dev/null 2>&1 && log 'backup GPT moved to the disk end' ||
             log 'backup GPT not moved (sfdisk refused); the primary GPT stays valid'
     fi
+fi
+
+# GPT image with a hybrid MBR (KolibriOS raw image: slot 1 = EF ESP, slot 2 =
+# EE over LBA 1-2047, disk signature 0): firmware that reads the MBR first
+# sees an MBR disk with an MBR ESP, so the boot entry's GPT HD() node
+# (uefi_boot_entry.sh) never matches and the entry is skipped (X470,
+# B261012-154207: KolibriOS not started first, Haiku's MBR image was). EDK2
+# takes the GPT whenever an EE slot starts at LBA 1, so QEMU did not show it.
+# UEFI mode needs only the GPT: the partition table area becomes the
+# protective MBR of UEFI 2.x 5.2.3 (one EE slot from LBA 1 over the disk),
+# the boot code stays. GPT images with a protective MBR are not touched.
+pmbr_fix() {
+    hybrid=no
+    for slot in 0 1 2 3; do
+        case "$(u8 "$head" $((446 + 16 * slot + 4)))" in 0|238) ;; *) hybrid=yes ;; esac
+    done
+    [ "$hybrid" = yes ] || return 0
+    pmbr_size=$((total - 1))
+    [ "$pmbr_size" -le 4294967295 ] || pmbr_size=4294967295
+    pmbr="$work/pmbr.bin"
+    # 00 | CHS 00 02 00 | EE | CHS FF FF FF | LBA 1 | size, then three empty slots.
+    printf '\000\000\002\000\356\377\377\377\001\000\000\000' > "$pmbr"
+    printf "$(printf '\\%03o\\%03o\\%03o\\%03o' $((pmbr_size & 255)) $((pmbr_size >> 8 & 255)) $((pmbr_size >> 16 & 255)) $((pmbr_size >> 24 & 255)))" >> "$pmbr"
+    dd if=/dev/zero bs=48 count=1 2>/dev/null >> "$pmbr"
+    [ "$(wc -c < "$pmbr" | tr -d ' ')" = 64 ] || fail 'internal error: protective MBR size'
+    dd if="$pmbr" of="$TARGET_DEVICE" bs=1 seek=446 count=64 conv=notrunc,fsync 2>/dev/null || fail 'cannot write the protective MBR'
+    [ "$(dd if="$TARGET_DEVICE" bs=1 skip=446 count=64 2>/dev/null | sha256sum | awk '{print $1}')" = "$(sha256sum < "$pmbr" | awk '{print $1}')" ] ||
+        fail 'read-back: the protective MBR differs'
+    log "hybrid MBR replaced by a protective MBR (EE, LBA 1, $pmbr_size sectors): the firmware uses the GPT"
+}
+if [ "$gpt" = yes ] && [ "$mode" = uefi ]; then
+    pmbr_fix
 fi
 
 # FreeDOS FullUSB: start into DOS, not into the installer on its own disk.
