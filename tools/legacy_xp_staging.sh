@@ -504,6 +504,14 @@ usos_legacy_xp_staging() {
         [ "$USOS_W2K_ACPI" = on ] || stop 'Windows 2000: acpi-off.txt and the user ACPI package (Unattended\acpi) exclude each other; remove one. No target write occurred'
         USOS_W2K_ACPI_PKG="/mnt/data/Systems/Windows/$NT5_NAME/Unattended/acpi"
     fi
+    # ACPI on: the target gets the Windows 2000 ACPI build of the USOS MBR
+    # (HPET LegacyReplacement off before the HAL calibrates on IRQ 0, ACPI 2.0
+    # QWord names rewritten for 2000's acpi.sys; xp_geometry_fix_mbr.S).
+    if [ "$USOS_W2K_ACPI" = on ]; then
+        [ -f /usr/lib/usos/w2k-acpi-mbr-440.bin ] || stop 'Windows 2000 ACPI MBR is missing from the package; no target write occurred'
+        USOS_XP_MBR_CODE=/usr/lib/usos/w2k-acpi-mbr-440.bin; export USOS_XP_MBR_CODE
+        printf '[W2K_DRIVERS] MBR w2k-acpi-mbr-440.bin (HPET LegacyReplacement off, QWord names for acpi.sys)\n'
+    fi
     export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL USOS_W2K_HPET USOS_W2K_RTC USOS_W2K_ACPI_PKG
     printf '[W2K_DRIVERS] storage %s, ACPI %s, HAL %s, HPET %s, RTC %s, usosrst, xhci98 x86%s; the XP bundle is NT 5.1 only\n' "$USOS_W2K_STORAGE" "$USOS_W2K_ACPI" "$USOS_W2K_HAL" "$USOS_W2K_HPET" "$USOS_W2K_RTC" "$([ -n "$USOS_W2K_ACPI_PKG" ] && echo ', user ACPI package')"
     else

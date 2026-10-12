@@ -87,6 +87,7 @@ function Run-Unit {
     Invoke-PythonStep 'tools/tests/test_vista_autochk.py' 'Vista autochk exclusion tests failed.'
     Invoke-PythonStep 'tools/tests/test_x86_vista_oobe_gate.py' 'Vista / 2008 x86 OOBE gate tests failed.'
     Invoke-PythonStep 'tools/tests/test_image_disk_elcr.py' 'Custom OS ELCR MBR tests failed.'
+    Invoke-PythonStep 'tools/tests/legacy_bios/test_w2k_acpi_mbr.py' 'Windows 2000 ACPI MBR emulation test failed.'
     Invoke-PythonStep 'tools/tests/test_uefi_boot_entry.py' 'Custom OS firmware boot entry (Boot####/BootNext) tests failed.'
     Invoke-PythonStep 'tools/tests/test_stick_release.py' 'micro-Linux stick release tests failed.'
     Invoke-PythonStep 'tools/tests/test_stick_write.py' 'micro-Linux read-only stick ESP tests failed.'

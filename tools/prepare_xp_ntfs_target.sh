@@ -29,7 +29,7 @@ dd if="$TARGET_DEVICE" of="$work/before" bs=512 count=1 2>/dev/null
 cmp -s "$work/before" "$XP_EXPECTED_MBR" || fail 'MBR changed before NTFS preparation'
 cp "$work/before" "$work/expected"
 printf '\007' | dd of="$work/expected" bs=1 seek=$((450+(slot-1)*16)) conv=notrunc 2>/dev/null
-dd if="$SCRIPT_DIR/xp-geometry-fix-mbr-440.bin" of="$work/expected" bs=440 count=1 conv=notrunc 2>/dev/null
+dd if="${XP_MBR_CODE:-$SCRIPT_DIR/xp-geometry-fix-mbr-440.bin}" of="$work/expected" bs=440 count=1 conv=notrunc 2>/dev/null
 dd if="$work/expected" of="$TARGET_DEVICE" bs=512 count=1 conv=notrunc 2>/dev/null
 sync
 dd if="$TARGET_DEVICE" of="$work/after" bs=512 count=1 2>/dev/null
