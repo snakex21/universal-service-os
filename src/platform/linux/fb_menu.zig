@@ -226,7 +226,7 @@ fn console(tty: i32, state: model.State) void {
             const part = std.fmt.bufPrint(chips[chips_len..], " [{s}]", .{disk_badge.badge(token).text}) catch break;
             chips_len += part.len;
         }
-        const line = std.fmt.bufPrint(&buffer, "{s} {s}\n    {s}\n", .{if (i == state.selected) ">" else " ", item.title, chips[0..chips_len], item.detail}) catch continue;
+        const line = std.fmt.bufPrint(&buffer, "{s} {s}{s}\n    {s}\n", .{if (i == state.selected) ">" else " ", item.title, chips[0..chips_len], item.detail}) catch continue;
         _ = linux.write(tty, line.ptr, line.len);
     }
     const info_first = if (state.table.columns > 0) 0 else state.scroll;
