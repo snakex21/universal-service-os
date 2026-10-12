@@ -61,6 +61,9 @@ done
 if awk -v d="$TARGET_DEVICE" 'index($1, d) == 1 { found=1 } END { exit(found ? 0 : 1) }' /proc/mounts; then
     fail 'a partition of the selected disk is mounted; no disk was changed'
 fi
+# NVMe target gate (docs/nvme-nt6-2026-10-12.md): usosnvme is not wired into
+# the POSReady flow yet, the installed system would stop with 0x7B.
+case "$TARGET_DEVICE" in /dev/nvme*) fail 'no NVMe driver for POSReady 2009 in this flow yet; pick a SATA disk. No disk was changed' ;; esac
 
 work=/run/posready
 rm -rf "$work"

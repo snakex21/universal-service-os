@@ -176,7 +176,11 @@ else
     helper_check=usos-vista-install.exe
 fi
 cp "$REQUEST_DIR/usos-source.ini" "$work/inject/usos-source.ini"
-printf 'disk_signature=%s\r\nstaging_start=%s\r\nstaging_sectors=%s\r\nesp_start=%s\r\ndisk_sectors=%s\r\nwindows_start=%s\r\nwindows_sectors=%s\r\n' "$signature_hex" "$staging_start" "$staging_sectors" "$esp_start" "$total" "$windows_start" "$windows_sectors" > "$work/inject/$target_ini"
+# target_bus=nvme: the WinPE nvme step (usos-x86-csmwrap.cmd) gives an
+# installed Windows 7 / Vista / Server 2008 x86 its NVMe boot driver
+# (docs/nvme-nt6-2026-10-12.md); the gate is in vista_csmwrap_prepare.sh.
+case "$TARGET_DEVICE" in /dev/nvme*) target_bus=nvme ;; *) target_bus=other ;; esac
+printf 'disk_signature=%s\r\nstaging_start=%s\r\nstaging_sectors=%s\r\nesp_start=%s\r\ndisk_sectors=%s\r\nwindows_start=%s\r\nwindows_sectors=%s\r\ntarget_bus=%s\r\n' "$signature_hex" "$staging_start" "$staging_sectors" "$esp_start" "$total" "$windows_start" "$windows_sectors" "$target_bus" > "$work/inject/$target_ini"
 if [ -n "$ANSWER_XML" ]; then
     [ -r "$ANSWER_XML" ] || fail 'the answer file is missing'
     cp "$ANSWER_XML" "$work/inject/usos-unattend.xml"
