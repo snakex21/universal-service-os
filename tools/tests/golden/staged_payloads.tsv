@@ -442,7 +442,7 @@ native_cpio	modern-support.cpio	usos-modern-finalize.exe	27648	56ea932c88e1bff0a
 native_cpio	modern-support.cpio	usos-x86-csmwrap.cmd	12152	b4a2ac000a8ff9d07475a70b576f7504ca97fd09981083e2880cfe44dc992c07
 native_cpio	modern-support.cpio	usos-x86-csmwrap.exe	22016	2dba965f50a99a5e7d2bfa2e0cfee4dd93d27d014b5f89bf0b29d38eaf4f0f2e
 native_cpio	modern-support.cpio	usos-vista-oobe-x86.exe	11264	e271c999bb54a8fafe785cf561ab5c2b427d8502ee83081b7c3b2edad2c5b644
-native_cpio	modern-support.cpio	usosusb-nt6.sys	21760	a5f0898b5bb87498cd3a98a5ca0f191ae7789a283a28bd891d1261315af53cd4
+native_cpio	modern-support.cpio	usosusb-nt6.sys	46592	494c45350acc0438020bf1999f916983590b2ff83547c0c57f8f701fddfefb6d
 native_cpio	modern-support.cpio	usos-drivers.exe	6656	f4c681d3554da1989277d43a2cbf68d8fc069e865e2a2ef4f6795a9b783ec08a
 native_cpio	modern-support.cpio	usos-unattend-drivers.exe	9216	7eb53c21cdf89b761755b1cfaf5c4b19e420590b75ad1ee7cb7e9af7e2ed3f3f
 # payload_zip: member names of the embedded installer payload

@@ -864,11 +864,13 @@ driver, no shared rings). Details in `tools/nt4/usosusb/README.md`
   `FILE_DEVICE_DISK` device that answers the disk and mountdev IOCTLs; the
   mount manager gives the drive letter (arrival notification; if it assigns
   none, `CREATE_POINT` on a free letter). File systems mount as usual (FAT,
-  FAT32, NTFS). This also shows every partition of a multi-partition stick
-  (the USOS stick: ESP, DATA, WORK), which the Windows 7 removable-media
-  stack does not.
-* Hot plug: port status events; unplug removes the letter and fails further
-  I/O; a new stick gets new volume devices.
+  FAT32, NTFS). This also shows every data partition of a multi-partition
+  stick (the USOS stick: DATA and WORK; EFI system partitions get no volume,
+  as in Windows), which the Windows 7 removable-media stack does not.
+* Hot plug: port status events; unplug removes the letter, sets
+  DO_VERIFY_VOLUME and opens the volume once, so the file system's verify
+  fails and it dismounts (without that a removed NTFS stick made shutdown
+  hang on endless write-behind retries); a new stick gets new volume devices.
 * No change to the flow: the `nt60_usb` step installs the same file.
 
 QEMU (2026-10-12; Web Server 2008 SP2 PL x86 installed through the real stick
@@ -887,9 +889,23 @@ qemu-xhci, AHCI target cache=writeback):
 * `pc,i8042=off`, usb-kbd + usb-mouse + stick: i8042prt STOPPED, typing,
   Start menu by mouse click, Explorer "Komputer" lists `USBMSC (D:)` as a
   removable disk, copy both ways.
-* Hot plug of the USOS test stick (GPT, 20 GiB): `S(20480M wp0 3v)`, three
-  letters (USOS_ESP FAT32, USOS_DATA NTFS, USOS_WORK NTFS); 1.7 GB ISO copied
-  from DATA to C: in 43 s (about 41 MB/s under TCG).
+* Hot plug of the USOS test stick (GPT, 20 GiB): 1.7 GB ISO copied from
+  DATA (NTFS) to C: in 43 s (about 41 MB/s under TCG). Final build: the
+  stick at boot gives `S(20480M wp0 2v)`, USOS_DATA D: + USOS_WORK E: (ESP
+  skipped); the ISO copied C: -> WORK in 60 s, a file written to DATA,
+  surprise removal (`UsosUsbDisk0:gone0 UsosUsbDisk1:gone0`), clean
+  shutdown; on the host both NTFS volumes are healthy and `BIG.BIN` has the
+  ISO's MD5.
+* Vista SP2 PL x86 (USOS profile "Vista Ultimate", installed through the same
+  stick path, key page Next + No, then the final driver): `pc,i8042=off`,
+  usb-kbd + usb-mouse + USOS GPT stick + FAT32 stick: `ver` 6.0.6002, Diag
+  `p3:s1--S(20480M wp0 2v) p4:s2--S(512M wp0 1v) p5:s3K- p6:s4-M`, letters
+  D: (DATA) E: (WORK) F: (FAT32), i8042prt STOPPED; copy both ways (`fc /b`
+  equal), NTFS write on DATA, hot swap of the FAT32 stick for another one
+  (`p4-gone p4:s2--S(128M wp0 1v)`, same letter F:, read + write), Explorer
+  lists USOS_DATA / USOS_WORK / HOTPLUG as removable disks, Start menu by USB
+  mouse click, clean shutdown; on the host every file the guest wrote has
+  the expected MD5.
 * Harness: QEMU's qemu-xhci has 4 root ports; a 5th USB device lands behind
   an emulated hub, which usosusb does not support (`p7-nohid`), so tests keep
   at most four USB devices.
