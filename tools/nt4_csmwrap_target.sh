@@ -653,6 +653,19 @@ fi
 if [ -n "$SP_EXE" ]; then
     cp "$SP_EXE" "$usos/SP6I386.EXE" || fail 'cannot copy the service pack'
     log "service pack: $(basename "$SP_EXE") ($(wc -c < "$SP_EXE" | tr -d ' ') bytes)"
+    # Only the newer sfxcab stub (English SP6a re-release, 2000) knows -x:dir
+    # and -q: its stub (the bytes before the MSCF cabinet, about 6 KiB) has
+    # the " -X:" switch text. The older stub (Polish SP6a, 1999-12-15) knows
+    # no switch and hands every argument to update.exe, which then shows its
+    # modal usage box "UPDATE [-u] [-f] [-n] [-o] [-z] [-q]" and the install
+    # waits forever (X470 NVMe run 2026-10-12, B261012-104904). For it
+    # POST.CMD runs the package with -u -z directly (SPPKG.TXT).
+    if head -c 16384 "$SP_EXE" | od -An -v -tx1 | tr -d ' \n' | grep -q '202d583a'; then
+        log 'service pack: self-extractor with -x (extracted first)'
+    else
+        printf 'package\r\n' > "$usos/SPPKG.TXT"
+        log 'service pack: older self-extractor without -x (package run with -u -z)'
+    fi
 elif [ -n "$tse" ]; then
     log 'service pack: none (the X470 needs the Terminal Server Edition SP6: the RTM TSE kernel stops on CPUs with more than 3 CPUID leaves)'
 else
@@ -833,6 +846,7 @@ goto vesadone
 echo vesa off: no framebuf.dll, VGA stays >> C:\USOS\NT4\POST.LOG
 :vesadone
 if not exist C:\USOS\NT4\SP6I386.EXE goto nosp
+if exist C:\USOS\NT4\SPPKG.TXT goto sppkg
 start /wait C:\USOS\NT4\SP6I386.EXE -x:C:\USOS\NT4\SP6X -q
 if not exist C:\USOS\NT4\SP6X\update\update.exe goto spsfx
 echo sp start >> C:\USOS\NT4\POST.LOG
@@ -859,6 +873,10 @@ echo sp end %errorlevel% >> C:\USOS\NT4\POST.LOG
 goto nosp
 :spsfx
 echo sp extract failed, running the package >> C:\USOS\NT4\POST.LOG
+goto sprun
+:sppkg
+echo sp package without -x, running it with -u -z >> C:\USOS\NT4\POST.LOG
+:sprun
 start /wait C:\USOS\NT4\SP6I386.EXE -u -z
 echo sp end %errorlevel% >> C:\USOS\NT4\POST.LOG
 :nosp
