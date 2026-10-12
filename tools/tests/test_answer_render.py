@@ -36,9 +36,13 @@ TOOL = ROOT / 'zig-out' / 'bin' / 'usos-answer.exe'
 ZIG = ROOT / 'tools' / 'zig' / 'zig.exe'
 SH = next((p for p in (r'C:\msys64\usr\bin\sh.exe', r'C:\Program Files\Git\usr\bin\sh.exe', shutil.which('sh') or '') if p and Path(p).exists()), None)
 # The shell's own coreutils (head, od, awk) first: PowerShell runs lack them on PATH.
+# Only for this module's shells (env=SH_ENV), never os.environ: pytest imports
+# every test module into one process, and a PATH with another MSYS runtime's
+# sh first breaks the nested `VAR=x sh script` calls of other modules.
+SH_ENV = dict(os.environ)
 if SH:
     # cmp (tools/answer_plan.sh) may only be in Git's usr/bin: second.
-    os.environ['PATH'] = os.pathsep.join([str(Path(SH).parent), r'C:\Program Files\Git\usr\bin', os.environ.get('PATH', '')])
+    SH_ENV['PATH'] = os.pathsep.join([str(Path(SH).parent), r'C:\Program Files\Git\usr\bin', os.environ.get('PATH', '')])
 UPDATE = os.environ.get('USOS_UPDATE_GOLDEN') == '1'
 NS = '{urn:schemas-microsoft-com:unattend}'
 failures: list[str] = []
@@ -73,7 +77,7 @@ def posix(path: Path) -> str:
 
 def sh(command: str) -> subprocess.CompletedProcess:
     lib = posix(ROOT / 'tools' / 'xp_user_settings.sh')
-    return subprocess.run([SH, '-c', f". '{lib}'; {command}"], capture_output=True)
+    return subprocess.run([SH, '-c', f". '{lib}'; {command}"], capture_output=True, env=SH_ENV)
 
 
 def tool(*args: str) -> subprocess.CompletedProcess:
@@ -575,7 +579,7 @@ def main() -> int:
     lib = posix(ROOT / 'tools' / 'xp_user_settings.sh')
     plan_cmd = subprocess.run([SH, '-c', f"USOS_XP_SETTINGS_OUT='{posix(OUT / 'plan.normalized')}'; . '{lib}'; "
                                f"usos_xp_settings_select x '{posix(OUT / 'source')}' '' plan '{posix(esp / 'usos-plan.ini')}' 2>&1; echo rc=$? settings=$XP_USER_SETTINGS"],
-                              capture_output=True)
+                              capture_output=True, env=SH_ENV)
     out = plan_cmd.stdout.decode(errors='replace')
     check('plan: rendered settings consumed', 'profile "Dom" active' in out and 'rc=0' in out and 'family=xp' in out and 'plan.normalized' in out, out)
     check('plan: rendered file deleted from the ESP', not (esp / 'nt5-settings.ini').exists())
@@ -583,19 +587,19 @@ def main() -> int:
     check('plan: normalized settings equal the direct load', (OUT / 'plan.normalized').read_bytes() == (OUT / 'full.windows-xp.normalized').read_bytes())
     plan_cmd = subprocess.run([SH, '-c', f"USOS_XP_SETTINGS_OUT='{posix(OUT / 'plan2.normalized')}'; . '{lib}'; "
                                f"usos_xp_settings_select x '{posix(OUT / 'source')}' '' plan '{posix(esp / 'usos-plan.ini')}' 2>&1"],
-                              capture_output=True)
+                              capture_output=True, env=SH_ENV)
     check('plan: missing rendered file stops before any write', plan_cmd.returncode == 1 and b'STOP' in plan_cmd.stdout)
 
     ap = posix(ROOT / 'tools' / 'answer_plan.sh')
     shutil.copy(OUT / 'full.windows-10.amd64.xml', esp / 'autounattend.xml')
     (esp / 'usos-plan.ini').write_bytes(b'[plan]\r\nversion=1\r\nprofile=windows-work\r\nsystem=windows-10\r\n[answer]\r\nsource=profile\r\nname=Dom\r\nformat=autounattend_xml\r\nfile=EFI/USOS/answer/autounattend.xml\r\narch=amd64\r\nkey=yes\r\n')
     taken = OUT / 'taken' / 'Autounattend.xml'
-    r = subprocess.run([SH, '-c', f". '{ap}'; usos_answer_plan_take '{posix(esp / 'usos-plan.ini')}' autounattend_xml '{posix(taken)}'"], capture_output=True)
+    r = subprocess.run([SH, '-c', f". '{ap}'; usos_answer_plan_take '{posix(esp / 'usos-plan.ini')}' autounattend_xml '{posix(taken)}'"], capture_output=True, env=SH_ENV)
     check('WORK plan: file taken', r.returncode == 0 and taken.read_bytes() == (OUT / 'full.windows-10.amd64.xml').read_bytes(), r.stdout.decode(errors='replace'))
     check('WORK plan: rendered file deleted from the ESP', not (esp / 'autounattend.xml').exists())
-    r = subprocess.run([SH, '-c', f". '{ap}'; usos_answer_plan_take '{posix(esp / 'usos-plan.ini')}' autounattend_xml '{posix(taken)}'"], capture_output=True)
+    r = subprocess.run([SH, '-c', f". '{ap}'; usos_answer_plan_take '{posix(esp / 'usos-plan.ini')}' autounattend_xml '{posix(taken)}'"], capture_output=True, env=SH_ENV)
     check('WORK plan: refuses a missing rendered file', r.returncode == 1)
-    r = subprocess.run([SH, '-c', f". '{ap}'; usos_answer_plan_take '{posix(esp / 'usos-plan.ini')}' nt5_settings '{posix(taken)}'"], capture_output=True)
+    r = subprocess.run([SH, '-c', f". '{ap}'; usos_answer_plan_take '{posix(esp / 'usos-plan.ini')}' nt5_settings '{posix(taken)}'"], capture_output=True, env=SH_ENV)
     check('WORK plan: refuses another format', r.returncode == 1)
 
     check_linux()

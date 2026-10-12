@@ -18,8 +18,12 @@ OUT = ROOT / 'zig-out' / 'xp-user-settings-tests'
 BASE = ROOT / 'tools' / 'xp_selected_partition_uefi_csm.sif'
 SH = next((p for p in (r'C:\msys64\usr\bin\sh.exe', r'C:\Program Files\Git\usr\bin\sh.exe', shutil.which('sh') or '') if p and Path(p).exists()), None)
 # The shell's own coreutils (head, od, awk) first: PowerShell runs lack them on PATH.
+# Only for this module's shells (env=SH_ENV), never os.environ: pytest imports
+# every test module into one process, and a PATH with another MSYS runtime's
+# sh first breaks the nested `VAR=x sh script` calls of other modules.
+SH_ENV = dict(os.environ)
 if SH:
-    os.environ['PATH'] = str(Path(SH).parent) + os.pathsep + os.environ.get('PATH', '')
+    SH_ENV['PATH'] = str(Path(SH).parent) + os.pathsep + os.environ.get('PATH', '')
 CRLF = b'\r\n'
 failures: list[str] = []
 
@@ -31,7 +35,7 @@ def posix(path: Path) -> str:
 
 def sh(command: str) -> subprocess.CompletedProcess:
     lib = posix(ROOT / 'tools' / 'xp_user_settings.sh')
-    return subprocess.run([SH, '-c', f". '{lib}'; {command}"], capture_output=True)
+    return subprocess.run([SH, '-c', f". '{lib}'; {command}"], capture_output=True, env=SH_ENV)
 
 
 def check(name: str, condition: bool, detail: str = '') -> None:
