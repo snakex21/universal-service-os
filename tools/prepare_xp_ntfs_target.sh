@@ -57,6 +57,17 @@ cmp -s "$work/sector" "$work/readback" || fail 'NTFS backup boot sector mismatch
 modprobe ntfs3
 mkdir "$work/volume"
 mount -t ntfs3 "$node" "$work/volume"; mounted=yes
+# Typed answer-profile options (src/flow/answer/options.zig): the registry
+# set of the rendered profile and usos-reg.exe (tools/windows_usos_reg.c)
+# next to usos-users.cmd, which applies and deletes the set at setup end.
+usos_nt5_stage_regset() {
+    usos_xp_settings_regset "$XP_USER_SETTINGS" "$work/usos-reg.txt" || return 0
+    [ -f "$SCRIPT_DIR/usos-reg.exe" ] || fail 'usos-reg.exe is missing from this build'
+    cp "$SCRIPT_DIR/usos-reg.exe" "$1/usos-reg.exe" && cp "$work/usos-reg.txt" "$1/usos-reg.txt" || fail 'cannot stage the registry set'
+    cmp -s "$SCRIPT_DIR/usos-reg.exe" "$1/usos-reg.exe" && cmp -s "$work/usos-reg.txt" "$1/usos-reg.txt" || fail 'registry set readback mismatch'
+    printf '[NT5] registry set staged: %s entries for usos-reg.exe\n' "$(grep -vc '^;' "$work/usos-reg.txt")"
+    rm -f "$work/usos-reg.txt"
+}
 export XP_TARGET_ROOT="$work/volume" MTOOLS_IMAGE="$node"
 sh "$SCRIPT_DIR/prepare_xp_local_source.sh"
 if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ] || [ "${USOS_PLAN_PROFILE:-}" = w2k3-x86-sp2-uefi-csm ]; then
@@ -103,6 +114,7 @@ cp "$work/accounts.cmd" "$work/volume/USOS/XP/usos-users.cmd"
 cmp -s "$work/accounts.cmd" "$work/volume/USOS/XP/usos-users.cmd" || fail 'usos-users.cmd readback mismatch'
 rm -f "$work/accounts.cmd"
 printf '[XP_PAE] usos-users.cmd staged (accounts from usos-xp.ini, run hidden by pae.exe)\n'
+usos_nt5_stage_regset "$work/volume/USOS/XP"
 fi
 # Installer-chosen language (only that one is on the ESP); pae.exe falls back to English.
 if [ -f /mnt/esp/EFI/USOS/lang-xp.ini ]; then
@@ -157,6 +169,7 @@ cp "$work/accounts.cmd" "$setup_dir/usos-users.cmd"
 cmp -s "$work/accounts.cmd" "$setup_dir/usos-users.cmd" || fail 'usos-users.cmd readback mismatch'
 rm -f "$work/accounts.cmd"
 printf '[NT5] usos-users.cmd staged in USOS/%s (accounts from usos-xp.ini, run by usos-setup.cmd at setup end)\n' "$NT5_SETUP_DIR"
+usos_nt5_stage_regset "$setup_dir"
 fi
 sync
 umount "$work/volume"; mounted=no

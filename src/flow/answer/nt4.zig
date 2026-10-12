@@ -29,6 +29,7 @@ const std = @import("std");
 const profile_mod = @import("profile.zig");
 const Profile = profile_mod.Profile;
 const msbatch = @import("msbatch.zig");
+const options = @import("options.zig");
 
 pub const file_name = "WINNT.SIF";
 
@@ -103,7 +104,45 @@ pub fn render(p: *const Profile, key: []const u8, buffer: []u8) ![]const u8 {
         if (msbatch.timeZoneName(zone)) |name98| try w.print(";USOS-TZ={s}\r\n", .{name98});
     }
     try w.writeAll("\r\n[Display]\r\nConfigureAtLogon = 0\r\nAutoConfirm = 1\r\nBitsPerPel = 8\r\nXResolution = 640\r\nYResolution = 480\r\nVRefresh = 60\r\n");
+    try optionLines(p, &w);
     return w.buffered();
+}
+
+/// The typed options (options.zig) as ";USOS-REG=<usos-reg set line>"
+/// comments (Setup skips them): micro-Linux (nt4_csmwrap_target.sh) writes
+/// them to C:\USOS\NT4\USOS-REG.TXT and POST.CMD applies them with
+/// usos-reg.exe at the automatic Administrator logon (HKLM, HKU\.DEFAULT,
+/// the Default User hive and the Administrator's own HKCU).
+fn optionLines(p: *const Profile, w: *std.Io.Writer) !void {
+    var values: [options.count]u8 = undefined;
+    var it = options.iterate(p, &values, .{ .os = .nt4 });
+    while (it.next()) |rule| switch (rule.action) {
+        .reg => |r| {
+            try w.writeAll(";USOS-REG=");
+            try options.writeSetLine(w, r, p);
+            try w.writeAll("\r\n");
+        },
+        else => {},
+    };
+}
+
+test "NT 4.0 WINNT.SIF: typed options as USOS-REG comments, nothing by default" {
+    var p = Profile{};
+    try p.name.set("A");
+    try p.user.set("Jan");
+    var buffer: [4096]u8 = undefined;
+    const plain = try render(&p, "", &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, plain, "USOS-REG") == null);
+    p.no_autorun = true;
+    p.opts[@intFromEnum(options.Opt.numlock)] = 1;
+    p.opts[@intFromEnum(options.Opt.no_tips)] = 1;
+    const text = try render(&p, "", &buffer);
+    try std.testing.expect(std.mem.endsWith(u8, text, "VRefresh = 60\r\n" ++
+        ";USOS-REG=HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer|NoDriveTypeAutoRun|dword|255\r\n" ++
+        ";USOS-REG=HKLM\\SYSTEM\\CurrentControlSet\\Services\\Cdrom|Autorun|dword|0\r\n" ++
+        ";USOS-REG=USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Tips|Show|dword|0\r\n" ++
+        ";USOS-REG=DEFAULT\\Control Panel\\Keyboard|InitialKeyboardIndicators|sz|2\r\n" ++
+        ";USOS-REG=USER\\Control Panel\\Keyboard|InitialKeyboardIndicators|sz|2\r\n"));
 }
 
 test "NT 4.0 ids and key shapes" {

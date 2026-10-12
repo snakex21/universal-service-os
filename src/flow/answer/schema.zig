@@ -95,7 +95,15 @@ pub const settings = [_]Setting{
     // (2008 / 2008 R2) do not open at the first logon.
     .{ .pass = .specialize, .component = server_manager, .path = "DoNotOpenServerManagerAtLogon", .since = .windows_7, .server_only = true },
     .{ .pass = .specialize, .component = ict, .path = "DoNotOpenInitialConfigurationTasksAtLogon", .until = .windows_7, .server_only = true },
+    // Typed option workgroup (options.zig).
+    .{ .pass = .specialize, .component = "Microsoft-Windows-UnattendedJoin", .path = "Identification/JoinWorkgroup" },
     // oobeSystem
+    // Typed option autologon (options.zig).
+    .{ .pass = .oobeSystem, .component = shell, .path = "AutoLogon/Enabled" },
+    .{ .pass = .oobeSystem, .component = shell, .path = "AutoLogon/LogonCount" },
+    .{ .pass = .oobeSystem, .component = shell, .path = "AutoLogon/Username" },
+    .{ .pass = .oobeSystem, .component = shell, .path = "AutoLogon/Password/Value" },
+    .{ .pass = .oobeSystem, .component = shell, .path = "AutoLogon/Password/PlainText" },
     .{ .pass = .oobeSystem, .component = intl, .path = "InputLocale" },
     .{ .pass = .oobeSystem, .component = intl, .path = "SystemLocale" },
     .{ .pass = .oobeSystem, .component = intl, .path = "UILanguage" },
