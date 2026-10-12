@@ -131,19 +131,20 @@ usos_vista_csmwrap_prepare() {
         usos_xp_choose_disk
         # NVMe target gate (docs/nvme-nt6-2026-10-12.md), before the erase
         # confirmation: CSMWrap's SeaBIOS boots only 512-byte LBAs; 32-bit
-        # 8.1 / 10 have stornvme; 32-bit 7 / Vista / 2008 get their boot
-        # driver from the WinPE nvme step (usosnvme, or the user's KB2990941
-        # x86 on 7); 64-bit Vista / 2008 would need a signed x64 driver.
+        # 8.1 / 10 have stornvme; 32-bit 7 / Vista / 2008 stop (below);
+        # 64-bit Vista / 2008 would need a signed x64 driver.
         case "$TARGET_DEVICE" in /dev/nvme*)
             nvme_lbs=$(cat "/sys/class/block/${TARGET_DEVICE##*/}/queue/logical_block_size" 2>/dev/null || echo unknown)
             vista_csmwrap_log "NVME $TARGET_DEVICE logical_block=$nvme_lbs profile=$profile"
             [ "$nvme_lbs" = 512 ] || stop "The NVMe disk uses $nvme_lbs-byte sectors; $NT5_NAME through CSMWrap needs 512-byte sectors (switch the namespace to a 512-byte LBA format first). No disk was changed."
             [ "$x86_self" = 1 ] || stop "No NVMe driver for 64-bit $NT5_NAME yet (it would need a signed x64 driver). Pick a SATA disk. No disk was changed."
-            # NT 6.0 x86 (Vista / Server 2008): Setup accepts the disk with
-            # usosnvme but cannot migrate it (offline driver store of the
-            # Windows 10 donor refuses NT 6.0, 0x80070032, QEMU 2026-10-12).
-            case "$profile:$folder" in
-                'win-nt6-x86-uefi-csmwrap:Windows Vista'|'win-nt6-x86-uefi-csmwrap:Windows Server 2008')
+            # 32-bit 7 / Vista / Server 2008 (x86 PE10 donor): Setup accepts
+            # the disk with usosnvme but cannot migrate it into the new
+            # system (the Windows 10 donor's offline driver store refuses
+            # NT 6.0 and NT 6.1 images, 0x80070032; QEMU 2026-10-12 Server
+            # 2008 SP2 x86 and Windows 7 SP1 x86) and rolls the install back.
+            case "$profile" in
+                win-nt6-x86-uefi-csmwrap)
                     stop "No NVMe support for 32-bit $NT5_NAME yet (Setup cannot take the NVMe driver). Pick a SATA disk. No disk was changed." ;;
             esac ;;
         esac

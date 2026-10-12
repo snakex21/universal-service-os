@@ -123,7 +123,9 @@ class Nt6Flow(unittest.TestCase):
         self.assertLess(gate.index('case "$TARGET_DEVICE" in /dev/nvme*)'), gate.index('usos_xp_confirm '))
         self.assertIn('[ "$nvme_lbs" = 512 ] || stop', gate)
         self.assertIn('[ "$x86_self" = 1 ] || stop "No NVMe driver for 64-bit', gate)
-        self.assertIn("'win-nt6-x86-uefi-csmwrap:Windows Vista'|'win-nt6-x86-uefi-csmwrap:Windows Server 2008')", gate)
+        # Windows 7 x86 joined Vista / 2008 x86 (Setup 0x80070032, QEMU 2026-10-12).
+        self.assertIn('case "$profile" in\n                win-nt6-x86-uefi-csmwrap)\n'
+                      '                    stop "No NVMe support for 32-bit', gate)
         target = (ROOT / 'tools/vista_csmwrap_target.sh').read_text(encoding='utf-8')
         self.assertIn('/dev/nvme*) target_bus=nvme', target)
         self.assertIn(r'target_bus=%s\r\n', target)
