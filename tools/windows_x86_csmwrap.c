@@ -393,6 +393,15 @@ void entry(void) {
     }
     if (lstrcmpiW(args[1], L"stick") == 0) { stick_report(); ExitProcess(0); }
     if (lstrcmpiW(args[1], L"nodump") == 0) ExitProcess(no_dump_stack());
+    /* setupver <setup.exe>: exit code = major * 10 + minor of the file version
+     * (60 Vista / 2008, 61 Windows 7, 62 / 63 8.x, 100 Windows 10), 0 unknown.
+     * usos-x86-csmwrap.cmd: NVMe target, Setup 6.0 / 6.1 only. */
+    if (lstrcmpiW(args[1], L"setupver") == 0 && arg_count == 3) {
+        DWORD major = 0, minor = 0;
+        if (!file_version(args[2], &major, &minor) || major > 25 || minor > 9) ExitProcess(0);
+        logn("Setup file version major=", major); logn("Setup file version minor=", minor);
+        ExitProcess(major * 10 + minor);
+    }
     FIRMWARE_TYPE firmware;
     if (!GetFirmwareType(&firmware) || firmware != FirmwareTypeBios) { say("[X86_CSMWRAP] STOP: not booted in BIOS mode\r\n"); ExitProcess(2); }
     if (!load_target()) { say("[X86_CSMWRAP] STOP: usos-csmwrap-target.ini is invalid\r\n"); ExitProcess(3); }

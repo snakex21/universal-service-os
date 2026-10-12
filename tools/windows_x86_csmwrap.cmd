@@ -24,7 +24,10 @@ rem   3c. Vista / Server 2008 SP2 x86 (NT 6.0.6002) only: usosusb.sys (own
 rem      xHCI keyboard / mouse port driver, tools/nt4/usosusb build-nt6)
 rem      copied to system32\drivers and registered offline as a system-start
 rem      "Keyboard Port" service; never fatal (design doc section 12.6);
-rem   3d. NVMe target (target_bus=nvme in usos-csmwrap-target.ini), Windows
+rem   0. NVMe target (target_bus=nvme in usos-csmwrap-target.ini), Setup 6.0 /
+rem      6.1: Setup runs from a copy of the media's sources folder whose
+rem      hwcompat.txt lists PCI\CC_010802 (:nvme_setup);
+rem   3d. NVMe target, Windows
 rem      7 / Vista / Server 2008 x86 only: the installed system gets an NVMe
 rem      boot driver before its first start (Setup itself ran in the PE10
 rem      donor, which has stornvme): NT 6.1 with the user's KB2990941 +
@@ -41,24 +44,16 @@ if exist "%~dp0usos-unattend.xml" set "USOS_ANSWER=%~dp0usos-unattend.xml"
 if exist "%~dp0usos-unattend.xml" (echo [USOS] User answer file supplied.) else (echo [USOS] No user answer file.)
 echo [USOS] phase=x86-csmwrap-before
 "%~dp0usos-x86-csmwrap.exe" stick
-rem NVMe target: Vista / 2008 / 7 Setup must see a driver for the disk's
-rem controller that the new system can take; the helper adds this folder as
-rem PnpCustomizationsWinPE DriverPaths for Setup 6.0 / 6.1 only.
-set "USOS_NVME_DRIVERS="
-find "target_bus=nvme" "%~dp0usos-csmwrap-target.ini" >nul 2>&1
-if not errorlevel 1 if exist "%~dp0usosnvme-nt6.sys" if exist "%~dp0usosnvme.inf" (
-    md "%SystemDrive%\USOS-nvme" 2>nul
-    copy /y "%~dp0usosnvme-nt6.sys" "%SystemDrive%\USOS-nvme\usosnvme.sys" >nul
-    copy /y "%~dp0usosnvme.inf" "%SystemDrive%\USOS-nvme\usosnvme.inf" >nul
-    set "USOS_NVME_DRIVERS=%SystemDrive%\USOS-nvme"
-    echo [USOS] NVMe target: usosnvme staged in %SystemDrive%\USOS-nvme for Setup.
-    "%~dp0usos-x86-csmwrap.exe" nodump
-)
+rem NVMe target, Setup 6.0 / 6.1 (Vista / 2008 / 7): see :nvme_setup.
+set "USOS_NVME_TARGET="
+find "target_bus=nvme" "%~dp0usos-csmwrap-target.ini" >nul 2>&1 && set "USOS_NVME_TARGET=1"
+if defined USOS_NVME_TARGET call :nvme_setup
+if defined USOS_NVME_TARGET if errorlevel 1 exit /b 1
 "%~dp0usos-x86-csmwrap.exe" before "%USOS_ANSWER%" "%~dp0usos-csmwrap-unattend.xml" "%USOS_SETUP%"
 if errorlevel 1 exit /b 1
 echo [USOS] phase=launch-setup answer=%~dp0usos-csmwrap-unattend.xml
 "%~dp0usos-log-x86.exe"
-pushd "%USOS_SOURCE%\sources"
+for %%S in ("%USOS_SETUP%") do pushd "%%~dpS"
 "%USOS_SETUP%" /noreboot /installfrom:"%USOS_INSTALL%" /unattend:"%~dp0usos-csmwrap-unattend.xml"
 set "USOS_SETUP_RESULT=%errorlevel%"
 popd
@@ -222,6 +217,60 @@ reg unload HKLM\USOS_SYS >nul
 "%~dp0usos-log-x86.exe"
 exit /b 0
 
+rem ---- NVMe target: Setup 6.0 / 6.1 disk check (before Setup) --------------
+rem Vista / 2008 / 7 Setup looks up the disk's controller (PCI\CC_010802, run
+rem by the donor's inbox stornvme) in sources\hwcompat.txt of the media, which
+rem predates NVMe, and refuses the disk ("Windows needs the driver for
+rem [Standard NVM Express controller]"). A driver injected into the PE to pass
+rem the check (PnpCustomizationsWinPE) must then be migrated by Setup through
+rem the Windows 10 offline driver store, which refuses NT 6.0 / 6.1 images
+rem (0x80070032, QEMU 2026-10-12; docs/nvme-nt6-2026-10-12.md). Instead Setup
+rem runs from a copy of the media's sources folder (install.wim stays on the
+rem ISO, /installfrom) in the WinPE RAM disk whose hwcompat.txt also lists
+rem the NVMe class code; nothing is injected or migrated, and the installed
+rem system gets its NVMe boot driver in :nvme after Setup. The copy is reached
+rem through a SUBST drive: Vista Setup started from the system drive (X:)
+rem treats itself as booted Setup media, looks for a DVD and asks for a
+rem "CD/DVD driver" (QEMU 2026-10-13, Server 2008 SP2 x86); it also needs
+rem sources\boot.wim next to setup.exe (copied, ~140 MB; WinPE has no
+rem symbolic links on X:).
+:nvme_setup
+"%~dp0usos-x86-csmwrap.exe" setupver "%USOS_SETUP%"
+set "USOS_SETUPVER=%errorlevel%"
+if not "%USOS_SETUPVER%"=="60" if not "%USOS_SETUPVER%"=="61" (echo [USOS] NVMe target: Setup version code %USOS_SETUPVER%, no hwcompat change needed. & exit /b 0)
+set "USOS_SRC=%SystemDrive%\USOS-src"
+if exist "%USOS_SRC%" rd /s /q "%USOS_SRC%"
+echo [USOS] NVMe target: copying the Setup files (without install.wim) to %USOS_SRC%
+robocopy "%USOS_SOURCE%\sources" "%USOS_SRC%\sources" /e /r:1 /w:1 /xf install.wim install.esd install.swm /njh /njs /nfl /ndl /np >nul
+if errorlevel 8 (echo [USOS] NVMe target: copying the Setup files to %USOS_SRC% failed; Setup would refuse the NVMe disk. & exit /b 1)
+if not exist "%USOS_SRC%\sources\setup.exe" (echo [USOS] NVMe target: %USOS_SRC%\sources\setup.exe missing after the copy. & exit /b 1)
+attrib -r -h -s "%USOS_SRC%\sources\hwcompat.txt" >nul 2>&1
+>>"%USOS_SRC%\sources\hwcompat.txt" echo.
+>>"%USOS_SRC%\sources\hwcompat.txt" echo stornvme.inf:
+>>"%USOS_SRC%\sources\hwcompat.txt" echo PCI\CC_010802
+find /i "PCI\CC_010802" "%USOS_SRC%\sources\hwcompat.txt" >nul 2>&1
+if errorlevel 1 (echo [USOS] NVMe target: hwcompat.txt could not be extended. & exit /b 1)
+rem Setup 6.1 runs from X:\USOS-src itself: from the SUBST drive Windows 7
+rem Setup hit an access violation in WinSetup.dll right after the image
+rem apply (QEMU 2026-10-13); from X: it went on through "Installing
+rem features". Vista / 2008 (6.0) need the SUBST drive (see above).
+set "USOS_SETUP=%USOS_SRC%\sources\setup.exe"
+if "%USOS_SETUPVER%"=="61" goto nvme_setup_ready
+set "USOS_SUBST="
+for %%L in (Z Y W V U R Q P O N M L K J I H) do if not defined USOS_SUBST if not exist %%L:\ (subst %%L: "%USOS_SRC%" >nul 2>&1 && set "USOS_SUBST=%%L:")
+if not defined USOS_SUBST (echo [USOS] NVMe target: no free drive letter for the Setup copy. & exit /b 1)
+if not exist "%USOS_SUBST%\sources\setup.exe" (echo [USOS] NVMe target: %USOS_SUBST% does not show the Setup copy. & exit /b 1)
+set "USOS_SETUP=%USOS_SUBST%\sources\setup.exe"
+:nvme_setup_ready
+rem The donor booted from the NVMe staging partition, so its crash-dump
+rem stack (dump_stornvme) is armed for the controller; once Setup works on
+rem the disk it bugchecked there (KMODE_EXCEPTION_NOT_HANDLED, "What failed:
+rem dump_stornvme.sys", QEMU 2026-10-13 Windows 7 + Server 2008 x86). Off.
+"%~dp0usos-x86-csmwrap.exe" nodump
+echo [USOS] NVMe target: Setup %USOS_SETUPVER% runs from %USOS_SETUP% = %USOS_SRC% (hwcompat.txt + PCI\CC_010802)
+"%~dp0usos-log-x86.exe"
+exit /b 0
+
 rem ---- NVMe target: boot driver for Windows 7 / Vista / Server 2008 x86 -----
 rem Only when micro-Linux prepared an NVMe disk (target_bus=nvme): a SATA
 rem install never gets a boot-start driver for a controller it may not have
@@ -247,7 +296,7 @@ echo [USOS] phase=nvme nt=%USOS_NT% build=%USOS_BUILD%
 set "USOS_NVME_MSU="
 if not "%USOS_NT%"=="6.0" if not "%USOS_NT%"=="6.1" (echo [USOS] NVMe: Windows %USOS_NT% has its own NVMe driver. & exit /b 0)
 if "%USOS_NT%"=="6.1" call :nvme_msu
-if "%USOS_NVME_MSU%"=="ok" (echo [USOS] NVMe: Microsoft stornvme installed; usosnvme not needed. & goto nvme_done)
+if "%USOS_NVME_MSU%"=="ok" (echo [USOS] NVMe: Microsoft stornvme installed; usosnvme not needed. & goto nvme_stornvme)
 if not exist "%~dp0usosnvme-nt6.sys" (echo [USOS] NVMe: usosnvme driver missing; skipped. & goto nvme_done)
 copy /y "%~dp0usosnvme-nt6.sys" "%USOS_T%\Windows\System32\drivers\usosnvme.sys" >nul
 if errorlevel 1 (echo [USOS] NVMe: usosnvme copy failed; skipped. & goto nvme_done)
@@ -269,6 +318,30 @@ reg add "%USOS_SVC%\Parameters\PnpInterface" /v 5 /t REG_DWORD /d 1 /f >nul
 reg add "%USOS_CDD%" /v Service /t REG_SZ /d usosnvme /f >nul
 reg add "%USOS_CDD%" /v ClassGUID /t REG_SZ /d "{4D36E97B-E325-11CE-BFC1-08002BE10318}" /f >nul
 echo [USOS] NVMe: usosnvme registered in ControlSet00%USOS_CS% exit=%errorlevel%
+reg unload HKLM\USOS_SYS >nul
+goto nvme_done
+rem KB2990941 brings stornvme; the first start must load it for the
+rem controller before PnP runs. DISM's offline driver install normally adds
+rem the CriticalDeviceDatabase entry for a boot-critical class; if it is
+rem missing, add it and make stornvme boot-start (logged either way).
+:nvme_stornvme
+reg load HKLM\USOS_SYS "%USOS_T%\Windows\System32\config\SYSTEM" >nul
+if errorlevel 1 (echo [USOS] NVMe: SYSTEM hive not loaded; stornvme boot entry not checked. & goto nvme_done)
+set "USOS_CS="
+for /f "tokens=3" %%A in ('reg query "HKLM\USOS_SYS\Select" /v Current ^| find /i "Current"') do set /a "USOS_CS=%%A"
+if not defined USOS_CS set "USOS_CS=1"
+set "USOS_SVC=HKLM\USOS_SYS\ControlSet00%USOS_CS%\Services\stornvme"
+set "USOS_CDD=HKLM\USOS_SYS\ControlSet00%USOS_CS%\Control\CriticalDeviceDatabase\pci#cc_010802"
+set "USOS_START="
+for /f "tokens=3" %%A in ('reg query "%USOS_SVC%" /v Start 2^>nul ^| find /i "Start"') do set "USOS_START=%%A"
+echo [USOS] NVMe: stornvme service Start=%USOS_START%
+reg query "%USOS_CDD%" /v Service >nul 2>&1
+if not errorlevel 1 (echo [USOS] NVMe: CriticalDeviceDatabase pci#cc_010802 present. & goto nvme_stornvme_done)
+reg add "%USOS_CDD%" /v Service /t REG_SZ /d stornvme /f >nul
+reg add "%USOS_CDD%" /v ClassGUID /t REG_SZ /d "{4D36E97B-E325-11CE-BFC1-08002BE10318}" /f >nul
+reg add "%USOS_SVC%" /v Start /t REG_DWORD /d 0 /f >nul
+echo [USOS] NVMe: CriticalDeviceDatabase pci#cc_010802 -^> stornvme added, Start=0 exit=%errorlevel%
+:nvme_stornvme_done
 reg unload HKLM\USOS_SYS >nul
 :nvme_done
 "%~dp0usos-log-x86.exe"

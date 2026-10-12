@@ -123,7 +123,8 @@ class Nt6Flow(unittest.TestCase):
         self.assertLess(gate.index('case "$TARGET_DEVICE" in /dev/nvme*)'), gate.index('usos_xp_confirm '))
         self.assertIn('[ "$nvme_lbs" = 512 ] || stop', gate)
         self.assertIn('[ "$x86_self" = 1 ] || stop "No NVMe driver for 64-bit', gate)
-        # Windows 7 x86 joined Vista / 2008 x86 (Setup 0x80070032, QEMU 2026-10-12).
+        # 7 / Vista / 2008 x86 still stop: the hwcompat route has no full
+        # QEMU pass yet (docs/nvme-nt6-2026-10-12.md section 7).
         self.assertIn('case "$profile" in\n                win-nt6-x86-uefi-csmwrap)\n'
                       '                    stop "No NVMe support for 32-bit', gate)
         target = (ROOT / 'tools/vista_csmwrap_target.sh').read_text(encoding='utf-8')
@@ -149,18 +150,31 @@ class Nt6Flow(unittest.TestCase):
             self.assertIn(want, s)
         self.assertNotRegex(s, r'exit /b [1-9]')
 
-    def test_setup_sees_driver(self):
-        # Vista / 7 Setup refuses the NVMe disk unless a driver for its
-        # controller was loaded: DriverPaths before Setup, crash dump off.
+    def test_setup_hwcompat(self):
+        # Setup 6.0 / 6.1 checks the NVMe controller against hwcompat.txt; a
+        # PE-injected driver would have to be migrated (0x80070032), so Setup
+        # runs from a sources copy that lists PCI\CC_010802.
         before = self.CMD[:self.CMD.index('usos-x86-csmwrap.exe" before')]
-        self.assertIn('set "USOS_NVME_DRIVERS=%SystemDrive%\\USOS-nvme"', before)
-        self.assertIn('usos-x86-csmwrap.exe" nodump', before)
+        self.assertIn('if defined USOS_NVME_TARGET call :nvme_setup', before)
+        self.assertNotIn('USOS_NVME_DRIVERS', self.CMD)
+        sub = self.CMD[self.CMD.index('\n:nvme_setup\n'):self.CMD.index('\n:nvme\n')]
+        self.assertIn('usos-x86-csmwrap.exe" setupver "%USOS_SETUP%"', sub)
+        self.assertIn('if not "%USOS_SETUPVER%"=="60" if not "%USOS_SETUPVER%"=="61"', sub)
+        # boot.wim is copied too: Vista Setup needs it next to setup.exe.
+        self.assertIn('/xf install.wim install.esd install.swm /njh', sub)
+        self.assertIn(r'>>"%USOS_SRC%\sources\hwcompat.txt" echo PCI\CC_010802', sub)
+        # SUBST drive: Vista Setup started from X: looks for a DVD.
+        self.assertIn('(subst %%L: "%USOS_SRC%" >nul 2>&1 && set "USOS_SUBST=%%L:")', sub)
+        self.assertIn(r'set "USOS_SETUP=%USOS_SUBST%\sources\setup.exe"', sub)
+        # Setup 6.1 stays on X: (WinSetup.dll AV from the SUBST drive).
+        self.assertIn('if "%USOS_SETUPVER%"=="61" goto nvme_setup_ready', sub)
+        # dump_stornvme bugchecked while Setup worked on the NVMe disk.
+        self.assertIn('usos-x86-csmwrap.exe" nodump', sub)
+        self.assertIn('for %%S in ("%USOS_SETUP%") do pushd "%%~dpS"', self.CMD)
         src = (ROOT / 'tools/windows_x86_csmwrap.c').read_text(encoding='utf-8')
-        self.assertIn('Microsoft-Windows-PnpCustomizationsWinPE', src)
-        self.assertIn('if (major == 6 && minor <= 1 && dn && dn < MAX_PATH)', src)
-        self.assertIn('34 /* SystemCrashDumpStateInformation */', src)
-        build = (ROOT / 'tools/build_windows_native_support.py').read_text(encoding='utf-8')
-        self.assertIn("b'DriverVer=01/01/2001,1.0.0.0'", build)
+        self.assertIn('L"setupver"', src)
+        # MSU path: the stornvme CriticalDeviceDatabase entry is checked.
+        self.assertIn('CriticalDeviceDatabase pci#cc_010802 -^> stornvme added', self.step())
 
     def test_packed(self):
         build = (ROOT / 'tools/build_windows_native_support.py').read_text(encoding='utf-8')
