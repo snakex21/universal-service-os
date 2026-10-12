@@ -1,4 +1,5 @@
-"""tools/posready_x470.reg from tools/xp_driver_overlay.py registry_rows().
+"""tools/posready_x470.reg from tools/xp_driver_overlay.py registry_rows() plus
+the CriticalDeviceDatabase rows POSReady's minimal FBA database lacks.
 
 The XP path writes these values into Setup's hives; POSReady 2009 has no
 text-mode Setup, so C:\\USOS\\POSR\\FIRST.CMD imports the same values with
@@ -16,13 +17,28 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "tools" / "posready_x470.reg"
 
 
+# POSReady's CriticalDeviceDatabase is the minimal First Boot Agent one: it
+# holds only the devices of the install VM (i440FX, PIIX IDE, no PCI-to-PCI
+# bridge). XP's text-mode Setup would add txtsetup.sif's PCI\CC_0604 = pci;
+# without it the X470 bridges in front of the SATA controllers get no boot
+# driver, GenAHCI never sees its controller and the first real boot stops with
+# 0x7B INACCESSIBLE_BOOT_DEVICE (X470, 2026-10-12).
+POSREADY_CDD = [
+    (r"pci#cc_0604", "pci", "4D36E97D-E325-11CE-BFC1-08002BE10318"),
+]
+
+
 def rows() -> list[tuple[str, str, int, object]]:
     src = (ROOT / "tools" / "xp_driver_overlay.py").read_text(encoding="utf-8")
     start = src.index("def registry_rows():")
     end = src.index("def patch_hive")
     ns: dict = {}
     exec(src[start:end], ns)  # noqa: S102 - our own source, one pure function
-    return ns["registry_rows"]()
+    out = ns["registry_rows"]()
+    for hw, svc, guid in POSREADY_CDD:
+        key = "Control" + "\\" + "CriticalDeviceDatabase" + "\\" + hw
+        out += [(key, "Service", 1, svc), (key, "ClassGUID", 1, "{" + guid + "}")]
+    return out
 
 
 def render() -> bytes:
