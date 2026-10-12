@@ -80,6 +80,8 @@ function Run-Unit {
     if ($LASTEXITCODE -ne 0) { throw 'Vista / 2008 x86 OOBE gate tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/test_image_disk_elcr.py')
     if ($LASTEXITCODE -ne 0) { throw 'Custom OS ELCR MBR tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/test_uefi_boot_entry.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Custom OS firmware boot entry (Boot####/BootNext) tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/test_stick_release.py')
     if ($LASTEXITCODE -ne 0) { throw 'micro-Linux stick release tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/test_stick_write.py')

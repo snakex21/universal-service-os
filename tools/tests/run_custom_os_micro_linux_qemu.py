@@ -44,7 +44,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "tests" / "uefi_drivers"))
 from run_stage_drivers_qemu import Console  # noqa: E402
 
-SCRIPTS = ("image_disk_target.sh", "xp_csmwrap_esp.sh")
+SCRIPTS = ("image_disk_target.sh", "xp_csmwrap_esp.sh", "uefi_boot_entry.sh")
 
 GUEST = r'''#!/bin/sh
 set -u
@@ -52,7 +52,13 @@ export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 for m in ahci sd_mod virtio_pci virtio_blk loop vfat fat nls_cp437 nls_iso8859_1; do modprobe "$m" 2>/dev/null; done
 sleep 2; mdev -s 2>/dev/null
 [ -b /dev/sda ] && [ -b /dev/vda ] || { echo "E2E: no sda/vda"; lsblk; echo E2E-RESULT=FAIL; exit 1; }
-if env TARGET_DEVICE=/dev/sda IMAGE_SOURCE=/dev/vda IMAGE_SYSTEM="$SYSTEM" USOS_CSMWRAP_DIR=/usos-e2e/csmwrap \
+# UEFI prepare (OVMF): efivarfs for uefi_boot_entry.sh; a micro-Linux built
+# before efivarfs.ko was added gets it from the overlay (--efivarfs-ko).
+if [ -d /sys/firmware/efi ]; then
+    modprobe efivarfs 2>/dev/null || { [ -f /usos-e2e/efivarfs.ko ] && insmod /usos-e2e/efivarfs.ko; }
+    echo "E2E: UEFI prepare, efivarfs registered: $(grep -c efivarfs /proc/filesystems)"
+fi
+if env TARGET_DEVICE=/dev/sda IMAGE_SOURCE=/dev/vda IMAGE_SYSTEM="$SYSTEM" IMAGE_TITLE="$TITLE" USOS_CSMWRAP_DIR=/usos-e2e/csmwrap \
     sh /usr/lib/usos/image_disk_target.sh > /tmp/prepare.log 2>&1 < /dev/null; then
     cat /tmp/prepare.log; cat /run/image-disk.result
     sfdisk -l /dev/sda 2>&1 | tail -n 6
@@ -87,7 +93,7 @@ def cpio_newc(entries):
 BLOBS = ("elcr-mbr-440.bin",)
 
 
-def overlay(csmwrap: Path, root: Path) -> bytes:
+def overlay(csmwrap: Path, root: Path, efivarfs_ko: Path | None = None) -> bytes:
     entries = []
     dirs = set()
 
@@ -101,6 +107,8 @@ def overlay(csmwrap: Path, root: Path) -> bytes:
         entries.append((path, mode, data))
 
     add("usos-e2e/guest.sh", GUEST.encode(), 0o100755)
+    if efivarfs_ko is not None:
+        add("usos-e2e/efivarfs.ko", efivarfs_ko.read_bytes())
     for f in sorted(csmwrap.rglob("*")):
         if f.is_file():
             add("usos-e2e/csmwrap/" + f.relative_to(csmwrap).as_posix(), f.read_bytes())
@@ -125,10 +133,23 @@ def free_port():
 
 
 def qemu_copy(root: Path) -> Path:
+    # USOS_QEMU_EXE: a renamed copy elsewhere (own temp folder); its DLLs and
+    # data still come from tools/qemu (PATH and -L, see qemu_env/qemu_data).
+    own = os.environ.get("USOS_QEMU_EXE")
+    if own:
+        return Path(own)
     exe = root / "tools" / "qemu" / "qemu-cos-e2e.exe"
     if not exe.exists():
         shutil.copyfile(root / "tools" / "qemu" / "qemu-system-x86_64.exe", exe)
     return exe
+
+
+def qemu_env(root: Path) -> dict:
+    return dict(os.environ, PATH=str(root / "tools" / "qemu") + os.pathsep + os.environ.get("PATH", ""))
+
+
+def qemu_data(root: Path) -> list:
+    return ["-L", str(root / "tools" / "qemu" / "share")] if os.environ.get("USOS_QEMU_EXE") else []
 
 
 def stop(proc):
@@ -141,17 +162,27 @@ def prepare(args, root: Path, out: Path, disk: Path) -> bool:
     ml = root / "zig-out" / "micro-linux"
     initrd = out / "initrd.cpio"
     with initrd.open("wb") as f:
-        for part in ((ml / "initramfs-usos").read_bytes(), overlay(root / "zig-out" / "usb" / "EFI" / "USOS" / "csmwrap", root)):
+        efivarfs_ko = Path(args.efivarfs_ko) if args.efivarfs_ko else None
+        for part in ((ml / "initramfs-usos").read_bytes(), overlay(root / "zig-out" / "usb" / "EFI" / "USOS" / "csmwrap", root, efivarfs_ko)):
             f.write(part)
             f.write(b"\0" * (-f.tell() % 4))
     port = free_port()
-    cmd = [str(qemu_copy(root)), "-machine", "q35", "-accel", "whpx", "-accel", "tcg", "-m", "2048", "-smp", "2",
+    firmware = []
+    if not args.bios_prepare:
+        # UEFI like the real step 620 (USOS starts micro-Linux from the
+        # firmware): the boot entry lands in OUT/vars.fd, which --boot uses.
+        share = root / "tools" / "qemu" / "share"
+        vars_copy = out / "vars.fd"
+        vars_copy.write_bytes(Path(args.vars_from).read_bytes() if args.vars_from else (share / "edk2-i386-vars.fd").read_bytes())
+        firmware = ["-drive", f"if=pflash,format=raw,readonly=on,file={share / 'edk2-x86_64-code.fd'}",
+                    "-drive", f"if=pflash,format=raw,file={vars_copy}"]
+    cmd = [str(qemu_copy(root)), "-machine", "q35", "-accel", "whpx", "-accel", "tcg", "-m", "2048", "-smp", "2", *qemu_data(root), *firmware,
            "-display", "none", "-nic", "none", "-kernel", str(ml / "vmlinuz-virt"), "-initrd", str(initrd),
            "-append", "console=ttyS0,115200 rdinit=/bin/sh loglevel=3",
            "-chardev", f"socket,id=s0,host=127.0.0.1,port={port},server=on,wait=off", "-serial", "chardev:s0",
            "-drive", f"file={disk.as_posix()},format=raw,if=none,id=t,cache=writeback", "-device", "ide-hd,drive=t,bus=ide.0",
            "-drive", f"file={Path(args.image).as_posix()},format=raw,if=none,id=img,readonly=on", "-device", "virtio-blk-pci,drive=img"]
-    q = subprocess.Popen(cmd, stderr=(out / "prepare-qemu.log").open("wb"))
+    q = subprocess.Popen(cmd, stderr=(out / "prepare-qemu.log").open("wb"), env=qemu_env(root))
     print("prepare PID", q.pid, flush=True)
     console = None
     try:
@@ -161,7 +192,7 @@ def prepare(args, root: Path, out: Path, disk: Path) -> bool:
                     "mount -t proc proc /proc; mount -t sysfs sys /sys; mount -t devtmpfs dev /dev 2>/dev/null; "
                     "mkdir -p /tmp /run; mount -t tmpfs tmp /tmp; mount -t tmpfs run /run", "SETUP-DONE", 120)
         start = len(console.text)
-        console.sock.sendall(f"SYSTEM={args.system} sh /usos-e2e/guest.sh 2>&1; echo E2E-EXIT\n".encode())
+        console.sock.sendall(f"SYSTEM={args.system} TITLE='{args.title or args.system}' sh /usos-e2e/guest.sh 2>&1; echo E2E-EXIT\n".encode())
         deadline = time.time() + args.timeout
         while "\nE2E-EXIT" not in console.text[start:] and time.time() < deadline and q.poll() is None:
             try:
@@ -172,7 +203,7 @@ def prepare(args, root: Path, out: Path, disk: Path) -> bool:
                 pass
         console.run("sync", "SYNC-DONE", 120)
         for line in console.text[start:].splitlines():
-            if line.startswith(("[IMAGE_DISK]", "[XP_CSMWRAP]", "E2E", "mode=", "stop=", "/dev/sda")):
+            if line.startswith(("[IMAGE_DISK]", "[XP_CSMWRAP]", "[BOOT_ENTRY]", "E2E", "mode=", "stop=", "boot_entry=", "/dev/sda")):
                 print(line.rstrip(), flush=True)
         return "E2E-RESULT=PASS" in console.text[start:]
     finally:
@@ -189,12 +220,13 @@ def prepare(args, root: Path, out: Path, disk: Path) -> bool:
 def boot(args, root: Path, out: Path, disk: Path) -> None:
     qd = root / "tools" / "qemu"
     vars_copy = out / "vars.fd"
-    vars_copy.write_bytes((qd / "share" / "edk2-i386-vars.fd").read_bytes())
+    if not vars_copy.exists():
+        vars_copy.write_bytes((qd / "share" / "edk2-i386-vars.fd").read_bytes())
     port = free_port()
     accel = ["-accel", "tcg"] if args.tcg else ["-accel", "whpx", "-accel", "tcg"]
     # No i8042: keys reach the guest only through the xHCI USB keyboard, as on
     # an X470 without a PS/2 keyboard.
-    cmd = [str(qemu_copy(root)), "-machine", "q35,i8042=off", *accel, "-m", "4096", "-smp", "2",
+    cmd = [str(qemu_copy(root)), "-machine", "q35,i8042=off", *accel, "-m", "4096", "-smp", "2", *qemu_data(root),
            "-drive", f"if=pflash,format=raw,readonly=on,file={qd / 'share' / 'edk2-x86_64-code.fd'}",
            "-drive", f"if=pflash,format=raw,file={vars_copy}",
            "-drive", f"file={disk.as_posix()},format=raw,if=none,id=t,cache=writeback", "-device", "ide-hd,drive=t,bus=ide.0",
@@ -205,11 +237,25 @@ def boot(args, root: Path, out: Path, disk: Path) -> None:
         # below 4 GiB). With the bundled OVMF (2026-10-12) the qemu-xhci BAR
         # still lands at 0xC0_0000_0000, so this changes nothing yet.
         cmd += ["-fw_cfg", "name=opt/ovmf/X-PciMmio64Mb,string=0"]
+    if args.decoy:
+        # A second bootable disk (UEFI Shell as its removable loader, prints
+        # USOS-DECOY-SHELL). No bootindex: with a fw_cfg boot order OVMF
+        # deletes every Boot#### it cannot match to it (Haiku's own entry
+        # included, QEMU 2026-10-12). Put first in BootOrder by an earlier
+        # run (--vars-from), it shows that BootNext, not the order, starts
+        # the disk under test.
+        decoy = out / "decoy"
+        (decoy / "EFI" / "BOOT").mkdir(parents=True, exist_ok=True)
+        shell = ROOT / "tools" / "vendor" / "uefi-shell" / "edk2-stable202002" / "Shell.efi"
+        (decoy / "EFI" / "BOOT" / "BOOTX64.EFI").write_bytes(shell.read_bytes())
+        (decoy / "startup.nsh").write_bytes(b"echo USOS-DECOY-SHELL\r\n")
+        cmd += ["-drive", f"file=fat:{decoy.as_posix()},format=raw,if=none,id=decoy,readonly=on",
+                "-device", "virtio-blk-pci,drive=decoy"]
     for extra in args.qemu_arg:
         cmd += extra.split(" ", 1) if extra.startswith("-") and " " in extra else [extra]
     if args.serial:
         cmd += ["-serial", f"file:{(out / 'boot-serial.log').as_posix()}"]
-    q = subprocess.Popen(cmd, stderr=(out / "boot-qemu.log").open("wb"))
+    q = subprocess.Popen(cmd, stderr=(out / "boot-qemu.log").open("wb"), env=qemu_env(root))
     print("boot PID", q.pid, flush=True)
     keys = {}
     for item in filter(None, (args.keys or "").split(";")):
@@ -267,6 +313,18 @@ def boot(args, root: Path, out: Path, disk: Path) -> None:
         stop(q)
 
 
+def show_vars(when: str, out: Path) -> None:
+    vars_copy = out / "vars.fd"
+    if not vars_copy.exists():
+        return
+    sys.path.insert(0, str(ROOT / "tools" / "tests"))
+    from ovmf_vars import boot_summary
+    summary = boot_summary(vars_copy)
+    print(f"VARS {when}: BootOrder={','.join(summary.get('BootOrder', []))} BootNext={summary.get('BootNext', '-')}", flush=True)
+    for number, (description, device_path) in summary["entries"].items():
+        print(f"VARS   Boot{number} {description!r} {device_path[:140]}", flush=True)
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--image", required=True)
@@ -283,6 +341,11 @@ def main() -> int:
     p.add_argument("--qemu-arg", action="append", default=[], help='boot: extra QEMU option ("-trace usb_xhci_*")')
     p.add_argument("--shot-step", type=int, default=20, help="boot: seconds between screenshots")
     p.add_argument("--serial", action="store_true", help="boot: COM1 to OUT/boot-serial.log")
+    p.add_argument("--title", default="", help="prepare: the boot entry name (IMAGE_TITLE; default --system)")
+    p.add_argument("--bios-prepare", action="store_true", help="prepare without OVMF (no UEFI variables, no boot entry)")
+    p.add_argument("--efivarfs-ko", default="", help="prepare: efivarfs.ko for a micro-Linux built without it")
+    p.add_argument("--vars-from", default="", help="prepare: start from this OVMF VARS file instead of a blank one")
+    p.add_argument("--decoy", action="store_true", help="boot: a UEFI Shell disk first in the boot order (checks BootNext)")
     args = p.parse_args()
     root = Path(args.root)
     out = Path(args.out)
@@ -295,9 +358,11 @@ def main() -> int:
             f.truncate(args.disk_gib << 30)
         ok = prepare(args, root, out, disk)
     print("PREPARE", "PASS" if ok else "FAIL", flush=True)
+    show_vars("after prepare", out)
     if ok and args.boot:
         boot(args, root, out, disk)
         print("BOOT screenshots in", out, flush=True)
+        show_vars("after boot", out)
     return 0 if ok else 1
 
 
