@@ -1172,17 +1172,19 @@ pub fn readableOn(theme: Theme, fill: Color) Color {
     return if (roughRatio10(white, fill) >= roughRatio10(black, fill)) white else black;
 }
 
-fn roughRatio10(x: Color, y: Color) u64 {
+fn roughRatio10(x: Color, y: Color) u32 {
+    // u32 only (the Legacy Core is i386 without 64-bit division): at most
+    // 10000 * 65025 = 650_250_000.
     const lum = struct {
-        fn of(c: Color) u64 {
-            const r: u64 = c.r;
-            const g: u64 = c.g;
-            const b: u64 = c.b;
+        fn of(c: Color) u32 {
+            const r: u32 = c.r;
+            const g: u32 = c.g;
+            const b: u32 = c.b;
             return 2126 * r * r + 7152 * g * g + 722 * b * b;
         }
     }.of;
-    const flare: u64 = 10000 * 65025 / 20;
+    const flare: u32 = 10000 * 65025 / 20;
     const p = lum(x) + flare;
     const q = lum(y) + flare;
-    return @max(p, q) * 10 / @min(p, q);
+    return @max(p, q) / (@min(p, q) / 10);
 }
