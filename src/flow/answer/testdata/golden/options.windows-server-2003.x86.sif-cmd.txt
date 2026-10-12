@@ -67,7 +67,6 @@ exit /b 0
 
 ----- usos-reg.txt -----
 ; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
-USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|Hidden|dword|1
 USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|ShowSuperHidden|dword|1
 DEFAULT\Control Panel\Keyboard|InitialKeyboardIndicators|sz|2
 USER\Control Panel\Keyboard|InitialKeyboardIndicators|sz|2

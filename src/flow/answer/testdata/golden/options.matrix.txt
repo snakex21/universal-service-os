@@ -461,14 +461,18 @@ taskbar_search=hidden	windows-11	+    <component name="Microsoft-Windows-Deploym
 taskbar_search=hidden	windows-11	+      <RunSynchronous>
 taskbar_search=hidden	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=hidden	windows-11	+          <Order>1</Order>
-taskbar_search=hidden	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
+taskbar_search=hidden	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search&quot; /v SearchOnTaskbarMode /t REG_DWORD /d 0 /f</Path>
 taskbar_search=hidden	windows-11	+        </RunSynchronousCommand>
 taskbar_search=hidden	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=hidden	windows-11	+          <Order>2</Order>
-taskbar_search=hidden	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 0 /f</Path>
+taskbar_search=hidden	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 taskbar_search=hidden	windows-11	+        </RunSynchronousCommand>
 taskbar_search=hidden	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=hidden	windows-11	+          <Order>3</Order>
+taskbar_search=hidden	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 0 /f</Path>
+taskbar_search=hidden	windows-11	+        </RunSynchronousCommand>
+taskbar_search=hidden	windows-11	+        <RunSynchronousCommand wcm:action="add">
+taskbar_search=hidden	windows-11	+          <Order>4</Order>
 taskbar_search=hidden	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 taskbar_search=hidden	windows-11	+        </RunSynchronousCommand>
 taskbar_search=hidden	windows-11	+      </RunSynchronous>
@@ -525,14 +529,18 @@ taskbar_search=hidden	windows-server-2025	+    <component name="Microsoft-Window
 taskbar_search=hidden	windows-server-2025	+      <RunSynchronous>
 taskbar_search=hidden	windows-server-2025	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=hidden	windows-server-2025	+          <Order>1</Order>
-taskbar_search=hidden	windows-server-2025	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
+taskbar_search=hidden	windows-server-2025	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search&quot; /v SearchOnTaskbarMode /t REG_DWORD /d 0 /f</Path>
 taskbar_search=hidden	windows-server-2025	+        </RunSynchronousCommand>
 taskbar_search=hidden	windows-server-2025	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=hidden	windows-server-2025	+          <Order>2</Order>
-taskbar_search=hidden	windows-server-2025	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 0 /f</Path>
+taskbar_search=hidden	windows-server-2025	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 taskbar_search=hidden	windows-server-2025	+        </RunSynchronousCommand>
 taskbar_search=hidden	windows-server-2025	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=hidden	windows-server-2025	+          <Order>3</Order>
+taskbar_search=hidden	windows-server-2025	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 0 /f</Path>
+taskbar_search=hidden	windows-server-2025	+        </RunSynchronousCommand>
+taskbar_search=hidden	windows-server-2025	+        <RunSynchronousCommand wcm:action="add">
+taskbar_search=hidden	windows-server-2025	+          <Order>4</Order>
 taskbar_search=hidden	windows-server-2025	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 taskbar_search=hidden	windows-server-2025	+        </RunSynchronousCommand>
 taskbar_search=hidden	windows-server-2025	+      </RunSynchronous>
@@ -557,14 +565,18 @@ taskbar_search=icon	windows-11	+    <component name="Microsoft-Windows-Deploymen
 taskbar_search=icon	windows-11	+      <RunSynchronous>
 taskbar_search=icon	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=icon	windows-11	+          <Order>1</Order>
-taskbar_search=icon	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
+taskbar_search=icon	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search&quot; /v SearchOnTaskbarMode /t REG_DWORD /d 1 /f</Path>
 taskbar_search=icon	windows-11	+        </RunSynchronousCommand>
 taskbar_search=icon	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=icon	windows-11	+          <Order>2</Order>
-taskbar_search=icon	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 1 /f</Path>
+taskbar_search=icon	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 taskbar_search=icon	windows-11	+        </RunSynchronousCommand>
 taskbar_search=icon	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=icon	windows-11	+          <Order>3</Order>
+taskbar_search=icon	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 1 /f</Path>
+taskbar_search=icon	windows-11	+        </RunSynchronousCommand>
+taskbar_search=icon	windows-11	+        <RunSynchronousCommand wcm:action="add">
+taskbar_search=icon	windows-11	+          <Order>4</Order>
 taskbar_search=icon	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 taskbar_search=icon	windows-11	+        </RunSynchronousCommand>
 taskbar_search=icon	windows-11	+      </RunSynchronous>
@@ -621,14 +633,18 @@ taskbar_search=icon	windows-server-2025	+    <component name="Microsoft-Windows-
 taskbar_search=icon	windows-server-2025	+      <RunSynchronous>
 taskbar_search=icon	windows-server-2025	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=icon	windows-server-2025	+          <Order>1</Order>
-taskbar_search=icon	windows-server-2025	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
+taskbar_search=icon	windows-server-2025	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search&quot; /v SearchOnTaskbarMode /t REG_DWORD /d 1 /f</Path>
 taskbar_search=icon	windows-server-2025	+        </RunSynchronousCommand>
 taskbar_search=icon	windows-server-2025	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=icon	windows-server-2025	+          <Order>2</Order>
-taskbar_search=icon	windows-server-2025	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 1 /f</Path>
+taskbar_search=icon	windows-server-2025	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 taskbar_search=icon	windows-server-2025	+        </RunSynchronousCommand>
 taskbar_search=icon	windows-server-2025	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=icon	windows-server-2025	+          <Order>3</Order>
+taskbar_search=icon	windows-server-2025	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 1 /f</Path>
+taskbar_search=icon	windows-server-2025	+        </RunSynchronousCommand>
+taskbar_search=icon	windows-server-2025	+        <RunSynchronousCommand wcm:action="add">
+taskbar_search=icon	windows-server-2025	+          <Order>4</Order>
 taskbar_search=icon	windows-server-2025	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 taskbar_search=icon	windows-server-2025	+        </RunSynchronousCommand>
 taskbar_search=icon	windows-server-2025	+      </RunSynchronous>
@@ -653,14 +669,18 @@ taskbar_search=box	windows-11	+    <component name="Microsoft-Windows-Deployment
 taskbar_search=box	windows-11	+      <RunSynchronous>
 taskbar_search=box	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=box	windows-11	+          <Order>1</Order>
-taskbar_search=box	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
+taskbar_search=box	windows-11	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search&quot; /v SearchOnTaskbarMode /t REG_DWORD /d 3 /f</Path>
 taskbar_search=box	windows-11	+        </RunSynchronousCommand>
 taskbar_search=box	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=box	windows-11	+          <Order>2</Order>
-taskbar_search=box	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 2 /f</Path>
+taskbar_search=box	windows-11	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 taskbar_search=box	windows-11	+        </RunSynchronousCommand>
 taskbar_search=box	windows-11	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=box	windows-11	+          <Order>3</Order>
+taskbar_search=box	windows-11	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 2 /f</Path>
+taskbar_search=box	windows-11	+        </RunSynchronousCommand>
+taskbar_search=box	windows-11	+        <RunSynchronousCommand wcm:action="add">
+taskbar_search=box	windows-11	+          <Order>4</Order>
 taskbar_search=box	windows-11	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 taskbar_search=box	windows-11	+        </RunSynchronousCommand>
 taskbar_search=box	windows-11	+      </RunSynchronous>
@@ -717,14 +737,18 @@ taskbar_search=box	windows-server-2025	+    <component name="Microsoft-Windows-D
 taskbar_search=box	windows-server-2025	+      <RunSynchronous>
 taskbar_search=box	windows-server-2025	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=box	windows-server-2025	+          <Order>1</Order>
-taskbar_search=box	windows-server-2025	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
+taskbar_search=box	windows-server-2025	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search&quot; /v SearchOnTaskbarMode /t REG_DWORD /d 3 /f</Path>
 taskbar_search=box	windows-server-2025	+        </RunSynchronousCommand>
 taskbar_search=box	windows-server-2025	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=box	windows-server-2025	+          <Order>2</Order>
-taskbar_search=box	windows-server-2025	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 2 /f</Path>
+taskbar_search=box	windows-server-2025	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
 taskbar_search=box	windows-server-2025	+        </RunSynchronousCommand>
 taskbar_search=box	windows-server-2025	+        <RunSynchronousCommand wcm:action="add">
 taskbar_search=box	windows-server-2025	+          <Order>3</Order>
+taskbar_search=box	windows-server-2025	+          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 2 /f</Path>
+taskbar_search=box	windows-server-2025	+        </RunSynchronousCommand>
+taskbar_search=box	windows-server-2025	+        <RunSynchronousCommand wcm:action="add">
+taskbar_search=box	windows-server-2025	+          <Order>4</Order>
 taskbar_search=box	windows-server-2025	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 taskbar_search=box	windows-server-2025	+        </RunSynchronousCommand>
 taskbar_search=box	windows-server-2025	+      </RunSynchronous>

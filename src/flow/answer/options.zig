@@ -244,6 +244,8 @@ pub const Rule = struct {
     value: u8 = 1,
     os: OsSet,
     who: Who = .any,
+    /// Skipped when this option is on (it already writes the same value).
+    unless: ?Opt = null,
     action: Action,
 };
 
@@ -276,7 +278,7 @@ pub const rules = [_]Rule{
     .{ .opt = .show_extensions, .os = w9x_shell.unionWith(set(&.{.w2000})), .action = dw(.user, advanced, "HideFileExt", 0) },
     .{ .opt = .show_hidden, .os = w9x_shell.unionWith(set(&.{.w2000})), .action = dw(.user, advanced, "Hidden", 1) },
     // Protected operating system files (Me and 2000 introduced them).
-    .{ .opt = .show_protected, .os = set(&.{ .win_me, .w2000 }).unionWith(set(&.{ .xp, .w2003 })).unionWith(nt6), .action = dw(.user, advanced, "Hidden", 1) },
+    .{ .opt = .show_protected, .os = set(&.{ .win_me, .w2000 }).unionWith(set(&.{ .xp, .w2003 })).unionWith(nt6), .unless = .show_hidden, .action = dw(.user, advanced, "Hidden", 1) },
     .{ .opt = .show_protected, .os = set(&.{ .win_me, .w2000 }).unionWith(set(&.{ .xp, .w2003 })).unionWith(nt6), .action = dw(.user, advanced, "ShowSuperHidden", 1) },
     .{ .opt = .launch_to_pc, .os = w10up, .action = dw(.user, advanced, "LaunchTo", 1) },
     .{ .opt = .end_task, .os = set(&.{.w11}), .action = dw(.user, advanced ++ "\\TaskbarDeveloperSettings", "TaskbarEndTask", 1) },
@@ -292,6 +294,12 @@ pub const rules = [_]Rule{
     .{ .opt = .taskbar_search, .value = 1, .os = w10up, .action = dw(.user, "Software\\Microsoft\\Windows\\CurrentVersion\\Search", "SearchboxTaskbarMode", 0) },
     .{ .opt = .taskbar_search, .value = 2, .os = w10up, .action = dw(.user, "Software\\Microsoft\\Windows\\CurrentVersion\\Search", "SearchboxTaskbarMode", 1) },
     .{ .opt = .taskbar_search, .value = 3, .os = w10up, .action = dw(.user, "Software\\Microsoft\\Windows\\CurrentVersion\\Search", "SearchboxTaskbarMode", 2) },
+    // 11 rewrites the per-user value at the first logon (QEMU 2026-10-12:
+    // icon became box); the policy (Search/ConfigureSearchOnTaskbarMode:
+    // 0 hide, 1 icon, 3 box) holds it.
+    .{ .opt = .taskbar_search, .value = 1, .os = set(&.{.w11}), .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search", "SearchOnTaskbarMode", 0) },
+    .{ .opt = .taskbar_search, .value = 2, .os = set(&.{.w11}), .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search", "SearchOnTaskbarMode", 1) },
+    .{ .opt = .taskbar_search, .value = 3, .os = set(&.{.w11}), .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search", "SearchOnTaskbarMode", 3) },
     .{ .opt = .taskbar_left, .os = set(&.{.w11}), .who = .client, .action = dw(.user, advanced, "TaskbarAl", 0) },
     .{ .opt = .task_view_off, .os = w10up, .action = dw(.user, advanced, "ShowTaskViewButton", 0) },
     // Widgets (11) / News and interests (10).
@@ -424,6 +432,7 @@ pub const Iterator = struct {
             self.i += 1;
             if (!ruleApplies(rule, self.t)) continue;
             if (self.values[@intFromEnum(rule.opt)] != rule.value) continue;
+            if (rule.unless) |other| if (self.values[@intFromEnum(other)] != 0) continue;
             if (option(rule.opt).legacy and legacyAvailable(rule.opt, self.t)) continue;
             return rule;
         }

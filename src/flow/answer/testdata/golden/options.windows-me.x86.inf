@@ -44,7 +44,6 @@ UpdateIniFields=USOS.Csm
 [USOS.Profile]
 HKCU,"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",HideFileExt,1,00,00,00,00
 HKCU,"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",Hidden,1,01,00,00,00
-HKCU,"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",Hidden,1,01,00,00,00
 HKCU,"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",ShowSuperHidden,1,01,00,00,00
 HKCU,"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer",NoDriveTypeAutoRun,1,ff,00,00,00
 

@@ -83,62 +83,58 @@
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>12</Order>
-          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
-        </RunSynchronousCommand>
-        <RunSynchronousCommand wcm:action="add">
-          <Order>13</Order>
           <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ShowSuperHidden /t REG_DWORD /d 1 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>14</Order>
+          <Order>13</Order>
           <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v LaunchTo /t REG_DWORD /d 1 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>15</Order>
+          <Order>14</Order>
           <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Search&quot; /v SearchboxTaskbarMode /t REG_DWORD /d 1 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>16</Order>
+          <Order>15</Order>
           <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ShowTaskViewButton /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>17</Order>
+          <Order>16</Order>
           <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Software\Policies\Microsoft\Windows\Explorer&quot; /v DisableSearchBoxSuggestions /t REG_DWORD /d 1 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Keyboard&quot; /v InitialKeyboardIndicators /t REG_SZ /d 2 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>18</Order>
+          <Order>17</Order>
           <Path>reg.exe add &quot;HKU\USOSDefault\Software\Policies\Microsoft\Windows\CloudContent&quot; /v DisableTailoredExperiencesWithDiagnosticData /t REG_DWORD /d 1 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>19</Order>
+          <Order>18</Order>
           <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo&quot; /v Enabled /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>20</Order>
+          <Order>19</Order>
           <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SilentInstalledAppsEnabled /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>21</Order>
+          <Order>20</Order>
           <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SystemPaneSuggestionsEnabled /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>22</Order>
+          <Order>21</Order>
           <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SoftLandingEnabled /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>23</Order>
+          <Order>22</Order>
           <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SubscribedContent-338388Enabled /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>24</Order>
+          <Order>23</Order>
           <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SubscribedContent-338389Enabled /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>25</Order>
+          <Order>24</Order>
           <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager&quot; /v SubscribedContent-353698Enabled /t REG_DWORD /d 0 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>26</Order>
+          <Order>25</Order>
           <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
         </RunSynchronousCommand>
       </RunSynchronous>

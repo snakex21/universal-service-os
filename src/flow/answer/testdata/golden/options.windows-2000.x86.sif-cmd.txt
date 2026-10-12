@@ -52,7 +52,6 @@ exit /b 0
 ; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|HideFileExt|dword|0
 USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|Hidden|dword|1
-USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|Hidden|dword|1
 USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|ShowSuperHidden|dword|1
 HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer|NoDriveTypeAutoRun|dword|255
 HKLM\SYSTEM\CurrentControlSet\Services\Cdrom|Autorun|dword|0

@@ -80,14 +80,10 @@
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>12</Order>
-          <Path>reg.exe add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v Hidden /t REG_DWORD /d 1 /f</Path>
-        </RunSynchronousCommand>
-        <RunSynchronousCommand wcm:action="add">
-          <Order>13</Order>
           <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced&quot; /v ShowSuperHidden /t REG_DWORD /d 1 /f &amp; reg add &quot;HKU\USOSDefault\Control Panel\Keyboard&quot; /v InitialKeyboardIndicators /t REG_SZ /d 2 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>14</Order>
+          <Order>13</Order>
           <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
         </RunSynchronousCommand>
       </RunSynchronous>
