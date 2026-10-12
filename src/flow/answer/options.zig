@@ -124,7 +124,7 @@ pub const Option = struct {
     legacy: bool = false,
 
     pub fn isToggle(self: Option) bool {
-        return self.values.ptr == toggle.ptr;
+        return self.values.len == 2 and std.mem.eql(u8, self.values[0], "no") and std.mem.eql(u8, self.values[1], "yes");
     }
 
     pub fn key(self: Option) []const u8 {

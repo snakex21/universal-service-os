@@ -256,9 +256,10 @@ TWEAKS = {
     'no_sidebar=yes': {'windows-vista', 'windows-7'},
     'no_welcome_center=yes': {'windows-vista'},
     'no_hibernation=yes': {'windows-vista', 'windows-7'},
-    'show_extensions=yes': {'windows-xp', 'windows-server-2003'} | NT6_ALL,
-    'show_hidden=yes': {'windows-xp', 'windows-server-2003'} | NT6_ALL,
-    'no_autorun=yes': {'windows-xp', 'windows-server-2003'} | NT6_ALL,
+    # 2000 since the typed options (2026-10-12): through usos-reg.exe.
+    'show_extensions=yes': {'windows-xp', 'windows-server-2003', 'windows-2000'} | NT6_ALL,
+    'show_hidden=yes': {'windows-xp', 'windows-server-2003', 'windows-2000'} | NT6_ALL,
+    'no_autorun=yes': {'windows-xp', 'windows-server-2003', 'windows-2000'} | NT6_ALL,
 }
 # Text each tweak must bring where it applies (one marker per tweak).
 MARKERS = {
@@ -275,7 +276,7 @@ MARKERS = {
     'no_welcome_center=yes': ('WindowsWelcomeCenter',),
     'no_hibernation=yes': ('powercfg.exe -h off',),
     'show_extensions=yes': ('HideFileExt',),
-    'show_hidden=yes': ('/v Hidden ',),
+    'show_hidden=yes': ('/v Hidden ', '|Hidden|dword|1'),
     'no_autorun=yes': ('NoDriveTypeAutoRun',),
 }
 
@@ -289,10 +290,96 @@ def render_any(profile: Path, system: str, arch: str, name: str) -> bytes | None
         return None
     if system in NT5_BASE:
         sif, accounts = nt5_merge(out, NT5_BASE[system], name, True)
-        return sif + b'\n----- usos-users.cmd -----\n' + accounts
+        # The typed options' registry set (usos-reg.txt), when there is one.
+        regset = OUT / (name + '.usos-reg.txt')
+        r = sh(f"usos_xp_settings_regset '{posix(OUT / (name + '.normalized'))}' '{posix(regset)}'")
+        extra = b'\n----- usos-reg.txt -----\n' + regset.read_bytes() if r.returncode == 0 else b''
+        return sif + b'\n----- usos-users.cmd -----\n' + accounts + extra
+    if system in LEGACY:
+        return out.read_bytes()
     data = out.read_bytes()
     check_xml(name, data, arch)
     return data
+
+
+# Windows 9x and NT 4.0: MSBATCH.INF / WINNT.SIF straight from the renderer.
+LEGACY = {'windows-95', 'windows-98-se', 'windows-me', 'windows-nt-4'}
+
+
+def option_profile_lines() -> list[str]:
+    """Every typed option at each of its values (src/flow/answer/options.zig)."""
+    lines = []
+    for o in OPTIONS:
+        key, values = o.split('=')
+        for v in values.split('|'):
+            lines.append(f'{key}={v}')
+    return lines + ['workgroup=USOSLAB']
+
+
+# The typed options and their non-default values (options.zig table).
+OPTIONS = [
+    'show_protected=yes', 'launch_to_pc=yes', 'end_task=yes', 'no_tips=yes',
+    'taskbar_search=hidden|icon|box', 'taskbar_left=yes', 'task_view_off=yes', 'widgets_off=yes', 'bing_search_off=yes',
+    'uac_level=no_dim|never', 'hibernation=no_fast_startup|off', 'system_restore_off=yes', 'numlock=on|off',
+    'windows_update=no_restart|notify|off', 'privacy=yes', 'autologon=yes', 'password_never_expires=yes',
+]
+
+
+def check_options() -> None:
+    """Typed options: one matrix golden (what each value adds on each
+    system, from the minimal profile), a system where a value renders nothing
+    stays byte for byte the baseline, and one golden per system with every
+    option on (testdata/options.profile.ini)."""
+    import difflib
+    base_text = (DATA / 'minimal.profile.ini').read_text()
+    first: dict[str, str] = {}
+    for s, a in NT6:
+        first.setdefault(s, a)
+    systems = list(first.items()) + [('windows-xp', 'x86'), ('windows-2000', 'x86'), ('windows-server-2003', 'x86'),
+                                     ('windows-nt-4', 'x86'), ('windows-95', 'x86'), ('windows-98-se', 'x86'), ('windows-me', 'x86')]
+    baseline = {s: render_any(DATA / 'minimal.profile.ini', s, a, f'op-base.{s}') for s, a in systems}
+    matrix = []
+    for line in option_profile_lines():
+        profile = OUT / ('op-' + line.replace('=', '-') + '.profile.ini')
+        profile.write_text(base_text + line + '\n')
+        rendered_somewhere = False
+        for system, arch in systems:
+            data = render_any(profile, system, arch, f'op-{line.replace("=", "-")}.{system}')
+            if data is None or baseline[system] is None:
+                continue
+            added = [d for d in difflib.unified_diff(baseline[system].decode().splitlines(), data.decode().splitlines(), lineterm='', n=0)
+                     if d[:1] in '+-' and not d.startswith(('+++', '---'))]
+            rendered_somewhere = rendered_somewhere or bool(added)
+            for d in added:
+                matrix.append(f'{line}\t{system}\t{d}')
+        check(f'option {line} renders somewhere', rendered_somewhere)
+    golden('options.matrix.txt', ('\n'.join(matrix) + '\n').encode())
+    results: dict[str, str] = {}
+    for system, arch in systems:
+        data = render_any(DATA / 'options.profile.ini', system, arch, f'options.{system}.{arch}')
+        if data is None:
+            continue
+        results[system] = data.decode(errors='replace')
+        ext = 'sif-cmd.txt' if system in NT5_BASE else 'inf' if system.startswith('windows-9') or system == 'windows-me' else 'sif' if system == 'windows-nt-4' else 'xml'
+        golden(f'options.{system}.{arch}.{ext}', data)
+        if ext == 'xml':
+            check(f'options.{system}: under 16 KiB with headroom', len(data) <= 16 * 1024 - 1536, str(len(data)))
+            check(f'options.{system}: commands within 259 characters', all(len(p.text or '') <= 259 for p in ET.fromstring(data).iter(NS + 'Path')))
+    eleven = results.get('windows-11', '')
+    check('options: 11 auto logon, workgroup, packs', all(k in eleven for k in ('<LogonCount>9999999</LogonCount>', '<JoinWorkgroup>USOSLAB</JoinWorkgroup>', 'TaskbarAl', 'AllowNewsAndInterests', 'DisableAIDataAnalysis', 'powercfg.exe -h off')))
+    w2k = results.get('windows-2000', '')
+    check('options: 2000 through usos-reg.exe', 'usos-reg.exe' in w2k and 'DEFAULT\\Control Panel\\Keyboard|InitialKeyboardIndicators|sz|2' in w2k and 'JoinWorkgroup=USOSLAB' in w2k)
+    nt4 = results.get('windows-nt-4', '')
+    check('options: NT 4.0 registry set as comments', ';USOS-REG=HKLM\\SYSTEM\\CurrentControlSet\\Services\\Cdrom|Autorun|dword|0' in nt4)
+    me = results.get('windows-me', '')
+    check('options: Me AddReg section, [USOS.Csm] last', '[USOS.Profile]' in me and me.rstrip().endswith('[USOS.Csm]'))
+    bad = OUT / 'bad-option.ini'
+    bad.write_bytes(b'user=Bob\nfamily=xp\nrun=format c:\n')
+    check('profile mode refuses an unknown run= command', sh(f"usos_xp_settings_load '{posix(bad)}' '{posix(OUT / 'bad.out')}' 00000415 profile").returncode == 1)
+    bad.write_bytes(b'user=Bob\nfamily=xp\nreg=HKCU\\Software|A|dword|1\n')
+    check('profile mode refuses a registry line outside HKLM/USER/DEFAULT', sh(f"usos_xp_settings_load '{posix(bad)}' '{posix(OUT / 'bad.out')}' 00000415 profile").returncode == 1)
+    bad.write_bytes(b'user=Bob\nreg=HKLM\\Software|A|dword|1\n')
+    check('usos-xp.ini refuses reg=', sh(f"usos_xp_settings_load '{posix(bad)}' '{posix(OUT / 'bad.out')}' 00000415").returncode == 1)
 
 
 def check_tweaks() -> None:
@@ -513,6 +600,7 @@ def main() -> int:
 
     check_linux()
     check_tweaks()
+    check_options()
 
     # Architecture-mismatch warning on a user's (Schneegans) amd64-only file.
     for candidate in (ROOT / 'zig-out' / 'usb' / 'Systems' / 'Windows' / 'Windows 11' / 'Unattended').glob('*.xml') if (ROOT / 'zig-out' / 'usb').exists() else []:
