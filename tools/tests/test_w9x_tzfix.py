@@ -89,7 +89,10 @@ class Tzfix(unittest.TestCase):
 class Wiring(unittest.TestCase):
     def test_prepare_guards_the_msbatch_zone_and_passes_it_on(self):
         text = (ROOT / 'tools/w9x_csmwrap_prepare.sh').read_text(encoding='utf-8')
-        none = text[text.index('        none)'):text.index('        profile)')]
+        # The 9x answer switch; the POSReady and NT switches above it have
+        # their own none) / profile) arms.
+        begin = text.index('\n        none)', text.index('        nt4|posr) ;;'))
+        none = text[begin:text.index('\n        profile)', begin)]
         self.assertIn('w9x_csmwrap_log "TIMEZONE ${time_zone:-none', none)
         self.assertIn("grep -q 'TimeZone=' \"$answer_inf\"", none)
         self.assertIn('W9X_TIME_ZONE="${time_zone:-}"', text)

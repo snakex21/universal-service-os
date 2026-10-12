@@ -1,11 +1,20 @@
 """Bounded CPU-level regression checks; no firmware, VM, OS or disk image boot."""
 from pathlib import Path
-import json, struct, unittest
+import json, struct, sys, unittest
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_16
 from unicorn.x86_const import *
 
 ROOT=Path(__file__).resolve().parents[2]
 OUT=ROOT/'zig-out/windows7-int10-patch'
+# The handler is a build artifact (tools/build_windows7_int10_patch.py): built
+# here when it is missing and the pinned Zig is present, else the module is
+# skipped (a fresh worktree has neither zig-out nor tools/zig).
+if not ((OUT/'handler.bin').is_file() and (OUT/'manifest.json').is_file()):
+    if not (ROOT/'tools/zig/zig.exe').is_file():
+        raise unittest.SkipTest(f'{OUT} missing and no tools/zig to build it')
+    sys.path.insert(0, str(ROOT/'tools'))
+    from build_windows7_int10_patch import build
+    build()
 NEW=(OUT/'handler.bin').read_bytes()
 INFO=json.loads((OUT/'manifest.json').read_text())
 EFI=(ROOT/'tools/vendor/uefiseven/1.30/UefiSeven.efi').read_bytes()

@@ -464,7 +464,9 @@ class PrepareWiring(unittest.TestCase):
         target = text.index('sh /usr/lib/usos/w9x_csmwrap_target.sh')
         run = text.index('w9x_phase1_run "$TARGET_DEVICE"')
         verify = text.index('w9x_phase1_verify "$TARGET_DEVICE"')
-        reboot = text.index('reboot -f')
+        # The restart goes through stick_release.sh since 752a81f (stick mounts
+        # released first), no longer a bare reboot -f.
+        reboot = text.index('sh /usr/lib/usos/stick_release.sh reboot')
         self.assertLess(target, run)
         self.assertLess(run, verify)
         self.assertLess(verify, reboot)

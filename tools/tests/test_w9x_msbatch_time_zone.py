@@ -82,7 +82,10 @@ class MsbatchTimeZone(unittest.TestCase):
 
     def test_prepare_uses_it_only_for_the_default_answer(self):
         text = Path(PREPARE).read_text(encoding='utf-8')
-        none = text[text.index('        none)'):text.index('        profile)')]
+        # The 9x answer switch; the POSReady and NT switches above it have
+        # their own none) / profile) arms.
+        begin = text.index('\n        none)', text.index('        nt4|posr) ;;'))
+        none = text[begin:text.index('\n        profile)', begin)]
         self.assertIn('w9x_csmwrap_value timezone "$request"', none)
         self.assertIn('w9x_msbatch_time_zone "$time_zone" "$answer_inf"', none)
         # The default file itself stays without a zone (BIOS mode, other languages).

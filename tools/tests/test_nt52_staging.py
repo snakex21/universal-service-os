@@ -21,8 +21,12 @@ sys.path.insert(0, str(ROOT / 'tools'))
 SH = next((p for p in (r'C:\msys64\usr\bin\sh.exe', r'C:\Program Files\Git\usr\bin\sh.exe', shutil.which('sh') or '')
            if p and Path(p).exists() and any((Path(p).parent / n).exists() for n in ('cmp.exe', 'cmp'))), None)
 # The shell's own coreutils (awk) first: PowerShell runs lack them on PATH.
+# Only for this module's shells (env=SH_ENV), never os.environ: pytest imports
+# every test module into one process, and a PATH with another MSYS runtime's
+# sh first breaks the nested `VAR=x sh script` calls of other modules.
+SH_ENV = dict(os.environ)
 if SH:
-    os.environ['PATH'] = str(Path(SH).parent) + os.pathsep + os.environ.get('PATH', '')
+    SH_ENV['PATH'] = str(Path(SH).parent) + os.pathsep + os.environ.get('PATH', '')
 
 
 def posix(path: Path) -> str:
@@ -31,7 +35,7 @@ def posix(path: Path) -> str:
 
 
 def sh(command: str, stdin: bytes = b'') -> subprocess.CompletedProcess:
-    return subprocess.run([SH, '-c', command], input=stdin, capture_output=True)
+    return subprocess.run([SH, '-c', command], input=stdin, capture_output=True, env=SH_ENV)
 
 
 TXTSETUP = (b'[SetupData]\r\nMajorVersion = 5\r\n[SourceDisksFiles]\r\nstorport.sys = 1,,,,,,3_,4,0,0,,1,4\r\n'
