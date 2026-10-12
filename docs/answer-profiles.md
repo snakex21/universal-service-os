@@ -245,6 +245,28 @@ on 6.x+ yet: the WORK path has no channel to put a file into the target
 before specialize (stage 2: payload channel, then one `usos-reg.exe` command
 instead of the `reg.exe` chains).
 
+**QEMU verification (2026-10-12)**, registry read offline after the install:
+
+- Windows 11 Pro (`tools/tests/check_profile_options_w11.py`): all HKLM,
+  `.DEFAULT` and Default-hive values present, all 33 specialize commands exit
+  0, auto logon, hibernation off, workgroup, This PC, End task, left taskbar,
+  no Task view / widgets, hidden + protected files and extensions visible. The
+  per-user `SearchboxTaskbarMode` was rewritten by 11 at the first logon (icon
+  -> box): 11 now also gets the `SearchOnTaskbarMode` policy (not yet re-run).
+  The VM applied the image from WinPE by hand (multi-core VMs hang on this
+  host, Setup refuses one core); specialize and oobeSystem ran as in Setup.
+- XP SP3 (MCE) and 2000 Pro SP4 through the real staging
+  (`tools/tests/run_nt5_profile_options_qemu.py`): every value, auto logon,
+  `net accounts`, `usos-reg.log` 0 failed. XP folds `ShowSuperHidden` into
+  `ShellState` at the first logon (effective). **Workgroup needs a network
+  adapter**: without one Setup ignores `JoinWorkgroup` (X470 I211 has no inbox
+  NT5 driver).
+- NT 4.0 Workstation and 98 SE (`tools/tests/run_profile_options_legacy_qemu.py`,
+  `w9x_creg.py`): all values PASS after two fixes (usos-reg.exe built for i586:
+  NT 4.0 faulted on an SSE `movaps`; the 9x CSMWrap staging overwrote the chosen
+  MSBATCH.INF with the default). NT 4.0: the Administrator's own NumLock value
+  is reset at logoff (new users and the logon screen keep it).
+
 ### Edition
 
 `src/flow/answer/editions.zig`. The edition is matched **at start** against
