@@ -33,6 +33,28 @@ $sha = (Get-FileHash -LiteralPath $bin -Algorithm SHA256).Hash
 Write-Host "[PASS] XP geometry-fix MBR: $($code.Length)/440 bytes SHA256=$sha"
 Write-Host "OUTPUT=$bin"
 
+# Windows 2000 with the ACPI HAL: the same MBR built with USOS_W2K_ACPI
+# (HPET LegacyReplacement off, ACPI 2.0 QWord names rewritten for the 1.0b
+# acpi.sys; src/platform/bios/xp/xp_geometry_fix_mbr.S).
+$w2kelf = Join-Path $out 'w2k-acpi-mbr.elf'
+$w2kraw = Join-Path $out 'w2k-acpi-mbr.raw.bin'
+$w2kbin = Join-Path $out 'w2k-acpi-mbr-440.bin'
+& $zig cc -target x86-freestanding-none -mcpu=i386 -nostdlib -nodefaultlibs -DUSOS_W2K_ACPI `
+    "-Wl,-T,$((Join-Path $src 'xp_geometry_fix_mbr.ld'))" `
+    '-Wl,--entry=xp_geometry_fix_mbr_start' `
+    (Join-Path $src 'xp_geometry_fix_mbr.S') -o $w2kelf
+if ($LASTEXITCODE -ne 0) { throw "W2K ACPI MBR assembly/link failed: $LASTEXITCODE" }
+& $zig objcopy -O binary -j .text $w2kelf $w2kraw
+if ($LASTEXITCODE -ne 0) { throw "W2K ACPI MBR objcopy failed: $LASTEXITCODE" }
+$code = [IO.File]::ReadAllBytes($w2kraw)
+if ($code.Length -gt 440) { throw "W2K ACPI MBR code is $($code.Length) bytes; max is 440" }
+$padded = New-Object byte[] 440
+[Array]::Copy($code,$padded,$code.Length)
+[IO.File]::WriteAllBytes($w2kbin,$padded)
+$sha = (Get-FileHash -LiteralPath $w2kbin -Algorithm SHA256).Hash
+Write-Host "[PASS] W2K ACPI MBR: $($code.Length)/440 bytes SHA256=$sha"
+Write-Host "OUTPUT=$w2kbin"
+
 # NT 3.x variant: same boot path plus the resident INT 15h E820 filter
 # (src/platform/bios/nt3/nt3_e820_mbr.S).
 $nt3src = Full 'src/platform/bios/nt3'

@@ -688,7 +688,9 @@ def main() -> int:
         nt3_e820_hook = root / "zig-out/xp-geometry-fix-mbr/nt3-e820-hook-512.bin"
         # ReactOS / own BIOS images behind CSMWrap: ELCR MBR (elcr_mbr.S).
         elcr_mbr = root / "zig-out/xp-geometry-fix-mbr/elcr-mbr-440.bin"
-        for required in (xp_vbr, xp_stage2, xp_nt52_vbr, xp_nt52_stage2, xp_geometry_fix_mbr, nt3_e820_mbr, nt3_e820_hook, elcr_mbr):
+        # Windows 2000 with ACPI: the USOS_W2K_ACPI build of the geometry MBR.
+        w2k_acpi_mbr = root / "zig-out/xp-geometry-fix-mbr/w2k-acpi-mbr-440.bin"
+        for required in (xp_vbr, xp_stage2, xp_nt52_vbr, xp_nt52_stage2, xp_geometry_fix_mbr, nt3_e820_mbr, nt3_e820_hook, elcr_mbr, w2k_acpi_mbr):
             if not required.is_file():
                 raise FileNotFoundError(f"XP BIOS bootstrap artifact missing: {required}")
         geometry_mbr = xp_geometry_fix_mbr.read_bytes()
@@ -777,6 +779,10 @@ def main() -> int:
         if len(elcr) != 440:
             raise RuntimeError(f"ELCR MBR code must be 440 bytes: {elcr_mbr}")
         put(entries, Entry("usr/lib/usos/elcr-mbr-440.bin", stat.S_IFREG | 0o644, elcr))
+        w2k_mbr = w2k_acpi_mbr.read_bytes()
+        if len(w2k_mbr) != 440:
+            raise RuntimeError(f"Windows 2000 ACPI MBR code must be 440 bytes: {w2k_acpi_mbr}")
+        put(entries, Entry("usr/lib/usos/w2k-acpi-mbr-440.bin", stat.S_IFREG | 0o644, w2k_mbr))
         nt3_hook = nt3_e820_hook.read_bytes()
         if len(nt3_hook) != 512 or nt3_hook[510:] != b"U3":
             raise RuntimeError(f"NT 3.x MBR hook sector must be 512 bytes ending in U3: {nt3_e820_hook}")
