@@ -252,7 +252,7 @@ def boot(args, root: Path, out: Path, disk: Path) -> None:
     cmd = [str(qemu_copy(root)), "-machine", "q35,i8042=off", *accel, "-m", "4096", "-smp", "2", *qemu_data(root),
            "-drive", f"if=pflash,format=raw,readonly=on,file={qd / 'share' / 'edk2-x86_64-code.fd'}",
            "-drive", f"if=pflash,format=raw,file={vars_copy}",
-           "-drive", f"file={disk.as_posix()},format=raw,if=none,id=t,cache=writeback", "-device", "ide-hd,drive=t,bus=ide.0",
+           "-drive", f"file={disk.as_posix()},format=raw,if=none,id=t,cache=writeback", *(["-device", "nvme,drive=t,serial=USOSNVME01"] if args.nvme else ["-device", "ide-hd,drive=t,bus=ide.0"]),
            "-device", "qemu-xhci,id=xhci", "-device", "usb-kbd,bus=xhci.0", "-device", "usb-mouse,bus=xhci.0",
            "-vga", "std", "-display", "none", "-nic", "none", "-monitor", f"tcp:127.0.0.1:{port},server,nowait"]
     if args.mmio32:
@@ -360,6 +360,7 @@ def main() -> int:
     p.add_argument("--keys", default="")
     p.add_argument("--boot-only", action="store_true", help="boot OUT/target.raw of an earlier run")
     p.add_argument("--tcg", action="store_true", help="boot under TCG (ReactOS stops under WHPX on this host)")
+    p.add_argument("--nvme", action="store_true", help="boot: the target disk on NVMe (as the X470 Micron) instead of AHCI")
     p.add_argument("--mmio32", action="store_true", help="OVMF: no 64-bit PCI MMIO window (BARs below 4 GiB)")
     p.add_argument("--qemu-arg", action="append", default=[], help='boot: extra QEMU option ("-trace usb_xhci_*")')
     p.add_argument("--shot-step", type=int, default=20, help="boot: seconds between screenshots")
