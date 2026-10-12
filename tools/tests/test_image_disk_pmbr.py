@@ -81,6 +81,51 @@ class ProtectiveMbr(unittest.TestCase):
         self.assertLess(call, text.index('sh "$LIB/uefi_boot_entry.sh" add'))
 
 
+class MbrSignature(unittest.TestCase):
+    """X470 2026-10-12: the OpenBSD entry showed "drive not present". MBR
+    images ship disk signature 0 (OpenBSD, 9front, Haiku, FreeDOS), which is
+    all an MBR HD() node names the disk by; it becomes a random nonzero one."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix='usos-mbrsig-'))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        (self.tmp / 'work').mkdir()
+        self.disk = self.tmp / 'disk.raw'
+
+    def run_fix(self, first):
+        self.disk.write_bytes(first + b'\xAB' * 4096)
+        fns = '\n'.join(function_text(TARGET, n) for n in ('hex4', 'mbr_sig_others', 'mbr_signature_fix'))
+        script = (f'log() {{ printf "[IMAGE_DISK] %s\\n" "$*"; }}\n'
+                  f'fail() {{ printf "STOP: %s\\n" "$1"; exit 1; }}\n'
+                  f'TARGET_DEVICE="{self.disk.as_posix()}"; work="{(self.tmp / "work").as_posix()}"\n{fns}\nmbr_signature_fix')
+        rc, out, err = sh(script)
+        self.assertEqual(rc, 0, out + err)
+        return out
+
+    def test_zero_signature_becomes_random_nonzero(self):
+        # OpenBSD install79.img: EF at 64 (960), A6 at 1024.
+        first = mbr([slot(0, 0xEF, 64, 960), b'\0' * 16, b'\0' * 16, slot(0x80, 0xA6, 1024, 1637376)])
+        out = self.run_fix(first)
+        data = self.disk.read_bytes()
+        self.assertNotEqual(data[440:444], b'\0\0\0\0')
+        self.assertIn('MBR disk signature 00000000 -> ' + data[440:444].hex(), out)
+        self.assertEqual(data[:440], first[:440])
+        self.assertEqual(data[444:], first[444:] + b'\xAB' * 4096)
+
+    def test_nonzero_signature_is_kept(self):
+        first = mbr([slot(0x80, 0x96, 0, 794624)], signature=b'\xc1\x0d\x60\x6c')
+        out = self.run_fix(first)
+        self.assertIn('kept', out)
+        self.assertEqual(self.disk.read_bytes()[:512], first)
+
+    def test_only_for_mbr_images_before_the_boot_entry(self):
+        text = TARGET.read_text(encoding='utf-8')
+        call = text.index('    mbr_signature_fix\n')
+        self.assertIn('if [ "$gpt" = no ]; then', text[call - 40:call])
+        self.assertLess(text.index('reactos|other-os) elcr_fix ;;'), call)
+        self.assertLess(call, text.index('sh "$LIB/uefi_boot_entry.sh" add'))
+
+
 class FastWrite(unittest.TestCase):
     """Step 620 slowness (X470 2026-10-12, Haiku after KolibriOS): BusyBox
     `wc -c` reads the whole image (1.4 GB for Haiku) from the stick, twice

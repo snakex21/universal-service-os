@@ -15,6 +15,14 @@
 #   uefi_boot_entry.sh option    print the load option (hex) for the ESP of
 #                                TARGET_DEVICE (tests)
 #   uefi_boot_entry.sh esp       print "number start size mbrtype sigtype signature" (tests)
+#   uefi_boot_entry.sh ids       print what firmware entries can name this disk
+#                                by: "g:PARTUUID" per GPT partition and
+#                                "m:SIGNATURE:start:size" per MBR partition.
+#                                image_disk_target.sh saves it BEFORE the write;
+#                                `add` with STALE_IDS_FILE then deletes every
+#                                Boot#### whose HD() node names the old layout
+#                                (X470 2026-10-12: FreeBSD written over Haiku
+#                                restarted into Haiku's old entry).
 #
 # The device path is the short form HD(...)/File(...) (UEFI 2.x 3.1.2; what
 # bcdedit writes): the firmware finds the partition on whatever port the disk
@@ -104,6 +112,76 @@ find_esp() {
     return 1
 }
 
+# Every partition of TARGET_DEVICE as a firmware HD() node can name it:
+# "g:<PARTUUID hex as stored>" (GPT) or "m:<signature 8 hex>:<start>:<size>"
+# (MBR slots; protective EE slots give nothing).
+disk_ids() {
+    head=/tmp/usos-boot-ids.$$
+    dd if="$TARGET_DEVICE" of="$head" bs="$SS" count=34 2>/dev/null || { rm -f "$head"; return 1; }
+    if [ "$(dd if="$head" bs=1 skip="$SS" count=8 2>/dev/null)" = 'EFI PART' ]; then
+        entries=$(u32_at "$head" $((SS + 72)))
+        count=$(u32_at "$head" $((SS + 80)))
+        esize=$(u32_at "$head" $((SS + 84)))
+        [ "$count" -le 128 ] || count=128
+        if [ "$((entries * SS + count * esize))" -gt "$((34 * SS))" ]; then
+            dd if="$TARGET_DEVICE" of="$head" bs="$SS" count=$((entries + (count * esize + SS - 1) / SS)) 2>/dev/null || { rm -f "$head"; return 1; }
+        fi
+        i=0
+        while [ "$i" -lt "$count" ]; do
+            off=$((entries * SS + i * esize))
+            [ "$(hexdump_bytes "$head" "$off" 16)" = 00000000000000000000000000000000 ] || printf 'g:%s\n' "$(hexdump_bytes "$head" $((off + 16)) 16)"
+            i=$((i + 1))
+        done
+    fi
+    if [ "$(hexdump_bytes "$head" 510 2)" = 55aa ]; then
+        sig=$(hexdump_bytes "$head" 440 4)
+        for slot in 0 1 2 3; do
+            case "$(u8_at "$head" $((446 + 16 * slot + 4)))" in 0|238) continue ;; esac
+            printf 'm:%s:%s:%s\n' "$sig" "$(u32_at "$head" $((446 + 16 * slot + 8)))" "$(u32_at "$head" $((446 + 16 * slot + 12)))"
+        done
+    fi
+    rm -f "$head"
+}
+
+# The HD() nodes of a load option (hex, without the variable attributes), in
+# the "ids" form; nothing for entries without one (USB, network, shell).
+option_hd_ids() {
+    printf '%s\n' "$1" | awk '
+        function b(o) { return index("0123456789abcdef", substr(s, 2*o+1, 1)) * 16 + index("0123456789abcdef", substr(s, 2*o+2, 1)) - 17 }
+        function le(o, n,   v, k) { v = 0; for (k = n - 1; k >= 0; k--) v = v * 256 + b(o + k); return v }
+        {
+            s = tolower($0); total = length(s) / 2
+            if (total < 8) exit
+            plen = le(4, 2); o = 6
+            while (o + 1 < total && substr(s, 2*o+1, 4) != "0000") o += 2
+            o += 2; end = o + plen
+            if (end > total) end = total
+            while (o + 4 <= end) {
+                t = b(o); st = b(o + 1); n = le(o + 2, 2)
+                if (n < 4 || o + n > end) break
+                if (t == 127 && st == 255) break
+                if (t == 4 && st == 1 && n >= 42) {
+                    if (b(o + 41) == 2) printf "g:%s\n", substr(s, 2*(o+24)+1, 32)
+                    else if (b(o + 41) == 1) printf "m:%s:%.0f:%.0f\n", substr(s, 2*(o+24)+1, 8), le(o + 8, 8), le(o + 16, 8)
+                }
+                o += n
+            }
+        }'
+}
+
+# 0 when an HD() id of an entry names the old layout (file $2): the same GPT
+# PARTUUID, the same nonzero MBR signature, or for MBR signature 0 (which
+# names no disk) the same signature, start and size.
+stale_match() {
+    for id in $1; do
+        case "$id" in
+            g:*|m:00000000:*) grep -qx "$id" "$2" && return 0 ;;
+            m:*) grep -q "^$(printf '%s' "$id" | cut -d: -f1-2):" "$2" && return 0 ;;
+        esac
+    done
+    return 1
+}
+
 # EFI_LOAD_OPTION: Attributes (LOAD_OPTION_ACTIVE), FilePathListLength,
 # Description, HD(number,start,size,signature,mbrtype,sigtype) node (4/1, 42
 # bytes), File(LOADER) node (4/4), End (7F/FF).
@@ -129,6 +207,9 @@ var_write() {
     [ "$bytes" = $(( (${#ATTR} + ${#2}) / 2 )) ] || { rm -f "$tmp"; fail "internal error: $1 encodes to $bytes bytes"; }
     # efivarfs marks existing variables immutable.
     [ ! -e "$file" ] || ! command -v chattr >/dev/null 2>&1 || chattr -i "$file" 2>/dev/null || true
+    # A plain folder (EFIVARS_DIR, tests) keeps the old tail of a longer
+    # value under conv=notrunc; efivarfs replaces the whole variable.
+    [ -z "${EFIVARS_DIR:-}" ] || [ "$(stat -f -c %T "$EFIVARS" 2>/dev/null)" = efivarfs ] || rm -f "$file"
     dd if="$tmp" of="$file" bs="$bytes" count=1 conv=notrunc 2>/dev/null || { rm -f "$tmp"; fail "cannot write $1 (the firmware refused the variable)"; }
     rm -f "$tmp"
     [ "$(var_hex "$1")" = "$ATTR$2" ] || fail "read-back: $1 differs"
@@ -137,6 +218,13 @@ var_write() {
 case "${1:-add}" in
     esp)
         find_esp || fail 'no EFI system partition on the disk'
+        exit 0 ;;
+    ids)
+        disk_ids || fail 'cannot read the disk start'
+        exit 0 ;;
+    hdids)
+        # Tests: the HD() ids of the load option OPTION_HEX.
+        option_hd_ids "${OPTION_HEX:?OPTION_HEX is required}"
         exit 0 ;;
     option)
         NAME=${ENTRY_NAME:?ENTRY_NAME is required}
@@ -160,6 +248,34 @@ fi
 option=$(load_option) || fail 'no EFI system partition on the disk'
 set -- $(find_esp)
 log "ESP partition $1 start=$2 size=$3 $([ "$4" = 2 ] && echo "GPT PARTUUID=$6" || echo "MBR signature=$(printf '%s' "$6" | cut -c1-8)") loader=$LOADER"
+
+# Entries for what the disk held before the write (STALE_IDS_FILE, saved by
+# image_disk_target.sh before it cleared the disk) are deleted, so the old
+# system's entry cannot start instead of the new one. The entry the firmware
+# started now (BootCurrent: the USOS stick) and one equal to the new option
+# stay.
+current=$(var_hex BootCurrent | cut -c9- || true)
+removed=' '
+if [ -n "${STALE_IDS_FILE:-}" ] && [ -s "$STALE_IDS_FILE" ]; then
+    for f in "$EFIVARS"/Boot[0-9A-F][0-9A-F][0-9A-F][0-9A-F]-$GLOBAL; do
+        [ -f "$f" ] || continue
+        n=${f##*/Boot}
+        n=${n%%-*}
+        [ "$(le16 $((0x$n)))" != "$current" ] || continue
+        body=$(od -An -v -tx1 "$f" | tr -d ' \n' | cut -c9-)
+        [ "$body" != "$option" ] || continue
+        ids=$(option_hd_ids "$body")
+        [ -n "$ids" ] || continue
+        stale_match "$ids" "$STALE_IDS_FILE" || continue
+        ! command -v chattr >/dev/null 2>&1 || chattr -i "$f" 2>/dev/null || true
+        if rm -f "$f" 2>/dev/null && [ ! -e "$f" ]; then
+            removed="$removed$(le16 $((0x$n))) "
+            log "Boot$n removed: it named the disk's previous layout ($(printf '%s' "$ids" | tr '\n' ' '))"
+        else
+            log "Boot$n names the disk's previous layout but could not be removed"
+        fi
+    done
+fi
 
 # The same entry already there (the same image written again): reuse it.
 number=''
@@ -189,16 +305,21 @@ le_number=$(le16 $((0x$number)))
 
 order=$(var_hex BootOrder | cut -c9- || true)
 # Every other entry (the USOS stick, other systems) stays, in its order.
+# Removed (stale) entries leave BootOrder.
 others=''
+kept=''
 rest=$order
 while [ -n "$rest" ]; do
     item=$(printf '%s' "$rest" | cut -c1-4)
-    [ "$item" = "$le_number" ] || others="$others$item"
+    case "$removed" in
+        *" $item "*) ;;
+        *) kept="$kept$item"; [ "$item" = "$le_number" ] || others="$others$item" ;;
+    esac
     rest=$(printf '%s' "$rest" | cut -c5-)
 done
 case "$ORDER" in
     first) new_order="$le_number$others" ;;
-    *) if [ "$others" = "$order" ]; then new_order="$order$le_number"; else new_order=$order; fi ;;
+    *) if [ "$others" = "$kept" ]; then new_order="$kept$le_number"; else new_order=$kept; fi ;;
 esac
 if [ "$new_order" != "$order" ]; then
     var_write BootOrder "$new_order"

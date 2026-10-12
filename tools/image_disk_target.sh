@@ -132,6 +132,16 @@ log "system=$SYSTEM image_bytes=$image_bytes mode=$mode gpt=$gpt mbr_esp=$mbr_es
 printf 'mode=%s\n' "$mode" > "$RESULT"
 
 # ---------------------------------------------------------------- the disk
+# What firmware entries can name the disk by now (old GPT PARTUUIDs, old MBR
+# signature + partitions), read before the write: the new boot entry deletes
+# the entries of the system that was on the disk (X470 2026-10-12: FreeBSD
+# written over Haiku restarted into Haiku's old entry).
+stale_ids="$work/stale-ids.txt"
+: > "$stale_ids"
+if [ -r "$LIB/uefi_boot_entry.sh" ]; then
+    TARGET_DEVICE=$TARGET_DEVICE sh "$LIB/uefi_boot_entry.sh" ids > "$stale_ids" 2>/dev/null || : > "$stale_ids"
+    log "previous layout: $(wc -l < "$stale_ids" | tr -d ' ') partition id(s) for stale boot entries"
+fi
 # Old partition tables at both ends go first (a stale backup GPT at the disk
 # end would make the firmware or the OS see the old layout).
 dd if=/dev/zero of="$TARGET_DEVICE" bs=512 count=2048 conv=notrunc,fsync 2>/dev/null || fail 'cannot clear the disk start'
@@ -256,6 +266,53 @@ fi
 sync
 blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true
 
+# MBR disk signature (UEFI HD() node, signature type 1): the firmware boot
+# entry names an MBR partition only by this 32-bit value at 0x1B8. Most
+# images ship 0 (OpenBSD, 9front, Haiku, FreeDOS), which names no disk: the
+# X470 AMI firmware showed the OpenBSD entry as "drive not present"
+# (B261012-154207), and two such disks look alike. A signature of 0, or one
+# another disk in this PC already has, becomes a random nonzero one unused on
+# this PC. Only bytes 440-443 change (boot code ends at 440; the partition
+# table stays); GPT disks are named by PARTUUID and are not touched.
+hex4() { od -An -v -tx1 | tr -d ' \n'; }
+mbr_sig_others() {
+    for dev in /sys/block/*; do
+        name=${dev##*/}
+        case "$name" in loop*|ram*|zram*|sr*|fd*|dm-*|md*) continue ;; esac
+        [ "/dev/$name" != "$TARGET_DEVICE" ] || continue
+        [ -b "/dev/$name" ] || continue
+        dd if="/dev/$name" bs=512 count=1 2>/dev/null | dd bs=1 skip=440 count=4 2>/dev/null | hex4
+        echo
+    done
+}
+mbr_signature_fix() {
+    [ "$(dd if="$TARGET_DEVICE" bs=1 skip=510 count=2 2>/dev/null | hex4)" = 55aa ] || return 0
+    sig=$(dd if="$TARGET_DEVICE" bs=1 skip=440 count=4 2>/dev/null | hex4)
+    others=$(mbr_sig_others 2>/dev/null || true)
+    if [ "$sig" != 00000000 ] && ! echo "$others" | grep -qx "$sig"; then
+        log "MBR disk signature $sig kept (unique on this PC)"
+        return 0
+    fi
+    tries=0
+    while :; do
+        tries=$((tries + 1))
+        [ "$tries" -le 16 ] || fail 'cannot pick a unique MBR disk signature'
+        new=$(dd if=/dev/urandom bs=4 count=1 2>/dev/null | hex4)
+        [ "${#new}" = 8 ] && [ "$new" != 00000000 ] || continue
+        echo "$others" | grep -qx "$new" || break
+    done
+    printf "$(printf '\\%03o\\%03o\\%03o\\%03o' $((0x$(echo "$new" | cut -c1-2))) $((0x$(echo "$new" | cut -c3-4))) $((0x$(echo "$new" | cut -c5-6))) $((0x$(echo "$new" | cut -c7-8))))" > "$work/sig.bin"
+    [ "$(wc -c < "$work/sig.bin" | tr -d ' ')" = 4 ] || fail 'internal error: MBR signature size'
+    dd if="$work/sig.bin" of="$TARGET_DEVICE" bs=1 seek=440 count=4 conv=notrunc,fsync 2>/dev/null || fail 'cannot write the MBR disk signature'
+    [ "$(dd if="$TARGET_DEVICE" bs=1 skip=440 count=4 2>/dev/null | hex4)" = "$new" ] || fail 'read-back: the MBR disk signature differs'
+    log "MBR disk signature $sig -> $new (the firmware boot entry names the disk by it)"
+}
+if [ "$gpt" = no ]; then
+    mbr_signature_fix
+    sync
+    blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true
+fi
+
 # Firmware boot entry named after the system (BootOrder + BootNext): the
 # restart after the flow starts this disk, and the entry stays in the
 # firmware boot menu (Haiku had none on the X470, 2026-10-12). Not fatal:
@@ -263,7 +320,7 @@ blockdev --flushbufs "$TARGET_DEVICE" 2>/dev/null || true
 # removable-media scan.
 if [ -r "$LIB/uefi_boot_entry.sh" ]; then
     entry_log="$work/boot-entry.log"
-    if TARGET_DEVICE=$TARGET_DEVICE ENTRY_NAME="${IMAGE_TITLE:-$SYSTEM}" sh "$LIB/uefi_boot_entry.sh" add > "$entry_log" 2>&1; then
+    if TARGET_DEVICE=$TARGET_DEVICE ENTRY_NAME="${IMAGE_TITLE:-$SYSTEM}" STALE_IDS_FILE="$stale_ids" sh "$LIB/uefi_boot_entry.sh" add > "$entry_log" 2>&1; then
         cat "$entry_log"
         grep '^boot_entry=' "$entry_log" >> "$RESULT" || true
     else

@@ -567,12 +567,30 @@ usos_w9x_csmwrap_prepare() {
     w9x_csmwrap_log 'DONE; waiting for the restart'
     usos_stick_write mv "$request" "$W9X_DIR/request.done" 2>/dev/null || true
     usos_stick_flush || true
-    if [ -n "$img" ] && [ "$system" = haiku ]; then
-        # The rest of the disk stays unallocated; Haiku's Installer asks for a
-        # BFS partition (X470 2026-10-12). USOS does not format BFS.
-        usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry and Haiku starts from it. To install Haiku permanently: Installer > Set up partitions > create a BFS partition in the free space. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true
-    elif [ -n "$img" ]; then
-        usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry and $folder starts from it. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true
+    if [ -n "$img" ]; then
+        # Per-system hints (docs/custom-os-2026-10-11.md, sections 7-8); every text
+        # is translated (boot.lx.image_disk_restart_notice_*).
+        img_notice=$system
+        case "$system" in
+            # The official VM image (growfs on the first start); disc1/memstick are installers.
+            freebsd) case "$iso" in *.iso|*memstick*|*bootonly*|*disc1*) img_notice=generic ;; esac ;;
+            # The live image (resize_root, then one reboot); install.img is sysinst.
+            netbsd) case "$iso" in *live*|*Live*) ;; *) img_notice=generic ;; esac ;;
+        esac
+        case "$img_notice" in
+            # The rest of the disk stays unallocated; Haiku's Installer asks for a
+            # BFS partition (X470 2026-10-12). USOS does not format BFS.
+            haiku) usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry and Haiku starts from it. To install Haiku permanently: Installer > Set up partitions > create a BFS partition in the free space. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true ;;
+            # 9front: the boot prompts are answered by hand (X470 2026-10-12).
+            9front) usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry and 9front starts from it. At the bootargs prompt press Enter, then Enter again for the user glenda (if asked for vgasize, type text). To install 9front, run inst/start in a terminal. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true ;;
+            # OpenBSD has no ready-made image: the installer needs sets or a second disk.
+            openbsd) usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry and OpenBSD starts from it. It is the OpenBSD installer: it needs a network connection for the file sets (http) or a second disk to install onto. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true ;;
+            freebsd) usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry and FreeBSD starts from it. The first start enlarges the system to the whole disk. Log in as root (no password) and set a password with passwd. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true ;;
+            netbsd) usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry and NetBSD starts from it. The first start enlarges the system to the whole disk and restarts once by itself. Log in as root (no password) and set a password with passwd. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true ;;
+            # Redox: X470 2026-10-12 hung at redoxfs on NVMe, no PS/2 = no input.
+            redox) usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry and Redox starts from it. Redox on real hardware is experimental: if it stops at \"redoxfs: failed to open\" or the keyboard does not react, this PC's disk or USB controller is not supported yet. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true ;;
+            *) usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry and $folder starts from it. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true ;;
+        esac
     else
     usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry (CSMWrap; CSM stays off) and the $folder installation continues on it. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true
     fi

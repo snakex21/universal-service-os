@@ -67,7 +67,12 @@ pub const hashes = [_]u32{
     0x58230247, // lx.image_disk_after_restart
     0x27467e49, // lx.image_disk_layout
     0x627a6d87, // lx.image_disk_restart_notice
+    0xfc2931f2, // lx.image_disk_restart_notice_9front
+    0xe13475fb, // lx.image_disk_restart_notice_freebsd
     0x710fff7e, // lx.image_disk_restart_notice_haiku
+    0xa24fc59c, // lx.image_disk_restart_notice_netbsd
+    0xa24adf21, // lx.image_disk_restart_notice_openbsd
+    0x3c39c188, // lx.image_disk_restart_notice_redox
     0x6e68bf21, // lx.image_disk_writing
     0x6cc43056, // lx.initializing_keyboard_and_mouse
     0x34d9903d, // lx.initializing_only_the_storage_stack_needed_for_p
@@ -280,7 +285,12 @@ pub const english = [_][]const u8{
     "After the restart the disk starts by itself into {0}.",
     "New layout: the {0} image unchanged at the start of the disk ({1} MB); a 64 MiB CSMWrap partition at the end only when the image has no UEFI loader; the rest stays unallocated.",
     "After the restart the firmware starts this disk's UEFI entry and {0} starts from it. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
+    "After the restart the firmware starts this disk's UEFI entry and 9front starts from it. At the bootargs prompt press Enter, then Enter again for the user glenda (if asked for vgasize, type text). To install 9front, run inst/start in a terminal. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
+    "After the restart the firmware starts this disk's UEFI entry and FreeBSD starts from it. The first start enlarges the system to the whole disk. Log in as root (no password) and set a password with passwd. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
     "After the restart the firmware starts this disk's UEFI entry and Haiku starts from it. To install Haiku permanently: Installer > Set up partitions > create a BFS partition in the free space. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
+    "After the restart the firmware starts this disk's UEFI entry and NetBSD starts from it. The first start enlarges the system to the whole disk and restarts once by itself. Log in as root (no password) and set a password with passwd. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
+    "After the restart the firmware starts this disk's UEFI entry and OpenBSD starts from it. It is the OpenBSD installer: it needs a network connection for the file sets (http) or a second disk to install onto. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
+    "After the restart the firmware starts this disk's UEFI entry and Redox starts from it. Redox on real hardware is experimental: if it stops at \"redoxfs: failed to open\" or the keyboard does not react, this PC's disk or USB controller is not supported yet. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
     "Writing the {0} image to the selected disk.",
     "Initializing keyboard and mouse.",
     "Initializing only the storage stack needed for preparation.",
