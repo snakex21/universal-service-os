@@ -109,8 +109,11 @@ class Nt5MenuStrings(unittest.TestCase):
         boot keys (single- or double-quoted, $folder as {0})."""
         exact, templates = catalog()
         src = (ROOT / 'tools/w9x_csmwrap_prepare.sh').read_text(encoding='utf-8')
+        # w9x_release_time_zone prints TIMEZONE.INF keys (data, not UI text).
+        tz = src.index('w9x_release_time_zone() {')
+        scan = src[:tz] + src[src.index('\n}\n', tz):]
         found = []
-        for m in re.finditer(r"printf '([^']*)'", src):
+        for m in re.finditer(r"printf '([^']*)'", scan):
             found += m.group(1).split('\\n')
         found += re.findall(r"USOS_XP_DISK_NOTE=\"([^\"]*)\"", src)
         for m in re.finditer(r"usos_ui_stage \d \d ('[^']*'|\"[^\"]*\") ('[^']*'|\"[^\"]*\")", src):
