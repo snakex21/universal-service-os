@@ -7,9 +7,23 @@
 # (USOS_XP_ESP_DIR), uses the canonical 255/63 geometry and runs the driver
 # preflight; every other profile behaves as before.
 
+# The stick ESP may be read-only here (a menu wait, tools/stick_write.sh;
+# X470 2026-10-12, B261012-104904: "cannot write Legacy XP staging status to
+# ESP" at the disk picker): every write onto it goes through usos_stick_write.
+command -v usos_stick_write >/dev/null 2>&1 || usos_stick_write() { "$@"; }
+
 xp_stage_set() {
     XP_STAGE_STATE=$1
     export XP_STAGE_STATE
+    usos_stick_write xp_stage_write
+    case $? in
+        0) ;;
+        2) stop 'cannot publish Legacy XP staging status on ESP' ;;
+        *) stop 'cannot write Legacy XP staging status to ESP' ;;
+    esac
+}
+
+xp_stage_write() {
     status_file=${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/legacy-xp-staging-status.txt
     tmp_file="$status_file.tmp"
     {
@@ -18,9 +32,8 @@ xp_stage_set() {
         printf 'image=%s\n' "${XP_IMAGE_NAME:-unknown}"
         printf 'target=%s\n' "${TARGET_DEVICE:-unselected}"
         printf 'uptime=%s\n' "$(cut -d' ' -f1 /proc/uptime 2>/dev/null || true)"
-    } > "$tmp_file" || stop 'cannot write Legacy XP staging status to ESP'
-    mv "$tmp_file" "$status_file" || stop 'cannot publish Legacy XP staging status on ESP'
-    sync
+    } > "$tmp_file" || return 1
+    mv "$tmp_file" "$status_file" || return 2
 }
 
 xp_run_logged() {
@@ -35,8 +48,7 @@ xp_run_logged() {
     ) 2>&1 | tee "$tmp_log"
     [ -r "$rc_file" ] || return 125
     command_rc=$(cat "$rc_file")
-    cp "$tmp_log" "${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/$log_name" 2>/dev/null || true
-    sync
+    usos_stick_write cp "$tmp_log" "${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}/$log_name" 2>/dev/null || true
     return "$command_rc"
 }
 

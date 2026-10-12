@@ -54,3 +54,18 @@ usos_stick_write() {
     [ "$_usos_stick_was" != ro ] || usos_stick_ro || true
     return "$_usos_stick_rc"
 }
+
+# Writers for usos_stick_write (stdin -> one ESP file):
+#   { ...; } | usos_stick_write usos_esp_put FILE      replace FILE
+#   { ...; } | usos_stick_write usos_esp_append FILE   append to FILE
+# Every write onto the stick ESP goes through usos_stick_write
+# (tools/tests/test_esp_writes_helper.py): a plain pass-through while the ESP
+# is read-write, a short read-write window while it is read-only
+# (X470 2026-10-12, B261012-104904: the XP disk picker wrote its traces into
+# the read-only ESP and stopped with "cannot write Legacy XP staging status").
+usos_esp_put() {
+    cat > "$1"
+}
+usos_esp_append() {
+    cat >> "$1"
+}

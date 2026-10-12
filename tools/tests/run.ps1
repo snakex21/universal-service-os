@@ -83,6 +83,7 @@ function Run-Unit {
     & python.exe (Join-Path $root 'tools/tests/test_stick_release.py')
     if ($LASTEXITCODE -ne 0) { throw 'micro-Linux stick release tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/test_stick_write.py')
+    & python.exe (Join-Path $root 'tools/tests/test_esp_writes_helper.py')
     if ($LASTEXITCODE -ne 0) { throw 'micro-Linux read-only stick ESP tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/test_initrd_alignment.py')
     if ($LASTEXITCODE -ne 0) { throw 'Initramfs alignment (lang.cpio) tests failed.' }
