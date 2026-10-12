@@ -67,6 +67,8 @@ foreach ($relative in @(
     'tools\vendor\patcher9x\0.9.91\NOTICE.TXT',
     'tools\build_windows_native_cache.py',
     'tools\build_windows_source_mount.py',
+    'tools\build_windows_usos_reg.py',
+    'tools\windows_usos_reg.c',
     'tools\windows_setup_logging.c',
     'tools\windows_setup_launcher.c',
     'tools\windows_source_mount.c',

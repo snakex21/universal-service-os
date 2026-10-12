@@ -13,6 +13,7 @@ const Profile = @import("profile.zig").Profile;
 const target = @import("target.zig");
 const tables = @import("tables.zig");
 const schema = @import("schema.zig");
+const options = @import("options.zig");
 
 pub const Arch = target.Arch;
 pub const Family = target.Family;
@@ -171,19 +172,110 @@ const explorer_advanced = "reg.exe add \"" ++ default_hive ++ "\\Software\\Micro
 /// RunSynchronous, run as SYSTEM before OOBE). Each command is at most 259
 /// characters (the schema's limit of Path).
 pub const Commands = struct {
-    items: [16][]const u8 = undefined,
-    storage: [16][200]u8 = undefined,
+    items: [max_commands][]const u8 = undefined,
+    storage: [max_commands][259]u8 = undefined,
     len: usize = 0,
 
     fn add(self: *Commands, comptime format: []const u8, args: anytype) !void {
+        if (self.len == max_commands) return error.TooManyCommands;
         self.items[self.len] = try std.fmt.bufPrint(&self.storage[self.len], format, args);
         self.len += 1;
+    }
+
+    fn addText(self: *Commands, value: []const u8) !void {
+        return self.add("{s}", .{value});
     }
 
     pub fn slice(self: *const Commands) []const []const u8 {
         return self.items[0..self.len];
     }
 };
+
+pub const max_commands = 48;
+
+/// A packed command stays short enough for usos-run-hidden.exe's prefix
+/// (tools/windows_hidden_commands.h: 20 characters within 259).
+pub const packed_limit = 239;
+
+/// Registry operations of the typed options (options.zig) as reg.exe
+/// commands, several per command ("cmd.exe /c reg add ... & reg add ...")
+/// while they fit: fewer RunSynchronousCommand elements keep the answer well
+/// under max_size with every option on. One operation alone is a plain
+/// "reg.exe ..." command.
+const Packer = struct {
+    out: *Commands,
+    text: [packed_limit]u8 = undefined,
+    len: usize = 0,
+    ops: usize = 0,
+
+    fn op(self: *Packer, comptime format: []const u8, args: anytype) !void {
+        var buffer: [packed_limit]u8 = undefined;
+        const one = try std.fmt.bufPrint(&buffer, format, args);
+        const prefix = "cmd.exe /c ";
+        if (self.ops > 0 and prefix.len + self.len + 3 + one.len > packed_limit) try self.flush();
+        if (self.ops > 0) {
+            @memcpy(self.text[self.len .. self.len + 3], " & ");
+            self.len += 3;
+        }
+        @memcpy(self.text[self.len .. self.len + one.len], one);
+        self.len += one.len;
+        self.ops += 1;
+    }
+
+    fn flush(self: *Packer) !void {
+        if (self.ops == 1) {
+            // "reg add ..." -> "reg.exe add ...".
+            try self.out.add("reg.exe{s}", .{self.text[3..self.len]});
+        } else if (self.ops > 1) try self.out.add("cmd.exe /c {s}", .{self.text[0..self.len]});
+        self.len = 0;
+        self.ops = 0;
+    }
+};
+
+fn regOp(packer: *Packer, r: options.Reg, p: *const Profile) !void {
+    const root: []const u8 = switch (r.root) {
+        .hklm => "HKLM",
+        .user => default_hive,
+        .default => "HKU\\.DEFAULT",
+    };
+    switch (r.data) {
+        .del => try packer.op("reg delete \"{s}\\{s}\" /v {s} /f", .{ root, r.key, r.name }),
+        .dword => |v| try packer.op("reg add \"{s}\\{s}\" /v {s} /t REG_DWORD /d {d} /f", .{ root, r.key, r.name, v }),
+        else => {
+            var number: [16]u8 = undefined;
+            const data = options.dataText(r.data, p, &number);
+            const quote: []const u8 = if (std.mem.indexOfScalar(u8, data, ' ') != null) "\"" else "";
+            try packer.op("reg add \"{s}\\{s}\" /v {s} /t REG_SZ /d {s}{s}{s} /f", .{ root, r.key, r.name, quote, data, quote });
+        },
+    }
+}
+
+/// The typed options' machine-wide operations (HKLM, HKU\.DEFAULT and
+/// commands) or, with `user`, the Default User hive ones.
+fn optionCommands(p: *const Profile, family: Family, user: bool, out: *Commands) !void {
+    var values: [options.count]u8 = undefined;
+    var it = options.iterate(p, &values, options.osOfFamily(family));
+    var packer: Packer = .{ .out = out };
+    while (it.next()) |rule| switch (rule.action) {
+        .reg => |r| if ((r.root == .user) == user) try regOp(&packer, r, p),
+        .command => |c| if (!user) {
+            try packer.flush();
+            try out.addText(c);
+        },
+        .native => {},
+    };
+    try packer.flush();
+}
+
+fn hasUserOptions(p: *const Profile, family: Family) bool {
+    var values: [options.count]u8 = undefined;
+    var it = options.iterate(p, &values, options.osOfFamily(family));
+    while (it.next()) |rule| switch (rule.action) {
+        .reg => |r| if (r.root == .user) return true,
+        else => {},
+    };
+    return false;
+}
 
 pub fn specializeCommands(p: *const Profile, family: Family, out: *Commands) !void {
     out.len = 0;
@@ -211,12 +303,15 @@ pub fn specializeCommands(p: *const Profile, family: Family, out: *Commands) !vo
             try out.add("cmd.exe /c start /w pkgmgr.exe /uu:InboxGames /quiet /norestart", .{});
         } else try out.add("dism.exe /Online /NoRestart /Disable-Feature /FeatureName:InboxGames", .{});
     }
-    const hive = on(p, .show_extensions, family) or on(p, .show_hidden, family) or on(p, .no_welcome_center, family);
+    // Typed options (options.zig): HKLM, HKU\.DEFAULT, commands.
+    try optionCommands(p, family, false, out);
+    const hive = on(p, .show_extensions, family) or on(p, .show_hidden, family) or on(p, .no_welcome_center, family) or hasUserOptions(p, family);
     if (hive) {
         try out.add("reg.exe load \"" ++ default_hive ++ "\" \"C:\\Users\\Default\\NTUSER.DAT\"", .{});
         if (on(p, .show_extensions, family)) try out.add(explorer_advanced, .{ "HideFileExt", 0 });
         if (on(p, .show_hidden, family)) try out.add(explorer_advanced, .{ "Hidden", 1 });
         if (on(p, .no_welcome_center, family)) try out.add("reg.exe delete \"" ++ default_hive ++ "\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /v WindowsWelcomeCenter /f", .{});
+        try optionCommands(p, family, true, out);
         try out.add("reg.exe unload \"" ++ default_hive ++ "\"", .{});
     }
 }
@@ -264,6 +359,14 @@ fn specialize(w: *W, input: Input) !void {
             try endComponent(w);
         }
     }
+    // Workgroup (UnattendedJoin; without it Windows uses WORKGROUP).
+    if (p.workgroup.len > 0) {
+        try component(w, "Microsoft-Windows-UnattendedJoin", input.arch);
+        try open(w, 3, "Identification");
+        try element(w, 4, "JoinWorkgroup", p.workgroup.slice());
+        try close(w, 3, "Identification");
+        try endComponent(w);
+    }
     var commands: Commands = .{};
     try specializeCommands(p, input.family, &commands);
     if (commands.len > 0) {
@@ -295,6 +398,19 @@ fn oobe(w: *W, input: Input) !void {
     try w.writeAll("  <settings pass=\"oobeSystem\">\n");
     try international(w, input, false);
     try component(w, "Microsoft-Windows-Shell-Setup", input.arch);
+    // Automatic logon of the first user at every start (LogonCount counts
+    // down per logon: practically permanent).
+    if (p.opt(.autologon) == 1) {
+        try open(w, 3, "AutoLogon");
+        try element(w, 4, "Enabled", "true");
+        try element(w, 4, "LogonCount", "9999999");
+        try element(w, 4, "Username", p.user.slice());
+        try open(w, 4, "Password");
+        try element(w, 5, "Value", p.password.slice());
+        try element(w, 5, "PlainText", "true");
+        try close(w, 4, "Password");
+        try close(w, 3, "AutoLogon");
+    }
     try open(w, 3, "OOBE");
     // Per version (Microsoft unattend reference, schema.zig): Vista has
     // HideEULAPage, NetworkLocation and ProtectYourPC only; 7 adds
@@ -473,4 +589,72 @@ test "autounattend: Server Manager and Initial Configuration Tasks stay closed a
     try std.testing.expect(std.mem.indexOf(u8, s2008, "DoNotOpenInitialConfigurationTasksAtLogon") != null);
     const eight = try render(.{ .profile = &p, .family = .windows_8_1, .arch = .amd64 }, &buffer);
     try std.testing.expect(std.mem.indexOf(u8, eight, "ServerManager") == null and std.mem.indexOf(u8, eight, "OutOfBoxExperience") == null);
+}
+
+/// Every typed option at its last value, every tweak, workgroup and a
+/// long password: the largest answer a profile can produce.
+pub fn everythingOn() !Profile {
+    var p = try allTweaks();
+    try p.user2.set("Drugi-Uzytkownik-20c");
+    try p.org.set("USOS Laboratory Organization Name For Size Tests 0123456789ABCD");
+    try p.password.set("P4ssw0rd-P4ssw0rd-P4ssw0rd-P4ssw0rd-P4ssw0rd-P4ssw0rd-P4ssw0rd!!");
+    try p.workgroup.set("LABORATORY-0123");
+    p.disable_wer = true;
+    p.bypass_tpm = true;
+    p.bypass_secure_boot = true;
+    p.bypass_ram = true;
+    p.no_network_oobe = true;
+    p.timezone = @intCast(tables.timeZoneIndex("Europe/Warsaw").?);
+    p.language = @intCast(tables.languageIndex("pl-PL").?);
+    for (options.table) |o| {
+        if (!o.legacy) p.opts[@intFromEnum(o.opt)] = @intCast(o.values.len - 1);
+    }
+    return p;
+}
+
+test "autounattend: every option on stays within the limits on every version" {
+    const p = try everythingOn();
+    var buffer: [max_size]u8 = undefined;
+    inline for (@typeInfo(Family).@"enum".fields) |f| {
+        const family: Family = @enumFromInt(f.value);
+        if (comptime family.nt5()) continue;
+        for ([_]Arch{ .x86, .amd64 }) |arch| {
+            const xml = try render(.{ .profile = &p, .family = family, .arch = arch, .key = "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE", .image_index = 2 }, &buffer);
+            // Headroom (1.5 KiB) for later options; the hidden-runner
+            // prefixes go into a copy without this limit.
+            errdefer std.debug.print("{s}: {d} bytes\n", .{ f.name, xml.len });
+            try std.testing.expect(xml.len <= max_size - 1536);
+            try @import("xml_check.zig").wellFormed(xml);
+            try schema.check(xml, family, null);
+        }
+        var commands: Commands = .{};
+        try specializeCommands(&p, family, &commands);
+        for (commands.slice()) |command| {
+            try std.testing.expect(command.len <= 259);
+            if (std.mem.startsWith(u8, command, "cmd.exe /c reg")) try std.testing.expect(command.len <= packed_limit);
+        }
+    }
+}
+
+test "autounattend: typed options render only when set (byte identity)" {
+    var p = try allTweaks();
+    var a: [max_size]u8 = undefined;
+    var b: [max_size]u8 = undefined;
+    const before = try render(.{ .profile = &p, .family = .windows_11, .arch = .amd64 }, &a);
+    p.opts = @splat(0);
+    const after = try render(.{ .profile = &p, .family = .windows_11, .arch = .amd64 }, &b);
+    try std.testing.expectEqualStrings(before, after);
+    p.opts[@intFromEnum(options.Opt.autologon)] = 1;
+    p.opts[@intFromEnum(options.Opt.taskbar_left)] = 1;
+    p.opts[@intFromEnum(options.Opt.widgets_off)] = 1;
+    p.opts[@intFromEnum(options.Opt.uac_level)] = 1;
+    const eleven = try render(.{ .profile = &p, .family = .windows_11, .arch = .amd64 }, &b);
+    try std.testing.expect(std.mem.indexOf(u8, eleven, "<LogonCount>9999999</LogonCount>") != null);
+    try std.testing.expect(std.mem.indexOf(u8, eleven, "/v TaskbarAl /t REG_DWORD /d 0 /f") != null);
+    try std.testing.expect(std.mem.indexOf(u8, eleven, "cmd.exe /c reg add &quot;HKLM\\SOFTWARE\\Policies\\Microsoft\\Dsh&quot; /v AllowNewsAndInterests /t REG_DWORD /d 0 /f &amp; reg add &quot;HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System&quot; /v ConsentPromptBehaviorAdmin /t REG_DWORD /d 5 /f</Path>") != null);
+    // 10 has no left taskbar; Server 2025 no widgets.
+    const ten = try render(.{ .profile = &p, .family = .windows_10, .arch = .amd64 }, &b);
+    try std.testing.expect(std.mem.indexOf(u8, ten, "TaskbarAl") == null);
+    const server = try render(.{ .profile = &p, .family = .server_2025, .arch = .amd64 }, &b);
+    try std.testing.expect(std.mem.indexOf(u8, server, "AllowNewsAndInterests") == null);
 }

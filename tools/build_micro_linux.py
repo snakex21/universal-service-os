@@ -744,6 +744,13 @@ def main() -> int:
                 raise RuntimeError("Pinned UefiSeven checksum mismatch: " + filename)
             name = "uefiseven-LICENSE.txt" if filename == "LICENSE.txt" else filename
             put(entries, Entry("usr/lib/usos/" + name, stat.S_IFREG | 0o644, data))
+        # usos-reg.exe (own GPL tool, tools/windows_usos_reg.c): declarative
+        # registry set files for NT 4.0 SP6 .. 11; the XP/2000/2003 and NT 4.0
+        # target scripts run from usr/lib/usos and find it as
+        # "$SCRIPT_DIR/usos-reg.exe" / "$LIB/usos-reg.exe".
+        from build_windows_usos_reg import build as build_usos_reg
+        usos_reg = build_usos_reg(root, root / "zig-out/windows-usos-reg")
+        put(entries, Entry("usr/lib/usos/usos-reg.exe", stat.S_IFREG | 0o644, usos_reg.read_bytes()))
         reader_out = root / "zig-out/windows-source-mount"
         build_source_reader(root, reader_out)
         vendor = root / "tools/vendor/imdisk/2.1.2"

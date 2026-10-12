@@ -93,7 +93,7 @@ Optional, off by default (nothing in the Win10 defaults suggested
 otherwise). `schema.tweak_support` is the one table of where each tweak is
 rendered; everywhere else the tweak writes nothing, and the editor's
 "Appearance and extras" section offers only the tweaks of its system.
-Windows 2000 has none (no `reg.exe` in its base system).
+Windows 2000 gets `show_extensions`, `show_hidden` and `no_autorun` through usos-reg.exe since 2026-10-12 (no `reg.exe` in its base system; see "Options").
 
 | tweak | XP | 2003 | Vista | 7 | 8 .. 11, Server 2012+ | how |
 |---|---|---|---|---|---|---|
@@ -165,6 +165,107 @@ rendered for the Server releases of the same schema level.
   driver offers that mode. Without a display driver (the VGA driver, e.g.
   XP through CSMWrap without a GOP-capable driver) Windows keeps its basic
   mode; "Automatic" writes nothing.
+
+### Options (typed, stage 1, 2026-10-12)
+
+`src/flow/answer/options.zig` is the one option table: each option has a
+value type (toggle `no`/`yes`, or a choice whose first value is the default),
+an editor group, and per release the rules that render each value: a
+registry value (`hklm`, `user` = every new user, `default` = `HKU\.DEFAULT`),
+a command, or a native answer element. The editor shows a group and an option
+only where the system renders it (`options.available`), a choice only with the
+values that render there. A value is written to the profile only when it is
+not the default, so older builds still read profiles that do not use them and
+existing profiles render byte for byte as before (goldens). Plan and
+background: [research/profile-options-2026-10-12.md](research/profile-options-2026-10-12.md).
+
+| option | values | 95 | 98/Me | NT 4.0 | 2000 | XP/2003 | Vista/7 | 8.x | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `show_extensions`, `show_hidden` (tweaks) | yes | | yes | | yes | yes | yes | yes | yes | yes |
+| `show_protected` (`Hidden`+`ShowSuperHidden`) | yes | | Me | | yes | yes | yes | yes | yes | yes |
+| `launch_to_pc` (`LaunchTo=1`) | yes | | | | | | | | yes | yes |
+| `end_task` (`TaskbarEndTask`) | yes | | | | | | | | | yes |
+| `no_autorun` (tweak) | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| `no_tips` (Welcome / Getting Started, `Tips\Show=0`) | yes | | | yes | yes | | | | | |
+| `taskbar_search` (`SearchboxTaskbarMode`) | hidden, icon, box | | | | | | | | yes | yes |
+| `taskbar_left` (`TaskbarAl=0`, client) | yes | | | | | | | | | yes |
+| `task_view_off`, `bing_search_off` | yes | | | | | | | | yes | yes |
+| `widgets_off` (Feeds / Dsh policy, client) | yes | | | | | | | | yes | yes |
+| `uac_level` (EnableLUA stays on) | no_dim, never | | | | | | yes | yes | yes | yes |
+| `disable_uac` (tweak) | yes | | | | | | yes | | | |
+| `hibernation` (client) | no_fast_startup, off | | | | | | | yes | yes | yes |
+| `no_hibernation` (tweak) | yes | | | | | | client | | | |
+| `system_restore_off` | yes | | | | | XP | client | client | client | client |
+| `numlock` (`InitialKeyboardIndicators`, `.DEFAULT` + new users) | on, off | | | yes | yes | yes | yes | yes | yes | yes |
+| `windows_update` (AU policy) | no_restart, notify, off | | | | yes | yes | yes | yes | yes | yes |
+| `privacy` (consumer features, suggestions, advertising ID, tailored experiences, telemetry minimum; 11: Copilot, Recall) | yes | | | | | | | | yes | yes |
+| `disable_wer` | yes | | | | | | yes | yes | yes | yes |
+| `autologon` | yes | | | | yes | yes | yes | yes | yes | yes |
+| `password_never_expires` (`net accounts /maxpwage:unlimited`) | yes | | | | yes | yes | yes | yes | yes | yes |
+| `workgroup` | name (computer-name rule) | yes | yes | | yes | yes | yes | yes | yes | yes |
+
+Delivery per family:
+
+- **6.x+**: specialize `RunSynchronous` as before. The options' registry
+  values are `reg.exe` operations; several go into one
+  `cmd.exe /c reg add ... & reg add ...` command while it stays within 239
+  characters (room for the `usos-run-hidden.exe` prefix), so a profile with
+  every option stays under 15 KiB (`max_size` 16 KiB; test
+  `every option on stays within the limits`). Default-user values go between
+  the existing `reg load` / `reg unload` of `HKU\USOSDefault`. `autologon`:
+  `Shell-Setup/AutoLogon` (oobeSystem, `LogonCount` 9999999); `workgroup`:
+  `Microsoft-Windows-UnattendedJoin/Identification/JoinWorkgroup`.
+- **NT5**: `workgroup=`, `run=` (only known commands) and `reg=` lines in the
+  rendered settings; the staging writes `[Identification] JoinWorkgroup`,
+  appends the commands to `usos-users.cmd` and stages **usos-reg.exe** with
+  `usos-reg.txt` next to it (`usos_nt5_stage_regset`); `usos-users.cmd` runs
+  it at setup end (`%SystemRoot%\usos-reg.log`) and deletes the set (it can
+  hold the automatic logon password). XP/2003 keep their tweak tokens;
+  2000 (no `reg.exe`) gets `show_extensions`, `show_hidden` and `no_autorun`
+  through usos-reg.exe since this change (golden
+  `tweaks.windows-2000.x86.sif-cmd.txt` updated for that only).
+- **NT 4.0**: `;USOS-REG=` comment lines at the end of `WINNT.SIF`;
+  `nt4_csmwrap_target.sh` writes `C:\USOS\NT4\USOS-REG.TXT` and
+  `USOS-REG.EXE`, `POST.CMD` applies them at the automatic Administrator
+  logon (Default User hive + the Administrator's own HKCU).
+- **95/98/Me**: `[Install] AddReg=...,USOS.Profile` and a `[USOS.Profile]`
+  section (HKCU at Setup time is the single default user; DWORDs as four
+  binary bytes); `workgroup` replaces `Workgroup="WORKGROUP"`.
+
+**usos-reg.exe** (`tools/windows_usos_reg.c`, own GPL code, no C runtime,
+x86, PE 4.0, NT 4.0 SP6 .. 11, `KEY_WOW64_64KEY` under WOW64): applies a set
+file of lines `ROOT\Key|Name|type|data` (ROOT `HKLM`, `USER`, `DEFAULT`; type
+`dword`, `sz`, `expand_sz`, `binary`, `del`). `USER` = the Default User hive
+(found through `ProfileList`, loaded with `RegLoadKey`) plus HKCU when not run
+as LocalSystem. `--dry-run`, `--log FILE`, `--hive FILE`; exit 0 all applied,
+2 some failed, 1 bad set (nothing written). Built by
+`tools/build_windows_usos_reg.py`, in the micro-Linux image as
+`usr/lib/usos/usos-reg.exe`; tests `tools/tests/test_usos_reg.py`. Not used
+on 6.x+ yet: the WORK path has no channel to put a file into the target
+before specialize (stage 2: payload channel, then one `usos-reg.exe` command
+instead of the `reg.exe` chains).
+
+**QEMU verification (2026-10-12)**, registry read offline after the install:
+
+- Windows 11 Pro (`tools/tests/check_profile_options_w11.py`): all HKLM,
+  `.DEFAULT` and Default-hive values present, all 33 specialize commands exit
+  0, auto logon, hibernation off, workgroup, This PC, End task, left taskbar,
+  no Task view / widgets, hidden + protected files and extensions visible. The
+  per-user `SearchboxTaskbarMode` was rewritten by 11 at the first logon (icon
+  -> box): 11 now also gets the `SearchOnTaskbarMode` policy (not yet re-run).
+  The VM applied the image from WinPE by hand (multi-core VMs hang on this
+  host, Setup refuses one core); specialize and oobeSystem ran as in Setup.
+- XP SP3 (MCE) and 2000 Pro SP4 through the real staging
+  (`tools/tests/run_nt5_profile_options_qemu.py`): every value, auto logon,
+  `net accounts`, `usos-reg.log` 0 failed. XP folds `ShowSuperHidden` into
+  `ShellState` at the first logon (effective). **Workgroup needs a network
+  adapter**: without one Setup ignores `JoinWorkgroup` (X470 I211 has no inbox
+  NT5 driver).
+- NT 4.0 Workstation and 98 SE (`tools/tests/run_profile_options_legacy_qemu.py`,
+  `w9x_creg.py`): all values PASS after two fixes (usos-reg.exe built for i586:
+  NT 4.0 faulted on an SSE `movaps`; the 9x CSMWrap staging overwrote the chosen
+  MSBATCH.INF with the default). NT 4.0: the Administrator's own NumLock value
+  is reset at logoff (new users and the logon screen keep it).
 
 ### Edition
 

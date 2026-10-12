@@ -16,6 +16,7 @@ const std = @import("std");
 const Profile = @import("profile.zig").Profile;
 const Family = @import("target.zig").Family;
 const schema = @import("schema.zig");
+const options = @import("options.zig");
 
 /// Staging token of each NT5 tweak (tools/xp_user_settings.sh).
 pub const Token = struct { tweak: schema.Tweak, token: []const u8, only: ?Family = null };
@@ -86,6 +87,47 @@ fn tweakLines(p: *const Profile, family: Family, w: *std.Io.Writer) !void {
     }
     if (!first) try w.writeAll("\n");
     if (schema.tweakOn(p, .display, family)) try w.print("display={s}\n", .{@tagName(p.display)});
+    try optionLines(p, family, w);
+}
+
+/// The typed options (options.zig), only when set: workgroup=, run= (a
+/// command of the setup-end script) and reg= (one usos-reg set line,
+/// applied by usos-reg.exe from the setup-end script).
+fn optionLines(p: *const Profile, family: Family, w: *std.Io.Writer) !void {
+    if (p.workgroup.len > 0) try w.print("workgroup={s}\n", .{p.workgroup.slice()});
+    var values: [options.count]u8 = undefined;
+    var it = options.iterate(p, &values, options.osOfFamily(family));
+    while (it.next()) |rule| switch (rule.action) {
+        .command => |c| try w.print("run={s}\n", .{c}),
+        .reg => |r| {
+            try w.writeAll("reg=");
+            try options.writeSetLine(w, r, p);
+            try w.writeAll("\n");
+        },
+        .native => {},
+    };
+}
+
+test "NT5 render: typed options as reg= and run= lines, only when set" {
+    var p = Profile{};
+    try p.name.set("A");
+    try p.user.set("Tester");
+    try p.password.set("pw1");
+    p.opts[@intFromEnum(options.Opt.autologon)] = 1;
+    p.opts[@intFromEnum(options.Opt.password_never_expires)] = 1;
+    p.opts[@intFromEnum(options.Opt.windows_update)] = 3;
+    try p.workgroup.set("LAB");
+    p.show_extensions = true;
+    const xp = try render(&p, .windows_xp, "", &buffer_for_test);
+    try std.testing.expect(std.mem.indexOf(u8, xp, "tweaks=extensions\nworkgroup=LAB\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, xp, "reg=HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU|NoAutoUpdate|dword|1\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, xp, "reg=HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon|DefaultUserName|sz|Tester\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, xp, "|AutoLogonCount|del|\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, xp, "run=net.exe accounts /maxpwage:unlimited\n") != null);
+    // XP renders show_extensions through its token; 2000 through usos-reg.
+    try std.testing.expect(std.mem.indexOf(u8, xp, "HideFileExt") == null);
+    const w2k = try render(&p, .windows_2000, "", &buffer_for_test);
+    try std.testing.expect(std.mem.indexOf(u8, w2k, "reg=USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced|HideFileExt|dword|0\n") != null);
 }
 
 test "NT5 render: automatic language keeps the usos-xp.ini keys" {

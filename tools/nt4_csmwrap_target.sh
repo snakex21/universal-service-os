@@ -628,6 +628,14 @@ cp "$LIB/nt4/USOSRST.SYS" "$usos/USOSRST.SYS" || fail 'cannot copy USOSRST.SYS'
 cp "$LIB/nt4/USOSUSB.SYS" "$usos/USOSUSB.SYS" || fail 'cannot copy USOSUSB.SYS'
 cp "$LIB/nt4/USOSVBE.SYS" "$usos/USOSVBE.SYS" || fail 'cannot copy USOSVBE.SYS'
 cp "$LIB/nt4/USOSOFF.EXE" "$usos/USOSOFF.EXE" || fail 'cannot copy USOSOFF.EXE'
+# Typed answer-profile options (src/flow/answer/nt4.zig: ";USOS-REG=" lines
+# of the rendered WINNT.SIF): the registry set for usos-reg.exe
+# (tools/windows_usos_reg.c), applied by POST.CMD.
+if grep -q '^;USOS-REG=' "$ANSWER_SIF"; then
+    { printf '; USOS answer profile: registry set for usos-reg.exe\r\n'; sed -n 's/^;USOS-REG=//p' "$ANSWER_SIF" | tr -d '\r' | sed 's/$/\r/'; } > "$usos/USOS-REG.TXT" || fail 'cannot write USOS-REG.TXT'
+    cp "$LIB/usos-reg.exe" "$usos/USOS-REG.EXE" || fail 'cannot copy usos-reg.exe'
+    log "profile registry set: $(grep -vc '^;' "$usos/USOS-REG.TXT") entries (usos-reg.exe in POST.CMD)"
+fi
 # VESA display = our miniport (usosvbe.sys) + NT 4.0's own frame buffer
 # display driver framebuf.dll. USOS never ships framebuf.dll: text-mode Setup
 # installs it from the user's CD ([files.vga] of TXTSETUP.SIF, Workstation and
@@ -806,6 +814,11 @@ if not exist %SystemRoot%\system32\drivers\usosrst.sys echo USOSRST.SYS copy FAI
 if not exist %SystemRoot%\system32\drivers\usosusb.sys echo USOSUSB.SYS copy FAILED >> C:\USOS\NT4\POST.LOG
 %SystemRoot%\regedit.exe /s C:\USOS\NT4\DRIVERS.REG
 echo drivers registered >> C:\USOS\NT4\POST.LOG
+if not exist C:\USOS\NT4\USOS-REG.TXT goto noregset
+C:\USOS\NT4\USOS-REG.EXE --log C:\USOS\NT4\USOS-REG.LOG C:\USOS\NT4\USOS-REG.TXT
+echo profile registry set applied %errorlevel% >> C:\USOS\NT4\POST.LOG
+del C:\USOS\NT4\USOS-REG.TXT
+:noregset
 if exist %SystemRoot%\system32\framebuf.dll goto vesa
 if not exist C:\USOS\NT4\FRAMEBUF.DL_ goto novesa
 %SystemRoot%\system32\expand.exe C:\USOS\NT4\FRAMEBUF.DL_ %SystemRoot%\system32\framebuf.dll >> C:\USOS\NT4\POST.LOG

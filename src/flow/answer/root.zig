@@ -17,6 +17,7 @@ pub const msbatch = @import("msbatch.zig");
 pub const nt4 = @import("nt4.zig");
 pub const nt3 = @import("nt3.zig");
 pub const posready = @import("posready.zig");
+pub const options = @import("options.zig");
 
 pub const Profile = profile.Profile;
 pub const Arch = target.Arch;
@@ -104,6 +105,7 @@ test {
     _ = nt4;
     _ = nt3;
     _ = posready;
+    _ = options;
 }
 
 test "render dispatch per system" {

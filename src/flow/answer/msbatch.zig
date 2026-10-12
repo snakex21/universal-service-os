@@ -14,6 +14,7 @@ const std = @import("std");
 const profile_mod = @import("profile.zig");
 const Profile = profile_mod.Profile;
 const tables = @import("tables.zig");
+const options = @import("options.zig");
 
 pub const file_name = "MSBATCH.INF";
 
@@ -139,14 +140,45 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
     const org = if (p.org.slice().len > 0) p.org.slice() else "USOS";
     try w.print("\r\n[NameAndOrg]\r\nName=\"{s}\"\r\nOrg=\"{s}\"\r\nDisplay=0\r\n", .{ p.user.slice(), org });
     const computer = if (p.computer.slice().len > 0) p.computer.slice() else "USOS-9X";
-    try w.print("\r\n[Network]\r\nComputerName=\"{s}\"\r\nWorkgroup=\"WORKGROUP\"\r\nDescription=\"{s}\"\r\nDisplay=0\r\n", .{ computer, p.user.slice() });
+    const workgroup = if (p.workgroup.len > 0) p.workgroup.slice() else "WORKGROUP";
+    try w.print("\r\n[Network]\r\nComputerName=\"{s}\"\r\nWorkgroup=\"{s}\"\r\nDescription=\"{s}\"\r\nDisplay=0\r\n", .{ computer, workgroup, p.user.slice() });
     try w.writeAll("Clients=\r\nProtocols=\r\nServices=\r\n");
+    // Typed options (options.zig): their own AddReg section, only when set.
+    var values: [options.count]u8 = undefined;
+    var it = options.iterate(p, &values, .{ .os = switch (release) {
+        .windows_95 => .win95,
+        .windows_98 => .win98,
+        .windows_me => .win_me,
+    } });
+    const any_option = it.next() != null;
+    try w.writeAll(if (any_option) "\n[Install]\nAddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile\n" else "\n[Install]\nAddReg=USOS.RunOnce,USOS.CsmReg\n");
+    try w.writeAll("UpdateInis=USOS.Memory\nUpdateIniFields=USOS.Csm\n");
+    if (any_option) {
+        // Setup's INF AddReg: HKCU at Setup time is the one default user.
+        // A DWORD is written as 4 binary bytes (flag 1), as the 9x shell
+        // and policy readers take it.
+        try w.writeAll("\n[USOS.Profile]\n");
+        it = options.iterate(p, &values, it.t);
+        while (it.next()) |rule| switch (rule.action) {
+            .reg => |r| {
+                const root: []const u8 = switch (r.root) {
+                    .hklm => "HKLM",
+                    .user => "HKCU",
+                    .default => continue,
+                };
+                try w.print("{s},\"{s}\",{s},", .{ root, r.key, r.name });
+                switch (r.data) {
+                    .dword => |v| try w.print("1,{x:0>2},{x:0>2},{x:0>2},{x:0>2}\n", .{ v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, v >> 24 }),
+                    else => {
+                        var number: [16]u8 = undefined;
+                        try w.print(",\"{s}\"\n", .{options.dataText(r.data, p, &number)});
+                    },
+                }
+            },
+            else => {},
+        };
+    }
     try w.writeAll(
-        \\
-        \\[Install]
-        \\AddReg=USOS.RunOnce,USOS.CsmReg
-        \\UpdateInis=USOS.Memory
-        \\UpdateIniFields=USOS.Csm
         \\
         \\[USOS.Memory]
         \\system.ini,386Enh,,"MaxPhysPage=40000"
@@ -190,6 +222,30 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
         }
     }
     return buffer[0 .. text.len + extra];
+}
+
+test "MSBATCH.INF: typed options in their own AddReg section, only when set" {
+    var p = Profile{};
+    try p.name.set("Retro");
+    try p.user.set("Jan");
+    var buffer: [4096]u8 = undefined;
+    const plain = try render(&p, .windows_98, "", &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, plain, "USOS.Profile") == null);
+    p.show_extensions = true;
+    p.no_autorun = true;
+    p.opts[@intFromEnum(options.Opt.show_protected)] = 1;
+    try p.workgroup.set("RETRO");
+    const me = try render(&p, .windows_me, "", &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, me, "\r\nWorkgroup=\"RETRO\"\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, me, "\r\nAddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile\r\nUpdateInis=USOS.Memory\r\nUpdateIniFields=USOS.Csm\r\n\r\n[USOS.Profile]\r\n" ++
+        "HKCU,\"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\",HideFileExt,1,00,00,00,00\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, me, "\r\nHKCU,\"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\",ShowSuperHidden,1,01,00,00,00\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, me, "\r\nHKCU,\"Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\",NoDriveTypeAutoRun,1,ff,00,00,00\r\n") != null);
+    // [USOS.Csm] stays the last section (INSTALL.BAT appends to it).
+    try std.testing.expect(std.mem.endsWith(u8, me, "[USOS.Csm]\r\n"));
+    // 95: no Explorer\Advanced values, AutoRun only.
+    const ninety_five = try render(&p, .windows_95, "", &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, ninety_five, "HideFileExt") == null and std.mem.indexOf(u8, ninety_five, "NoDriveTypeAutoRun") != null);
 }
 
 test "releases of the catalog 9x systems" {

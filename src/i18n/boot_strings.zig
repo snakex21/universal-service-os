@@ -439,6 +439,8 @@ pub const Key = enum(u16) {
     profile_editor_subtitle,
     profile_editor_subtitle_linux,
     profile_editor_title,
+    profile_field_autologon,
+    profile_field_bing_search_off,
     profile_field_bypass_ram,
     profile_field_bypass_secure_boot,
     profile_field_bypass_tpm,
@@ -448,10 +450,13 @@ pub const Key = enum(u16) {
     profile_field_disable_wer,
     profile_field_display,
     profile_field_edition,
+    profile_field_end_task,
+    profile_field_hibernation,
     profile_field_hide_outlook_express,
     profile_field_key,
     profile_field_keyboard,
     profile_field_language,
+    profile_field_launch_to_pc,
     profile_field_local_account,
     profile_field_locale,
     profile_field_name,
@@ -461,21 +466,36 @@ pub const Key = enum(u16) {
     profile_field_no_hibernation,
     profile_field_no_network,
     profile_field_no_sidebar,
+    profile_field_no_tips,
     profile_field_no_welcome_center,
+    profile_field_numlock,
     profile_field_org,
     profile_field_password,
+    profile_field_password_never_expires,
+    profile_field_privacy,
     profile_field_protect_pc,
     profile_field_remember_key,
     profile_field_show_extensions,
     profile_field_show_hidden,
+    profile_field_show_protected,
     profile_field_skip_games,
     profile_field_skip_msn,
+    profile_field_system_restore_off,
     profile_field_systems,
+    profile_field_task_view_off,
+    profile_field_taskbar_left,
+    profile_field_taskbar_search,
     profile_field_theme,
     profile_field_timezone,
+    profile_field_uac_level,
     profile_field_user,
     profile_field_user2,
+    profile_field_widgets_off,
+    profile_field_windows_update,
+    profile_field_workgroup,
     profile_file_detail,
+    profile_help_autologon,
+    profile_help_bing_search_off,
     profile_help_bypass,
     profile_help_classic_start,
     profile_help_computer,
@@ -483,10 +503,13 @@ pub const Key = enum(u16) {
     profile_help_disable_wer,
     profile_help_display,
     profile_help_edition,
+    profile_help_end_task,
+    profile_help_hibernation,
     profile_help_hide_outlook_express,
     profile_help_key,
     profile_help_keyboard,
     profile_help_language,
+    profile_help_launch_to_pc,
     profile_help_local_account,
     profile_help_locale,
     profile_help_name,
@@ -496,20 +519,33 @@ pub const Key = enum(u16) {
     profile_help_no_hibernation,
     profile_help_no_network,
     profile_help_no_sidebar,
+    profile_help_no_tips,
     profile_help_no_welcome_center,
+    profile_help_numlock,
     profile_help_org,
     profile_help_password,
+    profile_help_password_never_expires,
+    profile_help_privacy,
     profile_help_protect_pc,
     profile_help_remember_key,
     profile_help_show_extensions,
     profile_help_show_hidden,
+    profile_help_show_protected,
     profile_help_skip_games,
     profile_help_skip_msn,
+    profile_help_system_restore_off,
     profile_help_systems,
+    profile_help_task_view_off,
+    profile_help_taskbar_left,
+    profile_help_taskbar_search,
     profile_help_theme,
     profile_help_timezone,
+    profile_help_uac_level,
     profile_help_user,
     profile_help_user2,
+    profile_help_widgets_off,
+    profile_help_windows_update,
+    profile_help_workgroup,
     profile_key_delete,
     profile_key_edit,
     profile_key_import,
@@ -529,14 +565,23 @@ pub const Key = enum(u16) {
     profile_row_help,
     profile_save,
     profile_save_failed,
+    profile_section_accounts,
+    profile_section_explorer,
     profile_section_extras,
+    profile_section_system,
+    profile_section_taskbar,
+    profile_section_updates,
     profile_summary,
     profile_value_auto,
     profile_value_edition_manual,
     profile_value_edition_server_default,
+    profile_value_hibernation_no_fast_startup,
+    profile_value_hibernation_off,
     profile_value_network_home,
     profile_value_network_public,
     profile_value_network_work,
+    profile_value_numlock_off,
+    profile_value_numlock_on,
     profile_value_protect_off,
     profile_value_protect_recommended,
     profile_value_protect_updates,
@@ -547,9 +592,18 @@ pub const Key = enum(u16) {
     profile_value_systems_linux,
     profile_value_systems_only,
     profile_value_systems_windows,
+    profile_value_taskbar_search_box,
+    profile_value_taskbar_search_hidden,
+    profile_value_taskbar_search_icon,
     profile_value_theme_basic,
     profile_value_theme_classic,
     profile_value_theme_default,
+    profile_value_uac_level_never,
+    profile_value_uac_level_no_dim,
+    profile_value_unchanged,
+    profile_value_windows_update_no_restart,
+    profile_value_windows_update_notify,
+    profile_value_windows_update_off,
     profile_xp_ini_detail,
     server_belongs_in,
     server_blocked_ia64,
@@ -1132,6 +1186,8 @@ pub const hashes = [_]u32{
     0x6f2b3c09, // profile.editor.subtitle
     0x39676f88, // profile.editor.subtitle_linux
     0xde080639, // profile.editor.title
+    0xd73398b0, // profile.field.autologon
+    0xf8ca5d3b, // profile.field.bing_search_off
     0x49862935, // profile.field.bypass_ram
     0x1513f82f, // profile.field.bypass_secure_boot
     0x50329252, // profile.field.bypass_tpm
@@ -1141,10 +1197,13 @@ pub const hashes = [_]u32{
     0x8015202b, // profile.field.disable_wer
     0xe8e3e9d4, // profile.field.display
     0x9c409bd4, // profile.field.edition
+    0x90ff1671, // profile.field.end_task
+    0x80abb369, // profile.field.hibernation
     0xf69d863d, // profile.field.hide_outlook_express
     0x1d1b0b5d, // profile.field.key
     0x40eff7a3, // profile.field.keyboard
     0x7890b224, // profile.field.language
+    0xd799a139, // profile.field.launch_to_pc
     0x06522829, // profile.field.local_account
     0x383d1338, // profile.field.locale
     0x8dd802a5, // profile.field.name
@@ -1154,21 +1213,36 @@ pub const hashes = [_]u32{
     0xa22f6351, // profile.field.no_hibernation
     0xe80859fc, // profile.field.no_network
     0x1cafbf72, // profile.field.no_sidebar
+    0xaccf34a4, // profile.field.no_tips
     0xc6afb682, // profile.field.no_welcome_center
+    0x73371209, // profile.field.numlock
     0x7cebcb94, // profile.field.org
     0x367e27db, // profile.field.password
+    0xc81462fd, // profile.field.password_never_expires
+    0x48b024de, // profile.field.privacy
     0xf251a013, // profile.field.protect_pc
     0xf04168d9, // profile.field.remember_key
     0x228b6a96, // profile.field.show_extensions
     0x57fc2cd0, // profile.field.show_hidden
+    0x98a107f2, // profile.field.show_protected
     0xea43708d, // profile.field.skip_games
     0xf47b87f8, // profile.field.skip_msn
+    0xbc33fc7c, // profile.field.system_restore_off
     0x66eb02dc, // profile.field.systems
+    0xf7ee62db, // profile.field.task_view_off
+    0xfd6664fc, // profile.field.taskbar_left
+    0x260b778d, // profile.field.taskbar_search
     0xacd6085f, // profile.field.theme
     0xc97f214d, // profile.field.timezone
+    0xa8ce7478, // profile.field.uac_level
     0xa0db31f9, // profile.field.user
     0x040f6291, // profile.field.user2
+    0xc8544321, // profile.field.widgets_off
+    0x9ca4635d, // profile.field.windows_update
+    0xc6e00a62, // profile.field.workgroup
     0x39ab14e9, // profile.file.detail
+    0xd04313ef, // profile.help.autologon
+    0x29c9462c, // profile.help.bing_search_off
     0x0922c403, // profile.help.bypass
     0x2218a4ea, // profile.help.classic_start
     0x46264466, // profile.help.computer
@@ -1176,10 +1250,13 @@ pub const hashes = [_]u32{
     0xa0ced3e4, // profile.help.disable_wer
     0xdfc03dcf, // profile.help.display
     0xbe0d347f, // profile.help.edition
+    0xbd1a9960, // profile.help.end_task
+    0x1ffa8922, // profile.help.hibernation
     0x08ba0e0c, // profile.help.hide_outlook_express
     0xcca2e39e, // profile.help.key
     0x10f18736, // profile.help.keyboard
     0x8e773749, // profile.help.language
+    0xd336c9e0, // profile.help.launch_to_pc
     0x7425bece, // profile.help.local_account
     0x69474139, // profile.help.locale
     0x33f53224, // profile.help.name
@@ -1189,20 +1266,33 @@ pub const hashes = [_]u32{
     0x65b474ac, // profile.help.no_hibernation
     0x7cf8eb69, // profile.help.no_network
     0xdda310d3, // profile.help.no_sidebar
+    0x5f0f6607, // profile.help.no_tips
     0x69a6ce19, // profile.help.no_welcome_center
+    0xcace29b2, // profile.help.numlock
     0x324f097b, // profile.help.org
     0xfc88614e, // profile.help.password
+    0xc7adad6c, // profile.help.password_never_expires
+    0xe1caa001, // profile.help.privacy
     0x4d51ba86, // profile.help.protect_pc
     0xa2076c1c, // profile.help.remember_key
     0xa9724261, // profile.help.show_extensions
     0x2872a44f, // profile.help.show_hidden
+    0x938b1dcf, // profile.help.show_protected
     0xe0f94590, // profile.help.skip_games
     0xfb1b5659, // profile.help.skip_msn
+    0xfdb1b2a1, // profile.help.system_restore_off
     0xd953794f, // profile.help.systems
+    0x2d7feb38, // profile.help.task_view_off
+    0x45b638e9, // profile.help.taskbar_left
+    0x4dee8c84, // profile.help.taskbar_search
     0x65191388, // profile.help.theme
     0xf3284598, // profile.help.timezone
+    0xdbb03237, // profile.help.uac_level
     0xb1ef9f14, // profile.help.user
     0x423788d2, // profile.help.user2
+    0xe2dec316, // profile.help.widgets_off
+    0xa6ae3d48, // profile.help.windows_update
+    0xe79573c5, // profile.help.workgroup
     0x5f1c9d40, // profile.key.delete
     0x4c0a173f, // profile.key.edit
     0x4ce11c3a, // profile.key.import
@@ -1222,14 +1312,23 @@ pub const hashes = [_]u32{
     0x134a2641, // profile.row.help
     0x4c6f4f3d, // profile.save
     0x9f87b247, // profile.save_failed
+    0xe88e7367, // profile.section.accounts
+    0x45c4b98c, // profile.section.explorer
     0xd52428ac, // profile.section.extras
+    0x96551582, // profile.section.system
+    0x9c49cdcb, // profile.section.taskbar
+    0x5843572b, // profile.section.updates
     0xea748758, // profile.summary
     0x803f740e, // profile.value.auto
     0x74eb2ac4, // profile.value.edition_manual
     0xf324f363, // profile.value.edition_server_default
+    0x2429db7f, // profile.value.hibernation_no_fast_startup
+    0xbb954da2, // profile.value.hibernation_off
     0x94a66e59, // profile.value.network_home
     0x0742279f, // profile.value.network_public
     0xce89b51b, // profile.value.network_work
+    0x5f811626, // profile.value.numlock_off
+    0x723274cc, // profile.value.numlock_on
     0x7de03296, // profile.value.protect_off
     0x6c457fe8, // profile.value.protect_recommended
     0x9310ce39, // profile.value.protect_updates
@@ -1240,9 +1339,18 @@ pub const hashes = [_]u32{
     0xd11c4254, // profile.value.systems_linux
     0x95a3a608, // profile.value.systems_only
     0xfc2781a3, // profile.value.systems_windows
+    0xbb634288, // profile.value.taskbar_search_box
+    0xc4651757, // profile.value.taskbar_search_hidden
+    0x4a133df6, // profile.value.taskbar_search_icon
     0x84c34547, // profile.value.theme_basic
     0xcb765071, // profile.value.theme_classic
     0x87382378, // profile.value.theme_default
+    0x88cf19a0, // profile.value.uac_level_never
+    0xe0354d18, // profile.value.uac_level_no_dim
+    0x9c0a3a46, // profile.value.unchanged
+    0x98559c24, // profile.value.windows_update_no_restart
+    0xe3ca47d6, // profile.value.windows_update_notify
+    0xc92a07f8, // profile.value.windows_update_off
     0x8b09c640, // profile.xp_ini.detail
     0x50256306, // server.belongs_in
     0xb1aaa349, // server.blocked_ia64
@@ -2077,6 +2185,60 @@ pub const bios = [_]bool{
     false,
     false,
     false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
@@ -2520,6 +2682,8 @@ pub const english = [_][]const u8{
     "One profile for every Windows: USOS writes the answer file when the installation starts",
     "One profile for Windows and Linux: USOS writes the answer file when the installation starts",
     "Answer profile",
+    "Sign in automatically",
+    "No web results in search",
     "Windows 11: skip the RAM check",
     "Windows 11: skip the Secure Boot check",
     "Windows 11: skip the TPM check",
@@ -2529,10 +2693,13 @@ pub const english = [_][]const u8{
     "Turn off error reporting",
     "Screen resolution",
     "Edition",
+    "End task in the taskbar menu",
+    "Hibernation and Fast startup",
     "Hide Outlook Express",
     "Product key ({0})",
     "Keyboard",
     "Windows language",
+    "Open Explorer to This PC",
     "Local account",
     "Formats",
     "Profile name",
@@ -2542,21 +2709,36 @@ pub const english = [_][]const u8{
     "Turn off hibernation",
     "Windows 11: set up without network",
     "Turn off Sidebar and gadgets",
+    "Turn off the welcome window",
     "No Welcome Center",
+    "NumLock at startup",
     "Organization",
     "Password",
+    "Passwords never expire",
+    "Privacy settings",
     "Protection and updates",
     "Remember the key on this stick",
     "Show file extensions",
     "Show hidden files",
+    "Show protected system files",
     "No games",
     "No MSN Explorer and Messenger",
+    "Turn off System Restore",
     "Use for",
+    "Hide the Task view button",
+    "Taskbar aligned left",
+    "Search on the taskbar",
     "Theme",
     "Time zone",
+    "User Account Control",
     "User name",
     "Second user",
+    "Turn off widgets",
+    "Automatic updates",
+    "Workgroup",
     "Answer file from the Unattended folder, used as it is",
+    "The first user signs in automatically at every start. The password is stored on the stick and in the installed system.",
+    "Searching from Start or the taskbar shows only local results, no Bing suggestions (for every new user).",
     "For hardware below the Windows 11 requirements. Microsoft does not support such installations; feature updates may need the bypass again.",
     "XP: the Windows 2000 style Start menu for new users.",
     "1-15 characters A-Z a-z 0-9 and -, not only digits. Empty: USOS-XP on XP, a name chosen by Setup on newer Windows.",
@@ -2564,10 +2746,13 @@ pub const english = [_][]const u8{
     "Vista and newer: Windows Error Reporting stays off (no problem reports are sent).",
     "XP and Server 2003: 32-bit colour at this resolution when the display driver offers it. Automatic: unchanged; without a display driver (the VGA driver, e.g. through CSMWrap) Windows keeps its basic mode.",
     "Edition Setup installs, matched against the images of the chosen ISO (also across languages; Server: Core or Desktop Experience). Empty or not on the ISO: Setup shows its edition list.",
+    "Right-clicking a taskbar button offers End task (for every new user).",
+    "Turn off Fast startup (a full shutdown every time), or hibernation altogether, which also ends Fast startup.",
     "XP and Server 2003: the Outlook Express shortcuts are removed; the program itself stays.",
     "Product key for {0} (XXXXX-XXXXX-XXXXX-XXXXX-XXXXX). Empty: Setup asks for it or offers the edition list.",
     "Keyboard layout of Windows. Same as the formats: the default keyboard of that language.",
     "Language of Setup and of Windows; the installation media must contain it. Automatic: Setup asks.",
+    "File Explorer opens on This PC instead of Home or Quick access (for every new user).",
     "Windows 8 and newer: create the accounts locally and hide the Microsoft account pages.",
     "Date, time, number and currency formats.",
     "Name of the profile on this stick: 1-32 characters A-Z a-z 0-9, space, . _ -",
@@ -2577,20 +2762,33 @@ pub const english = [_][]const u8{
     "Vista and 7: no hibernation and no hybrid sleep; the disk space of hiberfil.sys is freed.",
     "Windows 11: finish the setup without a network connection (BypassNRO).",
     "Vista: Windows Sidebar, 7: desktop gadgets, turned off by policy.",
+    "The Welcome or Getting Started window does not open at logon (for every new user).",
     "Vista: the Welcome Center does not open at every logon.",
+    "NumLock on or off at the logon screen and for every new user.",
     "Optional: up to 64 characters, without \" % ^ & | < >",
     "Password of the accounts; empty means no password. It is stored as plain text on the stick.",
+    "Local account passwords do not expire (maximum password age: unlimited).",
+    "Suggestions, consumer apps, advertising ID, tailored experiences, Copilot and Recall off; diagnostic data at the lowest level the edition allows.",
     "Answer to the \"Help protect Windows\" page (Vista and newer). Off: no automatic updates until you turn them on.",
     "Off: the key is used until this computer restarts and is never written to the stick.",
     "Explorer shows file name extensions such as .exe (for every new user).",
     "Explorer shows hidden files and folders (for every new user); protected system files stay hidden.",
+    "Explorer also shows hidden files and the protected operating system files (for every new user).",
     "XP: the games are not installed. Vista and 7: the Games feature is turned off during Setup.",
     "XP and Server 2003: MSN Explorer and Windows Messenger are not installed.",
+    "No restore points are created (saves disk space; no rollback after a bad driver or update).",
     "The systems whose answer screen offers this profile. Profiles saved without this setting are offered for every Windows, never for Linux.",
+    "The taskbar has no Task view button (for every new user).",
+    "Start and the taskbar buttons sit on the left, as in earlier Windows (for every new user).",
+    "How the taskbar shows search: hidden, an icon only or a search box (for every new user).",
     "Theme of new users. XP: Windows Classic instead of Luna. 7: Windows Classic or Windows 7 Basic.",
     "Automatic: the default of the installation media.",
+    "How administrators are asked to confirm changes; User Account Control itself stays on.",
     "First local account, an administrator: 1-20 characters A-Z a-z 0-9 . _ - and space.",
     "Optional second administrator account.",
+    "No widgets board or news and interests on the taskbar (policy for the whole computer).",
+    "Automatic Updates policy: no restart while someone is signed in, notify before downloading, or off.",
+    "The workgroup of the computer: up to 15 letters, digits and dashes. Empty: WORKGROUP.",
     "Delete",
     "Edit",
     "Import",
@@ -2610,14 +2808,23 @@ pub const english = [_][]const u8{
     "A USOS profile, turned into the answer file for this Windows when the installation starts. The target disk is always chosen in Setup.",
     "Save",
     "The profile could not be saved on the stick:",
+    "Accounts and network",
+    "Explorer",
     "Appearance and extras",
+    "System",
+    "Taskbar and Start",
+    "Updates and privacy",
     "Profile {0}: {1} ({2})",
     "Automatic",
     "Type manually\xe2\x80\xa6",
     "(Standard - default)",
+    "Fast startup off",
+    "Hibernation off",
     "Home",
     "Public",
     "Work",
+    "Off",
+    "On",
     "Off",
     "Recommended settings",
     "Important updates only",
@@ -2628,9 +2835,18 @@ pub const english = [_][]const u8{
     "Every Linux installer",
     "Only {0}",
     "Every Windows",
+    "Search box",
+    "Hidden",
+    "Icon only",
     "Windows 7 Basic",
     "Windows Classic",
     "Default",
+    "Never notify",
+    "Ask without dimming the screen",
+    "Unchanged",
+    "No automatic restart",
+    "Notify before download",
+    "Off",
     "usos-xp.ini on DATA (read only); Import makes a USOS profile of it",
     "Belongs in Systems\\Windows\\{0}",
     "Itanium (IA64) image - it does not start on this PC",

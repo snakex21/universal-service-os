@@ -6,9 +6,11 @@
 //! system the editor was opened from (key.<system-id>); it is written only
 //! with "Remember the key".
 //!
-//! "Use for" (`systems=`) says which systems offer the profile; the
-//! "Appearance and extras" section lists only the tweaks the system has
-//! (answer.schema.tweak_support).
+//! "Use for" (`systems=`) says which systems offer the profile. Then the
+//! typed options (answer.options) in their groups (Explorer, Taskbar and
+//! Start, System, Updates and privacy, Accounts and network), each group and
+//! each option only where the system renders it, and last the "Appearance
+//! and extras" section with the remaining tweaks (answer.schema.tweak_support).
 const std = @import("std");
 const uefi = std.os.uefi;
 const usos = @import("usos");
@@ -43,13 +45,16 @@ const F = enum(u8) {
     no_network,
     protect_pc,
     network_location,
-    disable_wer,
     systems,
+    section_explorer,
+    section_taskbar,
+    section_system,
+    section_updates,
+    section_accounts,
+    /// A row of the typed option table (field_option says which).
+    option,
+    workgroup,
     section_extras,
-    show_extensions,
-    show_hidden,
-    no_autorun,
-    disable_uac,
     skip_games,
     skip_msn,
     hide_outlook_express,
@@ -57,7 +62,6 @@ const F = enum(u8) {
     no_balloon_tips,
     no_sidebar,
     no_welcome_center,
-    no_hibernation,
     theme,
     display,
     save,
@@ -67,10 +71,6 @@ const F = enum(u8) {
 /// The tweak toggles in the order of the "Appearance and extras" section.
 const TweakRow = struct { id: F, field: answer.profile.Field, tweak: schema.Tweak, label: view.Key, help: view.Key };
 const tweak_rows = [_]TweakRow{
-    .{ .id = .show_extensions, .field = .show_extensions, .tweak = .show_extensions, .label = .profile_field_show_extensions, .help = .profile_help_show_extensions },
-    .{ .id = .show_hidden, .field = .show_hidden, .tweak = .show_hidden, .label = .profile_field_show_hidden, .help = .profile_help_show_hidden },
-    .{ .id = .no_autorun, .field = .no_autorun, .tweak = .no_autorun, .label = .profile_field_no_autorun, .help = .profile_help_no_autorun },
-    .{ .id = .disable_uac, .field = .disable_uac, .tweak = .disable_uac, .label = .profile_field_disable_uac, .help = .profile_help_disable_uac },
     .{ .id = .skip_games, .field = .skip_games, .tweak = .skip_games, .label = .profile_field_skip_games, .help = .profile_help_skip_games },
     .{ .id = .skip_msn, .field = .skip_msn, .tweak = .skip_msn, .label = .profile_field_skip_msn, .help = .profile_help_skip_msn },
     .{ .id = .hide_outlook_express, .field = .hide_outlook_express, .tweak = .hide_outlook_express, .label = .profile_field_hide_outlook_express, .help = .profile_help_hide_outlook_express },
@@ -78,7 +78,6 @@ const tweak_rows = [_]TweakRow{
     .{ .id = .no_balloon_tips, .field = .no_balloon_tips, .tweak = .no_balloon_tips, .label = .profile_field_no_balloon_tips, .help = .profile_help_no_balloon_tips },
     .{ .id = .no_sidebar, .field = .no_sidebar, .tweak = .no_sidebar, .label = .profile_field_no_sidebar, .help = .profile_help_no_sidebar },
     .{ .id = .no_welcome_center, .field = .no_welcome_center, .tweak = .no_welcome_center, .label = .profile_field_no_welcome_center, .help = .profile_help_no_welcome_center },
-    .{ .id = .no_hibernation, .field = .no_hibernation, .tweak = .no_hibernation, .label = .profile_field_no_hibernation, .help = .profile_help_no_hibernation },
 };
 var tweak_values: [tweak_rows.len]bool = @splat(false);
 
@@ -126,7 +125,17 @@ var no_network = false;
 var protect_index: usize = 2;
 /// Index into NetworkLocation order work, home, public (network_options).
 var network_index: usize = 0;
-var disable_wer = false;
+/// The typed options (answer.options.table order): a toggle's state, or a
+/// choice's offered values (those this system renders, plus a stored value
+/// it does not, kept for other systems) and the selected one.
+const options = answer.options;
+const max_values = 4;
+var opt_flag: [options.count]bool = @splat(false);
+var opt_index: [options.count]usize = @splat(0);
+var opt_labels: [options.count][max_values][]const u8 = undefined;
+var opt_values: [options.count][max_values]u8 = undefined;
+var opt_value_count: [options.count]usize = @splat(0);
+var workgroup_text = form.TextValue{ .max = 15 };
 var protect_options: [3][]const u8 = undefined;
 /// "Use for": this system, its kind (every Windows / every Linux installer),
 /// Windows and Linux, and a stored list that is none of these (kept).
@@ -163,8 +172,11 @@ const key_chars = form.charset("", true);
 const org_chars = form.cleanAscii(true);
 const password_chars = form.cleanAscii(false);
 
-var fields_storage: [@typeInfo(F).@"enum".fields.len]form.Field = undefined;
-var field_ids: [@typeInfo(F).@"enum".fields.len]F = undefined;
+const max_fields = @typeInfo(F).@"enum".fields.len + options.count;
+var fields_storage: [max_fields]form.Field = undefined;
+var field_ids: [max_fields]F = undefined;
+/// For an F.option row: its index in answer.options.table.
+var field_option: [max_fields]usize = undefined;
 var field_count: usize = 0;
 
 var base: Profile = .{};
@@ -236,7 +248,8 @@ fn load(p: *const Profile) void {
     no_network = p.no_network_oobe;
     protect_index = std.mem.indexOfScalar(answer.profile.ProtectPc, &protect_values, p.protect_pc).?;
     network_index = std.mem.indexOfScalar(answer.profile.NetworkLocation, &network_values, p.network_location).?;
-    disable_wer = p.disable_wer;
+    loadOptions(p);
+    workgroup_text.set(p.workgroup.slice());
     for (tweak_rows, 0..) |row, i| tweak_values[i] = p.flagValue(row.field);
     display_index = @intFromEnum(p.display);
     loadTheme(p.theme);
@@ -368,7 +381,8 @@ fn build(out: *Profile) void {
     out.no_network_oobe = no_network;
     out.protect_pc = protect_values[protect_index];
     out.network_location = network_values[network_index];
-    out.disable_wer = disable_wer;
+    buildOptions(out);
+    out.workgroup.set(workgroup_text.slice()) catch {};
     for (tweak_rows, 0..) |row, i| out.flag(row.field).?.* = tweak_values[i];
     out.theme = theme_values[theme_index];
     out.display = @enumFromInt(display_index);
@@ -386,6 +400,7 @@ fn problemOf(id: F) ?Problem {
         .password => answer.profile.checkPassword(password_text.slice()),
         .key => answer.profile.checkKey(key_text.slice()),
         .edition => if (editionManual()) answer.profile.checkEdition(edition_text.slice()) else null,
+        .workgroup => answer.profile.checkWorkgroup(workgroup_text.slice()),
         else => null,
     };
 }
@@ -431,19 +446,21 @@ fn helpKey(id: F) view.Key {
         .no_network => .profile_help_no_network,
         .protect_pc => .profile_help_protect_pc,
         .network_location => .profile_help_network_location,
-        .disable_wer => .profile_help_disable_wer,
         .systems => .profile_help_systems,
         .section_extras => .profile_section_extras,
         .theme => .profile_help_theme,
         .display => .profile_help_display,
-        .show_extensions, .show_hidden, .no_autorun, .disable_uac, .skip_games, .skip_msn, .hide_outlook_express, .classic_start, .no_balloon_tips, .no_sidebar, .no_welcome_center, .no_hibernation => tweak_rows[tweakRow(id).?].help,
+        .skip_games, .skip_msn, .hide_outlook_express, .classic_start, .no_balloon_tips, .no_sidebar, .no_welcome_center => tweak_rows[tweakRow(id).?].help,
+        .section_explorer, .section_taskbar, .section_system, .section_updates, .section_accounts => .profile_section_extras,
+        .option => .profile_help_systems,
+        .workgroup => .profile_help_workgroup,
         .save, .cancel => subtitleKey(),
     };
 }
 
 fn hookHelp(_: *anyopaque, index: usize) usos.gui.menu_screens.Help {
     const id = field_ids[index];
-    help_lines[0] = if (id == .key) view.format(&help_text[0], .profile_help_key, &.{system_name}) else t(helpKey(id));
+    help_lines[0] = if (id == .key) view.format(&help_text[0], .profile_help_key, &.{system_name}) else if (id == .option) t(optionHelp(field_option[index])) else t(helpKey(id));
     var n: usize = 1;
     if (problemOf(id)) |problem| {
         if (show_all or !isEmptyRequired(id)) {
@@ -480,6 +497,87 @@ fn addField(id: F, field: form.Field) void {
     field_count += 1;
 }
 
+const workgroup_chars = form.charset("-", true);
+
+fn optionLabel(opt: options.Opt) view.Key {
+    return switch (opt) {
+        inline else => |o| @field(view.Key, "profile_field_" ++ @tagName(o)),
+    };
+}
+
+fn optionHelp(i: usize) view.Key {
+    return switch (options.table[i].opt) {
+        inline else => |o| @field(view.Key, "profile_help_" ++ @tagName(o)),
+    };
+}
+
+/// The label of a choice value (value 0: unchanged / the release default).
+fn valueLabel(comptime opt: options.Opt, comptime value: []const u8) view.Key {
+    if (comptime std.mem.eql(u8, value, "default")) return .profile_value_unchanged;
+    return @field(view.Key, "profile_value_" ++ @tagName(opt) ++ "_" ++ value);
+}
+
+fn editorTarget() ?options.Target {
+    return options.targetFor(system_id);
+}
+
+fn loadOptions(p: *const Profile) void {
+    const values = options.values(p);
+    const t_opt = editorTarget();
+    inline for (options.table, 0..) |o, i| {
+        const current = values[i];
+        opt_flag[i] = current != 0;
+        opt_value_count[i] = 0;
+        opt_index[i] = 0;
+        if (comptime !o.isToggle()) {
+            inline for (o.values, 0..) |name, v| {
+                const offered = v == 0 or (if (t_opt) |tt| options.valueAvailable(o.opt, v, tt) else false);
+                // A stored value this system lacks stays (other systems use it).
+                if (offered or v == current) {
+                    if (v == current) opt_index[i] = opt_value_count[i];
+                    opt_labels[i][opt_value_count[i]] = t(valueLabel(o.opt, name));
+                    opt_values[i][opt_value_count[i]] = v;
+                    opt_value_count[i] += 1;
+                }
+            }
+        }
+    }
+}
+
+fn buildOptions(out: *Profile) void {
+    inline for (options.table, 0..) |o, i| {
+        const value: u8 = if (o.isToggle()) @intFromBool(opt_flag[i]) else opt_values[i][opt_index[i]];
+        if (o.legacy) {
+            @field(out, @tagName(o.opt)) = value != 0;
+        } else out.opts[i] = value;
+    }
+}
+
+/// The option rows of one group (with its heading) that this system renders.
+fn addGroup(group: options.Group, heading: F, label: view.Key, tt: options.Target) void {
+    var any = false;
+    for (options.table) |o| any = any or (o.group == group and options.available(o.opt, tt));
+    const workgroup_here = group == .accounts and workgroupAvailable(tt);
+    if (!any and !workgroup_here) return;
+    addField(heading, .{ .kind = .section, .label = t(label) });
+    for (options.table, 0..) |o, i| {
+        if (o.group != group or !options.available(o.opt, tt)) continue;
+        field_option[field_count] = i;
+        if (o.isToggle()) {
+            addField(.option, .{ .kind = .toggle, .label = t(optionLabel(o.opt)), .flag = &opt_flag[i] });
+        } else addField(.option, .{ .kind = .choice, .label = t(optionLabel(o.opt)), .options = opt_labels[i][0..opt_value_count[i]], .index = &opt_index[i] });
+    }
+    if (workgroup_here) addField(.workgroup, .{ .kind = .text, .label = t(.profile_field_workgroup), .text = &workgroup_text, .allowed = &workgroup_chars, .uppercase = true, .placeholder = t(.profile_value_unchanged) });
+}
+
+/// Workgroup: 9x MSBATCH.INF, NT5 WINNT.SIF, 6.x+ UnattendedJoin.
+fn workgroupAvailable(tt: options.Target) bool {
+    return switch (tt.os) {
+        .nt3, .nt4 => false,
+        else => true,
+    };
+}
+
 fn buildFields() void {
     field_count = 0;
     const win11 = std.mem.eql(u8, system_id, "windows-11");
@@ -510,14 +608,22 @@ fn buildFields() void {
     }
     if (nt6) addField(.protect_pc, .{ .kind = .choice, .label = t(.profile_field_protect_pc), .options = &protect_options, .index = &protect_index });
     if (legacy_nt6) addField(.network_location, .{ .kind = .choice, .label = t(.profile_field_network_location), .options = &network_options, .index = &network_index });
-    if (nt6) addField(.disable_wer, .{ .kind = .toggle, .label = t(.profile_field_disable_wer), .flag = &disable_wer });
     // Where the profile is offered (after the general settings, so the
     // rows above keep their places).
     addField(.systems, .{ .kind = .choice, .label = t(.profile_field_systems), .options = systems_options[0..systems_option_count], .index = &systems_index });
+    // The typed options, grouped; only what this system renders.
+    if (editorTarget()) |tt| {
+        addGroup(.explorer, .section_explorer, .profile_section_explorer, tt);
+        addGroup(.taskbar, .section_taskbar, .profile_section_taskbar, tt);
+        addGroup(.system, .section_system, .profile_section_system, tt);
+        addGroup(.updates, .section_updates, .profile_section_updates, tt);
+        addGroup(.accounts, .section_accounts, .profile_section_accounts, tt);
+    }
     // Appearance and extras: only what this system has.
     if (family) |f| {
         var any = false;
-        inline for (@typeInfo(schema.Tweak).@"enum".fields) |tf| any = any or schema.tweakAvailable(@enumFromInt(tf.value), f);
+        for (tweak_rows) |row| any = any or schema.tweakAvailable(row.tweak, f);
+        any = any or schema.tweakAvailable(.theme_classic, f) or schema.tweakAvailable(.theme_basic, f) or schema.tweakAvailable(.display, f);
         if (any) {
             addField(.section_extras, .{ .kind = .section, .label = t(.profile_section_extras) });
             for (tweak_rows, 0..) |row, i| {

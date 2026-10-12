@@ -9,6 +9,7 @@
 //! and the field, never the value (keys and passwords stay out of logs).
 const std = @import("std");
 const tables = @import("tables.zig");
+const options = @import("options.zig");
 
 pub fn Text(comptime capacity: usize) type {
     return struct {
@@ -71,6 +72,25 @@ pub const Field = enum {
     show_extensions,
     show_hidden,
     no_autorun,
+    // Typed options (options.zig), stage 1 of the 2026-10-12 plan.
+    show_protected,
+    launch_to_pc,
+    end_task,
+    no_tips,
+    taskbar_search,
+    taskbar_left,
+    task_view_off,
+    widgets_off,
+    bing_search_off,
+    uac_level,
+    hibernation,
+    system_restore_off,
+    numlock,
+    windows_update,
+    privacy,
+    autologon,
+    password_never_expires,
+    workgroup,
 };
 
 /// The optional look and extras toggles (docs/answer-profiles.md,
@@ -231,6 +251,15 @@ pub const Profile = struct {
     show_extensions: bool = false,
     show_hidden: bool = false,
     no_autorun: bool = false,
+    /// The typed options without a field of their own (options.zig), by
+    /// options.Opt; 0 = the default (unchanged, not written).
+    opts: [options.count]u8 = @splat(0),
+    /// Workgroup (NetBIOS name rule); empty: the release's default.
+    workgroup: Text(15) = .{},
+
+    pub fn opt(self: *const Profile, o: options.Opt) u8 {
+        return self.opts[@intFromEnum(o)];
+    }
 
     pub fn flag(self: *Profile, field: Field) ?*bool {
         return switch (field) {
@@ -613,8 +642,15 @@ pub fn validate(p: *const Profile) ?Issue {
     for (p.system_editions[0..p.system_edition_count]) |*entry| {
         if (checkEdition(entry.edition.slice())) |problem| return .{ .field = .edition, .problem = problem };
     }
+    if (checkWorkgroup(p.workgroup.slice())) |problem| return .{ .field = .workgroup, .problem = problem };
     if (!p.manual_disk) return .{ .field = .manual_disk, .problem = .unsupported };
     return null;
+}
+
+/// Workgroup: like a computer name (1-15 characters A-Z a-z 0-9 -, not
+/// only digits). Empty = the release's default (WORKGROUP).
+pub fn checkWorkgroup(value: []const u8) ?Problem {
+    return checkComputer(value);
 }
 
 // ------------------------------------------------------------ parsing
@@ -769,6 +805,17 @@ fn applyField(p: *Profile, name: []const u8, value: []const u8) ?Issue {
         return null;
     }
     const field = fieldByName(name) orelse return .{ .problem = .unknown_field };
+    if (field == .workgroup) {
+        p.workgroup.set(value) catch return .{ .field = field, .problem = .too_long };
+        return null;
+    }
+    if (options.byKey(name)) |o| {
+        const entry = options.option(o);
+        if (!entry.legacy) {
+            p.opts[@intFromEnum(o)] = options.valueByName(entry, value) orelse return .{ .field = field, .problem = if (entry.isToggle()) .bad_boolean else .bad_choice };
+            return null;
+        }
+    }
     switch (field) {
         .name => p.name.set(value) catch return .{ .field = field, .problem = .too_long },
         .user => p.user.set(value) catch return .{ .field = field, .problem = .too_long },
