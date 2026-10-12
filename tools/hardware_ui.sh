@@ -1,6 +1,11 @@
 #!/bin/sh
 # A self-contained, read-only service session using the common USOS GUI.
 
+# usos_disk_type (disk bus: "SATA SSD", "M.2 NVMe", "USB", ...), read-only.
+if ! command -v usos_disk_type >/dev/null 2>&1 && [ -r /usr/lib/usos/target_disk_identity.sh ]; then
+    . /usr/lib/usos/target_disk_identity.sh
+fi
+
 usos_hw_info_lines() {
     LC_ALL=C awk '{gsub(/\t/, "    "); gsub(/[^ -~]/, "?");
         gsub(/\/dev\/[A-Za-z0-9_.\/-]+/, "selected disk");
@@ -78,6 +83,9 @@ usos_hw_disk_screen() {
                 serial=$(usos_hw_disk_field "$disk" SERIAL)
                 bytes=$(usos_hw_disk_field "$disk" SIZE)
                 transport=$(usos_hw_disk_field "$disk" TRAN)
+                if command -v usos_disk_type >/dev/null 2>&1; then
+                    transport=$(usos_disk_type "$disk" || printf '%s' "$transport")
+                fi
                 case "$bytes" in ''|*[!0-9]*) bytes=0 ;; esac
                 label="Disk $number - ${model:-Unknown model} - $(usos_hw_size "$bytes")"
                 printf '%s\n' "$label" >> "$USOS_HW_DIR/disk-labels.txt"

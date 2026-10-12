@@ -870,6 +870,7 @@
   "boot.lx.a_new_x_layout_will_be_created": "Va fi creată o nouă structură {0}.",
   "boot.lx.x_confirm_installation": "{0} - confirmați instalarea",
   "boot.lx.disk_x": "Disc: {0}",
+  "boot.lx.type_x": "Tip: {0}",
   "boot.lx.s_n_x": "S/N: {0}",
   "boot.lx.size_x_gib": "Dimensiune: {0} GiB",
   "boot.lx.status_in_use_formatting_is_blocked": "Stare: în uz - formatarea este blocată.",

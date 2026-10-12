@@ -565,7 +565,9 @@ usos_legacy_xp_staging() {
     else
         confirmation_screen=/run/xp-disk-confirm.txt
         {
-            printf '%s - CONFIRM INSTALLATION\n\nDisk: %s\nS/N: %s\nSize: %s GiB\n\n' "$NT5_TITLE" "$XP_TARGET_MODEL" "$XP_TARGET_SERIAL" "$((TARGET_SIZE_FOR_BIOS / 1073741824))"
+            printf '%s - CONFIRM INSTALLATION\n\nDisk: %s\n' "$NT5_TITLE" "$XP_TARGET_MODEL"
+            usos_disk_type_line "$TARGET_DEVICE"
+            printf 'S/N: %s\nSize: %s GiB\n\n' "$XP_TARGET_SERIAL" "$((TARGET_SIZE_FOR_BIOS / 1073741824))"
             if [ -n "$XP_WINDOWS_PLAN" ]; then
                 windows_sectors=$(awk -F= '$1=="windows_sectors" {print $2}' "$XP_WINDOWS_PLAN")
                 printf 'Windows C: %s GiB NTFS.\nOne partition for Windows and automatic setup.\nNo separate XPSETUP partition will remain.\n' "$((windows_sectors / 2097152))"

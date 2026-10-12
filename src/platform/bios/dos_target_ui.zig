@@ -9,6 +9,7 @@ const seeder16 = @import("dos_fat16_seed.zig");
 const menu = @import("graphics_menu.zig");
 const seabios = @import("seabios.zig");
 const csmwrap_esp = @import("dos_csmwrap_esp.zig");
+const edd_interface = @import("edd_interface.zig");
 const Raw = extern struct { sectors_low: u32 = 0, sectors_high: u32 = 0, bytes_per_sector: u16 = 0, cylinders: u16 = 0, heads: u16 = 0, sectors_per_track: u16 = 0 };
 extern fn bios_drive_info(drive: u32, output: *Raw) callconv(.c) u32;
 extern fn bios_read_sector_drive(drive: u32, lba: u64, out: [*]u8) callconv(.c) u32;
@@ -92,6 +93,8 @@ pub fn choose(source: u8, session: vbe.Session, selected_action: Action, win9x_t
         if (number == source) continue;
         var raw = Raw{};
         if (bios_drive_info(@intCast(number), &raw) != 0 or raw.bytes_per_sector != 512 or raw.sectors_high != 0 or raw.sectors_low < (if (fat16) @as(u32, 264226) else 4_196_386)) continue;
+        // Read before any other INT 13h call; null when the firmware does not say.
+        const bus = edd_interface.lastLabel();
         if (fat16) _ = partition.planFat16(@intCast(number), source, planSectors(raw.sectors_low), 128, raw.cylinders, raw.heads, raw.sectors_per_track, [_]u8{0} ** 512) catch continue;
         var sector: [512]u8 = undefined;
         if (bios_read_sector_drive(@intCast(number), 1, &sector) != 0) continue;
@@ -115,12 +118,16 @@ pub fn choose(source: u8, session: vbe.Session, selected_action: Action, win9x_t
         var ordinal: [8]u8 = undefined;
         var mib: [12]u8 = undefined;
         var part_text: [4]u8 = undefined;
+        var body: [160]u8 = undefined;
         const number_text = try std.fmt.bufPrint(&ordinal, "{d}", .{count + 1});
         const mib_text = try std.fmt.bufPrint(&mib, "{d}", .{raw.sectors_low >> 11});
-        const text = if (std.mem.eql(u8, style, "GPT"))
-            strings.format(&disk.label, .dos_disk, &.{ number_text, mib_text })
+        const described = if (std.mem.eql(u8, style, "GPT"))
+            strings.format(&body, .dos_disk, &.{ number_text, mib_text })
         else
-            strings.format(&disk.label, .dos_disk_mbr, &.{ number_text, mib_text, style, try std.fmt.bufPrint(&part_text, "{d}", .{parts}) });
+            strings.format(&body, .dos_disk_mbr, &.{ number_text, mib_text, style, try std.fmt.bufPrint(&part_text, "{d}", .{parts}) });
+        // "SATA - Disk 1 - ...": the same "<type> - " prefix as the
+        // micro-Linux pickers; no prefix when the firmware does not say.
+        const text = edd_interface.prefixed(&disk.label, bus, described);
         disk.len = text.len; count += 1;
     }
     if (count == 0) return error.NoCompatibleDosTargetDisk;

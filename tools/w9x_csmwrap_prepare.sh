@@ -368,7 +368,7 @@ usos_w9x_csmwrap_prepare() {
         screen=/run/w9x-disk-confirm.txt
         usos_ui_stage 3 5 'Inspecting disk' 'Reading partitions, free space and system files.' || true
         if ! TARGET_DEVICE=$TARGET_DEVICE sh /usr/lib/usos/xp_disk_overview.sh > "$overview" 2>> "$W9X_LOG/prepare.log"; then
-            printf 'Disk: %s\nS/N: %s\nSize: %s GiB\n' "$model" "$serial" "$((size / 1073741824))" > "$overview"
+            { printf 'Disk: %s\n' "$model"; usos_disk_type_line "$TARGET_DEVICE"; printf 'S/N: %s\nSize: %s GiB\n' "$serial" "$((size / 1073741824))"; } > "$overview"
         fi
         # The layout w9x_csmwrap_target.sh writes (same arithmetic).
         total=$((size / 512))

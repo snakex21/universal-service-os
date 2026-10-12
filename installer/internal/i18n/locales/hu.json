@@ -867,6 +867,7 @@
   "boot.lx.a_new_x_layout_will_be_created": "Új {0} elrendezés jön létre.",
   "boot.lx.x_confirm_installation": "{0} - a telepítés megerősítése",
   "boot.lx.disk_x": "Lemez: {0}",
+  "boot.lx.type_x": "Típus: {0}",
   "boot.lx.s_n_x": "S/N: {0}",
   "boot.lx.size_x_gib": "Méret: {0} GiB",
   "boot.lx.status_in_use_formatting_is_blocked": "Állapot: használatban - a formázás le van tiltva.",

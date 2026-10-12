@@ -867,6 +867,7 @@
   "boot.lx.a_new_x_layout_will_be_created": "Um novo layout {0} será criado.",
   "boot.lx.x_confirm_installation": "{0} - Confirmar instalação",
   "boot.lx.disk_x": "Disco: {0}",
+  "boot.lx.type_x": "Tipo: {0}",
   "boot.lx.s_n_x": "S/N: {0}",
   "boot.lx.size_x_gib": "Tamanho: {0} GiB",
   "boot.lx.status_in_use_formatting_is_blocked": "Status: em uso - a formatação está bloqueada.",

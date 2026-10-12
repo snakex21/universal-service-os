@@ -65,7 +65,9 @@ while read -r overview_node overview_type; do
 done < "$overview_work/nodes"
 overview_allocated=$(sort -n "$overview_work/extents" | awk 'BEGIN {e=0;s=0} {if($1>=e){s+=$2-$1;e=$2}else if($2>e){s+=$2-e;e=$2}} END {printf "%.0f",s}')
 overview_size=$(usos_disk_size "$TARGET_DEVICE")
-printf 'Disk: %s\nS/N: %s\nSize: %s GiB\n' "$(usos_disk_model "$TARGET_DEVICE")" "$(usos_disk_serial "$TARGET_DEVICE")" "$((overview_size/1073741824))"
+printf 'Disk: %s\n' "$(usos_disk_model "$TARGET_DEVICE")"
+usos_disk_type_line "$TARGET_DEVICE"
+printf 'S/N: %s\nSize: %s GiB\n' "$(usos_disk_serial "$TARGET_DEVICE")" "$((overview_size/1073741824))"
 if [ "$overview_busy" = yes ]; then printf 'Status: IN USE - formatting is blocked.\n'; else printf 'Status: not currently in use.\n'; fi
 printf 'Partitions: %s; unallocated: approx. %s MiB\n' "$overview_count" "$(((overview_size/512-overview_allocated)/2048))"
 if [ "$overview_known" -gt 0 ]; then

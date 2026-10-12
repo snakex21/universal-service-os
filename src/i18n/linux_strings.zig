@@ -161,6 +161,7 @@ pub const hashes = [_]u32{
     0xc4b74054, // lx.the_native_vhd_boot_manager_and_bcd_will_be_asse
     0x7383eba2, // lx.the_vhd_vhdx_remains_on_data_work_contains_the_v
     0xb35dc805, // lx.the_wim_boot_environment_will_be_assembled_next
+    0x1217c9ca, // lx.type_x
     0x74abccc9, // lx.unknown_interface
     0x41cf0383, // lx.used_free_space_in_file_systems_unknown
     0xc59b65ff, // lx.usos_creates_an_efi_partition_vista
@@ -372,6 +373,7 @@ pub const english = [_][]const u8{
     "The native VHD boot manager and BCD will be assembled next.",
     "The VHD/VHDX remains on DATA; WORK contains the verified boot manager and BCD.",
     "The WIM boot environment will be assembled next.",
+    "Type: {0}",
     "Unknown interface",
     "Used/free space in file systems: unknown.",
     "USOS creates an EFI partition and leaves the rest free. In Vista Setup select the unallocated space.",

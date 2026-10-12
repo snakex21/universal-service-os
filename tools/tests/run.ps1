@@ -29,6 +29,7 @@ function Run-Unit {
     Run-Zig @('build', '--cache-dir', $zigCache, 'test')
     Run-Zig @('test', 'src/platform/bios/memtest_image.zig', '--cache-dir', $zigCache)
     Run-Zig @('test', 'src/platform/bios/dos_fat.zig', '--cache-dir', $zigCache)
+    Run-Zig @('test', 'src/platform/bios/edd_interface.zig', '--cache-dir', $zigCache)
     Run-Zig @('test', '--dep', 'graphics', '-Mroot=src/platform/bios/linux_boot_params.zig', '-Mgraphics=src/legacy_graphics_module.zig', '--cache-dir', $zigCache)
     # M0 golden fingerprints (docs/design/refactor-os-pipeline.md): staged
     # micro-Linux/XP/WinPE payloads and WINNT.SIF of the last build.
@@ -36,6 +37,8 @@ function Run-Unit {
     if ($LASTEXITCODE -ne 0) { throw 'Staged payload goldens differ (see tools/tests/artifacts/golden).' }
     & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_hardware_smart.py')
     if ($LASTEXITCODE -ne 0) { throw 'Hardware SMART tests failed.' }
+    & python.exe (Join-Path $root 'tools/tests/test_disk_type_labels.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Disk type label tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_legacy_rgba_rle.py')
     if ($LASTEXITCODE -ne 0) { throw 'Legacy icon compression tests failed.' }
     & python.exe (Join-Path $root 'tools/tests/legacy_bios/test_windows3_media.py')

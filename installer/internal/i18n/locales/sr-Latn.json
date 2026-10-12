@@ -870,6 +870,7 @@
   "boot.lx.a_new_x_layout_will_be_created": "Biće napravljen novi {0} raspored.",
   "boot.lx.x_confirm_installation": "{0} - potvrda instalacije",
   "boot.lx.disk_x": "Disk: {0}",
+  "boot.lx.type_x": "Tip: {0}",
   "boot.lx.s_n_x": "S/N: {0}",
   "boot.lx.size_x_gib": "Veličina: {0} GiB",
   "boot.lx.status_in_use_formatting_is_blocked": "Status: u upotrebi - formatiranje je blokirano.",
