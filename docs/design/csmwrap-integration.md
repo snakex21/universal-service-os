@@ -602,7 +602,7 @@ Where the ISOs go on DATA: the system ISO in its usual folder
 
 * USB 3 in the installed system: Windows 7 x86 see 12.3 (user files on
   DATA); Vista / Server 2008 SP2 x86: USB keyboard and mouse through our own
-  usosusb driver (12.6), no USB storage (no 32-bit NT 6.0 xHCI stack).
+  usosusb driver (12.6), USB sticks through the same driver (12.7).
 * DATA\Drivers and answer-command wrapping: as section 11.1.
 * A USOS profile renders x86 components; with no key and no edition Vista /
   2008 Setup asks for them (a DATA answer with `/IMAGE/INDEX` avoids that).
@@ -819,13 +819,10 @@ legacy keyboard / pointer port for kbdclass / mouclass) gets an NT 6.0 build:
   `ControlSet00<Select\Current>`: Type 1, Start 1, ErrorControl 0, Group
   "Keyboard Port", ImagePath `system32\drivers\usosusb.sys`. Never fatal.
 * Limits (as NT4): root-port devices only (no hubs, so no keyboards with a
-  built-in hub), HID boot protocol only (no absolute tablets), no USB
-  storage, no power management (sleep / hibernate would leave the controller
-  unprogrammed; the Vista profile turns hibernation off). Stage 2 (USB mass
-  storage) would need a SCSI miniport (or storport-less ScsiPort) on the same
-  xHCI rings: bulk-only transport, SCSI READ/WRITE(10) passthrough, a PnP or
-  legacy disk class binding, plus sharing the controller with the HID code
-  (one driver owning the xHCI, two device stacks).
+  built-in hub), HID boot protocol only (no absolute tablets), no power
+  management (sleep / hibernate would leave the controller unprogrammed; the
+  Vista profile turns hibernation off). USB sticks: stage 2 in 12.7 (same
+  driver, volumes instead of a SCSI miniport stack).
 
 QEMU (build B261011-151241-B661FA01; OVMF without CSM, `pc`, TCG, AHCI target
 cache=writeback, stick on qemu-xhci, PE10 x86 donor):
@@ -850,6 +847,71 @@ X470 to check: USB keyboard / mouse on root ports (not behind a hub) from
 the first phase-2 boot through OOBE to the desktop; `Diag` / `Conn` values
 (controllers 2, keyboard `K`, mouse `M`); keyboards with a built-in hub
 will not work (as on NT4).
+
+### 12.7 Vista / Server 2008 SP2 x86: USB sticks (usosusb 1.1-nt6, 2026-10-12)
+
+usosusb stage 2: the NT6 build also handles USB mass storage, so one
+driver owns the xHCI controller for keyboard, mouse and sticks (no second
+driver, no shared rings). Details in `tools/nt4/usosusb/README.md`
+("USB mass storage"):
+
+* Bulk-only transport (class 08h / 06h / 50h, LUN 0), SCSI INQUIRY, TEST
+  UNIT READY, REQUEST SENSE, READ CAPACITY(10), MODE SENSE(6), READ(10) /
+  WRITE(10); 512-byte sectors; one 64 KiB bounce buffer; reset recovery.
+* Volumes, not disks: no SCSI port / disk class / partition manager stack
+  (a legacy driver cannot get one on NT 6.0 without PnP). Each superfloppy,
+  MBR primary partition or GPT entry (max 4 per stick) becomes a removable
+  `FILE_DEVICE_DISK` device that answers the disk and mountdev IOCTLs; the
+  mount manager gives the drive letter (arrival notification; if it assigns
+  none, `CREATE_POINT` on a free letter). File systems mount as usual (FAT,
+  FAT32, NTFS). This also shows every data partition of a multi-partition
+  stick (the USOS stick: DATA and WORK; EFI system partitions get no volume,
+  as in Windows), which the Windows 7 removable-media stack does not.
+* Hot plug: port status events; unplug removes the letter, sets
+  DO_VERIFY_VOLUME and opens the volume once, so the file system's verify
+  fails and it dismounts (without that a removed NTFS stick made shutdown
+  hang on endless write-behind retries); a new stick gets new volume devices.
+* No change to the flow: the `nt60_usb` step installs the same file.
+
+QEMU (2026-10-12; Web Server 2008 SP2 PL x86 installed through the real stick
+path with build B261012-104904 (OVMF without CSM, CSMWrap, PE10 x86 donor,
+DATA answer), then `usosusb.sys` replaced by the 1.1-nt6 build; `pc`,
+qemu-xhci, AHCI target cache=writeback):
+
+* FAT32 stick (512 MiB MBR, `usb-storage` on qemu-xhci) present at boot:
+  `Diag` `p3:s1--S(512M wp0 1v)`, `Msc` `UsosUsbDisk0:0=E` (letter from
+  the mount manager). `dir`, `type`, copy stick -> C: (`fc /b` equal), copy
+  C: -> stick; on the host the image holds the files written by the guest
+  (MD5 equal).
+* Hot unplug (`device_del`): letter removed (`UsosUsbDisk0:gone0`), no
+  crash; hot plug of another FAT32 stick: `p4:s1--S(128M wp0 1v)`, new
+  letter, read + write (MD5 checked on the host).
+* `pc,i8042=off`, usb-kbd + usb-mouse + stick: i8042prt STOPPED, typing,
+  Start menu by mouse click, Explorer "Komputer" lists `USBMSC (D:)` as a
+  removable disk, copy both ways.
+* Hot plug of the USOS test stick (GPT, 20 GiB): 1.7 GB ISO copied from
+  DATA (NTFS) to C: in 43 s (about 41 MB/s under TCG). Final build: the
+  stick at boot gives `S(20480M wp0 2v)`, USOS_DATA D: + USOS_WORK E: (ESP
+  skipped); the ISO copied C: -> WORK in 60 s, a file written to DATA,
+  surprise removal (`UsosUsbDisk0:gone0 UsosUsbDisk1:gone0`), clean
+  shutdown; on the host both NTFS volumes are healthy and `BIG.BIN` has the
+  ISO's MD5.
+* Vista SP2 PL x86 (USOS profile "Vista Ultimate", installed through the same
+  stick path, key page Next + No, then the final driver): `pc,i8042=off`,
+  usb-kbd + usb-mouse + USOS GPT stick + FAT32 stick: `ver` 6.0.6002, Diag
+  `p3:s1--S(20480M wp0 2v) p4:s2--S(512M wp0 1v) p5:s3K- p6:s4-M`, letters
+  D: (DATA) E: (WORK) F: (FAT32), i8042prt STOPPED; copy both ways (`fc /b`
+  equal), NTFS write on DATA, hot swap of the FAT32 stick for another one
+  (`p4-gone p4:s2--S(128M wp0 1v)`, same letter F:, read + write), Explorer
+  lists USOS_DATA / USOS_WORK / HOTPLUG as removable disks, Start menu by USB
+  mouse click, clean shutdown; on the host every file the guest wrote has
+  the expected MD5.
+* Harness: QEMU's qemu-xhci has 4 root ports; a 5th USB device lands behind
+  an emulated hub, which usosusb does not support (`p7-nohid`), so tests keep
+  at most four USB devices.
+
+Limits: root ports only, LUN 0, 2 TiB, polling, no safe-removal UI, Explorer
+may need F5 after a hot plug, at most 32 volume devices per boot.
 
 ## 13. One disk question per flow (2026-10-11)
 

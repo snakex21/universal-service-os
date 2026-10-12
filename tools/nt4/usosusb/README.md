@@ -97,6 +97,54 @@ unsigned driver loads. `tools/tests/test_nt60_usosusb.py` checks the imports
 against the Server 2008 SP2 x86 kernels and HALs (export-name fixture) and
 the flow wiring.
 
+### USB mass storage (NT 6.0 build only)
+
+The NT6 build also drives USB sticks (`USOSUSB_MSC`): the same worker thread
+owns the controller for keyboard, mouse and storage, so there is no second
+driver and no hand-off between drivers. Written from the public USB Mass
+Storage Class Bulk-Only Transport 1.0 and SCSI (SPC / SBC) command
+descriptions.
+
+* Enumeration picks interface class 08h, subclass 06h (SCSI transparent),
+  protocol 50h (bulk-only), alternate setting 0, with one bulk IN and one bulk
+  OUT endpoint (SuperSpeed burst from the companion descriptor). LUN 0 only.
+* Bring-up: INQUIRY (direct-access device only), TEST UNIT READY with
+  REQUEST SENSE (up to about 10 s), READ CAPACITY(10) (512-byte sectors only,
+  up to 2 TiB), MODE SENSE(6) for the write-protect bit. Then LBA 0: a
+  superfloppy (boot sector at LBA 0) is one volume; an MBR gives one volume per
+  primary partition; a protective MBR leads to the GPT entries. EFI system
+  partitions (GPT type or MBR EFh), Microsoft reserved and GPT entries marked
+  "no drive letter" / hidden get no volume, as in Windows itself (so the USOS
+  stick shows DATA and WORK, its ESP stays untouched). At most 4 volumes per
+  stick.
+* Transfers: CBW / data / CSW as single-TRB TDs through a 64 KiB bounce
+  buffer (READ(10) / WRITE(10) of up to 128 sectors), reset recovery
+  (class reset + CLEAR_FEATURE(HALT)) after a transport error, up to 4
+  attempts; sense 3Ah = no medium, sense key 7 = write protected.
+* Each volume is a non-PnP `\Device\UsosUsbDiskN` (FILE_DEVICE_DISK,
+  removable media, direct I/O) answering the disk / mountdev IOCTLs the file
+  systems and the mount manager use. READ / WRITE IRPs queue to the worker. A
+  second thread tells the mount manager about arrivals
+  (`IOCTL_MOUNTMGR_VOLUME_ARRIVAL_NOTIFICATION`; if that gives no drive letter,
+  `IOCTL_MOUNTMGR_CREATE_POINT` with the first free letter from D: that
+  `MountedDevices` keeps for no other volume) and removals
+  (`IOCTL_MOUNTMGR_DELETE_POINTS`). FAT / FAT32 / NTFS mount through the
+  normal file system recognizer; Explorer lists the volume as a removable
+  disk.
+* Hot plug: port status events. Unplug marks the volumes gone (I/O fails with
+  STATUS_NO_MEDIA_IN_DEVICE, letter removed); plugging a stick in creates new
+  volume devices (32 per boot; device objects are never deleted because a file
+  system may still hold the old one).
+* `Parameters\Diag` shows `S` and `(<MiB>M wp<0|1> <n>v)` per stick, e.g.
+  `p3:s1--S(512M wp0 1v)`; `Parameters\Msc` the mount manager results, e.g.
+  `UsosUsbDisk0:0=E` (`=` letter from the mount manager, `+` set by usosusb,
+  `UsosUsbDisk0:gone0` after removal).
+* Limits: root ports only (no hubs, as for HID), polling (no interrupts; about
+  40 MB/s read under QEMU TCG), no safe-removal UI (unplug after the copy has
+  finished), Explorer may need F5 / reopening after a hot plug (a kernel
+  driver cannot broadcast WM_DEVICECHANGE), no media change polling for card
+  readers.
+
 ## NT 3.1 build
 
 `build-nt31.cmd` (`-DUSOSUSB_NT31`, PE version 3.10) -> `bin/nt31/i386/usosusb.sys`:

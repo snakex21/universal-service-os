@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import shutil
 import socket
 import subprocess
@@ -96,7 +97,10 @@ def launch(args: list[str], label: str, no_reboot: bool) -> None:
             # the PS/2 keyboard (installed systems without an xHCI driver:
             # Server 2008 R2 / Home Server 2011 first logon).
             *([] if os.environ.get("USOS_NATIVE_PS2_INPUT") == "1" else ["-device", "usb-kbd,bus=xhci.0", "-device", USB_POINTER + ",bus=xhci.0"]),
-            *args]
+            *args,
+            # USOS_NATIVE_EXTRA: more QEMU arguments (shlex syntax), e.g. a
+            # usb-storage stick for the usosusb mass storage checks.
+            *shlex.split(os.environ.get("USOS_NATIVE_EXTRA", ""), posix=True)]
     if no_reboot:
         full.append("-no-reboot")
     stderr = open(RUN / f"qemu-{label}.stderr.log", "wb")
