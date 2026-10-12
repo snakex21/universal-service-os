@@ -138,7 +138,14 @@ usos_vista_csmwrap_prepare() {
             nvme_lbs=$(cat "/sys/class/block/${TARGET_DEVICE##*/}/queue/logical_block_size" 2>/dev/null || echo unknown)
             vista_csmwrap_log "NVME $TARGET_DEVICE logical_block=$nvme_lbs profile=$profile"
             [ "$nvme_lbs" = 512 ] || stop "The NVMe disk uses $nvme_lbs-byte sectors; $NT5_NAME through CSMWrap needs 512-byte sectors (switch the namespace to a 512-byte LBA format first). No disk was changed."
-            [ "$x86_self" = 1 ] || stop "No NVMe driver for 64-bit $NT5_NAME yet (it would need a signed x64 driver). Pick a SATA disk. No disk was changed." ;;
+            [ "$x86_self" = 1 ] || stop "No NVMe driver for 64-bit $NT5_NAME yet (it would need a signed x64 driver). Pick a SATA disk. No disk was changed."
+            # NT 6.0 x86 (Vista / Server 2008): Setup accepts the disk with
+            # usosnvme but cannot migrate it (offline driver store of the
+            # Windows 10 donor refuses NT 6.0, 0x80070032, QEMU 2026-10-12).
+            case "$profile:$folder" in
+                'win-nt6-x86-uefi-csmwrap:Windows Vista'|'win-nt6-x86-uefi-csmwrap:Windows Server 2008')
+                    stop "No NVMe support for 32-bit $NT5_NAME yet (Setup cannot take the NVMe driver). Pick a SATA disk. No disk was changed." ;;
+            esac ;;
         esac
         model=$(usos_disk_model "$TARGET_DEVICE" || true)
         serial=$(usos_disk_serial "$TARGET_DEVICE" || true)
