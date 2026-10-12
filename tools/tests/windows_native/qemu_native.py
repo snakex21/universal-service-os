@@ -136,7 +136,11 @@ def disk_args(stick: Path | None, target: Path) -> list[str]:
         args += ["-drive", f"if=none,id=target,file={target.as_posix()},format={target_fmt},cache=writeback",
                  "-device", f"ide-hd,bus=sata.{port},drive=target,serial=USOSTARGET" + (",bootindex=0" if TARGET_FIRST else "")]
     else:
-        args += ["-drive", f"if=none,id=target,file={target.as_posix()},format=qcow2", "-device", "nvme,drive=target,serial=USOSTARGET"]
+        # NVMe target (default). With USOS_NATIVE_TARGET_FIRST=1 it boots before
+        # the stick, as the AHCI target (CSMWrap paths on an NVMe-only PC,
+        # docs/nvme-nt6-2026-10-12.md).
+        args += ["-drive", f"if=none,id=target,file={target.as_posix()},format={target_fmt},cache=writeback",
+                 "-device", "nvme,drive=target,serial=USOSTARGET" + (",bootindex=0" if TARGET_FIRST else "")]
     return args
 
 

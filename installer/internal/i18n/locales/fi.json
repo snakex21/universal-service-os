@@ -334,7 +334,7 @@
   "boot.category.dos.desc": "DOS-järjestelmät ja vanhat käynnistyslevykuvat",
   "boot.category.utilities.desc": "Diagnostiikka-, palautus- ja laiteohjelmistotyökalut",
   "boot.category.others": "Muut järjestelmät",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS ja omat levykuvat",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS ja omat levykuvat",
   "boot.category.power.desc": "Käynnistä uudelleen, sammuta tai avaa laiteohjelmiston asetukset",
   "boot.systems.subtitle": "Valitse järjestelmä, jakelu tai työkaluryhmä",
   "boot.system.ready": "Valmis",

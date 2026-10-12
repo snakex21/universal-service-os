@@ -334,7 +334,7 @@
   "boot.category.dos.desc": "DOS-systemer og ældre startaftryk",
   "boot.category.utilities.desc": "Værktøjer til diagnostik, gendannelse og firmware",
   "boot.category.others": "Andre systemer",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS og egne aftryk",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS og egne aftryk",
   "boot.category.power.desc": "Genstart, luk ned eller åbn firmwareopsætning",
   "boot.systems.subtitle": "Vælg et system, en distribution eller en værktøjsgruppe",
   "boot.system.ready": "Klar",

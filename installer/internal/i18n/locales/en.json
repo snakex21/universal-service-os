@@ -334,7 +334,7 @@
   "boot.category.dos.desc": "DOS systems and legacy boot images",
   "boot.category.utilities.desc": "Diagnostics, recovery and firmware tools",
   "boot.category.others": "Other systems",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS and your own images",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS and your own images",
   "boot.category.power.desc": "Restart, shut down or enter firmware setup",
   "boot.systems.subtitle": "Select a system, distribution or utility group",
   "boot.system.ready": "Ready",

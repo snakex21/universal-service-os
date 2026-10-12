@@ -334,7 +334,7 @@
   "boot.category.dos.desc": "DOS-systemen en oudere opstartimages",
   "boot.category.utilities.desc": "Hulpmiddelen voor diagnose, herstel en firmware",
   "boot.category.others": "Andere systemen",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS en eigen images",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS en eigen images",
   "boot.category.power.desc": "Opnieuw opstarten, afsluiten of firmware-instellingen openen",
   "boot.systems.subtitle": "Kies een systeem, distributie of groep hulpprogramma's",
   "boot.system.ready": "Gereed",

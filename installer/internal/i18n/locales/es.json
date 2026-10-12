@@ -334,7 +334,7 @@
   "boot.category.dos.desc": "Sistemas DOS e imágenes de arranque antiguas",
   "boot.category.utilities.desc": "Herramientas de diagnóstico, recuperación y firmware",
   "boot.category.others": "Otros sistemas",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS e imágenes propias",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS e imágenes propias",
   "boot.category.power.desc": "Reiniciar, apagar o entrar en la configuración del firmware",
   "boot.systems.subtitle": "Seleccione un sistema, una distribución o un grupo de utilidades",
   "boot.system.ready": "Listo",

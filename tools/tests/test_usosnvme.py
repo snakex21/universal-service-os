@@ -44,6 +44,12 @@ class Imports(unittest.TestCase):
     def test_nt31(self):
         self.check('NT31', 'nt31_exports.txt', (('ntoskrnl.exe', 'hal.dll'), ('ntkrnlmp.exe', 'hal.dll')))
 
+    def test_nt6_x86(self):
+        # Windows Vista / Server 2008 (and 7) x86 run the 2KXP build
+        # (docs/nvme-nt6-2026-10-12.md): Server 2008 SP2 x86 kernels, HALs
+        # and its SCSIPORT.
+        self.check('2KXP', 'nt60sp2_x86_exports.txt', (('ntoskrnl.exe', 'halmacpi.dll'), ('ntkrnlpa.exe', 'halacpi.dll')))
+
     def test_no_crt(self):
         # NT 3.1 exports neither memset nor memcpy; no build may import them.
         for v in ('2KXP', 'NT4', 'NT351', 'NT31'):
@@ -100,6 +106,62 @@ class Flow(unittest.TestCase):
         self.assertIn('if exist C:\\USOS\\NT4\\USOSNVME.SYS copy', nt4)
         build = (ROOT / 'tools/build_micro_linux.py').read_text(encoding='utf-8')
         self.assertIn('("tools/nt/usosnvme/bin/NT4/i386/usosnvme.sys", "usr/lib/usos/nt4/USOSNVME.SYS")', build)
+
+
+class Nt6Flow(unittest.TestCase):
+    """Windows 7 / Vista / Server 2008 x86 through CSMWrap (x86 PE10 donor):
+    the NVMe gate in micro-Linux, target_bus in the target record and the
+    WinPE nvme step (docs/nvme-nt6-2026-10-12.md)."""
+    CMD = (ROOT / 'tools/windows_x86_csmwrap.cmd').read_text(encoding='utf-8')
+
+    def step(self):
+        return self.CMD[self.CMD.index('\n:nvme\n'):]
+
+    def test_gate(self):
+        prep = (ROOT / 'tools/vista_csmwrap_prepare.sh').read_text(encoding='utf-8')
+        gate = prep[prep.index('usos_xp_choose_disk\n'):]
+        self.assertLess(gate.index('case "$TARGET_DEVICE" in /dev/nvme*)'), gate.index('usos_xp_confirm '))
+        self.assertIn('[ "$nvme_lbs" = 512 ] || stop', gate)
+        self.assertIn('[ "$x86_self" = 1 ] || stop "No NVMe driver for 64-bit', gate)
+        target = (ROOT / 'tools/vista_csmwrap_target.sh').read_text(encoding='utf-8')
+        self.assertIn('/dev/nvme*) target_bus=nvme', target)
+        self.assertIn(r'target_bus=%s\r\n', target)
+
+    def test_other_flows_stop(self):
+        nt4 = (ROOT / 'tools/nt4_csmwrap_target.sh').read_text(encoding='utf-8')
+        self.assertLess(nt4.index('no NVMe driver for Windows NT 3.x'), nt4.index('of="$TARGET_DEVICE"'))
+        pos = (ROOT / 'tools/posready_csmwrap_target.sh').read_text(encoding='utf-8')
+        self.assertLess(pos.index('no NVMe driver for POSReady 2009'), pos.index('of="$TARGET_DEVICE"'))
+
+    def test_step(self):
+        self.assertIn('call :nt60_usb\ncall :nvme\n', self.CMD)
+        s = self.step()
+        self.assertLess(s.index('find "target_bus=nvme"'), s.index('copy /y'))
+        self.assertIn('if not "%USOS_NT%"=="6.0" if not "%USOS_NT%"=="6.1"', s)
+        self.assertIn(r'copy /y "%~dp0usosnvme-nt6.sys" "%USOS_T%\Windows\System32\drivers\usosnvme.sys"', s)
+        for want in ('/v Start /t REG_DWORD /d 0 ', '/v Group /t REG_SZ /d "SCSI miniport"',
+                     r'Services\usosnvme"', r'\Parameters\PnpInterface" /v 5 /t REG_DWORD /d 1',
+                     r'CriticalDeviceDatabase\pci#cc_010802"', '/v Service /t REG_SZ /d usosnvme',
+                     '{4D36E97B-E325-11CE-BFC1-08002BE10318}', '*kb2990941*x86*.msu', '*kb3087873*x86*.msu'):
+            self.assertIn(want, s)
+        self.assertNotRegex(s, r'exit /b [1-9]')
+
+    def test_setup_sees_driver(self):
+        # Vista / 7 Setup refuses the NVMe disk unless a driver for its
+        # controller was loaded: DriverPaths before Setup, crash dump off.
+        before = self.CMD[:self.CMD.index('usos-x86-csmwrap.exe" before')]
+        self.assertIn('set "USOS_NVME_DRIVERS=%SystemDrive%\\USOS-nvme"', before)
+        self.assertIn('usos-x86-csmwrap.exe" nodump', before)
+        src = (ROOT / 'tools/windows_x86_csmwrap.c').read_text(encoding='utf-8')
+        self.assertIn('Microsoft-Windows-PnpCustomizationsWinPE', src)
+        self.assertIn('if (major == 6 && minor <= 1 && dn && dn < MAX_PATH)', src)
+        self.assertIn('34 /* SystemCrashDumpStateInformation */', src)
+        build = (ROOT / 'tools/build_windows_native_support.py').read_text(encoding='utf-8')
+        self.assertIn("b'DriverVer=01/01/2001,1.0.0.0'", build)
+
+    def test_packed(self):
+        build = (ROOT / 'tools/build_windows_native_support.py').read_text(encoding='utf-8')
+        self.assertIn("writer.add_file('usosnvme-nt6.sys', root / 'tools/nt/usosnvme/bin/2KXP/i386/usosnvme.sys')", build)
 
 
 if __name__ == '__main__':

@@ -334,7 +334,7 @@
   "boot.category.dos.desc": "DOS-süsteemid ja pärandkäivituspildid",
   "boot.category.utilities.desc": "Diagnostika-, taaste- ja püsivaratööriistad",
   "boot.category.others": "Muud süsteemid",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS ja oma tõmmised",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS ja oma tõmmised",
   "boot.category.power.desc": "Taaskäivitus, väljalülitus või püsivara seadistus",
   "boot.systems.subtitle": "Valige süsteem, distributsioon või tööriistarühm",
   "boot.system.ready": "Valmis",

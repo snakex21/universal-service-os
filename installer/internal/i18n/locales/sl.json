@@ -340,7 +340,7 @@
   "boot.category.dos.desc": "Sistemi DOS in starejše zagonske slike",
   "boot.category.utilities.desc": "Orodja za diagnostiko, obnovitev in vdelano programsko opremo",
   "boot.category.others": "Drugi sistemi",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS in lastne slike",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS in lastne slike",
   "boot.category.power.desc": "Vnovični zagon, zaustavitev ali nastavitve vdelane programske opreme",
   "boot.systems.subtitle": "Izberite sistem, distribucijo ali skupino orodij",
   "boot.system.ready": "Pripravljeno",

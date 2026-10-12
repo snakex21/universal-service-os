@@ -1,6 +1,8 @@
 # Windows Server 2008 SP2 x86 (6.0.6002.18005, Web Server PL install.wim index 1)
-# kernel and HAL export names, for tools/tests/test_nt60_usosusb.py. Names only;
-# "name -> target" marks an export forwarder. hal.dll is the halmacpi copy Setup installs.
+# kernel and HAL export names, for tools/tests/test_nt60_usosusb.py, and
+# scsiport.sys (6.0.6001.18000, the same install.wim) for test_usosnvme.py.
+# Names only; "name -> target" marks an export forwarder. hal.dll is the
+# halmacpi copy Setup installs.
 [ntoskrnl.exe]
 AlpcGetHeaderSize
 AlpcGetMessageAttribute
@@ -4151,3 +4153,51 @@ x86BiosCall
 x86BiosFreeBuffer
 x86BiosReadMemory
 x86BiosWriteMemory
+[scsiport.sys]
+DllInitialize
+ScsiDebugPrint
+ScsiPortCompleteRequest
+ScsiPortConvertPhysicalAddressToUlong
+ScsiPortConvertUlongToPhysicalAddress
+ScsiPortFlushDma
+ScsiPortFreeDeviceBase
+ScsiPortGetBusData
+ScsiPortGetDeviceBase
+ScsiPortGetLogicalUnit
+ScsiPortGetPhysicalAddress
+ScsiPortGetSrb
+ScsiPortGetUncachedExtension
+ScsiPortGetVirtualAddress
+ScsiPortInitialize
+ScsiPortIoMapTransfer
+ScsiPortLogError
+ScsiPortMoveMemory
+ScsiPortNotification
+ScsiPortQuerySystemTime -> NTOSKRNL.KeQuerySystemTime
+ScsiPortReadPortBufferUchar -> HAL.READ_PORT_BUFFER_UCHAR
+ScsiPortReadPortBufferUlong -> HAL.READ_PORT_BUFFER_ULONG
+ScsiPortReadPortBufferUshort -> HAL.READ_PORT_BUFFER_USHORT
+ScsiPortReadPortUchar -> HAL.READ_PORT_UCHAR
+ScsiPortReadPortUlong -> HAL.READ_PORT_ULONG
+ScsiPortReadPortUshort -> HAL.READ_PORT_USHORT
+ScsiPortReadRegisterBufferUchar -> NTOSKRNL.READ_REGISTER_BUFFER_UCHAR
+ScsiPortReadRegisterBufferUlong -> NTOSKRNL.READ_REGISTER_BUFFER_ULONG
+ScsiPortReadRegisterBufferUshort -> NTOSKRNL.READ_REGISTER_BUFFER_USHORT
+ScsiPortReadRegisterUchar -> NTOSKRNL.READ_REGISTER_UCHAR
+ScsiPortReadRegisterUlong -> NTOSKRNL.READ_REGISTER_ULONG
+ScsiPortReadRegisterUshort -> NTOSKRNL.READ_REGISTER_USHORT
+ScsiPortSetBusDataByOffset
+ScsiPortStallExecution
+ScsiPortValidateRange
+ScsiPortWritePortBufferUchar -> HAL.WRITE_PORT_BUFFER_UCHAR
+ScsiPortWritePortBufferUlong -> HAL.WRITE_PORT_BUFFER_ULONG
+ScsiPortWritePortBufferUshort -> HAL.WRITE_PORT_BUFFER_USHORT
+ScsiPortWritePortUchar -> HAL.WRITE_PORT_UCHAR
+ScsiPortWritePortUlong -> HAL.WRITE_PORT_ULONG
+ScsiPortWritePortUshort -> HAL.WRITE_PORT_USHORT
+ScsiPortWriteRegisterBufferUchar -> NTOSKRNL.WRITE_REGISTER_BUFFER_UCHAR
+ScsiPortWriteRegisterBufferUlong -> NTOSKRNL.WRITE_REGISTER_BUFFER_ULONG
+ScsiPortWriteRegisterBufferUshort -> NTOSKRNL.WRITE_REGISTER_BUFFER_USHORT
+ScsiPortWriteRegisterUchar -> NTOSKRNL.WRITE_REGISTER_UCHAR
+ScsiPortWriteRegisterUlong -> NTOSKRNL.WRITE_REGISTER_ULONG
+ScsiPortWriteRegisterUshort -> NTOSKRNL.WRITE_REGISTER_USHORT

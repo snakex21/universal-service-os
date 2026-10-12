@@ -337,7 +337,7 @@
   "boot.category.dos.desc": "Системы DOS и старые загрузочные образы",
   "boot.category.utilities.desc": "Средства диагностики, восстановления и прошивки",
   "boot.category.others": "Другие системы",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS и собственные образы",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS и собственные образы",
   "boot.category.power.desc": "Перезагрузка, выключение или вход в настройки прошивки",
   "boot.systems.subtitle": "Выберите систему, дистрибутив или группу утилит",
   "boot.system.ready": "Готово",

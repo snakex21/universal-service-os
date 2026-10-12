@@ -337,7 +337,7 @@
   "boot.category.dos.desc": "DOS sustavi i stare slike za pokretanje",
   "boot.category.utilities.desc": "Alati za dijagnostiku, oporavak i firmver",
   "boot.category.others": "Ostali sustavi",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS i vlastite slike",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS i vlastite slike",
   "boot.category.power.desc": "Ponovno pokretanje, isključivanje ili postavke firmvera",
   "boot.systems.subtitle": "Odaberite sustav, distribuciju ili grupu alata",
   "boot.system.ready": "Spremno",

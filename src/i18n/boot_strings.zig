@@ -2275,7 +2275,7 @@ pub const english = [_][]const u8{
     "DOS systems and legacy boot images",
     "Linux installers and live systems",
     "Other systems",
-    "Haiku, FreeBSD, ReactOS, KolibriOS and your own images",
+    "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS and your own images",
     "Power",
     "Restart, shut down or enter firmware setup",
     "Utilities",

@@ -337,7 +337,7 @@
   "boot.category.dos.desc": "DOS sistemos ir senieji įkrovos atvaizdai",
   "boot.category.utilities.desc": "Diagnostikos, atkūrimo ir programinės aparatinės įrangos įrankiai",
   "boot.category.others": "Kitos sistemos",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS ir savi atvaizdai",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS ir savi atvaizdai",
   "boot.category.power.desc": "Paleisti iš naujo, išjungti arba atverti BIOS/UEFI sąranką",
   "boot.systems.subtitle": "Pasirinkite sistemą, distribuciją arba įrankių grupę",
   "boot.system.ready": "Paruošta",

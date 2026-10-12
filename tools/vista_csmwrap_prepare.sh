@@ -129,6 +129,17 @@ usos_vista_csmwrap_prepare() {
     while :; do
         TARGET_DEVICE=''
         usos_xp_choose_disk
+        # NVMe target gate (docs/nvme-nt6-2026-10-12.md), before the erase
+        # confirmation: CSMWrap's SeaBIOS boots only 512-byte LBAs; 32-bit
+        # 8.1 / 10 have stornvme; 32-bit 7 / Vista / 2008 get their boot
+        # driver from the WinPE nvme step (usosnvme, or the user's KB2990941
+        # x86 on 7); 64-bit Vista / 2008 would need a signed x64 driver.
+        case "$TARGET_DEVICE" in /dev/nvme*)
+            nvme_lbs=$(cat "/sys/class/block/${TARGET_DEVICE##*/}/queue/logical_block_size" 2>/dev/null || echo unknown)
+            vista_csmwrap_log "NVME $TARGET_DEVICE logical_block=$nvme_lbs profile=$profile"
+            [ "$nvme_lbs" = 512 ] || stop "The NVMe disk uses $nvme_lbs-byte sectors; $NT5_NAME through CSMWrap needs 512-byte sectors (switch the namespace to a 512-byte LBA format first). No disk was changed."
+            [ "$x86_self" = 1 ] || stop "No NVMe driver for 64-bit $NT5_NAME yet (it would need a signed x64 driver). Pick a SATA disk. No disk was changed." ;;
+        esac
         model=$(usos_disk_model "$TARGET_DEVICE" || true)
         serial=$(usos_disk_serial "$TARGET_DEVICE" || true)
         size=$(usos_disk_size "$TARGET_DEVICE")

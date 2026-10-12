@@ -334,7 +334,7 @@
   "boot.category.dos.desc": "DOS sistemleri ve eski önyükleme görüntüleri",
   "boot.category.utilities.desc": "Tanılama, kurtarma ve ürün yazılımı araçları",
   "boot.category.others": "Diğer sistemler",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS ve kendi kalıplarınız",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS ve kendi kalıplarınız",
   "boot.category.power.desc": "Yeniden başlat, kapat veya ürün yazılımı ayarlarına gir",
   "boot.systems.subtitle": "Bir sistem, dağıtım veya araç grubu seçin",
   "boot.system.ready": "Hazır",
