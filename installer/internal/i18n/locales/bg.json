@@ -1246,6 +1246,7 @@
   "boot.lx.image_disk_after_restart": "След рестартирането дискът стартира сам в {0}.",
   "boot.lx.image_disk_writing": "Записване на образа на {0} на избрания диск.",
   "boot.lx.image_disk_restart_notice": "След рестартирането фърмуерът стартира UEFI записа на този диск и от него стартира {0}. Ако вместо това стартира флашката на USOS, изберете диска от менюто за зареждане на фърмуера.",
+  "boot.lx.image_disk_restart_notice_haiku": "След рестартирането фърмуерът стартира UEFI записа на този диск и Haiku стартира от него. За постоянна инсталация на Haiku: Installer > Set up partitions > създайте BFS дял в свободното място. Ако вместо това стартира флашката USOS, изберете диска в менюто за зареждане на фърмуера.",
   "boot.lx.w9x_csmwrap_copying": "Копиране на инсталацията на {0}, помощните средства на USOS и CSMWrap на избрания диск.",
   "boot.lx.w9x_preparation_failed": "Подготовката на Windows 9x е неуспешна; вижте EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0}: стартирайте подготвения диск",

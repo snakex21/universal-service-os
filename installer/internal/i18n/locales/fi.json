@@ -1246,6 +1246,7 @@
   "boot.lx.image_disk_after_restart": "Uudelleenkäynnistyksen jälkeen levy käynnistyy itsestään järjestelmään {0}.",
   "boot.lx.image_disk_writing": "Kirjoitetaan {0}-levykuva valitulle levylle.",
   "boot.lx.image_disk_restart_notice": "Uudelleenkäynnistyksen jälkeen laiteohjelmisto käynnistää tämän levyn UEFI-merkinnän ja {0} käynnistyy siltä. Jos USOS-tikku käynnistyy sen sijaan, valitse levy laiteohjelmiston käynnistysvalikosta.",
+  "boot.lx.image_disk_restart_notice_haiku": "Uudelleenkäynnistyksen jälkeen laiteohjelmisto käynnistää tämän levyn UEFI-merkinnän ja Haiku käynnistyy siltä. Haiku pysyvästi asennettuna: Installer > Set up partitions > luo BFS-osio vapaaseen tilaan. Jos USOS-tikku käynnistyy sen sijaan, valitse levy laiteohjelmiston käynnistysvalikosta.",
   "boot.lx.w9x_csmwrap_copying": "Kopioidaan {0}-asennusohjelma, USOS-apuohjelmat ja CSMWrap valitulle levylle.",
   "boot.lx.w9x_preparation_failed": "Windows 9x -valmistelu epäonnistui; katso EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0}: käynnistä valmisteltu levy",

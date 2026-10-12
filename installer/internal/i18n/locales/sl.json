@@ -1252,6 +1252,7 @@
   "boot.lx.image_disk_after_restart": "Po ponovnem zagonu se disk sam zažene v {0}.",
   "boot.lx.image_disk_writing": "Zapisovanje slike {0} na izbrani disk.",
   "boot.lx.image_disk_restart_notice": "Po ponovnem zagonu vdelana programska oprema zažene vnos UEFI tega diska in z njega se zažene {0}. Če se namesto tega zažene ključek USOS, izberite disk v zagonskem meniju.",
+  "boot.lx.image_disk_restart_notice_haiku": "Po ponovnem zagonu vdelana programska oprema zažene vnos UEFI tega diska in z njega se zažene Haiku. Za trajno namestitev Haikuja: Installer > Set up partitions > ustvarite particijo BFS v prostem prostoru. Če se namesto tega zažene ključek USOS, izberite disk v zagonskem meniju vdelane programske opreme.",
   "boot.lx.w9x_csmwrap_copying": "Kopiranje namestitve sistema {0}, orodij USOS in CSMWrap na izbrani disk.",
   "boot.lx.w9x_preparation_failed": "Priprava sistema Windows 9x ni uspela; glejte EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0}: zaženite pripravljeni disk",

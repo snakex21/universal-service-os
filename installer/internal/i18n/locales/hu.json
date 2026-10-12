@@ -1246,6 +1246,7 @@
   "boot.lx.image_disk_after_restart": "Újraindítás után a lemez magától elindítja ezt: {0}.",
   "boot.lx.image_disk_writing": "A(z) {0} lemezkép írása a kiválasztott lemezre.",
   "boot.lx.image_disk_restart_notice": "Újraindítás után a firmware elindítja a lemez UEFI-bejegyzését, és arról indul a(z) {0}. Ha helyette az USOS pendrive indul, válaszd ki a lemezt a firmware rendszerindító menüjében.",
+  "boot.lx.image_disk_restart_notice_haiku": "Az újraindítás után a firmware elindítja ennek a lemeznek az UEFI-bejegyzését, és arról indul a Haiku. A Haiku végleges telepítése: Installer > Set up partitions > hozzon létre egy BFS-partíciót a szabad helyen. Ha helyette az USOS pendrive indul el, válassza ki a lemezt a firmware rendszerindító menüjében.",
   "boot.lx.w9x_csmwrap_copying": "A(z) {0} telepítőjének, az USOS segédeszközeinek és a CSMWrapnek a másolása a kiválasztott lemezre.",
   "boot.lx.w9x_preparation_failed": "A Windows 9x előkészítése nem sikerült; lásd: EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0}: indítsa el az előkészített lemezt",

@@ -1249,6 +1249,7 @@
   "boot.lx.image_disk_after_restart": "Po restarcie dysk uruchomi się sam i wystartuje {0}.",
   "boot.lx.image_disk_writing": "Zapisywanie obrazu {0} na wybrany dysk.",
   "boot.lx.image_disk_restart_notice": "Po restarcie firmware uruchomi wpis UEFI tego dysku i wystartuje z niego {0}. Jeśli zamiast tego uruchomi się pendrive USOS, wybierz dysk w menu startowym firmware.",
+  "boot.lx.image_disk_restart_notice_haiku": "Po ponownym uruchomieniu firmware uruchomi wpis UEFI tego dysku i z niego wystartuje Haiku. Aby zainstalować Haiku na stałe: Installer > Set up partitions > utwórz partycję BFS w wolnym miejscu. Jeśli zamiast tego uruchomi się pendrive USOS, wybierz dysk w menu rozruchu firmware.",
   "boot.lx.w9x_csmwrap_copying": "Kopiowanie instalatora {0}, narzędzi USOS i CSMWrap na wybrany dysk.",
   "boot.lx.w9x_preparation_failed": "Przygotowanie Windows 9x nie powiodło się; zobacz EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0}: uruchom przygotowany dysk",

@@ -1249,6 +1249,7 @@
   "boot.lx.image_disk_after_restart": "După repornire, discul pornește singur în {0}.",
   "boot.lx.image_disk_writing": "Se scrie imaginea {0} pe discul selectat.",
   "boot.lx.image_disk_restart_notice": "După repornire, firmware-ul pornește intrarea UEFI a acestui disc și {0} pornește de pe el. Dacă pornește în schimb stick-ul USOS, alege discul din meniul de pornire al firmware-ului.",
+  "boot.lx.image_disk_restart_notice_haiku": "După repornire, firmware-ul pornește intrarea UEFI a acestui disc și Haiku pornește de pe el. Pentru a instala Haiku permanent: Installer > Set up partitions > creați o partiție BFS în spațiul liber. Dacă pornește în schimb stick-ul USOS, alegeți discul din meniul de pornire al firmware-ului.",
   "boot.lx.w9x_csmwrap_copying": "Se copiază instalarea {0}, utilitarele USOS și CSMWrap pe discul ales.",
   "boot.lx.w9x_preparation_failed": "Pregătirea Windows 9x a eșuat; vedeți EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0}: porniți discul pregătit",

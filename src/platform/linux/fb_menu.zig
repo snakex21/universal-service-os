@@ -7,6 +7,7 @@ const input_module = @import("fb_menu_input.zig");
 const fb = @import("fb_device.zig");
 const trace = @import("fb_menu_trace.zig");
 const fb_i18n = @import("fb_i18n.zig");
+const disk_badge = @import("fb_disk_badge.zig");
 
 pub fn run(allocator: std.mem.Allocator, path: []const u8) !u8 {
     trace.write("menu-entry state={s}", .{path});
@@ -218,7 +219,14 @@ fn console(tty: i32, state: model.State) void {
     const title = std.fmt.bufPrint(&buffer, "USOS - {s}\n{s}\n\n", .{state.title, state.subtitle}) catch return;
     _ = linux.write(tty, title.ptr, title.len);
     for (state.items[0..state.count], 0..) |item, i| {
-        const line = std.fmt.bufPrint(&buffer, "{s} {s}\n    {s}\n", .{if (i == state.selected) ">" else " ", item.title, item.detail}) catch continue;
+        // Text fallback: the disk chips as "[NVMe] [SSD]" after the name.
+        var chips: [64]u8 = undefined;
+        var chips_len: usize = 0;
+        for (item.badgeTokens()) |token| {
+            const part = std.fmt.bufPrint(chips[chips_len..], " [{s}]", .{disk_badge.badge(token).text}) catch break;
+            chips_len += part.len;
+        }
+        const line = std.fmt.bufPrint(&buffer, "{s} {s}\n    {s}\n", .{if (i == state.selected) ">" else " ", item.title, chips[0..chips_len], item.detail}) catch continue;
         _ = linux.write(tty, line.ptr, line.len);
     }
     const info_first = if (state.table.columns > 0) 0 else state.scroll;

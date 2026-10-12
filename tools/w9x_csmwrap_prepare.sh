@@ -390,7 +390,7 @@ usos_w9x_csmwrap_prepare() {
                 printf 'All partitions, systems and files on this disk will be erased.
 '
                 printf 'New layout: the %s image unchanged at the start of the disk (%s MB); a 64 MiB CSMWrap partition at the end only when the image has no UEFI loader; the rest stays unallocated.
-' "$folder" "$(( ($(wc -c < "/mnt/data/$iso") + 1048575) / 1048576 ))"
+' "$folder" "$(( ($(stat -L -c %s "/mnt/data/$iso" 2>/dev/null || wc -c < "/mnt/data/$iso") + 1048575) / 1048576 ))"
                 printf 'After the restart the disk starts by itself into %s.
 ' "$folder"
             } > "$screen"
@@ -567,7 +567,11 @@ usos_w9x_csmwrap_prepare() {
     w9x_csmwrap_log 'DONE; waiting for the restart'
     usos_stick_write mv "$request" "$W9X_DIR/request.done" 2>/dev/null || true
     usos_stick_flush || true
-    if [ -n "$img" ]; then
+    if [ -n "$img" ] && [ "$system" = haiku ]; then
+        # The rest of the disk stays unallocated; Haiku's Installer asks for a
+        # BFS partition (X470 2026-10-12). USOS does not format BFS.
+        usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry and Haiku starts from it. To install Haiku permanently: Installer > Set up partitions > create a BFS partition in the free space. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true
+    elif [ -n "$img" ]; then
         usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry and $folder starts from it. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true
     else
     usos_ui_notice_continue "$folder: start the prepared disk" "After the restart the firmware starts this disk's UEFI entry (CSMWrap; CSM stays off) and the $folder installation continues on it. If the USOS stick starts instead, pick the disk in the firmware boot menu." 'Restart' || true

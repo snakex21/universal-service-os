@@ -1,7 +1,19 @@
 const std = @import("std");
 pub const Table = @import("fb_menu_table.zig").Table;
 
-pub const Item = struct { title: []const u8, detail: []const u8 = "" };
+pub const max_badges = 3;
+/// A choice; `badges` are chip tokens from `badge=` lines after its `item=`
+/// line (disk bus and media, fb_disk_badge.zig).
+pub const Item = struct {
+    title: []const u8,
+    detail: []const u8 = "",
+    badges: [max_badges][]const u8 = undefined,
+    badge_count: usize = 0,
+
+    pub fn badgeTokens(self: *const Item) []const []const u8 {
+        return self.badges[0..self.badge_count];
+    }
+};
 pub const State = struct {
     title: []const u8 = "WINDOWS XP",
     subtitle: []const u8 = "",
@@ -41,6 +53,12 @@ pub fn parse(input: []const u8) !State {
             const split = std.mem.indexOfScalar(u8, value, '|') orelse value.len;
             state.items[state.count] = .{ .title = value[0..split], .detail = if (split < value.len) value[split + 1 ..] else "" };
             state.count += 1;
+        } else if (std.mem.eql(u8, key, "badge")) {
+            if (state.count == 0 or value.len == 0) continue;
+            const item = &state.items[state.count - 1];
+            if (item.badge_count == max_badges) continue;
+            item.badges[item.badge_count] = value;
+            item.badge_count += 1;
         } else if (std.mem.eql(u8, key, "table_header")) {
             try state.table.header(value);
         } else if (std.mem.eql(u8, key, "table_row")) {
@@ -75,4 +93,12 @@ test "overview scroll stays in bounds" {
     state.scrollInfo(false, 2);
     state.scrollInfo(false, 2);
     try std.testing.expectEqual(@as(usize, 0), state.scroll);
+}
+
+test "badge lines attach to the item before them" {
+    const state = try parse("badge=orphan\nitem=Micron 3400 (476 GiB)|S/N: 1\nbadge=nvme\nbadge=ssd\nitem=Return to USOS\n");
+    try std.testing.expectEqual(@as(usize, 2), state.items[0].badge_count);
+    try std.testing.expectEqualStrings("nvme", state.items[0].badgeTokens()[0]);
+    try std.testing.expectEqualStrings("ssd", state.items[0].badgeTokens()[1]);
+    try std.testing.expectEqual(@as(usize, 0), state.items[1].badge_count);
 }

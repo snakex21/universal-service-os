@@ -55,6 +55,11 @@ pub const Badge = struct {
     /// as "tested in a VM"; the details pane carries the words). `text`
     /// and `tone` are ignored.
     dot: bool = false,
+    /// A solid chip in this colour instead of the tone's soft fill (disk
+    /// bus chips, src/platform/linux/fb_disk_badge.zig); the label takes
+    /// whichever of the theme's text and background colours (or white and
+    /// black) contrasts more with it.
+    fill: ?Color = null,
 };
 
 pub const HeaderInfo = struct {
@@ -185,6 +190,10 @@ pub const Row = struct {
     detail: []const u8 = "",
     icon: RowIcon = .none,
     badge: ?Badge = null,
+    /// Chips drawn right-aligned in this order left to right (disk bus and
+    /// media in the disk pickers); a chip that would squeeze the title
+    /// below 120 px is left out.
+    chips: []const Badge = &.{},
     enabled: bool = true,
 };
 
@@ -524,13 +533,22 @@ pub const Ui = struct {
         const h = self.px(24);
         const x = right -| w;
         const y = center_y -| (h / 2);
-        const colors = self.toneColors(badge.tone);
+        const colors: ToneColors = if (badge.fill) |fill| .{ .fill = fill, .text = self.textOn(fill) } else self.toneColors(badge.tone);
         paint.roundRect(self.surface, x, y, w, h, h / 2, colors.fill, background);
         self.fonts.drawCentered(self.surface, x + w / 2, self.fonts.centeredTop(.small, center_y), .small, badge.text, colors.text, colors.fill);
         return x;
     }
 
-    pub fn toneColors(self: *const Ui, tone: Tone) struct { fill: Color, text: Color } {
+    /// Label colour on a solid chip: the theme's text or background colour,
+    /// whichever contrasts more; plain white or black when neither reaches
+    /// WCAG 4.5:1 (odd custom themes).
+    pub fn textOn(self: *const Ui, fill: Color) Color {
+        return readableOn(self.theme, fill);
+    }
+
+    pub const ToneColors = struct { fill: Color, text: Color };
+
+    pub fn toneColors(self: *const Ui, tone: Tone) ToneColors {
         const theme = self.theme;
         return switch (tone) {
             .neutral => .{ .fill = theme.panel_alt, .text = theme.muted },
@@ -742,6 +760,16 @@ pub const Ui = struct {
                 right = self.badgeRight(right, center_y, badge, fill) -| self.px(12);
             }
         }
+        var chip_index = item.chips.len;
+        while (chip_index > 0) {
+            chip_index -= 1;
+            const chip = item.chips[chip_index];
+            if (self.badgeWidth(chip.text) + self.px(120) >= right -| x) break;
+            var drawn = chip;
+            if (!item.enabled) drawn = .{ .text = chip.text, .tone = .neutral };
+            right = self.badgeRight(right, center_y, drawn, fill) -| self.px(8);
+        }
+        if (item.chips.len > 0) right -|= self.px(4);
         const text_w = right -| x;
         const title_color = if (!item.enabled) theme.disabled_text else theme.text;
         if (item.detail.len > 0) {
@@ -1128,4 +1156,16 @@ test "pad hint keys draw as controller glyphs, other keys as key caps" {
         try std.testing.expectEqual(@as(?usize, 2), ui.footerHit(&hints, "", b_left + ui.keycapWidth("B") + ui.px(8) + ui.fonts.width(.small, "Back") + ui.px(22) + ui.px(4), cy));
         try std.testing.expect(ui.keycapWidth("LB/RB") > 2 * ui.px(24));
     }
+}
+
+/// See Ui.textOn.
+pub fn readableOn(theme: Theme, fill: Color) Color {
+    const contrast = @import("theme_contrast.zig");
+    const a = contrast.ratio10(theme.text, fill);
+    const b = contrast.ratio10(theme.background, fill);
+    const best = if (a >= b) theme.text else theme.background;
+    if (@max(a, b) >= 45) return best;
+    const white = Color{ .r = 0xff, .g = 0xff, .b = 0xff };
+    const black = Color{ .r = 0, .g = 0, .b = 0 };
+    return if (contrast.ratio10(white, fill) >= contrast.ratio10(black, fill)) white else black;
 }

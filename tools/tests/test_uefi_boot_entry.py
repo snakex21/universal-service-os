@@ -67,10 +67,12 @@ class Encoding(unittest.TestCase):
         self.vars = self.tmp / 'efivars'
         self.vars.mkdir()
 
-    def run_helper(self, command, name='Haiku', ok=True):
-        rc, out, err = sh(f'sh "{HELPER.as_posix()}" {command}', env={
-            'TARGET_DEVICE': self.disk.as_posix(), 'ENTRY_NAME': name, 'SECTOR_SIZE': '512',
-            'EFIVARS_DIR': self.vars.as_posix()})
+    def run_helper(self, command, name='Haiku', ok=True, order=None):
+        env = {'TARGET_DEVICE': self.disk.as_posix(), 'ENTRY_NAME': name, 'SECTOR_SIZE': '512',
+               'EFIVARS_DIR': self.vars.as_posix()}
+        if order:
+            env['ENTRY_ORDER'] = order
+        rc, out, err = sh(f'sh "{HELPER.as_posix()}" {command}', env=env)
         if ok:
             self.assertEqual(rc, 0, out + err)
         return rc, out, err
@@ -115,9 +117,30 @@ class Encoding(unittest.TestCase):
         self.assertIn('boot_entry=Boot0002', out)
         option = load_option('Haiku', 2, 2879488, 5760, b'\x78\x56\x34\x12' + b'\0' * 12, 1, 1)
         self.assertEqual(self.var('Boot0002'), b'\x07\0\0\0' + option)
-        # Appended: the firmware's default entry stays first.
-        self.assertEqual(self.var('BootOrder'), b'\x07\0\0\0' + b'\x01\x00\x00\x00\x02\x00')
+        # First: the written system stays the default after BootNext is
+        # used up; the other entries (USOS stick, other systems) keep their order.
+        self.assertEqual(self.var('BootOrder'), b'\x07\0\0\0' + b'\x02\x00\x01\x00\x00\x00')
         self.assertEqual(self.var('BootNext'), b'\x07\0\0\0\x02\x00')
+
+    def test_add_moves_an_existing_entry_to_the_front(self):
+        self.disk.write_bytes(mbr_disk())
+        self.put_var('Boot0000', b'other')
+        self.put_var('BootOrder', b'\x00\x00')
+        self.run_helper('add')
+        self.put_var('BootOrder', b'\x00\x00\x01\x00\x05\x00')
+        _, out, _ = self.run_helper('add')
+        self.assertIn('already present', out)
+        self.assertEqual(self.var('BootOrder'), b'\x07\0\0\0' + b'\x01\x00\x00\x00\x05\x00')
+
+    def test_entry_order_last_appends(self):
+        self.disk.write_bytes(mbr_disk())
+        self.put_var('Boot0000', b'other')
+        self.put_var('BootOrder', b'\x00\x00')
+        self.run_helper('add', order='last')
+        self.assertEqual(self.var('BootOrder'), b'\x07\0\0\0' + b'\x00\x00\x01\x00')
+        rc, _, err = self.run_helper('add', ok=False, order='middle')
+        self.assertNotEqual(rc, 0)
+        self.assertIn('ENTRY_ORDER', err)
 
     def test_add_again_reuses_the_entry(self):
         self.disk.write_bytes(mbr_disk())

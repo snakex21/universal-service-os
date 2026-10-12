@@ -1246,6 +1246,7 @@
   "boot.lx.image_disk_after_restart": "After the restart the disk starts by itself into {0}.",
   "boot.lx.image_disk_writing": "Writing the {0} image to the selected disk.",
   "boot.lx.image_disk_restart_notice": "After the restart the firmware starts this disk's UEFI entry and {0} starts from it. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
+  "boot.lx.image_disk_restart_notice_haiku": "After the restart the firmware starts this disk's UEFI entry and Haiku starts from it. To install Haiku permanently: Installer > Set up partitions > create a BFS partition in the free space. If the USOS stick starts instead, pick the disk in the firmware boot menu.",
   "boot.lx.w9x_csmwrap_copying": "Copying {0} Setup, the USOS helpers and CSMWrap to the selected disk.",
   "boot.lx.w9x_preparation_failed": "The Windows 9x preparation failed; see EFI/USOS/win9x/prepare.log",
   "boot.lx.w9x_start_the_prepared_disk": "{0}: start the prepared disk",
