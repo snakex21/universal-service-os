@@ -18,6 +18,11 @@ const icons = @import("icons.zig");
 const lang_file = @import("../i18n/lang_file.zig");
 const rgba_image = @import("rgba_image.zig");
 
+/// Solid chips (Badge.fill, Row.chips) are drawn only by 64-bit builds: the
+/// micro-Linux disk pickers use them; the i386 Legacy BIOS Core has a fixed
+/// size budget and never shows them.
+const solid_chips = @import("builtin").cpu.arch != .x86;
+
 pub const Fonts = text.Fonts;
 pub const Style = text.Style;
 pub const Key = lang_file.Key;
@@ -533,7 +538,7 @@ pub const Ui = struct {
         const h = self.px(24);
         const x = right -| w;
         const y = center_y -| (h / 2);
-        const colors: ToneColors = if (badge.fill) |fill| .{ .fill = fill, .text = self.textOn(fill) } else self.toneColors(badge.tone);
+        const colors: ToneColors = if (!solid_chips) self.toneColors(badge.tone) else if (badge.fill) |fill| .{ .fill = fill, .text = self.textOn(fill) } else self.toneColors(badge.tone);
         paint.roundRect(self.surface, x, y, w, h, h / 2, colors.fill, background);
         self.fonts.drawCentered(self.surface, x + w / 2, self.fonts.centeredTop(.small, center_y), .small, badge.text, colors.text, colors.fill);
         return x;
@@ -760,7 +765,7 @@ pub const Ui = struct {
                 right = self.badgeRight(right, center_y, badge, fill) -| self.px(12);
             }
         }
-        var chip_index = item.chips.len;
+        var chip_index = if (solid_chips) item.chips.len else 0;
         while (chip_index > 0) {
             chip_index -= 1;
             const chip = item.chips[chip_index];
@@ -769,7 +774,7 @@ pub const Ui = struct {
             if (!item.enabled) drawn = .{ .text = chip.text, .tone = .neutral };
             right = self.badgeRight(right, center_y, drawn, fill) -| self.px(8);
         }
-        if (item.chips.len > 0) right -|= self.px(4);
+        if (solid_chips and item.chips.len > 0) right -|= self.px(4);
         const text_w = right -| x;
         const title_color = if (!item.enabled) theme.disabled_text else theme.text;
         if (item.detail.len > 0) {
