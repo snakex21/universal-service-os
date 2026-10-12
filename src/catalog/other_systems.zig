@@ -15,6 +15,12 @@ pub const entries = [_]SystemEntry{
     other("freebsd", "FreeBSD", "FreeBSD"),
     other("reactos", "ReactOS", "ReactOS"),
     other("kolibrios", "KolibriOS", "KolibriOS"),
+    // Batch 2 (docs/custom-os-2026-10-11.md, section 6): official UEFI disk
+    // images, QEMU-verified with USB-only input.
+    other("openbsd", "OpenBSD", "OpenBSD"),
+    other("netbsd", "NetBSD", "NetBSD"),
+    other("9front", "Plan 9 (9front)", "9front"),
+    other("redox", "Redox OS", "Redox"),
     // Bring your own image: any hybrid ISO / disk image (UEFI loader or MBR).
     other("other-os", "Other system (own image)", "Other"),
 };

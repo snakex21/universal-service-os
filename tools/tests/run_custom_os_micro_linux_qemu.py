@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Custom OS image-to-disk through the REAL micro-Linux, then the X470-like boot.
 
-Step 620 for Haiku / FreeBSD / ReactOS / KolibriOS / FreeDOS / own images
+Step 620 for Haiku / FreeBSD / ReactOS / KolibriOS / FreeDOS / OpenBSD /
+NetBSD / 9front / Redox / own images
 (profile custom-image-uefi, docs/custom-os-2026-10-11.md) runs
 tools/image_disk_target.sh on the confirmed target disk. This test runs that
 script (and xp_csmwrap_esp.sh, which it calls for BIOS-only images) in the
@@ -17,7 +18,8 @@ Then --boot starts the written disk like the X470 without CSM: q35, OVMF
 (no CSM), ich9-ahci, qemu-xhci keyboard + mouse (no PS/2 devices are used:
 keys are sent to the USB keyboard), screenshots OUT/boot-*.png; --keys sends
 HMP sendkey lists at given seconds ("40:ret;60:tab,ret") to check the USB
-keyboard.
+keyboard; an item starting with "!" is raw HMP, "|"-separated
+("70:!mouse_move 200 100|mouse_button 1|mouse_button 0") for the USB mouse.
 
     python tools/tests/run_custom_os_micro_linux_qemu.py --image X.iso --system haiku --out DIR [--boot 150]
 
@@ -198,13 +200,22 @@ def boot(args, root: Path, out: Path, disk: Path) -> None:
            "-drive", f"file={disk.as_posix()},format=raw,if=none,id=t,cache=writeback", "-device", "ide-hd,drive=t,bus=ide.0",
            "-device", "qemu-xhci,id=xhci", "-device", "usb-kbd,bus=xhci.0", "-device", "usb-mouse,bus=xhci.0",
            "-vga", "std", "-display", "none", "-nic", "none", "-monitor", f"tcp:127.0.0.1:{port},server,nowait"]
+    if args.mmio32:
+        # Asks OVMF for no 64-bit MMIO window (the X470 keeps the AMD xHCI
+        # below 4 GiB). With the bundled OVMF (2026-10-12) the qemu-xhci BAR
+        # still lands at 0xC0_0000_0000, so this changes nothing yet.
+        cmd += ["-fw_cfg", "name=opt/ovmf/X-PciMmio64Mb,string=0"]
+    for extra in args.qemu_arg:
+        cmd += extra.split(" ", 1) if extra.startswith("-") and " " in extra else [extra]
+    if args.serial:
+        cmd += ["-serial", f"file:{(out / 'boot-serial.log').as_posix()}"]
     q = subprocess.Popen(cmd, stderr=(out / "boot-qemu.log").open("wb"))
     print("boot PID", q.pid, flush=True)
     keys = {}
     for item in filter(None, (args.keys or "").split(";")):
         t, k = item.split(":", 1)
         keys[int(t)] = k
-    shots = sorted({*range(20, args.boot + 1, 20), *(t + 8 for t in keys)})
+    shots = sorted({*range(args.shot_step, args.boot + 1, args.shot_step), *(t + 8 for t in keys)})
     try:
         time.sleep(2)
         mon = socket.create_connection(("127.0.0.1", port), timeout=10)
@@ -224,6 +235,13 @@ def boot(args, root: Path, out: Path, disk: Path) -> None:
             for t, k in keys.items():
                 if el >= t and ("k", t) not in done:
                     done.add(("k", t))
+                    if k.startswith("!"):
+                        # Raw HMP commands ("!mouse_move 40 30|mouse_button 1|mouse_button 0")
+                        # for the USB mouse.
+                        for one in k[1:].split("|"):
+                            hmp(one)
+                            time.sleep(0.3)
+                        continue
                     for one in k.split(","):
                         hmp(f"sendkey {one}")
                         time.sleep(0.2)
@@ -261,6 +279,10 @@ def main() -> int:
     p.add_argument("--keys", default="")
     p.add_argument("--boot-only", action="store_true", help="boot OUT/target.raw of an earlier run")
     p.add_argument("--tcg", action="store_true", help="boot under TCG (ReactOS stops under WHPX on this host)")
+    p.add_argument("--mmio32", action="store_true", help="OVMF: no 64-bit PCI MMIO window (BARs below 4 GiB)")
+    p.add_argument("--qemu-arg", action="append", default=[], help='boot: extra QEMU option ("-trace usb_xhci_*")')
+    p.add_argument("--shot-step", type=int, default=20, help="boot: seconds between screenshots")
+    p.add_argument("--serial", action="store_true", help="boot: COM1 to OUT/boot-serial.log")
     args = p.parse_args()
     root = Path(args.root)
     out = Path(args.out)

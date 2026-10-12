@@ -337,7 +337,7 @@
   "boot.category.dos.desc": "Sisteme DOS și imagini de pornire vechi",
   "boot.category.utilities.desc": "Instrumente de diagnosticare, recuperare și firmware",
   "boot.category.others": "Alte sisteme",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS și imagini proprii",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS și imagini proprii",
   "boot.category.power.desc": "Repornire, oprire sau configurarea firmware-ului",
   "boot.systems.subtitle": "Selectați un sistem, o distribuție sau un grup de utilitare",
   "boot.system.ready": "Pregătit",

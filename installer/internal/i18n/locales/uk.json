@@ -337,7 +337,7 @@
   "boot.category.dos.desc": "Системи DOS і застарілі завантажувальні образи",
   "boot.category.utilities.desc": "Засоби діагностики, відновлення та мікропрограми",
   "boot.category.others": "Інші системи",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS і власні образи",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS і власні образи",
   "boot.category.power.desc": "Перезапуск, вимкнення або вхід у налаштування мікропрограми",
   "boot.systems.subtitle": "Виберіть систему, дистрибутив або групу утиліт",
   "boot.system.ready": "Готово",

@@ -334,7 +334,7 @@
   "boot.category.dos.desc": "DOS-rendszerek és régi rendszerindító képek",
   "boot.category.utilities.desc": "Diagnosztikai, helyreállítási és firmware-eszközök",
   "boot.category.others": "Egyéb rendszerek",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS és saját lemezképek",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS és saját lemezképek",
   "boot.category.power.desc": "Újraindítás, leállítás vagy a firmware beállításai",
   "boot.systems.subtitle": "Válasszon rendszert, disztribúciót vagy segédprogram-csoportot",
   "boot.system.ready": "Kész",

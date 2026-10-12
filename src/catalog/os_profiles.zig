@@ -322,7 +322,7 @@ const nt4_ids = &[_][]const u8{ "windows-nt-4", "windows-nt-4-server", "windows-
 const posready_ids = &[_][]const u8{"windows-embedded-posready-2009"};
 /// Custom OS (src/catalog/other_systems.zig) and FreeDOS from UEFI: the image
 /// written to the target disk (docs/custom-os-2026-10-11.md).
-pub const custom_image_ids = &[_][]const u8{ "haiku", "freebsd", "reactos", "kolibrios", "other-os", "freedos" };
+pub const custom_image_ids = &[_][]const u8{ "haiku", "freebsd", "reactos", "kolibrios", "openbsd", "netbsd", "9front", "redox", "other-os", "freedos" };
 const nt3_ids = &[_][]const u8{ "windows-nt-3-51", "windows-nt-3-51-server", "windows-nt-3-5", "windows-nt-3-5-server", "windows-nt-3-1", "windows-nt-3-1-server" };
 
 const uefi_profiles = [_]Profile{

@@ -334,7 +334,7 @@
   "boot.category.dos.desc": "Συστήματα DOS και παλαιά είδωλα εκκίνησης",
   "boot.category.utilities.desc": "Εργαλεία διάγνωσης, ανάκτησης και υλικολογισμικού",
   "boot.category.others": "Άλλα συστήματα",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS και δικές σας εικόνες",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS και δικές σας εικόνες",
   "boot.category.power.desc": "Επανεκκίνηση, τερματισμός ή είσοδος στη ρύθμιση υλικολογισμικού",
   "boot.systems.subtitle": "Επιλέξτε σύστημα, διανομή ή ομάδα βοηθητικών προγραμμάτων",
   "boot.system.ready": "Έτοιμο",

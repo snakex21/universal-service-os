@@ -1,7 +1,7 @@
 #!/bin/sh
 # Custom OS from the UEFI menu (profile custom-image-uefi, experimental;
-# docs/custom-os-2026-10-11.md): Haiku, FreeBSD, ReactOS, KolibriOS, FreeDOS
-# and "bring your own image". Called by tools/w9x_csmwrap_prepare.sh (step
+# docs/custom-os-2026-10-11.md): Haiku, FreeBSD, ReactOS, KolibriOS, FreeDOS,
+# OpenBSD, NetBSD, 9front, Redox and "bring your own image". Called by tools/w9x_csmwrap_prepare.sh (step
 # 620) after the user picked and confirmed the disk.
 #
 # The official image is a hybrid disk image (Haiku anyboot ISO, FreeBSD

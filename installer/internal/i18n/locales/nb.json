@@ -334,7 +334,7 @@
   "boot.category.dos.desc": "DOS-systemer og eldre oppstartsbilder",
   "boot.category.utilities.desc": "Verktøy for diagnostikk, gjenoppretting og fastvare",
   "boot.category.others": "Andre systemer",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS og egne avbildninger",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS og egne avbildninger",
   "boot.category.power.desc": "Start på nytt, slå av eller åpne fastvareoppsettet",
   "boot.systems.subtitle": "Velg et system, en distribusjon eller en verktøygruppe",
   "boot.system.ready": "Klar",

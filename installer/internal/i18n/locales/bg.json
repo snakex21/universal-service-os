@@ -334,7 +334,7 @@
   "boot.category.dos.desc": "DOS системи и стари образи за зареждане",
   "boot.category.utilities.desc": "Инструменти за диагностика, възстановяване и фърмуер",
   "boot.category.others": "Други системи",
-  "boot.category.others.desc": "Haiku, FreeBSD, ReactOS, KolibriOS и собствени образи",
+  "boot.category.others.desc": "Haiku, BSD, Plan 9, Redox, ReactOS, KolibriOS и собствени образи",
   "boot.category.power.desc": "Рестартиране, изключване или вход в настройките на фърмуера",
   "boot.systems.subtitle": "Изберете система, дистрибуция или група помощни програми",
   "boot.system.ready": "Готово",
