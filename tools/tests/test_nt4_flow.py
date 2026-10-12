@@ -326,9 +326,13 @@ class Nt4Target(unittest.TestCase):
             r'ren %SystemRoot%\system32\rsaenh.dll rsaenh.128',
             'echo sp start (standard)',
             ':spsfx',
+            ':sppkg',
+            ':sprun',
             r'start /wait C:\USOS\NT4\SP6I386.EXE -u -z',
             ':nosp',
         ]
+        # The older self-extractor (no -x) skips the extraction.
+        self.assertLess(post.index(r'if exist C:\USOS\NT4\SPPKG.TXT goto sppkg'), post.index(r'SP6I386.EXE -x:'))
         positions = [post.index(item) for item in order]
         self.assertEqual(positions, sorted(positions))
         self.assertEqual(post.count(r'SP6X\update\update.exe -u -z'), 2)
@@ -340,6 +344,30 @@ class Nt4Target(unittest.TestCase):
                 self.assertNotIn('>', text_part[5:], line)
         # The flag is written only for a 128-bit CD.
         self.assertIn('if [ "$crypto" = high ]; then printf \'high\\r\\n\' > "$usos/CRYPTOHI.TXT"; fi', text)
+
+    def _sfx_kind(self, stub: bytes) -> tuple[str, bool]:
+        text = TARGET.read_text(encoding='utf-8')
+        start = text.index('    if head -c 16384 "$SP_EXE"')
+        end = text.index('    fi\n', start) + len('    fi\n')
+        tmp = Path(tempfile.mkdtemp(prefix='usos-nt4-sfx-'))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / 'SP6I386.EXE').write_bytes(stub + b'MSCF' + bytes(40000))
+        script = (f'set -eu\nSP_EXE={tmp.as_posix()}/SP6I386.EXE\nusos={tmp.as_posix()}\n'
+                  'log() { echo "$*"; }\n' + text[start:end])
+        rc, out, err = sh(script)
+        self.assertEqual(rc, 0, err)
+        return out.strip(), (tmp / 'SPPKG.TXT').exists()
+
+    def test_service_pack_self_extractor_kind(self):
+        # English SP6a re-release stub: " -X:" / " -Q " switch texts; the
+        # Polish SP6a (1999-12-15) stub has none and passes every argument
+        # to update.exe (X470 2026-10-12: its usage box stalled the install).
+        out, flag = self._sfx_kind(b'MZ' + bytes(3000) + b' -X:u\0 -Q u\0' + bytes(3000))
+        self.assertIn('with -x', out)
+        self.assertFalse(flag)
+        out, flag = self._sfx_kind(b'MZ' + bytes(3000) + b'temp\\ext\0' + bytes(2000))
+        self.assertIn('without -x', out)
+        self.assertTrue(flag)
 
     def test_finish_removes_the_extracted_service_pack(self):
         nt4 = Path(NT4).read_text(encoding='utf-8')
