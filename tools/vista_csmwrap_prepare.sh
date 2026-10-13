@@ -31,12 +31,16 @@ usos_vista_csmwrap_prepare() {
     VISTA_CSMWRAP_DIR=/mnt/esp/EFI/USOS/vista-csmwrap
     request=$VISTA_CSMWRAP_DIR/request.ini
     [ -f "$request" ] || stop 'the Vista CSMWrap request is missing on the USOS ESP'
+    # The previous run's log stays as prepare.log.previous (X470 2026-10-13:
+    # a retry after a failed run overwrote the first diagnosis).
+    mv -f "$VISTA_CSMWRAP_DIR/prepare.log" "$VISTA_CSMWRAP_DIR/prepare.log.previous" 2>/dev/null || true
     : > "$VISTA_CSMWRAP_DIR/prepare.log" 2>/dev/null || true
     [ -d /sys/firmware/efi ] || stop 'the Vista CSMWrap preparation requires UEFI'
-    for helper in target_disk_identity.sh xp_confirmation_ui.sh xp_menu_ui.sh xp_disk_overview.sh xp_detect_system.sh vista_csmwrap_target.sh answer_plan.sh; do
+    for helper in target_disk_identity.sh xp_confirmation_ui.sh xp_menu_ui.sh xp_disk_overview.sh xp_detect_system.sh vista_csmwrap_target.sh answer_plan.sh target_disk_wait.sh; do
         [ -r "/usr/lib/usos/$helper" ] || stop "$helper is missing"
     done
     . /usr/lib/usos/target_disk_identity.sh
+    . /usr/lib/usos/target_disk_wait.sh
     . /usr/lib/usos/xp_confirmation_ui.sh
     . /usr/lib/usos/answer_plan.sh
     xp_stage_set() { :; }
@@ -99,11 +103,9 @@ usos_vista_csmwrap_prepare() {
     CANDIDATES=/run/vista-candidates
     : > "$CANDIDATES"
     index=0
-    for attempt in 1 2 3 4 5 6 7 8 9 10; do
-        mdev -s 2>/dev/null || true
-        lsblk -dnpo NAME,TYPE 2>/dev/null | awk '$2 == "disk" { print $1 }' | grep -qv "^$USOS_DISK_DEVICE\$" && break
-        sleep 1
-    done
+    # Storage drivers may still be probing: wait for a non-USOS disk (10 s; up
+    # to 60 s while an NVMe controller has no disk yet, tools/target_disk_wait.sh).
+    usos_target_disk_wait "$USOS_DISK_DEVICE" vista_csmwrap_log 3 5 || true
     for candidate in $(lsblk -dnpo NAME,TYPE 2>/dev/null | awk '$2 == "disk" { print $1 }'); do
         ro=$(lsblk -dnro RO "$candidate" 2>/dev/null | head -n 1 || true)
         if [ "$candidate" = "$USOS_DISK_DEVICE" ]; then
@@ -116,6 +118,12 @@ usos_vista_csmwrap_prepare() {
             vista_csmwrap_log "DISK $candidate ACCEPT index=$index model=$(usos_disk_model "$candidate" || true) size=$(usos_disk_size "$candidate" || true)"
         fi
     done
+    if [ "$index" -eq 0 ]; then
+        # X470 2026-10-13: the log said only "REJECT USOS stick"; keep the
+        # disks, PCI storage controllers and kernel messages for the report.
+        usos_target_disk_report | usos_stick_write usos_esp_append "$VISTA_CSMWRAP_DIR/prepare.log" || true
+        stop "$(usos_target_disk_stop)"
+    fi
     [ "$index" -gt 0 ] || stop 'No target disk found (only the USOS stick). No disk was changed.'
 
     # Why the disk is chosen now (on the picker itself), then the XP erase

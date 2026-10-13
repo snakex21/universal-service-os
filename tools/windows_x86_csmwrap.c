@@ -22,6 +22,10 @@
  *                            of the installed Windows (a letter is given to
  *                            its volume when it has none), for the offline
  *                            USB 3 step of usos-x86-csmwrap.cmd.
+ *   disks                    read-only: every PhysicalDrive (bus, removable,
+ *                            size, partition style, MBR signature) and the
+ *                            expected signature; "before" logs the same, any
+ *                            other mode only when the disk is not found.
  *   stick                    read-only: logs the dirty bit of every volume on
  *                            a USB / removable disk (the USOS stick).
  *   after                    the Windows partition holds bootmgr and
@@ -93,13 +97,68 @@ static BOOL internal(HANDLE h) {
     STORAGE_DEVICE_DESCRIPTOR *d = (void *)out;
     return d->BusType != BusTypeUsb && !d->RemovableMedia;
 }
+/* ---- disk inventory for the log (X470 2026-10-13, B261013-184439) -------
+ * Windows 7 x86 to an NVMe disk stopped with "the prepared disk was not found
+ * exactly once" and "disks with the prepared MBR signature=0": the log did
+ * not say which PhysicalDrives this WinPE saw. Every PhysicalDrive that opens
+ * (or fails with anything but "not present") is described; read-only. */
+static void hex8(char *out, DWORD v) { for (int i = 7; i >= 0; i--) { DWORD d = v & 15; out[i] = (char)(d < 10 ? '0' + d : 'a' + d - 10); v >>= 4; } out[8] = 0; }
+static void logx(const char *text, DWORD v) { char d[12]; hex8(d, v); say("[X86_CSMWRAP] "); say(text); say("0x"); say(d); say("\r\n"); }
+static void sayn(DWORD v) { char d[24]; decimal(d, v); say(d); }
+static const char *bus_name(DWORD bus) {
+    static const char *names[] = {"unknown", "SCSI", "ATAPI", "ATA", "1394", "SSA", "Fibre", "USB", "RAID", "iSCSI", "SAS", "SATA", "SD", "MMC", "Virtual", "FileBackedVirtual", "Spaces", "NVMe", "SCM", "UFS"};
+    return bus < sizeof(names) / sizeof(names[0]) ? names[bus] : "other";
+}
+/* A descriptor string (vendor / product / serial): printable ASCII only. */
+static void say_field(const BYTE *out, DWORD got, DWORD offset) {
+    char text[48]; int n = 0;
+    if (offset && offset < got) for (DWORD i = offset; i < got && out[i] && n < 47; i++) if (out[i] >= 32 && out[i] < 127 && out[i] != '"') text[n++] = (char)out[i];
+    while (n && text[n - 1] == ' ') n--;
+    text[n] = 0;
+    { char *t = text; while (*t == ' ') t++; say(t); }
+}
+static void describe_disk(DWORD n, HANDLE h) {
+    STORAGE_PROPERTY_QUERY q = {StorageDeviceProperty, PropertyStandardQuery}; static BYTE out[1024]; DWORD got = 0;
+    say("[X86_CSMWRAP] PhysicalDrive"); sayn(n);
+    if (DeviceIoControl(h, IOCTL_STORAGE_QUERY_PROPERTY, &q, sizeof(q), out, sizeof(out), &got, 0) && got >= sizeof(STORAGE_DEVICE_DESCRIPTOR)) {
+        STORAGE_DEVICE_DESCRIPTOR *d = (void *)out;
+        say(" bus="); say(bus_name((DWORD)d->BusType)); say("("); sayn((DWORD)d->BusType); say(")");
+        say(" removable="); sayn(d->RemovableMedia ? 1 : 0);
+        say(" vendor=\""); say_field(out, got, d->VendorIdOffset); say("\" product=\""); say_field(out, got, d->ProductIdOffset);
+        say("\" serial=\""); say_field(out, got, d->SerialNumberOffset); say("\"");
+    } else { say(" descriptor-error="); sayn(GetLastError()); }
+    GET_LENGTH_INFORMATION length;
+    if (DeviceIoControl(h, IOCTL_DISK_GET_LENGTH_INFO, 0, 0, &length, sizeof(length), &got, 0)) { say(" size_mib="); sayn((DWORD)((ULONGLONG)length.Length.QuadPart >> 20)); }
+    else { say(" size-error="); sayn(GetLastError()); }
+    if (DeviceIoControl(h, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, 0, 0, buffer, sizeof(buffer), &got, 0) && got >= offsetof(DRIVE_LAYOUT_INFORMATION_EX, PartitionEntry)) {
+        DRIVE_LAYOUT_INFORMATION_EX *layout = (void *)buffer; char d[12];
+        if (layout->PartitionStyle == PARTITION_STYLE_MBR) { hex8(d, layout->Mbr.Signature); say(" style=MBR signature=0x"); say(d); }
+        else say(layout->PartitionStyle == PARTITION_STYLE_GPT ? " style=GPT" : " style=RAW");
+        say(" partition_entries="); sayn(layout->PartitionCount);
+    } else { say(" layout-error="); sayn(GetLastError()); }
+    say("\r\n");
+}
+
 /* The one internal MBR disk with the signature, and the partition number
- * Windows gave the prepared Windows partition (its start and length). */
-static BOOL find_disk(void) {
-    DWORD found = 0;
+ * Windows gave the prepared Windows partition (its start and length).
+ * verbose: every PhysicalDrive is described in the log (see above). */
+static BOOL find_disk(BOOL verbose) {
+    DWORD found = 0, absent = 0;
+    disk = 0xffffffff; windows_number = 0;
+    if (verbose) {
+        logx("expected MBR signature=", signature);
+        logn("expected Windows partition start LBA (low 32 bits)=", (DWORD)windows_start);
+        logn("expected Windows partition sectors (low 32 bits)=", (DWORD)windows_sectors);
+    }
     for (DWORD n = 0; n < 64; n++) {
         HANDLE h = disk_handle(n, GENERIC_READ);
-        if (h == INVALID_HANDLE_VALUE) continue;
+        if (h == INVALID_HANDLE_VALUE) {
+            DWORD error = GetLastError();
+            if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND) absent++;
+            else if (verbose) { say("[X86_CSMWRAP] PhysicalDrive"); sayn(n); say(" open failed, error="); sayn(error); say("\r\n"); }
+            continue;
+        }
+        if (verbose) describe_disk(n, h);
         DWORD got = 0;
         BOOL ok = internal(h) && DeviceIoControl(h, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, 0, 0, buffer, sizeof(buffer), &got, 0) && got >= offsetof(DRIVE_LAYOUT_INFORMATION_EX, PartitionEntry);
         CloseHandle(h);
@@ -112,6 +171,7 @@ static BOOL find_disk(void) {
             if (p->PartitionNumber && (ULONGLONG)p->StartingOffset.QuadPart == windows_start * 512 && (ULONGLONG)p->PartitionLength.QuadPart == windows_sectors * 512) windows_number = p->PartitionNumber;
         }
     }
+    if (verbose) logn("PhysicalDrive numbers 0-63 not present=", absent);
     logn("disks with the prepared MBR signature=", found);
     if (found != 1 || !windows_number) { logn("Windows partition number=", windows_number); return FALSE; }
     logn("target physical disk=", disk);
@@ -393,6 +453,10 @@ void entry(void) {
     }
     if (lstrcmpiW(args[1], L"stick") == 0) { stick_report(); ExitProcess(0); }
     if (lstrcmpiW(args[1], L"nodump") == 0) ExitProcess(no_dump_stack());
+    /* disks: read-only inventory of every PhysicalDrive (find_disk verbose);
+     * the expected signature from usos-csmwrap-target.ini when present.
+     * For a manual check in a WinPE command prompt; exit 0. */
+    if (lstrcmpiW(args[1], L"disks") == 0) { load_target(); find_disk(TRUE); ExitProcess(0); }
     /* setupver <setup.exe>: exit code = major * 10 + minor of the file version
      * (60 Vista / 2008, 61 Windows 7, 62 / 63 8.x, 100 Windows 10), 0 unknown.
      * usos-x86-csmwrap.cmd: NVMe target, Setup 6.0 / 6.1 only. */
@@ -405,7 +469,10 @@ void entry(void) {
     FIRMWARE_TYPE firmware;
     if (!GetFirmwareType(&firmware) || firmware != FirmwareTypeBios) { say("[X86_CSMWRAP] STOP: not booted in BIOS mode\r\n"); ExitProcess(2); }
     if (!load_target()) { say("[X86_CSMWRAP] STOP: usos-csmwrap-target.ini is invalid\r\n"); ExitProcess(3); }
-    if (!find_disk()) { say("[X86_CSMWRAP] STOP: the prepared disk was not found exactly once\r\n"); ExitProcess(4); }
+    /* "before" (the first call) describes every disk; a later call only when
+     * it fails (the inventory is read-only, so it simply runs again). */
+    BOOL verbose = lstrcmpiW(args[1], L"before") == 0;
+    if (!find_disk(verbose) && (verbose || !find_disk(TRUE))) { say("[X86_CSMWRAP] STOP: the prepared disk was not found exactly once\r\n"); ExitProcess(4); }
     BYTE s[512];
     if (!mbr_io(s, FALSE)) { logn("cannot read the target MBR, error=", GetLastError()); ExitProcess(5); }
     int staging = slot_of(s, staging_start, staging_sectors, TRUE), windows = slot_of(s, windows_start, windows_sectors, FALSE);

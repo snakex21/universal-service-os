@@ -560,6 +560,7 @@ def main() -> int:
             ("tools/partuuid_diagnostics.sh", "usr/lib/usos/partuuid_diagnostics.sh"),
             ("tools/device_guard.sh", "usr/lib/usos/device_guard.sh"),
             ("tools/target_disk_identity.sh", "usr/lib/usos/target_disk_identity.sh"),
+            ("tools/target_disk_wait.sh", "usr/lib/usos/target_disk_wait.sh"),
             ("tools/target_disk_guard.sh", "usr/lib/usos/target_disk_guard.sh"),
             ("tools/extract.sh", "usr/lib/usos/extract.sh"),
             ("tools/windows_setup_media.sh", "usr/lib/usos/windows_setup_media.sh"),
