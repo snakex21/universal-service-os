@@ -23,7 +23,13 @@ a copy cut to the ACPI 1.0 layout (revision 1, length 116, 32-bit fields
 filled). The 2000 ACPI HALs copy FADT.Length bytes into a fixed 0x84-byte
 buffer; a revision 3+ FADT (0xF4+ bytes) overwrites the HAL's MADT/IOAPIC
 data in HAL phase 0. The XSDT keeps the firmware FADT; XP and every other
-flow see no change from this option.
+flow see no change from this option. With the same option the DSDT and
+SSDTs reached through the RSDT are copies in which every static resource
+template's QWord Address Space descriptor reaching above 4 GiB is cleared
+(Min/Max/Translation/Length 0, the firmware's own "unused window" form):
+the 2000 acpi.sys keeps only the low 32 bits of a QWord Length and stops
+with STOP 0xA5 (0x2, ...) in its PCI root window check (QEMU q35's 64-bit
+window). The firmware tables and the XSDT view stay unchanged.
 
 Applies to CSMWrap 3.1.2 (808ac8e) with its seabios submodule (578d260b)
 after patches 0001-0005, patch -p1 from the top of the tree. Part of
@@ -104,7 +110,7 @@ diff -ruN a/src/csmwrap.c b/src/csmwrap.c
 diff -ruN a/src/usos_acpi10.c b/src/usos_acpi10.c
 --- a/src/usos_acpi10.c
 +++ b/src/usos_acpi10.c
-@@ -0,0 +1,345 @@
+@@ -0,0 +1,543 @@
 +/*
 + * USOS patch 0006: ACPI 1.0 view for legacy operating systems.
 + * See usos_acpi10.h. Own code from the public ACPI specification;
@@ -332,6 +338,190 @@ diff -ruN a/src/usos_acpi10.c b/src/usos_acpi10.c
 +    return n;
 +}
 +
++/*
++ * Legacy AML filter (Windows 2000 only, ops->legacy_fadt).
++ *
++ * The 2000 acpi.sys keeps only the low 32 bits of a QWord Address Space
++ * descriptor's Length (ACPI 6.5 6.4.3.5.1) when it turns a _CRS into an
++ * IO_RESOURCE_REQUIREMENTS_LIST, then checks every PCI root window for
++ * Max - Min + 1 == Length and stops with STOP 0xA5 (0x2, device extension,
++ * requirements list, error count) on a mismatch. A 64-bit MMIO window
++ * (QEMU q35: 0x100000000-0x8FFFFFFFF, Length 0x800000000) always trips it.
++ * The same acpi.sys skips descriptors whose Length is 0, which is how
++ * firmware itself marks an unused window (AMI CRS templates). So in every
++ * static resource template of the DSDT/SSDTs a QWord descriptor that
++ * reaches above 4 GiB gets Min/Max/Translation/Length 0: 2000 (no PAE use
++ * of PCI windows) could not use that space anyway.
++ *
++ * A resource template is a Buffer (AML 0x11 PkgLength BufferSize ByteList)
++ * whose initializer parses as small/large resource items ending with the
++ * End Tag exactly at the end of the initializer; anything else is left
++ * alone. Windows written at run time by the AML (CreateQWordField) are not
++ * covered.
++ */
++#define AML_BUFFER_OP 0x11u
++#define RES_QWORD_ADDR 0x8Au
++#define RES_QWORD_BODY 43u
++#define RES_END_TAG 0x0Fu
++
++/* PkgLength at p (ACPI 6.5 20.2.4): encoded size in bytes, 0 if invalid. */
++static uint32_t aml_pkglen(const uint8_t *p, const uint8_t *end, uint32_t *val)
++{
++    if (p >= end)
++        return 0;
++    uint32_t extra = p[0] >> 6;
++    if ((uint32_t)(end - p) < 1 + extra)
++        return 0;
++    if (extra == 0) {
++        *val = p[0] & 0x3Fu;
++        return 1;
++    }
++    if (p[0] & 0x30u)
++        return 0;
++    uint32_t v = p[0] & 0x0Fu;
++    for (uint32_t i = 0; i < extra; i++)
++        v |= (uint32_t)p[1 + i] << (4 + 8 * i);
++    *val = v;
++    return 1 + extra;
++}
++
++static bool qword_high(const uint8_t *d)
++{
++    /* Min 14, Max 22, Translation 30, Length 38 (from the tag byte). */
++    static const uint8_t offs[] = { 14, 22, 30, 38 };
++    for (unsigned i = 0; i < sizeof(offs); i++)
++        if (rd32(d + offs[i] + 4) != 0)
++            return true;
++    return false;
++}
++
++/*
++ * Resource template at [p, e): number of QWord descriptors above 4 GiB, or
++ * -1 if it is not a well-formed template. With apply, clears them.
++ */
++static int res_template_filter(uint8_t *p, uint8_t *e, bool apply)
++{
++    uint8_t *start = p;
++    int hits = 0;
++    while (p < e) {
++        uint8_t tag = p[0];
++        if (tag & 0x80u) {
++            if (e - p < 3)
++                return -1;
++            uint32_t l = (uint32_t)p[1] | ((uint32_t)p[2] << 8);
++            if ((uint32_t)(e - p) - 3 < l)
++                return -1;
++            if (tag == RES_QWORD_ADDR && l >= RES_QWORD_BODY && qword_high(p)) {
++                hits++;
++                if (apply) {
++                    for (unsigned i = 14; i < 46; i++)
++                        p[i] = 0;
++                }
++            }
++            p += 3 + l;
++        } else {
++            uint32_t l = tag & 7u;
++            if ((uint32_t)(e - p) - 1 < l)
++                return -1;
++            if (((tag >> 3) & 0x0Fu) == RES_END_TAG) {
++                if (l != 1 || p + 2 != e)
++                    return -1;
++                if (apply && hits && p[1] != 0) {
++                    /* Checksum in use: whole template sums to 0. */
++                    p[1] = 0;
++                    p[1] = (uint8_t)(0u - sum8(start, (uint32_t)(e - start)));
++                }
++                return hits;
++            }
++            p += 1 + l;
++        }
++    }
++    return -1;
++}
++
++/* AML table t (length len): QWord windows above 4 GiB in static templates. */
++static unsigned aml_legacy_filter(uint8_t *t, uint32_t len, bool apply)
++{
++    unsigned hits = 0;
++    uint8_t *end = t + len;
++    for (uint8_t *p = t + HDR_LEN; p + 4 < end; p++) {
++        if (*p != AML_BUFFER_OP)
++            continue;
++        uint32_t plen = 0;
++        uint32_t pl = aml_pkglen(p + 1, end, &plen);
++        if (!pl || plen <= pl || plen > (uint32_t)(end - (p + 1)))
++            continue;
++        uint8_t *q = p + 1 + pl;               /* BufferSize */
++        uint8_t *bend = p + 1 + plen;          /* end of the ByteList */
++        uint32_t size;
++        uint32_t sl;
++        switch (*q) {
++        case 0x0A: sl = 2; size = q + 1 < bend ? q[1] : 0; break;
++        case 0x0B: sl = 3; size = q + 2 < bend ? (uint32_t)q[1] | ((uint32_t)q[2] << 8) : 0; break;
++        case 0x0C: sl = 5; size = q + 4 < bend ? rd32(q + 1) : 0; break;
++        default: continue;
++        }
++        uint8_t *init = q + sl;
++        if (init + 2 > bend || (uint32_t)(bend - init) > size)
++            continue;
++        int n = res_template_filter(init, bend, false);
++        if (n > 0) {
++            hits += (unsigned)n;
++            if (apply)
++                res_template_filter(init, bend, true);
++        }
++        if (n >= 0)
++            p = bend - 1;                      /* a template holds no AML */
++    }
++    return hits;
++}
++
++/*
++ * Copy of the AML table at phys with the legacy filter applied; physical
++ * address of the copy, or 0 if nothing needed changing (or no memory).
++ */
++static uint32_t aml_legacy_copy(const struct usos_acpi10_ops *ops, uint32_t phys, const char *sig, uint32_t *flags)
++{
++    uint32_t len = 0;
++    uint8_t *t = map_table(ops, phys, &len);
++    if (!t || !sig_is(t, sig))
++        return 0;
++    unsigned hits = aml_legacy_filter(t, len, false);
++    if (hits == 0)
++        return 0;
++    uint64_t cphys = ops->alloc(ops->ctx, len);
++    uint8_t *copy = cphys ? ops->map(ops->ctx, cphys, len) : NULL;
++    if (!copy || cphys > 0xFFFFFFFFull - len) {
++        *flags |= USOS_ACPI10_ALLOC_FAILED;
++        LOG("USOS ACPI10: cannot allocate %s copy\n", sig);
++        return 0;
++    }
++    copy_bytes(copy, t, len);
++    aml_legacy_filter(copy, len, true);
++    fix_table_checksum(copy);
++    *flags |= USOS_ACPI10_AML_FILTERED;
++    LOG("USOS ACPI10: legacy %s copy at %x: %u QWord window(s) above 4 GiB cleared\n",
++        sig, (unsigned)cphys, hits);
++    return (uint32_t)cphys;
++}
++
++/* Make the RSDT ours (a copy) before an entry changes. */
++static bool own_rsdt(const struct usos_acpi10_ops *ops, uint8_t **rsdt, uint32_t *rsdt_phys, uint32_t rlen, uint32_t *flags)
++{
++    uint64_t rphys = ops->alloc(ops->ctx, rlen);
++    uint8_t *rcopy = rphys ? ops->map(ops->ctx, rphys, rlen) : NULL;
++    if (!rcopy || rphys > 0xFFFFFFFFull - rlen) {
++        *flags |= USOS_ACPI10_ALLOC_FAILED;
++        LOG("USOS ACPI10: cannot allocate RSDT copy\n");
++        return false;
++    }
++    copy_bytes(rcopy, *rsdt, rlen);
++    *rsdt = rcopy;
++    *rsdt_phys = (uint32_t)rphys;
++    *flags |= USOS_ACPI10_RSDT_COPIED;
++    return true;
++}
++
 +uint32_t usos_acpi10_fixup(const struct usos_acpi10_ops *ops, void *rsdp_v)
 +{
 +    uint8_t *rsdp = rsdp_v;
@@ -390,7 +580,11 @@ diff -ruN a/src/usos_acpi10.c b/src/usos_acpi10.c
 +        uint32_t plen = flen < sizeof(probe) ? flen : (uint32_t)sizeof(probe);
 +        copy_bytes(probe, fadt, plen);
 +        bool cut = ops->legacy_fadt && (flen > FADT_V1_LEN || fadt[8] != 1);
-+        if (fill_fadt(ops, probe, plen, false) == 0 && !cut)
++        unsigned need = fill_fadt(ops, probe, plen, false);
++        /* Windows 2000: DSDT copy without QWord windows above 4 GiB. */
++        uint32_t dsdt_new = ops->legacy_fadt && plen >= FADT_DSDT + 4
++            ? aml_legacy_copy(ops, rd32(probe + FADT_DSDT), "DSDT", &flags) : 0;
++        if (need == 0 && !cut && !dsdt_new)
 +            break;
 +        uint64_t cphys = ops->alloc(ops->ctx, flen);
 +        uint8_t *copy = cphys ? ops->map(ops->ctx, cphys, flen) : NULL;
@@ -411,27 +605,37 @@ diff -ruN a/src/usos_acpi10.c b/src/usos_acpi10.c
 +            copy[8] = 1;
 +            flags |= USOS_ACPI10_FADT_LEGACY;
 +        }
-+        fix_table_checksum(copy);
-+        if (!rsdt_ours) {
-+            uint64_t rphys = ops->alloc(ops->ctx, rlen);
-+            uint8_t *rcopy = rphys ? ops->map(ops->ctx, rphys, rlen) : NULL;
-+            if (!rcopy || rphys > 0xFFFFFFFFull - rlen) {
-+                flags |= USOS_ACPI10_ALLOC_FAILED;
-+                LOG("USOS ACPI10: cannot allocate RSDT copy\n");
-+                break;
++        if (dsdt_new) {
++            wr32(copy + FADT_DSDT, dsdt_new);
++            if (flen >= FADT_X_DSDT + 8 && rd64(copy + FADT_X_DSDT) != 0) {
++                wr32(copy + FADT_X_DSDT, dsdt_new);
++                wr32(copy + FADT_X_DSDT + 4, 0);
 +            }
-+            copy_bytes(rcopy, rsdt, rlen);
-+            rsdt = rcopy;
-+            rsdt_phys = (uint32_t)rphys;
-+            rsdt_ours = true;
-+            flags |= USOS_ACPI10_RSDT_COPIED;
 +        }
++        fix_table_checksum(copy);
++        if (!rsdt_ours && !own_rsdt(ops, &rsdt, &rsdt_phys, rlen, &flags))
++            break;
++        rsdt_ours = true;
 +        wr32(rsdt + HDR_LEN + 4 * i, (uint32_t)cphys);
 +        fix_table_checksum(rsdt);
 +        flags |= USOS_ACPI10_FADT_FIXED;
 +        LOG("USOS ACPI10: FADT copy at %x (%u fields filled), RSDT at %x\n",
 +            (unsigned)cphys, filled, (unsigned)rsdt_phys);
 +        break;
++    }
++
++    /* Windows 2000: SSDT copies without QWord windows above 4 GiB. */
++    if (ops->legacy_fadt) {
++        for (uint32_t i = 0; i < n; i++) {
++            uint32_t snew = aml_legacy_copy(ops, rd32(rsdt + HDR_LEN + 4 * i), "SSDT", &flags);
++            if (!snew)
++                continue;
++            if (!rsdt_ours && !own_rsdt(ops, &rsdt, &rsdt_phys, rlen, &flags))
++                break;
++            rsdt_ours = true;
++            wr32(rsdt + HDR_LEN + 4 * i, snew);
++            fix_table_checksum(rsdt);
++        }
 +    }
 +
 +    if (rsdt_ours) {
@@ -453,7 +657,7 @@ diff -ruN a/src/usos_acpi10.c b/src/usos_acpi10.c
 diff -ruN a/src/usos_acpi10.h b/src/usos_acpi10.h
 --- a/src/usos_acpi10.h
 +++ b/src/usos_acpi10.h
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,79 @@
 +/*
 + * USOS patch 0006: ACPI 1.0 view for legacy operating systems.
 + *
@@ -473,7 +677,11 @@ diff -ruN a/src/usos_acpi10.h b/src/usos_acpi10.h
 + *  3. RSDP copy: RsdtAddress, checksum and extended checksum.
 + *  4. Only with ops->legacy_fadt (Windows 2000): the RSDT FADT copy is cut
 + *     to the ACPI 1.0 layout (revision 1, length 116) even when no field
-+ *     needed filling.
++ *     needed filling, and the DSDT/SSDTs it reaches are copies in which
++ *     every static resource template's QWord Address Space descriptor that
++ *     reaches above 4 GiB is cleared (Min/Max/Translation/Length 0): the
++ *     2000 acpi.sys keeps only 32 bits of the Length and then stops with
++ *     STOP 0xA5 (0x2, ...) in its PCI root window check.
 + *
 + * A valid ACPI 1.0 view is left untouched. Written by the USOS project from
 + * the public ACPI specification (6.5, sections 5.2.5-5.2.9). Part of
@@ -516,6 +724,7 @@ diff -ruN a/src/usos_acpi10.h b/src/usos_acpi10.h
 +#define USOS_ACPI10_ALLOC_FAILED    0x20u
 +#define USOS_ACPI10_SKIPPED_HIGH    0x40u  /* XSDT entries above 4 GiB left out */
 +#define USOS_ACPI10_FADT_LEGACY     0x80u  /* RSDT FADT cut to revision 1, 116 bytes */
++#define USOS_ACPI10_AML_FILTERED    0x100u /* DSDT/SSDT copy: QWord windows above 4 GiB cleared */
 +
 +/*
 + * rsdp: CSMWrap's writable RSDP copy (20 bytes for revision 0, else

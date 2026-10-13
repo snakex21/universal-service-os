@@ -230,7 +230,8 @@ def boot(out, disk, tag, vga, accel, minutes, shots_every=3.0, run_through=False
     shutil.copyfile(OVMF_VARS, vars_copy)
     port = free_port()
     serial = shots / 'serial.log'
-    cmd = [QEMU, '-machine', 'pc', '-accel', accel, '-cpu', 'max', '-m', '1024', '-smp', '2',
+    # USOS_QEMU_MACHINE=q35: ACPI 2.0+ tables (FADT revision 3, 64-bit PCI window), the X470 class.
+    cmd = [QEMU, '-machine', os.environ.get('USOS_QEMU_MACHINE', 'pc'), '-accel', accel, '-cpu', 'max', '-m', '1024', '-smp', '2',
            '-drive', f'if=pflash,unit=0,format=raw,readonly=on,file={OVMF_CODE}',
            '-drive', f'if=pflash,unit=1,format=raw,file={vars_copy}',
            '-display', 'none', '-nic', 'none', '-serial', f'file:{serial}',
