@@ -41,6 +41,7 @@ pub const hashes = [_]u32{
     0x0366a7d5, // lx.detecting_usos_partitions
     0x6d3ee2fe, // lx.device_guard_runs_before_the_first_destructive_o
     0x42f61b3c, // lx.disk_prepared
+    0xd49c641f, // lx.disk_wait_nvme_countdown
     0x94ae85fb, // lx.disk_x
     0xf0f119eb, // lx.disks_smart
     0xb68b6f2a, // lx.disks_smart_2
@@ -91,6 +92,8 @@ pub const hashes = [_]u32{
     0xc9d96a0d, // lx.new_xpsetup_installer_partition_2_gib
     0x399e2996, // lx.no_disks_detected
     0x2be3334f, // lx.no_separate_xpsetup_partition_will_remain
+    0x5acb69c8, // lx.no_target_disk_no_nvme_controller
+    0x1d25b9a3, // lx.no_target_disk_nvme_no_disk
     0x76d8d357, // lx.no_unattended_file_selected_skipped
     0xf76a47e0, // lx.nt3_failed
     0xdc0d7b06, // lx.nt3_needs_vm
@@ -259,6 +262,7 @@ pub const english = [_][]const u8{
     "Detecting USOS partitions",
     "device_guard runs before the first destructive operation.",
     "Disk prepared",
+    "Waiting for the NVMe disk to appear: {0} s left.",
     "Disk: {0}",
     "DISKS & SMART",
     "Disks & SMART",
@@ -309,6 +313,8 @@ pub const english = [_][]const u8{
     "New XPSETUP installer partition: 2 GiB.",
     "No disks detected.",
     "No separate XPSETUP partition will remain.",
+    "No target disk found (only the USOS stick), and no NVMe controller is visible on PCI. If an NVMe disk is installed, shut the computer down completely (power off, not restart), wait a few seconds and try again. No disk was changed.",
+    "No target disk found: the NVMe controller is on PCI, but its disk did not appear within 60 s. Shut the computer down completely (power off, not restart) and try again. No disk was changed.",
     "No unattended file selected - skipped.",
     "The Windows NT 3.51 installation did not finish. The computer was not restarted; logs: EFI/USOS/win9x/nt4",
     "Windows NT 3.51 installs only in the VM on this PC, which is not available: {0}",

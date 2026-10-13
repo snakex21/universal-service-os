@@ -50,7 +50,9 @@ find "target_bus=nvme" "%~dp0usos-csmwrap-target.ini" >nul 2>&1 && set "USOS_NVM
 if defined USOS_NVME_TARGET call :nvme_setup
 if defined USOS_NVME_TARGET if errorlevel 1 exit /b 1
 "%~dp0usos-x86-csmwrap.exe" before "%USOS_ANSWER%" "%~dp0usos-csmwrap-unattend.xml" "%USOS_SETUP%"
-if errorlevel 1 exit /b 1
+set "USOS_BEFORE_RESULT=%errorlevel%"
+if "%USOS_BEFORE_RESULT%"=="4" call :disk_report
+if not "%USOS_BEFORE_RESULT%"=="0" exit /b 1
 echo [USOS] phase=launch-setup answer=%~dp0usos-csmwrap-unattend.xml
 "%~dp0usos-log-x86.exe"
 for %%S in ("%USOS_SETUP%") do pushd "%%~dpS"
@@ -75,6 +77,36 @@ set "USOS_FINALIZE_RESULT=%errorlevel%"
 if not "%USOS_FINALIZE_RESULT%"=="0" exit /b %USOS_FINALIZE_RESULT%
 echo [USOS] phase=reboot-after-success
 wpeutil reboot
+exit /b 0
+
+rem ---- the prepared disk was not found ("before" exit 4) -------------------
+rem X470 2026-10-13 (B261013-184439, Windows 7 x86 to an NVMe disk): the log
+rem said only "disks with the prepared MBR signature=0". Read-only report into
+rem the startup log (EFI\USOS\Logs on the stick): diskpart's disk and volume
+rem lists, and the storage controllers and disks with their PnP state and
+rem problem codes (pnputil /enum-devices, Windows 10 2004+ PE; wmic when the
+rem PE has it). Nothing is selected or changed.
+:disk_report
+echo [USOS] phase=x86-csmwrap-disk-report
+set "USOS_DP_SCRIPT=%TEMP%\usos-diskpart-list.txt"
+> "%USOS_DP_SCRIPT%" echo list disk
+>> "%USOS_DP_SCRIPT%" echo list volume
+echo [USOS] diskpart: list disk, list volume
+diskpart /s "%USOS_DP_SCRIPT%"
+set "USOS_PNPUTIL=%SystemRoot%\System32\pnputil.exe"
+if not exist "%USOS_PNPUTIL%" echo [USOS] pnputil.exe is not in this WinPE.
+if exist "%USOS_PNPUTIL%" for %%C in (SCSIAdapter HDC DiskDrive) do (
+    echo [USOS] pnputil /enum-devices /class %%C
+    "%USOS_PNPUTIL%" /enum-devices /class %%C
+)
+if exist "%USOS_PNPUTIL%" echo [USOS] pnputil /enum-devices /problem
+if exist "%USOS_PNPUTIL%" "%USOS_PNPUTIL%" /enum-devices /problem
+set "USOS_WMIC=%SystemRoot%\System32\wbem\wmic.exe"
+if not exist "%USOS_WMIC%" goto disk_report_done
+echo [USOS] wmic: storage controllers, disks and devices with a problem code
+"%USOS_WMIC%" path Win32_PnPEntity where "PNPClass='SCSIAdapter' or PNPClass='HDC' or PNPClass='DiskDrive' or ConfigManagerErrorCode<>0" get Name,PNPClass,Service,ConfigManagerErrorCode,DeviceID /format:list
+:disk_report_done
+"%~dp0usos-log-x86.exe"
 exit /b 0
 
 rem ---- USB 3 for the installed 32-bit Windows 7 (section 12.3) ------------
