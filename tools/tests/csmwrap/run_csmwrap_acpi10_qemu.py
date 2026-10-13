@@ -168,7 +168,7 @@ def boot(out: Path, overlay: Path, minutes: float, accel: str, machine: str = 'p
            '-drive', f'if=pflash,unit=1,format=raw,file={vars_copy}',
            '-display', 'none', '-nic', 'none', '-serial', f'file:{serial}',
            '-monitor', f'tcp:127.0.0.1:{port},server=on,wait=off',
-           '-drive', f'if=ide,index=0,format=qcow2,file={overlay}', '-vga', 'std']
+           '-drive', f'if=ide,index=0,format=qcow2,file={overlay}', '-vga', 'std'] + os.environ.get('USOS_QEMU_EXTRA', '').split()  # e.g. -global q35-pcihost.pci-hole64-size=0
     proc = subprocess.Popen([str(c) for c in cmd], stdout=subprocess.DEVNULL, stderr=open(out / 'qemu-stderr.log', 'wb'))
     result, screens, last = 'timeout', [], None
     start = time.time()

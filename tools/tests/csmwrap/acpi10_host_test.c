@@ -1,5 +1,6 @@
 /*
- * Host unit test for CSMWrap 3.1.2-usos5 patch 0006 (usos_acpi10.c).
+ * Host unit test for CSMWrap 3.1.2-usos5 patch 0006 (usos_acpi10.c: ACPI 1.0
+ * view, legacy FADT and the legacy AML filter for Windows 2000).
  * Built by tools/tests/csmwrap/test_csmwrap_acpi10.py with the sources taken
  * from the patch itself. SPDX-License-Identifier: GPL-2.0-or-later
  */
@@ -357,6 +358,166 @@ static void test_legacy_fadt_v1_unchanged(void)
     CHECK(fl == 0);
 }
 
+/* AML: Name(_CRS, Buffer(n){template}) with the given template. */
+static uint32_t aml_name_buffer(uint8_t *a, const char *name, const uint8_t *tpl, uint32_t n)
+{
+    uint32_t i = 0;
+    a[i++] = 0x08; memcpy(a + i, name, 4); i += 4;
+    a[i++] = 0x11;
+    uint32_t body = 2 + n;                 /* BytePrefix size + ByteList */
+    uint32_t plen = body + 2;              /* 2-byte PkgLength */
+    a[i++] = (uint8_t)(0x40 | (plen & 0x0F));
+    a[i++] = (uint8_t)(plen >> 4);
+    a[i++] = 0x0A; a[i++] = (uint8_t)n;
+    memcpy(a + i, tpl, n); i += n;
+    return i;
+}
+
+static uint32_t qword(uint8_t *d, uint64_t min, uint64_t max, uint64_t len)
+{
+    memset(d, 0, 46);
+    d[0] = 0x8A; d[1] = 43; d[2] = 0; d[3] = 0; d[4] = 0x0C; d[5] = 0x03;
+    w64(d + 14, min); w64(d + 22, max); w64(d + 38, len);
+    return 46;
+}
+
+static uint32_t dword_mem(uint8_t *d, uint32_t min, uint32_t max)
+{
+    memset(d, 0, 26);
+    d[0] = 0x87; d[1] = 23; d[4] = 0x0C; d[5] = 0x01;
+    w32(d + 10, min); w32(d + 14, max); w32(d + 22, max - min + 1);
+    return 26;
+}
+
+/* PCI root _CRS like QEMU q35: DWord window, QWord window above 4 GiB, a
+ * QWord window below 4 GiB, End (checksum byte ck). Returns length. */
+static uint32_t q35_template(uint8_t *t, uint8_t ck)
+{
+    uint32_t n = 0;
+    n += dword_mem(t + n, 0x40000000u, 0xDFFFFFFFu);
+    n += qword(t + n, 0x100000000ull, 0x8FFFFFFFFull, 0x800000000ull);
+    n += qword(t + n, 0xE0000000ull, 0xEFFFFFFFull, 0x10000000ull);
+    t[n++] = 0x79; t[n++] = 0;
+    if (ck) t[n - 1] = (uint8_t)-sum(t, n - 1);
+    return n;
+}
+
+#define BIGDSDT 0x7F001000u
+#define SSDT1 0x7F002000u
+
+static uint32_t setup_aml(int ssdt, uint8_t ck)
+{
+    setup(1, 0, 0);
+    uint8_t tpl[160];
+    uint32_t tn = q35_template(tpl, ck);
+    uint8_t *d = P(BIGDSDT);
+    hdr(BIGDSDT, "DSDT", 0);
+    uint32_t i = 36;
+    i += aml_name_buffer(d + i, "_CRS", tpl, tn);
+    /* not a template: bytes 0x8A inside a plain data buffer */
+    uint8_t junk[50]; memset(junk, 0x8A, sizeof junk);
+    i += aml_name_buffer(d + i, "JUNK", junk, sizeof junk);
+    w32(d + 4, i); fix(d);
+    uint8_t *f = P(FACP);
+    w32(f + 40, BIGDSDT); w64(f + 140, BIGDSDT); fix(f);
+    if (ssdt) {
+        uint8_t *s = P(SSDT1);
+        hdr(SSDT1, "SSDT", 0);
+        uint32_t j = 36 + aml_name_buffer(s + 36, "CRS2", tpl, tn);
+        w32(s + 4, j); fix(s);
+        hdr(RSDT, "RSDT", 52);
+        w32(P(RSDT) + 36, FACP); w32(P(RSDT) + 40, APIC); w32(P(RSDT) + 44, HPET); w32(P(RSDT) + 48, SSDT1);
+        fix(P(RSDT));
+    }
+    return tn;
+}
+
+/* Offset of the first template (Name _CRS) in an AML table built above. */
+#define TPL_OFF (36 + 10)
+
+static void check_filtered(const uint8_t *t, uint32_t tn)
+{
+    const uint8_t *tpl = t + TPL_OFF;
+    CHECK(tpl[0] == 0x87 && r32(tpl + 10) == 0x40000000u);           /* DWord kept */
+    const uint8_t *q = tpl + 26;
+    CHECK(q[0] == 0x8A && q[1] == 43 && q[4] == 0x0C);                 /* header kept */
+    int zero = 1;
+    for (int k = 14; k < 46; k++) if (q[k]) zero = 0;
+    CHECK(zero);                                                        /* high window cleared */
+    const uint8_t *q2 = q + 46;
+    CHECK(r32(q2 + 14) == 0xE0000000u && r32(q2 + 38) == 0x10000000u); /* low QWord kept */
+    CHECK(tpl[tn - 2] == 0x79);
+    CHECK(tpl[tn - 1] == 0 || sum(tpl, tn) == 0);
+}
+
+static void test_legacy_aml_dsdt_ssdt(void)
+{
+    printf("acpi_legacy_fadt: DSDT/SSDT copies without QWord windows above 4 GiB\n");
+    uint32_t tn = setup_aml(1, 0);
+    uint32_t dlen = r32(P(BIGDSDT) + 4), slen = r32(P(SSDT1) + 4);
+    uint8_t dorig[512], sorig[512];
+    memcpy(dorig, P(BIGDSDT), dlen); memcpy(sorig, P(SSDT1), slen);
+    ops.legacy_fadt = true;
+    uint32_t fl = run();
+    ops.legacy_fadt = false;
+    CHECK(fl & USOS_ACPI10_AML_FILTERED);
+    CHECK(fl & USOS_ACPI10_FADT_LEGACY);
+    CHECK(rsdp_ok());
+    CHECK(memcmp(dorig, P(BIGDSDT), dlen) == 0 && memcmp(sorig, P(SSDT1), slen) == 0); /* firmware untouched */
+    uint8_t *f = facp_of_copy();
+    CHECK(f && r32(f + 40) != BIGDSDT && sum(f, 116) == 0);
+    uint8_t *d = f ? map(NULL, r32(f + 40), 36) : NULL;
+    CHECK(d && !memcmp(d, "DSDT", 4) && r32(d + 4) == dlen && sum(d, dlen) == 0);
+    if (d) {
+        check_filtered(d, tn);
+        CHECK(memcmp(d + TPL_OFF + tn, dorig + TPL_OFF + tn, dlen - TPL_OFF - tn) == 0); /* JUNK unchanged */
+    }
+    uint32_t n = 0;
+    uint8_t *r = rsdt_of_copy(&n);
+    CHECK(r && n == 4 && sum(r, r32(r + 4)) == 0 && r32(r + 48) != SSDT1);
+    uint8_t *s = r ? map(NULL, r32(r + 48), 36) : NULL;
+    CHECK(s && !memcmp(s, "SSDT", 4) && sum(s, slen) == 0);
+    if (s) check_filtered(s, tn);
+    CHECK(r32(P(XSDT) + 36) == FACP && r32(P(FACP) + 40) == BIGDSDT); /* XSDT view unchanged */
+}
+
+static void test_legacy_aml_checksum(void)
+{
+    printf("acpi_legacy_fadt: End Tag checksum in use is recomputed\n");
+    uint32_t tn = setup_aml(0, 1);
+    ops.legacy_fadt = true;
+    uint32_t fl = run();
+    ops.legacy_fadt = false;
+    CHECK(fl & USOS_ACPI10_AML_FILTERED);
+    uint8_t *f = facp_of_copy();
+    uint8_t *d = f ? map(NULL, r32(f + 40), 36) : NULL;
+    CHECK(d && d[TPL_OFF + tn - 1] != 0 && sum(d + TPL_OFF, tn) == 0);
+    if (d) check_filtered(d, tn);
+}
+
+static void test_aml_untouched_without_option(void)
+{
+    printf("without acpi_legacy_fadt the DSDT/SSDTs stay as they are\n");
+    setup_aml(1, 0);
+    uint32_t fl = run();
+    CHECK(fl == 0);
+}
+
+static void test_legacy_v1_fadt_with_high_window(void)
+{
+    printf("acpi_legacy_fadt, revision 1 FADT (QEMU pc), DSDT with a high window: DSDT copy only\n");
+    setup_aml(0, 0);
+    uint8_t *f = P(FACP);
+    w32(f + 4, 116); f[8] = 1; fix(f);
+    ops.legacy_fadt = true;
+    uint32_t fl = run();
+    ops.legacy_fadt = false;
+    CHECK(fl & USOS_ACPI10_AML_FILTERED);
+    CHECK(!(fl & USOS_ACPI10_FADT_LEGACY));
+    uint8_t *c = facp_of_copy();
+    CHECK(c && c != P(FACP) && r32(c + 4) == 116 && r32(c + 40) != BIGDSDT && sum(c, 116) == 0);
+}
+
 int main(void)
 {
     test_valid_unchanged();
@@ -371,6 +532,10 @@ int main(void)
     test_legacy_fadt_valid_view();
     test_legacy_fadt_with_zero32();
     test_legacy_fadt_v1_unchanged();
+    test_legacy_aml_dsdt_ssdt();
+    test_legacy_aml_checksum();
+    test_aml_untouched_without_option();
+    test_legacy_v1_fadt_with_high_window();
     printf(fails ? "ACPI10-HOST-TEST FAIL (%d)\n" : "ACPI10-HOST-TEST PASS\n", fails);
     return fails ? 1 : 0;
 }

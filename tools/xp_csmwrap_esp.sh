@@ -17,7 +17,7 @@ TARGET_DEVICE=${TARGET_DEVICE:?TARGET_DEVICE is required}
 TAIL=${USOS_XP_ESP_TAIL_SECTORS:?USOS_XP_ESP_TAIL_SECTORS is required}
 SRC=${USOS_CSMWRAP_DIR:-/mnt/esp/EFI/USOS/csmwrap}
 ESP_SECTORS=131072
-PINNED=e659dd513d8649db16588c1385e9c340db24a083c7f7bc27fc5ff64a82bf1a68
+PINNED=1207f8cc287372b32cc3ddce2ea4cc67c022a8d7844f7651bff476ca3fb1598b
 # The LGPL obligations travel with the binary: licence texts, SOURCES.txt
 # (MODIFIED), the complete source archive and the USOS patches.
 CSMWRAP_FILES='LICENSE-CSMWrap-LGPL-2.1.txt COPYING-SeaBIOS-LGPLv3.txt COPYING-SeaBIOS-GPLv3.txt SOURCES.txt csmwrap-3.1.2-src.tar.xz'
