@@ -29,7 +29,7 @@ QEMU = ROOT / 'tools/qemu' / os.environ.get('USOS_QEMU_EXE', 'qemu-system-x86_64
 QEMU_IMG = ROOT / 'tools/qemu/qemu-img.exe'
 OVMF_CODE = ROOT / 'tools/qemu/share/edk2-x86_64-code.fd'
 OVMF_VARS = ROOT / 'tools/qemu/share/edk2-i386-vars.fd'
-CSMWRAP_DIR = ROOT / 'tools/vendor/csmwrap/3.1.2-usos4'  # the release binary (1.1; 1.0 shipped 3.1.2-usos1)
+CSMWRAP_DIR = ROOT / 'tools/vendor/csmwrap/3.1.2-usos5'  # the release binary (1.1; 1.0 shipped 3.1.2-usos1)
 
 SECTOR = 512
 ESP_SECTORS = 65536          # 32 MiB FAT16
@@ -152,7 +152,7 @@ def make_overlay(prepared, path, esp, ini, efi_path=None):
         assert hashlib.sha256(efi).hexdigest() == pinned, 'CSMWrap binary does not match manifest'
     else:
         efi = efi_path.read_bytes()
-    print('[ESP] CSMWrap', efi_path or 'pinned 3.1.2-usos4', hashlib.sha256(efi).hexdigest(), flush=True)
+    print('[ESP] CSMWrap', efi_path or 'pinned 3.1.2-usos5', hashlib.sha256(efi).hexdigest(), flush=True)
     part = path.with_suffix('.esp')
     part.write_bytes(build_fat16({'EFI/BOOT/BOOTX64.EFI': efi, 'EFI/BOOT/CSMWRAP.INI': ini.encode()}, start))
     # qemu-io 'write -s' reads its pattern file in text mode on Windows (stops at
@@ -325,7 +325,7 @@ def main():
     p.add_argument('--before-minutes', type=float, default=1.0)
     p.add_argument('--skip-before', action='store_true')
     p.add_argument('--run-through', action='store_true', help='keep running after text-mode copying (reboots, GUI Setup); frames every 20 s')
-    p.add_argument('--csmwrap-efi', type=Path, help='CSMWrap binary to test instead of the pinned 3.1.2-usos4 (e.g. tools/vendor/csmwrap/3.1.2/csmwrapx64.efi, upstream)')
+    p.add_argument('--csmwrap-efi', type=Path, help='CSMWrap binary to test instead of the pinned 3.1.2-usos5 (e.g. tools/vendor/csmwrap/3.1.2/csmwrapx64.efi, upstream)')
     p.add_argument('--verbose', choices=('true', 'false'), default='true', help='csmwrap.ini verbose value')
     p.add_argument('--tag', default='', help='suffix of the after-* screenshot folder')
     p.add_argument('--decoy', action='store_true', help='a bootable decoy disk on port 0 of the same AHCI controller (target on port 1); it must stay byte-identical')

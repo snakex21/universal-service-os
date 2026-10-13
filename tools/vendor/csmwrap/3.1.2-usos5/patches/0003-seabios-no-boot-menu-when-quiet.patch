@@ -1,0 +1,25 @@
+USOS 3.1.2-usos1 patch 3/3: no boot menu prompt or wait on a quiet boot
+
+csm_maininit adds the romfiles etc/show-boot-menu=0 and etc/boot-menu-wait=0
+(next to etc/extra-pci-roots) when csm_quiet(), so interactive_bootmenu
+returns at once: no "Press ESC for boot menu." and no 2.5 s wait.
+
+Applies to CSMWrap 3.1.2 (808ac8e) with its seabios submodule (578d260b),
+patch -p1 from the top of the tree. Part of CSMWrap 3.1.2-usos1, a MODIFIED
+version made by the USOS project (LGPL-2.1 / SeaBIOS LGPLv3).
+
+diff -ruN a/seabios/src/fw/csm.c b/seabios/src/fw/csm.c
+--- a/seabios/src/fw/csm.c
++++ b/seabios/src/fw/csm.c
+@@ -90,6 +90,11 @@
+                               (void *)csm_compat_table.ExtraPciRootListPointer,
+                               csm_compat_table.ExtraPciRootListCount);
+     }
++    // Quiet boot: no "Press ESC for boot menu" prompt and no wait.
++    if (csm_quiet()) {
++        const_romfile_add_int("etc/show-boot-menu", 0);
++        const_romfile_add_int("etc/boot-menu-wait", 0);
++    }
+     pci_probe_devices();
+ 
+     csm_compat_table.PnPInstallationCheckSegment = SEG_BIOS;

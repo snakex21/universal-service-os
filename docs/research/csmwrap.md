@@ -405,3 +405,16 @@ usb-storage: all `USOS-TARGET USOS-DECOY` with usos4; the usos3 control
 boots the decoy. XP SP3 PL (`run_csmwrap_xp_ovmf.py --decoy`) and 32-bit
 Windows 10 (`qemu_native.py`, `USOS_NATIVE_DECOY_SAME_CONTROLLER=1`) in
 csmwrap-integration 13.4.
+
+## 10. 3.1.2-usos5: ACPI 1.0 view for Windows 2000/XP (2026-10-13, branch `feature/csmwrap-acpi10`)
+
+Patch 0006 (`src/usos_acpi10.c`, own code from the ACPI specification):
+CSMWrap's RSDP copy gets an RSDT built from the XSDT when RsdtAddress is 0 or
+the RSDT is invalid, and a FADT copy with the 32-bit fields filled from the
+X_ fields when they are 0; with `acpi_legacy_fadt = true` in csmwrap.ini
+(written by `tools/xp_csmwrap_esp.sh` only for Windows 2000 with ACPI) the
+RSDT's FADT is cut to revision 1 / 116 bytes for the 2000 ACPI HALs. Binary
+`e659dd513d8649db16588c1385e9c340db24a083c7f7bc27fc5ff64a82bf1a68`, built
+twice identical in the pinned Alpine VM (xxd pin moved to 9.2.1178-r0; the
+unpatched build still matches upstream_rebuild). Details and the q35 A/B:
+docs/windows-2000-acpi-x470-2026-10-12.md, last section.
