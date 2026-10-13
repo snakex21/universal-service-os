@@ -151,11 +151,23 @@ class Nt6Flow(unittest.TestCase):
         self.assertIn('[ "$x86_self" = 1 ] || stop "No NVMe driver for 64-bit', gate)
         # Windows 7 x86 (hwcompat route + KB2990941/KB3087873 or usosnvme)
         # and Server 2008 x86 (signed usosnvme package, section 9) are
-        # allowed; Vista x86 still stops (docs/nvme-nt6-2026-10-12.md).
+        # allowed; Vista x86 only with DATA's nvme-experimental.txt (X470
+        # test), otherwise it stops (docs/nvme-nt6-2026-10-12.md).
         self.assertIn('case "$profile:$folder" in\n'
                       "                'win-nt6-x86-uefi-csmwrap:Windows 7'|'win-nt6-x86-uefi-csmwrap:Windows Server 2008') ;;\n"
-                      '                win-nt6-x86-uefi-csmwrap:*)\n'
+                      "                'win-nt6-x86-uefi-csmwrap:Windows Vista')\n"
+                      '                    [ -f "/mnt/data/Systems/Windows/$folder/Unattended/nvme-experimental.txt" ]'
+                      ' || stop "Windows Vista x86 on NVMe is experimental', gate)
+        self.assertIn('                win-nt6-x86-uefi-csmwrap:*)\n'
                       '                    stop "No NVMe support for 32-bit', gate)
+        # DATA is still mounted (read-only) when the gate runs.
+        flag = prep.index('nvme-experimental.txt')
+        self.assertLess(prep.index('mount -t ntfs3 -o ro,noatime "$DATA_PATH" /mnt/data'), flag)
+        self.assertLess(flag, prep.index('umount /mnt/data'))
+        # The OOBE gate (signed usosnvme staging) is not folder-specific:
+        # any NT 6.0.6002 x86 install, Vista SP2 as Server 2008 SP2.
+        oobe = (ROOT / 'tools/windows_vista_oobe_gate.c').read_text(encoding='utf-8')
+        self.assertNotIn('Server 2008', oobe[oobe.index('void entry(void)'):].split('#ifdef USOS_GATE_NATIVE_DEPLOY')[0])
         target = (ROOT / 'tools/vista_csmwrap_target.sh').read_text(encoding='utf-8')
         self.assertIn('/dev/nvme*) target_bus=nvme', target)
         self.assertIn(r'target_bus=%s\r\n', target)

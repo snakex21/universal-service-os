@@ -146,9 +146,14 @@ usos_vista_csmwrap_prepare() {
             # 2008 x86: the installed system stages the signed usosnvme
             # package before specialize (section 9, QEMU PASS 2026-10-13;
             # without it specialize installed the NULL driver -> STOP 0x7B).
-            # Vista x86 takes the same path but has no full pass yet: stops.
+            # Vista x86 takes the same path but has no full pass yet: only
+            # with DATA's Unattended\nvme-experimental.txt (X470 test, as
+            # Windows 2000 in legacy_xp_staging.sh); otherwise it stops.
             case "$profile:$folder" in
                 'win-nt6-x86-uefi-csmwrap:Windows 7'|'win-nt6-x86-uefi-csmwrap:Windows Server 2008') ;;
+                'win-nt6-x86-uefi-csmwrap:Windows Vista')
+                    [ -f "/mnt/data/Systems/Windows/$folder/Unattended/nvme-experimental.txt" ] || stop "Windows Vista x86 on NVMe is experimental (usosnvme): put an empty nvme-experimental.txt into Systems\\Windows\\$folder\\Unattended to try it. No disk was changed."
+                    vista_csmwrap_log "NVME Windows Vista x86 experimental (nvme-experimental.txt)" ;;
                 win-nt6-x86-uefi-csmwrap:*)
                     stop "No NVMe support for 32-bit $NT5_NAME yet. Pick a SATA disk. No disk was changed." ;;
             esac ;;
