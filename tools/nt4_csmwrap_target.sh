@@ -298,6 +298,19 @@ nt31_layout() {
     log "local source: $(find "$ls_dir" -type f | wc -l | tr -d ' ') files (NT 3.1 layout)"
 }
 
+# NVMe target: usosnvme (own GPL miniport, tools/nt/usosnvme; the NT 3.x
+# builds scan every PCI bus through CF8h/CFCh, so the PCI BIOS the NT 3.x MBR
+# hides does not matter) as \USOS\NT3\USOSNVME.SYS. NT 3.5x: USOSNT3.EXE
+# copies and registers it when present; NT 3.1: POST.CMD copies it and
+# INITIAL.INF [UsosNt31Post] (nt31_initial_inf, nt4_qemu_install.sh) writes
+# its key. The install VM runs on IDE / am53c974 and never starts it. A SATA
+# target never gets the file.
+nt3_nvme_stage() {
+    [ -n "$nvme" ] || return 0
+    cp "$drv/$nvme_sys" "$usos/USOSNVME.SYS" || fail "cannot copy $nvme_sys"
+    log "storage: NVMe target $TARGET_DEVICE, usosnvme ($nvme_sys) staged next to AHCINT"
+}
+
 # NT 3.1: \USOS\NT3 with the NT 3.1 driver builds; GUI Setup (the patched
 # INITIAL.INF, nt31_initial_inf) copies and registers them itself.
 nt31_usos() {
@@ -306,6 +319,7 @@ nt31_usos() {
     cp "$drv/$ahci" "$usos/AHCINT.SYS" || fail "cannot copy $ahci"
     cp "$drv/$rst" "$usos/USOSRST.SYS" || fail "cannot copy $rst"
     cp "$drv/$usb" "$usos/USOSUSB.SYS" || fail "cannot copy $usb"
+    nt3_nvme_stage
     log 'display: VGA (640x480x16)'
     printf 'answer=%s\r\nversion=%s.%s\r\n' "$ANSWER_KIND" "$major" "$minor" > "$usos/SOURCE.TXT"
     # The names GUI Setup would ask for (WINNT.SIF [UserData]; NT 3.1 has no
@@ -324,7 +338,9 @@ echo USOS NT 3.1 post > C:\USOS\NT3\POST.LOG
 copy C:\USOS\NT3\AHCINT.SYS C:\WINNT\SYSTEM32\DRIVERS\AHCINT.SYS >> C:\USOS\NT3\POST.LOG
 copy C:\USOS\NT3\USOSRST.SYS C:\WINNT\SYSTEM32\DRIVERS\USOSRST.SYS >> C:\USOS\NT3\POST.LOG
 copy C:\USOS\NT3\USOSUSB.SYS C:\WINNT\SYSTEM32\DRIVERS\USOSUSB.SYS >> C:\USOS\NT3\POST.LOG
+if exist C:\USOS\NT3\USOSNVME.SYS copy C:\USOS\NT3\USOSNVME.SYS C:\WINNT\SYSTEM32\DRIVERS\USOSNVME.SYS >> C:\USOS\NT3\POST.LOG
 if not exist C:\WINNT\SYSTEM32\DRIVERS\AHCINT.SYS echo AHCINT.SYS copy FAILED >> C:\USOS\NT3\POST.LOG
+if exist C:\USOS\NT3\USOSNVME.SYS if not exist C:\WINNT\SYSTEM32\DRIVERS\USOSNVME.SYS echo USOSNVME.SYS copy FAILED >> C:\USOS\NT3\POST.LOG
 echo done > C:\USOS\NT3\DONE.TXT
 EOF
 }
@@ -399,11 +415,13 @@ case "$nt3:$minor" in
     *) fail "of the NT 3.x family only NT 3.51, 3.5 and 3.1 are supported so far (MinorVersion=${minor:-none})" ;;
 esac
 # NVMe target gate, before any write (docs/nvme-nt6-2026-10-12.md): NT 4.0
-# gets usosnvme below; the NT 3.x builds exist but are not wired yet.
+# and NT 3.x get usosnvme below (NT 3.5x: NT351 build, NT 3.1: NT31 build;
+# docs/nvme-nt-2026-10-11.md section 9).
+nvme=''
 case "$TARGET_DEVICE" in /dev/nvme*)
+    nvme=yes
     nvme_lbs=$(cat "/sys/class/block/${TARGET_DEVICE##*/}/queue/logical_block_size" 2>/dev/null || echo unknown)
-    [ "$nvme_lbs" = 512 ] || fail "the NVMe target uses $nvme_lbs-byte sectors; Windows NT needs 512-byte sectors. No disk was changed"
-    [ -z "$nt3" ] || fail "no NVMe driver for Windows NT 3.x in this flow yet; pick a SATA disk. No disk was changed" ;;
+    [ "$nvme_lbs" = 512 ] || fail "the NVMe target uses $nvme_lbs-byte sectors; Windows NT needs 512-byte sectors. No disk was changed" ;;
 esac
 [ -z "${NT_MINOR:-}" ] || [ "$NT_MINOR" = "$minor" ] || fail "the ISO is Windows NT $major.$minor Setup, not the chosen NT $major.$NT_MINOR system"
 mbr_code=$LIB/xp-geometry-fix-mbr-440.bin
@@ -425,6 +443,11 @@ rst=USOSRST.SYS
 # Kf*Irql in the 3.1 kernel / HAL): AHCINT31.SYS, USOSRST31.SYS, USOSUSB31.SYS.
 ahci=AHCINT.SYS usb=USOSUSB.SYS
 [ -z "$nt31" ] || { rst=USOSRST31.SYS ahci=AHCINT31.SYS usb=USOSUSB31.SYS; }
+# usosnvme for an NVMe target: NT 3.1 build USOSNVME31.SYS, NT 3.5x build
+# USOSNVME.SYS (both in $LIB/nt3); NT 4.0 takes $LIB/nt4/USOSNVME.SYS below.
+nvme_sys=USOSNVME.SYS
+[ -z "$nt31" ] || nvme_sys=USOSNVME31.SYS
+[ -z "$nvme" ] || [ -r "$drv/$nvme_sys" ] || fail "missing: $drv/$nvme_sys (NVMe driver). No disk was changed"
 if [ -n "$nt31" ]; then
     for file in $ahci $rst $usb; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
 elif [ -n "$nt3" ]; then
@@ -599,6 +622,7 @@ for file in AHCINT.SYS USOSUSB.SYS USOSNT3.EXE; do
     cp "$drv/$file" "$usos/$file" || fail "cannot copy $file"
 done
 cp "$drv/$rst" "$usos/USOSRST.SYS" || fail "cannot copy $rst"
+nt3_nvme_stage
 # Text-mode Setup runs AUTOCHK.EXE from the local source on C: ("Checking
 # drive C:"); in the QEMU install VM that run overflows a kernel stack and
 # the VM triple-faults (2026-10-08: double fault -> STOP 0x7F 8 while the

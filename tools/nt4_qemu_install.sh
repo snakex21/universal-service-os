@@ -81,13 +81,14 @@ nt31_vm_tick() {
 # answers it with ENTER); at the end the USOS
 # section (drivers and their Services keys) and the restart without the
 # "Setup is done" page. 1 when an anchor is missing (another INITIAL.INF).
+# $5 = nvme: also the usosnvme Services key (NVMe target).
 # $4 = net (Advanced Server, STF_PRODUCT LanmanNT): the network stays on.
 # 3.1 AS is always a domain controller; without the network WinLogon refuses
 # every logon ("Unable to log you on because the netlogon service is not
 # running", QEMU 2026-10-10), so its Setup installs the MS Loopback Adapter
 # (nt31_ntlanman_inf) and creates the domain.
 nt31_initial_inf() {
-    awk -v BINMODE=3 -v full="$1" -v org="$2" -v comp="$3" -v net="${4:-}" '
+    awk -v BINMODE=3 -v full="$1" -v org="$2" -v comp="$3" -v net="${4:-}" -v nvme="${5:-}" '
         function out(t) { printf "%s\r\n", t }
         { line = $0; sub(/\r$/, "", line); low = tolower(line); gsub(/[ \t]/, "", low) }
         low ~ /^\[/ { sec = low }
@@ -106,6 +107,8 @@ nt31_initial_inf() {
             out("[UsosNt31Post]")
             out("    OpenRegKey $(!REG_H_LOCAL) \"\" \"system\\CurrentControlSet\\services\" 33554432 UsosSvc")
             svc("ahcint", 1, 0, 1, "SCSI miniport")
+            # NVMe target: usosnvme (NT31 build; POST.CMD copies the file).
+            if (nvme == "nvme") svc("usosnvme", 1, 0, 1, "SCSI miniport")
             svc("usosrst", 1, 0, 0, "SCSI miniport")
             par("usosrst", "{HpetLegacyOff,0,$(!REG_VT_DWORD),1},{RtcFix,0,$(!REG_VT_DWORD),1}")
             # usosusb as a boot driver: as a system driver (Start 1) NT 3.1
@@ -158,7 +161,10 @@ nt31_vm_patch_initial() {
             nt31_vm_patch_file "$img" NTLANMAN.INF nt31_ntlanman_inf &&
                 nt31_vm_patch_file "$img" OEMNADLB.INF nt31_oemnadlb_inf || { rm -f "$inf"; return 1; }
         fi
-        nt31_initial_inf "$(value fullname)" "$(value org)" "$(value computer)" "$NT31_NET" < "$inf" > "$inf.new" || { rm -f "$inf" "$inf.new"; return 1; }
+        # NVMe target: nt4_csmwrap_target.sh staged USOS/NT3/USOSNVME.SYS.
+        NT31_NVME=''
+        ! MTOOLS_SKIP_CHECK=1 mdir -i "$img" ::/USOS/NT3/USOSNVME.SYS >/dev/null 2>&1 || NT31_NVME=nvme
+        nt31_initial_inf "$(value fullname)" "$(value org)" "$(value computer)" "$NT31_NET" "$NT31_NVME" < "$inf" > "$inf.new" || { rm -f "$inf" "$inf.new"; return 1; }
         MTOOLS_SKIP_CHECK=1 mcopy -o -i "$img" "$inf.new" ::/WINNT/SYSTEM32/INITIAL.INF || { rm -f "$inf" "$inf.new"; return 1; }
     fi
     rm -f "$inf" "$inf.new"
