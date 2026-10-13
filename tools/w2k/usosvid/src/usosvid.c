@@ -426,9 +426,10 @@ ImageBase(ULONG Address)
     return 0;
 }
 
-/* "name+offset", or "sz<SizeOfImage>+offset" without an export directory. */
+/* "name+offset", or "sz<SizeOfImage>+offset" without an export directory;
+   WithOffset FALSE: the name only. */
 static PCHAR
-PutModule(PCHAR p, PCHAR end, ULONG Address)
+PutModuleEx(PCHAR p, PCHAR end, ULONG Address, BOOLEAN WithOffset)
 {
     ULONG base = ImageBase(Address), nt, exp, name = 0, i;
     volatile CHAR *s;
@@ -444,9 +445,12 @@ PutModule(PCHAR p, PCHAR end, ULONG Address)
         p = PutStr(p, end, "sz");
         p = PutHex(p, end, Rd(nt + 0x50), 6);
     }
+    if (!WithOffset) return p;
     p = PutStr(p, end, "+");
     return PutHex(p, end, Address - base, 6);
 }
+
+#define PutModule(p, end, a) PutModuleEx(p, end, a, TRUE)
 
 /* Base 0 = idle sample, 1 = frame outside any image. */
 static VOID
@@ -507,7 +511,9 @@ HbDpc(IN PKDPC Dpc, IN PVOID Context, IN PVOID Arg1, IN PVOID Arg2)
     }
 
     p = PutStr(line, end, "hb t=");
-    p = PutHex(p, end, KeTickCount.LowPart, 8);
+    /* KeTickCount is a data import: the symbol is the import slot, which
+       holds the variable's address. Only the low dword is shown. */
+    p = PutHex(p, end, *(volatile ULONG *)*(PULONG *)&KeTickCount, 8);
     p = PutStr(p, end, " n=");
     p = PutHex(p, end, g_HbCount, 4);
     p = PutStr(p, end, onDpc ? " dpcstk" : " thrstk");
@@ -538,7 +544,7 @@ HbDpc(IN PKDPC Dpc, IN PVOID Context, IN PVOID Arg1, IN PVOID Arg2)
         p = PutStr(p, end, " ");
         if (g_Hist[i].Base == 0) p = PutStr(p, end, "idle");
         else if (g_Hist[i].Base == 1) p = PutStr(p, end, "?");
-        else p = PutModule(p, end, g_Hist[i].Base);
+        else p = PutModuleEx(p, end, g_Hist[i].Base, FALSE);
         p = PutStr(p, end, "=");
         p = PutHex(p, end, g_Hist[i].Hits, 4);
     }

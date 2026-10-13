@@ -8,9 +8,9 @@
   "imports": "ntoskrnl: MmMapIoSpace, MmUnmapIoSpace, MmIsAddressValid, KeTickCount, KeInitializeDpc, KeInitializeTimerEx, KeSetTimerEx, KeCancelTimer, memset (all exported by the Windows 2000 SP4 kernels)",
   "use": "Windows 2000 text-mode Setup with ACPI on: $WIN_NT$.~BT\\BOOTVID.DLL only (tools/w2k_stage.sh 8.)",
   "files": {
-    "bin/i386/bootvid.dll": "f9dcd33fdf34614f68b22cbf0853f7e9e337d1a5d50c4f494cafd2ed2cd4b772",
+    "bin/i386/bootvid.dll": "4e402aa11aee2630ff00b82a66c053b9748a9821bb0fd0286efea57250f45036",
     "build.cmd": "7f4ff4a185f4a8597fcec7fade7fb966b0c75e73848eee558ad389132d37e42c",
-    "src/usosvid.c": "55f9af6af74cf42c8a3694685f02db2b529c5bcad18184ba2734a74182509bf6",
+    "src/usosvid.c": "9aab07c6d64be745357ffbf57510fb33e854fe8d36ab6919432fc3babb8311d9",
     "src/usosvid.def": "dbbf9892496612f965b2846063a3307788404bb41116a6f5b910bbfe32c67357",
     "src/sources": "5ba2ab894680c5433e56282cb84462932fd762af725435132ad90a7467deb798",
     "src/makefile": "7289517c7028ff031a48cc84f6308a437c3abe6e046c93f3132255221842d433"
