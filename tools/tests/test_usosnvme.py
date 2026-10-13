@@ -108,6 +108,32 @@ class Flow(unittest.TestCase):
         self.assertIn('("tools/nt/usosnvme/bin/NT4/i386/usosnvme.sys", "usr/lib/usos/nt4/USOSNVME.SYS")', build)
 
 
+class Nt3Flow(unittest.TestCase):
+    """NT 3.1 / 3.5 / 3.51 (docs/nvme-nt-2026-10-11.md section 9): the NT31 /
+    NT351 builds staged as USOS/NT3/USOSNVME.SYS only for an NVMe target,
+    registered by USOSNT3.EXE (3.5x) or INITIAL.INF [UsosNt31Post] (3.1)."""
+
+    def test_target_script(self):
+        nt4 = (ROOT / 'tools/nt4_csmwrap_target.sh').read_text(encoding='utf-8')
+        self.assertIn('[ -z "$nt31" ] || nvme_sys=USOSNVME31.SYS', nt4)
+        self.assertIn('cp "$drv/$nvme_sys" "$usos/USOSNVME.SYS"', nt4)
+        self.assertIn('    [ -n "$nvme" ] || return 0', nt4)
+        self.assertEqual(nt4.count('nt3_nvme_stage\n'), 2)
+        self.assertLess(nt4.index('fail "missing: $drv/$nvme_sys'), nt4.index('of="$TARGET_DEVICE"'))
+        self.assertIn(r'if exist C:\USOS\NT3\USOSNVME.SYS copy', nt4)
+
+    def test_nt31_initial_inf(self):
+        inst = (ROOT / 'tools/nt4_qemu_install.sh').read_text(encoding='utf-8')
+        self.assertIn('if (nvme == "nvme") svc("usosnvme", 1, 0, 1, "SCSI miniport")', inst)
+        self.assertIn('::/USOS/NT3/USOSNVME.SYS', inst)
+
+    def test_usosnt3(self):
+        src = (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='utf-8')
+        self.assertIn('DIR "USOSNVME.SYS"', src)
+        self.assertIn('set_dword("usosnvme", NULL, "Start", 0);', src)
+        self.assertIn(b'USOSNVME.SYS', (ROOT / 'tools/nt3/usosnt3/bin/i386/usosnt3.exe').read_bytes())
+
+
 class Nt6Flow(unittest.TestCase):
     """Windows 7 / Vista / Server 2008 x86 through CSMWrap (x86 PE10 donor):
     the NVMe gate in micro-Linux, target_bus in the target record and the
@@ -136,7 +162,8 @@ class Nt6Flow(unittest.TestCase):
 
     def test_other_flows_stop(self):
         nt4 = (ROOT / 'tools/nt4_csmwrap_target.sh').read_text(encoding='utf-8')
-        self.assertLess(nt4.index('no NVMe driver for Windows NT 3.x'), nt4.index('of="$TARGET_DEVICE"'))
+        self.assertNotIn('no NVMe driver for Windows NT 3.x', nt4)
+        self.assertLess(nt4.index('[ "$nvme_lbs" = 512 ] || fail'), nt4.index('of="$TARGET_DEVICE"'))
         pos = (ROOT / 'tools/posready_csmwrap_target.sh').read_text(encoding='utf-8')
         self.assertLess(pos.index('no NVMe driver for POSReady 2009'), pos.index('of="$TARGET_DEVICE"'))
 

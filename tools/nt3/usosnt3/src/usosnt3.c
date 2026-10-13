@@ -29,7 +29,8 @@
  * program early (INITIAL.INF StartDetachedProcess); it only writes the
  * Services\usosnt3 key (own-process Win32 service, automatic, LocalSystem).
  * At the first start of the installed system the service:
- *   1. copies C:\USOS\NT3\{AHCINT,USOSRST,USOSUSB}.SYS to system32\drivers;
+ *   1. copies C:\USOS\NT3\{AHCINT,USOSRST,USOSUSB}.SYS to system32\drivers
+ *      (+ USOSNVME.SYS for an NVMe target, when the target script staged it);
  *   2. writes their Services keys (the values of the NT 4.0 DRIVERS.REG) and
  *      Kbdclass/Mouclass ConnectMultiplePorts = 1;
  *   3. turns atdisk, atapi and (when installed) amsint off (the real machine
@@ -232,7 +233,7 @@ static void restart(void)
 static void post(void)
 {
     static const char *const drivers[] = { "AHCINT", "USOSRST", "USOSUSB" };
-    static const char *const keys[] = { "ahcint", "usosrst", "usosusb", "atdisk", "atapi", "i8042prt",
+    static const char *const keys[] = { "ahcint", "usosnvme", "usosrst", "usosusb", "atdisk", "atapi", "i8042prt",
                                         "Kbdclass", "Mouclass", "vga", "VgaSave", "amsint", "Scsidisk" };
     static const char ver[] = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion";
     char sys[MAX_PATH], src[MAX_PATH], dst[MAX_PATH], key[128];
@@ -256,6 +257,21 @@ static void post(void)
         say(CopyFileA(src, dst, FALSE) ? "copied " : "COPY FAILED ");
         say(dst);
         say("\r\n");
+    }
+    /* NVMe target (docs/nvme-nt-2026-10-11.md): usosnvme (NT351 build, PCI
+       config through CF8h/CFCh) next to AHCINT, only when
+       nt4_csmwrap_target.sh staged it (a SATA install never gets it). */
+    lstrcpyA(src, DIR "USOSNVME.SYS");
+    if (GetFileAttributesA(src) != 0xFFFFFFFF) {
+        lstrcpyA(dst, sys);
+        lstrcatA(dst, "\\drivers\\usosnvme.sys");
+        say(CopyFileA(src, dst, FALSE) ? "copied " : "COPY FAILED ");
+        say(dst);
+        say("\r\n");
+        set_dword("usosnvme", NULL, "Type", 1);
+        set_dword("usosnvme", NULL, "Start", 0);
+        set_dword("usosnvme", NULL, "ErrorControl", 1);
+        set_sz("usosnvme", "Group", REG_SZ, "SCSI miniport");
     }
     /* The values of the NT 4.0 DRIVERS.REG (tools/nt4_csmwrap_target.sh). */
     set_dword("ahcint", NULL, "Type", 1);

@@ -192,6 +192,8 @@ def overlay(scripts: bool, answer: Path | None = None, sp: Path | None = None, n
         # --nvme: this checkout's usosnvme builds (a package built before them has none).
         for variant, name in (("NT4", "nt4/USOSNVME.SYS"), ("NT351", "nt3/USOSNVME.SYS"), ("NT31", "nt3/USOSNVME31.SYS")):
             add("usr/lib/usos/" + name, (ROOT / "tools/nt/usosnvme/bin" / variant / "i386/usosnvme.sys").read_bytes())
+        # and this checkout's USOSNT3.EXE (registers usosnvme on NT 3.5x).
+        add("usr/lib/usos/nt3/USOSNT3.EXE", (ROOT / "tools/nt3/usosnt3/bin/i386/usosnt3.exe").read_bytes())
     if scripts:
         for name in SCRIPTS:
             add("usr/lib/usos/" + name, (ROOT / "tools" / name).read_bytes(), 0o100755)
@@ -276,23 +278,33 @@ def install(args, out: Path, target: Path) -> bool:
         stderr.close()
 
 
-def boot(out: Path, target: Path, seconds: int, cpu: str = "EPYC-Rome", nvme: bool = False) -> None:
-    """X470-like boot of the finished disk; screenshots only (the user logs on by hand there)."""
+def boot(out: Path, target: Path, seconds: int, cpu: str = "EPYC-Rome", nvme: bool = False,
+         nvme_high: bool = False, persist: bool = False, prefix: str = "boot") -> None:
+    """X470-like boot of the finished disk; screenshots only (the user logs on by hand there).
+
+    nvme_high: the NVMe sits behind the LAST root port (bus 13, past the 12
+    others), like the X470's Micron on bus 7 behind its GPP bridges: with
+    more than 8 buses the NT 3.x MBR hides the PCI BIOS, so usosnvme's own
+    CF8h/CFCh scan must reach it. persist: writes go to the disk (no
+    snapshot), for a reboot check; the run ends with a hard stop."""
     vars_ = out / "vars.fd"
     shutil.copyfile(OVMF_VARS, vars_)
     port = free_port()
     cmd = [str(QEMU), "-machine", "q35", "-accel", "tcg", "-cpu", cpu, "-smp", "2", "-m", "2048",
            "-drive", f"if=pflash,unit=0,format=raw,readonly=on,file={OVMF_CODE.as_posix()}",
            "-drive", f"if=pflash,unit=1,format=raw,file={vars_.as_posix()}",
-           "-drive", f"file={target.as_posix()},format=qcow2,if=none,id=t,snapshot=on",
+           "-drive", f"file={target.as_posix()},format=qcow2,if=none,id=t" + ("" if persist else ",snapshot=on"),
            # --nvme: the NVMe controller behind a PCIe root port (bus 1+), as on the X470's M.2.
-           *(["-device", "pcie-root-port,id=rpn,chassis=20,slot=20", "-device", "nvme,drive=t,serial=NT-NVME-TARGET,bus=rpn"] if nvme else ["-device", "ide-hd,drive=t,bus=ide.0"]),
+           *(["-device", "pcie-root-port,id=rpn,chassis=20,slot=20", "-device", "nvme,drive=t,serial=NT-NVME-TARGET,bus=rpn"] if nvme and not nvme_high
+             else [] if nvme else ["-device", "ide-hd,drive=t,bus=ide.0"]),
            "-display", "none", "-nic", "none", "-vga", "std",
            "-device", "qemu-xhci,id=xhci", "-device", "usb-kbd,bus=xhci.0", "-device", "usb-mouse,bus=xhci.0",
            "-monitor", f"tcp:127.0.0.1:{port},server=on,wait=off"]
     for i in range(12):
         cmd += ["-device", f"pcie-root-port,id=rp{i},chassis={i + 1},slot={i + 1}"]
-    q = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=(out / "boot-qemu.log").open("wb"))
+    if nvme and nvme_high:
+        cmd += ["-device", "pcie-root-port,id=rpn,chassis=20,slot=20", "-device", "nvme,drive=t,serial=NT-NVME-TARGET,bus=rpn"]
+    q = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=(out / f"{prefix}-qemu.log").open("wb"))
     try:
         for _ in range(100):
             try:
@@ -326,12 +338,26 @@ def boot(out: Path, target: Path, seconds: int, cpu: str = "EPYC-Rome", nvme: bo
         while time.time() - t0 < seconds and q.poll() is None:
             time.sleep(30)
             n += 1
-            shot(f"boot-{n:02d}")
+            shot(f"{prefix}-{n:02d}")
             print(f"boot screenshot {n} at {int(time.time() - t0)} s", flush=True)
         hmp("sendkey ctrl-alt-delete", 5)
-        shot("boot-cad")
+        shot(f"{prefix}-cad")
+        if persist:
+            # User name (empty after Setup on NT 3.5x, the last user later,
+            # Administrator on 3.1; with a name filled in the focus starts in
+            # Password): Alt+U, clear, type Administrator; Alt+P, clear.
+            for field, text in (("u", "administrator"), ("p", "")):
+                hmp(f"sendkey alt-{field}", 1)
+                hmp("sendkey end", 0.5)
+                for _ in range(24):
+                    hmp("sendkey backspace", 0.2)
+                for ch in text:
+                    hmp(f"sendkey {ch}", 0.3)
         hmp("sendkey ret", 60)
-        shot("boot-logon")
+        shot(f"{prefix}-logon")
+        if persist:
+            hmp("sendkey ret", 30)  # NT 3.1 / 3.5: a "logon message" or tutorial box, if any
+            shot(f"{prefix}-desktop")
     finally:
         q.kill()
         q.wait()
@@ -354,6 +380,8 @@ def main() -> int:
     p.add_argument("--boot-only", action="store_true")
     p.add_argument("--boot-seconds", type=int, default=420)
     p.add_argument("--nvme", action="store_true", help="target on an NVMe controller (install and boot; usosnvme)")
+    p.add_argument("--nvme-high", action="store_true", help="--boot: NVMe behind the last root port (bus 13; NT 3.x hidden PCI BIOS case)")
+    p.add_argument("--reboots", type=int, default=0, help="--boot: N more boots on the same disk (writes kept, hard stop between)")
     p.add_argument("--qemu", type=Path, help="host qemu-system-x86_64 to use (default: ROOT/tools/qemu)")
     args = p.parse_args()
     set_root(args.root)
@@ -376,7 +404,11 @@ def main() -> int:
         if not ok:
             return 1
     if args.boot or args.boot_only:
-        boot(args.out, target, args.boot_seconds, args.boot_cpu, args.nvme)
+        persist = args.reboots > 0
+        boot(args.out, target, args.boot_seconds, args.boot_cpu, args.nvme, args.nvme_high, persist)
+        for n in range(args.reboots):
+            print(f"reboot {n + 1}", flush=True)
+            boot(args.out, target, args.boot_seconds, args.boot_cpu, args.nvme, args.nvme_high, persist, f"reboot{n + 1}")
     return 0
 
 
