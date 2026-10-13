@@ -1242,6 +1242,7 @@
   "boot.lx.disk_wait_nvme_countdown": "NVMe diskinin görünmesi bekleniyor: {0} sn kaldı.",
   "boot.lx.no_target_disk_no_nvme_controller": "Hedef disk bulunamadı (yalnızca USOS belleği) ve PCI üzerinde hiçbir NVMe denetleyicisi görünmüyor. Bir NVMe disk takılıysa bilgisayarı tamamen kapatın (kapatma, yeniden başlatma değil), birkaç saniye bekleyin ve yeniden deneyin. Hiçbir disk değiştirilmedi.",
   "boot.lx.no_target_disk_nvme_no_disk": "Hedef disk bulunamadı: NVMe denetleyicisi PCI üzerinde, ancak diski 60 sn içinde görünmedi. Bilgisayarı tamamen kapatın (kapatma, yeniden başlatma değil) ve yeniden deneyin. Hiçbir disk değiştirilmedi.",
+  "boot.lx.nvme_x86_csmwrap_not_supported": "NVMe üzerinde 32 bit {0} bu kurulum yolunda henüz desteklenmiyor. Hiçbir disk değiştirilmedi.",
   "boot.lx.w9x_csmwrap_why": "CSM olmadan {0} CSMWrap üzerinden başlar, bu yüzden USOS önce hedef diski hazırlar.",
   "boot.lx.w9x_csmwrap_layout": "Yeni düzen (MBR): {1} için {0} (C: sürücüsü), ardından diskin sonunda 64 MiB CSMWrap bölümü; geri kalanı ayrılmamış kalır.",
   "boot.lx.w9x_csmwrap_after_restart": "Yeniden başlatmadan sonra disk kendiliğinden başlar ve {0} kurulumu onun üzerinde devam eder.",

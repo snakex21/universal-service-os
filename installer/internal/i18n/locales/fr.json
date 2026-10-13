@@ -1242,6 +1242,7 @@
   "boot.lx.disk_wait_nvme_countdown": "En attente du disque NVMe : encore {0} s.",
   "boot.lx.no_target_disk_no_nvme_controller": "Aucun disque cible trouvé (seulement la clé USOS) et aucun contrôleur NVMe n'est visible sur le bus PCI. Si un disque NVMe est installé, éteignez complètement l'ordinateur (arrêt, pas redémarrage), attendez quelques secondes et réessayez. Aucun disque n'a été modifié.",
   "boot.lx.no_target_disk_nvme_no_disk": "Aucun disque cible trouvé : le contrôleur NVMe est sur le bus PCI, mais son disque n'est pas apparu en 60 s. Éteignez complètement l'ordinateur (arrêt, pas redémarrage) et réessayez. Aucun disque n'a été modifié.",
+  "boot.lx.nvme_x86_csmwrap_not_supported": "{0} 32 bits sur NVMe n'est pas encore pris en charge par ce mode d'installation. Aucun disque n'a été modifié.",
   "boot.lx.w9x_csmwrap_why": "Sans CSM, {0} démarre via CSMWrap, donc USOS prépare d'abord le disque cible.",
   "boot.lx.w9x_csmwrap_layout": "Nouvelle disposition (MBR) : {0} (lecteur C:) pour {1}, puis une partition CSMWrap de 64 Mio à la fin du disque ; le reste reste non alloué.",
   "boot.lx.w9x_csmwrap_after_restart": "Après le redémarrage, le disque démarre seul et l'installation de {0} s'y poursuit.",

@@ -1242,6 +1242,7 @@
   "boot.lx.disk_wait_nvme_countdown": "Odotetaan NVMe-levyn ilmestymistä: {0} s jäljellä.",
   "boot.lx.no_target_disk_no_nvme_controller": "Kohdelevyä ei löytynyt (vain USOS-tikku), eikä PCI-väylällä näy NVMe-ohjainta. Jos koneessa on NVMe-levy, sammuta tietokone kokonaan (sammutus, ei uudelleenkäynnistys), odota muutama sekunti ja yritä uudelleen. Mitään levyä ei muutettu.",
   "boot.lx.no_target_disk_nvme_no_disk": "Kohdelevyä ei löytynyt: NVMe-ohjain on PCI-väylällä, mutta sen levy ei ilmestynyt 60 sekunnissa. Sammuta tietokone kokonaan (sammutus, ei uudelleenkäynnistys) ja yritä uudelleen. Mitään levyä ei muutettu.",
+  "boot.lx.nvme_x86_csmwrap_not_supported": "32-bittistä {0}-järjestelmää NVMe-levylle ei vielä tueta tällä asennustavalla. Mitään levyä ei muutettu.",
   "boot.lx.w9x_csmwrap_why": "Ilman CSM:ää {0} käynnistyy CSMWrapin kautta, joten USOS valmistelee ensin kohdelevyn.",
   "boot.lx.w9x_csmwrap_layout": "Uusi asettelu (MBR): {0} (asema C:) järjestelmälle {1}, sitten 64 MiB:n CSMWrap-osio levyn lopussa; loput jää varaamatta.",
   "boot.lx.w9x_csmwrap_after_restart": "Uudelleenkäynnistyksen jälkeen levy käynnistyy itsestään ja {0}-asennus jatkuu sillä.",

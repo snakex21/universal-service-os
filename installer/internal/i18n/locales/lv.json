@@ -1245,6 +1245,7 @@
   "boot.lx.disk_wait_nvme_countdown": "Gaida NVMe diska parādīšanos: atlikušas {0} s.",
   "boot.lx.no_target_disk_no_nvme_controller": "Mērķa disks netika atrasts (tikai USOS zibatmiņa), un PCI kopnē nav redzams neviens NVMe kontrolleris. Ja ir uzstādīts NVMe disks, pilnībā izslēdziet datoru (izslēgšana, nevis restartēšana), pagaidiet dažas sekundes un mēģiniet vēlreiz. Neviens disks netika mainīts.",
   "boot.lx.no_target_disk_nvme_no_disk": "Mērķa disks netika atrasts: NVMe kontrolleris ir PCI kopnē, bet tā disks 60 s laikā neparādījās. Pilnībā izslēdziet datoru (izslēgšana, nevis restartēšana) un mēģiniet vēlreiz. Neviens disks netika mainīts.",
+  "boot.lx.nvme_x86_csmwrap_not_supported": "32 bitu {0} uz NVMe diska šajā instalēšanas ceļā vēl netiek atbalstīts. Neviens disks netika mainīts.",
   "boot.lx.w9x_csmwrap_why": "Bez CSM {0} startē caur CSMWrap, tāpēc USOS vispirms sagatavo mērķa disku.",
   "boot.lx.w9x_csmwrap_layout": "Jauns izkārtojums (MBR): {0} (disks C:) sistēmai {1}, pēc tam 64 MiB CSMWrap nodalījums diska beigās; pārējais paliek nepiešķirts.",
   "boot.lx.w9x_csmwrap_after_restart": "Pēc restartēšanas disks startēs pats, un {0} instalēšana turpināsies tajā.",

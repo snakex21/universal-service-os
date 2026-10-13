@@ -1242,6 +1242,7 @@
   "boot.lx.disk_wait_nvme_countdown": "Aguardando o disco NVMe aparecer: faltam {0} s.",
   "boot.lx.no_target_disk_no_nvme_controller": "Nenhum disco de destino encontrado (apenas o pendrive USOS) e nenhum controlador NVMe está visível no PCI. Se houver um disco NVMe instalado, desligue o computador completamente (desligar, não reiniciar), aguarde alguns segundos e tente novamente. Nenhum disco foi alterado.",
   "boot.lx.no_target_disk_nvme_no_disk": "Nenhum disco de destino encontrado: o controlador NVMe está no PCI, mas o disco dele não apareceu em 60 s. Desligue o computador completamente (desligar, não reiniciar) e tente novamente. Nenhum disco foi alterado.",
+  "boot.lx.nvme_x86_csmwrap_not_supported": "{0} de 32 bits em NVMe ainda não é compatível com este caminho de instalação. Nenhum disco foi alterado.",
   "boot.lx.w9x_csmwrap_why": "Sem CSM, o {0} inicia pelo CSMWrap, então o USOS prepara primeiro o disco de destino.",
   "boot.lx.w9x_csmwrap_layout": "Novo layout (MBR): {0} (unidade C:) para {1}, depois uma partição CSMWrap de 64 MiB no fim do disco; o resto fica não alocado.",
   "boot.lx.w9x_csmwrap_after_restart": "Após a reinicialização o disco inicia sozinho e a instalação do {0} continua nele.",

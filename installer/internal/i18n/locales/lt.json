@@ -1245,6 +1245,7 @@
   "boot.lx.disk_wait_nvme_countdown": "Laukiama, kol atsiras NVMe diskas: liko {0} s.",
   "boot.lx.no_target_disk_no_nvme_controller": "Tikslinis diskas nerastas (tik USOS atmintukas), o PCI magistralėje nematyti jokio NVMe valdiklio. Jei NVMe diskas įdiegtas, visiškai išjunkite kompiuterį (išjungimas, ne paleidimas iš naujo), palaukite kelias sekundes ir bandykite dar kartą. Joks diskas nepakeistas.",
   "boot.lx.no_target_disk_nvme_no_disk": "Tikslinis diskas nerastas: NVMe valdiklis yra PCI magistralėje, bet jo diskas neatsirado per 60 s. Visiškai išjunkite kompiuterį (išjungimas, ne paleidimas iš naujo) ir bandykite dar kartą. Joks diskas nepakeistas.",
+  "boot.lx.nvme_x86_csmwrap_not_supported": "32 bitų {0} NVMe diske šiuo diegimo būdu dar nepalaikoma. Joks diskas nepakeistas.",
   "boot.lx.w9x_csmwrap_why": "Be CSM {0} paleidžiama per CSMWrap, todėl USOS pirmiausia paruošia tikslinį diską.",
   "boot.lx.w9x_csmwrap_layout": "Naujas išdėstymas (MBR): {0} (diskas C:) sistemai {1}, tada 64 MiB CSMWrap skaidinys disko gale; likusi dalis lieka nepaskirstyta.",
   "boot.lx.w9x_csmwrap_after_restart": "Po paleidimo iš naujo diskas pasileis pats ir {0} diegimas jame tęsis.",

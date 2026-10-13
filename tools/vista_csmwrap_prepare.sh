@@ -137,34 +137,32 @@ usos_vista_csmwrap_prepare() {
     while :; do
         TARGET_DEVICE=''
         usos_xp_choose_disk
-        # NVMe target gate (docs/nvme-nt6-2026-10-12.md), before the erase
-        # confirmation: CSMWrap's SeaBIOS boots only 512-byte LBAs; 32-bit
-        # 8.1 / 10 have stornvme; 32-bit 7 / Vista / 2008 (x86 PE10 donor):
-        # Setup runs from a sources copy whose hwcompat.txt lists the NVMe
-        # class, the installed system gets KB2990941 + KB3087873 (7, DATA)
-        # or usosnvme after Setup (usos-x86-csmwrap.cmd :nvme_setup / :nvme);
-        # 64-bit Vista / 2008 would need a signed x64 driver.
+        # NVMe target gate (docs/nvme-nt6-2026-10-12.md section 12), before
+        # the erase confirmation. X470 2026-10-13 (B261013-211100, Micron
+        # 3400): in the x86 PE10 under CSMWrap, stornvme started and the disk
+        # enumerated, but every size / layout IOCTL failed (433) and diskpart
+        # showed 0 B; afterwards the controller was gone from PCI until a
+        # full power-off. Every 32-bit NT6 flow on this path runs that
+        # stornvme (8.1 / 10 x86 in Setup itself, 7 / Vista / 2008 x86 in
+        # the PE10 donor), so all of them stop here, without the
+        # nvme-experimental.txt override. The hwcompat / KB2990941 /
+        # signed-usosnvme code in windows_x86_csmwrap.cmd stays in place,
+        # dormant (target_bus=nvme is never written). 64-bit Vista / 2008
+        # would need a signed x64 driver. To reopen: drop the profile stops
+        # below; the 512-byte LBA check then applies again.
         case "$TARGET_DEVICE" in /dev/nvme*)
             nvme_lbs=$(cat "/sys/class/block/${TARGET_DEVICE##*/}/queue/logical_block_size" 2>/dev/null || echo unknown)
-            vista_csmwrap_log "NVME $TARGET_DEVICE logical_block=$nvme_lbs profile=$profile"
-            [ "$nvme_lbs" = 512 ] || stop "The NVMe disk uses $nvme_lbs-byte sectors; $NT5_NAME through CSMWrap needs 512-byte sectors (switch the namespace to a 512-byte LBA format first). No disk was changed."
+            vista_csmwrap_log "NVME $TARGET_DEVICE logical_block=$nvme_lbs profile=$profile folder=$folder"
             [ "$x86_self" = 1 ] || stop "No NVMe driver for 64-bit $NT5_NAME yet (it would need a signed x64 driver). Pick a SATA disk. No disk was changed."
-            # Windows 7 x86 is allowed (docs/nvme-nt6-2026-10-12.md sections
-            # 7-8: hwcompat route + KB2990941/KB3087873 or usosnvme). Server
-            # 2008 x86: the installed system stages the signed usosnvme
-            # package before specialize (section 9, QEMU PASS 2026-10-13;
-            # without it specialize installed the NULL driver -> STOP 0x7B).
-            # Vista x86 takes the same path but has no full pass yet: only
-            # with DATA's Unattended\nvme-experimental.txt (X470 test, as
-            # Windows 2000 in legacy_xp_staging.sh); otherwise it stops.
-            case "$profile:$folder" in
-                'win-nt6-x86-uefi-csmwrap:Windows 7'|'win-nt6-x86-uefi-csmwrap:Windows Server 2008') ;;
-                'win-nt6-x86-uefi-csmwrap:Windows Vista')
-                    [ -f "/mnt/data/Systems/Windows/$folder/Unattended/nvme-experimental.txt" ] || stop "Windows Vista x86 on NVMe is experimental (usosnvme): put an empty nvme-experimental.txt into Systems\\Windows\\$folder\\Unattended to try it. No disk was changed."
-                    vista_csmwrap_log "NVME Windows Vista x86 experimental (nvme-experimental.txt)" ;;
-                win-nt6-x86-uefi-csmwrap:*)
-                    stop "No NVMe support for 32-bit $NT5_NAME yet. Pick a SATA disk. No disk was changed." ;;
-            esac ;;
+            case "$profile" in
+                win-nt6-x86-uefi-csmwrap)
+                    vista_csmwrap_log "NVME STOP 32-bit NT6 through CSMWrap (stornvme I/O failure on the X470, 2026-10-13)"
+                    stop '32-bit Windows 7/Vista/2008 on NVMe is not supported yet on this path. No disk was changed.' ;;
+                win-x86-uefi-csmwrap)
+                    vista_csmwrap_log "NVME STOP 32-bit Windows 8.1/10 through CSMWrap (stornvme I/O failure on the X470, 2026-10-13)"
+                    stop '32-bit Windows 8.1/10 on NVMe is not supported yet on this path. No disk was changed.' ;;
+            esac
+            [ "$nvme_lbs" = 512 ] || stop "The NVMe disk uses $nvme_lbs-byte sectors; $NT5_NAME through CSMWrap needs 512-byte sectors (switch the namespace to a 512-byte LBA format first). No disk was changed." ;;
         esac
         model=$(usos_disk_model "$TARGET_DEVICE" || true)
         serial=$(usos_disk_serial "$TARGET_DEVICE" || true)

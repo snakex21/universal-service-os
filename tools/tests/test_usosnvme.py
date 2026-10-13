@@ -3,7 +3,7 @@ Server 2003 x86. Every committed binary's imports resolve on its NT version
 (export-name fixtures, no Microsoft file needed), the PE versions match, and
 the source keeps the per-version ScsiPort rules."""
 from pathlib import Path
-import sys, unittest
+import json, sys, unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -149,21 +149,30 @@ class Nt6Flow(unittest.TestCase):
         self.assertLess(gate.index('case "$TARGET_DEVICE" in /dev/nvme*)'), gate.index('usos_xp_confirm '))
         self.assertIn('[ "$nvme_lbs" = 512 ] || stop', gate)
         self.assertIn('[ "$x86_self" = 1 ] || stop "No NVMe driver for 64-bit', gate)
-        # Windows 7 x86 (hwcompat route + KB2990941/KB3087873 or usosnvme)
-        # and Server 2008 x86 (signed usosnvme package, section 9) are
-        # allowed; Vista x86 only with DATA's nvme-experimental.txt (X470
-        # test), otherwise it stops (docs/nvme-nt6-2026-10-12.md).
-        self.assertIn('case "$profile:$folder" in\n'
-                      "                'win-nt6-x86-uefi-csmwrap:Windows 7'|'win-nt6-x86-uefi-csmwrap:Windows Server 2008') ;;\n"
-                      "                'win-nt6-x86-uefi-csmwrap:Windows Vista')\n"
-                      '                    [ -f "/mnt/data/Systems/Windows/$folder/Unattended/nvme-experimental.txt" ]'
-                      ' || stop "Windows Vista x86 on NVMe is experimental', gate)
-        self.assertIn('                win-nt6-x86-uefi-csmwrap:*)\n'
-                      '                    stop "No NVMe support for 32-bit', gate)
-        # DATA is still mounted (read-only) when the gate runs.
-        flag = prep.index('nvme-experimental.txt')
-        self.assertLess(prep.index('mount -t ntfs3 -o ro,noatime "$DATA_PATH" /mnt/data'), flag)
-        self.assertLess(flag, prep.index('umount /mnt/data'))
+        # X470 2026-10-13: stornvme in the x86 PE10 under CSMWrap enumerated
+        # the Micron but failed every size / layout IOCTL (433), then the
+        # controller dropped off PCI. Every 32-bit NT6 flow on this path stops
+        # on NVMe, with no nvme-experimental.txt override
+        # (docs/nvme-nt6-2026-10-12.md section 12).
+        nv = gate[gate.index('case "$TARGET_DEVICE" in /dev/nvme*)'):gate.index('usos_xp_confirm ')]
+        self.assertIn('case "$profile" in\n'
+                      '                win-nt6-x86-uefi-csmwrap)\n', nv)
+        self.assertIn("stop '32-bit Windows 7/Vista/2008 on NVMe is not supported yet on this path. No disk was changed.' ;;", nv)
+        self.assertIn("                win-x86-uefi-csmwrap)\n", nv)
+        self.assertIn("stop '32-bit Windows 8.1/10 on NVMe is not supported yet on this path. No disk was changed.' ;;", nv)
+        self.assertNotIn('Unattended/nvme-experimental.txt', prep)
+        self.assertNotIn("'win-nt6-x86-uefi-csmwrap:Windows 7'", prep)
+        # Both stops come before the 512-byte check (dormant until reopened).
+        self.assertLess(nv.index("32-bit Windows 8.1/10 on NVMe"), nv.index('[ "$nvme_lbs" = 512 ] || stop'))
+        # Translated: the stop text is a {0} template of a boot.lx key.
+        en = json.loads((ROOT / 'installer/internal/i18n/locales/en.json').read_text(encoding='utf-8'))
+        tmpl = en['boot.lx.nvme_x86_csmwrap_not_supported']
+        self.assertEqual(tmpl, '32-bit {0} on NVMe is not supported yet on this path. No disk was changed.')
+        for system in ('Windows 7/Vista/2008', 'Windows 8.1/10'):
+            self.assertIn(tmpl.replace('{0}', system), nv)
+        for loc in (ROOT / 'installer/internal/i18n/locales').glob('*.json'):
+            self.assertIn('{0}', json.loads(loc.read_text(encoding='utf-8'))['boot.lx.nvme_x86_csmwrap_not_supported'], loc.name)
+        self.assertIn(tmpl, (ROOT / 'src/i18n/linux_strings.zig').read_text(encoding='utf-8'))
         # The OOBE gate (signed usosnvme staging) is not folder-specific:
         # any NT 6.0.6002 x86 install, Vista SP2 as Server 2008 SP2.
         oobe = (ROOT / 'tools/windows_vista_oobe_gate.c').read_text(encoding='utf-8')

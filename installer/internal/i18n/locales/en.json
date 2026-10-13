@@ -1242,6 +1242,7 @@
   "boot.lx.disk_wait_nvme_countdown": "Waiting for the NVMe disk to appear: {0} s left.",
   "boot.lx.no_target_disk_no_nvme_controller": "No target disk found (only the USOS stick), and no NVMe controller is visible on PCI. If an NVMe disk is installed, shut the computer down completely (power off, not restart), wait a few seconds and try again. No disk was changed.",
   "boot.lx.no_target_disk_nvme_no_disk": "No target disk found: the NVMe controller is on PCI, but its disk did not appear within 60 s. Shut the computer down completely (power off, not restart) and try again. No disk was changed.",
+  "boot.lx.nvme_x86_csmwrap_not_supported": "32-bit {0} on NVMe is not supported yet on this path. No disk was changed.",
   "boot.lx.w9x_csmwrap_why": "Without CSM, {0} starts through CSMWrap, so USOS prepares the target disk first.",
   "boot.lx.w9x_csmwrap_layout": "New layout (MBR): {0} (drive C:) for {1}, then a 64 MiB CSMWrap partition at the end of the disk; the rest stays unallocated.",
   "boot.lx.w9x_csmwrap_after_restart": "After the restart the disk starts by itself and {0} Setup continues on it.",

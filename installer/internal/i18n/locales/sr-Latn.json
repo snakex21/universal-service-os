@@ -1245,6 +1245,7 @@
   "boot.lx.disk_wait_nvme_countdown": "Čeka se da se pojavi NVMe disk: preostalo {0} s.",
   "boot.lx.no_target_disk_no_nvme_controller": "Nije pronađen ciljni disk (samo USOS fleš disk), a na PCI magistrali nije vidljiv nijedan NVMe kontroler. Ako je NVMe disk ugrađen, potpuno isključite računar (isključivanje, ne ponovno pokretanje), sačekajte nekoliko sekundi i pokušajte ponovo. Nijedan disk nije promenjen.",
   "boot.lx.no_target_disk_nvme_no_disk": "Nije pronađen ciljni disk: NVMe kontroler je na PCI magistrali, ali se njegov disk nije pojavio u roku od 60 s. Potpuno isključite računar (isključivanje, ne ponovno pokretanje) i pokušajte ponovo. Nijedan disk nije promenjen.",
+  "boot.lx.nvme_x86_csmwrap_not_supported": "32-bitni {0} na NVMe disku još nije podržan ovim putem instalacije. Nijedan disk nije promenjen.",
   "boot.lx.w9x_csmwrap_why": "Bez CSM-a {0} se pokreće preko CSMWrap-a, pa USOS najpre priprema ciljni disk.",
   "boot.lx.w9x_csmwrap_layout": "Novi raspored (MBR): {0} (disk C:) za {1}, zatim CSMWrap particija od 64 MiB na kraju diska; ostatak ostaje nedodeljen.",
   "boot.lx.w9x_csmwrap_after_restart": "Posle ponovnog pokretanja disk se pokreće sam i instalacija sistema {0} se nastavlja na njemu.",

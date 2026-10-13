@@ -1248,6 +1248,7 @@
   "boot.lx.disk_wait_nvme_countdown": "Čakanje, da se prikaže disk NVMe: še {0} s.",
   "boot.lx.no_target_disk_no_nvme_controller": "Ciljnega diska ni bilo mogoče najti (samo ključ USOS) in na vodilu PCI ni viden noben krmilnik NVMe. Če je disk NVMe nameščen, računalnik popolnoma izklopite (izklop, ne vnovični zagon), počakajte nekaj sekund in poskusite znova. Noben disk ni bil spremenjen.",
   "boot.lx.no_target_disk_nvme_no_disk": "Ciljnega diska ni bilo mogoče najti: krmilnik NVMe je na vodilu PCI, vendar se njegov disk ni prikazal v 60 s. Računalnik popolnoma izklopite (izklop, ne vnovični zagon) in poskusite znova. Noben disk ni bil spremenjen.",
+  "boot.lx.nvme_x86_csmwrap_not_supported": "32-bitni {0} na disku NVMe po tej poti namestitve še ni podprt. Noben disk ni bil spremenjen.",
   "boot.lx.w9x_csmwrap_why": "Brez CSM se {0} zažene prek CSMWrap, zato USOS najprej pripravi ciljni disk.",
   "boot.lx.w9x_csmwrap_layout": "Nova postavitev (MBR): {0} (pogon C:) za {1}, nato particija CSMWrap 64 MiB na koncu diska; preostanek ostane nedodeljen.",
   "boot.lx.w9x_csmwrap_after_restart": "Po ponovnem zagonu se disk zažene sam in namestitev sistema {0} se nadaljuje na njem.",

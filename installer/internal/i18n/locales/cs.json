@@ -1245,6 +1245,7 @@
   "boot.lx.disk_wait_nvme_countdown": "Čekání na zobrazení disku NVMe: zbývá {0} s.",
   "boot.lx.no_target_disk_no_nvme_controller": "Nebyl nalezen cílový disk (jen disk USOS) a na sběrnici PCI není vidět žádný řadič NVMe. Pokud je disk NVMe nainstalován, počítač úplně vypněte (vypnutí, ne restart), počkejte několik sekund a zkuste to znovu. Žádný disk nebyl změněn.",
   "boot.lx.no_target_disk_nvme_no_disk": "Nebyl nalezen cílový disk: řadič NVMe je na sběrnici PCI, ale jeho disk se do 60 s neobjevil. Počítač úplně vypněte (vypnutí, ne restart) a zkuste to znovu. Žádný disk nebyl změněn.",
+  "boot.lx.nvme_x86_csmwrap_not_supported": "32bitový {0} na NVMe zatím není v tomto postupu instalace podporován. Žádný disk nebyl změněn.",
   "boot.lx.w9x_csmwrap_why": "Bez CSM se {0} spouští přes CSMWrap, proto USOS nejprve připraví cílový disk.",
   "boot.lx.w9x_csmwrap_layout": "Nové rozložení (MBR): {0} (jednotka C:) pro {1}, poté oddíl CSMWrap 64 MiB na konci disku; zbytek zůstane nepřidělený.",
   "boot.lx.w9x_csmwrap_after_restart": "Po restartu se disk spustí sám a instalace {0} na něm bude pokračovat.",

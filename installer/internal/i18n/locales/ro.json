@@ -1245,6 +1245,7 @@
   "boot.lx.disk_wait_nvme_countdown": "Se așteaptă apariția discului NVMe: mai sunt {0} s.",
   "boot.lx.no_target_disk_no_nvme_controller": "Nu s-a găsit niciun disc țintă (doar stick-ul USOS) și niciun controler NVMe nu este vizibil pe PCI. Dacă este instalat un disc NVMe, opriți complet computerul (oprire, nu repornire), așteptați câteva secunde și încercați din nou. Niciun disc nu a fost modificat.",
   "boot.lx.no_target_disk_nvme_no_disk": "Nu s-a găsit niciun disc țintă: controlerul NVMe este pe PCI, dar discul său nu a apărut în 60 s. Opriți complet computerul (oprire, nu repornire) și încercați din nou. Niciun disc nu a fost modificat.",
+  "boot.lx.nvme_x86_csmwrap_not_supported": "{0} pe 32 de biți pe NVMe nu este încă acceptat pe această cale de instalare. Niciun disc nu a fost modificat.",
   "boot.lx.w9x_csmwrap_why": "Fără CSM, {0} pornește prin CSMWrap, așa că USOS pregătește mai întâi discul țintă.",
   "boot.lx.w9x_csmwrap_layout": "Aspect nou (MBR): {0} (unitatea C:) pentru {1}, apoi o partiție CSMWrap de 64 MiB la sfârșitul discului; restul rămâne nealocat.",
   "boot.lx.w9x_csmwrap_after_restart": "După repornire discul pornește singur și instalarea {0} continuă pe el.",

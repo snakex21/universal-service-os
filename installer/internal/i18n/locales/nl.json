@@ -1242,6 +1242,7 @@
   "boot.lx.disk_wait_nvme_countdown": "Wachten tot de NVMe-schijf verschijnt: nog {0} s.",
   "boot.lx.no_target_disk_no_nvme_controller": "Geen doelschijf gevonden (alleen de USOS-stick) en er is geen NVMe-controller zichtbaar op PCI. Als er een NVMe-schijf is geïnstalleerd, schakel de computer dan volledig uit (uitschakelen, niet opnieuw opstarten), wacht enkele seconden en probeer het opnieuw. Er is geen schijf gewijzigd.",
   "boot.lx.no_target_disk_nvme_no_disk": "Geen doelschijf gevonden: de NVMe-controller staat op PCI, maar de schijf is niet binnen 60 s verschenen. Schakel de computer volledig uit (uitschakelen, niet opnieuw opstarten) en probeer het opnieuw. Er is geen schijf gewijzigd.",
+  "boot.lx.nvme_x86_csmwrap_not_supported": "32-bits {0} op NVMe wordt via deze installatieroute nog niet ondersteund. Er is geen schijf gewijzigd.",
   "boot.lx.w9x_csmwrap_why": "Zonder CSM start {0} via CSMWrap, dus USOS bereidt eerst de doelschijf voor.",
   "boot.lx.w9x_csmwrap_layout": "Nieuwe indeling (MBR): {0} (station C:) voor {1}, daarna een CSMWrap-partitie van 64 MiB aan het einde van de schijf; de rest blijft niet-toegewezen.",
   "boot.lx.w9x_csmwrap_after_restart": "Na de herstart start de schijf vanzelf en gaat de installatie van {0} erop verder.",

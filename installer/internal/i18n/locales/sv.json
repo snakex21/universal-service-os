@@ -1242,6 +1242,7 @@
   "boot.lx.disk_wait_nvme_countdown": "Väntar på att NVMe-disken ska visas: {0} s kvar.",
   "boot.lx.no_target_disk_no_nvme_controller": "Ingen måldisk hittades (bara USOS-stickan), och ingen NVMe-styrenhet syns på PCI. Om en NVMe-disk är installerad stänger du av datorn helt (stäng av, inte starta om), väntar några sekunder och försöker igen. Ingen disk ändrades.",
   "boot.lx.no_target_disk_nvme_no_disk": "Ingen måldisk hittades: NVMe-styrenheten finns på PCI, men dess disk visades inte inom 60 s. Stäng av datorn helt (stäng av, inte starta om) och försök igen. Ingen disk ändrades.",
+  "boot.lx.nvme_x86_csmwrap_not_supported": "32-bitars {0} på NVMe stöds ännu inte via den här installationsvägen. Ingen disk ändrades.",
   "boot.lx.w9x_csmwrap_why": "Utan CSM startar {0} via CSMWrap, så USOS förbereder måldisken först.",
   "boot.lx.w9x_csmwrap_layout": "Ny layout (MBR): {0} (enhet C:) för {1}, sedan en CSMWrap-partition på 64 MiB i slutet av disken; resten förblir oallokerad.",
   "boot.lx.w9x_csmwrap_after_restart": "Efter omstarten startar disken av sig själv och {0}-installationen fortsätter på den.",

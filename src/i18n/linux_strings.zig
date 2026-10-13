@@ -104,6 +104,7 @@ pub const hashes = [_]u32{
     0x69cefafb, // lx.nt4_needs_key
     0xcfdf9246, // lx.nt4_needs_sp6a
     0xff201299, // lx.nt4_needs_vm
+    0xe770f2ef, // lx.nvme_x86_csmwrap_not_supported
     0xe5d5307c, // lx.one_partition_for_windows_and_automatic_setup
     0x02b9eb81, // lx.opening_data_partition
     0x03527491, // lx.opening_the_hardware_panel
@@ -325,6 +326,7 @@ pub const english = [_][]const u8{
     "Windows NT 4.0 needs a product key: choose an answer profile with the key or type it when the menu asks",
     "Windows NT 4.0 needs Service Pack 6a: put SP6I386.EXE into Systems\\Windows\\Windows NT 4.0\\ServicePack on USOS_DATA",
     "Windows NT 4.0 installs only in the VM on this PC, which is not available: {0}",
+    "32-bit {0} on NVMe is not supported yet on this path. No disk was changed.",
     "One partition for Windows and automatic setup.",
     "Opening DATA partition",
     "Opening the hardware panel.",
