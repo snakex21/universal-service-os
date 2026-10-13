@@ -1,16 +1,16 @@
 {
   "name": "usosvid",
-  "version": "1.0",
+  "version": "1.1",
   "licence": "GPL-3.0-or-later (repository LICENSE, NOTICE)",
   "own_code": true,
   "build": "build.cmd (WDK 7.1, x86 WXP environment, EXPORT_DRIVER linked as bootvid.sys, shipped as bootvid.dll); not byte-reproducible (PE time stamp, PDB GUID)",
   "exports": "VidBitBlt@12 VidBufferToScreenBlt@24 VidCleanUp@0 VidDisplayString@4 VidDisplayStringXY@16 VidInitialize@4 VidResetDisplay@4 VidScreenToBufferBlt@24 VidSetScrollRegion@16 VidSetTextColor@4 VidSolidColorFill@20 (names and argument sizes of the Windows 2000 BOOTVID.DLL the 2000 kernel imports)",
-  "imports": "ntoskrnl: MmMapIoSpace, MmUnmapIoSpace, memset (all exported by the Windows 2000 SP4 kernels)",
+  "imports": "ntoskrnl: MmMapIoSpace, MmUnmapIoSpace, MmIsAddressValid, KeTickCount, KeInitializeDpc, KeInitializeTimerEx, KeSetTimerEx, KeCancelTimer, memset (all exported by the Windows 2000 SP4 kernels)",
   "use": "Windows 2000 text-mode Setup with ACPI on: $WIN_NT$.~BT\\BOOTVID.DLL only (tools/w2k_stage.sh 8.)",
   "files": {
-    "bin/i386/bootvid.dll": "100edf8b242e357206e51d44cff2151b5e6d244ebd69acf140063324ca1fb61a",
+    "bin/i386/bootvid.dll": "f9dcd33fdf34614f68b22cbf0853f7e9e337d1a5d50c4f494cafd2ed2cd4b772",
     "build.cmd": "7f4ff4a185f4a8597fcec7fade7fb966b0c75e73848eee558ad389132d37e42c",
-    "src/usosvid.c": "c4714aa946a08a2c20542df88050d2f619ad4439bf43edcfd98c31ef3e101fa3",
+    "src/usosvid.c": "55f9af6af74cf42c8a3694685f02db2b529c5bcad18184ba2734a74182509bf6",
     "src/usosvid.def": "dbbf9892496612f965b2846063a3307788404bb41116a6f5b910bbfe32c67357",
     "src/sources": "5ba2ab894680c5433e56282cb84462932fd762af725435132ad90a7467deb798",
     "src/makefile": "7289517c7028ff031a48cc84f6308a437c3abe6e046c93f3132255221842d433"
