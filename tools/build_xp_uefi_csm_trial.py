@@ -241,7 +241,11 @@ def w2k_driver_files():
     vid=json.loads((USOSVID_DIR/'manifest.json').read_text())
     files['usosvid/bootvid.dll']=(USOSVID_DIR/'bin/i386/bootvid.dll').read_bytes()
     if hashlib.sha256(files['usosvid/bootvid.dll']).hexdigest()!=vid['files']['bin/i386/bootvid.dll']:raise ValueError('usosvid file hash mismatch')
-    for name in ('ahcint.sys','uniata/uniata.sys','usosrst.sys','usosvid/bootvid.dll'):
+    # usosnvme (own GPL NVMe miniport, tools/nt/usosnvme) for an NVMe target:
+    # the NT4 build (non-PnP, scans PCI itself) in 2000's legacy mode (w2k_stage.sh 9.).
+    files['usosnvme/usosnvme.sys']=(ROOT/'tools/nt/usosnvme/bin/NT4/i386/usosnvme.sys').read_bytes()
+    files['usosnvme/usosnvme.inf']=(ROOT/'tools/nt/usosnvme/usosnvme.inf').read_bytes()
+    for name in ('ahcint.sys','uniata/uniata.sys','usosrst.sys','usosvid/bootvid.dll','usosnvme/usosnvme.sys'):
         if struct.unpack_from('<H',files[name],struct.unpack_from('<I',files[name],60)[0]+4)[0]!=0x14c:raise ValueError(name+' is not i386')
     files['SOURCE.txt']=('AHCINT %s (i386 ScsiPort miniport, MODIFIED by USOS, see MODIFIED.txt), %s\n'
         'base: tag %s = commit %s (release archive sha256 %s) plus %s,\n'
@@ -254,6 +258,8 @@ def w2k_driver_files():
         'tools/w2k/usosrst/src in the USOS sources zip).\n'
         'usosvid/bootvid.dll: USOS\'s own text-mode boot video %s (GPL-3.0-or-later,\n'
         'source: tools/w2k/usosvid/src in the USOS sources zip).\n'
+        'usosnvme/: USOS\'s own NVMe miniport 1.0, NT4 build (GPL-3.0-or-later, source:\n'
+        'tools/nt/usosnvme/src in the USOS sources zip), only for an NVMe target.\n'
         'USOS uses them only for Windows 2000 SP4 Setup; staging writes the INF\n'
         'source path (\\i386\\ahcint or \\i386\\uniata) and its own uniata.inf.\n'
         %(pins['version'],base['upstream'],base['tag'],base['commit'],base['release_zip']['sha256'],', '.join(pins['patches']),rst['version'],vid['version'])).encode()

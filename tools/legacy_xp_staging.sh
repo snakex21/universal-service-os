@@ -420,7 +420,7 @@ usos_legacy_xp_staging() {
         case "$TARGET_DEVICE" in /dev/nvme*)
             nvme_lbs=$(cat "/sys/class/block/${TARGET_DEVICE##*/}/queue/logical_block_size" 2>/dev/null || echo unknown)
             [ "$nvme_lbs" = 512 ] || stop "The NVMe target uses $nvme_lbs-byte sectors; Windows NT 3.x to 2003 need 512-byte sectors (switch the namespace to a 512-byte LBA format first). No target write occurred"
-            case "${NT5_SYSTEM:-windows-xp}" in windows-xp|windows-server-2003) ;; *) stop "No NVMe driver for $NT5_SYSTEM in this flow yet (usosnvme: XP SP3 and Server 2003 SP2 x86). No target write occurred" ;; esac
+            case "${NT5_SYSTEM:-windows-xp}" in windows-xp|windows-server-2003|windows-2000) ;; *) stop "No NVMe driver for $NT5_SYSTEM in this flow yet (usosnvme: XP SP3, Server 2003 SP2 x86 and 2000 SP4). No target write occurred" ;; esac
             printf '[XP_NVME] target=%s logical_block=512 driver=usosnvme\n' "$TARGET_DEVICE" ;;
         esac
         # Canonical on-disk geometry, NOT a claim about firmware AH08 geometry.

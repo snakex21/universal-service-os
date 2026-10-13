@@ -205,8 +205,11 @@ class W2kStorage(unittest.TestCase):
         import build_xp_uefi_csm_trial as builder
         files = builder.w2k_driver_files()
         self.assertEqual(sorted(files), ['LICENSE', 'MODIFIED.txt', 'SOURCE.txt', 'ahcint.inf', 'ahcint.sys',
-                                         'uniata/COPYING-GPL-2.0.txt', 'uniata/SOURCES.txt', 'uniata/uniata.sys', 'usosrst.sys',
-                                         'usosvid/bootvid.dll'])
+                                         'uniata/COPYING-GPL-2.0.txt', 'uniata/SOURCES.txt', 'uniata/uniata.sys', 'usosnvme/usosnvme.inf',
+                                         'usosnvme/usosnvme.sys', 'usosrst.sys', 'usosvid/bootvid.dll'])
+        # usosnvme: the NT4 build (legacy, scans PCI itself), the tracked INF.
+        self.assertEqual(files['usosnvme/usosnvme.sys'], (ROOT / 'tools/nt/usosnvme/bin/NT4/i386/usosnvme.sys').read_bytes())
+        self.assertIn(b'usosnvme/: USOS', files['SOURCE.txt'])
         self.assertEqual(struct.unpack_from('<H', files['usosrst.sys'], struct.unpack_from('<I', files['usosrst.sys'], 60)[0] + 4)[0], 0x14c)
         self.assertIn(b'usosrst.sys: USOS', files['SOURCE.txt'])
         # usosrst: own source next to the pinned binary, every file pinned.
@@ -372,6 +375,86 @@ class W2kStorage(unittest.TestCase):
                 self.assertEqual((ls / 'HIVESYS.INF').read_bytes(), hivesys)
                 self.assertNotEqual(self.apply(t).returncode, 0)
                 self.assertEqual((ls / 'TXTSETUP.SIF').read_bytes(), sif)
+
+    def test_nvme_rows(self):
+        # NVMe target (w2k_stage.sh 9.): usosnvme rows after AHCINT's, once.
+        base = run_fn('usos_w2k_storage_sif', W2K_TXTSETUP).stdout
+        r = run_fn('usos_w2k_nvme_sif', base)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        out = rows(r.stdout)
+        first = out.index('[SourceDisksFiles]')
+        self.assertEqual(out[first + 1:first + 3], ['usosnvme.sys = 1,,,,,,4_,4,1,,,1,4', 'usosnvme.inf = 1,,,,,,,20,0,0'])
+        self.assertEqual(out[out.index('[HardwareIdsDatabase]') + 1], 'PCI\\CC_010802 = "usosnvme"')
+        self.assertEqual(out[out.index('[SCSI.Load]') + 1], 'usosnvme = usosnvme.sys,4')
+        self.assertEqual(out[out.index('[SCSI]') + 1], 'usosnvme = "NVM Express Controller (usosnvme 1.0, USOS)"')
+        self.assertEqual(len(out), len(rows(base)) + 5)
+        self.assertEqual(run_fn('usos_w2k_nvme_sif', r.stdout).returncode, 3)                       # twice
+        self.assertEqual(run_fn('usos_w2k_nvme_sif', base.replace(b'[SCSI.Load]', b'[Other]')).returncode, 3)
+        # The INF: GUI-mode source \i386\usosnvme, legacy mode (no PnpInterface).
+        inf = (ROOT / 'tools/nt/usosnvme/usosnvme.inf').read_bytes()
+        r = run_fn('usos_w2k_nvme_inf', inf)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.count(b'\r\n'), r.stdout.count(b'\n'))
+        out = rows(r.stdout)
+        self.assertIn('1 = %DiskName%,,,\\i386\\usosnvme', out)
+        self.assertIn('; USOS legacy mode (Windows 2000): HKR, "Parameters\\PnpInterface", "5", 0x00010001, 0x00000001', out)
+        self.assertEqual(run_fn('usos_w2k_nvme_inf', r.stdout).returncode, 3)
+        # usosw2k.inf: the class code -> usosnvme only for an NVMe target.
+        row = 'HKLM,"SYSTEM\\CurrentControlSet\\Control\\CriticalDeviceDatabase\\pci#cc_010802","Service",0x00000000,"usosnvme"'
+        self.assertIn(row, rows(run_fn('USOS_W2K_NVME=on usos_w2k_hive_inf', b'').stdout))
+        self.assertNotIn(b'usosnvme', run_fn('usos_w2k_hive_inf', b'').stdout)
+        d = run_fn('USOS_W2K_NVME=on usos_w2k_dosnet', W2K_DOSNET).stdout
+        self.assertEqual(d.count(b'd1,usosnvme.sys\r\n'), 2)
+        self.assertEqual(d.count(b'd1,usosnvme.inf\r\n'), 2)
+        self.assertEqual(run_fn('USOS_W2K_NVME=on usos_w2k_dosnet', d).returncode, 3)
+        self.assertNotIn(b'usosnvme', run_fn('usos_w2k_dosnet', W2K_DOSNET).stdout)
+        # The NVMe gate lets 2000 through (both editions share NT5_SYSTEM windows-2000).
+        self.assertIn('windows-xp|windows-server-2003|windows-2000) ;;', (ROOT / 'tools/legacy_xp_staging.sh').read_text())
+
+    def test_apply_nvme(self):
+        import build_xp_uefi_csm_trial as builder
+        pkg = builder.w2k_driver_files()
+        for acpi in ('off', 'on'):
+            with tempfile.TemporaryDirectory() as tmp:
+                t = Path(tmp)
+                bt, ls = self.stand_in(t)
+                sata = self.apply(t, f'TARGET_DEVICE=/dev/sda USOS_W2K_ACPI={acpi}')
+                self.assertEqual(sata.returncode, 0, sata.stdout + sata.stderr)
+                self.assertNotIn(b'usosnvme', sata.stdout)
+                self.assertNotIn(b'usosnvme', (ls / 'TXTSETUP.SIF').read_bytes())
+                self.assertFalse((ls / 'USOSNVME').exists())
+            with tempfile.TemporaryDirectory() as tmp:
+                t = Path(tmp)
+                bt, ls = self.stand_in(t)
+                (bt / 'USOSNVME.SY_').write_bytes(b'stale')
+                r = self.apply(t, f'TARGET_DEVICE=/dev/nvme0n1 USOS_W2K_ACPI={acpi}')
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+                self.assertIn(b'NVMe target: usosnvme 1.0 (legacy mode, PCI\\CC_010802)', r.stdout)
+                inf = run_fn('usos_w2k_nvme_inf', pkg['usosnvme/usosnvme.inf']).stdout
+                for folder in (bt, ls):
+                    self.assertEqual((folder / 'usosnvme.sys').read_bytes(), pkg['usosnvme/usosnvme.sys'])
+                    self.assertEqual((folder / 'usosnvme.inf').read_bytes(), inf)
+                    self.assertFalse((folder / 'USOSNVME.SY_').exists())
+                    self.assertEqual((folder / 'ahcint.sys').read_bytes(), pkg['ahcint.sys'])           # AHCINT stays
+                    self.assertIn(b'pci#cc_010802","Service",0x00000000,"usosnvme"', (folder / 'usosw2k.inf').read_bytes())
+                    sif = rows((folder / 'TXTSETUP.SIF').read_bytes())
+                    self.assertIn('usosnvme = usosnvme.sys,4', sif)
+                    self.assertIn('ahcint = ahcint.sys,4', sif)
+                    self.assertIn('ACPIEnable = ' + ('0' if acpi == 'off' else '2'), sif)
+                self.assertIn('PCI\\CC_010802 = "usosnvme"', rows((t / 'root/TXTSETUP.SIF').read_bytes()))
+                self.assertEqual((ls / 'USOSNVME/usosnvme.sys').read_bytes(), pkg['usosnvme/usosnvme.sys'])
+                self.assertIn(b'd1,usosnvme.inf', (ls / 'DOSNET.INF').read_bytes())
+            with tempfile.TemporaryDirectory() as tmp:
+                t = Path(tmp)
+                bt, ls = self.stand_in(t)
+                (t / 'pkg/usosnvme/usosnvme.sys').unlink()
+                r = self.apply(t, f'TARGET_DEVICE=/dev/nvme0n1 USOS_W2K_ACPI={acpi}')
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn(b'the target is NVMe but', r.stdout)
+                self.assertEqual((ls / 'TXTSETUP.SIF').read_bytes(), W2K_TXTSETUP)                # nothing written
+                self.assertEqual(self.apply(t, 'USOS_W2K_NVME=maybe').returncode, 1)
+                # SATA targets do not need it.
+                self.assertEqual(self.apply(t, f'USOS_W2K_ACPI={acpi}').returncode, 0)
 
     def test_user_acpi_package(self):
         # DATA Unattended\acpi\ (w2k_stage.sh 5.): a new .sys is an extra boot driver
