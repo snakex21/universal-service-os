@@ -75,6 +75,32 @@ pub fn writeRsdp(w: *Writer, label: []const u8, address: usize, bytes: []const u
     if (rsdp.rsdt == 0) w.print("  !! RsdtAddress is 0: an ACPI 1.0 OS (Windows 2000, 98, ME) finds no tables\r\n", .{});
 }
 
+/// Verdict on the ACPI 1.0 table list: `rsdt_address` from the RSDP the OS
+/// uses, `signatures` = the tables the RSDT lists. Flags with "!!" what an
+/// ACPI 1.0 OS (Windows 2000's ACPI HAL, XP) cannot find.
+pub fn writeRsdtVerdict(w: *Writer, rsdt_address: u32, rsdt_valid: bool, signatures: []const [4]u8) void {
+    if (rsdt_address == 0) {
+        w.print("!! ACPI 1.0 view: RsdtAddress is 0, no RSDT (CSMWrap 3.1.2-usos5 builds one from the XSDT)\r\n", .{});
+        return;
+    }
+    if (!rsdt_valid) {
+        w.print("!! ACPI 1.0 view: RSDT at 0x{x:0>8} invalid (CSMWrap 3.1.2-usos5 builds one from the XSDT)\r\n", .{rsdt_address});
+        return;
+    }
+    var missing = false;
+    for ([_]*const [4]u8{ "FACP", "APIC" }) |want| {
+        var found = false;
+        for (signatures) |sig| {
+            if (std.mem.eql(u8, &sig, want)) found = true;
+        }
+        if (!found) {
+            missing = true;
+            w.print("!! ACPI 1.0 view: {s} missing from the RSDT\r\n", .{want});
+        }
+    }
+    if (!missing) w.print("ACPI 1.0 view: RSDT at 0x{x:0>8} lists FACP and APIC\r\n", .{rsdt_address});
+}
+
 /// Generic Address Structure (12 bytes): space id, width, offset, access, address.
 fn gasAddress(bytes: []const u8, at: usize) u64 {
     return r64(bytes, at + 4);
@@ -90,8 +116,10 @@ pub fn writeFadt(w: *Writer, fadt: []const u8) void {
     w.print("FACP revision {d} length {d}\r\n", .{ r8(fadt, 8), len });
     const firmware_ctrl = r32(fadt, 36);
     const dsdt = r32(fadt, 40);
-    w.print("  1.0 view: FIRMWARE_CTRL(FACS)=0x{x:0>8} DSDT=0x{x:0>8} INT_MODEL={d} SCI_INT={d} SMI_CMD=0x{x} ACPI_ENABLE=0x{x:0>2} ACPI_DISABLE=0x{x:0>2}\r\n", .{
-        firmware_ctrl, dsdt, r8(fadt, 45), r16(fadt, 46), r32(fadt, 48), r8(fadt, 52), r8(fadt, 53),
+    // Byte 44 is INT_MODEL in ACPI 1.0 (reserved from 2.0 on), byte 45 is
+    // Preferred_PM_Profile (2.0+, reserved in 1.0).
+    w.print("  1.0 view: FIRMWARE_CTRL(FACS)=0x{x:0>8} DSDT=0x{x:0>8} INT_MODEL(byte 44, reserved in 2.0+)={d} Preferred_PM_Profile={d} SCI_INT={d} SMI_CMD=0x{x} ACPI_ENABLE=0x{x:0>2} ACPI_DISABLE=0x{x:0>2}\r\n", .{
+        firmware_ctrl, dsdt, r8(fadt, 44), r8(fadt, 45), r16(fadt, 46), r32(fadt, 48), r8(fadt, 52), r8(fadt, 53),
     });
     w.print("  PM1a_EVT=0x{x} PM1b_EVT=0x{x} PM1a_CNT=0x{x} PM1b_CNT=0x{x} PM2_CNT=0x{x} PM_TMR=0x{x} GPE0=0x{x} GPE1=0x{x}\r\n", .{
         r32(fadt, 56), r32(fadt, 60), r32(fadt, 64), r32(fadt, 68), r32(fadt, 72), r32(fadt, 76), r32(fadt, 80), r32(fadt, 84),
@@ -217,6 +245,35 @@ test "RSDP 1.0 view and the RsdtAddress 0 warning" {
     writeRsdp(&w, "rsdp20", 0x1000, &rsdp);
     try std.testing.expect(std.mem.indexOf(u8, w.text(), "RsdtAddress is 0") != null);
     try std.testing.expect(parseRsdp("not an rsdp at all.") == null);
+}
+
+test "RSDT verdict flags RsdtAddress 0 and missing FACP/APIC" {
+    var buf: [1024]u8 = undefined;
+    var w = Writer{ .buffer = &buf };
+    writeRsdtVerdict(&w, 0, false, &.{});
+    try std.testing.expect(std.mem.indexOf(u8, w.text(), "!! ACPI 1.0 view: RsdtAddress is 0") != null);
+    w.used = 0;
+    writeRsdtVerdict(&w, 0xBD068600, false, &.{});
+    try std.testing.expect(std.mem.indexOf(u8, w.text(), "!! ACPI 1.0 view: RSDT at 0xbd068600 invalid") != null);
+    w.used = 0;
+    writeRsdtVerdict(&w, 0xBD068600, true, &.{ "FACP".*, "HPET".* });
+    try std.testing.expect(std.mem.indexOf(u8, w.text(), "!! ACPI 1.0 view: APIC missing from the RSDT") != null);
+    try std.testing.expect(std.mem.indexOf(u8, w.text(), "FACP missing") == null);
+    w.used = 0;
+    writeRsdtVerdict(&w, 0xBD068600, true, &.{ "HPET".*, "APIC".*, "FACP".* });
+    try std.testing.expect(std.mem.indexOf(u8, w.text(), "!!") == null);
+    try std.testing.expect(std.mem.indexOf(u8, w.text(), "lists FACP and APIC") != null);
+}
+
+test "FADT INT_MODEL is byte 44, Preferred_PM_Profile byte 45" {
+    var fadt = [_]u8{0} ** 276;
+    @memcpy(fadt[0..4], "FACP");
+    fadt[44] = 1;
+    fadt[45] = 3;
+    var buf: [4096]u8 = undefined;
+    var w = Writer{ .buffer = &buf };
+    writeFadt(&w, &fadt);
+    try std.testing.expect(std.mem.indexOf(u8, w.text(), "INT_MODEL(byte 44, reserved in 2.0+)=1 Preferred_PM_Profile=3") != null);
 }
 
 test "FADT 32-bit fields missing are flagged" {

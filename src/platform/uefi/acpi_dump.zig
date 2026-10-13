@@ -222,22 +222,28 @@ fn writeRaw(machine: *uefi.protocol.File) !bool {
 
     var rsdt_count: usize = 0;
     var rsdt_entries: [max_tables]u32 = undefined;
+    var rsdt_sigs: [max_tables][4]u8 = undefined;
+    var rsdt_valid = false;
     if (parsed.rsdt != 0) {
         if (headerAt(parsed.rsdt)) |h| {
             const bytes = bytesAt(parsed.rsdt, h.length);
             try writeFile(dir, wide("RSDT.bin"), bytes);
             const ok = if (rules.parseHeader(bytes, bytes)) |c| c.checksum_ok else false;
             w.print("\r\nRSDT at 0x{x} length {d} checksum {s}\r\n", .{ parsed.rsdt, h.length, if (ok) "ok" else "BAD" });
+            rsdt_valid = ok and std.mem.eql(u8, bytes[0..4], "RSDT");
             var offset: usize = rules.header_size;
             while (offset + 4 <= h.length and rsdt_count < max_tables) : (offset += 4) {
                 const address = std.mem.readInt(u32, bytes[offset..][0..4], .little);
                 rsdt_entries[rsdt_count] = address;
-                rsdt_count += 1;
                 const sig = signatureAt(address);
+                rsdt_sigs[rsdt_count] = sig;
+                rsdt_count += 1;
                 w.print("  RSDT[{d}] 0x{x:0>8} {s}\r\n", .{ rsdt_count - 1, address, &sig });
             }
         } else w.print("\r\n!! RSDT at 0x{x}: no valid table header\r\n", .{parsed.rsdt});
     }
+    w.print("\r\n", .{});
+    raw.writeRsdtVerdict(&w, parsed.rsdt, rsdt_valid, rsdt_sigs[0..rsdt_count]);
     if (parsed.xsdt != 0 and parsed.xsdt <= std.math.maxInt(u32)) {
         const xsdt: usize = @intCast(parsed.xsdt);
         if (headerAt(xsdt)) |h| {
