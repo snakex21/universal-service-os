@@ -123,9 +123,12 @@ class Nt6Flow(unittest.TestCase):
         self.assertLess(gate.index('case "$TARGET_DEVICE" in /dev/nvme*)'), gate.index('usos_xp_confirm '))
         self.assertIn('[ "$nvme_lbs" = 512 ] || stop', gate)
         self.assertIn('[ "$x86_self" = 1 ] || stop "No NVMe driver for 64-bit', gate)
-        # 7 / Vista / 2008 x86 still stop: the hwcompat route has no full
-        # QEMU pass yet (docs/nvme-nt6-2026-10-12.md section 7).
-        self.assertIn('case "$profile" in\n                win-nt6-x86-uefi-csmwrap)\n'
+        # Windows 7 x86 is allowed (hwcompat route + KB2990941/KB3087873 or
+        # usosnvme); Vista / 2008 x86 still stop (docs/nvme-nt6-2026-10-12.md
+        # section 7).
+        self.assertIn('case "$profile:$folder" in\n'
+                      "                'win-nt6-x86-uefi-csmwrap:Windows 7') ;;\n"
+                      '                win-nt6-x86-uefi-csmwrap:*)\n'
                       '                    stop "No NVMe support for 32-bit', gate)
         target = (ROOT / 'tools/vista_csmwrap_target.sh').read_text(encoding='utf-8')
         self.assertIn('/dev/nvme*) target_bus=nvme', target)

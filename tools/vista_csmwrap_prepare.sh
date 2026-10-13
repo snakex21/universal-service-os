@@ -141,15 +141,16 @@ usos_vista_csmwrap_prepare() {
             vista_csmwrap_log "NVME $TARGET_DEVICE logical_block=$nvme_lbs profile=$profile"
             [ "$nvme_lbs" = 512 ] || stop "The NVMe disk uses $nvme_lbs-byte sectors; $NT5_NAME through CSMWrap needs 512-byte sectors (switch the namespace to a 512-byte LBA format first). No disk was changed."
             [ "$x86_self" = 1 ] || stop "No NVMe driver for 64-bit $NT5_NAME yet (it would need a signed x64 driver). Pick a SATA disk. No disk was changed."
-            # Still stopped (docs/nvme-nt6-2026-10-12.md section 7, QEMU
-            # 2026-10-13): Vista / Server 2008 x86 pass Setup on NVMe now,
-            # but the installed system boots once (specialize) and then
-            # loops (PnP drops the CDD binding of the unsigned usosnvme);
-            # Windows 7 x86 Setup hit an access violation in winsetup.dll at
-            # the end of the image expansion (run from the SUBST copy) and
-            # has no full pass yet.
-            case "$profile" in
-                win-nt6-x86-uefi-csmwrap)
+            # Windows 7 x86 is allowed (docs/nvme-nt6-2026-10-12.md sections
+            # 7-8: hwcompat route + KB2990941/KB3087873 or usosnvme). Vista /
+            # Server 2008 x86 still stop: they pass Setup on NVMe and start
+            # once through usosnvme, but specialize installs a NULL driver on
+            # the controller (the unsigned usosnvme INF is not in the NT 6.0
+            # driver store) and every later start is STOP 0x7B (QEMU
+            # 2026-10-13).
+            case "$profile:$folder" in
+                'win-nt6-x86-uefi-csmwrap:Windows 7') ;;
+                win-nt6-x86-uefi-csmwrap:*)
                     stop "No NVMe support for 32-bit $NT5_NAME yet. Pick a SATA disk. No disk was changed." ;;
             esac ;;
         esac
