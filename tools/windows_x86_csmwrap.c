@@ -22,6 +22,9 @@
  *                            of the installed Windows (a letter is given to
  *                            its volume when it has none), for the offline
  *                            USB 3 step of usos-x86-csmwrap.cmd.
+ *   lowmem                   NVMe target: when this WinPE has RAM above 4 GiB,
+ *                            truncatememory 0x100000000 in the staging BCD
+ *                            (exit 10: the cmd restarts the WinPE once).
  *   stick                    read-only: logs the dirty bit of every volume on
  *                            a USB / removable disk (the USOS stick).
  *   after                    the Windows partition holds bootmgr and
@@ -369,6 +372,107 @@ static DWORD no_dump_stack(void) {
     return 0;
 }
 
+/* ---- lowmem: the PE10 donor without RAM above 4 GiB (NVMe target) --------
+ * Windows 7 SP1 x86 Setup in the PAE PE10 x86 donor wrote a corrupt image to
+ * an NVMe disk (stornvme) when the PE had RAM above 4 GiB: 0x80070570 /
+ * 0x80070003 during the apply with 4 and 8 GiB guest RAM, clean with 3 GiB
+ * (QEMU 2026-10-13, docs/nvme-nt6-2026-10-12.md section 10). The X470 has
+ * 32 GiB. When the PE sees memory above 4 GiB, the staging BCD's boot entry
+ * gets truncatememory 0x100000000 (BcdLibraryInteger_TruncatePhysicalMemory,
+ * element 15000007) and the cmd restarts the PE once; the disk is still in
+ * its prepared state (this runs before "before"). Only the staging BCD is
+ * changed: the installed Windows gets its own BCD from Setup and the staging
+ * partition is removed afterwards.
+ * Exit: 0 nothing to do (no RAM above 4 GiB, or the entry already has the
+ * limit), 10 limit written (restart now), 1 error (logged; the flow goes on). */
+static ULONGLONG ram_top(void) {
+    static BYTE data[16384]; HKEY k; DWORD type = 0, size = sizeof(data);
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"HARDWARE\\RESOURCEMAP\\System Resources\\Physical Memory", 0, KEY_QUERY_VALUE, &k) != ERROR_SUCCESS) return 0;
+    LONG r = RegQueryValueExW(k, L".Translated", 0, &type, data, &size); RegCloseKey(k);
+    if (r != ERROR_SUCCESS || size < 4) return 0;
+    /* CM_RESOURCE_LIST: Count, then per list InterfaceType, BusNumber,
+     * Version/Revision, Count and 16-byte partial descriptors (Type 3 memory,
+     * 7 large memory; Flags 0x200/0x400/0x800 scale Length by 2^8/16/32). */
+    ULONGLONG top = 0; DWORD lists, o = 4; memcpy(&lists, data, 4);
+    for (DWORD l = 0; l < lists && o + 16 <= size; l++) {
+        DWORD count; memcpy(&count, data + o + 12, 4); o += 16;
+        for (DWORD i = 0; i < count && o + 16 <= size; i++, o += 16) {
+            BYTE t = data[o]; WORD flags; ULONGLONG start, length; DWORD len;
+            memcpy(&flags, data + o + 2, 2); memcpy(&start, data + o + 4, 8); memcpy(&len, data + o + 12, 4);
+            if (t != 3 && t != 7) continue;
+            length = len;
+            if (t == 7 && (flags & 0x200)) length <<= 8;
+            else if (t == 7 && (flags & 0x400)) length <<= 16;
+            else if (t == 7 && (flags & 0x800)) length <<= 32;
+            if (start + length > top) top = start + length;
+        }
+    }
+    return top;
+}
+static void privilege(const WCHAR *name) {
+    HANDLE token;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &token)) return;
+    TOKEN_PRIVILEGES tp = {1}; tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+    if (LookupPrivilegeValueW(0, name, &tp.Privileges[0].Luid)) AdjustTokenPrivileges(token, FALSE, &tp, 0, 0, 0);
+    CloseHandle(token);
+}
+static DWORD staging_number(void) {
+    HANDLE h = disk_handle(disk, GENERIC_READ); DWORD got = 0, number = 0;
+    if (h == INVALID_HANDLE_VALUE) return 0;
+    if (DeviceIoControl(h, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, 0, 0, buffer, sizeof(buffer), &got, 0)) {
+        DRIVE_LAYOUT_INFORMATION_EX *layout = (void *)buffer;
+        for (DWORD i = 0; i < layout->PartitionCount; i++) {
+            PARTITION_INFORMATION_EX *p = &layout->PartitionEntry[i];
+            if (p->PartitionNumber && (ULONGLONG)p->StartingOffset.QuadPart == staging_start * 512) number = p->PartitionNumber;
+        }
+    }
+    CloseHandle(h);
+    return number;
+}
+static DWORD low_memory(void) {
+    ULONGLONG top = ram_top();
+    logn("WinPE RAM top (MiB)=", (DWORD)(top >> 20));
+    if (top <= 0x100000000ULL) { say("[X86_CSMWRAP] lowmem: no RAM above 4 GiB in this WinPE\r\n"); return 0; }
+    DWORD part = staging_number();
+    if (!part) { say("[X86_CSMWRAP] lowmem: staging partition not found\r\n"); return 1; }
+    WCHAR file[MAX_PATH] = L"\\\\?\\GLOBALROOT\\Device\\Harddisk";
+    wdecimal(file + lstrlenW(file), disk); lstrcatW(file, L"\\Partition"); wdecimal(file + lstrlenW(file), part); lstrcatW(file, L"\\boot\\bcd");
+    privilege(L"SeRestorePrivilege"); privilege(L"SeBackupPrivilege");
+    const WCHAR *root = L"USOS_BCD"; BOOL loaded = FALSE;
+    LONG r = RegLoadKeyW(HKEY_LOCAL_MACHINE, root, file);
+    if (r == ERROR_SUCCESS) loaded = TRUE;
+    else {
+        /* The system store of a WinPE started from a disk is that disk's
+         * \boot\bcd (HKLM\BCD00000000); edit it there when it is in use. */
+        logn("lowmem: staging BCD not loadable as a hive, error=", (DWORD)r);
+        root = L"BCD00000000";
+    }
+    WCHAR key[160]; lstrcpyW(key, root); lstrcatW(key, L"\\Objects\\{9dea862c-5cdd-4e70-acc1-f32b344d4795}\\Elements\\23000003");
+    WCHAR guid[64] = {0}; DWORD type = 0, size = sizeof(guid) - sizeof(WCHAR); HKEY k; DWORD result = 1;
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, key, 0, KEY_QUERY_VALUE, &k) == ERROR_SUCCESS) {
+        if (RegQueryValueExW(k, L"Element", 0, &type, (BYTE *)guid, &size) != ERROR_SUCCESS || type != REG_SZ || lstrlenW(guid) != 38) guid[0] = 0;
+        RegCloseKey(k);
+    }
+    if (!guid[0]) say("[X86_CSMWRAP] lowmem: the BCD has no default boot entry\r\n");
+    else {
+        lstrcpyW(key, root); lstrcatW(key, L"\\Objects\\"); lstrcatW(key, guid); lstrcatW(key, L"\\Elements\\15000007");
+        ULONGLONG limit = 0, want = 0x100000000ULL; size = sizeof(limit);
+        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, key, 0, KEY_QUERY_VALUE, &k) == ERROR_SUCCESS) {
+            if (RegQueryValueExW(k, L"Element", 0, &type, (BYTE *)&limit, &size) != ERROR_SUCCESS) limit = 0;
+            RegCloseKey(k);
+        }
+        if (limit) { logn("lowmem: the boot entry already has truncatememory (MiB)=", (DWORD)(limit >> 20)); result = 0; }
+        else if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, key, 0, 0, 0, KEY_SET_VALUE, 0, &k, 0) == ERROR_SUCCESS) {
+            r = RegSetValueExW(k, L"Element", 0, REG_BINARY, (const BYTE *)&want, sizeof(want));
+            RegFlushKey(k); RegCloseKey(k);
+            if (r == ERROR_SUCCESS) { say("[X86_CSMWRAP] lowmem: truncatememory 0x100000000 set in the staging BCD; restarting the WinPE\r\n"); result = 10; }
+            else logn("lowmem: cannot write truncatememory, error=", (DWORD)r);
+        } else say("[X86_CSMWRAP] lowmem: cannot create the truncatememory element\r\n");
+    }
+    if (loaded) { r = RegUnLoadKeyW(HKEY_LOCAL_MACHINE, L"USOS_BCD"); if (r != ERROR_SUCCESS) logn("lowmem: BCD unload error=", (DWORD)r); }
+    return result;
+}
+
 static DWORD WINAPI notice(LPVOID unused) {
     (void)unused;
     MessageBoxW(0, L"The first part of the Windows installation is complete.\n\nRemove the USOS stick now, then choose OK: the computer restarts and Windows continues from the disk through CSMWrap. If the stick stays connected, start this disk's UEFI entry from the firmware boot menu.\n\nThe computer restarts by itself in 2 minutes.",
@@ -411,6 +515,7 @@ void entry(void) {
     int staging = slot_of(s, staging_start, staging_sectors, TRUE), windows = slot_of(s, windows_start, windows_sectors, FALSE);
     if (staging < 0 || windows < 0) { logn("MBR entries not found (staging slot+1, windows slot+1)=", (DWORD)((staging + 1) * 10 + windows + 1)); ExitProcess(5); }
     BYTE *se = s + 446 + 16 * staging, *we = s + 446 + 16 * windows;
+    if (lstrcmpiW(args[1], L"lowmem") == 0) ExitProcess(low_memory());
     if (lstrcmpiW(args[1], L"before") == 0 && (arg_count == 4 || arg_count == 5)) {
         DWORD major = 0, minor = 0;
         if (arg_count == 5 && file_version(args[4], &major, &minor)) {

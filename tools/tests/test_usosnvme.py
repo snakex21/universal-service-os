@@ -179,6 +179,23 @@ class Nt6Flow(unittest.TestCase):
         # MSU path: the stornvme CriticalDeviceDatabase entry is checked.
         self.assertIn('CriticalDeviceDatabase pci#cc_010802 -^> stornvme added', self.step())
 
+    def test_lowmem(self):
+        # NVMe target: the WinPE runs without RAM above 4 GiB (truncatememory in
+        # the staging BCD, one WinPE restart) before the disk is touched.
+        before = self.CMD[:self.CMD.index('usos-x86-csmwrap.exe" before')]
+        self.assertLess(before.index('call :nvme_lowmem'), before.index('call :nvme_setup'))
+        self.assertIn('if defined USOS_NVME_TARGET if "%USOS_LOWMEM%"=="10" exit /b 0', before)
+        sub = self.CMD[self.CMD.index('\n:nvme_lowmem\n'):self.CMD.index('\n:nvme_setup\n')]
+        self.assertIn('usos-x86-csmwrap.exe" lowmem', sub)
+        self.assertLess(sub.index('if not "%USOS_LOWMEM%"=="10" exit /b 0'), sub.index('wpeutil reboot'))
+        src = (ROOT / 'tools/windows_x86_csmwrap.c').read_text(encoding='utf-8')
+        main = src[src.index('void entry(void)'):]
+        self.assertLess(main.index('L"lowmem"'), main.index('L"before"'))
+        for want in ('System Resources\\\\Physical Memory', 'L".Translated"', 'Elements\\\\15000007',
+                     '{9dea862c-5cdd-4e70-acc1-f32b344d4795}\\\\Elements\\\\23000003', 'want = 0x100000000ULL',
+                     'top <= 0x100000000ULL'):
+            self.assertIn(want, src)
+
     def test_packed(self):
         build = (ROOT / 'tools/build_windows_native_support.py').read_text(encoding='utf-8')
         self.assertIn("writer.add_file('usosnvme-nt6.sys', root / 'tools/nt/usosnvme/bin/2KXP/i386/usosnvme.sys')", build)

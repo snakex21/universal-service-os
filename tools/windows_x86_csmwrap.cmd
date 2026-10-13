@@ -47,6 +47,11 @@ echo [USOS] phase=x86-csmwrap-before
 rem NVMe target, Setup 6.0 / 6.1 (Vista / 2008 / 7): see :nvme_setup.
 set "USOS_NVME_TARGET="
 find "target_bus=nvme" "%~dp0usos-csmwrap-target.ini" >nul 2>&1 && set "USOS_NVME_TARGET=1"
+rem NVMe target: the WinPE must not use RAM above 4 GiB (corrupt image apply
+rem through stornvme, QEMU 2026-10-13); "lowmem" limits the staging BCD and
+rem the WinPE restarts once (docs/nvme-nt6-2026-10-12.md section 10).
+if defined USOS_NVME_TARGET call :nvme_lowmem
+if defined USOS_NVME_TARGET if "%USOS_LOWMEM%"=="10" exit /b 0
 if defined USOS_NVME_TARGET call :nvme_setup
 if defined USOS_NVME_TARGET if errorlevel 1 exit /b 1
 "%~dp0usos-x86-csmwrap.exe" before "%USOS_ANSWER%" "%~dp0usos-csmwrap-unattend.xml" "%USOS_SETUP%"
@@ -215,6 +220,17 @@ reg add "%USOS_SVC%" /v DisplayName /t REG_SZ /d "USOS USB keyboard and mouse (x
 echo [USOS] usosusb: registered in ControlSet00%USOS_CS% exit=%errorlevel%
 reg unload HKLM\USOS_SYS >nul
 "%~dp0usos-log-x86.exe"
+exit /b 0
+
+rem ---- NVMe target: WinPE below 4 GiB --------------------------------------
+:nvme_lowmem
+"%~dp0usos-x86-csmwrap.exe" lowmem
+set "USOS_LOWMEM=%errorlevel%"
+echo [USOS] NVMe target: lowmem result=%USOS_LOWMEM%
+"%~dp0usos-log-x86.exe"
+if not "%USOS_LOWMEM%"=="10" exit /b 0
+echo [USOS] phase=reboot-lowmem
+wpeutil reboot
 exit /b 0
 
 rem ---- NVMe target: Setup 6.0 / 6.1 disk check (before Setup) --------------
