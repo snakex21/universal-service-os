@@ -297,6 +297,11 @@ class W2kStorage(unittest.TestCase):
         self.assertNotIn(b'HAL.dll', dll)
         for name in (b'MmMapIoSpace', b'MmUnmapIoSpace'):
             self.assertIn(name, dll)
+        # 1.1 heartbeat: a periodic kernel timer DPC (all exported by the 2000
+        # SP4 ntoskrnl), rows 16-21 while text-mode Setup runs with /NOGUIBOOT.
+        for name in (b'MmIsAddressValid', b'KeTickCount', b'KeInitializeDpc', b'KeInitializeTimerEx', b'KeSetTimerEx', b'KeCancelTimer'):
+            self.assertIn(name, dll)
+        self.assertIn(b'usosvid 1.1', dll)
 
     def stand_in(self, t: Path) -> tuple:
         import build_xp_uefi_csm_trial as builder

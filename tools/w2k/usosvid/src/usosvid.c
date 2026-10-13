@@ -31,13 +31,31 @@
  *   row 14  the "*** STOP" line, kept even when the console scrolls.
  *   row 15  the last other "***" line (the driver the STOP points into).
  *   16-24   console: every string the kernel displays (/SOS, STOP text).
+ *           Text-mode Setup boots with /NOGUIBOOT (TXTSETUP.SIF), so the
+ *           2000 kernel never sends a string here (InbvEnableBootDriver
+ *           (FALSE) leaves the display "disabled"); only a STOP does. Until
+ *           then usosvid 1.1 uses rows 16-21 for a heartbeat:
+ *   row 16  "hb t=<KeTickCount> n=<samples> ...": a periodic kernel timer
+ *           (250 ms). "t=--------" staying = no clock interrupt (or
+ *           interrupts off for good) after kernel phase 1.
+ *   17-19   the interrupt frames on the interrupted thread's stack, inner to
+ *           outer: EIP and module (export name, or "sz" + SizeOfImage when
+ *           the image has no export directory) + offset. "idle" = no frame:
+ *           the timer DPC ran from the idle loop, nothing is spinning.
+ *   row 20  where the outermost frame was, counted over all samples
+ *           (module=count), so a spin loop shows as one module filling up.
+ *   row 21  current thread, its stack limits, the PCR DPC stack, the
+ *           interrupted ESP.
+ *           The heartbeat stops for good once anything else owns the screen
+ *           (row 11 overwritten, e.g. setupdd's blue screen; VidCleanUp,
+ *           VidResetDisplay, or a full-screen fill = the STOP screen).
  *
  * Only staged into $WIN_NT$.~BT (text-mode Setup) for Windows 2000 with the
  * ACPI HAL; the installed system keeps the Microsoft BOOTVID.DLL.
  */
 #include <ntddk.h>
 
-#define USOSVID_VERSION "usosvid 1.0"
+#define USOSVID_VERSION "usosvid 1.1"
 
 #define COLS        80
 #define ROWS        25
@@ -48,6 +66,13 @@
 #define ROW_ADDR    15
 #define CON_TOP     16
 #define CON_BOTTOM  24
+#define ROW_HB      16
+#define ROW_FRAME   17
+#define ROW_HIST    20
+#define ROW_THREAD  21
+#define HB_PERIOD_MS 250
+#define MAX_FRAMES  3
+#define MAX_HIST    4
 
 static PUSHORT g_Vga;
 static USHORT g_Attr = 0x0F00;          /* white on black */
@@ -342,6 +367,218 @@ ShowAcpi(VOID)
 }
 
 /* ------------------------------------------------------------------ */
+/* Heartbeat (usosvid 1.1)                                             */
+/*                                                                     */
+/* Windows 2000 x86 layout (SP4 ntoskrnl: KiDispatchInterrupt,         */
+/* IoGetStackLimits, KeGetCurrentThread), read only, every page checked */
+/* with MmIsAddressValid first (the DPC runs at DISPATCH_LEVEL):       */
+/*   PCR at FFDFF000: +04/+08 stack base/limit of the current thread,  */
+/*   +1C SelfPcr, +124 current thread, +81C the DPC stack.             */
+/*   KiDispatchInterrupt switches to the DPC stack and pushes the      */
+/*   interrupted ESP as its first dword.                                */
+/*   A hardware interrupt frame: EIP (kernel), CS = 8, EFLAGS with IF  */
+/*   and the reserved bit 1 set.                                       */
+/* ------------------------------------------------------------------ */
+
+static KTIMER g_HbTimer;
+static KDPC g_HbDpc;
+static BOOLEAN g_HbOn;
+static volatile BOOLEAN g_Stop;
+static ULONG g_HbCount;
+static struct { ULONG Base; ULONG Hits; } g_Hist[MAX_HIST];
+static ULONG g_HistOther;
+
+static BOOLEAN
+Valid(ULONG Address, ULONG Length)
+{
+    ULONG page = Address & ~0xFFFUL, last;
+
+    if (Address < 0x80000000UL || Length == 0 || Address + Length < Address) return FALSE;
+    last = (Address + Length - 1) & ~0xFFFUL;
+    for (;;) {
+        if (!MmIsAddressValid((PVOID)page)) return FALSE;
+        if (page == last) return TRUE;
+        page += 0x1000;
+    }
+}
+
+static ULONG
+Rd(ULONG Address)
+{
+    return Valid(Address, 4) ? *(volatile ULONG *)Address : 0;
+}
+
+/* Image base of the module that contains Address (0 = none found). */
+static ULONG
+ImageBase(ULONG Address)
+{
+    ULONG page = Address & ~0xFFFUL, i, lfanew;
+
+    for (i = 0; i < 1024 && page >= 0x80000000UL; i++, page -= 0x1000) {
+        if (!Valid(page, 0x40)) return 0;
+        if (*(volatile USHORT *)page != 0x5A4D) continue;                /* MZ */
+        lfanew = *(volatile ULONG *)(page + 0x3C);
+        if (lfanew < 0x40 || lfanew > 0x800 || !Valid(page + lfanew, 0x80)) continue;
+        if (*(volatile ULONG *)(page + lfanew) != 0x00004550) continue;  /* PE */
+        if (Address - page >= *(volatile ULONG *)(page + lfanew + 0x50)) return 0;
+        return page;
+    }
+    return 0;
+}
+
+/* "name+offset", or "sz<SizeOfImage>+offset" without an export directory. */
+static PCHAR
+PutModule(PCHAR p, PCHAR end, ULONG Address)
+{
+    ULONG base = ImageBase(Address), nt, exp, name = 0, i;
+    volatile CHAR *s;
+
+    if (base == 0) return PutStr(p, end, "?");
+    nt = base + *(volatile ULONG *)(base + 0x3C);
+    exp = Rd(nt + 0x78);
+    if (exp && Valid(base + exp, 0x10)) name = *(volatile ULONG *)(base + exp + 0x0C);
+    if (name && Valid(base + name, 16)) {
+        s = (volatile CHAR *)(base + name);
+        for (i = 0; i < 14 && s[i] > 0x20 && s[i] < 0x7F && p < end; i++) *p++ = s[i];
+    } else {
+        p = PutStr(p, end, "sz");
+        p = PutHex(p, end, Rd(nt + 0x50), 6);
+    }
+    p = PutStr(p, end, "+");
+    return PutHex(p, end, Address - base, 6);
+}
+
+/* Base 0 = idle sample, 1 = frame outside any image. */
+static VOID
+HbRecord(ULONG Base)
+{
+    ULONG i;
+
+    for (i = 0; i < MAX_HIST; i++) {
+        if (g_Hist[i].Hits && g_Hist[i].Base == Base) { g_Hist[i].Hits++; return; }
+        if (g_Hist[i].Hits == 0) { g_Hist[i].Base = Base; g_Hist[i].Hits = 1; return; }
+    }
+    g_HistOther++;
+}
+
+static VOID NTAPI
+HbDpc(IN PKDPC Dpc, IN PVOID Context, IN PVOID Arg1, IN PVOID Arg2)
+{
+    CHAR line[COLS];
+    PCHAR p, end = line + COLS;
+    ULONG here = (ULONG)line, pcr, dpcStack, from, top, limit, a, page = 0;
+    ULONG eip[MAX_FRAMES], n = 0, i, onDpc = 0, base, v0, v1, v2;
+
+    UNREFERENCED_PARAMETER(Dpc);
+    UNREFERENCED_PARAMETER(Context);
+    UNREFERENCED_PARAMETER(Arg1);
+    UNREFERENCED_PARAMETER(Arg2);
+    if (g_Stop || g_Vga == NULL) return;
+    if (g_Vga[ROW_MARK * COLS] != (USHORT)(0x2F00 | 'u')) {   /* someone else owns the screen */
+        g_Stop = TRUE;
+        KeCancelTimer(&g_HbTimer);
+        return;
+    }
+    g_HbCount++;
+
+    pcr = Rd(0xFFDFF01C);
+    dpcStack = pcr ? Rd(pcr + 0x81C) : 0;
+    top = Rd(0xFFDFF004);
+    limit = Rd(0xFFDFF008);
+    from = here;
+    if (dpcStack > 0x3000 && here < dpcStack && here > dpcStack - 0x3000) {
+        onDpc = 1;
+        from = Rd(dpcStack - 4);                /* the interrupted ESP */
+    }
+    if (!(from >= limit && from < top)) top = (from & ~0xFFFUL) + 0x3000;
+
+    for (a = from & ~3UL; a + 12 <= top && a >= 0x80000000UL && n < MAX_FRAMES; a += 4) {
+        if (((a + 8) & ~0xFFFUL) != page) {
+            if (!Valid(a, 12)) break;
+            page = (a + 8) & ~0xFFFUL;
+        }
+        v0 = *(volatile ULONG *)a;
+        v1 = *(volatile ULONG *)(a + 4);
+        v2 = *(volatile ULONG *)(a + 8);
+        if (v0 >= 0x80000000UL && v1 == 8 && (v2 & 0x202) == 0x202 && (v2 & 0xFFC28028UL) == 0) {
+            eip[n++] = v0;
+            a += 8;
+        }
+    }
+
+    p = PutStr(line, end, "hb t=");
+    p = PutHex(p, end, KeTickCount.LowPart, 8);
+    p = PutStr(p, end, " n=");
+    p = PutHex(p, end, g_HbCount, 4);
+    p = PutStr(p, end, onDpc ? " dpcstk" : " thrstk");
+    if (n) {
+        p = PutStr(p, end, " frames=");
+        p = PutHex(p, end, n, 1);
+    } else {
+        p = PutStr(p, end, " idle (no interrupt frame)");
+    }
+    PutRow(ROW_HB, line, (ULONG)(p - line), 0x0E00);
+
+    for (i = 0; i < MAX_FRAMES; i++) {
+        p = line;
+        if (i < n) {
+            p = PutStr(p, end, i + 1 == n ? "outer " : "inner ");
+            p = PutHex(p, end, eip[i], 8);
+            p = PutStr(p, end, " ");
+            p = PutModule(p, end, eip[i]);
+        }
+        PutRow(ROW_FRAME + i, line, (ULONG)(p - line), 0x0E00);
+    }
+
+    base = 0;
+    if (n) { base = ImageBase(eip[n - 1]); if (base == 0) base = 1; }
+    HbRecord(base);
+    p = PutStr(line, end, "where:");
+    for (i = 0; i < MAX_HIST && g_Hist[i].Hits; i++) {
+        p = PutStr(p, end, " ");
+        if (g_Hist[i].Base == 0) p = PutStr(p, end, "idle");
+        else if (g_Hist[i].Base == 1) p = PutStr(p, end, "?");
+        else p = PutModule(p, end, g_Hist[i].Base);
+        p = PutStr(p, end, "=");
+        p = PutHex(p, end, g_Hist[i].Hits, 4);
+    }
+    if (g_HistOther) {
+        p = PutStr(p, end, " other=");
+        p = PutHex(p, end, g_HistOther, 4);
+    }
+    PutRow(ROW_HIST, line, (ULONG)(p - line), 0x0E00);
+
+    p = PutStr(line, end, "thread ");
+    p = PutHex(p, end, Rd(0xFFDFF124), 8);
+    p = PutStr(p, end, " stack ");
+    p = PutHex(p, end, limit, 8);
+    p = PutStr(p, end, "-");
+    p = PutHex(p, end, Rd(0xFFDFF004), 8);
+    p = PutStr(p, end, " dpcstack ");
+    p = PutHex(p, end, dpcStack, 8);
+    p = PutStr(p, end, " esp ");
+    p = PutHex(p, end, from, 8);
+    PutRow(ROW_THREAD, line, (ULONG)(p - line), 0x0700);
+}
+
+static VOID
+HbStart(VOID)
+{
+    LARGE_INTEGER due;
+    CHAR line[COLS];
+    PCHAR p;
+
+    if (g_HbOn) return;
+    p = PutStr(line, line + COLS, "hb t=-------- (no timer tick yet: no clock interrupt seen)");
+    PutRow(ROW_HB, line, (ULONG)(p - line), 0x0E00);
+    KeInitializeDpc(&g_HbDpc, HbDpc, NULL);
+    KeInitializeTimerEx(&g_HbTimer, NotificationTimer);
+    due.QuadPart = -(LONGLONG)HB_PERIOD_MS * 10000;
+    KeSetTimerEx(&g_HbTimer, due, HB_PERIOD_MS, &g_HbDpc);
+    g_HbOn = TRUE;
+}
+
+/* ------------------------------------------------------------------ */
 /* BOOTVID.DLL exports (the names and argument sizes the 2000 kernel    */
 /* imports)                                                             */
 /* ------------------------------------------------------------------ */
@@ -366,6 +603,7 @@ VidInitialize(IN BOOLEAN SetMode)
     ShowAcpi();
     p = PutStr(line, end, USOSVID_VERSION " (text BOOTVID): kernel phase 1 reached; ACPI facts below");
     PutRow(ROW_MARK, line, (ULONG)(p - line), 0x2F00);
+    HbStart();
     return TRUE;
 }
 
@@ -373,11 +611,13 @@ VOID NTAPI
 VidResetDisplay(IN BOOLEAN HalReset)
 {
     UNREFERENCED_PARAMETER(HalReset);
+    g_Stop = TRUE;
 }
 
 VOID NTAPI
 VidCleanUp(VOID)
 {
+    g_Stop = TRUE;
 }
 
 ULONG NTAPI
@@ -424,6 +664,7 @@ VidSolidColorFill(IN ULONG Left, IN ULONG Top, IN ULONG Right, IN ULONG Bottom, 
     UNREFERENCED_PARAMETER(Left);
     UNREFERENCED_PARAMETER(Right);
     if (g_Vga == NULL || Top > 8 || Bottom < 400) return;
+    g_Stop = TRUE;
     g_Attr = (USHORT)(((Color & 0x07) << 12) | (g_Attr & 0x0F00));
     for (r = CON_TOP; r <= CON_BOTTOM; r++) PutRow(r, "", 0, g_Attr);
     g_Row = CON_TOP;
