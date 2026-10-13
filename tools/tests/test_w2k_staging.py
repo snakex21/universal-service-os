@@ -408,8 +408,12 @@ class W2kStorage(unittest.TestCase):
         self.assertEqual(d.count(b'd1,usosnvme.inf\r\n'), 2)
         self.assertEqual(run_fn('USOS_W2K_NVME=on usos_w2k_dosnet', d).returncode, 3)
         self.assertNotIn(b'usosnvme', run_fn('usos_w2k_dosnet', W2K_DOSNET).stdout)
-        # The NVMe gate lets 2000 through (both editions share NT5_SYSTEM windows-2000).
-        self.assertIn('windows-xp|windows-server-2003|windows-2000) ;;', (ROOT / 'tools/legacy_xp_staging.sh').read_text())
+        # The NVMe gate: XP / 2003 pass; 2000 (both editions share NT5_SYSTEM
+        # windows-2000) only with DATA's nvme-experimental.txt (no QEMU desktop
+        # pass yet, docs/nvme-nt-2026-10-11.md section 8).
+        stage = (ROOT / 'tools/legacy_xp_staging.sh').read_text()
+        self.assertIn('windows-xp|windows-server-2003) ;;', stage)
+        self.assertIn('windows-2000) [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/nvme-experimental.txt" ] || stop', stage)
 
     def test_apply_nvme(self):
         import build_xp_uefi_csm_trial as builder
