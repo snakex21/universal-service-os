@@ -24,7 +24,7 @@ def build_gate(out: Path, target: str, native: bool) -> bytes:
     if native:
         args.append('-DUSOS_GATE_NATIVE_DEPLOY')
     args += ['-I' + str(ROOT / 'tools/zig/lib/libc/include/any-windows-any'), str(ROOT / 'tools/windows_vista_oobe_gate.c'),
-             '-Wl,--entry,entry', '-lkernel32', '-ladvapi32', '-lnetapi32', '-luser32', '-o', str(out)]
+             '-Wl,--entry,entry', '-lkernel32', '-ladvapi32', '-lnetapi32', '-luser32', '-lcrypt32', '-o', str(out)]
     subprocess.run(args, env=env, check=True)
     return out.read_bytes()
 

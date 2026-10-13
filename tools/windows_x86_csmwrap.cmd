@@ -300,7 +300,16 @@ if "%USOS_NVME_MSU%"=="ok" (echo [USOS] NVMe: Microsoft stornvme installed; usos
 if not exist "%~dp0usosnvme-nt6.sys" (echo [USOS] NVMe: usosnvme driver missing; skipped. & goto nvme_done)
 copy /y "%~dp0usosnvme-nt6.sys" "%USOS_T%\Windows\System32\drivers\usosnvme.sys" >nul
 if errorlevel 1 (echo [USOS] NVMe: usosnvme copy failed; skipped. & goto nvme_done)
-if exist "%~dp0usosnvme.inf" copy /y "%~dp0usosnvme.inf" "%USOS_T%\Windows\inf\usosnvme.inf" >nul
+rem The signed package (per-build certificate, key destroyed at build time)
+rem for the driver store: on 6.0 the OOBE gate trusts usosnvme.cer (machine
+rem Root + TrustedPublisher) and stages it with pnputil before specialize, so
+rem specialize installs usosnvme instead of the NULL driver (STOP 0x7B
+rem otherwise, docs/nvme-nt6-2026-10-12.md sections 8-9). Not in
+rem Windows\inf: an unstaged INF there is skipped anyway.
+md "%USOS_T%\USOS\nvme" 2>nul
+for %%F in (usosnvme.inf usosnvme.cat usosnvme.cer) do if exist "%~dp0%%F" copy /y "%~dp0%%F" "%USOS_T%\USOS\nvme\%%F" >nul
+copy /y "%~dp0usosnvme-nt6.sys" "%USOS_T%\USOS\nvme\usosnvme.sys" >nul
+if exist "%USOS_T%\USOS\nvme\usosnvme.cat" (echo [USOS] NVMe: signed usosnvme package in %USOS_T%\USOS\nvme for the driver store.) else (echo [USOS] NVMe: usosnvme catalog missing; specialize may install the NULL driver.)
 reg load HKLM\USOS_SYS "%USOS_T%\Windows\System32\config\SYSTEM" >nul
 if errorlevel 1 (echo [USOS] NVMe: SYSTEM hive not loaded; skipped. & goto nvme_done)
 set "USOS_CS="

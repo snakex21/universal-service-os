@@ -12,6 +12,7 @@ from build_windows7_nvme import read_assets, build_helpers as build_nvme_helpers
 from build_windows7_sha2 import read_cab as read_sha2_cab, CAB_NAME as SHA2_CAB_NAME
 from build_windows7_kmdf import read_cab as read_kmdf_cab, CAB_NAME as KMDF_CAB_NAME
 from build_windows_vista_support import build as build_vista_support
+from build_usosnvme_nt6_signed import build as build_usosnvme_nt6_signed
 
 
 def build(root: Path):
@@ -124,7 +125,7 @@ def build_modern_support(root: Path, out: Path):
     # installs it as C:/USOS/oobe.exe (csmwrap-integration 12.5).
     subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.vista-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
                     '-DUSOS_GATE_NATIVE_DEPLOY', '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_vista_oobe_gate.c'),
-                    '-Wl,--entry,entry', '-lkernel32', '-ladvapi32', '-lnetapi32', '-luser32', '-o', str(helpers / 'usos-vista-oobe-x86.exe')], env=env, check=True)
+                    '-Wl,--entry,entry', '-lkernel32', '-ladvapi32', '-lnetapi32', '-luser32', '-lcrypt32', '-o', str(helpers / 'usos-vista-oobe-x86.exe')], env=env, check=True)
     win7 = root / 'zig-out/windows7-uefi'
     writer = NewcWriter(out / 'modern-support.cpio.tmp')
     try:
@@ -141,15 +142,15 @@ def build_modern_support(root: Path, out: Path):
         # miniport (2KXP build of tools/nt/usosnvme; imports checked against
         # NT 6.0 SP2 in tools/tests/test_usosnvme.py), registered offline by
         # the nvme step of usos-x86-csmwrap.cmd (docs/nvme-nt6-2026-10-12.md).
-        writer.add_file('usosnvme-nt6.sys', root / 'tools/nt/usosnvme/bin/2KXP/i386/usosnvme.sys')
-        # DriverVer older than every inbox stornvme.inf: Setup only has to
-        # find a driver for the controller in the list it migrates; in the
-        # PE10 donor stornvme must keep the running disk (QEMU 2026-10-12: a
-        # newer date let usosnvme take the controller and the PE restarted).
-        inf = (root / 'tools/nt/usosnvme/usosnvme.inf').read_bytes()
-        if b'DriverVer=10/11/2026,1.0.0.0' not in inf:
-            raise ValueError('usosnvme.inf DriverVer changed; update the NT6 copy')
-        writer.add_bytes('usosnvme.inf', inf.replace(b'DriverVer=10/11/2026,1.0.0.0', b'DriverVer=01/01/2001,1.0.0.0'))
+        # Signed per build (sys + catalog) with a certificate whose private
+        # key is deleted right after signing; the installed system trusts
+        # only that certificate, so specialize stages / installs the package
+        # silently instead of the NULL driver (section 9).
+        signed = helpers / 'usosnvme-nt6'
+        build_usosnvme_nt6_signed(root, signed)
+        writer.add_file('usosnvme-nt6.sys', signed / 'usosnvme.sys')
+        for name in ('usosnvme.inf', 'usosnvme.cat', 'usosnvme.cer'):
+            writer.add_file(name, signed / name)
         for name in ('usos-drivers.exe', 'usos-unattend-drivers.exe'):
             writer.add_file(name, win7 / name)
     finally:

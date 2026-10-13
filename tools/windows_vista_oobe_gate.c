@@ -4,6 +4,7 @@
 #define _WIN32_WINNT 0x0600
 #include <windows.h>
 #include <lm.h>
+#include <wincrypt.h>
 #include "vista_oobe_recovery_policy.h"
 #include "vista_autochk.h"
 static WCHAR windows[MAX_PATH],self[MAX_PATH],file[MAX_PATH];
@@ -124,6 +125,40 @@ static void limit_autochk(void){
  report("Autochk: AutoChkTimeout = 3 s=",e);
  RegCloseKey(key);
 }
+#ifdef USOS_GATE_NATIVE_DEPLOY
+/* NVMe target (usos-x86-csmwrap.cmd :nvme put the signed usosnvme package in
+ * C:\USOS\nvme): before specialize, trust the package's per-build
+ * certificate (its private key was deleted at build time, so nothing else can
+ * carry this signature) in the machine's Root + TrustedPublisher stores and
+ * stage the package into the driver store. Specialize then installs usosnvme
+ * on the controller silently; without it NT 6.0 installed the NULL driver
+ * and every later start was STOP 0x7B (docs/nvme-nt6-2026-10-12.md 8-9).
+ * Never fatal. */
+static void nvme_stage(void){
+ static WCHAR dir[MAX_PATH],path[MAX_PATH],cmd[3*MAX_PATH];static BYTE cert[8192];
+ lstrcpyW(dir,L"C:\\USOS\\nvme\\");dir[0]=windows[0];
+ lstrcpyW(path,dir);lstrcatW(path,L"usosnvme.inf");
+ if(GetFileAttributesW(path)==INVALID_FILE_ATTRIBUTES)return;
+ lstrcpyW(path,dir);lstrcatW(path,L"usosnvme.cer");
+ DWORD n=0;HANDLE f=CreateFileW(path,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
+ if(f==INVALID_HANDLE_VALUE){report("NVMe: usosnvme.cer not opened=",GetLastError());return;}
+ BOOL read=ReadFile(f,cert,sizeof(cert),&n,0);CloseHandle(f);
+ if(!read||!n||n==sizeof(cert)){report("NVMe: usosnvme.cer not read=",read?ERROR_INVALID_DATA:GetLastError());return;}
+ static const WCHAR *const stores[]={L"Root",L"TrustedPublisher"};
+ for(unsigned i=0;i<2;i++){
+  HCERTSTORE store=CertOpenStore(CERT_STORE_PROV_SYSTEM_W,0,0,CERT_SYSTEM_STORE_LOCAL_MACHINE,stores[i]);
+  DWORD e=0;if(!store)e=GetLastError();
+  else{if(!CertAddEncodedCertificateToStore(store,X509_ASN_ENCODING,cert,n,CERT_STORE_ADD_REPLACE_EXISTING,0))e=GetLastError();CertCloseStore(store,0);}
+  report(i?"NVMe: certificate -> LocalMachine TrustedPublisher=":"NVMe: certificate -> LocalMachine Root=",e);
+ }
+ STARTUPINFOW si={sizeof(si)};PROCESS_INFORMATION pi={0};DWORD result=ERROR_GEN_FAILURE;
+ lstrcpyW(path,windows);lstrcatW(path,L"\\System32\\pnputil.exe");
+ lstrcpyW(cmd,L"\"");lstrcatW(cmd,path);lstrcatW(cmd,L"\" -a \"");lstrcatW(cmd,dir);lstrcatW(cmd,L"usosnvme.inf\"");
+ if(!CreateProcessW(path,cmd,0,0,FALSE,CREATE_NO_WINDOW,0,0,&si,&pi))result=GetLastError();
+ else{CloseHandle(pi.hThread);if(WaitForSingleObject(pi.hProcess,120000)==WAIT_OBJECT_0)GetExitCodeProcess(pi.hProcess,&result);else{TerminateProcess(pi.hProcess,WAIT_TIMEOUT);result=WAIT_TIMEOUT;}CloseHandle(pi.hProcess);}
+ report("NVMe: pnputil -a usosnvme.inf (driver store) exit=",result);
+}
+#endif
 void entry(void){
  static OSVERSIONINFOW os={sizeof(os)};
  if(!GetVersionExW(&os)||os.dwMajorVersion!=6||os.dwMinorVersion!=0||os.dwBuildNumber!=6002)ExitProcess(2);
@@ -154,6 +189,7 @@ void entry(void){
  }else{
   if(!start_watch())ExitProcess(ERROR_NOT_READY);
 #ifdef USOS_GATE_NATIVE_DEPLOY
+  nvme_stage();
   /* 32-bit Vista / Server 2008 SP2 (usos-x86-csmwrap.cmd, no USB payload):
    * straight to native windeploy, as on the recovery branch above. */
   lstrcpyW(file,windows);lstrcatW(file,L"\\System32\\oobe\\windeploy.exe");

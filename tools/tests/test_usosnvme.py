@@ -149,11 +149,11 @@ class Nt6Flow(unittest.TestCase):
         self.assertLess(gate.index('case "$TARGET_DEVICE" in /dev/nvme*)'), gate.index('usos_xp_confirm '))
         self.assertIn('[ "$nvme_lbs" = 512 ] || stop', gate)
         self.assertIn('[ "$x86_self" = 1 ] || stop "No NVMe driver for 64-bit', gate)
-        # Windows 7 x86 is allowed (hwcompat route + KB2990941/KB3087873 or
-        # usosnvme); Vista / 2008 x86 still stop (docs/nvme-nt6-2026-10-12.md
-        # section 7).
+        # Windows 7 x86 (hwcompat route + KB2990941/KB3087873 or usosnvme)
+        # and Server 2008 x86 (signed usosnvme package, section 9) are
+        # allowed; Vista x86 still stops (docs/nvme-nt6-2026-10-12.md).
         self.assertIn('case "$profile:$folder" in\n'
-                      "                'win-nt6-x86-uefi-csmwrap:Windows 7') ;;\n"
+                      "                'win-nt6-x86-uefi-csmwrap:Windows 7'|'win-nt6-x86-uefi-csmwrap:Windows Server 2008') ;;\n"
                       '                win-nt6-x86-uefi-csmwrap:*)\n'
                       '                    stop "No NVMe support for 32-bit', gate)
         target = (ROOT / 'tools/vista_csmwrap_target.sh').read_text(encoding='utf-8')
@@ -208,7 +208,41 @@ class Nt6Flow(unittest.TestCase):
 
     def test_packed(self):
         build = (ROOT / 'tools/build_windows_native_support.py').read_text(encoding='utf-8')
-        self.assertIn("writer.add_file('usosnvme-nt6.sys', root / 'tools/nt/usosnvme/bin/2KXP/i386/usosnvme.sys')", build)
+        self.assertIn("writer.add_file('usosnvme-nt6.sys', signed / 'usosnvme.sys')", build)
+        for name in ('usosnvme.inf', 'usosnvme.cat', 'usosnvme.cer'):
+            self.assertIn(repr(name), build)
+
+    def test_signed_package(self):
+        # Vista / 2008 specialize installs the NULL driver unless the package
+        # is in the driver store: per-build signature, key deleted right
+        # after signing, certificate trusted by the gate, pnputil before
+        # windeploy (docs/nvme-nt6-2026-10-12.md section 9).
+        sign = (ROOT / 'tools/build_usosnvme_nt6_signed.py').read_text(encoding='utf-8')
+        for want in ('-KeyExportPolicy NonExportable', '-HashAlgorithm SHA1', '-DeleteKey', '} finally {',
+                     'signing certificate still in CurrentUser', 'OSAttr:2:6.0,2:6.1',
+                     '<hash>usosnvme.inf=usosnvme.inf', '<hash>usosnvme.sys=usosnvme.sys', '/fd sha1'):
+            self.assertIn(want, sign)
+        self.assertLess(sign.index('& $signtool sign'), sign.index('-DeleteKey'))
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('usosnvme_signed', ROOT / 'tools/build_usosnvme_nt6_signed.py')
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        inf = mod.nt6_inf(ROOT)
+        self.assertIn(b'DriverVer=01/01/2001,1.0.0.0\r\nCatalogFile=usosnvme.cat\r\n', inf)
+        s = self.step()
+        self.assertNotIn('Windows\\inf\\usosnvme.inf', s)
+        self.assertIn('for %%F in (usosnvme.inf usosnvme.cat usosnvme.cer) do if exist "%~dp0%%F" '
+                      'copy /y "%~dp0%%F" "%USOS_T%\\USOS\\nvme\\%%F"', s)
+        gate = (ROOT / 'tools/windows_vista_oobe_gate.c').read_text(encoding='utf-8')
+        body = gate[gate.index('static void nvme_stage(void)'):]
+        for want in ('CERT_SYSTEM_STORE_LOCAL_MACHINE', 'L"Root",L"TrustedPublisher"', 'CertAddEncodedCertificateToStore',
+                     'pnputil.exe', '-a \\"', 'CREATE_NO_WINDOW'):
+            self.assertIn(want, body)
+        entry = gate[gate.index('void entry(void)'):]
+        native = entry[entry.index('#ifdef USOS_GATE_NATIVE_DEPLOY'):entry.index('#else')]
+        self.assertLess(native.index('nvme_stage();'), native.index('windeploy.exe'))
+        build = (ROOT / 'tools/build_windows_native_support.py').read_text(encoding='utf-8')
+        self.assertIn("'-lcrypt32', '-o', str(helpers / 'usos-vista-oobe-x86.exe')", build)
 
 
 if __name__ == '__main__':
