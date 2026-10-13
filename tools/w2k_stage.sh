@@ -131,6 +131,19 @@
 #    = the "***" driver line, rows 16-24 = the kernel's own text. Only ~BT:
 #    ~LS (the installed system) keeps the Microsoft file. USOS_W2K_BOOTVID=ms
 #    (DATA bootvid-ms.txt) leaves it out; with ACPI off it is never used.
+# 9. NVMe target (TARGET_DEVICE /dev/nvme*, or USOS_W2K_NVME=on/off;
+#    docs/nvme-nt-2026-10-11.md): USOS's own usosnvme (GPL, tools/nt/usosnvme)
+#    next to AHCINT, integrated the same way and in the same legacy mode:
+#    the NT4 build (non-PnP: it scans PCI for class 01-08-02 itself, claims
+#    BAR0, polls; the 2KXP build waits for a PnP start, which 2000's text
+#    mode never gives without PnpInterface in its own setup hive) in ~BT,
+#    I386 and I386\USOSNVME (GUI-mode copy); usosnvme.inf (source path
+#    \i386\usosnvme, PnpInterface row commented out) to %windir%\inf;
+#    TXTSETUP.SIF [SourceDisksFiles], [HardwareIdsDatabase] PCI\CC_010802,
+#    [SCSI.Load], [SCSI]; usosw2k.inf the CriticalDeviceDatabase row
+#    pci#cc_010802 -> usosnvme; DOSNET.INF. Polled, so the MPS HAL path
+#    (ACPI off, no PCI INTx) needs nothing more. AHCINT stays: it serves
+#    the SATA disks and only ever writes to a disk with the USOS gap marker.
 # No Microsoft file is added or changed except the TXTSETUP.SIF and
 # DOSNET.INF copies on the target (and USOS's own WINNT.SIF); with a user
 # ACPI package, the user's own files replace the ones they name.
@@ -183,6 +196,16 @@ usos_w2k_apply() (
     if [ -n "$(find "$ls" -maxdepth 1 -type f \( -iname usbport.sys -o -iname usbport.sy_ \) 2>/dev/null)" ]; then usb=${USOS_W2K_USB:-on}; else usb=off; fi
     case "$usb" in on|off) ;; *) echo '[W2K_STAGE] STOP: USOS_W2K_USB must be on or off'; exit 1 ;; esac
     USOS_W2K_USB=$usb; export USOS_W2K_USB
+    # NVMe target (see 9.).
+    case "${TARGET_DEVICE:-}" in /dev/nvme*) nvme=on ;; *) nvme=off ;; esac
+    nvme=${USOS_W2K_NVME:-$nvme}
+    case "$nvme" in on|off) ;; *) echo '[W2K_STAGE] STOP: USOS_W2K_NVME must be on or off'; exit 1 ;; esac
+    if [ "$nvme" = on ]; then
+        for name in usosnvme.sys usosnvme.inf; do
+            [ -f "$pkg/usosnvme/$name" ] || { echo "[W2K_STAGE] STOP: the target is NVMe but $pkg/usosnvme/$name is missing"; exit 1; }
+        done
+    fi
+    USOS_W2K_NVME=$nvme; export USOS_W2K_NVME
     # The user ACPI package (see 5.): resolved before anything is written.
     acpipkg=${USOS_W2K_ACPI_PKG:-}
     pkgplan=
@@ -220,7 +243,19 @@ usos_w2k_apply() (
             usos_w2k_uniata_inf > "$folder/uniata.inf"
         fi
         usos_w2k_hive_inf "$mode" > "$folder/usosw2k.inf"
+        find "$folder" -maxdepth 1 -type f \( -iname usosnvme.sys -o -iname usosnvme.sy_ -o -iname usosnvme.inf -o -iname usosnvme.in_ \) -exec rm -f '{}' \;
+        if [ "$nvme" = on ]; then
+            cp "$pkg/usosnvme/usosnvme.sys" "$folder/usosnvme.sys"
+            cmp -s "$pkg/usosnvme/usosnvme.sys" "$folder/usosnvme.sys"
+            usos_w2k_nvme_inf < "$pkg/usosnvme/usosnvme.inf" > "$folder/usosnvme.inf" || { echo '[W2K_STAGE] STOP: cannot adapt usosnvme.inf'; exit 1; }
+        fi
     done
+    find "$ls" -maxdepth 1 -type d -iname usosnvme -exec rm -rf '{}' +
+    if [ "$nvme" = on ]; then
+        mkdir "$ls/USOSNVME"
+        cp "$pkg/usosnvme/usosnvme.sys" "$ls/USOSNVME/usosnvme.sys"
+        cmp -s "$pkg/usosnvme/usosnvme.sys" "$ls/USOSNVME/usosnvme.sys"
+    fi
     upper=$(printf '%s' "$drv" | tr '[:lower:]' '[:upper:]')
     find "$ls" -maxdepth 1 -type d -iname "$drv" -exec rm -rf '{}' +
     mkdir "$ls/$upper"
@@ -229,6 +264,10 @@ usos_w2k_apply() (
     for sif in "$bt/TXTSETUP.SIF" "$ls/TXTSETUP.SIF" "$XP_TARGET_ROOT/TXTSETUP.SIF"; do
         [ -f "$sif" ] || continue
         usos_w2k_storage_sif < "$sif" > "$sif.usos" || { rm -f "$sif.usos"; echo "[W2K_STAGE] STOP: cannot patch $sif"; exit 1; }
+        if [ "$nvme" = on ]; then
+            usos_w2k_nvme_sif < "$sif.usos" > "$sif.nvme" || { rm -f "$sif.usos" "$sif.nvme"; echo "[W2K_STAGE] STOP: cannot add usosnvme to $sif"; exit 1; }
+            mv "$sif.nvme" "$sif.usos"
+        fi
         if [ "$acpi" = off ]; then
             usos_w2k_acpi_off_sif < "$sif.usos" > "$sif.acpi" || { rm -f "$sif.usos" "$sif.acpi"; echo "[W2K_STAGE] STOP: no [ACPIOptions] ACPIEnable row in $sif"; exit 1; }
             mv "$sif.acpi" "$sif.usos"
@@ -253,7 +292,7 @@ usos_w2k_apply() (
     printf '[W2K_STAGE] APPLIED PASS %s boot+local source, TXTSETUP.SIF PCI\\CC_010601, usosw2k.inf (CriticalDeviceDatabase), %s mode; ACPI %s; HAL %s; WINNT.SIF answers: standard keyboard; usosrst %s\n' \
         "$(usos_w2k_driver_title)" "$mode" "$([ "$acpi" = off ] && echo 'off (ACPIEnable = 0)' || echo 'kept (ACPIEnable unchanged)')" \
         "$(case "$hal" in mps) echo 'MPS Multiprocessor (ComputerType)' ;; standard) echo 'Standard PC (ComputerType)' ;; *) echo 'chosen by Setup' ;; esac)" \
-        "$([ "$helper" = on ] && echo 'on (STOP screen, Setup and text-mode restart via FADT/CF9/8042)' || echo off)$([ "$hpet" = legacy-off ] && echo '; HPET LegacyReplacement off')$([ "$rtc" = fix ] && echo '; RTC fix')$([ "$bootvid" = text ] && echo '; text boot video usosvid + /SOS (~BT)')$([ "$usb" = on ] && echo '; USB keyboard preinstall (CriticalDeviceDatabase)')$([ -n "$pkgplan" ] && printf '; user ACPI package: %s' "$(printf '%s\n' "$pkgplan" | awk -F '\t' '{ printf "%s%s %s", sep, ($1 == "extra" ? "boot driver" : "replaces"), $2; sep = ", " }')")"
+        "$([ "$helper" = on ] && echo 'on (STOP screen, Setup and text-mode restart via FADT/CF9/8042)' || echo off)$([ "$hpet" = legacy-off ] && echo '; HPET LegacyReplacement off')$([ "$rtc" = fix ] && echo '; RTC fix')$([ "$bootvid" = text ] && echo '; text boot video usosvid + /SOS (~BT)')$([ "$usb" = on ] && echo '; USB keyboard preinstall (CriticalDeviceDatabase)')$([ "$nvme" = on ] && echo '; NVMe target: usosnvme 1.0 (legacy mode, PCI\CC_010802)')$([ -n "$pkgplan" ] && printf '; user ACPI package: %s' "$(printf '%s\n' "$pkgplan" | awk -F '\t' '{ printf "%s%s %s", sep, ($1 == "extra" ? "boot driver" : "replaces"), $2; sep = ", " }')")"
 )
 
 # stdout: the plan for the user ACPI package folder $1 (see 5.) against the
@@ -356,7 +395,7 @@ usos_w2k_storage_sif() {
 # PnpInterface for AHCINT and the CriticalDeviceDatabase entries of
 # USOS_W2K_AHCI_IDS. Loaded through TXTSETUP.SIF [HiveInfs.Fresh].
 usos_w2k_hive_inf() {
-    awk -v ids="$USOS_W2K_AHCI_IDS" -v mode="${1:-legacy}" -v drv="${USOS_W2K_DRV:-ahcint}" -v helper="${USOS_W2K_USOSRST:-on}" -v acpi="${USOS_W2K_ACPI:-on}" -v hpet="${USOS_W2K_HPET:-keep}" -v rtc="${USOS_W2K_RTC:-keep}" -v usb="${USOS_W2K_USB:-off}" -v extra="${USOS_W2K_ACPI_EXTRA:-}" '
+    awk -v ids="$USOS_W2K_AHCI_IDS" -v mode="${1:-legacy}" -v drv="${USOS_W2K_DRV:-ahcint}" -v helper="${USOS_W2K_USOSRST:-on}" -v acpi="${USOS_W2K_ACPI:-on}" -v hpet="${USOS_W2K_HPET:-keep}" -v rtc="${USOS_W2K_RTC:-keep}" -v usb="${USOS_W2K_USB:-off}" -v extra="${USOS_W2K_ACPI_EXTRA:-}" -v nvme="${USOS_W2K_NVME:-off}" '
         BEGIN {
             bs = sprintf("%c", 92); q = sprintf("%c", 34); n = split(ids, id, " ")
             base = "HKLM," q "SYSTEM" bs "CurrentControlSet" bs
@@ -438,6 +477,11 @@ usos_w2k_hive_inf() {
                 key = tolower(id[i])
                 print cddb key q "," q "Service" q ",0x00000000," q drv q "\r"
                 print cddb key q "," q "ClassGUID" q ",0x00000000," q "{4D36E97B-E325-11CE-BFC1-08002BE10318}" q "\r"
+            }
+            # NVMe target (see 9.): the NVMe class code -> usosnvme.
+            if (nvme == "on") {
+                print cddb "cc_010802" q "," q "Service" q ",0x00000000," q "usosnvme" q "\r"
+                print cddb "cc_010802" q "," q "ClassGUID" q ",0x00000000," q "{4D36E97B-E325-11CE-BFC1-08002BE10318}" q "\r"
             }
         }
     '
@@ -596,16 +640,52 @@ usos_w2k_ahcint_inf() {
 # (and d1,usosrst.sys unless USOS_W2K_USOSRST=off) in the first [Files] and
 # [FloppyFiles.1] blocks.
 usos_w2k_dosnet() {
-    awk -v drv="${USOS_W2K_DRV:-ahcint}" -v helper="${USOS_W2K_USOSRST:-on}" -v extra="${USOS_W2K_ACPI_EXTRA:-}" '
+    awk -v drv="${USOS_W2K_DRV:-ahcint}" -v helper="${USOS_W2K_USOSRST:-on}" -v extra="${USOS_W2K_ACPI_EXTRA:-}" -v nvme="${USOS_W2K_NVME:-off}" '
         BEGIN { ne = split(extra, ex, " ") }
         { line = $0; sub(/\r$/, "", line); low = tolower(line) }
-        index(low, drv) || index(low, "usosw2k") || index(low, "usosrst") { dup = 1 }
+        index(low, drv) || index(low, "usosw2k") || index(low, "usosrst") || index(low, "usosnvme") { dup = 1 }
         { for (i = 1; i <= ne; i++) if (index(low, "d1," ex[i] ".sys")) dup = 1 }
         { print line "\r" }
         low == "[files]" && !f { rowsfor(); f = 1 }
         low == "[floppyfiles.1]" && !b { rowsfor(); b = 1 }
-        function rowsfor() { print "d1," drv ".sys\r"; print "d1," drv ".inf\r"; print "d1,usosw2k.inf\r"; if (helper == "on") print "d1,usosrst.sys\r"; for (i = 1; i <= ne; i++) print "d1," ex[i] ".sys\r" }
+        function rowsfor() { print "d1," drv ".sys\r"; print "d1," drv ".inf\r"; print "d1,usosw2k.inf\r"; if (helper == "on") print "d1,usosrst.sys\r"; for (i = 1; i <= ne; i++) print "d1," ex[i] ".sys\r"; if (nvme == "on") { print "d1,usosnvme.sys\r"; print "d1,usosnvme.inf\r" } }
         END { if (dup || !(f && b)) exit 3 }
+    '
+}
+
+# stdin TXTSETUP.SIF (after usos_w2k_storage_sif) -> stdout with the usosnvme
+# rows (see 9.): [SourceDisksFiles] usosnvme.sys / usosnvme.inf,
+# [HardwareIdsDatabase] PCI\CC_010802, [SCSI.Load], [SCSI]; the first block of
+# each section. Exit 3 if a section is missing or usosnvme is already there.
+usos_w2k_nvme_sif() {
+    awk '
+        BEGIN { bs = sprintf("%c", 92); q = sprintf("%c", 34) }
+        { line = $0; sub(/\r$/, "", line); low = tolower(line) }
+        index(low, "usosnvme") || index(low, "pci" bs "cc_010802") { dup = 1 }
+        { print line "\r" }
+        low == "[sourcedisksfiles]" && !f { print "usosnvme.sys = 1,,,,,,4_,4,1,,,1,4\r"; print "usosnvme.inf = 1,,,,,,,20,0,0\r"; f = 1 }
+        low == "[hardwareidsdatabase]" && !h { print "PCI" bs "CC_010802 = " q "usosnvme" q "\r"; h = 1 }
+        low == "[scsi.load]" && !l { print "usosnvme = usosnvme.sys,4\r"; l = 1 }
+        low == "[scsi]" && !s { print "usosnvme = " q "NVM Express Controller (usosnvme 1.0, USOS)" q "\r"; s = 1 }
+        END { if (dup || !(f && h && l && s)) exit 3 }
+    '
+}
+
+# stdin usosnvme.inf -> stdout (CRLF): [SourceDisksNames] row 1 with the path
+# \i386\usosnvme (the GUI-mode copy) and the PnpInterface row commented out
+# (legacy mode, see 9.). Exit 3 unless both changed exactly once.
+usos_w2k_nvme_inf() {
+    awk '
+        BEGIN { bs = sprintf("%c", 92); dir = bs "i386" bs "usosnvme" }
+        { line = $0; sub(/\r$/, "", line); low = tolower(line) }
+        low ~ /^[ \t]*\[/ { section = low; sub(/[ \t]+$/, "", section) }
+        index(low, "pnpinterface") && low !~ /^[ \t]*;/ { line = "; USOS legacy mode (Windows 2000): " line; pnp++ }
+        section == "[sourcedisksnames]" && line ~ /^[ \t]*1[ \t]*=/ {
+            m = split(line, v, ",")
+            if (m != 4) bad = 1; else { line = v[1] ",," v[3] "," dir; sdn++ }
+        }
+        { print line "\r" }
+        END { if (bad || pnp != 1 || sdn != 1) exit 3 }
     '
 }
 
