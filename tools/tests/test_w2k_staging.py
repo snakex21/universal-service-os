@@ -107,6 +107,7 @@ class W2kStorage(unittest.TestCase):
         self.assertEqual(rows(both.stdout), rows(sif.replace(b'/nodebug"', b'/nodebug /USOSHPETLEGOFF /USOSRTCFIX"')))
         self.assertEqual(run_fn('usos_w2k_load_options', b'').stdout, b'')
         self.assertEqual(run_fn('USOS_W2K_RTC=fix usos_w2k_load_options', b'').stdout, b'/USOSRTCFIX')
+        self.assertEqual(run_fn('USOS_W2K_BOOTVID=text usos_w2k_load_options', b'').stdout, b'/SOS')
         rtc = 'HKLM,"SYSTEM\\CurrentControlSet\\Services\\usosrst\\Parameters","RtcFix",0x00010001,1'
         self.assertIn(rtc, rows(run_fn('USOS_W2K_RTC=fix usos_w2k_hive_inf', b'').stdout))
         self.assertNotIn(rtc, rows(run_fn('usos_w2k_hive_inf', b'').stdout))
@@ -204,7 +205,8 @@ class W2kStorage(unittest.TestCase):
         import build_xp_uefi_csm_trial as builder
         files = builder.w2k_driver_files()
         self.assertEqual(sorted(files), ['LICENSE', 'MODIFIED.txt', 'SOURCE.txt', 'ahcint.inf', 'ahcint.sys',
-                                         'uniata/COPYING-GPL-2.0.txt', 'uniata/SOURCES.txt', 'uniata/uniata.sys', 'usosrst.sys'])
+                                         'uniata/COPYING-GPL-2.0.txt', 'uniata/SOURCES.txt', 'uniata/uniata.sys', 'usosrst.sys',
+                                         'usosvid/bootvid.dll'])
         self.assertEqual(struct.unpack_from('<H', files['usosrst.sys'], struct.unpack_from('<I', files['usosrst.sys'], 60)[0] + 4)[0], 0x14c)
         self.assertIn(b'usosrst.sys: USOS', files['SOURCE.txt'])
         # usosrst: own source next to the pinned binary, every file pinned.
@@ -267,6 +269,32 @@ class W2kStorage(unittest.TestCase):
         for rel, digest in pins['files'].items():
             self.assertEqual(hashlib.sha256((ROOT / 'tools/vendor/uniata/0.47b' / rel).read_bytes()).hexdigest(), digest, rel)
 
+    def test_usosvid(self):
+        # usosvid: own source next to the pinned binary, every file pinned; the
+        # export names of the Windows 2000 BOOTVID.DLL and only kernel imports
+        # the 2000 SP4 ntoskrnl exports.
+        vid = ROOT / 'tools/w2k/usosvid'
+        pins = json.loads((vid / 'manifest.json').read_text())
+        for rel, digest in pins['files'].items():
+            self.assertEqual(hashlib.sha256((vid / rel).read_bytes()).hexdigest(), digest, rel)
+        c = (vid / 'src/usosvid.c').read_bytes()
+        self.assertIn(b'SPDX-License-Identifier: GPL-3.0-or-later', c)
+        exports = ('VidBitBlt', 'VidBufferToScreenBlt', 'VidCleanUp', 'VidDisplayString', 'VidDisplayStringXY', 'VidInitialize',
+                   'VidResetDisplay', 'VidScreenToBufferBlt', 'VidSetScrollRegion', 'VidSetTextColor', 'VidSolidColorFill')
+        for name, size in zip(exports, (12, 24, 0, 4, 16, 4, 4, 24, 16, 4, 20)):
+            self.assertIn(f'{name}@{size}'.encode(), pins['exports'].encode())
+        dll = (vid / 'bin/i386/bootvid.dll').read_bytes()
+        pe = struct.unpack_from('<I', dll, 60)[0]
+        self.assertEqual(struct.unpack_from('<H', dll, pe + 4)[0], 0x14c)
+        self.assertTrue(struct.unpack_from('<H', dll, pe + 22)[0] & 0x2000)        # IMAGE_FILE_DLL
+        for name in exports:
+            self.assertIn(name.encode() + b'\0', dll)
+        self.assertIn(b'BOOTVID.DLL\0', dll)
+        self.assertIn(b'ntoskrnl.exe\0', dll)
+        self.assertNotIn(b'HAL.dll', dll)
+        for name in (b'MmMapIoSpace', b'MmUnmapIoSpace'):
+            self.assertIn(name, dll)
+
     def stand_in(self, t: Path) -> tuple:
         import build_xp_uefi_csm_trial as builder
         for rel, data in builder.w2k_driver_files().items():
@@ -277,6 +305,7 @@ class W2kStorage(unittest.TestCase):
             folder.mkdir(parents=True)
             (folder / 'TXTSETUP.SIF').write_bytes(W2K_TXTSETUP)
             (folder / 'AHCINT.SY_').write_bytes(b'stale')
+            (folder / 'BOOTVID.DL_').write_bytes(b'ms')
         (t / 'root/TXTSETUP.SIF').write_bytes(W2K_TXTSETUP)
         (bt / 'WINNT.SIF').write_bytes(W2K_WINNT)
         (ls / 'DOSNET.INF').write_bytes(W2K_DOSNET)
@@ -298,7 +327,8 @@ class W2kStorage(unittest.TestCase):
                 self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
                 self.assertIn(b'[W2K_STAGE] APPLIED PASS AHCINT 1.3.0.0-usos4', r.stdout)
                 sif = run_fn('usos_w2k_storage_sif', W2K_TXTSETUP).stdout
-                sif = run_fn('usos_w2k_hpet_sif "/USOSHPETLEGOFF /USOSRTCFIX"', sif).stdout   # the clock default
+                # the clock default; with ACPI kept also /SOS for the text boot video (8.)
+                sif = run_fn('usos_w2k_hpet_sif "/USOSHPETLEGOFF /USOSRTCFIX' + ('' if acpi == 'off' else ' /SOS') + '"', sif).stdout
                 if acpi == 'off':  # default (empty) keeps ACPI since 2026-10-03
                     sif = run_fn('usos_w2k_acpi_off_sif', sif).stdout
                     self.assertIn(b'ACPI off', r.stdout)
@@ -319,6 +349,16 @@ class W2kStorage(unittest.TestCase):
                 self.assertIn(b'd1,ahcint.inf', (ls / 'DOSNET.INF').read_bytes())
                 self.assertIn(b'd1,usosrst.sys', (ls / 'DOSNET.INF').read_bytes())
                 self.assertIn(b'usosrst on', r.stdout)
+                # Text boot video (8.): ~BT only, ACPI kept only; ~LS keeps Microsoft's file.
+                self.assertEqual((ls / 'BOOTVID.DL_').read_bytes(), b'ms')
+                if acpi == 'off':
+                    self.assertEqual((bt / 'BOOTVID.DL_').read_bytes(), b'ms')
+                    self.assertFalse((bt / 'BOOTVID.DLL').exists())
+                    self.assertNotIn(b'text boot video', r.stdout)
+                else:
+                    self.assertEqual((bt / 'BOOTVID.DLL').read_bytes(), pkg['usosvid/bootvid.dll'])
+                    self.assertFalse((bt / 'BOOTVID.DL_').exists())
+                    self.assertIn(b'text boot video usosvid + /SOS (~BT)', r.stdout)
                 # WINNT.SIF is written later (prepare_xp_windows_partition.sh); apply only checks.
                 self.assertEqual((bt / 'WINNT.SIF').read_bytes(), W2K_WINNT)
                 self.assertIn(b'HAL MPS Multiprocessor' if acpi == 'off' else b'HAL chosen by Setup', r.stdout)
@@ -357,7 +397,7 @@ class W2kStorage(unittest.TestCase):
             self.assertIn(b'ACPI kept', r.stdout)
             extra = 'USOS_W2K_ACPI_EXTRA=acpi_w2k'
             sif = run_fn(f'{extra} usos_w2k_storage_sif', W2K_TXTSETUP).stdout
-            sif = run_fn('usos_w2k_hpet_sif "/USOSHPETLEGOFF /USOSRTCFIX"', sif).stdout
+            sif = run_fn('usos_w2k_hpet_sif "/USOSHPETLEGOFF /USOSRTCFIX /SOS"', sif).stdout
             for folder in (bt, ls):
                 self.assertEqual((folder / 'acpi_w2k.sys').read_bytes(), b'MZ user driver')
                 self.assertEqual((folder / 'acpi.sys').read_bytes(), b'MZ user acpi')

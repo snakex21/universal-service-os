@@ -221,6 +221,8 @@ AHCINT_BASE=ROOT/'tools/vendor/ahcint/1.3.0.0'
 UNIATA_DIR=ROOT/'tools/vendor/uniata/0.47b'
 # usosrst.sys: USOS's own GPL helper (STOP screen, Setup restart without an 8042).
 USOSRST_DIR=ROOT/'tools/w2k/usosrst'
+# usosvid/bootvid.dll: USOS's own text-mode BOOTVID.DLL (ACPI HAL diagnostic, ~BT only).
+USOSVID_DIR=ROOT/'tools/w2k/usosvid'
 
 def w2k_driver_files():
     pins=json.loads((AHCINT_DIR/'manifest.json').read_text())
@@ -236,7 +238,10 @@ def w2k_driver_files():
         if hashlib.sha256(files[name]).hexdigest()!=uni['files'][member]:raise ValueError('UniATA file hash mismatch: '+member)
     files['usosrst.sys']=(USOSRST_DIR/'bin/i386/usosrst.sys').read_bytes()
     if hashlib.sha256(files['usosrst.sys']).hexdigest()!=rst['files']['bin/i386/usosrst.sys']:raise ValueError('usosrst file hash mismatch')
-    for name in ('ahcint.sys','uniata/uniata.sys','usosrst.sys'):
+    vid=json.loads((USOSVID_DIR/'manifest.json').read_text())
+    files['usosvid/bootvid.dll']=(USOSVID_DIR/'bin/i386/bootvid.dll').read_bytes()
+    if hashlib.sha256(files['usosvid/bootvid.dll']).hexdigest()!=vid['files']['bin/i386/bootvid.dll']:raise ValueError('usosvid file hash mismatch')
+    for name in ('ahcint.sys','uniata/uniata.sys','usosrst.sys','usosvid/bootvid.dll'):
         if struct.unpack_from('<H',files[name],struct.unpack_from('<I',files[name],60)[0]+4)[0]!=0x14c:raise ValueError(name+' is not i386')
     files['SOURCE.txt']=('AHCINT %s (i386 ScsiPort miniport, MODIFIED by USOS, see MODIFIED.txt), %s\n'
         'base: tag %s = commit %s (release archive sha256 %s) plus %s,\n'
@@ -247,9 +252,11 @@ def w2k_driver_files():
         'tools/vendor/uniata/0.47b/BusMaster_v47b_src.rar).\n'
         'usosrst.sys: USOS\'s own helper driver %s (GPL-3.0-or-later, source:\n'
         'tools/w2k/usosrst/src in the USOS sources zip).\n'
+        'usosvid/bootvid.dll: USOS\'s own text-mode boot video %s (GPL-3.0-or-later,\n'
+        'source: tools/w2k/usosvid/src in the USOS sources zip).\n'
         'USOS uses them only for Windows 2000 SP4 Setup; staging writes the INF\n'
         'source path (\\i386\\ahcint or \\i386\\uniata) and its own uniata.inf.\n'
-        %(pins['version'],base['upstream'],base['tag'],base['commit'],base['release_zip']['sha256'],', '.join(pins['patches']),rst['version'])).encode()
+        %(pins['version'],base['upstream'],base['tag'],base['commit'],base['release_zip']['sha256'],', '.join(pins['patches']),rst['version'],vid['version'])).encode()
     return files
 
 def is_package_entry(name):

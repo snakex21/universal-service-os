@@ -120,6 +120,17 @@
 #    usosw2k.inf also writes Services\xhci98\Parameters PollMode = 1:
 #    xhci98 1.1.1.0-usos3 then registers without an interrupt and collects
 #    its events from a periodic timer.
+# 8. Text boot video (ACPI HAL diagnostic, X470 2026-10-13): with ACPI on,
+#    $WIN_NT$.~BT gets USOS's own BOOTVID.DLL (tools/w2k/usosvid, GPL; the
+#    compressed BOOTVID.DL_ is removed) and the text-mode OsLoadOptions get
+#    /SOS. Behind CSMWrap the Microsoft boot video's 640x480 mode never
+#    shows, so a STOP before usosrst starts (acpi.sys, pci.sys, the HAL) was
+#    only a black "_". usosvid keeps the text mode: row 11 = kernel phase 1
+#    reached, rows 12-13 = HPET/RSDP/RSDT/FACP/DSDT/MADT facts as the kernel
+#    sees them (QWord names left, checksums), row 14 = the STOP line, row 15
+#    = the "***" driver line, rows 16-24 = the kernel's own text. Only ~BT:
+#    ~LS (the installed system) keeps the Microsoft file. USOS_W2K_BOOTVID=ms
+#    (DATA bootvid-ms.txt) leaves it out; with ACPI off it is never used.
 # No Microsoft file is added or changed except the TXTSETUP.SIF and
 # DOSNET.INF copies on the target (and USOS's own WINNT.SIF); with a user
 # ACPI package, the user's own files replace the ones they name.
@@ -151,6 +162,11 @@ usos_w2k_apply() (
     case "$mode" in legacy|pnp) ;; *) echo "[W2K_STAGE] STOP: USOS_W2K_AHCINT_MODE must be legacy or pnp"; exit 1 ;; esac
     case "$acpi" in on|off) ;; *) echo "[W2K_STAGE] STOP: USOS_W2K_ACPI must be on or off"; exit 1 ;; esac
     hal=$(usos_w2k_hal) || { echo "$hal"; exit 1; }
+    # Text boot video (see 8.): default with ACPI on, never with ACPI off.
+    if [ "$acpi" = on ]; then bootvid=${USOS_W2K_BOOTVID:-text}; else bootvid=ms; fi
+    case "$bootvid" in text|ms) ;; *) echo '[W2K_STAGE] STOP: USOS_W2K_BOOTVID must be text or ms'; exit 1 ;; esac
+    [ "$bootvid" = ms ] || [ -f "$pkg/usosvid/bootvid.dll" ] || { echo "[W2K_STAGE] STOP: $pkg/usosvid/bootvid.dll missing"; exit 1; }
+    USOS_W2K_BOOTVID=$bootvid; export USOS_W2K_BOOTVID
     # The clock (see 6.): USOS_W2K_HPET legacy-off (default with usosrst) or
     # keep; USOS_W2K_RTC fix (default with usosrst) or keep. Both need usosrst.
     if [ "$helper" = on ]; then hpet=${USOS_W2K_HPET:-legacy-off} rtc=${USOS_W2K_RTC:-fix}; else hpet=${USOS_W2K_HPET:-keep} rtc=${USOS_W2K_RTC:-keep}; fi
@@ -224,6 +240,11 @@ usos_w2k_apply() (
         fi
         mv "$sif.usos" "$sif"
     done
+    if [ "$bootvid" = text ]; then
+        find "$bt" -maxdepth 1 -type f \( -iname bootvid.dll -o -iname bootvid.dl_ \) -exec rm -f '{}' \;
+        cp "$pkg/usosvid/bootvid.dll" "$bt/BOOTVID.DLL"
+        cmp -s "$pkg/usosvid/bootvid.dll" "$bt/BOOTVID.DLL" || { echo '[W2K_STAGE] STOP: cannot copy the text boot video into ~BT'; exit 1; }
+    fi
     if [ -f "$ls/DOSNET.INF" ]; then
         usos_w2k_dosnet < "$ls/DOSNET.INF" > "$ls/DOSNET.INF.usos" || { rm -f "$ls/DOSNET.INF.usos"; echo '[W2K_STAGE] STOP: cannot patch DOSNET.INF'; exit 1; }
         mv "$ls/DOSNET.INF.usos" "$ls/DOSNET.INF"
@@ -232,7 +253,7 @@ usos_w2k_apply() (
     printf '[W2K_STAGE] APPLIED PASS %s boot+local source, TXTSETUP.SIF PCI\\CC_010601, usosw2k.inf (CriticalDeviceDatabase), %s mode; ACPI %s; HAL %s; WINNT.SIF answers: standard keyboard; usosrst %s\n' \
         "$(usos_w2k_driver_title)" "$mode" "$([ "$acpi" = off ] && echo 'off (ACPIEnable = 0)' || echo 'kept (ACPIEnable unchanged)')" \
         "$(case "$hal" in mps) echo 'MPS Multiprocessor (ComputerType)' ;; standard) echo 'Standard PC (ComputerType)' ;; *) echo 'chosen by Setup' ;; esac)" \
-        "$([ "$helper" = on ] && echo 'on (STOP screen, Setup and text-mode restart via FADT/CF9/8042)' || echo off)$([ "$hpet" = legacy-off ] && echo '; HPET LegacyReplacement off')$([ "$rtc" = fix ] && echo '; RTC fix')$([ "$usb" = on ] && echo '; USB keyboard preinstall (CriticalDeviceDatabase)')$([ -n "$pkgplan" ] && printf '; user ACPI package: %s' "$(printf '%s\n' "$pkgplan" | awk -F '\t' '{ printf "%s%s %s", sep, ($1 == "extra" ? "boot driver" : "replaces"), $2; sep = ", " }')")"
+        "$([ "$helper" = on ] && echo 'on (STOP screen, Setup and text-mode restart via FADT/CF9/8042)' || echo off)$([ "$hpet" = legacy-off ] && echo '; HPET LegacyReplacement off')$([ "$rtc" = fix ] && echo '; RTC fix')$([ "$bootvid" = text ] && echo '; text boot video usosvid + /SOS (~BT)')$([ "$usb" = on ] && echo '; USB keyboard preinstall (CriticalDeviceDatabase)')$([ -n "$pkgplan" ] && printf '; user ACPI package: %s' "$(printf '%s\n' "$pkgplan" | awk -F '\t' '{ printf "%s%s %s", sep, ($1 == "extra" ? "boot driver" : "replaces"), $2; sep = ", " }')")"
 )
 
 # stdout: the plan for the user ACPI package folder $1 (see 5.) against the
@@ -433,6 +454,7 @@ usos_w2k_load_options() {
     o=
     [ "${USOS_W2K_HPET:-keep}" = legacy-off ] && o="/USOSHPETLEGOFF"
     [ "${USOS_W2K_RTC:-keep}" = fix ] && o="${o:+$o }/USOSRTCFIX"
+    [ "${USOS_W2K_BOOTVID:-ms}" = text ] && o="${o:+$o }/SOS"
     printf '%s' "$o"
 }
 
