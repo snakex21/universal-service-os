@@ -29,7 +29,10 @@ rem      usosmpart.sys (own GPL USB multi-partition disk filter,
 rem      tools/nt/usosmpart) copied to system32\drivers and registered offline
 rem      as a boot-start disk class lower filter, so every partition of a USB
 rem      stick gets a letter (Windows before 10 1703 mounts only the first
-rem      one of removable media); never fatal (:mpart);
+rem      one of removable media); never fatal (:mpart); then (:usbfix)
+rem      usos-usbreenum.exe, run once from SetupComplete.cmd, restarts or
+rem      reinstalls the USB mass-storage device nodes after Setup (a stick
+rem      plugged in during the installation stayed invisible on the X470);
 rem   0. NVMe target (target_bus=nvme in usos-csmwrap-target.ini), Setup 6.0 /
 rem      6.1: Setup runs from a copy of the media's sources folder whose
 rem      hwcompat.txt lists PCI\CC_010802 (:nvme_setup);
@@ -568,7 +571,41 @@ set "USOS_SVC=HKLM\USOS_SYS\ControlSet00%USOS_CS%\Services\usosmpart"
 set "USOS_CLS=HKLM\USOS_SYS\ControlSet00%USOS_CS%\Control\Class\{4D36E967-E325-11CE-BFC1-08002BE10318}"
 call :mpart_reg
 reg unload HKLM\USOS_SYS >nul
+call :usbfix
 "%~dp0usos-log-x86.exe"
+exit /b 0
+
+rem ---- after Setup: USB mass-storage device nodes like a replug --------------
+rem X470 2026-10-14 (Windows 7 SP1 x86, B261014-195920): the USOS stick,
+rem plugged in during the whole installation, stayed invisible in the
+rem installed Windows (a restart did not help, one unplug / replug did, and
+rem every later boot then found it). usos-usbreenum.exe (own code,
+rem tools/windows_usb_reenum.c) runs once from SetupComplete.cmd (SYSTEM,
+rem before the first logon, no window): it removes a USB / USBSTOR device
+rem node with an install problem and re-enumerates the tree with "retry
+rem installation" (= a replug), restarts one with another problem and every
+rem USBSTOR disk node, and logs the device nodes, USB disks and volumes to
+rem C:\USOS\Logs and the stick's EFI\USOS\Logs. An existing SetupComplete.cmd
+rem of the image gets the call as its first line. Never fatal.
+:usbfix
+if not exist "%~dp0usos-usbreenum.exe" (echo [USOS] usbfix: helper missing; skipped. & exit /b 0)
+if not exist "%USOS_T%\Windows\Setup\Scripts\" md "%USOS_T%\Windows\Setup\Scripts"
+copy /y "%~dp0usos-usbreenum.exe" "%USOS_T%\Windows\Setup\Scripts\usos-usbreenum.exe" >nul
+if errorlevel 1 (echo [USOS] usbfix: copy failed; skipped. & exit /b 0)
+set "USOS_SC=%USOS_T%\Windows\Setup\Scripts\SetupComplete.cmd"
+if not exist "%USOS_SC%" goto usbfix_new
+find /i "usos-usbreenum" "%USOS_SC%" >nul 2>&1
+if not errorlevel 1 exit /b 0
+rem The call goes first: the image's own script may end with exit.
+(echo "%%SystemRoot%%\Setup\Scripts\usos-usbreenum.exe")>"%USOS_SC%.usos"
+type "%USOS_SC%" >>"%USOS_SC%.usos"
+move /y "%USOS_SC%.usos" "%USOS_SC%" >nul
+if errorlevel 1 (del "%USOS_SC%.usos" & echo [USOS] usbfix: SetupComplete.cmd of the image not changed. & exit /b 0)
+echo [USOS] usbfix: call added before the image's SetupComplete.cmd lines.
+exit /b 0
+:usbfix_new
+(echo @echo off& echo rem USOS: USB mass-storage device nodes after Setup, tools/windows_usb_reenum.c& echo "%%SystemRoot%%\Setup\Scripts\usos-usbreenum.exe"& echo exit /b 0)>"%USOS_SC%"
+echo [USOS] usbfix: SetupComplete.cmd written.
 exit /b 0
 
 rem The registry rows of :mpart (USOS_SVC, USOS_CLS set by the caller; also

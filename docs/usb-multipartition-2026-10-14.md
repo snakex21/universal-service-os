@@ -1,6 +1,9 @@
 # Every partition of a USB stick in old Windows (2026-10-14)
 
-Status: implemented, QEMU-tested (see "Tests"); **not tested on the X470**.
+Status: implemented, QEMU-tested (see "Tests"); X470 Windows 7 SP1 x86
+2026-10-14: every partition after a replug, but the stick present during the
+installation stayed invisible until that replug -> `:usbfix` (usos-usbreenum,
+QEMU only, see "X470: Windows 7 SP1 x86").
 
 ## Problem
 
@@ -119,9 +122,82 @@ to the flipped stick before that were complete on the host, and the
 dedicated copy-and-yank test above did not show it. Not attributed; worth a
 look on hardware.
 
+### X470: Windows 7 SP1 x86 (2026-10-14, B261014-195920)
+
+Windows 7 SP1 x86 installed on the Micron NVMe (usosnvme NT 6 no-interrupt
+build) through the CSMWrap x86 flow with the USOS SanDisk stick (GPT: ESP,
+DATA NTFS, WORK NTFS) plugged in the whole time:
+
+- multi-partition works: after **one unplug / replug** the stick appeared
+  with its partitions (usosmpart flipped it), and from then on it came up at
+  every boot; a Goodram stick plugged in later was visible at once;
+- **but** right after the installation the stick was not visible at all, and
+  a restart did not change that.
+
+A boot builds every device stack again; a replug also creates the device
+node again and installs it. So the state that survived the restart was in
+the device node (install / problem flags), not in a stack or the filter
+order. The filter was **not** registered after the node was created: `:mpart`
+runs in WinPE after `Setup /noreboot`, before the installed system's first
+boot, so specialize already installs the stick with usosmpart in place.
+
+#### QEMU (repro attempt and simulation)
+
+pc + qemu-xhci only (as the X470), Windows 7 Ultimate SP1 PL x86 from the ISO
+(answer on a floppy), Setup's WinPE pass stopped at its reboot, then in the
+ISO's WinPE exactly what `:usb3` + `:mpart` do offline (KMDF 1.11 + the
+user's x86 xHCI backport via DISM, usosmpart + LowerFilters via `reg load`),
+then the first boot with a GPT 3-partition usb-storage stick (removable=on)
+attached from the start:
+
+| Check | Result |
+|---|---|
+| X470 symptom reproduced? | **No.** After specialize / OOBE the stick was there: `removable=0 style=1 partitions=3`, two lettered fixed volumes, USBSTOR node started, problem 0 |
+| simulated install failure: USBSTOR node `ConfigFlags = 0x40` (FAILEDINSTALL), `Service` / `Driver` removed (as SYSTEM), restart | stick invisible after the restart, node `problem=28 configflags=0x40` = the X470 pattern (a boot does not retry a failed install) |
+| `usos-usbreenum.exe` (fix mode, as SYSTEM) on that state | PASS: node removed, tree re-enumerated with retry installation, "device ready" balloon, node `service=disk started=1 problem=0 configflags=0`, disk `removable=0 partitions=3`, volumes back |
+| second fix-mode run on the healthy stick | USBSTOR node restart ok, stick stays, volumes unchanged |
+
+So the root cause on the X470 is not proven (QEMU does not show it; the
+X470-only parts are real xHCI timing, the SanDisk and the CSMWrap SeaBIOS
+that used the stick as the boot disk just before). The fix covers the state
+that matches the symptom and logs the real one on the next X470 install.
+
+#### Fix: usos-usbreenum (`:usbfix`)
+
+Own helper `tools/windows_usb_reenum.c` (x86, SetupAPI / CfgMgr32, no
+window). `usos-x86-csmwrap.cmd` `:usbfix` (called by `:mpart` after the
+offline registration, so on 7 / 8.x / 10 < 1703 x86) copies it to
+`Windows\Setup\Scripts` and writes `SetupComplete.cmd` (or puts one call
+line before the lines of the image's own, which may end with `exit`), so it
+runs once as SYSTEM after Setup, before the first logon:
+
+1. waits for pending PnP installs (`CMP_WaitNoPendingInstallEvents`);
+2. logs every present `USB\` / `USBSTOR\` node (service, status, problem,
+   ConfigFlags), every USB disk (removable media, partition style and count,
+   offline / read-only attribute) and the volumes;
+3. a node with an install problem (CM_PROB 1 / 18 / 28 or ConfigFlags
+   REINSTALL / FAILEDINSTALL) is removed (`DIF_REMOVE`, like an unplug) and
+   the tree is re-enumerated with `CM_REENUMERATE_RETRY_INSTALLATION` (the
+   device comes back as new and is installed: a replug);
+4. a node with another problem (not "disabled") and every working `USBSTOR\`
+   node is restarted (`DIF_PROPERTYCHANGE` / `DICS_PROPCHANGE`);
+5. logs the state again.
+
+Log: `C:\USOS\Logs\usos-usbreenum.log`, and a copy in `EFI\USOS\Logs` of the
+stick's first partition when that folder exists. `usos-usbreenum.exe report`
+= steps 1-2 to stdout only (read-only).
+
+Windows 8.x / 10 ignore `SetupComplete.cmd` when the product key is an OEM
+key; the stick then stays as it is today. NT 5 (2000 / XP / 2003, text-mode
+registration) and POSReady get no `:usbfix`: their filter is in place from
+text mode on and no NT 5 report of this symptom exists; the helper itself
+links only XP-era APIs, but the build has the NT 6 subsystem version.
+
+Host test: `python tools/tests/test_windows_usb_reenum.py`.
+
 ### Not tested
 
-- X470 hardware (nothing deployed; no stick or disk written).
+- X470 hardware for `:usbfix` (nothing deployed; no stick or disk written).
 - Windows 2000, Server 2003, XP x64 / 2003 x64 (amd64 build), POSReady,
   Windows 8.x / 10 < 1703 x86; the WinPE `:mpart` wrapper (`reg load`) itself.
 - NTFS / exFAT sticks (FAT16 only in QEMU), sticks with logical partitions.
