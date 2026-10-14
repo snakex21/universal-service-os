@@ -63,11 +63,16 @@ pub fn main(init: std.process.Init) !u8 {
     try save(io, cwd, init.gpa, out_dir, "01-home", pixels, width, height);
 
     var count_buffer: [48]u8 = undefined;
+    // architecture chips (src/gui/arch_badge.zig): system rows show the
+    // architectures of the ISOs probed in this session
+    const arch = gui.arch_badge;
+    const win11_chips = [_]gui.ui.Badge{arch.badge(.x64).?};
+    const win7_chips = [_]gui.ui.Badge{ arch.badge(.x86).?, arch.badge(.x64).? };
     const rows = [_]gui.ui.Row{
-        .{ .title = "Windows 11", .detail = ui.format(&count_buffer, .system_image_count, &.{"2"}), .icon = .{ .vector = .windows }, .badge = .{ .text = ui.t(.system_ready), .tone = .success } },
+        .{ .title = "Windows 11", .detail = ui.format(&count_buffer, .system_image_count, &.{"2"}), .icon = .{ .vector = .windows }, .badge = .{ .text = ui.t(.system_ready), .tone = .success }, .chips = &win11_chips },
         .{ .title = "Windows 10", .detail = ui.t(.system_no_image), .icon = .{ .vector = .windows }, .badge = .{ .text = ui.t(.system_no_image) }, .enabled = false },
         .{ .title = "Windows 8.1", .detail = ui.t(.system_no_image), .icon = .{ .vector = .windows }, .enabled = false },
-        .{ .title = "Windows 7", .detail = ui.format(&count_buffer, .system_image_count, &.{"1"}), .icon = .{ .vector = .windows }, .badge = .{ .text = ui.t(.system_ready), .tone = .success } },
+        .{ .title = "Windows 7", .detail = ui.format(&count_buffer, .system_image_count, &.{"1"}), .icon = .{ .vector = .windows }, .badge = .{ .text = ui.t(.system_ready), .tone = .success }, .chips = &win7_chips },
         .{ .title = "Windows Vista", .detail = ui.t(.system_no_image), .icon = .{ .vector = .windows }, .enabled = false },
         .{ .title = "Windows XP", .detail = ui.t(.system_no_image), .icon = .{ .vector = .windows }, .badge = .{ .text = ui.t(.system_requires_bios), .tone = .warning }, .enabled = false },
         .{ .title = "Windows XP UEFI-CSM PAE", .detail = "Images: 1", .icon = .{ .vector = .windows }, .badge = .{ .text = ui.t(.badge_experimental), .tone = .warning } },
@@ -75,6 +80,14 @@ pub fn main(init: std.process.Init) !u8 {
     };
     _ = gui.menu_screens.listScreen(&ui, header, .{ .title = "Windows", .subtitle = ui.t(.systems_subtitle), .rows = &rows, .selected = 0, .hover = 3, .hints = &hints }, 0);
     try save(io, cwd, init.gpa, out_dir, "02-systems", pixels, width, height);
+
+    const images = [_]gui.ui.Row{
+        .{ .title = "pl_windows_7_ultimate_with_sp1_x86_dvd_u_677455.iso", .detail = ui.t(.media_setup), .icon = .{ .label = "ISO" }, .badge = arch.badge(.x86) },
+        .{ .title = "Windows 7 Ultimate SP1 PL x64.iso", .detail = ui.t(.media_setup), .icon = .{ .label = "ISO" }, .badge = arch.badge(.x64) },
+        .{ .title = "Windows 7 AIO x86 x64.iso", .detail = ui.t(.media_setup), .icon = .{ .label = "ISO" }, .badge = arch.badge(.multi) },
+    };
+    _ = gui.menu_screens.listScreen(&ui, header, .{ .title = "Windows 7", .subtitle = ui.t(.images_subtitle), .rows = &images, .selected = 0, .hints = &hints }, 0);
+    try save(io, cwd, init.gpa, out_dir, "02b-images", pixels, width, height);
 
     // UEFI with Secure Boot on: rows that need Secure Boot off or BIOS stay
     // selectable and explain themselves in the help panel.
