@@ -27,6 +27,7 @@ rem /R the USB keyboard relayed through the 8042 for KEYBOARD.DRV of Windows
 rem 1.0x-3.0 (USOSKEY.DRV needs Windows 3.1); /M the USB mouse for MOUSE.DRV
 rem of Windows 2.x/3.0 (PS/2 path: BIOS INT 15h C2xx, INT 74h after each
 rem packet, which SeaBIOS delivers from its timer and not as IRQ 12).
+rem Windows 1.0x: USOSMS1.DRV (bound as MOUSE.DRV) takes the same INT 74h.
 if "%UDIAG%"=="D4" goto kbc_load
 if "%UDIAG%"=="D5" goto tsr_done
 if "%UDIAG%"=="D6" goto tsr_done

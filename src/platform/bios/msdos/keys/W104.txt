@@ -1,5 +1,6 @@
 # Windows 1.04 Setup (USOSKBC, tools/usos_keyscript.py). US keyboard,
-# Microsoft Mouse, EGA (more than 64K), no printer, C:\WINDOWS.
+# Microsoft Mouse (under CSMWrap
+# USOSMS1.DRV: USB mouse through the BIOS), EGA (more than 64K), no printer, C:\WINDOWS.
 wait "Setup prepares Microsoft Windows to run"
 key c
 wait "full pathname of the directory"

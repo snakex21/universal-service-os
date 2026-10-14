@@ -3,7 +3,8 @@ USOSKEY.COM (DOS TSR, src/platform/bios/msdos/usoskey.S, zig cc + ld.lld at
 0100h) and USOSKEY.DRV (Win16 installable driver, src/platform/win3/usoskey.c,
 OpenWatcom 2.0 wcc/wlink, no OpenWatcom runtime linked). USB mouse:
 USOSMOUS.DRV (Win16 mouse driver, src/platform/win3/usosmous.c) on the
-mouse ring of the same TSR (shared block version 4).
+mouse ring of the same TSR (shared block version 4). Windows 1.0x USB mouse:
+USOSMS1.DRV (src/platform/win1/usosms1.S, NE file written here).
 
 OpenWatcom is pinned (OW_SNAPSHOT below): the snapshot archive is taken from
 tools/cache/openwatcom or tools/cache/buildkit-downloads (build kit), or
@@ -174,6 +175,74 @@ def build_mouse_driver(out: Path, work: Path) -> Path:
     return drv
 
 
+def ne_driver(code: bytes, module: str, description: str, exports, stub_text: str) -> bytes:
+    """A Windows 1.0x driver file in the layout of the shipped NOMOUSE.DRV:
+    MZ stub, NE header (linker version 4.0, library without automatic data
+    segment, flags 8004h), one fixed preloaded code segment without
+    relocations (512-byte alignment), resident name = module, entry table
+    with one bundle for segment 1, non-resident names = description plus
+    the exported names. exports: [(ordinal, NAME, offset)], ordinals 1..n."""
+    import struct
+    msg = stub_text.encode('ascii') + b'\r\n$'
+    stub_code = bytes([0x0e, 0x1f, 0xba, 0x0e, 0x00, 0xb4, 0x09, 0xcd, 0x21,   # push cs; pop ds; mov dx,0Eh; mov ah,9; int 21h
+                       0xb8, 0x01, 0x4c, 0xcd, 0x21]) + msg                    # mov ax,4C01h; int 21h
+    ne_off = 0x40 + ((len(stub_code) + 15) & ~15)
+    stub_size = ne_off
+    mz = bytearray(0x40)
+    struct.pack_into('<2s13H', mz, 0, b'MZ', stub_size % 512, (stub_size + 511) // 512, 0, 4, 0x10, 0xffff,
+                     0, 0xb8, 0, 0, 0, 0x40, 0)
+    struct.pack_into('<I', mz, 0x3c, ne_off)
+    head = bytes(mz) + stub_code.ljust(ne_off - 0x40, b'\0')
+    exports = sorted(exports)
+    if [o for o, _, _ in exports] != list(range(1, len(exports) + 1)):
+        raise ValueError('ordinals must be 1..n')
+    segtab = 0x40
+    restab = segtab + 8
+    resnames = bytes([len(module)]) + module.encode() + b'\0\0' + b'\0'
+    modtab = restab + len(resnames)
+    enttab = modtab                                     # no module references, no imported names
+    entries = bytes([len(exports), 1]) + b''.join(struct.pack('<BH', 1, off) for _, _, off in exports) + b'\0\0'
+    nres = bytes([len(description)]) + description.encode() + b'\0\0'
+    for o, name, _ in sorted(exports, key=lambda e: e[1]):
+        nres += bytes([len(name)]) + name.encode() + struct.pack('<H', o)
+    nres += b'\0'
+    tables_end = ne_off + enttab + len(entries)
+    nres_off = tables_end
+    seg_off = (nres_off + len(nres) + 511) & ~511
+    hdr = bytearray(0x40)
+    struct.pack_into('<2sBBHHIHHHHHHHHHHHHHHHHIHH', hdr, 0, b'NE', 4, 0, enttab, len(entries), 0, 0x8004,
+                     0, 0, 0, 0, 0, 0, 0,               # no automatic data, heap, stack, CS:IP, SS:SP
+                     1, 0, len(nres), segtab, restab, restab, modtab, modtab, nres_off, 0, 9)  # alignment shift 9
+    seg = struct.pack('<HHHH', seg_off >> 9, len(code), 0x0040, len(code))
+    body = bytes(hdr) + seg + resnames + entries
+    out = bytearray(head + body + nres)
+    out += b'\0' * (seg_off - len(out))
+    out += code
+    return bytes(out)
+
+
+def build_win1_mouse(out: Path, work: Path) -> Path:
+    """USOSMS1.DRV (src/platform/win1/usosms1.S): BIOS pointing-device
+    (USB under CSMWrap) mouse driver for Windows 1.0x, module MOUSE."""
+    env = dict(os.environ, ZIG_GLOBAL_CACHE_DIR=str(ROOT / 'tools/cache/zig-global'))
+    zig = str(ROOT / 'tools/zig/zig.exe')
+    obj, elf, raw = work / 'usosms1.o', work / 'usosms1.elf', work / 'usosms1.bin'
+    subprocess.run([zig, 'cc', '-target', 'x86-freestanding-none', '-mcpu=i386', '-c',
+                    str(ROOT / 'src/platform/win1/usosms1.S'), '-o', str(obj)], env=env, check=True)
+    subprocess.run([zig, 'ld.lld', '-m', 'elf_i386', '-T', str(ROOT / 'src/platform/win1/drv.ld'),
+                    str(obj), '-o', str(elf)], env=env, check=True)
+    subprocess.run([zig, 'objcopy', '-O', 'binary', str(elf), str(raw)], env=env, check=True)
+    code = raw.read_bytes()
+    sym = elf_symbols(elf)
+    if not 0 < len(code) <= 2048 or code[14:18] != b'USM1' or sym['seg_end'] != len(code):
+        raise ValueError('unexpected USOSMS1 segment layout')
+    drv = out / 'USOSMS1.DRV'
+    drv.write_bytes(ne_driver(code, 'MOUSE', 'USOS USB mouse (BIOS pointing device)',
+                              [(1, 'INQUIRE', sym['inquire']), (2, 'ENABLE', sym['enable']), (3, 'DISABLE', sym['disable'])],
+                              'USOSMS1.DRV is a Windows 1.0x mouse driver.'))
+    return drv
+
+
 def build(root: Path = ROOT, out: Path | None = None):
     out = (out or root / 'zig-out/dos-native/msdos').resolve()
     work = root / 'zig-out/win3-usb-keyboard'
@@ -184,10 +253,11 @@ def build(root: Path = ROOT, out: Path | None = None):
     drv = build_driver(out, work)
     mouse = build_mouse_driver(out, work)
     kbc = build_kbc(out, work)
+    win1 = build_win1_mouse(out, work)
     from usos_keyscript import build_all as build_keyscripts
     scripts = build_keyscripts(out)
     print(f'[PASS] Windows 3.x USB keyboard and mouse: {com.name} {com.stat().st_size} bytes, {drv.name} {drv.stat().st_size} bytes, '
-          f'{mouse.name} {mouse.stat().st_size} bytes, {kbc.name} {kbc.stat().st_size} bytes, {len(scripts)} key scripts '
+          f'{mouse.name} {mouse.stat().st_size} bytes, {win1.name} {win1.stat().st_size} bytes, {kbc.name} {kbc.stat().st_size} bytes, {len(scripts)} key scripts '
           f'(OpenWatcom snapshot {OW_SNAPSHOT["sha256"][:12]})')
 
 

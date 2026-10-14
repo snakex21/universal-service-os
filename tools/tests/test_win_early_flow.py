@@ -45,6 +45,32 @@ class SetverWin100(unittest.TestCase):
             self.assertIn(r'DEVICE=C:\DOS\SETVER.EXE', text)
 
 
+class Win1Mouse(unittest.TestCase):
+    """USOSMS1.DRV (Windows 1.0x USB mouse through the BIOS) replaces
+    MOUSE.DRV in C:\\WINSETUP before Setup binds it into WIN100.BIN, only in
+    the CSMWrap branch and only for 1.01/1.04."""
+    def test_install_copies_over_mouse_drv(self):
+        lines = batch_lines(MSDOS / 'install.cmd')
+        csm = lines.index(r'if not exist %USRC%\CSMWRAP.TAG goto early_setver')
+        copy = lines.index(r'copy %USRC%\USOSMS1.DRV C:\WINSETUP\MOUSE.DRV /y >nul')
+        self.assertLess(csm, copy)
+        self.assertLess(copy, lines.index(':early_setver'))
+        self.assertEqual(lines[copy + 1], 'if errorlevel 1 goto failed')
+
+    def test_staged_only_for_1x(self):
+        text = (ROOT / 'tools/dos_csmwrap_target.sh').read_text(encoding='utf-8')
+        self.assertIn('windows-1-01|windows-1-04) ;;', text)
+        self.assertEqual(text.count('rm -f "$U/USOSMS1.DRV"'), 2)
+        self.assertIn('USOSMS1.DRV', (ROOT / 'installer/cmd/usos-payload-pack/main.go').read_text(encoding='utf-8'))
+        self.assertIn('build_win1_mouse(out, work)', (ROOT / 'tools/build_win3_usb_keyboard.py').read_text(encoding='utf-8'))
+
+    def test_key_scripts_pick_microsoft_mouse(self):
+        for name in ('W101.txt', 'W104.txt'):
+            lines = [l.strip() for l in (MSDOS / 'keys' / name).read_text(encoding='ascii').splitlines()]
+            i = lines.index('wait "Type the number for your pointing device"')
+            self.assertEqual(lines[i + 1], 'key 2 enter')   # 2 = MOUSE.DRV
+
+
 class KeyScripts(unittest.TestCase):
     def ops(self, name):
         return [l.strip() for l in (MSDOS / 'keys' / name).read_text(encoding='ascii').splitlines()

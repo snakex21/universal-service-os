@@ -132,6 +132,13 @@ if errorlevel 1 goto failed
 copy %USRC%\W1AUTO.CSM C:\USOSW3\W3AUTO.BAT /y >nul
 if errorlevel 1 goto failed
 if exist C:\USOSW3\W3INI.BAS del C:\USOSW3\W3INI.BAS
+rem Windows 1.0x (dos_csmwrap_target.sh stages USOSMS1.DRV only for them):
+rem none of its mouse drivers uses the BIOS, the USB mouse exists only as
+rem the BIOS pointing device. USOSMS1.DRV takes the place of MOUSE.DRV, the
+rem "Microsoft Mouse" answer of W101/W104.KEY; Setup binds it into WIN100.BIN.
+if not exist %USRC%\USOSMS1.DRV goto early_setver
+copy %USRC%\USOSMS1.DRV C:\WINSETUP\MOUSE.DRV /y >nul
+if errorlevel 1 goto failed
 :early_setver
 rem The SETVER table of MS-DOS 6.22 lists WIN200.BIN (Windows 2.x) but not
 rem WIN100.BIN: the Windows 1.0x kernel then fails its DOS check and prints
