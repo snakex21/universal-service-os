@@ -192,12 +192,30 @@ for file in "$work/inject"/*; do
     [ -f "$file" ] || continue
     printf 'add "%s" "/Windows/System32/%s"\n' "$file" "${file##*/}" >> "$commands"
 done
+# NVMe target, 32-bit Windows 7 / Vista / Server 2008 (USOS_PE_NVME=usosnvme
+# from vista_csmwrap_prepare.sh; docs/nvme-nt6-2026-10-12.md section 15):
+# the donor's boot-start stornvme service gets usosnvme (polled SCSIPORT
+# miniport) as its image, so Microsoft's stornvme never touches the
+# controller in the PE (X470 2026-10-13: size / layout error 433, then the
+# controller was off PCI until a power-off). Service, INF and the hwcompat
+# route stay stornvme.inf; only this PE copy on the target disk changes.
+pe_nvme=0
+if [ "$target_bus" = nvme ] && [ "${USOS_PE_NVME:-}" = usosnvme ]; then
+    [ -r "$work/inject/usosnvme-nt6.sys" ] || fail 'usosnvme-nt6.sys is missing from the USOS WinPE helpers'
+    printf 'add "%s" "/Windows/System32/drivers/stornvme.sys"\n' "$work/inject/usosnvme-nt6.sys" >> "$commands"
+    pe_nvme=1
+fi
 wimlib-imagex update "$work/staging/sources/boot.wim" 1 < "$commands" >/dev/null || fail 'cannot add the USOS helpers to the PE10 image'
 rm -rf "$work/check"; mkdir -p "$work/check"
 wimlib-imagex extract "$work/staging/sources/boot.wim" 1 /Windows/System32/winpeshl.ini "/Windows/System32/$target_ini" "/Windows/System32/$helper_check" --dest-dir="$work/check" --no-acls >/dev/null || fail 'read-back: the helpers are not in the PE10 image'
 for file in winpeshl.ini "$target_ini" "$helper_check"; do
     cmp -s "$work/inject/$file" "$work/check/$file" || fail "read-back: $file differs in the PE10 image"
 done
+if [ "$pe_nvme" = 1 ]; then
+    wimlib-imagex extract "$work/staging/sources/boot.wim" 1 /Windows/System32/drivers/stornvme.sys --dest-dir="$work/check" --no-acls >/dev/null || fail 'read-back: no stornvme.sys in the PE10 image'
+    cmp -s "$work/inject/usosnvme-nt6.sys" "$work/check/stornvme.sys" || fail 'read-back: the PE10 stornvme.sys is not usosnvme'
+    log 'PE10 NVMe: stornvme service runs usosnvme PASS'
+fi
 rm -f "$work/inject/usos-unattend.xml"
 log "PE10 image PASS files=$(wc -l < "$commands" | tr -d ' ')"
 sync

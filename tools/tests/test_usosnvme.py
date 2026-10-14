@@ -157,10 +157,21 @@ class Nt6Flow(unittest.TestCase):
         nv = gate[gate.index('case "$TARGET_DEVICE" in /dev/nvme*)'):gate.index('usos_xp_confirm ')]
         self.assertIn('case "$profile" in\n'
                       '                win-nt6-x86-uefi-csmwrap)\n', nv)
-        self.assertIn("stop '32-bit Windows 7/Vista/2008 on NVMe is not supported yet on this path. No disk was changed.' ;;", nv)
+        self.assertIn("stop '32-bit Windows 7/Vista/2008 on NVMe is not supported yet on this path. No disk was changed.'\n"
+                      "                    fi ;;", nv)
+        # Exception (section 15): Windows 7 / Vista / Server 2008 x86 with
+        # their own DATA Systems/Windows/<folder>/Unattended/nvme-experimental.txt:
+        # usosnvme replaces stornvme in the PE image (USOS_PE_NVME).
+        nt6 = nv[nv.index('win-nt6-x86-uefi-csmwrap)'):nv.index('win-x86-uefi-csmwrap)')]
+        self.assertIn('if [ -f "/mnt/data/Systems/Windows/$folder/Unattended/nvme-experimental.txt" ]; then', nt6)
+        self.assertLess(nt6.index('nvme-experimental.txt'), nt6.index('pe_nvme=usosnvme'))
+        self.assertLess(nt6.index('pe_nvme=usosnvme'), nt6.index('else'))
+        self.assertLess(nt6.index('else'), nt6.index("stop '32-bit Windows 7/Vista/2008"))
+        self.assertLess(prep.index("pe_nvme=''"), prep.index('        usos_xp_choose_disk\n'))
+        self.assertIn('X86_SELF=$x86_self USOS_PE_NVME=$pe_nvme', prep)
         self.assertIn("                win-x86-uefi-csmwrap)\n", nv)
         self.assertIn("stop '32-bit Windows 8.1/10 on NVMe is not supported yet on this path. No disk was changed.' ;;", nv)
-        self.assertNotIn('Unattended/nvme-experimental.txt', prep)
+        self.assertEqual(prep.count('Unattended/nvme-experimental.txt'), 1)
         self.assertNotIn("'win-nt6-x86-uefi-csmwrap:Windows 7'", prep)
         # Both stops come before the 512-byte check (dormant until reopened).
         self.assertLess(nv.index("32-bit Windows 8.1/10 on NVMe"), nv.index('[ "$nvme_lbs" = 512 ] || stop'))
@@ -180,6 +191,12 @@ class Nt6Flow(unittest.TestCase):
         target = (ROOT / 'tools/vista_csmwrap_target.sh').read_text(encoding='utf-8')
         self.assertIn('/dev/nvme*) target_bus=nvme', target)
         self.assertIn(r'target_bus=%s\r\n', target)
+        # The PE image: the stornvme service's file becomes usosnvme (NVMe
+        # target + USOS_PE_NVME only), read back after the update.
+        self.assertIn('if [ "$target_bus" = nvme ] && [ "${USOS_PE_NVME:-}" = usosnvme ]; then', target)
+        self.assertIn('''printf 'add "%s" "/Windows/System32/drivers/stornvme.sys"\\n' "$work/inject/usosnvme-nt6.sys" >> "$commands"''', target)
+        self.assertLess(target.index('/Windows/System32/drivers/stornvme.sys'), target.index('wimlib-imagex update "$work/staging/sources/boot.wim"'))
+        self.assertIn('''cmp -s "$work/inject/usosnvme-nt6.sys" "$work/check/stornvme.sys" || fail''', target)
 
     def test_other_flows_stop(self):
         nt4 = (ROOT / 'tools/nt4_csmwrap_target.sh').read_text(encoding='utf-8')
@@ -226,6 +243,50 @@ class Nt6Flow(unittest.TestCase):
         self.assertIn('L"setupver"', src)
         # MSU path: the stornvme CriticalDeviceDatabase entry is checked.
         self.assertIn('CriticalDeviceDatabase pci#cc_010802 -^> stornvme added', self.step())
+
+    def test_usosnvme_only(self):
+        # User decision 2026-10-14: usosnvme in the PE and the installed
+        # system, no Microsoft stornvme MSUs on this path.
+        self.assertNotIn('call :nvme_msu', self.CMD)
+        s = self.step()
+        self.assertIn('if "%USOS_NT%"=="6.1" call :nvme_dism', s)
+        # DISM runs before the SYSTEM hive is loaded for the service / CDD.
+        self.assertLess(s.index('call :nvme_dism'), s.index('reg load HKLM\\USOS_SYS'))
+        dism = self.CMD[self.CMD.index('\n:nvme_dism\n'):]
+        dism = dism[:dism.index('exit /b 0')]
+        self.assertIn('/Add-Driver /Driver:"%USOS_T%\\USOS\\nvme\\usosnvme.inf" /ForceUnsigned', dism)
+        # PE: first NVMe step; nodump before anything touches the disk.
+        before = self.CMD[:self.CMD.index('usos-x86-csmwrap.exe" before')]
+        self.assertLess(before.index('call :nvme_pe_driver'), before.index('call :nvme_lowmem'))
+        pe = self.CMD[self.CMD.index('\n:nvme_pe_driver\n'):self.CMD.index('\n:nvme_lowmem\n')]
+        self.assertIn('usos-x86-csmwrap.exe" nodump', pe)
+        self.assertIn('%SystemRoot%\\System32\\drivers\\stornvme.sys', pe)
+        self.assertIn('%~dp0usosnvme-nt6.sys', pe)
+        # Disk not found: the System event log entries of the storage stack.
+        report = self.CMD[self.CMD.index('\n:disk_report\n'):]
+        report = report[:report.index('exit /b 0')]
+        self.assertIn("qe System /q:\"*[System[Provider[@Name='stornvme' or @Name='storport' or @Name='disk'", report)
+        self.assertIn('/f:text /c:50', report)
+
+    def test_lowmem(self):
+        # NVMe target: the WinPE runs without RAM above 4 GiB (truncatememory in
+        # the staging BCD, one WinPE restart) before the disk is touched.
+        before = self.CMD[:self.CMD.index('usos-x86-csmwrap.exe" before')]
+        self.assertLess(before.index('call :nvme_lowmem'), before.index('call :nvme_setup'))
+        self.assertIn('if defined USOS_NVME_TARGET if "%USOS_LOWMEM%"=="10" exit /b 0', before)
+        sub = self.CMD[self.CMD.index('\n:nvme_lowmem\n'):self.CMD.index('\n:nvme_setup\n')]
+        self.assertIn('usos-x86-csmwrap.exe" lowmem', sub)
+        # Disk not found in lowmem (exit 4): disk report before nodump too.
+        self.assertLess(sub.index('if "%USOS_LOWMEM%"=="4" call :disk_report'), sub.index('wpeutil reboot'))
+        self.assertIn('lowmem: WinPE RAM top before any disk access (MiB)=', (ROOT / 'tools/windows_x86_csmwrap.c').read_text(encoding='utf-8'))
+        self.assertLess(sub.index('if not "%USOS_LOWMEM%"=="10" exit /b 0'), sub.index('wpeutil reboot'))
+        src = (ROOT / 'tools/windows_x86_csmwrap.c').read_text(encoding='utf-8')
+        main = src[src.index('void entry(void)'):]
+        self.assertLess(main.index('ExitProcess(low_memory())'), main.index('L"before") == 0 && (arg_count'))
+        for want in ('System Resources\\\\Physical Memory', 'L".Translated"', 'Elements\\\\15000007',
+                     '{9dea862c-5cdd-4e70-acc1-f32b344d4795}\\\\Elements\\\\23000003', 'want = 0x100000000ULL',
+                     'top <= 0x100000000ULL'):
+            self.assertIn(want, src)
 
     def test_packed(self):
         build = (ROOT / 'tools/build_windows_native_support.py').read_text(encoding='utf-8')

@@ -36,9 +36,8 @@ rem      hwcompat.txt lists PCI\CC_010802 (:nvme_setup);
 rem   3d. NVMe target, Windows
 rem      7 / Vista / Server 2008 x86 only: the installed system gets an NVMe
 rem      boot driver before its first start (Setup itself ran in the PE10
-rem      donor, which has stornvme): NT 6.1 with the user's KB2990941 +
-rem      KB3087873 x86 on DATA -> DISM /Add-Package (Microsoft stornvme);
-rem      otherwise usosnvme.sys (own GPL SCSIPORT miniport, tools/nt/usosnvme)
+rem      donor, whose stornvme service runs usosnvme on an NVMe target):
+rem      usosnvme.sys (own GPL SCSIPORT miniport, tools/nt/usosnvme)
 rem      as a boot-start service with a CriticalDeviceDatabase entry for
 rem      PCI\CC_010802 (docs/nvme-nt6-2026-10-12.md); never fatal;
 rem   4. usos-x86-csmwrap after: boot files on the Windows partition checked,
@@ -53,6 +52,12 @@ echo [USOS] phase=x86-csmwrap-before
 rem NVMe target, Setup 6.0 / 6.1 (Vista / 2008 / 7): see :nvme_setup.
 set "USOS_NVME_TARGET="
 find "target_bus=nvme" "%~dp0usos-csmwrap-target.ini" >nul 2>&1 && set "USOS_NVME_TARGET=1"
+rem NVMe target: the WinPE must not use RAM above 4 GiB (corrupt image apply
+rem through stornvme, QEMU 2026-10-13); "lowmem" limits the staging BCD and
+rem the WinPE restarts once (docs/nvme-nt6-2026-10-12.md section 10).
+if defined USOS_NVME_TARGET call :nvme_pe_driver
+if defined USOS_NVME_TARGET call :nvme_lowmem
+if defined USOS_NVME_TARGET if "%USOS_LOWMEM%"=="10" exit /b 0
 if defined USOS_NVME_TARGET call :nvme_setup
 if defined USOS_NVME_TARGET if errorlevel 1 exit /b 1
 "%~dp0usos-x86-csmwrap.exe" before "%USOS_ANSWER%" "%~dp0usos-csmwrap-unattend.xml" "%USOS_SETUP%"
@@ -113,6 +118,13 @@ if not exist "%USOS_WMIC%" goto disk_report_done
 echo [USOS] wmic: storage controllers, disks and devices with a problem code
 "%USOS_WMIC%" path Win32_PnPEntity where "PNPClass='SCSIAdapter' or PNPClass='HDC' or PNPClass='DiskDrive' or ConfigManagerErrorCode<>0" get Name,PNPClass,Service,ConfigManagerErrorCode,DeviceID /format:list
 :disk_report_done
+rem stornvme / StorPort / disk events of this WinPE boot (resets, timeouts,
+rem controller fatal status, surprise removal; X470 2026-10-13 had none in
+rem the log), oldest first, when the PE has wevtutil.
+set "USOS_WEVTUTIL=%SystemRoot%\System32\wevtutil.exe"
+if not exist "%USOS_WEVTUTIL%" echo [USOS] wevtutil.exe is not in this WinPE.
+if exist "%USOS_WEVTUTIL%" echo [USOS] wevtutil: System log, stornvme / storport / disk
+if exist "%USOS_WEVTUTIL%" "%USOS_WEVTUTIL%" qe System /q:"*[System[Provider[@Name='stornvme' or @Name='storport' or @Name='disk' or @Name='Microsoft-Windows-StorPort']]]" /f:text /c:50
 "%~dp0usos-log-x86.exe"
 exit /b 0
 
@@ -256,6 +268,45 @@ reg unload HKLM\USOS_SYS >nul
 "%~dp0usos-log-x86.exe"
 exit /b 0
 
+rem ---- NVMe target: which driver runs the controller in this WinPE ---------
+rem micro-Linux (vista_csmwrap_target.sh, NVMe target, NT6 x86 donor) put
+rem usosnvme (polled, own GPL SCSIPORT miniport) into the PE image as
+rem drivers\stornvme.sys, so the boot-start stornvme service of the PE runs
+rem usosnvme from the first boot and Microsoft's stornvme never touches the
+rem controller (X470 2026-10-13: 433 + controller off PCI). The service and
+rem its INF stay stornvme.inf for Setup's hwcompat check (:nvme_setup), so
+rem nothing is injected or migrated. Logged here: file sizes (equal = the
+rem replacement is in place) and the controller's PnP state; the crash-dump
+rem stack (dump_stornvme = this image) is switched off first.
+:nvme_pe_driver
+"%~dp0usos-x86-csmwrap.exe" nodump
+set "USOS_PE_NVME=%SystemRoot%\System32\drivers\stornvme.sys"
+set "USOS_PE_NVME_SIZE="
+set "USOS_OWN_NVME_SIZE="
+for %%F in ("%USOS_PE_NVME%") do set "USOS_PE_NVME_SIZE=%%~zF"
+for %%F in ("%~dp0usosnvme-nt6.sys") do set "USOS_OWN_NVME_SIZE=%%~zF"
+if "%USOS_PE_NVME_SIZE%"=="%USOS_OWN_NVME_SIZE%" (echo [USOS] NVMe target: the WinPE stornvme service runs usosnvme ^(stornvme.sys = usosnvme-nt6.sys, %USOS_PE_NVME_SIZE% bytes^).) else (echo [USOS] NVMe target: WARNING the WinPE stornvme.sys is not usosnvme ^(%USOS_PE_NVME_SIZE% vs %USOS_OWN_NVME_SIZE% bytes^): Microsoft stornvme runs the controller.)
+if exist "%SystemRoot%\System32\pnputil.exe" "%SystemRoot%\System32\pnputil.exe" /enum-devices /class SCSIAdapter
+"%~dp0usos-log-x86.exe"
+exit /b 0
+
+rem ---- NVMe target: WinPE below 4 GiB --------------------------------------
+rem Result: 0 nothing to do (no RAM above 4 GiB, or the limit is already in
+rem the BCD: the second boot), 10 limit written (restart), 1 error, 4 the
+rem prepared disk was not found (stornvme without a usable disk, X470
+rem 2026-10-13): the disk report then runs here too, before nodump and the
+rem Setup copy, and again after "before" (two snapshots for the log).
+:nvme_lowmem
+"%~dp0usos-x86-csmwrap.exe" lowmem
+set "USOS_LOWMEM=%errorlevel%"
+echo [USOS] NVMe target: lowmem result=%USOS_LOWMEM%
+if "%USOS_LOWMEM%"=="4" call :disk_report
+"%~dp0usos-log-x86.exe"
+if not "%USOS_LOWMEM%"=="10" exit /b 0
+echo [USOS] phase=reboot-lowmem
+wpeutil reboot
+exit /b 0
+
 rem ---- NVMe target: Setup 6.0 / 6.1 disk check (before Setup) --------------
 rem Vista / 2008 / 7 Setup looks up the disk's controller (PCI\CC_010802, run
 rem by the donor's inbox stornvme) in sources\hwcompat.txt of the media, which
@@ -314,14 +365,14 @@ rem ---- NVMe target: boot driver for Windows 7 / Vista / Server 2008 x86 -----
 rem Only when micro-Linux prepared an NVMe disk (target_bus=nvme): a SATA
 rem install never gets a boot-start driver for a controller it may not have
 rem (as for XP / NT 4.0). Windows 8.1 / 10 x86 have stornvme inbox.
-rem NT 6.1: Microsoft's NVMe update (KB2990941 v3 + KB3087873 v2, x86) when
-rem the user put both into DATA Systems\Windows\Windows 7\Updates (DISM, as the
-rem USB 3 step); otherwise, and on NT 6.0 (DISM 10 cannot service it), our
-rem usosnvme.sys (2KXP build; its imports resolve on the NT 6.0 / 6.1
-rem SCSIPORT, 32-bit Windows does not enforce kernel signatures): copied to
+rem NT 6.0 / 6.1: usosnvme.sys (2KXP build; its imports resolve on the NT 6.0 /
+rem 6.1 SCSIPORT, 32-bit Windows does not enforce kernel signatures; the same
+rem driver ran the controller in the PE, :nvme_pe_driver): copied to
 rem system32\drivers, service Start 0 "SCSI miniport", PnpInterface\5 and the
 rem CriticalDeviceDatabase entry pci#cc_010802 (class SCSIAdapter), so the
-rem boot loader loads it and PnP binds the NVMe controller at the first start.
+rem boot loader loads it and PnP binds the NVMe controller at the first start;
+rem the signed package is staged for specialize (6.0: OOBE gate, 6.1: DISM).
+rem The KB2990941 / KB3087873 x86 MSUs are not used (user decision 2026-10-14).
 :nvme
 find "target_bus=nvme" "%~dp0usos-csmwrap-target.ini" >nul 2>&1
 if errorlevel 1 exit /b 0
@@ -334,8 +385,10 @@ for /f "usebackq tokens=1,2,3" %%A in ("%TEMP%\usos-target.txt") do (set "USOS_T
 echo [USOS] phase=nvme nt=%USOS_NT% build=%USOS_BUILD%
 set "USOS_NVME_MSU="
 if not "%USOS_NT%"=="6.0" if not "%USOS_NT%"=="6.1" (echo [USOS] NVMe: Windows %USOS_NT% has its own NVMe driver. & exit /b 0)
-if "%USOS_NT%"=="6.1" call :nvme_msu
-if "%USOS_NVME_MSU%"=="ok" (echo [USOS] NVMe: Microsoft stornvme installed; usosnvme not needed. & goto nvme_stornvme)
+rem User decision 2026-10-14: no Microsoft stornvme for 32-bit NT6 on NVMe
+rem (it failed on the X470 Micron in the PE, docs/nvme-nt6-2026-10-12.md
+rem section 12); the polled usosnvme serves the disk in the PE and in the
+rem installed system. :nvme_msu (KB2990941 / KB3087873 x86) stays, unused.
 if not exist "%~dp0usosnvme-nt6.sys" (echo [USOS] NVMe: usosnvme driver missing; skipped. & goto nvme_done)
 copy /y "%~dp0usosnvme-nt6.sys" "%USOS_T%\Windows\System32\drivers\usosnvme.sys" >nul
 if errorlevel 1 (echo [USOS] NVMe: usosnvme copy failed; skipped. & goto nvme_done)
@@ -349,6 +402,13 @@ md "%USOS_T%\USOS\nvme" 2>nul
 for %%F in (usosnvme.inf usosnvme.cat usosnvme.cer) do if exist "%~dp0%%F" copy /y "%~dp0%%F" "%USOS_T%\USOS\nvme\%%F" >nul
 copy /y "%~dp0usosnvme-nt6.sys" "%USOS_T%\USOS\nvme\usosnvme.sys" >nul
 if exist "%USOS_T%\USOS\nvme\usosnvme.cat" (echo [USOS] NVMe: signed usosnvme package in %USOS_T%\USOS\nvme for the driver store.) else (echo [USOS] NVMe: usosnvme catalog missing; specialize may install the NULL driver.)
+rem NT 6.1 has no OOBE gate: the package goes into the offline driver store
+rem with this WinPE's DISM (it services 6.1 images, as in the USB 3 step), so
+rem specialize finds a published usosnvme.inf for the controller instead of
+rem installing the NULL driver (the NT 6.0 0x7B of section 8). Windows 7 has
+rem no inbox NVMe driver, so usosnvme is the only match. The service and CDD
+rem entries below are written either way.
+if "%USOS_NT%"=="6.1" call :nvme_dism
 reg load HKLM\USOS_SYS "%USOS_T%\Windows\System32\config\SYSTEM" >nul
 if errorlevel 1 (echo [USOS] NVMe: SYSTEM hive not loaded; skipped. & goto nvme_done)
 set "USOS_CS="
@@ -393,6 +453,16 @@ echo [USOS] NVMe: CriticalDeviceDatabase pci#cc_010802 -^> stornvme added, Start
 reg unload HKLM\USOS_SYS >nul
 :nvme_done
 "%~dp0usos-log-x86.exe"
+exit /b 0
+
+:nvme_dism
+set "USOS_WORKDIR=%USOS_T%\USOS-nvme"
+if exist "%USOS_WORKDIR%" rd /s /q "%USOS_WORKDIR%"
+md "%USOS_WORKDIR%\scratch"
+dism.exe /English /Image:%USOS_T%\ /ScratchDir:"%USOS_WORKDIR%\scratch" /LogPath:"%USOS_T%\USOS\nvme\dism-usosnvme.log" /Add-Driver /Driver:"%USOS_T%\USOS\nvme\usosnvme.inf" /ForceUnsigned
+echo [USOS] NVMe: usosnvme.inf into the offline driver store (DISM) exit=%errorlevel%
+dism.exe /English /Image:%USOS_T%\ /ScratchDir:"%USOS_WORKDIR%\scratch" /Get-Drivers | find /i "usosnvme"
+if exist "%USOS_WORKDIR%" rd /s /q "%USOS_WORKDIR%"
 exit /b 0
 
 rem NT 6.1 x86: both packages or none (KB2990941 adds stornvme, KB3087873
