@@ -23,6 +23,9 @@
  *                          as [GuiUnattended] !DetachedProgram)
  *   usosnt3.exe /service   the service itself (started by the SCM)
  *   usosnt3.exe /post      the post-install work by hand, no restart
+ *   usosnt3.exe /polish    only the answer-profile part (accounts, automatic
+ *                          logon, locale / keyboard / code pages, no Display
+ *                          Settings at logon); NT 3.1 POST.CMD runs this
  *
  * NT 3.51 has no RunOnce, no CMDLINES.TXT and no REGEDIT4 import, so the
  * NT 4.0 POST.CMD + .REG files cannot be used. GUI Setup starts this
@@ -37,7 +40,9 @@
  *      has no legacy IDE ports; the VM's IDE/SCSI disk is not needed any more);
  *   4. writes VERSION.TXT and DRIVERS.TXT (values read back), turns itself
  *      off (Start = 4) and writes DONE.TXT;
- *   5. restarts the system (InitiateSystemShutdown, then NtShutdownSystem),
+ *   5. applies the answer profile (polish(): ACCOUNT.TXT, INTL.TXT) and
+ *      removes GraphicsDrivers\DetectDisplay;
+ *   6. restarts the system (InitiateSystemShutdown, then NtShutdownSystem),
  *      which ends the install VM (-no-reboot).
  * Every step is logged to C:\USOS\NT3\POST.LOG (SETUP.LOG for /setup).
  * No C runtime; only kernel32 and advapi32 functions of NT 3.1.
@@ -230,6 +235,492 @@ static void restart(void)
     say("NtShutdownSystem failed\r\n");
 }
 
+/* ------------------------------------------------------------------------
+ * Answer profile (docs/nt3-polish-2026-10-14.md): accounts, automatic logon,
+ * locale / keyboard / code pages. nt4_csmwrap_target.sh writes
+ *   ACCOUNT.TXT  user=, password=, autologon=0|1 (deleted after use: it
+ *                holds the password; DefaultPassword keeps it only when the
+ *                profile asks for the automatic logon, as on every Windows)
+ *   INTL.TXT     locale=0000LLLL, keyboard=KKKKKKKK (hex, as in the registry)
+ * Netapi and the newer kernel32 calls are looked up at run time: NT 3.1 has
+ * NetLocalGroupAddMember but no GetLocaleInfoA.
+ * ---------------------------------------------------------------------- */
+
+typedef DWORD (WINAPI *NET_USER_SET_INFO)(LPCWSTR, LPCWSTR, DWORD, LPBYTE, LPDWORD);
+typedef DWORD (WINAPI *NET_USER_ADD)(LPCWSTR, DWORD, LPBYTE, LPDWORD);
+typedef DWORD (WINAPI *NET_LOCALGROUP_ADD_MEMBER)(LPCWSTR, LPCWSTR, PSID);
+typedef int (WINAPI *GET_LOCALE_INFO_A)(LCID, DWORD, LPSTR, int);
+
+/* USER_INFO_1 (lmaccess.h). */
+struct usos_user_info_1 {
+    LPWSTR name, password;
+    DWORD password_age, priv;
+    LPWSTR home_dir, comment;
+    DWORD flags;
+    LPWSTR script_path;
+};
+#define USOS_USER_PRIV_USER 1
+#define USOS_UF_SCRIPT 0x0001
+#define USOS_UF_DONT_EXPIRE_PASSWD 0x10000
+
+static void enable_privilege(const char *name)
+{
+    HANDLE token;
+    TOKEN_PRIVILEGES tp;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &token))
+        return;
+    tp.PrivilegeCount = 1;
+    tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+    if (LookupPrivilegeValueA(NULL, name, &tp.Privileges[0].Luid))
+        AdjustTokenPrivileges(token, FALSE, &tp, 0, NULL, NULL);
+    CloseHandle(token);
+}
+
+/* DIR<name> into buf (NUL-terminated); -1 when missing. */
+static int read_text(const char *name, char *buf, int cap)
+{
+    char path[MAX_PATH];
+    DWORD n = 0;
+    HANDLE h;
+    lstrcpyA(path, DIR);
+    lstrcatA(path, name);
+    h = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE)
+        return -1;
+    if (!ReadFile(h, buf, (DWORD)cap - 1, &n, NULL))
+        n = 0;
+    CloseHandle(h);
+    buf[n] = 0;
+    return (int)n;
+}
+
+/* Overwrites DIR<name> with zeros, then deletes it. */
+static void wipe_file(const char *name, int size)
+{
+    char path[MAX_PATH];
+    static char zero[512];
+    DWORD n;
+    HANDLE h;
+    lstrcpyA(path, DIR);
+    lstrcatA(path, name);
+    h = CreateFileA(path, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h != INVALID_HANDLE_VALUE) {
+        while (size > 0) {
+            WriteFile(h, zero, size > (int)sizeof zero ? (DWORD)sizeof zero : (DWORD)size, &n, NULL);
+            size -= (int)sizeof zero;
+        }
+        FlushFileBuffers(h);
+        CloseHandle(h);
+    }
+    say(DeleteFileA(path) ? "deleted " : "DELETE FAILED ");
+    say(name);
+    say("\r\n");
+}
+
+/* The value of a "key=value" line of text ("" when absent). */
+static void text_value(const char *text, const char *key, char *out, int cap)
+{
+    const char *p = text;
+    int k = len(key), n = 0;
+    out[0] = 0;
+    while (*p) {
+        int i = 0;
+        while (i < k && p[i] && (p[i] | 32) == (key[i] | 32))
+            i++;
+        if (i == k && p[k] == '=') {
+            p += k + 1;
+            while (*p && *p != '\r' && *p != '\n' && n < cap - 1)
+                out[n++] = *p++;
+            out[n] = 0;
+            return;
+        }
+        while (*p && *p != '\n')
+            p++;
+        if (*p)
+            p++;
+    }
+}
+
+static DWORD hex_value(const char *s)
+{
+    DWORD v = 0;
+    for (; *s; s++) {
+        char c = *s;
+        if (c >= '0' && c <= '9')
+            v = v * 16 + (DWORD)(c - '0');
+        else if ((c | 32) >= 'a' && (c | 32) <= 'f')
+            v = v * 16 + (DWORD)((c | 32) - 'a' + 10);
+        else
+            break;
+    }
+    return v;
+}
+
+static void dec(char *out, DWORD v)
+{
+    char t[12];
+    int n = 0, i = 0;
+    do {
+        t[n++] = (char)('0' + v % 10);
+        v /= 10;
+    } while (v);
+    while (n)
+        out[i++] = t[--n];
+    out[i] = 0;
+}
+
+/* <root>\<key> <name> = <v> (REG_SZ), logged (secret: value not logged). */
+static void put_sz(HKEY root, const char *root_name, const char *key, const char *name, const char *v, int secret)
+{
+    HKEY h;
+    DWORD disp;
+    LONG rc = RegCreateKeyExA(root, key, 0, "", REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &h, &disp);
+    if (rc == ERROR_SUCCESS) {
+        rc = RegSetValueExA(h, name, 0, REG_SZ, (const BYTE *)v, len(v) + 1);
+        RegCloseKey(h);
+    }
+    say(root_name);
+    say("\\");
+    say(key);
+    say(" ");
+    say(name);
+    say(rc == ERROR_SUCCESS ? " = " : " FAILED: ");
+    say(secret ? "(not logged)" : v);
+    say("\r\n");
+}
+
+static void to_wide(const char *s, WCHAR *w, int cap)
+{
+    if (!MultiByteToWideChar(CP_ACP, 0, s, -1, w, cap))
+        w[0] = 0;
+}
+
+/* Administrator password, an own account in Administrators, automatic logon. */
+static void account(void)
+{
+    static const char winlogon[] = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon";
+    static WCHAR admin[] = { 'A', 'd', 'm', 'i', 'n', 'i', 's', 't', 'r', 'a', 't', 'o', 'r', 0 };
+    static WCHAR admins[] = { 'A', 'd', 'm', 'i', 'n', 'i', 's', 't', 'r', 'a', 't', 'o', 'r', 's', 0 };
+    char text[1024], user[64], password[128], autologon[8], domain[64];
+    WCHAR wuser[64], wpassword[128];
+    HMODULE net;
+    NET_USER_SET_INFO set_info;
+    NET_USER_ADD add;
+    NET_LOCALGROUP_ADD_MEMBER add_member;
+    int size = read_text("ACCOUNT.TXT", text, sizeof text);
+    DWORD rc, parm, cb_sid, cb_domain;
+    BYTE sid[128];
+    SID_NAME_USE use;
+    const char *logon_user;
+
+    if (size < 0) {
+        say("ACCOUNT.TXT: none (Administrator, blank password)\r\n");
+        return;
+    }
+    text_value(text, "user", user, sizeof user);
+    text_value(text, "password", password, sizeof password);
+    text_value(text, "autologon", autologon, sizeof autologon);
+    wipe_file("ACCOUNT.TXT", size);
+    if (lstrcmpiA(user, "Administrator") == 0 || lstrcmpiA(user, "Guest") == 0)
+        user[0] = 0;
+    to_wide(password, wpassword, 128);
+    net = LoadLibraryA("netapi32.dll");
+    set_info = net ? (NET_USER_SET_INFO)GetProcAddress(net, "NetUserSetInfo") : NULL;
+    add = net ? (NET_USER_ADD)GetProcAddress(net, "NetUserAdd") : NULL;
+    add_member = net ? (NET_LOCALGROUP_ADD_MEMBER)GetProcAddress(net, "NetLocalGroupAddMember") : NULL;
+    if (password[0]) {
+        LPWSTR info = wpassword; /* USER_INFO_1003 */
+        rc = set_info ? set_info(NULL, admin, 1003, (LPBYTE)&info, &parm) : 0xFFFFFFFF;
+        say_hex(rc ? "Administrator password FAILED " : "Administrator password set ", rc);
+    }
+    if (user[0]) {
+        struct usos_user_info_1 ui;
+        to_wide(user, wuser, 64);
+        ui.name = wuser;
+        ui.password = wpassword;
+        ui.password_age = 0;
+        ui.priv = USOS_USER_PRIV_USER;
+        ui.home_dir = NULL;
+        ui.comment = NULL;
+        ui.flags = USOS_UF_SCRIPT | USOS_UF_DONT_EXPIRE_PASSWD;
+        ui.script_path = NULL;
+        rc = add ? add(NULL, 1, (LPBYTE)&ui, &parm) : 0xFFFFFFFF;
+        say("account ");
+        say(user);
+        say_hex(rc ? " NetUserAdd FAILED " : " created ", rc);
+        cb_sid = sizeof sid;
+        cb_domain = sizeof domain;
+        if (LookupAccountNameA(NULL, user, (PSID)sid, &cb_sid, domain, &cb_domain, &use)) {
+            rc = add_member ? add_member(NULL, admins, (PSID)sid) : 0xFFFFFFFF;
+            say_hex(rc ? "Administrators membership FAILED " : "Administrators membership ", rc);
+        } else {
+            say_hex("LookupAccountName FAILED ", GetLastError());
+        }
+    }
+    logon_user = user[0] ? user : "Administrator";
+    /* The account domain: the computer name, or the domain on a domain
+       controller (NT 3.1 Advanced Server). */
+    cb_sid = sizeof sid;
+    cb_domain = sizeof domain;
+    if (!LookupAccountNameA(NULL, logon_user, (PSID)sid, &cb_sid, domain, &cb_domain, &use))
+        domain[0] = 0;
+    put_sz(HKEY_LOCAL_MACHINE, "HKLM", winlogon, "DefaultUserName", logon_user, 0);
+    if (domain[0])
+        put_sz(HKEY_LOCAL_MACHINE, "HKLM", winlogon, "DefaultDomainName", domain, 0);
+    if (autologon[0] == '1') {
+        put_sz(HKEY_LOCAL_MACHINE, "HKLM", winlogon, "DefaultPassword", password, 1);
+        put_sz(HKEY_LOCAL_MACHINE, "HKLM", winlogon, "AutoAdminLogon", "1", 0);
+    }
+    if (net)
+        FreeLibrary(net);
+}
+
+/* Code pages of a locale (the values of the NT 3.51 LANGUAGE.INF [Options]
+   rows): ANSI, OEM, Mac. Locales not listed keep the CD's code pages. */
+struct usos_cp {
+    WORD lang;
+    WORD acp, oemcp, maccp;
+};
+static const struct usos_cp g_cps[] = {
+    { 0x0405, 1250, 852, 10029 }, { 0x040e, 1250, 852, 10029 }, { 0x0415, 1250, 852, 10029 },
+    { 0x041b, 1250, 852, 10029 }, { 0x0424, 1250, 852, 10029 }, { 0x041a, 1250, 852, 10029 },
+    { 0x0418, 1250, 852, 10029 }, { 0x0419, 1251, 866, 10007 }, { 0x0402, 1251, 866, 10007 },
+    { 0x0408, 1253, 737, 10006 }, { 0x041f, 1254, 857, 10081 },
+};
+
+/* The ANSI code page's bitmap font names end in this letter. */
+static const char *font_suffix(DWORD acp)
+{
+    switch (acp) {
+    case 1250: return "e";
+    case 1251: return "r";
+    case 1253: return "g";
+    case 1254: return "t";
+    default: return "";
+    }
+}
+
+/* system32\<file>, or for a font system\ or system32\. */
+static int sys_file(const char *file, int font)
+{
+    char path[MAX_PATH];
+    if (!GetWindowsDirectoryA(path, MAX_PATH))
+        lstrcpyA(path, "C:\\WINNT");
+    lstrcatA(path, font ? "\\system\\" : "\\system32\\");
+    lstrcatA(path, file);
+    if (GetFileAttributesA(path) != 0xFFFFFFFF)
+        return 1;
+    if (!font)
+        return 0;
+    if (!GetWindowsDirectoryA(path, MAX_PATH))
+        lstrcpyA(path, "C:\\WINNT");
+    lstrcatA(path, "\\system32\\");
+    lstrcatA(path, file);
+    return GetFileAttributesA(path) != 0xFFFFFFFF;
+}
+
+/* "<base><suffix>.fon" / "c_<cp>.nls" into out. */
+static char *name3(char *out, const char *a, const char *b, const char *c)
+{
+    lstrcpyA(out, a);
+    lstrcatA(out, b);
+    lstrcatA(out, c);
+    return out;
+}
+
+/* A win.ini value; NT maps these sections to the registry (IniFileMapping). */
+static void ini(const char *section, const char *key, const char *value)
+{
+    say(WriteProfileStringA(section, key, value) ? "win.ini [" : "win.ini FAILED [");
+    say(section);
+    say("] ");
+    say(key);
+    say(" = ");
+    say(value);
+    say("\r\n");
+}
+
+/* Locale and keyboard of one user hive (HKU\<sub>): what the International
+   applet writes (Control Panel\International, the values from the locale
+   data when this kernel32 has GetLocaleInfoA) and Keyboard Layout\Active. */
+static void intl_user(const char *sub, LCID lcid, const char *locale, const char *keyboard)
+{
+    static const struct { const char *name; DWORD type; } items[] = {
+        { "sLanguage", 0x03 }, { "sCountry", 0x06 }, { "iCountry", 0x05 }, { "sList", 0x0C },
+        { "iMeasure", 0x0D }, { "sDecimal", 0x0E }, { "sThousand", 0x0F }, { "iDigits", 0x11 },
+        { "iLZero", 0x12 }, { "sCurrency", 0x14 }, { "iCurrDigits", 0x19 }, { "iCurrency", 0x1B },
+        { "iNegCurr", 0x1C }, { "sDate", 0x1D }, { "sTime", 0x1E }, { "sShortDate", 0x1F },
+        { "sLongDate", 0x20 }, { "iDate", 0x21 }, { "iTime", 0x23 }, { "iTLZero", 0x25 },
+        { "s1159", 0x28 }, { "s2359", 0x29 },
+    };
+    char key[160], value[96];
+    GET_LOCALE_INFO_A get = (GET_LOCALE_INFO_A)GetProcAddress(GetModuleHandleA("kernel32.dll"), "GetLocaleInfoA");
+    int i;
+    lstrcpyA(key, sub);
+    lstrcatA(key, "\\Control Panel\\International");
+    put_sz(HKEY_USERS, "HKU", key, "Locale", locale, 0);
+    for (i = 0; get && i < (int)(sizeof items / sizeof items[0]); i++) {
+        if (get(lcid, items[i].type, value, sizeof value) > 0)
+            put_sz(HKEY_USERS, "HKU", key, items[i].name, value, 0);
+    }
+    if (keyboard[0]) {
+        lstrcpyA(key, sub);
+        lstrcatA(key, "\\Keyboard Layout");
+        put_sz(HKEY_USERS, "HKU", key, "Active", keyboard, 0);
+    }
+}
+
+/* Code pages and the bitmap fonts that match them (what LANGUAGE.INF
+   InstallOption does through MakeCodePageEntry and MakeFontEntries), only
+   when every file is installed: text-mode Setup of the NT 3.51 CD copies the
+   CE, Cyrillic, Greek and Turkish fonts; the NT 3.5 and 3.1 CDs have none,
+   there only the locale and the keyboard change. */
+static void code_pages(const struct usos_cp *c)
+{
+    static const char nls_cp[] = "SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage";
+    static const char *const bases[] = { "vgasys", "vgafix", "sserife", "coure", "serife", "smalle" };
+    static const char *const oem_kinds[] = { "app", "cga40", "cga80", "ega40", "ega80" };
+    static const char *const oem_keys[] = { "woafont", "CGA40WOA.FON", "CGA80WOA.FON", "EGA40WOA.FON", "EGA80WOA.FON" };
+    const char *sfx = font_suffix(c->acp);
+    char acp[8], oem[8], mac[8], file[32];
+    int i;
+
+    dec(acp, c->acp);
+    dec(oem, c->oemcp);
+    dec(mac, c->maccp);
+    if (!sys_file(name3(file, "c_", acp, ".nls"), 0) || !sys_file(name3(file, "c_", oem, ".nls"), 0) ||
+        !sys_file(name3(file, "vga", oem, ".fon"), 1)) {
+        say("missing ");
+        say(file);
+        say(": code pages unchanged\r\n");
+        return;
+    }
+    for (i = 0; i < 6; i++) {
+        if (!sys_file(name3(file, bases[i], sfx, ".fon"), 1)) {
+            say("missing font ");
+            say(file);
+            say(": code pages unchanged\r\n");
+            return;
+        }
+    }
+    put_sz(HKEY_LOCAL_MACHINE, "HKLM", nls_cp, "ACP", acp, 0);
+    put_sz(HKEY_LOCAL_MACHINE, "HKLM", nls_cp, "OEMCP", oem, 0);
+    put_sz(HKEY_LOCAL_MACHINE, "HKLM", nls_cp, acp, name3(file, "c_", acp, ".nls"), 0);
+    put_sz(HKEY_LOCAL_MACHINE, "HKLM", nls_cp, oem, name3(file, "c_", oem, ".nls"), 0);
+    if (sys_file(name3(file, "c_", mac, ".nls"), 0)) {
+        put_sz(HKEY_LOCAL_MACHINE, "HKLM", nls_cp, "MACCP", mac, 0);
+        put_sz(HKEY_LOCAL_MACHINE, "HKLM", nls_cp, mac, file, 0);
+    }
+    put_sz(HKEY_LOCAL_MACHINE, "HKLM", nls_cp, "OEMHAL", name3(file, "vga", oem, ".fon"), 0);
+    ini("GRE_Initialize", "OEMFONT.FON", file);
+    WritePrivateProfileStringA("boot.description", "oemfonts.fon", file, "system.ini");
+    for (i = 0; i < 5; i++) {
+        if (sys_file(name3(file, oem_kinds[i], oem, ".fon"), 1))
+            WritePrivateProfileStringA("386Enh", oem_keys[i], file, "system.ini");
+    }
+    ini("GRE_Initialize", "FIXEDFON.FON", name3(file, "vgafix", sfx, ".fon"));
+    ini("GRE_Initialize", "FONTS.FON", name3(file, "vgasys", sfx, ".fon"));
+    ini("FontSubstitutes", "MS Shell Dlg", "MS Sans Serif");
+    ini("Fonts", "MS Sans Serif 8,10,12,14,18,24 (VGA res)", name3(file, "sserife", sfx, ".fon"));
+    ini("Fonts", "Courier 10,12,15 (VGA res)", name3(file, "coure", sfx, ".fon"));
+    ini("Fonts", "MS Serif 8,10,12,14,18,24 (VGA res)", name3(file, "serife", sfx, ".fon"));
+    ini("Fonts", "Small Fonts (VGA res)", name3(file, "smalle", sfx, ".fon"));
+    /* TrueType: the tagged face names applications ask for ("Arial CE"). */
+    if (c->acp == 1250 || c->acp == 1251) {
+        ini("FontSubstitutes", "Arial CE", "Arial");
+        ini("FontSubstitutes", "Courier New CE", "Courier New");
+        ini("FontSubstitutes", "Times New Roman CE", "Times New Roman");
+        ini("FontSubstitutes", "Arial CYR", "Arial");
+        ini("FontSubstitutes", "Courier New CYR", "Courier New");
+        ini("FontSubstitutes", "Times New Roman CYR", "Times New Roman");
+    }
+}
+
+static void intl(void)
+{
+    static const char nls_lang[] = "SYSTEM\\CurrentControlSet\\Control\\Nls\\Language";
+    char text[256], locale[16], keyboard[16], file[32], lang[8], hive[MAX_PATH];
+    LCID lcid;
+    LONG rc;
+    int i;
+
+    if (read_text("INTL.TXT", text, sizeof text) < 0) {
+        say("INTL.TXT: none (the CD's locale and keyboard)\r\n");
+        return;
+    }
+    text_value(text, "locale", locale, sizeof locale);
+    text_value(text, "keyboard", keyboard, sizeof keyboard);
+    lcid = (LCID)hex_value(locale);
+    if (len(locale) != 8 || !lcid) {
+        say("INTL.TXT: no locale\r\n");
+        return;
+    }
+    if (len(keyboard) != 8)
+        keyboard[0] = 0;
+    /* The layout DLL (HKLM Keyboard Layout maps the id to it; text-mode
+       Setup copies every layout of TXTSETUP [Keyboard Layout]). */
+    if (keyboard[0]) {
+        HKEY h;
+        DWORD type, size = sizeof file;
+        file[0] = 0;
+        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout", 0, KEY_READ, &h) == ERROR_SUCCESS) {
+            if (RegQueryValueExA(h, keyboard, NULL, &type, (BYTE *)file, &size) != ERROR_SUCCESS)
+                file[0] = 0;
+            RegCloseKey(h);
+        }
+        if (!file[0] || !sys_file(file, 0)) {
+            say("keyboard ");
+            say(keyboard);
+            say(" has no layout DLL here: keyboard unchanged\r\n");
+            keyboard[0] = 0;
+        }
+    }
+    for (i = 0; i < (int)(sizeof g_cps / sizeof g_cps[0]); i++)
+        if (g_cps[i].lang == (WORD)lcid)
+            code_pages(&g_cps[i]);
+    /* System locale (MakeLanguageEntry). */
+    for (i = 0; i < 4; i++)
+        lang[i] = locale[4 + i];
+    lang[4] = 0;
+    put_sz(HKEY_LOCAL_MACHINE, "HKLM", nls_lang, "Default", lang, 0);
+    if (sys_file("l_intl.nls", 0))
+        put_sz(HKEY_LOCAL_MACHINE, "HKLM", nls_lang, lang, "l_intl.nls", 0);
+    /* The logon desktop (.DEFAULT) and the Default User hive (config\userdef,
+       which GUI Setup saved from .DEFAULT; every new profile starts from it). */
+    intl_user(".DEFAULT", lcid, locale, keyboard);
+    enable_privilege("SeRestorePrivilege");
+    enable_privilege("SeBackupPrivilege");
+    if (!GetWindowsDirectoryA(hive, MAX_PATH))
+        lstrcpyA(hive, "C:\\WINNT");
+    lstrcatA(hive, "\\system32\\config\\userdef");
+    rc = RegLoadKeyA(HKEY_USERS, "USOSDEF", hive);
+    if (rc == ERROR_SUCCESS) {
+        intl_user("USOSDEF", lcid, locale, keyboard);
+        rc = RegUnLoadKeyA(HKEY_USERS, "USOSDEF");
+        say_hex(rc ? "userdef unload FAILED " : "userdef updated ", rc);
+    } else {
+        say_hex("userdef not loaded, rc ", rc);
+    }
+}
+
+/* GUI Setup without its display page leaves GraphicsDrivers\DetectDisplay;
+   userinit then opens "Display Settings" at every logon until the applet
+   confirms a mode (NT 3.5x userinit.exe / display.cpl). */
+static void display_confirmed(void)
+{
+    LONG rc = RegDeleteKeyA(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers\\DetectDisplay");
+    say_hex("GraphicsDrivers\\DetectDisplay removed, rc ", rc);
+}
+
+/* What the answer profile asks for (/service after post(); NT 3.1: /polish). */
+static void polish(void)
+{
+    say("USOS answer profile: account, locale\r\n");
+    account();
+    intl();
+    display_confirmed();
+}
+
 static void post(void)
 {
     static const char *const drivers[] = { "AHCINT", "USOSRST", "USOSUSB" };
@@ -347,6 +838,7 @@ static void WINAPI service_main(DWORD argc, LPSTR *argv)
         SetServiceStatus(g_status_handle, &g_status);
     open_log("POST.LOG");
     post();
+    polish();
     /* Once only: the service turns itself off before DONE.TXT. */
     set_dword(SVC_NAME, NULL, "Start", SERVICE_DISABLED);
     write_file("DONE.TXT", "done\r\n");
@@ -418,6 +910,12 @@ void __stdcall entry(void)
     if (lstrcmpA(opt, "post") == 0) {
         open_log("POST.LOG");
         post();
+        ExitProcess(0);
+    }
+    /* NT 3.1: POST.CMD at the end of GUI Setup (no usosnt3 service there). */
+    if (lstrcmpA(opt, "polish") == 0) {
+        open_log("POST.LOG");
+        polish();
         ExitProcess(0);
     }
     /* "/setup" or nothing: what GUI Setup runs ([GuiUnattended] !DetachedProgram). */

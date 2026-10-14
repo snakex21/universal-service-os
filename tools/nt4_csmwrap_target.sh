@@ -247,6 +247,30 @@ nt3_detached_answer() {
         }'
 }
 
+# NT 3.x answer-profile values (docs/nt3-polish-2026-10-14.md): the
+# ;USOS-USER= / ;USOS-PASSWORD= / ;USOS-AUTOLOGON= / ;USOS-LOCALE= /
+# ;USOS-KEYBOARD= lines of the answer $1 (src/flow/answer/nt3.zig; the menu
+# language's locale from w9x_csmwrap_prepare.sh w9x_nt3_ui_locale) become
+# $2/ACCOUNT.TXT and $2/INTL.TXT (key=value, CR LF) for usosnt3.exe, which
+# applies them at the first start (NT 3.1: POST.CMD at the end of GUI Setup)
+# and deletes ACCOUNT.TXT. The account lines then leave $1, so the password
+# is not in the copies of WINNT.SIF on C:.
+nt3_profile_files() {
+    awk -v BINMODE=3 -v dir="$2" '
+        { line = $0; sub(/\r$/, "", line) }
+        line ~ /^;USOS-USER=/ { v = line; sub(/^[^=]*=/, "", v); user = v; acct = 1; next }
+        line ~ /^;USOS-PASSWORD=/ { v = line; sub(/^[^=]*=/, "", v); pw = v; acct = 1; next }
+        line ~ /^;USOS-AUTOLOGON=/ { v = line; sub(/^[^=]*=/, "", v); auto = (v == "1") ? 1 : 0; acct = 1; next }
+        line ~ /^;USOS-LOCALE=[0-9A-Fa-f]+$/ { v = line; sub(/^[^=]*=/, "", v); loc = toupper(v); intl = 1 }
+        line ~ /^;USOS-KEYBOARD=[0-9A-Fa-f]+$/ { v = line; sub(/^[^=]*=/, "", v); kbd = toupper(v); intl = 1 }
+        { printf "%s\r\n", line > (dir "/WINNT.NEW") }
+        END {
+            if (acct) printf "user=%s\r\npassword=%s\r\nautologon=%d\r\n", user, pw, auto > (dir "/ACCOUNT.TXT")
+            if (intl) printf "locale=%s\r\nkeyboard=%s\r\n", loc, kbd > (dir "/INTL.TXT")
+            printf "account=%s user=%s password=%s autologon=%s locale=%s keyboard=%s\n", acct ? "yes" : "no", user == "" ? "Administrator" : user, pw == "" ? "blank" : "set", auto ? "yes" : "no", loc == "" ? "CD" : loc, kbd == "" ? "CD" : kbd
+        }' "$1" && mv "$2/WINNT.NEW" "$1"
+}
+
 # NT 3.51 TXTSETUP.SIF (stdin -> stdout, CR LF): the [hal] rows of the MPS
 # machine types (mps_up = halapic.dll, mps_mp = halmps.dll) install the
 # "Standard PC" hal.dll (8259 PIC) instead. The install VM has an APIC and an
@@ -311,6 +335,13 @@ nt3_nvme_stage() {
     log "storage: NVMe target $TARGET_DEVICE, usosnvme ($nvme_sys) staged next to AHCINT"
 }
 
+# The answer-profile files of nt3_profile_files into \USOS\NT3.
+nt3_stage_profile() {
+    for file in ACCOUNT.TXT INTL.TXT; do
+        [ ! -f "$work/$file" ] || mv "$work/$file" "$usos/$file" || fail "cannot copy $file"
+    done
+}
+
 # NT 3.1: \USOS\NT3 with the NT 3.1 driver builds; GUI Setup (the patched
 # INITIAL.INF, nt31_initial_inf) copies and registers them itself.
 nt31_usos() {
@@ -319,7 +350,9 @@ nt31_usos() {
     cp "$drv/$ahci" "$usos/AHCINT.SYS" || fail "cannot copy $ahci"
     cp "$drv/$rst" "$usos/USOSRST.SYS" || fail "cannot copy $rst"
     cp "$drv/$usb" "$usos/USOSUSB.SYS" || fail "cannot copy $usb"
+    cp "$drv/USOSNT3.EXE" "$usos/USOSNT3.EXE" || fail 'cannot copy USOSNT3.EXE'
     nt3_nvme_stage
+    nt3_stage_profile
     log 'display: VGA (640x480x16)'
     printf 'answer=%s\r\nversion=%s.%s\r\n' "$ANSWER_KIND" "$major" "$minor" > "$usos/SOURCE.TXT"
     # The names GUI Setup would ask for (WINNT.SIF [UserData]; NT 3.1 has no
@@ -341,6 +374,7 @@ copy C:\USOS\NT3\USOSUSB.SYS C:\WINNT\SYSTEM32\DRIVERS\USOSUSB.SYS >> C:\USOS\NT
 if exist C:\USOS\NT3\USOSNVME.SYS copy C:\USOS\NT3\USOSNVME.SYS C:\WINNT\SYSTEM32\DRIVERS\USOSNVME.SYS >> C:\USOS\NT3\POST.LOG
 if not exist C:\WINNT\SYSTEM32\DRIVERS\AHCINT.SYS echo AHCINT.SYS copy FAILED >> C:\USOS\NT3\POST.LOG
 if exist C:\USOS\NT3\USOSNVME.SYS if not exist C:\WINNT\SYSTEM32\DRIVERS\USOSNVME.SYS echo USOSNVME.SYS copy FAILED >> C:\USOS\NT3\POST.LOG
+C:\USOS\NT3\USOSNT3.EXE /polish
 echo done > C:\USOS\NT3\DONE.TXT
 EOF
 }
@@ -365,7 +399,7 @@ cleanup() {
     umount "$work/iso" 2>/dev/null || true
     [ -z "${part_loop:-}" ] || losetup -d "$part_loop" 2>/dev/null || true
     [ -z "${iso_loop:-}" ] || losetup -d "$iso_loop" 2>/dev/null || true
-    rm -f "$work/WINNT.SIF"
+    rm -f "$work/WINNT.SIF" "$work/ACCOUNT.TXT" "$work/WINNT.NEW"
 }
 trap cleanup EXIT HUP INT TERM
 
@@ -449,7 +483,7 @@ nvme_sys=USOSNVME.SYS
 [ -z "$nt31" ] || nvme_sys=USOSNVME31.SYS
 [ -z "$nvme" ] || [ -r "$drv/$nvme_sys" ] || fail "missing: $drv/$nvme_sys (NVMe driver). No disk was changed"
 if [ -n "$nt31" ]; then
-    for file in $ahci $rst $usb; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
+    for file in $ahci $rst $usb USOSNT3.EXE; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
 elif [ -n "$nt3" ]; then
     for file in USOSNT3.EXE USOSACHK.EXE $rst; do [ -r "$drv/$file" ] || fail "missing: $drv/$file"; done
 else
@@ -474,6 +508,8 @@ fi
 if [ -n "$nt3" ]; then
     nt4_resolve_time_zone "${lang:-}" yes < "$ANSWER_SIF" | nt4_server_answer "${product:-0}" yes | nt3_detached_answer > "$work/WINNT.SIF" ||
         fail 'cannot prepare WINNT.SIF'
+    profile_values=$(nt3_profile_files "$work/WINNT.SIF" "$work") || fail 'cannot read the answer profile values'
+    log "answer profile: $profile_values"
 else
     nt4_resolve_time_zone "${lang:-}" < "$ANSWER_SIF" | nt4_server_answer "${product:-0}" > "$work/WINNT.SIF" || fail 'cannot prepare WINNT.SIF'
     if [ -n "$tse" ]; then
@@ -623,6 +659,7 @@ for file in AHCINT.SYS USOSUSB.SYS USOSNT3.EXE; do
 done
 cp "$drv/$rst" "$usos/USOSRST.SYS" || fail "cannot copy $rst"
 nt3_nvme_stage
+nt3_stage_profile
 # Text-mode Setup runs AUTOCHK.EXE from the local source on C: ("Checking
 # drive C:"); in the QEMU install VM that run overflows a kernel stack and
 # the VM triple-faults (2026-10-08: double fault -> STOP 0x7F 8 while the

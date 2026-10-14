@@ -103,9 +103,15 @@ elif [ -f /usos-e2e/winnt.sif ]; then
 else
 sed -n '/^w9x_nt3_default_sif()/,/^}/p' /usr/lib/usos/w9x_csmwrap_prepare.sh > /tmp/sif.sh
 . /tmp/sif.sh
-w9x_nt3_default_sif 'Central European' ${E2E_LANG:-} > /run/nt4-winnt.sif
+w9x_nt3_default_sif 'Central European' > /run/nt4-winnt.sif
 SP=''
 KIND=USOS
+fi
+if [ "$NT_MAJOR" = 3 ] && [ -n "${E2E_LOCALE:-}" ]; then
+    # The menu language's locale + keyboard (request.ini), as step 620 adds them.
+    sed -n '/^w9x_nt3_ui_locale()/,/^}/p' /usr/lib/usos/w9x_csmwrap_prepare.sh > /tmp/loc.sh
+    . /tmp/loc.sh
+    w9x_nt3_ui_locale /run/nt4-winnt.sif "$E2E_LOCALE" "${E2E_KEYBOARD:-$E2E_LOCALE}"
 fi
 if ! env TARGET_DEVICE="$TARGET" NT4_SOURCE_ISO=/mnt/data/source.iso NT4_ANSWER_SIF=/run/nt4-winnt.sif \
     NT4_ANSWER_KIND="$KIND" NT4_SP_EXE="$SP" NT_MAJOR="$NT_MAJOR" NT_MINOR="$NT_MINOR" NT4_EDITION="${NT4_EDITION:-}" \
@@ -138,6 +144,7 @@ fi
 if ! check=$(nt4_vm_finish "$TARGET" "$LOGS"); then log "finish FAIL $check"; cat "$LOGS/fsck.txt"; echo E2E-RESULT=FAIL; exit 1; fi
 log "finish PASS $check"
 cat "$LOGS/BOOT.INI"
+[ ! -f "$LOGS/POST.LOG" ] || { echo "== POST.LOG"; tr -d "\r" < "$LOGS/POST.LOG" | sed "s/^/POSTLOG: /"; }
 if ! TARGET_DEVICE="$TARGET" USOS_XP_ESP_TAIL_SECTORS=133120 USOS_CSMWRAP_DIR=/usos-e2e/csmwrap sh /usr/lib/usos/xp_csmwrap_esp.sh > /tmp/esp.log 2>&1; then
     cat /tmp/esp.log; echo E2E-RESULT=FAIL; exit 1
 fi
@@ -268,7 +275,7 @@ def install(args, out: Path, target: Path) -> bool:
             if "\n" in new:
                 cut = new.rindex("\n") + 1
                 for line in new[:cut].splitlines():
-                    if line.startswith(("E2E", "[NT4_CSMWRAP]", "run ", "nt31 ", "answer ", "text answer", "stalled", "rc=")):
+                    if line.startswith(("E2E", "POSTLOG", "[NT4_CSMWRAP]", "run ", "nt31 ", "answer ", "text answer", "stalled", "rc=")):
                         print(line.rstrip(), flush=True)
                 shown += cut
         console.run("sync", "SYNC-DONE", 120)

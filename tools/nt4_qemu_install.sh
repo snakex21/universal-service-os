@@ -490,6 +490,11 @@ nt4_vm_finish() {
                 { reason="$reason cannot restore autochk.exe;"; status=1; }
         fi
     fi
+    # The answer profile's password (usosnt3.exe deletes ACCOUNT.TXT after
+    # use; docs/nt3-polish-2026-10-14.md): never left on C:.
+    if [ "$sub" = NT3 ] && src=$(nt4_ci_path "$c" USOS/NT3/ACCOUNT.TXT); then
+        rm -f "$src" && reason="$reason ACCOUNT.TXT was left and is removed;"
+    fi
     if [ "$status" = 0 ] && [ "$sub" = NT3 ] && src=$(nt4_ci_path "$c" USOS/NT3/SOURCE.TXT) &&
         grep -aq '^version=3\.50' "$src"; then
         NT4_BOOT_OPTIONS=$NT35_BOOT_OPTIONS
