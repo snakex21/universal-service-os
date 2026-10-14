@@ -602,6 +602,7 @@ def main() -> int:
             ("tools/xp64_selected_partition_uefi_csm.sif", "usr/lib/usos/xp64_selected_partition_uefi_csm.sif"),
             ("tools/nt5_storage_stage.sh", "usr/lib/usos/nt5_storage_stage.sh"),
             ("tools/nt52_usb_stage.sh", "usr/lib/usos/nt52_usb_stage.sh"),
+            ("tools/nt5_usosmpart_stage.sh", "usr/lib/usos/nt5_usosmpart_stage.sh"),
             ("tools/w2k_stage.sh", "usr/lib/usos/w2k_stage.sh"),
             ("tools/nt5_user_drivers.sh", "usr/lib/usos/nt5_user_drivers.sh"),
             ("tools/nt5_media_key.sh", "usr/lib/usos/nt5_media_key.sh"),
@@ -664,6 +665,10 @@ def main() -> int:
             ("tools/vendor/ahcint/1.3.0.0-usos4/bin/NT31/i386/ahcint.sys", "usr/lib/usos/nt3/AHCINT31.SYS"),
             ("tools/w2k/usosrst/bin/nt31/i386/usosrst.sys", "usr/lib/usos/nt3/USOSRST31.SYS"),
             ("tools/nt4/usosusb/bin/nt31/i386/usosusb.sys", "usr/lib/usos/nt3/USOSUSB31.SYS"),
+            # usosmpart (own GPL USB multi-partition disk filter,
+            # tools/nt/usosmpart): every NT 5 system (nt5_usosmpart_stage.sh).
+            ("tools/nt/usosmpart/bin/i386/usosmpart.sys", "usr/lib/usos/nt5-usosmpart/i386/usosmpart.sys"),
+            ("tools/nt/usosmpart/bin/amd64/usosmpart.sys", "usr/lib/usos/nt5-usosmpart/amd64/usosmpart.sys"),
         ):
             put(entries, Entry(target_name, stat.S_IFREG | 0o644, (root / source_name).read_bytes()))
         # Windows Embedded POSReady 2009 (docs/posready-2009-2026-10-10.md):
@@ -678,6 +683,8 @@ def main() -> int:
         posready_drivers = root / "media/Systems/Windows/Windows XP UEFI-CSM PAE/Drivers/x86"
         for name in POSREADY_DRIVERS:
             put(entries, Entry("usr/lib/usos/posready/DRV/" + name.split("/")[1], stat.S_IFREG | 0o644, (posready_drivers / name).read_bytes()))
+        # Own GPL USB multi-partition disk filter; FIRST.CMD registers it.
+        put(entries, Entry("usr/lib/usos/posready/DRV/usosmpart.sys", stat.S_IFREG | 0o644, (root / "tools/nt/usosmpart/bin/i386/usosmpart.sys").read_bytes()))
         xp_vbr = root / "zig-out/xp-bios/xp-vbr-code.bin"
         xp_stage2 = root / "zig-out/xp-bios/xp-stage2.bin"
         xp_nt52_vbr = root / "zig-out/xp-bios/xp-nt52-vbr-tail.bin"
