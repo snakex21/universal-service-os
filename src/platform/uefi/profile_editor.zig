@@ -8,7 +8,7 @@
 //!
 //! "Use for" (`systems=`) says which systems offer the profile. Then the
 //! typed options (answer.options) in their groups (Explorer, Taskbar and
-//! Start, System, Updates and privacy, Accounts and network), each group and
+//! Start, System, Updates and privacy, Apps and scripts, Accounts and network), each group and
 //! each option only where the system renders it, and last the "Appearance
 //! and extras" section with the remaining tweaks (answer.schema.tweak_support).
 const std = @import("std");
@@ -50,6 +50,7 @@ const F = enum(u8) {
     section_taskbar,
     section_system,
     section_updates,
+    section_apps,
     section_accounts,
     /// A row of the typed option table (field_option says which).
     option,
@@ -451,7 +452,7 @@ fn helpKey(id: F) view.Key {
         .theme => .profile_help_theme,
         .display => .profile_help_display,
         .skip_games, .skip_msn, .hide_outlook_express, .classic_start, .no_balloon_tips, .no_sidebar, .no_welcome_center => tweak_rows[tweakRow(id).?].help,
-        .section_explorer, .section_taskbar, .section_system, .section_updates, .section_accounts => .profile_section_extras,
+        .section_explorer, .section_taskbar, .section_system, .section_updates, .section_apps, .section_accounts => .profile_section_extras,
         .option => .profile_help_systems,
         .workgroup => .profile_help_workgroup,
         .save, .cancel => subtitleKey(),
@@ -617,6 +618,7 @@ fn buildFields() void {
         addGroup(.taskbar, .section_taskbar, .profile_section_taskbar, tt);
         addGroup(.system, .section_system, .profile_section_system, tt);
         addGroup(.updates, .section_updates, .profile_section_updates, tt);
+        addGroup(.apps, .section_apps, .profile_section_apps, tt);
         addGroup(.accounts, .section_accounts, .profile_section_accounts, tt);
     }
     // Appearance and extras: only what this system has.

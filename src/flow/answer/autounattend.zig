@@ -191,7 +191,7 @@ pub const Commands = struct {
     }
 };
 
-pub const max_commands = 48;
+pub const max_commands = 96;
 
 /// A packed command stays short enough for usos-run-hidden.exe's prefix
 /// (tools/windows_hidden_commands.h: 20 characters within 259).
@@ -241,6 +241,16 @@ fn regOp(packer: *Packer, r: options.Reg, p: *const Profile) !void {
     switch (r.data) {
         .del => try packer.op("reg delete \"{s}\\{s}\" /v {s} /f", .{ root, r.key, r.name }),
         .dword => |v| try packer.op("reg add \"{s}\\{s}\" /v {s} /t REG_DWORD /d {d} /f", .{ root, r.key, r.name, v }),
+        .binary => |hex| {
+            // "90,12,03,80" -> /d 90120380.
+            var bytes: [64]u8 = undefined;
+            var n: usize = 0;
+            for (hex) |c| if (c != ',') {
+                bytes[n] = c;
+                n += 1;
+            };
+            try packer.op("reg add \"{s}\\{s}\" /v {s} /t REG_BINARY /d {s} /f", .{ root, r.key, r.name, bytes[0..n] });
+        },
         else => {
             var number: [16]u8 = undefined;
             const data = options.dataText(r.data, p, &number);
@@ -411,6 +421,22 @@ fn oobe(w: *W, input: Input) !void {
         try close(w, 4, "Password");
         try close(w, 3, "AutoLogon");
     }
+    // The user script hook (options.user_script): at the first sign-in.
+    if (p.opt(.user_script) == 1) {
+        try open(w, 3, "FirstLogonCommands");
+        const scripts = [_][]const u8{ options.user_script_reg, options.user_script_cmd };
+        const descriptions = [_][]const u8{ "USOS user script (.reg)", "USOS user script (.cmd)" };
+        for (scripts, descriptions, 1..) |command, description, order| {
+            try indent(w, 4);
+            try w.writeAll("<SynchronousCommand wcm:action=\"add\">\n");
+            var number: [8]u8 = undefined;
+            try element(w, 5, "Order", try std.fmt.bufPrint(&number, "{d}", .{order}));
+            try element(w, 5, "CommandLine", command);
+            try element(w, 5, "Description", description);
+            try close(w, 4, "SynchronousCommand");
+        }
+        try close(w, 3, "FirstLogonCommands");
+    }
     try open(w, 3, "OOBE");
     // Per version (Microsoft unattend reference, schema.zig): Vista has
     // HideEULAPage, NetworkLocation and ProtectYourPC only; 7 adds
@@ -459,7 +485,10 @@ pub fn render(input: Input, buffer: []u8) ![]const u8 {
     return w.buffered();
 }
 
-pub const max_size = 16 * 1024;
+/// 64 KiB (16 KiB until stage 2 of the options, 2026-10-14): every option
+/// on stays far below it (test below); the consumers take more (DATA answers
+/// up to 1 MiB; usos-run-hidden.exe --wrap allocates the file size + 64 KiB).
+pub const max_size = 64 * 1024;
 
 test "autounattend: manual disk, escaped values, arch on every component" {
     var p = Profile{};

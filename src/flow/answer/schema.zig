@@ -104,6 +104,10 @@ pub const settings = [_]Setting{
     .{ .pass = .oobeSystem, .component = shell, .path = "AutoLogon/Username" },
     .{ .pass = .oobeSystem, .component = shell, .path = "AutoLogon/Password/Value" },
     .{ .pass = .oobeSystem, .component = shell, .path = "AutoLogon/Password/PlainText" },
+    // Typed option user_script (options.zig).
+    .{ .pass = .oobeSystem, .component = shell, .path = "FirstLogonCommands/SynchronousCommand/Order" },
+    .{ .pass = .oobeSystem, .component = shell, .path = "FirstLogonCommands/SynchronousCommand/CommandLine" },
+    .{ .pass = .oobeSystem, .component = shell, .path = "FirstLogonCommands/SynchronousCommand/Description" },
     .{ .pass = .oobeSystem, .component = intl, .path = "InputLocale" },
     .{ .pass = .oobeSystem, .component = intl, .path = "SystemLocale" },
     .{ .pass = .oobeSystem, .component = intl, .path = "UILanguage" },

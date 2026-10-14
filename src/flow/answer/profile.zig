@@ -91,6 +91,35 @@ pub const Field = enum {
     autologon,
     password_never_expires,
     workgroup,
+    // Typed options, stage 2 (2026-10-14).
+    classic_context_menu,
+    shortcut_suffix_off,
+    desktop_icons,
+    classic_taskbar,
+    all_tray_icons,
+    boot_to_desktop,
+    lock_screen_off,
+    visual_effects,
+    font_smoothing,
+    mouse_accel_off,
+    sticky_keys_off,
+    power_profile,
+    no_sleep,
+    last_access_off,
+    long_paths,
+    search_index_off,
+    remote_desktop,
+    firewall_off,
+    server_nags_off,
+    ie_esc_off,
+    security_center_off,
+    defender_off,
+    smartscreen_off,
+    device_encryption_off,
+    remove_apps,
+    first_run_off,
+    onedrive_off,
+    user_script,
 };
 
 /// The optional look and extras toggles (docs/answer-profiles.md,
@@ -185,7 +214,7 @@ pub const SystemEdition = struct {
 };
 
 pub const max_system_editions = 8;
-pub const max_file = 4096;
+pub const max_file = 8192;
 
 pub const Profile = struct {
     /// Name shown in the menu; also the file name stem.
@@ -900,6 +929,14 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
     }
     if (p.theme != .default) try w.print("theme={s}\r\n", .{@tagName(p.theme)});
     if (p.display != .auto) try w.print("display={s}\r\n", .{@tagName(p.display)});
+    // Typed options (options.zig) and the workgroup, only when set (the
+    // editor saves through here: before 2026-10-14 they were dropped).
+    if (p.workgroup.len > 0) try w.print("workgroup={s}\r\n", .{p.workgroup.slice()});
+    for (options.table) |o| {
+        if (o.legacy) continue;
+        const value = p.opts[@intFromEnum(o.opt)];
+        if (value != 0) try w.print("{s}={s}\r\n", .{ o.key(), o.values[value] });
+    }
     return w.buffered();
 }
 
@@ -1022,6 +1059,33 @@ test "profile round trip keeps every field; keys only with remember_key" {
     try std.testing.expect(std.mem.indexOf(u8, forgotten, "FFFFF") == null);
     try std.testing.expect(parse(forgotten, &q) == .ok);
     try std.testing.expect(!q.hasAnyKey());
+}
+
+test "profile round trip keeps typed options and the workgroup; every option at its last value fits" {
+    var p = Profile{};
+    try p.name.set("Opcje");
+    try p.user.set("Tester");
+    try p.workgroup.set("LAB");
+    p.opts[@intFromEnum(options.Opt.power_profile)] = 2;
+    p.opts[@intFromEnum(options.Opt.user_script)] = 1;
+    var buffer: [max_file]u8 = undefined;
+    var text = try write(&p, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, text, "workgroup=LAB\r\npower_profile=balanced\r\nuser_script=yes\r\n") != null);
+    var q: Profile = undefined;
+    try std.testing.expect(parse(text, &q) == .ok);
+    try std.testing.expectEqualSlices(u8, &p.opts, &q.opts);
+    try std.testing.expectEqualStrings("LAB", q.workgroup.slice());
+    for (options.table) |o| {
+        if (!o.legacy) p.opts[@intFromEnum(o.opt)] = @intCast(o.values.len - 1);
+    }
+    p.remember_key = true;
+    for (0..max_system_keys) |i| {
+        var name: [32]u8 = undefined;
+        try p.setSystemKey(try std.fmt.bufPrint(&name, "windows-system-{d}", .{i}), "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE");
+    }
+    text = try write(&p, &buffer);
+    try std.testing.expect(parse(text, &q) == .ok);
+    try std.testing.expectEqualSlices(u8, &p.opts, &q.opts);
 }
 
 test "profile parse errors name the field and line, never the value" {
