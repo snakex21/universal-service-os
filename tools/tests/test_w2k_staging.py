@@ -301,7 +301,9 @@ class W2kStorage(unittest.TestCase):
         # SP4 ntoskrnl), rows 16-21 while text-mode Setup runs with /NOGUIBOOT.
         for name in (b'MmIsAddressValid', b'KeTickCount', b'KeInitializeDpc', b'KeInitializeTimerEx', b'KeSetTimerEx', b'KeCancelTimer'):
             self.assertIn(name, dll)
-        self.assertIn(b'usosvid 1.1', dll)
+        self.assertIn(b'usosvid 1.2', dll)
+        # 1.2: the CSMWrap usos6 ACPI-enable record (BDA 4F4h) on row 12
+        self.assertIn(b' en=', dll)
 
     def stand_in(self, t: Path) -> tuple:
         import build_xp_uefi_csm_trial as builder

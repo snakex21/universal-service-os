@@ -40,7 +40,7 @@ const (
 	// NTFS driver. USOS starts it only on matching SMBIOS (touch_driver.zig).
 	touchVendorDir    = "tools/vendor/touchi2cdxe/v1.3.1-usos1"
 	touchDriverTarget = "EFI/USOS/touchi2c_x64.efi"
-	// CSMWrap 3.1.2-usos5 (a MODIFIED CSMWrap 3.1.2: quiet boot unless
+	// CSMWrap 3.1.2-usos6 (a MODIFIED CSMWrap 3.1.2: quiet boot unless
 	// csmwrap.ini sets verbose = true, and SeaBIOS boot priorities from
 	// CSMWrap's BBS table, USB included, the exact disk CSMWrap was loaded
 	// from as 0x80, an ACPI 1.0 view (RSDT, 32-bit FADT fields) for 2000/XP;
@@ -51,7 +51,7 @@ const (
 	// ESP (tools/xp_csmwrap_esp.sh, the BIOS Core DOS installer). The LGPL
 	// source (the unpatched archive plus the patches) and every licence
 	// notice travel with it.
-	csmwrapVendorDir  = "tools/vendor/csmwrap/3.1.2-usos5"
+	csmwrapVendorDir  = "tools/vendor/csmwrap/3.1.2-usos6"
 	csmwrapLicenseDir = "tools/vendor/csmwrap/3.1.2"
 	csmwrapSourceDir  = "tools/vendor/csmwrap/3.1.2-src"
 	csmwrapTargetDir  = "EFI/USOS/csmwrap"
@@ -421,8 +421,11 @@ func stageCSMWrap(vendorDir, licenseDir, sourceDir, gplv3, usb string) error {
 		"makes that disk 0x80 also when other disks share its controller, and on\r\n" +
 		"2026-10-13 (patch 0006): an ACPI 1.0 view for legacy systems on CSMWrap's\r\n" +
 		"RSDP copy (an RSDT built from the XSDT when RsdtAddress is 0 or the RSDT is\r\n" +
-		"invalid; a FADT copy with the 32-bit fields filled from the X_ fields). Version\r\n" +
-		"strings: CSMWrap Version 3.1.2-usos5, SeaBIOS 578d260b-CSMWrap-3.1.2-usos5.\r\n" +
+		"invalid; a FADT copy with the 32-bit fields filled from the X_ fields), and on\r\n" +
+		"2026-10-14 (patch 0007, diagnostic, only with csmwrap.ini acpi_legacy_fadt =\r\n" +
+		"true): the switch to ACPI mode (FADT ACPI_ENABLE to SMI_CMD) right before the\r\n" +
+		"legacy boot, with the RTC A/B registers recorded around it. Version\r\n" +
+		"strings: CSMWrap Version 3.1.2-usos6, SeaBIOS 578d260b-CSMWrap-3.1.2-usos6.\r\n" +
 		"\r\n" +
 		"Complete corresponding source, next to this file:\r\n" +
 		"  " + source.Archive.File + " (unpatched CSMWrap 3.1.2, commit 808ac8e, with all\r\n" +
