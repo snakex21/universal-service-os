@@ -439,3 +439,59 @@ twice identical in the pinned Alpine VM (same lock as usos5, BUILD_VERSION
 vendor folder is `tools/vendor/csmwrap/3.1.2-usos6` (release.go, the DOS
 ESP builder, the XP ESP script pin and the tests moved to it; 3.1.2-usos5
 stays as the previous release binary).
+
+## 12. 3.1.2-usos7: APM power-off from every APM interface (2026-10-15, branch `feature/apm-poweroff`)
+
+Why: Windows 98 SE / ME on the X470 end at "Można teraz bezpiecznie wyłączyć
+komputer" (docs/research/win9x-acpi-2026-10-15.md). Two holes in CSMWrap
+3.1.2's APM 5307h power-off: from the 16-bit and 32-bit protected-mode APM
+interfaces (Windows 9x VPOWERD uses the 32-bit one) `apm_shutdown()` called
+`bios_proxy_reset()`, whose mailbox scan loads real-mode segment values
+into `%es` = #GP in protected mode; and the fallback wrote SLP_TYP 0, which
+is S5 on QEMU only (X470 `_S5` = 5, the right PM1a_CNT write is 0x3400).
+SeaBIOS `dprintf` had no output at all in this build (no DEBUG_SERIAL), so
+the "UEFI reset" lines were never visible.
+
+Patch 0008 (own code from the APM 1.2 and ACPI specifications; host unit
+test `tools/tests/csmwrap/test_csmwrap_apmoff.py`, QEMU test
+`tools/tests/csmwrap/run_csmwrap_apmoff_qemu.py`):
+
+1. UEFI `ResetSystem(EfiResetShutdown)` on the helper core through the
+   existing mailbox (`usos_proxy_reset_timed`, 2 s timeout): from INT 15h
+   (real / V86 mode; `%es` = F000h) and from the 32-bit PM interface
+   (through `%gs`, the APM data segment based at the F-segment). The
+   helper-core loop is unchanged. The 16-bit PM interface skips this step.
+2. Direct ACPI S5: SLP_TYPa/b from `Name(_S5, Package(){...})` in the DSDT
+   (else an SSDT), found by a small AML byte parser (`fw/usos_s5.h`), into
+   PM1a_CNT and PM1b_CNT, SLP_EN last (X_ GAS fallbacks for the FADT ports).
+3. Still on after 2 s with SCI_EN = 0: FADT ACPI_ENABLE to SMI_CMD, S5 again.
+4. Still on: the APM call returns AH=60h instead of halting (9x then shows
+   its own "safe to turn off" text, the USOS menu its message).
+
+Known limitation: `_PTS(5)` is not run (no AML interpreter). Boards whose S5
+needs `_PTS` work only through step 1 (the firmware's own ResetSystem).
+
+Diagnostics: "USOS APMOFF:" lines (pm1a/pm1b/pm_tmr/`_S5` at boot, the path
+at power-off) reach the serial port with csmwrap.ini `serial = true`:
+CSMWrap sets CsmwrapFlags bit 0x02 and the new CsmwrapSerialPort field, and
+SeaBIOS's debug output (dprintf level 1) goes to that port; with serial off
+nothing changes. For INT 15h callers 4 bytes at BDA 4FCh-4FFh: `'P'`,
+step<<4 | path (path 1 INT 15h, 2 PM16, 3 PM32; step 1 helper asked, 2 S5
+written, 3 S5 after ACPI enable, 4 gave up), SLP_TYPa | SLP_TYPb<<4, flags
+(bit0 `_S5` found, bit1 PM1a, bit2 PM1b, bit3 helper timeout, bit4 helper
+reset unavailable, bit5 ACPI enable tried). The PM paths cannot write the
+BDA (no flat data segment) and log to serial only.
+
+QEMU (OVMF, TCG, own test MBR, pc and q35): real-mode INT 15h -> `path=uefi
+from=1`, 32-bit PM with paging -> `path=uefi from=3`, 16-bit PM -> `path=s5
+from=2 typ=0/0`: all six runs end with a guest SHUTDOWN. Control with usos6:
+both PM paths reset the guest (the #GP). The X470 values (PM1a_CNT 0x804,
+`_S5` 5, no PM1b) are covered by the host test on the X470 DSDT dump only.
+
+Binary `6a7746ca17327c4007dfc7bfb8e15db35a7c43c115bed68021113373a3653a52`,
+built twice identical in the pinned Alpine VM (same lock as usos6,
+BUILD_VERSION 3.1.2-usos7; the unpatched build still matches
+upstream_rebuild). Vendor folder `tools/vendor/csmwrap/3.1.2-usos7`
+(release.go, the DOS ESP builder, the XP ESP script pin and the tests moved
+to it; 3.1.2-usos6 stays as the previous binary). A later patch 0009 (the
+Windows 2000 ACPI watcher) goes on top of usos7.

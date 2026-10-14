@@ -3,7 +3,7 @@
 # docs/design/csmwrap-integration.md). Runs after prepare_xp_target.sh PASSED
 # on the same target: adds a small FAT16 EFI system partition (MBR type 0xEF)
 # in the space the Windows plan left free at the end of the disk
-# (USOS_XP_ESP_TAIL_SECTORS), with the pinned CSMWrap 3.1.2-usos6 (a MODIFIED
+# (USOS_XP_ESP_TAIL_SECTORS), with the pinned CSMWrap 3.1.2-usos7 (a MODIFIED
 # CSMWrap 3.1.2: quiet unless verbose = true, docs/research/csmwrap.md 6 and 7)
 # as \EFI\BOOT\BOOTX64.EFI, its licences, source and patches in \CSMWRAP.
 # The firmware then boots the target through
@@ -17,7 +17,7 @@ TARGET_DEVICE=${TARGET_DEVICE:?TARGET_DEVICE is required}
 TAIL=${USOS_XP_ESP_TAIL_SECTORS:?USOS_XP_ESP_TAIL_SECTORS is required}
 SRC=${USOS_CSMWRAP_DIR:-/mnt/esp/EFI/USOS/csmwrap}
 ESP_SECTORS=131072
-PINNED=804d5f870c8958067ced48a23b461a69e98da81a645e50750b99d8b7feb4f342
+PINNED=6a7746ca17327c4007dfc7bfb8e15db35a7c43c115bed68021113373a3653a52
 # The LGPL obligations travel with the binary: licence texts, SOURCES.txt
 # (MODIFIED), the complete source archive and the USOS patches.
 CSMWRAP_FILES='LICENSE-CSMWrap-LGPL-2.1.txt COPYING-SeaBIOS-LGPLv3.txt COPYING-SeaBIOS-GPLv3.txt SOURCES.txt csmwrap-3.1.2-src.tar.xz'
@@ -29,7 +29,7 @@ for tool in dd od mkfs.fat mmd mcopy mdir sha256sum awk blockdev sync wc; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
 [ -r "$SRC/csmwrapx64.efi" ] || fail 'CSMWrap is missing on the USOS stick (EFI/USOS/csmwrap)'
-[ "$(sha256sum "$SRC/csmwrapx64.efi" | awk '{print $1}')" = "$PINNED" ] || fail 'CSMWrap binary does not match the pinned 3.1.2-usos6 hash'
+[ "$(sha256sum "$SRC/csmwrapx64.efi" | awk '{print $1}')" = "$PINNED" ] || fail 'CSMWrap binary does not match the pinned 3.1.2-usos7 hash'
 for file in $CSMWRAP_FILES; do
     [ -r "$SRC/$file" ] || fail "$file is missing next to CSMWrap"
 done
@@ -80,7 +80,7 @@ log "csmwrap.ini verbose=$verbose"
 printf 'serial = false\r\nverbose = %s\r\n' "$verbose" > "$ini"
 # Windows 2000 with ACPI on (legacy_xp_staging.sh exports USOS_W2K_ACPI only
 # in the 2000 flow): the RSDT gets an ACPI 1.0 FADT copy (revision 1, 116
-# bytes; CSMWrap 3.1.2-usos6 patch 0006). The 2000 ACPI HALs copy the whole
+# bytes; CSMWrap 3.1.2-usos7 patch 0006). The 2000 ACPI HALs copy the whole
 # FADT into a 0x84-byte buffer, so a revision 3+ FADT overwrites their
 # MADT/IOAPIC data in HAL phase 0 (black screen). XP and the rest: unchanged.
 if [ "${USOS_W2K_ACPI:-}" = on ]; then
