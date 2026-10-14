@@ -156,6 +156,7 @@ attached from the start:
 | simulated install failure: USBSTOR node `ConfigFlags = 0x40` (FAILEDINSTALL), `Service` / `Driver` removed (as SYSTEM), restart | stick invisible after the restart, node `problem=28 configflags=0x40` = the X470 pattern (a boot does not retry a failed install) |
 | `usos-usbreenum.exe` (fix mode, as SYSTEM) on that state | PASS: node removed, tree re-enumerated with retry installation, "device ready" balloon, node `service=disk started=1 problem=0 configflags=0`, disk `removable=0 partitions=3`, volumes back |
 | second fix-mode run on the healthy stick | USBSTOR node restart ok, stick stays, volumes unchanged |
+| the real `:usbfix` block (run in the ISO's WinPE on the target after the Setup pass), then specialize / OOBE with the stick attached | PASS: `SetupComplete.cmd` written, Setup ran the helper as SYSTEM before the first logon (about 1 min, both PnP waits returned at once), log in `C:\USOS\Logs`, USBSTOR node restarted, stick lettered at the desktop |
 
 So the root cause on the X470 is not proven (QEMU does not show it; the
 X470-only parts are real xHCI timing, the SanDisk and the CSMWrap SeaBIOS
