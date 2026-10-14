@@ -89,6 +89,20 @@ w9x_nt3_default_sif() {
     printf '\r\n[LicenseFilePrintData]\r\n\r\n[NetworkAdapterData]\r\n\r\n[TransportData]\r\n\r\n[DomainData]\r\n'
 }
 
+# NT 3.x (English-only CDs; docs/nt3-polish-2026-10-14.md): the menu
+# language's locale and keyboard layout (request.ini locale= / keyboard=,
+# 8 hex digits) as ;USOS-LOCALE= / ;USOS-KEYBOARD= lines of the answer $1,
+# each only when the answer has none (a profile's own choice wins).
+# nt4_csmwrap_target.sh writes them to \USOS\NT3\INTL.TXT for usosnt3.exe.
+w9x_nt3_ui_locale() {
+    for nt3l_pair in "LOCALE:$2" "KEYBOARD:$3"; do
+        nt3l_name=${nt3l_pair%%:*} nt3l_value=${nt3l_pair#*:}
+        case "$nt3l_value" in [0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]) ;; *) continue ;; esac
+        grep -q "^;USOS-$nt3l_name=" "$1" && continue
+        printf ';USOS-%s=%s\r\n' "$nt3l_name" "$nt3l_value" >> "$1" || return 1
+    done
+}
+
 usos_w9x_csmwrap_prepare() {
     W9X_DIR=/mnt/esp/EFI/USOS/win9x
     W9X_LOG=/run/usos-stick-log/win9x
@@ -478,6 +492,12 @@ usos_w9x_csmwrap_prepare() {
     elif [ -n "$posr" ]; then
         set -- env TARGET_DEVICE="$TARGET_DEVICE" POSR_SOURCE_ISO="/mnt/data/$iso" POSR_UNATTENDED="$answer_inf" sh /usr/lib/usos/posready_csmwrap_target.sh
     elif [ -n "$nt4" ]; then
+        if [ "$nt_major" = 3 ]; then
+            ui_locale=$(w9x_csmwrap_value locale "$request") || ui_locale=
+            ui_keyboard=$(w9x_csmwrap_value keyboard "$request") || ui_keyboard=
+            w9x_nt3_ui_locale "$answer_inf" "$ui_locale" "$ui_keyboard" || stop 'the locale could not be added to the answer'
+            w9x_csmwrap_log "NT3 locale: $(grep -a '^;USOS-\(LOCALE\|KEYBOARD\)=' "$answer_inf" | tr -d '\r' | tr '\n' ' ')"
+        fi
         set -- env TARGET_DEVICE="$TARGET_DEVICE" NT4_SOURCE_ISO="/mnt/data/$iso" NT4_ANSWER_SIF="$answer_inf"             NT4_ANSWER_KIND="$answer_kind" NT4_SP_EXE="$sp_exe" NT4_EDITION="$([ "$tag" = NT4T ] && echo tse)" NT_MAJOR="$nt_major" NT_MINOR="$nt_minor" sh /usr/lib/usos/nt4_csmwrap_target.sh
     elif [ -n "$dos_iso" ]; then
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="$dos_iso" DOS_WIN3_ISO="$win3_iso" DOS_WIN_EARLY="${win_early:-}" \

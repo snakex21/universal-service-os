@@ -71,6 +71,28 @@ fn quoted(w: *std.Io.Writer, value: []const u8, fallback: []const u8) !void {
     try w.writeByte('"');
 }
 
+/// The answer-profile values NT 3.x GUI Setup has no key for, as comment
+/// lines the INF reader skips (docs/nt3-polish-2026-10-14.md): micro-Linux
+/// (nt4_csmwrap_target.sh) turns them into \USOS\NT3\ACCOUNT.TXT and
+/// INTL.TXT, and usosnt3.exe applies them at the first start (NT 3.1: at
+/// the end of GUI Setup):
+///   ;USOS-USER=        an own account (Administrators), also the logon name
+///   ;USOS-PASSWORD=    its password and the Administrator's
+///   ;USOS-AUTOLOGON=1  Winlogon AutoAdminLogon (typed option "autologon")
+///   ;USOS-LOCALE=0000LLLL, ;USOS-KEYBOARD=KKKKKKKK  locale (code pages and
+///                      bitmap fonts follow it where the CD has them) and
+///                      the keyboard layout; without them micro-Linux adds
+///                      the menu language's.
+fn usosLines(p: *const Profile, w: *std.Io.Writer) !void {
+    if (p.user.slice().len > 0) try w.print(";USOS-USER={s}\r\n", .{p.user.slice()});
+    if (p.password.slice().len > 0) try w.print(";USOS-PASSWORD={s}\r\n", .{p.password.slice()});
+    if (p.opt(.autologon) == 1) try w.writeAll(";USOS-AUTOLOGON=1\r\n");
+    if (p.localeEntry()) |entry| try w.print(";USOS-LOCALE={X:0>8}\r\n", .{entry.lcid});
+    if (p.keyboard != null or p.localeEntry() != null) {
+        if (p.inputProfile()) |k| try w.print(";USOS-KEYBOARD={X:0>8}\r\n", .{k.klid});
+    }
+}
+
 /// WINNT.SIF (CRLF). NT 3.51 takes no product key.
 pub fn render(p: *const Profile, buffer: []u8) ![]const u8 {
     var w: std.Io.Writer = .fixed(buffer);
@@ -82,6 +104,7 @@ pub fn render(p: *const Profile, buffer: []u8) ![]const u8 {
     if (p.timeZone()) |zone| {
         if (msbatch.timeZoneName(zone)) |name98| try w.print(";USOS-TZ={s}\r\n", .{name98});
     }
+    try usosLines(p, &w);
     try w.writeAll("\r\n[UserData]\r\n!FullName = ");
     try quoted(&w, p.user.slice(), "USOS");
     try w.writeAll("\r\n!OrgName = ");
@@ -143,4 +166,24 @@ test "NT 3.51 WINNT.SIF: owner, computer name, no key, no OEM preinstall" {
         try std.testing.expect(std.mem.indexOf(u8, text, absent) == null);
     }
     try std.testing.expect(std.mem.indexOf(u8, text, "\n\n") == null);
+}
+
+test "NT 3.x WINNT.SIF: account, password, automatic logon, locale and keyboard markers" {
+    const tables = @import("tables.zig");
+    var p = Profile{};
+    try p.name.set("A");
+    try p.user.set("Jan");
+    try p.password.set("tajne;1=2");
+    p.opts[@intFromEnum(@import("options.zig").Opt.autologon)] = 1;
+    p.locale = @intCast(tables.language("pl-PL").? - &tables.languages[0]);
+    var buffer: [4096]u8 = undefined;
+    const text = try render(&p, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, text, "!SetupApplications = NO\r\n;USOS-USER=Jan\r\n;USOS-PASSWORD=tajne;1=2\r\n;USOS-AUTOLOGON=1\r\n;USOS-LOCALE=00000415\r\n;USOS-KEYBOARD=00000415\r\n\r\n[UserData]") != null);
+    // An explicit keyboard without a locale.
+    var q = Profile{};
+    try q.name.set("B");
+    q.keyboard = .{ .lcid = 0x0415, .klid = 0x00010415 };
+    const text2 = try render(&q, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, text2, ";USOS-KEYBOARD=00010415\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, text2, "USOS-LOCALE") == null and std.mem.indexOf(u8, text2, "USOS-USER") == null);
 }

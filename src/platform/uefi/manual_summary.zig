@@ -404,7 +404,10 @@ fn start(
         // No answer chosen: the USOS default MSBATCH.INF gets the menu
         // language's time zone (else the Date/Time page waits for a click).
         const time_zone = usos.flow.answer.msbatch.timeZoneForUi(view.languageCode());
-        win9x.writeRequest(root, system.id, system.name, system.image_directory, image.name.slice(), request_answer, time_zone) catch |err| return showError(view.t(.error_preparation), err);
+        // The menu language's locale and keyboard (NT 3.x English CDs take them).
+        const tables = usos.flow.answer.tables;
+        const ui_input: ?win9x.UiInput = if (tables.language(tables.languageForUi(view.languageCode()))) |l| .{ .lcid = l.lcid, .klid = l.keyboard } else null;
+        win9x.writeRequest(root, system.id, system.name, system.image_directory, image.name.slice(), request_answer, time_zone, ui_input) catch |err| return showError(view.t(.error_preparation), err);
         view.vistaCsmwrapStatus(.loading, usos.flow.preparation_boot_progress.VistaCsmwrapStage.loading_detail, vista_csmwrap_heading);
         @import("vista_preparation.zig").startWin9x(root, vista_csmwrap_heading) catch |err| {
             view.refreshFramebuffer();

@@ -508,5 +508,107 @@ class Nt31(unittest.TestCase):
             self.assertIn(f'("{pair[0]}", "{pair[1]}")', build)
 
 
+class Nt3AnswerProfile(unittest.TestCase):
+    """Answer-profile values NT 3.x Setup has no key for
+    (docs/nt3-polish-2026-10-14.md): nt3.zig ;USOS-* lines -> ACCOUNT.TXT /
+    INTL.TXT (nt4_csmwrap_target.sh) -> usosnt3.exe (/service, NT 3.1 /polish)."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix='usos-nt3-profile-'))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def test_profile_files(self):
+        sif = self.tmp / 'WINNT.SIF'
+        sif.write_bytes(b'[GuiUnattended]\r\n!SetupNetwork = NO\r\n;USOS-USER=Jan\r\n;USOS-PASSWORD=a b;c=d\r\n'
+                        b';USOS-AUTOLOGON=1\r\n;USOS-LOCALE=00000415\r\n;USOS-KEYBOARD=00000415\r\n\r\n[UserData]\r\n!FullName = "x"\r\n')
+        fn = function_text(TARGET, 'nt3_profile_files')
+        rc, out, err = sh(f'{fn}\nnt3_profile_files "{sif.as_posix()}" "{self.tmp.as_posix()}"')
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(out.strip(), 'account=yes user=Jan password=set autologon=yes locale=00000415 keyboard=00000415')
+        self.assertNotIn('a b;c=d', out)
+        self.assertEqual((self.tmp / 'ACCOUNT.TXT').read_bytes(), b'user=Jan\r\npassword=a b;c=d\r\nautologon=1\r\n')
+        self.assertEqual((self.tmp / 'INTL.TXT').read_bytes(), b'locale=00000415\r\nkeyboard=00000415\r\n')
+        # The account lines (password) leave WINNT.SIF; the rest stays.
+        self.assertEqual(sif.read_bytes(), b'[GuiUnattended]\r\n!SetupNetwork = NO\r\n;USOS-LOCALE=00000415\r\n'
+                         b';USOS-KEYBOARD=00000415\r\n\r\n[UserData]\r\n!FullName = "x"\r\n')
+
+    def test_no_profile_values(self):
+        sif = self.tmp / 'WINNT.SIF'
+        sif.write_bytes(GOLDEN.read_bytes())
+        fn = function_text(TARGET, 'nt3_profile_files')
+        rc, out, err = sh(f'{fn}\nnt3_profile_files "{sif.as_posix()}" "{self.tmp.as_posix()}"')
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(out.strip(), 'account=no user=Administrator password=blank autologon=no locale=CD keyboard=CD')
+        self.assertFalse((self.tmp / 'ACCOUNT.TXT').exists())
+        self.assertFalse((self.tmp / 'INTL.TXT').exists())
+        self.assertEqual(sif.read_bytes(), GOLDEN.read_bytes())
+
+    def test_ui_locale_only_when_missing(self):
+        fn = function_text(PREPARE, 'w9x_nt3_ui_locale')
+        sif = self.tmp / 'a.sif'
+        sif.write_bytes(b'[UserData]\r\n;USOS-KEYBOARD=00010415\r\n')
+        rc, _, err = sh(f'{fn}\nw9x_nt3_ui_locale "{sif.as_posix()}" 00000415 00000415')
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(sif.read_bytes(), b'[UserData]\r\n;USOS-KEYBOARD=00010415\r\n;USOS-LOCALE=00000415\r\n')
+        rc, _, err = sh(f'{fn}\nw9x_nt3_ui_locale "{sif.as_posix()}" "" bad')
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(sif.read_bytes(), b'[UserData]\r\n;USOS-KEYBOARD=00010415\r\n;USOS-LOCALE=00000415\r\n')
+        text = PREPARE.read_text(encoding='utf-8')
+        self.assertIn('w9x_nt3_ui_locale "$answer_inf" "$ui_locale" "$ui_keyboard"', text)
+
+    def test_wiring(self):
+        text = TARGET.read_text(encoding='utf-8')
+        for want in ('profile_values=$(nt3_profile_files "$work/WINNT.SIF" "$work")',
+                     'cp "$drv/USOSNT3.EXE" "$usos/USOSNT3.EXE"', 'C:\\USOS\\NT3\\USOSNT3.EXE /polish',
+                     'for file in $ahci $rst $usb USOSNT3.EXE; do'):
+            self.assertIn(want, text)
+        self.assertEqual(text.count('    nt3_stage_profile\n') + text.count('\nnt3_stage_profile\n'), 2)
+        self.assertIn('USOS/NT3/ACCOUNT.TXT', QEMU_INSTALL.read_text(encoding='utf-8'))
+        src = (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='utf-8')
+        for want in ('wipe_file("ACCOUNT.TXT", size);', 'GraphicsDrivers\\\\DetectDisplay', '"NetLocalGroupAddMember"',
+                     'RegSaveKeyA(def, hive, NULL)', 'lstrcmpA(opt, "polish") == 0'):
+            self.assertIn(want, src)
+
+    def test_stage_intl(self):
+        i386 = self.tmp / 'i386'
+        usos = self.tmp / 'usos'
+        i386.mkdir()
+        usos.mkdir()
+        for name in ('KBDPL1.DLL', 'C_1250.NL_', 'C_852.NL_', 'VGASYSE.FO_', 'KBDCZ.DLL'):
+            (i386 / name).write_bytes(b'x')
+        (usos / 'INTL.TXT').write_bytes(b'locale=00000415\r\nkeyboard=00000415\r\n')
+        txt = self.tmp / 'TXTSETUP.SIF'
+        txt.write_bytes(b'[Files.KeyboardLayout]\r\n00000405 = KBDCZ.DLL,2\r\n00000415 = KBDPL1.DLL,2\r\n[Other]\r\n')
+        fn = function_text(TARGET, 'nt3_stage_intl')
+        rc, out, err = sh(f'log() {{ echo "$*"; }}\nfail() {{ echo "FAIL $*"; exit 1; }}\n{fn}\n'
+                          f'i386="{i386.as_posix()}" usos="{usos.as_posix()}" txtsetup="{txt.as_posix()}"\nnt3_stage_intl')
+        self.assertEqual(rc, 0, err + out)
+        self.assertIn('(KBDPL1.DLL): 4 CD files', out)
+        self.assertEqual(sorted(f.name for f in (usos / 'INTL').iterdir()), ['C_1250.NLS', 'C_852.NLS', 'KBDPL1.DLL', 'VGASYSE.FON'])
+        self.assertTrue((usos / 'INTL.TXT').read_bytes().endswith(b'keyboard_dll=kbdpl1.dll\r\n'))
+
+    def test_usosnt3_imports_exist_on_nt31(self):
+        # Every static import of usosnt3.exe is exported by the kernel32 /
+        # advapi32 of NT 3.1 (checked against the 3.1, 3.5 and 3.51 CDs'
+        # DLLs on 2026-10-14); newer calls go through GetProcAddress.
+        from check_nt52_driver_imports import pe
+        nt31 = {
+            'kernel32.dll': {'CloseHandle', 'CopyFileA', 'CreateFileA', 'DeleteFileA', 'ExitProcess', 'FlushFileBuffers',
+                             'FindClose', 'FindFirstFileA', 'FindNextFileA', 'CreateProcessA', 'WaitForSingleObject', 'GetExitCodeProcess',
+                             'FreeLibrary', 'GetCommandLineA', 'GetCurrentProcess', 'GetFileAttributesA', 'GetLastError',
+                             'GetModuleHandleA', 'GetProcAddress', 'GetSystemDirectoryA', 'GetWindowsDirectoryA',
+                             'LoadLibraryA', 'MoveFileA', 'MultiByteToWideChar', 'ReadFile', 'SetFilePointer', 'Sleep', 'WriteFile',
+                             'WritePrivateProfileStringA', 'WriteProfileStringA', 'lstrcatA', 'lstrcmpA', 'lstrcmpiA',
+                             'lstrcpyA'},
+            'advapi32.dll': {'AdjustTokenPrivileges', 'InitiateSystemShutdownA', 'LookupAccountNameA',
+                             'LookupPrivilegeValueA', 'OpenProcessToken', 'RegCloseKey', 'RegCreateKeyExA', 'RegDeleteKeyA',
+                             'RegLoadKeyA', 'RegOpenKeyExA', 'RegSaveKeyA', 'RegQueryValueExA', 'RegSetValueExA', 'RegSetValueExW', 'RegUnLoadKeyA',
+                             'RegisterServiceCtrlHandlerA', 'SetServiceStatus', 'StartServiceCtrlDispatcherA'},
+        }
+        _, imports = pe(ROOT / 'tools/nt3/usosnt3/bin/i386/usosnt3.exe')
+        missing = [f'{m}!{n}' for m, n in imports if n not in nt31.get(m.lower(), set())]
+        self.assertEqual(missing, [])
+
+
 if __name__ == '__main__':
     unittest.main()

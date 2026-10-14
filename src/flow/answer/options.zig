@@ -601,6 +601,8 @@ pub const rules = [_]Rule{
     // 6.x+: the Shell-Setup AutoLogon element (autounattend.zig). NT5: the
     // Winlogon values, written at setup end after Setup's own.
     .{ .opt = .autologon, .os = nt6, .action = .native },
+    // NT 3.x: nt3.zig ";USOS-AUTOLOGON=1", usosnt3.exe writes the Winlogon values.
+    .{ .opt = .autologon, .os = set(&.{.nt3}), .action = .native },
     .{ .opt = .autologon, .os = nt5, .action = reg(.hklm, winlogon, "AutoAdminLogon", .{ .sz = "1" }) },
     .{ .opt = .autologon, .os = nt5, .action = reg(.hklm, winlogon, "DefaultUserName", .profile_user) },
     .{ .opt = .autologon, .os = nt5, .action = reg(.hklm, winlogon, "DefaultPassword", .profile_password) },

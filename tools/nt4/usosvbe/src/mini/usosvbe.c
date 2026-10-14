@@ -34,6 +34,21 @@
  * Services\usosvbe\Device0\UsosVbeDiag (REG_SZ) holds a short status line.
  * Imports only routines that NT 4.0 RTM and SP6a export
  * (tools/tests/check_nt4_driver_imports.py).
+ *
+ * USOSVBE_NT3 (build-nt3.cmd): the same miniport for Windows NT 3.1, 3.5 and
+ * 3.51, paired with the CD's own framebuf.dll there too. Differences, from
+ * the NT 3.x video port interface as the CDs' videoprt.sys use it:
+ *  - VIDEO_HW_INITIALIZATION_DATA is 0x20 bytes (NT 3.1 accepts exactly that
+ *    size, NT 3.5/3.51 up to 0x28), VIDEO_PORT_CONFIG_INFO at least 0x38;
+ *  - the kernel exports no PsGetCurrentProcessId (trace without the PID);
+ *  - VideoPortInt10 maps the low megabyte into the calling process on its
+ *    first call (VdmPhysicalVideoMemory* = the VGA window, as for vga.sys)
+ *    and reads the video ROM at C0000h of the current process before every
+ *    call, so after the first good call a call is skipped unless that page
+ *    is valid in the current process (CSRSS);
+ *  - no /BASEVIDEO handling in the NT 3.x video port: with BASEVIDEO in
+ *    SystemStartOptions the driver does not start, so the "[VGA mode]" boot
+ *    entry gets the VGA driver (VgaSave on NT 3.5/3.51).
  */
 
 #include <dderror.h>
@@ -42,7 +57,13 @@
 #include <ntddvdeo.h>
 #include <video.h>
 
+#ifdef USOSVBE_NT3
+#define USOSVBE_VERSION L"usosvbe 1.1-nt3"
+#define NT3_HW_INIT_DATA_SIZE 0x20
+#define NT3_CONFIG_INFO_SIZE 0x38
+#else
 #define USOSVBE_VERSION L"usosvbe 1.0-nt4"
+#endif
 
 #define MAXMODES 64
 #define MAXLIST 256
@@ -72,6 +93,7 @@ typedef struct _DEVEXT {
     ULONG ListCount;        /* modes the BIOS listed */
     ULONG LastVp;           /* VideoPortInt10 status of the last call */
     ULONG Tries;            /* query attempts */
+    BOOLEAN Int10Ok;        /* a VideoPortInt10 call has worked */
     VBEMODE Modes[MAXMODES];
     PVOID MappedBase;
     ULONG MappedLength;
@@ -110,7 +132,9 @@ static void dnum(PDEVEXT x, ULONG v, ULONG base, ULONG minDigits)
     dcat(x, &b[i]);
 }
 
+#ifndef USOSVBE_NT3
 __declspec(dllimport) HANDLE __stdcall PsGetCurrentProcessId(VOID);
+#endif
 #define IOCTL_USOSVBE_TRACE CTL_CODE(FILE_DEVICE_VIDEO, 0x8F0, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 static void trace(PDEVEXT x, WCHAR tag, ULONG v)
@@ -118,7 +142,11 @@ static void trace(PDEVEXT x, WCHAR tag, ULONG v)
     ULONG n = 0, i;
     WCHAR b[16];
     int k = 15;
+#ifdef USOSVBE_NT3
+    ULONG pid = 0;
+#else
     ULONG pid = (ULONG)(ULONG_PTR)PsGetCurrentProcessId();
+#endif
     while (x->Trace[n]) n++;
     if (n > 170) {      /* keep the newest part */
         for (i = 0; i + 60 <= n; i++) x->Trace[i] = x->Trace[i + 60];
@@ -159,10 +187,21 @@ static BOOLEAN vesa_at(ULONG va)
 static ULONG int10(PDEVEXT x, ULONG eax, ULONG ebx, ULONG ecx, ULONG edi)
 {
     VIDEO_X86_BIOS_ARGUMENTS a;
+#ifdef USOSVBE_NT3
+    /* NT 3.x VideoPortInt10 maps the low megabyte into the calling process
+     * on its first call, then checksums C0000h-C0FFFh of the current process
+     * before every call. Once a call worked (in CSRSS), a later call from a
+     * process without that mapping would fault: skip it there. */
+    if (x->Int10Ok && (!valid(0xC0000) || !valid(0xC0FFF))) {
+        x->LastVp = 0xFFFF;
+        return 0xFFFFFFFF;
+    }
+#endif
     VideoPortZeroMemory(&a, sizeof(a));
     a.Eax = eax; a.Ebx = ebx; a.Ecx = ecx; a.Edi = edi;
     x->LastVp = VideoPortInt10(x, &a);
     if (x->LastVp != NO_ERROR) return 0xFFFFFFFF;
+    x->Int10Ok = TRUE;
     return a.Eax & 0xFFFF;
 }
 
@@ -220,6 +259,12 @@ static void add_mode(PDEVEXT x, ULONG num, const UCHAR *mi)
     else if (bpp == 15) { depth = 15; bpp = 16; }
     else depth = bpp;
     if (bpp != 16 && bpp != 24 && bpp != 32) return;
+#ifdef USOSVBE_NT3
+    /* NT 3.x framebuf.dll matches DEVMODE bpp against planes x BitsPerPlane
+     * (16 for both 5:5:5 and 5:6:5) and takes the first hit, which was the
+     * 15-bit mode (QEMU 2026-10-14: set=1024x768x15): list 5:6:5 only. */
+    if (depth == 15) return;
+#endif
     if (rs == 0 || gs == 0 || bs == 0 || rp + rs > 32 || gp + gs > 32 || bp + bs > 32) return;
     if (pitch < w * (bpp / 8) || (ULONGLONG)pitch * h > x->VramBytes) return;
     for (i = 0; i < x->NumModes; i++)
@@ -357,7 +402,11 @@ static BOOLEAN __stdcall StartIO(PVOID ext, PVIDEO_REQUEST_PACKET rp)
         sb->Status = NO_ERROR;
         return TRUE;
     }
+#ifndef USOSVBE_NT3
+    /* NT 3.x: no per-IOCTL registry trace (it is for usosvbe.dll work on
+     * NT 4.0); only UsosVbeDiag is written there. */
     trace(x, L'i', (rp->IoControlCode >> 2) & 0xFFF);
+#endif
     switch (rp->IoControlCode) {
     case IOCTL_VIDEO_QUERY_NUM_AVAIL_MODES: {
         PVIDEO_NUM_MODES nm = (PVIDEO_NUM_MODES)rp->OutputBuffer;
@@ -447,14 +496,24 @@ static VP_STATUS __stdcall FindAdapter(PVOID ext, PVOID ctx, PWSTR args, PVIDEO_
     UNREFERENCED_PARAMETER(ctx);
     UNREFERENCED_PARAMETER(args);
     *again = FALSE;
+#ifdef USOSVBE_NT3
+    if (ci->Length < NT3_CONFIG_INFO_SIZE) return ERROR_INVALID_PARAMETER;
+#else
     if (ci->Length < SIZE_OF_NT4_VIDEO_PORT_CONFIG_INFO) return ERROR_INVALID_PARAMETER;
+#endif
     /* Nothing to claim: all hardware access goes through the video BIOS.
      * VgaSave keeps the VGA ranges for full-screen consoles. */
     ci->NumEmulatorAccessEntries = 0;
     ci->EmulatorAccessEntries = NULL;
     ci->EmulatorAccessEntriesContext = 0;
+#ifdef USOSVBE_NT3
+    /* the first VideoPortInt10 call maps this range (the VGA window) */
+    ci->VdmPhysicalVideoMemoryAddress.QuadPart = 0xA0000;
+    ci->VdmPhysicalVideoMemoryLength = 0x20000;
+#else
     ci->VdmPhysicalVideoMemoryAddress.QuadPart = 0;
     ci->VdmPhysicalVideoMemoryLength = 0;
+#endif
     ci->HardwareStateSize = 0;
     x->Current = (ULONG)~0;
     return NO_ERROR;
@@ -467,13 +526,67 @@ static BOOLEAN __stdcall Initialize(PVOID ext)
     return TRUE;
 }
 
+#ifdef USOSVBE_NT3
+typedef struct _USTR { USHORT Length; USHORT MaximumLength; PWSTR Buffer; } USTR;
+typedef struct _QTABLE {        /* RTL_QUERY_REGISTRY_TABLE */
+    PVOID QueryRoutine;
+    ULONG Flags;
+    PWSTR Name;
+    PVOID EntryContext;
+    ULONG DefaultType;
+    PVOID DefaultData;
+    ULONG DefaultLength;
+} QTABLE;
+__declspec(dllimport) LONG __stdcall RtlQueryRegistryValues(ULONG RelativeTo, PWSTR Path, QTABLE *Table,
+                                                            PVOID Context, PVOID Environment);
+
+/* Does SystemStartOptions (the BOOT.INI options) name BASEVIDEO? */
+static BOOLEAN basevideo(void)
+{
+    static WCHAR buf[256];
+    static const WCHAR word[] = L"BASEVIDEO";
+    USTR u;
+    QTABLE t[2];
+    ULONG i, k, n;
+
+    VideoPortZeroMemory(t, sizeof(t));
+    VideoPortZeroMemory(buf, sizeof(buf));
+    u.Length = 0;
+    u.MaximumLength = sizeof(buf) - sizeof(WCHAR);
+    u.Buffer = buf;
+    t[0].Flags = 0x20;                  /* RTL_QUERY_REGISTRY_DIRECT */
+    t[0].Name = L"SystemStartOptions";
+    t[0].EntryContext = &u;
+    if (RtlQueryRegistryValues(0 /* RTL_REGISTRY_ABSOLUTE */,
+                               L"\\Registry\\Machine\\System\\CurrentControlSet\\Control", t, NULL, NULL) < 0)
+        return FALSE;
+    n = u.Length / sizeof(WCHAR);
+    for (i = 0; i + 9 <= n; i++) {
+        for (k = 0; k < 9; k++) {
+            WCHAR c = buf[i + k];
+            if (c >= L'a' && c <= L'z') c = (WCHAR)(c - 32);
+            if (c != word[k]) break;
+        }
+        if (k == 9) return TRUE;
+    }
+    return FALSE;
+}
+#endif
+
 ULONG __stdcall DriverEntry(PVOID ctx1, PVOID ctx2)
 {
     VIDEO_HW_INITIALIZATION_DATA d;
     ULONG st;
 
+#ifdef USOSVBE_NT3
+    if (basevideo()) return 0xC000000EUL;   /* STATUS_NO_SUCH_DEVICE */
+#endif
     VideoPortZeroMemory(&d, sizeof(d));
+#ifdef USOSVBE_NT3
+    d.HwInitDataSize = NT3_HW_INIT_DATA_SIZE;
+#else
     d.HwInitDataSize = SIZE_OF_NT4_VIDEO_HW_INITIALIZATION_DATA;
+#endif
     d.HwFindAdapter = FindAdapter;
     d.HwInitialize = Initialize;
     d.HwStartIO = StartIO;

@@ -95,12 +95,23 @@ if [ "$NT_MAJOR" = 4 ]; then
     SP=''
     [ ! -f /usos-e2e/SP6I386.EXE ] || SP=/usos-e2e/SP6I386.EXE
     KIND=PROFILE
+elif [ -f /usos-e2e/winnt.sif ]; then
+    # NT 3.x with --answer: the menu-rendered NT3*.SIF (a USOS profile).
+    cp /usos-e2e/winnt.sif /run/nt4-winnt.sif
+    SP=''
+    KIND=PROFILE
 else
 sed -n '/^w9x_nt3_default_sif()/,/^}/p' /usr/lib/usos/w9x_csmwrap_prepare.sh > /tmp/sif.sh
 . /tmp/sif.sh
 w9x_nt3_default_sif 'Central European' > /run/nt4-winnt.sif
 SP=''
 KIND=USOS
+fi
+if [ "$NT_MAJOR" = 3 ] && [ -n "${E2E_LOCALE:-}" ]; then
+    # The menu language's locale + keyboard (request.ini), as step 620 adds them.
+    sed -n '/^w9x_nt3_ui_locale()/,/^}/p' /usr/lib/usos/w9x_csmwrap_prepare.sh > /tmp/loc.sh
+    . /tmp/loc.sh
+    w9x_nt3_ui_locale /run/nt4-winnt.sif "$E2E_LOCALE" "${E2E_KEYBOARD:-$E2E_LOCALE}"
 fi
 if ! env TARGET_DEVICE="$TARGET" NT4_SOURCE_ISO=/mnt/data/source.iso NT4_ANSWER_SIF=/run/nt4-winnt.sif \
     NT4_ANSWER_KIND="$KIND" NT4_SP_EXE="$SP" NT_MAJOR="$NT_MAJOR" NT_MINOR="$NT_MINOR" NT4_EDITION="${NT4_EDITION:-}" \
@@ -133,6 +144,7 @@ fi
 if ! check=$(nt4_vm_finish "$TARGET" "$LOGS"); then log "finish FAIL $check"; cat "$LOGS/fsck.txt"; echo E2E-RESULT=FAIL; exit 1; fi
 log "finish PASS $check"
 cat "$LOGS/BOOT.INI"
+[ ! -f "$LOGS/POST.LOG" ] || { echo "== POST.LOG"; tr -d "\r" < "$LOGS/POST.LOG" | sed "s/^/POSTLOG: /"; }
 if ! TARGET_DEVICE="$TARGET" USOS_XP_ESP_TAIL_SECTORS=133120 USOS_CSMWRAP_DIR=/usos-e2e/csmwrap sh /usr/lib/usos/xp_csmwrap_esp.sh > /tmp/esp.log 2>&1; then
     cat /tmp/esp.log; echo E2E-RESULT=FAIL; exit 1
 fi
@@ -164,7 +176,8 @@ def cpio_newc(entries: list[tuple[str, int, bytes]]) -> bytes:
     return blob + b"\0" * (-len(blob) % 512)
 
 
-def overlay(scripts: bool, answer: Path | None = None, sp: Path | None = None, nvme: bool = False) -> bytes:
+def overlay(scripts: bool, answer: Path | None = None, sp: Path | None = None, nvme: bool = False,
+            libs: list[str] | None = None) -> bytes:
     entries: list[tuple[str, int, bytes]] = []
     dirs = set()
 
@@ -194,6 +207,13 @@ def overlay(scripts: bool, answer: Path | None = None, sp: Path | None = None, n
             add("usr/lib/usos/" + name, (ROOT / "tools/nt/usosnvme/bin" / variant / "i386/usosnvme.sys").read_bytes())
         # and this checkout's USOSNT3.EXE (registers usosnvme on NT 3.5x).
         add("usr/lib/usos/nt3/USOSNT3.EXE", (ROOT / "tools/nt3/usosnt3/bin/i386/usosnt3.exe").read_bytes())
+    # --lib NAME=FILE: a file of this checkout (a driver or tool built
+    # before build.bat) as /usr/lib/usos/NAME, e.g. nt3/USOSNT3.EXE=tools/nt3/usosnt3/bin/i386/usosnt3.exe.
+    for spec in libs or []:
+        name, _, src = spec.partition("=")
+        if not name or not src:
+            raise SystemExit(f"--lib needs NAME=FILE: {spec}")
+        add("usr/lib/usos/" + name.strip("/"), (ROOT / src).read_bytes() if not Path(src).is_absolute() else Path(src).read_bytes())
     if scripts:
         for name in SCRIPTS:
             add("usr/lib/usos/" + name, (ROOT / "tools" / name).read_bytes(), 0o100755)
@@ -212,7 +232,7 @@ def install(args, out: Path, target: Path) -> bool:
     initrd = out / "initrd.cpio"
     with initrd.open("wb") as f:
         for part in ((ML / "initramfs-usos").read_bytes(), (ML / "qemu9x.cpio").read_bytes(),
-                     overlay(args.scripts, args.answer, args.sp, args.nvme)):
+                     overlay(args.scripts, args.answer, args.sp, args.nvme, args.lib)):
             f.write(part)
             f.write(b"\0" * (-f.tell() % 4))
     port = free_port()
@@ -255,7 +275,7 @@ def install(args, out: Path, target: Path) -> bool:
             if "\n" in new:
                 cut = new.rindex("\n") + 1
                 for line in new[:cut].splitlines():
-                    if line.startswith(("E2E", "[NT4_CSMWRAP]", "run ", "nt31 ", "answer ", "text answer", "stalled", "rc=")):
+                    if line.startswith(("E2E", "POSTLOG", "[NT4_CSMWRAP]", "run ", "nt31 ", "answer ", "text answer", "stalled", "rc=")):
                         print(line.rstrip(), flush=True)
                 shown += cut
         console.run("sync", "SYNC-DONE", 120)
@@ -367,7 +387,10 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--iso", required=True)
     p.add_argument("--tag", default="NT31", choices=["NT31", "NT31S", "NT35", "NT35S", "NT351", "NT351S", "NT4", "NT4S", "NT4T"])
-    p.add_argument("--answer", type=Path, help="NT 4.0: the WINNT.SIF the menu would stage (holds the key)")
+    p.add_argument("--answer", type=Path, help="NT 4.0: the WINNT.SIF the menu would stage (holds the key); "
+                   "NT 3.x: a menu-rendered NT3*.SIF instead of the default answer")
+    p.add_argument("--lib", action="append", default=[], metavar="NAME=FILE",
+                   help="overlay FILE (checkout-relative or absolute) as /usr/lib/usos/NAME")
     p.add_argument("--sp", type=Path, help="NT 4.0: the service pack SP6I386.EXE (optional)")
     p.add_argument("--boot-cpu", default="EPYC-Rome", help="CPU model of the --boot run")
     p.add_argument("--out", required=True, type=Path)
