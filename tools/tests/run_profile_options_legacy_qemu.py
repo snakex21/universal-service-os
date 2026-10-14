@@ -361,6 +361,12 @@ def check_nt4(out: Path, qemu_img: Path) -> list[str]:
             continue
         res(f"{prof} NTUSER Explorer\\Tips Show", nt_value(hive, r"Software\Microsoft\Windows\CurrentVersion\Explorer\Tips", "Show"), ("RegDWord", 0))
         res(f"{prof} NTUSER Control Panel\\Keyboard InitialKeyboardIndicators", nt_value(hive, r"Control Panel\Keyboard", "InitialKeyboardIndicators"), ("RegSZ", "2"))
+        # Stage 2 (2026-10-14).
+        res(f"{prof} NTUSER Explorer link", nt_value(hive, r"Software\Microsoft\Windows\CurrentVersion\Explorer", "link"), ("RegBin", bytes(4)))
+        res(f"{prof} NTUSER WindowMetrics MinAnimate", nt_value(hive, r"Control Panel\Desktop\WindowMetrics", "MinAnimate"), ("RegSZ", "0"))
+        res(f"{prof} NTUSER Mouse MouseSpeed", nt_value(hive, r"Control Panel\Mouse", "MouseSpeed"), ("RegSZ", "0"))
+    if system:
+        res(f"HKLM\\SYSTEM\\ControlSet{cur:03d}\\Control\\FileSystem NtfsDisableLastAccessUpdate", nt_value(system, f"ControlSet{cur:03d}\\Control\\FileSystem", "NtfsDisableLastAccessUpdate"), ("RegDWord", 1))
     for rel in ("USOS/NT4/USOS-REG.LOG", "USOS/NT4/POST.LOG"):
         p = find_ci(files, rel)
         text = p.read_bytes().decode("cp1250", errors="replace") if p else "<missing>"
@@ -401,6 +407,12 @@ def check_98se(out: Path, qemu_img: Path) -> list[str]:
     tips = u.value(p + tips_key, "Show")
     lines.append(f"{'PASS' if tips is None else 'FAIL'}  no_tips not rendered for 98 (Explorer\\Tips Show absent): {tips!r}")
     lines.append(f"INFO  USER.DAT .DEFAULT Explorer\\Advanced values: {u.values(p + adv)}")
+    # Stage 2 (2026-10-14): shortcut naming, visual effects, mouse acceleration.
+    res("USER.DAT .DEFAULT Explorer link", u.value(p + r"Software\Microsoft\Windows\CurrentVersion\Explorer", "link"), (3, bytes.fromhex("00000000")))
+    res("USER.DAT .DEFAULT WindowMetrics MinAnimate", u.value(p + r"Control Panel\Desktop\WindowMetrics", "MinAnimate"), (1, b"0"))
+    res("USER.DAT .DEFAULT Desktop DragFullWindows", u.value(p + r"Control Panel\Desktop", "DragFullWindows"), (1, b"0"))
+    for name in ("MouseSpeed", "MouseThreshold1", "MouseThreshold2"):
+        res(f"USER.DAT .DEFAULT Mouse {name}", u.value(p + r"Control Panel\Mouse", name), (1, b"0"))
     # Win9x stores REG_SZ without the terminating NUL.
     res("SYSTEM.DAT VxD\\VNETSUP Workgroup", s.value(vnetsup, "Workgroup"), (1, b"USOSLAB"))
     lines.append(f"INFO  SYSTEM.DAT VNETSUP values: {s.values(vnetsup)}")

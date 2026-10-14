@@ -241,9 +241,81 @@ as LocalSystem. `--dry-run`, `--log FILE`, `--hive FILE`; exit 0 all applied,
 2 some failed, 1 bad set (nothing written). Built by
 `tools/build_windows_usos_reg.py`, in the micro-Linux image as
 `usr/lib/usos/usos-reg.exe`; tests `tools/tests/test_usos_reg.py`. Not used
-on 6.x+ yet: the WORK path has no channel to put a file into the target
-before specialize (stage 2: payload channel, then one `usos-reg.exe` command
-instead of the `reg.exe` chains).
+on 6.x+: the WORK path has no channel to put a file into the target before
+specialize; stage 2 raised the answer limit instead (64 KiB) and keeps the
+`reg.exe` commands.
+
+**Stage 2 (2026-10-14)**: packs for every family, new group "Apps and
+scripts". Same rules as stage 1 (only where the release renders it, written
+only when set, defaults unchanged).
+
+| option | values | 95 | 98/Me | NT 4.0 | 2000 | XP/2003 | Vista/7 | 8.x | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `classic_context_menu` (Active Setup `USOS-ClassicContextMenu`: per user at first sign-in, the `{86ca1aa0-...}\InprocServer32` override in HKCU Classes) | yes | | | | | | | | | yes |
+| `shortcut_suffix_off` (`Explorer link` = 00000000) | yes | yes | yes | yes | yes | yes | yes | yes | yes | |
+| `desktop_icons` (`HideDesktopIcons`: XP Computer/Documents/Network Places, Vista+ Computer/user/Network/Control Panel) | yes | | | | | yes | yes | yes | yes | yes |
+| `no_tips` (XP/2003: Tour `RunCount=0`, Desktop Cleanup Wizard `NoRun`) | yes | | | yes | yes | yes | | | | |
+| `classic_taskbar` (XP..Vista `TaskbarGlomming=0`; 7..10 small + `TaskbarGlomLevel=2`; 11 `TaskbarGlomLevel=2`, 23H2+) | yes | | | | | yes | yes | yes | yes | yes |
+| `all_tray_icons` (`EnableAutoTray=0`) | yes | | | | | yes | yes | yes | yes | |
+| `boot_to_desktop` (8.1 `StartPage OpenAtLogon=0`; 8/8.1 `EdgeUi` corner + charms hint off) | yes | | | | | | | yes | | |
+| `lock_screen_off` (policy `NoLockScreen`) | yes | | | | | | | yes | yes | yes |
+| `visual_effects` (`MinAnimate`, `DragFullWindows`; XP+ `UserPreferencesMask`, `VisualFXSetting=2`; 6.x+ taskbar/list-view animations, Aero Peek) | performance | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| `font_smoothing` (`FontSmoothing=2`; XP/2003 ClearType `FontSmoothingType=2`; new users + logon screen) | yes | | | | yes | yes | | | | |
+| `mouse_accel_off` (`MouseSpeed`, `MouseThreshold1/2` = 0) | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| `sticky_keys_off` (`StickyKeys Flags=506`) | yes | | | | yes | yes | yes | yes | yes | yes |
+| `hibernation=off` on XP/2003 (`powercfg.exe /hibernate off` at setup end) | off | | | | | yes | (tweak) | yes | yes | yes |
+| `power_profile` (6.x+ `powercfg -setactive SCHEME_MIN/BALANCED/MAX`; XP/2003 `PowerCfg CurrentPowerPolicy` 3 Always On / 0 Home/Office Desk / 5 Max Battery) | high_performance, balanced, power_saver | | | | | yes | yes | yes | yes | yes |
+| `no_sleep` (client: AC standby/hibernate timeouts 0 of the active plan) | yes | | | | | | yes | yes | yes | yes |
+| `last_access_off` (`NtfsDisableLastAccessUpdate=1`; Vista+ default) | yes | | | yes | yes | yes | | | | |
+| `long_paths` (`LongPathsEnabled=1`) | yes | | | | | | | | yes | yes |
+| `search_index_off` (client: `sc config WSearch start= disabled`) | yes | | | | | | yes | yes | yes | yes |
+| `remote_desktop` (`fDenyTSConnections=0`; XP/2003 port 3389 in the firewall's `GloballyOpenPorts`; 6.x+ `netsh advfirewall` rule `USOS-RDP`) | yes | | | | | yes | yes | yes | yes | yes |
+| `firewall_off` (XP/2003 `FirewallPolicy\*Profile EnableFirewall=0`; 6.x+ `netsh advfirewall set allprofiles state off`) | yes | | | | | yes | yes | yes | yes | yes |
+| `server_nags_off` (Server: `ShutdownReasonOn=0`, `DisableCAD=1`; 2003 also Manage Your Server policy) | yes | | | | | 2003 | Server | Server | Server | Server |
+| `ie_esc_off` (Server 2008+: IE ESC Active Setup components `IsInstalled=0`) | yes | | | | | | Server | Server | Server | Server |
+| `disable_wer` on XP/2003 (`PCHealth\ErrorReporting DoReport=0 ShowUI=0`) | yes | | | | | yes | yes | yes | yes | yes |
+| `privacy` adds CEIP off (Vista+), 8.1 advertising ID and web search off | yes | | | | | | yes | yes | yes | yes |
+| `security_center_off` (client: XP/Vista Security Center `*DisableNotify`; 7/8.x `HideSCAHealth`; 10/11 Security and Maintenance toasts) | yes | | | | | XP | yes | yes | yes | yes |
+| `defender_off` (client: policy `DisableAntiSpyware=1`; 10+ Tamper Protection ignores it, not offered) | yes | | | | | | yes | yes | | |
+| `smartscreen_off` (policy `EnableSmartScreen=0`, Explorer `SmartScreenEnabled=Off`) | yes | | | | | | | yes | yes | yes |
+| `device_encryption_off` (`BitLocker PreventDeviceEncryption=1`) | yes | | | | | | | | yes | yes |
+| `remove_apps` (client: provisioned Store apps, PowerShell `Remove-AppxProvisionedPackage` in specialize) | games, bloat | | | | | | | yes | yes | yes |
+| `first_run_off` (IE6/7 `RunOnceHasShown/Complete`; IE8+ `DisableFirstRunCustomize`; WMP `GroupPrivacyAcceptance`; Edge `HideFirstRunExperience`, `StartupBoostEnabled=0`) | yes | | | | | yes | yes | yes | yes | yes |
+| `onedrive_off` (client: 8.1 SkyDrive `DisableFileSync`; 10/11 `DisableFileSyncNGSC` + Default User `Run\OneDriveSetup` removed) | yes | | | | | | | 8.1 | yes | yes |
+| `user_script` (see below) | yes | | | | yes | yes | yes | yes | yes | yes |
+
+`remove_apps` vocabulary (USOS's own list, matched with `-match` on the
+package name, case-insensitive): `games` = Xbox*, GamingApp, Solitaire;
+`bloat` = games + Bing* (News, Weather, Search, ...), Zune (Groove, Movies),
+Getstarted (Tips), OfficeHub, MixedReality, 3D Viewer, Print 3D, MSPaint
+(Paint 3D on 10), People, Maps, Skype, Messaging, Clipchamp, Feedback Hub, Get
+Help, Wallet, Phone Link, Power Automate, To Do, Family, Cortana
+(549981C3F5F10), Copilot, Mail/Calendar, Teams, OneNote, Sticky Notes, Voice
+Recorder, Quick Assist, 8.1 Help+Tips and Reading List, Dev Home, Outlook.
+Kept: Store, Store purchase, App Installer, Calculator, Camera, Clock
+(Alarms), Notepad, Paint, Photos, Snipping Tool, Terminal, Security, media
+extensions, frameworks, Widgets, Edge.
+
+**User script hook** (`user_script=yes`): at the first sign-in after Setup,
+`Scripts\first-logon.reg` (imported with `regedit /s`) and then
+`Scripts\first-logon.cmd` (`call`) are run from every drive with the
+USOS_DATA layout (a `Systems` folder), if the stick is still plugged in.
+6.x+: `oobeSystem` Shell-Setup `FirstLogonCommands` (two
+`SynchronousCommand`s; elevated, a console window is visible); 2000/XP/2003:
+two `HKLM\...\RunOnce` values (`USOS1UserReg`, `USOS2UserScript`) written by
+usos-reg.exe at setup end, run at the first sign-in of any user. Not offered
+for 9x (no NTFS) and NT 4.0 (no USB storage). A drive letter without media
+(card reader) may show a "No disk" prompt on XP.
+
+Delivery changes: `autounattend.max_size` 16 -> 64 KiB (all options on: at
+most ~24 KiB; DATA answers were already accepted up to 1 MiB, the hidden
+runner's `--wrap` allocates file size + 64 KiB), `max_commands` 96; the
+usos-reg set has the `binary` type (reg.exe `REG_BINARY`, MSBATCH flag 1);
+NT5 `reg=` lines may hold `%` (the set is data), `run=` knows
+`powercfg.exe /hibernate off`. 6.x+ still uses `reg.exe` in specialize (no
+file channel was needed: the larger answer limit carries the commands), so
+usos-reg.exe stays NT 4.0/NT5. **Fixed**: `profile.write` (the editor's save)
+dropped the typed options and the workgroup before this change.
 
 **QEMU verification (2026-10-12)**, registry read offline after the install:
 
