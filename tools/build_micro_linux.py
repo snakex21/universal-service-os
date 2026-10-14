@@ -582,6 +582,7 @@ def main() -> int:
             ("tools/w9x_csmwrap_target.sh", "usr/lib/usos/w9x_csmwrap_target.sh"),
             ("tools/w9x_tzfix.sh", "usr/lib/usos/w9x_tzfix.sh"),
             ("tools/w9x_vesa95.sh", "usr/lib/usos/w9x_vesa95.sh"),
+            ("tools/w9x_nvme.sh", "usr/lib/usos/w9x_nvme.sh"),
             ("tools/w9x_phase1_qemu.sh", "usr/lib/usos/w9x_phase1_qemu.sh"),
             ("tools/dos_csmwrap_target.sh", "usr/lib/usos/dos_csmwrap_target.sh"),
             ("tools/image_disk_target.sh", "usr/lib/usos/image_disk_target.sh"),

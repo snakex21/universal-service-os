@@ -1,0 +1,47 @@
+; USOSNVME.INF - USOS NVMe SCSI miniport for Windows 95 OSR2 / 98 / 98 SE / Me
+; Copyright (C) 2026 Maksymilian and the USOS Authors, GPL-3.0-or-later.
+; usosnvme.mpd (tools/nt/usosnvme, USOSNVME_W9X build) runs under the
+; Windows SCSIPORT.PDR / IOS, so an NVMe disk leaves MS-DOS compatibility
+; mode. Polled, 512-byte LBA only, BAR below 4 GiB only.
+; The USOS 9x flow adds one line per NVMe controller of the target PC
+; (PCI\VEN_xxxx&DEV_yyyy) below [USOS.Mfg]; PCI\CC_010802 matches the rest.
+; Experimental until a hardware pass: only with DATA
+; Systems\Windows\<9x>\Unattended\nvme-experimental.txt.
+
+[Version]
+Signature="$CHICAGO$"
+Class=SCSIAdapter
+Provider=%USOS%
+DriverVer=10/14/2026,1.0.0.1
+
+[DestinationDirs]
+DefaultDestDir=12
+
+[SourceDisksNames]
+1=%DiskName%,,0
+
+[SourceDisksFiles]
+usosnvme.mpd=1
+
+[Manufacturer]
+%USOS%=USOS.Mfg
+
+[USOS.Mfg]
+%USOSNVME.DeviceDesc%=USOSNVME, PCI\CC_010802
+
+[USOSNVME]
+CopyFiles=USOSNVME.Copy
+AddReg=USOSNVME.AddReg
+
+[USOSNVME.Copy]
+usosnvme.mpd
+
+[USOSNVME.AddReg]
+HKR,,DevLoader,,*IOS
+HKR,,DontLoadIfConflict,,"Y"
+HKR,,PortDriver,,usosnvme.mpd
+
+[Strings]
+USOS="USOS"
+USOSNVME.DeviceDesc="USOS NVMe Controller (usosnvme)"
+DiskName="USOS NVMe driver"

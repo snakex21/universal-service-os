@@ -25,8 +25,13 @@
  */
 #include "usosnvme.h"
 
+#ifndef USOSNVME_W9X
 __declspec(dllimport) PVOID __stdcall MmMapIoSpace(IN PHYSICAL_ADDRESS PhysicalAddress,
                                                    IN ULONG NumberOfBytes, IN ULONG CacheType);
+#else
+static BOOLEAN NvmeAdapterState(IN PVOID DeviceExtension, IN PVOID Context, IN BOOLEAN SaveState);
+static ULONG NvmeFlush(PHW_DEVICE_EXTENSION Ext);
+#endif
 
 ULONG DriverEntry(IN PVOID DriverObject, IN PVOID Argument2);
 static ULONG NvmeFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOID BusInformation,
@@ -54,6 +59,88 @@ static VOID NvmeCopy(PVOID Dest, const VOID *Src, ULONG Length)
     const UCHAR *s = (const UCHAR *)Src;
     while (Length--) *d++ = *s++;
 }
+
+/* ------------------------------------------------------------------ */
+/* Windows 9x: VMM service and port I/O (the MPD runs in ring 0 under   */
+/* VMM; SCSIPORT.PDR has no MmMapIoSpace and no HAL port routines)      */
+/* ------------------------------------------------------------------ */
+
+#ifdef USOSNVME_W9X
+/* VxD service call: INT 20h followed by the service ordinal and the VxD id
+   (VMM = 0001h, _MapPhysToLinear = 006Ch, a C-convention service; KB
+   Q169584 for its use from a SCSI miniport). VMM patches the six bytes into
+   an indirect call on first use. Returns the linear address or NULL. */
+static PVOID NvmeMapPhys(ULONG Phys, ULONG Bytes)
+{
+    ULONG lin;
+    __asm {
+        push 0
+        push Bytes
+        push Phys
+        int 20h
+        _emit 06Ch
+        _emit 000h
+        _emit 001h
+        _emit 000h
+        add esp, 12
+        mov lin, eax
+    }
+    return lin == 0xFFFFFFFFUL ? NULL : (PVOID)lin;
+}
+
+static VOID NvmeOut32(ULONG Port, ULONG Value)
+{
+    __asm {
+        mov edx, Port
+        mov eax, Value
+        out dx, eax
+    }
+}
+
+static ULONG NvmeIn32(ULONG Port)
+{
+    ULONG v;
+    __asm {
+        mov edx, Port
+        in eax, dx
+        mov v, eax
+    }
+    return v;
+}
+
+static VOID NvmeOut16(ULONG Port, USHORT Value)
+{
+    __asm {
+        mov edx, Port
+        mov ax, Value
+        out dx, ax
+    }
+}
+
+/* Bochs / QEMU debug console (-debugcon): port E9h reads back E9h there and
+   FFh on real hardware, where nothing is written. */
+static LONG NvmeE9 = -1;
+
+static VOID NvmeDbgStr(const CHAR *s)
+{
+    if (NvmeE9 < 0) {
+        UCHAR v;
+        __asm {
+            in al, 0E9h
+            mov v, al
+        }
+        NvmeE9 = (v == 0xE9) ? 1 : 0;
+    }
+    if (!NvmeE9) return;
+    while (*s) {
+        CHAR c = *s++;
+        __asm {
+            mov al, c
+            out 0E9h, al
+        }
+    }
+}
+#endif
 
 static ULONG NvmeRd(PHW_DEVICE_EXTENSION Ext, ULONG Offset)
 {
@@ -116,12 +203,23 @@ static VOID NvmeShowLine(PHW_DEVICE_EXTENSION Ext, NVME_LINE *l, BOOLEAN Error)
     ULONG i;
     USHORT attr = Error ? 0x4F00 : 0x1F00;
 
+#ifdef USOSNVME_W9X
+    l->Text[l->Len < 80 ? l->Len : 80] = 0;
+    NvmeDbgStr(l->Text);
+    NvmeDbgStr("\n");
+    (VOID)vga;
+    if (Ext->Vga == NULL) {
+        Ext->Vga = (PUSHORT)NvmeMapPhys(0xB8000, 80 * 25 * 2);
+        if (Ext->Vga == NULL) return;
+    }
+#else
     if (Ext->Vga == NULL) {
         vga.LowPart = 0xB8000;
         vga.HighPart = 0;
         Ext->Vga = (PUSHORT)MmMapIoSpace(vga, 80 * 25 * 2, 0 /* non-cached */);
         if (Ext->Vga == NULL) return;
     }
+#endif
     for (i = 0; i < 80; i++) {
         UCHAR c = (UCHAR)(i < l->Len ? l->Text[i] : ' ');
         Ext->Vga[NVME_VGA_ROW * 80 + i] = (USHORT)(attr | c);
@@ -156,10 +254,46 @@ static VOID NvmeReport(PHW_DEVICE_EXTENSION Ext, const CHAR *Msg, ULONG Value, B
 
 #define NVME_PCI_HEADER 64
 
-#ifdef USOSNVME_NT351
+#ifdef USOSNVME_CF8
 /* NT 3.x: the USOS NT 3.x MBR may hide the PCI BIOS from NTDETECT (boards
    whose PCI BIOS reports a last bus >= 8), so the HAL can have no PCI bus
-   handler. Configuration mechanism 1 through ports CF8h / CFCh instead. */
+   handler. Windows 9x: SCSIPORT.PDR's bus-data calls are not relied on.
+   Configuration mechanism 1 through ports CF8h / CFCh instead. */
+static ULONG NvmeCfgAddress(ULONG Bus, ULONG Slot, ULONG Offset)
+{
+    PCI_SLOT_NUMBER slot;
+    slot.u.AsULONG = Slot;
+    return 0x80000000UL | ((Bus & 0xFF) << 16) | ((ULONG)slot.u.bits.DeviceNumber << 11) |
+           ((ULONG)slot.u.bits.FunctionNumber << 8) | (Offset & 0xFC);
+}
+
+#ifdef USOSNVME_W9X
+static BOOLEAN NvmeCfgMap(PHW_DEVICE_EXTENSION Ext)
+{
+    (VOID)Ext;
+    return TRUE;
+}
+
+static ULONG NvmeCfgRead32(ULONG Bus, ULONG Slot, ULONG Offset)
+{
+    ULONG v;
+    _asm pushfd
+    _asm cli
+    NvmeOut32(0xCF8, NvmeCfgAddress(Bus, Slot, Offset));
+    v = NvmeIn32(0xCFC);
+    _asm popfd
+    return v;
+}
+
+static VOID NvmeCfgWrite16(ULONG Bus, ULONG Slot, ULONG Offset, USHORT Value)
+{
+    _asm pushfd
+    _asm cli
+    NvmeOut32(0xCF8, NvmeCfgAddress(Bus, Slot, Offset));
+    NvmeOut16(0xCFC + (Offset & 2), Value);
+    _asm popfd
+}
+#else
 static PUCHAR NvmeCfgPorts;
 
 static BOOLEAN NvmeCfgMap(PHW_DEVICE_EXTENSION Ext)
@@ -173,34 +307,25 @@ static BOOLEAN NvmeCfgMap(PHW_DEVICE_EXTENSION Ext)
     return (BOOLEAN)(NvmeCfgPorts != NULL);
 }
 
-static VOID NvmeCfgSelect(ULONG Bus, ULONG Slot, ULONG Offset)
-{
-    PCI_SLOT_NUMBER slot;
-    slot.u.AsULONG = Slot;
-    ScsiPortWritePortUlong((PULONG)NvmeCfgPorts,
-                           0x80000000UL | ((Bus & 0xFF) << 16) |
-                           ((ULONG)slot.u.bits.DeviceNumber << 11) |
-                           ((ULONG)slot.u.bits.FunctionNumber << 8) | (Offset & 0xFC));
-}
-
 static ULONG NvmeCfgRead32(ULONG Bus, ULONG Slot, ULONG Offset)
 {
-    NvmeCfgSelect(Bus, Slot, Offset);
+    ScsiPortWritePortUlong((PULONG)NvmeCfgPorts, NvmeCfgAddress(Bus, Slot, Offset));
     return ScsiPortReadPortUlong((PULONG)(NvmeCfgPorts + 4));
 }
 
 static VOID NvmeCfgWrite16(ULONG Bus, ULONG Slot, ULONG Offset, USHORT Value)
 {
-    NvmeCfgSelect(Bus, Slot, Offset);
+    ScsiPortWritePortUlong((PULONG)NvmeCfgPorts, NvmeCfgAddress(Bus, Slot, Offset));
     ScsiPortWritePortUshort((PUSHORT)(NvmeCfgPorts + 4 + (Offset & 2)), Value);
 }
+#endif
 #endif
 
 /* FALSE for an empty slot; *BusMissing when the bus does not exist */
 static BOOLEAN NvmeReadPci(PHW_DEVICE_EXTENSION Ext, ULONG Bus, ULONG Slot,
                            PPCI_COMMON_CONFIG Cfg, PBOOLEAN BusMissing)
 {
-#ifdef USOSNVME_NT351
+#ifdef USOSNVME_CF8
     ULONG i;
     if (BusMissing) *BusMissing = FALSE;
     if (Bus > 0xFF || !NvmeCfgMap(Ext)) return FALSE;
@@ -219,7 +344,7 @@ static BOOLEAN NvmeReadPci(PHW_DEVICE_EXTENSION Ext, ULONG Bus, ULONG Slot,
 
 static VOID NvmeWritePciCommand(PHW_DEVICE_EXTENSION Ext, ULONG Bus, ULONG Slot, USHORT Command)
 {
-#ifdef USOSNVME_NT351
+#ifdef USOSNVME_CF8
     NvmeCfgWrite16(Bus, Slot, 0x04, Command);
 #else
     ScsiPortSetBusDataByOffset(Ext, PCIConfiguration, Bus, Slot, &Command, 0x04, sizeof(USHORT));
@@ -402,7 +527,7 @@ static VOID NvmeTrimCopy(PUCHAR Dest, const UCHAR *Src, ULONG Len)
 static BOOLEAN NvmeStartController(PHW_DEVICE_EXTENSION Ext)
 {
     NVME_SQE c;
-    ULONG status, cc, mdts, nsid, flbas, lbaf, ms, lbads;
+    ULONG status, cc, mdts, nsid, flbas, lbaf, ms, lbads, qs = 0;
 
     Ext->ControllerUp = FALSE;
     Ext->NamespaceReady = FALSE;
@@ -481,15 +606,23 @@ static BOOLEAN NvmeStartController(PHW_DEVICE_EXTENSION Ext)
     NvmeZero(&c, sizeof(c));
     c.Cdw0 = NVME_ADM_SET_FEATURE;
     c.Cdw10 = NVME_FEAT_NUM_QUEUES;
-    c.Cdw11 = 0;                         /* 1 SQ, 1 CQ (0-based) */
-    (VOID)NvmeExec(Ext, &Ext->Admin, &c, NVME_ADMIN_TIMEOUT_US, NULL);
+    /* NVME_IO_QID SQs and CQs (0-based; NT: 1 + 1, Cdw11 = 0) */
+    c.Cdw11 = ((NVME_IO_QID - 1UL) << 16) | (NVME_IO_QID - 1UL);
+    status = NvmeExec(Ext, &Ext->Admin, &c, NVME_ADMIN_TIMEOUT_US, &qs);
+    Ext->IoQid = NVME_IO_QID;
+#if NVME_IO_QID > 1
+    if (status != 0 || (qs & 0xFFFF) < NVME_IO_QID - 1UL || (qs >> 16) < NVME_IO_QID - 1UL)
+        Ext->IoQid = 1;
+#else
+    (VOID)qs;
+#endif
 
-    NvmeQueueInit(Ext, &Ext->Io, 1, NVME_PG_IOSQ, NVME_PG_IOCQ, NVME_IO_DEPTH);
+    NvmeQueueInit(Ext, &Ext->Io, Ext->IoQid, NVME_PG_IOSQ, NVME_PG_IOCQ, NVME_IO_DEPTH);
     NvmeZero(&c, sizeof(c));
     c.Cdw0 = NVME_ADM_CREATE_CQ;
     c.Prp1Lo = Ext->Io.CqPhys.LowPart;
     c.Prp1Hi = Ext->Io.CqPhys.HighPart;
-    c.Cdw10 = ((NVME_IO_DEPTH - 1UL) << 16) | 1;
+    c.Cdw10 = ((NVME_IO_DEPTH - 1UL) << 16) | Ext->IoQid;
     c.Cdw11 = 1;                         /* physically contiguous, IEN = 0 */
     status = NvmeExec(Ext, &Ext->Admin, &c, NVME_ADMIN_TIMEOUT_US, NULL);
     if (status != 0) {
@@ -501,8 +634,8 @@ static BOOLEAN NvmeStartController(PHW_DEVICE_EXTENSION Ext)
     c.Cdw0 = NVME_ADM_CREATE_SQ;
     c.Prp1Lo = Ext->Io.SqPhys.LowPart;
     c.Prp1Hi = Ext->Io.SqPhys.HighPart;
-    c.Cdw10 = ((NVME_IO_DEPTH - 1UL) << 16) | 1;
-    c.Cdw11 = (1UL << 16) | 1;           /* CQ 1, physically contiguous */
+    c.Cdw10 = ((NVME_IO_DEPTH - 1UL) << 16) | Ext->IoQid;
+    c.Cdw11 = (Ext->IoQid << 16) | 1;    /* its CQ, physically contiguous */
     status = NvmeExec(Ext, &Ext->Admin, &c, NVME_ADMIN_TIMEOUT_US, NULL);
     if (status != 0) {
         NvmeReport(Ext, "CREATE I/O SQ failed; status", status, TRUE);
@@ -606,6 +739,11 @@ ULONG DriverEntry(IN PVOID DriverObject, IN PVOID Argument2)
     init.HwInterrupt = NvmeInterrupt;
     init.HwFindAdapter = NvmeFindAdapter;
     init.HwResetBus = NvmeResetBus;
+#ifdef USOSNVME_W9X
+    /* SCSIPORT.PDR reports "Init Failure" without HwAdapterState */
+    init.HwAdapterState = NvmeAdapterState;
+    NvmeDbgStr("USOSNVME " USOSNVME_VERSION " 9x: DriverEntry\n");
+#endif
     init.DeviceExtensionSize = sizeof(HW_DEVICE_EXTENSION);
 #ifdef USOSNVME_NT351
     init.AdapterInterfaceType = Isa;     /* see NvmeCfgMap */
@@ -673,6 +811,42 @@ static ULONG NvmeFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOI
     if ((bar.LowPart & 0x6) == 0x4) bar.HighPart = (LONG)cfg.u.type0.BaseAddresses[1];
     bar.LowPart &= 0xFFFFFFF0;
     mapSize = NVME_BAR_MAP_SIZE;
+#ifdef USOSNVME_W9X
+    {
+        NVME_LINE l;
+        l.Len = 0;
+        LineStr(&l, "USOSNVME 9x: ");
+        LineHex(&l, ext->PciId & 0xFFFF, 4);
+        LineStr(&l, ":");
+        LineHex(&l, ext->PciId >> 16, 4);
+        LineStr(&l, " bus ");
+        LineDec(&l, bus);
+        LineStr(&l, " slot ");
+        LineHex(&l, slot, 4);
+        LineStr(&l, " BAR ");
+        LineHex(&l, (ULONG)bar.HighPart, 8);
+        LineHex(&l, bar.LowPart, 8);
+        LineStr(&l, " given ");
+        LineDec(&l, ConfigInfo->SystemIoBusNumber);
+        LineStr(&l, "/");
+        LineHex(&l, ConfigInfo->SlotNumber, 4);
+        LineStr(&l, " IRQ ");
+        LineDec(&l, ConfigInfo->BusInterruptLevel);
+        LineStr(&l, " ranges ");
+        LineDec(&l, ConfigInfo->NumberOfAccessRanges);
+        l.Text[l.Len] = 0;
+        NvmeDbgStr(l.Text);
+        NvmeDbgStr("\n");
+    }
+    /* VMM maps 32-bit physical addresses only (and 98 / Me VMM mishandle
+       memory above 4 GiB): a BAR placed there is refused, the disk stays on
+       the BIOS (MS-DOS compatibility mode). Firmware: Above 4G Decoding off. */
+    if (bar.HighPart != 0) {
+        NvmeReport(ext, "BAR above 4 GiB, not used (Above 4G Decoding off); BAR high", (ULONG)bar.HighPart, TRUE);
+        NvmeLog(ext, NVME_LOG_BAR_HIGH);
+        return SP_RETURN_NOT_FOUND;
+    }
+#else
     if (ranges != NULL) {
         for (i = 0; i < ConfigInfo->NumberOfAccessRanges; i++) {
             if (ranges[i].RangeInMemory &&
@@ -684,6 +858,7 @@ static ULONG NvmeFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOI
             }
         }
     }
+#endif
     if (bar.LowPart == 0 && bar.HighPart == 0) return SP_RETURN_ERROR;
 
     /* memory decode + bus master on; INTx off (the driver polls) */
@@ -720,6 +895,8 @@ static ULONG NvmeFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOI
 #endif
     }
     *Again = TRUE;
+#elif defined(USOSNVME_W9X)
+    ext->Regs = (PUCHAR)NvmeMapPhys(bar.LowPart, mapSize);
 #else
     ext->Regs = (PUCHAR)ScsiPortGetDeviceBase(ext, ConfigInfo->AdapterInterfaceType, bus, bar, mapSize, FALSE);
     if (ext->Regs == NULL && ConfigInfo->AdapterInterfaceType != PCIBus)
@@ -767,6 +944,16 @@ static ULONG NvmeFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOI
     ext->PrpList = (PULONG)(ext->Uncached + NVME_PG_PRPLIST * NVME_PAGE);
     ext->PrpListPhys = ext->UncachedPhys;
     ext->PrpListPhys.LowPart += NVME_PG_PRPLIST * NVME_PAGE;
+#ifdef USOSNVME_W9X
+    /* the queues need physically contiguous pages */
+    for (i = 1; i < NVME_PAGES; i++) {
+        SCSI_PHYSICAL_ADDRESS p2 = ScsiPortGetPhysicalAddress(ext, NULL, ext->Uncached + i * NVME_PAGE, &len);
+        if (p2.LowPart != ext->UncachedPhys.LowPart + i * NVME_PAGE || p2.HighPart != ext->UncachedPhys.HighPart) {
+            NvmeReport(ext, "uncached extension not contiguous; page", i, TRUE);
+            return SP_RETURN_ERROR;
+        }
+    }
+#endif
     (VOID)found;
     return SP_RETURN_FOUND;
 }
@@ -779,6 +966,66 @@ static BOOLEAN NvmeHwInitialize(IN PVOID DeviceExtension)
        is on screen and in the event log. */
     return TRUE;
 }
+
+#ifdef USOSNVME_W9X
+static VOID NvmeDbgCounters(PHW_DEVICE_EXTENSION Ext, const CHAR *Why)
+{
+    NVME_LINE l;
+    l.Len = 0;
+    LineStr(&l, "USOSNVME 9x: ");
+    LineStr(&l, Why);
+    LineStr(&l, " srb ");
+    LineDec(&l, Ext->Srbs);
+    LineStr(&l, " rd ");
+    LineDec(&l, Ext->Reads);
+    LineStr(&l, " wr ");
+    LineDec(&l, Ext->Writes);
+    LineStr(&l, " fl ");
+    LineDec(&l, Ext->Flushes);
+    LineStr(&l, " err ");
+    LineDec(&l, Ext->Errors);
+    LineStr(&l, " to ");
+    LineDec(&l, Ext->Timeouts);
+    LineStr(&l, " qid ");
+    LineDec(&l, Ext->IoQid);
+    l.Text[l.Len] = 0;
+    NvmeDbgStr(l.Text);
+    NvmeDbgStr("\n");
+}
+
+/* Windows exits to real mode (shut down, restart, MS-DOS mode): flush,
+   normal shutdown notification (CC.SHN), then the controller is left
+   disabled. The BIOS (SeaBIOS NVMe in CSMWrap) cannot use it again - its
+   queues are gone - so its INT 13h calls fail with a timeout instead of
+   reaching a queue of ours. The next I/O from Windows re-initialises it. */
+static VOID NvmeShutdown(PHW_DEVICE_EXTENSION Ext)
+{
+    ULONG cc, ms;
+
+    if (Ext->Regs == NULL || NvmeControllerDead(Ext)) return;
+    if (Ext->ControllerUp && Ext->NamespaceReady && !Ext->NeedRestart) (VOID)NvmeFlush(Ext);
+    cc = NvmeRd(Ext, NVME_REG_CC);
+    if (cc & NVME_CC_EN) {
+        NvmeWr(Ext, NVME_REG_CC, (cc & ~(3UL << 14)) | NVME_CC_SHN_NORMAL);
+        for (ms = 0; ms < 10000; ms++) {
+            if ((NvmeRd(Ext, NVME_REG_CSTS) & NVME_CSTS_SHST_MASK) == NVME_CSTS_SHST_DONE) break;
+            ScsiPortStallExecution(1000);
+        }
+        NvmeWr(Ext, NVME_REG_CC, NvmeRd(Ext, NVME_REG_CC) & ~NVME_CC_EN);
+        (VOID)NvmeWaitReady(Ext, FALSE);
+    }
+    Ext->ControllerUp = FALSE;
+}
+
+static BOOLEAN NvmeAdapterState(IN PVOID DeviceExtension, IN PVOID Context, IN BOOLEAN SaveState)
+{
+    PHW_DEVICE_EXTENSION ext = (PHW_DEVICE_EXTENSION)DeviceExtension;
+    (VOID)Context;
+    NvmeDbgCounters(ext, SaveState ? "AdapterState save" : "AdapterState restore");
+    if (!SaveState) NvmeShutdown(ext);
+    return TRUE;
+}
+#endif
 
 static BOOLEAN NvmeInterrupt(IN PVOID DeviceExtension)
 {
@@ -918,6 +1165,42 @@ static VOID NvmeModeSense(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOO
     NvmeReturnData(Srb, d, len, alloc);
 }
 
+#ifdef USOSNVME_W9X
+/* Windows 9x: SCSIPORT.PDR maps an IOS request whose physical fragments
+   need not line up with the pages of its linear buffer (QEMU 98 SE: a
+   linear offset 0E00h on a page-aligned physical fragment gave "PRP Offset
+   Invalid"). The PRPs follow the physical fragments: PRP1 any dword offset,
+   every later entry page aligned, every entry but the last ending on a page
+   boundary. Returns how many of Blocks (from Va) one command can take, the
+   PRPs in Ext->Prp9x; 0 when even the first 512 bytes do not fit. */
+static ULONG NvmeRwPrps9x(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, PUCHAR Va, ULONG Blocks)
+{
+    ULONG want = Blocks << 9, done = 0, n = 0, len, seg, off, used;
+    ULONG starts[NVME_PRP9X_MAX];
+    SCSI_PHYSICAL_ADDRESS pa;
+
+    while (done < want && n < NVME_PRP9X_MAX) {
+        len = 0;
+        pa = ScsiPortGetPhysicalAddress(Ext, Srb, Va + done, &len);
+        off = pa.LowPart & (NVME_PAGE - 1);
+        if (n == 0 && (off & 3)) return 0;
+        if (n > 0 && off != 0) break;
+        seg = NVME_PAGE - off;
+        if (len != 0 && len < seg) seg = len;
+        if (seg > want - done) seg = want - done;
+        Ext->Prp9x[n] = pa;
+        starts[n] = done;
+        n++;
+        done += seg;
+        if (((pa.LowPart + seg) & (NVME_PAGE - 1)) != 0) break;   /* must be the last entry */
+    }
+    done &= ~511UL;
+    for (used = 0; used < n && starts[used] < done; used++) ;
+    Ext->Prp9xCount = used;
+    return done >> 9;
+}
+#endif
+
 /* One READ / WRITE command for Blocks blocks at Va (dword aligned). */
 static ULONG NvmeRw(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN Write, PUCHAR Va,
                     ULONG LbaLo, ULONG LbaHi, ULONG Blocks, BOOLEAN Fua)
@@ -930,6 +1213,22 @@ static ULONG NvmeRw(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN W
     NvmeZero(&c, sizeof(c));
     c.Cdw0 = Write ? NVME_NVM_WRITE : NVME_NVM_READ;
     c.Nsid = Ext->Nsid;
+#ifdef USOSNVME_W9X
+    /* PRPs from NvmeRwPrps9x (called just before for exactly Blocks) */
+    c.Prp1Lo = Ext->Prp9x[0].LowPart;
+    c.Prp1Hi = (ULONG)Ext->Prp9x[0].HighPart;
+    if (Ext->Prp9xCount == 2) {
+        c.Prp2Lo = Ext->Prp9x[1].LowPart;
+        c.Prp2Hi = (ULONG)Ext->Prp9x[1].HighPart;
+    } else if (Ext->Prp9xCount > 2) {
+        for (n = 1; n < Ext->Prp9xCount; n++) {
+            Ext->PrpList[2 * (n - 1)] = Ext->Prp9x[n].LowPart;
+            Ext->PrpList[2 * (n - 1) + 1] = (ULONG)Ext->Prp9x[n].HighPart;
+        }
+        c.Prp2Lo = Ext->PrpListPhys.LowPart;
+        c.Prp2Hi = Ext->PrpListPhys.HighPart;
+    }
+#else
     pa = ScsiPortGetPhysicalAddress(Ext, Srb, Va, &len);
     c.Prp1Lo = pa.LowPart;
     c.Prp1Hi = pa.HighPart;
@@ -955,6 +1254,7 @@ static ULONG NvmeRw(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOOLEAN W
             c.Prp2Hi = Ext->PrpListPhys.HighPart;
         }
     }
+#endif
     c.Cdw10 = LbaLo;
     c.Cdw11 = LbaHi;
     c.Cdw12 = (Blocks - 1) | (Fua ? (1UL << 30) : 0);
@@ -1044,6 +1344,17 @@ static VOID NvmeReadWrite(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, BOO
     while (blocks) {
         chunk = Ext->MaxChunkBytes >> 9;
         if (chunk > blocks) chunk = blocks;
+#ifdef USOSNVME_W9X
+        /* the run of the buffer that one PRP set can describe (may be fewer
+           blocks than asked); 0 = a fragment not on a 512-byte boundary */
+        chunk = NvmeRwPrps9x(Ext, Srb, va, chunk);
+        if (chunk == 0) {
+            Ext->Errors++;
+            NvmeReport(Ext, "buffer fragment not 512-byte aligned; VA", (ULONG)va, TRUE);
+            NvmeSetSense(Ext, Srb, SCSI_SENSE_ILLEGAL_REQUEST, 0x24, 0);
+            return;
+        }
+#endif
         status = NvmeRw(Ext, Srb, Write, va, lbaLo, lbaHi, chunk, fua);
         if (status != 0) {
             NvmeIoFailed(Ext, Srb, status, Write);
@@ -1169,6 +1480,49 @@ static BOOLEAN NvmeStartIo(IN PVOID DeviceExtension, IN PSCSI_REQUEST_BLOCK Srb)
         Srb->SrbStatus = SRB_STATUS_INVALID_REQUEST;
         break;
     }
+#ifdef USOSNVME_W9X
+    ext->Srbs++;
+    if (Srb->Function == SRB_FUNCTION_EXECUTE_SCSI) {
+        UCHAR op = Srb->Cdb[0];
+        BOOLEAN rw = (BOOLEAN)(op == SCSIOP_READ || op == SCSIOP_WRITE || op == SCSIOP_READ6 || op == SCSIOP_WRITE6 ||
+                               op == 0xA8 || op == 0xAA || op == 0x88 || op == 0x8A);
+        if ((!rw || Srb->SrbStatus != SRB_STATUS_SUCCESS) && ext->DbgNonRw < 64) {
+            NVME_LINE l;
+            ext->DbgNonRw++;
+            l.Len = 0;
+            LineStr(&l, "USOSNVME 9x: cdb ");
+            LineHex(&l, op, 2);
+            if (!rw) {
+                LineStr(&l, " t");
+                LineDec(&l, Srb->TargetId);
+                LineStr(&l, " l");
+                LineDec(&l, Srb->Lun);
+            }
+            LineStr(&l, " len ");
+            LineDec(&l, Srb->DataTransferLength);
+            LineStr(&l, " srb ");
+            LineHex(&l, Srb->SrbStatus, 2);
+            if (rw) {
+                LineStr(&l, " lba ");
+                LineHex(&l, NvmeGetBe32(Srb->Cdb + 2), 8);
+                LineStr(&l, " buf ");
+                LineHex(&l, (ULONG)Srb->DataBuffer, 8);
+                LineStr(&l, " sk ");
+                LineHex(&l, ext->SenseKey, 1);
+                LineStr(&l, "/");
+                LineHex(&l, ext->Asc, 2);
+                LineStr(&l, " st ");
+                LineHex(&l, ext->LastStatus, 4);
+            }
+            l.Text[l.Len] = 0;
+            NvmeDbgStr(l.Text);
+            NvmeDbgStr("\n");
+        }
+    } else if (Srb->Function == SRB_FUNCTION_SHUTDOWN || Srb->Function == SRB_FUNCTION_FLUSH) {
+        NvmeDbgCounters(ext, Srb->Function == SRB_FUNCTION_SHUTDOWN ? "shutdown" : "flush");
+    }
+    if ((ext->Srbs & 0x3FF) == 0) NvmeDbgCounters(ext, "io");
+#endif
     ScsiPortNotification(RequestComplete, ext, Srb);
     ScsiPortNotification(NextRequest, ext, NULL);
     return TRUE;

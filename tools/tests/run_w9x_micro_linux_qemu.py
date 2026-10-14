@@ -53,7 +53,7 @@ import run_nt3_micro_linux_qemu as nt3  # noqa: E402
 from run_stage_drivers_qemu import Console  # noqa: E402
 
 SCRIPTS = ("w9x_csmwrap_prepare.sh", "w9x_phase1_qemu.sh", "w9x_csmwrap_target.sh", "dos_csmwrap_target.sh",
-           "xp_csmwrap_esp.sh")
+           "xp_csmwrap_esp.sh", "w9x_nvme.sh")
 
 GUEST = r'''#!/bin/sh
 # run_w9x_micro_linux_qemu.py guest part: step 620's DOS / 9x calls, no screens.
@@ -93,6 +93,14 @@ if [ "$FAMILY" = 98se ]; then
         log "phase1 FAIL ${check:-}"; ls -la /tmp/w9x/phase1; echo E2E-RESULT=FAIL; exit 1
     fi
     log "phase1 PASS $check"
+    # --env W9X_NVME_DRIVER=1: step 620's nvme-experimental.txt path
+    # (tools/w9x_nvme.sh): usosnvme into the installed Windows
+    if [ "${W9X_NVME_DRIVER:-0}" = 1 ] && . /usr/lib/usos/w9x_nvme.sh && nl=$(losetup -f) && losetup -o 1048576 "$nl" "$TARGET"; then
+        log "nvme inject: $(MTOOLS_SKIP_CHECK=1 w9x_nvme_inject "$nl" 2>&1)"
+        MTOOLS_SKIP_CHECK=1 mtype -i "$nl" ::/WINDOWS/INF/USOSNVME.INF 2>/dev/null | grep -i 'PCI.VEN_\|CC_010802' | sed 's/^/E2E: inf /'
+        MTOOLS_SKIP_CHECK=1 mdir -i "$nl" ::/WINDOWS/SYSTEM/IOSUBSYS/USOSNVME.MPD 2>/dev/null | grep -i usosnvme | sed 's/^/E2E: mpd /'
+        losetup -d "$nl"
+    fi
 else
     WIN3=''
     if [ "$FAMILY" = w3 ]; then

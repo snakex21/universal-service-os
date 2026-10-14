@@ -52,6 +52,10 @@ XHCI98_FLAG=${W9X_XHCI98_FLAG:-$ESP_DIR/win9x/xhci98.flag}
 # Real-hardware diagnostics (USOSDIAG BOOT before every Windows start) are
 # opt-in too; the files are in C:\USOS9X either way.
 DIAG_FLAG=${W9X_DIAG_FLAG:-$ESP_DIR/win9x/diag.flag}
+# 1: the target is NVMe and DATA has the 9x nvme-experimental.txt
+# (tools/w9x_csmwrap_prepare.sh): usosnvme.mpd (tools/w9x_nvme.sh) instead
+# of MS-DOS compatibility mode, unless the disk fails w9x_nvme_check.
+NVME_DRIVER=${W9X_NVME_DRIVER:-0}
 LIB=${USOS_LIB_DIR:-/usr/lib/usos}
 ESP_TAIL=133120
 MIN_SECTORS=4194304
@@ -265,6 +269,27 @@ if [ "$VM_PHASE1" = 1 ]; then
     fi
     log "vm phase 1: U9VM=1, display ids: $(printf '%s' "$ids" | tr '\n' ' ')"
 fi
+
+# NVMe target: usosnvme.mpd + USOSNVME.INF stay in C:\USOS9X only when chosen
+# and the disk passes the check; INSTALL.BAT (U9NVME=1) puts them next to
+# Setup, tools/w9x_csmwrap_prepare.sh into C:\WINDOWS after the VM phase 1.
+nvme_ok=0
+if [ "$NVME_DRIVER" = 1 ]; then
+    if [ ! -f "$work/c/USOS9X/USOSNVME.MPD" ] || [ ! -f "$work/c/USOS9X/USOSNVME.INF" ] ||
+        [ ! -r "$LIB/w9x_nvme.sh" ] || ! . "$LIB/w9x_nvme.sh"; then
+        log 'nvme: usosnvme.mpd is not in this payload; Windows uses the disk in MS-DOS compatibility mode'
+    elif ! nvme_reason=$(w9x_nvme_check "$TARGET_DEVICE"); then
+        log "nvme: usosnvme.mpd refused: $nvme_reason; Windows uses the disk in MS-DOS compatibility mode"
+    else
+        nvme_id=$(w9x_nvme_hwid "$TARGET_DEVICE" || true)
+        w9x_nvme_inf_add_id "$nvme_id" < "$work/c/USOS9X/USOSNVME.INF" > "$work/USOSNVME.INF" &&
+            cp "$work/USOSNVME.INF" "$work/c/USOS9X/USOSNVME.INF" || fail 'cannot add the NVMe ID to USOSNVME.INF'
+        printf 'SET U9NVME=1\r\n' >> "$work/c/USOS9X/U9ENV.BAT"
+        nvme_ok=1
+        log "nvme: usosnvme.mpd (experimental, nvme-experimental.txt) for ${nvme_id:-PCI\\CC_010802}"
+    fi
+fi
+[ "$nvme_ok" = 1 ] || rm -f "$work/c/USOS9X/USOSNVME.MPD" "$work/c/USOS9X/USOSNVME.INF"
 
 case "$SYSTEM_TAG:$TIME_ZONE" in
     98SE:?*|98:?*|95:?*)
