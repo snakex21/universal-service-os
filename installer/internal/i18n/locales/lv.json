@@ -1346,5 +1346,13 @@
   "boot.lx.format_the_entire_disk_q": "FORMATĒT VISU DISKU?",
   "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Dzēst VISAS izvēlētā diska partīcijas un datus",
   "boot.lx.x_confirmation": "{0} - APSTIPRINĀJUMS",
-  "boot.lx.prepare_x_installation": "Sagatavot {0} instalēšanu"
+  "boot.lx.prepare_x_installation": "Sagatavot {0} instalēšanu",
+  "boot.lx.logon_no_password": "Pēc instalēšanas piesakieties kā {0} (bez paroles).",
+  "boot.lx.logon_profile_password": "Pēc instalēšanas piesakieties kā {0} ar atbilžu profilā iestatīto paroli.",
+  "boot.lx.logon_file_password": "Pēc instalēšanas piesakieties kā {0}; parole ir failā {1}.",
+  "boot.lx.logon_domain_no_password": "Pēc instalēšanas piesakieties domēnā {1} kā {0} (bez paroles).",
+  "boot.lx.logon_domain_profile_password": "Pēc instalēšanas piesakieties domēnā {1} kā {0} ar atbilžu profilā iestatīto paroli.",
+  "boot.lx.logon_autologon": "Pēc instalēšanas Windows automātiski piesakās kā {0}.",
+  "boot.lx.logon_setup_asks": "Windows iestatīšana instalēšanas laikā vaicā lietotājvārdu un paroli; USOS tos neiestata.",
+  "boot.lx.logon_answer_file": "Pēc instalēšanas piesakieties ar kontu no sava atbilžu faila {0}."
 }

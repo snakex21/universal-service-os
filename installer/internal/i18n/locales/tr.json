@@ -1343,5 +1343,13 @@
   "boot.lx.format_the_entire_disk_q": "TÜM DİSK BİÇİMLENDİRİLSİN Mİ?",
   "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Seçili diskteki TÜM bölümleri ve verileri sil",
   "boot.lx.x_confirmation": "{0} - ONAY",
-  "boot.lx.prepare_x_installation": "{0} kurulumunu hazırla"
+  "boot.lx.prepare_x_installation": "{0} kurulumunu hazırla",
+  "boot.lx.logon_no_password": "Kurulumdan sonra {0} olarak oturum açın (parola yok).",
+  "boot.lx.logon_profile_password": "Kurulumdan sonra yanıt profilinde ayarlanan parolayla {0} olarak oturum açın.",
+  "boot.lx.logon_file_password": "Kurulumdan sonra {0} olarak oturum açın; parola {1} dosyasındadır.",
+  "boot.lx.logon_domain_no_password": "Kurulumdan sonra {1} etki alanında {0} olarak oturum açın (parola yok).",
+  "boot.lx.logon_domain_profile_password": "Kurulumdan sonra yanıt profilinde ayarlanan parolayla {1} etki alanında {0} olarak oturum açın.",
+  "boot.lx.logon_autologon": "Kurulumdan sonra Windows otomatik olarak {0} olarak oturum açar.",
+  "boot.lx.logon_setup_asks": "Windows Kurulumu kurulum sırasında kullanıcı adını ve parolayı sorar; USOS bunları ayarlamaz.",
+  "boot.lx.logon_answer_file": "Kurulumdan sonra {0} yanıt dosyanızdaki hesapla oturum açın."
 }

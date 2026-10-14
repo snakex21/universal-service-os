@@ -83,6 +83,14 @@ pub const hashes = [_]u32{
     0xa8c66f00, // lx.keep_the_usos_stick_connected
     0x8173ebb9, // lx.keep_the_usos_usb_drive_connected_setup_will_sta
     0x752c33ab, // lx.loading_the_selected_boot_image_from_ntfs
+    0x238df5fa, // lx.logon_answer_file
+    0x30117541, // lx.logon_autologon
+    0x9200e4eb, // lx.logon_domain_no_password
+    0x4c3fbfd5, // lx.logon_domain_profile_password
+    0x8276d4e9, // lx.logon_file_password
+    0x533622f2, // lx.logon_no_password
+    0x6bfbeb26, // lx.logon_profile_password
+    0x3753f2a9, // lx.logon_setup_asks
     0x65fc5619, // lx.measured_byte_progress_transfer_speed_and_eta
     0xe0764ec1, // lx.measured_byte_progress_transfer_speed_and_eta_ar
     0xd738a5be, // lx.models_serial_numbers_capacity_and_health_report
@@ -305,6 +313,14 @@ pub const english = [_][]const u8{
     "Keep the USOS stick connected.",
     "Keep the USOS USB drive connected. Setup will start automatically.",
     "Loading the selected boot image from NTFS.",
+    "After the installation log on with the account from your answer file {0}.",
+    "After the installation Windows logs on automatically as {0}.",
+    "After the installation log on to the domain {1} as {0} (no password).",
+    "After the installation log on to the domain {1} as {0} with the password set in the answer profile.",
+    "After the installation log on as {0}; the password is the one in {1}.",
+    "After the installation log on as {0} (no password).",
+    "After the installation log on as {0} with the password set in the answer profile.",
+    "Windows Setup asks for the user name and password during the installation; USOS does not set them.",
     "Measured byte progress, transfer speed and ETA.",
     "Measured byte progress, transfer speed and ETA are now available.",
     "Models, serial numbers, capacity and health reports",

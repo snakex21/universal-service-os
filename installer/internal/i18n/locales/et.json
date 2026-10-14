@@ -1343,5 +1343,13 @@
   "boot.lx.format_the_entire_disk_q": "VORMINDADA KOGU KETAS?",
   "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Kustuta valitud kettalt KÕIK partitsioonid ja andmed",
   "boot.lx.x_confirmation": "{0} - KINNITUS",
-  "boot.lx.prepare_x_installation": "Valmista ette {0} paigaldus"
+  "boot.lx.prepare_x_installation": "Valmista ette {0} paigaldus",
+  "boot.lx.logon_no_password": "Pärast installimist logi sisse kasutajana {0} (parool puudub).",
+  "boot.lx.logon_profile_password": "Pärast installimist logi sisse kasutajana {0} vastuseprofiilis määratud parooliga.",
+  "boot.lx.logon_file_password": "Pärast installimist logi sisse kasutajana {0}; parool on failis {1}.",
+  "boot.lx.logon_domain_no_password": "Pärast installimist logi domeeni {1} sisse kasutajana {0} (parool puudub).",
+  "boot.lx.logon_domain_profile_password": "Pärast installimist logi domeeni {1} sisse kasutajana {0} vastuseprofiilis määratud parooliga.",
+  "boot.lx.logon_autologon": "Pärast installimist logib Windows automaatselt sisse kasutajana {0}.",
+  "boot.lx.logon_setup_asks": "Windowsi installiprogramm küsib installimise ajal kasutajanime ja parooli; USOS neid ei määra.",
+  "boot.lx.logon_answer_file": "Pärast installimist logi sisse oma vastusefaili {0} kontoga."
 }

@@ -39,6 +39,10 @@ pub const State = struct {
     /// replaces the power-off step (English, translated by Ui.tr).
     notice: []const u8 = "",
     action: []const u8 = "",
+    /// How to log on after the installation (English from logon.ini,
+    /// src/flow/answer/logon.zig, translated by Ui.tr): a second line of the
+    /// notice panel, or its own panel on the other pages.
+    logon: []const u8 = "",
 };
 
 pub const max_stages: usize = 5;
@@ -106,12 +110,22 @@ pub fn render(ui: *const Ui, state: State, header: ui_mod.HeaderInfo) void {
 
     var steps_y = card_y + card_h + ui.px(16);
     var action_buffer: [96]u8 = undefined;
+    var logon_buffer: [384]u8 = undefined;
+    const logon = if (state.logon.len > 0 and state.mode != .failure) ui.tr(&logon_buffer, state.logon) else "";
     if (notice) {
         var notice_buffer: [448]u8 = undefined;
-        const lines = [_][]const u8{ui.tr(&notice_buffer, state.notice)};
-        const notice_h = ui.infoPanelHeight(body.w, true, "", &lines);
-        _ = ui.infoPanel(.{ .x = body.x, .y = steps_y, .w = body.w, .h = notice_h }, .warning, .warning, "", &lines, null);
+        const both = [_][]const u8{ ui.tr(&notice_buffer, state.notice), logon };
+        const lines = if (logon.len > 0) both[0..2] else both[0..1];
+        const notice_h = ui.infoPanelHeight(body.w, true, "", lines);
+        _ = ui.infoPanel(.{ .x = body.x, .y = steps_y, .w = body.w, .h = notice_h }, .warning, .warning, "", lines, null);
         steps_y += notice_h + ui.px(16);
+    } else if (logon.len > 0) {
+        const lines = [_][]const u8{logon};
+        const logon_h = ui.infoPanelHeight(body.w, true, "", &lines);
+        if (steps_y + logon_h <= body.bottom()) {
+            _ = ui.infoPanel(.{ .x = body.x, .y = steps_y, .w = body.w, .h = logon_h }, .info, .accent, "", &lines, null);
+            steps_y += logon_h + ui.px(16);
+        }
     }
     const count = stageCount(state);
     const step_h = ui.px(46);
@@ -397,5 +411,30 @@ test "progress screen renders every mode in Polish at 1920x1080" {
         const notice_ui = Ui.init(small.surface, Theme{}, &pack, &table);
         render(&notice_ui, .{ .mode = .done, .title = "Windows XP will now install on its own", .notice = "After the restart, Windows XP Setup runs on its own up to the graphical setup wizard. Until then do not press any keys: the disk has already been chosen here.", .action = "Proceed" }, .{ .firmware = "UEFI", .language = "Polski" });
         try std.testing.expect(pixels[0] != pixels[size[0] * size[1] / 2]);
+        // With the logon line (logon.ini) under the notice, and on a stage page.
+        render(&notice_ui, .{ .mode = .done, .title = "Windows NT 3.51: start the prepared disk", .notice = "After the restart the firmware starts this disk's UEFI entry (CSMWrap; CSM stays off) and the Windows NT 3.51 installation continues on it. If the USOS stick starts instead, pick the disk in the firmware boot menu.", .action = "Restart", .logon = "After the installation log on as Administrator (no password)." }, .{ .firmware = "UEFI", .language = "Polski" });
+        render(&notice_ui, .{ .mode = .stage, .current = 3, .title = "Copying files", .logon = "After the installation log on as Jan with the password set in the answer profile." }, .{ .firmware = "UEFI", .language = "Polski" });
+    }
+}
+
+test "the logon line arrives in English and is shown translated" {
+    const font = @import("font.zig");
+    const lang_file = @import("../i18n/lang_file.zig");
+    const pack = try font.Pack.parse(@embedFile("fonts/usos-font.bin"));
+    const coverage = lang_file.Coverage{ .context = @ptrCast(&pack), .has = font.coverageHas };
+    const table = try lang_file.Table.parse(@embedFile("../i18n/testdata/lang-pl.bin"), coverage);
+    const cases = [_][2][]const u8{
+        .{ "After the installation log on as Administrator (no password).", "Po instalacji zaloguj się jako Administrator (bez hasła)." },
+        .{ "After the installation log on as Jan with the password set in the answer profile.", "Po instalacji zaloguj się jako Jan hasłem ustawionym w profilu odpowiedzi." },
+        .{ "After the installation log on as Tester; the password is the one in usos-xp.ini.", "Po instalacji zaloguj się jako Tester; hasło jest w pliku usos-xp.ini." },
+        .{ "After the installation log on to the domain USOSDOMAIN as Administrator (no password).", "Po instalacji zaloguj się do domeny USOSDOMAIN jako Administrator (bez hasła)." },
+        .{ "After the installation log on to the domain USOSDOMAIN as Jan with the password set in the answer profile.", "Po instalacji zaloguj się do domeny USOSDOMAIN jako Jan hasłem ustawionym w profilu odpowiedzi." },
+        .{ "After the installation Windows logs on automatically as Jan.", "Po instalacji Windows zaloguje się automatycznie jako Jan." },
+        .{ "Windows Setup asks for the user name and password during the installation; USOS does not set them.", "Instalator Windows zapyta w trakcie instalacji o nazwę użytkownika i hasło; USOS ich nie ustawia." },
+        .{ "After the installation log on with the account from your answer file my.sif.", "Po instalacji zaloguj się kontem z Twojego pliku odpowiedzi my.sif." },
+    };
+    for (cases) |case| {
+        var buffer: [384]u8 = undefined;
+        try std.testing.expectEqualStrings(case[1], table.translate(&buffer, case[0]));
     }
 }

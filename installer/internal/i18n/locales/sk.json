@@ -1346,5 +1346,13 @@
   "boot.lx.format_the_entire_disk_q": "NAFORMÁTOVAŤ CELÝ DISK?",
   "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Vymazať VŠETKY oddiely a údaje na vybranom disku",
   "boot.lx.x_confirmation": "{0} - POTVRDENIE",
-  "boot.lx.prepare_x_installation": "Pripraviť inštaláciu {0}"
+  "boot.lx.prepare_x_installation": "Pripraviť inštaláciu {0}",
+  "boot.lx.logon_no_password": "Po inštalácii sa prihláste ako {0} (bez hesla).",
+  "boot.lx.logon_profile_password": "Po inštalácii sa prihláste ako {0} heslom nastaveným v profile odpovedí.",
+  "boot.lx.logon_file_password": "Po inštalácii sa prihláste ako {0}; heslo je v súbore {1}.",
+  "boot.lx.logon_domain_no_password": "Po inštalácii sa prihláste do domény {1} ako {0} (bez hesla).",
+  "boot.lx.logon_domain_profile_password": "Po inštalácii sa prihláste do domény {1} ako {0} heslom nastaveným v profile odpovedí.",
+  "boot.lx.logon_autologon": "Po inštalácii sa Windows prihlási automaticky ako {0}.",
+  "boot.lx.logon_setup_asks": "Inštalátor Windows sa počas inštalácie opýta na meno používateľa a heslo; USOS ich nenastavuje.",
+  "boot.lx.logon_answer_file": "Po inštalácii sa prihláste účtom zo svojho súboru odpovedí {0}."
 }

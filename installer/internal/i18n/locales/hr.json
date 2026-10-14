@@ -1346,5 +1346,13 @@
   "boot.lx.format_the_entire_disk_q": "FORMATIRATI CIJELI DISK?",
   "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Izbriši SVE particije i podatke s odabranog diska",
   "boot.lx.x_confirmation": "{0} - POTVRDA",
-  "boot.lx.prepare_x_installation": "Pripremi instalaciju {0}"
+  "boot.lx.prepare_x_installation": "Pripremi instalaciju {0}",
+  "boot.lx.logon_no_password": "Nakon instalacije prijavite se kao {0} (bez lozinke).",
+  "boot.lx.logon_profile_password": "Nakon instalacije prijavite se kao {0} lozinkom postavljenom u profilu odgovora.",
+  "boot.lx.logon_file_password": "Nakon instalacije prijavite se kao {0}; lozinka je u datoteci {1}.",
+  "boot.lx.logon_domain_no_password": "Nakon instalacije prijavite se u domenu {1} kao {0} (bez lozinke).",
+  "boot.lx.logon_domain_profile_password": "Nakon instalacije prijavite se u domenu {1} kao {0} lozinkom postavljenom u profilu odgovora.",
+  "boot.lx.logon_autologon": "Nakon instalacije Windows se automatski prijavljuje kao {0}.",
+  "boot.lx.logon_setup_asks": "Instalacija sustava Windows tijekom instalacije traži korisničko ime i lozinku; USOS ih ne postavlja.",
+  "boot.lx.logon_answer_file": "Nakon instalacije prijavite se računom iz svoje datoteke odgovora {0}."
 }

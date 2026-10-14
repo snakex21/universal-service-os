@@ -643,6 +643,9 @@ if [ "${USOS_WINDOWS_BIOS:-no}" = yes ]; then
     sh /usr/lib/usos/prepare_windows_bios_boot.sh preflight || stop 'Windows BIOS source preflight failed'
 fi
 sh /usr/lib/usos/prepare_work.sh || stop 'prepare_work.sh failed'
+# How to log on afterwards (logon.ini from the menu, docs/logon-after-install.md).
+usos_logon_take /mnt/esp "${SELECTED_SYSTEM:-}" || true
+usos_logon_save /mnt/data "$(usos_logon_dir_of "$SELECTED_ISO")" || true
 if [ "${USOS_WINDOWS_BIOS:-no}" = yes ]; then
     sh /usr/lib/usos/prepare_windows_bios_boot.sh install || stop 'Windows BIOS bootstrap preparation failed'
 fi

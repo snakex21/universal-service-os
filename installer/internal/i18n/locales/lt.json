@@ -1346,5 +1346,13 @@
   "boot.lx.format_the_entire_disk_q": "FORMATUOTI VISĄ DISKĄ?",
   "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Ištrinti VISUS pasirinkto disko skaidinius ir duomenis",
   "boot.lx.x_confirmation": "{0} - PATVIRTINIMAS",
-  "boot.lx.prepare_x_installation": "Paruošti {0} diegimą"
+  "boot.lx.prepare_x_installation": "Paruošti {0} diegimą",
+  "boot.lx.logon_no_password": "Po diegimo prisijunkite kaip {0} (be slaptažodžio).",
+  "boot.lx.logon_profile_password": "Po diegimo prisijunkite kaip {0} atsakymų profilyje nustatytu slaptažodžiu.",
+  "boot.lx.logon_file_password": "Po diegimo prisijunkite kaip {0}; slaptažodis yra faile {1}.",
+  "boot.lx.logon_domain_no_password": "Po diegimo prisijunkite prie domeno {1} kaip {0} (be slaptažodžio).",
+  "boot.lx.logon_domain_profile_password": "Po diegimo prisijunkite prie domeno {1} kaip {0} atsakymų profilyje nustatytu slaptažodžiu.",
+  "boot.lx.logon_autologon": "Po diegimo Windows automatiškai prisijungs kaip {0}.",
+  "boot.lx.logon_setup_asks": "Windows sąranka diegimo metu paklaus vartotojo vardo ir slaptažodžio; USOS jų nenustato.",
+  "boot.lx.logon_answer_file": "Po diegimo prisijunkite paskyra iš savo atsakymų failo {0}."
 }

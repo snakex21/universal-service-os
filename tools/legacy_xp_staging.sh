@@ -650,6 +650,10 @@ usos_legacy_xp_staging() {
 
     umount /mnt/source || stop 'cannot unmount selected XP ISO after preparation'
     losetup -d "$LOOP_DEVICE" || stop 'cannot detach selected XP ISO loop device'
+    # How to log on afterwards (logon.ini from the menu, docs/logon-after-install.md):
+    # every later page shows it; DATA gets last-install-login.txt (no password).
+    usos_logon_take /mnt/esp "${NT5_SYSTEM:-}" || true
+    usos_logon_save /mnt/data "Systems/Windows/$NT5_NAME" || true
     umount /mnt/data || stop 'cannot unmount USOS_DATA after XP preparation'
     printf '[LEGACY_XP] PREPARED PASS backend=xp-staging\n'
     xp_stage_set handoff-finalize

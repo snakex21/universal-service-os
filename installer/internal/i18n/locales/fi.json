@@ -1343,5 +1343,13 @@
   "boot.lx.format_the_entire_disk_q": "ALUSTETAANKO KOKO LEVY?",
   "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Poista KAIKKI osiot ja tiedot valitulta levyltä",
   "boot.lx.x_confirmation": "{0} - VAHVISTUS",
-  "boot.lx.prepare_x_installation": "Valmistele {0} -asennus"
+  "boot.lx.prepare_x_installation": "Valmistele {0} -asennus",
+  "boot.lx.logon_no_password": "Kirjaudu asennuksen jälkeen käyttäjänä {0} (ei salasanaa).",
+  "boot.lx.logon_profile_password": "Kirjaudu asennuksen jälkeen käyttäjänä {0} vastausprofiilissa asetetulla salasanalla.",
+  "boot.lx.logon_file_password": "Kirjaudu asennuksen jälkeen käyttäjänä {0}; salasana on tiedostossa {1}.",
+  "boot.lx.logon_domain_no_password": "Kirjaudu asennuksen jälkeen toimialueelle {1} käyttäjänä {0} (ei salasanaa).",
+  "boot.lx.logon_domain_profile_password": "Kirjaudu asennuksen jälkeen toimialueelle {1} käyttäjänä {0} vastausprofiilissa asetetulla salasanalla.",
+  "boot.lx.logon_autologon": "Asennuksen jälkeen Windows kirjautuu automaattisesti käyttäjänä {0}.",
+  "boot.lx.logon_setup_asks": "Windowsin asennus kysyy käyttäjänimen ja salasanan asennuksen aikana; USOS ei aseta niitä.",
+  "boot.lx.logon_answer_file": "Kirjaudu asennuksen jälkeen vastaustiedostosi {0} tilillä."
 }

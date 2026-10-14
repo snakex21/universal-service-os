@@ -1343,5 +1343,13 @@
   "boot.lx.format_the_entire_disk_q": "DE HELE SCHIJF FORMATTEREN?",
   "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "ALLE partities en gegevens op de geselecteerde schijf wissen",
   "boot.lx.x_confirmation": "{0} - BEVESTIGING",
-  "boot.lx.prepare_x_installation": "Installatie van {0} voorbereiden"
+  "boot.lx.prepare_x_installation": "Installatie van {0} voorbereiden",
+  "boot.lx.logon_no_password": "Meld u na de installatie aan als {0} (geen wachtwoord).",
+  "boot.lx.logon_profile_password": "Meld u na de installatie aan als {0} met het wachtwoord uit het antwoordprofiel.",
+  "boot.lx.logon_file_password": "Meld u na de installatie aan als {0}; het wachtwoord staat in {1}.",
+  "boot.lx.logon_domain_no_password": "Meld u na de installatie aan bij het domein {1} als {0} (geen wachtwoord).",
+  "boot.lx.logon_domain_profile_password": "Meld u na de installatie aan bij het domein {1} als {0} met het wachtwoord uit het antwoordprofiel.",
+  "boot.lx.logon_autologon": "Na de installatie meldt Windows zich automatisch aan als {0}.",
+  "boot.lx.logon_setup_asks": "Windows Setup vraagt tijdens de installatie om de gebruikersnaam en het wachtwoord; USOS stelt ze niet in.",
+  "boot.lx.logon_answer_file": "Meld u na de installatie aan met het account uit uw antwoordbestand {0}."
 }

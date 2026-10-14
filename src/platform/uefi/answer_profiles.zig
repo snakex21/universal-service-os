@@ -351,6 +351,31 @@ pub fn stage(root: *uefi.protocol.File, profile: *const Profile, system_id: []co
     return result.format;
 }
 
+/// \EFI\USOS\answer\logon.ini for the chosen system (src/flow/answer/logon.zig):
+/// written at every start (no password in it, so clearRendered keeps it);
+/// removed when the system has no logon prompt. Failures only reach the
+/// serial log: the hint never blocks a start.
+pub fn writeLogon(root: *uefi.protocol.File, system_id: []const u8, logon: answer.logon.Logon, english: []const u8, local: []const u8) void {
+    if (logon.kind == .no_logon) {
+        deleteFile(root, answer.logon.path);
+        return;
+    }
+    var bytes: [1024]u8 = undefined;
+    const text = answer.logon.writeIni(logon, system_id, english, local, &bytes) catch {
+        deleteFile(root, answer.logon.path);
+        serial.writeAscii("[LOGON] logon.ini too long; not written\n");
+        return;
+    };
+    ensureDirectory(root, "\\EFI\\USOS") catch {};
+    ensureDirectory(root, plan_file.directory) catch {};
+    settings_store.replaceFile(root, answer.logon.path, text) catch {
+        serial.writeAscii("[LOGON] cannot write logon.ini\n");
+        return;
+    };
+    var line: [160]u8 = undefined;
+    serial.writeAscii(std.fmt.bufPrint(&line, "[LOGON] {s} kind={s} password={s} autologon={s}\n", .{ system_id, @tagName(logon.kind), @tagName(logon.password), if (logon.autologon) "yes" else "no" }) catch "[LOGON] written\n");
+}
+
 /// usos-plan.ini for the wimboot RAM disk (same content as on the ESP).
 pub fn planText(profile: *const Profile, system_id: []const u8, arch: answer.Arch, os_profile: []const u8, buffer: []u8) ![]const u8 {
     return plan_file.write(.{ .os_profile = os_profile, .system_id = system_id, .source = .profile, .name = profile.name.slice(), .format = .autounattend_xml, .arch = arch, .key = profile.keyFor(system_id).len > 0 }, buffer);
