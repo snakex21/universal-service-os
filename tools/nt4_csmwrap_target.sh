@@ -719,7 +719,24 @@ mv "$ls_src/AUTOCHK.EXE" "$usos/AUTOCHK.EXE" || fail 'cannot move AUTOCHK.EXE'
 cp "$drv/USOSACHK.EXE" "$ls_src/AUTOCHK.EXE" || fail 'cannot copy USOSACHK.EXE'
 rm -f "$bt_dir/AUTOCHK.EXE"
 [ -z "$SP_EXE" ] || log "service pack: $(basename "$SP_EXE") ignored (NT 3.51 service packs are not installed yet)"
-log 'display: VGA (640x480x16; no VESA for NT 3.51 yet)'
+# VESA display (docs/nt3-vesa-2026-10-14.md): our miniport (USOSVBE.SYS, NT 3.x
+# build of tools/nt4/usosvbe) + the CD's own framebuf.dll, which text-mode
+# Setup installs from the user's CD ([files.video]); the CD's compressed copy
+# goes along for usosnt3 (expanded with NT's own expand.exe if Setup did not
+# install it). USOS never ships framebuf.dll. usosnt3 registers usosvbe
+# (1024x768x16); without either file the system stays on VGA (640x480x16).
+# The [VGA mode] boot entry (/basevideo) keeps VGA: usosvbe does not start.
+if [ -r "$drv/USOSVBE.SYS" ]; then
+    cp "$drv/USOSVBE.SYS" "$usos/USOSVBE.SYS" || fail 'cannot copy USOSVBE.SYS'
+    framebuf=''
+    for name in FRAMEBUF.DL_ framebuf.dl_; do [ -f "$i386/$name" ] && framebuf="$i386/$name" && break; done
+    if [ -n "$framebuf" ]; then
+        cp "$framebuf" "$usos/FRAMEBUF.DL_" || fail 'cannot copy FRAMEBUF.DL_'
+    fi
+    log 'display: VESA (usosvbe + framebuf.dll from the CD), [VGA mode] = 640x480x16'
+else
+    log 'display: VGA (640x480x16; no USOSVBE.SYS in this build)'
+fi
 printf 'answer=%s\r\nversion=%s.%s\r\n' "$ANSWER_KIND" "$major" "$minor" > "$usos/SOURCE.TXT"
 else
 # $OEM$ (OemPreinstall = Yes): CMDLINES.TXT runs at the end of GUI-mode Setup

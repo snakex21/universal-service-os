@@ -922,6 +922,7 @@ static void polish(void)
     display_confirmed();
 }
 
+static void vesa(void);
 static void post(void)
 {
     static const char *const drivers[] = { "AHCINT", "USOSRST", "USOSUSB" };
@@ -1018,6 +1019,95 @@ static void post(void)
         dump_value(g_text, key, "Group");
     }
     write_file("DRIVERS.TXT", g_text);
+    vesa();
+}
+
+/* VESA display (docs/nt3-vesa-2026-10-14.md): usosvbe.sys (own miniport,
+   NT 3.x build) + the CD's own framebuf.dll. Text-mode Setup of NT 3.5/3.51
+   installs framebuf.dll ([files.video]); otherwise the CD's FRAMEBUF.DL_
+   staged by nt4_csmwrap_target.sh is expanded with NT's own expand.exe.
+   Without the miniport or framebuf.dll the system stays on VGA. The values
+   are those of VIDEO.INF for a frame buffer driver (VgaCompatible 0) and the
+   NT 4.0 VESA.REG defaults (1024x768, 16 bpp, 60 Hz). VgaStart (NT 3.51)
+   is turned off like in VESA.REG; VgaSave stays: it serves full-screen
+   consoles and the [VGA mode] (/basevideo) entry, where usosvbe does not
+   start. */
+static void vesa(void)
+{
+    static const WCHAR drivers[] = L"framebuf\0";
+    static const char *const dwords[] = { "DefaultSettings.BitsPerPel", "DefaultSettings.XResolution",
+                                          "DefaultSettings.YResolution", "DefaultSettings.VRefresh",
+                                          "DefaultSettings.Interlaced", "DefaultSettings.Flags", "VgaCompatible" };
+    static const DWORD values[] = { 16, 1024, 768, 60, 0, 0, 0 };
+    char sys[MAX_PATH], fb[MAX_PATH], cmd[3 * MAX_PATH], dst[MAX_PATH];
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    HKEY h;
+    LONG rc;
+    int i;
+
+    if (GetFileAttributesA(DIR "USOSVBE.SYS") == 0xFFFFFFFF) {
+        say("vesa off: no USOSVBE.SYS, VGA stays\r\n");
+        return;
+    }
+    if (!GetSystemDirectoryA(sys, sizeof sys))
+        lstrcpyA(sys, "C:\\WINNT\\system32");
+    lstrcpyA(fb, sys);
+    lstrcatA(fb, "\\framebuf.dll");
+    if (GetFileAttributesA(fb) == 0xFFFFFFFF && GetFileAttributesA(DIR "FRAMEBUF.DL_") != 0xFFFFFFFF) {
+        lstrcpyA(cmd, sys);
+        lstrcatA(cmd, "\\expand.exe " DIR "FRAMEBUF.DL_ ");
+        lstrcatA(cmd, fb);
+        say("run ");
+        say(cmd);
+        say("\r\n");
+        for (i = 0; i < (int)sizeof si; i++)   /* volatile: no memset (no C runtime) */
+            ((volatile char *)&si)[i] = 0;
+        si.cb = sizeof si;
+        if (CreateProcessA(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+            WaitForSingleObject(pi.hProcess, 60000);
+            CloseHandle(pi.hThread);
+            CloseHandle(pi.hProcess);
+        } else {
+            say_hex("CreateProcess failed, error ", GetLastError());
+        }
+    }
+    if (GetFileAttributesA(fb) == 0xFFFFFFFF) {
+        say("vesa off: no framebuf.dll, VGA stays\r\n");
+        return;
+    }
+    lstrcpyA(dst, sys);
+    lstrcatA(dst, "\\drivers\\usosvbe.sys");
+    if (!CopyFileA(DIR "USOSVBE.SYS", dst, FALSE)) {
+        say("vesa off: COPY FAILED ");
+        say(dst);
+        say("\r\n");
+        return;
+    }
+    say("copied ");
+    say(dst);
+    say("\r\n");
+    set_dword("usosvbe", NULL, "Type", 1);
+    set_dword("usosvbe", NULL, "Start", 1);
+    set_dword("usosvbe", NULL, "ErrorControl", 0);
+    set_sz("usosvbe", "Group", REG_SZ, "Video");
+    rc = open_service_key("usosvbe", "Device0", &h);
+    if (rc == ERROR_SUCCESS) {
+        rc = RegSetValueExW(h, L"InstalledDisplayDrivers", 0, REG_MULTI_SZ, (const BYTE *)drivers, sizeof drivers);
+        RegCloseKey(h);
+    }
+    say(rc == ERROR_SUCCESS ? "usosvbe\\Device0 InstalledDisplayDrivers = framebuf\r\n"
+                            : "usosvbe\\Device0 InstalledDisplayDrivers FAILED\r\n");
+    for (i = 0; i < (int)(sizeof values / sizeof values[0]); i++)
+        set_dword("usosvbe", "Device0", dwords[i], values[i]);
+    /* NT 3.51 also has VgaStart (Group "Video Init", loads before "Video"):
+       it would be \Device\Video0 and win (QEMU 2026-10-14: 640x480 with
+       usosvbe registered). Off, as in the NT 4.0 VESA.REG. */
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, SVC_KEY "VgaStart", 0, KEY_READ, &h) == ERROR_SUCCESS) {
+        RegCloseKey(h);
+        set_dword("VgaStart", NULL, "Start", 4);
+    }
+    say("vesa on\r\n");
 }
 
 static void WINAPI handler(DWORD control)

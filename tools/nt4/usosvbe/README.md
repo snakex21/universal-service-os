@@ -16,6 +16,22 @@ framebuf.dll. `usosvbe.dll` is WIP and not shipped (see the blocker below).
 Wiring: `tools/nt4_csmwrap_target.sh` (VESA.REG, POST.CMD),
 `docs/nt4-2026-10-07.md`.
 
+**NT 3.5 / 3.51 flow (2026-10-14): the same miniport, NT 3.x build**
+(`build-nt3.cmd` -> `bin\nt3\i386\usosvbe.sys`, PE 3.10, `-DUSOSVBE_NT3`),
+again with the CD's own `framebuf.dll` (text-mode Setup of NT 3.5/3.51
+installs it with the VGA display, `[files.video]`). `usosnt3.exe` registers
+it at the first start of the install VM; see `docs/nt3-vesa-2026-10-14.md`.
+NT 3.x differences: `VIDEO_HW_INITIALIZATION_DATA` size 0x20, config info
+length >= 0x38, no `PsGetCurrentProcessId`, `VdmPhysicalVideoMemory*` = the
+VGA window (NT 3.x `VideoPortInt10` maps it on its first call), after the
+first good int 10h call a call is skipped unless C0000h is valid in the
+current process (NT 3.x `VideoPortInt10` checksums the video ROM there
+first), no 15 bpp modes (NT 3.x framebuf.dll would pick 5:5:5 for 16 bpp),
+no per-IOCTL `UsosVbeTrace`, and with `BASEVIDEO` in `SystemStartOptions` the
+driver does not start (`[VGA mode]` stays VGA). Status string:
+`usosvbe 1.1-nt3 ...`. QEMU: NT 3.51 and 3.5 logon/desktop at 1024x768x16.
+The NT 4.0 binary in `bin\i386` is unchanged (not rebuilt).
+
 ## How it works
 
 * `usosvbe.sys` claims no hardware. Everything goes through NT 4.0's

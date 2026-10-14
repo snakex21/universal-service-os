@@ -602,7 +602,7 @@ class Nt3AnswerProfile(unittest.TestCase):
                              'lstrcpyA'},
             'advapi32.dll': {'AdjustTokenPrivileges', 'InitiateSystemShutdownA', 'LookupAccountNameA',
                              'LookupPrivilegeValueA', 'OpenProcessToken', 'RegCloseKey', 'RegCreateKeyExA', 'RegDeleteKeyA',
-                             'RegLoadKeyA', 'RegOpenKeyExA', 'RegSaveKeyA', 'RegQueryValueExA', 'RegSetValueExA', 'RegUnLoadKeyA',
+                             'RegLoadKeyA', 'RegOpenKeyExA', 'RegSaveKeyA', 'RegQueryValueExA', 'RegSetValueExA', 'RegSetValueExW', 'RegUnLoadKeyA',
                              'RegisterServiceCtrlHandlerA', 'SetServiceStatus', 'StartServiceCtrlDispatcherA'},
         }
         _, imports = pe(ROOT / 'tools/nt3/usosnt3/bin/i386/usosnt3.exe')
