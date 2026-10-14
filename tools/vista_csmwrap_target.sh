@@ -153,7 +153,23 @@ else
     wimlib-imagex extract "$wim" "$boot_index" /Windows/Boot/PCAT/bootmgr --dest-dir="$work/pcat" --no-acls >/dev/null || fail 'cannot take bootmgr from the PE10 donor'
 fi
 cp "$work/pcat/bootmgr" "$work/staging/bootmgr" && cmp -s "$work/pcat/bootmgr" "$work/staging/bootmgr" || fail 'bootmgr copy failed'
-cp "$bcd" "$work/staging/boot/bcd" && cmp -s "$bcd" "$work/staging/boot/bcd" || fail 'BCD copy failed'
+# NVMe target, 32-bit WinPE: truncatememory 0x100000000 in the staging BCD's
+# default entry now, so the WinPE starts below 4 GiB from its first boot and
+# does not depend on seeing the disk to set it (X470 2026-10-14: no disk in
+# the WinPE, so `usos-x86-csmwrap.exe lowmem` could not reach the BCD). The
+# WinPE-side lowmem stays as the fallback (it finds the limit set). Edited
+# on a copy; any refusal leaves the donor's BCD as it is.
+cp "$bcd" "$work/bcd" || fail 'BCD copy failed'
+case "$TARGET_DEVICE" in /dev/nvme*)
+    if [ "$X86_SELF" = 1 ]; then
+        if command -v usos-fb-ui >/dev/null 2>&1; then
+            usos-fb-ui --bcd-truncatememory "$work/bcd" | while IFS= read -r line; do log "$line"; done
+        else
+            log 'BCD_LOWMEM usos-fb-ui missing; the WinPE lowmem step sets the limit'
+        fi
+    fi ;;
+esac
+cp "$work/bcd" "$work/staging/boot/bcd" && cmp -s "$work/bcd" "$work/staging/boot/bcd" || fail 'BCD copy failed'
 cp "$sdi" "$work/staging/boot/boot.sdi" && cmp -s "$sdi" "$work/staging/boot/boot.sdi" || fail 'boot.sdi copy failed'
 log "PE10 boot files PASS boot_index=$boot_index"
 wimlib-imagex export "$wim" "$boot_index" "$work/staging/sources/boot.wim" --boot >/dev/null || fail 'cannot copy the PE10 Setup image'

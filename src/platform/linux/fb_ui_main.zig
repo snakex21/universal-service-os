@@ -23,6 +23,10 @@ pub fn main(init: std.process.Init) !u8 {
             const log_path = args.next() orelse return 2;
             return @import("driver_stage.zig").run(source, destination, image, log_path);
         }
+        // tools/vista_csmwrap_target.sh: truncatememory in a staging BCD (no UI).
+        if (std.mem.eql(u8, arg, "--bcd-truncatememory")) {
+            return @import("bcd_lowmem.zig").run(args.next() orelse return 2);
+        }
     }
 
     // Take ownership of the visible fbdev surface first. As soon as mmap is

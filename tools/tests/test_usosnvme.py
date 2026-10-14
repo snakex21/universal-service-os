@@ -45,14 +45,15 @@ class Imports(unittest.TestCase):
         self.check('NT31', 'nt31_exports.txt', (('ntoskrnl.exe', 'hal.dll'), ('ntkrnlmp.exe', 'hal.dll')))
 
     def test_nt6_x86(self):
-        # Windows Vista / Server 2008 (and 7) x86 run the 2KXP build
-        # (docs/nvme-nt6-2026-10-12.md): Server 2008 SP2 x86 kernels, HALs
-        # and its SCSIPORT.
-        self.check('2KXP', 'nt60sp2_x86_exports.txt', (('ntoskrnl.exe', 'halmacpi.dll'), ('ntkrnlpa.exe', 'halacpi.dll')))
+        # Windows Vista / Server 2008 / 7 x86 and the Win10 x86 WinPE run the
+        # NT6 build (src/2KXP + USOSNVME_NT6, docs/nvme-nt6-2026-10-12.md
+        # section 16): Server 2008 SP2 x86 kernels, HALs and its SCSIPORT.
+        for v in ('2KXP', 'NT6'):
+            self.check(v, 'nt60sp2_x86_exports.txt', (('ntoskrnl.exe', 'halmacpi.dll'), ('ntkrnlpa.exe', 'halacpi.dll')))
 
     def test_no_crt(self):
         # NT 3.1 exports neither memset nor memcpy; no build may import them.
-        for v in ('2KXP', 'NT4', 'NT351', 'NT31'):
+        for v in ('2KXP', 'NT6', 'NT4', 'NT351', 'NT31'):
             names = {n for _, n in imports(v)}
             self.assertFalse(names & {'memset', 'memcpy', 'memmove'}, v)
             self.assertLessEqual({m.lower() for m, _ in imports(v)}, {'ntoskrnl.exe', 'scsiport.sys'}, v)
@@ -75,6 +76,26 @@ class Source(unittest.TestCase):
         # the class code the driver and the setup integration match
         self.assertIn('Cfg->BaseClass == 0x01 && Cfg->SubClass == 0x08 && Cfg->ProgIf == 0x02', SRC)
         self.assertIn('PCI\CC_010802', (DRV / 'usosnvme.inf').read_text(encoding='latin-1'))
+
+    def test_nt6_no_interrupt(self):
+        # NT6 build: no HwInterrupt (ScsiPort connects nothing; the X470
+        # Win10 x86 WinPE gave the stornvme.inf MSI-X resource and the 2KXP
+        # build's start failed, Problem 10 / 0xC000000D), no forced
+        # LevelSensitive, MSI / MSI-X masked at the function. 2KXP, NT4,
+        # NT3 and 9x keep the stub HwInterrupt.
+        self.assertIn('#ifdef USOSNVME_NT6\n    init.HwInterrupt = NULL;', SRC)
+        self.assertIn('#else\n    init.HwInterrupt = NvmeInterrupt;\n#endif', SRC)
+        self.assertIn('#ifndef USOSNVME_NT6\n    ConfigInfo->InterruptMode = LevelSensitive;\n#endif', SRC)
+        mask = SRC[SRC.index('static VOID NvmeMaskMessages('):SRC.index('static BOOLEAN NvmeIsNvme(')]
+        for want in ('cfg[ptr] == 0x11 && !(ctl & 0x4000)', 'ctl |= 0x4000;', 'cfg[ptr] == 0x05 && (ctl & 0x0001)', 'guard < 48'):
+            self.assertIn(want, mask)
+        self.assertIn('#ifdef USOSNVME_NT6\n    NvmeMaskMessages(ext, bus, slot);\n#endif', SRC)
+        build = (DRV / 'build.cmd').read_text(encoding='latin-1')
+        self.assertIn('if /i "%VARIANT%"=="nt6"   set "DIR=2KXP" & set "OUT=NT6" & set "DEFS=-DUSOSNVME_NT6"', build)
+        sign = (ROOT / 'tools/build_usosnvme_nt6_signed.py').read_text(encoding='utf-8')
+        self.assertIn("'tools/nt/usosnvme/bin/NT6/i386/usosnvme.sys'", sign)
+        self.assertNotIn('bin/2KXP', sign)
+        self.assertNotEqual((DRV / 'bin/NT6/i386/usosnvme.sys').read_bytes(), (DRV / 'bin/2KXP/i386/usosnvme.sys').read_bytes())
 
 
 class Flow(unittest.TestCase):
@@ -287,6 +308,55 @@ class Nt6Flow(unittest.TestCase):
                      '{9dea862c-5cdd-4e70-acc1-f32b344d4795}\\\\Elements\\\\23000003', 'want = 0x100000000ULL',
                      'top <= 0x100000000ULL'):
             self.assertIn(want, src)
+
+    def test_lowmem_stops_on_missing_disk(self):
+        # lowmem exit 4 (no prepared disk in the WinPE): disk report, then stop
+        # before the Setup copy and "before" (X470 2026-10-14).
+        before = self.CMD[:self.CMD.index('usos-x86-csmwrap.exe" before')]
+        stop = 'if defined USOS_NVME_TARGET if "%USOS_LOWMEM%"=="4" exit /b 1'
+        self.assertIn(stop, before)
+        self.assertLess(before.index('call :nvme_lowmem'), before.index(stop))
+        self.assertLess(before.index(stop), before.index('call :nvme_setup'))
+
+    def test_prepare_time_truncatememory(self):
+        # micro-Linux writes truncatememory into the staging BCD for an NVMe
+        # target of the 32-bit WinPE (usos-fb-ui --bcd-truncatememory,
+        # src/platform/linux/bcd_lowmem.zig) on a copy, before it is copied.
+        target = (ROOT / 'tools/vista_csmwrap_target.sh').read_text(encoding='utf-8')
+        edit = 'usos-fb-ui --bcd-truncatememory "$work/bcd"'
+        self.assertIn(edit, target)
+        self.assertLess(target.index('cp "$bcd" "$work/bcd"'), target.index(edit))
+        self.assertLess(target.index(edit), target.index('cp "$work/bcd" "$work/staging/boot/bcd" && cmp -s "$work/bcd" "$work/staging/boot/bcd"'))
+        block = target[target.index('cp "$bcd" "$work/bcd"'):target.index(edit)]
+        self.assertIn('case "$TARGET_DEVICE" in /dev/nvme*)', block)
+        self.assertIn('if [ "$X86_SELF" = 1 ]; then', block)
+        main = (ROOT / 'src/platform/linux/fb_ui_main.zig').read_text(encoding='utf-8')
+        self.assertIn('"--bcd-truncatememory"', main)
+        self.assertIn('@import("bcd_lowmem.zig").run(', main)
+        zig = (ROOT / 'src/platform/linux/bcd_lowmem.zig').read_text(encoding='utf-8')
+        for want in ('pub const limit: u64 = 0x100000000;', 'element_name = "15000007"', 'return error.Dirty;',
+                     '"{9dea862c-5cdd-4e70-acc1-f32b344d4795}"', 'default_element = "23000003"'):
+            self.assertIn(want, zig)
+        self.assertIn('_ = @import("bcd_lowmem.zig");', (ROOT / 'src/platform/linux/fb_ui_tests.zig').read_text(encoding='utf-8'))
+
+    def test_disk_report_interrupts(self):
+        report = self.CMD[self.CMD.index('\n:disk_report\n'):]
+        report = report[:report.index('exit /b 0')]
+        self.assertIn('call :nvme_pe_id', report)
+        self.assertIn(r'reg query "HKLM\SYSTEM\CurrentControlSet\Enum\%USOS_NVME_ID%\Device Parameters\Interrupt Management" /s', report)
+        self.assertIn(r'reg query "HKLM\HARDWARE\RESOURCEMAP\PnP Manager" /s', report)
+        pid = self.CMD[self.CMD.index('\n:nvme_pe_id\n'):]
+        self.assertIn(r'reg query "HKLM\SYSTEM\CurrentControlSet\Services\stornvme\Enum" /v 0', pid[:pid.index('exit /b 0')])
+
+    def test_pe_msi_fallback(self):
+        # Controller start failed in the WinPE: MSI off for that device
+        # instance (RAM WinPE only) and one device restart.
+        pe = self.CMD[self.CMD.index('\n:nvme_pe_driver\n'):self.CMD.index('\n:nvme_pe_id\n')]
+        problem = 'pnputil.exe" /enum-devices /problem | find /i "%USOS_NVME_ID%" >nul || goto nvme_pe_driver_done'
+        msi = r'\Device Parameters\Interrupt Management\MessageSignaledInterruptProperties" /v MSISupported /t REG_DWORD /d 0 /f'
+        self.assertIn(problem, pe)
+        self.assertLess(pe.index(problem), pe.index(msi))
+        self.assertLess(pe.index(msi), pe.index('/restart-device "%USOS_NVME_ID%"'))
 
     def test_packed(self):
         build = (ROOT / 'tools/build_windows_native_support.py').read_text(encoding='utf-8')

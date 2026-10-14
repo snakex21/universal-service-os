@@ -134,7 +134,9 @@ fn row(system: *const usos.catalog.SystemEntry, image: *const usos.catalog.Image
     };
     const hint = folderHint(system, image.*);
     if (hint != .none) result.detail = view.format(detail, .server_belongs_in, &.{suggestedFolder(image.*)});
-    if (arch) |text| result.badge = .{ .text = text, .tone = if (hint != .none) .warning else if (info.content == .setup) .success else .accent };
+    // a solid chip per architecture (x86 and x64 in their own colours,
+    // src/gui/arch_badge.zig); the folder hint is in the detail line
+    if (usos.gui.arch_badge.badge(info.arch)) |chip| result.badge = chip;
     if (info.content == .winpe and arch == null) result.badge = .{ .text = view.t(.media_winpe_badge), .tone = .accent };
     return result;
 }
