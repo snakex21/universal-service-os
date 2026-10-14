@@ -24,6 +24,12 @@ rem   3c. Vista / Server 2008 SP2 x86 (NT 6.0.6002) only: usosusb.sys (own
 rem      xHCI keyboard / mouse port driver, tools/nt4/usosusb build-nt6)
 rem      copied to system32\drivers and registered offline as a system-start
 rem      "Keyboard Port" service; never fatal (design doc section 12.6);
+rem   3e. Windows 7 / 8.x / 10 before 1703 x86 (NT 6.1 to 10.0.14393):
+rem      usosmpart.sys (own GPL USB multi-partition disk filter,
+rem      tools/nt/usosmpart) copied to system32\drivers and registered offline
+rem      as a boot-start disk class lower filter, so every partition of a USB
+rem      stick gets a letter (Windows before 10 1703 mounts only the first
+rem      one of removable media); never fatal (:mpart);
 rem   0. NVMe target (target_bus=nvme in usos-csmwrap-target.ini), Setup 6.0 /
 rem      6.1: Setup runs from a copy of the media's sources folder whose
 rem      hwcompat.txt lists PCI\CC_010802 (:nvme_setup);
@@ -69,6 +75,7 @@ call :usb3
 call :nt60_gate
 call :nt60_usb
 call :nvme
+call :mpart
 echo [USOS] phase=finalize-target-boot
 "%~dp0usos-x86-csmwrap.exe" stick
 "%~dp0usos-x86-csmwrap.exe" after
@@ -418,4 +425,65 @@ echo [USOS] NVMe: Microsoft packages installed=%USOS_NVME_OK% of 2
 if "%USOS_NVME_OK%"=="2" set "USOS_NVME_MSU=ok"
 if exist "%USOS_WORKDIR%\scratch" rd /s /q "%USOS_WORKDIR%\scratch"
 if exist "%USOS_WORKDIR%\cab" rd /s /q "%USOS_WORKDIR%\cab"
+exit /b 0
+
+rem ---- Windows 7 / 8.x / 10 before 1703 x86: every USB stick partition ------
+rem Windows before 10 1703 mounts only the first partition of a disk that
+rem reports removable media (most sticks; the USOS stick shows only its ESP).
+rem usosmpart.sys (own GPL disk class lower filter, tools/nt/usosmpart)
+rem attaches only to USBSTOR disks and lets a stick with more than one
+rem partition start like a USB hard disk; hot plug, safe removal and the
+rem quick-removal write policy stay (tools/nt/usosmpart/README.md). Offline,
+rem with this WinPE's reg.exe: the file into system32\drivers, a boot-start
+rem service (group "Filter") and usosmpart appended to the disk class
+rem LowerFilters (Windows 7+ already lists EhStorClass there). Vista / 2008
+rem x86 (NT 6.0) are skipped: usosusb owns their xHCI and mounts every
+rem partition itself. 32-bit Windows does not enforce kernel signatures.
+:mpart
+set "USOS_T="
+set "USOS_NT="
+set "USOS_BUILD="
+"%~dp0usos-x86-csmwrap.exe" target "%TEMP%\usos-target.txt" >nul
+if errorlevel 1 exit /b 0
+for /f "usebackq tokens=1,2,3" %%A in ("%TEMP%\usos-target.txt") do (set "USOS_T=%%A" & set "USOS_NT=%%B" & set "USOS_BUILD=%%C")
+if not "%USOS_NT%"=="6.1" if not "%USOS_NT%"=="6.2" if not "%USOS_NT%"=="6.3" if not "%USOS_NT%"=="10.0" exit /b 0
+if "%USOS_NT%"=="10.0" if "%USOS_BUILD%"=="" exit /b 0
+if "%USOS_NT%"=="10.0" if %USOS_BUILD% GEQ 15063 (echo [USOS] usosmpart: Windows 10 build %USOS_BUILD% mounts every USB stick partition itself; skipped. & exit /b 0)
+echo [USOS] phase=mpart nt=%USOS_NT% build=%USOS_BUILD%
+if not exist "%~dp0usosmpart-x86.sys" (echo [USOS] usosmpart: driver missing; skipped. & exit /b 0)
+copy /y "%~dp0usosmpart-x86.sys" "%USOS_T%\Windows\System32\drivers\usosmpart.sys" >nul
+if errorlevel 1 (echo [USOS] usosmpart: copy failed; skipped. & exit /b 0)
+fc /b "%~dp0usosmpart-x86.sys" "%USOS_T%\Windows\System32\drivers\usosmpart.sys" >nul
+if errorlevel 1 (echo [USOS] usosmpart: readback mismatch; not registered. & del "%USOS_T%\Windows\System32\drivers\usosmpart.sys" & exit /b 0)
+reg load HKLM\USOS_SYS "%USOS_T%\Windows\System32\config\SYSTEM" >nul
+if errorlevel 1 (echo [USOS] usosmpart: SYSTEM hive not loaded; skipped. & exit /b 0)
+set "USOS_CS="
+for /f "tokens=3" %%A in ('reg query "HKLM\USOS_SYS\Select" /v Current ^| find /i "Current"') do set /a "USOS_CS=%%A"
+if not defined USOS_CS set "USOS_CS=1"
+set "USOS_SVC=HKLM\USOS_SYS\ControlSet00%USOS_CS%\Services\usosmpart"
+set "USOS_CLS=HKLM\USOS_SYS\ControlSet00%USOS_CS%\Control\Class\{4D36E967-E325-11CE-BFC1-08002BE10318}"
+call :mpart_reg
+reg unload HKLM\USOS_SYS >nul
+"%~dp0usos-log-x86.exe"
+exit /b 0
+
+rem The registry rows of :mpart (USOS_SVC, USOS_CLS set by the caller; also
+rem usable on a running system with HKLM\SYSTEM\CurrentControlSet paths).
+:mpart_reg
+reg add "%USOS_SVC%" /v Type /t REG_DWORD /d 1 /f >nul
+reg add "%USOS_SVC%" /v Start /t REG_DWORD /d 0 /f >nul
+reg add "%USOS_SVC%" /v ErrorControl /t REG_DWORD /d 1 /f >nul
+reg add "%USOS_SVC%" /v Group /t REG_SZ /d "Filter" /f >nul
+reg add "%USOS_SVC%" /v ImagePath /t REG_EXPAND_SZ /d "system32\drivers\usosmpart.sys" /f >nul
+reg add "%USOS_SVC%" /v DisplayName /t REG_SZ /d "USOS USB multi-partition disk filter" /f >nul
+set "USOS_LF="
+for /f "tokens=2,*" %%A in ('reg query "%USOS_CLS%" /v LowerFilters 2^>nul ^| find /i "LowerFilters"') do set "USOS_LF=%%B"
+echo [USOS] usosmpart: disk class LowerFilters before: "%USOS_LF%"
+echo "\0%USOS_LF%\0" | find /i "\0usosmpart\0" >nul
+if not errorlevel 1 goto mpart_listed
+if defined USOS_LF (reg add "%USOS_CLS%" /v LowerFilters /t REG_MULTI_SZ /d "%USOS_LF%\0usosmpart" /f >nul) else (reg add "%USOS_CLS%" /v LowerFilters /t REG_MULTI_SZ /d "usosmpart" /f >nul)
+:mpart_listed
+set "USOS_LF="
+for /f "tokens=2,*" %%A in ('reg query "%USOS_CLS%" /v LowerFilters 2^>nul ^| find /i "LowerFilters"') do set "USOS_LF=%%B"
+echo [USOS] usosmpart: service registered, disk class LowerFilters now: "%USOS_LF%"
 exit /b 0
