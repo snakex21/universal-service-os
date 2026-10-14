@@ -170,29 +170,26 @@ class Nt6Flow(unittest.TestCase):
         self.assertLess(gate.index('case "$TARGET_DEVICE" in /dev/nvme*)'), gate.index('usos_xp_confirm '))
         self.assertIn('[ "$nvme_lbs" = 512 ] || stop', gate)
         self.assertIn('[ "$x86_self" = 1 ] || stop "No NVMe driver for 64-bit', gate)
-        # X470 2026-10-13: stornvme in the x86 PE10 under CSMWrap enumerated
-        # the Micron but failed every size / layout IOCTL (433), then the
-        # controller dropped off PCI. Every 32-bit NT6 flow on this path stops
-        # on NVMe, with no nvme-experimental.txt override
-        # (docs/nvme-nt6-2026-10-12.md section 12).
+        # X470 2026-10-13: Microsoft's stornvme under CSMWrap failed every
+        # size / layout IOCTL (433) on the Micron, so 8.1 / 10 x86 (stornvme
+        # in Setup itself) stop on NVMe (docs/nvme-nt6-2026-10-12.md
+        # section 12). Windows 7 / Vista / Server 2008 x86 run usosnvme in
+        # the PE image and the installed system (USOS_PE_NVME); X470 PASS
+        # 2026-10-14 for 7 SP1 x86 and Vista SP2 x86 (B261014-195920), so no
+        # nvme-experimental.txt any more (section 17).
         nv = gate[gate.index('case "$TARGET_DEVICE" in /dev/nvme*)'):gate.index('usos_xp_confirm ')]
         self.assertIn('case "$profile" in\n'
                       '                win-nt6-x86-uefi-csmwrap)\n', nv)
-        self.assertIn("stop '32-bit Windows 7/Vista/2008 on NVMe is not supported yet on this path. No disk was changed.'\n"
-                      "                    fi ;;", nv)
-        # Exception (section 15): Windows 7 / Vista / Server 2008 x86 with
-        # their own DATA Systems/Windows/<folder>/Unattended/nvme-experimental.txt:
-        # usosnvme replaces stornvme in the PE image (USOS_PE_NVME).
         nt6 = nv[nv.index('win-nt6-x86-uefi-csmwrap)'):nv.index('win-x86-uefi-csmwrap)')]
-        self.assertIn('if [ -f "/mnt/data/Systems/Windows/$folder/Unattended/nvme-experimental.txt" ]; then', nt6)
-        self.assertLess(nt6.index('nvme-experimental.txt'), nt6.index('pe_nvme=usosnvme'))
-        self.assertLess(nt6.index('pe_nvme=usosnvme'), nt6.index('else'))
-        self.assertLess(nt6.index('else'), nt6.index("stop '32-bit Windows 7/Vista/2008"))
+        self.assertIn('                    pe_nvme=usosnvme ;;\n', nt6)
+        self.assertNotIn('stop', nt6)
+        self.assertNotIn('nvme-experimental.txt', nt6)
+        self.assertNotIn('Unattended/nvme-experimental.txt', prep)
+        self.assertNotIn('32-bit Windows 7/Vista/2008', prep)
         self.assertLess(prep.index("pe_nvme=''"), prep.index('        usos_xp_choose_disk\n'))
         self.assertIn('X86_SELF=$x86_self USOS_PE_NVME=$pe_nvme', prep)
         self.assertIn("                win-x86-uefi-csmwrap)\n", nv)
         self.assertIn("stop '32-bit Windows 8.1/10 on NVMe is not supported yet on this path. No disk was changed.' ;;", nv)
-        self.assertEqual(prep.count('Unattended/nvme-experimental.txt'), 1)
         self.assertNotIn("'win-nt6-x86-uefi-csmwrap:Windows 7'", prep)
         # Both stops come before the 512-byte check (dormant until reopened).
         self.assertLess(nv.index("32-bit Windows 8.1/10 on NVMe"), nv.index('[ "$nvme_lbs" = 512 ] || stop'))
@@ -200,8 +197,7 @@ class Nt6Flow(unittest.TestCase):
         en = json.loads((ROOT / 'installer/internal/i18n/locales/en.json').read_text(encoding='utf-8'))
         tmpl = en['boot.lx.nvme_x86_csmwrap_not_supported']
         self.assertEqual(tmpl, '32-bit {0} on NVMe is not supported yet on this path. No disk was changed.')
-        for system in ('Windows 7/Vista/2008', 'Windows 8.1/10'):
-            self.assertIn(tmpl.replace('{0}', system), nv)
+        self.assertIn(tmpl.replace('{0}', 'Windows 8.1/10'), nv)
         for loc in (ROOT / 'installer/internal/i18n/locales').glob('*.json'):
             self.assertIn('{0}', json.loads(loc.read_text(encoding='utf-8'))['boot.lx.nvme_x86_csmwrap_not_supported'], loc.name)
         self.assertIn(tmpl, (ROOT / 'src/i18n/linux_strings.zig').read_text(encoding='utf-8'))
