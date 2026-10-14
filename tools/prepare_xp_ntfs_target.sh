@@ -100,6 +100,10 @@ else
 sh "$SCRIPT_DIR/nt52_usb_stage.sh" apply || fail 'NT 5.2 USB (xhci98) integration failed'
 fi ;;
 esac
+# Every NT 5 system: every partition of a USB stick gets a letter (own disk
+# class lower filter usosmpart.sys, nt5_usosmpart_stage.sh); after the
+# storage and USB steps, which edit the same TXTSETUP.SIF / HIVESYS.INF.
+sh "$SCRIPT_DIR/nt5_usosmpart_stage.sh" apply || fail 'USB multi-partition filter integration failed'
 XP_EXPECTED_MBR="$work/expected" sh "$SCRIPT_DIR/prepare_xp_windows_partition.sh"
 if [ "${USOS_PLAN_PROFILE:-}" = xp-x86-sp3-uefi-csm ]; then
 mkdir -p "$work/volume/USOS/XP"

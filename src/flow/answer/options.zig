@@ -78,17 +78,20 @@ pub fn targetFor(system_id: []const u8) ?Target {
     return osOfFamily(family);
 }
 
-pub const Group = enum { explorer, taskbar, system, updates, accounts };
+pub const Group = enum { explorer, taskbar, system, updates, apps, accounts };
 
 /// Every option of the table. Options with a `legacy` field keep their
 /// value in that existing Profile field (the tweaks of 2026-09-28); the
-/// others in Profile.opts.
+/// others in Profile.opts. The order is the table's (editor) order.
 pub const Opt = enum {
     show_extensions,
     show_hidden,
     show_protected,
     launch_to_pc,
     end_task,
+    classic_context_menu,
+    shortcut_suffix_off,
+    desktop_icons,
     no_autorun,
     no_tips,
     taskbar_search,
@@ -96,15 +99,40 @@ pub const Opt = enum {
     task_view_off,
     widgets_off,
     bing_search_off,
+    classic_taskbar,
+    all_tray_icons,
+    boot_to_desktop,
+    lock_screen_off,
     uac_level,
     disable_uac,
+    visual_effects,
+    font_smoothing,
+    mouse_accel_off,
+    sticky_keys_off,
     hibernation,
     no_hibernation,
+    power_profile,
+    no_sleep,
     system_restore_off,
     numlock,
+    last_access_off,
+    long_paths,
+    search_index_off,
+    remote_desktop,
+    firewall_off,
+    server_nags_off,
+    ie_esc_off,
     windows_update,
     privacy,
     disable_wer,
+    security_center_off,
+    defender_off,
+    smartscreen_off,
+    device_encryption_off,
+    remove_apps,
+    first_run_off,
+    onedrive_off,
+    user_script,
     autologon,
     password_never_expires,
 };
@@ -139,6 +167,9 @@ pub const table = [_]Option{
     .{ .opt = .show_protected, .group = .explorer },
     .{ .opt = .launch_to_pc, .group = .explorer },
     .{ .opt = .end_task, .group = .explorer },
+    .{ .opt = .classic_context_menu, .group = .explorer },
+    .{ .opt = .shortcut_suffix_off, .group = .explorer },
+    .{ .opt = .desktop_icons, .group = .explorer },
     .{ .opt = .no_autorun, .group = .explorer, .legacy = true },
     .{ .opt = .no_tips, .group = .explorer },
     .{ .opt = .taskbar_search, .group = .taskbar, .values = &.{ "default", "hidden", "icon", "box" } },
@@ -146,15 +177,40 @@ pub const table = [_]Option{
     .{ .opt = .task_view_off, .group = .taskbar },
     .{ .opt = .widgets_off, .group = .taskbar },
     .{ .opt = .bing_search_off, .group = .taskbar },
+    .{ .opt = .classic_taskbar, .group = .taskbar },
+    .{ .opt = .all_tray_icons, .group = .taskbar },
+    .{ .opt = .boot_to_desktop, .group = .taskbar },
+    .{ .opt = .lock_screen_off, .group = .taskbar },
     .{ .opt = .uac_level, .group = .system, .values = &.{ "default", "no_dim", "never" } },
     .{ .opt = .disable_uac, .group = .system, .legacy = true },
+    .{ .opt = .visual_effects, .group = .system, .values = &.{ "default", "performance" } },
+    .{ .opt = .font_smoothing, .group = .system },
+    .{ .opt = .mouse_accel_off, .group = .system },
+    .{ .opt = .sticky_keys_off, .group = .system },
     .{ .opt = .hibernation, .group = .system, .values = &.{ "default", "no_fast_startup", "off" } },
     .{ .opt = .no_hibernation, .group = .system, .legacy = true },
+    .{ .opt = .power_profile, .group = .system, .values = &.{ "default", "high_performance", "balanced", "power_saver" } },
+    .{ .opt = .no_sleep, .group = .system },
     .{ .opt = .system_restore_off, .group = .system },
     .{ .opt = .numlock, .group = .system, .values = &.{ "default", "on", "off" } },
+    .{ .opt = .last_access_off, .group = .system },
+    .{ .opt = .long_paths, .group = .system },
+    .{ .opt = .search_index_off, .group = .system },
+    .{ .opt = .remote_desktop, .group = .system },
+    .{ .opt = .firewall_off, .group = .system },
+    .{ .opt = .server_nags_off, .group = .system },
+    .{ .opt = .ie_esc_off, .group = .system },
     .{ .opt = .windows_update, .group = .updates, .values = &.{ "default", "no_restart", "notify", "off" } },
     .{ .opt = .privacy, .group = .updates },
     .{ .opt = .disable_wer, .group = .updates, .legacy = true },
+    .{ .opt = .security_center_off, .group = .updates },
+    .{ .opt = .defender_off, .group = .updates },
+    .{ .opt = .smartscreen_off, .group = .updates },
+    .{ .opt = .device_encryption_off, .group = .updates },
+    .{ .opt = .remove_apps, .group = .apps, .values = &.{ "default", "games", "bloat" } },
+    .{ .opt = .first_run_off, .group = .apps },
+    .{ .opt = .onedrive_off, .group = .apps },
+    .{ .opt = .user_script, .group = .apps },
     .{ .opt = .autologon, .group = .accounts },
     .{ .opt = .password_never_expires, .group = .accounts },
 };
@@ -212,6 +268,8 @@ pub const Root = enum {
 pub const Data = union(enum) {
     dword: u32,
     sz: []const u8,
+    /// REG_BINARY as comma-separated hex bytes ("90,12,03,80").
+    binary: []const u8,
     /// The profile's first user / password (automatic logon).
     profile_user,
     profile_password,
@@ -258,6 +316,53 @@ const winlogon = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon";
 const keyboard = "Control Panel\\Keyboard";
 const cdm = "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager";
 
+const explorer_user = "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer";
+const desktop = "Control Panel\\Desktop";
+const metrics = "Control Panel\\Desktop\\WindowMetrics";
+const mouse = "Control Panel\\Mouse";
+const new_start_panel = explorer_user ++ "\\HideDesktopIcons\\NewStartPanel";
+const classic_start_menu = explorer_user ++ "\\HideDesktopIcons\\ClassicStartMenu";
+const visual_fx = explorer_user ++ "\\VisualEffects";
+const edge_ui = "Software\\Microsoft\\Windows\\CurrentVersion\\ImmersiveShell\\EdgeUi";
+const power_cfg = "Control Panel\\PowerCfg";
+const file_system = "SYSTEM\\CurrentControlSet\\Control\\FileSystem";
+const terminal_server = "SYSTEM\\CurrentControlSet\\Control\\Terminal Server";
+/// The XP SP2 / 2003 SP1 Windows Firewall's own (non-policy) settings.
+const firewall_xp = "SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy";
+const security_center = "SOFTWARE\\Microsoft\\Security Center";
+const run_once = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce";
+const active_setup = "SOFTWARE\\Microsoft\\Active Setup\\Installed Components";
+const reliability = "SOFTWARE\\Policies\\Microsoft\\Windows NT\\Reliability";
+
+/// Classic context menu (11): the per-user COM override that makes Explorer
+/// show the full menu. It lives in the user's Classes hive (not in the
+/// Default User NTUSER.DAT), so an Active Setup component writes it for
+/// every user at their first sign-in, before Explorer starts.
+pub const classic_menu_stub = "reg.exe add HKCU\\Software\\Classes\\CLSID\\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\\InprocServer32 /ve /f";
+
+/// User script hook: at the first sign-in, every drive with the DATA layout
+/// (a Systems folder) and Scripts\first-logon.reg / .cmd: the .reg is
+/// imported, then the .cmd is called. Nothing happens without the stick.
+const data_letters = "C D E F G H I J K L M N O P Q R S T U V W X Y Z";
+pub const user_script_reg = "cmd.exe /c for %d in (" ++ data_letters ++ ") do @if exist %d:\\Systems\\nul if exist %d:\\Scripts\\first-logon.reg regedit.exe /s %d:\\Scripts\\first-logon.reg";
+pub const user_script_cmd = "cmd.exe /c for %d in (" ++ data_letters ++ ") do @if exist %d:\\Systems\\nul if exist %d:\\Scripts\\first-logon.cmd call %d:\\Scripts\\first-logon.cmd";
+
+/// Provisioned Store apps removed in specialize (8+: the Appx cmdlets of the
+/// DISM PowerShell module), matched on the package name. The vocabulary is
+/// USOS's own (docs/answer-profiles.md "Options"); Store, Calculator,
+/// Photos, Camera, Clock, Notepad, Paint, Snipping Tool, Terminal and the
+/// frameworks stay.
+fn appx(comptime pattern: []const u8) Action {
+    return .{ .command = "powershell.exe -NoP -NonI -C \"Get-AppxProvisionedPackage -Online|?{$_.DisplayName -match '" ++ pattern ++ "'}|Remove-AppxProvisionedPackage -Online\"" };
+}
+pub const appx_games = "Xbox|GamingApp|Solitaire";
+pub const appx_bloat = [_][]const u8{
+    "Bing|Zune|Getstarted|OfficeHub|MixedReality|3DViewer|Print3D|MSPaint$|\\.People$|WindowsMaps|SkypeApp",
+    "Messaging|Clipchamp|FeedbackHub|GetHelp|Wallet|YourPhone|PowerAutomate|Todos|Family|549981C3F5F10|Copilot",
+    "communicationsapps|Teams|OneNote|StickyNotes|SoundRecorder|QuickAssist|HelpAndTips|ReadingList|DevHome",
+    "OutlookForWindows",
+};
+
 fn reg(root: Root, key: []const u8, name: []const u8, data: Data) Action {
     return .{ .reg = .{ .root = root, .key = key, .name = name, .data = data } };
 }
@@ -268,6 +373,10 @@ fn dw(root: Root, key: []const u8, name: []const u8, value: u32) Action {
 
 const w9x_shell = set(&.{ .win98, .win_me });
 const w9x = set(&.{ .win95, .win98, .win_me });
+const xp2003 = set(&.{ .xp, .w2003 });
+const w9x_nt4 = w9x.unionWith(set(&.{.nt4}));
+const visual_basic = w9x_nt4.unionWith(set(&.{.w2000})).unionWith(nt6);
+const before_w11 = w9x_nt4.unionWith(nt5).unionWith(set(&.{ .vista, .w7, .w8, .w81, .w10 }));
 
 /// Rendering rules. A legacy option renders through its family renderer
 /// where it already did (NT5 tokens, 6.x commands); the rules here add the
@@ -351,6 +460,143 @@ pub const rules = [_]Rule{
     .{ .opt = .privacy, .os = w10up, .action = dw(.user, cdm, "SubscribedContent-338388Enabled", 0) },
     .{ .opt = .privacy, .os = w10up, .action = dw(.user, cdm, "SubscribedContent-338389Enabled", 0) },
     .{ .opt = .privacy, .os = w10up, .action = dw(.user, cdm, "SubscribedContent-353698Enabled", 0) },
+    // Stage 2 (2026-10-14): packs for every family ------------------------
+    // Explorer
+    .{ .opt = .classic_context_menu, .os = set(&.{.w11}), .action = reg(.hklm, active_setup ++ "\\USOS-ClassicContextMenu", "StubPath", .{ .sz = classic_menu_stub }) },
+    .{ .opt = .classic_context_menu, .os = set(&.{.w11}), .action = reg(.hklm, active_setup ++ "\\USOS-ClassicContextMenu", "Version", .{ .sz = "1" }) },
+    .{ .opt = .classic_context_menu, .os = set(&.{.w11}), .action = dw(.hklm, active_setup ++ "\\USOS-ClassicContextMenu", "IsInstalled", 1) },
+    // "Shortcut to" (9x, NT 4.0, 2000) / "- Shortcut" (XP..10) naming.
+    .{ .opt = .shortcut_suffix_off, .os = before_w11, .action = reg(.user, explorer_user, "link", .{ .binary = "00,00,00,00" }) },
+    // Desktop icons: XP / 2003 My Computer, My Documents, My Network Places
+    // (both Start menu styles); Vista+ Computer, the user's files, Network,
+    // Control Panel.
+    .{ .opt = .desktop_icons, .os = xp2003, .action = dw(.user, new_start_panel, "{20D04FE0-3AEA-1069-A2D8-08002B30309D}", 0) },
+    .{ .opt = .desktop_icons, .os = xp2003, .action = dw(.user, new_start_panel, "{450D8FBA-AD25-11D0-98A8-0800361B1103}", 0) },
+    .{ .opt = .desktop_icons, .os = xp2003, .action = dw(.user, new_start_panel, "{208D2C60-3AEA-1069-A2D7-08002B30309D}", 0) },
+    .{ .opt = .desktop_icons, .os = xp2003, .action = dw(.user, classic_start_menu, "{20D04FE0-3AEA-1069-A2D8-08002B30309D}", 0) },
+    .{ .opt = .desktop_icons, .os = xp2003, .action = dw(.user, classic_start_menu, "{450D8FBA-AD25-11D0-98A8-0800361B1103}", 0) },
+    .{ .opt = .desktop_icons, .os = xp2003, .action = dw(.user, classic_start_menu, "{208D2C60-3AEA-1069-A2D7-08002B30309D}", 0) },
+    .{ .opt = .desktop_icons, .os = nt6, .action = dw(.user, new_start_panel, "{20D04FE0-3AEA-1069-A2D8-08002B30309D}", 0) },
+    .{ .opt = .desktop_icons, .os = nt6, .action = dw(.user, new_start_panel, "{59031a47-3f72-44a7-89c5-5595fe6b30ee}", 0) },
+    .{ .opt = .desktop_icons, .os = nt6, .action = dw(.user, new_start_panel, "{F02C1A0D-BE21-4350-88B0-7367FC96EF3C}", 0) },
+    .{ .opt = .desktop_icons, .os = nt6, .action = dw(.user, new_start_panel, "{5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0}", 0) },
+    // XP / 2003: the Tour prompt and the Desktop Cleanup Wizard.
+    .{ .opt = .no_tips, .os = xp2003, .action = dw(.user, "Software\\Microsoft\\Windows\\CurrentVersion\\Applets\\Tour", "RunCount", 0) },
+    .{ .opt = .no_tips, .os = xp2003, .action = dw(.user, explorer_user ++ "\\Desktop\\CleanupWiz", "NoRun", 1) },
+    // Taskbar
+    // XP..Vista "Group similar taskbar buttons" off; 7..10 small buttons,
+    // never combined; 11 (23H2+) never combined.
+    .{ .opt = .classic_taskbar, .os = set(&.{ .xp, .w2003, .vista }), .action = dw(.user, advanced, "TaskbarGlomming", 0) },
+    .{ .opt = .classic_taskbar, .os = set(&.{ .w7, .w8, .w81, .w10 }), .action = dw(.user, advanced, "TaskbarSmallIcons", 1) },
+    .{ .opt = .classic_taskbar, .os = set(&.{ .w7, .w8, .w81, .w10, .w11 }), .action = dw(.user, advanced, "TaskbarGlomLevel", 2) },
+    // 11 ignores EnableAutoTray.
+    .{ .opt = .all_tray_icons, .os = xp2003.unionWith(nt6).differenceWith(set(&.{.w11})), .action = dw(.user, explorer_user, "EnableAutoTray", 0) },
+    .{ .opt = .boot_to_desktop, .os = set(&.{.w81}), .action = dw(.user, explorer_user ++ "\\StartPage", "OpenAtLogon", 0) },
+    .{ .opt = .boot_to_desktop, .os = set(&.{ .w8, .w81 }), .action = dw(.user, edge_ui, "DisableTLCorner", 1) },
+    .{ .opt = .boot_to_desktop, .os = set(&.{ .w8, .w81 }), .action = dw(.user, edge_ui, "DisableCharmsHint", 1) },
+    .{ .opt = .lock_screen_off, .os = w8up, .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\Windows\\Personalization", "NoLockScreen", 1) },
+    // System
+    // Best performance: no minimize animation, outlines while dragging;
+    // 6.x+ also the effect bits (UserPreferencesMask) and the dialog's choice.
+    // Not XP / 2003: QEMU 2026-10-14 (XP MCE), the first logon's own visual
+    // settings replaced MinAnimate, DragFullWindows and the mask in the
+    // user's profile (the Default User hive kept them).
+    .{ .opt = .visual_effects, .os = visual_basic, .action = reg(.user, metrics, "MinAnimate", .{ .sz = "0" }) },
+    .{ .opt = .visual_effects, .os = visual_basic, .action = reg(.user, desktop, "DragFullWindows", .{ .sz = "0" }) },
+    .{ .opt = .visual_effects, .os = nt6, .action = reg(.user, desktop, "UserPreferencesMask", .{ .binary = "90,12,03,80,10,00,00,00" }) },
+    .{ .opt = .visual_effects, .os = nt6, .action = dw(.user, visual_fx, "VisualFXSetting", 2) },
+    .{ .opt = .visual_effects, .os = nt6, .action = dw(.user, advanced, "TaskbarAnimations", 0) },
+    .{ .opt = .visual_effects, .os = nt6, .action = dw(.user, advanced, "ListviewAlphaSelect", 0) },
+    .{ .opt = .visual_effects, .os = nt6, .action = dw(.user, advanced, "ListviewShadow", 0) },
+    .{ .opt = .visual_effects, .os = nt6, .action = dw(.user, "Software\\Microsoft\\Windows\\DWM", "EnableAeroPeek", 0) },
+    // Font smoothing (2000: standard; XP / 2003: ClearType); Vista+ have
+    // ClearType on by default.
+    .{ .opt = .font_smoothing, .os = nt5, .action = reg(.default, desktop, "FontSmoothing", .{ .sz = "2" }) },
+    .{ .opt = .font_smoothing, .os = nt5, .action = reg(.user, desktop, "FontSmoothing", .{ .sz = "2" }) },
+    .{ .opt = .font_smoothing, .os = xp2003, .action = dw(.default, desktop, "FontSmoothingType", 2) },
+    .{ .opt = .font_smoothing, .os = xp2003, .action = dw(.user, desktop, "FontSmoothingType", 2) },
+    .{ .opt = .mouse_accel_off, .os = w9x_nt4.unionWith(nt5up), .action = reg(.user, mouse, "MouseSpeed", .{ .sz = "0" }) },
+    .{ .opt = .mouse_accel_off, .os = w9x_nt4.unionWith(nt5up), .action = reg(.user, mouse, "MouseThreshold1", .{ .sz = "0" }) },
+    .{ .opt = .mouse_accel_off, .os = w9x_nt4.unionWith(nt5up), .action = reg(.user, mouse, "MouseThreshold2", .{ .sz = "0" }) },
+    // The Shift x5 shortcut off (Flags without the hot key and confirmation bits).
+    .{ .opt = .sticky_keys_off, .os = nt5up, .action = reg(.user, "Control Panel\\Accessibility\\StickyKeys", "Flags", .{ .sz = "506" }) },
+    .{ .opt = .hibernation, .value = 2, .os = xp2003, .action = .{ .command = "powercfg.exe /hibernate off" } },
+    // Power plan: 6.x+ the built-in plans by alias (machine-wide); XP / 2003
+    // the scheme of every new user and the logon screen (3 Always On,
+    // 0 Home/Office Desk, 5 Max Battery).
+    .{ .opt = .power_profile, .value = 1, .os = nt6, .action = .{ .command = "powercfg.exe -setactive SCHEME_MIN" } },
+    .{ .opt = .power_profile, .value = 2, .os = nt6, .action = .{ .command = "powercfg.exe -setactive SCHEME_BALANCED" } },
+    .{ .opt = .power_profile, .value = 3, .os = nt6, .action = .{ .command = "powercfg.exe -setactive SCHEME_MAX" } },
+    .{ .opt = .power_profile, .value = 1, .os = xp2003, .action = reg(.default, power_cfg, "CurrentPowerPolicy", .{ .sz = "3" }) },
+    .{ .opt = .power_profile, .value = 1, .os = xp2003, .action = reg(.user, power_cfg, "CurrentPowerPolicy", .{ .sz = "3" }) },
+    .{ .opt = .power_profile, .value = 2, .os = xp2003, .action = reg(.default, power_cfg, "CurrentPowerPolicy", .{ .sz = "0" }) },
+    .{ .opt = .power_profile, .value = 2, .os = xp2003, .action = reg(.user, power_cfg, "CurrentPowerPolicy", .{ .sz = "0" }) },
+    .{ .opt = .power_profile, .value = 3, .os = xp2003, .action = reg(.default, power_cfg, "CurrentPowerPolicy", .{ .sz = "5" }) },
+    .{ .opt = .power_profile, .value = 3, .os = xp2003, .action = reg(.user, power_cfg, "CurrentPowerPolicy", .{ .sz = "5" }) },
+    // After power_profile (rule order): the active plan's AC timeouts.
+    .{ .opt = .no_sleep, .os = nt6, .who = .client, .action = .{ .command = "cmd.exe /c powercfg.exe -change -standby-timeout-ac 0 & powercfg.exe -change -hibernate-timeout-ac 0" } },
+    // Vista+ do not update the last-access time by default.
+    .{ .opt = .last_access_off, .os = set(&.{.nt4}).unionWith(nt5), .action = dw(.hklm, file_system, "NtfsDisableLastAccessUpdate", 1) },
+    .{ .opt = .long_paths, .os = w10up, .action = dw(.hklm, file_system, "LongPathsEnabled", 1) },
+    .{ .opt = .search_index_off, .os = nt6, .who = .client, .action = .{ .command = "sc.exe config WSearch start= disabled" } },
+    // Remote Desktop: XP / 2003 the firewall's port list (language-neutral);
+    // 6.x+ a named rule through netsh (the built-in group name is localized).
+    .{ .opt = .remote_desktop, .os = xp2003.unionWith(nt6), .action = dw(.hklm, terminal_server, "fDenyTSConnections", 0) },
+    .{ .opt = .remote_desktop, .os = xp2003, .action = reg(.hklm, firewall_xp ++ "\\StandardProfile\\GloballyOpenPorts\\List", "3389:TCP", .{ .sz = "3389:TCP:*:Enabled:Remote Desktop" }) },
+    .{ .opt = .remote_desktop, .os = xp2003, .action = reg(.hklm, firewall_xp ++ "\\DomainProfile\\GloballyOpenPorts\\List", "3389:TCP", .{ .sz = "3389:TCP:*:Enabled:Remote Desktop" }) },
+    .{ .opt = .remote_desktop, .os = nt6, .action = .{ .command = "netsh.exe advfirewall firewall add rule name=USOS-RDP dir=in action=allow protocol=TCP localport=3389" } },
+    .{ .opt = .firewall_off, .os = xp2003, .action = dw(.hklm, firewall_xp ++ "\\StandardProfile", "EnableFirewall", 0) },
+    .{ .opt = .firewall_off, .os = xp2003, .action = dw(.hklm, firewall_xp ++ "\\DomainProfile", "EnableFirewall", 0) },
+    .{ .opt = .firewall_off, .os = nt6, .action = .{ .command = "netsh.exe advfirewall set allprofiles state off" } },
+    // Server: shutdown reason prompt, Ctrl+Alt+Del, Manage Your Server (2003).
+    .{ .opt = .server_nags_off, .os = set(&.{.w2003}).unionWith(nt6), .who = .server, .action = dw(.hklm, reliability, "ShutdownReasonOn", 0) },
+    .{ .opt = .server_nags_off, .os = set(&.{.w2003}).unionWith(nt6), .who = .server, .action = dw(.hklm, system_policy, "DisableCAD", 1) },
+    .{ .opt = .server_nags_off, .os = set(&.{.w2003}), .who = .server, .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\Windows NT\\CurrentVersion\\MYS", "DisableShowAtLogon", 1) },
+    .{ .opt = .server_nags_off, .os = set(&.{.w2003}), .who = .server, .action = dw(.user, "Software\\Policies\\Microsoft\\Windows NT\\CurrentVersion\\MYS", "DisableShowAtLogon", 1) },
+    // IE Enhanced Security Configuration: its per-user Active Setup
+    // components (administrators, users) stay uninstalled.
+    .{ .opt = .ie_esc_off, .os = nt6, .who = .server, .action = dw(.hklm, active_setup ++ "\\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}", "IsInstalled", 0) },
+    .{ .opt = .ie_esc_off, .os = nt6, .who = .server, .action = dw(.hklm, active_setup ++ "\\{A509B1A8-37EF-4b3f-8CFC-4F3A74704073}", "IsInstalled", 0) },
+    // Updates, privacy and security
+    // XP / 2003 error reporting (Vista+: ErrorReportingCore, legacy field).
+    .{ .opt = .disable_wer, .os = xp2003, .action = dw(.hklm, "SOFTWARE\\Microsoft\\PCHealth\\ErrorReporting", "DoReport", 0) },
+    .{ .opt = .disable_wer, .os = xp2003, .action = dw(.hklm, "SOFTWARE\\Microsoft\\PCHealth\\ErrorReporting", "ShowUI", 0) },
+    // Customer Experience Improvement Program (Vista+), 8.1 web search.
+    .{ .opt = .privacy, .os = nt6, .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\SQMClient\\Windows", "CEIPEnable", 0) },
+    .{ .opt = .privacy, .os = set(&.{.w81}), .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\Windows\\AdvertisingInfo", "DisabledByGroupPolicy", 1) },
+    .{ .opt = .privacy, .os = set(&.{.w81}), .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search", "ConnectedSearchUseWeb", 0) },
+    .{ .opt = .security_center_off, .os = set(&.{ .xp, .vista }), .who = .client, .action = dw(.hklm, security_center, "FirewallDisableNotify", 1) },
+    .{ .opt = .security_center_off, .os = set(&.{ .xp, .vista }), .who = .client, .action = dw(.hklm, security_center, "AntiVirusDisableNotify", 1) },
+    .{ .opt = .security_center_off, .os = set(&.{ .xp, .vista }), .who = .client, .action = dw(.hklm, security_center, "UpdatesDisableNotify", 1) },
+    .{ .opt = .security_center_off, .os = set(&.{ .w7, .w8, .w81 }), .who = .client, .action = dw(.user, explorer_policy_user, "HideSCAHealth", 1) },
+    .{ .opt = .security_center_off, .os = w10up, .who = .client, .action = dw(.user, "Software\\Microsoft\\Windows\\CurrentVersion\\Notifications\\Settings\\Windows.SystemToast.SecurityAndMaintenance", "Enabled", 0) },
+    // Defender as antispyware (Vista..8.1; 10+ Tamper Protection ignores it).
+    .{ .opt = .defender_off, .os = set(&.{ .vista, .w7, .w8, .w81 }), .who = .client, .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\Windows Defender", "DisableAntiSpyware", 1) },
+    .{ .opt = .smartscreen_off, .os = w8up, .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\Windows\\System", "EnableSmartScreen", 0) },
+    .{ .opt = .smartscreen_off, .os = w8up, .action = reg(.hklm, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer", "SmartScreenEnabled", .{ .sz = "Off" }) },
+    .{ .opt = .device_encryption_off, .os = w10up, .action = dw(.hklm, "SYSTEM\\CurrentControlSet\\Control\\BitLocker", "PreventDeviceEncryption", 1) },
+    // Apps and scripts
+    .{ .opt = .remove_apps, .value = 1, .os = w8up, .who = .client, .action = appx(appx_games) },
+    .{ .opt = .remove_apps, .value = 2, .os = w8up, .who = .client, .action = appx(appx_games) },
+    .{ .opt = .remove_apps, .value = 2, .os = w8up, .who = .client, .action = appx(appx_bloat[0]) },
+    .{ .opt = .remove_apps, .value = 2, .os = w8up, .who = .client, .action = appx(appx_bloat[1]) },
+    .{ .opt = .remove_apps, .value = 2, .os = w8up, .who = .client, .action = appx(appx_bloat[2]) },
+    .{ .opt = .remove_apps, .value = 2, .os = w8up, .who = .client, .action = appx(appx_bloat[3]) },
+    // IE7+ customize wizard (policy); WMP privacy wizard; Edge first run and
+    // startup boost. Not XP / 2003: IE6 has no policy, and its per-user
+    // RunOnceHasShown values were reset at the first logon (QEMU 2026-10-14).
+    .{ .opt = .first_run_off, .os = nt6.differenceWith(set(&.{.w11})), .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\Internet Explorer\\Main", "DisableFirstRunCustomize", 1) },
+    .{ .opt = .first_run_off, .os = nt6, .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\WindowsMediaPlayer", "GroupPrivacyAcceptance", 1) },
+    .{ .opt = .first_run_off, .os = w10up, .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\Edge", "HideFirstRunExperience", 1) },
+    .{ .opt = .first_run_off, .os = w10up, .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\Edge", "StartupBoostEnabled", 0) },
+    .{ .opt = .onedrive_off, .os = set(&.{.w81}), .who = .client, .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\Windows\\Skydrive", "DisableFileSync", 1) },
+    .{ .opt = .onedrive_off, .os = w10up, .who = .client, .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\Windows\\OneDrive", "DisableFileSyncNGSC", 1) },
+    .{ .opt = .onedrive_off, .os = w10up, .who = .client, .action = reg(.user, "Software\\Microsoft\\Windows\\CurrentVersion\\Run", "OneDriveSetup", .del) },
+    // 6.x+: oobeSystem FirstLogonCommands (autounattend.zig); NT5: the
+    // machine RunOnce (the first sign-in after Setup, any user).
+    .{ .opt = .user_script, .os = nt6, .action = .native },
+    .{ .opt = .user_script, .os = nt5, .action = reg(.hklm, run_once, "USOS1UserReg", .{ .sz = user_script_reg }) },
+    .{ .opt = .user_script, .os = nt5, .action = reg(.hklm, run_once, "USOS2UserScript", .{ .sz = user_script_cmd }) },
     // Accounts -----------------------------------------------------------
     // 6.x+: the Shell-Setup AutoLogon element (autounattend.zig). NT5: the
     // Winlogon values, written at setup end after Setup's own.
@@ -460,7 +706,7 @@ pub fn iterate(p: *const @import("profile.zig").Profile, vals: *[count]u8, t: Ta
 pub fn dataText(data: Data, p: *const @import("profile.zig").Profile, buffer: []u8) []const u8 {
     return switch (data) {
         .dword => |v| std.fmt.bufPrint(buffer, "{d}", .{v}) catch unreachable,
-        .sz => |s| s,
+        .sz, .binary => |s| s,
         .profile_user => p.user.slice(),
         .profile_password => p.password.slice(),
         .del => "",
@@ -474,6 +720,7 @@ pub fn writeSetLine(w: *std.Io.Writer, r: Reg, p: *const @import("profile.zig").
     const kind: []const u8 = switch (r.data) {
         .dword => "dword",
         .del => "del",
+        .binary => "binary",
         else => "sz",
     };
     try w.print("{s}\\{s}|{s}|{s}|{s}", .{ r.root.setName(), r.key, r.name, kind, dataText(r.data, p, &number) });
@@ -500,7 +747,7 @@ test "options: every rule's value exists, every option renders somewhere" {
         // Every non-default value of a choice renders somewhere.
         for (1..o.values.len) |v| {
             var some = false;
-            for (all) |os| some = some or valueAvailable(o.opt, @intCast(v), .{ .os = os });
+            for (all) |os| some = some or valueAvailable(o.opt, @intCast(v), .{ .os = os }) or valueAvailable(o.opt, @intCast(v), .{ .os = os, .server = true });
             try std.testing.expect(some);
         }
     }
@@ -515,7 +762,7 @@ test "options: availability per release" {
     try std.testing.expect(!available(.taskbar_left, .{ .os = .w11, .server = true }));
     try std.testing.expect(available(.numlock, .{ .os = .nt4 }));
     try std.testing.expect(!available(.numlock, .{ .os = .win98 }));
-    try std.testing.expect(available(.disable_wer, .{ .os = .vista }) and !available(.disable_wer, .{ .os = .xp }));
+    try std.testing.expect(available(.disable_wer, .{ .os = .vista }) and available(.disable_wer, .{ .os = .xp }) and !available(.disable_wer, .{ .os = .w2000 }));
     try std.testing.expect(available(.hibernation, .{ .os = .w10 }) and !available(.hibernation, .{ .os = .w7 }));
     try std.testing.expect(available(.no_hibernation, .{ .os = .w7 }) and !available(.no_hibernation, .{ .os = .w10 }));
     try std.testing.expect(!valueAvailable(.taskbar_search, 2, .{ .os = .w81 }));
@@ -535,4 +782,46 @@ test "options: legacy options yield rules only where their renderer has none" {
     const rule = it.next().?;
     try std.testing.expectEqualStrings("HideFileExt", rule.action.reg.name);
     try std.testing.expect(it.next() == null);
+}
+
+test "options: stage 2 packs per family" {
+    const T = struct {
+        fn on(opt: Opt, os: Os) bool {
+            return available(opt, .{ .os = os });
+        }
+        fn server(opt: Opt, os: Os) bool {
+            return available(opt, .{ .os = os, .server = true });
+        }
+    };
+    // 9x: Explorer and input basics only.
+    for ([_]Os{ .win95, .win98, .win_me }) |os| {
+        try std.testing.expect(T.on(.shortcut_suffix_off, os) and T.on(.mouse_accel_off, os) and T.on(.visual_effects, os));
+        try std.testing.expect(!T.on(.user_script, os) and !T.on(.remote_desktop, os) and !T.on(.font_smoothing, os));
+    }
+    try std.testing.expect(T.on(.last_access_off, .nt4) and !T.on(.user_script, .nt4) and !T.on(.autologon, .nt4));
+    try std.testing.expect(T.on(.font_smoothing, .w2000) and T.on(.user_script, .w2000) and !T.on(.desktop_icons, .w2000));
+    try std.testing.expect(T.on(.firewall_off, .xp) and T.on(.security_center_off, .xp) and !T.server(.security_center_off, .w2003));
+    try std.testing.expect(T.server(.server_nags_off, .w2003) and !T.on(.server_nags_off, .xp) and !T.server(.ie_esc_off, .w2003));
+    try std.testing.expect(valueAvailable(.hibernation, 2, .{ .os = .xp }) and !valueAvailable(.hibernation, 1, .{ .os = .xp }));
+    try std.testing.expect(T.on(.defender_off, .w7) and !T.on(.defender_off, .w10) and T.on(.classic_taskbar, .vista));
+    try std.testing.expect(T.on(.boot_to_desktop, .w81) and !T.on(.boot_to_desktop, .w10) and T.on(.remove_apps, .w8));
+    try std.testing.expect(!T.server(.remove_apps, .w10) and T.server(.ie_esc_off, .w10) and T.on(.classic_context_menu, .w11));
+    try std.testing.expect(!T.on(.classic_context_menu, .w10) and !T.on(.all_tray_icons, .w11) and !T.on(.shortcut_suffix_off, .w11));
+    try std.testing.expect(T.on(.user_script, .vista) and T.on(.power_profile, .w7) and T.on(.power_profile, .xp));
+}
+
+test "options: commands fit the specialize limits; set lines stay printable ASCII" {
+    const autounattend = @import("autounattend.zig");
+    for (rules) |rule| switch (rule.action) {
+        .command => |c| {
+            errdefer std.debug.print("too long ({d}): {s}\n", .{ c.len, c });
+            try std.testing.expect(c.len <= autounattend.packed_limit);
+        },
+        .reg => |r| switch (r.data) {
+            .sz, .binary => |text| for (text) |ch| try std.testing.expect(ch >= 0x20 and ch < 0x7f and ch != '|' and ch != '"'),
+            else => {},
+        },
+        .native => {},
+    };
+    try std.testing.expect(user_script_reg.len <= 259 and user_script_cmd.len <= 259);
 }

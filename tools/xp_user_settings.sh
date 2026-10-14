@@ -71,12 +71,13 @@ usos_xp_settings_load() {
             # Typed options (src/flow/answer/options.zig): repeated reg= / run=.
             if (key == "reg") {
                 # ROOT\Key|Name|type|data (usos-reg set line); printable ASCII
-                # without " % ^ & < >.
-                if (split(value, f, "|") != 4 || f[1] !~ /^(HKLM|USER|DEFAULT)\\[ -~]+$/ || f[3] !~ /^(dword|sz|del)$/ || value ~ /["%^&<>]/ || value !~ /^[ -~]+$/) { bad("reg= on line " NR " is not a registry set line"); next }
+                # without " ^ & < > (the set is a data file, never run by
+                # cmd.exe: % stays for the user-script RunOnce command).
+                if (split(value, f, "|") != 4 || f[1] !~ /^(HKLM|USER|DEFAULT)\\[ -~]+$/ || f[3] !~ /^(dword|sz|binary|del)$/ || value ~ /["^&<>]/ || value !~ /^[ -~]+$/) { bad("reg= on line " NR " is not a registry set line"); next }
                 regs[++nreg] = value; next
             }
             if (key == "run") {
-                if (value !~ /^(net\.exe accounts \/maxpwage:unlimited)$/) { bad("run= on line " NR " is not a known command"); next }
+                if (value !~ /^(net\.exe accounts \/maxpwage:unlimited|powercfg\.exe \/hibernate off)$/) { bad("run= on line " NR " is not a known command"); next }
                 runs[++nrun] = value; next
             }
             values[key] = value

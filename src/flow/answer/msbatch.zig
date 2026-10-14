@@ -169,6 +169,7 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
                 try w.print("{s},\"{s}\",{s},", .{ root, r.key, r.name });
                 switch (r.data) {
                     .dword => |v| try w.print("1,{x:0>2},{x:0>2},{x:0>2},{x:0>2}\n", .{ v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, v >> 24 }),
+                    .binary => |hex| try w.print("1,{s}\n", .{hex}),
                     else => {
                         var number: [16]u8 = undefined;
                         try w.print(",\"{s}\"\n", .{options.dataText(r.data, p, &number)});

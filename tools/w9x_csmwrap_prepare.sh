@@ -469,6 +469,22 @@ usos_w9x_csmwrap_prepare() {
         fi
         w9x_csmwrap_log "PHASE1 vm=$vm_phase1 ($vm_reason)"
     fi
+    # Windows 9x on NVMe (tools/w9x_nvme.sh): the usosnvme.mpd miniport only
+    # with DATA's nvme-experimental.txt (no X470 pass yet); without it, and
+    # when the disk fails the target script's check, Windows reaches the disk
+    # through SeaBIOS INT 13h (MS-DOS compatibility mode) as before.
+    nvme9x=0
+    if [ -z "$img$posr$nt4$dos_iso" ]; then
+        case "$TARGET_DEVICE" in
+            /dev/nvme*)
+                if [ -f "/mnt/data/Systems/Windows/$folder/Unattended/nvme-experimental.txt" ]; then
+                    nvme9x=1
+                    w9x_csmwrap_log 'NVME usosnvme.mpd requested (nvme-experimental.txt)'
+                else
+                    w9x_csmwrap_log 'NVME no nvme-experimental.txt: MS-DOS compatibility mode (INT 13h)'
+                fi ;;
+        esac
+    fi
     usos_ui_stage 4 5 'Preparing the disk' "Copying $folder Setup, the USOS helpers and CSMWrap to the selected disk." || true
     if [ -n "$img" ]; then
         usos_ui_stage 4 5 'Preparing the disk' "Writing the $folder image to the selected disk." || true
@@ -489,7 +505,7 @@ usos_w9x_csmwrap_prepare() {
     else
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="/mnt/data/$iso" W9X_SETUP_FOLDER="$setup" W9X_TAG="$tag" \
             W9X_ANSWER_INF="$answer_inf" W9X_ANSWER_KIND="$answer_kind" W9X_BOOT_FLOPPY="$floppy" W9X_SIZE_GIB="$size_gib" \
-            W9X_USB_DIR="/mnt/data/Drivers/$folder/USB" W9X_TIME_ZONE="${time_zone:-}" W9X_VM_PHASE1="$([ "$vm_phase1" = yes ] && echo 1 || echo 0)"             sh /usr/lib/usos/w9x_csmwrap_target.sh
+            W9X_USB_DIR="/mnt/data/Drivers/$folder/USB" W9X_TIME_ZONE="${time_zone:-}" W9X_VM_PHASE1="$([ "$vm_phase1" = yes ] && echo 1 || echo 0)" W9X_NVME_DRIVER="$nvme9x"             sh /usr/lib/usos/w9x_csmwrap_target.sh
     fi
     "$@" >> "$W9X_LOG/prepare.log" 2>&1 < /dev/null
     target_rc=$?
@@ -588,6 +604,15 @@ usos_w9x_csmwrap_prepare() {
             stop 'Windows Setup stage 1 did not finish. The computer was not restarted; logs: EFI/USOS/win9x/phase1'
         fi
         w9x_csmwrap_log "PHASE1 PASS $vm_check"
+        # usosnvme chosen and accepted (C:\USOS9X\USOSNVME.MPD exists): into
+        # the installed Windows, for its first start on this PC.
+        if [ "$nvme9x" = 1 ] && . /usr/lib/usos/w9x_nvme.sh && nvme_loop=$(losetup -f) &&
+            losetup -o 1048576 "$nvme_loop" "$TARGET_DEVICE"; then
+            nvme_msg=$(MTOOLS_SKIP_CHECK=1 w9x_nvme_inject "$nvme_loop") || nvme_msg="FAILED: $nvme_msg (compatibility mode stays)"
+            losetup -d "$nvme_loop" 2>/dev/null || true
+            sync
+            w9x_csmwrap_log "NVME $nvme_msg"
+        fi
     fi
     umount /mnt/data 2>/dev/null || true
     sync

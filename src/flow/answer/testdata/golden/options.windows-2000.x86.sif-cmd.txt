@@ -61,6 +61,18 @@ USER\Control Panel\Keyboard|InitialKeyboardIndicators|sz|2
 HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|NoAutoUpdate|dword|0
 HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|AUOptions|dword|2
 HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|NoAutoRebootWithLoggedOnUsers|dword|1
+USER\Software\Microsoft\Windows\CurrentVersion\Explorer|link|binary|00,00,00,00
+USER\Control Panel\Desktop\WindowMetrics|MinAnimate|sz|0
+USER\Control Panel\Desktop|DragFullWindows|sz|0
+DEFAULT\Control Panel\Desktop|FontSmoothing|sz|2
+USER\Control Panel\Desktop|FontSmoothing|sz|2
+USER\Control Panel\Mouse|MouseSpeed|sz|0
+USER\Control Panel\Mouse|MouseThreshold1|sz|0
+USER\Control Panel\Mouse|MouseThreshold2|sz|0
+USER\Control Panel\Accessibility\StickyKeys|Flags|sz|506
+HKLM\SYSTEM\CurrentControlSet\Control\FileSystem|NtfsDisableLastAccessUpdate|dword|1
+HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce|USOS1UserReg|sz|cmd.exe /c for %d in (C D E F G H I J K L M N O P Q R S T U V W X Y Z) do @if exist %d:\Systems\nul if exist %d:\Scripts\first-logon.reg regedit.exe /s %d:\Scripts\first-logon.reg
+HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce|USOS2UserScript|sz|cmd.exe /c for %d in (C D E F G H I J K L M N O P Q R S T U V W X Y Z) do @if exist %d:\Systems\nul if exist %d:\Scripts\first-logon.cmd call %d:\Scripts\first-logon.cmd
 HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon|AutoAdminLogon|sz|1
 HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon|DefaultUserName|sz|Tester
 HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon|DefaultPassword|sz|Test123!

@@ -1,0 +1,10 @@
+# usosmpart: disk class lower filter (WDM), x86 (WXP target) and amd64 (WNET target).
+TARGETNAME=usosmpart
+TARGETPATH=obj
+TARGETTYPE=DRIVER
+MSC_WARNING_LEVEL=/W4 /WX
+MUI=0
+MUI_COMMENT=0
+BUFFER_OVERFLOW_CHECKS=0
+SOURCES=usosmpart.c \
+        usosmpart.rc

@@ -21,6 +21,11 @@
  *   NT351  Windows NT 3.5 / 3.51 (+USOSNVME_NT351): PCI config through
  *          CF8h/CFCh, registered for the Isa bus
  *   NT31   Windows NT 3.1 (+USOSNVME_NT31): NT 3.1 ScsiPort structure sizes
+ *   W9X    Windows 95 OSR2 / 98 / 98 SE / Me (USOSNVME_W9X): usosnvme.mpd,
+ *          a SCSI miniport for SCSIPORT.PDR under IOS (non-PnP-size init
+ *          data as NT4, PCI config through CF8h/CFCh, BAR mapped with the
+ *          VMM service _MapPhysToLinear, HwAdapterState, debug text to
+ *          port E9h when a debug console answers there)
  */
 #ifndef USOSNVME_H
 #define USOSNVME_H
@@ -30,11 +35,27 @@
 
 #define USOSNVME_VERSION "1.0"
 
+#if defined(USOSNVME_W9X) && !defined(USOSNVME_NT4)
+#define USOSNVME_NT4
+#endif
 #if defined(USOSNVME_NT31) && !defined(USOSNVME_NT351)
 #define USOSNVME_NT351
 #endif
 #if defined(USOSNVME_NT351) && !defined(USOSNVME_NT4)
 #define USOSNVME_NT4
+#endif
+/* PCI configuration through ports CF8h / CFCh (no HAL / PCI bus handler) */
+#if defined(USOSNVME_NT351) || defined(USOSNVME_W9X)
+#define USOSNVME_CF8
+#endif
+
+/* I/O queue id. Windows 9x: 2, so that a stray INT 13h from SeaBIOS (which
+   created queue 1 before Windows started and still rings doorbell 1) hits a
+   queue that no longer exists instead of our ring. NT never calls the BIOS. */
+#ifdef USOSNVME_W9X
+#define NVME_IO_QID 2
+#else
+#define NVME_IO_QID 1
 #endif
 
 /* ---- NVMe controller registers (NVM Express Base Specification 3.1) ---- */
@@ -57,6 +78,9 @@
 #define NVME_CC_IOCQES_16 (4UL << 20)
 #define NVME_CSTS_RDY     0x00000001UL
 #define NVME_CSTS_CFS     0x00000002UL
+#define NVME_CC_SHN_NORMAL (1UL << 14)
+#define NVME_CSTS_SHST_MASK (3UL << 2)
+#define NVME_CSTS_SHST_DONE (2UL << 2)
 
 /* Admin and NVM command set opcodes */
 #define NVME_ADM_CREATE_SQ   0x01
@@ -85,6 +109,7 @@
 #define NVME_BAR_MAP_SIZE  0x2000
 #define NVME_MAX_TRANSFER  (128UL * 1024UL)
 #define NVME_MAX_BREAKS    ((NVME_MAX_TRANSFER / NVME_PAGE) + 1)
+#define NVME_PRP9X_MAX     (NVME_MAX_BREAKS + 1)
 
 /* Polling limits (microseconds) */
 #define NVME_ADMIN_TIMEOUT_US  (5UL * 1000UL * 1000UL)
@@ -98,6 +123,7 @@
 #define NVME_LOG_IO_ERROR    0x4E560005UL  /* an I/O command returned an error */
 #define NVME_LOG_NO_NS       0x4E560006UL  /* no active namespace */
 #define NVME_LOG_PAGE_SIZE   0x4E560007UL  /* controller cannot do 4 KiB pages */
+#define NVME_LOG_BAR_HIGH    0x4E560008UL  /* 9x: BAR above 4 GiB, not mapped */
 
 #pragma pack(push, 1)
 typedef struct _NVME_SQE {
@@ -174,6 +200,13 @@ typedef struct _HW_DEVICE_EXTENSION {
     ULONG LastStatus;            /* last failing NVMe status (SCT << 8 | SC) */
     PUSHORT Vga;
     ULONG InitStage;
+    ULONG IoQid;                 /* NVME_IO_QID, or 1 if fewer queues */
+    ULONG Srbs;                  /* 9x debug: completed SRBs */
+    ULONG DbgNonRw;              /* 9x debug: non read/write SRBs shown */
+#ifdef USOSNVME_W9X
+    SCSI_PHYSICAL_ADDRESS Prp9x[NVME_PRP9X_MAX];  /* NvmeRwPrps9x */
+    ULONG Prp9xCount;
+#endif
 } HW_DEVICE_EXTENSION, *PHW_DEVICE_EXTENSION;
 
 #endif

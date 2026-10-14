@@ -247,13 +247,19 @@ def check(a, out: Path, target: Path) -> int:
             targets = ['DEFUSER', 'USER']
         for h in targets:
             got_type, got = get(h, path, name)
+            note = ''
             if typ == 'del':
                 ok = got_type in ('novalue', 'nokey')
             elif typ == 'dword':
                 ok = got_type == 'RegDWord' and got == int(data, 0)
+            elif typ == 'binary':
+                ok = got_type == 'RegBin' and bytes(got) == bytes.fromhex(data.replace(',', ''))
+            elif path.endswith('\\CurrentVersion\\RunOnce') and got_type == 'novalue':
+                # The machine RunOnce (user script hook) is consumed at the first sign-in.
+                ok = True
+                note = 'consumed by the first sign-in (RunOnce)'
             else:
                 ok = got_type == 'RegSZ' and str(got).rstrip('\x00') == data
-            note = ''
             if not ok and h == 'USER' and typ == 'dword' and name in SHELLSTATE_BITS:
                 # XP's first logon folds Hidden/ShowSuperHidden into Explorer\ShellState
                 # (SHELLSTATE flags) and may drop the raw value: the effective setting counts.

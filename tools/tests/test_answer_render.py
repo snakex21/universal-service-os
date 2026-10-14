@@ -326,6 +326,13 @@ OPTIONS = [
     'taskbar_search=hidden|icon|box', 'taskbar_left=yes', 'task_view_off=yes', 'widgets_off=yes', 'bing_search_off=yes',
     'uac_level=no_dim|never', 'hibernation=no_fast_startup|off', 'system_restore_off=yes', 'numlock=on|off',
     'windows_update=no_restart|notify|off', 'privacy=yes', 'autologon=yes', 'password_never_expires=yes',
+    # Stage 2 (2026-10-14).
+    'classic_context_menu=yes', 'shortcut_suffix_off=yes', 'desktop_icons=yes', 'classic_taskbar=yes', 'all_tray_icons=yes',
+    'boot_to_desktop=yes', 'lock_screen_off=yes', 'visual_effects=performance', 'font_smoothing=yes', 'mouse_accel_off=yes',
+    'sticky_keys_off=yes', 'power_profile=high_performance|balanced|power_saver', 'no_sleep=yes', 'last_access_off=yes',
+    'long_paths=yes', 'search_index_off=yes', 'remote_desktop=yes', 'firewall_off=yes', 'server_nags_off=yes', 'ie_esc_off=yes',
+    'security_center_off=yes', 'defender_off=yes', 'smartscreen_off=yes', 'device_encryption_off=yes',
+    'remove_apps=games|bloat', 'first_run_off=yes', 'onedrive_off=yes', 'user_script=yes',
 ]
 
 
@@ -367,10 +374,13 @@ def check_options() -> None:
         ext = 'sif-cmd.txt' if system in NT5_BASE else 'inf' if system.startswith('windows-9') or system == 'windows-me' else 'sif' if system == 'windows-nt-4' else 'xml'
         golden(f'options.{system}.{arch}.{ext}', data)
         if ext == 'xml':
-            check(f'options.{system}: under 16 KiB with headroom', len(data) <= 16 * 1024 - 1536, str(len(data)))
+            check(f'options.{system}: under 32 KiB (max_size 64 KiB)', len(data) <= 32 * 1024, str(len(data)))
             check(f'options.{system}: commands within 259 characters', all(len(p.text or '') <= 259 for p in ET.fromstring(data).iter(NS + 'Path')))
     eleven = results.get('windows-11', '')
     check('options: 11 auto logon, workgroup, packs', all(k in eleven for k in ('<LogonCount>9999999</LogonCount>', '<JoinWorkgroup>USOSLAB</JoinWorkgroup>', 'TaskbarAl', 'AllowNewsAndInterests', 'DisableAIDataAnalysis', 'powercfg.exe -h off')))
+    check('options: 11 stage 2 (classic menu, appx removal, first-logon script)', all(k in eleven for k in ('USOS-ClassicContextMenu', 'Remove-AppxProvisionedPackage', '<FirstLogonCommands>', 'first-logon.cmd', 'PreventDeviceEncryption')))
+    xp = results.get('windows-xp', '')
+    check('options: XP stage 2 (firewall, RDP port, power scheme, RunOnce script, hibernate)', all(k in xp for k in ('FirewallPolicy\StandardProfile|EnableFirewall|dword|0', '3389:TCP|sz|3389:TCP:*:Enabled:Remote Desktop', 'PowerCfg|CurrentPowerPolicy|sz|3', 'USOS2UserScript|sz|cmd.exe /c for %d', 'powercfg.exe /hibernate off')))
     w2k = results.get('windows-2000', '')
     check('options: 2000 through usos-reg.exe', 'usos-reg.exe' in w2k and 'DEFAULT\\Control Panel\\Keyboard|InitialKeyboardIndicators|sz|2' in w2k and 'JoinWorkgroup=USOSLAB' in w2k)
     nt4 = results.get('windows-nt-4', '')

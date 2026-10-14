@@ -89,6 +89,14 @@ IF NOT EXIST %U9T%\XHCI98.SYS GOTO USBDONE
 ECHO Natywne USB (xhci98 + stos USB 2.0)...
 FOR %%F IN (XHCI98.SYS XHCI98.INF USB\STACK.CAB) DO COPY /Y %U9T%\%%F C:\%U9SRC% >NUL
 :USBDONE
+REM NVMe target with usosnvme chosen (U9NVME=1, tools/w9x_nvme.sh): the 9x
+REM miniport next to Setup. A Setup that sees the controller binds it here;
+REM after a VM phase 1 the UEFI side copies both into C:\WINDOWS and this
+REM folder is the INF's copy source at the first start on the real PC.
+IF NOT "%U9NVME%"=="1" GOTO NVMEDONE
+IF NOT EXIST %U9T%\USOSNVME.MPD GOTO NVMEDONE
+FOR %%F IN (USOSNVME.INF USOSNVME.MPD) DO COPY /Y %U9T%\%%F C:\%U9SRC% >NUL
+:NVMEDONE
 REM Under CSMWrap HIMEM needs A20 through port 92h (/M:2), else DOS=HIGH hangs.
 REM Setup keeps the lines. C:\WINDOWS\HIMEM.SYS exists from Setup's first
 REM restart on; until then (a restart before Setup got that far) the copy of

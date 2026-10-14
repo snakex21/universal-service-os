@@ -138,6 +138,10 @@ def build_modern_support(root: Path, out: Path):
         # (committed build of tools/nt4/usosusb/build-nt6.cmd), registered
         # offline by the nt60_usb step of usos-x86-csmwrap.cmd (12.6).
         writer.add_file('usosusb-nt6.sys', root / 'tools/nt4/usosusb/bin/nt6/i386/usosusb.sys')
+        # Windows 7 / 8.x / 10 before 1703 x86: own USB multi-partition disk
+        # filter (committed x86 build of tools/nt/usosmpart), registered
+        # offline by the mpart step of usos-x86-csmwrap.cmd.
+        writer.add_file('usosmpart-x86.sys', root / 'tools/nt/usosmpart/bin/i386/usosmpart.sys')
         # NVMe target, Windows 7 / Vista / Server 2008 x86: own SCSIPORT
         # miniport (2KXP build of tools/nt/usosnvme; imports checked against
         # NT 6.0 SP2 in tools/tests/test_usosnvme.py), registered offline by
