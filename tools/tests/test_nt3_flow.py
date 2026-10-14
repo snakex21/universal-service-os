@@ -566,8 +566,26 @@ class Nt3AnswerProfile(unittest.TestCase):
         self.assertIn('USOS/NT3/ACCOUNT.TXT', QEMU_INSTALL.read_text(encoding='utf-8'))
         src = (ROOT / 'tools/nt3/usosnt3/src/usosnt3.c').read_text(encoding='utf-8')
         for want in ('wipe_file("ACCOUNT.TXT", size);', 'GraphicsDrivers\\\\DetectDisplay', '"NetLocalGroupAddMember"',
-                     'RegLoadKeyA(HKEY_USERS, "USOSDEF", hive)', 'lstrcmpA(opt, "polish") == 0'):
+                     'RegSaveKeyA(def, hive, NULL)', 'lstrcmpA(opt, "polish") == 0'):
             self.assertIn(want, src)
+
+    def test_stage_intl(self):
+        i386 = self.tmp / 'i386'
+        usos = self.tmp / 'usos'
+        i386.mkdir()
+        usos.mkdir()
+        for name in ('KBDPL1.DLL', 'C_1250.NL_', 'C_852.NL_', 'VGASYSE.FO_', 'KBDCZ.DLL'):
+            (i386 / name).write_bytes(b'x')
+        (usos / 'INTL.TXT').write_bytes(b'locale=00000415\r\nkeyboard=00000415\r\n')
+        txt = self.tmp / 'TXTSETUP.SIF'
+        txt.write_bytes(b'[Files.KeyboardLayout]\r\n00000405 = KBDCZ.DLL,2\r\n00000415 = KBDPL1.DLL,2\r\n[Other]\r\n')
+        fn = function_text(TARGET, 'nt3_stage_intl')
+        rc, out, err = sh(f'log() {{ echo "$*"; }}\nfail() {{ echo "FAIL $*"; exit 1; }}\n{fn}\n'
+                          f'i386="{i386.as_posix()}" usos="{usos.as_posix()}" txtsetup="{txt.as_posix()}"\nnt3_stage_intl')
+        self.assertEqual(rc, 0, err + out)
+        self.assertIn('(KBDPL1.DLL): 4 CD files', out)
+        self.assertEqual(sorted(f.name for f in (usos / 'INTL').iterdir()), ['C_1250.NLS', 'C_852.NLS', 'KBDPL1.DLL', 'VGASYSE.FON'])
+        self.assertTrue((usos / 'INTL.TXT').read_bytes().endswith(b'keyboard_dll=kbdpl1.dll\r\n'))
 
     def test_usosnt3_imports_exist_on_nt31(self):
         # Every static import of usosnt3.exe is exported by the kernel32 /
@@ -576,14 +594,15 @@ class Nt3AnswerProfile(unittest.TestCase):
         from check_nt52_driver_imports import pe
         nt31 = {
             'kernel32.dll': {'CloseHandle', 'CopyFileA', 'CreateFileA', 'DeleteFileA', 'ExitProcess', 'FlushFileBuffers',
+                             'FindClose', 'FindFirstFileA', 'FindNextFileA', 'CreateProcessA', 'WaitForSingleObject', 'GetExitCodeProcess',
                              'FreeLibrary', 'GetCommandLineA', 'GetCurrentProcess', 'GetFileAttributesA', 'GetLastError',
                              'GetModuleHandleA', 'GetProcAddress', 'GetSystemDirectoryA', 'GetWindowsDirectoryA',
-                             'LoadLibraryA', 'MultiByteToWideChar', 'ReadFile', 'SetFilePointer', 'Sleep', 'WriteFile',
+                             'LoadLibraryA', 'MoveFileA', 'MultiByteToWideChar', 'ReadFile', 'SetFilePointer', 'Sleep', 'WriteFile',
                              'WritePrivateProfileStringA', 'WriteProfileStringA', 'lstrcatA', 'lstrcmpA', 'lstrcmpiA',
                              'lstrcpyA'},
             'advapi32.dll': {'AdjustTokenPrivileges', 'InitiateSystemShutdownA', 'LookupAccountNameA',
                              'LookupPrivilegeValueA', 'OpenProcessToken', 'RegCloseKey', 'RegCreateKeyExA', 'RegDeleteKeyA',
-                             'RegLoadKeyA', 'RegOpenKeyExA', 'RegQueryValueExA', 'RegSetValueExA', 'RegUnLoadKeyA',
+                             'RegLoadKeyA', 'RegOpenKeyExA', 'RegSaveKeyA', 'RegQueryValueExA', 'RegSetValueExA', 'RegUnLoadKeyA',
                              'RegisterServiceCtrlHandlerA', 'SetServiceStatus', 'StartServiceCtrlDispatcherA'},
         }
         _, imports = pe(ROOT / 'tools/nt3/usosnt3/bin/i386/usosnt3.exe')

@@ -340,6 +340,53 @@ nt3_stage_profile() {
     for file in ACCOUNT.TXT INTL.TXT; do
         [ ! -f "$work/$file" ] || mv "$work/$file" "$usos/$file" || fail "cannot copy $file"
     done
+    [ ! -f "$usos/INTL.TXT" ] || nt3_stage_intl
+}
+
+# The CD files GUI Setup would copy for the chosen locale and keyboard
+# (LANGUAGE.INF / LAYOUT.INF; text-mode Setup copies only its own default
+# layout and code pages): the layout DLL of TXTSETUP [Files.KeyboardLayout]
+# (NT 3.1: TXTSETUP.INF) and, for the locale's code pages (the LANGUAGE.INF
+# [Options] values), the code page tables and the bitmap fonts, each as the
+# CD has it (NAME or the LZ-compressed NAM_, stored under NAME) in
+# \USOS\NT3\INTL; usosnt3.exe expands them (docs/nt3-polish-2026-10-14.md). Files the CD lacks (the 3.5
+# and 3.1 CDs have no CE fonts) are skipped; usosnt3.exe then keeps the
+# code pages.
+nt3_stage_intl() {
+    intl_locale=$(awk -F= '{ sub(/\r$/, "") } $1 == "locale" { print toupper($2) }' "$usos/INTL.TXT")
+    intl_kbd=$(awk -F= '{ sub(/\r$/, "") } $1 == "keyboard" { print toupper($2) }' "$usos/INTL.TXT")
+    mkdir -p "$usos/INTL" || fail 'cannot create \USOS\NT3\INTL'
+    kbd_dll=''
+    if [ -n "$intl_kbd" ]; then
+        kbd_dll=$(awk -v id="$intl_kbd" '{ sub(/\r$/, "") } /^\[/ { s = (tolower($0) ~ /keyboardlayout/); next }
+            s { k = $1; gsub(/[ \t]/, "", k); if (toupper(k) == id && match(toupper($0), /[A-Z0-9_]+\.DLL/)) { print substr(toupper($0), RSTART, RLENGTH); exit } }' "$txtsetup")
+    fi
+    case "$intl_locale" in
+        00000405|0000040E|00000415|0000041B|00000424|0000041A|00000418) cps='1250 852 10029' sfx=E ;;
+        00000419|00000402) cps='1251 866 10007' sfx=R ;;
+        00000408) cps='1253 737 10006' sfx=G ;;
+        0000041F) cps='1254 857 10081' sfx=T ;;
+        *) cps='' sfx='' ;;
+    esac
+    names=$kbd_dll
+    if [ -n "$cps" ]; then
+        set -- $cps
+        names="$names C_$1.NLS C_$2.NLS C_$3.NLS VGA$2.FON APP$2.FON CGA40$2.FON CGA80$2.FON EGA40$2.FON EGA80$2.FON"
+        for base in VGASYS VGAFIX SSERIFE COURE SERIFE SMALLE; do names="$names $base$sfx.FON"; done
+    fi
+    staged=0
+    for name in $names; do
+        packed=$(printf %s "$name" | sed 's/.$/_/')
+        lower=$(printf '%s %s' "$name" "$packed" | tr '[:upper:]' '[:lower:]')
+        for cand in "$name" "$packed" $lower; do
+            [ -f "$i386/$cand" ] || continue
+            cp "$i386/$cand" "$usos/INTL/$name" || fail "cannot copy $cand"
+            staged=$((staged + 1))
+            break
+        done
+    done
+    [ -z "$kbd_dll" ] || printf 'keyboard_dll=%s\r\n' "$(printf %s "$kbd_dll" | tr '[:upper:]' '[:lower:]')" >> "$usos/INTL.TXT"
+    log "locale ${intl_locale:-none}, keyboard ${intl_kbd:-none} (${kbd_dll:-no layout DLL}): $staged CD files for \\USOS\\NT3\\INTL"
 }
 
 # NT 3.1: \USOS\NT3 with the NT 3.1 driver builds; GUI Setup (the patched

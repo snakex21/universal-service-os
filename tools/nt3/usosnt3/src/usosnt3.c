@@ -249,7 +249,8 @@ static void restart(void)
 typedef DWORD (WINAPI *NET_USER_SET_INFO)(LPCWSTR, LPCWSTR, DWORD, LPBYTE, LPDWORD);
 typedef DWORD (WINAPI *NET_USER_ADD)(LPCWSTR, DWORD, LPBYTE, LPDWORD);
 typedef DWORD (WINAPI *NET_LOCALGROUP_ADD_MEMBER)(LPCWSTR, LPCWSTR, PSID);
-typedef int (WINAPI *GET_LOCALE_INFO_A)(LCID, DWORD, LPSTR, int);
+typedef int (WINAPI *GET_LOCALE_INFO_W)(LCID, DWORD, LPWSTR, int);
+typedef LONG (WINAPI *REG_SET_VALUE_EX_W)(HKEY, LPCWSTR, DWORD, DWORD, const BYTE *, DWORD);
 
 /* USER_INFO_1 (lmaccess.h). */
 struct usos_user_info_1 {
@@ -458,12 +459,34 @@ static void account(void)
         }
     }
     logon_user = user[0] ? user : "Administrator";
-    /* The account domain: the computer name, or the domain on a domain
-       controller (NT 3.1 Advanced Server). */
-    cb_sid = sizeof sid;
-    cb_domain = sizeof domain;
-    if (!LookupAccountNameA(NULL, logon_user, (PSID)sid, &cb_sid, domain, &cb_domain, &use))
-        domain[0] = 0;
+    /* The logon domain: on a domain controller (ProductType LanmanNt, NT
+       3.1 Advanced Server) the account domain LookupAccountName reports;
+       elsewhere the computer name Setup configured (Control\ComputerName\
+       ComputerName): during NT 3.1 GUI Setup the account domain is still
+       "MACHINENAME" (QEMU 2026-10-14), renamed only at the next start. */
+    domain[0] = 0;
+    {
+        HKEY h;
+        DWORD type, size = sizeof domain;
+        char product[32];
+        DWORD psize = sizeof product;
+        product[0] = 0;
+        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\ProductOptions", 0, KEY_READ, &h) == ERROR_SUCCESS) {
+            if (RegQueryValueExA(h, "ProductType", NULL, &type, (BYTE *)product, &psize) != ERROR_SUCCESS)
+                product[0] = 0;
+            RegCloseKey(h);
+        }
+        if (lstrcmpiA(product, "LanmanNt") == 0) {
+            cb_sid = sizeof sid;
+            cb_domain = sizeof domain;
+            if (!LookupAccountNameA(NULL, logon_user, (PSID)sid, &cb_sid, domain, &cb_domain, &use))
+                domain[0] = 0;
+        } else if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\ComputerName\\ComputerName", 0, KEY_READ, &h) == ERROR_SUCCESS) {
+            if (RegQueryValueExA(h, "ComputerName", NULL, &type, (BYTE *)domain, &size) != ERROR_SUCCESS)
+                domain[0] = 0;
+            RegCloseKey(h);
+        }
+    }
     put_sz(HKEY_LOCAL_MACHINE, "HKLM", winlogon, "DefaultUserName", logon_user, 0);
     if (domain[0])
         put_sz(HKEY_LOCAL_MACHINE, "HKLM", winlogon, "DefaultDomainName", domain, 0);
@@ -501,6 +524,8 @@ static const char *font_suffix(DWORD acp)
 }
 
 /* system32\<file>, or for a font system\ or system32\. */
+static int unpacked(const char *path);
+
 static int sys_file(const char *file, int font)
 {
     char path[MAX_PATH];
@@ -508,7 +533,7 @@ static int sys_file(const char *file, int font)
         lstrcpyA(path, "C:\\WINNT");
     lstrcatA(path, font ? "\\system\\" : "\\system32\\");
     lstrcatA(path, file);
-    if (GetFileAttributesA(path) != 0xFFFFFFFF)
+    if (unpacked(path))
         return 1;
     if (!font)
         return 0;
@@ -516,7 +541,27 @@ static int sys_file(const char *file, int font)
         lstrcpyA(path, "C:\\WINNT");
     lstrcatA(path, "\\system32\\");
     lstrcatA(path, file);
-    return GetFileAttributesA(path) != 0xFFFFFFFF;
+    return unpacked(path);
+}
+
+/* The file exists and is not a packed CD copy: an MSCF cabinet or an LZ
+   "SZDD" file under its real name stops the next start (STOP 0x7F with a
+   packed c_1250.nls as the ANSI code page, QEMU 2026-10-14). A file that
+   cannot be opened but exists is in use, so it was loaded and is real. */
+static int unpacked(const char *path)
+{
+    char head[4];
+    DWORD n = 0;
+    HANDLE h = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE)
+        return GetFileAttributesA(path) != 0xFFFFFFFF;
+    ReadFile(h, head, 4, &n, NULL);
+    CloseHandle(h);
+    if (n == 4 && head[0] == 'M' && head[1] == 'S' && head[2] == 'C' && head[3] == 'F')
+        return 0;
+    if (n == 4 && head[0] == 'S' && head[1] == 'Z' && head[2] == 'D' && head[3] == 'D')
+        return 0;
+    return 1;
 }
 
 /* "<base><suffix>.fon" / "c_<cp>.nls" into out. */
@@ -541,8 +586,13 @@ static void ini(const char *section, const char *key, const char *value)
 }
 
 /* Locale and keyboard of one user hive (HKU\<sub>): what the International
-   applet writes (Control Panel\International, the values from the locale
-   data when this kernel32 has GetLocaleInfoA) and Keyboard Layout\Active. */
+   applet writes (Control Panel\International: Locale and the values of the
+   locale data) and Keyboard Layout\Active. The locale values are read with
+   GetLocaleInfoW and stored with RegSetValueExW: GetLocaleInfoA converts
+   through the locale's ANSI code page and hung the service once c_1250.nls
+   had just been installed (QEMU 2026-10-14). Both are looked up at run time
+   (NT 3.1's kernel32 has no GetLocaleInfoA; values are skipped without the W
+   calls). */
 static void intl_user(const char *sub, LCID lcid, const char *locale, const char *keyboard)
 {
     static const struct { const char *name; DWORD type; } items[] = {
@@ -553,16 +603,29 @@ static void intl_user(const char *sub, LCID lcid, const char *locale, const char
         { "sLongDate", 0x20 }, { "iDate", 0x21 }, { "iTime", 0x23 }, { "iTLZero", 0x25 },
         { "s1159", 0x28 }, { "s2359", 0x29 },
     };
-    char key[160], value[96];
-    GET_LOCALE_INFO_A get = (GET_LOCALE_INFO_A)GetProcAddress(GetModuleHandleA("kernel32.dll"), "GetLocaleInfoA");
-    int i;
+    char key[160];
+    WCHAR value[96], wname[32];
+    GET_LOCALE_INFO_W get = (GET_LOCALE_INFO_W)GetProcAddress(GetModuleHandleA("kernel32.dll"), "GetLocaleInfoW");
+    REG_SET_VALUE_EX_W set_w = (REG_SET_VALUE_EX_W)GetProcAddress(GetModuleHandleA("advapi32.dll"), "RegSetValueExW");
+    HKEY h;
+    DWORD disp;
+    int i, n, written = 0;
     lstrcpyA(key, sub);
     lstrcatA(key, "\\Control Panel\\International");
     put_sz(HKEY_USERS, "HKU", key, "Locale", locale, 0);
-    for (i = 0; get && i < (int)(sizeof items / sizeof items[0]); i++) {
-        if (get(lcid, items[i].type, value, sizeof value) > 0)
-            put_sz(HKEY_USERS, "HKU", key, items[i].name, value, 0);
+    if (get && set_w && RegCreateKeyExA(HKEY_USERS, key, 0, "", REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &h, &disp) == ERROR_SUCCESS) {
+        for (i = 0; i < (int)(sizeof items / sizeof items[0]); i++) {
+            n = get(lcid, items[i].type, value, 96);
+            if (n <= 0)
+                continue;
+            to_wide(items[i].name, wname, 32);
+            if (set_w(h, wname, 0, REG_SZ, (const BYTE *)value, (DWORD)n * sizeof(WCHAR)) == ERROR_SUCCESS)
+                written++;
+        }
+        RegCloseKey(h);
     }
+    say(key);
+    say_hex(": locale values written ", (DWORD)written);
     if (keyboard[0]) {
         lstrcpyA(key, sub);
         lstrcatA(key, "\\Keyboard Layout");
@@ -636,6 +699,112 @@ static void code_pages(const struct usos_cp *c)
     }
 }
 
+/* The files GUI Setup would copy for the locale (LANGUAGE.INF / LAYOUT.INF
+   from the CD; text-mode Setup copies only the chosen keyboard layout and a
+   few code pages): nt4_csmwrap_target.sh nt3_stage_intl puts the CD's
+   copies in DIR\INTL under their expanded names. The NT 3.5 / 3.51 CDs
+   compress with MSCF cabinets (lz32's LZCopy only copies those: QEMU
+   2026-10-14, a 1510-byte c_1250.nls and STOP 0x7F at the next start), the
+   NT 3.1 CD with LZ: the system's own expand.exe (system32, every NT 3.x)
+   takes both; LZCopy stays as the fallback. Destination: system (fonts) or
+   system32, unless the file is there already. */
+typedef INT (WINAPI *LZ_OPEN_FILE_A)(LPSTR, LPOFSTRUCT, WORD);
+typedef LONG (WINAPI *LZ_COPY)(INT, INT);
+typedef VOID (WINAPI *LZ_CLOSE)(INT);
+
+/* expand.exe <src> <dst>, waited for (at most a minute). */
+static int run_expand(const char *src, const char *dst)
+{
+    char cmd[3 * MAX_PATH];
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    DWORD code = 1;
+    int i;
+    if (!GetSystemDirectoryA(cmd, MAX_PATH))
+        lstrcpyA(cmd, "C:\\WINNT\\system32");
+    lstrcatA(cmd, "\\expand.exe ");
+    lstrcatA(cmd, src);
+    lstrcatA(cmd, " ");
+    lstrcatA(cmd, dst);
+    for (i = 0; i < (int)sizeof si; i++) /* volatile: no memset (no C runtime) */
+        ((volatile char *)&si)[i] = 0;
+    si.cb = sizeof si;
+    if (!CreateProcessA(NULL, cmd, NULL, NULL, FALSE, DETACHED_PROCESS, NULL, NULL, &si, &pi))
+        return 0;
+    WaitForSingleObject(pi.hProcess, 60000);
+    GetExitCodeProcess(pi.hProcess, &code);
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    return GetFileAttributesA(dst) != 0xFFFFFFFF;
+}
+
+/* The first bytes of a file are "MSCF" (a cabinet). */
+static int is_cabinet(const char *path)
+{
+    char head[4];
+    DWORD n = 0;
+    HANDLE h = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE)
+        return 0;
+    ReadFile(h, head, 4, &n, NULL);
+    CloseHandle(h);
+    return n == 4 && head[0] == 'M' && head[1] == 'S' && head[2] == 'C' && head[3] == 'F';
+}
+
+static void install_intl_files(void)
+{
+    char src[MAX_PATH], dst[MAX_PATH];
+    const char *base, *how;
+    WIN32_FIND_DATAA fd;
+    OFSTRUCT of_src, of_dst;
+    HANDLE find;
+    HMODULE lz = LoadLibraryA("lz32.dll");
+    LZ_OPEN_FILE_A lz_open = lz ? (LZ_OPEN_FILE_A)GetProcAddress(lz, "LZOpenFileA") : NULL;
+    LZ_COPY lz_copy = lz ? (LZ_COPY)GetProcAddress(lz, "LZCopy") : NULL;
+    LZ_CLOSE lz_close = lz ? (LZ_CLOSE)GetProcAddress(lz, "LZClose") : NULL;
+    int n = 0, i, ok;
+
+    find = FindFirstFileA(DIR "INTL\\*", &fd);
+    if (find == INVALID_HANDLE_VALUE)
+        return;
+    do {
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            continue;
+        lstrcpyA(src, DIR "INTL\\");
+        lstrcatA(src, fd.cFileName);
+        base = fd.cFileName;
+        if (!GetWindowsDirectoryA(dst, MAX_PATH))
+            lstrcpyA(dst, "C:\\WINNT");
+        i = len(base);
+        lstrcatA(dst, i > 4 && lstrcmpiA(base + i - 4, ".fon") == 0 ? "\\system\\" : "\\system32\\");
+        lstrcatA(dst, base);
+        if (GetFileAttributesA(dst) != 0xFFFFFFFF)
+            continue;
+        how = "expand.exe";
+        ok = run_expand(src, dst);
+        if (!ok && !is_cabinet(src) && lz_open && lz_copy && lz_close) {
+            INT a = lz_open(src, &of_src, OF_READ);
+            INT b = a < 0 ? -1 : lz_open(dst, &of_dst, OF_CREATE);
+            ok = a >= 0 && b >= 0 && lz_copy(a, b) >= 0;
+            if (a >= 0)
+                lz_close(a);
+            if (b >= 0)
+                lz_close(b);
+            how = "LZCopy";
+        }
+        if (!ok)
+            DeleteFileA(dst); /* never a packed file under the real name */
+        say(ok ? "installed " : "INSTALL FAILED ");
+        say(dst);
+        say(" (");
+        say(how);
+        say(")\r\n");
+        n += ok;
+    } while (FindNextFileA(find, &fd));
+    FindClose(find);
+    say_hex("locale files installed: ", (DWORD)n);
+}
+
 static void intl(void)
 {
     static const char nls_lang[] = "SYSTEM\\CurrentControlSet\\Control\\Nls\\Language";
@@ -657,16 +826,24 @@ static void intl(void)
     }
     if (len(keyboard) != 8)
         keyboard[0] = 0;
-    /* The layout DLL (HKLM Keyboard Layout maps the id to it; text-mode
-       Setup copies every layout of TXTSETUP [Keyboard Layout]). */
+    install_intl_files();
+    /* The layout DLL: HKLM Keyboard Layout maps the id to it (LAYOUT.INF
+       MakeLayoutEntry); text-mode Setup writes only the chosen layout, so
+       the staged one (keyboard_dll=) is added. */
     if (keyboard[0]) {
         HKEY h;
         DWORD type, size = sizeof file;
+        char dll[32];
         file[0] = 0;
         if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout", 0, KEY_READ, &h) == ERROR_SUCCESS) {
             if (RegQueryValueExA(h, keyboard, NULL, &type, (BYTE *)file, &size) != ERROR_SUCCESS)
                 file[0] = 0;
             RegCloseKey(h);
+        }
+        text_value(text, "keyboard_dll", dll, sizeof dll);
+        if (!file[0] && dll[0] && sys_file(dll, 0)) {
+            put_sz(HKEY_LOCAL_MACHINE, "HKLM", "SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout", keyboard, dll, 0);
+            lstrcpyA(file, dll);
         }
         if (!file[0] || !sys_file(file, 0)) {
             say("keyboard ");
@@ -685,21 +862,45 @@ static void intl(void)
     put_sz(HKEY_LOCAL_MACHINE, "HKLM", nls_lang, "Default", lang, 0);
     if (sys_file("l_intl.nls", 0))
         put_sz(HKEY_LOCAL_MACHINE, "HKLM", nls_lang, lang, "l_intl.nls", 0);
-    /* The logon desktop (.DEFAULT) and the Default User hive (config\userdef,
-       which GUI Setup saved from .DEFAULT; every new profile starts from it). */
+    /* The logon desktop (.DEFAULT), then the Default User hive the way GUI
+       Setup made it (INITIAL.INF SaveHive .DEFAULT -> config\UserDef):
+       winlogon copies config\userdef for every new profile. Writing into a
+       RegLoadKey-ed userdef did not reach the file winlogon copies (QEMU
+       2026-10-14: the values stayed in userdef.LOG). The old file is kept
+       as userdef.sav until the new one is saved. */
     intl_user(".DEFAULT", lcid, locale, keyboard);
-    enable_privilege("SeRestorePrivilege");
     enable_privilege("SeBackupPrivilege");
     if (!GetWindowsDirectoryA(hive, MAX_PATH))
         lstrcpyA(hive, "C:\\WINNT");
     lstrcatA(hive, "\\system32\\config\\userdef");
-    rc = RegLoadKeyA(HKEY_USERS, "USOSDEF", hive);
-    if (rc == ERROR_SUCCESS) {
-        intl_user("USOSDEF", lcid, locale, keyboard);
-        rc = RegUnLoadKeyA(HKEY_USERS, "USOSDEF");
-        say_hex(rc ? "userdef unload FAILED " : "userdef updated ", rc);
-    } else {
-        say_hex("userdef not loaded, rc ", rc);
+    {
+        char saved[MAX_PATH], log[MAX_PATH];
+        lstrcpyA(saved, hive);
+        lstrcatA(saved, ".sav");
+        lstrcpyA(log, hive);
+        lstrcatA(log, ".log");
+        DeleteFileA(saved);
+        if (!MoveFileA(hive, saved)) {
+            say_hex("userdef not replaced (rename), error ", GetLastError());
+            return;
+        }
+        {
+            HKEY def;
+            rc = RegOpenKeyExA(HKEY_USERS, ".DEFAULT", 0, KEY_READ, &def);
+            if (rc == ERROR_SUCCESS) {
+                rc = RegSaveKeyA(def, hive, NULL);
+                RegCloseKey(def);
+            }
+        }
+        if (rc == ERROR_SUCCESS) {
+            DeleteFileA(saved);
+            DeleteFileA(log);
+            say("userdef saved from .DEFAULT\r\n");
+        } else {
+            DeleteFileA(hive);
+            MoveFileA(saved, hive);
+            say_hex("userdef save FAILED (old one kept), rc ", rc);
+        }
     }
 }
 
