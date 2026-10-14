@@ -58,16 +58,16 @@ def run(cmd, **kw):
     return subprocess.run([str(c) for c in cmd], check=True, capture_output=True, **kw)
 
 
-def build_breaker(out: Path) -> Path:
+def build_breaker(out: Path, source: str = 'acpi10_break.zig') -> Path:
     zig = None
     for base in (ROOT, MAIN):
         if (base / 'tools/zig/zig.exe').exists():
             zig = base / 'tools/zig/zig.exe'
             break
-    efi = out / 'acpi10-break.efi'
+    efi = out / (Path(source).stem + '.efi')
     env = dict(os.environ, ZIG_GLOBAL_CACHE_DIR=str(out / 'zig-cache'))
     run([zig, 'build-exe', '-target', 'x86_64-uefi', '-O', 'ReleaseSmall',
-         '-Mroot=' + str(Path(__file__).with_name('acpi10_break.zig')), '-femit-bin=' + str(efi),
+         '-Mroot=' + str(Path(__file__).with_name(source)), '-femit-bin=' + str(efi),
          '--cache-dir', str(out / 'zig-cache-local')], env=env)
     return efi
 
@@ -243,6 +243,7 @@ def main() -> int:
     p.add_argument('--minutes', type=float, default=8)
     p.add_argument('--legacy-fadt', action='store_true', help='csmwrap.ini acpi_legacy_fadt = true (the Windows 2000 flow)')
     p.add_argument('--accel', default='tcg,thread=multi')
+    p.add_argument('--sci-off', action='store_true', help='start CSMWrap through acpien_legacy.zig: PM1a_CNT.SCI_EN cleared first (legacy mode, as AMI hands over)')
     p.add_argument('--expect-logon', action='store_true', help='installed target: PASS = no bugcheck until --minutes are up')
     p.add_argument('--machine', default='pc', help='q35: FADT revision 3+ (longer than the 0x84 bytes the Windows 2000 ACPI HALs copy)')
     a = p.parse_args()
@@ -252,14 +253,19 @@ def main() -> int:
     overlay = out / 'overlay.qcow2'
     run([QEMU_IMG, 'create', '-f', 'qcow2', '-F', 'qcow2', '-b', str(a.target.resolve()), str(overlay)])
     csmwrap = a.csmwrap.read_bytes()
+    assert not (a.brk and a.sci_off)
     boot_efi = build_breaker(out).read_bytes() if a.brk else csmwrap
+    if a.sci_off:
+        boot_efi = build_breaker(out, 'acpien_legacy.zig').read_bytes()
     patch_esp(overlay, out, boot_efi, csmwrap, 'acpi_legacy_fadt = true\r\n' if a.legacy_fadt else '')
     summary = boot(out, overlay, a.minutes, a.accel, a.machine)
     lines = summary['serial_acpi10']
     reached = ('timeout',) if a.expect_logon else ('kernel-screen', 'kernel-bsod')
     ok = summary['result'] in reached and any('USOS ACPI10' in l for l in lines)
     en = summary['serial_acpien']
-    ok = ok and (any('USOS ACPIEN: status' in l for l in en) if a.legacy_fadt else not en)
+    ok = ok and (any('USOS ACPIEN: status' in l for l in en) if a.legacy_fadt else not any('USOS ACPIEN' in l for l in en))
+    if a.sci_off and a.legacy_fadt:
+        ok = ok and any('USOS ACPIEN: status o' in l for l in en)
     if a.brk:
         ok = ok and any('built RSDT' in l for l in lines) and any('ACPI10-BREAK RSDP' in l for l in lines)
     summary['pass'] = ok
