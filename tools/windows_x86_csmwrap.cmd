@@ -523,7 +523,8 @@ echo [USOS] phase=mpart nt=%USOS_NT% build=%USOS_BUILD%
 if not exist "%~dp0usosmpart-x86.sys" (echo [USOS] usosmpart: driver missing; skipped. & exit /b 0)
 copy /y "%~dp0usosmpart-x86.sys" "%USOS_T%\Windows\System32\drivers\usosmpart.sys" >nul
 if errorlevel 1 (echo [USOS] usosmpart: copy failed; skipped. & exit /b 0)
-fc /b "%~dp0usosmpart-x86.sys" "%USOS_T%\Windows\System32\drivers\usosmpart.sys" >nul
+rem Readback through the helper: this WinPE has no fc.exe (nor findstr).
+"%~dp0usos-x86-csmwrap.exe" samefile "%~dp0usosmpart-x86.sys" "%USOS_T%\Windows\System32\drivers\usosmpart.sys" >nul
 if errorlevel 1 (echo [USOS] usosmpart: readback mismatch; not registered. & del "%USOS_T%\Windows\System32\drivers\usosmpart.sys" & exit /b 0)
 reg load HKLM\USOS_SYS "%USOS_T%\Windows\System32\config\SYSTEM" >nul
 if errorlevel 1 (echo [USOS] usosmpart: SYSTEM hive not loaded; skipped. & exit /b 0)

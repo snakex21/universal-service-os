@@ -29,6 +29,9 @@
  *   lowmem                   NVMe target: when this WinPE has RAM above 4 GiB,
  *                            truncatememory 0x100000000 in the staging BCD
  *                            (exit 10: the cmd restarts the WinPE once).
+ *   samefile <a> <b>         read-only: exit 0 when both files exist and have
+ *                            the same bytes, 1 otherwise (this WinPE has no
+ *                            fc.exe; the usosmpart copy readback of the cmd).
  *   stick                    read-only: logs the dirty bit of every volume on
  *                            a USB / removable disk (the USOS stick).
  *   after                    the Windows partition holds bootmgr and
@@ -533,6 +536,23 @@ static DWORD low_memory(void) {
     return result;
 }
 
+/* samefile: byte compare of two files (exit 0 equal, 1 different or unreadable). */
+static BOOL same_file(const WCHAR *a, const WCHAR *b) {
+    static BYTE other[65536];
+    HANDLE x = CreateFileW(a, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0);
+    if (x == INVALID_HANDLE_VALUE) return FALSE;
+    HANDLE y = CreateFileW(b, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0);
+    if (y == INVALID_HANDLE_VALUE) { CloseHandle(x); return FALSE; }
+    BOOL equal = TRUE;
+    for (;;) {
+        DWORD got_x = 0, got_y = 0;
+        if (!ReadFile(x, buffer, sizeof(buffer), &got_x, 0) || !ReadFile(y, other, sizeof(other), &got_y, 0) || got_x != got_y || !same(buffer, other, got_x)) { equal = FALSE; break; }
+        if (!got_x) break;
+    }
+    CloseHandle(x); CloseHandle(y);
+    return equal;
+}
+
 static DWORD WINAPI notice(LPVOID unused) {
     (void)unused;
     MessageBoxW(0, L"The first part of the Windows installation is complete.\n\nRemove the USOS stick now, then choose OK: the computer restarts and Windows continues from the disk through CSMWrap. If the stick stays connected, start this disk's UEFI entry from the firmware boot menu.\n\nThe computer restarts by itself in 2 minutes.",
@@ -555,6 +575,7 @@ void entry(void) {
         { char d[MAX_PATH]; DWORD dn = GetEnvironmentVariableA("USOS_NVME_DRIVERS", d, MAX_PATH); if (dn && dn < MAX_PATH) lstrcpyA(nvme_drivers, d); }
         ExitProcess(write_answer(args[2], args[3]) ? 0 : 7);
     }
+    if (lstrcmpiW(args[1], L"samefile") == 0 && arg_count == 4) ExitProcess(same_file(args[2], args[3]) ? 0 : 1);
     if (lstrcmpiW(args[1], L"stick") == 0) { stick_report(); ExitProcess(0); }
     if (lstrcmpiW(args[1], L"nodump") == 0) ExitProcess(no_dump_stack());
     /* disks: read-only inventory of every PhysicalDrive (find_disk verbose);

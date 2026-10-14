@@ -176,7 +176,27 @@ def main() -> int:
     assert script.index("setup-returned") < usb3 < script.index('usos-x86-csmwrap.exe" after')
     assert script.index("/Add-Package") < script.index("/Add-Driver")
     assert 'if not "%USOS_NT%"=="6.1" exit /b 0' in script and "/ForceUnsigned" in script
-    print("PASS windows_x86_csmwrap answer edit (arch + product key) + usb3 step")
+    # The Win10 x86 WinPE has neither fc.exe nor findstr.exe (find only): any
+    # call of them fails, so a check built on them silently skips its step
+    # (usosmpart readback 2026-10-14). The readback uses the helper instead.
+    code = [line for line in script.splitlines() if not line.lstrip().lower().startswith(("rem ", "::"))]
+    for tool in ("fc", "fc.exe", "findstr", "findstr.exe", "comp", "comp.exe", "certutil"):
+        bad = [line for line in code if re.search(r'(?<![\w.%~-])' + re.escape(tool) + r'(?![\w.-])', line, re.I)]
+        assert not bad, (tool, bad)
+    mpart = script[script.index("\n:mpart\n"):script.index("\n:mpart_reg\n")]
+    assert r'usos-x86-csmwrap.exe" samefile "%~dp0usosmpart-x86.sys" "%USOS_T%\Windows\System32\drivers\usosmpart.sys"' in mpart
+    assert mpart.index(" samefile ") < mpart.index("readback mismatch") < mpart.index("reg load")
+    # samefile on the host: equal, different (same size), shorter, missing.
+    with tempfile.TemporaryDirectory() as tmp:
+        a, b, c, d = (Path(tmp) / n for n in ("a.sys", "b.sys", "c.sys", "d.sys"))
+        blob = bytes(range(256)) * 700  # spans more than one 64 KiB read
+        a.write_bytes(blob); b.write_bytes(blob); c.write_bytes(blob[:-1] + b"\x00"); d.write_bytes(blob[:-1])
+        same = lambda x, y: subprocess.run([str(EXE), "samefile", str(x), str(y)], capture_output=True).returncode
+        assert same(a, b) == 0 and same(a, c) == 1 and same(a, d) == 1 and same(d, a) == 1
+        assert same(a, Path(tmp) / "missing.sys") == 1 and same(Path(tmp) / "missing.sys", a) == 1
+        e = Path(tmp) / "e.sys"; e.write_bytes(b""); f = Path(tmp) / "f.sys"; f.write_bytes(b"")
+        assert same(e, f) == 0 and same(e, a) == 1
+    print("PASS windows_x86_csmwrap answer edit (arch + product key) + usb3 step + mpart readback (no fc/findstr)")
     return 0
 
 
