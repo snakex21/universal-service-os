@@ -22,7 +22,11 @@ OOBE gate adds it to the machine's Root + TrustedPublisher stores before
 specialize, tools/windows_vista_oobe_gate.c).
 
 Output folder: usosnvme.inf (NT6 copy with CatalogFile), usosnvme.sys
-(signed copy of the committed 2KXP build), usosnvme.cat, usosnvme.cer.
+(signed copy of the committed NT6 build: src\2KXP with -DUSOSNVME_NT6, no
+HwInterrupt, so ScsiPort connects no interrupt; the X470 Win10 x86 WinPE
+failed the 2KXP build's start with Problem 10 / 0xC000000D, 2026-10-14),
+usosnvme.cat, usosnvme.cer. The amd64 build does not exist yet (build.cmd
+is x86 only).
 """
 from __future__ import annotations
 
@@ -99,7 +103,7 @@ def build(root: Path, out: Path) -> str:
         shutil.rmtree(out)
     out.mkdir(parents=True)
     (out / 'usosnvme.inf').write_bytes(nt6_inf(root))
-    shutil.copyfile(root / 'tools/nt/usosnvme/bin/2KXP/i386/usosnvme.sys', out / 'usosnvme.sys')
+    shutil.copyfile(root / 'tools/nt/usosnvme/bin/NT6/i386/usosnvme.sys', out / 'usosnvme.sys')
     (out / 'usosnvme.cdf').write_bytes(
         b'[CatalogHeader]\r\nName=usosnvme.cat\r\nResultDir=.\r\nPublicVersion=0x0000001\r\nEncodingType=0x00010001\r\n'
         b'CATATTR1=0x10010001:OSAttr:2:6.0,2:6.1\r\n\r\n'

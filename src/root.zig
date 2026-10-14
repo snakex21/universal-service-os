@@ -33,6 +33,7 @@ pub const gui = struct {
     pub const usb_gamepad = @import("gui/usb_gamepad.zig");
     pub const handheld = @import("gui/handheld.zig");
     pub const ui = @import("gui/ui.zig");
+    pub const arch_badge = @import("gui/arch_badge.zig");
     pub const menu_screens = @import("gui/menu_screens.zig");
     pub const form = @import("gui/form.zig");
     pub const osk = @import("gui/osk.zig");
@@ -107,6 +108,7 @@ test {
     _ = @import("flow/linux_iso/root.zig");
     _ = @import("gui/form.zig");
     _ = @import("gui/osk.zig");
+    _ = @import("gui/arch_badge.zig");
     _ = @import("flow/plan.zig");
     _ = @import("platform/bios/windows_boot_contract.zig");
     _ = @import("platform/bios/windows_cpio.zig");

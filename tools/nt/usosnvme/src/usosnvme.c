@@ -22,6 +22,19 @@
  *  - only namespaces with 512-byte LBAs and no metadata are exposed; any
  *    other format is refused (no disk) with an event-log entry and a line
  *    in the VGA text buffer.
+ *
+ * USOSNVME_NT6 (Windows Vista / 7 / 2008 and the Windows 10 x86 WinPE, built
+ * from src/2KXP): no HwInterrupt at all, so ScsiPort connects no interrupt
+ * object (its "adapter has no interrupt" path). In that WinPE the driver
+ * runs as the stornvme service under stornvme.inf, which asks PnP for
+ * MSI-X (MSISupported = 1); connecting the message resource through
+ * ScsiPort's line-based IoConnectInterrupt failed the start (X470,
+ * 2026-10-14: Problem 10, 0xC000000D). The message vectors are masked at
+ * the function instead (MSI-X Function Mask, MSI Enable off).
+ * Provenance: the diagnosis (ScsiPort's interrupt connect for a miniport
+ * with / without HwInterrupt) was informed by reading the Windows Server
+ * 2003 scsiport source supplied by the user as a reference; this variant
+ * is our own code, not derived from that source.
  */
 #include "usosnvme.h"
 
@@ -39,7 +52,9 @@ static ULONG NvmeFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOI
                              OUT PBOOLEAN Again);
 static BOOLEAN NvmeHwInitialize(IN PVOID DeviceExtension);
 static BOOLEAN NvmeStartIo(IN PVOID DeviceExtension, IN PSCSI_REQUEST_BLOCK Srb);
+#ifndef USOSNVME_NT6
 static BOOLEAN NvmeInterrupt(IN PVOID DeviceExtension);
+#endif
 static BOOLEAN NvmeResetBus(IN PVOID DeviceExtension, IN ULONG PathId);
 
 /* ------------------------------------------------------------------ */
@@ -350,6 +365,32 @@ static VOID NvmeWritePciCommand(PHW_DEVICE_EXTENSION Ext, ULONG Bus, ULONG Slot,
     ScsiPortSetBusDataByOffset(Ext, PCIConfiguration, Bus, Slot, &Command, 0x04, sizeof(USHORT));
 #endif
 }
+
+#ifdef USOSNVME_NT6
+/* MSI-X: Function Mask on (vectors stay allocated, nothing is sent);
+   MSI: Enable off. INTx is already off (PCI Command bit 10). */
+static VOID NvmeMaskMessages(PHW_DEVICE_EXTENSION Ext, ULONG Bus, ULONG Slot)
+{
+    UCHAR cfg[256];
+    ULONG got, ptr, guard;
+    USHORT ctl;
+
+    got = ScsiPortGetBusData(Ext, PCIConfiguration, Bus, Slot, cfg, sizeof(cfg));
+    if (got < 0x40 || !(cfg[0x06] & 0x10)) return;     /* no capability list */
+    ptr = cfg[0x34] & 0xFC;
+    for (guard = 0; ptr >= 0x40 && ptr + 4 <= got && guard < 48; guard++) {
+        ctl = (USHORT)(cfg[ptr + 2] | ((USHORT)cfg[ptr + 3] << 8));
+        if (cfg[ptr] == 0x11 && !(ctl & 0x4000)) {
+            ctl |= 0x4000;
+            ScsiPortSetBusDataByOffset(Ext, PCIConfiguration, Bus, Slot, &ctl, ptr + 2, sizeof(ctl));
+        } else if (cfg[ptr] == 0x05 && (ctl & 0x0001)) {
+            ctl &= (USHORT)~0x0001;
+            ScsiPortSetBusDataByOffset(Ext, PCIConfiguration, Bus, Slot, &ctl, ptr + 2, sizeof(ctl));
+        }
+        ptr = cfg[ptr + 1] & 0xFC;
+    }
+}
+#endif
 
 static BOOLEAN NvmeIsNvme(PPCI_COMMON_CONFIG Cfg)
 {
@@ -736,7 +777,11 @@ ULONG DriverEntry(IN PVOID DriverObject, IN PVOID Argument2)
 #endif
     init.HwInitialize = NvmeHwInitialize;
     init.HwStartIo = NvmeStartIo;
+#ifdef USOSNVME_NT6
+    init.HwInterrupt = NULL;             /* polled, no interrupt object */
+#else
     init.HwInterrupt = NvmeInterrupt;
+#endif
     init.HwFindAdapter = NvmeFindAdapter;
     init.HwResetBus = NvmeResetBus;
 #ifdef USOSNVME_W9X
@@ -864,6 +909,9 @@ static ULONG NvmeFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOI
     /* memory decode + bus master on; INTx off (the driver polls) */
     cmd = (USHORT)(cfg.Command | 0x0006 | 0x0400);
     NvmeWritePciCommand(ext, bus, slot, cmd);
+#ifdef USOSNVME_NT6
+    NvmeMaskMessages(ext, bus, slot);
+#endif
 
 #ifdef USOSNVME_NT4
     /* non-PnP: report the range so ScsiPort claims it */
@@ -913,7 +961,9 @@ static ULONG NvmeFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOI
     ConfigInfo->BusInterruptLevel = 0;
     ConfigInfo->BusInterruptVector = 0;
 #endif
+#ifndef USOSNVME_NT6
     ConfigInfo->InterruptMode = LevelSensitive;
+#endif
     ConfigInfo->Master = TRUE;
     ConfigInfo->Dma32BitAddresses = TRUE;
 #if !defined(USOSNVME_NT4) && defined(SCSI_DMA64_MINIPORT_SUPPORTED)
@@ -1027,11 +1077,13 @@ static BOOLEAN NvmeAdapterState(IN PVOID DeviceExtension, IN PVOID Context, IN B
 }
 #endif
 
+#ifndef USOSNVME_NT6
 static BOOLEAN NvmeInterrupt(IN PVOID DeviceExtension)
 {
     (VOID)DeviceExtension;
     return FALSE;        /* polled; INTx disabled, INTMS masked */
 }
+#endif
 
 static BOOLEAN NvmeResetBus(IN PVOID DeviceExtension, IN ULONG PathId)
 {

@@ -72,6 +72,22 @@ const Iso = struct {
     }
 };
 
+/// Architectures already known for a system's image folder (probed earlier
+/// in this menu session), each once, in probe order: the chips of the
+/// system entry (manual_rows.zig). Nothing is read here.
+pub fn cachedArchs(directory: []const u8, out: []media.Arch) []media.Arch {
+    const directory_hash = std.hash.Wyhash.hash(0, directory);
+    var n: usize = 0;
+    for (cache) |entry| {
+        if (!entry.used or entry.directory_hash != directory_hash or entry.info.unreadable or entry.info.arch == .unknown) continue;
+        if (std.mem.indexOfScalar(media.Arch, out[0..n], entry.info.arch) != null) continue;
+        if (n == out.len) break;
+        out[n] = entry.info.arch;
+        n += 1;
+    }
+    return out[0..n];
+}
+
 /// Fills `images.items[i].media` for every ISO of a probed system.
 pub fn probeList(system: *const usos.catalog.SystemEntry, images: *usos.catalog.ImageList) void {
     if (!applies(system)) return;

@@ -58,6 +58,9 @@ rem the WinPE restarts once (docs/nvme-nt6-2026-10-12.md section 10).
 if defined USOS_NVME_TARGET call :nvme_pe_driver
 if defined USOS_NVME_TARGET call :nvme_lowmem
 if defined USOS_NVME_TARGET if "%USOS_LOWMEM%"=="10" exit /b 0
+rem lowmem exit 4: the prepared disk is not visible; the disk report already
+rem ran, so stop here (no Setup copy, no "before").
+if defined USOS_NVME_TARGET if "%USOS_LOWMEM%"=="4" exit /b 1
 if defined USOS_NVME_TARGET call :nvme_setup
 if defined USOS_NVME_TARGET if errorlevel 1 exit /b 1
 "%~dp0usos-x86-csmwrap.exe" before "%USOS_ANSWER%" "%~dp0usos-csmwrap-unattend.xml" "%USOS_SETUP%"
@@ -118,6 +121,15 @@ if not exist "%USOS_WMIC%" goto disk_report_done
 echo [USOS] wmic: storage controllers, disks and devices with a problem code
 "%USOS_WMIC%" path Win32_PnPEntity where "PNPClass='SCSIAdapter' or PNPClass='HDC' or PNPClass='DiskDrive' or ConfigManagerErrorCode<>0" get Name,PNPClass,Service,ConfigManagerErrorCode,DeviceID /format:list
 :disk_report_done
+rem The NVMe controller's interrupt settings (MSISupported / MessageNumberLimit
+rem from stornvme.inf, X470 2026-10-14) and what PnP assigned (raw and
+rem translated resource lists of every started device).
+call :nvme_pe_id
+if defined USOS_NVME_ID echo [USOS] NVMe device %USOS_NVME_ID%: Device Parameters\Interrupt Management
+if defined USOS_NVME_ID reg query "HKLM\SYSTEM\CurrentControlSet\Enum\%USOS_NVME_ID%\Device Parameters\Interrupt Management" /s
+if not defined USOS_NVME_ID echo [USOS] no device under the stornvme service.
+reg query "HKLM\HARDWARE\RESOURCEMAP\PnP Manager" >nul 2>&1 && echo [USOS] HKLM\HARDWARE\RESOURCEMAP\PnP Manager
+reg query "HKLM\HARDWARE\RESOURCEMAP\PnP Manager" /s 2>nul
 rem stornvme / StorPort / disk events of this WinPE boot (resets, timeouts,
 rem controller fatal status, surprise removal; X470 2026-10-13 had none in
 rem the log), oldest first, when the PE has wevtutil.
@@ -287,15 +299,36 @@ for %%F in ("%USOS_PE_NVME%") do set "USOS_PE_NVME_SIZE=%%~zF"
 for %%F in ("%~dp0usosnvme-nt6.sys") do set "USOS_OWN_NVME_SIZE=%%~zF"
 if "%USOS_PE_NVME_SIZE%"=="%USOS_OWN_NVME_SIZE%" (echo [USOS] NVMe target: the WinPE stornvme service runs usosnvme ^(stornvme.sys = usosnvme-nt6.sys, %USOS_PE_NVME_SIZE% bytes^).) else (echo [USOS] NVMe target: WARNING the WinPE stornvme.sys is not usosnvme ^(%USOS_PE_NVME_SIZE% vs %USOS_OWN_NVME_SIZE% bytes^): Microsoft stornvme runs the controller.)
 if exist "%SystemRoot%\System32\pnputil.exe" "%SystemRoot%\System32\pnputil.exe" /enum-devices /class SCSIAdapter
+rem Start failed anyway (X470 2026-10-14 with the 2KXP build: Problem 10,
+rem 0xC000000D on the MSI-X resource stornvme.inf asks for): this PE's
+rem device instance gets line-based interrupts (MSISupported = 0 under its
+rem Device Parameters, only in this RAM WinPE) and is restarted once.
+call :nvme_pe_id
+if not defined USOS_NVME_ID goto nvme_pe_driver_done
+if not exist "%SystemRoot%\System32\pnputil.exe" goto nvme_pe_driver_done
+"%SystemRoot%\System32\pnputil.exe" /enum-devices /problem | find /i "%USOS_NVME_ID%" >nul || goto nvme_pe_driver_done
+echo [USOS] NVMe target: the controller did not start; MSI off for this WinPE device, restart device.
+reg add "HKLM\SYSTEM\CurrentControlSet\Enum\%USOS_NVME_ID%\Device Parameters\Interrupt Management\MessageSignaledInterruptProperties" /v MSISupported /t REG_DWORD /d 0 /f
+"%SystemRoot%\System32\pnputil.exe" /restart-device "%USOS_NVME_ID%"
+ping -n 6 127.0.0.1 >nul
+"%SystemRoot%\System32\pnputil.exe" /enum-devices /instanceid "%USOS_NVME_ID%"
+:nvme_pe_driver_done
 "%~dp0usos-log-x86.exe"
+exit /b 0
+
+rem The NVMe controller's device instance under the stornvme service (the
+rem WinPE runs usosnvme as stornvme), empty when none is enumerated.
+:nvme_pe_id
+set "USOS_NVME_ID="
+for /f "tokens=2,*" %%A in ('reg query "HKLM\SYSTEM\CurrentControlSet\Services\stornvme\Enum" /v 0 2^>nul ^| find "REG_SZ"') do set "USOS_NVME_ID=%%B"
 exit /b 0
 
 rem ---- NVMe target: WinPE below 4 GiB --------------------------------------
 rem Result: 0 nothing to do (no RAM above 4 GiB, or the limit is already in
-rem the BCD: the second boot), 10 limit written (restart), 1 error, 4 the
-rem prepared disk was not found (stornvme without a usable disk, X470
-rem 2026-10-13): the disk report then runs here too, before nodump and the
-rem Setup copy, and again after "before" (two snapshots for the log).
+rem the BCD: the second boot, or micro-Linux set it at prepare time), 10
+rem limit written (restart), 1 error, 4 the prepared disk was not found
+rem (X470 2026-10-13 / 10-14): the disk report runs here and the flow stops
+rem (no Setup copy, no "before").
 :nvme_lowmem
 "%~dp0usos-x86-csmwrap.exe" lowmem
 set "USOS_LOWMEM=%errorlevel%"

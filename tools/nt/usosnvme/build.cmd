@@ -2,11 +2,13 @@
 rem build.cmd - build usosnvme.sys (USOS NVMe SCSI miniport, i386, free)
 rem with WDK 7.1 (7600.16385.1).
 rem
-rem   tools\nt\usosnvme\build.cmd <2kxp|nt4|nt351|nt31|w9x|all> [workdir]
+rem   tools\nt\usosnvme\build.cmd <2kxp|nt6|nt4|nt351|nt31|w9x|all> [workdir]
 rem
 rem Needs tools\WinDDK71 (or %WDKROOT%), see docs\BUILDING.md. Output:
 rem tools\nt\usosnvme\bin\<VARIANT>\i386\usosnvme.sys.
 rem   2kxp   Windows 2000 / XP / Server 2003 x86, PnP ScsiPort (src\2KXP)
+rem   nt6    Windows Vista / 7 / 2008 x86 and the Win10 x86 WinPE (src\2KXP,
+rem          -DUSOSNVME_NT6: no HwInterrupt, MSI / MSI-X masked)
 rem   nt4    Windows NT 4.0 (src\NT4, -DUSOSNVME_NT4, PE 4.00)
 rem   nt351  Windows NT 3.5 / 3.51 (+ -DUSOSNVME_NT351: CF8h/CFCh PCI
 rem          config, Isa registration, PE 3.51)
@@ -27,19 +29,20 @@ if not exist "%WDKROOT%\bin\setenv.bat" (
 )
 set "VARIANT=%~1"
 if /i "%VARIANT%"=="all" (
-  for %%V in (2kxp nt4 nt351 nt31 w9x) do (
+  for %%V in (2kxp nt6 nt4 nt351 nt31 w9x) do (
     call "%~f0" %%V "%~2" || exit /b 1
   )
   exit /b 0
 )
 set "DIR=" & set "DEFS=" & set "PEVER=" & set "OUT="
 if /i "%VARIANT%"=="2kxp"  set "DIR=2KXP" & set "OUT=2KXP"
+if /i "%VARIANT%"=="nt6"   set "DIR=2KXP" & set "OUT=NT6" & set "DEFS=-DUSOSNVME_NT6"
 if /i "%VARIANT%"=="nt4"   set "DIR=NT4" & set "OUT=NT4" & set "PEVER=4.00"
 if /i "%VARIANT%"=="nt351" set "DIR=NT4" & set "OUT=NT351" & set "PEVER=3.51" & set "DEFS=-DUSOSNVME_NT351"
 if /i "%VARIANT%"=="nt31"  set "DIR=NT4" & set "OUT=NT31" & set "PEVER=3.10" & set "DEFS=-DUSOSNVME_NT351 -DUSOSNVME_NT31"
 if /i "%VARIANT%"=="w9x"   set "DIR=W9X" & set "OUT=W9X" & set "PEVER=4.00"
 if "%DIR%"=="" (
-  echo usage: build.cmd ^<2kxp^|nt4^|nt351^|nt31^|w9x^|all^> [workdir]
+  echo usage: build.cmd ^<2kxp^|nt6^|nt4^|nt351^|nt31^|w9x^|all^> [workdir]
   exit /b 1
 )
 set "WORK=%~2"
