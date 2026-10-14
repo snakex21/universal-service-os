@@ -34,6 +34,13 @@
                 the first CONFIG.SYS line under CSMWrap (boot floppy and C:),
                 clears the control registers CSMWrap leaves set
 
+  USOSNVME.MPD, USOSNVME.INF
+                usosnvme 1.0 for Windows 9x (USOS, GPL-3.0-or-later): the NVMe
+                SCSI miniport for SCSIPORT.PDR (tools/nt/usosnvme, committed
+                build bin/W9X/usosnvme.mpd; usosnvme9x.inf). Only for an
+                NVMe target with DATA's nvme-experimental.txt
+                (tools/w9x_nvme.sh); otherwise removed from C:\\USOS9X
+
 Hardware diagnostics, staged (the UEFI path copies them to C:\\USOS9X;
 nothing runs them unless EFI/USOS/win9x/diag.flag exists):
   USOSDIAG.COM  timer tick / PIC / PIT, INT 15h memory, INT 13h, PCI, VBE, HPET report
@@ -77,7 +84,10 @@ STAGED = FILES + ('MSBATCH.INF', 'VMDISP9X.TGZ', 'XHCI98.SYS', 'XHCI98.INF', 'XH
     # Hardware diagnostics: on the stick, so the UEFI path's target writer
     # (tools/w9x_csmwrap_target.sh) puts them into C:\USOS9X; nothing runs
     # them unless EFI/USOS/win9x/diag.flag exists (USOSDIAG BOOT, INSTALL.BAT).
-    'USOSDIAG.COM', 'USOSDBG.EXE')
+    'USOSDIAG.COM', 'USOSDBG.EXE') + (
+    # NVMe targets with nvme-experimental.txt only (tools/w9x_nvme.sh).
+    'USOSNVME.MPD', 'USOSNVME.INF')
+USOSNVME = ROOT / 'tools/nt/usosnvme'
 
 NOTICE = """U9FIX.COM - USOS helper for Windows 95/98/Me
 Copyright (C) 2026 Maksymilian and the USOS Authors.
@@ -250,6 +260,16 @@ def stage_cregfix(out: Path) -> None:
     (out / 'CREGFIX.TXT').write_bytes(dos_text(notice))
 
 
+def stage_usosnvme(out: Path) -> None:
+    """usosnvme.mpd (USOSNVME_W9X build, committed) + its 9x INF."""
+    mpd = (USOSNVME / 'bin/W9X/usosnvme.mpd').read_bytes()
+    if mpd[:2] != b'MZ' or b'SCSIPORT.SYS' not in mpd or b'ntoskrnl' in mpd.lower():
+        raise ValueError('unexpected usosnvme.mpd (build: tools/nt/usosnvme/build.cmd w9x)')
+    (out / 'USOSNVME.MPD').write_bytes(mpd)
+    inf = (USOSNVME / 'usosnvme9x.inf').read_text(encoding='ascii')
+    (out / 'USOSNVME.INF').write_bytes(dos_text(inf))
+
+
 def build(root: Path = ROOT, out: Path | None = None) -> None:
     out = out or root / 'zig-out/dos-native/win9x'
     out.mkdir(parents=True, exist_ok=True)
@@ -266,6 +286,7 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
     stage_vmdisp9x(out)
     stage_xhci98(out)
     stage_cregfix(out)
+    stage_usosnvme(out)
     msdos = root / 'zig-out/dos-native/msdos'
     for name in BRIDGE:
         if not (msdos / name).is_file():

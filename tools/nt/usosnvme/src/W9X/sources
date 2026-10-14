@@ -1,0 +1,21 @@
+# usosnvme for Windows 95 OSR2 / 98 / 98 SE / Me: usosnvme.mpd, a SCSI
+# miniport loaded by SCSIPORT.PDR (docs/research/nvme-9x-2026-10-13.md).
+# The 9x port driver resolves the SCSIPORT.SYS imports of a PE miniport, so
+# WDK 7.1 builds it like the NT4 variant; no ntoskrnl import. build.cmd
+# renames the output to usosnvme.mpd and sets the PE version to 4.00.
+TARGETNAME=usosnvme
+TARGETPATH=obj
+TARGETTYPE=MINIPORT
+INCLUDES=..
+C_DEFINES=$(C_DEFINES) -DUSOSNVME_W9X
+TARGETLIBS=$(DDK_LIB_PATH)\scsiport.lib
+MSC_WARNING_LEVEL=/W3
+_NT_TARGET_VERSION=$(_NT_TARGET_VERSION_WINXP)
+SUBSYSTEM_VERSION=4.00
+MUI=0
+MUI_COMMENT=0
+BUFFER_OVERFLOW_CHECKS=0
+# The stock 9x miniports have no discardable INIT section.
+LINKER_FLAGS=$(LINKER_FLAGS) /MERGE:INIT=.text
+SOURCES=..\usosnvme.c \
+        ..\usosnvme.rc
