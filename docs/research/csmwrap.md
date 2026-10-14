@@ -418,3 +418,24 @@ RSDT's FADT is cut to revision 1 / 116 bytes for the 2000 ACPI HALs. Binary
 twice identical in the pinned Alpine VM (xxd pin moved to 9.2.1178-r0; the
 unpatched build still matches upstream_rebuild). Details and the q35 A/B:
 docs/windows-2000-acpi-x470-2026-10-12.md, last section.
+
+## 11. 3.1.2-usos6: ACPI mode before the legacy boot, Windows 2000 diagnostic (2026-10-14, branch `feature/w2k-acpi-csmen`)
+
+Patch 0007 (`src/usos_acpien.c`, own code from the ACPI specification and
+the PC CMOS RTC layout; host unit test
+`tools/tests/csmwrap/test_csmwrap_acpien.py`): only with
+`acpi_legacy_fadt = true` (the Windows 2000 ACPI flow), CSMWrap reads
+SMI_CMD / ACPI_ENABLE / PM1a_CNT_BLK / PM_TMR_BLK from the RSDT's FADT
+before ExitBootServices and, after SeaBIOS's Legacy16PrepareToBoot and right
+before Legacy16Boot, switches the machine to ACPI mode (SCI_EN polled for at
+most 3 s on the PM timer) with RTC A/B read before and after. Result: 8
+bytes at physical 0x4F4 (BDA inter-application area) for usosvid 1.2, and a
+`USOS ACPIEN:` serial line. Every other flow runs the usos5 path. Why and
+the reading table: docs/windows-2000-acpi-x470-2026-10-12.md, section
+"Step A". Binary
+`804d5f870c8958067ced48a23b461a69e98da81a645e50750b99d8b7feb4f342`, built
+twice identical in the pinned Alpine VM (same lock as usos5, BUILD_VERSION
+3.1.2-usos6; the unpatched build still matches upstream_rebuild). The
+vendor folder is `tools/vendor/csmwrap/3.1.2-usos6` (release.go, the DOS
+ESP builder, the XP ESP script pin and the tests moved to it; 3.1.2-usos5
+stays as the previous release binary).

@@ -21,9 +21,15 @@
  *           (HAL phase 0 and kernel phase 0 are done). A screen that still
  *           shows SETUPLDR's last line without this row = the hang is
  *           earlier.
- *   row 12  HPET (capabilities, general configuration: bit 1 =
- *           LegacyReplacement), RSDP (address, revision, RSDT, XSDT), RSDT
- *           entry count.
+ *   row 12  HPET (capabilities, general configuration low byte: bit 1 =
+ *           LegacyReplacement), RSDP (address, revision, RSDT, RSDT entry
+ *           count, x+/x- = XSDT address present or not), then (1.2) the
+ *           record CSMWrap 3.1.2-usos6 leaves at BDA 4F4h-4FBh when it
+ *           switched to ACPI mode before the boot (2000 ACPI flow):
+ *           "en=<o|t|a|n|s> a<RTC A before>><after> b<RTC B before>><after>
+ *           c<PM1a_CNT low byte after>"; o = SCI_EN set by the SMI,
+ *           t = still 0 after 3 s, a = already set (no SMI), n = no usable
+ *           FADT fields, s = the SMI never returned; "en=-" = no record.
  *   row 13  FACP revision, SCI, DSDT/SSDT QWord names still present
  *           (0 = the USOS W2K ACPI MBR patched them), checksums, MADT:
  *           enabled/total local APICs, x2APIC entries, I/O APIC id@GSI base,
@@ -55,7 +61,7 @@
  */
 #include <ntddk.h>
 
-#define USOSVID_VERSION "usosvid 1.1"
+#define USOSVID_VERSION "usosvid 1.2"
 
 #define COLS        80
 #define ROWS        25
@@ -232,6 +238,7 @@ ShowAcpi(VOID)
     ULONG lapics = 0, lapicsOn = 0, x2 = 0, nmis = 0, ios = 0, ebda = 0;
     PULONG r = NULL;
     PUSHORT bda;
+    UCHAR ae[8];                        /* CSMWrap usos6 result, BDA 4F4h-4FBh */
 
     /* HPET (the usual address; capabilities all-ones = nothing there) */
     hpet = (PULONG)MapPhys(0xFED00000, 0x400, MmNonCached);
@@ -239,13 +246,17 @@ ShowAcpi(VOID)
         p = PutStr(p, end, "hpet ");
         p = PutHex(p, end, hpet[0], 8);
         p = PutStr(p, end, " cfg=");
-        p = PutHex(p, end, hpet[4], 8);
+        p = PutHex(p, end, hpet[4] & 0xFF, 2);
         MmUnmapIoSpace(hpet, 0x400);
     }
 
     /* RSDP: EBDA first KiB, then E0000h-FFFFFh */
     bda = (PUSHORT)MapPhys(0x400, 0x100, MmCached);
-    if (bda != NULL) { ebda = (ULONG)bda[7] << 4; MmUnmapIoSpace(bda, 0x100); }
+    for (i = 0; i < sizeof(ae); i++) ae[i] = bda != NULL ? ((PUCHAR)bda)[0xF4 + i] : 0;
+    if (bda != NULL) {
+        ebda = (ULONG)bda[7] << 4;
+        MmUnmapIoSpace(bda, 0x100);
+    }
     if (ebda >= 0x80000 && ebda < 0xA0000) {
         area = (PUCHAR)MapPhys(ebda, 0x400, MmCached);
         if (area != NULL) {
@@ -280,9 +291,27 @@ ShowAcpi(VOID)
     if (r != NULL) n = (len - 36) / 4;
     p = PutStr(p, end, len ? "(" : "(none ");
     p = PutHex(p, end, n, 2);
-    p = PutStr(p, end, ") xsdt=");
-    if (xsdtHi) { p = PutHex(p, end, xsdtHi, 8); p = PutStr(p, end, ":"); }
-    p = PutHex(p, end, xsdtLo, 8);
+    p = PutStr(p, end, (xsdtLo | xsdtHi) ? ") x+" : ") x-");
+    /* CSMWrap 3.1.2-usos6 ACPI enable before the boot (2000 ACPI flow):
+       en=<status> a<RTC A before>><after> b<RTC B before>><after>
+       c<PM1a_CNT low byte after>; en=- = no record (older CSMWrap, or
+       another flow). */
+    if (ae[0] == 'A' && ae[1] == 'E') {
+        p = PutStr(p, end, " en=");
+        if (p < end) *p++ = (ae[2] >= 0x20 && ae[2] < 0x7F) ? (CHAR)ae[2] : '?';
+        p = PutStr(p, end, " a");
+        p = PutHex(p, end, ae[3], 2);
+        p = PutStr(p, end, ">");
+        p = PutHex(p, end, ae[4], 2);
+        p = PutStr(p, end, " b");
+        p = PutHex(p, end, ae[5], 2);
+        p = PutStr(p, end, ">");
+        p = PutHex(p, end, ae[6], 2);
+        p = PutStr(p, end, " c");
+        p = PutHex(p, end, ae[7], 2);
+    } else {
+        p = PutStr(p, end, " en=-");
+    }
     PutRow(ROW_ACPI1, line, (ULONG)(p - line), 0x1F00);
 
     /* Every RSDT entry: FACP -> DSDT; SSDTs; APIC */

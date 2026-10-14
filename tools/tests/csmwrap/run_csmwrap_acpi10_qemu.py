@@ -1,4 +1,5 @@
-"""QEMU smoke test for CSMWrap 3.1.2-usos5 patch 0006 (ACPI 1.0 view).
+"""QEMU smoke test for CSMWrap 3.1.2-usos6 patches 0006 (ACPI 1.0 view) and
+0007 (ACPI mode enabled before the legacy boot, with --legacy-fadt).
 
 Boots an already prepared Windows 2000/XP CSMWrap target (its MBR partition
 with $WIN_NT$.~BT or an installed system, plus the CSMWrap ESP) on OVMF
@@ -10,7 +11,11 @@ written). On the overlay's ESP:
   \\EFI\\BOOT\\CSMWRAP.EFI = the CSMWrap under test, csmwrap.ini verbose+serial
 PASS = the serial log has CSMWrap's "USOS ACPI10" lines (when --break: the
 RSDT was built and the FADT copy made) and the guest reaches the NT kernel's
-own text-mode screen (Setup copying files / the GUI-mode boot screen).
+own text-mode screen (Setup copying files / the GUI-mode boot screen); with
+--legacy-fadt also CSMWrap's "USOS ACPIEN: status" line, without it no
+"USOS ACPIEN" line at all (the option-off flows keep the usos5 path).
+--expect-logon: an installed system, PASS = no bugcheck until the time is up
+(look at final.ppm for the logon screen).
 
   python tools/tests/csmwrap/run_csmwrap_acpi10_qemu.py --target T.qcow2 --csmwrap csmwrapx64.efi --out DIR [--break] [--minutes 8]
 
@@ -225,7 +230,8 @@ def boot(out: Path, overlay: Path, minutes: float, accel: str, machine: str = 'p
         except Exception:
             proc.kill()
     log = serial.read_text(errors='replace') if serial.exists() else ''
-    return {'result': result, 'screens': len(screens), 'serial_acpi10': [l for l in log.splitlines() if 'ACPI10' in l]}
+    return {'result': result, 'screens': len(screens), 'serial_acpi10': [l for l in log.splitlines() if 'ACPI10' in l],
+            'serial_acpien': [l for l in log.splitlines() if 'ACPIEN' in l]}
 
 
 def main() -> int:
@@ -237,6 +243,7 @@ def main() -> int:
     p.add_argument('--minutes', type=float, default=8)
     p.add_argument('--legacy-fadt', action='store_true', help='csmwrap.ini acpi_legacy_fadt = true (the Windows 2000 flow)')
     p.add_argument('--accel', default='tcg,thread=multi')
+    p.add_argument('--expect-logon', action='store_true', help='installed target: PASS = no bugcheck until --minutes are up')
     p.add_argument('--machine', default='pc', help='q35: FADT revision 3+ (longer than the 0x84 bytes the Windows 2000 ACPI HALs copy)')
     a = p.parse_args()
     out = a.out.resolve()
@@ -249,7 +256,10 @@ def main() -> int:
     patch_esp(overlay, out, boot_efi, csmwrap, 'acpi_legacy_fadt = true\r\n' if a.legacy_fadt else '')
     summary = boot(out, overlay, a.minutes, a.accel, a.machine)
     lines = summary['serial_acpi10']
-    ok = summary['result'] in ('kernel-screen', 'kernel-bsod') and any('USOS ACPI10' in l for l in lines)
+    reached = ('timeout',) if a.expect_logon else ('kernel-screen', 'kernel-bsod')
+    ok = summary['result'] in reached and any('USOS ACPI10' in l for l in lines)
+    en = summary['serial_acpien']
+    ok = ok and (any('USOS ACPIEN: status' in l for l in en) if a.legacy_fadt else not en)
     if a.brk:
         ok = ok and any('built RSDT' in l for l in lines) and any('ACPI10-BREAK RSDP' in l for l in lines)
     summary['pass'] = ok
