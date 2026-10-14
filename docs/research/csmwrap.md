@@ -488,7 +488,18 @@ from=2 typ=0/0`: all six runs end with a guest SHUTDOWN. Control with usos6:
 both PM paths reset the guest (the #GP). The X470 values (PM1a_CNT 0x804,
 `_S5` 5, no PM1b) are covered by the host test on the X470 DSDT dump only.
 
-Binary `6a7746ca17327c4007dfc7bfb8e15db35a7c43c115bed68021113373a3653a52`,
+F-segment space: with this patch SeaBIOS's 16-bit + 32-bit segmented code,
+F-segment variables and 32-bit flat runtime code no longer fit in the
+F-segment with room left, so `scripts/layoutrom.py` falls back to its
+minimum allocation zone (BUILD_MIN_BIOSTABLE). Upstream's 2048 bytes did not
+hold the SMBIOS and MP table copies plus one block per AHCI port: the first
+usos7 build lost AHCI port 1 in `run_csmwrap_boot_disk_qemu.py` ("Unable to
+allocate resource at ahci_port_realloc"). Patch 0008 raises the minimum to
+6144 bytes (upstream 3.1.2 had 4320 free); 32-bit flat code moves below the
+F-segment, ROM use 96.0 % of 128 KiB. Boot-disk regression: all six layouts
+PASS; about 4 KiB of F-segment allocation space stays free in QEMU.
+
+Binary `bd91e53aeab1e971362509cfdfbf61fa7d72dba99b66b269d202c52d0da1041e`,
 built twice identical in the pinned Alpine VM (same lock as usos6,
 BUILD_VERSION 3.1.2-usos7; the unpatched build still matches
 upstream_rebuild). Vendor folder `tools/vendor/csmwrap/3.1.2-usos7`

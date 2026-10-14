@@ -32,12 +32,33 @@ encoding, 7.4.2 \_Sx states):
 - serialio.c/csm.c/csmwrap.c/LegacyBios.h: CsmwrapFlags bit 0x02 and
   CsmwrapSerialPort; with csmwrap.ini serial = true SeaBIOS dprintf level 1
   goes to that port (it had no output in this build: no DEBUG_SERIAL).
+- scripts/layoutrom.py: the minimum F-segment allocation zone goes from
+  2048 to 6144 bytes. With this patch the code no longer leaves room in
+  the F-segment, the layout falls back to that minimum, and 2048 bytes
+  lost AHCI port 1 in QEMU (SMBIOS + MP table copies + per-port blocks).
 
 Applies on top of patches 0001-0007 to CSMWrap 3.1.2 (808ac8e) with its
 seabios submodule (578d260b), patch -p1 from the top of the tree. Part of
 CSMWrap 3.1.2-usos7, a MODIFIED version made by the USOS project
 (LGPL-2.1 / SeaBIOS LGPLv3).
 
+diff -ruN a/seabios/scripts/layoutrom.py b/seabios/scripts/layoutrom.py
+--- a/seabios/scripts/layoutrom.py
++++ b/seabios/scripts/layoutrom.py
+@@ -66,7 +66,12 @@
+ BUILD_ROM_START = 0xc0000
+ BUILD_LOWRAM_END = 0xa0000
+ # Space to reserve in f-segment for dynamic allocations
+-BUILD_MIN_BIOSTABLE = 2048
++# USOS 0008: 6144 instead of 2048. The CSMWrap code no longer fits in the
++# F-segment with room left, so the layout falls back to this minimum; 2048
++# bytes did not hold the SMBIOS and MP table copies plus one fseg block per
++# AHCI port (AHCI port 1 lost in QEMU). 6144 is more than any earlier
++# CSMWrap build had (upstream 3.1.2: 4320); 32-bit flat code moves below.
++BUILD_MIN_BIOSTABLE = 6144
+ 
+ # Layout the 16bit code.  This ensures sections with fixed offset
+ # requirements are placed in the correct location.  It also places the
 diff -ruN a/seabios/src/apm.c b/seabios/src/apm.c
 --- a/seabios/src/apm.c
 +++ b/seabios/src/apm.c
