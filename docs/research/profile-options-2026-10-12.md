@@ -1,6 +1,6 @@
 # Answer-profile options: inventory, Schneegans comparison, per-family plan (2026-10-12)
 
-Status: **research**; stage 1 implemented 2026-10-12 (options.zig, editor groups, usos-reg.exe, core set, 10/11 packs; see answer-profiles.md "Options"). Goal from the user: USOS answer
+Status: **research**; stage 1 implemented 2026-10-12 (options.zig, editor groups, usos-reg.exe, core set, 10/11 packs; see answer-profiles.md "Options"); stage 2 implemented 2026-10-14 (packs for 9x, NT 4.0, 2000, XP/2003, Vista/7, 8.x, 10/11, Store app removal, power plan, user script hook, 11 classic context menu). Goal from the user: USOS answer
 profiles (the UEFI answer-profile manager and editor, the `usos-profile`
 INI and the `usos-answer` renderers) should offer as many options as the
 unattend generator at schneegans.de, and an equally rich, native set for

@@ -5,4 +5,6 @@ net user "Tester" "Test123!" /add >> "%USOS_LOG%" 2>&1
 for %%G in (Administrators Administratorzy Administratoren Administrateurs Administradores Administratori) do net localgroup %%G "Tester" /add >> "%USOS_LOG%" 2>&1
 net user "Drugi" "Test123!" /add >> "%USOS_LOG%" 2>&1
 for %%G in (Administrators Administratorzy Administratoren Administrateurs Administradores Administratori) do net localgroup %%G "Drugi" /add >> "%USOS_LOG%" 2>&1
+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
 exit /b 0
