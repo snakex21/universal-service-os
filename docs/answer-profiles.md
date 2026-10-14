@@ -259,7 +259,7 @@ only when set, defaults unchanged).
 | `all_tray_icons` (`EnableAutoTray=0`) | yes | | | | | yes | yes | yes | yes | |
 | `boot_to_desktop` (8.1 `StartPage OpenAtLogon=0`; 8/8.1 `EdgeUi` corner + charms hint off) | yes | | | | | | | yes | | |
 | `lock_screen_off` (policy `NoLockScreen`) | yes | | | | | | | yes | yes | yes |
-| `visual_effects` (`MinAnimate`, `DragFullWindows`; XP+ `UserPreferencesMask`, `VisualFXSetting=2`; 6.x+ taskbar/list-view animations, Aero Peek) | performance | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| `visual_effects` (`MinAnimate`, `DragFullWindows`; 6.x+ also `UserPreferencesMask`, `VisualFXSetting=2`, taskbar/list-view animations, Aero Peek; not XP/2003: their first logon replaced the values in the user's profile, QEMU 2026-10-14) | performance | yes | yes | yes | yes | | yes | yes | yes | yes |
 | `font_smoothing` (`FontSmoothing=2`; XP/2003 ClearType `FontSmoothingType=2`; new users + logon screen) | yes | | | | yes | yes | | | | |
 | `mouse_accel_off` (`MouseSpeed`, `MouseThreshold1/2` = 0) | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
 | `sticky_keys_off` (`StickyKeys Flags=506`) | yes | | | | yes | yes | yes | yes | yes | yes |
@@ -280,7 +280,7 @@ only when set, defaults unchanged).
 | `smartscreen_off` (policy `EnableSmartScreen=0`, Explorer `SmartScreenEnabled=Off`) | yes | | | | | | | yes | yes | yes |
 | `device_encryption_off` (`BitLocker PreventDeviceEncryption=1`) | yes | | | | | | | | yes | yes |
 | `remove_apps` (client: provisioned Store apps, PowerShell `Remove-AppxProvisionedPackage` in specialize) | games, bloat | | | | | | | yes | yes | yes |
-| `first_run_off` (IE6/7 `RunOnceHasShown/Complete`; IE8+ `DisableFirstRunCustomize`; WMP `GroupPrivacyAcceptance`; Edge `HideFirstRunExperience`, `StartupBoostEnabled=0`) | yes | | | | | yes | yes | yes | yes | yes |
+| `first_run_off` (IE7+ policy `DisableFirstRunCustomize`; WMP `GroupPrivacyAcceptance`; Edge `HideFirstRunExperience`, `StartupBoostEnabled=0`; not XP/2003: IE6's per-user values were reset at the first logon) | yes | | | | | | yes | yes | yes | yes |
 | `onedrive_off` (client: 8.1 SkyDrive `DisableFileSync`; 10/11 `DisableFileSyncNGSC` + Default User `Run\OneDriveSetup` removed) | yes | | | | | | | 8.1 | yes | yes |
 | `user_script` (see below) | yes | | | | yes | yes | yes | yes | yes | yes |
 

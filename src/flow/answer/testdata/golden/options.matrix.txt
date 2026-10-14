@@ -4996,15 +4996,6 @@ visual_effects=performance	windows-server-2025	+          <Order>8</Order>
 visual_effects=performance	windows-server-2025	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 visual_effects=performance	windows-server-2025	+        </RunSynchronousCommand>
 visual_effects=performance	windows-server-2025	+      </RunSynchronous>
-visual_effects=performance	windows-xp	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-visual_effects=performance	windows-xp	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-visual_effects=performance	windows-xp	+
-visual_effects=performance	windows-xp	+----- usos-reg.txt -----
-visual_effects=performance	windows-xp	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
-visual_effects=performance	windows-xp	+USER\Control Panel\Desktop\WindowMetrics|MinAnimate|sz|0
-visual_effects=performance	windows-xp	+USER\Control Panel\Desktop|DragFullWindows|sz|0
-visual_effects=performance	windows-xp	+USER\Control Panel\Desktop|UserPreferencesMask|binary|90,12,01,80
-visual_effects=performance	windows-xp	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects|VisualFXSetting|dword|2
 visual_effects=performance	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
 visual_effects=performance	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
 visual_effects=performance	windows-2000	+
@@ -5012,15 +5003,6 @@ visual_effects=performance	windows-2000	+----- usos-reg.txt -----
 visual_effects=performance	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 visual_effects=performance	windows-2000	+USER\Control Panel\Desktop\WindowMetrics|MinAnimate|sz|0
 visual_effects=performance	windows-2000	+USER\Control Panel\Desktop|DragFullWindows|sz|0
-visual_effects=performance	windows-server-2003	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-visual_effects=performance	windows-server-2003	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-visual_effects=performance	windows-server-2003	+
-visual_effects=performance	windows-server-2003	+----- usos-reg.txt -----
-visual_effects=performance	windows-server-2003	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
-visual_effects=performance	windows-server-2003	+USER\Control Panel\Desktop\WindowMetrics|MinAnimate|sz|0
-visual_effects=performance	windows-server-2003	+USER\Control Panel\Desktop|DragFullWindows|sz|0
-visual_effects=performance	windows-server-2003	+USER\Control Panel\Desktop|UserPreferencesMask|binary|90,12,01,80
-visual_effects=performance	windows-server-2003	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects|VisualFXSetting|dword|2
 visual_effects=performance	windows-nt-4	+;USOS-REG=USER\Control Panel\Desktop\WindowMetrics|MinAnimate|sz|0
 visual_effects=performance	windows-nt-4	+;USOS-REG=USER\Control Panel\Desktop|DragFullWindows|sz|0
 visual_effects=performance	windows-95	-AddReg=USOS.RunOnce,USOS.CsmReg
@@ -7051,18 +7033,6 @@ first_run_off=yes	windows-vista	+        <RunSynchronousCommand wcm:action="add"
 first_run_off=yes	windows-vista	+          <Order>1</Order>
 first_run_off=yes	windows-vista	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Internet Explorer\Main&quot; /v DisableFirstRunCustomize /t REG_DWORD /d 1 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\WindowsMediaPlayer&quot; /v GroupPrivacyAcceptance /t REG_DWORD /d 1 /f</Path>
 first_run_off=yes	windows-vista	+        </RunSynchronousCommand>
-first_run_off=yes	windows-vista	+        <RunSynchronousCommand wcm:action="add">
-first_run_off=yes	windows-vista	+          <Order>2</Order>
-first_run_off=yes	windows-vista	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
-first_run_off=yes	windows-vista	+        </RunSynchronousCommand>
-first_run_off=yes	windows-vista	+        <RunSynchronousCommand wcm:action="add">
-first_run_off=yes	windows-vista	+          <Order>3</Order>
-first_run_off=yes	windows-vista	+          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Software\Microsoft\Internet Explorer\Main&quot; /v RunOnceHasShown /t REG_DWORD /d 1 /f &amp; reg add &quot;HKU\USOSDefault\Software\Microsoft\Internet Explorer\Main&quot; /v RunOnceComplete /t REG_DWORD /d 1 /f</Path>
-first_run_off=yes	windows-vista	+        </RunSynchronousCommand>
-first_run_off=yes	windows-vista	+        <RunSynchronousCommand wcm:action="add">
-first_run_off=yes	windows-vista	+          <Order>4</Order>
-first_run_off=yes	windows-vista	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
-first_run_off=yes	windows-vista	+        </RunSynchronousCommand>
 first_run_off=yes	windows-vista	+      </RunSynchronous>
 first_run_off=yes	windows-7	+    </component>
 first_run_off=yes	windows-7	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
@@ -7118,18 +7088,6 @@ first_run_off=yes	windows-server-2008	+      <RunSynchronous>
 first_run_off=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
 first_run_off=yes	windows-server-2008	+          <Order>1</Order>
 first_run_off=yes	windows-server-2008	+          <Path>cmd.exe /c reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\Internet Explorer\Main&quot; /v DisableFirstRunCustomize /t REG_DWORD /d 1 /f &amp; reg add &quot;HKLM\SOFTWARE\Policies\Microsoft\WindowsMediaPlayer&quot; /v GroupPrivacyAcceptance /t REG_DWORD /d 1 /f</Path>
-first_run_off=yes	windows-server-2008	+        </RunSynchronousCommand>
-first_run_off=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
-first_run_off=yes	windows-server-2008	+          <Order>2</Order>
-first_run_off=yes	windows-server-2008	+          <Path>reg.exe load &quot;HKU\USOSDefault&quot; &quot;C:\Users\Default\NTUSER.DAT&quot;</Path>
-first_run_off=yes	windows-server-2008	+        </RunSynchronousCommand>
-first_run_off=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
-first_run_off=yes	windows-server-2008	+          <Order>3</Order>
-first_run_off=yes	windows-server-2008	+          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Software\Microsoft\Internet Explorer\Main&quot; /v RunOnceHasShown /t REG_DWORD /d 1 /f &amp; reg add &quot;HKU\USOSDefault\Software\Microsoft\Internet Explorer\Main&quot; /v RunOnceComplete /t REG_DWORD /d 1 /f</Path>
-first_run_off=yes	windows-server-2008	+        </RunSynchronousCommand>
-first_run_off=yes	windows-server-2008	+        <RunSynchronousCommand wcm:action="add">
-first_run_off=yes	windows-server-2008	+          <Order>4</Order>
-first_run_off=yes	windows-server-2008	+          <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
 first_run_off=yes	windows-server-2008	+        </RunSynchronousCommand>
 first_run_off=yes	windows-server-2008	+      </RunSynchronous>
 first_run_off=yes	windows-server-2008-r2	+    </component>
@@ -7204,20 +7162,6 @@ first_run_off=yes	windows-server-2025	+          <Order>2</Order>
 first_run_off=yes	windows-server-2025	+          <Path>reg.exe add &quot;HKLM\SOFTWARE\Policies\Microsoft\Edge&quot; /v StartupBoostEnabled /t REG_DWORD /d 0 /f</Path>
 first_run_off=yes	windows-server-2025	+        </RunSynchronousCommand>
 first_run_off=yes	windows-server-2025	+      </RunSynchronous>
-first_run_off=yes	windows-xp	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-first_run_off=yes	windows-xp	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-first_run_off=yes	windows-xp	+
-first_run_off=yes	windows-xp	+----- usos-reg.txt -----
-first_run_off=yes	windows-xp	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
-first_run_off=yes	windows-xp	+USER\Software\Microsoft\Internet Explorer\Main|RunOnceHasShown|dword|1
-first_run_off=yes	windows-xp	+USER\Software\Microsoft\Internet Explorer\Main|RunOnceComplete|dword|1
-first_run_off=yes	windows-server-2003	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-first_run_off=yes	windows-server-2003	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-first_run_off=yes	windows-server-2003	+
-first_run_off=yes	windows-server-2003	+----- usos-reg.txt -----
-first_run_off=yes	windows-server-2003	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
-first_run_off=yes	windows-server-2003	+USER\Software\Microsoft\Internet Explorer\Main|RunOnceHasShown|dword|1
-first_run_off=yes	windows-server-2003	+USER\Software\Microsoft\Internet Explorer\Main|RunOnceComplete|dword|1
 onedrive_off=yes	windows-8-1	+    </component>
 onedrive_off=yes	windows-8-1	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 onedrive_off=yes	windows-8-1	+      <RunSynchronous>

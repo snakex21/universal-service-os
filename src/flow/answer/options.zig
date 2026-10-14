@@ -332,7 +332,6 @@ const firewall_xp = "SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Paramete
 const security_center = "SOFTWARE\\Microsoft\\Security Center";
 const run_once = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce";
 const active_setup = "SOFTWARE\\Microsoft\\Active Setup\\Installed Components";
-const ie_main_user = "Software\\Microsoft\\Internet Explorer\\Main";
 const reliability = "SOFTWARE\\Policies\\Microsoft\\Windows NT\\Reliability";
 
 /// Classic context menu (11): the per-user COM override that makes Explorer
@@ -376,6 +375,7 @@ const w9x_shell = set(&.{ .win98, .win_me });
 const w9x = set(&.{ .win95, .win98, .win_me });
 const xp2003 = set(&.{ .xp, .w2003 });
 const w9x_nt4 = w9x.unionWith(set(&.{.nt4}));
+const visual_basic = w9x_nt4.unionWith(set(&.{.w2000})).unionWith(nt6);
 const before_w11 = w9x_nt4.unionWith(nt5).unionWith(set(&.{ .vista, .w7, .w8, .w81, .w10 }));
 
 /// Rendering rules. A legacy option renders through its family renderer
@@ -497,12 +497,14 @@ pub const rules = [_]Rule{
     .{ .opt = .lock_screen_off, .os = w8up, .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\Windows\\Personalization", "NoLockScreen", 1) },
     // System
     // Best performance: no minimize animation, outlines while dragging;
-    // XP+ also the effect bits (UserPreferencesMask) and the dialog's choice.
-    .{ .opt = .visual_effects, .os = w9x_nt4.unionWith(nt5up), .action = reg(.user, metrics, "MinAnimate", .{ .sz = "0" }) },
-    .{ .opt = .visual_effects, .os = w9x_nt4.unionWith(nt5up), .action = reg(.user, desktop, "DragFullWindows", .{ .sz = "0" }) },
-    .{ .opt = .visual_effects, .os = xp2003, .action = reg(.user, desktop, "UserPreferencesMask", .{ .binary = "90,12,01,80" }) },
+    // 6.x+ also the effect bits (UserPreferencesMask) and the dialog's choice.
+    // Not XP / 2003: QEMU 2026-10-14 (XP MCE), the first logon's own visual
+    // settings replaced MinAnimate, DragFullWindows and the mask in the
+    // user's profile (the Default User hive kept them).
+    .{ .opt = .visual_effects, .os = visual_basic, .action = reg(.user, metrics, "MinAnimate", .{ .sz = "0" }) },
+    .{ .opt = .visual_effects, .os = visual_basic, .action = reg(.user, desktop, "DragFullWindows", .{ .sz = "0" }) },
     .{ .opt = .visual_effects, .os = nt6, .action = reg(.user, desktop, "UserPreferencesMask", .{ .binary = "90,12,03,80,10,00,00,00" }) },
-    .{ .opt = .visual_effects, .os = xp2003.unionWith(nt6), .action = dw(.user, visual_fx, "VisualFXSetting", 2) },
+    .{ .opt = .visual_effects, .os = nt6, .action = dw(.user, visual_fx, "VisualFXSetting", 2) },
     .{ .opt = .visual_effects, .os = nt6, .action = dw(.user, advanced, "TaskbarAnimations", 0) },
     .{ .opt = .visual_effects, .os = nt6, .action = dw(.user, advanced, "ListviewAlphaSelect", 0) },
     .{ .opt = .visual_effects, .os = nt6, .action = dw(.user, advanced, "ListviewShadow", 0) },
@@ -580,10 +582,9 @@ pub const rules = [_]Rule{
     .{ .opt = .remove_apps, .value = 2, .os = w8up, .who = .client, .action = appx(appx_bloat[1]) },
     .{ .opt = .remove_apps, .value = 2, .os = w8up, .who = .client, .action = appx(appx_bloat[2]) },
     .{ .opt = .remove_apps, .value = 2, .os = w8up, .who = .client, .action = appx(appx_bloat[3]) },
-    // IE6/7 first-run page; IE8+ customize wizard; WMP privacy wizard;
-    // Edge first run and startup boost.
-    .{ .opt = .first_run_off, .os = set(&.{ .xp, .w2003, .vista }), .action = dw(.user, ie_main_user, "RunOnceHasShown", 1) },
-    .{ .opt = .first_run_off, .os = set(&.{ .xp, .w2003, .vista }), .action = dw(.user, ie_main_user, "RunOnceComplete", 1) },
+    // IE7+ customize wizard (policy); WMP privacy wizard; Edge first run and
+    // startup boost. Not XP / 2003: IE6 has no policy, and its per-user
+    // RunOnceHasShown values were reset at the first logon (QEMU 2026-10-14).
     .{ .opt = .first_run_off, .os = nt6.differenceWith(set(&.{.w11})), .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\Internet Explorer\\Main", "DisableFirstRunCustomize", 1) },
     .{ .opt = .first_run_off, .os = nt6, .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\WindowsMediaPlayer", "GroupPrivacyAcceptance", 1) },
     .{ .opt = .first_run_off, .os = w10up, .action = dw(.hklm, "SOFTWARE\\Policies\\Microsoft\\Edge", "HideFirstRunExperience", 1) },

@@ -85,10 +85,6 @@ USER\Software\Microsoft\Windows\CurrentVersion\Applets\Tour|RunCount|dword|0
 USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Desktop\CleanupWiz|NoRun|dword|1
 USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|TaskbarGlomming|dword|0
 USER\Software\Microsoft\Windows\CurrentVersion\Explorer|EnableAutoTray|dword|0
-USER\Control Panel\Desktop\WindowMetrics|MinAnimate|sz|0
-USER\Control Panel\Desktop|DragFullWindows|sz|0
-USER\Control Panel\Desktop|UserPreferencesMask|binary|90,12,01,80
-USER\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects|VisualFXSetting|dword|2
 DEFAULT\Control Panel\Desktop|FontSmoothing|sz|2
 USER\Control Panel\Desktop|FontSmoothing|sz|2
 DEFAULT\Control Panel\Desktop|FontSmoothingType|dword|2
@@ -111,8 +107,6 @@ HKLM\SOFTWARE\Policies\Microsoft\Windows NT\CurrentVersion\MYS|DisableShowAtLogo
 USER\Software\Policies\Microsoft\Windows NT\CurrentVersion\MYS|DisableShowAtLogon|dword|1
 HKLM\SOFTWARE\Microsoft\PCHealth\ErrorReporting|DoReport|dword|0
 HKLM\SOFTWARE\Microsoft\PCHealth\ErrorReporting|ShowUI|dword|0
-USER\Software\Microsoft\Internet Explorer\Main|RunOnceHasShown|dword|1
-USER\Software\Microsoft\Internet Explorer\Main|RunOnceComplete|dword|1
 HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce|USOS1UserReg|sz|cmd.exe /c for %d in (C D E F G H I J K L M N O P Q R S T U V W X Y Z) do @if exist %d:\Systems\nul if exist %d:\Scripts\first-logon.reg regedit.exe /s %d:\Scripts\first-logon.reg
 HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce|USOS2UserScript|sz|cmd.exe /c for %d in (C D E F G H I J K L M N O P Q R S T U V W X Y Z) do @if exist %d:\Systems\nul if exist %d:\Scripts\first-logon.cmd call %d:\Scripts\first-logon.cmd
 HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon|AutoAdminLogon|sz|1

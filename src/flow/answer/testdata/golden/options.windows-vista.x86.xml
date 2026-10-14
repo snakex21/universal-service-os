@@ -176,10 +176,6 @@
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>36</Order>
-          <Path>cmd.exe /c reg add &quot;HKU\USOSDefault\Software\Microsoft\Internet Explorer\Main&quot; /v RunOnceHasShown /t REG_DWORD /d 1 /f &amp; reg add &quot;HKU\USOSDefault\Software\Microsoft\Internet Explorer\Main&quot; /v RunOnceComplete /t REG_DWORD /d 1 /f</Path>
-        </RunSynchronousCommand>
-        <RunSynchronousCommand wcm:action="add">
-          <Order>37</Order>
           <Path>reg.exe unload &quot;HKU\USOSDefault&quot;</Path>
         </RunSynchronousCommand>
       </RunSynchronous>
