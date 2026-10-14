@@ -31,7 +31,9 @@
  * someone hooked INT 74h above this TSR's own stub. That stub sits under
  * the driver's handler (MOUSE.DRV chains to it): for this software INT 74h
  * it returns at once (no BIOS IRQ 12 code, no EOI); a real IRQ 12 goes on
- * to the BIOS. No 8042 needed. Windows 1.0x has no PS/2 mouse driver.
+ * to the BIOS. No 8042 needed. Windows 1.0x has no PS/2 mouse driver; USOS
+ * gives it USOSMS1.DRV (src/platform/win1/usosms1.S), which hooks INT 74h
+ * the same way and so also gets these software interrupts.
  *
  * Script (built by tools/usos_keyscript.py; header "UKS1"): steps run from
  * the timer interrupt, so Setup programs get their answers without a person

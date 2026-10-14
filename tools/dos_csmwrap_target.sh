@@ -173,7 +173,8 @@ if [ -n "$WIN3_ISO" ]; then
         '')
             # Windows 3.1 / WfW 3.11 batch Setup: the text pages of the Central
             # European editions (W3PL; other editions never show its texts).
-            [ ! -f "$U/W3PL.KEY" ] || cp "$U/W3PL.KEY" "$U/SETUP.KEY" || fail 'cannot copy W3PL.KEY' ;;
+            [ ! -f "$U/W3PL.KEY" ] || cp "$U/W3PL.KEY" "$U/SETUP.KEY" || fail 'cannot copy W3PL.KEY'
+            rm -f "$U/USOSMS1.DRV" ;;
         windows-1-01|windows-1-04|windows-2-03|windows-2-11-286|windows-2-11-386|windows-3-0)
             printf '%s\r\n' "$WIN_EARLY" > "$U/EARLY.TAG"
             # Setup answers for USOSKBC (src/platform/bios/msdos/keys).
@@ -182,6 +183,12 @@ if [ -n "$WIN3_ISO" ]; then
                 windows-2-11-286) key=W211 ;; windows-2-11-386) key=W386 ;; *) key=W30 ;;
             esac
             [ ! -f "$U/$key.KEY" ] || cp "$U/$key.KEY" "$U/SETUP.KEY" || fail "cannot copy $key.KEY"
+            # USOSMS1.DRV (USB mouse through the BIOS) replaces MOUSE.DRV of
+            # Windows 1.0x only (INSTALL.BAT); 2.x/3.0 use USOSKBC /M.
+            case "$WIN_EARLY" in
+                windows-1-01|windows-1-04) ;;
+                *) rm -f "$U/USOSMS1.DRV" ;;
+            esac
             log "early Windows: $WIN_EARLY (Setup from A: = C:\WINSETUP)" ;;
         *) fail "unexpected DOS_WIN_EARLY: $WIN_EARLY" ;;
     esac

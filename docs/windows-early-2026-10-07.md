@@ -461,3 +461,56 @@ Setup) to get MOUSE.DRV. Unit test: tools/tests/legacy_bios/test_usoskbc_mouse.p
 (Unicorn: install, C207h trampoline incl. error and remove, packet from the
 timer -> driver's INT 74h -> event, no kick without a hook, real IRQ 12 to
 the BIOS). Hardware test pending (no QEMU proof: QEMU has a real PS/2 mouse).
+
+## USB mouse for Windows 1.0x: USOSMS1.DRV (2026-10-15)
+
+Windows 1.01/1.04 now get their own mouse driver, `USOSMS1.DRV`
+(src/platform/win1/usosms1.S, GPL-3.0-or-later), which uses the BIOS
+pointing device (INT 15h AX=C2xxh) - under CSMWrap the only form in which
+the USB mouse exists.
+
+Interface (read from the NE headers and code of the 1.01/1.04 mouse drivers
+on the user's media; no Microsoft code used): module name `MOUSE`, exports
+INQUIRE (1), ENABLE (2), DISABLE (3); MOUSEINFO is 14 bytes (exists,
+relative, buttons, rate, X/Y threshold, X/Y resolution; no COM port field as
+in 3.x); the event procedure from Enable is far-called after the EOI with
+interrupts on: AX flags (1 move, 2/4 left down/up, 8/10h right down/up),
+BX/CX relative movement (Y down positive), DX number of buttons. Setup offers
+NOMOUSE, MOUSE (Microsoft bus/InPort or serial), MSMOUSE1/2 (Mouse Systems
+COM1/2), LMOUSE (Logitech serial), JOYMOUSE (1.04 also ATTMOUSE); none of them
+calls the BIOS. Setup's Build step re-links the chosen driver into WIN100.BIN
+(it rewrites the NE headers, alignment 512 -> 16), so the driver must be an
+NE file Setup accepts: USOSMS1.DRV copies the shape of NOMOUSE.DRV (linker
+version 4.0, flags 8004h, one fixed preloaded segment with code and data, no
+relocations, no imports, no entry point); tools/build_win3_usb_keyboard.py
+assembles the segment (zig cc, linked at 0) and writes the NE file itself.
+
+Driver: Inquire initializes the BIOS device (C205h, 3-byte packets; failure
+= no mouse, Windows runs like NOMOUSE). Enable registers its C207h handler
+(stores packets in a 32-entry ring), enables the device (C200h) and hooks
+INT 74h and INT 08h; both chain the previous handler first and then hand the
+queued packets to USER (one dispatcher at a time). INT 74h covers a real PS/2
+IRQ 12 and the software INT 74h of `USOSKBC /M`; INT 08h covers a start
+without USOSKBC. Movement is divided by 2 (word after the `USM1` signature,
+remainder carried): a USB mouse reports far more counts than a 1985 bus
+mouse, and USER doubles deltas above the thresholds (2, as the shipped
+drivers). Disable: C200h off, C207h 0:0, vectors back when still ours.
+
+Flow: dos_csmwrap_target.sh keeps USOSMS1.DRV in USOSDOS only for
+windows-1-01/1-04; INSTALL.BAT (EARLY.TAG + CSMWRAP.TAG branch) copies it
+over C:\WINSETUP\MOUSE.DRV, so the existing W101/W104.KEY answer "2"
+(Microsoft Mouse) binds it. No user step. Existing 1.x installs need a fresh
+install (the driver lives inside WIN100.BIN).
+
+Tests: tools/tests/legacy_bios/test_usosms1.py (Unicorn: NE shape, Inquire
+with and without a BIOS mouse, Enable/Disable calls and vectors, packets from
+the BIOS timer -> events incl. sign bits, overflow, button transitions,
+software INT 74h, divisor with carried remainder, foreign hook kept);
+test_win_early_flow.py (Win1Mouse). QEMU (scratch harness: SeaBIOS =
+CSMWrap's BIOS, `-machine pc,smm=off`, qemu-xhci usb-kbd + usb-mouse,
+i8042 present but SeaBIOS routes the BIOS mouse to the USB mouse when one is
+attached): fresh unattended installs of 1.04 and 1.01 bound the driver
+(`USM1` inside WIN100.BIN); pointer moves, 40 packets -> 40 events, clicks
+select files, double-click starts CALC.EXE (1.04) and PAINT.EXE (1.01), a
+pencil drag draws in Paint, a dialog closes with a click. QEMU is not
+hardware evidence; the X470 test is pending (fresh 1.0x install).
