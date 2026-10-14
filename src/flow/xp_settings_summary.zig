@@ -13,6 +13,10 @@ pub const Summary = struct {
     user_len: usize = 0,
     computer_bytes: [max_value]u8 = undefined,
     computer_len: usize = 0,
+    /// password= is not empty (only whether; the value is never kept). The
+    /// logon hint says "the password is the one in usos-xp.ini"
+    /// (src/flow/answer/logon.zig).
+    password_set: bool = false,
 
     pub fn user(self: *const Summary) []const u8 {
         return self.user_bytes[0..self.user_len];
@@ -34,6 +38,7 @@ pub fn parse(text: []const u8) Summary {
     const body = if (std.mem.startsWith(u8, text, "\xef\xbb\xbf")) text[3..] else text;
     var user: []const u8 = "";
     var computer: []const u8 = "";
+    var password_set = false;
     var lines = std.mem.splitScalar(u8, body, '\n');
     while (lines.next()) |raw| {
         const line = std.mem.trim(u8, raw, " \t\r");
@@ -44,10 +49,12 @@ pub fn parse(text: []const u8) Summary {
         if (value.len >= 2 and value[0] == '"' and value[value.len - 1] == '"') value = value[1 .. value.len - 1];
         if (std.ascii.eqlIgnoreCase(key, "user")) user = value;
         if (std.ascii.eqlIgnoreCase(key, "computer")) computer = value;
+        if (std.ascii.eqlIgnoreCase(key, "password")) password_set = value.len > 0;
     }
     if (user.len == 0) return summary;
     if (computer.len == 0) computer = default_computer;
     summary.active = true;
+    summary.password_set = password_set;
     summary.user_len = copyPrintable(&summary.user_bytes, user);
     summary.computer_len = copyPrintable(&summary.computer_bytes, computer);
     return summary;
@@ -89,4 +96,7 @@ test "the key and the password never reach the summary" {
     const s = parse("user=Tester\nkey=AAAAA-BBBBB-CCCCC-DDDDD-EEEEE\npassword=secret\n");
     try std.testing.expect(std.mem.indexOf(u8, s.user(), "AAAAA") == null);
     try std.testing.expect(std.mem.indexOf(u8, s.computer(), "secret") == null);
+    try std.testing.expect(s.password_set);
+    try std.testing.expect(!parse("user=Tester\npassword=\n").password_set);
+    try std.testing.expect(!parse("user=Tester\n").password_set);
 }

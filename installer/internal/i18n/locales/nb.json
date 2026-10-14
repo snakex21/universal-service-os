@@ -1343,5 +1343,13 @@
   "boot.lx.format_the_entire_disk_q": "FORMATERE HELE DISKEN?",
   "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Slett ALLE partisjoner og data på den valgte disken",
   "boot.lx.x_confirmation": "{0} - BEKREFTELSE",
-  "boot.lx.prepare_x_installation": "Forbered installasjon av {0}"
+  "boot.lx.prepare_x_installation": "Forbered installasjon av {0}",
+  "boot.lx.logon_no_password": "Logg på som {0} etter installasjonen (uten passord).",
+  "boot.lx.logon_profile_password": "Logg på som {0} etter installasjonen med passordet fra svarprofilen.",
+  "boot.lx.logon_file_password": "Logg på som {0} etter installasjonen; passordet står i {1}.",
+  "boot.lx.logon_domain_no_password": "Logg på domenet {1} som {0} etter installasjonen (uten passord).",
+  "boot.lx.logon_domain_profile_password": "Logg på domenet {1} som {0} etter installasjonen med passordet fra svarprofilen.",
+  "boot.lx.logon_autologon": "Etter installasjonen logger Windows automatisk på som {0}.",
+  "boot.lx.logon_setup_asks": "Windows installasjonsprogram spør etter brukernavn og passord under installasjonen; USOS angir dem ikke.",
+  "boot.lx.logon_answer_file": "Logg på etter installasjonen med kontoen fra svarfilen din {0}."
 }

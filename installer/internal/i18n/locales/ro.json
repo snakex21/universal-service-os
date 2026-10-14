@@ -1346,5 +1346,13 @@
   "boot.lx.format_the_entire_disk_q": "FORMATAȚI ÎNTREGUL DISC?",
   "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Șterge TOATE partițiile și datele de pe discul selectat",
   "boot.lx.x_confirmation": "{0} - CONFIRMARE",
-  "boot.lx.prepare_x_installation": "Pregătește instalarea {0}"
+  "boot.lx.prepare_x_installation": "Pregătește instalarea {0}",
+  "boot.lx.logon_no_password": "După instalare conectați-vă ca {0} (fără parolă).",
+  "boot.lx.logon_profile_password": "După instalare conectați-vă ca {0} cu parola setată în profilul de răspuns.",
+  "boot.lx.logon_file_password": "După instalare conectați-vă ca {0}; parola este cea din {1}.",
+  "boot.lx.logon_domain_no_password": "După instalare conectați-vă la domeniul {1} ca {0} (fără parolă).",
+  "boot.lx.logon_domain_profile_password": "După instalare conectați-vă la domeniul {1} ca {0} cu parola setată în profilul de răspuns.",
+  "boot.lx.logon_autologon": "După instalare Windows se conectează automat ca {0}.",
+  "boot.lx.logon_setup_asks": "Programul de instalare Windows cere numele de utilizator și parola în timpul instalării; USOS nu le setează.",
+  "boot.lx.logon_answer_file": "După instalare conectați-vă cu contul din fișierul dvs. de răspuns {0}."
 }

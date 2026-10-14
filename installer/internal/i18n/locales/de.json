@@ -1343,5 +1343,13 @@
   "boot.lx.format_the_entire_disk_q": "GESAMTE FESTPLATTE FORMATIEREN?",
   "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "ALLE Partitionen und Daten auf dem gewählten Datenträger löschen",
   "boot.lx.x_confirmation": "{0} - BESTÄTIGUNG",
-  "boot.lx.prepare_x_installation": "Installation von {0} vorbereiten"
+  "boot.lx.prepare_x_installation": "Installation von {0} vorbereiten",
+  "boot.lx.logon_no_password": "Nach der Installation als {0} anmelden (kein Kennwort).",
+  "boot.lx.logon_profile_password": "Nach der Installation als {0} mit dem im Antwortprofil festgelegten Kennwort anmelden.",
+  "boot.lx.logon_file_password": "Nach der Installation als {0} anmelden; das Kennwort steht in {1}.",
+  "boot.lx.logon_domain_no_password": "Nach der Installation an der Domäne {1} als {0} anmelden (kein Kennwort).",
+  "boot.lx.logon_domain_profile_password": "Nach der Installation an der Domäne {1} als {0} mit dem im Antwortprofil festgelegten Kennwort anmelden.",
+  "boot.lx.logon_autologon": "Nach der Installation meldet sich Windows automatisch als {0} an.",
+  "boot.lx.logon_setup_asks": "Windows Setup fragt während der Installation nach Benutzername und Kennwort; USOS legt sie nicht fest.",
+  "boot.lx.logon_answer_file": "Nach der Installation mit dem Konto aus Ihrer Antwortdatei {0} anmelden."
 }

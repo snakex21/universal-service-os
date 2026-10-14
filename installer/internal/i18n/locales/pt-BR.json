@@ -1343,5 +1343,13 @@
   "boot.lx.format_the_entire_disk_q": "FORMATAR O DISCO INTEIRO?",
   "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Apagar TODAS as partições e dados do disco selecionado",
   "boot.lx.x_confirmation": "{0} - CONFIRMAÇÃO",
-  "boot.lx.prepare_x_installation": "Preparar a instalação do {0}"
+  "boot.lx.prepare_x_installation": "Preparar a instalação do {0}",
+  "boot.lx.logon_no_password": "Após a instalação, entre como {0} (sem senha).",
+  "boot.lx.logon_profile_password": "Após a instalação, entre como {0} com a senha definida no perfil de respostas.",
+  "boot.lx.logon_file_password": "Após a instalação, entre como {0}; a senha é a que está em {1}.",
+  "boot.lx.logon_domain_no_password": "Após a instalação, entre no domínio {1} como {0} (sem senha).",
+  "boot.lx.logon_domain_profile_password": "Após a instalação, entre no domínio {1} como {0} com a senha definida no perfil de respostas.",
+  "boot.lx.logon_autologon": "Após a instalação, o Windows entra automaticamente como {0}.",
+  "boot.lx.logon_setup_asks": "A Instalação do Windows pede o nome de usuário e a senha durante a instalação; o USOS não os define.",
+  "boot.lx.logon_answer_file": "Após a instalação, entre com a conta do seu arquivo de respostas {0}."
 }

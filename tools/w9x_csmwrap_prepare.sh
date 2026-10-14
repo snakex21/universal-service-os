@@ -614,6 +614,9 @@ usos_w9x_csmwrap_prepare() {
             w9x_csmwrap_log "NVME $nvme_msg"
         fi
     fi
+    # How to log on afterwards (logon.ini from the menu; nothing for 9x/DOS/images).
+    usos_logon_take /mnt/esp "$system" || true
+    usos_logon_save /mnt/data "$(usos_logon_dir_of "$iso")" || true
     umount /mnt/data 2>/dev/null || true
     sync
     w9x_csmwrap_log 'DONE; waiting for the restart'

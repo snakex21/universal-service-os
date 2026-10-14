@@ -212,6 +212,9 @@ usos_vista_csmwrap_prepare() {
     fi
     rm -f /run/vista-answer.xml
     mv "$request" "$VISTA_CSMWRAP_DIR/request.done" 2>/dev/null || true
+    # How to log on afterwards (logon.ini from the menu, docs/logon-after-install.md).
+    usos_logon_take /mnt/esp || true
+    usos_logon_save /mnt/data "$(usos_logon_dir_of "$iso")" || true
     umount /mnt/data 2>/dev/null || true
     sync
     vista_csmwrap_log 'DONE; waiting for the restart'

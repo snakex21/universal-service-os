@@ -367,6 +367,7 @@ fn start(
     // Rendered answers of an earlier start may hold a key or a password.
     answer_profiles.clearRendered(root);
     const profile: ?*const answer_profiles.Profile = if (answer.profile) |index| answer_profiles.get(index) else null;
+    recordLogon(root, system, answer, profile);
     const os_profile_id = if (os_plan) |plan| plan.profile.id else "unknown";
     const resolved = backend.method();
     const method_firmware = backend.firmwareRequirement();
@@ -540,6 +541,39 @@ fn start(
 
 var wimboot_plan: [512]u8 = undefined;
 
+/// How to log on after this installation (src/flow/answer/logon.zig,
+/// docs/logon-after-install.md), from the answer this start hands over:
+/// \EFI\USOS\answer\logon.ini for the micro-Linux pages and the DATA note,
+/// and the line of the native ISO progress page. Every start rewrites (or
+/// removes) it, so no hint of an earlier start remains.
+fn recordLogon(root: *std.os.uefi.protocol.File, system: *const usos.catalog.SystemEntry, answer: manual_unattended.Choice, profile: ?*const answer_profiles.Profile) void {
+    const logon = usos.flow.answer.logon;
+    const source: logon.Source = if (profile) |p|
+        .{ .profile = p }
+    else if (answer.path) |name|
+        .{ .file = name }
+    else xp: {
+        // NT5 without a profile or a .sif: DATA's usos-xp.ini, unless the
+        // manual installation was chosen.
+        if (logon.flowFor(system.id) != .nt5 or answer.ignore_settings) break :xp .none;
+        const name = usos.catalog.os_profiles.traits(system.id).settings_file orelse break :xp .none;
+        const directory = system.unattended_directory orelse break :xp .none;
+        const read = struct {
+            var summary: usos.flow.xp_settings_summary.Summary = .{};
+        };
+        read.summary = xp_settings.read(directory, name);
+        if (!read.summary.active) break :xp .none;
+        break :xp .{ .xp_settings = .{ .user = read.summary.user(), .password_set = read.summary.password_set } };
+    };
+    const result = logon.derive(system.id, source);
+    var english_buffer: [256]u8 = undefined;
+    const english = result.sentence(&english_buffer);
+    var local_buffer: [512]u8 = undefined;
+    const local = if (english.len > 0) view.trFormat(&local_buffer, english) else "";
+    view.setLogonLine(english);
+    answer_profiles.writeLogon(root, system.id, result, english, local);
+}
+
 /// The native wimboot starts are x64 (amd64 components).
 fn renderForWimboot(profile: ?*const answer_profiles.Profile, system: *const usos.catalog.SystemEntry, os_profile_id: []const u8) !?windows_native_iso.Rendered {
     const p = profile orelse return null;
@@ -589,6 +623,7 @@ pub fn showWinPe(
 
 fn startWinPe(root: *std.os.uefi.protocol.File, system: *const usos.catalog.SystemEntry, image: usos.catalog.ImageItem) void {
     input.stopGamepads();
+    view.setLogonLine("");
     view.setPlanLabels(null);
     view.windowsIsoStatus(.validating, "Reading the selected WinPE ISO");
     windows_native_iso.startModern(root, system.image_directory, image.name.slice(), null, null, true, view.windowsIsoStatus) catch |err| {

@@ -1346,5 +1346,13 @@
   "boot.lx.format_the_entire_disk_q": "ОТФОРМАТИРОВАТЬ ВЕСЬ ДИСК?",
   "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "Удалить ВСЕ разделы и данные на выбранном диске",
   "boot.lx.x_confirmation": "{0} - ПОДТВЕРЖДЕНИЕ",
-  "boot.lx.prepare_x_installation": "Подготовить установку {0}"
+  "boot.lx.prepare_x_installation": "Подготовить установку {0}",
+  "boot.lx.logon_no_password": "После установки войдите как {0} (без пароля).",
+  "boot.lx.logon_profile_password": "После установки войдите как {0} с паролем, заданным в профиле ответов.",
+  "boot.lx.logon_file_password": "После установки войдите как {0}; пароль указан в {1}.",
+  "boot.lx.logon_domain_no_password": "После установки войдите в домен {1} как {0} (без пароля).",
+  "boot.lx.logon_domain_profile_password": "После установки войдите в домен {1} как {0} с паролем, заданным в профиле ответов.",
+  "boot.lx.logon_autologon": "После установки Windows автоматически входит как {0}.",
+  "boot.lx.logon_setup_asks": "Программа установки Windows запросит имя пользователя и пароль во время установки; USOS их не задаёт.",
+  "boot.lx.logon_answer_file": "После установки войдите с учётной записью из вашего файла ответов {0}."
 }

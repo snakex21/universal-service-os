@@ -1343,5 +1343,13 @@
   "boot.lx.format_the_entire_disk_q": "A TELJES LEMEZ FORMÁZÁSA?",
   "boot.lx.erase_all_partitions_and_data_on_the_selected_disk": "A kiválasztott lemez ÖSSZES partíciójának és adatának törlése",
   "boot.lx.x_confirmation": "{0} - MEGERŐSÍTÉS",
-  "boot.lx.prepare_x_installation": "A(z) {0} telepítésének előkészítése"
+  "boot.lx.prepare_x_installation": "A(z) {0} telepítésének előkészítése",
+  "boot.lx.logon_no_password": "A telepítés után jelentkezzen be {0} néven (jelszó nélkül).",
+  "boot.lx.logon_profile_password": "A telepítés után jelentkezzen be {0} néven a válaszprofilban megadott jelszóval.",
+  "boot.lx.logon_file_password": "A telepítés után jelentkezzen be {0} néven; a jelszó a(z) {1} fájlban van.",
+  "boot.lx.logon_domain_no_password": "A telepítés után jelentkezzen be a(z) {1} tartományba {0} néven (jelszó nélkül).",
+  "boot.lx.logon_domain_profile_password": "A telepítés után jelentkezzen be a(z) {1} tartományba {0} néven a válaszprofilban megadott jelszóval.",
+  "boot.lx.logon_autologon": "A telepítés után a Windows automatikusan bejelentkezik {0} néven.",
+  "boot.lx.logon_setup_asks": "A Windows telepítője a telepítés közben kéri a felhasználónevet és a jelszót; a USOS nem állítja be őket.",
+  "boot.lx.logon_answer_file": "A telepítés után jelentkezzen be a(z) {0} válaszfájlban megadott fiókkal."
 }

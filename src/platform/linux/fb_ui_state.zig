@@ -39,6 +39,9 @@ pub const State = struct {
     /// key label (English, translated like the other texts).
     notice: []const u8 = "",
     action: []const u8 = "",
+    /// How to log on after the installation (`logon=`, English from
+    /// logon.ini, src/flow/answer/logon.zig; translated like the others).
+    logon: []const u8 = "",
 };
 
 pub fn parse(input: []const u8) !State {
@@ -77,6 +80,8 @@ pub fn parse(input: []const u8) !State {
             state.notice = value;
         } else if (std.mem.eql(u8, key, "action")) {
             state.action = value;
+        } else if (std.mem.eql(u8, key, "logon")) {
+            state.logon = value;
         } else if (std.mem.eql(u8, key, "label")) {
             if (state.label_count >= state.labels.len) return error.TooManyStageLabels;
             if (value.len == 0) return error.InvalidStageLabel;
@@ -171,6 +176,9 @@ test "done state carries a notice and its action" {
     try std.testing.expectEqual(Mode.done, state.mode);
     try std.testing.expectEqualStrings("Do not press keys", state.notice);
     try std.testing.expectEqualStrings("Proceed", state.action);
+    try std.testing.expectEqualStrings("", state.logon);
+    const with_logon = try parse("mode=done" ++ NL ++ "notice=N" ++ NL ++ "logon=After the installation log on as Administrator (no password)." ++ NL);
+    try std.testing.expectEqualStrings("After the installation log on as Administrator (no password).", with_logon.logon);
 }
 
 test "stage labels beyond the renderer limit are rejected" {
