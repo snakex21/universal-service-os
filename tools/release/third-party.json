@@ -1104,7 +1104,7 @@
     {
       "id": "csmwrap",
       "name": "CSMWrap with its SeaBIOS fork",
-      "version": "3.1.2-usos9",
+      "version": "3.1.2-usos10",
       "license": "LGPL-2.1-only AND LGPL-3.0-only",
       "modified": true,
       "ships_in": [
@@ -1127,7 +1127,7 @@
       "source": {
         "bundle_paths": [
           "tools/vendor/csmwrap/3.1.2-src",
-          "tools/vendor/csmwrap/3.1.2-usos9",
+          "tools/vendor/csmwrap/3.1.2-usos10",
           "tools/csmwrap_build",
           "tools/build_csmwrap.ps1",
           "docs/research/csmwrap.md"
@@ -1138,7 +1138,7 @@
         ],
         "offer": false
       },
-      "notice": "MODIFIED by USOS on 2026-09-27 (quiet boot unless csmwrap.ini sets verbose = true; patches 0001-0003) and 2026-09-29 (SeaBIOS boot priorities from the CSMWrap BBS table by PCI address, USB included; patch 0004) and 2026-10-11 (the exact disk CSMWrap was loaded from becomes BIOS drive 0x80, by a hash of its sector 0; patch 0005) and 2026-10-13 (an ACPI 1.0 view for legacy systems: an RSDT built from the XSDT when RsdtAddress is 0 or the RSDT is invalid, a FADT copy with the 32-bit fields filled from the X_ fields; patch 0006) and 2026-10-14 (diagnostic, Windows 2000 ACPI flow only: ACPI mode switched on through FADT SMI_CMD/ACPI_ENABLE right before the legacy boot, RTC A/B recorded; patch 0007) and 2026-10-15 (APM power-off from every APM interface: UEFI ResetSystem on the helper core, then a direct ACPI S5 write with SLP_TYP from the DSDT _S5 package; SeaBIOS debug output on the serial port with csmwrap.ini serial = true; patch 0008) and 2026-10-15 (power-off order ACPI mode first, PM1/GPE0 status cleared, S5, helper ResetSystem last, bounded waits, every step recorded in the CMOS RTC alarm bytes; patch 0009) and 2026-10-15 (SeaBIOS NVMe re-arms a controller an OS left stopped or shut down: admin queue and I/O queue pair 1 again in the POST memory, a controller running another admin queue is refused, FUA writes after a re-arm; patch 0010); ten patches in 3.1.2-usos9/patches. Submodules: cc-runtime (Apache-2.0 WITH LLVM-exception), flanterm (BSD-2-Clause), freestnd-c-hdrs (0BSD), nanoprintf (Unlicense OR 0BSD), PicoEFI, uACPI (MIT)."
+      "notice": "MODIFIED by USOS on 2026-09-27 (quiet boot unless csmwrap.ini sets verbose = true; patches 0001-0003) and 2026-09-29 (SeaBIOS boot priorities from the CSMWrap BBS table by PCI address, USB included; patch 0004) and 2026-10-11 (the exact disk CSMWrap was loaded from becomes BIOS drive 0x80, by a hash of its sector 0; patch 0005) and 2026-10-13 (an ACPI 1.0 view for legacy systems: an RSDT built from the XSDT when RsdtAddress is 0 or the RSDT is invalid, a FADT copy with the 32-bit fields filled from the X_ fields; patch 0006) and 2026-10-14 (diagnostic, Windows 2000 ACPI flow only: ACPI mode switched on through FADT SMI_CMD/ACPI_ENABLE right before the legacy boot, RTC A/B recorded; patch 0007) and 2026-10-15 (APM power-off from every APM interface: UEFI ResetSystem on the helper core, then a direct ACPI S5 write with SLP_TYP from the DSDT _S5 package; SeaBIOS debug output on the serial port with csmwrap.ini serial = true; patch 0008) and 2026-10-15 (power-off order ACPI mode first, PM1/GPE0 status cleared, S5, helper ResetSystem last, bounded waits, every step recorded in the CMOS RTC alarm bytes; patch 0009) and 2026-10-15 (SeaBIOS NVMe re-arms a controller an OS left stopped or shut down: admin queue and I/O queue pair 1 again in the POST memory, a controller running another admin queue is refused, FUA writes after a re-arm; patch 0010) and 2026-10-15 (diagnostic, only with csmwrap.ini acpi_legacy_fadt = true: a read-only KeTickCount/PM1/GPE0 watcher on the helper core, VGA text row 24, reserved E820 page published at BDA 4FCh; patch 0011, written by Codex and reviewed for USOS); eleven patches in 3.1.2-usos10/patches. Submodules: cc-runtime (Apache-2.0 WITH LLVM-exception), flanterm (BSD-2-Clause), freestnd-c-hdrs (0BSD), nanoprintf (Unlicense OR 0BSD), PicoEFI, uACPI (MIT)."
     },
     {
       "id": "touchi2cdxe",

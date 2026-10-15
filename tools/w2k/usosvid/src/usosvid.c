@@ -36,14 +36,15 @@
  *           local APIC NMI entries.
  *   row 14  the "*** STOP" line, kept even when the console scrolls.
  *   row 15  the last other "***" line (the driver the STOP points into).
- *   16-24   console: every string the kernel displays (/SOS, STOP text).
+ *   16-23   console (row 24 belongs to the independent helper watcher): every string the kernel displays (/SOS, STOP text).
  *           Text-mode Setup boots with /NOGUIBOOT (TXTSETUP.SIF), so the
  *           2000 kernel never sends a string here (InbvEnableBootDriver
  *           (FALSE) leaves the display "disabled"); only a STOP does. Until
  *           then usosvid 1.1 uses rows 16-21 for a heartbeat:
- *   row 16  "hb t=<KeTickCount> n=<samples> ...": a periodic kernel timer
- *           (250 ms). "t=--------" staying = no clock interrupt (or
- *           interrupts off for good) after kernel phase 1.
+ *   row 16  "hb t=<KeTickCount> e=<entries> n=<samples> ...": a periodic
+ *           kernel timer (250 ms). "t=--------" alone only means no accepted
+ *           DPC sample was drawn. Row 24 independently observes the clock;
+ *           entries are counted before all DPC guards in 1.3.
  *   17-19   the interrupt frames on the interrupted thread's stack, inner to
  *           outer: EIP and module (export name, or "sz" + SizeOfImage when
  *           the image has no export directory) + offset. "idle" = no frame:
@@ -52,6 +53,7 @@
  *           (module=count), so a spin loop shows as one module filling up.
  *   row 21  current thread, its stack limits, the PCR DPC stack, the
  *           interrupted ESP.
+ *           Entries are counted before all guards in 1.3.
  *           The heartbeat stops for good once anything else owns the screen
  *           (row 11 overwritten, e.g. setupdd's blue screen; VidCleanUp,
  *           VidResetDisplay, or a full-screen fill = the STOP screen).
@@ -60,8 +62,9 @@
  * ACPI HAL; the installed system keeps the Microsoft BOOTVID.DLL.
  */
 #include <ntddk.h>
+#include "usos_watcher.h"
 
-#define USOSVID_VERSION "usosvid 1.2"
+#define USOSVID_VERSION "usosvid 1.3"
 
 #define COLS        80
 #define ROWS        25
@@ -71,7 +74,7 @@
 #define ROW_STOP    14
 #define ROW_ADDR    15
 #define CON_TOP     16
-#define CON_BOTTOM  24
+#define CON_BOTTOM  23
 #define ROW_HB      16
 #define ROW_FRAME   17
 #define ROW_HIST    20
@@ -412,8 +415,65 @@ ShowAcpi(VOID)
 static KTIMER g_HbTimer;
 static KDPC g_HbDpc;
 static BOOLEAN g_HbOn;
-static volatile BOOLEAN g_Stop;
 static ULONG g_HbCount;
+static volatile ULONG g_HbDraws;
+static volatile BOOLEAN g_Stop;
+static volatile PUCHAR g_Watch;
+static volatile ULONG g_HbEntries;
+
+/* MmGetPhysicalAddress returns the address of the imported data, not IAT. */
+static USHORT WatchInw(USHORT port)
+{
+    USHORT v;
+#if defined(_MSC_VER)
+    __asm { mov dx, port }
+    __asm { in ax, dx }
+    __asm { mov v, ax }
+#else
+    __asm__ __volatile__("inw %w1,%0" : "=a"(v) : "d"(port));
+#endif
+    return v;
+}
+static VOID WatchInit(VOID)
+{
+    PUCHAR bda, page;
+    ULONG pa, seq;
+    USHORT cntPort;
+    PHYSICAL_ADDRESS tick, shared;
+    bda = (PUCHAR)MapPhys(0x400, 0x100, MmCached);
+    if (bda == NULL) return;
+    pa = *(PULONG)(bda + 0xFC);
+    MmUnmapIoSpace(bda, 0x100);
+    if (pa < 0x100000UL || pa > 0xFFFFF000UL || (pa & 0xFFF)) return;
+    page = (PUCHAR)MapPhys(pa, USW_SIZE, MmCached);
+    if (page == NULL) return;
+    if (*(PULONG)(page + 0) != USW_MAGIC || *(PUSHORT)(page + 4) != 1 ||
+        *(PUSHORT)(page + 6) != USW_HEADER || *(PULONG)(page + 8) != USW_SIZE ||
+        !(*(PULONG)(page + 12) & USW_RESERVED)) {
+        MmUnmapIoSpace(page, USW_SIZE);
+        return;
+    }
+    tick = MmGetPhysicalAddress((PVOID)*(PULONG *)&KeTickCount);
+    shared = MmGetPhysicalAddress((PVOID)0xFFDF0000);
+    seq = *(volatile ULONG *)(page + USW_SEQ);
+    *(volatile ULONG *)(page + USW_SEQ) = (seq | 1UL);
+    *(volatile ULONG *)(page + USW_READY) = 0;
+    *(volatile ULONG *)(page + USW_TICK_PA) = tick.LowPart;
+    *(volatile ULONG *)(page + USW_TICK_PA + 4) = (ULONG)tick.HighPart;
+    *(volatile ULONG *)(page + USW_SHARED_PA) = shared.LowPart;
+    *(volatile ULONG *)(page + USW_SHARED_PA + 4) = (ULONG)shared.HighPart;
+    *(volatile ULONG *)(page + USW_HB_ENTRY) = g_HbEntries;
+    *(volatile ULONG *)(page + USW_HB_DRAW) = g_HbDraws;
+    cntPort = *(PUSHORT)(page + USW_CONFIG + 4);
+    *(volatile ULONG *)(page + USW_INIT_CNT) =
+        cntPort >= 0x100 && cntPort <= 0xFFFE ? WatchInw(cntPort) : 0xFFFFFFFFUL;
+    /* x86 stores are ordered; volatile stores prevent compiler reordering.
+       This sequence is single-writer initialization, not a spinlock. */
+    *(volatile ULONG *)(page + USW_SEQ) = (seq | 1UL) + 1UL;
+    *(volatile ULONG *)(page + USW_READY) = 1;
+    g_Watch = page; /* retain mapping for the lifetime of this BOOTVID */
+}
+
 static struct { ULONG Base; ULONG Hits; } g_Hist[MAX_HIST];
 static ULONG g_HistOther;
 
@@ -502,6 +562,9 @@ HbDpc(IN PKDPC Dpc, IN PVOID Context, IN PVOID Arg1, IN PVOID Arg2)
     ULONG here = (ULONG)line, pcr, dpcStack, from, top, limit, a, page = 0;
     ULONG eip[MAX_FRAMES], n = 0, i, onDpc = 0, base, v0, v1, v2;
 
+    g_HbEntries++;
+    if (g_Watch != NULL)
+        *(volatile ULONG *)(g_Watch + USW_HB_ENTRY) = g_HbEntries;
     UNREFERENCED_PARAMETER(Dpc);
     UNREFERENCED_PARAMETER(Context);
     UNREFERENCED_PARAMETER(Arg1);
@@ -543,6 +606,8 @@ HbDpc(IN PKDPC Dpc, IN PVOID Context, IN PVOID Arg1, IN PVOID Arg2)
     /* KeTickCount is a data import: the symbol is the import slot, which
        holds the variable's address. Only the low dword is shown. */
     p = PutHex(p, end, *(volatile ULONG *)*(PULONG *)&KeTickCount, 8);
+    p = PutStr(p, end, " e=");
+    p = PutHex(p, end, g_HbEntries, 4);
     p = PutStr(p, end, " n=");
     p = PutHex(p, end, g_HbCount, 4);
     p = PutStr(p, end, onDpc ? " dpcstk" : " thrstk");
@@ -553,6 +618,8 @@ HbDpc(IN PKDPC Dpc, IN PVOID Context, IN PVOID Arg1, IN PVOID Arg2)
         p = PutStr(p, end, " idle (no interrupt frame)");
     }
     PutRow(ROW_HB, line, (ULONG)(p - line), 0x0E00);
+    g_HbDraws++;
+    if (g_Watch != NULL) *(volatile ULONG *)(g_Watch + USW_HB_DRAW) = g_HbDraws;
 
     for (i = 0; i < MAX_FRAMES; i++) {
         p = line;
@@ -604,12 +671,14 @@ HbStart(VOID)
     PCHAR p;
 
     if (g_HbOn) return;
-    p = PutStr(line, line + COLS, "hb t=-------- (no timer tick yet: no clock interrupt seen)");
+    p = PutStr(line, line + COLS, "hb t=-------- e=0000 (waiting for drawn DPC; clock: row 24)");
     PutRow(ROW_HB, line, (ULONG)(p - line), 0x0E00);
     KeInitializeDpc(&g_HbDpc, HbDpc, NULL);
     KeInitializeTimerEx(&g_HbTimer, NotificationTimer);
     due.QuadPart = -(LONGLONG)HB_PERIOD_MS * 10000;
+    if (g_Watch != NULL) *(volatile ULONG *)(g_Watch + USW_ARM) = 1;
     KeSetTimerEx(&g_HbTimer, due, HB_PERIOD_MS, &g_HbDpc);
+    if (g_Watch != NULL) *(volatile ULONG *)(g_Watch + USW_ARM) = 2;
     g_HbOn = TRUE;
 }
 
@@ -638,6 +707,7 @@ VidInitialize(IN BOOLEAN SetMode)
     ShowAcpi();
     p = PutStr(line, end, USOSVID_VERSION " (text BOOTVID): kernel phase 1 reached; ACPI facts below");
     PutRow(ROW_MARK, line, (ULONG)(p - line), 0x2F00);
+    if (g_Watch == NULL) WatchInit();
     HbStart();
     return TRUE;
 }

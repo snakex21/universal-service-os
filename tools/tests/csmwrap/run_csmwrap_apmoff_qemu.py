@@ -238,7 +238,7 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument('--out', type=Path, required=True)
     p.add_argument('--root', type=Path, default=ROOT)
-    p.add_argument('--csmwrap-efi', type=Path, default=ROOT / 'tools/vendor/csmwrap/3.1.2-usos9/csmwrapx64.efi')
+    p.add_argument('--csmwrap-efi', type=Path, default=ROOT / 'tools/vendor/csmwrap/3.1.2-usos10/csmwrapx64.efi')
     p.add_argument('--expect-usos7', action='store_true', help='usos7 order: helper ResetSystem first on real/pm32')
     p.add_argument('--mode', action='append', choices=sorted(MODES))
     p.add_argument('--machine', action='append', choices=('pc', 'q35'))

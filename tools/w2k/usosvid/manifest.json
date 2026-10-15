@@ -1,18 +1,20 @@
 {
   "name": "usosvid",
-  "version": "1.2",
+  "version": "1.3",
   "licence": "GPL-3.0-or-later (repository LICENSE, NOTICE)",
   "own_code": true,
   "build": "build.cmd (WDK 7.1, x86 WXP environment, EXPORT_DRIVER linked as bootvid.sys, shipped as bootvid.dll); not byte-reproducible (PE time stamp, PDB GUID)",
   "exports": "VidBitBlt@12 VidBufferToScreenBlt@24 VidCleanUp@0 VidDisplayString@4 VidDisplayStringXY@16 VidInitialize@4 VidResetDisplay@4 VidScreenToBufferBlt@24 VidSetScrollRegion@16 VidSetTextColor@4 VidSolidColorFill@20 (names and argument sizes of the Windows 2000 BOOTVID.DLL the 2000 kernel imports)",
-  "imports": "ntoskrnl: MmMapIoSpace, MmUnmapIoSpace, MmIsAddressValid, KeTickCount, KeInitializeDpc, KeInitializeTimerEx, KeSetTimerEx, KeCancelTimer, memset (all exported by the Windows 2000 SP4 kernels)",
+  "imports": "ntoskrnl: MmMapIoSpace, MmUnmapIoSpace, MmIsAddressValid, KeTickCount, KeInitializeDpc, KeInitializeTimerEx, KeSetTimerEx, KeCancelTimer, MmGetPhysicalAddress, memset (all exported by the Windows 2000 SP4 kernels)",
   "use": "Windows 2000 text-mode Setup with ACPI on: $WIN_NT$.~BT\\BOOTVID.DLL only (tools/w2k_stage.sh 8.)",
   "files": {
-    "bin/i386/bootvid.dll": "dfe08db595119ae23452b60eadf79b18873ac74271d9d4257906953d12e1d5d5",
+    "bin/i386/bootvid.dll": "577ba9de4791d6cb6b292749b6de53127effe6d298841df68f16e7b91645f552",
     "build.cmd": "7f4ff4a185f4a8597fcec7fade7fb966b0c75e73848eee558ad389132d37e42c",
-    "src/usosvid.c": "95263910b06d04968587d823ff6e3738ee0ae92474839a37fbbf864b502b58bf",
+    "src/usosvid.c": "5d76644e0e9d51519fbefa3917a1bcec755a2c4a9578f6a5581702c66686b904",
+    "src/usos_watcher.h": "873a54950e14e99d09a3cab48d76532ab0af9227509d558879148b03400317da",
     "src/usosvid.def": "dbbf9892496612f965b2846063a3307788404bb41116a6f5b910bbfe32c67357",
     "src/sources": "5ba2ab894680c5433e56282cb84462932fd762af725435132ad90a7467deb798",
     "src/makefile": "7289517c7028ff031a48cc84f6308a437c3abe6e046c93f3132255221842d433"
-  }
+  },
+  "watcher": "1.3: with CSMWrap 3.1.2-usos10 (Windows 2000 ACPI flow) publishes the physical addresses of KeTickCount and KUSER_SHARED_DATA plus heartbeat-DPC entry/draw counters and the timer-arm state into the reserved watcher page whose address CSMWrap leaves at BDA 4FCh; the CSMWrap helper core shows them on text row 24 (src/usos_watcher.h = the ABI header of CSMWrap patch 0011). Console rows 16-23."
 }

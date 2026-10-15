@@ -622,3 +622,57 @@ run_nvme_freedos_probe.py (FreeDOS from NVMe, write + read back) PASS,
 test_csmwrap_acpi10/acpien/apmoff PASS. Windows 98 itself
 cannot run this path in QEMU (its VMM exit hangs under CSMWrap there,
 docs/research/win9x-acpi-2026-10-15.md). Hardware: not yet run on the X470.
+
+## 15. 3.1.2-usos10: read-only Tick watcher on the helper core, Windows 2000 ACPI diagnostic (2026-10-15)
+
+Windows 2000 SP4 with the ACPI HAL on the X470 stops after kernel phase 1;
+step A (patch 0007) ruled out an SMI rewriting RTC A/B, and usosvid's
+`hb t=--------` cannot tell a missing clock interrupt from starved DPCs.
+Patch 0011 (design and code by Codex, its patch 0008 on usos6; reviewed and
+applied unchanged on top of 0001-0010) lets CSMWrap's hidden helper core
+read KeTickCount once a second, independently of Windows.
+
+Only with `csmwrap.ini acpi_legacy_fadt = true` (the 2000 ACPI flow):
+
+- EFI: ports from the validated RSDT FADT (PM1a_EVT/CNT, PM_TMR, GPE0; GAS
+  System I/O fallback), TSC calibrated on the PM timer (~100 ms, bounded),
+  one EfiReservedMemoryType page below 4 GiB. After `build_e820_map` the page
+  must be wholly E820 type 2 (`usw_e820_reserved`), else the watcher stays
+  off. The address reaches the helper through a private trampoline dword
+  (EDX; the CSMPPrxy ABI is unchanged) and BDA 0x4FC-0x4FF right before
+  Legacy16Boot through patch 0007's page-0 store (only exactly 0x4FC/4).
+  Patch 0008's APM power-off record uses 0x4FC-0x4FF only during an INT 15h
+  power-off, which the 2000 ACPI HAL never calls; usosvid reads 0x4FC once
+  at VidInitialize and validates the page magic.
+- Helper loop (`romlayout.S`): a page address in ESI (> 1) selects watcher
+  mode: `request_pending` is still checked first on every iteration, then
+  `usos_watch_tick` (PAUSE + RDTSC deadline instead of MWAIT); proxy calls
+  record their start and a late flag. A proxied call that never returns stops
+  the watcher too.
+- Sample: Tick and KUSER_SHARED_DATA InterruptTime (physical addresses
+  published by usosvid 1.3), PM1_STS/EN/CNT (16-bit), GPE0 STS/EN (bytewise),
+  PIC IMRs from the data ports; stored in the helper's page range
+  0x100-0x1FF and as 80 characters on VGA text row 24. Reads only: no OUT, no
+  W1C, no SMI_CMD, no CMOS, no IOREGSEL/IOWIN, no LAPIC/IPI.
+- Off: trampoline argument 0, no calibration, page, BDA write or sample; the
+  loop is the usos9 one (code layout differs, function checked by the
+  regression runs below).
+
+Layout: 16bit 37408 (+64) + 32bit segmented 4118 + f-segment vars 3328 =
+44854 bytes, 20682 bytes for the allocation zone (6144 minimum kept);
+32-bit flat 31722 bytes (+2656); ROM 130528 of 131072 bytes (99.6 %): only
+544 bytes are left, so the next SeaBIOS-side addition needs room first (for
+example dropping the watcher once the 2000 ACPI diagnosis is done).
+
+Binary `95a85360a10ff5e657f2636f9eedb3a08dfc02d019f8375558e884692b160d63`,
+built twice identical in one pinned Alpine VM run (same lock and toolchain as
+usos9, BUILD_VERSION 3.1.2-usos10; the unpatched build still matches
+upstream_rebuild). Pins moved to 3.1.2-usos10 as for usos9.
+
+Tests: test_csmwrap_watcher.py (Codex's 15 host cases on usos_watcher.c
+from the patch, UBSan; gate, read-only and BDA-range checks, pins);
+test_csmwrap_acpi10/acpien/apmoff/nvme_rearm PASS. QEMU (not hardware):
+run_csmwrap_apmoff_qemu.py pc/q35 x real/pm32/pm16 PASS,
+run_csmwrap_nvme_rearm_qemu.py pc/q35 PASS, run_csmwrap_boot_disk_qemu.py
+six layouts PASS; 2000 Pro SP4 ACPI on q35 reaches logon with Tick growing
+on the page (docs/windows-2000-acpi-x470-2026-10-12.md). X470 not tested.

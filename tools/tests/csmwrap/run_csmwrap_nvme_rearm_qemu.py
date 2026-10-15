@@ -1,4 +1,4 @@
-"""QEMU test for CSMWrap 3.1.2-usos9 patch 0010 (SeaBIOS NVMe runtime re-arm).
+"""QEMU test for CSMWrap 3.1.2-usos10 patch 0010 (SeaBIOS NVMe runtime re-arm).
 
 Windows 98 SE boots from NVMe (CSMWrap SeaBIOS INT 13h, then usosnvme.mpd).
 usosnvme rebuilds the admin queue in its own memory at start and, on the exit
@@ -158,7 +158,7 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument('--out', type=Path, required=True)
     p.add_argument('--root', type=Path, default=ROOT)
-    p.add_argument('--csmwrap-efi', type=Path, default=ROOT / 'tools/vendor/csmwrap/3.1.2-usos9/csmwrapx64.efi')
+    p.add_argument('--csmwrap-efi', type=Path, default=ROOT / 'tools/vendor/csmwrap/3.1.2-usos10/csmwrapx64.efi')
     p.add_argument('--machine', action='append', choices=('pc', 'q35'))
     p.add_argument('--minutes', type=float, default=4)
     p.add_argument('--expect-old', action='store_true', help='control run with usos8 or older: the R2 read fails')

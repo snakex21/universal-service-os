@@ -301,9 +301,21 @@ class W2kStorage(unittest.TestCase):
         # SP4 ntoskrnl), rows 16-21 while text-mode Setup runs with /NOGUIBOOT.
         for name in (b'MmIsAddressValid', b'KeTickCount', b'KeInitializeDpc', b'KeInitializeTimerEx', b'KeSetTimerEx', b'KeCancelTimer'):
             self.assertIn(name, dll)
-        self.assertIn(b'usosvid 1.2', dll)
+        self.assertIn(b'usosvid 1.3', dll)
         # 1.2: the CSMWrap usos6 ACPI-enable record (BDA 4F4h) on row 12
         self.assertIn(b' en=', dll)
+        # 1.3: the CSMWrap usos10 watcher page (BDA 4FCh): KeTickCount and
+        # KUSER_SHARED_DATA physical addresses (MmGetPhysicalAddress, exported
+        # by the 2000 SP4 kernels) and the DPC entry counter; the ABI header is
+        # the one CSMWrap patch 0011 adds (byte for byte).
+        self.assertIn(b'MmGetPhysicalAddress', dll)
+        self.assertIn(b' e=', dll)
+        self.assertIn(b'#define CON_BOTTOM  23', c)
+        header = (vid / 'src/usos_watcher.h').read_bytes()
+        patch = (ROOT / 'tools/vendor/csmwrap/3.1.2-usos10/patches/0011-w2k-acpi-tick-watcher.patch').read_text(encoding='utf-8')
+        part = patch.split('+++ b/src/usos_watcher.h\n', 1)[1].split('\ndiff --git', 1)[0]
+        lines = [l[1:] for l in part.split('\n') if l.startswith('+')]
+        self.assertEqual('\n'.join(lines) + '\n', header.decode())
 
     def stand_in(self, t: Path) -> tuple:
         import build_xp_uefi_csm_trial as builder
