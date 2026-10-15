@@ -68,7 +68,7 @@ Answers to the questions of the task:
 * **Reset / exit.** One way: there is no return to UEFI without a reset. Any
   reset (REBOOT.COM, Ctrl+Alt+Del, the menu's restart) is a platform reset;
   the firmware then starts its UEFI boot order again, normally the USOS UEFI
-  menu. Power off from the BIOS menu goes through SeaBIOS APM (CSMWrap 3.1.2-usos8:
+  menu. Power off from the BIOS menu goes through SeaBIOS APM (CSMWrap 3.1.2-usos9:
   ACPI mode, then a direct ACPI S5 write, UEFI ResetSystem on the helper core
   last, every step recorded in CMOS for EFI\USOS\Logs\apm-off.txt; QEMU PASS,
   X470 not tested yet; docs/research/csmwrap.md sections 12 and 13).

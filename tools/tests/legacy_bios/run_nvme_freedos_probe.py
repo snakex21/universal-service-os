@@ -27,7 +27,7 @@ from run_seabios_xp_uefi_csm_textmode import Monitor, free_port, vga_text  # noq
 QEMU = ROOT / 'tools/qemu' / os.environ.get('USOS_QEMU_EXE', 'qemu-system-x86_64.exe')
 OVMF_CODE = ROOT / 'tools/qemu/share/edk2-x86_64-code.fd'
 OVMF_VARS = ROOT / 'tools/qemu/share/edk2-i386-vars.fd'
-CSMWRAP = ROOT / 'tools/vendor/csmwrap/3.1.2-usos8/csmwrapx64.efi'
+CSMWRAP = ROOT / 'tools/vendor/csmwrap/3.1.2-usos9/csmwrapx64.efi'
 FREEDOS = ROOT / 'tools/vendor/freedos/1.4'
 SECTOR = 512
 C_START, C_SECTORS = 2048, ESP_SECTORS

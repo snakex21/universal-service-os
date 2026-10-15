@@ -560,3 +560,65 @@ tests; `--cmos-check` (build B261015-141111-C6FB249D): pc/q35 x
 real/pm32/pm16, the USOS menu reads the record after the power-off and
 writes it to apm-off.txt (record found in the ESP image), all six PASS.
 Hardware: not yet run on the X470.
+
+## 14. 3.1.2-usos9: NVMe INT 13h after an OS stopped the controller (2026-10-15)
+
+Windows 98 SE on the X470 runs from the Micron NVMe: CSMWrap's SeaBIOS
+INT 13h until the VMM starts, then the USOS 9x miniport usosnvme.mpd. The
+APM power-off of 98 lives in real mode: after the VMM returns, WIN.COM
+re-executes itself from disk as `WIN.COM /z`, which shows LOGOS.SYS and then
+calls INT 15h 5300h/5301h/.../5307h. usosnvme resets the controller at its
+start (CC.EN = 0, its own AQA/ASQ/ACQ, usosnvme.c init steps 1-3) and on the
+exit to real mode flushes, sets CC.SHN and disables it (`HwAdapterState`).
+SeaBIOS's admin queue and I/O queue pair 1 were therefore gone, every
+INT 13h read timed out (5 s each), the exec failed and the parent WIN.COM
+printed "It's now safe to turn off your computer" as plain text (X470 with
+usos8: exactly that screen, no LOGOS.SYS; CMOS record: 5301h/5307h never
+called).
+
+Patch 0010 (own code from the NVMe 1.4 base specification; the earlier
+uncompiled draft had a use-after-free of `ctrl->pci`, which is POST-only
+temporary memory): `nvme_runtime_rearm()` runs before every read/write.
+
+| Controller state | Action |
+|---|---|
+| enabled, ready, no SHN requested/reported, not fatal, ASQ/ACQ = SeaBIOS's pages | used as it is (normal case; one config read + register reads) |
+| enabled and ready with another admin queue | a live OS driver owns it: refused at once, nothing written (before: 5 s timeout, and our doorbells could make the controller fetch stale OS slots) |
+| anything else (disabled, not ready, CC.SHN, SHST, CFS) | memory + bus master on, CC = 0, wait RDY 0, admin + I/O queue memory from POST cleared, head/tail/phase and doorbells 0-3 reset, AQA/ASQ/ACQ, CC.EN, wait RDY 1, CREATE I/O CQ 1, CREATE I/O SQ 1 on the same pages; `USOS NVME: re-arm` / `re-armed` on serial |
+
+BAR 0 is read again from PCI config space (an OS may move it; a 64-bit BAR
+above 4 GiB is refused). The BDF is kept in `struct nvme_ctrl`. No runtime
+allocation. After a re-arm every write carries FUA, because SeaBIOS never
+sends FLUSH and an APM power-off follows; the OS driver flushed and shut the
+controller down before it handed it back.
+
+Why not in usosnvme.mpd only: the driver replaces SeaBIOS's admin queue at
+start, and SeaBIOS's I/O queue addresses, tails, heads and phases live in
+SeaBIOS's own memory, so the driver cannot hand the original queues back.
+Keeping the controller enabled at exit would leave the driver's admin queue
+in place, which the new check refuses anyway. usosnvme stays unchanged (its
+flush + CC.SHN is the clean handoff for data on the medium).
+
+Layout: 16-bit and 32-bit segmented code unchanged (patch 0010 is 32-bit
+flat only), so the F-segment allocation zone keeps 20746 bytes free above
+the 6144-byte minimum; 32-bit flat 29066 bytes; ROM 127808 of 131072 bytes
+(97.5 %, usos8 96.9 %).
+
+Binary `07afed185535294065276d02e7ca3c18a04b3a0ca7e8cc3bce38333faafa56b8`,
+built twice identical in the pinned Alpine VM (same lock and toolchain as
+usos8, BUILD_VERSION 3.1.2-usos9; the unpatched build still matches
+upstream_rebuild). Vendor folder `tools/vendor/csmwrap/3.1.2-usos9`; the
+pins moved as for usos8; 3.1.2-usos8 stays as the previous binary.
+
+Tests: test_csmwrap_nvme_rearm.py (patch wiring, manifest and pins);
+run_csmwrap_nvme_rearm_qemu.py: OVMF + CSMWrap from QEMU NVMe, a test MBR
+replays usosnvme's register sequence (own admin queue -> INT 13h refused;
+CC.SHN + CC.EN = 0 -> INT 13h read works again, FUA write of LBA 1 to LBA 4
+reaches the image, real-mode APM power-off), pc and q35 PASS; usos8 control:
+the read after the shutdown fails (the X470 symptom). Regression with
+usos9: run_csmwrap_apmoff_qemu.py pc/q35 x real/pm32/pm16 all PASS
+(`path=s5`), run_csmwrap_boot_disk_qemu.py all six layouts PASS,
+run_nvme_freedos_probe.py (FreeDOS from NVMe, write + read back) PASS,
+test_csmwrap_acpi10/acpien/apmoff PASS. Windows 98 itself
+cannot run this path in QEMU (its VMM exit hangs under CSMWrap there,
+docs/research/win9x-acpi-2026-10-15.md). Hardware: not yet run on the X470.

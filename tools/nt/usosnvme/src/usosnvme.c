@@ -1045,9 +1045,11 @@ static VOID NvmeDbgCounters(PHW_DEVICE_EXTENSION Ext, const CHAR *Why)
 
 /* Windows exits to real mode (shut down, restart, MS-DOS mode): flush,
    normal shutdown notification (CC.SHN), then the controller is left
-   disabled. The BIOS (SeaBIOS NVMe in CSMWrap) cannot use it again - its
-   queues are gone - so its INT 13h calls fail with a timeout instead of
-   reaching a queue of ours. The next I/O from Windows re-initialises it. */
+   disabled. Its admin queue was replaced at our init, so SeaBIOS NVMe in
+   CSMWrap 3.1.2-usos9+ re-arms its own queues on its next INT 13h call
+   (98's WIN.COM /z power-off; older CSMWrap timed out there); it refuses a
+   controller that still runs our queues. The next I/O from Windows
+   re-initialises it. */
 static VOID NvmeShutdown(PHW_DEVICE_EXTENSION Ext)
 {
     ULONG cc, ms;
