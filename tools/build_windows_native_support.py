@@ -134,6 +134,9 @@ def build_modern_support(root: Path, out: Path):
                     '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_usb_reenum.c'),
                     '-Wl,--entry,entry', '-lkernel32', '-ladvapi32', '-lsetupapi', '-lcfgmgr32', '-o', str(helpers / 'usos-usbreenum.exe')], env=env, check=True)
     win7 = root / 'zig-out/windows7-uefi'
+    subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.vista-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
+                    '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_nvme_modern.c'), '-Wl,--entry,entry', '-lkernel32', '-ladvapi32', '-lcrypt32', '-lshell32',
+                    '-o', str(helpers / 'usos-nvme-modern.exe')], env=env, check=True)
     writer = NewcWriter(out / 'modern-support.cpio.tmp')
     try:
         writer.add_bytes('usos-modern-uefi.cmd', (root / 'tools/windows_modern_uefi_startup.cmd').read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
@@ -163,6 +166,12 @@ def build_modern_support(root: Path, out: Path):
         writer.add_file('usosnvme-nt6.sys', signed / 'usosnvme.sys')
         for name in ('usosnvme.inf', 'usosnvme.cat', 'usosnvme.cer'):
             writer.add_file(name, signed / name)
+        modern_signed = helpers / 'usosnvme-modern'
+        build_usosnvme_nt6_signed(root, modern_signed, modern=True)
+        for name in ('usosnvme.inf', 'usosnvme.sys', 'usosnvme.cat', 'usosnvme.cer'):
+            writer.add_file('modern-' + name, modern_signed / name)
+        writer.add_file('usos-nvme-modern.exe', helpers / 'usos-nvme-modern.exe')
+        writer.add_bytes('usos-nvme-modern.cmd', (root / 'tools/windows_nvme_modern.cmd').read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
         for name in ('usos-drivers.exe', 'usos-unattend-drivers.exe'):
             writer.add_file(name, win7 / name)
     finally:

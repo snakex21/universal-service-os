@@ -499,6 +499,34 @@ pub noinline fn inspectModernX86(image_directory: []const u8, name: []const u8) 
 
 pub const x86_csmwrap_profile = "win-x86-uefi-csmwrap";
 
+/// The experimental 8.1 NVMe route needs PE10's SCSIPORT-capable setup host.
+/// The regular self-PE route and Windows 10 remain unchanged.
+pub fn modernX86ExternalDonor(setup: wim.Setup, folder: []const u8, opted_in: bool) bool {
+    return opted_in and setup.major == 6 and setup.minor == 3 and
+        (std.mem.eql(u8, folder, "Windows 8.1") or std.mem.eql(u8, folder, "Windows Embedded 8.1 Industry"));
+}
+
+fn modernNvmeOptIn(state: *BootState, folder: []const u8) !bool {
+    var directory: [160]u8 = undefined;
+    const path = try std.fmt.bufPrint(&directory, "Systems/Windows/{s}/Unattended", .{folder});
+    var flag: ntfs.File = undefined;
+    openIn(&state.catalog, path, "nvme-experimental.txt", &flag) catch |err| switch (err) {
+        error.NotFound => return false,
+        else => return err,
+    };
+    return true;
+}
+
+test "modern x86 PE10 donor is confined to opted-in 8.1 folders" {
+    const pe81 = wim.Setup{ .index = 2, .major = 6, .minor = 3, .build = 9600 };
+    const pe10 = wim.Setup{ .index = 2, .major = 10, .minor = 0, .build = 19041 };
+    try std.testing.expect(modernX86ExternalDonor(pe81, "Windows 8.1", true));
+    try std.testing.expect(modernX86ExternalDonor(pe81, "Windows Embedded 8.1 Industry", true));
+    try std.testing.expect(!modernX86ExternalDonor(pe81, "Windows 8.1", false));
+    try std.testing.expect(!modernX86ExternalDonor(pe10, "Windows 10", true));
+    try std.testing.expect(!modernX86ExternalDonor(pe81, "Windows 7", true));
+}
+
 /// request.ini of the x86 path: the ISO is its own boot source (donor = iso).
 pub fn formatX86CsmwrapRequest(buffer: []u8, folder: []const u8, name: []const u8, answer: CsmwrapAnswer) ![]const u8 {
     try source_config.validateName(folder);
@@ -542,7 +570,16 @@ pub noinline fn prepareX86Csmwrap(root: *uefi.protocol.File, image_directory: []
     var config: [544]u8 = undefined;
     const binding = try source_config.sourceConfigForFolder(&config, state.catalog.partition.part_guid, state.source.size(), folder, name);
     var request: [1024]u8 = undefined;
-    const text = try formatX86CsmwrapRequest(&request, folder, name, answer);
+    const external_pe10 = modernX86ExternalDonor(inspection.setup, folder, true) and try modernNvmeOptIn(state, folder);
+    const text = if (external_pe10) blk: {
+        progress(.validating, "Validating the x86 PE10 donor for the NVMe experiment");
+        const selected = scanner.Inspection{ .mode = .original, .selected_setup = inspection.setup, .boot_setup = inspection.setup, .nvme_packages = false };
+        var adapter = directory_source.Adapter.init(state.catalog.fs, state.catalog.reader());
+        var context = X86DonorContext{ .state = state };
+        const donor = try scanner.resolveX86Donor(selected, adapter.source(), &context);
+        serial.writeAscii("[X86_CSMWRAP] opted-in 8.1 NVMe: external x86 PE10 donor\r\n");
+        break :blk try formatCsmwrapRequestFor(&request, x86_csmwrap_profile, folder, name, donor.donor_directory, donor.donor_name.slice(), answer);
+    } else try formatX86CsmwrapRequest(&request, folder, name, answer);
     const settings_store = @import("settings_store.zig");
     try ensureEspDirectory(root, csmwrap_directory);
     try settings_store.replaceFile(root, csmwrap_directory ++ "\\usos-source.ini", binding);

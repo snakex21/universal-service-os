@@ -41,12 +41,20 @@ INF_DATE_IN = b'DriverVer=10/11/2026,1.0.0.0'
 INF_DATE_OUT = b'DriverVer=01/01/2001,1.0.0.0'
 
 
-def nt6_inf(root: Path) -> bytes:
+def nt6_inf(root: Path, modern: bool = False) -> bytes:
     inf = (root / 'tools/nt/usosnvme/usosnvme.inf').read_bytes()
     if INF_DATE_IN not in inf:
         raise ValueError('usosnvme.inf DriverVer changed; update the NT6 copy')
     inf = inf.replace(INF_DATE_IN, INF_DATE_OUT + b'\r\nCatalogFile=usosnvme.cat')
-    return inf.replace(b'\r\n', b'\n').replace(b'\n', b'\r\n')
+    inf = inf.replace(b'\r\n', b'\n').replace(b'\n', b'\r\n')
+    if modern:
+        # Separate owned package, exact IDs reviewed for the first opt-in trial.
+        # Retain the boot-critical service identity without replacing its inbox file.
+        inf = inf.replace(b'AddService = usosnvme,', b'AddService = stornvme,')
+        inf = inf.replace(b'%Nvme.DeviceDesc% = Nvme_Inst, PCI\\CC_010802',
+                          b'%Nvme.DeviceDesc% = Nvme_Inst, PCI\\VEN_1344&DEV_5407\r\n'
+                          b'%Nvme.DeviceDesc% = Nvme_Inst, PCI\\VEN_1B36&DEV_0010')
+    return inf
 
 
 def find_tools() -> tuple[Path, Path]:
@@ -97,16 +105,17 @@ Write-Output $thumb
 '''
 
 
-def build(root: Path, out: Path) -> str:
+def build(root: Path, out: Path, *, modern: bool = False) -> str:
     """Writes the signed package to out; returns the certificate thumbprint."""
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
-    (out / 'usosnvme.inf').write_bytes(nt6_inf(root))
+    (out / 'usosnvme.inf').write_bytes(nt6_inf(root, modern))
     shutil.copyfile(root / 'tools/nt/usosnvme/bin/NT6/i386/usosnvme.sys', out / 'usosnvme.sys')
     (out / 'usosnvme.cdf').write_bytes(
-        b'[CatalogHeader]\r\nName=usosnvme.cat\r\nResultDir=.\r\nPublicVersion=0x0000001\r\nEncodingType=0x00010001\r\n'
-        b'CATATTR1=0x10010001:OSAttr:2:6.0,2:6.1\r\n\r\n'
+        b'[CatalogHeader]\r\nName=usosnvme.cat\r\nResultDir=.\r\nPublicVersion=0x0000001\r\nEncodingType=0x00010001\r\n' +
+        (b'CATATTR1=0x10010001:OSAttr:2:6.3,2:10.0\r\n\r\n' if modern else
+         b'CATATTR1=0x10010001:OSAttr:2:6.0,2:6.1\r\n\r\n') +
         b'[CatalogFiles]\r\n<hash>usosnvme.inf=usosnvme.inf\r\n<hash>usosnvme.sys=usosnvme.sys\r\n')
     signtool, makecat = find_tools()
     env = dict(os.environ, USOS_SIGN_OUT=str(out), USOS_SIGNTOOL=str(signtool), USOS_MAKECAT=str(makecat),
