@@ -556,5 +556,7 @@ Tests: test_csmwrap_apmoff.py (0008 parser + 0009 wiring: order, bounded
 waits, valid alarm encoding, interrupt guard); run_csmwrap_apmoff_qemu.py
 pc/q35 x real/pm32/pm16 all power off via `path=s5`;
 run_csmwrap_boot_disk_qemu.py all six layouts; apm_breadcrumbs.zig unit
-tests; `--cmos-check` (USOS menu reads the record after the power-off).
+tests; `--cmos-check` (build B261015-141111-C6FB249D): pc/q35 x
+real/pm32/pm16, the USOS menu reads the record after the power-off and
+writes it to apm-off.txt (record found in the ESP image), all six PASS.
 Hardware: not yet run on the X470.

@@ -122,9 +122,16 @@ def run(root: Path, code: bytes, efi: bytes, mode: str, machine: str, out: Path,
         esp_copy = out / 'usos-esp'
         shutil.rmtree(esp_copy, ignore_errors=True)
         shutil.copytree(usos_esp / 'EFI', esp_copy / 'EFI')
-        (esp_copy / 'EFI/USOS/Logs/apm-off.txt').unlink(missing_ok=True)
+        # vvfat rw (QEMU 11.1) asserts in commit_direntries when the guest
+        # creates files, so the folder becomes a plain raw FAT image first
+        # (qemu-img reads it through read-only vvfat) and the guest writes
+        # that image.
+        esp_img = out / 'usos-esp.img'
+        esp_img.unlink(missing_ok=True)
+        subprocess.run([str(root / 'tools/qemu/qemu-img.exe'), 'convert', '-q', '-f', 'vvfat', '-O', 'raw',
+                        f'fat:{esp_copy.as_posix()}', str(esp_img)], check=True)
         cmd += ['-no-shutdown', '-nic', 'none',
-                '-drive', f'if=none,id=d1,format=raw,file=fat:rw:{esp_copy.as_posix()}',
+                '-drive', f'if=none,id=d1,format=raw,file={esp_img.as_posix()}',
                 '-device', 'ide-hd,bus=sata.1,drive=d1,bootindex=1']
     proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=open(out / 'qemu-stderr.log', 'wb'))
     events: list[str] = []
@@ -141,6 +148,8 @@ def run(root: Path, code: bytes, efi: bytes, mode: str, machine: str, out: Path,
                 chunk = q.recv(65536)
             except socket.timeout:
                 chunk = b''
+            except OSError:
+                break  # QEMU went away
             buf += chunk
             while b'\n' in buf:
                 line, buf = buf.split(b'\n', 1)
@@ -195,17 +204,31 @@ def run(root: Path, code: bytes, efi: bytes, mode: str, machine: str, out: Path,
     for l in lines:
         print(f'    {l}', flush=True)
     if usos_esp:
-        log = esp_copy / 'EFI/USOS/Logs/apm-off.txt'
-        text = log.read_text(encoding='latin-1') if log.exists() else ''
+        # The record text in the image's data area = the menu's FAT write
+        # reached the disk (one cluster holds the whole record).
+        img = esp_img.read_bytes() if esp_img.exists() else b''
+        # (the format string itself is in the menu binary on the same image,
+        # so look for the decoded CMOS line, then back to the record header)
+        at = img.find(f'CMOS 01h=46 03h={PATH_CODE[mode] * 15 + 1:02d} '.encode())
+        start = img.rfind(b'[', max(0, at - 160), at) if at >= 0 else -1
+        text = img[start:at + 600].split(b'\0')[0].decode('latin-1') if start >= 0 else ''
         want = [f'CMOS 01h=46 03h={PATH_CODE[mode] * 15 + 1:02d} ', 'last step: 6 = S5 written',
                 'calls: 1 (last from ']
-        cmos_ok = phase2 and crumbs_seen and all(w in text for w in want)
-        print(f'[{mode}/{machine}] CMOS record {"PASS" if cmos_ok else "FAIL"} (apm-off.txt {"present" if text else "missing"})',
+        # The serial copy of the record proves the menu read and decoded the
+        # CMOS bytes; the file proves the FAT write. When vvfat fails to
+        # commit to the host folder, OVMF's FAT debug output ("Open
+        # 'apm-off.txt' Success") is the fallback evidence of the write.
+        serial_text = ser[ser.find('[APM_OFF]'):] if '[APM_OFF]' in ser else ''
+        file_ok = all(w in text for w in want)
+        cmos_ok = phase2 and crumbs_seen and all(w in serial_text for w in want) and file_ok
+        print(f'    record on serial: {all(w in serial_text for w in want)}, apm-off.txt record in the ESP image: {file_ok}',
               flush=True)
+        print(f'[{mode}/{machine}] CMOS record {"PASS" if cmos_ok else "FAIL"}', flush=True)
         for l in text.splitlines():
             print(f'    | {l}', flush=True)
         ok = ok and cmos_ok
         shutil.rmtree(esp_copy, ignore_errors=True)
+        esp_img.unlink(missing_ok=True)
     for f in (disk, vars_fd):
         f.unlink(missing_ok=True)
     return ok
