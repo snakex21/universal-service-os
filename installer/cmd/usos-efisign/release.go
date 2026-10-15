@@ -40,11 +40,12 @@ const (
 	// NTFS driver. USOS starts it only on matching SMBIOS (touch_driver.zig).
 	touchVendorDir    = "tools/vendor/touchi2cdxe/v1.3.1-usos1"
 	touchDriverTarget = "EFI/USOS/touchi2c_x64.efi"
-	// CSMWrap 3.1.2-usos7 (a MODIFIED CSMWrap 3.1.2: quiet boot unless
+	// CSMWrap 3.1.2-usos8 (a MODIFIED CSMWrap 3.1.2: quiet boot unless
 	// csmwrap.ini sets verbose = true, and SeaBIOS boot priorities from
 	// CSMWrap's BBS table, USB included, the exact disk CSMWrap was loaded
 	// from as 0x80, an ACPI 1.0 view (RSDT, 32-bit FADT fields) for 2000/XP,
-	// APM power-off that works from 9x (helper ResetSystem, then ACPI S5);
+	// APM power-off that works from 9x (ACPI mode, then S5, the helper's
+	// ResetSystem last) with CMOS breadcrumbs of every step;
 	// docs/research/csmwrap.md sections 6
 	// and 7, docs/design/bios-via-csmwrap.md) for XP / Vista without firmware
 	// CSM and for the UEFI menu's "Legacy BIOS mode (CSMWrap)": copied
@@ -52,7 +53,7 @@ const (
 	// ESP (tools/xp_csmwrap_esp.sh, the BIOS Core DOS installer). The LGPL
 	// source (the unpatched archive plus the patches) and every licence
 	// notice travel with it.
-	csmwrapVendorDir  = "tools/vendor/csmwrap/3.1.2-usos7"
+	csmwrapVendorDir  = "tools/vendor/csmwrap/3.1.2-usos8"
 	csmwrapLicenseDir = "tools/vendor/csmwrap/3.1.2"
 	csmwrapSourceDir  = "tools/vendor/csmwrap/3.1.2-src"
 	csmwrapTargetDir  = "EFI/USOS/csmwrap"
@@ -429,8 +430,11 @@ func stageCSMWrap(vendorDir, licenseDir, sourceDir, gplv3, usb string) error {
 		"(patch 0008): APM power-off (5307h) that also works from the protected-mode\r\n" +
 		"APM interfaces (UEFI ResetSystem on the helper core, then a direct ACPI S5\r\n" +
 		"write with SLP_TYP read from the DSDT's \\_S5), and SeaBIOS debug output on the\r\n" +
-		"serial port when csmwrap.ini sets serial = true. Version strings: CSMWrap\r\n" +
-		"Version 3.1.2-usos7, SeaBIOS 578d260b-CSMWrap-3.1.2-usos7.\r\n" +
+		"serial port when csmwrap.ini sets serial = true, and on 2026-10-15 (patch\r\n" +
+		"0009): the power-off order ACPI mode, PM1/GPE0 status cleared, S5, helper\r\n" +
+		"ResetSystem last, bounded waits, every step recorded in the CMOS RTC alarm\r\n" +
+		"bytes for the USOS menu. Version strings: CSMWrap\r\n" +
+		"Version 3.1.2-usos8, SeaBIOS 578d260b-CSMWrap-3.1.2-usos8.\r\n" +
 		"\r\n" +
 		"Complete corresponding source, next to this file:\r\n" +
 		"  " + source.Archive.File + " (unpatched CSMWrap 3.1.2, commit 808ac8e, with all\r\n" +

@@ -1,4 +1,4 @@
-"""Host test: CSMWrap 3.1.2-usos7 patch 0007 (ACPI mode enabled before the
+"""Host test: CSMWrap 3.1.2-usos8 patch 0007 (ACPI mode enabled before the
 legacy boot, Windows 2000 ACPI flow only; RTC A/B recorded around it).
 
     python tools/tests/csmwrap/test_csmwrap_acpien.py [path-to-zig.exe]
@@ -22,7 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_csmwrap_acpi10 import ROOT, find_zig, new_files  # noqa: E402
 
-PATCH = ROOT / "tools/vendor/csmwrap/3.1.2-usos7/patches/0007-acpi-enable-before-legacy-boot.patch"
+PATCH = ROOT / "tools/vendor/csmwrap/3.1.2-usos8/patches/0007-acpi-enable-before-legacy-boot.patch"
 HARNESS = Path(__file__).with_name("acpien_host_test.c")
 
 

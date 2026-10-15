@@ -504,5 +504,57 @@ built twice identical in the pinned Alpine VM (same lock as usos6,
 BUILD_VERSION 3.1.2-usos7; the unpatched build still matches
 upstream_rebuild). Vendor folder `tools/vendor/csmwrap/3.1.2-usos7`
 (release.go, the DOS ESP builder, the XP ESP script pin and the tests moved
-to it; 3.1.2-usos6 stays as the previous binary). A later patch 0009 (the
-Windows 2000 ACPI watcher) goes on top of usos7.
+to it; 3.1.2-usos6 stays as the previous binary). The next patch 0009 (APM
+power-off order and breadcrumbs, section 13) goes on top of usos7.
+
+## 13. 3.1.2-usos8: APM power-off ACPI mode first, CMOS breadcrumbs (2026-10-15)
+
+Why: with usos7, Windows 98 SE on the X470 stays forever on its "shutting
+down" logo; BOOTLOG.TXT shows 98 got through `EndTerminate = KERNEL`, so the
+hang is inside the 5307h path (docs/research/win9x-acpi-2026-10-15.md, last
+section). The board has no serial port, so nothing recorded which step hung.
+
+Patch 0009 (own code from the APM 1.2 and ACPI specifications and the
+MC146818 register map; reviewed from a draft that was never compiled):
+
+1. Order on every interface: ACPI mode (SCI_EN = 0 -> ACPI_ENABLE to
+   SMI_CMD, at most 1 s), PM1a_EVT/GPE0 status cleared and enables 0
+   (FADT PM1a_EVT_BLK/GPE0_BLK with X_ fallbacks), S5 + 2 s wait, then
+   (INT 15h and 32-bit PM only) the helper-core ResetSystem, then AH=60h.
+2. Waits bounded by the PM timer and by a spin count (4000 port reads per
+   millisecond asked).
+3. CMOS breadcrumbs in the RTC alarm bytes 01h/03h/05h, written as valid
+   alarm times (seconds 40 + step, minutes path * 15 + call count, hours
+   1 + function bitmap) in BCD or binary per Status B, because edk2
+   PcRtcInit resets invalid alarm bytes at every boot; armed (40/0/1) from
+   handle_csm_0002. Own port I/O with interrupts off around each
+   index/data pair: hw/rtc.c is not linked into the 32-bit segmented code
+   (SRC32SEG) the 32-bit PM entry runs, so the draft's rtc_read/rtc_write
+   calls would not link there. Port 80h gets A0h | step.
+4. "USOS APMOFF: path=s5 from=N" is now logged for every path;
+   "path=uefi" only when S5 left the machine on.
+
+Review fixes against the draft: own CMOS I/O instead of hw/rtc.c (link
+error in 32seg, and no interrupt guard), valid alarm encoding instead of
+A0h-AFh (wiped by edk2 firmware), BDA flags kept (ACPI enable tried, helper
+timeout/unavailable), the 0008 header comment updated to the new order,
+dprintf path lines restored for the QEMU test.
+
+Layout (build log): F-segment 16-bit 37344 + 32-bit segmented 4118 +
+F-segment variables 3328 = 44790 bytes, leaving 20746 bytes, so the forced
+allocation zone keeps the full 6144-byte minimum from patch 0008; ROM 127040
+of 131072 bytes used (96.9 %, usos7 96.0 %).
+
+Binary `65df046fc84deb111cb0f867c50dcb7e1971ee3a46890ea353bd0c6174d89a59`,
+built twice identical in the pinned Alpine VM (same lock as usos7,
+BUILD_VERSION 3.1.2-usos8; the unpatched build still matches
+upstream_rebuild). Vendor folder `tools/vendor/csmwrap/3.1.2-usos8`;
+release.go, the DOS ESP builder, the XP ESP script pin, third-party.json and
+the tests moved to it; 3.1.2-usos7 stays as the previous binary.
+
+Tests: test_csmwrap_apmoff.py (0008 parser + 0009 wiring: order, bounded
+waits, valid alarm encoding, interrupt guard); run_csmwrap_apmoff_qemu.py
+pc/q35 x real/pm32/pm16 all power off via `path=s5`;
+run_csmwrap_boot_disk_qemu.py all six layouts; apm_breadcrumbs.zig unit
+tests; `--cmos-check` (USOS menu reads the record after the power-off).
+Hardware: not yet run on the X470.

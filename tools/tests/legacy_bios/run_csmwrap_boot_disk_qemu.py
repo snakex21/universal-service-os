@@ -38,7 +38,7 @@ from run_csmwrap_xp_ovmf import build_fat16, ESP_SECTORS  # noqa: E402
 QEMU = ROOT / 'tools/qemu' / os.environ.get('USOS_QEMU_EXE', 'qemu-system-x86_64.exe')
 OVMF_CODE = ROOT / 'tools/qemu/share/edk2-x86_64-code.fd'
 OVMF_VARS = ROOT / 'tools/qemu/share/edk2-i386-vars.fd'
-CSMWRAP = ROOT / 'tools/vendor/csmwrap/3.1.2-usos7/csmwrapx64.efi'
+CSMWRAP = ROOT / 'tools/vendor/csmwrap/3.1.2-usos8/csmwrapx64.efi'
 SECTOR = 512
 DISK_SECTORS = 2048 + ESP_SECTORS + 2048
 LAYOUTS = ('same-port0', 'same-port1', 'other-ctrl', 'usb-target', 'nvme-target', 'nvme-decoy')

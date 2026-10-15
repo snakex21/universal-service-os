@@ -1,6 +1,6 @@
 //! Utilities -> "Legacy BIOS mode (CSMWrap)" (docs/design/bios-via-csmwrap.md,
 //! option A): on a UEFI PC without a firmware CSM, start the stick's own
-//! CSMWrap (EFI\USOS\csmwrap\csmwrapx64.efi, 3.1.2-usos7). CSMWrap turns the
+//! CSMWrap (EFI\USOS\csmwrap\csmwrapx64.efi, 3.1.2-usos8). CSMWrap turns the
 //! machine into a BIOS PC until the next reset; its SeaBIOS boots the stick
 //! it was loaded from (patch 0004) and the stick's BIOS MBR opens the USOS
 //! BIOS menu (FreeDOS, MS-DOS, Windows 3.x). Any restart returns to UEFI.

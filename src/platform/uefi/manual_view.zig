@@ -9,6 +9,7 @@ const console = @import("console.zig");
 const file_read = @import("file_read.zig");
 const input = @import("input.zig");
 const input_report = @import("input_report.zig");
+const apm_breadcrumbs = @import("apm_breadcrumbs.zig");
 const pointer = @import("pointer.zig");
 const usb_gamepad = @import("usb_gamepad.zig");
 const serial = @import("serial.zig");
@@ -137,6 +138,9 @@ fn afterFirstFrame() void {
     // (EFI\USOS\Logs\input-devices.txt), for touch/gamepad bring-up.
     input_report.write(root, if (video_surface) |canvas| canvas.framebuffer.width else 0, if (video_surface) |canvas| canvas.framebuffer.height else 0);
     boot_timing.mark("input-devices.txt written (after the menu)");
+    // CSMWrap usos8 APM power-off record from CMOS, when a legacy OS tried
+    // to power off since the last boot (EFI\USOS\Logs\apm-off.txt).
+    apm_breadcrumbs.write(root);
     boot_timing.report(root, "boot-timing.txt", serial_before);
 }
 

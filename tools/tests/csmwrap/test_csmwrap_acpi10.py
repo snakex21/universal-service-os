@@ -1,4 +1,4 @@
-"""Host test: CSMWrap 3.1.2-usos7 patch 0006 (ACPI 1.0 view: RSDT from the
+"""Host test: CSMWrap 3.1.2-usos8 patch 0006 (ACPI 1.0 view: RSDT from the
 XSDT, 32-bit FADT fields from the X_ fields).
 
     python tools/tests/csmwrap/test_csmwrap_acpi10.py [path-to-zig.exe]
@@ -20,7 +20,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-PATCH = ROOT / "tools/vendor/csmwrap/3.1.2-usos7/patches/0006-acpi10-view-rsdt-and-fadt-32bit-fields.patch"
+PATCH = ROOT / "tools/vendor/csmwrap/3.1.2-usos8/patches/0006-acpi10-view-rsdt-and-fadt-32bit-fields.patch"
 HARNESS = Path(__file__).with_name("acpi10_host_test.c")
 
 

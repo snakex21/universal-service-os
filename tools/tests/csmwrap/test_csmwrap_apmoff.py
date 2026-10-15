@@ -1,4 +1,4 @@
-"""Host test: CSMWrap 3.1.2-usos7 patch 0008 (APM power-off: helper-core
+"""Host test: CSMWrap 3.1.2-usos8 patches 0008 + 0009 (APM power-off: helper-core
 ResetSystem, then a direct ACPI S5 write with SLP_TYP from \\_S5; SeaBIOS
 debug output on the serial port with csmwrap.ini serial = true).
 
@@ -26,8 +26,46 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_csmwrap_acpi10 import ROOT, new_files  # noqa: E402
 import test_csmwrap_acpi10  # noqa: E402
 
-PATCH = ROOT / "tools/vendor/csmwrap/3.1.2-usos7/patches/0008-apm-poweroff.patch"
+PATCH = ROOT / "tools/vendor/csmwrap/3.1.2-usos8/patches/0008-apm-poweroff.patch"
+PATCH_0009 = ROOT / "tools/vendor/csmwrap/3.1.2-usos8/patches/0009-apm-poweroff-acpi-first-cmos-breadcrumbs.patch"
 HARNESS = Path(__file__).with_name("apmoff_host_test.c")
+
+
+def check_0009() -> None:
+    """Patch 0009 (usos8) wiring: ACPI mode -> quiesce -> S5 before the helper,
+    bounded waits, CMOS breadcrumbs written as valid alarm values with own
+    port I/O (hw/rtc.c is not linked into the 32-bit segmented code)."""
+    text = PATCH_0009.read_text(encoding="utf-8")
+    apm = text[text.index("--- a/seabios/src/apm.c"):text.index("--- a/seabios/src/fw/biostables.c")]
+    added = "\n".join(l[1:] for l in apm.splitlines() if l.startswith("+"))
+    new = "\n".join(l[1:] for l in apm.splitlines() if l[:1] in ("+", " ") and not l.startswith("+++"))
+    assert "rtc_read" not in added and "rtc_write" not in added
+    assert "bios_proxy_reset" not in added and "call32" not in added
+    body = new[new.index("usos_apmoff(u8 path)\n{"):]
+    body = body[:body.index("\n}")]
+    assert body.index("usos_apmoff_s5(path)") < body.index("usos_apmoff_helper(path, flags)")
+    assert "if (path != USOS_APMOFF_PM16)" in body  # no mailbox from 16-bit PM
+    s5 = new[new.index("usos_apmoff_s5(u8 path)\n{"):]
+    s5 = s5[:s5.index("\n}")]
+    order = [s5.index(k) for k in ("outb(en, smi);", "usos_s5_quiesce();", "usos_s5_write();", "usos_apmoff_wait(2000);")]
+    assert order == sorted(order), order
+    assert "i < 20 && !(inw(a) & 1)" in s5  # ACPI enable poll: 20 x 50 ms
+    assert "while (waited < limit && spins++ < spin_limit)" in added  # spin bound
+    # valid alarm encoding (edk2 PcRtcInit resets invalid alarm bytes)
+    assert "usos_crumb_put(USOS_CRUMB_STEP, 40 + (step & 0x0f));" in added
+    assert "usos_crumb_put(USOS_CRUMB_CALLS, (path & 3) * 15 + n);" in added
+    assert "usos_crumb_put(USOS_CRUMB_FNS, 1 + (v | bit));" in added
+    assert "if (n < 14)" in added
+    for v in [40 + s for s in range(16)] + [p * 15 + n for p in range(4) for n in range(15)]:
+        assert 0 <= v <= 59
+    assert all(1 <= 1 + b <= 8 for b in range(8))
+    # interrupts off around each CMOS index/data pair
+    rd = new[new.index("usos_cmos_rd(u8 index)\n{"):]
+    rd = rd[:rd.index("\n}")]
+    assert rd.index("irq_disable();") < rd.index("outb(index | NMI_DISABLE_BIT, PORT_CMOS_INDEX);") < rd.index("restore_flags(flags);")
+    csm = text[text.index("--- a/seabios/src/fw/csm.c"):]
+    assert "+        usos_apm_crumb_arm();" in csm
+    print("0009 wiring: PASS")
 
 
 def main() -> int:
@@ -65,6 +103,8 @@ def main() -> int:
     assert "+    if (csm_compat_table.CsmwrapFlags & CSMWRAP_FLAG_SERIAL)\n+        UsosDebugSerialPort = csm_compat_table.CsmwrapSerialPort;" in text
     # both copies of LegacyBios.h get the same field
     assert text.count("+  UINT16                            CsmwrapSerialPort;") == 2
+
+    check_0009()
 
     with tempfile.TemporaryDirectory() as tmp:
         t = Path(tmp)
