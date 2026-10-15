@@ -216,9 +216,12 @@ REM Windows 95 Setup knows only /IS of these (and ignored the batch file
 REM with the 98 switches in QEMU): MSBATCH.INF first, then /IS, and /IW: no
 REM licence page (SUWIN.EXE looks for /IW on its command line; the licence
 REM runs in Setup's own mini-Windows, before any USB keyboard bridge, and in
-REM the phase-1 VM nobody can answer it). 95 has no ACPI: no /P I.
+REM the phase-1 VM nobody can answer it). /P I below ignores the PnP BIOS.
 SET U9SW=/IS /IE /NM
 IF "%U9SYS%"=="95" SET U9SW=/IS /IW
+REM Windows 95 NVMe opt-in: ignore the empty SeaBIOS PnP BIOS device list.
+REM /P I exists in 95 too (Microsoft KB152064); test PCI detection here.
+IF "%U9SYS%"=="95" IF "%U9NVME%"=="1" SET U9SW=/IS /IW /P I
 REM U9VM=1: this Setup runs in USOS's QEMU (ACPI off) for its phase 1, the
 REM rest on the real PC under CSMWrap: /P I keeps Windows off ACPI (APM/legacy).
 IF "%U9SYS%"=="95" GOTO VMSWOK
