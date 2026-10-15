@@ -343,7 +343,9 @@ XP64_SP2_PREFIX='usr/lib/usos/nt5-storage/'+xp64_acpi.PREFIX+'sp2/'
 def old_xp64_cabs(old):
     """The XP x64 ACPI SP2.CAB entries of an older package (nt5-storage relative)."""
     entries=parse_newc(gzip.decompress((old/'initramfs-xp').read_bytes()))
-    return {n[len('usr/lib/usos/nt5-storage/'):]:e.data for n,e in entries.items() if n.startswith(XP64_SP2_PREFIX)}
+    # Regular files only: a carried directory entry would become an empty
+    # file in front of its own SP2.CAB (the cpio then cannot create the CAB).
+    return {n[len('usr/lib/usos/nt5-storage/'):]:e.data for n,e in entries.items() if n.startswith(XP64_SP2_PREFIX) and stat.S_ISREG(e.mode)}
 
 # --release-lang: one language's source only (the 1.0 release ships the PL and
 # EN packages as separate assets); the name prefix picks the allowlist entry.
