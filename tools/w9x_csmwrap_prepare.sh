@@ -458,8 +458,17 @@ usos_w9x_csmwrap_prepare() {
         # Windows 95: the COA page of phase 1 needs the key, typed into the VM
         # (w9x_phase1_run); never logged, only its length.
         W9X_VM_KEY=''
+        W9X_VM_OWNER=USOS
+        W9X_VM_ORG=''
         if [ "$vm_phase1" = yes ] && [ "$tag" = 95 ]; then
             if W9X_VM_KEY=$(w9x_vm_key_digits "$answer_inf"); then
+                command -v w9x_vm_owner_value >/dev/null 2>&1 && [ -x "${W9X_VM_95_HELPER:-}" ] ||
+                    stop 'Windows 95 VM needs the updated Setup page classifier; target preparation was not started'
+                W9X_VM_OWNER=$(w9x_vm_owner_value "$answer_inf" Name)
+                W9X_VM_ORG=$(w9x_vm_owner_value "$answer_inf" Org)
+                [ -n "$W9X_VM_OWNER" ] || W9X_VM_OWNER=USOS
+                w9x_vm_owner_valid "$W9X_VM_KEY" ||
+                    stop 'Windows 95 unattended Setup currently needs an ASCII owner and organisation (letters, digits, spaces, dot, dash or underscore; at most 40 characters)'
                 vm_reason="$vm_reason; 95 key from the answer: ${#W9X_VM_KEY} digits for the COA page"
             else
                 W9X_VM_KEY=''

@@ -21,12 +21,10 @@
 # Windows 95 (2026-10-06): its OEM Setup asks for the Certificate of
 # Authenticity number in phase 1 (SUWIN's COA page; for ProductType 9 it does
 # not take MSBATCH.INF ProductID) and nobody can type in the VM. The caller
-# passes the answer's key as digits (W9X_VM_KEY, never logged); when the guest
-# writes nothing for W9X_VM_IDLE seconds early in phase 1 (a page waits),
-# w9x_phase1_run types those digits and Enter through a second QEMU monitor
-# whose output is discarded (the edit fields move on by themselves at 5 / 7
-# digits; Enter is the wizard's Next). The licence page is skipped by Setup's
-# own /IW switch (INSTALL.BAT).
+# passes the answer's key as digits (W9X_VM_KEY). The native classifier gates
+# key input on the actual COA page; owner data and wizard navigation have
+# separate handlers. Monitor output carrying input is discarded. The licence
+# page is skipped by Setup's own /IW switch (INSTALL.BAT).
 
 W9X_VM_QEMU=${W9X_VM_QEMU:-/usr/bin/qemu-system-i386}
 W9X_VM_DATADIR=${W9X_VM_DATADIR:-/usr/share/qemu}
@@ -42,11 +40,9 @@ W9X_VM_MIN_KB=${W9X_VM_MIN_KB:-900000}
 # stopped on an error) never restarts, so the VM is stopped after this.
 W9X_VM_TIMEOUT=${W9X_VM_TIMEOUT:-5400}
 W9X_VM_SCREEN_EVERY=${W9X_VM_SCREEN_EVERY:-60}
-# Windows 95 key typing (see above): seconds without a disk write that count
-# as "a page waits", at most this many attempts, and only while the guest has
-# written less than this many MB (the COA page comes before the file copy).
+# Windows 95 input: idle window for a stable page. The COA can receive the key
+# once, before the copy threshold; known Next/Finish pages have no attempt cap.
 W9X_VM_IDLE=${W9X_VM_IDLE:-60}
-W9X_VM_KEY_TRIES=${W9X_VM_KEY_TRIES:-5}
 W9X_VM_KEY_MAX_MB=${W9X_VM_KEY_MAX_MB:-64}
 # With key typing, or with W9X_VM_STALL_ANY=1 (NT 4.0: no key to type), no
 # disk write for this long ends the VM (rc 3, W9X_VM_STALLED = the idle
@@ -74,6 +70,10 @@ W9X_VM_ANSWER_QUIET_MB=${W9X_VM_ANSWER_QUIET_MB:-}
 # empty.
 W9X_VM_TEXT_ANSWER=${W9X_VM_TEXT_ANSWER:-}
 W9X_VM_TEXT_ANSWER_IDLE=${W9X_VM_TEXT_ANSWER_IDLE:-90}
+
+# Kept separate from the shared VM controller used by NT and other 9x.
+W9X_VM_95_LIB=${W9X_VM_95_LIB:-/usr/lib/usos/w9x_95_ui.sh}
+if [ -r "$W9X_VM_95_LIB" ]; then . "$W9X_VM_95_LIB"; fi
 
 # 0 when this system's Setup phase 1 runs in the VM (reason on stdout).
 w9x_vm_available() {
@@ -151,6 +151,7 @@ w9x_vm_key_digits() {
 # $W9X_VM_RUN only for its header and is deleted at once (it may show a page
 # with the digits after a rejected attempt).
 w9x_vm_graphics_screen() {
+    W9X_VM_PAGE=unknown
     rm -f "$W9X_VM_RUN/mode.ppm"
     w9x_vm_monitor "screendump $W9X_VM_RUN/mode.ppm"
     for _ in 1 2 3 4 5; do
@@ -158,22 +159,12 @@ w9x_vm_graphics_screen() {
         sleep 1
     done
     size=$(head -c 20 "$W9X_VM_RUN/mode.ppm" 2>/dev/null | tr '\n' ' ' | awk '{ print $2 "x" $3 }')
+    if [ -n "${W9X_VM_KEY:-}" ] && [ -x "${W9X_VM_95_HELPER:-}" ]; then
+        W9X_VM_PAGE=$("$W9X_VM_95_HELPER" "$W9X_VM_RUN/mode.ppm" 2>/dev/null) || W9X_VM_PAGE=unknown
+    fi
     rm -f "$W9X_VM_RUN/mode.ppm"
     case "$size" in 720x*|x|'') return 1 ;; esac
     return 0
-}
-
-# Types the digits $1 and Enter into the guest (second monitor; its output,
-# which echoes the commands, goes nowhere).
-w9x_vm_type_key() {
-    keys=$1
-    while [ -n "$keys" ]; do
-        digit=${keys%"${keys#?}"}
-        keys=${keys#?}
-        printf 'sendkey %s\n' "$digit" 1<> "$W9X_VM_RUN/key.in" 2>/dev/null || return 1
-        sleep 1
-    done
-    printf 'sendkey ret\n' 1<> "$W9X_VM_RUN/key.in" 2>/dev/null || return 1
 }
 
 # Sectors written to block device $1 so far (/sys/block/<name>/stat field 7).
@@ -213,6 +204,13 @@ w9x_phase1_run() {
     cat 0<> "$W9X_VM_RUN/key.out" > /dev/null 2>&1 &
     drain_key=$!
     key=${W9X_VM_KEY:-}
+    if [ -n "$key" ] && { ! command -v w9x_vm_95_input >/dev/null 2>&1 || [ ! -x "${W9X_VM_95_HELPER:-}" ]; }; then
+        printf 'Windows 95 page classifier missing; no unattended input sent\n' >> "$W9X_VM_RUN/command.txt"
+        kill "$drain" "$drain_key" 2>/dev/null || true
+        return 2
+    fi
+    w95_last_page=''
+    W9X_VM_PAGE=unknown
     key_tries=0
     key_on_screen=0
     last_written=-1
@@ -261,21 +259,16 @@ EOF
         elif [ "$sectors" != "$last_written" ]; then
             last_written=$sectors
             idle_since=$now
-            key_on_screen=0
+            [ -n "$key" ] || key_on_screen=0
         elif [ -n "$key" ] || [ "${W9X_VM_STALL_ANY:-0}" = 1 ]; then
             idle=$((now - idle_since))
-            if [ -n "$key" ] && [ "$idle" -ge "$W9X_VM_IDLE" ] && [ "$key_tries" -lt "$W9X_VM_KEY_TRIES" ] && [ "$written" -lt "$W9X_VM_KEY_MAX_MB" ] &&
+            if [ -n "$key" ] && [ "$idle" -ge "$W9X_VM_IDLE" ] &&
                 ! w9x_vm_graphics_screen; then
                 # Text mode (DOS: INSTALL.BAT, Patcher9x, Setup's DOS stage):
                 # no page of Setup's mini-Windows waits; look again later.
                 idle_since=$(date +%s)
-            elif [ -n "$key" ] && [ "$idle" -ge "$W9X_VM_IDLE" ] && [ "$key_tries" -lt "$W9X_VM_KEY_TRIES" ] && [ "$written" -lt "$W9X_VM_KEY_MAX_MB" ]; then
-                key_tries=$((key_tries + 1))
-                printf 'key typed: attempt %s at %ss, idle %ss, written %s MB\n' "$key_tries" "$elapsed" "$idle" "$written" >> "$W9X_VM_RUN/command.txt"
-                # Until the guest writes again the page may still show the
-                # digits: no screendump of it (the logs go to the USOS ESP).
-                key_on_screen=1
-                w9x_vm_type_key "$key"
+            elif [ -n "$key" ] && [ "$idle" -ge "$W9X_VM_IDLE" ] && w9x_vm_95_page_ready; then
+                w9x_vm_95_input || { result=2; w9x_vm_monitor quit; break; }
                 idle_since=$(date +%s)
             elif [ -n "$W9X_VM_ANSWER" ] && { [ "$idle" -ge "$W9X_VM_ANSWER_IDLE" ] || [ "$quiet" = 1 ]; } &&
                 [ "$answer_tries" -lt "$W9X_VM_ANSWER_TRIES" ] && w9x_vm_graphics_screen; then

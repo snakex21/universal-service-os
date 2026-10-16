@@ -388,6 +388,10 @@ on the Kingston is still empty, copy it there before the X470 run).
 
 ## 4h. Windows 95 OSR2.1 through the same UEFI flow (2026-10-06)
 
+The idle-graphics key typing described in this historical section was replaced
+by page-gated input on 2026-10-16 (section 4i). The old method could write the
+OEM digits into the owner field and exhaust its five attempts before detection.
+
 Audit of the CSMWrap path for `windows-95` (tag `95`, Setup folder `WIN95`), media: the user's
 `Windows_95_PL_OSR2.1.iso` (4.00.1111, OEM, `ProductType=9`) in DATA `Systems\Windows\Windows 95\Images`
 and the 95 OSR2 startup disk as `Systems\Windows\Windows 95\Boot\BOOTDISK.IMG` (bridge, section 2).
@@ -456,6 +460,56 @@ and the 95 OSR2 startup disk as `Systems\Windows\Windows 95\Boot\BOOTDISK.IMG` (
   `[VESA]`'s values (DEFAULT `vesamini.drv`/`.vxd`, MODES, `vmdisp9x\vesa` `NoMemTest`="1"), 16-bit
   1024x768, with the TZFIX guards (`VESA95.RUN/.OK/.BAD`, backup `SYSTEM.V5`/`USER.V5`, export + FIND,
   restore on failure). SYSTEM.INI already has `display.drv=pnpdrvr.drv` and `display=*vdd,*vflatd`.
+
+## 4i. Windows 95 PL Setup page-gated input (2026-10-16)
+
+The X470 attempt stopped at 11 MB of VM writes. Its SETUPLOG owner field held
+the OEM key digits. The old controller sent those digits plus Enter to any
+idle graphics page, up to five times, only before 64 MB. This also left later
+Next/Finish pages unanswered. Replaying the completed attempt on a private
+copy reproduced the DETLOG prefix before the hardware-selection page; pressing
+Next completed 65 detector calls, found 16 devices including `*PNP0A03`, and
+allowed Windows files to be copied.
+
+`win95_setup_ui.c` classifies known **Windows 95 OSR2.1 PL, 640x480** pages
+using hashes of static heading/label regions. No edit-field pixels or Windows
+source code are embedded. Unknown pages receive no input. Other languages and
+editions need their own validated profile; this is an experimental PL path.
+
+`w9x_95_ui.sh` separates the actions:
+
+* The OEM key is entered once, only on the matched COA dialog, before the copy
+  threshold. Each of its three fields is cleared before filling it.
+* Owner and organisation come from `[NameAndOrg]`, in separate fields. Current
+  unattended input accepts ASCII letters, digits, spaces, dot, dash and
+  underscore, at most 40 characters; preflight rejects unsupported data before
+  the target writer starts.
+* Known Next/Finish pages have no key-attempt limit and remain actionable after
+  64 MB. The startup-floppy question selects No. An unchanged page is not
+  answered repeatedly.
+* Key input uses the discarded monitor. A disk write no longer clears the
+  sensitive-screen flag; a known completed safe action clears it.
+
+The micro-Linux builder compiles the static classifier, includes it and the
+shell module, and keeps temporary build data beneath its output folder.
+Missing UI support stops the 95 path before target preparation. Other families
+keep their existing controller path because their `W9X_VM_KEY` is empty.
+
+Validation: 27 shared-controller tests, 8 input-policy tests, 19 native matcher
+cases, and 17 cases in micro-Linux. A private component repack of the current
+stick changed only the two controller scripts and added the shell module and
+classifier; its packaged shell/classifier checks passed. A fresh standalone
+QEMU replay used the same 512 GB disk geometry, 32 GiB partition, pc/ACPI-off,
+Pentium III, one CPU and 512 MiB. It completed all pages with one COA entry,
+owner Retro / organisation USOS, exit 0 and `guest-reset`. Read-only FAT check
+returned 0. The packaged post-VM verifier and NVMe file staging then passed on
+a disposable child image, including `PHASE1.OK`.
+
+The private replay fixture needed its FSInfo free-count hints recomputed after
+PyFatFS removed the previous temporary Setup tree. The final replay starts
+with correct hints; no filesystem repair was added to the product. Full USOS
+build/menu/CSMWrap hardware boot and 95 NVMe runtime remain unconfirmed. These
+tests establish Setup phase 1 and staging, not a 95 NVMe desktop or shutdown.
 
 ## 5. Open points
 

@@ -14,6 +14,14 @@ LIB = (ROOT / 'tools/w9x_phase1_qemu.sh').as_posix()
 TARGET = ROOT / 'tools/w9x_csmwrap_target.sh'
 
 
+def scratch(prefix):
+    parent = (ROOT / 'zig-out/w9x-phase1-tests').resolve()
+    parent.mkdir(parents=True, exist_ok=True)
+    folder = Path(tempfile.mkdtemp(prefix=prefix, dir=parent)).resolve()
+    assert folder.is_relative_to(parent)
+    return folder
+
+
 def shell():
     for candidate in ('C:/Program Files/Git/bin/sh.exe', 'C:/Program Files/Git/bin/bash.exe'):
         if os.path.exists(candidate):
@@ -32,7 +40,7 @@ def sh(script, env=None):
 
 class Phase1Vm(unittest.TestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-vm-'))
+        self.tmp = scratch('usos-w9x-vm-')
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         (self.tmp / 'share').mkdir()
         for name in ('bios-256k.bin', 'vgabios-stdvga.bin'):
@@ -43,6 +51,9 @@ class Phase1Vm(unittest.TestCase):
         self.qemu.chmod(0o755)
         self.meminfo = self.tmp / 'meminfo'
         self.meminfo.write_text('MemTotal:       16336004 kB\nMemFree: 1 kB\n', newline='\n')
+        self.page_helper = self.tmp / 'page-helper'
+        self.page_helper.write_text('#!/bin/sh\necho unknown\n', newline='\n')
+        self.page_helper.chmod(0o755)
 
     def env(self, **extra):
         env = {
@@ -50,6 +61,8 @@ class Phase1Vm(unittest.TestCase):
             'W9X_VM_MEMINFO': self.meminfo.as_posix(), 'W9X_VM_FLAGS': (self.tmp / 'flags').as_posix(),
             'W9X_VM_RUN': (self.tmp / 'run').as_posix(), 'W9X_VM_KVM_DEV': (self.tmp / 'nokvm').as_posix(),
             'W9X_FAKE_ARGS': (self.tmp / 'args.txt').as_posix(),
+            'W9X_VM_95_LIB': (ROOT / 'tools/w9x_95_ui.sh').as_posix(),
+            'W9X_VM_95_HELPER': self.page_helper.as_posix(),
         }
         env.update(extra)
         return env
@@ -94,17 +107,25 @@ class Phase1Vm(unittest.TestCase):
             else:
                 self.assertEqual((rc, out.strip()), (0, digits), text)
 
+    def test_missing_95_classifier_stops_before_qemu_starts(self):
+        if self.run_lib('command -v mkfifo')[0] != 0:
+            self.skipTest('no mkfifo in this sh')
+        rc, out, err = self.run_lib('w9x_phase1_run /dev/fake tcg; echo "rc=$?"',
+            W9X_VM_KEY='98765001234554321', W9X_VM_95_HELPER=(self.tmp / 'absent').as_posix())
+        self.assertIn('rc=2', out, err)
+        self.assertFalse((self.tmp / 'args.txt').exists())
+        self.assertNotIn('98765', (self.tmp / 'run/command.txt').read_text())
+
     def test_the_key_is_typed_once_idle_and_never_logged(self):
         if self.run_lib('command -v mkfifo')[0] != 0:
             self.skipTest('no mkfifo in this sh')
         # No /sys/block here: the written counter stays 0, i.e. a waiting page;
         # the fake QEMU draws nothing, so the screen test is replaced.
-        rc, out, err = self.run_lib('w9x_vm_graphics_screen() { return 0; }\nw9x_phase1_run /dev/fake tcg; echo "rc=$?"', W9X_FAKE_SLEEP='12',
+        rc, out, err = self.run_lib('w9x_vm_graphics_screen() { W9X_VM_PAGE=coa; return 0; }\nw9x_phase1_run /dev/fake tcg; echo "rc=$?"', W9X_FAKE_SLEEP='12',
                                     W9X_VM_KEY='98765001234554321', W9X_VM_IDLE='1', W9X_VM_KEY_TRIES='1')
         self.assertIn('rc=0', out, err)
         command = (self.tmp / 'run/command.txt').read_text()
-        self.assertIn('key typed: attempt 1', command)
-        self.assertNotIn('key typed: attempt 2', command)
+        self.assertEqual(command.count('95 input: coa'), 1)
         for name in ('command.txt', 'monitor.log', 'qemu.log'):
             path = self.tmp / 'run' / name
             if path.exists():
@@ -117,7 +138,7 @@ class Phase1Vm(unittest.TestCase):
         rc, out, err = self.run_lib('w9x_phase1_run /dev/fake tcg; echo "rc=$?"', W9X_FAKE_SLEEP='8',
                                     W9X_VM_KEY='98765001234554321', W9X_VM_IDLE='1')
         self.assertIn('rc=0', out, err)
-        self.assertNotIn('key typed', (self.tmp / 'run/command.txt').read_text())
+        self.assertNotIn('95 input: coa', (self.tmp / 'run/command.txt').read_text())
         for header, graphics in ((b'P6\n720 400\n255\n', False), (b'P6\n640 480\n255\n', True)):
             (self.tmp / 'hdr.bin').write_bytes(header + b'\0' * 32)
             body = (f'mkdir -p "$W9X_VM_RUN"\nw9x_vm_monitor() {{ cp "{(self.tmp / "hdr.bin").as_posix()}" "${{1#screendump }}"; }}\n'
@@ -325,7 +346,7 @@ class TargetVmParts(unittest.TestCase):
         return text[start:text.index('\nfor tool in dd od', start)]
 
     def test_real_display_controllers_go_into_usosvesa_inf(self):
-        tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-pci-'))
+        tmp = scratch('usos-w9x-pci-')
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
         for name, (vendor, device, klass) in {'0000_00_01.0': ('0x1022', '0x1480', '0x060000'),
                                               '0000_0a_00.0': ('0x1002', '0x67FF', '0x030000'),
@@ -357,7 +378,7 @@ class TargetVmParts(unittest.TestCase):
         lines, with a fake cabinet carver; returns (files in USB, U9ENV.BAT)."""
         text = TARGET.read_text(encoding='utf-8')
         block = text[text.index('# 98 SE: the user'):text.index("if [ \"$VM_PHASE1\" = 1 ]")]
-        tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-usb-'))
+        tmp = scratch('usos-w9x-usb-')
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
         (tmp / 'usb').mkdir()
         (tmp / 'usb/NUSB33E.EXE').write_bytes(b'MSCF usbport.sys usbhub20.sys')
