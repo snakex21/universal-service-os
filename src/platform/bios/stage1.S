@@ -126,3 +126,11 @@ boot_drive:
 
 fail_message:
     .asciz "USOS BIOS STAGE1 FAIL"
+
+/* Windows 95 OSR2/98/Me may write a disk timestamp here. Keep every
+ * instruction and live datum before it; .org fails if future code grows in. */
+.org 0xDA
+.global stage1_timestamp_start, stage1_timestamp_end
+stage1_timestamp_start:
+    .skip 6, 0
+stage1_timestamp_end:
