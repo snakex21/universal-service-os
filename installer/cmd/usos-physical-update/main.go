@@ -57,7 +57,11 @@ func main() {
 		fatalf("invalid installer executable %s: %v", installerAbs, err)
 	}
 	if strings.TrimSpace(*logPath) == "" {
-		*logPath = "USOS Physical Update Test.log"
+		executable, err := os.Executable()
+		if err != nil {
+			fatalf("locate application directory: %v", err)
+		}
+		*logPath = filepath.Join(filepath.Dir(executable), "USOS Physical Update Test.log")
 	}
 	logAbs, err := filepath.Abs(*logPath)
 	if err != nil {
@@ -123,13 +127,23 @@ func main() {
 	}
 	fmt.Printf("LANGUAGE=%s\n", i18n.SetLanguage(chosen))
 
+	if err := winhost.ValidateBackupDirectory(filepath.Dir(logAbs), target.Disk.Number); err != nil {
+		fatalf("validate local evidence directory: %v", err)
+	}
+	build, err := localupdate.PayloadBuildInfo()
+	if err != nil {
+		fatalf("read deployment build identity: %v", err)
+	}
 	logger, err := install.NewOperationLoggerAt(logAbs)
 	if err != nil {
 		fatalf("open operation log: %v", err)
 	}
 	defer logger.Close()
 
-	backend := winhost.Backend{InstallerExecutable: installerAbs, VolumeInUse: consoleVolumeInUse, VolumeLockLog: func(line string) { fmt.Println(line) }}
+	backend := winhost.Backend{InstallerExecutable: installerAbs, VolumeInUse: consoleVolumeInUse, VolumeLockLog: func(line string) { fmt.Println(line) },
+		PreDeployBackupDirectory: filepath.Dir(logAbs), PreDeployBackupBuild: build.ID,
+		PreDeployBackupLog: func(line string) error { fmt.Println(line); return logger.WriteLine(line) },
+	}
 	if strings.TrimSpace(*legacyCorePath) != "" {
 		coreAbs, err := filepath.Abs(*legacyCorePath)
 		if err != nil {

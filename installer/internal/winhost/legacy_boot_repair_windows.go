@@ -5,6 +5,7 @@ package winhost
 import (
 	"fmt"
 
+	"github.com/snakex21/universal-service-os/installer/internal/bootbackup"
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 	"github.com/snakex21/universal-service-os/installer/internal/installed"
 	"github.com/snakex21/universal-service-os/installer/internal/legacyboot"
@@ -82,7 +83,28 @@ func (b Backend) RestoreLegacyBoot(expected installed.Target) (legacyboot.Audit,
 			return legacyboot.Audit{}, fmt.Errorf("validate Legacy rollback override: %w", err)
 		}
 	}
-	audit, err := applyLegacyBootArea(handle, current.SizeBytes, current.SectorBytes, actual.Header.StartingUsableOffset, verified.ESP.StartBytes, boot.Stage1, boot.Core)
+	var audit legacyboot.Audit
+	apply := func() error {
+		var applyErr error
+		audit, applyErr = applyLegacyBootArea(handle, current.SizeBytes, current.SectorBytes, actual.Header.StartingUsableOffset, verified.ESP.StartBytes, boot.Stage1, boot.Core)
+		return applyErr
+	}
+	if b.PreDeployBackupDirectory != "" {
+		if err := ValidateBackupDirectory(b.PreDeployBackupDirectory, expected.Disk.Number); err != nil {
+			return audit, err
+		}
+		region, regionErr := legacyboot.ComputeRegion(actual.Header.StartingUsableOffset, verified.ESP.StartBytes, current.SectorBytes)
+		if regionErr != nil {
+			return audit, regionErr
+		}
+		err = bootbackup.BeforeUpdate(bootBackupReader{handle}, bootbackup.Options{
+			Directory: b.PreDeployBackupDirectory, Build: b.PreDeployBackupBuild,
+			Identity:    fmt.Sprintf("PhysicalDrive%d GPT=%s serial=%s", expected.Disk.Number, expected.Media.DiskPTUUID, current.Serial),
+			SectorBytes: current.SectorBytes, CoreOffset: region.CoreStartBytes, Log: b.PreDeployBackupLog,
+		}, apply)
+	} else {
+		err = apply()
+	}
 	if err != nil {
 		return audit, err
 	}

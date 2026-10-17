@@ -16,6 +16,10 @@ import (
 
 type Backend struct {
 	InstallerExecutable string
+	// Set by the physical update CLI. Empty keeps other callers unchanged.
+	PreDeployBackupDirectory string
+	PreDeployBackupBuild     string
+	PreDeployBackupLog       func(string) error
 	// LegacyCoreOverride is intentionally empty in normal install/update paths.
 	// It exists only for an explicitly invoked physical rollback tool and still
 	// goes through the same locked-disk/GPT/read-back safety path.
