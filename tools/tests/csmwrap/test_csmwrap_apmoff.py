@@ -1,4 +1,4 @@
-"""Host test: CSMWrap 3.1.2-usos10 patches 0008 + 0009 (APM power-off: helper-core
+"""Host test: CSMWrap 3.1.2-usos11 patches 0008 + 0009 (APM power-off: helper-core
 ResetSystem, then a direct ACPI S5 write with SLP_TYP from \\_S5; SeaBIOS
 debug output on the serial port with csmwrap.ini serial = true).
 
@@ -26,8 +26,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_csmwrap_acpi10 import ROOT, new_files  # noqa: E402
 import test_csmwrap_acpi10  # noqa: E402
 
-PATCH = ROOT / "tools/vendor/csmwrap/3.1.2-usos10/patches/0008-apm-poweroff.patch"
-PATCH_0009 = ROOT / "tools/vendor/csmwrap/3.1.2-usos10/patches/0009-apm-poweroff-acpi-first-cmos-breadcrumbs.patch"
+PATCH = ROOT / "tools/vendor/csmwrap/3.1.2-usos11/patches/0008-apm-poweroff.patch"
+PATCH_0009 = ROOT / "tools/vendor/csmwrap/3.1.2-usos11/patches/0009-apm-poweroff-acpi-first-cmos-breadcrumbs.patch"
 HARNESS = Path(__file__).with_name("apmoff_host_test.c")
 
 

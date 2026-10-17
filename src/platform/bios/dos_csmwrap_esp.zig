@@ -2,7 +2,7 @@
 //! (docs/design/bios-via-csmwrap.md section 4.2): the BIOS-side equivalent of
 //! tools/xp_csmwrap_esp.sh. The build writes the used part of the 64 MiB
 //! FAT16 ESP (tools/build_csmwrap_dos_esp.py -> EFI\USOS\dos-native\msdos\
-//! CSMESP.IMG: \EFI\BOOT\BOOTX64.EFI = CSMWrap 3.1.2-usos10 with csmwrap.ini,
+//! CSMESP.IMG: \EFI\BOOT\BOOTX64.EFI = CSMWrap 3.1.2-usos11 with csmwrap.ini,
 //! \CSMWRAP\ licences, source and patches). The Core copies it to the XP
 //! tail position, sets the BPB hidden sectors, reads every sector back, and
 //! only then publishes MBR slot 2 as type 0xEF. The firmware then boots the

@@ -1,4 +1,4 @@
-"""QEMU smoke test for CSMWrap 3.1.2-usos10 patches 0006 (ACPI 1.0 view) and
+"""QEMU smoke test for CSMWrap 3.1.2-usos11 patches 0006 (ACPI 1.0 view) and
 0007 (ACPI mode enabled before the legacy boot, with --legacy-fadt).
 
 Boots an already prepared Windows 2000/XP CSMWrap target (its MBR partition

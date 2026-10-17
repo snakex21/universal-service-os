@@ -10,7 +10,7 @@ check, mailbox validation, 80-column line, InterruptTime read, PA above
 4 GiB. Also checks the wiring: everything gated on csmwrap.ini
 acpi_legacy_fadt = true, no port writes in the helper code, BDA publication
 limited to 0x4FC-0x4FF, CSMPPrxy served before every sample, and the pins
-(manifest, lock, xp_csmwrap_esp.sh) on 3.1.2-usos10.
+(the usos10 manifest; usos11 no longer carries the watcher) on 3.1.2-usos10.
 """
 from __future__ import annotations
 
@@ -77,12 +77,10 @@ def main() -> int:
     assert len(manifest["patches"]) == 11
     for name, digest in manifest["files"].items():
         assert sha(VENDOR / name) == digest, name
-    lock = json.loads((ROOT / "tools/csmwrap_build/lock.json").read_text(encoding="utf-8"))
-    assert lock["usos_version"] == "3.1.2-usos10"
-    esp = (ROOT / "tools/xp_csmwrap_esp.sh").read_text(encoding="utf-8")
-    assert f"PINNED={manifest['files']['csmwrapx64.efi']}" in esp
-    gate = esp.index('if [ "${USOS_W2K_ACPI:-}" = on ]; then')
-    assert esp.count("acpi_legacy_fadt = true") == 1 and gate < esp.index("acpi_legacy_fadt = true") < esp.index("fi", gate)
+    # 3.1.2-usos11 dropped patch 0011 from the series (diagnostic only); the
+    # usos10 vendor folder keeps it and its binary as the history of the X470
+    # watcher rounds. The current pins are checked by test_csmwrap_w2khide.py.
+    assert not (ROOT / "tools/vendor/csmwrap/3.1.2-usos11/patches/0011-w2k-acpi-tick-watcher.patch").exists()
     efi = (VENDOR / "csmwrapx64.efi").read_bytes()
     assert b"USOS WATCH" in efi and b"3.1.2-usos10" in efi
 

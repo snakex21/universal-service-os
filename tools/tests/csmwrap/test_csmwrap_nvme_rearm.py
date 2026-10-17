@@ -1,4 +1,4 @@
-"""Host test: CSMWrap 3.1.2-usos10 patch 0010 (SeaBIOS NVMe runtime re-arm).
+"""Host test: CSMWrap 3.1.2-usos11 patch 0010 (SeaBIOS NVMe runtime re-arm).
 
     python tools/tests/csmwrap/test_csmwrap_nvme_rearm.py
 
@@ -9,7 +9,7 @@ one running another admin queue is refused before anything is written; the
 re-arm allocates nothing at runtime, uses the BDF kept in struct nvme_ctrl
 (struct pci_device is POST-only), disables before reprogramming AQA/ASQ/ACQ,
 resets head/tail/phase and doorbells 0-3, creates CQ 1 before SQ 1; FUA only
-after a re-arm. Also: the usos10 manifest hashes match the vendored files and
+after a re-arm. Also: the usos11 manifest hashes match the vendored files and
 tools/xp_csmwrap_esp.sh pins the manifest binary.
 """
 from __future__ import annotations
@@ -20,7 +20,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-VENDOR = ROOT / "tools/vendor/csmwrap/3.1.2-usos10"
+VENDOR = ROOT / "tools/vendor/csmwrap/3.1.2-usos11"
 PATCH = VENDOR / "patches/0010-nvme-runtime-rearm.patch"
 
 
@@ -77,7 +77,7 @@ def main() -> int:
     assert re.search(r"if \(write && ns->ctrl->rearmed\)\s*io_read->dword\[12\] \|= 1U << 30;", added)
 
     manifest = json.loads((VENDOR / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == "3.1.2-usos10"
+    assert manifest["version"] == "3.1.2-usos11"
     for name, digest in manifest["patches"].items():
         assert hashlib.sha256((VENDOR / "patches" / name).read_bytes()).hexdigest() == digest, name
     assert len(manifest["patches"]) == len(list((VENDOR / "patches").glob("*.patch"))) == 11
@@ -86,7 +86,7 @@ def main() -> int:
     esp = (ROOT / "tools/xp_csmwrap_esp.sh").read_text(encoding="utf-8")
     assert f"PINNED={efi}" in esp
     lock = json.loads((ROOT / "tools/csmwrap_build/lock.json").read_text(encoding="utf-8"))
-    assert lock["usos_version"] == "3.1.2-usos10"
+    assert lock["usos_version"] == "3.1.2-usos11"
     print("CSMWRAP-NVME-REARM-TEST-PASS")
     return 0
 

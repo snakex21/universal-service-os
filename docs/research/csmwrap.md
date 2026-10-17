@@ -676,3 +676,57 @@ run_csmwrap_apmoff_qemu.py pc/q35 x real/pm32/pm16 PASS,
 run_csmwrap_nvme_rearm_qemu.py pc/q35 PASS, run_csmwrap_boot_disk_qemu.py
 six layouts PASS; 2000 Pro SP4 ACPI on q35 reaches logon with Tick growing
 on the page (docs/windows-2000-acpi-x470-2026-10-12.md). X470 not tested.
+
+## 16. 3.1.2-usos11: HPET and AMD GPIO hidden from Windows 2000, watcher dropped (2026-10-17)
+
+The X470 Windows 2000 ACPI hang is a page fault in the 2000 SP4 acpi.sys
+early boot IRQ arbitration for devices it has no driver for: the HPET
+(PNP0103) and, once that was hidden, the AMD GPIO controller `\_SB.GPIO`
+(AMDI0030, IRQ 7). Codex's diagnostic firmware-13 hid both and the X470
+reached the 2000 desktop (docs/windows-2000-acpi-x470-2026-10-12.md, section
+"2026-10-17").
+
+Series: 0001-0010 unchanged from usos10 + **0012**
+(`0012-w2k-hide-hpet-amd-gpio.patch`, own code from the ACPI 6.5 AML
+grammar). 0011 (the read-only tick watcher, diagnostic) is no longer in the
+series; its file stays in `3.1.2-usos10/patches`. Codex's NMI helper,
+capsule staging, `w2k_nmi_snapshot` / `w2k_acpi_profile` options and Intel
+GPIO rules are not part of usos11.
+
+Patch 0012, only with `csmwrap.ini acpi_legacy_fadt = true`, only in the
+private DSDT/SSDT copies of patch 0006 (RSDT view): a flat Device (NameOp/
+MethodOp terms only) with exactly one `_HID`, at most one `_CID` and exactly
+one `_STA` whose `_HID` or a `_CID` entry is PNP0103, AMDI0030 or AMD0030
+(string, EISA ID integer, `_CID` Package) gets a `_STA` that returns 0, in
+place (Name -> Zero, method body -> Return (Zero) + Noop). Dry run on the
+firmware table first (valid checksum only; a malformed PkgLength makes the
+table count 0), the copy must match the dry run; firmware tables and XSDT
+unchanged; `USOS W2KHIDE` log line, flags 0x200/0x400. On the X470 DSDT the
+result is byte-identical to firmware-13's table (only the two `_STA` bodies
+and the checksum change).
+
+Layout (SeaBIOS identical to usos9 apart from the version string; 0012 is
+EFI-side code): 16bit 37344 + 32bit segmented 4118 + f-segment vars 3328 =
+44790 bytes, **20746 bytes** for the allocation zone (6144 minimum kept);
+32-bit flat 29066; **ROM 127808 of 131072 bytes (97.5 %, 3264 free)**;
+CONFIG_SDCARD on.
+
+Binary `94a93de4b40614bc2c75079e83cfbf23c9629a58016bd98ee0fa446d71872cc8`,
+built twice identical in one pinned Alpine VM run; the unpatched build
+still matches upstream_rebuild `62d617fc...`. xxd 9.2.1178-r0 was superseded
+on the v3.24 branch; pin moved to 9.2.1202-r0 (libexpat in apk-installed.txt
+also moved, 2.8.5 -> 2.9.0; neither changes the upstream binary). Pins moved
+to 3.1.2-usos11 as for usos10.
+
+Tests: test_csmwrap_w2khide.py (new: filter unit cases, truncation/
+corruption fuzz, patched usos_acpi10.c against the full 0006 harness and an
+end-to-end fixup harness, series and pins), test_csmwrap_acpi10/acpien/
+apmoff/nvme_rearm PASS, test_csmwrap_watcher.py now checks the 0011 file in
+3.1.2-usos10 only. QEMU (not hardware): run_csmwrap_apmoff_qemu.py pc/q35 x
+real/pm32/pm16 PASS, run_csmwrap_nvme_rearm_qemu.py pc/q35 PASS,
+run_csmwrap_boot_disk_qemu.py six layouts PASS, 2000 Pro SP4 ACPI on q35
+(installed target, legacy FADT, 8 min) reaches the logon screen, no bugcheck; nothing hidden there (QEMU's HPET has an OperationRegion, not a flat device). X470 with usos11: not run.
+
+Provenance: the device-hiding rule comes from Codex's diagnosis, which used
+the user-supplied NT5 material as a behaviour map (not clean-room); the
+patch 0012 code is ours, from the ACPI specification, without Microsoft code.
