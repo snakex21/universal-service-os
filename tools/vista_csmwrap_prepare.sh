@@ -28,6 +28,9 @@ vista_csmwrap_value() {
 }
 
 # First 8.1/10 trial only: scoped DATA opt-in. Older x86 paths are unchanged.
+# x64 hook: codex/nvme-vista-x64 adds vista_nvme64_enabled (profile
+# vista-x64-sp2-uefi-csmwrap, same flag file) next to this; keep both scoped
+# by profile so one flag never opens the other architecture.
 vista_modern_nvme_enabled() {
     [ "$1" = win-x86-uefi-csmwrap ] || return 1
     case "$3" in 'Windows 10'|'Windows 8.1'|'Windows Embedded 8.1 Industry') ;; *) return 1 ;; esac

@@ -41,7 +41,16 @@ INF_DATE_IN = b'DriverVer=10/11/2026,1.0.0.0'
 INF_DATE_OUT = b'DriverVer=01/01/2001,1.0.0.0'
 
 
-def nt6_inf(root: Path, modern: bool = False) -> bytes:
+# Joint-merge hook for codex/nvme-vista-x64 (pending the test-mode decision):
+# that series adds arch='amd64' (NTamd64 models, NT6/amd64 binary, explicit
+# allow_test_signature). Only x86 is accepted until it is merged; modern=True
+# (8.1/10 exact-ID package) stays x86-only.
+ARCHES = ('x86',)
+
+
+def nt6_inf(root: Path, modern: bool = False, arch: str = 'x86') -> bytes:
+    if arch not in ARCHES:
+        raise ValueError('unsupported usosnvme architecture: ' + arch)
     inf = (root / 'tools/nt/usosnvme/usosnvme.inf').read_bytes()
     if INF_DATE_IN not in inf:
         raise ValueError('usosnvme.inf DriverVer changed; update the NT6 copy')
@@ -105,12 +114,14 @@ Write-Output $thumb
 '''
 
 
-def build(root: Path, out: Path, *, modern: bool = False) -> str:
+def build(root: Path, out: Path, *, modern: bool = False, arch: str = 'x86') -> str:
     """Writes the signed package to out; returns the certificate thumbprint."""
+    if arch not in ARCHES:
+        raise ValueError('unsupported usosnvme architecture: ' + arch)
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
-    (out / 'usosnvme.inf').write_bytes(nt6_inf(root, modern))
+    (out / 'usosnvme.inf').write_bytes(nt6_inf(root, modern, arch))
     shutil.copyfile(root / 'tools/nt/usosnvme/bin/NT6/i386/usosnvme.sys', out / 'usosnvme.sys')
     (out / 'usosnvme.cdf').write_bytes(
         b'[CatalogHeader]\r\nName=usosnvme.cat\r\nResultDir=.\r\nPublicVersion=0x0000001\r\nEncodingType=0x00010001\r\n' +

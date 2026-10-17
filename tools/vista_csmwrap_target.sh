@@ -77,6 +77,9 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
+# Pre-write NVMe package checks. x64 hook: codex/nvme-vista-x64 adds its
+# amd64 package check (X86_SELF != 1, USOS_PE_NVME=usosnvme) here as a
+# separate branch; this one only handles USOS_PE_NVME=usosnvme-modern.
 modern_nvme=0
 if [ "${USOS_PE_NVME:-}" = usosnvme-modern ]; then
     [ "$X86_SELF" = 1 ] || fail 'modern NVMe requires the x86 self-boot profile'
