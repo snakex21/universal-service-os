@@ -1,0 +1,540 @@
+USOS 3.1.2-usos11-diag patch 0013 (2026-10-17): one-shot BSP NMI snapshot for the Windows 2000 ACPI diagnosis (DIAGNOSTIC VARIANT ONLY)
+
+Design and code by Codex (its "0012-one-shot-bsp-nmi-diagnostic" for the
+X470 rounds of 2026-10-16/17, firmware-13 c1f1c4fa..., commit c6222cd of
+codex/w2k-watcher-results), taken without its ACPI table filter parts
+(src/usos_acpi10.*, usos_w2k_hpet_filter.inc: production patch 0012 does
+that with our own code). Applies on 0001-0012 including the 0011 watcher.
+
+Only in the diagnostic CSMWrap variant (tools/vendor/csmwrap/3.1.2-usos11-diag,
+used by the Windows 2000 flow only when DATA ...\Unattended\w2k-diag.txt or
+nmi-snapshot.txt exists) and only with csmwrap.ini acpi_legacy_fadt = true
+and w2k_nmi_snapshot = true: the watcher helper core may send one NMI to the
+boot CPU when the clock stops, and the NMI handler of the diagnostic usosvid
+records its state into the watcher page. CONFIG_SDCARD is off in this
+variant only, so SeaBIOS keeps its 6144-byte F-segment floor with the extra
+helper code. Not part of the production series 3.1.2-usos11.
+
+diff --git a/seabios-config b/seabios-config
+index e55d81b..031e9e9 100644
+--- a/seabios-config
++++ b/seabios-config
+@@ -3,3 +3,6 @@ CONFIG_CSM=y
+ # CONFIG_VGAHOOKS is not set
+ # CONFIG_TCGBIOS is not set
+ CONFIG_VGA_COREBOOT=y
++
++# USOS NMI diagnostic profile: retain the 6144-byte F-segment floor.
++# CONFIG_SDCARD is not set
+diff --git a/seabios/src/romlayout.S b/seabios/src/romlayout.S
+index 669c83c..0b7a17b 100644
+--- a/seabios/src/romlayout.S
++++ b/seabios/src/romlayout.S
+@@ -557,6 +557,7 @@ bios_proxy_helper_16_entry:
+ .Lusw_tick:
+         pushal
+         movl %esi, %eax
++        movl %ebp, %edx  // private proxy PA; CSMPPrxy layout unchanged
+         calll _cfunc32flat_usos_watch_tick - BUILD_BIOS_ADDR
+         popal
+         // Check pending again on the next iteration; PAUSE never sleeps.
+diff --git a/seabios/src/usos_nmi_helper.inc b/seabios/src/usos_nmi_helper.inc
+new file mode 100644
+index 0000000..1b7666a
+--- /dev/null
++++ b/seabios/src/usos_nmi_helper.inc
+@@ -0,0 +1,152 @@
++/* One-shot physical NMI IPI + frozen display. Own code, LGPL-3.0-or-later.
++ * Hardware writes: helper APIC_BASE enable/restore when originally disabled,
++ * and helper ICR high/low once to verified BSP. No other CPU is reconfigured.
++ * No broadcast, EOI, RTC, IOREGSEL or clock/routing repair.
++ */
++#include "../../src/usos_nmi.h"
++#include "../../src/usos_nmi_state.inc"
++
++static void usn_skip(volatile usw_u8 *m, usw_u32 reason)
++{
++    usw_store32(m, USN_PHASE, USN_SKIPPED);
++    usw_store32(m, USN_REASON, reason);
++    usw_store32(m, USN_REQUEST, 0);
++}
++
++static void usn_send(volatile usw_u8 *m)
++{
++    usw_u32 low, high, actual, i, restored_low, restored_high;
++    if (usw_load32(m, USN_ACK) == USN_TOKEN) { usw_store32(m, USN_PHASE, USN_DONE); return; }
++    if (usw_load32(m, USN_READY) != USN_READY_MAGIC || usw_load32(m, USN_REJECT)) { usn_skip(m, 8); return; }
++    asm volatile("rdmsr" : "=a"(low), "=d"(high) : "c"(0x1Bu));
++    if (high || (low & 0x400u) || (low & 0x100u) || !(low & 0xFFFFF000u)) { usn_skip(m, 3); return; }
++    usw_store32(m, USN_APIC_BEFORE, low);
++    int enable = !(low & 0x800u);
++    if (enable) {
++        /* Upstream intentionally disables the helper APIC. The diagnostic
++           must briefly enable it to send an IPI. Restrict that transition
++           to modern AMD (K8+, including the X470 target and QEMU max).
++           Do not attempt to re-enable an old three-wire APIC. */
++        usw_u32 a, b, c, d, family;
++        asm volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(0));
++        if (b != 0x68747541u || d != 0x69746E65u || c != 0x444D4163u) { usn_skip(m, 9); return; }
++        asm volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(1));
++        family = (a >> 8) & 15;
++        if (family == 15) family += (a >> 20) & 255;
++        if (family < 15) { usn_skip(m, 9); return; }
++        asm volatile("wrmsr" :: "a"(low | 0x800u), "d"(high), "c"(0x1Bu) : "memory");
++    }
++    volatile usw_u32 *apic = (void *)(low & 0xFFFFF000u);
++    usw_store32(m, USN_HELPER_SVR, apic[0xF0 / 4]);
++    actual = apic[0x20 / 4] >> 24;
++    if (actual != usw_load32(m, USN_HELPER) || actual == usw_load32(m, USN_BSP)) { usn_skip(m, 4); goto restore; }
++    if (apic[0x300 / 4] & 0x1000u) { usn_skip(m, 5); goto restore; }
++    apic[0x310 / 4] = usw_load32(m, USN_BSP) << 24;
++    apic[0x300 / 4] = 0x4400u; /* NMI, physical destination, no shorthand */
++    /* <= 1 ms, power-of-two division avoids a 32-bit libgcc dependency. */
++    usw_u64 deadline = usw_helper_tsc() + (usw_load64(m, USW_FREQ) >> 10);
++    for (i = 0; i < 100000u; i++) {
++        if (!(apic[0x300 / 4] & 0x1000u)) goto restore;
++        if (usw_helper_tsc() >= deadline) break;
++        asm volatile("pause");
++    }
++    /* Keep the token: a delayed NMI is still ours. No second ICR write. */
++    usw_store32(m, USN_REASON, 6);
++restore:
++    if (enable) asm volatile("wrmsr" :: "a"(low), "d"(high), "c"(0x1Bu) : "memory");
++    asm volatile("rdmsr" : "=a"(restored_low), "=d"(restored_high) : "c"(0x1Bu));
++    usw_store32(m, USN_APIC_AFTER, restored_low);
++    usw_store32(m, USN_APIC_RESTORED, restored_low == low && restored_high == high);
++    if (restored_low != low || restored_high != high) usw_store32(m, USN_REASON, 10);
++}
++
++static char *usn_hex(char *p, usw_u32 value)
++{
++    static const char digits[] = "0123456789ABCDEF";
++    for (unsigned n = 0; n < 8; n++) *p++ = digits[(value >> (28 - n * 4)) & 15];
++    return p;
++}
++
++static void usn_row(unsigned row, const char *name, const usw_u32 *values, unsigned count)
++{
++    char line[80]; unsigned n = 0;
++    while (*name && n < 80) line[n++] = *name++;
++    for (unsigned i = 0; i < count && n + 8 <= 80; i++) {
++        usn_hex(line + n, values[i]); n += 8;
++        if (n < 80) line[n++] = ' ';
++    }
++    volatile usw_u16 *vga = (void *)(0xB8000 + row * 160);
++    for (unsigned i = 0; i < 80; i++) vga[i] = 0x0B00u | (unsigned char)(i < n ? line[i] : ' ');
++}
++
++static void usn_context_display(volatile usw_u8 *m)
++{
++    usw_u32 values[6];
++    if (usw_load32(m, UE_PANEL_MAGIC) != UE_PANEL_VALUE) return;
++    for (unsigned row = 0; row < 11; row++) {
++        for (unsigned i = 0; i < 6; i++) values[i] = usw_load32(m, UE_PANEL + row * 24 + i * 4);
++        usn_row(row, row == 0 ? "ACPI B/RVA/CODE/ARB/V/N " : row == 1 ? "IRQ V/A/Start/End/F/PDO " : row >= 8 ? "ORIG " :
++            row % 3 == 2 ? "EXC " : row % 3 == 0 ? "REG " : "RET ", values, 6);
++    }
++}
++
++static void usn_display(volatile usw_u8 *m)
++{
++    usw_u32 phase = usw_load32(m, USN_PHASE), values[8];
++    if (phase != USN_DONE && phase != USN_NOACK && phase != USN_SKIPPED) return;
++    if (usw_load32(m, USN_UNSOL) == USN_EVENT_MAGIC) {
++        values[0] = usw_load32(m, USN_UNSOL_EIP); values[1] = usw_load32(m, USN_UNSOL_FLAGS);
++        values[2] = usw_load32(m, USN_UNSOL_TICK); values[3] = usw_load32(m, USN_UNSOL_TR);
++        values[4] = usw_load32(m, USN_UNSOL_VALID);
++        usn_row(16, "UNSOL EIP/F/T/TR/V ", values, 5);
++    }
++    values[0] = phase; values[1] = usw_load32(m, USN_REASON);
++    if (phase != USN_DONE) {
++        usn_row(17, "NMI state/reason ", values, 2);
++        if (usw_load32(m, USN_UNSOL) == USN_EVENT_MAGIC) {
++            values[0] = usw_load32(m, USN_KBASE); values[1] = usw_load32(m, USN_HBASE);
++            usn_row(18, "UNSOL kernel/HAL base ", values, 2);
++            usn_row(19, "Unsolicited NMI chained to stock W2K; no probe IPI ", values, 0);
++        }
++        return;
++    }
++    volatile usw_u8 *s = m + USN_SNAPSHOT;
++    usn_context_display(m);
++    if (usw_load32(s, NS_VALID) & 32u) {
++        for (unsigned i = 0; i < 5; i++) values[i] = usw_load32(s, NS_BUGCHECK + i * 4);
++        usn_row(16, "STOP code/P1/P2/P3/P4 ", values, 5);
++    }
++    values[0] = usw_load32(s, NS_EIP); values[1] = usw_load32(s, NS_FLAGS);
++    values[2] = usw_load32(s, NS_CS); values[3] = usw_load32(s, NS_VALID);
++    values[4] = usw_load32(m, USN_REASON); values[5] = usw_load32(m, USN_CAPTURE_REASON);
++    usn_row(17, "NMI EIP/F/CS/V/Herr/Berr ", values, 6);
++    values[0] = usw_load32(m, USN_KBASE); values[1] = usw_load32(m, USN_HBASE);
++    values[2] = usw_load32(s, NS_ESP); values[3] = usw_load32(s, NS_CR3);
++    values[4] = usw_load32(s, NS_APIC_BASE);
++    usn_row(18, "NMI K/H/ESP/CR3/APIC ", values, 5);
++    values[0] = usw_load32(s, NS_TPR); values[1] = usw_load32(s, NS_PPR);
++    values[2] = usw_load32(s, NS_ID); values[3] = usw_load32(s, NS_PCR_IRQL);
++    values[4] = usw_load32(s, NS_SVR);
++    usn_row(19, "NMI TPR/PPR/ID/IRQL/SVR ", values, 5);
++    values[0] = usw_load32(s, NS_TICK); values[1] = usw_load32(s, NS_IT);
++    values[2] = usw_load32(s, NS_HB); values[3] = usw_load32(s, NS_PARTIAL);
++    values[4] = usw_load32(m, USN_APIC_RESTORED);
++    usn_row(20, "NMI T/I/h/P/rest;noRTE/RTC ", values, 5);
++    for (unsigned group = 0; group < 3; group++) {
++        for (unsigned i = 0; i < 8; i++) values[i] = usw_load32(s, NS_ISR + group * 32 + i * 4);
++        usn_row(21 + group, group == 0 ? "ISR " : group == 1 ? "IRR " : "TMR ", values, 8);
++    }
++    usw_store32(m, USN_DRAWS, usw_load32(m, USN_DRAWS) + 1);
++}
++
++static void usn_tick(volatile usw_u8 *m, usw_u64 now, const struct usw_sample *sample, usw_u32 proxy)
++{
++    int pending = !proxy || *(volatile usw_u32 *)(proxy + 8) != 0;
++    if (usn_step(m, now, sample, usw_load32(m, USW_PROXY_COUNT), pending)) {
++        /* Recheck priority immediately before the sole send. A new request
++           cancels this attempt conservatively; it is not retried. */
++        if (*(volatile usw_u32 *)(proxy + 8)) usn_skip(m, 7);
++        else usn_send(m);
++    }
++    usn_display(m);
++}
+diff --git a/seabios/src/usos_watch.c b/seabios/src/usos_watch.c
+index 64fa0ae..b690def 100644
+--- a/seabios/src/usos_watch.c
++++ b/seabios/src/usos_watch.c
+@@ -16,7 +16,8 @@ static usw_u8 usw_port8(void *ctx,usw_u16 p) {
+ static usw_u16 usw_port16(void *ctx,usw_u16 p) {
+     usw_u16 v;(void)ctx;asm volatile("inw %w1,%0":"=a"(v):"d"(p));return v;
+ }
+-void VISIBLE32FLAT usos_watch_tick(u32 pa) {
++#include "usos_nmi_helper.inc"
++void VISIBLE32FLAT usos_watch_tick(u32 pa, u32 proxy) {
+     volatile usw_u8 *m=(void *)pa;u64 now=usw_helper_tsc(),hz,next;
+     if(!usw_header_valid(m,USW_SIZE)) return;
+     hz=usw_load64(m,USW_FREQ);next=usw_load64(m,USW_NEXT);
+@@ -34,6 +35,7 @@ void VISIBLE32FLAT usos_watch_tick(u32 pa) {
+     usw_store64(m,USW_LAST,now);
+     usw_store64(m,USW_NEXT,now+hz); /* no catch-up burst after a proxy delay */
+     usw_store32(m,USW_LATE,0);
++    if (*(volatile usw_u16 *)(m + 4) == 2) usn_tick(m, now, &s, proxy);
+ }
+ void VISIBLE32FLAT usos_watch_proxy_enter(u32 pa) {
+     volatile usw_u8 *m=(void *)pa;
+diff --git a/src/bios_proxy.c b/src/bios_proxy.c
+index aa218fc..b8f4d2e 100644
+--- a/src/bios_proxy.c
++++ b/src/bios_proxy.c
+@@ -704,6 +704,9 @@ int bios_proxy_init(void *csm_base, size_t csm_size, void *rsdp_copy)
+         return -1;
+     }
+ 
++    if (gConfig.acpi_legacy_fadt && gConfig.w2k_nmi_snapshot)
++        usos_watcher_nmi_target(get_bsp_apic_id(), (uint32_t)selected_ap_id);
++
+     /* Patch ACPI tables to hide the helper core from the OS */
+     if (rsdp_copy) {
+         if (patch_acpi_hide_helper(rsdp_copy, selected_ap_id) < 0) {
+diff --git a/src/config.c b/src/config.c
+index 394b9ad..087c025 100644
+--- a/src/config.c
++++ b/src/config.c
+@@ -366,6 +366,12 @@ static void config_apply(const char *key, const char *val)
+         } else {
+             printf("  warning: invalid value for 'acpi_legacy_fadt': %s\n", val);
+         }
++    } else if (streq_nocase(key, "w2k_nmi_snapshot")) {
++        bool v;
++        if (parse_bool(val, &v)) {
++            gConfig.w2k_nmi_snapshot = v;
++            printf("  w2k_nmi_snapshot = %s\n", v ? "true" : "false");
++        } else printf("  warning: invalid w2k_nmi_snapshot\n");
+     } else if (streq_nocase(key, "vga")) {
+         uint8_t b, d, f;
+         if (parse_pci_address(val, &b, &d, &f)) {
+diff --git a/src/config.h b/src/config.h
+index 41c6322..a0a0e78 100644
+--- a/src/config.h
++++ b/src/config.h
+@@ -23,6 +23,7 @@ struct csmwrap_config {
+     bool verbose;
+     /* USOS patch 0006: RSDT FACP -> ACPI 1.0 FADT copy (Windows 2000 flow) */
+     bool acpi_legacy_fadt;
++    bool w2k_nmi_snapshot; /* explicit diagnostic option, default false */
+     bool vga_specified;
+     uint8_t vga_bus;
+     uint8_t vga_device;
+diff --git a/src/usos_nmi.h b/src/usos_nmi.h
+new file mode 100644
+index 0000000..512be7c
+--- /dev/null
++++ b/src/usos_nmi.h
+@@ -0,0 +1,146 @@
++/* One-shot USOS NMI diagnostic ABI. Own code, LGPL-2.1-or-later.
++ * Extends UW7D without changing any offset below 0x240.
++ * Firmware: 240..257. BOOTVID: 258..27f, 2c0..2ff, 300..47f.
++ * Helper: 280..2bf. No physical addresses are truncated to 32 bits. */
++#ifndef USOS_NMI_H
++#define USOS_NMI_H
++#define USN_MAGIC 0x324D4E55UL /* UNM2 */
++#define USN_CFG 0x240u
++#define USN_ENABLE 0x244u
++#define USN_BSP 0x248u
++#define USN_HELPER 0x24Cu
++#define USN_READY 0x258u
++#define USN_REJECT 0x25Cu
++#define USN_KBASE 0x260u
++#define USN_KSIZE 0x264u
++#define USN_HBASE 0x268u
++#define USN_HSIZE 0x26Cu
++#define USN_KVARIANT 0x270u
++#define USN_TR 0x274u
++#define USN_VBASE 0x278u
++#define USN_VSIZE 0x27Cu
++#define USN_REQUEST 0x280u
++#define USN_PHASE 0x284u
++#define USN_REASON 0x288u
++#define USN_OLD_TICK 0x28Cu
++#define USN_OLD_IT 0x290u
++#define USN_OLD_PROXY 0x294u
++#define USN_ADVANCE 0x298u
++#define USN_SENT_TSC 0x2A0u
++#define USN_DRAWS 0x2A8u
++#define USN_APIC_BEFORE 0x2B0u
++#define USN_APIC_AFTER 0x2B4u
++#define USN_APIC_RESTORED 0x2B8u
++#define USN_HELPER_SVR 0x2BCu
++#define USN_ACK 0x2C0u
++#define USN_CAPTURE_REASON 0x2C4u
++#define USN_COUNT 0x2C8u
++#define USN_LAB 0x2CCu /* BOOTVID laboratory build only, never hardware mode */
++#define USN_UNSOL 0x2D0u
++#define USN_UNSOL_EIP 0x2D4u
++#define USN_UNSOL_FLAGS 0x2D8u
++#define USN_UNSOL_TICK 0x2DCu
++#define USN_UNSOL_TR 0x2E0u
++#define USN_UNSOL_VALID 0x2E4u
++#define USN_UNSOL_COUNT 0x2E8u
++#define USN_EVENT_MAGIC 0x324E5645UL /* EVN2, committed last */
++#define USN_SNAPSHOT 0x300u
++#define USN_SNAPSHOT_SIZE 0x180u
++#define USN_READY_MAGIC 0x32594452UL /* RDY2 */
++#define USN_TOKEN 0x21494D4EUL /* NMI! */
++#define USN_SNAP_MAGIC 0x32504E53UL /* SNP2 */
++#define USN_WAIT 0u
++#define USN_WATCH 1u
++#define USN_REQUESTED 2u
++#define USN_DONE 3u
++#define USN_NOACK 4u
++#define USN_SKIPPED 5u
++/* Snapshot offsets, relative to USN_SNAPSHOT. All fields are u32 except TSC. */
++#define NS_VALID 0x08u
++#define NS_PARTIAL 0x0Cu
++#define NS_EIP 0x10u
++#define NS_FLAGS 0x14u
++#define NS_ESP 0x18u
++#define NS_CR3 0x1Cu
++#define NS_CS 0x20u
++#define NS_SS 0x24u
++#define NS_EAX 0x28u
++#define NS_EBX 0x2Cu
++#define NS_ECX 0x30u
++#define NS_EDX 0x34u
++#define NS_ESI 0x38u
++#define NS_EDI 0x3Cu
++#define NS_EBP 0x40u
++#define NS_BACKLINK 0x44u
++#define NS_NMI_CR3 0x48u
++#define NS_TSC 0x50u
++#define NS_TICK 0x58u
++#define NS_IT 0x5Cu
++#define NS_HB 0x64u
++#define NS_ARM 0x68u
++#define NS_APIC_BASE 0x70u
++#define NS_ID 0x78u
++#define NS_TPR 0x7Cu
++#define NS_PPR 0x80u
++#define NS_SVR 0x84u
++#define NS_LDR 0x88u
++#define NS_DFR 0x8Cu
++#define NS_LVTT 0x90u
++#define NS_LINT0 0x94u
++#define NS_LINT1 0x98u
++#define NS_ISR 0xA0u
++#define NS_IRR 0xC0u
++#define NS_TMR 0xE0u
++#define NS_PCR_TSS 0x100u
++#define NS_PCR_GDT 0x104u
++#define NS_PCR_IRQL 0x108u
++#define NS_BUGCHECK 0x110u /* five raw u32s, code plus four parameters */
++#define USN_DETAIL 0x500u
++#define USN_DETAIL_SIZE 0x300u
++#define USN_DETAIL_MAGIC 0x334C5444UL /* DTL3, committed before ACK */
++#define ND_VALID 0x04u
++#define ND_STACK_LO 0x0Cu
++#define ND_STACK_HI 0x10u
++#define ND_INIT_THREAD 0x14u
++#define ND_THREAD 0x18u
++#define ND_INIT_CR3 0x1Cu
++#define ND_CR3 0x20u
++#define ND_ESP 0x24u
++#define ND_EBP 0x28u
++#define ND_FS0 0x2Cu
++#define ND_FAULT 0x30u
++#define ND_FAULT_WORDS 0x34u /* eight raw words */
++#define ND_FRAME_COUNT 0x54u
++#define ND_SEH_COUNT 0x58u
++#define ND_TOP_COUNT 0x5Cu
++#define ND_FRAMES 0x60u /* sixteen records: frame, previous, return, three args */
++#define ND_SEH 0x1E0u /* eight raw six-word records, first word is record VA */
++#define ND_TOP 0x2A0u /* sixteen words from interrupted ESP, bounded */
++#define ND_HIGH 0x2E0u /* eight words below initial stack high */
++/* EX4: three nested MP dispatcher contexts, newest first. Read only within
++ * the already validated initial stack. Nine screen rows, six words each. */
++#define USN_EXCEPTION 0x800u
++#define UE_MAGIC 0x8E0u
++#define UE_COUNT 0x8E4u
++#define UE_RAW 0x900u /* three 0x100-byte records, raw EXCEPTION_RECORD/CONTEXT */
++#define UE_MAGIC_VALUE 0x34584345UL /* ECX4, commit before primary ACK */
++#define UE_ORIGINAL 0xC00u /* three six-word frames from oldest captured context */
++#define UE_PANEL 0xD00u /* eleven rows of six u32s, prepared by the BSP NMI */
++#define UE_PANEL_MAGIC 0xE0Cu
++#define UE_PANEL_VALUE 0x354C4E50UL /* PNL5 */
++#define UE_IRQ 0xE10u /* IRQ7: 8 header words then 0x68 raw stack bytes */
++#define UE_IRQ_VALUE 0x37515249UL
++/* Detail validity: 1 stack mapping verified, 2 same initial thread,
++ * 4 same initial CR3, 8 interrupted ESP within that stack, 16 EBP records,
++ * 32 SEH records, 64 fault window prevalidated, 128 fault bytes copied.
++ * Only the prevalidated original stack may be dereferenced. No page walk,
++ * Windows API, allocation, lock or arbitrary pointer dereference in NMI. */
++/* Validity: 1 previous TSS, 2 LAPIC, 4 counters, 8 prevalidated PCR,
++ * 16 consistent InterruptTime, 32 prevalidated KiBugCheckData[5].
++ * PARTIAL bit 1: RTE/RTC/PM indexed or destructive I/O deliberately omitted.
++ * No IOREGSEL, EOI, RTC, PM/GPE or chipset write exists in the handler. */
++#ifdef _NTDDK_
++VOID UsosNmiInitialize(volatile UCHAR *Mailbox);
++VOID UsosNmiLaboratory(VOID);
++#endif
++#endif
+diff --git a/src/usos_nmi_state.inc b/src/usos_nmi_state.inc
+new file mode 100644
+index 0000000..7053dd9
+--- /dev/null
++++ b/src/usos_nmi_state.inc
+@@ -0,0 +1,64 @@
++/* Pure helper-side NMI state machine. Own code, LGPL-2.1-or-later. */
++#include "usos_watcher.h"
++#include "usos_nmi.h"
++
++int usn_step(volatile usw_u8 *m, usw_u64 now, const struct usw_sample *sample,
++             usw_u32 proxy_calls, int proxy_pending)
++{
++    usw_u32 phase, required = USW_V_TICK | USW_V_TIME | USW_V_PUBLISH;
++    usw_u64 hz, changed;
++    if (usw_load32(m, USN_CFG) != USN_MAGIC || usw_load32(m, USN_ENABLE) != 1 ||
++        m[4] != 2 || m[5] != 0 || !usw_header_valid(m, USW_SIZE)) return 0;
++    phase = usw_load32(m, USN_PHASE);
++    if ((phase == USN_REQUESTED || phase == USN_NOACK) &&
++        usw_load32(m, USN_ACK) == USN_TOKEN) {
++        usw_store32(m, USN_PHASE, USN_DONE);
++        return 0;
++    }
++    hz = usw_load64(m, USW_FREQ);
++    if (phase == USN_REQUESTED) {
++        if (now - usw_load64(m, USN_SENT_TSC) >= hz) {
++            usw_store32(m, USN_PHASE, USN_NOACK);
++            usw_store32(m, USN_REASON, 20);
++        }
++        return 0;
++    }
++    if (phase >= USN_DONE) return 0;
++    if (usw_load32(m, USN_REJECT)) {
++        usw_store32(m, USN_PHASE, USN_SKIPPED);
++        usw_store32(m, USN_REASON, 0x100u + usw_load32(m, USN_REJECT));
++        return 0;
++    }
++    if (usw_load32(m, USN_READY) != USN_READY_MAGIC) return 0;
++    if (usw_load32(m, USN_BSP) >= 255 || usw_load32(m, USN_HELPER) >= 255 ||
++        usw_load32(m, USN_BSP) == usw_load32(m, USN_HELPER) ||
++        hz < 1000000ull || hz > 20000000000ull) {
++        usw_store32(m, USN_PHASE, USN_SKIPPED);
++        usw_store32(m, USN_REASON, 2);
++        return 0;
++    }
++    /* NONINVARIANT marks approximate elapsed time, not invalid T/I samples.
++       It is retained in the watcher line, including under QEMU TCG. */
++    if ((sample->flags & required) != required || (sample->flags & (USW_F_TORN | USW_F_BUSY)) ||
++        sample->arm != 2 || proxy_pending) {
++        usw_store64(m, USN_ADVANCE, 0);
++        return 0;
++    }
++    changed = usw_load64(m, USN_ADVANCE);
++    if (!changed || sample->tick != usw_load32(m, USN_OLD_TICK) ||
++        sample->it_low != usw_load32(m, USN_OLD_IT) ||
++        proxy_calls != usw_load32(m, USN_OLD_PROXY)) {
++        usw_store32(m, USN_PHASE, USN_WATCH);
++        usw_store32(m, USN_OLD_TICK, sample->tick);
++        usw_store32(m, USN_OLD_IT, sample->it_low);
++        usw_store32(m, USN_OLD_PROXY, proxy_calls);
++        usw_store64(m, USN_ADVANCE, now);
++        return 0;
++    }
++    if (now - changed < hz * 10) return 0;
++    /* Commit the sole token before sending. Never retry, including NOACK. */
++    usw_store64(m, USN_SENT_TSC, now);
++    usw_store32(m, USN_PHASE, USN_REQUESTED);
++    usw_store32(m, USN_REQUEST, USN_TOKEN);
++    return 1;
++}
+diff --git a/src/usos_watcher.c b/src/usos_watcher.c
+index 8d74b73..663c784 100644
+--- a/src/usos_watcher.c
++++ b/src/usos_watcher.c
+@@ -25,7 +25,7 @@ void usw_store64(volatile usw_u8 *p, usw_u32 off, usw_u64 v) {
+ }
+ int usw_header_valid(const volatile usw_u8 *p, usw_u32 n) {
+     return p && n>=USW_SIZE && usw_load32(p,0)==USW_MAGIC &&
+-        usw_rd16(p+4)==1 && usw_rd16(p+6)==USW_HEADER &&
++        (usw_rd16(p+4)==1 || usw_rd16(p+4)==2) && usw_rd16(p+6)==USW_HEADER &&
+         usw_load32(p,8)==USW_SIZE && (usw_load32(p,12)&USW_RESERVED);
+ }
+ static usw_u16 usw_port(const usw_u8 *f, usw_u32 n, usw_u32 old, usw_u32 gas,
+diff --git a/src/usos_watcher_efi.c b/src/usos_watcher_efi.c
+index 8484e62..7fc3fd4 100644
+--- a/src/usos_watcher_efi.c
++++ b/src/usos_watcher_efi.c
+@@ -1,6 +1,8 @@
+ /* Own USOS watcher preparation, LGPL-2.1-or-later.
+  * No RTC, SMI, APIC or chipset writes added by this file. */
+ #include <efi.h>
++#include <config.h>
++#include "usos_nmi.h"
+ #include <csmwrap.h>
+ #include <io.h>
+ #include <printf.h>
+@@ -65,6 +67,18 @@ void usos_watcher_verify_e820(struct csmwrap_priv *p) {
+     }
+     printf("USOS WATCH: E820 page %x %s\n",usw_page,usw_reserved?"RESERVED PASS":"FAIL (watcher disabled)");
+ }
++void usos_watcher_nmi_target(uint32_t bsp, uint32_t helper) {
++    if (!gConfig.acpi_legacy_fadt || !gConfig.w2k_nmi_snapshot || !usw_page ||
++        bsp >= 255 || helper >= 255 || bsp == helper) return;
++    volatile usw_u8 *m = (void *)(uintptr_t)usw_page;
++    *(volatile usw_u16 *)(m + 4) = 2;
++    usw_store32(m, USN_CFG, USN_MAGIC);
++    usw_store32(m, USN_ENABLE, 1);
++    usw_store32(m, USN_BSP, bsp);
++    usw_store32(m, USN_HELPER, helper);
++    printf("USOS NMI: one-shot BSP %u helper %u (RTE/RTC omitted)\n", bsp, helper);
++}
++
+ uint32_t usos_watcher_helper_pa(void) {return usw_reserved?usw_page:0;}
+ void usos_watcher_publish(void) {
+     uint32_t pa=usos_watcher_helper_pa();uint8_t bytes[4];
+diff --git a/src/usos_watcher_efi.h b/src/usos_watcher_efi.h
+index 949b226..422f85d 100644
+--- a/src/usos_watcher_efi.h
++++ b/src/usos_watcher_efi.h
+@@ -6,4 +6,5 @@ void usos_watcher_prepare(const void *rsdp);
+ void usos_watcher_verify_e820(struct csmwrap_priv *priv);
+ uint32_t usos_watcher_helper_pa(void);
+ void usos_watcher_publish(void);
++void usos_watcher_nmi_target(uint32_t bsp, uint32_t helper);
+ #endif

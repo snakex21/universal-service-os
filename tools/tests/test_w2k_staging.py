@@ -201,12 +201,46 @@ class W2kStorage(unittest.TestCase):
         self.assertEqual(run_fn('usos_w2k_dosnet', r.stdout).returncode, 3)
         self.assertEqual(run_fn('USOS_W2K_USOSRST=off usos_w2k_dosnet', W2K_DOSNET).stdout, r.stdout.replace(b'd1,usosrst.sys\r\n', b''))
 
+    def test_diag_sif(self):
+        sif = b'[Version]\r\n[SetupData]\r\nOsLoadOptions = "/fastdetect"\r\nOsLoadOptionsVar = "/fastdetect"\r\n[Other]\r\n'
+        r = run_fn('usos_w2k_diag_sif', sif)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn(b'OsLoadOptionsVar = "/fastdetect /SOS /BOOTLOG"\r\n', r.stdout)
+        self.assertIn(b'OsLoadOptions = "/fastdetect"\r\n', r.stdout)
+        self.assertEqual(run_fn('usos_w2k_diag_sif', r.stdout).stdout, r.stdout)
+        r = run_fn('usos_w2k_diag_sif', b'[SetupData]\r\nA=1\r\n[Other]\r\n')
+        self.assertEqual(r.stdout, b'[SetupData]\r\nA=1\r\nOsLoadOptionsVar = "/fastdetect /SOS /BOOTLOG"\r\n[Other]\r\n')
+        self.assertEqual(run_fn('usos_w2k_diag_sif', b'[Other]\r\n').returncode, 3)
+
+    def test_diag_switch_wiring(self):
+        stage = (ROOT / 'tools/legacy_xp_staging.sh').read_text(encoding='utf-8')
+        self.assertIn('Unattended/w2k-diag.txt', stage)
+        self.assertIn('Unattended/nmi-snapshot.txt', stage)
+        self.assertIn('USOS_W2K_DIAG=off', stage)
+        esp = (ROOT / 'tools/xp_csmwrap_esp.sh').read_text(encoding='utf-8')
+        import json, hashlib
+        dm = json.loads((ROOT / 'tools/vendor/csmwrap/3.1.2-usos11-diag/manifest.json').read_text(encoding='utf-8'))
+        self.assertIn('PINNED_DIAG=' + dm['files']['csmwrapx64.efi'], esp)
+        self.assertEqual(hashlib.sha256((ROOT / 'tools/vendor/csmwrap/3.1.2-usos11-diag/csmwrapx64.efi').read_bytes()).hexdigest(), dm['files']['csmwrapx64.efi'])
+        gate = esp.index('if [ "${USOS_W2K_DIAG:-off}" = on ]; then\n    printf \'w2k_nmi_snapshot')
+        self.assertEqual(esp.count('w2k_nmi_snapshot = true'), 1)
+        self.assertGreater(gate, 0)
+        w2k = (ROOT / 'tools/w2k_stage.sh').read_text(encoding='utf-8')
+        self.assertIn('vidsrc="$pkg/usosvid-diag/bootvid.dll"', w2k)
+        self.assertIn('cp "$vidsrc" "$ls/BOOTVID.DLL"', w2k)
+
     def test_package_files(self):
         import build_xp_uefi_csm_trial as builder
         files = builder.w2k_driver_files()
-        self.assertEqual(sorted(files), ['LICENSE', 'MODIFIED.txt', 'SOURCE.txt', 'ahcint.inf', 'ahcint.sys',
+        self.assertEqual(sorted(files), sorted(['LICENSE', 'MODIFIED.txt', 'SOURCE.txt', 'ahcint.inf', 'ahcint.sys',
                                          'uniata/COPYING-GPL-2.0.txt', 'uniata/SOURCES.txt', 'uniata/uniata.sys', 'usosnvme/usosnvme.inf',
-                                         'usosnvme/usosnvme.sys', 'usosrst.sys', 'usosvid/bootvid.dll'])
+                                         'usosnvme/usosnvme.sys', 'usosrst.sys', 'usosvid/bootvid.dll']
+                         + [n for n in files if n.startswith(('csmwrap-diag/', 'usosvid-diag/'))]))
+        # diagnostic setup files: usosvid 1.3-diag, CSMWrap 3.1.2-usos11-diag + its series
+        self.assertIn('usosvid-diag/bootvid.dll', files)
+        self.assertIn('csmwrap-diag/csmwrapx64.efi', files)
+        self.assertIn('csmwrap-diag/patches/0013-w2k-diag-nmi-snapshot.patch', files)
+        self.assertNotEqual(files['usosvid-diag/bootvid.dll'], files['usosvid/bootvid.dll'])
         # usosnvme: the NT4 build (legacy, scans PCI itself), the tracked INF.
         self.assertEqual(files['usosnvme/usosnvme.sys'], (ROOT / 'tools/nt/usosnvme/bin/NT4/i386/usosnvme.sys').read_bytes())
         self.assertIn(b'usosnvme/: USOS', files['SOURCE.txt'])

@@ -507,6 +507,18 @@ usos_legacy_xp_staging() {
     # bootvid-ms.txt: the Microsoft boot video in text mode even with ACPI on
     # (w2k_stage.sh 8.; default there: USOS's text BOOTVID.DLL + /SOS).
     if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/bootvid-ms.txt" ]; then USOS_W2K_BOOTVID=ms; else USOS_W2K_BOOTVID=text; fi
+    # w2k-diag.txt (alias: Codex's old nmi-snapshot.txt): the Windows 2000
+    # ACPI diagnostic setup instead of the clean default (w2k_stage.sh 10.,
+    # xp_csmwrap_esp.sh): CSMWrap 3.1.2-usos11-diag (tick watcher + NMI
+    # snapshot), usosvid 1.3-diag in ~BT and the installed system, /SOS
+    # /BOOTLOG in the installed boot.ini. Needs ACPI on.
+    USOS_W2K_DIAG=off
+    if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/w2k-diag.txt" ] || [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/nmi-snapshot.txt" ]; then
+        [ "$USOS_W2K_ACPI" = on ] || stop 'Windows 2000: the diagnostic flag (w2k-diag.txt / nmi-snapshot.txt) needs ACPI on; remove acpi-off.txt or the flag. No target write occurred'
+        [ -f /usr/lib/usos/w2k-drivers/usosvid-diag/bootvid.dll ] && [ -f /usr/lib/usos/w2k-drivers/csmwrap-diag/csmwrapx64.efi ] || stop 'Windows 2000 diagnostic files are missing from the package; no target write occurred'
+        USOS_W2K_DIAG=on; USOS_W2K_BOOTVID=text
+        printf '[W2K_DRIVERS] DIAGNOSTIC setup (w2k-diag.txt): CSMWrap usos11-diag, usosvid 1.3-diag, /SOS /BOOTLOG\n'
+    fi
     # Unattended\acpi\ (the user's own ACPI package, w2k_stage.sh 5.): ACPI
     # stays on, so it never combines with acpi-off.txt.
     USOS_W2K_ACPI_PKG=
@@ -522,7 +534,7 @@ usos_legacy_xp_staging() {
         USOS_XP_MBR_CODE=/usr/lib/usos/w2k-acpi-mbr-440.bin; export USOS_XP_MBR_CODE
         printf '[W2K_DRIVERS] MBR w2k-acpi-mbr-440.bin (HPET LegacyReplacement off, QWord names for acpi.sys)\n'
     fi
-    export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL USOS_W2K_HPET USOS_W2K_RTC USOS_W2K_ACPI_PKG USOS_W2K_BOOTVID
+    export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL USOS_W2K_HPET USOS_W2K_RTC USOS_W2K_ACPI_PKG USOS_W2K_BOOTVID USOS_W2K_DIAG
     printf '[W2K_DRIVERS] storage %s, ACPI %s, HAL %s, HPET %s, RTC %s, usosrst, xhci98 x86%s; the XP bundle is NT 5.1 only\n' "$USOS_W2K_STORAGE" "$USOS_W2K_ACPI" "$USOS_W2K_HAL" "$USOS_W2K_HPET" "$USOS_W2K_RTC" "$([ -n "$USOS_W2K_ACPI_PKG" ] && echo ', user ACPI package')"
     else
     # XP x64 (NT 5.2 amd64): GenAHCI on the system's own StorPort

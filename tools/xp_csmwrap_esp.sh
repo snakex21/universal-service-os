@@ -18,6 +18,11 @@ TAIL=${USOS_XP_ESP_TAIL_SECTORS:?USOS_XP_ESP_TAIL_SECTORS is required}
 SRC=${USOS_CSMWRAP_DIR:-/mnt/esp/EFI/USOS/csmwrap}
 ESP_SECTORS=131072
 PINNED=94a93de4b40614bc2c75079e83cfbf23c9629a58016bd98ee0fa446d71872cc8
+# Windows 2000 diagnostic setup (USOS_W2K_DIAG=on, DATA w2k-diag.txt):
+# CSMWrap 3.1.2-usos11-diag (usos11 + 0011 tick watcher + 0013 NMI snapshot,
+# tools/vendor/csmwrap/3.1.2-usos11-diag) from the XP/2000 package.
+DIAG_DIR=${USOS_W2K_DIR:-/usr/lib/usos/w2k-drivers}/csmwrap-diag
+PINNED_DIAG=a100cae3ba4177dde7c4f183f2499b34171cb6f77af68439427003ae02485e7d
 # The LGPL obligations travel with the binary: licence texts, SOURCES.txt
 # (MODIFIED), the complete source archive and the USOS patches.
 CSMWRAP_FILES='LICENSE-CSMWrap-LGPL-2.1.txt COPYING-SeaBIOS-LGPLv3.txt COPYING-SeaBIOS-GPLv3.txt SOURCES.txt csmwrap-3.1.2-src.tar.xz'
@@ -34,6 +39,15 @@ for file in $CSMWRAP_FILES; do
     [ -r "$SRC/$file" ] || fail "$file is missing next to CSMWrap"
 done
 ls "$SRC"/patches/*.patch >/dev/null 2>&1 || fail 'the CSMWrap patches are missing next to CSMWrap'
+EFI_INPUT="$SRC/csmwrapx64.efi"
+if [ "${USOS_W2K_DIAG:-off}" = on ]; then
+    [ "${USOS_W2K_ACPI:-}" = on ] || fail 'the Windows 2000 diagnostic CSMWrap needs ACPI on'
+    [ -r "$DIAG_DIR/csmwrapx64.efi" ] || fail 'the diagnostic CSMWrap is missing from the package'
+    [ "$(sha256sum "$DIAG_DIR/csmwrapx64.efi" | awk '{print $1}')" = "$PINNED_DIAG" ] || fail 'diagnostic CSMWrap does not match the pinned 3.1.2-usos11-diag hash'
+    ls "$DIAG_DIR"/patches/*.patch >/dev/null 2>&1 || fail 'the diagnostic CSMWrap patches are missing'
+    EFI_INPUT="$DIAG_DIR/csmwrapx64.efi"
+    log 'Windows 2000 DIAGNOSTIC CSMWrap 3.1.2-usos11-diag (tick watcher + NMI snapshot)'
+fi
 ls "$SRC"/licenses/*.txt >/dev/null 2>&1 || fail 'the CSMWrap licence notices are missing next to CSMWrap'
 
 size=$(blockdev --getsize64 "$TARGET_DEVICE") || fail 'cannot read the target size'
@@ -87,8 +101,12 @@ if [ "${USOS_W2K_ACPI:-}" = on ]; then
     printf 'acpi_legacy_fadt = true\r\n' >> "$ini"
     log 'csmwrap.ini acpi_legacy_fadt=true (Windows 2000 ACPI)'
 fi
+if [ "${USOS_W2K_DIAG:-off}" = on ]; then
+    printf 'w2k_nmi_snapshot = true\r\n' >> "$ini"
+    log 'csmwrap.ini w2k_nmi_snapshot=true (Windows 2000 diagnostic setup)'
+fi
 mmd -i "$image" ::/EFI ::/EFI/BOOT ::/CSMWRAP ::/CSMWRAP/patches ::/CSMWRAP/licenses || fail 'cannot create ESP folders'
-mcopy -i "$image" "$SRC/csmwrapx64.efi" ::/EFI/BOOT/BOOTX64.EFI || fail 'cannot copy CSMWrap'
+mcopy -i "$image" "$EFI_INPUT" ::/EFI/BOOT/BOOTX64.EFI || fail 'cannot copy CSMWrap'
 mcopy -i "$image" "$ini" ::/EFI/BOOT/csmwrap.ini || fail 'cannot copy csmwrap.ini'
 for file in $CSMWRAP_FILES; do
     mcopy -i "$image" "$SRC/$file" "::/CSMWRAP/$file" || fail "cannot copy $file"
@@ -97,6 +115,13 @@ for file in "$SRC"/patches/*.patch "$SRC"/licenses/*.txt; do
     sub=${file%/*}; sub=${sub##*/}
     mcopy -i "$image" "$file" "::/CSMWRAP/$sub/${file##*/}" || fail "cannot copy $sub/${file##*/}"
 done
+if [ "${USOS_W2K_DIAG:-off}" = on ]; then
+    # The diagnostic binary's own series (same source archive).
+    mmd -i "$image" ::/CSMWRAP/patches-diag || fail 'cannot create CSMWRAP/patches-diag'
+    for file in "$DIAG_DIR"/patches/*.patch; do
+        mcopy -i "$image" "$file" "::/CSMWRAP/patches-diag/${file##*/}" || fail "cannot copy patches-diag/${file##*/}"
+    done
+fi
 
 le32() {
     v=$1

@@ -144,6 +144,13 @@
 #    pci#cc_010802 -> usosnvme; DOSNET.INF. Polled, so the MPS HAL path
 #    (ACPI off, no PCI INTx) needs nothing more. AHCINT stays: it serves
 #    the SATA disks and only ever writes to a disk with the USOS gap marker.
+# 10. Diagnostic setup (USOS_W2K_DIAG=on, DATA ...\Unattended\w2k-diag.txt
+#    or nmi-snapshot.txt; ACPI on only): usosvid 1.3-diag (built with
+#    USOS_VID_DIAG: Codex's NMI snapshot, HPET/GPIO _STA signature rows) in
+#    ~BT AND in ~LS (BOOTVID.DL_ removed, so the installed system boots with
+#    it too), and [SetupData] OsLoadOptionsVar (the installed boot.ini
+#    options) gets /SOS /BOOTLOG. Default (off): ~LS keeps the Microsoft
+#    BOOTVID and boot.ini gets no extra options.
 # No Microsoft file is added or changed except the TXTSETUP.SIF and
 # DOSNET.INF copies on the target (and USOS's own WINNT.SIF); with a user
 # ACPI package, the user's own files replace the ones they name.
@@ -178,7 +185,14 @@ usos_w2k_apply() (
     # Text boot video (see 8.): default with ACPI on, never with ACPI off.
     if [ "$acpi" = on ]; then bootvid=${USOS_W2K_BOOTVID:-text}; else bootvid=ms; fi
     case "$bootvid" in text|ms) ;; *) echo '[W2K_STAGE] STOP: USOS_W2K_BOOTVID must be text or ms'; exit 1 ;; esac
-    [ "$bootvid" = ms ] || [ -f "$pkg/usosvid/bootvid.dll" ] || { echo "[W2K_STAGE] STOP: $pkg/usosvid/bootvid.dll missing"; exit 1; }
+    diag=${USOS_W2K_DIAG:-off}
+    case "$diag" in on|off) ;; *) echo '[W2K_STAGE] STOP: USOS_W2K_DIAG must be on or off'; exit 1 ;; esac
+    vidsrc="$pkg/usosvid/bootvid.dll"
+    if [ "$diag" = on ]; then
+        [ "$acpi" = on ] || { echo '[W2K_STAGE] STOP: the diagnostic setup needs ACPI on'; exit 1; }
+        bootvid=text; vidsrc="$pkg/usosvid-diag/bootvid.dll"
+    fi
+    [ "$bootvid" = ms ] || [ -f "$vidsrc" ] || { echo "[W2K_STAGE] STOP: $vidsrc missing"; exit 1; }
     USOS_W2K_BOOTVID=$bootvid; export USOS_W2K_BOOTVID
     # The clock (see 6.): USOS_W2K_HPET legacy-off (default with usosrst) or
     # keep; USOS_W2K_RTC fix (default with usosrst) or keep. Both need usosrst.
@@ -277,12 +291,21 @@ usos_w2k_apply() (
             usos_w2k_hpet_sif "$loadopts" < "$sif.usos" > "$sif.hpet" || { rm -f "$sif.usos" "$sif.hpet"; echo "[W2K_STAGE] STOP: no [SetupData] OsLoadOptions row in $sif"; exit 1; }
             mv "$sif.hpet" "$sif.usos"
         fi
+        if [ "$diag" = on ]; then
+            usos_w2k_diag_sif < "$sif.usos" > "$sif.diag" || { rm -f "$sif.usos" "$sif.diag"; echo "[W2K_STAGE] STOP: no [SetupData] section in $sif"; exit 1; }
+            mv "$sif.diag" "$sif.usos"
+        fi
         mv "$sif.usos" "$sif"
     done
     if [ "$bootvid" = text ]; then
         find "$bt" -maxdepth 1 -type f \( -iname bootvid.dll -o -iname bootvid.dl_ \) -exec rm -f '{}' \;
-        cp "$pkg/usosvid/bootvid.dll" "$bt/BOOTVID.DLL"
-        cmp -s "$pkg/usosvid/bootvid.dll" "$bt/BOOTVID.DLL" || { echo '[W2K_STAGE] STOP: cannot copy the text boot video into ~BT'; exit 1; }
+        cp "$vidsrc" "$bt/BOOTVID.DLL"
+        cmp -s "$vidsrc" "$bt/BOOTVID.DLL" || { echo '[W2K_STAGE] STOP: cannot copy the text boot video into ~BT'; exit 1; }
+    fi
+    if [ "$diag" = on ]; then
+        find "$ls" -maxdepth 1 -type f \( -iname bootvid.dll -o -iname bootvid.dl_ \) -exec rm -f '{}' \;
+        cp "$vidsrc" "$ls/BOOTVID.DLL"
+        cmp -s "$vidsrc" "$ls/BOOTVID.DLL" || { echo '[W2K_STAGE] STOP: cannot copy the diagnostic boot video into ~LS'; exit 1; }
     fi
     if [ -f "$ls/DOSNET.INF" ]; then
         usos_w2k_dosnet < "$ls/DOSNET.INF" > "$ls/DOSNET.INF.usos" || { rm -f "$ls/DOSNET.INF.usos"; echo '[W2K_STAGE] STOP: cannot patch DOSNET.INF'; exit 1; }
@@ -292,7 +315,7 @@ usos_w2k_apply() (
     printf '[W2K_STAGE] APPLIED PASS %s boot+local source, TXTSETUP.SIF PCI\\CC_010601, usosw2k.inf (CriticalDeviceDatabase), %s mode; ACPI %s; HAL %s; WINNT.SIF answers: standard keyboard; usosrst %s\n' \
         "$(usos_w2k_driver_title)" "$mode" "$([ "$acpi" = off ] && echo 'off (ACPIEnable = 0)' || echo 'kept (ACPIEnable unchanged)')" \
         "$(case "$hal" in mps) echo 'MPS Multiprocessor (ComputerType)' ;; standard) echo 'Standard PC (ComputerType)' ;; *) echo 'chosen by Setup' ;; esac)" \
-        "$([ "$helper" = on ] && echo 'on (STOP screen, Setup and text-mode restart via FADT/CF9/8042)' || echo off)$([ "$hpet" = legacy-off ] && echo '; HPET LegacyReplacement off')$([ "$rtc" = fix ] && echo '; RTC fix')$([ "$bootvid" = text ] && echo '; text boot video usosvid + /SOS (~BT)')$([ "$usb" = on ] && echo '; USB keyboard preinstall (CriticalDeviceDatabase)')$([ "$nvme" = on ] && echo '; NVMe target: usosnvme 1.0 (legacy mode, PCI\CC_010802)')$([ -n "$pkgplan" ] && printf '; user ACPI package: %s' "$(printf '%s\n' "$pkgplan" | awk -F '\t' '{ printf "%s%s %s", sep, ($1 == "extra" ? "boot driver" : "replaces"), $2; sep = ", " }')")"
+        "$([ "$helper" = on ] && echo 'on (STOP screen, Setup and text-mode restart via FADT/CF9/8042)' || echo off)$([ "$hpet" = legacy-off ] && echo '; HPET LegacyReplacement off')$([ "$rtc" = fix ] && echo '; RTC fix')$([ "$bootvid" = text ] && echo '; text boot video usosvid + /SOS (~BT)')$([ "$diag" = on ] && echo '; DIAGNOSTIC: usosvid 1.3-diag in ~BT and ~LS, boot.ini /SOS /BOOTLOG')$([ "$usb" = on ] && echo '; USB keyboard preinstall (CriticalDeviceDatabase)')$([ "$nvme" = on ] && echo '; NVMe target: usosnvme 1.0 (legacy mode, PCI\CC_010802)')$([ -n "$pkgplan" ] && printf '; user ACPI package: %s' "$(printf '%s\n' "$pkgplan" | awk -F '\t' '{ printf "%s%s %s", sep, ($1 == "extra" ? "boot driver" : "replaces"), $2; sep = ", " }')")"
 )
 
 # stdout: the plan for the user ACPI package folder $1 (see 5.) against the
@@ -500,6 +523,36 @@ usos_w2k_load_options() {
     [ "${USOS_W2K_RTC:-keep}" = fix ] && o="${o:+$o }/USOSRTCFIX"
     [ "${USOS_W2K_BOOTVID:-ms}" = text ] && o="${o:+$o }/SOS"
     printf '%s' "$o"
+}
+
+# stdin TXTSETUP.SIF -> stdout with /SOS /BOOTLOG added (each once) to
+# [SetupData] OsLoadOptionsVar, the options text-mode Setup writes into the
+# installed boot.ini (see 10.); without that row one is added after the
+# section header with /fastdetect /SOS /BOOTLOG. Status 3 without [SetupData].
+usos_w2k_diag_sif() {
+    awk '
+        { line = $0; sub(/\r$/, "", line); low = tolower(line) }
+        low ~ /^[ \t]*\[/ {
+            if (section == "[setupdata]" && !done) { print "OsLoadOptionsVar = \"/fastdetect /SOS /BOOTLOG\"\r"; done++ }
+            section = low; sub(/[ \t]+$/, "", section)
+            if (section == "[setupdata]") seen++
+            print line "\r"; next
+        }
+        section == "[setupdata]" && low ~ /^[ \t]*osloadoptionsvar[ \t]*=/ {
+            n = split("/SOS /BOOTLOG", opt, " ")
+            for (i = 1; i <= n; i++) {
+                if (index(low, tolower(opt[i]))) continue
+                if (line ~ /"[ \t]*$/) sub(/"[ \t]*$/, " " opt[i] "\"", line); else line = line " " opt[i]
+                low = tolower(line)
+            }
+            done++
+        }
+        { print line "\r" }
+        END {
+            if (section == "[setupdata]" && !done) { print "OsLoadOptionsVar = \"/fastdetect /SOS /BOOTLOG\"\r"; done++ }
+            if (!seen) exit 3
+        }
+    '
 }
 
 # stdin TXTSETUP.SIF -> stdout with the options $1 (default /USOSHPETLEGOFF;

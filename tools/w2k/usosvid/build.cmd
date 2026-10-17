@@ -2,7 +2,7 @@
 rem build.cmd - build bootvid.dll (i386, free) with WDK 7.1 (7600.16385.1)
 rem from src\ in this folder.
 rem
-rem   tools\w2k\usosvid\build.cmd [workdir]
+rem   tools\w2k\usosvid\build.cmd [workdir] [diag]
 rem
 rem Needs tools\WinDDK71 (or %WDKROOT%), see docs\BUILDING.md. Output:
 rem <workdir>\out\bootvid.dll. Nothing is copied into the repository.
@@ -24,6 +24,9 @@ if "%WORK%"=="" set "WORK=%TEMP%\usosvid-build"
 if exist "%WORK%" rmdir /s /q "%WORK%"
 mkdir "%WORK%" || exit /b 2
 xcopy /e /i /q "%HERE%src" "%WORK%\src" >nul || exit /b 3
+rem "build.cmd <workdir> diag": the diagnostic variant (USOS_VID_DIAG, the
+rem NMI snapshot of usos_nmi.c) from src\sources.diag; output bootvid.dll too.
+if /i "%~2"=="diag" copy /y "%WORK%\src\sources.diag" "%WORK%\src\sources" >nul || exit /b 3
 cmd /c "call "%WDKROOT%\bin\setenv.bat" %WDKROOT% fre x86 WXP no_oacr && set "BUILD_ALT_DIR=fre" && cd /d "%WORK%\src" && build -cZ"
 if not exist "%WORK%\src\objfre\i386\bootvid.sys" (
   echo build failed - see %WORK%\src\buildfre*.log

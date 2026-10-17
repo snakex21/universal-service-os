@@ -63,8 +63,15 @@
  */
 #include <ntddk.h>
 #include "usos_watcher.h"
-
+#ifdef USOS_VID_DIAG
+/* Diagnostic variant only (build.cmd diag): Codex's NMI snapshot and the
+   HPET/GPIO _STA signature rows. The production bootvid.dll is built
+   without USOS_VID_DIAG and has none of it. */
+#include "usos_nmi.h"
+#define USOSVID_VERSION "usosvid 1.3-diag"
+#else
 #define USOSVID_VERSION "usosvid 1.3"
+#endif
 
 #define COLS        80
 #define ROWS        25
@@ -88,6 +95,10 @@ static USHORT g_Attr = 0x0F00;          /* white on black */
 static ULONG g_Row = CON_TOP, g_Col;
 static CHAR g_Line[COLS + 1];
 static ULONG g_LineLen;
+#ifdef USOS_VID_DIAG
+static ULONG g_HpSeen, g_HpHidden;
+static ULONG g_GpSeen, g_GpHidden;
+#endif
 
 /* ------------------------------------------------------------------ */
 /* Text output                                                         */
@@ -218,6 +229,75 @@ QWordNames(PUCHAR t, ULONG len)
     return n;
 }
 
+#ifdef USOS_VID_DIAG
+/* Read-only signature probe for the exact _HID(PNP0103), Method(_STA)
+   layout observed in the X470 DSDT. This is not a general AML evaluator.
+   Called while the table is mapped in phase 1, never from NMI. */
+static VOID
+HpetStaSignatures(PUCHAR t, ULONG len, PULONG seen, PULONG hidden)
+{
+    ULONG i, m, extra, bytes, size, j, body, end;
+    BOOLEAN zero;
+    for (i = 36; i + 18 < len; i++) {
+        if (t[i] != 8 || t[i + 1] != '_' || t[i + 2] != 'H' || t[i + 3] != 'I' ||
+            t[i + 4] != 'D' || t[i + 5] != 0x0C || t[i + 6] != 0x41 ||
+            t[i + 7] != 0xD0 || t[i + 8] != 1 || t[i + 9] != 3) continue;
+        m = i + 10;
+        if (t[m] != 0x14) continue;
+        extra = t[m + 1] >> 6; bytes = 1 + extra;
+        if (m + 1 + bytes + 7 > len || (extra && (t[m + 1] & 0x30))) continue;
+        size = t[m + 1] & (extra ? 15 : 63);
+        for (j = 0; j < extra; j++) size |= (ULONG)t[m + 2 + j] << (4 + j * 8);
+        if (size < bytes + 7 || size > len - m - 1) continue;
+        body = m + 1 + bytes;
+        if (t[body] != '_' || t[body + 1] != 'S' || t[body + 2] != 'T' ||
+            t[body + 3] != 'A' || (t[body + 4] & 7)) continue;
+        (*seen)++; body += 5; end = m + 1 + size;
+        zero = t[body] == 0xA4 && t[body + 1] == 0;
+        for (j = body + 2; zero && j < end; j++) if (t[j] != 0xA3) zero = FALSE;
+        if (zero) (*hidden)++;
+    }
+}
+
+/* Read-only signature of X470's literal HID/CID/UID + _CRS/_STA methods.
+   Deliberately narrower than the firmware filter. Zero counts mean the
+   signature was not recognized, not that GPIO is absent. Phase 1 only. */
+static VOID
+GpioStaSignatures(PUCHAR t, ULONG len, PULONG seen, PULONG hidden)
+{
+    static const UCHAR prefix[] = {8,'_','H','I','D',13,'A','M','D','I','0','0','3','0',0,
+        8,'_','C','I','D',13,'A','M','D','I','0','0','3','0',0,8,'_','U','I','D',0};
+    ULONG i, j, m, k, extra, bytes, size, body, end;
+    BOOLEAN match, zero;
+    for (i = 36; i < len && len - i >= sizeof(prefix) + 18; i++) {
+        match = TRUE;
+        for (j = 0; j < sizeof(prefix); j++) if (t[i + j] != prefix[j]) match = FALSE;
+        if (!match) continue;
+        m = i + sizeof(prefix);
+        for (k = 0; k < 2; k++) {
+            if (len - m < 2 || t[m] != 0x14) break;
+            extra = t[m + 1] >> 6; bytes = 1 + extra;
+            if (len - m < 1 + bytes + 7 || (extra && (t[m + 1] & 0x30))) break;
+            size = t[m + 1] & (extra ? 15 : 63);
+            for (j = 0; j < extra; j++) size |= (ULONG)t[m + 2 + j] << (4 + j * 8);
+            if (size < bytes + 7 || size > len - m - 1) break;
+            body = m + 1 + bytes;
+            if (t[body] != '_' || (t[body + 4] & 7)) break;
+            if (k == 0) {
+                if (t[body + 1] != 'C' || t[body + 2] != 'R' || t[body + 3] != 'S') break;
+                m += 1 + size;
+                continue;
+            }
+            if (t[body + 1] != 'S' || t[body + 2] != 'T' || t[body + 3] != 'A') break;
+            (*seen)++; body += 5; end = m + 1 + size;
+            zero = t[body] == 0xA4 && t[body + 1] == 0;
+            for (j = body + 2; zero && j < end; j++) if (t[j] != 0xA3) zero = FALSE;
+            if (zero) (*hidden)++;
+        }
+    }
+}
+#endif
+
 static ULONG
 FindRsdp(PUCHAR Base, ULONG Length)
 {
@@ -238,6 +318,9 @@ ShowAcpi(VOID)
     PUCHAR area, rsdp = NULL, t;
     ULONG off, rsdpAddr = 0, rsdt = 0, xsdtLo = 0, xsdtHi = 0, rev = 0, n = 0, i, len, sig, addr;
     ULONG dsdt = 0, facpRev = 0, sci = 0, dq = 0, sq = 0, ssdts = 0, bad = 0;
+#ifdef USOS_VID_DIAG
+    ULONG hpSeen = 0, hpHidden = 0, gpSeen = 0, gpHidden = 0;
+#endif
     ULONG lapics = 0, lapicsOn = 0, x2 = 0, nmis = 0, ios = 0, ebda = 0;
     PULONG r = NULL;
     PUSHORT bda;
@@ -333,6 +416,10 @@ ShowAcpi(VOID)
             if (t == NULL) continue;
             ssdts++;
             sq += QWordNames(t, len);
+#ifdef USOS_VID_DIAG
+            HpetStaSignatures(t, len, &hpSeen, &hpHidden);
+            GpioStaSignatures(t, len, &gpSeen, &gpHidden);
+#endif
             if (ByteSum(t, len) != 0) bad++;
             MmUnmapIoSpace(t, len);
         } else if (sig == 0x43495041) {                     /* "APIC" */
@@ -363,6 +450,10 @@ ShowAcpi(VOID)
         t = len ? (PUCHAR)MapPhys(dsdt, len, MmCached) : NULL;
         if (t != NULL) {
             dq = QWordNames(t, len);
+#ifdef USOS_VID_DIAG
+            HpetStaSignatures(t, len, &hpSeen, &hpHidden);
+            GpioStaSignatures(t, len, &gpSeen, &gpHidden);
+#endif
             if (ByteSum(t, len) != 0) bad++;
             MmUnmapIoSpace(t, len);
         } else {
@@ -378,6 +469,16 @@ ShowAcpi(VOID)
     p = PutHex(p, end, sci, 2);
     p = PutStr(p, end, " dsdt=");
     p = PutHex(p, end, dsdt, 8);
+#ifdef USOS_VID_DIAG
+    p = PutStr(p, end, " hs");
+    p = PutHex(p, end, hpSeen, 1);
+    p = PutStr(p, end, "/");
+    p = PutHex(p, end, hpHidden, 1);
+    p = PutStr(p, end, " gs");
+    p = PutHex(p, end, gpSeen, 1);
+    p = PutStr(p, end, "/");
+    p = PutHex(p, end, gpHidden, 1);
+#endif
     p = PutStr(p, end, " q");
     p = PutHex(p, end, dq, 1);
     p = PutStr(p, end, " ssdt");
@@ -396,6 +497,10 @@ ShowAcpi(VOID)
     p = PutHex(p, end, nmis, 1);
     for (i = 0; line2 + i < q && p < end; i++) *p++ = line2[i];
     PutRow(ROW_ACPI2, line, (ULONG)(p - line), 0x1F00);
+#ifdef USOS_VID_DIAG
+    g_HpSeen = hpSeen; g_HpHidden = hpHidden;
+    g_GpSeen = gpSeen; g_GpHidden = gpHidden;
+#endif
 }
 
 /* ------------------------------------------------------------------ */
@@ -447,7 +552,11 @@ static VOID WatchInit(VOID)
     if (pa < 0x100000UL || pa > 0xFFFFF000UL || (pa & 0xFFF)) return;
     page = (PUCHAR)MapPhys(pa, USW_SIZE, MmCached);
     if (page == NULL) return;
+#ifdef USOS_VID_DIAG
+    if (*(PULONG)(page + 0) != USW_MAGIC || (*(PUSHORT)(page + 4) != 1 && *(PUSHORT)(page + 4) != 2) ||
+#else
     if (*(PULONG)(page + 0) != USW_MAGIC || *(PUSHORT)(page + 4) != 1 ||
+#endif
         *(PUSHORT)(page + 6) != USW_HEADER || *(PULONG)(page + 8) != USW_SIZE ||
         !(*(PULONG)(page + 12) & USW_RESERVED)) {
         MmUnmapIoSpace(page, USW_SIZE);
@@ -472,6 +581,16 @@ static VOID WatchInit(VOID)
     *(volatile ULONG *)(page + USW_SEQ) = (seq | 1UL) + 1UL;
     *(volatile ULONG *)(page + USW_READY) = 1;
     g_Watch = page; /* retain mapping for the lifetime of this BOOTVID */
+#ifdef USOS_VID_DIAG
+    /* Optional read-only phase-1 table evidence, outside all NMI records. */
+    *(volatile ULONG *)(page + 0xEA4) = g_HpSeen;
+    *(volatile ULONG *)(page + 0xEA8) = g_HpHidden;
+    *(volatile ULONG *)(page + 0xEA0) = 0x37535048UL; /* HPS7, commit last */
+    *(volatile ULONG *)(page + 0xEB4) = g_GpSeen;
+    *(volatile ULONG *)(page + 0xEB8) = g_GpHidden;
+    *(volatile ULONG *)(page + 0xEB0) = 0x38535047UL; /* GPS8, commit last */
+    UsosNmiInitialize(page);
+#endif
 }
 
 static struct { ULONG Base; ULONG Hits; } g_Hist[MAX_HIST];
@@ -709,6 +828,9 @@ VidInitialize(IN BOOLEAN SetMode)
     PutRow(ROW_MARK, line, (ULONG)(p - line), 0x2F00);
     if (g_Watch == NULL) WatchInit();
     HbStart();
+#ifdef USOS_VID_DIAG
+    UsosNmiLaboratory();
+#endif
     return TRUE;
 }
 
