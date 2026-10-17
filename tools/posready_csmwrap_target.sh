@@ -55,7 +55,7 @@ fail() { printf '[POSREADY] STOP: %s\n' "$1" >&2; exit 1; }
 for tool in dd od mkfs.fat mdir syslinux mount umount losetup blockdev awk sync wc tr cp; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
-for file in "$LIB/xp-geometry-fix-mbr-440.bin" "$SYSLINUX_DIR/chain.c32" "$SYSLINUX_DIR/libcom32.c32" "$SYSLINUX_DIR/libutil.c32" "$UNATTENDED" "$SOURCE_ISO" "$PAYLOAD/FIRST.CMD" "$PAYLOAD/LOGON.CMD" "$PAYLOAD/X470.REG" "$PAYLOAD/LOGON.REG" "$PAYLOAD/DRV/acpi.sys" "$PAYLOAD/DRV/genahci.sys"; do
+for file in "$LIB/xp-geometry-fix-mbr-440.bin" "$SYSLINUX_DIR/chain.c32" "$SYSLINUX_DIR/libcom32.c32" "$SYSLINUX_DIR/libutil.c32" "$UNATTENDED" "$SOURCE_ISO" "$PAYLOAD/FIRST.CMD" "$PAYLOAD/LOGON.CMD" "$PAYLOAD/LOGON.EXE" "$PAYLOAD/X470.REG" "$PAYLOAD/LOGON.REG" "$PAYLOAD/DRV/acpi.sys" "$PAYLOAD/DRV/genahci.sys"; do
     [ -r "$file" ] || fail "missing: $file"
 done
 if awk -v d="$TARGET_DEVICE" 'index($1, d) == 1 { found=1 } END { exit(found ? 0 : 1) }' /proc/mounts; then
@@ -174,7 +174,12 @@ cp "$UNATTENDED" "$work/pe/Setup/unattended.xml" || fail 'cannot copy unattended
 # \USOS\POSR: FIRST.CMD (the RunOnce of the first logon in the VM), the X470
 # registry values and the XP path's community driver set.
 mkdir -p "$work/pe/USOS/POSR/DRV" || fail 'cannot create \USOS\POSR'
-cp "$PAYLOAD/FIRST.CMD" "$PAYLOAD/LOGON.CMD" "$PAYLOAD/X470.REG" "$PAYLOAD/LOGON.REG" "$work/pe/USOS/POSR/" || fail 'cannot copy the \USOS\POSR scripts'
+cp "$PAYLOAD/FIRST.CMD" "$PAYLOAD/LOGON.CMD" "$PAYLOAD/LOGON.EXE" "$PAYLOAD/X470.REG" "$PAYLOAD/LOGON.REG" "$work/pe/USOS/POSR/" || fail 'cannot copy the \USOS\POSR scripts'
+# Public identity only: FBA has no letter for partition 1. LOGON.EXE finds
+# its volume by this FAT16 serial, reads the existing Setup answer and writes
+# credentials directly to Winlogon. No second password-bearing file.
+od -An -tx4 -j39 -N4 "$pe_loop" | tr -d ' \n' > "$work/pe/USOS/POSR/SOURCE.ID"
+[ "$(wc -c < "$work/pe/USOS/POSR/SOURCE.ID" | tr -d ' ')" = 8 ] || fail 'cannot read the Setup volume identity'
 cp "$PAYLOAD"/DRV/* "$work/pe/USOS/POSR/DRV/" || fail 'cannot copy the X470 drivers'
 
 sync

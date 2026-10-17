@@ -236,12 +236,25 @@ posready_after_setup() {
 # logs the key. rc 1 without a ProductKey.
 posready_answer_xml() {
     awk -v sif="$2" '
+        function escape_xml(v, out,i,c) {
+            out=""
+            for (i=1;i<=length(v);i++) {
+                c=substr(v,i,1)
+                if(c=="&") out=out "&amp;"
+                else if(c==sprintf("%c",34)) out=out "&quot;"
+                else if(c=="<") out=out "&lt;"
+                else if(c==">") out=out "&gt;"
+                else out=out c
+            }
+            return out
+        }
         BEGIN {
             while ((getline line < sif) > 0) {
                 sub(/\r$/, "", line)
                 if (line ~ /^;/ || line !~ /=/) continue
                 k = line; sub(/=.*/, "", k); v = line; sub(/^[^=]*=/, "", v)
-                gsub(/["<>&]/, "", v)
+                if(k=="AdminPassword") v=escape_xml(v)
+                else gsub(/["<>&]/, "", v)
                 val[k] = v
             }
             if (val["ProductKey"] == "") exit 3
@@ -251,11 +264,14 @@ posready_answer_xml() {
             for (i = 1; i <= n; i++) { split(pairs[i], kv, "="); ph["@" kv[1] "@"] = val[kv[2]] }
         }
         {
-            for (p in ph) {
-                out = ""
-                while ((at = index($0, p)) > 0) { out = out substr($0, 1, at - 1) ph[p]; $0 = substr($0, at + length(p)) }
-                $0 = out $0
+            # One pass through the template: inserted values are never
+            # interpreted again as placeholders.
+            line=$0; out=""
+            while(match(line, /@[A-Z_]+@/)) {
+                p=substr(line,RSTART,RLENGTH)
+                out=out substr(line,1,RSTART-1) ((p in ph)?ph[p]:p)
+                line=substr(line,RSTART+RLENGTH)
             }
-            print
+            print out line
         }' "$1"
 }

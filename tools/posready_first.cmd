@@ -35,4 +35,9 @@ if defined USOS_LF (reg add "%USOS_CLS%" /v LowerFilters /t REG_MULTI_SZ /d "%US
 echo usosmpart registered %ERRORLEVEL% >> "%S%FIRST.LOG"
 :mpart_done
 regedit /s "%S%LOGON.REG"
+rem Use the real AdminPassword from the existing Setup answer. Disable the
+rem blank-password fallback first; LOGON.EXE enables it only after success.
+reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoAdminLogon /t REG_SZ /d 0 /f >nul
+"%S%LOGON.EXE"
+if errorlevel 1 echo autologon preparation failed - credentials were not logged >> "%S%FIRST.LOG"
 echo regedit LOGON %ERRORLEVEL% >> "%S%FIRST.LOG"

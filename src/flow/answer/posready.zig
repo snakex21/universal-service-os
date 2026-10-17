@@ -64,7 +64,13 @@ pub fn render(p: *const Profile, key: []const u8, buffer: []u8) ![]const u8 {
     try plain(&w, p.org.slice(), "");
     var name: [15]u8 = undefined;
     try w.print("\r\nComputerName={s}\r\nAdminPassword=", .{computerName(p.computer.slice(), &name)});
-    try plain(&w, p.password.slice(), "");
+    // SIF is a single raw value after the first '='. XML escaping happens
+    // once in posready_answer_xml; replacing these characters changes the
+    // password that Setup creates.
+    for (p.password.slice()) |c| {
+        if (c < 0x20) return error.InvalidPassword;
+        try w.writeByte(c);
+    }
     try w.writeAll("\r\n");
     if (validKey(key)) {
         try w.writeAll("ProductKey=");
@@ -77,6 +83,14 @@ pub fn render(p: *const Profile, key: []const u8, buffer: []u8) ![]const u8 {
 test "POSReady id and key shape" {
     try std.testing.expect(isPosReady("Windows-Embedded-POSReady-2009") and !isPosReady("windows-xp"));
     try std.testing.expect(validKey("AAAAA-BBBBB-CCCCC-DDDDD-EEEEE") and !validKey("123-4567890") and !validKey(""));
+}
+
+test "POSReady password preserves XML and registry special characters" {
+    var p = Profile{};
+    try p.password.set("a\\b\"&<>@FULL_NAME@");
+    var buffer: [2048]u8 = undefined;
+    const text = try render(&p, "", &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, text, "AdminPassword=a\\b\"&<>@FULL_NAME@\r\n") != null);
 }
 
 test "POSR.SIF: names, sanitised values, key only in 5x5 shape" {
