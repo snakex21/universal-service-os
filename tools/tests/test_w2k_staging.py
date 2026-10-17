@@ -234,7 +234,7 @@ class W2kStorage(unittest.TestCase):
         files = builder.w2k_driver_files()
         self.assertEqual(sorted(files), sorted(['LICENSE', 'MODIFIED.txt', 'SOURCE.txt', 'ahcint.inf', 'ahcint.sys',
                                          'uniata/COPYING-GPL-2.0.txt', 'uniata/SOURCES.txt', 'uniata/uniata.sys', 'usosnvme/usosnvme.inf',
-                                         'usosnvme/usosnvme.sys', 'usosrst.sys', 'usosvid/bootvid.dll']
+                                         'usosnvme/usosnvme.sys', 'usosrst.sys', 'usosvbe/usosvbe.sys', 'usosvid/bootvid.dll']
                          + [n for n in files if n.startswith(('csmwrap-diag/', 'usosvid-diag/'))]))
         # diagnostic setup files: usosvid 1.3-diag, CSMWrap 3.1.2-usos11-diag + its series
         self.assertIn('usosvid-diag/bootvid.dll', files)

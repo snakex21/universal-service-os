@@ -150,6 +150,10 @@ mkdir -p "$setup_dir"
     printf 'set USOS_LOG=%%SystemRoot%%\\usos-setup.log\r\n'
     printf 'if exist "%%USOS_DIR%%\\usos-users.cmd" call "%%USOS_DIR%%\\usos-users.cmd"\r\n'
     printf 'if exist "%%USOS_DIR%%\\usos-users.cmd" del /f /q "%%USOS_DIR%%\\usos-users.cmd"\r\n'
+    if [ "$NT5_SYSTEM" = windows-2000 ]; then
+        printf 'rem VESA display (usosvbe + framebuf.dll, w2k_stage.sh 11.; DATA vesa-off.txt: none).\r\n'
+        printf 'if exist "%%USOS_DIR%%\\vesa.cmd" call "%%USOS_DIR%%\\vesa.cmd"\r\n'
+    fi
     if [ "$NT5_SYSTEM" = windows-server-2003 ]; then
         printf 'rem Enterprise/Datacenter: /PAE on the installed entry (without it SP2 uses PAE only with DEP).\r\n'
         printf 'bootcfg /raw "/PAE" /A /ID 1 >> "%%USOS_LOG%%" 2>&1\r\n'
@@ -164,6 +168,12 @@ if [ "$NT5_SYSTEM" = windows-2000 ]; then
 if usos_w2k_server_source "$work/volume/\$WIN_NT\$.~LS/I386/TXTSETUP.SIF"; then
 usos_w2k_server_reg > "$setup_dir/srvwiz.reg"
 printf '[NT5] srvwiz.reg staged in USOS/%s (Windows 2000 Server: Configure Your Server off at the first logon)\n' "$NT5_SETUP_DIR"
+fi
+# VESA display (w2k_stage.sh 11.): on unless DATA's vesa-off.txt.
+if [ "${USOS_W2K_VESA:-on}" = on ]; then
+usos_w2k_vesa_stage "$setup_dir" "$work/volume/\$WIN_NT\$.~LS/I386" || fail 'cannot stage the Windows 2000 VESA display'
+else
+printf '[NT5] VESA display off (vesa-off.txt): VGA 640x480 stays\n'
 fi
 fi
 if [ -n "${XP_USER_SETTINGS:-}" ] && [ -z "${XP_CUSTOM_SIF:-}" ]; then

@@ -257,7 +257,11 @@ def w2k_driver_files():
     # the NT4 build (non-PnP, scans PCI itself) in 2000's legacy mode (w2k_stage.sh 9.).
     files['usosnvme/usosnvme.sys']=(ROOT/'tools/nt/usosnvme/bin/NT4/i386/usosnvme.sys').read_bytes()
     files['usosnvme/usosnvme.inf']=(ROOT/'tools/nt/usosnvme/usosnvme.inf').read_bytes()
-    for name in ('ahcint.sys','uniata/uniata.sys','usosrst.sys','usosvid/bootvid.dll','usosvid-diag/bootvid.dll','usosnvme/usosnvme.sys'):
+    # usosvbe (own GPL VESA video miniport, tools/nt4/usosvbe, the NT 4.0 build
+    # unchanged) for the setup-end VESA display (w2k_stage.sh 11.); the display
+    # driver is the CD's own framebuf.dll, never shipped.
+    files['usosvbe/usosvbe.sys']=(ROOT/'tools/nt4/usosvbe/bin/i386/usosvbe.sys').read_bytes()
+    for name in ('ahcint.sys','uniata/uniata.sys','usosrst.sys','usosvid/bootvid.dll','usosvid-diag/bootvid.dll','usosnvme/usosnvme.sys','usosvbe/usosvbe.sys'):
         if struct.unpack_from('<H',files[name],struct.unpack_from('<I',files[name],60)[0]+4)[0]!=0x14c:raise ValueError(name+' is not i386')
     files['SOURCE.txt']=('AHCINT %s (i386 ScsiPort miniport, MODIFIED by USOS, see MODIFIED.txt), %s\n'
         'base: tag %s = commit %s (release archive sha256 %s) plus %s,\n'
@@ -276,6 +280,9 @@ def w2k_driver_files():
         'csmwrap-diag/patches).\n'
         'usosnvme/: USOS\'s own NVMe miniport 1.0, NT4 build (GPL-3.0-or-later, source:\n'
         'tools/nt/usosnvme/src in the USOS sources zip), only for an NVMe target.\n'
+        'usosvbe/: USOS\'s own VESA video miniport (NT 4.0 build, GPL-3.0-or-later,\n'
+        'source: tools/nt4/usosvbe/src in the USOS sources zip), registered at setup\n'
+        'end with the CD\'s own framebuf.dll (DATA vesa-off.txt: not used).\n'
         'USOS uses them only for Windows 2000 SP4 Setup; staging writes the INF\n'
         'source path (\\i386\\ahcint or \\i386\\uniata) and its own uniata.inf.\n'
         %(pins['version'],base['upstream'],base['tag'],base['commit'],base['release_zip']['sha256'],', '.join(pins['patches']),rst['version'],vid['version'])).encode()

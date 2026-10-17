@@ -519,6 +519,10 @@ usos_legacy_xp_staging() {
         USOS_W2K_DIAG=on; USOS_W2K_BOOTVID=text
         printf '[W2K_DRIVERS] DIAGNOSTIC setup (w2k-diag.txt): CSMWrap usos11-diag, usosvid 1.3-diag, /SOS /BOOTLOG\n'
     fi
+    # vesa-off.txt: no VESA display (w2k_stage.sh 11.; default: own usosvbe
+    # miniport + the CD's framebuf.dll, registered at setup end, 1024x768x16).
+    if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/vesa-off.txt" ]; then USOS_W2K_VESA=off; else USOS_W2K_VESA=on; fi
+    [ "$USOS_W2K_VESA" = off ] || [ -f /usr/lib/usos/w2k-drivers/usosvbe/usosvbe.sys ] || stop 'Windows 2000 VESA miniport (usosvbe) is missing from the package; no target write occurred'
     # Unattended\acpi\ (the user's own ACPI package, w2k_stage.sh 5.): ACPI
     # stays on, so it never combines with acpi-off.txt.
     USOS_W2K_ACPI_PKG=
@@ -534,8 +538,8 @@ usos_legacy_xp_staging() {
         USOS_XP_MBR_CODE=/usr/lib/usos/w2k-acpi-mbr-440.bin; export USOS_XP_MBR_CODE
         printf '[W2K_DRIVERS] MBR w2k-acpi-mbr-440.bin (HPET LegacyReplacement off, QWord names for acpi.sys)\n'
     fi
-    export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL USOS_W2K_HPET USOS_W2K_RTC USOS_W2K_ACPI_PKG USOS_W2K_BOOTVID USOS_W2K_DIAG
-    printf '[W2K_DRIVERS] storage %s, ACPI %s, HAL %s, HPET %s, RTC %s, usosrst, xhci98 x86%s; the XP bundle is NT 5.1 only\n' "$USOS_W2K_STORAGE" "$USOS_W2K_ACPI" "$USOS_W2K_HAL" "$USOS_W2K_HPET" "$USOS_W2K_RTC" "$([ -n "$USOS_W2K_ACPI_PKG" ] && echo ', user ACPI package')"
+    export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL USOS_W2K_HPET USOS_W2K_RTC USOS_W2K_ACPI_PKG USOS_W2K_BOOTVID USOS_W2K_DIAG USOS_W2K_VESA
+    printf '[W2K_DRIVERS] storage %s, ACPI %s, HAL %s, HPET %s, RTC %s, usosrst, xhci98 x86, VESA %s%s; the XP bundle is NT 5.1 only\n' "$USOS_W2K_STORAGE" "$USOS_W2K_ACPI" "$USOS_W2K_HAL" "$USOS_W2K_HPET" "$USOS_W2K_RTC" "$USOS_W2K_VESA" "$([ -n "$USOS_W2K_ACPI_PKG" ] && echo ', user ACPI package')"
     else
     # XP x64 (NT 5.2 amd64): GenAHCI on the system's own StorPort
     # (nt5_storage_stage.sh, applied to the target after the source copy).

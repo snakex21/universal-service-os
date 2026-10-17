@@ -151,6 +151,19 @@
 #    it too), and [SetupData] OsLoadOptionsVar (the installed boot.ini
 #    options) gets /SOS /BOOTLOG. Default (off): ~LS keeps the Microsoft
 #    BOOTVID and boot.ini gets no extra options.
+# 11. VESA display (USOS_W2K_VESA=on by default, DATA ...\Unattended\
+#    vesa-off.txt -> off; docs/w2k-vesa-2026-10-17.md): USOS's own usosvbe.sys
+#    (GPL video miniport, tools/nt4/usosvbe, the NT 4.0 build unchanged: its
+#    imports all exist on 2000 SP4) with the CD's own framebuf.dll, which
+#    text-mode Setup installs from [files.vga]; the CD's FRAMEBUF.DL_ goes
+#    along as a second source. USOS never ships framebuf.dll. Nothing changes
+#    for text-mode or GUI-mode Setup (both stay on VGA, so a VESA problem
+#    cannot break the install): usos_w2k_vesa_stage puts USOSVBE.SYS,
+#    FRAMEBUF.DL_, VESA.REG and vesa.cmd into C:\USOS\W2K and usos-setup.cmd
+#    (UserExecute, setup end) calls vesa.cmd: driver copy, VESA.REG
+#    (usosvbe at 1024x768x16), a "[VGA mode]" (/basevideo) entry in boot.ini
+#    (timeout 5). The PnP vga service and VgaSave stay (full-screen consoles,
+#    Safe Mode, /basevideo).
 # No Microsoft file is added or changed except the TXTSETUP.SIF and
 # DOSNET.INF copies on the target (and USOS's own WINNT.SIF); with a user
 # ACPI package, the user's own files replace the ones they name.
@@ -194,6 +207,10 @@ usos_w2k_apply() (
     fi
     [ "$bootvid" = ms ] || [ -f "$vidsrc" ] || { echo "[W2K_STAGE] STOP: $vidsrc missing"; exit 1; }
     USOS_W2K_BOOTVID=$bootvid; export USOS_W2K_BOOTVID
+    # VESA display (see 11.): only checked here; staged with usos-setup.cmd.
+    vesa=${USOS_W2K_VESA:-on}
+    case "$vesa" in on|off) ;; *) echo '[W2K_STAGE] STOP: USOS_W2K_VESA must be on or off'; exit 1 ;; esac
+    [ "$vesa" = off ] || [ -f "$pkg/usosvbe/usosvbe.sys" ] || { echo "[W2K_STAGE] STOP: $pkg/usosvbe/usosvbe.sys missing"; exit 1; }
     # The clock (see 6.): USOS_W2K_HPET legacy-off (default with usosrst) or
     # keep; USOS_W2K_RTC fix (default with usosrst) or keep. Both need usosrst.
     if [ "$helper" = on ]; then hpet=${USOS_W2K_HPET:-legacy-off} rtc=${USOS_W2K_RTC:-fix}; else hpet=${USOS_W2K_HPET:-keep} rtc=${USOS_W2K_RTC:-keep}; fi
@@ -315,7 +332,7 @@ usos_w2k_apply() (
     printf '[W2K_STAGE] APPLIED PASS %s boot+local source, TXTSETUP.SIF PCI\\CC_010601, usosw2k.inf (CriticalDeviceDatabase), %s mode; ACPI %s; HAL %s; WINNT.SIF answers: standard keyboard; usosrst %s\n' \
         "$(usos_w2k_driver_title)" "$mode" "$([ "$acpi" = off ] && echo 'off (ACPIEnable = 0)' || echo 'kept (ACPIEnable unchanged)')" \
         "$(case "$hal" in mps) echo 'MPS Multiprocessor (ComputerType)' ;; standard) echo 'Standard PC (ComputerType)' ;; *) echo 'chosen by Setup' ;; esac)" \
-        "$([ "$helper" = on ] && echo 'on (STOP screen, Setup and text-mode restart via FADT/CF9/8042)' || echo off)$([ "$hpet" = legacy-off ] && echo '; HPET LegacyReplacement off')$([ "$rtc" = fix ] && echo '; RTC fix')$([ "$bootvid" = text ] && echo '; text boot video usosvid + /SOS (~BT)')$([ "$diag" = on ] && echo '; DIAGNOSTIC: usosvid 1.3-diag in ~BT and ~LS, boot.ini /SOS /BOOTLOG')$([ "$usb" = on ] && echo '; USB keyboard preinstall (CriticalDeviceDatabase)')$([ "$nvme" = on ] && echo '; NVMe target: usosnvme 1.0 (legacy mode, PCI\CC_010802)')$([ -n "$pkgplan" ] && printf '; user ACPI package: %s' "$(printf '%s\n' "$pkgplan" | awk -F '\t' '{ printf "%s%s %s", sep, ($1 == "extra" ? "boot driver" : "replaces"), $2; sep = ", " }')")"
+        "$([ "$helper" = on ] && echo 'on (STOP screen, Setup and text-mode restart via FADT/CF9/8042)' || echo off)$([ "$hpet" = legacy-off ] && echo '; HPET LegacyReplacement off')$([ "$rtc" = fix ] && echo '; RTC fix')$([ "$bootvid" = text ] && echo '; text boot video usosvid + /SOS (~BT)')$([ "$diag" = on ] && echo '; DIAGNOSTIC: usosvid 1.3-diag in ~BT and ~LS, boot.ini /SOS /BOOTLOG')$([ "$usb" = on ] && echo '; USB keyboard preinstall (CriticalDeviceDatabase)')$([ "$nvme" = on ] && echo '; NVMe target: usosnvme 1.0 (legacy mode, PCI\CC_010802)')$([ "$vesa" = on ] && echo '; VESA usosvbe at setup end (vesa.cmd)')$([ -n "$pkgplan" ] && printf '; user ACPI package: %s' "$(printf '%s\n' "$pkgplan" | awk -F '\t' '{ printf "%s%s %s", sep, ($1 == "extra" ? "boot driver" : "replaces"), $2; sep = ", " }')")"
 )
 
 # stdout: the plan for the user ACPI package folder $1 (see 5.) against the
@@ -841,6 +858,101 @@ usos_w2k_server_sif() {
 # Server" off for that user (HKCU ...\Setup\Welcome srvwiz = 0).
 usos_w2k_server_reg() {
     printf 'REGEDIT4\r\n\r\n[HKEY_CURRENT_USER\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Setup\\Welcome]\r\n"srvwiz"=dword:00000000\r\n\r\n'
+}
+
+# stdout (CRLF): C:\USOS\W2K\VESA.REG (see 11.). usosvbe as a legacy (non-PnP)
+# video miniport in group Video, framebuf as its display driver, 1024x768x16
+# (the mode proven with this miniport on the X470 under NT 4.0; the Display
+# applet lists every VBE mode). The DefaultSettings go to the service's
+# Device0 key (NT 4.0's place) and to the current hardware profile's copy,
+# which the 2000 Display applet writes. InstalledDisplayDrivers is
+# REG_MULTI_SZ "framebuf": REGEDIT4 hex(7) is read as ANSI bytes and widened.
+usos_w2k_vesa_reg() {
+    printf 'REGEDIT4\r\n\r\n'
+    printf '[HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\usosvbe]\r\n'
+    printf '"Type"=dword:00000001\r\n"Start"=dword:00000001\r\n"ErrorControl"=dword:00000000\r\n"Group"="Video"\r\n\r\n'
+    for key in 'Services\usosvbe\Device0' 'Hardware Profiles\Current\System\CurrentControlSet\Services\usosvbe\Device0'; do
+        printf '[HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\%s]\r\n' "$key"
+        if [ "$key" = 'Services\usosvbe\Device0' ]; then
+            printf '"InstalledDisplayDrivers"=hex(7):66,72,61,6d,65,62,75,66,00,00\r\n"VgaCompatible"=dword:00000000\r\n'
+        fi
+        printf '"DefaultSettings.BitsPerPel"=dword:00000010\r\n"DefaultSettings.XResolution"=dword:00000400\r\n"DefaultSettings.YResolution"=dword:00000300\r\n'
+        printf '"DefaultSettings.VRefresh"=dword:0000003c\r\n"DefaultSettings.Flags"=dword:00000000\r\n"DefaultSettings.XPanning"=dword:00000000\r\n"DefaultSettings.YPanning"=dword:00000000\r\n\r\n'
+    done
+}
+
+# stdout (CRLF): C:\USOS\W2K\vesa.cmd (see 11.), called by usos-setup.cmd at
+# setup end (USOS_DIR, USOS_LOG set there). framebuf.dll from Setup, else
+# expanded from the CD's FRAMEBUF.DL_ with 2000's own expand.exe; without it
+# VGA stays. Then usosvbe.sys, VESA.REG and the boot.ini "[VGA mode]" entry:
+# the default entry's ARC path with /fastdetect /basevideo, timeout 5 (one
+# entry gives no menu; two would wait 30 s). boot.ini is rewritten through a
+# copy that must still hold default= and the new entry; the old one stays
+# as C:\USOS\W2K\boot.ini.usos.
+usos_w2k_vesa_cmd() {
+    sed 's/$/\r/' <<'EOF'
+@echo off
+rem USOS: Windows 2000 VESA display (usosvbe + the CD's framebuf.dll), setup end.
+if not defined USOS_DIR set USOS_DIR=%SystemDrive%\USOS\W2K
+if not defined USOS_LOG set USOS_LOG=%SystemRoot%\usos-setup.log
+if exist "%SystemRoot%\system32\framebuf.dll" goto vesa
+if not exist "%USOS_DIR%\FRAMEBUF.DL_" goto novesa
+"%SystemRoot%\system32\expand.exe" "%USOS_DIR%\FRAMEBUF.DL_" "%SystemRoot%\system32\framebuf.dll" >> "%USOS_LOG%"
+if not exist "%SystemRoot%\system32\framebuf.dll" goto novesa
+:vesa
+copy /y "%USOS_DIR%\USOSVBE.SYS" "%SystemRoot%\system32\drivers\usosvbe.sys" >> "%USOS_LOG%"
+if not exist "%SystemRoot%\system32\drivers\usosvbe.sys" goto novesa
+"%SystemRoot%\regedit.exe" /s "%USOS_DIR%\VESA.REG"
+echo vesa on: usosvbe + framebuf.dll, 1024x768x16 >> "%USOS_LOG%"
+call :vgaentry
+goto end
+:novesa
+echo vesa off: no framebuf.dll, VGA stays >> "%USOS_LOG%"
+goto end
+:vgaentry
+set USOS_BINI=%SystemDrive%\boot.ini
+if not exist "%USOS_BINI%" goto vganone
+findstr /i /c:"/basevideo" "%USOS_BINI%" > nul && goto :eof
+set USOS_ARC=
+for /f "tokens=1* delims==" %%a in ('findstr /b /i /c:"default=" "%USOS_BINI%"') do set USOS_ARC=%%b
+if not defined USOS_ARC goto vganone
+attrib -r -s -h "%USOS_BINI%"
+copy /y "%USOS_BINI%" "%USOS_DIR%\boot.ini.usos" > nul
+(for /f "usebackq eol=| delims=" %%l in ("%USOS_DIR%\boot.ini.usos") do (echo %%l| findstr /b /i "timeout=" > nul && echo timeout=5|| echo %%l)) > "%USOS_DIR%\boot.ini.new"
+>> "%USOS_DIR%\boot.ini.new" echo %USOS_ARC%="Windows 2000 [VGA mode]" /fastdetect /basevideo
+findstr /b /i /c:"default=" "%USOS_DIR%\boot.ini.new" > nul || goto vgafail
+findstr /i /c:"/basevideo" "%USOS_DIR%\boot.ini.new" > nul || goto vgafail
+copy /y "%USOS_DIR%\boot.ini.new" "%USOS_BINI%" > nul
+echo boot.ini: [VGA mode] entry added (/basevideo), timeout 5 >> "%USOS_LOG%"
+goto vgaattr
+:vgafail
+echo boot.ini: [VGA mode] entry FAILED, boot.ini unchanged >> "%USOS_LOG%"
+:vgaattr
+del /f /q "%USOS_DIR%\boot.ini.new" 2> nul
+attrib +r +s +h "%USOS_BINI%"
+goto :eof
+:vganone
+echo boot.ini: no default= line, no [VGA mode] entry >> "%USOS_LOG%"
+goto :eof
+:end
+EOF
+}
+
+# usos_w2k_vesa_stage DIR LS_I386: the setup-end VESA files (see 11.) in DIR
+# (C:\USOS\W2K): USOSVBE.SYS from the package, FRAMEBUF.DL_ from the local
+# source when it has one (the CD's own file), VESA.REG, vesa.cmd. Messages on
+# stdout; status 1 when a copy fails.
+usos_w2k_vesa_stage() {
+    pkg=${USOS_W2K_DIR:-/usr/lib/usos/w2k-drivers}
+    cp "$pkg/usosvbe/usosvbe.sys" "$1/USOSVBE.SYS" && cmp -s "$pkg/usosvbe/usosvbe.sys" "$1/USOSVBE.SYS" || { echo '[W2K_STAGE] STOP: cannot stage USOSVBE.SYS'; return 1; }
+    fb=$(find "$2" -maxdepth 1 -type f \( -iname framebuf.dl_ -o -iname framebuf.dll \) | LC_ALL=C sort | head -n 1)
+    case "$fb" in
+        *_) cp "$fb" "$1/FRAMEBUF.DL_" && cmp -s "$fb" "$1/FRAMEBUF.DL_" || { echo '[W2K_STAGE] STOP: cannot stage FRAMEBUF.DL_'; return 1; } ;;
+        ?*) echo '[W2K_STAGE] VESA: the local source has an uncompressed framebuf.dll (Setup installs it)' ;;
+        *) echo '[W2K_STAGE] VESA: no FRAMEBUF.DL_ in the local source (VESA only if Setup installs framebuf.dll)' ;;
+    esac
+    usos_w2k_vesa_reg > "$1/VESA.REG" && usos_w2k_vesa_cmd > "$1/vesa.cmd" || { echo '[W2K_STAGE] STOP: cannot write VESA.REG / vesa.cmd'; return 1; }
+    echo '[W2K_STAGE] VESA staged: usosvbe.sys + framebuf.dll at setup end (vesa.cmd), 1024x768x16, boot.ini [VGA mode]'
 }
 
 # stdout: the 512-byte marker sector USOS writes at LBA 2046 of the prepared
