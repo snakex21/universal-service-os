@@ -24,6 +24,14 @@ SEABIOS=ROOT/'tools/qemu/share/bios-256k.bin'
 PACKAGE=Path(__import__('os').environ.get('USOS_XP_PACKAGE_DIR',ROOT/'zig-out/xp-uefi-csm'))
 DEFAULT_ISO=Path('L:/Systems/Windows/Windows XP/Images/pl_windows_xp_professional_with_service_pack_3_x86_cd_x14-80476.iso')
 TARGET_BYTES=12*1024**3
+# Windows 2000: 40 GiB. Its GUI Setup can hit the ESENT security-log flood
+# (docs/windows-2000-modern-2026-09-30.md); with 12 GiB the flood fills the disk
+# and Setup stops with "initializing the security subsystem failed".
+# USOS_TEST_TARGET_GIB overrides the size for any profile.
+TARGET_BYTES_BY_PROFILE={'w2k-x86-sp4-uefi-csm':40*1024**3}
+def target_bytes(profile):
+    gib=__import__('os').environ.get('USOS_TEST_TARGET_GIB','')
+    return int(gib)*1024**3 if gib else TARGET_BYTES_BY_PROFILE.get(profile,TARGET_BYTES)
 # TARGET_NVME (run_csmwrap_xp_prepared.py --nvme): the target is an NVMe disk
 # (-device nvme), so the package sees /dev/nvme0n1 (docs/nvme-nt-2026-10-11.md).
 TARGET_NVME=False
@@ -39,7 +47,7 @@ for d in /sys/bus/pci/devices/*; do modprobe "$(cat "$d/modalias")" 2>/dev/null;
 for m in sd_mod isofs ntfs3 loop; do modprobe $m 2>/dev/null; done
 sleep 3; mdev -s; cat /proc/partitions
 # The kernel may enumerate the three IDE disks in any order: pick them by size
-# (USOS stand-in 256 MiB, target 12 GiB, the rest is the ISO).
+# (USOS stand-in 256 MiB, target 12 GiB or target_bytes(), the rest is the ISO).
 USOS_DEV= TARGET_DEV= ISO_DEV=
 for b in /sys/block/sd? /sys/block/nvme?n?; do
   [ -e "$b/size" ] || continue
@@ -104,10 +112,13 @@ NT5_UEFI_SYSTEMS={'w2k-x86-sp4-uefi-csm':'windows-2000','w2k3-x86-sp2-uefi-csm':
 
 def prepare(out,iso,profile='xp-x86-sp3-uefi-csm',settings=None,tree_scripts=(),sif=None):
     usos=out/'usos-blank.qcow2';target=out/'target.qcow2'
-    for disk,size in ((usos,256*1024**2),(target,TARGET_BYTES)):
+    size_target=target_bytes(profile)
+    for disk,size in ((usos,256*1024**2),(target,size_target)):
         subprocess.run([str(QEMU_IMG),'create','-q','-f','qcow2',str(disk),str(size)],check=True)
     entries=cpio.parse_newc(gzip.decompress((PACKAGE/'initramfs-xp').read_bytes()))
     probe=PROBE_INIT.replace('USOS_PLAN_PROFILE=xp-x86-sp3-uefi-csm','USOS_PLAN_PROFILE='+profile)
+    # The probe picks the target disk by its size in 512-byte sectors.
+    probe=probe.replace(' 25165824) TARGET_DEV=',' %d) TARGET_DEV='%(size_target//512),1)
     if profile in NT5_UEFI_SYSTEMS:
         # Windows 2000 / Server 2003 / XP x64 from UEFI: their NT5 profile.
         probe=probe.replace('. /usr/lib/usos/nt5_profile.sh; usos_nt5_profile','export NT5_SYSTEM='+NT5_UEFI_SYSTEMS[profile]+'; . /usr/lib/usos/nt5_profile.sh; usos_nt5_profile')
