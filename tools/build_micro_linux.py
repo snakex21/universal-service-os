@@ -419,10 +419,8 @@ def main() -> int:
         (record, obtain(root, record, packages_dir / str(record["file"]))) for record in qemu9x_lock["packages"]
     ]
 
-    output.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="usos-micro-linux-", dir=output) as temp_name:
+    with tempfile.TemporaryDirectory(prefix="usos-micro-linux-") as temp_name:
         temp = Path(temp_name)
-        assert temp.resolve().is_relative_to(output.resolve())
         modloop_out = temp / "modloop"
         run_7z(
             seven_zip,
