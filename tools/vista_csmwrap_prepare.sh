@@ -27,6 +27,19 @@ vista_csmwrap_value() {
     awk -F= -v key="$1" '{ sub(/\r$/, "") } $1 == key { sub(/^[^=]*=/, ""); print; found=1; exit } END { if (!found) exit 1 }' "$2"
 }
 
+# First 8.1/10 trial only: scoped DATA opt-in. Older x86 paths are unchanged.
+vista_modern_nvme_enabled() {
+    [ "$1" = win-x86-uefi-csmwrap ] || return 1
+    case "$3" in 'Windows 10'|'Windows 8.1'|'Windows Embedded 8.1 Industry') ;; *) return 1 ;; esac
+    [ -f "$2/Systems/Windows/$3/Unattended/nvme-experimental.txt" ]
+}
+
+# External PE10 is accepted only for the same opted-in 8.1 experiment.
+vista_modern_external_donor_enabled() {
+    case "$3" in 'Windows 8.1'|'Windows Embedded 8.1 Industry') ;; *) return 1 ;; esac
+    vista_modern_nvme_enabled "$@"
+}
+
 usos_vista_csmwrap_prepare() {
     VISTA_CSMWRAP_DIR=/mnt/esp/EFI/USOS/vista-csmwrap
     request=$VISTA_CSMWRAP_DIR/request.ini
@@ -52,7 +65,7 @@ usos_vista_csmwrap_prepare() {
     profile=$(vista_csmwrap_value profile "$request") || profile=vista-x64-sp2-uefi-csmwrap
     case "$profile" in
         vista-x64-sp2-uefi-csmwrap) x86_self=0 ;;
-        win-x86-uefi-csmwrap) x86_self=1; [ "$donor" = "$iso" ] || stop 'request.ini: the x86 path boots the Windows ISO itself' ;;
+        win-x86-uefi-csmwrap) x86_self=1 ;;
         # 32-bit Windows 7 / Vista / Server 2008 (design doc section 12): the
         # same layout, the x86 PE10 donor is the staged WinPE.
         win-nt6-x86-uefi-csmwrap) x86_self=1; [ "$donor" != "$iso" ] || stop 'request.ini: the 32-bit Windows 7 / Vista path needs an x86 PE10 donor' ;;
@@ -80,6 +93,9 @@ usos_vista_csmwrap_prepare() {
     mount -t ntfs3 -o ro,noatime "$DATA_PATH" /mnt/data || stop 'cannot mount USOS_DATA read-only'
     [ -f "/mnt/data/$iso" ] || stop "the Windows ISO is not on DATA: $iso"
     [ -f "/mnt/data/$donor" ] || stop "the PE10 donor is not on DATA: $donor"
+    if [ "$profile" = win-x86-uefi-csmwrap ] && [ "$donor" != "$iso" ]; then
+        vista_modern_external_donor_enabled "$profile" /mnt/data "$folder" || stop 'request.ini: external x86 PE10 requires the opted-in Windows 8.1 NVMe experiment'
+    fi
 
     answer_xml=''
     case "$answer" in
@@ -159,8 +175,9 @@ usos_vista_csmwrap_prepare() {
                     vista_csmwrap_log "NVME $folder x86: usosnvme in the WinPE and the installed system, WinPE lowmem"
                     pe_nvme=usosnvme ;;
                 win-x86-uefi-csmwrap)
-                    vista_csmwrap_log "NVME STOP 32-bit Windows 8.1/10 through CSMWrap (stornvme I/O failure on the X470, 2026-10-13)"
-                    stop '32-bit Windows 8.1/10 on NVMe is not supported yet on this path. No disk was changed.' ;;
+                    vista_modern_nvme_enabled "$profile" /mnt/data "$folder" || stop '32-bit Windows 8.1/10 on NVMe is not supported yet on this path. No disk was changed.'
+                    pe_nvme=usosnvme-modern
+                    vista_csmwrap_log 'NVME x86 modern: experimental PE, installed system and WinRE path' ;;
             esac
             [ "$nvme_lbs" = 512 ] || stop "The NVMe disk uses $nvme_lbs-byte sectors; $NT5_NAME through CSMWrap needs 512-byte sectors (switch the namespace to a 512-byte LBA format first). No disk was changed." ;;
         esac

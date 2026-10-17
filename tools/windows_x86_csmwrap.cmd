@@ -86,6 +86,7 @@ call :usb3
 call :nt60_gate
 call :nt60_usb
 call :nvme
+if exist "%~dp0usos-nvme-modern.flag" if errorlevel 1 exit /b 1
 call :mpart
 echo [USOS] phase=finalize-target-boot
 "%~dp0usos-x86-csmwrap.exe" stick
@@ -361,6 +362,7 @@ rem "CD/DVD driver" (QEMU 2026-10-13, Server 2008 SP2 x86); it also needs
 rem sources\boot.wim next to setup.exe (copied, ~140 MB; WinPE has no
 rem symbolic links on X:).
 :nvme_setup
+if exist "%~dp0usos-nvme-modern.flag" "%~dp0usos-x86-csmwrap.exe" nodump
 "%~dp0usos-x86-csmwrap.exe" setupver "%USOS_SETUP%"
 set "USOS_SETUPVER=%errorlevel%"
 if not "%USOS_SETUPVER%"=="60" if not "%USOS_SETUPVER%"=="61" (echo [USOS] NVMe target: Setup version code %USOS_SETUPVER%, no hwcompat change needed. & exit /b 0)
@@ -419,6 +421,10 @@ set "USOS_BUILD="
 if errorlevel 1 (echo [USOS] NVMe: installed Windows not found; skipped. & exit /b 0)
 for /f "usebackq tokens=1,2,3" %%A in ("%TEMP%\usos-target.txt") do (set "USOS_T=%%A" & set "USOS_NT=%%B" & set "USOS_BUILD=%%C")
 echo [USOS] phase=nvme nt=%USOS_NT% build=%USOS_BUILD%
+if exist "%~dp0usos-nvme-modern.flag" (
+    call "%~dp0usos-nvme-modern.cmd" "%USOS_T%" "%USOS_NT%" "%USOS_BUILD%"
+    exit /b
+)
 set "USOS_NVME_MSU="
 if not "%USOS_NT%"=="6.0" if not "%USOS_NT%"=="6.1" (echo [USOS] NVMe: Windows %USOS_NT% has its own NVMe driver. & exit /b 0)
 rem User decision 2026-10-14: no Microsoft stornvme for 32-bit NT6 on NVMe
@@ -553,7 +559,9 @@ set "USOS_BUILD="
 if errorlevel 1 exit /b 0
 for /f "usebackq tokens=1,2,3" %%A in ("%TEMP%\usos-target.txt") do (set "USOS_T=%%A" & set "USOS_NT=%%B" & set "USOS_BUILD=%%C")
 if not "%USOS_NT%"=="6.1" if not "%USOS_NT%"=="6.2" if not "%USOS_NT%"=="6.3" if not "%USOS_NT%"=="10.0" exit /b 0
-if "%USOS_NT%"=="10.0" if "%USOS_BUILD%"=="" exit /b 0
+if "%USOS_BUILD%"=="" exit /b 0
+rem The modern NVMe path can receive ntoskrnl fixed version 6.2 for 19041.
+if exist "%~dp0usos-nvme-modern.flag" if %USOS_BUILD% GEQ 15063 if %USOS_BUILD% LSS 22000 (echo [USOS] usosmpart: modern Windows 10 mounts USB partitions itself; skipped. & exit /b 0)
 if "%USOS_NT%"=="10.0" if %USOS_BUILD% GEQ 15063 (echo [USOS] usosmpart: Windows 10 build %USOS_BUILD% mounts every USB stick partition itself; skipped. & exit /b 0)
 echo [USOS] phase=mpart nt=%USOS_NT% build=%USOS_BUILD%
 if not exist "%~dp0usosmpart-x86.sys" (echo [USOS] usosmpart: driver missing; skipped. & exit /b 0)

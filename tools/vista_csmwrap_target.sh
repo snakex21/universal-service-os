@@ -77,6 +77,23 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
+modern_nvme=0
+if [ "${USOS_PE_NVME:-}" = usosnvme-modern ]; then
+    [ "$X86_SELF" = 1 ] || fail 'modern NVMe requires the x86 self-boot profile'
+    case "$TARGET_DEVICE" in /dev/nvme*) ;; *) fail 'modern NVMe requires an NVMe target' ;; esac
+    . "$LIB/w9x_nvme.sh"
+    modern_id=$(w9x_nvme_hwid "$TARGET_DEVICE") || fail 'cannot identify the NVMe PCI controller'
+    case "$modern_id" in 'PCI\VEN_1344&DEV_5407'|'PCI\VEN_1B36&DEV_0010') ;; *) fail 'modern NVMe package does not cover this PCI hardware ID' ;; esac
+    mkdir -p "$work/preflight"
+    ( cd "$work/preflight" && cpio -idm < "$helpers_cpio" 2>/dev/null ) || fail 'cannot preflight modern NVMe helpers'
+    for file in usos-nvme-modern.exe usos-nvme-modern.cmd modern-usosnvme.inf modern-usosnvme.cat modern-usosnvme.cer modern-usosnvme.sys; do
+        [ -s "$work/preflight/$file" ] || fail "missing modern NVMe helper: $file; no disk was changed"
+    done
+    modern_nvme=1
+    USOS_PE_NVME=usosnvme
+    log "modern NVMe preflight PASS id=$modern_id"
+fi
+
 # 1. Partition table: erase the old one (both GPT copies), then a new MBR.
 dd if=/dev/zero of="$TARGET_DEVICE" bs=1048576 count=1 conv=fsync 2>/dev/null || fail 'cannot erase the partition table'
 dd if=/dev/zero of="$TARGET_DEVICE" bs=512 seek=$((total - 2048)) count=2048 conv=fsync 2>/dev/null || fail 'cannot erase the backup partition table'
@@ -178,6 +195,7 @@ wimlib-imagex export "$wim" "$boot_index" "$work/staging/sources/boot.wim" --boo
 # wimbootPlan .vista): support.cpio, vista-support.cpio, the flags, the source
 # binding; plus the CSMWrap flag, the target record and the answer file.
 ( cd "$work/inject" && cpio -idm < "$SUPPORT_DIR/support.cpio" 2>/dev/null && cpio -idm < "$helpers_cpio" 2>/dev/null ) || fail 'cannot unpack the USOS WinPE helpers'
+if [ "$modern_nvme" = 1 ]; then printf '1\r\n' > "$work/inject/usos-nvme-modern.flag"; fi
 if [ "$X86_SELF" = 1 ]; then
     [ -r "$work/inject/usos-x86-csmwrap.exe" ] && [ -r "$work/inject/usos-x86-csmwrap.cmd" ] && [ -r "$work/inject/winpeshl.ini" ] || fail 'the USOS WinPE helpers are incomplete'
     printf '1\r\n' > "$work/inject/usos-x86-csmwrap.flag"
