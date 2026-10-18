@@ -53,6 +53,13 @@ nothing runs them unless EFI/USOS/win9x/diag.flag exists):
                 V86-vs-physical page map, xHCI and bridge PCI state, live
                 (src/platform/bios/win9x/usosdbg.c, OpenWatcom like USOSKEY.DRV)
 
+Built only with --usoslog (into zig-out/win9x-usoslog, copied by hand):
+  USOSLOG.EXE   Win32, no window: silent logger for test installs, started from
+                the Startup folder; mouse (via USOSDBG.EXE /L), usosnet 0.4
+                statistics, DNS / TCP / HTTP tests, processes, startup entries
+                into C:\\USOS9X\\LOGS\\USOSLOG.TXT (src/platform/bios/win9x/usoslog.c,
+                OpenWatcom wcc386 / wlink, PE 4.00; tools/tests/test_usoslog.py)
+
 Also built, not staged (copied by hand):
   USOSHPET.COM  clears HPET LegacyReplacement (src/platform/bios/win9x/usosdiag.S)
   USOSWHERE.COM TSR: interrupted CS:IP, ticks, PSP and last INT 13h/15h/21h/2Fh
@@ -231,6 +238,125 @@ def build_usosdbg(out: Path, work: Path) -> Path:
     return exe
 
 
+OW_LIB386_NT = ('kernel32.lib', 'user32.lib', 'advapi32.lib', 'wsock32.lib')
+# What USOSLOG.EXE may import: present in the Windows 95 / 98 / Me system
+# DLLs (IPHLPAPI and Toolhelp32 are looked up at run time).
+USOSLOG_IMPORTS = {
+    'kernel32.dll': {
+        'CloseHandle', 'CreateDirectoryA', 'CreateFileA', 'CreateMutexA', 'CreateProcessA', 'CreateThread',
+        'DeleteFileA', 'EnterCriticalSection', 'ExitProcess', 'FindClose', 'FindFirstFileA', 'FindNextFileA',
+        'FlushFileBuffers', 'GetCommandLineA', 'GetComputerNameA', 'GetCurrentThreadId', 'GetFileSize',
+        'GetLastError', 'GetLocalTime', 'GetModuleHandleA', 'GetPrivateProfileStringA', 'GetProcAddress',
+        'GetProfileStringA', 'GetTickCount', 'GetVersionExA', 'GlobalMemoryStatus', 'InitializeCriticalSection',
+        'IsBadReadPtr', 'LeaveCriticalSection', 'LoadLibraryA', 'MoveFileA', 'ReadFile', 'SetFilePointer', 'Sleep',
+        'WaitForSingleObject', 'WriteFile', 'lstrcatA', 'lstrcmpiA', 'lstrcpyA', 'lstrcpynA', 'lstrlenA'},
+    'user32.dll': {
+        'CallNextHookEx', 'DispatchMessageA', 'EnumWindows', 'GetClassNameA', 'GetMessageA', 'GetSystemMetrics',
+        'GetWindowTextA', 'GetWindowThreadProcessId', 'IsWindowVisible', 'KillTimer', 'PeekMessageA',
+        'PostThreadMessageA', 'SetTimer', 'SetWindowsHookExA', 'SystemParametersInfoA', 'UnhookWindowsHookEx',
+        'wsprintfA', 'wvsprintfA'},
+    'advapi32.dll': {'RegCloseKey', 'RegEnumKeyExA', 'RegEnumValueA', 'RegOpenKeyExA', 'RegQueryValueExA'},
+    'wsock32.dll': {
+        'WSAGetLastError', 'WSAStartup', 'closesocket', 'connect', 'gethostbyname', 'htons', 'inet_addr',
+        'ioctlsocket', 'ntohs', 'recv', 'recvfrom', 'select', 'send', 'sendto', 'setsockopt', 'socket'},
+}
+
+
+def openwatcom_nt(ow: Path) -> None:
+    """The Win32 import libraries (lib386/nt) from the pinned OpenWatcom
+    snapshot; build_win3_usb_keyboard.openwatcom() unpacks only the 16-bit
+    parts."""
+    import sys
+    import tarfile
+    sys.path.insert(0, str(ROOT / 'tools'))
+    from build_win3_usb_keyboard import OW_CACHE, OW_SNAPSHOT
+    lib = ow / 'lib386/nt'
+    if all((lib / n).is_file() for n in OW_LIB386_NT):
+        return
+    archive = OW_CACHE / OW_SNAPSHOT['file']
+    if not archive.is_file():
+        archive = ROOT / 'tools/cache/buildkit-downloads' / OW_SNAPSHOT['file']
+    with tarfile.open(archive) as t:
+        members = [m for m in t.getmembers() if m.name in {'./lib386/nt/' + n for n in OW_LIB386_NT}]
+        t.extractall(ow, members=members, filter='data')
+
+
+def pe_imports(data: bytes) -> dict:
+    """{dll (lower case): {names}} of a PE32 image (no ordinal imports expected)."""
+    pe = int.from_bytes(data[0x3C:0x40], 'little')
+    nsec = int.from_bytes(data[pe + 6:pe + 8], 'little')
+    opt = pe + 24
+    secs = [(int.from_bytes(data[s + 12:s + 16], 'little'), int.from_bytes(data[s + 8:s + 12], 'little'),
+             int.from_bytes(data[s + 20:s + 24], 'little'))
+            for s in (opt + int.from_bytes(data[pe + 20:pe + 22], 'little') + 40 * i for i in range(nsec))]
+
+    def off(rva):
+        for va, vs, raw in secs:
+            if va <= rva < va + max(vs, 1):
+                return raw + rva - va
+        raise ValueError(f'rva {rva:#x} outside the sections')
+
+    def cstr(o):
+        return data[o:data.index(b'\0', o)].decode('ascii')
+    imp = int.from_bytes(data[opt + 104:opt + 108], 'little')
+    out = {}
+    d = off(imp)
+    while int.from_bytes(data[d + 12:d + 16], 'little'):
+        dll = cstr(off(int.from_bytes(data[d + 12:d + 16], 'little'))).lower()
+        thunk = int.from_bytes(data[d:d + 4], 'little') or int.from_bytes(data[d + 16:d + 20], 'little')
+        t = off(thunk)
+        names = out.setdefault(dll, set())
+        while True:
+            v = int.from_bytes(data[t:t + 4], 'little')
+            if not v:
+                break
+            if v & 0x80000000:
+                names.add(f'#{v & 0xFFFF}')
+            else:
+                names.add(cstr(off(v) + 2))
+            t += 4
+        d += 20
+    return out
+
+
+def build_usoslog(out: Path, work: Path) -> Path:
+    """USOSLOG.EXE: Win32 GUI program (OpenWatcom wcc386 / wlink, no runtime),
+    PE subsystem and OS version 4.00 so Windows 95 / 98 / Me load it."""
+    import sys
+    sys.path.insert(0, str(ROOT / 'tools'))
+    from build_win3_usb_keyboard import openwatcom
+    ow = openwatcom()
+    openwatcom_nt(ow)
+    env = dict(os.environ, WATCOM=str(ow), INCLUDE=f'{ow / "h/nt"};{ow / "h"}',
+               PATH=str(ow / 'binnt64') + os.pathsep + os.environ.get('PATH', ''))
+    obj = work / 'usoslog.obj'
+    subprocess.run([str(ow / 'binnt64/wcc386.exe'), '-q', '-bt=nt', '-zl', '-s', '-5r', '-os', '-zp4',
+                    '-w3', '-we', '-fo=' + str(obj), str(SOURCE / 'usoslog.c')], env=env, check=True, cwd=work)
+    exe = out / 'USOSLOG.EXE'
+    subprocess.run([str(ow / 'binnt64/wlink.exe'), '@' + str(SOURCE / 'usoslog.lnk'), 'file', str(obj),
+                    'name', str(exe), 'option', 'map=' + str(work / 'usoslog.map')], env=env, check=True, cwd=work)
+    spec = importlib_util_spec('pe_nt4_version', ROOT / 'tools/nt4/pe_nt4_version.py')
+    data = spec.set_nt4(exe.read_bytes(), 4, 0)
+    exe.write_bytes(data)
+    if data[:2] != b'MZ' or b'USOSLOG' not in data:
+        raise ValueError('USOSLOG.EXE is not the expected PE program')
+    for dll, names in pe_imports(data).items():
+        extra = names - USOSLOG_IMPORTS.get(dll, set())
+        if extra:
+            raise ValueError(f'USOSLOG.EXE imports outside the 9x list: {dll} {sorted(extra)}')
+    if 'clib' in (work / 'usoslog.map').read_text(errors='replace').lower():
+        raise ValueError('USOSLOG.EXE must not link the OpenWatcom C library')
+    return exe
+
+
+def importlib_util_spec(name: str, path: Path):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def stage_vmdisp9x(out: Path) -> None:
     manifest = json.loads((VMDISP / 'manifest.json').read_text())
     for name, expected in manifest['files'].items():
@@ -332,4 +458,15 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--out', type=Path)
-    build(ROOT, p.parse_args().out)
+    p.add_argument('--usoslog', action='store_true',
+                   help='only USOSDBG.EXE and USOSLOG.EXE (test-install logger, not staged)')
+    a = p.parse_args()
+    if a.usoslog:
+        o = a.out or ROOT / 'zig-out/win9x-usoslog'
+        w = ROOT / 'zig-out/win9x-support'
+        o.mkdir(parents=True, exist_ok=True)
+        w.mkdir(parents=True, exist_ok=True)
+        print(build_usosdbg(o, w))
+        print(build_usoslog(o, w))
+    else:
+        build(ROOT, a.out)

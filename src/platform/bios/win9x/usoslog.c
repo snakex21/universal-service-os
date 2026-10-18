@@ -1,0 +1,1612 @@
+/*
+ * USOSLOG.EXE - silent diagnostics logger for Windows 98 / 98 SE / Me test
+ * installs (X470 under CSMWrap). Win32, no window, no C runtime.
+ * Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
+ *
+ * Started from the Startup folder (one instance: a named mutex). It writes
+ * a short start record at once, a full snapshot about 3 minutes after the
+ * start and then every 5 minutes, appended to C:\USOS9X\LOGS\USOSLOG.TXT
+ * (over 256 KiB: renamed to USOSLOG.OLD, one generation kept). Each write
+ * is flushed and the file closed, so a normal shutdown loses nothing.
+ *
+ * A full snapshot:
+ *   SYS    Windows version, memory, uptime
+ *   MOUSE  system metrics (mouse / wheel present, buttons, wheel lines),
+ *          the input this logger saw through a journal record hook (wheel
+ *          messages, moves, clicks: proves whether WM_MOUSEWHEEL reaches
+ *          USER), SYSTEM.INI mouse lines, and USOSDBG.EXE /L (log mode of
+ *          the Win16 diagnostics: USOSKEY / USOSMOUS / SeaBIOS USOSMWHL
+ *          record, packets, descriptor, PCI once)
+ *   NET    the usosnet adapter's registry values (Class\Net\00nn), its live
+ *          statistics page (usosnet 0.4: per protocol RX / TX, drops,
+ *          TransferData, last frames, last DNS frames; through
+ *          UsosnetStatsVa, else USOSDBG's physical dump of UsosnetStatsPa),
+ *          MSTCP / NetTrans / DHCP / Internet Settings registry, HOSTS,
+ *          IPHLPAPI (DNS servers as the resolver sees them, adapters, IP /
+ *          UDP / TCP / ICMP statistics before and after the tests), then the
+ *          active tests: gethostbyname, raw UDP DNS queries (1.1.1.1,
+ *          8.8.8.8, the gateway, the configured servers), a DNS query over
+ *          TCP, TCP connect to the gateway port 80, HTTP GET frogfind.com
+ *          (by the resolved address or the one embedded below), and a UDP
+ *          broadcast that asks usosnet 0.4 for one NDIS log round; the new
+ *          part of C:\WINDOWS\NDISLOG.TXT
+ *   PROC   processes (Toolhelp32), visible top-level windows, and what the
+ *          2-second watcher saw since the last snapshot: processes started /
+ *          ended, new windows (a console flashing up is a "tty" window)
+ *   START  Startup folders, Run keys, WIN.INI load= / run=, SYSTEM.INI
+ *          shell=, AUTOEXEC.BAT / CONFIG.SYS (start record and every 6th)
+ *
+ * Nothing is written anywhere but C:\USOS9X\LOGS; the only packets sent are
+ * the test queries above and the one broadcast.
+ *
+ * Options (testing): /once (one full snapshot, then exit), /out <file>,
+ * /first <s>, /every <s>, /nonet (no active network tests), /nodbg (no
+ * USOSDBG), /nohook (no journal hook), /dbgfile <file> (decode a saved
+ * USOSDBG /L output instead of running USOSDBG: host tests).
+ *
+ * Built with tools/build_win9x_support.py (OpenWatcom wcc386 / wlink,
+ * PE 4.00, imports from KERNEL32 / USER32 / ADVAPI32 / WSOCK32 only;
+ * IPHLPAPI and Toolhelp32 are looked up at run time).
+ */
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <winsock.h>
+#include <stdarg.h>
+
+#ifndef WM_MOUSEWHEEL
+#define WM_MOUSEWHEEL 0x020A
+#endif
+#ifndef WM_CANCELJOURNAL
+#define WM_CANCELJOURNAL 0x004B
+#endif
+#ifndef SM_MOUSEWHEELPRESENT
+#define SM_MOUSEWHEELPRESENT 75
+#endif
+#ifndef SPI_GETWHEELSCROLLLINES
+#define SPI_GETWHEELSCROLLLINES 0x0068
+#endif
+
+#define VERSION     "1.0"
+#define LOGDIR      "C:\\USOS9X\\LOGS"
+#define LOGFILE     LOGDIR "\\USOSLOG.TXT"
+#define DBGEXE      "C:\\USOS9X\\USOSDBG.EXE"
+#define DBGTMP      LOGDIR "\\USOSDBG.TMP"
+#define ROTATE      (256UL * 1024)
+/* frogfind.com A record, resolved 2026-10-18 through 1.1.1.1 and 8.8.8.8 */
+#define FALLBACK_IP "64.227.13.248"
+#define TEST_HOST   "frogfind.com"
+/* control site, plain HTTP too (2026-10-18 from the dev PC: frogfind.com
+ * did not answer on port 80 or 443 at all, 68k.news answered 200) */
+#define CONTROL_HOST "68k.news"
+#define CONTROL_IP  "134.209.213.152"
+#define LOG_PORT    21843           /* usosnet 0.4 USNS_LOG_PORT */
+
+/* ------------------------------------------------------------------ */
+/* usosnet 0.4 statistics page: same layout as USNS_BLOCK in
+ * tools/nt/usosnet/src/usosnet_proto.h (branch feature/usosnet) */
+#define USNS_MAGIC  0x534E5355UL
+#define USNS_CLASSES 16
+#define USNS_DROPS  16
+#define USNS_TDS    8
+#define USNS_CORES  31
+#define USNS_HIST   32
+#define USNS_DUMP   128
+typedef struct {
+    DWORD Magic, Version, Size, Seconds;
+    DWORD Rx[USNS_CLASSES];
+    DWORD Tx[USNS_CLASSES];
+    DWORD Drop[USNS_DROPS];
+    DWORD Td[USNS_TDS];
+    DWORD Core[USNS_CORES];
+    DWORD Seq;
+    DWORD Hist[USNS_HIST][6];
+    DWORD LastDnsRxLen, LastDnsTxLen;
+    BYTE LastDnsRx[USNS_DUMP];
+    BYTE LastDnsTx[USNS_DUMP];
+} USNS;
+
+static const char *const usns_class[USNS_CLASSES] = {
+    "bcast", "mcast", "arp", "ipv4", "icmp", "udp", "tcp", "dns", "dhcp", "http", "frag", "ipv6",
+    "other", "short", "ipopt", "netbios" };
+static const char *const usns_drop[USNS_DROPS] = {
+    "drop:not_eop", "drop:crc", "drop:symbol", "drop:seq", "drop:carrier_ext", "drop:rx_data",
+    "drop:length", "drop:no_filter", "note:l4e", "note:ipe", "note:l4e_udp", "note:l4e_dns",
+    "note:ipcs", "note:l4cs", "note:udpcs", "note:loopback" };
+static const char *const usns_td[USNS_TDS] = {
+    "calls", "outside_indication", "short_copy", "bytes", "max_offset", "max_len", "udp", "dns" };
+static const char *const usns_core[USNS_CORES] = {
+    "isr_calls", "isr_claimed", "dpc", "rx_ok", "rx_by_timer", "tx_ok", "tx_done", "tx_err", "tx_full",
+    "rx_err", "rx_crc", "hw_tpr", "hw_gprc", "hw_gptc", "hw_mpc", "hw_rnbc", "hw_crcerrs", "filter",
+    "lookahead", "pollmode", "linkflags", "STATUS", "RCTL", "RXCSUM", "RDH", "RDT", "TDH", "TDT",
+    "tx_busy", "logs", "log_requests" };
+
+/* ------------------------------------------------------------------ */
+/* IPHLPAPI (run-time lookup; layouts of iptypes.h / iprtrmib.h)       */
+typedef struct _IPSTRING { char String[16]; } IPSTRING;
+typedef struct _IPADDRSTR {
+    struct _IPADDRSTR *Next;
+    IPSTRING IpAddress, IpMask;
+    DWORD Context;
+} IPADDRSTR;
+typedef struct {
+    char HostName[132];
+    char DomainName[132];
+    IPADDRSTR *CurrentDnsServer;
+    IPADDRSTR DnsServerList;
+    UINT NodeType;
+    char ScopeId[260];
+    UINT EnableRouting, EnableProxy, EnableDns;
+} FIXEDINFO;
+typedef struct _ADAPTERINFO {
+    struct _ADAPTERINFO *Next;
+    DWORD ComboIndex;
+    char AdapterName[260];
+    char Description[132];
+    UINT AddressLength;
+    BYTE Address[8];
+    DWORD Index;
+    UINT Type;
+    UINT DhcpEnabled;
+    IPADDRSTR *CurrentIpAddress;
+    IPADDRSTR IpAddressList, GatewayList, DhcpServer;
+    BOOL HaveWins;
+    IPADDRSTR PrimaryWinsServer, SecondaryWinsServer;
+    DWORD LeaseObtained, LeaseExpires;   /* time_t (32-bit on 9x); not printed */
+} ADAPTERINFO;
+typedef DWORD (WINAPI *PFN_BUF)(void *, ULONG *);
+typedef DWORD (WINAPI *PFN_STAT)(void *);
+
+/* Toolhelp32 (run-time lookup) */
+typedef struct {
+    DWORD dwSize, cntUsage, th32ProcessID, th32DefaultHeapID, th32ModuleID, cntThreads,
+          th32ParentProcessID;
+    LONG pcPriClassBase;
+    DWORD dwFlags;
+    char szExeFile[260];
+} PROCENTRY;
+typedef HANDLE (WINAPI *PFN_SNAP)(DWORD, DWORD);
+typedef BOOL (WINAPI *PFN_PROC)(HANDLE, PROCENTRY *);
+
+/* ------------------------------------------------------------------ */
+/* options and state                                                   */
+static DWORD opt_first = 180, opt_every = 300;
+static int opt_once, opt_nonet, opt_nodbg, opt_nohook;
+static char opt_dbgfile[MAX_PATH];
+static char out_path[MAX_PATH] = LOGFILE;
+static DWORD main_tid;
+static DWORD t_start;
+static int snap_no;
+
+/* journal hook counters (main thread writes, worker reads) */
+static HHOOK g_hook;
+static volatile DWORD g_wheel, g_wheel_pos, g_wheel_neg, g_moves, g_ldown, g_rdown, g_mdown, g_xdown,
+                      g_keys, g_cancels, g_installs, g_install_fail;
+static volatile DWORD g_wheel_l, g_wheel_h, g_wheel_tick;
+
+static CRITICAL_SECTION ev_cs;
+static char ev_buf[24576];
+static DWORD ev_len, ev_lost;
+
+static char obuf[393216];
+static DWORD olen, olost;
+
+static PFN_SNAP p_snap;
+static PFN_PROC p_first, p_next;
+
+/* ------------------------------------------------------------------ */
+/* helpers without the C runtime                                       */
+static void mset(void *d, int c, DWORD n)
+{
+    volatile BYTE *p = (volatile BYTE *)d;
+    while (n--) *p++ = (BYTE)c;
+}
+
+static void mcpy(void *d, const void *s, DWORD n)
+{
+    BYTE *a = (BYTE *)d;
+    const BYTE *b = (const BYTE *)s;
+    while (n--) *a++ = *b++;
+}
+
+static char lower(char c)
+{
+    return (c >= 'A' && c <= 'Z') ? (char)(c + 32) : c;
+}
+
+static int has_text(const char *hay, const char *needle)
+{
+    int i, j;
+    for (i = 0; hay[i]; i++) {
+        for (j = 0; needle[j] && lower(hay[i + j]) == lower(needle[j]); j++) ;
+        if (!needle[j]) return 1;
+    }
+    return 0;
+}
+
+static DWORD hexval(const char *p, int n)
+{
+    DWORD v = 0;
+    for (; n-- > 0; p++) {
+        char c = *p;
+        if (c >= '0' && c <= '9') v = (v << 4) | (DWORD)(c - '0');
+        else if (c >= 'a' && c <= 'f') v = (v << 4) | (DWORD)(c - 'a' + 10);
+        else if (c >= 'A' && c <= 'F') v = (v << 4) | (DWORD)(c - 'A' + 10);
+        else break;
+    }
+    return v;
+}
+
+static DWORD decval(const char *p)
+{
+    DWORD v = 0;
+    while (*p >= '0' && *p <= '9') v = v * 10 + (DWORD)(*p++ - '0');
+    return v;
+}
+
+/* ------------------------------------------------------------------ */
+/* output buffer: one snapshot, written in one go                      */
+static void oput(const char *s, DWORD n)
+{
+    if (olen + n + 2 > sizeof(obuf)) { olost += n; return; }
+    mcpy(obuf + olen, s, n);
+    olen += n;
+}
+
+static void o(const char *fmt, ...)
+{
+    char t[1100];
+    va_list ap;
+    int n;
+    va_start(ap, fmt);
+    n = wvsprintfA(t, fmt, ap);
+    va_end(ap);
+    if (n < 0) n = 0;
+    oput(t, (DWORD)n);
+    oput("\r\n", 2);
+}
+
+/* printable copy of up to Max bytes (CR / LF / TAB kept or made spaces) */
+static void otext(const char *prefix, const char *s, DWORD n)
+{
+    char line[300];
+    DWORD i, k = 0;
+    for (i = 0; i <= n; i++) {
+        char c = i < n ? s[i] : '\n';
+        if (c == '\r') continue;
+        if (c == '\n' || k >= sizeof(line) - 1) {
+            line[k] = 0;
+            if (k || i < n) o("%s%s", (LPSTR)prefix, (LPSTR)line);
+            k = 0;
+            if (c == '\n') continue;
+        }
+        line[k++] = (c == '\t') ? ' ' : (c < 32 || c == 127) ? '.' : c;
+    }
+}
+
+static void ohex(const char *prefix, const BYTE *b, DWORD n)
+{
+    char line[200];
+    DWORD r, i;
+    int k;
+    for (r = 0; r < n; r += 32) {
+        k = wsprintfA(line, "%s+%03lX:", (LPSTR)prefix, r);
+        for (i = r; i < n && i < r + 32; i++) k += wsprintfA(line + k, " %02X", (unsigned)b[i]);
+        o("%s", (LPSTR)line);
+    }
+}
+
+static void stamp(char *t)
+{
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    wsprintfA(t, "%04u-%02u-%02u %02u:%02u:%02u", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+}
+
+static void ipstr(char *t, DWORD a)   /* network order */
+{
+    wsprintfA(t, "%u.%u.%u.%u", (unsigned)(a & 0xFF), (unsigned)((a >> 8) & 0xFF), (unsigned)((a >> 16) & 0xFF),
+              (unsigned)(a >> 24));
+}
+
+static void flush_out(void)
+{
+    HANDLE f;
+    DWORD w, size;
+    if (olost) o("(output truncated: %lu bytes lost)", olost);
+    CreateDirectoryA("C:\\USOS9X", 0);
+    CreateDirectoryA(LOGDIR, 0);
+    f = CreateFileA(out_path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+    if (f != INVALID_HANDLE_VALUE) {
+        size = GetFileSize(f, 0);
+        CloseHandle(f);
+        if (size != 0xFFFFFFFFUL && size > ROTATE) {
+            char old[MAX_PATH];
+            int n;
+            lstrcpynA(old, out_path, MAX_PATH - 4);
+            n = lstrlenA(old);
+            if (n > 4 && old[n - 4] == '.') old[n - 4] = 0;
+            lstrcatA(old, ".OLD");
+            DeleteFileA(old);
+            MoveFileA(out_path, old);
+        }
+    }
+    f = CreateFileA(out_path, GENERIC_WRITE, FILE_SHARE_READ, 0, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+    if (f != INVALID_HANDLE_VALUE) {
+        SetFilePointer(f, 0, 0, FILE_END);
+        WriteFile(f, obuf, olen, &w, 0);
+        FlushFileBuffers(f);
+        CloseHandle(f);
+    }
+    olen = 0;
+    olost = 0;
+}
+
+/* whole small file into Buf (NUL-terminated), returns length or -1 */
+static int read_file(const char *path, char *buf, DWORD cap, DWORD from)
+{
+    HANDLE f = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+    DWORD r = 0;
+    if (f == INVALID_HANDLE_VALUE) return -1;
+    if (from) SetFilePointer(f, (LONG)from, 0, FILE_BEGIN);
+    if (!ReadFile(f, buf, cap - 1, &r, 0)) r = 0;
+    CloseHandle(f);
+    buf[r] = 0;
+    return (int)r;
+}
+
+static DWORD file_size(const char *path)
+{
+    HANDLE f = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+    DWORD s;
+    if (f == INVALID_HANDLE_VALUE) return 0xFFFFFFFFUL;
+    s = GetFileSize(f, 0);
+    CloseHandle(f);
+    return s;
+}
+
+static void dump_file(const char *label, const char *path, DWORD max)
+{
+    static char fb[8192];
+    int n;
+    if (max > sizeof(fb)) max = sizeof(fb);
+    n = read_file(path, fb, max, 0);
+    if (n < 0) { o("%s %s: missing", (LPSTR)label, (LPSTR)path); return; }
+    o("%s %s (%d bytes shown, size %lu):", (LPSTR)label, (LPSTR)path, n, file_size(path));
+    otext("    | ", fb, (DWORD)n);
+}
+
+/* ------------------------------------------------------------------ */
+/* registry                                                            */
+static BYTE rdata[4096];
+
+static void reg_dump(HKEY root, const char *rootname, const char *path, DWORD maxbin)
+{
+    HKEY k;
+    DWORD i, nl, dl, type;
+    char name[256];
+    if (RegOpenKeyExA(root, path, 0, KEY_READ, &k) != ERROR_SUCCESS) {
+        o("  [%s\\%s] (missing)", (LPSTR)rootname, (LPSTR)path);
+        return;
+    }
+    o("  [%s\\%s]", (LPSTR)rootname, (LPSTR)path);
+    for (i = 0; i < 400; i++) {
+        nl = sizeof(name);
+        dl = sizeof(rdata) - 1;
+        if (RegEnumValueA(k, i, name, &nl, 0, &type, rdata, &dl) != ERROR_SUCCESS) break;
+        rdata[dl < sizeof(rdata) ? dl : sizeof(rdata) - 1] = 0;
+        if (!name[0]) lstrcpyA(name, "(default)");
+        if (type == REG_SZ || type == REG_EXPAND_SZ) {
+            char t[600];
+            lstrcpynA(t, (char *)rdata, sizeof(t));
+            o("    %s = \"%s\"", (LPSTR)name, (LPSTR)t);
+        } else if (type == REG_DWORD && dl == 4) {
+            DWORD v = *(DWORD *)rdata;
+            o("    %s = dword:%08lX (%lu)", (LPSTR)name, v, v);
+        } else {
+            char t[700];
+            DWORD j, n = dl > maxbin ? maxbin : dl;
+            int m = wsprintfA(t, "    %s = type %lu, %lu bytes:", (LPSTR)name, type, dl);
+            for (j = 0; j < n && m < (int)sizeof(t) - 4; j++) m += wsprintfA(t + m, " %02X", (unsigned)rdata[j]);
+            if (n < dl) lstrcatA(t, " ...");
+            o("%s", (LPSTR)t);
+        }
+    }
+    RegCloseKey(k);
+}
+
+static int reg_str(HKEY root, const char *path, const char *name, char *buf, DWORD cap)
+{
+    HKEY k;
+    DWORD type, dl = cap - 1;
+    buf[0] = 0;
+    if (RegOpenKeyExA(root, path, 0, KEY_READ, &k) != ERROR_SUCCESS) return 0;
+    if (RegQueryValueExA(k, (LPSTR)name, 0, &type, (BYTE *)buf, &dl) != ERROR_SUCCESS) dl = 0;
+    RegCloseKey(k);
+    buf[dl < cap ? dl : cap - 1] = 0;
+    return dl != 0;
+}
+
+static DWORD reg_dword(HKEY root, const char *path, const char *name)
+{
+    HKEY k;
+    DWORD type, v = 0, dl = 4;
+    if (RegOpenKeyExA(root, path, 0, KEY_READ, &k) != ERROR_SUCCESS) return 0;
+    if (RegQueryValueExA(k, (LPSTR)name, 0, &type, (BYTE *)&v, &dl) != ERROR_SUCCESS || dl != 4) v = 0;
+    RegCloseKey(k);
+    return v;
+}
+
+/* subkeys of Path, each dumped */
+static void reg_dump_sub(HKEY root, const char *rootname, const char *path, DWORD maxbin, int max)
+{
+    HKEY k;
+    DWORD i, nl;
+    char sub[128], full[400];
+    FILETIME ft;
+    if (RegOpenKeyExA(root, path, 0, KEY_READ, &k) != ERROR_SUCCESS) {
+        o("  [%s\\%s] (missing)", (LPSTR)rootname, (LPSTR)path);
+        return;
+    }
+    for (i = 0; i < (DWORD)max; i++) {
+        nl = sizeof(sub);
+        if (RegEnumKeyExA(k, i, sub, &nl, 0, 0, 0, &ft) != ERROR_SUCCESS) break;
+        wsprintfA(full, "%s\\%s", (LPSTR)path, (LPSTR)sub);
+        reg_dump(root, rootname, full, maxbin);
+    }
+    RegCloseKey(k);
+}
+
+/* ------------------------------------------------------------------ */
+/* journal record hook (main thread)                                   */
+LRESULT CALLBACK journal(int code, WPARAM wp, LPARAM lp)
+{
+    if (code == HC_ACTION && lp) {
+        const EVENTMSG *e = (const EVENTMSG *)lp;
+        switch (e->message) {
+        case WM_MOUSEWHEEL:
+            g_wheel++;
+            g_wheel_l = e->paramL;
+            g_wheel_h = e->paramH;
+            g_wheel_tick = GetTickCount();
+            if ((short)HIWORD(e->paramL) > 0 || (short)e->paramH > 0) g_wheel_pos++;
+            else g_wheel_neg++;
+            break;
+        case WM_MOUSEMOVE: g_moves++; break;
+        case WM_LBUTTONDOWN: g_ldown++; break;
+        case WM_RBUTTONDOWN: g_rdown++; break;
+        case WM_MBUTTONDOWN: g_mdown++; break;
+        case 0x020B: g_xdown++; break;             /* WM_XBUTTONDOWN */
+        case WM_KEYDOWN: case WM_SYSKEYDOWN: g_keys++; break;
+        }
+    }
+    return CallNextHookEx(g_hook, code, wp, lp);
+}
+
+static void hook_install(void)
+{
+    if (opt_nohook || g_hook) return;
+    g_hook = SetWindowsHookExA(WH_JOURNALRECORD, journal, GetModuleHandleA(0), 0);
+    if (g_hook) g_installs++;
+    else g_install_fail++;
+}
+
+/* ------------------------------------------------------------------ */
+/* process / window watcher (main thread, every 2 s)                   */
+#define MAXP 512
+#define MAXW 256
+typedef struct { DWORD pid, ppid, born; char exe[80]; } PROCREC;
+static PROCREC procs[MAXP], procs_new[MAXP];
+static int nprocs, watch_primed;
+static HWND wins[MAXW], wins_new[MAXW];
+static int nwins, nwins_new;
+
+static void ev(const char *fmt, ...)
+{
+    char t[600], ts[32];
+    va_list ap;
+    int n, m;
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    m = wsprintfA(ts, "%02u:%02u:%02u ", st.wHour, st.wMinute, st.wSecond);
+    va_start(ap, fmt);
+    n = wvsprintfA(t, fmt, ap);
+    va_end(ap);
+    EnterCriticalSection(&ev_cs);
+    if (ev_len + (DWORD)(m + n) + 8 < sizeof(ev_buf)) {
+        mcpy(ev_buf + ev_len, "    ", 4); ev_len += 4;
+        mcpy(ev_buf + ev_len, ts, (DWORD)m); ev_len += (DWORD)m;
+        mcpy(ev_buf + ev_len, t, (DWORD)n); ev_len += (DWORD)n;
+        mcpy(ev_buf + ev_len, "\r\n", 2); ev_len += 2;
+    } else {
+        ev_lost++;
+    }
+    LeaveCriticalSection(&ev_cs);
+}
+
+/* 9x: WinOldAp's "tty" hosts DOS boxes and Win32 consoles; NT: conhost */
+static int console_class(const char *cls)
+{
+    return !lstrcmpiA(cls, "tty") || !lstrcmpiA(cls, "ConsoleWindowClass");
+}
+
+static const char *base_name(const char *p)
+{
+    const char *b = p;
+    for (; *p; p++) if (*p == '\\' || *p == '/' || *p == ':') b = p + 1;
+    return b;
+}
+
+static int proc_list(PROCREC *out, int max)
+{
+    HANDLE h;
+    PROCENTRY pe;
+    int n = 0;
+    if (!p_snap || !p_first || !p_next) return -1;
+    h = p_snap(2 /* TH32CS_SNAPPROCESS */, 0);
+    if (h == INVALID_HANDLE_VALUE || !h) return -1;
+    mset(&pe, 0, sizeof(pe));
+    pe.dwSize = sizeof(pe);
+    if (p_first(h, &pe)) {
+        do {
+            if (n < max) {
+                out[n].pid = pe.th32ProcessID;
+                out[n].ppid = pe.th32ParentProcessID;
+                out[n].born = 0;
+                lstrcpynA(out[n].exe, pe.szExeFile, sizeof(out[n].exe));
+                n++;
+            }
+            pe.dwSize = sizeof(pe);
+        } while (p_next(h, &pe));
+    }
+    CloseHandle(h);
+    return n;
+}
+
+static const char *exe_of(DWORD pid)
+{
+    int i;
+    for (i = 0; i < nprocs; i++) if (procs[i].pid == pid) return base_name(procs[i].exe);
+    return "?";
+}
+
+typedef struct { HWND *w; int n; } WINLIST;
+
+BOOL CALLBACK collect_win(HWND w, LPARAM lp)
+{
+    WINLIST *l = (WINLIST *)lp;
+    if (IsWindowVisible(w) && l->n < MAXW) l->w[l->n++] = w;
+    return TRUE;
+}
+
+static int win_list(HWND *out)
+{
+    WINLIST l;
+    l.w = out;
+    l.n = 0;
+    EnumWindows(collect_win, (LPARAM)&l);
+    return l.n;
+}
+
+static void watch_tick(void)
+{
+    int n = proc_list(procs_new, MAXP), i, j;
+    DWORD now = GetTickCount();
+    if (n >= 0) {
+        for (i = 0; i < n; i++) {
+            for (j = 0; j < nprocs && procs[j].pid != procs_new[i].pid; j++) ;
+            if (j < nprocs) procs_new[i].born = procs[j].born;
+            else {
+                procs_new[i].born = now;
+                if (watch_primed) {
+                    const char *parent = "?";
+                    int k;
+                    for (k = 0; k < n; k++) if (procs_new[k].pid == procs_new[i].ppid) parent = base_name(procs_new[k].exe);
+                    ev("+proc %08lX %s (parent %08lX %s)", procs_new[i].pid, (LPSTR)procs_new[i].exe,
+                       procs_new[i].ppid, (LPSTR)parent);
+                }
+            }
+        }
+        for (j = 0; j < nprocs; j++) {
+            for (i = 0; i < n && procs_new[i].pid != procs[j].pid; i++) ;
+            if (i == n && watch_primed)
+                ev("-proc %08lX %s (ran about %lu s)", procs[j].pid, (LPSTR)base_name(procs[j].exe),
+                   procs[j].born ? (now - procs[j].born) / 1000 : 0);
+        }
+        mcpy(procs, procs_new, sizeof(PROCREC) * (DWORD)n);
+        nprocs = n;
+    }
+    nwins_new = win_list(wins_new);
+    for (i = 0; i < nwins_new; i++) {
+        for (j = 0; j < nwins && wins[j] != wins_new[i]; j++) ;
+        if (j == nwins && watch_primed) {
+            char cls[64], title[128];
+            DWORD pid = 0;
+            cls[0] = title[0] = 0;
+            GetClassNameA(wins_new[i], cls, sizeof(cls));
+            GetWindowTextA(wins_new[i], title, sizeof(title));
+            GetWindowThreadProcessId(wins_new[i], &pid);
+            ev("+window %08lX class \"%s\" title \"%s\" process %s%s", (DWORD)wins_new[i], (LPSTR)cls,
+               (LPSTR)title, (LPSTR)exe_of(pid), (LPSTR)(console_class(cls) ? "  <- console / DOS box" : ""));
+        }
+    }
+    for (j = 0; j < nwins; j++) {
+        for (i = 0; i < nwins_new && wins_new[i] != wins[j]; i++) ;
+        if (i == nwins_new && watch_primed) ev("-window %08lX", (DWORD)wins[j]);
+    }
+    mcpy(wins, wins_new, sizeof(HWND) * (DWORD)nwins_new);
+    nwins = nwins_new;
+    watch_primed = 1;
+}
+
+/* ------------------------------------------------------------------ */
+/* sections                                                            */
+static void sec_sys(void)
+{
+    OSVERSIONINFOA v;
+    MEMORYSTATUS m;
+    char t[64];
+    DWORD up = GetTickCount();
+    mset(&v, 0, sizeof(v));
+    v.dwOSVersionInfoSize = sizeof(v);
+    GetVersionExA(&v);
+    mset(&m, 0, sizeof(m));
+    m.dwLength = sizeof(m);
+    GlobalMemoryStatus(&m);
+    t[0] = 0;
+    {
+        DWORD n = sizeof(t);
+        GetComputerNameA(t, &n);
+    }
+    o("[SYS] Windows %lu.%lu build %lu platform %lu \"%s\"  computer \"%s\"", v.dwMajorVersion, v.dwMinorVersion,
+      v.dwBuildNumber & 0xFFFF, v.dwPlatformId, (LPSTR)v.szCSDVersion, (LPSTR)t);
+    o("[SYS] memory load %lu%%  phys %lu/%lu KiB free  page %lu/%lu KiB free  uptime %lu s  screen %dx%d",
+      m.dwMemoryLoad, m.dwAvailPhys / 1024, m.dwTotalPhys / 1024, m.dwAvailPageFile / 1024, m.dwTotalPageFile / 1024,
+      up / 1000, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
+}
+
+/* --- USOSDBG /L ------------------------------------------------------ */
+static HANDLE dbg_proc;
+static int dbg_pci_done;
+static BYTE usns_raw[4096];
+static DWORD usns_raw_len;
+static char dbg_text[65536];
+
+static void run_usosdbg(DWORD stats_pa)
+{
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    char cmd[300];
+    DWORD t0, w;
+    int n, i, ended;
+    usns_raw_len = 0;
+    if (opt_dbgfile[0]) {
+        n = read_file(opt_dbgfile, dbg_text, sizeof(dbg_text), 0);
+        o("[MOUSE] USOSDBG output from %s (/dbgfile)", (LPSTR)opt_dbgfile);
+        if (n <= 0) return;
+        otext("  ", dbg_text, (DWORD)n);
+        goto parse;
+    }
+    if (opt_nodbg) { o("[MOUSE] USOSDBG skipped (/nodbg)"); return; }
+    if (file_size(DBGEXE) == 0xFFFFFFFFUL) { o("[MOUSE] %s missing", (LPSTR)DBGEXE); return; }
+    if (dbg_proc) {
+        if (WaitForSingleObject(dbg_proc, 0) == WAIT_TIMEOUT) {
+            o("[MOUSE] the previous USOSDBG /L is still running: skipped this time");
+            return;
+        }
+        CloseHandle(dbg_proc);
+        dbg_proc = 0;
+    }
+    DeleteFileA(DBGTMP);
+    n = wsprintfA(cmd, "%s /L %s", (LPSTR)DBGEXE, (LPSTR)DBGTMP);
+    if (!dbg_pci_done) n += wsprintfA(cmd + n, " /F");
+    if (stats_pa) n += wsprintfA(cmd + n, " /N %08lX", stats_pa);
+    mset(&si, 0, sizeof(si));
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_HIDE;
+    t0 = GetTickCount();
+    if (!CreateProcessA(0, cmd, 0, 0, FALSE, 0, 0, "C:\\USOS9X", &si, &pi)) {
+        o("[MOUSE] %s: CreateProcess failed, error %lu", (LPSTR)cmd, GetLastError());
+        return;
+    }
+    CloseHandle(pi.hThread);
+    dbg_proc = pi.hProcess;
+    w = WaitForSingleObject(dbg_proc, 20000);
+    /* a Win16 task's handle may signal early: the END line decides */
+    ended = 0;
+    for (;;) {
+        n = read_file(DBGTMP, dbg_text, sizeof(dbg_text), 0);
+        if (n > 0 && has_text(dbg_text, "USOSDBG END")) { ended = 1; break; }
+        if (GetTickCount() - t0 > 25000) break;
+        Sleep(500);
+    }
+    if (!dbg_pci_done) dbg_pci_done = 1;
+    o("[MOUSE] %s  (%lu ms, wait %s, %s)", (LPSTR)cmd, GetTickCount() - t0,
+      (LPSTR)(w == WAIT_OBJECT_0 ? "exited" : "timeout"), (LPSTR)(ended ? "complete" : "INCOMPLETE"));
+    if (n <= 0) { o("[MOUSE]   no output file"); return; }
+    otext("  ", dbg_text, (DWORD)n);
+parse:
+    /* USNS+ooo:hex lines (usosnet statistics page through DPMI) */
+    for (i = 0; i < n; i++) {
+        if ((i == 0 || dbg_text[i - 1] == '\n') && dbg_text[i] == 'U' && i + 9 < n &&
+            dbg_text[i + 1] == 'S' && dbg_text[i + 2] == 'N' && dbg_text[i + 3] == 'S' && dbg_text[i + 4] == '+') {
+            DWORD off = hexval(dbg_text + i + 5, 3);
+            int k = i + 9;
+            if (dbg_text[k] == ':') k++;
+            while (k + 1 < n && off < sizeof(usns_raw) && dbg_text[k] != '\r' && dbg_text[k] != '\n') {
+                usns_raw[off++] = (BYTE)hexval(dbg_text + k, 2);
+                k += 2;
+            }
+            if (off > usns_raw_len) usns_raw_len = off;
+        }
+    }
+}
+
+static void sec_mouse(void)
+{
+    char a[80], b[80], c[80];
+    UINT lines = 0;
+    SystemParametersInfoA(SPI_GETWHEELSCROLLLINES, 0, &lines, 0);
+    o("[MOUSE] metrics: mouse present %d  buttons %d  wheel present %d  wheel scroll lines %u  swap %d",
+      GetSystemMetrics(SM_MOUSEPRESENT), GetSystemMetrics(SM_CMOUSEBUTTONS), GetSystemMetrics(SM_MOUSEWHEELPRESENT),
+      lines, GetSystemMetrics(SM_SWAPBUTTON));
+    o("[MOUSE] journal hook: %s (installs %lu, failed %lu, cancelled %lu)  WM_MOUSEWHEEL %lu (up %lu down %lu, last %lu s ago L=%08lX H=%08lX)",
+      (LPSTR)(opt_nohook ? "off (/nohook)" : g_hook ? "on" : "not installed"), g_installs, g_install_fail, g_cancels,
+      g_wheel, g_wheel_pos, g_wheel_neg, g_wheel_tick ? (GetTickCount() - g_wheel_tick) / 1000 : 0, g_wheel_l, g_wheel_h);
+    o("[MOUSE] journal hook: moves %lu  left %lu  right %lu  middle %lu  x-buttons %lu  keys %lu",
+      g_moves, g_ldown, g_rdown, g_mdown, g_xdown, g_keys);
+    GetPrivateProfileStringA("boot", "mouse.drv", "(none)", a, sizeof(a), "SYSTEM.INI");
+    GetPrivateProfileStringA("386Enh", "mouse", "(none)", b, sizeof(b), "SYSTEM.INI");
+    GetPrivateProfileStringA("boot", "drivers", "(none)", c, sizeof(c), "SYSTEM.INI");
+    o("[MOUSE] SYSTEM.INI [boot] mouse.drv=%s  [386Enh] mouse=%s  [boot] drivers=%s", (LPSTR)a, (LPSTR)b, (LPSTR)c);
+    GetPrivateProfileStringA("mouse", "wheel", "(none)", a, sizeof(a), "SYSTEM.INI");
+    GetPrivateProfileStringA("boot.description", "mouse.drv", "(none)", b, sizeof(b), "SYSTEM.INI");
+    o("[MOUSE] SYSTEM.INI [mouse] wheel=%s  [boot.description] mouse.drv=%s", (LPSTR)a, (LPSTR)b);
+}
+
+/* --- usosnet ----------------------------------------------------------- */
+static char net_key[96];
+static DWORD stats_va, stats_pa;
+static USNS usns_now, usns_prev;
+static int usns_prev_ok;
+
+static void find_usosnet(int dump)
+{
+    int i;
+    char path[96], vxd[128], desc[160];
+    net_key[0] = 0;
+    stats_va = stats_pa = 0;
+    for (i = 0; i < 32; i++) {
+        wsprintfA(path, "System\\CurrentControlSet\\Services\\Class\\Net\\%04u", i);
+        if (!reg_str(HKEY_LOCAL_MACHINE, path, "DriverDesc", desc, sizeof(desc))) continue;
+        reg_str(HKEY_LOCAL_MACHINE, path, "DeviceVxDs", vxd, sizeof(vxd));
+        if (has_text(vxd, "usosnet") && !net_key[0]) {
+            lstrcpyA(net_key, path);
+            stats_va = reg_dword(HKEY_LOCAL_MACHINE, path, "UsosnetStatsVa");
+            stats_pa = reg_dword(HKEY_LOCAL_MACHINE, path, "UsosnetStatsPa");
+            if (dump) reg_dump(HKEY_LOCAL_MACHINE, "HKLM", path, 64);
+        } else if (dump) {
+            o("  [HKLM\\%s] \"%s\" DeviceVxDs=%s", (LPSTR)path, (LPSTR)desc, (LPSTR)vxd);
+        }
+    }
+    if (dump && !net_key[0]) o("[NET] no adapter with DeviceVxDs usosnet.sys");
+}
+
+static void class_line(const char *label, const DWORD *v, const DWORD *prev)
+{
+    char t[900];
+    int i, m = wsprintfA(t, "%s", (LPSTR)label);
+    for (i = 0; i < USNS_CLASSES; i++) {
+        DWORD d = prev ? v[i] - prev[i] : v[i];
+        if (prev && !d) continue;
+        m += wsprintfA(t + m, " %s=%lu", (LPSTR)usns_class[i], d);
+    }
+    o("%s", (LPSTR)t);
+}
+
+static void classes_str(char *t, DWORD c)
+{
+    int i, m = 0;
+    t[0] = 0;
+    for (i = 0; i < USNS_CLASSES; i++)
+        if (c & (1UL << i)) m += wsprintfA(t + m, "%s%s", (LPSTR)(m ? "," : ""), (LPSTR)usns_class[i]);
+}
+
+static void dns_frame(const char *label, const BYTE *f, DWORD len)
+{
+    DWORD n = len > USNS_DUMP ? USNS_DUMP : len;
+    char a[20], b[20];
+    if (!len) { o("  %s: none yet", (LPSTR)label); return; }
+    if (n >= 14 + 20 + 8 + 12 && f[12] == 8 && f[13] == 0) {
+        const BYTE *ip = f + 14, *u = ip + (ip[0] & 15) * 4, *d = u + 8;
+        ipstr(a, *(const DWORD *)(ip + 12));
+        ipstr(b, *(const DWORD *)(ip + 16));
+        if ((DWORD)(d + 12 - f) <= n)
+            o("  %s: %lu bytes  %s:%u -> %s:%u  ip proto %u  dns id %04X flags %04X qd %u an %u ns %u ar %u",
+              (LPSTR)label, len, (LPSTR)a, (unsigned)((u[0] << 8) | u[1]), (LPSTR)b, (unsigned)((u[2] << 8) | u[3]),
+              (unsigned)ip[9], (unsigned)((d[0] << 8) | d[1]), (unsigned)((d[2] << 8) | d[3]),
+              (unsigned)((d[4] << 8) | d[5]), (unsigned)((d[6] << 8) | d[7]), (unsigned)((d[8] << 8) | d[9]),
+              (unsigned)((d[10] << 8) | d[11]));
+    } else {
+        o("  %s: %lu bytes", (LPSTR)label, len);
+    }
+    ohex("    ", f, n);
+}
+
+static void usns_print(const USNS *s, const char *source)
+{
+    DWORD i, first;
+    char t[900], cl[200], peer[20];
+    int m;
+    const USNS *p = usns_prev_ok && usns_prev.Seconds <= s->Seconds ? &usns_prev : 0;
+    o("[NET] usosnet statistics (%s): version %lu size %lu  driver up %lu s", (LPSTR)source, s->Version, s->Size,
+      s->Seconds);
+    class_line("  RX  ", s->Rx, 0);
+    class_line("  TX  ", s->Tx, 0);
+    if (p) { class_line("  RX since last snapshot:", s->Rx, p->Rx); class_line("  TX since last snapshot:", s->Tx, p->Tx); }
+    m = wsprintfA(t, "  RX drops / notes:");
+    for (i = 0; i < USNS_DROPS; i++) m += wsprintfA(t + m, " %s=%lu", (LPSTR)usns_drop[i], s->Drop[i]);
+    o("%s", (LPSTR)t);
+    m = wsprintfA(t, "  TransferData:");
+    for (i = 0; i < USNS_TDS; i++) m += wsprintfA(t + m, " %s=%lu", (LPSTR)usns_td[i], s->Td[i]);
+    o("%s", (LPSTR)t);
+    m = wsprintfA(t, "  core:");
+    for (i = 0; i < USNS_CORES; i++) {
+        if (i >= 21 && i <= 23) m += wsprintfA(t + m, " %s=%08lX", (LPSTR)usns_core[i], s->Core[i]);
+        else m += wsprintfA(t + m, " %s=%lu", (LPSTR)usns_core[i], s->Core[i]);
+        if (m > 700) { o("%s", (LPSTR)t); m = wsprintfA(t, "  core:"); }
+    }
+    o("%s", (LPSTR)t);
+    first = s->Seq > USNS_HIST ? s->Seq - USNS_HIST : 0;
+    o("  last frames (seq dir classes ports length status peer), %lu frames seen:", s->Seq);
+    for (i = first; i < s->Seq; i++) {
+        const DWORD *h = s->Hist[i % USNS_HIST];
+        DWORD dir = h[0] & 0xFF;
+        classes_str(cl, h[1]);
+        ipstr(peer, h[5]);
+        o("    %6lu %s %-24s %5lu>%-5lu len %4lu st %08lX %s %s", h[0] >> 8,
+          (LPSTR)(dir == 1 ? "RX" : dir == 2 ? "TX" : dir == 3 ? "RX-DROP" : "?"), (LPSTR)cl, h[2] >> 16,
+          h[2] & 0xFFFF, h[3], h[4], (LPSTR)(dir == 2 ? "to" : "from"), (LPSTR)peer);
+    }
+    dns_frame("last DNS frame received", s->LastDnsRx, s->LastDnsRxLen);
+    dns_frame("last DNS frame sent", s->LastDnsTx, s->LastDnsTxLen);
+}
+
+/* through the linear address (9x system arena); 1 = read */
+static int usns_read_va(USNS *s)
+{
+    const USNS *v = (const USNS *)stats_va;
+    if (!stats_va || IsBadReadPtr(v, sizeof(USNS))) return 0;
+    if (v->Magic != USNS_MAGIC || v->Version != 1) return 0;
+    mcpy(s, v, sizeof(USNS));
+    return 1;
+}
+
+static void sec_usns(int after)
+{
+    if (!net_key[0] && !(opt_dbgfile[0] && !after)) return;
+    if (!stats_va && !stats_pa && !opt_dbgfile[0]) {
+        o("[NET] usosnet: no UsosnetStatsVa / UsosnetStatsPa (driver older than 0.4, or no page)");
+        return;
+    }
+    if (usns_read_va(&usns_now)) {
+        usns_print(&usns_now, after ? "after the tests, VA" : "VA");
+    } else if (!after && usns_raw_len >= sizeof(USNS) && ((USNS *)usns_raw)->Magic == USNS_MAGIC) {
+        mcpy(&usns_now, usns_raw, sizeof(USNS));
+        usns_print(&usns_now, "PA through USOSDBG");
+    } else {
+        o("[NET] usosnet statistics: VA %08lX not readable%s; PA %08lX%s", stats_va,
+          (LPSTR)(stats_va && IsBadReadPtr((void *)stats_va, 4) ? " (IsBadReadPtr)" : ""), stats_pa,
+          (LPSTR)(after ? "" : usns_raw_len ? " dump without magic" : " no USOSDBG dump"));
+        return;
+    }
+    mcpy(&usns_prev, &usns_now, sizeof(USNS));
+    usns_prev_ok = 1;
+}
+
+/* --- IPHLPAPI ----------------------------------------------------------- */
+static HMODULE iphlp;
+static PFN_BUF p_gnp, p_gai;
+static PFN_STAT p_ips, p_udps, p_tcps, p_icmps;
+static BYTE ipbuf[16384];
+static DWORD dns_cfg[8];
+static int ndns_cfg;
+static DWORD gateway;
+
+static void iphlp_load(void)
+{
+    if (iphlp) return;
+    iphlp = LoadLibraryA("IPHLPAPI.DLL");
+    if (!iphlp) return;
+    p_gnp = (PFN_BUF)GetProcAddress(iphlp, "GetNetworkParams");
+    p_gai = (PFN_BUF)GetProcAddress(iphlp, "GetAdaptersInfo");
+    p_ips = (PFN_STAT)GetProcAddress(iphlp, "GetIpStatistics");
+    p_udps = (PFN_STAT)GetProcAddress(iphlp, "GetUdpStatistics");
+    p_tcps = (PFN_STAT)GetProcAddress(iphlp, "GetTcpStatistics");
+    p_icmps = (PFN_STAT)GetProcAddress(iphlp, "GetIcmpStatistics");
+}
+
+static void add_dns(DWORD a)
+{
+    int i;
+    if (a == INADDR_NONE || !a) return;
+    for (i = 0; i < ndns_cfg; i++) if (dns_cfg[i] == a) return;
+    if (ndns_cfg < 8) dns_cfg[ndns_cfg++] = a;
+}
+
+static void sec_iphlp_config(void)
+{
+    ULONG len;
+    DWORD r;
+    iphlp_load();
+    if (!iphlp) { o("[NET] IPHLPAPI.DLL: not loadable (error %lu)", GetLastError()); return; }
+    if (p_gnp) {
+        len = sizeof(ipbuf);
+        r = p_gnp(ipbuf, &len);
+        if (r == 0) {
+            FIXEDINFO *f = (FIXEDINFO *)ipbuf;
+            IPADDRSTR *d;
+            char t[600];
+            int m = wsprintfA(t, "[NET] GetNetworkParams: host \"%s\" domain \"%s\" node %u routing %u proxy %u dns %u  servers:",
+                              (LPSTR)f->HostName, (LPSTR)f->DomainName, f->NodeType, f->EnableRouting, f->EnableProxy,
+                              f->EnableDns);
+            for (d = &f->DnsServerList; d && m < 500; d = d->Next) {
+                m += wsprintfA(t + m, " %s", (LPSTR)d->IpAddress.String);
+                add_dns(inet_addr(d->IpAddress.String));
+            }
+            o("%s", (LPSTR)t);
+        } else {
+            o("[NET] GetNetworkParams: error %lu", r);
+        }
+    } else {
+        o("[NET] GetNetworkParams: not exported");
+    }
+    if (p_gai) {
+        len = sizeof(ipbuf);
+        r = p_gai(ipbuf, &len);
+        if (r == 0) {
+            ADAPTERINFO *a;
+            for (a = (ADAPTERINFO *)ipbuf; a; a = a->Next) {
+                IPADDRSTR *x;
+                char t[700];
+                int m = wsprintfA(t, "[NET] adapter %lu \"%s\" type %u mac", a->Index, (LPSTR)a->Description, a->Type);
+                UINT i;
+                for (i = 0; i < a->AddressLength && i < 8; i++) m += wsprintfA(t + m, "%s%02X", (LPSTR)(i ? "-" : " "), (unsigned)a->Address[i]);
+                m += wsprintfA(t + m, " dhcp %u server %s  ip", a->DhcpEnabled, (LPSTR)a->DhcpServer.IpAddress.String);
+                for (x = &a->IpAddressList; x && m < 550; x = x->Next)
+                    m += wsprintfA(t + m, " %s/%s", (LPSTR)x->IpAddress.String, (LPSTR)x->IpMask.String);
+                m += wsprintfA(t + m, "  gw");
+                for (x = &a->GatewayList; x && m < 650; x = x->Next) {
+                    m += wsprintfA(t + m, " %s", (LPSTR)x->IpAddress.String);
+                    if (!gateway) {
+                        DWORD g = inet_addr(x->IpAddress.String);
+                        if (g && g != INADDR_NONE) gateway = g;
+                    }
+                }
+                o("%s", (LPSTR)t);
+            }
+        } else {
+            o("[NET] GetAdaptersInfo: error %lu", r);
+        }
+    }
+}
+
+static DWORD st_ip[23], st_udp[5], st_tcp[15], st_icmp[26];
+static DWORD st_ip0[23], st_udp0[5], st_tcp0[15], st_icmp0[26];
+
+static void stats_line(const char *label, PFN_STAT fn, DWORD *v, DWORD *before, int n, const char *const *names,
+                       int after)
+{
+    char t[1000];
+    int i, m;
+    DWORD r;
+    if (!fn) { o("[NET] %s: not exported", (LPSTR)label); return; }
+    mset(v, 0, (DWORD)n * 4);
+    r = fn(v);
+    if (r) { o("[NET] %s: error %lu", (LPSTR)label, r); return; }
+    m = wsprintfA(t, "[NET] %s%s:", (LPSTR)label, (LPSTR)(after ? " after the tests (change)" : ""));
+    for (i = 0; i < n; i++) {
+        if (after) {
+            if (v[i] == before[i]) continue;
+            m += wsprintfA(t + m, " %s=%lu(%s%ld)", (LPSTR)names[i], v[i], (LPSTR)(v[i] >= before[i] ? "+" : ""),
+                           (long)(v[i] - before[i]));
+        } else {
+            m += wsprintfA(t + m, " %s=%lu", (LPSTR)names[i], v[i]);
+        }
+        if (m > 850) { o("%s", (LPSTR)t); m = wsprintfA(t, "[NET] %s (cont.):", (LPSTR)label); }
+    }
+    o("%s", (LPSTR)t);
+    if (!after) mcpy(before, v, (DWORD)n * 4);
+}
+
+static const char *const n_ip[23] = { "forwarding", "ttl", "InReceives", "InHdrErrors", "InAddrErrors",
+    "ForwDatagrams", "InUnknownProtos", "InDiscards", "InDelivers", "OutRequests", "RoutingDiscards",
+    "OutDiscards", "OutNoRoutes", "ReasmTimeout", "ReasmReqds", "ReasmOks", "ReasmFails", "FragOks",
+    "FragFails", "FragCreates", "NumIf", "NumAddr", "NumRoutes" };
+static const char *const n_udp[5] = { "InDatagrams", "NoPorts", "InErrors", "OutDatagrams", "NumAddrs" };
+static const char *const n_tcp[15] = { "RtoAlgorithm", "RtoMin", "RtoMax", "MaxConn", "ActiveOpens",
+    "PassiveOpens", "AttemptFails", "EstabResets", "CurrEstab", "InSegs", "OutSegs", "RetransSegs", "InErrs",
+    "OutRsts", "NumConns" };
+static const char *const n_icmp[26] = { "in.Msgs", "in.Errors", "in.DestUnreachs", "in.TimeExcds",
+    "in.ParmProbs", "in.SrcQuenchs", "in.Redirects", "in.Echos", "in.EchoReps", "in.Timestamps",
+    "in.TimestampReps", "in.AddrMasks", "in.AddrMaskReps", "out.Msgs", "out.Errors", "out.DestUnreachs",
+    "out.TimeExcds", "out.ParmProbs", "out.SrcQuenchs", "out.Redirects", "out.Echos", "out.EchoReps",
+    "out.Timestamps", "out.TimestampReps", "out.AddrMasks", "out.AddrMaskReps" };
+
+static void sec_iphlp_stats(int after)
+{
+    iphlp_load();
+    if (!iphlp) return;
+    stats_line("IP", p_ips, st_ip, st_ip0, 23, n_ip, after);
+    stats_line("UDP", p_udps, st_udp, st_udp0, 5, n_udp, after);
+    stats_line("TCP", p_tcps, st_tcp, st_tcp0, 15, n_tcp, after);
+    stats_line("ICMP", p_icmps, st_icmp, st_icmp0, 26, n_icmp, after);
+}
+
+/* --- Winsock tests ------------------------------------------------------- */
+static int ws_ok;
+static BYTE pkt[2048];
+
+static int sock_wait(SOCKET s, int write, DWORD ms)
+{
+    fd_set r, w, e;
+    struct timeval tv;
+    r.fd_count = w.fd_count = e.fd_count = 0;
+    if (write) { w.fd_count = 1; w.fd_array[0] = s; e.fd_count = 1; e.fd_array[0] = s; }
+    else { r.fd_count = 1; r.fd_array[0] = s; }
+    tv.tv_sec = (long)(ms / 1000);
+    tv.tv_usec = (long)((ms % 1000) * 1000);
+    if (select(0, &r, &w, &e, &tv) <= 0) return 0;
+    if (write) return w.fd_count ? 1 : -1;      /* except set: connect failed */
+    return 1;
+}
+
+static int dns_query(BYTE *q, WORD id, const char *name)
+{
+    int n = 12, lab = 0, i;
+    mset(q, 0, 12);
+    q[0] = (BYTE)(id >> 8); q[1] = (BYTE)id;
+    q[2] = 0x01;                                /* RD */
+    q[5] = 1;                                   /* QDCOUNT */
+    lab = n++;
+    for (i = 0; name[i]; i++) {
+        if (name[i] == '.') { q[lab] = (BYTE)(n - lab - 1); lab = n++; }
+        else q[n++] = (BYTE)name[i];
+    }
+    q[lab] = (BYTE)(n - lab - 1);
+    q[n++] = 0;
+    q[n++] = 0; q[n++] = 1;                     /* A */
+    q[n++] = 0; q[n++] = 1;                     /* IN */
+    return n;
+}
+
+static int dns_skip_name(const BYTE *r, int n, int p)
+{
+    while (p < n) {
+        if (r[p] == 0) return p + 1;
+        if ((r[p] & 0xC0) == 0xC0) return p + 2;
+        p += r[p] + 1;
+    }
+    return n;
+}
+
+/* summary of a DNS reply; *First = first A record (network order) */
+static void dns_answer(char *t, const BYTE *r, int n, WORD id, DWORD *first)
+{
+    int p, an, i, m;
+    *first = 0;
+    if (n < 12) { wsprintfA(t, "short reply (%d bytes)", n); return; }
+    an = (r[6] << 8) | r[7];
+    m = wsprintfA(t, "%d bytes id %s rcode %u an %d ns %d ar %d tc %u:", n,
+                  (LPSTR)(((r[0] << 8) | r[1]) == id ? "ok" : "MISMATCH"), (unsigned)(r[3] & 15), an,
+                  (r[8] << 8) | r[9], (r[10] << 8) | r[11], (unsigned)((r[2] >> 1) & 1));
+    p = dns_skip_name(r, n, 12) + 4;
+    for (i = 0; i < an && p + 10 <= n && m < 400; i++) {
+        int type, len;
+        p = dns_skip_name(r, n, p);
+        if (p + 10 > n) break;
+        type = (r[p] << 8) | r[p + 1];
+        len = (r[p + 8] << 8) | r[p + 9];
+        p += 10;
+        if (type == 1 && len == 4 && p + 4 <= n) {
+            char a[20];
+            DWORD v = *(const DWORD *)(r + p);
+            ipstr(a, v);
+            m += wsprintfA(t + m, " A %s", (LPSTR)a);
+            if (!*first) *first = v;
+        } else {
+            m += wsprintfA(t + m, " type %d (%d bytes)", type, len);
+        }
+        p += len;
+    }
+}
+
+static DWORD resolved;      /* frogfind.com from any test, network order */
+
+static void udp_dns(DWORD server, const char *why)
+{
+    SOCKET s;
+    struct sockaddr_in a, from;
+    int n, fl = sizeof(from), q;
+    WORD id = (WORD)(GetTickCount() ^ server);
+    DWORD t0, first;
+    char srv[20], t[600];
+    ipstr(srv, server);
+    s = socket(AF_INET, SOCK_DGRAM, 0);
+    if (s == INVALID_SOCKET) { o("[NET] UDP DNS %s (%s): socket error %d", (LPSTR)srv, (LPSTR)why, WSAGetLastError()); return; }
+    mset(&a, 0, sizeof(a));
+    a.sin_family = AF_INET;
+    a.sin_port = htons(53);
+    a.sin_addr.s_addr = server;
+    q = dns_query(pkt, id, TEST_HOST);
+    t0 = GetTickCount();
+    if (sendto(s, (char *)pkt, q, 0, (struct sockaddr *)&a, sizeof(a)) != q) {
+        o("[NET] UDP DNS %s (%s): sendto error %d", (LPSTR)srv, (LPSTR)why, WSAGetLastError());
+        closesocket(s);
+        return;
+    }
+    if (sock_wait(s, 0, 3000) <= 0) {
+        o("[NET] UDP DNS %s (%s): query %d bytes sent, NO REPLY in 3000 ms", (LPSTR)srv, (LPSTR)why, q);
+        closesocket(s);
+        return;
+    }
+    n = recvfrom(s, (char *)pkt, sizeof(pkt), 0, (struct sockaddr *)&from, &fl);
+    if (n <= 0) {
+        o("[NET] UDP DNS %s (%s): recvfrom error %d after %lu ms", (LPSTR)srv, (LPSTR)why, WSAGetLastError(),
+          GetTickCount() - t0);
+    } else {
+        char f[20];
+        dns_answer(t, pkt, n, id, &first);
+        ipstr(f, from.sin_addr.s_addr);
+        o("[NET] UDP DNS %s (%s): reply after %lu ms from %s:%u: %s", (LPSTR)srv, (LPSTR)why, GetTickCount() - t0,
+          (LPSTR)f, (unsigned)ntohs(from.sin_port), (LPSTR)t);
+        ohex("[NET]   reply", pkt, (DWORD)(n > 96 ? 96 : n));
+        if (first && !resolved) resolved = first;
+    }
+    closesocket(s);
+}
+
+/* TCP connect with a timeout; INVALID_SOCKET on failure (reason logged) */
+static SOCKET tcp_open(DWORD ip, WORD port, const char *label, DWORD *ms)
+{
+    SOCKET s = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in a;
+    u_long nb = 1;
+    DWORD t0 = GetTickCount();
+    int r;
+    char t[20];
+    ipstr(t, ip);
+    if (s == INVALID_SOCKET) { o("[NET] %s %s:%u: socket error %d", (LPSTR)label, (LPSTR)t, port, WSAGetLastError()); return s; }
+    ioctlsocket(s, FIONBIO, &nb);
+    mset(&a, 0, sizeof(a));
+    a.sin_family = AF_INET;
+    a.sin_port = htons(port);
+    a.sin_addr.s_addr = ip;
+    r = connect(s, (struct sockaddr *)&a, sizeof(a));
+    if (r == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) {
+        o("[NET] %s %s:%u: connect error %d", (LPSTR)label, (LPSTR)t, port, WSAGetLastError());
+        closesocket(s);
+        return INVALID_SOCKET;
+    }
+    if (r == SOCKET_ERROR) {
+        r = sock_wait(s, 1, 4000);
+        if (r <= 0) {
+            o("[NET] %s %s:%u: %s after %lu ms", (LPSTR)label, (LPSTR)t, port,
+              (LPSTR)(r < 0 ? "connect REFUSED / failed" : "connect TIMEOUT"), GetTickCount() - t0);
+            closesocket(s);
+            return INVALID_SOCKET;
+        }
+    }
+    nb = 0;
+    ioctlsocket(s, FIONBIO, &nb);
+    *ms = GetTickCount() - t0;
+    return s;
+}
+
+static int recv_wait(SOCKET s, BYTE *b, int cap, DWORD ms)
+{
+    int got = 0, n;
+    DWORD t0 = GetTickCount();
+    while (got < cap) {
+        DWORD left = GetTickCount() - t0;
+        if (left >= ms) break;
+        if (sock_wait(s, 0, ms - left) <= 0) break;
+        n = recv(s, (char *)b + got, cap - got, 0);
+        if (n <= 0) break;
+        got += n;
+        if (got >= 2 && b == pkt && (DWORD)got >= 2 + (DWORD)((pkt[0] << 8) | pkt[1]) && cap == sizeof(pkt)) break;
+    }
+    return got;
+}
+
+static void tcp_dns(DWORD server)
+{
+    DWORD ms, first;
+    SOCKET s = tcp_open(server, 53, "TCP DNS", &ms);
+    WORD id = (WORD)(GetTickCount() ^ 0x5A5A);
+    int q, n;
+    char t[600], srv[20];
+    if (s == INVALID_SOCKET) return;
+    ipstr(srv, server);
+    q = dns_query(pkt + 2, id, TEST_HOST);
+    pkt[0] = (BYTE)(q >> 8); pkt[1] = (BYTE)q;
+    send(s, (char *)pkt, q + 2, 0);
+    n = recv_wait(s, pkt, sizeof(pkt), 4000);
+    if (n > 2) {
+        dns_answer(t, pkt + 2, n - 2, id, &first);
+        o("[NET] TCP DNS %s:53: connected in %lu ms, reply: %s", (LPSTR)srv, ms, (LPSTR)t);
+        if (first && !resolved) resolved = first;
+    } else {
+        o("[NET] TCP DNS %s:53: connected in %lu ms, NO REPLY (%d bytes)", (LPSTR)srv, ms, n);
+    }
+    closesocket(s);
+}
+
+static void http_get(const char *host, DWORD ip, const char *how)
+{
+    static BYTE page[4096];
+    DWORD ms;
+    SOCKET s;
+    char req[200];
+    int n, i;
+    char t[20];
+    ipstr(t, ip);
+    o("[NET] HTTP GET http://%s/ at %s (%s):", (LPSTR)host, (LPSTR)t, (LPSTR)how);
+    s = tcp_open(ip, 80, "  HTTP", &ms);
+    if (s == INVALID_SOCKET) return;
+    n = wsprintfA(req, "GET / HTTP/1.0\r\nHost: %s\r\nUser-Agent: USOSLOG/" VERSION "\r\nConnection: close\r\n\r\n",
+                  (LPSTR)host);
+    send(s, req, n, 0);
+    n = recv_wait(s, page, sizeof(page) - 1, 6000);
+    for (i = 0; i < n && page[i] != '\r' && page[i] != '\n'; i++) ;
+    page[i < n ? i : (n > 0 ? n : 0)] = 0;
+    o("[NET]   connected in %lu ms, %d bytes, status line \"%s\"", ms, n, (LPSTR)page);
+    closesocket(s);
+}
+
+static void http_site(const char *host, DWORD ip, const char *fallback)
+{
+    if (ip) http_get(host, ip, "resolved");
+    if (!ip || ip != inet_addr(fallback)) http_get(host, inet_addr(fallback), "embedded address");
+}
+
+static void log_request(void)
+{
+    SOCKET s = socket(AF_INET, SOCK_DGRAM, 0);
+    struct sockaddr_in a;
+    BOOL on = TRUE;
+    int r;
+    if (s == INVALID_SOCKET) return;
+    setsockopt(s, SOL_SOCKET, SO_BROADCAST, (char *)&on, sizeof(on));
+    mset(&a, 0, sizeof(a));
+    a.sin_family = AF_INET;
+    a.sin_port = htons(LOG_PORT);
+    a.sin_addr.s_addr = INADDR_BROADCAST;
+    r = sendto(s, "USOSLOG", 7, 0, (struct sockaddr *)&a, sizeof(a));
+    o("[NET] usosnet log request broadcast (UDP 255.255.255.255:%u): %s", LOG_PORT,
+      (LPSTR)(r == 7 ? "sent" : "sendto failed"));
+    closesocket(s);
+}
+
+static void sec_tests(void)
+{
+    WSADATA wd;
+    struct hostent *h;
+    DWORD t0, a;
+    char t[20], cfg[256];
+    int i;
+    if (opt_nonet) { o("[NET] active tests skipped (/nonet)"); return; }
+    if (!ws_ok) {
+        int r = WSAStartup(0x0101, &wd);
+        if (r) { o("[NET] WSAStartup error %d", r); return; }
+        ws_ok = 1;
+        o("[NET] Winsock \"%s\" version %04X", (LPSTR)wd.szDescription, (unsigned)wd.wVersion);
+    }
+    t0 = GetTickCount();
+    h = gethostbyname(TEST_HOST);
+    if (h && h->h_addr_list && h->h_addr_list[0]) {
+        mcpy(&a, h->h_addr_list[0], 4);
+        ipstr(t, a);
+        o("[NET] gethostbyname(%s): %s after %lu ms", (LPSTR)TEST_HOST, (LPSTR)t, GetTickCount() - t0);
+        resolved = a;
+    } else {
+        o("[NET] gethostbyname(%s): FAILED error %d after %lu ms", (LPSTR)TEST_HOST, WSAGetLastError(), GetTickCount() - t0);
+    }
+    t0 = GetTickCount();
+    h = gethostbyname("example.com");
+    o("[NET] gethostbyname(example.com): %s error %d after %lu ms", (LPSTR)(h ? "ok" : "FAILED"),
+      h ? 0 : WSAGetLastError(), GetTickCount() - t0);
+    /* configured servers: IPHLPAPI + MSTCP NameServer (comma / space list) */
+    if (reg_str(HKEY_LOCAL_MACHINE, "System\\CurrentControlSet\\Services\\VxD\\MSTCP", "NameServer", cfg, sizeof(cfg))) {
+        char *p = cfg;
+        while (*p) {
+            char one[20];
+            int k = 0;
+            while (*p == ',' || *p == ' ') p++;
+            while (*p && *p != ',' && *p != ' ' && k < 19) one[k++] = *p++;
+            one[k] = 0;
+            if (k) add_dns(inet_addr(one));
+        }
+    }
+    udp_dns(inet_addr("1.1.1.1"), "fixed");
+    udp_dns(inet_addr("8.8.8.8"), "fixed");
+    if (gateway) udp_dns(gateway, "gateway");
+    else udp_dns(inet_addr("192.168.0.1"), "fixed gateway");
+    for (i = 0; i < ndns_cfg; i++) {
+        if (dns_cfg[i] == inet_addr("1.1.1.1") || dns_cfg[i] == inet_addr("8.8.8.8") || dns_cfg[i] == gateway) continue;
+        udp_dns(dns_cfg[i], "configured");
+    }
+    tcp_dns(inet_addr("1.1.1.1"));
+    {
+        DWORD ms;
+        SOCKET s = tcp_open(gateway ? gateway : inet_addr("192.168.0.1"), 80, "TCP connect", &ms);
+        if (s != INVALID_SOCKET) {
+            ipstr(t, gateway ? gateway : inet_addr("192.168.0.1"));
+            o("[NET] TCP connect %s:80: connected in %lu ms", (LPSTR)t, ms);
+            closesocket(s);
+        }
+    }
+    http_site(TEST_HOST, resolved, FALLBACK_IP);
+    t0 = GetTickCount();
+    h = gethostbyname(CONTROL_HOST);
+    a = 0;
+    if (h && h->h_addr_list && h->h_addr_list[0]) mcpy(&a, h->h_addr_list[0], 4);
+    o("[NET] gethostbyname(%s): %s error %d after %lu ms", (LPSTR)CONTROL_HOST, (LPSTR)(a ? "ok" : "FAILED"),
+      a ? 0 : WSAGetLastError(), GetTickCount() - t0);
+    http_site(CONTROL_HOST, a, CONTROL_IP);
+}
+
+static DWORD ndis_off = 0xFFFFFFFFUL;
+
+static void sec_ndislog(void)
+{
+    static char nb[16384];
+    DWORD size = file_size("C:\\WINDOWS\\NDISLOG.TXT");
+    int n;
+    if (size == 0xFFFFFFFFUL) { o("[NET] C:\\WINDOWS\\NDISLOG.TXT: missing"); return; }
+    if (ndis_off == 0xFFFFFFFFUL) ndis_off = size > 4096 ? size - 4096 : 0;
+    if (size < ndis_off) ndis_off = 0;
+    if (size == ndis_off) { o("[NET] NDISLOG.TXT: %lu bytes, nothing new", size); return; }
+    n = read_file("C:\\WINDOWS\\NDISLOG.TXT", nb, sizeof(nb), ndis_off);
+    o("[NET] NDISLOG.TXT: %lu bytes, new from %lu:", size, ndis_off);
+    if (n > 0) { otext("    | ", nb, (DWORD)n); ndis_off += (DWORD)n; }
+}
+
+static void sec_net_config(void)
+{
+    HKEY k;
+    DWORD i, nl;
+    char sub[64], path[160], desc[160];
+    FILETIME ft;
+    o("[NET] adapters (Class\\Net):");
+    find_usosnet(1);
+    o("[NET] MSTCP / NetTrans / DHCP / proxy:");
+    reg_dump(HKEY_LOCAL_MACHINE, "HKLM", "System\\CurrentControlSet\\Services\\VxD\\MSTCP", 64);
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "System\\CurrentControlSet\\Services\\Class\\NetTrans", 0, KEY_READ, &k) == ERROR_SUCCESS) {
+        for (i = 0; i < 32; i++) {
+            nl = sizeof(sub);
+            if (RegEnumKeyExA(k, i, sub, &nl, 0, 0, 0, &ft) != ERROR_SUCCESS) break;
+            wsprintfA(path, "System\\CurrentControlSet\\Services\\Class\\NetTrans\\%s", (LPSTR)sub);
+            reg_str(HKEY_LOCAL_MACHINE, path, "DriverDesc", desc, sizeof(desc));
+            if (has_text(desc, "TCP")) reg_dump(HKEY_LOCAL_MACHINE, "HKLM", path, 64);
+            else o("  [HKLM\\%s] \"%s\"", (LPSTR)path, (LPSTR)desc);
+        }
+        RegCloseKey(k);
+    }
+    reg_dump_sub(HKEY_LOCAL_MACHINE, "HKLM", "System\\CurrentControlSet\\Services\\VxD\\DHCP", 96, 8);
+    reg_dump(HKEY_CURRENT_USER, "HKCU", "Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings", 32);
+    dump_file("[NET] HOSTS", "C:\\WINDOWS\\HOSTS", 2048);
+}
+
+/* --- PROC / START -------------------------------------------------------- */
+static PROCREC snap_procs[MAXP];     /* worker thread only */
+static HWND snap_wins[MAXW];
+
+static void sec_proc(void)
+{
+    int n, i, nw;
+    n = proc_list(snap_procs, MAXP);
+    if (n < 0) o("[PROC] Toolhelp32 not available");
+    else o("[PROC] processes (%d):", n);
+    for (i = 0; i < n; i++)
+        o("    %08lX parent %08lX %s", snap_procs[i].pid, snap_procs[i].ppid, (LPSTR)snap_procs[i].exe);
+    nw = win_list(snap_wins);
+    o("[PROC] visible top-level windows (%d):", nw);
+    for (i = 0; i < nw; i++) {
+        char cls[64], title[128];
+        DWORD pid = 0;
+        cls[0] = title[0] = 0;
+        GetClassNameA(snap_wins[i], cls, sizeof(cls));
+        GetWindowTextA(snap_wins[i], title, sizeof(title));
+        GetWindowThreadProcessId(snap_wins[i], &pid);
+        o("    %08lX class \"%s\" title \"%s\" process %08lX%s", (DWORD)snap_wins[i], (LPSTR)cls, (LPSTR)title, pid,
+          (LPSTR)(console_class(cls) ? "  <- console / DOS box" : ""));
+    }
+    EnterCriticalSection(&ev_cs);
+    o("[PROC] watcher events since the last record (every 2 s; %lu lost):", ev_lost);
+    oput(ev_buf, ev_len);
+    ev_len = 0;
+    ev_lost = 0;
+    LeaveCriticalSection(&ev_cs);
+}
+
+static void list_dir(const char *label, const char *dir)
+{
+    WIN32_FIND_DATAA fd;
+    HANDLE h;
+    char pat[MAX_PATH + 4];
+    int n = 0;
+    if (!dir[0]) { o("[START] %s: (no path)", (LPSTR)label); return; }
+    lstrcpynA(pat, dir, MAX_PATH);
+    lstrcatA(pat, "\\*.*");
+    o("[START] %s: %s", (LPSTR)label, (LPSTR)dir);
+    h = FindFirstFileA(pat, &fd);
+    if (h == INVALID_HANDLE_VALUE) { o("    (empty or missing)"); return; }
+    do {
+        if (fd.cFileName[0] == '.') continue;
+        o("    %s  %lu bytes%s", (LPSTR)fd.cFileName, fd.nFileSizeLow,
+          (LPSTR)((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? "  <dir>" : ""));
+        n++;
+    } while (FindNextFileA(h, &fd) && n < 100);
+    FindClose(h);
+}
+
+static void sec_start(int full)
+{
+    char p[MAX_PATH], a[300];
+    reg_str(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders", "Startup", p, sizeof(p));
+    list_dir("Startup (HKCU Shell Folders)", p);
+    reg_str(HKEY_LOCAL_MACHINE, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders", "Common Startup", p, sizeof(p));
+    list_dir("Common Startup (HKLM Shell Folders)", p);
+    o("[START] Run keys:");
+    reg_dump(HKEY_LOCAL_MACHINE, "HKLM", "Software\\Microsoft\\Windows\\CurrentVersion\\Run", 32);
+    reg_dump(HKEY_LOCAL_MACHINE, "HKLM", "Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce", 32);
+    reg_dump(HKEY_LOCAL_MACHINE, "HKLM", "Software\\Microsoft\\Windows\\CurrentVersion\\RunServices", 32);
+    reg_dump(HKEY_LOCAL_MACHINE, "HKLM", "Software\\Microsoft\\Windows\\CurrentVersion\\RunServicesOnce", 32);
+    reg_dump(HKEY_CURRENT_USER, "HKCU", "Software\\Microsoft\\Windows\\CurrentVersion\\Run", 32);
+    reg_dump(HKEY_CURRENT_USER, "HKCU", "Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce", 32);
+    GetProfileStringA("windows", "load", "", a, sizeof(a));
+    o("[START] WIN.INI [windows] load=%s", (LPSTR)a);
+    GetProfileStringA("windows", "run", "", a, sizeof(a));
+    o("[START] WIN.INI [windows] run=%s", (LPSTR)a);
+    GetPrivateProfileStringA("boot", "shell", "", a, sizeof(a), "SYSTEM.INI");
+    o("[START] SYSTEM.INI [boot] shell=%s", (LPSTR)a);
+    if (full) {
+        dump_file("[START]", "C:\\AUTOEXEC.BAT", 3072);
+        dump_file("[START]", "C:\\CONFIG.SYS", 3072);
+        dump_file("[START]", "C:\\WINDOWS\\WINSTART.BAT", 2048);
+    }
+}
+
+/* ------------------------------------------------------------------ */
+static void header(const char *kind)
+{
+    char t[32];
+    stamp(t);
+    o("");
+    o("=== USOSLOG %s %s #%d  %s  tick %lu  (running %lu s) ===", (LPSTR)VERSION, (LPSTR)kind, snap_no, (LPSTR)t,
+      GetTickCount(), (GetTickCount() - t_start) / 1000);
+}
+
+static void start_record(void)
+{
+    header("start");
+    sec_sys();
+    sec_start(1);
+    sec_proc();
+    flush_out();
+}
+
+static void snapshot(void)
+{
+    DWORD t0 = GetTickCount();
+    snap_no++;
+    header("snapshot");
+    sec_sys();
+    sec_mouse();
+    find_usosnet(0);
+    run_usosdbg(stats_pa);
+    flush_out();                        /* the mouse part is safe even if a test hangs */
+    sec_net_config();
+    sec_usns(0);
+    sec_iphlp_config();
+    sec_iphlp_stats(0);
+    flush_out();
+    sec_tests();
+    sec_iphlp_stats(1);
+    if (net_key[0]) sec_usns(1);
+    if (!opt_nonet && ws_ok) log_request();
+    sec_ndislog();
+    sec_proc();
+    if (snap_no % 6 == 0) sec_start(0);
+    o("=== end of snapshot #%d (%lu ms) ===", snap_no, GetTickCount() - t0);
+    flush_out();
+}
+
+DWORD WINAPI worker(LPVOID arg)
+{
+    (void)arg;
+    if (!opt_once) {
+        start_record();
+        Sleep(opt_first * 1000);
+    }
+    for (;;) {
+        snapshot();
+        if (opt_once) break;
+        Sleep(opt_every * 1000);
+    }
+    PostThreadMessageA(main_tid, WM_QUIT, 0, 0);
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
+static void parse_args(void)
+{
+    char *c = GetCommandLineA(), arg[MAX_PATH];
+    int n, first = 1, want = 0;
+    for (;;) {
+        while (*c == ' ' || *c == '\t') c++;
+        if (!*c) break;
+        n = 0;
+        if (*c == '"') {
+            c++;
+            while (*c && *c != '"') { if (n < MAX_PATH - 1) arg[n++] = *c; c++; }
+            if (*c) c++;
+        } else {
+            while (*c && *c != ' ' && *c != '\t') { if (n < MAX_PATH - 1) arg[n++] = *c; c++; }
+        }
+        arg[n] = 0;
+        if (first) { first = 0; continue; }       /* program name */
+        if (want == 1) { lstrcpynA(out_path, arg, MAX_PATH); want = 0; continue; }
+        if (want == 2) { opt_first = decval(arg); want = 0; continue; }
+        if (want == 3) { opt_every = decval(arg); if (opt_every < 10) opt_every = 10; want = 0; continue; }
+        if (want == 4) { lstrcpynA(opt_dbgfile, arg, MAX_PATH); want = 0; continue; }
+        if (!lstrcmpiA(arg, "/once")) opt_once = 1;
+        else if (!lstrcmpiA(arg, "/nonet")) opt_nonet = 1;
+        else if (!lstrcmpiA(arg, "/nodbg")) opt_nodbg = 1;
+        else if (!lstrcmpiA(arg, "/nohook")) opt_nohook = 1;
+        else if (!lstrcmpiA(arg, "/out")) want = 1;
+        else if (!lstrcmpiA(arg, "/first")) want = 2;
+        else if (!lstrcmpiA(arg, "/every")) want = 3;
+        else if (!lstrcmpiA(arg, "/dbgfile")) want = 4;
+    }
+}
+
+void __cdecl usos_entry(void)
+{
+    MSG msg;
+    HANDLE th, mutex;
+    HMODULE k32;
+    DWORD tid, ticks = 0;
+    UINT timer;
+    t_start = GetTickCount();
+    parse_args();
+    mutex = CreateMutexA(0, FALSE, "USOSLOG-instance");
+    if (!opt_once && mutex && GetLastError() == ERROR_ALREADY_EXISTS) ExitProcess(0);
+    InitializeCriticalSection(&ev_cs);
+    k32 = GetModuleHandleA("KERNEL32.DLL");
+    if (k32) {
+        p_snap = (PFN_SNAP)GetProcAddress(k32, "CreateToolhelp32Snapshot");
+        p_first = (PFN_PROC)GetProcAddress(k32, "Process32First");
+        p_next = (PFN_PROC)GetProcAddress(k32, "Process32Next");
+    }
+    main_tid = GetCurrentThreadId();
+    PeekMessageA(&msg, 0, 0, 0, PM_NOREMOVE);  /* message queue before the worker posts */
+    watch_tick();
+    hook_install();
+    timer = SetTimer(0, 0, 2000, 0);
+    th = CreateThread(0, 0, worker, 0, 0, &tid);
+    if (!th) ExitProcess(1);
+    while (GetMessageA(&msg, 0, 0, 0) > 0) {
+        if (msg.message == WM_CANCELJOURNAL) { g_hook = 0; g_cancels++; continue; }
+        if (msg.message == WM_TIMER && !msg.hwnd) {
+            watch_tick();
+            if (++ticks % 30 == 0) hook_install();     /* again a minute after Ctrl+Esc / Ctrl+Alt+Del */
+            continue;
+        }
+        DispatchMessageA(&msg);
+    }
+    if (timer) KillTimer(0, timer);
+    if (g_hook) UnhookWindowsHookEx(g_hook);
+    ExitProcess(0);
+}

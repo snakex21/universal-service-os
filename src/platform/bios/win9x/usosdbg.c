@@ -44,6 +44,17 @@
  *         bridge control. Same format as USOSDIAG.COM's PCI section (DOS,
  *         C:\USOS9X\DIAG.LOG), so the two can be compared line by line
  * S appends the current screen to C:\USOS9X\USOSDBG.LOG, Esc quits.
+ *
+ * Log mode (1.5, for USOSLOG.EXE, no window shown, no key needed):
+ *   USOSDBG.EXE /L <file> [/F] [/N <hex>]
+ * takes two snapshots one second apart (so the "+n" deltas are per second),
+ * writes the second one to <file> (created anew) and exits. Without /F the
+ * PCI section (xHCI MMIO mapping) is left out: DPMI 0800h mappings cannot
+ * be released, so USOSLOG asks for it only on its first run after a boot.
+ * /N dumps the usosnet 0.4 statistics page at that physical address
+ * (registry UsosnetStatsPa) as USNS+ooo: hex lines. The wheel knock (W) is
+ * never sent in log mode; the C204h ID question is asked once per run as
+ * on the first display.
  * Nothing is written to any device: configuration space and xHCI registers
  * are only read.
  *
@@ -140,6 +151,10 @@ static BYTE id_asked, id_failed;    /* C204h asked (first display, after W) */
 static WORD id_result;
 static DWORD mdiag_at;              /* physical address of the 0018 record, 0 not found */
 static BYTE mdiag_scanned;
+static BYTE log_mode, log_pci;      /* /L, /F */
+static char log_path[128];
+static DWORD net_pa;                /* /N */
+static WORD e_cmdseg, e_cmdoff;     /* command tail (InitTask ES:BX) */
 
 static LPSTR line(void)
 {
@@ -658,18 +673,46 @@ static void show_pci(void)
     wsprintf(line(), "PCI xhci:%d lastbus:%02X", nxhci, (WORD)max_bus);
 }
 
+/* ---------------------------------------------------------- NET */
+/* usosnet 0.4 statistics page (/N physical address): raw hex, USOSLOG
+ * decodes it (layout: tools/nt/usosnet/src/usosnet_proto.h, USNS_BLOCK). */
+static void show_net(void)
+{
+    BYTE FAR *b;
+    DWORD FAR *d;
+    WORD size, r, i;
+    LPSTR l;
+    if (!net_pa) return;
+    b = physical(net_pa & 0xFFFFF000L, 0x1000);
+    if (!b) { wsprintf(line(), "USNS %08lX: DPMI 0800h refused", net_pa); return; }
+    b += (WORD)(net_pa & 0xFFF);
+    d = (DWORD FAR *)b;
+    if (d[0] != 0x534E5355L) { wsprintf(line(), "USNS %08lX: no USNS magic (%08lX)", net_pa, d[0]); return; }
+    size = d[2] > 0x1000 - (net_pa & 0xFFF) ? (WORD)(0x1000 - (net_pa & 0xFFF)) : (WORD)d[2];
+    wsprintf(line(), "USNS %08lX: version %lu size %u", net_pa, d[1], size);
+    for (r = 0; r < size; r += 64) {
+        l = line();
+        wsprintf(l, "USNS+%03X:", r);
+        for (i = r; i < size && i < r + 64; i++) wsprintf(l + lstrlen(l), "%02X", (WORD)b[i]);
+    }
+}
+
 /* ---------------------------------------------------------- UI */
 static void refresh(void)
 {
     nlines = 0;
-    wsprintf(line(), "USOSDBG 1.4  tick:%lu  S = append to C:\\USOS9X\\USOSDBG.LOG (saved:%u)  W = wheel knock  Esc = quit",
-             GetTickCount(), snapshots);
+    if (log_mode)
+        wsprintf(line(), "USOSDBG 1.5 log mode  tick:%lu  pci:%s", GetTickCount(), (LPSTR)(log_pci ? "yes" : "no (first run only)"));
+    else
+        wsprintf(line(), "USOSDBG 1.5  tick:%lu  S = append to C:\\USOS9X\\USOSDBG.LOG (saved:%u)  W = wheel knock  Esc = quit",
+                 GetTickCount(), snapshots);
     show_key();
     show_mouse();
     show_wheel();
     show_ivt();
     show_map();
-    show_pci();
+    if (!log_mode || log_pci) show_pci();
+    show_net();
     if (window) InvalidateRect(window, 0, TRUE);
 }
 
@@ -728,18 +771,113 @@ LRESULT FAR PASCAL __export __loadds wndproc(HWND hwnd, UINT msg, WPARAM wp, LPA
     return DefWindowProc(hwnd, msg, wp, lp);
 }
 
+/* ---------------------------------------------------------- log mode */
+static DWORD hexval(LPSTR p)
+{
+    DWORD v = 0;
+    for (;; p++) {
+        char c = *p;
+        if (c >= '0' && c <= '9') v = (v << 4) | (c - '0');
+        else if (c >= 'a' && c <= 'f') v = (v << 4) | (c - 'a' + 10);
+        else if (c >= 'A' && c <= 'F') v = (v << 4) | (c - 'A' + 10);
+        else return v;
+    }
+}
+
+/* "/L file /F /N hex" from the command tail (ends at CR or NUL) */
+static void parse_args(void)
+{
+    char FAR *t = (char FAR *)MAKELP(e_cmdseg, e_cmdoff);
+    char arg[128];
+    char opt = 0;
+    WORD n;
+    if (!e_cmdseg) return;
+    for (;;) {
+        while (*t == ' ' || *t == '\t') t++;
+        if (!*t || *t == '\r' || *t == '\n') break;
+        for (n = 0; *t && *t != ' ' && *t != '\t' && *t != '\r' && *t != '\n'; t++)
+            if (n < sizeof(arg) - 1) arg[n++] = *t;
+        arg[n] = 0;
+        if (opt) {
+            if (opt == 'L') { lstrcpy(log_path, arg); log_mode = 1; }
+            else if (opt == 'N') net_pa = hexval(arg);
+            opt = 0;
+        } else if (arg[0] == '/' || arg[0] == '-') {
+            char c = arg[1] & ~0x20;
+            if (c == 'F') log_pci = 1;
+            else if (c == 'L' || c == 'N') opt = c;
+        }
+    }
+}
+
+static void write_log(void)
+{
+    HFILE f = _lcreat(log_path, 0);
+    int i;
+    if (f == HFILE_ERROR) return;
+    for (i = 0; i < nlines; i++) {
+        _lwrite(f, text[i], lstrlen(text[i]));
+        _lwrite(f, "\r\n", 2);
+    }
+    _lwrite(f, "USOSDBG END\r\n", 14);
+    _lclose(f);
+}
+
+/* the one-second pause: a hidden window's timer, so GetMessage blocks (no
+ * busy loop holding the Win16 lock) */
+static void run_log(HINSTANCE inst)
+{
+    WNDCLASS wc;
+    MSG msg;
+    HWND w;
+    DWORD t0;
+    refresh();
+    wc.style = 0;
+    wc.lpfnWndProc = (WNDPROC)DefWindowProc;
+    wc.cbClsExtra = 0;
+    wc.cbWndExtra = 0;
+    wc.hInstance = inst;
+    wc.hIcon = 0;
+    wc.hCursor = 0;
+    wc.hbrBackground = 0;
+    wc.lpszMenuName = 0;
+    wc.lpszClassName = "USOSDBGL";
+    RegisterClass(&wc);                 /* a second instance finds it registered */
+    w = CreateWindow("USOSDBGL", "USOSDBG log", WS_POPUP, 0, 0, 1, 1, 0, 0, inst, 0);
+    t0 = GetTickCount();
+    if (w && SetTimer(w, 1, 1000, 0)) {
+        while (GetMessage(&msg, 0, 0, 0)) {
+            if (msg.message == WM_TIMER && msg.hwnd == w) break;
+            DispatchMessage(&msg);
+            if (GetTickCount() - t0 > 5000) break;
+        }
+        KillTimer(w, 1);
+    }
+    if (w) DestroyWindow(w);
+    refresh();
+    write_log();
+}
+
 static void run(HINSTANCE inst, HINSTANCE prev, int show)
 {
     WNDCLASS wc;
     MSG msg;
     instance = inst;
-    if (prev) return;
+    parse_args();
+    if (prev && !log_mode) return;
     lin_sel = AllocSelector(SELECTOROF((void FAR *)&text));
     phys_sel = AllocSelector(SELECTOROF((void FAR *)&text));
     bda_sel = AllocSelector(SELECTOROF((void FAR *)&text));
     if (!lin_sel || !phys_sel || !bda_sel) return;
     SetSelectorBase(bda_sel, 0x400);
     SetSelectorLimit(bda_sel, 0xFF);
+    if (log_mode) {
+        run_log(inst);
+        FreeSelector(lin_sel);
+        FreeSelector(phys_sel);
+        FreeSelector(bda_sel);
+        return;
+    }
     wc.style = CS_HREDRAW | CS_VREDRAW;
     wc.lpfnWndProc = (WNDPROC)wndproc;
     wc.cbClsExtra = 0;
@@ -797,13 +935,20 @@ void __declspec(naked) __far task_entry(void)
         push di
         push si
         push dx
+        push es
+        push bx
         call zero_bss
+        pop bx
+        pop es
         pop dx
         pop si
         pop di
         mov e_inst, di
         mov e_prev, si
         mov e_show, dx
+        mov e_cmdoff, bx
+        mov ax, es
+        mov e_cmdseg, ax
         call start_c
     fail:
         mov ax, 4C00h
