@@ -209,6 +209,9 @@ else
     printf '1\r\n' > "$work/inject/usos-modern-vista.flag"
     printf '1\r\n' > "$work/inject/usos-external-pe10.flag"
     printf '1\r\n' > "$work/inject/usos-vista-csmwrap.flag"
+    if [ "${VISTA_TESTMODE_WATERMARK_ON:-0}" = 1 ]; then
+        : > "$work/inject/usos-testmode-watermark-on.flag"
+    fi
     target_ini=usos-vista-target.ini
     helper_check=usos-vista-install.exe
 fi

@@ -664,6 +664,16 @@ fn inject(root: *uefi.protocol.File, state: *BootState, volume: *files.Volume, o
         switch (item) {
             .support => |support| try addSupport(root, volume, owned, support.path, support.limit_mib),
             .flag => |flag_name| try volume.add(flag_name, usos.flow.plan.flag_content),
+            .unattended_flag => |flag| {
+                var directory: [192]u8 = undefined;
+                const path = try std.fmt.bufPrint(&directory, "Systems/Windows/{s}/Unattended", .{flag.folder});
+                var marker: ntfs.File = undefined;
+                const present = if (openIn(catalog, path, flag.source, &marker)) |_| true else |err| switch (err) {
+                    error.NotFound => false,
+                    else => return err,
+                };
+                if (present) try volume.add(flag.target, usos.flow.plan.flag_content);
+            },
             .bundled_drivers => |user_folder| {
                 progress(.loading, "Reading optional Windows 7 x64 driver packages");
                 const drivers = try driver_files.loadWithUser(catalog, user_folder);

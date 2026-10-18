@@ -770,6 +770,27 @@ static BOOL copy_payload(const Target *t){
   BOOL ok=FlushFileBuffers(f);CloseHandle(f);if(!ok)return FALSE;
  }return TRUE;
 }
+/* A separate cosmetic package: failure keeps the normal Windows watermark
+ * and never prevents a correctly prepared USB/storage installation. */
+static void stage_testmode_desktop_root(const WCHAR *root){
+#ifdef USOS_VISTA_WATERMARK_PAYLOAD
+ WCHAR src[MAX_PATH],dst[MAX_PATH];BYTE digest[32];BOOL ok=TRUE;
+ for(unsigned i=0;i<sizeof(vista_wm_files)/sizeof(vista_wm_files[0]);i++){
+  path(src,base,vista_wm_files[i].source);path(dst,root,vista_wm_files[i].target);
+  if(!hash_file(src,digest)||!same(digest,vista_wm_files[i].sha256,32)||!mkdirs(dst)||!CopyFileW(src,dst,FALSE)||!hash_file(dst,digest)||!same(digest,vista_wm_files[i].sha256,32)){ok=FALSE;break;}
+  HANDLE file=CreateFileW(dst,GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
+  if(file==INVALID_HANDLE_VALUE){ok=FALSE;break;}BOOL flushed=FlushFileBuffers(file);CloseHandle(file);if(!flushed){ok=FALSE;break;}
+ }
+ path(src,base,L"usos-testmode-watermark-on.flag");BOOL visible=GetFileAttributesW(src)!=INVALID_FILE_ATTRIBUTES;
+ path(dst,root,L"USOS\\usoswm\\testmode-watermark-on.txt");
+ if(ok&&visible){HANDLE flag=CreateFileW(dst,GENERIC_WRITE,0,0,CREATE_ALWAYS,FILE_FLAG_WRITE_THROUGH,0);ok=flag!=INVALID_HANDLE_VALUE;if(ok){ok=FlushFileBuffers(flag);CloseHandle(flag);}}
+ if(ok&&!visible&&!DeleteFileW(dst)&&GetLastError()!=ERROR_FILE_NOT_FOUND)ok=FALSE;
+ logcode("Test-mode desktop: payload staged (cosmetic; native UI on error)=",ok?0:ERROR_WRITE_FAULT);
+ logcode("Test-mode desktop: user requested visible watermark=",visible);
+#else
+ (void)root;
+#endif
+}
 static BOOL prepare_servicing_answer(WCHAR *answer){
  static WCHAR xml[2048],cab[MAX_PATH],source[MAX_PATH];BYTE digest[32];
  unsigned i;for(i=0;i<sizeof(vista_files)/sizeof(vista_files[0]);i++)
@@ -998,6 +1019,7 @@ void entry(void){
  if(!install_hidden_runner(target))ExitProcess(6);
  BOOL system_is_staging=FALSE;
  if(csmwrap?!configure_boot_bios(target,&system_is_staging):!configure_boot(target)){logcode("Target BCD preparation failed (see the lines above)=",ERROR_GEN_FAILURE);ExitProcess(7);}
+ stage_testmode_desktop_root(target->root);
  if(!arm_target(target)){logcode("Arm pre-Setup USB failed=",GetLastError());ExitProcess(8);}
  install_optional_dispatcher(target);
  /* PE10 runs from RAM: the staging partition is not needed any more unless

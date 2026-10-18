@@ -43,6 +43,13 @@ vista_modern_external_donor_enabled() {
     vista_modern_nvme_enabled "$@"
 }
 
+# Cosmetic opt-out, confined to the profile which enables testsigning.
+vista_testmode_watermark_visible() {
+    [ "$1" = vista-x64-sp2-uefi-csmwrap ] || return 1
+    case "$3" in 'Windows Vista'|'Windows Server 2008') ;; *) return 1 ;; esac
+    [ -f "$2/Systems/Windows/$3/Unattended/testmode-watermark-on.txt" ]
+}
+
 usos_vista_csmwrap_prepare() {
     VISTA_CSMWRAP_DIR=/mnt/esp/EFI/USOS/vista-csmwrap
     request=$VISTA_CSMWRAP_DIR/request.ini
@@ -224,7 +231,9 @@ usos_vista_csmwrap_prepare() {
     # Every tool's output goes to prepare.log (none reaches the screen); the
     # stage-4 page stays up until the script ends.
     usos_ui_stage 4 5 'Preparing the disk' 'Copying the Windows PE helper and CSMWrap to the selected disk.' || true
-    if ! TARGET_DEVICE=$TARGET_DEVICE VISTA_DONOR_ISO="/mnt/data/$donor" VISTA_REQUEST_DIR=$VISTA_CSMWRAP_DIR VISTA_ANSWER_XML=$answer_xml X86_SELF=$x86_self USOS_PE_NVME=$pe_nvme \
+    watermark_visible=0
+    if vista_testmode_watermark_visible "$profile" /mnt/data "$folder"; then watermark_visible=1; fi
+    if ! TARGET_DEVICE=$TARGET_DEVICE VISTA_DONOR_ISO="/mnt/data/$donor" VISTA_REQUEST_DIR=$VISTA_CSMWRAP_DIR VISTA_ANSWER_XML=$answer_xml X86_SELF=$x86_self USOS_PE_NVME=$pe_nvme VISTA_TESTMODE_WATERMARK_ON=$watermark_visible \
         sh /usr/lib/usos/vista_csmwrap_target.sh >> "$VISTA_CSMWRAP_DIR/prepare.log" 2>&1 < /dev/null; then
         rm -f /run/vista-answer.xml
         tail -n 5 "$VISTA_CSMWRAP_DIR/prepare.log" 2>/dev/null || true

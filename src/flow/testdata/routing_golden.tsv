@@ -26811,55 +26811,63 @@ wimboot	win7	1	1	1	8	file usos-unattend.xml from Systems\Windows\Windows 7\Unatt
 wimboot	vista	0	0	0	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
 wimboot	vista	0	0	0	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
 wimboot	vista	0	0	0	2	flag usos-modern-vista.flag
-wimboot	vista	0	0	0	3	boot BCD boot.sdi boot.wim
-wimboot	vista	0	0	0	4	file usos-source.ini folder=Windows Vista
+wimboot	vista	0	0	0	3	optional flag usos-testmode-watermark-on.flag from Systems\Windows\Windows Vista\Unattended\testmode-watermark-on.txt
+wimboot	vista	0	0	0	4	boot BCD boot.sdi boot.wim
+wimboot	vista	0	0	0	5	file usos-source.ini folder=Windows Vista
 wimboot	vista	0	0	1	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
 wimboot	vista	0	0	1	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
 wimboot	vista	0	0	1	2	flag usos-modern-vista.flag
-wimboot	vista	0	0	1	3	boot BCD boot.sdi boot.wim
-wimboot	vista	0	0	1	4	file usos-source.ini folder=Windows Vista
-wimboot	vista	0	0	1	5	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
+wimboot	vista	0	0	1	3	optional flag usos-testmode-watermark-on.flag from Systems\Windows\Windows Vista\Unattended\testmode-watermark-on.txt
+wimboot	vista	0	0	1	4	boot BCD boot.sdi boot.wim
+wimboot	vista	0	0	1	5	file usos-source.ini folder=Windows Vista
+wimboot	vista	0	0	1	6	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
 wimboot	vista	0	1	0	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
 wimboot	vista	0	1	0	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
 wimboot	vista	0	1	0	2	flag usos-modern-vista.flag
 wimboot	vista	0	1	0	3	flag usos-nvme-packages.flag
-wimboot	vista	0	1	0	4	boot BCD boot.sdi boot.wim
-wimboot	vista	0	1	0	5	file usos-source.ini folder=Windows Vista
+wimboot	vista	0	1	0	4	optional flag usos-testmode-watermark-on.flag from Systems\Windows\Windows Vista\Unattended\testmode-watermark-on.txt
+wimboot	vista	0	1	0	5	boot BCD boot.sdi boot.wim
+wimboot	vista	0	1	0	6	file usos-source.ini folder=Windows Vista
 wimboot	vista	0	1	1	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
 wimboot	vista	0	1	1	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
 wimboot	vista	0	1	1	2	flag usos-modern-vista.flag
 wimboot	vista	0	1	1	3	flag usos-nvme-packages.flag
-wimboot	vista	0	1	1	4	boot BCD boot.sdi boot.wim
-wimboot	vista	0	1	1	5	file usos-source.ini folder=Windows Vista
-wimboot	vista	0	1	1	6	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
+wimboot	vista	0	1	1	4	optional flag usos-testmode-watermark-on.flag from Systems\Windows\Windows Vista\Unattended\testmode-watermark-on.txt
+wimboot	vista	0	1	1	5	boot BCD boot.sdi boot.wim
+wimboot	vista	0	1	1	6	file usos-source.ini folder=Windows Vista
+wimboot	vista	0	1	1	7	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
 wimboot	vista	1	0	0	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
 wimboot	vista	1	0	0	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
 wimboot	vista	1	0	0	2	flag usos-modern-vista.flag
 wimboot	vista	1	0	0	3	flag usos-external-pe10.flag
-wimboot	vista	1	0	0	4	boot BCD boot.sdi boot.wim
-wimboot	vista	1	0	0	5	file usos-source.ini folder=Windows Vista
+wimboot	vista	1	0	0	4	optional flag usos-testmode-watermark-on.flag from Systems\Windows\Windows Vista\Unattended\testmode-watermark-on.txt
+wimboot	vista	1	0	0	5	boot BCD boot.sdi boot.wim
+wimboot	vista	1	0	0	6	file usos-source.ini folder=Windows Vista
 wimboot	vista	1	0	1	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
 wimboot	vista	1	0	1	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
 wimboot	vista	1	0	1	2	flag usos-modern-vista.flag
 wimboot	vista	1	0	1	3	flag usos-external-pe10.flag
-wimboot	vista	1	0	1	4	boot BCD boot.sdi boot.wim
-wimboot	vista	1	0	1	5	file usos-source.ini folder=Windows Vista
-wimboot	vista	1	0	1	6	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
+wimboot	vista	1	0	1	4	optional flag usos-testmode-watermark-on.flag from Systems\Windows\Windows Vista\Unattended\testmode-watermark-on.txt
+wimboot	vista	1	0	1	5	boot BCD boot.sdi boot.wim
+wimboot	vista	1	0	1	6	file usos-source.ini folder=Windows Vista
+wimboot	vista	1	0	1	7	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
 wimboot	vista	1	1	0	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
 wimboot	vista	1	1	0	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
 wimboot	vista	1	1	0	2	flag usos-modern-vista.flag
 wimboot	vista	1	1	0	3	flag usos-external-pe10.flag
 wimboot	vista	1	1	0	4	flag usos-nvme-packages.flag
-wimboot	vista	1	1	0	5	boot BCD boot.sdi boot.wim
-wimboot	vista	1	1	0	6	file usos-source.ini folder=Windows Vista
+wimboot	vista	1	1	0	5	optional flag usos-testmode-watermark-on.flag from Systems\Windows\Windows Vista\Unattended\testmode-watermark-on.txt
+wimboot	vista	1	1	0	6	boot BCD boot.sdi boot.wim
+wimboot	vista	1	1	0	7	file usos-source.ini folder=Windows Vista
 wimboot	vista	1	1	1	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
 wimboot	vista	1	1	1	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
 wimboot	vista	1	1	1	2	flag usos-modern-vista.flag
 wimboot	vista	1	1	1	3	flag usos-external-pe10.flag
 wimboot	vista	1	1	1	4	flag usos-nvme-packages.flag
-wimboot	vista	1	1	1	5	boot BCD boot.sdi boot.wim
-wimboot	vista	1	1	1	6	file usos-source.ini folder=Windows Vista
-wimboot	vista	1	1	1	7	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
+wimboot	vista	1	1	1	5	optional flag usos-testmode-watermark-on.flag from Systems\Windows\Windows Vista\Unattended\testmode-watermark-on.txt
+wimboot	vista	1	1	1	6	boot BCD boot.sdi boot.wim
+wimboot	vista	1	1	1	7	file usos-source.ini folder=Windows Vista
+wimboot	vista	1	1	1	8	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
 # wimboot_server: system kind index injection (external PE10, NVMe packages and an answer file where the kind allows them)
 wimboot_server	windows-server-2025	modern_setup	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
 wimboot_server	windows-server-2025	modern_setup	1	support \EFI\USOS\windows-native\modern-support.cpio limit=8MiB
@@ -26918,8 +26926,9 @@ wimboot_server	windows-server-2008	vista	0	support \EFI\USOS\windows-native\supp
 wimboot_server	windows-server-2008	vista	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
 wimboot_server	windows-server-2008	vista	2	flag usos-modern-vista.flag
 wimboot_server	windows-server-2008	vista	3	flag usos-external-pe10.flag
-wimboot_server	windows-server-2008	vista	4	boot BCD boot.sdi boot.wim
-wimboot_server	windows-server-2008	vista	5	file usos-source.ini folder=Windows Server 2008
+wimboot_server	windows-server-2008	vista	4	optional flag usos-testmode-watermark-on.flag from Systems\Windows\Windows Server 2008\Unattended\testmode-watermark-on.txt
+wimboot_server	windows-server-2008	vista	5	boot BCD boot.sdi boot.wim
+wimboot_server	windows-server-2008	vista	6	file usos-source.ini folder=Windows Server 2008
 # int10_dispatcher: systems whose installed copy boots through the USOS Int10 dispatcher (win7-vista-no-csm.md)
 int10_dispatcher	windows-7
 int10_dispatcher	windows-vista
@@ -26931,30 +26940,34 @@ wimboot_int10	vista	0	0	0	support \EFI\USOS\windows-native\support.cpio limit=8M
 wimboot_int10	vista	0	0	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
 wimboot_int10	vista	0	0	2	flag usos-modern-vista.flag
 wimboot_int10	vista	0	0	3	flag usos-int10-dispatcher.flag
-wimboot_int10	vista	0	0	4	boot BCD boot.sdi boot.wim
-wimboot_int10	vista	0	0	5	file usos-source.ini folder=Windows Vista
+wimboot_int10	vista	0	0	4	optional flag usos-testmode-watermark-on.flag from Systems\Windows\Windows Vista\Unattended\testmode-watermark-on.txt
+wimboot_int10	vista	0	0	5	boot BCD boot.sdi boot.wim
+wimboot_int10	vista	0	0	6	file usos-source.ini folder=Windows Vista
 wimboot_int10	vista	0	1	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
 wimboot_int10	vista	0	1	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
 wimboot_int10	vista	0	1	2	flag usos-modern-vista.flag
 wimboot_int10	vista	0	1	3	flag usos-int10-dispatcher.flag
-wimboot_int10	vista	0	1	4	boot BCD boot.sdi boot.wim
-wimboot_int10	vista	0	1	5	file usos-source.ini folder=Windows Vista
-wimboot_int10	vista	0	1	6	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
+wimboot_int10	vista	0	1	4	optional flag usos-testmode-watermark-on.flag from Systems\Windows\Windows Vista\Unattended\testmode-watermark-on.txt
+wimboot_int10	vista	0	1	5	boot BCD boot.sdi boot.wim
+wimboot_int10	vista	0	1	6	file usos-source.ini folder=Windows Vista
+wimboot_int10	vista	0	1	7	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
 wimboot_int10	vista	1	0	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
 wimboot_int10	vista	1	0	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
 wimboot_int10	vista	1	0	2	flag usos-modern-vista.flag
 wimboot_int10	vista	1	0	3	flag usos-external-pe10.flag
 wimboot_int10	vista	1	0	4	flag usos-int10-dispatcher.flag
-wimboot_int10	vista	1	0	5	boot BCD boot.sdi boot.wim
-wimboot_int10	vista	1	0	6	file usos-source.ini folder=Windows Vista
+wimboot_int10	vista	1	0	5	optional flag usos-testmode-watermark-on.flag from Systems\Windows\Windows Vista\Unattended\testmode-watermark-on.txt
+wimboot_int10	vista	1	0	6	boot BCD boot.sdi boot.wim
+wimboot_int10	vista	1	0	7	file usos-source.ini folder=Windows Vista
 wimboot_int10	vista	1	1	0	support \EFI\USOS\windows-native\support.cpio limit=8MiB
 wimboot_int10	vista	1	1	1	support \EFI\USOS\windows-native\vista-support.cpio limit=64MiB
 wimboot_int10	vista	1	1	2	flag usos-modern-vista.flag
 wimboot_int10	vista	1	1	3	flag usos-external-pe10.flag
 wimboot_int10	vista	1	1	4	flag usos-int10-dispatcher.flag
-wimboot_int10	vista	1	1	5	boot BCD boot.sdi boot.wim
-wimboot_int10	vista	1	1	6	file usos-source.ini folder=Windows Vista
-wimboot_int10	vista	1	1	7	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
+wimboot_int10	vista	1	1	5	optional flag usos-testmode-watermark-on.flag from Systems\Windows\Windows Vista\Unattended\testmode-watermark-on.txt
+wimboot_int10	vista	1	1	6	boot BCD boot.sdi boot.wim
+wimboot_int10	vista	1	1	7	file usos-source.ini folder=Windows Vista
+wimboot_int10	vista	1	1	8	file usos-unattend.xml from Systems\Windows\Windows 7\Unattended
 # progress
 progress	micro_linux	request_saved	1/5 Starting environment - preparation request saved	Preparation request saved
 progress	micro_linux	return_boot_configured	1/5 Starting environment - return boot configured	Return boot configured

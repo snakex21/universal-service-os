@@ -98,6 +98,20 @@ static DWORD run(const WCHAR *path){
  if(!CreateProcessW(path,0,0,0,FALSE,0,0,0,&si,&pi))return GetLastError();
  CloseHandle(pi.hThread);if(WaitForSingleObject(pi.hProcess,INFINITE)==WAIT_OBJECT_0)GetExitCodeProcess(pi.hProcess,&result);CloseHandle(pi.hProcess);return result;
 }
+static void register_testmode_desktop(void){
+#ifdef _WIN64
+ WCHAR helper[MAX_PATH];lstrcpyW(helper,windows);helper[3]=0;lstrcatW(helper,L"USOS\\usoswm\\usoswm-register.exe");
+ if(GetFileAttributesW(helper)==INVALID_FILE_ATTRIBUTES)return;
+ STARTUPINFOW si={sizeof(si)};PROCESS_INFORMATION pi={0};DWORD result=ERROR_GEN_FAILURE;
+ if(CreateProcessW(helper,0,0,0,FALSE,CREATE_NO_WINDOW,0,0,&si,&pi)){
+  CloseHandle(pi.hThread);
+  if(WaitForSingleObject(pi.hProcess,20000)==WAIT_OBJECT_0)GetExitCodeProcess(pi.hProcess,&result);
+  else {TerminateProcess(pi.hProcess,ERROR_TIMEOUT);WaitForSingleObject(pi.hProcess,10000);result=ERROR_TIMEOUT;}
+  CloseHandle(pi.hProcess);
+ }else result=GetLastError();
+ report("Test-mode desktop: common Startup registration (nonfatal)=",result);
+#endif
+}
 /* No boot-time autochk on fixed volumes other than the system volume
  * (vista_autochk.h). Only the untouched Windows default is replaced; the
  * system volume keeps its check (runs only when dirty). Never fatal. */
@@ -177,6 +191,7 @@ void entry(void){
  if(!(oobe==1&&child==3)&&!(active==1&&child==0))ExitProcess(3);
  error=put(L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\WinSAT",L"MOOBE",2);report("Automatic WinSAT guard readback=",error);if(error)ExitProcess(error);
  limit_autochk();
+ register_testmode_desktop();
  if(oobe==1&&child==3){
   static WCHAR name[257];DWORD count=0;BOOL enumerated=account(name,&count),completed=enumerated&&count==1&&evidence(name);
   int decision=enumerated?vo_decide(oobe,child==3,count,completed):-1;

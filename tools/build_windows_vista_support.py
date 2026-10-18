@@ -5,15 +5,18 @@ import json
 import os
 import subprocess
 import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_windows_native_cache import NewcWriter
+from nt6.usoswm.build import build as build_watermark
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def build(root=ROOT, intel_profile=False):
+def build(root=ROOT, intel_profile=False, tool_root=None, frozen_root=None):
+    tool_root = Path(tool_root) if tool_root is not None else root / 'tools'
     # Keep the physically successful binaries: changing the installer must not
     # silently rebuild or alter firstboot, certificates or the driver package.
-    frozen = root / 'artifacts/vista/hardware-success-v11-20260920-235629'
+    frozen = Path(frozen_root) if frozen_root is not None else root / 'artifacts/vista/hardware-success-v11-20260920-235629'
     # Git-ignored (/artifacts/) but a REQUIRED build input: never clean it up
     # (docs/HANDOFF-2026-09-28-release.md).
     if not (frozen / 'manifest.json').is_file():
@@ -37,13 +40,23 @@ def build(root=ROOT, intel_profile=False):
     temp=out/'tmp';temp.mkdir(exist_ok=True)
     env=dict(os.environ,TEMP=str(temp),TMP=str(temp),ZIG_GLOBAL_CACHE_DIR=str(root/'tools/cache/zig-global'),ZIG_LOCAL_CACHE_DIR=str(out/'zig-cache'))
     gate=out/'usos-vista-oobe.exe'
-    subprocess.run([str(root/'tools/zig/zig.exe'),'cc','-target','x86_64-windows.vista-gnu','-Os','-nostdlib','-fno-stack-protector','-fno-builtin','-I'+str(root/'tools/zig/lib/libc/include/any-windows-any'),str(root/'tools/windows_vista_oobe_gate.c'),'-Wl,--entry,entry','-lkernel32','-ladvapi32','-lnetapi32','-luser32','-o',str(gate)],env=env,check=True)
+    watermark_out=out/'usoswm'
+    watermark_manifest=build_watermark(tool_root,watermark_out)
+    watermark_files=[]
+    for name,digest in watermark_manifest['files'].items():
+        watermark_files.append((watermark_out/name,'USOS\\usoswm\\'+name,digest))
+    subprocess.run([str(tool_root/'zig/zig.exe'),'cc','-target','x86_64-windows.vista-gnu','-Os','-nostdlib','-fno-stack-protector','-fno-builtin','-I'+str(tool_root/'zig/lib/libc/include/any-windows-any'),str(root/'tools/windows_vista_oobe_gate.c'),'-Wl,--entry,entry','-lkernel32','-ladvapi32','-lnetapi32','-luser32','-o',str(gate)],env=env,check=True)
     # Added independently; the 13 hardware-tested USB files stay byte-identical.
     files.append((gate,'USOS\\oobe.exe',hashlib.sha256(gate.read_bytes()).hexdigest()))
     lines = ['static const struct { const WCHAR *source, *target; BYTE sha256[32]; } vista_files[] = {']
     for index, (path, target, digest) in enumerate(files):
         name = 'vista-payload-%02d.bin' % index
         lines.append('{L"%s",L"%s",{%s}},' % (name, target.replace('\\', '\\\\'), ','.join('0x'+digest[i:i+2] for i in range(0,64,2))))
+    lines.append('};')
+    lines.append('#define USOS_VISTA_WATERMARK_PAYLOAD 1')
+    lines.append('static const struct { const WCHAR *source, *target; BYTE sha256[32]; } vista_wm_files[] = {')
+    for index,(_,target,digest) in enumerate(watermark_files):
+        lines.append('{L"vista-watermark-%02d.bin",L"%s",{%s}},'%(index,target.replace('\\','\\\\'),','.join('0x'+digest[i:i+2] for i in range(0,64,2))))
     lines.append('};')
     (out/'vista_deploy_files.h').write_text('\n'.join(lines)+'\n', encoding='ascii')
     # An explicit hardware-trial option, never an implicit release dependency.
@@ -63,14 +76,15 @@ def build(root=ROOT, intel_profile=False):
     profile_lines.append('{0,{0}}};')
     (out/'vista_boot_files.h').write_text('\n'.join(profile_lines)+'\n',encoding='ascii')
     exe=out/'usos-vista-install.exe'
-    subprocess.run([str(root/'tools/zig/zig.exe'),'cc','-target','x86_64-windows.win10-gnu','-Os','-nostdlib','-fno-stack-protector','-fno-builtin','-I'+str(root/'tools/zig/lib/libc/include/any-windows-any'),'-I'+str(out),str(root/'tools/windows_vista_install.c'),'-Wl,--entry,entry','-lkernel32','-ladvapi32','-lversion','-luser32','-o',str(exe)],env=env,check=True)
+    subprocess.run([str(tool_root/'zig/zig.exe'),'cc','-target','x86_64-windows.win10-gnu','-Os','-nostdlib','-fno-stack-protector','-fno-builtin','-I'+str(tool_root/'zig/lib/libc/include/any-windows-any'),'-I'+str(out),str(root/'tools/windows_vista_install.c'),'-Wl,--entry,entry','-lkernel32','-ladvapi32','-lversion','-luser32','-o',str(exe)],env=env,check=True)
     destination=root/'zig-out/windows-native';destination.mkdir(parents=True,exist_ok=True)
     # Int10 dispatcher assets, shared with Windows 7 (docs/design/win7-vista-no-csm.md
     # section 7): used only when the plan adds usos-int10-dispatcher.flag. The
     # release UefiSeven binary (manifest-checked), never the source build.
     wrapper=root/'zig-out/windows7-uefi/win7-wrapper.efi'
     if not wrapper.is_file():
-        subprocess.run([sys.executable,str(root/'tools/build_windows7_uefi.py')],check=True)
+        wrapper.parent.mkdir(parents=True,exist_ok=True)
+        subprocess.run([str(tool_root/'zig/zig.exe'),'build-exe','-target','x86_64-uefi','-O','ReleaseSmall','--dep','windows7_video','-Mroot='+str(root/'tools/windows7_uefi_wrapper.zig'),'-Mwindows7_video='+str(root/'src/platform/uefi/windows7_video.zig'),'-femit-bin='+str(wrapper)],env=env,check=True)
     uefiseven=root/'tools/vendor/uefiseven/1.30'
     seven=json.loads((uefiseven/'manifest.json').read_text())
     for name in ('UefiSeven.efi','LICENSE.txt'):
@@ -82,6 +96,8 @@ def build(root=ROOT, intel_profile=False):
         writer.add_bytes('usos-modern-vista.cmd',(root/'tools/windows_vista_modern_startup.cmd').read_bytes().replace(b'\r\n',b'\n').replace(b'\n',b'\r\n'))
         for index,(path,_,_) in enumerate(files):
             writer.add_file('vista-payload-%02d.bin'%index,path)
+        for index,(path,_,_) in enumerate(watermark_files):
+            writer.add_file('vista-watermark-%02d.bin'%index,path)
         for path,name,_ in profile_files:
             writer.add_file(name,path)
         # WIMBoot treats .efi files as boot applications: neutral names, as
@@ -100,4 +116,7 @@ if __name__=='__main__':
     import argparse
     parser=argparse.ArgumentParser()
     parser.add_argument('--intel-profile',action='store_true')
-    build(intel_profile=parser.parse_args().intel_profile)
+    parser.add_argument('--tool-root',type=Path)
+    parser.add_argument('--frozen-root',type=Path)
+    args=parser.parse_args()
+    build(intel_profile=args.intel_profile,tool_root=args.tool_root,frozen_root=args.frozen_root)
