@@ -238,6 +238,30 @@ def ne_driver(code: bytes, module: str, description: str, exports, stub_text: st
     return bytes(out)
 
 
+def build_vxd(out: Path, work: Path) -> Path:
+    """USOSVMD.VXD (src/platform/win9x/usosvmd.asm): a Windows 9x VMOUSE
+    mouse minidriver (LE VxD, OpenWatcom wasm + wlink). It feeds VMOUSE from
+    USOSKEY.COM's USB mouse ring so MS-DOS boxes get an Int 33h mouse. Our
+    own implementation from the public 95/98 DDK docs; no Microsoft code is
+    linked (own DDB and control proc, import records only)."""
+    ow = openwatcom()
+    env = dict(os.environ, WATCOM=str(ow),
+               PATH=str(ow / 'binnt64') + os.pathsep + os.environ.get('PATH', ''))
+    asm = ROOT / 'src/platform/win9x/usosvmd.asm'
+    obj = work / 'usosvmd.obj'
+    subprocess.run([str(ow / 'binnt64/wasm.exe'), '-q', '-3p', '-mf',
+                    '-fo=' + str(obj), str(asm)], env=env, check=True, cwd=work)
+    vxd = out / 'USOSVMD.VXD'
+    subprocess.run([str(ow / 'binnt64/wlink.exe'), '@' + str(ROOT / 'src/platform/win9x/usosvmd.lnk'),
+                    'file', str(obj), 'name', str(vxd), 'option', 'map=' + str(work / 'usosvmd.map')],
+                   env=env, check=True, cwd=work)
+    data = vxd.read_bytes()
+    le = int.from_bytes(data[0x3c:0x3e], 'little')
+    if data[le:le + 2] != b'LE' or b'USOSVMD ' not in data:
+        raise ValueError('USOSVMD.VXD is not the expected LE VxD')
+    return vxd
+
+
 def build_win1_mouse(out: Path, work: Path) -> Path:
     """USOSMS1.DRV (src/platform/win1/usosms1.S): BIOS pointing-device
     (USB under CSMWrap) mouse driver for Windows 1.0x, module MOUSE."""
@@ -271,10 +295,12 @@ def build(root: Path = ROOT, out: Path | None = None):
     mouse = build_mouse_driver(out, work)
     kbc = build_kbc(out, work)
     win1 = build_win1_mouse(out, work)
+    vxd = build_vxd(out, work)
     from usos_keyscript import build_all as build_keyscripts
     scripts = build_keyscripts(out)
     print(f'[PASS] Windows 3.x USB keyboard and mouse: {com.name} {com.stat().st_size} bytes, {drv.name} {drv.stat().st_size} bytes, '
-          f'{mouse.name} {mouse.stat().st_size} bytes, {win1.name} {win1.stat().st_size} bytes, {kbc.name} {kbc.stat().st_size} bytes, {len(scripts)} key scripts '
+          f'{mouse.name} {mouse.stat().st_size} bytes, {win1.name} {win1.stat().st_size} bytes, {kbc.name} {kbc.stat().st_size} bytes, '
+          f'{vxd.name} {vxd.stat().st_size} bytes, {len(scripts)} key scripts '
           f'(OpenWatcom snapshot {OW_SNAPSHOT["sha256"][:12]})')
 
 

@@ -484,9 +484,71 @@ static void bios_off(BYTE state)
     shared->mstate = state;
 }
 
+/* VMOUSE mode (USOSVMD.VXD present): the VxD drains the mouse ring at ring 0
+ * and posts to VMOUSE, which serves the Windows desktop (through USER's
+ * Mouse_Event) and, for the first time, MS-DOS boxes (its Int 33h
+ * emulation). In this mode this driver still performs the INT 15h C2xx BIOS
+ * registration (so SeaBIOS keeps feeding the TSR ring) but, instead of its
+ * own 20 ms timer feeding USER, it hands USER's event procedure to VMOUSE
+ * with the documented VMDAPI_SET_MOUSE_EVENT_CALLBACK call (95/98 DDK
+ * MOUSE.DOC / the MOUSEDRV sample). Gate: C:\USOS9X\USOSVMD.ON exists and
+ * VMOUSE's API answers. When the VxD is not loaded nothing changes and the
+ * existing timer/pause path runs. */
+#define VMD_DEVICE_ID              0x000C
+#define VMDAPI_SET_MOUSE_EVENT_CB  0x0003
+
+static DWORD vmd_api;               /* VMOUSE PM API entry (seg:off), 0 = none */
+static BYTE vmdmode, vmdmode_checked;
+
+static int vmd_present(void)
+{
+    OFSTRUCT of;
+    WORD o = 0, s = 0;
+    if (vmdmode_checked) return vmdmode;
+    vmdmode_checked = 1;
+    if (OpenFile("C:\\USOS9X\\USOSVMD.ON", &of, OF_EXIST) == HFILE_ERROR) return 0;
+    _asm {                          /* INT 2Fh AX=1684h BX=VMD: ES:DI = API */
+        push es
+        push di
+        mov ax, 1684h
+        mov bx, VMD_DEVICE_ID
+        xor di, di
+        mov es, di
+        int 2Fh
+        mov o, di
+        mov s, es
+        pop di
+        pop es
+    }
+    if (!s) return 0;
+    vmd_api = ((DWORD)s << 16) | o;
+    vmdmode = 1;
+    return 1;
+}
+
+/* Give VMOUSE the event procedure to call (proc) or 0 to stop. */
+static void vmd_set_callback(DWORD proc)
+{
+    WORD vseg = HIWORD(proc), voff = LOWORD(proc);
+    if (!vmd_api) return;
+    _asm {
+        pusha
+        push es
+        push ds
+        mov ax, VMDAPI_SET_MOUSE_EVENT_CB
+        mov cx, vseg
+        mov dx, voff
+        call dword ptr vmd_api
+        pop ds
+        pop es
+        popa
+    }
+}
+
 static void stop(void)
 {
     if (timer) { kill_timer(timer); timer = 0; }
+    if (vmdmode) vmd_set_callback(0);   /* stop VMOUSE calling USER */
     if (shared && shared->mstate == MS_ENABLED) bios_off(MS_DISABLED);
     if (shared && (shared->mstate == MS_PAUSED || shared->mstate == MS_NO_GUARD)) shared->mstate = MS_DISABLED;
     if (shared) shared->malive = 0;
@@ -516,7 +578,19 @@ static int is_me(void)
  * timer, the BIOS mouse stays off. Task time only (Enable, USOSATTACH). */
 static void start(void)
 {
-    if (timer || !event_proc || !shared || !present || !init_timer_procs()) return;
+    if (!event_proc || !shared || !present) return;
+    /* VMOUSE mode: register USER's procedure with VMOUSE and let USOSVMD.VXD
+     * drain the ring; this driver keeps only the BIOS registration, no
+     * SYSTEM.DRV timer. Not while paused (Me DOS-box guard still wins). */
+    if (!paused && vmd_present()) {
+        shared->mtail = shared->mhead;
+        buttons = 0;
+        if (!bios_on()) return;
+        shared->malive = 18;        /* the VxD tops this up; set it now too */
+        vmd_set_callback(event_proc);
+        return;
+    }
+    if (timer || !init_timer_procs()) return;
     shared->mtail = shared->mhead;  /* nothing stale */
     buttons = 0;
     if (paused) shared->mstate = paused;

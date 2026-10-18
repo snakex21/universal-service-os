@@ -543,16 +543,34 @@ static int query_bridge(void)
     return shared->magic[0] == 'U' && shared->magic[1] == 'S' && shared->magic[2] == 'K' && shared->magic[3] == 'Y';
 }
 
+/* C:\USOS9X\USOSVMD.ON (read only): USOSVMD.VXD is deployed, so the DOS-box
+ * mouse comes from the VxD (which drains the ring at ring 0 and feeds
+ * VMOUSE). The Me DOS-box pause must then stay off, or it would stop the
+ * ring while a DOS box is open and starve the VxD. Without the flag the
+ * pause is the fallback, unchanged. Checked once. */
+static BYTE vmd_on, vmd_on_checked;
+
+static int usosvmd_on(void)
+{
+    OFSTRUCT of;
+    if (!vmd_on_checked) {
+        vmd_on_checked = 1;
+        vmd_on = OpenFile("C:\\USOS9X\\USOSVMD.ON", &of, OF_EXIST) != HFILE_ERROR;
+    }
+    return vmd_on;
+}
+
 /* Me: the bridge copy came from here, after USER enabled the mouse driver.
  * USOSMOUS.DRV (module MOUSE) registers with the BIOS now; another mouse
  * driver has no USOSATTACH and is left alone. With USOSPAUSE (v3) it is
  * paused first: the DOS-box hook comes at DRV_ENABLE (start), which resumes
- * it. Task time (DRV_LOAD). */
+ * it. Task time (DRV_LOAD). When USOSVMD.VXD is deployed the guard is left
+ * off (the VxD owns the DOS-box mouse). */
 static void attach_mouse(void)
 {
     FARPROC attach = mouse_export("USOSATTACH");
     if (!attach) return;
-    mouse_guard = mouse_export("USOSPAUSE") != 0;
+    mouse_guard = !usosvmd_on() && mouse_export("USOSPAUSE") != 0;
     if (mouse_guard) mouse_pause(1);
     ((void (FAR PASCAL *)(void))attach)();
 }
