@@ -24,12 +24,21 @@ def build_gate(out: Path, target: str, native: bool) -> bytes:
     if native:
         args.append('-DUSOS_GATE_NATIVE_DEPLOY')
     args += ['-I' + str(ROOT / 'tools/zig/lib/libc/include/any-windows-any'), str(ROOT / 'tools/windows_vista_oobe_gate.c'),
-             '-Wl,--entry,entry', '-lkernel32', '-ladvapi32', '-lnetapi32', '-luser32', '-lcrypt32', '-o', str(out)]
+             '-Wl,--entry,entry', '-Wl,--subsystem,windows', '-lkernel32', '-ladvapi32', '-lnetapi32', '-luser32', '-lcrypt32', '-o', str(out)]
     subprocess.run(args, env=env, check=True)
     return out.read_bytes()
 
 
 class X86VistaOobeGate(unittest.TestCase):
+    def test_hidden_console_chain_retains_stdout(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder=Path(temporary)
+            env=dict(os.environ,ZIG_GLOBAL_CACHE_DIR=str(folder/'global'),ZIG_LOCAL_CACHE_DIR=str(folder/'local'))
+            common=[str(ZIG),'cc','-target','x86_64-windows.win10-gnu','-Os','-nostdlib','-fno-stack-protector','-fno-builtin','-I'+str(ROOT/'tools/zig/lib/libc/include/any-windows-any'),'-Wl,--entry,entry','-lkernel32','-luser32']
+            subprocess.run(common+[str(ROOT/'tools/tests/vista_console_child.c'),str(ROOT/'tools/nt6/usoswm/runtime.c'),'-Wl,--subsystem,console','-o',str(folder/'console-child.exe')],env=env,check=True)
+            subprocess.run(common+[str(ROOT/'tools/tests/vista_console_harness.c'),str(ROOT/'tools/nt6/usoswm/runtime.c'),'-Wl,--subsystem,windows','-ladvapi32','-lnetapi32','-o',str(folder/'quiet-parent.exe')],env=env,check=True)
+            subprocess.run([str(folder/'quiet-parent.exe')],env=env,check=True,timeout=30)
+
     def test_gate_variants(self):
         with tempfile.TemporaryDirectory() as tmp:
             x86 = build_gate(Path(tmp) / 'x86.exe', 'x86-windows.vista-gnu', True)
@@ -39,10 +48,15 @@ class X86VistaOobeGate(unittest.TestCase):
         moobe = 'MOOBE'.encode('utf-16-le')
         pe = int.from_bytes(x86[0x3c:0x40], 'little')
         self.assertEqual(x86[pe + 4:pe + 6], b'\x4c\x01')  # IMAGE_FILE_MACHINE_I386
+        for data in (x86,x64):
+            header=int.from_bytes(data[0x3c:0x40],'little')
+            self.assertEqual(2,int.from_bytes(data[header+24+68:header+24+70],'little')) # WINDOWS_GUI, no console
         self.assertIn(moobe, x86)
         self.assertIn(windeploy, x86)
         self.assertNotIn(usb, x86)
         self.assertIn(usb, x64)  # the x64 USB v11 path is unchanged
+        self.assertNotIn(b'WM_SETUP_GATE_DESKTOP', x86)
+        self.assertNotIn(b'WM_SETUP_GATE_DESKTOP', x64)
 
     def test_cmd_arms_gate_for_nt60_sp2_only(self):
         self.assertIn('call :usb3\ncall :nt60_gate\n', CMD)

@@ -45,7 +45,7 @@ def build(root=ROOT, intel_profile=False, tool_root=None, frozen_root=None):
     watermark_files=[]
     for name,digest in watermark_manifest['files'].items():
         watermark_files.append((watermark_out/name,'USOS\\usoswm\\'+name,digest))
-    subprocess.run([str(tool_root/'zig/zig.exe'),'cc','-target','x86_64-windows.vista-gnu','-Os','-nostdlib','-fno-stack-protector','-fno-builtin','-I'+str(tool_root/'zig/lib/libc/include/any-windows-any'),str(root/'tools/windows_vista_oobe_gate.c'),'-Wl,--entry,entry','-lkernel32','-ladvapi32','-lnetapi32','-luser32','-o',str(gate)],env=env,check=True)
+    subprocess.run([str(tool_root/'zig/zig.exe'),'cc','-target','x86_64-windows.vista-gnu','-Os','-nostdlib','-fno-stack-protector','-fno-builtin','-I'+str(tool_root/'zig/lib/libc/include/any-windows-any'),str(root/'tools/windows_vista_oobe_gate.c'),'-Wl,--entry,entry','-Wl,--subsystem,windows','-lkernel32','-ladvapi32','-lnetapi32','-luser32','-o',str(gate)],env=env,check=True)
     # Added independently; the 13 hardware-tested USB files stay byte-identical.
     files.append((gate,'USOS\\oobe.exe',hashlib.sha256(gate.read_bytes()).hexdigest()))
     lines = ['static const struct { const WCHAR *source, *target; BYTE sha256[32]; } vista_files[] = {']

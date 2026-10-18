@@ -9,6 +9,9 @@
 #include "vista_autochk.h"
 static WCHAR windows[MAX_PATH],self[MAX_PATH],file[MAX_PATH];
 static HANDLE log_file=INVALID_HANDLE_VALUE;
+#ifdef USOSWM_VM_EVIDENCE
+static HANDLE setup_background_proof;
+#endif
 static const WCHAR native[]=L"oobe\\windeploy.exe";
 static void report(const char *label,DWORD v){
  DWORD n;char hex[13]="0x00000000\r\n";
@@ -93,9 +96,13 @@ static BOOL evidence(const WCHAR *user){
   if(bytes){if(ReadFile(f,bytes,(DWORD)size.QuadPart,&got,0)&&got==size.QuadPart)ok=vo_completed(bytes,got,encoded);LocalFree(bytes);}
  }CloseHandle(f);return ok;
 }
-static DWORD run(const WCHAR *path){
+static DWORD run(const WCHAR *path,BOOL quiet_console){
  STARTUPINFOW si={sizeof(si)};PROCESS_INFORMATION pi={0};DWORD result=ERROR_GEN_FAILURE;
- if(!CreateProcessW(path,0,0,0,FALSE,0,0,0,&si,&pi))return GetLastError();
+ /* The frozen console bootstrap and its console children share one hidden
+  * console. Keep stdout and their logs working; native Windows UI uses the
+  * normal startup path. No changes to the frozen helper binaries. */
+ if(quiet_console){si.dwFlags=STARTF_USESHOWWINDOW;si.wShowWindow=SW_HIDE;}
+ if(!CreateProcessW(path,0,0,0,FALSE,quiet_console?CREATE_NEW_CONSOLE:0,0,0,&si,&pi))return GetLastError();
  CloseHandle(pi.hThread);if(WaitForSingleObject(pi.hProcess,INFINITE)==WAIT_OBJECT_0)GetExitCodeProcess(pi.hProcess,&result);CloseHandle(pi.hProcess);return result;
 }
 static void register_testmode_desktop(void){
@@ -112,6 +119,35 @@ static void register_testmode_desktop(void){
  report("Test-mode desktop: common Startup registration (nonfatal)=",result);
 #endif
 }
+static void start_testmode_setup_background(void){
+#ifdef _WIN64
+ WCHAR helper[MAX_PATH],command[MAX_PATH+32];lstrcpyW(helper,windows);helper[3]=0;lstrcatW(helper,L"USOS\\usoswm\\usoswm.exe");
+ if(GetFileAttributesW(helper)==INVALID_FILE_ATTRIBUTES)return;
+ HANDLE ready=CreateEventW(0,TRUE,FALSE,L"Local\\USOSWM.Setup.Background.Ready");if(!ready)return;ResetEvent(ready);
+ lstrcpyW(command,L"\"");lstrcatW(command,helper);lstrcatW(command,L"\" --setup");
+ STARTUPINFOW si={sizeof(si)};PROCESS_INFORMATION pi={0};DWORD result=ERROR_GEN_FAILURE;
+ if(CreateProcessW(helper,command,0,0,FALSE,CREATE_NO_WINDOW,0,0,&si,&pi)){
+  CloseHandle(pi.hThread);HANDLE waits[]={ready,pi.hProcess};DWORD event=WaitForMultipleObjects(2,waits,FALSE,10000);
+  if(event==WAIT_OBJECT_0){result=0;
+#ifdef USOSWM_VM_EVIDENCE
+   DuplicateHandle(GetCurrentProcess(),pi.hProcess,GetCurrentProcess(),&setup_background_proof,SYNCHRONIZE,FALSE,0);
+#endif
+  }
+  else if(event==WAIT_OBJECT_0+1)GetExitCodeProcess(pi.hProcess,&result);
+  else {TerminateProcess(pi.hProcess,ERROR_TIMEOUT);WaitForSingleObject(pi.hProcess,10000);result=ERROR_TIMEOUT;}
+  CloseHandle(pi.hProcess);
+ }else result=GetLastError();
+ CloseHandle(ready);report("Test-mode setup background start (nonfatal)=",result);
+#endif
+}
+#ifdef USOSWM_VM_EVIDENCE
+/* Test-only checkpoint before native deploy/USB. Not present in product builds. */
+static char capture_setup_desktop(const char *event){
+ HANDLE port=CreateFileW(L"\\\\.\\COM1",GENERIC_READ|GENERIC_WRITE,0,0,OPEN_EXISTING,0,0);if(port==INVALID_HANDLE_VALUE)return 0;
+ DCB dcb={sizeof(dcb)};if(GetCommState(port,&dcb)){dcb.BaudRate=115200;dcb.ByteSize=8;dcb.StopBits=ONESTOPBIT;dcb.Parity=NOPARITY;SetCommState(port,&dcb);}
+ DWORD n;WriteFile(port,event,lstrlenA(event),&n,0);char ack=0;ReadFile(port,&ack,1,&n,0);CloseHandle(port);return ack;
+}
+#endif
 /* No boot-time autochk on fixed volumes other than the system volume
  * (vista_autochk.h). Only the untouched Windows default is replaced; the
  * system volume keeps its check (runs only when dirty). Never fatal. */
@@ -191,7 +227,22 @@ void entry(void){
  if(!(oobe==1&&child==3)&&!(active==1&&child==0))ExitProcess(3);
  error=put(L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\WinSAT",L"MOOBE",2);report("Automatic WinSAT guard readback=",error);if(error)ExitProcess(error);
  limit_autochk();
+#ifdef USOSWM_VM_EVIDENCE
+ capture_setup_desktop("WM_SETUP_GATE_NATIVE\n");
+#endif
+ start_testmode_setup_background();
  register_testmode_desktop();
+#ifdef USOSWM_VM_EVIDENCE
+ if(capture_setup_desktop("WM_SETUP_GATE_DESKTOP\n")=='F'){
+  /* Explicit fixture-only lifecycle action, never in a product build. */
+  DWORD zero=0;LONG first=RegSetValueExW(setup,L"SystemSetupInProgress",0,REG_DWORD,(BYTE*)&zero,4);
+  LONG second=RegSetValueExW(setup,L"OOBEInProgress",0,REG_DWORD,(BYTE*)&zero,4);RegFlushKey(setup);
+  DWORD waited=setup_background_proof?WaitForSingleObject(setup_background_proof,10000):WAIT_FAILED;
+  capture_setup_desktop(!first&&!second&&waited==WAIT_OBJECT_0?"WM_SETUP_BACKGROUND_CLOSED\n":"WM_SETUP_BACKGROUND_CLOSE_FAILED\n");
+  ExitProcess(first||second||waited!=WAIT_OBJECT_0?1:0);
+ }
+#endif
+ BOOL quiet_console=FALSE;
  if(oobe==1&&child==3){
   static WCHAR name[257];DWORD count=0;BOOL enumerated=account(name,&count),completed=enumerated&&count==1&&evidence(name);
   int decision=enumerated?vo_decide(oobe,child==3,count,completed):-1;
@@ -210,7 +261,8 @@ void entry(void){
   lstrcpyW(file,windows);lstrcatW(file,L"\\System32\\oobe\\windeploy.exe");
 #else
   lstrcpyW(file,L"C:\\USOS\\usb.exe");file[0]=windows[0];
+  quiet_console=TRUE;
 #endif
  }
- RegCloseKey(setup);DWORD result=run(file);report("Native bootstrap/deploy exit=",result);CloseHandle(log_file);ExitProcess(result);
+ RegCloseKey(setup);DWORD result=run(file,quiet_console);report("Native bootstrap/deploy exit=",result);CloseHandle(log_file);ExitProcess(result);
 }

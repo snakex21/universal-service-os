@@ -2,6 +2,7 @@
  * Per-session launcher. Shell notifications replace process polling.
  */
 #include "common.h"
+#include "setup_background.h"
 static HWND receiver;
 static HHOOK thread_hook;
 static HMODULE component;
@@ -27,6 +28,7 @@ static LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM w,LPARAM l){
 }
 void entry(void){
  if(!wm_supported()||!wm_default_desktop()||wm_visible(0)){wm_log(0,"Not started: OS/testsigning/default desktop/opt-out guard");ExitProcess(0);}
+ if(setup_requested()){setup_present();ExitProcess(0);}
  HANDLE mutex=CreateMutexW(0,TRUE,L"Local\\USOSWM.Desktop.Launcher");if(!mutex||GetLastError()==ERROR_ALREADY_EXISTS)ExitProcess(0);
  WCHAR path[MAX_PATH];if(!wm_directory(0,path))ExitProcess(2);lstrcatW(path,L"usoswm-desktop.dll");component=LoadLibraryW(path);if(!component)ExitProcess(3);
  taskbar_created=RegisterWindowMessageW(L"TaskbarCreated");WNDCLASSW type={0};type.lpfnWndProc=window_proc;type.hInstance=GetModuleHandleW(0);type.lpszClassName=L"USOSWM.Session";

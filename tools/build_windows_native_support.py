@@ -125,7 +125,7 @@ def build_modern_support(root: Path, out: Path):
     # installs it as C:/USOS/oobe.exe (csmwrap-integration 12.5).
     subprocess.run([str(root / 'tools/zig/zig.exe'), 'cc', '-target', 'x86-windows.vista-gnu', '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
                     '-DUSOS_GATE_NATIVE_DEPLOY', '-I' + str(root / 'tools/zig/lib/libc/include/any-windows-any'), str(root / 'tools/windows_vista_oobe_gate.c'),
-                    '-Wl,--entry,entry', '-lkernel32', '-ladvapi32', '-lnetapi32', '-luser32', '-lcrypt32', '-o', str(helpers / 'usos-vista-oobe-x86.exe')], env=env, check=True)
+                    '-Wl,--entry,entry', '-Wl,--subsystem,windows', '-lkernel32', '-ladvapi32', '-lnetapi32', '-luser32', '-lcrypt32', '-o', str(helpers / 'usos-vista-oobe-x86.exe')], env=env, check=True)
     # 32-bit 7 / 8.x / 10 before 1703 on that path: usos-usbreenum (USB
     # mass-storage device nodes after Setup, run once from SetupComplete.cmd;
     # usos-x86-csmwrap.cmd :usbfix). Runs in the installed Windows, so the

@@ -57,8 +57,24 @@ Transparent images, nonzero patterns and unknown formats retain native rendering
 The stock NT 6.0 REG_DWORD-zero pattern and eight zero rows represent no pattern.
 There is no injection into Winlogon, LogonUI, DWM or other applications.
 
+The OOBE gate also starts `usoswm.exe --setup` on the setup Default desktop.
+This mode owns a temporary solid-colour bottom window below installer windows;
+it installs no hooks. It reads the existing setup state, respects the opt-out,
+safe-mode, version-text and genuine-status guards, and closes at setup end or
+when the real Explorer shell appears. Registry notifications and WinEvents
+drive its lifetime without polling. Its files and logs stay beside the app.
+It cannot prevent a native paint that happens before the gate starts it.
+
+The gate is a GUI-subsystem program, so it allocates no console. The unchanged
+frozen USB bootstrap starts with a hidden console inherited by its console
+children; stdout and their file logs remain available. Native Windows GUI
+configuration keeps its normal startup behaviour. Both x86/x64 gates are GUI
+programs; x86 does not install the watermark component.
+
 This implementation still needs complete coverage for a second user's desktop,
-RDP, setup, Aero and real multi-monitor/DPI behaviour. Classic-theme changes
+RDP, Aero and real multi-monitor/DPI behaviour. Setup has a deliberately rearmed
+VM checkpoint with visible-before/hidden-after/opt-out and shutdown-of-background
+proof; that fixture is not a complete fresh-install acceptance. Classic-theme changes
 have measured VM coverage. A successful build or
 an attached hook is not evidence of successful watermark suppression.
 
