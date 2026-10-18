@@ -1308,7 +1308,7 @@
         ],
         "offer": false
       },
-      "notice": "By Javier S. Pedro; unmodified release binaries, source on the ESP (VBADOS.TGZ) and VBADOS.TXT (SOURCES + GPL text) next to them on MS-DOS / Windows 3.x disks installed under CSMWrap."
+      "notice": "By Javier S. Pedro; unmodified release binaries, source on the ESP (VBADOS.TGZ) and VBADOS.TXT (SOURCES + GPL text) next to them on MS-DOS / Windows 3.x disks installed under CSMWrap; VBMOUSE.EXE + VBADOS.TXT also in the FreeDOS and MS-DOS RAM sessions and for MS-DOS mode of Windows 95/98/98 SE (USOS9X folder, DOSMOUSE.BAT)."
     },
     {
       "id": "vmdisp9x",

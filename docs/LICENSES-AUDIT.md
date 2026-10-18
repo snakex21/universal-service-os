@@ -184,12 +184,12 @@ Notes on individual entries:
 | `EFI/USOS/dos-native/memdisk`, `COPYING`, `source.zip` | Syslinux MEMDISK 6.03 |
 | `EFI/USOS/dos-native/ram-patch/*` | Patcher9x 0.9.91, CWSDPMI r7 (+ USOS BAT files) |
 | `EFI/USOS/dos-native/msdos/HIMEMX.*`, `HIMEMSRC.ZIP`, `LICENSE.TXT` | HimemX 3.40 (+ USOS BAT files and REBOOT.COM) |
-| `EFI/USOS/dos-native/freedos/*` | FreeDOS kernel, FreeCOM, Doszip (+ USOS BAT files) |
+| `EFI/USOS/dos-native/freedos/*` | FreeDOS kernel, FreeCOM, Doszip (+ USOS BAT files); a copy of VBADOS 0.67 `VBMOUSE.EXE` + `VBADOS.TXT` (source: `msdos/VBADOS.TGZ` on the same ESP) |
 | `EFI/USOS/csmwrap/*` | CSMWrap 3.1.2-usos3 with source and licences |
 | `EFI/USOS/dos-native/msdos/CSMESP.IMG` | the same CSMWrap build, licences, source and patches as a FAT16 image for DOS / Windows 3.x targets (1.1) |
 | `EFI/USOS/dos-native/msdos/VBMOUSE.*`, `VBADOS.TXT`, `VBADOS.TGZ` | VBADOS 0.67 with its GPL text and source (1.1) |
 | `EFI/USOS/dos-native/msdos/USOSKEY.COM`, `USOSKEY.DRV` | USOS code (GPL-3.0-or-later); the driver is built with OpenWatcom 2.0 but links no OpenWatcom library code (1.1) |
-| `EFI/USOS/dos-native/win9x/*` | USOS U9FIX.COM, MSBATCH.INF, USOSVESA.INF (GPL-3.0-or-later); vmdisp9x 1.2025.0.119 + VMHal9x (MIT) with VMDISP9X.TXT and VMDISP9X.TGZ; copies of USOSKEY and VBADOS 0.67 (+ VBADOS.TXT) for Windows 9x under CSMWrap |
+| `EFI/USOS/dos-native/win9x/*` | USOS U9FIX.COM, MSBATCH.INF, USOSVESA.INF (GPL-3.0-or-later); vmdisp9x 1.2025.0.119 + VMHal9x (MIT) with VMDISP9X.TXT and VMDISP9X.TGZ; copies of USOSKEY and VBADOS 0.67 (+ VBADOS.TXT) for Windows 9x under CSMWrap; USOS DOSMOUSE.BAT and INWIN.COM (GPL-3.0-or-later, MS-DOS mode mouse) |
 | `EFI/USOS/shell/*` | EDK2 UEFI Shell (+ USOS `startup.nsh`) |
 | `EFI/USOS/touchi2c_x64.efi`, `EFI/USOS/licenses/touchi2cdxe/LICENSE` | TouchI2cDxe v1.3.1-usos1 |
 | `EFI/USOS/linux/usos-linux.cpio`, `EFI/USOS/themes/*`, `ENROLL*`, `secure-boot.ini`, `build-info.ini`, `USOS-KEY.cer`, `UI/index.html`, `UI/theme.css` | USOS only |

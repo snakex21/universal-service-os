@@ -132,6 +132,8 @@ try {
         'EFI/USOS/dos-native/win9x/VBMOUSE.EXE',
         'EFI/USOS/dos-native/win9x/VBMOUSE.DRV',
         'EFI/USOS/dos-native/win9x/VBADOS.TXT',
+        'EFI/USOS/dos-native/win9x/DOSMOUSE.BAT',
+        'EFI/USOS/dos-native/win9x/INWIN.COM',
         'EFI/USOS/dos-native/win9x/XHCI98.SYS',
         'EFI/USOS/dos-native/win9x/XHCI98.INF',
         'EFI/USOS/dos-native/win9x/XHCI98.TXT',
@@ -231,6 +233,8 @@ try {
         @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\VBMOUSE.EXE'); Target = 'EFI/USOS/dos-native/win9x/VBMOUSE.EXE' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\VBMOUSE.DRV'); Target = 'EFI/USOS/dos-native/win9x/VBMOUSE.DRV' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\VBADOS.TXT'); Target = 'EFI/USOS/dos-native/win9x/VBADOS.TXT' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\DOSMOUSE.BAT'); Target = 'EFI/USOS/dos-native/win9x/DOSMOUSE.BAT' },
+        @{ Source = (Join-Path $ProjectRoot 'zig-out\dos-native\win9x\INWIN.COM'); Target = 'EFI/USOS/dos-native/win9x/INWIN.COM' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\micro-linux\vmlinuz-virt'); Target = 'EFI/USOS/micro-linux/vmlinuz-virt' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\micro-linux\systemd-bootx64.efi'); Target = 'EFI/USOS/systemd-bootx64.efi' },
         @{ Source = (Join-Path $ProjectRoot 'zig-out\test-assets\ntfs_x64.efi'); Target = 'EFI/USOS/ntfs_x64.efi' }
@@ -241,7 +245,7 @@ try {
     foreach ($name in $msDosFiles) {
         $explicitPayloadFiles += @{ Source = (Join-Path $ProjectRoot ('zig-out/dos-native/msdos/' + $name)); Target = ('EFI/USOS/dos-native/msdos/' + $name) }
     }
-    foreach ($name in @('BOOT16.BIN','KERNEL.SYS','COMMAND.COM','DZ.EXE','DZ.DOS','FDAUTO.BAT','FDCONFIG.SYS','TOOLS.BAT','README.TXT','REBOOT.COM','DOSZIP.TXT','COPYING','kernel.zip','freecom.zip','doszip.zip','manifest.json')) {
+    foreach ($name in @('BOOT16.BIN','KERNEL.SYS','COMMAND.COM','DZ.EXE','DZ.DOS','FDAUTO.BAT','FDCONFIG.SYS','TOOLS.BAT','README.TXT','REBOOT.COM','DOSZIP.TXT','VBMOUSE.EXE','VBADOS.TXT','COPYING','kernel.zip','freecom.zip','doszip.zip','manifest.json')) {
         $explicitPayloadFiles += @{ Source = (Join-Path $ProjectRoot ('zig-out/dos-native/freedos/' + $name)); Target = ('EFI/USOS/dos-native/freedos/' + $name) }
     }
     foreach ($item in $explicitPayloadFiles) {

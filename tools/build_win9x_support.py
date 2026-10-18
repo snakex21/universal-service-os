@@ -17,6 +17,11 @@
                 the USB keyboard and mouse bridge (USOS; USOSMOUS.DRV: 98 SE
                 and 98 mouse.drv) and VBADOS 0.67 (GPL-2.0+) of
                 the MS-DOS support, for installs under CSMWrap
+  DOSMOUSE.BAT, INWIN.COM
+                USB mouse for DOS programs in MS-DOS mode of 95/98/98 SE
+                under CSMWrap (src/platform/bios/win9x/dosmouse.cmd, inwin.S;
+                docs/dos-mouse-2026-10-18.md): VBMOUSE for one DOS session,
+                unloaded before Windows starts; INWIN.COM refuses DOS boxes
   XHCI98.SYS, XHCI98.INF, XHCI98.TXT
                 xhci98 1.1.1.0-usos3-w9x (GPL-2.0-only, MODIFIED: polling,
                 Windows 98 SE build; tools/vendor/xhci98/1.1.1.0-usos3-w9x,
@@ -75,6 +80,8 @@ FILES = ('U9FIX.COM', 'U9FIX.TXT', 'USOSVESA.INF', 'VESAMINI.DRV', 'VESAMINI.VXD
     # Under CSMWrap: the Windows 3.x USB keyboard bridge and VBADOS work in
     # Windows 9x too (copied from the MS-DOS support, built before this).
     'USOSKEY.COM', 'USOSKEY.DRV', 'USOSMOUS.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT') + (
+    # Under CSMWrap: VBMOUSE in MS-DOS mode only (DOSSTART.BAT calls DOSMOUSE).
+    'DOSMOUSE.BAT', 'INWIN.COM') + (
     # Under CSMWrap: CONFIG.SYS loads it first (dos_native_iso.zig, INSTALL.BAT).
     'CREGFIX.SYS',)
 BRIDGE = ('USOSKEY.COM', 'USOSKEY.DRV', 'USOSMOUS.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT')
@@ -134,6 +141,28 @@ def build_u9fix(out: Path, work: Path) -> Path:
     if not 0 < len(data) <= 4096 or b'SYSTEM.U9$' not in data:
         raise ValueError('unexpected U9FIX.COM layout')
     return com
+
+
+def build_inwin(out: Path, work: Path) -> Path:
+    env = dict(os.environ, ZIG_GLOBAL_CACHE_DIR=str(ROOT / 'tools/cache/zig-global'))
+    zig = str(ROOT / 'tools/zig/zig.exe')
+    obj, elf, com = work / 'inwin.o', work / 'inwin.elf', out / 'INWIN.COM'
+    subprocess.run([zig, 'cc', '-target', 'x86-freestanding-none', '-mcpu=i386', '-c',
+                    str(SOURCE / 'inwin.S'), '-o', str(obj)], env=env, check=True)
+    subprocess.run([zig, 'ld.lld', '-m', 'elf_i386', '-T', str(ROOT / 'src/platform/bios/msdos/com.ld'),
+                    str(obj), '-o', str(elf)], env=env, check=True)
+    subprocess.run([zig, 'objcopy', '-O', 'binary', str(elf), str(com)], env=env, check=True)
+    data = com.read_bytes()
+    if not 0 < len(data) <= 64 or data[:3] != bytes((0xb8, 0x00, 0x16)):
+        raise ValueError('unexpected INWIN.COM layout')
+    return com
+
+
+def dosmouse_bat(out: Path) -> None:
+    text = (SOURCE / 'dosmouse.cmd').read_text(encoding='ascii')
+    if any(len(line) > 127 for line in text.splitlines()):
+        raise ValueError('dosmouse.cmd: batch line too long for COMMAND.COM')
+    (out / 'DOSMOUSE.BAT').write_bytes(dos_text(text))
 
 
 def build_diag(out: Path, work: Path) -> None:
@@ -276,6 +305,8 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
     work = root / 'zig-out/win9x-support'
     work.mkdir(parents=True, exist_ok=True)
     build_u9fix(out, work)
+    build_inwin(out, work)
+    dosmouse_bat(out)
     build_diag(out, work)
     build_usosdbg(out, work)
     (out / 'U9FIX.TXT').write_bytes(dos_text(NOTICE))

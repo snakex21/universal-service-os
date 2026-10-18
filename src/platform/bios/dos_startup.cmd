@@ -59,6 +59,7 @@ COPY /Y A:\U9FIX.TXT C:\USOS9X >NUL
 IF ERRORLEVEL 1 GOTO FAILED
 COPY /Y A:\VMDISP9X.TXT C:\USOS9X >NUL
 FOR %%F IN (USOSKEY.COM USOSKEY.DRV USOSMOUS.DRV VBMOUSE.EXE VBMOUSE.DRV VBADOS.TXT CREGFIX.SYS) DO COPY /Y A:\%%F C:\USOS9X >NUL
+FOR %%F IN (DOSMOUSE.BAT INWIN.COM) DO COPY /Y A:\%%F C:\USOS9X >NUL
 :COPYDONE
 REM Step markers for a hang on real hardware: the last line shows the step.
 ECHO start %U9SYS% (U9CSM=%U9CSM% U9DISK=%U9DISK% U9VM=%U9VM%)>>C:\USOS9X\INSTALL.LOG
@@ -166,6 +167,12 @@ REM A restart before Setup copied Windows (hang, power loss): RESUME.BAT,
 REM written once Patcher9x succeeded, starts Setup again.
 ECHO @IF NOT EXIST C:\WINDOWS\WIN.COM IF EXIST C:\USOS9X\RESUME.BAT CALL C:\USOS9X\RESUME.BAT>>C:\AUTOEXEC.BAT
 ECHO @C:\USOS9X\USOSKEY.COM>>C:\AUTOEXEC.BAT
+REM USB mouse for DOS programs in MS-DOS mode (95/98/98 SE; Me has none):
+REM DOSMOUSE SETUP puts its CALL at the end of DOSSTART.BAT; VBMOUSE runs only
+REM in that session and is unloaded before Windows (docs/dos-mouse-2026-10-18.md).
+IF "%U9SYS%"=="ME" GOTO DMDONE
+ECHO @IF EXIST C:\USOS9X\DOSMOUSE.BAT CALL C:\USOS9X\DOSMOUSE.BAT SETUP>>C:\AUTOEXEC.BAT
+:DMDONE
 REM Real-hardware report before every Windows start (C:\USOS9X\DIAG.LOG):
 REM off by default, only with EFI\USOS\win9x\diag.flag (U9DIAG=1).
 IF NOT "%U9DIAG%"=="1" GOTO DIAGDONE

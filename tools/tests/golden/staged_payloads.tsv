@@ -493,6 +493,8 @@ payload_zip	EFI/USOS/dos-native/freedos/KERNEL.SYS
 payload_zip	EFI/USOS/dos-native/freedos/README.TXT
 payload_zip	EFI/USOS/dos-native/freedos/REBOOT.COM
 payload_zip	EFI/USOS/dos-native/freedos/TOOLS.BAT
+payload_zip	EFI/USOS/dos-native/freedos/VBADOS.TXT
+payload_zip	EFI/USOS/dos-native/freedos/VBMOUSE.EXE
 payload_zip	EFI/USOS/dos-native/freedos/doszip.zip
 payload_zip	EFI/USOS/dos-native/freedos/freecom.zip
 payload_zip	EFI/USOS/dos-native/freedos/kernel.zip
@@ -554,6 +556,8 @@ payload_zip	EFI/USOS/dos-native/ram-patch/source.zip
 payload_zip	EFI/USOS/dos-native/source.zip
 payload_zip	EFI/USOS/dos-native/win9x/CREGFIX.SYS
 payload_zip	EFI/USOS/dos-native/win9x/CREGFIX.TXT
+payload_zip	EFI/USOS/dos-native/win9x/DOSMOUSE.BAT
+payload_zip	EFI/USOS/dos-native/win9x/INWIN.COM
 payload_zip	EFI/USOS/dos-native/win9x/MSBATCH.INF
 payload_zip	EFI/USOS/dos-native/win9x/U9FIX.COM
 payload_zip	EFI/USOS/dos-native/win9x/U9FIX.TXT

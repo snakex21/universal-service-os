@@ -34,7 +34,7 @@ const max_answer_bytes = 256 * 1024;
 const win9x_folder = [_][]const u16{ wide("EFI"), wide("USOS"), wide("dos-native"), wide("win9x") };
 /// Copied from EFI\USOS\dos-native\win9x to the RAM disk root; the list
 /// matches tools/build_win9x_support.py FILES.
-const win9x_helpers = [_][]const u8{ "U9FIX.COM", "U9FIX.TXT", "USOSVESA.INF", "VESAMINI.DRV", "VESAMINI.VXD", "VMHAL9X.DLL", "VMHAL486.DLL", "VMDISP9X.DLL", "VMDISP9X.TXT", "USOSKEY.COM", "USOSKEY.DRV", "USOSMOUS.DRV", "VBMOUSE.EXE", "VBMOUSE.DRV", "VBADOS.TXT", "CREGFIX.SYS" };
+const win9x_helpers = [_][]const u8{ "U9FIX.COM", "U9FIX.TXT", "USOSVESA.INF", "VESAMINI.DRV", "VESAMINI.VXD", "VMHAL9X.DLL", "VMHAL486.DLL", "VMDISP9X.DLL", "VMDISP9X.TXT", "USOSKEY.COM", "USOSKEY.DRV", "USOSMOUS.DRV", "VBMOUSE.EXE", "VBMOUSE.DRV", "VBADOS.TXT", "DOSMOUSE.BAT", "INWIN.COM", "CREGFIX.SYS" };
 
 const Iso = struct {
     fs: ntfs.FileSystem,

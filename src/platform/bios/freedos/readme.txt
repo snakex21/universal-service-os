@@ -30,6 +30,12 @@ MEMDISK supplies the RAM disk. BIOS disk services expose only that disk;
 programs that access hardware directly can still access the real hardware.
 A firmware backup saved only on C: will be lost on restart.
 
+Mouse: VBMOUSE (VBADOS 0.67, GPLv2+) is loaded at start. It is an INT 33h
+driver that reads the mouse through the BIOS: a USB mouse on a UEFI PC
+without CSM (Legacy BIOS mode through CSMWrap) or a PS/2 / emulated mouse
+on a BIOS PC. Its licence and source location are in VBADOS.TXT; the
+source archive is EFI\USOS\dos-native\msdos\VBADOS.TGZ on the USB drive.
+
 FreeDOS kernel 2043, FreeCOM 0.86a and Doszip Commander 2.68 are included
 under GPLv2. Their complete upstream packages and source archives are
 included in EFI\USOS\dos-native\freedos on the USB drive.
