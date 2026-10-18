@@ -51,6 +51,15 @@
  * is the mouse driver: USER enabled the mouse before drivers= were loaded,
  * and only now is there a bridge to register with the BIOS. SYSTEM.INI is
  * never written here (v2, 2026-10-18).
+ * DOS-box guard for that mouse (Me, v3): SeaBIOS keeps one C207h pointer
+ * for every VM and it points into the system VM's DOS memory, so no DOS VM
+ * may get the far call. The WH_CBT hook counts the WinOldAp "tty" windows
+ * (HCBT_CREATEWND / HCBT_DESTROYWND) and calls USOSMOUS.DRV's USOSPAUSE by
+ * name: 1 for the first, 0 after the last; the mouse is paused from before
+ * USOSATTACH until the hook is installed (DRV_ENABLE), and stays paused for
+ * good (USOSPAUSE 2) if the hook cannot be installed. The hook then stays
+ * until DRV_FREE. USOSMOUS.DRV imports KERNEL only, so the USER part of
+ * the guard lives here.
  * No OpenWatcom runtime is linked (own entry point, -zl): the binary is only
  * this file plus import records. docs/design/bios-via-csmwrap.md.
  */
@@ -89,6 +98,8 @@ static WORD timer;
 static BYTE busy;
 static HHOOK cbt_hook;
 static BYTE dos_focus;              /* WH_CBT: a DOS box (class "tty") is active */
+static BYTE mouse_guard;            /* Me: USOSMOUS.DRV paused while DOS boxes exist */
+static WORD dos_boxes;              /* WH_CBT: "tty" windows alive (mouse_guard) */
 static BYTE FAR *bda;               /* selector for 0040:0000 */
 
 /* The stock KEYBOARD.DRV keeps the BIOS shift flags in step with every
@@ -188,16 +199,46 @@ static void sync_bios_flags(void)
     if (bda[0x96] != f96) bda[0x96] = f96;
 }
 
+static int is_dos_box(HWND w)
+{
+    char name[8];
+    return w && GetClassName(w, name, sizeof(name)) == 3 &&
+           (name[0] | 0x20) == 't' && (name[1] | 0x20) == 't' && (name[2] | 0x20) == 'y';
+}
+
+/* An export of the mouse driver (module MOUSE) by name, task time only:
+ * looked up at every use, so a freed or foreign mouse driver is never
+ * called. */
+static FARPROC mouse_export(LPCSTR name)
+{
+    HINSTANCE mouse = GetModuleHandle("MOUSE");
+    return mouse ? GetProcAddress(mouse, name) : 0;
+}
+
+/* USOSMOUS.DRV's USOSPAUSE: 1 pause (DOS box), 2 pause (no guard), 0 resume. */
+static void mouse_pause(WORD how)
+{
+    FARPROC pause = mouse_export("USOSPAUSE");
+    if (pause) ((void (FAR PASCAL *)(WORD))pause)(how);
+}
+
 /* Windows 9x: WH_CBT hook, called in the context of the thread that
- * activates a window (never at interrupt time): is the new active window a
- * DOS box (WinOldAp, class "tty")? Only the flag reaches the timer. */
+ * creates, destroys or activates a window (never at interrupt time):
+ *   HCBT_ACTIVATE: is the new active window a DOS box (WinOldAp, class
+ *     "tty")? Only the flag reaches the timer.
+ *   HCBT_CREATEWND / HCBT_DESTROYWND (mouse_guard, Me): the first DOS box
+ *     pauses the USB mouse, the last one gone resumes it. A creation that
+ *     another hook cancels leaves the count high: the mouse stays paused. */
 LRESULT FAR PASCAL __export __loadds cbt_proc(int code, WPARAM wp, LPARAM lp)
 {
     if (code == HCBT_ACTIVATE) {
-        char name[8];
-        HWND w = (HWND)wp;
-        dos_focus = w && GetClassName(w, name, sizeof(name)) == 3 &&
-                    (name[0] | 0x20) == 't' && (name[1] | 0x20) == 't' && (name[2] | 0x20) == 'y';
+        dos_focus = is_dos_box((HWND)wp);
+    } else if (mouse_guard && (code == HCBT_CREATEWND || code == HCBT_DESTROYWND) && is_dos_box((HWND)wp)) {
+        if (code == HCBT_CREATEWND) {
+            if (dos_boxes++ == 0) mouse_pause(1);
+        } else if (dos_boxes && --dos_boxes == 0) {
+            mouse_pause(0);
+        }
     }
     return CallNextHookEx(cbt_hook, code, wp, lp);
 }
@@ -284,12 +325,16 @@ static int query_bridge(void)
 
 /* Me: the bridge copy came from here, after USER enabled the mouse driver.
  * USOSMOUS.DRV (module MOUSE) registers with the BIOS now; another mouse
- * driver has no USOSATTACH and is left alone. Task time (DRV_LOAD). */
+ * driver has no USOSATTACH and is left alone. With USOSPAUSE (v3) it is
+ * paused first: the DOS-box hook comes at DRV_ENABLE (start), which resumes
+ * it. Task time (DRV_LOAD). */
 static void attach_mouse(void)
 {
-    HINSTANCE mouse = GetModuleHandle("MOUSE");
-    FARPROC attach = mouse ? GetProcAddress(mouse, "USOSATTACH") : 0;
-    if (attach) ((void (FAR PASCAL *)(void))attach)();
+    FARPROC attach = mouse_export("USOSATTACH");
+    if (!attach) return;
+    mouse_guard = mouse_export("USOSPAUSE") != 0;
+    if (mouse_guard) mouse_pause(1);
+    ((void (FAR PASCAL *)(void))attach)();
 }
 
 static int find_bridge(void)
@@ -370,17 +415,39 @@ static void start(void)
 {
     if (!timer && shared) timer = create_timer(20, (FARPROC)poll);
     /* DOS-box routing (Windows 9x): without the hook every key takes the
-     * keybd_event path, as on the desktop. */
-    if (win9x && vkd_entry && !cbt_hook)
+     * keybd_event path, as on the desktop. Mouse guard (Me): the hook ends
+     * the pause attach_mouse began; no hook, the mouse stays paused. */
+    if (!cbt_hook && ((win9x && vkd_entry) || mouse_guard)) {
         cbt_hook = SetWindowsHookEx(WH_CBT, (HOOKPROC)cbt_proc, GetModuleHandle("USOSKEY"), 0);
+        if (mouse_guard) {
+            dos_boxes = 0;
+            mouse_pause(cbt_hook ? 0 : 2);
+        }
+    }
 }
 
+static void unhook(void)
+{
+    if (cbt_hook) { UnhookWindowsHookEx(cbt_hook); cbt_hook = 0; }
+}
+
+/* DRV_DISABLE: the mouse guard keeps its hook (and its DOS-box count). */
 static void stop(void)
 {
     if (timer) { kill_timer(timer); timer = 0; }
-    if (cbt_hook) { UnhookWindowsHookEx(cbt_hook); cbt_hook = 0; }
+    if (!mouse_guard) unhook();
     dos_focus = 0;
     if (shared) shared->alive = 0;
+}
+
+/* DRV_FREE (task time): without the hook the mouse is unguarded, so it is
+ * paused first. */
+static void release(void)
+{
+    stop();
+    if (mouse_guard) { mouse_pause(2); mouse_guard = 0; }
+    unhook();
+    remove_resident();
 }
 
 LRESULT FAR PASCAL __export __loadds DriverProc(DWORD id, HANDLE driver, UINT msg, LPARAM p1, LPARAM p2)
@@ -390,7 +457,7 @@ LRESULT FAR PASCAL __export __loadds DriverProc(DWORD id, HANDLE driver, UINT ms
     case DRV_LOAD:    return init() ? 1L : 0L;
     case DRV_ENABLE:  start(); return 1L;
     case DRV_DISABLE: stop(); return 1L;
-    case DRV_FREE:    stop(); remove_resident(); return 1L;
+    case DRV_FREE:    release(); return 1L;
     case DRV_OPEN:
     case DRV_CLOSE:   return 1L;
     }
@@ -401,6 +468,7 @@ int FAR PASCAL __export __loadds WEP(int exit_type)
 {
     (void)exit_type;
     stop();
+    unhook();
     remove_resident();
     return 1;
 }

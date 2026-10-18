@@ -90,7 +90,8 @@ class TimerSafe(unittest.TestCase):
         self.check_entry(funcs)
         src = (WIN3 / 'usoskey.c').read_text(encoding='utf-8')
         # The DOS-box test lives in the CBT hook, not on the timer path.
-        self.assertIn('GetClassName', funcs['cbt_proc'])
+        self.assertIn('is_dos_box(', funcs['cbt_proc'])
+        self.assertIn('GetClassName', funcs['is_dos_box'])
         self.assertNotIn('GetAsyncKeyState', strip_comments(src))
 
     def test_usosmous(self):

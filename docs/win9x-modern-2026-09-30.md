@@ -345,7 +345,10 @@ on the Kingston is still empty, copy it there before the X470 run).
 * **Keyboard**: no TSR on Me, USOSKEY.DRV installs its own resident copy; that copy is the whole USOSKEY.COM
   resident part (`tsr_image` up to `resident_end`), so it has the v4 mouse ring and callback (`mcb`) and the
   INT 16h guard (TSR_HOOKS: 08h/09h/15h/16h/1Ch/2Fh).
-* **Mouse** (2026-10-18): USOSMOUS.DRV on Me too, same driver and ring as 98 SE. **v2, X470 test pending.**
+* **Mouse** (2026-10-18): USOSMOUS.DRV on Me too, same driver and ring as 98 SE. **v2 X470 PASS 2026-10-18**
+  (Micron Me install: USOSMOUS.DRV SHA-256 d0a65c3d..., USOSKEY.DRV 777835e4..., `[boot] mouse.drv=usosmous.drv`
+  set by hand: the USB mouse works on the Me desktop). **v3** (below): DOS-box guard and the install wiring,
+  host tests only, X470 test pending.
   * *Root cause of "no mouse" on the Micron Me install* (USOSDBG: `state: not registered`, packets 0, DRV
     polls 0; BOOTLOG.TXT): USER asks the mouse driver (`Init = Mouse`, Inquire) **before** it loads the
     installable drivers (`Init = Installable Drivers`), and the bridge copy came only from USOSKEY.DRV
@@ -378,21 +381,41 @@ on the Kingston is still empty, copy it there before the X470 run).
     event procedure, as before. (6) Recovery switch: `C:\USOS9X\NOMOUSE.TXT` present = "no mouse" and the
     driver does nothing (useful only while Windows still starts, or with the disk on another PC; the
     reliable rollback is `mouse.drv=mouse.drv`).
-  * *Known limitation (v2, Me only)*: the copy lives in the system VM's DOS memory while SeaBIOS keeps the
-    C207h pointer for every VM (EBDA), so a DOS box opened while the USB mouse is registered may take
-    SeaBIOS's far call into its own memory at that address. v2 has no guard: Disable is not a reliable DOS-box signal in 386 enhanced mode (USER calls it
-    at exit; not relied on), and a hook in the mouse driver needs USER. Avoid
-    DOS boxes on Me with the USB mouse until a guard exists (candidate: USOSKEY.DRV's own WH_CBT hook, which
-    already tracks DOS boxes, pausing the mouse through the driver).
-  * *mouse.drv on Me*: nothing writes it any more (v1's per-start INI writer is gone). INSTALL.BAT still
-    copies USOSMOUS.DRV into `C:\WINDOWS\SYSTEM` before Setup, but a fresh Me install stays keyboard-only
-    until the user sets `[boot] mouse.drv=usosmous.drv` (and no `[386Enh] mouse=*vmouse`).
+  * *DOS-box guard (v3)*: the copy lives in the system VM's DOS memory while SeaBIOS keeps one C207h pointer
+    for every VM (EBDA), so a DOS VM must never take SeaBIOS's far call (v2 had no guard). USOSMOUS.DRV still
+    imports KERNEL only; the USER part is in USOSKEY.DRV (loaded after USER). Its WH_CBT hook (installed on Me
+    for the guard even without VKD) counts the WinOldAp `tty` windows (`HCBT_CREATEWND` / `HCBT_DESTROYWND`;
+    on 9x a Win32 console window is a WinOldAp window too) and calls the mouse driver's new resident export
+    `USOSPAUSE` (ordinal 7) by name: `1` for the first DOS box (C200h off, C207h 0:0, USOSDBG state
+    `paused (DOS box open)`), `0` when the last one is gone (C205h, C207h, C200h again; a BIOS error leaves it
+    off with the error in `merr`). The mouse is paused from before USOSATTACH (USOSKEY.DRV's DRV_LOAD) until
+    the hook is in place (DRV_ENABLE); no hook = `USOSPAUSE 2`, state `paused (no DOS-box guard)`, for good.
+    DRV_DISABLE keeps the hook and the count; DRV_FREE pauses (2) before it unhooks. While paused the poll
+    timer keeps running on an empty ring; Enable/USOSATTACH during a pause start only the timer. A window
+    creation that another hook cancels leaves the count high: paused, never unguarded. USOSDBG 1.3 shows the
+    states. *Not covered*: a DOS VM that runs before its `tty` window exists (WinOldAp start-up) could still
+    get a packet in that short window; SeaBIOS only far-calls when the mouse sends a packet. 95/98/98 SE:
+    unchanged (the guard needs the Windows copy, `'W'`).
+  * *mouse.drv on Me (v3)*: Setup's own mouse detection writes `mouse.drv=mouse.drv` (phase 1 in the VM found
+    QEMU's i8042 mouse; that is where the Micron's `mouse.drv=mouse.drv` came from), and the order of MSBATCH
+    `UpdateIniFields` against it is not known, so the line is set later: INSTALL.BAT (Me under CSMWrap,
+    USOSMOUS.DRV present) writes `C:\USOS9X\USOSMOUS.INF` (`UpdateInis`: `[boot] mouse.drv=*` ->
+    `mouse.drv=usosmous.drv`, `[386Enh] mouse=*` removed, as U9FIX `/CSM` and the phase-1 patch do on the other
+    systems) and appends `[USOS.CsmReg]` (named by `[Install] AddReg` already; Me had none) with a machine
+    RunOnce value `USOSMouse` = `rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4
+    C:\USOS9X\USOSMOUS.INF`, through a `[Strings]` section so that every INSTALL.BAT line stays under 128
+    characters. It runs once at the first sign-in after Setup (after the hardware detection of both phases);
+    the line takes effect at the next start (reboot mode 4: setupx asks if it thinks a restart is needed).
+    No driver writes SYSTEM.INI. A user's own answer file gets nothing (as for `drivers=`). *Unverified on Me*:
+    the RunOnce run itself (QEMU Me never reached the desktop); fallback = set the line by hand as before.
   * *The 2026-10-03 protection error*: that uncommitted test predates the v4 ring callback (2026-10-06) and
     is not reproducible from the repo; the v4 callback runs on the main CPU in V86 mode (SeaBIOS
     `invoke_mouse_handler` hops back to the interrupted 16-bit stack; only the xHCI poll goes to CSMWrap's
     helper core), like the keyboard's INT 15h/4Fh hook that works on Me.
-  * Tests: `tools/tests/legacy_bios/test_usosmous.py` (NE exports, KERNEL-only imports, segment flags,
-    MeBridge v2 checks), timer-safety unchanged. No Me QEMU run (no ready Me image; the 2026-10-06 QEMU Me
+  * Tests: `tools/tests/legacy_bios/test_usosmous.py` (NE exports incl. USOSPAUSE, KERNEL-only imports and
+    the build's check, segment flags, MeBridge v2 checks, v3 guard: hook counting, pause before attach,
+    no-hook pause, DRV_FREE order, UsosPause states; Me INSTALL.BAT block: the INF and MSBATCH lines as
+    COMMAND.COM writes them, line lengths), timer-safety (`cbt_proc` through `is_dos_box`). No Me QEMU run (no ready Me image; the 2026-10-06 QEMU Me
     never reached the desktop).
 * **TZFIX: not needed on Me.** The Me CD's SETUPC.INF (PRECOPY1.CAB) defines `SetTimeZone_Desc` but adds no
   `RunOnce\Setup` TIMEDATE step (its `[NewWin.AddReg]` has only wallpaper, RunOnceEx 101 and VPOWERD); Me's

@@ -18,5 +18,7 @@ export MOUSEGETINTVECT.4 resident
 export WEP.5 resident
 # Windows Me: USOSKEY.DRV calls it by name once its bridge copy is in place.
 export USOSATTACH.6 resident
+# Windows Me: USOSKEY.DRV's DOS-box guard (WH_CBT) pauses / resumes the mouse.
+export USOSPAUSE.7 resident
 segment type code fixed
 segment type data fixed

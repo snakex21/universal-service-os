@@ -2,8 +2,9 @@
 real USOSKEY.COM (shared block version 4) in Unicorn, the USOSMOUS.DRV NE
 exports and imports, the Windows Me path (v2: USOSKEY.DRV installs the
 bridge copy and calls USOSMOUS.DRV's USOSATTACH; the mouse driver imports
-KERNEL only) and its wiring into the 95 / 98 / 98 SE / Me install
-(INSTALL.BAT, payload)."""
+KERNEL only; v3: USOSKEY.DRV's WH_CBT hook pauses the mouse through
+USOSPAUSE while a DOS box exists) and its wiring into the 95 / 98 / 98 SE /
+Me install (INSTALL.BAT, payload; Me: mouse.drv= at the first sign-in)."""
 from pathlib import Path
 import re
 import struct
@@ -111,14 +112,18 @@ class UsosMouse(unittest.TestCase):
             names[d[i + 1:i + 1 + n].decode()] = struct.unpack_from('<H', d, i + 1 + n)[0]
             i += n + 3
         # Module name MOUSE (USER imports the mouse driver by it), DDK
-        # ordinals; USOSATTACH (Me, called by USOSKEY.DRV by name) after them.
+        # ordinals; USOSATTACH and USOSPAUSE (Me, called by USOSKEY.DRV by
+        # name) after them.
         self.assertEqual(names, {'MOUSE': 0, 'INQUIRE': 1, 'ENABLE': 2, 'DISABLE': 3, 'MOUSEGETINTVECT': 4, 'WEP': 5,
-                                 'USOSATTACH': 6})
+                                 'USOSATTACH': 6, 'USOSPAUSE': 7})
 
     def test_mouse_driver_imports_kernel_only(self):
         # KERNEL loads mouse.drv right after keyboard.drv, before DISPLAY, GDI
         # and USER (Me BOOTLOG.TXT); v1 imported USER and Me did not start.
+        # v3 keeps it so: the DOS-box guard's USER part is in USOSKEY.DRV.
         self.assertEqual(ne_imported_modules(self.drv), ['KERNEL'])
+        build = (ROOT / 'tools/build_win3_usb_keyboard.py').read_text(encoding='utf-8')
+        self.assertIn("if ne_imported_modules(data) != ['KERNEL']:", build)   # the build refuses anything else
 
     def test_mouse_driver_segments_as_before(self):
         # Two segments as in the driver that worked on 98 SE: code fixed
@@ -146,6 +151,9 @@ class UsosMouse(unittest.TestCase):
         me = install[install.index('IF NOT "%U9SYS%"=="ME" GOTO CSMREG'):install.index(':CSMREG')]
         self.assertIn('COPY /Y C:\\USOS9X\\USOSKEY.DRV C:\\WINDOWS\\SYSTEM', me)
         self.assertIn('COPY /Y C:\\USOS9X\\USOSMOUS.DRV C:\\WINDOWS\\SYSTEM', me)
+        # 95 / 98 / 98 SE: unchanged, no first-sign-in INF.
+        nine_x = install[install.index(':CSMREG\n'):install.index(':AUTODONE')]
+        self.assertNotIn('USOSMOUS.INF', nine_x)
         sys.path.insert(0, str(ROOT / 'tools'))
         import build_win9x_support
         self.assertIn('USOSMOUS.DRV', build_win9x_support.FILES)
@@ -234,11 +242,112 @@ class MeBridge(unittest.TestCase):
         self.assertIn('if (shared->pad == RESIDENT_FROM_WINDOWS) attach_mouse();', init)
         self.assertLess(init.index('find_bridge()'), init.index('attach_mouse()'))
         attach = self.body(self.key, 'attach_mouse')
-        self.assertIn('GetModuleHandle("MOUSE")', attach)
-        self.assertIn('GetProcAddress(mouse, "USOSATTACH")', attach)    # by name: other mouse drivers have none
+        self.assertIn('mouse_export("USOSATTACH")', attach)    # by name: other mouse drivers have none
         self.assertNotIn('attach_mouse', self.body(self.key, 'poll_body'))
         fb = self.body(self.key, 'find_bridge')
         self.assertLess(fb.index('query_bridge()'), fb.index('install_resident()'))
+
+    def test_me_dos_box_guard_in_usoskey(self):
+        # v3: the hook counts WinOldAp "tty" windows; the first pauses the
+        # mouse, the last one gone resumes it.
+        cbt = self.body(self.key, 'cbt_proc')
+        self.assertIn('code == HCBT_CREATEWND || code == HCBT_DESTROYWND', cbt)
+        self.assertIn('mouse_guard &&', cbt)
+        self.assertIn('if (dos_boxes++ == 0) mouse_pause(1);', cbt)
+        self.assertIn('else if (dos_boxes && --dos_boxes == 0) {', cbt)
+        self.assertIn('mouse_pause(0);', cbt)
+        self.assertIn('dos_focus = is_dos_box((HWND)wp);', cbt)     # keyboard routing as before
+        self.assertIn("(name[0] | 0x20) == 't'", self.body(self.key, 'is_dos_box'))
+        self.assertIn('mouse_export("USOSPAUSE")', self.body(self.key, 'mouse_pause'))
+        export = self.body(self.key, 'mouse_export')
+        self.assertIn('GetModuleHandle("MOUSE")', export)             # looked up at every use
+        self.assertIn('GetProcAddress(mouse, name)', export)
+
+    def test_me_guard_pauses_before_attach_and_until_the_hook(self):
+        attach = self.body(self.key, 'attach_mouse')
+        self.assertIn('mouse_export("USOSATTACH")', attach)          # by name: other mouse drivers have none
+        self.assertIn('mouse_guard = mouse_export("USOSPAUSE") != 0;', attach)
+        self.assertLess(attach.index('mouse_pause(1)'), attach.index('attach)();'))
+        start = self.body(self.key, 'start')
+        self.assertIn('(win9x && vkd_entry) || mouse_guard', start)
+        self.assertIn('mouse_pause(cbt_hook ? 0 : 2);', start)      # no hook: paused for good
+        self.assertLess(start.index('SetWindowsHookEx'), start.index('mouse_pause('))
+        # DRV_DISABLE keeps the guard's hook and count; DRV_FREE pauses first.
+        stop = self.body(self.key, 'stop')
+        self.assertIn('if (!mouse_guard) unhook();', stop)
+        self.assertNotIn('dos_boxes', stop)
+        release = self.body(self.key, 'release')
+        self.assertLess(release.index('mouse_pause(2)'), release.index('unhook()'))
+        self.assertIn('case DRV_FREE:    release(); return 1L;', self.key)
+        self.assertIn('unhook();', self.body(self.key, 'WEP'))
+        self.assertNotIn('mouse_pause', self.body(self.key, 'poll_body'))
+
+    def test_me_pause_export_in_the_mouse_driver(self):
+        self.assertIn('export USOSPAUSE.7 resident', self.lnk)
+        pause = self.body(self.mouse, 'UsosPause')
+        self.assertIn("paused = how == 2 ? MS_NO_GUARD : MS_PAUSED;", pause)
+        self.assertIn('if (shared->mstate == MS_ENABLED) bios_off(paused);', pause)
+        self.assertIn('paused = 0;', pause)
+        self.assertIn('shared->mstate != MS_PAUSED && shared->mstate != MS_NO_GUARD', pause)
+        self.assertLess(pause.index('paused = 0;'), pause.index('bios_on()'))
+        self.assertIn('!shared || !timer || !event_proc', pause)
+        # bios_off: C200h off, then C207h 0:0.
+        off = self.body(self.mouse, 'bios_off')
+        self.assertLess(off.index('bios15(0xC200, 0x0000, 0)'), off.index('bios15(0xC207, 0, 0)'))
+        # start() while paused: timer only, the BIOS mouse stays off.
+        start = self.body(self.mouse, 'start')
+        self.assertIn('if (paused) shared->mstate = paused;', start)
+        self.assertIn('else if (!bios_on()) return;', start)
+        self.assertIn('#define MS_PAUSED     5', self.mouse)
+        self.assertIn('#define MS_NO_GUARD   6', self.mouse)
+        self.assertNotIn('UsosPause', self.body(self.mouse, 'poll_body'))
+        dbg = (ROOT / 'src/platform/bios/win9x/usosdbg.c').read_text(encoding='utf-8')
+        self.assertIn('"paused (DOS box open)",', dbg)
+        self.assertIn('"paused (no DOS-box guard)" };', dbg)
+        self.assertIn('s->mstate < 7 ? states[s->mstate]', dbg)
+
+    def me_install(self):
+        install = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='latin-1')
+        return install[install.index('IF NOT "%U9SYS%"=="ME" GOTO CSMREG'):install.index(':CSMREG\n')]
+
+    @staticmethod
+    def echo_output(block, target):
+        """What the block's ECHO lines append to (or create as) target,
+        as COMMAND.COM writes it: %% becomes %, %U9SRC% expands."""
+        out = []
+        for line in block.splitlines():
+            m = re.match(r'ECHO (.*?)(>>?)(\S+)$', line)
+            if m and m.group(3).replace('%U9SRC%', 'WIN9X') == target:
+                if m.group(2) == '>':
+                    out = []
+                out.append(m.group(1).replace('%%', '%'))
+        return out
+
+    def test_me_install_sets_mouse_drv_at_the_first_sign_in(self):
+        me = self.me_install()
+        self.assertIn('IF NOT EXIST C:\\USOS9X\\USOSMOUS.DRV GOTO MEKEY', me)
+        self.assertLess(me.index('COPY /Y C:\\USOS9X\\USOSMOUS.DRV C:\\WINDOWS\\SYSTEM'), me.index(':MEKEY'))
+        inf = self.echo_output(me, 'C:\\USOS9X\\USOSMOUS.INF')
+        self.assertEqual(inf, ['[Version]', 'Signature="$CHICAGO$"', '[DefaultInstall]', 'UpdateInis=USOS.MeMouse.Ini',
+                               '[USOS.MeMouse.Ini]', 'system.ini,boot,"mouse.drv=*","mouse.drv=usosmous.drv"',
+                               'system.ini,386Enh,"mouse=*",'])
+        batch = self.echo_output(me, 'C:\\WIN9X\\MSBATCH.INF')
+        self.assertEqual(batch[0], 'system.ini,boot,drivers,,usoskey.drv')        # still in [USOS.Csm]
+        self.assertEqual(batch[1:], [
+            '[USOS.CsmReg]',
+            'HKLM,%USOSRO%,USOSMouse,,"%USOSMC%"',
+            '[Strings]',
+            'USOSRO="Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce"',
+            'USOSMC="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\USOS9X\\USOSMOUS.INF"'])
+        # [Install] AddReg names USOS.CsmReg, [USOS.Csm] is the last section.
+        msbatch = (ROOT / 'src/flow/answer/msbatch.zig').read_text(encoding='utf-8')
+        self.assertIn('AddReg=USOS.RunOnce,USOS.CsmReg', msbatch)
+        self.assertIn('std.mem.endsWith(u8, me, "[USOS.Csm]', msbatch)
+        # The user's own answer file: nothing appended.
+        self.assertLess(me.index('IF "%U9ANS%"=="USER" GOTO AUTODONE'), me.index('>>C:\\%U9SRC%\\MSBATCH.INF'))
+        # Every line fits COMMAND.COM's batch line (127 characters, expanded).
+        for line in me.splitlines():
+            self.assertLessEqual(len(line.replace('%U9SRC%', 'WIN9X').replace('%%', '%')), 127, line)
 
     def test_no_system_ini_rewriting(self):
         for src in (self.key, self.mouse):

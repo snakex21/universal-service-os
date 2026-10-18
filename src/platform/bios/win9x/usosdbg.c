@@ -259,8 +259,9 @@ static void show_key(void)
 
 static void show_mouse(void)
 {
-    static const char *const states[6] = { "not registered", "registered", "no BIOS mouse (C205h failed)",
-                                           "BIOS refused (C207h/C200h)", "disabled", "paused (DOS box open)" };
+    static const char *const states[7] = { "not registered", "registered", "no BIOS mouse (C205h failed)",
+                                           "BIOS refused (C207h/C200h)", "disabled", "paused (DOS box open)",
+                                           "paused (no DOS-box guard)" };
     SHARED FAR *s = find_shared();
     if (!s || s->version < 4) {
         wsprintf(line(), "MOUSE USOSKEY.COM %s: no mouse ring (copy the new USOSKEY.COM)",
@@ -269,7 +270,7 @@ static void show_mouse(void)
     }
     wsprintf(line(), "MOUSE USOSMOUS.DRV %s  state:%s  last BIOS error:%04X  callback %04X:%04X  alive:%u  head/tail:%u/%u",
              (LPSTR)(GetModuleHandle("MOUSE") ? "MOUSE module loaded" : "no MOUSE module"),
-             (LPSTR)(s->mstate < 6 ? states[s->mstate] : "?"), s->merr, key_seg, s->mcb,
+             (LPSTR)(s->mstate < 7 ? states[s->mstate] : "?"), s->merr, key_seg, s->mcb,
              (WORD)s->malive, (WORD)s->mhead, (WORD)s->mtail);
     wsprintf(line(), "MOUSE packets:%lu (+%lu)  dropped:%u  ignored:%u  last %02X %02X %02X  DRV polls:%u (+%u)  events:%u (+%u)",
              s->mpackets, s->mpackets - prev_mpackets, s->mdropped, s->mignored,
@@ -474,7 +475,7 @@ static void show_pci(void)
 static void refresh(void)
 {
     nlines = 0;
-    wsprintf(line(), "USOSDBG 1.2  tick:%lu  S = append to C:\\USOS9X\\USOSDBG.LOG (saved:%u)  Esc = quit",
+    wsprintf(line(), "USOSDBG 1.3  tick:%lu  S = append to C:\\USOS9X\\USOSDBG.LOG (saved:%u)  Esc = quit",
              GetTickCount(), snapshots);
     show_key();
     show_mouse();

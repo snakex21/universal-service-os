@@ -43,10 +43,16 @@
  *     driver's USOSATTACH by name; only there the BIOS mouse is registered
  *     and the timer started. Every failure leaves the pointer still;
  *   - C:\USOS9X\NOMOUSE.TXT present: "no mouse", nothing else happens.
- * Known limitation (Me only): the copy lives in the system VM's DOS memory
- * while SeaBIOS keeps the C207h pointer for every VM, so a DOS box opened
- * while the USB mouse is registered may take SeaBIOS's far call into its
- * own memory; v2 has no DOS-box guard (docs/win9x-modern-2026-09-30.md 4g).
+ * DOS-box guard (Me, v3): the copy lives in the system VM's DOS memory
+ * while SeaBIOS keeps the C207h pointer for every VM, so a DOS VM must
+ * never get SeaBIOS's far call. USOSKEY.DRV (loaded after USER) counts the
+ * WinOldAp "tty" windows in its WH_CBT hook and calls this driver's
+ * USOSPAUSE by name: 1 when the first one appears (C200h off, C207h 0:0,
+ * state "paused"), 0 when the last one is gone (C205h/C207h/C200h again),
+ * 2 when it has no hook (paused for good). Paused is the default on Me
+ * from before USOSATTACH until the hook is there; every failure leaves the
+ * mouse paused (docs/win9x-modern-2026-09-30.md 4g). This driver itself
+ * still imports KERNEL only.
  * 95/98/98 SE (TSR from AUTOEXEC.BAT, the same memory in every VM): the
  * plain path, as before.
  * No OpenWatcom runtime is linked (own entry point, -zl).
@@ -100,6 +106,8 @@ typedef struct {
 #define MS_NO_MOUSE   2     /* C205h failed: no BIOS pointing device */
 #define MS_FAILED     3     /* C207h/C200h failed */
 #define MS_DISABLED   4
+#define MS_PAUSED     5     /* Me: a DOS box exists (USOSPAUSE 1) */
+#define MS_NO_GUARD   6     /* Me: USOSKEY.DRV has no DOS-box hook (USOSPAUSE 2) */
 
 /* mouse_event flags (SF_ in the DDK) */
 #define SF_MOVEMENT   0x0001
@@ -130,6 +138,7 @@ static RMREGS rm;
 static SCALE scale;
 static int move_x, move_y;          /* DGROUP: -zu, SS is not DS */
 static BYTE nomouse, nomouse_checked;
+static BYTE paused;                 /* 0, MS_PAUSED or MS_NO_GUARD (USOSPAUSE) */
 
 /* INT 2Fh AX=D700h: the bridge (TSR or USOSKEY.DRV's copy), read only. */
 static int query_bridge(void)
@@ -352,8 +361,9 @@ static void stop(void)
 {
     if (timer) { kill_timer(timer); timer = 0; }
     if (shared && shared->mstate == MS_ENABLED) bios_off(MS_DISABLED);
+    if (shared && (shared->mstate == MS_PAUSED || shared->mstate == MS_NO_GUARD)) shared->mstate = MS_DISABLED;
     if (shared) shared->malive = 0;
-    event_proc = 0;
+    event_proc = 0;                 /* paused stays: USOSKEY.DRV's count */
 }
 
 /* C:\USOS9X\NOMOUSE.TXT (KERNEL OpenFile, OF_EXIST: read only): the
@@ -375,13 +385,15 @@ static int is_me(void)
 }
 
 /* BIOS mouse on and the poll timer started once USER's procedure and the
- * bridge are both there. Task time only (Enable, USOSATTACH). */
+ * bridge are both there; while paused (Me: a DOS box, or no guard) only the
+ * timer, the BIOS mouse stays off. Task time only (Enable, USOSATTACH). */
 static void start(void)
 {
     if (timer || !event_proc || !shared || !present || !init_timer_procs()) return;
     shared->mtail = shared->mhead;  /* nothing stale */
     buttons = 0;
-    if (!bios_on()) return;
+    if (paused) shared->mstate = paused;
+    else if (!bios_on()) return;
     shared->malive = 18;
     timer = create_timer(20, (FARPROC)poll);
     if (!timer) bios_off(MS_FAILED);
@@ -454,6 +466,28 @@ void FAR PASCAL __loadds UsosAttach(void)
     if (switched_off() || !event_proc || timer) return;
     probe();
     start();
+}
+
+/* Ordinal 7, called by name from USOSKEY.DRV's WH_CBT hook (task time,
+ * the thread that creates or destroys a DOS box window) on Me:
+ * 1 = the first DOS box appears, 2 = no DOS-box guard: BIOS mouse off;
+ * 0 = the last DOS box is gone: on again, unless anything fails (then the
+ * state shows the BIOS error and the mouse stays off). Never at interrupt
+ * time; the poll timer keeps running and finds an empty ring. */
+void FAR PASCAL __loadds UsosPause(WORD how)
+{
+    if (how) {
+        paused = how == 2 ? MS_NO_GUARD : MS_PAUSED;
+        if (!shared) return;
+        if (shared->mstate == MS_ENABLED) bios_off(paused);
+        else if (shared->mstate == MS_PAUSED || shared->mstate == MS_NO_GUARD) shared->mstate = paused;
+        return;
+    }
+    paused = 0;
+    if (!shared || !timer || !event_proc) return;   /* start() turns it on later */
+    if (shared->mstate != MS_PAUSED && shared->mstate != MS_NO_GUARD) return;
+    shared->mtail = shared->mhead;  /* nothing stale */
+    bios_on();
 }
 
 /* DLL entry (no C runtime): DS = DGROUP. Returns AX = 1. */

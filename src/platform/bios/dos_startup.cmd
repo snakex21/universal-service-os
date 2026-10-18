@@ -183,13 +183,35 @@ IF NOT "%U9SYS%"=="ME" GOTO CSMREG
 MD C:\WINDOWS
 MD C:\WINDOWS\SYSTEM
 COPY /Y C:\USOS9X\USOSKEY.DRV C:\WINDOWS\SYSTEM >NUL
-REM USB mouse on Me: USOSMOUS.DRV in SYSTEM before Setup, not named in
-REM SYSTEM.INI (v2: nothing writes mouse.drv= on Me; the user sets
-REM [boot] mouse.drv=usosmous.drv, docs section 4g). Keyboard only by default.
+REM USB mouse on Me: USOSMOUS.DRV in SYSTEM before Setup. mouse.drv= is set
+REM once at the first sign-in after Setup (machine RunOnce, so after Setup's
+REM own mouse detection in both phases, which writes mouse.drv=mouse.drv):
+REM C:\USOS9X\USOSMOUS.INF through setupx InstallHinfSection sets [boot]
+REM mouse.drv=usosmous.drv and drops [386Enh] mouse= (*vmouse; no U9FIX on
+REM Me). Effective from the next start; no driver writes SYSTEM.INI.
+REM C:\USOS9X\NOMOUSE.TXT still switches the driver off (docs section 4g).
+IF NOT EXIST C:\USOS9X\USOSMOUS.DRV GOTO MEKEY
 COPY /Y C:\USOS9X\USOSMOUS.DRV C:\WINDOWS\SYSTEM >NUL
+ECHO [Version]>C:\USOS9X\USOSMOUS.INF
+ECHO Signature="$CHICAGO$">>C:\USOS9X\USOSMOUS.INF
+ECHO [DefaultInstall]>>C:\USOS9X\USOSMOUS.INF
+ECHO UpdateInis=USOS.MeMouse.Ini>>C:\USOS9X\USOSMOUS.INF
+ECHO [USOS.MeMouse.Ini]>>C:\USOS9X\USOSMOUS.INF
+ECHO system.ini,boot,"mouse.drv=*","mouse.drv=usosmous.drv">>C:\USOS9X\USOSMOUS.INF
+ECHO system.ini,386Enh,"mouse=*",>>C:\USOS9X\USOSMOUS.INF
+:MEKEY
 REM A user's own answer file is copied 1:1 (it ends with its own section).
 IF "%U9ANS%"=="USER" GOTO AUTODONE
 ECHO system.ini,boot,drivers,,usoskey.drv>>C:\%U9SRC%\MSBATCH.INF
+REM [Install] AddReg names USOS.CsmReg (98/98 SE append theirs below). The
+REM values come from [Strings]: COMMAND.COM batch lines stay under 128
+REM characters (expanded), and the quotes keep the comma in the command.
+IF NOT EXIST C:\USOS9X\USOSMOUS.INF GOTO AUTODONE
+ECHO [USOS.CsmReg]>>C:\%U9SRC%\MSBATCH.INF
+ECHO HKLM,%%USOSRO%%,USOSMouse,,"%%USOSMC%%">>C:\%U9SRC%\MSBATCH.INF
+ECHO [Strings]>>C:\%U9SRC%\MSBATCH.INF
+ECHO USOSRO="Software\Microsoft\Windows\CurrentVersion\RunOnce">>C:\%U9SRC%\MSBATCH.INF
+ECHO USOSMC="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\USOS9X\USOSMOUS.INF">>C:\%U9SRC%\MSBATCH.INF
 GOTO AUTODONE
 :CSMREG
 REM 98/98 SE: no PCI bus without this. SeaBIOS has a $PnP header but gives no
