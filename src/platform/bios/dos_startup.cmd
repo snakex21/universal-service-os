@@ -135,8 +135,8 @@ REM No firmware CSM: USB keyboard (USOSKEY bridge) in Windows through the
 REM SeaBIOS services; U9FIX /CSM adds its driver. No VBADOS mouse: VBMOUSE.EXE
 REM next to the PS/2 mouse VxD of the installed system stops Windows.
 REM USB mouse: USOSMOUS.DRV (mouse.drv=) on USOSKEY.COM's mouse ring, 98 SE,
-REM 98, 95 and Me (same 16-bit Windows 4.x mouse.drv interface; on Me the
-REM driver installs the bridge copy itself, see the Me block below).
+REM 98, 95 and Me (same 16-bit Windows 4.x mouse.drv interface; on Me
+REM USOSKEY.DRV installs the bridge copy, see the Me block below).
 REM U9FIX /CSM names it once it is in C:\WINDOWS\SYSTEM, so the drivers are
 REM copied before U9FIX runs.
 IF NOT EXIST C:\USOS9X\USOSKEY.DRV GOTO FAILED
@@ -183,9 +183,9 @@ IF NOT "%U9SYS%"=="ME" GOTO CSMREG
 MD C:\WINDOWS
 MD C:\WINDOWS\SYSTEM
 COPY /Y C:\USOS9X\USOSKEY.DRV C:\WINDOWS\SYSTEM >NUL
-REM USB mouse on Me: USOSMOUS.DRV in SYSTEM before Setup. Me runs no U9FIX:
-REM USOSKEY.DRV sets [boot] mouse.drv=usosmous.drv at every start while the
-REM file is there (from Setup's restart before the first desktop on).
+REM USB mouse on Me: USOSMOUS.DRV in SYSTEM before Setup, not named in
+REM SYSTEM.INI (v2: nothing writes mouse.drv= on Me; the user sets
+REM [boot] mouse.drv=usosmous.drv, docs section 4g). Keyboard only by default.
 COPY /Y C:\USOS9X\USOSMOUS.DRV C:\WINDOWS\SYSTEM >NUL
 REM A user's own answer file is copied 1:1 (it ends with its own section).
 IF "%U9ANS%"=="USER" GOTO AUTODONE

@@ -2,17 +2,16 @@
  * usos_resident.h - the USOSKEY.COM resident part installed from Windows.
  * Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
  *
- * Shared by USOSKEY.DRV and USOSMOUS.DRV (include after usoskey_tsr.h).
- * Windows Me starts no real-mode program from AUTOEXEC.BAT, so there is no
- * USOSKEY.COM TSR: whichever driver Windows loads first without finding the
- * bridge (INT 2Fh AX=D700h) puts a copy of the resident part (tsr_image, up
+ * Used by USOSKEY.DRV only (include after usoskey_tsr.h); USOSMOUS.DRV v2
+ * never installs it (KERNEL loads the mouse driver before USER, see
+ * usosmous.c). Windows Me starts no real-mode program from AUTOEXEC.BAT, so
+ * there is no USOSKEY.COM TSR: USOSKEY.DRV, not finding the bridge (INT 2Fh
+ * AX=D700h) at its DRV_LOAD, puts a copy of the resident part (tsr_image, up
  * to resident_end) at offset 0100h of a DOS block (GlobalDosAlloc, system VM)
  * and hooks INT 08h/09h/15h/16h/1Ch/2Fh in the system VM's real-mode vector
- * table (DPMI 0200h/0201h). On Me USER loads and asks the mouse driver
- * (Inquire) before the installable drivers of [boot] drivers=, so
- * USOSMOUS.DRV is the first one there. The block is never freed (the other
- * driver may still read it); remove_resident only gives back the vectors
- * that still point at the copy. The copy marks itself in the shared block's
+ * table (DPMI 0200h/0201h). The block is never freed (USOSMOUS.DRV may
+ * still read it); remove_resident only gives back the vectors that still
+ * point at the copy. The copy marks itself in the shared block's
  * byte +9 (unused by the TSR, 0 there) with 'W': the bridge comes from
  * Windows, i.e. no AUTOEXEC.BAT ran USOSKEY.COM (Me).
  */

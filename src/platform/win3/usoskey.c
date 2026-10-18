@@ -46,11 +46,11 @@
  * and has no WINSTART.BAT) the driver installs the TSR's resident part
  * itself: a copy in DOS memory (GlobalDosAlloc) with INT 08h/09h/15h/1Ch/2Fh
  * hooked in the system VM's real-mode vector table (DPMI 0200h/0201h); the
- * vectors are restored when the driver is freed. With mouse.drv=usosmous.drv
- * USOSMOUS.DRV has done that already (USER asks the mouse driver before it
- * loads drivers=); this driver then finds its copy (usos_resident.h). On Me
- * (no TSR) it also keeps SYSTEM.INI [boot] mouse.drv=usosmous.drv while
- * SYSTEM\USOSMOUS.DRV exists, as U9FIX /CSM does on 95/98 (next start).
+ * vectors are restored when the driver is freed (usos_resident.h). With
+ * that copy (Me) it then calls USOSMOUS.DRV's USOSATTACH by name, if that
+ * is the mouse driver: USER enabled the mouse before drivers= were loaded,
+ * and only now is there a bridge to register with the BIOS. SYSTEM.INI is
+ * never written here (v2, 2026-10-18).
  * No OpenWatcom runtime is linked (own entry point, -zl): the binary is only
  * this file plus import records. docs/design/bios-via-csmwrap.md.
  */
@@ -282,38 +282,14 @@ static int query_bridge(void)
     return shared->magic[0] == 'U' && shared->magic[1] == 'S' && shared->magic[2] == 'K' && shared->magic[3] == 'Y';
 }
 
-/* "vmouse" anywhere in a lower-case SYSTEM.INI value. */
-static int has_vmouse(const char *v)
+/* Me: the bridge copy came from here, after USER enabled the mouse driver.
+ * USOSMOUS.DRV (module MOUSE) registers with the BIOS now; another mouse
+ * driver has no USOSATTACH and is left alone. Task time (DRV_LOAD). */
+static void attach_mouse(void)
 {
-    for (; *v; v++)
-        if (v[0] == 'v' && v[1] == 'm' && v[2] == 'o' && v[3] == 'u' && v[4] == 's' && v[5] == 'e')
-            return 1;
-    return 0;
-}
-
-/* Bridge from Windows (no USOSKEY.COM, i.e. Me): nothing runs U9FIX /CSM
- * at the start, so this driver keeps SYSTEM.INI [boot]
- * mouse.drv=usosmous.drv and drops a [386Enh] mouse=*vmouse line (next to
- * SeaBIOS's BIOS mouse it stopped the X470 in VPICD) while
- * SYSTEM\USOSMOUS.DRV exists, as U9FIX /CSM does on 95/98. Setup's device
- * detection may write mouse.drv=mouse.drv again; the fix applies from the
- * next start. Task time (DRV_LOAD), never from the timer. */
-static void keep_mouse_ini(void)
-{
-    static char path[160], value[64];
-    OFSTRUCT of;
-    UINT n = GetSystemDirectory(path, sizeof(path) - 16);
-    if (!n || n >= sizeof(path) - 16) return;
-    if (path[n - 1] != '\\') path[n++] = '\\';
-    lstrcpy(path + n, "USOSMOUS.DRV");
-    if (OpenFile(path, &of, OF_EXIST) == HFILE_ERROR) return;
-    GetPrivateProfileString("boot", "mouse.drv", "", value, sizeof(value), "SYSTEM.INI");
-    if (lstrcmpi(value, "usosmous.drv"))
-        WritePrivateProfileString("boot", "mouse.drv", "usosmous.drv", "SYSTEM.INI");
-    GetPrivateProfileString("386Enh", "mouse", "", value, sizeof(value), "SYSTEM.INI");
-    AnsiLower(value);
-    if (has_vmouse(value))
-        WritePrivateProfileString("386Enh", "mouse", NULL, "SYSTEM.INI");
+    HINSTANCE mouse = GetModuleHandle("MOUSE");
+    FARPROC attach = mouse ? GetProcAddress(mouse, "USOSATTACH") : 0;
+    if (attach) ((void (FAR PASCAL *)(void))attach)();
 }
 
 static int find_bridge(void)
@@ -349,7 +325,6 @@ static int init(void)
     BYTE code;
     if (shared) return 1;
     if (!find_bridge()) return 0;
-    if (shared->pad == RESIDENT_FROM_WINDOWS) keep_mouse_ini();
     user = GetModuleHandle("USER");
     keyboard = GetModuleHandle("KEYBOARD");
     system = GetModuleHandle("SYSTEM");
@@ -387,6 +362,7 @@ static int init(void)
     if (GetWinFlags() & WF_ENHANCED) find_vkd();
     win9x = LOBYTE(LOWORD(GetVersion())) >= 4 ||
             (LOBYTE(LOWORD(GetVersion())) == 3 && HIBYTE(LOWORD(GetVersion())) >= 95);
+    if (shared->pad == RESIDENT_FROM_WINDOWS) attach_mouse();
     return 1;
 }
 

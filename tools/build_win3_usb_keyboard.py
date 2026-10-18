@@ -156,6 +156,19 @@ def build_driver(out: Path, work: Path) -> Path:
     return drv
 
 
+def ne_imported_modules(data: bytes) -> list:
+    """Names in an NE file's module reference table (the imported modules)."""
+    ne = int.from_bytes(data[0x3c:0x3e], 'little')
+    count = int.from_bytes(data[ne + 0x1e:ne + 0x20], 'little')
+    modref = ne + int.from_bytes(data[ne + 0x28:ne + 0x2a], 'little')
+    names = ne + int.from_bytes(data[ne + 0x2a:ne + 0x2c], 'little')
+    out = []
+    for i in range(count):
+        p = names + int.from_bytes(data[modref + 2 * i:modref + 2 * i + 2], 'little')
+        out.append(data[p + 1:p + 1 + data[p]].decode('ascii'))
+    return out
+
+
 def build_mouse_driver(out: Path, work: Path) -> Path:
     ow = openwatcom()
     env = dict(os.environ, WATCOM=str(ow), INCLUDE=f'{work};{ow / "h"};{ow / "h/win"}',
@@ -170,6 +183,10 @@ def build_mouse_driver(out: Path, work: Path) -> Path:
     ne = int.from_bytes(data[0x3c:0x3e], 'little')
     if data[ne:ne + 2] != b'NE' or b'MOUSEGETINTVECT' not in data or b'MOUSE' not in data:
         raise ValueError('USOSMOUS.DRV is not the expected NE mouse driver (module MOUSE)')
+    if ne_imported_modules(data) != ['KERNEL']:
+        # KERNEL loads mouse.drv before DISPLAY, GDI and USER (Me BOOTLOG.TXT):
+        # an import of USER there pulls USER in early (v1, Me did not start).
+        raise ValueError('USOSMOUS.DRV may import KERNEL only, not %r' % ne_imported_modules(data))
     if 'clib' in (work / 'usosmous.map').read_text(errors='replace').lower():
         raise ValueError('USOSMOUS.DRV must not link the OpenWatcom C library')
     return drv

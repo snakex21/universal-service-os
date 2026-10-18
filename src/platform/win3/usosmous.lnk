@@ -16,5 +16,7 @@ export ENABLE.2 resident
 export DISABLE.3 resident
 export MOUSEGETINTVECT.4 resident
 export WEP.5 resident
+# Windows Me: USOSKEY.DRV calls it by name once its bridge copy is in place.
+export USOSATTACH.6 resident
 segment type code fixed
 segment type data fixed

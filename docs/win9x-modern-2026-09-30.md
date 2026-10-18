@@ -345,36 +345,55 @@ on the Kingston is still empty, copy it there before the X470 run).
 * **Keyboard**: no TSR on Me, USOSKEY.DRV installs its own resident copy; that copy is the whole USOSKEY.COM
   resident part (`tsr_image` up to `resident_end`), so it has the v4 mouse ring and callback (`mcb`) and the
   INT 16h guard (TSR_HOOKS: 08h/09h/15h/16h/1Ch/2Fh).
-* **Mouse** (2026-10-18, X470 test pending): USOSMOUS.DRV on Me too, same driver and ring as 98 SE.
+* **Mouse** (2026-10-18): USOSMOUS.DRV on Me too, same driver and ring as 98 SE. **v2, X470 test pending.**
   * *Root cause of "no mouse" on the Micron Me install* (USOSDBG: `state: not registered`, packets 0, DRV
     polls 0; BOOTLOG.TXT): USER asks the mouse driver (`Init = Mouse`, Inquire) **before** it loads the
     installable drivers (`Init = Installable Drivers`), and the bridge copy came only from USOSKEY.DRV
     (drivers=). Inquire found no bridge, answered "no mouse" (`Status = No mouse driver installed`), USER
     never called Enable, so nothing registered INT 15h C207h.
-  * *Fix*: the resident-part installer moved into `src/platform/win3/usos_resident.h`, used by both drivers;
-    USOSMOUS.DRV installs the copy itself at Inquire when INT 2Fh D700h finds none, USOSKEY.DRV then finds
-    that copy. The copy marks byte +9 of the shared block with `W` (0 in the TSR), USOSDBG shows
-    "copy from Windows". The callback stays the TSR's `mcb` (only writes the ring in its own segment; the
-    driver drains it from the SYSTEM.DRV timer), so the V86 side is the 98 SE code.
-  * *DOS boxes*: the copy is in the system VM's DOS memory, while SeaBIOS keeps the C207h pointer for every
-    VM (EBDA). A DOS VM's INT 08h would far-call that address in its own memory. With a copy from Windows a
-    WH_CBT hook switches the BIOS mouse off (C200h off, C207h 0:0, state 5 "paused (DOS box open)") when the
-    first WinOldAp window (class `tty`, also Win32 consoles) is created and on again when the last one is
-    destroyed; no desktop mouse meanwhile. Hook refused: `merr` F0FFh, mouse still on. 95/98/98 SE with the
-    TSR keep the plain path (no hook).
-  * *mouse.drv at every start*: Me runs no U9FIX. USOSKEY.DRV, when the bridge is a copy from Windows and
-    `SYSTEM\USOSMOUS.DRV` exists, writes `[boot] mouse.drv=usosmous.drv` and removes a `[386Enh]
-    mouse=...vmouse...` line (as U9FIX /CSM on 95/98); it applies from the next start, i.e. from Setup's
-    restart before the first desktop. INSTALL.BAT keeps USOSMOUS.DRV for Me and copies it into
-    `C:\WINDOWS\SYSTEM` before Setup next to USOSKEY.DRV. No MSBATCH change (Setup's detection may write
-    mouse.drv later anyway) and no phase-1 patch change (the micro-Linux base stays as it is).
+  * *v1 (47bff94, build B261018-123919-EFF8BD06) failed on the X470*: with its USOSMOUS.DRV (SHA-256
+    F8389DF6...) and USOSKEY.DRV (F7CF7008...) on the Micron, Me no longer started normally (no BOOTLOG of
+    the failure). v1 installed the bridge copy from Inquire, hooked WH_CBT from Enable (DOS-box guard) and
+    let USOSKEY.DRV rewrite SYSTEM.INI at every start. Most likely cause: **v1's USOSMOUS.DRV imported
+    USER** (SetWindowsHookEx, CallNextHookEx, UnhookWindowsHookEx, GetClassName; NE module table KERNEL +
+    USER), while KERNEL loads `mouse.drv` right after `keyboard.drv`, **before DISPLAY, GDI and USER**
+    (`LoadStart = mouse.drv` precedes `LoadStart = gdi.exe` / `user.exe` in the Me BOOTLOG.TXT): resolving
+    that import pulls USER in out of order. The working 98 SE driver imports KERNEL only. Not proven on the
+    hardware (no log); the other v1 changes (copy from Inquire during USER's init, the hook, the INI
+    writer) are dropped as well. Safe Mode does not load our drivers (it uses SYSTEM.CB, which on the Micron
+    names neither `mouse.drv=` nor `drivers=`), and Safe Mode under CSMWrap was already known not to start
+    (HIMEM without /M:2, section 4c): the Safe Mode blue screen is the baseline, not v1. The Micron is back
+    on the keyboard-only state (USOSMOUS.DRV renamed .OFF, USOSKEY.DRV 382C7BC8, `mouse.drv=mouse.drv`).
+  * *v2 design*: (1) USOSMOUS.DRV imports **KERNEL only** (build and test check the NE module table) and
+    keeps the 98 SE segment layout (code and DGROUP fixed preload, 0D60h/0C61h); no hook, no SYSTEM.INI
+    write, no bridge install. (2) Inquire without a bridge on Me (DOS 8.00 in GetVersion) answers from
+    static data (3-button relative mouse present) and changes nothing; with a bridge (95/98/98 SE TSR) it
+    asks the BIOS (C205h) as before, and 95/98 without a bridge still report no mouse. (3) Enable keeps
+    USER's event procedure; with a bridge it starts at once (95/98 path), on Me it waits. (4) USOSKEY.DRV
+    installs the copy at its DRV_LOAD (task time, USER up: the keyboard-only state that works on Me) and then
+    calls `GetProcAddress(GetModuleHandle("MOUSE"), "USOSATTACH")` (new resident export ordinal 6): only
+    there the BIOS mouse is registered (C205h, C207h, C200h) and the 20 ms timer started. Any other mouse
+    driver has no USOSATTACH and is left alone; every failure leaves the pointer still (mstate / merr for
+    USOSDBG). (5) Interrupt time only touches the shared block (fixed DOS memory), fixed DGROUP and USER's
+    event procedure, as before. (6) Recovery switch: `C:\USOS9X\NOMOUSE.TXT` present = "no mouse" and the
+    driver does nothing (useful only while Windows still starts, or with the disk on another PC; the
+    reliable rollback is `mouse.drv=mouse.drv`).
+  * *Known limitation (v2, Me only)*: the copy lives in the system VM's DOS memory while SeaBIOS keeps the
+    C207h pointer for every VM (EBDA), so a DOS box opened while the USB mouse is registered may take
+    SeaBIOS's far call into its own memory at that address. v2 has no guard: Disable is not a reliable DOS-box signal in 386 enhanced mode (USER calls it
+    at exit; not relied on), and a hook in the mouse driver needs USER. Avoid
+    DOS boxes on Me with the USB mouse until a guard exists (candidate: USOSKEY.DRV's own WH_CBT hook, which
+    already tracks DOS boxes, pausing the mouse through the driver).
+  * *mouse.drv on Me*: nothing writes it any more (v1's per-start INI writer is gone). INSTALL.BAT still
+    copies USOSMOUS.DRV into `C:\WINDOWS\SYSTEM` before Setup, but a fresh Me install stays keyboard-only
+    until the user sets `[boot] mouse.drv=usosmous.drv` (and no `[386Enh] mouse=*vmouse`).
   * *The 2026-10-03 protection error*: that uncommitted test predates the v4 ring callback (2026-10-06) and
     is not reproducible from the repo; the v4 callback runs on the main CPU in V86 mode (SeaBIOS
     `invoke_mouse_handler` hops back to the interrupted 16-bit stack; only the xHCI poll goes to CSMWrap's
-    helper core), like the keyboard's INT 15h/4Fh hook that works on Me. Only the X470 run can show
-    whether it is gone; revert = `mouse.drv=mouse.drv` and rename `SYSTEM\USOSMOUS.DRV`.
-  * Tests: `tools/tests/legacy_bios/test_usosmous.py` (MeBridge), timer-safety unchanged. No Me QEMU run
-    (no ready Me image; the 2026-10-06 QEMU Me never reached the desktop).
+    helper core), like the keyboard's INT 15h/4Fh hook that works on Me.
+  * Tests: `tools/tests/legacy_bios/test_usosmous.py` (NE exports, KERNEL-only imports, segment flags,
+    MeBridge v2 checks), timer-safety unchanged. No Me QEMU run (no ready Me image; the 2026-10-06 QEMU Me
+    never reached the desktop).
 * **TZFIX: not needed on Me.** The Me CD's SETUPC.INF (PRECOPY1.CAB) defines `SetTimeZone_Desc` but adds no
   `RunOnce\Setup` TIMEDATE step (its `[NewWin.AddReg]` has only wallpaper, RunOnceEx 101 and VPOWERD); Me's
   TIMEZONE.INF has every key of the menu's list (63; Me adds 12 more), so `TimeZone=` from the menu or a
