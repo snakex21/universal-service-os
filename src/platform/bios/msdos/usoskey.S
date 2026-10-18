@@ -44,14 +44,16 @@
  *        safe at interrupt time), 0040:0017 and 0040:0018 after the call
  *   version 4 (USB mouse for USOSMOUS.DRV, src/platform/win3/usosmous.c):
  *   +396 mouse ring head (TSR)  +397 tail (consumer)  ring of 32 packets
- *        of 4 bytes (status, X, Y, 0) at +420
+ *        of 4 bytes (status, X, Y, Z) at +420; Z is the low byte of the
+ *        handler's Z word: the IntelliMouse wheel byte (up negative) from
+ *        CSMWrap patch 0016 once USOSMOUS.DRV sent the knock, else 0
  *   +398 mouse alive: set by USOSMOUS.DRV on every poll, INT 1Ch counts it
  *        down; packets are stored only while it is nonzero
  *   +399 registration state (written by USOSMOUS.DRV)
  *   +400 offset of the mouse callback in this segment (mcb)
  *   +402 packets dropped (ring full)  +404 packets ignored (no consumer)
  *   +406 USOSMOUS.DRV polls  +408 packets seen (dword)
- *   +412 last packet (status, X, Y, 0)
+ *   +412 last packet (status, X, Y, Z)
  *   +416 USOSMOUS.DRV event procedure calls  +418 its last BIOS error
  * The mouse callback (mcb) is what USOSMOUS.DRV registers with INT 15h
  * AX=C207h: SeaBIOS (CSMWrap) serves a USB boot-protocol mouse as the BIOS
@@ -302,7 +304,8 @@ chain15:
 
 /* Mouse callback (INT 15h C207h handler), far-called by the BIOS with
  * [SP+4] Z, [SP+6] Y, [SP+8] X, [SP+10] status (the caller pops them).
- * Stores the packet while USOSMOUS.DRV polls; no other side effects. */
+ * Stores the packet (Z: wheel byte, 0 from a BIOS without it) while
+ * USOSMOUS.DRV polls; no other side effects. */
 mcb:
     push bp
     mov bp, sp
@@ -316,6 +319,8 @@ mcb:
     mov byte ptr cs:[mlast + 1], al
     mov al, byte ptr [bp + 8]
     mov byte ptr cs:[mlast + 2], al
+    mov al, byte ptr [bp + 6]
+    mov byte ptr cs:[mlast + 3], al
     cmp byte ptr cs:[malive], 0
     je mcb_ignored
     mov bl, byte ptr cs:[mhead]
@@ -333,6 +338,8 @@ mcb:
     mov byte ptr cs:[mring + si + 1], al
     mov al, byte ptr [bp + 8]
     mov byte ptr cs:[mring + si + 2], al
+    mov al, byte ptr [bp + 6]
+    mov byte ptr cs:[mring + si + 3], al
     mov byte ptr cs:[mhead], bh
     jmp mcb_done
 mcb_full:

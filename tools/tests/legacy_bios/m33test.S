@@ -3,13 +3,16 @@
  * (tools/tests/legacy_bios/run_dos_mouse_probe.py).
  * Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
  *
- * Resets the mouse driver (AX=0000h), shows its cursor (AX=0001h) and then
+ * Resets the mouse driver (AX=0000h), asks for the wheel API (AX=0011h,
+ * CuteMouse / VBMOUSE extension), shows its cursor (AX=0001h) and then
  * writes, about 18 times a second, one line at the top of the text screen
  * (B800:0000, no DOS output, so nothing scrolls):
- *   M33 I=FFFF N=0003 X=0140 Y=0064 B=0000 P=0001
+ *   M33 I=FFFF N=0003 X=0140 Y=0064 B=0000 P=0001 A=574D C=0001 W=FFFD
  * I = reset result (FFFFh = driver present), N = buttons, X/Y = AX=0003h
- * position, B = its button state, P = AX=0005h press count of the left
- * button (accumulated). Any key ends it (cursor hidden again).
+ * position, B = its button state (BL), P = AX=0005h press count of the
+ * left button (accumulated), A/C = AX/CX of AX=0011h (574Dh = wheel API,
+ * CX bit 0 = a wheel), W = the sum of the AX=0003h wheel counts (BH,
+ * signed; negative = up). Any key ends it (cursor hidden again).
  * Built by the probe with zig cc + ld.lld at 0100h (src/platform/bios/msdos/com.ld).
  */
 .intel_syntax noprefix
@@ -30,6 +33,12 @@ _start:
     int 0x33
     mov word ptr [inst], ax
     mov word ptr [nbtn], bx
+    mov ax, 0x11
+    xor bx, bx
+    xor cx, cx
+    int 0x33
+    mov word ptr [wapi], ax
+    mov word ptr [wcap], cx
     mov ax, 1
     int 0x33
 next:
@@ -37,6 +46,10 @@ next:
     int 0x33
     mov word ptr [posx], cx
     mov word ptr [posy], dx
+    mov al, bh
+    cbw
+    add word ptr [wsum], ax
+    xor bh, bh
     mov word ptr [btns], bx
     mov ax, 5
     xor bx, bx
@@ -100,7 +113,7 @@ show:
 3:  pop es
     ret
 
-text:   .asciz "M33 I=# N=# X=# Y=# B=# P=# "
+text:   .asciz "M33 I=# N=# X=# Y=# B=# P=# A=# C=# W=# "
 values:
 inst:   .word 0
 nbtn:   .word 0
@@ -108,3 +121,6 @@ posx:   .word 0
 posy:   .word 0
 btns:   .word 0
 press:  .word 0
+wapi:   .word 0
+wcap:   .word 0
+wsum:   .word 0

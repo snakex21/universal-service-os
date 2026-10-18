@@ -11,6 +11,11 @@ C2xxh), and M33TEST.COM (m33test.S) shows the INT 33h state on screen.
 The monitor moves the mouse (mouse_move) and clicks (mouse_button). PASS when
 INT 33h reports the driver (AX=FFFFh), X and Y follow the moves (right/down,
 then back left/up) and the left press count grows after a click.
+--wheel (with --csmwrap pointing at a build with patch 0016-usb-mouse-wheel):
+also the INT 33h wheel API (AX=0011h: 574Dh, CX bit 0) and the AX=0003h
+wheel count (BH) after mouse_move 0 0 dz: dz > 0 (QEMU wheel up) must give
+a negative sum (CuteMouse convention: up negative), dz < 0 positive. Without
+--wheel the probe also checks that no wheel shows up (an older CSMWrap).
 
 --mode session (default): AUTOEXEC loads VBMOUSE and runs M33TEST (the
 FreeDOS / MS-DOS RAM session wiring: FDAUTO.BAT, LIVE.BAT).
@@ -23,6 +28,7 @@ from AUTOEXEC shows I=0000). FreeCOM's EXIT in the primary shell does
 nothing, like COMMAND.COM /P at a "Command prompt only" start.
 
   python tools/tests/legacy_bios/run_dos_mouse_probe.py --output DIR [--mode dosmouse] [--keep]
+      [--csmwrap EFI] [--wheel]
 
 USOS_BUILD_ROOT: a checkout whose zig-out has the MBR code (and tools/zig,
 tools/qemu when this checkout has none). USOS_QEMU_EXE selects a renamed QEMU
@@ -63,7 +69,8 @@ AUTOEXEC = {
     'session': '@echo off\r\nC:\\VBMOUSE.EXE\r\nC:\\M33TEST.COM\r\n',
     'dosmouse': '@echo off\r\nCALL C:\\USOS9X\\DOSMOUSE.BAT\r\necho ' + AFTER + '\r\nC:\\M33TEST.COM\r\n',
 }
-LINE = re.compile(r'M33 I=([0-9A-F]{4}) N=([0-9A-F]{4}) X=([0-9A-F]{4}) Y=([0-9A-F]{4}) B=([0-9A-F]{4}) P=([0-9A-F]{4})')
+LINE = re.compile(r'M33 I=([0-9A-F]{4}) N=([0-9A-F]{4}) X=([0-9A-F]{4}) Y=([0-9A-F]{4}) B=([0-9A-F]{4}) P=([0-9A-F]{4})'
+                  r' A=([0-9A-F]{4}) C=([0-9A-F]{4}) W=([0-9A-F]{4})')
 KEYS = {' ': 'spc', '\n': 'ret', '\\': 'backslash', ':': 'shift-semicolon', '.': 'dot'}
 
 
@@ -102,14 +109,14 @@ def dos_volume(mode: str, work: Path) -> bytes:
     return bytes(vol)
 
 
-def make_disk(path: Path, mode: str, work: Path):
+def make_disk(path: Path, mode: str, work: Path, csmwrap: Path = CSMWRAP):
     mbr = bytearray(SECTOR)
     mbr[:440] = mbr_code()
     struct.pack_into('<I', mbr, 440, 0x55534D53)
     mbr[446:462] = struct.pack('<B3sB3sII', 0x80, b'\xfe\xff\xff', 0x06, b'\xfe\xff\xff', C_START, C_SECTORS)
     mbr[462:478] = struct.pack('<B3sB3sII', 0, b'\xfe\xff\xff', 0xEF, b'\xfe\xff\xff', ESP_START, ESP_SECTORS)
     mbr[510:512] = b'\x55\xaa'
-    esp = build_fat16({'EFI/BOOT/BOOTX64.EFI': CSMWRAP.read_bytes(), 'EFI/BOOT/CSMWRAP.INI': b'serial = false\nverbose = false\n'}, ESP_START)
+    esp = build_fat16({'EFI/BOOT/BOOTX64.EFI': csmwrap.read_bytes(), 'EFI/BOOT/CSMWRAP.INI': b'serial = false\nverbose = false\n'}, ESP_START)
     with open(path, 'wb') as f:
         f.truncate(TOTAL * SECTOR)
         f.write(mbr)
@@ -179,17 +186,46 @@ def mouse_checks(mon: Monitor, scr: Screen, first, log) -> bool:
                 and held[4] & 1 and not clicked[4] & 1 and clicked[5] > first[5])
 
 
+def signed16(v: int) -> int:
+    return v - 0x10000 if v & 0x8000 else v
+
+
+def wheel_checks(mon: Monitor, scr: Screen, want: bool, log) -> bool:
+    """Indices 6..8: A (AX=0011h), C (its CX), W (wheel sum, signed)."""
+    before = scr.state()
+    for _ in range(3):
+        mon.cmd('mouse_move 0 0 1')
+        time.sleep(0.4)
+    time.sleep(1.5)
+    up = scr.state()
+    for _ in range(5):
+        mon.cmd('mouse_move 0 0 -1')
+        time.sleep(0.4)
+    time.sleep(1.5)
+    down = scr.state()
+    log.append(f'wheel: before {before} after dz+3 {up} after dz-5 {down}')
+    if not (before and up and down):
+        return False
+    w0, w1, w2 = (signed16(s[8]) for s in (before, up, down))
+    log.append(f'wheel sums {w0} {w1} {w2} api={before[6]:04X} caps={before[7]:04X}')
+    if not want:
+        return w0 == w1 == w2 and not before[7] & 1
+    return before[6] == 0x574D and bool(before[7] & 1) and w1 < w0 and w2 > w1
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--mode', choices=sorted(AUTOEXEC), default='session')
     p.add_argument('--seconds', type=int, default=240)
     p.add_argument('--keep', action='store_true')
+    p.add_argument('--csmwrap', type=Path, default=CSMWRAP, help='csmwrapx64.efi (default: 3.1.2-usos11)')
+    p.add_argument('--wheel', action='store_true', help='expect the USB wheel (CSMWrap patch 0016)')
     a = p.parse_args()
     out = a.output.resolve()
     out.mkdir(parents=True, exist_ok=True)
     disk = out / 'dos-mouse.img'
-    make_disk(disk, a.mode, out)
+    make_disk(disk, a.mode, out, a.csmwrap)
     vars_fd = out / 'vars.fd'
     vars_fd.write_bytes(OVMF_VARS.read_bytes())
     port = free_port()
@@ -220,6 +256,7 @@ def main() -> int:
         log.append(f'start {first}')
         if first and first[0] == 0xFFFF:
             ok = mouse_checks(mon, scr, first, log)
+            ok = wheel_checks(mon, scr, a.wheel, log) and ok
             if a.mode == 'dosmouse':
                 mon.cmd('sendkey spc')
                 time.sleep(1.5)

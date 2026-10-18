@@ -49,11 +49,11 @@ class UsosMouse(unittest.TestCase):
     def set_shared(self, u, off, data):
         u.mem_write(SEG * 16 + self.sym['shared'] + off, data)
 
-    def callback(self, u, status, x, y):
+    def callback(self, u, status, x, y, z=0):
         """Far call as SeaBIOS's invoke_mouse_handler: push status, X, Y, Z
         (words), lcall, the caller pops 8 bytes."""
         sp = 0xff00
-        frame = struct.pack('<HHHHHH', 0x7000, 0x0000, 0, y, x, status)  # ret IP, ret CS, Z, Y, X, status
+        frame = struct.pack('<HHHHHH', 0x7000, 0x0000, z, y, x, status)  # ret IP, ret CS, Z, Y, X, status
         u.mem_write(0x30000 + sp, frame)
         u.reg_write(UC_X86_REG_SP, sp)
         u.reg_write(UC_X86_REG_BP, 0x1234)
@@ -101,6 +101,17 @@ class UsosMouse(unittest.TestCase):
         self.callback(u, 0x0a, 0x41, 0x42)
         self.assertEqual(self.shared(u, MHEAD, 1), b'\x00')
         self.assertEqual(self.shared(u, MRING + 31 * 4, 3), b'\x0a\x41\x42')
+
+    def test_wheel_byte_from_the_z_word(self):
+        # CSMWrap patch 0016: after the IntelliMouse knock SeaBIOS passes the
+        # wheel byte (up negative) in the Z word; the ring keeps its low byte.
+        u = self.machine()
+        self.set_shared(u, MALIVE, b'\x12')
+        self.callback(u, 0x08, 0, 0, 0xfffe)       # two notches up
+        self.callback(u, 0x08, 0, 0)               # a BIOS without the wheel: Z = 0
+        self.assertEqual(self.shared(u, MRING, 4), b'\x08\x00\x00\xfe')
+        self.assertEqual(self.shared(u, MRING + 4, 4), b'\x08\x00\x00\x00')
+        self.assertEqual(self.shared(u, MLAST, 4), b'\x08\x00\x00\x00')
 
     def test_mouse_driver_exports(self):
         d = self.drv
@@ -232,9 +243,37 @@ class MeBridge(unittest.TestCase):
         for name in ('Inquire', 'Enable', 'UsosAttach'):
             self.assertIn('switched_off()', self.body(self.mouse, name))
 
-    def test_timer_path_stays_interrupt_safe(self):
+    def test_wheel(self):
+        # 98 / 98 SE / Me USER: mouse_event AX=0800h with the delta in DX
+        # (WM_MOUSEWHEEL), Inquire msExists 4Bh = SM_MOUSEWHEELPRESENT.
+        self.assertIn('#define SF_WHEEL      0x0800', self.mouse)
+        self.assertIn('#define MS_EXISTS_WHEEL 0x4B', self.mouse)
+        knock = self.body(self.mouse, 'knock')
+        rates = [knock.index("bios15(0xC202, 0x%04X, 0)" % bh) for bh in (0x0600, 0x0500, 0x0400)]  # 200, 100, 80
+        self.assertEqual(rates, sorted(rates))
+        self.assertLess(rates[-1], knock.index('bios15(0xC204, 0, 0)'))
+        self.assertIn('== 3', knock)
+        self.assertLess(knock.index('wheel = 0;'), knock.index('wheel_wanted()'))
+        wanted = self.body(self.mouse, 'wheel_wanted')
+        self.assertIn('LOBYTE(dos) >= 10', wanted)                       # DOS 7.10+: 98 and later
+        self.assertIn('"usosmous", "Wheel", 1', wanted)
+        on = self.body(self.mouse, 'bios_on')
+        self.assertLess(on.index('bios15(0xC205'), on.index('knock()'))  # C205h resets the device ID
+        self.assertLess(on.index('knock()'), on.index('bios15(0xC207'))
         poll = self.body(self.mouse, 'poll_body')
-        for call in ('Get', 'Open', 'bios15', 'Alloc', 'probe', 'start(', 'create_timer'):
+        self.assertIn('wheel_sum += (signed char)p[3];', poll)
+        self.assertLess(poll.index('call_event(SF_MOVEMENT'), poll.index('call_wheel(wheel_sum)'))
+        wheel = self.body(self.mouse, 'call_wheel')
+        self.assertIn('mov ax, SF_WHEEL', wheel)
+        self.assertIn('mov dx, delta', wheel)
+        self.assertIn('-sum * WHEEL_DELTA', wheel)                        # IntelliMouse up negative, USER up positive
+        inquire = self.body(self.mouse, 'Inquire')
+        self.assertIn('(probed ? wheel : wheel_wanted())', inquire)      # Me without bridge: no BIOS call
+        self.assertNotIn('knock', inquire)
+
+    def test_timer_path_stays_interrupt_safe(self):
+        poll = self.body(self.mouse, 'poll_body') + self.body(self.mouse, 'call_wheel')
+        for call in ('Get', 'Open', 'bios15', 'Alloc', 'probe', 'start(', 'create_timer', 'knock', 'wheel_wanted'):
             self.assertNotIn(call, poll)
 
     def test_usoskey_installs_then_attaches_the_mouse_on_me_only(self):

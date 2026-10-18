@@ -579,6 +579,44 @@ with correct hints; no filesystem repair was added to the product. Full USOS
 build/menu/CSMWrap hardware boot and 95 NVMe runtime remain unconfirmed. These
 tests establish Setup phase 1 and staging, not a 95 NVMe desktop or shutdown.
 
+## 4j. USB mouse wheel on 98 / 98 SE / Me (2026-10-18, X470 untested)
+
+* **Path**: CSMWrap patch `0016-usb-mouse-wheel` (draft, stacked after 0015 pci-irq-routing; not in a
+  pinned CSMWrap yet) makes SeaBIOS read a USB mouse whose HID report descriptor has a relative wheel in the
+  report protocol (minimal descriptor walk: buttons 1-3, X/Y up to 16 bits, wheel, report IDs; anything
+  else stays in the boot protocol as before) and emulate a PS/2 **IntelliMouse**: the knock (INT 15h C202h
+  sample rates 200, 100, 80) switches the device ID to 3 (C204h; it used to return 0AAh for USB mice),
+  C205h accepts package sizes 1..7. With 3-byte packages the wheel byte (IntelliMouse sign, up negative)
+  comes in the handler's Z word (always 0 before); with 4 bytes it is the 4th byte. No knock: exactly the
+  old 3-byte behaviour.
+* **USOSKEY.COM / USOSKEY.DRV's copy**: the mouse callback stores the Z word's low byte as the ring's 4th
+  byte (it was never written, so 0 from an older TSR or BIOS). Shared block stays version 4.
+* **USOSMOUS.DRV** (still KERNEL only, interrupt path unchanged in kind): on DOS 7.10+ (98, 98 SE, Me; 95
+  OSR2 is 7.10 too and its USER ignores the flag) and unless `SYSTEM.INI [usosmous] Wheel=0`, `bios_on`
+  sends the knock after C205h and asks C204h; ID 3 = wheel. The poll timer sums the ring's wheel bytes and
+  calls USER's event procedure once more with **AX=0800h, DX = -sum * 120** after the movement/button calls.
+  This is the register interface of the 98 / 98 SE / Me USER.EXE `mouse_event` (checked in the 98 SE and Me
+  USER.EXE: `test ax, 0800h` -> DX taken as the wheel data, WM_MOUSEWHEEL 020Ah queued like for its own
+  wheel mice; button flags in the same call are dropped, hence a call of its own). Inquire answers
+  **msExists = 4Bh** (75 = SM_MOUSEWHEELPRESENT) for a wheel: USER of 98 / Me sets SM_MOUSEWHEELPRESENT
+  exactly when the mouse driver returns 4Bh there (any nonzero value still means "mouse present"). On Me
+  Inquire runs before the bridge exists: it answers 4Bh from `Wheel=` alone and makes no BIOS call (the
+  knock comes with USOSATTACH). WheelScrollLines is USER's (default 3, Control Panel / registry); nothing
+  written.
+* **Not done**: Win 3.x (its USER has no wheel message; no MSWHEEL there), the registered MSWHEEL_ROLLMSG for
+  Win95-era programs (USOSMOUS.DRV cannot call USER; 98 programs take WM_MOUSEWHEEL), horizontal wheel,
+  buttons 4/5. A DOS box under Windows gets no mouse at all (unchanged).
+* **Tests**: `tools/tests/legacy_bios/test_usosmous_wheel_emu.py` (Unicorn: the built USOSMOUS.DRV with its
+  relocations and KERNEL/SYSTEM stubs, a fake BIOS with and without the knock: Inquire 4Bh / 1, the
+  C205h-knock-C204h-C207h-C200h order, events AX=0800h DX=+240 / -360 after the button/move events, none
+  without wheel bytes, none on 95 / 3.x, Me Inquire without BIOS calls), `test_usosmous.py` (ring 4th byte
+  from the Z word, source checks, interrupt safety), patch 0016 host test (descriptor walk: QEMU usb-mouse,
+  Logitech-style report ID 2 with 12-bit X/Y, no wheel, absolute, push/pop, truncated) and the QEMU DOS probe
+  (below). No Windows 9x VM run (no ready image).
+* **X470 check** (after the CSMWrap with 0016 is on the disk and the drivers from this build are in
+  `WINDOWS/SYSTEM`): Explorer and Notepad scroll with the wheel, IE scrolls, Control Panel -> Mouse unchanged;
+  USOSDBG last packet shows the 4th byte moving. `Wheel=0` under `[usosmous]` switches it off.
+
 ## 5. Open points
 
 * Own Windows 95 boot environment from the CD's CABs (bridge today).

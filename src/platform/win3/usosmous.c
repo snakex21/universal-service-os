@@ -55,6 +55,23 @@
  * still imports KERNEL only.
  * 95/98/98 SE (TSR from AUTOEXEC.BAT, the same memory in every VM): the
  * plain path, as before.
+ * Wheel (2026-10-18): CSMWrap patch 0016 reads a USB wheel mouse in the HID
+ * report protocol and emulates a PS/2 IntelliMouse: after the knock (C202h
+ * sample rates 200, 100, 80) C204h answers device ID 3 and, with 3-byte
+ * packages, the BIOS passes the wheel byte (up negative) in the handler's Z
+ * word; USOSKEY.COM's handler keeps it as the ring's 4th byte (0 from an
+ * older TSR or BIOS). On Windows 98, 98 SE and Me (DOS 7.10 and later in
+ * GetVersion) this driver sends the knock after C205h; device ID 3 = wheel:
+ *   - Inquire returns msExists = 4Bh (75, SM_MOUSEWHEELPRESENT): USER of
+ *     98 / 98 SE / Me then reports a wheel mouse (that is how it reads the
+ *     wheel from the mouse driver; any nonzero value is "mouse present"),
+ *   - the poll sums the wheel bytes and calls USER's event procedure once
+ *     more with AX = 0800h (MOUSEEVENTF_WHEEL) and DX = the delta in
+ *     WHEEL_DELTA units (120 per notch, up positive); USER queues
+ *     WM_MOUSEWHEEL for the focus window as for its own wheel mice (USER
+ *     drops button flags in a wheel call, so it is a call of its own).
+ * Without the knock answered (older CSMWrap, wheel-less mouse, Windows
+ * 3.x / 95, SYSTEM.INI [usosmous] Wheel=0) nothing changes.
  * No OpenWatcom runtime is linked (own entry point, -zl).
  * Built with tools/build_win3_usb_keyboard.py; docs/win9x-modern-2026-09-30.md.
  */
@@ -117,6 +134,9 @@ typedef struct {
 #define SF_B2_UP      0x0010
 #define SF_B3_DOWN    0x0020
 #define SF_B3_UP      0x0040
+#define SF_WHEEL      0x0800    /* 98 / Me USER: DX = wheel delta */
+#define WHEEL_DELTA   120
+#define MS_EXISTS_WHEEL 0x4B    /* Inquire msExists: wheel mouse (98 / Me USER) */
 
 typedef struct {
     DWORD edi, esi, ebp, reserved, ebx, edx, ecx, eax;
@@ -139,6 +159,9 @@ static SCALE scale;
 static int move_x, move_y;          /* DGROUP: -zu, SS is not DS */
 static BYTE nomouse, nomouse_checked;
 static BYTE paused;                 /* 0, MS_PAUSED or MS_NO_GUARD (USOSPAUSE) */
+static BYTE wheel;                  /* the BIOS answered the IntelliMouse knock */
+static BYTE wheel_pref;             /* wheel_wanted: 0 not asked yet, 1 no, 2 yes */
+static int wheel_sum;               /* DGROUP: -zu, SS is not DS */
 
 /* INT 2Fh AX=D700h: the bridge (TSR or USOSKEY.DRV's copy), read only. */
 static int query_bridge(void)
@@ -217,6 +240,33 @@ static void note_error(WORD function, WORD result)
     if (shared) shared->merr = (WORD)((function & 0xFF) << 8) | (result & 0xFF);
 }
 
+/* Windows 98 or later (DOS 7.10+ in GetVersion's high word; 95 OSR2 is
+ * 7.10 as well, its USER ignores the wheel flag) and not switched off
+ * with SYSTEM.INI [usosmous] Wheel=0. */
+static int wheel_wanted(void)
+{
+    WORD dos;
+    if (!wheel_pref) {
+        dos = HIWORD(GetVersion());
+        wheel_pref = 1;
+        if (HIBYTE(dos) > 7 || (HIBYTE(dos) == 7 && LOBYTE(dos) >= 10))
+            if (GetPrivateProfileInt("usosmous", "Wheel", 1, "SYSTEM.INI")) wheel_pref = 2;
+    }
+    return wheel_pref == 2;
+}
+
+/* IntelliMouse knock (C202h rates 200, 100, 80), then C204h: device ID 3
+ * means the BIOS (CSMWrap patch 0016) sends the wheel. Older CSMWrap
+ * answers 0AAh or 0, a PS/2 BIOS 0: no wheel. Sets wheel. */
+static void knock(void)
+{
+    wheel = 0;
+    if (!wheel_wanted()) return;
+    if (bios15(0xC202, 0x0600, 0) || bios15(0xC202, 0x0500, 0) || bios15(0xC202, 0x0400, 0)) return;
+    if (bios15(0xC204, 0, 0)) return;
+    wheel = (BYTE)((rm.ebx >> 8) & 0xFF) == 3;
+}
+
 /* Once there is a bridge: is there a BIOS pointing device (USB through
  * SeaBIOS)? Without a bridge (Me before USOSKEY.DRV) nothing happens. */
 static void probe(void)
@@ -230,7 +280,7 @@ static void probe(void)
     if (!present) {
         note_error(0x05, r);
         shared->mstate = MS_NO_MOUSE;
-    }
+    } else knock();
 }
 
 static void call_event(WORD flags, int dx, int dy)
@@ -266,6 +316,31 @@ static void call_event(WORD flags, int dx, int dy)
     shared->mevents++;
 }
 
+/* The summed wheel bytes (IntelliMouse: up negative) as one wheel event. */
+static void call_wheel(int sum)
+{
+    WORD delta;
+    if (sum > 200) sum = 200;
+    if (sum < -200) sum = -200;
+    delta = (WORD)(-sum * WHEEL_DELTA);
+    _asm {
+        pusha
+        push ds
+        push es
+        mov ax, SF_WHEEL
+        xor bx, bx
+        xor cx, cx
+        mov dx, delta
+        xor si, si
+        xor di, di
+        call dword ptr event_proc
+        pop es
+        pop ds
+        popa
+    }
+    shared->mevents++;
+}
+
 static WORD button_flags(BYTE old, BYTE now)
 {
     WORD f = 0;
@@ -287,12 +362,14 @@ static void __near __loadds poll_body(void)
     busy = 1;
     shared->malive = 18;            /* about 1 s of INT 1Ch ticks */
     shared->mpolls++;
+    wheel_sum = 0;
     while (shared->mtail != shared->mhead) {
         BYTE FAR *p = shared->mring + ((WORD)shared->mtail << 2);
         BYTE status = p[0], now;
         int dx = (int)(p[1] | ((status & 0x10) ? 0xFF00 : 0));
         int dy = (int)(p[2] | ((status & 0x20) ? 0xFF00 : 0));
         shared->mtail = (BYTE)((shared->mtail + 1) & 31);
+        wheel_sum += (signed char)p[3];         /* 0 without the wheel */
         if (status & 0xC0) continue;            /* overflow: no valid motion */
         now = (BYTE)(status & 7);
         sx += dx;
@@ -304,6 +381,7 @@ static void __near __loadds poll_body(void)
         }
     }
     if (sx || sy) call_event(SF_MOVEMENT, sx, sy);
+    if (wheel && wheel_sum) call_wheel(wheel_sum);
     busy = 0;
 }
 
@@ -336,12 +414,14 @@ static int init_timer_procs(void)
     return create_timer && kill_timer;
 }
 
-/* C205h init (3-byte packets), C207h the TSR's handler, C200h enable.
- * Sets mstate; 1 when the BIOS mouse runs. */
+/* C205h init (3-byte packets), the wheel knock (C205h resets the device
+ * ID), C207h the TSR's handler, C200h enable. Sets mstate; 1 when the
+ * BIOS mouse runs. */
 static int bios_on(void)
 {
     WORD r = bios15(0xC205, 0x0300, 0);
     if (r) { note_error(0x05, r); shared->mstate = MS_NO_MOUSE; return 0; }
+    knock();
     r = bios15(0xC207, shared->mcb, shared_seg);
     if (r) { note_error(0x07, r); shared->mstate = MS_FAILED; return 0; }
     r = bios15(0xC200, 0x0100, 0);
@@ -402,7 +482,9 @@ static void start(void)
 /* Ordinal 1: fill MOUSEINFO, return its size. With a bridge (USOSKEY.COM:
  * 95/98/98 SE) the BIOS is asked as before (no bridge there: no mouse);
  * on Me without one (the copy comes later from USOSKEY.DRV) static data,
- * a 3-button relative mouse. */
+ * a 3-button relative mouse, with a wheel unless Wheel=0 (no BIOS call
+ * there; the knock comes with USOSATTACH). msExists 4Bh: a wheel mouse
+ * for 98 / Me USER (SM_MOUSEWHEELPRESENT). */
 WORD FAR PASCAL __loadds Inquire(MOUSEINFO FAR *info)
 {
     WORD i;
@@ -411,6 +493,7 @@ WORD FAR PASCAL __loadds Inquire(MOUSEINFO FAR *info)
     if (!switched_off()) {
         probe();
         exists = probed ? present : (BYTE)is_me();
+        if (exists && (probed ? wheel : wheel_wanted())) exists = MS_EXISTS_WHEEL;
     }
     for (i = 0; i < sizeof(MOUSEINFO); i++) p[i] = 0;
     info->msExists = exists;
