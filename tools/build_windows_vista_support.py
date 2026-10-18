@@ -83,8 +83,7 @@ def build(root=ROOT, intel_profile=False, tool_root=None, frozen_root=None):
     # release UefiSeven binary (manifest-checked), never the source build.
     wrapper=root/'zig-out/windows7-uefi/win7-wrapper.efi'
     if not wrapper.is_file():
-        wrapper.parent.mkdir(parents=True,exist_ok=True)
-        subprocess.run([str(tool_root/'zig/zig.exe'),'build-exe','-target','x86_64-uefi','-O','ReleaseSmall','--dep','windows7_video','-Mroot='+str(root/'tools/windows7_uefi_wrapper.zig'),'-Mwindows7_video='+str(root/'src/platform/uefi/windows7_video.zig'),'-femit-bin='+str(wrapper)],env=env,check=True)
+        subprocess.run([sys.executable,str(root/'tools/build_windows7_uefi.py')],check=True)
     uefiseven=root/'tools/vendor/uefiseven/1.30'
     seven=json.loads((uefiseven/'manifest.json').read_text())
     for name in ('UefiSeven.efi','LICENSE.txt'):
