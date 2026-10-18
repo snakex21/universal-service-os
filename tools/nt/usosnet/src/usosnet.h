@@ -24,9 +24,10 @@
 #define USOSNET_H
 
 #include <ndis.h>
+#include "usosnet_proto.h"
 
 #define USOSNET_MAJOR 0
-#define USOSNET_MINOR 3
+#define USOSNET_MINOR 4
 #define USOSNET_TAG 'NSOU'
 
 #define ETH_ALEN 6
@@ -94,7 +95,7 @@ typedef struct _USOSNET_CHIP_OPS {
 
 /* Diag() snapshot order */
 enum { DR_STATUS, DR_CTRL, DR_IMS, DR_RCTL, DR_TCTL, DR_RDH, DR_RDT, DR_TDH, DR_TDT,
-       DR_RXDCTL, DR_TXDCTL, DIAG_REGS };
+       DR_RXDCTL, DR_TXDCTL, DR_RXCSUM, DIAG_REGS };
 
 typedef struct _USOSNET_CHIP {
     USHORT Vendor;
@@ -157,6 +158,7 @@ typedef struct _ADAPTER {
     /* RX frame being indicated (for MiniportTransferData) */
     PUCHAR CurRx;
     ULONG CurRxLen;
+    ULONG CurRxClasses;         /* 0.4: its classes (usosnet_proto.h) */
 
     /* options (registry, see usosnet9x.inf [params]) */
     ULONG PollMode;             /* 1 = no interrupt (registry), 2 = switched by the IRQ watchdog */
@@ -176,6 +178,12 @@ typedef struct _ADAPTER {
     ULONG Stage, Error, StatusAtInit, CtrlAtInit, PhyBmsr, PhyId, Bar0High;
     ULONG PllTries;             /* I210/I211 iNVM PLL workaround: tries, 0x100 = failed */
     BOOLEAN IrqMasked;          /* set by the ISR, cleared by IrqEnable */
+
+    /* 0.4: live statistics page (usosnet_proto.h), UsosnetStatsVa / Pa */
+    DMAMEM StatsMem;
+    USNS_BLOCK *Stats;
+    ULONG LogRequest;           /* TX saw the USOSLOG request broadcast */
+    ULONG ForcedLogs;
 } ADAPTER, *PADAPTER;
 
 /* register access (MMIO through volatile pointers, no HAL import) */
@@ -193,7 +201,8 @@ void UsCopy(void *D, const void *S, ULONG N);
 BOOLEAN UsEqual(const void *A, const void *B, ULONG N);
 void UsStall(ULONG Us);
 void UsLog(PADAPTER A, const char *Fmt, ULONG V1, ULONG V2);
-void UsIndicateRx(PADAPTER A, PUCHAR Frame, ULONG Len);
+void UsIndicateRx(PADAPTER A, PUCHAR Frame, ULONG Len, ULONG Status);
+void UsRxDropped(PADAPTER A, PUCHAR Frame, ULONG Len, ULONG Status);
 
 extern const USOSNET_CHIP_OPS IgbOps;
 

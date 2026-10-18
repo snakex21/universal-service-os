@@ -7,8 +7,10 @@ One `usosnet.sys` for Windows 98 / 98 SE / Me (NDIS.VXD) and
 Windows 2000 / XP / Server 2003 x86. Round 1 backend: Intel igb family
 (I211 8086:1539, I210 8086:1533/157B, 82576 8086:10C9 = QEMU `-device igb`).
 
-Status 2026-10-18: builds, imports checked against the 98 SE / Me NDIS.VXD
-export names; **not run yet** on QEMU or hardware.
+Status 2026-10-18: 0.3 runs on the X470 under Windows Me (DHCP lease,
+ping to the gateway and the internet answer; DNS fails, see 0.4). 0.4
+(live per-protocol statistics) builds and passes the host tests; **not run
+yet** on QEMU or hardware.
 
 ## Files
 
@@ -43,7 +45,7 @@ At the end of every start (success or failure) into the adapter's key
 
 | value | meaning |
 |---|---|
-| `UsosnetVersion` | driver version (0x00000003 = 0.3) |
+| `UsosnetVersion` | driver version (0x00000004 = 0.4) |
 | `UsosnetStage` | last stage reached: 1 entry, 2 config, 3 PCI, 4 resources, 5 MMIO mapped, 6 reset, 7 MAC, 8 DMA memory, 9 rings, 10 IRQ, 11 PHY, 12 started (0xC) |
 | `UsosnetError` | NDIS status of a failed start (0 = none) |
 | `UsosnetDevice` | vendor << 16 \| device (0x80861539 = I211) |
@@ -57,6 +59,7 @@ At the end of every start (success or failure) into the adapter's key
 | `UsosnetPhyId` | PHY ID1 << 16 \| ID2 (0 = MDIC failed) |
 | `UsosnetBar0High` | BAR0 high dword (non-zero: above 4 GiB, start refused - turn off "Above 4G decoding") |
 | `UsosnetPllTries` | I210/I211 iNVM PLL check: 0 not needed, n = checks until OK, 0x100+n = PLL never configured |
+| `UsosnetStatsVa` / `UsosnetStatsPa` | 0.4: linear / physical address of the live statistics page (0 = not allocated) |
 
 | `UsosnetLast*` | only after Device Manager disable + enable (driver kept loaded): counters of the previous run - `IsrCalls`, `Isr` (claimed), `Rx`, `RxTimer`, `Tx`, `TxDone`, `HwRx` (GPRC), `HwTx` (GPTC), `Flags` (as USN1 flags, TX stalls << 4) |
 
@@ -93,3 +96,37 @@ GPTC = 0 with TX completed > 0 -> frames dropped in the MAC / PHY.
 A start that hangs or crashes the machine writes nothing (9x keeps the
 registry in memory until it flushes): then `PollMode=1` / `SkipPhy=1` narrow
 it down, and `DebugPort` in QEMU shows the last step.
+
+## Live statistics (0.4)
+
+One 4 KiB shared-memory page, layout `USNS_BLOCK` in `src/usosnet_proto.h`
+(magic `USNS`, version 1, cleared at halt before the page is freed).
+USOSLOG (`src/platform/bios/win9x/usoslog.c`, branch `test/x470-98se-qemu`)
+reads it through `UsosnetStatsVa` (Windows 9x system arena) or, through
+USOSDBG's DPMI mapping, `UsosnetStatsPa`.
+
+* `Rx[]` / `Tx[]`: frames per class bit (`USNS_C_*`: broadcast, multicast,
+  ARP, IPv4, ICMP, UDP, TCP, DNS = port 53 either side, DHCP, HTTP = TCP 80,
+  fragment, IPv6, other, short, IP options, NetBIOS 137/138);
+* `Drop[]`: RX drops by reason (not EOP, CE, SE, SEQ, CXE, RXE, bad length,
+  no packet filter yet) and notes on indicated frames (L4E, IPE, L4E on UDP,
+  L4E on DNS, IPCS / L4CS / UDPCS checked, looped back);
+* `Td[]`: MiniportTransferData calls, calls outside an indication, short
+  copies, bytes, largest offset / length, calls for UDP / DNS frames;
+* `Core[]`: the adapter counters and STATUS / RCTL / RXCSUM / ring
+  pointers, once a second;
+* `Hist[32]`: the last frames (direction, classes, ports, length, RX status,
+  peer IPv4), `LastDnsRx` / `LastDnsTx`: first 128 bytes of the last DNS frame.
+
+RX drop rule (0.4 review of the DNS failure on the X470): only frame errors
+(CE SE SEQ CXE RXE, mask 0x97000000, the same as the Linux igb driver) drop
+a frame. The IPv4 / L4 checksum error bits (IPE 0x40000000, L4E 0x20000000)
+were never in that mask and are now only counted: Windows 9x verifies the
+checksums itself. So the driver did not drop UDP replies for a checksum
+verdict; the statistics show where they go.
+
+A UDP broadcast to port 21843 (0x5553, `USNS_LOG_PORT`) sent by USOSLOG
+asks for one extra `NdisWriteErrorLogEntry` round in the next second (at
+most 100 per start, besides the 40 scheduled ones). Every round now also
+has `USN5` 0x55534E35: seconds, RX UDP, RX DNS, RX TCP, RX ICMP, TX UDP,
+TX DNS, UDP frames with L4E, TransferData calls outside an indication.

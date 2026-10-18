@@ -17,6 +17,12 @@
  *       indicates each frame with NdisMEthIndicateReceive (the full frame
  *       is the lookahead, MiniportTransferData copies from the same
  *       buffer while the indication runs) and hands the buffer back.
+ *
+ * 0.4: every frame in both directions is classified (usosnet_proto.h) into
+ * a live statistics page (ARP / ICMP / UDP / DNS / TCP / HTTP counters, RX
+ * drop reasons, checksum notes, MiniportTransferData calls, the last 32
+ * frames, the last DNS frame per direction). Its address is in the
+ * registry (UsosnetStatsVa / UsosnetStatsPa) for USOSLOG.
  */
 #include "usosnet.h"
 #include "usosnet_irq.h"
@@ -181,7 +187,11 @@ static void WriteDiag(PADAPTER A, NDIS_HANDLE Cfg)
     NDIS_STRING kVer = NDIS_STRING_CONST("UsosnetVersion");
     NDIS_STRING kBarHi = NDIS_STRING_CONST("UsosnetBar0High");
     NDIS_STRING kPll = NDIS_STRING_CONST("UsosnetPllTries");
+    NDIS_STRING kSva = NDIS_STRING_CONST("UsosnetStatsVa");
+    NDIS_STRING kSpa = NDIS_STRING_CONST("UsosnetStatsPa");
     if (!Cfg) return;
+    CfgPut(Cfg, &kSva, A->Stats ? (ULONG)(ULONG_PTR)A->Stats : 0);
+    CfgPut(Cfg, &kSpa, A->Stats ? A->StatsMem.Pa : 0);
     CfgPut(Cfg, &kVer, (USOSNET_MAJOR << 16) | USOSNET_MINOR);
     CfgPut(Cfg, &kStage, A->Stage);
     CfgPut(Cfg, &kError, A->Error);
@@ -280,6 +290,9 @@ static void FreeAll(PADAPTER A)
     A->TimerInit = FALSE;
     if (A->IrqRegistered) NdisMDeregisterInterrupt(&A->Interrupt);
     A->IrqRegistered = FALSE;
+    if (A->Stats) A->Stats->Magic = 0;       /* readers check it first */
+    A->Stats = NULL;
+    DmaFree(A, &A->StatsMem);
     DmaFree(A, &A->RxRing);
     DmaFree(A, &A->TxRing);
     for (i = 0; i < RX_COUNT / BUFS_PER_PAGE; i++) DmaFree(A, &A->RxPage[i]);
@@ -320,6 +333,8 @@ static BOOLEAN CheckLink(PADAPTER A)
 #define EV_IRQ_POLL     1       /* IRQ watchdog switched to timer polling */
 #define EV_TX_STALL     2       /* TX descriptors pending 3 s without completion */
 #define EV_LINK         3
+#define EV_REQUEST      4       /* USOSLOG asked (UDP broadcast to USNS_LOG_PORT) */
+#define LOG_FORCED_MAX  100     /* such rounds per start, on top of LOG_MAX */
 
 static ULONG DiagFlags(PADAPTER A, ULONG Event)
 {
@@ -330,7 +345,12 @@ static ULONG DiagFlags(PADAPTER A, ULONG Event)
 static void DiagLog(PADAPTER A, ULONG Event, ULONG Sec)
 {
     ULONG r[DIAG_REGS], pci = 0;
-    if (A->LogCount >= LOG_MAX) return;
+    if (Event == EV_REQUEST) {
+        if (A->ForcedLogs >= LOG_FORCED_MAX) return;
+        A->ForcedLogs++;
+    } else {
+        if (A->LogCount >= LOG_MAX) return;
+    }
     A->LogCount++;
     A->Chip->Ops->Diag(A, r);
     NdisReadPciSlotInformation(A->Handle, 0, 4, &pci, 4);   /* bit 19 = PCI status INTx pending */
@@ -348,6 +368,54 @@ static void DiagLog(PADAPTER A, ULONG Event, ULONG Sec)
                                (A->IrqLevel << 16) | (A->IrqVector & 0xFFFF), A->RxRing.Pa, A->TxRing.Pa,
                                r[DR_CTRL], r[DR_TCTL], r[DR_RXDCTL], r[DR_TXDCTL], A->HwCrc,
                                (USOSNET_MAJOR << 16) | USOSNET_MINOR);
+    if (A->Stats) {
+        /* USN5: RX UDP, RX DNS, RX TCP, RX ICMP, TX UDP, TX DNS, UDP with L4E,
+         * TransferData without a frame being indicated */
+        USNS_BLOCK *S = A->Stats;
+        NdisWriteErrorLogEntry(A->Handle, NDIS_ERROR_CODE_DRIVER_FAILURE, 10, 0x55534E35UL, Sec,
+                               S->Rx[5], S->Rx[7], S->Rx[6], S->Rx[4], S->Tx[5], S->Tx[7],
+                               S->Drop[USNS_N_L4E_UDP], S->Td[USNS_T_NO_FRAME]);
+    }
+}
+
+/* once a second: the core counters into the statistics page */
+static void StatsSecond(PADAPTER A, ULONG Sec)
+{
+    ULONG r[DIAG_REGS], *k;
+    if (!A->Stats) return;
+    k = A->Stats->Core;
+    A->Chip->Ops->Diag(A, r);
+    A->Stats->Seconds = Sec;
+    k[USNS_K_ISRCALLS] = A->IsrCalls; k[USNS_K_ISR] = A->IsrCount; k[USNS_K_DPC] = A->DpcCount;
+    k[USNS_K_RXOK] = A->RxOk; k[USNS_K_RXTIMER] = A->RxByTimer; k[USNS_K_TXOK] = A->TxOk;
+    k[USNS_K_TXDONE] = A->TxDone; k[USNS_K_TXERR] = A->TxErr; k[USNS_K_TXFULL] = A->TxFull;
+    k[USNS_K_RXERR] = A->RxErr; k[USNS_K_RXCRC] = A->RxCrcErr; k[USNS_K_TPR] = A->HwTpr;
+    k[USNS_K_GPRC] = A->HwGprc; k[USNS_K_GPTC] = A->HwGptc; k[USNS_K_MPC] = A->HwMpc;
+    k[USNS_K_RNBC] = A->HwRnbc; k[USNS_K_CRCERRS] = A->HwCrc; k[USNS_K_FILTER] = A->PacketFilter;
+    k[USNS_K_LOOKAHEAD] = A->Lookahead; k[USNS_K_POLLMODE] = A->PollMode;
+    k[USNS_K_LINK] = DiagFlags(A, 0); k[USNS_K_STATUS] = r[DR_STATUS]; k[USNS_K_RCTL] = r[DR_RCTL];
+    k[USNS_K_RXCSUM] = r[DR_RXCSUM]; k[USNS_K_RDH] = r[DR_RDH]; k[USNS_K_RDT] = r[DR_RDT];
+    k[USNS_K_TDH] = r[DR_TDH]; k[USNS_K_TDT] = r[DR_TDT]; k[USNS_K_TXBUSY] = A->TxBusy;
+    k[USNS_K_LOGS] = A->LogCount; k[USNS_K_LOGREQ] = A->ForcedLogs;
+}
+
+/* one shared-memory page (has a physical address for USOSDBG's DPMI map) */
+static void StatsInit(PADAPTER A)
+{
+    USNS_BLOCK *S;
+    if (sizeof(USNS_BLOCK) > 4096 || !DmaAlloc(A, &A->StatsMem, 4096, 64)) return;
+    S = (USNS_BLOCK *)A->StatsMem.Va;
+    UsZero(S, 4096);
+    S->Version = USNS_VERSION;
+    S->Size = sizeof(USNS_BLOCK);
+    S->Magic = USNS_MAGIC;
+    A->Stats = S;
+}
+
+static void StatsDump(UCHAR *Dst, ULONG *DstLen, const UCHAR *Frame, ULONG Len)
+{
+    *DstLen = Len;
+    UsCopy(Dst, Frame, Len > USNS_DUMP ? USNS_DUMP : Len);
 }
 
 /* once a second: link, chip counters, IRQ and TX watchdogs, log schedule */
@@ -371,6 +439,8 @@ static void TimerSecond(PADAPTER A)
     }
     A->TxLastClean = A->TxDone;
     if (linkChanged && sec) DiagLog(A, EV_LINK, sec);
+    if (A->LogRequest) { A->LogRequest = 0; DiagLog(A, EV_REQUEST, sec); }
+    StatsSecond(A, sec);
     if (sec == 3 || sec == 10 || sec == 30 || sec == 60 || (sec && sec % 300 == 0))
         DiagLog(A, EV_PERIODIC, sec);
 }
@@ -391,9 +461,38 @@ static VOID TimerFn(PVOID S1, PVOID Ctx, PVOID S2, PVOID S3)
 /* ------------------------------------------------------------------ */
 /* RX indication (called by the backend from RxPoll)                   */
 
-void UsIndicateRx(PADAPTER A, PUCHAR Frame, ULONG Len)
+void UsRxDropped(PADAPTER A, PUCHAR Frame, ULONG Len, ULONG Status)
 {
-    if (Len < ETH_HDR || Len > ETH_MAX_FRAME + 4) { A->RxErr++; return; }
+    USNS_BLOCK *S = A->Stats;
+    ULONG c, ports, peer;
+    if (!S) return;
+    c = UsnsClassify(Frame, Len > BUF_SIZE ? BUF_SIZE : Len, 1, &ports, &peer);
+    (void)UsnsRxStatus(S->Drop, Status, c);
+    UsnsHistory(S, 3, c, ports, Len, Status, peer);
+}
+
+void UsIndicateRx(PADAPTER A, PUCHAR Frame, ULONG Len, ULONG Status)
+{
+    USNS_BLOCK *S = A->Stats;
+    if (Len < ETH_HDR || Len > ETH_MAX_FRAME + 4) {
+        A->RxErr++;
+        if (S) { S->Drop[USNS_D_LEN]++; UsnsHistory(S, 3, 0, 0, Len, Status, 0); }
+        return;
+    }
+    A->CurRxClasses = 0;
+    if (S) {
+        ULONG ports, peer, c = UsnsClassify(Frame, Len, 1, &ports, &peer);
+        if (!A->PacketFilter) {
+            S->Drop[USNS_D_NOFILTER]++;
+            UsnsHistory(S, 3, c, ports, Len, Status, peer);
+            return;
+        }
+        (void)UsnsRxStatus(S->Drop, Status, c);
+        UsnsCount(S->Rx, c);
+        UsnsHistory(S, 1, c, ports, Len, Status, peer);
+        if (c & USNS_C_DNS) StatsDump(S->LastDnsRx, &S->LastDnsRxLen, Frame, Len);
+        A->CurRxClasses = c;
+    }
     if (!A->PacketFilter) return;
     A->CurRx = Frame;
     A->CurRxLen = Len;
@@ -401,6 +500,7 @@ void UsIndicateRx(PADAPTER A, PUCHAR Frame, ULONG Len)
     NdisMEthIndicateReceive(A->Handle, (NDIS_HANDLE)A, (PCHAR)Frame, ETH_HDR,
                             Frame + ETH_HDR, Len - ETH_HDR, Len - ETH_HDR);
     A->CurRx = NULL;
+    A->CurRxClasses = 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -551,6 +651,7 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     if (st != NDIS_STATUS_SUCCESS) goto fail;
     A->MapRegs = TRUE;
     if (!AllocRings(A)) { st = NDIS_STATUS_RESOURCES; goto fail; }
+    StatsInit(A);                             /* optional: no page, no live statistics */
     A->Stage = ST_DMA;
 
     A->Chip->Ops->Start(A);
@@ -699,6 +800,14 @@ static NDIS_STATUS MpSend(NDIS_HANDLE Ctx, PNDIS_PACKET Packet, UINT Flags)
     }
     if (total < ETH_HDR) { A->TxErr++; return NDIS_STATUS_SUCCESS; }
     if (total < 60) { UsZero(dst + total, 60 - total); total = 60; }
+    if (A->Stats) {
+        USNS_BLOCK *S = A->Stats;
+        ULONG ports, peer, c = UsnsClassify(dst, total, 0, &ports, &peer);
+        UsnsCount(S->Tx, c);
+        UsnsHistory(S, 2, c, ports, total, 0, peer);
+        if (c & USNS_C_DNS) StatsDump(S->LastDnsTx, &S->LastDnsTxLen, dst, total);
+        if (UsnsIsLogRequest(c, ports)) A->LogRequest = 1;
+    }
     if (!A->Chip->Ops->Transmit(A, total)) { A->TxErr++; return NDIS_STATUS_SUCCESS; }
     A->TxOk++;
     return NDIS_STATUS_SUCCESS;
@@ -713,8 +822,20 @@ static NDIS_STATUS MpTransferData(PNDIS_PACKET Packet, PUINT BytesTransferred, N
     UINT len, n, done = 0;
     PUCHAR src;
     ULONG avail;
+    USNS_BLOCK *S = A->Stats;
     UNREFERENCED_PARAMETER(Ctx);
     *BytesTransferred = 0;
+    if (S) {
+        S->Td[USNS_T_CALLS]++;
+        if (ByteOffset > S->Td[USNS_T_MAX_OFFSET]) S->Td[USNS_T_MAX_OFFSET] = ByteOffset;
+        if (BytesToTransfer > S->Td[USNS_T_MAX_LEN]) S->Td[USNS_T_MAX_LEN] = BytesToTransfer;
+        if (!A->CurRx) {
+            S->Td[USNS_T_NO_FRAME]++;
+        } else {
+            if (A->CurRxClasses & USNS_C_UDP) S->Td[USNS_T_UDP]++;
+            if (A->CurRxClasses & USNS_C_DNS) S->Td[USNS_T_DNS]++;
+        }
+    }
     if (!A->CurRx) return NDIS_STATUS_FAILURE;
     avail = A->CurRxLen - ETH_HDR;
     if (ByteOffset >= avail) return NDIS_STATUS_SUCCESS;
@@ -730,6 +851,10 @@ static NDIS_STATUS MpTransferData(PNDIS_PACKET Packet, PUINT BytesTransferred, N
         done += n;
     }
     *BytesTransferred = done;
+    if (S) {
+        S->Td[USNS_T_BYTES] += done;
+        if (done < BytesToTransfer) S->Td[USNS_T_SHORT]++;
+    }
     return NDIS_STATUS_SUCCESS;
 }
 

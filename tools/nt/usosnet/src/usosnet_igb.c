@@ -137,7 +137,10 @@
 /* advanced RX write-back, dword 2 (status / error) */
 #define RXD_STAT_DD     1UL
 #define RXD_STAT_EOP    2UL
-#define RXD_ERR_FRAME   0x97000000UL  /* CE SE SEQ CXE RXE */
+/* frame errors (CE SE SEQ CXE RXE, 0x97000000) and the checksum notes are
+ * decided in UsIndicateRx / UsRxDropped (usosnet_proto.h UsnsRxStatus):
+ * IPE / L4E never drop a frame (0.4 review: UDP replies must not be lost
+ * to a checksum offload verdict; Windows checks the checksums itself). */
 
 #define PHY_ADDR        1
 
@@ -553,11 +556,12 @@ static void IgbRxPoll(PADAPTER A)
         st = d[2];
         if (!(st & RXD_STAT_DD)) break;
         len = d[3] & 0xFFFF;
-        if (!(st & RXD_STAT_EOP) || (st & RXD_ERR_FRAME)) {
+        if (!(st & RXD_STAT_EOP) || (st & USNS_ST_FRAME_ERR)) {
             A->RxErr++;
-            if (st & 0x01000000UL) A->RxCrcErr++;
+            if (st & USNS_ST_CE) A->RxCrcErr++;
+            UsRxDropped(A, A->RxBuf[i], len, st);
         } else {
-            UsIndicateRx(A, A->RxBuf[i], len);
+            UsIndicateRx(A, A->RxBuf[i], len, st);
         }
         d[0] = A->RxBufPa[i]; d[1] = 0; d[2] = 0; d[3] = 0;   /* back to read format */
         last = i;
@@ -614,6 +618,7 @@ static void IgbDiag(PADAPTER A, ULONG *R)
     R[DR_TDT] = RD32(A, TDT0);
     R[DR_RXDCTL] = RD32(A, RXDCTL0);
     R[DR_TXDCTL] = RD32(A, TXDCTL0);
+    R[DR_RXCSUM] = RD32(A, RXCSUM);
 }
 
 const USOSNET_CHIP_OPS IgbOps = {
