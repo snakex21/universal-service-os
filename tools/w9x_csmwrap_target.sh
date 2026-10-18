@@ -346,8 +346,11 @@ losetup -d "$part_loop"; part_loop=''
 sync
 blockdev --rereadpt "$TARGET_DEVICE" 2>/dev/null || true
 
-# The CSMWrap ESP at the disk end (slot 2), the XP/Vista writer unchanged.
-TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=$ESP_TAIL sh "$LIB/xp_csmwrap_esp.sh" || fail 'the CSMWrap ESP could not be written'
+# The CSMWrap ESP at the disk end (slot 2), the XP/Vista writer. Windows 9x
+# has no IRQ steering miniport for current chipsets and takes PCI IRQs from
+# the BIOS, so CSMWrap routes PCI INTx to 8259 IRQs for it (csmwrap.ini
+# pci_irq_routing = true, CSMWrap 3.1.2-usos12 patch 0015).
+TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=$ESP_TAIL USOS_PCI_IRQ_ROUTING=on sh "$LIB/xp_csmwrap_esp.sh" || fail 'the CSMWrap ESP could not be written'
 dd if="$TARGET_DEVICE" of="$mbr" bs=512 count=1 2>/dev/null || fail 'cannot read back the MBR'
 [ "$(od -An -tu1 -j450 -N1 "$mbr" | tr -d ' \n')" = 12 ] || fail 'read-back: the Windows partition type differs'
 [ "$(od -An -tu1 -j446 -N1 "$mbr" | tr -d ' \n')" = 128 ] || fail 'read-back: the Windows partition is not active'

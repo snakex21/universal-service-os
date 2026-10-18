@@ -106,10 +106,8 @@ def main() -> int:
     assert manifest["patches"] == {n: hashlib.sha256((V11 / n).read_bytes()).hexdigest() for n in names}
     for name, digest in manifest["files"].items():
         assert hashlib.sha256((vendor / name).read_bytes()).hexdigest() == digest, name
-    lock = json.loads((ROOT / "tools/csmwrap_build/lock.json").read_text(encoding="utf-8"))
-    assert lock["usos_version"] == "3.1.2-usos11"
-    esp = (ROOT / "tools/xp_csmwrap_esp.sh").read_text(encoding="utf-8")
-    assert f"PINNED={manifest['files']['csmwrapx64.efi']}" in esp
+    # the release pins moved to 3.1.2-usos12 (same 0012 file, test_csmwrap_pciirq.py)
+    assert (ROOT / "tools/vendor/csmwrap/3.1.2-usos12/patches" / PATCH.name).read_bytes() == PATCH.read_bytes()
     efi = (vendor / "csmwrapx64.efi").read_bytes()
     assert b"USOS W2KHIDE" in efi and b"3.1.2-usos11" in efi and b"USOS WATCH" not in efi
 

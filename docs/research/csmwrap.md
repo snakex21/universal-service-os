@@ -750,3 +750,50 @@ builds are identical). It is not in the flow and not pinned in xp_csmwrap_esp.sh
 QEMU: `run_csmwrap_boot_disk_qemu.py --only` PASSES on nvme-usb, same-port0, usb-target and
 nvme-target (`USOS-TARGET NO-DRIVE-81`). The same runs without `--only` keep the usos11 order.
 The new layout `nvme-usb` (NVMe target, USB decoy) also PASSES with usos11.
+
+## 18. 3.1.2-usos12: PCI INTx routed to 8259 IRQs for Windows 9x (2026-10-18)
+
+X470, Windows Me on the Micron (CSM off): the USOS usosnet I211 driver installs, but Device
+Manager shows Code 29 ("the BIOS did not assign an IRQ"). Every other PCI device with an
+interrupt pin shows the same code. Cause: the firmware leaves PIC-mode routing empty (Linux on the
+same board: LNKA..LNKH "configured for IRQ 0", FCH PCI_INTR index 0..7 = 0). Interrupt Line holds
+no 8259 IRQ. Windows 9x without ACPI has no IRQ steering miniport for the AMD FCH router (1022:790E),
+so it can only use what the BIOS assigned. CSMWrap's own `pir.c` `$PIR` also had no slots for
+buses without their own `_PRT`. On the X470 that is everything behind the Promontory switch (I211
+on bus 4, Wi-Fi, NVMe). Its secondary-bus lookup also reads nested bridges on the root bus number.
+
+Patch 0015 (own code, `src/usos_pciirq.c` + `src/usos_pciirq_core.inc`), only with csmwrap.ini
+`pci_irq_routing = true`. The 9x flow alone writes it: `w9x_csmwrap_target.sh` →
+`USOS_PCI_IRQ_ROUTING=on` → `xp_csmwrap_esp.sh`. Before `pir_init()` (boot services still up),
+CSMWrap:
+
+- walks every PCI bus from the PNP0A08/PNP0A03 root bridges (`_BBN`), through bridges by secondary
+  bus number and the ACPI child with the matching `_ADR`;
+- resolves each pin through the PIC-mode `_PRT`. uACPI never calls `_PIC`, so `PICM` = 0 and the
+  link packages are returned. Buses without a `_PRT` use the bridge swizzle (pin + device) mod 4;
+- for each used link, keeps a valid `_CRS` IRQ, or sets one with `_SRS`: the `_PRS` template is
+  reduced to one IRQ, 11/10/5/9 first, least loaded, busiest links first, and the result is
+  checked with `_CRS`. If that fails, the link's `_DIS` is called and its functions stay unrouted;
+- writes Interrupt Line and sets ELCR level bits. IRQ 0/1/2/8/13 are never used;
+- has `pir.c` build `$PIR` from that routing: one slot per bus/device with a pin, link 0x80 + n,
+  bitmap = the one IRQ.
+
+APIC-mode routing (a separate FCH register bank), the MADT, the MP table and the ACPI tables are
+unchanged. 3.1.2-usos12 = usos11 (0001-0010, 0012) + 0014 + 0015. It is the new release pin. The
+SeaBIOS side is unchanged from usos11-int13x: ROM 127936/131072, F-segment zone 20746 B. Binary
+`35e4e37dc504aecf811277ec3243b303708a49443b4f35bc1789c2b015d2c4eb`, the same in two VM runs; the
+unpatched build still matches `upstream_rebuild`.
+
+Tests:
+
+- `test_csmwrap_pciirq.py`: core unit cases on the X470 tree, wiring, pins and the 9x-only gate.
+- `--e2e`: the real glue + uACPI on the host against the X470 DSDT/FADT dump (not in the repo),
+  with a simulated PCI tree and FCH ports. It found that the firmware's `LNKE._SRS` is broken:
+  `FindSetRightBit(PIRE)` instead of its argument, so it stores 0xFF. `_DIS` now handles that
+  case. The result: I211 → LNKB → IRQ 10, NVMe/Wi-Fi → LNKA → IRQ 11.
+- `run_csmwrap_pciirq_qemu.py`: pc + pci-bridge and q35 + root port PASS (B10Eh, Interrupt Line,
+  ELCR). Without the key, the output is identical to usos11-int13x.
+- boot-disk layouts (also `--only`) and apmoff PASS with usos12.
+
+X470 with usos12: not tried. The in-place kit is `me-irq-fix`. The 9x side (whether PCI.VXD takes
+the BIOS IRQs as expected with no miniport) is checked only on the hardware.

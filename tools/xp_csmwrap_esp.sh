@@ -3,7 +3,7 @@
 # docs/design/csmwrap-integration.md). Runs after prepare_xp_target.sh PASSED
 # on the same target: adds a small FAT16 EFI system partition (MBR type 0xEF)
 # in the space the Windows plan left free at the end of the disk
-# (USOS_XP_ESP_TAIL_SECTORS), with the pinned CSMWrap 3.1.2-usos11 (a MODIFIED
+# (USOS_XP_ESP_TAIL_SECTORS), with the pinned CSMWrap 3.1.2-usos12 (a MODIFIED
 # CSMWrap 3.1.2: quiet unless verbose = true, docs/research/csmwrap.md 6 and 7)
 # as \EFI\BOOT\BOOTX64.EFI, its licences, source and patches in \CSMWRAP.
 # The firmware then boots the target through
@@ -17,7 +17,7 @@ TARGET_DEVICE=${TARGET_DEVICE:?TARGET_DEVICE is required}
 TAIL=${USOS_XP_ESP_TAIL_SECTORS:?USOS_XP_ESP_TAIL_SECTORS is required}
 SRC=${USOS_CSMWRAP_DIR:-/mnt/esp/EFI/USOS/csmwrap}
 ESP_SECTORS=131072
-PINNED=94a93de4b40614bc2c75079e83cfbf23c9629a58016bd98ee0fa446d71872cc8
+PINNED=35e4e37dc504aecf811277ec3243b303708a49443b4f35bc1789c2b015d2c4eb
 # Windows 2000 diagnostic setup (USOS_W2K_DIAG=on, DATA w2k-diag.txt):
 # CSMWrap 3.1.2-usos11-diag (usos11 + 0011 tick watcher + 0013 NMI snapshot,
 # tools/vendor/csmwrap/3.1.2-usos11-diag) from the XP/2000 package.
@@ -34,7 +34,7 @@ for tool in dd od mkfs.fat mmd mcopy mdir sha256sum awk blockdev sync wc; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
 [ -r "$SRC/csmwrapx64.efi" ] || fail 'CSMWrap is missing on the USOS stick (EFI/USOS/csmwrap)'
-[ "$(sha256sum "$SRC/csmwrapx64.efi" | awk '{print $1}')" = "$PINNED" ] || fail 'CSMWrap binary does not match the pinned 3.1.2-usos11 hash'
+[ "$(sha256sum "$SRC/csmwrapx64.efi" | awk '{print $1}')" = "$PINNED" ] || fail 'CSMWrap binary does not match the pinned 3.1.2-usos12 hash'
 for file in $CSMWRAP_FILES; do
     [ -r "$SRC/$file" ] || fail "$file is missing next to CSMWrap"
 done
@@ -100,6 +100,15 @@ printf 'serial = false\r\nverbose = %s\r\n' "$verbose" > "$ini"
 if [ "${USOS_W2K_ACPI:-}" = on ]; then
     printf 'acpi_legacy_fadt = true\r\n' >> "$ini"
     log 'csmwrap.ini acpi_legacy_fadt=true (Windows 2000 ACPI)'
+fi
+# Windows 9x (w9x_csmwrap_target.sh exports USOS_PCI_IRQ_ROUTING only there):
+# CSMWrap routes PCI INTA#..INTD# to 8259 IRQs, writes Interrupt Line and
+# ELCR and a matching $PIR, as a legacy BIOS POST does (patch 0015). 9x has
+# no IRQ steering for current chipsets, so without it every PCI device with
+# an interrupt pin gets Code 29. XP/2000/Vista and the rest: unchanged.
+if [ "${USOS_PCI_IRQ_ROUTING:-}" = on ]; then
+    printf 'pci_irq_routing = true\r\n' >> "$ini"
+    log 'csmwrap.ini pci_irq_routing=true (Windows 9x PCI IRQs)'
 fi
 if [ "${USOS_W2K_DIAG:-off}" = on ]; then
     printf 'w2k_nmi_snapshot = true\r\n' >> "$ini"
