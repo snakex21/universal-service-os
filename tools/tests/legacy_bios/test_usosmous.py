@@ -264,6 +264,13 @@ class MeBridge(unittest.TestCase):
         poll = self.body(self.mouse, 'poll_body')
         self.assertIn('wheel_sum += (signed char)p[3];', poll)
         self.assertLess(poll.index('call_event(SF_MOVEMENT'), poll.index('call_wheel(wheel_sum)'))
+        # v4 (CSMWrap usos15 patch 0020): the Z word counts also when the
+        # knock was not answered with ID 3, but only where the wheel is wanted.
+        self.assertIn('if (wheel_sum && (wheel || wheel_pref == 2)) call_wheel(wheel_sum);', poll)
+        # v4: a knock answered with an ID other than 3 is sent once more, at most.
+        self.assertIn('for (tries = 0; tries < 2 && !wheel; tries++)', knock)
+        self.assertLess(knock.index('for (tries = 0;'), knock.index('winfo.knocks++;'))
+        self.assertLess(knock.index('wheel = winfo.knock_id == 3;'), knock.rindex('winfo.wheel = wheel;'))
         wheel = self.body(self.mouse, 'call_wheel')
         self.assertIn('mov ax, SF_WHEEL', wheel)
         self.assertIn('mov dx, delta', wheel)

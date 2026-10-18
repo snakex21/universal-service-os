@@ -72,6 +72,15 @@
  *     drops button flags in a wheel call, so it is a call of its own).
  * Without the knock answered (older CSMWrap, wheel-less mouse, Windows
  * 3.x / 95, SYSTEM.INI [usosmous] Wheel=0) nothing changes.
+ * Wheel v4 (2026-10-19, Me on the X470 with CSMWrap usos14: the knock was
+ * answered with ID 0, the BIOS saw a later reset and rates 10, 40 from
+ * another INT 15h client): CSMWrap 3.1.2-usos15 (patch 0020) passes the
+ * wheel in the Z word with 3-byte packages also without the knock. So
+ * where the wheel is wanted (98 / 98 SE / Me, Wheel=1) a nonzero Z sum is
+ * sent as a wheel event even when the knock was not answered with ID 3
+ * (Z is 0 from an older CSMWrap and from a mouse without a wheel), and a
+ * knock answered with an ID other than 3 is sent once more (once per
+ * C205h init, i.e. per Enable / USOSATTACH / end of a DOS-box pause).
  * No OpenWatcom runtime is linked (own entry point, -zl).
  * Built with tools/build_win3_usb_keyboard.py; docs/win9x-modern-2026-09-30.md.
  */
@@ -274,20 +283,22 @@ static int wheel_wanted(void)
 static void knock(void)
 {
     static const WORD rates[3] = { 0x0600, 0x0500, 0x0400 };   /* 200, 100, 80 */
-    WORD i, r;
+    WORD i, r, tries;
     int want = wheel_wanted();
     wheel = 0;
     winfo.wheel = 0;
     winfo.pref = wheel_pref;
     if (!want) return;
-    winfo.knocks++;
-    winfo.knock_id = 0xFF;
-    for (i = 0; i < 3; i++)
-        if ((r = bios15(0xC202, rates[i], 0)) != 0) { winfo.knock_err = (WORD)((i + 1) << 12) | (r & 0x1FF); return; }
-    if ((r = bios15(0xC204, 0, 0)) != 0) { winfo.knock_err = 0x4000 | (r & 0x1FF); return; }
-    winfo.knock_err = 0;
-    winfo.knock_id = (BYTE)((rm.ebx >> 8) & 0xFF);
-    wheel = winfo.knock_id == 3;
+    for (tries = 0; tries < 2 && !wheel; tries++) {     /* v4: ID != 3: once more */
+        winfo.knocks++;
+        winfo.knock_id = 0xFF;
+        for (i = 0; i < 3; i++)
+            if ((r = bios15(0xC202, rates[i], 0)) != 0) { winfo.knock_err = (WORD)((i + 1) << 12) | (r & 0x1FF); return; }
+        if ((r = bios15(0xC204, 0, 0)) != 0) { winfo.knock_err = 0x4000 | (r & 0x1FF); return; }
+        winfo.knock_err = 0;
+        winfo.knock_id = (BYTE)((rm.ebx >> 8) & 0xFF);
+        wheel = winfo.knock_id == 3;
+    }
     winfo.wheel = wheel;
 }
 
@@ -407,7 +418,9 @@ static void __near __loadds poll_body(void)
         }
     }
     if (sx || sy) call_event(SF_MOVEMENT, sx, sy);
-    if (wheel && wheel_sum) call_wheel(wheel_sum);
+    /* v4: the Z word with or without device ID 3 (CSMWrap patch 0020);
+     * wheel_pref is set at task time, no KERNEL call here. */
+    if (wheel_sum && (wheel || wheel_pref == 2)) call_wheel(wheel_sum);
     busy = 0;
 }
 

@@ -30,13 +30,25 @@
  *         USOSMWHL in the first MiB): per mouse report/boot protocol and
  *         why, wMaxPacketSize, the field layout, the last raw packet, the
  *         wheel packet count and the first bytes of the HID report
- *         descriptor (S saves them all to the log)
+ *         descriptor (S saves them all to the log); with CSMWrap
+ *         3.1.2-usos15 (patch 0020) also the record's ring of the last 16
+ *         INT 15h AH=C2h calls (function, BX, ES, caller CS:IP, device ID
+ *         after the call, result) and what followed the last IntelliMouse
+ *         knock (rates 200, 100, 80): a later C201h reset / C205h init
+ *         and its caller
  *   IVT   INT 08h/09h/15h/16h/1Ch/2Fh vectors of the system VM
  *   MAP   linear (system VM V86) against physical (DPMI 0800h) for a few
  *         pages: page 0 (control: the IVT page is per VM, expected to
  *         differ), the USOSKEY page, the INT 08h and USB INT 15h/4Fh stack
  *         pages, and C0000-FFFFF (SeaBIOS low zone, its extra stack: where
  *         CSMWrap's helper core writes the HID report, by physical address)
+ *   NIC   every network controller (class 02h) and the I211 (8086:1539):
+ *         command (INTx disable), status (interrupt status), line / pin,
+ *         MSI / MSI-X enable, the bridges above it
+ *   IRQ   ELCR (4D0h/4D1h), the 8259 masks (in 21h / A1h: VPICD's view of
+ *         the system VM; IRR / ISR are not read), the NIC's line in both
+ *   PIR   the $PIR routing table in F0000-FFFFF (header, slot entries, the
+ *         NIC's and its bridges' entries marked)
  *   PCI   every xHCI (class 0C0330) through ports CF8h/CFCh: command,
  *         status, BARs, interrupt; its registers through a DPMI 0800h
  *         mapping (USBCMD, USBSTS, MFINDEX twice, PORTSC of connected
@@ -45,7 +57,7 @@
  *         C:\USOS9X\DIAG.LOG), so the two can be compared line by line
  * S appends the current screen to C:\USOS9X\USOSDBG.LOG, Esc quits.
  *
- * Log mode (1.5, for USOSLOG.EXE, no window shown, no key needed):
+ * Log mode (1.5 on, for USOSLOG.EXE, no window shown, no key needed):
  *   USOSDBG.EXE /L <file> [/F] [/N <hex>]
  * takes two snapshots one second apart (so the "+n" deltas are per second),
  * writes the second one to <file> (created anew) and exits. Without /F the
@@ -63,7 +75,7 @@
  */
 #include <windows.h>
 
-#define LINES 96
+#define LINES 144
 #define WIDTH 256
 
 typedef struct {
@@ -404,6 +416,22 @@ static const char *md_reason(int r)
     return "boot: ?";
 }
 
+/* CSMWrap 3.1.2-usos15 (patch 0020): the last INT 15h AH=C2h calls, an
+ * extension after the record (SeaBIOS sizeof 312; the version byte stays
+ * 1). Read by byte offsets from the record start, valid only with the
+ * magic: u32 magic, u16 count (calls since boot, wraps), u8 head (next
+ * slot), u8 pad, then 16 x { u16 ax, bx, es, caller cs, caller ip;
+ * u8 id after the call, u8 res (0 ok, 80h | AH with CF) }. */
+#define C2RG_OFF     312
+#define C2RG_MAGIC   0x47523243L    /* "C2RG" */
+#define C2RG_COUNT   316
+#define C2RG_HEAD    318
+#define C2RG_RING    320
+#define C2RG_ENTRY   12
+#define C2RG_SLOTS   16
+#define MDIAG_MAP    512            /* record + ring: 320 + 16 * 12 */
+static WORD mdiag_mapped;           /* bytes mapped at mdiag_at */
+
 /* The 0018 record: first MiB, 16-byte steps, from 80000h up (low zone). */
 static MDIAG FAR *find_mdiag(void)
 {
@@ -419,8 +447,93 @@ static MDIAG FAR *find_mdiag(void)
         }
     }
     if (!mdiag_at) return 0;
-    d = (MDIAG FAR *)physical(mdiag_at, sizeof(MDIAG));
+    /* the ring too when it fits below 1 MiB (the low mapping) */
+    mdiag_mapped = mdiag_at + MDIAG_MAP <= 0x100000L ? MDIAG_MAP : sizeof(MDIAG);
+    d = (MDIAG FAR *)physical(mdiag_at, mdiag_mapped);
     return d;
+}
+
+static const WORD c2_rates[7] = { 10, 20, 40, 60, 80, 100, 200 };
+
+/* short name of one C2xxh call (BH as the function takes it) */
+static void c2_name(LPSTR t, WORD ax, WORD bx)
+{
+    WORD bh = bx >> 8;
+    if ((ax >> 8) != 0xC2) { wsprintf(t, "%04X", ax); return; }
+    switch (ax & 0xFF) {
+    case 0: wsprintf(t, "C200 %s", (LPSTR)(bh ? "on" : "off")); break;
+    case 1: wsprintf(t, "C201 reset"); break;
+    case 2:
+        if (bh < 7) wsprintf(t, "C202 rate %u", c2_rates[bh]);
+        else wsprintf(t, "C202 rate ?%u", bh);
+        break;
+    case 3: wsprintf(t, "C203 res %u", bh); break;
+    case 4: wsprintf(t, "C204 getid"); break;
+    case 5: wsprintf(t, "C205 init pkt %u", bh); break;
+    case 6: wsprintf(t, "C206 %s", (LPSTR)(bh == 0 ? "status" : bh == 1 ? "scale 1:1" : bh == 2 ? "scale 2:1" : "?")); break;
+    case 7: wsprintf(t, "C207 handler"); break;
+    default: wsprintf(t, "%04X", ax); break;
+    }
+}
+
+/* the C2 ring, oldest first, four calls a line, then what followed the
+ * last IntelliMouse knock (rates 200, 100, 80) */
+static void show_c2(BYTE FAR *rec)
+{
+    WORD count, head, n, first, i, k, knock = 0xFFFF, resets = 0, inits = 0, offs = 0, other = 0;
+    WORD reset_cs = 0, reset_ip = 0, reset_ax = 0;
+    BYTE FAR *e[C2RG_SLOTS];
+    LPSTR l = 0;
+    char nm[24];
+    if (mdiag_mapped < MDIAG_MAP) {
+        wsprintf(line(), "WHEEL  C2 ring: not mapped (record above %05lX)", 0x100000L - MDIAG_MAP);
+        return;
+    }
+    if (*(DWORD FAR *)(rec + C2RG_OFF) != C2RG_MAGIC) {
+        wsprintf(line(), "WHEEL  C2 ring: none (CSMWrap before usos15)");
+        return;
+    }
+    count = *(WORD FAR *)(rec + C2RG_COUNT);
+    head = rec[C2RG_HEAD] & (C2RG_SLOTS - 1);
+    if (count < C2RG_SLOTS && head == count) { n = count; first = 0; }
+    else { n = C2RG_SLOTS; first = head; }
+    for (i = 0; i < n; i++) e[i] = rec + C2RG_RING + ((first + i) & (C2RG_SLOTS - 1)) * C2RG_ENTRY;
+    wsprintf(line(), "WHEEL  C2 ring: %u INT 15h AH=C2h calls since boot, last %u (oldest first; ID after the call; ok / err AH)",
+             count, n);
+    for (i = 0; i < n; i++) {
+        WORD FAR *w = (WORD FAR *)e[i];
+        BYTE res = e[i][11];
+        if (i % 4 == 0) { l = line(); wsprintf(l, "WHEEL  C2 #%u:", (WORD)(count - n + i)); }
+        c2_name(nm, w[0], w[1]);
+        wsprintf(l + lstrlen(l), "  %s bx=%04X es=%04X @%04X:%04X id%u ", (LPSTR)nm, w[1], w[2], w[3], w[4],
+                 (WORD)e[i][10]);
+        if (res) wsprintf(l + lstrlen(l), "err%02X", (WORD)(res & 0x7F));
+        else lstrcat(l, "ok");
+    }
+    /* the last knock: C202 rate 200, 100, 80 in a row */
+    for (i = 0; i + 2 < n; i++) {
+        WORD FAR *a = (WORD FAR *)e[i], FAR *b = (WORD FAR *)e[i + 1], FAR *c = (WORD FAR *)e[i + 2];
+        if (a[0] == 0xC202 && b[0] == 0xC202 && c[0] == 0xC202 &&
+            (a[1] >> 8) == 6 && (b[1] >> 8) == 5 && (c[1] >> 8) == 4) knock = i + 2;
+    }
+    if (knock == 0xFFFF) {
+        wsprintf(line(), "WHEEL  C2 knock (rate 200,100,80) not in the ring: never sent, or more than %u calls ago", n);
+        return;
+    }
+    for (k = knock + 1; k < n; k++) {
+        WORD FAR *w = (WORD FAR *)e[k];
+        WORD f = w[0];
+        if (f == 0xC201 || f == 0xC205) {
+            if (f == 0xC201) resets++; else inits++;
+            if (!reset_ax) { reset_ax = f; reset_cs = w[3]; reset_ip = w[4]; }
+        } else if (f == 0xC200 && !(w[1] >> 8)) offs++;
+        else other++;
+    }
+    l = line();
+    wsprintf(l, "WHEEL  C2 after the last knock (#%u, id%u): resets C201 %u  inits C205 %u  off C200 %u  other %u  ID now %u",
+             (WORD)(count - n + knock), (WORD)e[knock][10], resets, inits, offs, other, (WORD)e[n - 1][10]);
+    if (reset_ax)
+        wsprintf(l + lstrlen(l), "  -> first reset/init after it: %04X from %04X:%04X", reset_ax, reset_cs, reset_ip);
 }
 
 static void show_wheel(void)
@@ -481,6 +594,7 @@ static void show_wheel(void)
         wsprintf(l, "WHEEL  desc+%03u:", r);
         for (i = r; i < d->desc_got && i < r + 64; i++) wsprintf(l + lstrlen(l), "%02X", (WORD)d->desc[i]);
     }
+    show_c2((BYTE FAR *)d);
 }
 
 static void show_ivt(void)
@@ -673,6 +787,184 @@ static void show_pci(void)
     wsprintf(line(), "PCI xhci:%d lastbus:%02X", nxhci, (WORD)max_bus);
 }
 
+/* ---------------------------------------------------------- IRQ */
+/* Every network controller (class 02h) and the I211 (8086:1539): config
+ * 3Ch, command / status, MSI / MSI-X state, the bridges above it; ELCR
+ * (4D0h/4D1h), the 8259 masks as VPICD shows them to the system VM (IRR /
+ * ISR are not read: OCW3 would be a write), and the $PIR table in
+ * F0000-FFFFF with the NIC's entries marked. Only reads (no MMIO). */
+#define MAXNIC 4
+#define MAXBR  32
+static DWORD nic_at[MAXNIC], br_at[MAXBR];
+static BYTE br_sec[MAXBR], br_sub[MAXBR];
+static int nnic, nbr;
+
+static BYTE inb(WORD port)
+{
+    BYTE v = 0;
+    _asm {
+        mov dx, port
+        in al, dx
+        mov v, al
+    }
+    return v;
+}
+
+static void find_nics(void)
+{
+    WORD bus, dev, fn, fns, last = 0;
+    nnic = nbr = 0;
+    for (bus = 0; bus <= last; bus++) {
+        for (dev = 0; dev < 32; dev++) {
+            fns = 1;
+            for (fn = 0; fn < fns; fn++) {
+                DWORD a = 0x80000000L | ((DWORD)bus << 16) | ((DWORD)dev << 11) | ((DWORD)fn << 8);
+                DWORD id = cfg(a, 0), cls, hdr;
+                if (LOWORD(id) == 0xFFFF) continue;
+                hdr = cfg(a, 0x0C);
+                if (fn == 0 && (hdr & 0x00800000L)) fns = 8;
+                cls = cfg(a, 0x08) >> 8;
+                if (((cls >> 16) == 0x02 || id == 0x15398086L) && nnic < MAXNIC) nic_at[nnic++] = a;
+                if (((hdr >> 16) & 0x7F) == 1 && nbr < MAXBR) {
+                    DWORD b = cfg(a, 0x18);
+                    br_at[nbr] = a;
+                    br_sec[nbr] = (BYTE)(b >> 8);
+                    br_sub[nbr] = (BYTE)(b >> 16);
+                    if (br_sub[nbr] > last && br_sub[nbr] != 0xFF) last = br_sub[nbr];
+                    nbr++;
+                }
+            }
+        }
+    }
+}
+
+static void irq_list(LPSTR t, WORD bits)
+{
+    WORD i;
+    for (i = 0; i < 16; i++) if (bits & (1 << i)) wsprintf(t + lstrlen(t), " %u", i);
+    if (!bits) lstrcat(t, " none");
+}
+
+static void show_nic(DWORD a)
+{
+    DWORD id = cfg(a, 0), cs = cfg(a, 4), il = cfg(a, 0x3C), cls = cfg(a, 0x08) >> 8;
+    WORD cmd = LOWORD(cs), sts = HIWORD(cs), pin = (WORD)(il >> 8) & 0xFF, bus = (WORD)(a >> 16) & 0xFF;
+    BYTE ptr;
+    int n, i;
+    LPSTR l = line();
+    wsprintf(l, "NIC %02X:%02X.%X %04X:%04X%s class %06lX cmd:%04X (INTx %s, mem %s, master %s) sts:%04X (int %u) line:%02X pin:%c 3C:%08lX bar0:%08lX",
+             bus, (WORD)(a >> 11) & 0x1F, (WORD)(a >> 8) & 7, LOWORD(id), HIWORD(id),
+             (LPSTR)(id == 0x15398086L ? " (I211)" : ""), cls, cmd,
+             (LPSTR)((cmd & 0x400) ? "DISABLED" : "on"), (LPSTR)((cmd & 2) ? "on" : "off"),
+             (LPSTR)((cmd & 4) ? "on" : "off"), sts, (sts >> 3) & 1, (WORD)il & 0xFF,
+             pin >= 1 && pin <= 4 ? 'A' + pin - 1 : '-', il, cfg(a, 0x10));
+    l = line();
+    wsprintf(l, "NIC  caps:");
+    if (!(sts & 0x10)) lstrcat(l, " none");
+    else {
+        ptr = (BYTE)(cfg(a, 0x34) & 0xFC);
+        for (n = 0; ptr >= 0x40 && n < 48 && lstrlen(l) < 200; n++) {
+            DWORD c = cfg(a, ptr);
+            WORD capid = (WORD)c & 0xFF, ctl = HIWORD(c);
+            if (capid == 0x05)
+                wsprintf(l + lstrlen(l), " MSI@%02X ctl:%04X (%s)", (WORD)ptr, ctl, (LPSTR)((ctl & 1) ? "ENABLED" : "off"));
+            else if (capid == 0x11)
+                wsprintf(l + lstrlen(l), " MSI-X@%02X ctl:%04X (%s%s)", (WORD)ptr, ctl,
+                         (LPSTR)((ctl & 0x8000) ? "ENABLED" : "off"), (LPSTR)((ctl & 0x4000) ? ", masked" : ""));
+            else wsprintf(l + lstrlen(l), " %02X@%02X", capid, (WORD)ptr);
+            ptr = (BYTE)((c >> 8) & 0xFC);
+        }
+    }
+    for (i = 0; i < nbr; i++) {
+        if (bus < br_sec[i] || bus > br_sub[i]) continue;
+        l = line();
+        wsprintf(l, "NIC  bridge above: ");
+        bdf(l, br_at[i]);
+        wsprintf(l + lstrlen(l), " bus %02X-%02X ctl(3C):%08lX", (WORD)br_sec[i], (WORD)br_sub[i], cfg(br_at[i], 0x3C));
+    }
+}
+
+/* 1 = the $PIR entry for bus / device belongs to a NIC (2: a bridge above one) */
+static int pir_mark(WORD bus, WORD dev)
+{
+    int i, j;
+    for (i = 0; i < nnic; i++)
+        if (((nic_at[i] >> 16) & 0xFF) == bus && ((nic_at[i] >> 11) & 0x1F) == dev) return 1;
+    for (j = 0; j < nbr; j++) {
+        if (((br_at[j] >> 16) & 0xFF) != bus || ((br_at[j] >> 11) & 0x1F) != dev) continue;
+        for (i = 0; i < nnic; i++) {
+            WORD nb = (WORD)(nic_at[i] >> 16) & 0xFF;
+            if (nb >= br_sec[j] && nb <= br_sub[j]) return 2;
+        }
+    }
+    return 0;
+}
+
+static void show_pir(void)
+{
+    BYTE FAR *f = physical(0xF0000L, 0x10000L);
+    DWORD o;
+    WORD size, i, n, sum;
+    LPSTR l = 0;
+    if (!f) { wsprintf(line(), "PIR  F0000-FFFFF not mapped (DPMI 0800h refused)"); return; }
+    for (o = 0; o + 32 <= 0x10000L; o += 16) {
+        BYTE FAR *p = f + (WORD)o;
+        if (p[0] != '$' || p[1] != 'P' || p[2] != 'I' || p[3] != 'R') continue;
+        size = *(WORD FAR *)(p + 6);
+        if (size < 32 || o + size > 0x10000L) continue;
+        for (sum = 0, i = 0; i < size; i++) sum += p[i];
+        n = (size - 32) / 16;
+        l = line();
+        wsprintf(l, "PIR  at F%04X: version %u.%u size %u (%u entries) router %02X:%02X.%X compatible %04X:%04X miniport %08lX checksum %s  exclusive IRQs %04X:",
+                 (WORD)o, (WORD)p[5], (WORD)p[4], size, n, (WORD)p[8], (WORD)p[9] >> 3, (WORD)p[9] & 7,
+                 *(WORD FAR *)(p + 12), *(WORD FAR *)(p + 14), *(DWORD FAR *)(p + 16),
+                 (LPSTR)((sum & 0xFF) ? "BAD" : "ok"), *(WORD FAR *)(p + 10));
+        irq_list(l, *(WORD FAR *)(p + 10));
+        for (i = 0; i < n && i < 32; i++) {
+            BYTE FAR *e = p + 32 + i * 16;
+            int m = pir_mark(e[0], e[1] >> 3);
+            if (i % 2 == 0) { l = line(); wsprintf(l, "PIR "); }
+            wsprintf(l + lstrlen(l), " %02X:%02X slot %u A:%02X/%04X B:%02X/%04X C:%02X/%04X D:%02X/%04X%s",
+                     (WORD)e[0], (WORD)e[1] >> 3, (WORD)e[14], (WORD)e[2], *(WORD FAR *)(e + 3), (WORD)e[5],
+                     *(WORD FAR *)(e + 6), (WORD)e[8], *(WORD FAR *)(e + 9), (WORD)e[11], *(WORD FAR *)(e + 12),
+                     (LPSTR)(m == 1 ? " <-NIC" : m == 2 ? " <-bridge above NIC" : ""));
+        }
+        if (n > 32) wsprintf(line(), "PIR  (%u more entries not shown)", n - 32);
+        return;
+    }
+    wsprintf(line(), "PIR  none in F0000-FFFFF (no $PIR table: the OS has only ACPI _PRT / its own routing)");
+}
+
+static void show_irq(void)
+{
+    WORD elcr, imr, i;
+    LPSTR l;
+    if (LOWORD(cfg(0x80000000L, 0)) == 0xFFFF) return;
+    find_nics();
+    if (!nnic) wsprintf(line(), "NIC  no network controller (class 02h) found");
+    for (i = 0; i < (WORD)nnic; i++) show_nic(nic_at[i]);
+    elcr = inb(0x4D0) | ((WORD)inb(0x4D1) << 8);
+    imr = inb(0x21) | ((WORD)inb(0xA1) << 8);
+    l = line();
+    wsprintf(l, "IRQ  ELCR 4D0/4D1:%02X %02X  level:", elcr & 0xFF, elcr >> 8);
+    irq_list(l, elcr);
+    wsprintf(l + lstrlen(l), "  IMR 21/A1:%02X %02X (VPICD's view for the system VM) masked:", imr & 0xFF, imr >> 8);
+    irq_list(l, imr);
+    for (i = 0; i < (WORD)nnic; i++) {
+        WORD irq = (WORD)cfg(nic_at[i], 0x3C) & 0xFF;
+        if (irq >= 16) {
+            wsprintf(line(), "IRQ  NIC %02X:%02X.%X line %02X: no ISA IRQ assigned", (WORD)(nic_at[i] >> 16) & 0xFF,
+                     (WORD)(nic_at[i] >> 11) & 0x1F, (WORD)(nic_at[i] >> 8) & 7, irq);
+            continue;
+        }
+        wsprintf(line(), "IRQ  NIC %02X:%02X.%X line %u: %s in ELCR (PCI INTx wants level), %s in IMR%s",
+                 (WORD)(nic_at[i] >> 16) & 0xFF, (WORD)(nic_at[i] >> 11) & 0x1F, (WORD)(nic_at[i] >> 8) & 7, irq,
+                 (LPSTR)((elcr >> irq) & 1 ? "level" : "EDGE"), (LPSTR)((imr >> irq) & 1 ? "MASKED" : "unmasked"),
+                 (LPSTR)(irq >= 8 && (imr & 4) ? ", cascade IRQ 2 MASKED" : ""));
+    }
+    show_pir();
+}
+
 /* ---------------------------------------------------------- NET */
 /* usosnet 0.4 statistics page (/N physical address): raw hex, USOSLOG
  * decodes it (layout: tools/nt/usosnet/src/usosnet_proto.h, USNS_BLOCK). */
@@ -702,15 +994,16 @@ static void refresh(void)
 {
     nlines = 0;
     if (log_mode)
-        wsprintf(line(), "USOSDBG 1.5 log mode  tick:%lu  pci:%s", GetTickCount(), (LPSTR)(log_pci ? "yes" : "no (first run only)"));
+        wsprintf(line(), "USOSDBG 1.6 log mode  tick:%lu  pci:%s", GetTickCount(), (LPSTR)(log_pci ? "yes" : "no (first run only)"));
     else
-        wsprintf(line(), "USOSDBG 1.5  tick:%lu  S = append to C:\\USOS9X\\USOSDBG.LOG (saved:%u)  W = wheel knock  Esc = quit",
+        wsprintf(line(), "USOSDBG 1.6  tick:%lu  S = append to C:\\USOS9X\\USOSDBG.LOG (saved:%u)  W = wheel knock  Esc = quit",
                  GetTickCount(), snapshots);
     show_key();
     show_mouse();
     show_wheel();
     show_ivt();
     show_map();
+    show_irq();
     if (!log_mode || log_pci) show_pci();
     show_net();
     if (window) InvalidateRect(window, 0, TRUE);

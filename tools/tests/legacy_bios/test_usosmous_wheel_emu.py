@@ -261,12 +261,33 @@ class WheelEmu(unittest.TestCase):
         self.assertEqual(e.events, [(0x0001, 1, 0, 3)])       # no wheel byte, no wheel event
 
     def test_older_csmwrap_no_wheel(self):
+        # an older CSMWrap answers the knock with 0AAh and passes Z = 0
         e, exists = self.start(0x070A, 0xAA)
         self.assertEqual(exists, 1)
         e.u.mem_write(SHARED_SEG * 16 + SHARED_OFF + MALIVE, b'\x12')
-        e.push_packets([(0x08, 0, 0, 0xFF)])
+        e.push_packets([(0x08, 0, 0, 0x00)])
         e.poll()
         self.assertEqual(e.events, [])
+
+    def test_wheel_in_z_without_the_knock(self):
+        # v4 / CSMWrap usos15 (patch 0020): the device ID was reset by another
+        # INT 15h client (C204h answers 0), the wheel still comes in the Z word
+        e, exists = self.start(0x070A, 0)
+        self.assertEqual(exists, 1)
+        e.u.mem_write(SHARED_SEG * 16 + SHARED_OFF + MALIVE, b'\x12')
+        e.push_packets([(0x08, 0, 0, 0xFF), (0x08, 0, 0, 0xFF)])
+        e.poll()
+        self.assertEqual(e.events, [(0x0800, 0, 0, 240)])
+        e.events.clear()
+        e.push_packets([(0x08, 2, 0, 0)])
+        e.poll()
+        self.assertEqual(e.events, [(0x0001, 1, 0, 3)])       # no wheel byte, no wheel event
+        # the knock answered with ID 0 was sent once more (probe + bios_on: 2 x 2)
+        self.assertEqual(e.wheel_info()[:6], (1, 2, 0, 0, 0, 4))
+        calls = [c[0] for c in e.bios_calls]
+        on = len(calls) - 1 - calls[::-1].index(0xC205)
+        knock = [(0xC202, 0x0600), (0xC202, 0x0500), (0xC202, 0x0400), (0xC204, 0)]
+        self.assertEqual(e.bios_calls[on:], [(0xC205, 0x0300)] + knock + knock + [(0xC207, 0x0400), (0xC200, 0x0100)])
 
     def test_win95_and_win3_never_knock(self):
         for dos in (0x0700, 0x0616):
@@ -291,9 +312,9 @@ class WheelEmu(unittest.TestCase):
         calls = len(e.bios_calls)
         e.wheel_info()
         self.assertEqual(len(e.bios_calls), calls)                     # read only: no BIOS call
-        # older CSMWrap: the knock is answered with 0AAh
+        # older CSMWrap: the knock is answered with 0AAh, and sent once more (v4)
         e, _ = self.start(0x070A, 0xAA)
-        self.assertEqual(e.wheel_info(), (1, 2, 0, 0xAA, 0, 2, 0, 0))
+        self.assertEqual(e.wheel_info(), (1, 2, 0, 0xAA, 0, 4, 0, 0))
         # Windows 95: not wanted, no knock
         e, _ = self.start(0x0700, 3)
         self.assertEqual(e.wheel_info()[:6], (1, 1, 0, 0xFF, 0, 0))

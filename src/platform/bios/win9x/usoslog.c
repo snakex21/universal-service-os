@@ -31,8 +31,13 @@
  *          broadcast that asks usosnet 0.4 for one NDIS log round; the new
  *          part of C:\WINDOWS\NDISLOG.TXT
  *   PROC   processes (Toolhelp32), visible top-level windows, and what the
- *          2-second watcher saw since the last snapshot: processes started /
- *          ended, new windows (a console flashing up is a "tty" window)
+ *          watcher saw since the last snapshot (processes every 250 ms,
+ *          diffed by PID; windows on a change, else every second): processes
+ *          started / ended with PID, parent PID and exe, windows shown /
+ *          gone with class, title, PID and exe (a console flashing up is a
+ *          "tty" window, "ConsoleWindowClass" on NT), each line with wall
+ *          time and t+seconds.ms since the logger started; at most 1000
+ *          event lines per session, then a counter
  *   START  Startup folders, Run keys, WIN.INI load= / run=, SYSTEM.INI
  *          shell=, AUTOEXEC.BAT / CONFIG.SYS (start record and every 6th)
  *
@@ -238,7 +243,7 @@ static volatile DWORD g_wheel, g_wheel_pos, g_wheel_neg, g_moves, g_ldown, g_rdo
 static volatile DWORD g_wheel_l, g_wheel_h, g_wheel_tick;
 
 static CRITICAL_SECTION ev_cs;
-static char ev_buf[24576];
+static char ev_buf[32768];
 static DWORD ev_len, ev_lost;
 
 static char obuf[393216];
@@ -591,28 +596,47 @@ static void hook_install(void)
 }
 
 /* ------------------------------------------------------------------ */
-/* process / window watcher (main thread, every 2 s)                   */
+/* process / window watcher (main thread, every 250 ms)                */
+/* Every tick: one Toolhelp32 process snapshot, diffed by PID against the
+ * previous one. EnumWindows (visible top-level windows) on every tick for
+ * WATCH_HOT ticks after the process set changed (a console flashing up
+ * comes with CONAGENT / WINOA386 / the program itself), otherwise on every
+ * WATCH_WIN_EVERY-th tick; without Toolhelp32 (NT 4.0) every 2nd tick.
+ * At most WATCH_EV_MAX event lines per session, then only counted. */
+#define WATCH_MS        250
+#define WATCH_WIN_EVERY 4               /* quiet: windows once a second */
+#define WATCH_HOT       8               /* 2 s of per-tick window scans after a change */
+#define WATCH_EV_MAX    1000
 #define MAXP 512
 #define MAXW 256
 typedef struct { DWORD pid, ppid, born; char exe[80]; } PROCREC;
+typedef struct { HWND w; DWORD pid, born; char cls[32]; } WINREC;
 static PROCREC procs[MAXP], procs_new[MAXP];
 static int nprocs, watch_primed;
-static HWND wins[MAXW], wins_new[MAXW];
+static WINREC wins[MAXW], wins_new[MAXW];
+static HWND win_handles[MAXW];
 static int nwins, nwins_new;
+static DWORD watch_ticks, watch_hot, watch_enums;
+static DWORD ev_total, ev_suppressed;   /* under ev_cs */
 
 static void ev(const char *fmt, ...)
 {
-    char t[600], ts[32];
+    char t[600], ts[48];
     va_list ap;
     int n, m;
     SYSTEMTIME st;
+    DWORD rel = GetTickCount() - t_start;
     GetLocalTime(&st);
-    m = wsprintfA(ts, "%02u:%02u:%02u ", st.wHour, st.wMinute, st.wSecond);
+    m = wsprintfA(ts, "%02u:%02u:%02u.%03u t+%lu.%03lu ", st.wHour, st.wMinute, st.wSecond, st.wMilliseconds,
+                  rel / 1000, rel % 1000);
     va_start(ap, fmt);
     n = wvsprintfA(t, fmt, ap);
     va_end(ap);
     EnterCriticalSection(&ev_cs);
-    if (ev_len + (DWORD)(m + n) + 8 < sizeof(ev_buf)) {
+    if (ev_total >= WATCH_EV_MAX) {
+        ev_suppressed++;
+    } else if (ev_len + (DWORD)(m + n) + 8 < sizeof(ev_buf)) {
+        ev_total++;
         mcpy(ev_buf + ev_len, "    ", 4); ev_len += 4;
         mcpy(ev_buf + ev_len, ts, (DWORD)m); ev_len += (DWORD)m;
         mcpy(ev_buf + ev_len, t, (DWORD)n); ev_len += (DWORD)n;
@@ -662,11 +686,24 @@ static int proc_list(PROCREC *out, int max)
     return n;
 }
 
-static const char *exe_of(DWORD pid)
+/* exe of Pid in the current list, else in the other one (ended / not yet
+ * merged), else "?" */
+static const char *exe_in(const PROCREC *a, int na, const PROCREC *b, int nb, DWORD pid)
 {
     int i;
-    for (i = 0; i < nprocs; i++) if (procs[i].pid == pid) return base_name(procs[i].exe);
+    for (i = 0; i < na; i++) if (a[i].pid == pid) return base_name(a[i].exe);
+    for (i = 0; i < nb; i++) if (b[i].pid == pid) return base_name(b[i].exe);
     return "?";
+}
+
+/* the last processes that ended: their windows go after them */
+#define GONE 16
+static PROCREC gone[GONE];
+static int ngone, gone_next;
+
+static const char *exe_of(DWORD pid)
+{
+    return exe_in(procs, nprocs, gone, ngone, pid);
 }
 
 typedef struct { HWND *w; int n; } WINLIST;
@@ -687,54 +724,81 @@ static int win_list(HWND *out)
     return l.n;
 }
 
-static void watch_tick(void)
+/* 1 = the process set changed */
+static int watch_procs(DWORD now)
 {
-    int n = proc_list(procs_new, MAXP), i, j;
-    DWORD now = GetTickCount();
-    if (n >= 0) {
-        for (i = 0; i < n; i++) {
-            for (j = 0; j < nprocs && procs[j].pid != procs_new[i].pid; j++) ;
-            if (j < nprocs) procs_new[i].born = procs[j].born;
-            else {
-                procs_new[i].born = now;
-                if (watch_primed) {
-                    const char *parent = "?";
-                    int k;
-                    for (k = 0; k < n; k++) if (procs_new[k].pid == procs_new[i].ppid) parent = base_name(procs_new[k].exe);
-                    ev("+proc %08lX %s (parent %08lX %s)", procs_new[i].pid, (LPSTR)procs_new[i].exe,
-                       procs_new[i].ppid, (LPSTR)parent);
-                }
-            }
-        }
-        for (j = 0; j < nprocs; j++) {
-            for (i = 0; i < n && procs_new[i].pid != procs[j].pid; i++) ;
-            if (i == n && watch_primed)
-                ev("-proc %08lX %s (ran about %lu s)", procs[j].pid, (LPSTR)base_name(procs[j].exe),
-                   procs[j].born ? (now - procs[j].born) / 1000 : 0);
-        }
-        mcpy(procs, procs_new, sizeof(PROCREC) * (DWORD)n);
-        nprocs = n;
+    int n = proc_list(procs_new, MAXP), i, j, changed = 0;
+    if (n < 0) return 0;
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < nprocs && procs[j].pid != procs_new[i].pid; j++) ;
+        if (j < nprocs) { procs_new[i].born = procs[j].born; continue; }
+        procs_new[i].born = watch_primed ? now : 0;     /* 0: running before the logger */
+        changed = 1;
+        if (watch_primed)
+            ev("+proc %08lX %s  parent %08lX %s", procs_new[i].pid, (LPSTR)procs_new[i].exe, procs_new[i].ppid,
+               (LPSTR)exe_in(procs_new, n, procs, nprocs, procs_new[i].ppid));
     }
-    nwins_new = win_list(wins_new);
-    for (i = 0; i < nwins_new; i++) {
-        for (j = 0; j < nwins && wins[j] != wins_new[i]; j++) ;
-        if (j == nwins && watch_primed) {
-            char cls[64], title[128];
-            DWORD pid = 0;
-            cls[0] = title[0] = 0;
-            GetClassNameA(wins_new[i], cls, sizeof(cls));
-            GetWindowTextA(wins_new[i], title, sizeof(title));
-            GetWindowThreadProcessId(wins_new[i], &pid);
-            ev("+window %08lX class \"%s\" title \"%s\" process %s%s", (DWORD)wins_new[i], (LPSTR)cls,
-               (LPSTR)title, (LPSTR)exe_of(pid), (LPSTR)(console_class(cls) ? "  <- console / DOS box" : ""));
+    for (j = 0; j < nprocs; j++) {
+        for (i = 0; i < n && procs_new[i].pid != procs[j].pid; i++) ;
+        if (i < n) continue;
+        changed = 1;
+        mcpy(&gone[gone_next], &procs[j], sizeof(PROCREC));
+        gone_next = (gone_next + 1) % GONE;
+        if (ngone < GONE) ngone++;
+        if (watch_primed)
+            ev("-proc %08lX %s  parent %08lX %s  ran %lu ms%s", procs[j].pid, (LPSTR)base_name(procs[j].exe),
+               procs[j].ppid, (LPSTR)exe_in(procs_new, n, procs, nprocs, procs[j].ppid),
+               procs[j].born ? now - procs[j].born : now - t_start,
+               (LPSTR)(procs[j].born ? "" : " at least (before the logger)"));
+    }
+    mcpy(procs, procs_new, sizeof(PROCREC) * (DWORD)n);
+    nprocs = n;
+    return changed;
+}
+
+static void watch_windows(DWORD now)
+{
+    int i, j, nh = win_list(win_handles);
+    watch_enums++;
+    nwins_new = 0;
+    for (i = 0; i < nh; i++) {
+        WINREC *r = &wins_new[nwins_new++];
+        for (j = 0; j < nwins && wins[j].w != win_handles[i]; j++) ;
+        if (j < nwins) { mcpy(r, &wins[j], sizeof(WINREC)); continue; }
+        r->w = win_handles[i];
+        r->pid = 0;
+        r->born = watch_primed ? now : 0;
+        r->cls[0] = 0;
+        GetClassNameA(r->w, r->cls, sizeof(r->cls));
+        GetWindowThreadProcessId(r->w, &r->pid);
+        if (watch_primed) {
+            char title[128];
+            title[0] = 0;
+            GetWindowTextA(r->w, title, sizeof(title));
+            ev("+window %08lX class \"%s\" title \"%s\" pid %08lX %s%s", (DWORD)r->w, (LPSTR)r->cls, (LPSTR)title,
+               r->pid, (LPSTR)exe_of(r->pid), (LPSTR)(console_class(r->cls) ? "  <- console / DOS box" : ""));
         }
     }
     for (j = 0; j < nwins; j++) {
-        for (i = 0; i < nwins_new && wins_new[i] != wins[j]; i++) ;
-        if (i == nwins_new && watch_primed) ev("-window %08lX", (DWORD)wins[j]);
+        for (i = 0; i < nwins_new && wins_new[i].w != wins[j].w; i++) ;
+        if (i == nwins_new && watch_primed)
+            ev("-window %08lX class \"%s\" pid %08lX %s  shown %lu ms%s%s", (DWORD)wins[j].w, (LPSTR)wins[j].cls,
+               wins[j].pid, (LPSTR)exe_of(wins[j].pid), now - (wins[j].born ? wins[j].born : t_start),
+               (LPSTR)(wins[j].born ? "" : " at least"),
+               (LPSTR)(console_class(wins[j].cls) ? "  <- console / DOS box" : ""));
     }
-    mcpy(wins, wins_new, sizeof(HWND) * (DWORD)nwins_new);
+    mcpy(wins, wins_new, sizeof(WINREC) * (DWORD)nwins_new);
     nwins = nwins_new;
+}
+
+static void watch_tick(void)
+{
+    DWORD now = GetTickCount();
+    int toolhelp = p_snap && p_first && p_next;
+    if (watch_procs(now)) watch_hot = WATCH_HOT;
+    if (!watch_primed || watch_hot || watch_ticks % (toolhelp ? WATCH_WIN_EVERY : 2) == 0) watch_windows(now);
+    if (watch_hot) watch_hot--;
+    watch_ticks++;
     watch_primed = 1;
 }
 
@@ -1532,8 +1596,12 @@ static void sec_proc(void)
           (LPSTR)(console_class(cls) ? "  <- console / DOS box" : ""));
     }
     EnterCriticalSection(&ev_cs);
-    o("[PROC] watcher events since the last record (every 2 s; %lu lost):", ev_lost);
+    o("[PROC] watcher events since the last record (processes every %u ms%s, windows on a change or every %u ms; %lu ticks, %lu window scans; %lu lost):",
+      WATCH_MS, (LPSTR)(p_snap ? "" : ": no Toolhelp32, windows only"),
+      WATCH_MS * (p_snap ? WATCH_WIN_EVERY : 2), watch_ticks, watch_enums, ev_lost);
     oput(ev_buf, ev_len);
+    if (ev_suppressed)
+        o("[PROC] watcher: session limit of %u event lines reached, %lu more not logged", WATCH_EV_MAX, ev_suppressed);
     ev_len = 0;
     ev_lost = 0;
     LeaveCriticalSection(&ev_cs);
@@ -1709,14 +1777,14 @@ void __cdecl usos_entry(void)
     PeekMessageA(&msg, 0, 0, 0, PM_NOREMOVE);  /* message queue before the worker posts */
     watch_tick();
     hook_install();
-    timer = SetTimer(0, 0, 2000, 0);
+    timer = SetTimer(0, 0, WATCH_MS, 0);
     th = CreateThread(0, 0, worker, 0, 0, &tid);
     if (!th) ExitProcess(1);
     while (GetMessageA(&msg, 0, 0, 0) > 0) {
         if (msg.message == WM_CANCELJOURNAL) { g_hook = 0; g_cancels++; continue; }
         if (msg.message == WM_TIMER && !msg.hwnd) {
             watch_tick();
-            if (++ticks % 30 == 0) hook_install();     /* again a minute after Ctrl+Esc / Ctrl+Alt+Del */
+            if (++ticks % (60000 / WATCH_MS) == 0) hook_install();   /* again a minute after Ctrl+Esc / Ctrl+Alt+Del */
             continue;
         }
         DispatchMessageA(&msg);
