@@ -25,7 +25,7 @@
 #include <ndis.h>
 
 #define USOSNET_MAJOR 0
-#define USOSNET_MINOR 1
+#define USOSNET_MINOR 2
 #define USOSNET_TAG 'NSOU'
 
 #define ETH_ALEN 6
@@ -154,7 +154,9 @@ typedef struct _ADAPTER {
     ULONG IsrCount, DpcCount, TimerCount, LinkChanges;
 
     /* diagnostics written to the adapter's registry key at init */
-    ULONG Stage, Error, StatusAtInit, CtrlAtInit, PhyBmsr, PhyId;
+    ULONG Stage, Error, StatusAtInit, CtrlAtInit, PhyBmsr, PhyId, Bar0High;
+    ULONG PllTries;             /* I210/I211 iNVM PLL workaround: tries, 0x100 = failed */
+    BOOLEAN IrqMasked;          /* set by the ISR, cleared by IrqEnable */
 } ADAPTER, *PADAPTER;
 
 /* register access (MMIO through volatile pointers, no HAL import) */

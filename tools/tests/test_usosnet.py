@@ -78,5 +78,59 @@ class Inf(unittest.TestCase):
                 self.assertNotIn(bad + '(', src, f'{f}: {bad}')
 
 
+
+
+class IsrClaim(unittest.TestCase):
+    """Shared INTx: claim only with ICR.INT_ASSERTED, never while masked."""
+
+    def test_claim_rule_host_compiled(self):
+        import shutil, subprocess, tempfile
+        cc = shutil.which('gcc') or shutil.which('cc') or (
+            'C:/msys64/mingw64/bin/gcc.exe' if Path('C:/msys64/mingw64/bin/gcc.exe').exists() else None)
+        if not cc:
+            self.skipTest('no host C compiler')
+        harness = r'''
+#include <stdio.h>
+#define __inline inline
+#include "usosnet_irq.h"
+int main(void) {
+    struct { unsigned long m, icr, want; } t[] = {
+        {0, 0x00000000UL, 0},            /* idle, shared line: not ours */
+        {0, 0x00000084UL, 0},            /* causes latched but not asserted (masked by IMS) */
+        {0, 0x80000080UL, 0x80000080UL}, /* RXT0 asserted */
+        {0, 0x80000004UL, 0x80000004UL}, /* LSC asserted */
+        {0, 0xFFFFFFFFUL, 0},            /* device gone */
+        {1, 0x80000080UL, 0},            /* driver masked: never ours */
+    };
+    unsigned i; int bad = 0;
+    for (i = 0; i < sizeof t / sizeof t[0]; i++)
+        if (UsosnetIrqClaim(t[i].m, t[i].icr) != t[i].want) { printf("case %u\n", i); bad = 1; }
+    return bad;
+}
+'''
+        with tempfile.TemporaryDirectory() as d:
+            c = Path(d) / 't.c'
+            c.write_text(harness)
+            exe = Path(d) / 't.exe'
+            r = subprocess.run([cc, '-I', str(DRV / 'src'), '-o', str(exe), str(c)], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            r = subprocess.run([str(exe)], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_isr_reads_icr_only_when_unmasked(self):
+        src = (DRV / 'src/usosnet_igb.c').read_text(encoding='latin-1')
+        body = re.search(r'static ULONG IgbIrqRead\(PADAPTER A\)\n\{(.*?)\n\}', src, re.S).group(1)
+        self.assertLess(body.index('A->IrqMasked'), body.index('RD32(A, ICR)'))
+        self.assertNotIn('EICR', body)
+        self.assertIn('UsosnetIrqClaim', body)
+        dis = re.search(r'static void IgbIrqDisable\(PADAPTER A\)\n\{(.*?)\n\}', src, re.S).group(1)
+        en = re.search(r'static void IgbIrqEnable\(PADAPTER A\)\n\{(.*?)\n\}', src, re.S).group(1)
+        self.assertIn('A->IrqMasked = TRUE', dis)
+        self.assertIn('A->IrqMasked = FALSE', en)
+        self.assertNotIn('EIMS', en)                      # legacy INTx: no extended causes
+        self.assertIn('WR32(A, IVAR0, 0)', src)
+        self.assertIn('MdicWrite(A, 4, 0x01E1)', src)     # no pause advertised
+
+
 if __name__ == '__main__':
     unittest.main()

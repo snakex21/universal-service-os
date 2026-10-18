@@ -13,13 +13,25 @@
  * iNVM record types carry extra dwords, RAH pool bit, polling the queue
  * ENABLE bits); no code was copied.
  *
- * Interrupt model: legacy INTx (Windows 9x has no MSI). Queue 0 RX and TX
- * are mapped to vector 0 through IVAR0 and EIMS bit 0 is enabled next to
- * the legacy ICR causes, so both the "other" causes (link) and the queue
- * cause raise INTx. The ISR masks everything (IMC / EIMC), the DPC polls
- * the RX ring and unmasks again.
+ * Interrupt model: legacy INTx (Windows 9x has no MSI), possibly shared.
+ * Non-MSI-X mode (GPIE = 0): only the legacy ICR causes are used (IMS:
+ * LSC, RXSEQ, RXDMT0, RXO, RXT0); IVAR0 maps no queue and EIMS stays 0, so
+ * nothing reaches INTx through the extended (EICR) path. With GPIE.NSICR
+ * clear, reading ICR clears it only when INT_ASSERTED is set. The ISR
+ * claims the interrupt only when ICR.INT_ASSERTED is set and never reads
+ * ICR while the driver keeps the chip masked (A->IrqMasked); it masks
+ * everything (IMC), the DPC polls the RX ring and IrqEnable unmasks again.
+ *
+ * Flow control: none for now. ANAR advertises no PAUSE / ASM_DIR, and
+ * CTRL.RFCE / TFCE stay at their reset value of 0, so both ends resolve to
+ * no pause frames - simple and consistent until the FCRTL / FCRTH / FCTTV
+ * thresholds are programmed (TODO, post 1.0).
+ *
+ * I210 / I211 without flash (iNVM only, every I211): the PLL erratum of the
+ * Intel I210/I211 specification update is handled in IgbPllCheck().
  */
 #include "usosnet.h"
+#include "usosnet_irq.h"
 
 #define CTRL        0x0000
 #define STATUS      0x0008
@@ -34,12 +46,15 @@
 #define IMC         0x150C
 #define IAM         0x1510
 #define GPIE        0x1514
-#define EIMS        0x1524
 #define EIMC        0x1528
+#define EIMC_ALL    0xFFFFFFFFUL
 #define EIAC        0x152C
 #define EIAM        0x1530
 #define EICR        0x1580
 #define IVAR0       0x1700
+#define MDICNFG     0x0E04
+#define WUC         0x5800
+#define EEARBC_I210 0x12024     /* NVM auto-read bus control (iNVM word override) */
 #define RXCSUM      0x5000
 #define MTA         0x5200
 #define RAL0        0x5400
@@ -72,7 +87,10 @@
 #define STATUS_PF_RST_DONE (1UL << 21)
 #define EECD_AUTO_RD    (1UL << 9)
 #define EECD_FLASH_DETECTED (1UL << 19)   /* I210: external flash present */
+#define CTRL_EXT_SDLPE  (1UL << 18)
+#define CTRL_EXT_PHYPDEN (1UL << 20)
 #define CTRL_EXT_DRV_LOAD (1UL << 28)
+#define MDICNFG_EXT_MDIO (1UL << 31)
 #define EERD_START      1UL
 #define EERD_DONE       2UL
 
@@ -94,7 +112,7 @@
 #define ICR_RXDMT0      (1UL << 4)
 #define ICR_RXO         (1UL << 6)
 #define ICR_RXT0        (1UL << 7)
-#define ICR_ASSERTED    (1UL << 31)
+#define ICR_ASSERTED    USOSNET_ICR_INT_ASSERTED
 #define IMS_MASK        (ICR_LSC | ICR_RXSEQ | ICR_RXDMT0 | ICR_RXO | ICR_RXT0)
 
 /* advanced TX data descriptor, dword 2 / 3 */
@@ -140,27 +158,31 @@ static BOOLEAN MdicWrite(PADAPTER A, ULONG Reg, USHORT Val)
     return FALSE;
 }
 
+static void IgbPllCheck(PADAPTER A);
+
 static void IgbIrqDisable(PADAPTER A)
 {
+    A->IrqMasked = TRUE;
     WR32(A, IMC, 0xFFFFFFFF);
-    WR32(A, EIMC, 0xFFFFFFFF);
+    WR32(A, EIMC, EIMC_ALL);
+    (void)RD32(A, STATUS);                    /* flush: INTx drops before we return */
 }
 
 static void IgbIrqEnable(PADAPTER A)
 {
-    WR32(A, IMS, IMS_MASK);
-    WR32(A, EIMS, 1);
+    A->IrqMasked = FALSE;
+    WR32(A, IMS, IMS_MASK);                   /* causes latched meanwhile assert now */
 }
 
+/* ISR: 0 = not ours (see usosnet_irq.h). Masked: ICR is not even read. */
 static ULONG IgbIrqRead(PADAPTER A)
 {
-    ULONG icr = RD32(A, ICR);
-    ULONG eicr = RD32(A, EICR);
-    if (icr == 0xFFFFFFFF) return 0;          /* device gone */
-    if (eicr) WR32(A, EICR, eicr);
-    if (!(icr & (ICR_ASSERTED | IMS_MASK)) && !(eicr & 1)) return 0;
+    ULONG icr;
+    if (A->IrqMasked) return 0;
+    icr = UsosnetIrqClaim(0, RD32(A, ICR));   /* the read acknowledges the causes */
+    if (!icr) return 0;
     IgbIrqDisable(A);
-    return (icr & ~ICR_ASSERTED) | ((eicr & 1) ? ICR_RXT0 : 0) | 0x100;
+    return icr;
 }
 
 static NDIS_STATUS IgbReset(PADAPTER A)
@@ -187,6 +209,8 @@ static NDIS_STATUS IgbReset(PADAPTER A)
     for (i = 0; i < 100 && !(RD32(A, EECD) & EECD_AUTO_RD); i++) UsStall(1000);
     for (i = 0; i < 100 && !(RD32(A, STATUS) & STATUS_PF_RST_DONE); i++) UsStall(1000);
     if (RD32(A, STATUS) == 0xFFFFFFFF) return NDIS_STATUS_HARD_ERRORS;
+
+    IgbPllCheck(A);
 
     IgbIrqDisable(A);
     (void)RD32(A, ICR);
@@ -220,10 +244,12 @@ static BOOLEAN EerdRead(PADAPTER A, ULONG Word, USHORT *Val)
     return FALSE;
 }
 
-/* I210 / I211 iNVM: word-autoload records carry NVM words 0..2 (MAC). */
-static BOOLEAN InvmMac(PADAPTER A, UCHAR *Mac)
+/* I210 / I211 iNVM: word-autoload records (type 1) carry NVM words; the
+ * last record for a word wins. Words 0..2 are the MAC address. */
+static BOOLEAN InvmWord(PADAPTER A, ULONG Word, USHORT *Val)
 {
-    ULONG i, d, type, addr, data, got = 0;
+    ULONG i, d, type;
+    BOOLEAN found = FALSE;
     for (i = 0; i < 64; i++) {
         d = RD32(A, INVM_DATA + 4 * i);
         type = d & 7;
@@ -231,15 +257,126 @@ static BOOLEAN InvmMac(PADAPTER A, UCHAR *Mac)
         if (type == 2) { i += 1; continue; }  /* CSR autoload: + 1 data dword */
         if (type == 4) { i += 8; continue; }  /* RSA key SHA-256: + 8 dwords */
         if (type != 1) continue;              /* PHY autoload, invalidated */
-        addr = (d >> 9) & 0x7F;
-        data = d >> 16;
-        if (addr <= 2) {
-            Mac[addr * 2] = (UCHAR)data;
-            Mac[addr * 2 + 1] = (UCHAR)(data >> 8);
-            got |= 1UL << addr;
+        if (((d >> 9) & 0x7F) == Word) { *Val = (USHORT)(d >> 16); found = TRUE; }
+    }
+    return found;
+}
+
+static BOOLEAN InvmMac(PADAPTER A, UCHAR *Mac)
+{
+    ULONG i;
+    USHORT w;
+    for (i = 0; i < 3; i++) {
+        if (!InvmWord(A, i, &w)) return FALSE;
+        Mac[i * 2] = (UCHAR)w;
+        Mac[i * 2 + 1] = (UCHAR)(w >> 8);
+    }
+    return TRUE;
+}
+
+/* ------------------------------------------------------------------ */
+/* I210 / I211 iNVM PLL erratum (Intel I210/I211 specification update):
+ * after power-up the PHY PLL of a flashless part may come up with a wrong
+ * clock. Detection: the internal PHY's PLL frequency register (page 0xFC,
+ * register 14) still reads its unconfigured low byte 0xFF. Recovery, up to
+ * five times: reset the PHY, let the NVM auto-read load iNVM word 0x0A with
+ * the PLL bit (0x0010) forced on through EEARBC, and pass the function
+ * through D3hot and back to D0 so the PHY restarts with that word; then put
+ * the real word back. UsosnetPllTries: 0 = not needed (flash part / other
+ * chip), n = PHY checks until the PLL read configured, 0x100 | n = failed. */
+
+#define PLL_TRIES       5
+#define PHY_PAGE_SELECT 22
+#define PHY_PLL_PAGE    0xFC
+#define PHY_PLL_FREQ    14
+#define INVM_W_AUTOLOAD 0x0A
+#define INVM_AL_DEFAULT 0x202F      /* datasheet default of iNVM word 0x0A */
+#define INVM_AL_PLL     0x0010
+
+static ULONG PmCsrOffset(PADAPTER A)
+{
+    ULONG v = 0, p, n;
+    NdisReadPciSlotInformation(A->Handle, 0, 0x04, &v, 4);
+    if (v & (1UL << 20)) {                   /* capability list present */
+        v = 0;
+        NdisReadPciSlotInformation(A->Handle, 0, 0x34, &v, 1);
+        for (p = v & 0xFC, n = 0; p >= 0x40 && n < 48; n++) {
+            v = 0;
+            NdisReadPciSlotInformation(A->Handle, 0, p, &v, 2);
+            if ((v & 0xFF) == 0x01) return p + 4;   /* power management: PMCSR */
+            p = (v >> 8) & 0xFC;
         }
     }
-    return got == 7 ? TRUE : FALSE;
+    return 0x44;                             /* the I210 / I211 PM capability is at 0x40 */
+}
+
+static void PciSetD(PADAPTER A, ULONG Pmcsr, ULONG State)
+{
+    ULONG v = 0;
+    NdisReadPciSlotInformation(A->Handle, 0, Pmcsr, &v, 2);
+    v = (v & ~3UL & ~0x8000UL) | State;      /* keep PME_Status untouched (RW1C) */
+    NdisWritePciSlotInformation(A->Handle, 0, Pmcsr, &v, 2);
+}
+
+static BOOLEAN PllConfigured(PADAPTER A)
+{
+    USHORT v = 0xFFFF;
+    BOOLEAN ok;
+    MdicWrite(A, PHY_PAGE_SELECT, PHY_PLL_PAGE);
+    UsStall(20);
+    ok = MdicRead(A, PHY_PLL_FREQ, &v);
+    UsStall(20);
+    MdicWrite(A, PHY_PAGE_SELECT, 0);
+    return (ok && (v & 0xFF) != 0xFF) ? TRUE : FALSE;
+}
+
+static void IgbPllCheck(PADAPTER A)
+{
+    ULONG wuc, mdicnfg, pmcsr, i, j, saved[7], bar0;
+    USHORT al;
+
+    A->PllTries = 0;
+    if (!(A->Chip->Flags & CHIP_IGB_I210) || (RD32(A, EECD) & EECD_FLASH_DETECTED)) return;
+    wuc = RD32(A, WUC);
+    mdicnfg = RD32(A, MDICNFG);
+    WR32(A, MDICNFG, mdicnfg & ~MDICNFG_EXT_MDIO);   /* MDIO to the internal PHY */
+    if (!InvmWord(A, INVM_W_AUTOLOAD, &al)) al = INVM_AL_DEFAULT;
+    pmcsr = PmCsrOffset(A);
+
+    for (i = 1; i <= PLL_TRIES; i++) {
+        A->PllTries = i;
+        if (PllConfigured(A)) break;
+        if (i == PLL_TRIES) { A->PllTries = 0x100 | i; break; }
+
+        WR32(A, CTRL, RD32(A, CTRL) | CTRL_PHY_RST);
+        WR32(A, CTRL_EXT, RD32(A, CTRL_EXT) | CTRL_EXT_PHYPDEN | CTRL_EXT_SDLPE);
+        WR32(A, WUC, 0);
+        WR32(A, EEARBC_I210, (INVM_W_AUTOLOAD << 4) | ((ULONG)(al | INVM_AL_PLL) << 16));
+
+        /* D3hot and back; command + BARs are saved in case D0 resets them */
+        for (j = 0; j < 7; j++) {
+            saved[j] = 0;
+            NdisReadPciSlotInformation(A->Handle, 0, j ? 0x0C + 4 * j : 0x04, &saved[j], 4);
+        }
+        PciSetD(A, pmcsr, 3);
+        UsStall(1000);
+        PciSetD(A, pmcsr, 0);
+        UsStall(10000);                       /* PCI PM: D3hot -> D0 recovery time */
+        bar0 = 0;
+        NdisReadPciSlotInformation(A->Handle, 0, 0x10, &bar0, 4);
+        if (bar0 != saved[1]) {
+            for (j = 1; j < 7; j++) NdisWritePciSlotInformation(A->Handle, 0, 0x0C + 4 * j, &saved[j], 4);
+            NdisWritePciSlotInformation(A->Handle, 0, 0x04, &saved[0], 2);
+        }
+        for (j = 0; j < 100 && !(RD32(A, EECD) & EECD_AUTO_RD); j++) UsStall(1000);
+        WR32(A, CTRL, RD32(A, CTRL) & ~CTRL_PHY_RST);   /* if D0 kept CTRL: PHY out of reset */
+        UsStall(5000);
+
+        WR32(A, EEARBC_I210, (INVM_W_AUTOLOAD << 4) | ((ULONG)al << 16));
+        WR32(A, WUC, wuc);
+    }
+    WR32(A, MDICNFG, mdicnfg);
+    UsLog(A, "pll tries %x al %x", A->PllTries, al);
 }
 
 static BOOLEAN IgbReadMac(PADAPTER A, UCHAR *Mac)
@@ -293,7 +430,7 @@ static void IgbPhyInit(PADAPTER A)
     if (MdicRead(A, 2, &id1) && MdicRead(A, 3, &id2)) A->PhyId = ((ULONG)id1 << 16) | id2;
     if (MdicRead(A, 0, &bmcr)) {
         /* power up (bit 11), advertise 10/100/1000, restart autoneg */
-        MdicWrite(A, 4, 0x0DE1);     /* ANAR: 10/100 half+full, pause, asym pause, selector 802.3 */
+        MdicWrite(A, 4, 0x01E1);     /* ANAR: 10/100 half+full, selector 802.3, no pause (see top) */
         MdicWrite(A, 9, 0x0300);     /* 1000BASE-T full + half */
         bmcr &= ~0x0800;
         bmcr |= 0x1000 | 0x0200;
@@ -344,8 +481,8 @@ static void IgbStart(PADAPTER A)
     for (i = 0; i < 100 && !(RD32(A, RXDCTL0) & QUEUE_ENABLE); i++) UsStall(100);
     WR32(A, RDT0, RX_COUNT - 1);
 
-    /* queue 0 RX + TX -> vector 0 (bit 7 = valid) */
-    WR32(A, IVAR0, 0x00008080UL);
+    /* legacy INTx: no queue -> EICR mapping, queue 0 RX reports via ICR.RXT0 */
+    WR32(A, IVAR0, 0);
     WR32(A, RCTL, RCTL_EN | RCTL_BAM | RCTL_SECRC);
     UsLog(A, "rings rx %x tx %x", A->RxRing.Pa, A->TxRing.Pa);
 }

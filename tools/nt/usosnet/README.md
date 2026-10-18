@@ -43,7 +43,7 @@ At the end of every start (success or failure) into the adapter's key
 
 | value | meaning |
 |---|---|
-| `UsosnetVersion` | driver version (0x00000001 = 0.1) |
+| `UsosnetVersion` | driver version (0x00000002 = 0.2) |
 | `UsosnetStage` | last stage reached: 1 entry, 2 config, 3 PCI, 4 resources, 5 MMIO mapped, 6 reset, 7 MAC, 8 DMA memory, 9 rings, 10 IRQ, 11 PHY, 12 started (0xC) |
 | `UsosnetError` | NDIS status of a failed start (0 = none) |
 | `UsosnetDevice` | vendor << 16 \| device (0x80861539 = I211) |
@@ -55,6 +55,8 @@ At the end of every start (success or failure) into the adapter's key
 | `UsosnetCtrlReg` | CTRL after reset |
 | `UsosnetPhyBmsr` | PHY BMCR << 16 \| BMSR |
 | `UsosnetPhyId` | PHY ID1 << 16 \| ID2 (0 = MDIC failed) |
+| `UsosnetBar0High` | BAR0 high dword (non-zero: above 4 GiB, start refused - turn off "Above 4G decoding") |
+| `UsosnetPllTries` | I210/I211 iNVM PLL check: 0 not needed, n = checks until OK, 0x100+n = PLL never configured |
 
 A start that hangs or crashes the machine writes nothing (9x keeps the
 registry in memory until it flushes): then `PollMode=1` / `SkipPhy=1` narrow

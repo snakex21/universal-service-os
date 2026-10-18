@@ -172,6 +172,8 @@ static void WriteDiag(PADAPTER A, NDIS_HANDLE Cfg)
     NDIS_STRING kPhy = NDIS_STRING_CONST("UsosnetPhyBmsr");
     NDIS_STRING kPhyId = NDIS_STRING_CONST("UsosnetPhyId");
     NDIS_STRING kVer = NDIS_STRING_CONST("UsosnetVersion");
+    NDIS_STRING kBarHi = NDIS_STRING_CONST("UsosnetBar0High");
+    NDIS_STRING kPll = NDIS_STRING_CONST("UsosnetPllTries");
     if (!Cfg) return;
     CfgPut(Cfg, &kVer, (USOSNET_MAJOR << 16) | USOSNET_MINOR);
     CfgPut(Cfg, &kStage, A->Stage);
@@ -186,6 +188,8 @@ static void WriteDiag(PADAPTER A, NDIS_HANDLE Cfg)
     CfgPut(Cfg, &kCtrl, A->CtrlAtInit);
     CfgPut(Cfg, &kPhy, A->PhyBmsr);
     CfgPut(Cfg, &kPhyId, A->PhyId);
+    CfgPut(Cfg, &kBarHi, A->Bar0High);
+    CfgPut(Cfg, &kPll, A->PllTries);
 }
 
 /* ------------------------------------------------------------------ */
@@ -193,14 +197,20 @@ static void WriteDiag(PADAPTER A, NDIS_HANDLE Cfg)
 
 static BOOLEAN DmaAlloc(PADAPTER A, DMAMEM *M, ULONG Len, ULONG Align)
 {
-    ULONG pa, off;
-    M->AllocLen = Len + Align;
-    NdisMAllocateSharedMemory(A->Handle, M->AllocLen, FALSE, &M->AllocVa, &M->AllocPa);
-    if (!M->AllocVa) { M->AllocLen = 0; return FALSE; }
-    if (NdisGetPhysicalAddressHigh(M->AllocPa) != 0) return FALSE;  /* freed by FreeAll */
+    ULONG pa, off, tries;
+    /* exactly Len first (4 KiB pages stay one page); pad only if misaligned */
+    for (tries = 0; tries < 2; tries++) {
+        M->AllocLen = tries ? Len + Align : Len;
+        NdisMAllocateSharedMemory(A->Handle, M->AllocLen, FALSE, &M->AllocVa, &M->AllocPa);
+        if (!M->AllocVa) { M->AllocLen = 0; return FALSE; }
+        if (NdisGetPhysicalAddressHigh(M->AllocPa) != 0) return FALSE;  /* freed by FreeAll */
+        pa = NdisGetPhysicalAddressLow(M->AllocPa);
+        off = (Align - (pa & (Align - 1))) & (Align - 1);
+        if (!off || tries) break;
+        NdisMFreeSharedMemory(A->Handle, M->AllocLen, FALSE, M->AllocVa, M->AllocPa);
+        M->AllocVa = NULL;
+    }
     UsZero(M->AllocVa, M->AllocLen);
-    pa = NdisGetPhysicalAddressLow(M->AllocPa);
-    off = (Align - (pa & (Align - 1))) & (Align - 1);
     M->Va = (PUCHAR)M->AllocVa + off;
     M->Pa = pa + off;
     return TRUE;
@@ -277,7 +287,6 @@ static void CheckLink(PADAPTER A)
     A->FullDuplex = full;
     A->LinkChanges++;
     UsLog(A, "link %x speed %x", up, mbps);
-    if (!A->LinkReported) { A->LinkReported = TRUE; if (up) return; }
     NdisMIndicateStatus(A->Handle, up ? NDIS_STATUS_MEDIA_CONNECT : NDIS_STATUS_MEDIA_DISCONNECT, NULL, 0);
     NdisMIndicateStatusComplete(A->Handle);
 }
@@ -322,7 +331,8 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     NDIS_HANDLE cfg = NULL;
     NDIS_PHYSICAL_ADDRESS hi;
     UINT i;
-    ULONG cfg32, bar0 = 0;
+    ULONG cfg32, bar0 = 0, bar0hi = 0;
+    BOOLEAN memFound = FALSE;
     UCHAR resBuf[sizeof(NDIS_RESOURCE_LIST) + 12 * sizeof(CM_PARTIAL_RESOURCE_DESCRIPTOR)];
     PNDIS_RESOURCE_LIST res = (PNDIS_RESOURCE_LIST)resBuf;
     UINT resLen = sizeof(resBuf);
@@ -380,23 +390,39 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     NdisReadPciSlotInformation(MiniportAdapterHandle, 0, 0x10, &bar0, 4);
     A->Stage = ST_PCI;
 
-    /* resources: the first memory range of >= 128 KiB is BAR0 (CSR) */
+    /* BAR0 (CSR, 128 KiB) from config space; a 64-bit BAR has its high half at 0x14 */
+    bar0hi = 0;
+    if ((bar0 & 7) == 4) NdisReadPciSlotInformation(MiniportAdapterHandle, 0, 0x14, &bar0hi, 4);
+    A->Bar0High = bar0hi;
+
+    /* resources: the memory range at BAR0; else the first one of >= 128 KiB */
     NdisMQueryAdapterResources(&st, WrapperConfigurationContext, res, &resLen);
     if (st == NDIS_STATUS_SUCCESS) {
         for (i = 0; i < res->Count; i++) {
             PCM_PARTIAL_RESOURCE_DESCRIPTOR d = &res->PartialDescriptors[i];
-            if (d->Type == CmResourceTypeMemory && !A->MmioLen && d->u.Memory.Length >= 0x20000) {
+            if (d->Type == CmResourceTypeMemory && d->u.Memory.Length >= 0x20000 &&
+                NdisGetPhysicalAddressLow(d->u.Memory.Start) == (bar0 & ~0xFUL) &&
+                (ULONG)NdisGetPhysicalAddressHigh(d->u.Memory.Start) == bar0hi) {
                 A->MmioPa = d->u.Memory.Start;
                 A->MmioLen = d->u.Memory.Length;
+                memFound = TRUE;
             } else if (d->Type == CmResourceTypeInterrupt && !A->IrqVector && !A->IrqLevel) {
                 A->IrqLevel = d->u.Interrupt.Level;
                 A->IrqVector = d->u.Interrupt.Vector;
             }
         }
+        for (i = 0; !memFound && i < res->Count; i++) {
+            PCM_PARTIAL_RESOURCE_DESCRIPTOR d = &res->PartialDescriptors[i];
+            if (d->Type == CmResourceTypeMemory && d->u.Memory.Length >= 0x20000) {
+                A->MmioPa = d->u.Memory.Start;
+                A->MmioLen = d->u.Memory.Length;
+                memFound = TRUE;
+            }
+        }
     }
-    if (!A->MmioLen && (bar0 & ~0xFUL) && !(bar0 & 1)) {
+    if (!memFound && (bar0 & ~0xFUL) && !(bar0 & 1)) {
         /* no list (should not happen with PnP): BAR0 from config space */
-        NdisSetPhysicalAddressHigh(A->MmioPa, 0);
+        NdisSetPhysicalAddressHigh(A->MmioPa, bar0hi);
         NdisSetPhysicalAddressLow(A->MmioPa, bar0 & ~0xFUL);
         A->MmioLen = 0x20000;
     }
@@ -407,6 +433,12 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     UsLog(A, "bar0 %x irq %x", NdisGetPhysicalAddressLow(A->MmioPa), A->IrqVector);
     A->Stage = ST_RESOURCES;
     if (!A->MmioLen) { st = NDIS_STATUS_RESOURCE_CONFLICT; goto fail; }
+    /* 32-bit only (9x cannot map above 4 GiB): firmware "Above 4G decoding" must be off */
+    if (NdisGetPhysicalAddressHigh(A->MmioPa) != 0 || bar0hi) {
+        UsLog(A, "bar0 above 4 GiB, high %x", bar0hi, 0);
+        st = NDIS_STATUS_RESOURCE_CONFLICT;
+        goto fail;
+    }
     if (A->MmioLen > 0x20000) A->MmioLen = 0x20000;
 
     st = NdisMMapIoSpace((PVOID *)&A->Mmio, MiniportAdapterHandle, A->MmioPa, A->MmioLen);
@@ -452,6 +484,10 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     A->Stage = ST_PHY;
 
     A->Chip->Ops->SetFilter(A);
+    /* initial link state: OID_GEN_MEDIA_CONNECT_STATUS answers from it, the
+     * timer indicates every later change */
+    A->Chip->Ops->LinkState(A, &A->LinkUp, &A->LinkMbps, &A->FullDuplex);
+    A->LinkReported = TRUE;
     if (!A->PollMode) A->Chip->Ops->IrqEnable(A);
     NdisMInitializeTimer(&A->Timer, MiniportAdapterHandle, TimerFn, A);
     A->TimerInit = TRUE;
@@ -622,8 +658,8 @@ static NDIS_STATUS MpQuery(NDIS_HANDLE Ctx, NDIS_OID Oid, PVOID Buf, ULONG BufLe
     case OID_GEN_HARDWARE_STATUS: src = &hw; len = sizeof(hw); break;
     case OID_GEN_MEDIA_SUPPORTED:
     case OID_GEN_MEDIA_IN_USE: src = &med; len = sizeof(med); break;
+    case OID_GEN_CURRENT_LOOKAHEAD: v = A->Lookahead; break;
     case OID_GEN_MAXIMUM_LOOKAHEAD:
-    case OID_GEN_CURRENT_LOOKAHEAD:
     case OID_GEN_MAXIMUM_FRAME_SIZE: v = ETH_MAX_DATA; break;
     case OID_GEN_MAXIMUM_TOTAL_SIZE:
     case OID_GEN_TRANSMIT_BLOCK_SIZE:

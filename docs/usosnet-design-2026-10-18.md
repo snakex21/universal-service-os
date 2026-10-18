@@ -125,12 +125,16 @@ revision on the B450 board.
 
 * Windows 9x has no MSI: legacy INTx, level triggered, shared. NDIS 5.0
   `NdisMRegisterInterrupt(RequestIsr=TRUE, Shared=TRUE, LevelSensitive)`.
-* igb in non-MSI-X mode (GPIE = 0): queue 0 RX/TX mapped to vector 0 in IVAR0,
-  `EIMS` bit 0 and the legacy `IMS` causes (LSC, RXSEQ, RXDMT0, RXO, RXT0)
-  enabled. ISR: read ICR + EICR (clear EICR), not ours unless INT_ASSERTED /
-  an enabled cause / EICR bit 0; mask everything (IMC / EIMC), queue the DPC.
-  DPC: drain RX, indicate, return buffers, unmask. TX completion needs no
-  interrupt (reclaimed in Send).
+* igb in non-MSI-X mode (GPIE = 0, so NSICR = 0: an ICR read clears it
+  only while INT_ASSERTED is set): only the legacy `IMS` causes (LSC, RXSEQ,
+  RXDMT0, RXO, RXT0) are enabled; IVAR0 = 0 and EIMS stays 0 (no extended /
+  EICR path). ISR: while the driver keeps the chip masked (`IrqMasked`, set
+  by IrqDisable, cleared by IrqEnable) it returns "not ours" without touching
+  ICR; otherwise it reads ICR and claims only when INT_ASSERTED is set
+  (all-ones = device gone, not ours); then masks (IMC, flushed with a STATUS
+  read) and queues the DPC. DPC: drain RX, indicate, return buffers, unmask.
+  TX completion needs no interrupt (reclaimed in Send). The claim rule is
+  `usosnet_irq.h`, host-tested by `tools/tests/test_usosnet.py`.
 * X470 without CSM: the INTx line of the I211 comes from the ACPI `_PRT` /
   PCI IRQ routing that CSMWrap's SeaBIOS + the 9x PCI bus driver use; Me
   should see an IRQ in the resource list like for every other PCI device.
@@ -145,7 +149,8 @@ revision on the B450 board.
 
 * After the MAC reset (CTRL.RST, waiting for EECD.AUTO_RD and
   STATUS.PF_RST_DONE): CTRL.SLU on, forced speed / duplex off, PHY (MDIC
-  address 1) BMCR power-down bit cleared, ANAR = 10/100 half+full + pause,
+  address 1) BMCR power-down bit cleared, ANAR = 0x01E1 (10/100 half+full, no PAUSE / ASM_DIR; CTRL.RFCE / TFCE stay 0, so
+  no flow control either way until the FC thresholds are programmed),
   1000BASE-T control = 1000 half+full, autonegotiation restarted. The PHY
   power-down matters on real boards: a previous OS (Windows 10 shutdown,
   Wake-on-LAN off) can leave the PHY powered down.
@@ -175,7 +180,16 @@ revision on the B450 board.
   (NDIS status), `UsosnetDevice`, `UsosnetMmio`, `UsosnetIrq`
   (level << 16 | vector), `UsosnetMacHi`/`Lo`, `UsosnetMacSource`,
   `UsosnetStatusReg`, `UsosnetCtrlReg`, `UsosnetPhyBmsr` (BMCR << 16 | BMSR),
-  `UsosnetPhyId`.
+  `UsosnetPhyId`, `UsosnetBar0High` (BAR0 high dword; non-zero = above 4 GiB,
+  start refused), `UsosnetPllTries` (I210/I211 iNVM PLL erratum check).
+* I210 / I211 without flash (every I211): the PLL erratum of the Intel
+  I210/I211 specification update. After the reset the driver reads the
+  internal PHY's PLL frequency register (page 0xFC, register 14); a low byte
+  of 0xFF means the PLL came up unconfigured. Then: PHY reset, iNVM word 0x0A
+  (default 0x202F) with bit 0x0010 forced through EEARBC, D3hot -> D0 cycle
+  of the function (command + BARs restored if D0 cleared them), real word
+  back; up to 5 checks. Sequence taken from the spec update's description
+  and cross-checked for step order against FreeBSD e1000 (no code copied).
 * `DebugPort` (decimal; 233 = 0xE9 for QEMU `isa-debugcon`): text lines
   `USOSNET ...` at every step, link changes, filter changes.
 * Statistics through the standard OIDs (`netstat -e` on 9x / XP).
