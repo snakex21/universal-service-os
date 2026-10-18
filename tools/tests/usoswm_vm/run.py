@@ -4,14 +4,17 @@ Fresh file-backed VM, serial evidence events and blocking process completion.
 No progress polling. No physical disks or network exposed to the guest.
 """
 from pathlib import Path
-import argparse,hashlib,io,json,os,socket,subprocess,time,struct,threading
+import argparse,hashlib,io,json,os,socket,subprocess,sys,time,struct,threading
 import pycdlib
 
 ROOT=Path(__file__).resolve().parents[3]
 WORK=ROOT/'zig-out/watermark/vm-tools'
 TOOLS=ROOT/'tools'
 SOURCE=Path(__file__).resolve().parent
+sys.path.insert(0,str(SOURCE))
+import ui_steps
 ARCH='amd64'
+GATE_NATIVE=False
 NAMESPACE='urn:schemas-microsoft-com:unattend'
 QMP_LOCK=threading.RLock()
 def answer(control=False):
@@ -24,16 +27,20 @@ def answer(control=False):
 <ImageInstall><OSImage><InstallFrom><MetaData wcm:action="add"><Key>/IMAGE/INDEX</Key><Value>1</Value></MetaData></InstallFrom><InstallTo><DiskID>0</DiskID><PartitionID>1</PartitionID></InstallTo><WillShowUI>OnError</WillShowUI></OSImage></ImageInstall>
 </component></settings>
 <settings pass="specialize"><component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS"><ComputerName>USOS-WM-VM</ComputerName><TimeZone>Central European Standard Time</TimeZone></component>
-<component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS"><RunSynchronous><RunSynchronousCommand wcm:action="add"><Order>1</Order><Path>cmd.exe /d /c for %d in (D E F G H I J K L M N O P Q R S T U V W X Y Z) do if exist %d:\USOSVM.TAG xcopy %d:\USOS C:\USOS\ /e /i /y</Path></RunSynchronousCommand><RunSynchronousCommand wcm:action="add"><Order>2</Order><Path>cmd.exe /d /c bcdedit /set {current} testsigning on</Path><WillReboot>Always</WillReboot></RunSynchronousCommand></RunSynchronous></component></settings>
+<component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS"><RunSynchronous><RunSynchronousCommand wcm:action="add"><Order>1</Order><Path>cmd.exe /d /c for %d in (D E F G H I J K L M N O P Q R S T U V W X Y Z) do if exist %d:\USOSVM.TAG xcopy %d:\USOS C:\USOS\ /e /i /y</Path></RunSynchronousCommand><RunSynchronousCommand wcm:action="add"><Order>2</Order><Path>cmd.exe /d /c bcdedit /set {current} testsigning on</Path><WillReboot>Always</WillReboot></RunSynchronousCommand><RunSynchronousCommand wcm:action="add"><Order>3</Order><Path>C:\USOS\WMTEST\wmready.exe --setup</Path></RunSynchronousCommand></RunSynchronous></component></settings>
 <settings pass="oobeSystem"><component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 <OOBE><HideEULAPage>true</HideEULAPage><NetworkLocation>Work</NetworkLocation><ProtectYourPC>3</ProtectYourPC><SkipMachineOOBE>true</SkipMachineOOBE><SkipUserOOBE>true</SkipUserOOBE></OOBE>
 <UserAccounts><LocalAccounts><LocalAccount wcm:action="add"><Password><Value>Local-VM-Only-2026!</Value><PlainText>true</PlainText></Password><Name>USOS</Name><Group>Administrators</Group><DisplayName>USOS VM</DisplayName></LocalAccount></LocalAccounts></UserAccounts>
 <AutoLogon><Password><Value>Local-VM-Only-2026!</Value><PlainText>true</PlainText></Password><Enabled>true</Enabled><LogonCount>3</LogonCount><Username>USOS</Username></AutoLogon>
-<FirstLogonCommands><SynchronousCommand wcm:action="add"><Order>1</Order><CommandLine>cmd.exe /d /c start "" C:\USOS\WMTEST\wmprobe.exe</CommandLine><Description>Private cosmetic evidence test</Description></SynchronousCommand></FirstLogonCommands>
+<FirstLogonCommands><SynchronousCommand wcm:action="add"><Order>1</Order><CommandLine>C:\USOS\WMTEST\wmready.exe</CommandLine><Description>Short-lived VM desktop notification</Description></SynchronousCommand></FirstLogonCommands>
 </component></settings></unattend>
 '''
     if control:
         text=text.replace('cmd.exe /d /c bcdedit /set {current} testsigning on','cmd.exe /d /c exit /b 0').replace('<WillReboot>Always</WillReboot>','<WillReboot>Never</WillReboot>')
+    if GATE_NATIVE:
+        text=text.replace('<Order>3</Order><Path>C:\\USOS\\WMTEST\\wmready.exe --setup', '<Order>4</Order><Path>C:\\USOS\\WMTEST\\wmready.exe --setup')
+        tag='<RunSynchronousCommand wcm:action="add"><Order>2</Order><Path>cmd.exe /d /c bcdedit'
+        text=text.replace(tag,'<RunSynchronousCommand wcm:action="add"><Order>2</Order><Path>C:\\USOS\\WMTEST\\wmready.exe --arm-gate</Path></RunSynchronousCommand><RunSynchronousCommand wcm:action="add"><Order>3</Order><Path>cmd.exe /d /c bcdedit')
     return text.replace('processorArchitecture="amd64"','processorArchitecture="'+ARCH+'"')
 def qmp_receive(f):
     while True:
@@ -67,8 +74,11 @@ def build():
     env=dict(os.environ,TEMP=str(tmp),TMP=str(tmp),ZIG_GLOBAL_CACHE_DIR=str(WORK/'zig-global'),ZIG_LOCAL_CACHE_DIR=str(WORK/'zig-local'))
     exe=WORK/'wmprobe.exe'
     target=('x86' if ARCH=='x86' else 'x86_64')+'-windows.vista-gnu'
-    subprocess.run([str(TOOLS/'zig/zig.exe'),'cc','-target',target,'-Os','-nostdlib','-fno-stack-protector','-fno-builtin','-I'+str(TOOLS/'zig/lib/libc/include/any-windows-any'),str(SOURCE/'probe.c'),'-Wl,--entry,entry','-Wl,--subsystem,windows','-lkernel32','-luser32','-ladvapi32','-lshell32','-luxtheme','-o',str(exe)],env=env,check=True)
+    subprocess.run([str(TOOLS/'zig/zig.exe'),'cc','-target',target,'-Os','-nostdlib','-fno-stack-protector','-fno-builtin','-Wno-missing-declarations','-I'+str(TOOLS/'zig/lib/libc/include/any-windows-any'),str(SOURCE/'probe.c'),'-Wl,--entry,entry','-Wl,--subsystem,windows','-lkernel32','-luser32','-lgdi32','-ladvapi32','-lshell32','-luxtheme','-lwtsapi32','-o',str(exe)],env=env,check=True)
     subprocess.run([str(TOOLS/'zig/zig.exe'),'cc','-target',target,'-Os','-nostdlib','-fno-stack-protector','-fno-builtin','-I'+str(TOOLS/'zig/lib/libc/include/any-windows-any'),str(SOURCE/'setup-ui.c'),'-Wl,--entry,entry','-Wl,--subsystem,windows','-lkernel32','-luser32','-ladvapi32','-o',str(WORK/'setup-ui.exe')],env=env,check=True)
+    subprocess.run([str(TOOLS/'zig/zig.exe'),'cc','-target',target,'-Os','-nostdlib','-fno-stack-protector','-fno-builtin','-I'+str(TOOLS/'zig/lib/libc/include/any-windows-any'),str(SOURCE/'ready.c'),'-Wl,--entry,entry','-Wl,--subsystem,windows','-lkernel32','-ladvapi32','-o',str(WORK/'wmready.exe')],env=env,check=True)
+    if GATE_NATIVE:
+        subprocess.run([str(TOOLS/'zig/zig.exe'),'cc','-target',target,'-Os','-nostdlib','-fno-stack-protector','-fno-builtin','-DUSOS_GATE_NATIVE_DEPLOY','-DUSOSWM_VM_EVIDENCE','-I'+str(TOOLS/'zig/lib/libc/include/any-windows-any'),str(ROOT/'tools/windows_vista_oobe_gate.c'),'-Wl,--entry,entry','-Wl,--subsystem,windows','-lkernel32','-ladvapi32','-lnetapi32','-luser32','-lcrypt32','-o',str(WORK/'oobe.exe')],env=env,check=True)
     return exe
 def answer_floppy(path,data):
     image=bytearray(1440*1024)
@@ -95,12 +105,12 @@ def answer_floppy(path,data):
     image[19*512:19*512+96]=b''.join(entries);image[33*512:33*512+len(data)]=data
     path.write_bytes(image)
 def main():
-    global WORK,TOOLS,ARCH
-    ap=argparse.ArgumentParser();ap.add_argument('os',choices=['vista','server2008','win7','server2008r2']);ap.add_argument('--media',type=Path,required=True);ap.add_argument('--tool-root',type=Path,required=True);ap.add_argument('--out',type=Path,required=True);ap.add_argument('--component',type=Path);ap.add_argument('--control',action='store_true');ap.add_argument('--arch',choices=['amd64','x86'],default='amd64');ap.add_argument('--accel',choices=['whpx','tcg'],default='tcg');ap.add_argument('--pe-console-helper',action='store_true');ap.add_argument('--limit-seconds',type=int,default=3600);a=ap.parse_args()
+    global WORK,TOOLS,ARCH,GATE_NATIVE
+    ap=argparse.ArgumentParser();ap.add_argument('os',choices=['vista','server2008','win7','server2008r2']);ap.add_argument('--media',type=Path,required=True);ap.add_argument('--tool-root',type=Path,required=True);ap.add_argument('--out',type=Path,required=True);ap.add_argument('--component',type=Path);ap.add_argument('--control',action='store_true');ap.add_argument('--arch',choices=['amd64','x86'],default='amd64');ap.add_argument('--accel',choices=['whpx','tcg'],default='tcg');ap.add_argument('--consent-action');ap.add_argument('--gate-native',action='store_true');ap.add_argument('--pe-console-helper',action='store_true');ap.add_argument('--limit-seconds',type=int,default=3600);a=ap.parse_args()
     if a.media.suffix.lower()!='.iso' or not a.media.is_file():raise ValueError('A regular ISO file is required')
     if a.limit_seconds<300:raise ValueError('Minimum diagnostic deadline is 300 seconds')
     if not a.control and (a.arch!='amd64' or a.os not in ('vista','server2008') or not a.component):raise ValueError('Component trial requires Vista/2008 amd64 and --component; use --control elsewhere')
-    ARCH=a.arch
+    ARCH=a.arch;GATE_NATIVE=a.gate_native
     WORK=a.out.resolve();WORK.mkdir(parents=True,exist_ok=False);TOOLS=a.tool_root.resolve()
     folder=WORK
     target=folder/'target.qcow2'
@@ -108,29 +118,32 @@ def main():
     probe=build()
     iso=pycdlib.PyCdlib();iso.new(interchange_level=3,joliet=3,vol_ident='USOSWMTEST')
     for path in ('/USOS','/USOS/WMTEST','/USOS/USOSWM'):iso.add_directory(path,joliet_path=path)
-    files={'/AUTOUNATTEND.XML;1':answer(a.control).encode(),'/USOSVM.TAG;1':b'USOS-WATERMARK-PRIVATE\n','/USOS/WMTEST/WMPROBE.EXE;1':probe.read_bytes(),'/USOS/WMTEST/SETUP_UI.EXE;1':(WORK/'setup-ui.exe').read_bytes()}
+    files={'/AUTOUNATTEND.XML;1':answer(a.control).encode(),'/USOSVM.TAG;1':b'USOS-WATERMARK-PRIVATE\n','/USOS/WMTEST/WMPROBE.EXE;1':probe.read_bytes(),'/USOS/WMTEST/WMREADY.EXE;1':(WORK/'wmready.exe').read_bytes(),'/USOS/WMTEST/SETUP_UI.EXE;1':(WORK/'setup-ui.exe').read_bytes()}
     # Joliet keeps the actual Windows filename; ISO9660 uses an underscore.
     files['/USOS/WMTEST/setup-ui.exe;1']=files.pop('/USOS/WMTEST/SETUP_UI.EXE;1')
     for name in (() if a.control else ('usoswm.exe','usoswm-desktop.dll','usoswm-register.exe')):
         component=a.component/name
         if not component.is_file():raise FileNotFoundError(component)
         files['/USOS/USOSWM/'+name.upper()+';1']=component.read_bytes()
+    if GATE_NATIVE:
+        if a.control or a.arch!='amd64':raise ValueError('Native gate fixture is x64 component-only')
+        files['/USOS/OOBE.EXE;1']=(WORK/'oobe.exe').read_bytes()
     for name,data in files.items():iso.add_fp(io.BytesIO(data),len(data),iso_path=name.upper().replace('-','_'),joliet_path=name.removesuffix(';1'))
     support=folder/'answer.iso';iso.write(str(support));iso.close()
     floppy=folder/'answer.img';answer_floppy(floppy,answer(a.control).encode())
     subprocess.run([str(TOOLS/'qemu/qemu-img.exe'),'create','-q','-f','qcow2',str(target),'24G'],check=True)
     media=a.media.resolve()
-    snapshot={'source':{name:hashlib.sha256((SOURCE/name).read_bytes()).hexdigest() for name in ('run.py','probe.c','setup-ui.c')},'control':a.control,'arch':a.arch,'accel':a.accel,'own_files':{name:hashlib.sha256(raw).hexdigest() for name,raw in files.items() if name.lower().endswith(('.exe;1','.dll;1'))}}
+    snapshot={'source':{name:hashlib.sha256((SOURCE/name).read_bytes()).hexdigest() for name in ('run.py','probe.c','ready.c','setup-ui.c','ui_steps.py')},'control':a.control,'arch':a.arch,'accel':a.accel,'own_files':{name:hashlib.sha256(raw).hexdigest() for name,raw in files.items() if name.lower().endswith(('.exe;1','.dll;1'))}}
     (folder/'input-manifest.json').write_text(json.dumps(snapshot,indent=2))
     serial=socket.socket();serial.bind(('127.0.0.1',0));serial.listen();serial.settimeout(a.limit_seconds);sp=serial.getsockname()[1]
     qmp=socket.socket();qmp.bind(('127.0.0.1',0));qmp.listen();qmp.settimeout(60);qp=qmp.getsockname()[1]
     with socket.socket() as allocation:allocation.bind(('127.0.0.1',0));hp=allocation.getsockname()[1]
-    cmd=[str(TOOLS/'qemu/qemu-system-x86_64.exe'),'-machine','pc','-accel',a.accel,'-cpu','max' if a.accel=='tcg' else 'qemu64,-xsave','-smp','2','-m','3072','-vga','std','-display','none','-nic','none','-boot','order=dc,menu=off','-drive',f'file={target},format=qcow2,if=ide,index=0','-drive',f'file={media},media=cdrom,readonly=on,if=ide,index=2','-drive',f'file={support},media=cdrom,readonly=on,if=ide,index=3','-drive',f'file={floppy},format=raw,if=floppy,readonly=on','-serial',f'tcp:127.0.0.1:{sp},server=off','-qmp',f'tcp:127.0.0.1:{qp},server=off','-monitor',f'tcp:127.0.0.1:{hp},server=on,wait=off','-rtc','base=2009-07-01T12:00:00,clock=host']
+    cmd=[str(TOOLS/'qemu/qemu-system-x86_64.exe'),'-machine','pc','-accel',a.accel,'-cpu','max' if a.accel=='tcg' else 'qemu64,-xsave','-smp','2','-m','3072','-vga','std','-usb','-device','usb-tablet','-display','none','-nic','none','-boot','order=dc,menu=off','-drive',f'file={target},format=qcow2,if=ide,index=0','-drive',f'file={media},media=cdrom,readonly=on,if=ide,index=2','-drive',f'file={support},media=cdrom,readonly=on,if=ide,index=3','-drive',f'file={floppy},format=raw,if=floppy,readonly=on','-serial',f'tcp:127.0.0.1:{sp},server=off','-qmp',f'tcp:127.0.0.1:{qp},server=off','-monitor',f'tcp:127.0.0.1:{hp},server=on,wait=off','-rtc','base=2009-07-01T12:00:00,clock=host']
     (folder/'command.json').write_text(json.dumps(cmd,indent=2))
     started=time.monotonic()
     with (folder/'qemu.log').open('wb') as log:
         proc=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT)
-        qf=None;helper_timer=None
+        qf=None;helper_timer=None;desktop_timer=None
         try:
             ser,_=serial.accept();ser.settimeout(a.limit_seconds);q,_=qmp.accept();q.settimeout(60);qf=q.makefile('rwb',buffering=0);json.loads(qf.readline());qmp_call(qf,'qmp_capabilities')
             (folder/'process.json').write_text(json.dumps({'pid':proc.pid,'started':time.time(),'hmp_port':hp}))
@@ -146,10 +159,18 @@ def main():
                     events.write(line);events.flush()
                     text=line.decode(errors='replace').strip()
                     print(text,flush=True) # Guest-pushed events, never a status query.
-                    if text.startswith(('WM_BASELINE_','WM_FILTERED_','WM_OPT_OUT_')) and text!='WM_BASELINE_COMPLETE':
+                    if text=='WM_READY_FOR_DESKTOP':
+                        desktop_timer=threading.Timer(120,ui_steps.type_run,args=(qmp_call,qf,r'c:\usos\wmtest\wmprobe.exe'));desktop_timer.daemon=True;desktop_timer.start()
+                    if text=='WM_UAC_REQUESTED':ui_steps.consent_checkpoint(qmp_call,qf,folder,a.consent_action)
+                    if text=='WM_UAC_FAILED':raise RuntimeError('VM consent declined; no elevated measurements')
+                    if text.startswith(('WM_BASELINE_','WM_FILTERED_','WM_OPT_OUT_','WM_SETUP_')) and text!='WM_BASELINE_COMPLETE':
+                        if text.endswith('_CAD'):
+                            qmp_call(qf,'human-monitor-command',{'command-line':'sendkey ctrl-alt-delete'});threading.Event().wait(3)
                         shot=folder/(text.lower()+'.ppm');qmp_call(qf,'screendump',{'filename':str(shot)})
                         from PIL import Image
                         with Image.open(shot) as im:im.save(shot.with_suffix('.png'))
+                        if text.endswith('_CAD'):
+                            qmp_call(qf,'human-monitor-command',{'command-line':'sendkey esc'});threading.Event().wait(1)
                         ser.sendall(b'A')
                     if text=='WM_BASELINE_COMPLETE':break
             result=proc.wait(timeout=max(1,a.limit_seconds-(time.monotonic()-started)))
@@ -168,6 +189,7 @@ def main():
             raise
         finally:
             if helper_timer:helper_timer.cancel()
+            if desktop_timer:desktop_timer.cancel()
             if proc.returncode is None:
                 proc.terminate();proc.wait(timeout=60)
             serial.close();qmp.close()

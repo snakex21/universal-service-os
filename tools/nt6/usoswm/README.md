@@ -71,8 +71,9 @@ children; stdout and their file logs remain available. Native Windows GUI
 configuration keeps its normal startup behaviour. Both x86/x64 gates are GUI
 programs; x86 does not install the watermark component.
 
-This implementation still needs complete coverage for a second user's desktop,
-RDP, Aero and real multi-monitor/DPI behaviour. Setup has a deliberately rearmed
+RDP reconnection of the existing user's session has measured PL coverage on
+Vista/Server 2008. A separate user's desktop, newly created remote sessions,
+Aero and real multi-monitor/DPI behaviour still need coverage. Setup has a deliberately rearmed
 VM checkpoint with visible-before/hidden-after/opt-out and shutdown-of-background
 proof; that fixture is not a complete fresh-install acceptance. Classic-theme changes
 have measured VM coverage. A successful build or
