@@ -616,6 +616,17 @@ tests establish Setup phase 1 and staging, not a 95 NVMe desktop or shutdown.
 * **X470 check** (after the CSMWrap with 0016 is on the disk and the drivers from this build are in
   `WINDOWS/SYSTEM`): Explorer and Notepad scroll with the wheel, IE scrolls, Control Panel -> Mouse unchanged;
   USOSDBG last packet shows the 4th byte moving. `Wheel=0` under `[usosmous]` switches it off.
+* **Round 2 (2026-10-18, X470 untested)**: with usos13 the X470 Me mouse (Logitech G502 HERO) moves and
+  clicks, the wheel does nothing. CSMWrap 3.1.2-usos14 (docs/research/csmwrap.md section 20) adds the
+  SeaBIOS record `USOSMWHL` (per mouse: report/boot protocol and why, layout, report descriptor, packet
+  and wheel counters) and accepts more mouse shapes (long reports of other report IDs, a mouse behind a
+  keyboard interface). USOSMOUS.DRV exports `USOSWHEELINFO` (ordinal 8, read only: wanted, knock ID,
+  knock error = step << 12 | 100h | AH, knocks, wheel calls, last sum); still KERNEL only. USOSDBG 1.4
+  shows both in `WHEEL` lines, plus the BIOS C204h ID (asked once, and again after **W**, which sends the
+  knock), the ring's 4th bytes and the first descriptor bytes; **S** saves them to `C:\USOS9X\USOSDBG.LOG`.
+  Tests: `test_usosmous_wheel_emu.py` (USOSWHEELINFO after the knock, with 0AAh, on 95, with a failed C202h
+  / C204h; reading it makes no BIOS call), `test_usosmous.py`, `test_csmwrap_wheel_diag.py`. In-place kit
+  `me-wheel-kit-v2`.
 
 ## 5. Open points
 

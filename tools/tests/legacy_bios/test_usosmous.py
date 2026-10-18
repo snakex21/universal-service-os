@@ -124,9 +124,9 @@ class UsosMouse(unittest.TestCase):
             i += n + 3
         # Module name MOUSE (USER imports the mouse driver by it), DDK
         # ordinals; USOSATTACH and USOSPAUSE (Me, called by USOSKEY.DRV by
-        # name) after them.
+        # name) after them, USOSWHEELINFO (USOSDBG.EXE, read only) last.
         self.assertEqual(names, {'MOUSE': 0, 'INQUIRE': 1, 'ENABLE': 2, 'DISABLE': 3, 'MOUSEGETINTVECT': 4, 'WEP': 5,
-                                 'USOSATTACH': 6, 'USOSPAUSE': 7})
+                                 'USOSATTACH': 6, 'USOSPAUSE': 7, 'USOSWHEELINFO': 8})
 
     def test_mouse_driver_imports_kernel_only(self):
         # KERNEL loads mouse.drv right after keyboard.drv, before DISPLAY, GDI
@@ -249,11 +249,12 @@ class MeBridge(unittest.TestCase):
         self.assertIn('#define SF_WHEEL      0x0800', self.mouse)
         self.assertIn('#define MS_EXISTS_WHEEL 0x4B', self.mouse)
         knock = self.body(self.mouse, 'knock')
-        rates = [knock.index("bios15(0xC202, 0x%04X, 0)" % bh) for bh in (0x0600, 0x0500, 0x0400)]  # 200, 100, 80
-        self.assertEqual(rates, sorted(rates))
-        self.assertLess(rates[-1], knock.index('bios15(0xC204, 0, 0)'))
-        self.assertIn('== 3', knock)
-        self.assertLess(knock.index('wheel = 0;'), knock.index('wheel_wanted()'))
+        self.assertIn('rates[3] = { 0x0600, 0x0500, 0x0400 };', knock)    # 200, 100, 80, in order
+        self.assertIn('for (i = 0; i < 3; i++)', knock)
+        self.assertLess(knock.index('bios15(0xC202, rates[i], 0)'), knock.index('bios15(0xC204, 0, 0)'))
+        self.assertIn('winfo.knock_id == 3', knock)
+        self.assertLess(knock.index('wheel = 0;'), knock.index('if (!want) return;'))  # cleared before any return
+        self.assertLess(knock.index('if (!want) return;'), knock.index('bios15('))
         wanted = self.body(self.mouse, 'wheel_wanted')
         self.assertIn('LOBYTE(dos) >= 10', wanted)                       # DOS 7.10+: 98 and later
         self.assertIn('"usosmous", "Wheel", 1', wanted)
@@ -270,6 +271,19 @@ class MeBridge(unittest.TestCase):
         inquire = self.body(self.mouse, 'Inquire')
         self.assertIn('(probed ? wheel : wheel_wanted())', inquire)      # Me without bridge: no BIOS call
         self.assertNotIn('knock', inquire)
+
+    def test_wheel_diagnostics(self):
+        # USOSWHEELINFO (ordinal 8, USOSDBG.EXE): a far pointer to the
+        # driver's own record; no BIOS call, nothing changed but winfo.wheel.
+        self.assertIn('export USOSWHEELINFO.8 resident', self.lnk)
+        info = self.body(self.mouse, 'UsosWheelInfo')
+        self.assertIn('__loadds', self.mouse[self.mouse.index('UsosWheelInfo') - 60:self.mouse.index('UsosWheelInfo')])
+        self.assertNotIn('bios15', info)
+        self.assertIn('return (DWORD)(WHEELINFO FAR *)&winfo;', info)
+        self.assertIn('static WHEELINFO winfo = { 1, 0, 0, 0xFF };', self.mouse)
+        wheel = self.body(self.mouse, 'call_wheel')
+        self.assertIn('winfo.wheel_calls++;', wheel)
+        self.assertIn('winfo.last_sum = sum;', wheel)
 
     def test_timer_path_stays_interrupt_safe(self):
         poll = self.body(self.mouse, 'poll_body') + self.body(self.mouse, 'call_wheel')

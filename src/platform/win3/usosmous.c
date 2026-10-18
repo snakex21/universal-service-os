@@ -163,6 +163,19 @@ static BYTE wheel;                  /* the BIOS answered the IntelliMouse knock 
 static BYTE wheel_pref;             /* wheel_wanted: 0 not asked yet, 1 no, 2 yes */
 static int wheel_sum;               /* DGROUP: -zu, SS is not DS */
 
+/* Wheel diagnostics for USOSDBG.EXE (USOSWHEELINFO): written here only. */
+typedef struct {
+    BYTE version;                   /* 1 */
+    BYTE pref;                      /* wheel_pref */
+    BYTE wheel;                     /* the knock was answered with ID 3 */
+    BYTE knock_id;                  /* BH of the last C204h after a knock, FFh none */
+    WORD knock_err;                 /* (step << 12) | bios15 result of a failed knock */
+    WORD knocks;                    /* knocks sent */
+    WORD wheel_calls;               /* AX=0800h event procedure calls */
+    int last_sum;                   /* the last wheel sum handed to USER */
+} WHEELINFO;
+static WHEELINFO winfo = { 1, 0, 0, 0xFF };
+
 /* INT 2Fh AX=D700h: the bridge (TSR or USOSKEY.DRV's copy), read only. */
 static int query_bridge(void)
 {
@@ -260,11 +273,22 @@ static int wheel_wanted(void)
  * answers 0AAh or 0, a PS/2 BIOS 0: no wheel. Sets wheel. */
 static void knock(void)
 {
+    static const WORD rates[3] = { 0x0600, 0x0500, 0x0400 };   /* 200, 100, 80 */
+    WORD i, r;
+    int want = wheel_wanted();
     wheel = 0;
-    if (!wheel_wanted()) return;
-    if (bios15(0xC202, 0x0600, 0) || bios15(0xC202, 0x0500, 0) || bios15(0xC202, 0x0400, 0)) return;
-    if (bios15(0xC204, 0, 0)) return;
-    wheel = (BYTE)((rm.ebx >> 8) & 0xFF) == 3;
+    winfo.wheel = 0;
+    winfo.pref = wheel_pref;
+    if (!want) return;
+    winfo.knocks++;
+    winfo.knock_id = 0xFF;
+    for (i = 0; i < 3; i++)
+        if ((r = bios15(0xC202, rates[i], 0)) != 0) { winfo.knock_err = (WORD)((i + 1) << 12) | (r & 0x1FF); return; }
+    if ((r = bios15(0xC204, 0, 0)) != 0) { winfo.knock_err = 0x4000 | (r & 0x1FF); return; }
+    winfo.knock_err = 0;
+    winfo.knock_id = (BYTE)((rm.ebx >> 8) & 0xFF);
+    wheel = winfo.knock_id == 3;
+    winfo.wheel = wheel;
 }
 
 /* Once there is a bridge: is there a BIOS pointing device (USB through
@@ -323,6 +347,8 @@ static void call_wheel(int sum)
     if (sum > 200) sum = 200;
     if (sum < -200) sum = -200;
     delta = (WORD)(-sum * WHEEL_DELTA);
+    winfo.wheel_calls++;
+    winfo.last_sum = sum;
     _asm {
         pusha
         push ds
@@ -571,6 +597,14 @@ void FAR PASCAL __loadds UsosPause(WORD how)
     if (shared->mstate != MS_PAUSED && shared->mstate != MS_NO_GUARD) return;
     shared->mtail = shared->mhead;  /* nothing stale */
     bios_on();
+}
+
+/* Ordinal 8, by name from USOSDBG.EXE (task time): the wheel diagnostics,
+ * a far pointer into this driver's fixed DGROUP; nothing changes. */
+DWORD FAR PASCAL __loadds UsosWheelInfo(void)
+{
+    winfo.wheel = wheel;
+    return (DWORD)(WHEELINFO FAR *)&winfo;
 }
 
 /* DLL entry (no C runtime): DS = DGROUP. Returns AX = 1. */

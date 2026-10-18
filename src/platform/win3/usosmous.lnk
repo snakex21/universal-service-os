@@ -20,5 +20,7 @@ export WEP.5 resident
 export USOSATTACH.6 resident
 # Windows Me: USOSKEY.DRV's DOS-box guard (WH_CBT) pauses / resumes the mouse.
 export USOSPAUSE.7 resident
+# USOSDBG.EXE: wheel diagnostics (read only).
+export USOSWHEELINFO.8 resident
 segment type code fixed
 segment type data fixed

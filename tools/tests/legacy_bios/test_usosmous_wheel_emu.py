@@ -5,7 +5,9 @@ small stubs, the BIOS answers like CSMWrap with patch 0016 (IntelliMouse
 knock: C204h BH=3) or like an older CSMWrap (BH=0AAh). Checks Inquire's
 msExists (4Bh = wheel for 98 / Me USER), the knock order, and the events
 the poll timer sends to USER's procedure: AX=0800h, DX = -wheel * 120 after
-the movement/button events, nothing for a ring without wheel bytes.
+the movement/button events, nothing for a ring without wheel bytes; and
+the USOSWHEELINFO record (ordinal 8, read by USOSDBG.EXE): knock answer,
+knock error code (step << 12 | 100h | AH), knocks and wheel calls.
 """
 from pathlib import Path
 import struct
@@ -69,10 +71,11 @@ def load_ne(data: bytes):
 
 
 class Emu:
-    def __init__(self, drv: bytes, dos_version: int, bios_id: int, bridge=True):
+    def __init__(self, drv: bytes, dos_version: int, bios_id: int, bridge=True, fail=None):
         self.u = u = Uc(UC_ARCH_X86, UC_MODE_16)
         u.mem_map(0, 0x100000)
         self.dos_version, self.bios_id, self.bridge = dos_version, bios_id, bridge
+        self.fail = fail                     # (AX, BX, AH): that BIOS call fails with CF and AH
         self.bios_calls, self.events, self.timer_proc = [], [], None
         segs, self.names, self.ents = load_ne(drv)
         bases = [CODE_SEG, DATA_SEG]
@@ -168,7 +171,10 @@ class Emu:
         ax, bx = eax & 0xFFFF, ebx & 0xFFFF
         self.bios_calls.append((ax, bx))
         flags = struct.unpack_from('<H', regs, 0x20)[0] & ~1
-        if ax == 0xC204:
+        if self.fail and (ax, bx) == self.fail[:2]:
+            flags |= 1
+            struct.pack_into('<I', regs, 0x1C, (eax & 0xFFFF00FF) | (self.fail[2] << 8))
+        elif ax == 0xC204:
             struct.pack_into('<I', regs, 0x10, (ebx & 0xFFFF00FF) | (self.bios_id << 8))
         struct.pack_into('<H', regs, 0x20, flags)
         u.mem_write(rm, bytes(regs))
@@ -190,6 +196,12 @@ class Emu:
         u.emu_start(seg * 16 + off, RET, count=200000)
         assert (u.reg_read(UC_X86_REG_CS), u.reg_read(UC_X86_REG_IP)) == (0, RET)
         return u.reg_read(UC_X86_REG_AX)
+
+    def wheel_info(self):
+        self.export('USOSWHEELINFO')
+        seg, off = self.u.reg_read(UC_X86_REG_DX), self.u.reg_read(UC_X86_REG_AX)
+        assert seg == DATA_SEG, hex(seg)
+        return struct.unpack_from('<BBBBHHHh', bytes(self.u.mem_read(seg * 16 + off, 12)))
 
     def export(self, name, words=()):
         seg, off = self.ents[self.names[name]]
@@ -265,6 +277,35 @@ class WheelEmu(unittest.TestCase):
             e.push_packets([(0x08, 0, 0, 0xFF)])
             e.poll()
             self.assertEqual(e.events, [])
+
+    def test_wheel_info(self):
+        # version, pref (2 = wanted), wheel, knock ID, knock error, knocks, wheel calls, last sum
+        e, _ = self.start(0x070A, 3)
+        self.assertEqual(e.wheel_info(), (1, 2, 1, 3, 0, 2, 0, 0))   # probe + bios_on: two knocks
+        e.u.mem_write(SHARED_SEG * 16 + SHARED_OFF + MALIVE, b'\x12')
+        e.push_packets([(0x08, 0, 0, 0xFF), (0x08, 0, 0, 0xFF)])
+        e.poll()
+        e.push_packets([(0x08, 0, 0, 0x03)])
+        e.poll()
+        self.assertEqual(e.wheel_info(), (1, 2, 1, 3, 0, 2, 2, 3))   # last sum: three notches down
+        calls = len(e.bios_calls)
+        e.wheel_info()
+        self.assertEqual(len(e.bios_calls), calls)                     # read only: no BIOS call
+        # older CSMWrap: the knock is answered with 0AAh
+        e, _ = self.start(0x070A, 0xAA)
+        self.assertEqual(e.wheel_info(), (1, 2, 0, 0xAA, 0, 2, 0, 0))
+        # Windows 95: not wanted, no knock
+        e, _ = self.start(0x0700, 3)
+        self.assertEqual(e.wheel_info()[:6], (1, 1, 0, 0xFF, 0, 0))
+        # the second sample rate refused (AH=03h) / C204h refused (AH=86h)
+        e = Emu(self.drv, 0x070A, 3, fail=(0xC202, 0x0500, 0x03))
+        e.export('INQUIRE', (0, MOUSEINFO_SEG))
+        e.export('ENABLE', (e.stubs['EventProc'], STUB_SEG))
+        self.assertEqual(e.wheel_info()[:6], (1, 2, 0, 0xFF, 0x2103, 2))
+        e = Emu(self.drv, 0x070A, 3, fail=(0xC204, 0, 0x86))
+        e.export('INQUIRE', (0, MOUSEINFO_SEG))
+        e.export('ENABLE', (e.stubs['EventProc'], STUB_SEG))
+        self.assertEqual(e.wheel_info()[:6], (1, 2, 0, 0xFF, 0x4186, 2))
 
     def test_me_inquire_without_bridge_is_static(self):
         e = Emu(self.drv, 0x0800, 3, bridge=False)

@@ -23,6 +23,14 @@
  *         C205h/C207h/C200h result), packets the INT 15h C207h callback
  *         saw / stored / dropped / ignored, the last packet, the driver's
  *         polls and event procedure calls
+ *   WHEEL USOSMOUS.DRV's wheel state (USOSWHEELINFO: knock answer, wheel
+ *         event calls), the BIOS device ID now (INT 15h C204h, read only;
+ *         W sends the knock again and asks once more), the 4th bytes of
+ *         the 32 ring slots, and CSMWrap patch 0018's record (signature
+ *         USOSMWHL in the first MiB): per mouse report/boot protocol and
+ *         why, wMaxPacketSize, the field layout, the last raw packet, the
+ *         wheel packet count and the first bytes of the HID report
+ *         descriptor (S saves them all to the log)
  *   IVT   INT 08h/09h/15h/16h/1Ch/2Fh vectors of the system VM
  *   MAP   linear (system VM V86) against physical (DPMI 0800h) for a few
  *         pages: page 0 (control: the IVT page is per VM, expected to
@@ -44,7 +52,7 @@
  */
 #include <windows.h>
 
-#define LINES 72
+#define LINES 96
 #define WIDTH 256
 
 typedef struct {
@@ -71,7 +79,40 @@ typedef struct {
     DWORD mpackets;
     BYTE mlast[4];
     WORD mevents, merr;
+    BYTE mring[128];                /* 32 x status, X, Y, wheel */
 } SHARED;
+
+/* USOSMOUS.DRV USOSWHEELINFO (version 1). */
+typedef struct {
+    BYTE version, pref, wheel, knock_id;
+    WORD knock_err, knocks, wheel_calls;
+    int last_sum;
+} WHEELINFO;
+
+/* CSMWrap patch 0018: SeaBIOS's usb_mouse_diag (version 1, natural
+ * alignment, 310 bytes). */
+typedef struct {
+    BYTE iface, maxpacket, report, report_id;
+    signed char result;
+    BYTE pad;
+    WORD desclen;
+    BYTE loc[6][3];                 /* off, size, sign: X, Y, wheel, buttons 1-3 */
+} MDIAGDEV;
+typedef struct {
+    DWORD sig[2];
+    BYTE version, count, wheel, id, rate1, rate2, last_dev;
+    signed char last_z;
+    DWORD packets, zpackets, skipped;
+    BYTE last_raw[16];
+    MDIAGDEV dev[4];
+    WORD desc_got;
+    BYTE desc[160];
+} MDIAG;
+
+typedef struct {
+    DWORD edi, esi, ebp, reserved, ebx, edx, ecx, eax;
+    WORD flags, es, ds, fs, gs, ip, cs, sp, ss;
+} RMREGS;
 
 extern BOOL FAR PASCAL WaitEvent(HANDLE);
 extern BOOL FAR PASCAL InitApp(HINSTANCE);
@@ -93,6 +134,12 @@ static DWORD prev_mpackets;
 static WORD prev_mpolls, prev_mevents;
 static WORD snapshots;
 static int char_h = 16;
+static RMREGS rm;
+static BYTE knock_now;              /* W pressed: knock before the next C204h */
+static BYTE id_asked, id_failed;    /* C204h asked (first display, after W) */
+static WORD id_result;
+static DWORD mdiag_at;              /* physical address of the 0018 record, 0 not found */
+static BYTE mdiag_scanned;
 
 static LPSTR line(void)
 {
@@ -279,6 +326,146 @@ static void show_mouse(void)
     prev_mpackets = s->mpackets;
     prev_mpolls = s->mpolls;
     prev_mevents = s->mevents;
+}
+
+/* INT 15h in real mode (V86) through DPMI 0300h, as USOSMOUS.DRV does.
+ * 0 ok, 100h | AH BIOS error, FFFFh DPMI refused. */
+static WORD bios15(WORD ax, WORD bx)
+{
+    BYTE failed = 0;
+    WORD off = (WORD)(void NEAR *)&rm;
+    BYTE NEAR *p = (BYTE NEAR *)&rm;
+    WORD i;
+    for (i = 0; i < sizeof(rm); i++) p[i] = 0;
+    rm.eax = ax;
+    rm.ebx = bx;
+    rm.flags = 0x0202;
+    _asm {
+        push es
+        push di
+        pushad
+        mov ax, ds
+        mov es, ax
+        xor edi, edi
+        mov di, off
+        mov ax, 0300h
+        mov bx, 0015h
+        xor cx, cx
+        int 31h
+        popad
+        pop di
+        pop es
+        jnc ok
+        mov failed, 1
+    ok:
+    }
+    if (failed) return 0xFFFF;
+    if (rm.flags & 1) return 0x100 | (WORD)((rm.eax >> 8) & 0xFF);
+    return 0;
+}
+
+static const char *md_reason(int r)
+{
+    switch (r) {
+    case 0: return "report protocol";
+    case -1: return "boot: long/truncated item";
+    case -2: return "boot: bad report ID";
+    case -3: return "boot: nested Push";
+    case -4: return "boot: Pop without Push";
+    case -5: return "boot: too many report IDs";
+    case -6: return "boot: field too big";
+    case -7: return "boot: an input report longer than one packet";
+    case -8: return "boot: no relative X";
+    case -9: return "boot: no relative Y";
+    case -10: return "boot: no relative wheel";
+    case -11: return "boot: no button 1";
+    case -12: return "boot: X without report ID";
+    case -20: return "boot: no HID report descriptor";
+    case -21: return "boot: report descriptor too long";
+    case -22: return "boot: no memory";
+    case -23: return "boot: GET_DESCRIPTOR failed";
+    case -30: return "boot: SET_PROTOCOL(report) failed";
+    }
+    return "boot: ?";
+}
+
+/* The 0018 record: first MiB, 16-byte steps, from 80000h up (low zone). */
+static MDIAG FAR *find_mdiag(void)
+{
+    MDIAG FAR *d;
+    if (!mdiag_scanned) {
+        DWORD a;
+        BYTE FAR *low = physical(0, 0xFFFFL);  /* maps the first MiB once */
+        mdiag_scanned = 1;
+        if (!low) return 0;
+        for (a = 0x80000L; a < 0x100000L - sizeof(MDIAG); a += 16) {
+            DWORD FAR *q = (DWORD FAR *)physical(a, 16);
+            if (q && q[0] == 0x534F5355L && q[1] == 0x4C48574DL && ((BYTE FAR *)q)[8] == 1) { mdiag_at = a; break; }
+        }
+    }
+    if (!mdiag_at) return 0;
+    d = (MDIAG FAR *)physical(mdiag_at, sizeof(MDIAG));
+    return d;
+}
+
+static void show_wheel(void)
+{
+    SHARED FAR *s = find_shared();
+    FARPROC info = GetModuleHandle("MOUSE") ? GetProcAddress(GetModuleHandle("MOUSE"), "USOSWHEELINFO") : 0;
+    MDIAG FAR *d;
+    LPSTR l;
+    WORD r, i, nz = 0, last = 0;
+    if (info) {
+        WHEELINFO FAR *w = (WHEELINFO FAR *)((DWORD (FAR PASCAL *)(void))info)();
+        wsprintf(line(), "WHEEL USOSMOUS: wanted:%s  knock answered ID:%02X  wheel:%s  knocks:%u  knock error:%04X  wheel calls:%u  last sum:%d",
+                 (LPSTR)(w->pref == 2 ? "yes" : w->pref == 1 ? "no (Wheel=0 or before 98)" : "not asked"),
+                 (WORD)w->knock_id, (LPSTR)(w->wheel ? "ON" : "off"), w->knocks, w->knock_err, w->wheel_calls, w->last_sum);
+    } else {
+        wsprintf(line(), "WHEEL USOSMOUS.DRV without USOSWHEELINFO (older driver)");
+    }
+    /* C204h only on the first display and after W (with an i8042 mouse it
+     * is a device command; the USB emulation answers from memory) */
+    if (knock_now) {
+        knock_now = 0;
+        bios15(0xC202, 0x0600); bios15(0xC202, 0x0500); bios15(0xC202, 0x0400);
+        id_asked = 0;
+    }
+    if (!id_asked) {
+        id_asked = 1;
+        r = bios15(0xC204, 0);
+        id_result = r ? r : (WORD)((rm.ebx >> 8) & 0xFF);
+        id_failed = r != 0;
+    }
+    wsprintf(line(), "WHEEL BIOS C204h (at start / after W): %s%02X  (3 = IntelliMouse, wheel bytes sent; 0 = no knock or no wheel mouse; W = knock again)",
+             (LPSTR)(id_failed ? "error " : "ID "), id_result);
+    if (s && s->version >= 4) {
+        for (i = 0; i < 32; i++) if (s->mring[i * 4 + 3]) { nz++; last = s->mring[i * 4 + 3]; }
+        wsprintf(line(), "WHEEL last packet 4th byte:%02X  ring slots with a wheel byte:%u/32 (last %02X)",
+                 (WORD)s->mlast[3], nz, last);
+    }
+    d = find_mdiag();
+    if (!d) {
+        wsprintf(line(), "WHEEL SeaBIOS: no USOSMWHL record (CSMWrap without patch 0018, or no USB mouse set up)");
+        return;
+    }
+    wsprintf(line(), "WHEEL SeaBIOS at %05lX: mice:%u  wheel mouse:%u  ID:%u  rates:%u,%u  packets:%lu  with wheel:%lu  other reports:%lu  last z:%d (mouse %u)",
+             mdiag_at, (WORD)d->count, (WORD)d->wheel, (WORD)d->id, (WORD)d->rate1, (WORD)d->rate2,
+             d->packets, d->zpackets, d->skipped, (int)d->last_z, (WORD)d->last_dev);
+    for (i = 0; i < d->count && i < 4; i++) {
+        MDIAGDEV FAR *v = &d->dev[i];
+        wsprintf(line(), "WHEEL  mouse %u: if %u  maxpacket %u  %s (%d)  report ID %u  desc %u bytes  X %u/%u  Y %u/%u  W %u/%u  B1 %u",
+                 i, (WORD)v->iface, (WORD)v->maxpacket, (LPSTR)md_reason(v->result), (int)v->result, (WORD)v->report_id,
+                 v->desclen, (WORD)v->loc[0][0], (WORD)v->loc[0][1], (WORD)v->loc[1][0], (WORD)v->loc[1][1],
+                 (WORD)v->loc[2][0], (WORD)v->loc[2][1], (WORD)v->loc[3][0]);
+    }
+    l = line();
+    wsprintf(l, "WHEEL  last raw:");
+    for (i = 0; i < 16; i++) wsprintf(l + lstrlen(l), " %02X", (WORD)d->last_raw[i]);
+    for (r = 0; r < d->desc_got; r += 64) {
+        l = line();
+        wsprintf(l, "WHEEL  desc+%03u:", r);
+        for (i = r; i < d->desc_got && i < r + 64; i++) wsprintf(l + lstrlen(l), "%02X", (WORD)d->desc[i]);
+    }
 }
 
 static void show_ivt(void)
@@ -475,10 +662,11 @@ static void show_pci(void)
 static void refresh(void)
 {
     nlines = 0;
-    wsprintf(line(), "USOSDBG 1.3  tick:%lu  S = append to C:\\USOS9X\\USOSDBG.LOG (saved:%u)  Esc = quit",
+    wsprintf(line(), "USOSDBG 1.4  tick:%lu  S = append to C:\\USOS9X\\USOSDBG.LOG (saved:%u)  W = wheel knock  Esc = quit",
              GetTickCount(), snapshots);
     show_key();
     show_mouse();
+    show_wheel();
     show_ivt();
     show_map();
     show_pci();
@@ -521,6 +709,7 @@ LRESULT FAR PASCAL __export __loadds wndproc(HWND hwnd, UINT msg, WPARAM wp, LPA
     case WM_CHAR:
         if (wp == 27) DestroyWindow(hwnd);
         else if (wp == 's' || wp == 'S') { refresh(); save(); refresh(); }
+        else if (wp == 'w' || wp == 'W') { knock_now = 1; refresh(); }
         return 0;
     case WM_PAINT: {
         PAINTSTRUCT ps;
