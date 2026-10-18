@@ -9,5 +9,5 @@ option nodefaultlibs
 option stack=256k
 option quiet
 libpath '%WATCOM%/lib386/nt'
-library kernel32, user32, advapi32, wsock32
+library kernel32, user32, advapi32
 option norelocs

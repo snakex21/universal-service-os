@@ -44,14 +44,68 @@
  * USOSDBG), /nohook (no journal hook), /dbgfile <file> (decode a saved
  * USOSDBG /L output instead of running USOSDBG: host tests).
  *
- * Built with tools/build_win9x_support.py (OpenWatcom wcc386 / wlink,
- * PE 4.00, imports from KERNEL32 / USER32 / ADVAPI32 / WSOCK32 only;
- * IPHLPAPI and Toolhelp32 are looked up at run time).
+ * Compatibility: Windows 95 (OSR2 and later; the 4.00.950 retail too as
+ * far as the APIs go), 98, 98 SE, Me; NT 4.0, 2000, XP for reuse. Static
+ * imports are the Windows 95 subset of KERNEL32 / USER32 / ADVAPI32 only.
+ * Looked up at run time, each part skipped with a log line when missing:
+ * WSOCK32.DLL (Winsock 1.1; absent without TCP/IP: no network tests),
+ * IPHLPAPI.DLL (98 and later: resolver view and IP / UDP / TCP / ICMP
+ * counters; on 95 the registry sections stand in), Toolhelp32 (not on NT
+ * 4.0: no process list there). On the NT family USOSDBG (Win16, DPMI,
+ * port I/O: 9x only) and the usosnet page through the system arena are
+ * skipped, and Services\Tcpip\Parameters is logged instead of MSTCP.
+ *
+ * Built with tools/build_win9x_support.py --usoslog (OpenWatcom wcc386 /
+ * wlink, PE 4.00, no C runtime).
  */
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <winsock.h>
 #include <stdarg.h>
+
+/* WSOCK32.DLL at run time (Windows 95 without TCP/IP has none) */
+typedef int (PASCAL FAR *PFN_WSASTARTUP)(WORD, LPWSADATA);
+typedef int (PASCAL FAR *PFN_INT0)(void);
+typedef SOCKET (PASCAL FAR *PFN_SOCKET)(int, int, int);
+typedef int (PASCAL FAR *PFN_CLOSE)(SOCKET);
+typedef int (PASCAL FAR *PFN_CONNECT)(SOCKET, const struct sockaddr FAR *, int);
+typedef struct hostent FAR *(PASCAL FAR *PFN_GHBN)(const char FAR *);
+typedef int (PASCAL FAR *PFN_IOCTL)(SOCKET, long, u_long FAR *);
+typedef int (PASCAL FAR *PFN_RECV)(SOCKET, char FAR *, int, int);
+typedef int (PASCAL FAR *PFN_RECVFROM)(SOCKET, char FAR *, int, int, struct sockaddr FAR *, int FAR *);
+typedef int (PASCAL FAR *PFN_SELECT)(int, fd_set FAR *, fd_set FAR *, fd_set FAR *, const struct timeval FAR *);
+typedef int (PASCAL FAR *PFN_SEND)(SOCKET, const char FAR *, int, int);
+typedef int (PASCAL FAR *PFN_SENDTO)(SOCKET, const char FAR *, int, int, const struct sockaddr FAR *, int);
+typedef int (PASCAL FAR *PFN_SETSOCKOPT)(SOCKET, int, int, const char FAR *, int);
+static PFN_WSASTARTUP ws_startup;
+static PFN_INT0 ws_lasterror;
+static PFN_SOCKET ws_socket;
+static PFN_CLOSE ws_close;
+static PFN_CONNECT ws_connect;
+static PFN_GHBN ws_ghbn;
+static PFN_IOCTL ws_ioctl;
+static PFN_RECV ws_recv;
+static PFN_RECVFROM ws_recvfrom;
+static PFN_SELECT ws_select;
+static PFN_SEND ws_send;
+static PFN_SENDTO ws_sendto;
+static PFN_SETSOCKOPT ws_setsockopt;
+#define WSAStartup ws_startup
+#define WSAGetLastError ws_lasterror
+#define socket ws_socket
+#define closesocket ws_close
+#define connect ws_connect
+#define gethostbyname ws_ghbn
+#define ioctlsocket ws_ioctl
+#define recv ws_recv
+#define recvfrom ws_recvfrom
+#define select ws_select
+#define send ws_send
+#define sendto ws_sendto
+#define setsockopt ws_setsockopt
+#define htons(x) ((u_short)((((x) & 0xFF) << 8) | (((x) >> 8) & 0xFF)))
+#define ntohs(x) htons(x)
+#define inet_addr ip_addr
 
 #ifndef WM_MOUSEWHEEL
 #define WM_MOUSEWHEEL 0x020A
@@ -195,6 +249,52 @@ static PFN_PROC p_first, p_next;
 
 /* ------------------------------------------------------------------ */
 /* helpers without the C runtime                                       */
+/* dotted quad -> network order (INADDR_NONE when malformed) */
+static DWORD ip_addr(const char *p)
+{
+    DWORD v = 0, part;
+    int i;
+    for (i = 0; i < 4; i++) {
+        if (*p < '0' || *p > '9') return INADDR_NONE;
+        for (part = 0; *p >= '0' && *p <= '9'; p++) part = part * 10 + (DWORD)(*p - '0');
+        if (part > 255) return INADDR_NONE;
+        v |= part << (8 * i);
+        if (i < 3) { if (*p != '.') return INADDR_NONE; p++; }
+    }
+    return *p ? INADDR_NONE : v;
+}
+
+static int winsock_load(void)
+{
+    static int tried;
+    HMODULE w;
+    if (tried) return ws_socket != 0;
+    tried = 1;
+    w = LoadLibraryA("WSOCK32.DLL");
+    if (!w) return 0;
+    ws_startup = (PFN_WSASTARTUP)GetProcAddress(w, "WSAStartup");
+    ws_lasterror = (PFN_INT0)GetProcAddress(w, "WSAGetLastError");
+    ws_close = (PFN_CLOSE)GetProcAddress(w, "closesocket");
+    ws_connect = (PFN_CONNECT)GetProcAddress(w, "connect");
+    ws_ghbn = (PFN_GHBN)GetProcAddress(w, "gethostbyname");
+    ws_ioctl = (PFN_IOCTL)GetProcAddress(w, "ioctlsocket");
+    ws_recv = (PFN_RECV)GetProcAddress(w, "recv");
+    ws_recvfrom = (PFN_RECVFROM)GetProcAddress(w, "recvfrom");
+    ws_select = (PFN_SELECT)GetProcAddress(w, "select");
+    ws_send = (PFN_SEND)GetProcAddress(w, "send");
+    ws_sendto = (PFN_SENDTO)GetProcAddress(w, "sendto");
+    ws_setsockopt = (PFN_SETSOCKOPT)GetProcAddress(w, "setsockopt");
+    ws_socket = (PFN_SOCKET)GetProcAddress(w, "socket");
+    if (!ws_startup || !ws_lasterror || !ws_close || !ws_connect || !ws_ghbn || !ws_ioctl || !ws_recv ||
+        !ws_recvfrom || !ws_select || !ws_send || !ws_sendto || !ws_setsockopt || !ws_socket) {
+        ws_socket = 0;
+        return 0;
+    }
+    return 1;
+}
+
+static int is_nt;                   /* VER_PLATFORM_WIN32_NT: no Win16 DPMI tools */
+
 static void mset(void *d, int c, DWORD n)
 {
     volatile BYTE *p = (volatile BYTE *)d;
@@ -687,6 +787,7 @@ static void run_usosdbg(DWORD stats_pa)
         goto parse;
     }
     if (opt_nodbg) { o("[MOUSE] USOSDBG skipped (/nodbg)"); return; }
+    if (is_nt) { o("[MOUSE] USOSDBG skipped: Windows NT family (Win16 DPMI diagnostics are 9x only)"); return; }
     if (file_size(DBGEXE) == 0xFFFFFFFFUL) { o("[MOUSE] %s missing", (LPSTR)DBGEXE); return; }
     if (dbg_proc) {
         if (WaitForSingleObject(dbg_proc, 0) == WAIT_TIMEOUT) {
@@ -876,7 +977,7 @@ static void usns_print(const USNS *s, const char *source)
 static int usns_read_va(USNS *s)
 {
     const USNS *v = (const USNS *)stats_va;
-    if (!stats_va || IsBadReadPtr(v, sizeof(USNS))) return 0;
+    if (is_nt || !stats_va || IsBadReadPtr(v, sizeof(USNS))) return 0;
     if (v->Magic != USNS_MAGIC || v->Version != 1) return 0;
     mcpy(s, v, sizeof(USNS));
     return 1;
@@ -1296,6 +1397,7 @@ static void sec_tests(void)
     char t[20], cfg[256];
     int i;
     if (opt_nonet) { o("[NET] active tests skipped (/nonet)"); return; }
+    if (!winsock_load()) { o("[NET] WSOCK32.DLL not loadable (no TCP/IP installed?): tests skipped"); return; }
     if (!ws_ok) {
         int r = WSAStartup(0x0101, &wd);
         if (r) { o("[NET] WSAStartup error %d", r); return; }
@@ -1317,7 +1419,8 @@ static void sec_tests(void)
     o("[NET] gethostbyname(example.com): %s error %d after %lu ms", (LPSTR)(h ? "ok" : "FAILED"),
       h ? 0 : WSAGetLastError(), GetTickCount() - t0);
     /* configured servers: IPHLPAPI + MSTCP NameServer (comma / space list) */
-    if (reg_str(HKEY_LOCAL_MACHINE, "System\\CurrentControlSet\\Services\\VxD\\MSTCP", "NameServer", cfg, sizeof(cfg))) {
+    if (reg_str(HKEY_LOCAL_MACHINE, is_nt ? "System\\CurrentControlSet\\Services\\Tcpip\\Parameters" :
+                "System\\CurrentControlSet\\Services\\VxD\\MSTCP", "NameServer", cfg, sizeof(cfg))) {
         char *p = cfg;
         while (*p) {
             char one[20];
@@ -1381,6 +1484,12 @@ static void sec_net_config(void)
     o("[NET] adapters (Class\\Net):");
     find_usosnet(1);
     o("[NET] MSTCP / NetTrans / DHCP / proxy:");
+    if (is_nt) {
+        reg_dump(HKEY_LOCAL_MACHINE, "HKLM", "System\\CurrentControlSet\\Services\\Tcpip\\Parameters", 64);
+        reg_dump_sub(HKEY_LOCAL_MACHINE, "HKLM", "System\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces", 64, 16);
+        reg_dump(HKEY_CURRENT_USER, "HKCU", "Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings", 32);
+        return;
+    }
     reg_dump(HKEY_LOCAL_MACHINE, "HKLM", "System\\CurrentControlSet\\Services\\VxD\\MSTCP", 64);
     if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "System\\CurrentControlSet\\Services\\Class\\NetTrans", 0, KEY_READ, &k) == ERROR_SUCCESS) {
         for (i = 0; i < 32; i++) {
@@ -1581,6 +1690,12 @@ void __cdecl usos_entry(void)
     UINT timer;
     t_start = GetTickCount();
     parse_args();
+    {
+        OSVERSIONINFOA v;
+        mset(&v, 0, sizeof(v));
+        v.dwOSVersionInfoSize = sizeof(v);
+        if (GetVersionExA(&v)) is_nt = v.dwPlatformId == VER_PLATFORM_WIN32_NT;
+    }
     mutex = CreateMutexA(0, FALSE, "USOSLOG-instance");
     if (!opt_once && mutex && GetLastError() == ERROR_ALREADY_EXISTS) ExitProcess(0);
     InitializeCriticalSection(&ev_cs);

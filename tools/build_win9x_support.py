@@ -238,9 +238,10 @@ def build_usosdbg(out: Path, work: Path) -> Path:
     return exe
 
 
-OW_LIB386_NT = ('kernel32.lib', 'user32.lib', 'advapi32.lib', 'wsock32.lib')
-# What USOSLOG.EXE may import: present in the Windows 95 / 98 / Me system
-# DLLs (IPHLPAPI and Toolhelp32 are looked up at run time).
+OW_LIB386_NT = ('kernel32.lib', 'user32.lib', 'advapi32.lib')
+# What USOSLOG.EXE may import statically: the Windows 95 (4.00.950) subset,
+# also in 98 / Me / NT 4.0 and later. WSOCK32, IPHLPAPI and Toolhelp32 are
+# looked up at run time (missing on some installs / systems).
 USOSLOG_IMPORTS = {
     'kernel32.dll': {
         'CloseHandle', 'CreateDirectoryA', 'CreateFileA', 'CreateMutexA', 'CreateProcessA', 'CreateThread',
@@ -256,9 +257,6 @@ USOSLOG_IMPORTS = {
         'PostThreadMessageA', 'SetTimer', 'SetWindowsHookExA', 'SystemParametersInfoA', 'UnhookWindowsHookEx',
         'wsprintfA', 'wvsprintfA'},
     'advapi32.dll': {'RegCloseKey', 'RegEnumKeyExA', 'RegEnumValueA', 'RegOpenKeyExA', 'RegQueryValueExA'},
-    'wsock32.dll': {
-        'WSAGetLastError', 'WSAStartup', 'closesocket', 'connect', 'gethostbyname', 'htons', 'inet_addr',
-        'ioctlsocket', 'ntohs', 'recv', 'recvfrom', 'select', 'send', 'sendto', 'setsockopt', 'socket'},
 }
 
 

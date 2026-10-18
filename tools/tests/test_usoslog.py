@@ -104,6 +104,12 @@ class Sources(unittest.TestCase):
         self.assertIn('#define FALLBACK_IP "64.227.13.248"', log)
         self.assertIn('#define LOG_PORT    21843', log)
         self.assertNotIn('CreateWindow', log)             # no window of its own
+        # Windows 95 .. Me and NT: Winsock, IPHLPAPI, Toolhelp32 at run time only
+        self.assertNotIn('wsock32', lnk.lower())
+        for dll in ('"WSOCK32.DLL"', '"IPHLPAPI.DLL"', '"CreateToolhelp32Snapshot"'):
+            self.assertIn(dll, log)
+        self.assertIn('if (is_nt) { o("[MOUSE] USOSDBG skipped', log)
+        self.assertIn('if (is_nt || !stats_va', log)
 
 
 def build(tmp: Path) -> Path:
