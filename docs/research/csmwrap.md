@@ -878,3 +878,79 @@ contiguous clusters (FAT chain). An independent FAT16 walk of the image read all
 byte for byte.
 
 X470 with usos13: not tried. The in-place kit for the Me install on the Micron is `me-wheel-kit`.
+
+## 20. 3.1.2-usos14: USB mouse wheel diagnostics (0018) and more mouse shapes (0019) (2026-10-18)
+
+3.1.2-usos14 = 3.1.2-usos13 (0001-0010, 0012, 0014-0017, byte for byte) + 0018 + 0019. It is the new
+release pin (xp_csmwrap_esp.sh `PINNED`, release.go, lock.json, run_build_vm.py, third-party.json).
+
+Why: Windows Me on the X470 with usos13 (Micron, `me-wheel-kit`): the USB mouse moves and clicks, the
+wheel does nothing. The mouse is a Logitech G502 HERO (046D:C08B). Nothing showed whether SeaBIOS had
+taken the report protocol, whether the knock was answered with ID 3, or where the wheel was lost.
+
+**0018 diagnostics record** (own code). SeaBIOS keeps `usb_mouse_diag` in its low memory zone (VARLOW,
+16-byte aligned, 312 bytes, signature `USOS` `MWHL` written at setup, version 1). Per mouse (first 4):
+interface, wMaxPacketSize, report/boot protocol, a reason code, report ID, wDescriptorLength, the parsed
+X/Y/wheel/button layout. Also the first 160 bytes of the first mouse's report descriptor, the IntelliMouse
+ID and the last two sample rates, counters (packets, packets with a nonzero wheel, skipped packets of
+other report IDs) and the last raw packet. `hid_parse_mouse` returns `USB_MD_*` codes instead of -1; every
+decision is the same as in 0016. The record is only written. USOSDBG.EXE 1.4 finds it by scanning
+80000h-FFFFFh in 16-byte steps and shows it in its `WHEEL` lines (docs/win9x-modern-2026-09-30.md 4j).
+
+**0019 more mouse shapes** (own code, generic, no VID/PID logic):
+
+- Report IDs present: input reports of other IDs longer than one packet no longer refuse the mouse.
+  A packet that starts with such an ID is skipped with its (packets - 1) continuation packets, counted
+  from the report length (up to 4 such IDs, up to 127 packets). The mouse report itself must still fit
+  one packet. Without report IDs a longer report is still refused (nothing tells the reports apart).
+- Zero-length packets: a report that fills its last packet exactly may be ended by a ZLP. The xHCI
+  driver then copies its unchanged buffer, so the ZLP reads as the last continuation packet again. After
+  such a report, a byte-identical next packet of the same mouse is skipped (USB_MOUSE_ZLP flag). A real
+  mouse packet equal to a vendor continuation packet is the only false skip.
+- Report descriptors up to 4096 bytes (was 1024), up to 16 input report IDs (was 8).
+- usb.c: when a device's first boot HID interface is a keyboard (wireless receivers, keyboards with a
+  pointing device), the first later boot mouse interface (alternate setting 0) is set up too, with a copy
+  of the device record (same default pipe and address; xHCI endpoint contexts are per endpoint, as for
+  UAS). Keyboards are set up exactly as before. A second keyboard interface is never added (usb-hid.c has
+  one key state). The device counts as configured when the keyboard or that mouse was set up. This
+  closes the "combo receiver gets no BIOS mouse" limit of section 19.
+
+Review of the drafts: 0018 unchanged apart from being split from 0019; 0019 got the ZLP skip, the
+127-packet bound, the per-mouse `maxpacket` and the usb.c part.
+
+Shapes (host test, `test_csmwrap_wheel_diag.py`; only the QEMU descriptor is a byte copy of a published
+one, the others are written to the layouts these families are reported to use, no device dump was found):
+accepted: QEMU usb-mouse; Logitech HERO wired (G502 HERO layout: 16 buttons, 16-bit X/Y, wheel, AC Pan,
+no report ID, 8-byte packets; usos13 already accepts it); Logitech receiver mouse ID 2 with 12-bit X/Y plus
+consumer and system reports; the same with 16-bit X/Y on a 16-byte endpoint; Razer-style 5 buttons 16-bit;
+SteelSeries-style ID 1 with a usage range and vendor feature reports; Microsoft basic; Microsoft Resolution
+Multiplier with Push/Pop and AC Pan; generic 3-button wheel; gaming composite (mouse, consumer, keyboard)
+with a 32-byte vendor input report on 8-byte packets, or a 64-byte one on 16-byte packets (ZLP case).
+Refused (boot protocol, reason code): 9-byte mouse report on an 8-byte endpoint (-7), long report without
+report IDs (-7), wheel in another report than X (-10), absolute X/Y (-8), no wheel (-10), truncated (-1),
+nested Push (-3), Pop without Push (-4), 17 input report IDs (-5). Not handled at all (upstream limit):
+wMaxPacketSize over 16 (no BIOS mouse).
+
+Layout (build log): **ROM 120224 of 131072 bytes (91.7 %, 10848 free)**; F-segment 16-bit 36512 + 32-bit
+segmented 4118 + variables 3328 = 43958 bytes, **21578 bytes** allocation zone (6144 minimum kept); low
+memory 2512; 32-bit flat 28522, flat init 42080.
+
+Binary `12d05612dc647c9c6b387157e15343ae1c7c34bd501f74c6f789566744b93ffe`, the same in two pinned Alpine VM
+runs (each with its in-guest repeat build); the unpatched build still matches `upstream_rebuild`.
+
+Tests:
+
+- `test_csmwrap_wheel_diag.py`: the archive + 0016 + 0018 + 0019 on the host (zig cc, UBSan): the shapes
+  above, decoding (G502 layout, receiver ID filter), long-report skipping (also a continuation packet that
+  starts with the mouse ID), the ZLP replay, the record layout against USOSDBG.EXE's `MDIAG` (1-, 2- and
+  4-byte packing), every reason code named in USOSDBG, the usb.c interface walk (receiver, vendor
+  interface first, keyboard only, second keyboard, non-boot or alternate mouse, bNumInterfaces bound,
+  truncated), wiring (keyboard functions identical to upstream, the HID branch of configure_usb_device the
+  only usb.c change), series and pins. `test_csmwrap_wheel.py` (0016) still PASS.
+- QEMU with usos14 (2026-10-18): `run_csmwrap_boot_disk_qemu.py` all 7 layouts and `--only` PASS;
+  `run_csmwrap_apmoff_qemu.py` PASS; `run_csmwrap_pciirq_qemu.py` pc + q35 PASS, key-off output identical
+  to usos13; `run_dos_mouse_probe.py --csmwrap <usos14> --wheel` session and `--mode dosmouse` PASS (wheel
+  API 574Dh, caps 1, sums -3 / +2; the dosmouse mode types through QEMU usb-kbd). QEMU has no composite
+  keyboard+mouse HID device, so the usb.c part is host-tested only.
+
+X470 with usos14: not tried. The in-place kit for the Me install on the Micron is `me-wheel-kit-v2`.

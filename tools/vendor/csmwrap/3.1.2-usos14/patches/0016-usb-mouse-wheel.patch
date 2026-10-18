@@ -1,0 +1,488 @@
+USOS CSMWrap patch 0016 (2026-10-18): USB mouse wheel (IntelliMouse emulation)
+
+SeaBIOS serves a USB mouse as the BIOS PS/2 pointing device (INT 15h
+C2xxh) in the HID boot protocol: 3-byte packets, no wheel. With this patch:
+- usb_mouse_setup reads the interface's HID report descriptor (GET_DESCRIPTOR
+  0x22, buffer zeroed first) and walks it minimally (buttons 1-3, relative
+  X/Y, relative wheel 0x01:0x38 of the report that has X; report IDs; fields
+  up to 16 bits; one Push level). With a wheel found, and every input report
+  of the interface no longer than one interrupt packet, it switches the
+  mouse to the report protocol and decodes that layout; packets of other
+  report IDs (consumer, keyboard macro reports of gaming mice) are ignored.
+  Otherwise (no wheel, nested Push, long items, a longer report, any error)
+  it stays in the boot protocol exactly as before. SET_PROTOCOL is per
+  interface; SeaBIOS uses only the first boot HID interface of a device,
+  keyboards stay in the boot protocol unchanged.
+- PS/2 IntelliMouse emulation: sample rates 200, 100, 80 (INT 15h C202h)
+  switch the device ID to 3 (only when a wheel mouse is present); C204h
+  returns the device ID (was 0AAh, the BAT code, for USB mice); C201h /
+  C205h reset it to 0.
+- C205h accepts package sizes 1..7 (was 3 only). Package size 3: three bytes
+  as before; after the knock the wheel byte (IntelliMouse sign: up is
+  negative) is passed in the handler's Z word (always 0 before). Package
+  size 4..7: status, X, Y, wheel (0 without the knock), zero padding; the
+  handler's Z word is the 4th byte. Package size 1/2: a byte stream of 3
+  bytes, 4 after the knock (VBADOS VBMOUSE "streaming" mode).
+- USB mice with wMaxPacketSize 9..16 are accepted (were refused).
+Clients that never send the knock see the old behaviour (3-byte packets,
+Z = 0). Consumers: USOSKEY.COM/USOSKEY.DRV ring + USOSMOUS.DRV (Windows
+98/98 SE/Me WM_MOUSEWHEEL), VBADOS VBMOUSE.EXE 0.67 unmodified (INT 33h
+wheel API in DOS).
+
+Own code (HID 1.11 report descriptor format, IBM PS/2 BIOS C2xxh and the
+public IntelliMouse PS/2 knock). Applies after 0001-0010, 0012, 0014, 0015
+(no common file), patch -p1 from the top of the tree. Part of a MODIFIED
+CSMWrap made by the USOS project (SeaBIOS LGPLv3).
+
+diff -ruN a/seabios/src/hw/usb-hid.c b/seabios/src/hw/usb-hid.c
+--- a/seabios/src/hw/usb-hid.c
++++ b/seabios/src/hw/usb-hid.c
+@@ -12,6 +12,7 @@
+ #include "ps2port.h" // ATKBD_CMD_GETID
+ #include "usb.h" // usb_ctrlrequest
+ #include "usb-hid.h" // usb_keyboard_setup
++#include "string.h" // memset
+ #include "util.h" // process_key
+ 
+ struct pipe_node {
+@@ -20,7 +21,28 @@
+ };
+ 
+ struct pipe_node *keyboards VARFSEG = NULL;
+-struct pipe_node *mice VARFSEG = NULL;
++
++// USOS (usb-mouse-wheel): a mouse is read either in the boot protocol
++// (3 bytes: buttons, X, Y) or, when its HID report descriptor has a
++// relative wheel, in the report protocol with the field layout parsed at
++// setup. Bit offsets count from the first byte after the report ID.
++// Field slots: 0 X, 1 Y, 2 wheel, 3..5 buttons 1-3; size 0 = absent.
++struct hid_loc { u8 off, size, sgn; };
++
++struct mouse_node {
++    struct usb_pipe *pipe;
++    struct mouse_node *next;
++    u8 report;          // 1 = report protocol (layout below), 0 = boot
++    u8 report_id;       // 0 = the device uses no report IDs
++    struct hid_loc loc[6];
++};
++
++struct mouse_node *mice VARFSEG = NULL;
++// Any mouse with a wheel: only then the IntelliMouse knock answers ID 3.
++u8 usb_mouse_wheel VARFSEG;
++// IntelliMouse emulation (16-bit runtime state): last two sample rates
++// and the device ID (0 standard PS/2 mouse, 3 IntelliMouse with wheel).
++u8 usb_mouse_rate1 VARLOW, usb_mouse_rate2 VARLOW, usb_mouse_id VARLOW;
+ 
+ static int
+ add_pipe_node(struct pipe_node **list
+@@ -124,7 +146,142 @@
+     u8 x, y;
+ };
+ 
+-#define MAX_MOUSE_EVENT 8
++#define MAX_MOUSE_EVENT 16
++#define MAX_REPORT_DESC 1024
++
++// Minimal HID report descriptor walk (HID 1.11 6.2.2): finds buttons 1-3,
++// X, Y (relative) and the wheel (Generic Desktop 0x38, relative) of the
++// report that has X. One Push level is kept; nested Push, Pop without Push,
++// long items and any input report longer than one packet end the walk (the
++// mouse then stays in the boot protocol). Returns 0 with a usable layout.
++static int
++hid_parse_mouse(u8 *d, int len, struct mouse_node *m, int maxbits)
++{
++    u32 page = 0, usage[8], umin = 0, umax = 0, offs[8], saved[5];
++    int nu = 0, range = 0, rsize = 0, rcount = 0, lneg = 0, id = 0;
++    int has_ids = 0, nids = 0, pushed = 0, i;
++    u8 ids[8], fid[6] = { 0 };
++    u8 *end = d + len;
++    while (d < end) {
++        u8 p = *d++;
++        int sz = (p & 3) == 3 ? 4 : p & 3;
++        if (p == 0xfe || d + sz > end)
++            return -1;                          // long item, truncated
++        u32 v = 0;
++        for (i = sz; i--; )
++            v = (v << 8) | d[i];
++        d += sz;
++        if ((p & 0x0c) == 0x08 && sz < 4)
++            v |= page << 16;                    // local usage: add the page
++        switch (p & 0xfc) {
++        case 0x04: page = v; break;
++        case 0x14: lneg = sz && (d[-1] & 0x80); break;
++        case 0x74: rsize = v; break;
++        case 0x84:
++            if (!v || v > 255)
++                return -1;
++            id = v; has_ids = 1; break;
++        case 0x94: rcount = v; break;
++        case 0xa4:                              // push (one level)
++            if (pushed)
++                return -1;
++            saved[0] = page; saved[1] = lneg; saved[2] = rsize;
++            saved[3] = rcount; saved[4] = id;
++            pushed = 1;
++            break;
++        case 0xb4:                              // pop
++            if (!pushed)
++                return -1;
++            page = saved[0]; lneg = saved[1]; rsize = saved[2];
++            rcount = saved[3]; id = saved[4];
++            pushed = 0;
++            break;
++        case 0x08: if (nu < ARRAY_SIZE(usage)) usage[nu++] = v; break;
++        case 0x18: umin = v; range = 1; break;
++        case 0x28: umax = v; range = 1; break;
++        case 0x80: {                            // Input
++            int slot;
++            for (slot = 0; slot < nids && ids[slot] != id; slot++)
++                ;
++            if (slot == nids) {
++                if (nids >= ARRAY_SIZE(ids))
++                    return -1;
++                ids[nids] = id;
++                offs[nids++] = 0;
++            }
++            if (rsize > 32 || rcount > 255)
++                return -1;
++            for (i = 0; i < rcount && (v & 3) == 2; i++) {   // data, variable
++                u32 u = range ? (umin + i <= umax ? umin + i : umax)
++                    : nu ? usage[i < nu ? i : nu - 1] : 0;
++                int w = u == 0x10030 ? 0 : u == 0x10031 ? 1 : u == 0x10038 ? 2
++                    : u - 0x90001 < 3 ? 3 + u - 0x90001 : -1;
++                u32 off = offs[slot] + i * rsize;
++                if (w < 0 || (w < 3 && !(v & 4)) || m->loc[w].size
++                    || !rsize || rsize > 16 || off + rsize > 248)
++                    continue;
++                m->loc[w].off = off;
++                m->loc[w].size = rsize;
++                m->loc[w].sgn = lneg;
++                fid[w] = id;
++            }
++            offs[slot] += rcount * rsize;
++            nu = range = umin = umax = 0;
++            break;
++        }
++        case 0x90: case 0xa0: case 0xb0: case 0xc0:  // other main items
++            nu = range = umin = umax = 0;
++            break;
++        }
++    }
++    for (i = 1; i < 6; i++)
++        if (fid[i] != fid[0])
++            m->loc[i].size = 0;
++    // Every input report (all IDs) must fit in one interrupt packet, so
++    // each packet starts a report and its first byte is the report ID.
++    for (i = 0; i < nids; i++)
++        if ((has_ids ? 8 : 0) + offs[i] > maxbits)
++            return -1;
++    if (!m->loc[0].size || !m->loc[1].size || !m->loc[2].size
++        || !m->loc[3].size || (has_ids && !fid[0]))
++        return -1;
++    m->report_id = has_ids ? fid[0] : 0;
++    return 0;
++}
++
++// Read the interface's HID report descriptor and parse it.
++static int
++usb_mouse_layout(struct usbdevice_s *usbdev, struct mouse_node *m, int maxpacket)
++{
++    struct usb_interface_descriptor *iface = usbdev->iface;
++    u8 *p = (void*)iface + iface->bLength, *end = (void*)iface + usbdev->imax;
++    int rlen = 0;
++    while (p + 2 <= end && p[0] >= 2 && p + p[0] <= end
++           && p[1] != USB_DT_INTERFACE) {
++        if (p[1] == 0x21 && p[0] >= 9 && p[6] == 0x22) {
++            rlen = p[7] | (p[8] << 8);
++            break;
++        }
++        p += p[0];
++    }
++    if (rlen <= 0 || rlen > MAX_REPORT_DESC)
++        return -1;
++    u8 *desc = malloc_tmphigh(rlen);
++    if (!desc)
++        return -1;
++    memset(desc, 0, rlen);                      // a short answer reads as 0
++    struct usb_ctrlrequest req;
++    req.bRequestType = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_INTERFACE;
++    req.bRequest = USB_REQ_GET_DESCRIPTOR;
++    req.wValue = 0x22 << 8;
++    req.wIndex = iface->bInterfaceNumber;
++    req.wLength = rlen;
++    int ret = usb_send_default_control(usbdev->defpipe, &req, desc);
++    if (!ret)
++        ret = hid_parse_mouse(desc, rlen, m, maxpacket * 8);
++    free(desc);
++    return ret;
++}
+ 
+ static int
+ usb_mouse_setup(struct usbdevice_s *usbdev
+@@ -140,12 +297,36 @@
+         return -1;
+     }
+ 
+-    // Enable "boot" protocol.
+-    if (set_protocol(usbdev->defpipe, 0, usbdev->iface->bInterfaceNumber))
++    struct mouse_node *m = malloc_fseg(sizeof(*m));
++    if (!m) {
++        warn_noalloc();
+         return -1;
++    }
++    memset(m, 0, sizeof(*m));
++    u16 ifnum = usbdev->iface->bInterfaceNumber;
++
++    // A wheel in the report descriptor: report protocol, else "boot".
++    if (!usb_mouse_layout(usbdev, m, epdesc->wMaxPacketSize)
++        && !set_protocol(usbdev->defpipe, 1, ifnum)) {
++        m->report = 1;
++    } else {
++        m->report = 0;
++        // Enable "boot" protocol.
++        if (set_protocol(usbdev->defpipe, 0, ifnum)) {
++            free(m);
++            return -1;
++        }
++    }
+ 
+-    if (add_pipe_node(&mice, usbdev, epdesc))
++    m->pipe = usb_alloc_pipe(usbdev, epdesc);
++    if (!m->pipe) {
++        free(m);
+         return -1;
++    }
++    if (m->report)
++        usb_mouse_wheel = 1;
++    m->next = mice;
++    mice = m;
+ 
+     dprintf(1, "USB mouse initialized\n");
+     return 0;
+@@ -392,18 +573,60 @@
+  * Mouse events
+  ****************************************************************/
+ 
++// A field of a report (bit offset from the start of the data).
++static s32
++hid_bits(u8 *data, int off, int size, int sgn)
++{
++    u32 v = 0;
++    int i;
++    for (i = 0; i < size; i++, off++)
++        if (data[off >> 3] & (1 << (off & 7)))
++            v |= (u32)1 << i;
++    if (sgn && size && size < 32 && (v & ((u32)1 << (size - 1))))
++        v |= ~(u32)0 << size;
++    return v;
++}
++
++static int
++clamp127(s32 v)
++{
++    return v > 127 ? 127 : (v < -127 ? -127 : v);
++}
++
+ // Process USB mouse data.
+ static void
+-handle_mouse(struct mouseevent *data)
++handle_mouse(struct mouse_node *node, u8 *data)
+ {
+-    dprintf(9, "Got mouse b=%x x=%x y=%x\n", data->buttons, data->x, data->y);
+-
+-    s8 x = data->x, y = -data->y;
+-    u8 flag = ((data->buttons & 0x7) | (1<<3)
++    u8 buttons;
++    s8 x, y, z = 0;
++    if (!GET_GLOBALFLAT(node->report)) {
++        dprintf(9, "Got mouse b=%x x=%x y=%x\n", data[0], data[1], data[2]);
++        buttons = data[0];
++        x = data[1];
++        y = -(s8)data[2];
++    } else {
++        u8 rid = GET_GLOBALFLAT(node->report_id);
++        if (rid) {
++            if (data[0] != rid)
++                return;                         // another report of the device
++            data++;
++        }
++        int i, val[6];
++        for (i = 0; i < 6; i++) {
++            struct hid_loc *l = &node->loc[i];
++            u8 size = GET_GLOBALFLAT(l->size);
++            val[i] = size ? clamp127(hid_bits(data, GET_GLOBALFLAT(l->off), size
++                                              , GET_GLOBALFLAT(l->sgn))) : 0;
++        }
++        x = val[0];
++        y = -val[1];
++        // HID: wheel up is positive; IntelliMouse PS/2: up is negative.
++        z = -val[2];
++        buttons = (val[3] != 0) | ((val[4] != 0) << 1) | ((val[5] != 0) << 2);
++    }
++    u8 flag = ((buttons & 0x7) | (1<<3)
+                | (x & 0x80 ? (1<<4) : 0) | (y & 0x80 ? (1<<5) : 0));
+-    process_mouse(flag);
+-    process_mouse(x);
+-    process_mouse(y);
++    process_mouse_packet(flag, x, y, z, GET_LOW(usb_mouse_id) == 3);
+ }
+ 
+ // Check if a USB mouse event is pending and process it if so.
+@@ -413,7 +636,7 @@
+     if (! CONFIG_USB_MOUSE)
+         return;
+ 
+-    for (struct pipe_node *node = GET_GLOBAL(mice);
++    for (struct mouse_node *node = GET_GLOBAL(mice);
+          node;
+          node = GET_GLOBALFLAT(node->next)) {
+         struct usb_pipe *pipe = GET_GLOBALFLAT(node->pipe);
+@@ -423,7 +646,7 @@
+             int ret = usb_poll_intr(pipe, data);
+             if (ret)
+                 break;
+-            handle_mouse((void*)data);
++            handle_mouse(node, data);
+         }
+     }
+ }
+@@ -451,16 +674,30 @@
+     case PSMOUSE_CMD_SETSCALE11:
+         return 0;
+     case PSMOUSE_CMD_SETSCALE21:
+-    case PSMOUSE_CMD_SETRATE:
+     case PSMOUSE_CMD_SETRES:
+         // XXX
+         return 0;
++    case PSMOUSE_CMD_SETRATE:
++        // IntelliMouse knock: sample rates 200, 100, 80 switch a wheel
++        // mouse to device ID 3 (4-byte packets, wheel in the 4th byte).
++        if (GET_GLOBAL(usb_mouse_wheel) && GET_LOW(usb_mouse_rate1) == 200
++            && GET_LOW(usb_mouse_rate2) == 100 && param[0] == 80)
++            SET_LOW(usb_mouse_id, 3);
++        SET_LOW(usb_mouse_rate1, GET_LOW(usb_mouse_rate2));
++        SET_LOW(usb_mouse_rate2, param[0]);
++        return 0;
+     case PSMOUSE_CMD_RESET_BAT:
+-    case PSMOUSE_CMD_GETID:
+-        // Return the id of a standard AT mouse.
++        // Self test passed, id of a standard AT mouse.
++        SET_LOW(usb_mouse_id, 0);
++        SET_LOW(usb_mouse_rate1, 0);
++        SET_LOW(usb_mouse_rate2, 0);
+         param[0] = 0xaa;
+         param[1] = 0x00;
+         return 0;
++    case PSMOUSE_CMD_GETID:
++        // 0 = standard PS/2 mouse, 3 = IntelliMouse (after the knock).
++        param[0] = GET_LOW(usb_mouse_id);
++        return 0;
+ 
+     case PSMOUSE_CMD_GETINFO:
+         param[0] = 0x00;
+diff -ruN a/seabios/src/mouse.c b/seabios/src/mouse.c
+--- a/seabios/src/mouse.c
++++ b/seabios/src/mouse.c
+@@ -155,7 +155,9 @@
+ static void
+ mouse_15c205(struct bregs *regs)
+ {
+-    if (regs->bh != 3) {
++    // BH = package size, 1 to 7 bytes (1: every byte on its own, as used
++    // by DOS drivers that read IntelliMouse 4-byte packets).
++    if (regs->bh < 1 || regs->bh > 7) {
+         set_code_invalid(regs, RET_EINTERFACE);
+         return;
+     }
+@@ -274,6 +276,10 @@
+     }
+ }
+ 
++// USOS (usb-mouse-wheel): the wheel byte of an IntelliMouse packet while
++// the handler takes 3-byte packages; passed in the handler's Z word.
++u8 mouse_extra_z VARLOW;
++
+ void VISIBLE16
+ invoke_mouse_handler(void)
+ {
+@@ -288,6 +294,12 @@
+     u16 status = GET_EBDA(ebda_seg, mouse_data[0]);
+     u16 X      = GET_EBDA(ebda_seg, mouse_data[1]);
+     u16 Y      = GET_EBDA(ebda_seg, mouse_data[2]);
++    u16 Z;
++    if ((GET_EBDA(ebda_seg, mouse_flag2) & 0x07) >= 4)
++        Z = GET_EBDA(ebda_seg, mouse_data[3]);
++    else
++        Z = GET_LOW(mouse_extra_z);
++    SET_LOW(mouse_extra_z, 0);
+ 
+     struct segoff_s func = GET_EBDA(ebda_seg, far_call_pointer);
+     dprintf(16, "mouse farcall s=%04x x=%04x y=%04x func=%04x:%04x\n"
+@@ -301,16 +313,16 @@
+         "pushw %w1\n"  // status
+         "pushw %w2\n"  // X
+         "pushw %w3\n"  // Y
+-        "pushw $0\n"   // Z
++        "pushw %w4\n"  // Z
+         "lcallw *8(%%esp)\n"
+         "addl $12, %%esp\n"
+ 
+         "cli\n"
+         "cld\n"
+         "popl %%ebp"
+-        : "+a"(func.segoff), "+c"(status), "+d"(X), "+b"(Y)
++        : "+a"(func.segoff), "+c"(status), "+d"(X), "+b"(Y), "+S"(Z)
+         :
+-        : "edi", "esi", "cc", "memory");
++        : "edi", "cc", "memory");
+ }
+ 
+ void
+@@ -340,3 +352,36 @@
+     SET_EBDA(ebda_seg, mouse_flag1, 0);
+     invoke_mouse_handler();
+ }
++
++// USOS (usb-mouse-wheel): one packet from the USB mouse. imps2: the client
++// sent the IntelliMouse knock (device ID 3) and expects the wheel byte.
++// Package size 3: three bytes, the wheel goes in the handler's Z word;
++// package size 4..7: the 4th byte is the wheel (0 without the knock), the
++// rest zero; package size 1 or 2: a byte stream of 3 or (imps2) 4 bytes.
++void
++process_mouse_packet(u8 flag, u8 x, u8 y, u8 z, int imps2)
++{
++    if (!CONFIG_MOUSE)
++        return;
++    u16 ebda_seg = get_ebda_seg();
++    u8 mouse_flags_2 = GET_EBDA(ebda_seg, mouse_flag2);
++    if (! (mouse_flags_2 & 0x80))
++        return;
++    u8 package_count = mouse_flags_2 & 0x07;
++    if (package_count == 3 && imps2)
++        SET_LOW(mouse_extra_z, z);
++    process_mouse(flag);
++    process_mouse(x);
++    process_mouse(y);
++    if (package_count == 3)
++        return;
++    if (package_count < 3) {
++        if (imps2)
++            process_mouse(z);
++        return;
++    }
++    process_mouse(imps2 ? z : 0);
++    int i;
++    for (i = 4; i < package_count; i++)
++        process_mouse(0);
++}
+diff -ruN a/seabios/src/util.h b/seabios/src/util.h
+--- a/seabios/src/util.h
++++ b/seabios/src/util.h
+@@ -240,6 +240,7 @@
+ // mouse.c
+ void mouse_init(void);
+ void process_mouse(u8 data);
++void process_mouse_packet(u8 flag, u8 x, u8 y, u8 z, int imps2);
+ 
+ // optionroms.c
+ struct rom_header;

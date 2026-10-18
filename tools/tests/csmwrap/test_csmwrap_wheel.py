@@ -16,8 +16,8 @@
    IntelliMouse knock.
 2. Wiring: the keyboard path is untouched; the knock answers ID 3 only with
    a wheel mouse; C201h resets it; C204h returns it; the handler's Z word.
-3. Series and pins: usos13 = usos12 byte for byte + 0016 + 0017; manifest,
-   lock.json, xp_csmwrap_esp.sh PINNED, release.go, run_build_vm.py count.
+3. Series: usos13 = usos12 byte for byte + 0016 + 0017; manifest; the
+   release pins are usos14 now (same 0016/0017 files, test_csmwrap_wheel_diag.py).
 """
 from __future__ import annotations
 
@@ -307,13 +307,9 @@ def pins() -> None:
     assert manifest["patches"] == {n: sha(V13 / "patches" / n) for n in names}
     for name, digest in manifest["files"].items():
         assert sha(V13 / name) == digest, name
-    lock = json.loads((ROOT / "tools/csmwrap_build/lock.json").read_text(encoding="utf-8"))
-    assert lock["usos_version"] == "3.1.2-usos13"
-    assert f"PINNED={manifest['files']['csmwrapx64.efi']}\n" in (ROOT / "tools/xp_csmwrap_esp.sh").read_text(encoding="utf-8")
-    assert 'csmwrapVendorDir  = "tools/vendor/csmwrap/3.1.2-usos13"' in (
-        ROOT / "installer/cmd/usos-efisign/release.go").read_text(encoding="utf-8")
-    vm = (ROOT / "tools/csmwrap_build/run_build_vm.py").read_text(encoding="utf-8")
-    assert "3.1.2-usos13/patches" in vm and "len(patches) != 15" in vm
+    # the release pins moved to 3.1.2-usos14 (same 0016/0017 files, test_csmwrap_wheel_diag.py)
+    for n in (PATCH.name, CONFIG.name):
+        assert sha(ROOT / "tools/vendor/csmwrap/3.1.2-usos14/patches" / n) == sha(V13 / "patches" / n), n
     efi = (V13 / "csmwrapx64.efi").read_bytes()
     assert efi[:2] == b"MZ" and b"3.1.2-usos13" in efi and b"pci_irq_routing" in efi
 
