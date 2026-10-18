@@ -46,7 +46,11 @@
  * and has no WINSTART.BAT) the driver installs the TSR's resident part
  * itself: a copy in DOS memory (GlobalDosAlloc) with INT 08h/09h/15h/1Ch/2Fh
  * hooked in the system VM's real-mode vector table (DPMI 0200h/0201h); the
- * vectors are restored when the driver is freed.
+ * vectors are restored when the driver is freed. With mouse.drv=usosmous.drv
+ * USOSMOUS.DRV has done that already (USER asks the mouse driver before it
+ * loads drivers=); this driver then finds its copy (usos_resident.h). On Me
+ * (no TSR) it also keeps SYSTEM.INI [boot] mouse.drv=usosmous.drv while
+ * SYSTEM\USOSMOUS.DRV exists, as U9FIX /CSM does on 95/98 (next start).
  * No OpenWatcom runtime is linked (own entry point, -zl): the binary is only
  * this file plus import records. docs/design/bios-via-csmwrap.md.
  */
@@ -248,65 +252,7 @@ void __declspec(naked) __far poll(void)
     }
 }
 
-#define TSR_HOOKS 6
-static const BYTE tsr_ints[TSR_HOOKS] = { 0x08, 0x09, 0x15, 0x16, 0x1C, 0x2F };
-static const WORD tsr_handler[TSR_HOOKS] = { TSR_INT08, TSR_INT09, TSR_INT15, TSR_INT16, TSR_INT1C, TSR_INT2F };
-static const WORD tsr_old_slot[TSR_HOOKS] = { TSR_OLD08, TSR_OLD09, TSR_OLD15, TSR_OLD16, TSR_OLD1C, TSR_OLD2F };
-static DWORD tsr_mem;               /* GlobalDosAlloc: segment:selector */
-
-static DWORD get_rm_vector(BYTE n)
-{
-    WORD s = 0, o = 0;
-    _asm {
-        mov ax, 0200h
-        mov bl, n
-        int 31h
-        mov s, cx
-        mov o, dx
-    }
-    return ((DWORD)s << 16) | o;
-}
-
-static void set_rm_vector(BYTE n, DWORD v)
-{
-    WORD s = HIWORD(v), o = LOWORD(v);
-    _asm {
-        mov ax, 0201h
-        mov bl, n
-        mov cx, s
-        mov dx, o
-        int 31h
-    }
-}
-
-/* The TSR's resident part at offset 0100h of a DOS block, as if loaded. */
-static void install_resident(void)
-{
-    BYTE FAR *p;
-    WORD i, seg;
-    tsr_mem = GlobalDosAlloc(0x100 + sizeof(tsr_image));
-    if (!tsr_mem) return;
-    seg = HIWORD(tsr_mem);
-    p = (BYTE FAR *)MAKELP(LOWORD(tsr_mem), 0);
-    for (i = 0; i < sizeof(tsr_image); i++) p[0x100 + i] = tsr_image[i];
-    for (i = 0; i < TSR_HOOKS; i++) *(DWORD FAR *)(p + tsr_old_slot[i]) = get_rm_vector(tsr_ints[i]);
-    _asm cli
-    for (i = 0; i < TSR_HOOKS; i++) set_rm_vector(tsr_ints[i], ((DWORD)seg << 16) | tsr_handler[i]);
-    _asm sti
-}
-
-static void remove_resident(void)
-{
-    BYTE FAR *p;
-    WORD i, seg;
-    if (!tsr_mem) return;
-    seg = HIWORD(tsr_mem);
-    p = (BYTE FAR *)MAKELP(LOWORD(tsr_mem), 0);
-    /* Only vectors that still point at the copy go back. */
-    for (i = 0; i < TSR_HOOKS; i++)
-        if (get_rm_vector(tsr_ints[i]) == (((DWORD)seg << 16) | tsr_handler[i]))
-            set_rm_vector(tsr_ints[i], *(DWORD FAR *)(p + tsr_old_slot[i]));
-}
+#include "usos_resident.h"         /* install_resident / remove_resident */
 
 static int query_bridge(void)
 {
@@ -334,6 +280,40 @@ static int query_bridge(void)
     SetSelectorLimit(shared_sel, 0xFFFFL);
     shared = (SHARED FAR *)MAKELP(shared_sel, roff);
     return shared->magic[0] == 'U' && shared->magic[1] == 'S' && shared->magic[2] == 'K' && shared->magic[3] == 'Y';
+}
+
+/* "vmouse" anywhere in a lower-case SYSTEM.INI value. */
+static int has_vmouse(const char *v)
+{
+    for (; *v; v++)
+        if (v[0] == 'v' && v[1] == 'm' && v[2] == 'o' && v[3] == 'u' && v[4] == 's' && v[5] == 'e')
+            return 1;
+    return 0;
+}
+
+/* Bridge from Windows (no USOSKEY.COM, i.e. Me): nothing runs U9FIX /CSM
+ * at the start, so this driver keeps SYSTEM.INI [boot]
+ * mouse.drv=usosmous.drv and drops a [386Enh] mouse=*vmouse line (next to
+ * SeaBIOS's BIOS mouse it stopped the X470 in VPICD) while
+ * SYSTEM\USOSMOUS.DRV exists, as U9FIX /CSM does on 95/98. Setup's device
+ * detection may write mouse.drv=mouse.drv again; the fix applies from the
+ * next start. Task time (DRV_LOAD), never from the timer. */
+static void keep_mouse_ini(void)
+{
+    static char path[160], value[64];
+    OFSTRUCT of;
+    UINT n = GetSystemDirectory(path, sizeof(path) - 16);
+    if (!n || n >= sizeof(path) - 16) return;
+    if (path[n - 1] != '\\') path[n++] = '\\';
+    lstrcpy(path + n, "USOSMOUS.DRV");
+    if (OpenFile(path, &of, OF_EXIST) == HFILE_ERROR) return;
+    GetPrivateProfileString("boot", "mouse.drv", "", value, sizeof(value), "SYSTEM.INI");
+    if (lstrcmpi(value, "usosmous.drv"))
+        WritePrivateProfileString("boot", "mouse.drv", "usosmous.drv", "SYSTEM.INI");
+    GetPrivateProfileString("386Enh", "mouse", "", value, sizeof(value), "SYSTEM.INI");
+    AnsiLower(value);
+    if (has_vmouse(value))
+        WritePrivateProfileString("386Enh", "mouse", NULL, "SYSTEM.INI");
 }
 
 static int find_bridge(void)
@@ -369,6 +349,7 @@ static int init(void)
     BYTE code;
     if (shared) return 1;
     if (!find_bridge()) return 0;
+    if (shared->pad == RESIDENT_FROM_WINDOWS) keep_mouse_ini();
     user = GetModuleHandle("USER");
     keyboard = GetModuleHandle("KEYBOARD");
     system = GetModuleHandle("SYSTEM");

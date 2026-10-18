@@ -345,10 +345,36 @@ on the Kingston is still empty, copy it there before the X470 run).
 * **Keyboard**: no TSR on Me, USOSKEY.DRV installs its own resident copy; that copy is the whole USOSKEY.COM
   resident part (`tsr_image` up to `resident_end`), so it has the v4 mouse ring and callback (`mcb`) and the
   INT 16h guard (TSR_HOOKS: 08h/09h/15h/16h/1Ch/2Fh).
-* **Mouse**: still off on Me (INSTALL.BAT deletes USOSMOUS.DRV for 95/Me, nothing names it). Two open
-  problems: the earlier Me callback test ended in a protection error at the first USB mouse report, and Me
-  runs nothing at every start that could set `mouse.drv=usosmous.drv` again after Setup's detection (U9FIX
-  /CSM only runs from AUTOEXEC.BAT on 95/98).
+* **Mouse** (2026-10-18, X470 test pending): USOSMOUS.DRV on Me too, same driver and ring as 98 SE.
+  * *Root cause of "no mouse" on the Micron Me install* (USOSDBG: `state: not registered`, packets 0, DRV
+    polls 0; BOOTLOG.TXT): USER asks the mouse driver (`Init = Mouse`, Inquire) **before** it loads the
+    installable drivers (`Init = Installable Drivers`), and the bridge copy came only from USOSKEY.DRV
+    (drivers=). Inquire found no bridge, answered "no mouse" (`Status = No mouse driver installed`), USER
+    never called Enable, so nothing registered INT 15h C207h.
+  * *Fix*: the resident-part installer moved into `src/platform/win3/usos_resident.h`, used by both drivers;
+    USOSMOUS.DRV installs the copy itself at Inquire when INT 2Fh D700h finds none, USOSKEY.DRV then finds
+    that copy. The copy marks byte +9 of the shared block with `W` (0 in the TSR), USOSDBG shows
+    "copy from Windows". The callback stays the TSR's `mcb` (only writes the ring in its own segment; the
+    driver drains it from the SYSTEM.DRV timer), so the V86 side is the 98 SE code.
+  * *DOS boxes*: the copy is in the system VM's DOS memory, while SeaBIOS keeps the C207h pointer for every
+    VM (EBDA). A DOS VM's INT 08h would far-call that address in its own memory. With a copy from Windows a
+    WH_CBT hook switches the BIOS mouse off (C200h off, C207h 0:0, state 5 "paused (DOS box open)") when the
+    first WinOldAp window (class `tty`, also Win32 consoles) is created and on again when the last one is
+    destroyed; no desktop mouse meanwhile. Hook refused: `merr` F0FFh, mouse still on. 95/98/98 SE with the
+    TSR keep the plain path (no hook).
+  * *mouse.drv at every start*: Me runs no U9FIX. USOSKEY.DRV, when the bridge is a copy from Windows and
+    `SYSTEM\USOSMOUS.DRV` exists, writes `[boot] mouse.drv=usosmous.drv` and removes a `[386Enh]
+    mouse=...vmouse...` line (as U9FIX /CSM on 95/98); it applies from the next start, i.e. from Setup's
+    restart before the first desktop. INSTALL.BAT keeps USOSMOUS.DRV for Me and copies it into
+    `C:\WINDOWS\SYSTEM` before Setup next to USOSKEY.DRV. No MSBATCH change (Setup's detection may write
+    mouse.drv later anyway) and no phase-1 patch change (the micro-Linux base stays as it is).
+  * *The 2026-10-03 protection error*: that uncommitted test predates the v4 ring callback (2026-10-06) and
+    is not reproducible from the repo; the v4 callback runs on the main CPU in V86 mode (SeaBIOS
+    `invoke_mouse_handler` hops back to the interrupted 16-bit stack; only the xHCI poll goes to CSMWrap's
+    helper core), like the keyboard's INT 15h/4Fh hook that works on Me. Only the X470 run can show
+    whether it is gone; revert = `mouse.drv=mouse.drv` and rename `SYSTEM\USOSMOUS.DRV`.
+  * Tests: `tools/tests/legacy_bios/test_usosmous.py` (MeBridge), timer-safety unchanged. No Me QEMU run
+    (no ready Me image; the 2026-10-06 QEMU Me never reached the desktop).
 * **TZFIX: not needed on Me.** The Me CD's SETUPC.INF (PRECOPY1.CAB) defines `SetTimeZone_Desc` but adds no
   `RunOnce\Setup` TIMEDATE step (its `[NewWin.AddReg]` has only wallpaper, RunOnceEx 101 and VPOWERD); Me's
   TIMEZONE.INF has every key of the menu's list (63; Me adds 12 more), so `TimeZone=` from the menu or a
@@ -384,7 +410,7 @@ on the Kingston is still empty, copy it there before the X470 run).
   Me -> target disk -> phase 1 in the VM (about 17 min under TCG in the nested test) -> restart into the
   disk's CSMWrap entry -> detection -> OEM wizard on the USB keyboard (user page, licence Alt+A, product key
   typed, finish) -> last restart: report whether the desktop appears or the start stops like in QEMU
-  (with `Logo=0` the last text line is visible). No USB mouse on Me yet.
+  (with `Logo=0` the last text line is visible). USB mouse on Me: see **Mouse** above.
 
 ## 4h. Windows 95 OSR2.1 through the same UEFI flow (2026-10-06)
 

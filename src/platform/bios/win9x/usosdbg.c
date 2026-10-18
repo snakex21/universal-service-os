@@ -230,8 +230,9 @@ static void show_key(void)
         wsprintf(line(), "KEY  USOSKEY.COM not found (INT 2Fh AX=D700h): not loaded before Windows?");
         return;
     }
-    wsprintf(line(), "KEY  USOSKEY v%u at %04X:%04X  USOSKEY.DRV %s  alive(heartbeat):%u  head/tail:%u/%u",
-             s->version, key_seg, key_off, (LPSTR)(GetModuleHandle("USOSKEY") ? "loaded" : "NOT loaded"),
+    wsprintf(line(), "KEY  USOSKEY v%u at %04X:%04X (%s)  USOSKEY.DRV %s  alive(heartbeat):%u  head/tail:%u/%u",
+             s->version, key_seg, key_off, (LPSTR)(s->pad == 'W' ? "copy from Windows" : "TSR"),
+             (LPSTR)(GetModuleHandle("USOSKEY") ? "loaded" : "NOT loaded"),
              (WORD)s->alive, (WORD)s->head, (WORD)s->tail);
     wsprintf(line(), "KEY  captured:%u (+%u)  passed:%u  dropped:%u  forced:%u  refused:%u",
              s->captured, (WORD)(s->captured - prev_captured), s->passed, s->dropped, s->forced, s->refused);
@@ -258,8 +259,8 @@ static void show_key(void)
 
 static void show_mouse(void)
 {
-    static const char *const states[5] = { "not registered", "registered", "no BIOS mouse (C205h failed)",
-                                           "BIOS refused (C207h/C200h)", "disabled" };
+    static const char *const states[6] = { "not registered", "registered", "no BIOS mouse (C205h failed)",
+                                           "BIOS refused (C207h/C200h)", "disabled", "paused (DOS box open)" };
     SHARED FAR *s = find_shared();
     if (!s || s->version < 4) {
         wsprintf(line(), "MOUSE USOSKEY.COM %s: no mouse ring (copy the new USOSKEY.COM)",
@@ -268,7 +269,7 @@ static void show_mouse(void)
     }
     wsprintf(line(), "MOUSE USOSMOUS.DRV %s  state:%s  last BIOS error:%04X  callback %04X:%04X  alive:%u  head/tail:%u/%u",
              (LPSTR)(GetModuleHandle("MOUSE") ? "MOUSE module loaded" : "no MOUSE module"),
-             (LPSTR)(s->mstate < 5 ? states[s->mstate] : "?"), s->merr, key_seg, s->mcb,
+             (LPSTR)(s->mstate < 6 ? states[s->mstate] : "?"), s->merr, key_seg, s->mcb,
              (WORD)s->malive, (WORD)s->mhead, (WORD)s->mtail);
     wsprintf(line(), "MOUSE packets:%lu (+%lu)  dropped:%u  ignored:%u  last %02X %02X %02X  DRV polls:%u (+%u)  events:%u (+%u)",
              s->mpackets, s->mpackets - prev_mpackets, s->mdropped, s->mignored,

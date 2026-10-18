@@ -1,7 +1,10 @@
 """USB mouse for Windows 9x under CSMWrap: the INT 15h C207h callback of the
 real USOSKEY.COM (shared block version 4) in Unicorn, the USOSMOUS.DRV NE
-exports, and its wiring into the 98 SE / 98 install (INSTALL.BAT, payload)."""
+exports, the Windows Me path (USOSMOUS.DRV installs the bridge copy itself,
+DOS-box guard, USOSKEY.DRV keeps mouse.drv=) and its wiring into the
+95 / 98 / 98 SE / Me install (INSTALL.BAT, payload)."""
 from pathlib import Path
+import re
 import struct
 import sys
 import unittest
@@ -106,8 +109,10 @@ class UsosMouse(unittest.TestCase):
             n = d[i]
             names[d[i + 1:i + 1 + n].decode()] = struct.unpack_from('<H', d, i + 1 + n)[0]
             i += n + 3
-        # Module name MOUSE (USER imports the mouse driver by it), DDK ordinals.
-        self.assertEqual(names, {'MOUSE': 0, 'INQUIRE': 1, 'ENABLE': 2, 'DISABLE': 3, 'MOUSEGETINTVECT': 4, 'WEP': 5})
+        # Module name MOUSE (USER imports the mouse driver by it), DDK
+        # ordinals; CBT_PROC (the Me DOS-box guard hook) after them.
+        self.assertEqual(names, {'MOUSE': 0, 'INQUIRE': 1, 'ENABLE': 2, 'DISABLE': 3, 'MOUSEGETINTVECT': 4, 'WEP': 5,
+                                 'CBT_PROC': 6})
 
     def test_install_wiring(self):
         install = (ROOT / 'src/platform/bios/dos_startup.cmd').read_text(encoding='latin-1')
@@ -116,15 +121,101 @@ class UsosMouse(unittest.TestCase):
         fix_line = next(i for i, l in enumerate(auto) if 'U9FIX.COM /CSM' in l)
         self.assertLess(copy_line, fix_line, 'the driver must be in SYSTEM before U9FIX names it')
         self.assertIn('IF "%U9SYS%"=="98SE" GOTO MOUSEOK', install)
-        # 98 (first edition) and 95 get the mouse driver too; Me drops it.
+        # 98 (first edition), 95 and Me get the mouse driver too.
         self.assertIn('IF "%U9SYS%"=="98" GOTO MOUSEOK', install)
         self.assertIn('IF "%U9SYS%"=="95" GOTO MOUSEOK', install)
-        self.assertNotIn('IF "%U9SYS%"=="ME" GOTO MOUSEOK', install)
+        self.assertIn('IF "%U9SYS%"=="ME" GOTO MOUSEOK', install)
+        # Me: both drivers in SYSTEM before Setup (no AUTOEXEC.BAT copy runs).
+        me = install[install.index('IF NOT "%U9SYS%"=="ME" GOTO CSMREG'):install.index(':CSMREG')]
+        self.assertIn('COPY /Y C:\\USOS9X\\USOSKEY.DRV C:\\WINDOWS\\SYSTEM', me)
+        self.assertIn('COPY /Y C:\\USOS9X\\USOSMOUS.DRV C:\\WINDOWS\\SYSTEM', me)
         sys.path.insert(0, str(ROOT / 'tools'))
         import build_win9x_support
         self.assertIn('USOSMOUS.DRV', build_win9x_support.FILES)
         self.assertIn('"USOSMOUS.DRV"', (ROOT / 'src/platform/bios/dos_native_iso.zig').read_text())
         self.assertIn('win9x/USOSMOUS.DRV', (ROOT / 'installer/cmd/usos-payload-pack/main.go').read_text())
+
+
+class MeBridge(unittest.TestCase):
+    """Windows Me: no USOSKEY.COM. USER calls the mouse driver's Inquire
+    before it loads the installable drivers (Micron BOOTLOG.TXT 2026-10-18:
+    "Init = Mouse" ... "Status = No mouse driver installed" ahead of "Init =
+    Installable Drivers"), so USOSMOUS.DRV must find or install the bridge
+    itself; v4 never registered there (USOSDBG: state not registered)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.mouse = (ROOT / 'src/platform/win3/usosmous.c').read_text(encoding='utf-8')
+        cls.key = (ROOT / 'src/platform/win3/usoskey.c').read_text(encoding='utf-8')
+        cls.resident = (ROOT / 'src/platform/win3/usos_resident.h').read_text(encoding='utf-8')
+        work = ROOT / 'zig-out/win3-usb-mouse-test'
+        work.mkdir(parents=True, exist_ok=True)
+        com = build_tsr(work, work)
+        cls.code = com.read_bytes()
+        cls.sym = elf_symbols(work / 'usoskey.elf')
+        cls.header = write_tsr_header(com, work / 'usoskey.elf', work).read_text()
+
+    @staticmethod
+    def body(text, name):
+        m = re.search(r'\b%s\s*\([^;{]*\)\s*\{' % name, text)
+        assert m, name
+        depth, i = 0, m.end() - 1
+        for j in range(i, len(text)):
+            depth += {'{': 1, '}': -1}.get(text[j], 0)
+            if depth == 0:
+                return text[i:j + 1]
+        raise AssertionError(name)
+
+    def test_inquire_installs_the_bridge_when_none_is_there(self):
+        self.assertIn('probe()', self.body(self.mouse, 'Inquire'))
+        self.assertIn('find_bridge()', self.body(self.mouse, 'probe'))
+        fb = self.body(self.mouse, 'find_bridge')
+        self.assertLess(fb.index('query_bridge()'), fb.index('install_resident()'))
+        self.assertIn('remove_resident()', self.body(self.mouse, 'WEP'))
+
+    def test_both_drivers_share_one_resident_installer(self):
+        for src in (self.mouse, self.key):
+            self.assertIn('#include "usos_resident.h"', src)
+            self.assertNotIn('GlobalDosAlloc(', src)    # the call only in the header
+        self.assertIn('GlobalDosAlloc(', self.resident)
+        # A second install_resident (or one after the other driver's) is a no-op.
+        self.assertIn('if (tsr_mem) return;', self.body(self.resident, 'install_resident'))
+
+    def test_the_windows_copy_marks_itself_in_an_unused_tsr_byte(self):
+        shared = self.sym['shared']
+        self.assertIn('#define TSR_SHARED 0x%04X' % shared, self.header)
+        self.assertEqual(self.code[shared - 0x100:shared - 0x100 + 4], b'USKY')
+        self.assertEqual(self.code[shared - 0x100 + 9], 0)  # the TSR leaves it 0
+        self.assertEqual(self.sym['alive'] - shared, 8)
+        self.assertIn('p[TSR_SHARED + 9] = RESIDENT_FROM_WINDOWS;', self.resident)
+
+    def test_dos_box_guard_only_for_the_windows_copy(self):
+        enable = self.body(self.mouse, 'Enable')
+        self.assertIn('shared->origin == RESIDENT_FROM_WINDOWS', enable)
+        self.assertIn('SetWindowsHookEx(WH_CBT', enable)
+        self.assertLess(enable.index('bios_on()'), enable.index('SetWindowsHookEx'))
+        cbt = self.body(self.mouse, 'cbt_proc')
+        self.assertIn('HCBT_CREATEWND', cbt)
+        self.assertIn('bios_off(MS_PAUSED)', cbt)
+        self.assertIn('HCBT_DESTROYWND', cbt)
+        self.assertIn('bios_on()', cbt)
+        self.assertIn('CallNextHookEx', cbt)
+        self.assertIn("(name[0] | 0x20) == 't'", self.body(self.mouse, 'is_dos_box'))
+        off = self.body(self.mouse, 'bios_off')
+        self.assertLess(off.index('0xC200'), off.index('0xC207'))
+        self.assertIn('UnhookWindowsHookEx', self.body(self.mouse, 'stop'))
+
+    def test_usoskey_keeps_mouse_drv_on_me_only(self):
+        init = self.body(self.key, 'init')
+        self.assertIn('if (shared->pad == RESIDENT_FROM_WINDOWS) keep_mouse_ini();', init)
+        keep = self.body(self.key, 'keep_mouse_ini')
+        self.assertIn('"USOSMOUS.DRV"', keep)
+        self.assertIn('OF_EXIST', keep)
+        self.assertLess(keep.index('OF_EXIST'), keep.index('WritePrivateProfileString'))
+        self.assertIn('WritePrivateProfileString("boot", "mouse.drv", "usosmous.drv", "SYSTEM.INI")', keep)
+        self.assertIn('WritePrivateProfileString("386Enh", "mouse", NULL, "SYSTEM.INI")', keep)
+        # Not from the timer path.
+        self.assertNotIn('keep_mouse_ini', self.body(self.key, 'poll_body'))
 
 
 if __name__ == '__main__':

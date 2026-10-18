@@ -28,11 +28,25 @@
  * boxes do not (no INT 33h). The Windows mouse driver interface used here
  * is the documented one of the Windows 3.1 DDK (Inquire, Enable, Disable,
  * MouseGetIntVect; MOUSEINFO) as also described by Wine's mouse.drv16.
+ * Windows Me (no AUTOEXEC.BAT programs, so no USOSKEY.COM): USER loads and
+ * asks the mouse driver (Inquire) before the installable drivers, so this
+ * driver installs the TSR's resident part itself when it finds no bridge
+ * (usos_resident.h, the code USOSKEY.DRV uses; USOSKEY.DRV then finds this
+ * copy). The copy lives in the system VM's DOS memory, while the C207h
+ * pointer is kept by the BIOS for every VM: a DOS box would take SeaBIOS's
+ * far call into its own memory at that address. So with such a copy a
+ * WH_CBT hook switches the BIOS mouse off (C200h, C207h 0:0; state
+ * "paused") while a DOS box window (WinOldAp, class "tty") exists and on
+ * again when the last one is gone; the desktop has no mouse meanwhile.
+ * 95/98/98 SE (TSR from AUTOEXEC.BAT, the same memory in every VM) keep
+ * the plain path without the hook.
  * No OpenWatcom runtime is linked (own entry point, -zl).
  * Built with tools/build_win3_usb_keyboard.py; docs/win9x-modern-2026-09-30.md.
  */
 #include <windows.h>
 #include "usosmous_scale.h"
+#include "usoskey_tsr.h"            /* generated: USOSKEY.COM resident part */
+#include "usos_resident.h"          /* install_resident / remove_resident */
 
 typedef struct {
     BYTE msExists;
@@ -50,7 +64,7 @@ typedef struct {
 typedef struct {
     char magic[4];
     WORD version;
-    BYTE head, tail, alive, pad;
+    BYTE head, tail, alive, origin; /* origin: RESIDENT_FROM_WINDOWS or 0 */
     WORD dropped, captured, passed;
     BYTE ring[64];
     WORD forced, refused;
@@ -79,6 +93,7 @@ typedef struct {
 #define MS_NO_MOUSE   2     /* C205h failed: no BIOS pointing device */
 #define MS_FAILED     3     /* C207h/C200h failed */
 #define MS_DISABLED   4
+#define MS_PAUSED     5     /* a DOS box exists (copy in system VM memory) */
 
 /* mouse_event flags (SF_ in the DDK) */
 #define SF_MOVEMENT   0x0001
@@ -108,6 +123,8 @@ static BYTE busy, buttons;
 static RMREGS rm;
 static SCALE scale;
 static int move_x, move_y;          /* DGROUP: -zu, SS is not DS */
+static HHOOK cbt_hook;
+static WORD dos_boxes;              /* "tty" windows (WinOldAp) alive */
 
 static int query_bridge(void)
 {
@@ -141,6 +158,14 @@ static int query_bridge(void)
     }
     shared_seg = rseg;
     return 1;
+}
+
+/* The bridge, installed here if nothing has done it yet (Me). */
+static int find_bridge(void)
+{
+    if (query_bridge()) return 1;
+    install_resident();
+    return tsr_mem && query_bridge();
 }
 
 /* INT 15h in real mode (V86) through DPMI 0300h. Returns 0 on success,
@@ -190,7 +215,7 @@ static void probe(void)
 {
     WORD r;
     if (probed) return;
-    if (!query_bridge()) return;
+    if (!find_bridge()) return;
     probed = 1;
     r = bios15(0xC205, 0x0300, 0);  /* initialize, 3-byte packets */
     present = r == 0;
@@ -302,14 +327,57 @@ static int init_timer_procs(void)
     return create_timer && kill_timer;
 }
 
+/* C205h init (3-byte packets), C207h the copy's handler, C200h enable.
+ * Sets mstate; 1 when the BIOS mouse runs. */
+static int bios_on(void)
+{
+    WORD r = bios15(0xC205, 0x0300, 0);
+    if (r) { note_error(0x05, r); shared->mstate = MS_NO_MOUSE; return 0; }
+    r = bios15(0xC207, shared->mcb, shared_seg);
+    if (r) { note_error(0x07, r); shared->mstate = MS_FAILED; return 0; }
+    r = bios15(0xC200, 0x0100, 0);
+    if (r) { note_error(0x00, r); bios15(0xC207, 0, 0); shared->mstate = MS_FAILED; return 0; }
+    shared->mstate = MS_ENABLED;
+    return 1;
+}
+
+static void bios_off(BYTE state)
+{
+    bios15(0xC200, 0x0000, 0);      /* disable */
+    bios15(0xC207, 0, 0);           /* remove the handler */
+    shared->mstate = state;
+}
+
+static int is_dos_box(HWND w)
+{
+    char name[8];
+    return w && GetClassName(w, name, sizeof(name)) == 3 &&
+           (name[0] | 0x20) == 't' && (name[1] | 0x20) == 't' && (name[2] | 0x20) == 'y';
+}
+
+/* WH_CBT, task time (the thread that creates / destroys the window). A
+ * DOS box's VM must never see the BIOS mouse callback while it points into
+ * the system VM's DOS memory (see the top). */
+LRESULT FAR PASCAL __export __loadds cbt_proc(int code, WPARAM wp, LPARAM lp)
+{
+    if (shared && (code == HCBT_CREATEWND || code == HCBT_DESTROYWND) && is_dos_box((HWND)wp)) {
+        if (code == HCBT_CREATEWND) {
+            if (dos_boxes++ == 0 && shared->mstate == MS_ENABLED) bios_off(MS_PAUSED);
+        } else if (dos_boxes && --dos_boxes == 0 && shared->mstate == MS_PAUSED && event_proc) {
+            shared->mtail = shared->mhead;
+            bios_on();
+        }
+    }
+    return CallNextHookEx(cbt_hook, code, wp, lp);
+}
+
 static void stop(void)
 {
     if (timer) { kill_timer(timer); timer = 0; }
-    if (shared && shared->mstate == MS_ENABLED) {
-        bios15(0xC200, 0x0000, 0);  /* disable */
-        bios15(0xC207, 0, 0);       /* remove the handler */
-        shared->mstate = MS_DISABLED;
-    }
+    if (cbt_hook) { UnhookWindowsHookEx(cbt_hook); cbt_hook = 0; }
+    dos_boxes = 0;
+    if (shared && shared->mstate == MS_ENABLED) bios_off(MS_DISABLED);
+    if (shared && shared->mstate == MS_PAUSED) shared->mstate = MS_DISABLED;
     if (shared) shared->malive = 0;
     event_proc = 0;
 }
@@ -335,7 +403,6 @@ WORD FAR PASCAL __loadds Inquire(MOUSEINFO FAR *info)
 /* Ordinal 2: start sending events to USER's procedure. */
 void FAR PASCAL __loadds Enable(FARPROC proc)
 {
-    WORD r;
     if (timer) stop();
     probe();
     if (!present || !init_timer_procs()) return;
@@ -343,17 +410,17 @@ void FAR PASCAL __loadds Enable(FARPROC proc)
     buttons = 0;
     scale_init(&scale, (int)GetPrivateProfileInt("usosmous", "Multiplier", SCALE_MUL_DEFAULT, "SYSTEM.INI"),
                (int)GetPrivateProfileInt("usosmous", "Divisor", SCALE_DIV_DEFAULT, "SYSTEM.INI"));
-    r = bios15(0xC205, 0x0300, 0);
-    if (r) { note_error(0x05, r); shared->mstate = MS_NO_MOUSE; return; }
-    r = bios15(0xC207, shared->mcb, shared_seg);
-    if (r) { note_error(0x07, r); shared->mstate = MS_FAILED; return; }
-    r = bios15(0xC200, 0x0100, 0);
-    if (r) { note_error(0x00, r); bios15(0xC207, 0, 0); shared->mstate = MS_FAILED; return; }
-    shared->mstate = MS_ENABLED;
+    if (!bios_on()) return;
     shared->malive = 18;
     event_proc = (DWORD)proc;
     timer = create_timer(20, (FARPROC)poll);
-    if (!timer) stop();
+    if (!timer) { stop(); return; }
+    /* Copy in system VM memory: the DOS-box guard. Without the hook (USER
+     * refused it) the desktop mouse still works; merr F0FFh tells USOSDBG. */
+    if (shared->origin == RESIDENT_FROM_WINDOWS && !cbt_hook) {
+        cbt_hook = SetWindowsHookEx(WH_CBT, (HOOKPROC)cbt_proc, GetModuleHandle("MOUSE"), 0);
+        if (!cbt_hook) shared->merr = 0xF0FF;
+    }
 }
 
 /* Ordinal 3. */
@@ -372,6 +439,7 @@ int FAR PASCAL __loadds WEP(int exit_type)
 {
     (void)exit_type;
     stop();
+    remove_resident();              /* only a copy installed here */
     return 1;
 }
 
