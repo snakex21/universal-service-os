@@ -11,7 +11,7 @@ Contents (as on the XP CSMWrap ESP):
   \\EFI\\BOOT\\csmwrap.ini      first file, cluster 2 (the Core patches
                                 "verbose = false" to "verbose = true " when
                                 EFI\\USOS\\csmwrap-verbose.flag is on the stick)
-  \\EFI\\BOOT\\BOOTX64.EFI      CSMWrap 3.1.2-usos12, pinned hash
+  \\EFI\\BOOT\\BOOTX64.EFI      CSMWrap 3.1.2-usos13, pinned hash
   \\CSMWRAP\\...                licences, SOURCES.txt, source archive,
                                 patches\\, licenses\\ (LGPL obligations)
 
@@ -23,7 +23,7 @@ from pathlib import Path
 import argparse, hashlib, json, struct, sys
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST = ROOT / 'tools/vendor/csmwrap/3.1.2-usos12/manifest.json'
+MANIFEST = ROOT / 'tools/vendor/csmwrap/3.1.2-usos13/manifest.json'
 TOTAL_SECTORS = 131072            # 64 MiB, the XP ESP size
 TAIL_SECTORS = 133120             # USOS_XP_ESP_TAIL_SECTORS
 SPC = 4                           # 2 KiB clusters
@@ -152,23 +152,26 @@ def build(csmwrap: Path, out: Path):
         struct.pack_into('<HHHHHHHI', dot, 14, FAT_TIME, FAT_DATE, FAT_DATE, 0, FAT_TIME, FAT_DATE, cluster, 0)
         return bytes(dot)
 
-    def fill(cluster, parent, children):
-        """Writes a one-cluster subdirectory ('.', '..' = parent, 0 = root)."""
+    def fill(cluster, parent, children, clusters=1):
+        """Writes a subdirectory of `clusters` contiguous clusters ('.', '..' = parent, 0 = root)."""
         entries = img.directory(parent, children)
         entries[0] = dot_entry(cluster)
         blob = b''.join(entries)
-        if len(blob) > CLUSTER_BYTES:
-            raise ValueError('directory larger than one cluster')
+        if len(blob) > clusters * CLUSTER_BYTES:
+            raise ValueError(f'directory larger than {clusters} cluster(s)')
         off = (cluster - 2) * CLUSTER_BYTES
         img.data[off:off + len(blob)] = blob
 
     top_files = file_list(top)
     patch_files = file_list(patches, 'patches')
     license_files = file_list(licenses, 'licenses')
-    # One cluster per directory; clusters first, contents once all are known.
-    efi_dir, boot_dir, csm_dir, patches_dir, licenses_dir = (img.alloc(bytes(CLUSTER_BYTES)) for _ in range(5))
+    # One cluster per directory (patches: two, its long names need more than 64
+    # entries since 3.1.2-usos13); clusters first, contents once all are known.
+    efi_dir, boot_dir, csm_dir = (img.alloc(bytes(CLUSTER_BYTES)) for _ in range(3))
+    patches_dir = img.alloc(bytes(2 * CLUSTER_BYTES))
+    licenses_dir = img.alloc(bytes(CLUSTER_BYTES))
     fill(boot_dir, efi_dir, [('csmwrap.ini', 0x20, ini_cluster, len(INI)), ('BOOTX64.EFI', 0x20, efi_cluster, len(efi))])
-    fill(patches_dir, csm_dir, patch_files)
+    fill(patches_dir, csm_dir, patch_files, clusters=2)
     fill(licenses_dir, csm_dir, license_files)
     fill(efi_dir, 0, [('BOOT', 0x10, boot_dir, 0)])
     fill(csm_dir, 0, top_files + [('patches', 0x10, patches_dir, 0), ('licenses', 0x10, licenses_dir, 0)])

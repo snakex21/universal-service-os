@@ -40,7 +40,7 @@ const (
 	// NTFS driver. USOS starts it only on matching SMBIOS (touch_driver.zig).
 	touchVendorDir    = "tools/vendor/touchi2cdxe/v1.3.1-usos1"
 	touchDriverTarget = "EFI/USOS/touchi2c_x64.efi"
-	// CSMWrap 3.1.2-usos12 (a MODIFIED CSMWrap 3.1.2: quiet boot unless
+	// CSMWrap 3.1.2-usos13 (a MODIFIED CSMWrap 3.1.2: quiet boot unless
 	// csmwrap.ini sets verbose = true, and SeaBIOS boot priorities from
 	// CSMWrap's BBS table, USB included, the exact disk CSMWrap was loaded
 	// from as 0x80, an ACPI 1.0 view (RSDT, 32-bit FADT fields) for 2000/XP,
@@ -50,8 +50,9 @@ const (
 	// HPET / AMD GPIO devices hidden from Windows 2000 in its legacy
 	// DSDT/SSDT copies (only with csmwrap.ini acpi_legacy_fadt = true),
 	// only the boot disk as a BIOS hard disk (int13_boot_disk_only = true)
-	// and PCI INTx routed to 8259 IRQs for Windows 9x (pci_irq_routing =
-	// true, written by the 9x flow only);
+	// PCI INTx routed to 8259 IRQs for Windows 9x (pci_irq_routing =
+	// true, written by the 9x flow only) and the USB mouse wheel through
+	// the BIOS pointing device (IntelliMouse emulation);
 	// docs/research/csmwrap.md sections 6
 	// and 7, docs/design/bios-via-csmwrap.md) for XP / Vista without firmware
 	// CSM and for the UEFI menu's "Legacy BIOS mode (CSMWrap)": copied
@@ -59,7 +60,7 @@ const (
 	// ESP (tools/xp_csmwrap_esp.sh, the BIOS Core DOS installer). The LGPL
 	// source (the unpatched archive plus the patches) and every licence
 	// notice travel with it.
-	csmwrapVendorDir  = "tools/vendor/csmwrap/3.1.2-usos12"
+	csmwrapVendorDir  = "tools/vendor/csmwrap/3.1.2-usos13"
 	csmwrapLicenseDir = "tools/vendor/csmwrap/3.1.2"
 	csmwrapSourceDir  = "tools/vendor/csmwrap/3.1.2-src"
 	csmwrapTargetDir  = "EFI/USOS/csmwrap"
@@ -450,8 +451,13 @@ func stageCSMWrap(vendorDir, licenseDir, sourceDir, gplv3, usb string) error {
 		"CSMWrap was loaded from as a BIOS hard disk, and on 2026-10-18 (patch 0015,\r\n" +
 		"only with csmwrap.ini pci_irq_routing = true, the Windows 9x flow): PCI\r\n" +
 		"INTx routed to 8259 IRQs through the ACPI link devices (_PRT, bridge\r\n" +
-		"swizzle, _SRS), Interrupt Line registers, ELCR and a matching $PIR. Version\r\n" +
-		"strings: CSMWrap Version 3.1.2-usos12, SeaBIOS 578d260b-CSMWrap-3.1.2-usos12.\r\n" +
+		"swizzle, _SRS), Interrupt Line registers, ELCR and a matching $PIR, and on\r\n" +
+		"2026-10-18 (patch 0016): the USB mouse wheel through the BIOS pointing\r\n" +
+		"device (HID report protocol when the report descriptor has a wheel,\r\n" +
+		"IntelliMouse device ID 3 after the 200/100/80 sample-rate sequence, INT 15h\r\n" +
+		"C205h package sizes 1-7) and (patch 0017) the SeaBIOS options that only act\r\n" +
+		"on romfiles (boot splash, serial console, bios-geometry) turned off. Version\r\n" +
+		"strings: CSMWrap Version 3.1.2-usos13, SeaBIOS 578d260b-CSMWrap-3.1.2-usos13.\r\n" +
 		"\r\n" +
 		"Complete corresponding source, next to this file:\r\n" +
 		"  " + source.Archive.File + " (unpatched CSMWrap 3.1.2, commit 808ac8e, with all\r\n" +

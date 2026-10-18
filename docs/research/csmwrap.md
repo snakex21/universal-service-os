@@ -797,3 +797,84 @@ Tests:
 
 X470 with usos12: not tried. The in-place kit is `me-irq-fix`. The 9x side (whether PCI.VXD takes
 the BIOS IRQs as expected with no miniport) is checked only on the hardware.
+
+## 19. 3.1.2-usos13: USB mouse wheel (0016) and SeaBIOS romfile-only options off (0017) (2026-10-18)
+
+3.1.2-usos13 = 3.1.2-usos12 (0001-0010, 0012, 0014, 0015, byte for byte) + 0016 + 0017. It is the
+new release pin (xp_csmwrap_esp.sh `PINNED`, release.go, lock.json, run_build_vm.py, third-party.json).
+
+**0016 USB mouse wheel** (own code: HID 1.11 report descriptors, IBM PS/2 BIOS INT 15h C2xxh, the public
+IntelliMouse knock). SeaBIOS served a USB mouse to INT 15h C2xxh in the HID boot protocol only (3 bytes, no
+wheel). Now `usb_mouse_setup` reads the interface's report descriptor and walks it (buttons 1-3, relative
+X/Y and wheel of the report that has X, report IDs, fields up to 16 bits). With a wheel it sets the report
+protocol and decodes that layout; otherwise the boot protocol as before. The knock (sample rates 200, 100,
+80) gives device ID 3 when a wheel mouse is present; C204h returns the ID; C205h takes package sizes 1-7.
+Consumers: USOSMOUS.DRV (98/98 SE/Me WM_MOUSEWHEEL, commit dfa24a1) and VBADOS VBMOUSE (DOS INT 33h).
+
+Review of the draft (changes made for usos13):
+
+- Composite devices: SeaBIOS configures only the first boot HID interface of a device (usb.c), and
+  SET_PROTOCOL is per interface, so a keyboard interface of the same device stays as it was; the keyboard
+  code path is byte-identical. Packets of other report IDs on the mouse interface (consumer, keyboard-macro
+  reports of gaming mice) are dropped by the ID filter. New: the report protocol is used only when **every**
+  input report of the interface fits in one interrupt packet. A longer vendor report would arrive split, and
+  a continuation packet could start with the mouse report ID and be taken as motion. Such mice stay in the
+  boot protocol.
+- New: one Push level is supported (Push/Pop around feature collections). Nested Push or Pop without Push
+  still keeps the boot protocol.
+- New: the report-descriptor buffer is zeroed before GET_DESCRIPTOR, so a short answer parses as empty
+  items, not stale memory.
+- Kept: the boot-protocol fallback for no wheel, absolute X/Y, long items, descriptors over 1024 bytes,
+  fields over 16 bits, any control-transfer error; values clamped to +-127; HID wheel up (positive) becomes
+  the IntelliMouse negative.
+- Behaviour visible to non-wheel USB mice: C204h answers 00h (standard PS/2 mouse) instead of 0AAh (the BAT
+  code, an upstream bug), and C205h accepts 1-7 as the IBM BIOS does (C205h used to accept 3 only). With 3
+  and no knock, the packets and the handler's Z word (0) are unchanged. i8042 (ps2port.c) is unchanged.
+- Upstream limits that stay: a device whose first boot HID interface is a keyboard gets no BIOS mouse
+  (wireless combo receivers); mice with wMaxPacketSize over 16 are refused.
+
+**0017 SeaBIOS romfile-only options off.** A CSM build has no romfile source: fw_cfg needs
+CONFIG_QEMU_HARDWARE (off for CSM), CBFS and multiboot are coreboot-only; csm.c only adds
+`etc/extra-pci-roots-list`. CONFIG_BOOTSPLASH (`bootsplash.jpg/.bmp`, jpeg.c, bmp.c), CONFIG_SERCON
+(`etc/sercon-port`) and CONFIG_HOST_BIOS_GEOMETRY (`bios-geometry`) never ran under CSMWrap. They are now off
+in `seabios-config`. The VGA text console, INT 14h serial ports and the `serial = true` debug output stay.
+Other default-on options were kept because they serve real hardware or the QEMU tests: ATA (QEMU pc), AHCI,
+NVMe, SD, MegaRAID, floppy, USB UHCI/OHCI/EHCI/xHCI, UAS, LPT, S3 resume, CD-ROM emulation, DEBUG_LEVEL 1
+(serial diagnostics). The virtio/PV SCSI drivers and DEBUG_IO were already off (they need QEMU_HARDWARE).
+
+Layout (build log): **ROM 118688 of 131072 bytes (90.6 %, 12384 free)**. usos12 had 3136 free; with 0016
+alone (draft build) it was 864. F-segment: 16-bit 36032 + 32-bit segmented 4118 + variables 3328 = 43478
+bytes, **22058 bytes** for the allocation zone (6144 minimum kept). 32-bit flat 28522, flat init 41376.
+
+Binary `8798c35d83b3cd254a5a8cae94d2d5fe5e12fc665d6819a36523895f0fb1eec9`, the same in two pinned Alpine VM
+runs (each with its in-guest repeat build). The unpatched build still matches `upstream_rebuild`.
+
+The Windows 2000 diagnostic CSMWrap stays **3.1.2-usos11-diag** (`PINNED_DIAG`, own hash). It is used
+only by the Windows 2000 ACPI diagnostic setup (DATA `w2k-diag.txt`), and that round is closed (2000 PASS
+on the X470, 2026-10-17). Windows 2000 does not use the BIOS mouse (own USB stack) or the 9x
+`pci_irq_routing`, and the diag ESP takes its own binary and patch series from the XP/2000 package. A
+rebuild on usos13 would only add code that 2000 does not reach.
+
+Tests:
+
+- `test_csmwrap_wheel.py`: descriptor walk, decoder and packaging built on the host (zig cc, UBSan) from
+  the archive + 0016. Cases: QEMU usb-mouse, a Logitech-style report ID 2 mouse with 12-bit X/Y, a
+  composite gaming mouse (mouse ID 1 with 16-bit X/Y, consumer ID 2, keyboard ID 3) with foreign packets
+  ignored and values clamped, the same on a 7-byte endpoint (refused), plus a 20-byte vendor report
+  (refused), the wheel in another report (refused), no wheel, absolute, truncated, Push/Pop (one level kept,
+  the report size restored, nested and unbalanced refused), the boot path. Also INT 15h C205h package sizes
+  1/3/4/6 with and without the knock, wiring (keyboard functions identical to upstream, the knock gated on a
+  wheel mouse, C201h reset, C204h ID, the handler's Z word), the 0017 lines, the series and the pins.
+- QEMU with usos13 (2026-10-18): `run_csmwrap_boot_disk_qemu.py` all 7 layouts PASS and `--only` PASS
+  (`NO-DRIVE-81`); `run_csmwrap_apmoff_qemu.py` PASS; `run_csmwrap_pciirq_qemu.py` pc + q35 PASS, key-off
+  output identical to usos12; `run_dos_mouse_probe.py --csmwrap <usos13> --wheel` session PASS (wheel API
+  574Dh, caps 1, sums -3 / +2) and `--mode dosmouse` PASS. The dosmouse mode types `M33TEST` and `EXIT`
+  through QEMU's usb-kbd, so the USB keyboard under SeaBIOS still works. The session probe with usos12 shows
+  no wheel (caps 0, sums 0) PASS.
+
+`tools/build_csmwrap_dos_esp.py` (the BIOS Core DOS installer's CSMWrap ESP image): with 15 long patch
+names, `\CSMWRAP\patches` needs more than the 64 entries of one 2 KiB cluster. The directory now gets two
+contiguous clusters (FAT chain). An independent FAT16 walk of the image read all 15 patches back
+byte for byte.
+
+X470 with usos13: not tried. The in-place kit for the Me install on the Micron is `me-wheel-kit`.

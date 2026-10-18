@@ -581,8 +581,8 @@ tests establish Setup phase 1 and staging, not a 95 NVMe desktop or shutdown.
 
 ## 4j. USB mouse wheel on 98 / 98 SE / Me (2026-10-18, X470 untested)
 
-* **Path**: CSMWrap patch `0016-usb-mouse-wheel` (draft, stacked after 0015 pci-irq-routing; not in a
-  pinned CSMWrap yet) makes SeaBIOS read a USB mouse whose HID report descriptor has a relative wheel in the
+* **Path**: CSMWrap patch `0016-usb-mouse-wheel` (pinned since CSMWrap 3.1.2-usos13, docs/research/csmwrap.md
+  section 19) makes SeaBIOS read a USB mouse whose HID report descriptor has a relative wheel in the
   report protocol (minimal descriptor walk: buttons 1-3, X/Y up to 16 bits, wheel, report IDs; anything
   else stays in the boot protocol as before) and emulate a PS/2 **IntelliMouse**: the knock (INT 15h C202h
   sample rates 200, 100, 80) switches the device ID to 3 (C204h; it used to return 0AAh for USB mice),

@@ -162,7 +162,7 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument('--out', type=Path, required=True)
     p.add_argument('--root', type=Path, default=ROOT)
-    p.add_argument('--csmwrap-efi', type=Path, default=ROOT / 'tools/vendor/csmwrap/3.1.2-usos12/csmwrapx64.efi')
+    p.add_argument('--csmwrap-efi', type=Path, default=ROOT / 'tools/vendor/csmwrap/3.1.2-usos13/csmwrapx64.efi')
     p.add_argument('--machine', action='append', choices=('pc', 'q35'))
     p.add_argument('--minutes', type=float, default=3)
     p.add_argument('--baseline-efi', type=Path, help='key-off output must equal this binary (e.g. usos11-int13x)')
