@@ -1,0 +1,708 @@
+USOS 3.1.2-usos7 patch 8/8 (2026-10-15): APM power-off for Windows 9x and other APM callers; SeaBIOS debug output on the serial port
+
+Windows 98 SE / ME on the ASRock X470 (CSM off, CSMWrap) end at "It's now
+safe to turn off your computer" instead of powering off. Two holes in the
+APM 5307h (BX=0001h, CX=0003h) power-off of CSMWrap 3.1.2:
+1. From the 16-bit and 32-bit protected-mode APM interfaces (Windows 9x
+   VPOWERD connects the 32-bit one), apm_shutdown() called
+   bios_proxy_reset(), which scans the F-segment with real-mode segment
+   loads (find_bios_proxy -> GET_FARVAR -> mov %es) = #GP in protected
+   mode.
+2. The fallback wrote 0x2000 (SLP_EN, SLP_TYP 0) to PM1a_CNT. SLP_TYP 0 is
+   S5 on QEMU's PIIX4/ICH9 only; the X470 DSDT has Name(_S5, {5,0,0,0}),
+   so the right write there is 0x3400.
+
+Own code from the APM 1.2 specification (5303h, 5307h) and the ACPI
+specification (6.x: 4.8.3.2 PM1 control registers, 5.2.9 FADT, 5.4 AML
+encoding, 7.4.2 \_Sx states):
+- fw/usos_s5.h: finds Name(_S5, Package(){a, b, ...}) in the DSDT (else an
+  SSDT) without an interpreter; find_acpi_features() stores SLP_TYPa/b,
+  PM1b_CNT, the PM timer and SMI_CMD/ACPI_ENABLE (X_ GAS fallbacks).
+- stacks.c usos_proxy_reset_timed(): the helper-core ResetSystem request
+  through the existing mailbox, written with %es = F000h in real/V86 mode
+  and through %gs (the APM data segment, based at the F-segment) from the
+  32-bit PM interface; 2 s timeout. The helper-core loop is unchanged.
+- apm.c: order 1. UEFI ResetSystem(EfiResetShutdown) on the helper core
+  (INT 15h and 32-bit PM callers), 2. direct S5 write (SLP_TYP from \_S5,
+  PM1a and PM1b, then SLP_EN), 3. still on after 2 s with SCI_EN = 0: ACPI
+  mode on via SMI_CMD and S5 again, 4. still on: the call fails with
+  AH=60h instead of halting. The 16-bit PM interface goes straight to 2.
+  _PTS(5) is not run (no AML interpreter). Result bytes for INT 15h
+  callers at BDA 4FCh-4FFh, "USOS APMOFF:" debug lines.
+- serialio.c/csm.c/csmwrap.c/LegacyBios.h: CsmwrapFlags bit 0x02 and
+  CsmwrapSerialPort; with csmwrap.ini serial = true SeaBIOS dprintf level 1
+  goes to that port (it had no output in this build: no DEBUG_SERIAL).
+- scripts/layoutrom.py: the minimum F-segment allocation zone goes from
+  2048 to 6144 bytes. With this patch the code no longer leaves room in
+  the F-segment, the layout falls back to that minimum, and 2048 bytes
+  lost AHCI port 1 in QEMU (SMBIOS + MP table copies + per-port blocks).
+
+Applies on top of patches 0001-0007 to CSMWrap 3.1.2 (808ac8e) with its
+seabios submodule (578d260b), patch -p1 from the top of the tree. Part of
+CSMWrap 3.1.2-usos7, a MODIFIED version made by the USOS project
+(LGPL-2.1 / SeaBIOS LGPLv3).
+
+diff -ruN a/seabios/scripts/layoutrom.py b/seabios/scripts/layoutrom.py
+--- a/seabios/scripts/layoutrom.py
++++ b/seabios/scripts/layoutrom.py
+@@ -66,7 +66,12 @@
+ BUILD_ROM_START = 0xc0000
+ BUILD_LOWRAM_END = 0xa0000
+ # Space to reserve in f-segment for dynamic allocations
+-BUILD_MIN_BIOSTABLE = 2048
++# USOS 0008: 6144 instead of 2048. The CSMWrap code no longer fits in the
++# F-segment with room left, so the layout falls back to this minimum; 2048
++# bytes did not hold the SMBIOS and MP table copies plus one fseg block per
++# AHCI port (AHCI port 1 lost in QEMU). 6144 is more than any earlier
++# CSMWrap build had (upstream 3.1.2: 4320); 32-bit flat code moves below.
++BUILD_MIN_BIOSTABLE = 6144
+ 
+ # Layout the 16bit code.  This ensures sections with fixed offset
+ # requirements are placed in the correct location.  It also places the
+diff -ruN a/seabios/src/apm.c b/seabios/src/apm.c
+--- a/seabios/src/apm.c
++++ b/seabios/src/apm.c
+@@ -13,6 +13,7 @@
+ #include "stacks.h" // yield_toirq
+ #include "util.h" // apm_shutdown
+ #include "x86.h" // outb
++#include "fw/usos_s5.h" // usos_s5_cnt
+ 
+ // APM installation check
+ static void
+@@ -86,21 +87,139 @@
+     set_success(regs);
+ }
+ 
+-void
+-apm_shutdown(void)
+-{
+-    /* Try UEFI RuntimeServices->ResetSystem(EfiResetShutdown) via helper core */
+-    bios_proxy_reset(3);
++/*
++ * USOS 0008 (CSMWrap 3.1.2-usos7): APM power-off that works on more boards.
++ * Own code written from the APM 1.2 specification (5307h, BX=0001h,
++ * CX=0003h) and the ACPI specification (4.8.3.2 PM1 control, 7.4.2 \_S5).
++ *
++ * Order:
++ *  1. UEFI ResetSystem(EfiResetShutdown) on the helper core through the
++ *     bios_proxy mailbox (usos_proxy_reset_timed, 2 s timeout): from real /
++ *     V86 mode (INT 15h) and from the 32-bit protected-mode APM interface
++ *     (Windows 9x VPOWERD). Not from the 16-bit protected-mode interface
++ *     (no data segment for the mailbox there).
++ *  2. Direct ACPI S5: SLP_TYPa/b from the DSDT/SSDT Name(_S5) (X470: 5,
++ *     QEMU: 0) into PM1a_CNT/PM1b_CNT, then SLP_EN. Port I/O only, so it
++ *     runs in every mode.
++ *  3. Still running after 2 s with SCI_EN = 0 and an SMI_CMD port: ACPI
++ *     mode on (FADT ACPI_ENABLE to SMI_CMD), S5 written again.
++ *  4. Still running: the APM call fails (AH=60h, "can't enter requested
++ *     state") instead of halting, so the caller can show its own text.
++ * Not done: the _PTS(5) method (no AML interpreter); boards that need it
++ * for S5 are covered only by step 1 (firmware ResetSystem).
++ *
++ * Diagnostics: "USOS APMOFF:" lines through dprintf (they reach the serial
++ * port only with csmwrap.ini serial = true, patch 0008 serialio.c) and,
++ * for INT 15h callers only (segment loads), 4 bytes at BDA 4FCh-4FFh:
++ *   4FC 'P'   4FD step<<4 | path   4FE SLP_TYPa | SLP_TYPb<<4
++ *   4FF bit0 _S5 found, bit1 PM1a, bit2 PM1b, bit3 helper timeout,
++ *       bit4 helper reset unavailable, bit5 ACPI enable tried
++ * path 1 = INT 15h, 2 = 16-bit PM, 3 = 32-bit PM; step 1 = helper asked,
++ * 2 = S5 written, 3 = S5 written after ACPI enable, 4 = gave up.
++ */
++#define USOS_APMOFF_INT15 1
++#define USOS_APMOFF_PM16  2
++#define USOS_APMOFF_PM32  3
+ 
+-    /* Fallback: direct ACPI S5 shutdown (may not work properly on all HW) */
+-    dprintf(1, "UEFI shutdown unavailable, falling back to direct ACPI S5\n");
+-    u16 pm1a_cnt = GET_GLOBAL(acpi_pm1a_cnt);
+-    if (pm1a_cnt)
+-        outw(0x2000, pm1a_cnt);
++static void
++usos_apmoff_mark(u8 path, u8 step, u8 flags)
++{
++    if (path != USOS_APMOFF_INT15)
++        return;
++    u8 typ = GET_GLOBAL(usos_slp_typa) | (GET_GLOBAL(usos_slp_typb) << 4);
++    flags |= (GET_GLOBAL(usos_s5_found) ? 1 : 0)
++        | (GET_GLOBAL(acpi_pm1a_cnt) ? 2 : 0)
++        | (GET_GLOBAL(usos_pm1b_cnt) ? 4 : 0);
++    SET_FARVAR(SEG_BDA, *(u8*)0xFC, 'P');
++    SET_FARVAR(SEG_BDA, *(u8*)0xFD, (step << 4) | path);
++    SET_FARVAR(SEG_BDA, *(u8*)0xFE, typ);
++    SET_FARVAR(SEG_BDA, *(u8*)0xFF, flags);
++}
++
++// About ms milliseconds on the ACPI PM timer, else on port 80h reads.
++static void
++usos_apmoff_wait(u32 ms)
++{
++    u16 tmr = GET_GLOBAL(usos_pm_tmr);
++    u32 last = tmr ? inl(tmr) : 0, waited = 0, limit = ms * 3580;
++    if (!tmr)
++        limit = ms * 1000;
++    while (waited < limit) {
++        if (tmr) {
++            u32 now = inl(tmr);
++            waited += (now - last) & 0xffffff;
++            last = now;
++        } else {
++            inb(0x80);
++            waited++;
++        }
++    }
++}
+ 
++static void
++usos_s5_write(void)
++{
++    u32 a = GET_GLOBAL(acpi_pm1a_cnt), b = GET_GLOBAL(usos_pm1b_cnt);
++    u8 ta = GET_GLOBAL(usos_slp_typa), tb = GET_GLOBAL(usos_slp_typb);
++    if (a)
++        outw(usos_s5_cnt(inw(a), ta, 0), a);
++    if (b)
++        outw(usos_s5_cnt(inw(b), tb, 0), b);
++    if (a)
++        outw(usos_s5_cnt(inw(a), ta, 1), a);
++    if (b)
++        outw(usos_s5_cnt(inw(b), tb, 1), b);
++}
++
++// Steps 2-4; returns only when the machine is still on.
++static void
++usos_apmoff_s5(u8 path, u8 flags)
++{
++    u32 a = GET_GLOBAL(acpi_pm1a_cnt);
++    dprintf(1, "USOS APMOFF: path=s5 from=%d typ=%d/%d s5=%d cnt=%x/%x\n"
++            , path, GET_GLOBAL(usos_slp_typa), GET_GLOBAL(usos_slp_typb)
++            , GET_GLOBAL(usos_s5_found), a, GET_GLOBAL(usos_pm1b_cnt));
++    usos_apmoff_mark(path, 2, flags);
+     irq_disable();
+-    for (;;)
+-        hlt();
++    usos_s5_write();
++    usos_apmoff_wait(2000);
++
++    u16 smi = GET_GLOBAL(usos_smi_cmd);
++    u8 en = GET_GLOBAL(usos_acpi_enable);
++    if (a && smi && en && !(inw(a) & 1)) {
++        dprintf(1, "USOS APMOFF: still on, ACPI enable (%x to %x), S5 again\n"
++                , en, smi);
++        flags |= 0x20;
++        usos_apmoff_mark(path, 3, flags);
++        outb(en, smi);
++        u32 i;
++        for (i = 0; i < 20 && !(inw(a) & 1); i++)
++            usos_apmoff_wait(50);
++        usos_s5_write();
++        usos_apmoff_wait(2000);
++    }
++    dprintf(1, "USOS APMOFF: still on, power-off failed\n");
++    usos_apmoff_mark(path, 4, flags);
++}
++
++static u8
++usos_apmoff_helper(u8 path)
++{
++    dprintf(1, "USOS APMOFF: path=uefi from=%d (ResetSystem on the helper core)\n"
++            , path);
++    usos_apmoff_mark(path, 1, 0);
++    int r = usos_proxy_reset_timed(3);
++    dprintf(1, "USOS APMOFF: helper returned %d\n", r);
++    return r == -2 ? 0x08 : 0x10;
++}
++
++// INT 15h (real or V86 mode) and 32-bit flat callers. Returns only when
++// the machine is still on.
++void
++apm_shutdown(void)
++{
++    u8 flags = usos_apmoff_helper(USOS_APMOFF_INT15);
++    usos_apmoff_s5(USOS_APMOFF_INT15, flags);
+ }
+ 
+ // APM Set Power State
+@@ -120,7 +239,9 @@
+         break;
+     case 3:
+         apm_shutdown();
+-        break;
++        // USOS 0008: still on - report it instead of halting.
++        set_code_invalid_silent(regs, 0x60);
++        return;
+     }
+     set_success(regs);
+ }
+@@ -216,5 +337,15 @@
+ handle_apm(struct bregs *regs)
+ {
+     debug_enter(regs, DEBUG_HDL_apm);
++    // USOS 0008: power-off from the protected-mode interfaces. MODE16 here
++    // is the 16-bit PM entry: no real-mode segments, port I/O only.
++    if (regs->ax == 0x5307 && regs->bx == 1 && regs->cx == 3) {
++        u8 path = MODE16 ? USOS_APMOFF_PM16 : USOS_APMOFF_PM32, flags = 0;
++        if (!MODE16)
++            flags = usos_apmoff_helper(path);
++        usos_apmoff_s5(path, flags);
++        set_code_invalid_silent(regs, 0x60);
++        return;
++    }
+     handle_1553(regs);
+ }
+diff -ruN a/seabios/src/fw/biostables.c b/seabios/src/fw/biostables.c
+--- a/seabios/src/fw/biostables.c
++++ b/seabios/src/fw/biostables.c
+@@ -18,6 +18,7 @@
+ #include "string.h" // memcpy
+ #include "util.h" // copy_table
+ #include "x86.h" // outb
++#include "fw/usos_s5.h" // usos_s5_parse
+ 
+ struct pir_header *PirAddr VARFSEG;
+ 
+@@ -194,6 +195,13 @@
+ static struct acpi_20_generic_address acpi_reset_reg;
+ static u8 acpi_reset_val;
+ u32 acpi_pm1a_cnt VARFSEG;
++// USOS 0008: what an APM power-off needs for a direct ACPI S5 write.
++u32 usos_pm1b_cnt VARFSEG;
++u16 usos_pm_tmr VARFSEG;
++u16 usos_smi_cmd VARFSEG;
++u8 usos_acpi_enable VARFSEG;
++u8 usos_slp_typa VARFSEG, usos_slp_typb VARFSEG;
++u8 usos_s5_found VARFSEG;   // 1 = Name(_S5) package found in the DSDT/SSDT
+ u16 acpi_pm_base = 0xb000;
+ 
+ #define acpi_ga_to_bdf(addr) pci_to_bdf(0, (addr >> 32) & 0xffff, (addr >> 16) & 0xffff)
+@@ -234,6 +242,54 @@
+     acpi_reset_val = val;
+ }
+ 
++// USOS 0008: an I/O port from the FADT, or from its 64-bit X_ GAS (ACPI
++// 2.0+) when the 32-bit field is 0.
++static u32
++usos_fadt_port(struct fadt_descriptor_rev1 *fadt, u32 legacy, u32 gas_off)
++{
++    if (legacy || fadt->length < gas_off + 12)
++        return legacy;
++    u8 *gas = (u8*)fadt + gas_off;
++    u64 addr = *(u64*)(gas + 4);
++    if (gas[0] != 1 || !addr || addr > 0xffff)
++        return 0;
++    return addr;
++}
++
++// USOS 0008: \_S5 SLP_TYPa/b from the DSDT, else from an SSDT in the RSDT.
++#define USOS_SSDT_SIGNATURE 0x54445353 // SSDT
++static int
++usos_s5_in_table(struct acpi_table_header *t, u32 sig, u8 *a, u8 *b)
++{
++    if (!t || t->signature != sig || t->length <= 36 || t->length >= 0x1000000)
++        return 0;
++    return usos_s5_parse((u8*)t + 36, t->length - 36, a, b);
++}
++
++static void
++usos_find_s5(struct fadt_descriptor_rev1 *fadt)
++{
++    u32 dsdt = le32_to_cpu(fadt->dsdt);
++    if (!dsdt && fadt->length >= 148) {
++        u64 x = *(u64*)((u8*)fadt + 140);
++        if (x < 0x100000000ULL)
++            dsdt = x;
++    }
++    u8 a = 0, b = 0;
++    int found = usos_s5_in_table((void*)dsdt, DSDT_SIGNATURE, &a, &b);
++    struct rsdt_descriptor_rev1 *rsdt = (void*)RsdpAddr->rsdt_physical_address;
++    if (!found && rsdt && rsdt->signature == RSDT_SIGNATURE) {
++        void *end = (void*)rsdt + rsdt->length;
++        int i;
++        for (i=0; !found && (void*)&rsdt->table_offset_entry[i] < end; i++)
++            found = usos_s5_in_table((void*)rsdt->table_offset_entry[i]
++                                     , USOS_SSDT_SIGNATURE, &a, &b);
++    }
++    usos_slp_typa = a;
++    usos_slp_typb = b;
++    usos_s5_found = found;
++}
++
+ void
+ find_acpi_features(void)
+ {
+@@ -245,6 +301,18 @@
+     dprintf(4, "pm_tmr_blk=%x\n", pm_tmr);
+     if (pm_tmr)
+         pmtimer_setup(pm_tmr);
++    // USOS 0008: X_ fallbacks, PM1b, the PM timer for timeouts, \_S5.
++    pm1a_cnt = usos_fadt_port(fadt, pm1a_cnt, 172);
++    usos_pm1b_cnt = usos_fadt_port(fadt, le32_to_cpu(fadt->pm1b_cnt_blk), 184);
++    usos_pm_tmr = usos_fadt_port(fadt, pm_tmr, 208);
++    usos_find_s5(fadt);
++    if (le32_to_cpu(fadt->smi_cmd) <= 0xffff) {
++        usos_smi_cmd = le32_to_cpu(fadt->smi_cmd);
++        usos_acpi_enable = fadt->acpi_enable;
++    }
++    dprintf(1, "USOS APMOFF: pm1a_cnt=%x pm1b_cnt=%x pm_tmr=%x s5=%s typ=%d/%d\n"
++            , pm1a_cnt, usos_pm1b_cnt, usos_pm_tmr
++            , usos_s5_found ? "found" : "none", usos_slp_typa, usos_slp_typb);
+     if (pm1a_cnt)
+         acpi_pm1a_cnt = pm1a_cnt;
+ 
+diff -ruN a/seabios/src/fw/csm.c b/seabios/src/fw/csm.c
+--- a/seabios/src/fw/csm.c
++++ b/seabios/src/fw/csm.c
+@@ -12,6 +12,7 @@
+ #include "hw/pcidevice.h" // pci_probe_devices
+ #include "hw/pic.h" // pic_irqmask_read
+ #include "hw/ps2port.h" // ps2port_setup
++#include "hw/serialio.h" // UsosDebugSerialPort
+ #include "malloc.h" // malloc_csm_preinit
+ #include "memmap.h" // SYMBOL
+ #include "output.h" // dprintf
+@@ -111,6 +112,11 @@
+ {
+     qemu_preinit();
+ 
++    // USOS 0008: SeaBIOS debug output to the serial port CSMWrap uses,
++    // only when csmwrap.ini asks for serial output.
++    if (csm_compat_table.CsmwrapFlags & CSMWRAP_FLAG_SERIAL)
++        UsosDebugSerialPort = csm_compat_table.CsmwrapSerialPort;
++
+     dprintf(3, "Legacy16InitializeYourself table %04x:%04x\n", regs->es,
+             regs->bx);
+ 
+diff -ruN a/seabios/src/fw/usos_s5.h b/seabios/src/fw/usos_s5.h
+--- a/seabios/src/fw/usos_s5.h
++++ b/seabios/src/fw/usos_s5.h
+@@ -0,0 +1,98 @@
++// USOS (CSMWrap 3.1.2-usos7, patch 0008): find the \_S5 sleep type values
++// in an AML table (DSDT/SSDT) without an interpreter.
++//
++// Own code written from the ACPI specification (6.x: 5.4 AML encoding,
++// 7.4.2 \_Sx system states, 4.8.3.2 PM1 control registers). Only a plain
++// "Name (_S5, Package () {a, b, ...})" is recognised: NameOp 0x08,
++// optional root prefix '\', NameSeg "_S5_", PackageOp 0x12, PkgLength,
++// NumElements, then integer constants (ZeroOp 0x00, OneOp 0x01, OnesOp
++// 0xFF, BytePrefix 0x0A, WordPrefix 0x0B, DWordPrefix 0x0C). A _S5 that is
++// a method or uses names is not evaluated (returns 0).
++//
++// Header only and free of SeaBIOS dependencies apart from u8/u32, so the
++// host unit test (tools/tests/csmwrap/test_csmwrap_apmoff.py) compiles the
++// same text. This file may be distributed under the terms of the GNU
++// LGPLv3 license.
++#ifndef __USOS_S5_H
++#define __USOS_S5_H
++
++// One AML integer constant at aml[*pos]; 1 = parsed (value in *val).
++static inline int
++usos_s5_const(const u8 *aml, u32 len, u32 *pos, u32 *val)
++{
++    u32 p = *pos, n, i;
++    if (p >= len)
++        return 0;
++    switch (aml[p]) {
++    case 0x00: *val = 0; *pos = p + 1; return 1;
++    case 0x01: *val = 1; *pos = p + 1; return 1;
++    case 0xFF: *val = 0xFFFFFFFF; *pos = p + 1; return 1;
++    case 0x0A: n = 1; break;
++    case 0x0B: n = 2; break;
++    case 0x0C: n = 4; break;
++    default: return 0;
++    }
++    if (p + n >= len)
++        return 0;
++    *val = 0;
++    for (i = 0; i < n; i++)
++        *val |= (u32)aml[p + 1 + i] << (8 * i);
++    *pos = p + 1 + n;
++    return 1;
++}
++
++// Search aml[0..len) for Name(_S5, Package(){...}). On success stores the
++// 3-bit SLP_TYPa / SLP_TYPb values and returns 1. A one-element package is
++// the old packed form (SLP_TYPa in bits 0-7, SLP_TYPb in bits 8-15).
++static inline int
++usos_s5_parse(const u8 *aml, u32 len, u8 *typa, u8 *typb)
++{
++    u32 i;
++    for (i = 0; i + 6 < len; i++) {
++        if (aml[i] != 0x08)
++            continue;
++        u32 p = i + 1;
++        if (aml[p] == 0x5C)
++            p++;
++        if (p + 6 >= len || aml[p] != '_' || aml[p + 1] != 'S'
++            || aml[p + 2] != '5' || aml[p + 3] != '_' || aml[p + 4] != 0x12)
++            continue;
++        p += 5;
++        u32 lead = aml[p];
++        u32 pkglen_bytes = 1 + (lead >> 6);
++        if (lead >> 6 && (lead & 0x30))
++            continue;               // bits 4-5 must be 0 in the multi-byte form
++        p += pkglen_bytes;
++        if (p >= len)
++            continue;
++        u32 count = aml[p++];
++        u32 a, b;
++        if (!count || !usos_s5_const(aml, len, &p, &a))
++            continue;
++        if (count == 1) {
++            b = a >> 8;
++        } else if (!usos_s5_const(aml, len, &p, &b)) {
++            continue;
++        }
++        *typa = a & 7;
++        *typb = b & 7;
++        return 1;
++    }
++    return 0;
++}
++
++// PM1x_CNT value for entering a sleep state: SLP_TYP (bits 10-12) set,
++// SLP_EN (bit 13) clear or set, every other bit (SCI_EN etc.) kept.
++#define USOS_PM1_SLP_TYP_MASK 0x1C00
++#define USOS_PM1_SLP_EN       0x2000
++static inline u32
++usos_s5_cnt(u32 cnt, u8 typ, int enable)
++{
++    cnt = (cnt & ~(u32)(USOS_PM1_SLP_TYP_MASK | USOS_PM1_SLP_EN))
++        | ((u32)(typ & 7) << 10);
++    if (enable)
++        cnt |= USOS_PM1_SLP_EN;
++    return cnt & 0xFFFF;
++}
++
++#endif // usos_s5.h
+diff -ruN a/seabios/src/hw/serialio.c b/seabios/src/hw/serialio.c
+--- a/seabios/src/hw/serialio.c
++++ b/seabios/src/hw/serialio.c
+@@ -9,6 +9,7 @@
+ #include "output.h" // dprintf
+ #include "serialio.h" // serial_debug_preinit
+ #include "x86.h" // outb
++#include "biosvar.h" // GET_GLOBAL
+ 
+ 
+ /****************************************************************
+@@ -17,11 +18,19 @@
+ 
+ #define DEBUG_TIMEOUT 100000
+ 
++// USOS 0008: debug output port set at run time by CSMWrap (csmwrap.ini
++// serial = true, CsmwrapSerialPort), 0 = off. Used only when the build has
++// no CONFIG_DEBUG_SERIAL / MMIO port.
++u16 UsosDebugSerialPort VARFSEG;
++#define USOS_DEBUG_RUNTIME (!CONFIG_DEBUG_SERIAL && !CONFIG_DEBUG_SERIAL_MMIO)
++
+ // Write to a serial port register
+ static void
+ serial_debug_write(u8 offset, u8 val)
+ {
+-    if (CONFIG_DEBUG_SERIAL) {
++    if (USOS_DEBUG_RUNTIME) {
++        outb(val, GET_GLOBAL(UsosDebugSerialPort) + offset);
++    } else if (CONFIG_DEBUG_SERIAL) {
+         outb(val, CONFIG_DEBUG_SERIAL_PORT + offset);
+     } else if (CONFIG_DEBUG_SERIAL_MMIO) {
+         ASSERT32FLAT();
+@@ -33,6 +42,8 @@
+ static u8
+ serial_debug_read(u8 offset)
+ {
++    if (USOS_DEBUG_RUNTIME)
++        return inb(GET_GLOBAL(UsosDebugSerialPort) + offset);
+     if (CONFIG_DEBUG_SERIAL)
+         return inb(CONFIG_DEBUG_SERIAL_PORT + offset);
+     if (CONFIG_DEBUG_SERIAL_MMIO) {
+@@ -66,7 +77,10 @@
+ static void
+ serial_debug(char c)
+ {
+-    if (!CONFIG_DEBUG_SERIAL && (!CONFIG_DEBUG_SERIAL_MMIO || MODESEGMENT))
++    if (USOS_DEBUG_RUNTIME && !GET_GLOBAL(UsosDebugSerialPort))
++        return;
++    if (!USOS_DEBUG_RUNTIME && !CONFIG_DEBUG_SERIAL
++        && (!CONFIG_DEBUG_SERIAL_MMIO || MODESEGMENT))
+         return;
+     int timeout = DEBUG_TIMEOUT;
+     while ((serial_debug_read(SEROFF_LSR) & 0x20) != 0x20)
+@@ -88,7 +102,10 @@
+ void
+ serial_debug_flush(void)
+ {
+-    if (!CONFIG_DEBUG_SERIAL && (!CONFIG_DEBUG_SERIAL_MMIO || MODESEGMENT))
++    if (USOS_DEBUG_RUNTIME && !GET_GLOBAL(UsosDebugSerialPort))
++        return;
++    if (!USOS_DEBUG_RUNTIME && !CONFIG_DEBUG_SERIAL
++        && (!CONFIG_DEBUG_SERIAL_MMIO || MODESEGMENT))
+         return;
+     int timeout = DEBUG_TIMEOUT;
+     while ((serial_debug_read(SEROFF_LSR) & 0x60) != 0x60)
+diff -ruN a/seabios/src/hw/serialio.h b/seabios/src/hw/serialio.h
+--- a/seabios/src/hw/serialio.h
++++ b/seabios/src/hw/serialio.h
+@@ -24,6 +24,7 @@
+ void serial_debug_putc(char c);
+ void serial_debug_flush(void);
+ extern u16 DebugOutputPort;
++extern u16 UsosDebugSerialPort;
+ void qemu_debug_preinit(void);
+ void qemu_debug_putc(char c);
+ 
+diff -ruN a/seabios/src/stacks.c b/seabios/src/stacks.c
+--- a/seabios/src/stacks.c
++++ b/seabios/src/stacks.c
+@@ -379,6 +379,63 @@
+     /* Not reached */
+ }
+ 
++/*
++ * USOS 0008: ask the helper core to run bios_proxy_reset(type) (UEFI
++ * ResetSystem) through the mailbox, and give up after about 2 seconds.
++ * Unlike call32() this needs no segment that only exists in real mode in
++ * 32-bit code: it works from real/V86 mode (MODE16, %es = F000h), from the
++ * 32-bit protected-mode APM interface (32seg: %gs = the APM data segment,
++ * based at the F-segment, see entry_apm32) and from 32-bit flat code. Not
++ * for 16-bit protected mode (no usable data segment there).
++ * Returns -1 when the reset is not available or the helper is busy, -2 on
++ * timeout, else the helper's result (-1 = no ResetSystem pointer).
++ */
++#if MODE16
++#define USOS_PX_SET(field, val) SET_FARVAR(SEG_BIOS, bios_proxy.field, (val))
++#elif MODESEGMENT
++#define USOS_PX_SET(field, val) SET_VAR(GS, *(typeof(&bios_proxy.field))    \
++        ((void*)&bios_proxy.field + get_global_offset()), (val))
++#else
++#define USOS_PX_SET(field, val) do { bios_proxy.field = (val); } while (0)
++#endif
++#define USOS_PX_GET(field) GET_GLOBAL(bios_proxy.field)
++
++int
++usos_proxy_reset_timed(int type)
++{
++    extern void _cfunc32flat_bios_proxy_reset(void);
++    if (USOS_PX_GET(signature) != BIOS_PROXY_SIGNATURE
++        || (!USOS_PX_GET(reset_fn_lo) && !USOS_PX_GET(reset_fn_hi))
++        || !USOS_PX_GET(reset_cr3) || USOS_PX_GET(request_pending))
++        return -1;
++    USOS_PX_SET(func_ptr, (u32)_cfunc32flat_bios_proxy_reset);
++    USOS_PX_SET(arg_eax, (u32)type);
++    USOS_PX_SET(arg_edx, 0);
++    USOS_PX_SET(arg_ecx, 0);
++    asm volatile("" ::: "memory");
++    USOS_PX_SET(request_pending, 1);
++
++    /* ~2 s on the ACPI PM timer (3.579545 MHz, 24 bits used), else on
++     * port 80h reads (about 1 us each). */
++    u16 tmr = GET_GLOBAL(usos_pm_tmr);
++    u32 last = tmr ? inl(tmr) : 0, waited = 0;
++    while (USOS_PX_GET(request_pending)) {
++        asm volatile("pause" ::: "memory");
++        if (tmr) {
++            u32 now = inl(tmr);
++            waited += (now - last) & 0xffffff;
++            last = now;
++            if (waited > 7159090)
++                return -2;
++        } else {
++            inb(0x80);
++            if (++waited > 2000000)
++                return -2;
++        }
++    }
++    return USOS_PX_GET(result);
++}
++
+ static u32
+ call32_proxy(void *func, u32 eax, u32 edx, u32 ecx)
+ {
+diff -ruN a/seabios/src/std/LegacyBios.h b/seabios/src/std/LegacyBios.h
+--- a/seabios/src/std/LegacyBios.h
++++ b/seabios/src/std/LegacyBios.h
+@@ -266,12 +266,22 @@
+   /// CSMWrap USOS extension. CSMWRAP_FLAG_* bits set by the loader.
+   ///
+   UINT8                             CsmwrapFlags;
++
++  ///
++  /// CSMWrap USOS extension (usos7). I/O port of the serial debug output
++  /// when CsmwrapFlags has CSMWRAP_FLAG_SERIAL.
++  ///
++  UINT16                            CsmwrapSerialPort;
+ } EFI_COMPATIBILITY16_TABLE;
+ 
+ ///
+ /// CsmwrapFlags: quiet boot (no SeaBIOS banner, no boot menu prompt).
+ ///
+ #define CSMWRAP_FLAG_QUIET  0x01
++///
++/// CsmwrapFlags: SeaBIOS debug output (dprintf level 1) to CsmwrapSerialPort.
++///
++#define CSMWRAP_FLAG_SERIAL 0x02
+ 
+ ///
+ /// Functions provided by the CSM binary which communicate between the EfiCompatibility 
+diff -ruN a/seabios/src/util.h b/seabios/src/util.h
+--- a/seabios/src/util.h
++++ b/seabios/src/util.h
+@@ -11,6 +11,7 @@
+ 
+ // stacks.c - UEFI reset via helper core
+ int bios_proxy_reset(int type);
++int usos_proxy_reset_timed(int type);
+ 
+ // bmp.c
+ struct bmp_decdata *bmp_alloc(void);
+@@ -84,6 +85,11 @@
+ void copy_acpi_rsdp(void *pos);
+ extern struct rsdp_descriptor *RsdpAddr;
+ extern u32 acpi_pm1a_cnt;
++extern u32 usos_pm1b_cnt;
++extern u16 usos_pm_tmr;
++extern u16 usos_smi_cmd;
++extern u8 usos_acpi_enable;
++extern u8 usos_slp_typa, usos_slp_typb, usos_s5_found;
+ extern u16 acpi_pm_base;
+ void *find_acpi_rsdp(void);
+ void *find_acpi_table(u32 signature);
+diff -ruN a/src/csmwrap.c b/src/csmwrap.c
+--- a/src/csmwrap.c
++++ b/src/csmwrap.c
+@@ -785,6 +785,11 @@
+ 
+     /* USOS: ask SeaBIOS for a quiet boot unless verbose = true */
+     priv.csm_efi_table->CsmwrapFlags = gConfig.verbose ? 0 : CSMWRAP_FLAG_QUIET;
++    /* USOS 0008: SeaBIOS dprintf to the same serial port (serial = true) */
++    if (gConfig.serial_debug) {
++        priv.csm_efi_table->CsmwrapFlags |= CSMWRAP_FLAG_SERIAL;
++        priv.csm_efi_table->CsmwrapSerialPort = gConfig.serial_port;
++    }
+ 
+     /* Disable 8259 PIC */
+     outb(0x21, 0xff);
+diff -ruN a/src/edk2/LegacyBios.h b/src/edk2/LegacyBios.h
+--- a/src/edk2/LegacyBios.h
++++ b/src/edk2/LegacyBios.h
+@@ -267,12 +267,22 @@
+   /// CSMWrap USOS extension. CSMWRAP_FLAG_* bits set by the loader.
+   ///
+   UINT8                             CsmwrapFlags;
++
++  ///
++  /// CSMWrap USOS extension (usos7). I/O port of the serial debug output
++  /// when CsmwrapFlags has CSMWRAP_FLAG_SERIAL.
++  ///
++  UINT16                            CsmwrapSerialPort;
+ } EFI_COMPATIBILITY16_TABLE;
+ 
+ ///
+ /// CsmwrapFlags: quiet boot (no SeaBIOS banner, no boot menu prompt).
+ ///
+ #define CSMWRAP_FLAG_QUIET  0x01
++///
++/// CsmwrapFlags: SeaBIOS debug output (dprintf level 1) to CsmwrapSerialPort.
++///
++#define CSMWRAP_FLAG_SERIAL 0x02
+ 
+ ///
+ /// Functions provided by the CSM binary which communicate between the EfiCompatibility

@@ -106,8 +106,8 @@ def main() -> int:
     assert manifest["patches"] == {n: hashlib.sha256((V11 / n).read_bytes()).hexdigest() for n in names}
     for name, digest in manifest["files"].items():
         assert hashlib.sha256((vendor / name).read_bytes()).hexdigest() == digest, name
-    # the release pins moved to 3.1.2-usos14 (same 0012 file, test_csmwrap_wheel_diag.py)
-    assert (ROOT / "tools/vendor/csmwrap/3.1.2-usos14/patches" / PATCH.name).read_bytes() == PATCH.read_bytes()
+    # the release pins moved to 3.1.2-usos15 (same 0012 file, test_csmwrap_wheel15.py)
+    assert (ROOT / "tools/vendor/csmwrap/3.1.2-usos15/patches" / PATCH.name).read_bytes() == PATCH.read_bytes()
     efi = (vendor / "csmwrapx64.efi").read_bytes()
     assert b"USOS W2KHIDE" in efi and b"3.1.2-usos11" in efi and b"USOS WATCH" not in efi
 

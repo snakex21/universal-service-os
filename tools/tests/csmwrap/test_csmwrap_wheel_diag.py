@@ -15,8 +15,8 @@ behind a boot keyboard interface).
 2. Wiring: keyboard setup/handling untouched; boot protocol for every
    refusal; the record only written; usb.c adds only boot mice after a
    boot keyboard interface.
-3. Series and pins: usos14 = usos13 byte for byte + 0018 + 0019; manifest,
-   lock.json, xp_csmwrap_esp.sh PINNED, release.go, run_build_vm.py count.
+3. Series: usos14 = usos13 byte for byte + 0018 + 0019; manifest; the
+   release pins are usos15 now (same 0001-0019 files, test_csmwrap_wheel15.py).
 """
 from __future__ import annotations
 
@@ -442,13 +442,9 @@ def pins() -> None:
     assert manifest["patches"] == {n: sha(V14 / "patches" / n) for n in names}
     for name, digest in manifest["files"].items():
         assert sha(V14 / name) == digest, name
-    lock = json.loads((ROOT / "tools/csmwrap_build/lock.json").read_text(encoding="utf-8"))
-    assert lock["usos_version"] == "3.1.2-usos14"
-    assert f"PINNED={manifest['files']['csmwrapx64.efi']}\n" in (ROOT / "tools/xp_csmwrap_esp.sh").read_text(encoding="utf-8")
-    assert 'csmwrapVendorDir  = "tools/vendor/csmwrap/3.1.2-usos14"' in (
-        ROOT / "installer/cmd/usos-efisign/release.go").read_text(encoding="utf-8")
-    vm = (ROOT / "tools/csmwrap_build/run_build_vm.py").read_text(encoding="utf-8")
-    assert "3.1.2-usos14/patches" in vm and "len(patches) != 17" in vm
+    # the release pins moved to 3.1.2-usos15 (same 0018/0019 files, test_csmwrap_wheel15.py)
+    for n in (P18.name, P19.name):
+        assert sha(ROOT / "tools/vendor/csmwrap/3.1.2-usos15/patches" / n) == sha(V14 / "patches" / n), n
     efi = (V14 / "csmwrapx64.efi").read_bytes()
     assert efi[:2] == b"MZ" and b"3.1.2-usos14" in efi and b"pci_irq_routing" in efi
 

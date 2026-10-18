@@ -1,0 +1,140 @@
+USOS CSMWrap patch 0020 (2026-10-19): USB mouse wheel in the Z word without the knock, INT 15h C2xxh call ring
+
+Windows Me on the X470 (CSMWrap 3.1.2-usos14, Logitech G502 HERO): the
+USOSMWHL record shows the mouse in the HID report protocol with a wheel
+field and wheel packets arriving, but the emulated IntelliMouse device ID
+is 0 and the last sample rates are 10, 40: after USOSMOUS.DRV's knock
+(200, 100, 80) another INT 15h client reset the device (C201h/C205h) and
+set its own rates, so patch 0016 no longer passed the wheel. With this
+patch:
+- package size 3: the wheel value always goes in the far-call handler's
+  Z word, also with device ID 0 (no knock or a later reset); a standard
+  handler ignores Z, and z is 0 for a mouse without a wheel. Package sizes
+  1/2 and 4-7 are unchanged (the 4th byte only after the knock, device
+  ID 3), so 3-byte stream readers never see an extra byte;
+- the USOSMWHL record (version byte still 1, the first 310 bytes as in
+  0018) gets a ring of the last 16 INT 15h AH=C2h calls at +312: magic
+  "C2RG", a call counter, the next slot, then per call AX, BX, ES on
+  entry, the caller's CS:IP (the return address of the INT), the
+  emulated device ID after the call and the result (0, or 80h | AH with
+  CF set). Written only, never read back by the BIOS (USOSDBG.EXE).
+
+Own code. Applies after 0001-0010, 0012, 0014-0019, patch -p1 from the top
+of the tree. Part of a MODIFIED CSMWrap made by the USOS project (SeaBIOS
+LGPLv3).
+
+diff -ruN a/seabios/src/hw/usb-hid.c b/seabios/src/hw/usb-hid.c
+--- a/seabios/src/hw/usb-hid.c
++++ b/seabios/src/hw/usb-hid.c
+@@ -58,6 +58,13 @@ u8 usb_mouse_rate1 VARLOW, usb_mouse_rate2 VARLOW, usb_mouse_id VARLOW;
+ // BIOS. The signature is set at setup, so the image copy never has it.
+ #define USB_MOUSE_DIAG_DEVS 4
+ #define USB_MOUSE_DIAG_DESC 160
++#define USB_MOUSE_C2_RING 16
++struct usb_mouse_c2 {
++    u16 ax, bx, es;     // the call
++    u16 cs, ip;         // its return address
++    u8 id;              // usb_mouse_id after the call
++    u8 res;             // 0 success, 0x80 | AH with CF set
++};
+ struct usb_mouse_diag_dev {
+     u8 iface, maxpacket, report, report_id;
+     s8 result;          // 0 report protocol, < 0 why boot (USB_MD_*)
+@@ -81,6 +88,13 @@ struct usb_mouse_diag {
+     struct usb_mouse_diag_dev dev[USB_MOUSE_DIAG_DEVS];
+     u16 desc_got;       // bytes of dev[0]'s report descriptor in desc
+     u8 desc[USB_MOUSE_DIAG_DESC];
++    // USOS (patch 0020): the last INT 15h AH=C2h calls, to see which
++    // client resets the emulated mouse (+312; the version byte stays 1).
++    u32 c2_magic;       // "C2RG" (an immediate, set with every entry)
++    u16 c2_count;       // calls since boot (wraps)
++    u8 c2_head;         // next slot
++    u8 c2_pad;
++    struct usb_mouse_c2 c2[USB_MOUSE_C2_RING];
+ };
+ struct usb_mouse_diag usb_mouse_diag VARLOW __aligned(16);
+ // Continuation packets of a long report still to skip, per diag slot, and
+@@ -117,6 +131,26 @@ usb_mouse_diag_rates(void)
+     SET_LOW(usb_mouse_diag.rate2, GET_LOW(usb_mouse_rate2));
+ }
+ 
++// USOS (patch 0020): one INT 15h AH=C2h call into the ring (handle_15c2,
++// after the call). Written only, never read back by the BIOS.
++void
++usb_mouse_diag_c2(u16 ax, u16 bx, u16 es, u16 cs, u16 ip, u8 res)
++{
++    if (! CONFIG_USB_MOUSE)
++        return;
++    u8 i = GET_LOW(usb_mouse_diag.c2_head) & (USB_MOUSE_C2_RING - 1);
++    SET_LOW(usb_mouse_diag.c2[i].ax, ax);
++    SET_LOW(usb_mouse_diag.c2[i].bx, bx);
++    SET_LOW(usb_mouse_diag.c2[i].es, es);
++    SET_LOW(usb_mouse_diag.c2[i].cs, cs);
++    SET_LOW(usb_mouse_diag.c2[i].ip, ip);
++    SET_LOW(usb_mouse_diag.c2[i].id, GET_LOW(usb_mouse_id));
++    SET_LOW(usb_mouse_diag.c2[i].res, res);
++    SET_LOW(usb_mouse_diag.c2_head, (i + 1) & (USB_MOUSE_C2_RING - 1));
++    SET_LOW(usb_mouse_diag.c2_count, GET_LOW(usb_mouse_diag.c2_count) + 1);
++    SET_LOW(usb_mouse_diag.c2_magic, 0x47523243);
++}
++
+ static int
+ add_pipe_node(struct pipe_node **list
+               , struct usbdevice_s *usbdev
+diff -ruN a/seabios/src/hw/usb-hid.h b/seabios/src/hw/usb-hid.h
+--- a/seabios/src/hw/usb-hid.h
++++ b/seabios/src/hw/usb-hid.h
+@@ -8,6 +8,7 @@ int usb_kbd_active(void);
+ int usb_kbd_command(int command, u8 *param);
+ int usb_mouse_active(void);
+ int usb_mouse_command(int command, u8 *param);
++void usb_mouse_diag_c2(u16 ax, u16 bx, u16 es, u16 cs, u16 ip, u8 res);
+ void usb_check_event(void);
+ 
+ 
+diff -ruN a/seabios/src/mouse.c b/seabios/src/mouse.c
+--- a/seabios/src/mouse.c
++++ b/seabios/src/mouse.c
+@@ -263,6 +263,8 @@ handle_15c2(struct bregs *regs)
+         return;
+     }
+ 
++    // USOS (patch 0020): the call for the USOSMWHL ring.
++    u16 ax = regs->ax, bx = regs->bx;
+     switch (regs->al) {
+     case 0x00: mouse_15c200(regs); break;
+     case 0x01: mouse_15c201(regs); break;
+@@ -274,6 +276,8 @@ handle_15c2(struct bregs *regs)
+     case 0x07: mouse_15c207(regs); break;
+     default:   mouse_15c2XX(regs); break;
+     }
++    usb_mouse_diag_c2(ax, bx, regs->es, regs->code.seg, regs->code.offset
++                      , (regs->flags & F_CF) ? 0x80 | (regs->ah & 0x7f) : 0);
+ }
+ 
+ // USOS (usb-mouse-wheel): the wheel byte of an IntelliMouse packet while
+@@ -355,9 +359,12 @@ process_mouse(u8 data)
+ 
+ // USOS (usb-mouse-wheel): one packet from the USB mouse. imps2: the client
+ // sent the IntelliMouse knock (device ID 3) and expects the wheel byte.
+-// Package size 3: three bytes, the wheel goes in the handler's Z word;
+-// package size 4..7: the 4th byte is the wheel (0 without the knock), the
+-// rest zero; package size 1 or 2: a byte stream of 3 or (imps2) 4 bytes.
++// Package size 3: three bytes, the wheel goes in the handler's Z word,
++// with or without the knock (patch 0020: a client may reset the device ID
++// after another one knocked; a standard handler ignores Z, z is 0 without
++// a wheel); package size 4..7: the 4th byte is the wheel (0 without the
++// knock), the rest zero; package size 1 or 2: a byte stream of 3 or
++// (imps2) 4 bytes.
+ void
+ process_mouse_packet(u8 flag, u8 x, u8 y, u8 z, int imps2)
+ {
+@@ -368,7 +375,7 @@ process_mouse_packet(u8 flag, u8 x, u8 y, u8 z, int imps2)
+     if (! (mouse_flags_2 & 0x80))
+         return;
+     u8 package_count = mouse_flags_2 & 0x07;
+-    if (package_count == 3 && imps2)
++    if (package_count == 3)
+         SET_LOW(mouse_extra_z, z);
+     process_mouse(flag);
+     process_mouse(x);

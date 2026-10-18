@@ -83,8 +83,8 @@ def main() -> int:
     assert len(manifest["patches"]) == len(list((VENDOR / "patches").glob("*.patch"))) == 11
     efi = hashlib.sha256((VENDOR / "csmwrapx64.efi").read_bytes()).hexdigest()
     assert efi == manifest["files"]["csmwrapx64.efi"]
-    # the release pins moved to 3.1.2-usos14 (same 0010 file, test_csmwrap_wheel_diag.py)
-    assert (ROOT / "tools/vendor/csmwrap/3.1.2-usos14/patches" / "0010-nvme-runtime-rearm.patch").read_bytes() == (VENDOR / "patches" / "0010-nvme-runtime-rearm.patch").read_bytes()
+    # the release pins moved to 3.1.2-usos15 (same 0010 file, test_csmwrap_wheel15.py)
+    assert (ROOT / "tools/vendor/csmwrap/3.1.2-usos15/patches" / "0010-nvme-runtime-rearm.patch").read_bytes() == (VENDOR / "patches" / "0010-nvme-runtime-rearm.patch").read_bytes()
     print("CSMWRAP-NVME-REARM-TEST-PASS")
     return 0
 

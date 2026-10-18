@@ -954,3 +954,53 @@ Tests:
   keyboard+mouse HID device, so the usb.c part is host-tested only.
 
 X470 with usos14: not tried. The in-place kit for the Me install on the Micron is `me-wheel-kit-v2`.
+
+## 21. 3.1.2-usos15: the USB wheel in the Z word without the knock, INT 15h C2xxh call ring (0020) (2026-10-19)
+
+3.1.2-usos15 = 3.1.2-usos14 (0001-0010, 0012, 0014-0019, byte for byte) + 0020. It is the new release pin
+(xp_csmwrap_esp.sh `PINNED`, release.go, lock.json, run_build_vm.py, third-party.json).
+
+Why: Windows Me on the X470 with usos14 (Micron, G502 HERO), USOSLOG/USOSDBG: the USOSMWHL record shows
+the mouse in the report protocol with the wheel at bit 48 (8 bits) and `packets:1076 with wheel:114`, so
+the USB side works; but `ID:0 rates:10,40`, and USOSMOUS.DRV reports `knocks:2 knock answered ID:00
+wheel:off`. Its rate table is right (200/100/80). So after the knock something resets the emulated mouse
+(C201h/C205h set the ID back to 0) and sets rates 10, 40, and 0016 only passes the wheel in the Z word with
+ID 3. Who does it is not known yet (suspected: Windows' own PS/2 mouse support, `*PNP0F0E` / VMOUSE,
+through INT 15h C2xxh); the ring below is there to show it.
+
+**0020** (own code):
+
+- Package size 3 (USOSMOUS.DRV, VBMOUSE's 3-byte mode): the wheel value always goes in the far-call
+  handler's Z word, with or without device ID 3. A standard handler ignores Z; for a mouse without a wheel
+  (boot protocol) z is 0. Package sizes 1/2 (byte stream) and 4-7 (4th byte) are unchanged: the wheel byte
+  only after the knock, so a 3-byte stream reader never gets an extra byte.
+- The USOSMWHL record keeps version 1 and its first 310 bytes (older USOSDBG.EXE reads it as before) and
+  grows to 512 bytes: at +312 magic `C2RG` (0x47523243), +316 a call counter (u16, wraps), +318 the next
+  slot, +320 16 entries of 12 bytes: AX, BX, ES on entry, the caller's CS:IP (the INT's return address),
+  the emulated device ID after the call and the result (0, or 80h | AH with CF set). `handle_15c2` records
+  every AH=C2h call after its switch; the ring is only written.
+
+Layout (build log): **ROM 120576 of 131072 bytes (92.0 %, 10496 free; usos14 10848)**; F-segment 16-bit
+36672 + 32-bit segmented 4118 + variables 3328 = 44118 bytes, **21418 bytes** allocation zone (6144 minimum
+kept); low memory 2704 (usos14 2512); 32-bit flat 28522, flat init 42080.
+
+Binary `329756efef14581c17f1fe5402bcdb157162c234ce715e789d543ce53aa4a8c6` (one pinned Alpine VM run, the
+same in its in-guest repeat build); the unpatched build still matches `upstream_rebuild`.
+
+USOSMOUS.DRV v4 (src/platform/win3/usosmous.c): where the wheel is wanted (98 / 98 SE / Me, Wheel=1) a
+nonzero Z sum is sent as a wheel event also when the knock was not answered with ID 3, and a knock answered
+with another ID is sent once more (once per C205h init). With an older CSMWrap Z stays 0, so nothing changes
+there.
+
+Tests:
+
+- `test_csmwrap_wheel15.py` (host, zig cc, UBSan): package size 3 with ID 0 and 3 gives the wheel in Z;
+  sizes 1, 4 and 7 unchanged (wheel byte only with ID 3); a mouse without a wheel keeps Z 0; the ring
+  layout (+312/+316/+318/+320, 12-byte entries, sizeof 512) and its wrap; wiring (AX/BX taken before the
+  switch, the record call after it, the other C2xxh functions, `handle_mouse` and the setup identical to
+  usos14); series and pins. The usos14 tests (`test_csmwrap_wheel_diag.py`, `test_csmwrap_wheel.py`) and
+  the other csmwrap host tests still PASS.
+- QEMU with usos15 (2026-10-19): `run_dos_mouse_probe.py --csmwrap <usos15> --wheel` session PASS (wheel
+  API 574Dh, sums -3 / +2), `run_csmwrap_pciirq_qemu.py --machine pc` PASS.
+
+X470 with usos15: not tried when this was written. No Windows 9x VM run was made with usos15 either.
