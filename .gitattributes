@@ -66,6 +66,7 @@ tools/vendor/csmwrap/3.1.2-usos9/** -text
 tools/vendor/csmwrap/3.1.2-usos10/** -text
 tools/vendor/csmwrap/3.1.2-usos11/** -text
 tools/vendor/csmwrap/3.1.2-usos11-diag/** -text
+tools/vendor/csmwrap/3.1.2-usos11-int13x/** -text
 tools/vendor/csmwrap/3.1.2-src/** -text
 tools/csmwrap_build/guest_build.sh text eol=lf
 

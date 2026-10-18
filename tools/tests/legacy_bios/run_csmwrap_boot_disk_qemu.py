@@ -20,9 +20,15 @@ Layouts (all with the decoy's MBR bootable):
   nvme-target  target on an NVMe controller, decoy on AHCI (INT 13h on NVMe,
                docs/nvme-nt-2026-10-11.md: DOS / 9x / NTLDR read through it)
   nvme-decoy   target on AHCI, decoy on NVMe (0x81 read from NVMe)
+  nvme-usb     target on NVMe, decoy on qemu-xhci usb-storage (the X470 9x
+               case: Micron NVMe + a FAT32 stick plugged in before boot)
 
   python tools/tests/legacy_bios/run_csmwrap_boot_disk_qemu.py --output zig-out/csmwrap-bootdisk \
       [--csmwrap-efi <efi>] [--layout same-port0 ...] [--expect-fail]
+
+--only (CSMWrap 3.1.2-usos11-int13x, patch 0014): CSMWRAP.INI gets
+int13_boot_disk_only = true; then the target must be 0x80 and INT 13h 0x81
+must fail ("USOS-TARGET NO-DRIVE-81"): the decoy has no BIOS drive number.
 
 USOS_QEMU_EXE selects a renamed QEMU copy in tools/qemu (parallel runs).
 Test tool only; disposable images only; no physical disk access.
@@ -41,7 +47,7 @@ OVMF_VARS = ROOT / 'tools/qemu/share/edk2-i386-vars.fd'
 CSMWRAP = ROOT / 'tools/vendor/csmwrap/3.1.2-usos11/csmwrapx64.efi'
 SECTOR = 512
 DISK_SECTORS = 2048 + ESP_SECTORS + 2048
-LAYOUTS = ('same-port0', 'same-port1', 'other-ctrl', 'usb-target', 'nvme-target', 'nvme-decoy')
+LAYOUTS = ('same-port0', 'same-port1', 'other-ctrl', 'usb-target', 'nvme-target', 'nvme-decoy', 'nvme-usb')
 
 
 def boot_code(name: bytes) -> bytes:
@@ -68,7 +74,7 @@ def boot_code(name: bytes) -> bytes:
     return bytes(c)
 
 
-def make_disk(path: Path, name: bytes, esp: bool, efi: bytes):
+def make_disk(path: Path, name: bytes, esp: bool, efi: bytes, only: bool = False):
     mbr = bytearray(SECTOR)
     code = boot_code(name)
     mbr[:len(code)] = code
@@ -83,6 +89,8 @@ def make_disk(path: Path, name: bytes, esp: bool, efi: bytes):
         f.write(mbr)
         if esp:
             ini = 'serial = true\r\nserial_port = 0x3f8\r\nverbose = true\r\n'
+            if only:
+                ini += 'int13_boot_disk_only = true\r\n'
             f.seek(2048 * SECTOR)
             f.write(build_fat16({'EFI/BOOT/BOOTX64.EFI': efi, 'EFI/BOOT/CSMWRAP.INI': ini.encode()}, 2048))
 
@@ -113,15 +121,18 @@ def qemu_args(layout: str, target: Path, decoy: Path, out: Path, vars_fd: Path) 
     elif layout == 'nvme-decoy':
         a += ['-device', 'nvme,drive=decoy,serial=USOS-NVME-D',
               '-device', 'ahci,id=sata', '-device', 'ide-hd,bus=sata.0,drive=target']
+    elif layout == 'nvme-usb':
+        a += ['-device', 'usb-storage,bus=xhci.0,drive=decoy,removable=on',
+              '-device', 'nvme,drive=target,serial=USOS-NVME-T']
     return a
 
 
-def run_layout(layout: str, efi: bytes, out: Path, minutes: float) -> str:
+def run_layout(layout: str, efi: bytes, out: Path, minutes: float, only: bool = False) -> str:
     out.mkdir(parents=True, exist_ok=True)
     for f in ('debugcon.log', 'serial.log'):
         (out / f).unlink(missing_ok=True)
     target, decoy, vars_fd = out / 'target.img', out / 'decoy.img', out / 'vars.fd'
-    make_disk(target, b'USOS-TARGET', True, efi)
+    make_disk(target, b'USOS-TARGET', True, efi, only)
     make_disk(decoy, b'USOS-DECOY', False, efi)
     decoy_before = decoy.read_bytes()
     vars_fd.write_bytes(OVMF_VARS.read_bytes())
@@ -162,14 +173,17 @@ def main() -> int:
     p.add_argument('--csmwrap-efi', type=Path, default=CSMWRAP)
     p.add_argument('--layout', action='append', choices=LAYOUTS)
     p.add_argument('--minutes', type=float, default=6)
+    p.add_argument('--only', action='store_true', help='int13_boot_disk_only = true: want USOS-TARGET NO-DRIVE-81')
     p.add_argument('--expect-fail', action='store_true', help='control run with an older CSMWrap: same-port0 must boot the decoy')
     a = p.parse_args()
     efi = a.csmwrap_efi.read_bytes()
     ok = True
     for layout in a.layout or LAYOUTS:
-        got = run_layout(layout, efi, a.output / layout, a.minutes)
-        want = 'USOS-DECOY' if a.expect_fail else 'USOS-TARGET  USOS-DECOY'
-        if a.expect_fail:
+        got = run_layout(layout, efi, a.output / layout, a.minutes, a.only)
+        want = 'USOS-DECOY' if a.expect_fail else 'USOS-TARGET  NO-DRIVE-81' if a.only else 'USOS-TARGET  USOS-DECOY'
+        if a.only:
+            passed = got.replace('  ', ' ').startswith('USOS-TARGET NO-DRIVE-81')
+        elif a.expect_fail:
             passed = got.startswith('USOS-DECOY')
         else:
             passed = got.replace('  ', ' ').startswith('USOS-TARGET USOS-DECOY')

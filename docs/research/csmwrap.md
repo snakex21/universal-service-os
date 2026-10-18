@@ -730,3 +730,23 @@ run_csmwrap_boot_disk_qemu.py six layouts PASS, 2000 Pro SP4 ACPI on q35
 Provenance: the device-hiding rule comes from Codex's diagnosis, which used
 the user-supplied NT5 material as a behaviour map (not clean-room); the
 patch 0012 code is ours, from the ACPI specification, without Microsoft code.
+
+## 17. 3.1.2-usos11-int13x: only the boot disk gets a BIOS number (experimental, 2026-10-18)
+
+Patch 0014 (own code), on top of 3.1.2-usos11. When csmwrap.ini has
+`int13_boot_disk_only = true`, CSMWrap tags its boot disk with IBV1 "USOX" (it
+uses the same IBV2 hash as patch 0005). SeaBIOS (`usos_boot_disk_first`) moves the
+one matching disk to 0x80. Then it removes every other `IPL_TYPE_HARDDISK`
+entry before `bcv_prepboot` maps the drives. With no match or with several
+matches, nothing is removed. Without the key, the binary behaves the same as usos11.
+
+Purpose: on the X470, Windows Me on NVMe stops with "cannot find KRNL386.EXE" when a USB stick is
+plugged in. With this key, INT 13h shows exactly one hard disk again, which is the configuration that works.
+Details, the 9x IOS stamp/checksum matching and the X470 kit are in docs/nvme-9x-2026-10-14.md
+("A second BIOS disk"). Binary
+`e0ec207b444962c555b5dc65ccea99938673dca576488166bdc7cd11c8a054be` (the usos1 and repeat
+builds are identical). It is not in the flow and not pinned in xp_csmwrap_esp.sh.
+
+QEMU: `run_csmwrap_boot_disk_qemu.py --only` PASSES on nvme-usb, same-port0, usb-target and
+nvme-target (`USOS-TARGET NO-DRIVE-81`). The same runs without `--only` keep the usos11 order.
+The new layout `nvme-usb` (NVMe target, USB decoy) also PASSES with usos11.
