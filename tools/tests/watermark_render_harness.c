@@ -41,9 +41,26 @@ static DWORD scene(DWORD style,int left,int top){
  SelectObject(dc,old);DeleteObject(destination);DeleteDC(dc);reset_background();return 0;
 }
 void entry(void){
+ const WCHAR zeroes[]=L"0 0 0 0 0 0 0 0",empty[]=L"",nonzero[]=L"0 0 0 1 0 0 0 0",short_pattern[]=L"0 0",unterminated[]={L'0',L'0'};
+ if(!blank_pattern(zeroes,sizeof(zeroes))||!blank_pattern(empty,sizeof(empty))||blank_pattern(nonzero,sizeof(nonzero))||blank_pattern(short_pattern,sizeof(short_pattern))||blank_pattern(unterminated,sizeof(unterminated)))ExitProcess(100);
+ const WCHAR dword_zero[]={0,0},dword_nonzero[]={1,0};
+ if(!no_desktop_pattern(dword_zero,REG_DWORD,4)||no_desktop_pattern(dword_nonzero,REG_DWORD,4)||no_desktop_pattern(dword_zero,REG_BINARY,4)||!no_desktop_pattern(zeroes,REG_SZ,sizeof(zeroes)))ExitProcess(101);
  for(DWORD style=WPSTYLE_CENTER;style<=WPSTYLE_STRETCH;style++){
   DWORD result=scene(style,10,20);if(result)ExitProcess(10+style*10+result);
   result=scene(style,-12,-10);if(result)ExitProcess(50+style*10+result);
  }
+ if(FAILED(CoInitializeEx(0,COINIT_APARTMENTTHREADED)))ExitProcess(110);
+ const WCHAR *files[]={L"decode.jpg",L"decode.png",L"decode-alpha.png",L"decode-bad.dat"};
+ for(unsigned file=0;file<4;file++){
+  WCHAR path[MAX_PATH];if(!wm_directory(0,path))ExitProcess(111);lstrcatW(path,files[file]);BOOL loaded=load_wic_bitmap(path);
+  if(file<2){
+   if(!loaded)ExitProcess(112);BITMAP bitmap;if(GetObjectW(wallpaper,sizeof(bitmap),&bitmap)!=sizeof(bitmap)||bitmap.bmWidth!=8||bitmap.bmHeight!=4||!bitmap.bmBits)ExitProcess(113);
+   DWORD pixel=*(DWORD*)bitmap.bmBits;if((pixel>>24)!=255)ExitProcess(114);
+   int red=(pixel>>16)&255,green=(pixel>>8)&255,blue=pixel&255;
+   if(red<9||red>15||green<31||green>37||blue<53||blue>59)ExitProcess(115);
+  }else if(loaded)ExitProcess(116);
+  reset_background();
+ }
+ CoUninitialize();
  ExitProcess(0);
 }

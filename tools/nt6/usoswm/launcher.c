@@ -19,6 +19,8 @@ static void attach_shell(void){
 }
 static void CALLBACK shell_event(HWINEVENTHOOK hook,DWORD event,HWND window,LONG object,LONG child,DWORD thread,DWORD time){(void)hook;(void)event;(void)thread;(void)time;if(window&&object==OBJID_WINDOW&&child==CHILDID_SELF)PostMessageW(receiver,WM_APP,0,0);}
 static LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM w,LPARAM l){
+ if(message==WM_QUERYENDSESSION)return TRUE;
+ if(message==WM_ENDSESSION){if(w)PostQuitMessage(0);return 0;}
  if(message==WM_APP||message==taskbar_created){attach_shell();return 0;}
  if(message==WM_DESTROY){PostQuitMessage(0);return 0;}
  return DefWindowProcW(window,message,w,l);

@@ -12,6 +12,11 @@ TOOLS=ROOT/'tools'
 class ComponentTest(unittest.TestCase):
     def test_memory_renderer_clipping_and_origins(self):
         folder=OUT/'render-tests';folder.mkdir(exist_ok=True)
+        from PIL import Image
+        Image.new('RGB',(8,4),(12,34,56)).save(folder/'decode.jpg',quality=100,subsampling=0)
+        Image.new('RGBA',(8,4),(12,34,56,255)).save(folder/'decode.png')
+        Image.new('RGBA',(8,4),(12,34,56,128)).save(folder/'decode-alpha.png')
+        (folder/'decode-bad.dat').write_bytes(b'not an image')
         env=dict(os.environ,TEMP=str(folder),TMP=str(folder),ZIG_GLOBAL_CACHE_DIR=str(folder/'zig-global'),ZIG_LOCAL_CACHE_DIR=str(folder/'zig-local'))
         harness=folder/'render.exe'
         command=[str(TOOLS/'zig/zig.exe'),'cc','-target','x86_64-windows.win10-gnu','-Os','-nostdlib','-fno-stack-protector','-fno-builtin','-Wno-missing-declarations','-I'+str(TOOLS/'zig/lib/libc/include/any-windows-any'),str(ROOT/'tools/tests/watermark_render_harness.c'),str(ROOT/'tools/nt6/usoswm/runtime.c'),'-Wl,--entry,entry','-lkernel32','-luser32','-lgdi32','-ladvapi32','-lole32','-o',str(harness)]

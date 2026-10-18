@@ -42,5 +42,6 @@ static void wm_log(HMODULE module,const char *message){
  if(!GetFileInformationByHandle(log,&info)||info.nNumberOfLinks!=1||(info.dwFileAttributes&FILE_ATTRIBUTE_REPARSE_POINT)){CloseHandle(log);return;}
  DWORD written;WriteFile(log,message,lstrlenA(message),&written,0);WriteFile(log,"\r\n",2,&written,0);CloseHandle(log);
 }
+static void wm_log_code(HMODULE module,const char *label,DWORD value){char text[192];DWORD length=lstrlenA(label);if(length>175)return;for(DWORD i=0;i<length;i++)text[i]=label[i];for(DWORD i=0;i<8;i++)text[length+i]="0123456789ABCDEF"[(value>>(28-4*i))&15];text[length+8]=0;wm_log(module,text);}
 static BOOL wm_visible(HMODULE module){WCHAR path[MAX_PATH];if(!wm_directory(module,path))return TRUE;lstrcatW(path,L"testmode-watermark-on.txt");if(GetFileAttributesW(path)!=INVALID_FILE_ATTRIBUTES)return TRUE;DWORD error=GetLastError();return error!=ERROR_FILE_NOT_FOUND&&error!=ERROR_PATH_NOT_FOUND;}
 #endif

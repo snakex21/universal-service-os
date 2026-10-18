@@ -6,6 +6,7 @@
 #include <wininet.h>
 #include <shlobj.h>
 #include <objbase.h>
+#include <wincodec.h>
 typedef BOOL (WINAPI *PaintDesktopFn)(HDC);
 typedef BOOL (WINAPI *PaintMonitorFn)(HMONITOR,HDC,const RECT *);
 typedef HRESULT (WINAPI *LicenseValueFn)(PCWSTR,DWORD *);
@@ -19,42 +20,97 @@ static BOOL background_ready;
 static LONG initialized;
 static LONG render_state=-1;
 static DWORD desktop_thread;
+static LONG painting;
+static DWORD background_version;
+static DWORD refusal_reason,refusal_detail;
+static BOOL refuse(DWORD reason,const char *message,DWORD detail){if(reason!=refusal_reason||detail!=refusal_detail){refusal_reason=reason;refusal_detail=detail;wm_log(self,message);wm_log_code(self,"Detail=",detail);}return FALSE;}
 static const GUID active_desktop_class={0x75048700,0xef1f,0x11d0,{0x98,0x88,0x00,0x60,0x97,0xde,0xac,0xf9}};
 static const GUID active_desktop_interface={0xf490eb00,0x1240,0x11d1,{0x98,0x88,0x00,0x60,0x97,0xde,0xac,0xf9}};
+static const GUID wic_factory_class={0xcacaf262,0x9370,0x4615,{0xa1,0x3b,0x9f,0x55,0x39,0xda,0x4c,0x0a}};
+static const GUID wic_factory_interface={0xec5ec8a9,0xc395,0x4314,{0x9c,0x77,0x54,0xd7,0xa9,0x35,0xff,0x70}};
+static const GUID wic_bgra={0x6fddc324,0x4e03,0x4bfe,{0xb1,0x85,0x3d,0x77,0x76,0x8d,0xc9,0x0f}};
 
 static BOOL only_test_mode(void){
  /* The import table belongs to the process; only the actual desktop thread
   * may use our renderer. Other Explorer threads always call native USER32. */
- if(GetCurrentThreadId()!=desktop_thread||!wm_supported()||GetSystemMetrics(SM_CLEANBOOT)||wm_visible(self))return FALSE;
+ if(GetCurrentThreadId()!=desktop_thread)return refuse(1,"Native: different Explorer thread",GetCurrentThreadId());
+ if(!wm_supported())return refuse(2,"Native: unsupported OS/CI",0);
+ if(GetSystemMetrics(SM_CLEANBOOT))return refuse(3,"Native: safe mode",GetSystemMetrics(SM_CLEANBOOT));
+ if(wm_visible(self))return refuse(4,"Native: opt-out or marker access error",0);
  HKEY key;DWORD size=sizeof(DWORD),type=0,paint_version=0;LONG result;
- if(RegOpenKeyExW(HKEY_CURRENT_USER,L"Control Panel\\Desktop",0,KEY_QUERY_VALUE,&key)!=ERROR_SUCCESS)return FALSE;
+ LONG opened=RegOpenKeyExW(HKEY_CURRENT_USER,L"Control Panel\\Desktop",0,KEY_QUERY_VALUE,&key);if(opened!=ERROR_SUCCESS)return refuse(5,"Native: desktop settings unavailable",opened);
  result=RegQueryValueExW(key,L"PaintDesktopVersion",0,&type,(BYTE*)&paint_version,&size);RegCloseKey(key);
- if(result!=ERROR_FILE_NOT_FOUND&&(result!=ERROR_SUCCESS||type!=REG_DWORD||size!=sizeof(DWORD)||paint_version))return FALSE;
+ if(result!=ERROR_FILE_NOT_FOUND&&(result!=ERROR_SUCCESS||type!=REG_DWORD||size!=sizeof(DWORD)||paint_version))return refuse(6,"Native: PaintDesktopVersion present/unknown",paint_version);
  /* Query the same named licensing value as the original desktop renderer.
   * This is read-only. An unknown or non-genuine state always keeps native UI. */
  WCHAR dll[MAX_PATH];DWORD n=GetSystemDirectoryW(dll,MAX_PATH);if(!n||n>=MAX_PATH-16)return FALSE;lstrcatW(dll,L"\\slc.dll");
- HMODULE licensing=LoadLibraryW(dll);if(!licensing)return FALSE;
+ HMODULE licensing=LoadLibraryW(dll);if(!licensing)return refuse(7,"Native: licensing query library unavailable",GetLastError());
  LicenseValueFn query=(LicenseValueFn)GetProcAddress(licensing,"SLGetWindowsInformationDWORD");
- DWORD genuine=0;BOOL ok=query&&SUCCEEDED(query(L"Security-Licensing-SLC-GenuineLocalStatus",&genuine))&&genuine!=0;FreeLibrary(licensing);
- return ok;
+ DWORD genuine=0;HRESULT status=query?query(L"Security-Licensing-SLC-GenuineLocalStatus",&genuine):E_NOINTERFACE;FreeLibrary(licensing);
+ if(FAILED(status))return refuse(8,"Native: licensing query unknown",(DWORD)status);
+ if(!genuine)return refuse(9,"Native: licensing value is zero",genuine);return TRUE;
 }
-static void reset_background(void){if(wallpaper)DeleteObject(wallpaper);wallpaper=0;background_ready=FALSE;}
+static void reset_background(void){if(wallpaper)DeleteObject(wallpaper);wallpaper=0;background_ready=FALSE;background_version++;}
+static BOOL load_wic_bitmap(const WCHAR *file){
+ IWICImagingFactory *factory=0;IWICBitmapDecoder *decoder=0;IWICBitmapFrameDecode *frame=0;IWICFormatConverter *converter=0;
+ HBITMAP candidate=0;DWORD *pixels=0;UINT width=0,height=0,count=0;
+ HRESULT hr=CoCreateInstance(&wic_factory_class,0,CLSCTX_INPROC_SERVER,&wic_factory_interface,(void**)&factory);
+ if(SUCCEEDED(hr))hr=factory->lpVtbl->CreateDecoderFromFilename(factory,file,0,GENERIC_READ,WICDecodeMetadataCacheOnLoad,&decoder);
+ if(SUCCEEDED(hr))hr=decoder->lpVtbl->GetFrame(decoder,0,&frame);
+ if(SUCCEEDED(hr))hr=frame->lpVtbl->GetSize(frame,&width,&height);
+ if(SUCCEEDED(hr)&&(!width||!height||width>20000||height>20000||(ULONGLONG)width*height>67108864))hr=E_INVALIDARG;
+ if(SUCCEEDED(hr))hr=factory->lpVtbl->CreateFormatConverter(factory,&converter);
+ if(SUCCEEDED(hr))hr=converter->lpVtbl->Initialize(converter,(IWICBitmapSource*)frame,&wic_bgra,WICBitmapDitherTypeNone,0,0.0,WICBitmapPaletteTypeCustom);
+ if(SUCCEEDED(hr)){
+  BITMAPINFO info={0};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=width;info.bmiHeader.biHeight=-(LONG)height;info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
+  candidate=CreateDIBSection(0,&info,DIB_RGB_COLORS,(void**)&pixels,0,0);if(!candidate)hr=E_OUTOFMEMORY;
+ }
+ if(SUCCEEDED(hr)){count=width*height;hr=converter->lpVtbl->CopyPixels(converter,0,width*4,count*4,(BYTE*)pixels);}
+ /* Opaque JPEG/PNG/BMP frames preserve the native background. Transparency
+  * needs separate composition semantics, so retain native rendering there. */
+ if(SUCCEEDED(hr))for(UINT i=0;i<count;i++)if((pixels[i]>>24)!=255){hr=WINCODEC_ERR_UNSUPPORTEDPIXELFORMAT;break;}
+ if(converter)converter->lpVtbl->Release(converter);if(frame)frame->lpVtbl->Release(frame);if(decoder)decoder->lpVtbl->Release(decoder);if(factory)factory->lpVtbl->Release(factory);
+ if(FAILED(hr)){if(candidate)DeleteObject(candidate);return refuse(16,"Native: WIC cannot reconstruct opaque wallpaper",(DWORD)hr);}
+ wallpaper=candidate;return TRUE;
+}
+static BOOL blank_pattern(const WCHAR *text,DWORD bytes){
+ if(bytes<sizeof(WCHAR)||bytes%sizeof(WCHAR))return FALSE;DWORD limit=bytes/sizeof(WCHAR),length=0;
+ while(length<limit&&text[length])length++;if(length==limit)return FALSE;if(!length)return TRUE;
+ DWORD position=0;
+ for(unsigned row=0;row<8;row++){
+  while(position<length&&(text[position]==L' '||text[position]==L'\t'))position++;
+  if(position==length||text[position]!=L'0')return FALSE;
+  while(position<length&&text[position]==L'0')position++;
+  if(position<length&&text[position]!=L' '&&text[position]!=L'\t')return FALSE;
+ }
+ while(position<length&&(text[position]==L' '||text[position]==L'\t'))position++;
+ return position==length;
+}
+static BOOL no_desktop_pattern(const WCHAR *text,DWORD type,DWORD bytes){
+ /* NT 6.0 also stores "no pattern" as REG_DWORD 0, not only as REG_SZ.
+  * Nonzero integers, real patterns and unknown formats retain native UI. */
+ if(type==REG_DWORD)return bytes==sizeof(DWORD)&&text[0]==0&&text[1]==0;
+ return type==REG_SZ&&blank_pattern(text,bytes);
+}
 static BOOL load_background(void){
  if(background_ready)return TRUE;
+ DWORD version=background_version;
  WCHAR pattern[128]={0};HKEY key;DWORD bytes=sizeof(pattern),type=0;
  if(RegOpenKeyExW(HKEY_CURRENT_USER,L"Control Panel\\Desktop",0,KEY_QUERY_VALUE,&key)!=ERROR_SUCCESS)return FALSE;
  LONG r=RegQueryValueExW(key,L"Pattern",0,&type,(BYTE*)pattern,&bytes);RegCloseKey(key);
- if(r!=ERROR_FILE_NOT_FOUND&&(r!=ERROR_SUCCESS||type!=REG_SZ||bytes>sizeof(pattern)||pattern[0]))return FALSE;
+ if(r!=ERROR_FILE_NOT_FOUND&&(r!=ERROR_SUCCESS||bytes>sizeof(pattern)||!no_desktop_pattern(pattern,type,bytes)))return refuse(10,"Native: wallpaper pattern or unknown settings",r);
  IActiveDesktop *desktop=0;HRESULT hr=CoCreateInstance(&active_desktop_class,0,CLSCTX_INPROC_SERVER,&active_desktop_interface,(void**)&desktop);
- if(FAILED(hr)||!desktop)return FALSE;
+ if(FAILED(hr)||!desktop)return refuse(11,"Native: IActiveDesktop unavailable",(DWORD)hr);
  WCHAR file[MAX_PATH]={0};WALLPAPEROPT options={sizeof(options),0};
  hr=desktop->lpVtbl->GetWallpaper(desktop,file,MAX_PATH,AD_GETWP_BMP);
  if(SUCCEEDED(hr))hr=desktop->lpVtbl->GetWallpaperOptions(desktop,&options,0);
- desktop->lpVtbl->Release(desktop);if(FAILED(hr)||options.dwStyle>WPSTYLE_STRETCH)return FALSE;
+ desktop->lpVtbl->Release(desktop);if(FAILED(hr))return refuse(12,"Native: wallpaper query failed",(DWORD)hr);if(options.dwStyle>WPSTYLE_STRETCH)return refuse(13,"Native: unsupported wallpaper style",options.dwStyle);
  if(file[0]){
   wallpaper=(HBITMAP)LoadImageW(0,file,IMAGE_BITMAP,0,0,LR_LOADFROMFILE|LR_CREATEDIBSECTION);
-  if(!wallpaper||GetObjectW(wallpaper,sizeof(wallpaper_info),&wallpaper_info)!=sizeof(wallpaper_info)||wallpaper_info.bmWidth<=0||wallpaper_info.bmHeight<=0||wallpaper_info.bmWidth>20000||wallpaper_info.bmHeight>20000){reset_background();return FALSE;}
+  if(!wallpaper){if(!load_wic_bitmap(file))return FALSE;}
+  if(GetObjectW(wallpaper,sizeof(wallpaper_info),&wallpaper_info)!=sizeof(wallpaper_info)||wallpaper_info.bmWidth<=0||wallpaper_info.bmHeight<=0||wallpaper_info.bmWidth>20000||wallpaper_info.bmHeight>20000||(ULONGLONG)wallpaper_info.bmWidth*wallpaper_info.bmHeight>67108864){reset_background();return refuse(14,"Native: bitmap wallpaper unavailable",GetLastError());}
  }
+ if(version!=background_version){reset_background();return refuse(15,"Native: settings changed while decoding wallpaper",0);}
  wallpaper_style=options.dwStyle;background_ready=TRUE;return TRUE;
 }
 static BOOL paint_background(HMONITOR monitor,HDC dc,const RECT *update){
@@ -79,9 +135,9 @@ static BOOL paint_background(HMONITOR monitor,HDC dc,const RECT *update){
  RestoreDC(dc,saved);return ok;
 }
 static BOOL CALLBACK paint_one(HMONITOR monitor,HDC dc,RECT *rect,LPARAM param){(void)param;return paint_background(monitor,dc,rect);}
-static void record_render(BOOL active){if(render_state!=active){render_state=active;wm_log(self,active?"Own background renderer active":"Native background renderer retained");}}
-static BOOL WINAPI filtered_desktop(HDC dc){if(only_test_mode()&&load_background()&&EnumDisplayMonitors(dc,0,paint_one,0)){record_render(TRUE);return TRUE;}record_render(FALSE);return native_desktop(dc);}
-static BOOL WINAPI filtered_monitor(HMONITOR monitor,HDC dc,const RECT *rect){if(only_test_mode()&&load_background()&&paint_background(monitor,dc,rect)){record_render(TRUE);return TRUE;}record_render(FALSE);return native_monitor(monitor,dc,rect);}
+static void record_render(BOOL active){if(active)refusal_reason=0;if(render_state!=active){render_state=active;wm_log(self,active?"Own background renderer active":"Native background renderer retained");}}
+static BOOL WINAPI filtered_desktop(HDC dc){if(InterlockedCompareExchange(&painting,1,0))return native_desktop(dc);BOOL active=only_test_mode()&&load_background()&&EnumDisplayMonitors(dc,0,paint_one,0);record_render(active);BOOL result=active?TRUE:native_desktop(dc);InterlockedExchange(&painting,0);return result;}
+static BOOL WINAPI filtered_monitor(HMONITOR monitor,HDC dc,const RECT *rect){if(InterlockedCompareExchange(&painting,1,0))return native_monitor(monitor,dc,rect);BOOL active=only_test_mode()&&load_background()&&paint_background(monitor,dc,rect);record_render(active);BOOL result=active?TRUE:native_monitor(monitor,dc,rect);InterlockedExchange(&painting,0);return result;}
 
 static BOOL in_image(DWORD offset,SIZE_T size,DWORD image_size){return offset<image_size&&size<=image_size-offset;}
 static BOOL text_equal(const char *a,const char *b,DWORD maximum){for(DWORD i=0;i<maximum;i++){if(a[i]!=b[i])return FALSE;if(!a[i])return TRUE;}return FALSE;}

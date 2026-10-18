@@ -1,7 +1,9 @@
 # USOS test-mode desktop presentation (experimental)
 
-Status: implementation and host staging checks exist; **VM acceptance is still
-pending. Do not release or deploy this worktree's package yet.** GPL-3.0-or-later.
+Status: host checks and measured PL x64 desktop, opt-out, cold Startup,
+Explorer/resolution/Classic-theme trials pass in Vista/2008 QEMU. The complete
+setup/RDP/hardware matrix is still pending. **Do not release or deploy this
+worktree's package yet.** GPL-3.0-or-later.
 
 This is a user-mode presentation component for Vista SP2 / Server 2008 SP2 x64
 (NT 6.0.6002) with TESTSIGNING enabled. It does not change Code Integrity,
@@ -46,15 +48,18 @@ Although the import table is process-wide, rendering checks the desktop
 thread ID on every call; other Explorer threads retain native drawing.
 
 The renderer reads the current background through IActiveDesktop and renders
-solid colour or a bitmap in Vista centre/tile/stretch mode, under the shell's
+solid colour or an opaque image in Vista centre/tile/stretch mode, under the shell's
 existing clip region. Icons and application windows retain their normal paint.
 It falls back to the original functions if background reconstruction fails,
 in safe mode, with PaintDesktopVersion enabled or an unknown/non-genuine
-licensing value. Patterns and non-bitmap wallpaper paths are not reconstructed.
+licensing value. WIC decodes opaque JPEG/PNG when LoadImage cannot load a bitmap.
+Transparent images, nonzero patterns and unknown formats retain native rendering.
+The stock NT 6.0 REG_DWORD-zero pattern and eight zero rows represent no pattern.
 There is no injection into Winlogon, LogonUI, DWM or other applications.
 
-This implementation still needs measured coverage for desktop switching,
-RDP, theme changes and real multi-monitor/DPI behaviour. A successful build or
+This implementation still needs complete coverage for a second user's desktop,
+RDP, setup, Aero and real multi-monitor/DPI behaviour. Classic-theme changes
+have measured VM coverage. A successful build or
 an attached hook is not evidence of successful watermark suppression.
 
 ## Installation flow and opt-out
@@ -89,3 +94,5 @@ The host pixel test calls the actual renderer with memory DIBs, never the
 host's desktop. It checks centre/tile/stretch, nonzero window origins,
 negative monitor coordinates, the update clip and restoration of DC state.
 This caught a brush-origin error: SetBrushOrgEx requires device coordinates.
+It also exercises WIC with generated opaque JPEG/PNG fixtures and checks
+that transparent and damaged inputs are rejected. No host wallpaper changes.
