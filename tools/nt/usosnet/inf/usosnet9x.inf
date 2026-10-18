@@ -5,14 +5,15 @@
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; Diagnostics: the driver writes UsosnetStage, UsosnetError, ... into the
 ; adapter key HKLM\System\CurrentControlSet\Services\Class\Net\00nn at
-; every start (tools/nt/usosnet/README.md).
+; every start, runtime counters go to C:\WINDOWS\NDISLOG.TXT
+; (NdisWriteErrorLogEntry, tags USN1..USN4; tools/nt/usosnet/README.md).
 
 [Version]
 Signature="$CHICAGO$"
 Class=Net
 ClassGUID={4d36e972-e325-11ce-bfc1-08002be10318}
 Provider=%USOS%
-DriverVer=10/18/2026,0.2.0.0
+DriverVer=10/18/2026,0.3.0.0
 
 [Manufacturer]
 %Intel%=Intel

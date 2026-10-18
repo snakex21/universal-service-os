@@ -23,7 +23,8 @@
  * everything (IMC), the DPC polls the RX ring and IrqEnable unmasks again.
  *
  * Flow control: none for now. ANAR advertises no PAUSE / ASM_DIR, and
- * CTRL.RFCE / TFCE stay at their reset value of 0, so both ends resolve to
+ * IgbPhyInit clears CTRL.RFCE / TFCE (the X470 I211 iNVM loads RFCE = 1:
+ * CTRL after reset 0x081C0241), so both ends resolve to
  * no pause frames - simple and consistent until the FCRTL / FCRTH / FCTTV
  * thresholds are programmed (TODO, post 1.0).
  *
@@ -74,12 +75,22 @@
 #define TDT0        0xE018
 #define TXDCTL0     0xE028
 #define INVM_DATA   0x12120     /* I210 / I211: 64 dwords */
+/* statistics, clear on read (same offsets on 82576 and I210 / I211) */
+#define CRCERRS     0x4000
+#define MPC         0x4010
+#define GPRC        0x4074
+#define GPTC        0x4080
+#define RNBC        0x40A0
+#define TPR         0x40D0
+#define TPT         0x40D4
 
 #define CTRL_GIO_MASTER_DISABLE (1UL << 2)
 #define CTRL_SLU        (1UL << 6)
 #define CTRL_FRCSPD     (1UL << 11)
 #define CTRL_FRCDPLX    (1UL << 12)
 #define CTRL_RST        (1UL << 26)
+#define CTRL_RFCE       (1UL << 27)
+#define CTRL_TFCE       (1UL << 28)
 #define CTRL_PHY_RST    (1UL << 31)
 #define STATUS_FD       (1UL << 0)
 #define STATUS_LU       (1UL << 1)
@@ -423,7 +434,7 @@ static void IgbPhyInit(PADAPTER A)
 {
     USHORT bmcr = 0, id1 = 0, id2 = 0, bmsr = 0;
     ULONG ctrl = RD32(A, CTRL);
-    ctrl &= ~(CTRL_FRCSPD | CTRL_FRCDPLX | CTRL_PHY_RST);
+    ctrl &= ~(CTRL_FRCSPD | CTRL_FRCDPLX | CTRL_PHY_RST | CTRL_RFCE | CTRL_TFCE);
     ctrl |= CTRL_SLU;
     WR32(A, CTRL, ctrl);
     UsStall(1000);
@@ -528,6 +539,7 @@ static void IgbTxReclaim(PADAPTER A)
         d[3] = 0;
         A->TxClean = (A->TxClean + 1) % TX_COUNT;
         A->TxBusy--;
+        A->TxDone++;
     }
 }
 
@@ -577,9 +589,36 @@ static void IgbSetFilter(PADAPTER A)
     WR32(A, RCTL, rctl);
 }
 
+static void IgbStats(PADAPTER A)
+{
+    A->HwCrc += RD32(A, CRCERRS);
+    A->HwMpc += RD32(A, MPC);
+    A->HwGprc += RD32(A, GPRC);
+    A->HwGptc += RD32(A, GPTC);
+    A->HwRnbc += RD32(A, RNBC);
+    A->HwTpr += RD32(A, TPR);
+    A->HwTpt += RD32(A, TPT);
+}
+
+/* no ICR / EICR here: reading them would acknowledge causes */
+static void IgbDiag(PADAPTER A, ULONG *R)
+{
+    R[DR_STATUS] = RD32(A, STATUS);
+    R[DR_CTRL] = RD32(A, CTRL);
+    R[DR_IMS] = RD32(A, IMS);
+    R[DR_RCTL] = RD32(A, RCTL);
+    R[DR_TCTL] = RD32(A, TCTL);
+    R[DR_RDH] = RD32(A, RDH0);
+    R[DR_RDT] = RD32(A, RDT0);
+    R[DR_TDH] = RD32(A, TDH0);
+    R[DR_TDT] = RD32(A, TDT0);
+    R[DR_RXDCTL] = RD32(A, RXDCTL0);
+    R[DR_TXDCTL] = RD32(A, TXDCTL0);
+}
+
 const USOSNET_CHIP_OPS IgbOps = {
     "igb",
     IgbReset, IgbReadMac, IgbSetMac, IgbPhyInit, IgbStart, IgbStop,
     IgbIrqEnable, IgbIrqDisable, IgbIrqRead, IgbTransmit, IgbTxReclaim,
-    IgbRxPoll, IgbLinkState, IgbSetFilter,
+    IgbRxPoll, IgbLinkState, IgbSetFilter, IgbStats, IgbDiag,
 };

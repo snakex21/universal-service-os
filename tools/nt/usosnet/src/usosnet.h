@@ -15,9 +15,10 @@
  *   - NDIS_BUFFER is an MDL on NT but a different structure on 9x: only
  *     the exported NdisQueryBuffer() and the common Next field are used;
  *   - no 64-bit arithmetic (no __allmul / __aullshr helper imports);
- *   - serialized miniport (no spin locks needed): TX is touched only by
- *     MiniportSend, RX only by MiniportHandleInterrupt (or the poll timer
- *     in PollMode), the link state only by the timer.
+ *   - serialized miniport (no spin locks needed): NDIS never runs
+ *     MiniportSend, MiniportHandleInterrupt and the timer at the same time,
+ *     so TX reclaim / RX polling may happen in any of them; the ISR only
+ *     reads ICR and masks the chip. The link state is touched by the timer.
  */
 #ifndef USOSNET_H
 #define USOSNET_H
@@ -25,7 +26,7 @@
 #include <ndis.h>
 
 #define USOSNET_MAJOR 0
-#define USOSNET_MINOR 2
+#define USOSNET_MINOR 3
 #define USOSNET_TAG 'NSOU'
 
 #define ETH_ALEN 6
@@ -38,6 +39,13 @@
 #define TX_COUNT 64
 #define BUF_SIZE 2048          /* one RX / TX buffer, 2 per 4 KiB page */
 #define BUFS_PER_PAGE 2
+
+/* One timer for every mode: RX / TX housekeeping every tick (also with
+ * interrupts: a lost or misrouted INTx then costs latency, not the link),
+ * link, statistics, watchdogs and the diagnostic log once a second. */
+#define TICK_MS         20
+#define TICKS_PER_SEC   (1000 / TICK_MS)
+#define LOG_MAX         40      /* NdisWriteErrorLogEntry rounds per start */
 
 /* Diagnostic stages (registry value UsosnetStage, last stage reached). */
 #define ST_ENTRY        1
@@ -80,7 +88,13 @@ typedef struct _USOSNET_CHIP_OPS {
     void (*RxPoll)(struct _ADAPTER *A);                 /* indicates frames */
     void (*LinkState)(struct _ADAPTER *A, BOOLEAN *Up, ULONG *Mbps, BOOLEAN *Full);
     void (*SetFilter)(struct _ADAPTER *A);              /* PacketFilter + McList */
+    void (*Stats)(struct _ADAPTER *A);                  /* accumulate clear-on-read counters */
+    void (*Diag)(struct _ADAPTER *A, ULONG *R);         /* DIAG_REGS register snapshot */
 } USOSNET_CHIP_OPS;
+
+/* Diag() snapshot order */
+enum { DR_STATUS, DR_CTRL, DR_IMS, DR_RCTL, DR_TCTL, DR_RDH, DR_RDT, DR_TDH, DR_TDT,
+       DR_RXDCTL, DR_TXDCTL, DIAG_REGS };
 
 typedef struct _USOSNET_CHIP {
     USHORT Vendor;
@@ -145,13 +159,18 @@ typedef struct _ADAPTER {
     ULONG CurRxLen;
 
     /* options (registry, see usosnet9x.inf [params]) */
-    ULONG PollMode;             /* 1 = no interrupt, 10 ms... timer polling */
+    ULONG PollMode;             /* 1 = no interrupt (registry), 2 = switched by the IRQ watchdog */
     ULONG DebugPort;            /* 0 = off, else I/O port (0xE9 in QEMU) */
     ULONG SkipPhy;
 
     /* statistics */
     ULONG TxOk, RxOk, TxErr, RxErr, RxNoBuf, RxCrcErr;
     ULONG IsrCount, DpcCount, TimerCount, LinkChanges;
+    ULONG IsrCalls;             /* ISR entered at all (shared line: also not ours) */
+    ULONG RxByTimer;            /* frames found by the timer before any interrupt */
+    ULONG TxDone, TxFull, TxStalls, TxStallSec, TxLastClean;
+    ULONG HwTpr, HwTpt, HwGprc, HwGptc, HwMpc, HwRnbc, HwCrc;   /* chip counters, summed */
+    ULONG LogCount;
 
     /* diagnostics written to the adapter's registry key at init */
     ULONG Stage, Error, StatusAtInit, CtrlAtInit, PhyBmsr, PhyId, Bar0High;

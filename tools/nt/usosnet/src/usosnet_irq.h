@@ -26,4 +26,17 @@ static __inline unsigned long UsosnetIrqClaim(unsigned long Masked, unsigned lon
     return Icr;
 }
 
+/* IRQ watchdog: 1 = interrupts are not reaching the ISR, switch to timer
+ * polling and mask the chip (a misrouted INTx then cannot keep another
+ * line asserted). With working INTx the ISR always wins against the 20 ms
+ * timer: the link coming up after PhyInit raises LSC, every frame RXT0. So
+ * "no claimed interrupt for 5 s although the timer found frames or the
+ * link is up" means lost interrupts (X470 + Me round 1: no RX at all). */
+static __inline int UsosnetIrqBroken(unsigned long Sec, unsigned long IsrClaimed,
+                                     unsigned long RxByTimer, unsigned long LinkUp)
+{
+    if (IsrClaimed || Sec < 5) return 0;
+    return (RxByTimer || LinkUp) ? 1 : 0;
+}
+
 #endif

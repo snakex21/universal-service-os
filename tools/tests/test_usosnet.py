@@ -26,7 +26,7 @@ W9X_NDIS_EXPORTS = {
     'NdisMRegisterInterrupt', 'NdisMRegisterMiniport', 'NdisMSetAttributesEx', 'NdisMSetPeriodicTimer',
     'NdisMSleep', 'NdisMUnmapIoSpace', 'NdisOpenConfiguration', 'NdisQueryBuffer', 'NdisReadConfiguration',
     'NdisReadNetworkAddress', 'NdisReadPciSlotInformation', 'NdisTerminateWrapper', 'NdisWriteConfiguration',
-    'NdisWritePciSlotInformation',
+    'NdisWritePciSlotInformation', 'NdisWriteErrorLogEntry',
 }
 
 
@@ -102,9 +102,18 @@ int main(void) {
         {0, 0xFFFFFFFFUL, 0},            /* device gone */
         {1, 0x80000080UL, 0},            /* driver masked: never ours */
     };
+    struct { unsigned long sec, isr, rxt, up; int want; } w[] = {
+        {3, 0, 5, 1, 0},                 /* too early */
+        {5, 0, 0, 0, 0},                 /* no link, no traffic: nothing to judge */
+        {5, 0, 3, 0, 1},                 /* timer found frames, ISR never claimed */
+        {6, 0, 0, 1, 1},                 /* link up (LSC would have fired), no interrupt */
+        {9, 1, 40, 1, 0},                /* interrupts arrive */
+    };
     unsigned i; int bad = 0;
     for (i = 0; i < sizeof t / sizeof t[0]; i++)
         if (UsosnetIrqClaim(t[i].m, t[i].icr) != t[i].want) { printf("case %u\n", i); bad = 1; }
+    for (i = 0; i < sizeof w / sizeof w[0]; i++)
+        if (UsosnetIrqBroken(w[i].sec, w[i].isr, w[i].rxt, w[i].up) != w[i].want) { printf("wd %u\n", i); bad = 1; }
     return bad;
 }
 '''
@@ -130,6 +139,22 @@ int main(void) {
         self.assertNotIn('EIMS', en)                      # legacy INTx: no extended causes
         self.assertIn('WR32(A, IVAR0, 0)', src)
         self.assertIn('MdicWrite(A, 4, 0x01E1)', src)     # no pause advertised
+        self.assertIn('CTRL_RFCE | CTRL_TFCE', src)       # iNVM RFCE = 1 cleared too
+
+    def test_timer_polls_and_watchdog_masks(self):
+        '''X470 + Me round 1: no RX at all. The timer polls RX / TX in every
+        mode, the IRQ watchdog masks the chip, the DPC does not unmask it then.'''
+        src = (DRV / 'src/usosnet.c').read_text(encoding='latin-1')
+        timer = re.search(r'static VOID TimerFn\(.*?\n\}', src, re.S).group(0)
+        self.assertIn('RxPoll(A)', timer)
+        self.assertIn('TxReclaim(A)', timer)
+        self.assertNotIn('if (A->PollMode) {', timer)
+        sec = re.search(r'static void TimerSecond\(PADAPTER A\)\n\{(.*?)\n\}', src, re.S).group(1)
+        self.assertLess(sec.index('UsosnetIrqBroken'), sec.index('IrqDisable(A)'))
+        dpc = re.search(r'static VOID MpHandleInterrupt\(NDIS_HANDLE Ctx\)\n\{(.*?)\n\}', src, re.S).group(1)
+        self.assertIn('if (!A->PollMode) A->Chip->Ops->IrqEnable(A)', dpc)
+        send = re.search(r'static NDIS_STATUS MpSend\(.*?\n\}', src, re.S).group(0)
+        self.assertNotIn('UsStall', send)                 # no busy wait in the send path
 
 
 if __name__ == '__main__':

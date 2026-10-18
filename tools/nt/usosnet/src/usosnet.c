@@ -19,6 +19,7 @@
  *       buffer while the indication runs) and hands the buffer back.
  */
 #include "usosnet.h"
+#include "usosnet_irq.h"
 
 #pragma warning(disable:4054 4055 4152 4201 4214)
 
@@ -34,6 +35,12 @@ void __outbyte(unsigned short Port, unsigned char Data);
 EXPORT VOID NdisQueryBuffer(IN PNDIS_BUFFER Buffer, OUT PVOID *VirtualAddress OPTIONAL, OUT PUINT Length);
 
 NDIS_HANDLE g_Wrapper;
+
+/* counters of the last halted adapter, written as UsosnetLast* at the next
+ * start (Device Manager: disable + enable the card, then DIAG.BAT) */
+enum { LS_ISRCALLS, LS_ISR, LS_RX, LS_RXTIMER, LS_TX, LS_TXDONE, LS_HWRX, LS_HWTX, LS_FLAGS, LS_COUNT };
+static ULONG g_Last[LS_COUNT];
+static BOOLEAN g_LastValid;
 
 static const USOSNET_CHIP g_Chips[] = {
     { 0x8086, 0x1539, CHIP_IGB_I210 | CHIP_IGB_I211, "Intel I211", &IgbOps },
@@ -190,6 +197,17 @@ static void WriteDiag(PADAPTER A, NDIS_HANDLE Cfg)
     CfgPut(Cfg, &kPhyId, A->PhyId);
     CfgPut(Cfg, &kBarHi, A->Bar0High);
     CfgPut(Cfg, &kPll, A->PllTries);
+    if (g_LastValid) {
+        NDIS_STRING k[LS_COUNT] = {
+            NDIS_STRING_CONST("UsosnetLastIsrCalls"), NDIS_STRING_CONST("UsosnetLastIsr"),
+            NDIS_STRING_CONST("UsosnetLastRx"), NDIS_STRING_CONST("UsosnetLastRxTimer"),
+            NDIS_STRING_CONST("UsosnetLastTx"), NDIS_STRING_CONST("UsosnetLastTxDone"),
+            NDIS_STRING_CONST("UsosnetLastHwRx"), NDIS_STRING_CONST("UsosnetLastHwTx"),
+            NDIS_STRING_CONST("UsosnetLastFlags"),
+        };
+        ULONG i;
+        for (i = 0; i < LS_COUNT; i++) CfgPut(Cfg, &k[i], g_Last[i]);
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -276,12 +294,12 @@ static void FreeAll(PADAPTER A)
 /* ------------------------------------------------------------------ */
 /* link                                                                */
 
-static void CheckLink(PADAPTER A)
+static BOOLEAN CheckLink(PADAPTER A)
 {
     BOOLEAN up = FALSE, full = FALSE;
     ULONG mbps = 0;
     A->Chip->Ops->LinkState(A, &up, &mbps, &full);
-    if (A->LinkReported && up == A->LinkUp && mbps == A->LinkMbps) return;
+    if (A->LinkReported && up == A->LinkUp && mbps == A->LinkMbps) return FALSE;
     A->LinkUp = up;
     A->LinkMbps = mbps;
     A->FullDuplex = full;
@@ -289,19 +307,85 @@ static void CheckLink(PADAPTER A)
     UsLog(A, "link %x speed %x", up, mbps);
     NdisMIndicateStatus(A->Handle, up ? NDIS_STATUS_MEDIA_CONNECT : NDIS_STATUS_MEDIA_DISCONNECT, NULL, 0);
     NdisMIndicateStatusComplete(A->Handle);
+    return TRUE;
+}
+
+/* ------------------------------------------------------------------ */
+/* runtime diagnostics: NdisWriteErrorLogEntry (Windows 9x NDIS.VXD:
+ * C:\WINDOWS\NDISLOG.TXT; Windows 2000 / XP: System event log, source
+ * USOSNET). Every round = 3 entries of 10 values, tagged USN1..USN3
+ * (0x55534E31..), the first round also USN4. See README.md. */
+
+#define EV_PERIODIC     0
+#define EV_IRQ_POLL     1       /* IRQ watchdog switched to timer polling */
+#define EV_TX_STALL     2       /* TX descriptors pending 3 s without completion */
+#define EV_LINK         3
+
+static ULONG DiagFlags(PADAPTER A, ULONG Event)
+{
+    return (A->PollMode & 3) | (A->LinkUp ? 4UL : 0) | (A->FullDuplex ? 8UL : 0) |
+           ((Event & 0xFF) << 8) | ((A->LinkMbps & 0xFFFF) << 16);
+}
+
+static void DiagLog(PADAPTER A, ULONG Event, ULONG Sec)
+{
+    ULONG r[DIAG_REGS], pci = 0;
+    if (A->LogCount >= LOG_MAX) return;
+    A->LogCount++;
+    A->Chip->Ops->Diag(A, r);
+    NdisReadPciSlotInformation(A->Handle, 0, 4, &pci, 4);   /* bit 19 = PCI status INTx pending */
+    NdisWriteErrorLogEntry(A->Handle, NDIS_ERROR_CODE_DRIVER_FAILURE, 10, 0x55534E31UL, Sec,
+                           DiagFlags(A, Event), A->IsrCalls, A->IsrCount, A->DpcCount,
+                           A->RxOk, A->RxByTimer, A->TxOk, A->TxDone);
+    NdisWriteErrorLogEntry(A->Handle, NDIS_ERROR_CODE_DRIVER_FAILURE, 10, 0x55534E32UL, Sec,
+                           A->TxErr, A->TxFull, A->RxErr, A->HwTpr, A->HwGprc, A->HwGptc,
+                           A->HwMpc, A->HwRnbc);
+    NdisWriteErrorLogEntry(A->Handle, NDIS_ERROR_CODE_DRIVER_FAILURE, 10, 0x55534E33UL, Sec,
+                           r[DR_STATUS], r[DR_IMS], r[DR_RDH], r[DR_RDT], r[DR_TDH], r[DR_TDT],
+                           pci, r[DR_RCTL]);
+    if (A->LogCount == 1)
+        NdisWriteErrorLogEntry(A->Handle, NDIS_ERROR_CODE_DRIVER_FAILURE, 10, 0x55534E34UL,
+                               (A->IrqLevel << 16) | (A->IrqVector & 0xFFFF), A->RxRing.Pa, A->TxRing.Pa,
+                               r[DR_CTRL], r[DR_TCTL], r[DR_RXDCTL], r[DR_TXDCTL], A->HwCrc,
+                               (USOSNET_MAJOR << 16) | USOSNET_MINOR);
+}
+
+/* once a second: link, chip counters, IRQ and TX watchdogs, log schedule */
+static void TimerSecond(PADAPTER A)
+{
+    ULONG sec = A->TimerCount / TICKS_PER_SEC;
+    BOOLEAN linkChanged = CheckLink(A);
+
+    A->Chip->Ops->Stats(A);
+    if (!A->PollMode && UsosnetIrqBroken(sec, A->IsrCount, A->RxByTimer, A->LinkUp)) {
+        /* INTx does not reach us: mask the chip so the pin is released, poll */
+        A->PollMode = 2;
+        A->Chip->Ops->IrqDisable(A);
+        UsLog(A, "irq watchdog: poll, rx by timer %x", A->RxByTimer, 0);
+        DiagLog(A, EV_IRQ_POLL, sec);
+    }
+    if (A->TxBusy && A->TxDone == A->TxLastClean) {
+        if (++A->TxStallSec == 3) { A->TxStalls++; DiagLog(A, EV_TX_STALL, sec); }
+    } else {
+        A->TxStallSec = 0;
+    }
+    A->TxLastClean = A->TxDone;
+    if (linkChanged && sec) DiagLog(A, EV_LINK, sec);
+    if (sec == 3 || sec == 10 || sec == 30 || sec == 60 || (sec && sec % 300 == 0))
+        DiagLog(A, EV_PERIODIC, sec);
 }
 
 static VOID TimerFn(PVOID S1, PVOID Ctx, PVOID S2, PVOID S3)
 {
     PADAPTER A = (PADAPTER)Ctx;
+    ULONG rx = A->RxOk;
     UNREFERENCED_PARAMETER(S1); UNREFERENCED_PARAMETER(S2); UNREFERENCED_PARAMETER(S3);
     A->TimerCount++;
-    if (A->PollMode) {
-        A->Chip->Ops->RxPoll(A);
-        if (A->TimerCount % 50 == 0) CheckLink(A);
-    } else {
-        CheckLink(A);
-    }
+    /* serialized miniport: the timer never runs beside MpSend / the DPC */
+    A->Chip->Ops->RxPoll(A);
+    if (!A->PollMode) A->RxByTimer += A->RxOk - rx;
+    A->Chip->Ops->TxReclaim(A);
+    if (A->TimerCount % TICKS_PER_SEC == 0) TimerSecond(A);
 }
 
 /* ------------------------------------------------------------------ */
@@ -491,7 +575,7 @@ static NDIS_STATUS MpInitialize(PNDIS_STATUS OpenErrorStatus, PUINT SelectedMedi
     if (!A->PollMode) A->Chip->Ops->IrqEnable(A);
     NdisMInitializeTimer(&A->Timer, MiniportAdapterHandle, TimerFn, A);
     A->TimerInit = TRUE;
-    NdisMSetPeriodicTimer(&A->Timer, A->PollMode ? 20 : 1000);
+    NdisMSetPeriodicTimer(&A->Timer, TICK_MS);
     NdisMRegisterAdapterShutdownHandler(MiniportAdapterHandle, A, MpShutdown);
     A->Shutdown = TRUE;
     A->Started = TRUE;
@@ -514,6 +598,17 @@ static VOID MpHalt(NDIS_HANDLE Ctx)
     PADAPTER A = (PADAPTER)Ctx;
     BOOLEAN cancelled;
     UsLog(A, "halt rx %x tx %x", A->RxOk, A->TxOk);
+    A->Chip->Ops->Stats(A);
+    g_Last[LS_ISRCALLS] = A->IsrCalls;
+    g_Last[LS_ISR] = A->IsrCount;
+    g_Last[LS_RX] = A->RxOk;
+    g_Last[LS_RXTIMER] = A->RxByTimer;
+    g_Last[LS_TX] = A->TxOk;
+    g_Last[LS_TXDONE] = A->TxDone;
+    g_Last[LS_HWRX] = A->HwGprc;
+    g_Last[LS_HWTX] = A->HwGptc;
+    g_Last[LS_FLAGS] = DiagFlags(A, 0) | (A->TxStalls << 4);
+    g_LastValid = TRUE;
     if (A->TimerInit) NdisMCancelTimer(&A->Timer, &cancelled);
     A->TimerInit = FALSE;
     A->Chip->Ops->IrqDisable(A);
@@ -546,7 +641,9 @@ static BOOLEAN MpCheckForHang(NDIS_HANDLE Ctx)
 static VOID MpIsr(PBOOLEAN Recognized, PBOOLEAN QueueDpc, NDIS_HANDLE Ctx)
 {
     PADAPTER A = (PADAPTER)Ctx;
-    ULONG cause = A->Chip->Ops->IrqRead(A);   /* masks the chip when ours */
+    ULONG cause;
+    A->IsrCalls++;
+    cause = A->Chip->Ops->IrqRead(A);         /* masks the chip when ours */
     if (!cause) { *Recognized = FALSE; *QueueDpc = FALSE; return; }
     _InterlockedOr(&A->PendingIrq, (long)cause);
     A->IsrCount++;
@@ -561,7 +658,8 @@ static VOID MpHandleInterrupt(NDIS_HANDLE Ctx)
     UNREFERENCED_PARAMETER(cause);
     A->DpcCount++;
     A->Chip->Ops->RxPoll(A);
-    A->Chip->Ops->IrqEnable(A);
+    A->Chip->Ops->TxReclaim(A);
+    if (!A->PollMode) A->Chip->Ops->IrqEnable(A);
 }
 
 static VOID MpDisableInterrupt(NDIS_HANDLE Ctx)
@@ -582,16 +680,13 @@ static NDIS_STATUS MpSend(NDIS_HANDLE Ctx, PNDIS_PACKET Packet, UINT Flags)
     PNDIS_BUFFER b;
     PVOID va;
     UINT len;
-    ULONG total = 0, spin;
+    ULONG total = 0;
     PUCHAR dst;
     UNREFERENCED_PARAMETER(Flags);
 
+    /* no busy wait: the timer and the DPC reclaim too; a full ring drops */
     A->Chip->Ops->TxReclaim(A);
-    for (spin = 0; A->TxBusy >= TX_COUNT - 1 && spin < 1000; spin++) {
-        UsStall(1);
-        A->Chip->Ops->TxReclaim(A);
-    }
-    if (A->TxBusy >= TX_COUNT - 1) { A->TxErr++; return NDIS_STATUS_SUCCESS; }  /* dropped */
+    if (A->TxBusy >= TX_COUNT - 1) { A->TxFull++; A->TxErr++; return NDIS_STATUS_SUCCESS; }
 
     dst = A->TxBuf[A->TxNext];
     for (b = Packet->Private.Head; b; b = b->Next) {
