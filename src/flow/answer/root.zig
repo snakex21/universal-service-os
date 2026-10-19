@@ -251,6 +251,8 @@ test "beta and variant answers reuse base schemas with their own keys and editio
     }
     try std.testing.expect((try render(&p, "windows-longhorn", .x86, null, null, &buffer)) == null);
     try p.beta_clock.set("1999-12-11");
+    const me_answer = (try render(&p, "windows-millennium", .x86, null, null, &buffer)).?;
+    try std.testing.expect(std.mem.indexOf(u8, me_answer.bytes, ";USOS-BETA-CLOCK=1999-12-11") != null);
     const nt3_answer = (try render(&p, "citrix-winframe-1-8", .x86, null, null, &buffer)).?;
     try std.testing.expect(std.mem.indexOf(u8, nt3_answer.bytes, ";USOS-BETA-CLOCK=1999-12-11") != null);
 }
