@@ -13,7 +13,7 @@ usos_nt5_profile
 fail() { printf '[XP_WINDOWS] STOP: %s\n' "$1" >&2; exit 1; }
 value() { awk -F= -v key="$2" '$1==key {sub(/^[^=]*=/, ""); print; found=1; exit} END {if(!found) exit 1}' "$1"; }
 work=$(mktemp -d)
-trap 'rm -f "$work/plan" "$work/mbr" "$work/migrate.inf" "$work/readback" "$work/winnt.sif" "$work/winnt.base"; rmdir "$work"' EXIT HUP INT TERM
+trap 'rm -f "$work/plan" "$work/mbr" "$work/migrate.inf" "$work/readback" "$work/winnt.sif" "$work/winnt.base" "$work/network.ini"; rmdir "$work"' EXIT HUP INT TERM
 awk -f "$SCRIPT_DIR/xp_windows_partition_plan.awk" "$TARGET_SNAPSHOT" > "$work/plan"
 printf '[XP_WINDOWS] shared volume plan checked\n'
 cmp -s "$work/plan" "$XP_WINDOWS_PLAN" || fail 'Windows reservation changed after confirmation'
@@ -106,6 +106,17 @@ if [ -n "${SOURCE_ROOT:-}" ] && ! usos_nt5_answer_has_key "$key_field" < "$work/
     rm -f "$work/winnt.base"
     media_key=
     printf '[XP_WINDOWS] product key: none answered, taken from the disc'"'"'s own I386\\WINNT.SIF (not logged)\n'
+fi
+if [ "$NT5_SYSTEM" = windows-2000 ]; then
+    . "$SCRIPT_DIR/network_setup.sh"
+    usos_net_w2k_config "${XP_USER_SETTINGS:-}" > "$work/network.ini" || fail 'invalid LAN profile'
+    usos_net_stage "$work/network.ini" "$XP_TARGET_ROOT" "$SCRIPT_DIR" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
+    if [ "$(usos_net_value "$work/network.ini" network)" = on ]; then
+        mv "$work/winnt.sif" "$work/winnt.base"
+        usos_net_w2k_sif < "$work/winnt.base" > "$work/winnt.sif" || fail 'cannot add Windows 2000 LAN answer'
+        rm -f "$work/winnt.base"
+    fi
+    rm -f "$work/network.ini"
 fi
 put_verified "$work/winnt.sif" WINNT.SIF
 put_verified "$work/migrate.inf" MIGRATE.INF

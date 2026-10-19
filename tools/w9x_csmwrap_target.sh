@@ -263,6 +263,10 @@ if grep -q '^;USOS-DISPLAY=' "$ANSWER_INF"; then
     cp "$work/display-answer.inf" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot stage display answer'
     log "display: request=$display_request, validated VBE/INF mode at hardware logon"
 fi
+. "$LIB/network_setup.sh"
+usos_net_answer_config "$ANSWER_INF" "$SYSTEM_TAG" > "$work/network.ini" || fail 'invalid LAN metadata'
+usos_net_stage "$work/network.ini" "$work/c" "$LIB" "${W9X_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
+rm -f "$work/network.ini"
 for name in INSTALL.BAT PATCH9X.EXE CWSDPMI.EXE; do
     cp "$PATCH/$name" "$work/c/USOS9X/$name" || fail "cannot copy $name"
 done

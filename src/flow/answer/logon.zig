@@ -22,7 +22,9 @@
 //!   POSReady    Administrator with the profile's AdminPassword (blank without).
 //!   Vista+      the profile's first account (LocalAccounts, Administrators);
 //!               without an answer Setup/OOBE asks.
-//!   9x/Me       no logon prompt (MSBATCH.INF installs no network client).
+//!   9x/Me       with the default LAN client: automatic blank-password logon
+//!               as the profile user (USOS without a profile). network=off
+//!               keeps the previous no-client flow; custom files own their policy.
 const std = @import("std");
 const profile_mod = @import("profile.zig");
 const Profile = profile_mod.Profile;
@@ -140,7 +142,12 @@ fn autologonOn(p: *const Profile) bool {
 pub fn derive(system_id: []const u8, source: Source) Logon {
     const flow = flowFor(system_id);
     switch (flow) {
-        .win9x, .other => return .{ .kind = .no_logon },
+        .win9x => return switch (source) {
+            .profile => |p| if (p.network == .on) .{ .kind = .account, .user = if (p.user.len > 0) p.user.slice() else "USOS", .autologon = true } else .{ .kind = .no_logon },
+            .none => .{ .kind = .account, .user = "USOS", .autologon = true },
+            else => .{ .kind = .no_logon },
+        },
+        .other => return .{ .kind = .no_logon },
         else => {},
     }
     if (source == .file) return .{ .kind = .answer_file, .file = source.file };
@@ -334,12 +341,14 @@ test "Vista and later: the profile's account, Setup asks otherwise" {
     try expectLine("After the installation log on with the account from your answer file autounattend.xml.", derive("windows-10", .{ .file = "autounattend.xml" }));
 }
 
-test "9x and other systems: no logon line" {
+test "9x network defaults log on automatically; other systems retain policy" {
     var p = try testProfile("Jan", "x", true);
+    try std.testing.expect(derive("windows-98-se", .{ .profile = &p }).autologon);
+    try std.testing.expect(derive("windows-me", .none).autologon);
+    p.network = .off;
     try std.testing.expectEqual(Kind.no_logon, derive("windows-98-se", .{ .profile = &p }).kind);
-    try std.testing.expectEqual(Kind.no_logon, derive("windows-me", .none).kind);
     try std.testing.expectEqual(Kind.no_logon, derive("ms-dos-6-22", .{ .file = "x.inf" }).kind);
-    try expectLine("", derive("windows-95", .none));
+    try expectLine("After the installation Windows logs on automatically as USOS.", derive("windows-95", .none));
 }
 
 test "logon.ini: values, never the password" {

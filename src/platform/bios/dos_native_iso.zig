@@ -34,15 +34,18 @@ const max_answer_bytes = 256 * 1024;
 const win9x_folder = [_][]const u16{ wide("EFI"), wide("USOS"), wide("dos-native"), wide("win9x") };
 /// Copied from EFI\USOS\dos-native\win9x to the RAM disk root; the list
 /// matches tools/build_win9x_support.py FILES.
-const win9x_helpers = [_][]const u8{ "U9FIX.COM", "U9FIX.TXT", "USOSVESA.INF", "VESAMINI.DRV", "VESAMINI.VXD", "VMHAL9X.DLL", "VMHAL486.DLL", "VMDISP9X.DLL", "VMDISP9X.TXT", "USOSKEY.COM", "USOSKEY.DRV", "USOSMOUS.DRV", "VBMOUSE.EXE", "VBMOUSE.DRV", "VBADOS.TXT", "DOSMOUSE.BAT", "INWIN.COM", "CREGFIX.SYS" };
+const win9x_helpers = [_][]const u8{ "U9FIX.COM", "U9FIX.TXT", "USOSVESA.INF", "VESAMINI.DRV", "VESAMINI.VXD", "VMHAL9X.DLL", "VMHAL486.DLL", "VMDISP9X.DLL", "VMDISP9X.TXT", "USOSKEY.COM", "USOSKEY.DRV", "USOSMOUS.DRV", "VBMOUSE.EXE", "VBMOUSE.DRV", "VBADOS.TXT", "DOSMOUSE.BAT", "INWIN.COM", "CREGFIX.SYS", "USOSLAN.EXE" };
 
 const Iso = struct {
     fs: ntfs.FileSystem,
     disk: Reader,
     file: *const ntfs.File,
-    pub fn size(self: *const Iso) u64 { return self.file.size(); }
+    pub fn size(self: *const Iso) u64 {
+        return self.file.size();
+    }
     pub fn readAt(self: *const Iso, offset: u64, out: []u8) !usize {
-        try self.file.readAt(self.fs, self.disk, offset, out); return out.len;
+        try self.file.readAt(self.fs, self.disk, offset, out);
+        return out.len;
     }
 };
 
@@ -131,8 +134,7 @@ pub noinline fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8
     const answer_kind = try answerFile(esp, reader, bulk, fs, release, folder, unattended_name, &builder);
     const csmwrap = action == .install and seabios.csmwrap;
     var env: [96]u8 = undefined;
-    try builder.add("U9ENV.BAT", try std.fmt.bufPrint(&env, "SET U9SYS={s}\r\nSET U9SRC={s}\r\nSET U9ANS={s}\r\nSET U9CSM={s}\r\n", .{
-        release.tag, setup_folder, answer_kind, if (csmwrap) "1" else "0" }));
+    try builder.add("U9ENV.BAT", try std.fmt.bufPrint(&env, "SET U9SYS={s}\r\nSET U9SRC={s}\r\nSET U9ANS={s}\r\nSET U9CSM={s}\r\n", .{ release.tag, setup_folder, answer_kind, if (csmwrap) "1" else "0" }));
     const config_tail = "FILES=40\r\nBUFFERS=20\r\nLASTDRIVE=Z\r\n";
     // Under CSMWrap HIMEM picks an A20 handler that leaves A20 off and DOS=HIGH
     // hangs; port 92h (/M:2) works (docs/design/bios-via-csmwrap.md 4.3).
@@ -156,7 +158,7 @@ pub noinline fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8
             const length = descriptor[p];
             if (length > block_size - p) return error.InvalidDosSetupDirectory;
             const record = iso9660.recordInfo(descriptor[p..][0..length]) orelse return error.InvalidDosSetupDirectory;
-            const raw = descriptor[p + record.name_offset..][0..record.name_len];
+            const raw = descriptor[p + record.name_offset ..][0..record.name_len];
             if (!record.is_directory) {
                 if (descriptor[p + 25] & 0x80 != 0) return error.UnsupportedDosMultiExtent;
                 const end = std.mem.indexOfScalar(u8, raw, ';') orelse raw.len;
@@ -165,7 +167,8 @@ pub noinline fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8
                 while (done < output.len) {
                     const count = @min(1024 * 1024, output.len - done);
                     _ = try iso.readAt(@as(u64, record.extent_lba) * 2048 + done, output[done..][0..count]);
-                    done += count; copied += count;
+                    done += count;
+                    copied += count;
                     wimboot.Progress.update(&progress, copied);
                 }
             }

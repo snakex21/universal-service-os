@@ -1,7 +1,7 @@
 //! Windows 95/98/Me renderer: MSBATCH.INF for the DOS Setup that the BIOS
 //! Core starts (docs/win9x-modern-2026-09-30.md). The base is the USOS
 //! default answer (src/platform/bios/win9x/msbatch.inf: typical install,
-//! no startup disk, no licence page, no network components, restarts
+//! no startup disk, no licence page, TCP/IP with DHCP, restarts
 //! without a prompt, no Welcome screen); the profile adds the owner,
 //! organisation, computer name, time zone and, for 98/Me, the product key.
 //!
@@ -147,7 +147,7 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
     const computer = if (p.computer.slice().len > 0) p.computer.slice() else "USOS-9X";
     const workgroup = if (p.workgroup.len > 0) p.workgroup.slice() else "WORKGROUP";
     try w.print("\r\n[Network]\r\nComputerName=\"{s}\"\r\nWorkgroup=\"{s}\"\r\nDescription=\"{s}\"\r\nDisplay=0\r\n", .{ computer, workgroup, p.user.slice() });
-    try w.writeAll("Clients=\r\nProtocols=\r\nServices=\r\n");
+    try @import("network_defaults.zig").msbatch(p, computer, release == .windows_me, &w);
     // Typed options (options.zig): their own AddReg section, only when set.
     var values: [options.count]u8 = undefined;
     var it = options.iterate(p, &values, .{ .os = switch (release) {
@@ -156,7 +156,9 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
         .windows_me => .win_me,
     } });
     const any_option = it.next() != null;
-    try w.writeAll(if (any_option) "\n[Install]\nAddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile\n" else "\n[Install]\nAddReg=USOS.RunOnce,USOS.CsmReg\n");
+    try w.writeAll(if (any_option) "\n[Install]\nAddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile" else "\n[Install]\nAddReg=USOS.RunOnce,USOS.CsmReg");
+    if (p.network == .on) try w.writeAll(",USOS.Lan");
+    try w.writeByte('\n');
     try w.writeAll("UpdateInis=USOS.Memory\nUpdateIniFields=USOS.Csm\n");
     if (any_option) {
         // Setup's INF AddReg: HKCU at Setup time is the one default user.
@@ -184,6 +186,7 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
             else => {},
         };
     }
+    if (p.network == .on) try @import("network_defaults.zig").msbatchRegistry(p, &w);
     try w.writeAll(
         \\
         \\[USOS.Memory]
@@ -243,7 +246,7 @@ test "MSBATCH.INF: typed options in their own AddReg section, only when set" {
     try p.workgroup.set("RETRO");
     const me = try render(&p, .windows_me, "", &buffer);
     try std.testing.expect(std.mem.indexOf(u8, me, "\r\nWorkgroup=\"RETRO\"\r\n") != null);
-    try std.testing.expect(std.mem.indexOf(u8, me, "\r\nAddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile\r\nUpdateInis=USOS.Memory\r\nUpdateIniFields=USOS.Csm\r\n\r\n[USOS.Profile]\r\n" ++
+    try std.testing.expect(std.mem.indexOf(u8, me, "\r\nAddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan\r\nUpdateInis=USOS.Memory\r\nUpdateIniFields=USOS.Csm\r\n\r\n[USOS.Profile]\r\n" ++
         "HKCU,\"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\",HideFileExt,1,00,00,00,00\r\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, me, "\r\nHKCU,\"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\",ShowSuperHidden,1,01,00,00,00\r\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, me, "\r\nHKCU,\"Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\",NoDriveTypeAutoRun,1,ff,00,00,00\r\n") != null);
@@ -304,7 +307,7 @@ test "MSBATCH.INF carries the profile, CRLF, the key only for 98 and Me" {
     try std.testing.expect(std.mem.indexOf(u8, text, "\r\nName=\"Jan Kowalski\"\r\nOrg=\"USOS Lab\"\r\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, text, "\r\nTimeZone=\"Central European\"\r\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, text, "\r\nComputerName=\"USOS-9X\"\r\n") != null);
-    try std.testing.expect(std.mem.indexOf(u8, text, "\r\nAddReg=USOS.RunOnce,USOS.CsmReg\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "\r\nAddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan\r\n") != null);
     for (text, 0..) |c, i| {
         if (c == '\n') try std.testing.expectEqual(@as(u8, '\r'), text[i - 1]);
     }

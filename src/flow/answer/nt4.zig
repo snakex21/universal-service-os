@@ -107,6 +107,7 @@ pub fn render(p: *const Profile, key: []const u8, buffer: []u8) ![]const u8 {
     }
     try w.writeAll("\r\n[Display]\r\nConfigureAtLogon = 0\r\nAutoConfirm = 1\r\nBitsPerPel = 8\r\nXResolution = 640\r\nYResolution = 480\r\nVRefresh = 60\r\n");
     try optionLines(p, &w);
+    try @import("network_defaults.zig").nt4(p, if (p.workgroup.len > 0) p.workgroup.slice() else "WORKGROUP", &w);
     return w.buffered();
 }
 
@@ -132,6 +133,7 @@ test "NT 4.0 WINNT.SIF: typed options as USOS-REG comments, nothing by default" 
     var p = Profile{};
     try p.name.set("A");
     try p.user.set("Jan");
+    p.network = .off;
     var buffer: [4096]u8 = undefined;
     const plain = try render(&p, "", &buffer);
     try std.testing.expect(std.mem.indexOf(u8, plain, "USOS-REG") == null);
