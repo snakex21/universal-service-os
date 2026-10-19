@@ -38,6 +38,8 @@ pub const staged = [_]struct { system_id: []const u8, file: []const u8 }{
     // micro-Linux takes the [UserData] names into the patched INITIAL.INF.
     .{ .system_id = "windows-nt-3-1", .file = "NT31.SIF" },
     .{ .system_id = "windows-nt-3-1-server", .file = "NT31S.SIF" },
+    .{ .system_id = "citrix-winframe-1-8", .file = "WF18.SIF" },
+    .{ .system_id = "windows-nt-3-beta", .file = "NT3B.SIF" },
 };
 
 pub fn isNt3(system_id: []const u8) bool {
@@ -112,6 +114,10 @@ pub fn render(p: *const Profile, buffer: []u8) ![]const u8 {
     var name: [15]u8 = undefined;
     try w.print("\r\n!ComputerName = {s}\r\n", .{netbiosName(p.computer.slice(), &name)});
     try w.writeAll("\r\n[LicenseFilePrintData]\r\n\r\n[NetworkAdapterData]\r\n\r\n[TransportData]\r\n\r\n[DomainData]\r\n");
+    if (p.beta_clock.len > 0) {
+        if (!@import("beta_clock.zig").validSetting(p.beta_clock.slice())) return error.InvalidBetaClock;
+        try w.print(";USOS-BETA-CLOCK={s}\r\n", .{p.beta_clock.slice()});
+    }
     return w.buffered();
 }
 

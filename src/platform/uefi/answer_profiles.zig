@@ -344,6 +344,7 @@ pub fn stage(root: *uefi.protocol.File, profile: *const Profile, system_id: []co
         .format = result.format,
         .arch = if (result.format == .autounattend_xml) arch else null,
         .key = profile.keyFor(system_id).len > 0,
+        .beta_clock = profile.beta_clock.slice(),
     }, &plan_bytes);
     try settings_store.replaceFile(root, plan_file.plan_path, plan);
     var line: [160]u8 = undefined;
@@ -378,5 +379,5 @@ pub fn writeLogon(root: *uefi.protocol.File, system_id: []const u8, logon: answe
 
 /// usos-plan.ini for the wimboot RAM disk (same content as on the ESP).
 pub fn planText(profile: *const Profile, system_id: []const u8, arch: answer.Arch, os_profile: []const u8, buffer: []u8) ![]const u8 {
-    return plan_file.write(.{ .os_profile = os_profile, .system_id = system_id, .source = .profile, .name = profile.name.slice(), .format = .autounattend_xml, .arch = arch, .key = profile.keyFor(system_id).len > 0 }, buffer);
+    return plan_file.write(.{ .os_profile = os_profile, .system_id = system_id, .source = .profile, .name = profile.name.slice(), .format = .autounattend_xml, .arch = arch, .key = profile.keyFor(system_id).len > 0, .beta_clock = profile.beta_clock.slice() }, buffer);
 }

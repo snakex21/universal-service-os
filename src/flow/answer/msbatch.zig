@@ -25,11 +25,16 @@ pub const staged = [_]struct { system_id: []const u8, file: []const u8 }{
     .{ .system_id = "windows-98", .file = "98.INF" },
     .{ .system_id = "windows-me", .file = "ME.INF" },
     .{ .system_id = "windows-95", .file = "95.INF" },
+    .{ .system_id = "windows-millennium", .file = "MIL.INF" },
+    .{ .system_id = "windows-nashville", .file = "NASH.INF" },
+    .{ .system_id = "windows-memphis", .file = "MEMPHIS.INF" },
+    .{ .system_id = "windows-chicago", .file = "CHICAGO.INF" },
 };
 
 pub const Release = enum { windows_95, windows_98, windows_me };
 
 pub fn releaseFor(system_id: []const u8) ?Release {
+    const routed = @import("../../catalog/os_profiles.zig").routeId(system_id);
     const map = [_]struct { id: []const u8, release: Release }{
         .{ .id = "windows-95", .release = .windows_95 },
         .{ .id = "windows-98", .release = .windows_98 },
@@ -37,7 +42,7 @@ pub fn releaseFor(system_id: []const u8) ?Release {
         .{ .id = "windows-me", .release = .windows_me },
     };
     for (map) |entry| {
-        if (std.ascii.eqlIgnoreCase(entry.id, system_id)) return entry.release;
+        if (std.ascii.eqlIgnoreCase(entry.id, system_id) or std.ascii.eqlIgnoreCase(entry.id, routed)) return entry.release;
     }
     return null;
 }
@@ -83,30 +88,30 @@ pub fn timeZoneName95(name98: []const u8) ?[]const u8 {
 
 /// The Windows 98 keys that Windows 95 OSR2.1 has under the same name.
 const windows95_zones = [_][]const u8{
-    "GMT",          "Romance",        "W. Europe",     "E. Europe",       "E. South America", "Atlantic",
-    "Eastern",      "Central",        "Mountain",      "Pacific",         "Alaskan",          "Hawaiian",
-    "Samoa",        "New Zealand",    "AUS Eastern",   "Cen. Australia",  "Tokyo",            "Taipei",
-    "India",        "Arabian",        "Iran",          "Israel",          "Newfoundland",     "Azores",
-    "Mid-Atlantic", "Greenwich",      "SA Eastern",    "SA Western",      "US Eastern",       "SA Pacific",
-    "Canada Central", "Mexico",       "US Mountain",   "Dateline",        "Fiji",             "Central Pacific",
-    "Tasmania",     "West Pacific",   "AUS Central",   "Central Asia",    "West Asia",        "Afghanistan",
-    "Egypt",        "South Africa",   "Russian",       "E. Australia",
+    "GMT",            "Romance",      "W. Europe",   "E. Europe",      "E. South America", "Atlantic",
+    "Eastern",        "Central",      "Mountain",    "Pacific",        "Alaskan",          "Hawaiian",
+    "Samoa",          "New Zealand",  "AUS Eastern", "Cen. Australia", "Tokyo",            "Taipei",
+    "India",          "Arabian",      "Iran",        "Israel",         "Newfoundland",     "Azores",
+    "Mid-Atlantic",   "Greenwich",    "SA Eastern",  "SA Western",     "US Eastern",       "SA Pacific",
+    "Canada Central", "Mexico",       "US Mountain", "Dateline",       "Fiji",             "Central Pacific",
+    "Tasmania",       "West Pacific", "AUS Central", "Central Asia",   "West Asia",        "Afghanistan",
+    "Egypt",          "South Africa", "Russian",     "E. Australia",
 };
 
 /// The time zone keys of Windows 98 SE (TIMEZONE.INF), zones added later
 /// are missing on purpose.
 const windows98_zones = [_][]const u8{
-    "AUS Central",    "AUS Eastern",  "Afghanistan",     "Alaskan",       "Arab",           "Arabian",
-    "Atlantic",       "Azores",       "Canada Central",  "Caucasus",      "Cen. Australia", "Central",
-    "Central Asia",   "Central Europe", "Central European", "Central Pacific", "China",       "Dateline",
-    "E. Africa",      "E. Australia", "E. Europe",       "E. South America", "Eastern",     "Egypt",
-    "Ekaterinburg",   "FLE",          "Fiji",            "GMT",           "GTB",            "Greenwich",
-    "Hawaiian",       "India",        "Iran",            "Israel",        "Korea",          "Mexico",
-    "Mid-Atlantic",   "Mountain",     "New Zealand",     "Newfoundland",  "Pacific",        "Pacific SA",
-    "Romance",        "Russian",      "SA Eastern",      "SA Pacific",    "SA Western",     "SE Asia",
-    "Samoa",          "Singapore",    "South Africa",    "Sri Lanka",     "Taipei",         "Tasmania",
-    "Tokyo",          "US Eastern",   "US Mountain",     "Vladivostok",   "W. Australia",   "W. Europe",
-    "West Asia",      "West Pacific", "Yakutsk",
+    "AUS Central",  "AUS Eastern",    "Afghanistan",      "Alaskan",          "Arab",           "Arabian",
+    "Atlantic",     "Azores",         "Canada Central",   "Caucasus",         "Cen. Australia", "Central",
+    "Central Asia", "Central Europe", "Central European", "Central Pacific",  "China",          "Dateline",
+    "E. Africa",    "E. Australia",   "E. Europe",        "E. South America", "Eastern",        "Egypt",
+    "Ekaterinburg", "FLE",            "Fiji",             "GMT",              "GTB",            "Greenwich",
+    "Hawaiian",     "India",          "Iran",             "Israel",           "Korea",          "Mexico",
+    "Mid-Atlantic", "Mountain",       "New Zealand",      "Newfoundland",     "Pacific",        "Pacific SA",
+    "Romance",      "Russian",        "SA Eastern",       "SA Pacific",       "SA Western",     "SE Asia",
+    "Samoa",        "Singapore",      "South Africa",     "Sri Lanka",        "Taipei",         "Tasmania",
+    "Tokyo",        "US Eastern",     "US Mountain",      "Vladivostok",      "W. Australia",   "W. Europe",
+    "West Asia",    "West Pacific",   "Yakutsk",
 };
 
 /// MSBATCH.INF (CRLF) for the release. `key`: the product key to use (the

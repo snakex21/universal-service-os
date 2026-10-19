@@ -17,10 +17,11 @@ pub const system_id = "windows-embedded-posready-2009";
 /// Rendered files the UEFI menu leaves for micro-Linux (\EFI\USOS\answer\<file>).
 pub const staged = [_]struct { system_id: []const u8, file: []const u8 }{
     .{ .system_id = system_id, .file = "POSR.SIF" },
+    .{ .system_id = "windows-flp", .file = "FLP.SIF" },
 };
 
 pub fn isPosReady(id: []const u8) bool {
-    return std.ascii.eqlIgnoreCase(id, system_id);
+    return std.ascii.eqlIgnoreCase(id, system_id) or std.ascii.eqlIgnoreCase(id, "windows-flp");
 }
 
 /// POSReady keys are 5x5 (OEM, VL and the evaluation SKUs).
@@ -76,6 +77,10 @@ pub fn render(p: *const Profile, key: []const u8, buffer: []u8) ![]const u8 {
         try w.writeAll("ProductKey=");
         for (key) |c| try w.writeByte(std.ascii.toUpper(c));
         try w.writeAll("\r\n");
+    }
+    if (p.beta_clock.len > 0) {
+        if (!@import("beta_clock.zig").validSetting(p.beta_clock.slice())) return error.InvalidBetaClock;
+        try w.print(";USOS-BETA-CLOCK={s}\r\n", .{p.beta_clock.slice()});
     }
     return w.buffered();
 }

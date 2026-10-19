@@ -120,6 +120,7 @@ pub const Field = enum {
     first_run_off,
     onedrive_off,
     user_script,
+    beta_clock,
 };
 
 /// The optional look and extras toggles (docs/answer-profiles.md,
@@ -285,6 +286,8 @@ pub const Profile = struct {
     opts: [options.count]u8 = @splat(0),
     /// Workgroup (NetBIOS name rule); empty: the release's default.
     workgroup: Text(15) = .{},
+    /// Empty/off: unchanged; auto: exact detected beta build; or YYYY-MM-DD.
+    beta_clock: Text(10) = .{},
 
     pub fn opt(self: *const Profile, o: options.Opt) u8 {
         return self.opts[@intFromEnum(o)];
@@ -672,6 +675,7 @@ pub fn validate(p: *const Profile) ?Issue {
         if (checkEdition(entry.edition.slice())) |problem| return .{ .field = .edition, .problem = problem };
     }
     if (checkWorkgroup(p.workgroup.slice())) |problem| return .{ .field = .workgroup, .problem = problem };
+    if (!@import("beta_clock.zig").validSetting(p.beta_clock.slice())) return .{ .field = .beta_clock, .problem = .bad_choice };
     if (!p.manual_disk) return .{ .field = .manual_disk, .problem = .unsupported };
     return null;
 }
@@ -864,6 +868,10 @@ fn applyField(p: *Profile, name: []const u8, value: []const u8) ?Issue {
             if (checkEdition(value)) |problem| return .{ .field = field, .problem = problem };
             p.edition.set(value) catch return .{ .field = field, .problem = .too_long };
         },
+        .beta_clock => {
+            if (!@import("beta_clock.zig").validSetting(value)) return .{ .field = field, .problem = .bad_choice };
+            p.beta_clock.set(value) catch return .{ .field = field, .problem = .too_long };
+        },
         .protect_pc => p.protect_pc = enumByName(ProtectPc, value) orelse return .{ .field = field, .problem = .bad_choice },
         .network_location => p.network_location = enumByName(NetworkLocation, value) orelse return .{ .field = field, .problem = .bad_choice },
         .theme => p.theme = enumByName(Theme, value) orelse return .{ .field = field, .problem = .bad_choice },
@@ -915,8 +923,8 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
         for (p.system_keys[0..p.system_key_count]) |*entry| try w.print("key.{s}={s}\r\n", .{ entry.system.slice(), entry.key.slice() });
     }
     try w.print("manual_disk={s}\r\nlocal_account={s}\r\nbypass_tpm={s}\r\nbypass_secure_boot={s}\r\nbypass_ram={s}\r\nno_network_oobe={s}\r\n", .{
-        boolText(p.manual_disk),   boolText(p.local_account), boolText(p.bypass_tpm),
-        boolText(p.bypass_secure_boot), boolText(p.bypass_ram), boolText(p.no_network_oobe),
+        boolText(p.manual_disk),        boolText(p.local_account), boolText(p.bypass_tpm),
+        boolText(p.bypass_secure_boot), boolText(p.bypass_ram),    boolText(p.no_network_oobe),
     });
     try w.print("protect_pc={s}\r\nnetwork_location={s}\r\ndisable_wer={s}\r\n", .{ @tagName(p.protect_pc), @tagName(p.network_location), boolText(p.disable_wer) });
     try w.print("edition={s}\r\n", .{p.edition.slice()});
@@ -932,6 +940,7 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
     // Typed options (options.zig) and the workgroup, only when set (the
     // editor saves through here: before 2026-10-14 they were dropped).
     if (p.workgroup.len > 0) try w.print("workgroup={s}\r\n", .{p.workgroup.slice()});
+    if (p.beta_clock.len > 0) try w.print("beta_clock={s}\r\n", .{p.beta_clock.slice()});
     for (options.table) |o| {
         if (o.legacy) continue;
         const value = p.opts[@intFromEnum(o.opt)];
@@ -1212,3 +1221,17 @@ test "product key: typing inserts the dashes, backspace over a dash removes the 
     try std.testing.expectEqual(@as(usize, 0), keyBackspace(&buf, 0));
 }
 
+test "beta clock profile strict parse, round trip, invalid calendar and injection" {
+    var p = Profile{};
+    try std.testing.expect(parse("name=Beta\nuser=Tester\nbeta_clock=auto\n", &p) == .ok);
+    try std.testing.expectEqualStrings("auto", p.beta_clock.slice());
+    var buffer: [max_file]u8 = undefined;
+    const text = try write(&p, &buffer);
+    var again = Profile{};
+    try std.testing.expect(parse(text, &again) == .ok);
+    try std.testing.expectEqualStrings("auto", again.beta_clock.slice());
+    for ([_][]const u8{ "2001-02-29", "2005-04-31", "2009-01-15;id", "2009-1-15" }) |bad| {
+        var line: [100]u8 = undefined;
+        try std.testing.expect(parse(try std.fmt.bufPrint(&line, "name=Beta\nuser=Tester\nbeta_clock={s}\n", .{bad}), &p) == .invalid);
+    }
+}

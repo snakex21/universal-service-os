@@ -54,6 +54,7 @@ pub const Plan = struct {
     format: Format = .autounattend_xml,
     arch: ?Arch = null,
     key: bool = false,
+    beta_clock: []const u8 = "",
 };
 
 pub fn filePathPosix(format: Format, buffer: []u8) ![]const u8 {
@@ -79,6 +80,10 @@ pub fn write(plan: Plan, buffer: []u8) ![]const u8 {
         if (plan.arch) |arch| try w.print("arch={s}\r\n", .{@tagName(arch)});
         try w.print("key={s}\r\n", .{if (plan.key) "yes" else "no"});
     }
+    if (plan.beta_clock.len > 0) {
+        if (!@import("beta_clock.zig").validSetting(plan.beta_clock)) return error.InvalidBetaClock;
+        try w.print("[beta]\r\nclock={s}\r\n", .{plan.beta_clock});
+    }
     return w.buffered();
 }
 
@@ -91,4 +96,11 @@ test "plan file carries the profile, never the key" {
     );
     const none = try write(.{ .os_profile = "windows-work", .system_id = "windows-10", .source = .none }, &buffer);
     try std.testing.expect(std.mem.endsWith(u8, none, "[answer]\r\nsource=none\r\n"));
+}
+
+test "beta clock metadata is explicit and validated" {
+    var buffer: [512]u8 = undefined;
+    const text = try write(.{ .os_profile = "nt3-x86-qemu-csmwrap", .system_id = "windows-nt-3-beta", .source = .none, .beta_clock = "1999-12-11" }, &buffer);
+    try std.testing.expect(std.mem.endsWith(u8, text, "[beta]\r\nclock=1999-12-11\r\n"));
+    try std.testing.expectError(error.InvalidBetaClock, write(.{ .os_profile = "x", .system_id = "x", .source = .none, .beta_clock = "2000-02-30" }, &buffer));
 }

@@ -116,7 +116,7 @@ for file in "$LIB/xp-geometry-fix-mbr-440.bin" "$LIB/xp_csmwrap_esp.sh" "$ESP_DI
 done
 [ "$(wc -c < "$LIB/xp-geometry-fix-mbr-440.bin" | tr -d ' ')" = 440 ] || fail 'USOS MBR code must be 440 bytes'
 case "$SYSTEM_TAG" in 98SE|98|ME|95) ;; *) fail "unknown Windows 9x release: $SYSTEM_TAG" ;; esac
-case "$SETUP_FOLDER" in WIN98|WIN9X|WIN95) ;; *) fail "unexpected Setup folder: $SETUP_FOLDER" ;; esac
+case "$SETUP_FOLDER" in WIN98|WIN9X|WIN95) ;; WINME) [ "$SYSTEM_TAG" = ME ] || fail "WINME needs the Me flow" ;; *) fail "unexpected Setup folder: $SETUP_FOLDER" ;; esac
 case "$SIZE_GIB" in 2|8|32) ;; *) fail "unexpected partition size: $SIZE_GIB" ;; esac
 if awk -v d="$TARGET_DEVICE" 'index($1, d) == 1 { found=1 } END { exit(found ? 0 : 1) }' /proc/mounts; then
     fail 'a partition of the selected disk is mounted; no disk was changed'

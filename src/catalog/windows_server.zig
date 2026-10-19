@@ -98,6 +98,17 @@ pub const entries = [_]SystemEntry{
         .boot_methods = &nt5_methods,
         .server = true,
     },
+    SystemEntry{
+        .id = "citrix-winframe-1-8",
+        .name = "Citrix WinFrame 1.8",
+        .category = .windows,
+        .family = .windows_legacy,
+        .image_directory = "\\Systems\\Windows\\Citrix WinFrame 1.8\\Images",
+        .unattended_directory = "\\Systems\\Windows\\Citrix WinFrame 1.8\\Unattended",
+        .firmware = .uefi,
+        .boot_methods = &nt5_methods,
+        .server = true,
+    },
     // Windows NT 3.5 Server: the NT 3.5 Workstation flow with the Server CD
     // (docs/nt35-2026-10-09.md); UEFI only.
     SystemEntry{

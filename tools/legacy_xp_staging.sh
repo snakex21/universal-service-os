@@ -112,7 +112,7 @@ usos_legacy_xp_staging() {
     insmod "$NTFS3_MODULE" 2>/dev/null || true
     mkdir -p /mnt/data /mnt/source /mnt/xpsetup
     mount -t ntfs3 -o ro,noatime "$DATA_PATH" /mnt/data || stop 'cannot mount USOS_DATA read-only for Legacy XP staging'
-    XP_IMAGE_PATH="/mnt/data/Systems/Windows/$NT5_NAME/Images/$XP_IMAGE_NAME"
+    XP_IMAGE_PATH="/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Images/$XP_IMAGE_NAME"
     [ -f "$XP_IMAGE_PATH" ] || stop "selected XP ISO not found on DATA: $XP_IMAGE_NAME"
     printf '[LEGACY_XP] SOURCE PASS path=Systems/Windows/%s/Images/%s\n' "$NT5_NAME" "$XP_IMAGE_NAME"
 
@@ -127,7 +127,7 @@ usos_legacy_xp_staging() {
             *.sif) ;;
             *) stop "Legacy XP unattended file is not .sif: $XP_UNATTENDED_NAME" ;;
         esac
-        XP_WINNT_SIF="/mnt/data/Systems/Windows/$NT5_NAME/Unattended/$XP_UNATTENDED_NAME"
+        XP_WINNT_SIF="/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/$XP_UNATTENDED_NAME"
         [ -f "$XP_WINNT_SIF" ] || stop "selected XP WINNT.SIF not found on DATA: $XP_UNATTENDED_NAME"
         [ -r /usr/lib/usos/xp_unattended_policy.sh ] || stop 'xp_unattended_policy.sh is missing'
         . /usr/lib/usos/xp_unattended_policy.sh
@@ -424,7 +424,7 @@ usos_legacy_xp_staging() {
             # pass yet: only with DATA's Unattended\nvme-experimental.txt (X470 test).
             case "${NT5_SYSTEM:-windows-xp}" in
                 windows-xp|windows-server-2003) ;;
-                windows-2000) [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/nvme-experimental.txt" ] || stop "Windows 2000 on NVMe is experimental (usosnvme): put an empty nvme-experimental.txt into Systems\\Windows\\$NT5_NAME\\Unattended to try it. No target write occurred"
+                windows-2000) [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/nvme-experimental.txt" ] || stop "Windows 2000 on NVMe is experimental (usosnvme): put an empty nvme-experimental.txt into Systems\\Windows\\$NT5_NAME\\Unattended to try it. No target write occurred"
                     printf '[XP_NVME] Windows 2000 NVMe experimental (nvme-experimental.txt)\n' ;;
                 *) stop "No NVMe driver for $NT5_SYSTEM in this flow yet (usosnvme: XP SP3 and Server 2003 SP2 x86). No target write occurred" ;;
             esac
@@ -490,30 +490,30 @@ usos_legacy_xp_staging() {
     # ACPI kept (or off with DATA's acpi-off.txt, the STOP 0xA5 fallback),
     # plus xhci98 below (docs/windows-2000-modern-2026-09-30.md).
     [ -f /usr/lib/usos/w2k-drivers/ahcint.sys ] && [ -f /usr/lib/usos/w2k-drivers/ahcint.inf ] || stop 'Windows 2000 AHCI driver (AHCINT) is missing from the package; no target write occurred'
-    if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/acpi-off.txt" ]; then USOS_W2K_ACPI=off; else USOS_W2K_ACPI=on; fi
+    if [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/acpi-off.txt" ]; then USOS_W2K_ACPI=off; else USOS_W2K_ACPI=on; fi
     # hal-standard.txt (with acpi-off.txt): the Standard PC HAL (hal.dll, PIC)
     # instead of the MPS HAL, pinned through WINNT.SIF ComputerType.
-    if [ "$USOS_W2K_ACPI" = off ] && [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/hal-standard.txt" ]; then USOS_W2K_HAL=standard; else USOS_W2K_HAL=auto; fi
+    if [ "$USOS_W2K_ACPI" = off ] && [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/hal-standard.txt" ]; then USOS_W2K_HAL=standard; else USOS_W2K_HAL=auto; fi
     # storage-uniata.txt: UniATA 0.47b instead of AHCINT (the X470 A/B option).
-    if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/storage-uniata.txt" ]; then USOS_W2K_STORAGE=uniata; else USOS_W2K_STORAGE=ahcint; fi
+    if [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/storage-uniata.txt" ]; then USOS_W2K_STORAGE=uniata; else USOS_W2K_STORAGE=ahcint; fi
     [ "$USOS_W2K_STORAGE" = ahcint ] || [ -f /usr/lib/usos/w2k-drivers/uniata/uniata.sys ] || stop 'Windows 2000 UniATA driver is missing from the package; no target write occurred'
     # usosrst.sys (own helper: STOP screen, Setup restart without an 8042).
     [ -f /usr/lib/usos/w2k-drivers/usosrst.sys ] || stop 'Windows 2000 helper driver (usosrst) is missing from the package; no target write occurred'
     # The clock fixes are the default (w2k_stage.sh 6., X470 2026-10-05):
     # hpet-keep.txt keeps HPET LegacyReplacement, rtc-keep.txt keeps the HAL's
     # RTC reads (docs/windows-2000-modern-2026-09-30.md 7c-7e).
-    if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/hpet-keep.txt" ]; then USOS_W2K_HPET=keep; else USOS_W2K_HPET=legacy-off; fi
-    if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/rtc-keep.txt" ]; then USOS_W2K_RTC=keep; else USOS_W2K_RTC=fix; fi
+    if [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/hpet-keep.txt" ]; then USOS_W2K_HPET=keep; else USOS_W2K_HPET=legacy-off; fi
+    if [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/rtc-keep.txt" ]; then USOS_W2K_RTC=keep; else USOS_W2K_RTC=fix; fi
     # bootvid-ms.txt: the Microsoft boot video in text mode even with ACPI on
     # (w2k_stage.sh 8.; default there: USOS's text BOOTVID.DLL + /SOS).
-    if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/bootvid-ms.txt" ]; then USOS_W2K_BOOTVID=ms; else USOS_W2K_BOOTVID=text; fi
+    if [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/bootvid-ms.txt" ]; then USOS_W2K_BOOTVID=ms; else USOS_W2K_BOOTVID=text; fi
     # w2k-diag.txt (alias: Codex's old nmi-snapshot.txt): the Windows 2000
     # ACPI diagnostic setup instead of the clean default (w2k_stage.sh 10.,
     # xp_csmwrap_esp.sh): CSMWrap 3.1.2-usos11-diag (tick watcher + NMI
     # snapshot), usosvid 1.3-diag in ~BT and the installed system, /SOS
     # /BOOTLOG in the installed boot.ini. Needs ACPI on.
     USOS_W2K_DIAG=off
-    if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/w2k-diag.txt" ] || [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/nmi-snapshot.txt" ]; then
+    if [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/w2k-diag.txt" ] || [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/nmi-snapshot.txt" ]; then
         [ "$USOS_W2K_ACPI" = on ] || stop 'Windows 2000: the diagnostic flag (w2k-diag.txt / nmi-snapshot.txt) needs ACPI on; remove acpi-off.txt or the flag. No target write occurred'
         [ -f /usr/lib/usos/w2k-drivers/usosvid-diag/bootvid.dll ] && [ -f /usr/lib/usos/w2k-drivers/csmwrap-diag/csmwrapx64.efi ] || stop 'Windows 2000 diagnostic files are missing from the package; no target write occurred'
         USOS_W2K_DIAG=on; USOS_W2K_BOOTVID=text
@@ -521,14 +521,14 @@ usos_legacy_xp_staging() {
     fi
     # vesa-off.txt: no VESA display (w2k_stage.sh 11.; default: own usosvbe
     # miniport + the CD's framebuf.dll, registered at setup end, 1024x768x16).
-    if [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/vesa-off.txt" ]; then USOS_W2K_VESA=off; else USOS_W2K_VESA=on; fi
+    if [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/vesa-off.txt" ]; then USOS_W2K_VESA=off; else USOS_W2K_VESA=on; fi
     [ "$USOS_W2K_VESA" = off ] || [ -f /usr/lib/usos/w2k-drivers/usosvbe/usosvbe.sys ] || stop 'Windows 2000 VESA miniport (usosvbe) is missing from the package; no target write occurred'
     # Unattended\acpi\ (the user's own ACPI package, w2k_stage.sh 5.): ACPI
     # stays on, so it never combines with acpi-off.txt.
     USOS_W2K_ACPI_PKG=
-    if [ -d "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/acpi" ]; then
+    if [ -d "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/acpi" ]; then
         [ "$USOS_W2K_ACPI" = on ] || stop 'Windows 2000: acpi-off.txt and the user ACPI package (Unattended\acpi) exclude each other; remove one. No target write occurred'
-        USOS_W2K_ACPI_PKG="/mnt/data/Systems/Windows/$NT5_NAME/Unattended/acpi"
+        USOS_W2K_ACPI_PKG="/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/acpi"
     fi
     # ACPI on: the target gets the Windows 2000 ACPI build of the USOS MBR
     # (HPET LegacyReplacement off before the HAL calibrates on IRQ 0, ACPI 2.0
@@ -557,7 +557,7 @@ usos_legacy_xp_staging() {
     . /usr/lib/usos/xp_user_settings.sh
     # XP_SETTINGS_MODE=off (usos.xp_settings=off): manual installation chosen in the menu;
     # plan (usos.xp_settings=plan): a USOS answer profile rendered on the ESP.
-    usos_xp_settings_select "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/usos-xp.ini" "$SOURCE_ROOT" "$XP_WINNT_SIF$XP_CUSTOM_SIF" "${XP_SETTINGS_MODE:-}" || stop 'XP answer settings are invalid (usos-xp.ini on DATA or the chosen profile). No target write occurred'
+    usos_xp_settings_select "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/usos-xp.ini" "$SOURCE_ROOT" "$XP_WINNT_SIF$XP_CUSTOM_SIF" "${XP_SETTINGS_MODE:-}" || stop 'XP answer settings are invalid (usos-xp.ini on DATA or the chosen profile). No target write occurred'
     fi
     XP_SOURCE_OPEN=yes
     fi
@@ -669,7 +669,7 @@ usos_legacy_xp_staging() {
     # How to log on afterwards (logon.ini from the menu, docs/logon-after-install.md):
     # every later page shows it; DATA gets last-install-login.txt (no password).
     usos_logon_take /mnt/esp "${NT5_SYSTEM:-}" || true
-    usos_logon_save /mnt/data "Systems/Windows/$NT5_NAME" || true
+    usos_logon_save /mnt/data "Systems/$NT5_CATEGORY/$NT5_NAME" || true
     umount /mnt/data || stop 'cannot unmount USOS_DATA after XP preparation'
     printf '[LEGACY_XP] PREPARED PASS backend=xp-staging\n'
     xp_stage_set handoff-finalize

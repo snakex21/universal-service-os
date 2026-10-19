@@ -1,0 +1,7 @@
+; Synthetic 3.51 Server metadata; product marker supplied separately
+[SetupData]
+MajorVersion=3
+MinorVersion=51
+ProductType=1
+[nls]
+DefaultLayout=00000409

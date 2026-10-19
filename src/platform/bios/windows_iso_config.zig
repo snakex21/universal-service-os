@@ -31,7 +31,7 @@ pub fn sourceConfigForFolder(buffer: []u8, partition_guid: [16]u8, iso_size: u64
 
 fn encodeSourceConfig(buffer: []u8, partition_guid: [16]u8, iso_size: u64, folder: []const u8, image_name: []const u8) ![]const u8 {
     try validateName(image_name);
-    const parts = [_][]const u8{ "Systems\\Windows\\", folder, "\\Images\\", image_name, "\x00" };
+    const parts = [_][]const u8{ "Systems\\", categoryForFolder(folder), "\\", folder, "\\Images\\", image_name, "\x00" };
     var size: usize = 32;
     for (parts) |part| size += part.len;
     if (buffer.len < size or iso_size < 32768) return error.InvalidIsoConfiguration;
@@ -77,4 +77,18 @@ test "Windows 10 source and directory lookup use the same exact system folder" {
         try std.testing.expectError(error.InvalidIsoConfiguration, sourceConfig(buffer[0..32], id, 4702233088, system, "image.iso"));
         try std.testing.expectError(error.InvalidIsoConfiguration, sourceConfig(&buffer, id, 0, system, "image.iso"));
     }
+}
+
+/// Native NT6 variants keep their own catalog DATA category.
+pub fn categoryForFolder(folder: []const u8) []const u8 {
+    for ([_][]const u8{ "Windows 7 Beta", "Windows Longhorn" }) |known| {
+        if (std.mem.eql(u8, folder, known)) return "Betas";
+    }
+    return "Windows";
+}
+
+test "beta source binding preserves its catalog category" {
+    var buffer: [544]u8 = undefined;
+    const value = try sourceConfigForFolder(&buffer, [_]u8{1} ** 16, 900000, "Windows 7 Beta", "arbitrary.iso");
+    try std.testing.expectEqualStrings("Systems\\Betas\\Windows 7 Beta\\Images\\arbitrary.iso\x00", value[32..]);
 }

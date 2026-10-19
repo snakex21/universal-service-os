@@ -75,6 +75,25 @@ usos_nt5_profile() {
             ;;
         *) printf '[NT5_PROFILE] Unsupported system: %s\n' "$NT5_SYSTEM" >&2; return 1 ;;
     esac
+    NT5_CATEGORY=Windows
+    case "${USOS_NT5_VARIANT:-}" in
+        whistler|neptune|w2k-beta) ;;
+        *)
+            case " $(cat /proc/cmdline 2>/dev/null) " in
+                *' usos.nt5_variant=whistler '*) USOS_NT5_VARIANT=whistler ;;
+                *' usos.nt5_variant=neptune '*) USOS_NT5_VARIANT=neptune ;;
+                *' usos.nt5_variant=w2k-beta '*) USOS_NT5_VARIANT=w2k-beta ;;
+                *) USOS_NT5_VARIANT= ;;
+            esac ;;
+    esac
+    case "$NT5_SYSTEM:$USOS_NT5_VARIANT" in
+        windows-xp:whistler) NT5_NAME='Windows Whistler'; NT5_CATEGORY=Betas ;;
+        windows-2000:neptune) NT5_NAME='Windows Neptune'; NT5_CATEGORY=Betas ;;
+        windows-2000:w2k-beta) NT5_NAME='Windows 2000 Beta'; NT5_CATEGORY=Betas ;;
+        *:) ;;
+        *) printf '[NT5_PROFILE] STOP mismatched beta/base identity\n' >&2; return 1 ;;
+    esac
+    export NT5_CATEGORY USOS_NT5_VARIANT
     export NT5_SYSTEM NT5_NAME NT5_TITLE NT5_INSTALL_DIR NT5_SOURCE_DIR NT5_SETUP_DIR
 }
 

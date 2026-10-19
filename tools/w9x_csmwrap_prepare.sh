@@ -132,10 +132,19 @@ usos_w9x_csmwrap_prepare() {
     for value in "$iso" "$folder" "$answer"; do
         case "$value" in *..*|/*) stop 'request.ini has an unsafe path' ;; esac
     done
+    answer_tag=
     case "$system" in
         windows-98-se) tag=98SE setup=WIN98 ;;
         windows-98) tag=98 setup=WIN98 ;;
         windows-me) tag=ME setup=WIN9X ;;
+        windows-millennium) tag=ME setup=WINME answer_tag=MIL ;;
+        windows-nashville) stop "Nashville 999 is upgrade-only and has no FAT32 support; the existing fresh-disk formatter must not run. No disk was changed" ;;
+        windows-chicago|windows-memphis|windows-nt-3-beta|windows-nt-4-beta|windows-cairo)
+            stop "This prerelease is mapped, but awaits source-specific Setup validation. No disk was changed" ;;
+        citrix-winframe-1-8)
+            stop "WinFrame maps to NT 3.51 Server; Citrix licensing and INITIAL.INF still require validation from the inner ISO. No disk was changed" ;;
+        windows-flp)
+            stop "FLP is WinPE plus WinFLP.wim; its disk answer and NVMe package are not validated by the POSReady flow. No disk was changed" ;;
         windows-95) tag=95 setup=WIN95 ;;
         # DOS family (tools/dos_csmwrap_target.sh): MS-DOS 6.22, and Windows
         # 3.x on top of the MS-DOS 6.22 ISO from Systems\DOS\MS-DOS\Images.
@@ -175,6 +184,9 @@ usos_w9x_csmwrap_prepare() {
         haiku|freebsd|reactos|kolibrios|openbsd|netbsd|9front|redox|other-os|freedos) tag=IMG setup='' ;;
         *) stop "request.ini names an unsupported system: $system" ;;
     esac
+    [ -n "$answer_tag" ] || answer_tag=$tag
+    data_category=Windows
+    case "$iso" in Systems/Betas/*) data_category=Betas ;; esac
     w9x_csmwrap_log "REQUEST system=$system iso=$iso folder=$folder answer=${answer%%:*} size=$size_gib"
     NT5_NAME=$folder
     NT5_TITLE=$(printf '%s' "$NT5_NAME" | tr '[:lower:]' '[:upper:]')
@@ -276,7 +288,7 @@ usos_w9x_csmwrap_prepare() {
             profile)
                 cp /mnt/esp/EFI/USOS/answer/POSR.SIF /run/posready.sif || stop 'the answer profile could not be taken'
                 rm -f /mnt/esp/EFI/USOS/answer/POSR.SIF /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT4T.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF /mnt/esp/EFI/USOS/answer/NT31.SIF /mnt/esp/EFI/USOS/answer/NT31S.SIF
-                for staged in 98SE 98 ME 95; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
+                for staged in 98SE 98 ME 95 MIL NASH MEMPHIS CHICAGO; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
                 sync
                 posready_answer_xml /usr/lib/usos/posready_unattended.xml /run/posready.sif > "$answer_inf" || {
                     rm -f /run/posready.sif "$answer_inf"
@@ -286,7 +298,7 @@ usos_w9x_csmwrap_prepare() {
             file:*)
                 name=${answer#file:}
                 case "$name" in */*|'') stop 'request.ini has an unsafe answer file name' ;; esac
-                cp "/mnt/data/Systems/Windows/$folder/Unattended/$name" "$answer_inf" || stop "the answer file is not on DATA: $name"
+                cp "/mnt/data/Systems/$data_category/$folder/Unattended/$name" "$answer_inf" || stop "the answer file is not on DATA: $name"
                 answer_kind=USER ;;
             *) stop 'request.ini has an unknown answer kind' ;;
         esac
@@ -308,7 +320,7 @@ usos_w9x_csmwrap_prepare() {
             # staged copies go.
             cp "/mnt/esp/EFI/USOS/answer/$tag.SIF" "$answer_inf" || stop 'the answer profile could not be taken'
             rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT4T.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF /mnt/esp/EFI/USOS/answer/NT31.SIF /mnt/esp/EFI/USOS/answer/NT31S.SIF
-            for staged in 98SE 98 ME 95; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
+            for staged in 98SE 98 ME 95 MIL NASH MEMPHIS CHICAGO; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
             sync
             answer=nt4
             answer_kind=PROFILE ;;
@@ -330,18 +342,27 @@ usos_w9x_csmwrap_prepare() {
         profile)
             # Rendered by the UEFI menu (answer_profiles.stageWin9x); it may
             # hold a product key: copied to RAM, then every staged copy goes.
-            cp "/mnt/esp/EFI/USOS/answer/$tag.INF" "$answer_inf" || stop 'the answer profile could not be taken'
-            for staged in 98SE 98 ME 95; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
+            cp "/mnt/esp/EFI/USOS/answer/$answer_tag.INF" "$answer_inf" || stop 'the answer profile could not be taken'
+            for staged in 98SE 98 ME 95 MIL NASH MEMPHIS CHICAGO; do rm -f "/mnt/esp/EFI/USOS/answer/$staged.INF"; done
             rm -f /mnt/esp/EFI/USOS/answer/NT4.SIF /mnt/esp/EFI/USOS/answer/NT4S.SIF /mnt/esp/EFI/USOS/answer/NT4T.SIF /mnt/esp/EFI/USOS/answer/NT351.SIF /mnt/esp/EFI/USOS/answer/NT351S.SIF /mnt/esp/EFI/USOS/answer/NT35.SIF /mnt/esp/EFI/USOS/answer/NT35S.SIF /mnt/esp/EFI/USOS/answer/NT31.SIF /mnt/esp/EFI/USOS/answer/NT31S.SIF
             sync
             answer_kind=PROFILE ;;
         file:*)
             name=${answer#file:}
             case "$name" in */*|'') stop 'request.ini has an unsafe answer file name' ;; esac
-            cp "/mnt/data/Systems/Windows/$folder/Unattended/$name" "$answer_inf" || stop "the answer file is not on DATA: $name"
+            cp "/mnt/data/Systems/$data_category/$folder/Unattended/$name" "$answer_inf" || stop "the answer file is not on DATA: $name"
             answer_kind=USER ;;
         *) stop 'request.ini has an unknown answer kind' ;;
     esac
+    if grep -q '^;USOS-BETA-CLOCK=' "$answer_inf"; then
+        . /usr/lib/usos/beta_clock.sh
+        USOS_BETA_CLOCK=$(usos_beta_clock_from_answer "$answer_inf") || stop 'duplicate beta clock setting'
+        USOS_BETA_SYSTEM=$system
+        USOS_BETA_BUILD=0
+        beta_rtc=$(usos_beta_clock_rtc "$USOS_BETA_CLOCK" "$system" "$USOS_BETA_BUILD") || stop 'invalid beta clock or unknown auto build'
+        w9x_csmwrap_log "BETA_CLOCK system=$system setting=$USOS_BETA_CLOCK rtc=$beta_rtc host_rtc=unchanged"
+        export USOS_BETA_CLOCK USOS_BETA_SYSTEM USOS_BETA_BUILD
+    fi
     # From here on the stick ESP stays read-only (disk picker, the target
     # write, the VM loops, the final notice); logs reach it through
     # usos_stick_flush only.
@@ -486,7 +507,7 @@ usos_w9x_csmwrap_prepare() {
     if [ -z "$img$posr$nt4$dos_iso" ]; then
         case "$TARGET_DEVICE" in
             /dev/nvme*)
-                if [ -f "/mnt/data/Systems/Windows/$folder/Unattended/nvme-experimental.txt" ]; then
+                if [ -f "/mnt/data/Systems/$data_category/$folder/Unattended/nvme-experimental.txt" ]; then
                     nvme9x=1
                     w9x_csmwrap_log 'NVME usosnvme.mpd requested (nvme-experimental.txt)'
                 else

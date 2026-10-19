@@ -3,6 +3,13 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 . "$SCRIPT_DIR/nt5_profile.sh"
 usos_nt5_profile
+# Pre-release NT5 must not inherit source-specific RTM/SP3/SP4 binary edits.
+# Metadata/routing are host-tested; the compatibility-package contract for
+# these particular kernels remains an integration requirement (support matrix).
+if [ -n "${USOS_NT5_VARIANT:-}" ]; then
+    printf '[NT5_SOURCE] STOP beta=%s: source-bound driver/loader patches are not validated for this build; no target write occurred\n' "$USOS_NT5_VARIANT" >&2
+    exit 1
+fi
 if [ "$NT5_SYSTEM" = windows-xp ]; then
     exec sh "$SCRIPT_DIR/probe_xp_source.sh"
 fi
