@@ -40,7 +40,7 @@ typedef uint16_t uds_u16;
 typedef uint32_t uds_u32;
 #endif
 
-#define UDS_VERSION       1
+#define UDS_VERSION       1             /* channel magic "UDS1" = this version */
 #define UDS_CH1_OFFSET    48            /* from the "CSMPPrxy" signature */
 #define UDS_CH1_MAGIC     0x31534455UL  /* "UDS1" */
 #define UDS_REQ_MAGIC     0x52534455UL  /* "UDSR" */
@@ -78,6 +78,7 @@ struct uds_channel {
 #define UDS_S_PHASE    5   /* CSW invalid / phase error after one BOT reset */
 #define UDS_S_BADREQ   6   /* uds_req_check() refused the request */
 #define UDS_S_OWNED    7   /* the drive has a BIOS number: INT 13h owns it */
+#define UDS_S_HWFAIL   8   /* xHCI not usable (registers read all ones, halted, host system error) */
 #define UDS_S_PENDING  0xFFFFFFFFUL  /* written by the OS before the doorbell */
 
 struct uds_req {
@@ -116,6 +117,105 @@ struct uds_dev_info {
     uds_u32 last_lba_lo, last_lba_hi;
     char    vendor[8];
     char    product[16];
+};
+
+/*
+ * Diagnostics record "USOS" "UDSK" (CSMWrap 3.1.2-usos16 patch 0021): SeaBIOS
+ * low memory (VARLOW), 16-byte aligned, found by scanning the first MiB for
+ * the two signature dwords; also returned by UDS_OP_STATUS. Written by the
+ * helper core only, never read back by the BIOS. Version 1, 768 bytes.
+ */
+#define UDS_DIAG_SIG0     0x534F5355UL  /* "USOS" */
+#define UDS_DIAG_SIG1     0x4B534455UL  /* "UDSK" */
+#define UDS_DIAG_VERSION  1
+#define UDS_DIAG_DISKS    8
+#define UDS_DIAG_EVENTS   16
+
+struct uds_diag_dev {           /* 64 bytes, one per device table entry */
+    uds_u8  state, bios_drive, luns, port;     /* as struct uds_dev_info */
+    uds_u16 vid, pid;
+    uds_u8  slotid, speed, last_csw, last_key; /* speed: SeaBIOS USB_*SPEED */
+    uds_u8  last_asc, last_ascq, last_op, last_status;   /* last_op: CDB[0], last_status: UDS_S_* */
+    uds_u32 generation;
+    uds_u32 block_size;
+    uds_u32 last_lba_lo, last_lba_hi;
+    uds_u32 requests;           /* SCSI requests served */
+    uds_u32 checks;             /* CSW status 1 */
+    uds_u32 timeouts;
+    uds_u32 resets;             /* BOT reset recoveries */
+    uds_u32 gone;               /* requests ended with UDS_S_GONE */
+    uds_u32 refused;            /* UDS_S_OWNED / UDS_S_HWFAIL / UDS_S_BADREQ for this entry */
+    uds_u32 kib_in, kib_out;    /* data bytes / 1024 (rounded down per request) */
+};
+
+struct uds_diag_disk {          /* 12 bytes: the BIOS hard disks / CD-ROMs SeaBIOS mapped */
+    uds_u8  bios;               /* 80h.. hard disk, E0h.. CD-ROM, 0 = unused entry */
+    uds_u8  dtype;              /* SeaBIOS DTYPE_* (70h/71h USB MSC, 91h NVMe, 50h AHCI, 20h ATA, ...) */
+    uds_u8  uds;                /* device table index + 1 when this is a UDS stick, else 0 */
+    uds_u8  rsvd;
+    uds_u32 sectors_lo, sectors_hi;
+};
+
+/* event codes */
+#define UDS_EV_PRESENT   1   /* registered at POST (result: luns) */
+#define UDS_EV_GONE      2   /* root port lost CCS (result: the op) */
+#define UDS_EV_RESET     3   /* BOT reset recovery (result: 0 ok, 1 failed) */
+#define UDS_EV_EJECT     4
+#define UDS_EV_BADREQ    5   /* result: UDS_WHY_* */
+#define UDS_EV_HWFAIL    6   /* result: 1 all ones, 2 halted / host system error */
+#define UDS_EV_TIMEOUT   7   /* result: phase 1 CBW, 2 data, 3 CSW */
+#define UDS_EV_PHASE     8   /* result: phase, 4 CSW signature/tag, 5 CSW status 2 */
+#define UDS_EV_REGFAIL   9   /* registration: result 1 table full, 2 INQUIRY failed */
+#define UDS_EV_STALL    10   /* result: phase */
+
+struct uds_diag_event {         /* 8 bytes */
+    uds_u32 ms;                 /* SeaBIOS timer in ms (wraps; relative order only) */
+    uds_u8  dev, port, event, result;
+};
+
+struct uds_diag {
+    uds_u32 sig[2];             /* UDS_DIAG_SIG0, UDS_DIAG_SIG1 */
+    uds_u8  version, devs;      /* devs: table entries in use */
+    uds_u8  next_event, disks;  /* next ring slot, BIOS disk entries filled */
+    uds_u32 services;           /* channel 1 doorbells served */
+    uds_u32 badreq;             /* refused by the request check (or a bad req_phys) */
+    uds_u32 last_why;           /* UDS_WHY_* of the last refusal */
+    uds_u32 channel;            /* linear address of struct uds_channel */
+    uds_u32 events;             /* events written (the ring keeps the last 16) */
+    struct uds_diag_dev dev[UDS_MAX_DEVS];         /* +32 */
+    struct uds_diag_disk disk[UDS_DIAG_DISKS];     /* +544 */
+    struct uds_diag_event ev[UDS_DIAG_EVENTS];     /* +640 */
+};                                                  /* 768 */
+
+/*
+ * USOSUSB.MPD status page: right after the miniport's request block, at
+ * channel.req_phys + UDS_MP_STATUS_OFFSET (same physically contiguous
+ * uncached block), so USOSDBG finds it through the channel. Written by the
+ * miniport only.
+ */
+#define UDS_MP_STATUS_OFFSET  128
+#define UDS_MP_SIG0     0x534F5355UL  /* "USOS" */
+#define UDS_MP_SIG1     0x53504D55UL  /* "UMPS" */
+#define UDS_MP_VERSION  1
+#define UDS_MP_SLOTS    4
+
+struct uds_mp_slot {            /* 16 bytes */
+    uds_u8  dev, present, ua_pending, last_op;   /* last_op: CDB[0] of the last SRB */
+    uds_u8  last_srb_status, last_key, last_asc, last_ascq;
+    uds_u32 generation;
+    uds_u32 srbs;
+};
+
+struct uds_mp_status {          /* 100 bytes */
+    uds_u32 sig[2];             /* UDS_MP_SIG0, UDS_MP_SIG1 */
+    uds_u8  version, slots, mp_major, mp_minor;
+    uds_u32 srbs;               /* all SRBs seen */
+    uds_u32 posted;             /* requests posted to the channel */
+    uds_u32 polled;             /* completions found by the timer poll (not the short spin) */
+    uds_u32 errors;             /* SRBs completed with an error status */
+    uds_u32 enums;              /* UDS_OP_ENUM requests */
+    uds_u32 last_status;        /* UDS_S_* of the last request */
+    struct uds_mp_slot slot[UDS_MP_SLOTS];       /* +36 */
 };
 
 /* uds_req_check() result: UDS_S_OK or UDS_S_BADREQ, reason in *why */

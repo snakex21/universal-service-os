@@ -59,6 +59,21 @@ static void layout(void)
     CHECK(offsetof(struct uds_dev_info, generation) == 8);
     CHECK(offsetof(struct uds_dev_info, vendor) == 24);
     CHECK(UDS_MAX_DEVS * sizeof(struct uds_dev_info) <= 4096);
+    /* USOSUDSK record (patch 0021) and the USOSUSB.MPD status page */
+    CHECK(sizeof(struct uds_diag_dev) == 64);
+    CHECK(sizeof(struct uds_diag_disk) == 12);
+    CHECK(sizeof(struct uds_diag_event) == 8);
+    CHECK(offsetof(struct uds_diag, dev) == 32);
+    CHECK(offsetof(struct uds_diag, disk) == 544);
+    CHECK(offsetof(struct uds_diag, ev) == 640);
+    CHECK(sizeof(struct uds_diag) == 768);
+    CHECK(offsetof(struct uds_diag_dev, generation) == 16);
+    CHECK(offsetof(struct uds_diag_dev, requests) == 32);
+    CHECK(offsetof(struct uds_diag_dev, kib_in) == 56);
+    CHECK(sizeof(struct uds_mp_slot) == 16);
+    CHECK(offsetof(struct uds_mp_status, slot) == 36);
+    CHECK(sizeof(struct uds_mp_status) == 100);
+    CHECK(UDS_MP_STATUS_OFFSET >= sizeof(struct uds_req));
 }
 
 static void validation(void)
