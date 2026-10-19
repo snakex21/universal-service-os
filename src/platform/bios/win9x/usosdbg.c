@@ -157,7 +157,7 @@ typedef struct {
     DWORD ticks;
     WORD attach;
     DWORD sys_vm;
-    WORD pad;
+    WORD reclaims;
 } VXDSTAT;
 
 /* CSMWrap patch 0018: SeaBIOS's usb_mouse_diag (version 1, natural
@@ -705,9 +705,9 @@ static void show_vmd(void)
         return;
     }
     x = (VXDSTAT FAR *)v->vxd;
-    wsprintf(line(), "VMD  VxD v%u mode:%s  VMOUSE %u.%02u  mouse type at init:%02X now:%02X (2 = ours, 4 = PS/2)  changes:%u  callback %04X:%04X  block %08lX  attach:%u  err:%04X",
+    wsprintf(line(), "VMD  VxD v%u mode:%s  VMOUSE %u.%02u  mouse type at init:%02X now:%02X (2 = ours, 4 = PS/2)  changes:%u reclaims:%u  callback %04X:%04X  block %08lX  attach:%u  err:%04X",
              (WORD)x->version, (LPSTR)vmd_mode_name(x->mode), (WORD)HIBYTE(x->vmd_version), (WORD)LOBYTE(x->vmd_version),
-             (WORD)x->type_init, (WORD)x->type_now, x->type_changes, HIWORD(x->cb), LOWORD(x->cb), x->sb, x->attach, x->err);
+             (WORD)x->type_init, (WORD)x->type_now, x->type_changes, x->reclaims, HIWORD(x->cb), LOWORD(x->cb), x->sb, x->attach, x->err);
     wsprintf(line(), "VMD  BIOS callbacks:%lu  from a DOS VM:%lu  last VM %08lX (system VM %08lX)  last %02X %02X %02X %02X  posted:%lu  own ring full:%lu  shared ring put:%lu full:%lu  ticks:%lu",
              x->callbacks, x->foreign, x->last_vm, x->sys_vm, (WORD)x->last[0], (WORD)x->last[1], (WORD)x->last[2], (WORD)x->last[3],
              x->posted, x->own_drop, x->shared_put, x->shared_drop, x->ticks);

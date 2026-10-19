@@ -117,6 +117,16 @@ Client_EDI              equ 00h
 
 POLL_MS                 equ 20
 
+; Init order (public DDK VMM.INC VMD_INIT_ORDER). The DDK suggests
+; Undefined_Init_Order for minidrivers; this driver runs each init phase
+; just BEFORE VMOUSE instead, so its VMD_Set_Mouse_Data at Device_Init
+; lands before VMOUSE's own Device_Init and its built-in PS/2 detection
+; (the INT 15h C2xx probing that hung the X470; VMOUSE's Sys_Critical_Init,
+; which sets up its data, has run by then: every device's Sys_Critical_Init
+; comes before any Device_Init). If VMOUSE clears the type again during its
+; init, check_type claims it once more (type 0 is "no mouse").
+VMD_INIT_ORDER          equ 34000000h
+
 ; mode
 MODE_NONE               equ 0           ; VMOUSE not loaded
 MODE_MINI               equ 1           ; we own VMOUSE's mouse data: post
@@ -159,7 +169,7 @@ USOSVMD_DDB label dword
         db      0                       ; DDB_Dev_Minor_Version
         dw      0                       ; DDB_Flags
         db      'USOSVMD '              ; DDB_Name (8 chars)
-        dd      80000000h               ; DDB_Init_Order = Undefined (after VMOUSE)
+        dd      VMD_INIT_ORDER - 1      ; DDB_Init_Order: just before VMOUSE (see below)
         dd      offset USOSVMD_Control  ; DDB_Control_Proc
         dd      0                       ; DDB_V86_API_Proc
         dd      offset USOSVMD_PM_API   ; DDB_PM_API_Proc
@@ -193,7 +203,7 @@ st_type_changes dw      0               ; +50
 st_ticks        dd      0               ; +52 time-outs run
 st_attach       dw      0               ; +56 successful attach calls
 st_sys_vm       dd      0               ; +58 system VM handle
-                db      0,0             ; +62
+st_reclaims     db      0,0             ; +62 type found 0 again and claimed once more (word)
 STATUS_SIZE     equ     64
 
 ; own ring (callback -> time-out), 64 x [status, dx, dy, z]
@@ -241,13 +251,7 @@ dev_init_proc proc near
         mov     [st_type_init], ah
         test    ah, ah
         jnz     di_had
-        mov     ah, VMD_Type_Serial
-        xor     al, al                  ; no IRQ
-        xor     ebx, ebx                ; not a BallPoint
-        xor     ecx, ecx
-        mov     dh, BUTTONS
-        xor     dl, dl                  ; no port
-        VxDcall VMD_ID, VMD_Set_Mouse_Data
+        call    claim
         mov     byte ptr [st_mode], MODE_MINI
         jmp     di_cb
 di_had:
@@ -272,6 +276,18 @@ di_nocb:
         ret
 dev_init_proc endp
 
+;--- VMD_Set_Mouse_Data: serial type (not PS/2), no IRQ, 3 buttons, no port
+claim proc near
+        mov     ah, VMD_Type_Serial
+        xor     al, al                  ; no IRQ
+        xor     ebx, ebx                ; not a BallPoint
+        xor     ecx, ecx
+        mov     dh, BUTTONS
+        xor     dl, dl                  ; no port
+        VxDcall VMD_ID, VMD_Set_Mouse_Data
+        ret
+claim endp
+
 ;--- is VMOUSE's mouse still ours? (Init_Complete and every time-out) -------
 ; A different type (another minidriver or VMOUSE's own PS/2 code took the
 ; mouse) switches to observer for good: no posting, no duplicate motion.
@@ -291,6 +307,13 @@ ct_same:
         jne     ct_done
         cmp     ah, VMD_Type_Serial
         je      ct_done
+        test    ah, ah
+        jnz     ct_lost
+        call    claim                   ; VMOUSE cleared it: ours again
+        mov     byte ptr [st_type_now], VMD_Type_Serial
+        inc     word ptr [st_reclaims]
+        ret
+ct_lost:
         mov     byte ptr [st_mode], MODE_OBSERVER
         or      word ptr [st_err], ERR_TYPE_CHANGED
 ct_done:

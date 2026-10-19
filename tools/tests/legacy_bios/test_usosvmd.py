@@ -97,7 +97,7 @@ def sym_map(work: Path):
 
 
 # status block field offsets (usosvmd.asm, `status`)
-ST = dict(mode=3, type_init=6, type_now=7, cb=8, sb=12, callbacks=16, foreign=20, posted=24,
+ST = dict(reclaims=62, mode=3, type_init=6, type_now=7, cb=8, sb=12, callbacks=16, foreign=20, posted=24,
           own_drop=28, shared_put=32, shared_drop=36, last_vm=40, last_pkt=44, err=48,
           changes=50, ticks=52, attach=56, sys_vm=58)
 OWN_HEAD, OWN_TAIL, OWN_RING = 64, 65, 68
@@ -265,7 +265,7 @@ class UsosVmd(unittest.TestCase):
         ddb = i - 12
         self.assertEqual(struct.unpack_from('<H', b, ddb + 4)[0], 0x400)      # SDK 4.0
         self.assertEqual(b[ddb + 8], 2)                                       # version 2
-        self.assertEqual(struct.unpack_from('<I', b, ddb + 20)[0], 0x80000000)  # init order undefined
+        self.assertEqual(struct.unpack_from('<I', b, ddb + 20)[0], 0x34000000 - 1)  # just before VMOUSE
         self.assertEqual(struct.unpack_from('<I', b, ddb + 32)[0], self.sym['USOSVMD_PM_API'])
 
     def test_service_calls(self):
@@ -414,6 +414,16 @@ class UsosVmd(unittest.TestCase):
         self.assertEqual(v.st('err', 2) & 0x08, 0x08)
         v.run('drain')
         self.assertEqual(v.posts, [])                          # the queued packet is dropped
+
+    def test_type_cleared_by_vmouse_is_claimed_again(self):
+        v = self.ready()
+        v.mouse_type = 0                                       # VMOUSE's own init cleared it
+        v.run('check_type')
+        self.assertEqual(v.st('mode'), 1)                      # still minidriver
+        self.assertEqual(v.set_data, [(0x0200, 0x0300), (0x0200, 0x0300)])
+        self.assertEqual(v.st(62, 2), 1)                       # reclaims
+        v.run('check_type')
+        self.assertEqual((v.st('mode'), v.st(62, 2), v.st('changes', 2)), (1, 1, 1))   # the 2 -> 0 step only
 
     def test_callback_without_attach_counts_only(self):
         v = self.ready(attach=False)
