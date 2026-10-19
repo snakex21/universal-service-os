@@ -1,9 +1,11 @@
 # USB flash drives in Windows 95/98/98 SE/Me on the X470 without CSM: design (2026-10-19)
 
-Status: design, stage 0 in the flow, and stage 1 implemented (section 7: CSMWrap
+Status: design, stage 0 in the flow, stage 1 implemented and partly confirmed on the X470
+(Windows Me), stage 2 (hot-swap) implemented in CSMWrap 3.1.2-usos17 / USOSUSB.MPD 1.1, QEMU only
+(section 8). Stage 1 details: section 7 (CSMWrap
 3.1.2-usos16 patch 0021, USOSUSB.MPD, flow behind a DATA flag, logging). This branch is
 `feat/usb9x-hotswap`, based on `eb7138a` of `test/x470-98se-qemu`. The SeaBIOS side has
-passed a QEMU protocol test. Nothing has run on the X470 or in a 9x VM yet.
+passed a QEMU protocol test. Stage 1 then ran on the X470 under Windows Me (section 8); no 9x VM run.
 
 ## 0. Starting point (what is already known)
 
@@ -633,3 +635,132 @@ otherwise.
   - a removable letter after C:, with read/write working;
   - DISK dev 0 present / not mapped, its counters rising;
   - after an unplug: GONE, NOT READY on the letter.
+
+## 8. Stage 2 as implemented (hot-swap, 2026-10-19)
+
+Not tested on the X470 and not in a 9x VM. The SeaBIOS side passed a QEMU protocol test with a
+USB keyboard and mouse on the same xHCI.
+
+### X470 stage 1 results that shaped it (me-usb1 / me-usb1b kits)
+
+- Transport and enumeration work on Windows Me (Phison 13FE:4200, READ CAPACITY exact, 1,157 reads,
+  0 errors). With a FAT32 stick: read and write PASS (hashes equal, FAT clean), 0 timeouts / resets,
+  the RequestTimerCall timer works (`polled` 6).
+- Unplug: the TEST UNIT READY poll gave `GONE (during op 00h)`, D: stayed with "not ready". Replug:
+  not seen (stage 1 has no runtime enumeration), the slot stayed `dev 0 absent gen 1`.
+- While the slot was empty, IOS kept sending READs: the miniport counted every NOT READY answer as
+  an error (about 10 a second).
+- The KiB counters were rounded down per request, so 512-byte writes counted 0.
+- After the automatic warm restart (19:29:39) SeaBIOS had no UDS entry at all: the record shows
+  `devs 0` and no event, so `usb_msc_setup` was never reached. Whether the stick was plugged in
+  then is not known, and usos16 keeps no port data in the record. Stage 2 adds both: the record
+  keeps the root ports' CCS after POST and the ports that got a device slot, and a port that is
+  connected but has no slot when the watch arms is brought up like a new plug (event "connected,
+  not set up at POST"). The cause itself (for example xHCI port state after the warm reset) stays
+  unconfirmed until a hardware log shows such a port.
+
+### CSMWrap 3.1.2-usos17 (patch 0022 `usb-disk-hotswap`)
+
+- 3.1.2-usos16 (0001-0021, byte for byte) plus 0022. **Not the release pin**: xp_csmwrap_esp.sh,
+  release.go and lock.json stay on usos16 until the X470 run passes. The me-usb2 kit puts usos17 on
+  the Micron by hand.
+- Binary `3a36aba19b29ca5cf2fb35567381d48105bacdf11cc3198eccdc678d8c467c3d` (pinned VM build, the
+  in-guest repeat gave the same binary, the unpatched build matches `upstream_rebuild`).
+- **Only with `int13_boot_disk_only = true`** (the 9x flow; read at POST through
+  `csm_bootdisk_hash()`). Otherwise there is no pool and no watch, and empty controllers are stopped
+  as before.
+- **Pool:** 12 KiB from ZoneHigh at POST (E820 reserved). Page 0 is the input context of the
+  bring-up commands and the media check's sector buffer; pages 1-2 hold one device each (output
+  device context, control pipe, two bulk pipes, 512-byte descriptor buffer). Two sticks plugged in
+  at runtime at a time; the chunks are re-used, there is no runtime allocation.
+- **Controllers:** every xHCI is registered (up to 4) and stays running when POST found nothing on
+  it, so a stick can arrive on any port. The controller is never reset.
+- **Watch:** arms at the first channel 1 request (the miniport's first ENUM). From then on the helper
+  loop calls `usos_uds_idle()` when neither channel has a request and spins with PAUSE instead of
+  MWAIT. Every 100 ms: events processed, PORTSC of root ports 1-32 read, CCS plus CSC (directly, or
+  latched by `xhci_process_events`, which clears CSC itself). Port states: ours (a table entry),
+  busy (a device POST set up: keyboard, mouse, hub), failed / ejected (until unplugged), pending
+  (debounce: one watch period), free.
+- **Bring-up:** port reset (USB2 PR; USB3 only if the link did not train by itself), Enable Slot,
+  Address Device, device descriptor (8 bytes, Evaluate Context, 18 bytes), configuration descriptor
+  (up to 512 bytes), the first bulk-only MSC interface, SET_CONFIGURATION, one Configure Endpoint
+  for both bulk endpoints, GET MAX LUN. One bring-up per watch pass; INQUIRY, READ CAPACITY and the
+  media check in the next pass. A device that is not a BOT stick (a keyboard plugged in again, a
+  hub, a UAS-only drive) gets Disable Slot and is left alone until it is unplugged. HID re-attach
+  and sticks behind hubs are not done.
+- **Teardown:** Disable Slot, events drained, the device context pointer cleared, the chunk free,
+  the entry GONE. The next stick takes the lowest GONE / ejected / empty entry (never one INT 13h
+  owns) with a new generation (global; POST entries keep 1). A fast unplug / replug shows as the
+  change latch with CCS 1: teardown, then a new bring-up.
+- **EJECT** now also disables the slot; the port waits for a physical disconnect.
+- **Every boot:** a media check at the first probe (sector 0, MBR types, the first partition's boot
+  sector or sector 0 itself: FAT12/16/32, NTFS, exFAT, GPT protective, other) and exact KiB counters
+  (the remainder below 1 KiB is carried).
+- **USOSUDSK version 2** (984 bytes; version 1 = the first 768): watch passes, plugs, unplugs,
+  failed plugs and the last reason, the pool; per controller the port count, CCS after POST, ports
+  with a slot when the watch armed, CCS now; per entry the media check. New events: plugged in,
+  plug failed (reason), connect, unplugged, connected without a slot, media, watch armed.
+- **ROM:** 125504 of 131072 bytes used, **5568 free** (usos16: 4416). 0022 costs about 3.9 KiB of
+  ROM; `CONFIG_MEGASAS` (server RAID HBAs) and `CONFIG_USB_UHCI` (pre-2011 Intel chipsets, which have
+  a firmware CSM) are off. AHCI, NVMe, SD, xHCI, EHCI, OHCI and USB HID / MSC / UAS stay
+  (`CONFIG_SDCARD` stays, as decided in usos11). Low memory 3968 (+496), F-segment variables 3840
+  (+96).
+- A bug found on the way: the helper loop runs before SeaBIOS has set up its low memory, so the
+  armed flag has to be a VARFSEG byte. A VARLOW flag read garbage there and the VM reset at POST.
+
+### USOSUSB.MPD 1.1
+
+- A command to an empty slot (not only TEST UNIT READY) asks for ENUM, at most once a second. A new
+  generation gives one UNIT ATTENTION 06/28 on the existing letter (same devnode), then the stick's
+  data. IOS / VFAT re-read the volume after the unit attention. Whether the 9x DiskTSD re-reads the
+  capacity of a stick of another size is still unverified (no 9x VM run).
+- NOT READY / 3Ah answers of an empty slot are counted as `notready`, not as `errors`; only the first
+  few go to the debug port.
+- A request ring (32 entries: CDB[0], slot, SRB and UDS status, LBA, bytes, CRC-32 of the data) at
+  `req_phys + 1024`; status page version 2 (104 bytes). The CRC table lives in the device extension.
+
+### USOSDBG 1.8
+
+- Decodes record versions 1 and 2: the hot-swap line, per controller the port bitmaps, per entry the
+  media (`NTFS - 9x cannot read it (format the stick FAT32)`), the new events with their reasons,
+  the miniport's `not ready` counter and the request ring (last 16 entries).
+- The event text buffer (48 bytes) was too small for the longer texts; now 96.
+
+### Tests
+
+- Host: `test_csmwrap_uds17.py`, `test_csmwrap_uds16.py` (version 1 prefix of the record),
+  `test_usosuds.py`, `test_usosusb9x.py` (hot-swap path, the NOT READY counter, ring CRC),
+  `test_usosdbg_disk.py` (version 2, the ring, and the record of the QEMU run in
+  `tools/tests/usb9x/data/udsk-v2-qemu-hotswap.bin`), `test_usoslog.py`.
+- QEMU `run_csmwrap_uds_qemu.py` (usos17, q35, i8042 off, usb-kbd + usb-mouse + usb-storage on
+  qemu-xhci, the sticks as -blockdev nodes): every stage 1 step, then a key through the USB
+  keyboard; stick 2 plugged in (new generation, 32 MiB, its sector 0); stick 2 out and stick 1 in
+  within one QMP write (the latch); EJECT (state 3, SCSI GONE); 6 unplug / replug cycles (8
+  bring-ups, 8 teardowns, no failure, no pool leak); a key again; then the version 2 record checked
+  on the host (FAT32 and NTFS detected). `owned` mode unchanged. Unplug to GONE 0.01-0.03 s.
+- QEMU regressions with usos17, all PASS: boot-disk (7 layouts, with and without `--only`), APM
+  power-off (pc/q35 x real/pm32/pm16), PCI IRQ routing (pc/q35, key on/off), NVMe re-arm (pc, q35),
+  DOS mouse probe (`--wheel`).
+- QEMU is not the X470: no AMI SMM, other xHCI timings, no USB3 link training. A QEMU PASS is not a
+  hardware PASS.
+
+### In-place kit me-usb2 (Micron, Windows Me; built 2026-10-19, not applied)
+
+Session scratchpad, not in the repository; built from `int/me-round`. Baseline: the me-usb1 state
+(BOOTX64.EFI usos16, USOSUSB.MPD 1.0, USOSDBG 1.7, USOSLOG unchanged, the registry import done:
+`USOSUREG.OK` present, `USOSUREG.BAT` gone); refused otherwise.
+
+- Writes: `EFI\BOOT\BOOTX64.EFI` = usos17 (csmwrap.ini kept, it must have
+  `int13_boot_disk_only = true`), patch 0022 into `CSMWRAP\patches` when that folder exists, both
+  copies of USOSUSB.MPD 1.1, USOSDBG 1.8. No registry step, no batch file, no console window, no
+  extra restart.
+- Off switch: evidence first, then the me-usb1 bytes back from `micron-me-backup18`.
+- User test: boot Me without a stick, plug a FAT32 stick, open the drive (F5 if it shows the old
+  state), copy both ways, unplug (not ready, no hang), plug another or the same stick, copy again;
+  keyboard and mouse throughout. USOSLOG records everything in `C:\USOS9X\LOGS`.
+
+### Open
+
+- X470 run with the me-usb2 kit (boot without a stick, plug, copy, unplug, swap).
+- Sticks behind a hub, HID re-attach, a stick of another size in a 9x VM.
+- Release pin to usos17 after the hardware PASS (with the usos16 regressions repeated).
