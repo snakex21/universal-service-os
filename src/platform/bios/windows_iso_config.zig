@@ -21,17 +21,24 @@ pub const System = enum {
 };
 
 pub fn sourceConfig(buffer: []u8, partition_guid: [16]u8, iso_size: u64, system: System, image_name: []const u8) ![]const u8 {
-    return encodeSourceConfig(buffer, partition_guid, iso_size, system.folder(), image_name);
+    return encodeSourceConfig(buffer, partition_guid, iso_size, categoryForFolder(system.folder()), system.folder(), image_name);
 }
 
 pub fn sourceConfigForFolder(buffer: []u8, partition_guid: [16]u8, iso_size: u64, folder: []const u8, image_name: []const u8) ![]const u8 {
-    try validateName(folder);
-    return encodeSourceConfig(buffer, partition_guid, iso_size, folder, image_name);
+    return sourceConfigForCategory(buffer, partition_guid, iso_size, categoryForFolder(folder), folder, image_name);
 }
 
-fn encodeSourceConfig(buffer: []u8, partition_guid: [16]u8, iso_size: u64, folder: []const u8, image_name: []const u8) ![]const u8 {
+/// The same with the DATA category given. The Legacy Core opens the image from
+/// Systems\Windows\<folder> itself and binds exactly that path, without the
+/// catalog table walk (the Core has no room for it).
+pub fn sourceConfigForCategory(buffer: []u8, partition_guid: [16]u8, iso_size: u64, category: []const u8, folder: []const u8, image_name: []const u8) ![]const u8 {
+    try validateName(folder);
+    return encodeSourceConfig(buffer, partition_guid, iso_size, category, folder, image_name);
+}
+
+fn encodeSourceConfig(buffer: []u8, partition_guid: [16]u8, iso_size: u64, category: []const u8, folder: []const u8, image_name: []const u8) ![]const u8 {
     try validateName(image_name);
-    const parts = [_][]const u8{ "Systems\\", categoryForFolder(folder), "\\", folder, "\\Images\\", image_name, "\x00" };
+    const parts = [_][]const u8{ "Systems\\", category, "\\", folder, "\\Images\\", image_name, "\x00" };
     var size: usize = 32;
     for (parts) |part| size += part.len;
     if (buffer.len < size or iso_size < 32768) return error.InvalidIsoConfiguration;
