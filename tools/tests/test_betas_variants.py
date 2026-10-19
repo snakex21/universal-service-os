@@ -34,7 +34,9 @@ class Metadata(unittest.TestCase):
         self.assertEqual(facts['nls.defaultlayout'], '00000409')
         self.assertEqual(facts['Pid.pid'], '55034000')
         self.assertNotIn('SetupData.buildnumber', facts)
-        self.assertEqual(facts['Version.driverver'], '07/01/2001,5.1.2542.0')
+        self.assertNotIn('Version.driverver', facts)
+        dosnet = m.ini_facts((ROOT/'src/image_probe/testdata/variants/whistler.dosnet.inf').read_text())
+        self.assertEqual(dosnet['Version.driverver'], '07/01/2001,5.1.2542.0')
 
     def test_pre_rtm_wim_never_uses_modern_xml_offsets(self):
         m = load('windows_media_facts')
@@ -157,14 +159,32 @@ usos_legacy_xp_staging 00
         for fixture, version, system, identity in (('whistler', '5.1.2542.0', 'windows-xp', 'windows-whistler'), ('neptune', '5.50.5111.1', 'windows-2000', 'windows-neptune')):
             with tempfile.TemporaryDirectory() as temp:
                 source = Path(temp)
-                (source/'I386').mkdir()
-                sif = source/'I386/TXTSETUP.SIF'
+                (source/'i386').mkdir()
+                sif = source/'i386/TxtSetup.Sif'
                 sif.write_bytes((ROOT/f'src/image_probe/testdata/variants/{fixture}.sif').read_bytes())
+                (source/'i386/Dosnet.Inf').write_bytes((ROOT/f'src/image_probe/testdata/variants/{fixture}.dosnet.inf').read_bytes())
                 out = self.shell('sh tools/probe_nt5_source.sh', SOURCE_ROOT=posix(source), NT5_SYSTEM=system, USOS_NT5_VARIANT='')
                 self.assertNotEqual(out.returncode, 0)
                 self.assertIn('driver_version=' + version, out.stdout)
                 self.assertIn('source_identity=' + identity, out.stdout)
                 self.assertIn('pre-release DriverVer', out.stderr)
+
+    def test_rtm_dosnet_versions_are_unknown_to_beta_classifier(self):
+        for version in ('5.00.2195.1', '5.1.2600.5512'):
+            with tempfile.TemporaryDirectory() as temp:
+                inf = Path(temp)/'DOSNET.INF'
+                inf.write_text('[Version]\nDriverVer=07/01/2001,'+version+'\n')
+                out = self.shell('. tools/nt5_profile.sh; usos_nt5_source_metadata "$INF"', INF=posix(inf))
+                self.assertEqual(out.returncode, 0, out.stderr)
+                self.assertIn('source_identity=unknown', out.stdout)
+
+    def test_shell_beta_clock_ids_match_catalog(self):
+        import re
+        catalog = (ROOT/'src/catalog/windows_betas.zig').read_text()
+        script = (ROOT/'tools/beta_clock.sh').read_text().split('usos_beta_clock_date()', 1)[0]
+        expected = set(re.findall(r'beta\("([^"]+)"', catalog))
+        actual = set(re.findall(r'windows-[a-z0-9-]+', script))
+        self.assertEqual(actual, expected)
 
     def test_driverversion_unknown_invalid_and_duplicate(self):
         with tempfile.TemporaryDirectory() as temp:

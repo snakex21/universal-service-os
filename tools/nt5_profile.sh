@@ -108,6 +108,20 @@ usos_nt5_require_supported() {
 # Text-only, read-only identity probe. Missing DriverVer stays unknown; it
 # never guesses a build from a filename or treats SetupData 5.0 as Neptune.
 # Kept here so every initramfs containing nt5_profile.sh already has it.
+usos_nt5_source_file() {
+    # Mounted ISO files may use lower/mixed case names; no recursive search.
+    local directory file wanted_dir wanted_file
+    wanted_dir=$(printf '%s' "$2" | tr 'A-Z' 'a-z')
+    wanted_file=$(printf '%s' "$3" | tr 'A-Z' 'a-z')
+    for directory in "$1"/*; do
+        [ -d "$directory" ] || continue
+        [ "$(basename "$directory" | tr 'A-Z' 'a-z')" = "$wanted_dir" ] || continue
+        for file in "$directory"/*; do
+            [ -f "$file" ] || continue
+            [ "$(basename "$file" | tr 'A-Z' 'a-z')" != "$wanted_file" ] || { printf '%s\n' "$file"; return 0; }
+        done
+    done
+}
 usos_nt5_source_metadata() {
     [ -f "$1" ] || return 0
     awk '

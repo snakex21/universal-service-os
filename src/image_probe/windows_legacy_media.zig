@@ -6,6 +6,7 @@ const release = @import("windows_release.zig");
 
 pub const Source = struct {
     txtsetup: []const u8 = "",
+    dosnet: []const u8 = "",
     prodspec: []const u8 = "",
     setupp: []const u8 = "",
     setup_version: ?release.Version = null,
@@ -69,7 +70,7 @@ pub fn inspect(source: Source) Info {
     if (iniValue(source.txtsetup, "nls", "DefaultLayout")) |layout|
         info.locale = std.fmt.parseInt(u32, layout, 16) catch null;
     if (info.version == null) {
-        info.version = driverVersion(source.txtsetup);
+        info.version = driverVersion(source.dosnet) orelse driverVersion(source.txtsetup);
     }
     if (info.version == null) {
         if (number(source.txtsetup, "MajorVersion")) |major| if (number(source.txtsetup, "MinorVersion")) |minor| {
@@ -109,7 +110,7 @@ pub fn inspect(source: Source) Info {
     return info;
 }
 
-/// DriverVer is a version source even when SetupData has no BuildNumber.
+/// DOSNET.INF DriverVer is a version source when SetupData has no BuildNumber.
 /// Neptune's DriverVer (5.50) is more specific than its SetupData (5.0).
 pub fn driverVersion(text: []const u8) ?release.Version {
     const value = iniValue(text, "Version", "DriverVer") orelse return null;
@@ -183,11 +184,16 @@ test "legacy synthetic fixtures preserve SKU, locale, setup lineage and unknown 
 }
 
 test "DriverVer identifies NT5 betas without PE resources or filename guesses" {
-    const w = inspect(.{ .txtsetup = @embedFile("testdata/variants/whistler.sif") });
+    const w = inspect(.{ .txtsetup = @embedFile("testdata/variants/whistler.sif"), .dosnet = @embedFile("testdata/variants/whistler.dosnet.inf") });
     try std.testing.expectEqualStrings("windows-whistler", w.system_id.?);
-    const n = inspect(.{ .txtsetup = @embedFile("testdata/variants/neptune.sif"), .setupp = "[Pid]\nPid=50293270\n" });
+    const n = inspect(.{ .txtsetup = @embedFile("testdata/variants/neptune.sif"), .dosnet = @embedFile("testdata/variants/neptune.dosnet.inf"), .setupp = "[Pid]\nPid=50293270\n" });
     try std.testing.expectEqualStrings("windows-neptune", n.system_id.?);
     try std.testing.expect(n.channel == .unknown and n.channel_hint == .volume);
+    for ([_][]const u8{ "5.00.2195.1", "5.1.2600.5512" }) |rtm| {
+        var b: [128]u8 = undefined;
+        const v = driverVersion(try std.fmt.bufPrint(&b, "[Version]\nDriverVer=07/01/2001,{s}\n", .{rtm})).?;
+        try std.testing.expect(release.betaId(v) == null);
+    }
     for ([_][]const u8{ "1.2.3", "1.2.3.4.5", "5.1.BAD.0", "5.1.70000.0" }) |bad| {
         var b: [128]u8 = undefined;
         try std.testing.expect(driverVersion(try std.fmt.bufPrint(&b, "[Version]\nDriverVer=07/01/2001,{s}\n", .{bad})) == null);

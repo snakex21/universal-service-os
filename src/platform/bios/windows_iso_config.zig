@@ -88,6 +88,7 @@ test "Windows 10 source and directory lookup use the same exact system folder" {
 
 /// Native NT6 variants keep their own catalog DATA category.
 pub fn categoryForFolder(folder: []const u8) []const u8 {
+    if (folder.len == 0) return "Windows";
     for (@import("../../catalog/systems.zig").all) |entry| {
         if (std.mem.eql(u8, folder, entry.imageFolder())) return entry.dataCategory();
     }
@@ -95,6 +96,7 @@ pub fn categoryForFolder(folder: []const u8) []const u8 {
 }
 
 test "beta source binding preserves its catalog category" {
+    try std.testing.expectEqualStrings("Windows", categoryForFolder(""));
     var buffer: [544]u8 = undefined;
     const value = try sourceConfigForFolder(&buffer, [_]u8{1} ** 16, 900000, "Windows 7 Beta", "arbitrary.iso");
     try std.testing.expectEqualStrings("Systems\\Betas\\Windows 7 Beta\\Images\\arbitrary.iso\x00", value[32..]);
