@@ -31,9 +31,9 @@
 #endif
 #include "usosuds.h"
 
-#define USOSUSB_VERSION "1.0"
+#define USOSUSB_VERSION "1.1"
 #define USOSUSB_MAJOR   1
-#define USOSUSB_MINOR   0
+#define USOSUSB_MINOR   1
 
 #define USB_PAGE          4096UL
 #define USB_BOUNCE_PAGES  16UL                       /* 64 KiB = UDS_MAX_DATA */
@@ -51,7 +51,7 @@
 #define USB_TIMER_US      1000UL     /* RequestTimerCall interval */
 #define USB_WATCHDOG_MS   15000UL    /* hard limit per posted request */
 #define USB_INIT_ENUM_MS  3000UL     /* HwInitialize waits this long for the first ENUM, then it is stale */
-#define USB_TUR_ENUM_MS   1000UL     /* at most one ENUM per second from TEST UNIT READY */
+#define USB_TUR_ENUM_MS   1000UL     /* at most one ENUM per second from TEST UNIT READY / an empty slot */
 #define USB_TUR_ENUM_EVERY 8UL       /* no TSC: one ENUM per this many TEST UNIT READY */
 
 /* what HwStartIo / the timer do next while no request is posted */
@@ -69,6 +69,7 @@ typedef struct _HW_DEVICE_EXTENSION {
     ULONG BlockPhys;
     struct uds_req *Req;            /* Block + 0 */
     struct uds_mp_status *Mp;       /* Block + UDS_MP_STATUS_OFFSET */
+    struct uds_mp_ring *Ring;       /* Block + UDS_MP_RING_OFFSET (1.1) */
     struct uds_dev_info *Info;      /* Block + USB_ENUM_OFFSET */
     ULONG InfoPhys;
     PUCHAR Bounce;                  /* Block + USB_PAGE */
@@ -110,6 +111,7 @@ typedef struct _HW_DEVICE_EXTENSION {
     BOOLEAN TimerSeen;              /* SCSIPORT.PDR called UsbTimer at least once */
     BOOLEAN InPump;                 /* HwStartIo is running the state machine */
     ULONG DbgLines;
+    ULONG CrcTab[256];              /* CRC-32 of the request ring (1.1) */
 } HW_DEVICE_EXTENSION, *PHW_DEVICE_EXTENSION;
 
 #endif

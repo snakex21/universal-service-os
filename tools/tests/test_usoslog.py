@@ -79,7 +79,7 @@ class Layout(unittest.TestCase):
 class Sources(unittest.TestCase):
     def test_usosdbg_log_mode(self):
         dbg = (SRC / 'usosdbg.c').read_text(encoding='utf-8')
-        self.assertIn('USOSDBG 1.7', dbg)
+        self.assertIn('USOSDBG 1.8', dbg)
         self.assertIn("else if (c == 'D') disk_only = 1;", dbg)   # USOSLOG's disk snapshots
         self.assertIn('USOSDBG END', dbg)
         self.assertIn('if (!log_mode || log_pci) show_pci();', dbg)
@@ -453,7 +453,7 @@ class Binary(unittest.TestCase):
     @unittest.skipUnless(os.name == 'nt', 'runs the Win32 program')
     def test_host_run_decodes_usosdbg_dump(self):
         page = usns_bytes()
-        lines = ['USOSDBG 1.7 log mode  tick:1  pci:no (first run only)',
+        lines = ['USOSDBG 1.8 log mode  tick:1  pci:no (first run only)',
                  'WHEEL USOSMOUS: wanted:yes  knock answered ID:03  wheel:ON',
                  'USNS 1A2B3000: version 1 size 1400']
         lines += ['USNS+%03X:%s' % (r, page[r:r + 64].hex().upper()) for r in range(0, len(page), 64)]

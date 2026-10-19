@@ -124,7 +124,7 @@ class Image(unittest.TestCase):
         names = {b[sec + 40 * i:sec + 40 * i + 8].rstrip(b'\0') for i in range(nsec)}
         # same section set as the working usosnvme.mpd (its INIT also survives /MERGE:INIT=.text)
         self.assertEqual(names, {b'.text', b'.rdata', b'.data', b'INIT', b'.rsrc', b'.reloc'})
-        self.assertIn(b'USOSUSB 1.0', b)
+        self.assertIn(b'USOSUSB 1.1', b)
 
 
 class InfReg(unittest.TestCase):
@@ -351,6 +351,12 @@ static void helper_serve(void)
 
 static HW_DEVICE_EXTENSION *g_ext;
 static UCHAR g_buf[65536], g_sense[18];
+static ULONG ref_crc(const UCHAR *p, ULONG n)   /* bitwise CRC-32, independent of the table */
+{
+    ULONG c = 0xFFFFFFFFUL; int k;
+    while (n--) { c ^= *p++; for (k = 0; k < 8; k++) c = (c >> 1) ^ (0xEDB88320UL & (0UL - (c & 1))); }
+    return c ^ 0xFFFFFFFFUL;
+}
 static SCSI_REQUEST_BLOCK g_srb;
 
 /* StartIo, then 1 ms timer ticks until the SRB completes (or limit) */
@@ -439,7 +445,7 @@ int scenario(void)
     CHECK(find_adapter() == 110);
     CHECK(g_ext->BounceLen == 65536);
     CHECK(g_ch->req_phys == g_ext->BlockPhys && (g_ext->BlockPhys & 4095) == 0);
-    CHECK(g_ext->Mp->sig[0] == UDS_MP_SIG0 && g_ext->Mp->sig[1] == UDS_MP_SIG1 && g_ext->Mp->version == 1);
+    CHECK(g_ext->Mp->sig[0] == UDS_MP_SIG0 && g_ext->Mp->sig[1] == UDS_MP_SIG1 && g_ext->Mp->version == 2);
     CHECK(g_ext->Mp->mp_major == 1 && g_ext->Mp->slots == 1);
     CHECK((UCHAR *)g_ext->Mp == (UCHAR *)g_ext->Req + UDS_MP_STATUS_OFFSET);
     CHECK(g_init.HwInitialize(g_ext));
@@ -490,6 +496,15 @@ int scenario(void)
     CHECK(run(0, cdb, 10, SRB_FLAGS_DATA_IN, 65536, 1000) == SRB_STATUS_SUCCESS);
     CHECK(g_buf[0] == 3 && g_buf[65535] == (UCHAR)(65535 * 7 + 3) && g_srb.DataTransferLength == 65536);
     h_delay_us = 100;
+    /* 1.1 request ring: LBA, length and CRC-32 of both transfers */
+    CHECK(UsbCrc32(g_ext, (const UCHAR *)"123456789", 9) == 0xCBF43926UL);
+    { struct uds_mp_ring *rg = (struct uds_mp_ring *)((UCHAR *)g_ext->Req + UDS_MP_RING_OFFSET);
+      struct uds_mp_rent *w = &rg->ent[(rg->next + UDS_MP_RING - 2) % UDS_MP_RING];
+      struct uds_mp_rent *rd = &rg->ent[(rg->next + UDS_MP_RING - 1) % UDS_MP_RING];
+      CHECK(rg->sig[0] == UDS_MP_SIG0 && rg->sig[1] == UDS_MP_RSIG1 && rg->count >= 2);
+      CHECK(w->op == 0x2A && w->lba == 64 && w->bytes == 65536 && w->slot == 0);
+      CHECK(rd->op == 0x28 && rd->lba == 64 && rd->bytes == 65536 && rd->srb_status == SRB_STATUS_SUCCESS);
+      CHECK(w->crc == rd->crc && rd->crc == ref_crc(g_buf, 65536) && rd->uds_status == UDS_S_OK); }
 
     /* SYNCHRONIZE CACHE refused by the stick: GOOD; SRB flush / shutdown too */
     CHECK(run(0, SYNC, 10, 0, 0, 10) == SRB_STATUS_SUCCESS);
@@ -520,6 +535,30 @@ int scenario(void)
     CHECK(run(0, TUR, 6, 0, 0, 10) == SRB_STATUS_SUCCESS);
     CHECK(h_ops[UDS_OP_ENUM] == posted + 1);
     CHECK(g_ext->Mp->slot[0].generation == 6 && g_ext->Mp->slot[0].present == 1);
+
+    /* 1.1 hot-swap: the stick is pulled; IOS keeps sending READs to the empty
+       slot. A READ (not only TEST UNIT READY) enumerates again, at most once
+       a second; a new stick (generation 7) gives one UNIT ATTENTION, then
+       its data */
+    memset(cdb, 0, 10); cdb[0] = 0x28; cdb[8] = 1;
+    h_gone_next = 1; h_present = 0;
+    CHECK(run(0, cdb, 10, SRB_FLAGS_DATA_IN, 512, 10) == (SRB_STATUS_ERROR | SRB_STATUS_AUTOSENSE_VALID) && g_sense[12] == 0x3A);
+    posted = h_ops[UDS_OP_ENUM];
+    CHECK(run(0, cdb, 10, SRB_FLAGS_DATA_IN, 512, 10) == (SRB_STATUS_ERROR | SRB_STATUS_AUTOSENSE_VALID) && g_sense[12] == 0x3A);
+    CHECK(h_ops[UDS_OP_ENUM] == posted + 1 && !g_ext->Slot[0].present);
+    h_present = 1; h_gen = 7; h_disk[0] = 0xA7;
+    CHECK(run(0, cdb, 10, SRB_FLAGS_DATA_IN, 512, 10) == (SRB_STATUS_ERROR | SRB_STATUS_AUTOSENSE_VALID) && g_sense[12] == 0x3A);
+    CHECK(h_ops[UDS_OP_ENUM] == posted + 1);   /* within 1 s: no ENUM */
+    g_tsc += 1100ULL * 1000000;
+    CHECK(run(0, cdb, 10, SRB_FLAGS_DATA_IN, 512, 10) == (SRB_STATUS_ERROR | SRB_STATUS_AUTOSENSE_VALID));
+    CHECK(h_ops[UDS_OP_ENUM] == posted + 2 && g_sense[2] == 6 && g_sense[12] == 0x28);
+    CHECK(run(0, cdb, 10, SRB_FLAGS_DATA_IN, 512, 10) == SRB_STATUS_SUCCESS && g_buf[0] == 0xA7);
+    CHECK(g_ext->Slot[0].generation == 7 && h_ops[UDS_OP_ENUM] == posted + 2);
+    /* 1.1: the empty-slot NOT READY answers are not errors */
+    CHECK(g_ext->Mp->notready >= 3);
+    { ULONG e = g_ext->Mp->errors, n = g_ext->Mp->notready;
+      CHECK(run(0, TUR, 6, 0, 0, 10) == SRB_STATUS_SUCCESS && g_ext->Mp->errors == e && g_ext->Mp->notready == n); }
+    printf("hot-swap (empty slot READ enumerates): ok\n");
 
     /* watchdog: the helper stops answering -> SRB_STATUS_TIMEOUT after 15 s */
     h_dead = 1;
