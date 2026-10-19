@@ -163,7 +163,7 @@ ECHO @IF EXIST C:\USOS9X\TZFIX.BAT CALL C:\USOS9X\TZFIX.BAT>>C:\AUTOEXEC.BAT
 REM Windows 95: C:\USOS9X\VESA95.BAT (tools/w9x_vesa95.sh) moves the display
 REM from Standard VGA to the VESA driver once (95 never enumerates PCI here).
 ECHO @IF EXIST C:\USOS9X\VESA95.BAT CALL C:\USOS9X\VESA95.BAT>>C:\AUTOEXEC.BAT
-REM USB sticks through USOSUSB.MPD (U9UDS=1, DATA usb-storage-experimental.txt;
+REM USB sticks through USOSUSB.MPD (U9UDS=1, default; off: DATA usb-storage-off.txt;
 REM tools/w9x_csmwrap_target.sh): USBREG.BAT once the registry exists copies
 REM the MPD into IOSUBSYS and imports USOSUSB.REG (real-mode REGEDIT, once).
 REM Me runs no programs from AUTOEXEC.BAT: see the Me block below.
@@ -225,33 +225,50 @@ ECHO system.ini,386Enh,"mouse=*",>>C:\USOS9X\USOSMOUS.INF
 REM A user's own answer file is copied 1:1 (it ends with its own section).
 IF "%U9ANS%"=="USER" GOTO AUTODONE
 ECHO system.ini,boot,drivers,,usoskey.drv>>C:\%U9SRC%\MSBATCH.INF
-REM [Install] AddReg names USOS.CsmReg (98/98 SE append theirs below). The
-REM values come from [Strings]: COMMAND.COM batch lines stay under 128
-REM characters (expanded), and the quotes keep the comma in the command.
-IF NOT EXIST C:\USOS9X\USOSMOUS.INF GOTO AUTODONE
-ECHO [USOS.CsmReg]>>C:\%U9SRC%\MSBATCH.INF
-ECHO HKLM,%%USOSRO%%,USOSMouse,,"%%USOSMC%%">>C:\%U9SRC%\MSBATCH.INF
-IF NOT "%U9UDS%"=="1" GOTO MEUDSRO
-ECHO HKLM,%%USOSRO%%,USOSUsb,,"%%USOSUC%%">>C:\%U9SRC%\MSBATCH.INF
-:MEUDSRO
-ECHO [Strings]>>C:\%U9SRC%\MSBATCH.INF
-ECHO USOSRO="Software\Microsoft\Windows\CurrentVersion\RunOnce">>C:\%U9SRC%\MSBATCH.INF
-ECHO USOSMC="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\USOS9X\USOSMOUS.INF">>C:\%U9SRC%\MSBATCH.INF
-IF NOT "%U9UDS%"=="1" GOTO AUTODONE
-ECHO USOSUC="regedit /s C:\USOS9X\USOSUSB.REG">>C:\%U9SRC%\MSBATCH.INF
-GOTO AUTODONE
+GOTO CSMREGS
 :CSMREG
+IF "%U9ANS%"=="USER" GOTO AUTODONE
+:CSMREGS
+REM [Install] AddReg names USOS.CsmReg (every 9x under CSMWrap, USOS answer).
+REM The values come from [Strings]: COMMAND.COM batch lines stay under 128
+REM characters (expanded), and the quotes keep the comma in the command.
+ECHO [USOS.CsmReg]>>C:\%U9SRC%\MSBATCH.INF
 REM 98/98 SE: no PCI bus without this. SeaBIOS has a $PnP header but gives no
 REM PnP BIOS device nodes, and Setup's detection (SYSDETMG DetectBus) adds the
 REM PCI bus (*PNP0A03) only when it finds neither ACPI (refused: BIOS date
 REM before ACPICheckDate) nor a PnP BIOS. IgnorePnPBIOS makes it skip $PnP
-REM (docs/win9x-modern-2026-09-30.md 4c). [Install] names USOS.CsmReg.
-IF "%U9SYS%"=="98SE" GOTO CSMREG2
-IF NOT "%U9SYS%"=="98" GOTO AUTODONE
-:CSMREG2
-IF "%U9ANS%"=="USER" GOTO AUTODONE
-ECHO [USOS.CsmReg]>>C:\%U9SRC%\MSBATCH.INF
+REM (docs/win9x-modern-2026-09-30.md 4c).
+IF "%U9SYS%"=="98SE" GOTO PNPREG
+IF NOT "%U9SYS%"=="98" GOTO PNPDONE
+:PNPREG
 ECHO HKLM,"Software\Microsoft\Windows\CurrentVersion\Detect",IgnorePnPBIOS,,"1">>C:\%U9SRC%\MSBATCH.INF
+:PNPDONE
+REM Me: the mouse.drv switch (USOSMOUS.INF, written above) by machine RunOnce.
+IF NOT EXIST C:\USOS9X\USOSMOUS.INF GOTO MOUSRO
+ECHO HKLM,%%USOSRO%%,USOSMouse,,"%%USOSMC%%">>C:\%U9SRC%\MSBATCH.INF
+:MOUSRO
+REM Me: USOSUSB.REG by machine RunOnce (95/98/98 SE: USBREG.BAT, real mode).
+IF NOT "%U9SYS%"=="ME" GOTO UDSRO
+IF NOT "%U9UDS%"=="1" GOTO UDSRO
+ECHO HKLM,%%USOSRO%%,USOSUsb,,"%%USOSUC%%">>C:\%U9SRC%\MSBATCH.INF
+:UDSRO
+REM 98/98 SE/Me (U9VMD=1): the SYSTEM.INI device= lines of USOSVMD.VXD by
+REM machine RunOnce (C:\USOS9X\USOSVMD.INF, tools/w9x_csmwrap_target.sh).
+IF NOT "%U9VMD%"=="1" GOTO VMDRO
+IF NOT EXIST C:\USOS9X\USOSVMD.INF GOTO VMDRO
+ECHO HKLM,%%USOSRO%%,USOSVmd,,"%%USOSVC%%">>C:\%U9SRC%\MSBATCH.INF
+:VMDRO
+REM The silent logger (U9LOG=1): USOSLOG.EXE from the machine Run key.
+IF NOT "%U9LOG%"=="1" GOTO LOGRO
+IF NOT EXIST C:\USOS9X\USOSLOG.EXE GOTO LOGRO
+ECHO HKLM,%%USOSRN%%,USOSLog,,"C:\USOS9X\USOSLOG.EXE">>C:\%U9SRC%\MSBATCH.INF
+:LOGRO
+ECHO [Strings]>>C:\%U9SRC%\MSBATCH.INF
+ECHO USOSRO="Software\Microsoft\Windows\CurrentVersion\RunOnce">>C:\%U9SRC%\MSBATCH.INF
+ECHO USOSRN="Software\Microsoft\Windows\CurrentVersion\Run">>C:\%U9SRC%\MSBATCH.INF
+ECHO USOSMC="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\USOS9X\USOSMOUS.INF">>C:\%U9SRC%\MSBATCH.INF
+ECHO USOSUC="regedit /s C:\USOS9X\USOSUSB.REG">>C:\%U9SRC%\MSBATCH.INF
+ECHO USOSVC="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\USOS9X\USOSVMD.INF">>C:\%U9SRC%\MSBATCH.INF
 :AUTODONE
 ECHO Poprawki zgodnosci (Patcher9x: TLB, CPU, RAM, rejestry CPU)...
 REM CWSDPMI stays resident (-p) for Patcher9x and is unloaded (-u) right

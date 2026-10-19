@@ -1,6 +1,6 @@
-"""Windows 9x USB sticks through USOSUSB.MPD, gated by DATA's
-Systems\\Windows\\<9x>\\Unattended\\usb-storage-experimental.txt
-(docs/usb9x-hotswap-design-2026-10-19.md, stage 1 "Install"). Host only (Git sh):
+"""Windows 9x USB sticks through USOSUSB.MPD: on by default since the X470 Windows Me
+pass (2026-10-19), off with DATA's Systems\\<category>\\<9x>\\Unattended\\usb-storage-off.txt
+(docs/usb9x-hotswap-design-2026-10-19.md). Host only (Git sh):
 the USOSUSB and int13 blocks of tools/w9x_csmwrap_target.sh are cut out of the
 script and run as they are against a temp C:\\USOS9X; the prepare.sh flag, the
 INSTALL.BAT lines (dos_startup.cmd), build_win9x_support.stage_usosusb with
@@ -89,7 +89,7 @@ class TargetScript(unittest.TestCase):
         out, err = self.run_block(1)
         self.assertEqual(out, 'on')                         # SATA target: boot disk only, too
         self.assertIn('only the boot disk is a BIOS hard disk', err)
-        self.assertIn('3.1.2-usos16', err)
+        self.assertIn('3.1.2-usos17', err)
         self.assertIn(f'SCSIAdapter\\{CLASSIDX}', err)
         self.assertEqual(self.names(), ['U9ENV.BAT', 'USBREG.BAT', 'USOSUSB.INF', 'USOSUSB.MPD', 'USOSUSB.REG'])
         self.assertEqual((self.c / 'U9ENV.BAT').read_bytes(), U9ENV + b'SET U9UDS=1\r\n')
@@ -121,7 +121,7 @@ class TargetScript(unittest.TestCase):
     def test_flag_on_nvme(self):
         out, err = self.run_block(1, nvme_ok=1)
         self.assertEqual(out, 'on')
-        self.assertIn('USOSUSB.MPD (experimental', err)
+        self.assertIn('USOSUSB.MPD (default; usb-storage-off.txt', err)
 
     def test_me(self):
         out, err = self.run_block(1, 'ME')
@@ -182,10 +182,15 @@ class TargetScript(unittest.TestCase):
 class Prepare(unittest.TestCase):
     def test_flag(self):
         gate = PREPARE[PREPARE.index('    usb9x=0\n'):]
-        self.assertIn('[ -f "/mnt/data/Systems/Windows/$folder/Unattended/usb-storage-experimental.txt" ]', gate)
+        # default on, the opt-out file in the catalog category's Unattended folder
+        self.assertIn('unattended="/mnt/data/Systems/$data_category/$folder/Unattended"', gate)
+        off = gate.index('[ -f "$unattended/usb-storage-off.txt" ]')
+        self.assertLess(off, gate.index('usb9x=1'))
+        self.assertIn('else\n            usb9x=1', gate)
+        self.assertNotIn('usb-storage-experimental.txt ]', gate)
         self.assertIn('[ -z "$img$posr$nt4$dos_iso" ]', gate[:gate.index('usb9x=1')])
         self.assertLess(gate.index('usb9x=1'), gate.index('W9X_USB_STORAGE="$usb9x"'))
-        self.assertIn('3.1.2-usos16', gate[:gate.index('W9X_USB_STORAGE')])
+        self.assertIn('3.1.2-usos17', gate[:gate.index('W9X_USB_STORAGE')])
         # set before any flow script is chosen, next to the NVMe flag
         self.assertLess(PREPARE.index('    nvme9x=0\n'), PREPARE.index('    usb9x=0\n'))
         self.assertIn('W9X_NVME_DRIVER="$nvme9x" W9X_USB_STORAGE="$usb9x"', PREPARE)
@@ -208,10 +213,11 @@ class InstallBat(unittest.TestCase):
         b = self.block('IF NOT "%U9UDS%"=="1" GOTO MEUDS\n', ':MEUDS\n')
         self.assertIn(r'COPY /Y C:\USOS9X\USOSUSB.MPD C:\WINDOWS\SYSTEM\IOSUBSYS >NUL', b)
         self.assertLess(BAT.index('IF NOT "%U9SYS%"=="ME" GOTO CSMREG'), BAT.index('GOTO MEUDS\n'))
-        ro = self.block('IF NOT "%U9UDS%"=="1" GOTO MEUDSRO', 'GOTO AUTODONE')
+        # the RunOnce value only on Me and only with U9UDS=1 (95/98/98 SE: USBREG.BAT)
+        ro = self.block('IF NOT "%U9SYS%"=="ME" GOTO UDSRO', ':UDSRO')
+        self.assertIn('IF NOT "%U9UDS%"=="1" GOTO UDSRO', ro)
         self.assertIn('ECHO HKLM,%%USOSRO%%,USOSUsb,,"%%USOSUC%%">>', ro)
-        tail = BAT[BAT.index(':MEUDSRO'):]
-        tail = tail[:tail.index('GOTO AUTODONE', tail.index('USOSUC='))]
+        tail = BAT[BAT.index(':LOGRO'):BAT.index(':AUTODONE')]
         self.assertIn(r'ECHO USOSUC="regedit /s C:\USOS9X\USOSUSB.REG">>C:\%U9SRC%\MSBATCH.INF', tail)
 
     def test_batch_rules(self):

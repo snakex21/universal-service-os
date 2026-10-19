@@ -82,6 +82,8 @@ var payloadFiles = []payloadFile{
 	{`zig-out/dos-native/win9x/CREGFIX.TXT`, `EFI/USOS/dos-native/win9x/CREGFIX.TXT`},
 	{`zig-out/dos-native/win9x/USOSDIAG.COM`, `EFI/USOS/dos-native/win9x/USOSDIAG.COM`},
 	{`zig-out/dos-native/win9x/USOSDBG.EXE`, `EFI/USOS/dos-native/win9x/USOSDBG.EXE`},
+	{`zig-out/dos-native/win9x/USOSLOG.EXE`, `EFI/USOS/dos-native/win9x/USOSLOG.EXE`},
+	{`zig-out/dos-native/win9x/USOSVMD.VXD`, `EFI/USOS/dos-native/win9x/USOSVMD.VXD`},
 	{`zig-out/dos-native/win9x/USOSNVME.MPD`, `EFI/USOS/dos-native/win9x/USOSNVME.MPD`},
 	{`zig-out/dos-native/win9x/USOSNVME.INF`, `EFI/USOS/dos-native/win9x/USOSNVME.INF`},
 	{`zig-out/dos-native/win9x/USOSUSB.MPD`, `EFI/USOS/dos-native/win9x/USOSUSB.MPD`},

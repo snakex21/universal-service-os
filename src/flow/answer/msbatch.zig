@@ -205,7 +205,7 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
         \\HKLM,"Software\Microsoft\Windows\CurrentVersion",RegDone,1,01,00,00,00
         \\
         \\; Last section: under CSMWrap INSTALL.BAT appends the Me USB input lines
-        \\; (Me) or the USOS.CsmReg section (98, 98 SE); missing, it is skipped.
+        \\; (Me) and the USOS.CsmReg section (every 9x); missing, it is skipped.
         \\[USOS.Csm]
         \\
     );

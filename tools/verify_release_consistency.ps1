@@ -144,6 +144,8 @@ try {
         'EFI/USOS/dos-native/win9x/USOSUSB.MPD',
         'EFI/USOS/dos-native/win9x/USOSUSB.INF',
         'EFI/USOS/dos-native/win9x/USOSUSB.REG',
+        'EFI/USOS/dos-native/win9x/USOSVMD.VXD',
+        'EFI/USOS/dos-native/win9x/USOSLOG.EXE',
         'EFI/USOS/systemd-bootx64.efi',
         'EFI/USOS/touchi2c_x64.efi',
         'EFI/USOS/licenses/touchi2cdxe/LICENSE',

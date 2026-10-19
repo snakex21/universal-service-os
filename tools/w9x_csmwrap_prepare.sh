@@ -521,14 +521,35 @@ usos_w9x_csmwrap_prepare() {
                 fi ;;
         esac
     fi
-    # Windows 9x USB sticks through USOSUSB.MPD (docs/usb9x-hotswap-design-2026-10-19.md
-    # stage 1, no hardware pass yet): only with DATA's usb-storage-experimental.txt;
-    # without it nothing changes (no USOSUSB files on C:, the stick keeps INT 13h).
+    # Windows 9x defaults since the X470 Windows Me pass (2026-10-19); each one
+    # has an opt-out file in DATA's Systems\<category>\<9x>\Unattended:
+    #   usb-storage-off.txt  no USOSUSB.MPD: no USB sticks in Windows, a stick
+    #                        keeps INT 13h (docs/usb9x-hotswap-design-2026-10-19.md;
+    #                        the old opt-in usb-storage-experimental.txt is not needed)
+    #   vmd-off.txt          no USOSVMD.VXD (mouse in MS-DOS boxes; 98/98 SE/Me only,
+    #                        never on 95: not tested there)
+    #   logging-off.txt      no USOSLOG.EXE autostart (silent logger, C:\USOS9X\LOGS)
     usb9x=0
-    if [ -z "$img$posr$nt4$dos_iso" ] &&
-        [ -f "/mnt/data/Systems/Windows/$folder/Unattended/usb-storage-experimental.txt" ]; then
-        usb9x=1
-        w9x_csmwrap_log 'USB USOSUSB.MPD requested (usb-storage-experimental.txt; needs CSMWrap >= 3.1.2-usos16)'
+    vmd9x=0
+    log9x=0
+    if [ -z "$img$posr$nt4$dos_iso" ]; then
+        unattended="/mnt/data/Systems/$data_category/$folder/Unattended"
+        if [ -f "$unattended/usb-storage-off.txt" ]; then
+            w9x_csmwrap_log 'USB USOSUSB.MPD off (usb-storage-off.txt)'
+        else
+            usb9x=1
+            w9x_csmwrap_log 'USB USOSUSB.MPD on (default, usb-storage-off.txt turns it off; needs CSMWrap >= 3.1.2-usos17)'
+        fi
+        if [ -f "$unattended/vmd-off.txt" ]; then
+            w9x_csmwrap_log 'VMD USOSVMD.VXD off (vmd-off.txt)'
+        else
+            vmd9x=1
+        fi
+        if [ -f "$unattended/logging-off.txt" ]; then
+            w9x_csmwrap_log 'LOG USOSLOG.EXE off (logging-off.txt)'
+        else
+            log9x=1
+        fi
     fi
     usos_ui_stage 4 5 'Preparing the disk' "Copying $folder Setup, the USOS helpers and CSMWrap to the selected disk." || true
     if [ -n "$img" ]; then
@@ -550,7 +571,7 @@ usos_w9x_csmwrap_prepare() {
     else
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="/mnt/data/$iso" W9X_SETUP_FOLDER="$setup" W9X_TAG="$tag" \
             W9X_ANSWER_INF="$answer_inf" W9X_ANSWER_KIND="$answer_kind" W9X_BOOT_FLOPPY="$floppy" W9X_SIZE_GIB="$size_gib" \
-            W9X_USB_DIR="/mnt/data/Drivers/$folder/USB" W9X_TIME_ZONE="${time_zone:-}" W9X_VM_PHASE1="$([ "$vm_phase1" = yes ] && echo 1 || echo 0)" W9X_NVME_DRIVER="$nvme9x" W9X_USB_STORAGE="$usb9x"             sh /usr/lib/usos/w9x_csmwrap_target.sh
+            W9X_USB_DIR="/mnt/data/Drivers/$folder/USB" W9X_TIME_ZONE="${time_zone:-}" W9X_VM_PHASE1="$([ "$vm_phase1" = yes ] && echo 1 || echo 0)" W9X_NVME_DRIVER="$nvme9x" W9X_USB_STORAGE="$usb9x" W9X_VMD="$vmd9x" W9X_LOGGING="$log9x"             sh /usr/lib/usos/w9x_csmwrap_target.sh
     fi
     "$@" >> "$W9X_LOG/prepare.log" 2>&1 < /dev/null
     target_rc=$?
