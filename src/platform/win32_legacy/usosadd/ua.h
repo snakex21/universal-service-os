@@ -134,7 +134,7 @@ typedef struct {
     char preset[24];
     int full;
     char options[1024];
-    char exclude[512];
+    char exclude[1024];
 } ua_choice;
 void ua_selection(const ua_ini *m, const ua_ini *sel, ua_choice *out);
 

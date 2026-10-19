@@ -91,6 +91,20 @@ static int write_file(const char *path, const char *buf, int len) {
 
 static int exists(const char *path) { return GetFileAttributesA(path) != (DWORD)-1; }
 
+/* CPUID is optional on old CPUs. The ID-bit check precedes the instruction.
+ * NT4's preparation VM must not install the pack before the hardware boot. */
+static unsigned virtual_machine(void);
+#pragma aux virtual_machine = \
+    "pushfd" "pop eax" "mov edx,eax" "xor eax,200000h" \
+    "push eax" "popfd" "pushfd" "pop eax" "push edx" "popfd" \
+    "xor eax,edx" "and eax,200000h" "jz bare" \
+    "mov eax,1" "db 0fh,0a2h" "test ecx,80000000h" "jnz guest" \
+    "mov eax,40000000h" "db 0fh,0a2h" "cmp eax,40000000h" "jb bare" \
+    "cmp eax,40010000h" "jae bare" \
+    "guest:" "mov eax,1" "jmp done" \
+    "bare:" "xor eax,eax" "done:" \
+    value [eax] modify [ebx ecx edx];
+
 static void make_dirs(const char *path) {
     char tmp[UA_PATH];
     int i;
@@ -550,15 +564,28 @@ static int setup_busy(void) {
     return FindWindowA("Shell_TrayWnd", 0) == 0;
 }
 
-/* Waits (up to 30 minutes) until Setup is done and the desktop is there.
- * Returns 0 when it never got there: the chain then waits for the next boot. */
-static int wait_for_desktop(void) {
-    int i;
-    for (i = 0; i < 360 && setup_busy(); i++) {
-        if (i == 0) log_line("  waiting for Windows Setup to finish / the desktop");
-        Sleep(5000);
+/* Defer early Run/Setup calls until a later normal logon. No startup loop. */
+static int wait_for_desktop(void) { return !setup_busy(); }
+
+/* IE/DUN installers may reset browser settings. Reuse the network task's
+ * helper and its existing config, only when that component was staged. */
+static void lan_defaults(int launch) {
+    HKEY k;
+    const char *exe = g_facts.nt ? "C:\\USOS\\NT4\\USOSLAN.EXE" : "C:\\USOS9X\\USOSLAN.EXE";
+    if (!exists(exe)) return;
+    if (RegCreateKeyExA(HKEY_LOCAL_MACHINE, RUN_KEY, 0, 0, 0, KEY_WRITE, 0, &k, 0) == ERROR_SUCCESS) {
+        RegSetValueExA(k, "USOSLan", 0, REG_SZ, (const BYTE *)exe, (DWORD)ua_len(exe) + 1);
+        RegCloseKey(k);
     }
-    return !setup_busy();
+    log_line("  LAN defaults scheduled after compatibility installers");
+    if (launch) {
+        char command[UA_PATH]; STARTUPINFOA si; PROCESS_INFORMATION pi;
+        zero(&si, sizeof si); zero(&pi, sizeof pi); si.cb = sizeof si;
+        ua_copy(command, sizeof command, exe);
+        if (CreateProcessA(exe, command, 0, 0, FALSE, 0, 0, 0, &si, &pi)) {
+            CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
+        }
+    }
 }
 
 typedef BOOL (WINAPI *PFN_OPT)(HANDLE, DWORD, PHANDLE);
@@ -589,6 +616,7 @@ static void restart(void) {
     g_state.pending_reboot = 1;
     save_state();
     register_run();
+    lan_defaults(0);
     auto_logon();
     log_line(g_pl ? "Ponowne uruchomienie komputera" : "Restarting the computer");
     status(g_pl ? "Ponowne uruchomienie komputera..." : "Restarting the computer...");
@@ -782,6 +810,7 @@ static void finish(void) {
     }
     ua_append(text, sizeof text, g_pl ? "\r\n\r\nDziennik: " : "\r\n\r\nLog: ");
     ua_append(text, sizeof text, g_log);
+    lan_defaults(1);
     unregister();
     if (g_wnd) ShowWindow(g_wnd, SW_HIDE);
     MessageBoxA(0, text, "USOS", MB_OK | (failed ? MB_ICONWARNING : MB_ICONINFORMATION) | MB_SETFOREGROUND);
@@ -816,11 +845,10 @@ void __cdecl ua_start(void) {
                     g_pf, sizeof g_pf, &type))
         ua_copy(g_pf, sizeof g_pf, "C:\\Program Files");
 
-    /* the log sits next to the ADDONS folder: C:\USOS\addons.log */
-    ua_copy(path, sizeof path, g_root);
-    for (i = ua_len(path) - 1; i > 2 && path[i] != '\\'; i--) ;
-    if (i > 2) path[i] = 0;
-    path_join(g_log, path, "addons.log");
+    /* Agreed OS diagnostics locations; state/cache remain in g_root. */
+    ua_copy(path, sizeof path, (GetVersion() & 0x80000000UL) ? "C:\\USOS9X\\LOGS" : "C:\\USOS\\NT4");
+    make_dirs(path);
+    path_join(g_log, path, "ADDONS.LOG");
     path_join(path, g_root, "LEGACY.INI");
     n = read_file(path, g_manifest, sizeof g_manifest);
     if (n <= 0) { log2("USOSADD: manifest not found: ", path); ExitProcess(2); }
@@ -842,6 +870,13 @@ void __cdecl ua_start(void) {
     else ua_state_load(&g_state, 0, &g_p);
 
     detect();
+    /* Locale/keyboard can differ from the installation media's language.
+     * Stage selects packages by the latter; retain that language on resume. */
+    if (!dry) {
+        v = ua_ini_get(&g_sel, "select", "lang");
+        if (v && (ua_ieq(v, "PL") || ua_ieq(v, "EN") || ua_ieq(v, "XX")))
+            ua_copy(g_sys.lang, sizeof g_sys.lang, v);
+    }
     if (dry) {
         /* /dry /as:<os>,<lang>[,<ntsp>]: the plan another system would get */
         const char *as = ua_find(cmdline, "/as:");
@@ -875,9 +910,21 @@ void __cdecl ua_start(void) {
     /* Started from Run after the shell; still wait while Setup finishes
      * (an older RunOnce entry, or a slow first boot). */
     register_run();
+    if (virtual_machine()) {
+        log_line("USOSADD: VM deferred; Run retained for the first hardware desktop");
+        ExitProcess(0);
+    }
     if (!wait_for_desktop()) {
         log_line("USOSADD: Windows Setup is still running, trying again at the next start");
         ExitProcess(0);
+    }
+    path_join(path, g_root, "TMP");
+    make_dirs(path);
+    type = GetFileAttributesA(path);
+    if (type == (DWORD)-1 || !(type & FILE_ATTRIBUTE_DIRECTORY) ||
+        !SetEnvironmentVariableA("TEMP", path) || !SetEnvironmentVariableA("TMP", path)) {
+        log_line("USOSADD: private TMP unavailable; no profile-directory fallback");
+        ExitProcess(2);
     }
     g_state.starts++;
     g_state.pending_reboot = 0; /* we are running after the restart */

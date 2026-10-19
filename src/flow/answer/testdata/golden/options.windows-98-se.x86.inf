@@ -35,9 +35,12 @@ Display=0
 Clients=
 Protocols=
 Services=
+;USOS-ADDONS-PRESET=praca
+;USOS-ADDONS-OPTIONS=
+;USOS-ADDONS-EXCLUDE=
 
 [Install]
-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile
+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Addons
 UpdateInis=USOS.Memory
 UpdateIniFields=USOS.Csm
 
@@ -51,6 +54,9 @@ HKCU,"Control Panel\Desktop",DragFullWindows,,"0"
 HKCU,"Control Panel\Mouse",MouseSpeed,,"0"
 HKCU,"Control Panel\Mouse",MouseThreshold1,,"0"
 HKCU,"Control Panel\Mouse",MouseThreshold2,,"0"
+
+[USOS.Addons]
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Run",USOSAddons,,"C:\USOS\ADDONS\USOSADD.EXE"
 
 [USOS.Memory]
 system.ini,386Enh,,"MaxPhysPage=40000"

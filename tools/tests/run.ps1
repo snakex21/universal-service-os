@@ -103,6 +103,7 @@ function Run-Unit {
     Invoke-PythonStep 'tools/tests/test_xp_reproducible.py' 'XP cabinet/hive reproducibility tests failed.'
     # Answer profiles (docs/answer-profiles.md): rendered WINNT.SIF / autounattend.xml goldens.
     Invoke-PythonStep 'tools/tests/test_answer_render.py' 'Answer renderer goldens failed.'
+    Invoke-PythonStep 'tools/tests/addons/test_legacy_flow.py' 'Legacy pack flow tests failed.'
     Invoke-PythonStep 'tools/tests/test_xp_user_settings.py' 'usos-xp.ini tests failed.'
     # Every Python test module (unittest and pytest style) in one pytest run:
     # it lists every failing test instead of stopping at the first module.

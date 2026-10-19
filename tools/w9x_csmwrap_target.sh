@@ -223,6 +223,16 @@ done
 # After the helpers: they include the USOS default MSBATCH.INF, which must
 # not replace the chosen answer (a rendered profile or the user's file).
 cp "$ANSWER_INF" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot copy MSBATCH.INF'
+. "$LIB/legacy_addons.sh"
+usos_addons_config "$ANSWER_INF" > "$work/addons.ini" || fail 'invalid addon selection'
+addon_os=$SYSTEM_TAG;[ "$addon_os" != 98 ] || addon_os=98FE
+addon_lang=XX
+if [ -x "$LIB/addons/legacy-stage-plan" ]; then addon_lang=$("$LIB/addons/legacy-stage-plan" language "$work/c/$SETUP_FOLDER/SETUP.TXT") || addon_lang=XX; fi
+usos_addons_stage "$work/addons.ini" "$work/c" "$LIB" "${USOS_ADDONS_DIR:-/mnt/data/Addons}" "$addon_os" "$addon_lang" || fail 'cannot stage legacy pack'
+rm -f "$work/addons.ini"
+if [ ! -f "$work/c/USOS/ADDONS/USOSADD.EXE" ]; then
+    sed '/^HKLM,.*USOSAddons,,/d' "$work/c/USOS9X/MSBATCH.INF" > "$work/MSBATCH.NEW" && mv "$work/MSBATCH.NEW" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot drop missing addon runner'
+fi
 for name in INSTALL.BAT PATCH9X.EXE CWSDPMI.EXE; do
     cp "$PATCH/$name" "$work/c/USOS9X/$name" || fail "cannot copy $name"
 done

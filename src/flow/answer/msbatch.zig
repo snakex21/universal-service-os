@@ -83,30 +83,30 @@ pub fn timeZoneName95(name98: []const u8) ?[]const u8 {
 
 /// The Windows 98 keys that Windows 95 OSR2.1 has under the same name.
 const windows95_zones = [_][]const u8{
-    "GMT",          "Romance",        "W. Europe",     "E. Europe",       "E. South America", "Atlantic",
-    "Eastern",      "Central",        "Mountain",      "Pacific",         "Alaskan",          "Hawaiian",
-    "Samoa",        "New Zealand",    "AUS Eastern",   "Cen. Australia",  "Tokyo",            "Taipei",
-    "India",        "Arabian",        "Iran",          "Israel",          "Newfoundland",     "Azores",
-    "Mid-Atlantic", "Greenwich",      "SA Eastern",    "SA Western",      "US Eastern",       "SA Pacific",
-    "Canada Central", "Mexico",       "US Mountain",   "Dateline",        "Fiji",             "Central Pacific",
-    "Tasmania",     "West Pacific",   "AUS Central",   "Central Asia",    "West Asia",        "Afghanistan",
-    "Egypt",        "South Africa",   "Russian",       "E. Australia",
+    "GMT",            "Romance",      "W. Europe",   "E. Europe",      "E. South America", "Atlantic",
+    "Eastern",        "Central",      "Mountain",    "Pacific",        "Alaskan",          "Hawaiian",
+    "Samoa",          "New Zealand",  "AUS Eastern", "Cen. Australia", "Tokyo",            "Taipei",
+    "India",          "Arabian",      "Iran",        "Israel",         "Newfoundland",     "Azores",
+    "Mid-Atlantic",   "Greenwich",    "SA Eastern",  "SA Western",     "US Eastern",       "SA Pacific",
+    "Canada Central", "Mexico",       "US Mountain", "Dateline",       "Fiji",             "Central Pacific",
+    "Tasmania",       "West Pacific", "AUS Central", "Central Asia",   "West Asia",        "Afghanistan",
+    "Egypt",          "South Africa", "Russian",     "E. Australia",
 };
 
 /// The time zone keys of Windows 98 SE (TIMEZONE.INF), zones added later
 /// are missing on purpose.
 const windows98_zones = [_][]const u8{
-    "AUS Central",    "AUS Eastern",  "Afghanistan",     "Alaskan",       "Arab",           "Arabian",
-    "Atlantic",       "Azores",       "Canada Central",  "Caucasus",      "Cen. Australia", "Central",
-    "Central Asia",   "Central Europe", "Central European", "Central Pacific", "China",       "Dateline",
-    "E. Africa",      "E. Australia", "E. Europe",       "E. South America", "Eastern",     "Egypt",
-    "Ekaterinburg",   "FLE",          "Fiji",            "GMT",           "GTB",            "Greenwich",
-    "Hawaiian",       "India",        "Iran",            "Israel",        "Korea",          "Mexico",
-    "Mid-Atlantic",   "Mountain",     "New Zealand",     "Newfoundland",  "Pacific",        "Pacific SA",
-    "Romance",        "Russian",      "SA Eastern",      "SA Pacific",    "SA Western",     "SE Asia",
-    "Samoa",          "Singapore",    "South Africa",    "Sri Lanka",     "Taipei",         "Tasmania",
-    "Tokyo",          "US Eastern",   "US Mountain",     "Vladivostok",   "W. Australia",   "W. Europe",
-    "West Asia",      "West Pacific", "Yakutsk",
+    "AUS Central",  "AUS Eastern",    "Afghanistan",      "Alaskan",          "Arab",           "Arabian",
+    "Atlantic",     "Azores",         "Canada Central",   "Caucasus",         "Cen. Australia", "Central",
+    "Central Asia", "Central Europe", "Central European", "Central Pacific",  "China",          "Dateline",
+    "E. Africa",    "E. Australia",   "E. Europe",        "E. South America", "Eastern",        "Egypt",
+    "Ekaterinburg", "FLE",            "Fiji",             "GMT",              "GTB",            "Greenwich",
+    "Hawaiian",     "India",          "Iran",             "Israel",           "Korea",          "Mexico",
+    "Mid-Atlantic", "Mountain",       "New Zealand",      "Newfoundland",     "Pacific",        "Pacific SA",
+    "Romance",      "Russian",        "SA Eastern",       "SA Pacific",       "SA Western",     "SE Asia",
+    "Samoa",        "Singapore",      "South Africa",     "Sri Lanka",        "Taipei",         "Tasmania",
+    "Tokyo",        "US Eastern",     "US Mountain",      "Vladivostok",      "W. Australia",   "W. Europe",
+    "West Asia",    "West Pacific",   "Yakutsk",
 };
 
 /// MSBATCH.INF (CRLF) for the release. `key`: the product key to use (the
@@ -143,6 +143,7 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
     const workgroup = if (p.workgroup.len > 0) p.workgroup.slice() else "WORKGROUP";
     try w.print("\r\n[Network]\r\nComputerName=\"{s}\"\r\nWorkgroup=\"{s}\"\r\nDescription=\"{s}\"\r\nDisplay=0\r\n", .{ computer, workgroup, p.user.slice() });
     try w.writeAll("Clients=\r\nProtocols=\r\nServices=\r\n");
+    try @import("addons_profile.zig").metadata(p, &w);
     // Typed options (options.zig): their own AddReg section, only when set.
     var values: [options.count]u8 = undefined;
     var it = options.iterate(p, &values, .{ .os = switch (release) {
@@ -151,8 +152,9 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
         .windows_me => .win_me,
     } });
     const any_option = it.next() != null;
-    try w.writeAll(if (any_option) "\n[Install]\nAddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile\n" else "\n[Install]\nAddReg=USOS.RunOnce,USOS.CsmReg\n");
-    try w.writeAll("UpdateInis=USOS.Memory\nUpdateIniFields=USOS.Csm\n");
+    try w.writeAll(if (any_option) "\n[Install]\nAddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile" else "\n[Install]\nAddReg=USOS.RunOnce,USOS.CsmReg");
+    if (p.addons_preset != .none) try w.writeAll(",USOS.Addons");
+    try w.writeAll("\nUpdateInis=USOS.Memory\nUpdateIniFields=USOS.Csm\n");
     if (any_option) {
         // Setup's INF AddReg: HKCU at Setup time is the one default user.
         // A DWORD is written as 4 binary bytes (flag 1), as the 9x shell
@@ -178,6 +180,10 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
             },
             else => {},
         };
+    }
+    if (p.addons_preset != .none) {
+        try w.writeAll("\n[USOS.Addons]\n");
+        try w.writeAll(@import("addons_profile.zig").run_line);
     }
     try w.writeAll(
         \\
@@ -227,6 +233,7 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
 
 test "MSBATCH.INF: typed options in their own AddReg section, only when set" {
     var p = Profile{};
+    p.addons_preset = .none;
     try p.name.set("Retro");
     try p.user.set("Jan");
     var buffer: [4096]u8 = undefined;
@@ -288,6 +295,7 @@ test "the menu language gives the default 9x time zone" {
 
 test "MSBATCH.INF carries the profile, CRLF, the key only for 98 and Me" {
     var p = Profile{};
+    p.addons_preset = .none;
     try p.name.set("Retro");
     try p.user.set("Jan Kowalski");
     try p.org.set("USOS Lab");

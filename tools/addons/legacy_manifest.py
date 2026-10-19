@@ -23,7 +23,7 @@ TIERS = ('full', 'option', 'group', 'none')
 REBOOTS = ('now', 'end', 'no')
 REDIST = ('yes', 'no', 'conditional', 'unknown')
 SOURCES = ('bundled', 'release', 'user')
-DECISIONS = ('', 'maintainer-2026-09-30')
+DECISIONS = ('', 'maintainer-2026-09-30', 'maintainer-2026-10-20')
 STATUSES = ('', 'missing', 'needs-iss')
 LANGS = ('PL', 'EN', '*')
 BUILTINS = ('copy', 'force', 'attrib', 'append', 'cd', 'inf', 'msi')
@@ -153,10 +153,12 @@ class Package:
 class Manifest:
     entries: list[tuple[str, str, str]]
     packages: list[Package] = field(default_factory=list)
+    raw_text: str = ''
 
     @classmethod
     def load(cls, path: Path = MANIFEST) -> 'Manifest':
-        m = cls(parse_ini(path.read_text(encoding='utf-8')))
+        text = path.read_text(encoding='utf-8')
+        m = cls(parse_ini(text), raw_text=text)
         seen: dict[str, Package] = {}
         for section, key, value in m.entries:
             if section.lower().startswith('pkg:'):
@@ -326,6 +328,8 @@ def resolve(m: Manifest, os: str, lang: str, ntsp: str = '', full: bool = True, 
 def validate(m: Manifest) -> list[str]:
     """Structural checks; returns a list of problems (empty = valid)."""
     errors: list[str] = []
+    if re.search(r'https?://', m.raw_text, re.I) or any(re.search(r'https?://', value, re.I) for _, _, value in m.entries):
+        errors.append('public manifest must not contain HTTP(S) download addresses')
     tokens = set(t.lower() for t in m.os_tokens())
     groups = {k[6:].lower() for s, k, _ in m.entries if s.lower() == 'pack' and k.lower().startswith('group_')}
     if m.get('pack', 'format') != '1':

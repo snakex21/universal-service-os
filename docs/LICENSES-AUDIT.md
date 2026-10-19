@@ -461,16 +461,17 @@ manifest `src/addons/legacy-pack.ini` records `source`, `redist` and
   by any USOS licence, removed on request of the rights holder.
   `third-party.json` id `microsoft-legacy-pack-redist`. For these the
   shipped file is the permanent source, not a bridge.
-- **Other Microsoft packages** (IE, DCOM, DUN, WMP, RDP, DSClient, NT4 SP6a
-  and SRP, hotfixes) and community repacks of Microsoft files (NUSB, Movie
-  Maker 98): no redistribution grant; **user-supplied only**.
+- **Additional release class, maintainer decision 2026-10-20:** IE, DCOM,
+  DUN, WMP and NT4 SP6a/SRP join that separate asset, with per-file notices
+  and hashes in the manifest. This records the maintainer's decision,
+  not a new redistribution grant. No asset was built in the integration
+  task. RDP, DSClient, other hotfixes and community repacks of Microsoft
+  files (NUSB, Movie Maker 98) remain **user-supplied only**.
 - **Third-party freeware without a licence text** (Adaptec ASPI, HP printing
   wizard, WinMeDOS, a WMP skin, the Dell/Inside Out NT4 USB driver):
   **user-supplied only**. WinMeDOS and MSCONFIG-on-95 are marked as bridges
   "do zastąpienia własną implementacją".
-- **KernelEx 4.0 Final 2** (GPL-2.0): may be bundled once the matching
-  source is vendored next to it (then a `third-party.json` entry); user file
-  until then.
-- The other Microsoft packages (IE, DCOM, DUN, WMP, RDP, DSClient, NT4
-  SP6a/SRP, hotfixes) are **not** covered by the 2026-09-30 decision and
-  stay user-supplied.
+- **KernelEx 4.0 Final 2** (GPL-2.0): optional bundled classification under
+  the 2026-10-20 decision, currently `status=missing` because matching
+  source was not found locally. No binary is bundled until source and
+  notices are supplied (then add a `third-party.json` entry).

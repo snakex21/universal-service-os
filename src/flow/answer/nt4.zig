@@ -104,6 +104,7 @@ pub fn render(p: *const Profile, key: []const u8, buffer: []u8) ![]const u8 {
         if (msbatch.timeZoneName(zone)) |name98| try w.print(";USOS-TZ={s}\r\n", .{name98});
     }
     try w.writeAll("\r\n[Display]\r\nConfigureAtLogon = 0\r\nAutoConfirm = 1\r\nBitsPerPel = 8\r\nXResolution = 640\r\nYResolution = 480\r\nVRefresh = 60\r\n");
+    try @import("addons_profile.zig").metadata(p, &w);
     try optionLines(p, &w);
     return w.buffered();
 }
@@ -128,6 +129,7 @@ fn optionLines(p: *const Profile, w: *std.Io.Writer) !void {
 
 test "NT 4.0 WINNT.SIF: typed options as USOS-REG comments, nothing by default" {
     var p = Profile{};
+    p.addons_preset = .none;
     try p.name.set("A");
     try p.user.set("Jan");
     var buffer: [4096]u8 = undefined;

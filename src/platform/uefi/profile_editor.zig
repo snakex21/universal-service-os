@@ -153,6 +153,9 @@ var theme_option_count: usize = 0;
 var theme_index: usize = 0;
 var display_options: [@typeInfo(answer.profile.Display).@"enum".fields.len][]const u8 = undefined;
 var display_index: usize = 0;
+var saved_addons_preset: @TypeOf((Profile{}).addons_preset) = .praca;
+var saved_addons_options: answer.profile.Text(512) = .{};
+var saved_addons_exclude: answer.profile.Text(512) = .{};
 var network_options: [3][]const u8 = undefined;
 const protect_values = [_]answer.profile.ProtectPc{ .recommended, .updates, .off };
 const network_values = [_]answer.profile.NetworkLocation{ .work, .home, .public };
@@ -253,6 +256,9 @@ fn load(p: *const Profile) void {
     workgroup_text.set(p.workgroup.slice());
     for (tweak_rows, 0..) |row, i| tweak_values[i] = p.flagValue(row.field);
     display_index = @intFromEnum(p.display);
+    saved_addons_preset = p.addons_preset;
+    saved_addons_options = p.addons_options;
+    saved_addons_exclude = p.addons_exclude;
     loadTheme(p.theme);
     loadSystems(answer.applies.effective(p));
 }
@@ -387,6 +393,9 @@ fn build(out: *Profile) void {
     for (tweak_rows, 0..) |row, i| out.flag(row.field).?.* = tweak_values[i];
     out.theme = theme_values[theme_index];
     out.display = @enumFromInt(display_index);
+    out.addons_preset = saved_addons_preset;
+    out.addons_options = saved_addons_options;
+    out.addons_exclude = saved_addons_exclude;
     _ = answer.profile.normalizeSystems(systems_values[systems_index], &out.systems);
     out.manual_disk = true;
 }

@@ -43,10 +43,14 @@ Clients=
 Protocols=
 Services=
 
+;USOS-ADDONS-PRESET=praca
+;USOS-ADDONS-OPTIONS=
+;USOS-ADDONS-EXCLUDE=
+
 [Install]
 ; USOS.CsmReg exists only under CSMWrap (98, 98 SE: INSTALL.BAT appends it);
 ; a missing AddReg section is skipped (machine.inf does the same).
-AddReg=USOS.RunOnce,USOS.CsmReg
+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Addons
 UpdateInis=USOS.Memory
 UpdateIniFields=USOS.Csm
 
@@ -55,6 +59,9 @@ UpdateIniFields=USOS.Csm
 [USOS.Memory]
 system.ini,386Enh,,"MaxPhysPage=40000"
 system.ini,vcache,,"MaxFileCache=262144"
+
+[USOS.Addons]
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Run",USOSAddons,,"C:\USOS\ADDONS\USOSADD.EXE"
 
 [USOS.RunOnce]
 HKLM,"Software\Microsoft\Windows\CurrentVersion\RunOnce",USOSWelcome,,"%25%\rundll.exe setupx.dll,InstallHinfSection USOS.NoWelcome 4 %10%\msbatch.inf"

@@ -24,6 +24,12 @@ ALLOWED_IMPORTS = {'KERNEL32.DLL', 'USER32.DLL', 'ADVAPI32.DLL'}
 
 
 def openwatcom386() -> Path:
+    override = os.environ.get('USOS_WATCOM')
+    if override:
+        home = Path(override)
+        if not (home / 'binnt64/wcc386.exe').is_file() or not (home / 'lib386/nt/kernel32.lib').is_file():
+            raise ValueError('USOS_WATCOM lacks wcc386 or NT import libraries')
+        return home
     home = OW_CACHE / ('ow386-' + OW_SNAPSHOT['sha256'][:12])
     if (home / 'binnt64/wcc386.exe').is_file() and (home / 'lib386/nt/kernel32.lib').is_file():
         return home
@@ -110,6 +116,7 @@ def build(out: Path | None = None) -> Path:
     work.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, WATCOM=str(ow), INCLUDE=f'{ow / "h"};{ow / "h/nt"}',
                PATH=str(ow / 'binnt64') + os.pathsep + os.environ.get('PATH', ''))
+    env['TEMP'] = env['TMP'] = str(work)
     objs = []
     for name in SOURCES:
         # The runner calls the ANSI API: Polish strings are written as cp1250

@@ -40,7 +40,7 @@ def fail(msg: str) -> None:
 
 
 def build_host() -> Path:
-    zig = ROOT / 'tools/zig/zig.exe'
+    zig = Path(os.environ.get('USOS_ZIG', ROOT / 'tools/zig/zig.exe'))
     if not zig.is_file():
         zig = Path('zig')
     out_dir = ROOT / 'tools/tests/artifacts/addons'
@@ -249,7 +249,7 @@ def test_staging(m: lm.Manifest) -> None:
 
 def test_target_build() -> None:
     ow = ROOT / 'tools/cache/openwatcom/ow-snapshot-2026-09-01.tar.xz'
-    if not ow.is_file() and not (ROOT / 'tools/cache/buildkit-downloads/ow-snapshot-2026-09-01.tar.xz').is_file():
+    if not os.environ.get('USOS_WATCOM') and not ow.is_file() and not (ROOT / 'tools/cache/buildkit-downloads/ow-snapshot-2026-09-01.tar.xz').is_file():
         print('[SKIP] target build (no OpenWatcom snapshot in tools/cache)')
         return
     import build_usosadd

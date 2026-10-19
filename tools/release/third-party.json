@@ -1645,7 +1645,7 @@
     {
       "id": "microsoft-legacy-pack-redist",
       "name": "Microsoft redistributables of the Windows 95/98/Me/NT 4.0 compatibility pack",
-      "version": "DirectX 8.0 PL, DirectX 9.0c (December 2006), Windows Installer 2.0 (A/W), MDAC 2.8 SP1 PL, VB6 SP6 runtime, VC++ 6.0 SP6 runtime, MSLU 1.1.3790, .NET Framework 2.0 + PL, .NET Framework 1.1 + PL + SP1",
+      "version": "DirectX 8.0 PL, DirectX 9.0c (December 2006), Windows Installer 2.0 (A/W), MDAC 2.8 SP1 PL, VB6 SP6 runtime, VC++ 6.0 SP6 runtime, MSLU 1.1.3790, .NET Framework 2.0 + PL, .NET Framework 1.1 + PL + SP1; IE, DCOM, DUN, WMP and NT4 SP6a/SRP per manifest",
       "license": "LicenseRef-Microsoft-redistributed-by-user",
       "modified": false,
       "ships_in": [
@@ -1658,7 +1658,7 @@
         "offer": false,
         "urls": []
       },
-      "notice": "Original Microsoft redistributable installers, unmodified, in the release asset USOS-<version>-Legacy-pack-MS.zip (Addons/USOS/MS; embedded in the full installer, downloaded by the online one, SHA-256 pinned). Microsoft property, not covered by any USOS licence. Their redistribution terms allow them with an application that uses them; USOS ships them as a stand-alone pack by the maintainer's decision of 2026-09-30 (preservation: the original downloads are gone and archives may disappear), at the maintainer's own risk; removed on request of the rights holder. List of files and SHA-256: src/addons/legacy-pack.ini (source=release)."
+      "notice": "Original Microsoft installers, unmodified, assigned to the separate release asset USOS-<version>-Legacy-pack-MS.zip (Addons/USOS/MS; embedded in the full installer, downloaded by the online one, SHA-256 pinned). Microsoft property, not covered by any USOS licence. The maintainer's 2026-09-30 decision covers the original runtimes; the 2026-10-20 decision adds IE, DCOM, DUN, WMP and NT4 SP6a/SRP. Those decisions do not establish redistribution permission; per-file terms still apply. Kept at the maintainer's own risk for preservation, removed on request of the rights holder. No asset was built in the 2026-10-20 integration task. Files, classifications and SHA-256: src/addons/legacy-pack.ini (source=release)."
     },
     {
       "id": "microsoft-xp-driver-bundles",

@@ -55,6 +55,9 @@ pub const Field = enum {
     no_network_oobe,
     protect_pc,
     network_location,
+    addons_preset,
+    addons_options,
+    addons_exclude,
     disable_wer,
     edition,
     systems,
@@ -258,6 +261,9 @@ pub const Profile = struct {
     protect_pc: ProtectPc = .off,
     /// Vista/7: answer of the network location page (Work: no HomeGroup).
     network_location: NetworkLocation = .work,
+    addons_preset: @import("addons_profile.zig").Preset = .praca,
+    addons_options: Text(512) = .{},
+    addons_exclude: Text(512) = .{},
     /// Vista+: Windows Error Reporting off (ErrorReportingCore/DisableWER).
     disable_wer: bool = false,
     /// Systems that offer this profile (applies.zig): normalized, lower
@@ -654,6 +660,8 @@ pub fn checkName(value: []const u8) ?Problem {
 
 /// The first problem of a complete profile (null: valid).
 pub fn validate(p: *const Profile) ?Issue {
+    if (!@import("addons_profile.zig").validList(p.addons_options.slice())) return .{ .field = .addons_options, .problem = .bad_choice };
+    if (!@import("addons_profile.zig").validList(p.addons_exclude.slice())) return .{ .field = .addons_exclude, .problem = .bad_choice };
     if (checkName(p.name.slice())) |problem| return .{ .field = .name, .problem = problem };
     if (checkAccount(p.user.slice())) |problem| return .{ .field = .user, .problem = problem };
     if (p.user2.len > 0) {
@@ -865,6 +873,12 @@ fn applyField(p: *Profile, name: []const u8, value: []const u8) ?Issue {
             p.edition.set(value) catch return .{ .field = field, .problem = .too_long };
         },
         .protect_pc => p.protect_pc = enumByName(ProtectPc, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .addons_preset => p.addons_preset = enumByName(@import("addons_profile.zig").Preset, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .addons_options, .addons_exclude => {
+            if (!@import("addons_profile.zig").validList(value)) return .{ .field = field, .problem = .bad_choice };
+            const target = if (field == .addons_options) &p.addons_options else &p.addons_exclude;
+            target.set(value) catch return .{ .field = field, .problem = .too_long };
+        },
         .network_location => p.network_location = enumByName(NetworkLocation, value) orelse return .{ .field = field, .problem = .bad_choice },
         .theme => p.theme = enumByName(Theme, value) orelse return .{ .field = field, .problem = .bad_choice },
         .display => p.display = if (value.len == 0) .auto else enumByName(Display, value) orelse return .{ .field = field, .problem = .bad_choice },
@@ -915,10 +929,13 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
         for (p.system_keys[0..p.system_key_count]) |*entry| try w.print("key.{s}={s}\r\n", .{ entry.system.slice(), entry.key.slice() });
     }
     try w.print("manual_disk={s}\r\nlocal_account={s}\r\nbypass_tpm={s}\r\nbypass_secure_boot={s}\r\nbypass_ram={s}\r\nno_network_oobe={s}\r\n", .{
-        boolText(p.manual_disk),   boolText(p.local_account), boolText(p.bypass_tpm),
-        boolText(p.bypass_secure_boot), boolText(p.bypass_ram), boolText(p.no_network_oobe),
+        boolText(p.manual_disk),        boolText(p.local_account), boolText(p.bypass_tpm),
+        boolText(p.bypass_secure_boot), boolText(p.bypass_ram),    boolText(p.no_network_oobe),
     });
     try w.print("protect_pc={s}\r\nnetwork_location={s}\r\ndisable_wer={s}\r\n", .{ @tagName(p.protect_pc), @tagName(p.network_location), boolText(p.disable_wer) });
+    if (p.addons_preset != .praca) try w.print("addons_preset={s}\r\n", .{@tagName(p.addons_preset)});
+    if (p.addons_options.len > 0) try w.print("addons_options={s}\r\n", .{p.addons_options.slice()});
+    if (p.addons_exclude.len > 0) try w.print("addons_exclude={s}\r\n", .{p.addons_exclude.slice()});
     try w.print("edition={s}\r\n", .{p.edition.slice()});
     for (p.system_editions[0..p.system_edition_count]) |*entry| try w.print("edition.{s}={s}\r\n", .{ entry.system.slice(), entry.edition.slice() });
     // Written only when set: a profile without them stays readable by the
@@ -1003,6 +1020,20 @@ pub fn importXpIni(text: []const u8, out: *Profile) ?ParseResult {
 }
 
 // ------------------------------------------------------------ tests
+
+test "legacy pack choices round trip and reject commands or unknown presets" {
+    var p = Profile{};
+    try std.testing.expect(parse("name=Pack\nuser=Tester\naddons_preset=retro\naddons_options=kernelex,rdp51-pl\naddons_exclude=dotnet20\n", &p) == .ok);
+    var buffer: [8192]u8 = undefined;
+    const text = try write(&p, &buffer);
+    var q = Profile{};
+    try std.testing.expect(parse(text, &q) == .ok);
+    try std.testing.expect(q.addons_preset == .retro);
+    try std.testing.expectEqualStrings("kernelex,rdp51-pl", q.addons_options.slice());
+    try std.testing.expectEqualStrings("dotnet20", q.addons_exclude.slice());
+    try std.testing.expect(parse("name=Pack\nuser=Tester\naddons_options=x&cmd\n", &q) == .invalid);
+    try std.testing.expect(parse("name=Pack\nuser=Tester\naddons_preset=unknown\n", &q) == .invalid);
+}
 
 test "profile round trip keeps every field; keys only with remember_key" {
     var p = Profile{};
@@ -1211,4 +1242,3 @@ test "product key: typing inserts the dashes, backspace over a dash removes the 
     while (len > 0) len = keyBackspace(&buf, len);
     try std.testing.expectEqual(@as(usize, 0), keyBackspace(&buf, 0));
 }
-
