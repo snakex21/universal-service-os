@@ -711,7 +711,7 @@ static void show_vmd(void)
     wsprintf(line(), "VMD  BIOS callbacks:%lu  from a DOS VM:%lu  last VM %08lX (system VM %08lX)  last %02X %02X %02X %02X  posted:%lu  own ring full:%lu  shared ring put:%lu full:%lu  ticks:%lu",
              x->callbacks, x->foreign, x->last_vm, x->sys_vm, (WORD)x->last[0], (WORD)x->last[1], (WORD)x->last[2], (WORD)x->last[3],
              x->posted, x->own_drop, x->shared_put, x->shared_drop, x->ticks);
-    wsprintf(line(), "VMD  err bits: 1 no V86 callback  2 VMOUSE had a mouse at init  4 bad block  8 type changed later  10 own ring full  20 shared ring full  40 VMOUSE absent");
+    wsprintf(line(), "VMD  err bits: 1 no V86 callback  2 VMOUSE had a mouse at init  4 bad block  8 type changed later  10 own ring full  20 shared ring full  40 VMOUSE absent  80 DDB tail damaged (v3)");
 }
 
 static void show_ivt(void)

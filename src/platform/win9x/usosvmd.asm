@@ -25,6 +25,20 @@
 ; packet words are read from that VM's stack through its own high linear
 ; mapping, so no V86 code in any private memory is ever run for the mouse.
 ;
+; Version 3 (2026-10-19), after a Windows Me boot bluescreen on the X470
+; ("VMM(01) + 00009676 Error 0E : 0028 : C000A676"):
+;   - the DDB is the full 0x50-byte 4.0 VxD_Desc_Block. v2 stopped at
+;     DDB_Service_Table_Size and kept its status block at DDB+38h, so
+;     Device_Init wrote the VMOUSE version over DDB_Prev (+3Ch), the chain
+;     VMM walks backwards for its reverse-order control messages; VMM then
+;     called "[garbage+18h]" (confirmed in Me's VMM: object 1 + 963Fh walks
+;     DDB_Prev, + 9676h is the call through DDB_Control_Proc);
+;   - the V86 callback reads the arguments above SeaBIOS's far return
+;     address and returns with Simulate_Far_Ret (VMM does not do it; v2
+;     would have re-run the breakpoint for ever on the first packet);
+;   - Init_Complete and every time-out check that VMM-visible DDB fields we
+;     own (DDB_Size, DDB_Reserved1..3) are intact (err bit 80h otherwise).
+;
 ; Per packet the callback
 ;   - queues it in this driver's own ring (posted to VMOUSE from a 20 ms
 ;     global time-out with VMD_Post_Pointer_Message: buttons mapped to the
@@ -48,7 +62,7 @@
 ; state is in the status block for USOSDBG.
 ;
 ; PM API (INT 2Fh AX=1684h BX=0 ES:DI -> "USOSVMD "), AX = function:
-;   0  status: AX='UV', BX=version 0200h, CX=callbacks (low word),
+;   0  status: AX='UV', BX=version 0300h, CX=callbacks (low word),
 ;      DX=mode (0 VMOUSE absent, 1 minidriver, 2 observer)
 ;   1  attach: BX:CX = segment:offset of USOSKEY's shared block in the
 ;      system VM. Checks magic and version, then returns AX='UV',
@@ -61,7 +75,12 @@
 ; VMM services, callbacks and Client_Reg_Struc; MOUSE.DOC: the VMOUSE
 ; minidriver model; INC32\VMM.INC / VMD.INC: service numbers and layouts).
 ; No Microsoft code is copied or linked (own DDB and control proc, INT 20h
-; service dispatch only). OpenWatcom wasm + wlink, tools/build_win3_usb_
+; service dispatch only). The version 3 fixes also rest on a behaviour
+; analysis of Microsoft binaries supplied by the user (Windows Me's VMM in
+; VMM32.VXD: the DDB_Prev reverse walk and the V86 callback dispatcher; the
+; Windows 98 SE DDK debug VMOUSE.VXD: its BIOS-mouse callback ends with
+; Simulate_Far_Ret, VMD_Get/Set_Mouse_Data work on static data); only the
+; facts were taken, no code. OpenWatcom wasm + wlink, tools/build_win3_usb_
 ; keyboard.py. Host test: tools/tests/legacy_bios/test_usosvmd.py.
 ;*****************************************************************************
 
@@ -82,6 +101,7 @@ Get_Sys_VM_Handle       equ 03h
 Allocate_V86_Call_Back  equ 0Bh
 Map_Flat                equ 1Ch
 Set_Global_Time_Out     equ 3Ch
+Simulate_Far_Ret        equ 4Ah
 
 ; VMOUSE (VMD) service ordinals (public DDK VMD.INC service table order)
 VMD_Get_Version                 equ 00h
@@ -125,6 +145,18 @@ POLL_MS                 equ 20
 ; which sets up its data, has run by then: every device's Sys_Critical_Init
 ; comes before any Device_Init). If VMOUSE clears the type again during its
 ; init, check_type claims it once more (type 0 is "no mouse").
+; Re-checked for v3 (the Me bluescreen was the DDB, not this order): in the
+; 98 SE DDK debug VMOUSE, VMD_Get_Mouse_Data only reads static (load-time
+; initialised) data, so calling it and VMD_Set_Mouse_Data before VMOUSE's
+; Device_Init touches no state VMOUSE builds later; VMOUSE's own BIOS-mouse
+; (PS/2) setup sits in its PS2_Device_Init path. The documented minidriver
+; point (MOUSE README: detect at Device_Init, Undefined order; VMD.INC:
+; VMOUSE searches for mice itself "by the start of Init_Complete" when none
+; was set) would also be before that search, but not provably before
+; PS2_Device_Init, so the order stays. IRQ: VMD_Set_Mouse_Data's AL is
+; information only (Int 33h function 24h reports it; no documented "none"
+; value, 0 is what Int 33h reports for a PS/2 mouse); this driver
+; virtualises no IRQ (MIF_NoIRQ in its Mouse_Instance).
 VMD_INIT_ORDER          equ 34000000h
 
 ; mode
@@ -140,6 +172,7 @@ ERR_TYPE_CHANGED        equ 0008h       ; VMOUSE's mouse type changed later
 ERR_RING_FULL           equ 0010h       ; own ring overflowed at least once
 ERR_SHARED_FULL         equ 0020h       ; the shared ring was full at least once
 ERR_NO_VMOUSE           equ 0040h       ; VMD_Get_Version: VMOUSE absent
+ERR_DDB_DAMAGED         equ 0080h       ; DDB_Size / DDB_Reserved1..3 changed
 
 ; USOSKEY.COM shared block layout (byte-exact, src/platform/bios/msdos/
 ; usoskey.S; checked by tools/tests/legacy_bios/test_usosvmd.py).
@@ -165,7 +198,7 @@ USOSVMD_DDB label dword
         dd      0                       ; DDB_Next
         dw      400h                    ; DDB_SDK_Version (DDK 4.0)
         dw      0                       ; DDB_Req_Device_Number = Undefined
-        db      2                       ; DDB_Dev_Major_Version
+        db      3                       ; DDB_Dev_Major_Version
         db      0                       ; DDB_Dev_Minor_Version
         dw      0                       ; DDB_Flags
         db      'USOSVMD '              ; DDB_Name (8 chars)
@@ -178,12 +211,32 @@ USOSVMD_DDB label dword
         dd      0                       ; DDB_Reference_Data
         dd      0                       ; DDB_Service_Table_Ptr
         dd      0                       ; DDB_Service_Table_Size
+        ; --- the rest of the 4.0 VxD_Desc_Block (public DDK VMM.INC). VMM
+        ; owns these fields: it links every 4.0 DDB backwards through
+        ; DDB_Prev after loading the static VxDs and walks that chain for
+        ; the reverse-order control messages (Destroy_Thread, Destroy_VM2,
+        ; End_PM_App2, ...). v2 ended the DDB here and kept its status
+        ; block at +38h, so Device_Init overwrote DDB_Prev with the VMOUSE
+        ; version and type bytes and Windows Me faulted in VMM's reverse
+        ; walk ("VMM(01) + 00009676 Error 0E", 2026-10-19 X470). Nothing in
+        ; this driver writes these 0x18 bytes.
+        dd      0                       ; DDB_Win32_Service_Table
+        dd      'Prev'                  ; DDB_Prev (VMM fills it in)
+        dd      DDB_SIZE_40             ; DDB_Size
+        dd      'Rsv1'                  ; DDB_Reserved1
+        dd      'Rsv2'                  ; DDB_Reserved2
+        dd      'Rsv3'                  ; DDB_Reserved3
+USOSVMD_DDB_END label byte
+DDB_SIZE_40     equ     50h
 
 ; --- status block (PM API function 2; USOSDBG "VMD" lines) ---
+; Our own data from here on, after the 0x50-byte DDB (checked by
+; tools/tests/legacy_bios/test_usosvmd.py: every written symbol lies at or
+; after USOSVMD_DDB + 50h).
         public  status
 status label byte
 st_sig          dw      5655h           ; +0  'UV'
-st_version      db      2               ; +2
+st_version      db      3               ; +2
 st_mode         db      MODE_NONE       ; +3
 st_vmd_version  dw      0               ; +4  VMOUSE version (AH.AL)
 st_type_init    db      0FFh            ; +6  VMOUSE mouse type at Device_Init (FF = not asked)
@@ -233,7 +286,7 @@ _LDATA ends
 ;=============================== code ========================================
 _LTEXT segment dword public use32 'LCODE'
 
-        public  drain, v86_cb, dev_init_proc, check_type, api_attach
+        public  drain, v86_cb, dev_init_proc, check_type, api_attach, ddb_check, timer_cb
 
 ;--- Device_Init: VMOUSE present? claim its mouse data; allocate the callback
 dev_init_proc proc near
@@ -288,6 +341,23 @@ claim proc near
         ret
 claim endp
 
+;--- our DDB's tail still as declared? (Init_Complete and every time-out) --
+; Read only: DDB_Prev (+3Ch) belongs to VMM and is not looked at.
+ddb_check proc near
+        cmp     dword ptr [USOSVMD_DDB+40h], DDB_SIZE_40
+        jne     dc_bad
+        cmp     dword ptr [USOSVMD_DDB+44h], 'Rsv1'
+        jne     dc_bad
+        cmp     dword ptr [USOSVMD_DDB+48h], 'Rsv2'
+        jne     dc_bad
+        cmp     dword ptr [USOSVMD_DDB+4Ch], 'Rsv3'
+        je      dc_ok
+dc_bad:
+        or      word ptr [st_err], ERR_DDB_DAMAGED
+dc_ok:
+        ret
+ddb_check endp
+
 ;--- is VMOUSE's mouse still ours? (Init_Complete and every time-out) -------
 ; A different type (another minidriver or VMOUSE's own PS/2 code took the
 ; mouse) switches to observer for good: no posting, no duplicate motion.
@@ -322,8 +392,17 @@ check_type endp
 
 ;--- the V86 callback: SeaBIOS far-called the C207h handler ---------------
 ; Entry (DDK): EBX = current VM, EDX = reference data, EBP -> client regs.
-; VMM has already simulated the far return, so Client_SS:SP points at the
-; handler's arguments: [SP] Z, [SP+2] Y, [SP+4] X, [SP+6] status.
+; VMM's V86 breakpoint dispatcher does NOT simulate the far return (checked
+; in Windows Me's VMM and in the way VMOUSE's own BIOS-mouse callback ends,
+; 2026-10-19; v2 wrongly assumed it did): Client_CS:IP is still the
+; breakpoint and Client_SS:SP points at SeaBIOS's far return address, so
+; the handler's arguments are [SP+4] Z, [SP+6] Y, [SP+8] X, [SP+0Ah] status,
+; and this procedure ends with Simulate_Far_Ret (without it the VM would
+; re-execute the breakpoint for ever).
+ARG_Z                   equ 4
+ARG_Y                   equ 6
+ARG_X                   equ 8
+ARG_STATUS              equ 0Ah
 v86_cb proc near
         pushad
         inc     dword ptr [st_callbacks]
@@ -338,10 +417,10 @@ cb_sys:
         movzx   eax, word ptr [ebp+Client_ESP]
         add     esi, eax
         add     esi, [ebx+CB_High_Linear]
-        mov     cl, [esi+6]             ; status
-        mov     ch, [esi+4]             ; X
-        mov     dl, [esi+2]             ; Y
-        mov     dh, [esi]               ; Z (wheel, 0 without)
+        mov     cl, [esi+ARG_STATUS]    ; status
+        mov     ch, [esi+ARG_X]         ; X
+        mov     dl, [esi+ARG_Y]         ; Y
+        mov     dh, [esi+ARG_Z]         ; Z (wheel, 0 without)
         mov     [st_last_pkt], cl
         mov     [st_last_pkt+1], ch
         mov     [st_last_pkt+2], dl
@@ -399,6 +478,8 @@ cb_sh_put:
         inc     dword ptr [st_shared_put]
 cb_done:
         popad
+        ; back to SeaBIOS's far call (EBP -> client regs, restored above)
+        VxDcall VMM_ID, Simulate_Far_Ret
         ret
 v86_cb endp
 
@@ -457,6 +538,7 @@ drain endp
 timer_cb proc near
         pushad
         inc     dword ptr [st_ticks]
+        call    ddb_check
         call    check_type
         call    drain
         popad
@@ -484,6 +566,7 @@ c_devinit:
         ret
 c_initcomplete:
         pushad
+        call    ddb_check
         call    check_type
         cmp     byte ptr [st_mode], MODE_NONE
         je      ic_done
@@ -544,7 +627,7 @@ USOSVMD_PM_API proc near
         jmp     api_fail
 api_status:
         mov     word ptr [ebp+Client_EAX], 5655h        ; 'UV'
-        mov     word ptr [ebp+Client_EBX], 0200h
+        mov     word ptr [ebp+Client_EBX], 0300h
         mov     eax, [st_callbacks]
         mov     word ptr [ebp+Client_ECX], ax
         movzx   eax, byte ptr [st_mode]

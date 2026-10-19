@@ -1,15 +1,21 @@
-"""USOSVMD.VXD v2 - the Windows 9x VMOUSE mouse minidriver that gives MS-DOS
+"""USOSVMD.VXD v3 - the Windows 9x VMOUSE mouse minidriver that gives MS-DOS
 boxes an Int 33h mouse (docs/dos-mouse-2026-10-18.md). Checks:
 
   * the shared-block offsets the VxD hard-codes match usoskey.S (version 4);
-  * the built file is a valid LE VxD with the USOSVMD DDB (SDK 4.0, v2) and
+  * the built file is a valid LE VxD with the USOSVMD DDB (SDK 4.0, v3) and
     makes exactly the documented VMM / VMOUSE service calls;
+  * the DDB is the full 0x50-byte 4.0 VxD_Desc_Block ('Prev', DDB_Size 50h,
+    'Rsv1'..'Rsv3') and no instruction writes into it: v2 kept its status
+    block at DDB+38h and overwrote DDB_Prev, which Windows Me's VMM walks for
+    reverse-order control messages (the X470 bluescreen VMM(01)+9676);
   * emulated at ring 0 (Unicorn, 32-bit):
       - Device_Init claims VMOUSE's mouse data only when VMOUSE has none
         (otherwise "observer": never posts), allocates the V86 callback,
         and does nothing without VMOUSE;
       - the V86 callback (what SeaBIOS far-calls for INT 15h C207h) reads
-        the packet from the stack of WHATEVER VM was current through that
+        the packet above the far return address (VMM does not simulate the
+        far return) and ends with Simulate_Far_Ret, from the stack of
+        WHATEVER VM was current through that
         VM's high linear mapping, counts calls from DOS VMs, queues for
         VMOUSE and copies into the system VM's shared ring through the
         system VM's mapping (the Me callback hazard fix: no V86 code in
@@ -25,10 +31,12 @@ import struct
 import sys
 import unittest
 
+import capstone
+from capstone import x86 as cx86
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_INTR
 from unicorn.x86_const import (UC_X86_REG_EIP, UC_X86_REG_ESP, UC_X86_REG_EAX,
                                UC_X86_REG_EBX, UC_X86_REG_ESI, UC_X86_REG_EDI,
-                               UC_X86_REG_EDX, UC_X86_REG_EFLAGS)
+                               UC_X86_REG_EDX, UC_X86_REG_EFLAGS, UC_X86_REG_EBP)
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -122,6 +130,7 @@ class Vxd:
         self.vmd_version, self.mouse_type, self.alloc_ok = vmd_version, mouse_type, alloc_ok
         self.calls, self.posts, self.set_data = [], [], []
         self.map_flat = 0
+        self.far_rets = []
         u.hook_add(UC_HOOK_INTR, self.on_intr)
 
     def on_intr(self, uc, n, data):
@@ -152,6 +161,8 @@ class Vxd:
                 fl |= 1
         elif (dev, svc) == (0xc, 0x03):             # VMD_Post_Pointer_Message
             self.posts.append((r(UC_X86_REG_EAX) & 0xff, r(UC_X86_REG_ESI), r(UC_X86_REG_EDI), r(UC_X86_REG_EDX)))
+        elif (dev, svc) == (1, 0x4A):               # Simulate_Far_Ret (EBP -> client regs)
+            self.far_rets.append(r(UC_X86_REG_EBP))
         elif (dev, svc) == (1, 0x1C):               # Map_Flat
             self.map_ax = r(UC_X86_REG_EAX) & 0xFFFF
             uc.reg_write(UC_X86_REG_EAX, self.map_flat)
@@ -194,9 +205,10 @@ class Vxd:
         return struct.unpack_from('<H', bytes(self.u.mem_read(CRS + off, 2)))[0]
 
     def bios_call(self, vm_cb, high, status, dx, dy, z, ss=0x1500, sp=0x03E0):
-        """SeaBIOS far-called the callback in VM vm_cb: after VMM's simulated
-        far return SS:SP points at Z, Y, X, status."""
-        self.u.mem_write(high + ss * 16 + sp, struct.pack('<HHHH', z, dy, dx, status))
+        """SeaBIOS far-called the callback in VM vm_cb: VMM's breakpoint
+        dispatcher leaves Client SS:SP at SeaBIOS's far return address
+        (IP, CS); the arguments Z, Y, X, status follow."""
+        self.u.mem_write(high + ss * 16 + sp, struct.pack('<HHHHHH', 0x1234, 0xF000, z, dy, dx, status))
         self.client(ss=ss, esp=sp)
         self.run('v86_cb', ebx=vm_cb, ebp=CRS, edx=0)
 
@@ -264,16 +276,95 @@ class UsosVmd(unittest.TestCase):
         i = b.find(b'USOSVMD ')
         ddb = i - 12
         self.assertEqual(struct.unpack_from('<H', b, ddb + 4)[0], 0x400)      # SDK 4.0
-        self.assertEqual(b[ddb + 8], 2)                                       # version 2
+        self.assertEqual(b[ddb + 8], 3)                                       # version 3
         self.assertEqual(struct.unpack_from('<I', b, ddb + 20)[0], 0x34000000 - 1)  # just before VMOUSE
         self.assertEqual(struct.unpack_from('<I', b, ddb + 32)[0], self.sym['USOSVMD_PM_API'])
+
+    def test_ddb_is_the_full_40_block(self):
+        b = self.img
+        ddb = self.sym['USOSVMD_DDB'] - BASE
+        self.assertEqual(b[ddb + 12:ddb + 20], b'USOSVMD ')
+        u32 = lambda o: struct.unpack_from('<I', b, ddb + o)[0]
+        self.assertEqual(u32(0x38), 0)                       # DDB_Win32_Service_Table
+        self.assertEqual(b[ddb + 0x3C:ddb + 0x40], b'verP')  # DDB_Prev = MASM dd 'Prev'
+        self.assertEqual(u32(0x40), 0x50)                    # DDB_Size
+        self.assertEqual(b[ddb + 0x44:ddb + 0x50], b'1vsR2vsR3vsR')   # 'Rsv1'..'Rsv3', bytes as in Me VMM's own DDB
+        self.assertGreaterEqual(self.sym['status'], self.sym['USOSVMD_DDB'] + 0x50)
+
+    def test_nothing_writes_into_the_ddb(self):
+        """Every instruction that writes an absolute memory operand
+        (mov/inc/or/and ... [abs]) targets our own data at DDB+50h or later;
+        the DDB is only read (ddb_check). The only other writes go through
+        registers: the client registers / client stack (EBP, VMM's), the
+        shared block (attach-checked) and rep movsb into Map_Flat's buffer."""
+        md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
+        md.detail = True
+        ddb, end = self.sym['USOSVMD_DDB'], self.sym['USOSVMD_DDB'] + 0x50
+        img = self.img
+        off, writes, reads = self.sym['dev_init_proc'] - BASE, [], []
+        while off < len(img):
+            if img[off:off + 2] == b'\xcd\x20':              # INT 20h + service dword
+                off += 6
+                continue
+            ins = next(md.disasm(img[off:off + 15], BASE + off), None)
+            if ins is None:
+                off += 1
+                continue
+            for op in ins.operands:
+                if op.type == cx86.X86_OP_MEM and op.mem.base == 0 and op.mem.index == 0 \
+                        and BASE <= op.mem.disp < BASE + len(img):
+                    (writes if op.access & capstone.CS_AC_WRITE else reads).append((ins.address, ins.mnemonic, op.mem.disp))
+            off += ins.size
+        self.assertGreater(len(writes), 20)
+        bad = [(hex(a), m, hex(d)) for a, m, d in writes if d < end]
+        self.assertEqual(bad, [])
+        self.assertTrue(any(ddb + 0x40 <= d < end for _, _, d in reads))      # ddb_check reads it
+
+    def test_ddb_untouched_after_a_session(self):
+        """VMM fills DDB_Prev in after loading; Device_Init, Init_Complete,
+        attach, callbacks, time-outs and the PM API must leave all 0x50
+        bytes as VMM left them (the Me bluescreen)."""
+        v = Vxd(self.img, self.sym, vmd_version=0x040A)
+        ddb = self.sym['USOSVMD_DDB']
+        v.u.mem_write(ddb + 0x3C, struct.pack('<I', 0xC0012340))  # VMM's Prev link
+        before = bytes(v.u.mem_read(ddb, 0x50))
+        v.run('USOSVMD_Control', eax=1)                           # Device_Init
+        v.run('USOSVMD_Control', eax=2)                           # Init_Complete
+        v.make_block()
+        v.client(eax=1, ebx=BLK_SEG, ecx=BLK_OFF, eflags=0x202)
+        v.run('USOSVMD_PM_API', ebp=CRS)
+        for i in range(70):
+            v.bios_call(DOSCB if i & 1 else SYSCB, DOS_HIGH if i & 1 else SYS_HIGH, 0x09, 5, 3, 0xFF)
+        v.run('timer_cb')
+        v.map_flat = 0x700000
+        v.client(eax=2)
+        v.run('USOSVMD_PM_API', ebp=CRS)
+        self.assertEqual(bytes(v.u.mem_read(ddb, 0x50)), before)
+        self.assertEqual(v.st('err', 2) & 0x80, 0)
+        self.assertEqual(v.st('mode'), 1)
+        self.assertEqual(v.st('callbacks', 4), 70)
+
+    def test_ddb_check_flags_damage(self):
+        v = Vxd(self.img, self.sym)
+        v.run('ddb_check')
+        self.assertEqual(v.st('err', 2), 0)
+        v.u.mem_write(self.sym['USOSVMD_DDB'] + 0x40, struct.pack('<I', 0x38))
+        v.run('ddb_check')
+        self.assertEqual(v.st('err', 2), 0x80)
+
+    def test_callback_returns_with_simulate_far_ret(self):
+        v = self.ready()
+        v.calls.clear()
+        v.bios_call(SYSCB, SYS_HIGH, 0x09, 5, 3, 0xFF)
+        self.assertEqual(v.calls[-1], (1, 0x4A))              # the last thing it does
+        self.assertEqual(v.far_rets, [CRS])                   # with EBP -> client regs
 
     def test_service_calls(self):
         # exactly the documented services: VMM Get_Sys_VM_Handle,
         # Allocate_V86_Call_Back, Map_Flat, Set_Global_Time_Out; VMOUSE
         # Get_Version, Post_Pointer_Message, Set_Mouse_Data, Get_Mouse_Data
         self.assertEqual(set(vxd_calls(self.img)),
-                         {(1, 0x03), (1, 0x0B), (1, 0x1C), (1, 0x3C),
+                         {(1, 0x03), (1, 0x0B), (1, 0x1C), (1, 0x3C), (1, 0x4A),
                           (0xc, 0x00), (0xc, 0x03), (0xc, 0x06), (0xc, 0x07)})
 
     # --- Device_Init ---------------------------------------------------------
@@ -453,13 +544,13 @@ class UsosVmd(unittest.TestCase):
         self.assertEqual(v.client_word(0x2C) & 1, 0)           # CF clear
         v.client(eax=0)
         v.run('USOSVMD_PM_API', ebp=CRS)
-        self.assertEqual((v.client_word(0x1C), v.client_word(0x10), v.client_word(0x14)), (0x5655, 0x0200, 1))
+        self.assertEqual((v.client_word(0x1C), v.client_word(0x10), v.client_word(0x14)), (0x5655, 0x0300, 1))
         v.map_flat = 0x700000
         v.client(eax=2)
         v.run('USOSVMD_PM_API', ebp=CRS)
         self.assertEqual(v.map_ax, 0x3800)                     # Client_ES : Client_DI
         self.assertEqual(v.client_word(0x18), 64)
-        self.assertEqual(bytes(v.u.mem_read(0x700000, 4)), b'UV\x02\x01')
+        self.assertEqual(bytes(v.u.mem_read(0x700000, 4)), b'UV\x03\x01')               # v3, minidriver
         v.client(eax=7)
         v.run('USOSVMD_PM_API', ebp=CRS)
         self.assertEqual(v.client_word(0x2C) & 1, 1)           # unknown function: CF set
