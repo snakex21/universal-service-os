@@ -100,7 +100,7 @@
   "installer.reason.no_serial": "laite ei ilmoita uudelleentarkistukseen tarvittavaa sarjanumeroa",
   "installer.reason.spanned_volume": "levy kuuluu taltioon, joka ulottuu useammalle levylle",
   "installer.reason.not_removable": "laite ei ilmoita RemovableMedia-lippua",
-  "installer.reason.too_small": "laite on pienempi kuin vaaditut 32 GB",
+  "installer.reason.too_small": "laite on pienempi kuin vaaditut 16 GB",
   "installer.reason.unreadable": "ei luettavissa",
   "installer.reason.unreadable_detail": "ei luettavissa: %s",
 

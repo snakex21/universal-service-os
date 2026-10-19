@@ -100,7 +100,7 @@
   "installer.reason.no_serial": "o dispositivo não informa o número de série necessário para a revalidação",
   "installer.reason.spanned_volume": "o disco pertence a um volume que abrange mais de um disco",
   "installer.reason.not_removable": "o dispositivo não informa o sinalizador RemovableMedia",
-  "installer.reason.too_small": "o dispositivo é menor que os 32 GB exigidos",
+  "installer.reason.too_small": "o dispositivo é menor que os 16 GB exigidos",
   "installer.reason.unreadable": "ilegível",
   "installer.reason.unreadable_detail": "ilegível: %s",
 

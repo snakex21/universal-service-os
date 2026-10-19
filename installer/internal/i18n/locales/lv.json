@@ -102,7 +102,7 @@
   "installer.reason.no_serial": "ierīce neziņo sērijas numuru, kas nepieciešams atkārtotai pārbaudei",
   "installer.reason.spanned_volume": "disks ietilpst sējumā, kas aptver vairāk nekā vienu disku",
   "installer.reason.not_removable": "ierīce neziņo RemovableMedia karogu",
-  "installer.reason.too_small": "ierīce ir mazāka par nepieciešamajiem 32 GB",
+  "installer.reason.too_small": "ierīce ir mazāka par nepieciešamajiem 16 GB",
   "installer.reason.unreadable": "nav nolasāms",
   "installer.reason.unreadable_detail": "nav nolasāms: %s",
 

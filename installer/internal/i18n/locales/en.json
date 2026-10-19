@@ -100,7 +100,7 @@
   "installer.reason.no_serial": "the device does not report the serial number required for revalidation",
   "installer.reason.spanned_volume": "the disk belongs to a volume spanning more than one disk",
   "installer.reason.not_removable": "the device does not report the RemovableMedia flag",
-  "installer.reason.too_small": "the device is smaller than the required 32 GB",
+  "installer.reason.too_small": "the device is smaller than the required 16 GB",
   "installer.reason.unreadable": "not readable",
   "installer.reason.unreadable_detail": "not readable: %s",
 

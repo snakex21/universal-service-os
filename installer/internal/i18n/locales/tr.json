@@ -100,7 +100,7 @@
   "installer.reason.no_serial": "aygıt, yeniden doğrulama için gereken seri numarasını bildirmiyor",
   "installer.reason.spanned_volume": "disk, birden fazla diske yayılan bir birime ait",
   "installer.reason.not_removable": "aygıt RemovableMedia bayrağını bildirmiyor",
-  "installer.reason.too_small": "aygıt gereken 32 GB'tan küçük",
+  "installer.reason.too_small": "aygıt gereken 16 GB'tan küçük",
   "installer.reason.unreadable": "okunamıyor",
   "installer.reason.unreadable_detail": "okunamıyor: %s",
 

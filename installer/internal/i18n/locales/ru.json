@@ -102,7 +102,7 @@
   "installer.reason.no_serial": "устройство не сообщает серийный номер, необходимый для повторной проверки",
   "installer.reason.spanned_volume": "диск входит в том, охватывающий более одного диска",
   "installer.reason.not_removable": "устройство не сообщает флаг RemovableMedia",
-  "installer.reason.too_small": "устройство меньше требуемых 32 ГБ",
+  "installer.reason.too_small": "устройство меньше требуемых 16 ГБ",
   "installer.reason.unreadable": "не читается",
   "installer.reason.unreadable_detail": "не читается: %s",
 

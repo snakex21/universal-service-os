@@ -100,7 +100,7 @@
   "installer.reason.no_serial": "das Gerät meldet nicht die Seriennummer, die für die erneute Prüfung nötig ist",
   "installer.reason.spanned_volume": "der Datenträger gehört zu einem Volume, das sich über mehr als einen Datenträger erstreckt",
   "installer.reason.not_removable": "das Gerät meldet das Flag RemovableMedia nicht",
-  "installer.reason.too_small": "das Gerät ist kleiner als die erforderlichen 32 GB",
+  "installer.reason.too_small": "das Gerät ist kleiner als die erforderlichen 16 GB",
   "installer.reason.unreadable": "nicht lesbar",
   "installer.reason.unreadable_detail": "nicht lesbar: %s",
 

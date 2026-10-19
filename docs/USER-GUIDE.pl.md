@@ -37,10 +37,12 @@ dołącza żadnych obrazów Windows: przynosisz własne.
 
 ### Co jest potrzebne
 
-- **Pendrive USB o pojemności co najmniej 32 GiB.** Instalator odrzuca
-  mniejsze urządzenia. Uwaga: pendrive opisany na opakowaniu jako „32 GB”
-  ma zwykle trochę mniej niż 32 GiB i zostanie odrzucony. W praktyce
-  wybierz pendrive **64 GB lub większy**. Instalator przyjmuje tylko
+- **Pendrive USB opisany jako 16 GB lub większy.** Instalator odrzuca
+  urządzenia poniżej 14 000 000 000 bajtów (każdy pendrive sprzedawany
+  jako „16 GB” ma więcej). Pendrive 16 GB mieści USOS i około 7 GiB
+  obrazów (np. jedno ISO Windows 7); WORK zajmuje 6 GiB na pendrive'ach
+  poniżej 32 GiB i do 16 GiB na większych. Na kilka systemów wybierz
+  pendrive **64 GB lub większy**. Instalator przyjmuje tylko
   urządzenia zgłaszane przez Windows jako wymienne (flaga RemovableMedia);
   niektóre dyski USB SSD tego nie robią i nie pojawią się jako „Gotowe”.
 - **Cała zawartość pendrive'a zostanie skasowana** przy instalacji.
@@ -85,7 +87,7 @@ Na górze okna możesz wybrać język. Wybrany język trafia też na pendrive
 3. Na liście „Wybierz nośnik dla Universal Service OS” kliknij swój
    pendrive. Dyski, których nie wolno użyć, są widoczne z powodem odrzucenia
    (np. „dysk zawiera uruchomiony system Windows”, „urządzenie ma mniej niż
-   wymagane 32 GB”).
+   wymagane 16 GB”).
 4. Kliknij **Dalej**. Pojawi się ekran „**UWAGA - OPERACJA NISZCZĄCA**”
    z listą partycji i plików, które zostaną usunięte. Przeczytaj ją.
 5. Zaznacz **Rozumiem, że wszystko na tym dysku zostanie usunięte**.
@@ -893,7 +895,7 @@ prawdziwym sprzęcie** (albo wcale):
 
 | Objaw | Co zrobić |
 |---|---|
-| Instalator nie widzi pendrive'a jako „Gotowe” | Przeczytaj powód odrzucenia. Najczęściej: za mały (poniżej 32 GiB) albo nie zgłasza się jako wymienny. |
+| Instalator nie widzi pendrive'a jako „Gotowe” | Przeczytaj powód odrzucenia. Najczęściej: za mały (poniżej 16 GB) albo nie zgłasza się jako wymienny. |
 | Instalator pisze „Nośnik jest używany” | Zamknij okna Eksploratora pokazujące pendrive i kliknij Ponów. |
 | Pendrive nie startuje | Uruchom **Naprawa -> Napraw ESP**. |
 | W UEFI Vista / Windows 7 są zablokowane | Brak lub zmiana dawcy PE10: rozdział 3.2, potem **Aktualizuj USOS**. |

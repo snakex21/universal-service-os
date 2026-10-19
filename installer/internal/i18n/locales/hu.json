@@ -100,7 +100,7 @@
   "installer.reason.no_serial": "az eszköz nem adja meg az újraellenőrzéshez szükséges sorozatszámot",
   "installer.reason.spanned_volume": "a lemez egy több lemezre kiterjedő kötet része",
   "installer.reason.not_removable": "az eszköz nem jelzi a RemovableMedia jelzőt",
-  "installer.reason.too_small": "az eszköz kisebb a szükséges 32 GB-nál",
+  "installer.reason.too_small": "az eszköz kisebb a szükséges 16 GB-nál",
   "installer.reason.unreadable": "nem olvasható",
   "installer.reason.unreadable_detail": "nem olvasható: %s",
 
