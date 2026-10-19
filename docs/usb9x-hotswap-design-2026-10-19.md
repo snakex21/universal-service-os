@@ -220,6 +220,18 @@ SeaBIOS / CSMWrap (patch 0021 `usos-usb-disk-service`, own code, LGPL like the r
    If it moved, refuse (and log). If the command register lost memory decode, refuse.
 7. **Diagnostics record `USOSUDSK`** (section 4).
 
+Prototype on this branch (host-tested, not yet used by any binary):
+
+- `src/platform/bios/win9x/usosuds.h`: the channel 1 / request / device-table ABI.
+- `src/platform/bios/win9x/usosuds_slot.c`:
+  - `uds_req_check()`, the helper-side validation (bounds, 4 GiB wrap, no DMA into A0000h–FFFFFh);
+  - the miniport's slot state machine: absent → 02/3A, new generation → one 06/28, GONE mid-request
+    → fail + empty slot, SYNCHRONIZE CACHE without a cache → GOOD, TIMEOUT/PHASE → BOT reset;
+  - local INQUIRY/REQUEST SENSE/PREVENT/START STOP.
+- `tools/tests/usb9x/test_usosuds.py`: zig cc UBSan native + 32-bit, and WDK 7.1 `cl /W4 /WX /Za`.
+- The file is plain C89 without a C runtime, so SeaBIOS (an LGPL copy of the check) and the miniport
+  can share it.
+
 Room:
 
 - ROM: usos15 has 10496 bytes free. Stage 1 is estimated at 1.5–2.5 KiB of 32-bit flat runtime code,
@@ -236,7 +248,11 @@ Room:
     finds `USOSUDS1` behind `CSMPPrxy`. If the version is wrong, or the signature is missing (an older
     CSMWrap or a firmware CSM), it returns SP_RETURN_NOT_FOUND and Device Manager shows "not present".
   - Uncached extension: request block + 64 KiB bounce buffer. Targets = `Slots` (registry, default
-    1). INQUIRY RMB = 1 is answered by the miniport itself even when no stick is there.
+    1).
+  - INQUIRY is **always answered by the miniport**: `USOS` / `USB disk slot n`, RMB = 1, also when no
+    stick is there. 9x keys the `Enum\SCSI\<vendor><product>` devnode and its drive letter on the
+    INQUIRY strings. With the stick's own strings, every stick model would get a new devnode and
+    maybe another letter. A fixed slot identity keeps one DCB and one letter per slot.
 - **StartIo, hybrid.** Post the request. Then spin for at most ~2 ms on `done` with
   ScsiPortStallExecution, which finishes most 4–64 KiB reads.
   - If not done: return and poll with `ScsiPortNotification(RequestTimerCall, …, 1000 µs)`. If this
@@ -313,7 +329,8 @@ SeaBIOS (patch 0022 `usos-usb-runtime-enum`). This is the big part.
 
 - The miniport needs no structural change: the generation → UNIT ATTENTION and absent → NOT READY
   paths are already there in stage 1.
-- Added: a 1 s TEST UNIT READY poll is **not** needed; IOS polls removable media on access.
+- No periodic TEST UNIT READY from the miniport is needed: IOS checks removable media itself when a
+  program accesses the drive.
 - Explorer's stale view after a swap is the usual 9x removable behaviour (F5).
 - The risk to check in QEMU: IOS/DiskTSD must re-read capacity and BPB on UNIT ATTENTION for a
   stick of another size (as with ZIP 100 vs 250).
