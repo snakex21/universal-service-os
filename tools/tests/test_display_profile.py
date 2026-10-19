@@ -118,7 +118,15 @@ class DisplayTransport(unittest.TestCase):
         self.assertNotIn(b'\n', cmd.replace(b'\r\n', b''))
         for p in dest.iterdir():
             p.unlink()
+        # No request (user decision 2026-10-20): auto, still 1024x768x16 first.
         setup.write_text('family=2000\n')
+        self.assertEqual(shell(code).returncode, 0)
+        self.assertEqual((dest/'DISPLAY.TXT').read_bytes(), b'autoxauto\r\n')
+        self.assertIn(b'DISPLAY.REG', (dest/'vesa.cmd').read_bytes())
+        self.assertIn(b'"DefaultSettings.XResolution"=dword:00000400', (dest/'VESA.REG').read_bytes())
+        for p in dest.iterdir():
+            p.unlink()
+        (pkg/'USOSRES.EXE').unlink()
         self.assertEqual(shell(code).returncode, 0)
         self.assertFalse((dest/'DISPLAY.TXT').exists())
         self.assertNotIn(b'DISPLAY.REG', (dest/'vesa.cmd').read_bytes())
@@ -132,18 +140,71 @@ class DisplayTransport(unittest.TestCase):
         target=self.tmp/'c/USOS9X';target.mkdir(parents=True)
         # Network/addons have already removed an unavailable helper's Run row.
         staged=target/'MSBATCH.INF';staged.write_bytes(answer.read_bytes().replace(b'\r',b'').replace(b'HKLM,Run,USOSLan,,missing.exe\n',b''))
-        text=(ROOT/'tools/w9x_csmwrap_target.sh').read_text();start=text.index("if grep -q '^;USOS-DISPLAY='");end=text.index('\nfi\n',start)+3
+        text=(ROOT/'tools/w9x_csmwrap_target.sh').read_text();start=text.index("display_request=\nif grep -q '^;USOS-DISPLAY='");end=text.index('# Me, stock user USOS',start)
         pre='fail() { echo "$*" >&2; exit 1; }; log() { :; }; '
-        env='LIB='+quote(lib)+' work='+quote(self.tmp)+' ANSWER_INF='+quote(answer)+' ANSWER_SIF='+quote(answer)+'; '
+        env='LIB='+quote(lib)+' work='+quote(self.tmp)+' ANSWER_INF='+quote(answer)+' ANSWER_SIF='+quote(answer)+' ANSWER_KIND=PROFILE; '
         r=shell(pre+env+text[start:end]);self.assertEqual(r.returncode,0,r.stderr)
         rendered=staged.read_bytes();self.assertNotIn(b'missing.exe',rendered);self.assertIn(b'AddReg=USOS.RunOnce,USOS.Lan,USOS.Addons,USOS.Display',rendered)
         nt=self.tmp/'NT3';nt.mkdir()
         r=shell(pre+env+'usos='+quote(nt)+" nt3=1 nt31=''; "+function_text(ROOT/'tools/nt4_csmwrap_target.sh','nt3_stage_profile')+'; nt3_stage_profile')
         self.assertEqual(r.returncode,0,r.stderr);self.assertEqual((nt/'DISPLAY.TXT').read_bytes(),b'1920x1080x16\r\n')
         nt4=self.tmp/'NT4';nt4.mkdir();(nt4/'VESA.REG').write_bytes(b'REGEDIT4\r\n; preserved driver values\r\n')
-        text=(ROOT/'tools/nt4_csmwrap_target.sh').read_text();start=text.index('if [ -z "$nt3" ] && [ -z "$nt31" ] && grep');end=text.index('\nfor file in "$SYSLINUX_DIR',start)
+        text=(ROOT/'tools/nt4_csmwrap_target.sh').read_text();start=text.index('nt4_display_request=\nif [ -z "$nt3" ] && [ -z "$nt31" ] && grep');end=text.index('\nfor file in "$SYSLINUX_DIR',start)
         r=shell(pre+env+'usos='+quote(nt4)+" nt3='' nt31=''; "+text[start:end]);self.assertEqual(r.returncode,0,r.stderr)
         self.assertIn(b'; preserved driver values\r\n',(nt4/'VESA.REG').read_bytes());self.assertIn(b'"USOSDisplay"=',(nt4/'VESA.REG').read_bytes())
+
+    def test_display_section_stays_before_usos_csm(self):
+        # INSTALL.BAT appends Me's usoskey.drv line to the last section, which
+        # must stay [USOS.Csm] (else the Me USB keyboard driver is lost).
+        source = self.tmp/'MSBATCH.INF'
+        source.write_bytes(b'[Install]\r\nAddReg=USOS.RunOnce\r\n[USOS.RunOnce]\r\nHKLM,x,y,,z\r\n; last\r\n[USOS.Csm]\r\n')
+        r = shell(self.lib+'usos_display_9x_answer '+quote(source))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(r.stdout.endswith(b'[USOS.Csm]\r\n'), r.stdout)
+        self.assertLess(r.stdout.index(b'[USOS.Display]'), r.stdout.index(b'[USOS.Csm]'))
+        self.assertEqual(r.stdout.count(b'[USOS.Display]'), 1)
+        self.assertIn(b'HKLM,Software\\Microsoft\\Windows\\CurrentVersion\\Run,USOSDisplay,,"C:\\USOS9X\\USOSRES.EXE"\r\n', r.stdout)
+
+    def w9x_display_block(self, answer_text, kind):
+        lib=self.tmp/('lib-'+kind);lib.mkdir();(lib/'w9x-display').mkdir()
+        shutil.copy(ROOT/'tools/display_profile.sh',lib/'display_profile.sh')
+        for name in ('w9x-display/USOSRES.EXE','w9x-display/USOSVBI.EXE'):(lib/name).write_bytes(b'own helper fixture')
+        work=self.tmp/('w-'+kind);target=work/'c/USOS9X';target.mkdir(parents=True)
+        answer=work/'answer.inf';answer.write_bytes(answer_text)
+        (target/'MSBATCH.INF').write_bytes(answer_text)
+        text=(ROOT/'tools/w9x_csmwrap_target.sh').read_text();start=text.index("display_request=\nif grep -q '^;USOS-DISPLAY='");end=text.index('# Me, stock user USOS',start)
+        pre='fail() { echo "$*" >&2; exit 1; }; log() { echo "LOG $*"; }; '
+        env='LIB='+quote(lib)+' work='+quote(work)+' ANSWER_INF='+quote(answer)+' ANSWER_KIND='+kind+'; '
+        r=shell(pre+env+text[start:end]);self.assertEqual(r.returncode,0,r.stderr)
+        return target, r.stdout
+
+    def test_9x_default_auto_without_request_except_user_answer(self):
+        answer=b'[Install]\r\nAddReg=USOS.RunOnce\r\n[USOS.Csm]\r\n'
+        for kind in ('USOS','PROFILE'):
+            target,out=self.w9x_display_block(answer,kind)
+            self.assertEqual((target/'DISPLAY.TXT').read_bytes(),b'autoxauto\r\n')
+            self.assertTrue((target/'USOSRES.EXE').is_file() and (target/'USOSVBI.EXE').is_file())
+            staged=(target/'MSBATCH.INF').read_bytes()
+            self.assertIn(b'AddReg=USOS.RunOnce,USOS.Display\r\n',staged)
+            self.assertTrue(staged.endswith(b'[USOS.Csm]\r\n'))
+            self.assertIn(b'default auto',out)
+        target,_=self.w9x_display_block(answer,'USER')
+        self.assertFalse((target/'DISPLAY.TXT').exists());self.assertEqual((target/'MSBATCH.INF').read_bytes(),answer)
+
+    def test_nt4_default_auto_only_with_vesa_and_not_user_answer(self):
+        lib=self.tmp/'lib';lib.mkdir();shutil.copy(ROOT/'tools/display_profile.sh',lib/'display_profile.sh');(lib/'USOSRES.EXE').write_bytes(b'own helper fixture')
+        answer=self.tmp/'unattend.txt';answer.write_bytes(b'[Unattended]\r\n')
+        text=(ROOT/'tools/nt4_csmwrap_target.sh').read_text();start=text.index('nt4_display_request=\nif [ -z "$nt3" ]');end=text.index('\nfor file in "$SYSLINUX_DIR',start)
+        pre='fail() { echo "$*" >&2; exit 1; }; log() { :; }; '
+        for kind,vesa,expect in (('PROFILE',True,True),('USOS',True,True),('USER',True,False),('PROFILE',False,False)):
+            usos=self.tmp/('NT4-'+kind+str(vesa));usos.mkdir()
+            if vesa:(usos/'VESA.REG').write_bytes(b'REGEDIT4\r\n; driver\r\n')
+            env='LIB='+quote(lib)+' ANSWER_SIF='+quote(answer)+' ANSWER_KIND='+kind+' usos='+quote(usos)+" nt3='' nt31=''; "
+            r=shell(pre+env+text[start:end]);self.assertEqual(r.returncode,0,r.stderr)
+            self.assertEqual((usos/'DISPLAY.TXT').exists(),expect,(kind,vesa))
+            if expect:
+                self.assertEqual((usos/'DISPLAY.TXT').read_bytes(),b'autoxauto\r\n')
+                self.assertIn(b'"USOSDisplay"=',(usos/'VESA.REG').read_bytes())
 
     def test_collector_uses_pinned_buildkit_resolver_when_no_override(self):
         from unittest.mock import patch

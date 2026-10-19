@@ -952,9 +952,16 @@ usos_w2k_vesa_stage() {
         *) echo '[W2K_STAGE] VESA: no FRAMEBUF.DL_ in the local source (VESA only if Setup installs framebuf.dll)' ;;
     esac
     usos_w2k_vesa_reg > "$1/VESA.REG" && usos_w2k_vesa_cmd > "$1/vesa.cmd" || { echo '[W2K_STAGE] STOP: cannot write VESA.REG / vesa.cmd'; return 1; }
-    if [ -n "${XP_USER_SETTINGS:-}" ] && [ -f "$XP_USER_SETTINGS" ]; then
+    # The profile's request, else (user decision 2026-10-20) auto: the
+    # highest tested mode up to 1920x1080 at the first hardware logon; the
+    # first start keeps 1024x768x16 (VESA.REG), USOSRES tests and rolls back.
+    w2k_display_request=
+    if [ -f "${USOS_LIB_DIR:-/usr/lib/usos}/display_profile.sh" ] && [ -f "${USOS_LIB_DIR:-/usr/lib/usos}/USOSRES.EXE" ]; then
         . "${USOS_LIB_DIR:-/usr/lib/usos}/display_profile.sh"
-        w2k_display_request=$(usos_display_from_nt5 "$XP_USER_SETTINGS") || return 1
+        if [ -n "${XP_USER_SETTINGS:-}" ] && [ -f "$XP_USER_SETTINGS" ]; then
+            w2k_display_request=$(usos_display_from_nt5 "$XP_USER_SETTINGS") || return 1
+        fi
+        [ -n "$w2k_display_request" ] || w2k_display_request=autoxauto
         if [ -n "$w2k_display_request" ]; then
             usos_display_stage "$1" "${USOS_LIB_DIR:-/usr/lib/usos}/USOSRES.EXE" "$w2k_display_request" || return 1
             usos_display_run_reg W2K > "$1/DISPLAY.REG" || return 1

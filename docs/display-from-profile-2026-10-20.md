@@ -183,3 +183,14 @@ Automatic mode remains an **explicit profile request**, not a new default.
 No EDID/native monitor limit is claimed; CDS_TEST alone cannot prove monitor
 support. Expanding beta-family support is deferred until those flows are
 validated. The current staging paths still assume the existing C: layout.
+
+# Default auto, 2026-10-20 (user decision after the X470 Me fresh install)
+
+A USOS-made answer without a display request now stages `autoxauto`: 95/98/Me
+(w9x_csmwrap_target.sh), NT 4.0 with the VESA miniport (nt4_csmwrap_target.sh)
+and Windows 2000 VESA (w2k_stage.sh). Setup and the first start keep the safe
+mode (INF / 1024x768x16); USOSRES applies at the first hardware sign-in with
+CDS_TEST and rollback. A user's own answer file copied 1:1 gets no request;
+NT 3.x stays explicit (3.5 needs the miniport rebuild). The sections above
+that call auto an opt-in describe the earlier state. See
+docs/me-fresh-install-2026-10-20.md.

@@ -598,6 +598,7 @@ def main() -> int:
             ("tools/xp_unattended_policy.sh", "usr/lib/usos/xp_unattended_policy.sh"),
             ("tools/xp_user_settings.sh", "usr/lib/usos/xp_user_settings.sh"),
             ("tools/display_profile.sh", "usr/lib/usos/display_profile.sh"),
+            ("tools/w9x_logon.sh", "usr/lib/usos/w9x_logon.sh"),
             ("tools/network_setup.sh", "usr/lib/usos/network_setup.sh"),
             ("tools/answer_plan.sh", "usr/lib/usos/answer_plan.sh"),
             ("tools/xp_windows_partition_plan.awk", "usr/lib/usos/xp_windows_partition_plan.awk"),
@@ -687,6 +688,8 @@ def main() -> int:
         # the answer template, the X470 registry values and the XP path's
         # community driver set (the files of tools/xp_driver_overlay.py
         # SELECTED); FIRST.CMD installs them at the first logon in the VM.
+        # Windows Me, stock user USOS: the empty-password list (tools/w9x_logon.sh).
+        put(entries, Entry("usr/lib/usos/w9x/USOSME.PWL", stat.S_IFREG | 0o644, (root / "src/platform/bios/win9x/usosme.pwl").read_bytes()))
         put(entries, Entry("usr/lib/usos/posready_unattended.xml", stat.S_IFREG | 0o644, (root / "tools/posready_unattended.xml").read_bytes()))
         put(entries, Entry("usr/lib/usos/posready/X470.REG", stat.S_IFREG | 0o644, (root / "tools/posready_x470.reg").read_bytes()))
         put(entries, Entry("usr/lib/usos/posready/FIRST.CMD", stat.S_IFREG | 0o644, (root / "tools/posready_first.cmd").read_bytes()))

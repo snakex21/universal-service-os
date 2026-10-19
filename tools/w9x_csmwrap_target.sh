@@ -254,14 +254,39 @@ done
 # After the helpers: they include the USOS default MSBATCH.INF, which must
 # not replace the chosen answer (a rendered profile or the user's file).
 cp "$ANSWER_INF" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot copy MSBATCH.INF'
+# Display: the answer's ;USOS-DISPLAY= request, else (user decision
+# 2026-10-20) auto = the highest validated mode up to 1920x1080 for every
+# USOS-made answer. A user's own answer file (copied 1:1) gets no request.
+# Setup and the first start keep the INF's safe mode; USOSRES applies the
+# mode at the first hardware sign-in (CDS_TEST, rollback; defers in the VM).
+display_request=
 if grep -q '^;USOS-DISPLAY=' "$ANSWER_INF"; then
     . "$LIB/display_profile.sh"
     display_request=$(usos_display_from_answer "$ANSWER_INF") || fail 'invalid display request'
+elif [ "$ANSWER_KIND" != USER ] && [ -f "$LIB/w9x-display/USOSRES.EXE" ] && [ -f "$LIB/w9x-display/USOSVBI.EXE" ]; then
+    . "$LIB/display_profile.sh"
+    display_request=autoxauto
+    log 'display: no request in the answer, default auto (up to 1920x1080)'
+fi
+if [ -n "$display_request" ]; then
     usos_display_stage "$work/c/USOS9X" "$LIB/w9x-display/USOSRES.EXE" "$display_request" || fail 'cannot stage 9x display request'
     cp "$LIB/w9x-display/USOSVBI.EXE" "$work/c/USOS9X/USOSVBI.EXE" || fail 'cannot stage VBE reader'
     usos_display_9x_answer "$work/c/USOS9X/MSBATCH.INF" > "$work/display-answer.inf" || fail 'cannot register hardware display request'
     cp "$work/display-answer.inf" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot stage display answer'
     log "display: request=$display_request, validated VBE/INF mode at hardware logon"
+fi
+# Me, stock user USOS: the empty-password list (tools/w9x_logon.sh), so the
+# first start after Setup signs in without the Windows password dialog.
+# INSTALL.BAT copies C:\USOS9X\USOS.PWL into C:\WINDOWS before Setup.
+rm -f "$work/c/USOS9X/USOS.PWL"
+if [ -f "$LIB/w9x_logon.sh" ] && [ -f "$LIB/w9x/USOSME.PWL" ]; then
+    . "$LIB/w9x_logon.sh"
+    if usos_w9x_pwl_wanted "$work/c/USOS9X/MSBATCH.INF" "$SYSTEM_TAG" "$ANSWER_KIND"; then
+        usos_w9x_pwl_answer "$work/c/USOS9X/MSBATCH.INF" > "$work/pwl-answer.inf" || fail 'cannot add the password list to the answer'
+        cp "$work/pwl-answer.inf" "$work/c/USOS9X/MSBATCH.INF" && cp "$LIB/w9x/USOSME.PWL" "$work/c/USOS9X/USOS.PWL" ||
+            fail 'cannot stage the password list'
+        log 'logon: Me user USOS, empty-password list staged (no first-start password dialog)'
+    fi
 fi
 . "$LIB/network_setup.sh"
 usos_net_answer_config "$ANSWER_INF" "$SYSTEM_TAG" > "$work/network.ini" || fail 'invalid LAN metadata'

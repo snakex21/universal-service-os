@@ -102,9 +102,10 @@ static void shortcuts(void) {
   if(!initialize||!uninitialize||!create){failures++;FreeLibrary(ole);return;}
   r=initialize(0);if(FAILED(r)){failures++;FreeLibrary(ole);return;}
   desktop_links(HKEY_CURRENT_USER,"Desktop",create);
-#ifdef USOS_LAN_NT
+  /* Me puts its "Connect to the Internet" link on the common desktop
+   * (HKLM Shell Folders "Common Desktop" = C:\WINDOWS\All Users\Pulpit on a
+   * Polish Me, X470 2026-10-20); 95/98 without that value: nothing to do. */
   desktop_links(HKEY_LOCAL_MACHINE,"Common Desktop",create);
-#endif
   uninitialize();FreeLibrary(ole);
 }
 

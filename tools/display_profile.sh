@@ -26,11 +26,14 @@ usos_display_run_reg() {
 
 # Add only to Setup's [Install] AddReg (not the similarly named driver sections).
 # A persistent Run entry survives VM installation; the tool defers until hardware.
+# [USOS.Display] goes before [USOS.Csm], which must stay the last section:
+# INSTALL.BAT appends Me's usoskey.drv line to it (Me USB keyboard).
 usos_display_9x_answer() {
-    awk '{sub(/\r$/, ""); low=tolower($0)}
-         /^\[/ {install=(low=="[install]")}
+    awk 'function add() {if(done++)return
+             printf "[USOS.Display]\r\nHKLM,Software\\Microsoft\\Windows\\CurrentVersion\\Run,USOSDisplay,,\"C:\\USOS9X\\USOSRES.EXE\"\r\n\r\n"}
+         {sub(/\r$/, ""); low=tolower($0)}
+         /^\[/ {install=(low=="[install]"); if(low=="[usos.csm]")add()}
          install && low~/^addreg=/ {$0=$0 ",USOS.Display";n++}
          {printf "%s\r\n",$0}
-         END {if(n!=1)exit 1;
-              printf "\r\n[USOS.Display]\r\nHKLM,Software\\Microsoft\\Windows\\CurrentVersion\\Run,USOSDisplay,,\"C:\\USOS9X\\USOSRES.EXE\"\r\n"}' "$1"
+         END {if(n!=1)exit 1; if(!done){printf "\r\n";add()}}' "$1"
 }

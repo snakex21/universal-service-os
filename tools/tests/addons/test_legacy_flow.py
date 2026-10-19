@@ -130,6 +130,15 @@ file1=SETUP.EXE|demo.bin|HASH|SIZE
   app=self.target/'USOS/ADDONS';self.assertEqual((app/'PKG/DEMO/SETUP.EXE').read_bytes(),self.blob)
   self.assertIn('staged demo/SETUP.EXE',(self.target/'USOS9X/LOGS/ADDONS.LOG').read_text())
   self.assertFalse(list((app/'TMP').iterdir()))
+ def test_staged_package_keeps_runner_and_registration(self):
+  (self.data/'demo.bin').write_bytes(self.blob);r=self.stage();self.assertEqual(r.returncode,0,r.stderr)
+  app=self.target/'USOS/ADDONS';self.assertTrue((app/'USOSADD.EXE').is_file());self.assertTrue((app/'ADDONS.REG').is_file())
+ def test_nothing_staged_removes_runner_no_empty_installer_window(self):
+  # X470 Me 2026-10-20: empty DATA\Addons showed an "installed 0/10" box.
+  r=self.stage();self.assertEqual(r.returncode,0,r.stderr)
+  app=self.target/'USOS/ADDONS';self.assertFalse((app/'USOSADD.EXE').exists());self.assertFalse((app/'ADDONS.REG').exists())
+  log=(self.target/'USOS9X/LOGS/ADDONS.LOG').read_text()
+  self.assertIn('no package staged; runner not registered',log);self.assertIn('staging complete files=0 missing=1',log)
  def test_wrong_hash_and_absence_do_not_stop_setup(self):
   (self.data/'demo.bin').write_bytes(b'X'*len(self.blob));r=self.stage();self.assertEqual(r.returncode,0,r.stderr)
   self.assertIn(b'missing demo/SETUP.EXE',r.stdout);self.assertFalse((self.target/'USOS/ADDONS/PKG/DEMO/SETUP.EXE').exists())

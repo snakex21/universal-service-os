@@ -138,7 +138,15 @@ usos_addons_stage() {
         copied=$((copied+1));usos_addons_log "staged $id/$file SHA-256=$hash size=$size"
     done < "$_ad_plan"
     cp "$_ad_plan" "$_ad_app/PLAN.TXT" || return 1
-    usos_addons_run_reg > "$_ad_app/ADDONS.REG"
+    if [ "$copied" -gt 0 ]; then
+        usos_addons_run_reg > "$_ad_app/ADDONS.REG"
+    else
+        # Nothing staged (e.g. empty DATA\Addons): no runner, so no
+        # "installed 0/n" window. The callers drop the Run entry when
+        # USOSADD.EXE is absent.
+        rm -f "$_ad_app/USOSADD.EXE" "$_ad_app/ADDONS.REG"
+        usos_addons_log 'no package staged; runner not registered'
+    fi
     usos_addons_log "staging complete files=$copied missing=$missing; missing packages do not stop Windows Setup"
     # Delete only this freshly generated, owned private scratch directory.
     case "$_ad_tmp" in "$_ad_app"/TMP/STG*) [ ! -L "$_ad_tmp" ] && rm -rf -- "$_ad_tmp" ;; *) return 1 ;; esac
