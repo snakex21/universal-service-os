@@ -1093,3 +1093,37 @@ Tests:
 - Not rerun: the DOS mouse probe. No QEMU test covers the V86 channel 0 proxy.
 
 X470 with usos16: not tried. No Windows 9x VM run either.
+
+## 23. 3.1.2-usos17: USB stick hot-swap for the USB disk service (0022) (2026-10-19)
+
+3.1.2-usos16 (0001-0021, byte for byte) plus 0022. Experimental, **not the release pin**
+(xp_csmwrap_esp.sh, release.go and lock.json stay on usos16); the Windows Me in-place kit me-usb2
+uses it. Design and details: docs/usb9x-hotswap-design-2026-10-19.md section 8.
+
+0022 (own code, LGPLv3), only with `csmwrap.ini int13_boot_disk_only = true`: a 12 KiB runtime pool
+from ZoneHigh, every xHCI kept running, a port watch on the helper core (about 100 ms, CCS plus a
+CSC latch in `xhci_process_events`) armed by the first channel 1 request, runtime bring-up and
+teardown of bulk-only sticks, table entries re-used with a new generation, EJECT disables the slot.
+Every boot: a media check and exact KiB counters; the USOSUDSK record is version 2 (984 bytes).
+
+| | usos17 | usos16 |
+|---|---|---|
+| **ROM used** | **125504 of 131072 (95.8 %)** | 126656 |
+| **ROM free** | **5568** | 4416 |
+| 16-bit | 34624 | 36704 |
+| 32-bit flat | 36458 | 33386 |
+| flat init | 39392 | 41984 |
+| low memory | 3968 | 3472 |
+| F-segment variables | 3840 | 3744 |
+
+`CONFIG_MEGASAS` and `CONFIG_USB_UHCI` are off in seabios-config (0022) to make room;
+`CONFIG_SDCARD` stays.
+
+Binary `3a36aba19b29ca5cf2fb35567381d48105bacdf11cc3198eccdc678d8c467c3d` (pinned VM build, the
+repeat build identical, the unpatched build = `upstream_rebuild`).
+
+Tests: `test_csmwrap_uds17.py` (host); QEMU `run_csmwrap_uds_qemu.py` free (hot-swap with a USB
+keyboard and mouse) and owned PASS. Regressions with this binary (2026-10-19), all PASS:
+run_csmwrap_boot_disk_qemu.py (7 layouts, with and without --only), run_csmwrap_apmoff_qemu.py
+(pc/q35 x real/pm32/pm16), run_csmwrap_pciirq_qemu.py (pc/q35, key on/off),
+run_csmwrap_nvme_rearm_qemu.py (pc, q35), run_dos_mouse_probe.py --wheel. X470 with usos17: not tried.
