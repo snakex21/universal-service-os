@@ -21,6 +21,7 @@ pub const options = @import("options.zig");
 pub const logon = @import("logon.zig");
 
 pub const Profile = profile.Profile;
+pub const display_profile = @import("display_profile.zig");
 pub const Arch = target.Arch;
 pub const Family = target.Family;
 
@@ -70,11 +71,11 @@ pub fn matchEdition(p: *const Profile, system_id: []const u8, images: ?*const ed
 /// chosen media, for the profile's edition (null: no edition written).
 pub fn render(p: *const Profile, system_id: []const u8, arch: Arch, key: ?[]const u8, images: ?*const editions.List, buffer: []u8) !?Rendered {
     const use_key = key orelse p.keyFor(system_id);
-    if (nt4.isNt4(system_id)) return .{ .format = .nt4_sif, .bytes = try nt4.render(p, use_key, buffer) };
-    if (nt3.isNt3(system_id)) return .{ .format = .nt4_sif, .bytes = try nt3.render(p, buffer) };
+    if (nt4.isNt4(system_id)) return .{ .format = .nt4_sif, .bytes = try displayMetadata(p, system_id, try nt4.render(p, use_key, buffer), buffer) };
+    if (nt3.isNt3(system_id)) return .{ .format = .nt4_sif, .bytes = try displayMetadata(p, system_id, try nt3.render(p, buffer), buffer) };
     // POSReady 2009: POSR.SIF (staged like WINNT.SIF; posready.zig).
     if (posready.isPosReady(system_id)) return .{ .format = .nt4_sif, .bytes = try posready.render(p, use_key, buffer) };
-    if (msbatch.releaseFor(system_id)) |release| return .{ .format = .msbatch_inf, .bytes = try msbatch.render(p, release, use_key, buffer) };
+    if (msbatch.releaseFor(system_id)) |release| return .{ .format = .msbatch_inf, .bytes = try displayMetadata(p, system_id, try msbatch.render(p, release, use_key, buffer), buffer) };
     const family = target.familyFor(system_id) orelse return null;
     // NT keys are 5x5 only (a Windows 95 key in the profile's `key=` is not theirs).
     const nt_key = if (profile.keyShape(use_key) == .five_by_five) use_key else "";
@@ -87,6 +88,33 @@ pub fn render(p: *const Profile, system_id: []const u8, arch: Arch, key: ?[]cons
     try xml_check.wellFormed(xml);
     try schema.check(xml, family, null);
     return .{ .format = .autounattend_xml, .bytes = xml };
+}
+
+fn displayMetadata(p: *const Profile, id: []const u8, bytes: []const u8, buffer: []u8) ![]const u8 {
+    if (!display_profile.supportsSystem(id) or !display_profile.requested(p)) return bytes;
+    var writer: std.Io.Writer = .fixed(buffer[bytes.len..]);
+    try display_profile.comment(p, &writer);
+    return buffer[0 .. bytes.len + writer.buffered().len];
+}
+
+test "display metadata reaches supported legacy targets only and preserves missing request" {
+    var p = Profile{};
+    try p.name.set("A");
+    try p.user.set("Bob");
+    var buffer: [autounattend.max_size]u8 = undefined;
+    for ([_][]const u8{ "windows-nt-4", "windows-nt-3-51", "windows-nt-3-5", "windows-95", "windows-98-se", "windows-me" }) |id| {
+        p.display_explicit = false;
+        const plain = (try render(&p, id, .x86, null, null, &buffer)).?;
+        try std.testing.expect(std.mem.indexOf(u8, plain.bytes, "USOS-DISPLAY=") == null);
+        p.display_explicit = true;
+        const chosen = (try render(&p, id, .x86, null, null, &buffer)).?;
+        try std.testing.expect(std.mem.endsWith(u8, chosen.bytes, ";USOS-DISPLAY=autoxauto\r\n"));
+    }
+    for ([_][]const u8{ "windows-xp", "windows-server-2003", "windows-nt-3-1", "windows-vista" }) |id| {
+        const out = (try render(&p, id, .x86, null, null, &buffer)).?;
+        try std.testing.expect(std.mem.indexOf(u8, out.bytes, "USOS-DISPLAY=") == null);
+        try std.testing.expect(std.mem.indexOf(u8, out.bytes, "display_bpp=") == null);
+    }
 }
 
 test {
@@ -181,8 +209,8 @@ test "Server without an edition: Standard full installation by default" {
     // Server 2008 R2 SP1 VL pl (install.wim order of the X470 library ISO).
     var list = editions.List{};
     const images = [_]struct { []const u8, bool }{
-        .{ "ServerStandard", false }, .{ "ServerStandard", true }, .{ "ServerEnterprise", false }, .{ "ServerEnterprise", true },
-        .{ "ServerDatacenter", false }, .{ "ServerDatacenter", true }, .{ "ServerWeb", false }, .{ "ServerWeb", true },
+        .{ "ServerStandard", false },   .{ "ServerStandard", true },   .{ "ServerEnterprise", false }, .{ "ServerEnterprise", true },
+        .{ "ServerDatacenter", false }, .{ "ServerDatacenter", true }, .{ "ServerWeb", false },        .{ "ServerWeb", true },
     };
     for (images, 0..) |entry, i| {
         var image = editions.Image{ .index = @intCast(i + 1), .server = true, .core = entry[1] };

@@ -86,7 +86,9 @@ fn tweakLines(p: *const Profile, family: Family, w: *std.Io.Writer) !void {
         first = false;
     }
     if (!first) try w.writeAll("\n");
-    if (schema.tweakOn(p, .display, family)) try w.print("display={s}\n", .{@tagName(p.display)});
+    if (family == .windows_2000) {
+        if (@import("display_profile.zig").requested(p)) try w.print("display={s}\ndisplay_bpp={s}\n", .{ @tagName(p.display), @tagName(p.display_bpp) });
+    } else if (schema.tweakOn(p, .display, family)) try w.print("display={s}\n", .{@tagName(p.display)});
     try optionLines(p, family, w);
 }
 
@@ -152,7 +154,8 @@ test "NT5 render: tweaks per family, none for 2000" {
     const w2k3 = try render(&p, .windows_2003, "", &buffer_for_test);
     try std.testing.expect(std.mem.endsWith(u8, w2k3, "family=2003\ntweaks=messenger,outlook_express,balloons,extensions,hidden,autorun\ndisplay=1280x1024\n"));
     const w2k = try render(&p, .windows_2000, "", &buffer_for_test);
-    try std.testing.expect(std.mem.indexOf(u8, w2k, "tweaks") == null and std.mem.indexOf(u8, w2k, "display") == null);
+    try std.testing.expect(std.mem.indexOf(u8, w2k, "tweaks") == null);
+    try std.testing.expect(std.mem.indexOf(u8, w2k, "display=1280x1024\ndisplay_bpp=auto\n") != null);
     p.theme = .basic;
     const basic = try render(&p, .windows_xp, "", &buffer_for_test);
     try std.testing.expect(std.mem.indexOf(u8, basic, "classic_theme") == null);

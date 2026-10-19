@@ -952,6 +952,19 @@ usos_w2k_vesa_stage() {
         *) echo '[W2K_STAGE] VESA: no FRAMEBUF.DL_ in the local source (VESA only if Setup installs framebuf.dll)' ;;
     esac
     usos_w2k_vesa_reg > "$1/VESA.REG" && usos_w2k_vesa_cmd > "$1/vesa.cmd" || { echo '[W2K_STAGE] STOP: cannot write VESA.REG / vesa.cmd'; return 1; }
+    if [ -n "${XP_USER_SETTINGS:-}" ] && [ -f "$XP_USER_SETTINGS" ]; then
+        . "${USOS_LIB_DIR:-/usr/lib/usos}/display_profile.sh"
+        w2k_display_request=$(usos_display_from_nt5 "$XP_USER_SETTINGS") || return 1
+        if [ -n "$w2k_display_request" ]; then
+            usos_display_stage "$1" "${USOS_LIB_DIR:-/usr/lib/usos}/USOSRES.EXE" "$w2k_display_request" || return 1
+            usos_display_run_reg W2K > "$1/DISPLAY.REG" || return 1
+            # Existing vesa.cmd ends the registration with call :vgaentry and
+            # then exits. Register before it, only when VESA succeeded.
+            awk '{sub(/\r$/, "")} /^echo vesa on:/ {printf "if exist \"%%USOS_DIR%%\\DISPLAY.REG\" \"%%SystemRoot%%\\regedit.exe\" /s \"%%USOS_DIR%%\\DISPLAY.REG\"\r\n"} {printf "%s\r\n",$0}' "$1/vesa.cmd" > "$1/vesa-display.cmd" || return 1
+            mv "$1/vesa-display.cmd" "$1/vesa.cmd" || return 1
+            printf '[W2K_STAGE] DISPLAY request=%s first_mode=1024x768x16 apply=hardware-logon\n' "$w2k_display_request"
+        fi
+    fi
     echo '[W2K_STAGE] VESA staged: usosvbe.sys + framebuf.dll at setup end (vesa.cmd), 1024x768x16, boot.ini [VGA mode]'
 }
 

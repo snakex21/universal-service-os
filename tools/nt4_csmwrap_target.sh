@@ -341,6 +341,12 @@ nt3_stage_profile() {
         [ ! -f "$work/$file" ] || mv "$work/$file" "$usos/$file" || fail "cannot copy $file"
     done
     [ ! -f "$usos/INTL.TXT" ] || nt3_stage_intl
+    if [ -n "${nt3:-}" ] && [ -z "${nt31:-}" ] && grep -q '^;USOS-DISPLAY=' "$ANSWER_SIF"; then
+        . "$LIB/display_profile.sh"
+        nt3_display_request=$(usos_display_from_answer "$ANSWER_SIF") || fail 'duplicate display request'
+        usos_display_stage "$usos" "$LIB/USOSRES.EXE" "$nt3_display_request" || fail 'cannot stage NT3 hardware display request'
+        log "DISPLAY request=$nt3_display_request apply=hardware-service vm=deferred"
+    fi
 }
 
 # The CD files GUI Setup would copy for the chosen locale and keyboard
@@ -1020,6 +1026,17 @@ printf 'answer=%s\r\ncrypto=%s\r\nedition=%s\r\n' "$ANSWER_KIND" "$crypto" "${ts
 # easily): a 128-bit CD with a Standard Encryption SP6a switches to the
 # SP6a's own schannel.dll and runs update.exe again.
 if [ "$crypto" = high ]; then printf 'high\r\n' > "$usos/CRYPTOHI.TXT"; fi
+fi
+
+# Preserve the installation VM's basic mode. The persistent hardware helper
+# defers in QEMU and removes its Run value only after hardware processing.
+if [ -z "$nt3" ] && [ -z "$nt31" ] && grep -q '^;USOS-DISPLAY=' "$ANSWER_SIF"; then
+    . "$LIB/display_profile.sh"
+    nt4_display_request=$(usos_display_from_answer "$ANSWER_SIF") || fail 'duplicate display request'
+    [ -f "$usos/VESA.REG" ] || fail 'display request needs the VESA miniport'
+    usos_display_stage "$usos" "$LIB/USOSRES.EXE" "$nt4_display_request" || fail 'cannot stage hardware display request'
+    usos_display_run_reg NT4 | sed '1d' >> "$usos/VESA.REG" || fail 'cannot register hardware display helper'
+    log "DISPLAY request=$nt4_display_request apply=hardware-logon vm=deferred"
 fi
 
 for file in "$SYSLINUX_DIR/chain.c32" "$SYSLINUX_DIR/libcom32.c32" "$SYSLINUX_DIR/libutil.c32"; do

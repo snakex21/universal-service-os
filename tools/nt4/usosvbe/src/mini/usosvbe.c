@@ -56,6 +56,9 @@
 #include <miniport.h>
 #include <ntddvdeo.h>
 #include <video.h>
+#ifdef USOSVBE_NT3
+#include "display_modes.h"
+#endif
 
 #ifdef USOSVBE_NT3
 #define USOSVBE_VERSION L"usosvbe 1.1-nt3"
@@ -66,6 +69,9 @@
 #endif
 
 #define MAXMODES 64
+#if defined(USOSVBE_NT3) && MAXMODES != USOS_DISPLAY_MODES_COUNT
+#error NT3 display handoff capacity must match MAXMODES
+#endif
 #define MAXLIST 256
 
 /* NT 4.0 kernel export, used to scan CSRSS's V86 memory safely. */
@@ -341,6 +347,22 @@ static void query(PDEVEXT x)
     dcat(x, L" list="); dnum(x, n, 10, 0);
     dcat(x, L" modes="); dnum(x, x->NumModes, 10, 0);
     x->QueryOk = x->NumModes != 0;
+#ifdef USOSVBE_NT3
+    /* NT 3.5 has no EnumDisplaySettings. Publish only modes validated by
+       this miniport on this boot, using an already imported VideoPort API.
+       VideoPortSetRegistryParameters stores REG_BINARY, not REG_SZ. */
+    {
+        UsosDisplayModeList mode_list;
+        mode_list.magic = USOS_DISPLAY_MODES_MAGIC;
+        mode_list.count = x->NumModes;
+        for (i = 0; i < x->NumModes; i++) {
+            mode_list.modes[i].width = x->Modes[i].Width;
+            mode_list.modes[i].height = x->Modes[i].Height;
+            mode_list.modes[i].bpp = x->Modes[i].Bpp;
+        }
+        VideoPortSetRegistryParameters(x, L"UsosVbeModes", &mode_list, 8 + x->NumModes * sizeof(UsosDisplayRecord));
+    }
+#endif
     savediag(x);
 }
 
@@ -516,6 +538,12 @@ static VP_STATUS __stdcall FindAdapter(PVOID ext, PVOID ctx, PWSTR args, PVIDEO_
 #endif
     ci->HardwareStateSize = 0;
     x->Current = (ULONG)~0;
+#ifdef USOSVBE_NT3
+    {
+        ULONG empty_list[2] = { 0, 0 };
+        VideoPortSetRegistryParameters(ext, L"UsosVbeModes", empty_list, sizeof(empty_list));
+    }
+#endif
     return NO_ERROR;
 }
 

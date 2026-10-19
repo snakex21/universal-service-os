@@ -246,12 +246,13 @@ class Nt3AutochkStandIn(unittest.TestCase):
 class Nt3MicroLinux(unittest.TestCase):
     def test_file_list(self):
         text = BUILD.read_text(encoding='utf-8')
+        self.assertIn('registrar=True', text)
+        self.assertIn('"usr/lib/usos/nt3/USOSNT3.EXE"', text)
         for pair in (
             ('tools/vendor/ahcint/1.3.0.0-usos4/bin/NT351/i386/ahcint.sys', 'usr/lib/usos/nt3/AHCINT.SYS'),
             ('tools/w2k/usosrst/bin/nt351/i386/usosrst.sys', 'usr/lib/usos/nt3/USOSRST.SYS'),
             ('tools/w2k/usosrst/bin/nt35/i386/usosrst.sys', 'usr/lib/usos/nt3/USOSRST35.SYS'),
             ('tools/nt4/usosusb/bin/i386/usosusb.sys', 'usr/lib/usos/nt3/USOSUSB.SYS'),
-            ('tools/nt3/usosnt3/bin/i386/usosnt3.exe', 'usr/lib/usos/nt3/USOSNT3.EXE'),
             ('tools/nt3/usosachk/bin/i386/usosachk.exe', 'usr/lib/usos/nt3/USOSACHK.EXE'),
         ):
             self.assertIn(f'("{pair[0]}", "{pair[1]}")', text)

@@ -140,6 +140,7 @@ pub const Tweak = enum {
     theme_basic,
     no_balloon_tips,
     display,
+    display_bpp,
     disable_uac,
     no_sidebar,
     no_welcome_center,
@@ -164,7 +165,7 @@ const xp_2003 = &[_]Family{ .windows_xp, .windows_2003 };
 /// Which versions render each tweak. Everything else ignores it (the
 /// editor does not offer it there, the renderers write nothing): never a
 /// setting, component, Setup component name or command a version lacks.
-/// Windows 2000 has none (no reg.exe in the base system).
+/// Windows 2000 display requests use the USOS setup-end tools.
 pub const tweak_support = [_]TweakSupport{
     // XP [Components]; Vista pkgmgr / 7 DISM: the InboxGames feature.
     .{ .tweak = .skip_games, .nt5 = &.{.windows_xp}, .since = .vista, .until = .windows_7, .client_only = true },
@@ -176,7 +177,8 @@ pub const tweak_support = [_]TweakSupport{
     .{ .tweak = .theme_classic, .nt5 = &.{.windows_xp}, .since = .windows_7, .until = .windows_7, .client_only = true },
     .{ .tweak = .theme_basic, .since = .windows_7, .until = .windows_7, .client_only = true },
     .{ .tweak = .no_balloon_tips, .nt5 = xp_2003 },
-    .{ .tweak = .display, .nt5 = xp_2003 },
+    .{ .tweak = .display, .nt5 = &.{ .windows_2000, .windows_xp, .windows_2003 } },
+    .{ .tweak = .display_bpp, .nt5 = &.{.windows_2000} },
     .{ .tweak = .disable_uac, .since = .vista, .until = .windows_7 },
     .{ .tweak = .no_sidebar, .since = .vista, .until = .windows_7, .client_only = true },
     // Windows 7 no longer opens Getting Started at logon.
@@ -199,6 +201,13 @@ pub fn tweakAvailable(tweak: Tweak, family: Family) bool {
     unreachable;
 }
 
+/// Legacy renderers have no NT6 unattend schema level.
+pub fn tweakAvailableForSystem(tweak: Tweak, system_id: []const u8) bool {
+    if (@import("display_profile.zig").supportsSystem(system_id) and (tweak == .display or tweak == .display_bpp)) return true;
+    const family = target.familyFor(system_id) orelse return false;
+    return tweakAvailable(tweak, family);
+}
+
 /// The profile field of a tweak (theme and display are choices).
 pub fn tweakField(tweak: Tweak) @import("profile.zig").Field {
     return switch (tweak) {
@@ -214,6 +223,7 @@ pub fn tweakOn(p: *const @import("profile.zig").Profile, tweak: Tweak, family: F
         .theme_classic => p.theme == .classic,
         .theme_basic => p.theme == .basic,
         .display => p.display != .auto,
+        .display_bpp => p.display_bpp != .auto,
         inline else => |t| @field(p, @tagName(t)),
     };
     return on and tweakAvailable(tweak, family);
@@ -354,14 +364,15 @@ test "schema: every family renders only settings its version has" {
     }
 }
 
-test "schema: every tweak has one support row; 2000 has none" {
+test "schema: every tweak has one support row; 2000 exposes only display" {
     inline for (@typeInfo(Tweak).@"enum".fields) |f| {
         var rows: usize = 0;
         for (tweak_support) |entry| {
             if (entry.tweak == @as(Tweak, @enumFromInt(f.value))) rows += 1;
         }
         try std.testing.expectEqual(@as(usize, 1), rows);
-        try std.testing.expect(!tweakAvailable(@enumFromInt(f.value), .windows_2000));
+        const tweak: Tweak = @enumFromInt(f.value);
+        try std.testing.expectEqual(tweak == .display or tweak == .display_bpp, tweakAvailable(tweak, .windows_2000));
     }
     try std.testing.expect(tweakAvailable(.skip_games, .windows_7));
     try std.testing.expect(!tweakAvailable(.skip_games, .server_2008_r2));

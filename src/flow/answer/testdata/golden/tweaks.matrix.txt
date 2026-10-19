@@ -76,10 +76,16 @@ display=1280x1024	windows-xp	+[Display]
 display=1280x1024	windows-xp	+BitsPerPel=32
 display=1280x1024	windows-xp	+Xresolution=1280
 display=1280x1024	windows-xp	+Yresolution=1024
+display=1280x1024	windows-2000	+
+display=1280x1024	windows-2000	+----- DISPLAY.TXT -----
+display=1280x1024	windows-2000	+1280x1024xauto
 display=1280x1024	windows-server-2003	+[Display]
 display=1280x1024	windows-server-2003	+BitsPerPel=32
 display=1280x1024	windows-server-2003	+Xresolution=1280
 display=1280x1024	windows-server-2003	+Yresolution=1024
+display_bpp=16	windows-2000	+
+display_bpp=16	windows-2000	+----- DISPLAY.TXT -----
+display_bpp=16	windows-2000	+autox16
 disable_uac=yes	windows-vista	+    </component>
 disable_uac=yes	windows-vista	+    <component name="Microsoft-Windows-Deployment" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
 disable_uac=yes	windows-vista	+      <RunSynchronous>

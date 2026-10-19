@@ -1354,5 +1354,7 @@
   "boot.lx.logon_domain_profile_password": "Po instalacji zaloguj się do domeny {1} jako {0} hasłem ustawionym w profilu odpowiedzi.",
   "boot.lx.logon_autologon": "Po instalacji Windows zaloguje się automatycznie jako {0}.",
   "boot.lx.logon_setup_asks": "Instalator Windows zapyta w trakcie instalacji o nazwę użytkownika i hasło; USOS ich nie ustawia.",
-  "boot.lx.logon_answer_file": "Po instalacji zaloguj się kontem z Twojego pliku odpowiedzi {0}."
+  "boot.lx.logon_answer_file": "Po instalacji zaloguj się kontem z Twojego pliku odpowiedzi {0}.",
+  "boot.profile.field.display_bpp": "Głębia kolorów",
+  "boot.profile.help.display_legacy": "Ustawiane po instalacji na prawdziwym sprzęcie. Automatycznie: dostępny tryb do 1920x1080, z bezpiecznym wyborem niższego trybu. Bez zmian zachowuje ustawienia instalacji. Automatyczna głębia: 32 bity, gdy dostępne, inaczej 16."
 }
