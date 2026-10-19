@@ -171,7 +171,7 @@ class Flow(unittest.TestCase):
     def test_prepare_gate(self):
         prep = (ROOT / 'tools/w9x_csmwrap_prepare.sh').read_text(encoding='utf-8')
         gate = prep[prep.index('    nvme9x=0\n'):]
-        self.assertIn('[ -f "/mnt/data/Systems/Windows/$folder/Unattended/nvme-experimental.txt" ]', gate)
+        self.assertIn('[ -f "/mnt/data/Systems/$data_category/$folder/Unattended/nvme-experimental.txt" ]', gate)
         self.assertLess(gate.index('nvme9x=1'), gate.index('W9X_NVME_DRIVER="$nvme9x"'))
         inject = prep[prep.index('PHASE1 PASS $vm_check'):]
         self.assertIn('w9x_nvme_inject "$nvme_loop"', inject)
