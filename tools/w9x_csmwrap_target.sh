@@ -228,7 +228,7 @@ if grep -q '^;USOS-DISPLAY=' "$ANSWER_INF"; then
     display_request=$(usos_display_from_answer "$ANSWER_INF") || fail 'invalid display request'
     usos_display_stage "$work/c/USOS9X" "$LIB/w9x-display/USOSRES.EXE" "$display_request" || fail 'cannot stage 9x display request'
     cp "$LIB/w9x-display/USOSVBI.EXE" "$work/c/USOS9X/USOSVBI.EXE" || fail 'cannot stage VBE reader'
-    usos_display_9x_answer "$ANSWER_INF" > "$work/display-answer.inf" || fail 'cannot register hardware display request'
+    usos_display_9x_answer "$work/c/USOS9X/MSBATCH.INF" > "$work/display-answer.inf" || fail 'cannot register hardware display request'
     cp "$work/display-answer.inf" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot stage display answer'
     log "display: request=$display_request, validated VBE/INF mode at hardware logon"
 fi

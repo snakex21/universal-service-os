@@ -1354,5 +1354,7 @@
   "boot.lx.logon_domain_profile_password": "Po diegimo prisijunkite prie domeno {1} kaip {0} atsakymų profilyje nustatytu slaptažodžiu.",
   "boot.lx.logon_autologon": "Po diegimo Windows automatiškai prisijungs kaip {0}.",
   "boot.lx.logon_setup_asks": "Windows sąranka diegimo metu paklaus vartotojo vardo ir slaptažodžio; USOS jų nenustato.",
-  "boot.lx.logon_answer_file": "Po diegimo prisijunkite paskyra iš savo atsakymų failo {0}."
+  "boot.lx.logon_answer_file": "Po diegimo prisijunkite paskyra iš savo atsakymų failo {0}.",
+  "boot.profile.field.display_bpp": "Spalvų gylis",
+  "boot.profile.help.display_legacy": "Taikoma po diegimo tikroje aparatinėje įrangoje. Automatiškai parenkamas galimas režimas iki 1920x1080, prireikus saugiai mažesnis. Nekeisti išlaiko nuostatas. Automatinis gylis: 32 bitai, jei galima, kitu atveju 16."
 }

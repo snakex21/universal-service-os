@@ -663,7 +663,7 @@ fn buildFields() void {
     if (answer.display_profile.supportsSystem(system_id)) {
         if (family == null) addField(.section_extras, .{ .kind = .section, .label = t(.profile_section_extras) });
         if (family == null) addField(.display, .{ .kind = .choice, .label = t(.profile_field_display), .options = display_options[0..display_option_count], .index = &display_index });
-        addField(.display_bpp, .{ .kind = .choice, .label = t(.profile_field_display_bpp), .options = &bpp_options, .index = &bpp_index });
+        if (display_index != 0) addField(.display_bpp, .{ .kind = .choice, .label = t(.profile_field_display_bpp), .options = &bpp_options, .index = &bpp_index });
     }
     addField(.save, .{ .kind = .action, .label = t(.profile_save), .primary = true, .id = save_id });
     addField(.cancel, .{ .kind = .action, .label = t(.profile_cancel), .id = cancel_id });

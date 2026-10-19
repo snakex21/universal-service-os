@@ -201,13 +201,6 @@ pub fn tweakAvailable(tweak: Tweak, family: Family) bool {
     unreachable;
 }
 
-/// Legacy renderers have no NT6 unattend schema level.
-pub fn tweakAvailableForSystem(tweak: Tweak, system_id: []const u8) bool {
-    if (@import("display_profile.zig").supportsSystem(system_id) and (tweak == .display or tweak == .display_bpp)) return true;
-    const family = target.familyFor(system_id) orelse return false;
-    return tweakAvailable(tweak, family);
-}
-
 /// The profile field of a tweak (theme and display are choices).
 pub fn tweakField(tweak: Tweak) @import("profile.zig").Field {
     return switch (tweak) {

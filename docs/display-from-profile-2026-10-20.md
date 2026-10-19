@@ -154,3 +154,32 @@ Microsoft's [EnumDisplaySettings](https://learn.microsoft.com/en-us/windows/win3
 and [VideoPortSetRegistryParameters](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/video/nf-video-videoportsetregistryparameters)
 documentation. No NT5 leaked source was used for this change. No Microsoft
 binaries or product keys were added.
+# Review corrections, 2026-10-20
+
+All 27 installer catalogs now contain the legacy display help and color-depth
+label; the boot-font coverage test also passes. The depth row is hidden when
+the legacy UI selection is Unchanged. The unused schema wrapper was removed.
+
+The old USER32 adapter uses DEVMODE sizes 124/148/156 according to the OS,
+with bounded fallback attempts. CDS_GLOBAL is used only on NT5, and a
+BADFLAGS response retries without it. If ENUM_CURRENT_SETTINGS is unavailable,
+read-only GetDeviceCaps values must match a real enumerated mode before it can
+be used as the rollback mode. VGA below 16 bpp and permission failures retain
+the request and Run/service registration. Negative result codes are signed.
+
+The 9x target transforms the staged MSBATCH, preserving LAN/addons edits made
+earlier. Tests execute the actual 9x/NT3/NT4 target blocks against own files,
+including preservation of removed Run rows and existing VESA.REG content.
+Windows 2000 logs the DISPLAY.REG import in usos-setup.log.
+
+NT3 uses the Zig build option from review B2(b). build_nt3 is shared by the
+package, import/PE tests, NVMe test and optional VM overlay builder; they no
+longer inspect the old WDK binary while shipping another file. Hardware
+regression still needs **NT 3.1 and NT 3.51 without a display profile**, before
+accepting this compiler change. NT3.5 display selection additionally needs
+the separately rebuilt miniport; it safely retains a request without its list.
+
+Automatic mode remains an **explicit profile request**, not a new default.
+No EDID/native monitor limit is claimed; CDS_TEST alone cannot prove monitor
+support. Expanding beta-family support is deferred until those flows are
+validated. The current staging paths still assume the existing C: layout.

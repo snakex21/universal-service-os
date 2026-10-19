@@ -33,9 +33,18 @@ def build(root: Path, output: Path, win9x: bool = False, registrar: bool = False
     return exe
 
 
+def build_nt3(root: Path, output: Path | None = None) -> Path:
+    """Single entry point shared by the package and its import/flow tests."""
+    return build(root, output or root/'zig-out/windows-usos-res', registrar=True)
+
+
 def build_collector(root: Path, output: Path) -> Path:
-    """Use a configured OpenWatcom installation; never download implicitly."""
-    watcom = Path(os.environ.get('USOS_WATCOM', root/'tools/cache/openwatcom/ow-bac354f3c75f'))
+    """Use an explicit toolchain, otherwise the buildkit's pinned resolver."""
+    if os.environ.get('USOS_WATCOM'):
+        watcom = Path(os.environ['USOS_WATCOM'])
+    else:
+        from build_win3_usb_keyboard import openwatcom
+        watcom = openwatcom()
     compiler = watcom/'binnt64/wcc.exe'
     if not compiler.is_file():
         raise FileNotFoundError('Set USOS_WATCOM to the OpenWatcom folder containing binnt64/wcc.exe')

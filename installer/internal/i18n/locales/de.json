@@ -1351,5 +1351,7 @@
   "boot.lx.logon_domain_profile_password": "Nach der Installation an der Domäne {1} als {0} mit dem im Antwortprofil festgelegten Kennwort anmelden.",
   "boot.lx.logon_autologon": "Nach der Installation meldet sich Windows automatisch als {0} an.",
   "boot.lx.logon_setup_asks": "Windows Setup fragt während der Installation nach Benutzername und Kennwort; USOS legt sie nicht fest.",
-  "boot.lx.logon_answer_file": "Nach der Installation mit dem Konto aus Ihrer Antwortdatei {0} anmelden."
+  "boot.lx.logon_answer_file": "Nach der Installation mit dem Konto aus Ihrer Antwortdatei {0} anmelden.",
+  "boot.profile.field.display_bpp": "Farbtiefe",
+  "boot.profile.help.display_legacy": "Wird nach der Installation auf der echten Hardware angewendet. Automatisch wählt einen verfügbaren Modus bis 1920x1080 mit sicherem Rückfall. Unverändert behält die Einstellungen bei. Automatische Farbtiefe: 32 Bit, falls verfügbar, sonst 16."
 }

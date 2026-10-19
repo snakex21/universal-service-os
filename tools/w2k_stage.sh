@@ -960,7 +960,7 @@ usos_w2k_vesa_stage() {
             usos_display_run_reg W2K > "$1/DISPLAY.REG" || return 1
             # Existing vesa.cmd ends the registration with call :vgaentry and
             # then exits. Register before it, only when VESA succeeded.
-            awk '{sub(/\r$/, "")} /^echo vesa on:/ {printf "if exist \"%%USOS_DIR%%\\DISPLAY.REG\" \"%%SystemRoot%%\\regedit.exe\" /s \"%%USOS_DIR%%\\DISPLAY.REG\"\r\n"} {printf "%s\r\n",$0}' "$1/vesa.cmd" > "$1/vesa-display.cmd" || return 1
+            awk '{sub(/\r$/, "")} /^echo vesa on:/ {printf "if exist \"%%USOS_DIR%%\\DISPLAY.REG\" \"%%SystemRoot%%\\regedit.exe\" /s \"%%USOS_DIR%%\\DISPLAY.REG\"\r\nif exist \"%%USOS_DIR%%\\DISPLAY.REG\" echo display helper registered >> \"%%USOS_LOG%%\"\r\n"} {printf "%s\r\n",$0}' "$1/vesa.cmd" > "$1/vesa-display.cmd" || return 1
             mv "$1/vesa-display.cmd" "$1/vesa.cmd" || return 1
             printf '[W2K_STAGE] DISPLAY request=%s first_mode=1024x768x16 apply=hardware-logon\n' "$w2k_display_request"
         fi

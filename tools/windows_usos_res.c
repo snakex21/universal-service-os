@@ -13,19 +13,21 @@
 #include "display_vbe.h"
 #include "display_inf.h"
 #define DISPLAY_BUFFERS 1
-#define DISPLAY_APPLY CDS_UPDATEREGISTRY
 #else
 #define DISPLAY_BUFFERS 0
-#define DISPLAY_APPLY (CDS_UPDATEREGISTRY|CDS_GLOBAL)
 #endif
 
 typedef BOOL (WINAPI *EnumModes)(LPCSTR, DWORD, DEVMODEA *);
 typedef LONG (WINAPI *ChangeMode)(DEVMODEA *, DWORD);
+#include "display_compat.h"
 static char directory[MAX_PATH], path[MAX_PATH], line[512];
 static HANDLE log_file = INVALID_HANDLE_VALUE;
 static UsosDisplayMode modes[USOS_DISPLAY_MAX];
 static DEVMODEA settings[USOS_DISPLAY_MAX], current;
 static ChangeMode change_mode;
+static HMODULE display_user;
+static DWORD display_flags;
+static int permission_failure;
 static const char run_key[] = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 #ifndef USOSRES_9X
 static SERVICE_STATUS service_status;
@@ -55,6 +57,9 @@ static void number(unsigned long n) {
     char out[16], reverse[16]; int i=0,j=0;
     do { reverse[i++]=(char)('0'+n%10); n/=10; } while(n);
     while(i) out[j++]=reverse[--i]; out[j]=0; lstrcatA(line,out);
+}
+static void signed_number(long n) {
+    if(n<0) {lstrcatA(line,"-");number(0UL-(unsigned long)n);} else number((unsigned long)n);
 }
 static void describe(const UsosDisplayMode *m) {
     number(m->width); lstrcatA(line,"x"); number(m->height); lstrcatA(line,"x"); number(m->bpp);
@@ -123,12 +128,26 @@ static long action_test(void *context,int index,const char *reason) {
     LONG result; (void)context;
     result=change_mode(&settings[index],CDS_TEST);
     lstrcpyA(line,"DISPLAY selected=");describe(&modes[index]);lstrcatA(line," reason=");
-    lstrcatA(line,reason);lstrcatA(line," test=");number((unsigned long)result);
+    if(result==DISP_CHANGE_NOTUPDATED)permission_failure=1;
+    lstrcatA(line,reason);lstrcatA(line," test=");signed_number(result);
     lstrcatA(line,"\r\n");say(line);return result;
 }
 static int action_backup(void *context) {(void)context;return save_current();}
-static long action_apply(void *context,int index) {(void)context;return change_mode(&settings[index],DISPLAY_APPLY);}
-static long action_rollback(void *context) {(void)context;return change_mode(&current,DISPLAY_APPLY);}
+static long action_apply(void *context,int index) {(void)context;return usos_display_change(change_mode,&settings[index],display_flags);}
+static long action_rollback(void *context) {(void)context;return usos_display_change(change_mode,&current,display_flags);}
+static int current_caps(DWORD *width,DWORD *height,DWORD *bpp) {
+    HMODULE gdi=LoadLibraryA("gdi32.dll");HDC dc;int ok=0;
+    HDC(WINAPI *get_dc)(HWND);int(WINAPI *release_dc)(HWND,HDC);int(WINAPI *caps)(HDC,int);
+    if(!gdi)return 0;
+    get_dc=(void*)GetProcAddress(display_user,"GetDC");release_dc=(void*)GetProcAddress(display_user,"ReleaseDC");
+    caps=(void*)GetProcAddress(gdi,"GetDeviceCaps");
+    if(get_dc&&release_dc&&caps&&(dc=get_dc(NULL))!=NULL) {
+        *width=(DWORD)caps(dc,HORZRES);*height=(DWORD)caps(dc,VERTRES);
+        *bpp=(DWORD)(caps(dc,BITSPIXEL)*caps(dc,PLANES));
+        ok=*width&&*height&&*bpp;release_dc(NULL,dc);
+    }
+    FreeLibrary(gdi);return ok;
+}
 static int vm(void) {
     unsigned a,b,c,d;
     return __get_cpuid(1,&a,&b,&c,&d) && (c & (1U<<31));
@@ -255,11 +274,15 @@ static void run(void) {
 #endif
         CloseHandle(log_file); leave(0);
     }
-    zero(&current,sizeof current); current.dmSize=sizeof current;
-    if(!enumerate(NULL,(DWORD)-1,&current)) { say("DISPLAY no current mode for rollback; unchanged\r\n"); CloseHandle(log_file); leave(1); }
+    display_user=user;
+    if(!usos_display_current(enumerate,GetVersion(),current_caps,&current)) { say("DISPLAY no current mode for rollback; request retained\r\n"); CloseHandle(log_file); leave(1); }
+    if(current.dmBitsPerPel<16) {say("DISPLAY VGA/low depth; request retained for the normal driver\r\n");CloseHandle(log_file);leave(0);}
+    display_flags=CDS_UPDATEREGISTRY;
+#ifndef USOSRES_9X
+    if((GetVersion()&255)>=5)display_flags|=CDS_GLOBAL;
+#endif
     for(i=0;i<USOS_DISPLAY_MAX;i++) {
-        zero(&settings[count],sizeof(DEVMODEA)); settings[count].dmSize=sizeof(DEVMODEA);
-        if(!enumerate(NULL,i,&settings[count])) break;
+        if(!usos_display_enum(enumerate,GetVersion(),i,&settings[count])) break;
         modes[count].width=settings[count].dmPelsWidth; modes[count].height=settings[count].dmPelsHeight;
         modes[count].bpp=settings[count].dmBitsPerPel;
         /* Progressive 60 Hz or firmware default only; no guessed refresh. */
@@ -273,9 +296,12 @@ static void run(void) {
     request_log(&request,count);
     change_mode=change;
     transaction=usos_display_execute(modes,count,&request,DISPLAY_BUFFERS,&actions);
+    if(usos_display_retry(current.dmBitsPerPel,transaction.state,transaction.apply_result,permission_failure)) {
+        say("DISPLAY permissions prevent saving; request retained\r\n");CloseHandle(log_file);leave(1);
+    }
     if(transaction.state==4) say("DISPLAY cannot save rollback mode; unchanged\r\n");
     else if(transaction.state==3) {
-        lstrcpyA(line,"DISPLAY apply failed; rollback=");number((unsigned long)transaction.rollback_result);
+        lstrcpyA(line,"DISPLAY apply failed; rollback=");signed_number(transaction.rollback_result);
         lstrcatA(line,"\r\n");say(line);
         finish(transaction.rollback_result==0 ? "DISPLAY previous mode restored" : "DISPLAY rollback failed; inspect DISPLAY.BAK");
     } else finish(transaction.state==1 ? "DISPLAY applied" : transaction.state==2 ? "DISPLAY saved; restart required" : "DISPLAY no tested mode; current retained");

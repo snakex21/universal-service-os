@@ -774,10 +774,10 @@ def main() -> int:
         from build_windows_usos_reg import build as build_usos_reg
         usos_reg = build_usos_reg(root, root / "zig-out/windows-usos-reg")
         put(entries, Entry("usr/lib/usos/usos-reg.exe", stat.S_IFREG | 0o644, usos_reg.read_bytes()))
-        from build_windows_usos_res import build as build_usos_res, build_collector as build_vbe_collector
+        from build_windows_usos_res import build as build_usos_res, build_collector as build_vbe_collector, build_nt3
         usos_res = build_usos_res(root, root / "zig-out/windows-usos-res")
         put(entries, Entry("usr/lib/usos/USOSRES.EXE", stat.S_IFREG | 0o644, usos_res.read_bytes()))
-        nt3_post = build_usos_res(root, root / "zig-out/windows-usos-res", registrar=True)
+        nt3_post = build_nt3(root)
         put(entries, Entry("usr/lib/usos/nt3/USOSNT3.EXE", stat.S_IFREG | 0o644, nt3_post.read_bytes()))
         res9x_out = root / "zig-out/windows-usos-res/9x"
         res9x = build_usos_res(root, res9x_out, win9x=True)

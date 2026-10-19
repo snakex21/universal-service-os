@@ -1354,5 +1354,7 @@
   "boot.lx.logon_domain_profile_password": "Po inštalácii sa prihláste do domény {1} ako {0} heslom nastaveným v profile odpovedí.",
   "boot.lx.logon_autologon": "Po inštalácii sa Windows prihlási automaticky ako {0}.",
   "boot.lx.logon_setup_asks": "Inštalátor Windows sa počas inštalácie opýta na meno používateľa a heslo; USOS ich nenastavuje.",
-  "boot.lx.logon_answer_file": "Po inštalácii sa prihláste účtom zo svojho súboru odpovedí {0}."
+  "boot.lx.logon_answer_file": "Po inštalácii sa prihláste účtom zo svojho súboru odpovedí {0}.",
+  "boot.profile.field.display_bpp": "Počet bitov farby",
+  "boot.profile.help.display_legacy": "Použije sa po inštalácii na skutočnom hardvéri. Automaticky vyberie dostupný režim do 1920x1080 s bezpečným prechodom na nižší. Bez zmeny zachová nastavenia. Automatický počet bitov: 32, ak sú dostupné, inak 16."
 }

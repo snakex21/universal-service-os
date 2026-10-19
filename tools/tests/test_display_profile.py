@@ -114,6 +114,7 @@ class DisplayTransport(unittest.TestCase):
         cmd = (dest/'vesa.cmd').read_bytes()
         self.assertIn(b'if exist "%USOS_DIR%\\DISPLAY.REG" "%SystemRoot%\\regedit.exe" /s "%USOS_DIR%\\DISPLAY.REG"\r\n', cmd)
         self.assertLess(cmd.index(b'if exist "%USOS_DIR%\\DISPLAY.REG"'), cmd.index(b'echo vesa on:'))
+        self.assertIn(b'echo display helper registered >> "%USOS_LOG%"', cmd)
         self.assertNotIn(b'\n', cmd.replace(b'\r\n', b''))
         for p in dest.iterdir():
             p.unlink()
@@ -121,6 +122,38 @@ class DisplayTransport(unittest.TestCase):
         self.assertEqual(shell(code).returncode, 0)
         self.assertFalse((dest/'DISPLAY.TXT').exists())
         self.assertNotIn(b'DISPLAY.REG', (dest/'vesa.cmd').read_bytes())
+
+    def test_target_blocks_keep_staged_changes_and_register_nt_requests(self):
+        from test_nt4_flow import function_text
+        lib=self.tmp/'lib';lib.mkdir();(lib/'w9x-display').mkdir()
+        shutil.copy(ROOT/'tools/display_profile.sh',lib/'display_profile.sh')
+        for name in ('USOSRES.EXE','w9x-display/USOSRES.EXE','w9x-display/USOSVBI.EXE'):(lib/name).write_bytes(b'own helper fixture')
+        answer=self.tmp/'answer';answer.write_text(';USOS-DISPLAY=1920x1080x16\n[Install]\nAddReg=USOS.RunOnce,USOS.Lan,USOS.Addons\nHKLM,Run,USOSLan,,missing.exe\n')
+        target=self.tmp/'c/USOS9X';target.mkdir(parents=True)
+        # Network/addons have already removed an unavailable helper's Run row.
+        staged=target/'MSBATCH.INF';staged.write_bytes(answer.read_bytes().replace(b'\r',b'').replace(b'HKLM,Run,USOSLan,,missing.exe\n',b''))
+        text=(ROOT/'tools/w9x_csmwrap_target.sh').read_text();start=text.index("if grep -q '^;USOS-DISPLAY='");end=text.index('\nfor name in INSTALL.BAT',start)
+        pre='fail() { echo "$*" >&2; exit 1; }; log() { :; }; '
+        env='LIB='+quote(lib)+' work='+quote(self.tmp)+' ANSWER_INF='+quote(answer)+' ANSWER_SIF='+quote(answer)+'; '
+        r=shell(pre+env+text[start:end]);self.assertEqual(r.returncode,0,r.stderr)
+        rendered=staged.read_bytes();self.assertNotIn(b'missing.exe',rendered);self.assertIn(b'AddReg=USOS.RunOnce,USOS.Lan,USOS.Addons,USOS.Display',rendered)
+        nt=self.tmp/'NT3';nt.mkdir()
+        r=shell(pre+env+'usos='+quote(nt)+" nt3=1 nt31=''; "+function_text(ROOT/'tools/nt4_csmwrap_target.sh','nt3_stage_profile')+'; nt3_stage_profile')
+        self.assertEqual(r.returncode,0,r.stderr);self.assertEqual((nt/'DISPLAY.TXT').read_bytes(),b'1920x1080x16\r\n')
+        nt4=self.tmp/'NT4';nt4.mkdir();(nt4/'VESA.REG').write_bytes(b'REGEDIT4\r\n; preserved driver values\r\n')
+        text=(ROOT/'tools/nt4_csmwrap_target.sh').read_text();start=text.index('if [ -z "$nt3" ] && [ -z "$nt31" ] && grep');end=text.index('\nfor file in "$SYSLINUX_DIR',start)
+        r=shell(pre+env+'usos='+quote(nt4)+" nt3='' nt31=''; "+text[start:end]);self.assertEqual(r.returncode,0,r.stderr)
+        self.assertIn(b'; preserved driver values\r\n',(nt4/'VESA.REG').read_bytes());self.assertIn(b'"USOSDisplay"=',(nt4/'VESA.REG').read_bytes())
+
+    def test_collector_uses_pinned_buildkit_resolver_when_no_override(self):
+        from unittest.mock import patch
+        import build_win3_usb_keyboard
+        watcom=Path(os.environ['USOS_WATCOM'])
+        with patch.dict(os.environ,{},clear=False):
+            os.environ.pop('USOS_WATCOM',None)
+            with patch.object(build_win3_usb_keyboard,'openwatcom',return_value=watcom) as resolve:
+                build_collector(ROOT,self.tmp/'collector')
+                resolve.assert_called_once_with()
 
 
 class TargetBuilds(unittest.TestCase):
