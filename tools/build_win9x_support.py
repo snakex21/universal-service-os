@@ -90,7 +90,7 @@ FILES = ('U9FIX.COM', 'U9FIX.TXT', 'USOSVESA.INF', 'VESAMINI.DRV', 'VESAMINI.VXD
     # Under CSMWrap: VBMOUSE in MS-DOS mode only (DOSSTART.BAT calls DOSMOUSE).
     'DOSMOUSE.BAT', 'INWIN.COM') + (
     # Under CSMWrap: CONFIG.SYS loads it first (dos_native_iso.zig, INSTALL.BAT).
-    'CREGFIX.SYS',)
+    'CREGFIX.SYS', 'USOSLAN.EXE')
 BRIDGE = ('USOSKEY.COM', 'USOSKEY.DRV', 'USOSMOUS.DRV', 'VBMOUSE.EXE', 'VBMOUSE.DRV', 'VBADOS.TXT')
 # Everything on the stick (the payload list and the release check use it).
 STAGED = FILES + ('MSBATCH.INF', 'VMDISP9X.TGZ', 'XHCI98.SYS', 'XHCI98.INF', 'XHCI98.TXT',
@@ -442,8 +442,8 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
     stage_xhci98(out)
     stage_cregfix(out)
     stage_usosnvme(out)
-    from build_windows_usos_lan import stage_driver as stage_lan_driver
-    stage_lan_driver(root, work / 'network')
+    from build_windows_usos_lan import build as build_lan
+    shutil.copyfile(build_lan(root, work / 'network')['USOSLAN9X.EXE'], out / 'USOSLAN.EXE')
     msdos = root / 'zig-out/dos-native/msdos'
     for name in BRIDGE:
         if not (msdos / name).is_file():

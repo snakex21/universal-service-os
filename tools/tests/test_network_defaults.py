@@ -110,6 +110,15 @@ class Stage(unittest.TestCase):
         self.assertEqual(r.returncode,0,r.stderr);self.assertIn(b'static IP not applied',r.stdout);self.assertNotIn(b'SpecificTo=',r.stdout)
 
 class Builds(unittest.TestCase):
+    def test_retry_policy_native_config_and_target_matching(self):
+        zig=Path(os.environ.get('USOS_ZIG',ROOT/'tools/zig/zig.exe'));out=OUT/'policy';out.mkdir(exist_ok=True)
+        env=dict(os.environ,TEMP=str(out),TMP=str(out),ZIG_GLOBAL_CACHE_DIR=str(ROOT/'tools/cache/zig-global'),ZIG_LOCAL_CACHE_DIR=str(out/'zig-cache'))
+        for name in ('lan_policy_test','desktop_wait_test'):
+            exe=out/(name+'.exe')
+            subprocess.run([str(zig),'cc','-target','x86_64-windows-gnu','-Os','-nostdlib','-fno-builtin','-fms-extensions',
+                            '-isystem',str(zig.parent/'lib/libc/include/any-windows-any'),str(ROOT/'tools/tests'/(name+'.c')),
+                            '-Wl,--entry,entry','-lkernel32','-ladvapi32','-o',str(exe)],env=env,check=True)
+            self.assertEqual(subprocess.run([str(exe)],env=env).returncode,0,name)
     def test_windowless_pe4_no_crt_and_nt4_exports(self):
         files=build(ROOT,OUT/'build')
         table={};current=None
@@ -143,9 +152,9 @@ class Render(unittest.TestCase):
             out=OUT/(os_id+'.answer')
             subprocess.run([str(ROOT/'zig-out/bin/usos-answer.exe'),'render',str(profile),os_id,'x86',str(out)],check=True)
             expected=ROOT/'tools/tests/data'/('network-off.'+os_id+'.txt')
-            self.assertEqual(out.read_bytes().replace(b'\r',b''),expected.read_bytes().replace(b'\r',b''))
+            self.assertEqual(out.read_bytes(),expected.read_bytes())
     def test_default_source_and_renderer_have_same_lan_section(self):
-        profile=OUT/'default.ini';profile.write_text('name=LAN\nuser=Tester\n')
+        profile=OUT/'default.ini';profile.write_text('name=LAN\nuser=USOS\n')
         out=OUT/'default.inf'
         subprocess.run([str(ROOT/'zig-out/bin/usos-answer.exe'),'render',str(profile),'windows-98-se','x86',str(out)],check=True)
         def section(text,name):
@@ -154,5 +163,22 @@ class Render(unittest.TestCase):
         default=(ROOT/'src/platform/bios/win9x/msbatch.inf').read_text()
         for name in ('MSTCP','USOS.Lan'):
             self.assertEqual(section(default,name),section(out.read_text(),name))
+
+    def test_first_logon_dns_and_nt4_service_dependencies(self):
+        p=OUT/'first.ini';p.write_text('name=LAN\nuser=Tester\n')
+        for os_id in ('windows-98-se','windows-me','windows-nt-4'):
+            out=OUT/'first.answer';subprocess.run([str(ROOT/'zig-out/bin/usos-answer.exe'),'render',str(p),os_id,'x86',str(out)],check=True)
+            text=out.read_text()
+            if os_id=='windows-nt-4':
+                for service in ('LanmanServer','Browser'):self.assertIn('Services\\'+service+'|Start|dword|4',text)
+            else:
+                self.assertIn('DNS=1\nHostname=',text);self.assertNotIn('DNSServers=',text)
+                for value in ('AutoAdminLogon,,"1"','DefaultUserName,,"Tester"','DefaultPassword,,""','"First Home Page",,"about:blank"'):self.assertIn(value,text)
+
+    def test_dos_native_carries_the_same_helper(self):
+        native=(ROOT/'src/platform/bios/dos_native_iso.zig').read_text();builder=(ROOT/'tools/build_win9x_support.py').read_text();install=(ROOT/'src/platform/bios/dos_startup.cmd').read_text()
+        self.assertIn('"USOSLAN.EXE"',native);self.assertIn("out / 'USOSLAN.EXE'",builder)
+        self.assertIn('IF EXIST %U9T%\\USOSLAN.EXE COPY /Y %U9T%\\USOSLAN.EXE C:\\USOS9X',install)
+        self.assertIn('COPY /Y %U9T%\\MSBATCH.INF C:\\USOS9X\\MSBATCH.INF',install)
 
 if __name__=='__main__':unittest.main()

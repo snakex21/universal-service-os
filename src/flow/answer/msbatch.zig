@@ -181,7 +181,7 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
             else => {},
         };
     }
-    if (p.network == .on) try @import("network_defaults.zig").msbatchRegistry(&w);
+    if (p.network == .on) try @import("network_defaults.zig").msbatchRegistry(p, &w);
     try w.writeAll(
         \\
         \\[USOS.Memory]

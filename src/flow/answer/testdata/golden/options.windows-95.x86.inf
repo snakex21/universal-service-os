@@ -42,7 +42,8 @@ ValidatedLogon=0
 
 [MSTCP]
 DHCP=1
-DNS=0
+DNS=1
+Hostname=USOS-9X
 
 [OptionalComponents]
 "Dial-Up Networking"=0
@@ -77,6 +78,12 @@ HKCU,"Software\Microsoft\Windows\CurrentVersion\Internet Settings",NoNetAutodial
 HKLM,"Software\Microsoft\Windows\CurrentVersion\Internet Settings",EnableAutodial,0x00010001,0
 HKCU,"Software\Microsoft\Internet Connection Wizard",Completed,1,01,00,00,00
 HKCU,"Software\Microsoft\Internet Explorer\Main","Start Page",,"about:blank"
+HKCU,"Software\Microsoft\Internet Explorer\Main","First Home Page",,"about:blank"
+HKCU,"Software\Microsoft\Internet Explorer\Main",RunOnceHasShown,0x00010001,1
+HKCU,"Software\Microsoft\Internet Explorer\Main",RunOnceComplete,0x00010001,1
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Winlogon",AutoAdminLogon,,"1"
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Winlogon",DefaultUserName,,"Tester"
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Winlogon",DefaultPassword,,""
 HKLM,"System\CurrentControlSet\Services\VxD\MSTCP",EnableDNS,,"1"
 HKLM,"Software\Microsoft\Windows\CurrentVersion\Run",USOSLan,,"C:\USOS9X\USOSLAN.EXE"
 

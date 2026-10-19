@@ -33,19 +33,26 @@ pub fn msbatch(p: *const Profile, computer: []const u8, me: bool, w: *std.Io.Wri
         try w.print("DHCP=0\r\nIPAddress={s}\r\nIPMask={s}\r\n", .{ ip(p)[0..slash], try values.dotted(values.mask(n), &buf) });
         if (p.gateway.len > 0) try w.print("Gateways={s}\r\n", .{p.gateway.slice()});
     } else try w.writeAll("DHCP=1\r\n");
-    // DHCP DNS is supplied by the lease. The hardware step enforces EnableDNS=1.
-    try w.print("DNS={s}\r\n", .{if (p.dns.len > 0) "1" else "0"});
-    if (p.dns.len > 0) try w.print("DNSServers={s}\r\nHostname={s}\r\n", .{ p.dns.slice(), computer });
+    // Enable the resolver before the first lease; omit servers to use DHCP.
+    const enable_dns = values.prefix(ip(p)) == null or p.dns.len > 0;
+    try w.print("DNS={s}\r\n", .{if (enable_dns) "1" else "0"});
+    if (enable_dns) try w.print("Hostname={s}\r\n", .{computer});
+    if (p.dns.len > 0) try w.print("DNSServers={s}\r\n", .{p.dns.slice()});
     try w.print("\r\n[OptionalComponents]\r\n\"Dial-Up Networking\"={d}\r\n\"Dial-Up Server\"=0\r\n\"Direct Cable Connection\"=0\r\n", .{@as(u8, if (!me and p.dialup == .on) 1 else 0)});
     try metadata(p, me, w);
 }
 
-pub fn msbatchRegistry(w: *std.Io.Writer) !void {
+pub fn msbatchRegistry(p: *const Profile, w: *std.Io.Writer) !void {
     try w.writeAll("\r\n[USOS.Lan]\r\n");
     for ([_][]const u8{ "EnableAutodial", "ProxyEnable", "GlobalUserOffline" }) |name|
         try w.print("HKCU,\"{s}\",{s},0x00010001,0\r\n", .{ internet, name });
     try w.print("HKCU,\"{s}\",NoNetAutodial,0x00010001,1\r\nHKLM,\"{s}\",EnableAutodial,0x00010001,0\r\n", .{ internet, internet });
     try w.print("HKCU,\"{s}\",Completed,1,01,00,00,00\r\nHKCU,\"{s}\",\"Start Page\",,\"about:blank\"\r\n", .{ wizard, main });
+    try w.print("HKCU,\"{s}\",\"First Home Page\",,\"about:blank\"\r\n", .{main});
+    for ([_][]const u8{ "RunOnceHasShown", "RunOnceComplete" }) |name|
+        try w.print("HKCU,\"{s}\",{s},0x00010001,1\r\n", .{ main, name });
+    const winlogon = "Software\\Microsoft\\Windows\\CurrentVersion\\Winlogon";
+    try w.print("HKLM,\"{s}\",AutoAdminLogon,,\"1\"\r\nHKLM,\"{s}\",DefaultUserName,,\"{s}\"\r\nHKLM,\"{s}\",DefaultPassword,,\"\"\r\n", .{ winlogon, winlogon, if (p.user.len > 0) p.user.slice() else "USOS", winlogon });
     try w.writeAll("HKLM,\"System\\CurrentControlSet\\Services\\VxD\\MSTCP\",EnableDNS,,\"1\"\r\n");
     try w.writeAll("HKLM,\"Software\\Microsoft\\Windows\\CurrentVersion\\Run\",USOSLan,,\"C:\\USOS9X\\USOSLAN.EXE\"\r\n");
 }
@@ -61,6 +68,9 @@ pub fn ntRegistry(p: *const Profile, prefix: []const u8, w: *std.Io.Writer) !voi
         try w.print("{s}{s}\\{s}|Completed|binary|01,00,00,00{s}", .{ prefix, root, wizard, eol });
         // Custom URLs are applied from the data file, never interpolated in CMD/INF.
         try w.print("{s}{s}\\{s}|Start Page|sz|about:blank{s}", .{ prefix, root, main, eol });
+        try w.print("{s}{s}\\{s}|First Home Page|sz|about:blank{s}", .{ prefix, root, main, eol });
+        for ([_][]const u8{ "RunOnceHasShown", "RunOnceComplete" }) |name|
+            try w.print("{s}{s}\\{s}|{s}|dword|1{s}", .{ prefix, root, main, name, eol });
     }
     try w.print("{s}HKLM\\{s}|EnableAutodial|dword|0{s}", .{ prefix, internet, eol });
 }
@@ -74,6 +84,7 @@ pub fn nt4(p: *const Profile, workgroup: []const u8, w: *std.Io.Writer) !void {
     try metadata(p, false, w);
     try ntRegistry(p, ";USOS-REG=", w);
     try w.writeAll(";USOS-REG=HKLM\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer|Start|dword|4\r\n");
+    try w.writeAll(";USOS-REG=HKLM\\SYSTEM\\CurrentControlSet\\Services\\Browser|Start|dword|4\r\n");
 }
 
 test "LAN off preserves the pre-network byte stream" {

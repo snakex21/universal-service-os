@@ -22,8 +22,8 @@ def build(root: Path, output: Path) -> dict[str, Path]:
         name = 'USOSLAN' + system + '.EXE'
         exe = output / name
         subprocess.run([str(zig), 'cc', '-target', 'x86-windows-gnu', '-mcpu=i586',
-                        '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin',
-                        '-I' + str(zig.parent / 'lib/libc/include/any-windows-any'),
+                        '-Os', '-nostdlib', '-fno-stack-protector', '-fno-builtin', '-fms-extensions',
+                        '-isystem', str(zig.parent / 'lib/libc/include/any-windows-any'),
                         '-DUSOS_LAN_' + system, str(root / 'tools/windows_usos_lan.c'),
                         '-Wl,--entry,entry', '-Wl,--subsystem,windows',
                         '-lkernel32', '-ladvapi32', '-o', str(exe)], env=env, check=True)

@@ -12,7 +12,7 @@ full Windows VM installation was performed for this change.
 | 95 | VREDIR + MSTCP, DHCP by default | NDIS 4 pending; never receives NDIS 5 | IE LAN defaults and Favorite if IE exposes its Favorites folder |
 | 98 / 98 SE | VREDIR + MSTCP, DHCP by default | Existing usosnet NDIS 5, only with matching Ethernet PCI ID and SYS/INF pair | EnableDNS, IE LAN defaults, Favorite, transport diagnostics |
 | Me | Same | Same | Additionally removes exactly the inbox `*PNP8387` Dial-Up Adapter through SetupAPI |
-| NT4 | Inbox MS Loopback + TCP/IP, Workstation; Server service disabled | NDIS 4 pending; never receives NDIS 5 | IE settings in current and Default User profiles, Favorites, no network wait |
+| NT4 | Inbox MS Loopback + TCP/IP, Workstation; Server and Browser services disabled | NDIS 4 pending; never receives NDIS 5 | IE settings in current and Default User profiles, Favorites, no network wait |
 | 2000 | Microsoft client + TCP/IP; no MS_Server in NetServices | Existing usosnet, matching hardware only; OEM package and merged OemPnPDriversPath | IE settings and Favorites; existing `reg=` setup path seeds defaults too |
 
 NT4's loopback uses `192.0.2.1/24`, **not a usable LAN address or DHCP
@@ -29,8 +29,11 @@ and configured addresses; no successful binding or DHCP lease is inferred
 from the answer file. These no-NIC cases still need real Setup validation.
 
 No file/printer sharing, VSERVER or new network service is requested. On
-9x, Windows primary logon avoids selecting the network client as the
-interactive primary logon while retaining VREDIR. No extra menu questions
+9x, Windows primary logon is paired with explicit AutoAdminLogon and the
+profile username (USOS for the stock answer), with an empty initial password,
+while retaining VREDIR. This corrects the previous assumption that primary
+logon alone prevented the first Client-for-Microsoft-Networks logon prompt.
+No extra menu questions
 or manual first-boot actions were added. XP/2003 and routing policy are
 outside this change.
 
@@ -90,11 +93,17 @@ PnP is retained: no `IgnoreDetectedNetCards=1` and no fixed `NetCards=`
 list. Driver IDs, `PollMode`, IRQ, ELCR and $PIR are unchanged. The INF is
 the match authority, including SUBSYS/REV restrictions if present.
 
-ICW completion and autodial settings prevent the normal modem wizard
-path. Localized `.LNK` files are **not guessed or bulk-deleted**: a shortcut
-may belong to a user or target something else. The present implementation
-does not promise removal of every legacy Internet shortcut or every IE
-welcome page; confirm that behavior on the target versions.
+ICW completion, autodial settings, First Home Page and RunOnce welcome flags
+are applied together. Localized desktop `.LNK` names are not guessed:
+IShellLink/IPersistFile reads each shortcut's actual target without executing
+or resolving it. Only an ICWCONN1.EXE target is removed; unrelated or unreadable
+links stay. Common Desktop is checked on NT. OLE32 is loaded dynamically.
+Confirm actual shortcut and IE behavior on the target versions.
+
+DHCP with no explicit DNS keeps `EnableDNS=1` and the computer Hostname,
+without inventing DNSServers. This allows DHCP-provided DNS; a lease and
+working resolution still require hardware validation. NT4 disables Browser
+as well as LanmanServer so the remaining service has no disabled dependency.
 
 ## Files, logs and execution
 
@@ -108,33 +117,60 @@ Absence of an optional driver never prevents installation.
 9x: `C:\USOS9X\NETCFG.INI`, `USOSLAN.EXE`, optional `NET\USOSNET.*` and
 `LOGS\NETSETUP.TXT`. INSTALL.BAT places the pair beside Setup only when
 both files exist, using the existing DevicePath=1 flow. The support builder
-also exposes the optional pair in its private build directory; selection
-and distribution remain centralized in initramfs staging.
+does not create an unused second driver stage. Selection and distribution
+remain centralized in initramfs staging.
+
+The DOS-native/RAM-disk route also carries USOSLAN.EXE. If NETCFG.INI has
+not been staged, the helper creates its portable config beside itself from
+the selected adjacent MSBATCH's own network/homepage metadata. Existing
+NETCFG.INI takes priority. This makes the browser configuration available
+on the native path without claiming a new native NDIS driver installation.
 
 NT: `C:\USOS\NT4` or `C:\USOS\W2K`, `NETCFG.INI`, `USOSLAN.EXE`, `LAN.REG`,
 `NETSETUP.TXT`. NT4 POST.CMD registers it after SP6; W2K's setup-end script
 registers it. W2K also stages the optional OEM driver package under its
 local source's OEM roots and in `C:\USOS\Drivers\USOSNET`, with readback.
 
-HKLM Run `USOSLan` is used, not RunOnce: the helper exits immediately in a
-VM or before Explorer's desktop and retains Run. On hardware it applies
-LAN browser settings and Favorites, removes Me Dial-Up, records diagnostics
-and removes its own Run entry after success. Failures retain it for a later
-logon. No service, task, console, sleep, network traffic or restart is added.
+HKLM Run `USOSLan` is used, not RunOnce: the helper exits in a VM and
+retains Run. On hardware an early invocation waits up to five minutes for
+relevant taskbar or RunOnce registry notifications. It pumps messages but
+does not periodically poll readiness. Older systems without SetWinEventHook
+can use one Explorer input-idle wait; timeout/unavailable notifications
+retain Run for a later logon. See [original Microsoft startup ordering,
+Q179365](https://ftp.zx.net.nz/pub/archive/ftp.microsoft.com/MISC/KB/en-us/179/365.HTM)
+and [SetWinEventHook](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwineventhook).
+
+NETSTATE.DAT beside the helper stores a config fingerprint, completed steps
+and an attempt counter. Only failed steps retry, for at most three attempts;
+then Run is removed and the log records the incomplete result. Successfully
+set IE/default-profile preferences are not overwritten on an ordinary retry
+for a failed Favorite or adapter removal. A new config resets the state.
+The addons runner's explicit `/refresh` reapplies browser/system defaults
+after an IE/DUN installation; normal Run registration omits that argument.
+Logs have a timestamp and attempt number. No service, task, console, network
+traffic or restart is added.
 An OS class-installer reboot requirement is logged and left to normal
 shutdown. DNS/binding changes may only become effective after that boot.
 No DHCP lease is asserted without a separate network test.
 
-Only NETCFG/logs/helper files are private app data. OS registry preferences
+Only NETCFG/state/logs/helper files are private app data. OS registry preferences
 and the user-requested Favorites are intentional system configuration.
 NT's Default User hive is loaded briefly, seeded and unloaded; .DEFAULT is
 not substituted for that profile. Existing other users are not migrated.
 
+When integrating the display and addons branches, stage display, then network,
+then addons. Each answer transform must consume the current staged MSBATCH.INF,
+preserving prior removed Run entries. The addons review calls USOSLAN with an
+explicit `/refresh` after its IE/DUN changes; that call and the persistent
+NETSTATE logic must land together. There is no required ordering between the
+ordinary Run entries: the explicit final refresh supplies the dependency.
+
 ## X470 verification to be performed by Claude
 
 Host results: 562 Zig tests and the interactive x64 UEFI build passed;
-95 selected Python tests plus the XP settings checks passed. The dedicated
-LAN suite passed 17 tests, including original-byte comparisons with
+98 selected Python tests plus the XP settings checks passed. The dedicated
+LAN suite passed 20 tests, including native retry-state/file roundtrips,
+notification/deadline/fallback behavior, verified-target matching and original-byte comparisons with
 `network=off`, the default source/renderer match, all four driver/card
 states, subsystem/revision matching, W2K static ambiguity, OEM path merge
 and PE/import checks. The full answer-render regression passed after the
@@ -157,7 +193,12 @@ by this task. No user DIAG command or photo is required.
 
 Second pass: fresh 98 SE with matching I211, plus a no-NIC/unsupported-NIC
 case when practical. Confirm VREDIR/MSTCP present, DUN absent, no Server
-sharing, IE opens without ICW/dialer, DHCP and DNS work. Then verify static
+sharing, automatic logon without the initial password dialog, IE opens
+without ICW/dialer, and DHCP plus `68k.news` resolution work in the first
+hardware session. Confirm the helper starts in that session and disappears
+from Run after success or its third failed attempt. Change the homepage after
+an IE-success/Favorite-failure run and confirm a later retry preserves it.
+On NT4 check absence of the Browser dependency startup error. Then verify static
 IP on exactly one NIC and the normal subsequent reboot. Run 2000 and NT4
 separately; host tests do not replace those checks. The existing usosnet
 20 ms polling/IRQ issue remains Claude's separate driver work.

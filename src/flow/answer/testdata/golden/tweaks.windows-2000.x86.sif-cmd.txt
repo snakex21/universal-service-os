@@ -66,10 +66,16 @@ USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings|GlobalUserOffli
 USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings|NoNetAutodial|dword|1
 USER\Software\Microsoft\Internet Connection Wizard|Completed|binary|01,00,00,00
 USER\Software\Microsoft\Internet Explorer\Main|Start Page|sz|about:blank
+USER\Software\Microsoft\Internet Explorer\Main|First Home Page|sz|about:blank
+USER\Software\Microsoft\Internet Explorer\Main|RunOnceHasShown|dword|1
+USER\Software\Microsoft\Internet Explorer\Main|RunOnceComplete|dword|1
 DEFAULT\Software\Microsoft\Windows\CurrentVersion\Internet Settings|EnableAutodial|dword|0
 DEFAULT\Software\Microsoft\Windows\CurrentVersion\Internet Settings|ProxyEnable|dword|0
 DEFAULT\Software\Microsoft\Windows\CurrentVersion\Internet Settings|GlobalUserOffline|dword|0
 DEFAULT\Software\Microsoft\Windows\CurrentVersion\Internet Settings|NoNetAutodial|dword|1
 DEFAULT\Software\Microsoft\Internet Connection Wizard|Completed|binary|01,00,00,00
 DEFAULT\Software\Microsoft\Internet Explorer\Main|Start Page|sz|about:blank
+DEFAULT\Software\Microsoft\Internet Explorer\Main|First Home Page|sz|about:blank
+DEFAULT\Software\Microsoft\Internet Explorer\Main|RunOnceHasShown|dword|1
+DEFAULT\Software\Microsoft\Internet Explorer\Main|RunOnceComplete|dword|1
 HKLM\Software\Microsoft\Windows\CurrentVersion\Internet Settings|EnableAutodial|dword|0
