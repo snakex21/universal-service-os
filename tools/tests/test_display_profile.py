@@ -132,7 +132,7 @@ class DisplayTransport(unittest.TestCase):
         target=self.tmp/'c/USOS9X';target.mkdir(parents=True)
         # Network/addons have already removed an unavailable helper's Run row.
         staged=target/'MSBATCH.INF';staged.write_bytes(answer.read_bytes().replace(b'\r',b'').replace(b'HKLM,Run,USOSLan,,missing.exe\n',b''))
-        text=(ROOT/'tools/w9x_csmwrap_target.sh').read_text();start=text.index("if grep -q '^;USOS-DISPLAY='");end=text.index('\nfor name in INSTALL.BAT',start)
+        text=(ROOT/'tools/w9x_csmwrap_target.sh').read_text();start=text.index("if grep -q '^;USOS-DISPLAY='");end=text.index('\nfi\n',start)+3
         pre='fail() { echo "$*" >&2; exit 1; }; log() { :; }; '
         env='LIB='+quote(lib)+' work='+quote(self.tmp)+' ANSWER_INF='+quote(answer)+' ANSWER_SIF='+quote(answer)+'; '
         r=shell(pre+env+text[start:end]);self.assertEqual(r.returncode,0,r.stderr)
