@@ -1,0 +1,19 @@
+# usosnet.sys: USOS own NDIS 5.0 Ethernet miniport, one binary for
+# Windows 98 / 98 SE / Me (NDIS.VXD) and Windows 2000 / XP / 2003 x86.
+# TARGETTYPE=MINIPORT links only TARGETLIBS: every import must come from
+# NDIS.SYS (an ntoskrnl / HAL import would not resolve on 9x), so a stray
+# kernel call is a link error here. build.cmd sets the PE version to 4.00.
+TARGETNAME=usosnet
+TARGETPATH=obj
+TARGETTYPE=MINIPORT
+C_DEFINES=$(C_DEFINES) -DNDIS_MINIPORT_DRIVER=1 -DNDIS50_MINIPORT=1
+TARGETLIBS=$(DDK_LIB_PATH)\ndis.lib
+MSC_WARNING_LEVEL=/W3
+_NT_TARGET_VERSION=$(_NT_TARGET_VERSION_WINXP)
+SUBSYSTEM_VERSION=4.00
+MUI=0
+MUI_COMMENT=0
+BUFFER_OVERFLOW_CHECKS=0
+SOURCES=usosnet.c \
+        usosnet_igb.c \
+        usosnet.rc
