@@ -13,6 +13,7 @@ static RM rm;
 static UsosDisplayVbeList output;
 static WORD mode_numbers[256];
 static WORD instance,exit_code;
+static char output_path[260];
 extern char edata[],end[];
 extern BOOL FAR PASCAL WaitEvent(HANDLE);
 extern BOOL FAR PASCAL InitApp(HINSTANCE);
@@ -61,7 +62,7 @@ static int bios(WORD ax,WORD mode,WORD segment,WORD offset) {
 static void collect(void) {
     DWORD memory=GlobalDosAlloc(1024),vram,address;
     WORD selector=LOWORD(memory),segment=HIWORD(memory),i,list_segment,list_offset,list_selector,number;
-    WORD version,offset,count=0; BYTE FAR *data; BYTE FAR *info; WORD FAR *list; HFILE file;
+    WORD version,offset,count=0,length; BYTE FAR *data; BYTE FAR *info; WORD FAR *list; HFILE file;
     if(!memory)return;
     data=(BYTE FAR *)MAKELONG(0,selector);
     for(i=0;i<1024;i++)data[i]=0;
@@ -100,7 +101,15 @@ static void collect(void) {
         m->pitch=version>=0x0300&&word_at(info+50)?word_at(info+50):word_at(info+16);m->vram=vram;
     }
     if(!output.count)goto done;
-    file=_lcreat("C:\\USOS9X\\VBE.DAT",0);
+    length=GetModuleFileName((HINSTANCE)instance,output_path,sizeof output_path);
+    if(!length || length>=sizeof output_path)goto done;
+    while(length && output_path[length-1]!='\\')length--;
+    if(!length || length+sizeof("VBE.DAT")>sizeof output_path)goto done;
+    {
+        WORD j;const char *name="VBE.DAT";
+        for(j=0;j<sizeof("VBE.DAT");j++)output_path[length+j]=name[j];
+    }
+    file=_lcreat(output_path,0);
     if(file!=HFILE_ERROR) {
         WORD bytes=8+(WORD)output.count*sizeof(UsosDisplayVbeMode);
         if(_lwrite(file,(const char FAR *)&output,bytes)==bytes)exit_code=0;
