@@ -193,8 +193,10 @@ def source(zig: str) -> None:
                                     encoding='utf-8')
         lg = build_run(zig, td, 'lay_lgpl', LAYOUT, [], [str(shim), str(sb / 'hw')], ['-DHDR="usb-uds.h"'])
         gp = build_run(zig, td, 'lay_gpl', LAYOUT, [], [str(shim), str(GPL_H.parent)], ['-DHDR="gpl.h"'])
-        assert lg == gp, (lg, gp)
-        assert 'uds_diag 768' in lg and 'uds_req 80' in lg
+        # usosuds.h is version 2 since usos17 (patch 0022 appends at +768, test_csmwrap_uds17.py):
+        # every version 1 field the same, the record longer
+        assert 'uds_diag 768' in lg and 'uds_req 80' in lg and 'uds_diag 984' in gp, gp
+        assert lg.replace('uds_diag 768', 'uds_diag 984') == gp, (lg, gp)
         # the SeaBIOS copy of the check, built alone, against the GPL one
         body = re.search(r'static u32\nuds_req_check\(.*?\n\}\n', uds_c, re.S).group(0).replace('static u32', 'u32', 1)
         (td / 'lchk.c').write_text('#include "usb-uds.h"\n' + body, encoding='utf-8')

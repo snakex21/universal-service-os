@@ -111,6 +111,17 @@ and a zig cc host simulation of the whole SRB path against a fake helper).
 - Debug text goes to port E9h only when a debug console answers there (QEMU
   `-debugcon`), as in usosnvme.
 
+## 1.1 (hot-swap, CSMWrap 3.1.2-usos17)
+
+- Any command to an empty slot (not only TEST UNIT READY) asks the helper for the device table,
+  at most once a second. A stick plugged in later (the usos17 port watch brings it up with a new
+  generation) then gives one UNIT ATTENTION 06/28 on the same letter, and its data. With a usos16
+  BOOTX64.EFI nothing changes: no runtime enumeration there.
+- NOT READY / 3Ah answers of an empty slot are counted in `notready` (status page +100), not in
+  `errors`.
+- Request ring at `req_phys + 1024` (`struct uds_mp_ring`, 32 entries: CDB[0], slot, SRB / UDS
+  status, LBA, bytes, CRC-32 of the data); status page version 2. USOSDBG 1.8 decodes both.
+
 ## Registry (`usosusb.reg`)
 
 Registers a root devnode `HKLM\Enum\Root\SCSIAdapter\@CLASSIDX@` (Class SCSIAdapter,

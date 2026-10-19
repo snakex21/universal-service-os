@@ -21,6 +21,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / 'src/platform/bios/win9x'
+RECORD = Path(__file__).resolve().parent / 'data/udsk-v2-qemu-hotswap.bin'   # usos17 QEMU hot-swap run
 ARCHIVE = ROOT / 'tools/vendor/csmwrap/3.1.2-src/csmwrap-3.1.2-src.tar.xz'
 
 
@@ -55,6 +56,7 @@ typedef unsigned char BYTE; typedef unsigned short WORD; typedef unsigned long D
 #define FAR
 #define wsprintf sprintf
 #define lstrlen(s) ((int)strlen(s))
+#define lstrcat strcat
 #define LINES 160
 static char text[LINES][256];
 static int nlines;
@@ -65,6 +67,7 @@ MAIN = r'''
 static struct uds_diag d;
 static struct uds_mp_status m;
 static struct uds_channel c;
+static struct uds_mp_ring rg;
 
 static void base(void)
 {
@@ -107,7 +110,7 @@ static void base(void)
 static void mp(void)
 {
     memset(&m, 0, sizeof(m));
-    m.sig[0] = UDS_MP_SIG0; m.sig[1] = UDS_MP_SIG1; m.version = UDS_MP_VERSION; m.slots = 3;
+    m.sig[0] = UDS_MP_SIG0; m.sig[1] = UDS_MP_SIG1; m.version = 1; m.slots = 3;
     m.mp_major = 0; m.mp_minor = 3; m.srbs = 900; m.posted = 850; m.polled = 7; m.errors = 2; m.enums = 4;
     m.last_status = UDS_S_CHECK;
     m.slot[0].dev = 0; m.slot[0].present = 1; m.slot[0].last_op = 0x28; m.slot[0].generation = 1; m.slot[0].srbs = 800;
@@ -121,10 +124,50 @@ int main(int argc, char **argv)
     const char *k = argc > 1 ? argv[1] : "full";
     int i;
     base();
+    d.version = 1;   /* usos16 */
     if (!strcmp(k, "full")) show_disk_record(&d, 0x9FC00UL, 0xFE0F0UL);
+    else if (!strcmp(k, "hot")) {
+        /* version 2 (usos17): the port watch block and the media check */
+        d.version = 2; d.pool = 0x1F000000UL; d.armed = 1; d.watch_passes = 600; d.attaches = 3; d.detaches = 2;
+        d.attach_fails = 1; d.last_fail = UDS_AF_NOTMSC; d.pool_used = 2; d.ctls = 2;
+        d.ctl[0].ports = 8; d.ctl[0].ccs_post = 0x34; d.ctl[0].busy_arm = 0x30; d.ctl[0].ccs_now = 0x38;
+        d.ctl[1].ports = 18; d.ctl[1].ccs_post = 0x4000;
+        d.media[0].fs = UDS_FS_NTFS; d.media[0].types[0] = 0x07; d.media[0].flags = 3; d.media[0].ctl = 1;
+        d.media[0].attach = 1; d.media[0].part_lba = 2048; d.media[0].hash0 = 0xA4D1392DUL;
+        d.media[1].fs = UDS_FS_FAT32; d.media[1].flags = 3; d.media[1].ctl = 0xFF;
+        d.ev[4].event = UDS_EV_ATTACH; d.ev[4].result = 1;
+        d.ev[5].event = UDS_EV_ATTFAIL; d.ev[5].result = UDS_AF_NOTMSC; d.ev[5].dev = 0xF1;
+        d.ev[6].event = UDS_EV_CONNECT; d.ev[6].result = 0; d.ev[6].dev = 0xF0;
+        d.ev[7].event = UDS_EV_DETACH; d.ev[7].result = 1;
+        d.ev[8].event = UDS_EV_UNCLAIMED; d.ev[8].result = 7; d.ev[8].dev = 0xF1;
+        d.ev[9].event = UDS_EV_MEDIA; d.ev[9].result = UDS_FS_EXFAT;
+        d.ev[10].event = UDS_EV_ARM; d.ev[10].result = 2; d.ev[10].dev = 0xFF;
+        show_disk_record(&d, 0x9FC00UL, 0xFE0F0UL);
+    }
+    else if (!strcmp(k, "hotoff")) { d.version = 2; show_disk_record(&d, 0x9FC00UL, 0xFE0F0UL); }
+    else if (!strcmp(k, "file") && argc > 2) {
+        FILE *f = fopen(argv[2], "rb");
+        memset(&d, 0, sizeof(d));
+        if (!f || fread(&d, 1, sizeof(d), f) != sizeof(d)) return 2;
+        fclose(f);
+        show_disk_record(&d, 0x9FC00UL, d.channel);
+    }
+    else if (!strcmp(k, "ring")) {
+        memset(&rg, 0, sizeof(rg));
+        rg.sig[0] = UDS_MP_SIG0; rg.sig[1] = UDS_MP_RSIG1; rg.count = 40; rg.next = 8;
+        for (i = 0; i < UDS_MP_RING; i++) {
+            rg.ent[i].op = 0x28; rg.ent[i].lba = 1000 + i; rg.ent[i].bytes = 512; rg.ent[i].crc = 0x1000 + i;
+        }
+        rg.ent[7].op = 0x2A; rg.ent[7].srb_status = 0x01; rg.ent[7].uds_status = UDS_S_OK;
+        show_disk_ring(&rg, 0x01234400UL, 16);
+        rg.next = 0xFFFFFFF0UL; rg.count = 3; show_disk_ring(&rg, 0x01234400UL, 16);
+        rg.sig[1] = 0; show_disk_ring(&rg, 0x01234400UL, 16);
+    }
+    else if (!strcmp(k, "mp11")) { mp(); m.version = 2; m.mp_major = 1; m.mp_minor = 1; m.notready = 345;
+        show_disk_mp(&m, 0x01234080UL); }
     else if (!strcmp(k, "differs")) show_disk_record(&d, 0x9FC00UL, 0xFE130UL);
     else if (!strcmp(k, "nochan")) show_disk_record(&d, 0x9FC00UL, 0);
-    else if (!strcmp(k, "v2")) { d.version = 2; show_disk_record(&d, 0xE1230UL, 0); }
+    else if (!strcmp(k, "v3")) { d.version = 3; show_disk_record(&d, 0xE1230UL, 0); }
     else if (!strcmp(k, "hostile")) {
         d.devs = 200; d.disks = 99; d.events = 0xFFFFFFFFUL; d.next_event = 0xEE; d.last_why = 1000; d.channel = 0;
         for (i = 0; i < UDS_MAX_DEVS; i++) {
@@ -138,7 +181,7 @@ int main(int argc, char **argv)
         show_disk_record(&d, 0x9FC00UL, 0xFE0F0UL); }
     else if (!strcmp(k, "mp")) { mp(); show_disk_mp(&m, 0x01234080UL); }
     else if (!strcmp(k, "mpbad")) { mp(); m.sig[1] = 0x12345678UL; show_disk_mp(&m, 0x01234080UL); }
-    else if (!strcmp(k, "mpv2")) { mp(); m.version = 2; m.slots = 200; show_disk_mp(&m, 0x01234080UL); }
+    else if (!strcmp(k, "mpv3")) { mp(); m.version = 3; m.slots = 200; show_disk_mp(&m, 0x01234080UL); }
     else if (!strcmp(k, "mphostile")) { mp(); m.slots = 200; m.last_status = UDS_S_PENDING; show_disk_mp(&m, 0x01234080UL); }
     else if (!strcmp(k, "chan")) {
         c.magic = UDS_CH1_MAGIC; c.req_phys = 0x01234000UL; c.doorbell = 41; c.done = 40;
@@ -163,7 +206,8 @@ def decoder_block(src: str) -> str:
 
 def static_checks(src: str) -> None:
     assert '#include "usosuds.h"' in src
-    for t, n in (('uds_diag', 768), ('uds_diag_dev', 64), ('uds_diag_disk', 12), ('uds_mp_status', 100)):
+    for t, n in (('uds_diag', 984), ('uds_diag_dev', 64), ('uds_diag_disk', 12), ('uds_mp_status', 104),
+                 ('uds_mp_ring', 528), ('uds_diag_media', 16)):
         assert f'[sizeof(struct {t}) == {n} ? 1 : -1]' in src, t
     refresh = func(src, 'refresh')
     assert 'show_net();\n    show_disk();' in refresh                  # full /L and the window: last section
@@ -171,7 +215,7 @@ def static_checks(src: str) -> None:
     assert "else if (c == 'D') disk_only = 1;" in func(src, 'parse_args')
     run_log = func(src, 'run_log')
     assert run_log.index('if (disk_only)') < run_log.index('SetTimer(w, 1, 1000, 0)')
-    assert 'USOSDBG 1.7 log mode (disk)' in src
+    assert 'USOSDBG 1.8 log mode (disk)' in src
     find = func(src, 'find_udsk')
     assert 'for (w = 0; w < 16; w++)' in find                           # the first MiB, 64 KiB windows
     assert 'physical((DWORD)w << 16, 0x10000L)' in find
@@ -251,7 +295,7 @@ def check(out: dict) -> None:
     assert len(re.findall(r'^DISK  #\d+', full, re.M)) == 8   # two a line
     assert 'CSMPPrxy+48 is FE130: DIFFERS' in out['differs']
     assert '(no CSMPPrxy found)' in out['nochan']
-    assert out['v2'].strip() == 'DISK USOSUDSK at E1230: version 2 not decoded (USOSDBG knows version 1)'
+    assert out['v3'].strip() == 'DISK USOSUDSK at E1230: version 3 not decoded (USOSDBG knows version 2)'
     h = out['hostile']
     assert 'last why 1000 ?' in h and '(no channel 1 request served yet)' in h
     assert 'DISK  devs 200 > 8: the first 8 shown' in h
@@ -273,7 +317,45 @@ def check(out: dict) -> None:
             'slot 1: dev 1 absent UA pending gen 7 srbs 0 last op 00h SRB status 04 sense 2/3A/00;') in m, m
     assert 'DISK  slot 2: dev none absent gen 0' in m
     assert out['mpbad'].strip() == ('DISK USOSUSB.MPD status at 01234080: no USOSUMPS signature (534F5355 12345678)')
-    assert 'status version 2: slots not decoded' in out['mpv2'] and 'slot 0' not in out['mpv2']
+    assert 'status version 3: slots not decoded' in out['mpv3'] and 'slot 0' not in out['mpv3']
+    assert 'not ready' not in m                                             # version 1 page
+    m11 = out['mp11']
+    assert 'DISK USOSUSB.MPD 1.1 status at 01234080: version 2' in m11 and '  not ready (empty slot) 345' in m11, m11
+    assert 'slot 0: dev 0 present' in m11
+    # version 2 record (usos17)
+    hot = out['hot']
+    assert 'version 2  devs 2' in hot, hot
+    assert ('DISK hot-swap: watch armed  passes 600  plugged in 3  unplugged 2  failed 1 (last: not a USB stick '
+            '(no bulk-only mass storage))  pool 1F000000 used 01') in hot, hot
+    assert ('DISK  xHCI0: ports 8  connected at POST 00000034  set up at POST 00000030  connected now 00000038 '
+            '(bit 0 = port 1)') in hot
+    assert 'DISK  xHCI1: ports 18  connected at POST 00004000' in hot
+    assert ('DISK  dev 0 media: NTFS - 9x cannot read it (format the stick FAT32)  MBR types 07 00 00 00  volume at '
+            'LBA 2048  sector 0 FNV A4D1392D  plugged in after boot  xHCI1') in hot, hot
+    assert 'DISK  dev 1 media: FAT32 - 9x reads it (95 OSR2 and later)' in hot and 'present at POST  -' in hot
+    ev = re.findall(r' #(\d+) (\d+)ms dev (\S+) port (\d+) ([^(]+) \(([^;]*)\);', hot)
+    names = {int(e[0]): (e[4], e[5], e[2]) for e in ev}
+    assert names[4] == ('plugged in', 'luns 1', '0'), names
+    assert names[5] == ('PLUG FAILED', '6 not a USB stick (no bulk-only mass storage)', 'xHCI1')
+    assert names[6] == ('connect', 'link state 0', 'xHCI0')
+    assert names[7] == ('unplugged', 'replugged at once', '1')
+    assert names[8] == ('connected, not set up at POST', 'link state 7', 'xHCI1')
+    assert names[9] == ('media', 'exFAT - 9x cannot read it (format the stick FAT32)', '1')
+    assert names[10] == ('watch armed', '2 xHCI', '-')
+    assert 'DISK hot-swap: off (no runtime pool' in out['hotoff']
+    assert 'hot-swap' not in out['full']                                     # version 1: no block
+    r = out['ring'].splitlines()
+    assert r[0] == ('DISK request ring at 01234400: 40 requests, last 16 (oldest first; CRC-32 of the data, '
+                    'as zip)'), r
+    assert r[1] == 'DISK  #24 slot 0 28h READ(10)  LBA 1024  512 bytes  CRC 00001018  SRB 00  uds 0 ok', r[1]
+    assert r[16] == 'DISK  #39 slot 0 2Ah WRITE(10)  LBA 1007  512 bytes  CRC 00001007  SRB 01  uds 0 ok', r[16]
+    assert r[17].startswith('DISK request ring at 01234400: 3 requests, last 3') and len(r) == 22, r
+    assert r[21] == 'DISK request ring at 01234400: no URNG signature (USOSUSB.MPD 1.0?)'
+    # the record of the QEMU hot-swap run (run_csmwrap_uds_qemu.py, usos17): decoded as it is
+    if 'file' in out:
+        f = out['file']
+        assert 'version 2  devs 1' in f and 'DISK hot-swap: watch armed' in f and 'plugged in 8' in f, f
+        assert 'media: FAT32 - 9x reads it' in f and 'media (NTFS - 9x cannot read it' in f, f
     assert 'last status 4294967295 pending' in out['mphostile']
     assert len(re.findall(r'slot \d:', out['mphostile'])) == 4                # clamped to UDS_MP_SLOTS
     c = out['chan'].splitlines()
@@ -305,9 +387,12 @@ def run(zig: str) -> None:
                                capture_output=True, text=True, env=env)
             assert r.returncode == 0, r.stdout + r.stderr
             out = {}
-            for k in ('full', 'differs', 'nochan', 'v2', 'hostile', 'empty', 'mp', 'mpbad', 'mpv2', 'mphostile',
-                      'chan', 'mib'):
-                p = subprocess.run([str(exe), k], capture_output=True, text=True)
+            for k in ('full', 'differs', 'nochan', 'v3', 'hostile', 'empty', 'mp', 'mpbad', 'mpv3', 'mphostile',
+                      'chan', 'mib', 'hot', 'hotoff', 'ring', 'mp11', 'file'):
+                args = [str(exe), k] + ([str(RECORD)] if k == 'file' else [])
+                if k == 'file' and not RECORD.exists():
+                    continue
+                p = subprocess.run(args, capture_output=True, text=True)
                 assert p.returncode == 0, (k, p.stdout, p.stderr)
                 out[k] = p.stdout
             check(out)

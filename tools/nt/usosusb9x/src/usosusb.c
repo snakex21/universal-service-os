@@ -26,6 +26,10 @@
  *     machine of src/platform/bios/win9x/usosuds_slot.c (compiled into this
  *     binary): fixed INQUIRY identity, NOT READY / 3Ah when empty, one
  *     UNIT ATTENTION / 28h after a stick change.
+ *   - 1.1 (hot-swap, CSMWrap 3.1.2-usos17): an empty slot asks the helper
+ *     for the device table (ENUM, at most once a second) on every command,
+ *     not only on TEST UNIT READY, so a stick plugged in later fills it;
+ *     a request ring (LBA, length, CRC-32 of the data) for USOSDBG.
  */
 #include "usosusb.h"
 
@@ -250,6 +254,60 @@ static VOID UsbClockInit(PHW_DEVICE_EXTENSION Ext)
 }
 
 /* ------------------------------------------------------------------ */
+/* request ring (status page version 2)                                 */
+/* ------------------------------------------------------------------ */
+
+/* CRC-32 (IEEE 802.3, reflected 0xEDB88320), the zip / PNG one; the
+   table lives in the device extension (no .bss section in the MPD) */
+static VOID UsbCrcInit(PHW_DEVICE_EXTENSION Ext)
+{
+    ULONG i, k, c;
+    for (i = 0; i < 256; i++) {
+        c = i;
+        for (k = 0; k < 8; k++) c = (c & 1) ? 0xEDB88320UL ^ (c >> 1) : c >> 1;
+        Ext->CrcTab[i] = c;
+    }
+}
+
+static ULONG UsbCrc32(PHW_DEVICE_EXTENSION Ext, const UCHAR *p, ULONG n)
+{
+    ULONG c = 0xFFFFFFFFUL;
+    while (n--) c = Ext->CrcTab[(c ^ *p++) & 0xFF] ^ (c >> 8);
+    return c ^ 0xFFFFFFFFUL;
+}
+
+/* low 32 bits of the LBA of a READ / WRITE / VERIFY CDB, else 0 */
+static ULONG UsbCdbLba(const UCHAR *cdb, UCHAR len)
+{
+    UCHAR op = len ? cdb[0] : 0;
+    if ((op == 0x08 || op == 0x0A) && len >= 6)
+        return ((ULONG)(cdb[1] & 0x1F) << 16) | ((ULONG)cdb[2] << 8) | cdb[3];
+    if ((op == 0x28 || op == 0x2A || op == 0x2E || op == 0x2F || op == 0xA8 || op == 0xAA) && len >= 10)
+        return ((ULONG)cdb[2] << 24) | ((ULONG)cdb[3] << 16) | ((ULONG)cdb[4] << 8) | cdb[5];
+    if ((op == 0x88 || op == 0x8A || op == 0x8E) && len >= 16)
+        return ((ULONG)cdb[6] << 24) | ((ULONG)cdb[7] << 16) | ((ULONG)cdb[8] << 8) | cdb[9];
+    return 0;
+}
+
+static VOID UsbRingAdd(PHW_DEVICE_EXTENSION Ext, PSCSI_REQUEST_BLOCK Srb, UCHAR Slot, ULONG Status,
+                       const UCHAR *Data, ULONG Bytes)
+{
+    struct uds_mp_ring *r = Ext->Ring;
+    struct uds_mp_rent *e;
+    if (r == NULL) return;
+    e = &r->ent[r->next % UDS_MP_RING];
+    e->op = Srb->Cdb[0];
+    e->slot = Slot;
+    e->srb_status = Srb->SrbStatus;
+    e->uds_status = (UCHAR)Status;
+    e->lba = UsbCdbLba(Srb->Cdb, Srb->CdbLength);
+    e->bytes = Bytes;
+    e->crc = Bytes ? UsbCrc32(Ext, Data, Bytes) : 0;
+    r->next = (r->next + 1) % UDS_MP_RING;
+    r->count++;
+}
+
+/* ------------------------------------------------------------------ */
 /* status page                                                          */
 /* ------------------------------------------------------------------ */
 
@@ -399,7 +457,12 @@ static VOID UsbFinish(PHW_DEVICE_EXTENSION Ext)
     PSCSI_REQUEST_BLOCK srb = Ext->Srb;
     UCHAR st = (UCHAR)SRB_STATUS(srb->SrbStatus);
     Ext->Mp->srbs++;
-    if (st != SRB_STATUS_SUCCESS && st != SRB_STATUS_DATA_OVERRUN) Ext->Mp->errors++;
+    /* an empty slot answers NOT READY / 3Ah to every poll of IOS: counted
+       apart, so errors means real failures (1.1) */
+    if (st != SRB_STATUS_SUCCESS && st != SRB_STATUS_DATA_OVERRUN) {
+        if (Ext->Res.key == 0x02 && Ext->Res.asc == 0x3A) Ext->Mp->notready++;
+        else Ext->Mp->errors++;
+    }
     if (srb->Function == SRB_FUNCTION_EXECUTE_SCSI && srb->TargetId < Ext->Slots) {
         struct uds_mp_slot *m = &Ext->Mp->slot[srb->TargetId];
         m->last_op = srb->Cdb[0];
@@ -410,7 +473,8 @@ static VOID UsbFinish(PHW_DEVICE_EXTENSION Ext)
         m->srbs++;
     }
     UsbMpSlots(Ext);
-    if (srb->Function == SRB_FUNCTION_EXECUTE_SCSI && st != SRB_STATUS_SUCCESS && Ext->DbgLines < 256) {
+    if (srb->Function == SRB_FUNCTION_EXECUTE_SCSI && st != SRB_STATUS_SUCCESS && Ext->DbgLines < 256 &&
+        !(Ext->Res.key == 0x02 && Ext->Res.asc == 0x3A && Ext->Mp->notready > 4)) {
         USB_LINE l;
         Ext->DbgLines++;
         l.Len = 0;
@@ -547,6 +611,7 @@ static VOID UsbScsiDone(PHW_DEVICE_EXTENSION Ext)
     /* a short READ / WRITE is not a success; short INQUIRY / MODE SENSE data is */
     if (srb->SrbStatus == SRB_STATUS_SUCCESS && got < Ext->DataLen && UsbIsRw(srb->Cdb[0]))
         srb->SrbStatus = SRB_STATUS_DATA_OVERRUN;
+    UsbRingAdd(Ext, srb, slot, r->status, Ext->Bounce, got);
     if (Ext->Res.reset && Ext->Slot[slot].dev < UDS_MAX_DEVS) {
         Ext->ResetNeeded[slot] = 1;
         Ext->Step = STEP_FINISH;
@@ -571,7 +636,9 @@ static VOID UsbStep(PHW_DEVICE_EXTENSION Ext)
                 UsbPostDevOp(Ext, UDS_OP_RESET, slot);
                 return;
             }
-            if (srb->Cdb[0] == 0x00 /* TEST UNIT READY */) {
+            /* TEST UNIT READY, or any command to an empty slot: has a stick
+               been plugged in (or replaced) since the last ENUM? */
+            if (srb->Cdb[0] == 0x00 /* TEST UNIT READY */ || !Ext->Slot[slot].present) {
                 Ext->TurCount++;
                 if (Ext->Tsc ? UsbNow(Ext) >= Ext->NextTurEnum : (Ext->TurCount % USB_TUR_ENUM_EVERY) == 0)
                     Ext->NeedEnum = TRUE;
@@ -935,7 +1002,11 @@ static ULONG UsbFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOID
     ext->Info = (struct uds_dev_info *)(ext->Block + USB_ENUM_OFFSET);
     ext->InfoPhys = ext->BlockPhys + USB_ENUM_OFFSET;
     ext->Bounce = ext->Block + USB_PAGE;
+    ext->Ring = (struct uds_mp_ring *)(ext->Block + UDS_MP_RING_OFFSET);
     UsbZero(ext->Block, USB_PAGE);
+    ext->Ring->sig[0] = UDS_MP_SIG0;
+    ext->Ring->sig[1] = UDS_MP_RSIG1;
+    UsbCrcInit(ext);
     for (i = 0; i < UDS_MP_SLOTS; i++) {
         uds_slot_init(&ext->Slot[i]);
         ext->ResetNeeded[i] = 0;

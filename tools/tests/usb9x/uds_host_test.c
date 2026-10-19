@@ -66,13 +66,24 @@ static void layout(void)
     CHECK(offsetof(struct uds_diag, dev) == 32);
     CHECK(offsetof(struct uds_diag, disk) == 544);
     CHECK(offsetof(struct uds_diag, ev) == 640);
-    CHECK(sizeof(struct uds_diag) == 768);
+    /* version 2 (usos17 patch 0022): the port watch block appended at +768 */
+    CHECK(offsetof(struct uds_diag, watch_passes) == UDS_DIAG_V1_SIZE);
+    CHECK(offsetof(struct uds_diag, pool) == 788);
+    CHECK(offsetof(struct uds_diag, ctl) == 792);
+    CHECK(offsetof(struct uds_diag, media) == 856);
+    CHECK(sizeof(struct uds_diag_ctl) == 16 && sizeof(struct uds_diag_media) == 16);
+    CHECK(sizeof(struct uds_diag) == UDS_DIAG_V2_SIZE && UDS_DIAG_V2_SIZE == 984);
     CHECK(offsetof(struct uds_diag_dev, generation) == 16);
     CHECK(offsetof(struct uds_diag_dev, requests) == 32);
     CHECK(offsetof(struct uds_diag_dev, kib_in) == 56);
     CHECK(sizeof(struct uds_mp_slot) == 16);
     CHECK(offsetof(struct uds_mp_status, slot) == 36);
-    CHECK(sizeof(struct uds_mp_status) == 100);
+    CHECK(offsetof(struct uds_mp_status, notready) == 100 && sizeof(struct uds_mp_status) == 104);
+    /* USOSUSB 1.1 request ring: after the ENUM table (256 + 8 * 48), inside the control page */
+    CHECK(sizeof(struct uds_mp_rent) == 16 && sizeof(struct uds_mp_ring) == 528);
+    CHECK(UDS_MP_RING_OFFSET >= 256 + UDS_MAX_DEVS * sizeof(struct uds_dev_info));
+    CHECK(UDS_MP_RING_OFFSET + sizeof(struct uds_mp_ring) <= 4096);
+    CHECK(UDS_MP_STATUS_OFFSET + sizeof(struct uds_mp_status) <= 256);
     CHECK(UDS_MP_STATUS_OFFSET >= sizeof(struct uds_req));
 }
 

@@ -1,4 +1,4 @@
-/* USOS USB disk service (UDS) protocol test MBR, CSMWrap 3.1.2-usos16 patch 0021
+/* USOS USB disk service (UDS) protocol test MBR, CSMWrap 3.1.2-usos16 patch 0021 + usos17 0022
  * (tools/tests/csmwrap/run_csmwrap_uds_qemu.py, assembled there with zig cc + ld.lld into a
  * flat binary at 0:7C00). Boots from QEMU NVMe through CSMWrap's SeaBIOS and drives channel 1
  * of the helper core from real mode the way USOSUSB.MPD does from ring 0: a request block in
@@ -19,11 +19,23 @@
  *   UDS-RESET    RESET (BOT reset recovery), then TEST UNIT READY and a READ work
  *   UDS-UNPLUG?  the host removes the stick now (QMP device_del); 64 KiB reads in a loop
  *   UDS-GONE     a request ended with GONE; the next one is GONE at once, ENUM state 2
+ * Stage 2 (usos17 patch 0022, hot-swap; free mode, a USB keyboard and mouse on the same xHCI):
+ *   UDS-KEY1?    the host types 'a' (QMP send-key, i8042 off: only the USB keyboard);
+ *   UDS-KBD1     INT 16h returned it
+ *   UDS-PLUG?    the host plugs stick 2 (32 MiB, "UDSTICK1"); ENUM until entry 0 is present
+ *                again with a higher generation (the port watch brought it up)
+ *   UDS-NEW      capacity 65536 x 512, READ LBA 0 = "UDSTICK1"
+ *   UDS-FAST?    the host unplugs stick 2 and plugs stick 1 in one QMP write (the change latch)
+ *   UDS-FAST     a new generation, READ LBA 0 = "UDSTICK0"
+ *   UDS-EJECT    EJECT: ENUM state 3, SCSI GONE
+ *   UDS-CYC?     x6: the host unplugs / replugs, each time a new generation and a good READ
+ *                (the pool chunks are re-used: no leak)
+ *   UDS-KEY2? / UDS-KBD2  the keyboard still works after all of it
+ *   UDS-REC      STATUS: the version 2 record at 13000h (984 bytes), saved by the host
  * A failed step prints " UDS-F<c> " (and the status) and powers off. APM 5307h power-off at the
- * end, as in nvme_rearm_mbr.S. Layout: sector 0 = loader, LBA 1-7 = stage 2 ("UDST").
- * No USB keyboard/mouse in this VM: in real mode SeaBIOS's IRQ 0 HID poll would run on the BSP
- * next to the helper core (the OS client only runs under Windows, where all SeaBIOS 32-bit code
- * is proxied to the helper). */
+ * end, as in nvme_rearm_mbr.S. Layout: sector 0 = loader, LBA 1-15 = stage 2 ("UDST").
+ * The USB keyboard / mouse: SeaBIOS's IRQ 0 HID poll reaches xhci_poll_intr through call32,
+ * which CSMWrap's SeaBIOS always proxies to the helper core (channel 0), also in real mode. */
 .code16
 .globl _start
 _start:
@@ -62,7 +74,7 @@ print16:
   ret
 dap:
   .byte 16, 0
-  .word 7, 0x7e00, 0
+  .word 15, 0x7e00, 0
   .quad 1
 m_fail:  .asciz " UDS-F? "
 .org 0x1fe
@@ -260,7 +272,7 @@ stage2:
   jne fail
   cmpl $0x4b534455,%gs:4
   jne fail
-  cmpb $1,%gs:8
+  cmpb $2,%gs:8              /* version 2 (usos17) */
   jne fail
   mov $m_stat,%si
   call print16
@@ -348,6 +360,113 @@ stage2:
   jne fail
   mov $m_gone2,%si
   call print16
+
+  /* ---- stage 2 (0022): keyboard, hot-plug, fast replug, eject, cycles ---- */
+  mov $m_key1,%si
+  call print16
+  mov $'P',%bl
+  mov $0x1e61,%dx            /* 'a' */
+  call waitkey
+  jnz fail
+  mov $m_kbd1,%si
+  call print16
+
+  mov $m_plug,%si
+  call print16
+  mov $'Q',%bl
+  call waitnew
+  jnz fail
+  mov $'R',%bl
+  cmpl $512,%gs:12
+  jne fail
+  cmpl $65535,%gs:16         /* 32 MiB stick */
+  jne fail
+  mov $'S',%bl
+  call rd0
+  jnz failst
+  cmpl $0x54534455,%gs:0     /* "UDST" */
+  jne fail
+  cmpl $0x314b4349,%gs:4     /* "ICK1" */
+  jne fail
+  mov $m_new,%si
+  call print16
+
+  mov $m_fast,%si
+  call print16
+  mov $'T',%bl
+  call waitnew
+  jnz fail
+  mov $'U',%bl
+  call rd0
+  jnz failst
+  cmpl $0x304b4349,%gs:4     /* "ICK0" */
+  jne fail
+  mov $m_fastok,%si
+  call print16
+
+  mov $'V',%bl               /* EJECT: state 3, then SCSI GONE */
+  call reqinit
+  movb $4,%es:12
+  call post
+  test %eax,%eax
+  jnz failst
+  mov $'W',%bl
+  call enum
+  test %eax,%eax
+  jnz failst
+  cmpb $3,%gs:0
+  jne fail
+  call tur
+  cmp $3,%eax
+  jne failst
+  mov $m_eject,%si
+  call print16
+
+  movl $0,cyc
+5: mov $m_cyc,%si
+  call print16
+  mov $'X',%bl
+  call waitnew
+  jnz fail
+  mov $'Y',%bl
+  call rd0
+  jnz failst
+  cmpl $0x54534455,%gs:0     /* "UDST" */
+  jne fail
+  incl cyc
+  cmpl $6,cyc
+  jb 5b
+  mov $m_cycok,%si
+  call print16
+
+  mov $m_key2,%si
+  call print16
+  mov $'Z',%bl
+  mov $0x3062,%dx            /* 'b' */
+  call waitkey
+  jnz fail
+  mov $m_kbd2,%si
+  call print16
+
+  /* the version 2 record to 1300:0000 for the host (QMP pmemsave), 2 s */
+  mov $'z',%bl
+  call reqinit
+  movb $5,%es:12
+  movb $1,%es:15
+  movl $0x13000,%es:16
+  movl $984,%es:20
+  call post
+  test %eax,%eax
+  jnz failst
+  mov $m_rec,%si
+  call print16
+  mov 0x46c,%eax
+  mov %eax,t0
+1: hlt
+  mov 0x46c,%eax
+  sub t0,%eax
+  cmp $36,%eax
+  jb 1b
 
 apmoff:
   mov $0x5300,%ax
@@ -474,6 +593,88 @@ post:
   pop %bx
   ret
 
+/* ENUM into 1100:0000; EAX = status, GS = 1100h */
+enum:
+  call reqinit
+  movb $1,%es:12
+  movb $1,%es:15
+  movl $0x11000,%es:16
+  movl $384,%es:20
+  call post
+  push %ax
+  mov $0x1100,%ax
+  mov %ax,%gs
+  pop %ax
+  ret
+
+/* ENUM about every tick until entry 0 is PRESENT with a generation above
+   gen (at most ~30 s); then gen = it, GS = 1100h, ZF set. ZF clear: none */
+waitnew:
+  mov 0x46c,%eax
+  mov %eax,t0
+1: call enum
+  test %eax,%eax
+  jnz 3f
+  cmpb $1,%gs:0
+  jne 2f
+  mov %gs:8,%eax
+  cmp gen,%eax
+  jbe 2f
+  mov %eax,gen
+  xor %eax,%eax
+  ret
+2: mov 0x46c,%eax
+  sub t0,%eax
+  cmp $546,%eax
+  ja 3f
+  hlt                        /* IF = 1: the next IRQ 0 (HID poll) */
+  jmp 1b
+3: mov $1,%eax
+  test %eax,%eax
+  ret
+
+/* READ(10) LBA 0 to 1200:0000, once more after a CHECK (unit attention);
+   EAX = status, ZF = OK, GS = 1200h */
+rd0:
+  mov $0x12000,%eax
+  xor %ecx,%ecx
+  mov $1,%dx
+  call read10
+  jz 1f
+  cmp $1,%eax
+  jne 1f
+  mov $0x12000,%eax
+  xor %ecx,%ecx
+  mov $1,%dx
+  call read10
+1: pushf
+  push %ax
+  mov $0x1200,%ax
+  mov %ax,%gs
+  pop %ax
+  popf
+  ret
+
+/* INT 16h: wait (at most ~10 s) for a key, ZF = it is DX (scan code:ASCII) */
+waitkey:
+  mov 0x46c,%eax
+  mov %eax,t0
+1: mov $0x01,%ah
+  int $0x16
+  jnz 2f
+  mov 0x46c,%eax
+  sub t0,%eax
+  cmp $182,%eax
+  ja 3f
+  hlt
+  jmp 1b
+2: xor %ah,%ah
+  int $0x16
+  cmp %dx,%ax
+  ret
+3: or $1,%al
+  ret
+
 /* compare 4000:0000 with 5800:0000, 64 KiB; ZF = equal */
 cmp64k:
   push %ds
@@ -494,6 +695,8 @@ seq:     .long 0
 gen:     .long 0
 loops:   .long 0
 reads:   .long 0
+t0:      .long 0
+cyc:     .long 0
 m_start: .asciz " UDS-S "
 m_ch:    .asciz " UDS-CH "
 m_enum:  .asciz " UDS-ENUM "
@@ -512,5 +715,17 @@ m_unplug: .asciz " UDS-UNPLUG? "
 m_gone:  .asciz " UDS-GONE "
 m_gone2: .asciz " UDS-GONE2 "
 m_ret:   .asciz " UDS-RET "
+m_key1:  .asciz " UDS-KEY1? "
+m_kbd1:  .asciz " UDS-KBD1 "
+m_plug:  .asciz " UDS-PLUG? "
+m_new:   .asciz " UDS-NEW "
+m_fast:  .asciz " UDS-FAST? "
+m_fastok: .asciz " UDS-FAST "
+m_eject: .asciz " UDS-EJECT "
+m_cyc:   .asciz " UDS-CYC? "
+m_cycok: .asciz " UDS-CYC "
+m_key2:  .asciz " UDS-KEY2? "
+m_kbd2:  .asciz " UDS-KBD2 "
+m_rec:   .asciz " UDS-REC "
 m_st:    .asciz " ST=? "
-.org 0x1000
+.org 0x2000

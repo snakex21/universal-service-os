@@ -1128,10 +1128,12 @@ static void show_net(void)
  * (this or another USOSDBG) never finds a copy in a Win16 data segment.
  * The status page is mapped per run (one DPMI 0800h page, a cached mapping
  * over the miniport's uncached block: read only). */
-typedef char uds_diag_size_check[sizeof(struct uds_diag) == 768 ? 1 : -1];
+typedef char uds_diag_size_check[sizeof(struct uds_diag) == 984 ? 1 : -1];
 typedef char uds_dev_size_check[sizeof(struct uds_diag_dev) == 64 ? 1 : -1];
 typedef char uds_disk_size_check[sizeof(struct uds_diag_disk) == 12 ? 1 : -1];
-typedef char uds_mp_size_check[sizeof(struct uds_mp_status) == 100 ? 1 : -1];
+typedef char uds_mp_size_check[sizeof(struct uds_mp_status) == 104 ? 1 : -1];
+typedef char uds_ring_size_check[sizeof(struct uds_mp_ring) == 528 ? 1 : -1];
+typedef char uds_media_size_check[sizeof(struct uds_diag_media) == 16 ? 1 : -1];
 
 /* DISK-DECODE-BEGIN (compiled on the host by tools/tests/usb9x/test_usosdbg_disk.py) */
 static const char *uds_state_name(BYTE s)
@@ -1172,9 +1174,38 @@ static const char *uds_why_name(DWORD w)
 
 static const char *uds_ev_name(BYTE e)
 {
-    static const char *const n[11] = { "?", "present", "GONE", "reset", "eject", "badreq", "HWFAIL", "TIMEOUT",
-                                       "PHASE", "REGFAIL", "stall" };
-    return e <= UDS_EV_STALL ? n[e] : "?";
+    static const char *const n[18] = { "?", "present", "GONE", "reset", "eject", "badreq", "HWFAIL", "TIMEOUT",
+                                       "PHASE", "REGFAIL", "stall", "plugged in", "PLUG FAILED", "connect",
+                                       "unplugged", "connected, not set up at POST", "media", "watch armed" };
+    return e <= UDS_EV_ARM ? n[e] : "?";
+}
+
+/* UDS_AF_*: why a stick plugged in at runtime was not brought up */
+static const char *uds_af_name(BYTE r)
+{
+    static const char *const n[12] = { "?", "port reset", "Enable Slot", "Address Device", "device descriptor",
+                                       "config descriptor", "not a USB stick (no bulk-only mass storage)",
+                                       "SET_CONFIGURATION", "Configure Endpoint", "both hot-plug slots in use",
+                                       "device table full", "EP0 packet size" };
+    return r <= UDS_AF_MPS ? n[r] : "?";
+}
+
+/* UDS_FS_*: what the media check found, and whether Windows 9x reads it */
+static const char *uds_fs_name(BYTE f)
+{
+    switch (f) {
+    case UDS_FS_UNREAD: return "not checked";
+    case UDS_FS_READFAIL: return "sector read failed";
+    case UDS_FS_NOSIG: return "no 55AA signature (blank or not a PC disk) - 9x cannot use it";
+    case UDS_FS_FAT12: return "FAT12 - 9x reads it";
+    case UDS_FS_FAT16: return "FAT16 - 9x reads it";
+    case UDS_FS_FAT32: return "FAT32 - 9x reads it (95 OSR2 and later)";
+    case UDS_FS_NTFS: return "NTFS - 9x cannot read it (format the stick FAT32)";
+    case UDS_FS_EXFAT: return "exFAT - 9x cannot read it (format the stick FAT32)";
+    case UDS_FS_GPT: return "GPT partition table - 9x cannot read it (use MBR + FAT32)";
+    case UDS_FS_OTHER: return "MBR, unknown file system - 9x probably cannot read it";
+    }
+    return "?";
 }
 
 static const char *uds_phase_name(BYTE r)
@@ -1204,6 +1235,13 @@ static void uds_ev_result(LPSTR t, BYTE e, BYTE r)
     case UDS_EV_PHASE:
     case UDS_EV_STALL: wsprintf(t, "phase %u %s", (WORD)r, (LPSTR)uds_phase_name(r)); break;
     case UDS_EV_REGFAIL: wsprintf(t, "%s", (LPSTR)(r == 1 ? "table full" : r == 2 ? "INQUIRY failed" : "?")); break;
+    case UDS_EV_ATTACH: wsprintf(t, "luns %u", (WORD)r); break;
+    case UDS_EV_ATTFAIL: wsprintf(t, "%u %s", (WORD)r, (LPSTR)uds_af_name(r)); break;
+    case UDS_EV_CONNECT:
+    case UDS_EV_UNCLAIMED: wsprintf(t, "link state %u", (WORD)r); break;
+    case UDS_EV_DETACH: wsprintf(t, "%s", (LPSTR)(r ? "replugged at once" : "port empty")); break;
+    case UDS_EV_MEDIA: wsprintf(t, "%s", (LPSTR)uds_fs_name(r)); break;
+    case UDS_EV_ARM: wsprintf(t, "%u xHCI", (WORD)r); break;
     default: wsprintf(t, "result %u", (WORD)r); break;
     }
 }
@@ -1294,13 +1332,48 @@ static void uds_mib_text(LPSTR t, DWORD mib)
 
 /* the record (a copy) found at At; Chan = the CSMPPrxy+48 address found in
  * the F-segment, 0 none */
+/* version 2 (CSMWrap 3.1.2-usos17, hot-swap): the port watch and the media check */
+static void show_disk_v2(const struct uds_diag *d, WORD devs)
+{
+    WORD i, c;
+    char b[24];
+    if (!d->pool) {
+        wsprintf(line(), "DISK hot-swap: off (no runtime pool: csmwrap.ini without int13_boot_disk_only)");
+    } else {
+        LPSTR l = line();
+        wsprintf(l, "DISK hot-swap: watch %s  passes %lu  plugged in %lu  unplugged %lu  failed %lu",
+                 (LPSTR)(d->armed ? "armed" : "not armed yet (no channel 1 request)"), (DWORD)d->watch_passes,
+                 (DWORD)d->attaches, (DWORD)d->detaches, (DWORD)d->attach_fails);
+        if (d->attach_fails)
+            wsprintf(l + lstrlen(l), " (last: %s)", (LPSTR)uds_af_name(d->last_fail));
+        wsprintf(l + lstrlen(l), "  pool %08lX used %u%u", (DWORD)d->pool, (WORD)(d->pool_used & 1),
+                 (WORD)((d->pool_used >> 1) & 1));
+    }
+    c = d->ctls > UDS_DIAG_CTLS ? UDS_DIAG_CTLS : d->ctls;
+    for (i = 0; i < c; i++) {
+        const struct uds_diag_ctl *x = &d->ctl[i];
+        wsprintf(line(), "DISK  xHCI%u: ports %lu  connected at POST %08lX  set up at POST %08lX  connected now %08lX (bit 0 = port 1)",
+                 i, (DWORD)x->ports, (DWORD)x->ccs_post, (DWORD)x->busy_arm, (DWORD)x->ccs_now);
+    }
+    for (i = 0; i < devs; i++) {
+        const struct uds_diag_media *m = &d->media[i];
+        if (d->dev[i].state == UDS_DEV_EMPTY) continue;
+        if (m->ctl == 0xFF) wsprintf(b, "-");
+        else wsprintf(b, "xHCI%u", (WORD)m->ctl);
+        wsprintf(line(), "DISK  dev %u media: %s  MBR types %02X %02X %02X %02X  volume at LBA %lu  sector 0 FNV %08lX  %s  %s",
+                 i, (LPSTR)uds_fs_name(m->fs), (WORD)m->types[0], (WORD)m->types[1], (WORD)m->types[2],
+                 (WORD)m->types[3], (DWORD)m->part_lba, (DWORD)m->hash0,
+                 (LPSTR)(m->attach ? "plugged in after boot" : "present at POST"), (LPSTR)b);
+    }
+}
+
 static void show_disk_record(const struct uds_diag *d, DWORD at, DWORD chan)
 {
     WORD i, n, devs, disks, first;
     DWORD events;
-    char a[48], b[48], c[20];
+    char a[48], b[96], c[20];   /* b: an event result, up to 70 characters (usos17 media names) */
     LPSTR l = 0;
-    if (d->version != UDS_DIAG_VERSION) {
+    if (d->version != 1 && d->version != UDS_DIAG_VERSION) {
         wsprintf(line(), "DISK USOSUDSK at %05lX: version %u not decoded (USOSDBG knows version %u)", at,
                  (WORD)d->version, (WORD)UDS_DIAG_VERSION);
         return;
@@ -1365,10 +1438,12 @@ static void show_disk_record(const struct uds_diag *d, DWORD at, DWORD chan)
         if (i % 2 == 0) { l = line(); wsprintf(l, "DISK "); }
         uds_ev_result(b, e->event, e->result);
         if (e->dev == 0xFF) wsprintf(a, "-");
+        else if (e->dev >= 0xF0) wsprintf(a, "xHCI%u", (WORD)(e->dev & 0x0F));
         else wsprintf(a, "%u", (WORD)e->dev);
         wsprintf(l + lstrlen(l), " #%lu %lums dev %s port %u %s (%s);", events - n + i, (DWORD)e->ms, (LPSTR)a,
                  (WORD)e->port, (LPSTR)uds_ev_name(e->event), (LPSTR)b);
     }
+    if (d->version >= 2) show_disk_v2(d, devs);
 }
 
 /* channel 1 (a copy) of the CSMPPrxy mailbox at F-segment offset Off */
@@ -1391,11 +1466,14 @@ static void show_disk_mp(const struct uds_mp_status *s, DWORD at)
                  (DWORD)s->sig[0], (DWORD)s->sig[1]);
         return;
     }
-    wsprintf(line(), "DISK USOSUSB.MPD %u.%u status at %08lX: version %u  slots %u  srbs %lu  posted %lu  polled %lu  errors %lu  enums %lu  last status %lu %s",
+    l = line();
+    wsprintf(l, "DISK USOSUSB.MPD %u.%u status at %08lX: version %u  slots %u  srbs %lu  posted %lu  polled %lu  errors %lu  enums %lu  last status %lu %s",
              (WORD)s->mp_major, (WORD)s->mp_minor, at, (WORD)s->version, (WORD)s->slots, (DWORD)s->srbs,
              (DWORD)s->posted, (DWORD)s->polled, (DWORD)s->errors, (DWORD)s->enums, (DWORD)s->last_status,
              (LPSTR)uds_status_name((DWORD)s->last_status));
-    if (s->version != UDS_MP_VERSION) {
+    if (s->version >= 2)
+        wsprintf(l + lstrlen(l), "  not ready (empty slot) %lu", (DWORD)s->notready);
+    if (s->version != 1 && s->version != UDS_MP_VERSION) {
         wsprintf(line(), "DISK  status version %u: slots not decoded (USOSDBG knows version %u)", (WORD)s->version,
                  (WORD)UDS_MP_VERSION);
         return;
@@ -1413,10 +1491,50 @@ static void show_disk_mp(const struct uds_mp_status *s, DWORD at)
                  (WORD)t->last_asc, (WORD)t->last_ascq);
     }
 }
+static const char *uds_op_name(BYTE op)
+{
+    switch (op) {
+    case 0x00: return "TEST UNIT READY";
+    case 0x03: return "REQUEST SENSE";
+    case 0x12: return "INQUIRY";
+    case 0x1A: return "MODE SENSE(6)";
+    case 0x1B: return "START STOP";
+    case 0x1E: return "PREVENT/ALLOW";
+    case 0x25: return "READ CAPACITY";
+    case 0x28: return "READ(10)";
+    case 0x2A: return "WRITE(10)";
+    case 0x2F: return "VERIFY(10)";
+    case 0x35: return "SYNC CACHE";
+    case 0x5A: return "MODE SENSE(10)";
+    }
+    return "";
+}
+
+/* the USOSUSB.MPD 1.1 request ring (a copy): the last Max entries, oldest first */
+static void show_disk_ring(const struct uds_mp_ring *r, DWORD at, WORD max)
+{
+    WORD i, n;
+    DWORD count = (DWORD)r->count;
+    if (r->sig[0] != UDS_MP_SIG0 || r->sig[1] != UDS_MP_RSIG1) {
+        wsprintf(line(), "DISK request ring at %08lX: no URNG signature (USOSUSB.MPD 1.0?)", at);
+        return;
+    }
+    n = count < UDS_MP_RING ? (WORD)count : UDS_MP_RING;
+    if (n > max) n = max;
+    wsprintf(line(), "DISK request ring at %08lX: %lu requests, last %u (oldest first; CRC-32 of the data, as zip)", at,
+             count, n);
+    for (i = 0; i < n; i++) {
+        const struct uds_mp_rent *e = &r->ent[((WORD)(r->next % UDS_MP_RING) + UDS_MP_RING - n + i) % UDS_MP_RING];
+        wsprintf(line(), "DISK  #%lu slot %u %02Xh %s  LBA %lu  %lu bytes  CRC %08lX  SRB %02X  uds %u %s",
+                 count - n + i, (WORD)e->slot, (WORD)e->op, (LPSTR)uds_op_name(e->op), (DWORD)e->lba, (DWORD)e->bytes,
+                 (DWORD)e->crc, (WORD)e->srb_status, (WORD)e->uds_status, (LPSTR)uds_status_name((DWORD)e->uds_status));
+    }
+}
 /* DISK-DECODE-END */
 
 static struct uds_diag disk_rec;
 static struct uds_mp_status disk_mp;
+static struct uds_mp_ring disk_ring;
 static struct uds_channel disk_ch;
 
 static void fcopy(void *dst, const BYTE FAR *src, WORD n)
@@ -1503,6 +1621,11 @@ static void show_disk(void)
         if (!p) { wsprintf(line(), "DISK USOSUSB.MPD status at %08lX: DPMI 0800h refused", st); return; }
         fcopy(&disk_mp, p + in, sizeof(disk_mp));
         show_disk_mp(&disk_mp, st);
+        if (disk_mp.sig[0] == UDS_MP_SIG0 && disk_mp.sig[1] == UDS_MP_SIG1 && disk_mp.version >= 2 &&
+            in + (UDS_MP_RING_OFFSET - UDS_MP_STATUS_OFFSET) + sizeof(disk_ring) <= 0x1000) {
+            fcopy(&disk_ring, p + in + (UDS_MP_RING_OFFSET - UDS_MP_STATUS_OFFSET), sizeof(disk_ring));
+            show_disk_ring(&disk_ring, req + UDS_MP_RING_OFFSET, 16);
+        }
     }
 }
 
@@ -1511,14 +1634,14 @@ static void refresh(void)
 {
     nlines = 0;
     if (disk_only) {
-        wsprintf(line(), "USOSDBG 1.7 log mode (disk)  tick:%lu", GetTickCount());
+        wsprintf(line(), "USOSDBG 1.8 log mode (disk)  tick:%lu", GetTickCount());
         show_disk();
         return;
     }
     if (log_mode)
-        wsprintf(line(), "USOSDBG 1.7 log mode  tick:%lu  pci:%s", GetTickCount(), (LPSTR)(log_pci ? "yes" : "no (first run only)"));
+        wsprintf(line(), "USOSDBG 1.8 log mode  tick:%lu  pci:%s", GetTickCount(), (LPSTR)(log_pci ? "yes" : "no (first run only)"));
     else
-        wsprintf(line(), "USOSDBG 1.7  tick:%lu  S = append to C:\\USOS9X\\USOSDBG.LOG (saved:%u)  W = wheel knock  Esc = quit",
+        wsprintf(line(), "USOSDBG 1.8  tick:%lu  S = append to C:\\USOS9X\\USOSDBG.LOG (saved:%u)  W = wheel knock  Esc = quit",
                  GetTickCount(), snapshots);
     show_key();
     show_mouse();

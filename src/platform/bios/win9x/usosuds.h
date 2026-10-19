@@ -102,7 +102,7 @@ struct uds_req {
 /* states of a device table entry */
 #define UDS_DEV_EMPTY    0
 #define UDS_DEV_PRESENT  1
-#define UDS_DEV_GONE     2   /* removed; stage 1 keeps it gone until reboot */
+#define UDS_DEV_GONE     2   /* removed; from usos17 the entry is re-used for a new stick (new generation) */
 #define UDS_DEV_EJECTED  3
 #define UDS_DEV_FAILED   4   /* enumeration failed, see the USOSUDSK event ring */
 
@@ -123,11 +123,15 @@ struct uds_dev_info {
  * Diagnostics record "USOS" "UDSK" (CSMWrap 3.1.2-usos16 patch 0021): SeaBIOS
  * low memory (VARLOW), 16-byte aligned, found by scanning the first MiB for
  * the two signature dwords; also returned by UDS_OP_STATUS. Written by the
- * helper core only, never read back by the BIOS. Version 1, 768 bytes.
+ * helper core only, never read back by the BIOS. Version 1, 768 bytes
+ * (usos16); version 2 (usos17, patch 0022, hot-swap) appends the port watch
+ * block at +768: UDS_DIAG_V2_SIZE bytes.
  */
 #define UDS_DIAG_SIG0     0x534F5355UL  /* "USOS" */
 #define UDS_DIAG_SIG1     0x4B534455UL  /* "UDSK" */
-#define UDS_DIAG_VERSION  1
+#define UDS_DIAG_VERSION  2
+#define UDS_DIAG_V1_SIZE  768
+#define UDS_DIAG_V2_SIZE  984
 #define UDS_DIAG_DISKS    8
 #define UDS_DIAG_EVENTS   16
 
@@ -145,7 +149,7 @@ struct uds_diag_dev {           /* 64 bytes, one per device table entry */
     uds_u32 resets;             /* BOT reset recoveries */
     uds_u32 gone;               /* requests ended with UDS_S_GONE */
     uds_u32 refused;            /* UDS_S_OWNED / UDS_S_HWFAIL / UDS_S_BADREQ for this entry */
-    uds_u32 kib_in, kib_out;    /* data bytes / 1024 (rounded down per request) */
+    uds_u32 kib_in, kib_out;    /* data KiB (usos16: rounded down per request; usos17: exact, the remainder carried) */
 };
 
 struct uds_diag_disk {          /* 12 bytes: the BIOS hard disks / CD-ROMs SeaBIOS mapped */
@@ -167,6 +171,59 @@ struct uds_diag_disk {          /* 12 bytes: the BIOS hard disks / CD-ROMs SeaBI
 #define UDS_EV_PHASE     8   /* result: phase, 4 CSW signature/tag, 5 CSW status 2 */
 #define UDS_EV_REGFAIL   9   /* registration: result 1 table full, 2 INQUIRY failed */
 #define UDS_EV_STALL    10   /* result: phase */
+/* version 2 (patch 0022); port events: dev = F0h | controller index, port 1-based */
+#define UDS_EV_ATTACH    11  /* runtime bring-up done (result: LUNs) */
+#define UDS_EV_ATTFAIL   12  /* bring-up failed (result: UDS_AF_*) */
+#define UDS_EV_CONNECT   13  /* connect seen by the port watch (result: PORTSC.PLS) */
+#define UDS_EV_DETACH    14  /* unplug seen by the port watch (result: 1 = replugged at once) */
+#define UDS_EV_UNCLAIMED 15  /* connected when the watch armed, no device slot (result: PLS) */
+#define UDS_EV_MEDIA     16  /* media check (result: UDS_FS_*) */
+#define UDS_EV_ARM       17  /* the port watch armed (result: watched controllers) */
+
+/* bring-up failure reasons (UDS_EV_ATTFAIL, last_fail) */
+#define UDS_AF_RESET    1    /* port reset failed / disconnected */
+#define UDS_AF_SLOT     2    /* Enable Slot */
+#define UDS_AF_ADDRESS  3    /* Address Device */
+#define UDS_AF_DEVDESC  4    /* device descriptor */
+#define UDS_AF_CONFIG   5    /* configuration descriptor */
+#define UDS_AF_NOTMSC   6    /* no bulk-only mass storage interface (keyboard, hub, UAS only) */
+#define UDS_AF_SETCFG   7    /* SET_CONFIGURATION */
+#define UDS_AF_EPS      8    /* Configure Endpoint */
+#define UDS_AF_POOL     9    /* both runtime pool chunks in use */
+#define UDS_AF_TABLE   10    /* device table full */
+#define UDS_AF_MPS     11    /* EP0 packet size */
+
+/* media check (struct uds_diag_media.fs) */
+#define UDS_FS_UNREAD   0
+#define UDS_FS_READFAIL 1
+#define UDS_FS_NOSIG    2    /* sector 0 without 55AAh: blank / not a PC medium */
+#define UDS_FS_FAT12    3
+#define UDS_FS_FAT16    4
+#define UDS_FS_FAT32    5
+#define UDS_FS_NTFS     6
+#define UDS_FS_EXFAT    7
+#define UDS_FS_GPT      8    /* protective MBR (GPT) */
+#define UDS_FS_OTHER    9    /* MBR, volume unknown or not read */
+#define UDS_MF_SIG      1    /* sector 0 ends with 55AAh */
+#define UDS_MF_VBR      2    /* a boot sector was read and checked */
+#define UDS_DIAG_CTLS   4
+
+struct uds_diag_ctl {           /* 16 bytes per watched xHCI controller */
+    uds_u32 ports;
+    uds_u32 ccs_post;           /* CCS of root ports 1-32 after POST enumeration */
+    uds_u32 busy_arm;           /* ports with a device slot when the watch armed */
+    uds_u32 ccs_now;            /* CCS at the last watch pass */
+};
+
+struct uds_diag_media {         /* 16 bytes per device table entry */
+    uds_u8  fs;                 /* UDS_FS_* */
+    uds_u8  types[4];           /* MBR partition types, slots 1-4 */
+    uds_u8  flags;              /* UDS_MF_* */
+    uds_u8  ctl;                /* watched controller index, FFh none */
+    uds_u8  attach;             /* 0 POST, 1 port watch (runtime) */
+    uds_u32 part_lba;           /* boot sector checked (0 = sector 0) */
+    uds_u32 hash0;              /* FNV-1a of the first 512 bytes of sector 0 */
+};
 
 struct uds_diag_event {         /* 8 bytes */
     uds_u32 ms;                 /* SeaBIOS timer in ms (wraps; relative order only) */
@@ -185,7 +242,13 @@ struct uds_diag {
     struct uds_diag_dev dev[UDS_MAX_DEVS];         /* +32 */
     struct uds_diag_disk disk[UDS_DIAG_DISKS];     /* +544 */
     struct uds_diag_event ev[UDS_DIAG_EVENTS];     /* +640 */
-};                                                  /* 768 */
+    /* version 2 (patch 0022), +768 */
+    uds_u32 watch_passes, attaches, detaches, attach_fails;
+    uds_u8  ctls, armed, pool_used, last_fail;     /* last_fail: UDS_AF_* */
+    uds_u32 pool;               /* physical address of the runtime pool, 0 = none (no hot-swap) */
+    struct uds_diag_ctl ctl[UDS_DIAG_CTLS];        /* +792 */
+    struct uds_diag_media media[UDS_MAX_DEVS];     /* +856 */
+};                                                  /* 984 */
 
 /*
  * USOSUSB.MPD status page: right after the miniport's request block, at
@@ -196,7 +259,7 @@ struct uds_diag {
 #define UDS_MP_STATUS_OFFSET  128
 #define UDS_MP_SIG0     0x534F5355UL  /* "USOS" */
 #define UDS_MP_SIG1     0x53504D55UL  /* "UMPS" */
-#define UDS_MP_VERSION  1
+#define UDS_MP_VERSION  2             /* 2 (USOSUSB 1.1): the request ring below */
 #define UDS_MP_SLOTS    4
 
 struct uds_mp_slot {            /* 16 bytes */
@@ -206,16 +269,41 @@ struct uds_mp_slot {            /* 16 bytes */
     uds_u32 srbs;
 };
 
-struct uds_mp_status {          /* 100 bytes */
+struct uds_mp_status {          /* 104 bytes (1.0: 100) */
     uds_u32 sig[2];             /* UDS_MP_SIG0, UDS_MP_SIG1 */
     uds_u8  version, slots, mp_major, mp_minor;
     uds_u32 srbs;               /* all SRBs seen */
     uds_u32 posted;             /* requests posted to the channel */
     uds_u32 polled;             /* completions found by the timer poll (not the short spin) */
-    uds_u32 errors;             /* SRBs completed with an error status */
+    uds_u32 errors;             /* SRBs completed with an error status (1.1: not NOT READY / 3Ah of an empty slot) */
     uds_u32 enums;              /* UDS_OP_ENUM requests */
     uds_u32 last_status;        /* UDS_S_* of the last request */
     struct uds_mp_slot slot[UDS_MP_SLOTS];       /* +36 */
+    uds_u32 notready;           /* 1.1: SRBs answered NOT READY / 3Ah (empty slot polls), +100 */
+};
+
+/*
+ * USOSUSB.MPD request ring (status page version 2): the last UDS_MP_RING
+ * SCSI requests sent to a stick, at channel.req_phys + UDS_MP_RING_OFFSET.
+ * crc: CRC-32 (IEEE 802.3, as zip) of the data the stick returned (IN) or
+ * was sent (OUT), 0 without data.
+ */
+#define UDS_MP_RING_OFFSET  1024
+#define UDS_MP_RSIG1    0x474E5255UL  /* "URNG" (sig[0] = "USOS") */
+#define UDS_MP_RING     32
+
+struct uds_mp_rent {            /* 16 bytes */
+    uds_u8  op, slot, srb_status, uds_status;
+    uds_u32 lba;                /* READ / WRITE 6/10/12/16 (low 32 bits), else 0 */
+    uds_u32 bytes;              /* data moved */
+    uds_u32 crc;
+};
+
+struct uds_mp_ring {            /* 16 + 512 bytes */
+    uds_u32 sig[2];             /* UDS_MP_SIG0, UDS_MP_RSIG1 */
+    uds_u32 count;              /* entries written */
+    uds_u32 next;               /* next slot */
+    struct uds_mp_rent ent[UDS_MP_RING];
 };
 
 /* uds_req_check() result: UDS_S_OK or UDS_S_BADREQ, reason in *why */
