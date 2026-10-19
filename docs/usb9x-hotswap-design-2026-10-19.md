@@ -1,7 +1,9 @@
 # USB flash drives in Windows 95/98/98 SE/Me on the X470 without CSM: design (2026-10-19)
 
-Status: design plus stage 0 in the flow (this branch, `feat/usb9x-hotswap`, base
-`eb7138a` of `test/x470-98se-qemu`). Nothing here has run on the X470 or in a 9x VM yet.
+Status: design, stage 0 in the flow, and stage 1 implemented (section 7: CSMWrap
+3.1.2-usos16 patch 0021, USOSUSB.MPD, flow behind a DATA flag, logging). This branch is
+`feat/usb9x-hotswap`, based on `eb7138a` of `test/x470-98se-qemu`. The SeaBIOS side has
+passed a QEMU protocol test. Nothing has run on the X470 or in a 9x VM yet.
 
 ## 0. Starting point (what is already known)
 
@@ -449,3 +451,158 @@ Own design. Sources:
   from an earlier read-only disassembly for diagnosis), and Codex's 2026-10-16 cold-plug report.
 
 No NT5 / Windows source was used for this design.
+
+Stage 1 implementation (section 7): own code written from the same public specifications, the
+public SCSI miniport (DDK) interface documentation and the SeaBIOS/CSMWrap source (LGPL/GPL)
+that patch 0021 extends. Patch 0021 is LGPLv3 like SeaBIOS. USOSUSB.MPD, USOSDBG, USOSLOG and
+the flow scripts are GPL-3.0-or-later. No Microsoft or NT5 source and no other USB stack's
+source was used for stage 1.
+
+## 7. Stage 1 as implemented (2026-10-19)
+
+Not tested on the X470 and not in a 9x VM. The SeaBIOS side passed a QEMU protocol test.
+
+### CSMWrap 3.1.2-usos16 (patch 0021 `usb-disk-service`)
+
+- 3.1.2-usos16 is 3.1.2-usos15 (0001-0020, byte for byte) plus 0021, and it is the new release
+  pin: xp_csmwrap_esp.sh `PINNED`, release.go, lock.json, run_build_vm.py, third-party.json.
+- Binary `5d73385e797697b3207c95632da1307fe9d86a1f61e4fb4c57539cc9a39cbbb4`:
+  - built in one pinned Alpine VM run, and the in-guest repeat build gave the same binary;
+  - the unpatched build still matches `upstream_rebuild`.
+- Details: docs/research/csmwrap.md section 22.
+- **Changes from the plan in section 3:**
+  - *No PCI configuration access from the helper core.* CF8h/CFCh would race the OS running on
+    the other CPU. The BAR guard (step 6) is replaced by MMIO checks on every wait pass:
+    - the capability dword equals its POST value and does not read all ones;
+    - USBSTS has neither HCH nor HSE set.
+  - *POST sends no extra USB traffic.* VID:PID, the INQUIRY strings and READ CAPACITY(10) are
+    read on the helper core at the first channel 1 request for a device without a BIOS number.
+    A stick that INT 13h owns is never probed.
+  - *The MBR stamp bytes, the sector-0 hash and the INT 13h call ring are not in the record yet*
+    (section 4). The record has the BIOS disk table (number, DTYPE, UDS index, sectors), filled
+    at the first channel 1 request.
+  - *Transfers that cross a 64 KiB boundary* go as two chained TRBs with ISP in one TD, so the
+    OS needs no buffer alignment.
+- **ROM:**
+  - 126656 of 131072 bytes used (96.6 %), 4416 free (usos15: 10496 free);
+  - 32-bit flat code +4864 bytes, low memory +768 (the record), F-segment variables +416.
+  - Stage 2 (4-6 KiB) will not fit without the fallback in section 3: drop `CONFIG_MEGASAS` /
+    `CONFIG_SDCARD`, or the debug strings.
+- **Concurrency:**
+  - Channel 1 is meant for an OS that runs SeaBIOS's 32-bit code only through the helper core
+    (Windows 9x: V86 -> call32_proxy).
+  - In real mode, SeaBIOS's IRQ 0 HID poll runs on the BSP next to the helper. That is why the
+    QEMU test has no USB keyboard or mouse.
+- **QEMU** (`tools/tests/csmwrap/run_csmwrap_uds_qemu.py`, uds_mbr.S): q35, OVMF, the boot disk
+  on NVMe, qemu-xhci usb-storage, channel 1 driven from a real-mode MBR.
+  - `free` (int13_boot_disk_only) PASS:
+    - ENUM;
+    - INQUIRY;
+    - READ;
+    - WRITE and READ back across 64 KiB boundaries; the image compared on the host;
+    - two 64 KiB reads;
+    - BADREQ for a buffer in F0000h;
+    - STATUS record;
+    - CHECK with sense key 5;
+    - RESET, then TUR and READ;
+    - QMP `device_del` during 64 KiB reads gives GONE about 0.01 s later (host-side poll);
+    - GONE again at once; ENUM state GONE.
+  - `owned` (no key, stick = 81h) PASS: ENUM shows the BIOS number and SCSI gives OWNED, with no
+    probe traffic.
+  - Regression with usos16 PASS: `run_csmwrap_boot_disk_qemu.py` (7 layouts, with and without
+    `--only`), `run_csmwrap_apmoff_qemu.py`, `run_csmwrap_pciirq_qemu.py` (pc, q35, key on and off),
+    `run_csmwrap_nvme_rearm_qemu.py`.
+  - Not rerun: the DOS mouse probe. The channel 0 proxy from V86 (the 9x keyboard/mouse path) is
+    not covered by any QEMU test; its code is unchanged apart from the extra channel 1 test in
+    the helper loop and the 64-byte alignment of the mailbox.
+- **Host tests:**
+  - `tools/tests/csmwrap/test_csmwrap_uds16.py`:
+    - series and manifest;
+    - the LGPL request check is textually the same as the GPL `uds_req_check()` and gives the same
+      verdicts on 40000 generated requests;
+    - usb-uds.h and usosuds.h give the same layout;
+    - mailbox / helper-loop / hook wiring;
+    - no POST traffic;
+    - pins.
+  - The usos15 tests still PASS with the pins moved.
+
+### USOSUSB.MPD (`tools/nt/usosusb9x`)
+
+- Built with WDK 7.1 (PE 4.00, 11392 bytes). It imports only these SCSIPORT.SYS functions:
+  CompleteRequest, GetPhysicalAddress, GetUncachedExtension, Initialize, MoveMemory,
+  Notification, StallExecution.
+- It uses `usosuds_slot.c` as it is (fixed identity "USOS USB disk slot n", RMB = 1).
+- Uncached block:
+  - request at +0;
+  - status page `USOSUMPS` at +128;
+  - ENUM table at +256;
+  - 64 KiB bounce at +4096.
+- Polling: a 2 ms spin, then `RequestTimerCall` at 1 ms, with a 15 s watchdog.
+- Details: tools/nt/usosusb9x/README.md.
+- Host simulation of the SRB path: `tools/tests/usb9x/test_usosusb9x.py`.
+- **Open SCSIPORT.PDR points** (QEMU 9x run first):
+  - Does 9x honour `RequestTimerCall`? Without it, an SRB longer than 2 ms never completes.
+    Fallback: VMM `Set_Global_Time_Out`.
+  - Does DiskTSD give the empty removable target a letter?
+  - Is the 18-page uncached extension contiguous? If not, the bounce buffer shrinks.
+  - Does a non-numeric root instance key `Enum\Root\SCSIAdapter\USOSUSB` work?
+
+### Flow (DATA flag `Systems\Windows\<9x>\Unattended\usb-storage-experimental.txt`, off by default)
+
+- `w9x_csmwrap_prepare.sh` passes `W9X_USB_STORAGE=1`. `w9x_csmwrap_target.sh` then stages
+  USOSUSB.MPD/.INF/.REG in `C:\USOS9X`, sets the class index `@CLASSIDX@` = `0090` and adds
+  `U9UDS=1` to U9ENV.BAT. (`U9USB` is xhci98's variable.)
+- Install:
+  - 95/98/98 SE: `USBREG.BAT` from AUTOEXEC.BAT after Setup copies the MPD into IOSUBSYS and
+    imports the REG once with real-mode REGEDIT.
+  - Me: `INSTALL.BAT` copies the MPD before Setup and adds a RunOnce `regedit /s` (the driver
+    loads from the second start).
+- `int13_boot_disk_only` is on for every 9x target with the flag, SATA too. The opt-out flag
+  stays, and the log then says USOSUSB offers nothing.
+- USOSUSB is skipped with xhci98.flag and with a user answer file on Me.
+- Tests: `tools/tests/test_w9x_usb_storage_flag.py`, `test_w9x_int13_boot_disk_only.py`.
+
+### Logging
+
+- USOSDBG 1.7: new `DISK` section, also in `/L`, plus a `/D` mode. It decodes:
+  - the USOSUDSK record;
+  - channel 1;
+  - the USOSUSB.MPD status page (above 1 MiB, through DPMI 0800h).
+- USOSLOG: a `[DISK]` start record covering:
+  - one line per drive letter: type, file system, serial, label, free space;
+  - IOS.LOG copied, with its real-mode lines;
+  - BOOTLOG.TXT [IOS] / KRNL386 lines;
+  - `Enum\Root\SCSIAdapter`, `Enum\SCSI`, `Class\SCSIAdapter` PortDriver;
+  - one USOSDBG `/D` snapshot.
+- USOSLOG watcher (250 ms thread): `+drive` / `-drive` / `media X: changed`, each followed by a
+  USOSDBG `/D` snapshot (at most one per 2 s).
+- The drive APIs are loaded at run time, so the static Win95-only import list is unchanged.
+- Not done: WM_DEVICECHANGE (USOSLOG has no window) and the MBR 0xDA..0xDF bytes of unit 80h.
+- Tests: `tools/tests/usb9x/test_usosdbg_disk.py`, `tools/tests/test_usoslog.py`.
+
+### What remains for stage 1
+
+- A QEMU 9x run (98 SE, Me, 95 OSR2) with the stick through USOSUSB. No 9x VM image was found on
+  this machine, and new Windows installs in QEMU are not done here. Check:
+  - the drive letter;
+  - a 64 MB copy and compare, and the read-only check after a reboot;
+  - the keyboard and mouse during the copy;
+  - the open SCSIPORT.PDR points above.
+- X470 (Micron): 98 SE and Me, logged automatically (in-place kit below).
+- SeaBIOS: the MBR stamp / INT 13h call ring part of the record, and EJECT in the QEMU test.
+
+### In-place kit for the Micron (not built)
+
+- **CSMWRAP partition:** replace `EFI\BOOT\BOOTX64.EFI` with usos16 (hash above) and add
+  `int13_boot_disk_only = true` to `csmwrap.ini`.
+- **Windows partition:**
+  - `C:\WINDOWS\SYSTEM\IOSUBSYS\USOSUSB.MPD`;
+  - `C:\USOS9X\USOSUSB.REG` (with `0090`), imported once by an AUTOEXEC.BAT line (98 SE) or a
+    RunOnce entry (Me), the way the flow does it;
+  - the new USOSDBG.EXE / USOSLOG.EXE in `C:\USOS9X`, with USOSLOG in Startup.
+- **User action:** plug in a FAT32 test stick before boot (never the USOS SanDisk). Result
+  lands in `C:\USOS9X\LOGS`: the `[DISK]` lines and the USOSDBG DISK snapshot.
+- **Expected:**
+  - a removable letter after C:, with read/write working;
+  - DISK dev 0 present / not mapped, its counters rising;
+  - after an unplug: GONE, NOT READY on the letter.
