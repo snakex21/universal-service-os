@@ -606,15 +606,27 @@ Not tested on the X470 and not in a 9x VM. The SeaBIOS side passed a QEMU protoc
 - X470 (Micron): 98 SE and Me, logged automatically (in-place kit below).
 - SeaBIOS: the MBR stamp / INT 13h call ring part of the record, and EJECT in the QEMU test.
 
-### In-place kit for the Micron (not built)
+### In-place kit for the Micron (Me, built 2026-10-20, not applied yet)
 
-- **CSMWRAP partition:** replace `EFI\BOOT\BOOTX64.EFI` with usos16 (hash above) and add
-  `int13_boot_disk_only = true` to `csmwrap.ini`.
+Kit `me-usb1` (session scratchpad, not in the repository), built from the integration branch
+`int/me-round` (this branch + `feat/usosvmd-dosbox` up to USOSVMD v3.1, so one USOSDBG 1.7 has
+the VMD lines and the DISK section). Baseline: the vmd3 (or vmd2) in-place state; refused
+otherwise.
+
+- **CSMWRAP partition:** replace `EFI\BOOT\BOOTX64.EFI` with usos16 (hash above); `csmwrap.ini`
+  is kept and must already say `int13_boot_disk_only = true`.
 - **Windows partition:**
   - `C:\WINDOWS\SYSTEM\IOSUBSYS\USOSUSB.MPD`;
-  - `C:\USOS9X\USOSUSB.REG` (with `0090`), imported once by an AUTOEXEC.BAT line (98 SE) or a
-    RunOnce entry (Me), the way the flow does it;
-  - the new USOSDBG.EXE / USOSLOG.EXE in `C:\USOS9X`, with USOSLOG in Startup.
+  - `C:\USOS9X\USOSUSB.REG` (root and class instance `0090`). An offline edit cannot add a
+    RunOnce value (that is a registry write too, and no proven SYSTEM.DAT writer exists), so a
+    one-shot `USOSUREG.BAT` in the All Users Startup folder runs `START /W REGEDIT /S`, checks
+    the import with `REGEDIT /E` + `FIND`, writes `C:\USOS9X\USOSUREG.OK`, deletes itself and
+    restarts Windows once (the USOSLAN.BAT pattern already used on this Me install). SYSTEM.DAT
+    is only read, to check that `0090` is free;
+  - the unified USOSDBG.EXE / USOSLOG.EXE in `C:\USOS9X`, with USOSLOG in Startup.
+- **Off switch:** BOOTX64.EFI back to usos15, the MPD and the other files back from the backup;
+  when the import may have run, a one-shot `USOSUUNR.BAT` removes the two `0090` keys
+  (REGEDIT4 `[-key]`) at the next logon. Without the MPD the devnode cannot load either way.
 - **User action:** plug in a FAT32 test stick before boot (never the USOS SanDisk). Result
   lands in `C:\USOS9X\LOGS`: the `[DISK]` lines and the USOSDBG DISK snapshot.
 - **Expected:**
