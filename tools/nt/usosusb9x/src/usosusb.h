@@ -44,10 +44,13 @@
 
 #define USB_INITIATOR_ID  7
 #define USB_SPIN_US       2000UL     /* short spin in HwStartIo */
+/* until SCSIPORT.PDR has called the timer back once, HwStartIo waits for
+   the whole request (bounded by the watchdog), as usosnvme's W9X build */
+#define USB_SYNC_SPIN_US  ((USB_WATCHDOG_MS + 1000UL) * 1000UL)
 #define USB_SPIN_STEP_US  50UL
 #define USB_TIMER_US      1000UL     /* RequestTimerCall interval */
 #define USB_WATCHDOG_MS   15000UL    /* hard limit per posted request */
-#define USB_INIT_ENUM_MS  1000UL     /* HwInitialize waits this long for the first ENUM */
+#define USB_INIT_ENUM_MS  3000UL     /* HwInitialize waits this long for the first ENUM, then it is stale */
 #define USB_TUR_ENUM_MS   1000UL     /* at most one ENUM per second from TEST UNIT READY */
 #define USB_TUR_ENUM_EVERY 8UL       /* no TSC: one ENUM per this many TEST UNIT READY */
 
@@ -104,6 +107,8 @@ typedef struct _HW_DEVICE_EXTENSION {
     ULONG TicksPerMs;
     ULONGLONG Soft;
     BOOLEAN TimerArmed;
+    BOOLEAN TimerSeen;              /* SCSIPORT.PDR called UsbTimer at least once */
+    BOOLEAN InPump;                 /* HwStartIo is running the state machine */
     ULONG DbgLines;
 } HW_DEVICE_EXTENSION, *PHW_DEVICE_EXTENSION;
 

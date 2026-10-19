@@ -1,6 +1,6 @@
 REGEDIT4
 
-[HKEY_LOCAL_MACHINE\Enum\Root\SCSIAdapter\USOSUSB]
+[HKEY_LOCAL_MACHINE\Enum\Root\SCSIAdapter\@CLASSIDX@]
 "Class"="SCSIAdapter"
 "Driver"="SCSIAdapter\\@CLASSIDX@"
 "DeviceDesc"="USOS USB disk service (usosusb)"

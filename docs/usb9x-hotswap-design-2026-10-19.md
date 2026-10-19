@@ -280,7 +280,7 @@ Room:
 - **Install.**
   - Copy `USOSUSB.MPD` to `C:\WINDOWS\SYSTEM\IOSUBSYS`.
   - A first-boot registry import (the REGBIND pattern from `run_w9x_nvme_qemu.py --regbind`):
-    `Enum\Root\SCSIAdapter\USOSUSB` + `Services\Class\SCSIAdapter\nnnn` (DevLoader `*IOS`,
+    `Enum\Root\SCSIAdapter\nnnn` + `Services\Class\SCSIAdapter\nnnn` (DevLoader `*IOS`,
     PortDriver `usosusb.mpd`), and the removable-disk write-behind cache off.
   - Wired in `w9x_csmwrap_target.sh` / `INSTALL.BAT` like usosnvme, gated by a DATA flag
     `usb-storage-experimental.txt` until the hardware passes.
@@ -537,15 +537,30 @@ Not tested on the X470 and not in a 9x VM. The SeaBIOS side passed a QEMU protoc
   - status page `USOSUMPS` at +128;
   - ENUM table at +256;
   - 64 KiB bounce at +4096.
-- Polling: a 2 ms spin, then `RequestTimerCall` at 1 ms, with a 15 s watchdog.
+- Polling: a 2 ms spin, then `RequestTimerCall` at 1 ms, with a 15 s watchdog. Until the
+  timer has called back once, HwStartIo waits for the whole request (2026-10-20, below).
 - Details: tools/nt/usosusb9x/README.md.
 - Host simulation of the SRB path: `tools/tests/usb9x/test_usosusb9x.py`.
-- **Open SCSIPORT.PDR points** (QEMU 9x run first):
-  - Does 9x honour `RequestTimerCall`? Without it, an SRB longer than 2 ms never completes.
-    Fallback: VMM `Set_Global_Time_Out`.
-  - Does DiskTSD give the empty removable target a letter?
-  - Is the 18-page uncached extension contiguous? If not, the bounce buffer shrinks.
-  - Does a non-numeric root instance key `Enum\Root\SCSIAdapter\USOSUSB` work?
+- **Open SCSIPORT.PDR points, re-checked 2026-10-20** (code + documentation; no 9x DDK
+  text on SCSIPORT.PDR's timer was found on this machine):
+  - *RequestTimerCall*: still unverified on 9x, but no longer a hang risk. The first SRB
+    arms the timer as a probe; until `UsbTimer` has run once, HwStartIo waits for the
+    whole request (watchdog-bounded), the usosnvme W9X model proven on 98 SE (QEMU) and on
+    the X470. A callback while HwStartIo runs is re-armed and does nothing. On hardware,
+    `polled` > 0 in the USOSDBG DISK snapshot means the timer works.
+  - *Dead helper*: an ENUM unanswered after 3 s in HwInitialize is left stale; every SRB
+    then completes at once (slot empty, NOT READY / 3Ah) instead of waiting. A missing
+    channel (BOOTX64.EFI older than usos16, firmware CSM) was already `SP_RETURN_NOT_FOUND`:
+    IOS loads no adapter, nothing waits. Both are covered by the host simulation.
+  - *Empty removable slot letter*: not answerable from code. 9x gives SCSI removable
+    devices (ZIP-class, RMB = 1) a letter without media; the kit test plugs the stick
+    before boot, so stage 1 does not depend on it.
+  - *Contiguous uncached block*: the driver checks every bounce page with
+    `ScsiPortGetPhysicalAddress` and shrinks the bounce buffer and `MaximumTransferLength`
+    to the contiguous run (logged on port E9h only); a split block costs speed, not correctness.
+  - *Root instance key*: changed to the numeric `Enum\Root\SCSIAdapter\0090` (same number as
+    the class instance), the form CONFIGMG writes and the usosnvme `--regbind` QEMU run
+    proved with `0000`; the non-numeric `USOSUSB` was unproven.
 
 ### Flow (DATA flag `Systems\Windows\<9x>\Unattended\usb-storage-experimental.txt`, off by default)
 

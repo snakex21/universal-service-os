@@ -13,13 +13,15 @@
  * SeaBIOS inside CSMWrap stays the only xHCI owner. Its helper core serves
  * UDS channel 1 (struct uds_channel at "CSMPPrxy" + 48 in the F-segment);
  * this miniport never touches PCI or the xHCI. It is registered for the Isa
- * bus on a root devnode (Root\SCSIAdapter\USOSUSB), has no access ranges and
+ * bus on a root devnode (Root\SCSIAdapter\0090), has no access ranges and
  * no interrupt, and polls the channel:
  *   - one request at a time from a physically contiguous uncached block
  *     (request, status page, ENUM table, 64 KiB bounce buffer);
  *   - HwStartIo spins up to ~2 ms on channel->done, then the request is
- *     polled from a 1 ms RequestTimerCall; NextRequest only after the SRB
- *     completed; a 15 s watchdog per posted request;
+ *     polled from a 1 ms RequestTimerCall; until SCSIPORT.PDR has called
+ *     that timer once, HwStartIo waits for the whole request instead;
+ *     NextRequest only after the SRB completed; a 15 s watchdog per posted
+ *     request;
  *   - each SCSI target 0..Slots-1 is a removable slot, run by the slot state
  *     machine of src/platform/bios/win9x/usosuds_slot.c (compiled into this
  *     binary): fixed INQUIRY identity, NOT READY / 3Ah when empty, one
@@ -743,13 +745,13 @@ static BOOLEAN UsbPump(PHW_DEVICE_EXTENSION Ext, ULONG SpinUs, BOOLEAN FromTimer
                 UsbDone(Ext);
                 continue;
             }
+            if (UsbNow(Ext) >= Ext->Deadline) {
+                UsbWatchdog(Ext);
+                continue;
+            }
             if (SpinUs >= USB_SPIN_STEP_US) {
                 UsbStall(Ext, USB_SPIN_STEP_US);
                 SpinUs -= USB_SPIN_STEP_US;
-                continue;
-            }
-            if (UsbNow(Ext) >= Ext->Deadline) {
-                UsbWatchdog(Ext);
                 continue;
             }
             return FALSE;
@@ -780,6 +782,16 @@ static VOID UsbTimer(IN PVOID DeviceExtension)
     PHW_DEVICE_EXTENSION ext = (PHW_DEVICE_EXTENSION)DeviceExtension;
     BOOLEAN idle;
     ext->TimerArmed = FALSE;
+    if (!ext->TimerSeen) {
+        ext->TimerSeen = TRUE;
+        UsbSay("RequestTimerCall works: long requests complete from the timer", 0xFFFFFFFFUL);
+    }
+    /* never inside a running HwStartIo (should SCSIPORT.PDR call the timer
+       from an interrupt that interrupted it): try again in 1 ms */
+    if (ext->InPump) {
+        UsbArmTimer(ext);
+        return;
+    }
     if (ext->Srb == NULL && !ext->Posted) return;
     if (!ext->Tsc) ext->Soft += USB_TIMER_US;
     idle = UsbPump(ext, 0, TRUE);
@@ -934,6 +946,9 @@ static ULONG UsbFindAdapter(IN PVOID DeviceExtension, IN PVOID Context, IN PVOID
     ext->DoneSrb = NULL;
     ext->Step = STEP_IDLE;
     ext->NeedEnum = TRUE;
+    ext->TimerArmed = FALSE;
+    ext->TimerSeen = FALSE;
+    ext->InPump = FALSE;
     /* the helper may have served an earlier client (a previous Windows
        session): continue after its last sequence number */
     ext->Seq = ch->done;
@@ -986,8 +1001,19 @@ static BOOLEAN UsbHwInitialize(IN PVOID DeviceExtension)
             UsbStall(ext, 100);
             waited += 100;
         }
-        if (ext->Ch->done == ext->Seq) UsbDone(ext);
-        else UsbSay("first ENUM still out after 1 s; seq", ext->Seq);   /* finished by the first SRB */
+        if (ext->Ch->done == ext->Seq) {
+            UsbDone(ext);
+        } else {
+            /* the helper does not answer (yet): no SRB waits for it. The block
+               stays the helper's until done reaches this seq; meanwhile the
+               slot is empty (NOT READY / 3Ah) and the next TEST UNIT READY
+               after that enumerates again. */
+            UsbSay("first ENUM not answered in 3 s, slots empty until it is; seq", ext->Seq);
+            ext->Posted = FALSE;
+            ext->Stale = TRUE;
+            ext->StaleSeq = ext->Seq;
+            ext->Mp->last_status = UDS_S_TIMEOUT;
+        }
     }
     return TRUE;
 }
@@ -995,6 +1021,7 @@ static BOOLEAN UsbHwInitialize(IN PVOID DeviceExtension)
 static BOOLEAN UsbStartIo(IN PVOID DeviceExtension, IN PSCSI_REQUEST_BLOCK Srb)
 {
     PHW_DEVICE_EXTENSION ext = (PHW_DEVICE_EXTENSION)DeviceExtension;
+    BOOLEAN idle;
 
     ext->Res.key = ext->Res.asc = ext->Res.ascq = 0;
     ext->Res.scsi_status = SCSISTAT_GOOD;
@@ -1035,7 +1062,17 @@ static BOOLEAN UsbStartIo(IN PVOID DeviceExtension, IN PSCSI_REQUEST_BLOCK Srb)
     return TRUE;
 
 run:
-    if (!UsbPump(ext, USB_SPIN_US, FALSE) && ext->Srb != NULL && !ext->TimerArmed) UsbArmTimer(ext);
+    /*
+     * Whether SCSIPORT.PDR honours RequestTimerCall is not documented for 9x.
+     * Until it has called UsbTimer once, the first SRB arms the timer as a
+     * probe and HwStartIo waits for the whole request (bounded by the
+     * watchdog), so an SRB never depends on a timer that may not come.
+     */
+    if (!ext->TimerSeen && !ext->TimerArmed) UsbArmTimer(ext);
+    ext->InPump = TRUE;
+    idle = UsbPump(ext, ext->TimerSeen ? USB_SPIN_US : USB_SYNC_SPIN_US, FALSE);
+    ext->InPump = FALSE;
+    if (!idle && ext->Srb != NULL && !ext->TimerArmed) UsbArmTimer(ext);
     UsbNotifyDone(ext);
     return TRUE;
 }

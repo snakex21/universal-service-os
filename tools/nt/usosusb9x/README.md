@@ -65,8 +65,9 @@ and a zig cc host simulation of the whole SRB path against a fake helper).
 - **Slot mapping**: after each ENUM, slot i serves the i-th device table entry (in table
   order) that is `UDS_DEV_PRESENT`, has `bios_drive == 0` and a non-zero generation. A slot
   with no such entry is fed `NULL` (empty). Sticks with a BIOS number stay with INT 13h.
-- **ENUM**: at HwInitialize (waits up to 1 s; if the helper is slower the first SRB waits
-  for it), after a request ended `NODEV`/`GONE`/`OWNED`, after an eject, a watchdog or a bus
+- **ENUM**: at HwInitialize (waits up to 3 s; an unanswered ENUM is then left stale, so no
+  SRB waits for a helper core that does not answer: the slot is empty, NOT READY / 3Ah, until
+  the helper catches up and a TEST UNIT READY enumerates again), after a request ended `NODEV`/`GONE`/`OWNED`, after an eject, a watchdog or a bus
   reset, and at most once per second on TEST UNIT READY (TSC clock; without a TSC every
   8th TEST UNIT READY).
 - **Requests**: fill the request, `seq = ++n`, locked-instruction fence, `doorbell = n`;
@@ -74,6 +75,13 @@ and a zig cc host simulation of the whole SRB path against a fake helper).
   steps, interrupts never disabled by the driver), then returns and polls from
   `ScsiPortNotification(RequestTimerCall, ..., 1000 us)`. One SRB at a time; `NextRequest`
   only after it completed.
+- **Timer fail-safe**: no 9x DDK text states that SCSIPORT.PDR calls a miniport timer back.
+  The first SRB arms the timer as a probe; until `UsbTimer` has run once, HwStartIo waits
+  for the whole request (bounded by the watchdog), which is what usosnvme's W9X build does
+  for every request (proven on 98 SE in QEMU and on the X470). After the first callback the
+  2 ms spin + timer path is used. A timer that fires while HwStartIo is running is re-armed
+  and does nothing. On the X470 a `polled` counter above 0 in the USOSDBG DISK snapshot
+  shows that the timer works.
 - **Watchdog**: 15 s per posted request (TSC calibrated against `ScsiPortStallExecution`
   at HwInitialize; without a TSC the time spent spinning and in timer ticks is counted).
   On expiry the SRB completes with `SRB_STATUS_TIMEOUT`, the block stays the helper's
@@ -105,12 +113,15 @@ and a zig cc host simulation of the whole SRB path against a fake helper).
 
 ## Registry (`usosusb.reg`)
 
-Registers a root devnode `HKLM\Enum\Root\SCSIAdapter\USOSUSB` (Class SCSIAdapter,
+Registers a root devnode `HKLM\Enum\Root\SCSIAdapter\@CLASSIDX@` (Class SCSIAdapter,
 HardwareID `USOSUSB`) and its driver key `HKLM\System\CurrentControlSet\Services\Class\SCSIAdapter\@CLASSIDX@`
 (DevLoader `*IOS`, PortDriver `usosusb.mpd`). `@CLASSIDX@` is a placeholder: the flow
-substitutes a free 4-digit class instance number (for example `0009`) in both places
-before the real-mode `REGEDIT /L:SYSTEM.DAT /R:USER.DAT` import (the REGBIND pattern of
+substitutes a 4-digit number (`0090`, `USOSUSB_CLASSIDX` in `w9x_csmwrap_target.sh`) in all
+three places before the real-mode `REGEDIT /L:SYSTEM.DAT /R:USER.DAT` import (the REGBIND pattern of
 `tools/tests/run_w9x_nvme_qemu.py`). The MPD itself goes to `C:\WINDOWS\SYSTEM\IOSUBSYS`.
+The root instance is numeric, the form CONFIGMG itself writes and the one the usosnvme
+`--regbind` QEMU run proved (`Root\SCSIAdapter\0000`); a high number keeps clear of
+instances Windows created. (Until 2026-10-20 it was the unproven non-numeric `USOSUSB`.)
 
 Write-behind cache: no documented 9x registry value for *removable* drives only was
 identified, so the fragment sets none. The documented `DriveWriteBehind` value
@@ -121,9 +132,8 @@ System Properties > Performance > File System; check its state in the first VM r
 
 ## Open points (to verify in QEMU / on hardware)
 
-- SCSIPORT.PDR's support for `RequestTimerCall`. If it does not call the timer back, an
-  SRB that outlasts the 2 ms spin never completes; the fallback is VMM
-  `Set_Global_Time_Out` through INT 20h (design doc).
+- SCSIPORT.PDR's support for `RequestTimerCall`. No longer a hang risk (timer fail-safe
+  above); without it every request is synchronous, as in usosnvme.
 - Whether IOS treats target 0 as a removable drive letter after the fixed disks, as with
   ZIP / card-reader slots, and keys the `Enum\SCSI` devnode on the fixed INQUIRY strings.
 - That SCSIPORT.PDR's uncached extension is physically contiguous (usosnvme's 3-page block

@@ -31,7 +31,7 @@ UDS = cut(TARGET, 'uds_ok=0\n',
           '"$work/c/USOS9X/USOSUSB.REG"\n')
 GATE = cut(TARGET, 'int13_only=off\n', '\nfi\n')
 CLASSIDX = re.search(r'^USOSUSB_CLASSIDX=(\d{4})$', TARGET, re.M).group(1)
-REG = ('REGEDIT4\r\n\r\n[HKEY_LOCAL_MACHINE\\Enum\\Root\\SCSIAdapter\\USOSUSB]\r\n'
+REG = ('REGEDIT4\r\n\r\n[HKEY_LOCAL_MACHINE\\Enum\\Root\\SCSIAdapter\\@CLASSIDX@]\r\n'
        '"Driver"="SCSIAdapter\\\\@CLASSIDX@"\r\n\r\n'
        '[HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Class\\SCSIAdapter\\@CLASSIDX@]\r\n'
        '"PortDriver"="usosusb.mpd"\r\n\r\n')
@@ -96,7 +96,7 @@ class TargetScript(unittest.TestCase):
         self.assertNotIn(b'U9USB', (self.c / 'U9ENV.BAT').read_bytes())   # xhci98's variable
         reg = (self.c / 'USOSUSB.REG').read_bytes().replace(b'\r\n', b'\n')
         self.assertNotIn(b'@CLASSIDX@', reg)
-        self.assertEqual(reg.count(CLASSIDX.encode()), 2)
+        self.assertEqual(reg.count(CLASSIDX.encode()), 3)   # root instance, Driver, class key
         self.assertTrue(reg.startswith(b'REGEDIT4\n'))
         self.assertEqual((self.c / 'USOSUSB.MPD').read_bytes(), b'MZ stand-in')
         bat = (self.c / 'USBREG.BAT').read_bytes()

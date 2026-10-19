@@ -143,12 +143,15 @@ class InfReg(unittest.TestCase):
         self.assertNotIn(b'\n', raw.replace(b'\r\n', b''))
         t = raw.decode('ascii')
         self.assertTrue(t.startswith('REGEDIT4\r\n\r\n'))
-        for want in ('[HKEY_LOCAL_MACHINE\\Enum\\Root\\SCSIAdapter\\USOSUSB]', '"Class"="SCSIAdapter"',
+        for want in ('[HKEY_LOCAL_MACHINE\\Enum\\Root\\SCSIAdapter\\@CLASSIDX@]', '"Class"="SCSIAdapter"',
                      '"Driver"="SCSIAdapter\\\\@CLASSIDX@"', '"HardwareID"="USOSUSB"',
                      '[HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Class\\SCSIAdapter\\@CLASSIDX@]',
                      '"DevLoader"="*IOS"', '"PortDriver"="usosusb.mpd"'):
             self.assertIn(want, t)
-        self.assertEqual(t.count('@CLASSIDX@'), 2)
+        # numeric root instance (the form CONFIGMG writes, proven by the usosnvme
+        # --regbind QEMU run with 0000), same number as the class instance
+        self.assertEqual(t.count('@CLASSIDX@'), 3)
+        self.assertNotIn('SCSIAdapter\\USOSUSB]', t)
         # the flow substitutes a 4-digit class instance, e.g. 0009
         sub = t.replace('@CLASSIDX@', '0009')
         self.assertIn('Services\\Class\\SCSIAdapter\\0009]', sub)
@@ -359,7 +362,7 @@ static UCHAR run(UCHAR target, const UCHAR *cdb, UCHAR cdb_len, ULONG flags, ULO
     g_srb.Function = SRB_FUNCTION_EXECUTE_SCSI; g_srb.TargetId = target; g_srb.CdbLength = cdb_len;
     memcpy(g_srb.Cdb, cdb, cdb_len); g_srb.SrbFlags = flags; g_srb.DataTransferLength = len;
     g_srb.DataBuffer = len ? g_buf : NULL; g_srb.SenseInfoBuffer = g_sense; g_srb.SenseInfoBufferLength = 18;
-    g_timer = NULL;
+    /* a timer armed earlier stays pending (SCSIPORT keeps it) */
     g_init.HwStartIo(g_ext, &g_srb);
     while (g_completed == before && ticks < max_ticks) {
         void (*t)(PVOID) = g_timer;
@@ -377,7 +380,7 @@ static UCHAR run(UCHAR target, const UCHAR *cdb, UCHAR cdb_len, ULONG flags, ULO
 static UCHAR func(UCHAR f)
 {
     int before = g_completed, ticks = 0;
-    memset(&g_srb, 0, sizeof(g_srb)); g_srb.Function = f; g_timer = NULL;
+    memset(&g_srb, 0, sizeof(g_srb)); g_srb.Function = f;
     g_init.HwStartIo(g_ext, &g_srb);
     while (g_completed == before && g_timer && ticks++ < 100000) { void (*t)(PVOID) = g_timer; g_timer = NULL; g_tsc += 1000000; helper_tick(1000); t(g_ext); }
     CHECK(g_completed == before + 1);
@@ -461,8 +464,22 @@ int scenario(void)
     /* MODE SENSE short answer: success with the real length */
     CHECK(run(0, MS, 6, SRB_FLAGS_DATA_IN, 192, 0) == SRB_STATUS_SUCCESS && g_srb.DataTransferLength == 4);
 
-    /* 64 KiB WRITE + READ, slow helper (30 ms): timer path */
+    /* RequestTimerCall not seen yet: the first SRB armed it as a probe and a
+       slow request (30 ms) completes inside HwStartIo, nothing polled */
+    CHECK(!g_ext->TimerSeen && g_ext->TimerArmed && g_timer != NULL);
     h_delay_us = 30000;
+    posted = g_ext->Mp->polled;
+    CHECK(run(0, RC, 10, SRB_FLAGS_DATA_IN, 8, 0) == SRB_STATUS_SUCCESS && g_ext->Mp->polled == posted);
+    /* the probe fires while HwStartIo runs: re-armed, nothing done */
+    g_ext->InPump = TRUE;
+    { void (*t)(PVOID) = g_timer; g_timer = NULL; t(g_ext); }
+    CHECK(g_ext->TimerSeen && g_ext->TimerArmed && g_timer != NULL);
+    g_ext->InPump = FALSE;
+    /* and again with no SRB: nothing to do, not re-armed */
+    { void (*t)(PVOID) = g_timer; g_timer = NULL; t(g_ext); }
+    CHECK(!g_ext->TimerArmed && g_timer == NULL);
+
+    /* 64 KiB WRITE + READ, slow helper (30 ms): timer path */
     for (i = 0; i < 65536; i++) g_buf[i] = (UCHAR)(i * 7 + 3);
     memset(cdb, 0, 10); cdb[0] = 0x2A; cdb[5] = 64; cdb[8] = 128;
     CHECK(run(0, cdb, 10, SRB_FLAGS_DATA_OUT, 65536, 1000) == SRB_STATUS_SUCCESS);
@@ -526,6 +543,26 @@ int scenario(void)
     CHECK(g_ext->Mp->errors > 0 && g_ext->Mp->srbs > 10);
     printf("srbs %u posted %u polled %u enums %u errors %u\n", g_ext->Mp->srbs, g_ext->Mp->posted,
            g_ext->Mp->polled, g_ext->Mp->enums, g_ext->Mp->errors);
+
+    /* fail safe: the helper never answers the first ENUM (dead helper core):
+       HwInitialize returns after 3 s, every SRB completes at once with an
+       empty slot, nothing is posted; when the helper catches up, the next
+       TEST UNIT READY enumerates and the stick appears (UNIT ATTENTION) */
+    CHECK(find_adapter() == 110);
+    h_dead = 1;
+    { ULONGLONG t0 = g_tsc; CHECK(g_init.HwInitialize(g_ext)); CHECK(g_tsc - t0 <= 3100ULL * 1000000); }
+    CHECK(g_ext->Stale && !g_ext->Posted && !g_ext->Slot[0].present);
+    posted = g_ext->Mp->posted;
+    CHECK(run(0, TUR, 6, 0, 0, 0) == (SRB_STATUS_ERROR | SRB_STATUS_AUTOSENSE_VALID) && g_sense[2] == 2 && g_sense[12] == 0x3A);
+    CHECK(run(0, RC, 10, SRB_FLAGS_DATA_IN, 8, 0) == (SRB_STATUS_ERROR | SRB_STATUS_AUTOSENSE_VALID) && g_sense[12] == 0x3A);
+    CHECK(run(0, INQ, 6, SRB_FLAGS_DATA_IN, 36, 0) == SRB_STATUS_SUCCESS && g_buf[1] == 0x80);
+    CHECK(g_ext->Mp->posted == posted);
+    h_dead = 0; helper_tick(1000);
+    g_tsc += 1100ULL * 1000000;
+    CHECK(run(0, TUR, 6, 0, 0, 0) == (SRB_STATUS_ERROR | SRB_STATUS_AUTOSENSE_VALID) && g_sense[2] == 6 && g_sense[12] == 0x28);
+    CHECK(!g_ext->Stale && g_ext->Slot[0].present);
+    CHECK(run(0, TUR, 6, 0, 0, 0) == SRB_STATUS_SUCCESS);
+    printf("dead helper at init: ok\n");
     return g_fails;
 }
 '''
