@@ -35,7 +35,7 @@ if a.vendor_root:
 suite = unittest.TestLoader().loadTestsFromNames([
     'test_betas_variants', 'test_nt4_flow', 'test_nt3_flow', 'test_posready',
     'test_posready_credentials', 'test_nt52_staging', 'test_xp_mce', 'test_xp_tablet',
-    'legacy_bios.test_nt5_source',
+    'legacy_bios.test_nt5_source', 'test_w2k_staging', 'legacy_bios.test_xp_automatic_install',
 ])
 result = unittest.TextTestRunner(verbosity=1).run(suite)
 for test, reason in result.skipped:

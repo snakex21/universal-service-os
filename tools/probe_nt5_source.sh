@@ -10,9 +10,15 @@ usos_nt5_require_supported || exit 1
 # Runs for real sources, including XP before delegation to probe_xp_source.sh.
 # A beta placed in an RTM folder must not receive the RTM binary patches.
 if [ -n "${SOURCE_ROOT:-}" ]; then
-    metadata=$(usos_nt5_source_metadata "$SOURCE_ROOT/$NT5_SOURCE_DIR/TXTSETUP.SIF") || {
-        printf '[NT5_SOURCE] STOP invalid or duplicate DriverVer\n' >&2; exit 1;
-    }
+    metadata=''
+    for metadata_name in DOSNET.INF TXTSETUP.SIF; do
+        metadata_file=$(usos_nt5_source_file "$SOURCE_ROOT" "$NT5_SOURCE_DIR" "$metadata_name")
+        [ -n "$metadata_file" ] || continue
+        metadata=$(usos_nt5_source_metadata "$metadata_file") || {
+            printf '[NT5_SOURCE] STOP invalid or duplicate DriverVer\n' >&2; exit 1;
+        }
+        [ -z "$metadata" ] || break
+    done
     [ -z "$metadata" ] || printf '%s\n' "$metadata"
     case "$metadata" in
         *source_identity=windows-whistler*|*source_identity=windows-neptune*|*source_identity=windows-2000-beta*)

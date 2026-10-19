@@ -98,6 +98,7 @@ pub fn render(p: *const Profile, system_id: []const u8, arch: Arch, key: ?[]cons
 // Renderers are also used directly for RTM. Add optional metadata only here,
 // where the selected system id is known, without copying a large Profile.
 fn clockMetadata(bytes: []const u8, system_id: []const u8, setting: []const u8, buffer: []u8) ![]const u8 {
+    std.debug.assert(bytes.ptr == buffer.ptr);
     const clock = beta_clock.settingFor(system_id, setting);
     if (clock.len == 0) return bytes;
     if (!beta_clock.validSetting(clock)) return error.InvalidBetaClock;
