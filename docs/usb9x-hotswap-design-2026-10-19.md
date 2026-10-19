@@ -764,3 +764,117 @@ Session scratchpad, not in the repository; built from `int/me-round`. Baseline: 
 - X470 run with the me-usb2 kit (boot without a stick, plug, copy, unplug, swap).
 - Sticks behind a hub, HID re-attach, a stick of another size in a 9x VM.
 - Release pin to usos17 after the hardware PASS (with the usos16 regressions repeated).
+
+## 9. In the fresh-install flow (2026-10-19, after the X470 Windows Me pass)
+
+The X470 Windows Me run on the Micron passed with the in-place kits me-wheel16, me-vmd3, me-usb1
+and me-usb2. That covered: CSMWrap usos17 with hot-swap, USOSUSB.MPD 1.1, USOSVMD.VXD v3.1,
+USOSMOUS / USOSKEY, USOSLOG and USOSDBG 1.8. Branch `int/me-round` moves all of it into the
+normal 9x CSMWrap flow, so a fresh install gets it without a kit. No fresh install has been run
+yet (QEMU host tests only).
+
+**CSMWrap:** 3.1.2-usos17 is the release pin (xp_csmwrap_esp.sh `PINNED`, release.go, lock.json).
+The pin is global, so every CSMWrap flow uses usos17 (see docs/research/csmwrap.md section 23).
+
+**Defaults and opt-out files.** The opt-out files go in DATA
+`Systems\<category>\<9x>\Unattended` and are read by tools/w9x_csmwrap_prepare.sh.
+
+| | Default | Opt-out | 95 |
+|---|---|---|---|
+| USOSUSB.MPD (USB sticks in Windows) | on | `usb-storage-off.txt` | on (not run on 95 yet) |
+| `int13_boot_disk_only = true` | on together with USOSUSB (or usosnvme) | `EFI\USOS\win9x\int13-all-disks.flag` on the stick (as before) | same |
+| USOSVMD.VXD (mouse in MS-DOS boxes) | on, 98 / 98 SE / Me | `vmd-off.txt` | never |
+| USOSLOG.EXE autostart | on | `logging-off.txt` | on |
+
+USOSLOG.EXE and USOSDBG.EXE are copied to `C:\USOS9X` in every case. The old opt-in
+`usb-storage-experimental.txt` is no longer read. A user's own answer file (`ANSWER_KIND=USER`)
+gets USOSUSB only on 95/98/98 SE (USBREG.BAT); it gets no VMD and no logger autostart, because
+those come through the USOS answer's `[USOS.CsmReg]`.
+
+**Registry and SYSTEM.INI.** No console window and no extra restart, using the mechanisms the
+flow already had. The in-place kits used a Startup batch file only because they patched an
+installed system.
+
+- **USOSUSB, 95 / 98 / 98 SE:** USBREG.BAT, from AUTOEXEC.BAT in real mode, before the first
+  Windows start (as in stage 1). It copies the MPD into IOSUBSYS and imports USOSUSB.REG with
+  real-mode REGEDIT, once.
+- **USOSUSB, Me:** the MPD goes into IOSUBSYS before Setup. The REG goes through machine RunOnce
+  `regedit /s` (as in stage 1).
+- **USOSVMD, 98 / 98 SE / Me:**
+  - `C:\USOS9X\USOSVMD.VXD` and `USOSVMD.ON`.
+  - `C:\USOS9X\USOSVMD.INF` (UpdateInis: `[386Enh] device=*vmouse`,
+    `device=C:\USOS9X\USOSVMD.VXD`), run once by machine RunOnce after Setup, in the same way as
+    the Me `mouse.drv` switch.
+  - Effective from the next start.
+- **USOSLOG:** the machine Run value `USOSLog = C:\USOS9X\USOSLOG.EXE`. A Startup-folder copy
+  was not used: the folder name depends on the Windows language ("Autostart" on Polish Me) and
+  the folder does not exist before Setup.
+- **INSTALL.BAT:** writes one `[USOS.CsmReg]` + `[Strings]` block for every 9x (USOS / profile
+  answer). It holds:
+  - IgnorePnPBIOS (98 / 98 SE)
+  - USOSMouse (Me)
+  - USOSUsb (Me, U9UDS=1)
+  - USOSVmd (U9VMD=1)
+  - USOSLog (U9LOG=1)
+
+**Not verified by a run.**
+
+- Whether setupx `UpdateInis` adds a second `device=` key to `[386Enh]` next to the existing
+  ones, rather than replacing one. The Microsoft INFs add `device=` lines the same way.
+- Whether the HKLM RunOnce values run before Setup's last automatic restart. If they do, the
+  user sees the end state at the first desktop. If not, it appears after one restart.
+
+**Binaries (same bytes as the kits):**
+
+| File | Hash prefix |
+|---|---|
+| USOSVMD.VXD | `00a4325c` |
+| USOSMOUS.DRV | `dfdd5212` |
+| USOSKEY.DRV | `d48898ea` |
+| USOSDBG.EXE | `2d2e79af` |
+| USOSUSB.MPD | `9ffbaafb` |
+| USOSUSB.INF | `a69c73d5` |
+
+USOSLOG.EXE is built from the same source as the me-usb1 kit build. It differs only in the PE
+TimeDateStamp and checksum: the build now zeroes the link time, so the payload is reproducible.
+
+**Tests:**
+
+- tools/tests/test_w9x_me_defaults.py (new)
+- test_w9x_usb_storage_flag.py, legacy_bios/test_usosmous.py (updated)
+- test_csmwrap_uds17.py (pins)
+- QEMU usos17 regressions (2026-10-19, all PASS): boot-disk (7 layouts, with and without
+  `--only`), APM power-off, PCI IRQ, NVMe re-arm, DOS mouse probe `--wheel`, UDS free (6
+  hot-swap cycles) and owned.
+
+### Fresh Windows Me test on the Micron (X470, from the SanDisk)
+
+What the user does:
+
+1. Boot the SanDisk on the X470 and pick Windows Me in the USOS menu.
+2. Pick the Micron 3400 as the target disk. Leave the DATA opt-out files absent (all defaults
+   on). The answer must be the USOS answer or a profile.
+3. Let the flow run to the end: the phase 1 VM, then restarts into Me Setup on the Micron.
+   Do not plug in a test stick during Setup.
+4. At the first desktop, if Windows has not restarted by itself after "Setting up ...", restart
+   once (Start -> Shut Down -> Restart). Note whether that restart was needed.
+
+First-boot checks (yes/no answers only; the logs are written automatically):
+
+| | Check |
+|---|---|
+| A | Mouse moves; left click, double click and right click (the context menu on My Computer) work; the wheel scrolls in Explorer / IE. |
+| B | Start -> Programs -> MS-DOS Prompt -> `EDIT`: the mouse works in the window and after Alt+Enter (full screen); close the box, the desktop mouse still works. |
+| C | Network: IE opens a page. This needs usosnet 0.4 in the install. This branch does not stage it: the 9x flow has no usosnet wiring yet (pending Codex `siec` branch). Without that branch, C is expected to fail; record it, it is not a regression. |
+| D | Plug a FAT32 test stick (not the USOS SanDisk) while Windows runs: a removable drive appears (F5 in My Computer if needed); copy a file both ways; unplug (the drive goes "not ready", no hang); plug another or the same stick and copy again. |
+| E | Restart and shut down work (APM power-off). |
+
+**Logs, with nothing to do by hand:**
+
+- `C:\USOS9X\LOGS\USOSLOG.TXT` (MOUSE / VMD / DISK records, network tests)
+- USOSDBG snapshots
+- `C:\USOS9X\INSTALL.LOG`
+- `EFI\USOS\win9x\prepare.log` on the stick (opt-out decisions)
+- BOOTLOG.TXT
+
+Claude reads them afterwards with the Micron in the RTL9210B enclosure, read-only.

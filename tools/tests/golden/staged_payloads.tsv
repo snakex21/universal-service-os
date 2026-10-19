@@ -3,8 +3,9 @@ initramfs	init	100755	ed39cc3fe4db146315f1f877c94fad9fa99a057ed590cf1857ed9fb329
 initramfs	usos-init	100755	9a18048413acf3d76866b3eb3cd42c151495ed47f8bdc7a8a3e6674a473bc52f
 initramfs	usr/lib/usos/UefiSeven.efi	100644	0a44a256cda725c22f1daadcf093fc4660b7214e6437968a4c8e119aed02a947
 initramfs	usr/lib/usos/answer_plan.sh	100755	07d2dc07a197f98689ea8add0bc4c5271a457486324bef357b769ad3b39eaaa1
+initramfs	usr/lib/usos/beta_clock.sh	100755	1e8cd48156d2459597d522c0bae84c9920ab4b9449f25a4bcfc97f4e99bfc6d4
 initramfs	usr/lib/usos/device_guard.sh	100755	ec013aee287b67e8fde7d02a827b39eea1a2af8638884f135a5a51de8d59ebac
-initramfs	usr/lib/usos/dos_csmwrap_target.sh	100755	37d51f6b94ea10eb5bbcd9b35799b6686e6baef405527ac10e48d663a30572f8
+initramfs	usr/lib/usos/dos_csmwrap_target.sh	100755	72e1a3cef26e42e963b2389e2e1df925c1bf190024fb35b6fcd3e6cdc65d5b94
 initramfs	usr/lib/usos/elcr-mbr-440.bin	100644	9972fb3f8c9f802e634e8db6cdbffdeea22e975c5f44b4144eb83333a2e3e5be
 initramfs	usr/lib/usos/extract.sh	100755	a13f57d3ebbf0b2882a9306f0574a917a8686fb449189dfc26f85054c5f14371
 initramfs	usr/lib/usos/hardware_inventory.sh	100755	a6a69c8507fd4a087ebae896059f085bd81d6546aeb81a74071f2fa1ab0235d2
@@ -19,8 +20,8 @@ initramfs	usr/lib/usos/imdisk-x86_64.cpl	100644	728cfaf2e2ba469cd4c7129cf7b34351
 initramfs	usr/lib/usos/imdisk-x86_64.exe	100644	3a6a94c98a4b87e59a136052c50da070c99706db3bcd54ef5b148784b21f75dd
 initramfs	usr/lib/usos/imdisk-x86_64.sys	100644	72873d35ee3a9d9ef1311bbb6fdefd2dfea47b4752a6f1904bbdc6dc51afd820
 initramfs	usr/lib/usos/legacy_windows_request.sh	100755	86946245c2fcd93c7fc9ffef76cebe2f8a73f197a92958cd543d7644c97c657f
-initramfs	usr/lib/usos/legacy_xp_resume.sh	100755	50abdb4e5c844391889f4800f63a377b49f25ccf98aa8a62fd769caaaa107cb7
-initramfs	usr/lib/usos/legacy_xp_staging.sh	100755	64062fc5b99aaa3551e0abdf6a8a5823b71b1c003df961e96c9dc4ee64df2f1e
+initramfs	usr/lib/usos/legacy_xp_resume.sh	100755	5457855e7610a9033dfb9f67a8b6bb1a69f7c8c82cf8b35e66d08a7a66b40197
+initramfs	usr/lib/usos/legacy_xp_staging.sh	100755	cc082bf4c4a22de0003857e4030e603370f0da6da4114bb1e423a306dd1730cf
 initramfs	usr/lib/usos/micro_linux_ui.sh	100755	67df2951770fa4b05ee913bfd15da427b89019b8ea0b6d0fd5c9f7f21d1fe87d
 initramfs	usr/lib/usos/nt3	40755	dir
 initramfs	usr/lib/usos/nt3-e820-hook-512.bin	100644	c9204974b4a0e451a37f4a1d56c0a35a25826ab687d7cd9425177cbad29eec20
@@ -28,7 +29,7 @@ initramfs	usr/lib/usos/nt3-e820-mbr-440.bin	100644	0ea4cc7d3cc4bf672ff66548bade9
 initramfs	usr/lib/usos/nt3/AHCINT.SYS	100644	40ba39c123e98ae5129751e7691a8ca5c41b9e88c269daabf3f288b90fdb6ed9
 initramfs	usr/lib/usos/nt3/AHCINT31.SYS	100644	962db3d8b1d4882fbe6d287fc30abca3335c59fcad1d55fcffd2c47af803b53c
 initramfs	usr/lib/usos/nt3/USOSACHK.EXE	100644	748725aefcfeba1a6ef5af5feeb6d110c6ba90142c4a76bb0dee73adb924a4ac
-initramfs	usr/lib/usos/nt3/USOSNT3.EXE	100644	431499675756c8ad9a46e2b9367965721787456e572bbe911b3b320adcd5d5cf
+initramfs	usr/lib/usos/nt3/USOSNT3.EXE	100644	107c2863bce0ba2ccbaa96b4bb39ac0de6c214c4dd130634c99b7284aba1e2df
 initramfs	usr/lib/usos/nt3/USOSNVME.SYS	100644	37a8cb216cefaee85346decfc290c375f96471cc4b4c7122c5316dadf96ef102
 initramfs	usr/lib/usos/nt3/USOSNVME31.SYS	100644	94be50a827b3857c17ff2f03067b3ba253802f3c0c38ebc1c6191fad3d60f440
 initramfs	usr/lib/usos/nt3/USOSRST.SYS	100644	2b948d8817a291540e48da03e2aeb5553cd82580d0814ff3511f737eebd1397c
@@ -36,6 +37,7 @@ initramfs	usr/lib/usos/nt3/USOSRST31.SYS	100644	98b0bd71adee35db2586f5176a5049d9
 initramfs	usr/lib/usos/nt3/USOSRST35.SYS	100644	f52d33255efa90172769b37a0828baaf0bd9dc896213ddd688855bdbc5b61938
 initramfs	usr/lib/usos/nt3/USOSUSB.SYS	100644	68944efb7f3d26c7fc19bf99cab2bd7944e0d32955da97f933a8019b226d2046
 initramfs	usr/lib/usos/nt3/USOSUSB31.SYS	100644	e56a5fb2efce5bf77213e81c55f9b51b09ed6986ad46a31d1a8f03f750654314
+initramfs	usr/lib/usos/nt3/USOSVBE.SYS	100644	a931282919e0dda8a9f9f659462e78ef628cf815907adee6003f6c3242158366
 initramfs	usr/lib/usos/nt4	40755	dir
 initramfs	usr/lib/usos/nt4/AHCINT.SYS	100644	f2b90a21b4889229b758dec8478254c1fa5880c30c04831a9244a6c94ea71208
 initramfs	usr/lib/usos/nt4/USOSNVME.SYS	100644	64ed437187a94cc7644f4f984676a8bd5f4ed2691b8e83a82f9fb8d514f8637a
@@ -43,13 +45,19 @@ initramfs	usr/lib/usos/nt4/USOSOFF.EXE	100644	11ac72c6d5b73d6931e957df1e4b86348d
 initramfs	usr/lib/usos/nt4/USOSRST.SYS	100644	d028580b4040662605d2c88b90094fd4125b2526cfda1083dc9011d6efafb23b
 initramfs	usr/lib/usos/nt4/USOSUSB.SYS	100644	68944efb7f3d26c7fc19bf99cab2bd7944e0d32955da97f933a8019b226d2046
 initramfs	usr/lib/usos/nt4/USOSVBE.SYS	100644	35bcafe45c8cb8629a3b66923ffedf66ff75ab2ea1df8b42cb0bbfb192eb90bb
-initramfs	usr/lib/usos/nt4_csmwrap_target.sh	100755	0fee7d94b8debcaca4a57c91dbe26bc6005a2f7e9b3f7d36291e77fa762c648e
-initramfs	usr/lib/usos/nt4_qemu_install.sh	100755	7db7afa216646d59b81ad2202c63ad62d0e5c24ccc8cc6a65fbf305c37d658c2
+initramfs	usr/lib/usos/nt4_csmwrap_target.sh	100755	8a56e87786c6c4a295988e9e25510d353e8bd22745733cf96d5c3952bddc6a5e
+initramfs	usr/lib/usos/nt4_qemu_install.sh	100755	5fb78b40b879ea819d46806f1be941e2a828ba722072e91c52e84fe836da366a
+initramfs	usr/lib/usos/nt5-usosmpart	40755	dir
+initramfs	usr/lib/usos/nt5-usosmpart/amd64	40755	dir
+initramfs	usr/lib/usos/nt5-usosmpart/amd64/usosmpart.sys	100644	a601d1fad1a4dcf7cc5696ba2ed1e6e4eecc901b1e3a940d28124711c1cfdb87
+initramfs	usr/lib/usos/nt5-usosmpart/i386	40755	dir
+initramfs	usr/lib/usos/nt5-usosmpart/i386/usosmpart.sys	100644	d8bc77431394418381b8f551e136f75b538293343cee11620dc01827b6a67dd2
 initramfs	usr/lib/usos/nt52_usb_stage.sh	100755	32280cd7d12e0db9fbabfaf311ade7695311c3c9af3f8c884c5f112009ba9e93
 initramfs	usr/lib/usos/nt5_media_key.sh	100755	9f62ee0e64af21ec8a641b1bde227f8d1c2ae8e63938ec69c20c9d1d13d5db41
-initramfs	usr/lib/usos/nt5_profile.sh	100755	158f29d6a57910ca9f6221f6f447891edfff18f15d621a64b6c1d4fa517bc232
+initramfs	usr/lib/usos/nt5_profile.sh	100755	5c9bdf72681b06d96edf4a17941ca82b113efaa83541ee17dd876252b309d9cd
 initramfs	usr/lib/usos/nt5_storage_stage.sh	100755	2b656da845fb69abf6ba304ab97a3d3f32d8c19611e7a254120f8b133ee26f8d
 initramfs	usr/lib/usos/nt5_user_drivers.sh	100755	f119d30029bf0e34aa65a791509df186d00ce41d31c445efc1a89eefa5110ab0
+initramfs	usr/lib/usos/nt5_usosmpart_stage.sh	100755	6f534b960b35ed7487287f612abe17cd8fcc353078a75a83f64aa26a8a064875
 initramfs	usr/lib/usos/partuuid.sh	100755	717393ba57556d5e9b11bcc545f36738c07cf4a084967ce807f55b03193f995e
 initramfs	usr/lib/usos/partuuid_diagnostics.sh	100755	a44c0ab7e222998cd56b205a9ce6c0f40319b8853ebae90ac533427db0c10c37
 initramfs	usr/lib/usos/pe-file-version	100755	76488c8bca34de00e502afa467cc77a7ce6af90235c467a89d23bb076f3d27da
@@ -76,15 +84,17 @@ initramfs	usr/lib/usos/posready/DRV/usbhub3.inf	100644	a4658961dc6679c7640f761d4
 initramfs	usr/lib/usos/posready/DRV/usbhub3.sys	100644	7648152c456e48f38fdecad3d637e5b46d86c3a2d190612772f53f6c286de90d
 initramfs	usr/lib/usos/posready/DRV/usbxhci.inf	100644	bb27f4772b9e5dd49246a4489c3345c5cf948f88618034375dedbb2ef8fbe7cd
 initramfs	usr/lib/usos/posready/DRV/usbxhci.sys	100644	ce3c1c5aaabd91f20edc55697f4959e39a68b9c823f63cf8dcb433220d8b57af
+initramfs	usr/lib/usos/posready/DRV/usosmpart.sys	100644	d8bc77431394418381b8f551e136f75b538293343cee11620dc01827b6a67dd2
 initramfs	usr/lib/usos/posready/DRV/wdf01000.sys	100644	b1c119f541c46100731b5781964f1c9bed9cdf316cd73e40a5c328eba3933000
 initramfs	usr/lib/usos/posready/DRV/wdfldr.sys	100644	149de723bf02d8449fb63b71406857db54decf2dae7be0d51d003fbcf5c2a39b
 initramfs	usr/lib/usos/posready/DRV/wpprecor.sys	100644	a2636f0b9747c032bf3bda44c9c35783f0e11d2f2ede3b6c831f2b1f420436ef
-initramfs	usr/lib/usos/posready/FIRST.CMD	100644	b889a10fab6765be9bace879f91e4f2ef7bcfce8759679c30f942477a31cc64f
+initramfs	usr/lib/usos/posready/FIRST.CMD	100644	56cbe14ae70840aecfe965d5a88df9615d31cf527c10abe6e48ef4124c55dab4
 initramfs	usr/lib/usos/posready/LOGON.CMD	100644	3a4094d059de553fe0ed53c04c9552cd03a4d93bc5cde941e27cbcfe70510270
+initramfs	usr/lib/usos/posready/LOGON.EXE	100644	486d009f3e479c35b13b10b0f2ec90fd5af9d25124e66c2c2cbe2bc44532fa88
 initramfs	usr/lib/usos/posready/LOGON.REG	100644	0878d916caf7bdb6640a3e35c8593fdab924df35391fec7c29d0a6b53f695202
 initramfs	usr/lib/usos/posready/X470.REG	100644	502766b42e4af21d6e2cca7d80117f43d52f7763ddfddb17d7c70989a3d4352d
-initramfs	usr/lib/usos/posready_csmwrap_target.sh	100755	c81ca260d699c5d6ceea9c377ebf3ce5c0d8cd222ef0bf60b89e8e1f55d49c5d
-initramfs	usr/lib/usos/posready_qemu_install.sh	100755	6eb69b3b03f0b2610c8ae2f40e5654fec507abb4180300f09e2508b0d784ce47
+initramfs	usr/lib/usos/posready_csmwrap_target.sh	100755	4cbbee91db7499162f67eb7f73f8eda0e780a684cea90d4cc40ff7361d7b5b2f
+initramfs	usr/lib/usos/posready_qemu_install.sh	100755	2ad858af5660f26367c99ecf4cfd566a6eb65f9b48ad0a3d973b84cc803f697f
 initramfs	usr/lib/usos/posready_unattended.xml	100644	c19f8880135d33c4620ca3d5e11c5f1e5dc4ddb5738ff870c03992923ed6b853
 initramfs	usr/lib/usos/prepare_nt5_media_markers.sh	100755	09509af8f89c39b894e6a3a42993dbe37d94ba15b49278e9f9cfa423c5c97c42
 initramfs	usr/lib/usos/prepare_vhdboot.sh	100755	679ade96798fc6b3d3ca9c43d6acbc73fd22ebd437b1fcc39fbb18f57fca1c48
@@ -94,11 +104,11 @@ initramfs	usr/lib/usos/prepare_windows7_uefi.sh	100755	900eae05959e90e0293806cd5
 initramfs	usr/lib/usos/prepare_windows_bios_boot.sh	100755	4729c126c3f855176760534e4032807cfbc6f18469a7dc9422bd6f34cc21f1b2
 initramfs	usr/lib/usos/prepare_work.sh	100755	700bb7d9bc9e23ef61243275dc08ce155478e31d4a0868da68f26102739541bb
 initramfs	usr/lib/usos/prepare_xp_local_source.sh	100755	bda1217f08bb31dcac24e8fa5bbd682bbaa4b5eff816c5238a7df53027e93e47
-initramfs	usr/lib/usos/prepare_xp_ntfs_target.sh	100755	ba0ccaf7d5295196d987ceb12b2ecb95e9713aac4760d8dbaf1952def8d2515d
+initramfs	usr/lib/usos/prepare_xp_ntfs_target.sh	100755	4a559b2bd2e2113585ad90ec941770e0cb397aaf9d8f33a380fd1964fbfebbfb
 initramfs	usr/lib/usos/prepare_xp_source_aliases.sh	100755	71e9f08a8b877a11f67016aeea617dd4a7d690cb70c6c61f1b7711d3c2424ff2
-initramfs	usr/lib/usos/prepare_xp_target.sh	100755	022ce9ac03c0b5ac4cf4eb8d5527978f0620e0eb3aaf02f98999f012ef799465
+initramfs	usr/lib/usos/prepare_xp_target.sh	100755	0ad1734778aad35fd20dbec65d1757649ad62dfa6ff98e7d64bbfd4c730038e2
 initramfs	usr/lib/usos/prepare_xp_windows_partition.sh	100755	93dc273130a09b9a49ad70ef379ef97d8f818703044a7b7112b41b0dbf8f2ed3
-initramfs	usr/lib/usos/probe_nt5_source.sh	100755	4932efde2e08d5b415aa139ee240e844a6a8a6717171b68f562c71beb9ec7140
+initramfs	usr/lib/usos/probe_nt5_source.sh	100755	a87c5adbe7a446b0cf3aed8e8244c5aa5c5cac5dec24aa7806745988e0f1c814
 initramfs	usr/lib/usos/probe_xp_source.sh	100755	78bf6811b608ee7b2bdb9b2f383523437877f79a2cc61d21e0cb043de77a7dce
 initramfs	usr/lib/usos/simpledrm.modules	100644	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 initramfs	usr/lib/usos/stick_release.sh	100755	c0212d65e91c4f9378772ece46da1ff03be13c18910a3f97ad541eb4b0450e2a
@@ -120,21 +130,25 @@ initramfs	usr/lib/usos/usos-win7-finalize.exe	100644	795a61802043ce3d55224de9d1c
 initramfs	usr/lib/usos/usos-win7-nvme.exe	100644	c53bff2038ddbbc47afcc3922368423271e1ba88a6d262c4e61aa6e20fbf7bfa
 initramfs	usr/lib/usos/usos-win7-unattend.exe	100644	192df25befc5c371f7962a24a46724aeef6af958d5f42b0bba8a65c662bbd8e9
 initramfs	usr/lib/usos/vista-nt60-ntfs.bin	100644	b4d39e78db7bf5b3dfa8877d0939a2ada28f29496fa804fc6449d38742356b93
-initramfs	usr/lib/usos/vista_csmwrap_prepare.sh	100755	48776499ee5d0b1bc5d455a5f419077d3da482629f62e7e4069739d3af1674c3
-initramfs	usr/lib/usos/vista_csmwrap_target.sh	100755	ae451491ed21d47b1052889a006a479663dd4b55663e38707b422c2850f78cfc
+initramfs	usr/lib/usos/vista_csmwrap_prepare.sh	100755	5bf7c6b18e6c68f3f04501939a16ede4c1f117ce2976b3ad560e84223754d5f1
+initramfs	usr/lib/usos/vista_csmwrap_target.sh	100755	f06c4d8e4cf8a8eafffbb9359a0bb9a340462d0c367985d1f6b92d36769f8b36
 initramfs	usr/lib/usos/vista_disk_prepare.sh	100755	e17241c3bb32b7502cd1aeb1e56e848cec34b42f8eb54811d1ce9246b2a86c23
+initramfs	usr/lib/usos/w2k-acpi-mbr-440.bin	100644	917ae273cf339e5b6d820266be2234209e151a92cd63c50ccd15d9a66a1a9393
 initramfs	usr/lib/usos/w2k3_selected_partition_uefi_csm.sif	100755	d986de98a02dd6c9454db8e37d54999f9213b3d1fb5a8205ac996dc9f391f538
 initramfs	usr/lib/usos/w2k_selected_partition_uefi_csm.sif	100755	4081b007b280efb31c85ce519abbfcb18ac8f09482add26a7de1c8b3520de04e
-initramfs	usr/lib/usos/w2k_stage.sh	100755	e04c3009e784a75aec80a3c4c9390ddea80505468a34cb4d12383fc515186b7d
-initramfs	usr/lib/usos/w9x_csmwrap_prepare.sh	100755	9920dacc66abf98fa3fd2a01e5f0a1b56fda1946cd3a5f36bd38d9394b926b78
-initramfs	usr/lib/usos/w9x_csmwrap_target.sh	100755	2ff20b2a14c6abd0ce6f197bb1a9b0a2d97669519ff0673ca46ffaa620580851
-initramfs	usr/lib/usos/w9x_phase1_qemu.sh	100755	a3a9680a62407c051f32ca627eafa9214e48cb405cd272b6c389b93e4e0504b1
+initramfs	usr/lib/usos/w2k_stage.sh	100755	079856feeae0a043ed2e5193bfddbbe8b37099f80f4247ae2cab7c4f8ddfecd2
+initramfs	usr/lib/usos/w9x_95_ui.sh	100755	d79809cd9d7c02833d8d16237d148639c016322808333af13fa348a6cb8bd93f
+initramfs	usr/lib/usos/w9x_csmwrap_prepare.sh	100755	9278c7ad4ef8c50906de28550b80a3c968afddaa8def7e90f680bda876b44bca
+initramfs	usr/lib/usos/w9x_csmwrap_target.sh	100755	fca1a0d40eb0c4903c06e85ea3a6fa0d88f9766d931faf5e185e82932665d693
+initramfs	usr/lib/usos/w9x_nvme.sh	100755	7d461e3c4b226efe4d9cc0dbb2f3aacffff869646f9b8a0226494404ae167d1a
+initramfs	usr/lib/usos/w9x_phase1_qemu.sh	100755	7229f55571030174575b66427015119d519409bdca00bee8486f9c06763eddf2
 initramfs	usr/lib/usos/w9x_tzfix.sh	100755	c36eb1162d0f0fdf3d71717f8e18a0e88c29b74e71acfce0def5a1c9f8c0fd0c
 initramfs	usr/lib/usos/w9x_vesa95.sh	100755	05a18da41edc1342fe3a68b14d96f9d2a1820c573ac1f640668703b586e22c12
 initramfs	usr/lib/usos/wimboot	100644	5f067ccdc4d084d5bf77b6c853bd0f8402dfc2b4cd1b103d358993ae97fae8e3
 initramfs	usr/lib/usos/wimboot-kexec	100644	f0c38d5b145b70d2156a37f62e3d97abdb5d75a3ab8703a718d43f777df0692a
 initramfs	usr/lib/usos/wimboot-kexec-ordered	100644	bf506f033e29ac09b338a1572d726e7d02a046f91ce3de59fc72905f1e1b89b5
 initramfs	usr/lib/usos/win7-wrapper.efi	100644	0c09600c3f2f97c2427e452c172d36c0003c52ed4f9919a720216f12ba0ffc7b
+initramfs	usr/lib/usos/win95-setup-ui	100755	c99973a951958d51559b286a8dee6afc33db4f62e154fb53c497f9cf6bc5af81
 initramfs	usr/lib/usos/windows7-nvme	40755	dir
 initramfs	usr/lib/usos/windows7-nvme/bootstrap	40755	dir
 initramfs	usr/lib/usos/windows7-nvme/bootstrap/gdr	40755	dir
@@ -322,7 +336,7 @@ initramfs	usr/lib/usos/xp-stage2.bin	100644	1f73f3a534edc6d5a1f365d3bb6de43aca7f
 initramfs	usr/lib/usos/xp-vbr-code.bin	100644	6732885c24cc80d00f10093bb707fcfdd5e8755e8fc95734178f38b48ddb0059
 initramfs	usr/lib/usos/xp64_selected_partition_uefi_csm.sif	100755	d71bc6e824ebf15070445b4a17f6d5a0d18ff570e231a776d9af964f83922263
 initramfs	usr/lib/usos/xp_confirmation_ui.sh	100755	c9b9bc2530e7112173baf970fdebae2ab07854c3fcc65470aa1152fe28430283
-initramfs	usr/lib/usos/xp_csmwrap_esp.sh	100755	45eae78468c69cbd5d63cca6978c416ca2c468f4fcb1cbb81c072e3105114fa3
+initramfs	usr/lib/usos/xp_csmwrap_esp.sh	100755	5ad62add7521b49a97002bc904cb89b6d138b95f3478d5f34286bbd2be5d7c6c
 initramfs	usr/lib/usos/xp_detect_system.sh	100755	c80b0918d6794112474a18e57ef309ee4d32f09f37ecde4224c74680611ee046
 initramfs	usr/lib/usos/xp_disk_overview.sh	100755	a801fc759cca1a6311b9c432be9a7cdd7c68965e92016d15b00bfe2a1d960d27
 initramfs	usr/lib/usos/xp_disk_reset.sh	100755	b276d75d00ac5a0cb2fea21ffb53877db1336443ff5a398f40cc364eacbf6ff1
@@ -335,7 +349,7 @@ initramfs	usr/lib/usos/xp_selected_partition.sif	100755	7c49dde9dc1968f8964a8003
 initramfs	usr/lib/usos/xp_selected_partition_uefi_csm.sif	100755	62a9584c0e7541dfcbafc63bd7f9383b0f775739e46c2e1d62ff182d4b338035
 initramfs	usr/lib/usos/xp_source_io.sh	100755	5ee2e93d61ab46dc1e7606d4d672295da12520dd972bd2fd9597df512626790a
 initramfs	usr/lib/usos/xp_unattended_policy.sh	100755	c3565153a31e3a0ab02b95816b1a9fce80336750a475f6dd804d6aad9921dfe6
-initramfs	usr/lib/usos/xp_user_settings.sh	100755	e9d1cab68d785a96e0575dc11f02c68d050b2ac0cc9cf0883be619a9a915133a
+initramfs	usr/lib/usos/xp_user_settings.sh	100755	d597a19e509bb9762754299b538116395e491a5a8849e27149025b45133e0131
 initramfs	usr/lib/usos/xp_verify_target.sh	100755	a15439ab8f88fcd3506bace39833e4716b239a38dbd4ba498c3646bdbc2fd258
 initramfs	usr/lib/usos/xp_windows_partition_plan.awk	100755	daf7a14c3428503518c31e9172b16bffe0b00e8a8c1c9b062169949db4cf626b
 # xp_csm: entries added or changed by the UEFI-CSM overlay (stand-in pae.exe)
@@ -370,14 +384,40 @@ xp_csm	usr/lib/usos/nt52-usb/x86/xhci98.sys	100644	01adf36d75eccebf9365a169fa47e
 xp_csm	usr/lib/usos/w2k-drivers	40755	dir
 xp_csm	usr/lib/usos/w2k-drivers/LICENSE	100644	230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809
 xp_csm	usr/lib/usos/w2k-drivers/MODIFIED.txt	100644	88d9241a952cceac00921562087c1c13f175bf531ccccf1af4a44be4666834e8
-xp_csm	usr/lib/usos/w2k-drivers/SOURCE.txt	100644	16b6ee20784962d1979f77bc6b2b460fe56ce50f83ab29ac3b5e5ff62ff88240
+xp_csm	usr/lib/usos/w2k-drivers/SOURCE.txt	100644	a63e03c5860700e1f89050e3ba0ddecf0c486e008dca59d815d9630fc328239e
 xp_csm	usr/lib/usos/w2k-drivers/ahcint.inf	100644	c8dea5fd3839b8f9298a7925f6ba8c6451588638a42f24e10c4c8542915a6e21
 xp_csm	usr/lib/usos/w2k-drivers/ahcint.sys	100644	f5f0a8112f941f3833ac43c8104b4d169d2b6831d4ec224f9560ea10e3234f07
+xp_csm	usr/lib/usos/w2k-drivers/csmwrap-diag	40755	dir
+xp_csm	usr/lib/usos/w2k-drivers/csmwrap-diag/csmwrapx64.efi	100644	a100cae3ba4177dde7c4f183f2499b34171cb6f77af68439427003ae02485e7d
+xp_csm	usr/lib/usos/w2k-drivers/csmwrap-diag/manifest.json	100644	37b615a6031df1c41a6b28afaf340b3be87d548ad6c486a041421877674ec0c4
+xp_csm	usr/lib/usos/w2k-drivers/csmwrap-diag/patches	40755	dir
+xp_csm	usr/lib/usos/w2k-drivers/csmwrap-diag/patches/0001-csmwrap-logo-only-when-verbose.patch	100644	7b6b90c5b414eda41da6236a6a779b796949aa396a518e07010413f72d5cb3e8
+xp_csm	usr/lib/usos/w2k-drivers/csmwrap-diag/patches/0002-quiet-flag-no-seabios-banner-or-boot-messages.patch	100644	9666705cbe6feb5eff0fe1f2c50f330c69717d06ecffcbaf216b519cc224763d
+xp_csm	usr/lib/usos/w2k-drivers/csmwrap-diag/patches/0003-seabios-no-boot-menu-when-quiet.patch	100644	e07436766cb3c799ecaa98e95a740548d6c0292b9e7a9e7c1d0282b6c68d4790
+xp_csm	usr/lib/usos/w2k-drivers/csmwrap-diag/patches/0004-seabios-csm-bbs-priority-by-pci-address.patch	100644	7b85e08e2f554066c3c092813aaaa784486332df3cbfd0dafca15b44d2b0d9b3
+xp_csm	usr/lib/usos/w2k-drivers/csmwrap-diag/patches/0005-boot-disk-by-sector0-hash.patch	100644	3433a2323e333a70196440070540ed65b9f5697e00fbc54a794c6c51ba2264fd
+xp_csm	usr/lib/usos/w2k-drivers/csmwrap-diag/patches/0006-acpi10-view-rsdt-and-fadt-32bit-fields.patch	100644	17f0675395b70ab4ce63ad6ef6882524dfda4a603e030dae5900bd9ebf4e1d9c
+xp_csm	usr/lib/usos/w2k-drivers/csmwrap-diag/patches/0007-acpi-enable-before-legacy-boot.patch	100644	be231170e2401dfd3b67089eafb2f9b765bda2c60c9a711815455963f0bc194e
+xp_csm	usr/lib/usos/w2k-drivers/csmwrap-diag/patches/0008-apm-poweroff.patch	100644	ad16991640f1a50ac2467f77296b36f13323693130e2c26c6ef16ef706404699
+xp_csm	usr/lib/usos/w2k-drivers/csmwrap-diag/patches/0009-apm-poweroff-acpi-first-cmos-breadcrumbs.patch	100644	37819d6e41989e69405c8d119a2e7e8a0ae86567f85a46ea2a48fca238e47f76
+xp_csm	usr/lib/usos/w2k-drivers/csmwrap-diag/patches/0010-nvme-runtime-rearm.patch	100644	847f9d05a580d20d749f362e6e6f917dbbca12101554c6a345a7f9eaaaa211e0
+xp_csm	usr/lib/usos/w2k-drivers/csmwrap-diag/patches/0011-w2k-acpi-tick-watcher.patch	100644	eede4cb13318cd6df8d42eafb52c66c542e4f165d9524269ff06c803e92d21a9
+xp_csm	usr/lib/usos/w2k-drivers/csmwrap-diag/patches/0012-w2k-hide-hpet-amd-gpio.patch	100644	731168d73bb6855fb40b53ee6f1874a6a8d28997ff5e38d6d993a27668d36d6c
+xp_csm	usr/lib/usos/w2k-drivers/csmwrap-diag/patches/0013-w2k-diag-nmi-snapshot.patch	100644	2f5052eef3b6ce0312f70cfc414488e204d0c452ab4b77913b02d7fc659757fc
 xp_csm	usr/lib/usos/w2k-drivers/uniata	40755	dir
 xp_csm	usr/lib/usos/w2k-drivers/uniata/COPYING-GPL-2.0.txt	100644	162eb961bb30cf48b46be205aae1def8450ebbd6d9cd88fcb405b6379ac13d26
 xp_csm	usr/lib/usos/w2k-drivers/uniata/SOURCES.txt	100644	78556e7139f4336045dd34e5f209e40d0dacf35d4dfcfd23b0f4d7161e39bdcc
 xp_csm	usr/lib/usos/w2k-drivers/uniata/uniata.sys	100644	f496db42afc5d44723be43d7731e2e220745d82af23ab30dcd3dc6d05f761679
+xp_csm	usr/lib/usos/w2k-drivers/usosnvme	40755	dir
+xp_csm	usr/lib/usos/w2k-drivers/usosnvme/usosnvme.inf	100644	4de8b4494fbc5143e12aadfc137b7125e00c402cee2df88cf6424070fc4c6088
+xp_csm	usr/lib/usos/w2k-drivers/usosnvme/usosnvme.sys	100644	64ed437187a94cc7644f4f984676a8bd5f4ed2691b8e83a82f9fb8d514f8637a
 xp_csm	usr/lib/usos/w2k-drivers/usosrst.sys	100644	0c38413ad5c6e9f994ad4aa9f050a4ea7fe0aea188cb5abf28c381755ed76af5
+xp_csm	usr/lib/usos/w2k-drivers/usosvbe	40755	dir
+xp_csm	usr/lib/usos/w2k-drivers/usosvbe/usosvbe.sys	100644	35bcafe45c8cb8629a3b66923ffedf66ff75ab2ea1df8b42cb0bbfb192eb90bb
+xp_csm	usr/lib/usos/w2k-drivers/usosvid	40755	dir
+xp_csm	usr/lib/usos/w2k-drivers/usosvid-diag	40755	dir
+xp_csm	usr/lib/usos/w2k-drivers/usosvid-diag/bootvid.dll	100644	e53dd38178aa4199d3712256ca70b6a19f40dfd81dab6d4f0249cd404f89cfa6
+xp_csm	usr/lib/usos/w2k-drivers/usosvid/bootvid.dll	100644	577ba9de4791d6cb6b292749b6de53127effe6d298841df68f16e7b91645f552
 xp_csm	usr/lib/usos/xp-pae-LICENSE.txt	100644	65253ad371ef07ab6d3a3779a71ae195b54e0a3a05cac7ab99250c55ad0e01bd
 xp_csm	usr/lib/usos/xp-pae.exe	100644	stand-in
 # native_cpio: archive member size sha256
@@ -420,7 +460,7 @@ native_cpio	win7-support.cpio	usos-win7-wrapper.bin	97280	0c09600c3f2f97c2427e45
 native_cpio	win7-support.cpio	usos-win7-video.bin	96896	0a44a256cda725c22f1daadcf093fc4660b7214e6437968a4c8e119aed02a947
 native_cpio	win7-support.cpio	uefiseven-LICENSE.txt	1328	30b044939b58ef5754ed7479e5ec930dd49d154dbf07f618825d4470c189f4dd
 native_cpio	win7-support.cpio	UefiSeven.ini	64	133bccbf46d52a60fb64b8f9a4bd8a5c3c5b40605b60048869d3173c841e61c7
-native_cpio	vista-support.cpio	usos-vista-install.exe	68608	4014ed6f84dfd608c8983bf0706b12247d33b638bdca846b0b5cf33614e0b575
+native_cpio	vista-support.cpio	usos-vista-install.exe	70144	b0f58773fb24b2609c94d392c065d1b7d564081f52e600cc5ce3141e5a35b76f
 native_cpio	vista-support.cpio	usos-modern-vista.cmd	2247	2aa2226018fa1c3f6fcc4193b82568bd2f728ece41a171d0d2e7294bad039dbf
 native_cpio	vista-support.cpio	vista-payload-00.bin	14336	07e7c37da805eaee08c95fbbcb15348f74e00f17f35d96c99b47a3f24514519e
 native_cpio	vista-support.cpio	vista-payload-01.bin	8704	8d7bf2a6cc58affbb2f72fc0ab528ca99a124796adb7281b93caf547083ea3a5
@@ -435,19 +475,32 @@ native_cpio	vista-support.cpio	vista-payload-09.bin	26568	5241fc853c6d035a289332
 native_cpio	vista-support.cpio	vista-payload-10.bin	356797	ac61ca1a5c830e5442887b0277ad489214eca77d05af4c54a5532b2b8b27ba80
 native_cpio	vista-support.cpio	vista-payload-11.bin	947	7a4a59e44cfc8e33b313cfe69d22f2a7f2a7ecf6e5e3cd5722856d82aca78a20
 native_cpio	vista-support.cpio	vista-payload-12.bin	2461	e63a30ffe7a506592a6ca2becbed3aeaadd1b6dd7a5778e9f1492dece98a275a
-native_cpio	vista-support.cpio	vista-payload-13.bin	12800	6e2a1862cc80e4cc423556d1e9d7c2bd0c41782a7ed14f1c321ed5e740ecb3af
+native_cpio	vista-support.cpio	vista-payload-13.bin	13824	b847af355132721ee423ac6031ca443387fd7ab4e93cb38ee38f0c74a646919a
+native_cpio	vista-support.cpio	vista-watermark-00.bin	13312	f387c2536b7a356eb0ac90676f738ee42cc1824ddac5e9153f456a04744f91a1
+native_cpio	vista-support.cpio	vista-watermark-01.bin	10752	dc0b195ca885d24f8c8084926555cab6c337675fce61d5998a5e04892fd8b70e
+native_cpio	vista-support.cpio	vista-watermark-02.bin	6144	d0b3ce1e3ff3d7f0b809dadae3e0c60f627b7e72963ed35d13684aa9da37e7c9
 native_cpio	vista-support.cpio	usos-win7-wrapper.bin	97280	0c09600c3f2f97c2427e452c172d36c0003c52ed4f9919a720216f12ba0ffc7b
 native_cpio	vista-support.cpio	usos-win7-video.bin	96896	0a44a256cda725c22f1daadcf093fc4660b7214e6437968a4c8e119aed02a947
 native_cpio	vista-support.cpio	uefiseven-LICENSE.txt	1328	30b044939b58ef5754ed7479e5ec930dd49d154dbf07f618825d4470c189f4dd
 native_cpio	vista-support.cpio	UefiSeven.ini	64	133bccbf46d52a60fb64b8f9a4bd8a5c3c5b40605b60048869d3173c841e61c7
 native_cpio	modern-support.cpio	usos-modern-uefi.cmd	5598	b1fd56139bb586fcf59aa05dd932b5b214e54b020ce8e339ce8c11aee1f28257
 native_cpio	modern-support.cpio	usos-modern-finalize.exe	27648	56ea932c88e1bff0a8022a7b932cfa4838de256e10e90203249f14984fa3ca40
-native_cpio	modern-support.cpio	usos-x86-csmwrap.cmd	18883	49a07db649d10334a3b315ab4c9954c4670c9f91eb673cd7ba10b27b1bdb962e
-native_cpio	modern-support.cpio	usos-x86-csmwrap.exe	24064	a44c681d438ea25458bec23f06b87b395affdfc2b50739fa708d1536b7ccb50b
-native_cpio	modern-support.cpio	usos-vista-oobe-x86.exe	11264	e271c999bb54a8fafe785cf561ab5c2b427d8502ee83081b7c3b2edad2c5b644
+native_cpio	modern-support.cpio	usos-x86-csmwrap.cmd	40692	2c21784e0f7d86ab58494f52bc1d92e7734fb20e234d503584550067e57ab1da
+native_cpio	modern-support.cpio	usos-x86-csmwrap.exe	29696	ce9b43839b27c4e705ddedf5580aeaac0511f77a4055dcb0b62928fc2f53b966
+native_cpio	modern-support.cpio	usos-vista-oobe-x86.exe	12800	3c8d1691a19c27e9beccbac6aa2f3a87debaa2ff89545bad0535f262e953e296
 native_cpio	modern-support.cpio	usosusb-nt6.sys	46592	494c45350acc0438020bf1999f916983590b2ff83547c0c57f8f701fddfefb6d
-native_cpio	modern-support.cpio	usosnvme-nt6.sys	10240	478a94fdd3fdaa5e5a1a0d74e5770a755a9374c6be3c45eefa80ba9a954a911c
-native_cpio	modern-support.cpio	usosnvme.inf	1300	efba1ddd6d43772b1bc19482c05aabb02aa5ca585c0121f8ce8eb1859364affb
+native_cpio	modern-support.cpio	usosmpart-x86.sys	7040	d8bc77431394418381b8f551e136f75b538293343cee11620dc01827b6a67dd2
+native_cpio	modern-support.cpio	usos-usbreenum.exe	8704	33badba4ea6e904e77e27db6cc34eec55c93b7c3f5cfd0e076f06d59bc857d2a
+native_cpio	modern-support.cpio	usosnvme-nt6.sys	12432	fe6142d458b2ac6253aa2c59e765d20a9c26f363384481981ac8d3b5186b3615
+native_cpio	modern-support.cpio	usosnvme.inf	1383	cff13446e8d7ff163828cf3ecaa588ba65f290808c7bb9704f4a58a7043eda22
+native_cpio	modern-support.cpio	usosnvme.cat	2277	fc2922c876aae6bcdce8f09d41e930302a3fc598e440807e1e1b28220a54c604
+native_cpio	modern-support.cpio	usosnvme.cer	982	107ec54fe0b3874e215a2a88086874e580b0aa638c1797ea6e3db03de151166b
+native_cpio	modern-support.cpio	modern-usosnvme.inf	1445	c44808b408426bd75f3838c759961ef743df1199827e0324d8e733e5b906b384
+native_cpio	modern-support.cpio	modern-usosnvme.sys	12432	da55f486f64c11de66f301a90278642e25ea7412d1f7ce1f79d82a60ced6e969
+native_cpio	modern-support.cpio	modern-usosnvme.cat	2279	97e2fe90374644a9609c3b34c611c91dc4d0e944f7c7c905621534ff894398f6
+native_cpio	modern-support.cpio	modern-usosnvme.cer	982	de66ef97c1a5efffbf5ace44c841681c70819cc432016c0721234df204961d8a
+native_cpio	modern-support.cpio	usos-nvme-modern.exe	8192	004072fa54218d2db648be43ec834ba64dacd1b5eccda8e78f6a670b81920790
+native_cpio	modern-support.cpio	usos-nvme-modern.cmd	2746	69b087df0782d30472f1818eb004bbe8b18b0d47c0d5955076a5e7855380eaeb
 native_cpio	modern-support.cpio	usos-drivers.exe	6656	f4c681d3554da1989277d43a2cbf68d8fc069e865e2a2ef4f6795a9b783ec08a
 native_cpio	modern-support.cpio	usos-unattend-drivers.exe	9216	7eb53c21cdf89b761755b1cfaf5c4b19e420590b75ad1ee7cb7e9af7e2ed3f3f
 # payload_zip: member names of the embedded installer payload
@@ -480,6 +533,21 @@ payload_zip	EFI/USOS/csmwrap/patches/0002-quiet-flag-no-seabios-banner-or-boot-m
 payload_zip	EFI/USOS/csmwrap/patches/0003-seabios-no-boot-menu-when-quiet.patch
 payload_zip	EFI/USOS/csmwrap/patches/0004-seabios-csm-bbs-priority-by-pci-address.patch
 payload_zip	EFI/USOS/csmwrap/patches/0005-boot-disk-by-sector0-hash.patch
+payload_zip	EFI/USOS/csmwrap/patches/0006-acpi10-view-rsdt-and-fadt-32bit-fields.patch
+payload_zip	EFI/USOS/csmwrap/patches/0007-acpi-enable-before-legacy-boot.patch
+payload_zip	EFI/USOS/csmwrap/patches/0008-apm-poweroff.patch
+payload_zip	EFI/USOS/csmwrap/patches/0009-apm-poweroff-acpi-first-cmos-breadcrumbs.patch
+payload_zip	EFI/USOS/csmwrap/patches/0010-nvme-runtime-rearm.patch
+payload_zip	EFI/USOS/csmwrap/patches/0012-w2k-hide-hpet-amd-gpio.patch
+payload_zip	EFI/USOS/csmwrap/patches/0014-int13-boot-disk-only.patch
+payload_zip	EFI/USOS/csmwrap/patches/0015-pci-irq-routing.patch
+payload_zip	EFI/USOS/csmwrap/patches/0016-usb-mouse-wheel.patch
+payload_zip	EFI/USOS/csmwrap/patches/0017-seabios-config-no-romfile-features.patch
+payload_zip	EFI/USOS/csmwrap/patches/0018-usb-mouse-wheel-diag.patch
+payload_zip	EFI/USOS/csmwrap/patches/0019-usb-mouse-long-reports-and-composite.patch
+payload_zip	EFI/USOS/csmwrap/patches/0020-usb-mouse-wheel-z-always-c2-ring.patch
+payload_zip	EFI/USOS/csmwrap/patches/0021-usb-disk-service.patch
+payload_zip	EFI/USOS/csmwrap/patches/0022-usb-disk-hotswap.patch
 payload_zip	EFI/USOS/dos-native/COPYING
 payload_zip	EFI/USOS/dos-native/freedos/BOOT16.BIN
 payload_zip	EFI/USOS/dos-native/freedos/COMMAND.COM
@@ -516,6 +584,7 @@ payload_zip	EFI/USOS/dos-native/msdos/USOS.SHH
 payload_zip	EFI/USOS/dos-native/msdos/USOSKBC.COM
 payload_zip	EFI/USOS/dos-native/msdos/USOSKEY.COM
 payload_zip	EFI/USOS/dos-native/msdos/USOSKEY.DRV
+payload_zip	EFI/USOS/dos-native/msdos/USOSMS1.DRV
 payload_zip	EFI/USOS/dos-native/msdos/USOSV10.COM
 payload_zip	EFI/USOS/dos-native/msdos/USOSWHER.COM
 payload_zip	EFI/USOS/dos-native/msdos/VBADOS.TGZ
@@ -565,8 +634,15 @@ payload_zip	EFI/USOS/dos-native/win9x/USOSDBG.EXE
 payload_zip	EFI/USOS/dos-native/win9x/USOSDIAG.COM
 payload_zip	EFI/USOS/dos-native/win9x/USOSKEY.COM
 payload_zip	EFI/USOS/dos-native/win9x/USOSKEY.DRV
+payload_zip	EFI/USOS/dos-native/win9x/USOSLOG.EXE
 payload_zip	EFI/USOS/dos-native/win9x/USOSMOUS.DRV
+payload_zip	EFI/USOS/dos-native/win9x/USOSNVME.INF
+payload_zip	EFI/USOS/dos-native/win9x/USOSNVME.MPD
+payload_zip	EFI/USOS/dos-native/win9x/USOSUSB.INF
+payload_zip	EFI/USOS/dos-native/win9x/USOSUSB.MPD
+payload_zip	EFI/USOS/dos-native/win9x/USOSUSB.REG
 payload_zip	EFI/USOS/dos-native/win9x/USOSVESA.INF
+payload_zip	EFI/USOS/dos-native/win9x/USOSVMD.VXD
 payload_zip	EFI/USOS/dos-native/win9x/VBADOS.TXT
 payload_zip	EFI/USOS/dos-native/win9x/VBMOUSE.DRV
 payload_zip	EFI/USOS/dos-native/win9x/VBMOUSE.EXE

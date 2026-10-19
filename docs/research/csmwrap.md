@@ -1127,3 +1127,30 @@ keyboard and mouse) and owned PASS. Regressions with this binary (2026-10-19), a
 run_csmwrap_boot_disk_qemu.py (7 layouts, with and without --only), run_csmwrap_apmoff_qemu.py
 (pc/q35 x real/pm32/pm16), run_csmwrap_pciirq_qemu.py (pc/q35, key on/off),
 run_csmwrap_nvme_rearm_qemu.py (pc, q35), run_dos_mouse_probe.py --wheel. X470 with usos17: not tried.
+
+**Release pin since 2026-10-19:** X470 Windows Me PASS with the me-usb2 kit. `PINNED` in
+xp_csmwrap_esp.sh, release.go, lock.json, run_build_vm.py (20 patches) and third-party.json now
+point to usos17. The 9x flow turns `int13_boot_disk_only` on by default
+(docs/usb9x-hotswap-design-2026-10-19.md section 9).
+
+**Effect on the other flows.** The pin is global. DOS, NT 3.x/4.0, 2000, XP/2003, Vista/7 x86,
+POSReady and the UEFI menu's Legacy BIOS mode all copy the same `EFI\USOS\csmwrap\csmwrapx64.efi`.
+None of them writes `int13_boot_disk_only` into csmwrap.ini, and 0022 depends on it:
+
+- `usos_uds_pool()` is 0, so there is no 12 KiB pool and no extra E820 reservation.
+- `xhci_usos_register()` registers no controller, so an xHCI without devices is stopped as in
+  usos16 (`if (count || xhci->usos_idx)`).
+- The watch never arms, because only the channel 1 service arms it and only USOSUSB.MPD calls
+  that. The helper loop keeps MWAIT.
+
+What stays different everywhere:
+
+1. The SeaBIOS build has no `CONFIG_MEGASAS` (LSI MegaRAID SAS boot) and no `CONFIG_USB_UHCI`.
+   UHCI exists only on chipsets from before about 2011, which have a firmware CSM; the X470 and
+   the Ally have none.
+2. `xhci_process_events` sets a bit in `usos_latch` on a port change event. Outside the watch
+   nobody reads it.
+3. The media check and the exact KiB counters run only for channel 1 requests.
+
+The usos16 regressions, repeated with this binary on 2026-10-19, all PASS. The DOS and V86
+proxy paths (channel 0) are unchanged.
