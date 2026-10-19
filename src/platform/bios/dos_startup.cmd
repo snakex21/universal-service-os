@@ -65,10 +65,14 @@ REM Step markers for a hang on real hardware: the last line shows the step.
 ECHO start %U9SYS% (U9CSM=%U9CSM% U9DISK=%U9DISK% U9VM=%U9VM%)>>C:\USOS9X\INSTALL.LOG
 IF NOT EXIST C:\%U9SRC%\SETUP.EXE GOTO FAILED
 COPY /Y %U9T%\MSBATCH.INF C:\%U9SRC%\MSBATCH.INF >NUL
-REM The DOS-native RAM disk also carries the windowless LAN helper.
-IF EXIST %U9T%\USOSLAN.EXE COPY /Y %U9T%\USOSLAN.EXE C:\USOS9X >NUL
-IF "%U9T%"=="A:" COPY /Y %U9T%\MSBATCH.INF C:\USOS9X\MSBATCH.INF >NUL
 IF ERRORLEVEL 1 GOTO FAILED
+REM The DOS-native RAM disk (U9T=A:) also carries the windowless LAN helper
+REM and the MSBATCH.INF it reads. Disk mode (U9T=C:\USOS9X) has both in place
+REM already; copying a file onto itself fails there.
+IF NOT "%U9T%"=="A:" GOTO LANDONE
+IF EXIST %U9T%\USOSLAN.EXE COPY /Y %U9T%\USOSLAN.EXE C:\USOS9X >NUL
+COPY /Y %U9T%\MSBATCH.INF C:\USOS9X\MSBATCH.INF >NUL
+:LANDONE
 REM VESA display driver (vmdisp9x, MIT) next to Setup: DevicePath=1 finds it.
 FOR %%F IN (USOSVESA.INF VESAMINI.DRV VESAMINI.VXD VMHAL9X.DLL) DO COPY /Y %U9T%\%%F C:\%U9SRC% >NUL
 IF NOT EXIST %U9T%\NET\USOSNET.INF GOTO u9netdone

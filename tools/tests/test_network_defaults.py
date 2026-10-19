@@ -180,5 +180,12 @@ class Render(unittest.TestCase):
         self.assertIn('"USOSLAN.EXE"',native);self.assertIn("out / 'USOSLAN.EXE'",builder)
         self.assertIn('IF EXIST %U9T%\\USOSLAN.EXE COPY /Y %U9T%\\USOSLAN.EXE C:\\USOS9X',install)
         self.assertIn('COPY /Y %U9T%\\MSBATCH.INF C:\\USOS9X\\MSBATCH.INF',install)
+        # Disk mode (U9T=C:\USOS9X): no copy onto itself, and the Setup
+        # MSBATCH copy keeps its own ERRORLEVEL check.
+        lines=install.splitlines();setup=lines.index('COPY /Y %U9T%\\MSBATCH.INF C:\\%U9SRC%\\MSBATCH.INF >NUL')
+        self.assertEqual(lines[setup+1],'IF ERRORLEVEL 1 GOTO FAILED')
+        guard=lines.index('IF NOT "%U9T%"=="A:" GOTO LANDONE');end=lines.index(':LANDONE')
+        copies=[i for i,l in enumerate(lines) if 'USOSLAN.EXE C:\\USOS9X' in l or 'C:\\USOS9X\\MSBATCH.INF' in l]
+        self.assertTrue(len(copies)==2 and all(guard<i<end for i in copies))
 
 if __name__=='__main__':unittest.main()
