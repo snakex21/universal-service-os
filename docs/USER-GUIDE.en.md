@@ -37,9 +37,11 @@ ships no Windows images: you bring your own.
 
 ### What you need
 
-- **A USB stick of at least 32 GiB.** The installer rejects smaller
-  devices. Note: a stick sold as "32 GB" is usually slightly smaller than
-  32 GiB and will be rejected. In practice use a **64 GB or bigger** stick.
+- **A USB stick sold as 16 GB or bigger.** The installer rejects devices
+  below 14,000,000,000 bytes (every stick sold as "16 GB" is above that).
+  A 16 GB stick holds USOS and about 7 GiB of images (for example one
+  Windows 7 ISO); WORK takes 6 GiB on sticks below 32 GiB and up to 16 GiB
+  on bigger ones. For several systems use a **64 GB or bigger** stick.
   The installer accepts only devices that Windows reports as removable (the
   RemovableMedia flag); some USB SSDs do not, and they will not show as
   "Ready to use".
@@ -86,7 +88,7 @@ built in.
 3. In the list "Choose a drive for Universal Service OS" click your stick.
    Disks that must not be used stay visible with the reason (for example
    "the disk contains the running Windows system", "the device is smaller
-   than the required 32 GB").
+   than the required 16 GB").
 4. Click **Next**. The "**WARNING - DESTRUCTIVE OPERATION**" screen lists
    the partitions and files that will be deleted. Read it.
 5. Tick **I understand that everything on this drive will be erased**.
@@ -892,7 +894,7 @@ at all):
 
 | Symptom | What to do |
 |---|---|
-| The installer does not show the stick as "Ready to use" | Read the rejection reason. Most often: too small (below 32 GiB) or not reported as removable. |
+| The installer does not show the stick as "Ready to use" | Read the rejection reason. Most often: too small (below 16 GB) or not reported as removable. |
 | The installer says "The drive is in use" | Close Explorer windows showing the stick and click Retry. |
 | The stick does not start | Run **Repair -> Repair ESP**. |
 | Vista / Windows 7 are blocked on UEFI | PE10 donor missing or changed: section 3.2, then **Update USOS**. |

@@ -3,11 +3,24 @@ package layout
 import "fmt"
 
 const (
-	GiB              = uint64(1024 * 1024 * 1024)
-	MiB              = uint64(1024 * 1024)
-	MinimumDiskBytes = 32 * GiB
+	GiB = uint64(1024 * 1024 * 1024)
+	MiB = uint64(1024 * 1024)
+	// MinimumDiskBytes is a decimal threshold so that sticks sold as
+	// "16 GB" (vendors count 1 GB = 10^9 B; real capacity is typically
+	// 14.4-16.0e9 B, i.e. 13.4-14.9 GiB) are accepted. At this size the
+	// small-stick layout gives ESP 1 GiB, WORK 6 GiB and DATA ~6 GiB: room
+	// for USOS plus one Windows 7/Vista/XP-class ISO and its WORK copy.
+	MinimumDiskBytes = 14_000_000_000
 	ESPBytes         = 1 * GiB
-	WorkMinBytes     = 12 * GiB
+	// LegacyLayoutBytes is the disk size from which the original layout
+	// (WORK = disk/4 clamped to 12..16 GiB) applies unchanged. Media already
+	// installed on such disks must keep matching layout.Build exactly (the
+	// Linux updater rejects a GPT that differs from Build).
+	LegacyLayoutBytes = 32 * GiB
+	WorkMinBytes      = 12 * GiB
+	// WorkSmallMinBytes is the WORK floor below LegacyLayoutBytes: one Windows
+	// 7 ISO (up to ~5.1 GiB for the largest multi-edition images) + 256 MiB.
+	WorkSmallMinBytes = 6 * GiB
 	// WORK holds one guarded copy of the selected Windows Setup ISO (BIOS
 	// Windows PE path for 7/Vista/10, 8.1/2012 R2 on BIOS, and the generic
 	// ISO chainload fallback) plus WinPE drivers; the BIOS path requires
@@ -35,6 +48,19 @@ type Plan struct {
 }
 
 func WorkBytesForDisk(diskBytes uint64) uint64 {
+	if diskBytes < LegacyLayoutBytes {
+		// Small sticks: WORK = 3/8 of the disk, at least 6 GiB. The ratio
+		// meets the legacy 12 GiB exactly at 32 GiB, so the size is
+		// continuous across the boundary.
+		work := diskBytes / 8 * 3
+		if work < WorkSmallMinBytes {
+			return WorkSmallMinBytes
+		}
+		if work > WorkMinBytes {
+			return WorkMinBytes
+		}
+		return alignDown(work, AlignmentBytes)
+	}
 	work := diskBytes / 4
 	if work < WorkMinBytes {
 		return WorkMinBytes
@@ -47,7 +73,7 @@ func WorkBytesForDisk(diskBytes uint64) uint64 {
 
 func Build(diskBytes uint64) (Plan, error) {
 	if diskBytes < MinimumDiskBytes {
-		return Plan{}, fmt.Errorf("disk is too small: %d bytes; minimum is %d", diskBytes, MinimumDiskBytes)
+		return Plan{}, fmt.Errorf("disk is too small: %d bytes (%.1f GB); minimum is %d bytes (a stick sold as 16 GB)", diskBytes, float64(diskBytes)/1e9, MinimumDiskBytes)
 	}
 
 	usableEnd := alignDown(diskBytes-TailReserveBytes, AlignmentBytes)

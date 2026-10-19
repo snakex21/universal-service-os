@@ -104,7 +104,7 @@
   "installer.reason.no_serial": "naprava ne sporoča serijske številke, potrebne za ponovno preverjanje",
   "installer.reason.spanned_volume": "disk pripada nosilcu, ki se razteza čez več diskov",
   "installer.reason.not_removable": "naprava ne sporoča zastavice RemovableMedia",
-  "installer.reason.too_small": "naprava je manjša od zahtevanih 32 GB",
+  "installer.reason.too_small": "naprava je manjša od zahtevanih 16 GB",
   "installer.reason.unreadable": "ni berljivo",
   "installer.reason.unreadable_detail": "ni berljivo: %s",
 

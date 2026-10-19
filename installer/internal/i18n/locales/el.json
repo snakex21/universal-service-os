@@ -100,7 +100,7 @@
   "installer.reason.no_serial": "η συσκευή δεν αναφέρει τον σειριακό αριθμό που απαιτείται για τον επανέλεγχο",
   "installer.reason.spanned_volume": "ο δίσκος ανήκει σε τόμο που εκτείνεται σε περισσότερους από έναν δίσκους",
   "installer.reason.not_removable": "η συσκευή δεν αναφέρει τη σημαία RemovableMedia",
-  "installer.reason.too_small": "η συσκευή είναι μικρότερη από τα απαιτούμενα 32 GB",
+  "installer.reason.too_small": "η συσκευή είναι μικρότερη από τα απαιτούμενα 16 GB",
   "installer.reason.unreadable": "μη αναγνώσιμη",
   "installer.reason.unreadable_detail": "μη αναγνώσιμη: %s",
 

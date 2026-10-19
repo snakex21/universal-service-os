@@ -102,7 +102,7 @@
   "installer.reason.no_serial": "urządzenie nie zgłasza numeru seryjnego wymaganego do rewalidacji",
   "installer.reason.spanned_volume": "dysk należy do woluminu rozłożonego na więcej niż jednym dysku",
   "installer.reason.not_removable": "urządzenie nie zgłasza flagi RemovableMedia",
-  "installer.reason.too_small": "urządzenie ma mniej niż wymagane 32 GB",
+  "installer.reason.too_small": "urządzenie ma mniej niż wymagane 16 GB",
   "installer.reason.unreadable": "odczyt niedostępny",
   "installer.reason.unreadable_detail": "odczyt niedostępny: %s",
 

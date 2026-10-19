@@ -100,7 +100,7 @@
   "installer.reason.no_serial": "le périphérique ne fournit pas le numéro de série requis pour la revalidation",
   "installer.reason.spanned_volume": "le disque appartient à un volume réparti sur plusieurs disques",
   "installer.reason.not_removable": "le périphérique ne signale pas l'indicateur RemovableMedia",
-  "installer.reason.too_small": "le périphérique fait moins que les 32 Go requis",
+  "installer.reason.too_small": "le périphérique fait moins que les 16 Go requis",
   "installer.reason.unreadable": "illisible",
   "installer.reason.unreadable_detail": "illisible : %s",
 

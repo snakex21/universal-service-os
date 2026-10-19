@@ -100,7 +100,7 @@
   "installer.reason.no_serial": "enheten rapporterar inte det serienummer som krävs för omvalidering",
   "installer.reason.spanned_volume": "disken hör till en volym som sträcker sig över mer än en disk",
   "installer.reason.not_removable": "enheten rapporterar inte flaggan RemovableMedia",
-  "installer.reason.too_small": "enheten är mindre än de krävda 32 GB",
+  "installer.reason.too_small": "enheten är mindre än de krävda 16 GB",
   "installer.reason.unreadable": "inte läsbar",
   "installer.reason.unreadable_detail": "inte läsbar: %s",
 

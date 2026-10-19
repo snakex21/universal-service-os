@@ -100,7 +100,7 @@
   "installer.reason.no_serial": "enheden rapporterer ikke det serienummer, der kræves til genvalidering",
   "installer.reason.spanned_volume": "disken tilhører et volumen, der strækker sig over mere end én disk",
   "installer.reason.not_removable": "enheden rapporterer ikke flaget RemovableMedia",
-  "installer.reason.too_small": "enheden er mindre end de krævede 32 GB",
+  "installer.reason.too_small": "enheden er mindre end de krævede 16 GB",
   "installer.reason.unreadable": "ikke læsbar",
   "installer.reason.unreadable_detail": "ikke læsbar: %s",
 

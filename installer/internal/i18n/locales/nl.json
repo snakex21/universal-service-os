@@ -100,7 +100,7 @@
   "installer.reason.no_serial": "het apparaat meldt niet het serienummer dat nodig is voor de hercontrole",
   "installer.reason.spanned_volume": "de schijf hoort bij een volume dat over meer dan één schijf loopt",
   "installer.reason.not_removable": "het apparaat meldt de vlag RemovableMedia niet",
-  "installer.reason.too_small": "het apparaat is kleiner dan de vereiste 32 GB",
+  "installer.reason.too_small": "het apparaat is kleiner dan de vereiste 16 GB",
   "installer.reason.unreadable": "niet leesbaar",
   "installer.reason.unreadable_detail": "niet leesbaar: %s",
 

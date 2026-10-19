@@ -100,7 +100,7 @@
   "installer.reason.no_serial": "il dispositivo non riporta il numero di serie necessario per la riconvalida",
   "installer.reason.spanned_volume": "il disco appartiene a un volume che si estende su più dischi",
   "installer.reason.not_removable": "il dispositivo non riporta il flag RemovableMedia",
-  "installer.reason.too_small": "il dispositivo è più piccolo dei 32 GB richiesti",
+  "installer.reason.too_small": "il dispositivo è più piccolo dei 16 GB richiesti",
   "installer.reason.unreadable": "non leggibile",
   "installer.reason.unreadable_detail": "non leggibile: %s",
 
