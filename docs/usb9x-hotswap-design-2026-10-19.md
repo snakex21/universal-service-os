@@ -158,6 +158,11 @@ Rule: on a 9x target **the boot disk is the only BIOS hard disk**.
   - Opt-out: an empty `EFI\USOS\win9x\int13-all-disks.flag` on the USOS stick keeps the old mapping
     (the stick through INT 13h for the real-mode mapper).
   - Test: `tools/tests/test_w9x_int13_boot_disk_only.py`.
+  - QEMU with the pinned usos15 binary (2026-10-19), `run_csmwrap_boot_disk_qemu.py --only`:
+    - `nvme-usb` (target on NVMe, FAT stick on qemu-xhci, the X470 case) and `usb-target` gave
+      `USOS-TARGET NO-DRIVE-81`, decoy unchanged: PASS.
+    - Without the key, `nvme-usb` gave `USOS-TARGET USOS-DECOY` (stick = 81h, as before): PASS.
+    - Windows 9x itself was not run.
 - **Effects:**
   - The stick and other SATA/NVMe disks get no BIOS number. INT 13h therefore looks the same as with
     the Micron alone, which is the configuration that boots on the X470.
