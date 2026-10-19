@@ -97,6 +97,45 @@ usos_nt5_profile() {
     export NT5_SYSTEM NT5_NAME NT5_TITLE NT5_INSTALL_DIR NT5_SOURCE_DIR NT5_SETUP_DIR
 }
 
+# Also used before source discovery/disk selection; keep the source probe's
+# guard as defence for direct calls. No file or device access in this guard.
+usos_nt5_require_supported() {
+    [ -z "${USOS_NT5_VARIANT:-}" ] && return 0
+    printf '[NT5_SOURCE] STOP beta=%s: source-bound driver/loader patches are not validated for this build; no target write occurred\n' "$USOS_NT5_VARIANT" >&2
+    return 1
+}
+
+# Text-only, read-only identity probe. Missing DriverVer stays unknown; it
+# never guesses a build from a filename or treats SetupData 5.0 as Neptune.
+# Kept here so every initramfs containing nt5_profile.sh already has it.
+usos_nt5_source_metadata() {
+    [ -f "$1" ] || return 0
+    awk '
+    function trim(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); return s }
+    {
+        line=$0; sub(/;.*/, "", line); line=trim(line)
+        if (line ~ /^\[/) { active=(tolower(line)=="[version]"); next }
+        if (!active) next
+        eq=index(line,"="); if (!eq || tolower(trim(substr(line,1,eq-1)))!="driverver") next
+        count++; value=trim(substr(line,eq+1)); gsub(/"/, "", value)
+        comma=index(value,","); if (!comma) { bad=1; next }
+        value=trim(substr(value,comma+1)); n=split(value,v,".")
+        if(n!=4) bad=1
+        for(i=1;i<=n;i++) if(v[i]!~/^[0-9]+$/ || v[i]+0>65535) bad=1
+    }
+    END {
+        if (!count) exit 0
+        if (count!=1 || bad) exit 1
+        identity="unknown"
+        if(v[1]+0==5 && v[3]+0>0) {
+            if(v[2]+0==50 || (v[2]+0==0 && v[3]+0==5111)) identity="windows-neptune"
+            else if(v[2]+0==1 && v[3]+0<2600) identity="windows-whistler"
+            else if(v[2]+0==0 && v[3]+0<2195) identity="windows-2000-beta"
+        }
+        printf "driver_version=%s\nsource_identity=%s\n",value,identity
+    }' "$1"
+}
+
 # The NT5 preparation from UEFI (installed system boots through the firmware
 # CSM or CSMWrap): XP (xp-x86-sp3-uefi-csm), and experimental Windows 2000
 # (w2k-x86-sp4-uefi-csm), Server 2003 x86 (w2k3-x86-sp2-uefi-csm) and XP x64

@@ -21,6 +21,8 @@ pub const Info = struct {
     arch: media.Arch = .unknown,
     product_type: ?u8 = null,
     channel: enum { unknown, retail, oem, volume } = .unknown,
+    /// PID suffixes on pre-release discs are hints, not licensing proof.
+    channel_hint: enum { unknown, retail, oem, volume } = .unknown,
     locale: ?u32 = null,
     home: bool = false,
     media_center: bool = false,
@@ -67,6 +69,9 @@ pub fn inspect(source: Source) Info {
     if (iniValue(source.txtsetup, "nls", "DefaultLayout")) |layout|
         info.locale = std.fmt.parseInt(u32, layout, 16) catch null;
     if (info.version == null) {
+        info.version = driverVersion(source.txtsetup);
+    }
+    if (info.version == null) {
         if (number(source.txtsetup, "MajorVersion")) |major| if (number(source.txtsetup, "MinorVersion")) |minor| {
             if (major <= 65535 and minor <= 65535) info.version = .{ .major = @intCast(major), .minor = @intCast(minor), .build = number(source.txtsetup, "BuildNumber") orelse 0, .lineage = .nt };
         };
@@ -74,8 +79,16 @@ pub fn inspect(source: Source) Info {
     const product = iniValue(source.prodspec, "Product Specification", "Product") orelse iniValue(source.txtsetup, "Strings", "ProductName") orelse "";
     info.home = std.ascii.indexOfIgnoreCase(product, "Home") != null;
     if (iniValue(source.setupp, "Pid", "Pid")) |pid| {
-        if (std.ascii.endsWithIgnoreCase(pid, "OEM")) info.channel = .oem else if (std.mem.endsWith(u8, pid, "270")) info.channel = .volume else if (std.mem.endsWith(u8, pid, "000")) info.channel = .retail;
+        if (std.ascii.endsWithIgnoreCase(pid, "OEM")) info.channel_hint = .oem else if (std.mem.endsWith(u8, pid, "270")) info.channel_hint = .volume else if (std.mem.endsWith(u8, pid, "000")) info.channel_hint = .retail;
     }
+    if (info.version) |v| if (v.build != 0 and release.betaId(v) == null) {
+        info.channel = switch (info.channel_hint) {
+            .unknown => .unknown,
+            .retail => .retail,
+            .oem => .oem,
+            .volume => .volume,
+        };
+    };
     // WinPE sources must win over the PE's Server 2003 ProductType/version.
     if (source.flp_wim or source.posready_wim) {
         info.pe_installer = true;
@@ -94,6 +107,18 @@ pub fn inspect(source: Source) Info {
         if (release.betaId(v)) |id| info.system_id = id else if (v.major == 5 and v.minor == 1) info.system_id = if (source.media_center and !source.tablet_pc) "windows-xp-mce" else if (source.tablet_pc and !source.media_center) "windows-xp-tablet" else "windows-xp" else if (v.major == 5 and v.minor == 0) info.system_id = if ((info.product_type orelse 0) == 0) "windows-2000" else "windows-2000-server";
     }
     return info;
+}
+
+/// DriverVer is a version source even when SetupData has no BuildNumber.
+/// Neptune's DriverVer (5.50) is more specific than its SetupData (5.0).
+pub fn driverVersion(text: []const u8) ?release.Version {
+    const value = iniValue(text, "Version", "DriverVer") orelse return null;
+    const comma = std.mem.indexOfScalar(u8, value, ',') orelse return null;
+    var words = std.mem.splitScalar(u8, std.mem.trim(u8, value[comma + 1 ..], " \t"), '.');
+    var n: [4]u16 = undefined;
+    for (&n) |*part| part.* = std.fmt.parseInt(u16, words.next() orelse return null, 10) catch return null;
+    if (words.next() != null) return null;
+    return .{ .major = n[0], .minor = n[1], .build = n[2], .lineage = .nt };
 }
 
 test "real beta metadata values, synthetic source text, filenames are irrelevant" {
@@ -147,12 +172,24 @@ test "legacy synthetic fixtures preserve SKU, locale, setup lineage and unknown 
     const wf = inspect(.{ .txtsetup = @embedFile("testdata/variants/winframe.sif"), .prodspec = "[Product Specification]\nProduct=Citrix WinFrame\n" });
     try std.testing.expectEqualStrings("citrix-winframe-1-8", wf.system_id.?);
     try std.testing.expectEqual(@as(?u8, 1), wf.product_type);
-    const no_build = inspect(.{ .txtsetup = @embedFile("testdata/variants/whistler.sif") });
+    const no_build = inspect(.{ .txtsetup = "[SetupData]\nMajorVersion=5\nMinorVersion=1\n" });
     try std.testing.expectEqualStrings("windows-xp", no_build.system_id.?);
     try std.testing.expectEqual(@as(u32, 0), no_build.version.?.build);
-    try std.testing.expect(inspect(.{ .setupp = "[Pid]\nPid=76447OEM\n" }).channel == .oem);
-    try std.testing.expect(inspect(.{ .setupp = "[Pid]\nPid=69917270\n" }).channel == .volume);
-    try std.testing.expect(inspect(.{ .setupp = "[Pid]\nPid=76447000\n" }).channel == .retail);
+    try std.testing.expect(inspect(.{ .setupp = "[Pid]\nPid=76447OEM\n" }).channel_hint == .oem);
+    try std.testing.expect(inspect(.{ .setupp = "[Pid]\nPid=69917270\n" }).channel_hint == .volume);
+    try std.testing.expect(inspect(.{ .setupp = "[Pid]\nPid=76447000\n" }).channel_hint == .retail);
     const mce = inspect(.{ .setup_version = .{ .major = 5, .minor = 1, .build = 2600 }, .media_center = true });
     try std.testing.expectEqualStrings("windows-xp-mce", mce.system_id.?);
+}
+
+test "DriverVer identifies NT5 betas without PE resources or filename guesses" {
+    const w = inspect(.{ .txtsetup = @embedFile("testdata/variants/whistler.sif") });
+    try std.testing.expectEqualStrings("windows-whistler", w.system_id.?);
+    const n = inspect(.{ .txtsetup = @embedFile("testdata/variants/neptune.sif"), .setupp = "[Pid]\nPid=50293270\n" });
+    try std.testing.expectEqualStrings("windows-neptune", n.system_id.?);
+    try std.testing.expect(n.channel == .unknown and n.channel_hint == .volume);
+    for ([_][]const u8{ "1.2.3", "1.2.3.4.5", "5.1.BAD.0", "5.1.70000.0" }) |bad| {
+        var b: [128]u8 = undefined;
+        try std.testing.expect(driverVersion(try std.fmt.bufPrint(&b, "[Version]\nDriverVer=07/01/2001,{s}\n", .{bad})) == null);
+    }
 }

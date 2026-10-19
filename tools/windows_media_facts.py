@@ -78,7 +78,7 @@ def decode(data):
 def ini_facts(text):
     result = {}
     wanted = {'majorversion', 'minorversion', 'buildnumber', 'producttype', 'architecture',
-              'defaultlayout', 'pid', 'product', 'version', 'localization', 'buildbranch',
+              'defaultlayout', 'pid', 'product', 'version', 'driverver', 'localization', 'buildbranch',
               'buildarch', 'buildtype', 'productname', 'winntversion', 'win95version'}
     section = ''
     for line in text.splitlines():

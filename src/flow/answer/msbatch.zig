@@ -209,10 +209,6 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
         \\[USOS.Csm]
         \\
     );
-    if (p.beta_clock.len > 0) {
-        if (!@import("beta_clock.zig").validSetting(p.beta_clock.slice())) return error.InvalidBetaClock;
-        try w.print(";USOS-BETA-CLOCK={s}\r\n", .{p.beta_clock.slice()});
-    }
     // The multiline literal ends lines with LF only: make every line CRLF.
     const text = w.buffered();
     var extra: usize = 0;

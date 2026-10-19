@@ -78,10 +78,6 @@ pub fn render(p: *const Profile, key: []const u8, buffer: []u8) ![]const u8 {
         for (key) |c| try w.writeByte(std.ascii.toUpper(c));
         try w.writeAll("\r\n");
     }
-    if (p.beta_clock.len > 0) {
-        if (!@import("beta_clock.zig").validSetting(p.beta_clock.slice())) return error.InvalidBetaClock;
-        try w.print(";USOS-BETA-CLOCK={s}\r\n", .{p.beta_clock.slice()});
-    }
     return w.buffered();
 }
 

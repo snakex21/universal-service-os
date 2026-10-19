@@ -29,20 +29,8 @@ pub fn betaId(v: Version) ?[]const u8 {
 }
 
 pub fn betaFolder(id: []const u8) ?[]const u8 {
-    const Row = struct { id: []const u8, folder: []const u8 };
-    for ([_]Row{
-        .{ .id = "windows-7-beta", .folder = "Windows 7 Beta" },
-        .{ .id = "windows-longhorn", .folder = "Windows Longhorn" },
-        .{ .id = "windows-neptune", .folder = "Windows Neptune" },
-        .{ .id = "windows-whistler", .folder = "Windows Whistler" },
-        .{ .id = "windows-millennium", .folder = "Windows Millennium" },
-        .{ .id = "windows-nashville", .folder = "Windows Nashville" },
-        .{ .id = "windows-memphis", .folder = "Windows Memphis" },
-        .{ .id = "windows-chicago", .folder = "Windows Chicago" },
-        .{ .id = "windows-2000-beta", .folder = "Windows 2000 Beta" },
-        .{ .id = "windows-nt-4-beta", .folder = "Windows NT 4.0 Beta" },
-        .{ .id = "windows-nt-3-beta", .folder = "Windows NT 3.x Beta" },
-    }) |entry| if (std.mem.eql(u8, id, entry.id)) return entry.folder;
+    const entry = @import("../catalog/systems.zig").findById(id) orelse return null;
+    if (entry.category == .beta) return entry.imageFolder();
     return null;
 }
 

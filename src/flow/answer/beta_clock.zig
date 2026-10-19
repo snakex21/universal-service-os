@@ -26,11 +26,25 @@ pub const dates = [_]Entry{
     .{ .system = "windows-neptune", .build = 5111, .date = "1999-12-11" },
     .{ .system = "windows-longhorn", .build = 5048, .date = "2005-05-01" },
     .{ .system = "windows-7-beta", .build = 7000, .date = "2009-01-15" },
-    .{ .system = "windows-millennium", .build = 2525, .date = "2000-02-01" },
+    // WINME CAB timestamps on the supplied 2525 media: 2000-05-08.
+    .{ .system = "windows-millennium", .build = 2525, .date = "2000-05-15" },
     .{ .system = "windows-nashville", .build = 999, .date = "1995-12-01" },
 };
 
+/// A shared profile must never change the clock of an RTM selection.
+pub fn appliesTo(system: []const u8) bool {
+    for (@import("../../catalog/windows_betas.zig").entries) |entry| {
+        if (std.mem.eql(u8, entry.id, system)) return true;
+    }
+    return false;
+}
+
+pub fn settingFor(system: []const u8, setting: []const u8) []const u8 {
+    return if (appliesTo(system)) setting else "";
+}
+
 pub fn select(system: []const u8, build: u32, setting: []const u8) !?[]const u8 {
+    if (!appliesTo(system)) return null;
     if (setting.len == 0 or std.mem.eql(u8, setting, "off")) return null;
     if (!validSetting(setting)) return error.InvalidBetaClock;
     if (!std.mem.eql(u8, setting, "auto")) return setting;
@@ -51,6 +65,11 @@ test "beta clock validates real calendar dates and keeps default clocks" {
     try std.testing.expect((try select("windows-7-beta", 7000, "off")) == null);
     try std.testing.expectEqualStrings("2009-01-15", (try select("windows-7-beta", 7000, "auto")).?);
     try std.testing.expectError(error.UnknownBetaClockBuild, select("windows-whistler", 2257, "auto"));
+    try std.testing.expectEqualStrings("2000-05-15", (try select("windows-millennium", 2525, "auto")).?);
+    for ([_][]const u8{ "windows-nt-4", "windows-98-se", "windows-embedded-posready-2009", "citrix-winframe-1-8", "" }) |id| {
+        try std.testing.expect((try select(id, 0, "auto")) == null);
+        try std.testing.expect((try select(id, 0, "2005-05-01")) == null);
+    }
     var b: [64]u8 = undefined;
     try std.testing.expectEqualStrings("base=localtime", try qemuRtc(&b, null));
     try std.testing.expectEqualStrings("base=1999-12-11T12:00:00", try qemuRtc(&b, "1999-12-11"));

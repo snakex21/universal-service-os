@@ -71,9 +71,10 @@ usos_hex_to_ascii() {
 }
 
 usos_legacy_xp_staging() {
-    [ "${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}" = /mnt/esp/EFI/USOS ] || mkdir -p "$USOS_XP_ESP_DIR"
-    . /usr/lib/usos/nt5_profile.sh
+    . "${USOS_LIB_DIR:-/usr/lib/usos}/nt5_profile.sh"
     usos_nt5_profile || stop 'Unsupported NT5 source profile'
+    usos_nt5_require_supported || { stop 'NT5 beta compatibility is not validated; no disk was selected'; return 1; }
+    [ "${USOS_XP_ESP_DIR:-/mnt/esp/EFI/USOS}" = /mnt/esp/EFI/USOS ] || mkdir -p "$USOS_XP_ESP_DIR"
     # XP without firmware CSM (xp-x86-sp3-uefi-csmwrap, experimental): the UEFI
     # menu adds usos.xp_boot=csmwrap only when it found no CSM. The Windows
     # plan then leaves the disk's last 65 MiB for the CSMWrap ESP
@@ -114,7 +115,7 @@ usos_legacy_xp_staging() {
     mount -t ntfs3 -o ro,noatime "$DATA_PATH" /mnt/data || stop 'cannot mount USOS_DATA read-only for Legacy XP staging'
     XP_IMAGE_PATH="/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Images/$XP_IMAGE_NAME"
     [ -f "$XP_IMAGE_PATH" ] || stop "selected XP ISO not found on DATA: $XP_IMAGE_NAME"
-    printf '[LEGACY_XP] SOURCE PASS path=Systems/Windows/%s/Images/%s\n' "$NT5_NAME" "$XP_IMAGE_NAME"
+    printf '[LEGACY_XP] SOURCE PASS path=Systems/%s/%s/Images/%s\n' "$NT5_CATEGORY" "$NT5_NAME" "$XP_IMAGE_NAME"
 
     XP_WINNT_SIF=''
     if [ -n "$unattended_hex" ]; then
@@ -424,7 +425,7 @@ usos_legacy_xp_staging() {
             # pass yet: only with DATA's Unattended\nvme-experimental.txt (X470 test).
             case "${NT5_SYSTEM:-windows-xp}" in
                 windows-xp|windows-server-2003) ;;
-                windows-2000) [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/nvme-experimental.txt" ] || stop "Windows 2000 on NVMe is experimental (usosnvme): put an empty nvme-experimental.txt into Systems\\Windows\\$NT5_NAME\\Unattended to try it. No target write occurred"
+                windows-2000) [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/nvme-experimental.txt" ] || stop "Windows 2000 on NVMe is experimental (usosnvme): put an empty nvme-experimental.txt into Systems\\$NT5_CATEGORY\\$NT5_NAME\\Unattended to try it. No target write occurred"
                     printf '[XP_NVME] Windows 2000 NVMe experimental (nvme-experimental.txt)\n' ;;
                 *) stop "No NVMe driver for $NT5_SYSTEM in this flow yet (usosnvme: XP SP3 and Server 2003 SP2 x86). No target write occurred" ;;
             esac

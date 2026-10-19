@@ -5,6 +5,7 @@ import os
 import shutil
 import struct
 import subprocess
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,6 +34,7 @@ class Metadata(unittest.TestCase):
         self.assertEqual(facts['nls.defaultlayout'], '00000409')
         self.assertEqual(facts['Pid.pid'], '55034000')
         self.assertNotIn('SetupData.buildnumber', facts)
+        self.assertEqual(facts['Version.driverver'], '07/01/2001,5.1.2542.0')
 
     def test_pre_rtm_wim_never_uses_modern_xml_offsets(self):
         m = load('windows_media_facts')
@@ -79,15 +81,17 @@ class ClockAndAdapters(unittest.TestCase):
     def test_calendar_and_unknown_auto_build(self):
         self.assertEqual(self.rtc('').stdout.strip(), 'base=localtime')
         self.assertEqual(self.rtc('auto', 'windows-7-beta', '7000').stdout.strip(), 'base=2009-01-15T12:00:00')
-        self.assertEqual(self.rtc('2000-02-29').stdout.strip(), 'base=2000-02-29T12:00:00')
+        self.assertEqual(self.rtc('2000-02-29', 'windows-nt-3-beta').stdout.strip(), 'base=2000-02-29T12:00:00')
+        self.assertEqual(self.rtc('auto', 'windows-millennium', '2525').stdout.strip(), 'base=2000-05-15T12:00:00')
         for value in ('2001-02-29', '2005-04-31', '2009-1-15', '2009-01-15;echo BAD', '$(echo BAD)'):
-            self.assertNotEqual(self.rtc(value).returncode, 0, value)
+            self.assertNotEqual(self.rtc(value, 'windows-nt-3-beta').returncode, 0, value)
         self.assertNotEqual(self.rtc('auto', 'windows-nt-3-beta', '1').returncode, 0)
 
     def test_actual_nt3_nt4_posready_argument_functions(self):
         for helper, function in (('nt4_qemu_install.sh','nt4_vm_args'), ('posready_qemu_install.sh','posready_vm_args')):
             script = '. tools/w9x_phase1_qemu.sh; . tools/' + helper + '; W9X_VM_RUN=/run/test; NT4_VM_DISK_BYTES=1000000; ' + function + ' /dev/fixture tcg'
-            out = self.shell(script, USOS_BETA_CLOCK='1999-12-11', USOS_LIB_DIR=posix(ROOT/'tools'))
+            # These shared helpers may carry metadata only for a beta id.
+            out = self.shell(script, USOS_BETA_CLOCK='1999-12-11', USOS_BETA_SYSTEM='windows-nt-3-beta', USOS_LIB_DIR=posix(ROOT/'tools'))
             self.assertEqual(out.returncode, 0, out.stderr)
             args = out.stdout.splitlines()
             self.assertEqual(args[args.index('-rtc')+1], 'base=1999-12-11T12:00:00')
@@ -96,6 +100,14 @@ class ClockAndAdapters(unittest.TestCase):
             self.assertEqual(normal.returncode, 0, normal.stderr)
             args = normal.stdout.splitlines()
             self.assertEqual(args[args.index('-rtc')+1], 'base=localtime')
+
+            for system in ('windows-nt-4', 'windows-embedded-posready-2009', ''):
+                for setting in ('auto', '2005-05-01'):
+                    out = self.shell(script, USOS_BETA_CLOCK=setting, USOS_BETA_SYSTEM=system, USOS_LIB_DIR=posix(ROOT/'tools'))
+                    self.assertEqual(out.returncode, 0, out.stderr)
+                    args = out.stdout.splitlines()
+                    self.assertEqual(args[args.index('-rtc')+1], 'base=localtime')
+                    self.assertIn('ignored setting for non-beta', out.stderr)
 
     def test_nt5_beta_identity_uses_own_category_without_changing_base(self):
         cmd = '. tools/nt5_profile.sh; usos_nt5_profile && printf "%s|%s|%s" "$NT5_SYSTEM" "$NT5_CATEGORY" "$NT5_NAME"'
@@ -116,6 +128,51 @@ class ClockAndAdapters(unittest.TestCase):
         out = self.shell('NT5_SYSTEM=windows-xp USOS_NT5_VARIANT=whistler sh tools/probe_nt5_source.sh')
         self.assertNotEqual(out.returncode, 0)
         self.assertIn('no target write occurred', out.stderr)
+
+    def test_nt5_staging_guard_precedes_all_file_access_and_disk_selection(self):
+        script = '''. tools/legacy_xp_staging.sh
+stop() { printf 'STOP: %s\n' "$*"; exit 42; }
+mkdir() { echo UNEXPECTED_FILE_ACCESS; exit 99; }
+xp_stage_set() { echo UNEXPECTED_SOURCE_DISCOVERY; exit 99; }
+usos_xp_choose_disk() { echo UNEXPECTED_DISK_PICKER; exit 99; }
+usos_legacy_xp_staging 00
+'''
+        for system, variant in (('windows-xp', 'whistler'), ('windows-2000', 'neptune'), ('windows-2000', 'w2k-beta')):
+            out = self.shell(script, NT5_SYSTEM=system, USOS_NT5_VARIANT=variant,
+                             USOS_LIB_DIR=posix(ROOT/'tools'), USOS_XP_ESP_DIR='/forbidden-test-esp')
+            self.assertEqual(out.returncode, 42, out.stdout + out.stderr)
+            self.assertNotIn('UNEXPECTED_', out.stdout)
+            self.assertIn('no target write occurred', out.stderr)
+
+    def test_request_directory_uses_actual_beta_category_and_rejects_mismatch(self):
+        script = '. tools/vista_csmwrap_prepare.sh; vista_request_directory "$ISO" "$FOLDER"'
+        for folder, category in (('Windows 7 Beta', 'Betas'), ('Windows Longhorn', 'Betas'), ('Windows Vista', 'Windows')):
+            out = self.shell(script, ISO=f'Systems/{category}/{folder}/Images/arbitrary.iso', FOLDER=folder)
+            self.assertEqual(out.returncode, 0, out.stderr)
+            self.assertEqual(out.stdout.strip(), f'Systems/{category}/{folder}')
+        for iso in ('Systems/Windows/Other/Images/a.iso', 'Systems/Betas/Windows 7 Beta/Images/sub/Images/a.iso', '../a.iso'):
+            self.assertNotEqual(self.shell(script, ISO=iso, FOLDER='Windows 7 Beta').returncode, 0)
+
+    def test_real_source_probe_rejects_beta_driverversion_in_rtm_folder(self):
+        for fixture, version, system, identity in (('whistler', '5.1.2542.0', 'windows-xp', 'windows-whistler'), ('neptune', '5.50.5111.1', 'windows-2000', 'windows-neptune')):
+            with tempfile.TemporaryDirectory() as temp:
+                source = Path(temp)
+                (source/'I386').mkdir()
+                sif = source/'I386/TXTSETUP.SIF'
+                sif.write_bytes((ROOT/f'src/image_probe/testdata/variants/{fixture}.sif').read_bytes())
+                out = self.shell('sh tools/probe_nt5_source.sh', SOURCE_ROOT=posix(source), NT5_SYSTEM=system, USOS_NT5_VARIANT='')
+                self.assertNotEqual(out.returncode, 0)
+                self.assertIn('driver_version=' + version, out.stdout)
+                self.assertIn('source_identity=' + identity, out.stdout)
+                self.assertIn('pre-release DriverVer', out.stderr)
+
+    def test_driverversion_unknown_invalid_and_duplicate(self):
+        with tempfile.TemporaryDirectory() as temp:
+            sif = Path(temp)/'TXTSETUP.SIF'
+            for body, expected in (('[SetupData]\nMajorVersion=5', 0), ('[Version]\nDriverVer=x,5.1.2600.0', 0), ('[Version]\nDriverVer=x,5.1.BAD.0', 1), ('[Version]\nDriverVer=x,5.1.2600.0\nDriverVer=x,5.1.2600.0', 1)):
+                sif.write_text(body)
+                out = self.shell('. tools/nt5_profile.sh; usos_nt5_source_metadata "$SIF"', SIF=posix(sif))
+                self.assertEqual(out.returncode, expected, out.stdout + out.stderr)
 
 if __name__ == '__main__':
     unittest.main()

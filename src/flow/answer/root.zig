@@ -76,11 +76,11 @@ pub fn render(p: *const Profile, system_id: []const u8, arch: Arch, key: ?[]cons
     // this layer cannot dispatch the 5048-only schema safely. A user XML
     // remains available through the existing answer-file path.
     if (std.mem.eql(u8, system_id, "windows-longhorn")) return null;
-    if (nt4.isNt4(system_id)) return .{ .format = .nt4_sif, .bytes = try nt4.render(p, use_key, buffer) };
-    if (nt3.isNt3(system_id)) return .{ .format = .nt4_sif, .bytes = try nt3.render(p, buffer) };
+    if (nt4.isNt4(system_id)) return .{ .format = .nt4_sif, .bytes = try clockMetadata(try nt4.render(p, use_key, buffer), system_id, p.beta_clock.slice(), buffer) };
+    if (nt3.isNt3(system_id)) return .{ .format = .nt4_sif, .bytes = try clockMetadata(try nt3.render(p, buffer), system_id, p.beta_clock.slice(), buffer) };
     // POSReady 2009: POSR.SIF (staged like WINNT.SIF; posready.zig).
-    if (posready.isPosReady(system_id)) return .{ .format = .nt4_sif, .bytes = try posready.render(p, use_key, buffer) };
-    if (msbatch.releaseFor(system_id)) |release| return .{ .format = .msbatch_inf, .bytes = try msbatch.render(p, release, use_key, buffer) };
+    if (posready.isPosReady(system_id)) return .{ .format = .nt4_sif, .bytes = try clockMetadata(try posready.render(p, use_key, buffer), system_id, p.beta_clock.slice(), buffer) };
+    if (msbatch.releaseFor(system_id)) |release| return .{ .format = .msbatch_inf, .bytes = try clockMetadata(try msbatch.render(p, release, use_key, buffer), system_id, p.beta_clock.slice(), buffer) };
     const family = target.familyFor(system_id) orelse return null;
     // NT keys are 5x5 only (a Windows 95 key in the profile's `key=` is not theirs).
     const nt_key = if (profile.keyShape(use_key) == .five_by_five) use_key else "";
@@ -93,6 +93,16 @@ pub fn render(p: *const Profile, system_id: []const u8, arch: Arch, key: ?[]cons
     try xml_check.wellFormed(xml);
     try schema.check(xml, family, null);
     return .{ .format = .autounattend_xml, .bytes = xml };
+}
+
+// Renderers are also used directly for RTM. Add optional metadata only here,
+// where the selected system id is known, without copying a large Profile.
+fn clockMetadata(bytes: []const u8, system_id: []const u8, setting: []const u8, buffer: []u8) ![]const u8 {
+    const clock = beta_clock.settingFor(system_id, setting);
+    if (clock.len == 0) return bytes;
+    if (!beta_clock.validSetting(clock)) return error.InvalidBetaClock;
+    const suffix = try std.fmt.bufPrint(buffer[bytes.len..], ";USOS-BETA-CLOCK={s}\r\n", .{clock});
+    return buffer[0 .. bytes.len + suffix.len];
 }
 
 test {
@@ -253,6 +263,20 @@ test "beta and variant answers reuse base schemas with their own keys and editio
     try p.beta_clock.set("1999-12-11");
     const me_answer = (try render(&p, "windows-millennium", .x86, null, null, &buffer)).?;
     try std.testing.expect(std.mem.indexOf(u8, me_answer.bytes, ";USOS-BETA-CLOCK=1999-12-11") != null);
-    const nt3_answer = (try render(&p, "citrix-winframe-1-8", .x86, null, null, &buffer)).?;
+    const nt3_answer = (try render(&p, "windows-nt-3-beta", .x86, null, null, &buffer)).?;
     try std.testing.expect(std.mem.indexOf(u8, nt3_answer.bytes, ";USOS-BETA-CLOCK=1999-12-11") != null);
+}
+
+test "shared beta clock profile never emits metadata for RTM legacy systems" {
+    var p = Profile{};
+    try p.name.set("Mixed");
+    try p.user.set("Tester");
+    var buffer: [autounattend.max_size]u8 = undefined;
+    for ([_][]const u8{ "auto", "2005-05-01" }) |setting| {
+        try p.beta_clock.set(setting);
+        for ([_][]const u8{ "windows-nt-4", "windows-98-se", "windows-me", "windows-95", "windows-nt-3-51", "windows-embedded-posready-2009", "citrix-winframe-1-8" }) |id| {
+            const result = (try render(&p, id, .x86, null, null, &buffer)).?;
+            try std.testing.expect(std.mem.indexOf(u8, result.bytes, "USOS-BETA-CLOCK") == null);
+        }
+    }
 }

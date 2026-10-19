@@ -354,14 +354,20 @@ usos_w9x_csmwrap_prepare() {
             answer_kind=USER ;;
         *) stop 'request.ini has an unknown answer kind' ;;
     esac
+    # Reset inherited state as well as scoping metadata from user answers.
+    USOS_BETA_CLOCK=
+    USOS_BETA_SYSTEM=$system
+    USOS_BETA_BUILD=0
+    export USOS_BETA_CLOCK USOS_BETA_SYSTEM USOS_BETA_BUILD
     if grep -q '^;USOS-BETA-CLOCK=' "$answer_inf"; then
         . /usr/lib/usos/beta_clock.sh
-        USOS_BETA_CLOCK=$(usos_beta_clock_from_answer "$answer_inf") || stop 'duplicate beta clock setting'
-        USOS_BETA_SYSTEM=$system
-        USOS_BETA_BUILD=0
-        beta_rtc=$(usos_beta_clock_rtc "$USOS_BETA_CLOCK" "$system" "$USOS_BETA_BUILD") || stop 'invalid beta clock or unknown auto build'
-        w9x_csmwrap_log "BETA_CLOCK system=$system setting=$USOS_BETA_CLOCK rtc=$beta_rtc host_rtc=unchanged"
-        export USOS_BETA_CLOCK USOS_BETA_SYSTEM USOS_BETA_BUILD
+        if usos_beta_clock_applies "$system"; then
+            USOS_BETA_CLOCK=$(usos_beta_clock_from_answer "$answer_inf") || stop 'duplicate beta clock setting'
+            beta_rtc=$(usos_beta_clock_rtc "$USOS_BETA_CLOCK" "$system" "$USOS_BETA_BUILD") || stop 'invalid beta clock or unknown auto build'
+            w9x_csmwrap_log "BETA_CLOCK system=$system setting=$USOS_BETA_CLOCK rtc=$beta_rtc host_rtc=unchanged"
+        else
+            w9x_csmwrap_log "BETA_CLOCK ignored for non-beta system=$system"
+        fi
     fi
     # From here on the stick ESP stays read-only (disk picker, the target
     # write, the VM loops, the final notice); logs reach it through

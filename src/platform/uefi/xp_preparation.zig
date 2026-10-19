@@ -121,6 +121,7 @@ pub fn formatCommand(buffer: []u8, parts: CommandParts) ![]const u8 {
 /// a .sif (usos.legacy_unattended_hex=) or the manual installation
 /// (usos.xp_settings=off: the staging ignores usos-xp.ini).
 pub fn start(root: *uefi.protocol.File, system_id: []const u8, name: []const u8, answer: answer_screen.Choice, progress: *const fn (Stage) void) !void {
+    try usos.catalog.preparation_block.requireSupported(system_id);
     const system = Nt5System.fromId(system_id) orelse return error.UnsupportedNt5System;
     var answer_buffer: [300]u8 = undefined;
     const answer_option = try answer_screen.xpAnswerOption(&answer_buffer, answer.path);

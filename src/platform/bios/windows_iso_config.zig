@@ -81,8 +81,8 @@ test "Windows 10 source and directory lookup use the same exact system folder" {
 
 /// Native NT6 variants keep their own catalog DATA category.
 pub fn categoryForFolder(folder: []const u8) []const u8 {
-    for ([_][]const u8{ "Windows 7 Beta", "Windows Longhorn" }) |known| {
-        if (std.mem.eql(u8, folder, known)) return "Betas";
+    for (@import("../../catalog/systems.zig").all) |entry| {
+        if (std.mem.eql(u8, folder, entry.imageFolder())) return entry.dataCategory();
     }
     return "Windows";
 }
@@ -91,4 +91,15 @@ test "beta source binding preserves its catalog category" {
     var buffer: [544]u8 = undefined;
     const value = try sourceConfigForFolder(&buffer, [_]u8{1} ** 16, 900000, "Windows 7 Beta", "arbitrary.iso");
     try std.testing.expectEqualStrings("Systems\\Betas\\Windows 7 Beta\\Images\\arbitrary.iso\x00", value[32..]);
+}
+
+test "source categories and folders follow the catalog including all betas" {
+    for (@import("../../catalog/systems.zig").all) |entry| {
+        if (entry.category != .windows and entry.category != .beta) continue;
+        var buffer: [544]u8 = undefined;
+        var expected_buffer: [544]u8 = undefined;
+        const encoded = try sourceConfigForFolder(&buffer, [_]u8{1} ** 16, 900000, entry.imageFolder(), "a.iso");
+        const expected = try std.fmt.bufPrint(&expected_buffer, "{s}\\a.iso\x00", .{entry.image_directory[1..]});
+        try std.testing.expectEqualStrings(expected, encoded[32..]);
+    }
 }

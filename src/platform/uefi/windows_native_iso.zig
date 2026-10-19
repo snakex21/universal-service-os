@@ -543,7 +543,7 @@ pub fn formatX86CsmwrapRequest(buffer: []u8, folder: []const u8, name: []const u
             break :blk try std.fmt.bufPrint(&answer_text, "file:{s}", .{file});
         },
     };
-    return std.fmt.bufPrint(buffer, "version=1\r\nprofile=" ++ x86_csmwrap_profile ++ "\r\niso=Systems/Windows/{s}/Images/{s}\r\ndonor=Systems/Windows/{s}/Images/{s}\r\nfolder={s}\r\nanswer={s}\r\n", .{ folder, name, folder, name, folder, answer_value });
+    return std.fmt.bufPrint(buffer, "version=1\r\nprofile=" ++ x86_csmwrap_profile ++ "\r\niso=Systems/{s}/{s}/Images/{s}\r\ndonor=Systems/{s}/{s}/Images/{s}\r\nfolder={s}\r\nanswer={s}\r\n", .{ source_config.categoryForFolder(folder), folder, name, source_config.categoryForFolder(folder), folder, name, folder, answer_value });
 }
 
 test "x86 CSMWrap request boots the ISO itself" {
@@ -551,6 +551,9 @@ test "x86 CSMWrap request boots the ISO itself" {
     const text = try formatX86CsmwrapRequest(&buffer, "Windows 10", "w10x86.iso", .profile);
     try std.testing.expectEqualStrings("version=1\r\nprofile=win-x86-uefi-csmwrap\r\niso=Systems/Windows/Windows 10/Images/w10x86.iso\r\ndonor=Systems/Windows/Windows 10/Images/w10x86.iso\r\nfolder=Windows 10\r\nanswer=profile\r\n", text);
     try std.testing.expectError(error.InvalidImageName, formatX86CsmwrapRequest(&buffer, "Windows 10", "a/b.iso", .none));
+    const beta = try formatX86CsmwrapRequest(&buffer, "Windows 7 Beta", "beta.iso", .{ .file = "beta.xml" });
+    try std.testing.expect(std.mem.indexOf(u8, beta, "iso=Systems/Betas/Windows 7 Beta/Images/beta.iso\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, beta, "donor=Systems/Betas/Windows 7 Beta/Images/beta.iso\r\n") != null);
 }
 
 /// The ISO checks of the x86 path, then usos-source.ini (the DATA binding

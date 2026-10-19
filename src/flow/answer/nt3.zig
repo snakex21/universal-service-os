@@ -114,10 +114,6 @@ pub fn render(p: *const Profile, buffer: []u8) ![]const u8 {
     var name: [15]u8 = undefined;
     try w.print("\r\n!ComputerName = {s}\r\n", .{netbiosName(p.computer.slice(), &name)});
     try w.writeAll("\r\n[LicenseFilePrintData]\r\n\r\n[NetworkAdapterData]\r\n\r\n[TransportData]\r\n\r\n[DomainData]\r\n");
-    if (p.beta_clock.len > 0) {
-        if (!@import("beta_clock.zig").validSetting(p.beta_clock.slice())) return error.InvalidBetaClock;
-        try w.print(";USOS-BETA-CLOCK={s}\r\n", .{p.beta_clock.slice()});
-    }
     return w.buffered();
 }
 

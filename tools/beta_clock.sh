@@ -1,13 +1,23 @@
 # Pure beta RTC argument policy. No date/hwclock calls; never changes host RTC.
 # Off/default preserves the existing VM clock. Unknown auto builds fail closed.
+usos_beta_clock_applies() {
+    case "${1:-}" in
+        windows-whistler|windows-neptune|windows-longhorn|windows-7-beta|windows-millennium|windows-nashville|windows-chicago|windows-memphis|windows-nt-3-beta|windows-nt-4-beta|windows-2000-beta|windows-cairo) return 0 ;;
+    esac
+    return 1
+}
 usos_beta_clock_date() {
+    if ! usos_beta_clock_applies "${2:-}"; then
+        case "${1:-}" in ''|off) ;; *) printf '[BETA_CLOCK] ignored setting for non-beta system=%s\n' "${2:-unknown}" >&2 ;; esac
+        return 0
+    fi
     case "${1:-}" in ''|off) return 0 ;; auto)
         case "${2:-}:${3:-}" in
             windows-whistler:2542) printf '%s\n' 2001-08-15 ;;
             windows-neptune:5111) printf '%s\n' 1999-12-11 ;;
             windows-longhorn:5048) printf '%s\n' 2005-05-01 ;;
             windows-7-beta:7000) printf '%s\n' 2009-01-15 ;;
-            windows-millennium:2525) printf '%s\n' 2000-02-01 ;;
+            windows-millennium:2525) printf '%s\n' 2000-05-15 ;;
             windows-nashville:999) printf '%s\n' 1995-12-01 ;;
             *) printf '[BETA_CLOCK] STOP unknown auto build\n' >&2; return 1 ;;
         esac
