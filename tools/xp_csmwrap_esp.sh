@@ -110,6 +110,14 @@ if [ "${USOS_PCI_IRQ_ROUTING:-}" = on ]; then
     printf 'pci_irq_routing = true\r\n' >> "$ini"
     log 'csmwrap.ini pci_irq_routing=true (Windows 9x PCI IRQs)'
 fi
+# Windows 9x on NVMe with usosnvme.mpd (w9x_csmwrap_target.sh exports
+# USOS_INT13_BOOT_DISK_ONLY only there): only the disk CSMWrap was loaded
+# from gets a BIOS number (patch 0014), so a USB stick never shifts the 9x
+# INT 13h units / drive letters and IOS writes no MBR stamp into it.
+if [ "${USOS_INT13_BOOT_DISK_ONLY:-}" = on ]; then
+    printf 'int13_boot_disk_only = true\r\n' >> "$ini"
+    log 'csmwrap.ini int13_boot_disk_only=true (Windows 9x NVMe: the boot disk is the only BIOS hard disk)'
+fi
 if [ "${USOS_W2K_DIAG:-off}" = on ]; then
     printf 'w2k_nmi_snapshot = true\r\n' >> "$ini"
     log 'csmwrap.ini w2k_nmi_snapshot=true (Windows 2000 diagnostic setup)'

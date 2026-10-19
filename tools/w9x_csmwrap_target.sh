@@ -56,6 +56,13 @@ DIAG_FLAG=${W9X_DIAG_FLAG:-$ESP_DIR/win9x/diag.flag}
 # (tools/w9x_csmwrap_prepare.sh): usosnvme.mpd (tools/w9x_nvme.sh) instead
 # of MS-DOS compatibility mode, unless the disk fails w9x_nvme_check.
 NVME_DRIVER=${W9X_NVME_DRIVER:-0}
+# With usosnvme.mpd the boot disk is the only BIOS hard disk (csmwrap.ini
+# int13_boot_disk_only = true, CSMWrap patch 0014): a USB stick or another
+# disk with a BIOS number shifts the 9x INT 13h units / DOS letters (X470: Me
+# stops with "cannot find KRNL386.EXE") and gets IOS MBR stamps written at
+# every boot (docs/usb9x-hotswap-design-2026-10-19.md section 2). This empty
+# flag on the USOS stick keeps the old mapping (the stick through INT 13h).
+INT13_ALL_FLAG=${W9X_INT13_ALL_FLAG:-$ESP_DIR/win9x/int13-all-disks.flag}
 LIB=${USOS_LIB_DIR:-/usr/lib/usos}
 ESP_TAIL=133120
 MIN_SECTORS=4194304
@@ -290,6 +297,15 @@ if [ "$NVME_DRIVER" = 1 ]; then
     fi
 fi
 [ "$nvme_ok" = 1 ] || rm -f "$work/c/USOS9X/USOSNVME.MPD" "$work/c/USOS9X/USOSNVME.INF"
+int13_only=off
+if [ "$nvme_ok" = 1 ]; then
+    if [ -e "$INT13_ALL_FLAG" ]; then
+        log 'int13: every disk keeps a BIOS number (win9x/int13-all-disks.flag)'
+    else
+        int13_only=on
+        log 'int13: only the boot disk is a BIOS hard disk (csmwrap.ini int13_boot_disk_only)'
+    fi
+fi
 
 case "$SYSTEM_TAG:$TIME_ZONE" in
     98SE:?*|98:?*|95:?*)
@@ -350,7 +366,7 @@ blockdev --rereadpt "$TARGET_DEVICE" 2>/dev/null || true
 # has no IRQ steering miniport for current chipsets and takes PCI IRQs from
 # the BIOS, so CSMWrap routes PCI INTx to 8259 IRQs for it (csmwrap.ini
 # pci_irq_routing = true, CSMWrap 3.1.2-usos12 patch 0015).
-TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=$ESP_TAIL USOS_PCI_IRQ_ROUTING=on sh "$LIB/xp_csmwrap_esp.sh" || fail 'the CSMWrap ESP could not be written'
+TARGET_DEVICE=$TARGET_DEVICE USOS_XP_ESP_TAIL_SECTORS=$ESP_TAIL USOS_PCI_IRQ_ROUTING=on USOS_INT13_BOOT_DISK_ONLY=$int13_only sh "$LIB/xp_csmwrap_esp.sh" || fail 'the CSMWrap ESP could not be written'
 dd if="$TARGET_DEVICE" of="$mbr" bs=512 count=1 2>/dev/null || fail 'cannot read back the MBR'
 [ "$(od -An -tu1 -j450 -N1 "$mbr" | tr -d ' \n')" = 12 ] || fail 'read-back: the Windows partition type differs'
 [ "$(od -An -tu1 -j446 -N1 "$mbr" | tr -d ' \n')" = 128 ] || fail 'read-back: the Windows partition is not active'
