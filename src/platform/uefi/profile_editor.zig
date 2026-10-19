@@ -65,6 +65,7 @@ const F = enum(u8) {
     no_welcome_center,
     theme,
     display,
+    display_bpp,
     save,
     cancel,
 };
@@ -151,8 +152,12 @@ var theme_options: [3][]const u8 = undefined;
 var theme_values: [3]answer.profile.Theme = undefined;
 var theme_option_count: usize = 0;
 var theme_index: usize = 0;
-var display_options: [@typeInfo(answer.profile.Display).@"enum".fields.len][]const u8 = undefined;
+var display_options: [@typeInfo(answer.profile.Display).@"enum".fields.len + 1][]const u8 = undefined;
+var display_option_count: usize = 0;
+var bpp_options: [3][]const u8 = undefined;
+var bpp_index: usize = 0;
 var display_index: usize = 0;
+var display_explicit_loaded: bool = false;
 var network_options: [3][]const u8 = undefined;
 const protect_values = [_]answer.profile.ProtectPc{ .recommended, .updates, .off };
 const network_values = [_]answer.profile.NetworkLocation{ .work, .home, .public };
@@ -203,8 +208,13 @@ fn setOptions() void {
     locale_options[0] = t(.profile_value_same_language);
     keyboard_options[0] = t(.profile_value_same_locale);
     protect_options = .{ t(.profile_value_protect_recommended), t(.profile_value_protect_updates), t(.profile_value_protect_off) };
-    display_options[0] = t(.profile_value_auto);
-    inline for (@typeInfo(answer.profile.Display).@"enum".fields[1..], 1..) |f, i| display_options[i] = f.name;
+    const legacy_display = answer.display_profile.supportsSystem(system_id);
+    const offset: usize = if (legacy_display) 1 else 0;
+    display_options[0] = t(if (legacy_display) .profile_value_unchanged else .profile_value_auto);
+    if (legacy_display) display_options[1] = t(.profile_value_auto);
+    inline for (@typeInfo(answer.profile.Display).@"enum".fields[1..], 1..) |f, i| display_options[i + offset] = f.name;
+    display_option_count = @typeInfo(answer.profile.Display).@"enum".fields.len + offset;
+    bpp_options = .{ t(.profile_value_auto), "32", "16" };
     network_options = .{ t(.profile_value_network_work), t(.profile_value_network_home), t(.profile_value_network_public) };
     for (tables.languages, 0..) |entry, i| {
         language_options[i + 1] = entry.label;
@@ -252,7 +262,12 @@ fn load(p: *const Profile) void {
     loadOptions(p);
     workgroup_text.set(p.workgroup.slice());
     for (tweak_rows, 0..) |row, i| tweak_values[i] = p.flagValue(row.field);
-    display_index = @intFromEnum(p.display);
+    display_index = if (answer.display_profile.supportsSystem(system_id))
+        (if (answer.display_profile.requested(p)) @intFromEnum(p.display) + @as(usize, 1) else 0)
+    else
+        @intFromEnum(p.display);
+    bpp_index = @intFromEnum(p.display_bpp);
+    display_explicit_loaded = p.display_explicit;
     loadTheme(p.theme);
     loadSystems(answer.applies.effective(p));
 }
@@ -386,7 +401,15 @@ fn build(out: *Profile) void {
     out.workgroup.set(workgroup_text.slice()) catch {};
     for (tweak_rows, 0..) |row, i| out.flag(row.field).?.* = tweak_values[i];
     out.theme = theme_values[theme_index];
-    out.display = @enumFromInt(display_index);
+    if (answer.display_profile.supportsSystem(system_id)) {
+        out.display = if (display_index == 0) .auto else @enumFromInt(display_index - 1);
+        out.display_explicit = display_index != 0;
+        out.display_bpp = if (display_index == 0) .auto else @enumFromInt(bpp_index);
+    } else {
+        out.display = @enumFromInt(display_index);
+        out.display_bpp = @enumFromInt(bpp_index);
+        out.display_explicit = display_explicit_loaded;
+    }
     _ = answer.profile.normalizeSystems(systems_values[systems_index], &out.systems);
     out.manual_disk = true;
 }
@@ -450,7 +473,8 @@ fn helpKey(id: F) view.Key {
         .systems => .profile_help_systems,
         .section_extras => .profile_section_extras,
         .theme => .profile_help_theme,
-        .display => .profile_help_display,
+        .display => if (answer.display_profile.supportsSystem(system_id)) .profile_help_display_legacy else .profile_help_display,
+        .display_bpp => .profile_help_display_legacy,
         .skip_games, .skip_msn, .hide_outlook_express, .classic_start, .no_balloon_tips, .no_sidebar, .no_welcome_center => tweak_rows[tweakRow(id).?].help,
         .section_explorer, .section_taskbar, .section_system, .section_updates, .section_apps, .section_accounts => .profile_section_extras,
         .option => .profile_help_systems,
@@ -632,8 +656,14 @@ fn buildFields() void {
                 if (schema.tweakAvailable(row.tweak, f)) addField(row.id, .{ .kind = .toggle, .label = t(row.label), .flag = &tweak_values[i] });
             }
             if (theme_option_count > 1) addField(.theme, .{ .kind = .choice, .label = t(.profile_field_theme), .options = theme_options[0..theme_option_count], .index = &theme_index });
-            if (schema.tweakAvailable(.display, f)) addField(.display, .{ .kind = .choice, .label = t(.profile_field_display), .options = &display_options, .index = &display_index });
+            if (schema.tweakAvailable(.display, f)) addField(.display, .{ .kind = .choice, .label = t(.profile_field_display), .options = display_options[0..display_option_count], .index = &display_index });
         }
+    }
+    // Legacy renderers have no NT6 Family; expose only their display channel.
+    if (answer.display_profile.supportsSystem(system_id)) {
+        if (family == null) addField(.section_extras, .{ .kind = .section, .label = t(.profile_section_extras) });
+        if (family == null) addField(.display, .{ .kind = .choice, .label = t(.profile_field_display), .options = display_options[0..display_option_count], .index = &display_index });
+        if (display_index != 0) addField(.display_bpp, .{ .kind = .choice, .label = t(.profile_field_display_bpp), .options = &bpp_options, .index = &bpp_index });
     }
     addField(.save, .{ .kind = .action, .label = t(.profile_save), .primary = true, .id = save_id });
     addField(.cancel, .{ .kind = .action, .label = t(.profile_cancel), .id = cancel_id });

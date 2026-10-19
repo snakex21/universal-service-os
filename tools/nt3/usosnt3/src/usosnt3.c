@@ -47,6 +47,7 @@
  * Every step is logged to C:\USOS\NT3\POST.LOG (SETUP.LOG for /setup).
  * No C runtime; only kernel32 and advapi32 functions of NT 3.1.
  */
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 #define DIR "C:\\USOS\\NT3\\"
@@ -923,6 +924,19 @@ static void polish(void)
 }
 
 static void vesa(void);
+static void display_profile(void)
+{
+    /* The install VM must not select its own VBE modes for the real board.
+       This separate service stays automatic until the first hardware boot. */
+    if (GetFileAttributesA(DIR "DISPLAY.TXT") == 0xFFFFFFFF ||
+        GetFileAttributesA(DIR "USOSRES.EXE") == 0xFFFFFFFF) return;
+    set_sz("usosdisplay", "ImagePath", REG_SZ, DIR "USOSRES.EXE service");
+    set_sz("usosdisplay", "DisplayName", REG_SZ, "USOS display profile");
+    set_dword("usosdisplay", NULL, "Type", 0x110);
+    set_dword("usosdisplay", NULL, "ErrorControl", 0);
+    set_dword("usosdisplay", NULL, "Start", 2);
+    say("DISPLAY hardware service registered (VM defers)\r\n");
+}
 static void post(void)
 {
     static const char *const drivers[] = { "AHCINT", "USOSRST", "USOSUSB" };
@@ -1020,6 +1034,7 @@ static void post(void)
     }
     write_file("DRIVERS.TXT", g_text);
     vesa();
+    display_profile();
 }
 
 /* VESA display (docs/nt3-vesa-2026-10-14.md): usosvbe.sys (own miniport,

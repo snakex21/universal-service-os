@@ -1354,5 +1354,7 @@
   "boot.lx.logon_domain_profile_password": "Pēc instalēšanas piesakieties domēnā {1} kā {0} ar atbilžu profilā iestatīto paroli.",
   "boot.lx.logon_autologon": "Pēc instalēšanas Windows automātiski piesakās kā {0}.",
   "boot.lx.logon_setup_asks": "Windows iestatīšana instalēšanas laikā vaicā lietotājvārdu un paroli; USOS tos neiestata.",
-  "boot.lx.logon_answer_file": "Pēc instalēšanas piesakieties ar kontu no sava atbilžu faila {0}."
+  "boot.lx.logon_answer_file": "Pēc instalēšanas piesakieties ar kontu no sava atbilžu faila {0}.",
+  "boot.profile.field.display_bpp": "Krāsu dziļums",
+  "boot.profile.help.display_legacy": "Tiek lietots pēc instalēšanas uz īstās aparatūras. Automātiski izvēlas pieejamu režīmu līdz 1920x1080 ar drošu pāreju uz zemāku. Bez izmaiņām saglabā iestatījumus. Automātiskais dziļums: 32 biti, ja pieejami, citādi 16."
 }

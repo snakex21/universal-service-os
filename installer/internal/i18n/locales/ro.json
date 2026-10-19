@@ -1354,5 +1354,7 @@
   "boot.lx.logon_domain_profile_password": "După instalare conectați-vă la domeniul {1} ca {0} cu parola setată în profilul de răspuns.",
   "boot.lx.logon_autologon": "După instalare Windows se conectează automat ca {0}.",
   "boot.lx.logon_setup_asks": "Programul de instalare Windows cere numele de utilizator și parola în timpul instalării; USOS nu le setează.",
-  "boot.lx.logon_answer_file": "După instalare conectați-vă cu contul din fișierul dvs. de răspuns {0}."
+  "boot.lx.logon_answer_file": "După instalare conectați-vă cu contul din fișierul dvs. de răspuns {0}.",
+  "boot.profile.field.display_bpp": "Adâncime de culoare",
+  "boot.profile.help.display_legacy": "Se aplică după instalare pe hardware-ul real. Automat alege un mod disponibil până la 1920x1080, cu revenire sigură la unul inferior. Neschimbat păstrează setările. Adâncime automată: 32 de biți dacă sunt disponibili, altfel 16."
 }

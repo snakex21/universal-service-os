@@ -65,6 +65,7 @@ pub const Field = enum {
     theme,
     no_balloon_tips,
     display,
+    display_bpp,
     disable_uac,
     no_sidebar,
     no_welcome_center,
@@ -186,6 +187,8 @@ pub const Display = enum {
     }
 };
 
+pub const DisplayBpp = enum { auto, @"32", @"16" };
+
 fn enumByName(comptime E: type, name: []const u8) ?E {
     inline for (@typeInfo(E).@"enum".fields) |f| {
         if (std.ascii.eqlIgnoreCase(name, f.name)) return @enumFromInt(f.value);
@@ -274,6 +277,9 @@ pub const Profile = struct {
     theme: Theme = .default,
     no_balloon_tips: bool = false,
     display: Display = .auto,
+    /// Explicit auto differs from an old profile with no display request.
+    display_explicit: bool = false,
+    display_bpp: DisplayBpp = .auto,
     disable_uac: bool = false,
     no_sidebar: bool = false,
     no_welcome_center: bool = false,
@@ -875,7 +881,11 @@ fn applyField(p: *Profile, name: []const u8, value: []const u8) ?Issue {
         .protect_pc => p.protect_pc = enumByName(ProtectPc, value) orelse return .{ .field = field, .problem = .bad_choice },
         .network_location => p.network_location = enumByName(NetworkLocation, value) orelse return .{ .field = field, .problem = .bad_choice },
         .theme => p.theme = enumByName(Theme, value) orelse return .{ .field = field, .problem = .bad_choice },
-        .display => p.display = if (value.len == 0) .auto else enumByName(Display, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .display => {
+            p.display = if (value.len == 0) .auto else enumByName(Display, value) orelse return .{ .field = field, .problem = .bad_choice };
+            p.display_explicit = value.len > 0;
+        },
+        .display_bpp => p.display_bpp = if (value.len == 0) .auto else enumByName(DisplayBpp, value) orelse return .{ .field = field, .problem = .bad_choice },
         .systems => {
             var normalized: Text(160) = .{};
             if (normalizeSystems(value, &normalized)) |problem| return .{ .field = field, .problem = problem };
@@ -936,7 +946,8 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
         if (p.flagValue(field)) try w.print("{s}=yes\r\n", .{@tagName(field)});
     }
     if (p.theme != .default) try w.print("theme={s}\r\n", .{@tagName(p.theme)});
-    if (p.display != .auto) try w.print("display={s}\r\n", .{@tagName(p.display)});
+    if (p.display != .auto or p.display_explicit) try w.print("display={s}\r\n", .{@tagName(p.display)});
+    if (p.display_bpp != .auto) try w.print("display_bpp={s}\r\n", .{@tagName(p.display_bpp)});
     // Typed options (options.zig) and the workgroup, only when set (the
     // editor saves through here: before 2026-10-14 they were dropped).
     if (p.workgroup.len > 0) try w.print("workgroup={s}\r\n", .{p.workgroup.slice()});
@@ -1097,6 +1108,25 @@ test "profile round trip keeps typed options and the workgroup; every option at 
     try std.testing.expectEqualSlices(u8, &p.opts, &q.opts);
 }
 
+test "display absent, explicit auto and depth survive profile round trips" {
+    var p: Profile = undefined;
+    var q: Profile = undefined;
+    var buffer: [max_file]u8 = undefined;
+    try std.testing.expect(parse("name=A\nuser=Bob\n", &p) == .ok);
+    try std.testing.expect(!p.display_explicit);
+    try std.testing.expect(std.mem.indexOf(u8, try write(&p, &buffer), "display=") == null);
+    try std.testing.expect(parse("name=A\nuser=Bob\ndisplay=auto\ndisplay_bpp=16\n", &p) == .ok);
+    try std.testing.expect(p.display_explicit);
+    const written = try write(&p, &buffer);
+    try std.testing.expect(std.mem.indexOf(u8, written, "display=auto\r\ndisplay_bpp=16\r\n") != null);
+    try std.testing.expect(parse(written, &q) == .ok);
+    try std.testing.expect(q.display_explicit);
+    try std.testing.expectEqual(DisplayBpp.@"16", q.display_bpp);
+    try std.testing.expect(parse("name=A\nuser=Bob\ndisplay=\ndisplay_bpp=\n", &p) == .ok);
+    try std.testing.expect(!p.display_explicit);
+    try std.testing.expectEqual(DisplayBpp.auto, p.display_bpp);
+}
+
 test "profile parse errors name the field and line, never the value" {
     var p: Profile = undefined;
     const cases = [_]struct { text: []const u8, field: ?Field, problem: Problem, line: u32 }{
@@ -1117,6 +1147,7 @@ test "profile parse errors name the field and line, never the value" {
         .{ .text = "name=A\nuser=Bob\nsystems=windows-9x,windows-96\n", .field = .systems, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\ntheme=aero\n", .field = .theme, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\ndisplay=800x600\n", .field = .display, .problem = .bad_choice, .line = 3 },
+        .{ .text = "name=A\nuser=Bob\ndisplay_bpp=24\n", .field = .display_bpp, .problem = .bad_choice, .line = 3 },
         .{ .text = "name=A\nuser=Bob\nskip_games=maybe\n", .field = .skip_games, .problem = .bad_boolean, .line = 3 },
         .{ .text = "name=A\nuser=Bob\npassword=a b\n", .field = .password, .problem = .bad_characters, .line = 0 },
         .{ .text = "name=A\njusttext\n", .field = null, .problem = .not_key_value, .line = 2 },

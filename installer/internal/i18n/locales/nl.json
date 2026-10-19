@@ -1351,5 +1351,7 @@
   "boot.lx.logon_domain_profile_password": "Meld u na de installatie aan bij het domein {1} als {0} met het wachtwoord uit het antwoordprofiel.",
   "boot.lx.logon_autologon": "Na de installatie meldt Windows zich automatisch aan als {0}.",
   "boot.lx.logon_setup_asks": "Windows Setup vraagt tijdens de installatie om de gebruikersnaam en het wachtwoord; USOS stelt ze niet in.",
-  "boot.lx.logon_answer_file": "Meld u na de installatie aan met het account uit uw antwoordbestand {0}."
+  "boot.lx.logon_answer_file": "Meld u na de installatie aan met het account uit uw antwoordbestand {0}.",
+  "boot.profile.field.display_bpp": "Kleurdiepte",
+  "boot.profile.help.display_legacy": "Wordt na installatie op de echte hardware toegepast. Automatisch kiest een beschikbare modus tot 1920x1080 met een veilige terugval. Ongewijzigd behoudt de instellingen. Automatische kleurdiepte: 32 bits indien beschikbaar, anders 16."
 }

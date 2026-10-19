@@ -1351,5 +1351,7 @@
   "boot.lx.logon_domain_profile_password": "Logga in på domänen {1} som {0} efter installationen med lösenordet från svarsprofilen.",
   "boot.lx.logon_autologon": "Efter installationen loggar Windows in automatiskt som {0}.",
   "boot.lx.logon_setup_asks": "Windows installationsprogram frågar efter användarnamn och lösenord under installationen; USOS anger dem inte.",
-  "boot.lx.logon_answer_file": "Logga in efter installationen med kontot från din svarsfil {0}."
+  "boot.lx.logon_answer_file": "Logga in efter installationen med kontot från din svarsfil {0}.",
+  "boot.profile.field.display_bpp": "Färgdjup",
+  "boot.profile.help.display_legacy": "Används efter installation på den riktiga maskinvaran. Automatiskt väljer ett tillgängligt läge upp till 1920x1080 med säker återgång. Oförändrat behåller inställningarna. Automatiskt färgdjup föredrar 32 bitar, annars 16."
 }

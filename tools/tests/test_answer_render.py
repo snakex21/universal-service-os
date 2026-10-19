@@ -33,7 +33,7 @@ DATA = ROOT / 'src' / 'flow' / 'answer' / 'testdata'
 GOLDEN = DATA / 'golden'
 OUT = ROOT / 'zig-out' / 'answer-render-tests'
 TOOL = ROOT / 'zig-out' / 'bin' / 'usos-answer.exe'
-ZIG = ROOT / 'tools' / 'zig' / 'zig.exe'
+ZIG = Path(os.environ.get('USOS_ZIG', ROOT / 'tools' / 'zig' / 'zig.exe'))
 SH = next((p for p in (r'C:\msys64\usr\bin\sh.exe', r'C:\Program Files\Git\usr\bin\sh.exe', shutil.which('sh') or '') if p and Path(p).exists()), None)
 # The shell's own coreutils (head, od, awk) first: PowerShell runs lack them on PATH.
 # Only for this module's shells (env=SH_ENV), never os.environ: pytest imports
@@ -255,7 +255,8 @@ TWEAKS = {
     'theme=classic': {'windows-xp', 'windows-7'},
     'theme=basic': {'windows-7'},
     'no_balloon_tips=yes': {'windows-xp', 'windows-server-2003'},
-    'display=1280x1024': {'windows-xp', 'windows-server-2003'},
+    'display=1280x1024': {'windows-xp', 'windows-server-2003', 'windows-2000'},
+    'display_bpp=16': {'windows-2000'},
     'disable_uac=yes': {'windows-vista', 'windows-7', 'windows-server-2008', 'windows-server-2008-r2'},
     'no_sidebar=yes': {'windows-vista', 'windows-7'},
     'no_welcome_center=yes': {'windows-vista'},
@@ -274,7 +275,8 @@ MARKERS = {
     'theme=classic': ('DefaultThemesOff=Yes', 'classic.theme'),
     'theme=basic': ('basic.theme',),
     'no_balloon_tips=yes': ('EnableBalloonTips',),
-    'display=1280x1024': ('Xresolution=1280',),
+    'display=1280x1024': ('Xresolution=1280', '1280x1024xauto'),
+    'display_bpp=16': ('autox16',),
     'disable_uac=yes': ('<EnableLUA>false</EnableLUA>', '/v EnableLUA /t REG_DWORD /d 0'),
     'no_sidebar=yes': ('TurnOffSidebar',),
     'no_welcome_center=yes': ('WindowsWelcomeCenter',),
@@ -298,6 +300,12 @@ def render_any(profile: Path, system: str, arch: str, name: str) -> bytes | None
         regset = OUT / (name + '.usos-reg.txt')
         r = sh(f"usos_xp_settings_regset '{posix(OUT / (name + '.normalized'))}' '{posix(regset)}'")
         extra = b'\n----- usos-reg.txt -----\n' + regset.read_bytes() if r.returncode == 0 else b''
+        if system == 'windows-2000':
+            normalized = OUT/(name+'.normalized')
+            r = subprocess.run([SH, '-c', f". '{posix(ROOT/'tools/display_profile.sh')}'; usos_display_from_nt5 '{posix(normalized)}'"], capture_output=True, env=SH_ENV)
+            check('2000 display transport '+name, r.returncode == 0, r.stderr.decode(errors='replace'))
+            if r.stdout:
+                extra += b'\n----- DISPLAY.TXT -----\n'+r.stdout.strip()+b'\r\n'
         return sif + b'\n----- usos-users.cmd -----\n' + accounts + extra
     if system in LEGACY:
         return out.read_bytes()
@@ -429,7 +437,7 @@ def check_tweaks() -> None:
         golden(f'tweaks.{system}.{arch}.{"sif-cmd.txt" if system in NT5_BASE else "xml"}', data)
         text = data.decode()
         for tweak, where in TWEAKS.items():
-            if tweak == 'theme=basic' or tweak.startswith('display='):
+            if tweak == 'theme=basic' or tweak.startswith(('display=', 'display_bpp=')):
                 continue
             present = any(m in text for m in MARKERS[tweak])
             check(f'all tweaks: {tweak} {"on" if system in where else "absent"} on {system}', present == (system in where))
@@ -459,7 +467,8 @@ def main() -> int:
     if SH is None:
         print('sh not found')
         return 1
-    build = subprocess.run([str(ZIG), 'build', '--cache-dir', str(ROOT / 'tools' / 'cache' / 'zig'), 'answer-tool'], cwd=ROOT)
+    build = subprocess.run([str(ZIG), 'build', '--cache-dir', str(ROOT / 'tools' / 'cache' / 'zig'),
+                            '--global-cache-dir', str(ROOT/'tools/cache/zig-global'), 'answer-tool'], cwd=ROOT)
     if build.returncode != 0:
         print('FAIL zig build answer-tool')
         return 1

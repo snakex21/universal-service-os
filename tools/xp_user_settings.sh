@@ -67,7 +67,7 @@ usos_xp_settings_load() {
             key = tolower(trim(substr(line, 1, eq - 1)))
             value = trim(substr(line, eq + 1))
             if (value ~ /^".*"$/ && length(value) >= 2) value = substr(value, 2, length(value) - 2)
-            if (key !~ /^(user|user2|computer|org|key|timezone|password)$/ && !(profile != "" && key ~ /^(family|locale|input_locale|language_group|tweaks|display|workgroup|reg|run)$/)) { bad("unknown key on line " NR); next }
+            if (key !~ /^(user|user2|computer|org|key|timezone|password)$/ && !(profile != "" && key ~ /^(family|locale|input_locale|language_group|tweaks|display|display_bpp|workgroup|reg|run)$/)) { bad("unknown key on line " NR); next }
             # Typed options (src/flow/answer/options.zig): repeated reg= / run=.
             if (key == "reg") {
                 # ROOT\Key|Name|type|data (usos-reg set line); printable ASCII
@@ -123,7 +123,9 @@ usos_xp_settings_load() {
                 n = split(tweaks, parts, ",")
                 for (i = 1; i <= n; i++) if (parts[i] !~ /^(games|msn_explorer|messenger|outlook_express|classic_start|classic_theme|balloons|tour|extensions|hidden|autorun)$/) bad("tweaks= has an unknown tweak")
                 display = tolower(values["display"])
-                if (display != "" && display !~ /^(1024x768|1280x1024|1920x1080)$/) bad("display= must be 1024x768, 1280x1024 or 1920x1080")
+                if (display != "" && display !~ /^(1024x768|1280x1024|1920x1080)$/ && !(family=="2000" && display=="auto")) bad("display= must be 1024x768, 1280x1024 or 1920x1080 (2000 also accepts auto)")
+                display_bpp = tolower(values["display_bpp"])
+                if (display_bpp != "" && (family!="2000" || display_bpp !~ /^(auto|16|32)$/)) bad("display_bpp= is only supported for Windows 2000: auto, 16 or 32")
                 workgroup = values["workgroup"]
                 if (workgroup != "" && (length(workgroup) > 15 || workgroup !~ /^[A-Za-z0-9-]+$/ || workgroup ~ /^[0-9]+$/)) bad("workgroup= must be 1-15 characters A-Z a-z 0-9 -, not only digits")
             }
@@ -132,6 +134,7 @@ usos_xp_settings_load() {
             if (profile != "") printf "family=%s\nlocale=%s\ninput_locale=%s\nlanguage_group=%s\n", family, locale, input, group
             if (profile != "" && tweaks != "") printf "tweaks=%s\n", tweaks
             if (profile != "" && display != "") printf "display=%s\n", display
+            if (profile != "" && display_bpp != "") printf "display_bpp=%s\n", display_bpp
             if (profile != "" && workgroup != "") printf "workgroup=%s\n", workgroup
             for (i = 1; i <= nrun; i++) printf "run=%s\n", runs[i]
             for (i = 1; i <= nreg; i++) printf "reg=%s\n", regs[i]
@@ -223,7 +226,7 @@ usos_xp_settings_sif() {
                 if (t["classic_start"]) print "DefaultStartPanelOff=Yes"
                 if (t["classic_theme"]) print "DefaultThemesOff=Yes"
             }
-            if (v["display"] != "") {
+            if (v["display"] != "" && v["family"] != "2000") {
                 x = index(v["display"], "x")
                 print "[Display]"
                 print "BitsPerPel=32"

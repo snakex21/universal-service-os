@@ -456,6 +456,7 @@ pub const Key = enum(u16) {
     profile_field_disable_uac,
     profile_field_disable_wer,
     profile_field_display,
+    profile_field_display_bpp,
     profile_field_edition,
     profile_field_end_task,
     profile_field_firewall_off,
@@ -537,6 +538,7 @@ pub const Key = enum(u16) {
     profile_help_disable_uac,
     profile_help_disable_wer,
     profile_help_display,
+    profile_help_display_legacy,
     profile_help_edition,
     profile_help_end_task,
     profile_help_firewall_off,
@@ -1266,6 +1268,7 @@ pub const hashes = [_]u32{
     0x67b0880e, // profile.field.disable_uac
     0x8015202b, // profile.field.disable_wer
     0xe8e3e9d4, // profile.field.display
+    0x724f2711, // profile.field.display_bpp
     0x9c409bd4, // profile.field.edition
     0x90ff1671, // profile.field.end_task
     0xc81dad84, // profile.field.firewall_off
@@ -1347,6 +1350,7 @@ pub const hashes = [_]u32{
     0x8b080fad, // profile.help.disable_uac
     0xa0ced3e4, // profile.help.disable_wer
     0xdfc03dcf, // profile.help.display
+    0x2158e6ff, // profile.help.display_legacy
     0xbe0d347f, // profile.help.edition
     0xbd1a9960, // profile.help.end_task
     0x179d8dad, // profile.help.firewall_off
@@ -2428,6 +2432,8 @@ pub const bios = [_]bool{
     false,
     false,
     false,
+    false,
+    false,
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
@@ -2888,6 +2894,7 @@ pub const english = [_][]const u8{
     "Turn off UAC",
     "Turn off error reporting",
     "Screen resolution",
+    "Color depth",
     "Edition",
     "End task in the taskbar menu",
     "Turn off the firewall",
@@ -2969,6 +2976,7 @@ pub const english = [_][]const u8{
     "Vista and 7: User Account Control off. Less safe: every program of an administrator runs with full rights.",
     "Vista and newer: Windows Error Reporting stays off (no problem reports are sent).",
     "XP and Server 2003: 32-bit colour at this resolution when the display driver offers it. Automatic: unchanged; without a display driver (the VGA driver, e.g. through CSMWrap) Windows keeps its basic mode.",
+    "Applied after installation on the real hardware. Automatic chooses up to 1920x1080; unavailable modes fall back safely. Unchanged preserves the current installation defaults. Color depth: automatic prefers 32-bit where available, otherwise 16-bit.",
     "Edition Setup installs, matched against the images of the chosen ISO (also across languages; Server: Core or Desktop Experience). Empty or not on the ISO: Setup shows its edition list.",
     "Right-clicking a taskbar button offers End task (for every new user).",
     "Windows Firewall is off for every network type. Only for computers behind another firewall or for tests.",

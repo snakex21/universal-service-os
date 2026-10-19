@@ -93,7 +93,7 @@ class Flow(unittest.TestCase):
     def test_usosnt3_registers_usosvbe(self):
         src = USOSNT3.read_text(encoding='utf-8')
         post = function_body(src, 'post')
-        self.assertTrue(post.rstrip().endswith('write_file("DRIVERS.TXT", g_text);\n    vesa();'))
+        self.assertTrue(post.rstrip().endswith('write_file("DRIVERS.TXT", g_text);\n    vesa();\n    display_profile();'))
         body = function_body(src, 'vesa')
         self.assertLess(src.index('static void vesa(void)\n{'), src.index('static void WINAPI handler(DWORD control)'))
         for want in ('static const WCHAR drivers[] = L"framebuf\\0";',
