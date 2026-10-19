@@ -393,12 +393,20 @@ class MeBridge(unittest.TestCase):
                                'system.ini,386Enh,"mouse=*",'])
         batch = self.echo_output(me, 'C:\\WIN9X\\MSBATCH.INF')
         self.assertEqual(batch[0], 'system.ini,boot,drivers,,usoskey.drv')        # still in [USOS.Csm]
+        # (echo_output ignores the IF lines: the two USOSUsb / USOSUC lines are
+        # only written with U9UDS=1, usb-storage-experimental.txt, checked below)
         self.assertEqual(batch[1:], [
             '[USOS.CsmReg]',
             'HKLM,%USOSRO%,USOSMouse,,"%USOSMC%"',
+            'HKLM,%USOSRO%,USOSUsb,,"%USOSUC%"',
             '[Strings]',
             'USOSRO="Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce"',
-            'USOSMC="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\USOS9X\\USOSMOUS.INF"'])
+            'USOSMC="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\\USOS9X\\USOSMOUS.INF"',
+            'USOSUC="regedit /s C:\\USOS9X\\USOSUSB.REG"'])
+        lines = me.splitlines()
+        for want in ('ECHO HKLM,%%USOSRO%%,USOSUsb,', 'ECHO USOSUC='):
+            i = next(n for n, l in enumerate(lines) if l.startswith(want))
+            self.assertEqual(lines[i - 1].split(' GOTO ')[0], 'IF NOT "%U9UDS%"=="1"', want)
         # [Install] AddReg names USOS.CsmReg, [USOS.Csm] is the last section.
         msbatch = (ROOT / 'src/flow/answer/msbatch.zig').read_text(encoding='utf-8')
         self.assertIn('AddReg=USOS.RunOnce,USOS.CsmReg', msbatch)
