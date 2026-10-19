@@ -11,7 +11,7 @@ Contents (as on the XP CSMWrap ESP):
   \\EFI\\BOOT\\csmwrap.ini      first file, cluster 2 (the Core patches
                                 "verbose = false" to "verbose = true " when
                                 EFI\\USOS\\csmwrap-verbose.flag is on the stick)
-  \\EFI\\BOOT\\BOOTX64.EFI      CSMWrap 3.1.2-usos15, pinned hash
+  \\EFI\\BOOT\\BOOTX64.EFI      CSMWrap 3.1.2-usos16, pinned hash
   \\CSMWRAP\\...                licences, SOURCES.txt, source archive,
                                 patches\\, licenses\\ (LGPL obligations)
 
@@ -23,7 +23,7 @@ from pathlib import Path
 import argparse, hashlib, json, struct, sys
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST = ROOT / 'tools/vendor/csmwrap/3.1.2-usos15/manifest.json'
+MANIFEST = ROOT / 'tools/vendor/csmwrap/3.1.2-usos16/manifest.json'
 TOTAL_SECTORS = 131072            # 64 MiB, the XP ESP size
 TAIL_SECTORS = 133120             # USOS_XP_ESP_TAIL_SECTORS
 SPC = 4                           # 2 KiB clusters

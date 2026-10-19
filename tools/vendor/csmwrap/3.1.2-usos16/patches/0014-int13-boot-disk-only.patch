@@ -1,0 +1,171 @@
+USOS 3.1.2-usos11-int13x patch 0014 (2026-10-18): csmwrap.ini int13_boot_disk_only
+
+Windows Me on the ASRock X470 boots from the Micron NVMe (CSMWrap SeaBIOS
+INT 13h, then usosnvme.mpd). Alone it runs; with a FAT32 USB stick plugged
+in before boot (SeaBIOS: NVMe 0x80, stick 0x81) real-mode IO.SYS starts
+from C: on the NVMe, then Windows stops with "cannot find KRNL386.EXE"
+after IOS switched C: to protected mode. Experimental mitigation: with
+int13_boot_disk_only = true in csmwrap.ini, CSMWrap tags its boot disk with
+IBV1 = "USOX" instead of "USOS" (patch 0005, same IBV2 hash) and SeaBIOS,
+after moving that one disk to 0x80, removes every other hard disk from its
+boot list before the drives are mapped. INT 13h then has exactly one hard
+disk, as in the configuration that works. No match or several matches:
+nothing is removed (patch 0005 behaviour). Floppy, CD and USB keyboard/mouse
+are unchanged. Without the ini key the binary behaves as 3.1.2-usos11.
+
+Own code. Applies after 0001-0010 and 0012 (3.1.2-usos11), patch -p1 from
+the top of the tree. Part of a MODIFIED CSMWrap made by the USOS project
+(LGPL-2.1 / SeaBIOS LGPLv3).
+
+diff -ruN a/seabios/src/boot.c b/seabios/src/boot.c
+--- a/seabios/src/boot.c
++++ b/seabios/src/boot.c
+@@ -846,7 +846,8 @@
+ usos_boot_disk_first(void)
+ {
+     u32 want;
+-    if (!CONFIG_CSM || !csm_bootdisk_hash(&want))
++    int only = 0;
++    if (!CONFIG_CSM || !csm_bootdisk_hash(&want, &only))
+         return;
+     u8 *buf = memalign_tmplow(512, 4096);
+     if (!buf) {
+@@ -880,14 +881,30 @@
+         }
+     }
+     free(buf);
+-    if (matches != 1 || match == first) {
++    if (matches != 1) {
+         dprintf(1, "USOS boot disk: %d match(es), order unchanged\n", matches);
+         return;
+     }
+-    dprintf(1, "USOS boot disk: %s moved to 0x80\n", match->description);
+-    hlist_del(&match->node);
+-    hlist_add_before(&match->node, &first->node);
+-    match->priority = first->priority;
++    if (match != first) {
++        dprintf(1, "USOS boot disk: %s moved to 0x80\n", match->description);
++        hlist_del(&match->node);
++        hlist_add_before(&match->node, &first->node);
++        match->priority = first->priority;
++    }
++    if (!only)
++        return;
++    // USOS patch 0014 (csmwrap.ini int13_boot_disk_only = true, Windows 9x
++    // on NVMe): the other hard disks (a USB stick, a second SSD) are not
++    // mapped, so INT 13h has exactly one hard disk, 0x80, as when the 9x
++    // disk is alone in the PC (docs/nvme-9x-2026-10-14.md, drive letters).
++    struct hlist_node *n;
++    hlist_for_each_entry_safe(pos, n, &BootList, node) {
++        if (pos->type != IPL_TYPE_HARDDISK || pos == match)
++            continue;
++        dprintf(1, "USOS boot disk only: %s not mapped\n", pos->description);
++        hlist_del(&pos->node);
++        free(pos);
++    }
+ }
+ 
+ // Prepare for boot - show menu and run bcvs.
+diff -ruN a/seabios/src/fw/csm.c b/seabios/src/fw/csm.c
+--- a/seabios/src/fw/csm.c
++++ b/seabios/src/fw/csm.c
+@@ -456,7 +456,9 @@
+ // from with IBV1 = "USOS" and IBV2 = FNV-1a of that disk's first 512 bytes,
+ // so boot.c can put exactly that disk first (0x80) when several disks share
+ // its controller.
+-int csm_bootdisk_hash(u32 *hash)
++// USOS patch 0014: IBV1 = "USOX" is the same tag with csmwrap.ini
++// int13_boot_disk_only = true: no other hard disk gets a BIOS drive number.
++int csm_bootdisk_hash(u32 *hash, int *only)
+ {
+     if (!csm_boot_table)
+         return 0;
+@@ -464,8 +466,10 @@
+     int i;
+ 
+     for (i = 0; i < csm_boot_table->NumberBbsEntries; i++) {
+-        if (bbs[i].IBV1 == CSM_USOS_BOOTDISK_TAG) {
++        if (bbs[i].IBV1 == CSM_USOS_BOOTDISK_TAG
++            || bbs[i].IBV1 == CSM_USOS_BOOTDISK_ONLY_TAG) {
+             *hash = bbs[i].IBV2;
++            *only = bbs[i].IBV1 == CSM_USOS_BOOTDISK_ONLY_TAG;
+             return 1;
+         }
+     }
+diff -ruN a/seabios/src/util.h b/seabios/src/util.h
+--- a/seabios/src/util.h
++++ b/seabios/src/util.h
+@@ -136,7 +136,8 @@
+ int csm_bootprio_pci(struct pci_device *pci);
+ int csm_bootprio_usb(struct pci_device *pci);
+ #define CSM_USOS_BOOTDISK_TAG 0x534f5355 // "USOS"
+-int csm_bootdisk_hash(u32 *hash);
++#define CSM_USOS_BOOTDISK_ONLY_TAG 0x584f5355 // "USOX" (patch 0014)
++int csm_bootdisk_hash(u32 *hash, int *only);
+ int csm_quiet(void);
+ 
+ // fw/mptable.c
+diff -ruN a/src/bootdev.c b/src/bootdev.c
+--- a/src/bootdev.c
++++ b/src/bootdev.c
+@@ -1,6 +1,7 @@
+ #include <efi.h>
+ #include <csmwrap.h>
+ #include <bootdev.h>
++#include <config.h>
+ #include <printf.h>
+ 
+ /*
+@@ -355,7 +356,8 @@
+                                 (void **)&raw_path) == EFI_SUCCESS &&
+             device_path_is_prefix(raw_path, boot_path) &&
+             boot_disk_hash(block_io, &hash)) {
+-            low_stub->bbs_entries[idx].IBV1 = USOS_BOOTDISK_TAG;
++            low_stub->bbs_entries[idx].IBV1 = gConfig.int13_boot_disk_only
++                ? USOS_BOOTDISK_ONLY_TAG : USOS_BOOTDISK_TAG;
+             low_stub->bbs_entries[idx].IBV2 = hash;
+             boot_disk_tagged = true;
+             printf("bootdev: BBS[%zu] is the boot disk (sector 0 hash %08x)\n",
+diff -ruN a/src/bootdev.h b/src/bootdev.h
+--- a/src/bootdev.h
++++ b/src/bootdev.h
+@@ -17,6 +17,8 @@
+ /* USOS patch 0005: BBS IBV1 of the boot disk's entry; IBV2 = FNV-1a of its
+  * first 512 bytes (SeaBIOS csm_bootdisk_hash / usos_boot_disk_first) */
+ #define USOS_BOOTDISK_TAG 0x534f5355u /* "USOS" */
++/* USOS patch 0014: the same tag, and the other hard disks get no BIOS number */
++#define USOS_BOOTDISK_ONLY_TAG 0x584f5355u /* "USOX" */
+ 
+ /* Boot device information extracted from device path */
+ struct boot_device_info {
+diff -ruN a/src/config.c b/src/config.c
+--- a/src/config.c
++++ b/src/config.c
+@@ -366,6 +366,15 @@
+         } else {
+             printf("  warning: invalid value for 'acpi_legacy_fadt': %s\n", val);
+         }
++    } else if (streq_nocase(key, "int13_boot_disk_only")) {
++        /* USOS patch 0014 */
++        bool v;
++        if (parse_bool(val, &v)) {
++            gConfig.int13_boot_disk_only = v;
++            printf("  int13_boot_disk_only = %s\n", v ? "true" : "false");
++        } else {
++            printf("  warning: invalid value for 'int13_boot_disk_only': %s\n", val);
++        }
+     } else if (streq_nocase(key, "vga")) {
+         uint8_t b, d, f;
+         if (parse_pci_address(val, &b, &d, &f)) {
+diff -ruN a/src/config.h b/src/config.h
+--- a/src/config.h
++++ b/src/config.h
+@@ -23,6 +23,8 @@
+     bool verbose;
+     /* USOS patch 0006: RSDT FACP -> ACPI 1.0 FADT copy (Windows 2000 flow) */
+     bool acpi_legacy_fadt;
++    /* USOS patch 0014: only the boot disk is a BIOS hard disk (Windows 9x on NVMe) */
++    bool int13_boot_disk_only;
+     bool vga_specified;
+     uint8_t vga_bus;
+     uint8_t vga_device;

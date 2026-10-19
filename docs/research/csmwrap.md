@@ -1004,3 +1004,92 @@ Tests:
   API 574Dh, sums -3 / +2), `run_csmwrap_pciirq_qemu.py --machine pc` PASS.
 
 X470 with usos15: not tried when this was written. No Windows 9x VM run was made with usos15 either.
+
+## 22. 3.1.2-usos16: USB disk service on channel 1 of the helper core (0021) (2026-10-19)
+
+3.1.2-usos16 is 3.1.2-usos15 (0001-0010, 0012, 0014-0020, byte for byte) plus 0021. It is the new
+release pin: xp_csmwrap_esp.sh `PINNED`, release.go, lock.json, run_build_vm.py,
+third-party.json.
+
+Why: Windows 95/98/98 SE/Me on the X470 have no xHCI driver, and SeaBIOS is the only xHCI owner.
+0021 lets the 9x miniport USOSUSB.MPD (tools/nt/usosusb9x) send SCSI commands to a USB stick that
+has no BIOS drive number (`int13_boot_disk_only`, 0014). It does this without a second xHCI owner.
+Design and stage plan: docs/usb9x-hotswap-design-2026-10-19.md (sections 1 (A), 3, 7).
+
+**0021** (own code, LGPLv3):
+
+- **Mailbox and helper loop:**
+  - The `CSMPPrxy` mailbox becomes 64-byte aligned. Channel 1 sits at +48: `UDS1`, req_phys,
+    doorbell, done.
+  - Offsets 0-47 and CSMWrap's 48-byte copy of the struct are unchanged.
+  - The helper loop serves channel 0 first. It then calls `usos_uds_service(mailbox + 48)` when
+    doorbell != done, testing this both before and after MONITOR, because the doorbell shares
+    the monitored line.
+- **Request handling (hw/usb-uds.c):**
+  - The request block is copied once from the OS's physical address, then validated. The check
+    is the same code as `uds_req_check()` in src/platform/bios/win9x/usosuds_slot.c.
+  - Ops: ENUM, SCSI (any CDB and direction, automatic REQUEST SENSE), RESET (BOT reset recovery),
+    EJECT, STATUS.
+  - Only the results are written back.
+  - A device with a BIOS hard-disk or CD-ROM number is refused (OWNED).
+- **Device table (usb-msc.c):**
+  - xHCI BOT devices are registered at setup, up to 8.
+  - The control pipe is kept rather than put on the free list, for the reset recovery. On xHCI
+    the free list never released the slot.
+  - `usbdrive_s` moves to usb-msc.h and gets a table index.
+  - VID:PID, the INQUIRY strings and READ CAPACITY(10) are read on the helper core at the first
+    request. POST sends nothing new.
+- **Transport (usb-xhci.c):**
+  - Bulk TDs go to physical buffers. A buffer that crosses a 64 KiB boundary becomes two chained
+    TRBs with ISP.
+  - On every wait pass the code checks:
+    - the capability dword equals its POST value and is not all ones;
+    - USBSTS has neither HCH nor HSE set;
+    - the root port still has CCS.
+  - An unplug therefore ends the request at once (GONE), followed by Disable Slot.
+  - Endpoint recovery: Reset Endpoint, Stop Endpoint, Set TR Dequeue Pointer.
+  - No PCI configuration access from the helper core.
+- **USOSUDSK record** (VARLOW, version 1, 768 bytes, written only):
+  - per device: state, counters, last CDB / CSW / sense / status;
+  - the BIOS disk table;
+  - a ring of the last 16 events.
+  - Decoded by USOSDBG 1.7 `DISK`.
+
+Layout from the build log:
+
+| | usos16 | usos15 |
+|---|---|---|
+| **ROM used** | **126656 of 131072 bytes (96.6 %)** | 120576 |
+| **ROM free** | **4416** | 10496 |
+| 16-bit | 36704 | |
+| 32-bit segmented | 4118 | |
+| 32-bit flat | 33386 | 28522 |
+| flat init | 41984 | |
+| low memory | 3472 | 2704 |
+| F-segment variables | 3744 | 3328 |
+
+Stage 2 needs the fallback from the design: drop MEGASAS / SDCARD.
+
+Binary `5d73385e797697b3207c95632da1307fe9d86a1f61e4fb4c57539cc9a39cbbb4`, from one pinned Alpine VM
+run; the in-guest repeat build gave the same binary. The unpatched build still matches
+`upstream_rebuild`.
+
+Tests:
+
+- `test_csmwrap_uds16.py` (host):
+  - series and manifest;
+  - the LGPL and GPL request checks are textually equal and give the same verdicts on 40000
+    requests;
+  - both headers give the same layout;
+  - wiring, and no POST traffic;
+  - pins.
+  - The usos15 tests PASS with the pins moved.
+- QEMU with usos16 (2026-10-19), all PASS:
+  - `run_csmwrap_uds_qemu.py` `free` and `owned` (unplug -> GONE in about 0.01 s);
+  - `run_csmwrap_boot_disk_qemu.py` (7 layouts, with and without `--only`);
+  - `run_csmwrap_apmoff_qemu.py`;
+  - `run_csmwrap_pciirq_qemu.py`;
+  - `run_csmwrap_nvme_rearm_qemu.py`.
+- Not rerun: the DOS mouse probe. No QEMU test covers the V86 channel 0 proxy.
+
+X470 with usos16: not tried. No Windows 9x VM run either.

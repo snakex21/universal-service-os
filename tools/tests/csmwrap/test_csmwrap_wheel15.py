@@ -12,8 +12,8 @@ without the knock, ring of the last INT 15h C2xxh calls in USOSMWHL).
    and its wrap.
 2. Wiring: handle_15c2 records every call after its switch with AX/BX
    taken before it; the ring is only written; usb-hid.h declares it.
-3. Series and pins: usos15 = usos14 byte for byte + 0020; manifest,
-   lock.json, xp_csmwrap_esp.sh PINNED, release.go, run_build_vm.py count.
+3. Series: usos15 = usos14 byte for byte + 0020; manifest; the release
+   pins are usos16 now (same 0001-0020 files, test_csmwrap_uds16.py).
 """
 from __future__ import annotations
 
@@ -215,19 +215,13 @@ def pins() -> None:
     assert manifest["patches"] == {n: sha(V15 / "patches" / n) for n in names}
     for name, digest in manifest["files"].items():
         assert sha(V15 / name) == digest, name
-    lock = json.loads((ROOT / "tools/csmwrap_build/lock.json").read_text(encoding="utf-8"))
-    assert lock["usos_version"] == "3.1.2-usos15"
-    assert f"PINNED={manifest['files']['csmwrapx64.efi']}\n" in (ROOT / "tools/xp_csmwrap_esp.sh").read_text(encoding="utf-8")
-    assert 'csmwrapVendorDir  = "tools/vendor/csmwrap/3.1.2-usos15"' in (
-        ROOT / "installer/cmd/usos-efisign/release.go").read_text(encoding="utf-8")
-    vm = (ROOT / "tools/csmwrap_build/run_build_vm.py").read_text(encoding="utf-8")
-    assert "3.1.2-usos15/patches" in vm and "len(patches) != 18" in vm
+    # the release pins moved to 3.1.2-usos16 (same 0001-0020 files, test_csmwrap_uds16.py)
     efi = (V15 / "csmwrapx64.efi").read_bytes()
     assert efi[:2] == b"MZ" and b"3.1.2-usos15" in efi and b"pci_irq_routing" in efi
     tp = json.loads((ROOT / "tools/release/third-party.json").read_text(encoding="utf-8"))
     cw = [c for c in tp["components"] if c.get("id") == "csmwrap"] if isinstance(tp, dict) and "components" in tp else []
     if cw:
-        assert cw[0]["version"] == "3.1.2-usos15"
+        assert cw[0]["version"] in ("3.1.2-usos15", "3.1.2-usos16")
 
 
 def main() -> int:
