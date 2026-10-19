@@ -79,7 +79,7 @@ class Layout(unittest.TestCase):
 class Sources(unittest.TestCase):
     def test_usosdbg_log_mode(self):
         dbg = (SRC / 'usosdbg.c').read_text(encoding='utf-8')
-        self.assertIn('USOSDBG 1.6', dbg)
+        self.assertIn('USOSDBG 1.7', dbg)
         self.assertIn('USOSDBG END', dbg)
         self.assertIn('if (!log_mode || log_pci) show_pci();', dbg)
         # the knock (C202h rate commands) only from the W key, never in log mode

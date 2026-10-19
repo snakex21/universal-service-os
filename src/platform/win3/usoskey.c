@@ -543,21 +543,16 @@ static int query_bridge(void)
     return shared->magic[0] == 'U' && shared->magic[1] == 'S' && shared->magic[2] == 'K' && shared->magic[3] == 'Y';
 }
 
-/* C:\USOS9X\USOSVMD.ON (read only): USOSVMD.VXD is deployed, so the DOS-box
- * mouse comes from the VxD (which drains the ring at ring 0 and feeds
- * VMOUSE). The Me DOS-box pause must then stay off, or it would stop the
- * ring while a DOS box is open and starve the VxD. Without the flag the
- * pause is the fallback, unchanged. Checked once. */
-static BYTE vmd_on, vmd_on_checked;
-
+/* VMOUSE mode (USOSVMD.VXD v2): USOSMOUS.DRV's USOSVMDMODE answers 1 when
+ * the BIOS calls go to the VxD's global V86 callback instead of the copy's
+ * mcb; then no BIOS far call can land in the system VM's memory while a
+ * DOS VM is current, and the Me DOS-box pause must stay off (it would stop
+ * the mouse the VxD feeds to VMOUSE for the DOS box). Any other answer, or
+ * an older USOSMOUS.DRV: the pause is the fallback, unchanged. Task time. */
 static int usosvmd_on(void)
 {
-    OFSTRUCT of;
-    if (!vmd_on_checked) {
-        vmd_on_checked = 1;
-        vmd_on = OpenFile("C:\\USOS9X\\USOSVMD.ON", &of, OF_EXIST) != HFILE_ERROR;
-    }
-    return vmd_on;
+    FARPROC mode = mouse_export("USOSVMDMODE");
+    return mode && ((WORD (FAR PASCAL *)(void))mode)() != 0;
 }
 
 /* Me: the bridge copy came from here, after USER enabled the mouse driver.

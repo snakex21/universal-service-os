@@ -124,9 +124,11 @@ class UsosMouse(unittest.TestCase):
             i += n + 3
         # Module name MOUSE (USER imports the mouse driver by it), DDK
         # ordinals; USOSATTACH and USOSPAUSE (Me, called by USOSKEY.DRV by
-        # name) after them, USOSWHEELINFO (USOSDBG.EXE, read only) last.
+        # name) after them, USOSWHEELINFO (USOSDBG.EXE, read only), then
+        # USOSVMDMODE (USOSKEY.DRV) and USOSVMDINFO (USOSDBG.EXE).
         self.assertEqual(names, {'MOUSE': 0, 'INQUIRE': 1, 'ENABLE': 2, 'DISABLE': 3, 'MOUSEGETINTVECT': 4, 'WEP': 5,
-                                 'USOSATTACH': 6, 'USOSPAUSE': 7, 'USOSWHEELINFO': 8})
+                                 'USOSATTACH': 6, 'USOSPAUSE': 7, 'USOSWHEELINFO': 8,
+                                 'USOSVMDMODE': 9, 'USOSVMDINFO': 10})
 
     def test_mouse_driver_imports_kernel_only(self):
         # KERNEL loads mouse.drv right after keyboard.drv, before DISPLAY, GDI
