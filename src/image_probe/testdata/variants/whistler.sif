@@ -1,0 +1,10 @@
+; Synthetic source metadata
+[Version]
+DriverVer=07/01/2001,5.1.2542.0
+[SetupData]
+MajorVersion=5
+MinorVersion=1
+ProductType=0
+Architecture=i386
+[nls]
+DefaultLayout=00000409

@@ -41,6 +41,9 @@ pub const Nt5System = enum {
     /// XP Tablet PC Edition 2005: the XP action and profile; the micro-Linux
     /// takes the Tablet PC DATA folder (usos.xp_edition=tablet).
     windows_xp_tablet,
+    windows_whistler,
+    windows_neptune,
+    windows_2000_beta,
 
     pub fn fromId(system_id: []const u8) ?Nt5System {
         if (std.mem.eql(u8, system_id, "windows-xp")) return .windows_xp;
@@ -50,13 +53,16 @@ pub const Nt5System = enum {
         if (std.mem.eql(u8, system_id, "windows-xp-x64")) return .windows_xp_x64;
         if (std.mem.eql(u8, system_id, "windows-xp-mce")) return .windows_xp_mce;
         if (std.mem.eql(u8, system_id, "windows-xp-tablet")) return .windows_xp_tablet;
+        if (std.mem.eql(u8, system_id, "windows-whistler")) return .windows_whistler;
+        if (std.mem.eql(u8, system_id, "windows-neptune")) return .windows_neptune;
+        if (std.mem.eql(u8, system_id, "windows-2000-beta")) return .windows_2000_beta;
         return null;
     }
 
     pub fn action(self: Nt5System) []const u8 {
         return switch (self) {
-            .windows_xp, .windows_xp_mce, .windows_xp_tablet => "xp-staging",
-            .windows_2000, .windows_2000_server => "windows2000-staging",
+            .windows_xp, .windows_xp_mce, .windows_xp_tablet, .windows_whistler => "xp-staging",
+            .windows_2000, .windows_2000_server, .windows_neptune, .windows_2000_beta => "windows2000-staging",
             .windows_server_2003 => "windows2003-staging",
             .windows_xp_x64 => "xp64-staging",
         };
@@ -64,8 +70,8 @@ pub const Nt5System = enum {
 
     pub fn planProfile(self: Nt5System) []const u8 {
         return switch (self) {
-            .windows_xp, .windows_xp_mce, .windows_xp_tablet => "xp-x86-sp3-uefi-csm",
-            .windows_2000, .windows_2000_server => "w2k-x86-sp4-uefi-csm",
+            .windows_xp, .windows_xp_mce, .windows_xp_tablet, .windows_whistler => "xp-x86-sp3-uefi-csm",
+            .windows_2000, .windows_2000_server, .windows_neptune, .windows_2000_beta => "w2k-x86-sp4-uefi-csm",
             .windows_server_2003 => "w2k3-x86-sp2-uefi-csm",
             .windows_xp_x64 => "xp-x64-sp2-uefi-csm",
         };
@@ -77,6 +83,9 @@ pub const Nt5System = enum {
             .windows_2000_server => " usos.w2k_edition=server",
             .windows_xp_mce => " usos.xp_edition=mce",
             .windows_xp_tablet => " usos.xp_edition=tablet",
+            .windows_whistler => " usos.nt5_variant=whistler",
+            .windows_neptune => " usos.nt5_variant=neptune",
+            .windows_2000_beta => " usos.nt5_variant=w2k-beta",
             else => "",
         };
     }
@@ -112,6 +121,7 @@ pub fn formatCommand(buffer: []u8, parts: CommandParts) ![]const u8 {
 /// a .sif (usos.legacy_unattended_hex=) or the manual installation
 /// (usos.xp_settings=off: the staging ignores usos-xp.ini).
 pub fn start(root: *uefi.protocol.File, system_id: []const u8, name: []const u8, answer: answer_screen.Choice, progress: *const fn (Stage) void) !void {
+    try usos.catalog.preparation_block.requireSupported(system_id);
     const system = Nt5System.fromId(system_id) orelse return error.UnsupportedNt5System;
     var answer_buffer: [300]u8 = undefined;
     const answer_option = try answer_screen.xpAnswerOption(&answer_buffer, answer.path);

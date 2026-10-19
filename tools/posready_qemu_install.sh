@@ -31,13 +31,18 @@ POSR_VM_DISK_MAX=${POSR_VM_DISK_MAX:-35433480192}
 POSR_VM_LIVE_EVERY=${POSR_VM_LIVE_EVERY:-300}
 
 posready_vm_args() {
+    beta_rtc=base=localtime
+    if [ -n "${USOS_BETA_CLOCK:-}" ]; then
+        . "${USOS_LIB_DIR:-/usr/lib/usos}/beta_clock.sh" || return 1
+        beta_rtc=$(usos_beta_clock_rtc "$USOS_BETA_CLOCK" "${USOS_BETA_SYSTEM:-}" "${USOS_BETA_BUILD:-0}") || return 1
+    fi
     case "$2" in kvm) accel='kvm' ;; *) accel='tcg,tb-size=256' ;; esac
     bytes=$(blockdev --getsize64 "$1" 2>/dev/null || echo "$POSR_VM_DISK_MAX")
     [ "$bytes" -le "$POSR_VM_DISK_MAX" ] || bytes=$POSR_VM_DISK_MAX
     bytes=$((bytes / 512 * 512))
     printf '%s\n' -name usos-posready-install -nodefaults -L "$W9X_VM_DATADIR" \
         -machine pc -accel "$accel" -cpu "${POSR_VM_CPU:-pentium3}" -smp 1 -m "$POSR_VM_MB" \
-        -rtc base=localtime -vga std -display none -nic none -no-reboot \
+        -rtc "$beta_rtc" -vga std -display none -nic none -no-reboot \
         -drive "file=$1,format=raw,size=$bytes,if=ide,index=0,media=disk,cache=none,file.locking=off" \
         -boot order=c \
         -serial "file:$W9X_VM_RUN/serial.log" \

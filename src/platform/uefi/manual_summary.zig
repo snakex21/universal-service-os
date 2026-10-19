@@ -40,6 +40,7 @@ pub fn show(
     firmware: usos.firmware.Firmware,
 ) void {
     const unattended = answer.path;
+    if (usos.catalog.preparation_block.reason(system.id)) |reason| return showPreparationBlocked(system, reason);
     if (!system.firmware.accepts(firmware)) return showFirmwareUnavailable();
     if (manual_images.blockReason(system, image)) |reason| return showMediaBlocked(image.name.slice(), reason);
     const backend = usos.flow.preparation_capability.resolveForFirmware(system, image.kind, method, firmware) orelse return showUnsupported();
@@ -344,6 +345,7 @@ fn start(
     firmware: usos.firmware.Firmware,
 ) void {
     const unattended = answer.path;
+    if (usos.catalog.preparation_block.reason(system.id)) |reason| return showPreparationBlocked(system, reason);
     if (!system.firmware.accepts(firmware)) return showFirmwareUnavailable();
     // Windows 95 without a 95 key (profile or none): ask for it now, while
     // the gamepads still work (the on-screen keyboard). Phase 1 runs in the
@@ -669,6 +671,12 @@ fn showFirmwareUnavailable() void {
 fn showUnsupported() void {
     const lines = [_][]const u8{view.t(.error_unsupported_line1)};
     view.notice(view.t(.error_unsupported_title), .warning, .warning, "", &lines);
+    view.waitForDismiss();
+}
+
+fn showPreparationBlocked(system: *const usos.catalog.SystemEntry, reason: []const u8) void {
+    const lines = [_][]const u8{ view.tr(reason), view.t(.notice_backend_line2) };
+    view.notice(view.tr(system.name), .warning, .warning, view.t(.system_unavailable), &lines);
     view.waitForDismiss();
 }
 

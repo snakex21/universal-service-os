@@ -30,6 +30,7 @@ pub const entries = [_]SystemEntry{
     // the target like NT 4.0 (profile posready-x86-qemu-csmwrap,
     // docs/posready-2009-2026-10-10.md), then CSMWrap. Not in the BIOS Core.
     uefiLegacy("windows-embedded-posready-2009", "Windows Embedded POSReady 2009", "Windows Embedded POSReady 2009"),
+    uefiLegacy("windows-flp", "Windows Fundamentals for Legacy PCs", "Windows Fundamentals for Legacy PCs"),
 }) ++ [_]SystemEntry{
     // XP Professional x64 (NT 5.2 amd64): the NT5 staging with an AMD64
     // source (profile xp-x64-sp2-uefi-csm from UEFI, experimental).

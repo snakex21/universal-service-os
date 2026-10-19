@@ -40,6 +40,8 @@ pub const staged = [_]struct { system_id: []const u8, file: []const u8 }{
     // Terminal Server Edition: the Server answer (micro-Linux adds the
     // Server pages for the CD's ProductType 1).
     .{ .system_id = "windows-nt-4-tse", .file = "NT4T.SIF" },
+    .{ .system_id = "windows-nt-4-beta", .file = "NT4B.SIF" },
+    .{ .system_id = "windows-cairo", .file = "CAIRO.SIF" },
 };
 
 pub fn isNt4(system_id: []const u8) bool {

@@ -27,6 +27,20 @@ vista_csmwrap_value() {
     awk -F= -v key="$1" '{ sub(/\r$/, "") } $1 == key { sub(/^[^=]*=/, ""); print; found=1; exit } END { if (!found) exit 1 }' "$2"
 }
 
+# Resolve adjacent Unattended data from the ISO request, not a folder-name list.
+vista_request_directory() {
+    case "$2" in ''|*/*|*\\*|*..*) return 1 ;; esac
+    case "$1" in
+        "Systems/Windows/$2/Images/"*|"Systems/Betas/$2/Images/"*) ;;
+        *) return 1 ;;
+    esac
+    request_image=${1##*/}
+    case "$request_image" in ''|*\\*|*..*) return 1 ;; esac
+    request_parent=${1%/*}
+    case "$request_parent" in "Systems/Windows/$2/Images"|"Systems/Betas/$2/Images") ;; *) return 1 ;; esac
+    printf '%s\n' "${request_parent%/*}"
+}
+
 # First 8.1/10 trial only: scoped DATA opt-in. Older x86 paths are unchanged.
 # x64 hook: codex/nvme-vista-x64 adds vista_nvme64_enabled (profile
 # vista-x64-sp2-uefi-csmwrap, same flag file) next to this; keep both scoped
@@ -34,7 +48,7 @@ vista_csmwrap_value() {
 vista_modern_nvme_enabled() {
     [ "$1" = win-x86-uefi-csmwrap ] || return 1
     case "$3" in 'Windows 10'|'Windows 8.1'|'Windows Embedded 8.1 Industry') ;; *) return 1 ;; esac
-    [ -f "$2/Systems/Windows/$3/Unattended/nvme-experimental.txt" ]
+    [ -f "$2/${4:-Systems/Windows/$3}/Unattended/nvme-experimental.txt" ]
 }
 
 # External PE10 is accepted only for the same opted-in 8.1 experiment.
@@ -47,7 +61,7 @@ vista_modern_external_donor_enabled() {
 vista_testmode_watermark_visible() {
     [ "$1" = vista-x64-sp2-uefi-csmwrap ] || return 1
     case "$3" in 'Windows Vista'|'Windows Server 2008') ;; *) return 1 ;; esac
-    [ -f "$2/Systems/Windows/$3/Unattended/testmode-watermark-on.txt" ]
+    [ -f "$2/${4:-Systems/Windows/$3}/Unattended/testmode-watermark-on.txt" ]
 }
 
 usos_vista_csmwrap_prepare() {
@@ -84,6 +98,10 @@ usos_vista_csmwrap_prepare() {
     for value in "$iso" "$donor" "$folder" "$answer"; do
         case "$value" in *..*|/*) stop 'request.ini has an unsafe path' ;; esac
     done
+    source_directory=$(vista_request_directory "$iso" "$folder") || stop 'request.ini has an inconsistent ISO directory'
+    case "$folder" in
+        'Windows Embedded Standard 7') stop 'WES7 requires IBW and DS/Packages; Embedded Core-only installation is not supported' ;;
+    esac
     vista_csmwrap_log "REQUEST profile=$profile iso=$iso donor=$donor folder=$folder answer=${answer%%:*}"
     # "Windows Vista" or "Windows Server 2008": the heading of the UEFI page too.
     # x86: the DATA folder ("Windows 10", "Windows 8.1", ...).
@@ -104,7 +122,7 @@ usos_vista_csmwrap_prepare() {
     [ -f "/mnt/data/$iso" ] || stop "the Windows ISO is not on DATA: $iso"
     [ -f "/mnt/data/$donor" ] || stop "the PE10 donor is not on DATA: $donor"
     if [ "$profile" = win-x86-uefi-csmwrap ] && [ "$donor" != "$iso" ]; then
-        vista_modern_external_donor_enabled "$profile" /mnt/data "$folder" || stop 'request.ini: external x86 PE10 requires the opted-in Windows 8.1 NVMe experiment'
+        vista_modern_external_donor_enabled "$profile" /mnt/data "$folder" "$source_directory" || stop 'request.ini: external x86 PE10 requires the opted-in Windows 8.1 NVMe experiment'
     fi
 
     answer_xml=''
@@ -117,7 +135,7 @@ usos_vista_csmwrap_prepare() {
         file:*)
             name=${answer#file:}
             case "$name" in */*|'') stop 'request.ini has an unsafe answer file name' ;; esac
-            answer_xml="/mnt/data/Systems/Windows/$folder/Unattended/$name"
+            answer_xml="/mnt/data/$source_directory/Unattended/$name"
             [ -f "$answer_xml" ] || stop "the answer file is not on DATA: $name"
             ;;
         *) stop 'request.ini has an unknown answer kind' ;;
@@ -185,7 +203,7 @@ usos_vista_csmwrap_prepare() {
                     vista_csmwrap_log "NVME $folder x86: usosnvme in the WinPE and the installed system, WinPE lowmem"
                     pe_nvme=usosnvme ;;
                 win-x86-uefi-csmwrap)
-                    vista_modern_nvme_enabled "$profile" /mnt/data "$folder" || stop '32-bit Windows 8.1/10 on NVMe is not supported yet on this path. No disk was changed.'
+                    vista_modern_nvme_enabled "$profile" /mnt/data "$folder" "$source_directory" || stop '32-bit Windows 8.1/10 on NVMe is not supported yet on this path. No disk was changed.'
                     pe_nvme=usosnvme-modern
                     vista_csmwrap_log 'NVME x86 modern: experimental PE, installed system and WinRE path' ;;
             esac
@@ -232,7 +250,7 @@ usos_vista_csmwrap_prepare() {
     # stage-4 page stays up until the script ends.
     usos_ui_stage 4 5 'Preparing the disk' 'Copying the Windows PE helper and CSMWrap to the selected disk.' || true
     watermark_visible=0
-    if vista_testmode_watermark_visible "$profile" /mnt/data "$folder"; then watermark_visible=1; fi
+    if vista_testmode_watermark_visible "$profile" /mnt/data "$folder" "$source_directory"; then watermark_visible=1; fi
     if ! TARGET_DEVICE=$TARGET_DEVICE VISTA_DONOR_ISO="/mnt/data/$donor" VISTA_REQUEST_DIR=$VISTA_CSMWRAP_DIR VISTA_ANSWER_XML=$answer_xml X86_SELF=$x86_self USOS_PE_NVME=$pe_nvme VISTA_TESTMODE_WATERMARK_ON=$watermark_visible \
         sh /usr/lib/usos/vista_csmwrap_target.sh >> "$VISTA_CSMWRAP_DIR/prepare.log" 2>&1 < /dev/null; then
         rm -f /run/vista-answer.xml

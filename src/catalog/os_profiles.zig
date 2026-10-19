@@ -146,6 +146,22 @@ pub const traits_table = [_]SystemTraits{
     // Windows Home Server 2011 (UEFI only, windows_server.zig): the Windows 7
     // native start (PE10 donor, Setup from the ISO) from its own DATA folder.
     .{ .system_id = "windows-home-server-2011", .route_as = "windows-7" },
+    .{ .system_id = "windows-embedded-standard-7", .route_as = "windows-7" },
+    .{ .system_id = "windows-embedded-posready-7", .route_as = "windows-7" },
+    .{ .system_id = "windows-flp", .route_as = "windows-embedded-posready-2009" },
+    .{ .system_id = "citrix-winframe-1-8", .route_as = "windows-nt-3-51-server" },
+    .{ .system_id = "windows-whistler", .route_as = "windows-xp" },
+    .{ .system_id = "windows-neptune", .route_as = "windows-2000" },
+    .{ .system_id = "windows-longhorn", .route_as = "windows-vista" },
+    .{ .system_id = "windows-7-beta", .route_as = "windows-7" },
+    .{ .system_id = "windows-millennium", .route_as = "windows-me" },
+    .{ .system_id = "windows-nashville", .route_as = "windows-95" },
+    .{ .system_id = "windows-chicago", .route_as = "windows-95" },
+    .{ .system_id = "windows-memphis", .route_as = "windows-98" },
+    .{ .system_id = "windows-2000-beta", .route_as = "windows-2000" },
+    .{ .system_id = "windows-nt-4-beta", .route_as = "windows-nt-4" },
+    .{ .system_id = "windows-nt-3-beta", .route_as = "windows-nt-3-51" },
+    .{ .system_id = "windows-cairo", .route_as = "windows-nt-4" },
 } else [_]SystemTraits{});
 
 fn ownTraits(system_id: []const u8) SystemTraits {
@@ -222,11 +238,13 @@ pub fn mediaBlock(system_id: []const u8, info: windows_media.Info, firmware: win
 
 /// "<folder>" of a Windows system's "\Systems\Windows\<folder>\Images".
 pub fn windowsFolder(system: *const SystemEntry) ?[]const u8 {
-    const prefix = "\\Systems\\Windows\\";
     const suffix = "\\Images";
     const directory = system.image_directory;
-    if (!std.mem.startsWith(u8, directory, prefix) or !std.mem.endsWith(u8, directory, suffix) or directory.len <= prefix.len + suffix.len) return null;
-    return directory[prefix.len .. directory.len - suffix.len];
+    for ([_][]const u8{ "\\Systems\\Windows\\", "\\Systems\\Betas\\" }) |prefix| {
+        if (std.mem.startsWith(u8, directory, prefix) and std.mem.endsWith(u8, directory, suffix) and directory.len > prefix.len + suffix.len)
+            return directory[prefix.len .. directory.len - suffix.len];
+    }
+    return null;
 }
 
 pub const Systems = union(enum) {
@@ -639,4 +657,32 @@ test "Windows Server follows the client release it shares a Setup with" {
     try std.testing.expectEqualStrings("windows-10", routeId("windows-10"));
     try std.testing.expectEqualStrings("Windows Server 2008 R2", windowsFolder(systems.findById("windows-server-2008-r2").?).?);
     try std.testing.expect(windowsFolder(systems.findById("ubuntu").?) == null);
+}
+
+test "variants inherit the same existing backend and keep separate DATA directories" {
+    const systems = @import("systems.zig");
+    const rows = .{
+        .{ "windows-whistler", "windows-xp" },
+        .{ "windows-neptune", "windows-2000" },
+        .{ "windows-longhorn", "windows-vista" },
+        .{ "windows-7-beta", "windows-7" },
+        .{ "windows-embedded-standard-7", "windows-7" },
+        .{ "windows-embedded-posready-7", "windows-7" },
+        .{ "windows-flp", "windows-embedded-posready-2009" },
+        .{ "citrix-winframe-1-8", "windows-nt-3-51-server" },
+        .{ "windows-millennium", "windows-me" },
+        .{ "windows-nashville", "windows-95" },
+        .{ "windows-chicago", "windows-95" },
+        .{ "windows-memphis", "windows-98" },
+        .{ "windows-nt-3-beta", "windows-nt-3-51" },
+        .{ "windows-nt-4-beta", "windows-nt-4" },
+        .{ "windows-cairo", "windows-nt-4" },
+    };
+    inline for (rows) |row| {
+        const variant = systems.findById(row[0]).?;
+        const base = systems.findById(row[1]).?;
+        try std.testing.expectEqualStrings(row[1], routeId(row[0]));
+        try std.testing.expect(!std.mem.eql(u8, variant.image_directory, base.image_directory));
+        try std.testing.expectEqual(select(base, .iso, .automatic, .uefi), select(variant, .iso, .automatic, .uefi));
+    }
 }

@@ -27,6 +27,13 @@ pub fn system(
     detail_buffer: *DetailBuffer,
 ) usos.gui.ui.Row {
     const row_icon: usos.gui.ui.RowIcon = if (icon) |image| .{ .image = image } else .{ .vector = fallbackIcon(entry) };
+    if (usos.catalog.preparation_block.reason(entry.id)) |reason| return .{
+        .title = view.tr(entry.name),
+        .detail = view.tr(reason),
+        .icon = row_icon,
+        .badge = .{ .text = view.t(.system_unavailable), .tone = .warning },
+        .enabled = false,
+    };
     if (biosOnly(entry, firmware)) {
         if (!media.hasImages()) return .{ .title = view.tr(entry.name), .detail = view.t(.system_no_image), .icon = row_icon, .enabled = false };
         return .{ .title = view.tr(entry.name), .detail = view.t(.system_unavailable_detail), .icon = row_icon, .badge = .{ .text = view.t(.system_unavailable) }, .enabled = false };

@@ -31,7 +31,7 @@ pub fn sourceConfigForFolder(buffer: []u8, partition_guid: [16]u8, iso_size: u64
 
 fn encodeSourceConfig(buffer: []u8, partition_guid: [16]u8, iso_size: u64, folder: []const u8, image_name: []const u8) ![]const u8 {
     try validateName(image_name);
-    const parts = [_][]const u8{ "Systems\\Windows\\", folder, "\\Images\\", image_name, "\x00" };
+    const parts = [_][]const u8{ "Systems\\", categoryForFolder(folder), "\\", folder, "\\Images\\", image_name, "\x00" };
     var size: usize = 32;
     for (parts) |part| size += part.len;
     if (buffer.len < size or iso_size < 32768) return error.InvalidIsoConfiguration;
@@ -76,5 +76,30 @@ test "Windows 10 source and directory lookup use the same exact system folder" {
         for (folder, wide) |a, b| try std.testing.expectEqual(@as(u16, a), b);
         try std.testing.expectError(error.InvalidIsoConfiguration, sourceConfig(buffer[0..32], id, 4702233088, system, "image.iso"));
         try std.testing.expectError(error.InvalidIsoConfiguration, sourceConfig(&buffer, id, 0, system, "image.iso"));
+    }
+}
+
+/// Native NT6 variants keep their own catalog DATA category.
+pub fn categoryForFolder(folder: []const u8) []const u8 {
+    for (@import("../../catalog/systems.zig").all) |entry| {
+        if (std.mem.eql(u8, folder, entry.imageFolder())) return entry.dataCategory();
+    }
+    return "Windows";
+}
+
+test "beta source binding preserves its catalog category" {
+    var buffer: [544]u8 = undefined;
+    const value = try sourceConfigForFolder(&buffer, [_]u8{1} ** 16, 900000, "Windows 7 Beta", "arbitrary.iso");
+    try std.testing.expectEqualStrings("Systems\\Betas\\Windows 7 Beta\\Images\\arbitrary.iso\x00", value[32..]);
+}
+
+test "source categories and folders follow the catalog including all betas" {
+    for (@import("../../catalog/systems.zig").all) |entry| {
+        if (entry.category != .windows and entry.category != .beta) continue;
+        var buffer: [544]u8 = undefined;
+        var expected_buffer: [544]u8 = undefined;
+        const encoded = try sourceConfigForFolder(&buffer, [_]u8{1} ** 16, 900000, entry.imageFolder(), "a.iso");
+        const expected = try std.fmt.bufPrint(&expected_buffer, "{s}\\a.iso\x00", .{entry.image_directory[1..]});
+        try std.testing.expectEqualStrings(expected, encoded[32..]);
     }
 }

@@ -114,6 +114,10 @@ pub fn familyFor(system_id: []const u8) ?Family {
     for (entries) |entry| {
         if (std.ascii.eqlIgnoreCase(entry.id, system_id)) return entry.family;
     }
+    const routed = @import("../../catalog/os_profiles.zig").routeId(system_id);
+    for (entries) |entry| {
+        if (std.ascii.eqlIgnoreCase(entry.id, routed)) return entry.family;
+    }
     return null;
 }
 

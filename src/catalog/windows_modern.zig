@@ -13,6 +13,8 @@ pub const entries = [_]SystemEntry{
     // Setup (os_profiles.zig route_as windows-8-1); UEFI only, x64 starts
     // natively from the ISO, x86 media is blocked on 64-bit UEFI.
     uefiWindows("windows-embedded-8-1-industry", "Windows Embedded 8.1 Industry", "Windows Embedded 8.1 Industry"),
+    uefiWindows("windows-embedded-standard-7", "Windows Embedded Standard 7", "Windows Embedded Standard 7"),
+    uefiWindows("windows-embedded-posready-7", "Windows Embedded POSReady 7", "Windows Embedded POSReady 7"),
 }) ++ [_]SystemEntry{
     windows("windows-8", "Windows 8", "Windows 8"),
     windows("windows-7", "Windows 7", "Windows 7"),
