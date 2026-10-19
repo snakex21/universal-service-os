@@ -755,10 +755,11 @@ usos_addons_config "$ANSWER_SIF" > "$work/addons.ini" || fail 'invalid addon sel
 addon_lang=XX;case "$lang" in 0415) addon_lang=PL ;; *09) addon_lang=EN ;; esac
 addon_root="$ls_dir/I386/\$OEM\$/\$1"
 if [ -z "$tse" ]; then
-    usos_addons_stage "$work/addons.ini" "$addon_root" "$LIB" "${USOS_ADDONS_DIR:-/mnt/data/Addons}" NT4 "$addon_lang" 6a || fail 'cannot stage NT4 legacy pack'
+    usos_addons_stage "$work/addons.ini" "$addon_root" "$LIB" "${USOS_ADDONS_DIR:-/mnt/data/Addons}" NT4 "$addon_lang" "${SP_EXE:+6a}" || fail 'cannot stage NT4 legacy pack'
 fi
 rm -f "$work/addons.ini"
 if [ -f "$addon_root/USOS/ADDONS/USOSADD.EXE" ]; then
+    # Both OEM search locations can run this command; COPY.OK makes it once-only.
     for oem in "$ls_dir/\$OEM\$" "$ls_dir/I386/\$OEM\$"; do
         printf '".\\ADDONS.CMD"\r\n' >> "$oem/CMDLINES.TXT"
         crlf > "$oem/ADDONS.CMD" <<'ADDONSCMD'

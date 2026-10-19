@@ -26,7 +26,7 @@ Input sizes are not installed Windows sizes. The payload estimate expands matchi
 |PL|dcom95 / dcom:1.3|dcom95.exe|6706f79435d75682|1229056|release|LicenseRef-Microsoft-DCOM95-EULA / warunkowa; decyzja opiekuna|ok|
 |PL|ws2-95 / ws2:2|w95ws2setup.exe|48c82825328ef63b|986400|user|LicenseRef-Microsoft-EULA / plik użytkownika|missing|
 |PL|dun14-95-en-on-pl / dun:1.4|DUN14-95.EXE|1f72fcfbaedd9be5|1890376|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|ok|
-|PL|ie55sp2-pl / ie:5.5|ie55_pl_SP2.zip|46cb52b93624132d|44253282|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|ok|
+|PL|ie55sp2-pl / ie:5.5|ie55_pl_SP2.zip|46cb52b93624132d|44253282|release|LicenseRef-Microsoft-EULA / brak zgody licencji — zasób wydania z decyzji opiekuna 2026-10-20|ok|
 |PL|ie55sp2-q810847-pl / IE 5.5 SP2 cumulative update (Q810847, Polish)|q810847(2).exe|748a725be6f0295b|2259344|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|ok|
 |PL|msi20-9x / msi:2.0|InstMsiA.exe|536e4c8385d7d250|1709160|release|LicenseRef-Microsoft-Windows-Installer-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|dx80-pl / dx:8.0|DX80pol.exe|ae09e23690ad808b|11377840|release|LicenseRef-Microsoft-DirectX-Redist / warunkowa; decyzja opiekuna|ok|
@@ -57,7 +57,7 @@ Input sizes are not installed Windows sizes. The payload estimate expands matchi
 |---|---|---|---|---:|---|---|---|
 |PL|dcom98 / dcom:1.3|DCOM98.EXE|1259b3ab056cf053|1229056|release|LicenseRef-Microsoft-DCOM98-EULA / warunkowa; decyzja opiekuna|ok|
 |PL|dun14-98-pl / dun:1.4|dun14-98pl.exe|793be6a28ff31175|520264|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|ok|
-|PL|ie6sp1-pl-9x / ie:6.0|IE6PLSP1W9x.zip|fe0a5a9c2e835d6a|28664929|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|ok|
+|PL|ie6sp1-pl-9x / ie:6.0|IE6PLSP1W9x.zip|fe0a5a9c2e835d6a|28664929|release|LicenseRef-Microsoft-EULA / brak zgody licencji — zasób wydania z decyzji opiekuna 2026-10-20|ok|
 |PL|msi20-9x / msi:2.0|InstMsiA.exe|536e4c8385d7d250|1709160|release|LicenseRef-Microsoft-Windows-Installer-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|dx9c / dx:9.0c|directx_dec2006_redist.exe|887d1b123d9cce93|62086456|release|LicenseRef-Microsoft-DirectX-SDK-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|mdac28sp1-pl / mdac:2.81|MDAC_TYP.EXE|9eec4e6145e9fdbb|6112792|release|LicenseRef-Microsoft-MDAC-Redist / warunkowa; decyzja opiekuna|ok|
@@ -116,7 +116,7 @@ Input sizes are not installed Windows sizes. The payload estimate expands matchi
 |PL|hf98x-q896727 / hf98x-q896727|WinSPatcher_98.v1.0.exe!app/upd_c/IE6.0sp1-KB896727-Windows-98-ME-x86-PLK.exe|3ef9b16f8759dab1|3127560|user|LicenseRef-Microsoft-EULA / plik użytkownika|ok|
 |EN|dcom98 / dcom:1.3|DCOM98.EXE|1259b3ab056cf053|1229056|release|LicenseRef-Microsoft-DCOM98-EULA / warunkowa; decyzja opiekuna|ok|
 |EN|dun14-98-en / dun:1.4|DUN14-98.EXE|17eacf3e8a7b8338|517192|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|ok|
-|EN|ie6sp1-en-9x / ie:6.0|IE6SP1EN.iso|9e6c3ea3d389258f|82536448|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|missing|
+|EN|ie6sp1-en-9x / ie:6.0|IE6SP1EN.iso|9e6c3ea3d389258f|82536448|release|LicenseRef-Microsoft-EULA / brak zgody licencji — zasób wydania z decyzji opiekuna 2026-10-20|missing|
 |EN|msi20-9x / msi:2.0|InstMsiA.exe|536e4c8385d7d250|1709160|release|LicenseRef-Microsoft-Windows-Installer-Redist / warunkowa; decyzja opiekuna|ok|
 |EN|dx9c / dx:9.0c|directx_dec2006_redist.exe|887d1b123d9cce93|62086456|release|LicenseRef-Microsoft-DirectX-SDK-Redist / warunkowa; decyzja opiekuna|ok|
 |EN|vbrun6sp6 / vb6:6.0.97.82|vbrun60sp6.exe|467b5a10c369865f|1064736|release|LicenseRef-Microsoft-VB6-Runtime-Redist / warunkowa; decyzja opiekuna|ok|
@@ -146,7 +146,7 @@ Input sizes are not installed Windows sizes. The payload estimate expands matchi
 |PL|dcom98 / dcom:1.3|DCOM98.EXE|1259b3ab056cf053|1229056|release|LicenseRef-Microsoft-DCOM98-EULA / warunkowa; decyzja opiekuna|ok|
 |PL|dun14-98se-pl / dun:1.4|dun14-SEpl.exe|91da2d102a442310|473192|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|ok|
 |PL|q243199-98se-pl / Q243199 update (NDIS intermediate drivers, 98 SE)|243199POL8.EXE|0fcc8dc235f4e2a1|228056|user|LicenseRef-Microsoft-EULA / plik użytkownika|ok|
-|PL|ie6sp1-pl-9x / ie:6.0|IE6PLSP1W9x.zip|fe0a5a9c2e835d6a|28664929|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|ok|
+|PL|ie6sp1-pl-9x / ie:6.0|IE6PLSP1W9x.zip|fe0a5a9c2e835d6a|28664929|release|LicenseRef-Microsoft-EULA / brak zgody licencji — zasób wydania z decyzji opiekuna 2026-10-20|ok|
 |PL|msi20-9x / msi:2.0|InstMsiA.exe|536e4c8385d7d250|1709160|release|LicenseRef-Microsoft-Windows-Installer-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|dx9c / dx:9.0c|directx_dec2006_redist.exe|887d1b123d9cce93|62086456|release|LicenseRef-Microsoft-DirectX-SDK-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|mdac28sp1-pl / mdac:2.81|MDAC_TYP.EXE|9eec4e6145e9fdbb|6112792|release|LicenseRef-Microsoft-MDAC-Redist / warunkowa; decyzja opiekuna|ok|
@@ -154,7 +154,7 @@ Input sizes are not installed Windows sizes. The payload estimate expands matchi
 |PL|vcredist6sp6 / vc6:6.0|VCREDIST.EXE|ce05a2ad669fdc33|1821920|release|LicenseRef-Microsoft-VC6-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|mslu / mslu:1.1|UNICOWS.EXE|96d46c673e265b0c|266544|release|LicenseRef-Microsoft-MSLU-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|wmp9-pl / wmp:9.0|MPsetup.exe|48bd5bf4e917cfd4|13135464|release|LicenseRef-Microsoft-WMP-Redist / warunkowa; decyzja opiekuna|ok|
-|PL|wmp9-classic-skin / Classic skin for Windows Media Player 9|MediaPlayerClassicCompact-5.wmz|6b4a9345915b5206|21253|release|LicenseRef-unknown / warunkowa; decyzja opiekuna|ok|
+|PL|wmp9-classic-skin / Classic skin for Windows Media Player 9|MediaPlayerClassicCompact-5.wmz|6b4a9345915b5206|21253|user|LicenseRef-unknown / nieustalona licencja — plik użytkownika|ok|
 |PL|moviemaker98 / moviemaker:1|wmm98_build1.exe|ddf4084275766c68|1608704|user|LicenseRef-Microsoft-EULA / plik użytkownika|ok|
 |PL|dotnet20 / netfx:2.0|DOTNETFX.EXE|46693d9b74d12454|23510720|release|LicenseRef-Microsoft-NETFX20-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|dotnet20-pl / .NET Framework 2.0 Polish language pack|LANGPACK.EXE|3d1f0822cb0cb3ae|1962176|release|LicenseRef-Microsoft-NETFX20-Redist / warunkowa; decyzja opiekuna|ok|
@@ -193,7 +193,7 @@ Input sizes are not installed Windows sizes. The payload estimate expands matchi
 |PL|hf98-storage / Storage update (Q242975)|Pomoc techniczna.iso!update/add/Storage Update/242975.EXE|bd36aa9125659492|603328|user|LicenseRef-Microsoft-EULA / plik użytkownika|missing|
 |EN|dcom98 / dcom:1.3|DCOM98.EXE|1259b3ab056cf053|1229056|release|LicenseRef-Microsoft-DCOM98-EULA / warunkowa; decyzja opiekuna|ok|
 |EN|dun14-98se-en / dun:1.4|DUN14-SE.EXE|0ef49fb3a093b5d4|470632|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|ok|
-|EN|ie6sp1-en-9x / ie:6.0|IE6SP1EN.iso|9e6c3ea3d389258f|82536448|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|missing|
+|EN|ie6sp1-en-9x / ie:6.0|IE6SP1EN.iso|9e6c3ea3d389258f|82536448|release|LicenseRef-Microsoft-EULA / brak zgody licencji — zasób wydania z decyzji opiekuna 2026-10-20|missing|
 |EN|msi20-9x / msi:2.0|InstMsiA.exe|536e4c8385d7d250|1709160|release|LicenseRef-Microsoft-Windows-Installer-Redist / warunkowa; decyzja opiekuna|ok|
 |EN|dx9c / dx:9.0c|directx_dec2006_redist.exe|887d1b123d9cce93|62086456|release|LicenseRef-Microsoft-DirectX-SDK-Redist / warunkowa; decyzja opiekuna|ok|
 |EN|vbrun6sp6 / vb6:6.0.97.82|vbrun60sp6.exe|467b5a10c369865f|1064736|release|LicenseRef-Microsoft-VB6-Runtime-Redist / warunkowa; decyzja opiekuna|ok|
@@ -220,7 +220,7 @@ Input sizes are not installed Windows sizes. The payload estimate expands matchi
 
 |Language|Package / version|File|SHA-256 (prefix)|Bytes|Source|License / redistribution|Status|
 |---|---|---|---|---:|---|---|---|
-|PL|ie6sp1-pl-9x / ie:6.0|IE6PLSP1W9x.zip|fe0a5a9c2e835d6a|28664929|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|ok|
+|PL|ie6sp1-pl-9x / ie:6.0|IE6PLSP1W9x.zip|fe0a5a9c2e835d6a|28664929|release|LicenseRef-Microsoft-EULA / brak zgody licencji — zasób wydania z decyzji opiekuna 2026-10-20|ok|
 |PL|msi20-9x / msi:2.0|InstMsiA.exe|536e4c8385d7d250|1709160|release|LicenseRef-Microsoft-Windows-Installer-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|dx9c / dx:9.0c|directx_dec2006_redist.exe|887d1b123d9cce93|62086456|release|LicenseRef-Microsoft-DirectX-SDK-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|mdac28sp1-pl / mdac:2.81|MDAC_TYP.EXE|9eec4e6145e9fdbb|6112792|release|LicenseRef-Microsoft-MDAC-Redist / warunkowa; decyzja opiekuna|ok|
@@ -228,7 +228,7 @@ Input sizes are not installed Windows sizes. The payload estimate expands matchi
 |PL|vcredist6sp6 / vc6:6.0|VCREDIST.EXE|ce05a2ad669fdc33|1821920|release|LicenseRef-Microsoft-VC6-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|mslu / mslu:1.1|UNICOWS.EXE|96d46c673e265b0c|266544|release|LicenseRef-Microsoft-MSLU-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|wmp9-pl / wmp:9.0|MPsetup.exe|48bd5bf4e917cfd4|13135464|release|LicenseRef-Microsoft-WMP-Redist / warunkowa; decyzja opiekuna|ok|
-|PL|wmp9-classic-skin / Classic skin for Windows Media Player 9|MediaPlayerClassicCompact-5.wmz|6b4a9345915b5206|21253|release|LicenseRef-unknown / warunkowa; decyzja opiekuna|ok|
+|PL|wmp9-classic-skin / Classic skin for Windows Media Player 9|MediaPlayerClassicCompact-5.wmz|6b4a9345915b5206|21253|user|LicenseRef-unknown / nieustalona licencja — plik użytkownika|ok|
 |PL|dotnet20 / netfx:2.0|DOTNETFX.EXE|46693d9b74d12454|23510720|release|LicenseRef-Microsoft-NETFX20-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|dotnet20-pl / .NET Framework 2.0 Polish language pack|LANGPACK.EXE|3d1f0822cb0cb3ae|1962176|release|LicenseRef-Microsoft-NETFX20-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|aspi471 / aspi:4.71|aspi_471a2.exe|d362e24ebb82990e|522682|user|LicenseRef-Adaptec-ASPI / plik użytkownika|ok|
@@ -239,9 +239,9 @@ Input sizes are not installed Windows sizes. The payload estimate expands matchi
 |PL|speechsdk51-langpack / Microsoft Speech SDK 5.1 language pack (Japanese, Chinese)|SpeechSDK51LangPack.exe!Microsoft Speech SDK 5.1 Language Pack.msi|9b45a27845eaa3a4|289204|user|LicenseRef-Microsoft-Speech-SDK / plik użytkownika|missing|
 |PL|speechsdk51-langpack / Microsoft Speech SDK 5.1 language pack (Japanese, Chinese)|SpeechSDK51LangPack.exe!JpnRelease.Cab|403e17587737de48|37088424|user|LicenseRef-Microsoft-Speech-SDK / plik użytkownika|missing|
 |PL|speechsdk51-langpack / Microsoft Speech SDK 5.1 language pack (Japanese, Chinese)|SpeechSDK51LangPack.exe!ChsRelease.Cab|1bfc23eda4501a3f|48279369|user|LicenseRef-Microsoft-Speech-SDK / plik użytkownika|missing|
-|PL|winmedos / Real DOS mode for Windows Me (Real DOS-Mode Patch 1.3)|mfddme13.zip!WINMEDOS.COM|4c8e7194861674cc|5516|user|LicenseRef-freeware-MFD / plik użytkownika|ok|
+|PL|winmedos / Real DOS mode for Windows Me (Real DOS-Mode Patch 1.3)|mfddme13.zip!WINMEDOS.COM|4c8e7194861674cc|5516|user|LicenseRef-freeware-MFD / nieustalona licencja — plik użytkownika|ok|
 |PL|kernelex / kernelex:4.0|KernelEx-4.0-Final2.exe|5e75545699f906a2|205519|bundled|GPL-2.0-only / GPL: ze zgodnym źródłem|missing|
-|EN|ie6sp1-en-9x / ie:6.0|IE6SP1EN.iso|9e6c3ea3d389258f|82536448|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|missing|
+|EN|ie6sp1-en-9x / ie:6.0|IE6SP1EN.iso|9e6c3ea3d389258f|82536448|release|LicenseRef-Microsoft-EULA / brak zgody licencji — zasób wydania z decyzji opiekuna 2026-10-20|missing|
 |EN|msi20-9x / msi:2.0|InstMsiA.exe|536e4c8385d7d250|1709160|release|LicenseRef-Microsoft-Windows-Installer-Redist / warunkowa; decyzja opiekuna|ok|
 |EN|dx9c / dx:9.0c|directx_dec2006_redist.exe|887d1b123d9cce93|62086456|release|LicenseRef-Microsoft-DirectX-SDK-Redist / warunkowa; decyzja opiekuna|ok|
 |EN|vbrun6sp6 / vb6:6.0.97.82|vbrun60sp6.exe|467b5a10c369865f|1064736|release|LicenseRef-Microsoft-VB6-Runtime-Redist / warunkowa; decyzja opiekuna|ok|
@@ -255,15 +255,15 @@ Input sizes are not installed Windows sizes. The payload estimate expands matchi
 |EN|speechsdk51-langpack / Microsoft Speech SDK 5.1 language pack (Japanese, Chinese)|SpeechSDK51LangPack.exe!Microsoft Speech SDK 5.1 Language Pack.msi|9b45a27845eaa3a4|289204|user|LicenseRef-Microsoft-Speech-SDK / plik użytkownika|missing|
 |EN|speechsdk51-langpack / Microsoft Speech SDK 5.1 language pack (Japanese, Chinese)|SpeechSDK51LangPack.exe!JpnRelease.Cab|403e17587737de48|37088424|user|LicenseRef-Microsoft-Speech-SDK / plik użytkownika|missing|
 |EN|speechsdk51-langpack / Microsoft Speech SDK 5.1 language pack (Japanese, Chinese)|SpeechSDK51LangPack.exe!ChsRelease.Cab|1bfc23eda4501a3f|48279369|user|LicenseRef-Microsoft-Speech-SDK / plik użytkownika|missing|
-|EN|winmedos / Real DOS mode for Windows Me (Real DOS-Mode Patch 1.3)|mfddme13.zip!WINMEDOS.COM|4c8e7194861674cc|5516|user|LicenseRef-freeware-MFD / plik użytkownika|ok|
+|EN|winmedos / Real DOS mode for Windows Me (Real DOS-Mode Patch 1.3)|mfddme13.zip!WINMEDOS.COM|4c8e7194861674cc|5516|user|LicenseRef-freeware-MFD / nieustalona licencja — plik użytkownika|ok|
 |EN|kernelex / kernelex:4.0|KernelEx-4.0-Final2.exe|5e75545699f906a2|205519|bundled|GPL-2.0-only / GPL: ze zgodnym źródłem|missing|
 
 ## NT4 WS
 
 |Language|Package / version|File|SHA-256 (prefix)|Bytes|Source|License / redistribution|Status|
 |---|---|---|---|---:|---|---|---|
-|PL|nt4-srp-pl / Post-SP6a Security Rollup Package (Q299444, Polish)|POLQ299444i.exe|1f515c1bd729c42d|14922504|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|ok|
-|PL|ie6sp1-pl-nt4 / ie:6.0|MS InternetExplorer 6 sp1 PL.zip|0c2d999c34fd2984|49946527|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|ok|
+|PL|nt4-srp-pl / Post-SP6a Security Rollup Package (Q299444, Polish)|POLQ299444i.exe|1f515c1bd729c42d|14922504|release|LicenseRef-Microsoft-EULA / brak zgody licencji — zasób wydania z decyzji opiekuna 2026-10-20|ok|
+|PL|ie6sp1-pl-nt4 / ie:6.0|MS InternetExplorer 6 sp1 PL.zip|0c2d999c34fd2984|49946527|release|LicenseRef-Microsoft-EULA / brak zgody licencji — zasób wydania z decyzji opiekuna 2026-10-20|ok|
 |PL|msi20-nt4 / msi:2.0|InstMsiW.exe|4c3516c0b5c2b76b|1822848|release|LicenseRef-Microsoft-Windows-Installer-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|mdac28sp1-pl / mdac:2.81|MDAC_TYP.EXE|9eec4e6145e9fdbb|6112792|release|LicenseRef-Microsoft-MDAC-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|vbrun6sp6 / vb6:6.0.97.82|vbrun60sp6.exe|467b5a10c369865f|1064736|release|LicenseRef-Microsoft-VB6-Runtime-Redist / warunkowa; decyzja opiekuna|ok|
@@ -311,8 +311,8 @@ Input sizes are not installed Windows sizes. The payload estimate expands matchi
 |PL|hfnt-q823980 / hfnt-q823980|WinSPatcher_NT_v1.0.exe!app/upd_c/plk_Q823980i.exe|af2243830b71925a|1325168|user|LicenseRef-Microsoft-EULA / plik użytkownika|ok|
 |PL|hfnt-q823492 / hfnt-q823492|WinSPatcher_NT_v1.0.exe!app/upd_s/plk_Q823492i.exe|f8c9ea61e9ef7782|107624|user|LicenseRef-Microsoft-EULA / plik użytkownika|ok|
 |PL|hfnt-rootsupd / hfnt-rootsupd|WinSPatcher_NT_v1.0.exe!app/upd_s/rootsupd.exe|e2c6e8e83085490c|215096|user|LicenseRef-Microsoft-EULA / plik użytkownika|ok|
-|EN|nt4-srp-en / Post-SP6a Security Rollup Package (Q299444, English)|Q299444i.exe|92386543019eb40d|14883736|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|missing|
-|EN|ie6sp1-en-nt4 / ie:6.0|IE6SP1EN.iso|9e6c3ea3d389258f|82536448|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|missing|
+|EN|nt4-srp-en / Post-SP6a Security Rollup Package (Q299444, English)|Q299444i.exe|92386543019eb40d|14883736|release|LicenseRef-Microsoft-EULA / brak zgody licencji — zasób wydania z decyzji opiekuna 2026-10-20|missing|
+|EN|ie6sp1-en-nt4 / ie:6.0|IE6SP1EN.iso|9e6c3ea3d389258f|82536448|release|LicenseRef-Microsoft-EULA / brak zgody licencji — zasób wydania z decyzji opiekuna 2026-10-20|missing|
 |EN|msi20-nt4 / msi:2.0|InstMsiW.exe|4c3516c0b5c2b76b|1822848|release|LicenseRef-Microsoft-Windows-Installer-Redist / warunkowa; decyzja opiekuna|ok|
 |EN|vbrun6sp6 / vb6:6.0.97.82|vbrun60sp6.exe|467b5a10c369865f|1064736|release|LicenseRef-Microsoft-VB6-Runtime-Redist / warunkowa; decyzja opiekuna|ok|
 |EN|vcredist6sp6 / vc6:6.0|VCREDIST.EXE|ce05a2ad669fdc33|1821920|release|LicenseRef-Microsoft-VC6-Redist / warunkowa; decyzja opiekuna|ok|
@@ -332,8 +332,8 @@ Input sizes are not installed Windows sizes. The payload estimate expands matchi
 
 |Language|Package / version|File|SHA-256 (prefix)|Bytes|Source|License / redistribution|Status|
 |---|---|---|---|---:|---|---|---|
-|PL|nt4-srp-pl / Post-SP6a Security Rollup Package (Q299444, Polish)|POLQ299444i.exe|1f515c1bd729c42d|14922504|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|ok|
-|PL|ie6sp1-pl-nt4 / ie:6.0|MS InternetExplorer 6 sp1 PL.zip|0c2d999c34fd2984|49946527|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|ok|
+|PL|nt4-srp-pl / Post-SP6a Security Rollup Package (Q299444, Polish)|POLQ299444i.exe|1f515c1bd729c42d|14922504|release|LicenseRef-Microsoft-EULA / brak zgody licencji — zasób wydania z decyzji opiekuna 2026-10-20|ok|
+|PL|ie6sp1-pl-nt4 / ie:6.0|MS InternetExplorer 6 sp1 PL.zip|0c2d999c34fd2984|49946527|release|LicenseRef-Microsoft-EULA / brak zgody licencji — zasób wydania z decyzji opiekuna 2026-10-20|ok|
 |PL|msi20-nt4 / msi:2.0|InstMsiW.exe|4c3516c0b5c2b76b|1822848|release|LicenseRef-Microsoft-Windows-Installer-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|mdac28sp1-pl / mdac:2.81|MDAC_TYP.EXE|9eec4e6145e9fdbb|6112792|release|LicenseRef-Microsoft-MDAC-Redist / warunkowa; decyzja opiekuna|ok|
 |PL|vbrun6sp6 / vb6:6.0.97.82|vbrun60sp6.exe|467b5a10c369865f|1064736|release|LicenseRef-Microsoft-VB6-Runtime-Redist / warunkowa; decyzja opiekuna|ok|
@@ -381,8 +381,8 @@ Input sizes are not installed Windows sizes. The payload estimate expands matchi
 |PL|hfnt-q823980 / hfnt-q823980|WinSPatcher_NT_v1.0.exe!app/upd_c/plk_Q823980i.exe|af2243830b71925a|1325168|user|LicenseRef-Microsoft-EULA / plik użytkownika|ok|
 |PL|hfnt-q823492 / hfnt-q823492|WinSPatcher_NT_v1.0.exe!app/upd_s/plk_Q823492i.exe|f8c9ea61e9ef7782|107624|user|LicenseRef-Microsoft-EULA / plik użytkownika|ok|
 |PL|hfnt-rootsupd / hfnt-rootsupd|WinSPatcher_NT_v1.0.exe!app/upd_s/rootsupd.exe|e2c6e8e83085490c|215096|user|LicenseRef-Microsoft-EULA / plik użytkownika|ok|
-|EN|nt4-srp-en / Post-SP6a Security Rollup Package (Q299444, English)|Q299444i.exe|92386543019eb40d|14883736|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|missing|
-|EN|ie6sp1-en-nt4 / ie:6.0|IE6SP1EN.iso|9e6c3ea3d389258f|82536448|release|LicenseRef-Microsoft-EULA / warunkowa; decyzja opiekuna|missing|
+|EN|nt4-srp-en / Post-SP6a Security Rollup Package (Q299444, English)|Q299444i.exe|92386543019eb40d|14883736|release|LicenseRef-Microsoft-EULA / brak zgody licencji — zasób wydania z decyzji opiekuna 2026-10-20|missing|
+|EN|ie6sp1-en-nt4 / ie:6.0|IE6SP1EN.iso|9e6c3ea3d389258f|82536448|release|LicenseRef-Microsoft-EULA / brak zgody licencji — zasób wydania z decyzji opiekuna 2026-10-20|missing|
 |EN|msi20-nt4 / msi:2.0|InstMsiW.exe|4c3516c0b5c2b76b|1822848|release|LicenseRef-Microsoft-Windows-Installer-Redist / warunkowa; decyzja opiekuna|ok|
 |EN|vbrun6sp6 / vb6:6.0.97.82|vbrun60sp6.exe|467b5a10c369865f|1064736|release|LicenseRef-Microsoft-VB6-Runtime-Redist / warunkowa; decyzja opiekuna|ok|
 |EN|vcredist6sp6 / vc6:6.0|VCREDIST.EXE|ce05a2ad669fdc33|1821920|release|LicenseRef-Microsoft-VC6-Redist / warunkowa; decyzja opiekuna|ok|

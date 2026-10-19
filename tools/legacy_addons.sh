@@ -15,13 +15,23 @@ usos_addons_offer() {
     awk -F'|' -v hash="$hash" '$1=="file"&&$5==hash{found=1;exit}END{exit !found}' "$_ad_plan" || return 0
     [ -f "$_ad_tmp/RAW/$hash" ] || { cp "$source" "$_ad_tmp/RAW/$hash" && cmp -s "$source" "$_ad_tmp/RAW/$hash"; } || return 1
 }
-# unzip -l is provided by BusyBox as well as Info-ZIP. File names are data.
+# BusyBox streams the selected compressed member. File names are data.
 usos_addons_unzip() { if command -v unzip >/dev/null 2>&1; then unzip "$@"; else /bin/busybox unzip "$@"; fi; }
+# BusyBox does not compensate for a prepended SFX stub with relative ZIP
+# offsets. Strip only the envelope in private scratch; pinned input stays intact.
+usos_addons_zip_prepare() {
+    _ad_zip=$1
+    local normalized
+    normalized=$(mktemp "$_ad_tmp/ZIPNXXXXXX") || return 1
+    if "$_ad_tool" prepare-zip "$1" "$normalized"; then _ad_zip=$normalized; else rm -f "$normalized"; fi
+}
 usos_addons_zip_list() {
-    usos_addons_unzip -l "$1" 2>/dev/null | awk '$1~/^[0-9]+$/&&$2~/[-\/]/&&$3~/^[0-9]+:[0-9]+/ {size=$1;sub(/^[ \t]*[0-9]+[ \t]+[^ \t]+[ \t]+[^ \t]+[ \t]+/,"");sub(/\r$/,"");if($0!~/\|/&&$0!~/\/$/)print size "|" $0}'
+    # BusyBox canonicalizes ../ in its listing. Read original central names
+    # so the 8.3/path checks below see the actual archive member names.
+    "$_ad_tool" list-zip "$1" 2>/dev/null | tr -d '\r'
 }
 usos_addons_scan() {
-    local source=$1 depth=$2 file size member suffix scan count=0
+    local source=$1 depth=$2 file size member suffix scan archive count=0
     [ -d "$source" ] || return 0
     find "$source" -type f > "$source_list_base.$depth"
     while IFS= read -r file; do
@@ -33,7 +43,8 @@ usos_addons_scan() {
             scan=$(mktemp -d "$_ad_tmp/ISOXXXXXX") || return 1
             if "$_ad_tool" scan-iso "$file" "$scan" "$_ad_plan"; then usos_addons_scan "$scan" 3 || return 1; fi ;;
           *.zip|*.exe)
-            usos_addons_zip_list "$file" > "$_ad_tmp/MEMBERS.$depth"
+            usos_addons_zip_prepare "$file" || return 1; archive=$_ad_zip
+            usos_addons_zip_list "$archive" > "$_ad_tmp/MEMBERS.$depth"
             if [ ! -s "$_ad_tmp/MEMBERS.$depth" ] && head -c 4194304 "$file" | grep -a -q 'Inno Setup'; then
                 usos_addons_log "container needs existing host Inno import: $file; flat pinned members remain supported"
             fi
@@ -47,7 +58,7 @@ usos_addons_scan() {
                     # Some self-extracting ZIPs return a warning despite a
                     # complete member stream; the pinned digest is decisive.
                     suffix=${suffix##*.}
-                    usos_addons_unzip -p "$file" "$member" > "$scan/MEMBER.$suffix" 2>/dev/null || true
+                    usos_addons_unzip -p "$archive" "$member" > "$scan/MEMBER.$suffix" 2>/dev/null || true
                     usos_addons_scan "$scan" $((depth+1)) || return 1
                 fi
             done < "$_ad_tmp/MEMBERS.$depth" ;;
@@ -56,6 +67,7 @@ usos_addons_scan() {
 }
 usos_addons_unpack_zip() {
     local archive=$1 dest=$2 list root strip=1 size member relative written=0
+    usos_addons_zip_prepare "$archive" || return 1;archive=$_ad_zip
     list=$(mktemp "$_ad_tmp/UNPACKXXXXXX") || return 1
     usos_addons_zip_list "$archive" > "$list"
     [ -s "$list" ] || return 1
@@ -69,7 +81,7 @@ usos_addons_unpack_zip() {
         # Do not depend on interval regular expressions in BusyBox awk.
         printf '%s\n' "$relative" | awk -F/ '{for(i=1;i<=NF;i++){if($i!~/^[A-Z0-9_.-]+$/)exit 1;n=split($i,a,/\./);if(n>2||length(a[1])<1||length(a[1])>8||(n==2&&(length(a[2])<1||length(a[2])>3)))exit 1}}' || continue
         mkdir -p "$dest/$(dirname "$relative")" || return 1
-        usos_addons_unzip -p "$archive" "$member" > "$dest/$relative" 2>/dev/null || true
+        usos_addons_unzip -p "$archive" "$member" > "$dest/$relative" 2>/dev/null || return 1
         [ "$(wc -c < "$dest/$relative" | tr -d ' \r\n')" = "$size" ] || return 1
         written=$((written+1))
     done < "$list"

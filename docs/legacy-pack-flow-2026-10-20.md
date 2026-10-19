@@ -3,7 +3,8 @@
 Branch `codex/pakiet-zgodnosci`, base
 `9ca9d9a6a85dbed7a52c3c68cd75f6aac6cffd7d`. This port uses the existing
 ten legacy-pack commits. Their historical Windows VM results are not new
-validation of these flows. Current verification is host-only; X470 remains
+validation of these flows. Current verification uses host tests and a tiny
+Linux RAM-only VM with synthetic archives; X470 remains
 the acceptance target. No Windows installer or release asset was executed,
 built, downloaded or deployed as part of the inventory.
 
@@ -21,14 +22,19 @@ their own behavior. The stock no-profile MSBATCH explicitly requests praca.
 MSBATCH invokes `[USOS.Addons]` through its existing `[Install] AddReg list;
 the value goes into **HKLM Run**, not RunOnce. NT4 registers the same Run
 value at the end of POST.CMD, after its existing service-pack step. The
-runner defers a VM invocation and retains Run for hardware. An early call
-without a desktop/with unfinished Setup also defers to the next normal
-logon. It does not restart Windows Setup to force readiness.
+runner defers an **NT4** VM invocation and retains Run for hardware. 9x is
+not unconditionally deferred in a VM. An early call waits at most five
+minutes for relevant taskbar/RunOnce registry notifications, pumping the
+window event queue. The deadline never restarts. Older systems lacking
+SetWinEventHook use one Explorer WaitForInputIdle wait when available;
+otherwise the runner retains Run. Timeout also retains Run for a later
+logon. No periodic readiness polling or forced Setup restart is used.
+The first-session result still needs hardware acceptance.
 
 NT4 CMDLINES uses XCOPY /E /I and a COPY.OK completion marker; a failed
 copy can be retried. No COPY /Y or XCOPY /Y is assumed: those overwrite
 switches are documented as a Windows 2000 change in the original
-[Microsoft Q240268](https://www.betaarchive.com/wiki/index.php/Microsoft_KB_Archive/240268).
+[Microsoft Q240268](https://jeffpar.github.io/kbarchive/kb/240/Q240268/).
 The staging log is appended with TYPE, so it does not replace copy errors.
 
 Once ready, the existing resumable package chain, installed checks,
@@ -69,12 +75,35 @@ offline set and can scan nested directories for pinned input sizes. It
 does not implement UDF, Joliet or links. Scratch is deleted after successful
 staging; a failed operation leaves its private files for diagnosis.
 
-Inno containers use the existing host import tool. Micro-Linux does not
+BusyBox 1.37.0 was tested in a diskless Linux VM. It cannot directly read
+one SFX variant with a prepended stub and unadjusted relative offsets.
+The native planner now normalizes single-disk ZIP32 envelopes in private
+scratch (512 MiB input limit), preserving compressed bytes and the original
+input. It also lists the original central-directory names: BusyBox's own
+listing canonicalizes `../`, hiding it from the destination checks. BusyBox
+still decompresses selected members and checks their CRC; unsafe names are
+skipped. Tests cover ordinary ZIP, both SFX offset conventions, nested
+members and a malformed archive; four packages stage and the malformed one
+is reported missing. ZIP64 and multi-disk ZIP remain unsupported.
+
+Inno containers use an explicit host preparation step. Micro-Linux does not
 gain an unpinned Inno extractor in this port: such containers are logged,
 and the pinned flat members produced by host import are supported. If
 they have not been imported, the packages are missing and Windows Setup
 continues. This limitation is distinct from the inventory, which used the
 already-local pinned Windows innoextract to verify those members read-only.
+
+Before X470 acceptance, **Claude/the host operator** runs the own
+`tools/addons/prepare_legacy_user_files.py --source <local-patches-folder>
+--target <empty-private-prepared-folder> --innoextract <existing-tool>`.
+The output is `USOS/WSP/<package-dir>/<8.3-file>` plus `IMPORT.JSON`, with
+size/SHA-256 readback and explicit missing counts. Scratch stays inside
+that folder and is cleaned in a finally block. Then the operator copies
+the prepared `USOS/WSP` tree into `DATA/Addons/USOS/WSP` as part of an
+authorized deployment. This review tested that tool only on own synthetic
+ZIP data; no Microsoft payload was exported or put on a disk. The older
+`import_winspatcher.py` updates the manifest and is **not** this flat export
+step. The Go installer does not yet run this preparation automatically.
 
 Missing files, unsupported containers, known missing-source packages and
 groups are not presented as installed. PLAN.TXT and the automatic log show
@@ -92,18 +121,21 @@ NT4: `I386\$OEM$\$1\USOS\ADDONS` holds the selected package. CMDLINES calls
 own ADDONS.CMD to copy it to C: explicitly. NT4's drive-letter OEM behavior
 is not assumed to implement the NT5 `$1` mapping. The original two
 CMDLINES locations are retained; both reference the one package source.
+COPY.OK makes their copy operation execute only once after success.
 The new registration at POST.CMD's end checks that the runner and REG file
 were copied. NT4's existing POST service pack is treated as the source of
-SP6a: staging resolves at 6a and the runtime's installed check also prevents
+SP6a only when SP_EXE is present: staging then resolves at 6a. Without an
+external SP_EXE it stages the union of pre-SP6a and post-SP6a package plans,
+including the pack's SP6a files. The runtime's installed check also prevents
 reinstallation. No second service-pack installer is launched by the pack
 when SP6a is already present. NT4 TSE keeps its existing separate SP6 flow.
 
 Original Microsoft deployment references: [Q167364](https://ftp.zx.net.nz/pub/archive/ftp.microsoft.com/MISC/KB/en-us/167/364.HTM),
-[Q168814](https://www.betaarchive.com/wiki/index.php/Microsoft_KB_Archive/168814),
-[Q143171](https://www.betaarchive.com/wiki/index.php/Microsoft_KB_Archive/143171).
+[Q168814](https://jeffpar.github.io/kbarchive/kb/168/Q168814/),
+[Q143171](https://jeffpar.github.io/kbarchive/kb/143/Q143171/).
 README detection is backed by the supplied PL media and the Microsoft
 [95 README](https://jeffpar.github.io/kbarchive/kb/305/Q305710/) and
-[Me README](https://www.betaarchive.com/wiki/index.php/Microsoft_KB_Archive/271240).
+[Me README](https://jeffpar.github.io/kbarchive/kb/271/Q271240/).
 
 During NT4 Setup the OEM source and C: copy coexist, so add roughly one
 additional payload copy to the inventory estimate. Source files, installed
@@ -118,8 +150,23 @@ and release classification; policy exclusion is recorded in SELECT.INI.
 After package restarts and at final completion, USOSADD schedules the network
 task's USOSLAN.EXE when present, and launches it at completion. It reuses
 that component's NETCFG.INI, preserving the requested homepage and LAN
-preferences after IE or network component installation. No network wait,
+preferences after IE or network component installation. The final launch
+uses `/refresh` to explicitly reapply IE/system defaults after updates;
+the ordinary Run registration has no such argument, so successful steps
+are not reapplied every logon. No network wait,
 new driver, IRQ/ELCR setting or PollMode change is added here.
+
+Merge order in the 9x target script is **display, network, addons**. Every
+transform must read the current staged `C:/USOS9X/MSBATCH.INF`, preserving
+earlier removed Run lines, rather than recreating it from ANSWER_INF. The
+display review implements that rule. Keep both USOSLan and USOSAddons AddReg
+sections when resolving the answer-file merge conflicts.
+
+Release membership is distinct from redistribution metadata. IE offline
+sets and NT4 SP6a/SRP retain `redist=no` and their maintainer decision.
+The user explicitly confirmed `dcomcnfg9x` and `ie55sp2-q810847-pl` in the
+separate release asset during this review. The third-party WMP skin is
+again `source=user, redist=unknown`.
 
 usosnet is already present in the current project for 98/98 SE/Me and 2000
 (I211/I210/82576 family); 95/NT4 NDIS4 is separate work. The pack does not
@@ -142,7 +189,7 @@ are in [the refreshed inventory](legacy-compat-inventory-2026-10-20.md) and
 [full metadata TSV](legacy-compat-inventory-2026-10-20.tsv). It verifies 99
 hashes in the five supplied archives. A missing row means not verified in
 those archives, not proof that no copy exists elsewhere on the machine.
-The inventory read/hash pass took about 23 seconds on this host; this is
+The review's inventory read/hash pass took about 35 seconds on this host; this is
 not a full staging or installation time.
 
 IE, DCOM, DUN, WMP, SP6a and SRP now join the existing Microsoft release-asset
@@ -181,13 +228,13 @@ times are historical evidence only.
 ## Verification of this port
 
 Host checks passed: 561 Zig tests and the x64 UEFI build; the original
-legacy-pack C selftest and 1404 C/Python plan comparisons; 17 new flow
-tests; 68 existing NT4/9x/time-zone tests using fake processes; all 25 Go
-test packages, including components, i18n and UI. Answer regression is
-ALL PASS, with intentional changes only to the 9x/NT4 options goldens and
-their matrix. Routing and XP/2003/NT6 goldens are unchanged.
+legacy-pack C selftest and 1404 C/Python plan comparisons; 20 flow tests;
+41 related NT4/time-zone tests; Go components tests. This review's answer
+regression is ALL PASS without updating any golden. The original port's
+broader checks remain recorded in its earlier report. The diskless Linux
+BusyBox 1.37.0 test also passed with synthetic ZIP/SFX inputs.
 
-The final own USOSADD build is 32768 bytes, i386 PE32 GUI/subsystem 4.0,
+The final own USOSADD build is 33792 bytes, i386 PE32 GUI/subsystem 4.0,
 without CRT, importing only kernel32/user32/advapi32. The Linux planner
 is static ELF without PT_INTERP. Synthetic fixtures are own files; none
 of these results establishes that real package installers and their

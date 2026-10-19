@@ -79,7 +79,10 @@ def write_tables(m,inv,output):
                 for f in files:
                     origin=inv.matches.get((f['size'],f['sha256']),'')
                     status=p.get('status') or ('ok' if origin or p.tier=='group' else 'missing')
-                    redist='warunkowa; decyzja opiekuna' if p.get('source')=='release' else 'GPL: ze zgodnym źródłem' if p.get('license').startswith('GPL') else 'plik użytkownika'
+                    if p.get('source')=='release':
+                        redist='brak zgody licencji — zasób wydania z decyzji opiekuna 2026-10-20' if p.get('redist')=='no' else 'warunkowa; decyzja opiekuna' if p.get('redist')=='conditional' else 'decyzja opiekuna; patrz redist w manifeście'
+                    elif p.get('license').startswith('GPL'):redist='GPL: ze zgodnym źródłem'
+                    else:redist='nieustalona licencja — plik użytkownika' if p.get('redist')=='unknown' else 'plik użytkownika'
                     rows.append([title,lang,p.id,p.get('provides') or p.get('name_en'),f['original'],f['sha256'],str(f['size']),p.get('source'),p.get('license'),redist,status,origin or ('not indexed: '+p.get('status') if p.get('status') else 'not found in indexed containers')])
             default=[]
             excludes=[p.id for p in m.packages if p.id.startswith('dun') or (os_id=='NT4' and p.id.startswith('nt4-sp6a-'))]

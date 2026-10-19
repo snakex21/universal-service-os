@@ -11,6 +11,6 @@ def build(root: Path, out: Path, *, host=False):
     src=root/'src/platform/win32_legacy/usosadd'
     target=[] if host else ['-target','x86_64-linux-musl','-static']
     subprocess.run([zig,'cc',*target,'-O2','-Wall','-Wextra','-Werror','-Wno-misleading-indentation',
-                    '-I'+str(src),str(root/'tools/addons/legacy_stage_plan.c'),str(root/'tools/addons/legacy_stage_iso.c'),
+                    '-I'+str(src),str(root/'tools/addons/legacy_stage_plan.c'),str(root/'tools/addons/legacy_stage_iso.c'),str(root/'tools/addons/legacy_stage_zip.c'),
                     *[str(src/n) for n in ('str.c','ini.c','detect.c','plan.c')],'-o',str(exe)],env=env,check=True)
     return exe

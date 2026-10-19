@@ -7,6 +7,7 @@
 #include <string.h>
 #include "ua.h"
 int legacy_iso(const char *,const char *,const char *);
+int legacy_zip(const char *,const char *);
 static ua_ini manifest,select_ini;
 static ua_pkgs packages;
 static ua_plan plan;
@@ -45,6 +46,8 @@ static int language(const char *path){char buf[65537],*p;FILE *f=fopen(path,"rb"
  if(strstr(buf,"README for Setup")){puts("EN");return 0;}
  puts("XX");return 0;}
 int main(int argc,char **argv){int n;
+ if(argc==4&&!strcmp(argv[1],"prepare-zip"))return legacy_zip(argv[2],argv[3]);
+ if(argc==3&&!strcmp(argv[1],"list-zip"))return legacy_zip(argv[2],0);
  if(argc==4&&!strcmp(argv[1],"unpack-iso"))return legacy_iso(argv[2],argv[3],0);
  if(argc==5&&!strcmp(argv[1],"scan-iso"))return legacy_iso(argv[2],argv[3],argv[4]);
  if(argc==3&&!strcmp(argv[1],"language"))return language(argv[2]);
@@ -55,4 +58,5 @@ int main(int argc,char **argv){int n;
  ua_selection(&manifest,&select_ini,&choice);if(!strcmp(choice.preset,"none"))return 0;
  ua_copy(system_id.lang,sizeof system_id.lang,argv[4]);ua_copy(system_id.ntsp,sizeof system_id.ntsp,argv[5]);
  if(!strcmp(argv[3],"95")){add_plan("95OSR2");add_plan("95OSR21");add_plan("95OSR25");}
+ else if(!strcmp(argv[3],"NT4")&&!argv[5][0]){ua_copy(system_id.ntsp,sizeof system_id.ntsp,"0");add_plan("NT4");ua_copy(system_id.ntsp,sizeof system_id.ntsp,"6a");add_plan("NT4");}
  else add_plan(argv[3]);return emit();}

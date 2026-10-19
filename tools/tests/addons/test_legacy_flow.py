@@ -4,6 +4,7 @@ import hashlib,importlib.util,os,shutil,struct,subprocess,sys,tempfile,unittest,
 ROOT=Path(__file__).resolve().parents[3]
 sys.path[:0]=[str(ROOT/'tools'),str(ROOT/'tools/addons')]
 import legacy_manifest as lm
+import prepare_legacy_user_files as prepare_user
 from build_legacy_stage import build
 OUT=ROOT/'artifacts/legacy-pack/flow-tests';OUT.mkdir(parents=True,exist_ok=True)
 tempfile.tempdir=str(OUT)
@@ -22,7 +23,9 @@ class Policy(unittest.TestCase):
  def test_release_classes_and_missing_source_are_explicit(self):
   m=lm.Manifest.load()
   for p in m.packages:
-   if p.id.startswith(('ie5','ie6','dcom','dun','wmp','nt4-sp6a-','nt4-srp-')):self.assertEqual(p.get('source'),'release',p.id)
+   if p.id.startswith(('ie5','ie6','dcom','dun','wmp','nt4-sp6a-','nt4-srp-')) and p.id!='wmp9-classic-skin':self.assertEqual(p.get('source'),'release',p.id)
+   if p.id.startswith(('nt4-sp6a-','nt4-srp-')) or p.id in ('ie55sp2-pl','ie6sp1-pl-9x','ie6sp1-pl-nt4','ie6sp1-en-9x','ie6sp1-en-nt4'):self.assertEqual(p.get('redist'),'no',p.id)
+  skin=m.find('wmp9-classic-skin');self.assertEqual((skin.get('source'),skin.get('redist')),('user','unknown'))
   p=m.find('kernelex');self.assertEqual((p.get('source'),p.get('status'),p.tier),('bundled','missing','option'))
   self.assertEqual(m.find('speechsdk51-langpack').get('status'),'missing')
  def test_nt4_sp6a_is_not_planned_twice(self):
@@ -32,10 +35,12 @@ class Policy(unittest.TestCase):
  def test_runtime_defers_vm_and_reuses_lan_component(self):
   s=(ROOT/'src/platform/win32_legacy/usosadd/main.c').read_text()
   entry=s.split('void __cdecl ua_start(void)',1)[1]
-  self.assertLess(entry.index('if (virtual_machine())'),entry.index('run_chain();'))
+  self.assertLess(entry.index('if (ua_ieq(g_sys.os,"NT4") && virtual_machine())'),entry.index('run_chain();'))
   self.assertIn('lan_defaults(0);',s);self.assertIn('lan_defaults(1);',s)
   self.assertIn('C:\\\\USOS9X\\\\LOGS',s);self.assertIn('C:\\\\USOS\\\\NT4',s)
   self.assertNotIn('Sleep(5000)',s)
+  self.assertIn('usos_wait_desktop(addons_desktop_ready,300000)',s)
+  self.assertIn('" /refresh"',s)
 
 class Stage(unittest.TestCase):
  @classmethod
@@ -80,6 +85,35 @@ file1=SETUP.EXE|demo.bin|HASH|SIZE
   # No dynamic interpreter segment on the Linux initramfs build.
   data=self.linux.read_bytes();phoff=struct.unpack_from('<Q',data,32)[0];size,num=struct.unpack_from('<HH',data,54)
   self.assertNotIn(3,[struct.unpack_from('<I',data,phoff+i*size)[0] for i in range(num)])
+ def test_host_user_export_is_flat_pinned_and_does_not_change_inputs(self):
+  source=self.root/'own-source.zip'
+  with zipfile.ZipFile(source,'w') as z:z.writestr('app/upd_c/odd.exe',self.blob)
+  before=source.read_bytes()
+  text=self.manifest.replace('demo.bin','WinSPatcher_own.exe!app/upd_c/odd.exe').replace('tier=full','tier=full\nsource=user')
+  text=text.replace('HASH',self.hash).replace('SIZE',str(len(self.blob)))
+  mpath=self.root/'own.ini';mpath.write_text(text);m=lm.Manifest.load(mpath)
+  result=prepare_user.prepare(m,[source],self.root/'prepared')
+  self.assertEqual((result['prepared'],result['missing']),(1,0))
+  self.assertEqual((self.root/'prepared/USOS/WSP/DEMO/SETUP.EXE').read_bytes(),self.blob)
+  self.assertEqual(source.read_bytes(),before);self.assertEqual(mpath.read_text(),text)
+  self.assertFalse((self.root/'prepared/.work').exists())
+  with self.assertRaises(ValueError):prepare_user.prepare(m,[source],self.root/'prepared')
+  with self.assertRaises(ValueError):prepare_user.prepare(m,[self.root],self.root/'nested-target')
+ def test_zip32_sfx_offsets_and_malformed_directory(self):
+  import io
+  for adjusted in (False,True):
+   prefix=b'MZ own SFX stub'*19;stream=io.BytesIO(prefix if adjusted else b'')
+   if adjusted:stream.seek(0,2)
+   with zipfile.ZipFile(stream,'w') as z:z.writestr('ROOT/FILE.DAT',self.blob)
+   source=self.root/'sfx.exe';source.write_bytes(stream.getvalue() if adjusted else prefix+stream.getvalue())
+   before=source.read_bytes();dest=self.root/'fixed.zip'
+   r=subprocess.run([str(self.exe),'prepare-zip',str(source),str(dest)],capture_output=True)
+   self.assertEqual(r.returncode,0,r.stderr)
+   with zipfile.ZipFile(dest) as z:self.assertEqual(z.read('ROOT/FILE.DAT'),self.blob)
+   self.assertEqual(source.read_bytes(),before)
+   for offset,fmt,value in ((12,'<I',0x7fffffff),(16,'<I',0xffffffff),(4,'<H',1),(10,'<H',65535)):
+    broken=bytearray(before);pos=broken.rfind(b'PK\x05\x06');struct.pack_into(fmt,broken,pos+offset,value);source.write_bytes(broken)
+    self.assertNotEqual(subprocess.run([str(self.exe),'prepare-zip',str(source),str(self.root/'bad.zip')]).returncode,0)
  def test_iso_root_reader_and_bad_extents(self):
   image=bytearray(24*2048);pvd=16*2048;image[pvd:pvd+7]=b'\x01CD001\x01'
   def record(lba,size,name,flags=0):
@@ -124,6 +158,13 @@ file1=SETUP.EXE|demo.bin|HASH|SIZE
    for lang in ('PL','EN','XX'):
     r=self.stage(os_id,lang,'6a' if os_id=='NT4' else '');self.assertEqual(r.returncode,0,(os_id,lang,r.stderr))
     self.assertIn('lang='+lang,(self.target/'USOS/ADDONS/SELECT.INI').read_text())
+ def test_nt4_without_external_sp_stages_sp6a_and_post_sp_members(self):
+  text=(ROOT/'src/addons/legacy-pack.ini').read_text(encoding='utf-8')
+  for lang in ('PL','EN'):(self.lib/'addons'/('LEGACY.'+lang)).write_bytes(text.encode('cp1250' if lang=='PL' else 'cp1252',errors='replace'))
+  r=self.stage('NT4','PL','');self.assertEqual(r.returncode,0,r.stderr)
+  plan=(self.target/'USOS/ADDONS/PLAN.TXT').read_text();self.assertIn('file|nt4-sp6a-pl|',plan);self.assertIn('file|hfnt',plan)
+  r=self.stage('NT4','PL','6a');self.assertEqual(r.returncode,0,r.stderr)
+  self.assertNotIn('file|nt4-sp6a-',(self.target/'USOS/ADDONS/PLAN.TXT').read_text())
  def test_dun_exclusion_and_me_always_off(self):
   self.write_manifest(self.manifest+'\n[pkg:dun-test]\ndir=DUN\nos=9X\nlang=*\ntier=full\norder=2\n')
   self.assertEqual(self.stage().returncode,0);self.assertIn('exclude=dun-test',(self.target/'USOS/ADDONS/SELECT.INI').read_text())

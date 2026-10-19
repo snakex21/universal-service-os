@@ -15,6 +15,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include "ua.h"
+#include "../../../../tools/legacy_desktop_wait.h"
 
 #define MANIFEST_CAP (256 * 1024)
 #define SMALL_CAP (16 * 1024)
@@ -564,8 +565,12 @@ static int setup_busy(void) {
     return FindWindowA("Shell_TrayWnd", 0) == 0;
 }
 
-/* Defer early Run/Setup calls until a later normal logon. No startup loop. */
-static int wait_for_desktop(void) { return !setup_busy(); }
+/* Wait for first-session readiness notifications, with a fixed deadline. */
+static int addons_desktop_ready(void) { return !setup_busy(); }
+static int wait_for_desktop(void) {
+    if(!addons_desktop_ready())log_line("USOSADD: waiting for desktop/Setup notifications; bounded, no polling");
+    return usos_wait_desktop(addons_desktop_ready,300000);
+}
 
 /* IE/DUN installers may reset browser settings. Reuse the network task's
  * helper and its existing config, only when that component was staged. */
@@ -582,6 +587,7 @@ static void lan_defaults(int launch) {
         char command[UA_PATH]; STARTUPINFOA si; PROCESS_INFORMATION pi;
         zero(&si, sizeof si); zero(&pi, sizeof pi); si.cb = sizeof si;
         ua_copy(command, sizeof command, exe);
+        ua_append(command, sizeof command, " /refresh");
         if (CreateProcessA(exe, command, 0, 0, FALSE, 0, 0, 0, &si, &pi)) {
             CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
         }
@@ -910,7 +916,7 @@ void __cdecl ua_start(void) {
     /* Started from Run after the shell; still wait while Setup finishes
      * (an older RunOnce entry, or a slow first boot). */
     register_run();
-    if (virtual_machine()) {
+    if (ua_ieq(g_sys.os,"NT4") && virtual_machine()) {
         log_line("USOSADD: VM deferred; Run retained for the first hardware desktop");
         ExitProcess(0);
     }

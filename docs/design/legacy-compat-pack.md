@@ -400,9 +400,11 @@ user-supplied file is the **permanent** source (a clean-room DirectX, MDAC,
 | MDAC 2.8 SP1 | MDAC redistributable, with applications | **MS asset** (decision) |
 | MSLU | Platform SDK redistributable, with your application | **MS asset** (decision) |
 | .NET 1.1 / 2.0 + langpacks, .NET 1.1 SP1 | .NET redistributable, with your application | **MS asset** (decision) |
-| DCOM95/DCOM98, DUN, WMP, IE, SP6a, SRP | package-specific Microsoft terms, recorded as conditional | **MS asset**, maintainer decision 2026-10-20; no binary in Git |
+| DCOM95/DCOM98, DUN, WMP players | package-specific conditions, unchanged from the original manifest | **MS asset**, maintainer decision 2026-10-20; no binary in Git |
+| IE 5.5/6 offline sets, NT4 SP6a/SRP | `redist=no`: no redistribution grant established | **MS asset by maintainer decision 2026-10-20**, distinct from licence permission |
+| DCOM configuration utility / IE 5.5 Q810847 update | part of DCOM/IE in decision 11; original redist fields retained | **MS asset**, explicitly confirmed by the user during this review |
+| WMP 9 third-party skin | licence unknown | **user file**, outside decision 11 |
 | RDP, DSClient and other hotfixes | recorded package terms | **user file**, unchanged unless explicitly classified otherwise |
-| IE 5.5 / 6 sets | IE terms; no independent license determination in this port | **MS asset**, maintainer decision 2026-10-20 |
 | Movie Maker 98, NUSB 3.3a | community repacks of Microsoft binaries, no licence | **user file** only |
 | KernelEx 4.0 Final 2 | GPL-2.0 (its `License.txt`) | **bundled option, status=missing** until matching source and notices are present; no binary shipped by this port |
 | ASPI 4.71a2 | Adaptec; freely downloadable, no redistribution grant found | **user file** |
@@ -489,7 +491,7 @@ hardware allows it, and by hand on the X470 (RX 560, USB-only input):
 | Sound | | | SB16 found, warning | | | sb16 (98 driver) | no HD Audio driver on 9x (gap) |
 | Clean shutdown / restart | | | PASS | | | ACPI power-off in QEMU | by hand |
 | Period apps start: IE 6, WMP, a DirectX app (dxdiag), a VB6 app, a .NET 2.0 app | | | | | | USOS test apps (to write) | by hand |
-| Pack summary: `zainstalowano X/Y` with reasons | | | PASS | | | `C:\USOS\addons.log`, message box | by hand |
+| Pack summary: `zainstalowano X/Y` with reasons | | | PASS | | | `C:\USOS9X\LOGS\ADDONS.LOG` / `C:\USOS\NT4\ADDONS.LOG`, message box | by hand |
 
 QEMU results: see Â§6.1 (98 SE PL; * = after the fixes found in that run; the other systems are still to run).
 
