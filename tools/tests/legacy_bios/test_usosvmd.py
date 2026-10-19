@@ -20,8 +20,15 @@ boxes an Int 33h mouse (docs/dos-mouse-2026-10-18.md). Checks:
         VMOUSE and copies into the system VM's shared ring through the
         system VM's mapping (the Me callback hazard fix: no V86 code in
         private memory is run);
-      - drain posts to VMOUSE (b1=0x20, b2=0x08, b3=0x10, X as read, Y
-        negated, overflow skipped); a later VMOUSE type change stops posting;
+      - drain posts to VMOUSE in the button byte VMOUSE itself decodes
+        (left 0x20 = PrimaryButton, right 0x10 = SecondaryButton, middle
+        0x04; v3 sent right as 0x08, a 4th button on Me: the X470 "right
+        button does nothing"), X as read, Y negated, overflow skipped,
+        ONE post per time-out (VMOUSE drops a post while its event is
+        pending): same-button packets summed, a button change waits for
+        the next time-out, the last change repeated once; checked against
+        a model of VMOUSE (VmouseModel) per button, press and release;
+        a later VMOUSE type change stops posting;
       - PM API: attach (block checked), status, status-block copy;
   * USOSMOUS.DRV / USOSKEY.DRV source contracts for the VMOUSE mode.
 """
@@ -81,16 +88,21 @@ def le_image(path: Path):
     return bytes(buf[:vs])
 
 
-def vxd_calls(code: bytes):
+def vxd_calls(code: bytes, start: int = 0):
+    """INT 20h service dwords, found by walking the instructions from
+    `start` (the code): a byte scan would also take an `or ch, 20h`
+    (80 CD 20) for a service call."""
+    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
     out = []
-    i = 0
+    i = start
     while i < len(code) - 5:
         if code[i] == 0xcd and code[i + 1] == 0x20:
             v = struct.unpack_from('<I', code, i + 2)[0]
             out.append((v >> 16, v & 0x7fff))
             i += 6
-        else:
-            i += 1
+            continue
+        ins = next(md.disasm(code[i:i + 15], i), None)
+        i += ins.size if ins else 1
     return out
 
 
@@ -116,6 +128,44 @@ BLK_SEG, BLK_OFF = 0x2230, 0x0104    # the shared block in the system VM
 CB_ADDR = 0xFD6224F7
 
 
+class VmouseModel:
+    """What VMOUSE does with VMD_Post_Pointer_Message (behaviour of Windows
+    Me's VMOUSE.VXD, cross-checked with the 98 SE DDK debug build,
+    2026-10-19): one pending message - a post while its event has not run
+    is dropped; the event decodes AL with the PrimaryButton mask 20h, the
+    SecondaryButton mask 10h (registry defaults) and 04h as the middle
+    button (08h: a fourth button on Me) and calls USER's event procedure
+    with the change flags SF_B1/B2/B3 DOWN/UP and SF_MOVEMENT."""
+    PRIMARY, SECONDARY, MIDDLE, FOURTH = 0x20, 0x10, 0x04, 0x08
+
+    def __init__(self):
+        self.pending, self.state, self.user, self.dropped = None, 0, [], 0
+
+    def post(self, al, dx, dy):
+        if self.pending is not None:
+            self.dropped += 1
+            return
+        self.pending = (al, dx, dy)
+
+    def run_event(self):
+        if self.pending is None:
+            return
+        al, dx, dy = self.pending
+        self.pending = None
+        now = ((1 if al & self.PRIMARY else 0) | (2 if al & self.SECONDARY else 0)
+               | (4 if al & self.MIDDLE else 0) | (8 if al & self.FOURTH else 0))
+        f = 1 if (dx or dy) else 0
+        for bit, down, up in ((1, 0x02, 0x04), (2, 0x08, 0x10), (4, 0x20, 0x40)):
+            if (now ^ self.state) & bit:
+                f |= down if now & bit else up
+        self.state = now
+        self.user.append((f, dx, dy))
+
+    def buttons(self):
+        """USER-level button flags only, in order."""
+        return [f & 0x7E for f, _, _ in self.user if f & 0x7E]
+
+
 class Vxd:
     """The built VxD in Unicorn at ring 0 (flat 32-bit). VxD service calls
     (INT 20h + dword) go to `svc`; every call is logged in `calls`."""
@@ -131,6 +181,7 @@ class Vxd:
         self.calls, self.posts, self.set_data = [], [], []
         self.map_flat = 0
         self.far_rets = []
+        self.vmouse = VmouseModel()
         u.hook_add(UC_HOOK_INTR, self.on_intr)
 
     def on_intr(self, uc, n, data):
@@ -161,6 +212,8 @@ class Vxd:
                 fl |= 1
         elif (dev, svc) == (0xc, 0x03):             # VMD_Post_Pointer_Message
             self.posts.append((r(UC_X86_REG_EAX) & 0xff, r(UC_X86_REG_ESI), r(UC_X86_REG_EDI), r(UC_X86_REG_EDX)))
+            s32 = lambda x: x - 0x100000000 if x >= 0x80000000 else x
+            self.vmouse.post(r(UC_X86_REG_EAX) & 0xff, s32(r(UC_X86_REG_ESI)), s32(r(UC_X86_REG_EDI)))
         elif (dev, svc) == (1, 0x4A):               # Simulate_Far_Ret (EBP -> client regs)
             self.far_rets.append(r(UC_X86_REG_EBP))
         elif (dev, svc) == (1, 0x1C):               # Map_Flat
@@ -276,7 +329,7 @@ class UsosVmd(unittest.TestCase):
         i = b.find(b'USOSVMD ')
         ddb = i - 12
         self.assertEqual(struct.unpack_from('<H', b, ddb + 4)[0], 0x400)      # SDK 4.0
-        self.assertEqual(b[ddb + 8], 3)                                       # version 3
+        self.assertEqual((b[ddb + 8], b[ddb + 9]), (3, 1))                    # version 3.1
         self.assertEqual(struct.unpack_from('<I', b, ddb + 20)[0], 0x34000000 - 1)  # just before VMOUSE
         self.assertEqual(struct.unpack_from('<I', b, ddb + 32)[0], self.sym['USOSVMD_PM_API'])
 
@@ -363,7 +416,7 @@ class UsosVmd(unittest.TestCase):
         # exactly the documented services: VMM Get_Sys_VM_Handle,
         # Allocate_V86_Call_Back, Map_Flat, Set_Global_Time_Out; VMOUSE
         # Get_Version, Post_Pointer_Message, Set_Mouse_Data, Get_Mouse_Data
-        self.assertEqual(set(vxd_calls(self.img)),
+        self.assertEqual(set(vxd_calls(self.img, self.sym['dev_init_proc'] - BASE)),
                          {(1, 0x03), (1, 0x0B), (1, 0x1C), (1, 0x3C), (1, 0x4A),
                           (0xc, 0x00), (0xc, 0x03), (0xc, 0x06), (0xc, 0x07)})
 
@@ -473,9 +526,87 @@ class UsosVmd(unittest.TestCase):
     def test_drain_sign_and_button_map(self):
         v = self.post_one(0x06 | 0x10 | 0x20, 0xFE, 0xFD)
         al, esi, edi, _ = v.posts[0]
-        self.assertEqual(al, 0x08 | 0x10)                      # b2 | b3
+        self.assertEqual(al, 0x10 | 0x04)                      # right (SecondaryButton) | middle
         self.assertEqual(self.s32(esi), -2)
         self.assertEqual(self.s32(edi), 3)
+
+    # --- buttons as VMOUSE decodes them (X470 Me: right button lost) --------
+    def tick(self, v, event=True):
+        """One 20 ms time-out; VMOUSE's event runs before the next one."""
+        v.run('drain')
+        if event:
+            v.vmouse.run_event()
+
+    def press_release(self, statuses):
+        v = self.ready()
+        for st in statuses:
+            v.bios_call(SYSCB, SYS_HIGH, 0x08 | st, 0, 0, 0)
+            self.tick(v)
+        self.tick(v)                                            # the repeat
+        return v
+
+    def test_each_button_press_and_release(self):
+        for bit, down, up, name in ((1, 0x02, 0x04, 'left'), (2, 0x08, 0x10, 'right'),
+                                    (4, 0x20, 0x40, 'middle')):
+            with self.subTest(name):
+                v = self.press_release([bit, 0])
+                self.assertEqual(v.vmouse.buttons(), [down, up])
+                self.assertEqual(v.vmouse.state, 0)
+                self.assertEqual(v.vmouse.dropped, 0)
+
+    def test_button_byte_per_button(self):
+        for st, al in ((1, 0x20), (2, 0x10), (4, 0x04), (3, 0x30), (5, 0x24), (6, 0x14), (7, 0x34)):
+            with self.subTest(st=st):
+                v = self.post_one(0x08 | st, 0, 0)
+                self.assertEqual(v.posts[0][0], al)
+                self.assertEqual(v.posts[0][0] & 0x08, 0)          # never Me's 4th button
+                self.assertEqual(v.posts[0][0] & 0x01, 0)          # no wheel flag (ECX)
+
+    def test_button_combinations(self):
+        # left down, right down (left held), left up, right up, middle down+up
+        v = self.press_release([1, 3, 2, 0, 4, 0])
+        self.assertEqual(v.vmouse.buttons(), [0x02, 0x08, 0x04, 0x10, 0x20, 0x40])
+        # left+right+middle together, then all released together
+        v = self.press_release([7, 0])
+        self.assertEqual(v.vmouse.buttons(), [0x02 | 0x08 | 0x20, 0x04 | 0x10 | 0x40])
+
+    def test_burst_in_one_time_out_loses_nothing(self):
+        """SeaBIOS can hand over several packets between two time-outs; a
+        press and a release among them must each reach USER (v3 posted all
+        of them at once and VMOUSE kept only the first)."""
+        v = self.ready()
+        for st, dx, dy in ((0x08, 3, 0), (0x08, 2, 1), (0x0A, 0, 0), (0x0A, 4, 0), (0x08, 0, 0), (0x08, 1, 0)):
+            v.bios_call(SYSCB, SYS_HIGH, st, dx, dy, 0)
+        for _ in range(6):
+            self.tick(v)
+        self.assertEqual(v.vmouse.dropped, 0)
+        self.assertEqual(v.vmouse.buttons(), [0x08, 0x10])     # right down, right up
+        self.assertEqual(sum(dx for _, dx, _ in v.vmouse.user), 10)
+        self.assertEqual(sum(dy for _, _, dy in v.vmouse.user), -1)
+        # the first post is the motion run before the press, summed
+        self.assertEqual(v.vmouse.user[0], (1, 5, -1))
+        self.assertEqual(v.st(OWN_TAIL), v.st(OWN_HEAD))
+
+    def test_change_dropped_by_a_pending_event_is_repeated(self):
+        v = self.ready()
+        v.bios_call(SYSCB, SYS_HIGH, 0x08, 2, 0, 0)
+        self.tick(v, event=False)                               # VMOUSE's event not run yet
+        v.bios_call(SYSCB, SYS_HIGH, 0x0A, 0, 0, 0)             # right down
+        self.tick(v)                                            # posted while pending: dropped
+        self.assertEqual(v.vmouse.dropped, 1)
+        self.assertEqual(v.vmouse.buttons(), [])
+        self.tick(v)                                            # nothing queued: the repeat
+        self.assertEqual(v.vmouse.buttons(), [0x08])
+        self.tick(v)                                            # repeated once only
+        self.assertEqual(len(v.posts), 3)
+
+    def test_repeat_changes_nothing_when_the_first_arrived(self):
+        v = self.press_release([2])
+        self.assertEqual(v.vmouse.buttons(), [0x08])
+        self.assertEqual(v.vmouse.user[-1], (0, 0, 0))         # the repeat: no change, no motion
+        n = len(v.posts)
+        self.tick(v)
+        self.assertEqual(len(v.posts), n)                       # idle: no further posts
 
     def test_drain_skips_overflow(self):
         v = self.ready()
@@ -544,7 +675,7 @@ class UsosVmd(unittest.TestCase):
         self.assertEqual(v.client_word(0x2C) & 1, 0)           # CF clear
         v.client(eax=0)
         v.run('USOSVMD_PM_API', ebp=CRS)
-        self.assertEqual((v.client_word(0x1C), v.client_word(0x10), v.client_word(0x14)), (0x5655, 0x0300, 1))
+        self.assertEqual((v.client_word(0x1C), v.client_word(0x10), v.client_word(0x14)), (0x5655, 0x0301, 1))
         v.map_flat = 0x700000
         v.client(eax=2)
         v.run('USOSVMD_PM_API', ebp=CRS)

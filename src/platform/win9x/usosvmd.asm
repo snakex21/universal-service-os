@@ -39,11 +39,34 @@
 ;   - Init_Complete and every time-out check that VMM-visible DDB fields we
 ;     own (DDB_Size, DDB_Reserved1..3) are intact (err bit 80h otherwise).
 ;
+; Version 3.1 (2026-10-19), after "right button does nothing" on the X470
+; (Windows Me; left, motion and the DOS boxes worked):
+;   - the VMOUSE button byte. v3 posted right = 08h and middle = 10h (the
+;     DDK reference table read as b2/b3). VMOUSE itself decodes AL with
+;     two masks, PrimaryButton 20h and SecondaryButton 10h by default
+;     (registry values of the same names, button numbers indexing the
+;     table 20h, 08h, 10h, 04h), and 04h as the middle button; Windows Me's
+;     VMOUSE takes 08h as a fourth button (98 SE: 08h folds into the middle
+;     button). So v3's right button was a 4th / middle button and its
+;     middle button the right one. Now left 20h, right 10h, middle 04h;
+;   - one VMD_Post_Pointer_Message per time-out. VMOUSE keeps ONE pending
+;     message: a post while its event (Call_Priority_VM_Event) has not run
+;     yet is dropped. v3 posted every queued packet in a loop, so all but
+;     the first packet of a time-out were lost (a press or release among
+;     them with it). Now the time-out sums the packets with the same button
+;     state and stops at a button change (the rest waits for the next
+;     time-out, 20 ms later), and a time-out with nothing queued repeats
+;     the last button change once, without motion (VMOUSE compares with its
+;     own state, so a repeat that arrives twice changes nothing).
+;   Both from a behaviour analysis of Windows Me's VMOUSE.VXD and the 98 SE
+;   DDK debug VMOUSE.VXD (with its symbol file) supplied by the user; only
+;   the facts were taken, no code.
+;
 ; Per packet the callback
 ;   - queues it in this driver's own ring (posted to VMOUSE from a 20 ms
-;     global time-out with VMD_Post_Pointer_Message: buttons mapped to the
-;     VMOUSE AL format, X as read, Y negated), only while this driver owns
-;     VMOUSE's mouse data (see below);
+;     global time-out with VMD_Post_Pointer_Message, one message per
+;     time-out: buttons mapped to the VMOUSE AL format, X as read, Y
+;     negated), only while this driver owns VMOUSE's mouse data (see below);
 ;   - copies it into USOSKEY's shared-block mouse ring (magic "USKY", v4) in
 ;     the system VM, through the system VM's high linear mapping: USOSMOUS
 ;     .DRV's timer takes only the wheel byte (Z word, CSMWrap patch 0016 /
@@ -62,7 +85,7 @@
 ; state is in the status block for USOSDBG.
 ;
 ; PM API (INT 2Fh AX=1684h BX=0 ES:DI -> "USOSVMD "), AX = function:
-;   0  status: AX='UV', BX=version 0300h, CX=callbacks (low word),
+;   0  status: AX='UV', BX=version 0301h, CX=callbacks (low word),
 ;      DX=mode (0 VMOUSE absent, 1 minidriver, 2 observer)
 ;   1  attach: BX:CX = segment:offset of USOSKEY's shared block in the
 ;      system VM. Checks magic and version, then returns AX='UV',
@@ -199,7 +222,7 @@ USOSVMD_DDB label dword
         dw      400h                    ; DDB_SDK_Version (DDK 4.0)
         dw      0                       ; DDB_Req_Device_Number = Undefined
         db      3                       ; DDB_Dev_Major_Version
-        db      0                       ; DDB_Dev_Minor_Version
+        db      1                       ; DDB_Dev_Minor_Version (3.1)
         dw      0                       ; DDB_Flags
         db      'USOSVMD '              ; DDB_Name (8 chars)
         dd      VMD_INIT_ORDER - 1      ; DDB_Init_Order: just before VMOUSE (see below)
@@ -262,7 +285,8 @@ STATUS_SIZE     equ     64
 ; own ring (callback -> time-out), 64 x [status, dx, dy, z]
 own_head        db      0
 own_tail        db      0
-                db      0,0
+own_last        db      0               ; VMOUSE button byte of the last post
+own_resend      db      0               ; 1: repeat own_last once (see drain)
 own_ring        db      256 dup (0)
 
 ; Mouse_Instance passed to VMD_Post_Pointer_Message (EDX).
@@ -483,53 +507,105 @@ cb_done:
         ret
 v86_cb endp
 
-;--- drain the own ring and post each packet to VMOUSE ---------------------
-; VMOUSE packet AL: bit5=b1(left), bit3=b2(right), bit4=b3(middle) (public
-; DDK VMD.INC / MOUSE.DOC). ESI = X delta as read, EDI = PS/2 Y negated
-; (down positive). EDX -> our Mouse_Instance. Overflow packets are skipped.
+;--- drain the own ring: ONE post to VMOUSE per time-out --------------------
+; VMOUSE button byte (AL of VMD_Post_Pointer_Message) as VMOUSE decodes it
+; (Windows Me and 98 SE VMOUSE.VXD, version 3.1 above): PrimaryButton mask
+; 20h, SecondaryButton mask 10h (registry defaults), 04h middle; 08h is a
+; fourth button on Me; bit 0 would announce a wheel in ECX (not used:
+; USOSMOUS.DRV sends the wheel). PS/2 status bit 0 left, 1 right, 2 middle.
+VMB_LEFT                equ 20h
+VMB_RIGHT               equ 10h
+VMB_MIDDLE              equ 04h
+
+; VMOUSE keeps one pending message and drops a post while its event has
+; not run, so each time-out posts once: the packets from the tail with the
+; same button state as the first one, X and Y summed; a packet with another
+; button state stays queued for the next time-out (every press and release
+; gets a post of its own, in order). Overflow packets (status C0h bits) are
+; skipped. With nothing queued, the last button change is posted once more
+; without motion (in case its post met a pending event). ESI = X sum as
+; read, EDI = PS/2 Y sum negated (down positive), EDX -> our Mouse_Instance.
 drain proc near
+        cmp     byte ptr [st_mode], MODE_MINI
+        je      dr_mini
+        mov     al, [own_head]          ; observer since queued: drop all
+        mov     [own_tail], al
+        ret
+dr_mini:
+        xor     esi, esi                ; X sum
+        xor     edi, edi                ; PS/2 Y sum (up positive)
+        xor     edx, edx                ; DL = 1 once the run has a packet, DH = its buttons
 dr_loop:
         mov     al, [own_tail]
         cmp     al, [own_head]
-        je      drain_done
+        je      dr_post
         movzx   ebx, al
         shl     ebx, 2
-        inc     al
-        and     al, OWN_MASK
-        mov     [own_tail], al
-        cmp     byte ptr [st_mode], MODE_MINI
-        jne     dr_loop                 ; observer since queued: drop
         mov     cl, [own_ring+ebx]      ; status
         test    cl, 0C0h
-        jnz     dr_loop
-        movzx   esi, byte ptr [own_ring+ebx+1]
-        test    cl, 10h
-        jz      dr_dxp
-        or      esi, 0FFFFFF00h
-dr_dxp:
-        movzx   edi, byte ptr [own_ring+ebx+2]
-        test    cl, 20h
-        jz      dr_dyp
-        or      edi, 0FFFFFF00h
-dr_dyp:
-        neg     edi
-        xor     al, al
+        jnz     dr_next                 ; overflow: no valid packet
+        xor     ch, ch
         test    cl, 1
         jz      dr_nl
-        or      al, 20h                 ; b1 (left)
+        or      ch, VMB_LEFT
 dr_nl:
         test    cl, 2
         jz      dr_nr
-        or      al, 08h                 ; b2 (right)
+        or      ch, VMB_RIGHT
 dr_nr:
         test    cl, 4
         jz      dr_nm
-        or      al, 10h                 ; b3 (middle)
+        or      ch, VMB_MIDDLE
 dr_nm:
+        test    dl, dl
+        jz      dr_first
+        cmp     ch, dh
+        jne     dr_post                 ; button change: the next time-out
+        jmp     dr_add
+dr_first:
+        mov     dh, ch
+        mov     dl, 1
+dr_add:
+        movzx   eax, byte ptr [own_ring+ebx+1]
+        test    cl, 10h
+        jz      dr_dxp
+        or      eax, 0FFFFFF00h
+dr_dxp:
+        add     esi, eax
+        movzx   eax, byte ptr [own_ring+ebx+2]
+        test    cl, 20h
+        jz      dr_dyp
+        or      eax, 0FFFFFF00h
+dr_dyp:
+        add     edi, eax
+dr_next:
+        mov     al, [own_tail]
+        inc     al
+        and     al, OWN_MASK
+        mov     [own_tail], al
+        jmp     dr_loop
+dr_post:
+        test    dl, dl
+        jnz     dr_have
+        cmp     byte ptr [own_resend], 0
+        je      drain_done              ; nothing queued, nothing to repeat
+        mov     byte ptr [own_resend], 0
+        mov     dh, [own_last]          ; ESI = EDI = 0
+        jmp     dr_send
+dr_have:
+        mov     al, 0
+        cmp     dh, [own_last]
+        je      dr_keep
+        mov     al, 1                   ; a button change: repeat it once
+dr_keep:
+        mov     [own_resend], al
+        mov     [own_last], dh
+dr_send:
+        neg     edi
+        mov     al, dh
         mov     edx, offset mi_inst
         VxDcall VMD_ID, VMD_Post_Pointer_Message
         inc     dword ptr [st_posted]
-        jmp     dr_loop
 drain_done:
         ret
 drain endp
@@ -627,7 +703,7 @@ USOSVMD_PM_API proc near
         jmp     api_fail
 api_status:
         mov     word ptr [ebp+Client_EAX], 5655h        ; 'UV'
-        mov     word ptr [ebp+Client_EBX], 0300h
+        mov     word ptr [ebp+Client_EBX], 0301h
         mov     eax, [st_callbacks]
         mov     word ptr [ebp+Client_ECX], ax
         movzx   eax, byte ptr [st_mode]

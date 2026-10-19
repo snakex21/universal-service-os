@@ -147,6 +147,38 @@ class VmdMode(unittest.TestCase):
         self.assertEqual(e.events, [])
         self.assertEqual(e.shared(W.MTAIL), e.shared(W.MHEAD))             # ring drained
 
+    # (status) -> USER flags of the plain path: left B1 2/4, right B2 8/10h,
+    # middle B3 20h/40h (the X470 right button worked there)
+    BUTTONS = ((0x01, 0x0002, 0x0004, 'left'), (0x02, 0x0008, 0x0010, 'right'),
+               (0x04, 0x0020, 0x0040, 'middle'))
+
+    def test_vmouse_mode_sends_no_buttons(self):
+        """Buttons in VMOUSE mode come only from VMOUSE (USOSVMD.VXD posts
+        them): no button press or release of any kind from this driver's
+        timer, so there is no second, conflicting delivery."""
+        e = self.start()
+        for bit, _, _, name in self.BUTTONS:
+            with self.subTest(name):
+                e.events.clear()
+                e.push_packets([(0x08 | bit, 0, 0, 0), (0x08, 0, 0, 0)])
+                e.poll()
+                self.assertEqual(e.events, [])
+        e.events.clear()
+        e.push_packets([(0x0F, 0, 0, 0), (0x08, 0, 0, 0)])                 # all three, then none
+        e.poll()
+        self.assertEqual(e.events, [])
+
+    def test_plain_path_buttons(self):
+        e = self.start(vxd=False)
+        for bit, down, up, name in self.BUTTONS:
+            with self.subTest(name):
+                e.events.clear()
+                e.push_packets([(0x08 | bit, 0, 0, 0)])
+                e.poll()
+                e.push_packets([(0x08, 0, 0, 0)])
+                e.poll()
+                self.assertEqual([ev[0] for ev in e.events], [down, up])
+
     def test_mode_export_pause_and_disable(self):
         e = self.start(dos=0x0800)
         self.assertEqual(e.export('USOSVMDMODE'), 1)
