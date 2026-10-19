@@ -758,6 +758,39 @@ mkdir -p "$usos"
 usos_net_answer_config "$ANSWER_SIF" NT4 > "$work/network.ini" || fail 'invalid LAN metadata'
 usos_net_stage "$work/network.ini" "$work/c" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
 rm -f "$work/network.ini"
+# Keep the requested $OEM$/$1 layout. NT4 is explicitly copied from it by
+# CMDLINES: unlike NT5, do not assume that NT4 maps $1 to the system drive.
+. "$LIB/legacy_addons.sh"
+usos_addons_config "$ANSWER_SIF" > "$work/addons.ini" || fail 'invalid addon selection'
+addon_lang=XX;case "$lang" in 0415) addon_lang=PL ;; *09) addon_lang=EN ;; esac
+addon_root="$ls_dir/I386/\$OEM\$/\$1"
+if [ -z "$tse" ]; then
+    usos_addons_stage "$work/addons.ini" "$addon_root" "$LIB" "${USOS_ADDONS_DIR:-/mnt/data/Addons}" NT4 "$addon_lang" "${SP_EXE:+6a}" || fail 'cannot stage NT4 legacy pack'
+fi
+rm -f "$work/addons.ini"
+if [ -f "$addon_root/USOS/ADDONS/USOSADD.EXE" ]; then
+    # Both OEM search locations can run this command; COPY.OK makes it once-only.
+    for oem in "$ls_dir/\$OEM\$" "$ls_dir/I386/\$OEM\$"; do
+        printf '".\\ADDONS.CMD"\r\n' >> "$oem/CMDLINES.TXT"
+        crlf > "$oem/ADDONS.CMD" <<'ADDONSCMD'
+@echo off
+rem NT4 CMDLINES copy only; packages start after POST.CMD on hardware.
+if exist C:\USOS\ADDONS\COPY.OK goto addonscopied
+if not exist C:\$WIN_NT$.~LS\I386\$OEM$\$1\USOS\ADDONS\USOSADD.EXE goto addoncopyfailed
+if exist C:\$WIN_NT$.~LS\I386\$OEM$\$1\USOS\NT4\ADDONS.LOG type C:\$WIN_NT$.~LS\I386\$OEM$\$1\USOS\NT4\ADDONS.LOG >> C:\USOS\NT4\ADDONS.LOG
+%SystemRoot%\system32\xcopy.exe C:\$WIN_NT$.~LS\I386\$OEM$\$1\USOS\ADDONS C:\USOS\ADDONS /E /I >> C:\USOS\NT4\ADDONS.LOG 2>&1
+if errorlevel 1 goto addoncopyfailed
+if not exist C:\USOS\ADDONS\USOSADD.EXE goto addoncopyfailed
+if not exist C:\USOS\ADDONS\LEGACY.INI goto addoncopyfailed
+if not exist C:\USOS\ADDONS\SELECT.INI goto addoncopyfailed
+echo ok > C:\USOS\ADDONS\COPY.OK
+goto addonscopied
+:addoncopyfailed
+echo addon OEM copy incomplete; OS Setup continues >> C:\USOS\NT4\ADDONS.LOG
+:addonscopied
+ADDONSCMD
+    done
+fi
 cp "$LIB/nt4/AHCINT.SYS" "$usos/AHCINT.SYS" || fail 'cannot copy AHCINT.SYS'
 cp "$LIB/nt4/USOSRST.SYS" "$usos/USOSRST.SYS" || fail 'cannot copy USOSRST.SYS'
 cp "$LIB/nt4/USOSUSB.SYS" "$usos/USOSUSB.SYS" || fail 'cannot copy USOSUSB.SYS'
@@ -1017,6 +1050,8 @@ echo sp end %errorlevel% >> C:\USOS\NT4\POST.LOG
 :nosp
 if exist C:\USOS\NT4\USOSLAN.EXE if exist C:\USOS\NT4\LAN.REG %SystemRoot%\regedit.exe /s C:\USOS\NT4\LAN.REG
 echo LAN first-desktop registration processed >> C:\USOS\NT4\POST.LOG
+if exist C:\USOS\ADDONS\USOSADD.EXE if exist C:\USOS\ADDONS\ADDONS.REG %SystemRoot%\regedit.exe /s C:\USOS\ADDONS\ADDONS.REG
+echo addons hardware-desktop Run registration processed >> C:\USOS\NT4\POST.LOG
 echo ok > C:\USOS\NT4\POST.OK
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\VERSION.REG "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\CSD.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Windows

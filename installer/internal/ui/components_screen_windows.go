@@ -65,10 +65,11 @@ type componentsScreen struct {
 	hasTarget bool
 	status    components.Status
 
-	winpeSource components.Source
-	xpSource    components.Source
-	xpLang      xpLanguage
-	local       map[components.ID]string
+	winpeSource  components.Source
+	xpSource     components.Source
+	legacySource components.Source
+	xpLang       xpLanguage
+	local        map[components.ID]string
 
 	running bool
 	ran     bool
@@ -87,7 +88,7 @@ func (f *Flow) showComponents(after finalArgs, forced bool) {
 		prog: map[components.ID]components.Progress{}, errs: map[components.ID]error{}}
 	s.bundle = f.componentsBundle()
 	if !s.release.CanDownload() {
-		s.winpeSource, s.xpSource = components.SourceLocal, components.SourceLocal
+		s.winpeSource, s.xpSource, s.legacySource = components.SourceLocal, components.SourceLocal, components.SourceLocal
 	}
 	// The all-in-one installer preselects its own copies (no network).
 	if s.embedded(components.WinPE) {
@@ -95,6 +96,9 @@ func (f *Flow) showComponents(after finalArgs, forced bool) {
 	}
 	if s.embedded(components.PreferredXP(i18n.Current())) {
 		s.xpSource = components.SourceEmbedded
+	}
+	if s.embedded(components.LegacyMS) {
+		s.legacySource = components.SourceEmbedded
 	}
 	f.busy = false
 	f.show(s, "components.primary")
@@ -211,6 +215,9 @@ func (s *componentsScreen) choices() []components.Choice {
 			result = append(result, components.Choice{ID: id, Source: s.xpSource, LocalPath: s.local[id], StoreOnly: i > 0})
 		}
 	}
+	if !s.status.LegacyMS {
+		result = append(result, components.Choice{ID: components.LegacyMS, Source: s.legacySource, LocalPath: s.local[components.LegacyMS]})
+	}
 	return result
 }
 
@@ -323,6 +330,7 @@ func (s *componentsScreen) draw(f *Flow, w *win, area rect) {
 		y = body.Top - offset
 		y += s.drawWinPE(w, rect{body.Left, y, body.Right - w.px(12), 0}) + w.px(14)
 		y += s.drawXP(w, rect{body.Left, y, body.Right - w.px(12), 0}) + w.px(14)
+		y += s.drawLegacy(w, rect{body.Left, y, body.Right - w.px(12), 0}) + w.px(14)
 		w.endScroll("components", body, y+offset-body.Top)
 	}
 	s.drawActions(w, bar)
@@ -485,8 +493,11 @@ func (s *componentsScreen) progressLine(w *win, id components.ID, x, y, right in
 		text, col = i18n.T("installer.components.phase.failed", fmt.Sprint(s.errs[id])), theme.Danger.mix(theme.Text, 0.3)
 	}
 	label := strings.ToUpper(string(id))
-	if id == components.WinPE {
+	switch id {
+	case components.WinPE:
 		label = "WinPE"
+	case components.LegacyMS:
+		label = "95/98/Me/NT4"
 	}
 	text = label + ": " + text
 	h := c.measure(w.captionFont(), text, right-x)
@@ -595,6 +606,33 @@ func (s *componentsScreen) xpContent(w *win, r rect) int32 {
 	for _, id := range []components.ID{components.XPPL, components.XPEN} {
 		y += s.progressLine(w, id, inner.Left, y, inner.Right)
 	}
+	return y - r.Top + w.px(8)
+}
+
+func (s *componentsScreen) drawLegacy(w *win, r rect) int32 {
+	return s.card(w, "legacy", r, s.legacyContent)
+}
+
+// legacyContent: the Microsoft redistributables of the Windows 95/98/Me/NT4
+// compatibility pack (docs/design/legacy-compat-pack.md).
+func (s *componentsScreen) legacyContent(w *win, r rect) int32 {
+	badge, t := i18n.T("installer.components.status.missing"), toneWarning
+	if s.status.LegacyMS {
+		badge, t = i18n.T("installer.components.status.installed"), toneSuccess
+	}
+	inner, y := s.cardHeader(w, r, glyphDownload, i18n.T("installer.components.legacy.name"), i18n.T("installer.components.legacy.need"), badge, t)
+	if s.status.LegacyMS {
+		y += s.progressLine(w, components.LegacyMS, inner.Left, y, inner.Right)
+		return y - r.Top + w.px(8)
+	}
+	y += s.sourceSegments(w, "components.legacy", inner.Left, y, inner.Right, &s.legacySource, s.running, s.embedded(components.LegacyMS)) + w.px(10)
+	switch s.legacySource {
+	case components.SourceLocal:
+		y += s.localRow(w, components.LegacyMS, inner.Left, y, inner.Right, i18n.T("installer.components.choose_file")) + w.px(10)
+	case components.SourceSkip:
+		y += w.wrapped(w.captionFont(), i18n.T("installer.components.legacy.skip_note"), inner.Left, y, inner.w(), theme.Warning) + w.px(10)
+	}
+	y += s.progressLine(w, components.LegacyMS, inner.Left, y, inner.Right)
 	return y - r.Top + w.px(8)
 }
 

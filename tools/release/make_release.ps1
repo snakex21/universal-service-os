@@ -26,6 +26,9 @@ XP driver bundles) and never copied into the release.
 param(
     [string]$Data = 'L:\',
     [string]$WinPEDonor = '',
+    # Folder with the legacy pack's Microsoft redistributables (any layout,
+    # found by SHA-256; e.g. the maintainer's add-on archive). Not in git.
+    [string]$LegacyAddons = '',
     [switch]$SkipBuild,
     [switch]$SkipChecks,
     # Issue tracker named in SOURCE-OFFER.txt (the public repository, filled in
@@ -103,8 +106,9 @@ foreach ($lang in @('pl', 'en')) {
 # and pins their SHA-256: build the zips first, then rebuild the installer
 # (same build, same payload) with the release tag and that hash list.
 $componentsDir = Join-Path $work 'components'
-Step "component zips (WinPE, XP) -> $componentsDir"
-Run 'assemble components' { python.exe (Join-Path $root 'tools\release\assemble_release.py') --components-only --out $componentsDir --winpe $WinPEDonor @xpArgs }
+Step "component zips (WinPE, XP, legacy pack MS) -> $componentsDir"
+if ($LegacyAddons -eq '' -or -not (Test-Path -LiteralPath $LegacyAddons)) { throw '-LegacyAddons FOLDER is required (the legacy pack''s Microsoft redistributables)' }
+Run 'assemble components' { python.exe (Join-Path $root 'tools\release\assemble_release.py') --components-only --out $componentsDir --winpe $WinPEDonor @xpArgs --legacy-ms $LegacyAddons }
 $pins = ([IO.File]::ReadAllText((Join-Path $componentsDir 'component-sha256.txt'))).Trim()
 if ($Tag -eq '') { $Tag = "v$version" }
 if ($Tag -notmatch '^v\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$') { throw "-Tag must look like v1.0.0 or v1.0.0-rc2, got '$Tag'" }

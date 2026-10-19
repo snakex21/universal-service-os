@@ -581,6 +581,7 @@ def main() -> int:
             ("tools/xp_csmwrap_esp.sh", "usr/lib/usos/xp_csmwrap_esp.sh"),
             ("tools/w9x_csmwrap_prepare.sh", "usr/lib/usos/w9x_csmwrap_prepare.sh"),
             ("tools/w9x_csmwrap_target.sh", "usr/lib/usos/w9x_csmwrap_target.sh"),
+            ("tools/legacy_addons.sh", "usr/lib/usos/legacy_addons.sh"),
             ("tools/w9x_tzfix.sh", "usr/lib/usos/w9x_tzfix.sh"),
             ("tools/w9x_vesa95.sh", "usr/lib/usos/w9x_vesa95.sh"),
             ("tools/w9x_nvme.sh", "usr/lib/usos/w9x_nvme.sh"),
@@ -791,6 +792,19 @@ def main() -> int:
         lan_files = list(build_lan(root, lan_out).values()) + stage_lan_driver(root, lan_out / "driver")
         for file in lan_files:
             put(entries, Entry("usr/lib/usos/network/" + file.name, stat.S_IFREG | 0o644, file.read_bytes()))
+        from build_usosadd import build as build_addons_runner
+        from build_legacy_stage import build as build_addons_planner
+        addons_out = root / "zig-out/legacy-pack"
+        addons_runner = build_addons_runner(addons_out)
+        addons_planner = build_addons_planner(root, root / "zig-out/legacy-stage-linux")
+        put(entries, Entry("usr/lib/usos/addons/USOSADD.EXE", stat.S_IFREG | 0o644, addons_runner.read_bytes()))
+        put(entries, Entry("usr/lib/usos/addons/legacy-stage-plan", stat.S_IFREG | 0o755, addons_planner.read_bytes()))
+        from addons.legacy_manifest import Manifest as AddonsManifest, validate as validate_addons
+        if errors := validate_addons(AddonsManifest.load(root / "src/addons/legacy-pack.ini")):
+            raise ValueError("Invalid legacy pack: " + "; ".join(errors))
+        addon_text = (root / "src/addons/legacy-pack.ini").read_text(encoding="utf-8").replace("\r\n", "\n").replace("\n", "\r\n")
+        for addon_lang, codepage in (("PL", "cp1250"), ("EN", "cp1252")):
+            put(entries, Entry("usr/lib/usos/addons/LEGACY." + addon_lang, stat.S_IFREG | 0o644, addon_text.encode(codepage, errors="replace")))
         reader_out = root / "zig-out/windows-source-mount"
         build_source_reader(root, reader_out)
         vendor = root / "tools/vendor/imdisk/2.1.2"

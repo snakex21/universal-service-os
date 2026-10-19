@@ -337,6 +337,15 @@ func TestUnpackAndInspect(t *testing.T) {
 	os.MkdirAll(filepath.Join(esp, "EFI", "USOS-XP"), 0o755)
 	os.WriteFile(filepath.Join(esp, "EFI", "USOS-XP", "manifest.json"), []byte(`{"release":true,"release_lang":"pl","base_initramfs_sha256":"`+sum(base)+`"}`), 0o644)
 	s := Inspect(esp, data)
+	if !s.WinPE || !s.Present(XPPL) || s.Present(XPEN) || s.Complete() || s.Present(LegacyMS) {
+		t.Fatalf("stick without the legacy pack: %+v", s)
+	}
+	legacy := filepath.Join(t.TempDir(), "l.zip")
+	os.WriteFile(legacy, makeZip(t, legacyZip("DX9C", "DX9DEC06.EXE", "dx")), 0o644)
+	if n, err := ExtractLegacyMS(legacy, data); err != nil || n != 1 {
+		t.Fatal(n, err)
+	}
+	s = Inspect(esp, data)
 	if !s.WinPE || !s.Present(XPPL) || s.Present(XPEN) || !s.Complete() {
 		t.Fatalf("installed stick: %+v", s)
 	}
@@ -426,5 +435,61 @@ func TestEmbeddedBundleTamperedOrUnpinned(t *testing.T) {
 	cut := writeTemp(t, "cut.exe", data[:len(data)-5])
 	if _, err := OpenBundle(cut); err == nil {
 		t.Fatal("truncated bundle accepted")
+	}
+}
+
+func legacyZip(dir, file, content string) map[string]string {
+	index := `{"format":1,"version":"1.1.0","decision":"maintainer-2026-09-30","files":[{"package":"p","dir":"` + dir +
+		`","file":"` + file + `","sha256":"` + sum([]byte(content)) + `","size":` + fmt.Sprint(len(content)) + `}]}`
+	return map[string]string{
+		"Addons/USOS/MS/" + dir + "/" + file: content,
+		"Addons/USOS/MS/legacy-ms.json":      index,
+		"Addons/USOS/MS/README.txt":          "r",
+		"Addons/USOS/MS/EXTRA/NOTLISTED.EXE": "never written",
+	}
+}
+
+func TestLegacyMSAsset(t *testing.T) {
+	r := Release{BaseURL: ReleaseBaseURL, Tag: "v1.1.0", Version: "1.1.0"}
+	if r.Asset(LegacyMS) != "USOS-1.1.0-Legacy-pack-MS.zip" {
+		t.Fatal(r.Asset(LegacyMS))
+	}
+	data := t.TempDir()
+	good := filepath.Join(t.TempDir(), "good.zip")
+	os.WriteFile(good, makeZip(t, legacyZip("MSI20A", "INSTMSIA.EXE", "msi")), 0o644)
+	if n, err := ExtractLegacyMS(good, data); err != nil || n != 1 {
+		t.Fatal(n, err)
+	}
+	if got, _ := os.ReadFile(filepath.Join(data, "Addons", "USOS", "MS", "MSI20A", "INSTMSIA.EXE")); string(got) != "msi" {
+		t.Fatalf("content %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(data, "Addons", "USOS", "MS", "EXTRA")); err == nil {
+		t.Fatal("a file not listed in the index was written")
+	}
+	// a second run keeps the verified file
+	if n, err := ExtractLegacyMS(good, data); err != nil || n != 1 {
+		t.Fatal(n, err)
+	}
+	// content that does not match the index hash
+	bad := legacyZip("MSI20A", "INSTMSIA.EXE", "msi")
+	bad["Addons/USOS/MS/MSI20A/INSTMSIA.EXE"] = "tampered"
+	badZip := filepath.Join(t.TempDir(), "bad.zip")
+	os.WriteFile(badZip, makeZip(t, bad), 0o644)
+	if _, err := ExtractLegacyMS(badZip, t.TempDir()); !errors.Is(err, ErrHashMismatch) {
+		t.Fatal("tampered file accepted:", err)
+	}
+	// names that are not 8.3 (path escapes included)
+	for _, name := range []string{"../X.EXE", "long-file-name.exe"} {
+		z := filepath.Join(t.TempDir(), "n.zip")
+		os.WriteFile(z, makeZip(t, legacyZip("DIR", name, "x")), 0o644)
+		if _, err := ExtractLegacyMS(z, t.TempDir()); err == nil {
+			t.Fatal("bad name accepted:", name)
+		}
+	}
+	// not an asset
+	other := filepath.Join(t.TempDir(), "o.zip")
+	os.WriteFile(other, makeZip(t, map[string]string{"README.txt": "r"}), 0o644)
+	if _, err := ExtractLegacyMS(other, t.TempDir()); err == nil {
+		t.Fatal("zip without an index accepted")
 	}
 }

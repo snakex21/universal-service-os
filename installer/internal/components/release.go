@@ -1,5 +1,6 @@
 // Package components gets the optional USOS components that are separate
-// release assets (the WinPE PE10 donor and the Windows XP UEFI packages):
+// release assets (the WinPE PE10 donor, the Windows XP UEFI packages and
+// the Microsoft redistributables of the Windows 95/98/Me/NT4 legacy pack):
 // download from the installer's own GitHub release or pick a local zip,
 // verify against SHA256SUMS and the hash list compiled into the installer,
 // and unpack. Installing onto the stick is winhost's job (the same WinPE
@@ -33,10 +34,13 @@ const (
 	WinPE ID = "winpe"
 	XPPL  ID = "xp-pl"
 	XPEN  ID = "xp-en"
+	// LegacyMS: Microsoft redistributables of the legacy compatibility pack
+	// (maintainer decision 2026-09-30), unpacked to DATA\Addons\USOS\MS.
+	LegacyMS ID = "legacy-ms"
 )
 
 // All lists the components in display order.
-var All = []ID{WinPE, XPPL, XPEN}
+var All = []ID{WinPE, XPPL, XPEN, LegacyMS}
 
 // IsXP reports whether id is one of the XP packages.
 func (id ID) IsXP() bool { return id == XPPL || id == XPEN }
@@ -62,6 +66,8 @@ func AssetName(id ID, version string) string {
 		return "USOS-" + version + "-XP-package-PL.zip"
 	case XPEN:
 		return "USOS-" + version + "-XP-package-EN.zip"
+	case LegacyMS:
+		return "USOS-" + version + "-Legacy-pack-MS.zip"
 	}
 	return ""
 }

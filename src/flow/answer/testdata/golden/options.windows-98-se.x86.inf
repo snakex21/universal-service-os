@@ -55,9 +55,12 @@ Hostname=USOS-9X
 ;USOS-DNS=
 ;USOS-HOME=about:blank
 ;USOS-DIALUP=off
+;USOS-ADDONS-PRESET=praca
+;USOS-ADDONS-OPTIONS=
+;USOS-ADDONS-EXCLUDE=
 
 [Install]
-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan
+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 UpdateInis=USOS.Memory
 UpdateIniFields=USOS.Csm
 
@@ -88,6 +91,9 @@ HKLM,"Software\Microsoft\Windows\CurrentVersion\Winlogon",DefaultUserName,,"Test
 HKLM,"Software\Microsoft\Windows\CurrentVersion\Winlogon",DefaultPassword,,""
 HKLM,"System\CurrentControlSet\Services\VxD\MSTCP",EnableDNS,,"1"
 HKLM,"Software\Microsoft\Windows\CurrentVersion\Run",USOSLan,,"C:\USOS9X\USOSLAN.EXE"
+
+[USOS.Addons]
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Run",USOSAddons,,"C:\USOS\ADDONS\USOSADD.EXE"
 
 [USOS.Memory]
 system.ini,386Enh,,"MaxPhysPage=40000"

@@ -60,11 +60,14 @@ Hostname=USOS-9X
 ;USOS-DNS=
 ;USOS-HOME=about:blank
 ;USOS-DIALUP=off
+;USOS-ADDONS-PRESET=praca
+;USOS-ADDONS-OPTIONS=
+;USOS-ADDONS-EXCLUDE=
 
 [Install]
 ; USOS.CsmReg exists only under CSMWrap (every 9x: INSTALL.BAT appends it);
 ; a missing AddReg section is skipped (machine.inf does the same).
-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan
+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
 UpdateInis=USOS.Memory
 UpdateIniFields=USOS.Csm
 
@@ -90,6 +93,9 @@ HKLM,"Software\Microsoft\Windows\CurrentVersion\Run",USOSLan,,"C:\USOS9X\USOSLAN
 [USOS.Memory]
 system.ini,386Enh,,"MaxPhysPage=40000"
 system.ini,vcache,,"MaxFileCache=262144"
+
+[USOS.Addons]
+HKLM,"Software\Microsoft\Windows\CurrentVersion\Run",USOSAddons,,"C:\USOS\ADDONS\USOSADD.EXE"
 
 [USOS.RunOnce]
 HKLM,"Software\Microsoft\Windows\CurrentVersion\RunOnce",USOSWelcome,,"%25%\rundll.exe setupx.dll,InstallHinfSection USOS.NoWelcome 4 %10%\msbatch.inf"

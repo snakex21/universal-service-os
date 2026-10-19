@@ -165,6 +165,9 @@ var bpp_options: [3][]const u8 = undefined;
 var bpp_index: usize = 0;
 var display_index: usize = 0;
 var display_explicit_loaded: bool = false;
+var saved_addons_preset: @TypeOf((Profile{}).addons_preset) = .praca;
+var saved_addons_options: answer.profile.Text(512) = .{};
+var saved_addons_exclude: answer.profile.Text(512) = .{};
 var network_options: [3][]const u8 = undefined;
 const protect_values = [_]answer.profile.ProtectPc{ .recommended, .updates, .off };
 const network_values = [_]answer.profile.NetworkLocation{ .work, .home, .public };
@@ -281,6 +284,9 @@ fn load(p: *const Profile) void {
         @intFromEnum(p.display);
     bpp_index = @intFromEnum(p.display_bpp);
     display_explicit_loaded = p.display_explicit;
+    saved_addons_preset = p.addons_preset;
+    saved_addons_options = p.addons_options;
+    saved_addons_exclude = p.addons_exclude;
     loadTheme(p.theme);
     loadSystems(answer.applies.effective(p));
 }
@@ -429,6 +435,9 @@ fn build(out: *Profile) void {
         out.display_bpp = @enumFromInt(bpp_index);
         out.display_explicit = display_explicit_loaded;
     }
+    out.addons_preset = saved_addons_preset;
+    out.addons_options = saved_addons_options;
+    out.addons_exclude = saved_addons_exclude;
     _ = answer.profile.normalizeSystems(systems_values[systems_index], &out.systems);
     out.manual_disk = true;
 }

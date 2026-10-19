@@ -148,6 +148,7 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
     const workgroup = if (p.workgroup.len > 0) p.workgroup.slice() else "WORKGROUP";
     try w.print("\r\n[Network]\r\nComputerName=\"{s}\"\r\nWorkgroup=\"{s}\"\r\nDescription=\"{s}\"\r\nDisplay=0\r\n", .{ computer, workgroup, p.user.slice() });
     try @import("network_defaults.zig").msbatch(p, computer, release == .windows_me, &w);
+    try @import("addons_profile.zig").metadata(p, &w);
     // Typed options (options.zig): their own AddReg section, only when set.
     var values: [options.count]u8 = undefined;
     var it = options.iterate(p, &values, .{ .os = switch (release) {
@@ -158,8 +159,8 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
     const any_option = it.next() != null;
     try w.writeAll(if (any_option) "\n[Install]\nAddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile" else "\n[Install]\nAddReg=USOS.RunOnce,USOS.CsmReg");
     if (p.network == .on) try w.writeAll(",USOS.Lan");
-    try w.writeByte('\n');
-    try w.writeAll("UpdateInis=USOS.Memory\nUpdateIniFields=USOS.Csm\n");
+    if (p.addons_preset != .none) try w.writeAll(",USOS.Addons");
+    try w.writeAll("\nUpdateInis=USOS.Memory\nUpdateIniFields=USOS.Csm\n");
     if (any_option) {
         // Setup's INF AddReg: HKCU at Setup time is the one default user.
         // A DWORD is written as 4 binary bytes (flag 1), as the 9x shell
@@ -187,6 +188,10 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
         };
     }
     if (p.network == .on) try @import("network_defaults.zig").msbatchRegistry(p, &w);
+    if (p.addons_preset != .none) {
+        try w.writeAll("\n[USOS.Addons]\n");
+        try w.writeAll(@import("addons_profile.zig").run_line);
+    }
     try w.writeAll(
         \\
         \\[USOS.Memory]
@@ -235,6 +240,7 @@ pub fn render(p: *const Profile, release: Release, key: []const u8, buffer: []u8
 
 test "MSBATCH.INF: typed options in their own AddReg section, only when set" {
     var p = Profile{};
+    p.addons_preset = .none;
     try p.name.set("Retro");
     try p.user.set("Jan");
     var buffer: [4096]u8 = undefined;
@@ -296,6 +302,7 @@ test "the menu language gives the default 9x time zone" {
 
 test "MSBATCH.INF carries the profile, CRLF, the key only for 98 and Me" {
     var p = Profile{};
+    p.addons_preset = .none;
     try p.name.set("Retro");
     try p.user.set("Jan Kowalski");
     try p.org.set("USOS Lab");

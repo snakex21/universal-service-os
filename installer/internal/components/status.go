@@ -30,6 +30,9 @@ type Status struct {
 	// update it has to be replaced).
 	XPLang    string
 	XPCurrent bool
+	// LegacyMS: the legacy pack's Microsoft redistributables are on DATA
+	// (Addons\USOS\MS\legacy-ms.json readable).
+	LegacyMS bool
 }
 
 // Present reports whether id is installed and current.
@@ -39,6 +42,8 @@ func (s Status) Present(id ID) bool {
 		return s.WinPE
 	case XPPL, XPEN:
 		return s.XPCurrent && s.XPLang == id.XPLang()
+	case LegacyMS:
+		return s.LegacyMS
 	}
 	return false
 }
@@ -47,7 +52,7 @@ func (s Status) Present(id ID) bool {
 func (s Status) XPOK() bool { return s.XPLang != "" && s.XPCurrent }
 
 // Complete: nothing to offer.
-func (s Status) Complete() bool { return s.WinPE && s.XPOK() }
+func (s Status) Complete() bool { return s.WinPE && s.XPOK() && s.LegacyMS }
 
 // Inspect reads the component state of a stick (read-only).
 func Inspect(espRoot, dataRoot string) Status {
@@ -69,6 +74,9 @@ func Inspect(espRoot, dataRoot string) Status {
 				}
 			}
 		}
+	}
+	if _, err := ReadLegacyMSIndex(filepath.Join(dataRoot, LegacyMSDataDir, "legacy-ms.json")); err == nil {
+		s.LegacyMS = true
 	}
 	manifest, err := ReadXPManifest(filepath.Join(espRoot, xpESPDir, "manifest.json"))
 	if err == nil {

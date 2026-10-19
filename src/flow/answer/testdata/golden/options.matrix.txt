@@ -294,8 +294,8 @@ show_protected=yes	windows-server-2003	+----- usos-reg.txt -----
 show_protected=yes	windows-server-2003	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 show_protected=yes	windows-server-2003	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|Hidden|dword|1
 show_protected=yes	windows-server-2003	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|ShowSuperHidden|dword|1
-show_protected=yes	windows-me	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan
-show_protected=yes	windows-me	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan
+show_protected=yes	windows-me	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+show_protected=yes	windows-me	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 show_protected=yes	windows-me	+
 show_protected=yes	windows-me	+[USOS.Profile]
 show_protected=yes	windows-me	+HKCU,"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",Hidden,1,01,00,00,00
@@ -3370,18 +3370,18 @@ shortcut_suffix_off=yes	windows-server-2003	+----- usos-reg.txt -----
 shortcut_suffix_off=yes	windows-server-2003	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 shortcut_suffix_off=yes	windows-server-2003	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer|link|binary|00,00,00,00
 shortcut_suffix_off=yes	windows-nt-4	+;USOS-REG=USER\Software\Microsoft\Windows\CurrentVersion\Explorer|link|binary|00,00,00,00
-shortcut_suffix_off=yes	windows-95	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan
-shortcut_suffix_off=yes	windows-95	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan
+shortcut_suffix_off=yes	windows-95	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+shortcut_suffix_off=yes	windows-95	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 shortcut_suffix_off=yes	windows-95	+
 shortcut_suffix_off=yes	windows-95	+[USOS.Profile]
 shortcut_suffix_off=yes	windows-95	+HKCU,"Software\Microsoft\Windows\CurrentVersion\Explorer",link,1,00,00,00,00
-shortcut_suffix_off=yes	windows-98-se	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan
-shortcut_suffix_off=yes	windows-98-se	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan
+shortcut_suffix_off=yes	windows-98-se	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+shortcut_suffix_off=yes	windows-98-se	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 shortcut_suffix_off=yes	windows-98-se	+
 shortcut_suffix_off=yes	windows-98-se	+[USOS.Profile]
 shortcut_suffix_off=yes	windows-98-se	+HKCU,"Software\Microsoft\Windows\CurrentVersion\Explorer",link,1,00,00,00,00
-shortcut_suffix_off=yes	windows-me	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan
-shortcut_suffix_off=yes	windows-me	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan
+shortcut_suffix_off=yes	windows-me	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+shortcut_suffix_off=yes	windows-me	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 shortcut_suffix_off=yes	windows-me	+
 shortcut_suffix_off=yes	windows-me	+[USOS.Profile]
 shortcut_suffix_off=yes	windows-me	+HKCU,"Software\Microsoft\Windows\CurrentVersion\Explorer",link,1,00,00,00,00
@@ -4955,20 +4955,20 @@ visual_effects=performance	windows-2000	+USER\Control Panel\Desktop\WindowMetric
 visual_effects=performance	windows-2000	+USER\Control Panel\Desktop|DragFullWindows|sz|0
 visual_effects=performance	windows-nt-4	+;USOS-REG=USER\Control Panel\Desktop\WindowMetrics|MinAnimate|sz|0
 visual_effects=performance	windows-nt-4	+;USOS-REG=USER\Control Panel\Desktop|DragFullWindows|sz|0
-visual_effects=performance	windows-95	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan
-visual_effects=performance	windows-95	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan
+visual_effects=performance	windows-95	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+visual_effects=performance	windows-95	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 visual_effects=performance	windows-95	+
 visual_effects=performance	windows-95	+[USOS.Profile]
 visual_effects=performance	windows-95	+HKCU,"Control Panel\Desktop\WindowMetrics",MinAnimate,,"0"
 visual_effects=performance	windows-95	+HKCU,"Control Panel\Desktop",DragFullWindows,,"0"
-visual_effects=performance	windows-98-se	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan
-visual_effects=performance	windows-98-se	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan
+visual_effects=performance	windows-98-se	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+visual_effects=performance	windows-98-se	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 visual_effects=performance	windows-98-se	+
 visual_effects=performance	windows-98-se	+[USOS.Profile]
 visual_effects=performance	windows-98-se	+HKCU,"Control Panel\Desktop\WindowMetrics",MinAnimate,,"0"
 visual_effects=performance	windows-98-se	+HKCU,"Control Panel\Desktop",DragFullWindows,,"0"
-visual_effects=performance	windows-me	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan
-visual_effects=performance	windows-me	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan
+visual_effects=performance	windows-me	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+visual_effects=performance	windows-me	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 visual_effects=performance	windows-me	+
 visual_effects=performance	windows-me	+[USOS.Profile]
 visual_effects=performance	windows-me	+HKCU,"Control Panel\Desktop\WindowMetrics",MinAnimate,,"0"
@@ -5295,22 +5295,22 @@ mouse_accel_off=yes	windows-server-2003	+USER\Control Panel\Mouse|MouseThreshold
 mouse_accel_off=yes	windows-nt-4	+;USOS-REG=USER\Control Panel\Mouse|MouseSpeed|sz|0
 mouse_accel_off=yes	windows-nt-4	+;USOS-REG=USER\Control Panel\Mouse|MouseThreshold1|sz|0
 mouse_accel_off=yes	windows-nt-4	+;USOS-REG=USER\Control Panel\Mouse|MouseThreshold2|sz|0
-mouse_accel_off=yes	windows-95	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan
-mouse_accel_off=yes	windows-95	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan
+mouse_accel_off=yes	windows-95	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+mouse_accel_off=yes	windows-95	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 mouse_accel_off=yes	windows-95	+
 mouse_accel_off=yes	windows-95	+[USOS.Profile]
 mouse_accel_off=yes	windows-95	+HKCU,"Control Panel\Mouse",MouseSpeed,,"0"
 mouse_accel_off=yes	windows-95	+HKCU,"Control Panel\Mouse",MouseThreshold1,,"0"
 mouse_accel_off=yes	windows-95	+HKCU,"Control Panel\Mouse",MouseThreshold2,,"0"
-mouse_accel_off=yes	windows-98-se	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan
-mouse_accel_off=yes	windows-98-se	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan
+mouse_accel_off=yes	windows-98-se	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+mouse_accel_off=yes	windows-98-se	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 mouse_accel_off=yes	windows-98-se	+
 mouse_accel_off=yes	windows-98-se	+[USOS.Profile]
 mouse_accel_off=yes	windows-98-se	+HKCU,"Control Panel\Mouse",MouseSpeed,,"0"
 mouse_accel_off=yes	windows-98-se	+HKCU,"Control Panel\Mouse",MouseThreshold1,,"0"
 mouse_accel_off=yes	windows-98-se	+HKCU,"Control Panel\Mouse",MouseThreshold2,,"0"
-mouse_accel_off=yes	windows-me	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan
-mouse_accel_off=yes	windows-me	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan
+mouse_accel_off=yes	windows-me	-AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Lan,USOS.Addons
+mouse_accel_off=yes	windows-me	+AddReg=USOS.RunOnce,USOS.CsmReg,USOS.Profile,USOS.Lan,USOS.Addons
 mouse_accel_off=yes	windows-me	+
 mouse_accel_off=yes	windows-me	+[USOS.Profile]
 mouse_accel_off=yes	windows-me	+HKCU,"Control Panel\Mouse",MouseSpeed,,"0"

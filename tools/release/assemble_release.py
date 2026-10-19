@@ -7,6 +7,7 @@ builds; it never builds anything itself and never touches a USB stick.
       --installer "installer/USOS Installer.exe"
       --xp pl=zig-out/release-work/xp-pl --xp en=zig-out/release-work/xp-en
       --winpe L:/Programs/USOS/WinPE/PE10_x64_19041_USOS.iso
+      --legacy-ms <folder with the legacy pack's Microsoft redistributables>
 
 Layout (VERSION = build-info.ini version, e.g. 1.0.0):
   USOS-Installer-VERSION.exe          full installer: the online one + the component zips as overlay
@@ -14,6 +15,9 @@ Layout (VERSION = build-info.ini version, e.g. 1.0.0):
   USOS-VERSION-WinPE-PE10-donor.zip   Programs/USOS/WinPE/<donor ISO> + README.txt
   USOS-VERSION-XP-package-PL.zip      EFI/USOS-XP/* + install-xp-package.ps1 + README.txt
   USOS-VERSION-XP-package-EN.zip
+  USOS-VERSION-Legacy-pack-MS.zip     Addons/USOS/MS/*: Microsoft redistributables of the
+                                      Windows 95/98/Me/NT4 compatibility pack (maintainer
+                                      decision 2026-09-30, tools/addons/legacy_ms_asset.py)
   USOS-VERSION-sources.zip            third-party sources (tools/release/third-party.json)
   LICENSES/<component>/...            licence texts, LICENSES-AUDIT.md
   THIRD-PARTY-NOTICES.txt, SOURCE-OFFER.txt
@@ -35,6 +39,8 @@ import argparse, datetime, hashlib, json, os, shutil, sys, zipfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import scan_release  # noqa: E402
+sys.path.insert(0, str(ROOT / 'tools/addons'))
+import legacy_ms_asset  # noqa: E402
 
 # The PE10 donor the Vista/Windows 7 paths were validated with
 # (.supercli/scratchpad/pe10-donor-final.md, docs/windows-native-uefi-win10-11-2026-09-25.md).
@@ -306,7 +312,8 @@ the USOS project repository:
 
 def component_names(version):
     """The optional component zips the installer downloads (internal/components)."""
-    return [f'USOS-{version}-WinPE-PE10-donor.zip'] + [f'USOS-{version}-XP-package-{lang.upper()}.zip' for lang in sorted(XP_SOURCES)]
+    return ([f'USOS-{version}-WinPE-PE10-donor.zip'] + [f'USOS-{version}-XP-package-{lang.upper()}.zip' for lang in sorted(XP_SOURCES)]
+            + [f'USOS-{version}-Legacy-pack-MS.zip'])
 
 
 def pin_text(folder, version):
@@ -370,6 +377,8 @@ def main():
                    help='the online installer; --installer must then be it plus the component overlay')
     p.add_argument('--xp', action='append', default=[], help='LANG=PACKAGE_DIR (pl, en)')
     p.add_argument('--winpe', type=Path)
+    p.add_argument('--legacy-ms', type=Path, action='append', default=[],
+                   help='folder(s) holding the legacy pack\'s Microsoft redistributables (found by SHA-256)')
     p.add_argument('--buildkit', type=Path, action='append', default=[], help='USOS-VERSION-buildkit.zip (or its .001.. parts) from make_buildkit.py')
     p.add_argument('--components-only', action='store_true',
                    help='write only the WinPE and XP zips (and component-sha256.txt) to --out, for the installer build')
@@ -452,6 +461,11 @@ def build_components(a, out, version, build_id, epoch):
         z.add_file('install-xp-package.ps1', ROOT / 'tools/release/install-xp-package.ps1')
         z.add_text('README.txt', xp_readme(lang, version, build_id, manifest))
         z.close()
+
+    # Legacy compatibility pack: Microsoft redistributables (maintainer decision 2026-09-30)
+    if not a.legacy_ms:
+        raise SystemExit('need --legacy-ms FOLDER (the legacy pack\'s Microsoft redistributables, docs/design/legacy-compat-pack.md)')
+    legacy_ms_asset.build([f.resolve() for f in a.legacy_ms], out / f'USOS-{version}-Legacy-pack-MS.zip', version)
 
 
 def finish_release(a, out, version, build_id, epoch):
