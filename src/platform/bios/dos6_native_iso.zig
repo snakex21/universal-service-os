@@ -24,7 +24,7 @@ pub noinline fn run(esp: fat.FileSystem, reader: Reader, bulk: Reader, drive: u8
     const session = graphics orelse return error.DosPartitionScreenNeedsGraphics;
     const windows = !std.mem.eql(u8, system_id, "ms-dos");
     const install = if (windows) true else target_ui.dosAction(session) orelse return;
-    try @import("windows_iso_config.zig").validateName(image_name);
+    try @import("catalog").windows_iso_config.validateName(image_name);
     @import("graphics_menu.zig").busy(&session, if (windows) "Windows 3.x" else "MS-DOS");
     const data = try storage.gpt.findUsosData(reader);
     const fs = try ntfs.mount(reader, .{ .start_bytes = data.start_lba * 512, .size_bytes = data.sectorCount() * 512 });
