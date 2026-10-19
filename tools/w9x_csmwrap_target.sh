@@ -63,6 +63,19 @@ NVME_DRIVER=${W9X_NVME_DRIVER:-0}
 # every boot (docs/usb9x-hotswap-design-2026-10-19.md section 2). This empty
 # flag on the USOS stick keeps the old mapping (the stick through INT 13h).
 INT13_ALL_FLAG=${W9X_INT13_ALL_FLAG:-$ESP_DIR/win9x/int13-all-disks.flag}
+# 1: DATA has the 9x usb-storage-experimental.txt (tools/w9x_csmwrap_prepare.sh):
+# USB sticks in Windows through USOSUSB.MPD (tools/nt/usosusb9x, stage 1 of
+# docs/usb9x-hotswap-design-2026-10-19.md; no hardware pass yet). It talks to
+# the SeaBIOS USB disk service of CSMWrap >= 3.1.2-usos16 and only offers
+# sticks without a BIOS number, so the boot disk becomes the only BIOS hard
+# disk on SATA targets too. Never together with xhci98 (one xHCI owner).
+USB_STORAGE=${W9X_USB_STORAGE:-0}
+# Services\Class\SCSIAdapter\<n> of USOSUSB's Root devnode (@CLASSIDX@ in
+# USOSUSB.REG). The 9x class installer gives each new SCSI adapter the lowest
+# free number from 0000; 0090 is reached only after 90 SCSI adapter instances,
+# so it cannot meet one Setup or a later driver install writes. Fixed, so a
+# second import overwrites the same key instead of adding one.
+USOSUSB_CLASSIDX=0090
 LIB=${USOS_LIB_DIR:-/usr/lib/usos}
 ESP_TAIL=133120
 MIN_SECTORS=4194304
@@ -297,10 +310,73 @@ if [ "$NVME_DRIVER" = 1 ]; then
     fi
 fi
 [ "$nvme_ok" = 1 ] || rm -f "$work/c/USOS9X/USOSNVME.MPD" "$work/c/USOS9X/USOSNVME.INF"
+# USB sticks through USOSUSB.MPD (usb-storage-experimental.txt): USOSUSB.MPD,
+# .INF and .REG (class instance filled in) stay in C:\USOS9X, U9ENV.BAT gets
+# U9UDS=1 (U9USB is xhci98's). INSTALL.BAT then: 95/98/98 SE: AUTOEXEC.BAT
+# calls USBREG.BAT, which once Setup made the registry copies the MPD into
+# C:\WINDOWS\SYSTEM\IOSUBSYS and imports USOSUSB.REG with real-mode REGEDIT
+# (one attempt, USBREG.RUN / USBREG.OK); Me (no real-mode AUTOEXEC.BAT): the
+# MPD into IOSUBSYS before Setup, the REG by machine RunOnce regedit /s.
+uds_ok=0
+if [ "$USB_STORAGE" = 1 ]; then
+    if [ -e "$XHCI98_FLAG" ]; then
+        log 'usb storage: USOSUSB.MPD skipped: win9x/xhci98.flag chose xhci98 (one xHCI owner); no USB stick in Windows'
+    elif [ "$SYSTEM_TAG:$ANSWER_KIND" = ME:USER ]; then
+        # Me imports USOSUSB.REG through INSTALL.BAT's lines in the USOS answer.
+        log "usb storage: USOSUSB.MPD skipped: Windows Me with the user's own answer file (no RunOnce import)"
+    elif [ ! -f "$work/c/USOS9X/USOSUSB.MPD" ] || [ ! -f "$work/c/USOS9X/USOSUSB.INF" ] ||
+        [ ! -f "$work/c/USOS9X/USOSUSB.REG" ]; then
+        log 'usb storage: USOSUSB.MPD is not in this payload; no USB stick in Windows'
+    elif ! head -n 1 "$work/c/USOS9X/USOSUSB.REG" | grep -q '^REGEDIT4'; then
+        log 'usb storage: USOSUSB.REG is not a REGEDIT4 file; USOSUSB.MPD skipped'
+    else
+        sed "s/@CLASSIDX@/$USOSUSB_CLASSIDX/g" "$work/c/USOS9X/USOSUSB.REG" > "$work/USOSUSB.REG" &&
+            cp "$work/USOSUSB.REG" "$work/c/USOS9X/USOSUSB.REG" || fail 'cannot write USOSUSB.REG'
+        if [ "$SYSTEM_TAG" != ME ]; then
+            U='C:\USOS9X\'
+            A='C:\WINDOWS\COMMAND\ATTRIB.EXE'
+            R='REGEDIT /L:SYSTEM.DAT /R:USER.DAT'
+            sed 's/$/\r/' > "$work/c/USOS9X/USBREG.BAT" <<EOF || fail 'cannot write USBREG.BAT'
+@ECHO OFF
+REM USOS: USB stick miniport USOSUSB.MPD (experimental, usb-storage-experimental.txt).
+REM Runs from AUTOEXEC.BAT before Windows starts, at most once (USBREG.RUN).
+IF EXIST ${U}USBREG.OK GOTO END
+IF EXIST ${U}USBREG.RUN GOTO END
+IF NOT EXIST ${U}USOSUSB.REG GOTO END
+IF NOT EXIST ${U}USOSUSB.MPD GOTO END
+IF NOT EXIST C:\WINDOWS\REGEDIT.EXE GOTO END
+IF NOT EXIST C:\WINDOWS\SYSTEM.DAT GOTO END
+IF NOT EXIST C:\WINDOWS\SYSTEM\IOSUBSYS\NUL GOTO END
+IF NOT EXIST $A GOTO END
+COPY /Y ${U}USOSUSB.MPD C:\WINDOWS\SYSTEM\IOSUBSYS > NUL
+IF NOT EXIST C:\WINDOWS\SYSTEM\IOSUBSYS\USOSUSB.MPD GOTO END
+ECHO run> ${U}USBREG.RUN
+C:
+CD \WINDOWS
+$A -S -R -H SYSTEM.DAT
+$A -S -R -H USER.DAT
+$R ${U}USOSUSB.REG
+$R /E ${U}USBCHK.REG HKEY_LOCAL_MACHINE\Enum\Root\SCSIAdapter
+$A +S +R +H SYSTEM.DAT
+$A +S +R +H USER.DAT
+ECHO ok> ${U}USBREG.OK
+CD \\
+:END
+EOF
+        fi
+        printf 'SET U9UDS=1\r\n' >> "$work/c/USOS9X/U9ENV.BAT"
+        uds_ok=1
+        log 'usb storage: USOSUSB.MPD (experimental, usb-storage-experimental.txt), Services\Class\SCSIAdapter\'"$USOSUSB_CLASSIDX"'; needs CSMWrap >= 3.1.2-usos16 (USB disk service) on this disk'
+    fi
+fi
+[ "$uds_ok" = 1 ] || rm -f "$work/c/USOS9X/USOSUSB.MPD" "$work/c/USOS9X/USOSUSB.INF" "$work/c/USOS9X/USOSUSB.REG"
+# The boot disk is the only BIOS hard disk with usosnvme.mpd (NVMe) and with
+# USOSUSB.MPD (every target: it offers only sticks without a BIOS number).
 int13_only=off
-if [ "$nvme_ok" = 1 ]; then
+if [ "$nvme_ok" = 1 ] || [ "$uds_ok" = 1 ]; then
     if [ -e "$INT13_ALL_FLAG" ]; then
         log 'int13: every disk keeps a BIOS number (win9x/int13-all-disks.flag)'
+        [ "$uds_ok" != 1 ] || log 'usb storage: USOSUSB.MPD will offer no stick: with win9x/int13-all-disks.flag the stick is a BIOS disk (INT 13h owns it)'
     else
         int13_only=on
         log 'int13: only the boot disk is a BIOS hard disk (csmwrap.ini int13_boot_disk_only)'

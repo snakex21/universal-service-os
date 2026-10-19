@@ -494,6 +494,15 @@ usos_w9x_csmwrap_prepare() {
                 fi ;;
         esac
     fi
+    # Windows 9x USB sticks through USOSUSB.MPD (docs/usb9x-hotswap-design-2026-10-19.md
+    # stage 1, no hardware pass yet): only with DATA's usb-storage-experimental.txt;
+    # without it nothing changes (no USOSUSB files on C:, the stick keeps INT 13h).
+    usb9x=0
+    if [ -z "$img$posr$nt4$dos_iso" ] &&
+        [ -f "/mnt/data/Systems/Windows/$folder/Unattended/usb-storage-experimental.txt" ]; then
+        usb9x=1
+        w9x_csmwrap_log 'USB USOSUSB.MPD requested (usb-storage-experimental.txt; needs CSMWrap >= 3.1.2-usos16)'
+    fi
     usos_ui_stage 4 5 'Preparing the disk' "Copying $folder Setup, the USOS helpers and CSMWrap to the selected disk." || true
     if [ -n "$img" ]; then
         usos_ui_stage 4 5 'Preparing the disk' "Writing the $folder image to the selected disk." || true
@@ -514,7 +523,7 @@ usos_w9x_csmwrap_prepare() {
     else
         set -- env TARGET_DEVICE="$TARGET_DEVICE" W9X_SOURCE_ISO="/mnt/data/$iso" W9X_SETUP_FOLDER="$setup" W9X_TAG="$tag" \
             W9X_ANSWER_INF="$answer_inf" W9X_ANSWER_KIND="$answer_kind" W9X_BOOT_FLOPPY="$floppy" W9X_SIZE_GIB="$size_gib" \
-            W9X_USB_DIR="/mnt/data/Drivers/$folder/USB" W9X_TIME_ZONE="${time_zone:-}" W9X_VM_PHASE1="$([ "$vm_phase1" = yes ] && echo 1 || echo 0)" W9X_NVME_DRIVER="$nvme9x"             sh /usr/lib/usos/w9x_csmwrap_target.sh
+            W9X_USB_DIR="/mnt/data/Drivers/$folder/USB" W9X_TIME_ZONE="${time_zone:-}" W9X_VM_PHASE1="$([ "$vm_phase1" = yes ] && echo 1 || echo 0)" W9X_NVME_DRIVER="$nvme9x" W9X_USB_STORAGE="$usb9x"             sh /usr/lib/usos/w9x_csmwrap_target.sh
     fi
     "$@" >> "$W9X_LOG/prepare.log" 2>&1 < /dev/null
     target_rc=$?

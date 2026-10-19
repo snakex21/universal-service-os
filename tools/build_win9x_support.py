@@ -45,6 +45,14 @@
                 build bin/W9X/usosnvme.mpd; usosnvme9x.inf). Only for an
                 NVMe target with DATA's nvme-experimental.txt
                 (tools/w9x_nvme.sh); otherwise removed from C:\\USOS9X
+  USOSUSB.MPD, USOSUSB.INF, USOSUSB.REG
+                USOSUSB for Windows 9x (USOS, GPL-3.0-or-later): the USB stick
+                SCSI miniport on CSMWrap's SeaBIOS USB disk service
+                (tools/nt/usosusb9x: bin/W9X/usosusb.mpd, usosusb.inf; usosusb.reg =
+                REGEDIT4 fragment of its Root\\SCSIAdapter devnode with the
+                class instance placeholder @CLASSIDX@). Experimental: only with
+                DATA's usb-storage-experimental.txt (tools/w9x_csmwrap_target.sh
+                fills in the class instance); otherwise removed from C:\\USOS9X
 
 Hardware diagnostics, staged (the UEFI path copies them to C:\\USOS9X;
 nothing runs them unless EFI/USOS/win9x/diag.flag exists):
@@ -100,8 +108,12 @@ STAGED = FILES + ('MSBATCH.INF', 'VMDISP9X.TGZ', 'XHCI98.SYS', 'XHCI98.INF', 'XH
     # them unless EFI/USOS/win9x/diag.flag exists (USOSDIAG BOOT, INSTALL.BAT).
     'USOSDIAG.COM', 'USOSDBG.EXE') + (
     # NVMe targets with nvme-experimental.txt only (tools/w9x_nvme.sh).
-    'USOSNVME.MPD', 'USOSNVME.INF')
+    'USOSNVME.MPD', 'USOSNVME.INF') + (
+    # USB sticks with usb-storage-experimental.txt only (tools/w9x_csmwrap_target.sh).
+    'USOSUSB.MPD', 'USOSUSB.INF', 'USOSUSB.REG')
 USOSNVME = ROOT / 'tools/nt/usosnvme'
+USOSUSB = ROOT / 'tools/nt/usosusb9x'
+USOSUSB_FILES = ('bin/W9X/usosusb.mpd', 'usosusb.inf', 'usosusb.reg')
 
 NOTICE = """U9FIX.COM - USOS helper for Windows 95/98/Me
 Copyright (C) 2026 Maksymilian and the USOS Authors.
@@ -423,6 +435,24 @@ def stage_usosnvme(out: Path) -> None:
     (out / 'USOSNVME.INF').write_bytes(dos_text(inf))
 
 
+def stage_usosusb(out: Path, source: Path = USOSUSB) -> None:
+    """usosusb.mpd (the 9x SCSIPORT.PDR build) + its INF + its REGEDIT4 devnode fragment."""
+    missing = [name for name in USOSUSB_FILES if not (source / name).is_file()]
+    if missing:
+        raise ValueError('USOSUSB miniport not built yet: missing %s in %s' % (', '.join(missing), source))
+    mpd = (source / USOSUSB_FILES[0]).read_bytes()
+    pe = int.from_bytes(mpd[0x3c:0x40], 'little') if len(mpd) >= 0x40 else 0
+    if mpd[:2] != b'MZ' or mpd[pe:pe + 4] != b'PE\0\0' or b'SCSIPORT.SYS' not in mpd.upper() or \
+            b'ntoskrnl' in mpd.lower():
+        raise ValueError('unexpected usosusb.mpd (not a PE miniport importing SCSIPORT.SYS)')
+    reg = (source / USOSUSB_FILES[2]).read_text(encoding='ascii')
+    if not reg.startswith('REGEDIT4') or '@CLASSIDX@' not in reg:
+        raise ValueError('usosusb.reg must be a REGEDIT4 fragment with the @CLASSIDX@ class instance placeholder')
+    (out / 'USOSUSB.MPD').write_bytes(mpd)
+    (out / 'USOSUSB.INF').write_bytes(dos_text((source / USOSUSB_FILES[1]).read_text(encoding='ascii')))
+    (out / 'USOSUSB.REG').write_bytes(dos_text(reg))
+
+
 def build(root: Path = ROOT, out: Path | None = None) -> None:
     out = out or root / 'zig-out/dos-native/win9x'
     out.mkdir(parents=True, exist_ok=True)
@@ -442,6 +472,7 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
     stage_xhci98(out)
     stage_cregfix(out)
     stage_usosnvme(out)
+    stage_usosusb(out)
     msdos = root / 'zig-out/dos-native/msdos'
     for name in BRIDGE:
         if not (msdos / name).is_file():

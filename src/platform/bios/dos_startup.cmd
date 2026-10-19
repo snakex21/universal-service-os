@@ -163,6 +163,14 @@ ECHO @IF EXIST C:\USOS9X\TZFIX.BAT CALL C:\USOS9X\TZFIX.BAT>>C:\AUTOEXEC.BAT
 REM Windows 95: C:\USOS9X\VESA95.BAT (tools/w9x_vesa95.sh) moves the display
 REM from Standard VGA to the VESA driver once (95 never enumerates PCI here).
 ECHO @IF EXIST C:\USOS9X\VESA95.BAT CALL C:\USOS9X\VESA95.BAT>>C:\AUTOEXEC.BAT
+REM USB sticks through USOSUSB.MPD (U9UDS=1, DATA usb-storage-experimental.txt;
+REM tools/w9x_csmwrap_target.sh): USBREG.BAT once the registry exists copies
+REM the MPD into IOSUBSYS and imports USOSUSB.REG (real-mode REGEDIT, once).
+REM Me runs no programs from AUTOEXEC.BAT: see the Me block below.
+IF NOT "%U9UDS%"=="1" GOTO UDSAUTO
+IF "%U9SYS%"=="ME" GOTO UDSAUTO
+ECHO @IF EXIST C:\USOS9X\USBREG.BAT CALL C:\USOS9X\USBREG.BAT>>C:\AUTOEXEC.BAT
+:UDSAUTO
 REM A restart before Setup copied Windows (hang, power loss): RESUME.BAT,
 REM written once Patcher9x succeeded, starts Setup again.
 ECHO @IF NOT EXIST C:\WINDOWS\WIN.COM IF EXIST C:\USOS9X\RESUME.BAT CALL C:\USOS9X\RESUME.BAT>>C:\AUTOEXEC.BAT
@@ -190,6 +198,13 @@ IF NOT "%U9SYS%"=="ME" GOTO CSMREG
 MD C:\WINDOWS
 MD C:\WINDOWS\SYSTEM
 COPY /Y C:\USOS9X\USOSKEY.DRV C:\WINDOWS\SYSTEM >NUL
+REM USB sticks on Me (U9UDS=1): USOSUSB.MPD into IOSUBSYS before Setup, the
+REM REG through machine RunOnce (regedit /s, below; effective from the next start).
+IF NOT "%U9UDS%"=="1" GOTO MEUDS
+IF NOT EXIST C:\USOS9X\USOSUSB.MPD GOTO MEUDS
+MD C:\WINDOWS\SYSTEM\IOSUBSYS
+COPY /Y C:\USOS9X\USOSUSB.MPD C:\WINDOWS\SYSTEM\IOSUBSYS >NUL
+:MEUDS
 REM USB mouse on Me: USOSMOUS.DRV in SYSTEM before Setup. mouse.drv= is set
 REM once at the first sign-in after Setup (machine RunOnce, so after Setup's
 REM own mouse detection in both phases, which writes mouse.drv=mouse.drv):
@@ -216,9 +231,14 @@ REM characters (expanded), and the quotes keep the comma in the command.
 IF NOT EXIST C:\USOS9X\USOSMOUS.INF GOTO AUTODONE
 ECHO [USOS.CsmReg]>>C:\%U9SRC%\MSBATCH.INF
 ECHO HKLM,%%USOSRO%%,USOSMouse,,"%%USOSMC%%">>C:\%U9SRC%\MSBATCH.INF
+IF NOT "%U9UDS%"=="1" GOTO MEUDSRO
+ECHO HKLM,%%USOSRO%%,USOSUsb,,"%%USOSUC%%">>C:\%U9SRC%\MSBATCH.INF
+:MEUDSRO
 ECHO [Strings]>>C:\%U9SRC%\MSBATCH.INF
 ECHO USOSRO="Software\Microsoft\Windows\CurrentVersion\RunOnce">>C:\%U9SRC%\MSBATCH.INF
 ECHO USOSMC="rundll.exe setupx.dll,InstallHinfSection DefaultInstall 4 C:\USOS9X\USOSMOUS.INF">>C:\%U9SRC%\MSBATCH.INF
+IF NOT "%U9UDS%"=="1" GOTO AUTODONE
+ECHO USOSUC="regedit /s C:\USOS9X\USOSUSB.REG">>C:\%U9SRC%\MSBATCH.INF
 GOTO AUTODONE
 :CSMREG
 REM 98/98 SE: no PCI bus without this. SeaBIOS has a $PnP header but gives no

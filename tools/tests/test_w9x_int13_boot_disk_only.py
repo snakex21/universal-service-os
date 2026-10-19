@@ -32,8 +32,8 @@ class Int13BootDiskOnly(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self.flag = self.tmp / 'int13-all-disks.flag'
 
-    def gate(self, nvme_ok):
-        script = 'log() { printf "%s\\n" "$*" >&2; }\n' + f'nvme_ok={nvme_ok}\n' + \
+    def gate(self, nvme_ok, uds_ok=0):
+        script = 'log() { printf "%s\\n" "$*" >&2; }\n' + f'nvme_ok={nvme_ok}\nuds_ok={uds_ok}\n' + \
             f'INT13_ALL_FLAG="{self.flag.as_posix()}"\n' + GATE + 'printf "%s" "$int13_only"\n'
         rc, out, err = sh(script)
         self.assertEqual(rc, 0, err)
@@ -49,6 +49,10 @@ class Int13BootDiskOnly(unittest.TestCase):
         self.assertEqual(out, 'off')
         self.assertIn('int13-all-disks.flag', err)
         self.assertEqual(self.gate(0), ('off', ''))
+        # USOSUSB.MPD (usb-storage-experimental.txt) on any target: test_w9x_usb_storage_flag.py
+        self.assertEqual(self.gate(0, 1)[0], 'off')
+        self.flag.unlink()
+        self.assertEqual(self.gate(0, 1)[0], 'on')
 
     def ini(self, value):
         ini = self.tmp / 'csmwrap.ini'
