@@ -627,6 +627,23 @@ tests establish Setup phase 1 and staging, not a 95 NVMe desktop or shutdown.
   Tests: `test_usosmous_wheel_emu.py` (USOSWHEELINFO after the knock, with 0AAh, on 95, with a failed C202h
   / C204h; reading it makes no BIOS call), `test_usosmous.py`, `test_csmwrap_wheel_diag.py`. In-place kit
   `me-wheel-kit-v2`.
+* **Wheel scrolling of Win16 windows (2026-10-19, X470 untested)**: USER sends WM_MOUSEWHEEL to the focus
+  window only, and Win16 windows ignore it (Me's Device Manager is 16-bit SYSDM.CPL with the 16-bit
+  COMMCTRL `SysTreeView`; focus sits on the property sheet's tab control). USOSMOUS.DRV's USOSWHEELINFO
+  version 2 adds a running notch count (up positive), moved before USER gets the wheel event. USOSKEY.DRV
+  installs a WH_GETMESSAGE hook at DRV_ENABLE (task time, separate from the WH_CBT DOS-box hook; 98 / 98 SE
+  / Me with that USOSMOUS.DRV). When the count moved, the window under the pointer (or its first ancestor
+  with WS_VSCROLL) is classified (`src/platform/win3/usoskey_wheel.h`): a Win16 window (its module database
+  is NE without NE_FFLAGS_WIN32) or class `SysTreeView` / `SysListView` gets WM_VSCROLL SB_LINEUP /
+  SB_LINEDOWN x SPI_GETWHEELSCROLLLINES (SB_PAGE* for WHEEL_PAGESCROLL), then SB_ENDSCROLL, sent in its own
+  task (a WM_NULL wakes that task), and those notches' WM_MOUSEWHEEL become WM_NULL; Win32 windows keep the
+  stock path (no double scroll). `SYSTEM.INI [usosmous] WheelScroll=0` switches it off. USOSKEY.DRV's
+  `USOSWHEELLOG` keeps the last 16 decisions (real delta, action, target class, WM_VSCROLL sent); USOSDBG
+  1.6 shows them as `WHEEL USOSKEY` lines, and USOSLOG no longer derives up / down from journal records
+  (they carry no delta: on Me paramH is the pointer y). Not done: routing WM_MOUSEWHEEL to a Win32 window
+  under the pointer (Windows 10 style), Win16 programs that scroll through scroll bar controls instead of
+  WS_VSCROLL. Tests: `test_usoskey_wheel.py` (host-built classifier / plan / delta / swallow window, source
+  checks), `test_usosmous_wheel_emu.py` (notch count in the built driver).
 
 ## 5. Open points
 

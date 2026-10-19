@@ -81,6 +81,10 @@
  * (Z is 0 from an older CSMWrap and from a mouse without a wheel), and a
  * knock answered with an ID other than 3 is sent once more (once per
  * C205h init, i.e. per Enable / USOSATTACH / end of a DOS-box pause).
+ * Wheel scrolling of Win16 windows (2026-10-19): USOSWHEELINFO version 2
+ * adds a running notch count (up positive), moved here before USER gets
+ * the wheel event; USOSKEY.DRV's WH_GETMESSAGE hook (task time) reads it
+ * for the real delta (usoskey_wheel.h). Nothing else changes here.
  * No OpenWatcom runtime is linked (own entry point, -zl).
  * Built with tools/build_win3_usb_keyboard.py; docs/win9x-modern-2026-09-30.md.
  */
@@ -174,7 +178,7 @@ static int wheel_sum;               /* DGROUP: -zu, SS is not DS */
 
 /* Wheel diagnostics for USOSDBG.EXE (USOSWHEELINFO): written here only. */
 typedef struct {
-    BYTE version;                   /* 1 */
+    BYTE version;                   /* 2 (notches added) */
     BYTE pref;                      /* wheel_pref */
     BYTE wheel;                     /* the knock was answered with ID 3 */
     BYTE knock_id;                  /* BH of the last C204h after a knock, FFh none */
@@ -182,8 +186,11 @@ typedef struct {
     WORD knocks;                    /* knocks sent */
     WORD wheel_calls;               /* AX=0800h event procedure calls */
     int last_sum;                   /* the last wheel sum handed to USER */
+    WORD notches;                   /* version 2: running notch count, up positive,
+                                     * wraps; moved before USER gets the event
+                                     * (USOSKEY.DRV's wheel scrolling) */
 } WHEELINFO;
-static WHEELINFO winfo = { 1, 0, 0, 0xFF };
+static WHEELINFO winfo = { 2, 0, 0, 0xFF };
 
 /* INT 2Fh AX=D700h: the bridge (TSR or USOSKEY.DRV's copy), read only. */
 static int query_bridge(void)
@@ -360,6 +367,7 @@ static void call_wheel(int sum)
     delta = (WORD)(-sum * WHEEL_DELTA);
     winfo.wheel_calls++;
     winfo.last_sum = sum;
+    winfo.notches -= (WORD)sum;     /* one 16-bit store: USOSKEY.DRV reads it at task time */
     _asm {
         pusha
         push ds

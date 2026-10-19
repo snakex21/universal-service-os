@@ -201,7 +201,7 @@ class Emu:
         self.export('USOSWHEELINFO')
         seg, off = self.u.reg_read(UC_X86_REG_DX), self.u.reg_read(UC_X86_REG_AX)
         assert seg == DATA_SEG, hex(seg)
-        return struct.unpack_from('<BBBBHHHh', bytes(self.u.mem_read(seg * 16 + off, 12)))
+        return struct.unpack_from('<BBBBHHHhh', bytes(self.u.mem_read(seg * 16 + off, 14)))
 
     def export(self, name, words=()):
         seg, off = self.ents[self.names[name]]
@@ -283,7 +283,7 @@ class WheelEmu(unittest.TestCase):
         e.poll()
         self.assertEqual(e.events, [(0x0001, 1, 0, 3)])       # no wheel byte, no wheel event
         # the knock answered with ID 0 was sent once more (probe + bios_on: 2 x 2)
-        self.assertEqual(e.wheel_info()[:6], (1, 2, 0, 0, 0, 4))
+        self.assertEqual(e.wheel_info()[:6], (2, 2, 0, 0, 0, 4))
         calls = [c[0] for c in e.bios_calls]
         on = len(calls) - 1 - calls[::-1].index(0xC205)
         knock = [(0xC202, 0x0600), (0xC202, 0x0500), (0xC202, 0x0400), (0xC204, 0)]
@@ -300,33 +300,35 @@ class WheelEmu(unittest.TestCase):
             self.assertEqual(e.events, [])
 
     def test_wheel_info(self):
-        # version, pref (2 = wanted), wheel, knock ID, knock error, knocks, wheel calls, last sum
+        # version, pref (2 = wanted), wheel, knock ID, knock error, knocks, wheel calls, last sum,
+        # notch count (version 2: up positive, USOSKEY.DRV's wheel scrolling)
         e, _ = self.start(0x070A, 3)
-        self.assertEqual(e.wheel_info(), (1, 2, 1, 3, 0, 2, 0, 0))   # probe + bios_on: two knocks
+        self.assertEqual(e.wheel_info(), (2, 2, 1, 3, 0, 2, 0, 0, 0))   # probe + bios_on: two knocks
         e.u.mem_write(SHARED_SEG * 16 + SHARED_OFF + MALIVE, b'\x12')
         e.push_packets([(0x08, 0, 0, 0xFF), (0x08, 0, 0, 0xFF)])
         e.poll()
+        self.assertEqual(e.wheel_info()[8], 2)                          # two notches up
         e.push_packets([(0x08, 0, 0, 0x03)])
         e.poll()
-        self.assertEqual(e.wheel_info(), (1, 2, 1, 3, 0, 2, 2, 3))   # last sum: three notches down
+        self.assertEqual(e.wheel_info(), (2, 2, 1, 3, 0, 2, 2, 3, -1))  # last sum: three notches down
         calls = len(e.bios_calls)
         e.wheel_info()
         self.assertEqual(len(e.bios_calls), calls)                     # read only: no BIOS call
         # older CSMWrap: the knock is answered with 0AAh, and sent once more (v4)
         e, _ = self.start(0x070A, 0xAA)
-        self.assertEqual(e.wheel_info(), (1, 2, 0, 0xAA, 0, 4, 0, 0))
+        self.assertEqual(e.wheel_info(), (2, 2, 0, 0xAA, 0, 4, 0, 0, 0))
         # Windows 95: not wanted, no knock
         e, _ = self.start(0x0700, 3)
-        self.assertEqual(e.wheel_info()[:6], (1, 1, 0, 0xFF, 0, 0))
+        self.assertEqual(e.wheel_info()[:6], (2, 1, 0, 0xFF, 0, 0))
         # the second sample rate refused (AH=03h) / C204h refused (AH=86h)
         e = Emu(self.drv, 0x070A, 3, fail=(0xC202, 0x0500, 0x03))
         e.export('INQUIRE', (0, MOUSEINFO_SEG))
         e.export('ENABLE', (e.stubs['EventProc'], STUB_SEG))
-        self.assertEqual(e.wheel_info()[:6], (1, 2, 0, 0xFF, 0x2103, 2))
+        self.assertEqual(e.wheel_info()[:6], (2, 2, 0, 0xFF, 0x2103, 2))
         e = Emu(self.drv, 0x070A, 3, fail=(0xC204, 0, 0x86))
         e.export('INQUIRE', (0, MOUSEINFO_SEG))
         e.export('ENABLE', (e.stubs['EventProc'], STUB_SEG))
-        self.assertEqual(e.wheel_info()[:6], (1, 2, 0, 0xFF, 0x4186, 2))
+        self.assertEqual(e.wheel_info()[:6], (2, 2, 0, 0xFF, 0x4186, 2))
 
     def test_me_inquire_without_bridge_is_static(self):
         e = Emu(self.drv, 0x0800, 3, bridge=False)

@@ -287,7 +287,7 @@ class MeBridge(unittest.TestCase):
         self.assertIn('__loadds', self.mouse[self.mouse.index('UsosWheelInfo') - 60:self.mouse.index('UsosWheelInfo')])
         self.assertNotIn('bios15', info)
         self.assertIn('return (DWORD)(WHEELINFO FAR *)&winfo;', info)
-        self.assertIn('static WHEELINFO winfo = { 1, 0, 0, 0xFF };', self.mouse)
+        self.assertIn('static WHEELINFO winfo = { 2, 0, 0, 0xFF };', self.mouse)
         wheel = self.body(self.mouse, 'call_wheel')
         self.assertIn('winfo.wheel_calls++;', wheel)
         self.assertIn('winfo.last_sum = sum;', wheel)

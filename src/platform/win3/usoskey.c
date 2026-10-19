@@ -60,6 +60,16 @@
  * good (USOSPAUSE 2) if the hook cannot be installed. The hook then stays
  * until DRV_FREE. USOSMOUS.DRV imports KERNEL only, so the USER part of
  * the guard lives here.
+ * Wheel scrolling of Win16 windows (98 / 98 SE / Me, 2026-10-19): USER
+ * sends WM_MOUSEWHEEL to the focus window and Win16 windows ignore it (Me's
+ * Device Manager: 16-bit COMMCTRL "SysTreeView"). A WH_GETMESSAGE hook
+ * (task time, the thread that takes a message; separate from the WH_CBT
+ * DOS-box hook) sees USOSMOUS.DRV's notch counter (USOSWHEELINFO v2) move
+ * and, for a Win16 or no-wheel window under the pointer, sends it
+ * WM_VSCROLL in its own task and turns those notches' WM_MOUSEWHEEL into
+ * WM_NULL; Win32 windows keep the stock path. The decisions are in
+ * usoskey_wheel.h; USOSWHEELLOG (by name, USOSDBG.EXE) gives the last
+ * decisions with the real delta. SYSTEM.INI [usosmous] WheelScroll=0: off.
  * No OpenWatcom runtime is linked (own entry point, -zl): the binary is only
  * this file plus import records. docs/design/bios-via-csmwrap.md.
  */
@@ -243,6 +253,216 @@ LRESULT FAR PASCAL __export __loadds cbt_proc(int code, WPARAM wp, LPARAM lp)
     return CallNextHookEx(cbt_hook, code, wp, lp);
 }
 
+/* ---- Wheel scrolling of Win16 windows (usoskey_wheel.h) --------------
+ * Task time only: everything below runs in the WH_GETMESSAGE hook (the
+ * thread that takes a message, Win32 threads included, under the Win16
+ * lock) or at DRV_ENABLE / DRV_DISABLE; the timer path never comes here.
+ * USOSMOUS.DRV's DGROUP is fixed and the mouse driver stays loaded while
+ * USER runs, so its record is looked up once (wheel_start) and read in
+ * place. */
+#include "usoskey_wheel.h"
+
+#ifndef WM_MOUSEWHEEL
+#define WM_MOUSEWHEEL 0x020A
+#endif
+#define SPI_GETWHEELSCROLLLINES 0x0068
+
+typedef struct {                    /* USOSMOUS.DRV USOSWHEELINFO, version 2 */
+    BYTE version, pref, wheel, knock_id;
+    WORD knock_err, knocks, wheel_calls;
+    int last_sum;
+    WORD notches;
+} MOUSEWHEELINFO;
+
+#define WHEEL_RECS 16
+typedef struct {
+    WORD seq;                       /* record number + 1 (0: empty) */
+    DWORD tick;                     /* GetTickCount at the decision */
+    int notches;                    /* real delta in notches, up positive */
+    BYTE action;                    /* WA_* */
+    BYTE kind;                      /* WM_KIND_* of the target's module */
+    WORD hwnd;                      /* target: window under the pointer or its WS_VSCROLL ancestor */
+    WORD sent;                      /* WM_VSCROLL sent for it (translated) */
+    WORD code;                      /* SB_* sent */
+    char cls[20];                   /* target class */
+} WHEELREC;
+typedef struct {
+    BYTE version;                   /* 1 */
+    BYTE enabled;                   /* hook in place */
+    WORD seq;                       /* decisions so far */
+    WORD swallowed;                 /* WM_MOUSEWHEEL turned into WM_NULL */
+    WORD expired;                   /* translations dropped (window gone, task never ran) */
+    DWORD lines;                    /* last SPI_GETWHEELSCROLLLINES value (3 if the call failed) */
+    WHEELREC rec[WHEEL_RECS];
+} WHEELLOG;
+
+static HHOOK msg_hook;
+static MOUSEWHEELINFO FAR *mwi;
+static WHEELLOG wlog = { 1 };
+static WORD notch_seen;
+static BYTE wheel_busy, swallow_on;
+static DWORD translated_at;
+static HWND pend_hwnd;              /* translation waiting for the target's task */
+static int pend_notches;
+static DWORD pend_tick;
+static WORD pend_seq;
+static POINT wpt;                   /* DGROUP: SS is not DS here */
+static char wcls[20];
+static BYTE wmdb[16];
+static DWORD wlines;
+static WORD wcode;
+
+static HWND wheel_target(void)
+{
+    HWND w;
+    GetCursorPos(&wpt);
+    w = WindowFromPoint(wpt);
+    while (w) {
+        LONG style = GetWindowLong(w, GWL_STYLE);
+        if (style & WS_VSCROLL) return w;
+        if (!(style & WS_CHILD)) break;
+        w = GetParent(w);
+    }
+    return 0;
+}
+
+/* Module kind of the window's instance: GetModuleHandle of an instance
+ * handle (high word 0) is the module database selector. */
+static BYTE window_kind(HWND w)
+{
+    HINSTANCE inst = (HINSTANCE)GetWindowWord(w, GWW_HINSTANCE);
+    HMODULE mod;
+    BYTE FAR *p;
+    WORD i;
+    if (!inst) return WM_KIND_UNKNOWN;
+    mod = GetModuleHandle((LPCSTR)MAKELP(0, inst));
+    if (!mod) return WM_KIND_UNKNOWN;
+    p = (BYTE FAR *)MAKELP(mod, 0);
+    if (IsBadReadPtr(p, sizeof(wmdb))) return WM_KIND_UNKNOWN;
+    for (i = 0; i < sizeof(wmdb); i++) wmdb[i] = p[i];
+    return wheel_module_kind(wmdb);
+}
+
+static WHEELREC NEAR *wheel_rec(WORD seq)
+{
+    WHEELREC NEAR *r = &wlog.rec[(seq - 1) % WHEEL_RECS];
+    return r->seq == seq ? r : 0;
+}
+
+/* The counter moved: decide for the window under the pointer now. */
+static void wheel_new(void)
+{
+    int n = wheel_notches(mwi->notches, notch_seen);
+    HWND t = wheel_target();
+    BYTE kind = WM_KIND_UNKNOWN, action;
+    WHEELREC NEAR *r;
+    WORD i;
+    notch_seen = mwi->notches;
+    wcls[0] = 0;
+    if (t) {
+        GetClassName(t, wcls, sizeof(wcls));
+        kind = window_kind(t);
+    }
+    action = wheel_decide(1, t != 0, kind, wcls);
+    r = &wlog.rec[wlog.seq % WHEEL_RECS];
+    r->seq = ++wlog.seq;
+    r->tick = GetTickCount();
+    r->notches = n;
+    r->action = action;
+    r->kind = kind;
+    r->hwnd = (WORD)t;
+    r->sent = 0;
+    r->code = 0;
+    for (i = 0; i < sizeof(r->cls); i++) r->cls[i] = wcls[i];
+    if (action != WA_TRANSLATE) { swallow_on = 0; return; }
+    swallow_on = 1;
+    translated_at = r->tick;
+    if (pend_hwnd && pend_hwnd != t) wlog.expired++;     /* a new target: the old notches go */
+    if (pend_hwnd != t) pend_notches = 0;
+    pend_hwnd = t;
+    pend_notches += n;
+    pend_tick = r->tick;
+    pend_seq = r->seq;
+    /* Not this task's window: wake its task, which then sends (wheel_send). */
+    if (GetWindowTask(t) != GetCurrentTask()) PostMessage(t, WM_NULL, 0, 0L);
+}
+
+/* In the target's own task: WM_VSCROLL is a direct call there. */
+static void wheel_send(void)
+{
+    HWND w = pend_hwnd;
+    WORD i;
+    int count;
+    WHEELREC NEAR *r;
+    if (!IsWindow(w) || GetTickCount() - pend_tick > 1000) {
+        pend_hwnd = 0;
+        wlog.expired++;
+        return;
+    }
+    if (GetWindowTask(w) != GetCurrentTask()) return;
+    wlines = 0;
+    if (!SystemParametersInfo(SPI_GETWHEELSCROLLLINES, 0, &wlines, 0)) wlines = 3;
+    wlines &= 0xFFFF;               /* a 16-bit UINT or the 32-bit value */
+    wlog.lines = wlines;
+    count = wheel_plan(pend_notches, wlines, &wcode);
+    pend_hwnd = 0;
+    pend_notches = 0;
+    for (i = 0; i < (WORD)count; i++) SendMessage(w, WM_VSCROLL, wcode, 0L);
+    if (count) SendMessage(w, WM_VSCROLL, WHEEL_SB_ENDSCROLL, 0L);
+    if ((r = wheel_rec(pend_seq)) != 0) { r->sent = (WORD)count; r->code = wcode; }
+}
+
+LRESULT FAR PASCAL __export __loadds getmsg_proc(int code, WPARAM wp, LPARAM lp)
+{
+    if (code >= 0 && lp && mwi && !wheel_busy) {
+        MSG FAR *m = (MSG FAR *)lp;
+        wheel_busy = 1;
+        if (mwi->notches != notch_seen) wheel_new();
+        if (pend_hwnd) wheel_send();
+        if (m->message == WM_MOUSEWHEEL && wheel_swallow(swallow_on, translated_at, m->time)) {
+            m->message = WM_NULL;
+            wlog.swallowed++;
+        }
+        wheel_busy = 0;
+    }
+    return CallNextHookEx(msg_hook, code, wp, lp);
+}
+
+/* DRV_ENABLE: 98 / 98 SE / Me with USOSMOUS.DRV v4 (USOSWHEELINFO v2), the
+ * wheel not switched off (Wheel=0) and WheelScroll not 0. */
+static void wheel_start(void)
+{
+    FARPROC info;
+    MOUSEWHEELINFO FAR *w;
+    if (msg_hook || !win9x) return;
+    if (!GetPrivateProfileInt("usosmous", "WheelScroll", 1, "SYSTEM.INI")) return;
+    info = mouse_export("USOSWHEELINFO");
+    if (!info) return;
+    w = (MOUSEWHEELINFO FAR *)((DWORD (FAR PASCAL *)(void))info)();
+    if (!w || w->version < 2 || w->pref == 1) return;
+    mwi = w;
+    notch_seen = w->notches;
+    swallow_on = 0;
+    pend_hwnd = 0;
+    msg_hook = SetWindowsHookEx(WH_GETMESSAGE, (HOOKPROC)getmsg_proc, GetModuleHandle("USOSKEY"), 0);
+    wlog.enabled = msg_hook != 0;
+    if (!msg_hook) mwi = 0;
+}
+
+static void wheel_stop(void)
+{
+    if (msg_hook) { UnhookWindowsHookEx(msg_hook); msg_hook = 0; }
+    mwi = 0;
+    pend_hwnd = 0;
+    wlog.enabled = 0;
+}
+
+/* By name from USOSDBG.EXE (task time): the decision log, read only. */
+DWORD FAR PASCAL __export __loadds UsosWheelLog(void)
+{
+    return (DWORD)(WHEELLOG FAR *)&wlog;
+}
+
 /* Interrupt time: poll_body and what it calls (translate, keyboard_event,
  * force_key, cad_via_vkd, sync_bios_flags) run from the system timer.
  * Allowed beyond the shared block and the BIOS data area: keybd_event_proc
@@ -424,6 +644,7 @@ static void start(void)
             mouse_pause(cbt_hook ? 0 : 2);
         }
     }
+    wheel_start();
 }
 
 static void unhook(void)
@@ -435,6 +656,7 @@ static void unhook(void)
 static void stop(void)
 {
     if (timer) { kill_timer(timer); timer = 0; }
+    wheel_stop();
     if (!mouse_guard) unhook();
     dos_focus = 0;
     if (shared) shared->alive = 0;

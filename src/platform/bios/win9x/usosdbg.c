@@ -105,12 +105,29 @@ typedef struct {
     BYTE mring[128];                /* 32 x status, X, Y, wheel */
 } SHARED;
 
-/* USOSMOUS.DRV USOSWHEELINFO (version 1). */
+/* USOSMOUS.DRV USOSWHEELINFO (version 1; 2 adds notches). */
 typedef struct {
     BYTE version, pref, wheel, knock_id;
     WORD knock_err, knocks, wheel_calls;
     int last_sum;
+    WORD notches;                   /* version 2: running notch count, up positive */
 } WHEELINFO;
+
+/* USOSKEY.DRV USOSWHEELLOG (version 1): wheel scrolling decisions. */
+typedef struct {
+    WORD seq;
+    DWORD tick;
+    int notches;
+    BYTE action, kind;
+    WORD hwnd, sent, code;
+    char cls[20];
+} WSREC;
+typedef struct {
+    BYTE version, enabled;
+    WORD seq, swallowed, expired;
+    DWORD lines;
+    WSREC rec[16];
+} WSLOG;
 
 /* CSMWrap patch 0018: SeaBIOS's usb_mouse_diag (version 1, natural
  * alignment, 310 bytes). */
@@ -548,6 +565,9 @@ static void show_wheel(void)
         wsprintf(line(), "WHEEL USOSMOUS: wanted:%s  knock answered ID:%02X  wheel:%s  knocks:%u  knock error:%04X  wheel calls:%u  last sum:%d",
                  (LPSTR)(w->pref == 2 ? "yes" : w->pref == 1 ? "no (Wheel=0 or before 98)" : "not asked"),
                  (WORD)w->knock_id, (LPSTR)(w->wheel ? "ON" : "off"), w->knocks, w->knock_err, w->wheel_calls, w->last_sum);
+        if (w->version >= 2)
+            wsprintf(line(), "WHEEL USOSMOUS notch count:%d (up positive; last sum %d = %s)", (int)w->notches, w->last_sum,
+                     (LPSTR)(w->last_sum < 0 ? "up" : w->last_sum > 0 ? "down" : "none"));
     } else {
         wsprintf(line(), "WHEEL USOSMOUS.DRV without USOSWHEELINFO (older driver)");
     }
@@ -595,6 +615,35 @@ static void show_wheel(void)
         for (i = r; i < d->desc_got && i < r + 64; i++) wsprintf(l + lstrlen(l), "%02X", (WORD)d->desc[i]);
     }
     show_c2((BYTE FAR *)d);
+}
+
+/* USOSKEY.DRV's wheel scrolling (USOSWHEELLOG): per notch batch the real
+ * delta (USOSMOUS.DRV's counter, up positive) and what was done. */
+static void show_wheelscroll(void)
+{
+    static const char *const actions[5] = { "-", "stock (nothing scrollable under the pointer)",
+        "stock (Win32 window)", "translated to WM_VSCROLL", "off" };
+    static const char *const kinds[3] = { "?", "Win16", "Win32" };
+    HINSTANCE key = GetModuleHandle("USOSKEY");
+    FARPROC info = key ? GetProcAddress(key, "USOSWHEELLOG") : 0;
+    WSLOG FAR *g;
+    WORD i, first;
+    if (!info) {
+        wsprintf(line(), "WHEEL USOSKEY scrolling: no USOSWHEELLOG (USOSKEY.DRV not loaded or older)");
+        return;
+    }
+    g = (WSLOG FAR *)((DWORD (FAR PASCAL *)(void))info)();
+    wsprintf(line(), "WHEEL USOSKEY scrolling: hook:%s  decisions:%u  WM_MOUSEWHEEL swallowed:%u  dropped:%u  wheel lines:%lu",
+             (LPSTR)(g->enabled ? "on" : "off"), g->seq, g->swallowed, g->expired, g->lines);
+    first = g->seq > 16 ? g->seq - 16 : 0;
+    for (i = first; i < g->seq; i++) {
+        WSREC FAR *r = &g->rec[i % 16];
+        if (r->seq != i + 1) continue;
+        wsprintf(line(), "WHEEL  #%u t%lu delta %d notch(es) = %d (%s)  %s  hwnd %04X %s %s  sent %u x SB %u",
+                 r->seq, r->tick, r->notches, r->notches * 120, (LPSTR)(r->notches > 0 ? "up" : r->notches < 0 ? "down" : "none"),
+                 (LPSTR)actions[r->action < 5 ? r->action : 0], r->hwnd, (LPSTR)kinds[r->kind < 3 ? r->kind : 0],
+                 (LPSTR)(r->cls[0] ? r->cls : "-"), r->sent, r->code);
+    }
 }
 
 static void show_ivt(void)
@@ -1001,6 +1050,7 @@ static void refresh(void)
     show_key();
     show_mouse();
     show_wheel();
+    show_wheelscroll();
     show_ivt();
     show_map();
     show_irq();

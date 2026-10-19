@@ -14,8 +14,11 @@
  *   MOUSE  system metrics (mouse / wheel present, buttons, wheel lines),
  *          the input this logger saw through a journal record hook (wheel
  *          messages, moves, clicks: proves whether WM_MOUSEWHEEL reaches
- *          USER), per WM_MOUSEWHEEL the focus window, the window under the
- *          pointer and the foreground window (class, WS_VSCROLL), SYSTEM.INI
+ *          USER; journal records carry no wheel delta, so no direction is
+ *          claimed: USOSDBG's WHEEL USOSKEY lines have the real delta and
+ *          what USOSKEY.DRV did with it), per WM_MOUSEWHEEL the focus
+ *          window, the window under the pointer and the foreground window
+ *          (class, WS_VSCROLL), SYSTEM.INI
  *          mouse lines, and USOSDBG.EXE /L (log mode of
  *          the Win16 diagnostics: USOSKEY / USOSMOUS / SeaBIOS USOSMWHL
  *          record, packets, descriptor, PCI once)
@@ -245,7 +248,7 @@ static int snap_no;
 
 /* journal hook counters (main thread writes, worker reads) */
 static HHOOK g_hook;
-static volatile DWORD g_wheel, g_wheel_pos, g_wheel_neg, g_moves, g_ldown, g_rdown, g_mdown, g_xdown,
+static volatile DWORD g_wheel, g_moves, g_ldown, g_rdown, g_mdown, g_xdown,
                       g_keys, g_cancels, g_installs, g_install_fail;
 static volatile DWORD g_wheel_l, g_wheel_h, g_wheel_tick;
 
@@ -656,8 +659,9 @@ LRESULT CALLBACK journal(int code, WPARAM wp, LPARAM lp)
             g_wheel_l = e->paramL;
             g_wheel_h = e->paramH;
             g_wheel_tick = GetTickCount();
-            if ((short)HIWORD(e->paramL) > 0 || (short)e->paramH > 0) g_wheel_pos++;
-            else g_wheel_neg++;
+            /* No direction here: a journal record carries no wheel delta
+             * (98 / Me: paramL / paramH are the pointer x / y). The delta
+             * and what was done with it: USOSDBG's "WHEEL USOSKEY" lines. */
             wheel_detail(e);
             break;
         case WM_MOUSEMOVE: g_moves++; break;
@@ -999,9 +1003,9 @@ static void sec_mouse(void)
     o("[MOUSE] metrics: mouse present %d  buttons %d  wheel present %d  wheel scroll lines %u  swap %d",
       GetSystemMetrics(SM_MOUSEPRESENT), GetSystemMetrics(SM_CMOUSEBUTTONS), GetSystemMetrics(SM_MOUSEWHEELPRESENT),
       lines, GetSystemMetrics(SM_SWAPBUTTON));
-    o("[MOUSE] journal hook: %s (installs %lu, failed %lu, cancelled %lu)  WM_MOUSEWHEEL %lu (up %lu down %lu, last %lu s ago L=%08lX H=%08lX)",
+    o("[MOUSE] journal hook: %s (installs %lu, failed %lu, cancelled %lu)  WM_MOUSEWHEEL %lu (last %lu s ago L=%08lX H=%08lX; no delta in journal records: see WHEEL USOSKEY)",
       (LPSTR)(opt_nohook ? "off (/nohook)" : g_hook ? "on" : "not installed"), g_installs, g_install_fail, g_cancels,
-      g_wheel, g_wheel_pos, g_wheel_neg, g_wheel_tick ? (GetTickCount() - g_wheel_tick) / 1000 : 0, g_wheel_l, g_wheel_h);
+      g_wheel, g_wheel_tick ? (GetTickCount() - g_wheel_tick) / 1000 : 0, g_wheel_l, g_wheel_h);
     o("[MOUSE] journal hook: moves %lu  left %lu  right %lu  middle %lu  x-buttons %lu  keys %lu",
       g_moves, g_ldown, g_rdown, g_mdown, g_xdown, g_keys);
     GetPrivateProfileStringA("boot", "mouse.drv", "(none)", a, sizeof(a), "SYSTEM.INI");
