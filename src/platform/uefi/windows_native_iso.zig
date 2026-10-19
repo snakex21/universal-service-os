@@ -38,7 +38,9 @@ noinline fn initBootState(state: *BootState) !void {
 const Iso = struct {
     catalog: *data_volume.Catalog,
     file: *ntfs.File,
-    pub fn size(self: *const Iso) u64 { return self.file.size(); }
+    pub fn size(self: *const Iso) u64 {
+        return self.file.size();
+    }
     pub fn readAt(self: *const Iso, offset: u64, output: []u8) !usize {
         try self.file.readAt(self.catalog.fs, self.catalog.reader(), offset, output);
         return output.len;
@@ -79,7 +81,8 @@ fn openIso(catalog: *data_volume.Catalog, folder: []const u8, name: []const u8, 
     var name_buffer: [255]u16 = undefined;
     var folder_buffer: [64]u16 = undefined;
     if (folder.len > folder_buffer.len) return error.UnsupportedWindowsFolder;
-    const path = [_][]const u16{ wide("Systems"), wide("Windows"), widen(folder, &folder_buffer), wide("Images"), widen(name, &name_buffer) };
+    var category_buffer: [16]u16 = undefined;
+    const path = [_][]const u16{ wide("Systems"), widen(source_config.categoryForFolder(folder), &category_buffer), widen(folder, &folder_buffer), wide("Images"), widen(name, &name_buffer) };
     try ntfs.openFile(catalog.fs, catalog.reader(), &path, file);
 }
 
@@ -289,7 +292,7 @@ pub fn formatCsmwrapRequestFor(buffer: []u8, comptime profile: []const u8, folde
             break :blk try std.fmt.bufPrint(&answer_text, "file:{s}", .{file});
         },
     };
-    return std.fmt.bufPrint(buffer, "version=1\r\nprofile=" ++ profile ++ "\r\niso=Systems/Windows/{s}/Images/{s}\r\ndonor={s}/{s}\r\nfolder={s}\r\nanswer={s}\r\n", .{ folder, name, dir, donor_name, folder, answer_value });
+    return std.fmt.bufPrint(buffer, "version=1\r\nprofile=" ++ profile ++ "\r\niso=Systems/{s}/{s}/Images/{s}\r\ndonor={s}/{s}\r\nfolder={s}\r\nanswer={s}\r\n", .{ source_config.categoryForFolder(folder), folder, name, dir, donor_name, folder, answer_value });
 }
 
 fn ensureEspDirectory(root: *uefi.protocol.File, path_text: []const u8) !void {
@@ -508,7 +511,7 @@ pub fn modernX86ExternalDonor(setup: wim.Setup, folder: []const u8, opted_in: bo
 
 fn modernNvmeOptIn(state: *BootState, folder: []const u8) !bool {
     var directory: [160]u8 = undefined;
-    const path = try std.fmt.bufPrint(&directory, "Systems/Windows/{s}/Unattended", .{folder});
+    const path = try std.fmt.bufPrint(&directory, "Systems/{s}/{s}/Unattended", .{ source_config.categoryForFolder(folder), folder });
     var flag: ntfs.File = undefined;
     openIn(&state.catalog, path, "nvme-experimental.txt", &flag) catch |err| switch (err) {
         error.NotFound => return false,
@@ -540,7 +543,7 @@ pub fn formatX86CsmwrapRequest(buffer: []u8, folder: []const u8, name: []const u
             break :blk try std.fmt.bufPrint(&answer_text, "file:{s}", .{file});
         },
     };
-    return std.fmt.bufPrint(buffer, "version=1\r\nprofile=" ++ x86_csmwrap_profile ++ "\r\niso=Systems/Windows/{s}/Images/{s}\r\ndonor=Systems/Windows/{s}/Images/{s}\r\nfolder={s}\r\nanswer={s}\r\n", .{ folder, name, folder, name, folder, answer_value });
+    return std.fmt.bufPrint(buffer, "version=1\r\nprofile=" ++ x86_csmwrap_profile ++ "\r\niso=Systems/{s}/{s}/Images/{s}\r\ndonor=Systems/{s}/{s}/Images/{s}\r\nfolder={s}\r\nanswer={s}\r\n", .{ source_config.categoryForFolder(folder), folder, name, source_config.categoryForFolder(folder), folder, name, folder, answer_value });
 }
 
 test "x86 CSMWrap request boots the ISO itself" {
@@ -548,6 +551,9 @@ test "x86 CSMWrap request boots the ISO itself" {
     const text = try formatX86CsmwrapRequest(&buffer, "Windows 10", "w10x86.iso", .profile);
     try std.testing.expectEqualStrings("version=1\r\nprofile=win-x86-uefi-csmwrap\r\niso=Systems/Windows/Windows 10/Images/w10x86.iso\r\ndonor=Systems/Windows/Windows 10/Images/w10x86.iso\r\nfolder=Windows 10\r\nanswer=profile\r\n", text);
     try std.testing.expectError(error.InvalidImageName, formatX86CsmwrapRequest(&buffer, "Windows 10", "a/b.iso", .none));
+    const beta = try formatX86CsmwrapRequest(&buffer, "Windows 7 Beta", "beta.iso", .{ .file = "beta.xml" });
+    try std.testing.expect(std.mem.indexOf(u8, beta, "iso=Systems/Betas/Windows 7 Beta/Images/beta.iso\r\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, beta, "donor=Systems/Betas/Windows 7 Beta/Images/beta.iso\r\n") != null);
 }
 
 /// The ISO checks of the x86 path, then usos-source.ini (the DATA binding
@@ -666,7 +672,7 @@ fn inject(root: *uefi.protocol.File, state: *BootState, volume: *files.Volume, o
             .flag => |flag_name| try volume.add(flag_name, usos.flow.plan.flag_content),
             .unattended_flag => |flag| {
                 var directory: [192]u8 = undefined;
-                const path = try std.fmt.bufPrint(&directory, "Systems/Windows/{s}/Unattended", .{flag.folder});
+                const path = try std.fmt.bufPrint(&directory, "Systems/{s}/{s}/Unattended", .{ source_config.categoryForFolder(flag.folder), flag.folder });
                 var marker: ntfs.File = undefined;
                 const present = if (openIn(catalog, path, flag.source, &marker)) |_| true else |err| switch (err) {
                     error.NotFound => false,

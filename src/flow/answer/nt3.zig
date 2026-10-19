@@ -38,6 +38,8 @@ pub const staged = [_]struct { system_id: []const u8, file: []const u8 }{
     // micro-Linux takes the [UserData] names into the patched INITIAL.INF.
     .{ .system_id = "windows-nt-3-1", .file = "NT31.SIF" },
     .{ .system_id = "windows-nt-3-1-server", .file = "NT31S.SIF" },
+    .{ .system_id = "citrix-winframe-1-8", .file = "WF18.SIF" },
+    .{ .system_id = "windows-nt-3-beta", .file = "NT3B.SIF" },
 };
 
 pub fn isNt3(system_id: []const u8) bool {

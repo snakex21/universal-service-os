@@ -85,6 +85,11 @@ pub fn select(root: *std.os.uefi.protocol.File, discovery: *usos.catalog.media_d
         switch (navigation.handleSelectable(input.readBlocking(), &selected, count, &list, selectable[0..count])) {
             .activate => {
                 const entry = slots.at(selected) orelse continue;
+                if (usos.catalog.preparation_block.reason(entry.id)) |reason| {
+                    showBackendDisabledNotice(entry, view.tr(reason));
+                    list.redrawFull(selected, shown_help);
+                    continue;
+                }
                 const media = discovery.mediaStatus(entry.image_directory);
                 if (rows_model.biosOnly(entry, firmware)) {
                     if (media.hasImages()) showBackendDisabledNotice(entry, view.t(.notice_backend_line2)) else showMissingImageNotice(entry);

@@ -3,6 +3,23 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 . "$SCRIPT_DIR/nt5_profile.sh"
 usos_nt5_profile
+# Pre-release NT5 must not inherit source-specific RTM/SP3/SP4 binary edits.
+# Metadata/routing are host-tested; the compatibility-package contract for
+# these particular kernels remains an integration requirement (support matrix).
+usos_nt5_require_supported || exit 1
+# Runs for real sources, including XP before delegation to probe_xp_source.sh.
+# A beta placed in an RTM folder must not receive the RTM binary patches.
+if [ -n "${SOURCE_ROOT:-}" ]; then
+    metadata=$(usos_nt5_source_metadata "$SOURCE_ROOT/$NT5_SOURCE_DIR/TXTSETUP.SIF") || {
+        printf '[NT5_SOURCE] STOP invalid or duplicate DriverVer\n' >&2; exit 1;
+    }
+    [ -z "$metadata" ] || printf '%s\n' "$metadata"
+    case "$metadata" in
+        *source_identity=windows-whistler*|*source_identity=windows-neptune*|*source_identity=windows-2000-beta*)
+            printf '[NT5_SOURCE] STOP pre-release DriverVer in RTM source; no target write occurred\n' >&2
+            exit 1 ;;
+    esac
+fi
 if [ "$NT5_SYSTEM" = windows-xp ]; then
     exec sh "$SCRIPT_DIR/probe_xp_source.sh"
 fi

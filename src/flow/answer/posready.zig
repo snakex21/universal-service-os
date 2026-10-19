@@ -17,10 +17,11 @@ pub const system_id = "windows-embedded-posready-2009";
 /// Rendered files the UEFI menu leaves for micro-Linux (\EFI\USOS\answer\<file>).
 pub const staged = [_]struct { system_id: []const u8, file: []const u8 }{
     .{ .system_id = system_id, .file = "POSR.SIF" },
+    .{ .system_id = "windows-flp", .file = "FLP.SIF" },
 };
 
 pub fn isPosReady(id: []const u8) bool {
-    return std.ascii.eqlIgnoreCase(id, system_id);
+    return std.ascii.eqlIgnoreCase(id, system_id) or std.ascii.eqlIgnoreCase(id, "windows-flp");
 }
 
 /// POSReady keys are 5x5 (OEM, VL and the evaluation SKUs).

@@ -574,6 +574,7 @@ def main() -> int:
             ("tools/probe_nt5_source.sh", "usr/lib/usos/probe_nt5_source.sh"),
             ("tools/prepare_nt5_media_markers.sh", "usr/lib/usos/prepare_nt5_media_markers.sh"),
             ("tools/nt5_profile.sh", "usr/lib/usos/nt5_profile.sh"),
+            ("tools/beta_clock.sh", "usr/lib/usos/beta_clock.sh"),
             ("tools/prepare_xp_local_source.sh", "usr/lib/usos/prepare_xp_local_source.sh"),
             ("tools/prepare_xp_target.sh", "usr/lib/usos/prepare_xp_target.sh"),
             ("tools/legacy_xp_staging.sh", "usr/lib/usos/legacy_xp_staging.sh"),

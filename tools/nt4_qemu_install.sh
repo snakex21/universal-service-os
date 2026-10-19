@@ -252,10 +252,15 @@ nt4_vm_disk_args() {
 }
 
 nt4_vm_args() {
+    beta_rtc=base=localtime
+    if [ -n "${USOS_BETA_CLOCK:-}" ]; then
+        . "${USOS_LIB_DIR:-/usr/lib/usos}/beta_clock.sh" || return 1
+        beta_rtc=$(usos_beta_clock_rtc "$USOS_BETA_CLOCK" "${USOS_BETA_SYSTEM:-}" "${USOS_BETA_BUILD:-0}") || return 1
+    fi
     case "$2" in kvm) accel='kvm' ;; *) accel='tcg,tb-size=128' ;; esac
     printf '%s\n' -name usos-nt4-install -nodefaults -L "$W9X_VM_DATADIR" \
         -machine pc -accel "$accel" -cpu "${NT4_VM_CPU:-pentium3}" -smp 1 -m "${NT4_VM_MB:-$W9X_VM_GUEST_MB}" \
-        -rtc base=localtime -vga std -display none -nic none -no-reboot \
+        -rtc "$beta_rtc" -vga std -display none -nic none -no-reboot \
         $(nt4_vm_disk_args "$1") \
         -boot order=c \
         -serial "file:$W9X_VM_RUN/serial.log" \

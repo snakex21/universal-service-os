@@ -466,7 +466,7 @@ class W2kStorage(unittest.TestCase):
         # pass yet, docs/nvme-nt-2026-10-11.md section 8).
         stage = (ROOT / 'tools/legacy_xp_staging.sh').read_text()
         self.assertIn('windows-xp|windows-server-2003) ;;', stage)
-        self.assertIn('windows-2000) [ -f "/mnt/data/Systems/Windows/$NT5_NAME/Unattended/nvme-experimental.txt" ] || stop', stage)
+        self.assertIn('windows-2000) [ -f "/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/nvme-experimental.txt" ] || stop', stage)
 
     def test_apply_nvme(self):
         import build_xp_uefi_csm_trial as builder
@@ -588,7 +588,7 @@ class W2kStorage(unittest.TestCase):
                 self.assertEqual((ls / 'TXTSETUP.SIF').read_bytes(), W2K_TXTSETUP)
                 self.assertFalse((bt / 'ahcint.sys').exists())
         stage = (ROOT / 'tools/legacy_xp_staging.sh').read_text()
-        self.assertIn('USOS_W2K_ACPI_PKG="/mnt/data/Systems/Windows/$NT5_NAME/Unattended/acpi"', stage)
+        self.assertIn('USOS_W2K_ACPI_PKG="/mnt/data/Systems/$NT5_CATEGORY/$NT5_NAME/Unattended/acpi"', stage)
         self.assertIn("acpi-off.txt and the user ACPI package (Unattended\\acpi) exclude each other", stage)
         self.assertIn('export USOS_W2K_ACPI USOS_W2K_STORAGE USOS_W2K_HAL USOS_W2K_HPET USOS_W2K_RTC USOS_W2K_ACPI_PKG', stage)
 
