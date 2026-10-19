@@ -14,6 +14,8 @@ docs/usb9x-hotswap-design-2026-10-19.md section 8).
    csm_bootdisk_hash() "only" (int13_boot_disk_only); the watch arms only from the channel 1
    service; xhci_process_events latches CSC; a controller is kept only when registered;
    seabios-config drops MEGASAS and UHCI only; no runtime malloc in the hot-plug path.
+4. Pins (usos17 is the release pin since 2026-10-19): xp_csmwrap_esp.sh PINNED, release.go,
+   lock.json, run_build_vm.py (20 patches), third-party.json, build_csmwrap_dos_esp.py.
 """
 from __future__ import annotations
 
@@ -144,9 +146,29 @@ def source(zig: str) -> None:
     print('[source] request check identical, version 2 layouts identical')
 
 
+def pins() -> None:
+    h = json.loads((V17 / 'manifest.json').read_text(encoding='utf-8'))['files']['csmwrapx64.efi']
+    assert h == '3a36aba19b29ca5cf2fb35567381d48105bacdf11cc3198eccdc678d8c467c3d'
+    lock = json.loads((ROOT / 'tools/csmwrap_build/lock.json').read_text(encoding='utf-8'))
+    assert lock['usos_version'] == '3.1.2-usos17', lock['usos_version']
+    esp = (ROOT / 'tools/xp_csmwrap_esp.sh').read_text(encoding='utf-8')
+    assert f'PINNED={h}\n' in esp and 'pinned 3.1.2-usos17 hash' in esp
+    rel = (ROOT / 'installer/cmd/usos-efisign/release.go').read_text(encoding='utf-8')
+    assert 'csmwrapVendorDir  = "tools/vendor/csmwrap/3.1.2-usos17"' in rel and 'usos16' not in rel
+    vm = (ROOT / 'tools/csmwrap_build/run_build_vm.py').read_text(encoding='utf-8')
+    assert '3.1.2-usos17/patches' in vm and 'len(patches) != 20' in vm
+    tp = json.loads((ROOT / 'tools/release/third-party.json').read_text(encoding='utf-8'))
+    blob = json.dumps(tp)
+    assert '"version": "3.1.2-usos17"' in blob and 'tools/vendor/csmwrap/3.1.2-usos17' in blob and 'patch 0022' in blob
+    dos = (ROOT / 'tools/build_csmwrap_dos_esp.py').read_text(encoding='utf-8')
+    assert "3.1.2-usos17/manifest.json" in dos
+    print('[pins] xp_csmwrap_esp.sh, release.go, lock.json, run_build_vm.py, third-party.json, DOS ESP')
+
+
 def main() -> int:
     series()
     source(u16.find_zig())
+    pins()
     print('CSMWRAP-UDS17-TEST PASS')
     return 0
 
