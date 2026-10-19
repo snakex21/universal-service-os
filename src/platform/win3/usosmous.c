@@ -85,6 +85,12 @@
  * adds a running notch count (up positive), moved here before USER gets
  * the wheel event; USOSKEY.DRV's WH_GETMESSAGE hook (task time) reads it
  * for the real delta (usoskey_wheel.h). Nothing else changes here.
+ * VMOUSE mode (USOSVMD.VXD v2, 2026-10-19; C:\USOS9X\USOSVMD.ON): see
+ * vmd_present() below and docs/dos-mouse-2026-10-18.md. The INT 15h C207h
+ * handler is then the VxD's V86 callback (global VMM breakpoint, valid in
+ * every VM), never the bridge copy in the system VM's memory, so the Me
+ * DOS-box guard is not needed (USOSVMDMODE tells USOSKEY.DRV); VMOUSE feeds
+ * USER (and DOS boxes) and this driver's timer only adds the wheel.
  * No OpenWatcom runtime is linked (own entry point, -zl).
  * Built with tools/build_win3_usb_keyboard.py; docs/win9x-modern-2026-09-30.md.
  */
@@ -192,6 +198,26 @@ typedef struct {
 } WHEELINFO;
 static WHEELINFO winfo = { 2, 0, 0, 0xFF };
 
+/* VMOUSE mode (USOSVMD.VXD) state; USOSDBG.EXE reads it (USOSVMDINFO). */
+typedef struct {
+    BYTE version;                   /* 1 */
+    BYTE checked;                   /* vmd_present() decided */
+    BYTE flag;                      /* C:\USOS9X\USOSVMD.ON exists */
+    BYTE vmouse_api;                /* VMOUSE PM API found */
+    BYTE vxd_api;                   /* USOSVMD PM API found */
+    BYTE vxd_mode;                  /* VxD: 0 no VMOUSE, 1 minidriver, 2 observer, FF no answer */
+    BYTE active;                    /* VMOUSE mode in use */
+    BYTE cb_ok;                     /* VMDAPI_SET_MOUSE_EVENT_CALLBACK accepted */
+    DWORD vxd_cb;                   /* the VxD's V86 callback seg:off */
+    WORD direct_err;                /* last DPMI 0200h/0302h failure (1 / 2), 0 none */
+    WORD vxd_status;                /* bytes of the VxD status block copied below */
+    WORD wheel_only_polls;          /* timer polls in VMOUSE mode */
+    BYTE vxd[64];                   /* USOSVMD status block (PM API 2), at USOSVMDINFO */
+} VMDINFO;
+static VMDINFO vinfo = { 1, 0, 0, 0, 0, 0xFF };
+static BYTE vmdmode;                /* VMOUSE mode active */
+static BYTE direct15;               /* INT 15h through the real-mode vector (0302h) */
+
 /* INT 2Fh AX=D700h: the bridge (TSR or USOSKEY.DRV's copy), read only. */
 static int query_bridge(void)
 {
@@ -240,24 +266,74 @@ static WORD bios15(WORD ax, WORD bx, WORD es)
     rm.ebx = bx;
     rm.es = es;
     rm.flags = 0x0202;              /* IF */
-    _asm {
-        push es
-        push di
-        pushad
-        mov ax, ds
-        mov es, ax
-        xor edi, edi
-        mov di, off
-        mov ax, 0300h
-        mov bx, 0015h
-        xor cx, cx
-        int 31h
-        popad
-        pop di
-        pop es
-        jnc ok
-        mov failed, 1
-    ok:
+    if (direct15) {
+        /* VMOUSE mode: the system VM's real-mode INT 15h vector called as a
+         * far procedure with an IRET frame (DPMI 0302h), so a VxD that hooks
+         * V86 INT 15h C2xxh (VMOUSE virtualises the BIOS mouse for VMs)
+         * cannot swallow the registration: SeaBIOS itself must get the
+         * VxD's callback. */
+        WORD vseg = 0, voff = 0;
+        _asm {
+            push bx
+            push cx
+            push dx
+            mov ax, 0200h
+            mov bl, 15h
+            int 31h
+            jc v_fail
+            mov vseg, cx
+            mov voff, dx
+            jmp v_done
+        v_fail:
+            mov failed, 1
+        v_done:
+            pop dx
+            pop cx
+            pop bx
+        }
+        if (failed) { vinfo.direct_err = 1; return 0xFFFF; }
+        rm.cs = vseg;
+        rm.ip = voff;
+        _asm {
+            push es
+            push di
+            pushad
+            mov ax, ds
+            mov es, ax
+            xor edi, edi
+            mov di, off
+            mov ax, 0302h
+            xor bx, bx
+            xor cx, cx
+            int 31h
+            popad
+            pop di
+            pop es
+            jnc ok2
+            mov failed, 1
+        ok2:
+        }
+        if (failed) { vinfo.direct_err = 2; return 0xFFFF; }
+    } else {
+        _asm {
+            push es
+            push di
+            pushad
+            mov ax, ds
+            mov es, ax
+            xor edi, edi
+            mov di, off
+            mov ax, 0300h
+            mov bx, 0015h
+            xor cx, cx
+            int 31h
+            popad
+            pop di
+            pop es
+            jnc ok
+            mov failed, 1
+        ok:
+        }
     }
     if (failed) return 0xFFFF;
     if (rm.flags & 1) return 0x100 | (WORD)((rm.eax >> 8) & 0xFF);
@@ -408,6 +484,7 @@ static void __near __loadds poll_body(void)
     shared->malive = 18;            /* about 1 s of INT 1Ch ticks */
     shared->mpolls++;
     wheel_sum = 0;
+    if (vmdmode) vinfo.wheel_only_polls++;
     while (shared->mtail != shared->mhead) {
         BYTE FAR *p = shared->mring + ((WORD)shared->mtail << 2);
         BYTE status = p[0], now;
@@ -415,6 +492,7 @@ static void __near __loadds poll_body(void)
         int dy = (int)(p[2] | ((status & 0x20) ? 0xFF00 : 0));
         shared->mtail = (BYTE)((shared->mtail + 1) & 31);
         wheel_sum += (signed char)p[3];         /* 0 without the wheel */
+        if (vmdmode) continue;                  /* VMOUSE mode: motion and buttons come from VMOUSE */
         if (status & 0xC0) continue;            /* overflow: no valid motion */
         now = (BYTE)(status & 7);
         sx += dx;
@@ -469,7 +547,9 @@ static int bios_on(void)
     WORD r = bios15(0xC205, 0x0300, 0);
     if (r) { note_error(0x05, r); shared->mstate = MS_NO_MOUSE; return 0; }
     knock();
-    r = bios15(0xC207, shared->mcb, shared_seg);
+    /* VMOUSE mode: the VxD's V86 callback (global), else the bridge's mcb */
+    if (vmdmode) r = bios15(0xC207, LOWORD(vinfo.vxd_cb), HIWORD(vinfo.vxd_cb));
+    else r = bios15(0xC207, shared->mcb, shared_seg);
     if (r) { note_error(0x07, r); shared->mstate = MS_FAILED; return 0; }
     r = bios15(0xC200, 0x0100, 0);
     if (r) { note_error(0x00, r); bios15(0xC207, 0, 0); shared->mstate = MS_FAILED; return 0; }
@@ -484,9 +564,167 @@ static void bios_off(BYTE state)
     shared->mstate = state;
 }
 
+/* VMOUSE mode (USOSVMD.VXD v2 present). Gate: C:\USOS9X\USOSVMD.ON exists,
+ * VMOUSE's PM API answers, the USOSVMD PM API (INT 2Fh AX=1684h BX=0,
+ * ES:DI -> "USOSVMD ") accepts the bridge's shared block (function 1) and
+ * reports "minidriver" (it owns VMOUSE's mouse data). Then:
+ *   - the BIOS registration (C205h, knock, C207h, C200h) goes to SeaBIOS
+ *     through the real-mode INT 15h vector (bios15, direct15) and C207h
+ *     names the VxD's V86 callback (a VMM breakpoint in global V86 memory:
+ *     valid in every VM, it traps to ring 0). The bridge's mcb is never
+ *     registered, so no BIOS far call can land in the system VM's private
+ *     memory while a DOS VM is current (the Me callback hazard);
+ *   - USER's event procedure goes to VMOUSE (VMDAPI_SET_MOUSE_EVENT_CALLBACK,
+ *     95/98 DDK MOUSE.DOC); VMOUSE moves the pointer on the desktop and in
+ *     DOS boxes from what the VxD posts;
+ *   - the 20 ms timer still runs, but only for the wheel: the VxD copies
+ *     every packet into the shared ring and poll() sends the summed Z bytes
+ *     to USER (AX=0800h) as before; motion and buttons are skipped there.
+ * Any other answer (no flag, no VxD, VMOUSE already has another mouse:
+ * "observer") keeps the plain path and the Me DOS-box guard unchanged.
+ * Decided once, at task time, after the bridge exists. */
+#define VMD_DEVICE_ID              0x000C
+#define VMDAPI_SET_MOUSE_EVENT_CB  0x0003
+#define USOSVMD_MINIDRIVER         1
+
+static DWORD vmd_api;               /* VMOUSE PM API entry (seg:off), 0 = none */
+static DWORD vxd_api;               /* USOSVMD PM API entry, 0 = none */
+static const char vxd_name[8] = { 'U', 'S', 'O', 'S', 'V', 'M', 'D', ' ' };
+
+/* INT 2Fh AX=1684h: the PM API entry of a VxD by ID, or (id 0, Windows 95
+ * and later) by its 8-byte name at DS:name. 0 = not loaded. */
+static DWORD device_api(WORD id, const char NEAR *name)
+{
+    WORD o = 0, s = 0, noff = id ? 0 : (WORD)name, dsv = 0;
+    _asm {
+        push es
+        push di
+        mov dsv, ds
+        xor di, di
+        mov es, di
+        cmp noff, 0
+        je d_id
+        push ds
+        pop es
+        mov di, noff
+    d_id:
+        mov ax, 1684h
+        mov bx, id
+        int 2Fh
+        mov o, di
+        mov s, es
+        pop di
+        pop es
+    }
+    if (!id && s == dsv && o == noff) return 0;     /* name not found: ES:DI unchanged */
+    return s ? ((DWORD)s << 16) | o : 0;
+}
+
+/* USOSVMD function 1 (attach): BX:CX = the shared block; out BX:CX = the
+ * V86 callback, DX = mode. 0 on failure. */
+static int vxd_attach(void)
+{
+    WORD bseg = shared_seg, boff = OFFSETOF(shared), cseg = 0, coff = 0, mode = 0xFF, sig = 0;
+    BYTE failed = 0;
+    _asm {
+        pusha
+        push es
+        push ds
+        mov ax, 1
+        mov bx, bseg
+        mov cx, boff
+        call dword ptr vxd_api
+        pop ds
+        pop es
+        jnc a_ok
+        mov failed, 1
+    a_ok:
+        mov sig, ax
+        mov cseg, bx
+        mov coff, cx
+        mov mode, dx
+        popa
+    }
+    vinfo.vxd_mode = (BYTE)mode;
+    if (failed || sig != 0x5655) { vinfo.vxd_mode = 0xFF; return 0; }
+    vinfo.vxd_cb = ((DWORD)cseg << 16) | coff;
+    return vinfo.vxd_cb != 0;
+}
+
+/* USOSVMD function 2: its status block into vinfo.vxd (task time). */
+static void vxd_status(void)
+{
+    WORD boff = (WORD)(void NEAR *)vinfo.vxd, n = 0;
+    BYTE failed = 0;
+    if (!vxd_api) return;
+    _asm {
+        pusha
+        push es
+        push ds
+        push ds
+        pop es
+        mov di, boff
+        mov ax, 2
+        call dword ptr vxd_api
+        pop ds
+        pop es
+        jnc s_ok
+        mov failed, 1
+    s_ok:
+        mov n, cx
+        popa
+    }
+    vinfo.vxd_status = failed ? 0 : n;
+}
+
+static int vmd_present(void)
+{
+    OFSTRUCT of;
+    if (vinfo.checked) return vmdmode;
+    if (!query_bridge()) return 0;  /* not decided before the bridge exists */
+    vinfo.checked = 1;
+    vinfo.flag = OpenFile("C:\\USOS9X\\USOSVMD.ON", &of, OF_EXIST) != HFILE_ERROR;
+    if (!vinfo.flag) return 0;
+    vmd_api = device_api(VMD_DEVICE_ID, vxd_name);
+    vinfo.vmouse_api = vmd_api != 0;
+    vxd_api = device_api(0, vxd_name);
+    vinfo.vxd_api = vxd_api != 0;
+    if (!vmd_api || !vxd_api) return 0;
+    if (!vxd_attach() || vinfo.vxd_mode != USOSVMD_MINIDRIVER) return 0;
+    vmdmode = 1;
+    direct15 = 1;
+    vinfo.active = 1;
+    return 1;
+}
+
+/* Give VMOUSE the event procedure to call (proc) or 0 to stop; 1 = accepted. */
+static int vmd_set_callback(DWORD proc)
+{
+    WORD vseg = HIWORD(proc), voff = LOWORD(proc);
+    BYTE failed = 0;
+    if (!vmd_api) return 0;
+    _asm {
+        pusha
+        push es
+        push ds
+        mov ax, VMDAPI_SET_MOUSE_EVENT_CB
+        mov cx, vseg
+        mov dx, voff
+        call dword ptr vmd_api
+        pop ds
+        pop es
+        popa
+        jnc c_ok
+        mov failed, 1
+    c_ok:
+    }
+    return !failed;
+}
+
 static void stop(void)
 {
     if (timer) { kill_timer(timer); timer = 0; }
+    if (vmdmode) vmd_set_callback(0);   /* stop VMOUSE calling USER */
     if (shared && shared->mstate == MS_ENABLED) bios_off(MS_DISABLED);
     if (shared && (shared->mstate == MS_PAUSED || shared->mstate == MS_NO_GUARD)) shared->mstate = MS_DISABLED;
     if (shared) shared->malive = 0;
@@ -517,6 +755,19 @@ static int is_me(void)
 static void start(void)
 {
     if (timer || !event_proc || !shared || !present || !init_timer_procs()) return;
+    /* VMOUSE mode: BIOS registration of the VxD's callback, USER's
+     * procedure to VMOUSE, the timer for the wheel only. Never paused (the
+     * guard is off in this mode, USOSVMDMODE). */
+    if (vmd_present()) {
+        shared->mtail = shared->mhead;
+        buttons = 0;
+        if (!bios_on()) return;
+        shared->malive = 18;
+        vinfo.cb_ok = (BYTE)vmd_set_callback(event_proc);
+        timer = create_timer(20, (FARPROC)poll);
+        if (!timer) { vmd_set_callback(0); bios_off(MS_FAILED); }
+        return;
+    }
     shared->mtail = shared->mhead;  /* nothing stale */
     buttons = 0;
     if (paused) shared->mstate = paused;
@@ -606,6 +857,7 @@ void FAR PASCAL __loadds UsosAttach(void)
  * time; the poll timer keeps running and finds an empty ring. */
 void FAR PASCAL __loadds UsosPause(WORD how)
 {
+    if (vmdmode) return;            /* VMOUSE mode: no BIOS far call into private memory */
     if (how) {
         paused = how == 2 ? MS_NO_GUARD : MS_PAUSED;
         if (!shared) return;
@@ -626,6 +878,25 @@ DWORD FAR PASCAL __loadds UsosWheelInfo(void)
 {
     winfo.wheel = wheel;
     return (DWORD)(WHEELINFO FAR *)&winfo;
+}
+
+/* Ordinal 9, by name from USOSKEY.DRV (task time, before USOSATTACH):
+ * 1 when the VMOUSE mode (USOSVMD.VXD) is in use, so its Me DOS-box guard
+ * stays off. Decides it now if the bridge exists. */
+WORD FAR PASCAL __loadds UsosVmdMode(void)
+{
+    if (switched_off()) return 0;
+    return (WORD)vmd_present();
+}
+
+/* Ordinal 10, by name from USOSDBG.EXE (task time): the VMOUSE-mode state
+ * with a fresh copy of the VxD's status block; nothing else changes. */
+DWORD FAR PASCAL __loadds UsosVmdInfo(void)
+{
+    if (!vxd_api) vxd_api = device_api(0, vxd_name);
+    vinfo.vxd_api = vxd_api != 0;
+    vxd_status();
+    return (DWORD)(VMDINFO FAR *)&vinfo;
 }
 
 /* DLL entry (no C runtime): DS = DGROUP. Returns AX = 1. */

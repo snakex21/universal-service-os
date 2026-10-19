@@ -36,6 +36,13 @@
  *         after the call, result) and what followed the last IntelliMouse
  *         knock (rates 200, 100, 80): a later C201h reset / C205h init
  *         and its caller
+ *   VMD   USOSVMD.VXD / VMOUSE mode (1.7): C:\USOS9X\USOSVMD.ON, what
+ *         USOSMOUS.DRV decided (USOSVMDINFO: VMOUSE / USOSVMD APIs, the
+ *         VxD's mode, its V86 callback, the VMOUSE event callback, the
+ *         direct INT 15h path) and the VxD's own status block (loaded,
+ *         VMOUSE version and mouse type, callbacks from SeaBIOS and how many
+ *         came while a DOS VM was current, the last VM handle and packet,
+ *         packets posted to VMOUSE, ring drops, error bits)
  *   IVT   INT 08h/09h/15h/16h/1Ch/2Fh vectors of the system VM
  *   MAP   linear (system VM V86) against physical (DPMI 0800h) for a few
  *         pages: page 0 (control: the IVT page is per VM, expected to
@@ -137,6 +144,30 @@ typedef struct {
     DWORD lines;
     WSREC rec[16];
 } WSLOG;
+
+/* USOSMOUS.DRV USOSVMDINFO (version 1) with USOSVMD.VXD's status block. */
+typedef struct {
+    BYTE version, checked, flag, vmouse_api, vxd_api, vxd_mode, active, cb_ok;
+    DWORD vxd_cb;
+    WORD direct_err, vxd_status, wheel_only_polls;
+    BYTE vxd[64];
+} VMDINFO;
+
+/* USOSVMD.VXD status block (PM API function 2, src/platform/win9x/
+ * usosvmd.asm), 64 bytes. */
+typedef struct {
+    WORD sig;
+    BYTE version, mode;
+    WORD vmd_version;
+    BYTE type_init, type_now;
+    DWORD cb, sb, callbacks, foreign, posted, own_drop, shared_put, shared_drop, last_vm;
+    BYTE last[4];
+    WORD err, type_changes;
+    DWORD ticks;
+    WORD attach;
+    DWORD sys_vm;
+    WORD reclaims;
+} VXDSTAT;
 
 /* CSMWrap patch 0018: SeaBIOS's usb_mouse_diag (version 1, natural
  * alignment, 310 bytes). */
@@ -654,6 +685,43 @@ static void show_wheelscroll(void)
                  (LPSTR)actions[r->action < 5 ? r->action : 0], r->hwnd, (LPSTR)kinds[r->kind < 3 ? r->kind : 0],
                  (LPSTR)(r->cls[0] ? r->cls : "-"), r->sent, r->code);
     }
+}
+
+static LPCSTR vmd_mode_name(BYTE m)
+{
+    return m == 0 ? "no VMOUSE" : m == 1 ? "minidriver (posts to VMOUSE)" : m == 2 ? "observer (VMOUSE has another mouse)" : "no answer";
+}
+
+static void show_vmd(void)
+{
+    OFSTRUCT of;
+    HINSTANCE mouse = GetModuleHandle("MOUSE");
+    FARPROC info = mouse ? GetProcAddress(mouse, "USOSVMDINFO") : 0;
+    BOOL flag = OpenFile("C:\\USOS9X\\USOSVMD.ON", &of, OF_EXIST) != HFILE_ERROR;
+    VMDINFO FAR *v;
+    VXDSTAT FAR *x;
+    if (!info) {
+        wsprintf(line(), "VMD  USOSVMD.ON:%s  USOSMOUS.DRV without USOSVMDINFO (older driver or another mouse.drv)", (LPSTR)(flag ? "yes" : "no"));
+        return;
+    }
+    v = (VMDINFO FAR *)((DWORD (FAR PASCAL *)(void))info)();
+    wsprintf(line(), "VMD  USOSVMD.ON:%s  decided:%s  VMOUSE API:%s  USOSVMD API:%s  VxD mode:%s  VMOUSE mode:%s  event callback:%s  C207h -> %04X:%04X  direct INT15 error:%u  wheel polls:%u",
+             (LPSTR)(flag ? "yes" : "no"), (LPSTR)(v->checked ? "yes" : "not yet"), (LPSTR)(v->vmouse_api ? "yes" : "no"),
+             (LPSTR)(v->vxd_api ? "yes (loaded)" : "no (not loaded)"), (LPSTR)vmd_mode_name(v->vxd_mode),
+             (LPSTR)(v->active ? "ON" : "off"), (LPSTR)(v->cb_ok ? "accepted" : "no"),
+             HIWORD(v->vxd_cb), LOWORD(v->vxd_cb), v->direct_err, v->wheel_only_polls);
+    if (v->vxd_status < sizeof(VXDSTAT)) {
+        wsprintf(line(), "VMD  USOSVMD.VXD status: %s", (LPSTR)(v->vxd_api ? "PM API 2 failed" : "VxD not loaded"));
+        return;
+    }
+    x = (VXDSTAT FAR *)v->vxd;
+    wsprintf(line(), "VMD  VxD v%u mode:%s  VMOUSE %u.%02u  mouse type at init:%02X now:%02X (2 = ours, 4 = PS/2)  changes:%u reclaims:%u  callback %04X:%04X  block %08lX  attach:%u  err:%04X",
+             (WORD)x->version, (LPSTR)vmd_mode_name(x->mode), (WORD)HIBYTE(x->vmd_version), (WORD)LOBYTE(x->vmd_version),
+             (WORD)x->type_init, (WORD)x->type_now, x->type_changes, x->reclaims, HIWORD(x->cb), LOWORD(x->cb), x->sb, x->attach, x->err);
+    wsprintf(line(), "VMD  BIOS callbacks:%lu  from a DOS VM:%lu  last VM %08lX (system VM %08lX)  last %02X %02X %02X %02X  posted:%lu  own ring full:%lu  shared ring put:%lu full:%lu  ticks:%lu",
+             x->callbacks, x->foreign, x->last_vm, x->sys_vm, (WORD)x->last[0], (WORD)x->last[1], (WORD)x->last[2], (WORD)x->last[3],
+             x->posted, x->own_drop, x->shared_put, x->shared_drop, x->ticks);
+    wsprintf(line(), "VMD  err bits: 1 no V86 callback  2 VMOUSE had a mouse at init  4 bad block  8 type changed later  10 own ring full  20 shared ring full  40 VMOUSE absent  80 DDB tail damaged (v3)");
 }
 
 static void show_ivt(void)
@@ -1456,6 +1524,7 @@ static void refresh(void)
     show_mouse();
     show_wheel();
     show_wheelscroll();
+    show_vmd();
     show_ivt();
     show_map();
     show_irq();

@@ -124,9 +124,11 @@ class UsosMouse(unittest.TestCase):
             i += n + 3
         # Module name MOUSE (USER imports the mouse driver by it), DDK
         # ordinals; USOSATTACH and USOSPAUSE (Me, called by USOSKEY.DRV by
-        # name) after them, USOSWHEELINFO (USOSDBG.EXE, read only) last.
+        # name) after them, USOSWHEELINFO (USOSDBG.EXE, read only), then
+        # USOSVMDMODE (USOSKEY.DRV) and USOSVMDINFO (USOSDBG.EXE).
         self.assertEqual(names, {'MOUSE': 0, 'INQUIRE': 1, 'ENABLE': 2, 'DISABLE': 3, 'MOUSEGETINTVECT': 4, 'WEP': 5,
-                                 'USOSATTACH': 6, 'USOSPAUSE': 7, 'USOSWHEELINFO': 8})
+                                 'USOSATTACH': 6, 'USOSPAUSE': 7, 'USOSWHEELINFO': 8,
+                                 'USOSVMDMODE': 9, 'USOSVMDINFO': 10})
 
     def test_mouse_driver_imports_kernel_only(self):
         # KERNEL loads mouse.drv right after keyboard.drv, before DISPLAY, GDI
@@ -326,7 +328,10 @@ class MeBridge(unittest.TestCase):
     def test_me_guard_pauses_before_attach_and_until_the_hook(self):
         attach = self.body(self.key, 'attach_mouse')
         self.assertIn('mouse_export("USOSATTACH")', attach)          # by name: other mouse drivers have none
-        self.assertIn('mouse_guard = mouse_export("USOSPAUSE") != 0;', attach)
+        # The guard is armed through USOSPAUSE, except when USOSVMD.VXD is
+        # deployed (then the VxD owns the DOS-box mouse; see test_usosvmd.py).
+        self.assertIn('mouse_export("USOSPAUSE") != 0', attach)
+        self.assertIn('!usosvmd_on()', attach)
         self.assertLess(attach.index('mouse_pause(1)'), attach.index('attach)();'))
         start = self.body(self.key, 'start')
         self.assertIn('(win9x && vkd_entry) || mouse_guard', start)

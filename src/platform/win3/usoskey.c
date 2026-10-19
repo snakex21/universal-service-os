@@ -543,16 +543,29 @@ static int query_bridge(void)
     return shared->magic[0] == 'U' && shared->magic[1] == 'S' && shared->magic[2] == 'K' && shared->magic[3] == 'Y';
 }
 
+/* VMOUSE mode (USOSVMD.VXD v2): USOSMOUS.DRV's USOSVMDMODE answers 1 when
+ * the BIOS calls go to the VxD's global V86 callback instead of the copy's
+ * mcb; then no BIOS far call can land in the system VM's memory while a
+ * DOS VM is current, and the Me DOS-box pause must stay off (it would stop
+ * the mouse the VxD feeds to VMOUSE for the DOS box). Any other answer, or
+ * an older USOSMOUS.DRV: the pause is the fallback, unchanged. Task time. */
+static int usosvmd_on(void)
+{
+    FARPROC mode = mouse_export("USOSVMDMODE");
+    return mode && ((WORD (FAR PASCAL *)(void))mode)() != 0;
+}
+
 /* Me: the bridge copy came from here, after USER enabled the mouse driver.
  * USOSMOUS.DRV (module MOUSE) registers with the BIOS now; another mouse
  * driver has no USOSATTACH and is left alone. With USOSPAUSE (v3) it is
  * paused first: the DOS-box hook comes at DRV_ENABLE (start), which resumes
- * it. Task time (DRV_LOAD). */
+ * it. Task time (DRV_LOAD). When USOSVMD.VXD is deployed the guard is left
+ * off (the VxD owns the DOS-box mouse). */
 static void attach_mouse(void)
 {
     FARPROC attach = mouse_export("USOSATTACH");
     if (!attach) return;
-    mouse_guard = mouse_export("USOSPAUSE") != 0;
+    mouse_guard = !usosvmd_on() && mouse_export("USOSPAUSE") != 0;
     if (mouse_guard) mouse_pause(1);
     ((void (FAR PASCAL *)(void))attach)();
 }
