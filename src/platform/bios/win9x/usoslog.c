@@ -14,7 +14,9 @@
  *   MOUSE  system metrics (mouse / wheel present, buttons, wheel lines),
  *          the input this logger saw through a journal record hook (wheel
  *          messages, moves, clicks: proves whether WM_MOUSEWHEEL reaches
- *          USER), SYSTEM.INI mouse lines, and USOSDBG.EXE /L (log mode of
+ *          USER), per WM_MOUSEWHEEL the focus window, the window under the
+ *          pointer and the foreground window (class, WS_VSCROLL), SYSTEM.INI
+ *          mouse lines, and USOSDBG.EXE /L (log mode of
  *          the Win16 diagnostics: USOSKEY / USOSMOUS / SeaBIOS USOSMWHL
  *          record, packets, descriptor, PCI once)
  *   NET    the usosnet adapter's registry values (Class\Net\00nn), its live
@@ -40,6 +42,11 @@
  *          event lines per session, then a counter
  *   START  Startup folders, Run keys, WIN.INI load= / run=, SYSTEM.INI
  *          shell=, AUTOEXEC.BAT / CONFIG.SYS (start record and every 6th)
+ *
+ * Wheel record: a few seconds after the wheel was used (at most one per
+ * WHEEL_REC_GAP s, WHEEL_REC_MAX per session) a short record with the MOUSE
+ * part, USOSDBG and the WM_MOUSEWHEEL lines, so a wheel test is in the
+ * log even when Windows is shut down before the next snapshot.
  *
  * Nothing is written anywhere but C:\USOS9X\LOGS; the only packets sent are
  * the test queries above and the one broadcast.
@@ -241,6 +248,23 @@ static HHOOK g_hook;
 static volatile DWORD g_wheel, g_wheel_pos, g_wheel_neg, g_moves, g_ldown, g_rdown, g_mdown, g_xdown,
                       g_keys, g_cancels, g_installs, g_install_fail;
 static volatile DWORD g_wheel_l, g_wheel_h, g_wheel_tick;
+
+/* WM_MOUSEWHEEL detail lines (hook writes, worker prints; under ev_cs) */
+#define WHEEL_LINES_MAX 300             /* per session, then only counted */
+#define WHEEL_REC_QUIET 3000            /* ms without a wheel message before a wheel record */
+#define WHEEL_REC_GAP   30              /* s between wheel records */
+#define WHEEL_REC_MAX   10              /* wheel records per session */
+static char wh_buf[24576];
+static DWORD wh_len, wh_lines, wh_suppressed, wh_lost;
+static volatile DWORD wh_pending;
+typedef struct {
+    DWORD cbSize, flags;
+    HWND hwndActive, hwndFocus, hwndCapture, hwndMenuOwner, hwndMoveSize, hwndCaret;
+    RECT rcCaret;
+} GTINFO;                               /* GUITHREADINFO (98 / NT 4.0 SP3 and later) */
+typedef BOOL (WINAPI *PFN_GTI)(DWORD, GTINFO *);
+static PFN_GTI p_gti;
+static int gti_looked;
 
 static CRITICAL_SECTION ev_cs;
 static char ev_buf[32768];
@@ -563,6 +587,65 @@ static void reg_dump_sub(HKEY root, const char *rootname, const char *path, DWOR
 
 /* ------------------------------------------------------------------ */
 /* journal record hook (main thread)                                   */
+/* "hwnd class[ V]" (V: WS_VSCROLL), "-" without a window */
+static void win_desc(char *t, HWND w)
+{
+    char cls[48];
+    if (!w) { lstrcpyA(t, "-"); return; }
+    cls[0] = 0;
+    GetClassNameA(w, cls, sizeof(cls));
+    wsprintfA(t, "%08lX %s%s", (DWORD)w, (LPSTR)cls, (LPSTR)((GetWindowLongA(w, GWL_STYLE) & WS_VSCROLL) ? " V" : ""));
+}
+
+/* Where the wheel message goes (USER: the focus window of the foreground
+ * thread) and what is under the pointer; one line per WM_MOUSEWHEEL. */
+static void wheel_detail(const EVENTMSG *e)
+{
+    char t[400], ts[48], fo[72], hv[72], fg[72];
+    HWND fgw = GetForegroundWindow(), fow = 0, hvw;
+    POINT pt;
+    GTINFO gi;
+    SYSTEMTIME st;
+    DWORD rel = GetTickCount() - t_start;
+    int n, m;
+    if (!gti_looked) {
+        HMODULE u = GetModuleHandleA("USER32.DLL");
+        gti_looked = 1;
+        if (u) p_gti = (PFN_GTI)GetProcAddress(u, "GetGUIThreadInfo");
+    }
+    if (p_gti && fgw) {
+        mset(&gi, 0, sizeof(gi));
+        gi.cbSize = sizeof(gi);
+        if (p_gti(GetWindowThreadProcessId(fgw, 0), &gi)) fow = gi.hwndFocus;
+    }
+    pt.x = pt.y = 0;
+    GetCursorPos(&pt);
+    hvw = WindowFromPoint(pt);
+    win_desc(fo, fow);
+    win_desc(hv, hvw);
+    win_desc(fg, fgw);
+    GetLocalTime(&st);
+    m = wsprintfA(ts, "%02u:%02u:%02u.%03u t+%lu.%03lu ", st.wHour, st.wMinute, st.wSecond, st.wMilliseconds,
+                  rel / 1000, rel % 1000);
+    n = wsprintfA(t, "wheel L=%08lX H=%08lX at %ld,%ld  focus %s%s  under pointer %s%s  foreground %s",
+                  e->paramL, e->paramH, pt.x, pt.y, (LPSTR)fo, (LPSTR)(p_gti ? "" : " (no GetGUIThreadInfo)"),
+                  (LPSTR)hv, (LPSTR)(hvw && hvw == fow ? " (= focus)" : ""), (LPSTR)fg);
+    EnterCriticalSection(&ev_cs);
+    if (wh_lines >= WHEEL_LINES_MAX) {
+        wh_suppressed++;
+    } else if (wh_len + (DWORD)(m + n) + 8 < sizeof(wh_buf)) {
+        wh_lines++;
+        mcpy(wh_buf + wh_len, "    ", 4); wh_len += 4;
+        mcpy(wh_buf + wh_len, ts, (DWORD)m); wh_len += (DWORD)m;
+        mcpy(wh_buf + wh_len, t, (DWORD)n); wh_len += (DWORD)n;
+        mcpy(wh_buf + wh_len, "\r\n", 2); wh_len += 2;
+    } else {
+        wh_lost++;
+    }
+    wh_pending = 1;
+    LeaveCriticalSection(&ev_cs);
+}
+
 LRESULT CALLBACK journal(int code, WPARAM wp, LPARAM lp)
 {
     if (code == HC_ACTION && lp) {
@@ -575,6 +658,7 @@ LRESULT CALLBACK journal(int code, WPARAM wp, LPARAM lp)
             g_wheel_tick = GetTickCount();
             if ((short)HIWORD(e->paramL) > 0 || (short)e->paramH > 0) g_wheel_pos++;
             else g_wheel_neg++;
+            wheel_detail(e);
             break;
         case WM_MOUSEMOVE: g_moves++; break;
         case WM_LBUTTONDOWN: g_ldown++; break;
@@ -927,6 +1011,21 @@ static void sec_mouse(void)
     GetPrivateProfileStringA("mouse", "wheel", "(none)", a, sizeof(a), "SYSTEM.INI");
     GetPrivateProfileStringA("boot.description", "mouse.drv", "(none)", b, sizeof(b), "SYSTEM.INI");
     o("[MOUSE] SYSTEM.INI [mouse] wheel=%s  [boot.description] mouse.drv=%s", (LPSTR)a, (LPSTR)b);
+}
+
+/* the WM_MOUSEWHEEL lines since the last record (worker thread) */
+static void sec_wheel(void)
+{
+    EnterCriticalSection(&ev_cs);
+    o("[MOUSE] WM_MOUSEWHEEL lines since the last record (focus = where USER sends it; V = WS_VSCROLL; %lu lost):",
+      wh_lost);
+    oput(wh_buf, wh_len);
+    if (wh_suppressed)
+        o("[MOUSE] wheel lines: session limit of %u reached, %lu more not logged", WHEEL_LINES_MAX, wh_suppressed);
+    wh_len = 0;
+    wh_lost = 0;
+    wh_pending = 0;
+    LeaveCriticalSection(&ev_cs);
 }
 
 /* --- usosnet ----------------------------------------------------------- */
@@ -1681,6 +1780,7 @@ static void snapshot(void)
     header("snapshot");
     sec_sys();
     sec_mouse();
+    sec_wheel();
     find_usosnet(0);
     run_usosdbg(stats_pa);
     flush_out();                        /* the mouse part is safe even if a test hangs */
@@ -1700,17 +1800,45 @@ static void snapshot(void)
     flush_out();
 }
 
+/* Short record after the wheel was used: MOUSE part, USOSDBG, wheel lines. */
+static void wheel_record(void)
+{
+    header("wheel record");
+    sec_mouse();
+    run_usosdbg(stats_pa);
+    sec_wheel();
+    o("=== end of wheel record ===");
+    flush_out();
+}
+
+/* Sleep S seconds in 1 s steps; a wheel record when wheel lines wait and
+ * the wheel has been quiet for WHEEL_REC_QUIET ms. */
+static void wait_s(DWORD s)
+{
+    static DWORD recs, last_rec;
+    DWORD end = GetTickCount() + s * 1000;
+    while ((long)(end - GetTickCount()) > 0) {
+        Sleep(1000);
+        if (wh_pending && recs < WHEEL_REC_MAX && GetTickCount() - g_wheel_tick >= WHEEL_REC_QUIET &&
+            (!recs || GetTickCount() - last_rec >= WHEEL_REC_GAP * 1000UL)) {
+            recs++;
+            wheel_record();
+            last_rec = GetTickCount();
+        }
+    }
+}
+
 DWORD WINAPI worker(LPVOID arg)
 {
     (void)arg;
     if (!opt_once) {
         start_record();
-        Sleep(opt_first * 1000);
+        wait_s(opt_first);
     }
     for (;;) {
         snapshot();
         if (opt_once) break;
-        Sleep(opt_every * 1000);
+        wait_s(opt_every);
     }
     PostThreadMessageA(main_tid, WM_QUIT, 0, 0);
     return 0;

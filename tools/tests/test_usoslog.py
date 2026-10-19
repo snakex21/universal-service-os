@@ -334,6 +334,31 @@ class Watcher(unittest.TestCase):
         self.assertIn('"ConsoleWindowClass"', log)
         self.assertIn('!lstrcmpiA(cls, "tty")', log)
 
+    def test_wheel_detail_contract(self):
+        """Each WM_MOUSEWHEEL: focus window (GetGUIThreadInfo, looked up at run
+        time: not on 95), window under the pointer, foreground window; a short
+        wheel record after the wheel was used, so a test before shutdown is kept."""
+        log = (SRC / 'usoslog.c').read_text(encoding='utf-8').replace('\r\n', '\n')
+        hook = grab(log, r'^LRESULT CALLBACK journal\(.*?\n\}\n')
+        self.assertIn('wheel_detail(e);', hook)
+        det = grab(log, r'^static void wheel_detail\(const EVENTMSG \*e\)\n\{.*?\n\}\n')
+        self.assertIn('GetProcAddress(u, "GetGUIThreadInfo")', det)
+        self.assertNotIn('GetGUIThreadInfo(', det)            # never a static import
+        self.assertIn('fow = gi.hwndFocus', det)
+        self.assertIn('hvw = WindowFromPoint(pt)', det)
+        self.assertIn('if (wh_lines >= WHEEL_LINES_MAX)', det)
+        self.assertIn('#define WHEEL_LINES_MAX 300', log)
+        self.assertIn('#define WHEEL_REC_MAX   10', log)
+        snap = grab(log, r'^static void snapshot\(void\)\n\{.*?\n\}\n')
+        self.assertIn('sec_mouse();\n    sec_wheel();', snap)
+        wait = grab(log, r'^static void wait_s\(DWORD s\)\n\{.*?\n\}\n')
+        self.assertIn('GetTickCount() - g_wheel_tick >= WHEEL_REC_QUIET', wait)
+        self.assertIn('recs < WHEEL_REC_MAX', wait)
+        work = grab(log, r'^DWORD WINAPI worker\(LPVOID arg\)\n\{.*?\n\}\n')
+        self.assertIn('wait_s(opt_first);', work)
+        self.assertIn('wait_s(opt_every);', work)
+        self.assertNotIn('Sleep(opt_', work)
+
 
 def build(tmp: Path) -> Path:
     import build_win9x_support as b

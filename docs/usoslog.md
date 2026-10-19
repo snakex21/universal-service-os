@@ -12,6 +12,23 @@ a full snapshot after 3 minutes and then every 5 minutes, appended to
 `C:\USOS9X\LOGS\USOSLOG.TXT` (rotated to `USOSLOG.OLD` at 256 KiB). The
 sections and the options are listed in the source header.
 
+## Wheel lines and wheel records (2026-10-19)
+
+The journal hook writes one line per `WM_MOUSEWHEEL`: the raw EVENTMSG
+words, the pointer position, the **focus** window of the foreground thread
+(`GetGUIThreadInfo`, looked up at run time: 98 and later; USER sends the
+wheel message there), the window **under the pointer** (`WindowFromPoint`)
+and the foreground window, each as `hwnd class` plus ` V` for WS_VSCROLL:
+
+    13:05:01.250 t+249.010 wheel L=... H=... at 400,300  focus 00000F2C Button  under pointer 00000F44 SysTreeView32 V  foreground 00000F08 #32770
+
+At most 300 lines per session. Three seconds after the wheel stops (at
+most once per 30 s, 10 per session) a short `wheel record` is appended:
+the MOUSE metrics and journal counters, USOSDBG /L (USOSMOUS wheel calls,
+the C2 ring) and the wheel lines, so a wheel test is logged even when
+Windows is shut down before the next 5-minute snapshot. Snapshots print the
+lines too (after the MOUSE lines).
+
 ## Watcher (PROC)
 
 The main thread polls every 250 ms: one Toolhelp32 process snapshot,
