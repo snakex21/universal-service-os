@@ -212,7 +212,7 @@ revision on the B450 board.
 
 ## Open points after round 1
 
-* No runtime test yet: neither QEMU nor hardware.
+* Runtime: see "Status 2026-10-20" (X470 ME PASS via polling; IRQ open).
 * Multicast via "all multicast" (MPE) instead of the MTA hash.
 * 82576 / I210 with manageability firmware: the SW/FW semaphore around
   MDIC / EERD is not taken yet (I211 has no firmware; 82576 in QEMU none).
@@ -220,3 +220,15 @@ revision on the B450 board.
   supported), no checksum offload, no jumbo frames, no VLAN.
 * Installer integration (stage the package on DATA\Drivers, MSBATCH network
   section, answer-profile option "network driver") after the X470 PASS.
+
+## Status 2026-10-20
+
+First hardware round, usosnet 0.4, X470 Master SLI/ac, Windows ME, Intel I211:
+
+* DHCP lease obtained; DNS over UDP and TCP works; HTTP works (Internet
+  Explorer loads 68k.news); zero RX/TX drops in the statistics page.
+* The NIC interrupt never arrives: IRQ 5 is edge-triggered in the ELCR and
+  stays masked, `isr_calls=0`. The driver runs entirely on its 20 ms timer
+  polling fallback (0.3+). Fixing the IRQ routing is the next open point.
+* The earlier "DNS failure" report was frogfind.com being down server-side,
+  not a driver fault.
