@@ -384,11 +384,6 @@ show_extensions=yes	windows-xp	+if not defined USOS_DU set "USOS_DU=Default User
 show_extensions=yes	windows-xp	+reg load HKU\USOSDEF "%USOS_PD%\%USOS_DU%\NTUSER.DAT" >> "%USOS_LOG%" 2>&1
 show_extensions=yes	windows-xp	+reg add "HKU\USOSDEF\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v HideFileExt /t REG_DWORD /d 0 /f >> "%USOS_LOG%" 2>&1
 show_extensions=yes	windows-xp	+reg unload HKU\USOSDEF >> "%USOS_LOG%" 2>&1
-show_extensions=yes	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-show_extensions=yes	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-show_extensions=yes	windows-2000	+
-show_extensions=yes	windows-2000	+----- usos-reg.txt -----
-show_extensions=yes	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 show_extensions=yes	windows-2000	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|HideFileExt|dword|0
 show_extensions=yes	windows-server-2003	+rem USOS profile: Explorer settings for new users (Default User hive).
 show_extensions=yes	windows-server-2003	+set USOS_PD=
@@ -634,11 +629,6 @@ show_hidden=yes	windows-xp	+if not defined USOS_DU set "USOS_DU=Default User"
 show_hidden=yes	windows-xp	+reg load HKU\USOSDEF "%USOS_PD%\%USOS_DU%\NTUSER.DAT" >> "%USOS_LOG%" 2>&1
 show_hidden=yes	windows-xp	+reg add "HKU\USOSDEF\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Hidden /t REG_DWORD /d 1 /f >> "%USOS_LOG%" 2>&1
 show_hidden=yes	windows-xp	+reg unload HKU\USOSDEF >> "%USOS_LOG%" 2>&1
-show_hidden=yes	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-show_hidden=yes	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-show_hidden=yes	windows-2000	+
-show_hidden=yes	windows-2000	+----- usos-reg.txt -----
-show_hidden=yes	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 show_hidden=yes	windows-2000	+USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced|Hidden|dword|1
 show_hidden=yes	windows-server-2003	+rem USOS profile: Explorer settings for new users (Default User hive).
 show_hidden=yes	windows-server-2003	+set USOS_PD=
@@ -763,11 +753,6 @@ no_autorun=yes	windows-server-2025	+          <Path>reg.exe add &quot;HKLM\SOFTW
 no_autorun=yes	windows-server-2025	+        </RunSynchronousCommand>
 no_autorun=yes	windows-server-2025	+      </RunSynchronous>
 no_autorun=yes	windows-xp	+reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f >> "%USOS_LOG%" 2>&1
-no_autorun=yes	windows-2000	+"%~dp0usos-reg.exe" --log "%SystemRoot%\usos-reg.log" "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-no_autorun=yes	windows-2000	+del /f /q "%~dp0usos-reg.txt" >> "%USOS_LOG%" 2>&1
-no_autorun=yes	windows-2000	+
-no_autorun=yes	windows-2000	+----- usos-reg.txt -----
-no_autorun=yes	windows-2000	+; USOS answer profile: registry set for usos-reg.exe (docs/answer-profiles.md)
 no_autorun=yes	windows-2000	+HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer|NoDriveTypeAutoRun|dword|255
 no_autorun=yes	windows-2000	+HKLM\SYSTEM\CurrentControlSet\Services\Cdrom|Autorun|dword|0
 no_autorun=yes	windows-server-2003	+reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f >> "%USOS_LOG%" 2>&1

@@ -1,0 +1,158 @@
+"""Host-only LAN policy/staging tests. Never starts a helper on the host."""
+from pathlib import Path
+import importlib.util
+import os
+import shutil
+import struct
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path[:0] = [str(ROOT/'tools'), str(ROOT/'tools/tests')]
+from build_windows_usos_lan import build, stage_driver
+from check_nt52_driver_imports import pe
+
+OUT = ROOT/'artifacts/network-defaults/host'
+OUT.mkdir(parents=True, exist_ok=True)
+tempfile.tempdir = str(OUT)
+SH = shutil.which('sh') or r'C:\Program Files\Git\usr\bin\sh.exe'
+ENV = dict(os.environ, PATH=str(Path(SH).parent)+os.pathsep+os.environ.get('PATH',''))
+def q(p): return "'"+str(p).replace('\\','/')+"'"
+def shell(code):
+    return subprocess.run([SH,'-c','. '+q(ROOT/'tools/network_setup.sh')+'; '+code],
+                          cwd=ROOT, env=ENV, capture_output=True)
+
+class Stage(unittest.TestCase):
+    def setUp(self):
+        self.tmp=Path(tempfile.mkdtemp(prefix='net-'))
+        self.addCleanup(shutil.rmtree,self.tmp)
+        self.cfg=self.tmp/'config';self.target=self.tmp/'target';self.lib=self.tmp/'lib';self.pci=self.tmp/'pci'
+        self.target.mkdir();self.pci.mkdir();(self.lib/'network').mkdir(parents=True)
+        self.config()
+    def config(self,os_id='ME',ip='dhcp',gateway='',dns='',home='about:blank',network='on'):
+        self.cfg.write_text(f'system={os_id}\nnetwork={network}\nip={ip}\ngateway={gateway}\ndns={dns}\nhome_page={home}\ndialup=off\n')
+    def card(self,device='1539',index='0000-08-00.0',vendor='8086'):
+        p=self.pci/index;p.mkdir()
+        for name,value in dict(vendor='0x'+vendor,device='0x'+device,subsystem_vendor='0x1849',subsystem_device='0x1539',revision='0x03',**{'class':'0x020000'}).items():
+            (p/name).write_text(value+'\n')
+    def driver(self,id='PCI\\VEN_8086&DEV_1539'):
+        for name in ('usosnet.inf','usosnet9x.inf'):
+            (self.lib/'network'/name).write_text('[Models]\n%Card%=Install,'+id+'\n[Settings]\nHKR,,PollMode,0x10001,1\n')
+        (self.lib/'network/usosnet.sys').write_bytes(b'own test fixture, not a driver')
+        for name in ('USOSLAN9X.EXE','USOSLANNT.EXE'):
+            (self.lib/'network'/name).write_bytes(b'own helper fixture')
+    def run_stage(self,extra=''):
+        return shell('usos_net_stage '+' '.join(map(q,(self.cfg,self.target,self.lib,self.pci)))+extra)
+    def state(self,r,want):
+        self.assertEqual(r.returncode,0,r.stderr.decode(errors='replace'))
+        self.assertIn(want,r.stdout.decode())
+    def test_supported_present_readback_and_log(self):
+        self.card();self.driver();r=self.run_stage();self.state(r,'staged PCI\\VEN_8086&DEV_1539')
+        for name in ('INF','SYS'):
+            source='usosnet9x.inf' if name=='INF' else 'usosnet.sys'
+            self.assertEqual((self.target/'USOS9X/NET'/('USOSNET.'+name)).read_bytes(),(self.lib/'network'/source).read_bytes())
+        self.assertIn('PollMode unchanged',(self.target/'USOS9X/LOGS/NETSETUP.TXT').read_text())
+    def test_supported_missing_package(self):
+        self.card();self.state(self.run_stage(),'brak w kompilacji');self.assertFalse((self.target/'USOS9X/NET').exists())
+    def test_no_card(self):
+        self.driver();self.state(self.run_stage(),'no Ethernet card');self.assertFalse((self.target/'USOS9X/NET').exists())
+    def test_unsupported(self):
+        self.driver();self.card('9999');self.state(self.run_stage(),'card not listed in INF');self.assertFalse((self.target/'USOS9X/NET').exists())
+    def test_inf_drives_matching_including_subsystem_revision(self):
+        self.card(vendor='1234',device='5678');self.driver('PCI\\VEN_1234&DEV_5678&SUBSYS_15391849&REV_03')
+        self.state(self.run_stage(),'staged PCI\\VEN_1234')
+        (self.pci/'0000-08-00.0/revision').write_text('0x02\n')
+        # Fresh root: a previous install is never a staging input.
+        shutil.rmtree(self.target);self.target.mkdir()
+        self.state(self.run_stage(),'card not listed in INF')
+    def test_95_nt4_never_receive_ndis5(self):
+        self.card();self.driver()
+        for os_id in ('95','NT4'):
+            self.config(os_id);self.state(self.run_stage(),'NDIS 4 build not available')
+            self.assertFalse(list(self.target.rglob('USOSNET.SYS')))
+    def test_network_off_writes_nothing(self):
+        self.config(network='off');self.card();self.driver();self.state(self.run_stage(),'original flow')
+        self.assertEqual(list(self.target.iterdir()),[])
+    def test_validation_rejects_bad_addresses_before_any_write(self):
+        cases=[('192.168.1.0/24','',''),('192.168.1.255/24','',''),('1.2.3.4/024','',''),
+               ('dhcp','1.1.1.1',''),('192.168.1.9/24','10.0.0.1',''),('dhcp','','8.8.8.8,'),('dhcp','','127.0.0.1')]
+        for ip,gw,dns in cases:
+            self.config(ip=ip,gateway=gw,dns=dns)
+            self.assertNotEqual(self.run_stage().returncode,0,(ip,gw,dns))
+            self.assertEqual(list(self.target.iterdir()),[])
+    def test_data_url_with_query_is_never_a_command(self):
+        self.config(home='http://example.test/?a=1&b=2');self.driver()
+        self.assertEqual(self.run_stage().returncode,0)
+        self.assertIn('home_page=http://example.test/?a=1&b=2',(self.target/'USOS9X/NETCFG.INI').read_text())
+    def test_me_metadata_forces_dialup_off_and_duplicates_fail(self):
+        answer=self.tmp/'answer.inf';answer.write_text(';USOS-NETWORK=on\n;USOS-DIALUP=on\n')
+        r=shell('usos_net_answer_config '+q(answer)+' ME');self.assertIn(b'dialup=off',r.stdout)
+        answer.write_text(answer.read_text()*2);self.assertNotEqual(shell('usos_net_answer_config '+q(answer)+' ME').returncode,0)
+    def test_missing_helper_has_no_broken_run_registration(self):
+        app=self.target/'USOS9X';app.mkdir();(app/'MSBATCH.INF').write_text('HKLM,"Software\\Microsoft\\Windows\\CurrentVersion\\Run",USOSLan,,"C:\\USOS9X\\USOSLAN.EXE"\n')
+        self.assertEqual(self.run_stage().returncode,0)
+        self.assertNotIn('USOSLan',(app/'MSBATCH.INF').read_text())
+    def test_w2k_oem_merge_and_exact_static_adapter(self):
+        self.config('W2K',ip='192.168.1.20/24',gateway='192.168.1.1',dns='1.1.1.1,8.8.8.8');self.card();self.driver()
+        sif=self.tmp/'in.sif';sif.write_text('[Unattended]\nOemPreinstall=Yes\nOemPnPDriversPath="Drivers\\Other"\n[Networking]\nInstallDefaultComponents=Yes\n')
+        out=self.tmp/'out.sif';r=self.run_stage('; usos_net_w2k_sif < '+q(sif)+' > '+q(out));self.assertEqual(r.returncode,0,r.stderr)
+        data=out.read_bytes();text=data.decode()
+        for token in ('USOS\\Drivers\\USOSNET;Drivers\\Other','InfID="PCI\\VEN_8086&DEV_1539"','SpecificTo=USOSLAN','DHCP=No','SubnetMask=255.255.255.0','DNSServerSearchOrder=1.1.1.1,8.8.8.8','InstallDefaultComponents=No','MS_MSClient=','MS_TCPIP='):
+            self.assertIn(token,text)
+        self.assertNotIn('MS_Server=',text);self.assertNotIn(b'\n',data.replace(b'\r\n',b''))
+        self.assertEqual(text.count('[Networking]'),1)
+        self.assertEqual((self.target/'USOS/W2K/LAN.REG').read_bytes(),shell('usos_net_run_reg W2K').stdout)
+    def test_w2k_ambiguous_static_not_assigned_to_arbitrary_nic(self):
+        self.config('W2K',ip='10.0.0.20/24');self.card();self.card(index='0000-09-00.0');self.driver()
+        r=self.run_stage('; printf "[Unattended]\\n" | usos_net_w2k_sif')
+        self.assertEqual(r.returncode,0,r.stderr);self.assertIn(b'static IP not applied',r.stdout);self.assertNotIn(b'SpecificTo=',r.stdout)
+
+class Builds(unittest.TestCase):
+    def test_windowless_pe4_no_crt_and_nt4_exports(self):
+        files=build(ROOT,OUT/'build')
+        table={};current=None
+        for line in (ROOT/'tools/tests/data/nt4rtm_lan_exports.txt').read_text().splitlines():
+            if not line or line.startswith('#'):continue
+            if line.startswith('['):current=table.setdefault(line[1:-1].lower(),set())
+            else:current.add(line.split(' -> ')[0])
+        for name,file in files.items():
+            data=file.read_bytes();opt=struct.unpack_from('<I',data,0x3c)[0]+24
+            self.assertEqual(struct.unpack_from('<HH',data,opt+48),(4,0))
+            self.assertEqual(struct.unpack_from('<H',data,opt+68)[0],2)
+            imports=pe(file)[1]
+            self.assertEqual({m.lower() for m,_ in imports},{'kernel32.dll','advapi32.dll'})
+            for dll,symbol in imports:
+                self.assertIn(symbol,table.get(dll.lower(),set()),(name,dll,symbol))
+            if '9X' in name:
+                self.assertFalse({'RegLoadKeyA','OpenProcessToken','AdjustTokenPrivileges'} & {n for _,n in imports})
+    def test_stage_real_driver_copies_bytes_only(self):
+        for file in stage_driver(ROOT,OUT/'driver'):
+            sub='bin/i386' if file.suffix=='.sys' else 'inf'
+            self.assertEqual(file.read_bytes(),(ROOT/'tools/nt/usosnet'/sub/file.name).read_bytes())
+
+class Render(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        subprocess.run([os.environ.get('USOS_ZIG',str(ROOT/'tools/zig/zig.exe')),'build','answer-tool',
+                        '--cache-dir','tools/cache/zig-local','--global-cache-dir','tools/cache/zig-global'],cwd=ROOT,check=True)
+    def test_off_matches_pre_network_answers_byte_for_byte(self):
+        profile=OUT/'off.ini';profile.write_bytes((ROOT/'src/flow/answer/testdata/options.profile.ini').read_bytes()+b'\nnetwork=off\n')
+        for os_id in ('windows-95','windows-98-se','windows-me','windows-nt-4'):
+            out=OUT/(os_id+'.answer')
+            subprocess.run([str(ROOT/'zig-out/bin/usos-answer.exe'),'render',str(profile),os_id,'x86',str(out)],check=True)
+            expected=ROOT/'tools/tests/data'/('network-off.'+os_id+'.txt')
+            self.assertEqual(out.read_bytes().replace(b'\r',b''),expected.read_bytes().replace(b'\r',b''))
+    def test_default_source_and_renderer_have_same_lan_section(self):
+        profile=OUT/'default.ini';profile.write_text('name=LAN\nuser=Tester\n')
+        out=OUT/'default.inf'
+        subprocess.run([str(ROOT/'zig-out/bin/usos-answer.exe'),'render',str(profile),'windows-98-se','x86',str(out)],check=True)
+        def section(text,name):
+            body=text.split('['+name+']\n',1)[1].split('\n[',1)[0]
+            return '\n'.join(line for line in body.splitlines() if line.strip() and not line.lstrip().startswith(';'))
+        default=(ROOT/'src/platform/bios/win9x/msbatch.inf').read_text()
+        for name in ('MSTCP','USOS.Lan'):
+            self.assertEqual(section(default,name),section(out.read_text(),name))
+
+if __name__=='__main__':unittest.main()

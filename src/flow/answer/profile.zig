@@ -55,6 +55,12 @@ pub const Field = enum {
     no_network_oobe,
     protect_pc,
     network_location,
+    network,
+    dialup,
+    ip,
+    gateway,
+    dns,
+    home_page,
     disable_wer,
     edition,
     systems,
@@ -285,6 +291,13 @@ pub const Profile = struct {
     opts: [options.count]u8 = @splat(0),
     /// Workgroup (NetBIOS name rule); empty: the release's default.
     workgroup: Text(15) = .{},
+    /// Legacy LAN defaults; other families ignore these fields.
+    network: @import("network_values.zig").Mode = .on,
+    dialup: @import("network_values.zig").Mode = .off,
+    ip: Text(18) = .{}, // empty = DHCP
+    gateway: Text(15) = .{},
+    dns: Text(47) = .{},
+    home_page: Text(200) = .{}, // empty = about:blank
 
     pub fn opt(self: *const Profile, o: options.Opt) u8 {
         return self.opts[@intFromEnum(o)];
@@ -672,6 +685,11 @@ pub fn validate(p: *const Profile) ?Issue {
         if (checkEdition(entry.edition.slice())) |problem| return .{ .field = .edition, .problem = problem };
     }
     if (checkWorkgroup(p.workgroup.slice())) |problem| return .{ .field = .workgroup, .problem = problem };
+    const net = @import("network_values.zig");
+    if (!net.validIp(p.ip.slice())) return .{ .field = .ip, .problem = .bad_choice };
+    if (!net.validGateway(p.ip.slice(), p.gateway.slice())) return .{ .field = .gateway, .problem = .bad_choice };
+    if (!net.validDns(p.dns.slice())) return .{ .field = .dns, .problem = .bad_choice };
+    if (!net.validHome(p.home_page.slice())) return .{ .field = .home_page, .problem = .bad_choice };
     if (!p.manual_disk) return .{ .field = .manual_disk, .problem = .unsupported };
     return null;
 }
@@ -866,6 +884,24 @@ fn applyField(p: *Profile, name: []const u8, value: []const u8) ?Issue {
         },
         .protect_pc => p.protect_pc = enumByName(ProtectPc, value) orelse return .{ .field = field, .problem = .bad_choice },
         .network_location => p.network_location = enumByName(NetworkLocation, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .network => p.network = enumByName(@import("network_values.zig").Mode, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .dialup => p.dialup = enumByName(@import("network_values.zig").Mode, value) orelse return .{ .field = field, .problem = .bad_choice },
+        .ip => {
+            if (!@import("network_values.zig").validIp(value)) return .{ .field = field, .problem = .bad_choice };
+            p.ip.set(if (std.ascii.eqlIgnoreCase(value, "dhcp")) "dhcp" else value) catch return .{ .field = field, .problem = .too_long };
+        },
+        .gateway => {
+            if (value.len > 0 and @import("network_values.zig").address(value) == null) return .{ .field = field, .problem = .bad_choice };
+            p.gateway.set(value) catch return .{ .field = field, .problem = .too_long };
+        },
+        .dns => {
+            if (!@import("network_values.zig").validDns(value)) return .{ .field = field, .problem = .bad_choice };
+            p.dns.set(value) catch return .{ .field = field, .problem = .too_long };
+        },
+        .home_page => {
+            if (!@import("network_values.zig").validHome(value)) return .{ .field = field, .problem = .bad_choice };
+            p.home_page.set(value) catch return .{ .field = field, .problem = .too_long };
+        },
         .theme => p.theme = enumByName(Theme, value) orelse return .{ .field = field, .problem = .bad_choice },
         .display => p.display = if (value.len == 0) .auto else enumByName(Display, value) orelse return .{ .field = field, .problem = .bad_choice },
         .systems => {
@@ -915,8 +951,8 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
         for (p.system_keys[0..p.system_key_count]) |*entry| try w.print("key.{s}={s}\r\n", .{ entry.system.slice(), entry.key.slice() });
     }
     try w.print("manual_disk={s}\r\nlocal_account={s}\r\nbypass_tpm={s}\r\nbypass_secure_boot={s}\r\nbypass_ram={s}\r\nno_network_oobe={s}\r\n", .{
-        boolText(p.manual_disk),   boolText(p.local_account), boolText(p.bypass_tpm),
-        boolText(p.bypass_secure_boot), boolText(p.bypass_ram), boolText(p.no_network_oobe),
+        boolText(p.manual_disk),        boolText(p.local_account), boolText(p.bypass_tpm),
+        boolText(p.bypass_secure_boot), boolText(p.bypass_ram),    boolText(p.no_network_oobe),
     });
     try w.print("protect_pc={s}\r\nnetwork_location={s}\r\ndisable_wer={s}\r\n", .{ @tagName(p.protect_pc), @tagName(p.network_location), boolText(p.disable_wer) });
     try w.print("edition={s}\r\n", .{p.edition.slice()});
@@ -932,6 +968,11 @@ pub fn write(p: *const Profile, buffer: []u8) ![]const u8 {
     // Typed options (options.zig) and the workgroup, only when set (the
     // editor saves through here: before 2026-10-14 they were dropped).
     if (p.workgroup.len > 0) try w.print("workgroup={s}\r\n", .{p.workgroup.slice()});
+    if (p.network == .off) try w.writeAll("network=off\r\n");
+    if (p.dialup == .on) try w.writeAll("dialup=on\r\n");
+    inline for (.{ "ip", "gateway", "dns", "home_page" }) |field| {
+        if (@field(p, field).len > 0) try w.print("{s}={s}\r\n", .{ field, @field(p, field).slice() });
+    }
     for (options.table) |o| {
         if (o.legacy) continue;
         const value = p.opts[@intFromEnum(o.opt)];
@@ -1003,6 +1044,24 @@ pub fn importXpIni(text: []const u8, out: *Profile) ?ParseResult {
 }
 
 // ------------------------------------------------------------ tests
+
+test "network profile round trip validates subnet gateway and data URL" {
+    var p = Profile{};
+    const text = "[profile]\nname=LAN\nuser=Tester\nnetwork=on\ndialup=on\nip=192.168.1.20/24\ngateway=192.168.1.1\ndns=1.1.1.1,8.8.8.8\nhome_page=http://example.test/?a=1&b=2\n";
+    try std.testing.expect(parse(text, &p) == .ok);
+    var buf: [8192]u8 = undefined;
+    const saved = try write(&p, &buf);
+    var q = Profile{};
+    try std.testing.expect(parse(saved, &q) == .ok);
+    try std.testing.expectEqualStrings(p.ip.slice(), q.ip.slice());
+    try std.testing.expectEqualStrings(p.home_page.slice(), q.home_page.slice());
+    try std.testing.expect(q.network == .on and q.dialup == .on);
+    try q.gateway.set("10.0.0.1");
+    try std.testing.expect(validate(&q) != null);
+    try std.testing.expect(parse("name=LAN\nuser=Tester\nip=DHCP\n", &q) == .ok);
+    try std.testing.expectEqualStrings("dhcp", q.ip.slice());
+    try std.testing.expect(parse("name=LAN\nuser=Tester\nip=192.168.1.255/24\n", &q) == .invalid);
+}
 
 test "profile round trip keeps every field; keys only with remember_key" {
     var p = Profile{};
@@ -1211,4 +1270,3 @@ test "product key: typing inserts the dashes, backspace over a dash removes the 
     while (len > 0) len = keyBackspace(&buf, len);
     try std.testing.expectEqual(@as(usize, 0), keyBackspace(&buf, 0));
 }
-

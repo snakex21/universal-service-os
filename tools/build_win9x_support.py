@@ -442,6 +442,8 @@ def build(root: Path = ROOT, out: Path | None = None) -> None:
     stage_xhci98(out)
     stage_cregfix(out)
     stage_usosnvme(out)
+    from build_windows_usos_lan import stage_driver as stage_lan_driver
+    stage_lan_driver(root, work / 'network')
     msdos = root / 'zig-out/dos-native/msdos'
     for name in BRIDGE:
         if not (msdos / name).is_file():

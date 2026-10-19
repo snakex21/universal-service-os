@@ -88,6 +88,14 @@ fn tweakLines(p: *const Profile, family: Family, w: *std.Io.Writer) !void {
     if (!first) try w.writeAll("\n");
     if (schema.tweakOn(p, .display, family)) try w.print("display={s}\n", .{@tagName(p.display)});
     try optionLines(p, family, w);
+    if (family == .windows_2000) {
+        const network = @import("network_defaults.zig");
+        try w.print("network={s}\n", .{@tagName(p.network)});
+        if (p.network == .on) {
+            try w.print("ip={s}\ngateway={s}\ndns={s}\nhome_page={s}\n", .{ network.ip(p), p.gateway.slice(), p.dns.slice(), network.home(p) });
+            try network.ntRegistry(p, "reg=", w);
+        }
+    }
 }
 
 /// The typed options (options.zig), only when set: workgroup=, run= (a
@@ -138,7 +146,7 @@ test "NT5 render: automatic language keeps the usos-xp.ini keys" {
     try std.testing.expectEqualStrings("user=Tester\nuser2=\ncomputer=\norg=\nkey=\ntimezone=\npassword=\nfamily=xp\n", text);
 }
 
-var buffer_for_test: [1024]u8 = undefined;
+var buffer_for_test: [8192]u8 = undefined;
 
 test "NT5 render: tweaks per family, none for 2000" {
     var p = Profile{};

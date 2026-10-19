@@ -67,7 +67,7 @@ usos_xp_settings_load() {
             key = tolower(trim(substr(line, 1, eq - 1)))
             value = trim(substr(line, eq + 1))
             if (value ~ /^".*"$/ && length(value) >= 2) value = substr(value, 2, length(value) - 2)
-            if (key !~ /^(user|user2|computer|org|key|timezone|password)$/ && !(profile != "" && key ~ /^(family|locale|input_locale|language_group|tweaks|display|workgroup|reg|run)$/)) { bad("unknown key on line " NR); next }
+            if (key !~ /^(user|user2|computer|org|key|timezone|password)$/ && !(profile != "" && key ~ /^(family|locale|input_locale|language_group|tweaks|display|workgroup|reg|run|network|ip|gateway|dns|home_page)$/)) { bad("unknown key on line " NR); next }
             # Typed options (src/flow/answer/options.zig): repeated reg= / run=.
             if (key == "reg") {
                 # ROOT\Key|Name|type|data (usos-reg set line); printable ASCII
@@ -127,9 +127,17 @@ usos_xp_settings_load() {
                 workgroup = values["workgroup"]
                 if (workgroup != "" && (length(workgroup) > 15 || workgroup !~ /^[A-Za-z0-9-]+$/ || workgroup ~ /^[0-9]+$/)) bad("workgroup= must be 1-15 characters A-Z a-z 0-9 -, not only digits")
             }
+            for (netkey in values) if (netkey ~ /^(network|ip|gateway|dns|home_page)$/) {
+                if (family!="2000") bad("legacy network settings require Windows 2000");
+                if (values[netkey] ~ /[^ -~]/ || values[netkey] ~ /["\\|]/) bad("invalid network setting");
+            }
+            if (values["network"]!="" && values["network"]!~/^(on|off)$/) bad("network must be on or off");
             if (failed) exit 1
             printf "user=%s\nuser2=%s\ncomputer=%s\norg=%s\nkey=%s\ntimezone=%s\npassword=%s\n", user, user2, computer, org, key, timezone, password
             if (profile != "") printf "family=%s\nlocale=%s\ninput_locale=%s\nlanguage_group=%s\n", family, locale, input, group
+            if (profile!="" && family=="2000" && values["network"]!="") {
+                printf "network=%s\nip=%s\ngateway=%s\ndns=%s\nhome_page=%s\n",values["network"],values["ip"],values["gateway"],values["dns"],values["home_page"];
+            }
             if (profile != "" && tweaks != "") printf "tweaks=%s\n", tweaks
             if (profile != "" && display != "") printf "display=%s\n", display
             if (profile != "" && workgroup != "") printf "workgroup=%s\n", workgroup
@@ -197,7 +205,12 @@ usos_xp_settings_sif() {
             print "[Identification]"
             print "JoinWorkgroup=" (v["workgroup"] != "" ? v["workgroup"] : "WORKGROUP")
             print "[Networking]"
-            print "InstallDefaultComponents=Yes"
+            if (v["family"]=="2000" && v["network"]=="on") {
+                print "InstallDefaultComponents=No"
+                print "[NetClients]\nMS_MSClient=USOS.MSClient\n[USOS.MSClient]"
+                print "[NetProtocols]\nMS_TCPIP=USOS.TCPIP\n[USOS.TCPIP]"
+                print "[NetServices]"
+            } else print "InstallDefaultComponents=Yes"
             # Profile mode: Server 2003 stops on the licensing page without this.
             if (v["family"] == "2003") { print "[LicenseFilePrintData]"; print "AutoMode=PerServer"; print "AutoUsers=5" }
             if (v["locale"] != "") {

@@ -748,6 +748,10 @@ done
 
 usos="$work/c/USOS/NT4"
 mkdir -p "$usos"
+. "$LIB/network_setup.sh"
+usos_net_answer_config "$ANSWER_SIF" NT4 > "$work/network.ini" || fail 'invalid LAN metadata'
+usos_net_stage "$work/network.ini" "$work/c" "$LIB" "${USOS_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
+rm -f "$work/network.ini"
 cp "$LIB/nt4/AHCINT.SYS" "$usos/AHCINT.SYS" || fail 'cannot copy AHCINT.SYS'
 cp "$LIB/nt4/USOSRST.SYS" "$usos/USOSRST.SYS" || fail 'cannot copy USOSRST.SYS'
 cp "$LIB/nt4/USOSUSB.SYS" "$usos/USOSUSB.SYS" || fail 'cannot copy USOSUSB.SYS'
@@ -1005,6 +1009,8 @@ echo sp package without -x, running it with -u -z >> C:\USOS\NT4\POST.LOG
 start /wait C:\USOS\NT4\SP6I386.EXE -u -z
 echo sp end %errorlevel% >> C:\USOS\NT4\POST.LOG
 :nosp
+if exist C:\USOS\NT4\USOSLAN.EXE if exist C:\USOS\NT4\LAN.REG %SystemRoot%\regedit.exe /s C:\USOS\NT4\LAN.REG
+echo LAN first-desktop registration processed >> C:\USOS\NT4\POST.LOG
 echo ok > C:\USOS\NT4\POST.OK
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\VERSION.REG "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
 %SystemRoot%\regedit.exe /e C:\USOS\NT4\CSD.REG HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Windows

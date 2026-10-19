@@ -595,6 +595,7 @@ def main() -> int:
             ("tools/legacy_xp_resume.sh", "usr/lib/usos/legacy_xp_resume.sh"),
             ("tools/xp_unattended_policy.sh", "usr/lib/usos/xp_unattended_policy.sh"),
             ("tools/xp_user_settings.sh", "usr/lib/usos/xp_user_settings.sh"),
+            ("tools/network_setup.sh", "usr/lib/usos/network_setup.sh"),
             ("tools/answer_plan.sh", "usr/lib/usos/answer_plan.sh"),
             ("tools/xp_windows_partition_plan.awk", "usr/lib/usos/xp_windows_partition_plan.awk"),
             ("tools/xp_selected_partition.sif", "usr/lib/usos/xp_selected_partition.sif"),
@@ -774,6 +775,11 @@ def main() -> int:
         from build_windows_usos_reg import build as build_usos_reg
         usos_reg = build_usos_reg(root, root / "zig-out/windows-usos-reg")
         put(entries, Entry("usr/lib/usos/usos-reg.exe", stat.S_IFREG | 0o644, usos_reg.read_bytes()))
+        from build_windows_usos_lan import build as build_lan, stage_driver as stage_lan_driver
+        lan_out = root / "zig-out/windows-usos-lan"
+        lan_files = list(build_lan(root, lan_out).values()) + stage_lan_driver(root, lan_out / "driver")
+        for file in lan_files:
+            put(entries, Entry("usr/lib/usos/network/" + file.name, stat.S_IFREG | 0o644, file.read_bytes()))
         reader_out = root / "zig-out/windows-source-mount"
         build_source_reader(root, reader_out)
         vendor = root / "tools/vendor/imdisk/2.1.2"

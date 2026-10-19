@@ -23,6 +23,13 @@ const schema = answer.schema;
 const tables = answer.tables;
 const Profile = answer.Profile;
 const Problem = answer.profile.Problem;
+// Advanced file-only network settings survive ordinary edits; no extra Setup prompts.
+var saved_network: @TypeOf((Profile{}).network) = .on;
+var saved_dialup: @TypeOf((Profile{}).dialup) = .off;
+var saved_ip: answer.profile.Text(18) = .{};
+var saved_gateway: answer.profile.Text(15) = .{};
+var saved_dns: answer.profile.Text(47) = .{};
+var saved_home: answer.profile.Text(200) = .{};
 
 const F = enum(u8) {
     name,
@@ -251,6 +258,12 @@ fn load(p: *const Profile) void {
     network_index = std.mem.indexOfScalar(answer.profile.NetworkLocation, &network_values, p.network_location).?;
     loadOptions(p);
     workgroup_text.set(p.workgroup.slice());
+    saved_network = p.network;
+    saved_dialup = p.dialup;
+    saved_ip = p.ip;
+    saved_gateway = p.gateway;
+    saved_dns = p.dns;
+    saved_home = p.home_page;
     for (tweak_rows, 0..) |row, i| tweak_values[i] = p.flagValue(row.field);
     display_index = @intFromEnum(p.display);
     loadTheme(p.theme);
@@ -384,6 +397,12 @@ fn build(out: *Profile) void {
     out.network_location = network_values[network_index];
     buildOptions(out);
     out.workgroup.set(workgroup_text.slice()) catch {};
+    out.network = saved_network;
+    out.dialup = saved_dialup;
+    out.ip = saved_ip;
+    out.gateway = saved_gateway;
+    out.dns = saved_dns;
+    out.home_page = saved_home;
     for (tweak_rows, 0..) |row, i| out.flag(row.field).?.* = tweak_values[i];
     out.theme = theme_values[theme_index];
     out.display = @enumFromInt(display_index);

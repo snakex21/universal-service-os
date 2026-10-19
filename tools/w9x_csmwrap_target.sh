@@ -223,6 +223,10 @@ done
 # After the helpers: they include the USOS default MSBATCH.INF, which must
 # not replace the chosen answer (a rendered profile or the user's file).
 cp "$ANSWER_INF" "$work/c/USOS9X/MSBATCH.INF" || fail 'cannot copy MSBATCH.INF'
+. "$LIB/network_setup.sh"
+usos_net_answer_config "$ANSWER_INF" "$SYSTEM_TAG" > "$work/network.ini" || fail 'invalid LAN metadata'
+usos_net_stage "$work/network.ini" "$work/c" "$LIB" "${W9X_PCI_ROOT:-/sys/bus/pci/devices}" || fail 'cannot stage LAN defaults'
+rm -f "$work/network.ini"
 for name in INSTALL.BAT PATCH9X.EXE CWSDPMI.EXE; do
     cp "$PATCH/$name" "$work/c/USOS9X/$name" || fail "cannot copy $name"
 done
