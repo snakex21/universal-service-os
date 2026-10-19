@@ -147,7 +147,7 @@ class Render(unittest.TestCase):
         subprocess.run([os.environ.get('USOS_ZIG',str(ROOT/'tools/zig/zig.exe')),'build','answer-tool',
                         '--cache-dir','tools/cache/zig-local','--global-cache-dir','tools/cache/zig-global'],cwd=ROOT,check=True)
     def test_off_matches_pre_network_answers_byte_for_byte(self):
-        profile=OUT/'off.ini';profile.write_bytes((ROOT/'src/flow/answer/testdata/options.profile.ini').read_bytes()+b'\nnetwork=off\n')
+        profile=OUT/'off.ini';profile.write_bytes((ROOT/'src/flow/answer/testdata/options.profile.ini').read_bytes()+b'\nnetwork=off\naddons_preset=none\n')
         for os_id in ('windows-95','windows-98-se','windows-me','windows-nt-4'):
             out=OUT/(os_id+'.answer')
             subprocess.run([str(ROOT/'zig-out/bin/usos-answer.exe'),'render',str(profile),os_id,'x86',str(out)],check=True)
