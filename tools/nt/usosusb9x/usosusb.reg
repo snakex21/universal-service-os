@@ -1,0 +1,20 @@
+REGEDIT4
+
+[HKEY_LOCAL_MACHINE\Enum\Root\SCSIAdapter\USOSUSB]
+"Class"="SCSIAdapter"
+"Driver"="SCSIAdapter\\@CLASSIDX@"
+"DeviceDesc"="USOS USB disk service (usosusb)"
+"Mfg"="USOS"
+"HardwareID"="USOSUSB"
+"ConfigFlags"=hex:00,00,00,00
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\Class\SCSIAdapter\@CLASSIDX@]
+"DevLoader"="*IOS"
+"PortDriver"="usosusb.mpd"
+"DriverDesc"="USOS USB disk service (usosusb)"
+"DontLoadIfConflict"="Y"
+"MatchingDeviceId"="USOSUSB"
+"InfSection"="USOSUSB"
+"ProviderName"="USOS"
+"DriverDate"="10-19-2026"
+
