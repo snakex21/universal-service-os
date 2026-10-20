@@ -38,6 +38,69 @@ installation and exact-image hardware binding has been assessed.
   Known catalogue rows without images remain selectable, so choose the actual
   system row rather than pressing Enter on the first row.
 - `write_matrix.py`: render a clearly unfinished inventory checkpoint.
+  Exact-hash reviewed desktop results and separately cited hardware bindings
+  are optional inputs. Import resolution and `ASSESS_ENDPOINT` never become
+  desktop PASS. `test_matrix.py` checks that separation and original-PE
+  architecture/LCID fallback.
+
+The menu adapter supports a keyless ESP profile (`--profile` in fixture
+creation), selected from its real row trace. Validate it first with the
+production `usos-answer.exe render` CLI; time-zone identifiers are IANA
+names such as `Etc/UTC`. Rejected profiles terminate the test as an adapter
+error. Native support files and an optional read-only PE10 donor may be
+included for the modern Windows paths. Record which donor was actually used.
+
+`boot_menu.py --interactive` stops at a completed endpoint and blocks on
+operator input. Send one JSON action, e.g. `{"keys":["ret"],"settle":20}`,
+then inspect the announced `STEP_COMPLETE` frame. Finish with
+`{"finish":true}` to save the final evidence and remove the disks. This is
+for answering a visible keyless Setup question; do not use empty actions as
+a periodic progress check. `--boot-seconds` provides one target-boot endpoint
+after the actual prepared-disk notice, within the overall deadline.
+
+Keyed tests pass only the existing private-key filename with `--private-key`
+and the catalogue ID with `--key-for`. Multiple supplied candidates require
+an explicit zero-based `--key-index`; no key is generated or put in argv.
+The temporary profile is copied to the private disposable ESP, and its host
+share is removed after construction. The key's value is absent from metadata
+and logs. Keyed tests refuse interactive screenshots, and capture no screen
+or VGA contents until a family-specific event proves the key page passed.
+For 95/NT3/NT4/POSReady this is the successful prepared-disk notice; for
+98/Me and other keyed systems it requires the first-logon notification.
+Staging alone does not prove Setup accepted a key. Keep incomplete images private until
+cleanup; never attach or commit them.
+
+Optional first-logon notifications are test instrumentation, not desktop
+PASS. `--first-logon-observer` uses the existing `user_script` option and
+an own read-only scripts CD for NT5/NT6+. The test-only
+`--legacy-first-logon` overlay adds a RunOnce batch for profile-based
+98/98SE/Me, preserving the original installation answers. Only an exact
+per-test COM1 token allows the endpoint; visually review that frame.
+Neither mechanism edits a Windows binary. Record its use with the result.
+
+`--ps2-input` is an explicit alternative to the default xHCI USB input.
+`--accel whpx` uses an already available Windows hypervisor, with a different
+CPU model recorded in command.json/result.json. It never enables host
+features or silently falls back to TCG. A QMP startup/quit probe is only a
+hypervisor availability check, not evidence that a guest OS boots.
+
+`--auto-native` is an opt-in fixed input scenario for a known language-auto
+profile with an explicitly selected WIM edition: Enter on the language
+page and then the disk page. It must not be used to discover unknown UI
+states. A marker and endpoint review are still required for desktop PASS.
+
+`collect_guest_logs.py` reads only a stopped, keyless, owned test ESP
+read-only. It accepts generated log names and verified images, rejects
+invalid binary payloads, and records corrupt data as metadata instead of
+retaining it. Its direct Linux boot is evidence collection, not an OS test.
+
+`run_plan.py` executes an explicit NT5 case list one at a time. Its optional
+`--after` subscribes to the owned prior test's cleanup-file creation using
+Windows directory notifications, not repeated status-file reads. Only
+one-engine NT5 paths are accepted by this queue: with a separate nested
+9x trial, the total can then stay at three engines. The caller must reserve
+those slots; the queue is not a global VM scheduler. Archive members are
+hash checked and removed after the case. Results still require assessment.
 
 All new media/scratch is under `G:\USOS-Kolekcja`; other G: paths are never
 traversed. No physical disk is attached to a writable VM. Keep at least 100 GiB

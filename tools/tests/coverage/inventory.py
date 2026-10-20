@@ -31,7 +31,7 @@ def files():
 def main(a):
     previous={}
     if a.previous:
-        previous={r['path']:r for r in json.loads(a.previous.read_text())['files']}
+        previous={r['path']:r for r in json.loads(a.previous.read_text(encoding='utf-8'))['files']}
     def inspect(pair):
         root,p=pair;s=p.stat();old=previous.get(str(p))
         if old and old['bytes']==s.st_size and old['mtime_ns']==s.st_mtime_ns:
