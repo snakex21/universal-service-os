@@ -1,0 +1,32 @@
+"""Prevent inventory, imported symbols or a different image becoming PASS."""
+import importlib.util
+from pathlib import Path
+import unittest
+
+spec = importlib.util.spec_from_file_location('matrix', Path(__file__).with_name('write_matrix.py'))
+matrix = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(matrix)
+
+
+class MeasuredResultTests(unittest.TestCase):
+    def test_original_pe_and_locale_fill_missing_optical_arch(self):
+        facts = dict(usos=dict(legacy=dict(arch='unknown',locale=1033)),
+                     binary_versions={'i386/ntoskrnl.ex_':dict(machine='0x14c',file_version=[3,51,1025,1])})
+        self.assertEqual(matrix.identity(facts)[:3],('3.51.1025.1','en-US','x86'))
+
+    def test_same_hash_and_reviewed_desktop_required(self):
+        row = dict(sha256='a', result='PASS', stage='desktop', screen='s.png', evidence='result.json')
+        self.assertEqual(matrix.measured_result('a',[row])[0], 'QEMU PASS')
+        self.assertEqual(matrix.measured_result('b',[row])[0], 'oczekuje')
+        for invalid in (dict(row, stage='imports'), dict(row, screen=''), dict(row, result='ASSESS_ENDPOINT')):
+            self.assertEqual(matrix.measured_result('a',[invalid])[0], 'oczekuje')
+
+    def test_adapter_error_is_separate_from_windows_failure(self):
+        self.assertEqual(matrix.measured_result('a',[dict(sha256='a', result='RUNNER_ERROR', stage='menu')])[:2],
+                         ('błąd adaptera testu','menu'))
+        self.assertEqual(matrix.measured_result('a',[dict(sha256='a', result='FAIL', stage='Setup')])[:2],
+                         ('QEMU FAIL','Setup'))
+
+
+if __name__ == '__main__':
+    unittest.main()
