@@ -19,6 +19,9 @@ const (
 	gptInfoOffset                      = 32
 	gptNameChars                       = 36
 	gptBasicDataAttributeNoDriveLetter = uint64(0x8000000000000000)
+	// freshDataWorkAttributes: GPT attributes DATA and WORK are created
+	// with; ExposeFormattedVolumes clears them after formatting.
+	freshDataWorkAttributes = gptBasicDataAttributeNoDriveLetter
 )
 
 type gptHeader struct {
@@ -117,8 +120,8 @@ func buildDriveLayoutBuffer(plan layout.Plan, header gptHeader, ids gptIDs) ([]b
 		// windows and the "format the disk in drive X:" prompt). Bit 63 is
 		// cleared after formatting (ExposeFormattedVolumes).
 		{1, 1, plan.ESP, efiSystemPartitionType, ids.ESP, 0, "USOS_ESP"},
-		{2, 2, plan.DATA, basicDataPartitionType, ids.DATA, gptBasicDataAttributeNoDriveLetter, "USOS_DATA"},
-		{3, 3, plan.WORK, basicDataPartitionType, ids.WORK, gptBasicDataAttributeNoDriveLetter, "USOS_WORK"},
+		{2, 2, plan.DATA, basicDataPartitionType, ids.DATA, freshDataWorkAttributes, "USOS_DATA"},
+		{3, 3, plan.WORK, basicDataPartitionType, ids.WORK, freshDataWorkAttributes, "USOS_WORK"},
 	}
 	for index, partition := range partitions {
 		offset := driveLayoutHeaderSize + index*partitionEntrySize

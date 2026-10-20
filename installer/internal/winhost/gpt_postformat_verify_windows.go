@@ -8,7 +8,43 @@ import (
 	"github.com/snakex21/universal-service-os/installer/internal/install"
 )
 
+// layoutPhase says which GPT attributes DATA and WORK must carry when a
+// destructive-session check reads the layout back. A fresh install creates
+// DATA and WORK with NoDriveLetter (raw volumes stay unmounted) and clears
+// the bit only after formatting, in ExposeFormattedVolumes.
+type layoutPhase int
+
+const (
+	// layoutBeforeFormat: between CreateGPTAndPartitions and
+	// ExposeFormattedVolumes (Legacy boot write, formatting).
+	layoutBeforeFormat layoutPhase = iota
+	// layoutExposed: after ExposeFormattedVolumes, and for every installed
+	// medium (update, repair, clear, uninstall): all attributes 0.
+	layoutExposed
+)
+
+// GPT checks of the fresh-install stage sequence. The session methods use
+// these, so the stage-order regression test exercises the same phases.
+const (
+	writeLegacyBootLayoutPhase       = layoutBeforeFormat
+	verifyLayoutUnchangedLayoutPhase = layoutExposed
+	verifyLegacyBootLayoutPhase      = layoutExposed
+)
+
+func (p layoutPhase) dataWorkAttributes() uint64 {
+	if p == layoutBeforeFormat {
+		return freshDataWorkAttributes
+	}
+	return 0
+}
+
+// verifyMediaLayout checks an installed (exposed) medium: all attributes 0.
 func verifyMediaLayout(expected install.MediaLayout, actual parsedLayout) (install.MediaLayout, error) {
+	return verifyMediaLayoutPhase(expected, actual, layoutExposed)
+}
+
+func verifyMediaLayoutPhase(expected install.MediaLayout, actual parsedLayout, phase layoutPhase) (install.MediaLayout, error) {
+	dataWorkAttributes := phase.dataWorkAttributes()
 	if !equalGUIDText(guidString(actual.Header.DiskID), expected.DiskPTUUID) {
 		return install.MediaLayout{}, fmt.Errorf("disk GUID changed: got %s want %s", guidString(actual.Header.DiskID), expected.DiskPTUUID)
 	}
@@ -23,8 +59,8 @@ func verifyMediaLayout(expected install.MediaLayout, actual parsedLayout) (insta
 		attributes uint64
 	}{
 		{"ESP", expected.ESP, guidString(efiSystemPartitionType), 0},
-		{"DATA", expected.DATA, guidString(basicDataPartitionType), 0},
-		{"WORK", expected.WORK, guidString(basicDataPartitionType), 0},
+		{"DATA", expected.DATA, guidString(basicDataPartitionType), dataWorkAttributes},
+		{"WORK", expected.WORK, guidString(basicDataPartitionType), dataWorkAttributes},
 	}
 
 	result := install.MediaLayout{DiskNumber: expected.DiskNumber, DiskPTUUID: expected.DiskPTUUID}
