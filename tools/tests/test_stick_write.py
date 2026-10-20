@@ -36,6 +36,8 @@ class StickWriteStatic(unittest.TestCase):
             if rel.startswith(('tools/vendor/', 'tools/tests/', 'tools/cache/')) or path == LIB:
                 continue
             for number, code in code_lines(path):
+                if rel == 'tools/micro_linux_ui.sh' and '"$_lg_data"' in code:
+                    continue  # The login note remounts DATA, not the stick ESP.
                 if re.search(r'remount\s*,\s*rw|-o\s+rw\b.*remount', code):
                     offenders.append(f'{rel}:{number}: {code.strip()}')
                 if re.search(r'\bmount\b.*-o\s+rw\b', code) and '/mnt/esp' in code and rel != 'tools/micro_linux_init.sh':

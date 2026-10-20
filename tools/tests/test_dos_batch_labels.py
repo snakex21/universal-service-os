@@ -69,6 +69,8 @@ class BatchLabels(unittest.TestCase):
     def test_every_goto_has_a_label(self):
         for name, lines in batch_sources():
             known = {label[:8].lower() for label in labels(lines)}
+            if 'w2k_stage.sh heredoc' in name.replace('\\', '/'):
+                known.add('eof')  # CMD.EXE's built-in return label, NT5 only.
             for line in lines:
                 # REM lines, and ECHO lines writing another batch file.
                 if re.match(r'\s*(rem|@?echo)(\s|$)', line, re.I):
@@ -127,7 +129,8 @@ class Windows3Flow(unittest.TestCase):
 
     def test_add852_autostart_filter(self):
         bas = self.text('windows_inf.bas')
-        self.assertIn('INSTR(LCASE$(l$), "add852.exe /a")', bas)
+        self.assertIn('k$ = LCASE$(l$)', bas)
+        self.assertIn('INSTR(k$, "add852.exe /a")', bas)
         install = self.text('install.cmd')
         run = install.index('C:\\DOS\\QBASIC.EXE /RUN %USRC%\\W3INF.BAS')
         self.assertLess(install.index('C:\\DOS\\XCOPY.EXE %USRC%\\WINSETUP'), run)

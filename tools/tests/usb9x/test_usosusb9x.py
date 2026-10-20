@@ -38,7 +38,7 @@ PDR_EXPORTS = {
 
 
 def find_zig():
-    if len(sys.argv) > 1 and Path(sys.argv[1]).exists():
+    if __name__ == '__main__' and len(sys.argv) > 1 and Path(sys.argv[1]).is_file():
         return sys.argv[1]
     for cand in (ROOT / 'tools/zig/zig.exe', Path.home() / 'Desktop/Universal_Service_OS/tools/zig/zig.exe'):
         if cand.exists():
