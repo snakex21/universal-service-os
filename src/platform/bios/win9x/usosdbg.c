@@ -662,8 +662,8 @@ static void show_wheel(void)
  * delta (USOSMOUS.DRV's counter, up positive) and what was done. */
 static void show_wheelscroll(void)
 {
-    static const char *const actions[5] = { "-", "stock (nothing scrollable under the pointer)",
-        "stock (Win32 window)", "translated to WM_VSCROLL", "off" };
+    static const char *const actions[6] = { "-", "stock (nothing scrollable under the pointer)",
+        "stock (Win32 window)", "translated to WM_VSCROLL", "off", "95: MSWHEEL_ROLLMSG posted" };
     static const char *const kinds[3] = { "?", "Win16", "Win32" };
     HINSTANCE key = GetModuleHandle("USOSKEY");
     FARPROC info = key ? GetProcAddress(key, "USOSWHEELLOG") : 0;
@@ -682,7 +682,7 @@ static void show_wheelscroll(void)
         if (r->seq != i + 1) continue;
         wsprintf(line(), "WHEEL  #%u t%lu delta %d notch(es) = %d (%s)  %s  hwnd %04X %s %s  sent %u x SB %u",
                  r->seq, r->tick, r->notches, r->notches * 120, (LPSTR)(r->notches > 0 ? "up" : r->notches < 0 ? "down" : "none"),
-                 (LPSTR)actions[r->action < 5 ? r->action : 0], r->hwnd, (LPSTR)kinds[r->kind < 3 ? r->kind : 0],
+                 (LPSTR)actions[r->action < 6 ? r->action : 0], r->hwnd, (LPSTR)kinds[r->kind < 3 ? r->kind : 0],
                  (LPSTR)(r->cls[0] ? r->cls : "-"), r->sent, r->code);
     }
 }

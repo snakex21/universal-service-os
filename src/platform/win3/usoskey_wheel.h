@@ -19,6 +19,15 @@
  *     WHEEL_PAGESCROLL), then SB_ENDSCROLL, sent to that window; the
  *     WM_MOUSEWHEEL of those notches is turned into WM_NULL.
  * SYSTEM.INI [usosmous] WheelScroll=0 switches it off (default 1).
+ * Windows 95 (2026-10-20): 95 USER has no WM_MOUSEWHEEL at all (USOSMOUS.DRV
+ * does not call USER's wheel event there, only its notch counter moves), so
+ * no window gets a wheel message on its own. wheel_decide95: a window with
+ * WS_VSCROLL under the pointer (or an ancestor) always gets WM_VSCROLL,
+ * Win16 and Win32 alike; without one, the registered MSWHEEL_ROLLMSG (the
+ * IntelliPoint 1.x "MSWheel" message; 95 OSR2's COMCTL32.DLL and IE 3's
+ * SHDOCVW.DLL / MSHTML.DLL register it) goes to the window under the
+ * pointer (WA_ROLLMSG; [usosmous] MSWheel=0 switches that part off). One
+ * path per notch, so no window scrolls twice.
  * Callers keep every buffer they pass in DGROUP (SS is not DS in the
  * driver).
  */
@@ -31,6 +40,7 @@
 #define WA_STOCK_32   2     /* a Win32 window that takes the wheel */
 #define WA_TRANSLATE  3     /* WM_VSCROLL to the window under the pointer */
 #define WA_OFF        4     /* WheelScroll=0 */
+#define WA_ROLLMSG    5     /* Windows 95: MSWHEEL_ROLLMSG to the window under the pointer */
 
 /* Module kinds (wheel_module_kind). */
 #define WM_KIND_UNKNOWN 0   /* no readable module: treated as Win32 */
@@ -82,6 +92,32 @@ static unsigned char wheel_decide(int enabled, int has_target, unsigned char kin
     if (!has_target) return WA_STOCK_NONE;
     if (kind == WM_KIND_WIN16 || wheel_no_wheel_class(cls)) return WA_TRANSLATE;
     return WA_STOCK_32;
+}
+
+/* Windows 95: INT 2Fh AX=160Ah returns the Windows version in BX (95 and
+ * 95 OSR2: 0400h; 98: 040Ah; Me: 045Ah). ax_after: AX after the call (0 =
+ * supported). 1 = Windows 95, where USER has no wheel. */
+static int wheel_is_95(unsigned short ax_after, unsigned short bx)
+{
+    return ax_after == 0 && (bx >> 8) == 4 && (bx & 0xFF) < 10;
+}
+
+/* Windows 95 (no WM_MOUSEWHEEL): has_target as in wheel_decide; rollmsg:
+ * MSWheel not switched off and the message registered. */
+static unsigned char wheel_decide95(int enabled, int has_target, int rollmsg)
+{
+    if (!enabled) return WA_OFF;
+    if (has_target) return WA_TRANSLATE;
+    return rollmsg ? WA_ROLLMSG : WA_STOCK_NONE;
+}
+
+/* MSWHEEL_ROLLMSG wParam: the delta in WHEEL_DELTA (120) units, up
+ * positive, kept in a 16-bit int (Win16 WPARAM). */
+static short wheel_roll_delta(int notches)
+{
+    if (notches > 273) notches = 273;
+    if (notches < -273) notches = -273;
+    return (short)(notches * 120);
 }
 
 /* Notches since the last look: USOSMOUS.DRV's 16-bit notch counter (up

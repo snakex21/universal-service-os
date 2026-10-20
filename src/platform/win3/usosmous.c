@@ -85,6 +85,12 @@
  * adds a running notch count (up positive), moved here before USER gets
  * the wheel event; USOSKEY.DRV's WH_GETMESSAGE hook (task time) reads it
  * for the real delta (usoskey_wheel.h). Nothing else changes here.
+ * Windows 95 (2026-10-20): 95 USER has no wheel message, so this driver
+ * never calls USER's event procedure with AX = 0800h there (and Inquire
+ * does not report msExists 4Bh); the knock and the notch counter work as
+ * on 98, and USOSKEY.DRV turns the notches into WM_VSCROLL /
+ * MSWHEEL_ROLLMSG. 95 is told from 98 by INT 2Fh AX=160Ah (BX 0400h; the
+ * DOS version is 7.10 on both 95 OSR2 and 98).
  * VMOUSE mode (USOSVMD.VXD v2, 2026-10-19; C:\USOS9X\USOSVMD.ON): see
  * vmd_present() below and docs/dos-mouse-2026-10-18.md. The INT 15h C207h
  * handler is then the VxD's V86 callback (global VMM breakpoint, valid in
@@ -180,6 +186,7 @@ static BYTE nomouse, nomouse_checked;
 static BYTE paused;                 /* 0, MS_PAUSED or MS_NO_GUARD (USOSPAUSE) */
 static BYTE wheel;                  /* the BIOS answered the IntelliMouse knock */
 static BYTE wheel_pref;             /* wheel_wanted: 0 not asked yet, 1 no, 2 yes */
+static BYTE user_wheel;             /* wheel_wanted: USER takes AX=0800h (98 / Me, not 95) */
 static int wheel_sum;               /* DGROUP: -zu, SS is not DS */
 
 /* Wheel diagnostics for USOSDBG.EXE (USOSWHEELINFO): written here only. */
@@ -190,11 +197,13 @@ typedef struct {
     BYTE knock_id;                  /* BH of the last C204h after a knock, FFh none */
     WORD knock_err;                 /* (step << 12) | bios15 result of a failed knock */
     WORD knocks;                    /* knocks sent */
-    WORD wheel_calls;               /* AX=0800h event procedure calls */
+    WORD wheel_calls;               /* wheel batches (AX=0800h calls where user_wheel) */
     int last_sum;                   /* the last wheel sum handed to USER */
     WORD notches;                   /* version 2: running notch count, up positive,
                                      * wraps; moved before USER gets the event
                                      * (USOSKEY.DRV's wheel scrolling) */
+    BYTE user_wheel;                /* after notches (v2 readers stop there): 1 = USER gets
+                                     * AX=0800h (98 / Me), 0 = counter only (95) */
 } WHEELINFO;
 static WHEELINFO winfo = { 2, 0, 0, 0xFF };
 
@@ -345,17 +354,41 @@ static void note_error(WORD function, WORD result)
     if (shared) shared->merr = (WORD)((function & 0xFF) << 8) | (result & 0xFF);
 }
 
-/* Windows 98 or later (DOS 7.10+ in GetVersion's high word; 95 OSR2 is
- * 7.10 as well, its USER ignores the wheel flag) and not switched off
- * with SYSTEM.INI [usosmous] Wheel=0. */
+/* Windows 95: INT 2Fh AX=160Ah returns 0 in AX and the Windows version
+ * in BX (95 / 95 OSR2 0400h, 98 040Ah, Me 045Ah). */
+static int windows_95(void)
+{
+    WORD ax_after = 0x160A, wver = 0;
+    _asm {
+        push bx
+        push cx
+        mov ax, 160Ah
+        int 2Fh
+        mov ax_after, ax
+        mov wver, bx
+        pop cx
+        pop bx
+    }
+    return ax_after == 0 && HIBYTE(wver) == 4 && LOBYTE(wver) < 10;
+}
+
+/* DOS 7.10+ in GetVersion's high word (95 OSR2, 98, 98 SE; Me 8.00) and
+ * not switched off with SYSTEM.INI [usosmous] Wheel=0: the notch counter
+ * runs. USER gets the wheel event only on 98 / Me (user_wheel); 95 USER
+ * has no wheel message. */
 static int wheel_wanted(void)
 {
     WORD dos;
     if (!wheel_pref) {
         dos = HIWORD(GetVersion());
         wheel_pref = 1;
+        user_wheel = 0;
         if (HIBYTE(dos) > 7 || (HIBYTE(dos) == 7 && LOBYTE(dos) >= 10))
-            if (GetPrivateProfileInt("usosmous", "Wheel", 1, "SYSTEM.INI")) wheel_pref = 2;
+            if (GetPrivateProfileInt("usosmous", "Wheel", 1, "SYSTEM.INI")) {
+                wheel_pref = 2;
+                user_wheel = (BYTE)!windows_95();
+            }
+        winfo.user_wheel = user_wheel;
     }
     return wheel_pref == 2;
 }
@@ -444,6 +477,7 @@ static void call_wheel(int sum)
     winfo.wheel_calls++;
     winfo.last_sum = sum;
     winfo.notches -= (WORD)sum;     /* one 16-bit store: USOSKEY.DRV reads it at task time */
+    if (!user_wheel) return;        /* Windows 95: the counter only (USOSKEY.DRV scrolls) */
     _asm {
         pusha
         push ds
@@ -791,7 +825,7 @@ WORD FAR PASCAL __loadds Inquire(MOUSEINFO FAR *info)
     if (!switched_off()) {
         probe();
         exists = probed ? present : (BYTE)is_me();
-        if (exists && (probed ? wheel : wheel_wanted())) exists = MS_EXISTS_WHEEL;
+        if (exists && (probed ? wheel : wheel_wanted()) && user_wheel) exists = MS_EXISTS_WHEEL;
     }
     for (i = 0; i < sizeof(MOUSEINFO); i++) p[i] = 0;
     info->msExists = exists;

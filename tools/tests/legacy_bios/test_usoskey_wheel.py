@@ -25,7 +25,10 @@ HARNESS = r'''
  * k flags_hex [sig]                -> module kind ("x": no "NE")
  * n now seen                       -> notches
  * p notches lines_hex              -> "code count"
- * s active translated_at msg_time  -> 0/1 */
+ * s active translated_at msg_time  -> 0/1
+ * e enabled has_target rollmsg      -> Windows 95 action
+ * i ax_after bx                    -> 1: Windows 95 (INT 2Fh 160Ah)
+ * r notches                        -> MSWHEEL_ROLLMSG delta */
 int main(int argc, char **argv)
 {
     char c = argv[1][0];
@@ -45,6 +48,12 @@ int main(int argc, char **argv)
         unsigned short code = 99;
         int n = wheel_plan(atoi(argv[2]), strtoul(argv[3], 0, 16), &code);
         printf("%u %d\n", code, n);
+    } else if (c == 'e') {
+        printf("%u\n", wheel_decide95(atoi(argv[2]), atoi(argv[3]), atoi(argv[4])));
+    } else if (c == 'i') {
+        printf("%d\n", wheel_is_95((unsigned short)strtoul(argv[2], 0, 0), (unsigned short)strtoul(argv[3], 0, 0)));
+    } else if (c == 'r') {
+        printf("%d\n", wheel_roll_delta(atoi(argv[2])));
     } else if (c == 's') {
         printf("%d\n", wheel_swallow(atoi(argv[2]), strtoul(argv[3], 0, 0), strtoul(argv[4], 0, 0)));
     }
@@ -52,7 +61,7 @@ int main(int argc, char **argv)
 }
 '''
 
-WA_STOCK_NONE, WA_STOCK_32, WA_TRANSLATE, WA_OFF = 1, 2, 3, 4
+WA_STOCK_NONE, WA_STOCK_32, WA_TRANSLATE, WA_OFF, WA_ROLLMSG = 1, 2, 3, 4, 5
 UNKNOWN, WIN16, WIN32 = 0, 1, 2
 SB_LINEUP, SB_LINEDOWN, SB_PAGEUP, SB_PAGEDOWN = 0, 1, 2, 3
 
@@ -205,6 +214,53 @@ class UsosKeyWheel(unittest.TestCase):
         self.assertNotIn('paramH > 0', journal)
         self.assertNotIn('g_wheel_pos', log)
         self.assertIn('no delta in journal records: see WHEEL USOSKEY', log)
+
+
+    # --- Windows 95 (no WM_MOUSEWHEEL in USER) -------------------------------
+    def test_95_always_translates_a_scroll_bar_window(self):
+        # Win16 and Win32 alike: no 95 window ever gets WM_MOUSEWHEEL.
+        self.assertEqual(int(self.run_h('e', 1, 1, 1)), WA_TRANSLATE)
+        self.assertEqual(int(self.run_h('e', 1, 1, 0)), WA_TRANSLATE)
+        self.assertEqual(int(self.run_h('e', 1, 0, 1)), WA_ROLLMSG)     # MSWheel apps (IE 3, COMCTL32)
+        self.assertEqual(int(self.run_h('e', 1, 0, 0)), WA_STOCK_NONE)  # MSWheel=0
+        self.assertEqual(int(self.run_h('e', 0, 1, 1)), WA_OFF)
+
+    def test_95_is_told_from_98_by_int2f_160a(self):
+        self.assertEqual(self.run_h('i', 0, 0x0400), '1')     # 95 / 95 OSR2
+        self.assertEqual(self.run_h('i', 0, 0x040A), '0')     # 98 / 98 SE
+        self.assertEqual(self.run_h('i', 0, 0x045A), '0')     # Me
+        self.assertEqual(self.run_h('i', 0x160A, 0x0400), '0')  # call not supported
+        self.assertEqual(self.run_h('i', 0, 0x030A), '0')     # Windows 3.1
+
+    def test_rollmsg_delta(self):
+        self.assertEqual(self.run_h('r', 1), '120')
+        self.assertEqual(self.run_h('r', -2), '-240')
+        self.assertEqual(self.run_h('r', 1000), str(273 * 120))   # stays a 16-bit int
+        self.assertEqual(self.run_h('r', -1000), str(-273 * 120))
+
+    def test_95_hook_side(self):
+        start = body(self.key, 'wheel_start')
+        self.assertIn('w95 = (BYTE)windows_95();', start)
+        self.assertIn('RegisterWindowMessage("MSWHEEL_ROLLMSG")', start)
+        self.assertIn('GetPrivateProfileInt("usosmous", "MSWheel", 1, "SYSTEM.INI")', start)
+        self.assertIn('int 2Fh', body(self.key, 'windows_95'))
+        self.assertIn('wheel_is_95(ax_after, wver)', body(self.key, 'windows_95'))
+        new = body(self.key, 'wheel_new')
+        self.assertIn('w95 ? wheel_decide95(1, t != 0, rollmsg != 0) : wheel_decide(1, t != 0, kind, wcls)', new)
+        self.assertIn('PostMessage(t, rollmsg, (WPARAM)wheel_roll_delta(n), MAKELONG(wpt.x, wpt.y))', new)
+        self.assertNotIn('SendMessage', new)                     # the hook never waits for another task
+
+    def test_95_mouse_driver_counts_notches_without_user_wheel_event(self):
+        wheel = body(self.mouse, 'call_wheel')
+        self.assertLess(wheel.index('winfo.notches -= (WORD)sum;'), wheel.index('if (!user_wheel) return;'))
+        self.assertLess(wheel.index('if (!user_wheel) return;'), wheel.index('mov ax, SF_WHEEL'))
+        wanted = body(self.mouse, 'wheel_wanted')
+        self.assertIn('user_wheel = (BYTE)!windows_95();', wanted)
+        self.assertIn('wheel_pref = 2;', wanted)                  # the counter runs on 95 OSR2 (DOS 7.10)
+        self.assertIn('int 2Fh', body(self.mouse, 'windows_95'))
+        self.assertIn('&& user_wheel) exists = MS_EXISTS_WHEEL;', body(self.mouse, 'Inquire'))
+        # windows_95 (INT 2Fh) is task time only: never from the timer path.
+        self.assertNotIn('windows_95', body(self.mouse, 'poll_body'))
 
 
 if __name__ == '__main__':
