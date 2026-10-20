@@ -713,6 +713,8 @@
   "boot.iso.stage.3": "Avvio di Windows Setup",
   "boot.iso.reading": "Lettura della ISO di Windows selezionata",
   "boot.iso.validating": "Convalida della ISO di installazione e individuazione dell'origine di avvio",
+  "boot.iso.checking_helper": "Verifica dell’immagine ausiliaria WinPE",
+  "boot.iso.checking_helper_percent": "Verifica dell’immagine ausiliaria WinPE: {0}%",
   "boot.iso.drivers": "Lettura dei pacchetti driver facoltativi di Windows 7 x64",
   "boot.iso.loading_wim": "Caricamento di boot.wim dall'origine di avvio: {0}%",
   "boot.iso.external_pe": "Avvio di PE10 esterno; l'origine di installazione resta la ISO di Windows selezionata",

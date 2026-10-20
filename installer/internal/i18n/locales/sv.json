@@ -713,6 +713,8 @@
   "boot.iso.stage.3": "Startar Windows Setup",
   "boot.iso.reading": "Läser den valda Windows ISO",
   "boot.iso.validating": "Validerar installations-ISO och fastställer startkällan",
+  "boot.iso.checking_helper": "Kontrollerar WinPE-hjälpavbildningen",
+  "boot.iso.checking_helper_percent": "Kontrollerar WinPE-hjälpavbildningen: {0}%",
   "boot.iso.drivers": "Läser valfria drivrutinspaket för Windows 7 x64",
   "boot.iso.loading_wim": "Läser in startkällans boot.wim: {0}%",
   "boot.iso.external_pe": "Startar extern PE10; installationskällan är fortfarande den valda Windows ISO",

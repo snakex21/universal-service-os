@@ -716,6 +716,8 @@
   "boot.iso.stage.3": "Pornirea Windows Setup",
   "boot.iso.reading": "Se citește ISO-ul Windows selectat",
   "boot.iso.validating": "Se validează ISO-ul de instalare și se determină sursa de pornire",
+  "boot.iso.checking_helper": "Se verifică imaginea auxiliară WinPE",
+  "boot.iso.checking_helper_percent": "Se verifică imaginea auxiliară WinPE: {0}%",
   "boot.iso.drivers": "Se citesc pachetele opționale de drivere Windows 7 x64",
   "boot.iso.loading_wim": "Se încarcă boot.wim din sursa de pornire: {0}%",
   "boot.iso.external_pe": "Se pornește PE10 extern; sursa instalării rămâne ISO-ul Windows selectat",

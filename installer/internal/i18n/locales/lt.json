@@ -716,6 +716,8 @@
   "boot.iso.stage.3": "Windows Setup paleidimas",
   "boot.iso.reading": "Skaitomas pasirinktas Windows ISO",
   "boot.iso.validating": "Tikrinamas diegimo ISO ir nustatomas įkrovos šaltinis",
+  "boot.iso.checking_helper": "Tikrinamas pagalbinis WinPE atvaizdas",
+  "boot.iso.checking_helper_percent": "Tikrinamas pagalbinis WinPE atvaizdas: {0}%",
   "boot.iso.drivers": "Skaitomi pasirenkami Windows 7 x64 tvarkyklių paketai",
   "boot.iso.loading_wim": "Įkeliamas įkrovos šaltinio boot.wim: {0}%",
   "boot.iso.external_pe": "Paleidžiamas išorinis PE10; diegimo šaltinis lieka pasirinktas Windows ISO",

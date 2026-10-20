@@ -716,6 +716,8 @@
   "boot.iso.stage.3": "Spouštění Windows Setup",
   "boot.iso.reading": "Čtení vybraného Windows ISO",
   "boot.iso.validating": "Ověřování instalačního ISO a určení spouštěcího zdroje",
+  "boot.iso.checking_helper": "Kontrola pomocného obrazu WinPE",
+  "boot.iso.checking_helper_percent": "Kontrola pomocného obrazu WinPE: {0}%",
   "boot.iso.drivers": "Čtení volitelných balíčků ovladačů pro Windows 7 x64",
   "boot.iso.loading_wim": "Načítání boot.wim ze spouštěcího zdroje: {0}%",
   "boot.iso.external_pe": "Spouštění externího PE10; zdrojem instalace zůstává vybraný Windows ISO",

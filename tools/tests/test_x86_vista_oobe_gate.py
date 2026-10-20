@@ -60,7 +60,7 @@ class X86VistaOobeGate(unittest.TestCase):
 
     def test_cmd_arms_gate_for_nt60_sp2_only(self):
         self.assertIn('call :usb3\ncall :nt60_gate\n', CMD)
-        gate = CMD[CMD.index(':nt60_gate'):]
+        gate = CMD.split('\n:nt60_gate\n', 1)[1].split('\n:nt60_usb\n', 1)[0]
         self.assertIn('if not "%USOS_NT%"=="6.0" exit /b 0', gate)
         self.assertIn('if not "%USOS_BUILD%"=="6002"', gate)
         self.assertIn('Microsoft\\Windows NT\\CurrentVersion\\WinSAT" /v MOOBE /t REG_DWORD /d 2', gate)

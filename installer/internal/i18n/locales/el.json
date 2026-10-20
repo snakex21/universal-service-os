@@ -713,6 +713,8 @@
   "boot.iso.stage.3": "Έναρξη Windows Setup",
   "boot.iso.reading": "Ανάγνωση του επιλεγμένου Windows ISO",
   "boot.iso.validating": "Επικύρωση του ISO εγκατάστασης και προσδιορισμός της πηγής εκκίνησης",
+  "boot.iso.checking_helper": "Έλεγχος της βοηθητικής εικόνας WinPE",
+  "boot.iso.checking_helper_percent": "Έλεγχος της βοηθητικής εικόνας WinPE: {0}%",
   "boot.iso.drivers": "Ανάγνωση προαιρετικών πακέτων προγραμμάτων οδήγησης Windows 7 x64",
   "boot.iso.loading_wim": "Φόρτωση boot.wim από την πηγή εκκίνησης: {0}%",
   "boot.iso.external_pe": "Έναρξη εξωτερικού PE10, η πηγή εγκατάστασης παραμένει το επιλεγμένο Windows ISO",

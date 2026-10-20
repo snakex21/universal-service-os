@@ -20,10 +20,12 @@ rem      becomes Setup's first-boot command: WinSAT's OOBE assessment is
 rem      skipped (MOOBE=2; it hung on the X470 in "mem"), an interrupted
 rem      OOBE resumes without a second account, autochk stays on the system
 rem      volume; never fatal (design doc section 12.5);
-rem   3c. Vista / Server 2008 SP2 x86 (NT 6.0.6002) only: usosusb.sys (own
+rem   3c. Vista / Server 2008 SP2 x86 (NT 6.0.6002), and Windows 7 SP1 x86
+rem      (NT 6.1.7601) without a competing xHCI package: usosusb.sys (own
 rem      xHCI keyboard / mouse port driver, tools/nt4/usosusb build-nt6)
 rem      copied to system32\drivers and registered offline as a system-start
-rem      "Keyboard Port" service; never fatal (design doc section 12.6);
+rem      "Keyboard Port" service; a copy/registration error stops the reboot
+rem      (design doc sections 12.6 / 12.8);
 rem   3e. Windows 7 / 8.x / 10 before 1703 x86 (NT 6.1 to 10.0.14393):
 rem      usosmpart.sys (own GPL USB multi-partition disk filter,
 rem      tools/nt/usosmpart) copied to system32\drivers and registered offline
@@ -85,6 +87,7 @@ if not "%USOS_SETUP_RESULT%"=="0" (
 call :usb3
 call :nt60_gate
 call :nt60_usb
+if errorlevel 1 exit /b 1
 call :nvme
 if exist "%~dp0usos-nvme-modern.flag" if errorlevel 1 exit /b 1
 call :mpart
@@ -154,6 +157,7 @@ rem boot. Vista / Server 2008 (NT 6.0): this DISM cannot service them and no
 rem 32-bit NT 6.0 xHCI package is known; skipped with a note.
 :usb3
 echo [USOS] phase=usb3-offline
+set "USOS_USB3_INSTALLED="
 set "USOS_T="
 set "USOS_NT="
 set "USOS_WORKDIR="
@@ -169,7 +173,7 @@ for %%D in (C D E F G H I J K L M N O P Q R S T U V W Y Z) do if not defined USO
 if not defined USOS_DATA (echo [USOS] USB3: DATA\Systems\Windows\Windows 7 not visible; skipped. & exit /b 0)
 set "USOS_DRV=%USOS_DATA%\Drivers\x86"
 set "USOS_KMDF_MSU="
-for %%M in ("%USOS_DATA%\Updates\*kb2685811-x86*.msu" "%USOS_DATA%\Updates\*kb2864202-x86*.msu") do set "USOS_KMDF_MSU=%%~fM"
+for %%M in ("%USOS_DATA%\Updates\*kb2685811-x86*.msu" "%USOS_DATA%\Updates\*kb2864202-x86*.msu") do if exist "%%~fM" set "USOS_KMDF_MSU=%%~fM"
 set "USOS_HAVE_INF="
 if exist "%USOS_DRV%\" for /r "%USOS_DRV%" %%I in (*.inf) do set "USOS_HAVE_INF=1"
 if not defined USOS_HAVE_INF (echo [USOS] USB3: no 32-bit package in %USOS_DRV%; skipped. & exit /b 0)
@@ -180,7 +184,7 @@ md "%USOS_WORKDIR%\cab"
 md "%USOS_WORKDIR%\scratch"
 expand.exe -F:Windows6.1-KB*-x86.cab "%USOS_KMDF_MSU%" "%USOS_WORKDIR%\cab" >nul
 set "USOS_KMDF_CAB="
-for %%C in ("%USOS_WORKDIR%\cab\Windows6.1-KB*-x86.cab") do set "USOS_KMDF_CAB=%%~fC"
+for %%C in ("%USOS_WORKDIR%\cab\Windows6.1-KB*-x86.cab") do if exist "%%~fC" set "USOS_KMDF_CAB=%%~fC"
 if not defined USOS_KMDF_CAB (echo [USOS] USB3: no KMDF package inside %USOS_KMDF_MSU%; skipped. & goto usb3_done)
 echo [USOS] USB3: KMDF %USOS_KMDF_CAB% into %USOS_T%
 dism.exe /English /Image:%USOS_T%\ /ScratchDir:"%USOS_WORKDIR%\scratch" /LogPath:"%USOS_WORKDIR%\dism-kmdf.log" /Add-Package /PackagePath:"%USOS_KMDF_CAB%"
@@ -189,7 +193,10 @@ echo [USOS] USB3: KMDF DISM exit=%USOS_DISM%
 if not "%USOS_DISM%"=="0" if not "%USOS_DISM%"=="3010" (echo [USOS] USB3: KMDF not installed, so the USB 3 package would not start; skipped. & goto usb3_done)
 echo [USOS] USB3: drivers %USOS_DRV%
 dism.exe /English /Image:%USOS_T%\ /ScratchDir:"%USOS_WORKDIR%\scratch" /LogPath:"%USOS_WORKDIR%\dism-drivers.log" /Add-Driver /Driver:"%USOS_DRV%" /Recurse /ForceUnsigned
-echo [USOS] USB3: driver DISM exit=%errorlevel%
+set "USOS_DISM=%errorlevel%"
+echo [USOS] USB3: driver DISM exit=%USOS_DISM%
+if "%USOS_DISM%"=="0" set "USOS_USB3_INSTALLED=1"
+if "%USOS_DISM%"=="3010" set "USOS_USB3_INSTALLED=1"
 :usb3_done
 "%~dp0usos-log-x86.exe"
 if exist "%USOS_WORKDIR%\scratch" rd /s /q "%USOS_WORKDIR%\scratch"
@@ -243,7 +250,7 @@ reg unload HKLM\USOS_SYS >nul
 "%~dp0usos-log-x86.exe"
 exit /b 0
 
-rem ---- Vista / Server 2008 SP2 x86: USB keyboard and mouse (section 12.6) --
+rem ---- Vista SP2 / Windows 7 SP1 x86: bundled xHCI (sections 12.6 / 12.8) --
 rem NT 6.0 x86 has no xHCI driver and no Vista-capable 32-bit package exists;
 rem the X470 has only xHCI ports (firmware legacy emulation through i8042
 rem ended during OOBE). usosusb.sys (own GPL driver, tools/nt4/usosusb,
@@ -251,8 +258,10 @@ rem build-nt6.cmd) takes the xHCI controllers from the firmware (USBLEGSUP),
 rem polls root-port HID boot keyboards / mice and feeds kbdclass / mouclass
 rem as a legacy keyboard / pointer port. Offline, with this WinPE's reg.exe:
 rem the driver into system32\drivers and a system-start "Keyboard Port"
-rem service (loads before kbdclass / mouclass). 6.0.6002 only: Windows 7 and
-rem later have a Microsoft xHCI stack (usbxhci) that must not meet it.
+rem service (loads before kbdclass / mouclass). Windows 7 has no inbox xHCI
+rem stack either. On 6.1.7601 use it when the optional DATA package was not
+rem installed and no competing xHCI service exists in the offline SYSTEM.
+rem PE10's own USB driver stays in PE10; it is not a Windows 7 driver.
 rem 32-bit Vista does not enforce kernel-mode signatures (x64 only).
 :nt60_usb
 set "USOS_T="
@@ -261,28 +270,66 @@ set "USOS_BUILD="
 "%~dp0usos-x86-csmwrap.exe" target "%TEMP%\usos-target.txt" >nul
 if errorlevel 1 exit /b 0
 for /f "usebackq tokens=1,2,3" %%A in ("%TEMP%\usos-target.txt") do (set "USOS_T=%%A" & set "USOS_NT=%%B" & set "USOS_BUILD=%%C")
+if "%USOS_NT%"=="6.1" goto nt61_usb
 if not "%USOS_NT%"=="6.0" exit /b 0
 echo [USOS] phase=nt60-usb build=%USOS_BUILD%
 if not "%USOS_BUILD%"=="6002" (echo [USOS] usosusb: only for SP2 builds 6002; skipped. & exit /b 0)
-if not exist "%~dp0usosusb-nt6.sys" (echo [USOS] usosusb: driver missing; skipped. & exit /b 0)
+goto usb_port_install
+
+:nt61_usb
+echo [USOS] phase=nt61-usb build=%USOS_BUILD%
+if not "%USOS_BUILD%"=="7601" exit /b 0
+if defined USOS_USB3_INSTALLED (echo [USOS] usosusb: DATA USB package installed; bundled driver not enabled. & exit /b 0)
+
+:usb_port_install
+if not exist "%~dp0usosusb-nt6.sys" (echo [USOS] usosusb: bundled driver missing. & exit /b 1)
 copy /y "%~dp0usosusb-nt6.sys" "%USOS_T%\Windows\System32\drivers\usosusb.sys" >nul
-if errorlevel 1 (echo [USOS] usosusb: copy failed; skipped. & exit /b 0)
+if errorlevel 1 (echo [USOS] usosusb: copy failed. & exit /b 1)
+"%~dp0usos-x86-csmwrap.exe" samefile "%~dp0usosusb-nt6.sys" "%USOS_T%\Windows\System32\drivers\usosusb.sys"
+if errorlevel 1 (echo [USOS] usosusb: driver readback mismatch. & exit /b 1)
 reg load HKLM\USOS_SYS "%USOS_T%\Windows\System32\config\SYSTEM" >nul
-if errorlevel 1 (echo [USOS] usosusb: SYSTEM hive not loaded; skipped. & exit /b 0)
+if errorlevel 1 (echo [USOS] usosusb: SYSTEM hive not loaded. & exit /b 1)
 set "USOS_CS="
 for /f "tokens=3" %%A in ('reg query "HKLM\USOS_SYS\Select" /v Current ^| find /i "Current"') do set /a "USOS_CS=%%A"
 if not defined USOS_CS set "USOS_CS=1"
+rem Search service names and data (USBXHCI, amdxhc, iusb3xhc, ASMTXHCI,
+rem etc.). A partial DISM install or a package already in the ISO must not
+rem race this legacy driver for the same controller. Unknown/read errors
+rem are fatal: reg query returns 1 both for no match and for read failure,
+rem so first verify that the Services key can actually be read.
+if not "%USOS_NT%"=="6.1" goto usb_port_register
+reg query "HKLM\USOS_SYS\ControlSet00%USOS_CS%\Services" >nul 2>&1
+if errorlevel 1 goto usb_port_failed
+reg query "HKLM\USOS_SYS\ControlSet00%USOS_CS%\Services" /s /f xhc >nul 2>&1
+if errorlevel 1 goto usb_port_register
+echo [USOS] usosusb: existing xHCI service; bundled driver not enabled.
+reg unload HKLM\USOS_SYS >nul
+exit /b 0
+
+:usb_port_register
 set "USOS_SVC=HKLM\USOS_SYS\ControlSet00%USOS_CS%\Services\usosusb"
 reg add "%USOS_SVC%" /v Type /t REG_DWORD /d 1 /f >nul
+if errorlevel 1 goto usb_port_failed
 reg add "%USOS_SVC%" /v Start /t REG_DWORD /d 1 /f >nul
+if errorlevel 1 goto usb_port_failed
 reg add "%USOS_SVC%" /v ErrorControl /t REG_DWORD /d 0 /f >nul
+if errorlevel 1 goto usb_port_failed
 reg add "%USOS_SVC%" /v Group /t REG_SZ /d "Keyboard Port" /f >nul
+if errorlevel 1 goto usb_port_failed
 reg add "%USOS_SVC%" /v ImagePath /t REG_EXPAND_SZ /d "system32\drivers\usosusb.sys" /f >nul
-reg add "%USOS_SVC%" /v DisplayName /t REG_SZ /d "USOS USB keyboard and mouse (xHCI)" /f >nul
+if errorlevel 1 goto usb_port_failed
+reg add "%USOS_SVC%" /v DisplayName /t REG_SZ /d "USOS USB keyboard, mouse and disks (xHCI)" /f >nul
+if errorlevel 1 goto usb_port_failed
 echo [USOS] usosusb: registered in ControlSet00%USOS_CS% exit=%errorlevel%
 reg unload HKLM\USOS_SYS >nul
+if errorlevel 1 exit /b 1
 "%~dp0usos-log-x86.exe"
 exit /b 0
+
+:usb_port_failed
+echo [USOS] usosusb: offline registration failed; installation stopped before reboot.
+reg unload HKLM\USOS_SYS >nul
+exit /b 1
 
 rem ---- NVMe target: which driver runs the controller in this WinPE ---------
 rem micro-Linux (vista_csmwrap_target.sh, NVMe target, NT6 x86 donor) put

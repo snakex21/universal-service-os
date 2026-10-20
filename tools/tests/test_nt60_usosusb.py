@@ -1,10 +1,10 @@
-"""tools/nt4/usosusb build-nt6: USB keyboard / mouse for the installed
-Vista / Server 2008 SP2 x86 on xHCI-only machines (csmwrap-integration 12.6).
+"""tools/nt4/usosusb build-nt6: bundled USB for the installed Vista /
+Server 2008 SP2 and Windows 7 SP1 x86 (csmwrap-integration 12.6/12.8).
 Host-only, no Microsoft files: the committed NT 6.0 binary imports only
 kernel / HAL routines that the Server 2008 SP2 x86 kernels (ntoskrnl,
 ntkrnlpa) and HALs (halmacpi, halacpi) export (export-name fixture), it is
 the NT6 variant, and the x86 CSMWrap WinPE step installs it offline for
-6.0.6002 only.
+6.0.6002 and 6.1.7601, with precedence for another Win7 xHCI package.
 """
 from __future__ import annotations
 from pathlib import Path
@@ -25,6 +25,15 @@ FIXTURE = HERE / 'data/nt60sp2_x86_exports.txt'
 
 
 class Binary(unittest.TestCase):
+    def test_imports_resolve_on_windows7_sp1_x86(self):
+        tables = nt4.parse((HERE / 'data/nt61sp1_x86_exports.txt').read_text())
+        _, imports = pe(SYS)
+        for kernel in ('ntoskrnl.exe', 'ntkrnlpa.exe'):
+            for hal in ('hal.dll', 'halmacpi.dll', 'halacpi.dll'):
+                view = {'ntoskrnl.exe': (tables[kernel], []), 'hal.dll': (tables[hal], [])}
+                missing = [m for m in (resolve(view, mod, fn) for mod, fn in imports) if m]
+                self.assertEqual(missing, [], f'{kernel}+{hal}')
+
     def test_imports_resolve_on_server_2008_sp2_x86(self):
         tables = nt4.parse(FIXTURE.read_text())
         _, imports = pe(SYS)
@@ -98,11 +107,15 @@ class Flow(unittest.TestCase):
         text = CMD.read_text(encoding='utf-8')
         self.assertIn('call :nt60_gate\ncall :nt60_usb\n', text)
 
-    def test_only_nt60_sp2(self):
+    def test_nt60_sp2_and_nt61_sp1_fallback(self):
         s = self.step()
         self.assertIn('if not "%USOS_NT%"=="6.0" exit /b 0', s)
         self.assertIn('if not "%USOS_BUILD%"=="6002"', s)
         self.assertLess(s.index('"6002"'), s.index('copy /y'))
+        self.assertIn('if "%USOS_NT%"=="6.1" goto nt61_usb', s)
+        self.assertIn('if not "%USOS_BUILD%"=="7601" exit /b 0', s)
+        self.assertIn('if defined USOS_USB3_INSTALLED', s)
+        self.assertIn('/s /f xhc', s)
 
     def test_service_registration(self):
         s = self.step()
@@ -114,8 +127,8 @@ class Flow(unittest.TestCase):
         self.assertIn('/v Group /t REG_SZ /d "Keyboard Port"', s)
         self.assertIn(r'/v ImagePath /t REG_EXPAND_SZ /d "system32\drivers\usosusb.sys"', s)
         self.assertIn(r'reg unload HKLM\USOS_SYS', s)
-        # never fatal
-        self.assertNotRegex(s, r'exit /b [1-9]')
+        # A broken bundled driver must stop before the automatic reboot.
+        self.assertIn('if errorlevel 1 exit /b 1', s)
 
     def test_packed_into_modern_support(self):
         text = BUILD.read_text(encoding='utf-8')

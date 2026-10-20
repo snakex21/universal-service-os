@@ -719,6 +719,8 @@
   "boot.iso.stage.3": "Zagon programa Windows Setup",
   "boot.iso.reading": "Branje izbranega Windows ISO",
   "boot.iso.validating": "Preverjanje namestitvenega ISO in določanje zagonskega vira",
+  "boot.iso.checking_helper": "Preverjanje pomožne slike WinPE",
+  "boot.iso.checking_helper_percent": "Preverjanje pomožne slike WinPE: {0}%",
   "boot.iso.drivers": "Branje izbirnih paketov gonilnikov Windows 7 x64",
   "boot.iso.loading_wim": "Nalaganje boot.wim zagonskega vira: {0} %",
   "boot.iso.external_pe": "Zagon zunanjega PE10; namestitveni vir ostane izbrani Windows ISO",

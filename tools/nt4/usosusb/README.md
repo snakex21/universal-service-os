@@ -99,6 +99,17 @@ the flow wiring.
 
 ### USB mass storage (NT 6.0 build only)
 
+The same bundled NT6 binary is also used by Windows 7 SP1 x86 when the
+optional DATA USB package was not installed and the offline SYSTEM has no
+competing xHCI service. Windows 7 has no inbox xHCI stack; the PE10 donor's
+USB support does not migrate to the installed OS. This path needs neither
+KMDF nor a user driver package. Its 42 imports resolve against both Win7
+SP1 x86 kernels and all three HAL variants in the export-name fixture
+`tools/tests/data/nt61sp1_x86_exports.txt` (checked by
+`tools/tests/test_nt60_usosusb.py`). The root-port HID/BOT limits below
+also apply to Windows 7. To install another xHCI stack later, disable the
+legacy `usosusb` service first: two drivers must not own the controller.
+
 The NT6 build also drives USB sticks (`USOSUSB_MSC`): the same worker thread
 owns the controller for keyboard, mouse and storage, so there is no second
 driver and no hand-off between drivers. Written from the public USB Mass

@@ -713,6 +713,8 @@
   "boot.iso.stage.3": "Starting Windows Setup",
   "boot.iso.reading": "Reading the selected Windows ISO",
   "boot.iso.validating": "Validating the installation ISO and resolving the boot source",
+  "boot.iso.checking_helper": "Checking the WinPE helper image",
+  "boot.iso.checking_helper_percent": "Checking the WinPE helper image: {0}%",
   "boot.iso.drivers": "Reading optional Windows 7 x64 driver packages",
   "boot.iso.loading_wim": "Loading boot-source boot.wim: {0}%",
   "boot.iso.external_pe": "Starting external PE10; the install source remains the selected Windows ISO",

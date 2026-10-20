@@ -713,6 +713,8 @@
   "boot.iso.stage.3": "A Windows Setup indítása",
   "boot.iso.reading": "A kiválasztott Windows ISO beolvasása",
   "boot.iso.validating": "A telepítő ISO ellenőrzése és az indítási forrás meghatározása",
+  "boot.iso.checking_helper": "A WinPE segédlemezkép ellenőrzése",
+  "boot.iso.checking_helper_percent": "A WinPE segédlemezkép ellenőrzése: {0}%",
   "boot.iso.drivers": "Az opcionális Windows 7 x64 illesztőprogram-csomagok beolvasása",
   "boot.iso.loading_wim": "Az indítási forrás boot.wim fájljának betöltése: {0}%",
   "boot.iso.external_pe": "Külső PE10 indítása; a telepítés forrása továbbra is a kiválasztott Windows ISO",

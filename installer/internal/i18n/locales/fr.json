@@ -713,6 +713,8 @@
   "boot.iso.stage.3": "Démarrage de Windows Setup",
   "boot.iso.reading": "Lecture de l'ISO Windows sélectionnée",
   "boot.iso.validating": "Validation de l'ISO d'installation et détermination de la source de démarrage",
+  "boot.iso.checking_helper": "Vérification de l’image auxiliaire WinPE",
+  "boot.iso.checking_helper_percent": "Vérification de l’image auxiliaire WinPE: {0}%",
   "boot.iso.drivers": "Lecture des paquets de pilotes Windows 7 x64 facultatifs",
   "boot.iso.loading_wim": "Chargement du boot.wim de la source de démarrage : {0}%",
   "boot.iso.external_pe": "Démarrage du PE10 externe ; la source d'installation reste l'ISO Windows sélectionnée",

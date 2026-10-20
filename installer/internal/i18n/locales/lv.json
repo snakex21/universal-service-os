@@ -716,6 +716,8 @@
   "boot.iso.stage.3": "Windows Setup startēšana",
   "boot.iso.reading": "Lasa atlasīto Windows ISO",
   "boot.iso.validating": "Pārbauda instalācijas ISO un nosaka sāknēšanas avotu",
+  "boot.iso.checking_helper": "WinPE palīgattēla pārbaude",
+  "boot.iso.checking_helper_percent": "WinPE palīgattēla pārbaude: {0}%",
   "boot.iso.drivers": "Lasa neobligātās Windows 7 x64 draiveru pakotnes",
   "boot.iso.loading_wim": "Ielādē sāknēšanas avota boot.wim: {0}%",
   "boot.iso.external_pe": "Startē ārējo PE10; instalēšanas avots paliek atlasītais Windows ISO",

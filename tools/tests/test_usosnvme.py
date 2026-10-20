@@ -226,7 +226,8 @@ class Nt6Flow(unittest.TestCase):
         self.assertLess(pos.index('no NVMe driver for POSReady 2009'), pos.index('of="$TARGET_DEVICE"'))
 
     def test_step(self):
-        self.assertIn('call :nt60_usb\ncall :nvme\n', self.CMD)
+        lines = self.CMD.splitlines()
+        self.assertLess(lines.index('call :nt60_usb'), lines.index('call :nvme'))
         s = self.step()
         self.assertLess(s.index('find "target_bus=nvme"'), s.index('copy /y'))
         self.assertIn('if not "%USOS_NT%"=="6.0" if not "%USOS_NT%"=="6.1"', s)
