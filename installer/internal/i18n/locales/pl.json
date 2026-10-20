@@ -711,6 +711,8 @@
   "boot.prep.diag.title": "Diagnostyka USB / PARTUUID - ekran zatrzymany do zdjęcia",
   "boot.prep.diag.truncated": "[Diagnostyka skrócona - pełna treść w logu szeregowym]",
   "boot.iso.title": "Uruchamianie Windows z ISO",
+  "boot.iso.checking_helper": "Sprawdzanie obrazu pomocniczego WinPE",
+  "boot.iso.checking_helper_percent": "Sprawdzanie obrazu pomocniczego WinPE: {0}%",
   "boot.iso.stage.1": "Sprawdzanie ISO instalacyjnego",
   "boot.iso.stage.2": "Ładowanie plików startowych Windows",
   "boot.iso.stage.3": "Uruchamianie Instalatora Windows",

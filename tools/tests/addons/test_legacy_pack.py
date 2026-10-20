@@ -14,6 +14,10 @@
 """
 from __future__ import annotations
 
+# These parameterized helpers are driven by main() below (also by run.ps1),
+# rather than pytest fixtures.
+__test__ = False
+
 import hashlib
 import io
 import os

@@ -716,6 +716,8 @@
   "boot.iso.stage.3": "Pokretanje programa Windows Setup",
   "boot.iso.reading": "Čitanje odabranog Windows ISO-a",
   "boot.iso.validating": "Provjera instalacijskog ISO-a i određivanje izvora pokretanja",
+  "boot.iso.checking_helper": "Provjera pomoćne slike WinPE",
+  "boot.iso.checking_helper_percent": "Provjera pomoćne slike WinPE: {0}%",
   "boot.iso.drivers": "Čitanje neobaveznih paketa upravljačkih programa za Windows 7 x64",
   "boot.iso.loading_wim": "Učitavanje boot.wim iz izvora pokretanja: {0}%",
   "boot.iso.external_pe": "Pokretanje vanjskog PE10; izvor instalacije ostaje odabrani Windows ISO",

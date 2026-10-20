@@ -713,6 +713,8 @@
   "boot.iso.stage.3": "Windows Setupi käivitamine",
   "boot.iso.reading": "Valitud Windowsi ISO lugemine",
   "boot.iso.validating": "Installi-ISO kontrollimine ja käivitusallika määramine",
+  "boot.iso.checking_helper": "WinPE abipildi kontrollimine",
+  "boot.iso.checking_helper_percent": "WinPE abipildi kontrollimine: {0}%",
   "boot.iso.drivers": "Valikuliste Windows 7 x64 draiveripakettide lugemine",
   "boot.iso.loading_wim": "Käivitusallika boot.wim laadimine: {0}%",
   "boot.iso.external_pe": "Välise PE10 käivitamine; installiallikaks jääb valitud Windowsi ISO",

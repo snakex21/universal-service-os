@@ -603,8 +603,9 @@ Where the ISOs go on DATA: the system ISO in its usual folder
 
 ### 12.1 Limits / open
 
-* USB 3 in the installed system: Windows 7 x86 see 12.3 (user files on
-  DATA); Vista / Server 2008 SP2 x86: USB keyboard and mouse through our own
+* USB 3 in the installed system: Windows 7 SP1 x86 uses the bundled driver
+  when no other xHCI package is installed (12.8); optional DATA packages
+  still use 12.3. Vista / Server 2008 SP2 x86: USB keyboard and mouse through our own
   usosusb driver (12.6), USB sticks through the same driver (12.7).
 * DATA\Drivers and answer-command wrapping: as section 11.1.
 * A USOS profile renders x86 components; with no key and no edition Vista /
@@ -915,6 +916,60 @@ qemu-xhci, AHCI target cache=writeback):
 
 Limits: root ports only, LUN 0, 2 TiB, polling, no safe-removal UI, Explorer
 may need F5 after a hot plug, at most 32 volume devices per boot.
+
+### 12.8 Windows 7 SP1 x86: bundled USB fallback (2026-10-20)
+
+The Kingston run, build `B261020-154129-13B3EC8A`, installed Windows
+7 Ultimate SP1 PL x86 on the X470/Micron and reached the desktop with
+PS/2 input only. Its `usos-startup.log` says `installed Windows: C: 6.1
+7601`, then `USB3: no 32-bit package in
+D:\Systems\Windows\Windows 7\Drivers\x86; skipped.` DATA contains no
+driver/MSU package. The earlier 11 October USB pass used the manually
+added x86 Riolin backport and KMDF from 12.3/12.4; USB in PE10 alone does
+not supply a Windows 7 target driver. Replacing a full Windows 10 ISO with
+the managed PE10 donor did not remove an automatically migrated Win7 driver.
+
+`nt60_usb` now also accepts NT 6.1.7601 and installs the already bundled
+`usosusb-nt6.sys` before the first target boot. It needs no KMDF, profile,
+download or DATA file. The same NT6 implementation provides root-port boot
+HID keyboards/mice and bulk-only USB disks. Its 42 imports resolve against
+both Win7 SP1 x86 kernels and all three HAL variants (export-name fixture;
+no Windows binary is shipped by this change).
+
+The optional successful DATA package takes precedence. Before enabling
+the fallback, the offline Services tree is also searched for xHCI service
+names/data (`xhc`: USBXHCI, amdxhc, iusb3xhc, ASMTXHCI, etc.), covering a
+package already in the ISO or a partially completed DISM installation.
+The bundled legacy driver must not reset a controller owned by another
+stack. A copy/readback/hive/registration failure stops the automatic reboot.
+
+Limits are those of `usosusb` (12.6/12.7): root ports only, boot HID and
+bulk-only storage, no USB hubs or general USB device stack. Hardware
+validation of this Windows 7 path remains separate from the emulator test.
+
+Validation (20/21 October 2026, release `B261020-210441-22B3BE7F`): the
+Kingston's Windows 7 Ultimate SP1 PL x86 ISO (image 5) and its identical
+managed PE10 x86 19041 donor, with no DATA USB driver/MSU or USOS profile.
+A test-only answer automated edition/account/OOBE; it contained no driver
+paths. The production micro-Linux target preparer and WinPE offline step
+applied the image and registered `usosusb` successfully. Installation's own
+restarts completed with the 8042 present, as on the X470; subsequent USB
+checks used `pc,i8042=off`, OVMF without CSM, CSMWrap, TCG and
+`qemu64,+ssse3,+sse4.1,+sse4.2,+popcnt`. No source stick or ISO was attached
+to these final boots. The root-port USB keyboard, boot mouse and separate
+64 MiB FAT16 proof disk were tested through real Windows input/file APIs.
+
+| Target | First standalone boot | Further cold boot |
+|---|---|---|
+| AHCI, 24 GiB | F8 + mouse click + USB write/flush/reopen/read; usosusb RUNNING, i8042prt STOPPED: PASS | Same checks: PASS |
+| NVMe, 24 GiB | Same checks: PASS | Same checks: PASS |
+
+The host sent input only after the guest probe reported readiness. PASS
+required both hardware input events, the USB file round trip and the service
+states, then an orderly guest shutdown before the next boot. Explicit USB
+port numbers avoid QEMU's automatic hub for the fourth device. The WinPE
+image-apply phase used WHPX; the completed Windows boots above used TCG
+(the CSMWrap/WHPX legacy-kernel limitation is already recorded in 7).
 
 ## 13. One disk question per flow (2026-10-11)
 

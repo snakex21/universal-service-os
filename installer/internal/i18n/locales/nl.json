@@ -713,6 +713,8 @@
   "boot.iso.stage.3": "Windows Setup starten",
   "boot.iso.reading": "De geselecteerde Windows ISO wordt gelezen",
   "boot.iso.validating": "De installatie-ISO wordt gevalideerd en de opstartbron bepaald",
+  "boot.iso.checking_helper": "WinPE-hulpimage controleren",
+  "boot.iso.checking_helper_percent": "WinPE-hulpimage controleren: {0}%",
   "boot.iso.drivers": "Optionele stuurprogrammapakketten voor Windows 7 x64 worden gelezen",
   "boot.iso.loading_wim": "boot.wim van de opstartbron laden: {0}%",
   "boot.iso.external_pe": "Externe PE10 wordt gestart; de installatiebron blijft de geselecteerde Windows ISO",

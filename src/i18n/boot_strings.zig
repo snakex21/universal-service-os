@@ -402,6 +402,8 @@ pub const Key = enum(u16) {
     help_win7_wimboot_line1,
     help_win7_wimboot_line2,
     help_win7_wimboot_title,
+    iso_checking_helper,
+    iso_checking_helper_percent,
     iso_drivers,
     iso_external_pe,
     iso_hybrid_pe,
@@ -1214,6 +1216,8 @@ pub const hashes = [_]u32{
     0x4bf3a4b0, // help.win7_wimboot.line1
     0x4ef3a969, // help.win7_wimboot.line2
     0xc579f0eb, // help.win7_wimboot.title
+    0xcf4359c5, // iso.checking_helper
+    0xb8569c67, // iso.checking_helper_percent
     0x646697d7, // iso.drivers
     0x2482ded7, // iso.external_pe
     0x244161e4, // iso.hybrid_pe
@@ -2434,6 +2438,8 @@ pub const bios = [_]bool{
     false,
     false,
     false,
+    false,
+    false,
 };
 
 /// The BIOS Core's strings are the first bios_count keys.
@@ -2840,6 +2846,8 @@ pub const english = [_][]const u8{
     "Detects the installer version and starts it directly from ISO in UEFI.",
     "WinPE 7 receives UEFI compatibility and optional Drivers/x64 packages in RAM.",
     "Windows ISO - WIMBoot UEFI",
+    "Checking the WinPE helper image",
+    "Checking the WinPE helper image: {0}%",
     "Reading optional Windows 7 x64 driver packages",
     "Starting external PE10; the install source remains the selected Windows ISO",
     "Starting the hybrid ISO's own WinPE and Setup",

@@ -713,6 +713,8 @@
   "boot.iso.stage.3": "Стартиране на Windows Setup",
   "boot.iso.reading": "Четене на избрания Windows ISO",
   "boot.iso.validating": "Проверка на инсталационния ISO и определяне на източника за зареждане",
+  "boot.iso.checking_helper": "Проверка на помощния образ на WinPE",
+  "boot.iso.checking_helper_percent": "Проверка на помощния образ на WinPE: {0}%",
   "boot.iso.drivers": "Четене на незадължителни пакети драйвери за Windows 7 x64",
   "boot.iso.loading_wim": "Зареждане на boot.wim от източника за зареждане: {0}%",
   "boot.iso.external_pe": "Стартиране на външна PE10; източникът на инсталацията остава избраният Windows ISO",

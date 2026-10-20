@@ -716,6 +716,8 @@
   "boot.iso.stage.3": "Запуск Windows Setup",
   "boot.iso.reading": "Читання вибраного Windows ISO",
   "boot.iso.validating": "Перевірка інсталяційного ISO та визначення джерела завантаження",
+  "boot.iso.checking_helper": "Перевірка допоміжного образу WinPE",
+  "boot.iso.checking_helper_percent": "Перевірка допоміжного образу WinPE: {0}%",
   "boot.iso.drivers": "Читання необов'язкових пакетів драйверів Windows 7 x64",
   "boot.iso.loading_wim": "Завантаження boot.wim із завантажувального джерела: {0}%",
   "boot.iso.external_pe": "Запуск зовнішнього PE10; джерелом встановлення залишається вибраний Windows ISO",

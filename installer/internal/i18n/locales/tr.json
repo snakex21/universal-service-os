@@ -713,6 +713,8 @@
   "boot.iso.stage.3": "Windows Setup başlatılıyor",
   "boot.iso.reading": "Seçilen Windows ISO'su okunuyor",
   "boot.iso.validating": "Kurulum ISO'su doğrulanıyor ve önyükleme kaynağı belirleniyor",
+  "boot.iso.checking_helper": "WinPE yardımcı görüntüsü denetleniyor",
+  "boot.iso.checking_helper_percent": "WinPE yardımcı görüntüsü denetleniyor: {0}%",
   "boot.iso.drivers": "İsteğe bağlı Windows 7 x64 sürücü paketleri okunuyor",
   "boot.iso.loading_wim": "Önyükleme kaynağı boot.wim yükleniyor: %{0}",
   "boot.iso.external_pe": "Harici PE10 başlatılıyor; kurulum kaynağı seçilen Windows ISO'su olarak kalır",

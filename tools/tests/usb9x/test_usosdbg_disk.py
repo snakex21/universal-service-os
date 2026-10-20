@@ -26,7 +26,7 @@ ARCHIVE = ROOT / 'tools/vendor/csmwrap/3.1.2-src/csmwrap-3.1.2-src.tar.xz'
 
 
 def find_zig() -> str:
-    if len(sys.argv) > 1 and not sys.argv[1].startswith('-'):
+    if __name__ == '__main__' and len(sys.argv) > 1 and not sys.argv[1].startswith('-'):
         return sys.argv[1]
     for cand in (ROOT / 'tools/zig/zig.exe', ROOT.parent.parent / 'Desktop/Universal_Service_OS/tools/zig/zig.exe',
                  ROOT.parent.parent / 'Desktop/usos-x470-98se/tools/zig/zig.exe'):

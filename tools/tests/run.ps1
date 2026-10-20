@@ -83,6 +83,7 @@ function Run-Unit {
     Invoke-PythonStep 'tools/tests/legacy_bios/test_dos_reboot.py' 'DOS restart helper tests failed.'
     Invoke-PythonStep 'tools/tests/test_windows_source_mount.py' 'Windows PE source mapping tests failed.'
     Invoke-PythonStep 'tools/tests/test_windows_driver_support.py' 'Windows driver transport and answer-file tests failed.'
+    Invoke-PythonStep 'tools/tests/test_win7_x86_usb_fallback.py' 'Windows 7 x86 bundled USB fallback tests failed.'
     Invoke-PythonStep 'tools/tests/test_windows7_nvme.py' 'Windows 7 NVMe helper tests failed.'
     Invoke-PythonStep 'tools/tests/test_vista_int10_dispatcher.py' 'Vista Int10 dispatcher step tests failed.'
     Invoke-PythonStep 'tools/tests/test_vista_autochk.py' 'Vista autochk exclusion tests failed.'

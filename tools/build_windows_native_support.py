@@ -144,9 +144,10 @@ def build_modern_support(root: Path, out: Path):
         writer.add_bytes('usos-x86-csmwrap.cmd', (root / 'tools/windows_x86_csmwrap.cmd').read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
         writer.add_file('usos-x86-csmwrap.exe', helpers / 'usos-x86-csmwrap.exe')
         writer.add_file('usos-vista-oobe-x86.exe', helpers / 'usos-vista-oobe-x86.exe')
-        # Vista / Server 2008 SP2 x86: own xHCI keyboard / mouse port driver
+        # Vista / Server 2008 SP2 and Windows 7 SP1 x86: own xHCI driver
         # (committed build of tools/nt4/usosusb/build-nt6.cmd), registered
-        # offline by the nt60_usb step of usos-x86-csmwrap.cmd (12.6).
+        # offline by the nt60_usb step (Win7: only without another xHCI
+        # driver). HID and bulk-only disks need no external DATA package.
         writer.add_file('usosusb-nt6.sys', root / 'tools/nt4/usosusb/bin/nt6/i386/usosusb.sys')
         # Windows 7 / 8.x / 10 before 1703 x86: own USB multi-partition disk
         # filter (committed x86 build of tools/nt/usosmpart), registered

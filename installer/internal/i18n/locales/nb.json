@@ -713,6 +713,8 @@
   "boot.iso.stage.3": "Starter Windows Setup",
   "boot.iso.reading": "Leser den valgte Windows ISO",
   "boot.iso.validating": "Validerer installasjons-ISO og fastslår oppstartskilden",
+  "boot.iso.checking_helper": "Kontrollerer WinPE-hjelpeavbildningen",
+  "boot.iso.checking_helper_percent": "Kontrollerer WinPE-hjelpeavbildningen: {0}%",
   "boot.iso.drivers": "Leser valgfrie driverpakker for Windows 7 x64",
   "boot.iso.loading_wim": "Laster boot.wim fra oppstartskilden: {0}%",
   "boot.iso.external_pe": "Starter ekstern PE10; installasjonskilden er fortsatt den valgte Windows ISO",

@@ -179,8 +179,9 @@ class Wiring(unittest.TestCase):
 
     def test_x86_cmd_step(self):
         cmd = (ROOT / 'tools/windows_x86_csmwrap.cmd').read_text()
-        self.assertLess(cmd.index('call :nvme\r\ncall :mpart') if '\r\n' in cmd else cmd.index('call :nvme\ncall :mpart'),
-                        cmd.index('phase=finalize-target-boot'))
+        lines = cmd.splitlines()
+        self.assertLess(lines.index('call :nvme'), lines.index('call :mpart'))
+        self.assertLess(cmd.index('call :mpart'), cmd.index('phase=finalize-target-boot'))
         step = cmd[cmd.index('\n:mpart'):]
         self.assertIn('if not "%USOS_NT%"=="6.1" if not "%USOS_NT%"=="6.2" if not "%USOS_NT%"=="6.3" if not "%USOS_NT%"=="10.0" exit /b 0', step)
         self.assertIn('GEQ 15063', step)

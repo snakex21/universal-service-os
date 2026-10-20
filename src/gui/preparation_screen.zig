@@ -438,3 +438,21 @@ test "the logon line arrives in English and is shown translated" {
         try std.testing.expectEqualStrings(case[1], table.translate(&buffer, case[0]));
     }
 }
+
+test "WinPE donor verification is translated including the measured percent" {
+    const font = @import("font.zig");
+    const lang_file = @import("../i18n/lang_file.zig");
+    const pack = try font.Pack.parse(@embedFile("fonts/usos-font.bin"));
+    const coverage = lang_file.Coverage{ .context = @ptrCast(&pack), .has = font.coverageHas };
+    const table = try lang_file.Table.parse(@embedFile("../i18n/testdata/lang-pl.bin"), coverage);
+    var buffer: [128]u8 = undefined;
+    try std.testing.expectEqualStrings("Sprawdzanie obrazu pomocniczego WinPE", table.translate(&buffer, "Checking the WinPE helper image"));
+    for ([_][]const u8{ "0", "5", "50", "100" }) |percent| {
+        var english: [96]u8 = undefined;
+        var expected: [128]u8 = undefined;
+        try std.testing.expectEqualStrings(
+            try std.fmt.bufPrint(&expected, "Sprawdzanie obrazu pomocniczego WinPE: {s}%", .{percent}),
+            table.translate(&buffer, try std.fmt.bufPrint(&english, "Checking the WinPE helper image: {s}%", .{percent})),
+        );
+    }
+}

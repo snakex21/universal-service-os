@@ -713,6 +713,8 @@
   "boot.iso.stage.3": "Windows Setupin käynnistys",
   "boot.iso.reading": "Luetaan valittua Windows ISO:a",
   "boot.iso.validating": "Tarkistetaan asennus-ISO ja selvitetään käynnistyslähde",
+  "boot.iso.checking_helper": "Tarkistetaan WinPE-apukuvaa",
+  "boot.iso.checking_helper_percent": "Tarkistetaan WinPE-apukuvaa: {0}%",
   "boot.iso.drivers": "Luetaan valinnaisia Windows 7 x64 -ajuripaketteja",
   "boot.iso.loading_wim": "Ladataan käynnistyslähteen boot.wim: {0}%",
   "boot.iso.external_pe": "Käynnistetään ulkoinen PE10; asennuslähde on edelleen valittu Windows ISO",
