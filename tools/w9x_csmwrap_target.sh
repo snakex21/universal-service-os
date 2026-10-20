@@ -542,13 +542,19 @@ if [ "$SYSTEM_TAG" = 95 ]; then
     rm -f "$work/c/USOS9X/REG95.BAT" "$work/c/USOS9X/REG95.REG"
     if [ "$ANSWER_KIND" = USER ]; then
         log "answer registry: none for the user's own answer file"
+        [ ! -f "$work/c/USOS9X/NET/NET95.REG" ] || log 'usosnet4: NET95.REG unused (no REG95); the card comes from PnP + USOSNET.INF'
     else
         reg95_log=
         [ "$log_ok" != 1 ] || reg95_log='C:\USOS9X\USOSLOG.EXE'
         reg95_vmd=
         [ "$vmd_ok" != 1 ] || reg95_vmd='C:\USOS9X\USOSVMD.INF'
-        if [ -r "$LIB/w9x_reg95.sh" ] && . "$LIB/w9x_reg95.sh" && w9x_reg95_write "$work/c/USOS9X" "$work/c/USOS9X/MSBATCH.INF" "$reg95_log" "$reg95_vmd"; then
-            log "answer registry: REG95.BAT ($(grep -c -e '^"' -e '^@' "$work/c/USOS9X/REG95.REG") values, real-mode REGEDIT once)"
+        # usosnet4 adapter + TCP/IP + client (tools/network_setup.sh
+        # usos_net_w95_stage): imported with REG95.REG, checked into NET.
+        reg95_net=
+        [ ! -f "$work/c/USOS9X/NET/NET95.REG" ] || reg95_net="$work/c/USOS9X/NET/NET95.REG"
+        if [ -r "$LIB/w9x_reg95.sh" ] && . "$LIB/w9x_reg95.sh" && w9x_reg95_write "$work/c/USOS9X" "$work/c/USOS9X/MSBATCH.INF" "$reg95_log" "$reg95_vmd" "$reg95_net"; then
+            log "answer registry: REG95.BAT ($(grep -c -e '^"' -e '^@' "$work/c/USOS9X/REG95.REG") values, real-mode REGEDIT once; Network Logon: Windows Logon)"
+            [ -z "$reg95_net" ] || log 'usosnet4: NET95.REG imported with REG95 (evidence C:\USOS9X\NET\C1..C3.REG, NET95.OK / NET95.ERR)'
         else
             rm -f "$work/c/USOS9X/REG95.BAT" "$work/c/USOS9X/REG95.REG"
             log 'answer registry: no REG95.BAT (95 keeps Setup defaults)'

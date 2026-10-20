@@ -118,6 +118,7 @@ w9x_reg95_convert() {
     }
     function value(key, name, data) {
         if (tolower(key) == tolower(runkey)) { nrun++; runname[nrun] = name; rundata[nrun] = data; return }
+        if (tolower(key) ~ /\\currentversion\\winlogon$/ && tolower(name) == "defaultusername" && data != "\"\"") logon_user = data
         if (tolower(key) ~ /\\internet explorer\\main$/ && tolower(name) ~ /^(start page|first home page)$/ && tolower(data) == "\"about:blank\"")
             data = "\"" esc(home) "\""
         emit(key, name, data)
@@ -190,6 +191,13 @@ w9x_reg95_convert() {
         for (r = 0; r <= 4; r++)
             for (i = 1; i <= nrun; i++) if (rank(runname[i]) == r) emit(runkey, runname[i], rundata[i])
         if (icw) emit("HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID\\" clsid "\\Shell\\Open\\Command", "", "\"" esc("\"C:\\Program Files\\Internet Explorer\\IEXPLORE.EXE\"") "\"")
+        # Windows Logon as the primary logon (REG95.BAT deletes Network\Logon
+        # first: 95 Setup leaves PrimaryProvider "Microsoft Network" there
+        # although MSBATCH says PrimaryLogon=Windows), with the Winlogon
+        # DefaultUserName of the answer as the preset name.
+        emit("HKEY_LOCAL_MACHINE\\Network\\Logon", "ProcessLoginScript", "hex:01")
+        emit("HKEY_LOCAL_MACHINE\\Network\\Logon", "LMLogon", "hex:00,00,00,00")
+        if (logon_user != "") emit("HKEY_LOCAL_MACHINE\\Network\\Logon", "username", logon_user)
         emit("HKEY_USERS\\.Default\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Tips", "Show", "hex:00,00,00,00")
         if (vmd != "") {
             emit("HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce", "USOSVmd",
@@ -221,8 +229,14 @@ open.</P>
 EOF
 }
 
+# w9x_reg95_write DIR INF [usoslog] [vmd inf] [NET95.REG]
+# NET95.REG (tools/network_setup.sh usos_net_w95_reg, in DIR/NET): the
+# usosnet4 adapter, TCP/IP and client registry for a fresh install; its
+# sections are appended to REG95.REG (one import) and REG95.BAT exports
+# them afterwards to DIR\NET\C1..C3.REG and checks them with FIND:
+# NET\NET95.OK or NET\NET95.ERR (the in-place kit 95-net's evidence files).
 w9x_reg95_write() {
-    dir=$1 inf=$2 usoslog=${3:-} vmd=${4:-}
+    dir=$1 inf=$2 usoslog=${3:-} vmd=${4:-} net=${5:-}
     [ -d "$dir" ] && [ -r "$inf" ] || return 1
     grep -qi '^\[install\]' "$inf" || return 1
     w9x_reg95_convert "$inf" "$usoslog" "$vmd" >"$dir/REG95.REG" || return 1
@@ -230,8 +244,35 @@ w9x_reg95_write() {
     if grep -q 'START\.HTM' "$dir/REG95.REG"; then w9x_reg95_start_page > "$dir/START.HTM" || return 1; fi
     U='C:\USOS9X\'
     A='C:\WINDOWS\COMMAND\ATTRIB.EXE'
+    F='C:\WINDOWS\COMMAND\FIND.EXE'
     R='REGEDIT /L:SYSTEM.DAT /R:USER.DAT'
     run='HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run'
+    netbat=''
+    if [ -n "$net" ]; then
+        devnode=$(tr -d '\r' < "$net" | sed -n 's/^\[\(HKEY_LOCAL_MACHINE\\Enum\\PCI\\[^]\\]*\\[^]\\]*\)\]$/\1/p' | head -n 1)
+        [ -n "$devnode" ] || return 1
+        # Before the "; USOS: not converted" comments, which stay last.
+        # CRLF made once at the end (Git for Windows grep / sed drop the CR).
+        { tr -d '\r' < "$dir/REG95.REG" | sed '/^; USOS:/d'; tr -d '\r' < "$net" | sed '1{/^REGEDIT4$/d}'
+          tr -d '\r' < "$dir/REG95.REG" | sed -n '/^; USOS:/p'; } | sed 's/$/\r/' > "$dir/REG95.NEW" &&
+            mv "$dir/REG95.NEW" "$dir/REG95.REG" || return 1
+        N="${U}NET\\"
+        netbat="IF NOT EXIST $F GOTO NETEND
+$R /E ${N}C1.REG $devnode
+$R /E ${N}C2.REG HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Class\\Net
+$R /E ${N}C3.REG HKEY_LOCAL_MACHINE\\Enum\\Network
+$F \"usosnet.sys\" ${N}C2.REG > NUL
+IF ERRORLEVEL 1 GOTO NETERR
+$F \"Net\\\\0009\" ${N}C1.REG > NUL
+IF ERRORLEVEL 1 GOTO NETERR
+$F \"NetClient\\\\0009\" ${N}C3.REG > NUL
+IF ERRORLEVEL 1 GOTO NETERR
+ECHO ok> ${N}NET95.OK
+GOTO NETEND
+:NETERR
+ECHO registry check after the import failed (C1..C3.REG)> ${N}NET95.ERR
+:NETEND"
+    fi
     sed 's/$/\r/' > "$dir/REG95.BAT" <<EOF || return 1
 @ECHO OFF
 REM USOS: Windows 95 answer registry (tools/w9x_reg95.sh): 95 Setup ignores
@@ -248,8 +289,11 @@ C:
 CD \WINDOWS
 $A -S -R -H SYSTEM.DAT
 $A -S -R -H USER.DAT
+$R /D HKEY_LOCAL_MACHINE\\Network\\Logon
 $R ${U}REG95.REG
 $R /E ${U}REG95CHK.REG $run
+$R /E ${U}REG95LGN.REG HKEY_LOCAL_MACHINE\\Network\\Logon
+$netbat
 $A +S +R +H SYSTEM.DAT
 $A +S +R +H USER.DAT
 ECHO ok> ${U}REG95.OK

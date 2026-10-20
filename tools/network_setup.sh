@@ -94,6 +94,7 @@ usos_net_stage() {
             if cp "$_un_lib/network/$_un_inf" "$_un_driver/USOSNET.INF" && cp "$_un_lib/network/$_un_sys" "$_un_driver/$_un_dsys" &&
                cmp -s "$_un_lib/network/$_un_inf" "$_un_driver/USOSNET.INF" && cmp -s "$_un_lib/network/$_un_sys" "$_un_driver/$_un_dsys"; then
                 _un_state=staged; _un_driver_path='USOS\Drivers\USOSNET'; usos_net_log "usosnet: staged $_un_hwid matches=$_un_matches ($_un_sys as $_un_dsys); INF and PollMode unchanged"
+                if [ "$_un_os" = 95 ]; then usos_net_w95_stage; fi
                 if [ "$_un_os" = NT4 ]; then
                     if usos_net_nt4_reg "$_un_cfg" > "$_un_app/USOSNET.REG"; then
                         usos_net_log 'usosnet4: USOSNET.REG staged (POST.CMD: NDISLoop -> usosnet4.sys, NDISLoop1 TCP/IP)'
@@ -146,6 +147,267 @@ usos_net_run_reg() {
     case "$1" in NT4|W2K) ;; *) return 1 ;; esac
     printf '%s\r\n' 'REGEDIT4' '' '[HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run]'
     printf '"USOSLan"="C:\\\\USOS\\\\%s\\\\USOSLAN.EXE"\r\n' "$1"
+}
+
+# Windows 95: the devnode instance 95 OSR2's PCI enumerator gives a card,
+# from its sysfs path (/sys/devices/pci0000:00/0000:00:01.3/.../0000:08:00.0).
+# On the root bus: BUS_bb&DEV_dd&FUNC_f (two hex digits each). Behind
+# bridges: the devfn bytes from the card up to the root-bus bridge, then the
+# root bus number, %02X each. X470 95 OSR2.1 PL registry (95-fresh2,
+# read-only): I211 at 00:01.3 > 02:00.2 > 03:01.0 > 08:00.0 = 0008020B00,
+# the NVMe beside it 0020020B00, the GPU under 00:03.1 = 001900, root-bus
+# devices BUS_00&DEV_18&FUNC_03. Fails (no output) without a PCI chain.
+usos_net_w95_instance() {
+    printf '%s\n' "$1" | awk -F/ '
+      function hex(h) { return (index("0123456789abcdef", substr(h, 1, 1)) - 1) * 16 + index("0123456789abcdef", substr(h, 2, 1)) - 1 }
+      { for (i = 1; i <= NF; i++) { c = tolower($i)
+          if (c ~ /^pci[0-9a-f][0-9a-f][0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]$/) { root = substr(c, 9, 2); n = 0 }
+          else if (c ~ /^[0-9a-f][0-9a-f][0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]\.[0-7]$/) comp[++n] = c } }
+      END { if (root == "" || n < 1) exit 1
+        if (n == 1) { printf "BUS_%02X&DEV_%02X&FUNC_%02X\n", hex(substr(comp[1], 6, 2)), hex(substr(comp[1], 9, 2)), substr(comp[1], 12, 1) + 0; exit }
+        for (i = n; i >= 1; i--) printf "%02X", hex(substr(comp[i], 9, 2)) * 8 + substr(comp[i], 12, 1)
+        printf "%02X\n", hex(root) }'
+}
+
+# Windows 95: NET95.REG (C:\USOS9X\NET; tools/w9x_reg95.sh imports it with
+# REG95.REG by real-mode REGEDIT before the first Windows start on the PC):
+# what 95's own installers write when the card is set up from USOSNET.INF,
+# so no New Hardware step on the first desktop and TCP/IP + client bound to
+# the card. The X470 in-place kit 95-net wrote the same values (2026-10-20,
+# PASS). The devnode Enum\PCI\<id>\<instance> is made ahead of 95's PnP
+# pass, bound to Class\Net\0009 (usosnet95.inf AddReg values), TCP/IP
+# NetTrans\0009 (DHCP) on it, Client for Microsoft Networks NetClient\0009
+# with the MSNP32 provider (no file and printer sharing). Network\Logon
+# (Windows Logon as the primary logon) comes from REG95 itself for every 95
+# install (tools/w9x_reg95.sh). Instance numbers
+# 0009: free in every 95 registry USOS made (Setup uses 0000-0002).
+# Args: INF PCI id, devnode instance, card description, INF model section.
+# CRLF out.
+usos_net_w95_reg() {
+    _un_ide=$(printf '%s' "$1" | sed 's/\\/\\\\/g')
+    _un_k='HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\Class'
+    sed -e "s|@K@|$(printf '%s' "$_un_k" | sed 's/\\/\\\\/g')|g" -e "s|@ENUM@|$(printf '%s' "$1\\$2" | sed 's/\\/\\\\/g; s/&/\\&/g')|g" \
+        -e "s|@IDE@|$(printf '%s' "$_un_ide" | sed 's/\\/\\\\/g; s/&/\\&/g')|g" -e "s|@DESC@|$(printf '%s' "$3" | sed 's/[\\&|]/\\&/g')|g" \
+        -e "s|@SECT@|${4:-USOSNETI211.ndi}|g" -e 's/$/\r/' <<'EOF'
+REGEDIT4
+
+[@K@\Net\0009]
+"DriverDesc"="@DESC@"
+"InfPath"="USOSNET.INF"
+"InfSection"="@SECT@"
+"ProviderName"="Universal Service OS"
+"DriverDate"="10-20-2026"
+"MatchingDeviceId"="@IDE@"
+"DevLoader"="*ndis"
+"DeviceVxDs"="usosnet.sys"
+"EnumPropPages"="netdi.dll,EnumPropPages"
+"PollMode"="0"
+"SkipPhy"="0"
+"DebugPort"="0"
+
+[@K@\Net\0009\Ndi]
+"DeviceID"="@IDE@"
+"HelpText"="USOS own NDIS 4.0 driver for Intel I211 / I210 / 82576 Ethernet (Windows 95 OSR2)."
+"InstallInf"=""
+
+[@K@\Net\0009\Ndi\params\DebugPort]
+"ParamDesc"="Debug I/O port (decimal; 233 = E9h in QEMU; 0 = off)"
+"type"="dword"
+"default"="0"
+"min"="0"
+"max"="65535"
+
+[@K@\Net\0009\Ndi\params\NetworkAddress]
+"ParamDesc"="Network Address"
+"type"="edit"
+"LimitText"="12"
+"UpperCase"="1"
+"optional"="1"
+"default"=""
+
+[@K@\Net\0009\Ndi\params\PollMode]
+"ParamDesc"="Poll mode (no interrupt, diagnostics)"
+"type"="enum"
+"default"="0"
+
+[@K@\Net\0009\Ndi\params\PollMode\enum]
+"0"="Off"
+"1"="On"
+
+[@K@\Net\0009\Ndi\params\SkipPhy]
+"ParamDesc"="Skip PHY setup (diagnostics)"
+"type"="enum"
+"default"="0"
+
+[@K@\Net\0009\Ndi\params\SkipPhy\enum]
+"0"="Off"
+"1"="On"
+
+[@K@\Net\0009\Ndi\Interfaces]
+"DefUpper"="ndis3"
+"DefLower"="ethernet"
+"UpperRange"="ndis3"
+"LowerRange"="ethernet"
+"Upper"="ndis3"
+"Lower"="ethernet"
+
+[@K@\Net\0009\Ndi\Install]
+"ndis3"="USOSNET.ndis3"
+
+[@K@\Net\0009\NDIS]
+"LogDriverName"="USOSNET"
+"MajorNdisVersion"=hex:04
+"MinorNdisVersion"=hex:00
+
+[HKEY_LOCAL_MACHINE\Enum\@ENUM@]
+"Class"="Net"
+"Driver"="Net\\0009"
+"Mfg"="Intel"
+"DeviceDesc"="@DESC@"
+
+[HKEY_LOCAL_MACHINE\Enum\@ENUM@\Bindings]
+"MSTCP\\0009"=""
+
+[@K@\NetTrans\0009]
+"DriverDesc"="TCP/IP"
+"IPAddress"="0.0.0.0"
+"IPMask"="0.0.0.0"
+"DeviceVxDs"="vtdi.386,vip.386,vtcp.386,vdhcp.386,vnbt.386"
+"InstallVnbt"="0"
+"InfPath"="NETTRANS.INF"
+"DevLoader"="*ndis"
+
+[@K@\NetTrans\0009\Ndi]
+"DeviceID"="MSTCP"
+"MaxInstance"="8"
+"NdiInstaller"="mstcp.dll,TcpNdiProc"
+"InstallInf"=""
+"InfSection"="MSTCP.ndi"
+
+[@K@\NetTrans\0009\Ndi\Interfaces]
+"DefUpper"="netbios,tdi,winsock"
+"DefLower"="ndis2,ndis3,odi"
+"UpperRange"="netbios,tdi,winsock"
+"LowerRange"="ndis2,ndis3,odi"
+"Upper"="netbios,tdi,winsock"
+"Lower"="ndis2,ndis3,odi"
+
+[@K@\NetTrans\0009\Ndi\Install]
+@="MSTCP.Install"
+
+[@K@\NetTrans\0009\Ndi\Remove]
+@="MSTCP.Remove"
+
+[@K@\NetTrans\0009\Ndi\Default]
+@="True"
+
+[@K@\NetTrans\0009\NDIS]
+"LogDriverName"="MSTCP"
+"MajorNdisVersion"=hex:03
+"MinorNdisVersion"=hex:0a
+
+[HKEY_LOCAL_MACHINE\Enum\Network\MSTCP\0009]
+"Class"="NetTrans"
+"Driver"="NetTrans\\0009"
+"MasterCopy"="Enum\\Network\\MSTCP\\0009"
+"DeviceDesc"="TCP/IP"
+"CompatibleIDs"="MSTCP"
+"Mfg"="Microsoft"
+"ConfigFlags"=hex:00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Enum\Network\MSTCP\0009\Bindings]
+"VREDIR\\0009"=""
+
+[@K@\NetClient\0009]
+"DriverDesc"="Client for Microsoft Networks"
+"InfPath"="NETCLI.INF"
+"InfSection"="VREDIR.ndi"
+"DevLoader"="*ndis"
+"DeviceVxDs"="vredir.vxd"
+
+[@K@\NetClient\0009\Ndi]
+"DeviceID"="VREDIR"
+"NdiInstaller"="netdi.dll,MSClientNdiProc"
+"NetworkProvider"="Microsoft Network"
+"InstallInf"=""
+
+[@K@\NetClient\0009\Ndi\Interfaces]
+"DefUpper"="winnet4,vredir"
+"UpperRange"="winnet4,vredir"
+"DefLower"="netbios,ipxDHost"
+"LowerRange"="netbios,ipxDHost"
+"ExcludeAny"="winnet31"
+"Upper"="winnet4,vredir"
+"Lower"="netbios,ipxDHost"
+
+[@K@\NetClient\0009\Ndi\Install]
+@="VREDIR.Install"
+
+[@K@\NetClient\0009\Ndi\Remove]
+@="VREDIR.Remove"
+
+[HKEY_LOCAL_MACHINE\Enum\Network\VREDIR\0009]
+"Class"="NetClient"
+"Driver"="NetClient\\0009"
+"MasterCopy"="Enum\\Network\\VREDIR\\0009"
+"DeviceDesc"="Client for Microsoft Networks"
+"CompatibleIDs"="VREDIR"
+"Mfg"="Microsoft"
+"ConfigFlags"=hex:00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Enum\Network\VREDIR\0009\Bindings]
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\VxD\VREDIR]
+"StaticVxD"="vredir.vxd"
+"Start"=hex:00
+"NetClean"=hex:01
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\control\NetworkProvider\Order]
+"MSNP32"=""
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\MSNP32\NetworkProvider]
+"Name"="Microsoft Network"
+"ProviderPath"="msnp32.dll"
+"Description"="Microsoft Network"
+"NetID"=hex:00,00,01,00
+"CallOrder"=hex:00,00,00,40
+
+EOF
+}
+
+# 95, after USOSNET.INF / USOSNET.SYS were staged: NET95.REG for exactly
+# one matched card whose PCI path gives a 95 devnode instance; otherwise
+# PnP + USOSNET.INF only (95's New Hardware step). Logged either way.
+# USOS_NET_W95_PATH (tests): the card's sysfs path instead of cd -P.
+usos_net_w95_stage() {
+    rm -f "$_un_driver/NET95.REG"
+    if [ "$_un_matches" != 1 ]; then usos_net_log "usosnet4: $_un_matches matched cards; no NET95.REG (PnP + USOSNET.INF)"; return 0; fi
+    _un_dev=''
+    for _un_pci in "$_un_pci_root"/*; do
+        [ -d "$_un_pci" ] || continue
+        _un_v=$(cat "$_un_pci/vendor" 2>/dev/null || true); _un_d=$(cat "$_un_pci/device" 2>/dev/null || true)
+        [ "$(printf 'PCI\\VEN_%s&DEV_%s' "${_un_v#0x}" "${_un_d#0x}" | tr 'a-f' 'A-F')" = "$_un_hwid" ] || continue
+        _un_dev=$(cd -P "$_un_pci" 2>/dev/null && pwd -P) || _un_dev=$_un_pci
+        break
+    done
+    [ -z "${USOS_NET_W95_PATH:-}" ] || _un_dev=$USOS_NET_W95_PATH
+    if ! _un_inst=$(usos_net_w95_instance "$_un_dev"); then
+        usos_net_log "usosnet4: no PCI path for $_un_hwid ($_un_dev); no NET95.REG (PnP + USOSNET.INF)"; return 0
+    fi
+    # The card's DeviceDesc from USOSNET.INF ([Strings] of its model line).
+    _un_desc=$(USOS_NET_ID=$_un_hwid awk '
+        { sub(/\r$/, "") } /^\[/ { sec = tolower($0); next }
+        sec == "[strings]" && index($0, "=") { k = $0; sub(/[ \t]*=.*/, "", k); v = $0; sub(/^[^=]*=[ \t]*/, "", v); gsub(/"/, "", v); str[tolower(k)] = v; next }
+        /^%/ && index(toupper($0), toupper(ENVIRON["USOS_NET_ID"])) { d = $0; sub(/^%/, "", d); sub(/%.*/, "", d); want = tolower(d)
+            m = $0; sub(/^[^=]*=[ \t]*/, "", m); sub(/[ \t]*,.*/, "", m); sect = m }
+        END { print ((want in str) ? str[want] : "USOS usosnet Ethernet") "|" sect }' "$_un_driver/USOSNET.INF")
+    _un_sect=${_un_desc##*|}; _un_desc=${_un_desc%|*}
+    if usos_net_w95_reg "$_un_hwid" "$_un_inst" "$_un_desc" "$_un_sect" > "$_un_driver/NET95.REG"; then
+        usos_net_log "usosnet4: NET95.REG staged: Enum\\$_un_hwid\\$_un_inst -> Net\\0009, TCP/IP NetTrans\\0009 (DHCP), client NetClient\\0009; path $_un_dev"
+    else
+        rm -f "$_un_driver/NET95.REG"; usos_net_log 'usosnet4: NET95.REG not written (PnP + USOSNET.INF)'
+    fi
+    [ "$(usos_net_value "$_un_cfg" ip)" = dhcp ] || usos_net_log 'static LAN IP not applied on 95: NET95.REG uses DHCP'
 }
 
 # REG_MULTI_SZ for NT 4.0 regedit (REGEDIT4: ANSI bytes, NT widens them):
