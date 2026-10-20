@@ -99,3 +99,62 @@ it picks 1920x1080 on 95 is unverified until it runs there.
 
 Tests: `tools/tests/test_w9x_reg95.py` (conversion, DOS-safe batch, wiring,
 98 FE section). Not run on hardware or in a VM yet.
+
+## Retest after kit 95-fresh1 (one X470 session, 18:47-18:50)
+
+Read read-only from the Micron (raw FAT reader, results in the session
+scratchpad `95-fresh2-results`). REG95 worked: `REG95.OK`, `REG95CHK.REG`
+lists USOSLan, USOSDisplay, USOSLog; USOSLAN ran (NETSETUP.TXT "LAN defaults
+applied") and USOSLOG wrote its start record. Exactly one session since the
+kit (one USOSLOG start record, one NETSETUP try, USER.DAT written 18:49:58).
+
+### Display still 1024x768: the shell skipped USOSDisplay
+
+No `USOSRES.LOG`, no `VBE.LOG`, no `DISPLAY.DONE`; the USOSDisplay value is
+still in the Run key; USOSLOG's process list one second after the desktop
+has USOSLOG (the Run value after USOSDisplay) but no USOSRES. USOSRES creates
+its log before anything else, so it never started. Cause: the 9x shell starts
+each Run value inside its `RegEnumValue(index)` loop (the Windows 2000 shell
+source, `shell/inc/runonce.c`, says the old shell did exactly this before it
+switched to a snapshot). USOSLAN on 95 has no network wait and deleted its
+own value (index 3) within the loop; USOSDisplay moved down to index 3 and
+the shell went on with index 4 (USOSLog). The VBE / ChangeDisplaySettings
+path on 95 is still unexercised. At the next start USOSLan is gone, so
+USOSRES would run anyway.
+
+Fix: USOSLAN (9x) and USOSRES (9x) wait 15 s before deleting their Run
+value; REG95 writes USOSLog first and the self-removing helpers last
+(USOSDisplay, USOSAddons, USOSLan).
+
+### IE 3: "cannot find about:blank"
+
+IE 3 (95 OSR2, SHDOCVW.DLL 4.70) has no about:blank. Its own Local Page is a
+plain file (`C:\WINDOWS\SYSTEM\blank.htm`) and it builds local URLs as
+`file://C:\path`. REG95 now turns an about:blank Start Page / First Home Page
+into `file://C:\USOS9X\START.HTM` and writes that page (USOS info, the
+68k.news link); USOSLAN does the same on 95 when the page exists. 98 / Me /
+2000 keep about:blank. 68k.news not opening is expected (no 95 NIC driver).
+
+### Shutdown hung again at "Please wait while your computer shuts down"
+
+The only change against the sessions that powered off is the REG95 import:
+USOSLOG now stays resident (USOSLAN exited, USOSRES never started; the
+other imported values are IE / ICW / MSTCP settings). USOSLOG had no window,
+held a WH_JOURNALRECORD hook, polled the removable USB drive letter every
+2 s and starts the Win16 USOSDBG for snapshots; its log ends with the start
+record (the first snapshot is due after 180 s, the session lasted about
+156 s). BOOTLOG.TXT was not written (no logged start), and the CSMWrap APM
+record lives in the X470's CMOS, not on this disk. So USOSLOG is the
+suspect, not proven.
+
+Fix: USOSLOG has a hidden session window. WM_QUERYENDSESSION: no new USOSDBG
+or drive polls, journal hook removed, a "session end" record (processes,
+watcher events) written at once; WM_ENDSESSION TRUE: one line, then
+ExitProcess. Host test drives the messages (Windows 10).
+
+In-place kit 95-fresh2: new USOSLOG.EXE and USOSRES.EXE, START.HTM,
+REG95B.BAT/.REG (Start Page, once from AUTOEXEC.BAT), and `BootLog=1` in
+MSDOS.SYS so the next shutdown's Windows side is in BOOTLOG.TXT. Reading
+the next result: "session end" + "WM_ENDSESSION TRUE" in USOSLOG.TXT and a
+BOOTLOG.TXT ending with the terminate sequence but still a hang = the hang
+is after Windows (APM / WIN.COM path), not USOSLOG.
