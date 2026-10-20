@@ -312,6 +312,9 @@ func TestReleaseURLAndAssets(t *testing.T) {
 	if r.Asset(WinPE) != "USOS-1.0.0-WinPE-PE10-donor.zip" {
 		t.Fatal(r.Asset(WinPE))
 	}
+	if r.Asset(WinPEX86) != "USOS-1.0.0-WinPE-PE10-x86-donor.zip" || !WinPEX86.IsWinPE() || XPPL.IsWinPE() {
+		t.Fatal(r.Asset(WinPEX86))
+	}
 	if PreferredXP("pl") != XPPL || PreferredXP("de") != XPEN {
 		t.Fatal("preferred XP language")
 	}
@@ -346,7 +349,22 @@ func TestUnpackAndInspect(t *testing.T) {
 		t.Fatal(n, err)
 	}
 	s = Inspect(esp, data)
-	if !s.WinPE || !s.Present(XPPL) || s.Present(XPEN) || !s.Complete() {
+	if !s.WinPE || s.WinPEX86 || !s.Present(XPPL) || s.Present(XPEN) || s.Complete() {
+		t.Fatalf("stick without the x86 donor: %+v", s)
+	}
+	x86Zip := filepath.Join(t.TempDir(), "x86.zip")
+	os.WriteFile(x86Zip, makeZip(t, map[string]string{"Programs/USOS/WinPE/PE10_x86_19041_USOS.iso": "iso86", "README.txt": "r"}), 0o644)
+	if _, err := ExtractWinPEDonorFor(WinPE, x86Zip, t.TempDir()); err == nil {
+		t.Fatal("x86 donor accepted as the x64 component")
+	}
+	if _, err := ExtractWinPEDonorFor(WinPEX86, zipPath, t.TempDir()); err == nil {
+		t.Fatal("x64 donor accepted as the x86 component")
+	}
+	if name, err := ExtractWinPEDonorFor(WinPEX86, x86Zip, data); err != nil || name != "PE10_x86_19041_USOS.iso" {
+		t.Fatal(name, err)
+	}
+	s = Inspect(esp, data)
+	if !s.WinPE || s.WinPEName != "PE10_x64_19041_USOS.iso" || !s.Present(WinPEX86) || s.WinPEX86Name != "PE10_x86_19041_USOS.iso" || !s.Present(XPPL) || s.Present(XPEN) || !s.Complete() {
 		t.Fatalf("installed stick: %+v", s)
 	}
 	os.WriteFile(filepath.Join(esp, "EFI", "USOS", "micro-linux", "initramfs-usos"), []byte("updated"), 0o644)
@@ -491,5 +509,36 @@ func TestLegacyMSAsset(t *testing.T) {
 	os.WriteFile(other, makeZip(t, map[string]string{"README.txt": "r"}), 0o644)
 	if _, err := ExtractLegacyMS(other, t.TempDir()); err == nil {
 		t.Fatal("zip without an index accepted")
+	}
+}
+
+// One donor per architecture in Programs\USOS\WinPE: the name token "x86"
+// tells them apart; the legacy folder counts only for a missing architecture.
+func TestDonorArchitectureByName(t *testing.T) {
+	for name, x86 := range map[string]bool{
+		"PE10_x86_19041_USOS.iso": true, "PE10_X86_19045_USOS.ISO": true,
+		"pl-pl_windows_10_22h2_19045.6396_multi_editions_updated_september_2025_x86_c20a40ff.iso": true,
+		"w10 x86.iso": true, "PE10_x64_19041_USOS.iso": false, "renamed.iso": false, "x86host.iso": false, "amd64.iso": false,
+	} {
+		if IsX86DonorName(name) != x86 {
+			t.Errorf("%s: x86=%v", name, !x86)
+		}
+	}
+	esp, data := t.TempDir(), t.TempDir()
+	managed := filepath.Join(data, "Programs", "USOS", "WinPE")
+	legacy := filepath.Join(data, "Systems", "Windows", "Windows 10", "Images")
+	os.MkdirAll(managed, 0o755)
+	os.MkdirAll(legacy, 0o755)
+	// Only the x86 donor: the x64 one is still missing.
+	os.WriteFile(filepath.Join(managed, "PE10_x86_19041_USOS.iso"), []byte("x86"), 0o644)
+	if s := Inspect(esp, data); s.WinPE || !s.WinPEX86 {
+		t.Fatalf("only x86: %+v", s)
+	}
+	// A user's Windows 10 x86 install ISO in the legacy folder is not a donor
+	// the installer manages; an old x64 donor there is (it will be moved).
+	os.WriteFile(filepath.Join(legacy, "Win10_x86.iso"), []byte("user"), 0o644)
+	os.WriteFile(filepath.Join(legacy, "PE10_x64_19041_USOS.iso"), []byte("x64"), 0o644)
+	if s := Inspect(esp, data); !s.WinPE || s.WinPEName != "PE10_x64_19041_USOS.iso" || s.WinPEX86Name != "PE10_x86_19041_USOS.iso" {
+		t.Fatalf("legacy x64 + managed x86: %+v", s)
 	}
 }

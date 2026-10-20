@@ -14,7 +14,7 @@ against what is really packed, not against what the build is meant to pack:
   `Programs\USOS`, generated README files, empty profile folders);
 - the separately shipped XP package (`zig-out/xp-uefi-csm`: `initramfs-xp`,
   `vmlinuz.efi`, `manifest.json`), diffed against `initramfs-usos`;
-- the WinPE PE10 donor ISO shipped as a release asset;
+- the WinPE PE10 donor ISOs (x64 and x86) shipped as release assets;
 - the installer executable itself (Go).
 
 Licences of Alpine packages come from the `.PKGINFO` of the cached `.apk`
@@ -50,7 +50,8 @@ with exact upstream URLs. **GAP**: still open, with the reason.
 Where it ships: *stick ESP* = the installer payload on `USOS_ESP`
 (including the initramfs and cpio archives on it), *DATA* = `USOS_DATA`,
 *XP package* = `USOS-<version>-XP-package-*.zip` (`EFI/USOS-XP`),
-*WinPE asset* = `USOS-<version>-WinPE-PE10-donor.zip`, *installer* =
+*WinPE asset* = `USOS-<version>-WinPE-PE10-donor.zip`, *WinPE x86 asset* =
+`USOS-<version>-WinPE-PE10-x86-donor.zip`, *installer* =
 `USOS-Installer-<version>.exe`.
 
 | Component | Version | Licence (SPDX) | Where it ships | Source location / obligation | Status |
@@ -117,6 +118,7 @@ Where it ships: *stick ESP* = the installer payload on `USOS_ESP`
 | UniATA | 0.47b | `GPL-2.0` (source headers; the archives carry no licence text, USOS adds `COPYING-GPL-2.0.txt`) | XP package (branch `feature/win2000-modern`) | tracked: `tools/vendor/uniata/0.47b/BusMaster_v47b_src.rar` (the author's source archive); <http://alter.org.ua/soft/win/uni_ata/> | OK: unmodified `uniata.sys`, `COPYING-GPL-2.0.txt`, `SOURCES.txt` in `usr/lib/usos/w2k-drivers/uniata/`; Windows 2000 only, selected with DATA's `storage-uniata.txt`; USOS writes its own `uniata.inf` |
 | Go runtime and standard library, golang.org/x/sys | Go 1.26.2, x/sys v0.47.0 | `BSD-3-Clause` | installer, DATA | <https://go.dev/dl/go1.26.2.src.tar.gz> | FIXED in this audit (release LICENSES); the installer itself shows no notice (F2) |
 | Microsoft Windows PE 10.0.19041 x64 donor (PE10_x64_19041_USOS.iso) | 10.0.19041 | `LicenseRef-Microsoft-redistributed-by-user` | WinPE asset | n/a (proprietary) | Microsoft, see section 5 (maintainer responsibility) |
+| Microsoft Windows PE 10.0.19041 x86 donor (PE10_x86_19041_USOS.iso) | 10.0.19041 | `LicenseRef-Microsoft-redistributed-by-user` | WinPE x86 asset | n/a (proprietary) | Microsoft, see section 5 (maintainer responsibility) |
 | Microsoft Windows 7 SP1 x64 update packages | KB4474419 v3, KB2685811, KB2990941 v3, KB3087873 v2 | `LicenseRef-Microsoft-redistributed-by-user` | stick ESP | n/a (proprietary) | KEPT by maintainer decision (preservation), see section 5 |
 | Microsoft Windows Vista update and USB 3 driver files | KB2864202 + Windows 8-family USB 3 stack (usbxhci, ucx01000, usbhub3, usbd8) | `LicenseRef-Microsoft-redistributed-by-user` | stick ESP | n/a (proprietary) | KEPT by maintainer decision (preservation), see section 5 |
 | Windows XP / Server 2003 driver bundles derived from Microsoft ISOs | per source ISO (see XP package manifest.json) | `LicenseRef-Microsoft-redistributed-by-user` | XP package | n/a (proprietary) | KEPT by maintainer decision (preservation), see section 5 |
@@ -230,11 +232,27 @@ Microsoft files in four places, and the licence terms do not change because
 USOS packs them; they stay Microsoft's property and are not covered by any
 USOS licence:
 
-1. **WinPE PE10 donor** (`PE10_x64_19041_USOS.iso`, Windows PE 10.0.19041
-   x64: `boot/bcd`, `boot/boot.sdi`, `sources/boot.wim`, `sources/setup.exe`),
-   a separate release asset. It is redistributed by the USOS maintainer at
-   the maintainer's own responsibility; users download it separately and
-   place it on DATA. No USOS licence covers it.
+1. **WinPE PE10 donors**, two separate release assets, one per
+   architecture:
+   - `PE10_x64_19041_USOS.iso` (Windows PE 10.0.19041 x64: `boot/bcd`,
+     `boot/boot.sdi`, `sources/boot.wim`, `sources/setup.exe`) in
+     `USOS-<version>-WinPE-PE10-donor.zip`, for Vista and original
+     Windows 7 on UEFI;
+   - `PE10_x86_19041_USOS.iso` (Windows PE 10.0.19041 x86: `bootmgr`,
+     `boot/bcd`, `boot/boot.sdi`, `sources/boot.wim`, `sources/setup.exe`,
+     copied unmodified from the Polish Windows 10 22H2 19045.6396 x86 ISO
+     by `tools/release/build_pe10_donor.py`) in
+     `USOS-<version>-WinPE-PE10-x86-donor.zip`, for 32-bit Windows 7 /
+     Vista / Server 2008 on UEFI without CSM (shipped since 2026-10-20 by
+     maintainer decision; before that the user had to supply a Windows 10
+     x86 ISO, which still works as a fallback).
+
+   Both are images of WinPE and Setup only (no install image, no product
+   key). They are redistributed by the USOS maintainer at the maintainer's
+   own responsibility, on the same basis for both; the full installer embeds
+   them, the online one downloads them, and they are placed on DATA
+   (`Programs\USOS\WinPE`). They are never committed to the git repository.
+   No USOS licence covers them.
 2. **Windows 7 update packages in the stick payload**:
    `win7-support.cpio` holds the original CABs of KB4474419 v3 (SHA-2 code
    signing, 55.8 MB), KB2685811 (KMDF 1.11), KB2990941 v3 and KB3087873 v2

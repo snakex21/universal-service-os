@@ -3,7 +3,7 @@
 Builds the USOS release folder zig-out\release-<major.minor>\ in one command.
 
 .DESCRIPTION
-  powershell -NoProfile -ExecutionPolicy Bypass -File tools\release\make_release.ps1 [-Data L:\] [-WinPEDonor PATH] [-Tag v1.0.0-rc2] [-SkipBuild] [-SkipChecks]
+  powershell -NoProfile -ExecutionPolicy Bypass -File tools\release\make_release.ps1 [-Data L:\] [-WinPEDonor PATH] [-WinPEDonorX86 PATH] [-Tag v1.0.0-rc2] [-SkipBuild] [-SkipChecks]
 
 1. build.bat (full release build, payload and installer; unless -SkipBuild);
 2. the XP UEFI packages, one per language, from the allowlisted original ISOs
@@ -11,7 +11,7 @@ Builds the USOS release folder zig-out\release-<major.minor>\ in one command.
    read from -Data (default L:\, the DATA partition; read only);
 3. the XP package checks (tools/tests/check_xp_*.py) on each package
    (unless -SkipChecks);
-4. the WinPE donor zip and XP package zips (assemble_release.py
+4. the WinPE donor zips (x64 and x86) and XP package zips (assemble_release.py
    --components-only), then the installer rebuilt with -Tag (the GitHub
    release it downloads them from) and their SHA-256 list compiled in:
    USOS-Installer-VERSION-online.exe, and USOS-Installer-VERSION.exe, the
@@ -26,6 +26,9 @@ XP driver bundles) and never copied into the release.
 param(
     [string]$Data = 'L:\',
     [string]$WinPEDonor = '',
+    # The x86 PE10 donor (tools/release/build_pe10_donor.py --arch x86);
+    # default: DATA, then artifacts\pe10-x86 of this checkout.
+    [string]$WinPEDonorX86 = '',
     # Folder with the legacy pack's Microsoft redistributables (any layout,
     # found by SHA-256; e.g. the maintainer's add-on archive). Not in git.
     [string]$LegacyAddons = '',
@@ -71,6 +74,11 @@ $xpImages = Join-Path $Data 'Systems\Windows\Windows XP\Images'
 if (-not (Test-Path -LiteralPath $xpImages -PathType Container)) { throw "No XP images folder on DATA: $xpImages (pass -Data)" }
 if ($WinPEDonor -eq '') { $WinPEDonor = Join-Path $Data 'Programs\USOS\WinPE\PE10_x64_19041_USOS.iso' }
 if (-not (Test-Path -LiteralPath $WinPEDonor -PathType Leaf)) { throw "WinPE donor not found: $WinPEDonor (pass -WinPEDonor)" }
+if ($WinPEDonorX86 -eq '') {
+    $WinPEDonorX86 = Join-Path $Data 'Programs\USOS\WinPE\PE10_x86_19041_USOS.iso'
+    if (-not (Test-Path -LiteralPath $WinPEDonorX86 -PathType Leaf)) { $WinPEDonorX86 = Join-Path $root 'artifacts\pe10-x86\PE10_x86_19041_USOS.iso' }
+}
+if (-not (Test-Path -LiteralPath $WinPEDonorX86 -PathType Leaf)) { throw "x86 WinPE donor not found: $WinPEDonorX86 (pass -WinPEDonorX86; build it with tools\release\build_pe10_donor.py --arch x86)" }
 
 $xpSources = @{
     pl = 'pl_windows_xp_professional_with_service_pack_3_x86_cd_x14-80476.iso'
@@ -108,7 +116,7 @@ foreach ($lang in @('pl', 'en')) {
 $componentsDir = Join-Path $work 'components'
 Step "component zips (WinPE, XP, legacy pack MS) -> $componentsDir"
 if ($LegacyAddons -eq '' -or -not (Test-Path -LiteralPath $LegacyAddons)) { throw '-LegacyAddons FOLDER is required (the legacy pack''s Microsoft redistributables)' }
-Run 'assemble components' { python.exe (Join-Path $root 'tools\release\assemble_release.py') --components-only --out $componentsDir --winpe $WinPEDonor @xpArgs --legacy-ms $LegacyAddons }
+Run 'assemble components' { python.exe (Join-Path $root 'tools\release\assemble_release.py') --components-only --out $componentsDir --winpe $WinPEDonor --winpe-x86 $WinPEDonorX86 @xpArgs --legacy-ms $LegacyAddons }
 $pins = ([IO.File]::ReadAllText((Join-Path $componentsDir 'component-sha256.txt'))).Trim()
 if ($Tag -eq '') { $Tag = "v$version" }
 if ($Tag -notmatch '^v\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$') { throw "-Tag must look like v1.0.0 or v1.0.0-rc2, got '$Tag'" }

@@ -21,11 +21,21 @@ var XPPackageFiles = []string{"initramfs-xp", "vmlinuz.efi", "manifest.json"}
 // XPInstallScript is the installer script shipped in every XP package zip.
 const XPInstallScript = "install-xp-package.ps1"
 
-// ExtractWinPEDonor copies the donor ISO of a verified WinPE zip to
+// ExtractWinPEDonor copies the donor ISO of a verified WinPE (x64) zip to
 // dataRoot\Programs\USOS\WinPE\<name> (through <name>.part, so a cut-off copy
 // never looks like a donor) and returns the file name. It refuses to replace
 // an existing file.
 func ExtractWinPEDonor(zipPath, dataRoot string) (string, error) {
+	return ExtractWinPEDonorFor(WinPE, zipPath, dataRoot)
+}
+
+// ExtractWinPEDonorFor is ExtractWinPEDonor for either donor: the ISO name
+// must belong to id's architecture (IsX86DonorName), so the x86 zip can never
+// put an ISO where the x64 donor is expected and the other way round.
+func ExtractWinPEDonorFor(id ID, zipPath, dataRoot string) (string, error) {
+	if !id.IsWinPE() {
+		return "", fmt.Errorf("%s is not a WinPE donor component", id)
+	}
 	archive, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return "", err
@@ -44,6 +54,9 @@ func ExtractWinPEDonor(zipPath, dataRoot string) (string, error) {
 		return "", errors.New("the WinPE zip holds no " + WinPEZipDir + "*.iso")
 	}
 	name := path.Base(donor.Name)
+	if IsX86DonorName(name) != (id == WinPEX86) {
+		return "", fmt.Errorf("the %s zip holds %s, a donor of the other architecture", id, name)
+	}
 	folder := filepath.Join(dataRoot, filepath.FromSlash(strings.TrimSuffix(WinPEZipDir, "/")))
 	if err := os.MkdirAll(folder, 0o755); err != nil {
 		return "", err

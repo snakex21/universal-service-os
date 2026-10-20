@@ -49,7 +49,7 @@ const (
 )
 
 // componentsScreen is the "Components" step after install, update and
-// repair: the WinPE donor and the XP package, downloaded from this
+// repair: the WinPE donors (x64, x86) and the XP package, downloaded from this
 // installer's release (default), picked from a local zip, or skipped.
 type componentsScreen struct {
 	f       *Flow
@@ -66,6 +66,7 @@ type componentsScreen struct {
 	status    components.Status
 
 	winpeSource  components.Source
+	winpe86Src   components.Source
 	xpSource     components.Source
 	legacySource components.Source
 	xpLang       xpLanguage
@@ -88,11 +89,14 @@ func (f *Flow) showComponents(after finalArgs, forced bool) {
 		prog: map[components.ID]components.Progress{}, errs: map[components.ID]error{}}
 	s.bundle = f.componentsBundle()
 	if !s.release.CanDownload() {
-		s.winpeSource, s.xpSource, s.legacySource = components.SourceLocal, components.SourceLocal, components.SourceLocal
+		s.winpeSource, s.winpe86Src, s.xpSource, s.legacySource = components.SourceLocal, components.SourceLocal, components.SourceLocal, components.SourceLocal
 	}
 	// The all-in-one installer preselects its own copies (no network).
 	if s.embedded(components.WinPE) {
 		s.winpeSource = components.SourceEmbedded
+	}
+	if s.embedded(components.WinPEX86) {
+		s.winpe86Src = components.SourceEmbedded
 	}
 	if s.embedded(components.PreferredXP(i18n.Current())) {
 		s.xpSource = components.SourceEmbedded
@@ -209,6 +213,9 @@ func (s *componentsScreen) choices() []components.Choice {
 	var result []components.Choice
 	if !s.status.WinPE {
 		result = append(result, components.Choice{ID: components.WinPE, Source: s.winpeSource, LocalPath: s.local[components.WinPE]})
+	}
+	if !s.status.WinPEX86 {
+		result = append(result, components.Choice{ID: components.WinPEX86, Source: s.winpe86Src, LocalPath: s.local[components.WinPEX86]})
 	}
 	if !s.status.XPOK() {
 		for i, id := range s.xpIDs() {
@@ -329,6 +336,7 @@ func (s *componentsScreen) draw(f *Flow, w *win, area rect) {
 		offset := w.beginScroll("components", body)
 		y = body.Top - offset
 		y += s.drawWinPE(w, rect{body.Left, y, body.Right - w.px(12), 0}) + w.px(14)
+		y += s.drawWinPEX86(w, rect{body.Left, y, body.Right - w.px(12), 0}) + w.px(14)
 		y += s.drawXP(w, rect{body.Left, y, body.Right - w.px(12), 0}) + w.px(14)
 		y += s.drawLegacy(w, rect{body.Left, y, body.Right - w.px(12), 0}) + w.px(14)
 		w.endScroll("components", body, y+offset-body.Top)
@@ -495,7 +503,9 @@ func (s *componentsScreen) progressLine(w *win, id components.ID, x, y, right in
 	label := strings.ToUpper(string(id))
 	switch id {
 	case components.WinPE:
-		label = "WinPE"
+		label = "WinPE x64"
+	case components.WinPEX86:
+		label = "WinPE x86"
 	case components.LegacyMS:
 		label = "95/98/Me/NT4"
 	}
@@ -540,28 +550,38 @@ func (s *componentsScreen) card(w *win, id string, r rect, content func(*win, re
 }
 
 func (s *componentsScreen) drawWinPE(w *win, r rect) int32 {
-	return s.card(w, "winpe", r, s.winpeContent)
+	return s.card(w, "winpe", r, func(w *win, r rect) int32 { return s.winpeContent(w, r, components.WinPE) })
 }
 
-func (s *componentsScreen) winpeContent(w *win, r rect) int32 {
+func (s *componentsScreen) drawWinPEX86(w *win, r rect) int32 {
+	return s.card(w, "winpe-x86", r, func(w *win, r rect) int32 { return s.winpeContent(w, r, components.WinPEX86) })
+}
+
+// winpeContent: one PE10 donor card (x64: Vista / Windows 7 on UEFI; x86:
+// 32-bit Windows 7 / Vista / 2008 on UEFI without CSM).
+func (s *componentsScreen) winpeContent(w *win, r rect, id components.ID) int32 {
+	key, source, present, name := "installer.components.winpe", &s.winpeSource, s.status.WinPE, s.status.WinPEName
+	if id == components.WinPEX86 {
+		key, source, present, name = "installer.components.winpe_x86", &s.winpe86Src, s.status.WinPEX86, s.status.WinPEX86Name
+	}
 	badge, t := i18n.T("installer.components.status.missing"), toneWarning
-	if s.status.WinPE {
+	if present {
 		badge, t = i18n.T("installer.components.status.installed"), toneSuccess
 	}
-	inner, y := s.cardHeader(w, r, glyphDrive, i18n.T("installer.components.winpe.name"), i18n.T("installer.components.winpe.need"), badge, t)
-	if s.status.WinPE {
-		y += w.wrapped(w.captionFont(), s.status.WinPEName, inner.Left, y, inner.w(), theme.Faint) + w.px(4)
-		y += s.progressLine(w, components.WinPE, inner.Left, y, inner.Right)
+	inner, y := s.cardHeader(w, r, glyphDrive, i18n.T(key+".name"), i18n.T(key+".need"), badge, t)
+	if present {
+		y += w.wrapped(w.captionFont(), name, inner.Left, y, inner.w(), theme.Faint) + w.px(4)
+		y += s.progressLine(w, id, inner.Left, y, inner.Right)
 		return y - r.Top + w.px(8)
 	}
-	y += s.sourceSegments(w, "components.winpe", inner.Left, y, inner.Right, &s.winpeSource, s.running, s.embedded(components.WinPE)) + w.px(10)
-	switch s.winpeSource {
+	y += s.sourceSegments(w, "components."+string(id), inner.Left, y, inner.Right, source, s.running, s.embedded(id)) + w.px(10)
+	switch *source {
 	case components.SourceLocal:
-		y += s.localRow(w, components.WinPE, inner.Left, y, inner.Right, i18n.T("installer.components.choose_file")) + w.px(10)
+		y += s.localRow(w, id, inner.Left, y, inner.Right, i18n.T("installer.components.choose_file")) + w.px(10)
 	case components.SourceSkip:
-		y += w.wrapped(w.captionFont(), i18n.T("installer.components.winpe.skip_note"), inner.Left, y, inner.w(), theme.Warning) + w.px(10)
+		y += w.wrapped(w.captionFont(), i18n.T(key+".skip_note"), inner.Left, y, inner.w(), theme.Warning) + w.px(10)
 	}
-	y += s.progressLine(w, components.WinPE, inner.Left, y, inner.Right)
+	y += s.progressLine(w, id, inner.Left, y, inner.Right)
 	return y - r.Top + w.px(8)
 }
 

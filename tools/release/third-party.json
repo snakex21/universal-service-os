@@ -1609,6 +1609,23 @@
       "notice": "Microsoft files (boot.wim, setup.exe, bcd, boot.sdi), redistributed by the USOS maintainer at their own responsibility; not covered by any USOS licence; no product key."
     },
     {
+      "id": "microsoft-winpe-pe10-x86",
+      "name": "Microsoft Windows PE 10.0.19041 x86 donor (PE10_x86_19041_USOS.iso)",
+      "version": "10.0.19041",
+      "license": "LicenseRef-Microsoft-redistributed-by-user",
+      "modified": false,
+      "ships_in": [
+        "winpe-x86-asset"
+      ],
+      "license_files": [],
+      "source": {
+        "bundle_paths": [],
+        "offer": false,
+        "urls": []
+      },
+      "notice": "Microsoft files (bootmgr, boot.wim, setup.exe, bcd, boot.sdi; unmodified, copied from a Windows 10 22H2 x86 ISO), redistributed by the USOS maintainer at their own responsibility; not covered by any USOS licence; no product key."
+    },
+    {
       "id": "microsoft-win7-updates",
       "name": "Microsoft Windows 7 SP1 x64 update packages",
       "version": "KB4474419 v3, KB2685811, KB2990941 v3, KB3087873 v2",

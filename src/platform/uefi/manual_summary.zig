@@ -260,7 +260,8 @@ pub fn show(
         } else |err| {
             can_start = false;
             fields.add(view.t(.summary_iso_inspection), @errorName(err));
-            notes[note_count] = view.tr(usos.windows7_iso.errorDetail(err));
+            // A damaged recorded x86 donor: "run Repair", as for the x64 one.
+            notes[note_count] = (if (err == error.Windows10PeDonorCorrupt) donorNote(err) else null) orelse view.tr(usos.windows7_iso.errorDetail(err));
             note_count += 1;
         }
     }

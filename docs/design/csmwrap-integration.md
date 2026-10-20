@@ -579,10 +579,13 @@ section 11 (`X86_SELF=1`), only the staged WinPE comes from the donor.
 UEFI menu (no CSM, x86 media of windows-7 / windows-vista / Server 2008)
   -> windows_native_iso.prepareNt6X86Csmwrap: the ISO has sources/setup.exe
      and an all-x86 install.wim of NT 6.1 (Windows 7) or 6.0 (Vista / 2008);
-     the x86 PE10 donor = the first valid Windows 10 x86 Setup ISO (PE 10.0
+     the x86 PE10 donor = a valid Windows 10 x86 Setup ISO (PE 10.0
      build 10240..21999, BCD, SDI, setup.exe, root bootmgr) in
-     Programs/USOS/WinPE, else in Systems/Windows/Windows 10/Images (where a
-     Windows 10 x86 ISO for its own install already lives);
+     Programs/USOS/WinPE (the recorded one first: since 2026-10-20 USOS
+     ships PE10_x86_19041_USOS.iso, recorded under x86_ keys in
+     winpe-donor.ini and checked by size and SHA-256 before use), else the
+     first valid one in Systems/Windows/Windows 10/Images (where a
+     Windows 10 x86 ISO for its own install already lives; no record);
      usos-source.ini (binds the 32-bit ISO) + request.ini
      (profile=win-nt6-x86-uefi-csmwrap, donor=<the x86 PE10 ISO>)
   -> micro-Linux step 610: exactly the section 11 layout, with the donor's
