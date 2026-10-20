@@ -42,14 +42,25 @@ static const char *internet="Software\\Microsoft\\Windows\\CurrentVersion\\Inter
 static const char *wizard="Software\\Microsoft\\Internet Connection Wizard";
 static const char *main_key="Software\\Microsoft\\Internet Explorer\\Main";
 static const char *run="Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-static void ie(HKEY root){DWORD zero=0,one=1;
+/* Internet Explorer 3 (Windows 95 OSR2) cannot open about:blank ("cannot
+   find"); its own Local Page is a plain file and it writes local pages as
+   file://C:\path (SHDOCVW.DLL 4.70 "file://%c:%s"). On 95 the default page
+   is the small START.HTM the install writes beside this helper. */
+static const char *start_page(void){
+#ifndef USOS_LAN_NT
+  static char page[MAX_PATH+8];
+  if(eq(system_id,"95")&&!lstrcmpA(home,"about:blank")){local(path,"START.HTM");
+    if(GetFileAttributesA(path)!=INVALID_FILE_ATTRIBUTES&&len(path)<MAX_PATH){lstrcpyA(page,"file://");lstrcatA(page,path);return page;}}
+#endif
+  return home;}
+static void ie(HKEY root){DWORD zero=0,one=1;const char *page=start_page();
   set(root,internet,"EnableAutodial",REG_DWORD,&zero,4);
   set(root,internet,"NoNetAutodial",REG_DWORD,&one,4);
   set(root,internet,"ProxyEnable",REG_DWORD,&zero,4);
   set(root,internet,"GlobalUserOffline",REG_DWORD,&zero,4);
   set(root,wizard,"Completed",REG_BINARY,&one,4);
-  set(root,main_key,"Start Page",REG_SZ,home,len(home)+1);
-  set(root,main_key,"First Home Page",REG_SZ,home,len(home)+1);
+  set(root,main_key,"Start Page",REG_SZ,page,len(page)+1);
+  set(root,main_key,"First Home Page",REG_SZ,page,len(page)+1);
   set(root,main_key,"RunOnceHasShown",REG_DWORD,&one,4);set(root,main_key,"RunOnceComplete",REG_DWORD,&one,4);}
 static int favorite(const char *folder){char file[MAX_PATH];HANDLE f;DWORD wrote;
   static const char data[]="[InternetShortcut]\r\nURL=http://68k.news\r\n";
@@ -244,7 +255,18 @@ static int read_config(void){static char raw[4097];char *line,*end;HANDLE f;DWOR
   return eq(system_id,"95")||eq(system_id,"98")||eq(system_id,"98SE")||eq(system_id,"ME");
 #endif
 }
-static void unregister(void){HKEY k;if(!RegOpenKeyExA(HKEY_LOCAL_MACHINE,run,0,KEY_SET_VALUE,&k)){RegDeleteValueA(k,"USOSLan");RegCloseKey(k);}}
+/* The 9x shell starts Run values inside its RegEnumValue(index) loop
+   (Windows 2000's explorer\initcab.cpp / runonce.c says the old shell did
+   so before it switched to a snapshot). Deleting our value at once moves
+   the next value down to our index and the shell skips it: on the X470
+   (95 OSR2, 2026-10-20) USOSLan's quick delete hid USOSDisplay, so USOSRES
+   never ran. Wait out the shell's loop first. */
+#define USOS_RUN_DELETE_DELAY 15000
+static void unregister(void){HKEY k;
+#ifndef USOS_LAN_NT
+  Sleep(USOS_RUN_DELETE_DELAY);
+#endif
+  if(!RegOpenKeyExA(HKEY_LOCAL_MACHINE,run,0,KEY_SET_VALUE,&k)){RegDeleteValueA(k,"USOSLan");RegCloseKey(k);}}
 static unsigned long config_hash(void){unsigned long hash=2166136261UL;const char *p;
   for(p=system_id;*p;p++)hash=(hash^(BYTE)*p)*16777619UL;hash=(hash^'|')*16777619UL;
   for(p=home;*p;p++)hash=(hash^(BYTE)*p)*16777619UL;return hash;}

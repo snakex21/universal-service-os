@@ -1,6 +1,7 @@
 /*
  * USOSLOG.EXE - silent diagnostics logger for Windows 98 / 98 SE / Me test
- * installs (X470 under CSMWrap). Win32, no window, no C runtime.
+ * installs (X470 under CSMWrap). Win32, no visible window (a hidden one
+ * for the end of the Windows session), no C runtime.
  * Copyright (C) 2026 Maksymilian and the USOS Authors. GPL-3.0-or-later.
  *
  * Started from the Startup folder (one instance: a named mutex). It writes
@@ -256,6 +257,7 @@ typedef BOOL (WINAPI *PFN_PROC)(HANDLE, PROCENTRY *);
 /* options and state                                                   */
 static DWORD opt_first = 180, opt_every = 300;
 static int opt_once, opt_nonet, opt_nodbg, opt_nohook;
+static volatile LONG g_ending;         /* WM_QUERYENDSESSION seen: no new USOSDBG / disk polls */
 static char opt_dbgfile[MAX_PATH];
 static char out_path[MAX_PATH] = LOGFILE;
 static DWORD main_tid;
@@ -975,6 +977,7 @@ static void run_usosdbg(DWORD stats_pa)
         goto parse;
     }
     if (opt_nodbg) { o("[MOUSE] USOSDBG skipped (/nodbg)"); return; }
+    if (g_ending) { o("[MOUSE] USOSDBG skipped: Windows is ending the session"); return; }
     if (is_nt) { o("[MOUSE] USOSDBG skipped: Windows NT family (Win16 DPMI diagnostics are 9x only)"); return; }
     if (file_size(DBGEXE) == 0xFFFFFFFFUL) { o("[MOUSE] %s missing", (LPSTR)DBGEXE); return; }
     if (dbg_proc) {
@@ -1970,6 +1973,7 @@ static void run_usosdbg_disk(const char *why)
     int n, ended;
     if (opt_nodbg || opt_dbgfile[0]) { o("[DISK] USOSDBG DISK snapshot skipped (%s)", (LPSTR)(opt_nodbg ? "/nodbg" : "/dbgfile")); return; }
     if (is_nt) { o("[DISK] USOSDBG DISK snapshot skipped: Windows NT family"); return; }
+    if (g_ending) { o("[DISK] USOSDBG DISK snapshot skipped: Windows is ending the session"); return; }
     if (file_size(DBGEXE) == 0xFFFFFFFFUL) { o("[DISK] %s missing", (LPSTR)DBGEXE); return; }
     EnterCriticalSection(&dbg_cs);
     DeleteFileA(DBGTMPD);
@@ -2032,6 +2036,7 @@ DWORD WINAPI disk_watch(LPVOID arg)
         DWORD now, m;
         int changed = 0;
         Sleep(WATCH_MS);
+        if (g_ending) continue;         /* no volume calls while Windows shuts the drives down */
         ticks++;
         now = GetTickCount();
         m = p_drives();
@@ -2247,7 +2252,7 @@ DWORD WINAPI worker(LPVOID arg)
         wait_s(opt_first);
     }
     for (;;) {
-        snapshot();
+        if (!g_ending) snapshot();
         if (opt_once) break;
         wait_s(opt_every);
     }
@@ -2289,6 +2294,113 @@ static void parse_args(void)
     }
 }
 
+/* ------------------------------------------------------------------ */
+/* end of the Windows session                                          */
+/* A hidden top-level window gets WM_QUERYENDSESSION / WM_ENDSESSION (a
+ * windowless process is only terminated). On the query: no new USOSDBG
+ * (Win16 + DPMI child) or drive polls, journal hook removed, and a short
+ * record (processes, watcher events) written at once; on the end: one
+ * line, then ExitProcess, so nothing of USOSLOG is left to the forced
+ * termination. Windows 95 X470 2026-10-20: shutdown hung at "Please wait
+ * while your computer shuts down" in the first session with USOSLOG
+ * resident; this record says whether USOSLOG saw and left the session. */
+static char end_buf[24576];
+static DWORD end_len;
+static PROCREC end_procs[MAXP];         /* main thread only */
+
+static void eo(const char *fmt, ...)
+{
+    char t[600];
+    va_list ap;
+    int n;
+    va_start(ap, fmt);
+    n = wvsprintfA(t, fmt, ap);
+    va_end(ap);
+    if (n < 0) n = 0;
+    if (end_len + (DWORD)n + 2 >= sizeof(end_buf)) return;
+    mcpy(end_buf + end_len, t, (DWORD)n);
+    end_len += (DWORD)n;
+    mcpy(end_buf + end_len, "\r\n", 2);
+    end_len += 2;
+}
+
+static void end_write(void)
+{
+    HANDLE f;
+    DWORD w;
+    EnterCriticalSection(&file_cs);
+    f = CreateFileA(out_path, GENERIC_WRITE, FILE_SHARE_READ, 0, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+    if (f != INVALID_HANDLE_VALUE) {
+        SetFilePointer(f, 0, 0, FILE_END);
+        WriteFile(f, end_buf, end_len, &w, 0);
+        FlushFileBuffers(f);
+        CloseHandle(f);
+    }
+    LeaveCriticalSection(&file_cs);
+    end_len = 0;
+}
+
+static void end_query(LPARAM lp)
+{
+    char t[32];
+    int n, i;
+    DWORD take;
+    g_ending = 1;
+    if (g_hook) { UnhookWindowsHookEx(g_hook); g_hook = 0; }
+    watch_tick();                       /* the last process / window changes */
+    stamp(t);
+    eo("");
+    eo("=== USOSLOG %s session end  %s  tick %lu  (running %lu s) ===", (LPSTR)VERSION, (LPSTR)t, GetTickCount(),
+       (GetTickCount() - t_start) / 1000);
+    eo("[END] WM_QUERYENDSESSION lParam %08lX: journal hook removed, no new USOSDBG or drive polls", (DWORD)lp);
+    n = proc_list(end_procs, MAXP);
+    if (n >= 0) eo("[END] processes (%d):", n);
+    for (i = 0; i < n; i++) eo("    %08lX parent %08lX %s", end_procs[i].pid, end_procs[i].ppid, (LPSTR)end_procs[i].exe);
+    EnterCriticalSection(&ev_cs);
+    eo("[END] watcher events since the last record:");
+    take = ev_len;
+    if (end_len + take + 2 >= sizeof(end_buf)) take = sizeof(end_buf) - end_len - 2;
+    mcpy(end_buf + end_len, ev_buf, take);
+    end_len += take;
+    ev_len = 0;
+    LeaveCriticalSection(&ev_cs);
+    end_write();
+}
+
+static LRESULT CALLBACK end_wndproc(HWND w, UINT m, WPARAM wp, LPARAM lp)
+{
+    if (m == WM_QUERYENDSESSION) {
+        end_query(lp);
+        return TRUE;
+    }
+    if (m == WM_ENDSESSION) {
+        char t[32];
+        stamp(t);
+        if (!wp) {
+            g_ending = 0;
+            eo("[END] %s WM_ENDSESSION FALSE: the session goes on; watching again", (LPSTR)t);
+            end_write();
+            return 0;
+        }
+        eo("[END] %s WM_ENDSESSION TRUE: USOSLOG exits now", (LPSTR)t);
+        end_write();
+        ExitProcess(0);
+    }
+    return DefWindowProcA(w, m, wp, lp);
+}
+
+static void end_window(void)
+{
+    WNDCLASSA wc;
+    HINSTANCE hi = GetModuleHandleA(0);
+    mset(&wc, 0, sizeof(wc));
+    wc.lpfnWndProc = end_wndproc;
+    wc.hInstance = hi;
+    wc.lpszClassName = "USOSLOGSession";
+    if (RegisterClassA(&wc))
+        CreateWindowExA(0, "USOSLOGSession", "USOSLOG", WS_POPUP, 0, 0, 0, 0, 0, 0, hi, 0);
+}
+
 void __cdecl usos_entry(void)
 {
     MSG msg;
@@ -2320,6 +2432,7 @@ void __cdecl usos_entry(void)
     PeekMessageA(&msg, 0, 0, 0, PM_NOREMOVE);  /* message queue before the worker posts */
     watch_tick();
     hook_install();
+    if (!opt_once) end_window();
     timer = SetTimer(0, 0, WATCH_MS, 0);
     th = CreateThread(0, 0, worker, 0, 0, &tid);
     if (!th) ExitProcess(1);
@@ -2331,7 +2444,7 @@ void __cdecl usos_entry(void)
         if (msg.message == WM_CANCELJOURNAL) { g_hook = 0; g_cancels++; continue; }
         if (msg.message == WM_TIMER && !msg.hwnd) {
             watch_tick();
-            if (++ticks % (60000 / WATCH_MS) == 0) hook_install();   /* again a minute after Ctrl+Esc / Ctrl+Alt+Del */
+            if (++ticks % (60000 / WATCH_MS) == 0 && !g_ending) hook_install();   /* again a minute after Ctrl+Esc / Ctrl+Alt+Del */
             continue;
         }
         DispatchMessageA(&msg);

@@ -141,6 +141,33 @@ class Builds(unittest.TestCase):
             sub='bin/i386' if file.suffix=='.sys' else 'inf'
             self.assertEqual(file.read_bytes(),(ROOT/'tools/nt/usosnet'/sub/file.name).read_bytes())
 
+class RunValueAndStartPage(unittest.TestCase):
+    """95 X470 2026-10-20: the 9x shell starts Run values inside its
+    RegEnumValue(index) loop, so USOSLan's immediate self-delete made the
+    shell skip USOSDisplay; IE 3 cannot open about:blank."""
+    def test_helpers_wait_before_deleting_their_run_value(self):
+        lan=(ROOT/'tools/windows_usos_lan.c').read_text()
+        body=lan[lan.index('static void unregister(void)'):]
+        body=body[:body.index('\n}')+2] if '\n}' in body[:400] else body[:400]
+        self.assertIn('#define USOS_RUN_DELETE_DELAY 15000',lan)
+        self.assertLess(body.index('Sleep(USOS_RUN_DELETE_DELAY);'),body.index('RegDeleteValueA'))
+        self.assertLess(body.index('#ifndef USOS_LAN_NT'),body.index('Sleep('))
+        res=(ROOT/'tools/windows_usos_res.c').read_text()
+        fin=res[res.index('static int finish(const char *reason)'):]
+        fin=fin[:fin.index('\n}\n')]
+        self.assertLess(fin.index('Sleep(15000);'),fin.index('RegDeleteValueA(key,"USOSDisplay")'))
+    def test_95_start_page_is_local_file(self):
+        lan=(ROOT/'tools/windows_usos_lan.c').read_text()
+        page=lan[lan.index('static const char *start_page(void)'):]
+        page=page[:page.index('return home;}')]
+        for part in ('eq(system_id,"95")','!lstrcmpA(home,"about:blank")','local(path,"START.HTM")',
+                     'GetFileAttributesA(path)!=INVALID_FILE_ATTRIBUTES','lstrcpyA(page,"file://")'):
+            self.assertIn(part,page)
+        self.assertIn('set(root,main_key,"Start Page",REG_SZ,page,len(page)+1);',lan)
+        self.assertIn('set(root,main_key,"First Home Page",REG_SZ,page,len(page)+1);',lan)
+        self.assertIn('config_hash',lan)
+        self.assertNotIn('page',lan[lan.index('static unsigned long config_hash'):lan.index('static void initial_state')])
+
 class Render(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

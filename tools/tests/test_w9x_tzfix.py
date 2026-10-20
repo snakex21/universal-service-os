@@ -113,7 +113,8 @@ class Wiring(unittest.TestCase):
             tmp = Path(tempfile.mkdtemp(prefix='usos-w9x-tzblock-'))
             self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
             (tmp / 'c/USOS9X').mkdir(parents=True)
-            script = ('set -eu\nlog() { printf "%s\\n" "$*"; }\n'
+            # REG95 / Channel Bar steps share the block: off here (test_w9x_reg95.py).
+            script = ('set -eu\nlog() { printf "%s\\n" "$*"; }\nANSWER_KIND=USER\nlog_ok=0\n'
                       f'SYSTEM_TAG={tag}\nTIME_ZONE="$Z"\nLIB="{(ROOT / "tools").as_posix()}"\nwork="{tmp.as_posix()}"\n' + block)
             rc, out, err = sh(script, {'Z': zone})
             self.assertEqual(rc, 0, err)

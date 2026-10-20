@@ -584,6 +584,7 @@ def main() -> int:
             ("tools/legacy_addons.sh", "usr/lib/usos/legacy_addons.sh"),
             ("tools/w9x_tzfix.sh", "usr/lib/usos/w9x_tzfix.sh"),
             ("tools/w9x_vesa95.sh", "usr/lib/usos/w9x_vesa95.sh"),
+            ("tools/w9x_reg95.sh", "usr/lib/usos/w9x_reg95.sh"),
             ("tools/w9x_nvme.sh", "usr/lib/usos/w9x_nvme.sh"),
             ("tools/w9x_phase1_qemu.sh", "usr/lib/usos/w9x_phase1_qemu.sh"),
             ("tools/w9x_95_ui.sh", "usr/lib/usos/w9x_95_ui.sh"),
