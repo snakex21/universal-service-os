@@ -222,7 +222,7 @@ func (s *destructiveSession) VerifyLayoutUnchanged(expected install.MediaLayout)
 	if err != nil {
 		return install.MediaLayout{}, fmt.Errorf("post-format IOCTL_DISK_GET_DRIVE_LAYOUT_EX: %w", err)
 	}
-	verified, err := verifyMediaLayout(expected, actual)
+	verified, err := verifyMediaLayoutPhase(expected, actual, verifyLayoutUnchangedLayoutPhase)
 	if err != nil {
 		return install.MediaLayout{}, err
 	}

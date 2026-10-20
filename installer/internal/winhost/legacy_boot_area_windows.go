@@ -29,7 +29,9 @@ func (s *destructiveSession) WriteLegacyBoot(media install.MediaLayout) (legacyb
 	if err != nil {
 		return legacyboot.Audit{}, fmt.Errorf("read GPT before Legacy boot write: %w", err)
 	}
-	verified, err := verifyMediaLayout(media, actual)
+	// Runs before formatting: DATA/WORK still carry the NoDriveLetter bit
+	// they were created with (cleared later by ExposeFormattedVolumes).
+	verified, err := verifyMediaLayoutPhase(media, actual, writeLegacyBootLayoutPhase)
 	if err != nil {
 		return legacyboot.Audit{}, fmt.Errorf("GPT changed before Legacy boot write: %w", err)
 	}
@@ -48,7 +50,7 @@ func (s *destructiveSession) VerifyLegacyBoot(media install.MediaLayout) error {
 	if err != nil {
 		return fmt.Errorf("read GPT during Legacy boot verification: %w", err)
 	}
-	verified, err := verifyMediaLayout(media, actual)
+	verified, err := verifyMediaLayoutPhase(media, actual, verifyLegacyBootLayoutPhase)
 	if err != nil {
 		return fmt.Errorf("GPT changed during Legacy boot verification: %w", err)
 	}
