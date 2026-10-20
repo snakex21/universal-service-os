@@ -199,7 +199,7 @@ func (b Backend) verifyDataPayload(report *install.VerificationReport, resolved 
 	}
 
 	donorActual, donorOK := verifyWinpeDonor(resolved.DATA.VolumePath, resolved.ESP.VolumePath)
-	report.Items = append(report.Items, install.VerificationItem{Name: "Programs\\USOS\\WinPE (obraz pomocniczy Vista/Windows 7)", Expected: "zgodny z EFI\\USOS\\winpe-donor.ini", Actual: donorActual, Match: donorOK})
+	report.Items = append(report.Items, install.VerificationItem{Name: "Programs\\USOS\\WinPE (obrazy pomocnicze x64 Vista/Windows 7, x86 32-bit 7/Vista/2008)", Expected: "zgodny z EFI\\USOS\\winpe-donor.ini", Actual: donorActual, Match: donorOK})
 
 	readme, err := payload.README()
 	if err != nil {

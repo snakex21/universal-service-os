@@ -7,12 +7,14 @@ builds; it never builds anything itself and never touches a USB stick.
       --installer "installer/USOS Installer.exe"
       --xp pl=zig-out/release-work/xp-pl --xp en=zig-out/release-work/xp-en
       --winpe L:/Programs/USOS/WinPE/PE10_x64_19041_USOS.iso
+      --winpe-x86 artifacts/pe10-x86/PE10_x86_19041_USOS.iso
       --legacy-ms <folder with the legacy pack's Microsoft redistributables>
 
 Layout (VERSION = build-info.ini version, e.g. 1.0.0):
   USOS-Installer-VERSION.exe          full installer: the online one + the component zips as overlay
   USOS-Installer-VERSION-online.exe   downloads the component zips from the GitHub release
-  USOS-VERSION-WinPE-PE10-donor.zip   Programs/USOS/WinPE/<donor ISO> + README.txt
+  USOS-VERSION-WinPE-PE10-donor.zip   Programs/USOS/WinPE/<x64 donor ISO> + README.txt
+  USOS-VERSION-WinPE-PE10-x86-donor.zip  Programs/USOS/WinPE/<x86 donor ISO> + README.txt
   USOS-VERSION-XP-package-PL.zip      EFI/USOS-XP/* + install-xp-package.ps1 + README.txt
   USOS-VERSION-XP-package-EN.zip
   USOS-VERSION-Legacy-pack-MS.zip     Addons/USOS/MS/*: Microsoft redistributables of the
@@ -47,6 +49,15 @@ import legacy_ms_asset  # noqa: E402
 WINPE_DONOR_NAME = 'PE10_x64_19041_USOS.iso'
 WINPE_DONOR_SHA256 = 'a44ab63a1ddb415d8c216f104a3532cfc7fb3a951bd62a939d93991784306a5e'
 WINPE_DONOR_SIZE = 459735040
+# The x86 PE10 donor of the 32-bit Windows 7 / Vista / 2008 path without CSM
+# (win-nt6-x86-uefi-csmwrap; user decision 2026-10-20). Built by
+# tools/release/build_pe10_donor.py --arch x86 from the Polish Windows 10 22H2
+# 19045.6396 x86 ISO (SHA-256 d45968da...67823d7a); its boot.wim is
+# 10.0.19041 (SPBUILD 6396). Members: bootmgr, boot/bcd, boot/boot.sdi,
+# sources/boot.wim, sources/setup.exe.
+WINPE_X86_DONOR_NAME = 'PE10_x86_19041_USOS.iso'
+WINPE_X86_DONOR_SHA256 = '1d6bcb41241a75e05cbf45f7e09268b2fa1a4ebb95a1b5f36856a408f9b30f40'
+WINPE_X86_DONOR_SIZE = 475332608
 
 # XP package ESP payload, as tools/deploy_xp_uefi_csm_trial.ps1 installs it.
 XP_PACKAGE_FILES = ('initramfs-xp', 'vmlinuz.efi', 'manifest.json')
@@ -172,6 +183,41 @@ Install by hand (Windows, PowerShell as administrator, USOS stick plugged in)
 Checksums of the package files
 """ + ''.join(f"  {manifest['sha256'][n]}  EFI/USOS-XP/{n}\n" for n in ('initramfs-xp', 'vmlinuz.efi')) + f"""
 Licences: see THIRD-PARTY-NOTICES.txt and LICENSES/ in the release.
+"""
+
+
+def winpe_x86_readme(version, build_id):
+    return f"""USOS {version} - WinPE PE10 x86 donor
+Build {build_id}
+
+What it is
+  {WINPE_X86_DONOR_NAME} (SHA-256 {WINPE_X86_DONOR_SHA256},
+  {WINPE_X86_DONOR_SIZE} bytes): a minimal Windows PE 10.0.19041 x86 image with
+  Windows Setup (bootmgr, boot/bcd, boot/boot.sdi, sources/boot.wim,
+  sources/setup.exe; no install image). USOS uses it to start 32-bit
+  Windows 7, Vista and Server 2008 ISOs on UEFI without CSM (through
+  CSMWrap): it brings the USB 3, AHCI and NVMe drivers their own Setup lacks.
+  Without it, those systems need your own Windows 10 x86 ISO in
+  Systems\\Windows\\Windows 10\\Images. It is not a system to install and
+  never shows up in the menu.
+
+  It consists of Microsoft files, redistributed by the USOS maintainer at
+  their own responsibility. No product key, no activation change.
+
+Install with the installer (recommended)
+  USOS-Installer-{version}.exe downloads and installs this donor itself in
+  its "Components" step after Install, Update USOS or Repair. Offline,
+  choose "I already have the file" there and pick this zip (it is checked
+  by SHA-256 like a download).
+
+Install by hand
+  1. Copy the folder Programs from this zip to the root of the stick's
+     USOS_DATA partition, so the file ends up in
+     USOS_DATA:\\Programs\\USOS\\WinPE\\{WINPE_X86_DONOR_NAME}
+     (next to the x64 donor; one donor per architecture).
+  2. Run USOS-Installer-{version}.exe and choose "Update USOS" (or "Repair ESP"):
+     it records the donor's SHA-256 on the ESP (EFI\\USOS\\winpe-donor.ini)
+     and marks the file hidden and read-only.
 """
 
 
@@ -312,7 +358,7 @@ the USOS project repository:
 
 def component_names(version):
     """The optional component zips the installer downloads (internal/components)."""
-    return ([f'USOS-{version}-WinPE-PE10-donor.zip'] + [f'USOS-{version}-XP-package-{lang.upper()}.zip' for lang in sorted(XP_SOURCES)]
+    return ([f'USOS-{version}-WinPE-PE10-donor.zip', f'USOS-{version}-WinPE-PE10-x86-donor.zip'] + [f'USOS-{version}-XP-package-{lang.upper()}.zip' for lang in sorted(XP_SOURCES)]
             + [f'USOS-{version}-Legacy-pack-MS.zip'])
 
 
@@ -377,6 +423,7 @@ def main():
                    help='the online installer; --installer must then be it plus the component overlay')
     p.add_argument('--xp', action='append', default=[], help='LANG=PACKAGE_DIR (pl, en)')
     p.add_argument('--winpe', type=Path)
+    p.add_argument('--winpe-x86', type=Path, help='the x86 PE10 donor (build_pe10_donor.py --arch x86)')
     p.add_argument('--legacy-ms', type=Path, action='append', default=[],
                    help='folder(s) holding the legacy pack\'s Microsoft redistributables (found by SHA-256)')
     p.add_argument('--buildkit', type=Path, action='append', default=[], help='USOS-VERSION-buildkit.zip (or its .001.. parts) from make_buildkit.py')
@@ -403,8 +450,8 @@ def main():
                 raise SystemExit(f'--components {components}: missing {name}')
         check_installer_pins(a.installer, components, version)
     else:
-        if a.winpe is None:
-            raise SystemExit('need --winpe (or --components)')
+        if a.winpe is None or a.winpe_x86 is None:
+            raise SystemExit('need --winpe and --winpe-x86 (or --components)')
         build_components(a, out, version, build_id, epoch)
         if not a.components_only:
             check_installer_pins(a.installer, out, version)
@@ -435,6 +482,13 @@ def build_components(a, out, version, build_id, epoch):
     z = Zip(out / f'USOS-{version}-WinPE-PE10-donor.zip', epoch)
     z.add_file('Programs/USOS/WinPE/' + WINPE_DONOR_NAME, donor)
     z.add_text('README.txt', winpe_readme(version, build_id))
+    z.close()
+    donor = a.winpe_x86.resolve()
+    if donor.name != WINPE_X86_DONOR_NAME or donor.stat().st_size != WINPE_X86_DONOR_SIZE or sha256(donor) != WINPE_X86_DONOR_SHA256:
+        raise SystemExit('x86 WinPE donor is not the validated ' + WINPE_X86_DONOR_NAME + ' (name, size or SHA-256 differ): ' + str(donor))
+    z = Zip(out / f'USOS-{version}-WinPE-PE10-x86-donor.zip', epoch)
+    z.add_file('Programs/USOS/WinPE/' + WINPE_X86_DONOR_NAME, donor)
+    z.add_text('README.txt', winpe_x86_readme(version, build_id))
     z.close()
 
     # XP packages
@@ -505,7 +559,7 @@ def finish_release(a, out, version, build_id, epoch):
     # Forbidden content, then checksums
     scan_release.trust_buildkit_lock(ROOT / 'tools/release/buildkit.lock.json')
     findings = scan_release.scan(out, extra=[ROOT / 'installer/internal/payload/assets/payload.zip'],
-                                 allowed_iso_sha256={WINPE_DONOR_SHA256, ALPINE_ISO_SHA256})
+                                 allowed_iso_sha256={WINPE_DONOR_SHA256, WINPE_X86_DONOR_SHA256, ALPINE_ISO_SHA256})
     if findings:
         for f in findings:
             print('SCAN FAIL:', f)

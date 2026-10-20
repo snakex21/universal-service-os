@@ -149,14 +149,16 @@ pub fn userDriverCountsFor(folder: []const u8) ?[2]usize {
 
 pub const donor_record_path = scanner.donor_record_path;
 pub const DonorRecord = scanner.DonorRecord;
-const parseDonorRecord = scanner.parseDonorRecord;
-
 fn readDonorRecord(root: *uefi.protocol.File) ?DonorRecord {
+    return readDonorRecordFor(root, .x64);
+}
+
+fn readDonorRecordFor(root: *uefi.protocol.File, arch: scanner.DonorArch) ?DonorRecord {
     const file = root.open(wide(donor_record_path), .read, .{}) catch return null;
     defer file.close() catch {};
     var buffer: [1024]u8 = undefined;
     const got = file.read(&buffer) catch return null;
-    return parseDonorRecord(buffer[0..got]);
+    return scanner.parseDonorRecordFor(buffer[0..got], arch);
 }
 
 var record_root: ?*uefi.protocol.File = null;
@@ -173,9 +175,34 @@ fn checkDonorRecord(state: *BootState, inspection: *const scanner.Inspection, ro
     const esp = root orelse record_root orelse return;
     const record = readDonorRecord(esp) orelse return;
     if (!std.ascii.eqlIgnoreCase(record.nameSlice(), inspection.donor_name.slice())) return error.Windows10PeDonorNotRecorded;
+    try verifyRecordedDonor(state, inspection, &record, progress);
+}
+
+/// The x86 donor (32-bit Windows 7 / Vista / 2008 without CSM): checked
+/// against the x86_ entry of winpe-donor.ini when it is the recorded donor in
+/// Programs/USOS/WinPE (the shipped PE10_x86_19041_USOS.iso). A user's own
+/// Windows 10 x86 ISO (the Windows 10/Images fallback) has no record: the
+/// structural checks only.
+fn checkX86DonorRecord(state: *BootState, inspection: *const scanner.Inspection, root: ?*uefi.protocol.File, progress: ?*const fn (IsoStage, []const u8) void) !void {
+    const esp = root orelse record_root orelse return;
+    const record = readDonorRecordFor(esp, .x86) orelse return;
+    if (!scanner.x86DonorRecorded(record, inspection)) return;
+    try verifyRecordedDonor(state, inspection, &record, progress);
+}
+
+/// The x86_name of winpe-donor.ini: the donor resolveX86Donor prefers.
+fn recordedX86Name(root: ?*uefi.protocol.File, out: *DonorRecord) ?[]const u8 {
+    const esp = root orelse record_root orelse return null;
+    out.* = readDonorRecordFor(esp, .x86) orelse return null;
+    return out.nameSlice();
+}
+
+/// Size (always) and SHA-256 (with `progress`, right before use) of the
+/// resolved donor against its record.
+fn verifyRecordedDonor(state: *BootState, inspection: *const scanner.Inspection, record: *const DonorRecord, progress: ?*const fn (IsoStage, []const u8) void) !void {
     try openIn(&state.catalog, inspection.donor_directory, inspection.donor_name.slice(), &state.donor);
     const donor_bytes = ntfs.File.size(&state.donor);
-    if (donor_bytes != record.size) return error.Windows10PeDonorCorrupt;
+    try scanner.checkDonorDigest(record, donor_bytes, null);
     const report = progress orelse return;
     const bs = uefi.system_table.boot_services orelse return error.NoBootServices;
     const chunk = try bs.allocatePool(.loader_data, 8 * 1024 * 1024);
@@ -198,7 +225,7 @@ fn checkDonorRecord(state: *BootState, inspection: *const scanner.Inspection, ro
     }
     var digest: [32]u8 = undefined;
     hash.final(&digest);
-    if (!std.mem.eql(u8, &digest, &record.sha256)) return error.Windows10PeDonorCorrupt;
+    try scanner.checkDonorDigest(record, donor_bytes, &digest);
     serial.writeAscii("[WIN7_NATIVE] PE10 donor SHA-256 matches winpe-donor.ini\r\n");
 }
 
@@ -371,14 +398,15 @@ pub fn nt6Minor(system: *const usos.catalog.SystemEntry) u32 {
     return if (usos.catalog.os_profiles.traits(system.id).native_uefi == .vista) 0 else 1;
 }
 
-fn inspectNt6X86State(state: *BootState, folder: []const u8, name: []const u8, minor: u32) !scanner.Inspection {
+fn inspectNt6X86State(state: *BootState, root: ?*uefi.protocol.File, folder: []const u8, name: []const u8, minor: u32) !scanner.Inspection {
     try openIso(&state.catalog, folder, name, &state.source);
     var iso = Iso{ .catalog = &state.catalog, .file = &state.source };
     const install = try scanner.inspectNt6X86(uefi.pool_allocator, &iso, minor);
     const selected = scanner.Inspection{ .mode = .original, .selected_setup = install, .boot_setup = install, .nvme_packages = false };
     var adapter = directory_source.Adapter.init(state.catalog.fs, state.catalog.reader());
     var context = X86DonorContext{ .state = state };
-    return scanner.resolveX86Donor(selected, adapter.source(), &context);
+    var record: DonorRecord = .{};
+    return scanner.resolveX86Donor(selected, adapter.source(), &context, recordedX86Name(root, &record));
 }
 
 /// The summary's check: the 32-bit ISO and the x86 PE10 donor.
@@ -387,7 +415,9 @@ pub noinline fn inspectNt6X86(folder: []const u8, name: []const u8, minor: u32) 
     const state = try uefi.pool_allocator.create(BootState);
     defer uefi.pool_allocator.destroy(state);
     try initBootState(state);
-    return inspectNt6X86State(state, folder, name, minor);
+    const inspection = try inspectNt6X86State(state, null, folder, name, minor);
+    try checkX86DonorRecord(state, &inspection, null, null);
+    return inspection;
 }
 
 /// The ISO and donor checks, then usos-source.ini (the 32-bit ISO: WinPE
@@ -401,7 +431,8 @@ pub noinline fn prepareNt6X86Csmwrap(root: *uefi.protocol.File, folder: []const 
     defer uefi.pool_allocator.destroy(state);
     try initBootState(state);
     progress(.validating, "Validating the installation ISO and the x86 PE10 donor");
-    const inspection = try inspectNt6X86State(state, folder, name, minor);
+    const inspection = try inspectNt6X86State(state, root, folder, name, minor);
+    try checkX86DonorRecord(state, &inspection, root, progress);
     var message: [320]u8 = undefined;
     serial.writeAscii(std.fmt.bufPrint(&message, "[NT6_X86_CSMWRAP] {s}/{s}; NT 6.{d} x86; donor {s}/{s} PE={d}.{d}.{d} x86\r\n", .{ folder, name, minor, inspection.donor_directory, inspection.donor_name.slice(), inspection.boot_setup.major, inspection.boot_setup.minor, inspection.boot_setup.build }) catch "[NT6_X86_CSMWRAP] inspected\r\n");
     // Reopen the selected ISO (its size goes into the binding).
@@ -582,7 +613,9 @@ pub noinline fn prepareX86Csmwrap(root: *uefi.protocol.File, image_directory: []
         const selected = scanner.Inspection{ .mode = .original, .selected_setup = inspection.setup, .boot_setup = inspection.setup, .nvme_packages = false };
         var adapter = directory_source.Adapter.init(state.catalog.fs, state.catalog.reader());
         var context = X86DonorContext{ .state = state };
-        const donor = try scanner.resolveX86Donor(selected, adapter.source(), &context);
+        var record: DonorRecord = .{};
+        const donor = try scanner.resolveX86Donor(selected, adapter.source(), &context, recordedX86Name(root, &record));
+        try checkX86DonorRecord(state, &donor, root, progress);
         serial.writeAscii("[X86_CSMWRAP] opted-in 8.1 NVMe: external x86 PE10 donor\r\n");
         break :blk try formatCsmwrapRequestFor(&request, x86_csmwrap_profile, folder, name, donor.donor_directory, donor.donor_name.slice(), answer);
     } else try formatX86CsmwrapRequest(&request, folder, name, answer);

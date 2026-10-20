@@ -67,7 +67,7 @@ first and rebuilds the installer with the tag and their SHA-256 compiled in;
 a download must match both that list and the release's `SHA256SUMS`. Publish
 the release under exactly that tag. That rebuilt installer ships as
 `USOS-Installer-<version>-online.exe`; `USOS-Installer-<version>.exe` is the
-full build, the same executable with the three zips appended as an overlay
+full build, the same executable with the component zips appended as an overlay
 (`installer\cmd\usos-component-bundle`), which `assemble_release.py` checks
 byte for byte.
 
@@ -284,8 +284,14 @@ PDB GUID); compare with the pinned binaries by behaviour, not hash.
 
 ## Not in the kit
 
-- **Windows ISOs** (never shipped), the WinPE PE10 donor (a separate release
-  asset) and the XP ISOs the XP packages are derived from.
+- **Windows ISOs** (never shipped), the WinPE PE10 donors (separate release
+  assets, never in git) and the XP ISOs the XP packages are derived from.
+  A donor is made from a Windows 10 2004..22H2 Setup ISO with
+  `python -I tools\release\build_pe10_donor.py --arch x86|x64 --source <iso>
+  --out artifacts\pe10-<arch>` (7-Zip and Windows IMAPI2FS; the members are
+  copied unmodified). `make_release.ps1 -WinPEDonorX86` takes the x86 one
+  (default: DATA, then `artifacts\pe10-x86`); `assemble_release.py` refuses a
+  donor whose name, size or SHA-256 differs from its pin.
 - **TouchI2cDxe** is built outside the repository from an EDK2 checkout
   (`tools\build_touchi2cdxe.ps1`, network); the release uses the vendored,
   MOK-signed binary.
